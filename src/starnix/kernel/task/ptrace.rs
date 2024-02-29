@@ -37,9 +37,9 @@ use starnix_uapi::{
     PTRACE_GETSIGINFO, PTRACE_GETSIGMASK, PTRACE_GET_SYSCALL_INFO, PTRACE_INTERRUPT, PTRACE_KILL,
     PTRACE_LISTEN, PTRACE_O_TRACECLONE, PTRACE_O_TRACEEXEC, PTRACE_O_TRACEEXIT, PTRACE_O_TRACEFORK,
     PTRACE_O_TRACESYSGOOD, PTRACE_O_TRACEVFORK, PTRACE_O_TRACEVFORKDONE, PTRACE_PEEKDATA,
-    PTRACE_PEEKTEXT, PTRACE_PEEKUSR, PTRACE_POKEDATA, PTRACE_POKETEXT, PTRACE_SETOPTIONS,
-    PTRACE_SETSIGINFO, PTRACE_SETSIGMASK, PTRACE_SYSCALL, PTRACE_SYSCALL_INFO_ENTRY,
-    PTRACE_SYSCALL_INFO_EXIT, PTRACE_SYSCALL_INFO_NONE, SI_MAX_SIZE,
+    PTRACE_PEEKTEXT, PTRACE_PEEKUSR, PTRACE_POKEDATA, PTRACE_POKETEXT, PTRACE_POKEUSR,
+    PTRACE_SETOPTIONS, PTRACE_SETSIGINFO, PTRACE_SETSIGMASK, PTRACE_SYSCALL,
+    PTRACE_SYSCALL_INFO_ENTRY, PTRACE_SYSCALL_INFO_EXIT, PTRACE_SYSCALL_INFO_NONE, SI_MAX_SIZE,
 };
 
 use std::collections::BTreeMap;
@@ -197,10 +197,6 @@ pub struct PtraceState {
     /// special semantics for stopping behavior.
     pub stop_status: PtraceStatus,
 
-    /// The thread state of the target task.  This is copied out when the thread
-    /// stops; if the thread is not fully stopped, it is None.
-    tracee_thread_state: Option<ThreadState>,
-
     /// For SYSCALL_INFO_EXIT
     pub last_syscall_was_error: bool,
 }
@@ -219,7 +215,6 @@ impl PtraceState {
             last_signal_waitable: false,
             event_data: None,
             stop_status: PtraceStatus::default(),
-            tracee_thread_state: None,
             last_syscall_was_error: false,
         }
     }
@@ -276,14 +271,6 @@ impl PtraceState {
         self.last_signal.clone()
     }
 
-    pub fn copy_state_from(&mut self, current_task: &CurrentTask) {
-        self.tracee_thread_state = Some(current_task.thread_state.extended_snapshot())
-    }
-
-    pub fn clear_state(&mut self) {
-        self.tracee_thread_state = None;
-    }
-
     pub fn has_option(&self, option: PtraceOptions) -> bool {
         self.core_state.has_option(option)
     }
@@ -331,15 +318,15 @@ impl PtraceState {
         let mut info = ptrace_syscall_info { arch, ..Default::default() };
         let mut info_len = memoffset::offset_of!(ptrace_syscall_info, __bindgen_anon_1);
 
-        match &state.ptrace {
-            Some(PtraceState { tracee_thread_state: Some(thread_state), .. }) => {
-                let registers = thread_state.registers;
+        match &state.captured_thread_state {
+            Some(captured) => {
+                let registers = captured.thread_state.registers;
                 info.instruction_pointer = registers.instruction_pointer_register();
                 info.stack_pointer = registers.stack_pointer_register();
                 match target.load_stopped() {
                     StopState::SyscallEnterStopped => {
                         let syscall_decl = SyscallDecl::from_number(registers.syscall_register());
-                        let syscall = new_syscall_from_state(syscall_decl, &thread_state);
+                        let syscall = new_syscall_from_state(syscall_decl, &captured.thread_state);
                         info.op = PTRACE_SYSCALL_INFO_ENTRY as u8;
                         let entry = linux_uapi::ptrace_syscall_info__bindgen_ty_1__bindgen_ty_1 {
                             nr: syscall.decl.number,
@@ -796,55 +783,53 @@ pub fn ptrace_dispatch(
             Ok(starnix_syscalls::SUCCESS)
         }
         PTRACE_PEEKUSR => {
-            if let Some(ptrace) = &state.ptrace {
-                if let Some(ref thread_state) = ptrace.tracee_thread_state {
-                    let val = ptrace_peekuser(thread_state, addr.ptr() as usize)?;
-                    let dst: UserRef<usize> = UserRef::from(data);
-                    current_task.write_object(dst, &val)?;
-                    return Ok(starnix_syscalls::SUCCESS);
-                }
+            if let Some(ref mut captured) = &mut state.captured_thread_state {
+                let val = ptrace_peekuser(&mut captured.thread_state, addr.ptr() as usize)?;
+                let dst: UserRef<usize> = UserRef::from(data);
+                current_task.write_object(dst, &val)?;
+                return Ok(starnix_syscalls::SUCCESS);
             }
             error!(ESRCH)
         }
+        PTRACE_POKEUSR => {
+            ptrace_pokeuser(&mut *state, data.ptr() as usize, addr.ptr() as usize)?;
+            return Ok(starnix_syscalls::SUCCESS);
+        }
         PTRACE_GETREGSET => {
-            if let Some(ptrace) = &state.ptrace {
-                if let Some(ref thread_state) = ptrace.tracee_thread_state {
-                    let uiv: UserRef<iovec> = UserRef::from(data);
-                    let iv = current_task.read_object(uiv)?;
-                    let base = iv.iov_base.addr;
-                    let mut len = iv.iov_len as usize;
-                    ptrace_getregset(
-                        current_task,
-                        thread_state,
-                        ElfNoteType::try_from(addr.ptr() as usize)?,
-                        base,
-                        &mut len,
-                    )?;
-                    current_task.write_object(
-                        UserRef::<usize>::new(UserAddress::from_ptr(
-                            uiv.addr().ptr() + memoffset::offset_of!(iovec, iov_len),
-                        )),
-                        &(len as usize),
-                    )?;
-                    return Ok(starnix_syscalls::SUCCESS);
-                }
+            if let Some(ref mut captured) = state.captured_thread_state {
+                let uiv: UserRef<iovec> = UserRef::from(data);
+                let iv = current_task.read_object(uiv)?;
+                let base = iv.iov_base.addr;
+                let mut len = iv.iov_len as usize;
+                ptrace_getregset(
+                    current_task,
+                    &mut captured.thread_state,
+                    ElfNoteType::try_from(addr.ptr() as usize)?,
+                    base,
+                    &mut len,
+                )?;
+                current_task.write_object(
+                    UserRef::<usize>::new(UserAddress::from_ptr(
+                        uiv.addr().ptr() + memoffset::offset_of!(iovec, iov_len),
+                    )),
+                    &(len as usize),
+                )?;
+                return Ok(starnix_syscalls::SUCCESS);
             }
             error!(ESRCH)
         }
         #[cfg(target_arch = "x86_64")]
         PTRACE_GETREGS => {
-            if let Some(ptrace) = &state.ptrace {
-                if let Some(ref thread_state) = ptrace.tracee_thread_state {
-                    let mut len = usize::MAX;
-                    ptrace_getregset(
-                        current_task,
-                        thread_state,
-                        ElfNoteType::PrStatus,
-                        data.ptr() as u64,
-                        &mut len,
-                    )?;
-                    return Ok(starnix_syscalls::SUCCESS);
-                }
+            if let Some(ref mut captured) = &mut state.captured_thread_state {
+                let mut len = usize::MAX;
+                ptrace_getregset(
+                    current_task,
+                    &mut captured.thread_state,
+                    ElfNoteType::PrStatus,
+                    data.ptr() as u64,
+                    &mut len,
+                )?;
+                return Ok(starnix_syscalls::SUCCESS);
             }
             error!(ESRCH)
         }
@@ -1131,20 +1116,40 @@ where
 /// Implementation of ptrace(PTRACE_PEEKUSER).  The user struct holds the
 /// registers and other information about the process.  See ptrace(2) and
 /// sys/user.h for full details.
-pub fn ptrace_peekuser(thread_state: &ThreadState, offset: usize) -> Result<usize, Errno> {
+pub fn ptrace_peekuser(thread_state: &mut ThreadState, offset: usize) -> Result<usize, Errno> {
     #[cfg(any(target_arch = "x86_64"))]
     if offset >= std::mem::size_of::<user>() {
         return error!(EIO);
     }
     if offset < std::mem::size_of::<user_regs_struct>() {
-        return thread_state.registers.get_user_register(offset);
+        let result = thread_state.get_user_register(offset)?;
+        return Ok(result);
+    }
+    error!(EIO)
+}
+
+pub fn ptrace_pokeuser(
+    state: &mut TaskMutableState,
+    value: usize,
+    offset: usize,
+) -> Result<(), Errno> {
+    if let Some(ref mut thread_state) = state.captured_thread_state {
+        thread_state.dirty = true;
+
+        #[cfg(any(target_arch = "x86_64"))]
+        if offset >= std::mem::size_of::<user>() {
+            return error!(EIO);
+        }
+        if offset < std::mem::size_of::<user_regs_struct>() {
+            return thread_state.thread_state.set_user_register(offset, value);
+        }
     }
     error!(EIO)
 }
 
 pub fn ptrace_getregset(
     current_task: &CurrentTask,
-    thread_state: &ThreadState,
+    thread_state: &mut ThreadState,
     regset_type: ElfNoteType,
     base: u64,
     len: &mut usize,
@@ -1157,11 +1162,16 @@ pub fn ptrace_getregset(
             *len = std::cmp::min(*len, std::mem::size_of::<user_regs_struct>());
             let mut i: usize = 0;
             while i < *len {
-                let val = thread_state.registers.get_user_register(i)?;
-                current_task.write_object(
-                    UserRef::<usize>::new(UserAddress::from_ptr((base as usize) + i)),
-                    &val,
-                )?;
+                let mut val = None;
+                thread_state
+                    .registers
+                    .apply_user_register(i, &mut |register| val = Some(*register as usize))?;
+                if let Some(val) = val {
+                    current_task.write_object(
+                        UserRef::<usize>::new(UserAddress::from_ptr((base as usize) + i)),
+                        &val,
+                    )?;
+                }
                 i += std::mem::size_of::<usize>();
             }
             Ok(())

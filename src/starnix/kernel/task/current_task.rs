@@ -158,6 +158,21 @@ impl ThreadState {
             syscall_restart_func: None,
         }
     }
+
+    pub fn replace_registers(&mut self, other: &ThreadState) {
+        self.registers = other.registers;
+        self.extended_pstate = other.extended_pstate;
+    }
+
+    pub fn get_user_register(&mut self, offset: usize) -> Result<usize, Errno> {
+        let mut result: usize = 0;
+        self.registers.apply_user_register(offset, &mut |register| result = *register as usize)?;
+        Ok(result)
+    }
+
+    pub fn set_user_register(&mut self, offset: usize, value: usize) -> Result<(), Errno> {
+        self.registers.apply_user_register(offset, &mut |register| *register = value as u64)
+    }
 }
 
 type SyscallRestartFunc =
@@ -1631,9 +1646,7 @@ impl CurrentTask {
     pub fn set_stopped_and_notify(&self, stopped: StopState, siginfo: Option<SignalInfo>) {
         {
             let mut state = self.write();
-            if let Some(ref mut ptrace) = &mut state.ptrace {
-                ptrace.copy_state_from(self);
-            }
+            state.copy_state_from(self);
             state.set_stopped(stopped, siginfo, Some(self), None);
         }
 
@@ -1646,8 +1659,20 @@ impl CurrentTask {
     }
 
     /// If the task is stopping, set it as stopped. return whether the caller
-    /// should stop.
-    pub fn finalize_stop_state(&self) -> bool {
+    /// should stop.  The task might also be waking up.
+    pub fn finalize_stop_state(&mut self) -> bool {
+        let stopped = self.load_stopped();
+
+        if !stopped.is_stopping_or_stopped() {
+            // If we are waking up, potentially write back state a tracer may have modified.
+            let captured_state = self.write().take_captured_state();
+            if let Some(captured) = captured_state {
+                if captured.dirty {
+                    self.thread_state.replace_registers(&captured.thread_state);
+                }
+            }
+        }
+
         // Stopping because the thread group is stopping.
         // Try to flip to GroupStopped - will fail if we shouldn't.
         if self.thread_group.set_stopped(StopState::GroupStopped, None, true)
@@ -1661,7 +1686,6 @@ impl CurrentTask {
         }
 
         // Stopping because the task is stopping
-        let stopped = self.load_stopped();
         if stopped.is_stopping_or_stopped() {
             if let Ok(stopped) = stopped.finalize() {
                 self.set_stopped_and_notify(stopped, None);

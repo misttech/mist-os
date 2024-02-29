@@ -306,6 +306,22 @@ impl AtomicTaskFlags {
     }
 }
 
+/// This contains thread state that tracers can inspect and modify.  It is
+/// captured when a thread stops, and optionally copied back (if dirty) when a
+/// thread starts again.  An alternative implementation would involve the
+/// tracers acting on thread state directly; however, this would involve sharing
+/// CurrentTask structures across multiple threads, which goes against the
+/// intent of the design of CurrentTask.
+pub struct CapturedThreadState {
+    /// The thread state of the traced task.  This is copied out when the thread
+    /// stops.
+    pub thread_state: ThreadState,
+
+    /// Indicates that the last ptrace operation changed the thread state, so it
+    /// should be written back to the original thread.
+    pub dirty: bool,
+}
+
 pub struct TaskMutableState {
     // See https://man7.org/linux/man-pages/man2/set_tid_address.2.html
     pub clear_child_tid: UserRef<pid_t>,
@@ -367,6 +383,9 @@ pub struct TaskMutableState {
     /// Information that a tracer needs to communicate with this process, if it
     /// is being traced.
     pub ptrace: Option<PtraceState>,
+
+    /// Information that a tracer needs to inspect this process.
+    pub captured_thread_state: Option<CapturedThreadState>,
 }
 
 impl TaskMutableState {
@@ -431,6 +450,22 @@ impl TaskMutableState {
             ptrace.tracee_waiters.notify_all();
         }
     }
+
+    pub fn take_captured_state(&mut self) -> Option<CapturedThreadState> {
+        if self.captured_thread_state.is_some() {
+            let mut state = None;
+            std::mem::swap(&mut state, &mut self.captured_thread_state);
+            return state;
+        }
+        None
+    }
+
+    pub fn copy_state_from(&mut self, current_task: &CurrentTask) {
+        self.captured_thread_state = Some(CapturedThreadState {
+            thread_state: current_task.thread_state.extended_snapshot(),
+            dirty: false,
+        });
+    }
 }
 
 #[apply(state_implementation!)]
@@ -454,14 +489,12 @@ impl TaskMutableState<Base = Task> {
         // stopped inside user code, task will need to be either restarted or
         // stopped here.
         self.store_stopped(stopped);
-        if let Some(ref mut ptrace) = &mut self.ptrace {
-            if stopped.is_stopped() {
-                if let Some(ref current_task) = current_task {
-                    ptrace.copy_state_from(current_task);
-                }
-            } else {
-                ptrace.clear_state();
+        if stopped.is_stopped() {
+            if let Some(ref current_task) = current_task {
+                self.copy_state_from(current_task);
             }
+        }
+        if let Some(ref mut ptrace) = &mut self.ptrace {
             ptrace.set_last_signal(siginfo);
             ptrace.set_last_event(event);
         }
@@ -866,6 +899,7 @@ impl Task {
                 // The default timerslack is set to the current timerslack of the creating thread.
                 default_timerslack_ns: timerslack_ns,
                 ptrace: None,
+                captured_thread_state: None,
             }),
             persistent_info: TaskPersistentInfoState::new(id, pid, command, creds, exit_signal),
             seccomp_filter_state,

@@ -695,7 +695,6 @@
                 "All/ProcSelfUidGidMapTest.IdentityMapOwnID/GID",
 
                 // ptrace tests
-                "PtraceTest.85",
                 "PtraceTest.ChangeRegSetInOptSyscall",
                 "PtraceTest.Sysemu_PokeUser",
 

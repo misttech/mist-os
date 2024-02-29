@@ -378,6 +378,40 @@ TEST(PtraceTest, TraceSyscallWithRestart_ppoll) {
       SYS_ppoll, 0, 0, reinterpret_cast<long>(&req), 0, ERESTARTNOHAND));
 }
 
+TEST(PtraceTest, PokeUser) {
+  test_helper::ForkHelper helper;
+  helper.OnlyWaitForForkedChildren();
+  constexpr long kStartPattern = 0xabababab;
+  constexpr long kEndPattern = 0xcdcdcdcd;
+
+  pid_t child_pid = helper.RunInForkedProcess([kEndPattern] {
+    EXPECT_EQ(ptrace(PTRACE_TRACEME, 0, 0, 0), 0);
+    long output;
+
+    asm volatile("movq %0, %%rdi"
+                 :  // No output
+                 : "r"(kStartPattern));
+    // Use kill explicitly because we check the syscall argument register below.
+    kill(getpid(), SIGSTOP);
+
+    asm volatile("movq %%rdi, %0" : "=r"(output));
+    EXPECT_EQ(output, kEndPattern);
+  });
+
+  ASSERT_NE(child_pid, 0);
+
+  // Wait for the child to send itself SIGSTOP and enter signal-delivery-stop.
+  int status;
+  ASSERT_EQ(waitpid(child_pid, &status, 0), child_pid);
+  EXPECT_TRUE(WIFSTOPPED(status) && WSTOPSIG(status) == SIGSTOP) << " status " << status;
+
+  EXPECT_EQ(0,
+            ptrace(PTRACE_POKEUSER, child_pid, offsetof(struct user_regs_struct, rdi), kEndPattern))
+      << strerror(errno);
+
+  EXPECT_EQ(0, ptrace(PTRACE_DETACH, child_pid, 0, SIGCONT));
+}
+
 #endif  // __x86_64__
 
 TEST(PtraceTest, GetGeneralRegs) {
