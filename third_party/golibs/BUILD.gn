@@ -102,6 +102,40 @@ go_library("cloud.google.com/go/storage") {
 }
 
 ### github.com/*
+go_library("github.com/chzyer/readline") {
+  name = "github.com/chzyer/readline"
+  source_dir = "vendor/github.com/chzyer/readline"
+  sources = [
+    "ansi_windows.go",
+    "complete.go",
+    "complete_helper.go",
+    "complete_segment.go",
+    "history.go",
+    "operation.go",
+    "password.go",
+    "rawreader_windows.go",
+    "readline.go",
+    "remote.go",
+    "runebuf.go",
+    "runes.go",
+    "search.go",
+    "std.go",
+    "std_windows.go",
+    "term.go",
+    "term_bsd.go",
+    "term_linux.go",
+    "term_solaris.go",
+    "term_unix.go",
+    "term_windows.go",
+    "terminal.go",
+    "utils.go",
+    "utils_unix.go",
+    "utils_windows.go",
+    "vim.go",
+    "windows_api.go",
+  ]
+}
+
 go_library("github.com/creack/pty") {
   name = "github.com/creack/pty/..."
   source_dir = "vendor/github.com/creack/pty"
@@ -671,6 +705,46 @@ go_library("github.com/tent/canonical-json-go") {
   sources = [ "encode.go" ]
 }
 
+### go.starlark.net/*
+# Aggregates all packages provided by go.starlark.net.
+go_library("go.starlark.net") {
+  name = "go.starlark.net/..."
+  source_dir = "vendor/go.starlark.net"
+  deps = [ ":github.com/chzyer/readline" ]
+  sources = [
+    "cmd/starlark/starlark.go",
+    "internal/compile/compile.go",
+    "internal/compile/serial.go",
+    "internal/spell/spell.go",
+    "lib/json/json.go",
+    "lib/math/math.go",
+    "lib/time/time.go",
+    "repl/repl.go",
+    "resolve/binding.go",
+    "resolve/resolve.go",
+    "starlark/debug.go",
+    "starlark/empty.s",
+    "starlark/eval.go",
+    "starlark/hashtable.go",
+    "starlark/int.go",
+    "starlark/int_generic.go",
+    "starlark/int_posix64.go",
+    "starlark/interp.go",
+    "starlark/library.go",
+    "starlark/profile.go",
+    "starlark/unpack.go",
+    "starlark/value.go",
+    "starlarkstruct/module.go",
+    "starlarkstruct/struct.go",
+    "syntax/options.go",
+    "syntax/parse.go",
+    "syntax/quote.go",
+    "syntax/scan.go",
+    "syntax/syntax.go",
+    "syntax/walk.go",
+  ]
+}
+
 ### go.opencensus.io/*
 # Actually aggregates the dependencies of other go.opencensus.io/*
 # packages as well. Use this as a convenience target for any such package.
@@ -1206,6 +1280,21 @@ go_library("golang.org/x/net") {
   ]
 }
 
+go_library("golang.org/x/term") {
+  name = "golang.org/x/term/..."
+  source_dir = "vendor/golang.org/x/term"
+  sources = [
+    "term.go",
+    "term_plan9.go",
+    "term_unix.go",
+    "term_unix_bsd.go",
+    "term_unix_other.go",
+    "term_unsupported.go",
+    "term_windows.go",
+    "terminal.go",
+  ]
+}
+
 go_library("golang.org/x/time") {
   name = "golang.org/x/time/..."
   source_dir = "vendor/golang.org/x/time"
@@ -1318,6 +1407,25 @@ go_library("golang.org/x/sys") {
     "cpu/runtime_auxv_go121.go",
     "cpu/syscall_aix_gccgo.go",
     "cpu/syscall_aix_ppc64_gc.go",
+    "plan9/asm.s",
+    "plan9/asm_plan9_386.s",
+    "plan9/asm_plan9_amd64.s",
+    "plan9/asm_plan9_arm.s",
+    "plan9/const_plan9.go",
+    "plan9/dir_plan9.go",
+    "plan9/env_plan9.go",
+    "plan9/errors_plan9.go",
+    "plan9/pwd_go15_plan9.go",
+    "plan9/pwd_plan9.go",
+    "plan9/race.go",
+    "plan9/race0.go",
+    "plan9/str.go",
+    "plan9/syscall.go",
+    "plan9/syscall_plan9.go",
+    "plan9/zsyscall_plan9_386.go",
+    "plan9/zsyscall_plan9_amd64.go",
+    "plan9/zsyscall_plan9_arm.go",
+    "plan9/zsysnum_plan9.go",
     "unix/affinity_linux.go",
     "unix/aliases.go",
     "unix/asm_aix_ppc64.s",

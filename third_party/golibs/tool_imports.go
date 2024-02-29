@@ -13,4 +13,7 @@ import (
 
 	// //build/secondary/third_party/golibs/google.golang.org/grpc/cmd/protoc-gen-go-grpc
 	_ "google.golang.org/grpc/cmd/protoc-gen-go-grpc"
+
+	// //build/secondary/third_party/golibs/go.starlark.net/cmd/starlark
+	_ "go.starlark.net/cmd/starlark"
 )
