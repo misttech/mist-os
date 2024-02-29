@@ -147,7 +147,7 @@ impl ToolRunner for FfxSubCommand {
             let res = run_legacy_subcommand(self.app, self.context, self.cmd)
                 .await
                 .map(|_| ExitStatus::from_raw(0));
-            metrics.command_finished(res.is_ok(), &redacted_args).await.and(res)
+            metrics.command_finished(&res, &redacted_args).await.and(res)
         }
     }
 }

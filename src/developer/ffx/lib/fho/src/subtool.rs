@@ -126,7 +126,7 @@ impl<T: FfxTool> ToolRunner for FhoTool<T> {
         metrics.print_notice(&mut std::io::stderr()).await?;
         let writer = TryFromEnv::try_from_env(&self.env).await?;
         let res = self.main.main(writer).await.map(|_| ExitStatus::from_raw(0));
-        metrics.command_finished(res.is_ok(), &self.redacted_args).await.and(res)
+        metrics.command_finished(&res, &self.redacted_args).await.and(res)
     }
 }
 

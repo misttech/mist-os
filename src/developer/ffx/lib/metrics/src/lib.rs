@@ -31,9 +31,18 @@ pub async fn init_metrics_svc(
     .await;
 }
 
-pub async fn add_ffx_launch_event(sanitized_args: String, time: u128) -> Result<()> {
+pub async fn add_ffx_launch_event(
+    sanitized_args: String,
+    time: u128,
+    exit_code: i32,
+    error_message: Option<String>,
+) -> Result<()> {
     let u64_time = u64::try_from(time).unwrap_or(0);
-    let custom_dimensions = BTreeMap::from([("time", u64_time.into())]);
+    let custom_dimensions = BTreeMap::from([
+        ("time", u64_time.into()),
+        ("exit_code", exit_code.to_string().into()),
+        ("error_message", error_message.unwrap_or_else(|| "".to_string()).into()),
+    ]);
     let mut metrics_svc = ga4_metrics().await?;
     metrics_svc
         .add_custom_event(None, Some(&sanitized_args), None, custom_dimensions, Some("invoke"))

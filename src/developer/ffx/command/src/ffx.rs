@@ -8,7 +8,8 @@ use camino::Utf8PathBuf;
 use ffx_command_error::bug;
 use ffx_config::{environment::ExecutableKind, EnvironmentContext, FfxConfigBacked};
 use ffx_writer::Format;
-use std::{collections::HashMap, fmt::Write, path::PathBuf, str::FromStr};
+use std::os::unix::process::ExitStatusExt;
+use std::{collections::HashMap, fmt::Write, path::PathBuf, process::ExitStatus, str::FromStr};
 
 /// The environment variable name used for overriding the command name in help
 /// output.
@@ -119,7 +120,16 @@ impl FfxCommandLine {
             .chain(subcmd_name.map(|_| "<unknown-subtool>".to_owned()).into_iter())
             .collect();
 
-        metrics.command_finished(help_err.exit_code() == 0, &redacted).await?;
+        let error_res = match help_err.exit_code() {
+            0 => Ok(ExitStatus::from_raw(0)),
+            i @ _ => Err(Error::Help {
+                command: self.command.clone(),
+                output: help_err.to_string(),
+                code: i,
+            }),
+        };
+
+        metrics.command_finished(&error_res, &redacted).await?;
         Ok(help_err)
     }
 

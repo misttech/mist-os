@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::Error;
 use analytics::{get_notice, opt_out_for_this_invocation};
 use ffx_config::EnvironmentContext;
 use ffx_metrics::{add_ffx_launch_event, init_metrics_svc};
@@ -9,6 +10,7 @@ use fuchsia_async::TimeoutExt;
 use itertools::Itertools;
 use std::{
     io::Write,
+    process::ExitStatus,
     time::{Duration, Instant},
 };
 
@@ -66,9 +68,18 @@ impl MetricsSession {
 
     pub async fn command_finished(
         self,
-        success: bool,
+        res: &Result<ExitStatus, Error>,
         sanitized_args: &[impl AsRef<str>],
     ) -> Result<CommandStats> {
+        let exit_code = match res {
+            Ok(c) => c.code().unwrap_or(1),
+            Err(ref e) => e.exit_code(),
+        };
+        let error_message = match res {
+            Ok(_) => None,
+            Err(ref e) => Some(e.to_string()),
+        };
+
         let command_done = Instant::now();
         let command_duration = command_done - self.session_start;
         let analytics_duration = if self.enabled {
@@ -76,7 +87,10 @@ impl MetricsSession {
             let sanitized_args = sanitized_args.iter().map(AsRef::as_ref).join(" ");
 
             let analytics_task = fuchsia_async::Task::local(async move {
-                if let Err(e) = add_ffx_launch_event(sanitized_args, timing_in_millis).await {
+                if let Err(e) =
+                    add_ffx_launch_event(sanitized_args, timing_in_millis, exit_code, error_message)
+                        .await
+                {
                     tracing::error!("metrics submission failed: {}", e);
                 }
                 Instant::now()
@@ -96,6 +110,7 @@ impl MetricsSession {
         } else {
             None
         };
+        let success = exit_code == 0;
         let stats = CommandStats { success, command_duration, analytics_duration };
         match success {
             true => tracing::info!("{stats}",),
