@@ -22,18 +22,25 @@ class DriverTestFixture : public BaseDriverTestFixture<Configuration>, public ::
 // driver type.
 class EmptyDriverType {};
 
+// The EnvironmentType should implement this Class.
+class Environment {
+ public:
+  // This function is called on the dispatcher context of the environment. The class should serve
+  // its elements (eg. compat::DeviceServer, FIDL servers, etc...) to the |to_driver_vfs|.
+  // This object is serving the incoming directory of the driver under test.
+  virtual zx::result<> Serve(fdf::OutgoingDirectory& to_driver_vfs) = 0;
+};
+
 // A class that can be used in the Configuration's EnvironmentType if no environment customization
 // is needed. Provides a minimal compat server.
-class MinimalEnvironment {
+class MinimalEnvironment : public Environment {
  public:
-  static std::unique_ptr<MinimalEnvironment> CreateAndInitialize(
-      fdf::OutgoingDirectory& to_driver_vfs) {
-    auto env = std::make_unique<MinimalEnvironment>();
-    env->device_server_.Init(component::kDefaultInstance, "root");
-    EXPECT_EQ(ZX_OK, env->device_server_.Serve(fdf::Dispatcher::GetCurrent()->async_dispatcher(),
-                                               &to_driver_vfs));
+  zx::result<> Serve(fdf::OutgoingDirectory& to_driver_vfs) override {
+    device_server_.Init(component::kDefaultInstance, "root");
+    return zx::make_result(
+        device_server_.Serve(fdf::Dispatcher::GetCurrent()->async_dispatcher(), &to_driver_vfs));
 
-    return env;
+    return zx::ok();
   }
 
  private:

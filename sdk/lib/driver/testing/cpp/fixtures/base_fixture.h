@@ -32,14 +32,13 @@ namespace fdf_testing {
 //   EnvironmentType: A class that contains custom dependencies for the driver under test.
 //   The environment will always live on a background dispatcher.
 //
-//     It must contain the following static function:
-//     static std::unique_ptr<EnvironmentType>
-//       CreateAndInitialize(fdf::OutgoingDirectory& to_driver_vfs)
+//     It must contain a default constructor, and provide the following function:
+//     zx::result<> Serve(fdf::OutgoingDirectory& to_driver_vfs)
 //
 //     This is called automatically on the background environment dispatcher during initialization.
-//     This function must create the EnvironmentType, and add its components into the provided
-//     fdf::OutgoingDirectory object, generally done through the AddService method.
-//     This OutgoingDirectory backs the driver's incoming namespace, hence its name `to_driver_vfs`.
+//     This function must serve all of its components into the provided fdf::OutgoingDirectory
+//     object, generally done through the AddService method. This OutgoingDirectory backs the
+//     driver's incoming namespace, hence its name `to_driver_vfs`.
 //
 //   kDriverOnForeground: Whether to have the driver under test run on the foreground dispatcher,
 //   or to run it on a dedicated background dispatcher.

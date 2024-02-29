@@ -40,25 +40,20 @@ class DriverProtocolServer : public fdf::WireServer<fuchsia_driver_component_tes
   fdf::ServerBindingGroup<fuchsia_driver_component_test::DriverProtocol> bindings_;
 };
 
-class FixtureBasedTestEnvironment {
+class FixtureBasedTestEnvironment : public fdf_testing::Environment {
  public:
-  static std::unique_ptr<FixtureBasedTestEnvironment> CreateAndInitialize(
-      fdf::OutgoingDirectory& to_driver_vfs) {
-    auto env = std::make_unique<FixtureBasedTestEnvironment>();
-
+  zx::result<> Serve(fdf::OutgoingDirectory& to_driver_vfs) override {
     auto result = to_driver_vfs.AddService<fuchsia_driver_component_test::ZirconService>(
-        env->zircon_proto_server_.GetInstanceHandler());
+        zircon_proto_server_.GetInstanceHandler());
     EXPECT_EQ(ZX_OK, result.status_value());
 
     result = to_driver_vfs.AddService<fuchsia_driver_component_test::DriverService>(
-        env->driver_proto_server_.GetInstanceHandler());
+        driver_proto_server_.GetInstanceHandler());
     EXPECT_EQ(ZX_OK, result.status_value());
 
-    env->device_server_.Init(component::kDefaultInstance, "root");
-    EXPECT_EQ(ZX_OK, env->device_server_.Serve(fdf::Dispatcher::GetCurrent()->async_dispatcher(),
-                                               &to_driver_vfs));
-
-    return env;
+    device_server_.Init(component::kDefaultInstance, "root");
+    return zx::make_result(
+        device_server_.Serve(fdf::Dispatcher::GetCurrent()->async_dispatcher(), &to_driver_vfs));
   }
 
   std::string GetName() { return std::string(device_server_.name()); }

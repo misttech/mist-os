@@ -8,13 +8,12 @@
 
 namespace testing {
 
-class SimpleDriverTestEnvironment {
+class SimpleDriverTestEnvironment : public fdf_testing::Environment {
  public:
-  static std::unique_ptr<SimpleDriverTestEnvironment> CreateAndInitialize(
-      fdf::OutgoingDirectory& to_driver_vfs) {
+  zx::result<> Serve(fdf::OutgoingDirectory& to_driver_vfs) override {
     // Perform any additional initialization here, such as setting up compat device servers
     // and FIDL servers.
-    return std::make_unique<SimpleDriverTestEnvironment>();
+    return zx::ok();
   }
 };
 

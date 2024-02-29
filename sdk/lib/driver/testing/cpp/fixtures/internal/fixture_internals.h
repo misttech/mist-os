@@ -14,7 +14,12 @@
 
 #include <type_traits>
 
-namespace fdf_testing::internal {
+namespace fdf_testing {
+
+// Forward declare.
+class Environment;
+
+namespace internal {
 
 template <typename EnvironmentType>
 class EnvWrapper {
@@ -30,7 +35,9 @@ class EnvWrapper {
                   result.status_string());
     outgoing_client_ = std::move(start_args->outgoing_directory_client);
 
-    user_env_ = EnvironmentType::CreateAndInitialize(test_environment_.incoming_directory());
+    result = user_env_.Serve(test_environment_.incoming_directory());
+    ZX_ASSERT_MSG(result.is_ok(), "Failed to Serve the user's Environment: %s",
+                  result.status_string());
 
     return std::move(start_args->start_args);
   }
@@ -42,7 +49,7 @@ class EnvWrapper {
 
   fdf_testing::TestNode& node_server() { return node_server_; }
 
-  EnvironmentType& user_env() { return *user_env_; }
+  EnvironmentType& user_env() { return user_env_; }
 
  private:
   fdf_testing::TestNode node_server_{"root"};
@@ -50,7 +57,7 @@ class EnvWrapper {
   fidl::ClientEnd<fuchsia_io::Directory> outgoing_client_;
 
   // User env should be the last field as it could contain references to the test_environment_.
-  std::unique_ptr<EnvironmentType> user_env_;
+  EnvironmentType user_env_;
 };
 
 template <typename DriverType, bool DriverOnForeground>
@@ -165,16 +172,6 @@ class DriverWrapper {
   template <typename T>                                                          \
   constexpr inline auto Has##name##V = Has##name<T>::value;
 
-#define SETUP_HAS_STATIC(name)                                                    \
-  template <typename T, typename = void>                                          \
-  struct Has##name : public ::std::false_type {};                                 \
-                                                                                  \
-  template <typename T>                                                           \
-  struct Has##name<T, std::void_t<decltype(T::name)>> : public std::true_type {}; \
-                                                                                  \
-  template <typename T>                                                           \
-  constexpr inline auto Has##name##V = Has##name<T>::value;
-
 #define SETUP_HAS_CONSTEXPR(name)                                                    \
   template <typename T, typename = void>                                             \
   struct Has##name : public ::std::false_type {};                                    \
@@ -187,14 +184,12 @@ class DriverWrapper {
 
 SETUP_HAS_USING(DriverType)
 SETUP_HAS_USING(EnvironmentType)
-SETUP_HAS_STATIC(CreateAndInitialize)
 SETUP_HAS_CONSTEXPR(DriverOnForeground)
 SETUP_HAS_CONSTEXPR(AutoStartDriver)
 SETUP_HAS_CONSTEXPR(AutoStopDriver)
 
 #undef SETUP_HAS_CONSTEXPR
 #undef SETUP_HAS_USING
-#undef SETUP_HAS_STATIC
 
 template <class Configuration>
 class ConfigurationExtractor {
@@ -210,13 +205,12 @@ class ConfigurationExtractor {
                 "Ensure the Configuration class has defined an EnvironmentType "
                 "through a using statement: 'using EnvironmentType = MyTestEnvironment;'");
   using EnvironmentType = typename Configuration::EnvironmentType;
-  static_assert(HasCreateAndInitializeV<EnvironmentType>,
-                "EnvironmentType must contain a static function 'CreateAndInitialize' with the "
-                "signature 'std::unique_ptr<EnvironmentType>(fdf::OutgoingDirectory&)'.");
-  static_assert(std::is_same_v<decltype(&EnvironmentType::CreateAndInitialize),
-                               std::unique_ptr<EnvironmentType> (*)(fdf::OutgoingDirectory&)>,
-                "EnvironmentType's 'CreateAndInitialize' must have the signature"
-                " 'std::unique_ptr<EnvironmentType>(fdf::OutgoingDirectory&)'.");
+
+  static_assert(std::is_base_of_v<fdf_testing::Environment, EnvironmentType>,
+                "The EnvironmentType must implement the fdf_testing::Environment class.");
+  static_assert(!std::is_abstract_v<EnvironmentType>, "The EnvironmentType cannot be abstract.");
+  static_assert(std::is_constructible_v<EnvironmentType>,
+                "The EnvironmentType must have a default constructor.");
 
   static_assert(
       HasDriverOnForegroundV<Configuration>,
@@ -234,6 +228,8 @@ class ConfigurationExtractor {
   static constexpr bool kAutoStopDriver = Configuration::kAutoStopDriver;
 };
 
-}  // namespace fdf_testing::internal
+}  // namespace internal
+
+}  // namespace fdf_testing
 
 #endif  // LIB_DRIVER_TESTING_CPP_FIXTURES_INTERNAL_FIXTURE_INTERNALS_H_
