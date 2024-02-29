@@ -39,14 +39,6 @@ class {{ .WireAsyncEventHandler }}
    public:
     {{ .WireSyncEventHandler.Self }}() = default;
 
-    {{- range .Events }}
-      {{- if .Transitional }}
-        void {{ .Name }}({{ if .HasResponsePayload }}{{ .WireEvent }}* event{{ end }}) override {
-          OnTransitionalEvent_();
-        }
-      {{- end }}
-    {{- end }}
-
     // Handle all possible events defined in this protocol.
     // Blocks to consume exactly one message from the channel, then call the corresponding virtual
     // method.
@@ -176,14 +168,6 @@ class {{ .NaturalAsyncEventHandler }}
       : public {{ .NaturalEventHandlerInterface }}, public ::fidl::internal::SyncEventHandler {
    public:
     {{ .NaturalSyncEventHandler.Self }}() = default;
-
-    {{- range .Events }}
-      {{- if .Transitional }}
-        void {{ .Name }}({{ if .HasResponsePayload }}{{ .NaturalEvent }}&{{ end }}) override {
-          OnTransitionalEvent_();
-        }
-      {{- end }}
-    {{- end }}
 
     // Handle all possible events defined in this protocol.
     // Blocks to consume exactly one message from the channel, then call the corresponding virtual

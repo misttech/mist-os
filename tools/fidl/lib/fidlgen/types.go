@@ -1447,11 +1447,6 @@ func (m *Method) IsFlexible() bool {
 	return !m.IsStrict()
 }
 
-// IsTransitional returns whether this method has the `Transitional` attribute.
-func (m *Method) IsTransitional() bool {
-	return m.HasAttribute("transitional")
-}
-
 func (m *Method) HasRequestPayload() bool {
 	return m.RequestPayload != nil
 }

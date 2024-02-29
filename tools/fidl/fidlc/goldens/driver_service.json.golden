@@ -1,8 +1,7 @@
 {
   "name": "test.driverservice",
   "experiments": [
-    "output_index_json",
-    "transitional_allow_list"
+    "output_index_json"
   ],
   "available": {
     "fuchsia": "LEGACY"

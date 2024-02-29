@@ -442,12 +442,7 @@ AttributeSchemaMap AttributeSchema::OfficialAttributes() {
       })
       .AddArg(AttributeArgSchema(ConstantValue::Kind::kString))
       .UseEarly();
-  map["transitional"]
-      .RestrictTo({
-          Element::Kind::kProtocolMethod,
-      })
-      .AddArg(AttributeArgSchema(ConstantValue::Kind::kString,
-                                 AttributeArgSchema::Optionality::kOptional));
+  map["transitional"].Deprecate();
   map["transport"]
       .RestrictTo({
           Element::Kind::kProtocol,

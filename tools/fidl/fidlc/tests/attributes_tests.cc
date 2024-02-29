@@ -182,7 +182,6 @@ protocol ExampleProtocol {
     /// For ExampleMethod
     @internal
     @selector("Bar")
-    @transitional
     ExampleMethod();
 };
 
@@ -261,7 +260,6 @@ service ExampleService {
 
   auto& example_method = example_protocol->methods.front();
   EXPECT_TRUE(example_method.attributes->Get("internal"));
-  EXPECT_TRUE(example_method.attributes->Get("transitional"));
   EXPECT_TRUE(example_method.attributes->Get("doc")->GetArg("value"));
   auto& method_doc_value = static_cast<const DocCommentConstantValue&>(
       example_method.attributes->Get("doc")->GetArg("value")->value->Value());
@@ -490,20 +488,6 @@ protocol A {
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
-TEST(AttributesTests, BadTransitionalInvalidPlacement) {
-  TestLibrary library(R"FIDL(
-library fidl.test;
-
-@transitional
-protocol MyProtocol {
-  MyMethod();
-};
-)FIDL");
-
-  library.ExpectFail(ErrInvalidAttributePlacement, "transitional");
-  ASSERT_COMPILER_DIAGNOSTICS(library);
-}
-
 TEST(AttributesTests, BadUnknownInvalidPlacementOnUnion) {
   TestLibrary library(R"FIDL(
 library fidl.test;
@@ -548,20 +532,6 @@ TEST(AttributesTests, BadUnknownInvalidOnStrictEnumMember) {
   TestLibrary library;
   library.AddFile("bad/fi-0071.test.fidl");
   library.ExpectFail(ErrUnknownAttributeOnStrictEnumMember);
-  ASSERT_COMPILER_DIAGNOSTICS(library);
-}
-
-TEST(AttributesTests, BadTransitionalOnEnum) {
-  TestLibrary library(R"FIDL(
-library fidl.test;
-
-@transitional
-type E = strict enum : uint32 {
-  A = 1;
-};
-)FIDL");
-
-  library.ExpectFail(ErrInvalidAttributePlacement, "transitional");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 

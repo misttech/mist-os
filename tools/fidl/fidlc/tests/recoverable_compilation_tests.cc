@@ -66,7 +66,7 @@ TEST(RecoverableCompilationTests, BadRecoverInLibraryVerifyAttributePlacement) {
   TestLibrary library(R"FIDL(
 library example;
 
-@transitional            // Error: invalid placement
+@unknown            // Error: invalid placement
 type Table = table {
     1: foo string;
 };
@@ -75,7 +75,7 @@ type Struct = struct {
     foo uint16;
 };
 )FIDL");
-  library.ExpectFail(ErrInvalidAttributePlacement, "transitional");
+  library.ExpectFail(ErrInvalidAttributePlacement, "unknown");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 

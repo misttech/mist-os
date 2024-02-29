@@ -2,8 +2,7 @@
   "name": "test.newtype",
   "experiments": [
     "allow_new_types",
-    "output_index_json",
-    "transitional_allow_list"
+    "output_index_json"
   ],
   "available": {
     "fuchsia": "LEGACY"

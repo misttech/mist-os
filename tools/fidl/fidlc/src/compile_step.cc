@@ -1182,33 +1182,6 @@ void CompileStep::CompileProtocol(Protocol* protocol_declaration) {
       CheckNoEventErrorSyntax(method);
     }
   }
-
-  // Ensure that only methods from a small allow-list use the @transitional attribute.
-  static const auto transitional_allowlist = std::set<std::string_view>{
-      "test.protocols.Transitional.Event",
-      "test.protocols.Transitional.OneWay",
-      "test.protocols.Transitional.Request",
-      "test.transitional.TransitionalEvent.Event",
-      "test.transitional.TransitionMethods.UnimplementedMethod",
-  };
-  if (experimental_flags().IsEnabled(ExperimentalFlag::kTransitionalAllowList)) {
-    for (auto& method : protocol_declaration->methods) {
-      auto attribute = method.attributes->Get("transitional");
-      if (attribute == nullptr) {
-        continue;
-      }
-      std::ostringstream method_name;
-      for (const auto part : library()->name) {
-        method_name << part << '.';
-      }
-      method_name << protocol_declaration->name.decl_name() << '.' << method.name.data();
-      bool allowed = transitional_allowlist.find(method_name.str()) != transitional_allowlist.end();
-
-      if (!allowed) {
-        reporter()->Fail(ErrTransitionalNotAllowed, attribute->span, method.name.data());
-      }
-    }
-  }
 }
 
 void CompileStep::ValidateDomainErrorType(const Union* result_union) {

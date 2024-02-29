@@ -4,7 +4,6 @@
 
 #include <fidl/test.basic.protocol/cpp/wire.h>
 #include <fidl/test.empty.protocol/cpp/wire.h>
-#include <fidl/test.transitional/cpp/wire.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/async/cpp/time.h>
@@ -212,13 +211,10 @@ TEST(GenAPITestCase, AsyncEventHandlerExhaustivenessNotRequired) {
     void EventA() override {}
     void EventB() override {}
   };
-  class EventHandlerAllTransitional
-      : public fidl::WireSyncEventHandler<test_transitional::TransitionalEvent> {};
   static_assert(!std::is_abstract_v<EventHandlerNone>);
   static_assert(!std::is_abstract_v<EventHandlerA>);
   static_assert(!std::is_abstract_v<EventHandlerB>);
   static_assert(!std::is_abstract_v<EventHandlerAll>);
-  static_assert(!std::is_abstract_v<EventHandlerAllTransitional>);
 }
 
 TEST(GenAPITestCase, EventManaged) {

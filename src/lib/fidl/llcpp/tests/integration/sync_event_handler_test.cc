@@ -4,7 +4,6 @@
 
 #include <fidl/test.basic.protocol/cpp/wire.h>
 #include <fidl/test.basic.protocol/cpp/wire_test_base.h>
-#include <fidl/test.transitional/cpp/wire.h>
 
 #include <type_traits>
 
@@ -76,13 +75,10 @@ TEST(SyncEventHandler, ExhaustivenessRequired) {
     void EventA() override {}
     void EventB() override {}
   };
-  class EventHandlerAllTransitional
-      : public fidl::WireSyncEventHandler<test_transitional::TransitionalEvent> {};
   static_assert(std::is_abstract_v<EventHandlerNone>);
   static_assert(std::is_abstract_v<EventHandlerA>);
   static_assert(std::is_abstract_v<EventHandlerB>);
   static_assert(!std::is_abstract_v<EventHandlerAll>);
-  static_assert(!std::is_abstract_v<EventHandlerAllTransitional>);
 }
 
 TEST(SyncEventHandler, HandleEvent) {
@@ -126,19 +122,6 @@ TEST(SyncEventHandler, UnknownEvent) {
   EXPECT_EQ(fidl::Reason::kUnexpectedMessage, status.reason());
   EXPECT_EQ(ZX_ERR_NOT_SUPPORTED, status.status());
   EXPECT_SUBSTR(status.FormatDescription().c_str(), "unknown ordinal");
-}
-
-TEST(SyncEventHandler, UnhandledTransitionalEvent) {
-  zx::result endpoints = fidl::CreateEndpoints<test_transitional::TransitionalEvent>();
-  ASSERT_OK(endpoints.status_value());
-  ASSERT_OK(fidl::WireSendEvent(endpoints->server)->Event());
-
-  class EventHandler : public fidl::WireSyncEventHandler<test_transitional::TransitionalEvent> {};
-  EventHandler event_handler;
-  fidl::Status status = event_handler.HandleOneEvent(endpoints->client);
-  EXPECT_EQ(fidl::Reason::kUnexpectedMessage, status.reason());
-  EXPECT_EQ(ZX_ERR_NOT_SUPPORTED, status.status());
-  EXPECT_SUBSTR(status.FormatDescription().c_str(), "transitional");
 }
 
 TEST(SyncEventHandler, Epitaph) {
