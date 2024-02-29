@@ -321,8 +321,8 @@ impl TrelInstance {
         Ok(())
     }
 
-    pub fn get_trel_counters(&self) -> TrelCounters {
-        self.counters.borrow().clone()
+    pub fn get_trel_counters(&self) -> *const otPlatTrelCounters {
+        self.counters.borrow().as_ot_ptr()
     }
 
     pub fn reset_trel_counters(&self) {
@@ -516,11 +516,13 @@ unsafe extern "C" fn otPlatTrelSend(
 }
 
 #[no_mangle]
-unsafe extern "C" fn otPlatTrelGetCounters(_instance: *mut otInstance) -> otPlatTrelCounters {
+unsafe extern "C" fn otPlatTrelGetCounters(
+    _instance: *mut otInstance,
+) -> *const otPlatTrelCounters {
     if let Some(trel) = PlatformBacking::as_ref().trel.borrow().as_ref() {
-        trel.get_trel_counters().into()
+        trel.get_trel_counters()
     } else {
-        TrelCounters::default().into()
+        std::ptr::null()
     }
 }
 

@@ -1047,7 +1047,7 @@ where
             dnssd_counters: Some(ot.dnssd_get_counters().into_ext()),
             leader_data: Some((&ot.get_leader_data().ok().unwrap_or_default()).into_ext()),
             uptime: Some(ot.get_uptime().into_nanos()),
-            trel_counters: Some(ot.trel_get_counters().into_ext()),
+            trel_counters: ot.trel_get_counters().map(|x| x.into_ext()),
             nat64_info: Some(nat64_info),
             ..Default::default()
         })
