@@ -12,7 +12,6 @@ use selectors::SelectorExt;
 use std::{
     cmp::Ordering,
     fmt::Debug,
-    marker::Unpin,
     pin::Pin,
     sync::{atomic::AtomicUsize, Arc},
     task::{Context, Poll},
@@ -250,7 +249,7 @@ where
 mod tests {
     use super::*;
     use futures::{prelude::*, stream::iter as iter2stream};
-    use selectors::{self, FastError};
+    use selectors::FastError;
 
     #[fuchsia::test]
     async fn empty_multiplexer_terminates() {

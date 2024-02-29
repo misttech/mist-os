@@ -6,7 +6,7 @@ mod diagnostics;
 mod metrics;
 
 use {
-    anyhow::{self, bail, Error},
+    anyhow::{bail, Error},
     diagnostics::RequestId,
     diagnostics_reader::{ArchiveReader, Inspect, RetryConfig},
     fasync::Duration,

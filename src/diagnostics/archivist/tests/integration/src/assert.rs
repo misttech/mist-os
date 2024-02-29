@@ -6,7 +6,6 @@ use crate::puppet::LogMessage;
 use diagnostics_data::LogsData;
 use fidl_fuchsia_diagnostics::Severity;
 use futures::{Stream, StreamExt};
-use std::marker::Unpin;
 
 type LogStreamItem = Result<LogsData, diagnostics_reader::Error>;
 

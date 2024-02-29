@@ -14,7 +14,7 @@ use {
         constants, utils, Block, BlockAccessorExt, BlockContainer, BlockIndex, BlockType,
         Container, CopyBytes, ReadBytes,
     },
-    std::{cmp, convert::TryFrom},
+    std::cmp,
 };
 
 pub use crate::reader::tree_reader::SnapshotTree;
@@ -275,7 +275,7 @@ impl BlockContainer for BackingBuffer {
 mod tests {
     use super::*;
     use anyhow::Error;
-    use inspect_format::{BlockAccessorMutExt, Container, WriteBytes};
+    use inspect_format::{BlockAccessorMutExt, WriteBytes};
 
     #[cfg(target_os = "fuchsia")]
     macro_rules! get_snapshot {

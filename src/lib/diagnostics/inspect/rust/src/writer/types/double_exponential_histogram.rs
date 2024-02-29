@@ -89,10 +89,7 @@ impl HistogramProperty for DoubleExponentialHistogramProperty {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        writer::{testing_utils::GetBlockExt, Inspector},
-        ExponentialHistogramParams,
-    };
+    use crate::writer::{testing_utils::GetBlockExt, Inspector};
 
     #[fuchsia::test]
     fn test_double_exp_histogram() {

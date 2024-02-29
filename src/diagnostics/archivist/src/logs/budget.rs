@@ -130,7 +130,6 @@ mod tests {
     use super::*;
     use crate::{
         logs::{
-            container::LogsArtifactsContainer,
             multiplex::PinStream,
             stored_message::{GenericStoredMessage, StructuredStoredMessage},
         },

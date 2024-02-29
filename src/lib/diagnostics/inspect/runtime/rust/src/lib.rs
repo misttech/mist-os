@@ -251,16 +251,11 @@ mod tests {
     use diagnostics_assertions::assert_json_diff;
     use diagnostics_reader::{ArchiveReader, Inspect};
     use fidl::endpoints::RequestStream;
-    use fidl_fuchsia_inspect::{
-        InspectSinkPublishRequest, InspectSinkRequest, InspectSinkRequestStream, TreeMarker,
-    };
+    use fidl_fuchsia_inspect::{InspectSinkRequest, InspectSinkRequestStream, TreeMarker};
     use fidl_fuchsia_io as fio;
     use fidl_fuchsia_sys2 as fsys;
     use fuchsia_async as fasync;
-    use fuchsia_component::{
-        client,
-        server::{ServiceFs, ServiceObj},
-    };
+    use fuchsia_component::server::{ServiceFs, ServiceObj};
     use fuchsia_component_test::ScopedInstance;
     use fuchsia_inspect::{reader::read, Error, InspectorConfig};
     use fuchsia_zircon::{self as zx, DurationNum};

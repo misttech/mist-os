@@ -550,7 +550,6 @@ mod tests {
     use crate::{
         reader,
         writer::{
-            private::InspectTypeInternal,
             testing_utils::{get_state, GetBlockExt},
             ArrayProperty,
         },
@@ -915,7 +914,7 @@ mod fuchsia_tests {
     use crate::{hierarchy::DiagnosticsHierarchy, reader, NumericProperty};
     use diagnostics_assertions::assert_json_diff;
     use fuchsia_zircon::{self as zx, AsHandleRef, Peered};
-    use std::{convert::TryFrom, sync::Arc};
+    use std::sync::Arc;
 
     #[fuchsia::test]
     async fn atomic_update_reader() {

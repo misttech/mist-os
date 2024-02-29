@@ -7,7 +7,7 @@ use {
     fuchsia_inspect::reader::snapshot::ScannedBlock,
     inspect_format::{BlockType, PropertyFormat},
     serde::Serialize,
-    std::{self, collections::HashMap},
+    std::collections::HashMap,
 };
 
 // Blocks such as Node, Extent, and Name may or may not be part of the Inspect tree. We want to
@@ -193,15 +193,11 @@ impl Metrics {
 
 #[cfg(test)]
 mod tests {
-    use std::convert::TryFrom;
     use {
         super::*,
         crate::{data, puppet, results::Results},
         anyhow::{bail, format_err},
-        inspect_format::{
-            constants, ArrayFormat, Block, BlockIndex, BlockType, HeaderFields, PayloadFields,
-            PropertyFormat,
-        },
+        inspect_format::{constants, ArrayFormat, Block, BlockIndex, HeaderFields, PayloadFields},
     };
 
     #[fuchsia::test]

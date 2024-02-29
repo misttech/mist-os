@@ -7,7 +7,7 @@
 use super::*;
 use assert_matches::assert_matches;
 use diagnostics_data::*;
-use diagnostics_log_encoding::{encode::Encoder, Argument, Record};
+use diagnostics_log_encoding::{encode::Encoder, Record};
 use fidl_fuchsia_diagnostics::Severity as StreamSeverity;
 use fidl_fuchsia_logger::{LogLevelFilter, LogMessage};
 use lazy_static::lazy_static;

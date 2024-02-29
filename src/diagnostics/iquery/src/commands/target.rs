@@ -21,7 +21,6 @@ use {
     fidl_fuchsia_sys2 as fsys2,
     fuchsia_component::client,
     lazy_static::lazy_static,
-    selectors,
 };
 
 const ROOT_REALM_QUERY: &'static str = "/svc/fuchsia.sys2.RealmQuery.root";
@@ -220,9 +219,7 @@ mod test {
     use {
         super::*,
         assert_matches::assert_matches,
-        fidl_fuchsia_diagnostics::{
-            ComponentSelector, PropertySelector, Selector, StringSelector, TreeSelector,
-        },
+        fidl_fuchsia_diagnostics::{ComponentSelector, PropertySelector},
         iquery_test_support::MockRealmQuery,
         std::sync::Arc,
     };

@@ -8,7 +8,6 @@ use {
         ActionResultFormatter, ActionTagDirective, DiagnosticData, ParseResult, Source,
     },
     num_traits::cast::FromPrimitive,
-    serde_json5,
     std::collections::HashMap,
 };
 

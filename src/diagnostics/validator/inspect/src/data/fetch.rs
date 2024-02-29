@@ -90,16 +90,15 @@ impl LazyNodeFetcher {
 mod tests {
     use {
         super::*,
-        anyhow::{Context, Error},
+        anyhow::Context,
         fidl_fuchsia_inspect::{
-            TreeContent, TreeMarker, TreeNameIteratorRequest, TreeNameIteratorRequestStream,
-            TreeProxy, TreeRequest, TreeRequestStream,
+            TreeContent, TreeNameIteratorRequest, TreeNameIteratorRequestStream, TreeRequest,
+            TreeRequestStream,
         },
         fidl_fuchsia_mem::Buffer,
         fuchsia_async as fasync,
         fuchsia_zircon::{self as zx, HandleBased},
         futures::{TryFutureExt, TryStreamExt},
-        std::convert::TryInto,
         std::sync::Arc,
         tracing::error,
     };

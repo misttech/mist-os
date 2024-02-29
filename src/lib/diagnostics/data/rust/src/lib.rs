@@ -15,14 +15,12 @@ use flyweights::FlyStr;
 use moniker::{ExtendedMoniker, MonikerError};
 use selectors::SelectorExt;
 use serde::{
-    self,
     de::{DeserializeOwned, Deserializer},
     Deserialize, Serialize, Serializer,
 };
 use std::{
     borrow::Borrow,
     cmp::Ordering,
-    convert::TryFrom,
     fmt,
     hash::Hash,
     ops::{Deref, DerefMut},

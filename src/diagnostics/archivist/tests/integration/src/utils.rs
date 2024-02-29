@@ -7,7 +7,7 @@ use component_events::{events::*, matcher::*};
 use diagnostics_reader::{ArchiveReader, Logs};
 use fidl_fuchsia_diagnostics::{self as fdiagnostics, ArchiveAccessorMarker, Interest, Severity};
 use realm_proxy_client::RealmProxyClient;
-use selectors::{self, parse_component_selector, VerboseError};
+use selectors::{parse_component_selector, VerboseError};
 
 /// Returns a snapshot of the realm's logs as a stream.
 ///

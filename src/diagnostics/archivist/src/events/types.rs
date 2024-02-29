@@ -12,7 +12,7 @@ use fidl_fuchsia_logger as flogger;
 use fidl_table_validation::ValidFidlTable;
 use fuchsia_zircon as zx;
 use moniker::ExtendedMoniker;
-use std::{convert::TryFrom, sync::Arc};
+use std::sync::Arc;
 
 /// Event types that contain singleton data. When these events are cloned, their singleton data
 /// won't be cloned.
@@ -209,10 +209,8 @@ impl TryFrom<fcomponent::Event> for Event {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::identity::ComponentIdentity;
     use crate::logs::testing::create_log_sink_requested_event;
     use assert_matches::assert_matches;
-    use fidl::endpoints::ClientEnd;
     use fidl_fuchsia_component as fcomponent;
     use fidl_fuchsia_inspect as finspect;
     use fidl_fuchsia_io as fio;

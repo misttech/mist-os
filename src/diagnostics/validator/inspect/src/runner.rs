@@ -312,10 +312,7 @@ async fn try_compare<ActionType: std::fmt::Debug>(
 #[cfg(test)]
 mod tests {
     use {
-        super::*,
-        crate::trials::tests::trial_with_action,
-        crate::trials::{Step, Trial},
-        crate::*,
+        super::*, crate::trials::tests::trial_with_action, crate::trials::Trial, crate::*,
         fidl_diagnostics_validate::*,
     };
 

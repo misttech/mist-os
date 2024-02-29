@@ -937,9 +937,9 @@ mod tests {
     use crate::parse::parse_record;
     use once_cell::sync::Lazy;
     use std::sync::Mutex;
-    use tracing::{info_span, Subscriber};
+    use tracing::info_span;
     use tracing_subscriber::{
-        layer::{Context, Layer, SubscriberExt},
+        layer::{Layer, SubscriberExt},
         Registry,
     };
 

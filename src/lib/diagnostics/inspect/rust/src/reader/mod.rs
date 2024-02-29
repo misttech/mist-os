@@ -33,10 +33,10 @@
 
 use {
     crate::reader::snapshot::{ScannedBlock, Snapshot},
-    diagnostics_hierarchy::{DiagnosticsHierarchyGetter, *},
+    diagnostics_hierarchy::*,
     inspect_format::{utils, BlockIndex, BlockType, PropertyFormat},
     maplit::btreemap,
-    std::{borrow::Cow, cmp::min, collections::BTreeMap, convert::TryFrom},
+    std::{borrow::Cow, cmp::min, collections::BTreeMap},
 };
 
 pub use {
@@ -576,8 +576,7 @@ mod tests {
         super::*,
         crate::{
             types::private::InspectTypeInternal, writer::testing_utils::GetBlockExt, ArrayProperty,
-            ExponentialHistogramParams, HistogramProperty, Inspector, LinearHistogramParams,
-            StringReference,
+            HistogramProperty, Inspector, StringReference,
         },
         anyhow::Error,
         diagnostics_assertions::{assert_data_tree, assert_json_diff},

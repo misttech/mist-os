@@ -58,7 +58,6 @@ pub fn serve_persisted_data(persist_root: &fuchsia_inspect::Node) -> Result<(), 
 #[cfg(test)]
 mod test {
     use super::*;
-    use anyhow::Error;
     use diagnostics_assertions::assert_data_tree;
     use fuchsia_inspect::Inspector;
 

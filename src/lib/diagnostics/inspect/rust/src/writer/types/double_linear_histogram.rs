@@ -78,10 +78,7 @@ impl HistogramProperty for DoubleLinearHistogramProperty {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        writer::{testing_utils::GetBlockExt, Inspector},
-        LinearHistogramParams,
-    };
+    use crate::writer::{testing_utils::GetBlockExt, Inspector};
 
     #[fuchsia::test]
     fn double_linear_histogram() {

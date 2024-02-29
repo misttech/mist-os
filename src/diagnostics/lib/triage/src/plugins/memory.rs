@@ -12,7 +12,6 @@ use {
         },
     },
     itertools::Itertools,
-    std::convert::TryFrom,
 };
 
 pub struct MemoryPlugin();
@@ -95,7 +94,6 @@ impl Plugin for MemoryPlugin {
 mod tests {
     use super::*;
     use crate::metrics::fetch::InspectFetcher;
-    use std::convert::TryInto;
 
     #[fuchsia::test]
     fn test_crashes() {

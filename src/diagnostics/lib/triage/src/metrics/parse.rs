@@ -418,7 +418,7 @@ mod test {
         super::*,
         crate::{
             assert_problem,
-            metrics::{ExpressionTree, Fetcher, MathFunction, MetricState, TrialDataFetcher},
+            metrics::{Fetcher, MetricState, TrialDataFetcher},
         },
         std::collections::HashMap,
     };

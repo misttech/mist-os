@@ -10,11 +10,11 @@ use {
     fidl_fuchsia_diagnostics::Selector,
     lazy_static::lazy_static,
     regex::Regex,
-    selectors::{self, VerboseError},
-    serde::{self, Serialize},
+    selectors::VerboseError,
+    serde::Serialize,
     serde_derive::Deserialize,
     serde_json::{map::Map as JsonMap, Value as JsonValue},
-    std::{collections::HashMap, convert::TryFrom, str::FromStr, sync::Arc},
+    std::{collections::HashMap, str::FromStr, sync::Arc},
 };
 
 /// [Fetcher] is a source of values to feed into the calculations. It may contain data either
@@ -427,7 +427,6 @@ mod test {
             assert_problem, make_metrics,
             metrics::{variable::VariableName, Metric, MetricState, Problem, ValueSource},
         },
-        anyhow::Error,
         serde_json::Value as JsonValue,
     };
 

@@ -248,7 +248,7 @@ fn buddy(index: BlockIndex, order: u8) -> BlockIndex {
 mod tests {
     use super::*;
     use crate::reader::snapshot::{BackingBuffer, BlockIterator};
-    use inspect_format::{block_testing, BlockIndex, Container};
+    use inspect_format::{block_testing, Container};
 
     #[derive(Debug)]
     struct BlockDebug {

@@ -20,7 +20,7 @@ use {
     crate::metric_value_to_int,
     anyhow::{bail, Error},
     fidl_fuchsia_feedback::MAX_CRASH_SIGNATURE_LENGTH,
-    serde::{self, Deserialize, Serialize},
+    serde::{Deserialize, Serialize},
     std::{cell::RefCell, collections::HashMap},
 };
 
@@ -507,13 +507,7 @@ impl ActionContext<'_> {
 mod test {
     use {
         super::*,
-        crate::{
-            config::Source,
-            make_metrics,
-            metrics::{ExpressionContext, Metric, Metrics, ValueSource},
-        },
-        anyhow::Error,
-        std::cell::RefCell,
+        crate::{config::Source, make_metrics},
     };
 
     /// Tells whether any of the stored values include a substring.

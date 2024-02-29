@@ -5,7 +5,6 @@
 use {
     anyhow::{bail, Error},
     fuchsia_triage::{ActionTagDirective, DiagnosticData, ParseResult, Source},
-    serde_json,
     std::{collections::HashMap, fs, path::Path},
 };
 
@@ -108,7 +107,7 @@ fn base_name(path: &Path) -> Result<String, Error> {
 
 #[cfg(test)]
 mod test {
-    use {super::*, anyhow::Error};
+    use super::*;
 
     #[fuchsia::test]
     fn base_name_works() -> Result<(), Error> {

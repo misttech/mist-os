@@ -11,7 +11,6 @@ use {
     async_trait::async_trait,
     diagnostics_data::{Inspect, InspectData},
     diagnostics_hierarchy::DiagnosticsHierarchy,
-    selectors,
     serde::Serialize,
     std::fmt,
 };

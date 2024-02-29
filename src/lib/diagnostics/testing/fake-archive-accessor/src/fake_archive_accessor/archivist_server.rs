@@ -9,7 +9,7 @@ use {
     fidl::prelude::*,
     fidl_fuchsia_diagnostics::FormattedContent,
     fidl_fuchsia_diagnostics::{
-        self, BatchIteratorControlHandle, BatchIteratorRequest, BatchIteratorRequestStream,
+        BatchIteratorControlHandle, BatchIteratorRequest, BatchIteratorRequestStream,
     },
     fuchsia_zircon as zx,
     fuchsia_zircon_status::Status as ZxStatus,

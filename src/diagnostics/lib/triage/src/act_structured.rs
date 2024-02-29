@@ -16,7 +16,7 @@ use {
         plugins::{register_plugins, Plugin},
     },
     crate::act::{Action, Actions, Alert, Gauge, Snapshot},
-    serde::{self, Serialize},
+    serde::Serialize,
     std::collections::HashMap,
 };
 
@@ -190,7 +190,7 @@ mod test {
         crate::{
             act::{ActionsSchema, Severity},
             make_metrics,
-            metrics::{ExpressionContext, Metric, ValueSource},
+            metrics::{ExpressionContext, Metric},
         },
         std::cell::RefCell,
     };

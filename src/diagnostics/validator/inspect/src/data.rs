@@ -10,16 +10,13 @@ use {
         ArrayContent, DiagnosticsHierarchy, ExponentialHistogram, LinearHistogram,
         Property as iProperty,
     },
-    difference,
     fidl_diagnostics_validate::{self as validate, Value},
     inspect_format::{ArrayFormat, BlockIndex, LinkNodeDisposition},
     num_derive::{FromPrimitive, ToPrimitive},
     num_traits::Zero,
     std::{
-        self,
         clone::Clone,
         collections::{HashMap, HashSet},
-        convert::{From, TryInto},
     },
 };
 
@@ -1287,8 +1284,8 @@ mod tests {
     use {
         super::*,
         crate::*,
-        fidl_diagnostics_validate::{Value, ValueType, ROOT_ID},
-        fuchsia_inspect::reader::{ArrayContent as iArrayContent, ArrayFormat},
+        fidl_diagnostics_validate::{ValueType, ROOT_ID},
+        fuchsia_inspect::reader::ArrayContent as iArrayContent,
         inspect_format::BlockType,
     };
 

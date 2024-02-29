@@ -15,7 +15,6 @@ use selectors::VerboseError;
 use std::{
     borrow::Cow,
     collections::{HashSet, VecDeque},
-    convert::TryInto,
     sync::Arc,
     time::Duration,
 };

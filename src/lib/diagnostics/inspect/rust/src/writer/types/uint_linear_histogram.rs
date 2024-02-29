@@ -79,7 +79,6 @@ impl HistogramProperty for UintLinearHistogramProperty {
 mod tests {
     use super::*;
     use crate::writer::{testing_utils::GetBlockExt, Inspector};
-    use diagnostics_hierarchy::LinearHistogramParams;
 
     #[fuchsia::test]
     fn uint_linear_histogram() {

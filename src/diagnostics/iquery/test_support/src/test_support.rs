@@ -12,7 +12,6 @@ use fidl_fuchsia_component_decl::{
 };
 use fidl_fuchsia_io::{self as fio, DirectoryMarker};
 use fidl_fuchsia_sys2 as fsys2;
-use fuchsia_async;
 use fuchsia_zircon_status::Status;
 use futures::{StreamExt, TryStreamExt};
 use moniker::{Moniker, MonikerBase};

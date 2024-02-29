@@ -5,7 +5,7 @@ use {
     crate::{configs, constants, diagnostics::AccessorStats, error::Error},
     diagnostics_hierarchy::HierarchyMatcher,
     fidl::prelude::*,
-    fidl_fuchsia_diagnostics::{self, ArchiveAccessorMarker, Selector},
+    fidl_fuchsia_diagnostics::{ArchiveAccessorMarker, Selector},
     fuchsia_inspect as inspect,
     fuchsia_sync::RwLock,
     moniker::ExtendedMoniker,

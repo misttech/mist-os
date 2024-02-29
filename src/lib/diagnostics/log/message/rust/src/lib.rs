@@ -11,7 +11,7 @@ use diagnostics_log_encoding::{Argument, Value, ValueUnknown};
 use fuchsia_zircon as zx;
 use libc::{c_char, c_int};
 use serde::Serialize;
-use std::{convert::TryFrom, mem, str};
+use std::{mem, str};
 
 mod constants;
 pub mod error;

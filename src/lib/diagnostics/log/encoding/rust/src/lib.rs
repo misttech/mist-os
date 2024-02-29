@@ -8,7 +8,7 @@
 
 use bitfield::bitfield;
 use fidl_fuchsia_diagnostics_stream::RawSeverity;
-use std::{borrow::Cow, convert::TryFrom};
+use std::borrow::Cow;
 use tracing::{Level, Metadata};
 
 pub use fidl_fuchsia_diagnostics::Severity;
@@ -185,8 +185,6 @@ mod tests {
             encode::{Encoder, EncodingError, MutableBuffer},
             parse::{parse_argument, try_parse_record, ParseResult},
         },
-        fidl_fuchsia_diagnostics::Severity,
-        fidl_fuchsia_diagnostics_stream::{Argument, Record, Value},
         fuchsia_zircon as zx,
         std::{fmt::Debug, io::Cursor},
     };

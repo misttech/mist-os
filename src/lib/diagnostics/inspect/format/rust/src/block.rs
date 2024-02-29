@@ -18,7 +18,6 @@ use num_derive::FromPrimitive;
 use num_traits::FromPrimitive;
 use std::{
     cmp::min,
-    convert::TryInto,
     ops::{Deref, DerefMut},
     sync::atomic::{fence, Ordering},
 };
@@ -952,9 +951,8 @@ pub mod testing {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{block_index::BlockIndex, Container, CopyBytes};
+    use crate::{Container, CopyBytes};
     use std::collections::BTreeSet;
-    use std::iter::FromIterator;
 
     macro_rules! assert_8_bytes {
         ($container:ident, $offset:expr, $expected:expr) => {

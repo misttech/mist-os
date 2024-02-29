@@ -16,7 +16,7 @@ use {
     diagnostics_data::{Data, DiagnosticsData, Metadata},
     fidl::endpoints::{ControlHandle, RequestStream},
     fidl_fuchsia_diagnostics::{
-        self, ArchiveAccessorRequest, ArchiveAccessorRequestStream, BatchIteratorControlHandle,
+        ArchiveAccessorRequest, ArchiveAccessorRequestStream, BatchIteratorControlHandle,
         BatchIteratorRequest, BatchIteratorRequestStream, ClientSelectorConfiguration, DataType,
         Format, FormattedContent, PerformanceConfiguration, Selector, SelectorArgument, StreamMode,
         StreamParameters, StringSelector, TreeSelector, TreeSelectorUnknown,
@@ -36,7 +36,7 @@ use {
         stream::Peekable,
         StreamExt,
     },
-    selectors::{self, FastError},
+    selectors::FastError,
     serde::Serialize,
     std::{collections::HashMap, pin::Pin, sync::Arc},
     thiserror::Error,
@@ -776,7 +776,7 @@ impl PerformanceConfig {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{diagnostics::AccessorStats, pipeline::Pipeline};
+    use crate::diagnostics::AccessorStats;
     use assert_matches::assert_matches;
     use fidl_fuchsia_diagnostics::{ArchiveAccessorMarker, BatchIteratorMarker};
     use fuchsia_inspect::{Inspector, Node};

@@ -12,7 +12,6 @@ use {
     async_trait::async_trait,
     derivative::Derivative,
     diagnostics_data::{Inspect, InspectData, InspectHandleName},
-    glob,
     serde::Serialize,
     std::{cmp::Ordering, fmt, ops::Deref},
 };

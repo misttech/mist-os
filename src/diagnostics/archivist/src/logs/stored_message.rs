@@ -11,7 +11,7 @@ use diagnostics_data::{LogsData, Severity};
 use diagnostics_message::error::MessageError;
 use diagnostics_message::{LoggerMessage, METADATA_SIZE};
 use fuchsia_zircon as zx;
-use std::{convert::TryInto, fmt::Debug, sync::Arc};
+use std::{fmt::Debug, sync::Arc};
 
 pub type GenericStoredMessage = Box<dyn StoredMessage>;
 

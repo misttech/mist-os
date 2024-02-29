@@ -29,11 +29,7 @@ use fuchsia_async as fasync;
 use fuchsia_component::server::{ServiceFs, ServiceObj};
 use fuchsia_inspect::{component, health::Reporter};
 use fuchsia_zircon as zx;
-use futures::{
-    channel::oneshot,
-    future::{self, abortable},
-    prelude::*,
-};
+use futures::{channel::oneshot, future::abortable, prelude::*};
 use moniker::ExtendedMoniker;
 use std::{path::Path, sync::Arc};
 use tracing::{debug, error, info, warn};
@@ -399,7 +395,6 @@ mod tests {
     use crate::{
         constants::*,
         events::router::{Dispatcher, EventProducer},
-        identity::ComponentIdentity,
         logs::testing::*,
     };
     use diagnostics_data::LogsData;
@@ -414,7 +409,6 @@ mod tests {
     use fidl_fuchsia_process_lifecycle::{LifecycleMarker, LifecycleProxy};
     use fuchsia_async as fasync;
     use fuchsia_component::client::connect_to_protocol_at_dir_svc;
-    use futures::channel::oneshot;
     use std::marker::PhantomData;
 
     async fn init_archivist(fs: &mut ServiceFs<ServiceObj<'static, ()>>) -> Archivist {

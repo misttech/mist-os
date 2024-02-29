@@ -95,7 +95,7 @@
 use {
     crate::diagnostics::*,
     anyhow::{format_err, Context, Error},
-    diagnostics_data::{self, Data, InspectHandleName},
+    diagnostics_data::{Data, InspectHandleName},
     diagnostics_hierarchy::{
         ArrayContent, DiagnosticsHierarchy, ExponentialHistogram, LinearHistogram, Property,
     },
@@ -115,7 +115,6 @@ use {
     },
     std::{
         collections::{HashMap, HashSet},
-        convert::TryInto,
         sync::Arc,
     },
     tracing::{info, warn},

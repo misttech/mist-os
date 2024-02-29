@@ -135,10 +135,7 @@ impl StructuredRunResult {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        fuchsia_triage::{Action, ActionResults},
-    };
+    use {super::*, fuchsia_triage::Action};
 
     #[fuchsia::test]
     fn test_output_text_no_warnings() -> Result<(), Error> {

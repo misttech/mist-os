@@ -15,7 +15,7 @@ use {
     anyhow::{bail, format_err, Error},
     serde::Deserialize,
     serde_json as json,
-    std::{collections::HashMap, convert::TryFrom},
+    std::collections::HashMap,
 };
 
 #[derive(Clone, Deserialize, Debug)]
@@ -169,11 +169,10 @@ mod test {
     use {
         super::*,
         crate::{
-            act::{Action, Alert, Severity},
+            act::{Alert, Severity},
             make_metrics,
             metrics::ValueSource,
         },
-        anyhow::Error,
     };
 
     // Correct operation of the klog, syslog, and bootlog fields of TrialDataFetcher are tested

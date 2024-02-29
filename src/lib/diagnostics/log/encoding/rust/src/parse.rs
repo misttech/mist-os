@@ -13,7 +13,7 @@ use nom::{
     number::complete::{le_f64, le_i64, le_u64},
     Err, IResult,
 };
-use std::{borrow::Cow, cell::RefCell, convert::TryFrom, rc::Rc};
+use std::{borrow::Cow, cell::RefCell, rc::Rc};
 use thiserror::Error;
 
 pub(crate) type ParseResult<'a, T> = IResult<&'a [u8], T, ParseError>;

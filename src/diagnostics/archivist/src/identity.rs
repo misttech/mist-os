@@ -5,10 +5,7 @@
 use diagnostics_message::MonikerWithUrl;
 use flyweights::FlyStr;
 use moniker::ExtendedMoniker;
-use std::{
-    hash::{Hash, Hasher},
-    string::ToString,
-};
+use std::hash::{Hash, Hasher};
 
 #[derive(Debug)]
 pub struct ComponentIdentity {

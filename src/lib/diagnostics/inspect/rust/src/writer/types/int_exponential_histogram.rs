@@ -89,10 +89,7 @@ impl HistogramProperty for IntExponentialHistogramProperty {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        writer::{testing_utils::GetBlockExt, Inspector},
-        ExponentialHistogramParams,
-    };
+    use crate::writer::{testing_utils::GetBlockExt, Inspector};
 
     #[fuchsia::test]
     fn test_int_exp_histogram() {

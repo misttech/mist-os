@@ -10,16 +10,9 @@ use {
         ReadableTree, Snapshot,
     },
     fuchsia_async::{DurationExt, TimeoutExt},
-    futures::{
-        future::{self, BoxFuture},
-        prelude::*,
-    },
+    futures::{future::BoxFuture, prelude::*},
     inspect_format::LinkNodeDisposition,
-    std::{
-        collections::BTreeMap,
-        convert::{TryFrom, TryInto},
-        time::Duration,
-    },
+    std::{collections::BTreeMap, time::Duration},
 };
 
 /// Contains the snapshot of the hierarchy and snapshots of all the lazy nodes in the hierarchy.

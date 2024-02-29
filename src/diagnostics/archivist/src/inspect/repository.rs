@@ -14,7 +14,7 @@ use crate::{
     pipeline::Pipeline,
 };
 use diagnostics_hierarchy::HierarchyMatcher;
-use fidl_fuchsia_diagnostics::{self, Selector};
+use fidl_fuchsia_diagnostics::Selector;
 use fuchsia_async as fasync;
 use fuchsia_sync::RwLock;
 use fuchsia_zircon::Koid;
@@ -274,8 +274,7 @@ mod tests {
     use fidl_fuchsia_io as fio;
     use fuchsia_zircon as zx;
     use fuchsia_zircon::DurationNum;
-    use moniker::ExtendedMoniker;
-    use selectors::{self, FastError};
+    use selectors::FastError;
 
     const TEST_URL: &str = "fuchsia-pkg://test";
 

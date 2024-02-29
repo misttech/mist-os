@@ -233,7 +233,6 @@ mod tests {
     use fuchsia_zircon as zx;
     use libc::c_char;
     use moniker::ExtendedMoniker;
-    use std::convert::TryFrom;
 
     #[fuchsia::test]
     async fn normal_behavior_test() {

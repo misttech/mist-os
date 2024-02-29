@@ -12,7 +12,6 @@ use crate::{
     block::Block,
     container::{ReadBytes, WriteBytes},
 };
-use paste;
 use std::ops::{Deref, DerefMut};
 
 macro_rules! bitfield_fields {

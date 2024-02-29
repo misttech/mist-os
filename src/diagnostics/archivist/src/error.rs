@@ -4,7 +4,7 @@
 
 use crate::logs::error::LogsError;
 use fidl::prelude::*;
-use fidl_fuchsia_diagnostics::{self, BatchIteratorControlHandle};
+use fidl_fuchsia_diagnostics::BatchIteratorControlHandle;
 use fuchsia_zircon_status::Status as ZxStatus;
 use thiserror::Error;
 use tracing::warn;

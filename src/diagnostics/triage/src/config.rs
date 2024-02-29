@@ -59,7 +59,7 @@ pub fn initialize(options: Options) -> Result<ProgramStateHolder, Error> {
 
 #[cfg(test)]
 mod test {
-    use {super::*, anyhow::Error};
+    use super::*;
 
     #[fuchsia::test]
     fn output_format_from_string() -> Result<(), Error> {

@@ -7,11 +7,10 @@ use crate::{
     parser::{self, ParsingError, VerboseError},
     validate::*,
 };
-use anyhow::{self, format_err};
+use anyhow::format_err;
 use fidl_fuchsia_diagnostics::{
-    self, ComponentSelector, Interest, LogInterestSelector, PropertySelector, Selector,
-    SelectorArgument, Severity, StringSelector, StringSelectorUnknown, SubtreeSelector,
-    TreeSelector,
+    ComponentSelector, Interest, LogInterestSelector, PropertySelector, Selector, SelectorArgument,
+    Severity, StringSelector, StringSelectorUnknown, SubtreeSelector, TreeSelector,
 };
 use moniker::{
     ChildName, ExtendedMoniker, Moniker, MonikerBase, EXTENDED_MONIKER_COMPONENT_MANAGER_STR,

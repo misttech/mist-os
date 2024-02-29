@@ -5,7 +5,7 @@
 use {
     super::WriteInspect,
     fuchsia_inspect::{ArrayProperty, Node, StringReference},
-    std::{convert::AsRef, marker::PhantomData},
+    std::marker::PhantomData,
 };
 
 /// Wrapper to log bytes in an `inspect_log!` or `inspect_insert!` macro.

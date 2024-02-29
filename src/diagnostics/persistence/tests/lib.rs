@@ -10,7 +10,7 @@ use fidl_fuchsia_diagnostics_persist::{
 use fidl_fuchsia_samplertestcontroller::{SamplerTestControllerMarker, SamplerTestControllerProxy};
 use fuchsia_component_test::RealmInstance;
 use fuchsia_zircon::{Duration, Time};
-use serde_json::{self, Value};
+use serde_json::Value;
 use std::fs::File;
 use std::io::Read;
 use std::mem::take;

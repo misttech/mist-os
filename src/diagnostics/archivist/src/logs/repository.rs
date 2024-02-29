@@ -17,7 +17,7 @@ use crate::{
     },
 };
 use diagnostics_data::LogsData;
-use fidl_fuchsia_diagnostics::{self, LogInterestSelector, Selector, StreamMode};
+use fidl_fuchsia_diagnostics::{LogInterestSelector, Selector, StreamMode};
 use fuchsia_async as fasync;
 use fuchsia_inspect as inspect;
 use fuchsia_sync::{Mutex, RwLock};
@@ -378,7 +378,7 @@ mod tests {
             encode::Encoder, Argument, Record, Severity as StreamSeverity, Value,
         },
         moniker::ExtendedMoniker,
-        selectors::{self, FastError},
+        selectors::FastError,
         std::{io::Cursor, time::Duration},
     };
 

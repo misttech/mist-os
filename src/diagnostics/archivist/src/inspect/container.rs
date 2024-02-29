@@ -14,7 +14,6 @@ use fidl::endpoints::Proxy;
 use fidl_fuchsia_inspect::TreeProxy;
 use fidl_fuchsia_io as fio;
 use fuchsia_async::{self as fasync, DurationExt, TimeoutExt};
-use fuchsia_fs;
 use fuchsia_inspect::reader::snapshot::{Snapshot, SnapshotTree};
 use fuchsia_trace as ftrace;
 use fuchsia_zircon::{self as zx, AsHandleRef};
@@ -24,7 +23,6 @@ use lazy_static::lazy_static;
 use std::time::Duration;
 use std::{
     collections::{HashMap, VecDeque},
-    convert::{From, Into, TryFrom},
     sync::Arc,
 };
 use tracing::warn;
@@ -492,7 +490,6 @@ impl UnpopulatedInspectDataContainer {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::diagnostics::GlobalConnectionStats;
     use fuchsia_inspect::Node;
     use fuchsia_zircon::DurationNum;
     use futures::StreamExt;

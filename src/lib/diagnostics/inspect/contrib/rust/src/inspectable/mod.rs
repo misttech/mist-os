@@ -266,7 +266,6 @@ mod test {
         super::*,
         diagnostics_assertions::assert_data_tree,
         fuchsia_inspect::{Inspector, IntProperty},
-        std::collections::HashSet,
     };
 
     struct InspectableIntWatcher {

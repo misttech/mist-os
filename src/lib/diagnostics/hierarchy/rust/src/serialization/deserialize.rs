@@ -5,12 +5,11 @@
 use {
     crate::{ArrayContent, DiagnosticsHierarchy, ExponentialHistogram, LinearHistogram, Property},
     base64::engine::{general_purpose::STANDARD as BASE64_STANDARD, Engine as _},
-    paste,
     serde::{
         de::{self, MapAccess, SeqAccess, Visitor},
         Deserialize, Deserializer,
     },
-    std::{cmp::Eq, collections::HashMap, fmt, hash::Hash, marker::PhantomData, str::FromStr},
+    std::{collections::HashMap, fmt, hash::Hash, marker::PhantomData, str::FromStr},
 };
 
 struct RootVisitor<Key> {

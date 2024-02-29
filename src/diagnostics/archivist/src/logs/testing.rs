@@ -26,7 +26,6 @@ use futures::channel::mpsc;
 use futures::prelude::*;
 use std::{
     collections::VecDeque,
-    convert::TryInto,
     io::Cursor,
     marker::PhantomData,
     sync::{Arc, Weak},

@@ -4,7 +4,6 @@
 
 use {
     anyhow::{format_err, Error},
-    fdio, fidl,
     fidl_fuchsia_inspect_deprecated::{InspectProxy, MetricValue, PropertyValue},
     fuchsia_async as fasync,
     fuchsia_inspect::reader::{DiagnosticsHierarchy, Property},

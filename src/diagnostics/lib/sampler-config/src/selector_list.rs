@@ -4,7 +4,7 @@
 
 use {
     fidl_fuchsia_diagnostics::StringSelector,
-    selectors::{self, FastError},
+    selectors::FastError,
     serde::{de::Unexpected, Deserialize, Deserializer},
     std::sync::atomic::{AtomicU64, Ordering},
     std::sync::Arc,
@@ -161,7 +161,7 @@ impl<'de> Deserialize<'de> for SelectorList {
 mod tests {
     use super::*;
     use anyhow::Error;
-    use fidl_fuchsia_diagnostics::{StringSelector, TreeSelector};
+    use fidl_fuchsia_diagnostics::TreeSelector;
 
     fn require_string(data: &StringSelector, required: &str) {
         match data {

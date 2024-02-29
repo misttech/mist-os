@@ -4,7 +4,7 @@
 
 use {
     anyhow::Error,
-    argh, fuchsia_async as fasync,
+    fuchsia_async as fasync,
     iquery::{command_line::CommandLine, commands::ArchiveAccessorProvider, commands::Command},
 };
 

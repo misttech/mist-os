@@ -316,7 +316,6 @@ pub enum LazyItem<T> {
 mod tests {
     use super::*;
     use futures::poll;
-    use std::{fmt::Debug, task::Poll};
 
     impl<T: Debug> LazyItem<T> {
         #[track_caller]

@@ -6,7 +6,6 @@ use {
     crate::{commands::*, types::*},
     argh::FromArgs,
     async_trait::async_trait,
-    serde_json,
 };
 
 #[derive(FromArgs, PartialEq, Debug)]

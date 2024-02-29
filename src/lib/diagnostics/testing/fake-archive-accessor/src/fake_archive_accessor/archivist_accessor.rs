@@ -14,7 +14,7 @@ use {
     fidl_fuchsia_diagnostics::{
         self, ClientSelectorConfiguration, DataType, Format, Selector, SelectorArgument, StreamMode,
     },
-    selectors::{self, VerboseError},
+    selectors::VerboseError,
     tracing::warn,
 };
 

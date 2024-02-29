@@ -6,7 +6,7 @@ use crate::{constants::*, test_topology};
 use diagnostics_assertions::{assert_data_tree, AnyProperty};
 use diagnostics_reader::{ArchiveReader, Inspect};
 use fidl_fuchsia_diagnostics::ArchiveAccessorMarker;
-use std::{collections::HashSet, iter::FromIterator};
+use std::collections::HashSet;
 
 #[fuchsia::test]
 async fn read_components_recursive_glob() {

@@ -12,7 +12,6 @@ use {
     futures::FutureExt,
     glob::{GlobError, Paths},
     serde::{de::DeserializeOwned, Deserialize},
-    serde_json5,
     std::fs,
     std::path::{Path, PathBuf},
     std::sync::{Arc, Mutex},

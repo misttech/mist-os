@@ -8,7 +8,7 @@ use crate::{Data, Logs, Severity};
 use fidl_fuchsia_diagnostics as fdiagnostics;
 use fidl_fuchsia_logger::{LogLevelFilter, LogMessage};
 use fuchsia_zircon as zx;
-use std::{convert::TryFrom, fmt::Write, os::raw::c_int};
+use std::{fmt::Write, os::raw::c_int};
 use thiserror::Error;
 
 /// The legacy severity representation.
@@ -208,7 +208,6 @@ impl Into<LogMessage> for Data<Logs> {
 mod test {
     use super::*;
     use crate::{BuilderArgs, LogsDataBuilder};
-    use std::convert::TryFrom;
 
     const TEST_URL: &'static str = "fuchsia-pkg://test";
     const TEST_MONIKER: &'static str = "fake-test/moniker";

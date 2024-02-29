@@ -4,7 +4,6 @@
 
 use bitflags::bitflags;
 use diagnostics_data::{DiagnosticsData, Metadata, MetadataError};
-use fidl;
 use fidl_fuchsia_diagnostics::{
     ArchiveAccessorMarker, ArchiveAccessorProxy, BatchIteratorMarker, BatchIteratorProxy,
     ClientSelectorConfiguration, Format, FormattedContent, PerformanceConfiguration, ReaderError,

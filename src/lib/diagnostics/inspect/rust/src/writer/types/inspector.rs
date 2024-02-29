@@ -5,7 +5,7 @@
 use crate::writer::{private::InspectTypeInternal, Error, Heap, Node, State};
 use diagnostics_hierarchy::{DiagnosticsHierarchy, DiagnosticsHierarchyGetter};
 use inspect_format::{constants, BlockContainer, Container};
-use std::{borrow::Cow, cmp::max, default::Default, fmt, sync::Arc};
+use std::{borrow::Cow, cmp::max, fmt, sync::Arc};
 use tracing::error;
 
 #[cfg(target_os = "fuchsia")]
@@ -434,7 +434,6 @@ mod tests {
 #[cfg(all(test, target_os = "fuchsia"))]
 mod fuchsia_tests {
     use super::*;
-    use fuchsia_zircon::AsHandleRef;
     use std::ffi::CString;
 
     #[fuchsia::test]

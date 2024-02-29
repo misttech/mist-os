@@ -13,7 +13,6 @@ use {
     fuchsia_component::client as fclient,
     fuchsia_zircon::{self as zx, Vmo},
     serde::Serialize,
-    std::convert::TryFrom,
 };
 
 pub const VMO_SIZE: u64 = 4096;
@@ -207,7 +206,7 @@ impl Connection {
 pub(crate) mod tests {
     use {
         super::*,
-        crate::{create_node, puppet::DiffType},
+        crate::create_node,
         anyhow::Context as _,
         fidl::endpoints::{create_proxy, RequestStream, ServerEnd},
         fidl_diagnostics_validate::{

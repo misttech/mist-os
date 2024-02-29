@@ -6,7 +6,6 @@
 
 use crate::TreeServerSendPreference;
 use anyhow::Error;
-use fidl;
 use fidl_fuchsia_inspect::{
     TreeContent, TreeMarker, TreeNameIteratorRequest, TreeNameIteratorRequestStream, TreeRequest,
     TreeRequestStream,
@@ -140,13 +139,9 @@ mod tests {
     use diagnostics_assertions::{assert_data_tree, assert_json_diff};
     use fidl_fuchsia_inspect::{TreeNameIteratorMarker, TreeNameIteratorProxy, TreeProxy};
     use fuchsia_async::DurationExt;
-    use fuchsia_inspect::{
-        reader::{read_with_timeout, DiagnosticsHierarchy, PartialNodeHierarchy},
-        Inspector,
-    };
+    use fuchsia_inspect::reader::{read_with_timeout, DiagnosticsHierarchy, PartialNodeHierarchy};
     use fuchsia_zircon as zx;
     use futures::FutureExt;
-    use std::convert::TryFrom;
     use std::time::Duration;
 
     /// Spawns a `fuchsia.inspect.Tree` server and returns the task handling

@@ -7,13 +7,13 @@ use {
     fidl::endpoints::DiscoverableProtocolMarker,
     fidl_fuchsia_inspect::TreeMarker,
     fidl_fuchsia_inspect_deprecated::InspectMarker,
-    fidl_fuchsia_io as fio, fuchsia_fs,
+    fidl_fuchsia_io as fio,
     fuchsia_inspect::reader::{self, DiagnosticsHierarchy, PartialNodeHierarchy},
     fuchsia_zircon::{self as zx, DurationNum as _},
     futures::stream::StreamExt,
     inspect_fidl_load as inspect_fidl,
     lazy_static::lazy_static,
-    std::{convert::TryFrom, path::PathBuf, str::FromStr},
+    std::{path::PathBuf, str::FromStr},
 };
 
 lazy_static! {

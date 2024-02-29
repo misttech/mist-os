@@ -11,7 +11,6 @@ use {
     nom::HexDisplay,
     num_traits::{Bounded, Zero},
     std::{
-        cmp::PartialOrd,
         fmt,
         ops::{Add, AddAssign, Mul, MulAssign},
     },

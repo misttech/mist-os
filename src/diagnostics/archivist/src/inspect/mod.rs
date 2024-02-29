@@ -10,15 +10,12 @@ use {
     },
     diagnostics_data::{self as schema, Data, Inspect, InspectHandleName},
     diagnostics_hierarchy::{DiagnosticsHierarchy, HierarchyMatcher},
-    fidl_fuchsia_diagnostics::{self, Selector},
+    fidl_fuchsia_diagnostics::Selector,
     fuchsia_inspect::reader::PartialNodeHierarchy,
     fuchsia_trace as ftrace, fuchsia_zircon as zx,
     futures::prelude::*,
     selectors::SelectorExt,
-    std::{
-        convert::{TryFrom, TryInto},
-        sync::Arc,
-    },
+    std::sync::Arc,
     tracing::error,
 };
 
@@ -398,7 +395,6 @@ mod tests {
             pipeline::Pipeline,
         },
         diagnostics_assertions::{assert_data_tree, AnyProperty},
-        diagnostics_data::InspectHandleName,
         fidl::endpoints::{create_proxy_and_stream, ClientEnd, DiscoverableProtocolMarker},
         fidl_fuchsia_diagnostics::{BatchIteratorMarker, BatchIteratorProxy, Format, StreamMode},
         fidl_fuchsia_inspect::{InspectSinkMarker, InspectSinkPublishRequest, TreeMarker},
@@ -412,7 +408,7 @@ mod tests {
         futures::{FutureExt, StreamExt},
         inspect_runtime::{service, TreeServerSendPreference},
         moniker::ExtendedMoniker,
-        selectors::{self, VerboseError},
+        selectors::VerboseError,
         serde_json::json,
     };
 

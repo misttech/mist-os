@@ -5,7 +5,7 @@ use super::ListenerError;
 use diagnostics_data::{LegacySeverity, LogsData};
 use diagnostics_message::fx_log_severity_t;
 use fidl_fuchsia_logger::{LogFilterOptions, LogLevelFilter};
-use std::{collections::HashSet, convert::TryFrom};
+use std::collections::HashSet;
 
 /// Controls whether messages are seen by a given `Listener`. Created from
 /// `fidl_fuchsia_logger::LogFilterOptions`.

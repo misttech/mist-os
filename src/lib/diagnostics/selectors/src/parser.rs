@@ -8,7 +8,6 @@ use crate::{
     validate::{ValidateComponentSelectorExt, ValidateExt, ValidateTreeSelectorExt},
 };
 use nom::{
-    self,
     branch::alt,
     bytes::complete::{escaped, is_not, tag, take_while, take_while1},
     character::complete::{alphanumeric1, char, digit1, hex_digit1, multispace0, none_of, one_of},
@@ -540,7 +539,6 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use nom::combinator::all_consuming;
     use rand::distributions::Distribution;
 
     #[fuchsia::test]

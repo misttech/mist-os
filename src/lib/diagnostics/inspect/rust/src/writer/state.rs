@@ -4,7 +4,6 @@
 
 use {
     crate::writer::{error::Error, heap::Heap, Inspector, StringReference},
-    anyhow,
     derivative::Derivative,
     fuchsia_sync::{Mutex, MutexGuard},
     futures::future::BoxFuture,
@@ -1194,7 +1193,6 @@ mod tests {
             PartialNodeHierarchy,
         },
         writer::testing_utils::get_state,
-        Inspector,
     };
     use diagnostics_assertions::assert_data_tree;
     use futures::prelude::*;

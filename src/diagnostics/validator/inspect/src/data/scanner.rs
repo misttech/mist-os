@@ -13,10 +13,8 @@ use {
         PropertyFormat,
     },
     std::{
-        self,
         cmp::min,
         collections::{HashMap, HashSet},
-        convert::TryFrom,
     },
 };
 
@@ -739,9 +737,7 @@ mod tests {
         crate::*,
         fidl_diagnostics_validate::*,
         fuchsia_inspect::reader::snapshot::BackingBuffer,
-        inspect_format::{
-            constants, Block, BlockIndex, BlockType, HeaderFields, PayloadFields, ReadBytes,
-        },
+        inspect_format::{constants, Block, HeaderFields, PayloadFields, ReadBytes},
     };
 
     // TODO(https://fxbug.dev/42115894): Depending on the resolution of https://fxbug.dev/42115938, move this const out of mod test.

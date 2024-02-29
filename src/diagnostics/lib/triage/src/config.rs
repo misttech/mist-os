@@ -15,7 +15,7 @@ use {
     anyhow::{bail, format_err, Context, Error},
     num_derive::FromPrimitive,
     serde::{Deserialize, Deserializer},
-    std::{collections::HashMap, convert::TryFrom},
+    std::collections::HashMap,
 };
 
 // These numbers are used in the wasm-bindgen bridge so they are explicit and
@@ -358,12 +358,8 @@ pub(crate) fn filter_actions(
 #[cfg(test)]
 mod test {
     use {
-        super::*,
-        crate::act::{Action, Alert, Severity},
-        anyhow::Error,
-        fidl_fuchsia_feedback::MAX_CRASH_SIGNATURE_LENGTH,
+        super::*, crate::act::Alert, fidl_fuchsia_feedback::MAX_CRASH_SIGNATURE_LENGTH,
         maplit::hashmap,
-        std::convert::TryFrom,
     };
 
     // initialize() will be tested in the integration test: "fx test triage_lib_test"

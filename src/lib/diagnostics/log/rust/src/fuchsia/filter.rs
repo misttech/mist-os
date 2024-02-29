@@ -109,7 +109,6 @@ mod tests {
     use fidl::endpoints::create_proxy_and_stream;
     use fidl_fuchsia_logger::{LogSinkMarker, LogSinkRequest, LogSinkRequestStream};
     use futures::{channel::mpsc, StreamExt, TryStreamExt};
-    use std::sync::Mutex;
     use tracing::{debug, error, info, trace, warn, Event};
     use tracing_subscriber::{layer::SubscriberExt, Registry};
 
