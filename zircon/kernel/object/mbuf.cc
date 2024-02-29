@@ -80,11 +80,6 @@ zx_status_t MBufChain::ReadHelper(T* chain, user_out_ptr<char> dst, size_t len, 
       read_off = 0;
       ++iter;
     } else {
-      // TODO(https://fxbug.dev/42109418): Note, we're advancing (consuming data) after each copy.
-      // This means that if a subsequent copy fails (perhaps because a the write to the user buffer
-      // faults) data will be "dropped".  Consider changing this function to only advance (and
-      // free) once all data has been successfully copied.
-
       if (likely(copy_succeeded)) {
         read_off += static_cast<uint32_t>(copy_len);
         chain->size_ -= copy_len;
