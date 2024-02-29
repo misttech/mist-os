@@ -123,7 +123,7 @@ fn run_cmc() -> Result<(), Error> {
             path_exists(&file)?;
             compile::compile(
                 &file,
-                &output.unwrap(),
+                &output,
                 depfile,
                 &includepath,
                 &includeroot,

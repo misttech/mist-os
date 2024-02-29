@@ -195,8 +195,8 @@ pub enum Commands {
         file: PathBuf,
 
         #[structopt(short = "o", long = "output", parse(from_os_str))]
-        /// file to write the formatted results to, will print to stdout if not provided
-        output: Option<PathBuf>,
+        /// file to write the formatted results to
+        output: PathBuf,
 
         #[structopt(short = "d", long = "depfile", parse(from_os_str))]
         /// depfile for includes
