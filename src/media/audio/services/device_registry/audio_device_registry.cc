@@ -39,30 +39,30 @@ AudioDeviceRegistry::~AudioDeviceRegistry() { ADR_LOG_OBJECT(kLogObjectLifetimes
 zx_status_t AudioDeviceRegistry::StartDeviceDetection() {
   DeviceDetectionHandler device_detection_handler =
       [this](std::string_view name, fuchsia_audio_device::DeviceType device_type,
-             fuchsia_audio_device::AudioDriverClient audio_driver_client) {
+             fuchsia_audio_device::DriverClient driver_client) {
         ADR_LOG_OBJECT(kLogDeviceDetection)
             << "detected Audio " << device_type << " '" << name << "'";
 
-        switch (audio_driver_client.Which()) {
-          case fuchsia_audio_device::AudioDriverClient::Tag::kCodecClient:
-            FX_CHECK(audio_driver_client.codec_client()->is_valid());
+        switch (driver_client.Which()) {
+          case fuchsia_audio_device::DriverClient::Tag::kCodec:
+            FX_CHECK(driver_client.codec()->is_valid());
             ADR_LOG_OBJECT(kLogDeviceDetection) << "Detected Codec device - doing nothing for now";
             return;
-          case fuchsia_audio_device::AudioDriverClient::Tag::kStreamConfigClient:
-            FX_CHECK(audio_driver_client.stream_config_client()->is_valid());
+          case fuchsia_audio_device::DriverClient::Tag::kStreamConfig:
+            FX_CHECK(driver_client.stream_config()->is_valid());
             break;
-          case fuchsia_audio_device::AudioDriverClient::Tag::kCompositeClient:
+          case fuchsia_audio_device::DriverClient::Tag::kComposite:
             ADR_WARN_OBJECT() << "Composite device detection not yet supported";
             return;
-          case fuchsia_audio_device::AudioDriverClient::Tag::kDaiClient:
+          case fuchsia_audio_device::DriverClient::Tag::kDai:
             ADR_WARN_OBJECT() << "Dai device detection not yet supported";
             return;
           default:
-            FX_CHECK(!audio_driver_client.IsUnknown());
+            FX_CHECK(!driver_client.IsUnknown());
         }
-        // Eventually we will simply pass the audio_driver_client onward.
+        // Eventually we will simply pass the driver_client onward.
         fidl::ClientEnd<fuchsia_hardware_audio::StreamConfig> stream_config_client{
-            audio_driver_client.stream_config_client()->TakeChannel()};
+            driver_client.stream_config()->TakeChannel()};
         AddDevice(Device::Create(this->shared_from_this(), thread_->dispatcher(), name, device_type,
                                  std::move(stream_config_client)));
       };

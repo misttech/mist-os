@@ -5,7 +5,6 @@
 #include "src/media/audio/services/device_registry/registry_server.h"
 
 #include <fidl/fuchsia.audio.device/cpp/fidl.h>
-#include <fidl/fuchsia.audio.device/cpp/natural_types.h>
 #include <lib/fidl/cpp/unified_messaging_declarations.h>
 #include <lib/fidl/cpp/wire/transaction.h>
 #include <lib/fidl/cpp/wire/wire_messaging_declarations.h>
@@ -17,7 +16,6 @@
 #include <optional>
 #include <vector>
 
-#include "fidl/fuchsia.audio.device/cpp/common_types.h"
 #include "src/media/audio/services/device_registry/audio_device_registry.h"
 #include "src/media/audio/services/device_registry/device.h"
 #include "src/media/audio/services/device_registry/logging.h"
@@ -101,7 +99,7 @@ void RegistryServer::ReplyWithAddedDevices() {
   }}));
 }
 
-// TODO(https://fxbug.dev/42068345): consider WatchDevicesRemoved (plural: return vector) - more ergonomic?
+// TODO(https://fxbug.dev/42068345): is WatchDevicesRemoved (returning a vector) more ergonomic?
 void RegistryServer::WatchDeviceRemoved(WatchDeviceRemovedCompleter::Sync& completer) {
   ADR_LOG_OBJECT(kLogRegistryServerMethods);
   if (watch_device_removed_completer_) {

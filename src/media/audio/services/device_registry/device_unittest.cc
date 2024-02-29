@@ -389,7 +389,7 @@ TEST_F(DeviceTest, SetActiveChannels) {
   SetActiveChannelsAndExpect(0x0002);
 }
 
-// TODO(https://fxbug.dev/42069012): SetActiveChannel no change => no callback (no change in set_time)
+// TODO(https://fxbug.dev/42069012): SetActiveChannel no change => no callback or set_time change
 
 TEST_F(DeviceTest, BasicStartAndStop) {
   InitializeDeviceForFakeDriver();

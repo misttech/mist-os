@@ -35,18 +35,18 @@ const MAX_COUNT_CHANNELS uint32 = fuchsia.hardware.audio.MAX_COUNT_CHANNELS_IN_R
 const MAX_STRING_SIZE uint32 = fuchsia.hardware.audio.MAX_UI_STRING_SIZE;
 
 /// The protocol channel used to configure and observe a device.
-type AudioDriverClient = flexible resource union {
+type DriverClient = flexible resource union {
     /// Populated for drivers that use the `fuchsia_hardware_audio.Codec` interface.
-    1: codec_client client_end:fuchsia.hardware.audio.Codec;
+    1: codec client_end:fuchsia.hardware.audio.Codec;
 
     /// Populated for drivers that use the `fuchsia_hardware_audio.Composite` interface.
-    2: composite_client client_end:fuchsia.hardware.audio.Composite;
+    2: composite client_end:fuchsia.hardware.audio.Composite;
 
     /// Populated for drivers that use the `fuchsia_hardware_audio.Dai` interface.
-    3: dai_client client_end:fuchsia.hardware.audio.Dai;
+    3: dai client_end:fuchsia.hardware.audio.Dai;
 
     /// Populated for drivers that use the `fuchsia_hardware_audio.StreamConfig` interface.
-    4: stream_config_client client_end:fuchsia.hardware.audio.StreamConfig;
+    4: stream_config client_end:fuchsia.hardware.audio.StreamConfig;
 };
 
 /// The protocol used by the driver, and (if StreamConfig) its directionality.

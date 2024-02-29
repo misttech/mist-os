@@ -1201,14 +1201,16 @@ void Device::CalculateRequiredRingBufferSizes() {
     ring_buffer_consumer_bytes_ = requested_ring_buffer_frames_ * bytes_per_frame_;
   }
 
-  // TODO(https://fxbug.dev/42069012): validate this case; we don't surface this error to the caller.
+  // TODO(https://fxbug.dev/42069012): validate this case; we don't surface this error to the
+  // caller.
   if (requested_ring_buffer_frames_ > std::numeric_limits<uint32_t>::max()) {
     ADR_WARN_OBJECT() << "requested_ring_buffer_frames_ cannot exceed uint32_t::max()";
     requested_ring_buffer_frames_ = std::numeric_limits<uint32_t>::max();
   }
 }
 
-// TODO(https://fxbug.dev/42069013): implement this, via hanging RingBuffer/WatchClockRecoveryPositionInfo.
+// TODO(https://fxbug.dev/42069013): implement this, via hanging
+// RingBuffer/WatchClockRecoveryPositionInfo.
 void Device::RecoverDeviceClockFromPositionInfo() { ADR_LOG_OBJECT(kLogRingBufferMethods); }
 
 // TODO(https://fxbug.dev/42069013): implement this.

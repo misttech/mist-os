@@ -53,8 +53,8 @@ void ProviderServer::AddDevice(AddDeviceRequest& request, AddDeviceCompleter::Sy
     return;
   }
 
-  if (!request.stream_config_client()) {
-    ADR_WARN_OBJECT() << "stream_config_client was absent";
+  if (!request.stream_config()) {
+    ADR_WARN_OBJECT() << "stream_config was absent";
 
     completer.Reply(fit::error(fuchsia_audio_device::ProviderAddDeviceError::kInvalidStreamConfig));
     return;
@@ -65,8 +65,7 @@ void ProviderServer::AddDevice(AddDeviceRequest& request, AddDeviceCompleter::Sy
 
   // This kicks off device initialization, which notifies the parent when it completes.
   parent_->AddDevice(Device::Create(parent_, thread().dispatcher(), *request.device_name(),
-                                    *request.device_type(),
-                                    std::move(*request.stream_config_client())));
+                                    *request.device_type(), std::move(*request.stream_config())));
 
   fuchsia_audio_device::ProviderAddDeviceResponse response{};
   completer.Reply(fit::success(response));

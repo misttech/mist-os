@@ -21,7 +21,7 @@
 namespace media_audio {
 
 using DeviceDetectionHandler = std::function<void(
-    std::string_view, fuchsia_audio_device::DeviceType, fuchsia_audio_device::AudioDriverClient)>;
+    std::string_view, fuchsia_audio_device::DeviceType, fuchsia_audio_device::DriverClient)>;
 
 // This class detects devices and invokes the provided handler for those devices. It uses two
 // file-system watchers that focus on the device file system (devfs), specifically the locations
@@ -43,10 +43,8 @@ class DeviceDetector {
 
   // Open a devnode at the given path; use its FDIO device channel as a Connector to
   // connect (retrieve) the device's primary protocol (StreamConfig, etc).
-  template <typename ConnectorProtocolT, typename ProtocolT>
-  void AudioDriverClientFromDevFs(const fidl::ClientEnd<fuchsia_io::Directory>& dir,
-                                  const std::string& name,
-                                  fuchsia_audio_device::DeviceType device_type);
+  void DriverClientFromDevFs(const fidl::ClientEnd<fuchsia_io::Directory>& dir,
+                             const std::string& name, fuchsia_audio_device::DeviceType device_type);
 
   DeviceDetectionHandler handler_;
   std::vector<std::unique_ptr<fsl::DeviceWatcher>> watchers_;

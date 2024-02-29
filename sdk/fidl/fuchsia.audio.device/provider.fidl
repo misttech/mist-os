@@ -24,7 +24,7 @@ closed protocol Provider {
         /// The `StreamConfig` channel used to configure/observe the device.
         ///
         /// Required.
-        3: stream_config_client client_end:fuchsia.hardware.audio.StreamConfig;
+        3: stream_config client_end:fuchsia.hardware.audio.StreamConfig;
     }) -> (table {}) error ProviderAddDeviceError;
 };
 
@@ -36,6 +36,6 @@ type ProviderAddDeviceError = flexible enum {
     /// The required `device_type` is missing.
     INVALID_TYPE = 2;
 
-    /// The required `stream_config_client` is invalid or missing.
+    /// The required `stream_config` is invalid or missing.
     INVALID_STREAM_CONFIG = 3;
 };

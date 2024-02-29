@@ -102,15 +102,15 @@ class FakeAudioStreamConfig : public fidl::testing::TestBase<StreamConfigConnect
   std::optional<fidl::ServerBindingRef<StreamConfig>> binding_;
 };
 
-using fuchsia_audio_device::AudioDriverClient;
 using fuchsia_audio_device::DeviceType;
+using fuchsia_audio_device::DriverClient;
 
 class DeviceTracker {
  public:
   struct DeviceConnection {
     std::string_view name;
     DeviceType device_type;
-    AudioDriverClient client;
+    DriverClient client;
   };
 
   DeviceTracker(async_dispatcher_t* dispatcher, bool detection_is_expected)
@@ -125,10 +125,10 @@ class DeviceTracker {
 
  private:
   DeviceDetectionHandler handler_ = [this](std::string_view name, DeviceType device_type,
-                                           AudioDriverClient audio_driver_client) {
+                                           DriverClient driver_client) {
     ASSERT_TRUE(detection_is_expected_) << "Unexpected device detection";
 
-    devices_.emplace_back(DeviceConnection{name, device_type, std::move(audio_driver_client)});
+    devices_.emplace_back(DeviceConnection{name, device_type, std::move(driver_client)});
   };
   async_dispatcher_t* dispatcher_;
   const bool detection_is_expected_;
@@ -277,14 +277,14 @@ TEST_F(DeviceDetectorTest, DetectExistingDevices) {
   RunLoopUntilIdle();
   ASSERT_EQ(0u, tracker->size());
   {
-    // Create the detector; expect 10 events (1 for each device above);
+    // Create the detector; expect 6 events (1 for each device above);
     auto device_detector = DeviceDetector::Create(tracker->handler(), dispatcher());
     zx::time deadline = zx::clock::get_monotonic() + kCommandTimeout;
     while (zx::clock::get_monotonic() < deadline) {
       // A fake audio device could still be setting up its server end, by the time the
       // tracker adds it. We wait for the tracker AND the server-ends, to avoid a race.
       if (input0->is_bound() && input1->is_bound() && output0->is_bound() && output1->is_bound() &&
-          codec0->is_bound() && codec1->is_bound() && tracker->size() >= 10) {
+          codec0->is_bound() && codec1->is_bound() && tracker->size() >= 6) {
         break;
       }
       RunLoopUntilIdle();
@@ -296,16 +296,16 @@ TEST_F(DeviceDetectorTest, DetectExistingDevices) {
     for (auto dev_num = 0u; dev_num < tracker->size(); ++dev_num) {
       auto& device = tracker->devices()[dev_num];
       if (device.device_type == DeviceType::kInput) {
-        EXPECT_EQ(device.client.Which(), AudioDriverClient::Tag::kStreamConfigClient);
-        EXPECT_TRUE(device.client.stream_config_client()->is_valid());
+        EXPECT_EQ(device.client.Which(), DriverClient::Tag::kStreamConfig);
+        EXPECT_TRUE(device.client.stream_config()->is_valid());
         ++num_inputs;
       } else if (device.device_type == DeviceType::kOutput) {
-        EXPECT_EQ(device.client.Which(), AudioDriverClient::Tag::kStreamConfigClient);
-        EXPECT_TRUE(device.client.stream_config_client()->is_valid());
+        EXPECT_EQ(device.client.Which(), DriverClient::Tag::kStreamConfig);
+        EXPECT_TRUE(device.client.stream_config()->is_valid());
         ++num_outputs;
       } else if (device.device_type == DeviceType::kCodec) {
-        EXPECT_EQ(device.client.Which(), AudioDriverClient::Tag::kCodecClient);
-        EXPECT_TRUE(device.client.codec_client()->is_valid());
+        EXPECT_EQ(device.client.Which(), DriverClient::Tag::kCodec);
+        EXPECT_TRUE(device.client.codec()->is_valid());
         ++num_codecs;
       } else {
         ADD_FAILURE() << "Unknown device_type during test";
@@ -313,7 +313,6 @@ TEST_F(DeviceDetectorTest, DetectExistingDevices) {
     }
     EXPECT_EQ(num_inputs, 2);
     EXPECT_EQ(num_outputs, 2);
-    EXPECT_EQ(num_codecs, 2);
     EXPECT_EQ(num_codecs, 2);
   }
 
@@ -323,11 +322,11 @@ TEST_F(DeviceDetectorTest, DetectExistingDevices) {
   std::for_each(tracker->devices().begin(), tracker->devices().end(), [](const auto& device) {
     switch (device.device_type) {
       case DeviceType::kCodec:
-        EXPECT_TRUE(device.client.codec_client()->is_valid());
+        EXPECT_TRUE(device.client.codec()->is_valid());
         break;
       case DeviceType::kInput:
       case DeviceType::kOutput:
-        EXPECT_TRUE(device.client.stream_config_client()->is_valid());
+        EXPECT_TRUE(device.client.stream_config()->is_valid());
         break;
       case DeviceType::kComposite:
       case DeviceType::kDai:
@@ -406,11 +405,11 @@ TEST_F(DeviceDetectorTest, DetectHotplugDevices) {
   std::for_each(tracker->devices().begin(), tracker->devices().end(), [](const auto& device) {
     switch (device.device_type) {
       case DeviceType::kCodec:
-        EXPECT_TRUE(device.client.codec_client()->is_valid());
+        EXPECT_TRUE(device.client.codec()->is_valid());
         break;
       case DeviceType::kInput:
       case DeviceType::kOutput:
-        EXPECT_TRUE(device.client.stream_config_client()->is_valid());
+        EXPECT_TRUE(device.client.stream_config()->is_valid());
         break;
       case DeviceType::kComposite:
       case DeviceType::kDai:

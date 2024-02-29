@@ -30,7 +30,7 @@ TEST_F(ProviderServerWarningTest, MissingDeviceName) {
   provider->client()
       ->AddDevice({{
           .device_type = fuchsia_audio_device::DeviceType::kOutput,
-          .stream_config_client = std::move(stream_config_client_end),
+          .stream_config = std::move(stream_config_client_end),
       }})
       .Then([&received_callback](fidl::Result<Provider::AddDevice>& result) {
         received_callback = true;
@@ -61,7 +61,7 @@ TEST_F(ProviderServerWarningTest, EmptyDeviceName) {
       ->AddDevice({{
           .device_name = "",
           .device_type = fuchsia_audio_device::DeviceType::kOutput,
-          .stream_config_client = std::move(stream_config_client_end),
+          .stream_config = std::move(stream_config_client_end),
       }})
       .Then([&received_callback](fidl::Result<Provider::AddDevice>& result) {
         received_callback = true;
@@ -91,7 +91,7 @@ TEST_F(ProviderServerWarningTest, MissingDeviceType) {
   provider->client()
       ->AddDevice({{
           .device_name = "Test device name",
-          .stream_config_client = std::move(stream_config_client_end),
+          .stream_config = std::move(stream_config_client_end),
       }})
       .Then([&received_callback](fidl::Result<Provider::AddDevice>& result) {
         received_callback = true;
@@ -144,7 +144,7 @@ TEST_F(ProviderServerWarningTest, InvalidStreamConfig) {
       ->AddDevice({{
           .device_name = "Test device name",
           .device_type = fuchsia_audio_device::DeviceType::kOutput,
-          .stream_config_client = fidl::ClientEnd<fuchsia_hardware_audio::StreamConfig>(),
+          .stream_config = fidl::ClientEnd<fuchsia_hardware_audio::StreamConfig>(),
       }})
       .Then([&received_callback](fidl::Result<Provider::AddDevice>& result) {
         received_callback = true;

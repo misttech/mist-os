@@ -46,7 +46,7 @@ TEST_F(ProviderServerTest, AddDeviceThatOutlivesProvider) {
       ->AddDevice({{
           .device_name = "Test device name",
           .device_type = fuchsia_audio_device::DeviceType::kOutput,
-          .stream_config_client = std::move(stream_config_client_end),
+          .stream_config = std::move(stream_config_client_end),
       }})
       .Then([&received_callback](fidl::Result<Provider::AddDevice>& result) {
         EXPECT_TRUE(result.is_ok()) << result.error_value().FormatDescription();
@@ -77,7 +77,7 @@ TEST_F(ProviderServerTest, ProviderCanOutliveDevice) {
       ->AddDevice({{
           .device_name = "Test device name",
           .device_type = fuchsia_audio_device::DeviceType::kOutput,
-          .stream_config_client = std::move(stream_config_client_end),
+          .stream_config = std::move(stream_config_client_end),
       }})
       .Then([&received_callback](fidl::Result<Provider::AddDevice>& result) {
         EXPECT_TRUE(result.is_ok()) << result.error_value().FormatDescription();
@@ -113,7 +113,7 @@ TEST_F(ProviderServerTest, ProviderAddThenWatch) {
       ->AddDevice({{
           .device_name = "Test device name",
           .device_type = fuchsia_audio_device::DeviceType::kOutput,
-          .stream_config_client = std::move(stream_config_client_end),
+          .stream_config = std::move(stream_config_client_end),
       }})
       .Then([&received_callback](fidl::Result<Provider::AddDevice>& result) {
         EXPECT_TRUE(result.is_ok()) << result.error_value().FormatDescription();
@@ -168,7 +168,7 @@ TEST_F(ProviderServerTest, WatchThenProviderAdd) {
       ->AddDevice({{
           .device_name = "Test device name",
           .device_type = fuchsia_audio_device::DeviceType::kOutput,
-          .stream_config_client = std::move(stream_config_client_end),
+          .stream_config = std::move(stream_config_client_end),
       }})
       .Then([&received_callback](fidl::Result<Provider::AddDevice>& result) {
         EXPECT_TRUE(result.is_ok()) << result.error_value().FormatDescription();

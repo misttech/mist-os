@@ -17,13 +17,14 @@
 
 #include <fbl/unique_fd.h>
 
+#include "fidl/fuchsia.audio.device/cpp/common_types.h"
 #include "src/lib/fsl/io/device_watcher.h"
 #include "src/media/audio/services/device_registry/logging.h"
 
 namespace media_audio {
 
-using fuchsia_audio_device::AudioDriverClient;
 using fuchsia_audio_device::DeviceType;
+using fuchsia_audio_device::DriverClient;
 
 namespace {
 
@@ -33,8 +34,8 @@ struct DeviceNodeSpecifier {
 };
 
 constexpr DeviceNodeSpecifier kAudioDevNodes[] = {
-    {.path = "/dev/class/audio-output", .device_type = DeviceType::kOutput},
     {.path = "/dev/class/audio-input", .device_type = DeviceType::kInput},
+    {.path = "/dev/class/audio-output", .device_type = DeviceType::kOutput},
     {.path = "/dev/class/codec", .device_type = DeviceType::kCodec},
 };
 
@@ -71,19 +72,12 @@ zx_status_t DeviceDetector::StartDeviceWatchers() {
             FX_LOGS(ERROR) << "DeviceWatcher fired but dispatcher is gone";
             return;
           }
-          if (device_type == DeviceType::kCodec) {
-            AudioDriverClientFromDevFs<fuchsia_hardware_audio::CodecConnector,
-                                       fuchsia_hardware_audio::Codec>(dir, filename, device_type);
-          } else if (device_type == DeviceType::kComposite) {
-            FX_LOGS(WARNING) << "Composite device detection not yet supported";
+          if (device_type == DeviceType::kCodec || device_type == DeviceType::kInput ||
+              device_type == DeviceType::kOutput) {
+            DriverClientFromDevFs(dir, filename, device_type);
+          } else {
+            FX_LOGS(WARNING) << device_type << " device detection not yet supported";
             return;
-          } else if (device_type == DeviceType::kDai) {
-            FX_LOGS(WARNING) << "Dai device detection not yet supported";
-            return;
-          } else if (device_type == DeviceType::kInput || device_type == DeviceType::kOutput) {
-            AudioDriverClientFromDevFs<fuchsia_hardware_audio::StreamConfigConnector,
-                                       fuchsia_hardware_audio::StreamConfig>(dir, filename,
-                                                                             device_type);
           }
         },
         dispatcher_);
@@ -102,44 +96,64 @@ zx_status_t DeviceDetector::StartDeviceWatchers() {
   return ZX_OK;
 }
 
-template <typename ConnectorProtocolT, typename ProtocolT>
-void DeviceDetector::AudioDriverClientFromDevFs(const fidl::ClientEnd<fuchsia_io::Directory>& dir,
-                                                const std::string& name, DeviceType device_type) {
+void DeviceDetector::DriverClientFromDevFs(const fidl::ClientEnd<fuchsia_io::Directory>& dir,
+                                           const std::string& name, DeviceType device_type) {
   FX_CHECK(handler_);
-  zx::result client_end = component::ConnectAt<ConnectorProtocolT>(dir, name);
-  if (client_end.is_error()) {
-    FX_PLOGS(ERROR, client_end.error_value())
-        << "DeviceDetector failed to connect to device node at '" << name << "'";
+
+  std::optional<fuchsia_audio_device::DriverClient> driver_client;
+
+  if (device_type == fuchsia_audio_device::DeviceType::kCodec) {
+    zx::result client_end = component::ConnectAt<fuchsia_hardware_audio::CodecConnector>(dir, name);
+    if (client_end.is_error()) {
+      FX_PLOGS(ERROR, client_end.error_value())
+          << "DeviceDetector failed to connect to device node at '" << name << "'";
+      return;
+    }
+    fidl::Client connector(std::move(client_end.value()), dispatcher_);
+    auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_audio::Codec>();
+    if (!endpoints.is_ok()) {
+      FX_LOGS(ERROR) << "DriverClientFromDevFs: CreateEndpoints failed";
+      return;
+    }
+    auto status = connector->Connect(std::move(endpoints->server));
+    if (!status.is_ok()) {
+      FX_PLOGS(ERROR, status.error_value().status())
+          << "Connector/Connect failed for " << device_type;
+      return;
+    }
+    driver_client = DriverClient::WithCodec(std::move(endpoints->client));
+  } else if (device_type == fuchsia_audio_device::DeviceType::kInput ||
+             device_type == fuchsia_audio_device::DeviceType::kOutput) {
+    zx::result client_end =
+        component::ConnectAt<fuchsia_hardware_audio::StreamConfigConnector>(dir, name);
+    if (client_end.is_error()) {
+      FX_PLOGS(ERROR, client_end.error_value())
+          << "DeviceDetector failed to connect to device node at '" << name << "'";
+      return;
+    }
+    fidl::Client connector(std::move(client_end.value()), dispatcher_);
+    auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_audio::StreamConfig>();
+    if (!endpoints.is_ok()) {
+      FX_LOGS(ERROR) << "DriverClientFromDevFs: CreateEndpoints failed";
+      return;
+    }
+    auto status = connector->Connect(std::move(endpoints->server));
+    if (!status.is_ok()) {
+      FX_PLOGS(ERROR, status.error_value().status())
+          << "Connector/Connect failed for " << device_type;
+      return;
+    }
+    driver_client = DriverClient::WithStreamConfig(std::move(endpoints->client));
+  } else {
+    FX_LOGS(WARNING) << device_type << " device detection not yet supported";
     return;
   }
-  fidl::Client config_connector(std::move(client_end.value()), dispatcher_);
-  auto endpoints = fidl::CreateEndpoints<ProtocolT>();
-  if (!endpoints.is_ok()) {
-    FX_LOGS(ERROR) << "AudioDriverClientFromDevFs: CreateEndpoints failed";
-    return;
-  }
-  auto status = config_connector->Connect(std::move(endpoints->server));
-  if (!status.is_ok()) {
-    FX_PLOGS(ERROR, status.error_value().status())
-        << "Connector/Connect failed for " << device_type;
-    return;
-  }
+
   if constexpr (kLogDeviceDetection) {
     FX_LOGS(INFO) << "Detected and connected to " << device_type << " '" << name << "'";
   }
 
-  if constexpr (std::is_same_v<ProtocolT, fuchsia_hardware_audio::Codec>) {
-    handler_(name, device_type, AudioDriverClient::WithCodecClient(std::move(endpoints->client)));
-  } else if constexpr (std::is_same_v<ProtocolT, fuchsia_hardware_audio::Composite>) {
-    FX_LOGS(WARNING) << "Composite device detection not yet supported";
-    return;
-  } else if constexpr (std::is_same_v<ProtocolT, fuchsia_hardware_audio::Dai>) {
-    FX_LOGS(WARNING) << "Dai device detection not yet supported";
-    return;
-  } else if constexpr (std::is_same_v<ProtocolT, fuchsia_hardware_audio::StreamConfig>) {
-    handler_(name, device_type,
-             AudioDriverClient::WithStreamConfigClient(std::move(endpoints->client)));
-  }
+  handler_(name, device_type, std::move(*driver_client));
 }
 
 }  // namespace media_audio
