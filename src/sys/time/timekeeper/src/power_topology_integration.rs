@@ -46,8 +46,10 @@ where
     G: Future<Output = fasync::Task<()>>,
     F: Fn(fpb::LevelControlProxy) -> G,
 {
-    let power_elements =
-        governor_proxy.get_power_elements().await.context("while getting power elements")?;
+    let power_elements = governor_proxy
+        .get_power_elements()
+        .await
+        .context("in a call to ActivityGovernor/GetPowerElements")?;
 
     let _ignore = activity.send(()).await;
     if let Some(execution_state) = power_elements.execution_state {

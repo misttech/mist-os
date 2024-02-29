@@ -435,9 +435,9 @@ async fn maintain_utc<R: 'static, D: 'static>(
         if pte {
             power_topology_integration::manage(s1)
                 .await
-                .context("power topology integration error")
-                .map_err(|e| warn!("power_topology_error: {}", e))
-                .expect("power topology task setup succeeds")
+                .context("(timekeeper will ignore this error and just turn the integration off)")
+                .map_err(|e| error!("power management integration: {:#}", e))
+                .unwrap_or(fasync::Task::local(async {}))
                 .await;
         }
     });
