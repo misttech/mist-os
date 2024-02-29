@@ -54,9 +54,11 @@ constexpr std::string_view kBlockDevRelativePath = "class/block/";
 // devfs_root_fd: (OPTIONAL) A connection to devfs. If supplied, |path| is relative to this root.
 // parent_fd: An fd to the parent of the FVM device.
 // path: The path to the FVM device. Relative to |devfs_root_fd| if supplied.
-zx_status_t DestroyFvmAndWait(int devfs_root_fd, fbl::unique_fd parent_fd, fbl::unique_fd driver_fd,
-                              std::string_view path) {
-  auto volume_info_or = fs_management::FvmQuery(driver_fd.get());
+zx_status_t DestroyFvmAndWait(
+    int devfs_root_fd, fbl::unique_fd parent_fd,
+    fidl::ClientEnd<fuchsia_hardware_block_volume::VolumeManager> volume_manager,
+    std::string_view path) {
+  auto volume_info_or = fs_management::FvmQuery(volume_manager);
   if (volume_info_or.is_error()) {
     return ZX_ERR_WRONG_TYPE;
   }
@@ -427,11 +429,12 @@ zx_status_t FvmDestroy(std::string_view path) {
   if (!parent_fd) {
     return ZX_ERR_NOT_FOUND;
   }
-  fbl::unique_fd fvm_fd(open(driver_path.c_str(), O_RDONLY));
-  if (!fvm_fd) {
-    return ZX_ERR_NOT_FOUND;
+  zx::result<fidl::ClientEnd<fuchsia_hardware_block_volume::VolumeManager>> volume_manager =
+      component::Connect<fuchsia_hardware_block_volume::VolumeManager>(driver_path);
+  if (volume_manager.is_error()) {
+    return volume_manager.error_value();
   }
-  return DestroyFvmAndWait(-1, std::move(parent_fd), std::move(fvm_fd), path);
+  return DestroyFvmAndWait(-1, std::move(parent_fd), std::move(volume_manager.value()), path);
 }
 
 __EXPORT
@@ -442,11 +445,15 @@ zx_status_t FvmDestroyWithDevfs(int devfs_root_fd, std::string_view relative_pat
   if (!parent_fd) {
     return ZX_ERR_NOT_FOUND;
   }
-  fbl::unique_fd fvm_fd(openat(devfs_root_fd, driver_path.c_str(), O_RDONLY));
-  if (!fvm_fd) {
-    return ZX_ERR_NOT_FOUND;
+  fdio_cpp::UnownedFdioCaller caller(devfs_root_fd);
+  zx::result<fidl::ClientEnd<fuchsia_hardware_block_volume::VolumeManager>> volume_manager =
+      component::ConnectAt<fuchsia_hardware_block_volume::VolumeManager>(caller.directory(),
+                                                                         driver_path);
+  if (volume_manager.is_error()) {
+    return volume_manager.error_value();
   }
-  return DestroyFvmAndWait(devfs_root_fd, std::move(parent_fd), std::move(fvm_fd), relative_path);
+  return DestroyFvmAndWait(devfs_root_fd, std::move(parent_fd), std::move(volume_manager.value()),
+                           relative_path);
 }
 
 __EXPORT
@@ -501,11 +508,9 @@ zx::result<fidl::ClientEnd<fuchsia_device::Controller>> FvmAllocatePartitionWith
 }
 
 __EXPORT
-zx::result<fuchsia_hardware_block_volume::wire::VolumeManagerInfo> FvmQuery(int fvm_fd) {
-  fdio_cpp::UnownedFdioCaller caller(fvm_fd);
-
-  const fidl::WireResult result =
-      fidl::WireCall(caller.borrow_as<fuchsia_hardware_block_volume::VolumeManager>())->GetInfo();
+zx::result<fuchsia_hardware_block_volume::wire::VolumeManagerInfo> FvmQuery(
+    fidl::UnownedClientEnd<fuchsia_hardware_block_volume::VolumeManager> fvm) {
+  const fidl::WireResult result = fidl::WireCall(fvm)->GetInfo();
   if (!result.ok()) {
     return zx::error(result.status());
   }

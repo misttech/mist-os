@@ -9,6 +9,7 @@
 #include <fuchsia/hardware/block/driver/c/banjo.h>
 #include <fuchsia/hardware/block/volume/cpp/fidl.h>
 #include <inttypes.h>
+#include <lib/component/incoming/cpp/protocol.h>
 #include <lib/fdio/cpp/caller.h>
 #include <lib/fdio/directory.h>
 #include <lib/zx/clock.h>
@@ -301,8 +302,16 @@ bool StressFlash(StatusLine* logger, const CommandLineArgs& args, zx::duration d
     return false;
   }
 
+  zx::result<fidl::ClientEnd<fuchsia_hardware_block_volume::VolumeManager>> volume_manager =
+      component::Connect<fuchsia_hardware_block_volume::VolumeManager>(args.fvm_path);
+  if (volume_manager.is_error()) {
+    logger->Log("Error: Could not open FVM Volume Manager: %s\n",
+                zx_status_get_string(volume_manager.error_value()));
+    return false;
+  }
+
   // Calculate available space and number of slices needed.
-  auto fvm_info_or = fs_management::FvmQuery(fvm_fd.get());
+  auto fvm_info_or = fs_management::FvmQuery(volume_manager.value());
   if (fvm_info_or.is_error()) {
     logger->Log("Error: Could not get FVM info\n");
     return false;

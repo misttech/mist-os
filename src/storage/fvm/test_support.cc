@@ -406,12 +406,16 @@ zx_status_t FvmAdapter::Rebind(fbl::Vector<VPartitionAdapter*> vpartitions) {
 }
 
 zx_status_t FvmAdapter::Query(VolumeManagerInfo* out_info) const {
-  fbl::unique_fd fd;
-  if (zx_status_t status =
-          fdio_open_fd_at(devfs_root_.get(), path(), 0, fd.reset_and_get_address())) {
-    return status;
+  fdio_cpp::UnownedFdioCaller caller(devfs_root_.get());
+  zx::result<fidl::ClientEnd<fuchsia_hardware_block_volume::VolumeManager>> volume_manager =
+      component::ConnectAt<fuchsia_hardware_block_volume::VolumeManager>(caller.directory(),
+                                                                         path());
+  if (volume_manager.is_error()) {
+    ADD_FAILURE("Could not open FVM Volume Manager: %s\n",
+                zx_status_get_string(volume_manager.error_value()));
+    return volume_manager.error_value();
   }
-  zx::result info = fs_management::FvmQuery(fd.get());
+  zx::result info = fs_management::FvmQuery(volume_manager.value());
   if (info.is_error()) {
     return info.error_value();
   }

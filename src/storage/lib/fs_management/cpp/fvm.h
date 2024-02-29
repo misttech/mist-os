@@ -56,7 +56,8 @@ zx::result<fidl::ClientEnd<fuchsia_device::Controller>> FvmAllocatePartitionWith
     uuid::Uuid type_guid, uuid::Uuid instance_guid, std::string_view name, uint32_t flags);
 
 // Query the volume manager for info.
-zx::result<fuchsia_hardware_block_volume::wire::VolumeManagerInfo> FvmQuery(int fvm_fd);
+zx::result<fuchsia_hardware_block_volume::wire::VolumeManagerInfo> FvmQuery(
+    fidl::UnownedClientEnd<fuchsia_hardware_block_volume::VolumeManager> fvm);
 
 // Set of parameters to use for identifying the correct partition to open via |OpenPartition| or
 // to destroy via |DestroyPartition|.

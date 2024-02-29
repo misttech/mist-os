@@ -260,16 +260,17 @@ void FvmTest::FVMRebind() {
   ASSERT_OK(device_watcher::RecursiveWaitForFile(devfs_root_fd().get(), fvm_path().c_str()));
 }
 
-void FVMCheckSliceSize(const fbl::unique_fd& fd, size_t expected_slice_size) {
-  ASSERT_TRUE(fd);
-  auto volume_info_or = fs_management::FvmQuery(fd.get());
+void FVMCheckSliceSize(fidl::UnownedClientEnd<fuchsia_hardware_block_volume::VolumeManager> fvm,
+                       size_t expected_slice_size) {
+  auto volume_info_or = fs_management::FvmQuery(fvm);
   ASSERT_EQ(volume_info_or.status_value(), ZX_OK, "Failed to query fvm\n");
   ASSERT_EQ(expected_slice_size, volume_info_or->slice_size, "Unexpected slice size\n");
 }
 
-void FVMCheckAllocatedCount(const fbl::unique_fd& fd, size_t expected_allocated,
-                            size_t expected_total) {
-  auto volume_info_or = fs_management::FvmQuery(fd.get());
+void FVMCheckAllocatedCount(
+    fidl::UnownedClientEnd<fuchsia_hardware_block_volume::VolumeManager> fvm,
+    size_t expected_allocated, size_t expected_total) {
+  auto volume_info_or = fs_management::FvmQuery(fvm);
   ASSERT_EQ(volume_info_or.status_value(), ZX_OK);
   ASSERT_EQ(volume_info_or->slice_count, expected_total);
   ASSERT_EQ(volume_info_or->assigned_slice_count, expected_allocated);
@@ -546,16 +547,14 @@ void CheckDeadConnection(zx::channel& chan) {
   ASSERT_OK(chan.wait_one(ZX_CHANNEL_PEER_CLOSED, zx::time::infinite(), nullptr));
 }
 
-void Upgrade(const fdio_cpp::FdioCaller& caller, const uuid::Uuid& old_guid,
-             const uuid::Uuid& new_guid, zx_status_t status) {
+void Upgrade(fidl::UnownedClientEnd<fuchsia_hardware_block_volume::VolumeManager> fvm,
+             const uuid::Uuid& old_guid, const uuid::Uuid& new_guid, zx_status_t status) {
   fuchsia_hardware_block_partition::wire::Guid old_guid_fidl;
   std::copy(old_guid.cbegin(), old_guid.cend(), old_guid_fidl.value.begin());
   fuchsia_hardware_block_partition::wire::Guid new_guid_fidl;
   std::copy(new_guid.cbegin(), new_guid.cend(), new_guid_fidl.value.begin());
 
-  const fidl::WireResult result =
-      fidl::WireCall(caller.borrow_as<fuchsia_hardware_block_volume::VolumeManager>())
-          ->Activate(old_guid_fidl, new_guid_fidl);
+  const fidl::WireResult result = fidl::WireCall(fvm)->Activate(old_guid_fidl, new_guid_fidl);
   ASSERT_OK(result.status());
   const fidl::WireResponse response = result.value();
   ASSERT_STATUS(response.status, status);
@@ -607,9 +606,9 @@ TEST_F(FvmTest, TestEmpty) {
   constexpr uint64_t kBlockCount = 1 << 16;
   constexpr uint64_t kSliceSize = 64 * kBlockSize;
   CreateFVM(kBlockSize, kBlockCount, kSliceSize);
-  zx::result fvm_fd = fvm_device_fd();
-  ASSERT_OK(fvm_fd);
-  FVMCheckSliceSize(fvm_fd.value(), kSliceSize);
+  zx::result volume_manager = fvm_device();
+  ASSERT_OK(volume_manager);
+  FVMCheckSliceSize(volume_manager.value(), kSliceSize);
   ValidateFVM(ramdisk_block_interface());
 }
 
@@ -647,9 +646,9 @@ TEST_F(FvmTest, TestAllocateOne) {
   CheckWriteReadBlock(vp.as_block(), 0, 1);
   vp = {};
 
-  zx::result fvm_fd = fvm_device_fd();
-  ASSERT_OK(fvm_fd);
-  FVMCheckSliceSize(fvm_fd.value(), kSliceSize);
+  zx::result volume_manager = fvm_device();
+  ASSERT_OK(volume_manager);
+  FVMCheckSliceSize(volume_manager.value(), kSliceSize);
   ValidateFVM(ramdisk_block_interface());
 }
 
@@ -674,9 +673,9 @@ TEST_F(FvmTest, TestReadWriteSingle) {
   CheckWriteReadBytesFifo(vp->as_block(), kBlockSize * 7, kBlockSize * 4);
   vp = {};
 
-  zx::result fvm_fd = fvm_device_fd();
-  ASSERT_OK(fvm_fd);
-  FVMCheckSliceSize(fvm_fd.value(), kSliceSize);
+  zx::result volume_manager = fvm_device();
+  ASSERT_OK(volume_manager);
+  FVMCheckSliceSize(volume_manager.value(), kSliceSize);
   ValidateFVM(ramdisk_block_interface());
 }
 
@@ -720,9 +719,9 @@ TEST_F(FvmTest, TestAllocateMany) {
   blob = {};
   sys = {};
 
-  zx::result fvm_fd = fvm_device_fd();
-  ASSERT_OK(fvm_fd);
-  FVMCheckSliceSize(fvm_fd.value(), kSliceSize);
+  zx::result volume_manager = fvm_device();
+  ASSERT_OK(volume_manager);
+  FVMCheckSliceSize(volume_manager.value(), kSliceSize);
   ValidateFVM(ramdisk_block_interface());
 }
 
@@ -732,17 +731,17 @@ TEST_F(FvmTest, TestVPartitionExtend) {
   constexpr uint64_t kBlockCount = 1 << 16;
   constexpr uint64_t kSliceSize = 64 * kBlockSize;
   CreateFVM(kBlockSize, kBlockCount, kSliceSize);
-  zx::result fvm_fd = fvm_device_fd();
-  ASSERT_OK(fvm_fd);
+  zx::result volume_manager = fvm_device();
+  ASSERT_OK(volume_manager);
 
-  auto volume_info_or = fs_management::FvmQuery(fvm_fd.value().get());
+  auto volume_info_or = fs_management::FvmQuery(volume_manager.value());
   ASSERT_EQ(volume_info_or.status_value(), ZX_OK);
   size_t slice_size = volume_info_or->slice_size;
   constexpr uint64_t kDiskSize = kBlockSize * kBlockCount;
   size_t slices_total = UsableSlicesCount(kDiskSize, slice_size);
   size_t slices_left = slices_total;
 
-  FVMCheckAllocatedCount(fvm_fd.value(), slices_total - slices_left, slices_total);
+  FVMCheckAllocatedCount(volume_manager.value(), slices_total - slices_left, slices_total);
 
   // Allocate one VPart
   size_t slice_count = 1;
@@ -755,7 +754,7 @@ TEST_F(FvmTest, TestVPartitionExtend) {
   ASSERT_EQ(vp_or.status_value(), ZX_OK, "Couldn't open Volume");
   PartitionChannel vp = *std::move(vp_or);
   slices_left--;
-  FVMCheckAllocatedCount(fvm_fd.value(), slices_total - slices_left, slices_total);
+  FVMCheckAllocatedCount(volume_manager.value(), slices_total - slices_left, slices_total);
 
   // Confirm that the disk reports the correct number of slices
   {
@@ -820,7 +819,7 @@ TEST_F(FvmTest, TestVPartitionExtend) {
   }
 
   // The number of free slices should be unchanged.
-  FVMCheckAllocatedCount(fvm_fd.value(), slices_total - slices_left, slices_total);
+  FVMCheckAllocatedCount(volume_manager.value(), slices_total - slices_left, slices_total);
 
   // Allocate exactly the remaining number of slices
   {
@@ -833,7 +832,7 @@ TEST_F(FvmTest, TestVPartitionExtend) {
 
   slice_count += slices_left;
   slices_left = 0;
-  FVMCheckAllocatedCount(fvm_fd.value(), slices_total - slices_left, slices_total);
+  FVMCheckAllocatedCount(volume_manager.value(), slices_total - slices_left, slices_total);
 
   {
     const fidl::WireResult result = fidl::WireCall(vp.as_block())->GetInfo();
@@ -861,9 +860,9 @@ TEST_F(FvmTest, TestVPartitionExtend) {
   ASSERT_NE(vp2_or.status_value(), ZX_OK, "Expected VPart allocation failure");
 
   {
-    zx::result fvm_fd = fvm_device_fd();
-    ASSERT_OK(fvm_fd);
-    FVMCheckSliceSize(fvm_fd.value(), kSliceSize);
+    zx::result volume_manager = fvm_device();
+    ASSERT_OK(volume_manager);
+    FVMCheckSliceSize(volume_manager.value(), kSliceSize);
     ValidateFVM(ramdisk_block_interface());
   }
 }
@@ -930,9 +929,9 @@ TEST_F(FvmTest, TestVPartitionExtendSparse) {
   CheckNoAccessBlock(vp.as_block(), bno, 1);
 
   vp = {};
-  zx::result fvm_fd = fvm_device_fd();
-  ASSERT_OK(fvm_fd);
-  FVMCheckSliceSize(fvm_fd.value(), kSliceSize);
+  zx::result volume_manager = fvm_device();
+  ASSERT_OK(volume_manager);
+  FVMCheckSliceSize(volume_manager.value(), kSliceSize);
   ValidateFVM(ramdisk_block_interface());
 }
 
@@ -942,17 +941,17 @@ TEST_F(FvmTest, TestVPartitionShrink) {
   constexpr uint64_t kBlockCount = 1 << 16;
   constexpr uint64_t kSliceSize = 64 * kBlockSize;
   CreateFVM(kBlockSize, kBlockCount, kSliceSize);
-  zx::result fvm_fd = fvm_device_fd();
-  ASSERT_OK(fvm_fd);
+  zx::result volume_manager = fvm_device();
+  ASSERT_OK(volume_manager);
 
-  auto volume_info_or = fs_management::FvmQuery(fvm_fd.value().get());
+  auto volume_info_or = fs_management::FvmQuery(volume_manager.value());
   ASSERT_EQ(volume_info_or.status_value(), ZX_OK);
   size_t slice_size = volume_info_or->slice_size;
   const size_t kDiskSize = kBlockSize * kBlockCount;
   size_t slices_total = UsableSlicesCount(kDiskSize, slice_size);
   size_t slices_left = slices_total;
 
-  FVMCheckAllocatedCount(fvm_fd.value(), slices_total - slices_left, slices_total);
+  FVMCheckAllocatedCount(volume_manager.value(), slices_total - slices_left, slices_total);
 
   // Allocate one VPart
   size_t slice_count = 1;
@@ -976,7 +975,7 @@ TEST_F(FvmTest, TestVPartitionShrink) {
     ASSERT_EQ(block_info.block_count * block_info.block_size, slice_size * slice_count);
     CheckWriteReadBlock(vp.as_block(), (slice_size / block_info.block_size) - 1, 1);
     CheckNoAccessBlock(vp.as_block(), (slice_size / block_info.block_size) - 1, 2);
-    FVMCheckAllocatedCount(fvm_fd.value(), slices_total - slices_left, slices_total);
+    FVMCheckAllocatedCount(volume_manager.value(), slices_total - slices_left, slices_total);
   }
 
   // Try shrinking the 0th vslice
@@ -1024,7 +1023,7 @@ TEST_F(FvmTest, TestVPartitionShrink) {
     ASSERT_TRUE(response.is_ok(), "%s", zx_status_get_string(response.error_value()));
     const fuchsia_hardware_block::wire::BlockInfo& block_info = response.value()->info;
     ASSERT_EQ(block_info.block_count * block_info.block_size, slice_size * slice_count);
-    FVMCheckAllocatedCount(fvm_fd.value(), slices_total - slices_left, slices_total);
+    FVMCheckAllocatedCount(volume_manager.value(), slices_total - slices_left, slices_total);
   }
 
   // Allocate exactly the remaining number of slices
@@ -1048,7 +1047,7 @@ TEST_F(FvmTest, TestVPartitionShrink) {
     CheckWriteReadBlock(vp.as_block(), (slice_size / block_info.block_size) - 1, 1);
     CheckWriteReadBlock(vp.as_block(), (slice_size / block_info.block_size) - 1, 2);
   }
-  FVMCheckAllocatedCount(fvm_fd.value(), slices_total - slices_left, slices_total);
+  FVMCheckAllocatedCount(volume_manager.value(), slices_total - slices_left, slices_total);
 
   // We can't allocate any more to this VPartition
   {
@@ -1065,7 +1064,7 @@ TEST_F(FvmTest, TestVPartitionShrink) {
     const fidl::WireResponse response = result.value();
     ASSERT_OK(response.status);
   }
-  FVMCheckAllocatedCount(fvm_fd.value(), 1, slices_total);
+  FVMCheckAllocatedCount(volume_manager.value(), 1, slices_total);
 
   // The same request to shrink should now fail (NONE of the slices are
   // allocated)
@@ -1075,7 +1074,7 @@ TEST_F(FvmTest, TestVPartitionShrink) {
     const fidl::WireResponse response = result.value();
     ASSERT_STATUS(response.status, ZX_ERR_INVALID_ARGS);
   }
-  FVMCheckAllocatedCount(fvm_fd.value(), 1, slices_total);
+  FVMCheckAllocatedCount(volume_manager.value(), 1, slices_total);
 
   // ... unless we re-allocate and try again.
   {
@@ -1092,9 +1091,9 @@ TEST_F(FvmTest, TestVPartitionShrink) {
   }
 
   {
-    zx::result fvm_fd = fvm_device_fd();
-    ASSERT_OK(fvm_fd);
-    FVMCheckSliceSize(fvm_fd.value(), kSliceSize);
+    zx::result volume_manager = fvm_device();
+    ASSERT_OK(volume_manager);
+    FVMCheckSliceSize(volume_manager.value(), kSliceSize);
     ValidateFVM(ramdisk_block_interface());
   }
 }
@@ -1106,10 +1105,10 @@ TEST_F(FvmTest, TestVPartitionSplit) {
   constexpr uint64_t kSliceSize = 64 * kBlockSize;
   CreateFVM(kBlockSize, kBlockCount, kSliceSize);
 
-  zx::result fvm_fd = fvm_device_fd();
-  ASSERT_OK(fvm_fd);
+  zx::result volume_manager = fvm_device();
+  ASSERT_OK(volume_manager);
 
-  auto volume_info_or = fs_management::FvmQuery(fvm_fd.value().get());
+  auto volume_info_or = fs_management::FvmQuery(volume_manager.value());
   ASSERT_EQ(volume_info_or.status_value(), ZX_OK);
   size_t slice_size = volume_info_or->slice_size;
 
@@ -1241,11 +1240,10 @@ TEST_F(FvmTest, TestVPartitionSplit) {
   verifyExtents(true, true, true);
 
   vp = {};
-  ASSERT_EQ(close(fvm_fd.value().release()), 0);
   {
-    zx::result fvm_fd = fvm_device_fd();
-    ASSERT_OK(fvm_fd);
-    FVMCheckSliceSize(fvm_fd.value(), kSliceSize);
+    zx::result volume_manager = fvm_device();
+    ASSERT_OK(volume_manager);
+    FVMCheckSliceSize(volume_manager.value(), kSliceSize);
     ValidateFVM(ramdisk_block_interface());
   }
 }
@@ -1256,8 +1254,8 @@ TEST_F(FvmTest, TestVPartitionDestroy) {
   constexpr uint64_t kBlockCount = 1 << 16;
   constexpr uint64_t kSliceSize = 64 * kBlockSize;
   CreateFVM(kBlockSize, kBlockCount, kSliceSize);
-  zx::result fvm_fd = fvm_device_fd();
-  ASSERT_OK(fvm_fd);
+  zx::result volume_manager = fvm_device();
+  ASSERT_OK(volume_manager);
 
   // Test allocation of multiple VPartitions
   zx::result data_or = AllocatePartition({
@@ -1318,12 +1316,10 @@ TEST_F(FvmTest, TestVPartitionDestroy) {
   }
   CheckDeadConnection(sys.partition.channel());
 
-  ASSERT_EQ(close(fvm_fd.value().release()), 0);
-
   {
-    zx::result fvm_fd = fvm_device_fd();
-    ASSERT_OK(fvm_fd);
-    FVMCheckSliceSize(fvm_fd.value(), kSliceSize);
+    zx::result volume_manager = fvm_device();
+    ASSERT_OK(volume_manager);
+    FVMCheckSliceSize(volume_manager.value(), kSliceSize);
   }
 }
 
@@ -1332,8 +1328,8 @@ TEST_F(FvmTest, TestVPartitionQuery) {
   constexpr uint64_t kBlockCount = 1 << 16;
   constexpr uint64_t kSliceSize = 64 * kBlockSize;
   CreateFVM(kBlockSize, kBlockCount, kSliceSize);
-  zx::result fvm_fd = fvm_device_fd();
-  ASSERT_OK(fvm_fd);
+  zx::result volume_manager = fvm_device();
+  ASSERT_OK(volume_manager);
 
   // Allocate partition
   zx::result part_or = AllocatePartition({
@@ -1355,7 +1351,7 @@ TEST_F(FvmTest, TestVPartitionQuery) {
     ASSERT_OK(response.status);
   }
 
-  auto volume_info_or = fs_management::FvmQuery(fvm_fd.value().get());
+  auto volume_info_or = fs_management::FvmQuery(volume_manager.value());
   ASSERT_EQ(volume_info_or.status_value(), ZX_OK);
 
   // Query various vslice ranges
@@ -1435,11 +1431,10 @@ TEST_F(FvmTest, TestVPartitionQuery) {
   const fidl::WireResponse response = result.value();
   ASSERT_STATUS(response.status, ZX_ERR_OUT_OF_RANGE);
 
-  ASSERT_EQ(close(fvm_fd.value().release()), 0);
   {
-    zx::result fvm_fd = fvm_device_fd();
-    ASSERT_OK(fvm_fd);
-    FVMCheckSliceSize(fvm_fd.value(), kSliceSize);
+    zx::result volume_manager = fvm_device();
+    ASSERT_OK(volume_manager);
+    FVMCheckSliceSize(volume_manager.value(), kSliceSize);
   }
 }
 
@@ -1449,10 +1444,10 @@ TEST_F(FvmTest, TestSliceAccessContiguous) {
   constexpr uint64_t kBlockCount = 1 << 16;
   constexpr uint64_t kSliceSize = 64 * kBlockSize;
   CreateFVM(kBlockSize, kBlockCount, kSliceSize);
-  zx::result fvm_fd = fvm_device_fd();
-  ASSERT_OK(fvm_fd);
+  zx::result volume_manager = fvm_device();
+  ASSERT_OK(volume_manager);
 
-  auto volume_info_or = fs_management::FvmQuery(fvm_fd.value().get());
+  auto volume_info_or = fs_management::FvmQuery(volume_manager.value());
   ASSERT_EQ(volume_info_or.status_value(), ZX_OK);
   size_t slice_size = volume_info_or->slice_size;
 
@@ -1506,11 +1501,10 @@ TEST_F(FvmTest, TestSliceAccessContiguous) {
   }
 
   vp = {};
-  ASSERT_EQ(close(fvm_fd.value().release()), 0);
   {
-    zx::result fvm_fd = fvm_device_fd();
-    ASSERT_OK(fvm_fd);
-    FVMCheckSliceSize(fvm_fd.value(), kSliceSize);
+    zx::result volume_manager = fvm_device();
+    ASSERT_OK(volume_manager);
+    FVMCheckSliceSize(volume_manager.value(), kSliceSize);
   }
 }
 
@@ -1524,10 +1518,10 @@ TEST_F(FvmTest, TestSliceAccessMany) {
   constexpr uint64_t kBlocksPerSlice = 256;
   constexpr uint64_t kSliceSize = kBlocksPerSlice * kBlockSize;
   CreateFVM(kBlockSize, kBlockCount, kSliceSize);
-  zx::result fvm_fd = fvm_device_fd();
-  ASSERT_OK(fvm_fd);
+  zx::result volume_manager = fvm_device();
+  ASSERT_OK(volume_manager);
 
-  auto volume_info_or = fs_management::FvmQuery(fvm_fd.value().get());
+  auto volume_info_or = fs_management::FvmQuery(volume_manager.value());
   ASSERT_EQ(volume_info_or.status_value(), ZX_OK);
   ASSERT_EQ(volume_info_or->slice_size, kSliceSize);
 
@@ -1591,11 +1585,10 @@ TEST_F(FvmTest, TestSliceAccessMany) {
   }
 
   vp = {};
-  ASSERT_EQ(close(fvm_fd.value().release()), 0);
   {
-    zx::result fvm_fd = fvm_device_fd();
-    ASSERT_OK(fvm_fd);
-    FVMCheckSliceSize(fvm_fd.value(), kSliceSize);
+    zx::result volume_manager = fvm_device();
+    ASSERT_OK(volume_manager);
+    FVMCheckSliceSize(volume_manager.value(), kSliceSize);
     ValidateFVM(ramdisk_block_interface());
   }
 }
@@ -1609,10 +1602,10 @@ TEST_F(FvmTest, TestSliceAccessNonContiguousPhysical) {
   constexpr uint64_t kSliceSize{kBlockSize * 64};
   constexpr uint64_t kDiskSize{kBlockSize * kBlockCount};
   CreateFVM(kBlockSize, kBlockCount, kSliceSize);
-  zx::result fvm_fd = fvm_device_fd();
-  ASSERT_OK(fvm_fd);
+  zx::result volume_manager = fvm_device();
+  ASSERT_OK(volume_manager);
 
-  ASSERT_EQ(fs_management::FvmQuery(fvm_fd.value().get()).status_value(), ZX_OK);
+  ASSERT_EQ(fs_management::FvmQuery(volume_manager.value()).status_value(), ZX_OK);
 
   constexpr size_t kNumVParts = 3;
   constexpr size_t kSliceCount = 1;
@@ -1737,11 +1730,10 @@ TEST_F(FvmTest, TestSliceAccessNonContiguousPhysical) {
     vparts[i].partition = {};
   }
 
-  ASSERT_EQ(close(fvm_fd.value().release()), 0);
   {
-    zx::result fvm_fd = fvm_device_fd();
-    ASSERT_OK(fvm_fd);
-    FVMCheckSliceSize(fvm_fd.value(), kSliceSize);
+    zx::result volume_manager = fvm_device();
+    ASSERT_OK(volume_manager);
+    FVMCheckSliceSize(volume_manager.value(), kSliceSize);
     ValidateFVM(ramdisk_block_interface());
   }
 }
@@ -1754,10 +1746,10 @@ TEST_F(FvmTest, TestSliceAccessNonContiguousVirtual) {
   constexpr uint64_t kSliceSize{UINT64_C(64) * (1 << 20)};
   constexpr uint64_t kDiskSize{kBlockSize * kBlockCount};
   CreateFVM(kBlockSize, kBlockCount, kSliceSize);
-  zx::result fvm_fd = fvm_device_fd();
-  ASSERT_OK(fvm_fd);
+  zx::result volume_manager = fvm_device();
+  ASSERT_OK(volume_manager);
 
-  ASSERT_EQ(fs_management::FvmQuery(fvm_fd.value().get()).status_value(), ZX_OK);
+  ASSERT_EQ(fs_management::FvmQuery(volume_manager.value()).status_value(), ZX_OK);
 
   constexpr size_t kNumVParts = 3;
   constexpr size_t kSliceCount = 1;
@@ -1832,11 +1824,10 @@ TEST_F(FvmTest, TestSliceAccessNonContiguousVirtual) {
     vpart.partition = {};
   }
 
-  ASSERT_EQ(close(fvm_fd.value().release()), 0);
   {
-    zx::result fvm_fd = fvm_device_fd();
-    ASSERT_OK(fvm_fd);
-    FVMCheckSliceSize(fvm_fd.value(), kSliceSize);
+    zx::result volume_manager = fvm_device();
+    ASSERT_OK(volume_manager);
+    FVMCheckSliceSize(volume_manager.value(), kSliceSize);
     ValidateFVM(ramdisk_block_interface());
   }
 }
@@ -1847,14 +1838,14 @@ TEST_F(FvmTest, TestPersistenceSimple) {
   constexpr uint64_t kBlockCount{1 << 20};
   constexpr uint64_t kSliceSize{UINT64_C(64) * (1 << 20)};
   CreateFVM(kBlockSize, kBlockCount, kSliceSize);
-  zx::result fvm_fd = fvm_device_fd();
-  ASSERT_OK(fvm_fd);
+  zx::result volume_manager = fvm_device();
+  ASSERT_OK(volume_manager);
 
   constexpr uint64_t kDiskSize = kBlockSize * kBlockCount;
   size_t slices_left = UsableSlicesCount(kDiskSize, kSliceSize);
   const uint64_t kSliceCount = slices_left;
 
-  ASSERT_EQ(fs_management::FvmQuery(fvm_fd.value().get()).status_value(), ZX_OK);
+  ASSERT_EQ(fs_management::FvmQuery(volume_manager.value()).status_value(), ZX_OK);
 
   // Allocate one VPart
   auto vp_or = AllocatePartition({
@@ -1893,10 +1884,9 @@ TEST_F(FvmTest, TestPersistenceSimple) {
   vp = {};
 
   // Check that it still exists after rebinding the driver
-  ASSERT_EQ(close(fvm_fd.value().release()), 0);
   FVMRebind();
-  fvm_fd = fvm_device_fd();
-  ASSERT_OK(fvm_fd);
+  volume_manager = fvm_device();
+  ASSERT_OK(volume_manager);
 
   vp_or = WaitForPartition(kPartition1Matcher);
   ASSERT_OK(vp_or.status_value());
@@ -1929,10 +1919,9 @@ TEST_F(FvmTest, TestPersistenceSimple) {
   // FVMRebind will cause the rebind on ramdisk block device. The fvm device is child device
   // to ramdisk block device. Before issuing rebind make sure the fd is released.
   // Rebind the FVM driver, check the extension has succeeded.
-  ASSERT_EQ(close(fvm_fd.value().release()), 0);
   FVMRebind();
-  fvm_fd = fvm_device_fd();
-  ASSERT_OK(fvm_fd);
+  volume_manager = fvm_device();
+  ASSERT_OK(volume_manager);
 
   vp_or = WaitForPartition(kPartition1Matcher);
   ASSERT_OK(vp_or.status_value());
@@ -1979,10 +1968,9 @@ TEST_F(FvmTest, TestPersistenceSimple) {
   ASSERT_EQ(block_info.block_count * block_info.block_size, kSliceSize * kSliceCount);
 
   vp = {};
-  ASSERT_EQ(close(fvm_fd.value().release()), 0);
   FVMRebind();
-  fvm_fd = fvm_device_fd();
-  ASSERT_OK(fvm_fd);
+  volume_manager = fvm_device();
+  ASSERT_OK(volume_manager);
 
   vp_or = WaitForPartition(kPartition1Matcher);
   ASSERT_OK(vp_or.status_value());
@@ -1999,11 +1987,10 @@ TEST_F(FvmTest, TestPersistenceSimple) {
   ASSERT_EQ(block_info.block_count * block_info.block_size, kSliceSize * kSliceCount);
 
   vp = {};
-  ASSERT_EQ(close(fvm_fd.value().release()), 0);
   {
-    zx::result fvm_fd = fvm_device_fd();
-    ASSERT_OK(fvm_fd);
-    FVMCheckSliceSize(fvm_fd.value(), 64lu * (1 << 20));
+    zx::result volume_manager = fvm_device();
+    ASSERT_OK(volume_manager);
+    FVMCheckSliceSize(volume_manager.value(), 64lu * (1 << 20));
   }
 }
 
@@ -2167,10 +2154,10 @@ TEST_F(FvmTest, TestCorruptMount) {
   constexpr uint64_t kBlockCount = 1 << 16;
   constexpr uint64_t kSliceSize = 64 * kBlockSize;
   CreateFVM(kBlockSize, kBlockCount, kSliceSize);
-  zx::result fvm_fd = fvm_device_fd();
-  ASSERT_OK(fvm_fd);
+  zx::result volume_manager = fvm_device();
+  ASSERT_OK(volume_manager);
 
-  auto volume_info_or = fs_management::FvmQuery(fvm_fd.value().get());
+  auto volume_info_or = fs_management::FvmQuery(volume_manager.value());
   ASSERT_EQ(volume_info_or.status_value(), ZX_OK);
   ASSERT_EQ(kSliceSize, volume_info_or->slice_size);
 
@@ -2210,9 +2197,6 @@ TEST_F(FvmTest, TestCorruptMount) {
   // Run the test for Blobfs.
   CorruptMountHelper(devfs_root_fd(), partition_path->c_str(), mounting_options,
                      fs_management::kDiskFormatBlobfs, blobfs_vslice_start, blobfs_vslice_count);
-
-  // Clean up
-  ASSERT_EQ(close(fvm_fd.value().release()), 0);
 }
 
 TEST_F(FvmTest, TestVPartitionUpgrade) {
@@ -2220,10 +2204,6 @@ TEST_F(FvmTest, TestVPartitionUpgrade) {
   constexpr uint64_t kBlockCount = 1 << 16;
   constexpr uint64_t kSliceSize = 64 * kBlockSize;
   CreateFVM(kBlockSize, kBlockCount, kSliceSize);
-  zx::result fvm_fd = fvm_device_fd();
-  ASSERT_OK(fvm_fd);
-
-  fdio_cpp::FdioCaller volume_manager(std::move(fvm_fd.value()));
 
   // Allocate two VParts, one active, and one inactive.
   {
@@ -2246,13 +2226,7 @@ TEST_F(FvmTest, TestVPartitionUpgrade) {
   }
 
   // Release FVM device that we opened earlier
-  ASSERT_EQ(close(volume_manager.release().get()), 0);
   FVMRebind();
-  {
-    zx::result fvm_fd = fvm_device_fd();
-    ASSERT_OK(fvm_fd);
-    volume_manager.reset(std::move(fvm_fd.value()));
-  }
 
   // The active partition should still exist.
   ASSERT_OK(WaitForPartition(kPartition2Matcher).status_value());
@@ -2272,8 +2246,11 @@ TEST_F(FvmTest, TestVPartitionUpgrade) {
   }
 
   // Atomically set GUID1 as active and GUID2 as inactive.
-  Upgrade(volume_manager, kTestUniqueGuid2, kTestUniqueGuid1, ZX_OK);
-
+  {
+    zx::result volume_manager = fvm_device();
+    ASSERT_OK(volume_manager);
+    Upgrade(volume_manager.value(), kTestUniqueGuid2, kTestUniqueGuid1, ZX_OK);
+  }
   // After upgrading, we should be able to open both partitions
   ASSERT_OK(WaitForPartition(kPartition1Matcher).status_value());
   ASSERT_OK(WaitForPartition(kPartition2Matcher).status_value());
@@ -2281,30 +2258,21 @@ TEST_F(FvmTest, TestVPartitionUpgrade) {
   // Rebind the FVM driver, check that the upgrade has succeeded.
   // The original (GUID2) should be deleted, and the new partition (GUID)
   // should exist.
-  // Release FVM device that we opened earlier
-  ASSERT_EQ(close(volume_manager.release().get()), 0);
   FVMRebind();
-  {
-    zx::result fvm_fd = fvm_device_fd();
-    ASSERT_OK(fvm_fd);
-    volume_manager.reset(std::move(fvm_fd.value()));
-  }
 
   ASSERT_OK(WaitForPartition(kPartition1Matcher).status_value());
   ASSERT_STATUS(OpenPartition(kPartition2Matcher).status_value(), ZX_ERR_NOT_FOUND);
 
   // Try upgrading when the "new" version doesn't exist.
   // (It should return an error and have no noticeable effect).
-  Upgrade(volume_manager, kTestUniqueGuid1, kTestUniqueGuid2, ZX_ERR_NOT_FOUND);
+  {
+    zx::result volume_manager = fvm_device();
+    ASSERT_OK(volume_manager);
+    Upgrade(volume_manager.value(), kTestUniqueGuid1, kTestUniqueGuid2, ZX_ERR_NOT_FOUND);
+  }
 
   // Release FVM device that we opened earlier
-  ASSERT_EQ(close(volume_manager.release().get()), 0);
   FVMRebind();
-  {
-    zx::result fvm_fd = fvm_device_fd();
-    ASSERT_OK(fvm_fd);
-    volume_manager.reset(std::move(fvm_fd.value()));
-  }
 
   ASSERT_OK(WaitForPartition(kPartition1Matcher).status_value());
   ASSERT_STATUS(OpenPartition(kPartition2Matcher).status_value(), ZX_ERR_NOT_FOUND);
@@ -2321,16 +2289,13 @@ TEST_F(FvmTest, TestVPartitionUpgrade) {
   }
 
   uuid::Uuid fake_guid = {};
-  Upgrade(volume_manager, fake_guid, kTestUniqueGuid2, ZX_OK);
-
-  // Release FVM device that we opened earlier
-  ASSERT_EQ(close(volume_manager.release().get()), 0);
-  FVMRebind();
   {
-    zx::result fvm_fd = fvm_device_fd();
-    ASSERT_OK(fvm_fd);
-    volume_manager.reset(std::move(fvm_fd.value()));
+    zx::result volume_manager = fvm_device();
+    ASSERT_OK(volume_manager);
+    Upgrade(volume_manager.value(), fake_guid, kTestUniqueGuid2, ZX_OK);
   }
+
+  FVMRebind();
 
   // We should be able to open both partitions again.
   zx::result vp_or = WaitForPartition(kPartition1Matcher);
@@ -2356,16 +2321,13 @@ TEST_F(FvmTest, TestVPartitionUpgrade) {
 
   // Upgrade the partition with old_guid == new_guid.
   // This should activate the partition.
-  Upgrade(volume_manager, kTestUniqueGuid1, kTestUniqueGuid1, ZX_OK);
-
-  // Release FVM device that we opened earlier
-  ASSERT_EQ(close(volume_manager.release().get()), 0);
-  FVMRebind();
   {
-    zx::result fvm_fd = fvm_device_fd();
-    ASSERT_OK(fvm_fd);
-    volume_manager.reset(std::move(fvm_fd.value()));
+    zx::result volume_manager = fvm_device();
+    ASSERT_OK(volume_manager);
+    Upgrade(volume_manager.value(), kTestUniqueGuid1, kTestUniqueGuid1, ZX_OK);
   }
+
+  FVMRebind();
 
   // We should be able to open both partitions again.
   ASSERT_OK(WaitForPartition(kPartition1Matcher).status_value());
@@ -2378,10 +2340,10 @@ TEST_F(FvmTest, TestMounting) {
   constexpr uint64_t kBlockCount = 1 << 16;
   constexpr uint64_t kSliceSize = 64 * kBlockSize;
   CreateFVM(kBlockSize, kBlockCount, kSliceSize);
-  zx::result fvm_fd = fvm_device_fd();
-  ASSERT_OK(fvm_fd);
+  zx::result volume_manager = fvm_device();
+  ASSERT_OK(volume_manager);
 
-  auto volume_info_or = fs_management::FvmQuery(fvm_fd.value().get());
+  auto volume_info_or = fs_management::FvmQuery(volume_manager.value());
   ASSERT_EQ(volume_info_or.status_value(), ZX_OK);
 
   // Allocate one VPart
@@ -2430,11 +2392,10 @@ TEST_F(FvmTest, TestMounting) {
   ASSERT_LE(result.value().info->total_bytes, kSliceSize * slice_count);
 
   // Clean up.
-  ASSERT_EQ(close(fvm_fd.value().release()), 0);
   {
-    zx::result fvm_fd = fvm_device_fd();
-    ASSERT_OK(fvm_fd);
-    FVMCheckSliceSize(fvm_fd.value(), kSliceSize);
+    zx::result volume_manager = fvm_device();
+    ASSERT_OK(volume_manager);
+    FVMCheckSliceSize(volume_manager.value(), kSliceSize);
   }
 }
 
@@ -2444,10 +2405,10 @@ TEST_F(FvmTest, TestMkfs) {
   constexpr uint64_t kBlockCount = 1 << 16;
   constexpr uint64_t kSliceSize = 64 * kBlockSize;
   CreateFVM(kBlockSize, kBlockCount, kSliceSize);
-  zx::result fvm_fd = fvm_device_fd();
-  ASSERT_OK(fvm_fd);
+  zx::result volume_manager = fvm_device();
+  ASSERT_OK(volume_manager);
 
-  auto volume_info_or = fs_management::FvmQuery(fvm_fd.value().get());
+  auto volume_info_or = fs_management::FvmQuery(volume_manager.value());
   ASSERT_EQ(volume_info_or.status_value(), ZX_OK);
 
   // Allocate one VPart.
@@ -2536,7 +2497,7 @@ TEST_F(FvmTest, TestMkfs) {
   ASSERT_LE(result.value().info->total_bytes, kSliceSize * slice_count);
 
   // Clean up.
-  FVMCheckSliceSize(fvm_fd.value(), kSliceSize);
+  FVMCheckSliceSize(volume_manager.value(), kSliceSize);
 }
 
 // Test that the FVM can recover when one copy of
@@ -2546,10 +2507,10 @@ TEST_F(FvmTest, TestCorruptionOk) {
   constexpr uint64_t kBlockCount = 1 << 16;
   constexpr uint64_t kSliceSize = 64 * kBlockSize;
   CreateFVM(kBlockSize, kBlockCount, kSliceSize);
-  zx::result fvm_fd = fvm_device_fd();
-  ASSERT_OK(fvm_fd);
+  zx::result volume_manager = fvm_device();
+  ASSERT_OK(volume_manager);
 
-  auto volume_info_or = fs_management::FvmQuery(fvm_fd.value().get());
+  auto volume_info_or = fs_management::FvmQuery(volume_manager.value());
   ASSERT_EQ(volume_info_or.status_value(), ZX_OK);
 
   // Allocate one VPart (writes to backup)
@@ -2596,7 +2557,6 @@ TEST_F(FvmTest, TestCorruptionOk) {
   buf[128]++;
   ASSERT_OK(block_client::SingleWriteBytes(device, buf, sizeof(buf), off));
 
-  ASSERT_EQ(close(fvm_fd.value().release()), 0);
   FVMRebind();
 
   vp_or = WaitForPartition(kPartition1Matcher);
@@ -2611,9 +2571,9 @@ TEST_F(FvmTest, TestCorruptionOk) {
   vp = {};
 
   {
-    zx::result fvm_fd = fvm_device_fd();
-    ASSERT_OK(fvm_fd);
-    FVMCheckSliceSize(fvm_fd.value(), kSliceSize);
+    zx::result volume_manager = fvm_device();
+    ASSERT_OK(volume_manager);
+    FVMCheckSliceSize(volume_manager.value(), kSliceSize);
   }
 }
 
@@ -2622,10 +2582,10 @@ TEST_F(FvmTest, TestCorruptionRegression) {
   constexpr uint64_t kBlockCount = 1 << 16;
   constexpr uint64_t kSliceSize = 64 * kBlockSize;
   CreateFVM(kBlockSize, kBlockCount, kSliceSize);
-  zx::result fvm_fd = fvm_device_fd();
-  ASSERT_OK(fvm_fd);
+  zx::result volume_manager = fvm_device();
+  ASSERT_OK(volume_manager);
 
-  auto volume_info_or = fs_management::FvmQuery(fvm_fd.value().get());
+  auto volume_info_or = fs_management::FvmQuery(volume_manager.value());
   ASSERT_EQ(volume_info_or.status_value(), ZX_OK);
   size_t slice_size = volume_info_or->slice_size;
 
@@ -2670,7 +2630,6 @@ TEST_F(FvmTest, TestCorruptionRegression) {
   buf[128]++;
   ASSERT_OK(block_client::SingleWriteBytes(device, buf, sizeof(buf), off));
 
-  ASSERT_EQ(close(fvm_fd.value().release()), 0);
   FVMRebind();
 
   vp_or = WaitForPartition(kPartition1Matcher);
@@ -2684,9 +2643,9 @@ TEST_F(FvmTest, TestCorruptionRegression) {
   // Clean up
   vp = {};
   {
-    zx::result fvm_fd = fvm_device_fd();
-    ASSERT_OK(fvm_fd);
-    FVMCheckSliceSize(fvm_fd.value(), kSliceSize);
+    zx::result volume_manager = fvm_device();
+    ASSERT_OK(volume_manager);
+    FVMCheckSliceSize(volume_manager.value(), kSliceSize);
   }
 }
 
