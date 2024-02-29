@@ -373,6 +373,9 @@ class Dispatcher : public async_dispatcher_t,
   std::unique_ptr<driver_runtime::CallbackRequest> RegisterCallbackWithoutQueueing(
       std::unique_ptr<CallbackRequest> callback_request);
 
+  // Returns whether a request should be inlined, or queued for later processing.
+  bool ShouldInline(std::unique_ptr<CallbackRequest>& request) __TA_REQUIRES(&callback_lock_);
+
   // Queues a previously registered callback to be invoked by the dispatcher.
   // Asserts if no such callback is found.
   // |unowned_callback_request| is used to locate the callback.

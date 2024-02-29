@@ -937,6 +937,38 @@ std::unique_ptr<driver_runtime::CallbackRequest> Dispatcher::RegisterCallbackWit
   return nullptr;
 }
 
+bool Dispatcher::ShouldInline(std::unique_ptr<CallbackRequest>& callback_request) {
+  auto req_type = callback_request->request_type();
+
+  // Synchronous dispatchers do not allow parallel callbacks.
+  // Blocking dispatchers are required to queue all callbacks onto the async loop.
+  // TODO(https://fxbug.dev/42180471): we should be able to remove the task check once we track
+  // drivers through banjo calls, or start each DFv2 driver with a ALLOW_SYNC_CALLS
+  // dispatcher.
+  if (unsynchronized_ || (!dispatching_sync_ && !allow_sync_calls_ &&
+                          (req_type != CallbackRequest::RequestType::kTask))) {
+    // Callbacks that are for waits or irqs can skip the reentrancy check.
+    // This is as they are always first registered on the global async loop which
+    // will initiate the callback when ready, at which point the driver call stack
+    // will be empty, but we still want to consider it not reentrant and directly
+    // call into the driver.
+    bool is_global_loop_callback = (req_type == CallbackRequest::RequestType::kIrq) ||
+                                   (req_type == CallbackRequest::RequestType::kWait);
+    // Check if the call would be reentrant, in which case we will queue it up to be run
+    // later.
+    //
+    // If it is unknown which driver is calling this function, it is considered
+    // to be potentially reentrant.
+    // The call stack may be empty if the user writes to a channel, or registers a
+    // read callback on a thread not managed by the driver runtime.
+    if (is_global_loop_callback ||
+        (!driver_context::IsCallStackEmpty() && !driver_context::IsDriverInCallStack(owner_))) {
+      return true;
+    }
+  }
+  return false;
+}
+
 void Dispatcher::QueueRegisteredCallback(driver_runtime::CallbackRequest* request,
                                          zx_status_t callback_reason) {
   ZX_ASSERT(request);
@@ -948,8 +980,6 @@ void Dispatcher::QueueRegisteredCallback(driver_runtime::CallbackRequest* reques
     IdleCheckLocked();
   });
 
-  // Whether we want to call the callback now, or queue it to be run on the async loop.
-  bool direct_call = false;
   std::unique_ptr<driver_runtime::CallbackRequest> callback_request;
   {
     fbl::AutoLock lock(&callback_lock_);
@@ -983,43 +1013,17 @@ void Dispatcher::QueueRegisteredCallback(driver_runtime::CallbackRequest* reques
     }
     callback_request->SetCallbackReason(callback_reason);
 
-    auto req_type = callback_request->request_type();
-
-    // Synchronous dispatchers do not allow parallel callbacks.
-    // Blocking dispatchers are required to queue all callbacks onto the async loop.
-    // TODO(https://fxbug.dev/42180471): we should be able to remove the task check once we track
-    // drivers through banjo calls, or start each DFv2 driver with a ALLOW_SYNC_CALLS
-    // dispatcher.
-    if (unsynchronized_ || (!dispatching_sync_ && !allow_sync_calls_ &&
-                            (req_type != CallbackRequest::RequestType::kTask))) {
-      // Callbacks that are for waits or irqs can skip the reentrancy check.
-      // This is as they are always first registered on the global async loop which
-      // will initiate the callback when ready, at which point the driver call stack
-      // will be empty, but we still want to consider it not reentrant and directly
-      // call into the driver.
-      bool is_global_loop_callback = (req_type == CallbackRequest::RequestType::kIrq) ||
-                                     (req_type == CallbackRequest::RequestType::kWait);
-      // Check if the call would be reentrant, in which case we will queue it up to be run
-      // later.
-      //
-      // If it is unknown which driver is calling this function, it is considered
-      // to be potentially reentrant.
-      // The call stack may be empty if the user writes to a channel, or registers a
-      // read callback on a thread not managed by the driver runtime.
-      if (is_global_loop_callback ||
-          (!driver_context::IsCallStackEmpty() && !driver_context::IsDriverInCallStack(owner_))) {
-        direct_call = true;
-        dispatching_sync_ = true;
-      }
-    }
+    // Whether we want to call the callback now, or queue it to be run on the async loop.
+    bool should_inline = ShouldInline(callback_request);
     debug_stats_.num_total_requests++;
-    if (!direct_call) {
+    if (!should_inline) {
       callback_queue_.push_back(std::move(callback_request));
       if (event_waiter_ && !event_waiter_->signaled()) {
         event_waiter_->signal();
       }
       return;
     }
+    dispatching_sync_ = true;
     debug_stats_.num_inlined_requests++;
   }
   DispatchCallback(std::move(callback_request));
