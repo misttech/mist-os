@@ -1722,8 +1722,18 @@ go_library("gonum.org/v1/gonum") {
     "dsp/fourier/quarter.go",
     "dsp/fourier/radix24.go",
     "dsp/fourier/sincos.go",
+    "mathext/airy.go",
+    "mathext/beta.go",
+    "mathext/betainc.go",
+    "mathext/digamma.go",
+    "mathext/doc.go",
+    "mathext/ell_carlson.go",
+    "mathext/ell_complete.go",
+    "mathext/erf.go",
     "mathext/gamma_inc.go",
     "mathext/gamma_inc_inv.go",
+    "mathext/internal/amos/amos.go",
+    "mathext/internal/amos/doc.go",
     "mathext/internal/cephes/cephes.go",
     "mathext/internal/cephes/doc.go",
     "mathext/internal/cephes/igam.go",
@@ -1738,7 +1748,9 @@ go_library("gonum.org/v1/gonum") {
     "mathext/internal/gonum/beta.go",
     "mathext/internal/gonum/doc.go",
     "mathext/internal/gonum/gonum.go",
+    "mathext/mvgamma.go",
     "mathext/roots.go",
+    "mathext/zeta.go",
   ]
 }
 
