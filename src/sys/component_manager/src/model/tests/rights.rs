@@ -124,16 +124,7 @@ async fn framework_directory_rights() {
         (
             "b",
             ComponentDeclBuilder::new()
-                .use_(UseDecl::Directory(UseDirectoryDecl {
-                    dependency_type: DependencyType::Strong,
-                    source: UseSource::Parent,
-                    source_name: "foo_data".parse().unwrap(),
-                    source_dictionary: None,
-                    target_path: "/data/hippo".parse().unwrap(),
-                    rights: fio::R_STAR_DIR,
-                    subdir: None,
-                    availability: Availability::Required,
-                }))
+                .use_(UseBuilder::directory().name("foo_data").path("/data/hippo"))
                 .build(),
         ),
     ];
@@ -169,16 +160,12 @@ async fn framework_directory_incompatible_rights() {
         (
             "b",
             ComponentDeclBuilder::new()
-                .use_(UseDecl::Directory(UseDirectoryDecl {
-                    dependency_type: DependencyType::Strong,
-                    source: UseSource::Parent,
-                    source_name: "foo_data".parse().unwrap(),
-                    source_dictionary: None,
-                    target_path: "/data/hippo".parse().unwrap(),
-                    rights: fio::X_STAR_DIR,
-                    subdir: None,
-                    availability: Availability::Required,
-                }))
+                .use_(
+                    UseBuilder::directory()
+                        .name("foo_data")
+                        .path("/data/hippo")
+                        .rights(fio::X_STAR_DIR),
+                )
                 .build(),
         ),
     ];

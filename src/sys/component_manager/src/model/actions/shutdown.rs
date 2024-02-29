@@ -885,9 +885,7 @@ mod tests {
             OfferResolverDecl, OfferSource, OfferStorageDecl, OfferTarget, StorageDecl,
             StorageDirectorySource, UseDecl, UseSource,
         },
-        cm_rust_testing::{
-            ChildBuilder, CollectionBuilder, ComponentDeclBuilder, EnvironmentBuilder,
-        },
+        cm_rust_testing::*,
         cm_types::AllowedOffers,
         fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
         maplit::{btreeset, hashmap, hashset},
@@ -3374,16 +3372,7 @@ mod tests {
             ),
             (
                 "c",
-                ComponentDeclBuilder::new()
-                    .use_(UseDecl::Protocol(UseProtocolDecl {
-                        source: UseSource::Parent,
-                        source_name: "serviceD".parse().unwrap(),
-                        source_dictionary: None,
-                        target_path: "/svc/serviceD".parse().unwrap(),
-                        dependency_type: DependencyType::Strong,
-                        availability: Availability::Required,
-                    }))
-                    .build(),
+                ComponentDeclBuilder::new().use_(UseBuilder::protocol().name("serviceD")).build(),
             ),
             (
                 "d",
@@ -3401,16 +3390,7 @@ mod tests {
             ),
             (
                 "e",
-                ComponentDeclBuilder::new()
-                    .use_(UseDecl::Protocol(UseProtocolDecl {
-                        source: UseSource::Parent,
-                        source_name: "serviceD".parse().unwrap(),
-                        source_dictionary: None,
-                        target_path: "/svc/serviceD".parse().unwrap(),
-                        dependency_type: DependencyType::Strong,
-                        availability: Availability::Required,
-                    }))
-                    .build(),
+                ComponentDeclBuilder::new().use_(UseBuilder::protocol().name("serviceD")).build(),
             ),
         ];
         let test = ActionsTest::new("root", components, None).await;
@@ -3542,16 +3522,7 @@ mod tests {
             ),
             (
                 "c",
-                ComponentDeclBuilder::new()
-                    .use_(UseDecl::Protocol(UseProtocolDecl {
-                        source: UseSource::Parent,
-                        source_name: "serviceD".parse().unwrap(),
-                        source_dictionary: None,
-                        target_path: "/svc/serviceD".parse().unwrap(),
-                        dependency_type: DependencyType::Strong,
-                        availability: Availability::Required,
-                    }))
-                    .build(),
+                ComponentDeclBuilder::new().use_(UseBuilder::protocol().name("serviceD")).build(),
             ),
             (
                 "d",
@@ -3571,14 +3542,7 @@ mod tests {
                 "e",
                 ComponentDeclBuilder::new()
                     .protocol_default("serviceE")
-                    .use_(UseDecl::Protocol(UseProtocolDecl {
-                        source: UseSource::Parent,
-                        source_name: "serviceD".parse().unwrap(),
-                        source_dictionary: None,
-                        target_path: "/svc/serviceD".parse().unwrap(),
-                        dependency_type: DependencyType::Strong,
-                        availability: Availability::Required,
-                    }))
+                    .use_(UseBuilder::protocol().name("serviceD"))
                     .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
                         source: ExposeSource::Self_,
                         source_name: "serviceE".parse().unwrap(),
@@ -3591,16 +3555,7 @@ mod tests {
             ),
             (
                 "f",
-                ComponentDeclBuilder::new()
-                    .use_(UseDecl::Protocol(UseProtocolDecl {
-                        source: UseSource::Parent,
-                        source_name: "serviceE".parse().unwrap(),
-                        source_dictionary: None,
-                        target_path: "/svc/serviceE".parse().unwrap(),
-                        dependency_type: DependencyType::Strong,
-                        availability: Availability::Required,
-                    }))
-                    .build(),
+                ComponentDeclBuilder::new().use_(UseBuilder::protocol().name("serviceE")).build(),
             ),
         ];
         let moniker_a: Moniker = vec!["a"].try_into().unwrap();
@@ -3770,16 +3725,7 @@ mod tests {
             ),
             (
                 "c",
-                ComponentDeclBuilder::new()
-                    .use_(UseDecl::Protocol(UseProtocolDecl {
-                        source: UseSource::Parent,
-                        source_name: "serviceD".parse().unwrap(),
-                        source_dictionary: None,
-                        target_path: "/svc/serviceD".parse().unwrap(),
-                        dependency_type: DependencyType::Strong,
-                        availability: Availability::Required,
-                    }))
-                    .build(),
+                ComponentDeclBuilder::new().use_(UseBuilder::protocol().name("serviceD")).build(),
             ),
             (
                 "d",
@@ -3799,14 +3745,7 @@ mod tests {
                 "e",
                 ComponentDeclBuilder::new()
                     .protocol_default("serviceE")
-                    .use_(UseDecl::Protocol(UseProtocolDecl {
-                        source: UseSource::Parent,
-                        source_name: "serviceE".parse().unwrap(),
-                        source_dictionary: None,
-                        target_path: "/svc/serviceE".parse().unwrap(),
-                        dependency_type: DependencyType::Strong,
-                        availability: Availability::Required,
-                    }))
+                    .use_(UseBuilder::protocol().name("serviceE"))
                     .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
                         source: ExposeSource::Self_,
                         source_name: "serviceE".parse().unwrap(),
@@ -3820,22 +3759,8 @@ mod tests {
             (
                 "f",
                 ComponentDeclBuilder::new()
-                    .use_(UseDecl::Protocol(UseProtocolDecl {
-                        source: UseSource::Parent,
-                        source_name: "serviceE".parse().unwrap(),
-                        source_dictionary: None,
-                        target_path: "/svc/serviceE".parse().unwrap(),
-                        dependency_type: DependencyType::Strong,
-                        availability: Availability::Required,
-                    }))
-                    .use_(UseDecl::Protocol(UseProtocolDecl {
-                        source: UseSource::Parent,
-                        source_name: "serviceD".parse().unwrap(),
-                        source_dictionary: None,
-                        target_path: "/svc/serviceD".parse().unwrap(),
-                        dependency_type: DependencyType::Strong,
-                        availability: Availability::Required,
-                    }))
+                    .use_(UseBuilder::protocol().name("serviceE"))
+                    .use_(UseBuilder::protocol().name("serviceD"))
                     .build(),
             ),
         ];
@@ -3983,16 +3908,7 @@ mod tests {
             ),
             (
                 "d",
-                ComponentDeclBuilder::new()
-                    .use_(UseDecl::Protocol(UseProtocolDecl {
-                        source: UseSource::Parent,
-                        source_name: "serviceC".parse().unwrap(),
-                        source_dictionary: None,
-                        target_path: "/svc/serviceC".parse().unwrap(),
-                        dependency_type: DependencyType::Strong,
-                        availability: Availability::Required,
-                    }))
-                    .build(),
+                ComponentDeclBuilder::new().use_(UseBuilder::protocol().name("serviceC")).build(),
             ),
         ];
         let test = ActionsTest::new("root", components, None).await;
@@ -4059,14 +3975,11 @@ mod tests {
                 ComponentDeclBuilder::new()
                     .child(ChildBuilder::new().name("b").eager().build())
                     .child(ChildBuilder::new().name("c").eager().build())
-                    .use_(UseDecl::Protocol(UseProtocolDecl {
-                        source: UseSource::Child("b".to_string()),
-                        source_name: "serviceC".parse().unwrap(),
-                        source_dictionary: None,
-                        target_path: "/svc/serviceC".parse().unwrap(),
-                        dependency_type: DependencyType::Strong,
-                        availability: Availability::Required,
-                    }))
+                    .use_(
+                        UseBuilder::protocol()
+                            .source(UseSource::Child("b".to_string()))
+                            .name("serviceC"),
+                    )
                     .build(),
             ),
             (
@@ -4145,11 +4058,11 @@ mod tests {
                 ComponentDeclBuilder::new()
                     .child(ChildBuilder::new().name("b").eager().build())
                     .child(ChildBuilder::new().name("c").eager().build())
-                    .use_(UseDecl::Runner(UseRunnerDecl {
-                        source: UseSource::Child("b".to_string()),
-                        source_name: "test.runner".parse().unwrap(),
-                        source_dictionary: None,
-                    }))
+                    .use_(
+                        UseBuilder::runner()
+                            .source(UseSource::Child("b".to_string()))
+                            .name("test.runner"),
+                    )
                     .build(),
             ),
             (
@@ -4226,14 +4139,11 @@ mod tests {
                 ComponentDeclBuilder::new()
                     .child(ChildBuilder::new().name("b").eager().build())
                     .child(ChildBuilder::new().name("c").eager().build())
-                    .use_(UseDecl::Protocol(UseProtocolDecl {
-                        source: UseSource::Child("b".to_string()),
-                        source_name: "serviceB".parse().unwrap(),
-                        source_dictionary: None,
-                        target_path: "/svc/serviceB".parse().unwrap(),
-                        dependency_type: DependencyType::Strong,
-                        availability: Availability::Required,
-                    }))
+                    .use_(
+                        UseBuilder::protocol()
+                            .source(UseSource::Child("b".to_string()))
+                            .name("serviceB"),
+                    )
                     .offer(OfferDecl::Protocol(OfferProtocolDecl {
                         source: OfferSource::static_child("c".to_string()),
                         source_name: "serviceC".parse().unwrap(),
@@ -4257,14 +4167,7 @@ mod tests {
                         target: ExposeTarget::Parent,
                         availability: cm_rust::Availability::Required,
                     }))
-                    .use_(UseDecl::Protocol(UseProtocolDecl {
-                        source: UseSource::Parent,
-                        source_name: "serviceC".parse().unwrap(),
-                        source_dictionary: None,
-                        target_path: "/svc/serviceC".parse().unwrap(),
-                        dependency_type: DependencyType::Strong,
-                        availability: Availability::Required,
-                    }))
+                    .use_(UseBuilder::protocol().name("serviceC"))
                     .build(),
             ),
             (
@@ -4342,14 +4245,12 @@ mod tests {
                 ComponentDeclBuilder::new()
                     .child(ChildBuilder::new().name("b").eager().build())
                     .child(ChildBuilder::new().name("c").eager().build())
-                    .use_(UseDecl::Protocol(UseProtocolDecl {
-                        source: UseSource::Child("b".to_string()),
-                        source_name: "serviceC".parse().unwrap(),
-                        source_dictionary: None,
-                        target_path: "/svc/serviceC".parse().unwrap(),
-                        dependency_type: DependencyType::Weak,
-                        availability: Availability::Required,
-                    }))
+                    .use_(
+                        UseBuilder::protocol()
+                            .source(UseSource::Child("b".to_string()))
+                            .name("serviceC")
+                            .dependency(DependencyType::Weak),
+                    )
                     .build(),
             ),
             (

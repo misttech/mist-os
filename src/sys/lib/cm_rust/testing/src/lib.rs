@@ -10,7 +10,7 @@ use {
     cml,
     derivative::Derivative,
     fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_data as fdata, fidl_fuchsia_io as fio,
-    std::path::PathBuf,
+    std::{collections::BTreeMap, path::PathBuf},
 };
 
 /// Name of the test runner.
@@ -90,8 +90,8 @@ impl ComponentDeclBuilder {
     }
 
     /// Add a custom use decl.
-    pub fn use_(mut self, use_: cm_rust::UseDecl) -> Self {
-        self.result.uses.push(use_);
+    pub fn use_(mut self, use_: impl Into<cm_rust::UseDecl>) -> Self {
+        self.result.uses.push(use_.into());
         self
     }
 
@@ -359,7 +359,7 @@ impl From<EnvironmentBuilder> for cm_rust::EnvironmentDecl {
     }
 }
 
-/// A convenience builder for constructing CapabilityDecls.
+/// A convenience builder for constructing [CapabilityDecl]s.
 ///
 /// To use, call the constructor matching their capability type ([CapabilityBuilder::protocol],
 /// [CapabilityBuilder::directory], etc., and then call methods to set properties. When done,
@@ -552,6 +552,247 @@ impl CapabilityBuilder {
 
 impl From<CapabilityBuilder> for cm_rust::CapabilityDecl {
     fn from(builder: CapabilityBuilder) -> Self {
+        builder.build()
+    }
+}
+
+/// A convenience builder for constructing [UseDecl]s.
+///
+/// To use, call the constructor matching their capability type ([UseBuilder::protocol],
+/// [UseBuilder::directory], etc., and then call methods to set properties. When done,
+/// call [UseBuilder::build] (or [Into::into]) to generate the [UseDecl].
+#[derive(Debug)]
+pub struct UseBuilder {
+    source_name: Option<Name>,
+    type_: CapabilityTypeName,
+    source_dictionary: Option<RelativePath>,
+    source: cm_rust::UseSource,
+    target_name: Option<Name>,
+    target_path: Option<Path>,
+    dependency_type: cm_rust::DependencyType,
+    availability: cm_rust::Availability,
+    rights: fio::Operations,
+    subdir: Option<PathBuf>,
+    scope: Option<Vec<cm_rust::EventScope>>,
+    filter: Option<BTreeMap<String, cm_rust::DictionaryValue>>,
+}
+
+impl UseBuilder {
+    pub fn protocol() -> Self {
+        Self::new(CapabilityTypeName::Protocol)
+    }
+
+    pub fn service() -> Self {
+        Self::new(CapabilityTypeName::Service)
+    }
+
+    pub fn directory() -> Self {
+        Self::new(CapabilityTypeName::Directory)
+    }
+
+    pub fn storage() -> Self {
+        Self::new(CapabilityTypeName::Storage)
+    }
+
+    pub fn runner() -> Self {
+        Self::new(CapabilityTypeName::Runner)
+    }
+
+    pub fn event_stream() -> Self {
+        Self::new(CapabilityTypeName::EventStream)
+    }
+
+    pub fn config() -> Self {
+        Self::new(CapabilityTypeName::Config)
+    }
+
+    fn new(type_: CapabilityTypeName) -> Self {
+        Self {
+            type_,
+            source: cm_rust::UseSource::Parent,
+            source_name: None,
+            target_name: None,
+            target_path: None,
+            source_dictionary: None,
+            rights: fio::R_STAR_DIR,
+            subdir: None,
+            dependency_type: cm_rust::DependencyType::Strong,
+            availability: cm_rust::Availability::Required,
+            scope: None,
+            filter: None,
+        }
+    }
+
+    pub fn name(mut self, name: &str) -> Self {
+        self.source_name = Some(name.parse().unwrap());
+        if self.target_path.is_some() || self.target_name.is_some() {
+            return self;
+        }
+        match self.type_ {
+            CapabilityTypeName::Protocol | CapabilityTypeName::Service => {
+                self.target_path = Some(format!("/svc/{name}").parse().unwrap());
+            }
+            CapabilityTypeName::EventStream => {
+                self.target_path = Some("/svc/fuchsia.component.EventStream".parse().unwrap());
+            }
+            CapabilityTypeName::Runner | CapabilityTypeName::Config => {
+                self.target_name = self.source_name.clone();
+            }
+            CapabilityTypeName::Storage | CapabilityTypeName::Directory => {}
+            CapabilityTypeName::Dictionary | CapabilityTypeName::Resolver => unreachable!(),
+        }
+        self
+    }
+
+    pub fn path(mut self, path: &str) -> Self {
+        assert_matches!(
+            self.type_,
+            CapabilityTypeName::Protocol
+                | CapabilityTypeName::Service
+                | CapabilityTypeName::Directory
+                | CapabilityTypeName::EventStream
+                | CapabilityTypeName::Storage
+        );
+        self.target_path = Some(path.parse().unwrap());
+        self
+    }
+
+    pub fn target_name(mut self, name: &str) -> Self {
+        assert_matches!(self.type_, CapabilityTypeName::Runner | CapabilityTypeName::Config);
+        self.target_name = Some(name.parse().unwrap());
+        self
+    }
+
+    pub fn from_dictionary(mut self, dictionary: &str) -> Self {
+        assert_matches!(
+            self.type_,
+            CapabilityTypeName::Service
+                | CapabilityTypeName::Protocol
+                | CapabilityTypeName::Directory
+                | CapabilityTypeName::Runner
+        );
+        self.source_dictionary = Some(dictionary.parse().unwrap());
+        self
+    }
+
+    pub fn source(mut self, source: cm_rust::UseSource) -> Self {
+        assert_matches!(self.type_, t if t != CapabilityTypeName::Storage);
+        self.source = source;
+        self
+    }
+
+    pub fn availability(mut self, availability: cm_rust::Availability) -> Self {
+        assert_matches!(
+            self.type_,
+            CapabilityTypeName::Protocol
+                | CapabilityTypeName::Service
+                | CapabilityTypeName::Directory
+                | CapabilityTypeName::EventStream
+                | CapabilityTypeName::Storage
+                | CapabilityTypeName::Config
+        );
+        self.availability = availability;
+        self
+    }
+
+    pub fn dependency(mut self, dependency: cm_rust::DependencyType) -> Self {
+        assert_matches!(
+            self.type_,
+            CapabilityTypeName::Protocol
+                | CapabilityTypeName::Service
+                | CapabilityTypeName::Directory
+        );
+        self.dependency_type = dependency;
+        self
+    }
+
+    pub fn rights(mut self, rights: fio::Operations) -> Self {
+        assert_matches!(self.type_, CapabilityTypeName::Directory);
+        self.rights = rights;
+        self
+    }
+
+    pub fn subdir(mut self, subdir: &str) -> Self {
+        assert_matches!(self.type_, CapabilityTypeName::Directory);
+        self.subdir = Some(subdir.parse().unwrap());
+        self
+    }
+
+    pub fn scope(mut self, scope: Vec<cm_rust::EventScope>) -> Self {
+        assert_matches!(self.type_, CapabilityTypeName::EventStream);
+        self.scope = Some(scope);
+        self
+    }
+
+    pub fn filter(mut self, filter: BTreeMap<String, cm_rust::DictionaryValue>) -> Self {
+        assert_matches!(self.type_, CapabilityTypeName::EventStream);
+        self.filter = Some(filter);
+        self
+    }
+
+    pub fn build(self) -> cm_rust::UseDecl {
+        match self.type_ {
+            CapabilityTypeName::Protocol => cm_rust::UseDecl::Protocol(cm_rust::UseProtocolDecl {
+                source: self.source,
+                source_name: self.source_name.expect("name not set"),
+                source_dictionary: self.source_dictionary,
+                target_path: self.target_path.expect("path not set"),
+                dependency_type: self.dependency_type,
+                availability: self.availability,
+            }),
+            CapabilityTypeName::Service => cm_rust::UseDecl::Service(cm_rust::UseServiceDecl {
+                source: self.source,
+                source_name: self.source_name.expect("name not set"),
+                source_dictionary: self.source_dictionary,
+                target_path: self.target_path.expect("path not set"),
+                dependency_type: self.dependency_type,
+                availability: self.availability,
+            }),
+            CapabilityTypeName::Directory => {
+                cm_rust::UseDecl::Directory(cm_rust::UseDirectoryDecl {
+                    source: self.source,
+                    source_name: self.source_name.expect("name not set"),
+                    source_dictionary: self.source_dictionary,
+                    target_path: self.target_path.expect("path not set"),
+                    rights: self.rights,
+                    subdir: self.subdir,
+                    dependency_type: self.dependency_type,
+                    availability: self.availability,
+                })
+            }
+            CapabilityTypeName::Storage => cm_rust::UseDecl::Storage(cm_rust::UseStorageDecl {
+                source_name: self.source_name.expect("name not set"),
+                target_path: self.target_path.expect("path not set"),
+                availability: self.availability,
+            }),
+            CapabilityTypeName::EventStream => {
+                cm_rust::UseDecl::EventStream(cm_rust::UseEventStreamDecl {
+                    source: self.source,
+                    source_name: self.source_name.expect("name not set"),
+                    target_path: self.target_path.expect("path not set"),
+                    availability: self.availability,
+                    scope: self.scope,
+                    filter: self.filter,
+                })
+            }
+            CapabilityTypeName::Runner => cm_rust::UseDecl::Runner(cm_rust::UseRunnerDecl {
+                source: self.source,
+                source_name: self.source_name.expect("name not set"),
+                source_dictionary: self.source_dictionary,
+            }),
+            CapabilityTypeName::Config => cm_rust::UseDecl::Config(cm_rust::UseConfigurationDecl {
+                source: self.source,
+                source_name: self.source_name.expect("name not set"),
+                target_name: self.target_name.expect("target name not set"),
+                availability: self.availability,
+            }),
+            CapabilityTypeName::Resolver | CapabilityTypeName::Dictionary => unreachable!(),
+        }
+    }
+}
+
+impl From<UseBuilder> for cm_rust::UseDecl {
+    fn from(builder: UseBuilder) -> Self {
         builder.build()
     }
 }

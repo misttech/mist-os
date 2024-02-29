@@ -13,7 +13,6 @@ use {
         convert::{TryFrom, TryInto},
         marker::PhantomData,
         path::PathBuf,
-        str::FromStr,
     },
 };
 
@@ -75,25 +74,13 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
             (
                 "b",
                 ComponentDeclBuilder::new()
-                    .use_(UseDecl::Storage(UseStorageDecl {
-                        source_name: "data".parse().unwrap(),
-                        target_path: "/storage".parse().unwrap(),
-                        availability: Availability::Required,
-                    }))
+                    .use_(UseBuilder::storage().name("data").path("/storage"))
                     .build(),
             ),
             (
                 "c",
                 ComponentDeclBuilder::new()
-                    .use_(UseDecl::Protocol(UseProtocolDecl {
-                        source: UseSource::Parent,
-                        source_name: "fuchsia.sys2.StorageAdmin".parse().unwrap(),
-                        source_dictionary: None,
-                        target_path: cm_types::Path::from_str("/svc/fuchsia.sys2.StorageAdmin")
-                            .unwrap(),
-                        dependency_type: DependencyType::Strong,
-                        availability: Availability::Required,
-                    }))
+                    .use_(UseBuilder::protocol().name("fuchsia.sys2.StorageAdmin"))
                     .build(),
             ),
         ];
@@ -172,15 +159,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
             (
                 "c",
                 ComponentDeclBuilder::new()
-                    .use_(UseDecl::Protocol(UseProtocolDecl {
-                        source: UseSource::Parent,
-                        source_name: "fuchsia.sys2.StorageAdmin".parse().unwrap(),
-                        source_dictionary: None,
-                        target_path: cm_types::Path::from_str("/svc/fuchsia.sys2.StorageAdmin")
-                            .unwrap(),
-                        dependency_type: DependencyType::Strong,
-                        availability: Availability::Required,
-                    }))
+                    .use_(UseBuilder::protocol().name("fuchsia.sys2.StorageAdmin"))
                     .build(),
             ),
         ];
@@ -231,15 +210,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
             (
                 "b",
                 ComponentDeclBuilder::new()
-                    .use_(UseDecl::Protocol(UseProtocolDecl {
-                        source: UseSource::Parent,
-                        source_name: "fuchsia.sys2.StorageAdmin".parse().unwrap(),
-                        source_dictionary: None,
-                        target_path: cm_types::Path::from_str("/svc/fuchsia.sys2.StorageAdmin")
-                            .unwrap(),
-                        dependency_type: DependencyType::Strong,
-                        availability: Availability::Required,
-                    }))
+                    .use_(UseBuilder::protocol().name("fuchsia.sys2.StorageAdmin"))
                     .build(),
             ),
             (
@@ -278,11 +249,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
             (
                 "d",
                 ComponentDeclBuilder::new()
-                    .use_(UseDecl::Storage(UseStorageDecl {
-                        source_name: "data".parse().unwrap(),
-                        target_path: "/storage".parse().unwrap(),
-                        availability: Availability::Required,
-                    }))
+                    .use_(UseBuilder::storage().name("data").path("/storage"))
                     .build(),
             ),
         ];
@@ -331,26 +298,18 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
                         target_name: "data".parse().unwrap(),
                         availability: Availability::Required,
                     }))
-                    .use_(UseDecl::Protocol(UseProtocolDecl {
-                        source: UseSource::Capability("data".parse().unwrap()),
-                        source_name: "fuchsia.sys2.StorageAdmin".parse().unwrap(),
-                        source_dictionary: None,
-                        target_path: cm_types::Path::from_str("/svc/fuchsia.sys2.StorageAdmin")
-                            .unwrap(),
-                        dependency_type: DependencyType::Strong,
-                        availability: Availability::Required,
-                    }))
+                    .use_(
+                        UseBuilder::protocol()
+                            .source(UseSource::Capability("data".parse().unwrap()))
+                            .name("fuchsia.sys2.StorageAdmin"),
+                    )
                     .child_default("b")
                     .build(),
             ),
             (
                 "b",
                 ComponentDeclBuilder::new()
-                    .use_(UseDecl::Storage(UseStorageDecl {
-                        source_name: "data".parse().unwrap(),
-                        target_path: "/storage".parse().unwrap(),
-                        availability: Availability::Required,
-                    }))
+                    .use_(UseBuilder::storage().name("data").path("/storage"))
                     .build(),
             ),
         ];
@@ -404,26 +363,18 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
                         target_name: "data".parse().unwrap(),
                         availability: Availability::Required,
                     }))
-                    .use_(UseDecl::Protocol(UseProtocolDecl {
-                        source: UseSource::Capability("unrelated.protocol".parse().unwrap()),
-                        source_name: "fuchsia.sys2.StorageAdmin".parse().unwrap(),
-                        source_dictionary: None,
-                        target_path: cm_types::Path::from_str("/svc/fuchsia.sys2.StorageAdmin")
-                            .unwrap(),
-                        dependency_type: DependencyType::Strong,
-                        availability: Availability::Required,
-                    }))
+                    .use_(
+                        UseBuilder::protocol()
+                            .source(UseSource::Capability("unrelated.protocol".parse().unwrap()))
+                            .name("fuchsia.sys2.StorageAdmin"),
+                    )
                     .child_default("b")
                     .build(),
             ),
             (
                 "b",
                 ComponentDeclBuilder::new()
-                    .use_(UseDecl::Storage(UseStorageDecl {
-                        source_name: "data".parse().unwrap(),
-                        target_path: "/storage".parse().unwrap(),
-                        availability: Availability::Required,
-                    }))
+                    .use_(UseBuilder::storage().name("data").path("/storage"))
                     .build(),
             ),
         ];
@@ -484,15 +435,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
             (
                 "b",
                 ComponentDeclBuilder::new()
-                    .use_(UseDecl::Protocol(UseProtocolDecl {
-                        source: UseSource::Parent,
-                        source_name: "fuchsia.sys2.StorageAdmin".parse().unwrap(),
-                        source_dictionary: None,
-                        target_path: cm_types::Path::from_str("/svc/fuchsia.sys2.StorageAdmin")
-                            .unwrap(),
-                        dependency_type: DependencyType::Strong,
-                        availability: Availability::Required,
-                    }))
+                    .use_(UseBuilder::protocol().name("fuchsia.sys2.StorageAdmin"))
                     .build(),
             ),
         ];
@@ -544,15 +487,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
             (
                 "b",
                 ComponentDeclBuilder::new()
-                    .use_(UseDecl::Protocol(UseProtocolDecl {
-                        source: UseSource::Parent,
-                        source_name: "fuchsia.sys2.StorageAdmin".parse().unwrap(),
-                        source_dictionary: None,
-                        target_path: cm_types::Path::from_str("/svc/fuchsia.sys2.StorageAdmin")
-                            .unwrap(),
-                        dependency_type: DependencyType::Strong,
-                        availability: Availability::Required,
-                    }))
+                    .use_(UseBuilder::protocol().name("fuchsia.sys2.StorageAdmin"))
                     .build(),
             ),
             (
@@ -594,11 +529,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
             (
                 "d",
                 ComponentDeclBuilder::new()
-                    .use_(UseDecl::Storage(UseStorageDecl {
-                        source_name: "data".parse().unwrap(),
-                        target_path: "/storage".parse().unwrap(),
-                        availability: Availability::Required,
-                    }))
+                    .use_(UseBuilder::storage().name("data").path("/storage"))
                     .build(),
             ),
         ];
@@ -651,26 +582,19 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
                         target_name: "data".parse().unwrap(),
                         availability: Availability::Required,
                     }))
-                    .use_(UseDecl::Protocol(UseProtocolDecl {
-                        source: UseSource::Capability("unrelated.protocol".parse().unwrap()),
-                        source_name: "unrelated.protocol".parse().unwrap(),
-                        source_dictionary: None,
-                        target_path: cm_types::Path::from_str("/svc/fuchsia.sys2.StorageAdmin")
-                            .unwrap(),
-                        dependency_type: DependencyType::Strong,
-                        availability: Availability::Required,
-                    }))
+                    .use_(
+                        UseBuilder::protocol()
+                            .source(UseSource::Capability("unrelated.protocol".parse().unwrap()))
+                            .name("unrelated.protocol")
+                            .path("/svc/fuchsia.sys2.StorageAdmin"),
+                    )
                     .child_default("b")
                     .build(),
             ),
             (
                 "b",
                 ComponentDeclBuilder::new()
-                    .use_(UseDecl::Storage(UseStorageDecl {
-                        source_name: "data".parse().unwrap(),
-                        target_path: "/storage".parse().unwrap(),
-                        availability: Availability::Required,
-                    }))
+                    .use_(UseBuilder::storage().name("data").path("/storage"))
                     .build(),
             ),
         ];
@@ -727,15 +651,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
             (
                 "b",
                 ComponentDeclBuilder::new()
-                    .use_(UseDecl::Protocol(UseProtocolDecl {
-                        source: UseSource::Parent,
-                        source_name: "fuchsia.sys2.StorageAdmin".parse().unwrap(),
-                        source_dictionary: None,
-                        target_path: cm_types::Path::from_str("/svc/fuchsia.sys2.StorageAdmin")
-                            .unwrap(),
-                        dependency_type: DependencyType::Strong,
-                        availability: Availability::Required,
-                    }))
+                    .use_(UseBuilder::protocol().name("fuchsia.sys2.StorageAdmin"))
                     .build(),
             ),
         ];
@@ -786,15 +702,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
             (
                 "b",
                 ComponentDeclBuilder::new()
-                    .use_(UseDecl::Protocol(UseProtocolDecl {
-                        source: UseSource::Parent,
-                        source_name: "fuchsia.sys2.StorageAdmin".parse().unwrap(),
-                        source_dictionary: None,
-                        target_path: cm_types::Path::from_str("/svc/fuchsia.sys2.StorageAdmin")
-                            .unwrap(),
-                        dependency_type: DependencyType::Strong,
-                        availability: Availability::Required,
-                    }))
+                    .use_(UseBuilder::protocol().name("fuchsia.sys2.StorageAdmin"))
                     .build(),
             ),
             (
@@ -833,11 +741,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
             (
                 "d",
                 ComponentDeclBuilder::new()
-                    .use_(UseDecl::Storage(UseStorageDecl {
-                        source_name: "data".parse().unwrap(),
-                        target_path: "/storage".parse().unwrap(),
-                        availability: Availability::Required,
-                    }))
+                    .use_(UseBuilder::storage().name("data").path("/storage"))
                     .build(),
             ),
         ];

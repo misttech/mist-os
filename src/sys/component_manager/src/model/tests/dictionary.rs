@@ -52,30 +52,19 @@ async fn use_protocol_from_dictionary() {
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
                 }))
-                .use_(UseDecl::Protocol(UseProtocolDecl {
-                    dependency_type: DependencyType::Strong,
-                    source: UseSource::Self_,
-                    source_name: "A".parse().unwrap(),
-                    source_dictionary: Some("self_dict".parse().unwrap()),
-                    target_path: "/svc/A".parse().unwrap(),
-                    availability: Availability::Required,
-                }))
-                .use_(UseDecl::Protocol(UseProtocolDecl {
-                    dependency_type: DependencyType::Strong,
-                    source: UseSource::Parent,
-                    source_name: "B".parse().unwrap(),
-                    source_dictionary: Some("parent_dict".parse().unwrap()),
-                    target_path: "/svc/B".parse().unwrap(),
-                    availability: Availability::Required,
-                }))
-                .use_(UseDecl::Protocol(UseProtocolDecl {
-                    dependency_type: DependencyType::Strong,
-                    source: UseSource::Child("leaf".into()),
-                    source_name: "C".parse().unwrap(),
-                    source_dictionary: Some("child_dict".parse().unwrap()),
-                    target_path: "/svc/C".parse().unwrap(),
-                    availability: Availability::Required,
-                }))
+                .use_(
+                    UseBuilder::protocol()
+                        .source(UseSource::Self_)
+                        .name("A")
+                        .from_dictionary("self_dict"),
+                )
+                .use_(UseBuilder::protocol().name("B").from_dictionary("parent_dict"))
+                .use_(
+                    UseBuilder::protocol()
+                        .source(UseSource::Child("leaf".into()))
+                        .name("C")
+                        .from_dictionary("child_dict"),
+                )
                 .child_default("leaf")
                 .build(),
         ),
@@ -163,26 +152,14 @@ async fn use_directory_from_dictionary_not_supported() {
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
                 }))
-                .use_(UseDecl::Directory(UseDirectoryDecl {
-                    dependency_type: DependencyType::Strong,
-                    source: UseSource::Self_,
-                    source_name: "A".parse().unwrap(),
-                    source_dictionary: Some("self_dict".parse().unwrap()),
-                    target_path: "/A".parse().unwrap(),
-                    rights: fio::R_STAR_DIR,
-                    subdir: None,
-                    availability: Availability::Required,
-                }))
-                .use_(UseDecl::Directory(UseDirectoryDecl {
-                    dependency_type: DependencyType::Strong,
-                    source: UseSource::Parent,
-                    source_name: "B".parse().unwrap(),
-                    source_dictionary: Some("parent_dict".parse().unwrap()),
-                    target_path: "/B".parse().unwrap(),
-                    rights: fio::R_STAR_DIR,
-                    subdir: None,
-                    availability: Availability::Required,
-                }))
+                .use_(
+                    UseBuilder::directory()
+                        .source(UseSource::Self_)
+                        .name("A")
+                        .from_dictionary("self_dict")
+                        .path("/A"),
+                )
+                .use_(UseBuilder::directory().name("B").from_dictionary("parent_dict").path("/B"))
                 .build(),
         ),
     ];
@@ -215,26 +192,18 @@ async fn expose_directory_from_dictionary_not_supported() {
         (
             "root",
             ComponentDeclBuilder::new()
-                .use_(UseDecl::Directory(UseDirectoryDecl {
-                    dependency_type: DependencyType::Strong,
-                    source: UseSource::Child("mid".into()),
-                    source_name: "A".parse().unwrap(),
-                    source_dictionary: None,
-                    target_path: "/A".parse().unwrap(),
-                    rights: fio::R_STAR_DIR,
-                    subdir: None,
-                    availability: Availability::Required,
-                }))
-                .use_(UseDecl::Directory(UseDirectoryDecl {
-                    dependency_type: DependencyType::Strong,
-                    source: UseSource::Child("mid".into()),
-                    source_name: "B".parse().unwrap(),
-                    source_dictionary: None,
-                    target_path: "/B".parse().unwrap(),
-                    rights: fio::R_STAR_DIR,
-                    subdir: None,
-                    availability: Availability::Required,
-                }))
+                .use_(
+                    UseBuilder::directory()
+                        .source(UseSource::Child("mid".into()))
+                        .name("A")
+                        .path("/A"),
+                )
+                .use_(
+                    UseBuilder::directory()
+                        .source(UseSource::Child("mid".into()))
+                        .name("B")
+                        .path("/B"),
+                )
                 .child_default("mid")
                 .build(),
         ),
@@ -391,30 +360,19 @@ async fn use_protocol_from_nested_dictionary() {
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
                 }))
-                .use_(UseDecl::Protocol(UseProtocolDecl {
-                    dependency_type: DependencyType::Strong,
-                    source: UseSource::Self_,
-                    source_name: "A".parse().unwrap(),
-                    source_dictionary: Some("self_dict/nested".parse().unwrap()),
-                    target_path: "/svc/A".parse().unwrap(),
-                    availability: Availability::Required,
-                }))
-                .use_(UseDecl::Protocol(UseProtocolDecl {
-                    dependency_type: DependencyType::Strong,
-                    source: UseSource::Parent,
-                    source_name: "B".parse().unwrap(),
-                    source_dictionary: Some("parent_dict/nested".parse().unwrap()),
-                    target_path: "/svc/B".parse().unwrap(),
-                    availability: Availability::Required,
-                }))
-                .use_(UseDecl::Protocol(UseProtocolDecl {
-                    dependency_type: DependencyType::Strong,
-                    source: UseSource::Child("leaf".into()),
-                    source_name: "C".parse().unwrap(),
-                    source_dictionary: Some("child_dict/nested".parse().unwrap()),
-                    target_path: "/svc/C".parse().unwrap(),
-                    availability: Availability::Required,
-                }))
+                .use_(
+                    UseBuilder::protocol()
+                        .source(UseSource::Self_)
+                        .name("A")
+                        .from_dictionary("self_dict/nested"),
+                )
+                .use_(UseBuilder::protocol().name("B").from_dictionary("parent_dict/nested"))
+                .use_(
+                    UseBuilder::protocol()
+                        .source(UseSource::Child("leaf".into()))
+                        .name("C")
+                        .from_dictionary("child_dict/nested"),
+                )
                 .child_default("leaf")
                 .build(),
         ),
@@ -566,30 +524,9 @@ async fn offer_protocol_from_dictionary() {
         (
             "leaf",
             ComponentDeclBuilder::new()
-                .use_(UseDecl::Protocol(UseProtocolDecl {
-                    dependency_type: DependencyType::Strong,
-                    source: UseSource::Parent,
-                    source_name: "A_svc".parse().unwrap(),
-                    source_dictionary: None,
-                    target_path: "/svc/A".parse().unwrap(),
-                    availability: Availability::Required,
-                }))
-                .use_(UseDecl::Protocol(UseProtocolDecl {
-                    dependency_type: DependencyType::Strong,
-                    source: UseSource::Parent,
-                    source_name: "B_svc".parse().unwrap(),
-                    source_dictionary: None,
-                    target_path: "/svc/B".parse().unwrap(),
-                    availability: Availability::Required,
-                }))
-                .use_(UseDecl::Protocol(UseProtocolDecl {
-                    dependency_type: DependencyType::Strong,
-                    source: UseSource::Parent,
-                    source_name: "C_svc".parse().unwrap(),
-                    source_dictionary: None,
-                    target_path: "/svc/C".parse().unwrap(),
-                    availability: Availability::Required,
-                }))
+                .use_(UseBuilder::protocol().name("A_svc").path("/svc/A"))
+                .use_(UseBuilder::protocol().name("B_svc").path("/svc/B"))
+                .use_(UseBuilder::protocol().name("C_svc").path("/svc/C"))
                 .build(),
         ),
     ];
@@ -737,30 +674,9 @@ async fn offer_protocol_from_nested_dictionary() {
         (
             "leaf",
             ComponentDeclBuilder::new()
-                .use_(UseDecl::Protocol(UseProtocolDecl {
-                    dependency_type: DependencyType::Strong,
-                    source: UseSource::Parent,
-                    source_name: "A_svc".parse().unwrap(),
-                    source_dictionary: None,
-                    target_path: "/svc/A".parse().unwrap(),
-                    availability: Availability::Required,
-                }))
-                .use_(UseDecl::Protocol(UseProtocolDecl {
-                    dependency_type: DependencyType::Strong,
-                    source: UseSource::Parent,
-                    source_name: "B_svc".parse().unwrap(),
-                    source_dictionary: None,
-                    target_path: "/svc/B".parse().unwrap(),
-                    availability: Availability::Required,
-                }))
-                .use_(UseDecl::Protocol(UseProtocolDecl {
-                    dependency_type: DependencyType::Strong,
-                    source: UseSource::Parent,
-                    source_name: "C_svc".parse().unwrap(),
-                    source_dictionary: None,
-                    target_path: "/svc/C".parse().unwrap(),
-                    availability: Availability::Required,
-                }))
+                .use_(UseBuilder::protocol().name("A_svc").path("/svc/A"))
+                .use_(UseBuilder::protocol().name("B_svc").path("/svc/B"))
+                .use_(UseBuilder::protocol().name("C_svc").path("/svc/C"))
                 .build(),
         ),
     ];
@@ -782,22 +698,18 @@ async fn expose_protocol_from_dictionary() {
         (
             "root",
             ComponentDeclBuilder::new()
-                .use_(UseDecl::Protocol(UseProtocolDecl {
-                    dependency_type: DependencyType::Strong,
-                    source: UseSource::Child("mid".into()),
-                    source_name: "A_svc".parse().unwrap(),
-                    source_dictionary: None,
-                    target_path: "/svc/A".parse().unwrap(),
-                    availability: Availability::Required,
-                }))
-                .use_(UseDecl::Protocol(UseProtocolDecl {
-                    dependency_type: DependencyType::Strong,
-                    source: UseSource::Child("mid".into()),
-                    source_name: "B_svc".parse().unwrap(),
-                    source_dictionary: None,
-                    target_path: "/svc/B".parse().unwrap(),
-                    availability: Availability::Required,
-                }))
+                .use_(
+                    UseBuilder::protocol()
+                        .source(UseSource::Child("mid".into()))
+                        .name("A_svc")
+                        .path("/svc/A"),
+                )
+                .use_(
+                    UseBuilder::protocol()
+                        .source(UseSource::Child("mid".into()))
+                        .name("B_svc")
+                        .path("/svc/B"),
+                )
                 .child_default("mid")
                 .build(),
         ),
@@ -878,22 +790,18 @@ async fn expose_protocol_from_nested_dictionary() {
         (
             "root",
             ComponentDeclBuilder::new()
-                .use_(UseDecl::Protocol(UseProtocolDecl {
-                    dependency_type: DependencyType::Strong,
-                    source: UseSource::Child("mid".into()),
-                    source_name: "A_svc".parse().unwrap(),
-                    source_dictionary: None,
-                    target_path: "/svc/A".parse().unwrap(),
-                    availability: Availability::Required,
-                }))
-                .use_(UseDecl::Protocol(UseProtocolDecl {
-                    dependency_type: DependencyType::Strong,
-                    source: UseSource::Child("mid".into()),
-                    source_name: "B_svc".parse().unwrap(),
-                    source_dictionary: None,
-                    target_path: "/svc/B".parse().unwrap(),
-                    availability: Availability::Required,
-                }))
+                .use_(
+                    UseBuilder::protocol()
+                        .source(UseSource::Child("mid".into()))
+                        .name("A_svc")
+                        .path("/svc/A"),
+                )
+                .use_(
+                    UseBuilder::protocol()
+                        .source(UseSource::Child("mid".into()))
+                        .name("B_svc")
+                        .path("/svc/B"),
+                )
                 .child_default("mid")
                 .build(),
         ),
@@ -1142,30 +1050,24 @@ async fn offer_dictionary_to_dictionary() {
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
                 }))
-                .use_(UseDecl::Protocol(UseProtocolDecl {
-                    dependency_type: DependencyType::Strong,
-                    source: UseSource::Self_,
-                    source_name: "A".parse().unwrap(),
-                    source_dictionary: Some("root_dict/self_dict".parse().unwrap()),
-                    target_path: "/svc/A".parse().unwrap(),
-                    availability: Availability::Required,
-                }))
-                .use_(UseDecl::Protocol(UseProtocolDecl {
-                    dependency_type: DependencyType::Strong,
-                    source: UseSource::Self_,
-                    source_name: "B".parse().unwrap(),
-                    source_dictionary: Some("root_dict/parent_dict".parse().unwrap()),
-                    target_path: "/svc/B".parse().unwrap(),
-                    availability: Availability::Required,
-                }))
-                .use_(UseDecl::Protocol(UseProtocolDecl {
-                    dependency_type: DependencyType::Strong,
-                    source: UseSource::Self_,
-                    source_name: "C".parse().unwrap(),
-                    source_dictionary: Some("root_dict/child_dict".parse().unwrap()),
-                    target_path: "/svc/C".parse().unwrap(),
-                    availability: Availability::Required,
-                }))
+                .use_(
+                    UseBuilder::protocol()
+                        .source(UseSource::Self_)
+                        .name("A")
+                        .from_dictionary("root_dict/self_dict"),
+                )
+                .use_(
+                    UseBuilder::protocol()
+                        .source(UseSource::Self_)
+                        .name("B")
+                        .from_dictionary("root_dict/parent_dict"),
+                )
+                .use_(
+                    UseBuilder::protocol()
+                        .source(UseSource::Self_)
+                        .name("C")
+                        .from_dictionary("root_dict/child_dict"),
+                )
                 .child_default("leaf")
                 .build(),
         ),
@@ -1254,22 +1156,18 @@ async fn extend_from_self() {
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
                 }))
-                .use_(UseDecl::Protocol(UseProtocolDecl {
-                    dependency_type: DependencyType::Strong,
-                    source: UseSource::Self_,
-                    source_name: "A".parse().unwrap(),
-                    source_dictionary: Some("self_dict".parse().unwrap()),
-                    target_path: "/svc/A".parse().unwrap(),
-                    availability: Availability::Required,
-                }))
-                .use_(UseDecl::Protocol(UseProtocolDecl {
-                    dependency_type: DependencyType::Strong,
-                    source: UseSource::Self_,
-                    source_name: "B".parse().unwrap(),
-                    source_dictionary: Some("self_dict".parse().unwrap()),
-                    target_path: "/svc/B".parse().unwrap(),
-                    availability: Availability::Required,
-                }))
+                .use_(
+                    UseBuilder::protocol()
+                        .source(UseSource::Self_)
+                        .name("A")
+                        .from_dictionary("self_dict"),
+                )
+                .use_(
+                    UseBuilder::protocol()
+                        .source(UseSource::Self_)
+                        .name("B")
+                        .from_dictionary("self_dict"),
+                )
                 .build(),
         ),
     ];
@@ -1339,22 +1237,18 @@ async fn extend_from_parent() {
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
                 }))
-                .use_(UseDecl::Protocol(UseProtocolDecl {
-                    dependency_type: DependencyType::Strong,
-                    source: UseSource::Self_,
-                    source_name: "A".parse().unwrap(),
-                    source_dictionary: Some("self_dict".parse().unwrap()),
-                    target_path: "/svc/A".parse().unwrap(),
-                    availability: Availability::Required,
-                }))
-                .use_(UseDecl::Protocol(UseProtocolDecl {
-                    dependency_type: DependencyType::Strong,
-                    source: UseSource::Self_,
-                    source_name: "B".parse().unwrap(),
-                    source_dictionary: Some("self_dict".parse().unwrap()),
-                    target_path: "/svc/B".parse().unwrap(),
-                    availability: Availability::Required,
-                }))
+                .use_(
+                    UseBuilder::protocol()
+                        .source(UseSource::Self_)
+                        .name("A")
+                        .from_dictionary("self_dict"),
+                )
+                .use_(
+                    UseBuilder::protocol()
+                        .source(UseSource::Self_)
+                        .name("B")
+                        .from_dictionary("self_dict"),
+                )
                 .build(),
         ),
     ];
@@ -1404,22 +1298,18 @@ async fn extend_from_child() {
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
                 }))
-                .use_(UseDecl::Protocol(UseProtocolDecl {
-                    dependency_type: DependencyType::Strong,
-                    source: UseSource::Self_,
-                    source_name: "A".parse().unwrap(),
-                    source_dictionary: Some("self_dict".parse().unwrap()),
-                    target_path: "/svc/A".parse().unwrap(),
-                    availability: Availability::Required,
-                }))
-                .use_(UseDecl::Protocol(UseProtocolDecl {
-                    dependency_type: DependencyType::Strong,
-                    source: UseSource::Self_,
-                    source_name: "B".parse().unwrap(),
-                    source_dictionary: Some("self_dict".parse().unwrap()),
-                    target_path: "/svc/B".parse().unwrap(),
-                    availability: Availability::Required,
-                }))
+                .use_(
+                    UseBuilder::protocol()
+                        .source(UseSource::Self_)
+                        .name("A")
+                        .from_dictionary("self_dict"),
+                )
+                .use_(
+                    UseBuilder::protocol()
+                        .source(UseSource::Self_)
+                        .name("B")
+                        .from_dictionary("self_dict"),
+                )
                 .child_default("leaf")
                 .build(),
         ),
@@ -1520,22 +1410,18 @@ async fn use_from_dictionary_availability_attenuated() {
         (
             "leaf",
             ComponentDeclBuilder::new()
-                .use_(UseDecl::Protocol(UseProtocolDecl {
-                    dependency_type: DependencyType::Strong,
-                    source: UseSource::Parent,
-                    source_name: "A".parse().unwrap(),
-                    source_dictionary: Some("dict".parse().unwrap()),
-                    target_path: "/svc/A".parse().unwrap(),
-                    availability: Availability::Optional,
-                }))
-                .use_(UseDecl::Protocol(UseProtocolDecl {
-                    dependency_type: DependencyType::Strong,
-                    source: UseSource::Parent,
-                    source_name: "B".parse().unwrap(),
-                    source_dictionary: Some("dict/nested".parse().unwrap()),
-                    target_path: "/svc/B".parse().unwrap(),
-                    availability: Availability::Optional,
-                }))
+                .use_(
+                    UseBuilder::protocol()
+                        .name("A")
+                        .from_dictionary("dict")
+                        .availability(Availability::Optional),
+                )
+                .use_(
+                    UseBuilder::protocol()
+                        .name("B")
+                        .from_dictionary("dict/nested")
+                        .availability(Availability::Optional),
+                )
                 .build(),
         ),
     ];
@@ -1639,37 +1525,20 @@ async fn use_from_dictionary_availability_invalid() {
         (
             "leaf",
             ComponentDeclBuilder::new()
-                .use_(UseDecl::Protocol(UseProtocolDecl {
-                    dependency_type: DependencyType::Strong,
-                    source: UseSource::Parent,
-                    source_name: "A".parse().unwrap(),
-                    source_dictionary: Some("required_dict".parse().unwrap()),
-                    target_path: "/svc/A".parse().unwrap(),
-                    availability: Availability::Required,
-                }))
-                .use_(UseDecl::Protocol(UseProtocolDecl {
-                    dependency_type: DependencyType::Strong,
-                    source: UseSource::Parent,
-                    source_name: "B".parse().unwrap(),
-                    source_dictionary: Some("optional_dict".parse().unwrap()),
-                    target_path: "/svc/B".parse().unwrap(),
-                    availability: Availability::Required,
-                }))
-                .use_(UseDecl::Protocol(UseProtocolDecl {
-                    dependency_type: DependencyType::Strong,
-                    source: UseSource::Parent,
-                    source_name: "C".parse().unwrap(),
-                    source_dictionary: Some("dict_with_optional_nested/nested".parse().unwrap()),
-                    target_path: "/svc/C".parse().unwrap(),
-                    availability: Availability::Required,
-                }))
+                .use_(UseBuilder::protocol().name("A").from_dictionary("required_dict"))
+                .use_(UseBuilder::protocol().name("B").from_dictionary("optional_dict"))
+                .use_(
+                    UseBuilder::protocol()
+                        .name("C")
+                        .from_dictionary("dict_with_optional_nested/nested"),
+                )
                 .build(),
         ),
     ];
 
-    // TODO(fxbug.dev/319546081): This returns NOT_SUPPORTED due to the fallback to legacy routing.
-    // It should return NOT_FOUND. For this to happen, bedrock routing needs to return the error
-    // instead of falling back.
+    // TODO(https://fxbug.dev/319546081): This returns NOT_SUPPORTED due to the fallback to legacy
+    // routing. It should return NOT_FOUND. For this to happen, bedrock routing needs to return the
+    // error instead of falling back.
     let test = RoutingTestBuilder::new("root", components).build().await;
     test.check_use(
         "leaf".try_into().unwrap(),
@@ -1761,22 +1630,8 @@ async fn offer_from_dictionary_availability_attenuated() {
         (
             "leaf",
             ComponentDeclBuilder::new()
-                .use_(UseDecl::Protocol(UseProtocolDecl {
-                    dependency_type: DependencyType::Strong,
-                    source: UseSource::Parent,
-                    source_name: "A".parse().unwrap(),
-                    source_dictionary: None,
-                    target_path: "/svc/A".parse().unwrap(),
-                    availability: Availability::Optional,
-                }))
-                .use_(UseDecl::Protocol(UseProtocolDecl {
-                    dependency_type: DependencyType::Strong,
-                    source: UseSource::Parent,
-                    source_name: "B".parse().unwrap(),
-                    source_dictionary: None,
-                    target_path: "/svc/B".parse().unwrap(),
-                    availability: Availability::Optional,
-                }))
+                .use_(UseBuilder::protocol().name("A").availability(Availability::Optional))
+                .use_(UseBuilder::protocol().name("B").availability(Availability::Optional))
                 .build(),
         ),
     ];
@@ -1913,37 +1768,16 @@ async fn offer_from_dictionary_availability_invalid() {
         (
             "leaf",
             ComponentDeclBuilder::new()
-                .use_(UseDecl::Protocol(UseProtocolDecl {
-                    dependency_type: DependencyType::Strong,
-                    source: UseSource::Parent,
-                    source_name: "A".parse().unwrap(),
-                    source_dictionary: None,
-                    target_path: "/svc/A".parse().unwrap(),
-                    availability: Availability::Required,
-                }))
-                .use_(UseDecl::Protocol(UseProtocolDecl {
-                    dependency_type: DependencyType::Strong,
-                    source: UseSource::Parent,
-                    source_name: "B".parse().unwrap(),
-                    source_dictionary: None,
-                    target_path: "/svc/B".parse().unwrap(),
-                    availability: Availability::Required,
-                }))
-                .use_(UseDecl::Protocol(UseProtocolDecl {
-                    dependency_type: DependencyType::Strong,
-                    source: UseSource::Parent,
-                    source_name: "C".parse().unwrap(),
-                    source_dictionary: None,
-                    target_path: "/svc/C".parse().unwrap(),
-                    availability: Availability::Required,
-                }))
+                .use_(UseBuilder::protocol().name("A"))
+                .use_(UseBuilder::protocol().name("B"))
+                .use_(UseBuilder::protocol().name("C"))
                 .build(),
         ),
     ];
 
-    // TODO(fxbug.dev/319546081): This returns NOT_SUPPORTED due to the fallback to legacy routing.
-    // It should return NOT_FOUND. For this to happen, bedrock routing needs to return the error
-    // instead of falling back.
+    // TODO(https://fxbug.dev/319546081): This returns NOT_SUPPORTED due to the fallback to legacy
+    // routing. It should return NOT_FOUND. For this to happen, bedrock routing needs to return the
+    // error instead of falling back.
     let test = RoutingTestBuilder::new("root", components).build().await;
     test.check_use(
         "mid/leaf".try_into().unwrap(),
@@ -1980,22 +1814,18 @@ async fn expose_from_dictionary_availability_attenuated() {
         (
             "root",
             ComponentDeclBuilder::new()
-                .use_(UseDecl::Protocol(UseProtocolDecl {
-                    dependency_type: DependencyType::Strong,
-                    source: UseSource::Child("leaf".into()),
-                    source_name: "A".parse().unwrap(),
-                    source_dictionary: None,
-                    target_path: "/svc/A".parse().unwrap(),
-                    availability: Availability::Optional,
-                }))
-                .use_(UseDecl::Protocol(UseProtocolDecl {
-                    dependency_type: DependencyType::Strong,
-                    source: UseSource::Child("leaf".into()),
-                    source_name: "B".parse().unwrap(),
-                    source_dictionary: None,
-                    target_path: "/svc/B".parse().unwrap(),
-                    availability: Availability::Optional,
-                }))
+                .use_(
+                    UseBuilder::protocol()
+                        .source(UseSource::Child("leaf".into()))
+                        .name("A")
+                        .availability(Availability::Optional),
+                )
+                .use_(
+                    UseBuilder::protocol()
+                        .source(UseSource::Child("leaf".into()))
+                        .name("B")
+                        .availability(Availability::Optional),
+                )
                 .child_default("leaf")
                 .build(),
         ),
@@ -2076,30 +1906,9 @@ async fn expose_from_dictionary_availability_invalid() {
         (
             "root",
             ComponentDeclBuilder::new()
-                .use_(UseDecl::Protocol(UseProtocolDecl {
-                    dependency_type: DependencyType::Strong,
-                    source: UseSource::Child("mid".into()),
-                    source_name: "A".parse().unwrap(),
-                    source_dictionary: None,
-                    target_path: "/svc/A".parse().unwrap(),
-                    availability: Availability::Required,
-                }))
-                .use_(UseDecl::Protocol(UseProtocolDecl {
-                    dependency_type: DependencyType::Strong,
-                    source: UseSource::Child("mid".into()),
-                    source_name: "B".parse().unwrap(),
-                    source_dictionary: None,
-                    target_path: "/svc/B".parse().unwrap(),
-                    availability: Availability::Required,
-                }))
-                .use_(UseDecl::Protocol(UseProtocolDecl {
-                    dependency_type: DependencyType::Strong,
-                    source: UseSource::Child("mid".into()),
-                    source_name: "C".parse().unwrap(),
-                    source_dictionary: None,
-                    target_path: "/svc/C".parse().unwrap(),
-                    availability: Availability::Required,
-                }))
+                .use_(UseBuilder::protocol().source(UseSource::Child("mid".into())).name("A"))
+                .use_(UseBuilder::protocol().source(UseSource::Child("mid".into())).name("B"))
+                .use_(UseBuilder::protocol().source(UseSource::Child("mid".into())).name("C"))
                 .child_default("mid")
                 .build(),
         ),
@@ -2207,9 +2016,9 @@ async fn expose_from_dictionary_availability_invalid() {
         ),
     ];
 
-    // TODO(fxbug.dev/319546081): This returns NOT_SUPPORTED due to the fallback to legacy routing.
-    // It should return NOT_FOUND. For this to happen, bedrock routing needs to return the error
-    // instead of falling back.
+    // TODO(https://fxbug.dev/319546081): This returns NOT_SUPPORTED due to the fallback to legacy
+    // routing. It should return NOT_FOUND. For this to happen, bedrock routing needs to return the
+    // error instead of falling back.
     let test = RoutingTestBuilder::new("root", components).build().await;
     test.check_use(
         ".".try_into().unwrap(),

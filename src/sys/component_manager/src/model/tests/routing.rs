@@ -83,30 +83,24 @@ async fn capability_requested_event_at_parent() {
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
                 }))
-                .use_(UseDecl::EventStream(UseEventStreamDecl {
-                    source: UseSource::Parent,
-                    source_name: "capability_requested".parse().unwrap(),
-                    scope: None,
-                    target_path: "/events/capability_requested".parse().unwrap(),
-                    filter: Some(btreemap! {
-                        "name".to_string() => DictionaryValue::Str("foo".to_string())
-                    }),
-                    availability: Availability::Required,
-                }))
+                .use_(UseBuilder::event_stream()
+                    .name("capability_requested")
+                    .path("/events/capability_requested")
+                    .filter(
+                        btreemap! { "name".to_string() => DictionaryValue::Str("foo".to_string()) },
+                    )
+                )
                 .child_default("b")
                 .build(),
         ),
         (
             "b",
             ComponentDeclBuilder::new()
-                .use_(UseDecl::Protocol(UseProtocolDecl {
-                    dependency_type: DependencyType::Strong,
-                    source: UseSource::Parent,
-                    source_name: "bar".parse().unwrap(),
-                    source_dictionary: None,
-                    target_path: "/svc/hippo".parse().unwrap(),
-                    availability: Availability::Required,
-                }))
+                .use_(
+                    UseBuilder::protocol()
+                        .name("bar")
+                        .path("/svc/hippo")
+                )
                 .build(),
         ),
     ];
@@ -201,14 +195,11 @@ async fn use_in_collection() {
         (
             "b",
             ComponentDeclBuilder::new()
-                .use_(UseDecl::Protocol(UseProtocolDecl {
-                    source: UseSource::Framework,
-                    source_name: "fuchsia.component.Realm".parse().unwrap(),
-                    source_dictionary: None,
-                    target_path: "/svc/fuchsia.component.Realm".parse().unwrap(),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }))
+                .use_(
+                    UseBuilder::protocol()
+                        .source(UseSource::Framework)
+                        .name("fuchsia.component.Realm"),
+                )
                 .offer(OfferDecl::Directory(OfferDirectoryDecl {
                     source_name: "hippo_data".parse().unwrap(),
                     source: OfferSource::Parent,
@@ -235,29 +226,13 @@ async fn use_in_collection() {
         (
             "c",
             ComponentDeclBuilder::new()
-                .use_(UseDecl::Directory(UseDirectoryDecl {
-                    dependency_type: DependencyType::Strong,
-                    source: UseSource::Parent,
-                    source_name: "hippo_data".parse().unwrap(),
-                    source_dictionary: None,
-                    target_path: "/data/hippo".parse().unwrap(),
-                    rights: fio::R_STAR_DIR,
-                    subdir: None,
-                    availability: Availability::Required,
-                }))
+                .use_(UseBuilder::directory().name("hippo_data").path("/data/hippo"))
                 .build(),
         ),
         (
             "d",
             ComponentDeclBuilder::new()
-                .use_(UseDecl::Protocol(UseProtocolDecl {
-                    dependency_type: DependencyType::Strong,
-                    source: UseSource::Parent,
-                    source_name: "hippo".parse().unwrap(),
-                    source_dictionary: None,
-                    target_path: "/svc/hippo".parse().unwrap(),
-                    availability: Availability::Required,
-                }))
+                .use_(UseBuilder::protocol().name("hippo").path("/svc/hippo"))
                 .build(),
         ),
     ];
@@ -342,38 +317,19 @@ async fn use_in_collection_not_offered() {
         (
             "b",
             ComponentDeclBuilder::new()
-                .use_(UseDecl::Protocol(UseProtocolDecl {
-                    source: UseSource::Framework,
-                    source_name: "fuchsia.component.Realm".parse().unwrap(),
-                    source_dictionary: None,
-                    target_path: "/svc/fuchsia.component.Realm".parse().unwrap(),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }))
+                .use_(
+                    UseBuilder::protocol()
+                        .source(UseSource::Framework)
+                        .name("fuchsia.component.Realm"),
+                )
                 .collection_default("coll")
                 .build(),
         ),
         (
             "c",
             ComponentDeclBuilder::new()
-                .use_(UseDecl::Directory(UseDirectoryDecl {
-                    source: UseSource::Parent,
-                    source_name: "hippo_data".parse().unwrap(),
-                    source_dictionary: None,
-                    target_path: "/data/hippo".parse().unwrap(),
-                    rights: fio::R_STAR_DIR,
-                    subdir: None,
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }))
-                .use_(UseDecl::Protocol(UseProtocolDecl {
-                    dependency_type: DependencyType::Strong,
-                    source: UseSource::Parent,
-                    source_name: "hippo".parse().unwrap(),
-                    source_dictionary: None,
-                    target_path: "/svc/hippo".parse().unwrap(),
-                    availability: Availability::Required,
-                }))
+                .use_(UseBuilder::directory().name("hippo_data").path("/data/hippo"))
+                .use_(UseBuilder::protocol().name("hippo"))
                 .build(),
         ),
     ];
@@ -437,14 +393,11 @@ async fn dynamic_offer_from_parent() {
         (
             "b",
             ComponentDeclBuilder::new()
-                .use_(UseDecl::Protocol(UseProtocolDecl {
-                    source_name: "fuchsia.component.Realm".parse().unwrap(),
-                    source: UseSource::Framework,
-                    source_dictionary: None,
-                    target_path: "/svc/fuchsia.component.Realm".parse().unwrap(),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }))
+                .use_(
+                    UseBuilder::protocol()
+                        .source(UseSource::Framework)
+                        .name("fuchsia.component.Realm"),
+                )
                 .collection(
                     CollectionBuilder::new()
                         .name("coll")
@@ -452,32 +405,8 @@ async fn dynamic_offer_from_parent() {
                 )
                 .build(),
         ),
-        (
-            "c",
-            ComponentDeclBuilder::new()
-                .use_(UseDecl::Protocol(UseProtocolDecl {
-                    source_name: "hippo".parse().unwrap(),
-                    source: UseSource::Parent,
-                    source_dictionary: None,
-                    target_path: "/svc/hippo".parse().unwrap(),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }))
-                .build(),
-        ),
-        (
-            "d",
-            ComponentDeclBuilder::new()
-                .use_(UseDecl::Protocol(UseProtocolDecl {
-                    source_name: "hippo".parse().unwrap(),
-                    source: UseSource::Parent,
-                    source_dictionary: None,
-                    dependency_type: DependencyType::Strong,
-                    target_path: "/svc/hippo".parse().unwrap(),
-                    availability: Availability::Required,
-                }))
-                .build(),
-        ),
+        ("c", ComponentDeclBuilder::new().use_(UseBuilder::protocol().name("hippo")).build()),
+        ("d", ComponentDeclBuilder::new().use_(UseBuilder::protocol().name("hippo")).build()),
     ];
     let test = RoutingTest::new("a", components).await;
     test.create_dynamic_child_with_args(
@@ -543,14 +472,11 @@ async fn dynamic_offer_siblings_same_collection() {
         (
             "a",
             ComponentDeclBuilder::new()
-                .use_(UseDecl::Protocol(UseProtocolDecl {
-                    source_name: "fuchsia.component.Realm".parse().unwrap(),
-                    source: UseSource::Framework,
-                    source_dictionary: None,
-                    target_path: "/svc/fuchsia.component.Realm".parse().unwrap(),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }))
+                .use_(
+                    UseBuilder::protocol()
+                        .source(UseSource::Framework)
+                        .name("fuchsia.component.Realm"),
+                )
                 .collection(
                     CollectionBuilder::new()
                         .name("coll")
@@ -572,19 +498,7 @@ async fn dynamic_offer_siblings_same_collection() {
                 }))
                 .build(),
         ),
-        (
-            "c",
-            ComponentDeclBuilder::new()
-                .use_(UseDecl::Protocol(UseProtocolDecl {
-                    source_name: "hippo".parse().unwrap(),
-                    source: UseSource::Parent,
-                    source_dictionary: None,
-                    target_path: "/svc/hippo".parse().unwrap(),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }))
-                .build(),
-        ),
+        ("c", ComponentDeclBuilder::new().use_(UseBuilder::protocol().name("hippo")).build()),
     ];
     let test = RoutingTest::new("a", components).await;
 
@@ -646,14 +560,11 @@ async fn dynamic_offer_siblings_cross_collection() {
         (
             "a",
             ComponentDeclBuilder::new()
-                .use_(UseDecl::Protocol(UseProtocolDecl {
-                    source_name: "fuchsia.component.Realm".parse().unwrap(),
-                    source: UseSource::Framework,
-                    source_dictionary: None,
-                    target_path: "/svc/fuchsia.component.Realm".parse().unwrap(),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }))
+                .use_(
+                    UseBuilder::protocol()
+                        .source(UseSource::Framework)
+                        .name("fuchsia.component.Realm"),
+                )
                 .collection_default("source_coll")
                 .collection(
                     CollectionBuilder::new()
@@ -676,19 +587,7 @@ async fn dynamic_offer_siblings_cross_collection() {
                 }))
                 .build(),
         ),
-        (
-            "c",
-            ComponentDeclBuilder::new()
-                .use_(UseDecl::Protocol(UseProtocolDecl {
-                    source_name: "hippo".parse().unwrap(),
-                    source: UseSource::Parent,
-                    source_dictionary: None,
-                    target_path: "/svc/hippo".parse().unwrap(),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }))
-                .build(),
-        ),
+        ("c", ComponentDeclBuilder::new().use_(UseBuilder::protocol().name("hippo")).build()),
     ];
     let test = RoutingTest::new("a", components).await;
 
@@ -750,14 +649,11 @@ async fn dynamic_offer_destroyed_on_source_destruction() {
         (
             "a",
             ComponentDeclBuilder::new()
-                .use_(UseDecl::Protocol(UseProtocolDecl {
-                    source_name: "fuchsia.component.Realm".parse().unwrap(),
-                    source: UseSource::Framework,
-                    source_dictionary: None,
-                    target_path: "/svc/fuchsia.component.Realm".parse().unwrap(),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }))
+                .use_(
+                    UseBuilder::protocol()
+                        .source(UseSource::Framework)
+                        .name("fuchsia.component.Realm"),
+                )
                 .collection(
                     CollectionBuilder::new()
                         .name("coll")
@@ -779,19 +675,7 @@ async fn dynamic_offer_destroyed_on_source_destruction() {
                 }))
                 .build(),
         ),
-        (
-            "c",
-            ComponentDeclBuilder::new()
-                .use_(UseDecl::Protocol(UseProtocolDecl {
-                    source_name: "hippo".parse().unwrap(),
-                    source: UseSource::Parent,
-                    source_dictionary: None,
-                    target_path: "/svc/hippo".parse().unwrap(),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }))
-                .build(),
-        ),
+        ("c", ComponentDeclBuilder::new().use_(UseBuilder::protocol().name("hippo")).build()),
     ];
     let test = RoutingTest::new("a", components).await;
 
@@ -877,14 +761,11 @@ async fn dynamic_offer_destroyed_on_target_destruction() {
         (
             "a",
             ComponentDeclBuilder::new()
-                .use_(UseDecl::Protocol(UseProtocolDecl {
-                    source_name: "fuchsia.component.Realm".parse().unwrap(),
-                    source: UseSource::Framework,
-                    source_dictionary: None,
-                    target_path: "/svc/fuchsia.component.Realm".parse().unwrap(),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }))
+                .use_(
+                    UseBuilder::protocol()
+                        .source(UseSource::Framework)
+                        .name("fuchsia.component.Realm"),
+                )
                 .collection(
                     CollectionBuilder::new()
                         .name("coll")
@@ -911,16 +792,7 @@ async fn dynamic_offer_destroyed_on_target_destruction() {
         (
             "c",
             ComponentDeclBuilder::new()
-                .use_(UseDecl::Directory(UseDirectoryDecl {
-                    source_name: "hippo_data".parse().unwrap(),
-                    source: UseSource::Parent,
-                    source_dictionary: None,
-                    target_path: "/data/hippo".parse().unwrap(),
-                    dependency_type: DependencyType::Strong,
-                    rights: fio::R_STAR_DIR,
-                    subdir: None,
-                    availability: Availability::Required,
-                }))
+                .use_(UseBuilder::directory().name("hippo_data").path("/data/hippo"))
                 .build(),
         ),
     ];
@@ -1008,14 +880,11 @@ async fn dynamic_offer_to_static_offer() {
         (
             "a",
             ComponentDeclBuilder::new()
-                .use_(UseDecl::Protocol(UseProtocolDecl {
-                    source_name: "fuchsia.component.Realm".parse().unwrap(),
-                    source: UseSource::Framework,
-                    source_dictionary: None,
-                    target_path: "/svc/fuchsia.component.Realm".parse().unwrap(),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }))
+                .use_(
+                    UseBuilder::protocol()
+                        .source(UseSource::Framework)
+                        .name("fuchsia.component.Realm"),
+                )
                 .collection(
                     CollectionBuilder::new()
                         .name("coll")
@@ -1056,14 +925,7 @@ async fn dynamic_offer_to_static_offer() {
         (
             "d",
             ComponentDeclBuilder::new()
-                .use_(UseDecl::Protocol(UseProtocolDecl {
-                    source_name: "hippo".parse().unwrap(),
-                    source: UseSource::Parent,
-                    source_dictionary: None,
-                    target_path: "/svc/hippo".parse().unwrap(),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }))
+                .use_(UseBuilder::protocol().name("hippo"))
                 .child_default("d")
                 .build(),
         ),
@@ -1117,30 +979,15 @@ async fn create_child_with_dict() {
         (
             "a",
             ComponentDeclBuilder::new()
-                .use_(UseDecl::Protocol(UseProtocolDecl {
-                    source_name: "fuchsia.component.Realm".parse().unwrap(),
-                    source: UseSource::Framework,
-                    source_dictionary: None,
-                    target_path: "/svc/fuchsia.component.Realm".parse().unwrap(),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }))
+                .use_(
+                    UseBuilder::protocol()
+                        .source(UseSource::Framework)
+                        .name("fuchsia.component.Realm"),
+                )
                 .collection_default("coll")
                 .build(),
         ),
-        (
-            "b",
-            ComponentDeclBuilder::new()
-                .use_(UseDecl::Protocol(UseProtocolDecl {
-                    source_name: "hippo".parse().unwrap(),
-                    source: UseSource::Parent,
-                    source_dictionary: None,
-                    target_path: "/svc/hippo".parse().unwrap(),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }))
-                .build(),
-        ),
+        ("b", ComponentDeclBuilder::new().use_(UseBuilder::protocol().name("hippo")).build()),
     ];
 
     // Create a dictionary with a sender for the `hippo` protocol.
@@ -1203,14 +1050,11 @@ async fn destroying_instance_kills_framework_service_task() {
         (
             "b",
             ComponentDeclBuilder::new()
-                .use_(UseDecl::Protocol(UseProtocolDecl {
-                    source: UseSource::Framework,
-                    source_name: "fuchsia.component.Realm".parse().unwrap(),
-                    source_dictionary: None,
-                    target_path: "/svc/fuchsia.component.Realm".parse().unwrap(),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }))
+                .use_(
+                    UseBuilder::protocol()
+                        .source(UseSource::Framework)
+                        .name("fuchsia.component.Realm"),
+                )
                 .build(),
         ),
     ];
@@ -1264,24 +1108,8 @@ async fn destroying_instance_blocks_on_routing() {
         (
             "b",
             ComponentDeclBuilder::new()
-                .use_(UseDecl::Protocol(UseProtocolDecl {
-                    source: UseSource::Parent,
-                    source_name: "foo".parse().unwrap(),
-                    source_dictionary: None,
-                    target_path: "/svc/echo".parse().unwrap(),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }))
-                .use_(UseDecl::Directory(UseDirectoryDecl {
-                    source: UseSource::Parent,
-                    source_name: "foo_data".parse().unwrap(),
-                    source_dictionary: None,
-                    target_path: "/data".parse().unwrap(),
-                    rights: fio::R_STAR_DIR,
-                    subdir: None,
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }))
+                .use_(UseBuilder::protocol().name("foo").path("/svc/echo"))
+                .use_(UseBuilder::directory().name("foo_data").path("/data"))
                 .build(),
         ),
         (
@@ -1443,14 +1271,11 @@ async fn use_runner_from_environment_in_collection() {
                     source: RegistrationSource::Self_,
                     target_name: "hobbit".parse().unwrap(),
                 }))
-                .use_(UseDecl::Protocol(UseProtocolDecl {
-                    source: UseSource::Framework,
-                    source_name: "fuchsia.component.Realm".parse().unwrap(),
-                    source_dictionary: None,
-                    target_path: "/svc/fuchsia.component.Realm".parse().unwrap(),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }))
+                .use_(
+                    UseBuilder::protocol()
+                        .source(UseSource::Framework)
+                        .name("fuchsia.component.Realm"),
+                )
                 .runner_default("elf")
                 .build(),
         ),
@@ -1719,14 +1544,7 @@ async fn use_runner_from_environment_failed() {
                 }))
                 .runner_default("runner")
                 // For Stopped event
-                .use_(UseDecl::EventStream(UseEventStreamDecl {
-                    source: UseSource::Parent,
-                    source_name: "stopped".parse().unwrap(),
-                    scope: None,
-                    target_path: "/events/stopped".parse().unwrap(),
-                    filter: None,
-                    availability: Availability::Required,
-                }))
+                .use_(UseBuilder::event_stream().name("stopped").path("/events/stopped"))
                 .build(),
         ),
         ("b", ComponentDeclBuilder::new_empty_component().add_program("runner").build()),
@@ -1863,28 +1681,17 @@ async fn use_runner_from_environment_not_found() {
 /// c: uses service /svc/foo, which should fail
 #[fuchsia::test]
 async fn use_with_destroyed_parent() {
-    let use_protocol_decl = UseProtocolDecl {
-        source: UseSource::Parent,
-        source_name: "foo".parse().unwrap(),
-        source_dictionary: None,
-        target_path: "/svc/hippo".parse().unwrap(),
-        dependency_type: DependencyType::Strong,
-        availability: Availability::Required,
-    };
-    let use_decl = UseDecl::Protocol(use_protocol_decl.clone());
+    let use_decl = UseBuilder::protocol().name("foo").path("/svc/hippo").build();
     let components = vec![
         (
             "a",
             ComponentDeclBuilder::new()
                 .protocol_default("foo")
-                .use_(UseDecl::Protocol(UseProtocolDecl {
-                    source: UseSource::Framework,
-                    source_name: "fuchsia.component.Realm".parse().unwrap(),
-                    source_dictionary: None,
-                    target_path: "/svc/fuchsia.component.Realm".parse().unwrap(),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }))
+                .use_(
+                    UseBuilder::protocol()
+                        .source(UseSource::Framework)
+                        .name("fuchsia.component.Realm"),
+                )
                 .offer(OfferDecl::Protocol(OfferProtocolDecl {
                     source: OfferSource::Self_,
                     source_name: "foo".parse().unwrap(),
@@ -1948,7 +1755,10 @@ async fn use_with_destroyed_parent() {
 
     // Now attempt to route the service from "c". Should fail because "b" does not exist so we
     // cannot follow it.
-    let err = RouteRequest::UseProtocol(use_protocol_decl)
+    let UseDecl::Protocol(use_decl) = use_decl else {
+        unreachable!();
+    };
+    let err = RouteRequest::UseProtocol(use_decl)
         .route(&realm_c)
         .await
         .expect_err("routing unexpectedly succeeded");
@@ -2005,14 +1815,7 @@ async fn use_from_destroyed_but_not_removed() {
         (
             "c",
             ComponentDeclBuilder::new()
-                .use_(UseDecl::Protocol(UseProtocolDecl {
-                    source: UseSource::Parent,
-                    source_name: "baz".parse().unwrap(),
-                    source_dictionary: None,
-                    target_path: "/svc/hippo".parse().unwrap(),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }))
+                .use_(UseBuilder::protocol().name("baz").path("/svc/hippo"))
                 .build(),
         ),
     ];
@@ -2459,12 +2262,15 @@ enum RouteType {
 
 async fn verify_service_route(
     test: &RoutingTest,
-    use_decl: UseServiceDecl,
+    use_decl: UseDecl,
     target_moniker: &str,
     agg_moniker: &str,
     child_monikers: &[&str],
     route_type: RouteType,
 ) {
+    let UseDecl::Service(use_decl) = use_decl else {
+        unreachable!();
+    };
     let target_moniker: Moniker = target_moniker.try_into().unwrap();
     let agg_moniker: Moniker = agg_moniker.try_into().unwrap();
     let child_monikers: Vec<_> =
@@ -2546,14 +2352,7 @@ async fn verify_service_route(
 /// b: route `use service`
 #[fuchsia::test]
 async fn offer_service_from_collection() {
-    let use_decl = UseServiceDecl {
-        dependency_type: DependencyType::Strong,
-        source: UseSource::Parent,
-        source_name: "foo".parse().unwrap(),
-        source_dictionary: None,
-        target_path: "/svc/foo".parse().unwrap(),
-        availability: Availability::Required,
-    };
+    let use_decl = UseBuilder::service().name("foo").build();
     let mut components = vec![
         (
             "a",
@@ -2573,7 +2372,7 @@ async fn offer_service_from_collection() {
                 .child_default("b")
                 .build(),
         ),
-        ("b", ComponentDeclBuilder::new().use_(use_decl.clone().into()).build()),
+        ("b", ComponentDeclBuilder::new().use_(use_decl.clone()).build()),
     ];
     components.extend(["c1", "c2", "c3"].into_iter().map(|ch| {
         (
@@ -2612,14 +2411,7 @@ async fn offer_service_from_collection() {
 /// b: route `use service`
 #[fuchsia::test]
 async fn offer_service_from_collections() {
-    let use_decl = UseServiceDecl {
-        dependency_type: DependencyType::Strong,
-        source: UseSource::Parent,
-        source_name: "foo".parse().unwrap(),
-        source_dictionary: None,
-        target_path: "/svc/foo".parse().unwrap(),
-        availability: Availability::Required,
-    };
+    let use_decl = UseBuilder::service().name("foo").build();
     let mut offers: Vec<_> = ["coll1", "coll2", "coll3"]
         .into_iter()
         .map(|coll| {
@@ -2649,7 +2441,7 @@ async fn offer_service_from_collections() {
                 .child_default("b")
                 .build(),
         ),
-        ("b", ComponentDeclBuilder::new().use_(use_decl.clone().into()).build()),
+        ("b", ComponentDeclBuilder::new().use_(use_decl.clone()).build()),
     ];
     components.extend(["c1", "c2", "c3"].into_iter().map(|ch| {
         (
@@ -2690,14 +2482,7 @@ async fn offer_service_from_collections() {
 /// b: route `use service`
 #[fuchsia::test]
 async fn offer_service_from_collections_multilevel() {
-    let use_decl = UseServiceDecl {
-        dependency_type: DependencyType::Strong,
-        source: UseSource::Parent,
-        source_name: "foo".parse().unwrap(),
-        source_dictionary: None,
-        target_path: "/svc/foo".parse().unwrap(),
-        availability: Availability::Required,
-    };
+    let use_decl = UseBuilder::service().name("foo").build();
     let mut offers: Vec<_> = ["coll1", "coll2", "coll3"]
         .into_iter()
         .map(|coll| {
@@ -2743,7 +2528,7 @@ async fn offer_service_from_collections_multilevel() {
                 .child_default("b")
                 .build(),
         ),
-        ("b", ComponentDeclBuilder::new().use_(use_decl.clone().into()).build()),
+        ("b", ComponentDeclBuilder::new().use_(use_decl.clone()).build()),
     ];
     components.extend(["c1", "c2", "c3"].into_iter().map(|ch| {
         (
@@ -2784,16 +2569,9 @@ async fn offer_service_from_collections_multilevel() {
 /// a: route `use service`
 #[fuchsia::test]
 async fn expose_service_from_collection() {
-    let use_decl = UseServiceDecl {
-        dependency_type: DependencyType::Strong,
-        source: UseSource::Child("b".into()),
-        source_name: "foo".parse().unwrap(),
-        source_dictionary: None,
-        target_path: "/svc/foo".parse().unwrap(),
-        availability: Availability::Required,
-    };
+    let use_decl = UseBuilder::service().name("foo").source(UseSource::Child("b".into())).build();
     let mut components = vec![
-        ("a", ComponentDeclBuilder::new().use_(use_decl.clone().into()).child_default("b").build()),
+        ("a", ComponentDeclBuilder::new().use_(use_decl.clone()).child_default("b").build()),
         (
             "b",
             ComponentDeclBuilder::new()
@@ -2849,14 +2627,7 @@ async fn expose_service_from_collection() {
 /// a: route `use service`
 #[fuchsia::test]
 async fn expose_service_from_collections() {
-    let use_decl = UseServiceDecl {
-        dependency_type: DependencyType::Strong,
-        source: UseSource::Child("b".into()),
-        source_name: "foo".parse().unwrap(),
-        source_dictionary: None,
-        target_path: "/svc/foo".parse().unwrap(),
-        availability: Availability::Required,
-    };
+    let use_decl = UseBuilder::service().name("foo").source(UseSource::Child("b".into())).build();
     let mut exposes: Vec<_> = ["coll1", "coll2", "coll3"]
         .into_iter()
         .map(|coll| {
@@ -2871,7 +2642,7 @@ async fn expose_service_from_collections() {
         })
         .collect();
     let mut components = vec![
-        ("a", ComponentDeclBuilder::new().use_(use_decl.clone().into()).child_default("b").build()),
+        ("a", ComponentDeclBuilder::new().use_(use_decl.clone()).child_default("b").build()),
         (
             "b",
             ComponentDeclBuilder::new()
@@ -2926,14 +2697,7 @@ async fn expose_service_from_collections() {
 /// a: route `use service`
 #[fuchsia::test]
 async fn expose_service_from_collections_multilevel() {
-    let use_decl = UseServiceDecl {
-        dependency_type: DependencyType::Strong,
-        source: UseSource::Child("m".into()),
-        source_name: "foo".parse().unwrap(),
-        source_dictionary: None,
-        target_path: "/svc/foo".parse().unwrap(),
-        availability: Availability::Required,
-    };
+    let use_decl = UseBuilder::service().name("foo").source(UseSource::Child("m".into())).build();
     let mut exposes: Vec<_> = ["coll1", "coll2", "coll3"]
         .into_iter()
         .map(|coll| {
@@ -2948,7 +2712,7 @@ async fn expose_service_from_collections_multilevel() {
         })
         .collect();
     let mut components = vec![
-        ("a", ComponentDeclBuilder::new().use_(use_decl.clone().into()).child_default("m").build()),
+        ("a", ComponentDeclBuilder::new().use_(use_decl.clone()).child_default("m").build()),
         (
             "m",
             ComponentDeclBuilder::new()
@@ -3013,14 +2777,7 @@ async fn expose_service_from_collections_multilevel() {
 /// client: use service
 #[fuchsia::test]
 async fn list_service_instances_from_collections() {
-    let use_decl = UseServiceDecl {
-        dependency_type: DependencyType::Strong,
-        source: UseSource::Parent,
-        source_name: "foo".parse().unwrap(),
-        source_dictionary: None,
-        target_path: "/foo".parse().unwrap(),
-        availability: Availability::Required,
-    };
+    let use_decl = UseBuilder::service().name("foo").build();
     let mut offers: Vec<_> = ["coll1", "coll2"]
         .into_iter()
         .map(|coll| {
@@ -3048,7 +2805,7 @@ async fn list_service_instances_from_collections() {
                 .child_default("client")
                 .build(),
         ),
-        ("client", ComponentDeclBuilder::new().use_(use_decl.clone().into()).build()),
+        ("client", ComponentDeclBuilder::new().use_(use_decl.clone()).build()),
         (
             "service_child_a",
             ComponentDeclBuilder::new()
@@ -3107,6 +2864,7 @@ async fn list_service_instances_from_collections() {
         .find_and_maybe_resolve(&vec!["client"].try_into().unwrap())
         .await
         .expect("client instance");
+    let UseDecl::Service(use_decl) = use_decl else { unreachable!() };
     let source = RouteRequest::UseService(use_decl)
         .route(&client_component)
         .await
@@ -3189,27 +2947,17 @@ async fn use_service_from_sibling_collection() {
         (
             "b",
             ComponentDeclBuilder::new()
-                .use_(UseDecl::Service(UseServiceDecl {
-                    dependency_type: DependencyType::Strong,
-                    source: UseSource::Parent,
-                    source_name: "my.service.Service".parse().unwrap(),
-                    source_dictionary: None,
-                    target_path: "/svc/my.service.Service".parse().unwrap(),
-                    availability: Availability::Required,
-                }))
+                .use_(UseBuilder::service().name("my.service.Service"))
                 .build(),
         ),
         (
             "c",
             ComponentDeclBuilder::new()
-                .use_(UseDecl::Protocol(UseProtocolDecl {
-                    dependency_type: DependencyType::Strong,
-                    source: UseSource::Framework,
-                    source_name: "fuchsia.component.Realm".parse().unwrap(),
-                    source_dictionary: None,
-                    target_path: "/svc/fuchsia.component.Realm".parse().unwrap(),
-                    availability: Availability::Required,
-                }))
+                .use_(
+                    UseBuilder::protocol()
+                        .source(UseSource::Framework)
+                        .name("fuchsia.component.Realm"),
+                )
                 .expose(ExposeDecl::Service(ExposeServiceDecl {
                     source: ExposeSource::Collection("coll".parse().unwrap()),
                     source_name: "my.service.Service".parse().unwrap(),
@@ -3374,27 +3122,13 @@ async fn use_filtered_service_from_sibling() {
         (
             "c",
             ComponentDeclBuilder::new()
-                .use_(UseDecl::Service(UseServiceDecl {
-                    dependency_type: DependencyType::Strong,
-                    source: UseSource::Parent,
-                    source_name: "my.service.Service".parse().unwrap(),
-                    source_dictionary: None,
-                    target_path: "/svc/my.service.Service".parse().unwrap(),
-                    availability: Availability::Required,
-                }))
+                .use_(UseBuilder::service().name("my.service.Service"))
                 .build(),
         ),
         (
             "d",
             ComponentDeclBuilder::new()
-                .use_(UseDecl::Service(UseServiceDecl {
-                    dependency_type: DependencyType::Strong,
-                    source: UseSource::Parent,
-                    source_name: "my.service.Service".parse().unwrap(),
-                    source_dictionary: None,
-                    target_path: "/svc/my.service.Service".parse().unwrap(),
-                    availability: Availability::Required,
-                }))
+                .use_(UseBuilder::service().name("my.service.Service"))
                 .build(),
         ),
     ];
@@ -3534,14 +3268,7 @@ async fn use_filtered_aggregate_service_from_sibling() {
         (
             "c",
             ComponentDeclBuilder::new()
-                .use_(UseDecl::Service(UseServiceDecl {
-                    dependency_type: DependencyType::Strong,
-                    source: UseSource::Parent,
-                    source_name: "my.service.Service".parse().unwrap(),
-                    source_dictionary: None,
-                    target_path: "/svc/my.service.Service".parse().unwrap(),
-                    availability: Availability::Required,
-                }))
+                .use_(UseBuilder::service().name("my.service.Service"))
                 .build(),
         ),
     ];
@@ -3697,14 +3424,7 @@ async fn use_anonymized_aggregate_service() {
         (
             "e",
             ComponentDeclBuilder::new()
-                .use_(UseDecl::Service(UseServiceDecl {
-                    dependency_type: DependencyType::Strong,
-                    source: UseSource::Parent,
-                    source_name: "my.service.Service".parse().unwrap(),
-                    source_dictionary: None,
-                    target_path: "/svc/my.service.Service".parse().unwrap(),
-                    availability: Availability::Required,
-                }))
+                .use_(UseBuilder::service().name("my.service.Service"))
                 .build(),
         ),
     ];

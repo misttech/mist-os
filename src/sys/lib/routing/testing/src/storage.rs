@@ -60,11 +60,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
             (
                 "b",
                 ComponentDeclBuilder::new()
-                    .use_(UseDecl::Storage(UseStorageDecl {
-                        source_name: "cache".parse().unwrap(),
-                        target_path: "/storage".parse().unwrap(),
-                        availability: Availability::Required,
-                    }))
+                    .use_(UseBuilder::storage().name("cache").path("/storage"))
                     .build(),
             ),
         ];
@@ -130,11 +126,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
             (
                 "b",
                 ComponentDeclBuilder::new()
-                    .use_(UseDecl::Storage(UseStorageDecl {
-                        source_name: "cache".parse().unwrap(),
-                        target_path: "/storage".parse().unwrap(),
-                        availability: Availability::Required,
-                    }))
+                    .use_(UseBuilder::storage().name("cache").path("/storage"))
                     .build(),
             ),
         ];
@@ -193,11 +185,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
             (
                 "b",
                 ComponentDeclBuilder::new()
-                    .use_(UseDecl::Storage(UseStorageDecl {
-                        source_name: "cache".parse().unwrap(),
-                        target_path: "/storage".parse().unwrap(),
-                        availability: Availability::Required,
-                    }))
+                    .use_(UseBuilder::storage().name("cache").path("/storage"))
                     .build(),
             ),
         ];
@@ -230,12 +218,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
             (
                 "a",
                 ComponentDeclBuilder::new()
-                    .capability(
-                        CapabilityBuilder::directory()
-                            .name("data")
-                            .path("/data")
-                            .rights(fio::R_STAR_DIR),
-                    )
+                    .capability(CapabilityBuilder::directory().name("data").path("/data"))
                     .offer(OfferDecl::Storage(OfferStorageDecl {
                         source: OfferSource::Self_,
                         target: OfferTarget::static_child("b".to_string()),
@@ -255,11 +238,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
             (
                 "b",
                 ComponentDeclBuilder::new()
-                    .use_(UseDecl::Storage(UseStorageDecl {
-                        source_name: "cache".parse().unwrap(),
-                        target_path: "/storage".parse().unwrap(),
-                        availability: Availability::Required,
-                    }))
+                    .use_(UseBuilder::storage().name("cache").path("/storage"))
                     .build(),
             ),
         ];
@@ -335,11 +314,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
             (
                 "c",
                 ComponentDeclBuilder::new()
-                    .use_(UseDecl::Storage(UseStorageDecl {
-                        source_name: "data".parse().unwrap(),
-                        target_path: "/storage".parse().unwrap(),
-                        availability: Availability::Required,
-                    }))
+                    .use_(UseBuilder::storage().name("data").path("/storage"))
                     .build(),
             ),
         ];
@@ -417,11 +392,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
             (
                 "c",
                 ComponentDeclBuilder::new()
-                    .use_(UseDecl::Storage(UseStorageDecl {
-                        source_name: "data".parse().unwrap(),
-                        target_path: "/storage".parse().unwrap(),
-                        availability: Availability::Required,
-                    }))
+                    .use_(UseBuilder::storage().name("data").path("/storage"))
                     .build(),
             ),
         ];
@@ -506,11 +477,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
             (
                 "c",
                 ComponentDeclBuilder::new()
-                    .use_(UseDecl::Storage(UseStorageDecl {
-                        source_name: "data".parse().unwrap(),
-                        target_path: "/storage".parse().unwrap(),
-                        availability: Availability::Required,
-                    }))
+                    .use_(UseBuilder::storage().name("data").path("/storage"))
                     .build(),
             ),
         ];
@@ -583,11 +550,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
             (
                 "c",
                 ComponentDeclBuilder::new()
-                    .use_(UseDecl::Storage(UseStorageDecl {
-                        source_name: "data".parse().unwrap(),
-                        target_path: "/storage".parse().unwrap(),
-                        availability: Availability::Required,
-                    }))
+                    .use_(UseBuilder::storage().name("data").path("/storage"))
                     .build(),
             ),
         ];
@@ -660,11 +623,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
             (
                 "c",
                 ComponentDeclBuilder::new()
-                    .use_(UseDecl::Storage(UseStorageDecl {
-                        source_name: "cache".parse().unwrap(),
-                        target_path: "/storage".parse().unwrap(),
-                        availability: Availability::Required,
-                    }))
+                    .use_(UseBuilder::storage().name("cache").path("/storage"))
                     .build(),
             ),
         ];
@@ -739,11 +698,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
             (
                 "c",
                 ComponentDeclBuilder::new()
-                    .use_(UseDecl::Storage(UseStorageDecl {
-                        source_name: "cache".parse().unwrap(),
-                        target_path: "/storage".parse().unwrap(),
-                        availability: Availability::Required,
-                    }))
+                    .use_(UseBuilder::storage().name("cache").path("/storage"))
                     .build(),
             ),
         ];
@@ -855,32 +810,16 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                         target_name: "cache".parse().unwrap(),
                         availability: Availability::Required,
                     }))
-                    .use_(UseDecl::Storage(UseStorageDecl {
-                        source_name: "data".parse().unwrap(),
-                        target_path: "/storage".parse().unwrap(),
-                        availability: Availability::Required,
-                    }))
-                    .use_(UseDecl::Storage(UseStorageDecl {
-                        source_name: "cache".parse().unwrap(),
-                        target_path: "/cache".parse().unwrap(),
-                        availability: Availability::Required,
-                    }))
+                    .use_(UseBuilder::storage().name("data").path("/storage"))
+                    .use_(UseBuilder::storage().name("cache").path("/cache"))
                     .child_default("d")
                     .build(),
             ),
             (
                 "d",
                 ComponentDeclBuilder::new()
-                    .use_(UseDecl::Storage(UseStorageDecl {
-                        source_name: "data".parse().unwrap(),
-                        target_path: "/storage".parse().unwrap(),
-                        availability: Availability::Required,
-                    }))
-                    .use_(UseDecl::Storage(UseStorageDecl {
-                        source_name: "cache".parse().unwrap(),
-                        target_path: "/cache".parse().unwrap(),
-                        availability: Availability::Required,
-                    }))
+                    .use_(UseBuilder::storage().name("data").path("/storage"))
+                    .use_(UseBuilder::storage().name("cache").path("/cache"))
                     .build(),
             ),
         ];
@@ -973,11 +912,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
             (
                 "b",
                 ComponentDeclBuilder::new()
-                    .use_(UseDecl::Storage(UseStorageDecl {
-                        source_name: "data".parse().unwrap(),
-                        target_path: "/storage".parse().unwrap(),
-                        availability: Availability::Required,
-                    }))
+                    .use_(UseBuilder::storage().name("data").path("/storage"))
                     .build(),
             ),
         ];
@@ -1030,11 +965,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
             (
                 "b",
                 ComponentDeclBuilder::new()
-                    .use_(UseDecl::Storage(UseStorageDecl {
-                        source_name: "data".parse().unwrap(),
-                        target_path: "/storage".parse().unwrap(),
-                        availability: Availability::Required,
-                    }))
+                    .use_(UseBuilder::storage().name("data").path("/storage"))
                     .build(),
             ),
         ];
@@ -1083,11 +1014,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
             (
                 "b",
                 ComponentDeclBuilder::new()
-                    .use_(UseDecl::Storage(UseStorageDecl {
-                        source_name: "data".parse().unwrap(),
-                        target_path: "/storage".parse().unwrap(),
-                        availability: Availability::Required,
-                    }))
+                    .use_(UseBuilder::storage().name("data").path("/storage"))
                     .build(),
             ),
         ];
@@ -1163,11 +1090,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
             (
                 "c",
                 ComponentDeclBuilder::new()
-                    .use_(UseDecl::Storage(UseStorageDecl {
-                        source_name: "data".parse().unwrap(),
-                        target_path: "/storage".parse().unwrap(),
-                        availability: Availability::Required,
-                    }))
+                    .use_(UseBuilder::storage().name("data").path("/storage"))
                     .build(),
             ),
         ];
@@ -1221,11 +1144,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
             (
                 "b",
                 ComponentDeclBuilder::new()
-                    .use_(UseDecl::Storage(UseStorageDecl {
-                        source_name: "cache".parse().unwrap(),
-                        target_path: "/storage".parse().unwrap(),
-                        availability: Availability::Required,
-                    }))
+                    .use_(UseBuilder::storage().name("cache").path("/storage"))
                     .build(),
             ),
         ];
@@ -1308,11 +1227,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
             (
                 "b",
                 ComponentDeclBuilder::new()
-                    .use_(UseDecl::Storage(UseStorageDecl {
-                        source_name: "cache".parse().unwrap(),
-                        target_path: "/storage".parse().unwrap(),
-                        availability: Availability::Required,
-                    }))
+                    .use_(UseBuilder::storage().name("cache").path("/storage"))
                     .offer(OfferDecl::Storage(OfferStorageDecl {
                         source: OfferSource::Parent,
                         target: OfferTarget::static_child("c".to_string()),
@@ -1326,11 +1241,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
             (
                 "c",
                 ComponentDeclBuilder::new()
-                    .use_(UseDecl::Storage(UseStorageDecl {
-                        source_name: "cache".parse().unwrap(),
-                        target_path: "/storage".parse().unwrap(),
-                        availability: Availability::Required,
-                    }))
+                    .use_(UseBuilder::storage().name("cache").path("/storage"))
                     .build(),
             ),
         ];

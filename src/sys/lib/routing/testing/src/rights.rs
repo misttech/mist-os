@@ -5,9 +5,9 @@
 use {
     crate::{CheckUse, ExpectedResult, RoutingTestModel, RoutingTestModelBuilder},
     cm_rust::*,
-    cm_rust_testing::{CapabilityBuilder, ComponentDeclBuilder},
+    cm_rust_testing::*,
     fidl_fuchsia_io as fio, fuchsia_zircon_status as zx_status,
-    std::{marker::PhantomData, str::FromStr},
+    std::marker::PhantomData,
 };
 
 pub struct CommonRightsTest<T: RoutingTestModelBuilder> {
@@ -63,16 +63,7 @@ impl<T: RoutingTestModelBuilder> CommonRightsTest<T> {
             (
                 "c",
                 ComponentDeclBuilder::new()
-                    .use_(UseDecl::Directory(UseDirectoryDecl {
-                        source: UseSource::Parent,
-                        source_name: "baz_data".parse().unwrap(),
-                        source_dictionary: None,
-                        target_path: cm_types::Path::from_str("/data/hippo").unwrap(),
-                        rights: fio::R_STAR_DIR,
-                        subdir: None,
-                        dependency_type: DependencyType::Strong,
-                        availability: Availability::Required,
-                    }))
+                    .use_(UseBuilder::directory().name("baz_data").path("/data/hippo"))
                     .build(),
             ),
         ];
@@ -129,16 +120,7 @@ impl<T: RoutingTestModelBuilder> CommonRightsTest<T> {
             (
                 "c",
                 ComponentDeclBuilder::new()
-                    .use_(UseDecl::Directory(UseDirectoryDecl {
-                        source: UseSource::Parent,
-                        source_name: "baz_data".parse().unwrap(),
-                        source_dictionary: None,
-                        target_path: cm_types::Path::from_str("/data/hippo").unwrap(),
-                        rights: fio::R_STAR_DIR,
-                        subdir: None,
-                        dependency_type: DependencyType::Strong,
-                        availability: Availability::Required,
-                    }))
+                    .use_(UseBuilder::directory().name("baz_data").path("/data/hippo"))
                     .build(),
             ),
         ];
@@ -195,16 +177,7 @@ impl<T: RoutingTestModelBuilder> CommonRightsTest<T> {
             (
                 "c",
                 ComponentDeclBuilder::new()
-                    .use_(UseDecl::Directory(UseDirectoryDecl {
-                        source: UseSource::Parent,
-                        source_name: "baz_data".parse().unwrap(),
-                        source_dictionary: None,
-                        target_path: cm_types::Path::from_str("/data/hippo").unwrap(),
-                        rights: fio::R_STAR_DIR,
-                        subdir: None,
-                        dependency_type: DependencyType::Strong,
-                        availability: Availability::Required,
-                    }))
+                    .use_(UseBuilder::directory().name("baz_data").path("/data/hippo"))
                     .build(),
             ),
         ];
@@ -261,16 +234,7 @@ impl<T: RoutingTestModelBuilder> CommonRightsTest<T> {
             (
                 "c",
                 ComponentDeclBuilder::new()
-                    .use_(UseDecl::Directory(UseDirectoryDecl {
-                        source: UseSource::Parent,
-                        source_name: "baz_data".parse().unwrap(),
-                        source_dictionary: None,
-                        target_path: cm_types::Path::from_str("/data/hippo").unwrap(),
-                        rights: fio::R_STAR_DIR,
-                        subdir: None,
-                        dependency_type: DependencyType::Strong,
-                        availability: Availability::Required,
-                    }))
+                    .use_(UseBuilder::directory().name("baz_data").path("/data/hippo"))
                     .build(),
             ),
         ];
@@ -327,16 +291,7 @@ impl<T: RoutingTestModelBuilder> CommonRightsTest<T> {
             (
                 "c",
                 ComponentDeclBuilder::new()
-                    .use_(UseDecl::Directory(UseDirectoryDecl {
-                        source: UseSource::Parent,
-                        source_name: "baz_data".parse().unwrap(),
-                        source_dictionary: None,
-                        target_path: cm_types::Path::from_str("/data/hippo").unwrap(),
-                        rights: fio::R_STAR_DIR,
-                        subdir: None,
-                        dependency_type: DependencyType::Strong,
-                        availability: Availability::Required,
-                    }))
+                    .use_(UseBuilder::directory().name("baz_data").path("/data/hippo"))
                     .build(),
             ),
         ];
@@ -393,16 +348,7 @@ impl<T: RoutingTestModelBuilder> CommonRightsTest<T> {
             (
                 "c",
                 ComponentDeclBuilder::new()
-                    .use_(UseDecl::Directory(UseDirectoryDecl {
-                        source: UseSource::Parent,
-                        source_name: "baz_data".parse().unwrap(),
-                        source_dictionary: None,
-                        target_path: cm_types::Path::from_str("/data/hippo").unwrap(),
-                        rights: fio::R_STAR_DIR,
-                        subdir: None,
-                        dependency_type: DependencyType::Strong,
-                        availability: Availability::Required,
-                    }))
+                    .use_(UseBuilder::directory().name("baz_data").path("/data/hippo"))
                     .build(),
             ),
         ];
@@ -445,16 +391,7 @@ impl<T: RoutingTestModelBuilder> CommonRightsTest<T> {
             (
                 "b",
                 ComponentDeclBuilder::new()
-                    .use_(UseDecl::Directory(UseDirectoryDecl {
-                        source: UseSource::Parent,
-                        source_name: "bar_data".parse().unwrap(),
-                        source_dictionary: None,
-                        target_path: cm_types::Path::from_str("/data/hippo").unwrap(),
-                        rights: fio::R_STAR_DIR,
-                        subdir: None,
-                        dependency_type: DependencyType::Strong,
-                        availability: Availability::Required,
-                    }))
+                    .use_(UseBuilder::directory().name("bar_data").path("/data/hippo"))
                     .build(),
             ),
         ];

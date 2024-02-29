@@ -826,15 +826,11 @@ mod tests {
             let expose_name = format!("expose_{}", i);
             let capability_path = format!("/svc/capability_{}", i);
 
-            let use_decl = UseDecl::Protocol(UseProtocolDecl {
-                source: UseSource::Framework,
-                source_name: use_name.parse().unwrap(),
-                source_dictionary: None,
-                target_path: capability_path.parse().unwrap(),
-                dependency_type: DependencyType::Strong,
-                availability: Availability::Required,
-            });
-
+            let use_decl = UseBuilder::protocol()
+                .source(UseSource::Framework)
+                .name(&use_name)
+                .path(&capability_path)
+                .build();
             let expose_decl = ExposeDecl::Protocol(ExposeProtocolDecl {
                 source: ExposeSource::Self_,
                 source_name: expose_name.parse().unwrap(),
@@ -962,14 +958,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn open_test() {
-        let use_decl = UseDecl::Protocol(UseProtocolDecl {
-            source: UseSource::Framework,
-            source_name: "foo".parse().unwrap(),
-            source_dictionary: None,
-            target_path: "/svc/foo".parse().unwrap(),
-            dependency_type: DependencyType::Strong,
-            availability: Availability::Required,
-        });
+        let use_decl = UseBuilder::protocol().source(UseSource::Framework).name("foo").build();
         let expose_decl = ExposeDecl::Protocol(ExposeProtocolDecl {
             source: ExposeSource::Self_,
             source_name: "bar".parse().unwrap(),
@@ -1119,14 +1108,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn construct_namespace_test() {
-        let use_decl = UseDecl::Protocol(UseProtocolDecl {
-            source: UseSource::Framework,
-            source_name: "foo".parse().unwrap(),
-            source_dictionary: None,
-            target_path: "/svc/foo".parse().unwrap(),
-            dependency_type: DependencyType::Strong,
-            availability: Availability::Required,
-        });
+        let use_decl = UseBuilder::protocol().source(UseSource::Framework).name("foo").build();
 
         let components = vec![("root", ComponentDeclBuilder::new().use_(use_decl.clone()).build())];
 

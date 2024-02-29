@@ -8,7 +8,7 @@ mod tests {
         cm_moniker::InstancedMoniker,
         cm_rust::{
             Availability, OfferDecl, OfferSource, OfferStorageDecl, OfferTarget,
-            StorageDirectorySource, UseDecl, UseStorageDecl,
+            StorageDirectorySource,
         },
         cm_rust_testing::*,
         component_id_index::InstanceId,
@@ -196,11 +196,7 @@ mod tests {
             (
                 "consumer",
                 ComponentDeclBuilder::new()
-                    .use_(UseDecl::Storage(UseStorageDecl {
-                        source_name: "cache".parse().unwrap(),
-                        target_path: "/storage".parse().unwrap(),
-                        availability: Availability::Required,
-                    }))
+                    .use_(UseBuilder::storage().name("cache").path("/storage"))
                     .build(),
             ),
         ];

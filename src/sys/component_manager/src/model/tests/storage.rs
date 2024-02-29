@@ -128,14 +128,11 @@ async fn use_in_collection_from_parent() {
         (
             "b",
             ComponentDeclBuilder::new()
-                .use_(UseDecl::Protocol(UseProtocolDecl {
-                    source: UseSource::Framework,
-                    source_name: "fuchsia.component.Realm".parse().unwrap(),
-                    source_dictionary: None,
-                    target_path: "/svc/fuchsia.component.Realm".parse().unwrap(),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }))
+                .use_(
+                    UseBuilder::protocol()
+                        .source(UseSource::Framework)
+                        .name("fuchsia.component.Realm"),
+                )
                 .offer(OfferDecl::Storage(OfferStorageDecl {
                     source: OfferSource::Self_,
                     target: OfferTarget::Collection("coll".parse().unwrap()),
@@ -170,16 +167,8 @@ async fn use_in_collection_from_parent() {
         (
             "c",
             ComponentDeclBuilder::new()
-                .use_(UseDecl::Storage(UseStorageDecl {
-                    source_name: "data".parse().unwrap(),
-                    target_path: "/data".parse().unwrap(),
-                    availability: Availability::Required,
-                }))
-                .use_(UseDecl::Storage(UseStorageDecl {
-                    source_name: "cache".parse().unwrap(),
-                    target_path: "/cache".parse().unwrap(),
-                    availability: Availability::Required,
-                }))
+                .use_(UseBuilder::storage().name("data").path("/data"))
+                .use_(UseBuilder::storage().name("cache").path("/cache"))
                 .build(),
         ),
     ];
@@ -302,14 +291,11 @@ async fn use_in_collection_from_grandparent() {
         (
             "b",
             ComponentDeclBuilder::new()
-                .use_(UseDecl::Protocol(UseProtocolDecl {
-                    source: UseSource::Framework,
-                    source_name: "fuchsia.component.Realm".parse().unwrap(),
-                    source_dictionary: None,
-                    target_path: "/svc/fuchsia.component.Realm".parse().unwrap(),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }))
+                .use_(
+                    UseBuilder::protocol()
+                        .source(UseSource::Framework)
+                        .name("fuchsia.component.Realm"),
+                )
                 .offer(OfferDecl::Storage(OfferStorageDecl {
                     source: OfferSource::Parent,
                     target: OfferTarget::Collection("coll".parse().unwrap()),
@@ -330,16 +316,8 @@ async fn use_in_collection_from_grandparent() {
         (
             "c",
             ComponentDeclBuilder::new()
-                .use_(UseDecl::Storage(UseStorageDecl {
-                    source_name: "data".parse().unwrap(),
-                    target_path: "/data".parse().unwrap(),
-                    availability: Availability::Required,
-                }))
-                .use_(UseDecl::Storage(UseStorageDecl {
-                    source_name: "cache".parse().unwrap(),
-                    target_path: "/cache".parse().unwrap(),
-                    availability: Availability::Required,
-                }))
+                .use_(UseBuilder::storage().name("data").path("/data"))
+                .use_(UseBuilder::storage().name("cache").path("/cache"))
                 .build(),
         ),
     ];
@@ -517,11 +495,7 @@ async fn use_restricted_storage_start_failure() {
         (
             "parent_consumer",
             ComponentDeclBuilder::new()
-                .use_(UseDecl::Storage(UseStorageDecl {
-                    source_name: "cache".parse().unwrap(),
-                    target_path: "/storage".parse().unwrap(),
-                    availability: Availability::Required,
-                }))
+                .use_(UseBuilder::storage().name("cache").path("/storage"))
                 .offer(OfferDecl::Storage(OfferStorageDecl {
                     source: OfferSource::Parent,
                     target: OfferTarget::static_child("child_consumer".to_string()),
@@ -535,11 +509,7 @@ async fn use_restricted_storage_start_failure() {
         (
             "child_consumer",
             ComponentDeclBuilder::new()
-                .use_(UseDecl::Storage(UseStorageDecl {
-                    source_name: "cache".parse().unwrap(),
-                    target_path: "/storage".parse().unwrap(),
-                    availability: Availability::Required,
-                }))
+                .use_(UseBuilder::storage().name("cache").path("/storage"))
                 .build(),
         ),
     ];
@@ -620,11 +590,7 @@ async fn use_restricted_storage_open_failure() {
         (
             "parent_consumer",
             ComponentDeclBuilder::new()
-                .use_(UseDecl::Storage(UseStorageDecl {
-                    source_name: "cache".parse().unwrap(),
-                    target_path: "/storage".parse().unwrap(),
-                    availability: Availability::Required,
-                }))
+                .use_(UseBuilder::storage().name("cache").path("/storage"))
                 .build(),
         ),
     ];
@@ -750,11 +716,7 @@ async fn open_storage_subdirectory() {
         (
             "consumer",
             ComponentDeclBuilder::new()
-                .use_(UseDecl::Storage(UseStorageDecl {
-                    source_name: "cache".parse().unwrap(),
-                    target_path: "/storage".parse().unwrap(),
-                    availability: Availability::Required,
-                }))
+                .use_(UseBuilder::storage().name("cache").path("/storage"))
                 .build(),
         ),
     ];
@@ -879,27 +841,13 @@ async fn storage_persistence_moniker_path() {
         (
             "b",
             ComponentDeclBuilder::new()
-                .use_(UseDecl::Protocol(UseProtocolDecl {
-                    source: UseSource::Framework,
-                    source_name: "fuchsia.component.Realm".parse().unwrap(),
-                    source_dictionary: None,
-                    target_path: "/svc/fuchsia.component.Realm".parse().unwrap(),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }))
-                .use_(UseDecl::Protocol(UseProtocolDecl {
-                    source: UseSource::Parent,
-                    source_name: "fuchsia.sys2.StorageAdmin".parse().unwrap(),
-                    source_dictionary: None,
-                    target_path: "/svc/fuchsia.sys2.StorageAdmin".parse().unwrap(),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }))
-                .use_(UseDecl::Storage(UseStorageDecl {
-                    source_name: "data".parse().unwrap(),
-                    target_path: "/data".parse().unwrap(),
-                    availability: Availability::Required,
-                }))
+                .use_(
+                    UseBuilder::protocol()
+                        .source(UseSource::Framework)
+                        .name("fuchsia.component.Realm"),
+                )
+                .use_(UseBuilder::protocol().name("fuchsia.sys2.StorageAdmin"))
+                .use_(UseBuilder::storage().name("data").path("/data"))
                 .offer(OfferDecl::Storage(OfferStorageDecl {
                     source: OfferSource::Parent,
                     target: OfferTarget::Collection("persistent_coll".parse().unwrap()),
@@ -915,11 +863,7 @@ async fn storage_persistence_moniker_path() {
         (
             "c",
             ComponentDeclBuilder::new()
-                .use_(UseDecl::Storage(UseStorageDecl {
-                    source_name: "data".parse().unwrap(),
-                    target_path: "/data".parse().unwrap(),
-                    availability: Availability::Required,
-                }))
+                .use_(UseBuilder::storage().name("data").path("/data"))
                 .build(),
         ),
     ];
@@ -1065,27 +1009,13 @@ async fn storage_persistence_instance_id_path() {
         (
             "b",
             ComponentDeclBuilder::new()
-                .use_(UseDecl::Protocol(UseProtocolDecl {
-                    source: UseSource::Framework,
-                    source_name: "fuchsia.component.Realm".parse().unwrap(),
-                    source_dictionary: None,
-                    target_path: "/svc/fuchsia.component.Realm".parse().unwrap(),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }))
-                .use_(UseDecl::Protocol(UseProtocolDecl {
-                    source: UseSource::Parent,
-                    source_name: "fuchsia.sys2.StorageAdmin".parse().unwrap(),
-                    source_dictionary: None,
-                    target_path: "/svc/fuchsia.sys2.StorageAdmin".parse().unwrap(),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }))
-                .use_(UseDecl::Storage(UseStorageDecl {
-                    source_name: "data".parse().unwrap(),
-                    target_path: "/data".parse().unwrap(),
-                    availability: Availability::Required,
-                }))
+                .use_(
+                    UseBuilder::protocol()
+                        .source(UseSource::Framework)
+                        .name("fuchsia.component.Realm"),
+                )
+                .use_(UseBuilder::protocol().name("fuchsia.sys2.StorageAdmin"))
+                .use_(UseBuilder::storage().name("data").path("/data"))
                 .offer(OfferDecl::Storage(OfferStorageDecl {
                     source: OfferSource::Parent,
                     target: OfferTarget::Collection("persistent_coll".parse().unwrap()),
@@ -1101,11 +1031,7 @@ async fn storage_persistence_instance_id_path() {
         (
             "c",
             ComponentDeclBuilder::new()
-                .use_(UseDecl::Storage(UseStorageDecl {
-                    source_name: "data".parse().unwrap(),
-                    target_path: "/data".parse().unwrap(),
-                    availability: Availability::Required,
-                }))
+                .use_(UseBuilder::storage().name("data").path("/data"))
                 .build(),
         ),
     ];
@@ -1246,19 +1172,12 @@ async fn storage_persistence_inheritance() {
         (
             "b",
             ComponentDeclBuilder::new()
-                .use_(UseDecl::Protocol(UseProtocolDecl {
-                    source: UseSource::Framework,
-                    source_name: "fuchsia.component.Realm".parse().unwrap(),
-                    source_dictionary: None,
-                    target_path: "/svc/fuchsia.component.Realm".parse().unwrap(),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }))
-                .use_(UseDecl::Storage(UseStorageDecl {
-                    source_name: "data".parse().unwrap(),
-                    target_path: "/data".parse().unwrap(),
-                    availability: Availability::Required,
-                }))
+                .use_(
+                    UseBuilder::protocol()
+                        .source(UseSource::Framework)
+                        .name("fuchsia.component.Realm"),
+                )
+                .use_(UseBuilder::storage().name("data").path("/data"))
                 .offer(OfferDecl::Storage(OfferStorageDecl {
                     source: OfferSource::Parent,
                     target: OfferTarget::Collection("persistent_coll".parse().unwrap()),
@@ -1274,19 +1193,12 @@ async fn storage_persistence_inheritance() {
         (
             "c",
             ComponentDeclBuilder::new()
-                .use_(UseDecl::Protocol(UseProtocolDecl {
-                    source: UseSource::Framework,
-                    source_name: "fuchsia.component.Realm".parse().unwrap(),
-                    source_dictionary: None,
-                    target_path: "/svc/fuchsia.component.Realm".parse().unwrap(),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }))
-                .use_(UseDecl::Storage(UseStorageDecl {
-                    source_name: "data".parse().unwrap(),
-                    target_path: "/data".parse().unwrap(),
-                    availability: Availability::Required,
-                }))
+                .use_(
+                    UseBuilder::protocol()
+                        .source(UseSource::Framework)
+                        .name("fuchsia.component.Realm"),
+                )
+                .use_(UseBuilder::storage().name("data").path("/data"))
                 .offer(OfferDecl::Storage(OfferStorageDecl {
                     source: OfferSource::Parent,
                     target: OfferTarget::static_child("d".to_string()),
@@ -1308,21 +1220,13 @@ async fn storage_persistence_inheritance() {
         (
             "d",
             ComponentDeclBuilder::new()
-                .use_(UseDecl::Storage(UseStorageDecl {
-                    source_name: "data".parse().unwrap(),
-                    target_path: "/data".parse().unwrap(),
-                    availability: Availability::Required,
-                }))
+                .use_(UseBuilder::storage().name("data").path("/data"))
                 .build(),
         ),
         (
             "e",
             ComponentDeclBuilder::new()
-                .use_(UseDecl::Storage(UseStorageDecl {
-                    source_name: "data".parse().unwrap(),
-                    target_path: "/data".parse().unwrap(),
-                    availability: Availability::Required,
-                }))
+                .use_(UseBuilder::storage().name("data").path("/data"))
                 .build(),
         ),
     ];
@@ -1499,19 +1403,12 @@ async fn storage_persistence_disablement() {
         (
             "b",
             ComponentDeclBuilder::new()
-                .use_(UseDecl::Protocol(UseProtocolDecl {
-                    source: UseSource::Framework,
-                    source_name: "fuchsia.component.Realm".parse().unwrap(),
-                    source_dictionary: None,
-                    target_path: "/svc/fuchsia.component.Realm".parse().unwrap(),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }))
-                .use_(UseDecl::Storage(UseStorageDecl {
-                    source_name: "data".parse().unwrap(),
-                    target_path: "/data".parse().unwrap(),
-                    availability: Availability::Required,
-                }))
+                .use_(
+                    UseBuilder::protocol()
+                        .source(UseSource::Framework)
+                        .name("fuchsia.component.Realm"),
+                )
+                .use_(UseBuilder::storage().name("data").path("/data"))
                 .offer(OfferDecl::Storage(OfferStorageDecl {
                     source: OfferSource::Parent,
                     target: OfferTarget::Collection("persistent_coll".parse().unwrap()),
@@ -1527,19 +1424,12 @@ async fn storage_persistence_disablement() {
         (
             "c",
             ComponentDeclBuilder::new()
-                .use_(UseDecl::Protocol(UseProtocolDecl {
-                    source: UseSource::Framework,
-                    source_name: "fuchsia.component.Realm".parse().unwrap(),
-                    source_dictionary: None,
-                    target_path: "/svc/fuchsia.component.Realm".parse().unwrap(),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }))
-                .use_(UseDecl::Storage(UseStorageDecl {
-                    source_name: "data".parse().unwrap(),
-                    target_path: "/data".parse().unwrap(),
-                    availability: Availability::Required,
-                }))
+                .use_(
+                    UseBuilder::protocol()
+                        .source(UseSource::Framework)
+                        .name("fuchsia.component.Realm"),
+                )
+                .use_(UseBuilder::storage().name("data").path("/data"))
                 .offer(OfferDecl::Storage(OfferStorageDecl {
                     source: OfferSource::Parent,
                     target: OfferTarget::static_child("d".to_string()),
@@ -1563,29 +1453,18 @@ async fn storage_persistence_disablement() {
         (
             "d",
             ComponentDeclBuilder::new()
-                .use_(UseDecl::Protocol(UseProtocolDecl {
-                    source: UseSource::Framework,
-                    source_name: "fuchsia.component.Realm".parse().unwrap(),
-                    source_dictionary: None,
-                    target_path: "/svc/fuchsia.component.Realm".parse().unwrap(),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }))
-                .use_(UseDecl::Storage(UseStorageDecl {
-                    source_name: "data".parse().unwrap(),
-                    target_path: "/data".parse().unwrap(),
-                    availability: Availability::Required,
-                }))
+                .use_(
+                    UseBuilder::protocol()
+                        .source(UseSource::Framework)
+                        .name("fuchsia.component.Realm"),
+                )
+                .use_(UseBuilder::storage().name("data").path("/data"))
                 .build(),
         ),
         (
             "e",
             ComponentDeclBuilder::new()
-                .use_(UseDecl::Storage(UseStorageDecl {
-                    source_name: "data".parse().unwrap(),
-                    target_path: "/data".parse().unwrap(),
-                    availability: Availability::Required,
-                }))
+                .use_(UseBuilder::storage().name("data").path("/data"))
                 .build(),
         ),
     ];

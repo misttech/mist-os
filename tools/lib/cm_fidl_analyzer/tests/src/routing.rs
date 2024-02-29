@@ -527,7 +527,7 @@ impl RoutingTestModel for RoutingTestForAnalyzer {
 mod tests {
     use {
         super::*,
-        cm_rust::{EventScope, EventStreamDecl, OfferEventStreamDecl, UseEventStreamDecl},
+        cm_rust::{EventScope, EventStreamDecl, OfferEventStreamDecl},
         routing_test_helpers::instantiate_common_routing_tests,
     };
 
@@ -548,14 +548,7 @@ mod tests {
     /// b: use from parent
     #[fuchsia::test]
     async fn check_use_service_from_parent() {
-        let use_decl = UseServiceDecl {
-            dependency_type: DependencyType::Strong,
-            source: UseSource::Parent,
-            source_name: "foo".parse().unwrap(),
-            source_dictionary: None,
-            target_path: "/foo".parse().unwrap(),
-            availability: Availability::Required,
-        };
+        let use_decl = UseBuilder::service().name("foo").path("/foo").build();
         let components = vec![
             (
                 "a",
@@ -574,7 +567,7 @@ mod tests {
                     .child_default("b")
                     .build(),
             ),
-            ("b", ComponentDeclBuilder::new().use_(use_decl.clone().into()).build()),
+            ("b", ComponentDeclBuilder::new().use_(use_decl.clone()).build()),
         ];
         let model = RoutingTestBuilderForAnalyzer::new("a", components).build().await;
         model
@@ -598,14 +591,7 @@ mod tests {
     /// b: use from parent, but parent component is not executable
     #[fuchsia::test]
     async fn check_service_source_is_executable() {
-        let use_decl = UseServiceDecl {
-            dependency_type: DependencyType::Strong,
-            source: UseSource::Parent,
-            source_name: "foo".parse().unwrap(),
-            source_dictionary: None,
-            target_path: "/foo".parse().unwrap(),
-            availability: Availability::Required,
-        };
+        let use_decl = UseBuilder::service().name("foo").path("/foo").build();
         let components = vec![
             (
                 "a",
@@ -624,7 +610,7 @@ mod tests {
                     .child_default("b")
                     .build(),
             ),
-            ("b", ComponentDeclBuilder::new().use_(use_decl.clone().into()).build()),
+            ("b", ComponentDeclBuilder::new().use_(use_decl.clone()).build()),
         ];
         let model = RoutingTestBuilderForAnalyzer::new("a", components).build().await;
         model
@@ -648,22 +634,13 @@ mod tests {
     /// b: expose to parent from self
     #[fuchsia::test]
     async fn check_use_service_from_child() {
-        let use_decl = UseServiceDecl {
-            dependency_type: DependencyType::Strong,
-            source: UseSource::Child("b".to_string()),
-            source_name: "foo".parse().unwrap(),
-            source_dictionary: None,
-            target_path: "/foo".parse().unwrap(),
-            availability: Availability::Required,
-        };
+        let use_decl = UseBuilder::service()
+            .name("foo")
+            .path("/foo")
+            .source(UseSource::Child("b".to_string()))
+            .build();
         let components = vec![
-            (
-                "a",
-                ComponentDeclBuilder::new()
-                    .use_(use_decl.clone().into())
-                    .child_default("b")
-                    .build(),
-            ),
+            ("a", ComponentDeclBuilder::new().use_(use_decl.clone()).child_default("b").build()),
             (
                 "b",
                 ComponentDeclBuilder::new()
@@ -702,14 +679,7 @@ mod tests {
     /// c: expose from self
     #[fuchsia::test]
     async fn check_use_service_from_sibling() {
-        let use_decl = UseServiceDecl {
-            dependency_type: DependencyType::Strong,
-            source: UseSource::Parent,
-            source_name: "foo".parse().unwrap(),
-            source_dictionary: None,
-            target_path: "/foo".parse().unwrap(),
-            availability: Availability::Required,
-        };
+        let use_decl = UseBuilder::service().name("foo").path("/foo").build();
         let components = vec![
             (
                 "a",
@@ -728,7 +698,7 @@ mod tests {
                     .child_default("c")
                     .build(),
             ),
-            ("b", ComponentDeclBuilder::new().use_(use_decl.clone().into()).build()),
+            ("b", ComponentDeclBuilder::new().use_(use_decl.clone()).build()),
             (
                 "c",
                 ComponentDeclBuilder::new()
@@ -818,14 +788,7 @@ mod tests {
         let components = vec![(
             "a",
             ComponentDeclBuilder::new()
-                .use_(UseDecl::EventStream(UseEventStreamDecl {
-                    source: UseSource::Parent,
-                    filter: None,
-                    source_name: "started".parse().unwrap(),
-                    target_path: "/event/stream".parse().unwrap(),
-                    scope: None,
-                    availability: Availability::Required,
-                }))
+                .use_(UseBuilder::event_stream().name("started").path("/event/stream"))
                 .build(),
         )];
 
@@ -891,27 +854,13 @@ mod tests {
             (
                 "b",
                 ComponentDeclBuilder::new()
-                    .use_(UseDecl::EventStream(UseEventStreamDecl {
-                        source: UseSource::Parent,
-                        filter: None,
-                        source_name: "started".parse().unwrap(),
-                        target_path: "/event/stream".parse().unwrap(),
-                        scope: None,
-                        availability: Availability::Required,
-                    }))
+                    .use_(UseBuilder::event_stream().name("started").path("/event/stream"))
                     .build(),
             ),
             (
                 "c",
                 ComponentDeclBuilder::new()
-                    .use_(UseDecl::EventStream(UseEventStreamDecl {
-                        source: UseSource::Parent,
-                        filter: None,
-                        source_name: "started".parse().unwrap(),
-                        target_path: "/event/stream".parse().unwrap(),
-                        scope: None,
-                        availability: Availability::Required,
-                    }))
+                    .use_(UseBuilder::event_stream().name("started").path("/event/stream"))
                     .offer(OfferDecl::EventStream(OfferEventStreamDecl {
                         source: OfferSource::Parent,
                         source_name: "started".parse().unwrap(),
@@ -930,14 +879,7 @@ mod tests {
             (
                 "d",
                 ComponentDeclBuilder::new()
-                    .use_(UseDecl::EventStream(UseEventStreamDecl {
-                        source: UseSource::Parent,
-                        source_name: "started".parse().unwrap(),
-                        target_path: "/event/stream".parse().unwrap(),
-                        scope: None,
-                        filter: None,
-                        availability: Availability::Required,
-                    }))
+                    .use_(UseBuilder::event_stream().name("started").path("/event/stream"))
                     .build(),
             ),
             ("e", ComponentDeclBuilder::new().build()),
@@ -1197,14 +1139,7 @@ mod tests {
     /// b: uses protocol /svc/bar as /svc/hippo
     #[fuchsia::test]
     async fn map_route_use_from_parent() {
-        let use_decl = UseDecl::Protocol(UseProtocolDecl {
-            source: UseSource::Parent,
-            source_name: "bar".parse().unwrap(),
-            source_dictionary: None,
-            target_path: "/svc/hippo".parse().unwrap(),
-            dependency_type: DependencyType::Strong,
-            availability: Availability::Required,
-        });
+        let use_decl = UseBuilder::protocol().name("bar").path("/svc/hippo").build();
         let offer_decl = OfferDecl::Protocol(OfferProtocolDecl {
             source: OfferSource::Self_,
             source_name: "foo".parse().unwrap(),
@@ -1255,14 +1190,11 @@ mod tests {
     /// b: exposes protocol /svc/foo from self as /svc/bar
     #[fuchsia::test]
     async fn map_route_use_from_child() {
-        let use_decl = UseDecl::Protocol(UseProtocolDecl {
-            source: UseSource::Child("b".to_string()),
-            source_name: "bar".parse().unwrap(),
-            source_dictionary: None,
-            target_path: "/svc/hippo".parse().unwrap(),
-            dependency_type: DependencyType::Strong,
-            availability: Availability::Required,
-        });
+        let use_decl = UseBuilder::protocol()
+            .name("bar")
+            .source(UseSource::Child("b".into()))
+            .path("/svc/hippo")
+            .build();
         let expose_decl = ExposeDecl::Protocol(ExposeProtocolDecl {
             source: ExposeSource::Self_,
             source_name: "foo".parse().unwrap(),
@@ -1287,7 +1219,7 @@ mod tests {
         let route_results = test.model.check_use_capability(&use_decl, &a_component);
         assert_eq!(route_results.len(), 1);
         let route_result = &route_results[0];
-        assert!(route_result.error.is_none());
+        assert_matches!(route_result.error, None);
 
         assert_eq!(
             route_result.route,
@@ -1308,14 +1240,8 @@ mod tests {
     /// a: uses protocol /svc/foo from self under the path /svc/hippo
     #[fuchsia::test]
     async fn map_route_use_from_self() {
-        let use_decl = UseDecl::Protocol(UseProtocolDecl {
-            source: UseSource::Self_,
-            source_name: "foo".parse().unwrap(),
-            source_dictionary: None,
-            target_path: "/svc/hippo".parse().unwrap(),
-            dependency_type: DependencyType::Strong,
-            availability: Availability::Required,
-        });
+        let use_decl =
+            UseBuilder::protocol().name("foo").source(UseSource::Self_).path("/svc/hippo").build();
         let protocol_decl = CapabilityBuilder::protocol().name("foo").build();
         let components = vec![(
             "a",
@@ -1330,7 +1256,7 @@ mod tests {
         let route_results = test.model.check_use_capability(&use_decl, &a_component);
         assert_eq!(route_results.len(), 1);
         let route_result = &route_results[0];
-        assert!(route_result.error.is_none());
+        assert_matches!(route_result.error, None);
 
         assert_eq!(
             route_result.route,
@@ -1353,16 +1279,7 @@ mod tests {
     /// c: uses /data/foobar as /data/hippo
     #[fuchsia::test]
     async fn map_route_use_from_niece() {
-        let use_decl = UseDecl::Directory(UseDirectoryDecl {
-            source: UseSource::Parent,
-            source_name: "foobar_data".parse().unwrap(),
-            source_dictionary: None,
-            target_path: "/data/hippo".parse().unwrap(),
-            rights: fio::R_STAR_DIR,
-            subdir: None,
-            dependency_type: DependencyType::Strong,
-            availability: Availability::Required,
-        });
+        let use_decl = UseBuilder::directory().name("foobar_data").path("/data/hippo").build();
         let a_offer_decl = OfferDecl::Directory(OfferDirectoryDecl {
             source: OfferSource::static_child("b".to_string()),
             source_name: "baz_data".parse().unwrap(),
@@ -1546,11 +1463,7 @@ mod tests {
             target_name: "cache".parse().unwrap(),
             availability: Availability::Required,
         });
-        let use_storage_decl = UseDecl::Storage(UseStorageDecl {
-            source_name: "cache".parse().unwrap(),
-            target_path: "/storage".parse().unwrap(),
-            availability: Availability::Required,
-        });
+        let use_storage_decl = UseBuilder::storage().name("cache").path("/storage").build();
         let components = vec![
             (
                 "a",
@@ -1622,14 +1535,7 @@ mod tests {
             dependency_type: DependencyType::Strong,
             availability: Availability::Required,
         });
-        let use_realm_decl = UseDecl::Protocol(UseProtocolDecl {
-            source: UseSource::Parent,
-            source_name: "fuchsia.component.Realm".parse().unwrap(),
-            source_dictionary: None,
-            target_path: "/svc/fuchsia.component.Realm".parse().unwrap(),
-            dependency_type: DependencyType::Strong,
-            availability: Availability::Required,
-        });
+        let use_realm_decl = UseBuilder::protocol().name("fuchsia.component.Realm").build();
 
         let components = vec![
             (
@@ -1687,14 +1593,7 @@ mod tests {
             dependency_type: DependencyType::Strong,
             availability: Availability::Required,
         });
-        let use_decl = UseDecl::Protocol(UseProtocolDecl {
-            source: UseSource::Parent,
-            source_name: "bar".parse().unwrap(),
-            source_dictionary: None,
-            target_path: "/svc/hippo".parse().unwrap(),
-            dependency_type: DependencyType::Strong,
-            availability: Availability::Required,
-        });
+        let use_decl = UseBuilder::protocol().name("bar").path("/svc/hippo").build();
         let capability_decl = CapabilityBuilder::protocol()
             .name("foo")
             .path("/offer_from_cm_namespace/svc/foo")
@@ -2037,16 +1936,8 @@ mod tests {
         };
         let resolver_decl = CapabilityBuilder::resolver().name("base_resolver").build();
         let runner_decl = CapabilityBuilder::runner().name("hobbit").build();
-        let use_directory_decl = UseDecl::Directory(UseDirectoryDecl {
-            source: UseSource::Parent,
-            source_name: "bar_data".parse().unwrap(),
-            source_dictionary: None,
-            target_path: "/data/hippo".parse().unwrap(),
-            rights: fio::R_STAR_DIR,
-            subdir: None,
-            dependency_type: DependencyType::Strong,
-            availability: Availability::Required,
-        });
+        let use_directory_decl =
+            UseBuilder::directory().name("bar_data").path("/data/hippo").build();
         let offer_directory_decl = OfferDecl::Directory(OfferDirectoryDecl {
             source: OfferSource::Self_,
             source_name: "foo_data".parse().unwrap(),
@@ -2068,14 +1959,8 @@ mod tests {
             target: ExposeTarget::Parent,
             availability: cm_rust::Availability::Required,
         });
-        let use_event_decl = UseDecl::EventStream(UseEventStreamDecl {
-            source: UseSource::Parent,
-            source_name: "started_on_a".parse().unwrap(),
-            target_path: "/started".parse().unwrap(),
-            filter: None,
-            scope: None,
-            availability: Availability::Required,
-        });
+        let use_event_decl =
+            UseBuilder::event_stream().name("started_on_a").path("/started").build();
 
         let components = vec![
             (
@@ -2217,14 +2102,10 @@ mod tests {
         let a_url = make_test_url("a");
         let b_url = "base://b/".to_string();
 
-        let use_protocol_decl = UseDecl::Protocol(UseProtocolDecl {
-            source: UseSource::Parent,
-            source_name: "fuchsia.examples.Echo".parse().unwrap(),
-            source_dictionary: None,
-            target_path: "/svc/fuchsia.examples.Echo".parse().unwrap(),
-            dependency_type: DependencyType::Strong,
-            availability: Availability::Optional,
-        });
+        let use_protocol_decl = UseBuilder::protocol()
+            .name("fuchsia.examples.Echo")
+            .availability(Availability::Optional)
+            .build();
         let offer_protocol_decl = OfferDecl::Protocol(OfferProtocolDecl {
             source: OfferSource::Void,
             source_name: "fuchsia.examples.Echo".parse().unwrap(),

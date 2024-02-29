@@ -2631,12 +2631,9 @@ pub mod tests {
         cm_rust::{
             Availability, ChildRef, DependencyType, ExposeDecl, ExposeProtocolDecl, ExposeSource,
             ExposeTarget, OfferDecl, OfferDirectoryDecl, OfferProtocolDecl, OfferServiceDecl,
-            OfferSource, OfferTarget, UseEventStreamDecl, UseProtocolDecl, UseSource,
+            OfferSource, OfferTarget, UseEventStreamDecl, UseSource,
         },
-        cm_rust_testing::{
-            CapabilityBuilder, ChildBuilder, CollectionBuilder, ComponentDeclBuilder,
-            EnvironmentBuilder,
-        },
+        cm_rust_testing::*,
         component_id_index::InstanceId,
         fidl::endpoints::DiscoverableProtocolMarker,
         fidl_fuchsia_logger as flogger, fuchsia_async as fasync, fuchsia_zircon as zx,
@@ -2904,15 +2901,7 @@ pub mod tests {
             target_name: "bar".parse().unwrap(),
             availability: cm_rust::Availability::Required,
         });
-        let example_use = UseDecl::Protocol(UseProtocolDecl {
-            source: UseSource::Parent,
-            source_name: "baz".parse().unwrap(),
-            source_dictionary: None,
-            target_path: "/svc/baz".parse().expect("parsing"),
-            dependency_type: DependencyType::Strong,
-            availability: Availability::Required,
-        });
-
+        let example_use = UseBuilder::protocol().name("baz").build();
         let env_a = EnvironmentBuilder::new().name("env_a").build();
         let env_b = EnvironmentBuilder::new().name("env_b").build();
 
@@ -3756,14 +3745,7 @@ pub mod tests {
             (
                 TEST_CHILD_NAME,
                 ComponentDeclBuilder::new()
-                    .use_(UseDecl::Protocol(UseProtocolDecl {
-                        source: UseSource::Parent,
-                        source_name: flogger::LogSinkMarker::PROTOCOL_NAME.parse().unwrap(),
-                        source_dictionary: None,
-                        target_path: "/svc/fuchsia.logger.LogSink".parse().unwrap(),
-                        dependency_type: DependencyType::Strong,
-                        availability: Availability::Required,
-                    }))
+                    .use_(UseBuilder::protocol().name(flogger::LogSinkMarker::PROTOCOL_NAME))
                     .build(),
             ),
         ];

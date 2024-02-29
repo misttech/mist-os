@@ -639,7 +639,7 @@ mod tests {
             error::RoutingError,
         },
         cm_rust::*,
-        cm_rust_testing::{ChildBuilder, CollectionBuilder, ComponentDeclBuilder},
+        cm_rust_testing::*,
         fuchsia_async as fasync,
         maplit::hashmap,
         moniker::{Moniker, MonikerBase},
@@ -766,14 +766,11 @@ mod tests {
             (
                 "root",
                 ComponentDeclBuilder::new()
-                    .use_(UseDecl::Protocol(UseProtocolDecl {
-                        source: UseSource::Framework,
-                        source_name: "fuchsia.component.Realm".parse().unwrap(),
-                        source_dictionary: None,
-                        target_path: "/svc/fuchsia.component.Realm".parse().unwrap(),
-                        dependency_type: DependencyType::Strong,
-                        availability: Availability::Required,
-                    }))
+                    .use_(
+                        UseBuilder::protocol()
+                            .source(UseSource::Framework)
+                            .name("fuchsia.component.Realm"),
+                    )
                     .expose(ExposeDecl::Service(ExposeServiceDecl {
                         source: ExposeSource::Collection("coll1".parse().unwrap()),
                         source_name: "my.service.Service".parse().unwrap(),
@@ -1062,14 +1059,11 @@ mod tests {
             (
                 "container",
                 ComponentDeclBuilder::new()
-                    .use_(UseDecl::Protocol(UseProtocolDecl {
-                        source: UseSource::Framework,
-                        source_name: "fuchsia.component.Realm".parse().unwrap(),
-                        source_dictionary: None,
-                        target_path: "/svc/fuchsia.component.Realm".parse().unwrap(),
-                        dependency_type: DependencyType::Strong,
-                        availability: Availability::Required,
-                    }))
+                    .use_(
+                        UseBuilder::protocol()
+                            .source(UseSource::Framework)
+                            .name("fuchsia.component.Realm"),
+                    )
                     .offer(OfferDecl::Service(OfferServiceDecl {
                         source: OfferSource::Collection("coll".parse().unwrap()),
                         source_name: "my.service.Service".parse().unwrap(),
@@ -1107,14 +1101,7 @@ mod tests {
             (
                 "target",
                 ComponentDeclBuilder::new()
-                    .use_(UseDecl::Protocol(UseProtocolDecl {
-                        source: UseSource::Parent,
-                        source_name: "my.service.Service".parse().unwrap(),
-                        source_dictionary: None,
-                        target_path: "/svc/my.service.Service".parse().unwrap(),
-                        dependency_type: DependencyType::Strong,
-                        availability: Availability::Required,
-                    }))
+                    .use_(UseBuilder::protocol().name("my.service.Service"))
                     .build(),
             ),
             ("foo", leaf_component_decl.clone()),
