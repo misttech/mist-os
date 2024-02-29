@@ -13,10 +13,15 @@
 #include <lib/fdf/cpp/dispatcher.h>
 #include <lib/focaltech/focaltech.h>
 #include <lib/zx/clock.h>
+#include <zircon/assert.h>
+#include <zircon/errors.h>
 
-#include <zxtest/zxtest.h>
+#include <cstddef>
+
+#include <gtest/gtest.h>
 
 #include "ft_firmware.h"
+#include "lib/zx/result.h"
 #include "src/devices/gpio/testing/fake-gpio/fake-gpio.h"
 #include "src/devices/testing/mock-ddk/mock-device.h"
 
@@ -66,7 +71,7 @@ const size_t kNumFirmwareEntries = std::size(kFirmwareEntries);
 
 class FakeFtDevice : public fake_i2c::FakeI2c {
  public:
-  ~FakeFtDevice() { EXPECT_TRUE(expected_report_.empty()); }
+  ~FakeFtDevice() { ZX_ASSERT(expected_report_.empty()); }
 
   uint32_t firmware_write_size() const { return firmware_write_size_; }
 
@@ -172,10 +177,10 @@ struct IncomingNamespace {
   component::OutgoingDirectory reset_gpio_fragment_outgoing_{async_get_default_dispatcher()};
 };
 
-class FocaltechTest : public zxtest::Test {
+class FocaltechTest : public testing::Test {
  public:
   void SetUp() override {
-    ASSERT_OK(incoming_loop_.StartThread("incoming-ns-thread"));
+    ASSERT_EQ(ZX_OK, incoming_loop_.StartThread("incoming-ns-thread"));
 
     // I2c fragment
     {
@@ -224,8 +229,8 @@ class FocaltechTest : public zxtest::Test {
     }
 
     zx::interrupt interrupt;
-    ASSERT_OK(zx::interrupt::create(zx::resource(), 0, ZX_INTERRUPT_VIRTUAL, &interrupt));
-    ASSERT_OK(interrupt.duplicate(ZX_RIGHT_SAME_RIGHTS, &irq_));
+    ASSERT_EQ(ZX_OK, zx::interrupt::create(zx::resource(), 0, ZX_INTERRUPT_VIRTUAL, &interrupt));
+    ASSERT_EQ(ZX_OK, interrupt.duplicate(ZX_RIGHT_SAME_RIGHTS, &irq_));
     incoming_.SyncCall([interrupt = std::move(interrupt)](IncomingNamespace* infra) mutable {
       infra->interrupt_gpio_.SetInterrupt(zx::ok(std::move(interrupt)));
     });
@@ -233,16 +238,16 @@ class FocaltechTest : public zxtest::Test {
 
   fidl::ClientEnd<fuchsia_input_report::InputDevice> CreateDut() {
     auto result = fdf::RunOnDispatcherSync(dispatcher_->async_dispatcher(), [&]() {
-      EXPECT_OK(FtDevice::Create(nullptr, fake_parent_.get()));
+      EXPECT_EQ(ZX_OK, FtDevice::Create(nullptr, fake_parent_.get()));
     });
-    EXPECT_OK(result.status_value());
-    EXPECT_EQ(1, fake_parent_->child_count());
+    EXPECT_EQ(ZX_OK, result.status_value());
+    EXPECT_EQ(size_t(1), fake_parent_->child_count());
     child_ = fake_parent_->GetLatestChild();
     dut_ = child_->GetDeviceContext<FtDevice>();
     VerifyGpioInit();
 
     auto endpoints = fidl::CreateEndpoints<fuchsia_input_report::InputDevice>();
-    EXPECT_OK(endpoints);
+    EXPECT_EQ(ZX_OK, endpoints.status_value());
     fidl::BindServer(dispatcher_->async_dispatcher(), std::move(endpoints->server), dut_);
     return std::move(std::move(endpoints->client));
   }
@@ -253,19 +258,19 @@ class FocaltechTest : public zxtest::Test {
       mock_ddk::ReleaseFlaggedDevices(fake_parent_.get());
       ;
     });
-    EXPECT_OK(result.status_value());
+    EXPECT_EQ(ZX_OK, result.status_value());
   }
 
  private:
   void VerifyGpioInit() {
     incoming_.SyncCall([](IncomingNamespace* infra) mutable {
       std::vector interrupt_states = infra->interrupt_gpio_.GetStateLog();
-      ASSERT_GE(interrupt_states.size(), 1);
+      ASSERT_GE(interrupt_states.size(), size_t(1));
       ASSERT_EQ(fake_gpio::ReadSubState{.flags = fuchsia_hardware_gpio::GpioFlags::kNoPull},
                 interrupt_states[0].sub_state);
 
       std::vector reset_states = infra->reset_gpio_.GetStateLog();
-      ASSERT_GE(reset_states.size(), 2);
+      ASSERT_GE(reset_states.size(), size_t(2));
       ASSERT_EQ(fake_gpio::WriteSubState{.value = 0}, reset_states[0].sub_state);
       ASSERT_EQ(fake_gpio::WriteSubState{.value = 1}, reset_states[1].sub_state);
     });
@@ -284,8 +289,8 @@ class FocaltechTest : public zxtest::Test {
                                                                    std::in_place};
 };
 
-void VerifyDescriptor(const fuchsia_input_report::wire::DeviceDescriptor& descriptor, size_t x_max,
-                      size_t y_max) {
+void VerifyDescriptor(const fuchsia_input_report::wire::DeviceDescriptor& descriptor, int64_t x_max,
+                      int64_t y_max) {
   EXPECT_TRUE(descriptor.has_device_info());
   EXPECT_EQ(descriptor.device_info().vendor_id,
             static_cast<uint32_t>(fuchsia_input_report::wire::VendorId::kGoogle));
@@ -307,11 +312,11 @@ void VerifyDescriptor(const fuchsia_input_report::wire::DeviceDescriptor& descri
             fuchsia_input_report::wire::TouchType::kTouchscreen);
 
   EXPECT_TRUE(descriptor.touch().input().has_max_contacts());
-  EXPECT_EQ(descriptor.touch().input().max_contacts(), 10);
+  EXPECT_EQ(descriptor.touch().input().max_contacts(), uint32_t(10));
 
   EXPECT_FALSE(descriptor.touch().input().has_buttons());
   EXPECT_TRUE(descriptor.touch().input().has_contacts());
-  EXPECT_EQ(descriptor.touch().input().contacts().count(), 10);
+  EXPECT_EQ(descriptor.touch().input().contacts().count(), size_t(10));
 
   for (const auto& c : descriptor.touch().input().contacts()) {
     EXPECT_TRUE(c.has_position_x());
@@ -401,8 +406,9 @@ TEST_F(FocaltechTest, Firmware5726UpToDate) {
 
   CreateDut();
 
-  incoming_.SyncCall(
-      [](IncomingNamespace* infra) mutable { EXPECT_EQ(infra->i2c_.firmware_write_size(), 0); });
+  incoming_.SyncCall([](IncomingNamespace* infra) mutable {
+    EXPECT_EQ(infra->i2c_.firmware_write_size(), uint32_t(0));
+  });
 }
 
 TEST_F(FocaltechTest, Touch) {
@@ -415,13 +421,13 @@ TEST_F(FocaltechTest, Touch) {
   fidl::WireSyncClient<fuchsia_input_report::InputDevice> client(CreateDut());
 
   auto reader_endpoints = fidl::CreateEndpoints<fuchsia_input_report::InputReportsReader>();
-  ASSERT_OK(reader_endpoints.status_value());
+  ASSERT_EQ(ZX_OK, reader_endpoints.status_value());
   auto result = client->GetInputReportsReader(std::move(reader_endpoints->server));
-  ASSERT_OK(result.status());
+  ASSERT_EQ(ZX_OK, result.status());
   auto reader = fidl::WireSyncClient<fuchsia_input_report::InputReportsReader>(
       std::move(reader_endpoints->client));
 
-  ASSERT_OK(dut_->WaitForNextReader(zx::duration::infinite()));
+  ASSERT_EQ(ZX_OK, dut_->WaitForNextReader(zx::duration::infinite()));
 
   // clang-format off
   static const uint8_t expected_report[] = {
@@ -474,11 +480,11 @@ TEST_F(FocaltechTest, Touch) {
 
   {
     auto result = reader->ReadInputReports();
-    ASSERT_OK(result.status());
+    ASSERT_EQ(ZX_OK, result.status());
     ASSERT_FALSE(result.value().is_error());
     auto& reports = result.value().value()->reports;
 
-    ASSERT_EQ(1, reports.count());
+    ASSERT_EQ(size_t(1), reports.count());
     auto report = reports[0];
 
     ASSERT_TRUE(report.has_event_time());
@@ -486,15 +492,20 @@ TEST_F(FocaltechTest, Touch) {
     auto& touch_report = report.touch();
 
     ASSERT_TRUE(touch_report.has_contacts());
-    ASSERT_EQ(touch_report.contacts().count(), 2);
-    EXPECT_EQ(touch_report.contacts()[0].contact_id(), 0);
+    ASSERT_EQ(touch_report.contacts().count(), size_t(2));
+    EXPECT_EQ(touch_report.contacts()[0].contact_id(), uint32_t(0));
     EXPECT_EQ(touch_report.contacts()[0].position_x(), 0x001);
     EXPECT_EQ(touch_report.contacts()[0].position_y(), 0x013);
 
-    EXPECT_EQ(touch_report.contacts()[1].contact_id(), 1);
+    EXPECT_EQ(touch_report.contacts()[1].contact_id(), uint32_t(1));
     EXPECT_EQ(touch_report.contacts()[1].position_x(), 0x031);
     EXPECT_EQ(touch_report.contacts()[1].position_y(), 0x000);
   }
 }
 
 }  // namespace ft
+
+int main(int argc, char** argv) {
+  testing::InitGoogleTest(&argc, argv);
+  return RUN_ALL_TESTS();
+}
