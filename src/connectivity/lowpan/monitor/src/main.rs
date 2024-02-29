@@ -4,7 +4,7 @@
 use {
     anyhow::{Context, Error},
     fidl::endpoints::Proxy,
-    fuchsia_async as fasync, tracing,
+    fuchsia_async as fasync,
 };
 
 const MAX_RETRY_COUNT: u32 = 20;

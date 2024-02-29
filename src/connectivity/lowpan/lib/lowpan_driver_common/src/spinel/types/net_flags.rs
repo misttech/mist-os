@@ -4,7 +4,7 @@
 
 use crate::lowpan_fidl::*;
 use anyhow::Context as _;
-use core::convert::{TryFrom, TryInto};
+
 use spinel_pack::*;
 use std::io;
 use thiserror::Error;

@@ -6,8 +6,6 @@
 
 use crate::prelude_internal::*;
 use num_derive::FromPrimitive;
-use std::convert::TryInto;
-use std::marker::PhantomData;
 
 /// Message Priority.
 /// Functional equivalent of [`otsys::otMessagePriority`](crate::otsys::otMessagePriority).

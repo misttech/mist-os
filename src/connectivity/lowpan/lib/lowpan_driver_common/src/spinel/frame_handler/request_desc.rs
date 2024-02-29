@@ -4,8 +4,6 @@
 
 use super::*;
 
-use anyhow::Error;
-use core::fmt::Debug;
 use std::io;
 
 /// Trait that builds a request to send to a device

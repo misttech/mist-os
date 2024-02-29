@@ -7,7 +7,6 @@ use anyhow::Context;
 use byteorder::{BigEndian, ByteOrder, LittleEndian, WriteBytesExt};
 use core::hash::Hash;
 use std::collections::HashSet;
-use std::convert::TryInto;
 
 macro_rules! impl_try_array_unpack_sized(
     ($self:ty, $lifetime:lifetime) => {

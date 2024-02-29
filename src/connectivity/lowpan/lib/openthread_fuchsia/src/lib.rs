@@ -20,7 +20,6 @@ use binding::*;
 use anyhow::Error;
 use fuchsia_async as fasync;
 use futures::channel::mpsc as fmpsc;
-use futures::Stream;
 use lowpan_driver_common::spinel::*;
 use std::cell::RefCell;
 use std::sync::atomic::{AtomicBool, Ordering};

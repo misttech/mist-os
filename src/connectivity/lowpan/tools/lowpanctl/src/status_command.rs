@@ -4,7 +4,6 @@
 
 use crate::context::LowpanCtlContext;
 use crate::prelude::*;
-use fidl::endpoints::create_endpoints;
 use fidl_fuchsia_lowpan_device::{
     ConnectivityState, DeviceConnectorMarker, DeviceExtraConnectorMarker, DeviceExtraMarker,
     DeviceExtraProxy, DeviceMarker, DeviceProxy,

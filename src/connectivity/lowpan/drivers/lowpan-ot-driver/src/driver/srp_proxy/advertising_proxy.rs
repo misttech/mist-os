@@ -10,7 +10,7 @@ use fuchsia_async::Task;
 use fuchsia_component::client::connect_to_protocol;
 use fuchsia_sync::Mutex;
 use std::collections::{HashMap, HashSet};
-use std::ffi::{CStr, CString};
+use std::ffi::CString;
 use std::sync::Arc;
 
 /// The advertising proxy handles taking hosts and services registered with the SRP server

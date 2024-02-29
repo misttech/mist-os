@@ -99,7 +99,6 @@ impl<'a> std::fmt::Debug for Ipv6PacketDebug<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use hex;
 
     #[test]
     fn test_ipv6packet_debug() {

@@ -6,12 +6,9 @@ use super::*;
 use anyhow::Error;
 use async_trait::async_trait;
 use core::future::ready;
-use fuchsia_zircon::Duration;
 use lowpan_driver_common::lowpan_fidl::*;
-use lowpan_driver_common::net::BackboneInterface;
 use lowpan_driver_common::AsyncConditionWait;
 use lowpan_driver_common::Driver as LowpanDriver;
-use lowpan_driver_common::ZxResult;
 use openthread::ot::SrpServerLeaseInfo;
 
 /// Helpers for API-related tasks.

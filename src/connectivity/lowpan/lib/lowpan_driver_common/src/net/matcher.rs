@@ -172,7 +172,6 @@ impl Ipv6PacketMatcher {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use hex;
 
     #[test]
     fn test_ipv6packet_matcher_rule_corrupt() {

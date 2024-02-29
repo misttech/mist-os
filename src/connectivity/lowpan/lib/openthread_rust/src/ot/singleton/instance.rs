@@ -4,7 +4,6 @@
 
 use super::*;
 
-use std::marker::PhantomData;
 use std::task::{Context, Waker};
 
 /// OpenThread instance.

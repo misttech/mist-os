@@ -3,11 +3,9 @@
 // found in the LICENSE file.
 use super::*;
 use fuchsia_async as fasync;
-use futures::io::AsyncWrite;
 use futures::task::Poll;
 use std::cell::RefCell;
 use std::pin::Pin;
-use std::string::String;
 
 #[derive(Debug)]
 pub struct OtCtl {

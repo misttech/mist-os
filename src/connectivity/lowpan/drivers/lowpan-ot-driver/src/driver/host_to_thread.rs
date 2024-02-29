@@ -11,7 +11,6 @@ use anyhow::{Context as _, Error};
 
 use futures::prelude::*;
 use lowpan_driver_common::net::{Ipv6PacketMatcherRule, NetworkInterfaceEvent};
-use lowpan_driver_common::spinel::Subnet;
 
 use packet::ParsablePacket;
 use packet_formats::icmp::mld::MldPacket;

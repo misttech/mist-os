@@ -27,7 +27,6 @@ use fuchsia_zircon as zx;
 use futures::stream::BoxStream;
 use net_types::ip::{Ip as _, Ipv6};
 use socket2::{Domain, Protocol};
-use std::convert::TryInto;
 
 const TUN_PORT_ID: u8 = 0;
 

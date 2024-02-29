@@ -8,7 +8,6 @@ use fidl_fuchsia_lowpan_device::{Credential, Identity, ProvisioningParams};
 use fidl_fuchsia_lowpan_experimental::{
     JoinParams, JoinerCommissioningParams, ProvisioningMonitorMarker, ProvisioningProgress,
 };
-use hex;
 
 const PROVISION_CMD_NAME_LEN: usize = 63;
 const PROVISION_CMD_CRED_MASTER_LEY_LEN: &[usize] = &[16, 32];

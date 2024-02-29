@@ -11,7 +11,6 @@ use core::pin::Pin;
 use fidl_fuchsia_lowpan_spinel::DeviceEvent as SpinelDeviceEvent;
 use futures::task::{Context, Poll};
 use futures::{FutureExt, StreamExt};
-use std::convert::TryInto;
 use std::sync::Arc;
 
 pub(super) const INBOUND_FRAME_WINDOW_SIZE: usize = 8;

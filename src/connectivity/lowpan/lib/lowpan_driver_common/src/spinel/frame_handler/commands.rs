@@ -4,7 +4,6 @@
 
 use super::*;
 
-use anyhow::Error;
 use core::fmt::Debug;
 use spinel_pack::*;
 use std::io;

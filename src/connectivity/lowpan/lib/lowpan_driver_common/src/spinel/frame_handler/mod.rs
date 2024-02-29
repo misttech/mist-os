@@ -16,7 +16,6 @@ use derivative::Derivative;
 use fuchsia_sync::Mutex;
 use futures::channel::{mpsc, oneshot};
 use futures::future::BoxFuture;
-use futures::sink::Sink;
 use futures::stream::BoxStream;
 use futures::task::{Context, Poll};
 use futures::FutureExt;
@@ -357,7 +356,6 @@ where
 #[cfg(test)]
 #[allow(unused_mut)]
 pub(crate) mod tests {
-    use super::mock;
     use super::*;
 
     use assert_matches::assert_matches;
@@ -365,7 +363,6 @@ pub(crate) mod tests {
     use fuchsia_async as fasync;
     use futures::future::{join, select};
     use mock::DeviceRequest;
-    use std::convert::TryInto;
 
     #[fasync::run_until_stalled(test)]
     async fn test_spinel_frame_handler() {

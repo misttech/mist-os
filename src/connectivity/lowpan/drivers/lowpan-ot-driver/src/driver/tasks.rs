@@ -10,7 +10,6 @@ use fuchsia_component::client::connect_to_protocol;
 use futures::never::Never;
 use futures::prelude::*;
 use lowpan_driver_common::lowpan_fidl::ConnectivityState;
-use lowpan_driver_common::net::BackboneInterface;
 use lowpan_driver_common::spinel::Canceled;
 use lowpan_driver_common::FutureExt;
 use openthread::ot::InfraInterface;

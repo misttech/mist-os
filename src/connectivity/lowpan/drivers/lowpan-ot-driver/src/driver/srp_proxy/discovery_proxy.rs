@@ -12,7 +12,7 @@ use fuchsia_sync::Mutex;
 use futures::channel::mpsc;
 use futures::never::Never;
 use std::collections::HashMap;
-use std::ffi::{CStr, CString};
+use std::ffi::CString;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Context, Poll};

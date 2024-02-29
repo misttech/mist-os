@@ -8,8 +8,6 @@
 
 use crate::ot::DnsTxtEntryIterator;
 use crate::prelude_internal::*;
-use std::ffi::CStr;
-use std::ptr::null;
 
 /// Represents the SRP server state.
 ///

@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use super::*;
-use anyhow::Error;
 
 /// Trait used with [`RequestTracker`] for handling responses.
 pub trait ResponseHandler: Send {

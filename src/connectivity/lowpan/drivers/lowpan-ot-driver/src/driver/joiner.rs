@@ -7,7 +7,6 @@ use anyhow::Error;
 use futures::future::Either;
 use lowpan_driver_common::lowpan_fidl::*;
 use lowpan_driver_common::AsyncConditionWait;
-use lowpan_driver_common::ZxResult;
 
 impl<OT, NI, BI> OtDriver<OT, NI, BI>
 where

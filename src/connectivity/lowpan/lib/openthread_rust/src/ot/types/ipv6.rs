@@ -5,7 +5,6 @@
 use crate::prelude_internal::*;
 
 use core::fmt::{Debug, Formatter};
-use std::marker::PhantomData;
 use std::net::SocketAddrV6;
 
 /// IPv6 Address Type. Functional equivalent of [`otsys::otIp6Address`](crate::otsys::otIp6Address).

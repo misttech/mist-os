@@ -8,7 +8,7 @@ mod inspect;
 mod service;
 
 use anyhow::{format_err, Context as _, Error};
-use fidl_fuchsia_factory_lowpan::{FactoryLookupRequestStream, FactoryRegisterRequestStream};
+use fidl_fuchsia_factory_lowpan;
 use fidl_fuchsia_lowpan_driver::RegisterRequestStream;
 use fuchsia_async as fasync;
 use fuchsia_component::server::ServiceFs;

@@ -12,8 +12,7 @@ use crate::lowpan_fidl::{
     AllCounters, CoexCounters, JoinerCommissioningParams, MacCounters, RoutePreference,
 };
 use crate::net::Ipv6PacketDebug;
-use core::convert::{TryFrom, TryInto};
-use hex;
+
 use net_types::ip::IpAddress;
 use spinel_pack::*;
 use static_assertions::_core::str::from_utf8;

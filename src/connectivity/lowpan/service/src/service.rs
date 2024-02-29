@@ -10,31 +10,14 @@ use fidl_fuchsia_factory_lowpan::{
     FactoryDriverMarker, FactoryDriverProxy, FactoryLookupRequest, FactoryLookupRequestStream,
     FactoryRegisterRequest, FactoryRegisterRequestStream,
 };
-use fidl_fuchsia_lowpan_driver::{
-    DriverMarker, DriverProxy, Protocols, RegisterRequest, RegisterRequestStream,
-};
+use fidl_fuchsia_lowpan_driver::{DriverMarker, DriverProxy, Protocols, RegisterRequest};
 use fuchsia_sync::Mutex;
 use futures::prelude::*;
 use futures::task::{Spawn, SpawnExt};
-use lowpan_driver_common::lowpan_fidl::{
-    CapabilitiesConnectorRequest, CapabilitiesConnectorRequestStream, CountersConnectorRequest,
-    CountersConnectorRequestStream, DatasetConnectorRequest, DatasetConnectorRequestStream,
-    DeviceConnectorRequest, DeviceConnectorRequestStream, DeviceExtraConnectorRequest,
-    DeviceExtraConnectorRequestStream, DeviceRouteConnectorRequest,
-    DeviceRouteConnectorRequestStream, DeviceRouteExtraConnectorRequest,
-    DeviceRouteExtraConnectorRequestStream, DeviceTestConnectorRequest,
-    DeviceTestConnectorRequestStream, DeviceWatcherRequest, DeviceWatcherRequestStream,
-    EnergyScanConnectorRequest, EnergyScanConnectorRequestStream,
-    ExperimentalDeviceConnectorRequest, ExperimentalDeviceConnectorRequestStream,
-    ExperimentalDeviceExtraConnectorRequest, ExperimentalDeviceExtraConnectorRequestStream,
-    FeatureConnectorRequestStream, LegacyJoiningConnectorRequest,
-    LegacyJoiningConnectorRequestStream, MeshcopConnectorRequest, MeshcopConnectorRequestStream,
-    TelemetryProviderConnectorRequest, TelemetryProviderConnectorRequestStream, MAX_LOWPAN_DEVICES,
-};
+use lowpan_driver_common::lowpan_fidl::MAX_LOWPAN_DEVICES;
 use lowpan_driver_common::{AsyncCondition, ZxStatus};
 use regex::Regex;
 use std::collections::HashMap;
-use std::sync::Arc;
 
 lazy_static::lazy_static! {
     static ref DEVICE_NAME_REGEX: Regex = Regex::new("^[a-z_][-_.+0-9a-z]{1,31}$")

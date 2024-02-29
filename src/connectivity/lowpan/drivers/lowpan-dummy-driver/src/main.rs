@@ -12,7 +12,6 @@ use futures::prelude::*;
 use lowpan_driver_common::{
     register_and_serve_driver, register_and_serve_driver_factory, DummyDevice,
 };
-use std::default::Default;
 
 #[allow(unused_imports)]
 use tracing::{debug, error, info, trace, warn};

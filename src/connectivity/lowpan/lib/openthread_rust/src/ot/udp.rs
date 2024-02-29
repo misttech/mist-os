@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use crate::prelude_internal::*;
-use std::marker::PhantomData;
 use std::ptr::{null_mut, NonNull};
 
 /// Functional equivalent of [`otsys::otUdpSocket`](crate::otsys::otUdpSocket).
