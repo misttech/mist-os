@@ -216,6 +216,11 @@ board_input_bundle("x64_common") {
       package_set = "bootfs"
       driver_components = [ "meta/pc-ps2.cm" ]
     },
+    {
+      package_target = "//src/power/fake-powersource:fake-battery"
+      package_set = "base"
+      driver_components = [ "meta/fake_battery.cm" ]
+    },
   ]
 
   # Additional drivers to support running as a virtualization guest.
