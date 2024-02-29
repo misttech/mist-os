@@ -5,15 +5,6 @@
 #ifndef ZIRCON_AVAILABILITY_H_
 #define ZIRCON_AVAILABILITY_H_
 
-// When targeting the Fuchsia platform, `__Fuchsia_API_level__` must always be
-// specified and valid. For Clang, which defaults to level 0, the target level
-// should always be specified with `-ffuchsia-api-level`.
-#if defined(__Fuchsia__)
-#if !defined(__Fuchsia_API_level__) || __Fuchsia_API_level__ == 0
-#error `__Fuchsia_API_level__` must be set to a non-zero value. For Clang, use `-ffuchsia-api-level`.
-#endif  // !defined(__Fuchsia_API_level__) || __Fuchsia_API_level__ == 0
-#endif  // defined(__Fuchsia__)
-
 // The value of __Fuchsia_API_level__ when the target API level is HEAD.
 // While Fuchsia API levels are unsigned 64-bit integers, Clang only supports
 // 32-bit version segments, so we use the special value of `UINT32_MAX` to
@@ -26,20 +17,7 @@
 #define FUCHSIA_HEAD 4294967295
 // LINT.ThenChange(//build/config/fuchsia/platform_version.gni:fuchsia_head_c_value)
 
-// Only apply availability attributes when they are supported and will be used.
-// Clang already handles only applying the attribute to the specified platform,
-// so the __Fuchsia__ condition is at most a minor compile-time optimization
-// when the macros are encountered in non-Fuchsia builds.
-#if defined(__clang__) && defined(__Fuchsia__)
-
-// When targeting the Fuchsia platform, Clang compares the level(s) specified in
-// the availability attributes below against the target API level, so it is
-// important that the level has been specified correctly.
-// Ensure the level has been specified by checking __Fuchsia_API_level__, which
-// Clang sets to the same value used for these attributes.
-#if !defined(__Fuchsia_API_level__) || __Fuchsia_API_level__ == 0
-#error Could not verify the API level is set for `availability` attributes.
-#endif  // !defined(__Fuchsia_API_level__) || __Fuchsia_API_level__ == 0
+#if defined(__Fuchsia_API_level__) && defined(__clang__)
 
 // An API that was added to the platform.
 //
@@ -96,12 +74,12 @@
                               deprecated = level_deprecated, obsoleted = level_removed, \
                               message = msg)))
 
-#else  // defined(__clang__) && defined(__Fuchsia__)
+#else  // __Fuchsia_API_level__
 
 #define ZX_AVAILABLE_SINCE(level_added)
 #define ZX_DEPRECATED_SINCE(level_added, level_deprecated, msg)
 #define ZX_REMOVED_SINCE(level_added, level_deprecated, level_removed, msg)
 
-#endif  // defined(__clang__) && defined(__Fuchsia__)
+#endif  // __Fuchsia_API_level__
 
 #endif  // ZIRCON_AVAILABILITY_H_
