@@ -13,9 +13,7 @@ use {
     anyhow::Error,
     async_trait::async_trait,
     futures::try_join,
-    std::{
-        cmp::Ordering, collections::BinaryHeap, convert::From, fmt::Debug, fmt::Write, ops::Bound,
-    },
+    std::{cmp::Ordering, collections::BinaryHeap, fmt::Debug, fmt::Write, ops::Bound},
 };
 
 #[derive(Debug, Eq, PartialEq)]

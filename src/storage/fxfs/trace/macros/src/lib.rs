@@ -6,7 +6,6 @@ use {
     proc_macro::TokenStream,
     proc_macro2::TokenStream as TokenStream2,
     quote::{quote, ToTokens, TokenStreamExt},
-    std::vec::Vec,
     syn::{
         parse::{Parse, ParseStream},
         parse_macro_input, parse_quote,

@@ -572,12 +572,10 @@ mod tests {
         super::*,
         crate::fuchsia::fxblob::testing::{new_blob_fixture, BlobFixture},
         core::ops::Range,
-        delivery_blob::{CompressionMode, Type1Blob},
+        delivery_blob::CompressionMode,
         fidl_fuchsia_fxfs::CreateBlobError,
         fidl_fuchsia_io::UnlinkOptions,
         fuchsia_async as fasync,
-        fuchsia_merkle::MerkleTreeBuilder,
-        fuchsia_zircon::Status,
         rand::{thread_rng, Rng},
     };
 

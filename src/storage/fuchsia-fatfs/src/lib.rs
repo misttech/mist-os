@@ -118,14 +118,13 @@ mod tests {
     use {
         super::*,
         crate::types::{Dir, FileSystem},
-        anyhow::{anyhow, Context, Error},
-        fatfs::{format_volume, FormatVolumeOptions, FsOptions},
+        anyhow::{anyhow, Context},
+        fatfs::{format_volume, FormatVolumeOptions},
         fidl::endpoints::Proxy,
         fidl_fuchsia_io as fio,
-        fuchsia_zircon::Status,
         futures::{future::BoxFuture, prelude::*},
         std::{collections::HashMap, io::Write, ops::Deref},
-        vfs::{execution_scope::ExecutionScope, node::Node, path::Path},
+        vfs::{node::Node, path::Path},
     };
 
     #[derive(Debug, PartialEq)]

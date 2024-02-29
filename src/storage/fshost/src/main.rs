@@ -15,7 +15,6 @@ use {
     fuchsia_runtime::{take_startup_handle, HandleType},
     fuchsia_zircon::sys::zx_debug_write,
     futures::{channel::mpsc, lock::Mutex, StreamExt},
-    inspect_runtime,
     std::{collections::HashSet, sync::Arc},
     vfs::{
         directory::{entry_container::Directory, helper::DirectlyMutable},

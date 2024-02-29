@@ -28,8 +28,6 @@ use {
     std::{
         cell::UnsafeCell,
         collections::btree_map::BTreeMap,
-        convert::TryInto,
-        iter::Iterator,
         ops::{Bound, Range},
     },
 };

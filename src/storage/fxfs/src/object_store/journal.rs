@@ -59,21 +59,19 @@ use {
     anyhow::{anyhow, bail, Context, Error},
     event_listener::Event,
     fprint::TypeFingerprint,
-    futures::{self, future::poll_fn, FutureExt as _},
+    futures::{future::poll_fn, FutureExt as _},
     once_cell::sync::OnceCell,
     rand::Rng,
     serde::{Deserialize, Serialize},
     static_assertions::const_assert,
     std::{
         clone::Clone,
-        convert::AsRef,
         ops::{Bound, Range},
         sync::{
             atomic::{AtomicBool, Ordering},
             Arc, Mutex,
         },
         task::{Poll, Waker},
-        vec::Vec,
     },
 };
 

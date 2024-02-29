@@ -98,7 +98,7 @@ impl AsRef<[Vec<Vec<u8>>]> for MerkleTree {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{FsVerityHasher, FsVerityHasherOptions};
+    use crate::FsVerityHasherOptions;
     use hex::FromHex;
 
     impl MerkleTree {

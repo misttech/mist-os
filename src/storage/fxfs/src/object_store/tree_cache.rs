@@ -7,9 +7,7 @@ use {
     crate::lsm_tree::cache::{ObjectCache, ObjectCachePlaceholder, ObjectCacheResult},
     linked_hash_map::{Entry, LinkedHashMap},
     std::{
-        boxed::Box,
         hash::BuildHasherDefault,
-        ops::Drop,
         sync::{
             atomic::{AtomicU64, Ordering},
             Mutex,

@@ -8,7 +8,7 @@ use {
     fidl_fuchsia_io as fio,
     fuchia_storage_benchmarks_lib::filesystems::{BlobFilesystem, DeliveryBlob, PkgDirInstance},
     fuchsia_pkg_testing::PackageBuilder,
-    fuchsia_runtime, fuchsia_zircon as zx,
+    fuchsia_zircon as zx,
     futures::stream::{self, StreamExt},
     rand::{
         distributions::{Distribution, WeightedIndex},
@@ -16,11 +16,7 @@ use {
         Rng, SeedableRng,
     },
     rand_xorshift::XorShiftRng,
-    std::{
-        iter::{Iterator, StepBy},
-        ops::Range,
-        vec::Vec,
-    },
+    std::{iter::StepBy, ops::Range, vec::Vec},
     storage_benchmarks::{
         Benchmark, CacheClearableFilesystem as _, OperationDuration, OperationTimer,
     },

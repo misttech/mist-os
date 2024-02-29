@@ -133,7 +133,6 @@ use {
     std::{
         borrow::Borrow,
         collections::{BTreeMap, HashSet, VecDeque},
-        convert::TryInto,
         hash::Hash,
         marker::PhantomData,
         ops::{Bound, Range},

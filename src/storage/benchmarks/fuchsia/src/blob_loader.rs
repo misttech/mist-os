@@ -12,7 +12,6 @@ use {
     },
     fuchsia_zircon as zx,
     futures::StreamExt as _,
-    std::vec::Vec,
 };
 
 /// Pages in and retains all of the blobs in the pkg directory. This is done to avoid page faulting

@@ -140,7 +140,7 @@ impl MerkleTreeBuilder {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{FsVerityHasher, FsVerityHasherOptions};
+    use crate::FsVerityHasherOptions;
     use hex::FromHex;
     use test_case::test_case;
 

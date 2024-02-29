@@ -16,7 +16,6 @@ use {
     fxfs_crypto::WrappedKeys,
     serde::{Deserialize, Serialize},
     std::{
-        convert::From,
         default::Default,
         hash::Hash,
         time::{Duration, SystemTime, UNIX_EPOCH},

@@ -47,7 +47,6 @@ use {
     once_cell::sync::OnceCell,
     std::{
         collections::BTreeMap,
-        convert::TryInto,
         mem::{size_of, size_of_val},
         path::{Component, Path},
         str,

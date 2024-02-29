@@ -92,7 +92,7 @@ macro_rules! trace_future_args {
 
 #[cfg(test)]
 mod tests {
-    use crate::{duration, flow_begin, flow_end, trace_future_args, TraceFutureExt};
+    use crate::TraceFutureExt;
 
     #[fuchsia::test]
     fn test_duration() {

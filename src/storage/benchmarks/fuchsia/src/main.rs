@@ -13,7 +13,7 @@ use {
         filesystems::{Blobfs, F2fs, Fxblob, Fxfs, Memfs, Minfs, PkgDirTest},
     },
     regex::{Regex, RegexSetBuilder},
-    std::{fs::File, path::PathBuf, vec::Vec},
+    std::{fs::File, path::PathBuf},
     storage_benchmarks::{
         add_benchmarks,
         directory_benchmarks::{

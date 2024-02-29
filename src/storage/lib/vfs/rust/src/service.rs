@@ -16,13 +16,8 @@ use crate::{
 };
 
 use {
-    async_trait::async_trait,
-    fidl::{self, endpoints::RequestStream},
-    fidl_fuchsia_io as fio,
-    fuchsia_async::Channel,
-    fuchsia_zircon_status::Status,
-    futures::future::Future,
-    std::sync::Arc,
+    async_trait::async_trait, fidl::endpoints::RequestStream, fidl_fuchsia_io as fio,
+    fuchsia_async::Channel, fuchsia_zircon_status::Status, futures::future::Future, std::sync::Arc,
 };
 
 // Redefine these constants as a u32 as in macos they are u16

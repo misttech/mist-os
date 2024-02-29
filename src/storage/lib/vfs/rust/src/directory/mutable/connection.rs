@@ -347,14 +347,12 @@ mod tests {
                 traversal_position::TraversalPosition,
             },
             node::{IsDirectory, Node},
-            path::Path,
             ToObjectRequest,
         },
         async_trait::async_trait,
-        fidl::endpoints::ServerEnd,
         std::{
             any::Any,
-            sync::{Arc, Mutex, Weak},
+            sync::{Mutex, Weak},
         },
     };
 

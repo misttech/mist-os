@@ -12,8 +12,7 @@ use {
     async_trait::async_trait,
     fuchsiaperf::FuchsiaPerfBenchmarkResult,
     regex::RegexSet,
-    serde_json,
-    std::{io::Write, time::Instant, vec::Vec},
+    std::{io::Write, time::Instant},
     tracing::info,
 };
 
@@ -328,10 +327,7 @@ macro_rules! add_benchmarks {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::{block_device::PanickingBlockDeviceFactory, FilesystemConfig},
-    };
+    use {super::*, crate::block_device::PanickingBlockDeviceFactory};
 
     #[derive(Clone)]
     struct TestBenchmark(&'static str);

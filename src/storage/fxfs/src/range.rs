@@ -6,7 +6,6 @@ use {
     crate::errors::FxfsError,
     anyhow::{ensure, Error},
     std::{
-        cmp::Ord,
         fmt::Debug,
         ops::{Range, Rem, Sub},
     },

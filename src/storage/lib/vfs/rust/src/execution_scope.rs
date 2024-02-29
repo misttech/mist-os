@@ -29,7 +29,6 @@ use {
     pin_project::pin_project,
     slab::Slab,
     std::{
-        ops::Drop,
         pin::Pin,
         sync::{Arc, Mutex},
     },
@@ -568,7 +567,6 @@ mod tests {
                 Future,
             },
             std::{
-                ops::Drop,
                 pin::Pin,
                 sync::{
                     atomic::{AtomicUsize, Ordering},

@@ -10,7 +10,6 @@ use {
     },
     anyhow::Error,
     arrayref::array_refs,
-    async_channel,
     event_listener::EventListener,
     fuchsia_async as fasync,
     fuchsia_hash::Hash,
@@ -25,7 +24,6 @@ use {
     std::{
         collections::btree_map::{BTreeMap, Entry},
         mem::size_of,
-        ops::Drop,
         sync::{
             atomic::{AtomicBool, Ordering},
             Arc,

@@ -14,9 +14,8 @@ use super::simple;
 use crate::{
     assert_close, assert_event, assert_get_token, assert_get_token_err, assert_link_err,
     assert_read, assert_read_dirents, assert_rename, assert_rename_err, assert_unlink,
-    assert_unlink_err, assert_watch, assert_watcher_one_message_watched_events,
-    open_as_directory_assert_err, open_as_file_assert_err, open_get_directory_proxy_assert_ok,
-    open_get_proxy_assert, open_get_vmo_file_proxy_assert_ok,
+    assert_unlink_err, open_as_directory_assert_err, open_as_file_assert_err,
+    open_get_directory_proxy_assert_ok, open_get_proxy_assert, open_get_vmo_file_proxy_assert_ok,
 };
 
 use crate::{

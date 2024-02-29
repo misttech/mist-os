@@ -21,9 +21,7 @@ use {
     fuchsia_zircon as zx,
     futures::{channel::mpsc, lock::Mutex, SinkExt, StreamExt, TryStreamExt},
     std::{collections::HashMap, sync::Arc},
-    tracing,
     vfs::{
-        self,
         directory::{
             entry_container::Directory, helper::DirectlyMutable,
             mutable::connection::MutableConnection, simple::Simple,

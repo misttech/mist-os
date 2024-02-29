@@ -19,7 +19,6 @@ use {
     std::{
         borrow::Borrow,
         cell::UnsafeCell,
-        cmp::PartialEq,
         collections::HashMap,
         fmt::Debug,
         hash::{Hash, Hasher},
@@ -1123,10 +1122,7 @@ mod tests {
         assert_matches::assert_matches,
         futures::TryStreamExt,
         scopeguard::defer,
-        vfs::{
-            directory::dirents_sink::{AppendResult, Sealed},
-            node::Node as _,
-        },
+        vfs::{directory::dirents_sink::Sealed, node::Node as _},
     };
 
     const TEST_DISK_SIZE: u64 = 2048 << 10; // 2048K

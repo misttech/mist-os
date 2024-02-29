@@ -19,7 +19,6 @@ use {
 #[cfg(target_os = "linux")]
 use {
     fuse3::{raw::prelude::Session, MountOptions},
-    libc,
     tokio::runtime::Runtime,
     tools::fuse_fs::FuseFs,
 };

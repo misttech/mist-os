@@ -4,7 +4,7 @@
 
 use {
     super::types::{Key, Value},
-    std::{boxed::Box, fmt},
+    std::fmt,
 };
 
 pub trait ObjectCachePlaceholder<V: Value>: Send + Sync {

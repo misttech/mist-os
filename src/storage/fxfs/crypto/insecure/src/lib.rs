@@ -9,10 +9,7 @@ use {
     fxfs_crypto::{Crypt, KeyPurpose, UnwrappedKey, WrappedKey, WrappedKeyBytes},
     rand::{rngs::StdRng, RngCore, SeedableRng},
     rustc_hash::FxHashMap as HashMap,
-    std::{
-        convert::TryInto,
-        sync::atomic::{AtomicBool, Ordering},
-    },
+    std::sync::atomic::{AtomicBool, Ordering},
 };
 
 pub const DATA_KEY: [u8; 32] = [

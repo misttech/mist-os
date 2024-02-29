@@ -12,7 +12,6 @@ use {
     },
     fxfs_crypto::Crypt,
     fxfs_insecure_crypto::InsecureCrypt,
-    serde_json,
     std::{
         io::Write,
         path::{Path, PathBuf},

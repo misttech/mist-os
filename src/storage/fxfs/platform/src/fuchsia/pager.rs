@@ -810,10 +810,7 @@ impl<T: PagerBacked, U: PagerRequestType> Drop for PagerRangeChunksIter<T, U> {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*, crate::fuchsia::node::FxNode, futures::channel::mpsc, futures::StreamExt,
-        vfs::execution_scope::ExecutionScope,
-    };
+    use {super::*, futures::channel::mpsc, futures::StreamExt};
 
     struct MockFile {
         vmo: zx::Vmo,

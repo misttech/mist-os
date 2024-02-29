@@ -22,7 +22,6 @@ use {
     std::{
         collections::BTreeMap,
         hash::{Hash, Hasher},
-        option::Option,
         sync::Mutex,
     },
     vfs::{execution_scope::ExecutionScope, file::File, node::Node},

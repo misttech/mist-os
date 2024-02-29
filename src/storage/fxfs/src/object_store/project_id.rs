@@ -12,7 +12,7 @@ use {
         },
     },
     anyhow::{ensure, Error},
-    std::{convert::TryInto, ops::Bound},
+    std::ops::Bound,
 };
 
 impl ObjectStore {

@@ -4,7 +4,7 @@
 
 use {
     fuchsia_trace::{Arg, TraceFutureArgs},
-    std::{ffi::CStr, vec::Vec},
+    std::ffi::CStr,
 };
 
 pub use fuchsia_trace::{

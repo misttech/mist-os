@@ -63,7 +63,6 @@ use {
     rustc_hash::FxHashMap as HashMap,
     serde::{Deserialize, Serialize},
     std::{
-        convert::TryInto,
         fmt,
         io::{Read, Write},
         ops::{Bound, Range},

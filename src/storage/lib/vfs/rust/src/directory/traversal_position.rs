@@ -2,8 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::default::Default;
-
 /// Seek position inside a directory.  The precise meaning of the Name and Index values are entirely
 /// up to an implementation; it could indicate the next entry to be returned or the last entry
 /// returned; the type should be considered to be opaque to the client.  There are some

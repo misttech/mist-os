@@ -39,8 +39,6 @@ use {
     fidl_fuchsia_io as fio,
     fuchsia_zircon_status::Status,
     std::{
-        boxed::Box,
-        clone::Clone,
         collections::{
             btree_map::{self, Entry},
             BTreeMap,
@@ -778,7 +776,6 @@ mod tests {
     use super::*;
     use crate::{assert_event, test_utils::test_file::TestFile};
     use fidl::endpoints::create_proxy;
-    use std::sync::{Arc, Mutex};
 
     #[test]
     fn add_entry_success() {

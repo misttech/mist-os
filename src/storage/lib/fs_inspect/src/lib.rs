@@ -16,7 +16,6 @@ use {
     futures::FutureExt,
     std::{
         collections::hash_map::HashMap,
-        string::String,
         sync::{Arc, Mutex, Weak},
     },
 };

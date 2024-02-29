@@ -6,7 +6,7 @@ use {
     anyhow::{anyhow, Context, Error},
     fidl_fuchsia_io::{DirectoryProxy, NodeAttributes, OpenFlags},
     fuchsia_fs::directory::{open_directory, open_file, readdir, DirentKind},
-    fuchsia_inspect, fuchsia_zircon as zx,
+    fuchsia_zircon as zx,
     futures::{future::BoxFuture, FutureExt, TryFutureExt},
 };
 

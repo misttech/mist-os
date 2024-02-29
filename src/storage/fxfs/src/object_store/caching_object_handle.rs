@@ -12,7 +12,6 @@ use {
     std::{
         ops::Deref,
         sync::{Arc, Mutex},
-        vec::Vec,
     },
     storage_device::buffer::BufferFuture,
 };

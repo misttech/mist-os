@@ -28,7 +28,6 @@ use {
     std::{
         convert::TryInto as _,
         future::Future,
-        marker::{Send, Sync},
         ops::{Deref, DerefMut},
         sync::Arc,
     },
@@ -1068,11 +1067,7 @@ impl<T: 'static + File, U: Deref<Target = OpenNode<T>> + IoOpHandler> Representa
 mod tests {
     use {
         super::*,
-        crate::{
-            file::FileOptions,
-            node::{IsDirectory, Node},
-            ToObjectRequest,
-        },
+        crate::node::{IsDirectory, Node},
         assert_matches::assert_matches,
         async_trait::async_trait,
         futures::prelude::*,
@@ -1080,7 +1075,7 @@ mod tests {
     };
 
     #[cfg(target_os = "fuchsia")]
-    use fuchsia_zircon::{self as zx, HandleBased};
+    use fuchsia_zircon::{self as zx};
 
     const RIGHTS_R: fio::Operations =
         fio::Operations::READ_BYTES.union(fio::Operations::GET_ATTRIBUTES);

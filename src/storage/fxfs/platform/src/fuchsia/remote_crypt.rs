@@ -8,7 +8,6 @@ use {
     fidl::endpoints::ClientEnd,
     fidl_fuchsia_fxfs::{CryptMarker, CryptProxy, KeyPurpose as FidlKeyPurpose},
     fxfs_crypto::{Crypt, KeyPurpose, UnwrappedKey, WrappedKey, WrappedKeyBytes, KEY_SIZE},
-    std::convert::TryInto,
 };
 
 pub struct RemoteCrypt {

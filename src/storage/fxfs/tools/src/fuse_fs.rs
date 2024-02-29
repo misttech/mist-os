@@ -20,7 +20,6 @@ use {
         },
     },
     fxfs_crypto::Crypt,
-    libc,
     once_cell::sync::OnceCell,
     rustc_hash::FxHashMap as HashMap,
     std::{
@@ -31,7 +30,6 @@ use {
         sync::Arc,
     },
     storage_device::{fake_device::FakeDevice, file_backed_device::FileBackedDevice, DeviceHolder},
-    tokio,
     tokio::sync::RwLock,
 };
 

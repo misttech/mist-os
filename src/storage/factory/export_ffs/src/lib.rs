@@ -9,7 +9,6 @@
 use {
     anyhow::{bail, Context, Error},
     byteorder::{LittleEndian, WriteBytesExt},
-    fidl,
     fidl_fuchsia_hardware_block::BlockMarker,
     fidl_fuchsia_io as fio,
     fuchsia_fs::directory::{readdir_recursive, DirEntry, DirentKind},

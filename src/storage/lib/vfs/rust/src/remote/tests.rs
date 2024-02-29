@@ -18,10 +18,7 @@ use crate::{
     test_utils::test_file::TestFile,
 };
 
-use {
-    fidl::{self, endpoints::ServerEnd},
-    fidl_fuchsia_io as fio, fuchsia_async as fasync,
-};
+use {fidl::endpoints::ServerEnd, fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
 fn set_up_remote(scope: ExecutionScope) -> fio::DirectoryProxy {
     let r = pseudo_directory! {

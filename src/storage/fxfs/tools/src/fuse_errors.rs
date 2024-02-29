@@ -5,7 +5,6 @@
 use {
     fuse3::{Errno, Result},
     fxfs::{errors::FxfsError, log::info},
-    libc,
 };
 
 /// Pre-defined Fxfs Result with FxfsError.

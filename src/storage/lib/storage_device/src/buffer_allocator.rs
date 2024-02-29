@@ -12,7 +12,6 @@ use {
         pin::Pin,
         sync::Mutex,
         task::{Context, Poll},
-        vec::Vec,
     },
 };
 

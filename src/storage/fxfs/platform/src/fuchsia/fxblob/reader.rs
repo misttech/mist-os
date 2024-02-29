@@ -38,7 +38,6 @@ mod tests {
         fidl_fuchsia_io::{self as fio},
         fuchsia_async as fasync,
         fuchsia_component::client::connect_to_protocol_at_dir_svc,
-        std::vec::Vec,
     };
 
     /// Read a blob using BlobReader API and return its contents as a boxed slice.

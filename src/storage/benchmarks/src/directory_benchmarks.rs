@@ -12,7 +12,6 @@ use {
         ops::Range,
         os::{fd::RawFd, unix::ffi::OsStringExt},
         path::{Path, PathBuf},
-        vec::Vec,
     },
 };
 

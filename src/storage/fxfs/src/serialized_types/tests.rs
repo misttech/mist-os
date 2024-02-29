@@ -6,7 +6,6 @@ use {
     crate::serialized_types::{versioned_type, Version, Versioned, VersionedLatest},
     fprint::TypeFingerprint,
     serde::{Deserialize, Serialize},
-    std::convert::From,
     std::io::Cursor,
 };
 

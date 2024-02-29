@@ -9,10 +9,8 @@ use {
     std::{
         any::TypeId,
         collections::{btree_map::Entry, BTreeMap},
-        iter::Iterator,
         sync::{Arc, Mutex, Weak},
         task::{Poll, Waker},
-        vec::Vec,
     },
     vfs::common::IntoAny,
 };

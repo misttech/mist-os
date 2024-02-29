@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use std::{
-    convert::TryInto,
     io::{Read, Seek, SeekFrom},
     sync::{Arc, Mutex},
 };

@@ -165,7 +165,7 @@ mod tests {
         fidl::endpoints::create_proxy_and_stream,
         fidl_fuchsia_fxfs::{BlobWriterMarker, BlobWriterRequest},
         fuchsia_zircon::HandleBased,
-        futures::{future::BoxFuture, pin_mut, select},
+        futures::{pin_mut, select},
         rand::{thread_rng, Rng as _},
         std::sync::{Arc, Mutex},
     };

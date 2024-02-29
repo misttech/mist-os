@@ -10,7 +10,7 @@ use {
         FATFS_INFO_NAME, MAX_FILENAME_LEN,
     },
     anyhow::Error,
-    fatfs::{self, DefaultTimeProvider, FsOptions, LossyOemCpConverter},
+    fatfs::{DefaultTimeProvider, FsOptions, LossyOemCpConverter},
     fidl_fuchsia_io as fio,
     fuchsia_async::{Task, Time, Timer},
     fuchsia_zircon::{AsHandleRef, Event},

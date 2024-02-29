@@ -62,9 +62,8 @@ use {
         cmp::Ordering,
         io::Read,
         marker::PhantomData,
-        ops::{Bound, Drop},
+        ops::Bound,
         sync::{Arc, Mutex},
-        vec::Vec,
     },
     storage_device::buffer::Buffer,
 };

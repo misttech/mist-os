@@ -42,7 +42,6 @@ use {
         Arc, OnceLock, Weak,
     },
     vfs::{
-        self,
         directory::{entry_container, helper::DirectlyMutable},
         path::Path,
     },
@@ -645,7 +644,7 @@ mod tests {
         fidl::endpoints::{create_proxy, create_request_stream, ServerEnd},
         fidl_fuchsia_fs::AdminMarker,
         fidl_fuchsia_fxfs::{KeyPurpose, MountOptions, VolumeMarker, VolumeProxy},
-        fidl_fuchsia_io as fio, fuchsia, fuchsia_async as fasync,
+        fidl_fuchsia_io as fio, fuchsia_async as fasync,
         fuchsia_component::client::connect_to_protocol_at_dir_svc,
         fuchsia_fs::file,
         fuchsia_zircon::Status,

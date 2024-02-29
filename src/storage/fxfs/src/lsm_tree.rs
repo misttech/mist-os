@@ -21,7 +21,6 @@ use {
     std::{
         fmt,
         future::Future,
-        iter::IntoIterator,
         ops::Bound,
         sync::{Arc, RwLock},
     },

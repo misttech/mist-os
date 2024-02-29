@@ -121,8 +121,7 @@ pub mod test {
     use {
         super::*,
         fidl::endpoints::ServerEnd,
-        fidl_fuchsia_hardware_block::BlockMarker,
-        fidl_fuchsia_hardware_block_partition::{Guid, PartitionMarker, PartitionRequest},
+        fidl_fuchsia_hardware_block_partition::PartitionRequest,
         fuchsia_async as fasync,
         fuchsia_component::server::ServiceFs,
         futures::prelude::*,

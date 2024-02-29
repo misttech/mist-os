@@ -33,14 +33,12 @@ use {
         cell::UnsafeCell,
         cmp::Ordering,
         collections::{hash_map::Entry, BTreeSet},
-        convert::{From, Into},
         fmt,
         marker::PhantomPinned,
         mem,
         ops::{Deref, DerefMut, Range},
         sync::Mutex,
         task::{Poll, Waker},
-        vec::Vec,
     },
 };
 
@@ -1566,14 +1564,14 @@ impl fmt::Debug for WriteGuard<'_> {
 #[cfg(test)]
 mod tests {
     use {
-        super::{lock_keys, LockKey, LockKeys, LockManager, LockState, Mutation, Options},
+        super::{LockKey, LockKeys, LockManager, LockState, Mutation, Options},
         crate::filesystem::FxFilesystem,
         fuchsia_async as fasync,
         futures::{
             channel::oneshot::channel, future::FutureExt, join, pin_mut, stream::FuturesUnordered,
             StreamExt,
         },
-        std::{sync::Mutex, task::Poll, time::Duration, vec::Vec},
+        std::{sync::Mutex, task::Poll, time::Duration},
         storage_device::{fake_device::FakeDevice, DeviceHolder},
     };
 

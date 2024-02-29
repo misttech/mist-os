@@ -20,7 +20,6 @@ use {
         Deserialize, Deserializer, Serialize, Serializer,
     },
     static_assertions::assert_cfg,
-    std::convert::TryInto,
     zerocopy::{AsBytes, FromBytes, FromZeros, NoCell},
 };
 

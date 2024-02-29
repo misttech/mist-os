@@ -6,7 +6,7 @@
 
 use {
     fidl::endpoints::ServerEnd, fidl::prelude::*, fidl_fuchsia_io as fio,
-    fuchsia_zircon_status::Status, futures::StreamExt as _, libc, std::sync::Arc,
+    fuchsia_zircon_status::Status, futures::StreamExt as _, std::sync::Arc,
 };
 
 pub use vfs_macros::attribute_query;

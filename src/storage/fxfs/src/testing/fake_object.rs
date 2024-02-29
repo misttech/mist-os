@@ -11,10 +11,8 @@ use {
     async_trait::async_trait,
     std::{
         cmp::min,
-        convert::TryInto,
         ops::Range,
         sync::{Arc, Mutex},
-        vec::Vec,
     },
     storage_device::{
         buffer::{BufferFuture, BufferRef, MutableBufferRef},

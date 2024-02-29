@@ -18,7 +18,6 @@ use {
     },
     fxfs::log::*,
     std::{
-        convert::TryFrom,
         pin::Pin,
         sync::{
             atomic::{AtomicU32, Ordering},

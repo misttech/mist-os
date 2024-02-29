@@ -22,7 +22,7 @@ use {
 };
 
 mod private {
-    use {fidl_fuchsia_io as fio, std::convert::TryFrom};
+    use fidl_fuchsia_io as fio;
 
     /// A type-preserving wrapper around [`fuchsia_async::Channel`].
     #[derive(Debug)]

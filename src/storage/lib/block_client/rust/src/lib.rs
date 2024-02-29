@@ -13,7 +13,6 @@ use {
     lazy_static::lazy_static,
     std::{
         collections::HashMap,
-        convert::TryInto,
         future::Future,
         hash::{Hash, Hasher},
         ops::{DerefMut, Range},

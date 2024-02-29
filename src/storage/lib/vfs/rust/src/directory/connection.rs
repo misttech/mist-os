@@ -24,7 +24,7 @@ use {
     fidl_fuchsia_io as fio,
     fuchsia_zircon_status::Status,
     futures::future::poll_fn,
-    std::{convert::TryInto as _, default::Default, task::Poll},
+    std::{convert::TryInto as _, task::Poll},
     storage_trace::{self as trace, TraceFutureExt},
 };
 
@@ -532,7 +532,7 @@ impl<T: DerivedConnection + 'static> Representation for BaseConnection<T> {
 mod tests {
     use {
         super::*, crate::directory::immutable::simple::simple, assert_matches::assert_matches,
-        fidl_fuchsia_io as fio, fuchsia_zircon_status::Status, futures::prelude::*,
+        fidl_fuchsia_io as fio, futures::prelude::*,
     };
 
     #[fuchsia::test]

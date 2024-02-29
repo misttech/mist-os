@@ -10,7 +10,6 @@ use {
     fdio::{SpawnAction, SpawnOptions},
     fidl_fuchsia_io as fio,
     fidl_fuchsia_storage_ext4::{MountVmoResult, Server_Marker, ServiceMarker, Success},
-    fuchsia_fs,
     fuchsia_runtime::{HandleInfo, HandleType},
     fuchsia_zircon::{self as zx, AsHandleRef, DurationNum},
     maplit::hashmap,

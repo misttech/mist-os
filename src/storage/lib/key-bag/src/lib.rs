@@ -9,7 +9,6 @@ use {
     serde::{Deserialize, Deserializer, Serialize, Serializer},
     std::{
         collections::{hash_map::Entry, HashMap},
-        convert::TryFrom,
         fmt::Debug,
         ops::{Deref, DerefMut},
         os::fd::{FromRawFd as _, IntoRawFd as _},

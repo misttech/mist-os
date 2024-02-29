@@ -6,8 +6,6 @@ pub use macros::*;
 use {
     std::collections::{BTreeMap, BTreeSet, HashMap, HashSet},
     std::ops::Range,
-    std::option::Option,
-    std::string::String,
 };
 
 /// A TypeFingerprint is able to return a string that represents the layout of a type.

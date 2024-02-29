@@ -15,9 +15,7 @@ use crate::{
 };
 
 use {
-    fidl::{self, endpoints::ServerEnd},
-    fidl_fuchsia_io as fio,
-    fuchsia_zircon_status::Status,
+    fidl::endpoints::ServerEnd, fidl_fuchsia_io as fio, fuchsia_zircon_status::Status,
     std::sync::Arc,
 };
 

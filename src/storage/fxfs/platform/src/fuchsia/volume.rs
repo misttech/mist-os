@@ -26,7 +26,6 @@ use {
     fs_inspect::{FsInspectVolume, VolumeData},
     fuchsia_async as fasync,
     futures::{
-        self,
         channel::oneshot,
         stream::{self, FusedStream, Stream},
         FutureExt, StreamExt, TryStreamExt,
@@ -42,9 +41,7 @@ use {
         },
     },
     std::{
-        boxed::Box,
         future::Future,
-        marker::Unpin,
         sync::{Arc, Mutex, MutexGuard, Weak},
         time::Duration,
     },

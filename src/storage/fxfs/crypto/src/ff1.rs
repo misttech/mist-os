@@ -81,7 +81,7 @@ impl Ff1 {
 
 #[cfg(test)]
 mod tests {
-    use {super::Ff1, crate::UnwrappedKey, rand};
+    use {super::Ff1, crate::UnwrappedKey};
 
     #[test]
     fn test_ff1() {
