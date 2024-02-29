@@ -3,8 +3,6 @@
 # found in the LICENSE file.
 
 source_set("test_settings") {
-  testonly = true
-
   sources = [
     "test_settings.cc",
     "test_settings.h",
@@ -16,10 +14,8 @@ source_set("test_settings") {
   ]
 }
 
-# Generic main entry point target for GTest executables.
-source_set("gtest_main") {
-  testonly = true
-
+# Generic main entry point target for non-testonly GTest executables.
+source_set("gtest_main_no_testonly") {
   sources = [ "run_all_unittests.cc" ]
 
   deps = [
@@ -29,6 +25,12 @@ source_set("gtest_main") {
 
   public_deps = [
     "//sdk/lib/syslog/cpp",
-    "//third_party/googletest:gtest",
+    "//third_party/googletest:gtest_no_testonly",
   ]
+}
+
+# Generic main entry point target for GTest executables.
+source_set("gtest_main") {
+  testonly = true
+  public_deps = [ ":gtest_main_no_testonly" ]
 }

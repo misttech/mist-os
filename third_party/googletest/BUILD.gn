@@ -20,10 +20,15 @@ config("gtest_config") {
 }
 
 static_library("gtest_no_testonly") {
-  # In-tree tests should prefer //third_party/googletest:gtest.
+  # In-tree tests should prefer //third_party/googletest:gtest because that enforces that only
+  # testonly code uses gtest. This target should be used for tests or dependencies of tests that are
+  # packaged into the SDK, since they cannot be testonly.
   visibility = [
     ":*",
     "//src/graphics/magma/tests/integration:*",
+    "//src/graphics/tests/common:*",
+    "//src/graphics/tests/vkreadback:*",
+    "//src/lib/fxl/test:*",
     "//src/lib/testing/loop_fixture:*",
   ]
 

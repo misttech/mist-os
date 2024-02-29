@@ -13,8 +13,6 @@ fuchsia_structured_config_cpp_elf_lib("config") {
 }
 
 source_set("common") {
-  testonly = true
-
   sources = [
     "//src/graphics/tests/common/utils.cc",
     "//src/graphics/tests/common/vulkan_context.cc",
@@ -23,14 +21,13 @@ source_set("common") {
 
   public_deps = [
     "//src/lib/vulkan",
-    "//third_party/googletest:gtest",
+    "//third_party/googletest:gtest_no_testonly",
   ]
 }
 
 if (is_fuchsia) {
   # This target can set the gpu vendor ID from a config exactly matching the one in meta/config.shard.cml.
   source_set("config_query") {
-    testonly = true
     sources = [ "config_query.cc" ]
     deps = [
       ":common",

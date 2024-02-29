@@ -9,6 +9,6 @@
         "vulkan/client.shard.cml",
     ],
     program: {
-        binary: "test/vkreadback_test",
+        binary: "bin/vkreadback_test",
     },
 }
