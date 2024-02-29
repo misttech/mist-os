@@ -296,8 +296,8 @@ TEST_F(DispatcherDumpTest, DumpRequestsCount) {
     driver_runtime::Dispatcher* runtime_dispatcher =
         static_cast<driver_runtime::Dispatcher*>(dispatcher_.get());
     runtime_dispatcher->Dump(&state);
-    ASSERT_EQ(state.num_inlined_requests, 0);
-    ASSERT_EQ(state.num_total_requests, 1);
+    ASSERT_EQ(state.debug_stats.num_inlined_requests, 0);
+    ASSERT_EQ(state.debug_stats.num_total_requests, 1);
   }
 
   // Send an inlined request from end1 to end0 of the channel, which will be serviced by
@@ -329,8 +329,8 @@ TEST_F(DispatcherDumpTest, DumpRequestsCount) {
     driver_runtime::Dispatcher* runtime_dispatcher =
         static_cast<driver_runtime::Dispatcher*>(dispatcher_.get());
     runtime_dispatcher->Dump(&state);
-    ASSERT_EQ(state.num_inlined_requests, 1);
-    ASSERT_EQ(state.num_total_requests, 2);
+    ASSERT_EQ(state.debug_stats.num_inlined_requests, 1);
+    ASSERT_EQ(state.debug_stats.num_total_requests, 2);
   }
 
   dispatcher2->ShutdownAsync();

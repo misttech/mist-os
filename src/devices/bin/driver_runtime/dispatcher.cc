@@ -1012,7 +1012,7 @@ void Dispatcher::QueueRegisteredCallback(driver_runtime::CallbackRequest* reques
         dispatching_sync_ = true;
       }
     }
-    num_total_requests_++;
+    debug_stats_.num_total_requests++;
     if (!direct_call) {
       callback_queue_.push_back(std::move(callback_request));
       if (event_waiter_ && !event_waiter_->signaled()) {
@@ -1020,7 +1020,7 @@ void Dispatcher::QueueRegisteredCallback(driver_runtime::CallbackRequest* reques
       }
       return;
     }
-    num_inlined_requests_++;
+    debug_stats_.num_inlined_requests++;
   }
   DispatchCallback(std::move(callback_request));
 

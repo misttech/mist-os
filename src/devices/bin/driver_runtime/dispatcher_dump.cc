@@ -67,8 +67,7 @@ void Dispatcher::Dump(DumpState* out_state) {
   out_state->allow_sync_calls = allow_sync_calls_;
   out_state->state = state_;
   out_state->queued_tasks.clear();
-  out_state->num_inlined_requests = num_inlined_requests_;
-  out_state->num_total_requests = num_total_requests_;
+  out_state->debug_stats = debug_stats_;
 
   for (auto& callback_request : callback_queue_) {
     if (callback_request.request_type() == CallbackRequest::RequestType::kTask) {
@@ -100,7 +99,8 @@ void Dispatcher::FormatDump(DumpState* state, std::vector<std::string>* dump_out
   OutputFormattedString(dump_out, "Allow sync calls: %s", BoolToString(state->allow_sync_calls));
   OutputFormattedString(dump_out, "State: %s", DispatcherStateToString(state->state));
   OutputFormattedString(dump_out, "Processed %lu requests, %lu were inlined",
-                        state->num_total_requests, state->num_inlined_requests);
+                        state->debug_stats.num_total_requests,
+                        state->debug_stats.num_inlined_requests);
 
   if (state->queued_tasks.empty()) {
     OutputFormattedString(dump_out, "No queued tasks");
