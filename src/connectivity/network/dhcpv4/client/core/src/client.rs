@@ -13,7 +13,13 @@ use futures::{
 };
 use net_types::{ethernet::Mac, SpecifiedAddr, Witness as _};
 use rand::Rng as _;
-use std::{fmt::Debug, net::Ipv4Addr, num::NonZeroU32, time::Duration};
+
+use std::{
+    fmt::{Debug, Display},
+    net::Ipv4Addr,
+    num::{NonZeroU32, NonZeroU64},
+    time::Duration,
+};
 
 /// Unexpected, non-recoverable errors encountered by the DHCP client.
 #[derive(thiserror::Error, Debug)]
@@ -124,6 +130,7 @@ impl<I: deps::Instant> State<I> {
         clock: &C,
         stop_receiver: &mut mpsc::UnboundedReceiver<()>,
     ) -> Result<Step<I>, Error> {
+        let debug_log_prefix = &config.debug_log_prefix;
         match self {
             State::Init(init) => {
                 Ok(Step::NextState(Transition::Selecting(init.do_init(rng, clock))))
@@ -144,7 +151,8 @@ impl<I: deps::Instant> State<I> {
                 {
                     RequestingOutcome::RanOutOfRetransmits => {
                         tracing::info!(
-                            "Returning to Init due to running out of DHCPREQUEST retransmits"
+                            "{debug_log_prefix} Returning to Init due to \
+                            running out of DHCPREQUEST retransmits"
                         );
                         Ok(Step::NextState(Transition::Init(Init)))
                     }
@@ -176,12 +184,15 @@ impl<I: deps::Instant> State<I> {
                         // Per RFC 2131 section 3.1: "If the client receives a
                         // DHCPNAK message, the client restarts the
                         // configuration process."
-                        tracing::warn!("Returning to Init due to DHCPNAK: {:?}", nak);
+                        tracing::warn!(
+                            "{debug_log_prefix} Returning to Init due to DHCPNAK: {:?}",
+                            nak
+                        );
                         Ok(Step::NextState(Transition::Init(Init)))
                     }
                 }
             }
-            State::Bound(bound) => Ok(match bound.do_bound(clock, stop_receiver).await {
+            State::Bound(bound) => Ok(match bound.do_bound(config, clock, stop_receiver).await {
                 BoundOutcome::GracefulShutdown => Step::Exit(ExitReason::GracefulShutdown),
                 BoundOutcome::Renewing(renewing) => Step::NextState(Transition::Renewing(renewing)),
             }),
@@ -249,7 +260,8 @@ impl<I: deps::Instant> State<I> {
                                 },
                         } = renewing;
                         tracing::warn!(
-                            "Dropping lease on {} and returning to Init due to DHCPNAK: {:?}",
+                            "{debug_log_prefix} Dropping lease on {} \
+                            and returning to Init due to DHCPNAK: {:?}",
                             yiaddr,
                             nak
                         );
@@ -318,7 +330,8 @@ impl<I: deps::Instant> State<I> {
                                 },
                         } = rebinding;
                         tracing::warn!(
-                            "Dropping lease on {} and returning to Init due to DHCPNAK: {:?}",
+                            "{debug_log_prefix} Dropping lease on {} \
+                            and returning to Init due to DHCPNAK: {:?}",
                             yiaddr,
                             nak
                         );
@@ -338,7 +351,8 @@ impl<I: deps::Instant> State<I> {
                                 },
                         } = rebinding;
                         tracing::warn!(
-                            "Dropping lease on {} and returning to Init due to lease expiration",
+                            "{debug_log_prefix} Dropping lease on {} \
+                            and returning to Init due to lease expiration",
                             yiaddr,
                         );
                         Ok(Step::NextState(Transition::Init(Init)))
@@ -366,13 +380,14 @@ impl<I: deps::Instant> State<I> {
         clock: &C,
         ip_address: SpecifiedAddr<net_types::ip::Ipv4Addr>,
     ) -> Result<AddressRejectionOutcome<I>, Error> {
+        let debug_log_prefix = &config.debug_log_prefix;
         match self {
             State::Init(_)
             | State::Selecting(_)
             | State::Requesting(_)
             | State::WaitingToRestart(_) => {
                 tracing::warn!(
-                    "received address rejection in state {}; ignoring",
+                    "{debug_log_prefix} received address rejection in state {}; ignoring",
                     self.state_name()
                 );
                 Ok(AddressRejectionOutcome::ShouldBeImpossible)
@@ -392,7 +407,7 @@ impl<I: deps::Instant> State<I> {
 
                 if *yiaddr != ip_address {
                     tracing::warn!(
-                        "received rejection of address {} while bound to \
+                        "{debug_log_prefix} received rejection of address {} while bound to \
                          different address {}; ignoring",
                         *yiaddr,
                         ip_address,
@@ -421,7 +436,10 @@ impl<I: deps::Instant> State<I> {
                     .await
                     .map_err(Error::Socket)?;
 
-                tracing::info!("sent DHCPDECLINE for {}; waiting to restart", ip_address);
+                tracing::info!(
+                    "{debug_log_prefix} sent DHCPDECLINE for {}; waiting to restart",
+                    ip_address
+                );
 
                 Ok(AddressRejectionOutcome::NextState(State::WaitingToRestart(WaitingToRestart {
                     waiting_until: clock
@@ -458,7 +476,13 @@ impl<I: deps::Instant> State<I> {
 
     /// Applies a state-transition to `self`, returning the next state and
     /// effects that need to be performed by bindings as a result of the transition.
-    pub fn apply(&self, transition: Transition<I>) -> (State<I>, Option<TransitionEffect<I>>) {
+    pub fn apply(
+        &self,
+        config: &ClientConfig,
+        transition: Transition<I>,
+    ) -> (State<I>, Option<TransitionEffect<I>>) {
+        let debug_log_prefix = &config.debug_log_prefix;
+
         let (next_state, effect) = match transition {
             Transition::Init(init) => (State::Init(init), None),
             Transition::Selecting(selecting) => (State::Selecting(selecting), None),
@@ -474,7 +498,11 @@ impl<I: deps::Instant> State<I> {
             Transition::WaitingToRestart(waiting) => (State::WaitingToRestart(waiting), None),
         };
 
-        tracing::info!("transitioning from {} to {}", self.state_name(), next_state.state_name());
+        tracing::info!(
+            "{debug_log_prefix} transitioning from {} to {}",
+            self.state_name(),
+            next_state.state_name()
+        );
 
         let effect = match effect {
             Some(effect) => Some(effect),
@@ -496,6 +524,20 @@ impl<I> Default for State<I> {
     }
 }
 
+/// Debug information to include in log messages about the client.
+#[derive(Clone, Copy)]
+pub struct DebugLogPrefix {
+    /// The numerical interface ID the client is running on.
+    pub interface_id: NonZeroU64,
+}
+
+impl Display for DebugLogPrefix {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let Self { interface_id } = self;
+        f.write_fmt(format_args!("(interface_id = {interface_id})"))
+    }
+}
+
 /// Configuration for the DHCP client to be used while negotiating with DHCP
 /// servers.
 #[derive(Clone)]
@@ -512,6 +554,8 @@ pub struct ClientConfig {
     pub preferred_lease_time_secs: Option<NonZeroU32>,
     /// If set, the IP address to request from DHCP servers.
     pub requested_ip_address: Option<SpecifiedAddr<net_types::ip::Ipv4Addr>>,
+    /// Debug information to include in log messages about the client.
+    pub debug_log_prefix: DebugLogPrefix,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -615,6 +659,7 @@ async fn send_with_retransmits<T: Clone + Send + Debug>(
     message: &[u8],
     socket: &impl deps::Socket<T>,
     dest: T,
+    debug_log_prefix: DebugLogPrefix,
 ) -> Result<(), Error> {
     send_with_retransmits_at_instants(
         time,
@@ -622,6 +667,7 @@ async fn send_with_retransmits<T: Clone + Send + Debug>(
         message,
         socket,
         dest,
+        debug_log_prefix,
     )
     .await
 }
@@ -632,6 +678,7 @@ async fn send_with_retransmits_at_instants<I: deps::Instant, T: Clone + Send + D
     message: &[u8],
     socket: &impl deps::Socket<T>,
     dest: T,
+    debug_log_prefix: DebugLogPrefix,
 ) -> Result<(), Error> {
     for wait_until in std::iter::once(None).chain(retransmit_schedule.into_iter().map(Some)) {
         if let Some(wait_until) = wait_until {
@@ -652,12 +699,16 @@ async fn send_with_retransmits_at_instants<I: deps::Instant, T: Clone + Send + D
                 // not necessarily indicate an issue with our own network stack.
                 // Log a warning and continue retransmitting.
                 deps::SocketError::HostUnreachable => {
-                    tracing::warn!("destination host unreachable: {:?}", dest);
+                    tracing::warn!("{debug_log_prefix} destination host unreachable: {:?}", dest);
                 }
                 // For errors that we don't recognize, default to logging an
                 // error and continuing to operate.
                 deps::SocketError::Other(_) => {
-                    tracing::error!("socket error while sending to {:?}: {:?}", dest, e);
+                    tracing::error!(
+                        "{debug_log_prefix} socket error while sending to {:?}: {:?}",
+                        dest,
+                        e
+                    );
                 }
             },
         }
@@ -697,6 +748,7 @@ fn recv_stream<'a, T: 'a, U: Send>(
     socket: &'a impl deps::Socket<U>,
     recv_buf: &'a mut [u8],
     parser: impl Fn(&[u8], U) -> T + 'a,
+    debug_log_prefix: DebugLogPrefix,
 ) -> impl Stream<Item = Result<T, Error>> + 'a {
     futures::stream::try_unfold((recv_buf, parser), move |(recv_buf, parser)| async move {
         let result = socket.recv_from(recv_buf).await;
@@ -718,13 +770,13 @@ fn recv_stream<'a, T: 'a, U: Send>(
                 // like when IP_RECVERR is set on the socket and link resolution
                 // fails, or as a result of an ICMP message.)
                 deps::SocketError::HostUnreachable => {
-                    tracing::warn!("EHOSTUNREACH from recv_from");
+                    tracing::warn!("{debug_log_prefix} EHOSTUNREACH from recv_from");
                     return Ok(Some((None, (recv_buf, parser))));
                 }
                 // For errors that we don't recognize, default to logging an
                 // error and continuing to operate.
                 deps::SocketError::Other(_) => {
-                    tracing::error!("socket error while receiving: {:?}", e);
+                    tracing::error!("{debug_log_prefix} socket error while receiving: {:?}", e);
                     return Ok(Some((None, (recv_buf, parser))));
                 }
             },
@@ -752,6 +804,7 @@ fn build_outgoing_message(
         requested_parameters,
         preferred_lease_time_secs: _,
         requested_ip_address: _,
+        debug_log_prefix: _,
     }: &ClientConfig,
     DiscoverOptions { xid: TransactionId(xid) }: &DiscoverOptions,
     OutgoingOptions {
@@ -804,6 +857,7 @@ fn build_discover(
         requested_parameters: _,
         preferred_lease_time_secs,
         requested_ip_address,
+        debug_log_prefix: _,
     } = client_config;
 
     // Per the table in RFC 2131 section 4.4.1:
@@ -826,6 +880,37 @@ fn build_discover(
             include_parameter_request_list: true,
         },
     )
+}
+
+// Returns Ok(Some) if a DHCP message was successfully parsed, Ok(None) if the
+// IP packet should just be discarded (but does not indicate an error), and
+// Err if the IP packet indicates that some error should be logged.
+fn parse_incoming_dhcp_message_from_ip_packet(
+    packet: &[u8],
+    debug_log_prefix: DebugLogPrefix,
+) -> Result<Option<dhcp_protocol::Message>, anyhow::Error> {
+    match crate::parse::parse_dhcp_message_from_ip_packet(packet, CLIENT_PORT) {
+        Ok(message) => Ok(Some(message)),
+        Err(err) => match err {
+            crate::parse::ParseError::NotUdp => {
+                tracing::debug!("{debug_log_prefix} ignoring non-UDP incoming packet");
+                return Ok(None);
+            }
+            crate::parse::ParseError::WrongPort(port) => {
+                tracing::debug!(
+                    "{debug_log_prefix} ignoring incoming UDP packet \
+                    to non-DHCP-client port {port}"
+                );
+                return Ok(None);
+            }
+            err @ (crate::parse::ParseError::Ipv4(_)
+            | crate::parse::ParseError::Udp(_)
+            | crate::parse::ParseError::WrongSource(_)
+            | crate::parse::ParseError::Dhcp(_)) => {
+                return Err(err).context("error while parsing DHCP message from IP packet");
+            }
+        },
+    }
 }
 
 #[derive(Debug)]
@@ -872,6 +957,7 @@ impl<I: deps::Instant> Selecting<I> {
             requested_parameters,
             preferred_lease_time_secs: _,
             requested_ip_address: _,
+            debug_log_prefix,
         } = client_config;
 
         let message = crate::parse::serialize_dhcp_message_to_ip_packet(
@@ -888,26 +974,39 @@ impl<I: deps::Instant> Selecting<I> {
             message.as_ref(),
             &socket,
             /* dest= */ Mac::BROADCAST,
+            *debug_log_prefix,
         )
         .fuse();
 
         let mut recv_buf = [0u8; BUFFER_SIZE];
-        let offer_fields_stream = recv_stream(&socket, &mut recv_buf, |packet, src_addr| {
-            // We don't care about the src addr of incoming offers, because we
-            // identify DHCP servers via the Server Identifier option.
-            let _: Mac = src_addr;
-            let message = crate::parse::parse_dhcp_message_from_ip_packet(packet, CLIENT_PORT)
-                .context("error while parsing DHCP message from IP packet")?;
-            validate_message(discover_options, client_config, &message)
-                .context("invalid DHCP message")?;
-            crate::parse::fields_to_retain_from_selecting(requested_parameters, message)
-                .context("error while retrieving fields to use in DHCPREQUEST from DHCP message")
-        })
+        let offer_fields_stream = recv_stream(
+            &socket,
+            &mut recv_buf,
+            |packet, src_addr| {
+                // We don't care about the src addr of incoming offers, because we
+                // identify DHCP servers via the Server Identifier option.
+                let _: Mac = src_addr;
+
+                let message =
+                    match parse_incoming_dhcp_message_from_ip_packet(packet, *debug_log_prefix)? {
+                        Some(message) => message,
+                        None => return Ok(None),
+                    };
+                validate_message(discover_options, client_config, &message)
+                    .context("invalid DHCP message")?;
+                crate::parse::fields_to_retain_from_selecting(requested_parameters, message)
+                    .context(
+                        "error while retrieving fields to use in DHCPREQUEST from DHCP message",
+                    )
+                    .map(Some)
+            },
+            *debug_log_prefix,
+        )
         .try_filter_map(|parse_result| {
             futures::future::ok(match parse_result {
-                Ok(fields) => Some(fields),
+                Ok(fields) => fields,
                 Err(error) => {
-                    tracing::warn!("discarding incoming packet: {:?}", error);
+                    tracing::warn!("{debug_log_prefix} discarding incoming packet: {:?}", error);
                     None
                 }
             })
@@ -955,6 +1054,7 @@ fn validate_message(
         requested_parameters: _,
         preferred_lease_time_secs: _,
         requested_ip_address: _,
+        debug_log_prefix: _,
     }: &ClientConfig,
     dhcp_protocol::Message {
         op: _,
@@ -1037,42 +1137,56 @@ impl<I: deps::Instant> Requesting<I> {
             SERVER_PORT,
         );
 
-        let send_fut = send_with_retransmits(
-            time,
-            retransmit_schedule_during_acquisition(rng.get_rng()).take(NUM_REQUEST_RETRANSMITS),
-            message.as_ref(),
-            &socket,
-            Mac::BROADCAST,
-        )
-        .fuse();
-
         let ClientConfig {
             client_hardware_address: _,
             client_identifier: _,
             requested_parameters,
             preferred_lease_time_secs: _,
             requested_ip_address: _,
+            debug_log_prefix,
         } = client_config;
+
+        let send_fut = send_with_retransmits(
+            time,
+            retransmit_schedule_during_acquisition(rng.get_rng()).take(NUM_REQUEST_RETRANSMITS),
+            message.as_ref(),
+            &socket,
+            Mac::BROADCAST,
+            *debug_log_prefix,
+        )
+        .fuse();
 
         let mut recv_buf = [0u8; BUFFER_SIZE];
 
-        let ack_or_nak_stream = recv_stream(&socket, &mut recv_buf, |packet, src_addr| {
-            // We don't care about the src addr of incoming messages, because we
-            // identify DHCP servers via the Server Identifier option.
-            let _: Mac = src_addr;
-            let message = crate::parse::parse_dhcp_message_from_ip_packet(packet, CLIENT_PORT)
-                .context("error while parsing DHCP message from IP packet")?;
-            validate_message(discover_options, client_config, &message)
-                .context("invalid DHCP message")?;
+        let ack_or_nak_stream = recv_stream(
+            &socket,
+            &mut recv_buf,
+            |packet, src_addr| {
+                // We don't care about the src addr of incoming messages, because we
+                // identify DHCP servers via the Server Identifier option.
+                let _: Mac = src_addr;
+                let message =
+                    match parse_incoming_dhcp_message_from_ip_packet(packet, *debug_log_prefix)? {
+                        Some(message) => message,
+                        None => return Ok(None),
+                    };
+                validate_message(discover_options, client_config, &message)
+                    .context("invalid DHCP message")?;
 
-            crate::parse::fields_to_retain_from_response_to_request(requested_parameters, message)
+                crate::parse::fields_to_retain_from_response_to_request(
+                    requested_parameters,
+                    message,
+                )
                 .context("error extracting needed fields from DHCP message during Requesting")
-        })
+                .map(Some)
+            },
+            *debug_log_prefix,
+        )
         .try_filter_map(|parse_result| {
             futures::future::ok(match parse_result {
-                Ok(msg) => Some(msg),
+                Ok(msg) => msg,
                 Err(error) => {
-                    tracing::warn!("discarding incoming packet: {:?}", error);
+                    tracing::warn!("{debug_log_prefix} discarding incoming packet: {:?}", error);
                     None
                 }
             })
@@ -1149,6 +1263,7 @@ fn build_request_during_address_acquisition(
         requested_parameters: _,
         preferred_lease_time_secs,
         requested_ip_address: _,
+        debug_log_prefix: _,
     } = client_config;
 
     // Per the table in RFC 2131 section 4.4.1:
@@ -1211,6 +1326,7 @@ pub struct Bound<I> {
 impl<I: deps::Instant> Bound<I> {
     async fn do_bound<C: deps::Clock<Instant = I>>(
         &self,
+        client_config: &ClientConfig,
         time: &C,
         stop_receiver: &mut mpsc::UnboundedReceiver<()>,
     ) -> BoundOutcome<I> {
@@ -1228,8 +1344,9 @@ impl<I: deps::Instant> Bound<I> {
         // (T1 is how the RFC refers to the time at which we transition to Renewing.)
         let renewal_time = renewal_time.unwrap_or(*ip_address_lease_time / 2);
 
+        let debug_log_prefix = &client_config.debug_log_prefix;
         tracing::debug!(
-            "In Bound state; ip_address_lease_time = {}, renewal_time = {}",
+            "{debug_log_prefix} In Bound state; ip_address_lease_time = {}, renewal_time = {}",
             ip_address_lease_time.as_secs(),
             renewal_time.as_secs(),
         );
@@ -1286,6 +1403,7 @@ impl<I: deps::Instant> Renewing<I> {
         stop_receiver: &mut mpsc::UnboundedReceiver<()>,
     ) -> Result<RenewingOutcome<I>, Error> {
         let renewal_start_time = time.now();
+        let debug_log_prefix = client_config.debug_log_prefix;
 
         let Self {
             bound:
@@ -1345,30 +1463,36 @@ impl<I: deps::Instant> Renewing<I> {
             message_bytes.as_ref(),
             &socket,
             server_sockaddr,
+            debug_log_prefix,
         )
         .fuse();
 
         let mut recv_buf = [0u8; BUFFER_SIZE];
-        let responses_stream = recv_stream(&socket, &mut recv_buf, |packet, addr| {
-            if addr != server_sockaddr {
-                return Err(anyhow::Error::from(crate::parse::ParseError::WrongSource(addr)));
-            }
-            let message = dhcp_protocol::Message::from_buffer(packet)
-                .map_err(crate::parse::ParseError::Dhcp)
-                .context("error while parsing DHCP message from UDP datagram")?;
-            validate_message(discover_options, client_config, &message)
-                .context("invalid DHCP message")?;
-            crate::parse::fields_to_retain_from_response_to_request(
-                &client_config.requested_parameters,
-                message,
-            )
-            .context("error extracting needed fields from DHCP message during Renewing")
-        })
+        let responses_stream = recv_stream(
+            &socket,
+            &mut recv_buf,
+            |packet, addr| {
+                if addr != server_sockaddr {
+                    return Err(anyhow::Error::from(crate::parse::ParseError::WrongSource(addr)));
+                }
+                let message = dhcp_protocol::Message::from_buffer(packet)
+                    .map_err(crate::parse::ParseError::Dhcp)
+                    .context("error while parsing DHCP message from UDP datagram")?;
+                validate_message(discover_options, client_config, &message)
+                    .context("invalid DHCP message")?;
+                crate::parse::fields_to_retain_from_response_to_request(
+                    &client_config.requested_parameters,
+                    message,
+                )
+                .context("error extracting needed fields from DHCP message during Renewing")
+            },
+            debug_log_prefix,
+        )
         .try_filter_map(|parse_result| {
             futures::future::ok(match parse_result {
                 Ok(msg) => Some(msg),
                 Err(error) => {
-                    tracing::warn!("discarding incoming packet: {:?}", error);
+                    tracing::warn!("{debug_log_prefix} discarding incoming packet: {:?}", error);
                     None
                 }
             })
@@ -1402,10 +1526,16 @@ impl<I: deps::Instant> Renewing<I> {
                     parameters,
                 } = ack;
                 let variant = if new_yiaddr == *yiaddr {
-                    tracing::debug!("renewed with new lease time: {}", ip_address_lease_time_secs);
+                    tracing::debug!(
+                        "{debug_log_prefix} renewed with new lease time: {}",
+                        ip_address_lease_time_secs
+                    );
                     RenewingOutcome::Renewed
                 } else {
-                    tracing::info!("obtained different address from renewal: {}", new_yiaddr);
+                    tracing::info!(
+                        "{debug_log_prefix} obtained different address from renewal: {}",
+                        new_yiaddr
+                    );
                     RenewingOutcome::NewAddress
                 };
                 Ok(variant(
@@ -1481,6 +1611,7 @@ impl<I: deps::Instant> Rebinding<I> {
         stop_receiver: &mut mpsc::UnboundedReceiver<()>,
     ) -> Result<RebindingOutcome<I>, Error> {
         let rebinding_start_time = time.now();
+        let debug_log_prefix = client_config.debug_log_prefix;
 
         let Self {
             bound:
@@ -1539,44 +1670,50 @@ impl<I: deps::Instant> Rebinding<I> {
             message_bytes.as_ref(),
             &socket,
             server_sockaddr,
+            debug_log_prefix,
         )
         .fuse();
 
         let mut recv_buf = [0u8; BUFFER_SIZE];
-        let responses_stream = recv_stream(&socket, &mut recv_buf, |packet, _addr| {
-            let message = dhcp_protocol::Message::from_buffer(packet)
-                .map_err(crate::parse::ParseError::Dhcp)
-                .context("error while parsing DHCP message from UDP datagram")?;
-            validate_message(discover_options, client_config, &message)
-                .context("invalid DHCP message")?;
-            crate::parse::fields_to_retain_from_response_to_request(
-                &client_config.requested_parameters,
-                message,
-            )
-            .and_then(|response| match response {
-                crate::parse::IncomingResponseToRequest::Ack(ack) => {
-                    // We need to enforce that DHCPACKs in REBINDING include
-                    // a server identifier, as otherwise we won't know which
-                    // server to send future renewal requests to.
-                    Ok(crate::parse::IncomingResponseToRequest::Ack(ack.map_server_identifier(
-                        |server_identifier| {
-                            server_identifier.ok_or(
+        let responses_stream = recv_stream(
+            &socket,
+            &mut recv_buf,
+            |packet, _addr| {
+                let message = dhcp_protocol::Message::from_buffer(packet)
+                    .map_err(crate::parse::ParseError::Dhcp)
+                    .context("error while parsing DHCP message from UDP datagram")?;
+                validate_message(discover_options, client_config, &message)
+                    .context("invalid DHCP message")?;
+                crate::parse::fields_to_retain_from_response_to_request(
+                    &client_config.requested_parameters,
+                    message,
+                )
+                .and_then(|response| match response {
+                    crate::parse::IncomingResponseToRequest::Ack(ack) => {
+                        // We need to enforce that DHCPACKs in REBINDING include
+                        // a server identifier, as otherwise we won't know which
+                        // server to send future renewal requests to.
+                        Ok(crate::parse::IncomingResponseToRequest::Ack(
+                            ack.map_server_identifier(|server_identifier| {
+                                server_identifier.ok_or(
                                 crate::parse::IncomingResponseToRequestError::NoServerIdentifier,
                             )
-                        },
-                    )?))
-                }
-                crate::parse::IncomingResponseToRequest::Nak(nak) => {
-                    Ok(crate::parse::IncomingResponseToRequest::Nak(nak))
-                }
-            })
-            .context("error extracting needed fields from DHCP message during Rebinding")
-        })
+                            })?,
+                        ))
+                    }
+                    crate::parse::IncomingResponseToRequest::Nak(nak) => {
+                        Ok(crate::parse::IncomingResponseToRequest::Nak(nak))
+                    }
+                })
+                .context("error extracting needed fields from DHCP message during Rebinding")
+            },
+            debug_log_prefix,
+        )
         .try_filter_map(|parse_result| {
             futures::future::ok(match parse_result {
                 Ok(msg) => Some(msg),
                 Err(error) => {
-                    tracing::warn!("discarding incoming packet: {:?}", error);
+                    tracing::warn!("{debug_log_prefix} discarding incoming packet: {:?}", error);
                     None
                 }
             })
@@ -1608,10 +1745,16 @@ impl<I: deps::Instant> Rebinding<I> {
                     parameters,
                 } = ack;
                 let variant = if new_yiaddr == *yiaddr {
-                    tracing::debug!("rebound with new lease time: {}", ip_address_lease_time_secs);
+                    tracing::debug!(
+                        "{debug_log_prefix} rebound with new lease time: {}",
+                        ip_address_lease_time_secs
+                    );
                     RebindingOutcome::Renewed
                 } else {
-                    tracing::info!("obtained different address from rebinding: {}", new_yiaddr);
+                    tracing::info!(
+                        "{debug_log_prefix} obtained different address from rebinding: {}",
+                        new_yiaddr
+                    );
                     RebindingOutcome::NewAddress
                 };
                 Ok(variant(
@@ -1710,6 +1853,7 @@ mod test {
             requested_parameters: test_requested_parameters(),
             preferred_lease_time_secs: None,
             requested_ip_address: None,
+            debug_log_prefix: DebugLogPrefix { interface_id: NonZeroU64::new(2).unwrap() },
         }
     }
 
@@ -1969,6 +2113,7 @@ mod test {
             requested_parameters: test_requested_parameters(),
             preferred_lease_time_secs: None,
             requested_ip_address: None,
+            debug_log_prefix: DebugLogPrefix { interface_id: NonZeroU64::new(2).unwrap() },
         };
 
         let reply = dhcp_protocol::Message {
@@ -2598,7 +2743,7 @@ mod test {
     fn apply_transition(
         (state, transition): (State<Duration>, Transition<Duration>),
     ) -> Option<TransitionEffect<Duration>> {
-        let (_next_state, effect) = state.apply(transition);
+        let (_next_state, effect) = state.apply(&test_client_config(), transition);
         effect
     }
 
@@ -2718,7 +2863,8 @@ mod test {
     fn bound_waits_for_renewal_time(bound: Bound<Duration>) -> Duration {
         let time = &FakeTimeController::new();
         let (_stop_sender, mut stop_receiver) = mpsc::unbounded();
-        let main_fut = bound.do_bound(time, &mut stop_receiver).fuse();
+        let config = &test_client_config();
+        let main_fut = bound.do_bound(config, time, &mut stop_receiver).fuse();
         pin_mut!(main_fut);
         let mut executor = fasync::TestExecutor::new();
         let outcome = run_with_accelerated_time(&mut executor, time, &mut main_fut);
@@ -2731,7 +2877,8 @@ mod test {
         let time = &FakeTimeController::new();
         let (stop_sender, mut stop_receiver) = mpsc::unbounded();
         let bound = build_test_bound_state();
-        let bound_fut = bound.do_bound(time, &mut stop_receiver).fuse();
+        let config = &test_client_config();
+        let bound_fut = bound.do_bound(&config, time, &mut stop_receiver).fuse();
 
         stop_sender.unbounded_send(()).expect("send should succeed");
         assert_eq!(

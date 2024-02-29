@@ -68,12 +68,14 @@ pub(crate) async fn serve_client(
 ) -> Result<(), Error> {
     let (stop_sender, stop_receiver) = mpsc::unbounded();
     let stop_sender = &stop_sender;
+    let debug_log_prefix = dhcp_client_core::client::DebugLogPrefix { interface_id };
     let client = RefCell::new(Client::new(
         mac,
         interface_id,
         params,
         rand::rngs::StdRng::seed_from_u64(rand::random()),
         stop_receiver,
+        debug_log_prefix,
     )?);
     requests
         .map_err(Error::Fidl)
@@ -97,12 +99,12 @@ pub(crate) async fn serve_client(
                                 // Note that `try_send_error` cannot be exhaustively matched on.
                                 if try_send_error.is_disconnected() {
                                     tracing::warn!(
-                                        "tried to send shutdown request on \
+                                        "{debug_log_prefix} tried to send shutdown request on \
                                         already-closed channel to client core"
                                     );
                                 } else {
                                     tracing::error!(
-                                        "error while sending shutdown request \
+                                        "{debug_log_prefix} error while sending shutdown request \
                                         to client core: {:?}",
                                         try_send_error
                                     );
@@ -183,9 +185,13 @@ impl Client {
         NewClientParams { configuration_to_request, request_ip_address, .. }: NewClientParams,
         rng: rand::rngs::StdRng,
         stop_receiver: mpsc::UnboundedReceiver<()>,
+        debug_log_prefix: dhcp_client_core::client::DebugLogPrefix,
     ) -> Result<Self, Error> {
         if !request_ip_address.unwrap_or(false) {
-            tracing::error!("client creation failed: DHCPINFORM is unimplemented");
+            tracing::error!(
+                "{debug_log_prefix} client creation failed: \
+                DHCPINFORM is unimplemented"
+            );
             return Err(Error::Exit(ClientExitReason::InvalidParams));
         }
         let ConfigurationToRequest { routers, dns_servers, .. } =
@@ -209,6 +215,7 @@ impl Client {
             .collect::<dhcp_client_core::parse::OptionCodeMap<_>>(),
             preferred_lease_time_secs: None,
             requested_ip_address: None,
+            debug_log_prefix,
         };
         Ok(Self {
             core: dhcp_client_core::client::State::default(),
@@ -229,8 +236,14 @@ impl Client {
             parameters,
         }: dhcp_client_core::client::NewlyAcquiredLease<fasync::Time>,
     ) -> Result<ClientWatchConfigurationResponse, Error> {
-        let Self { core: _, rng: _, config: _, stop_receiver: _, current_lease, interface_id: _ } =
-            self;
+        let Self {
+            core: _,
+            rng: _,
+            config: dhcp_client_core::client::ClientConfig { debug_log_prefix, .. },
+            stop_receiver: _,
+            current_lease,
+            interface_id: _,
+        } = self;
 
         let mut dns_servers: Option<Vec<_>> = None;
         let mut routers: Option<Vec<_>> = None;
@@ -256,7 +269,7 @@ impl Client {
 
         if !unrequested_options.is_empty() {
             tracing::warn!(
-                "Received options from core that we didn't ask for: {:#?}",
+                "{debug_log_prefix} Received options from core that we didn't ask for: {:#?}",
                 unrequested_options
             );
         }
@@ -317,8 +330,14 @@ impl Client {
             parameters,
         }: dhcp_client_core::client::LeaseRenewal<fasync::Time>,
     ) -> Result<ClientWatchConfigurationResponse, Error> {
-        let Self { core: _, rng: _, config: _, stop_receiver: _, current_lease, interface_id: _ } =
-            self;
+        let Self {
+            core: _,
+            rng: _,
+            config: dhcp_client_core::client::ClientConfig { debug_log_prefix, .. },
+            stop_receiver: _,
+            current_lease,
+            interface_id: _,
+        } = self;
 
         let mut dns_servers: Option<Vec<_>> = None;
         let mut routers: Option<Vec<_>> = None;
@@ -327,7 +346,10 @@ impl Client {
         for option in parameters {
             match option {
                 dhcp_protocol::DhcpOption::SubnetMask(len) => {
-                    tracing::info!("ignoring prefix length={:?} for renewed lease", len);
+                    tracing::info!(
+                        "{debug_log_prefix} ignoring prefix length={:?} for renewed lease",
+                        len
+                    );
                 }
                 dhcp_protocol::DhcpOption::DomainNameServer(list) => {
                     assert_eq!(dns_servers.replace(list.into()), None);
@@ -343,7 +365,7 @@ impl Client {
 
         if !unrequested_options.is_empty() {
             tracing::warn!(
-                "Received options from core that we didn't ask for: {:#?}",
+                "{debug_log_prefix} Received options from core that we didn't ask for: {:#?}",
                 unrequested_options
             );
         }
@@ -374,11 +396,12 @@ impl Client {
         lease.address_state_provider.remove().map_err(Error::Fidl)?;
         let watch_result = lease.watch_for_address_removal().await;
         let Lease { address_state_provider: _, event_stream: _, ip_address } = lease;
+        let debug_log_prefix = &self.config.debug_log_prefix;
 
         match watch_result {
             Err(e) => {
                 tracing::error!(
-                    "error watching for \
+                    "{debug_log_prefix} error watching for \
                      AddressRemovalReason after explicitly removing address \
                      {}: {:?}",
                     ip_address,
@@ -392,7 +415,7 @@ impl Client {
                 | fnet_interfaces_admin::AddressRemovalReason::DadFailed
                 | fnet_interfaces_admin::AddressRemovalReason::InterfaceRemoved) => {
                     tracing::error!(
-                        "unexpected removal reason \
+                        "{debug_log_prefix} unexpected removal reason \
                         after explicitly removing address {}: {:?}",
                         ip_address,
                         reason
@@ -418,6 +441,7 @@ impl Client {
             match step {
                 WatchConfigurationStep::CurrentLeaseAddressRemoved((reason, ip_address)) => {
                     *current_lease = None;
+                    let debug_log_prefix = &config.debug_log_prefix;
                     match reason {
                         None => {
                             return Err(Error::Exit(ClientExitReason::AddressStateProviderError))
@@ -427,18 +451,25 @@ impl Client {
                                 panic!("yielded invalid address")
                             }
                             fnet_interfaces_admin::AddressRemovalReason::InterfaceRemoved => {
-                                tracing::warn!("interface removed; stopping");
+                                tracing::warn!("{debug_log_prefix} interface removed; stopping");
                                 return Err(Error::Exit(ClientExitReason::InvalidInterface));
                             }
                             fnet_interfaces_admin::AddressRemovalReason::UserRemoved => {
-                                tracing::warn!("address administratively removed; stopping");
+                                tracing::warn!(
+                                    "{debug_log_prefix} address \
+                                    administratively removed; stopping"
+                                );
                                 return Err(Error::Exit(ClientExitReason::AddressRemovedByUser));
                             }
                             fnet_interfaces_admin::AddressRemovalReason::AlreadyAssigned => {
-                                tracing::warn!("address already assigned; notifying core");
+                                tracing::warn!(
+                                    "{debug_log_prefix} address already assigned; notifying core"
+                                );
                             }
                             fnet_interfaces_admin::AddressRemovalReason::DadFailed => {
-                                tracing::warn!("duplicate address detected; notifying core");
+                                tracing::warn!(
+                                    "{debug_log_prefix} duplicate address detected; notifying core"
+                                );
                             }
                         },
                     };
@@ -460,7 +491,7 @@ impl Client {
                 }
                 WatchConfigurationStep::CoreStep(core_step) => match core_step? {
                     dhcp_client_core::client::Step::NextState(transition) => {
-                        let (next_core, effect) = core.apply(transition);
+                        let (next_core, effect) = core.apply(config, transition);
                         *core = next_core;
                         match effect {
                             Some(dhcp_client_core::client::TransitionEffect::DropLease) => {
@@ -538,10 +569,11 @@ impl Client {
                 Some(current_lease) => match current_lease.watch_for_address_removal().await {
                     Ok(reason) => (Some(reason), current_lease.ip_address),
                     Err(e) => {
+                        let debug_log_prefix = &config.debug_log_prefix;
                         tracing::error!(
-                            "observed error {:?} while watching for removal \
-                                         of address {} on interface {}; \
-                                         removing address",
+                            "{debug_log_prefix} observed error {:?} while watching for removal \
+                            of address {} on interface {}; \
+                            removing address",
                             e,
                             *current_lease.ip_address,
                             interface_id
