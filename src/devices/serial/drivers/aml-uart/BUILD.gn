@@ -178,13 +178,12 @@ test("aml-uart-dfv2-test-bin") {
   deps = [
     ":aml-uart-dfv2-source",
     "//sdk/fidl/fuchsia.hardware.serial:fuchsia.hardware.serial_cpp",
-    "//sdk/lib/async_patterns/testing/cpp",
-    "//sdk/lib/driver/testing/cpp",
+    "//sdk/lib/driver/testing/cpp:gtest_fixture",
     "//src/devices/bind/fuchsia.broadcom.platform:fuchsia.broadcom.platform_cpp",
     "//src/devices/bus/testing/fake-pdev",
     "//src/devices/testing/fake-mmio-reg",
     "//src/lib/ddk",  # needed for metadata.h
-    "//zircon/system/ulib/zxtest",
+    "//src/lib/fxl/test:gtest_main",
   ]
 }
 

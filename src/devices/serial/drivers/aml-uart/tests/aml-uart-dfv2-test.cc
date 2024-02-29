@@ -5,15 +5,10 @@
 #include "src/devices/serial/drivers/aml-uart/aml-uart-dfv2.h"
 
 #include <fidl/fuchsia.hardware.serial/cpp/wire.h>
-#include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
 #include <lib/ddk/metadata.h>
-#include <lib/driver/testing/cpp/driver_lifecycle.h>
-#include <lib/driver/testing/cpp/driver_runtime.h>
-#include <lib/driver/testing/cpp/test_environment.h>
-#include <lib/driver/testing/cpp/test_node.h>
+#include <lib/driver/testing/cpp/fixtures/gtest_fixture.h>
 
 #include <bind/fuchsia/broadcom/platform/cpp/bind.h>
-#include <zxtest/zxtest.h>
 
 #include "src/devices/bus/testing/fake-pdev/fake-pdev.h"
 #include "src/devices/serial/drivers/aml-uart/tests/device_state.h"
@@ -24,102 +19,59 @@ static constexpr serial_port_info_t kSerialInfo = {
     .serial_pid = bind_fuchsia_broadcom_platform::BIND_PLATFORM_DEV_PID_BCM43458,
 };
 
-class Environment {
+class Environment : public fdf_testing::Environment {
  public:
-  fdf::DriverStartArgs InitEnvironment(fake_pdev::FakePDevFidl::Config pdev_config) {
-    zx::result start_args_result = test_node_.CreateStartArgsAndServe();
-    ZX_ASSERT(start_args_result.is_ok());
-
-    zx::result init_result =
-        test_environment_.Initialize(std::move(start_args_result->incoming_directory_server));
-    ZX_ASSERT(init_result.is_ok());
-
-    pdev_server_.SetConfig(std::move(pdev_config));
-
-    async_dispatcher_t* dispatcher = fdf::Dispatcher::GetCurrent()->async_dispatcher();
-    std::string instance_name = "pdev";
-
-    zx::result add_service_result =
-        test_environment_.incoming_directory()
-            .AddService<fuchsia_hardware_platform_device::Service>(
-                pdev_server_.GetInstanceHandler(dispatcher), instance_name);
-    ZX_ASSERT(add_service_result.is_ok());
-
-    compat_server_.Init("default", "topo");
-    compat_server_.AddMetadata(DEVICE_METADATA_SERIAL_PORT_INFO, &kSerialInfo, sizeof(kSerialInfo));
-    zx_status_t status = compat_server_.Serve(dispatcher, &test_environment_.incoming_directory());
-    ZX_ASSERT(status == ZX_OK);
-
-    outgoing_client_ = std::move(start_args_result->outgoing_directory_client);
-
-    return std::move(start_args_result.value().start_args);
-  }
-
-  fidl::ClientEnd<fuchsia_io::Directory> TakeOutgoingClient() {
-    return std::move(outgoing_client_);
-  }
-
- private:
-  fdf_testing::TestNode test_node_{"root"};
-  fake_pdev::FakePDevFidl pdev_server_;
-  fdf_testing::TestEnvironment test_environment_;
-  compat::DeviceServer compat_server_;
-  fidl::ClientEnd<fuchsia_io::Directory> outgoing_client_;
-};
-
-class AmlUartHarness : public zxtest::Test {
- public:
-  void SetUp() override {
+  zx::result<> Serve(fdf::OutgoingDirectory& to_driver_vfs) override {
+    // Configure pdev.
     fake_pdev::FakePDevFidl::Config config;
     config.irqs[0] = {};
-    ASSERT_OK(zx::interrupt::create(zx::resource(), 0, ZX_INTERRUPT_VIRTUAL, &config.irqs[0]));
+    EXPECT_EQ(ZX_OK,
+              zx::interrupt::create(zx::resource(), 0, ZX_INTERRUPT_VIRTUAL, &config.irqs[0]));
     state_.set_irq_signaller(config.irqs[0].borrow());
     config.mmios[0] = state_.GetMmio();
 
-    fdf::DriverStartArgs start_args =
-        env_.SyncCall(&Environment::InitEnvironment, std::move(config));
+    pdev_server_.SetConfig(std::move(config));
 
-    zx::result run_result = runtime_.RunToCompletion(dut_.Start(std::move(start_args)));
-    ZX_ASSERT(run_result.is_ok());
-  }
+    // Add pdev.
+    async_dispatcher_t* dispatcher = fdf::Dispatcher::GetCurrent()->async_dispatcher();
+    constexpr std::string_view kInstanceName = "pdev";
+    zx::result add_service_result =
+        to_driver_vfs.AddService<fuchsia_hardware_platform_device::Service>(
+            pdev_server_.GetInstanceHandler(dispatcher), kInstanceName);
+    ZX_ASSERT(add_service_result.is_ok());
 
-  void TearDown() override {
-    zx::result run_result = runtime_.RunToCompletion(dut_.PrepareStop());
-    ZX_ASSERT(run_result.is_ok());
-  }
-
-  serial::AmlUart& Device() { return dut_->aml_uart_for_testing(); }
-
-  fidl::ClientEnd<fuchsia_io::Directory> CreateDriverSvcClient() {
-    auto driver_outgoing = env_.SyncCall(&Environment::TakeOutgoingClient);
-    // Open the svc directory in the driver's outgoing, and store a client to it.
-    auto svc_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-    EXPECT_EQ(ZX_OK, svc_endpoints.status_value());
-    zx_status_t status = fdio_open_at(driver_outgoing.handle()->get(), "/svc",
-                                      static_cast<uint32_t>(fuchsia_io::OpenFlags::kDirectory),
-                                      svc_endpoints->server.TakeChannel().release());
-    EXPECT_EQ(ZX_OK, status);
-    return std::move(svc_endpoints->client);
+    // Configure and add compat.
+    compat_server_.Init("default", "topo");
+    compat_server_.AddMetadata(DEVICE_METADATA_SERIAL_PORT_INFO, &kSerialInfo, sizeof(kSerialInfo));
+    return zx::make_result(compat_server_.Serve(dispatcher, &to_driver_vfs));
   }
 
   DeviceState& device_state() { return state_; }
 
-  async_dispatcher_t* env_dispatcher() { return env_dispatcher_->async_dispatcher(); }
-
-  fdf_testing::DriverRuntime& runtime() { return runtime_; }
-
  private:
-  fdf_testing::DriverRuntime runtime_;
-  fdf::UnownedSynchronizedDispatcher env_dispatcher_ = runtime_.StartBackgroundDispatcher();
-  async_patterns::TestDispatcherBound<Environment> env_{env_dispatcher(), std::in_place};
-
   DeviceState state_;
-  fdf_testing::DriverUnderTest<serial::AmlUartV2> dut_;
+  fake_pdev::FakePDevFidl pdev_server_;
+  compat::DeviceServer compat_server_;
+};
+
+class AmlUartTestConfig {
+ public:
+  static constexpr bool kDriverOnForeground = true;
+  static constexpr bool kAutoStartDriver = true;
+  static constexpr bool kAutoStopDriver = true;
+
+  using DriverType = serial::AmlUartV2;
+  using EnvironmentType = Environment;
+};
+
+class AmlUartHarness : public fdf_testing::DriverTestFixture<AmlUartTestConfig> {
+ public:
+  serial::AmlUart& Device() { return driver()->aml_uart_for_testing(); }
 };
 
 TEST_F(AmlUartHarness, SerialImplAsyncGetInfo) {
   serial_port_info_t info;
-  ASSERT_OK(Device().SerialImplAsyncGetInfo(&info));
+  ASSERT_EQ(ZX_OK, Device().SerialImplAsyncGetInfo(&info));
   ASSERT_EQ(info.serial_class, fidl::ToUnderlying(fuchsia_hardware_serial::Class::kBluetoothHci));
   ASSERT_EQ(info.serial_pid, bind_fuchsia_broadcom_platform::BIND_PLATFORM_DEV_PID_BCM43458);
   ASSERT_EQ(info.serial_vid, bind_fuchsia_broadcom_platform::BIND_PLATFORM_DEV_VID_BROADCOM);
@@ -127,8 +79,7 @@ TEST_F(AmlUartHarness, SerialImplAsyncGetInfo) {
 
 TEST_F(AmlUartHarness, SerialImplAsyncGetInfoFromDriverService) {
   zx::result driver_connect_result =
-      fdf::internal::DriverTransportConnect<fuchsia_hardware_serialimpl::Service::Device>(
-          CreateDriverSvcClient(), "aml-uart");
+      Connect<fuchsia_hardware_serialimpl::Service::Device>("aml-uart");
   ASSERT_EQ(ZX_OK, driver_connect_result.status_value());
   fdf::Arena arena('INFO');
   fdf::WireClient<fuchsia_hardware_serialimpl::Device> device_client(
@@ -151,56 +102,80 @@ TEST_F(AmlUartHarness, SerialImplAsyncGetInfoFromDriverService) {
 }
 
 TEST_F(AmlUartHarness, SerialImplAsyncConfig) {
-  ASSERT_OK(Device().SerialImplAsyncEnable(false));
-  ASSERT_EQ(device_state().Control().tx_enable(), 0);
-  ASSERT_EQ(device_state().Control().rx_enable(), 0);
-  ASSERT_EQ(device_state().Control().inv_cts(), 0);
+  ASSERT_EQ(ZX_OK, Device().SerialImplAsyncEnable(false));
+  RunInEnvironmentTypeContext([](Environment& env) {
+    ASSERT_EQ(env.device_state().Control().tx_enable(), 0u);
+    ASSERT_EQ(env.device_state().Control().rx_enable(), 0u);
+    ASSERT_EQ(env.device_state().Control().inv_cts(), 0u);
+  });
+
   static constexpr uint32_t serial_test_config =
       SERIAL_DATA_BITS_6 | SERIAL_STOP_BITS_2 | SERIAL_PARITY_EVEN | SERIAL_FLOW_CTRL_CTS_RTS;
-  ASSERT_OK(Device().SerialImplAsyncConfig(20, serial_test_config));
-  ASSERT_EQ(device_state().DataBits(), SERIAL_DATA_BITS_6);
-  ASSERT_EQ(device_state().StopBits(), SERIAL_STOP_BITS_2);
-  ASSERT_EQ(device_state().Parity(), SERIAL_PARITY_EVEN);
-  ASSERT_TRUE(device_state().FlowControl());
-  ASSERT_OK(Device().SerialImplAsyncConfig(40, SERIAL_SET_BAUD_RATE_ONLY));
-  ASSERT_EQ(device_state().DataBits(), SERIAL_DATA_BITS_6);
-  ASSERT_EQ(device_state().StopBits(), SERIAL_STOP_BITS_2);
-  ASSERT_EQ(device_state().Parity(), SERIAL_PARITY_EVEN);
-  ASSERT_TRUE(device_state().FlowControl());
+  ASSERT_EQ(ZX_OK, Device().SerialImplAsyncConfig(20, serial_test_config));
 
-  ASSERT_NOT_OK(Device().SerialImplAsyncConfig(0, serial_test_config));
-  ASSERT_NOT_OK(Device().SerialImplAsyncConfig(UINT32_MAX, serial_test_config));
-  ASSERT_NOT_OK(Device().SerialImplAsyncConfig(1, serial_test_config));
-  ASSERT_EQ(device_state().DataBits(), SERIAL_DATA_BITS_6);
-  ASSERT_EQ(device_state().StopBits(), SERIAL_STOP_BITS_2);
-  ASSERT_EQ(device_state().Parity(), SERIAL_PARITY_EVEN);
-  ASSERT_TRUE(device_state().FlowControl());
-  ASSERT_OK(Device().SerialImplAsyncConfig(40, SERIAL_SET_BAUD_RATE_ONLY));
-  ASSERT_EQ(device_state().DataBits(), SERIAL_DATA_BITS_6);
-  ASSERT_EQ(device_state().StopBits(), SERIAL_STOP_BITS_2);
-  ASSERT_EQ(device_state().Parity(), SERIAL_PARITY_EVEN);
-  ASSERT_TRUE(device_state().FlowControl());
+  RunInEnvironmentTypeContext([](Environment& env) {
+    ASSERT_EQ(env.device_state().DataBits(), SERIAL_DATA_BITS_6);
+    ASSERT_EQ(env.device_state().StopBits(), SERIAL_STOP_BITS_2);
+    ASSERT_EQ(env.device_state().Parity(), SERIAL_PARITY_EVEN);
+    ASSERT_TRUE(env.device_state().FlowControl());
+  });
+
+  ASSERT_EQ(ZX_OK, Device().SerialImplAsyncConfig(40, SERIAL_SET_BAUD_RATE_ONLY));
+
+  RunInEnvironmentTypeContext([](Environment& env) {
+    ASSERT_EQ(env.device_state().DataBits(), SERIAL_DATA_BITS_6);
+    ASSERT_EQ(env.device_state().StopBits(), SERIAL_STOP_BITS_2);
+    ASSERT_EQ(env.device_state().Parity(), SERIAL_PARITY_EVEN);
+    ASSERT_TRUE(env.device_state().FlowControl());
+  });
+
+  ASSERT_NE(ZX_OK, Device().SerialImplAsyncConfig(0, serial_test_config));
+  ASSERT_NE(ZX_OK, Device().SerialImplAsyncConfig(UINT32_MAX, serial_test_config));
+  ASSERT_NE(ZX_OK, Device().SerialImplAsyncConfig(1, serial_test_config));
+
+  RunInEnvironmentTypeContext([](Environment& env) {
+    ASSERT_EQ(env.device_state().DataBits(), SERIAL_DATA_BITS_6);
+    ASSERT_EQ(env.device_state().StopBits(), SERIAL_STOP_BITS_2);
+    ASSERT_EQ(env.device_state().Parity(), SERIAL_PARITY_EVEN);
+    ASSERT_TRUE(env.device_state().FlowControl());
+  });
+
+  ASSERT_EQ(ZX_OK, Device().SerialImplAsyncConfig(40, SERIAL_SET_BAUD_RATE_ONLY));
+
+  RunInEnvironmentTypeContext([](Environment& env) {
+    ASSERT_EQ(env.device_state().DataBits(), SERIAL_DATA_BITS_6);
+    ASSERT_EQ(env.device_state().StopBits(), SERIAL_STOP_BITS_2);
+    ASSERT_EQ(env.device_state().Parity(), SERIAL_PARITY_EVEN);
+    ASSERT_TRUE(env.device_state().FlowControl());
+  });
 }
 
 TEST_F(AmlUartHarness, SerialImplAsyncEnable) {
-  ASSERT_OK(Device().SerialImplAsyncEnable(false));
-  ASSERT_EQ(device_state().Control().tx_enable(), 0);
-  ASSERT_EQ(device_state().Control().rx_enable(), 0);
-  ASSERT_EQ(device_state().Control().inv_cts(), 0);
-  ASSERT_OK(Device().SerialImplAsyncEnable(true));
-  ASSERT_EQ(device_state().Control().tx_enable(), 1);
-  ASSERT_EQ(device_state().Control().rx_enable(), 1);
-  ASSERT_EQ(device_state().Control().inv_cts(), 0);
-  ASSERT_TRUE(device_state().PortResetRX());
-  ASSERT_TRUE(device_state().PortResetTX());
-  ASSERT_FALSE(device_state().Control().rst_rx());
-  ASSERT_FALSE(device_state().Control().rst_tx());
-  ASSERT_TRUE(device_state().Control().tx_interrupt_enable());
-  ASSERT_TRUE(device_state().Control().rx_interrupt_enable());
+  ASSERT_EQ(ZX_OK, Device().SerialImplAsyncEnable(false));
+
+  RunInEnvironmentTypeContext([](Environment& env) {
+    ASSERT_EQ(env.device_state().Control().tx_enable(), 0u);
+    ASSERT_EQ(env.device_state().Control().rx_enable(), 0u);
+    ASSERT_EQ(env.device_state().Control().inv_cts(), 0u);
+  });
+
+  ASSERT_EQ(ZX_OK, Device().SerialImplAsyncEnable(true));
+
+  RunInEnvironmentTypeContext([](Environment& env) {
+    ASSERT_EQ(env.device_state().Control().tx_enable(), 1u);
+    ASSERT_EQ(env.device_state().Control().rx_enable(), 1u);
+    ASSERT_EQ(env.device_state().Control().inv_cts(), 0u);
+    ASSERT_TRUE(env.device_state().PortResetRX());
+    ASSERT_TRUE(env.device_state().PortResetTX());
+    ASSERT_FALSE(env.device_state().Control().rst_rx());
+    ASSERT_FALSE(env.device_state().Control().rst_tx());
+    ASSERT_TRUE(env.device_state().Control().tx_interrupt_enable());
+    ASSERT_TRUE(env.device_state().Control().rx_interrupt_enable());
+  });
 }
 
 TEST_F(AmlUartHarness, SerialImplReadAsync) {
-  ASSERT_OK(Device().SerialImplAsyncEnable(true));
+  ASSERT_EQ(ZX_OK, Device().SerialImplAsyncEnable(true));
   struct Context {
     uint8_t data[kDataLen];
     sync_completion_t completion;
@@ -215,7 +190,9 @@ TEST_F(AmlUartHarness, SerialImplReadAsync) {
     sync_completion_signal(&context->completion);
   };
   Device().SerialImplAsyncReadAsync(cb, &context);
-  device_state().Inject(context.data, kDataLen);
+
+  RunInEnvironmentTypeContext(
+      [&context](Environment& env) { env.device_state().Inject(context.data, kDataLen); });
   sync_completion_wait(&context.completion, ZX_TIME_INFINITE);
 }
 
@@ -226,8 +203,7 @@ TEST_F(AmlUartHarness, SerialImplReadDriverService) {
   }
 
   zx::result driver_connect_result =
-      fdf::internal::DriverTransportConnect<fuchsia_hardware_serialimpl::Service::Device>(
-          CreateDriverSvcClient(), "aml-uart");
+      Connect<fuchsia_hardware_serialimpl::Service::Device>("aml-uart");
   ASSERT_EQ(ZX_OK, driver_connect_result.status_value());
   fdf::Arena arena('READ');
   fdf::WireClient<fuchsia_hardware_serialimpl::Device> device_client(
@@ -248,12 +224,14 @@ TEST_F(AmlUartHarness, SerialImplReadDriverService) {
         EXPECT_EQ(memcmp(data, res->data.data(), res->data.count()), 0);
         quit();
       });
-  device_state().Inject(data, kDataLen);
+
+  RunInEnvironmentTypeContext(
+      [&data](Environment& env) { env.device_state().Inject(data, kDataLen); });
   runtime().Run();
 }
 
 TEST_F(AmlUartHarness, SerialImplWriteAsync) {
-  ASSERT_OK(Device().SerialImplAsyncEnable(true));
+  ASSERT_EQ(ZX_OK, Device().SerialImplAsyncEnable(true));
   struct Context {
     uint8_t data[kDataLen];
     sync_completion_t completion;
@@ -267,9 +245,12 @@ TEST_F(AmlUartHarness, SerialImplWriteAsync) {
   };
   Device().SerialImplAsyncWriteAsync(context.data, kDataLen, cb, &context);
   sync_completion_wait(&context.completion, ZX_TIME_INFINITE);
-  auto buf = device_state().TxBuf();
-  ASSERT_EQ(buf.size(), kDataLen);
-  ASSERT_EQ(memcmp(buf.data(), context.data, buf.size()), 0);
+
+  RunInEnvironmentTypeContext([&context](Environment& env) {
+    auto buf = env.device_state().TxBuf();
+    ASSERT_EQ(buf.size(), kDataLen);
+    ASSERT_EQ(memcmp(buf.data(), context.data, buf.size()), 0);
+  });
 }
 
 TEST_F(AmlUartHarness, SerialImplWriteDriverService) {
@@ -279,8 +260,7 @@ TEST_F(AmlUartHarness, SerialImplWriteDriverService) {
   }
 
   zx::result driver_connect_result =
-      fdf::internal::DriverTransportConnect<fuchsia_hardware_serialimpl::Service::Device>(
-          CreateDriverSvcClient(), "aml-uart");
+      Connect<fuchsia_hardware_serialimpl::Service::Device>("aml-uart");
   ASSERT_EQ(ZX_OK, driver_connect_result.status_value());
   fdf::Arena arena('WRIT');
   fdf::WireClient<fuchsia_hardware_serialimpl::Device> device_client(
@@ -299,9 +279,12 @@ TEST_F(AmlUartHarness, SerialImplWriteDriverService) {
         quit();
       });
   runtime().Run();
-  auto buf = device_state().TxBuf();
-  ASSERT_EQ(buf.size(), kDataLen);
-  ASSERT_EQ(memcmp(buf.data(), data, buf.size()), 0);
+
+  RunInEnvironmentTypeContext([&data](Environment& env) {
+    auto buf = env.device_state().TxBuf();
+    ASSERT_EQ(buf.size(), kDataLen);
+    ASSERT_EQ(memcmp(buf.data(), data, buf.size()), 0);
+  });
 }
 
 TEST_F(AmlUartHarness, SerialImplAsyncWriteDoubleCallback) {
@@ -320,9 +303,12 @@ TEST_F(AmlUartHarness, SerialImplAsyncWriteDoubleCallback) {
   Device().SerialImplAsyncWriteAsync(context.data, kDataLen, cb, &context);
   Device().HandleTXRaceForTest();
   sync_completion_wait(&context.completion, ZX_TIME_INFINITE);
-  auto buf = device_state().TxBuf();
-  ASSERT_EQ(buf.size(), kDataLen);
-  ASSERT_EQ(memcmp(buf.data(), context.data, buf.size()), 0);
+
+  RunInEnvironmentTypeContext([&context](Environment& env) {
+    auto buf = env.device_state().TxBuf();
+    ASSERT_EQ(buf.size(), kDataLen);
+    ASSERT_EQ(memcmp(buf.data(), context.data, buf.size()), 0);
+  });
 }
 
 TEST_F(AmlUartHarness, SerialImplAsyncReadDoubleCallback) {
@@ -341,7 +327,9 @@ TEST_F(AmlUartHarness, SerialImplAsyncReadDoubleCallback) {
     sync_completion_signal(&context->completion);
   };
   Device().SerialImplAsyncReadAsync(cb, &context);
-  device_state().Inject(context.data, kDataLen);
+
+  RunInEnvironmentTypeContext(
+      [&context](Environment& env) { env.device_state().Inject(context.data, kDataLen); });
   Device().HandleRXRaceForTest();
   sync_completion_wait(&context.completion, ZX_TIME_INFINITE);
 }
