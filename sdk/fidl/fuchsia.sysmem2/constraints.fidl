@@ -42,20 +42,30 @@ type BufferCollectionConstraints = table {
     1: usage BufferUsage;
 
     /// Per-participant number of buffers that the participant may concurrently
-    /// hold for its exclusive use for a non-transient period of time (camp on).
+    /// hold for its exclusive use for more than a transient duration (camp on).
+    /// In this context, a "transient" duration is the time it takes to finish
+    /// running a small amount of non-blocking code that finishes transfering
+    /// away ownership of the buffer. Things like reading from storage, waiting
+    /// on hardware that isn't already known to be done, or doing things like
+    /// frame encode or decode are not considered transient durations, even if
+    /// they might sometimes complete quickly.
     ///
     /// For example, a video decoder would specify (at least) the maximum number
-    /// of reference frames + 1 frame currently being decoded into.
+    /// of reference frames + 1 frame currently being decoded into. But not 1
+    /// more for the code that runs async and quickly to deliver a previously
+    /// decoded frame, even though that frame can potentially be owned for a
+    /// transient duration concurrent with decode of the next frame.
     ///
     /// A participant must not camp on more buffers than specified here (except
-    /// very transiently) else processing may get stuck.
+    /// for a transient duration) else processing may get stuck.
     ///
     /// When aggregating BufferCollectionConstraints, these values add.
     ///
     /// In testing scenarios, camping on more buffers than this for any
-    /// significant duration may (ideally will) be flagged as a failure. In
-    /// testing scenarios, the participant may not be provided with more buffers
-    /// than this concurrently.
+    /// significant duration (one screen refresh period is "significant" in this
+    /// context) may (ideally will) be flagged as a failure.  In testing
+    /// scenarios, the participant may not be provided with more buffers than
+    /// this concurrently.
     2: min_buffer_count_for_camping uint32;
 
     /// Per-participant minimum number of buffers that are needed for slack

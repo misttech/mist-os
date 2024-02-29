@@ -869,7 +869,7 @@ open protocol BufferCollection {
     ///   result in no attenuation (note that 0 is not on this list):
     ///   + ZX_RIGHT_SAME_RIGHTS (preferred)
     ///   + 0xFFFFFFFF (this is reasonable when an attenuation mask is computed)
-    /// + requesst `token_request` The server end of the `BufferCollectionToken`
+    /// + request `token_request` The server end of the `BufferCollectionToken`
     ///   channel. The client retains the client end.
     flexible AttachToken(resource table {
         1: rights_attenuation_mask zx.Rights;
@@ -1052,6 +1052,11 @@ open protocol BufferCollectionTokenGroup {
     /// [`fuchsia.sysmem2/BufferCollectionTokenGroup.CreateChildrenSync`] which
     /// essentially includes the `Sync`.
     ///
+    /// Sending CreateChild after AllChildrenPresent is not permitted; this will
+    /// fail the group's subtree and close the connection.
+    ///
+    /// After all children have been created, send AllChildrenPresent.
+    ///
     /// + request `token_request` The server end of the new token channel.
     /// + request `rights_attenuation_mask` If ZX_RIGHT_SAME_RIGHTS, the created
     ///   token allows the holder to get the same rights to buffers as the
@@ -1086,6 +1091,11 @@ open protocol BufferCollectionTokenGroup {
     /// The maximum permissible total number of children per group, and total
     /// number of nodes in an overall tree (from the root) are capped to limits
     /// which are not configurable via these protocols.
+    ///
+    /// Sending CreateChildrenSync after AllChildrenPresent is not permitted;
+    /// this will fail the group's subtree and close the connection.
+    ///
+    /// After all children have been created, send AllChildrenPresent.
     ///
     /// + request `rights_attentuation_masks` The size of the
     ///   `rights_attentuation_masks` determines the number of created child
