@@ -1822,6 +1822,9 @@ pub fn sys_syslog(
             Ok(0)
         }
         SyslogAction::ConsoleLevel => {
+            if length <= 0 || length >= 8 {
+                return error!(EINVAL);
+            }
             track_stub!(TODO("https://fxbug.dev/322894199"), "syslog: console level");
             Ok(0)
         }

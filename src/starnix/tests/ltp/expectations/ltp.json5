@@ -183,8 +183,6 @@
                 "statx06",
                 "statx11",
                 "sync01",
-                "syslog11",
-                "syslog12",
                 "time-schedule01",
 
                 // Depends on real contents in /proc/sys/kernel/perf_event_mlock_kb

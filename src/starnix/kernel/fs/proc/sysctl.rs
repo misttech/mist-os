@@ -296,6 +296,14 @@ pub fn sysctl_directory(current_task: &CurrentTask, fs: &FileSystemHandle) -> Fs
             ),
         );
         dir.node(
+            "printk",
+            fs.create_node(
+                current_task,
+                BytesFile::new_node(b"4\t4\t1\t7\n".to_vec()),
+                FsNodeInfo::new_factory(mode, FsCred::root()),
+            ),
+        );
+        dir.node(
             "pid_max",
             fs.create_node(
                 current_task,
