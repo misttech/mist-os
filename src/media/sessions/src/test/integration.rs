@@ -18,7 +18,6 @@ use fuchsia_component_test::{
 };
 use fuchsia_inspect as inspect;
 use futures::{
-    self,
     channel::mpsc,
     sink::SinkExt,
     stream::{StreamExt, TryStreamExt},

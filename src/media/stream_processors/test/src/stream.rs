@@ -11,7 +11,7 @@ use crate::{
 use fidl_fuchsia_media::*;
 use fidl_fuchsia_sysmem::BufferCollectionConstraints;
 use fuchsia_stream_processors::*;
-use std::{convert::TryFrom, rc::Rc};
+use std::rc::Rc;
 use tracing::debug;
 
 pub type OrdinalSequence = <OrdinalPattern as IntoIterator>::IntoIter;

@@ -96,8 +96,6 @@ mod test {
 
     use super::*;
 
-    use std::convert::TryFrom;
-
     #[test]
     fn validate_stream_buffer_constraints() {
         let invalid_version_ordinal = StreamBufferConstraints {

@@ -2,9 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow;
 use fidl_fuchsia_audio_controller::Error;
-use fuchsia_zircon_status;
 use std::fmt;
 
 // Wrapper for the Controller FIDL error type.

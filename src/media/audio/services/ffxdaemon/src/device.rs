@@ -4,9 +4,8 @@
 
 use {
     crate::{error::ControllerError, socket, stop_listener, RingBuffer, SECONDS_PER_NANOSECOND},
-    anyhow::{self, Context, Error},
+    anyhow::{Context, Error},
     async_trait::async_trait,
-    fdio,
     fidl::endpoints::{Proxy, ServerEnd},
     fidl_fuchsia_audio_controller::{
         CompositeDeviceInfo, DeviceInfo,

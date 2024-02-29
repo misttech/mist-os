@@ -9,7 +9,6 @@
 
 #![cfg(test)]
 
-use anyhow;
 use h264_stream::*;
 use lazy_static::lazy_static;
 use std::{fs::File, io::Read, rc::Rc, result::Result};

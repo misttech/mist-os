@@ -243,8 +243,8 @@ impl OutputValidator for VideoFrameHasher {
 
 #[cfg(test)]
 mod test {
-    use super::{Error, *};
-    use fidl_fuchsia_sysmem::{ColorSpace, PixelFormat, *};
+    use super::*;
+    use fidl_fuchsia_sysmem::{ColorSpace, *};
     use fuchsia_stream_processors::{ValidPacket, ValidPacketHeader};
     use rand::prelude::*;
     use std::rc::Rc;

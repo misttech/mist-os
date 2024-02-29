@@ -2,8 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 use {
-    anyhow::{self, Context, Error},
-    fidl_fuchsia_audio_controller,
+    anyhow::{Context, Error},
     fidl_fuchsia_audio_controller::{RecordCancelerMarker, RecordCancelerRequest},
     futures::TryStreamExt,
 };

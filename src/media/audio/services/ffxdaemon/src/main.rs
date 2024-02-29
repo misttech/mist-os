@@ -10,7 +10,7 @@ mod socket;
 pub use ring_buffer::RingBuffer;
 
 use {
-    anyhow::{self, Context, Error},
+    anyhow::{Context, Error},
     async_lock as _,
     error::ControllerError,
     fidl_fuchsia_audio_controller::{
@@ -22,7 +22,7 @@ use {
     },
     fidl_fuchsia_hardware_audio::DeviceType,
     fidl_fuchsia_media::{AudioCapturerProxy, AudioRendererProxy, AudioStreamType},
-    fidl_fuchsia_media_audio, fuchsia as _, fuchsia_async as fasync,
+    fuchsia as _, fuchsia_async as fasync,
     fuchsia_component::server::ServiceFs,
     fuchsia_inspect::{component, health::Reporter},
     fuchsia_zircon::{self as zx, HandleBased},

@@ -10,15 +10,9 @@ use fidl::endpoints::{create_endpoints, ClientEnd, Proxy};
 use fidl_fuchsia_media::*;
 use fidl_fuchsia_sysmem::*;
 use fuchsia_component::client;
-use fuchsia_runtime;
 use fuchsia_stream_processors::*;
 use fuchsia_zircon::{self as zx, AsHandleRef};
-use std::{
-    convert::TryFrom,
-    fmt,
-    iter::{IntoIterator, StepBy},
-    ops::RangeFrom,
-};
+use std::{fmt, iter::StepBy, ops::RangeFrom};
 use thiserror::Error;
 use tracing::debug;
 

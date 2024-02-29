@@ -8,7 +8,6 @@ use {
     fuchsia_inspect::{component, health::Reporter},
     futures::lock::Mutex,
     std::sync::Arc,
-    tracing,
 };
 
 mod codec;

@@ -887,8 +887,7 @@ mod tests {
         anyhow::Result,
         assert_matches::assert_matches,
         fixture::fixture,
-        futures::{future, lock::Mutex, task::Poll},
-        std::sync::Arc,
+        futures::{future, task::Poll},
     };
 
     // Integration tests using //src/media/audio/drivers/testing/realm devices.

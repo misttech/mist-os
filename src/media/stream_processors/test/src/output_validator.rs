@@ -12,7 +12,7 @@ use hex::{decode, encode};
 use mundane::hash::{Digest, Hasher, Sha256};
 use num_traits::PrimInt;
 use std::io::Write;
-use std::{convert::TryInto, fmt, rc::Rc};
+use std::{fmt, rc::Rc};
 use tracing::info;
 
 #[derive(ValidFidlTable, Debug, PartialEq)]

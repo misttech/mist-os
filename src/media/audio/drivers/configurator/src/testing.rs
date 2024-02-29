@@ -8,7 +8,7 @@ pub mod tests {
         crate::{config::Config, configurator::Configurator},
         anyhow::Error,
         async_trait::async_trait,
-        device_watcher, fidl_fuchsia_io as fio, fuchsia_async as fasync,
+        fidl_fuchsia_io as fio, fuchsia_async as fasync,
         fuchsia_component_test::{RealmBuilder, RealmInstance},
         fuchsia_driver_test::{DriverTestRealmBuilder, DriverTestRealmInstance},
         futures::stream::TryStreamExt as _,

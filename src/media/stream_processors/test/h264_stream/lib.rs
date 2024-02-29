@@ -2,10 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::{self, ensure};
+use anyhow::ensure;
 use byteorder::{BigEndian, WriteBytesExt};
 use fidl_fuchsia_media::FormatDetails;
-use std::{convert::TryFrom, fs, mem, path::Path};
+use std::{fs, mem, path::Path};
 use stream_processor_test::*;
 
 const SEPARATE_SPS_PPS: bool = true;

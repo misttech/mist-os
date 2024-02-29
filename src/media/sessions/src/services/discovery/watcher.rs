@@ -7,7 +7,6 @@ use crate::{proxies::player::PlayerProxyEvent, Result, SessionId, MAX_EVENTS_SEN
 use fidl::client::QueryResponseFut;
 use fidl_fuchsia_media_sessions2::*;
 use futures::{
-    self,
     future::{self, Ready},
     stream::FuturesOrdered,
     task::{Context, Poll},

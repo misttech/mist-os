@@ -8,7 +8,7 @@ use {
     fidl_fuchsia_media::AudioSampleFormat,
     regex::Regex,
     std::io::{Cursor, Seek, SeekFrom, Write},
-    std::{convert::From, str::FromStr, time::Duration},
+    std::{str::FromStr, time::Duration},
 };
 
 pub const DURATION_REGEX: &'static str = r"^(\d+)(h|m|s|ms)$";

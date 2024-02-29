@@ -4,8 +4,8 @@
 
 use crate::{id::Id, services::discovery::filter::*, Result, SessionId};
 use anyhow::format_err;
+use fidl::client::QueryResponseFut;
 use fidl::endpoints::{ClientEnd, ServerEnd};
-use fidl::{self, client::QueryResponseFut};
 use fidl_fuchsia_media::*;
 use fidl_fuchsia_media_audio::*;
 use fidl_fuchsia_media_sessions2::*;
@@ -481,10 +481,7 @@ mod test {
         endpoints::{create_endpoints, create_proxy_and_stream},
         prelude::*,
     };
-    use futures::{
-        future,
-        stream::{StreamExt, TryStreamExt},
-    };
+    use futures::{future, stream::TryStreamExt};
     use futures_test::task::noop_waker;
     use inspect::Inspector;
 

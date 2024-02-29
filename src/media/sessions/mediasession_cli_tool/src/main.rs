@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow;
 use argh::FromArgs;
 use fidl::endpoints::create_endpoints;
 use fidl_fuchsia_media_sessions2::*;

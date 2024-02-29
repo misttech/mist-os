@@ -15,19 +15,9 @@ use async_utils::stream::StreamMap;
 use fidl::endpoints::{ClientEnd, ServerEnd};
 use fidl_fuchsia_media::UsageReporterProxy;
 use fidl_fuchsia_media_sessions2::*;
-use futures::{
-    self,
-    channel::mpsc,
-    future::BoxFuture,
-    prelude::*,
-    stream::{self, Once, Stream},
-    StreamExt,
-};
-use mpmc;
+use futures::{channel::mpsc, future::BoxFuture, prelude::*, stream::Once, StreamExt};
 use std::{
     collections::{HashMap, HashSet},
-    convert::TryFrom,
-    marker::Unpin,
     ops::RangeFrom,
 };
 use tracing::{info, warn};
