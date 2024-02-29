@@ -50,9 +50,31 @@ impl Inner {
 
 /// Designed to 'exercise' the filesystem and thrash the dirent cache.
 /// This cyclically works its way through 10000 files (the dirent cache holds 8000).
+///
 /// On each iteration it will either read, write or rewrite a file.
 /// Unaligned random reads and append-only writes up to 128kB each in length.
 /// Write errors causes the file to be truncated to zero bytes.
+///
+/// The file order is partially permuted each time (only those files which
+/// are known not to be in the dirent cache) to reduce cyclic write/delete patterns.
+///
+/// The truncation of files when we hit the target limit is also randomized to avoid
+/// introducing cyclic patterns (n writes, truncate, n writes, truncate, ...).
+///
+/// Despite these measures, we still expect to see some cyclic behaviour.
+/// Each pass has equal probability of read or write. It takes about 3 writes to reach
+/// 150kB (the average size before we hit target bytes of 1.5GB) so we can assume
+/// n reads, n writes, n/3 truncates in steady state.
+///
+///   n + n + n/3 = 10000
+///   n = 30000 / 7 = 4285
+///
+/// On average, 4285/3 = ~1500 files are truncated each pass. Assuming an average file
+/// size, this is around 220MB or 14%. Best case it will take 7 passes to rewrite all
+/// data, but we can assume that most of the data will be rewritten in a few dozen passes.
+///
+/// Each pass anecdotally takes between 2 and 20 seconds depending on system load,
+/// allocation strategy and fragmentation.
 pub struct Stressor {
     /// Inner state tracking which files can be accessed next.
     inner: Mutex<Inner>,
@@ -72,7 +94,8 @@ struct FileState {
 
 const READ: usize = 0;
 const WRITE: usize = 1;
-const NUM_OPS: usize = 2;
+const TRUNCATE: usize = 2;
+const NUM_OPS: usize = 3;
 
 /// The number of files to cycle through.
 /// This must be larger than DIRENT_CACHE_LIMIT to induce cache thrashing.
@@ -80,10 +103,6 @@ const NUM_FILES: usize = 10000;
 
 /// See src/storage/fxfs/platform/src/fuchsia/volume.rs.
 const DIRENT_CACHE_LIMIT: usize = 8000;
-
-// We favour writes because half of those writes will end up being truncates.
-// The expected long-term mix will therefore be around 1:1 reads/writes.
-const WEIGHTS: [f64; NUM_OPS] = [/* READ: */ 1.0, /* WRITE: */ 2.0];
 
 impl Stressor {
     /// Creates a new aggressive stressor that will try to fill the disk until
@@ -141,7 +160,16 @@ impl Stressor {
         let mut rng = rand::thread_rng();
         let mut buf = Vec::new();
         loop {
-            let op = WeightedIndex::new(WEIGHTS).unwrap().sample(&mut rng);
+            let bytes_stored = self.bytes_stored.load(Ordering::Relaxed);
+            // Note that truncate is rare until we exceed 100% target utilization, at which point it
+            // becomes as likely as read or write. By the time we hit 105% target utilization,
+            // truncates are 2.6x as likely as read or write.
+            let weights: [f64; NUM_OPS] = [
+                1.0,                                                             /* READ */
+                1.0,                                                             /* WRITE */
+                f64::powf(bytes_stored as f64 / self.target_bytes as f64, 20.0), /* TRUNCATE */
+            ];
+            let op = WeightedIndex::new(weights).unwrap().sample(&mut rng);
             let file_num = self.inner.lock().unwrap().next_file_num();
             let path = format!("/data/{}", file_num);
             match op {
@@ -165,43 +193,37 @@ impl Stressor {
                     match File::options().create(true).read(true).write(true).open(&path) {
                         Ok(f) => {
                             let file_len = f.metadata().unwrap().len();
-                            if self.bytes_stored.load(Ordering::Relaxed) >= self.target_bytes {
-                                self.bytes_stored.fetch_sub(file_len, Ordering::Relaxed);
-                                let _ = f.set_len(0).unwrap();
-                            } else {
-                                buf.resize(rng.gen_range(0..128 * 1024), 1);
-                                match f.write_at(&buf, file_len) {
-                                    Ok(bytes) => {
-                                        self.bytes_stored
-                                            .fetch_add(bytes as u64, Ordering::Relaxed);
-                                    }
-                                    Err(_) => {
-                                        // When a write fails due to space, we truncate.
-                                        // In this way we fill up the disk then start fragmenting it.
-                                        // Until #![feature(io_error_more)] is stable, we have
-                                        // a catch-all here.
-                                        let _ = f.set_len(0).unwrap();
-                                        // Metadata (layer files and such) can take up megabytes of
-                                        // space that is not tracked in `self.bytes_stored`.
-                                        // If we hit this code path then we've blown through
-                                        // available space but not hit our 'bytes_stored' limit.
-                                        //
-                                        // Writes are relatively small compared to the potential
-                                        // layer file size so even though it's a bit racy, we will
-                                        // accept the potential inaccuracy of concurrent writes
-                                        // and adjust bytes_stored here based on the filesystem's
-                                        // internal tally.
-                                        let info = self
-                                            .dir
-                                            .query_filesystem(Time::INFINITE.into())
-                                            .unwrap()
-                                            .1
-                                            .unwrap();
-                                        tracing::info!("Correcting bytes_stored. {info:?}");
-                                        self.bytes_stored.store(info.used_bytes, Ordering::SeqCst);
-                                    }
-                                };
-                            }
+                            buf.resize(rng.gen_range(0..128 * 1024), 1);
+                            match f.write_at(&buf, file_len) {
+                                Ok(bytes) => {
+                                    self.bytes_stored.fetch_add(bytes as u64, Ordering::Relaxed);
+                                }
+                                Err(_) => {
+                                    // When a write fails due to space, we truncate.
+                                    // In this way we fill up the disk then start fragmenting it.
+                                    // Until #![feature(io_error_more)] is stable, we have
+                                    // a catch-all here.
+                                    let _ = f.set_len(0).unwrap();
+                                    // Metadata (layer files and such) can take up megabytes of
+                                    // space that is not tracked in `self.bytes_stored`.
+                                    // If we hit this code path then we've blown through
+                                    // available space but not hit our 'bytes_stored' limit.
+                                    //
+                                    // Writes are relatively small compared to the potential
+                                    // layer file size so even though it's a bit racy, we will
+                                    // accept the potential inaccuracy of concurrent writes
+                                    // and adjust bytes_stored here based on the filesystem's
+                                    // internal tally.
+                                    let info = self
+                                        .dir
+                                        .query_filesystem(Time::INFINITE.into())
+                                        .unwrap()
+                                        .1
+                                        .unwrap();
+                                    tracing::info!("Correcting bytes_stored. {info:?}");
+                                    self.bytes_stored.store(info.used_bytes, Ordering::SeqCst);
+                                }
+                            };
                         }
                         // Unfortunately ErrorKind::StorageFull is unstable so
                         // we rely on a catch-all here and assume write errors are
@@ -209,6 +231,14 @@ impl Stressor {
                         Err(_) => {}
                     }
                 }
+                TRUNCATE => match File::options().write(true).open(&path) {
+                    Ok(f) => {
+                        let file_len = f.metadata().unwrap().len();
+                        self.bytes_stored.fetch_sub(file_len, Ordering::Relaxed);
+                        let _ = f.set_len(0).unwrap();
+                    }
+                    Err(_) => {}
+                },
                 _ => unreachable!(),
             }
             self.op_stats.lock().unwrap()[op] += 1;
