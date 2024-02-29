@@ -180,7 +180,7 @@ impl<M: FfxTool> ToolSuite for FhoSuite<M> {
         ffx: &FfxCommandLine,
     ) -> Result<Option<Box<dyn ToolRunner + '_>>> {
         if ffx.global.schema {
-            return Ok(Some(Box::new(schema::runner::<M::Writer>())));
+            return Ok(Some(Box::new(schema::runner::<M::Writer>(ffx.global.machine))));
         }
 
         let args = Vec::from_iter(ffx.global.subcommand.iter().map(String::as_str));

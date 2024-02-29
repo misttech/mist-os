@@ -54,10 +54,10 @@ impl<'a> InlineValue<'a> {
     }
 }
 
-impl<'a> Into<serde_json::Value> for &'_ InlineValue<'a> {
-    fn into(self) -> serde_json::Value {
+impl<'a> From<&'_ InlineValue<'a>> for serde_json::Value {
+    fn from(value: &'_ InlineValue<'a>) -> serde_json::Value {
         use serde_json::Value;
-        match *self {
+        match *value {
             InlineValue::Null => Value::Null,
             InlineValue::Bool(v) => v.into(),
             InlineValue::UInt(v) => v.into(),

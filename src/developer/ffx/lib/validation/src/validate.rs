@@ -336,8 +336,36 @@ impl<'j, 's> Walker<'s> for Validation<'j, 's> {
         }
     }
 
-    fn add_map(&mut self, _key: &'s Type<'s>, _value: &'s Type<'s>) -> ControlFlow<()> {
-        todo!("Validation not yet implemented - b/315385828")
+    fn add_map(&mut self, key_ty: &'s Type<'s>, value_ty: &'s Type<'s>) -> ControlFlow<()> {
+        let Some(object) = self.value.as_object() else {
+            return self.fail_with_err(ValidationErrorMessage::TypeMismatch {
+                expected: Cow::Borrowed(&[ValueType::Object]),
+                actual: self.value.into(),
+            });
+        };
+
+        let mut error = ValidationError::default();
+
+        for (key, value) in object.iter() {
+            let key_json = key.clone().into();
+            let mut validation = Validation::new(&key_json);
+
+            if key_ty.walk(&mut validation).is_continue() {
+                error.push_field(FieldId::Name(key.clone().into()), validation.error);
+            }
+
+            let mut validation = Validation::new(value);
+
+            if value_ty.walk(&mut validation).is_continue() {
+                error.push_field(FieldId::Name(key.clone().into()), validation.error);
+            }
+        }
+
+        if !error.is_empty() {
+            self.fail_with_err(error)
+        } else {
+            self.success()
+        }
     }
 
     fn add_type(&mut self, ty: ValueType) -> ControlFlow<()> {

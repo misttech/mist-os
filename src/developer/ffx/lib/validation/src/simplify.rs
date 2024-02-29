@@ -76,6 +76,36 @@ impl<'bump> Ctx<'bump> {
         Self { alias: AliasCtx { current: None, info: HashMap::new() }, sorted: true }
     }
 
+    /// Returns all recursive type aliases in a sorted list of identifier -> type pairs and a map
+    /// from alias [`TypeId`] to the respective identifier.
+    pub fn sorted_aliases(
+        &self,
+        bump: &'bump Bump,
+    ) -> (Vec<(&'bump str, &'bump Type<'bump>)>, HashMap<TypeId, &'bump str>) {
+        // Sort and filter aliases.
+        // Only non-recursive aliases are reachable within any simplified type.
+        let sorted = self.alias.info.iter().filter(|(_, info)| info.recursive).collect::<Vec<_>>();
+        // TODO: Sort when sorting code is available
+        // sorted.sort_by(|(_, lhs), (_, rhs)| cmp_processed_types(lhs.ty, rhs.ty));
+
+        let mut alias_id_map = HashMap::new();
+
+        let alias_types = sorted
+            .into_iter()
+            .enumerate()
+            .map(|(i, (id, info))| {
+                // Alias identifiers are currently based off of index. In the future this could utilize
+                // some sort of stable type hash to reduce churn when a type alias changes.
+                let alias_id = bumpalo::format!(in bump, "{i:04X}",).into_bump_str();
+
+                alias_id_map.insert(*id, alias_id);
+                (alias_id, info.ty)
+            })
+            .collect();
+
+        (alias_types, alias_id_map)
+    }
+
     /// Processes a single type, applying edits until it no longer has any edits to apply.
     pub fn process_type(&mut self, bump: &'bump Bump, ty: &mut &'bump Type<'bump>) -> bool {
         let mut updated_type = false;

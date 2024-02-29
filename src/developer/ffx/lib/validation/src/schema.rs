@@ -6,6 +6,7 @@ use std::{any::TypeId, fmt::Display, ops::ControlFlow};
 
 mod inline_value;
 mod macros;
+pub mod output;
 
 use ffx_validation_proc_macro::schema;
 pub use ffx_validation_proc_macro::Schema;
@@ -390,7 +391,7 @@ macro_rules! impl_prim {
     };
 }
 
-impl_prim!(Integer: u64 u32 u16 u8 i64 i32 i16 i8);
+impl_prim!(Integer: u64 u32 u16 u8 i64 i32 i16 i8 usize isize);
 impl_prim!(Double: f32 f64);
 impl_prim!(Bool: bool);
 impl_prim!(String: str String);
@@ -406,6 +407,12 @@ impl<T: Schema> Schema for [T] {
 
 impl<const N: usize, T: Schema> Schema for [T; N] {
     const TYPE: StaticType = &Type::Array { size: Some(N), ty: T::TYPE };
+}
+
+struct Map<K, V>(std::marker::PhantomData<(K, V)>);
+
+impl<K: Schema, V: Schema> Schema for Map<K, V> {
+    const TYPE: StaticType = &Type::Map { key: K::TYPE, value: V::TYPE };
 }
 
 macro_rules! make_tuple {

@@ -23,7 +23,9 @@ macro_rules! embedded_plugin {
             let ffx = FfxCommandLine::from_env()?;
 
             if ffx.global.schema {
-                return $crate::macro_deps::print_schema::<<$tool as $crate::FfxMain>::Writer>();
+                return $crate::macro_deps::print_schema::<<$tool as $crate::FfxMain>::Writer>(
+                    ffx.global.machine,
+                );
             }
 
             let context = if let Some(gc) = global_env_context() {
