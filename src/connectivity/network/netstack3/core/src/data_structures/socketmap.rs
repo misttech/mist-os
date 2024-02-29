@@ -161,22 +161,6 @@ where
         }
     }
 
-    /// Applies the provided function on the value for the given key.
-    ///
-    /// If the map has a value for `key`, calls `apply` on that value and then
-    /// returns the result. Otherwise returns `None`.
-    #[todo_unused::todo_unused("https://fxbug.dev/42178425")]
-    pub fn map_mut<R>(&mut self, key: &A, apply: impl FnOnce(&mut V) -> R) -> Option<R> {
-        let Self { map, len: _ } = self;
-        let value =
-            map.get_mut(key).and_then(|MapValue { value, descendant_counts: _ }| value.as_mut())?;
-        let old_tag = value.tag(key);
-        let r = apply(value);
-        let new_tag = value.tag(key);
-        Self::update_descendant_counts(map, key.iter_shadows(), old_tag, new_tag);
-        Some(r)
-    }
-
     /// Returns counts of tags for values at keys that shadow `key`.
     ///
     /// This is equivalent to iterating over all keys in the map, filtering for
@@ -540,47 +524,6 @@ mod tests {
     }
 
     #[test]
-    fn map_mut_keep_descendant_counts() {
-        let mut map = TestSocketMap::default();
-
-        assert_matches!(map.entry(A(1)), Entry::Vacant(v) => v.insert(TV(3, 56)));
-        assert_matches!(map.entry(ABC(1, 'c', 2)), Entry::Vacant(v) => v.insert(TV(3, 111)));
-        let expected_counts = HashMap::from([(3, 1)]);
-        assert_eq!(map.descendant_counts(&A(1)).as_map(), expected_counts);
-
-        assert_eq!(map.map_mut(&ABC(1, 'c', 2), |TV(_, v)| *v = 255), Some(()));
-        assert_eq!(map.descendant_counts(&A(1)).as_map(), expected_counts);
-    }
-
-    #[test]
-    fn map_mut_change_descendant_counts() {
-        let mut map = TestSocketMap::default();
-
-        assert_matches!(map.entry(A(1)), Entry::Vacant(v) => v.insert(TV(3, 56)));
-        assert_matches!(map.entry(ABC(1, 'c', 2)), Entry::Vacant(v) => v.insert(TV(3, 111)));
-        assert_eq!(map.descendant_counts(&A(1)).as_map(), HashMap::from([(3, 1)]));
-
-        assert_eq!(map.map_mut(&ABC(1, 'c', 2), |TV(t, _)| *t = 80), Some(()));
-        assert_eq!(map.descendant_counts(&A(1)).as_map(), HashMap::from([(80, 1)]));
-    }
-
-    #[test]
-    fn map_mut_value_not_present() {
-        let mut map = TestSocketMap::default();
-
-        assert_matches!(map.entry(ABC(1, 'c', 2)), Entry::Vacant(v) => v.insert(TV(3, 111)));
-        assert_eq!(map.map_mut(&ABC(32, 'g', 27), |TV(_, _)| 3245), None);
-    }
-
-    #[test]
-    fn map_mut_passes_return_value_when_present() {
-        let mut map = TestSocketMap::default();
-
-        assert_matches!(map.entry(ABC(16, 'c', 8)), Entry::Vacant(v) => v.insert(TV(3, 111)));
-        assert_eq!(map.map_mut(&ABC(16, 'c', 8), |TV(_, _)| 1845859), Some(1845859));
-    }
-
-    #[test]
     fn entry_remove_no_shadows() {
         let mut map = TestSocketMap::default();
 
@@ -638,7 +581,6 @@ mod tests {
     #[derive(Debug, Copy, Clone, Eq, PartialEq)]
     enum Operation {
         Entry(Address, TV<u8, u8>),
-        Replace(Address, TV<u8, u8>),
         Remove(Address),
     }
 
@@ -664,12 +606,6 @@ mod tests {
                         panic!("socketmap has no value for {:?} but reference does", a)
                     }
                 },
-                Operation::Replace(a, v) => {
-                    match socket_map.map_mut(&a, |x| core::mem::replace(x, v)) {
-                        Some(prev_v) => assert_eq!(reference.insert(a, v), Some(prev_v)),
-                        None => assert_eq!(reference.get(&a), None),
-                    }
-                }
                 Operation::Remove(a) => assert_eq!(socket_map.remove(&a), reference.remove(&a)),
             }
         }
@@ -678,7 +614,6 @@ mod tests {
     fn operation_strategy() -> impl Strategy<Value = Operation> {
         proptest::prop_oneof!(
             (key_strategy(), value_strategy()).prop_map(|(a, v)| Operation::Entry(a, v)),
-            (key_strategy(), value_strategy()).prop_map(|(a, v)| Operation::Replace(a, v)),
             key_strategy().prop_map(|a| Operation::Remove(a)),
         )
     }
