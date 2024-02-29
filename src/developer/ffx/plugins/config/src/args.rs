@@ -22,6 +22,7 @@ pub struct ConfigCommand {
 #[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(subcommand)]
 pub enum SubCommand {
+    CheckSshKeys(SshKeyCommand),
     Env(EnvCommand),
     Get(GetCommand),
     Set(SetCommand),
@@ -287,6 +288,13 @@ pub struct AnalyticsDisableCommand {}
 #[argh(subcommand, name = "show", description = "show analytics")]
 pub struct AnalyticsShowCommand {}
 
+#[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
+#[argh(
+    subcommand,
+    name = "check-ssh-keys",
+    description = "check the ssh key configuration and create keys if needed."
+)]
+pub struct SshKeyCommand {}
 #[cfg(test)]
 mod tests {
     use super::*;

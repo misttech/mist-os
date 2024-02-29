@@ -292,11 +292,11 @@ pub(crate) trait QemuBasedEngine: EmulatorEngine {
         let zbi_tool = get_host_tool(config::ZBI_HOST_TOOL)
             .await
             .map_err(|e| bug!("ZBI tool is missing: {e}"))?;
-        let ssh_keys = SshKeyFiles::load()
+        let ssh_keys = SshKeyFiles::load(None)
             .await
             .map_err(|e| bug!("Error finding ssh authorized_keys file: {e}"))?;
         ssh_keys
-            .create_keys_if_needed()
+            .create_keys_if_needed(false)
             .map_err(|e| bug!("Error creating ssh keys if needed: {e}"))?;
         let auth_keys = ssh_keys.authorized_keys.display().to_string();
         if !ssh_keys.authorized_keys.exists() {

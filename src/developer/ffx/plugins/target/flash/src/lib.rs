@@ -91,8 +91,8 @@ async fn preprocess_flash_cmd(mut cmd: FlashCommand) -> Result<FlashCommand> {
         None => {
             if !cmd.oem_stage.iter().any(|f| f.command() == SSH_OEM_COMMAND) {
                 let ssh_keys =
-                    SshKeyFiles::load().await.context("finding ssh authorized_keys file.")?;
-                ssh_keys.create_keys_if_needed().context("creating ssh keys if needed")?;
+                    SshKeyFiles::load(None).await.context("finding ssh authorized_keys file.")?;
+                ssh_keys.create_keys_if_needed(false).context("creating ssh keys if needed")?;
                 if ssh_keys.authorized_keys.exists() {
                     let k = ssh_keys.authorized_keys.display().to_string();
                     eprintln!("No `--authorized-keys` flag, using {}", k);

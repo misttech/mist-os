@@ -10,8 +10,10 @@ use ffx_config::{
 };
 use ffx_config_plugin_args::{
     AddCommand, AnalyticsCommand, AnalyticsControlCommand, ConfigCommand, EnvAccessCommand,
-    EnvCommand, EnvSetCommand, GetCommand, MappingMode, RemoveCommand, SetCommand, SubCommand,
+    EnvCommand, EnvSetCommand, GetCommand, MappingMode, RemoveCommand, SetCommand, SshKeyCommand,
+    SubCommand,
 };
+use ffx_ssh::{SshKeyErrorKind, SshKeyFiles};
 use fho::{FfxMain, FfxTool};
 use serde_json::Value;
 use std::{
@@ -34,6 +36,9 @@ impl FfxMain for ConfigTool {
 
     async fn main(self, writer: Self::Writer) -> fho::Result<()> {
         match &self.config.sub {
+            SubCommand::CheckSshKeys(check_ssh_cmd) => {
+                exec_check_ssh_keys(&self.ctx, check_ssh_cmd, writer).await
+            }
             SubCommand::Env(env) => exec_env(&self.ctx, env, writer).await,
             SubCommand::Get(get_cmd) => exec_get(&self.ctx, get_cmd, writer).await,
             SubCommand::Set(set_cmd) => exec_set(&self.ctx, set_cmd).await,
@@ -192,6 +197,33 @@ async fn exec_analytics(analytics_cmd: &AnalyticsCommand) -> Result<()> {
     Ok(())
 }
 
+async fn exec_check_ssh_keys<W: Write>(
+    ctx: &EnvironmentContext,
+    _check_ssh_command: &SshKeyCommand,
+    mut writer: W,
+) -> Result<()> {
+    match SshKeyFiles::load(Some(&ctx)).await {
+        Ok(ssh_files) => {
+            match ssh_files.check_keys(true) {
+                Ok(message) => writeln!(writer, "{message}")?,
+                Err(e) => match e.kind {
+                    SshKeyErrorKind::BadKeyType => {
+                        writeln!(writer, "SSH keys type not supported: {}", e.message)?
+                    }
+                    SshKeyErrorKind::BadConfiguration => {
+                        writeln!(writer, "SSH keys configuration problem: {e}")?
+                    }
+                    _ => writeln!(writer, "SSH keys problem: {e}.")?,
+                },
+            };
+        }
+        Err(e) => {
+            writeln!(writer, "Could not get SSH key paths {e}")?;
+        }
+    };
+    Ok(())
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 // tests
 
@@ -200,6 +232,7 @@ mod test {
     use super::*;
     use errors::{FfxError, IntoExitCode};
     use ffx_config::test_init;
+    use serde_json::json;
 
     #[fuchsia::test]
     async fn test_exec_env_set_set_values() -> Result<()> {
@@ -282,5 +315,160 @@ mod test {
                 }
             }
         };
+    }
+
+    #[fuchsia::test]
+    async fn test_exec_check_mismatched_ssh_keys() {
+        let test_env = test_init().await.expect("test env");
+        let mut writer = Vec::<u8>::new();
+
+        let auth_key_path1 = test_env.isolate_root.path().join("authorized_keys1");
+        let private_path1 = test_env.isolate_root.path().join("privatekey1");
+
+        let auth_key_path2 = test_env.isolate_root.path().join("authorized_keys2");
+        let private_path2 = test_env.isolate_root.path().join("privatekey2");
+
+        test_env
+            .context
+            .query("ssh.pub")
+            .level(Some(ConfigLevel::User))
+            .set(json!([
+                "$ENV_PATH_THAT_IS_NOT_SET",
+                auth_key_path2.to_string_lossy(),
+                "someother"
+            ]))
+            .await
+            .expect("set ssh.pub");
+        test_env
+            .context
+            .query("ssh.priv")
+            .level(Some(ConfigLevel::User))
+            .set(json!([
+                "$ENV_PATH_THAT_IS_NOT_SET_2",
+                private_path1.to_string_lossy(),
+                "someother/place"
+            ]))
+            .await
+            .expect("set ssh.priv");
+
+        let keys = SshKeyFiles {
+            authorized_keys: auth_key_path1.clone(),
+            private_key: private_path1.clone(),
+        };
+        keys.create_keys_if_needed(false).expect("Initializing keys");
+
+        let other_keys = SshKeyFiles {
+            authorized_keys: auth_key_path2.clone(),
+            private_key: private_path2.clone(),
+        };
+        other_keys.create_keys_if_needed(false).expect("Initializing other keys");
+
+        exec_check_ssh_keys(&test_env.context, &SshKeyCommand {}, &mut writer)
+            .await
+            .expect("no error");
+        assert_eq!(format!("Keys repaired: KeyMismatch:Could not find matching public key for the private key {}.\n", private_path1.to_string_lossy()), String::from_utf8_lossy(&writer));
+
+        let mut post_repair_writer = Vec::<u8>::new();
+
+        exec_check_ssh_keys(&test_env.context, &SshKeyCommand {}, &mut post_repair_writer)
+            .await
+            .expect("no error");
+        assert_eq!("SSH Public/Private keys match\n", String::from_utf8_lossy(&post_repair_writer));
+    }
+
+    #[fuchsia::test]
+    async fn test_exec_check_ok_ssh_keys() {
+        let test_env = test_init().await.expect("test env");
+        let mut writer = Vec::<u8>::new();
+
+        let auth_key_path = test_env.isolate_root.path().join("authorized_keys");
+        let private_path = test_env.isolate_root.path().join("privatekey");
+
+        test_env
+            .context
+            .query("ssh.pub")
+            .level(Some(ConfigLevel::User))
+            .set(json!(["$ENV_PATH_THAT_IS_NOT_SET", auth_key_path.to_string_lossy(), "someother"]))
+            .await
+            .expect("set ssh.pub");
+        test_env
+            .context
+            .query("ssh.priv")
+            .level(Some(ConfigLevel::User))
+            .set(json!([
+                "$ENV_PATH_THAT_IS_NOT_SET_2",
+                private_path.to_string_lossy(),
+                "someother/place"
+            ]))
+            .await
+            .expect("set ssh.priv");
+
+        let keys = SshKeyFiles::load(Some(&test_env.context)).await.expect("new ssh keys");
+
+        keys.create_keys_if_needed(false).expect("Initializing keys");
+
+        assert_eq!(
+            keys.authorized_keys.display().to_string(),
+            auth_key_path.to_string_lossy().to_string()
+        );
+        assert_eq!(
+            keys.private_key.display().to_string(),
+            private_path.to_string_lossy().to_string()
+        );
+
+        exec_check_ssh_keys(&test_env.context, &SshKeyCommand {}, &mut writer)
+            .await
+            .expect("no error");
+        assert_eq!("SSH Public/Private keys match\n", String::from_utf8_lossy(&writer));
+    }
+
+    #[fuchsia::test]
+    async fn test_exec_check_empty_ssh_keys() {
+        let test_env = test_init().await.expect("test env");
+        let mut writer = Vec::<u8>::new();
+
+        let auth_key_path = test_env.isolate_root.path().join("authorized_keys");
+        let private_path = test_env.isolate_root.path().join("privatekey");
+
+        test_env
+            .context
+            .query("ssh.pub")
+            .level(Some(ConfigLevel::User))
+            .set(json!(["$ENV_PATH_THAT_IS_NOT_SET", auth_key_path.to_string_lossy(), "someother"]))
+            .await
+            .expect("set ssh.pub");
+        test_env
+            .context
+            .query("ssh.priv")
+            .level(Some(ConfigLevel::User))
+            .set(json!([
+                "$ENV_PATH_THAT_IS_NOT_SET_2",
+                private_path.to_string_lossy(),
+                "someother/place"
+            ]))
+            .await
+            .expect("set ssh.priv");
+
+        let keys = SshKeyFiles::load(Some(&test_env.context)).await.expect("new ssh keys");
+
+        assert_eq!(
+            keys.authorized_keys.display().to_string(),
+            auth_key_path.to_string_lossy().to_string()
+        );
+        assert_eq!(
+            keys.private_key.display().to_string(),
+            private_path.to_string_lossy().to_string()
+        );
+
+        exec_check_ssh_keys(&test_env.context, &SshKeyCommand {}, &mut writer)
+            .await
+            .expect("no error");
+        assert_eq!(
+            format!(
+                "Keys repaired: FileNotFound:Private key {} does not exist.\n",
+                private_path.to_string_lossy()
+            ),
+            String::from_utf8_lossy(&writer)
+        );
     }
 }

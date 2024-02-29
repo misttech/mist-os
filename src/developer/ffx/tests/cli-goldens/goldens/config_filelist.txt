@@ -4,6 +4,7 @@ ffx/config/analytics.golden
 ffx/config/analytics/disable.golden
 ffx/config/analytics/enable.golden
 ffx/config/analytics/show.golden
+ffx/config/check-ssh-keys.golden
 ffx/config/env.golden
 ffx/config/env/get.golden
 ffx/config/env/set.golden

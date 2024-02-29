@@ -6,7 +6,7 @@ use base64::{
     display::Base64Display,
     prelude::{Engine as _, BASE64_STANDARD},
 };
-use ffx_config::{api::ConfigError, query};
+use ffx_config::{api::ConfigError, query, ConfigQuery, EnvironmentContext};
 use ring::{
     rand::{self, SystemRandom},
     signature::{Ed25519KeyPair, KeyPair},
@@ -134,10 +134,11 @@ impl SshKeyFiles {
     /// loads the file paths from the config properties `ssh.pub` and `ssh.priv`.
     /// If none of the paths configured are to files that exist, the paths will
     ///  be set to the default locations, which is the first element in the config settings.
-    pub async fn load() -> Result<Self, SshKeyError> {
+    pub async fn load(ctx: Option<&EnvironmentContext>) -> Result<Self, SshKeyError> {
         // initialize to the first path in the list, then iterate through the list to select
         // the first file that exists.
-        let authorized_keys_files: Vec<PathBuf> = query("ssh.pub").get().await?;
+        let authorized_keys_files: Vec<PathBuf> =
+            query(ConfigQuery { name: Some("ssh.pub"), ctx, ..Default::default() }).get().await?;
         if authorized_keys_files.is_empty() {
             return Err(SshKeyError {
                 kind: SshKeyErrorKind::BadConfiguration,
@@ -152,7 +153,8 @@ impl SshKeyFiles {
             }
         }
 
-        let key_files: Vec<PathBuf> = query("ssh.priv").get().await?;
+        let key_files: Vec<PathBuf> =
+            query(ConfigQuery { name: Some("ssh.priv"), ctx, ..Default::default() }).get().await?;
         if key_files.is_empty() {
             return Err(SshKeyError {
                 kind: SshKeyErrorKind::BadConfiguration,
@@ -171,9 +173,12 @@ impl SshKeyFiles {
 
     /// Generates the ed25519 key pair and saves openssh authorized_keys and private key file,
     /// if the paths point to files that do not exist.
-    pub fn create_keys_if_needed(&self) -> Result<(), SshKeyError> {
+    /// if append is true, the public key matching self.private key is appended to
+    /// the self.authorized_keys file. There is no check for duplication, so
+    /// append should only be true if check_keys returns KeyMismatch.
+    pub fn create_keys_if_needed(&self, append: bool) -> Result<(), SshKeyError> {
         let mut public_key: Vec<u8> = vec![];
-        let mut do_write_public_key = false;
+        let mut do_write_public_key = append;
 
         // Validate the paths are non-empty
         if self.private_key.display().to_string().is_empty() {
@@ -192,7 +197,7 @@ impl SshKeyFiles {
         if !self.private_key.exists() {
             // There is no private key, so generate a new key pair
             // resulting in a byte array .der encoded.
-            eprintln!("Creating SSH key pair: {}", self.private_key.display());
+            tracing::info!("Creating SSH key pair: {}", self.private_key.display());
             let rng = SystemRandom::new();
             let bytes = Ed25519KeyPair::generate_pkcs8(&rng).map_err(|m| SshKeyError {
                 kind: SshKeyErrorKind::GenerationError,
@@ -206,7 +211,7 @@ impl SshKeyFiles {
             write_private_key(&self.private_key, &key_pair, bytes.as_ref(), &rng)?;
             public_key = key_pair.public_key().as_ref().to_vec();
             do_write_public_key = true;
-        } else if !self.authorized_keys.exists() {
+        } else if do_write_public_key || !self.authorized_keys.exists() {
             // If we get here we need to get the public key from the private key.
             // If reading fails, the file is corrupted or it is not the format expected.
             // The easiest corrective action would be for the user to delete the file or generate authorized keys using ssh-keygen.
@@ -240,27 +245,47 @@ impl SshKeyFiles {
         Ok(())
     }
 
+    /// Checks the validity of the public and private key files.
+    /// |repair_if_needed| is true, then any problems with the keys
+    /// are corrected if possible.
+    /// If it is not possible, an error is returned, and the recommended
+    /// course of action is to delete the keys and try again.
     pub fn check_keys(&self, repair_if_needed: bool) -> Result<String, SshKeyError> {
         let mut message: String = String::from("");
         let mut del_priv_key = false;
         let mut recreate_keys = false;
+        let mut append_public_key = false;
 
         match self.analyze_check_keys() {
+            // If OK, then return OK.
             Ok(_) => {
                 tracing::info!("SSH Public/Private keys match");
                 return Ok("SSH Public/Private keys match".into());
             }
             Err(e) => {
+                // If there is an error, and repair_if_needed is not set,
+                // return the error.
                 if !repair_if_needed {
                     return Err(e);
                 }
                 match e.kind {
+                    // Bad Key Type. This means the private key is
+                    // not in the supported format. There is nothing to
+                    // do, so return the error. We don't want to delete it
+                    // since it may be used by some other process/workflow.
                     SshKeyErrorKind::BadKeyType => return Err(e),
+                    // Bad Format. This means one of the files is
+                    // not a properly formatted key file. In this case,
+                    // we know it cannot be used by another process/workflow
+                    // since it cannot be read, so delete it and recreate the
+                    // keys.
                     SshKeyErrorKind::BadKeyFormat => {
                         recreate_keys = true;
                         del_priv_key = true;
                         message = format!("{}. Regenerating a private key.", e.message)
                     }
+                    // Bad File permission. This means the private key file permission is
+                    // wrong. Fix it.
                     SshKeyErrorKind::BadFilePermission => {
                         let meta = self.private_key.metadata().map_err(|e| SshKeyError {
                             kind: SshKeyErrorKind::IOError,
@@ -272,7 +297,20 @@ impl SshKeyFiles {
                             SshKeyError { kind: SshKeyErrorKind::IOError, message: format!("{e}") }
                         })?;
                     }
-                    _ => recreate_keys = true,
+                    // Key Mismatch. This is the case of a valid private key, but the matching
+                    // public key is not found. In this case, add the public key to the
+                    // authorized key file.
+                    SshKeyErrorKind::KeyMismatch => {
+                        message = format!("{e}");
+                        recreate_keys = true;
+                        del_priv_key = false;
+                        append_public_key = true;
+                    }
+                    // Any other errors, recreate the keys, reusing the private key if present.
+                    _ => {
+                        message = format!("{e}");
+                        recreate_keys = true;
+                    }
                 };
             }
         };
@@ -284,8 +322,11 @@ impl SshKeyFiles {
                     message: format!("Cannot delete {:?}: {e}", self.private_key),
                 })?;
             }
-            match self.create_keys_if_needed() {
-                Ok(_) => message = format!("{message}\nKeys repaired."),
+            // If we get here, there was an error condition that requires the keys to
+            // be (re)created. This may include generating a new private key, or just
+            // the authorized public keys, or both.
+            match self.create_keys_if_needed(append_public_key) {
+                Ok(_) => message = format!("Keys repaired: {message}."),
                 Err(e) => {
                     // If there was an error, print it, delete the keys,
                     // and recreate.
@@ -295,7 +336,6 @@ impl SshKeyFiles {
                 }
             };
         }
-
         Ok(message)
     }
 
@@ -407,7 +447,7 @@ fn build_public_key_entry(key_type: &str, public_key: &[u8]) -> Result<String, s
 
 /// Appends the public key information to the authorized_keys file.
 fn write_public_key(path: &PathBuf, public_key: &[u8]) -> Result<(), SshKeyInternalError> {
-    eprintln!("Writing authorized_keys file: {}", path.display());
+    tracing::info!("Writing authorized_keys file: {}", path.display());
 
     let mut w = if !path.exists() {
         if let Some(parent) = path.parent() {
@@ -642,7 +682,7 @@ mod test {
 
         // set the config
 
-        let ssh_files = match SshKeyFiles::load().await {
+        let ssh_files = match SshKeyFiles::load(Some(&env.context)).await {
             Ok(ssh) => ssh,
             Err(e) => panic!("load failed: {e:?}"),
         };
@@ -672,7 +712,7 @@ mod test {
         }
 
         let ssh_files = SshKeyFiles { authorized_keys: auth_key_path, private_key: private_path };
-        if let Err(e) = ssh_files.create_keys_if_needed() {
+        if let Err(e) = ssh_files.create_keys_if_needed(false) {
             panic!("create_keys_if_needed failed: {e:?}");
         }
 
@@ -699,7 +739,7 @@ mod test {
         }
 
         let ssh_files = SshKeyFiles { authorized_keys: auth_key_path, private_key: private_path };
-        if let Err(e) = ssh_files.create_keys_if_needed() {
+        if let Err(e) = ssh_files.create_keys_if_needed(false) {
             panic!("create_keys_if_needed failed: {e:?}");
         }
 
@@ -721,7 +761,7 @@ mod test {
         assert!(!&private_path.exists());
 
         let ssh_files = SshKeyFiles { authorized_keys: auth_key_path, private_key: private_path };
-        if let Err(e) = ssh_files.create_keys_if_needed() {
+        if let Err(e) = ssh_files.create_keys_if_needed(false) {
             panic!("create_keys_if_needed failed: {e:?}");
         }
 
@@ -760,7 +800,7 @@ mod test {
         assert!(!&private_path.exists());
 
         let ssh_files = SshKeyFiles { authorized_keys: auth_key_path, private_key: private_path };
-        match ssh_files.create_keys_if_needed() {
+        match ssh_files.create_keys_if_needed(false) {
             Ok(_) => (),
             Err(e) => panic!("create keys if needed error: {e:?}"),
         };
@@ -781,7 +821,7 @@ mod test {
         assert!(!&private_path.exists());
 
         let ssh_files = SshKeyFiles { authorized_keys: auth_key_path, private_key: private_path };
-        ssh_files.create_keys_if_needed().expect("creating test keys");
+        ssh_files.create_keys_if_needed(false).expect("creating test keys");
 
         match ssh_files.check_keys(false) {
             Ok(_) => (),
@@ -823,7 +863,7 @@ mod test {
 
         let ssh_files =
             SshKeyFiles { authorized_keys: auth_key_path.clone(), private_key: private_path };
-        match ssh_files.create_keys_if_needed() {
+        match ssh_files.create_keys_if_needed(false) {
             Ok(_) => (),
             Err(e) => panic!("create keys if needed error: {e:?}"),
         };
@@ -832,7 +872,7 @@ mod test {
             authorized_keys: other_auth_key_path,
             private_key: other_private_path.clone(),
         };
-        match other_ssh_files.create_keys_if_needed() {
+        match other_ssh_files.create_keys_if_needed(false) {
             Ok(_) => (),
             Err(e) => panic!("create keys if needed error: {e:?}"),
         };
@@ -844,5 +884,62 @@ mod test {
             Ok(_) => panic!("mismatched keys should fail"),
             Err(e) => assert_eq!(e.kind, SshKeyErrorKind::KeyMismatch, "{e:?}"),
         };
+    }
+
+    #[test]
+    fn test_check_keys_mismatch_repaired() {
+        let tmp_dir = TempDir::new().expect("create temp dir");
+
+        let new_dir_path = tmp_dir.path().join("new-dir");
+        let auth_key_path = new_dir_path.join("authorized_keys");
+        let private_path = new_dir_path.join("privatekey");
+        let other_auth_key_path = new_dir_path.join("other_authorized_keys");
+        let other_private_path = new_dir_path.join("other_privatekey");
+
+        assert!(!&auth_key_path.exists());
+        assert!(!&private_path.exists());
+
+        let ssh_files =
+            SshKeyFiles { authorized_keys: auth_key_path.clone(), private_key: private_path };
+        match ssh_files.create_keys_if_needed(false) {
+            Ok(_) => (),
+            Err(e) => panic!("create keys if needed error: {e:?}"),
+        };
+
+        let other_ssh_files = SshKeyFiles {
+            authorized_keys: other_auth_key_path,
+            private_key: other_private_path.clone(),
+        };
+        match other_ssh_files.create_keys_if_needed(false) {
+            Ok(_) => (),
+            Err(e) => panic!("create keys if needed error: {e:?}"),
+        };
+
+        let mismatched =
+            SshKeyFiles { authorized_keys: auth_key_path, private_key: other_private_path.clone() };
+
+        match mismatched.check_keys(true) {
+            Ok(message) => assert_eq!(message,
+                format!("Keys repaired: KeyMismatch:Could not find matching public key for the private key {}.",other_private_path.to_string_lossy() )),
+            Err(e) => assert_eq!(e.kind, SshKeyErrorKind::KeyMismatch, "{e:?}"),
+        };
+
+        //check the mismatched keys are OK.
+        match mismatched.check_keys(false) {
+            Ok(_) => (),
+            Err(e) => panic!("unexpected error {e} for mismatched keys"),
+        };
+
+        // other should be ok since nothing should have changed.
+        match other_ssh_files.check_keys(false) {
+            Ok(_) => (),
+            Err(e) => panic!("unexpected error {e} for other keys"),
+        }
+
+        // ssh_keys should shill be OK too.
+        match ssh_files.check_keys(false) {
+            Ok(_) => (),
+            Err(e) => panic!("unexpected error {e} ssh keys"),
+        }
     }
 }

@@ -309,7 +309,7 @@ pub async fn doctor_cmd_impl<W: Write + Send + Sync + 'static>(
     };
 
     if cmd.repair_keys {
-        let keys = SshKeyFiles::load().await?;
+        let keys = SshKeyFiles::load(None).await?;
         let message = keys.check_keys(true)?;
         writeln!(&mut writer, "{message}")?;
     }
@@ -887,7 +887,7 @@ async fn doctor_summary<W: Write>(
 
     // Check SSH Keys
     let ssh_node: usize;
-    match SshKeyFiles::load().await {
+    match SshKeyFiles::load(None).await {
         Ok(ssh_files) => {
             let ( description, outcome) = match ssh_files.check_keys(false) {
                 Ok(_) => (format!("SSH Public/Private keys match"), LedgerOutcome::Success),
@@ -2050,8 +2050,8 @@ mod test {
             .level(Some(ConfigLevel::User))
             .set(json!([&priv_key]))
             .await?;
-        let keys = SshKeyFiles::load().await?;
-        keys.create_keys_if_needed()?;
+        let keys = SshKeyFiles::load(Some(&test_env.context)).await?;
+        keys.create_keys_if_needed(false)?;
         Ok(())
     }
 
