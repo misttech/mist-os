@@ -6,7 +6,10 @@ use anyhow::{Context, Result};
 use async_utils::hanging_get::server::HangingGet;
 use fidl_fuchsia_power_broker as fbroker;
 use fidl_fuchsia_power_suspend as fsuspend;
-use fidl_fuchsia_power_system as fsystem;
+use fidl_fuchsia_power_system::{
+    self as fsystem, APPLICATION_ACTIVITY_ACTIVE, APPLICATION_ACTIVITY_INACTIVE,
+    EXECUTION_STATE_ACTIVE, EXECUTION_STATE_INACTIVE, EXECUTION_STATE_WAKE_HANDLING,
+};
 use fuchsia_async as fasync;
 use fuchsia_component::server::ServiceFs;
 use futures::prelude::*;
@@ -21,13 +24,10 @@ enum IncomingRequest {
     Stats(fsuspend::StatsRequestStream),
 }
 
-const EXECUTION_STATE_ACTIVE: fbroker::PowerLevel = 2;
-const EXECUTION_STATE_WAKE_HANDLING: fbroker::PowerLevel = 1;
-const EXECUTION_STATE_INACTIVE: fbroker::PowerLevel = 0;
-
 /// SystemActivityGovernor runs the server for fuchsia.power.suspend FIDL APIs.
 pub struct SystemActivityGovernor {
     execution_state: PowerElementContext,
+    application_activity: PowerElementContext,
     stats_hanging_get: RefCell<StatsHangingGet>,
 }
 
@@ -39,24 +39,37 @@ impl SystemActivityGovernor {
             ..Default::default()
         };
 
-        let execution_state = PowerElementContext::new(
+        let execution_state = PowerElementContext::builder(
             topology,
             "execution_state",
-            0,
-            vec![EXECUTION_STATE_INACTIVE, EXECUTION_STATE_WAKE_HANDLING, EXECUTION_STATE_ACTIVE],
-            Vec::new(),
-            Vec::new(),
+            &[EXECUTION_STATE_INACTIVE, EXECUTION_STATE_WAKE_HANDLING, EXECUTION_STATE_ACTIVE],
         )
+        .build()
+        .await?;
+
+        let application_activity = PowerElementContext::builder(
+            topology,
+            "application_activity",
+            &[APPLICATION_ACTIVITY_INACTIVE, APPLICATION_ACTIVITY_ACTIVE],
+        )
+        .dependencies(vec![fbroker::LevelDependency {
+            dependency_type: fbroker::DependencyType::Active,
+            dependent_level: APPLICATION_ACTIVITY_ACTIVE,
+            requires_token: execution_state.active_dependency_token(),
+            requires_level: EXECUTION_STATE_ACTIVE,
+        }])
+        .build()
         .await?;
 
         Ok(Rc::new(Self {
             execution_state,
+            application_activity,
             stats_hanging_get: RefCell::new(HangingGet::new(
                 initial_stats,
                 Box::new(
                     |stats: &fsuspend::SuspendStats, res: fsuspend::StatsWatchResponder| -> bool {
-                        if let Err(e) = res.send(stats) {
-                            tracing::warn!("Failed to send suspend stats to client: {e:?}");
+                        if let Err(error) = res.send(stats) {
+                            tracing::warn!(?error, "Failed to send suspend stats to client");
                         }
                         true
                     },
@@ -67,49 +80,101 @@ impl SystemActivityGovernor {
 
     /// Runs a FIDL server to handle fuchsia.power.suspend and fuchsia.power.system API requests.
     pub async fn run(self: Rc<Self>) -> Result<()> {
-        fasync::Task::local(self.clone().watch_execution_state()).detach();
+        self.run_execution_state();
+        self.run_application_activity();
         self.run_fidl_server().await
     }
 
-    async fn watch_execution_state(self: Rc<Self>) {
+    fn run_execution_state(self: &Rc<Self>) {
         let stats_publisher = self.stats_hanging_get.borrow().new_publisher();
-        let mut last_required_level = 0;
-        loop {
-            match self.execution_state.level_control.watch_required_level(last_required_level).await
-            {
-                Ok(Ok(required_level)) => {
-                    tracing::debug!(
-                        "watch_execution_state: required power level = {required_level:?}, last power level = {last_required_level:?}");
+        let this = self.clone();
 
-                    let res = self
-                        .execution_state
-                        .level_control
-                        .update_current_power_level(required_level)
-                        .await;
-                    if let Err(e) = res {
-                        tracing::warn!("update_current_power_level failed: {e:?}");
-                    }
-
-                    if required_level == 0 {
+        fasync::Task::local(async move {
+            Self::run_power_element(
+                &this.execution_state,
+                EXECUTION_STATE_INACTIVE,
+                move |required_level| {
+                    if required_level == EXECUTION_STATE_INACTIVE {
                         stats_publisher.update(|stats_opt: &mut Option<fsuspend::SuspendStats>| {
                             let stats = stats_opt.as_mut().expect("stats is uninitialized");
                             // TODO(mbrunson): Trigger suspend and check return value.
                             stats.success_count = stats.success_count.map(|c| c + 1);
                             stats.last_time_in_suspend = Some(0);
-                            tracing::debug!("suspend stats: {stats:?}");
+                            tracing::debug!(?stats, "suspend stats");
                             true
                         });
                     }
+                },
+            )
+            .await;
+        })
+        .detach();
+    }
+
+    fn run_application_activity(self: &Rc<Self>) {
+        let this = self.clone();
+
+        fasync::Task::local(async move {
+            Self::run_power_element(
+                &this.application_activity,
+                APPLICATION_ACTIVITY_INACTIVE,
+                |_| {},
+            )
+            .await;
+        })
+        .detach();
+    }
+
+    async fn run_power_element<'a>(
+        power_element: &'a PowerElementContext,
+        initial_level: fbroker::PowerLevel,
+        update_fn: impl Fn(fbroker::PowerLevel),
+    ) {
+        let element_name = power_element.name();
+        let mut last_required_level = initial_level;
+
+        loop {
+            tracing::debug!(
+                ?element_name,
+                ?last_required_level,
+                "run_power_element: waiting for new level"
+            );
+            match power_element.level_control.watch_required_level(last_required_level).await {
+                Ok(Ok(required_level)) => {
+                    tracing::debug!(
+                        ?element_name,
+                        ?required_level,
+                        ?last_required_level,
+                        "run_power_element: new level requested"
+                    );
+
+                    let res = power_element
+                        .level_control
+                        .update_current_power_level(required_level)
+                        .await;
+                    if let Err(error) = res {
+                        tracing::warn!(
+                            ?element_name,
+                            ?error,
+                            "run_power_element: update_current_power_level failed"
+                        );
+                    }
+
+                    update_fn(required_level);
                     last_required_level = required_level;
                 }
-                e => {
-                    tracing::warn!("watch_required_level for execution state failed: {e:?}")
+                error => {
+                    tracing::warn!(
+                        ?element_name,
+                        ?error,
+                        "run_power_element: watch_required_level failed"
+                    )
                 }
             }
         }
     }
 
-    async fn run_fidl_server(self: Rc<Self>) -> Result<()> {
+    async fn run_fidl_server(self: &Rc<Self>) -> Result<()> {
         let mut service_fs = ServiceFs::new_local();
 
         service_fs
@@ -148,7 +213,18 @@ impl SystemActivityGovernor {
                 fsystem::ActivityGovernorRequest::GetPowerElements { responder } => {
                     let _ = responder.send(fsystem::PowerElements {
                         execution_state: Some(fsystem::ExecutionState {
-                            token: Some(self.execution_state.active_dependency_token()),
+                            passive_dependency_token: Some(
+                                self.execution_state.passive_dependency_token(),
+                            ),
+                            ..Default::default()
+                        }),
+                        application_activity: Some(fsystem::ApplicationActivity {
+                            passive_dependency_token: Some(
+                                self.application_activity.passive_dependency_token(),
+                            ),
+                            active_dependency_token: Some(
+                                self.application_activity.active_dependency_token(),
+                            ),
                             ..Default::default()
                         }),
                         ..Default::default()
@@ -159,7 +235,7 @@ impl SystemActivityGovernor {
                     let _ = responder.send();
                 }
                 fsystem::ActivityGovernorRequest::_UnknownMethod { ordinal, .. } => {
-                    tracing::warn!("Unknown ActivityGovernorRequest ordinal: {ordinal}");
+                    tracing::warn!(?ordinal, "Unknown ActivityGovernorRequest method");
                 }
             }
         }
@@ -171,12 +247,12 @@ impl SystemActivityGovernor {
         while let Ok(Some(request)) = stream.try_next().await {
             match request {
                 fsuspend::StatsRequest::Watch { responder } => {
-                    if let Err(e) = sub.register(responder) {
-                        tracing::warn!("Failed to register for Watch call: {e:?}");
+                    if let Err(error) = sub.register(responder) {
+                        tracing::warn!(?error, "Failed to register for Watch call");
                     }
                 }
                 fsuspend::StatsRequest::_UnknownMethod { ordinal, .. } => {
-                    tracing::warn!("Unknown StatsRequest ordinal: {ordinal}");
+                    tracing::warn!(?ordinal, "Unknown StatsRequest method");
                 }
             }
         }

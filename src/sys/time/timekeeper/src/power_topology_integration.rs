@@ -20,8 +20,7 @@ const ELEMENT_NAME: &str = "timekeeper-pe";
 const POWER_ON: u8 = 0xff;
 const POWER_OFF: u8 = 0x00;
 
-// TODO: fmil - verify
-const REQUIRED_LEVEL: u8 = 0x01;
+const REQUIRED_LEVEL: u8 = fps::EXECUTION_STATE_WAKE_HANDLING;
 
 pub async fn manage(activity_signal: mpsc::Sender<()>) -> Result<fasync::Task<()>> {
     let governor_proxy = client::connect_to_protocol::<fps::ActivityGovernorMarker>()
@@ -53,7 +52,7 @@ where
 
     let _ignore = activity.send(()).await;
     if let Some(execution_state) = power_elements.execution_state {
-        if let Some(token) = execution_state.token {
+        if let Some(token) = execution_state.passive_dependency_token {
             let token_dup = token.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("never fails");
             let deps = vec![fpb::LevelDependency {
                 dependency_type: fpb::DependencyType::Passive,
@@ -262,7 +261,7 @@ mod tests {
                         responder
                             .send(fps::PowerElements {
                                 execution_state: Some(fps::ExecutionState {
-                                    token: Some(event),
+                                    passive_dependency_token: Some(event),
                                     ..Default::default()
                                 }),
                                 ..Default::default()

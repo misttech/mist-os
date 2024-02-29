@@ -45,8 +45,14 @@ async fn test_activity_governor_returns_expected_power_elements() -> Result<()> 
     let activity_governor = realm.connect_to_protocol::<fsystem::ActivityGovernorMarker>().await?;
     let power_elements = activity_governor.get_power_elements().await?;
 
-    let es_token = power_elements.execution_state.unwrap().token.unwrap();
+    let es_token = power_elements.execution_state.unwrap().passive_dependency_token.unwrap();
     assert!(!es_token.is_invalid_handle());
+
+    let aa_element = power_elements.application_activity.unwrap();
+    let aa_passive_token = aa_element.passive_dependency_token.unwrap();
+    assert!(!aa_passive_token.is_invalid_handle());
+    let aa_active_token = aa_element.active_dependency_token.unwrap();
+    assert!(!aa_active_token.is_invalid_handle());
 
     Ok(())
 }
@@ -55,29 +61,22 @@ async fn create_suspend_topology(realm: &RealmProxyClient) -> Result<PowerElemen
     let topology = realm.connect_to_protocol::<fbroker::TopologyMarker>().await?;
     let activity_governor = realm.connect_to_protocol::<fsystem::ActivityGovernorMarker>().await?;
     let power_elements = activity_governor.get_power_elements().await?;
-    let es_token = power_elements.execution_state.unwrap().token.unwrap();
+    let aa_token = power_elements.application_activity.unwrap().active_dependency_token.unwrap();
 
-    let suspend_controller = PowerElementContext::new(
-        &topology,
-        "suspend_controller",
-        0,
-        vec![0, 1],
-        vec![fbroker::LevelDependency {
+    let suspend_controller = PowerElementContext::builder(&topology, "suspend_controller", &[0, 1])
+        .dependencies(vec![fbroker::LevelDependency {
             dependency_type: fbroker::DependencyType::Active,
             dependent_level: 1,
-            requires_token: es_token,
-            requires_level: 2,
-        }],
-        Vec::new(),
-    )
-    .await?;
+            requires_token: aa_token,
+            requires_level: 1,
+        }])
+        .build()
+        .await?;
 
     Ok(suspend_controller)
 }
 
-async fn cycle_execution_state_power_levels(
-    suspend_controller: &PowerElementContext,
-) -> Result<()> {
+async fn lease(suspend_controller: &PowerElementContext) -> Result<()> {
     let lease_control = suspend_controller
         .lessor
         .lease(1)
@@ -108,7 +107,8 @@ async fn test_activity_governor_increments_suspend_success_on_lease_drop() -> Re
     assert_eq!(None, current_stats.last_time_in_suspend);
 
     let suspend_controller = create_suspend_topology(&realm).await?;
-    cycle_execution_state_power_levels(&suspend_controller).await?;
+
+    lease(&suspend_controller).await?;
 
     let current_stats = stats.watch().await?;
     assert_eq!(Some(1), current_stats.success_count);
@@ -117,7 +117,7 @@ async fn test_activity_governor_increments_suspend_success_on_lease_drop() -> Re
     assert_eq!(Some(0), current_stats.last_time_in_suspend);
 
     // Continue incrementing success count on falling edge of Execution State level transitions.
-    cycle_execution_state_power_levels(&suspend_controller).await?;
+    lease(&suspend_controller).await?;
 
     let current_stats = stats.watch().await?;
     assert_eq!(Some(2), current_stats.success_count);

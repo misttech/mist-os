@@ -6,20 +6,34 @@ library fuchsia.power.system;
 using fuchsia.power.broker;
 using zx;
 
+// Execution state power levels
+const EXECUTION_STATE_ACTIVE fuchsia.power.broker.PowerLevel = 2;
+const EXECUTION_STATE_WAKE_HANDLING fuchsia.power.broker.PowerLevel = 1;
+const EXECUTION_STATE_INACTIVE fuchsia.power.broker.PowerLevel = 0;
+
+// Application activity power levels
+const APPLICATION_ACTIVITY_ACTIVE fuchsia.power.broker.PowerLevel = 1;
+const APPLICATION_ACTIVITY_INACTIVE fuchsia.power.broker.PowerLevel = 0;
+
+// Wake handling power levels
+const WAKE_HANDLING_ACTIVE fuchsia.power.broker.PowerLevel = 1;
+const WAKE_HANDLING_INACTIVE fuchsia.power.broker.PowerLevel = 0;
+
 /// Holds a token to the execution state power element.
 ///
 /// The execution state power element represents the execution state of the
-/// hardware platform.
+/// hardware platform. Power elements may only create passive dependencies on
+/// this power element.
 ///
 /// The execution state power element supports the following power levels:
-///   * 0: The hardware platform has little to no capability to execute code.
-///   * 1: The hardware platform is handling a wakeup event.
-///   * 2: The hardware platform is fully capable of executing code.
+///   * [`fuchsia.power.system/EXECUTION_STATE_INACTIVE`]: The hardware platform has little to no capability to execute code.
+///   * [`fuchsia.power.system/EXECUTION_STATE_WAKE_HANDLING`]: The hardware platform is handling a wakeup event.
+///   * [`fuchsia.power.system/EXECUTION_STATE_ACTIVE`]: The hardware platform is fully capable of executing code.
 type ExecutionState = resource table {
-    1: token fuchsia.power.broker.DependencyToken;
+    1: passive_dependency_token fuchsia.power.broker.DependencyToken;
 };
 
-/// Holds a token to the execution resume latency power element and its
+/// Holds tokens to the execution resume latency power element and its
 /// supported resume latencies.
 ///
 /// The execution resume latency power element represents the
@@ -31,11 +45,12 @@ type ExecutionState = resource table {
 /// `resume_latencies` is represented by power level 0, the item at index 1 is
 /// represented by power level 1, and so on.
 type ExecutionResumeLatency = resource table {
-    1: token fuchsia.power.broker.DependencyToken;
-    2: resume_latencies vector<zx.Duration>:MAX;
+    1: passive_dependency_token fuchsia.power.broker.DependencyToken;
+    2: active_dependency_token fuchsia.power.broker.DependencyToken;
+    3: resume_latencies vector<zx.Duration>:MAX;
 };
 
-/// Holds a token to the wake handling power element.
+/// Holds tokens to the wake handling power element.
 ///
 /// The wake handling power element represents the wake handling state of the
 /// hardware platform. Driver power elements are expected to claim the active
@@ -43,18 +58,34 @@ type ExecutionResumeLatency = resource table {
 /// triggers during system resume.
 ///
 /// The wake handling power element supports the following power levels:
-///   * 0: The hardware platform is not handling a wakeup event.
-///   * 1: The hardware platform is currently handling a wakeup event.
+///   * [`fuchsia.power.system/WAKE_HANDLING_INACTIVE`]: The hardware platform is not handling a wakeup event.
+///   * [`fuchsia.power.system/WAKE_HANDLING_ACTIVE`]: The hardware platform is currently handling a wakeup event.
 type WakeHandling = resource table {
-    1: token fuchsia.power.broker.DependencyToken;
+    1: passive_dependency_token fuchsia.power.broker.DependencyToken;
+    2: active_dependency_token fuchsia.power.broker.DependencyToken;
 };
 
-/// PowerElements holds all power elements that are supported by the activity
-/// governor.
+/// Holds tokens to the application activity power element.
+///
+/// The application activity power element represents the activity state of
+/// application-level components in the system. Components that require the
+/// hardware platform to stay active may take a claim on this power element in
+/// order to prevent platform suspension.
+///
+/// The application activity power element supports the following power levels:
+///   * [`fuchsia.power.system/APPLICATION_ACTIVITY_INACTIVE`]: The application layer is not running an execution sensitive operation.
+///   * [`fuchsia.power.system/APPLICATION_ACTIVITY_ACTIVE`]: The application layer is running an execution sensitive operation.
+type ApplicationActivity = resource table {
+    1: passive_dependency_token fuchsia.power.broker.DependencyToken;
+    2: active_dependency_token fuchsia.power.broker.DependencyToken;
+};
+
+/// A collection of power elements that are managed by the activity governor.
 type PowerElements = resource table {
     1: execution_state ExecutionState;
     2: execution_resume_latency ExecutionResumeLatency;
     3: wake_handling WakeHandling;
+    4: application_activity ApplicationActivity;
 };
 
 /// A listener for activity governor events.
