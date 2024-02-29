@@ -490,11 +490,8 @@ to run your test in the correct test realm.", TEST_TYPE_FACET_KEY)));
                     config
                 )));
             }
-            if use_.config_key == None {
-                return Err(Error::validate(format!(
-                    "Config '{}' missing field 'config_key'",
-                    config
-                )));
+            if use_.key == None {
+                return Err(Error::validate(format!("Config '{}' missing field 'key'", config)));
             }
             let _ = use_config_to_value_type(use_)?;
         }
@@ -1532,7 +1529,7 @@ to run your test in the correct test realm.", TEST_TYPE_FACET_KEY)));
                 if u.availability != Some(Availability::Optional) {
                     return None;
                 }
-                let key = ConfigKey(u.config_key.clone().expect("key should be set").into());
+                let key = ConfigKey(u.key.clone().expect("key should be set").into());
                 let value = use_config_to_value_type(u).expect("config type should be valid");
                 Some((key, value))
             })
@@ -7297,7 +7294,7 @@ mod tests {
         json!({"use": [
             {
                 "config": "fuchsia.config.MyConfig",
-                "config_key": "my_config",
+                "key": "my_config",
                 "type": "bool",
             },
         ],}),
@@ -7307,7 +7304,7 @@ mod tests {
         json!({"use": [
             {
                 "config": "fuchsia.config.MyConfig",
-                "config_key": "my_config",
+                "key": "my_config",
                 "type": "vector",
                 "element": { "type": "bool"},
                 "max_count": 1,
@@ -7319,7 +7316,7 @@ mod tests {
         json!({"use": [
             {
                 "config": "fuchsia.config.MyConfig",
-                "config_key": "my_config",
+                "key": "my_config",
                 "type": "vector",
                 "element": { "type": "bool"},
                 // Missing max count.
@@ -7332,7 +7329,7 @@ mod tests {
         json!({"use": [
             {
                 "config": "fuchsia.config.MyConfig",
-                "config_key": "my_config",
+                "key": "my_config",
                 "type": "string",
                 // Missing max size.
             },
@@ -7345,7 +7342,7 @@ mod tests {
         json!({"use": [
             {
                 "config": "fuchsia.config.MyConfig",
-                "config_key": "my_config",
+                "key": "my_config",
                 "type": "bool",
                 "availability": "optional",
             },
@@ -7357,7 +7354,7 @@ mod tests {
         json!({"use": [
             {
                 "config": "fuchsia.config.MyConfig",
-                "config_key": "my_config",
+                "key": "my_config",
                 "type": "bool",
                 "availability": "optional",
             },
@@ -7373,7 +7370,7 @@ mod tests {
         json!({"use": [
             {
                 "config": "fuchsia.config.MyConfig",
-                "config_key": "my_config",
+                "key": "my_config",
                 "type": "bool",
                 "availability": "optional",
             },

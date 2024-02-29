@@ -66,7 +66,7 @@
         },
         {
             config: "fuchsia.session.SessionUrl",
-            config_key: "session_url",
+            key: "session_url",
             type: "string",
             max_size: 512,
         },
@@ -75,7 +75,7 @@
             // `session_manager` will automatically launch the given `session_url`
             // on device startup.
             config: "fuchsia.session.AutoLaunch",
-            config_key: "autolaunch",
+            key: "autolaunch",
             type: "bool",
         },
     ],

@@ -16,20 +16,20 @@
         {
             from: "parent",
             config: "fuchsia.config.MyFlag",
-            config_key: "my_flag",
+            key: "my_flag",
             type: "bool",
         },
         {
             from: "parent",
             config: "fuchsia.config.MyInt",
-            config_key: "my_int",
+            key: "my_int",
             availability: "optional",
             type: "uint8",
         },
         {
             from: "parent",
             config: "fuchsia.config.MyTransitional",
-            config_key: "transitional",
+            key: "transitional",
             availability: "transitional",
             type: "uint8",
         },

@@ -409,12 +409,8 @@ fn translate_use(
         } else if let Some(n) = &use_.config {
             let (source, source_dictionary) =
                 extract_use_source(&options, use_, all_capability_names, all_children)?;
-            let target = match &use_.config_key {
-                None => {
-                    return Err(Error::validate(
-                        "\"use config\" must have \"config_key\" field set.",
-                    ))
-                }
+            let target = match &use_.key {
+                None => return Err(Error::validate("\"use config\" must have \"key\" field set.")),
                 Some(t) => t.clone(),
             };
             let availability = extract_use_availability(use_)?;
@@ -1140,7 +1136,7 @@ fn translate_config(
             if u.config.is_none() {
                 return None;
             }
-            let key = ConfigKey(u.config_key.clone().expect("key should be set").into());
+            let key = ConfigKey(u.key.clone().expect("key should be set").into());
             let config_type =
                 validate::use_config_to_value_type(u).expect("config type should be valid");
             Some((key, config_type))
@@ -5579,7 +5575,7 @@ mod tests {
             "use": [
                     {
                         "config": "fuchsia.config.Config",
-                        "config_key" : "my_config",
+                        "key" : "my_config",
                         "type": "bool",
                     }
             ],
@@ -5619,7 +5615,7 @@ mod tests {
             "use": [
                     {
                         "config": "fuchsia.config.Config",
-                        "config_key" : "my_config",
+                        "key" : "my_config",
                         "type": "bool",
                         "availability": "optional",
                     }

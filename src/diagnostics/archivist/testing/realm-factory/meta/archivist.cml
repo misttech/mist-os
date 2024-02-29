@@ -24,19 +24,19 @@
         },
         {
             config: "fuchsia.diagnostics.EnableKlog",
-            config_key: "enable_klog",
+            key: "enable_klog",
             availability: "optional",
             type: "bool",
         },
         {
             config: "fuchsia.diagnostics.LogToDebuglog",
-            config_key: "log_to_debuglog",
+            key: "log_to_debuglog",
             availability: "optional",
             type: "bool",
         },
         {
             config: "fuchsia.diagnostics.PipelinesPath",
-            config_key: "pipelines_path",
+            key: "pipelines_path",
             availability: "optional",
             type: "string",
             max_size: 256,

@@ -22,14 +22,14 @@
         {
             // Whether or not ephemeral drivers should be allowed to be registered dynamically.
             config: "fuchsia.driver.EnableEphemeralDrivers",
-            config_key: "enable_ephemeral_drivers",
+            key: "enable_ephemeral_drivers",
             type: "bool",
         },
         {
             // Whether or not fallback drivers should wait until base drivers have been indexed
             // before bound.
             config: "fuchsia.driver.DelayFallbackUntilBaseDriversIndexed",
-            config_key: "delay_fallback_until_base_drivers_indexed",
+            key: "delay_fallback_until_base_drivers_indexed",
             type: "bool",
         },
 
@@ -37,7 +37,7 @@
         // binds as a fallback driver into a driver that will be bound normally.
         {
             config: "fuchsia.driver.BindEager",
-            config_key: "bind_eager",
+            key: "bind_eager",
             type: "vector",
             max_count: 20,
             element: {
@@ -47,18 +47,18 @@
         },
         {
             config: "fuchsia.driver.EnableDriverLoadFuzzer",
-            config_key: "enable_driver_load_fuzzer",
+            key: "enable_driver_load_fuzzer",
             type: "bool",
         },
         {
             config: "fuchsia.driver.DriverLoadFuzzerMaxDelayMs",
-            config_key: "driver_load_fuzzer_max_delay_ms",
+            key: "driver_load_fuzzer_max_delay_ms",
             type: "int64",
         },
         {
             // Disable specific drivers by URL. These drivers will not be bound or loaded.
             config: "fuchsia.driver.DisabledDrivers",
-            config_key: "disabled_drivers",
+            key: "disabled_drivers",
             type: "vector",
             max_count: 20,
             element: {

@@ -99,7 +99,7 @@ To use a configuration capability, add a `use` declaration for it:
     use: [
         {
             config: "fuchsia.config.MyBool",
-            config_key: "say_hello",
+            key: "say_hello",
             from: "parent",
         },
     ],

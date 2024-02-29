@@ -219,8 +219,8 @@ impl<'a> CapabilityId<'a> {
                 }
             }
         } else if let Some(_) = use_.config() {
-            return match &use_.config_key {
-                None => Err(Error::validate("\"config_key\" should be present for `use config`.")),
+            return match &use_.key {
+                None => Err(Error::validate("\"key\" should be present for `use config`.")),
                 Some(name) => Ok(vec![CapabilityId::UsedConfiguration(name)]),
             };
         }
@@ -2863,7 +2863,7 @@ pub struct Use {
     /// (`config` only) The configuration key in the component's `config` block that this capability
     /// will set.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub config_key: Option<Name>,
+    pub key: Option<Name>,
 
     /// (`config` only) The type of configuration, one of:
     /// - `bool`: Boolean type.
@@ -4648,7 +4648,7 @@ mod tests {
             directory: None,
             storage: None,
             config: None,
-            config_key: None,
+            key: None,
             from: None,
             path: None,
             rights: None,

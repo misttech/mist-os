@@ -33,7 +33,7 @@
         // {
         //     from: "parent",
         //     config: "fuchsia.gpu.test.GpuVendorId",
-        //     config_key: "gpu_vendor_id",
+        //     key: "gpu_vendor_id",
         //     availability: "optional",
         // },
     ],

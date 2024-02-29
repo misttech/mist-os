@@ -584,7 +584,7 @@ This supports the following additional fields:
 
     For more information, see the
     [availability][/docs/concepts/components/v2/capabilities/availability.md] documentation.
-- `config_key`: (_optional `string`_) (`config` only) The configuration key in the component's `config` block that this capability
+- `key`: (_optional `string`_) (`config` only) The configuration key in the component's `config` block that this capability
     will set.
 - `type`: (_optional `string`_) (`config` only) The type of configuration, one of:
     - `bool`: Boolean type.
