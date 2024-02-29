@@ -6,7 +6,6 @@ use {
     crate::terminal::Terminal,
     anyhow::Error,
     fuchsia_async::{self as fasync, OnSignals},
-    fuchsia_runtime,
     fuchsia_zircon::{self as zx, AsHandleRef},
     std::io::sink,
     term_model::{ansi::Processor, event::EventListener},
@@ -113,12 +112,7 @@ impl Log {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::colors::ColorScheme,
-        fuchsia_async as fasync,
-        term_model::event::{Event, EventListener},
-    };
+    use {super::*, crate::colors::ColorScheme, fuchsia_async as fasync, term_model::event::Event};
 
     #[derive(Default)]
     struct TestListener;

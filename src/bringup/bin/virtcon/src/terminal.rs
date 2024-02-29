@@ -7,7 +7,7 @@ use {
     anyhow::Error,
     carnelian::{color::Color, Size},
     pty::ServerPty,
-    std::{cell::RefCell, convert::From, fs::File, io::Write, rc::Rc},
+    std::{cell::RefCell, fs::File, io::Write, rc::Rc},
     term_model::{
         clipboard::Clipboard,
         config::Config,
@@ -160,12 +160,7 @@ impl<T> Write for Terminal<T> {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        fuchsia_async as fasync,
-        pty::ServerPty,
-        term_model::event::{Event, EventListener},
-    };
+    use {super::*, fuchsia_async as fasync, term_model::event::Event};
 
     #[derive(Default)]
     struct TestListener;

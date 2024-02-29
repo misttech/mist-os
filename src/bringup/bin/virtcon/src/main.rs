@@ -8,7 +8,6 @@ use {
     fidl_fuchsia_boot::{ArgumentsMarker, ReadOnlyLogMarker},
     fuchsia_async::LocalExecutor,
     fuchsia_component::client::connect_to_protocol,
-    fuchsia_trace_provider,
     virtual_console_lib::{VirtualConsoleAppAssistant, VirtualConsoleArgs},
 };
 

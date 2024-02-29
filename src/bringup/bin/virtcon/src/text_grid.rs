@@ -146,7 +146,6 @@ impl<T: 'static> Facet for TextGridFacet<T> {
 mod tests {
     use {
         super::*,
-        crate::colors::ColorScheme,
         anyhow::Error,
         carnelian::drawing::load_font,
         std::path::PathBuf,

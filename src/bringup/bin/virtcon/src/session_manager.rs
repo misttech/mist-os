@@ -139,12 +139,7 @@ impl SessionManager {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::colors::ColorScheme,
-        fuchsia_async as fasync,
-        term_model::event::{Event, EventListener},
-    };
+    use {super::*, crate::colors::ColorScheme, fuchsia_async as fasync, term_model::event::Event};
 
     #[derive(Default)]
     struct TestListener;
