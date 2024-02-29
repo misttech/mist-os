@@ -19,8 +19,14 @@ pub enum UpdateError {
     CipdEnsureError { code: i32 },
     #[error("cipd-ensure was terminated by a signal")]
     CipdEnsureTerminated,
+    #[error("could not canonicalize path: {given_path}")]
+    CouldNotCanonicalizePath {
+        given_path: Utf8PathBuf,
+        #[source]
+        source: io::Error,
+    },
     #[error("unknown error updating: {0}")]
-    Unknown(#[from] io::Error),
+    Unknown(#[source] io::Error),
 }
 
 const CIPD_MANIFEST_NAME: &str = "funnel-cipd-manifest";
@@ -38,10 +44,17 @@ pub async fn self_update(funnel_path: impl AsRef<Utf8Path>) -> Result<(), Update
     let mut cipd = Command::new("cipd");
     cipd.arg("ensure");
     cipd.arg("-ensure-file");
-    cipd.arg(ensure_file);
+    cipd.arg(ensure_file.canonicalize().map_err(|e| UpdateError::CouldNotCanonicalizePath {
+        given_path: ensure_file,
+        source: e,
+    })?);
     cipd.arg("-root");
-    cipd.arg(funnel_parent);
+    cipd.arg(funnel_parent.canonicalize().map_err(|e| UpdateError::CouldNotCanonicalizePath {
+        given_path: funnel_parent.into(),
+        source: e,
+    })?);
 
+    tracing::debug!("about to run cipd command: {:?}", cipd);
     // Check errors
     match cipd.spawn() {
         Ok(mut cipd_process) => {

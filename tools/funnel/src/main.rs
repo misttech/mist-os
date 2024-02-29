@@ -7,6 +7,7 @@ use crate::target::choose_target;
 use anyhow::anyhow;
 use anyhow::{Context, Result};
 use argh::FromArgs;
+use camino::Utf8PathBuf;
 use discovery::{
     wait_for_devices, DiscoverySources, FastbootConnectionState, TargetEvent, TargetState,
 };
@@ -138,8 +139,10 @@ async fn cleanup_main(args: SubCommandCleanupRemote) -> Result<()> {
 }
 
 async fn update_main(_args: SubCommandUpdate) -> Result<()> {
-    let arg0 = std::env::args().into_iter().next().ok_or_else(|| anyhow!("No args passed"))?;
-    update::self_update(arg0).await.map_err(|e| anyhow!(e))
+    let current_exe_path = std::env::current_exe()?;
+    let exe_path_buf = Utf8PathBuf::from_path_buf(current_exe_path)
+        .map_err(|p| anyhow!("Non-Utf8 Path passed: {}", p.display()))?;
+    update::self_update(exe_path_buf).await.map_err(|e| anyhow!(e))
 }
 
 async fn funnel_main(args: SubCommandHost) -> Result<()> {
