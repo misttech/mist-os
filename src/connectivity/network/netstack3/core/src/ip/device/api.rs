@@ -94,7 +94,6 @@ where
         addr_subnet: AddrSubnet<I::Addr>,
         addr_config: I::ManualAddressConfig<<C::BindingsContext as InstantBindingsTypes>::Instant>,
     ) -> Result<(), AddIpAddrSubnetError> {
-        trace!("adding addr {addr_subnet:?} config {addr_config:?} to device {device:?}");
         let addr_subnet = addr_subnet
             .replace_witness::<I::AssignedWitness>()
             .ok_or(AddIpAddrSubnetError::InvalidAddr)?;

@@ -32,6 +32,7 @@ use packet_formats::{
     icmp::{mld::MldPacket, ndp::NonZeroNdpLifetime},
     utils::NonZeroDuration,
 };
+use tracing::info;
 use zerocopy::ByteSlice;
 
 use crate::{
@@ -1494,6 +1495,7 @@ fn add_ip_addr_subnet_with_config<
     // device configuration.
     _device_config: &I::Configuration,
 ) -> Result<CC::AddressId, ExistsError> {
+    info!("adding addr {addr_sub:?} config {addr_config:?} to device {device_id:?}");
     let valid_until = I::get_valid_until(&addr_config);
     let addr_id = core_ctx.add_ip_address(device_id, addr_sub, addr_config)?;
     assert_eq!(addr_id.addr().addr(), addr_sub.addr().get());

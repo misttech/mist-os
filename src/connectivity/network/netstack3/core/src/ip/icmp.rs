@@ -1576,9 +1576,9 @@ fn receive_ndp_packet<
                 Ipv6SourceAddr::Unspecified => return,
             };
 
-            core_ctx.increment(|counters| &counters.rx.router_advertisement);
-
             let ra = p.message();
+            debug!("received router advertisement from {:?}: {:?}", src_ip, ra);
+            core_ctx.increment(|counters| &counters.rx.router_advertisement);
 
             // As per RFC 4861 section 6.3.4,
             //   The RetransTimer variable SHOULD be copied from the Retrans
@@ -1621,6 +1621,7 @@ fn receive_ndp_packet<
                     | NdpOption::RedirectedHeader { .. }
                     | NdpOption::RecursiveDnsServer(_) => {}
                     NdpOption::SourceLinkLayerAddress(addr) => {
+                        debug!("processing SourceLinkLayerAddress option in RA: {:?}", addr);
                         // As per RFC 4861 section 6.3.4,
                         //
                         //   If the advertisement contains a Source Link-Layer
@@ -1658,6 +1659,7 @@ fn receive_ndp_packet<
                         );
                     }
                     NdpOption::PrefixInformation(prefix_info) => {
+                        debug!("processing Prefix Information option in RA: {:?}", prefix_info);
                         // As per RFC 4861 section 6.3.4,
                         //
                         //   For each Prefix Information option with the on-link
@@ -1716,6 +1718,7 @@ fn receive_ndp_packet<
                         }
                     }
                     NdpOption::RouteInformation(rio) => {
+                        debug!("processing Route Information option in RA: {:?}", rio);
                         // TODO(https://fxbug.dev/42077316): Support route preference.
                         Ipv6DeviceHandler::update_discovered_ipv6_route(
                             core_ctx,
@@ -1729,6 +1732,7 @@ fn receive_ndp_packet<
                         )
                     }
                     NdpOption::Mtu(mtu) => {
+                        debug!("processing MTU option in RA: {:?}", mtu);
                         // TODO(https://fxbug.dev/42052173): Control whether or
                         // not we should update the link's MTU in response to
                         // RAs.
