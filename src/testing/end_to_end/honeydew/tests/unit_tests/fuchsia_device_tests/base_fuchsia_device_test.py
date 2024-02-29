@@ -155,6 +155,64 @@ class BaseFuchsiaDeviceTests(unittest.TestCase):
             self.fd_obj, fuchsia_device_interface.FuchsiaDevice
         )
 
+    # List all the tests related to transports
+    @mock.patch.object(
+        base_fuchsia_device.fastboot_transport.Fastboot,
+        "__init__",
+        autospec=True,
+        return_value=None,
+    )
+    def test_fastboot_transport(self, mock_fastboot_init) -> None:
+        """Test case to make sure base_fuchsia_device supports fastboot
+        transport."""
+        self.assertIsInstance(
+            self.fd_obj.fastboot,
+            base_fuchsia_device.fastboot_transport.Fastboot,
+        )
+        mock_fastboot_init.assert_called_once()
+
+    def test_ffx_transport(self) -> None:
+        """Test case to make sure base_fuchsia_device supports ffx transport."""
+        self.assertIsInstance(
+            self.fd_obj.ffx,
+            base_fuchsia_device.ffx_transport.FFX,
+        )
+
+    def test_ssh_transport(self) -> None:
+        """Test case to make sure base_fuchsia_device supports ssh transport."""
+        self.assertIsInstance(
+            self.fd_obj.ssh,
+            base_fuchsia_device.ssh_transport.SSH,
+        )
+
+    def test_sl4f_transport(self) -> None:
+        """Test case to make sure base_fuchsia_device does not support sl4f
+        transport."""
+        with self.assertRaises(NotImplementedError):
+            self.fd_obj.sl4f  # pylint: disable=pointless-statement
+
+    def test_fuchsia_controller_transport(self) -> None:
+        """Test case to make sure base_fuchsia_device does not support
+        fuchsia-controller transport."""
+        with self.assertRaises(NotImplementedError):
+            self.fd_obj.fuchsia_controller  # pylint: disable=pointless-statement
+
+    # List all the tests related to affordances
+    def test_session(self) -> None:
+        """Test case to make sure base_fuchsia_device supports session
+        affordance implemented using FFX"""
+        self.assertIsInstance(
+            self.fd_obj.session, base_fuchsia_device.session_ffx.Session
+        )
+
+    def test_screenshot(self) -> None:
+        """Test case to make sure base_fuchsia_device supports screenshot
+        affordance implemented using FFX"""
+        self.assertIsInstance(
+            self.fd_obj.screenshot,
+            base_fuchsia_device.screenshot_ffx.Screenshot,
+        )
+
     # List all the tests related to static properties
     @mock.patch.object(
         base_fuchsia_device.ffx_transport.FFX,
@@ -242,9 +300,23 @@ class BaseFuchsiaDeviceTests(unittest.TestCase):
         )
 
     # List all the tests related to public methods
-    def test_close(self) -> None:
-        """Testcase for BaseFuchsiaDevice.close()"""
-        self.fd_obj.close()
+    @mock.patch.object(
+        base_fuchsia_device.ffx_transport.FFX,
+        "check_connection",
+        autospec=True,
+    )
+    @mock.patch.object(
+        base_fuchsia_device.ssh_transport.SSH,
+        "check_connection",
+        autospec=True,
+    )
+    def test_health_check(
+        self, mock_ssh_check_connection, mock_ffx_check_connection
+    ) -> None:
+        """Testcase for BaseFuchsiaDevice.health_check()"""
+        self.fd_obj.health_check()
+        mock_ssh_check_connection.assert_called_once_with(self.fd_obj.ssh)
+        mock_ffx_check_connection.assert_called_once_with(self.fd_obj.ffx)
 
     @parameterized.expand(
         [

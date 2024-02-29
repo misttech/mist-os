@@ -109,10 +109,135 @@ class FuchsiaDeviceSL4FTests(unittest.TestCase):
             self.fd_obj, fuchsia_device_interface.FuchsiaDevice
         )
 
+    # List all the tests related to transports
+    def test_sl4f_transport(self) -> None:
+        """Test case to make sure fsl4f_fuchsia_device supports SL4F
+        transport."""
+        self.assertIsInstance(
+            self.fd_obj.sl4f, fuchsia_device.sl4f_transport.SL4F
+        )
+
+    # List all the tests related to affordances
+    @mock.patch.object(
+        fuchsia_device.bluetooth_avrcp_sl4f.bluetooth_common.BluetoothCommon,
+        "__init__",
+        autospec=True,
+        return_value=None,
+    )
+    def test_bluetooth_avrcp(self, mock_bluetooth_common_init) -> None:
+        """Test case to make sure sl4f_fuchsia_device supports
+        bluetooth_avrcp affordance implemented using SL4F transport."""
+        self.assertIsInstance(
+            self.fd_obj.bluetooth_avrcp,
+            fuchsia_device.bluetooth_avrcp_sl4f.BluetoothAvrcp,
+        )
+        mock_bluetooth_common_init.assert_called_once()
+
+    @mock.patch.object(
+        fuchsia_device.bluetooth_avrcp_sl4f.bluetooth_common.BluetoothCommon,
+        "__init__",
+        autospec=True,
+        return_value=None,
+    )
+    def test_bluetooth_gap(self, mock_bluetooth_common_init) -> None:
+        """Test case to make sure sl4f_fuchsia_device supports
+        bluetooth_gap affordance implemented using SL4F transport."""
+        self.assertIsInstance(
+            self.fd_obj.bluetooth_gap,
+            fuchsia_device.bluetooth_gap_sl4f.BluetoothGap,
+        )
+        mock_bluetooth_common_init.assert_called_once()
+
+    def test_rtc(self) -> None:
+        """Test case to make sure sl4f_fuchsia_device does not support rtc
+        affordance"""
+        with self.assertRaises(NotImplementedError):
+            self.fd_obj.rtc  # pylint: disable=pointless-statement
+
+    def test_tracing(self) -> None:
+        """Test case to make sure sl4f_fuchsia_device supports
+        tracing affordance implemented using SL4F transport."""
+        self.assertIsInstance(
+            self.fd_obj.tracing,
+            fuchsia_device.tracing_sl4f.Tracing,
+        )
+
+    def test_user_input(self) -> None:
+        """Test case to make sure sl4f_fuchsia_device supports
+        user_input affordance implemented using SL4F transport."""
+        self.assertIsInstance(
+            self.fd_obj.user_input,
+            fuchsia_device.user_input_sl4f.UserInput,
+        )
+
+    def test_wlan_policy(self) -> None:
+        """Test case to make sure sl4f_fuchsia_device supports
+        wlan_policy affordance implemented using SL4F transport."""
+        self.assertIsInstance(
+            self.fd_obj.wlan_policy,
+            fuchsia_device.wlan_policy_sl4f.WlanPolicy,
+        )
+
+    def test_wlan(self) -> None:
+        """Test case to make sure sl4f_fuchsia_device supports
+        wlan affordance implemented using SL4F transport."""
+        self.assertIsInstance(
+            self.fd_obj.wlan,
+            fuchsia_device.wlan_sl4f.Wlan,
+        )
+
     # List all the tests related to public methods
     def test_close(self) -> None:
         """Testcase for FuchsiaDevice.close()"""
         self.fd_obj.close()
+
+    @mock.patch.object(
+        fuchsia_device.sl4f_transport.SL4F,
+        "check_connection",
+        autospec=True,
+    )
+    @mock.patch.object(
+        fuchsia_device.base_fuchsia_device.BaseFuchsiaDevice,
+        "health_check",
+        autospec=True,
+    )
+    def test_health_check(
+        self, mock_base_fuchsia_device_health_check, mock_sl4f_check_connection
+    ) -> None:
+        """Testcase for FuchsiaDevice.health_check()"""
+        self.fd_obj.health_check()
+        mock_base_fuchsia_device_health_check.assert_called_once_with(
+            self.fd_obj
+        )
+        mock_sl4f_check_connection.assert_called_once_with(self.fd_obj.sl4f)
+
+    @mock.patch.object(
+        fuchsia_device.base_fuchsia_device.BaseFuchsiaDevice,
+        "on_device_boot",
+        autospec=True,
+    )
+    @mock.patch.object(
+        fuchsia_device.FuchsiaDevice, "health_check", autospec=True
+    )
+    @mock.patch.object(
+        fuchsia_device.sl4f_transport.SL4F,
+        "start_server",
+        autospec=True,
+    )
+    def test_on_device_boot(
+        self,
+        mock_sl4f_start_server,
+        mock_sl4f_based_health_check,
+        mock_base_fuchsia_device_on_device_boot,
+    ) -> None:
+        """Testcase for FuchsiaDevice.on_device_boot()"""
+        self.fd_obj.on_device_boot()
+
+        mock_sl4f_start_server.assert_called_once_with(self.fd_obj.sl4f)
+        mock_sl4f_based_health_check.assert_called_once_with(self.fd_obj)
+        mock_base_fuchsia_device_on_device_boot.assert_called_once_with(
+            self.fd_obj
+        )
 
     # List all the tests related to private methods
     @mock.patch.object(
@@ -157,21 +282,6 @@ class FuchsiaDeviceSL4FTests(unittest.TestCase):
             self.fd_obj._product_info, _MOCK_DEVICE_PROPERTIES["product_info"]
         )
         mock_sl4f_run.assert_called()
-
-    @mock.patch.object(
-        fuchsia_device.FuchsiaDevice, "health_check", autospec=True
-    )
-    @mock.patch.object(
-        fuchsia_device.sl4f_transport.SL4F, "start_server", autospec=True
-    )
-    def test_on_device_boot(
-        self, mock_sl4f_start_server, mock_health_check
-    ) -> None:
-        """Testcase for FuchsiaDevice.on_device_boot()"""
-        self.fd_obj.on_device_boot()
-
-        mock_health_check.assert_called()
-        mock_sl4f_start_server.assert_called()
 
     @parameterized.expand(
         [

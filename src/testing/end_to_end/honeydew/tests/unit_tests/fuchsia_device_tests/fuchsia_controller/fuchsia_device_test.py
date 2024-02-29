@@ -141,6 +141,73 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
             self.fd_obj, fuchsia_device_interface.FuchsiaDevice
         )
 
+    # List all the tests related to transports
+    def test_fuchsia_controller_transport(self) -> None:
+        """Test case to make sure fc_fuchsia_device supports fuchsia-controller
+        transport."""
+        self.assertIsInstance(
+            self.fd_obj.fuchsia_controller,
+            fuchsia_device.fuchsia_controller_transport.FuchsiaController,
+        )
+
+    # List all the tests related to affordances
+    def test_bluetooth_avrcp(self) -> None:
+        """Test case to make sure fc_fuchsia_device does not support
+        bluetooth_avrcp affordance."""
+        with self.assertRaises(NotImplementedError):
+            self.fd_obj.bluetooth_avrcp  # pylint: disable=pointless-statement
+
+    def test_bluetooth_gap(self) -> None:
+        """Test case to make sure fc_fuchsia_device does not support
+        bluetooth_gap affordance."""
+        with self.assertRaises(NotImplementedError):
+            self.fd_obj.bluetooth_gap  # pylint: disable=pointless-statement
+
+    @mock.patch.object(
+        fuchsia_device.rtc_fc.Rtc,
+        "__init__",
+        autospec=True,
+        return_value=None,
+    )
+    def test_rtc(self, mock_rtc_fc_init) -> None:
+        """Test case to make sure fc_fuchsia_device supports rtc affordance
+        implemented using fuchsia-controller"""
+        self.assertIsInstance(
+            self.fd_obj.rtc,
+            fuchsia_device.rtc_fc.Rtc,
+        )
+        mock_rtc_fc_init.assert_called_once_with(
+            self.fd_obj.rtc,
+            fuchsia_controller=self.fd_obj.fuchsia_controller,
+            reboot_affordance=self.fd_obj,
+        )
+
+    def test_tracing(self) -> None:
+        """Test case to make sure fc_fuchsia_device supports tracing affordance
+        implemented using fuchsia-controller"""
+        self.assertIsInstance(
+            self.fd_obj.tracing,
+            fuchsia_device.tracing_fc.Tracing,
+        )
+
+    def test_user_input(self) -> None:
+        """Test case to make sure fc_fuchsia_device does not support
+        user_input affordance."""
+        with self.assertRaises(NotImplementedError):
+            self.fd_obj.user_input  # pylint: disable=pointless-statement
+
+    def test_wlan_policy(self) -> None:
+        """Test case to make sure fc_fuchsia_device does not support
+        wlan_policy affordance."""
+        with self.assertRaises(NotImplementedError):
+            self.fd_obj.wlan_policy  # pylint: disable=pointless-statement
+
+    def test_wlan(self) -> None:
+        """Test case to make sure fc_fuchsia_device does not support
+        wlan affordance."""
+        with self.assertRaises(NotImplementedError):
+            self.fd_obj.wlan  # pylint: disable=pointless-statement
+
     # List all the tests related to public methods
     def test_close(self) -> None:
         """Testcase for FuchsiaDevice.close()"""
