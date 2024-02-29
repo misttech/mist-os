@@ -165,7 +165,7 @@ class MockAllocator : public fidl::testing::WireTestBase<fuchsia_sysmem::Allocat
 
 class FakeGpuBackend : public virtio::FakeBackend {
  public:
-  FakeGpuBackend() : FakeBackend({{0, 1024}}) {}
+  FakeGpuBackend() : FakeBackend({{0, 1024}, {1, 16}}) {}
 
   uint64_t ReadFeatures() override { return VIRTIO_F_VERSION_1; }
 
@@ -179,7 +179,9 @@ class FakeGpuBackend : public virtio::FakeBackend {
 
 class VirtioGpuTest : public testing::Test, public loop_fixture::RealLoop {
  public:
-  VirtioGpuTest() : virtio_queue_buffer_pool_(zx_system_get_page_size()) {}
+  VirtioGpuTest()
+      : virtio_control_queue_buffer_pool_(zx_system_get_page_size()),
+        virtio_cursor_queue_buffer_pool_(zx_system_get_page_size()) {}
   ~VirtioGpuTest() override = default;
 
   void SetUp() override {
@@ -228,7 +230,8 @@ class VirtioGpuTest : public testing::Test, public loop_fixture::RealLoop {
   }
 
  protected:
-  std::vector<uint8_t> virtio_queue_buffer_pool_;
+  std::vector<uint8_t> virtio_control_queue_buffer_pool_;
+  std::vector<uint8_t> virtio_cursor_queue_buffer_pool_;
   std::unique_ptr<MockAllocator> fake_sysmem_;
   std::unique_ptr<DisplayEngine> device_;
 };

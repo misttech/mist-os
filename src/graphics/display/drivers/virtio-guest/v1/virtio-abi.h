@@ -154,6 +154,11 @@ enum class ControlType : uint32_t {
 
   // VIRTIO_GPU_RESP_ERR_INVALID_PARAMETER
   kInvalidParameterError = 0x1205,
+
+  // Command encoded by `UpdateCursorCommand`.
+  //
+  // VIRTIO_GPU_CMD_UPDATE_CURSOR
+  kUpdateCursorCommand = 0x0300,
 };
 
 // Descriptor for logging and debugging.
@@ -247,6 +252,13 @@ struct ScanoutInfo {
   uint32_t flags;
 };
 
+struct CursorPos {
+  uint32_t scanout_id;
+  uint32_t x;
+  uint32_t y;
+  uint32_t padding;
+};
+
 // VIRTIO_GPU_MAX_SCANOUTS in virtio12 5.7.6.8 "Device Operation: controlq",
 // under the VIRTIO_GPU_CMD_GET_DISPLAY_INFO command description
 constexpr int kMaxScanouts = 16;
@@ -311,6 +323,17 @@ struct Create2DResourceCommand {
   ResourceFormat format;
   uint32_t width;
   uint32_t height;
+};
+
+// struct virtio_gpu_update_cursor in virtio12 5.7.6.10 "Device Operation:
+// cursorq", under the VIRTIO_GPU_CMD_UPDATE_CURSOR command description
+struct UpdateCursorCommand {
+  ControlHeader header;
+  CursorPos pos;
+  uint32_t resource_id;
+  uint32_t hot_x;
+  uint32_t hot_y;
+  uint32_t padding;
 };
 
 // Sets scanout parameters for a single output.

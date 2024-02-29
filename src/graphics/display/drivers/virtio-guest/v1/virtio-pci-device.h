@@ -38,23 +38,33 @@ class VirtioPciDevice : public virtio::Device {
   // `bti` is used to obtain physical memory addresses given to the virtio
   // device.
   //
-  // `virtio_queue_buffer_pool` must be large enough to store requests and
-  // responses exchanged with the virtio device. The buffer must reside at
-  // `virtio_queue_buffer_pool_physical_address` in the virtio device's physical
-  // address space.
+  // `virtio_control_queue_buffer_pool` and `virtio_cursor_queue_buffer_pool`
+  // must be large enough to store requests and responses exchanged with the
+  // virtio device. The buffers must reside at
+  // `virtio_control_queue_buffer_pool_physical_address` and
+  // `virtio_cursor_queue_buffer_pool_physical_address`, respectively, in the
+  // virtio device's physical address space.
   //
-  // The instance hangs onto `virtio_queue_buffer_pool_vmo` and
-  // `virtio_queue_buffer_pool_pin` for the duration of its lifetime. They are
-  // intended to keep the memory backing `virtio_queue_buffer_pool` alive and
-  // pinned to `virtio_queue_buffer_pool_physical_address`.
+  // The instance hangs onto `virtio_control_queue_buffer_pool_vmo`,
+  // `virtio_cursor_queue_buffer_pool_vmo`,
+  // `virtio_control_queue_buffer_pool_pin`, and
+  // `virtio_cursor_queue_buffer_pool_pin` for the duration of its lifetime.
+  // They are intended to keep the memory backing
+  // `virtio_control_queue_buffer_pool` and `virtio_cursor_queue_buffer_pool`
+  // alive and pinned to `virtio_control_queue_buffer_pool_physical_address`
+  // and `virtio_cursor_queue_buffer_pool_physical_address`, respectively.
   explicit VirtioPciDevice(zx::bti bti, std::unique_ptr<virtio::Backend> backend,
-                           zx::vmo virtio_queue_buffer_pool_vmo,
-                           zx::pmt virtio_queue_buffer_pool_pin,
-                           zx_paddr_t virtio_queue_buffer_pool_physical_address,
-                           cpp20::span<uint8_t> virtio_queue_buffer_pool);
+                           zx::vmo virtio_control_queue_buffer_pool_vmo,
+                           zx::pmt virtio_control_queue_buffer_pool_pin,
+                           zx_paddr_t virtio_control_queue_buffer_pool_physical_address,
+                           cpp20::span<uint8_t> virtio_control_queue_buffer_pool,
+                           zx::vmo virtio_cursor_queue_buffer_pool_vmo,
+                           zx::pmt virtio_cursor_queue_buffer_pool_pin,
+                           zx_paddr_t virtio_cursor_queue_buffer_pool_physical_address,
+                           cpp20::span<uint8_t> virtio_cursor_queue_buffer_pool);
   ~VirtioPciDevice() override;
 
-  // Synchronous request/response exchange on the main virtqueue.
+  // Synchronous request/response exchange on the main `controlq` virtqueue.
   //
   // The returned reference points to data owned by the VirtioPciDevice
   // instance, and is only valid until the method is called again.
@@ -64,16 +74,22 @@ class VirtioPciDevice : public virtio::Device {
   //
   //     const virtio_abi::EmptyRequest request = {...};
   //     const auto& response =
-  //         device->ExchangeRequestResponse<virtio_abi::EmptyResponse>(
+  //         device->ExchangeControlqRequestResponse<virtio_abi::EmptyResponse>(
   //             request);
   //
   // The current implementation fully serializes request/response exchanges.
-  // More precisely, even if ExchangeRequestResponse() is called concurrently,
+  // More precisely, even if ExchangeControlqRequestResponse() is called concurrently,
   // the virtio device will never be given a request while another request is
   // pending. While this behavior is observable, it is not part of the API. The
   // implementation may be evolved to issue concurrent requests in the future.
   template <typename ResponseType, typename RequestType>
-  const ResponseType& ExchangeRequestResponse(const RequestType& request);
+  const ResponseType& ExchangeControlqRequestResponse(const RequestType& request);
+
+  // See ExchangeControlqRequestResponse() above; this method is functionally
+  // the same, except it manages synchronous request/response exchange on the
+  // `cursorq` virtqueue.
+  template <typename ResponseType, typename RequestType>
+  const ResponseType& ExchangeCursorqRequestResponse(const RequestType& request);
 
   // virtio::Device
   zx_status_t Init() override;
@@ -82,51 +98,103 @@ class VirtioPciDevice : public virtio::Device {
   const char* tag() const override;
 
  private:
-  // Called when the virtio device notifies the driver of having used a buffer.
+  // Called when the virtio device notifies the driver of having used a buffer
+  // corresponding to the `controlq`.
   //
   // `used_descriptor_index` is the virtqueue descriptor table index pointing to
   // the data that was consumed by the device. The indicated buffer, as well as
   // all the linked buffers, are now owned by the driver.
-  void VirtioBufferUsedByDevice(uint32_t used_descriptor_index) __TA_REQUIRES(virtio_queue_mutex_);
+  void VirtioControlqBufferUsedByDevice(uint32_t used_descriptor_index)
+      __TA_REQUIRES(virtio_control_queue_mutex_);
 
-  // Ensures that a single ExchangeRequestResponse() call is in progress.
-  fbl::Mutex exchange_request_response_mutex_;
+  // Called when the virtio device notifies the driver of having used a buffer
+  // corresponding to the `cursorq`.
+  //
+  // `used_descriptor_index` is the virtqueue descriptor table index pointing to
+  // the data that was consumed by the device. The indicated buffer, as well as
+  // all the linked buffers, are now owned by the driver.
+  void VirtioCursorqBufferUsedByDevice(uint32_t used_descriptor_index)
+      __TA_REQUIRES(virtio_cursor_queue_mutex_);
+
+  // Ensures that a single ExchangeControlqRequestResponse() call is in
+  // progress at a time.
+  fbl::Mutex exchange_controlq_request_response_mutex_;
+
+  // Ensures that a single ExchangeCursorqRequestResponse() call is in
+  // progress at a time.
+  fbl::Mutex exchange_cursorq_request_response_mutex_;
 
   // Protects data members modified by multiple threads.
-  fbl::Mutex virtio_queue_mutex_;
+  fbl::Mutex virtio_control_queue_mutex_;
+  fbl::Mutex virtio_cursor_queue_mutex_;
 
-  // Signaled when the virtio device consumes a designated virtio queue buffer.
+  // Signaled when the virtio device consumes a designated virtio queue
+  // `controlq` buffer.
   //
-  // The buffer is identified by `virtio_queue_request_index_`.
-  fbl::ConditionVariable virtio_queue_buffer_used_signal_;
+  // The buffer is identified by `virtio_control_queue_request_index_`.
+  fbl::ConditionVariable virtio_control_queue_buffer_used_signal_;
 
-  // Identifies the request buffer allocated in ExchangeRequestResponse().
+  // Signaled when the virtio device consumes a designated virtio queue
+  // `cursorq` buffer.
   //
-  // nullopt iff no ExchangeRequestResponse() is in progress.
-  std::optional<uint16_t> virtio_queue_request_index_ __TA_GUARDED(virtio_queue_mutex_);
+  // The buffer is identified by `virtio_cursor_queue_request_index_`.
+  fbl::ConditionVariable virtio_cursor_queue_buffer_used_signal_;
 
-  // The GPU device's control virtqueue.
+  // Identifies the request buffer allocated in ExchangeControlqRequestResponse().
+  //
+  // nullopt iff no ExchangeControlqRequestResponse() is in progress.
+  std::optional<uint16_t> virtio_control_queue_request_index_
+      __TA_GUARDED(virtio_control_queue_mutex_);
+
+  // Identifies the request buffer allocated in ExchangeCursorqRequestResponse().
+  //
+  // nullopt iff no ExchangeControlqRequestResponse() is in progress.
+  std::optional<uint16_t> virtio_cursor_queue_request_index_
+      __TA_GUARDED(virtio_cursor_queue_mutex_);
+
+  // The GPU device's control virtqueue, or `controlq`.
   //
   // Defined in the VIRTIO spec Section 5.7.2 "GPU Device" > "Virtqueues".
-  virtio::Ring virtio_queue_ __TA_GUARDED(virtio_queue_mutex_);
+  virtio::Ring virtio_control_queue_ __TA_GUARDED(virtio_control_queue_mutex_);
 
-  // Backs `virtio_queue_buffer_pool_`.
-  const zx::vmo virtio_queue_buffer_pool_vmo_;
+  // The GPU device's cursor virtqueue, or `cursorq`.
+  //
+  // Defined in the VIRTIO spec Section 5.7.2 "GPU Device" > "Virtqueues".
+  virtio::Ring virtio_cursor_queue_ __TA_GUARDED(virtio_cursor_queue_mutex_);
 
-  // Pins `virtio_queue_buffer_pool_vmo_` at a known physical address.
-  const zx::pmt virtio_queue_buffer_pool_pin_;
+  // Backs `virtio_control_queue_buffer_pool_`.
+  const zx::vmo virtio_control_queue_buffer_pool_vmo_;
 
-  // The starting address of `virtio_queue_buffer_pool_`.
-  const zx_paddr_t virtio_queue_buffer_pool_physical_address_;
+  // Backs `virtio_cursor_queue_buffer_pool_`.
+  const zx::vmo virtio_cursor_queue_buffer_pool_vmo_;
 
-  // Memory pinned at a known physical address, used for virtqueue buffers.
+  // Pins `virtio_control_queue_buffer_pool_vmo_` at a known physical address.
+  const zx::pmt virtio_control_queue_buffer_pool_pin_;
+
+  // Pins `virtio_cursor_queue_buffer_pool_vmo_` at a known physical address.
+  const zx::pmt virtio_cursor_queue_buffer_pool_pin_;
+
+  // The starting address of `virtio_control_queue_buffer_pool_`.
+  const zx_paddr_t virtio_control_queue_buffer_pool_physical_address_;
+
+  // The starting address of `virtio_cursor_queue_buffer_pool_`.
+  const zx_paddr_t virtio_cursor_queue_buffer_pool_physical_address_;
+
+  // Memory pinned at a known physical address, used for virtqueue buffers
+  // correlating to the `controlq`.
   //
   // The span's data is modified by the driver and by the virtio device.
-  const cpp20::span<uint8_t> virtio_queue_buffer_pool_;
+  const cpp20::span<uint8_t> virtio_control_queue_buffer_pool_;
+
+  // Memory pinned at a known physical address, used for virtqueue buffers
+  // correlating to the `cursorq`.
+  //
+  // The span's data is modified by the driver and by the virtio device.
+  const cpp20::span<uint8_t> virtio_cursor_queue_buffer_pool_;
 };
 
 template <typename ResponseType, typename RequestType>
-const ResponseType& VirtioPciDevice::ExchangeRequestResponse(const RequestType& request) {
+const ResponseType& VirtioPciDevice::ExchangeControlqRequestResponse(const RequestType& request) {
   static constexpr size_t request_size = sizeof(RequestType);
   static constexpr size_t response_size = sizeof(ResponseType);
   zxlogf(TRACE, "Sending %zu-byte request, expecting %zu-byte response", request_size,
@@ -135,23 +203,23 @@ const ResponseType& VirtioPciDevice::ExchangeRequestResponse(const RequestType& 
   // Request/response exchanges are fully serialized.
   //
   // Relaxing this implementation constraint would require the following:
-  // * An allocation scheme for `virtual_queue_buffer_pool`. An easy solution is
-  //   to sub-divide the area into equally-sized cells, where each cell can hold
-  //   the largest possible request + response.
+  // * An allocation scheme for `virtio_control_queue_buffer_pool`. An easy
+  //   solution is to sub-divide the area into equally-sized cells, where each
+  //   cell can hold the largest possible request + response.
   // * A map of virtio queue descriptor index to condition variable, so multiple
   //   threads can be waiting on the device notification interrupt.
-  // * Handling the case where `virtual_queue_buffer_pool` is full. Options are
-  //   waiting on a new condition variable signaled whenever a buffer is
-  //   released, and asserting that implies the buffer pool is statically sized
-  //   to handle the maximum possible concurrency.
+  // * Handling the case where `virtual_control_queue_buffer_pool` is full.
+  //   Options are waiting on a new condition variable signaled whenever a
+  //   buffer is released, and asserting that implies the buffer pool is
+  //   statically sized to handle the maximum possible concurrency.
   //
-  // Optionally, the locking around `virtio_queue_mutex_` could be more
+  // Optionally, the locking around `virtio_control_queue_mutex_` could be more
   // fine-grained. Allocating the descriptors needs to be serialized, but
   // populating them can be done concurrently. Last, submitting the descriptors
   // to the virtio device must be serialized.
-  fbl::AutoLock exhange_request_response_lock(&exchange_request_response_mutex_);
+  fbl::AutoLock exhange_controlq_request_response_lock(&exchange_controlq_request_response_mutex_);
 
-  fbl::AutoLock virtio_queue_lock(&virtio_queue_mutex_);
+  fbl::AutoLock virtio_control_queue_lock(&virtio_control_queue_mutex_);
 
   // Allocate two virtqueue descriptors. This is the minimum number of
   // descriptors needed to represent a request / response exchange using the
@@ -164,24 +232,25 @@ const ResponseType& VirtioPciDevice::ExchangeRequestResponse(const RequestType& 
 
   uint16_t request_descriptor_index;
   vring_desc* const request_descriptor =
-      virtio_queue_.AllocDescChain(/*count=*/2, &request_descriptor_index);
+      virtio_control_queue_.AllocDescChain(/*count=*/2, &request_descriptor_index);
   ZX_ASSERT(request_descriptor);
-  virtio_queue_request_index_ = request_descriptor_index;
+  virtio_control_queue_request_index_ = request_descriptor_index;
 
-  cpp20::span<uint8_t> request_span = virtio_queue_buffer_pool_.subspan(0, request_size);
+  cpp20::span<uint8_t> request_span = virtio_control_queue_buffer_pool_.subspan(0, request_size);
   std::memcpy(request_span.data(), &request, request_size);
 
-  const zx_paddr_t request_physical_address = virtio_queue_buffer_pool_physical_address_;
+  const zx_paddr_t request_physical_address = virtio_control_queue_buffer_pool_physical_address_;
   request_descriptor->addr = request_physical_address;
   static_assert(request_size <= std::numeric_limits<uint32_t>::max());
   request_descriptor->len = static_cast<uint32_t>(request_size);
   request_descriptor->flags = VRING_DESC_F_NEXT;
 
-  vring_desc* const response_descriptor = virtio_queue_.DescFromIndex(request_descriptor->next);
+  vring_desc* const response_descriptor =
+      virtio_control_queue_.DescFromIndex(request_descriptor->next);
   ZX_ASSERT(response_descriptor);
 
   cpp20::span<uint8_t> response_span =
-      virtio_queue_buffer_pool_.subspan(request_size, response_size);
+      virtio_control_queue_buffer_pool_.subspan(request_size, response_size);
   std::fill(response_span.begin(), response_span.end(), 0);
 
   const zx_paddr_t response_physical_address = request_physical_address + request_size;
@@ -191,10 +260,85 @@ const ResponseType& VirtioPciDevice::ExchangeRequestResponse(const RequestType& 
   response_descriptor->flags = VRING_DESC_F_WRITE;
 
   // Submit the transfer & wait for the response
-  virtio_queue_.SubmitChain(request_descriptor_index);
-  virtio_queue_.Kick();
+  virtio_control_queue_.SubmitChain(request_descriptor_index);
+  virtio_control_queue_.Kick();
 
-  virtio_queue_buffer_used_signal_.Wait(&virtio_queue_mutex_);
+  virtio_control_queue_buffer_used_signal_.Wait(&virtio_control_queue_mutex_);
+
+  return *reinterpret_cast<ResponseType*>(response_span.data());
+}
+
+template <typename ResponseType, typename RequestType>
+const ResponseType& VirtioPciDevice::ExchangeCursorqRequestResponse(const RequestType& request) {
+  static constexpr size_t request_size = sizeof(RequestType);
+  static constexpr size_t response_size = sizeof(ResponseType);
+  zxlogf(TRACE, "Sending %zu-byte request, expecting %zu-byte response", request_size,
+         response_size);
+
+  // Request/response exchanges are fully serialized.
+  //
+  // Relaxing this implementation constraint would require the following:
+  // * An allocation scheme for `virtio_cursor_queue_buffer_pool`. An easy
+  //   solution is to sub-divide the area into equally-sized cells, where each
+  //   cell can hold the largest possible request + response.
+  // * A map of virtio queue descriptor index to condition variable, so multiple
+  //   threads can be waiting on the device notification interrupt.
+  // * Handling the case where `virtual_cursor_queue_buffer_pool` is full.
+  //   Options are waiting on a new condition variable signaled whenever a
+  //   buffer is released, and asserting that implies the buffer pool is
+  //   statically sized to handle the maximum possible concurrency.
+  //
+  // Optionally, the locking around `virtio_cursor_queue_mutex_` could be more
+  // fine-grained. Allocating the descriptors needs to be serialized, but
+  // populating them can be done concurrently. Last, submitting the descriptors
+  // to the virtio device must be serialized.
+  fbl::AutoLock exhange_cursorq_request_response_lock(&exchange_cursorq_request_response_mutex_);
+
+  fbl::AutoLock virtio_cursor_queue_lock(&virtio_cursor_queue_mutex_);
+
+  // Allocate two virtqueue descriptors. This is the minimum number of
+  // descriptors needed to represent a request / response exchange using the
+  // split virtqueue format described in the VIRTIO spec Section 2.7 "Split
+  // Virtqueues". This is because each descriptor can point to a read-only or a
+  // write-only memory buffer, and we need one of each.
+  //
+  // The first (returned) descriptor will point to the request buffer, and the
+  // second (chained) descriptor will point to the response buffer.
+
+  uint16_t request_descriptor_index;
+  vring_desc* const request_descriptor =
+      virtio_cursor_queue_.AllocDescChain(/*count=*/2, &request_descriptor_index);
+  ZX_ASSERT(request_descriptor);
+  virtio_cursor_queue_request_index_ = request_descriptor_index;
+
+  cpp20::span<uint8_t> request_span = virtio_cursor_queue_buffer_pool_.subspan(0, request_size);
+  std::memcpy(request_span.data(), &request, request_size);
+
+  const zx_paddr_t request_physical_address = virtio_cursor_queue_buffer_pool_physical_address_;
+  request_descriptor->addr = request_physical_address;
+  static_assert(request_size <= std::numeric_limits<uint32_t>::max());
+  request_descriptor->len = static_cast<uint32_t>(request_size);
+  request_descriptor->flags = VRING_DESC_F_NEXT;
+
+  vring_desc* const response_descriptor =
+      virtio_cursor_queue_.DescFromIndex(request_descriptor->next);
+  ZX_ASSERT(response_descriptor);
+
+  cpp20::span<uint8_t> response_span =
+      virtio_cursor_queue_buffer_pool_.subspan(request_size, response_size);
+  std::fill(response_span.begin(), response_span.end(), 0);
+
+  const zx_paddr_t response_physical_address = request_physical_address + request_size;
+  response_descriptor->addr = response_physical_address;
+  static_assert(response_size <= std::numeric_limits<uint32_t>::max());
+  response_descriptor->len = static_cast<uint32_t>(response_size);
+  response_descriptor->flags = VRING_DESC_F_WRITE;
+
+  // Submit the transfer & wait for the response
+  virtio_cursor_queue_.SubmitChain(request_descriptor_index);
+  virtio_cursor_queue_.Kick();
+
+  virtio_cursor_queue_buffer_used_signal_.Wait(&virtio_cursor_queue_mutex_);
 
   return *reinterpret_cast<ResponseType*>(response_span.data());
 }

@@ -88,6 +88,9 @@ const char* ControlTypeToString(ControlType type) {
 
     case ControlType::kInvalidParameterError:
       return "Error: InvalidParameter";
+
+    case ControlType::kUpdateCursorCommand:
+      return "Command: UpdateCursor";
   }
 
   return "(unknown)";
