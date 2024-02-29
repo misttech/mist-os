@@ -754,66 +754,58 @@ impl ComponentInstance {
         self: &Arc<Self>,
         shut_down: bool,
     ) -> Result<(), StopActionError> {
-        let (was_running, stop_result) = {
+        let stop_result = {
             let mut execution = self.lock_execution().await;
-            let was_running = execution.runtime.is_some();
             let shut_down = execution.shut_down | shut_down;
-
-            let component_stop_result = {
-                if let Some(runtime) = &mut execution.runtime {
-                    let stop_timer = Box::pin(async move {
-                        let timer = fasync::Timer::new(fasync::Time::after(zx::Duration::from(
-                            self.environment.stop_timeout(),
-                        )));
-                        timer.await;
-                    });
-                    let kill_timer = Box::pin(async move {
-                        let timer = fasync::Timer::new(fasync::Time::after(zx::Duration::from(
-                            DEFAULT_KILL_TIMEOUT,
-                        )));
-                        timer.await;
-                    });
-                    let ret = runtime
-                        .stop_program(stop_timer, kill_timer)
-                        .await
-                        .map_err(StopActionError::ProgramStopError)?;
-                    if ret.request == StopRequestSuccess::KilledAfterTimeout
-                        || ret.request == StopRequestSuccess::Killed
-                    {
-                        warn!(
-                            "component {} did not stop in {:?}. Killed it.",
-                            self.moniker,
-                            self.environment.stop_timeout()
-                        );
-                    }
-                    if !shut_down && self.on_terminate == fdecl::OnTerminate::Reboot {
-                        warn!(
-                            "Component with on_terminate=REBOOT terminated: {}. \
-                            Rebooting the system",
-                            self.moniker
-                        );
-                        let top_instance = self
-                            .top_instance()
-                            .await
-                            .map_err(|_| StopActionError::GetTopInstanceFailed)?;
-                        top_instance.trigger_reboot().await;
-                    }
-
-                    if let Some(execution_controller_task) =
-                        runtime.execution_controller_task.as_mut()
-                    {
-                        execution_controller_task.set_stop_status(ret.component_exit_status);
-                    }
-                    ret.component_exit_status
-                } else {
-                    zx::Status::PEER_CLOSED
-                }
-            };
-
             execution.shut_down = shut_down;
-            execution.runtime = None;
 
-            (was_running, component_stop_result)
+            if let Some(ref mut runtime) = execution.runtime.take() {
+                let stop_timer = Box::pin(async move {
+                    let timer = fasync::Timer::new(fasync::Time::after(zx::Duration::from(
+                        self.environment.stop_timeout(),
+                    )));
+                    timer.await;
+                });
+                let kill_timer = Box::pin(async move {
+                    let timer = fasync::Timer::new(fasync::Time::after(zx::Duration::from(
+                        DEFAULT_KILL_TIMEOUT,
+                    )));
+                    timer.await;
+                });
+                let ret = runtime
+                    .stop_program(stop_timer, kill_timer)
+                    .await
+                    .map_err(StopActionError::ProgramStopError)?;
+                if ret.request == StopRequestSuccess::KilledAfterTimeout
+                    || ret.request == StopRequestSuccess::Killed
+                {
+                    warn!(
+                        "component {} did not stop in {:?}. Killed it.",
+                        self.moniker,
+                        self.environment.stop_timeout()
+                    );
+                }
+                if !shut_down && self.on_terminate == fdecl::OnTerminate::Reboot {
+                    warn!(
+                        "Component with on_terminate=REBOOT terminated: {}. \
+                            Rebooting the system",
+                        self.moniker
+                    );
+                    let top_instance = self
+                        .top_instance()
+                        .await
+                        .map_err(|_| StopActionError::GetTopInstanceFailed)?;
+                    top_instance.trigger_reboot().await;
+                }
+
+                if let Some(execution_controller_task) = runtime.execution_controller_task.as_mut()
+                {
+                    execution_controller_task.set_stop_status(ret.component_exit_status);
+                }
+                Some(ret.component_exit_status)
+            } else {
+                None
+            }
         };
 
         // TODO(b/322564390): Move program_input_dict_additions into `ExecutionState` to avoid locking InstanceState.
@@ -828,7 +820,7 @@ impl ComponentInstance {
         self.destroy_dynamic_children()
             .await
             .map_err(|err| StopActionError::DestroyDynamicChildrenFailed { err: Box::new(err) })?;
-        if was_running {
+        if let Some(stop_result) = stop_result {
             let event = Event::new(self, EventPayload::Stopped { status: stop_result });
             self.hooks.dispatch(&event).await;
         }
