@@ -159,7 +159,6 @@ mod tests {
     use fuchsia_async as fasync;
     use fuchsia_zircon as zx;
     use futures::{pin_mut, TryStreamExt};
-    use zx::Duration;
 
     #[test]
     fn no_message() {
