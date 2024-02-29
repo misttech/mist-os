@@ -1599,7 +1599,7 @@ mod tests {
     use {
         super::*,
         assert_matches::assert_matches,
-        cm_rust::{Availability, ChildRef, ExposeServiceDecl},
+        cm_rust::{ChildRef, ExposeServiceDecl},
     };
 
     #[test]

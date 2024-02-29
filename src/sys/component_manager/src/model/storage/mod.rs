@@ -541,17 +541,11 @@ mod tests {
             test_helpers::{self, component_decl_with_test_runner},
         },
         assert_matches::assert_matches,
-        cm_moniker::InstancedMoniker,
         cm_rust::*,
         cm_rust_testing::*,
-        component_id_index::InstanceId,
         fidl_fuchsia_io as fio,
-        moniker::{Moniker, MonikerBase},
-        rand::{self, distributions::Alphanumeric, Rng},
-        std::{
-            convert::{TryFrom, TryInto},
-            sync::Arc,
-        },
+        moniker::Moniker,
+        rand::{distributions::Alphanumeric, Rng},
     };
 
     #[fuchsia::test]

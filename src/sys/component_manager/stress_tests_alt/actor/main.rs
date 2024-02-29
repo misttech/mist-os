@@ -12,7 +12,6 @@ use {
     rand::prelude::SliceRandom,
     rand::rngs::SmallRng,
     rand::Rng,
-    std::convert::TryFrom,
     stress_test_actor::{actor_loop, Action},
     tracing::warn,
 };

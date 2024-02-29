@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use {
-    anyhow::{self, Error},
+    anyhow::Error,
     fidl_fidl_examples_routing_echo as fecho, fidl_fuchsia_logger as flogger,
     fuchsia_async as fasync,
     fuchsia_component::server as fserver,

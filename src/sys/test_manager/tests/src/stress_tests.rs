@@ -6,7 +6,7 @@ use {
     fidl_fuchsia_test_manager as ftest_manager,
     ftest_manager::{CaseStatus, SuiteStatus},
     fuchsia_component::client,
-    futures::{prelude::*, stream},
+    futures::prelude::*,
     pretty_assertions::assert_eq,
     test_diagnostics::collect_string_from_socket,
     test_manager_test_lib::{

@@ -6,8 +6,7 @@ use {
     super::*,
     assert_matches::assert_matches,
     fidl_fuchsia_update_installer_ext::{
-        monitor_update, start_update, Initiator, Options, Progress, State, StateId,
-        UpdateAttemptError, UpdateInfo, UpdateInfoAndProgress,
+        monitor_update, Progress, State, StateId, UpdateInfo, UpdateInfoAndProgress,
     },
     pretty_assertions::assert_eq,
 };

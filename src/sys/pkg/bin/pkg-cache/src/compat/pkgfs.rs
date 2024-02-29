@@ -127,10 +127,7 @@ mod testing {
     use {
         super::*,
         std::any::Any,
-        vfs::directory::{
-            dirents_sink::{AppendResult, Sealed, Sink},
-            entry::EntryInfo,
-        },
+        vfs::directory::dirents_sink::{AppendResult, Sealed, Sink},
     };
 
     /// Implementation of vfs::directory::dirents_sink::Sink.

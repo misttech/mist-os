@@ -9,7 +9,6 @@ use {
     fuchsia_component::client,
     fuchsia_runtime::{take_startup_handle, HandleInfo, HandleType},
     fuchsia_zircon::{self as zx, HandleBased, Resource},
-    std::convert::{From, TryFrom},
     std::sync::Arc,
     thiserror::Error,
     tracing::info,

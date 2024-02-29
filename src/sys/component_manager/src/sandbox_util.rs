@@ -361,7 +361,6 @@ pub mod tests {
     use fidl::endpoints::ClientEnd;
     use futures::StreamExt;
     use sandbox::Receiver;
-    use std::iter;
 
     #[fuchsia::test]
     async fn unwrap_server_end_or_serve_node_node_reference_and_describe() {

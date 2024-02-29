@@ -6,7 +6,7 @@ use {
     diagnostics_assertions::{assert_data_tree, AnyProperty},
     diagnostics_reader::{ArchiveReader, DiagnosticsHierarchy, Inspect},
     fidl::endpoints::create_proxy,
-    fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as fsys, fuchsia_fs,
+    fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as fsys,
 };
 
 async fn get_job_koid(moniker: &str, realm_query: &fsys::RealmQueryProxy) -> u64 {

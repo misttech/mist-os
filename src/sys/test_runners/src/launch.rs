@@ -210,7 +210,6 @@ mod tests {
         fuchsia_runtime::{job_default, process_self, swap_utc_clock_handle},
         fuchsia_zircon as zx,
         futures::prelude::*,
-        std::convert::TryInto,
     };
 
     #[test]

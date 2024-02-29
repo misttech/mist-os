@@ -411,13 +411,12 @@ mod tests {
         super::*,
         crate::model::{
             hooks::{CapabilityReceiver, Event as ComponentEvent, EventPayload},
-            testing::test_helpers::{TestModelResult, *},
+            testing::test_helpers::*,
         },
         assert_matches::assert_matches,
         cm_rust::{Availability, UseSource},
         fidl_fuchsia_component_sandbox as fsandbox, fidl_fuchsia_io as fio, fuchsia_zircon as zx,
         futures::StreamExt,
-        moniker::Moniker,
         sandbox::Message,
         std::str::FromStr,
     };

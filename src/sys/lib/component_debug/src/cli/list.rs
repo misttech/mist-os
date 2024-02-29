@@ -194,7 +194,7 @@ fn filter_relatives(instances: Vec<Instance>, child_str: String) -> Vec<Instance
 mod tests {
     use super::*;
     use crate::test_utils::*;
-    use moniker::{Moniker, MonikerBase};
+    use moniker::Moniker;
     use std::collections::HashMap;
 
     fn create_query() -> fsys::RealmQueryProxy {

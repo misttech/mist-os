@@ -121,10 +121,8 @@ fn new_table(title: &str) -> Table {
 #[cfg(test)]
 mod test {
     use {
-        super::*,
-        fidl::endpoints::create_proxy_and_stream,
-        futures::TryStreamExt,
-        moniker::{Moniker, MonikerBase},
+        super::*, fidl::endpoints::create_proxy_and_stream, futures::TryStreamExt,
+        moniker::MonikerBase,
     };
 
     fn route_validator(

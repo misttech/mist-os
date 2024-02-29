@@ -121,7 +121,6 @@ mod tests {
         fidl::endpoints::create_proxy_and_stream,
         fidl_fuchsia_sys2 as fsys, fuchsia_async as fasync,
         moniker::{Moniker, MonikerBase},
-        std::{boxed::Box, convert::TryFrom, sync::Arc, time::Duration},
     };
 
     /// Use SystemController to shut down a system whose root has the child `a`

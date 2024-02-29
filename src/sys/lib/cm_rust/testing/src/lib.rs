@@ -7,7 +7,6 @@ use {
     assert_matches::assert_matches,
     cm_rust::{CapabilityTypeName, ComponentDecl, FidlIntoNative},
     cm_types::{Name, Path, RelativePath},
-    cml,
     derivative::Derivative,
     fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_data as fdata, fidl_fuchsia_io as fio,
     std::{collections::BTreeMap, path::PathBuf},

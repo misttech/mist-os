@@ -274,7 +274,8 @@ impl State {
         let deadline = event_data.start_time + self.batch_timeout;
         let Some(sleep_time) = deadline.checked_duration_since(Instant::now()) else {
             // Return the data since we've passed the deadline.
-            if let StateInner::Event(event_data) = std::mem::replace(&mut *inner, StateInner::Empty) {
+            if let StateInner::Event(event_data) = std::mem::replace(&mut *inner, StateInner::Empty)
+            {
                 return Some(event_data);
             } else {
                 unreachable!()
@@ -357,7 +358,7 @@ impl fmt::Debug for EventFilter {
 mod tests {
     use {
         super::*,
-        std::{fs::File, io::Write, path::Path, sync::mpsc},
+        std::{fs::File, io::Write, sync::mpsc},
     };
 
     const BATCH_DURATION: Duration = Duration::from_millis(100);

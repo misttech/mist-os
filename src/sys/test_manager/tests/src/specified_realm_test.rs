@@ -10,7 +10,7 @@ use {
     ftest_manager::{CaseStatus, RunOptions, SuiteStatus},
     fuchsia_async as fasync,
     fuchsia_component::client,
-    futures::{prelude::*, stream},
+    futures::prelude::*,
     pretty_assertions::assert_eq,
     test_diagnostics::collect_string_from_socket,
     test_manager_test_lib::{

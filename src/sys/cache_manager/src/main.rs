@@ -5,7 +5,7 @@
 use {
     anyhow::{format_err, Context, Error},
     cache_manager_config_lib::Config,
-    fidl, fidl_fuchsia_sys2 as fsys, fuchsia_async as fasync,
+    fidl_fuchsia_sys2 as fsys, fuchsia_async as fasync,
     fuchsia_component::client as fclient,
     std::process,
     tracing::*,
@@ -181,7 +181,7 @@ mod tests {
             channel::mpsc::{self as mpsc, UnboundedReceiver},
             TryStreamExt,
         },
-        std::{boxed::Box, future::Future, pin::Pin},
+        std::{future::Future, pin::Pin},
     };
 
     struct FakeStorageServer {

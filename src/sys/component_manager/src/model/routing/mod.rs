@@ -18,7 +18,7 @@ use {
             storage,
         },
     },
-    ::routing::{self, component_instance::ComponentInstanceInterface, mapper::NoopRouteMapper},
+    ::routing::{component_instance::ComponentInstanceInterface, mapper::NoopRouteMapper},
     async_trait::async_trait,
     cm_rust::{ExposeDecl, ExposeDeclCommon, UseStorageDecl},
     cm_types::Availability,

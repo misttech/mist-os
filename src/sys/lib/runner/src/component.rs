@@ -10,18 +10,13 @@ use {
     fuchsia_runtime::{job_default, HandleInfo, HandleType},
     fuchsia_zircon::{self as zx, HandleBased, Status},
     futures::{
-        future::{self, BoxFuture, Either},
+        future::{BoxFuture, Either},
         prelude::*,
-        stream::{BoxStream, Stream},
-        Future,
+        stream::BoxStream,
     },
     lazy_static::lazy_static,
-    library_loader,
     namespace::{Namespace, Path},
-    std::{
-        convert::{TryFrom, TryInto},
-        path::PathBuf,
-    },
+    std::path::PathBuf,
     thiserror::Error,
     tracing::*,
 };
@@ -444,12 +439,7 @@ mod tests {
         fuchsia_zircon::{self as zx, HandleBased},
         futures::{future::BoxFuture, poll, prelude::*},
         namespace::{Namespace, NamespaceError},
-        std::{
-            boxed::Box,
-            convert::{TryFrom, TryInto},
-            pin::Pin,
-            task::Poll,
-        },
+        std::{pin::Pin, task::Poll},
     };
 
     #[test]
@@ -671,7 +661,7 @@ mod tests {
     mod launch_info {
         use fidl::endpoints::Proxy;
 
-        use {super::*, anyhow::format_err, futures::channel::oneshot, std::mem::drop};
+        use {super::*, anyhow::format_err, futures::channel::oneshot};
 
         fn setup_empty_namespace() -> Result<Namespace, NamespaceError> {
             setup_namespace(false, vec![])

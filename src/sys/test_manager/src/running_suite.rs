@@ -21,7 +21,6 @@ use {
         utilities::stream_fn,
     },
     anyhow::{anyhow, format_err, Context, Error},
-    cm_rust,
     fidl::endpoints::{create_proxy, ClientEnd},
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
     fidl_fuchsia_component_resolution::ResolverProxy,

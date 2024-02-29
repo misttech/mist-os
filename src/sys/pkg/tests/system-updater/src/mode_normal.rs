@@ -3,10 +3,8 @@
 // found in the LICENSE file.
 
 use {
-    super::*,
-    crate::progress_reporting::assert_success_monitor_states,
-    fidl_fuchsia_update_installer_ext::{start_update, StateId},
-    pretty_assertions::assert_eq,
+    super::*, crate::progress_reporting::assert_success_monitor_states,
+    fidl_fuchsia_update_installer_ext::StateId, pretty_assertions::assert_eq,
 };
 
 #[fasync::run_singlethreaded(test)]

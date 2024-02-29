@@ -174,7 +174,7 @@ mod tests {
         camino::Utf8Path,
         fuchsia_url::PackageName,
         serde_json::json,
-        std::{fs::File, io},
+        std::fs::File,
     };
 
     #[test]

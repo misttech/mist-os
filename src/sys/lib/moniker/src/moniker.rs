@@ -7,7 +7,7 @@ use {
         child_name::{ChildName, ChildNameBase},
         error::MonikerError,
     },
-    core::cmp::{self, Ord, Ordering, PartialEq},
+    core::cmp::{self, Ordering, PartialEq},
     std::{fmt, hash::Hash},
 };
 

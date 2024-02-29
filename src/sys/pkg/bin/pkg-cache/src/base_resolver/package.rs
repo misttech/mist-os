@@ -4,7 +4,7 @@
 
 use {
     super::{context_authenticator::ContextAuthenticator, ResolverError},
-    anyhow::{self, Context as _},
+    anyhow::Context as _,
     fidl::endpoints::ServerEnd,
     fidl_fuchsia_io as fio, fidl_fuchsia_pkg as fpkg,
     futures::stream::TryStreamExt as _,

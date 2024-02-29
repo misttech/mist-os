@@ -7,7 +7,7 @@ use {
     fidl::prelude::*,
     fidl_fuchsia_io as fio,
     fidl_fuchsia_ldsvc::{LoaderRequest, LoaderRequestStream},
-    fuchsia_async as fasync, fuchsia_fs, fuchsia_zircon as zx,
+    fuchsia_async as fasync, fuchsia_zircon as zx,
     futures::{TryFutureExt, TryStreamExt},
     std::sync::Arc,
     tracing::*,

@@ -224,7 +224,6 @@ mod tests {
         super::*,
         fidl_fuchsia_update_installer::{Initiator, MonitorMarker, MonitorRequest},
         pretty_assertions::assert_eq,
-        std::convert::TryFrom,
     };
 
     #[fasync::run_singlethreaded(test)]

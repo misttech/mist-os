@@ -9,7 +9,6 @@ use {
     fuchsia_zircon::{self as zx, AsHandleRef},
     futures::TryStreamExt,
     moniker::Moniker,
-    task_exceptions,
     tracing::error,
 };
 
@@ -84,9 +83,9 @@ mod tests {
         anyhow::{Context as _, Error},
         fidl_fuchsia_io as fio, fidl_fuchsia_process as fprocess,
         fuchsia_component::client as fclient,
-        fuchsia_fs, fuchsia_runtime as fruntime,
+        fuchsia_runtime as fruntime,
         fuchsia_zircon::HandleBased,
-        std::{convert::TryInto, sync::Arc},
+        std::sync::Arc,
     };
 
     #[fuchsia::test]

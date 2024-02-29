@@ -15,7 +15,7 @@ use {
     cm_rust::{ComponentDecl, ExposeDecl, ExposeDirectoryDecl, ExposeSource, ExposeTarget},
     cm_types::{Name, Path},
     fidl::endpoints::ServerEnd,
-    fidl_fuchsia_io as fio, fuchsia_async as fasync, fuchsia_fs, fuchsia_zircon as zx,
+    fidl_fuchsia_io as fio, fuchsia_async as fasync, fuchsia_zircon as zx,
     futures::stream::StreamExt,
     moniker::Moniker,
     std::{

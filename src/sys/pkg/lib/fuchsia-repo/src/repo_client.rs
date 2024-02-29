@@ -606,12 +606,10 @@ mod tests {
         },
         assert_matches::assert_matches,
         camino::{Utf8Path, Utf8PathBuf},
-        fidl_fuchsia_pkg_ext::RepositoryConfigBuilder,
         pretty_assertions::assert_eq,
         std::fs::{self, create_dir_all},
         tuf::{
-            database::Database, repo_builder::RepoBuilder as TufRepoBuilder,
-            repository::FileSystemRepositoryBuilder,
+            repo_builder::RepoBuilder as TufRepoBuilder, repository::FileSystemRepositoryBuilder,
         },
     };
 

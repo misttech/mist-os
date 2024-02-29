@@ -28,10 +28,7 @@ pub async fn cmd_repo_create(cmd: RepoCreateCommand) -> Result<()> {
 mod tests {
     use {
         super::*,
-        crate::{
-            args::RepoCreateCommand, args::RepoPublishCommand, repo_create::cmd_repo_create,
-            repo_publish::cmd_repo_publish,
-        },
+        crate::{args::RepoPublishCommand, repo_publish::cmd_repo_publish},
         assert_matches::assert_matches,
         camino::Utf8Path,
         chrono::Utc,

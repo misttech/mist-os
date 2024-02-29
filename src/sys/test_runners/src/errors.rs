@@ -8,7 +8,6 @@ use {
     crate::{elf::ComponentError, elf::KernelError, launch::LaunchError, logs::LogError},
     fuchsia_zircon as zx,
     namespace::NamespaceError,
-    serde_json,
     std::sync::Arc,
     thiserror::Error,
 };

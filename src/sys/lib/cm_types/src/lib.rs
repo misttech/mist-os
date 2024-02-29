@@ -15,15 +15,12 @@ use {
     serde::{Deserialize, Serialize},
     std::{
         cmp,
-        default::Default,
         fmt::{self, Display},
         iter,
-        iter::DoubleEndedIterator,
         path::PathBuf,
         str::FromStr,
     },
     thiserror::Error,
-    url,
 };
 
 lazy_static! {
@@ -990,11 +987,7 @@ symmetrical_enums!(StorageId, fdecl::StorageId, StaticInstanceId, StaticInstance
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        serde_json::{self, json},
-        std::iter::repeat,
-    };
+    use {super::*, serde_json::json, std::iter::repeat};
 
     macro_rules! expect_ok {
         ($type_:ty, $($input:tt)+) => {

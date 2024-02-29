@@ -96,7 +96,6 @@ mod tests {
         crate::model::testing::{mocks::MockRunner, routing_test_helpers::*},
         anyhow::Error,
         assert_matches::assert_matches,
-        cm_config::SecurityPolicy,
         cm_rust::{CapabilityDecl, RunnerDecl},
         cm_rust_testing::*,
         futures::prelude::*,

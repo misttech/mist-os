@@ -9,7 +9,7 @@ use {
     fuchsia_zbi::{ZbiParser, ZbiParserError, ZbiResult, ZbiType::BootloaderFile},
     fuchsia_zircon as zx,
     futures::prelude::*,
-    std::{collections::HashMap, convert::TryInto, str::from_utf8, sync::Arc},
+    std::{collections::HashMap, str::from_utf8, sync::Arc},
 };
 
 pub struct Items {
@@ -148,7 +148,6 @@ mod tests {
             zbi_header_t, ZbiType, ZBI_CONTAINER_MAGIC, ZBI_FLAGS_VERSION, ZBI_ITEM_MAGIC,
             ZBI_ITEM_NO_CRC32,
         },
-        std::convert::TryFrom,
         zerocopy::{byteorder::little_endian::U32, AsBytes},
     };
 

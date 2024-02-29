@@ -171,7 +171,7 @@ mod tests {
     use {
         fidl::endpoints,
         fidl_fuchsia_io as fio, fuchsia_async as fasync,
-        fuchsia_zircon::{self as zx, AsHandleRef, HandleBased},
+        fuchsia_zircon::{self as zx, HandleBased},
         sandbox::OneShotHandle,
     };
 

@@ -248,7 +248,7 @@ mod test {
         fuchsia_component_test::{
             Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route,
         },
-        futures::{FutureExt, TryFutureExt},
+        futures::TryFutureExt,
         maplit::hashset,
         std::{collections::HashSet, task::Poll},
         test_diagnostics::collect_string_from_socket,

@@ -143,7 +143,6 @@ mod tests {
             partition_types::{OperatingSystem, Type},
             GptConfig,
         },
-        fidl_fuchsia_hardware_block_partition::PartitionMarker,
         ramdevice_client::{RamdiskClient, RamdiskClientBuilder},
         std::collections::BTreeMap,
     };

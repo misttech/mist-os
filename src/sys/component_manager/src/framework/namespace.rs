@@ -17,7 +17,7 @@ use {
         prelude::*,
     },
     lazy_static::lazy_static,
-    namespace::{self, NamespaceError},
+    namespace::NamespaceError,
     sandbox::Capability,
     serve_processargs::{BuildNamespaceError, NamespaceBuilder},
     std::sync::Arc,
@@ -170,12 +170,12 @@ mod tests {
     use super::*;
     use {
         assert_matches::assert_matches,
-        fidl::endpoints::{self, ProtocolMarker, Proxy, ServerEnd},
+        fidl::endpoints::{self, ProtocolMarker, Proxy},
         fidl_fidl_examples_routing_echo as fecho, fidl_fuchsia_component_sandbox as fsandbox,
         fuchsia_async as fasync,
         fuchsia_component::client,
         futures::TryStreamExt,
-        sandbox::{Capability, Dict, Receiver},
+        sandbox::{Dict, Receiver},
     };
 
     async fn handle_echo_request_stream(response: &str, mut stream: fecho::EchoRequestStream) {

@@ -185,8 +185,6 @@ mod test_build_with_file_system {
     use rand::SeedableRng as _;
     use std::collections::{HashMap, HashSet};
     use std::fs::File;
-    use std::io;
-    use std::iter::FromIterator;
     use tempfile::TempDir;
 
     const GENERATED_FAR_CONTENTS: [&str; 2] = ["meta/contents", "meta/package"];
@@ -444,9 +442,7 @@ mod test_build {
     use crate::{test::*, MetaPackage};
     use proptest::prelude::*;
     use rand::SeedableRng as _;
-    use std::fs;
     use std::io::Write;
-    use std::path::PathBuf;
     use tempfile::TempDir;
 
     // Creates a temporary directory, then for each host path in the `PackageBuildManifest`'s

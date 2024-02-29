@@ -127,7 +127,7 @@ impl From<Directory> for fsandbox::Capability {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use fidl::endpoints::{create_endpoints, ClientEnd, ServerEnd};
+    use fidl::endpoints::ServerEnd;
     use fidl_fuchsia_io as fio;
     use fuchsia_zircon as zx;
     use futures::channel::{mpsc, oneshot};
@@ -138,7 +138,6 @@ mod tests {
     use test_util::Counter;
     use vfs::{
         directory::entry_container::Directory as VfsDirectory,
-        execution_scope::ExecutionScope,
         path::Path,
         pseudo_directory,
         remote::{remote_boxed_with_type, RoutingFn},

@@ -141,7 +141,7 @@ pub async fn get_cml_moniker_from_query(
 
 #[cfg(test)]
 mod tests {
-    use {super::*, crate::test_utils::serve_realm_query_instances, moniker::MonikerBase};
+    use {super::*, crate::test_utils::serve_realm_query_instances};
 
     fn setup_fake_realm_query() -> fsys::RealmQueryProxy {
         setup_fake_realm_query_with_entries(vec![

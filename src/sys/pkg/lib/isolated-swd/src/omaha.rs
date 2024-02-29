@@ -142,7 +142,6 @@ mod tests {
     use {
         super::*,
         crate::updater::for_tests::{UpdaterBuilder, UpdaterForTest, UpdaterResult},
-        anyhow::Context,
         fuchsia_pkg_testing::PackageBuilder,
         fuchsia_zircon as zx,
         mock_paver::{hooks as mphooks, PaverEvent},

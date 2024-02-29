@@ -126,7 +126,7 @@ mod test {
     use super::*;
     use crate::output::{
         directory::{DirectoryReporter, SchemaVersion},
-        ArtifactType, RunReporter, SuiteId,
+        RunReporter, SuiteId,
     };
     use tempfile::tempdir;
     use test_output_directory as directory;

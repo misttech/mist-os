@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use {
-    anyhow::{self, Context},
+    anyhow::Context,
     fidl::endpoints::{ControlHandle, Responder},
     fidl_fuchsia_dash::{LauncherControlHandle, LauncherRequest, LauncherRequestStream},
     fuchsia_async as fasync,
@@ -11,7 +11,6 @@ use {
     fuchsia_inspect::{component, health::Reporter},
     fuchsia_zircon as zx,
     futures::prelude::*,
-    std::convert::TryInto,
     tracing::*,
 };
 

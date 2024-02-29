@@ -5,7 +5,6 @@
 use {
     crate::error::AvailabilityRoutingError,
     cm_rust::{Availability, ExposeDeclCommon, ExposeSource, OfferDeclCommon, OfferSource},
-    std::convert::From,
 };
 
 /// Opaque availability type to define new traits like PartialOrd on.

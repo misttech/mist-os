@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use {
-    cm_fidl_validator,
     cm_rust_derive::{
         CapabilityDeclCommon, ExposeDeclCommon, ExposeDeclCommonAlwaysRequired, FidlDecl,
         OfferDeclCommon, OfferDeclCommonNoAvailability, UseDeclCommon,
@@ -14,11 +13,9 @@ use {
     flyweights::FlyStr,
     from_enum::FromEnum,
     std::collections::{BTreeMap, HashMap},
-    std::convert::{From, TryFrom},
     std::fmt,
     std::hash::Hash,
     std::path::PathBuf,
-    std::string::ToString,
     thiserror::Error,
 };
 

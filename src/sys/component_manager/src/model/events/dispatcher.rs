@@ -160,14 +160,9 @@ impl EventDispatcherScope {
 #[cfg(test)]
 mod tests {
     use {
-        super::*,
-        crate::model::hooks::CapabilityReceiver,
-        assert_matches::assert_matches,
+        super::*, crate::model::hooks::CapabilityReceiver, assert_matches::assert_matches,
         fidl_fuchsia_component_sandbox as fsandbox, fidl_fuchsia_io as fio, fuchsia_zircon as zx,
-        futures::StreamExt,
-        moniker::{Moniker, MonikerBase},
-        sandbox::Message,
-        std::{convert::TryInto, sync::Arc},
+        futures::StreamExt, moniker::Moniker, sandbox::Message, std::sync::Arc,
     };
 
     struct EventDispatcherFactory {

@@ -133,7 +133,7 @@ fn get_stream_sink(
 mod tests {
     use {
         super::*,
-        ::routing::policy::{PolicyError, ScopedPolicyChecker},
+        ::routing::policy::PolicyError,
         assert_matches::assert_matches,
         cm_config::{
             AllowlistEntryBuilder, ChildPolicyAllowlists, JobPolicyAllowlists, SecurityPolicy,
@@ -141,7 +141,7 @@ mod tests {
         fidl_fuchsia_data as fdata,
         lazy_static::lazy_static,
         moniker::{Moniker, MonikerBase},
-        std::{collections::HashMap, default::Default, sync::Arc},
+        std::{collections::HashMap, sync::Arc},
         test_case::test_case,
     };
 

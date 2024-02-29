@@ -10,10 +10,7 @@ use {
     fuchsia_async as fasync,
     maplit::hashset,
     pretty_assertions::assert_eq,
-    std::{
-        collections::{HashMap, HashSet},
-        iter::FromIterator,
-    },
+    std::collections::{HashMap, HashSet},
     test_manager_test_lib::{GroupRunEventByTestCase, GroupedRunEvents, RunEvent},
 };
 

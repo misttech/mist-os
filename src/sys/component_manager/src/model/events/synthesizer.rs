@@ -274,7 +274,6 @@ mod tests {
         cm_rust_testing::*,
         fidl_fuchsia_io as fio,
         routing::component_instance::ComponentInstanceInterface,
-        std::collections::HashSet,
         vfs::pseudo_directory,
     };
 

@@ -2310,7 +2310,6 @@ mod get_handler_tests {
     use {
         super::*,
         crate::{CobaltConnectedService, ProtocolConnector, COBALT_CONNECTOR_BUFFER_SIZE},
-        std::collections::HashSet,
     };
 
     #[fuchsia::test]

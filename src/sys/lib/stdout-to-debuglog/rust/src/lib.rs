@@ -4,7 +4,7 @@
 
 use {
     anyhow::Error,
-    fdio, fidl_fuchsia_boot as fboot, fuchsia_component,
+    fidl_fuchsia_boot as fboot,
     fuchsia_zircon::{self as zx, HandleBased},
 };
 

@@ -52,7 +52,6 @@ use {
     serde_json::json,
     std::{
         collections::HashMap,
-        convert::TryInto,
         fs::{self, create_dir},
         path::PathBuf,
         sync::Arc,

@@ -16,8 +16,6 @@ use {
     moniker::{ChildName, ChildNameBase, ExtendedMoniker, Moniker, MonikerBase, MonikerError},
     std::{
         collections::{HashMap, HashSet},
-        convert::TryFrom,
-        iter::FromIterator,
         sync::Arc,
     },
     thiserror::Error,
@@ -829,7 +827,6 @@ mod tests {
     use {
         super::*,
         assert_matches::assert_matches,
-        cm_types::ParseError,
         fidl_fuchsia_io as fio,
         version_history::{ApiLevel, Version},
     };

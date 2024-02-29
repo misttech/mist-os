@@ -230,7 +230,7 @@ pub use fake::FakeSampler;
 mod fake {
     use super::*;
     use futures::{channel::oneshot, future::pending, Future};
-    use std::{collections::VecDeque, iter::FromIterator};
+    use std::collections::VecDeque;
 
     /// An |HttpsSampler| which responds with premade responses and signals when the responses
     /// have been given out.
@@ -297,13 +297,9 @@ mod fake {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::Config;
-    use futures::{FutureExt, TryFutureExt};
+    use futures::TryFutureExt;
     use lazy_static::lazy_static;
-    use std::{
-        collections::{HashMap, VecDeque},
-        iter::FromIterator,
-    };
+    use std::collections::{HashMap, VecDeque};
 
     lazy_static! {
         static ref TEST_URI: hyper::Uri = "https://localhost/".parse().unwrap();

@@ -141,7 +141,7 @@ mod tests {
     use super::*;
     use crate::test_utils::*;
     use fidl_fuchsia_component_decl as fdecl;
-    use moniker::{Moniker, MonikerBase};
+    use moniker::MonikerBase;
     use std::collections::HashMap;
 
     fn create_query() -> fsys::RealmQueryProxy {

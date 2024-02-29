@@ -155,9 +155,7 @@ mod test_package {
     use crate::build::{build_with_file_system, FileSystem};
     use crate::PackageBuildManifest;
 
-    use fuchsia_merkle::Hash;
     use maplit::{btreemap, hashmap};
-    use std::collections::HashMap;
     use std::fs::File;
     use std::io;
     use std::str::FromStr;

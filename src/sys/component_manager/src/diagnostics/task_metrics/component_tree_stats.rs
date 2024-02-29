@@ -30,7 +30,6 @@ use {
     lazy_static::lazy_static,
     moniker::{ExtendedMoniker, Moniker, MonikerBase},
     std::{
-        boxed::Box,
         collections::{BTreeMap, VecDeque},
         fmt::Debug,
         sync::{Arc, Weak},
@@ -560,7 +559,6 @@ mod tests {
         fuchsia_inspect::DiagnosticsHierarchyGetter,
         fuchsia_zircon::{AsHandleRef, DurationNum},
         injectable_time::{FakeTime, IncrementingFakeTime},
-        moniker::Moniker,
     };
 
     #[fuchsia::test]

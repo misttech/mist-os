@@ -17,7 +17,7 @@ use {
         component_instance::ComponentInstanceInterface,
         error::{ComponentInstanceError, RoutingError},
     },
-    cm_rust::{self, ExposeDeclCommon, OfferDeclCommon, SourceName, SourcePath, UseDeclCommon},
+    cm_rust::{ExposeDeclCommon, OfferDeclCommon, SourceName, SourcePath, UseDeclCommon},
     cm_types::{IterablePath, Name, SeparatedPath},
     fidl_fuchsia_component_decl as fdecl,
     futures::FutureExt,

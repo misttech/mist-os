@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use super::*;
-use crate::protocol::Cohort;
 use pretty_assertions::assert_eq;
 use serde_json::json;
 

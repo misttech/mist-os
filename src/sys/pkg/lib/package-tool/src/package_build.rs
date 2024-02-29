@@ -188,9 +188,7 @@ mod test {
             collections::BTreeMap,
             convert::TryInto as _,
             fs::{read_dir, read_to_string},
-            io::Write,
         },
-        version_history::HISTORY,
     };
 
     fn file_merkle(path: &Utf8Path) -> fuchsia_merkle::Hash {

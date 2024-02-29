@@ -2620,11 +2620,8 @@ impl<'a> ValidationContext<'a> {
 #[cfg(test)]
 mod tests {
     use {
-        super::*,
-        crate::error::{Error, ErrorList},
-        cm_types::MAX_LONG_NAME_LENGTH,
-        fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_data as fdata, fidl_fuchsia_io as fio,
-        test_case::test_case,
+        super::*, cm_types::MAX_LONG_NAME_LENGTH, fidl_fuchsia_component_decl as fdecl,
+        fidl_fuchsia_data as fdata, fidl_fuchsia_io as fio, test_case::test_case,
     };
 
     macro_rules! test_validate {

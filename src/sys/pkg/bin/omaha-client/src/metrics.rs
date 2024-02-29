@@ -16,7 +16,7 @@ use omaha_client::{
     metrics::{ClockType, Metrics, MetricsReporter},
     protocol::request::{EventResult, EventType, InstallSource},
 };
-use std::{convert::TryFrom, time::Duration};
+use std::time::Duration;
 use tracing::{info, warn};
 
 pub struct CobaltConnectedService(pub u32);
@@ -365,7 +365,6 @@ mod tests {
     use fuchsia_async as fasync;
     use futures::stream::StreamExt;
     use omaha_client::{metrics::UpdateCheckFailureReason, protocol::request::Event};
-    use std::time::Duration;
 
     async fn assert_metrics(metrics: Metrics, expected_events: &[MetricEvent]) {
         let receiver = {

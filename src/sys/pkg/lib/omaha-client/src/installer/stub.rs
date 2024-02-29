@@ -3,10 +3,6 @@
 // found in the LICENSE file.
 
 use super::*;
-use crate::{
-    cup_ecdsa::RequestMetadata, protocol::response::Response, request_builder::RequestParams,
-};
-use futures::future::LocalBoxFuture;
 use futures::prelude::*;
 use thiserror::Error;
 

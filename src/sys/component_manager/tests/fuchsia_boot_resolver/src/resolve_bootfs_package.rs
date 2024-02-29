@@ -10,7 +10,6 @@ use {
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_io as fio, fidl_fuchsia_process as fprocess,
     fidl_fuchsia_sys2 as fsys,
     fuchsia_component_test::ScopedInstance,
-    fuchsia_fs,
     fuchsia_runtime::{HandleInfo, HandleType},
     fuchsia_zircon::HandleBased,
 };

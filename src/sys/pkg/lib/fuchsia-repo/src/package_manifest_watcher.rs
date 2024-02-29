@@ -568,9 +568,8 @@ fn read_package_manifest_list(path: &Utf8Path) -> Result<HashSet<Utf8PathBuf>> {
 #[cfg(test)]
 mod tests {
     use {
-        super::*, crate::test_utils, camino::Utf8Path, fuchsia_async::TimeoutExt,
-        fuchsia_pkg::PackageBuilder, futures::StreamExt as _, pretty_assertions::assert_eq,
-        std::fs::File,
+        super::*, crate::test_utils, fuchsia_async::TimeoutExt, fuchsia_pkg::PackageBuilder,
+        futures::StreamExt as _, pretty_assertions::assert_eq,
     };
 
     const TEST_BATCH_WATCHER_TIMEOUT: Duration = Duration::from_millis(100);

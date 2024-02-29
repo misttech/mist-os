@@ -23,7 +23,7 @@ use {
     fuchsia_zircon as zx,
     moniker::{Moniker, MonikerBase},
     routing::{error::RoutingError, RouteRequest},
-    std::{convert::TryInto, path::Path},
+    std::path::Path,
 };
 
 #[fuchsia::test]

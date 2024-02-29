@@ -3,15 +3,9 @@
 // found in the LICENSE file.
 
 use {
-    super::*,
-    fidl_fuchsia_recovery::FactoryResetRequestStream,
-    fidl_fuchsia_update_channel::ProviderRequestStream,
-    fuchsia_async as fasync,
-    fuchsia_sync::Mutex,
-    futures::prelude::*,
-    serde_json::json,
-    std::{fs, sync::Arc},
-    tempfile::TempDir,
+    super::*, fidl_fuchsia_recovery::FactoryResetRequestStream,
+    fidl_fuchsia_update_channel::ProviderRequestStream, fuchsia_async as fasync,
+    fuchsia_sync::Mutex, futures::prelude::*, serde_json::json, std::sync::Arc, tempfile::TempDir,
 };
 
 fn spawn_update_info_with_channel(mut stream: ProviderRequestStream, channel: String) {

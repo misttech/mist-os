@@ -19,11 +19,7 @@ use omaha_client::{
     unless::Unless,
 };
 use omaha_client_fuchsia::install_plan;
-use std::{
-    convert::{TryFrom, TryInto},
-    sync::Arc,
-    time::Duration,
-};
+use std::{sync::Arc, time::Duration};
 use tracing::{error, info, warn};
 
 mod rate_limiter;
@@ -666,11 +662,11 @@ mod tests {
     use assert_matches::assert_matches;
     use cobalt_client::traits::AsEventCode;
     use fidl::endpoints::create_proxy_and_stream;
-    use fidl_fuchsia_update::{CommitStatusProviderMarker, CommitStatusProviderRequest};
+    use fidl_fuchsia_update::CommitStatusProviderRequest;
     use fidl_fuchsia_update_config::OptOutRequest;
     use fuchsia_async as fasync;
     use fuchsia_zircon::{self as zx, Peered};
-    use omaha_client::time::{ComplexTime, MockTimeSource, StandardTimeSource, TimeSource};
+    use omaha_client::time::{MockTimeSource, StandardTimeSource};
     use proptest::prelude::*;
     use std::sync::atomic::{AtomicU8, Ordering};
     use std::{collections::VecDeque, time::Instant};

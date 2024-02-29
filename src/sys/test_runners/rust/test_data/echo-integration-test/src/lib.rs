@@ -2,11 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{self, Error},
-    fidl_fidl_examples_routing_echo as fecho,
-    fuchsia_component::client,
-};
+use {anyhow::Error, fidl_fidl_examples_routing_echo as fecho, fuchsia_component::client};
 
 #[fuchsia::test]
 async fn echo_integration_test() -> Result<(), Error> {

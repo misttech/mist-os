@@ -6,8 +6,7 @@ use {
     fuchsia_async as fasync,
     fuchsia_zircon::sys as zx_sys,
     fuchsia_zircon::{self as zx, HandleBased},
-    futures,
-    std::{convert::TryFrom, mem, ptr, task::Poll},
+    std::{mem, ptr, task::Poll},
 };
 
 #[derive(Debug, PartialEq, Clone)]
@@ -135,8 +134,7 @@ mod tests {
         anyhow::{format_err, Context, Error},
         fidl_fuchsia_io as fio, fidl_fuchsia_process as fprocess,
         fuchsia_component::client as fclient,
-        fuchsia_fs, fuchsia_runtime as fruntime,
-        fuchsia_zircon::HandleBased,
+        fuchsia_runtime as fruntime,
         futures::TryStreamExt,
         std::sync::Arc,
     };

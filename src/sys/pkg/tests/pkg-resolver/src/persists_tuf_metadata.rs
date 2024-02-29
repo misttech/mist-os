@@ -8,7 +8,7 @@ use {
     lib::{
         EnableDynamicConfig, MountsBuilder, PersistedReposConfig, TestEnvBuilder, EMPTY_REPO_PATH,
     },
-    std::{convert::TryInto, sync::Arc},
+    std::sync::Arc,
 };
 
 async fn test_package(name: &str, contents: &str) -> Package {

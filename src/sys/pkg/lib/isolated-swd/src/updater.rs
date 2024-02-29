@@ -125,7 +125,6 @@ pub(crate) mod for_tests {
     use {
         super::*,
         crate::resolver::for_tests::{ResolverForTest, EMPTY_REPO_PATH},
-        anyhow::Context,
         blobfs_ramdisk::BlobfsRamdisk,
         fidl_fuchsia_metrics as fmetrics,
         fidl_fuchsia_paver::PaverRequestStream,
@@ -518,13 +517,8 @@ pub(crate) mod for_tests {
 #[cfg(test)]
 pub mod tests {
     use {
-        super::for_tests::UpdaterBuilder,
-        super::*,
-        anyhow::Context,
-        fidl_fuchsia_paver::{Asset, Configuration},
-        fuchsia_async as fasync,
-        fuchsia_pkg_testing::PackageBuilder,
-        mock_paver::PaverEvent,
+        super::for_tests::UpdaterBuilder, super::*, fidl_fuchsia_paver::Asset,
+        fuchsia_async as fasync, fuchsia_pkg_testing::PackageBuilder, mock_paver::PaverEvent,
     };
 
     #[fasync::run_singlethreaded(test)]

@@ -35,9 +35,7 @@ impl MutableDirectory for Directory {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*, assert_matches::assert_matches, std::convert::TryInto, vfs::file::vmo::read_only,
-    };
+    use {super::*, assert_matches::assert_matches, vfs::file::vmo::read_only};
 
     #[fuchsia::test]
     fn addable_with_result_add_ok() {

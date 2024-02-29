@@ -397,11 +397,7 @@ impl ActionSet {
 pub mod tests {
     use {
         super::*,
-        crate::model::{
-            actions::{destroy::DestroyAction, shutdown::ShutdownAction},
-            error::StopActionError,
-            testing::test_helpers::ActionsTest,
-        },
+        crate::model::{error::StopActionError, testing::test_helpers::ActionsTest},
         assert_matches::assert_matches,
         fuchsia_async as fasync,
     };

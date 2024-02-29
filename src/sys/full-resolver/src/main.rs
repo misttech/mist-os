@@ -246,7 +246,7 @@ mod tests {
             Capability, ChildOptions, LocalComponentHandles, RealmBuilder, Ref, Route,
         },
         futures::{channel::mpsc, lock::Mutex, SinkExt as _},
-        std::{boxed::Box, sync::Arc},
+        std::sync::Arc,
         vfs::{
             directory::entry_container::Directory, execution_scope::ExecutionScope,
             file::vmo::read_only, path::Path, pseudo_directory,

@@ -390,7 +390,7 @@ pub mod tests {
         fuchsia_async as fasync,
         fuchsia_zircon::{self as zx, Koid},
         futures::lock::Mutex,
-        std::{boxed::Box, collections::HashMap, panic, sync::Arc, task::Poll},
+        std::{collections::HashMap, sync::Arc, task::Poll},
         zx::AsHandleRef,
     };
 

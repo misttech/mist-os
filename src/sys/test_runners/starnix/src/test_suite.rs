@@ -249,7 +249,6 @@ mod tests {
         super::*,
         fidl::endpoints::{create_request_stream, ClientEnd},
         fuchsia_async as fasync, fuchsia_zircon as zx,
-        futures::TryStreamExt,
     };
 
     /// Returns a `ftest::CaseIteratorProxy` that is served by `super::handle_case_iterator`.

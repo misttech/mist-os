@@ -15,10 +15,7 @@ use {
     fuchsia_fs::directory::open_file,
     fuchsia_zircon as zx,
     futures::StreamExt,
-    std::{
-        cmp,
-        convert::{TryFrom as _, TryInto},
-    },
+    std::{cmp, convert::TryFrom as _},
 };
 
 const TEST_PKG_HASH: &str = "44e7704720706ffd287bf0d27133cec7d609581547095ab6c6fee94f83a5bcbc";

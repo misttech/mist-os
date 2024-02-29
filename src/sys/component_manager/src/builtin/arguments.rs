@@ -282,7 +282,6 @@ mod tests {
         super::*,
         fuchsia_async as fasync,
         fuchsia_fs::{directory, file::close, file::write},
-        std::collections::HashMap,
     };
 
     fn serve_bootargs(args: Arc<Arguments>) -> Result<fboot::ArgumentsProxy, Error> {

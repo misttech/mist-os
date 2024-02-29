@@ -13,7 +13,7 @@ use {
     fuchsia_zircon::{Status, Vmo, VmoOptions},
     futures::lock::Mutex as AsyncMutex,
     futures::{channel::mpsc, prelude::*},
-    std::{convert::TryInto, sync::Arc},
+    std::sync::Arc,
 };
 
 fn verify_buffer(buffer: &mut Buffer) {
@@ -716,7 +716,7 @@ pub mod tests {
         super::*,
         assert_matches::assert_matches,
         fidl_fuchsia_paver as paver,
-        fuchsia_zircon::{self as zx, VmoOptions},
+        fuchsia_zircon::{self as zx},
         futures::task::Poll,
     };
 

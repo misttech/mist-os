@@ -56,7 +56,7 @@ use {
     cm_logger::scoped::ScopedLogger,
     cm_moniker::{IncarnationId, InstancedChildName, InstancedMoniker},
     cm_rust::{
-        self, CapabilityDecl, CapabilityTypeName, ChildDecl, CollectionDecl, ComponentDecl,
+        CapabilityDecl, CapabilityTypeName, ChildDecl, CollectionDecl, ComponentDecl,
         FidlIntoNative, NativeIntoFidl, OfferDeclCommon, SourceName, UseDecl,
     },
     cm_types::Name,
@@ -80,12 +80,9 @@ use {
     },
     moniker::{ChildName, ChildNameBase, Moniker, MonikerBase},
     sandbox::{Capability, CapabilityTrait, Dict, Open},
-    std::iter::Iterator,
     std::{
-        boxed::Box,
         clone::Clone,
         collections::{HashMap, HashSet},
-        convert::TryFrom,
         fmt, iter,
         sync::{Arc, Weak},
         time::Duration,
@@ -2618,7 +2615,7 @@ pub mod tests {
     use {
         super::*,
         crate::model::{
-            actions::{test_utils::is_discovered, ShutdownAction},
+            actions::test_utils::is_discovered,
             events::{registry::EventSubscription, stream::EventStream},
             hooks::EventType,
             testing::{
@@ -2634,14 +2631,11 @@ pub mod tests {
             OfferSource, OfferTarget, UseEventStreamDecl, UseSource,
         },
         cm_rust_testing::*,
-        component_id_index::InstanceId,
         fidl::endpoints::DiscoverableProtocolMarker,
         fidl_fuchsia_logger as flogger, fuchsia_async as fasync, fuchsia_zircon as zx,
         futures::{channel::mpsc, StreamExt, TryStreamExt},
-        moniker::Moniker,
         routing_test_helpers::component_id_index::make_index_file,
         std::panic,
-        std::sync::Arc,
         tracing::info,
         vfs::service::host,
     };

@@ -4,7 +4,7 @@
 
 use {
     cm_types::{LongName, Name},
-    core::cmp::{Ord, Ordering},
+    core::cmp::Ordering,
     moniker::{ChildName, ChildNameBase, MonikerError},
     std::fmt,
 };
@@ -156,7 +156,7 @@ impl fmt::Debug for InstancedChildName {
 mod tests {
     use {
         super::*,
-        cm_types::{Name, MAX_LONG_NAME_LENGTH, MAX_NAME_LENGTH},
+        cm_types::{MAX_LONG_NAME_LENGTH, MAX_NAME_LENGTH},
     };
 
     #[test]

@@ -9,7 +9,6 @@ use {
     serde::{Deserialize, Serialize},
     std::{
         fs::{create_dir_all, File},
-        iter::FromIterator,
         slice, vec,
     },
     utf8_path::{path_relative_from_file, resolve_path_from_file},
@@ -214,7 +213,7 @@ impl Iterator for IntoIter {
 
 #[cfg(test)]
 mod tests {
-    use {super::*, serde_json::json, std::fs::File, tempfile::TempDir};
+    use {super::*, serde_json::json, tempfile::TempDir};
 
     #[test]
     fn test_serialize() {

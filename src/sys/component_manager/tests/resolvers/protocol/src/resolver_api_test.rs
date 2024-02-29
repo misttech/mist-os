@@ -9,7 +9,6 @@
 
 use {
     anyhow::{Context as _, Error},
-    cm_rust,
     fidl::endpoints::DiscoverableProtocolMarker,
     fidl_fuchsia_component_decl as fcdecl, fidl_fuchsia_component_resolution as fcresolution,
     fuchsia_async as fasync,

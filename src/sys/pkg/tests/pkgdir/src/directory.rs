@@ -17,12 +17,7 @@ use {
     futures::{future::Future, StreamExt},
     itertools::Itertools as _,
     pretty_assertions::assert_eq,
-    std::{
-        clone::Clone,
-        collections::HashSet,
-        convert::TryInto,
-        iter::{FromIterator, IntoIterator},
-    },
+    std::collections::HashSet,
 };
 
 #[fuchsia::test]

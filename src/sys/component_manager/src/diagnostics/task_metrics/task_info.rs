@@ -301,7 +301,6 @@ mod tests {
     use diagnostics_assertions::assert_data_tree;
     use diagnostics_hierarchy::{ArrayContent, DiagnosticsHierarchyGetter, LinearHistogram};
     use injectable_time::FakeTime;
-    use std::sync::Arc;
 
     async fn take_measurement_then_tick_clock<
         'a,

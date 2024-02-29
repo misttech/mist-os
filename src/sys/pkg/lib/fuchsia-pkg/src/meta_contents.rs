@@ -181,7 +181,6 @@ mod tests {
         fuchsia_url::{errors::ResourcePathError, test::*},
         maplit::hashmap,
         proptest::prelude::*,
-        std::str::FromStr,
     };
 
     fn zeros_hash() -> Hash {

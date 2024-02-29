@@ -316,10 +316,7 @@ mod serde_system_time {
     use {
         anyhow::{anyhow, Error},
         serde::Deserialize,
-        std::{
-            convert::TryInto,
-            time::{Duration, SystemTime},
-        },
+        std::time::{Duration, SystemTime},
     };
 
     fn system_time_to_nanos(time: SystemTime) -> Result<u64, Error> {

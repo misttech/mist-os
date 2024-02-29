@@ -30,7 +30,7 @@ pub(crate) mod for_tests {
     use {
         super::*,
         crate::cache::for_tests::CacheForTest,
-        anyhow::{anyhow, Context, Error},
+        anyhow::{anyhow, Context},
         blobfs_ramdisk::BlobfsRamdisk,
         fidl_fuchsia_io as fio, fidl_fuchsia_metrics as fmetrics, fidl_fuchsia_pkg_ext as pkg,
         fidl_fuchsia_pkg_ext::RepositoryConfigs,

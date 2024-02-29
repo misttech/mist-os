@@ -340,7 +340,6 @@ mod tests {
         assert_matches::assert_matches,
         camino::{Utf8Path, Utf8PathBuf},
         std::fs::File,
-        url::Url,
     };
 
     #[derive(Debug)]

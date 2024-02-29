@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use super::*;
-use futures::future::BoxFuture;
 use futures::prelude::*;
 use std::collections::HashMap;
 use thiserror::Error;

@@ -43,8 +43,7 @@ use {
     moniker::Moniker,
     runner::component::ChannelEpitaph,
     runner::StartInfo,
-    std::convert::TryFrom,
-    std::{convert::TryInto, path::Path, sync::Arc},
+    std::{path::Path, sync::Arc},
     tracing::warn,
 };
 
@@ -630,32 +629,27 @@ mod tests {
     use {
         super::runtime_dir::RuntimeDirectory,
         super::*,
-        ::routing::policy::ScopedPolicyChecker,
         anyhow::{Context, Error},
         assert_matches::assert_matches,
         cm_config::{AllowlistEntryBuilder, JobPolicyAllowlists, SecurityPolicy},
         fidl::endpoints::{
             create_endpoints, create_proxy, spawn_stream_handler, ClientEnd,
-            DiscoverableProtocolMarker, Proxy, ServerEnd,
+            DiscoverableProtocolMarker, Proxy,
         },
         fidl_connector::Connect,
         fidl_fuchsia_component as fcomp, fidl_fuchsia_component_runner as fcrunner,
         fidl_fuchsia_data as fdata,
-        fidl_fuchsia_diagnostics_types::{
-            ComponentDiagnostics, ComponentTasks, Task as DiagnosticsTask,
-        },
+        fidl_fuchsia_diagnostics_types::Task as DiagnosticsTask,
         fidl_fuchsia_io as fio,
         fidl_fuchsia_logger::{LogSinkMarker, LogSinkRequest, LogSinkRequestStream},
-        fidl_fuchsia_process_lifecycle::{LifecycleMarker, LifecycleProxy},
+        fidl_fuchsia_process_lifecycle::LifecycleProxy,
         fuchsia_async as fasync,
         fuchsia_component::server::{ServiceFs, ServiceObjLocal},
-        fuchsia_fs,
-        fuchsia_zircon::{self as zx, AsHandleRef, Task},
-        futures::{channel::mpsc, join, lock::Mutex, StreamExt, TryStreamExt},
-        moniker::{Moniker, MonikerBase},
+        fuchsia_zircon::{self as zx, Task},
+        futures::{channel::mpsc, join, lock::Mutex, StreamExt},
+        moniker::MonikerBase,
         runner::component::Controllable,
-        scoped_task,
-        std::{convert::TryFrom, sync::Arc, task::Poll},
+        std::task::Poll,
     };
 
     pub enum MockServiceRequest {

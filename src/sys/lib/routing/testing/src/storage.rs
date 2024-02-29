@@ -14,7 +14,7 @@ use {
     component_id_index::InstanceId,
     fidl_fuchsia_io as fio, fuchsia_zircon_status as zx_status,
     moniker::{ExtendedMoniker, Moniker, MonikerBase},
-    std::{collections::HashSet, convert::TryInto, marker::PhantomData},
+    std::{collections::HashSet, marker::PhantomData},
 };
 
 pub struct CommonStorageTest<T: RoutingTestModelBuilder> {

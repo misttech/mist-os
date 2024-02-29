@@ -14,7 +14,7 @@ use {
     fuchsia_async as fasync,
     fuchsia_zircon::Status,
     futures::prelude::*,
-    std::{convert::TryInto, sync::Arc},
+    std::sync::Arc,
     tracing::{error, info, warn},
 };
 

@@ -5,11 +5,9 @@
 use {
     crate::error::{ComponentError, EvaluationError},
     crate::spec::TestCase,
-    fuchsia_triage,
     itertools::Itertools,
     maplit::hashmap,
     std::collections::HashMap,
-    std::convert::TryFrom,
 };
 
 const TRIAGE_PRESENCE_TEMPLATE: &'static str = r#"

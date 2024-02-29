@@ -5,8 +5,7 @@
 use {
     anyhow::Error,
     assert_matches::assert_matches,
-    cm_rust::{self, OfferDeclCommon},
-    cm_types,
+    cm_rust::OfferDeclCommon,
     fidl::endpoints::DiscoverableProtocolMarker,
     fidl_fidl_examples_routing_echo as fecho, fidl_fuchsia_component as fcomponent,
     fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_io as fio, fuchsia_async as fasync,
@@ -14,7 +13,6 @@ use {
     fuchsia_component_test::new::{
         Capability, ChildOptions, LocalComponentHandles, RealmBuilder, RealmInstance, Ref, Route,
     },
-    fuchsia_fs,
     futures::{channel::mpsc, FutureExt, SinkExt, StreamExt, TryStreamExt},
 };
 

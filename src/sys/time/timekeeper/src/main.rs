@@ -456,7 +456,7 @@ mod tests {
         super::*,
         crate::{
             diagnostics::FakeDiagnostics,
-            enums::{InitialClockState, InitializeRtcOutcome, WriteRtcOutcome},
+            enums::WriteRtcOutcome,
             rtc::FakeRtc,
             time_source::{Event as TimeSourceEvent, FakePushTimeSource, Sample},
         },

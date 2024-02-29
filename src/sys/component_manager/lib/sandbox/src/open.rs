@@ -311,16 +311,15 @@ fn join_path(base: &Path, mut relative: vfs::path::Path) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{Capability, Dict, Directory, Receiver};
+    use crate::{Capability, Dict, Receiver};
     use anyhow::Result;
     use assert_matches::assert_matches;
-    use fidl::endpoints::{create_endpoints, ClientEnd};
+    use fidl::endpoints::create_endpoints;
     use fidl_fuchsia_io as fio;
     use fuchsia_async as fasync;
     use fuchsia_zircon as zx;
-    use fuchsia_zircon::AsHandleRef;
     use futures::channel::oneshot;
-    use futures::{StreamExt, TryStreamExt};
+    use futures::StreamExt;
     use lazy_static::lazy_static;
     use std::sync::Mutex;
     use test_util::Counter;
@@ -328,7 +327,6 @@ mod tests {
         directory::{
             entry_container::Directory as _, helper::DirectlyMutable, immutable::simple as pfs,
         },
-        execution_scope::ExecutionScope,
         name::Name,
     };
 

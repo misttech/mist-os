@@ -26,7 +26,6 @@ use {
     p256::ecdsa::{signature::Signature, DerSignature},
     std::{
         collections::{BTreeMap, HashMap},
-        convert::TryInto,
         str::FromStr,
         sync::Arc,
     },
@@ -711,7 +710,7 @@ mod tests {
                     make_keys_for_test, make_public_keys_for_test,
                     make_standard_intermediate_for_test, RAW_PUBLIC_KEY_FOR_TEST,
                 },
-                Cupv2RequestHandler, PublicKeyAndId, PublicKeyId, PublicKeys,
+                Cupv2RequestHandler, PublicKeyAndId, PublicKeyId,
             },
             protocol::request::Request,
         },

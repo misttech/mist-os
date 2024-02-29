@@ -25,12 +25,7 @@ use {
     fuchsia_zircon as zx,
     futures::io::copy,
     futures::stream::TryStreamExt,
-    std::{
-        convert::{TryFrom, TryInto},
-        fs::File,
-        io,
-        process::exit,
-    },
+    std::{fs::File, io, process::exit},
 };
 
 mod args;

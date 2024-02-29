@@ -13,7 +13,6 @@ use {
     fuchsia_url::RelativePackageUrl,
     std::{
         collections::BTreeMap,
-        convert::{TryFrom, TryInto},
         fs::File,
         io::{BufReader, BufWriter, Cursor},
         path::{Path, PathBuf},
@@ -629,10 +628,7 @@ fn create_meta_subpackages_file(
 #[cfg(test)]
 mod tests {
     use {
-        super::*,
-        camino::Utf8Path,
-        fuchsia_merkle::MerkleTreeBuilder,
-        tempfile::{NamedTempFile, TempDir},
+        super::*, camino::Utf8Path, fuchsia_merkle::MerkleTreeBuilder, tempfile::TempDir,
         version_history::HISTORY,
     };
 

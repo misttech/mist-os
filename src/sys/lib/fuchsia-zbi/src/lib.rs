@@ -8,7 +8,6 @@ use {
     lazy_static::lazy_static,
     std::{
         collections::{HashMap, HashSet},
-        convert::TryFrom,
         mem::size_of,
     },
     thiserror::Error,
@@ -481,8 +480,6 @@ mod tests {
     use {
         super::*,
         anyhow::Error,
-        fuchsia_zbi_abi::zbi_container_header,
-        std::convert::TryInto,
         zerocopy::{byteorder::little_endian::U32, AsBytes},
     };
 

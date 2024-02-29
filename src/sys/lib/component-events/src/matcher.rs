@@ -11,7 +11,7 @@ use {
     fidl_fuchsia_component as fcomponent,
     moniker::Moniker,
     regex::RegexSet,
-    std::{convert::TryFrom, fmt, str::FromStr},
+    std::{fmt, str::FromStr},
     thiserror::Error,
 };
 

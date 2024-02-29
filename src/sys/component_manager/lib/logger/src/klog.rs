@@ -122,7 +122,7 @@ mod tests {
         anyhow::Context,
         fidl_fuchsia_boot as fboot,
         fuchsia_component::client::connect_channel_to_protocol,
-        fuchsia_zircon::{AsHandleRef, HandleBased},
+        fuchsia_zircon::HandleBased,
         rand::Rng,
         std::panic,
         tracing::{error, info, warn},

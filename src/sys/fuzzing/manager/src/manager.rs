@@ -231,10 +231,9 @@ mod tests {
     use {
         super::*,
         crate::test_support::{connect_to_manager, read_async, serve_test_realm, TestRealm},
-        fidl::endpoints::{create_endpoints, create_proxy, Proxy},
+        fidl::endpoints::{create_endpoints, Proxy},
         fidl_fuchsia_fuzzer as fuzz,
         futures::join,
-        std::cell::RefCell,
         std::rc::Rc,
         test_manager::LaunchError,
         zx::AsHandleRef,

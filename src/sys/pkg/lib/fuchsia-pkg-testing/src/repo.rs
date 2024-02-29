@@ -344,7 +344,6 @@ impl Repository {
 
 #[cfg(test)]
 mod tests {
-    use fuchsia_repo::repo_keys::RepoKeys;
 
     use {super::*, crate::package::PackageBuilder, fuchsia_merkle::MerkleTree};
 

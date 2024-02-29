@@ -197,10 +197,7 @@ mod tests {
         fidl_fuchsia_component as fcomponent,
         maplit::hashmap,
         moniker::{Moniker, MonikerBase},
-        std::{
-            collections::{HashMap, HashSet},
-            sync::Weak,
-        },
+        std::collections::{HashMap, HashSet},
     };
 
     #[fuchsia::test]

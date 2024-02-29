@@ -38,7 +38,6 @@ use {
     moniker::Moniker,
     sandbox::{Capability, Dict},
     serve_processargs::NamespaceBuilder,
-    std::string::ToString,
     std::sync::Arc,
     tracing::warn,
     vfs::execution_scope::ExecutionScope,
@@ -550,16 +549,12 @@ mod tests {
     use {
         crate::model::{
             actions::{
-                resolve::sandbox_construction::ComponentInput, start::should_return_early,
-                ActionError, ActionSet, ShutdownAction, ShutdownType, StartAction, StopAction,
+                resolve::sandbox_construction::ComponentInput, ActionSet, ShutdownAction,
+                ShutdownType, StopAction,
             },
-            component::{
-                Component, ComponentInstance, ComponentRuntime, ExecutionState,
-                IncomingCapabilities, InstanceState, ResolvedInstanceState, StartReason,
-                UnresolvedInstanceState,
-            },
-            error::{ModelError, StartActionError},
-            hooks::{Event, EventType, Hook, HooksRegistration},
+            component::{Component, ResolvedInstanceState, UnresolvedInstanceState},
+            error::ModelError,
+            hooks::{EventType, Hook, HooksRegistration},
             testing::{
                 routing_test_helpers::RoutingTestBuilder,
                 test_helpers::{self, ActionsTest},
@@ -568,14 +563,12 @@ mod tests {
         },
         assert_matches::assert_matches,
         async_trait::async_trait,
-        cm_rust::ComponentDecl,
         cm_rust_testing::{ChildBuilder, ComponentDeclBuilder},
-        fuchsia, fuchsia_async as fasync, fuchsia_zircon as zx,
+        fuchsia_async as fasync, fuchsia_zircon as zx,
         futures::{channel::mpsc, stream::FuturesUnordered, FutureExt, StreamExt},
-        moniker::Moniker,
         rand::seq::SliceRandom,
         routing::resolving::ComponentAddress,
-        std::sync::{Arc, Mutex, Weak},
+        std::sync::{Mutex, Weak},
     };
 
     // Child name for test child components instantiated during tests.

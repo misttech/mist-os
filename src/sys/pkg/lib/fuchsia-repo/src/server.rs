@@ -15,7 +15,7 @@ use {
     chrono::Utc,
     fuchsia_async as fasync,
     fuchsia_url::RepositoryUrl,
-    futures::{future::Shared, prelude::*, AsyncRead, AsyncWrite, TryStreamExt},
+    futures::{future::Shared, prelude::*, TryStreamExt},
     http::Uri,
     http_sse::{Event, EventSender, SseResponseCreator},
     hyper::{body::Body, header::RANGE, service::service_fn, Request, Response, StatusCode},
@@ -23,7 +23,6 @@ use {
     std::{
         collections::HashMap,
         convert::Infallible,
-        future::Future,
         io,
         net::SocketAddr,
         pin::Pin,
@@ -818,11 +817,9 @@ impl tokio::io::AsyncWrite for ConnectionStream {
 mod tests {
     use {
         super::*,
-        crate::{
-            manager::RepositoryManager,
-            test_utils::{make_file_system_repository, make_writable_empty_repository, repo_key},
+        crate::test_utils::{
+            make_file_system_repository, make_writable_empty_repository, repo_key,
         },
-        anyhow::Result,
         assert_matches::assert_matches,
         bytes::Bytes,
         camino::Utf8Path,
@@ -830,7 +827,6 @@ mod tests {
         fuchsia_async as fasync,
         fuchsia_hyper::HttpClient,
         http_sse::Client as SseClient,
-        std::convert::TryInto,
         std::{fs::remove_file, io::Write as _, net::Ipv4Addr},
     };
 

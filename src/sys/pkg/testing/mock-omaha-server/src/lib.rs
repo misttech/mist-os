@@ -499,12 +499,7 @@ pub async fn handle_omaha_request(
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        anyhow::Context,
-        fuchsia_async as fasync,
-        hyper::{Body, StatusCode},
-    };
+    use {super::*, anyhow::Context, fuchsia_async as fasync};
 
     #[fasync::run_singlethreaded(test)]
     async fn test_no_validate_version() -> Result<(), Error> {

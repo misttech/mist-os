@@ -623,32 +623,21 @@ impl<T: Send + Sync + 'static> DirectoryEntry for ServiceInstanceDirectoryEntry<
 mod tests {
     use {
         super::*,
-        crate::{
-            capability::CapabilitySource,
-            model::{
-                component::{IncomingCapabilities, StartReason},
-                testing::routing_test_helpers::{RoutingTest, RoutingTestBuilder},
-            },
+        crate::model::{
+            component::{IncomingCapabilities, StartReason},
+            testing::routing_test_helpers::{RoutingTest, RoutingTestBuilder},
         },
         ::routing::{
-            capability_source::{
-                AnonymizedAggregateCapabilityProvider, ComponentCapability,
-                FilteredAggregateCapabilityProvider, FilteredAggregateCapabilityRouteData,
-            },
+            capability_source::{ComponentCapability, FilteredAggregateCapabilityRouteData},
             component_instance::ComponentInstanceInterface,
-            error::RoutingError,
         },
         cm_rust::*,
         cm_rust_testing::*,
         fuchsia_async as fasync,
         maplit::hashmap,
-        moniker::{Moniker, MonikerBase},
         proptest::prelude::*,
         rand::SeedableRng,
-        std::{
-            collections::{HashMap, HashSet},
-            convert::TryInto,
-        },
+        std::collections::HashSet,
         vfs::pseudo_directory,
     };
 

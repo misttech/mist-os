@@ -22,10 +22,7 @@ use {
         future::{self, Future},
         FutureExt,
     },
-    std::{
-        convert::TryInto,
-        time::{Duration, Instant, SystemTime},
-    },
+    std::time::{Duration, Instant, SystemTime},
 };
 
 // See $FUCHSIA_OUT_DIR/gen/src/sys/pkg/bin/amber/cobalt_sw_delivery_registry.rs for more info.

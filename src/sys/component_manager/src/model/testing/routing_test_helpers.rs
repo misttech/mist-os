@@ -45,7 +45,6 @@ use {
     moniker::{ChildName, ChildNameBase, Moniker, MonikerBase},
     std::{
         collections::{HashMap, HashSet},
-        default::Default,
         fs,
         path::Path,
         str::FromStr,
@@ -957,7 +956,6 @@ pub mod capability_util {
     use {
         super::*,
         assert_matches::assert_matches,
-        cm_rust::NativeIntoFidl,
         fidl::endpoints::{DiscoverableProtocolMarker, ProtocolMarker},
     };
 

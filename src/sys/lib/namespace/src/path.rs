@@ -9,7 +9,6 @@ use std::{
     borrow::Borrow,
     ffi::{CString, IntoStringError},
     fmt,
-    iter::DoubleEndedIterator,
 };
 use thiserror::Error;
 

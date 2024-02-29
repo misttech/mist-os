@@ -241,7 +241,7 @@ mod test_util {
 mod tests {
     use {
         super::*,
-        crate::namespace::{ignore_not_found as ignore, BuildNamespaceError},
+        crate::namespace::ignore_not_found as ignore,
         anyhow::Result,
         assert_matches::assert_matches,
         fidl::endpoints::{Proxy, ServerEnd},

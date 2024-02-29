@@ -10,7 +10,6 @@ use {
     futures::TryStreamExt,
     std::{collections::HashMap, sync::Arc},
     vfs::{
-        self,
         directory::{entry::DirectoryEntry, entry_container::Directory, immutable::simple as pfs},
         execution_scope::ExecutionScope,
         file::vmo::read_only,

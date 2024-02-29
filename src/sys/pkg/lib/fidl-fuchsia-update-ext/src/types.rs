@@ -4,8 +4,7 @@
 
 use {
     event_queue::Event, fidl_fuchsia_update as fidl, proptest::prelude::*,
-    proptest_derive::Arbitrary, std::convert::TryFrom, std::fmt, thiserror::Error,
-    typed_builder::TypedBuilder,
+    proptest_derive::Arbitrary, std::fmt, thiserror::Error, typed_builder::TypedBuilder,
 };
 
 /// Wrapper type for [`fidl_fuchsia_update::State`] which works with

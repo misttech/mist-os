@@ -303,16 +303,11 @@ mod test {
     use {
         super::*,
         crate::{
-            datatypes::{HttpsSample, Poll},
-            diagnostics::FakeDiagnostics,
-            sampler::FakeSampler,
-            SampleConfig,
+            datatypes::Poll, diagnostics::FakeDiagnostics, sampler::FakeSampler, SampleConfig,
         },
         anyhow::format_err,
         assert_matches::assert_matches,
-        fidl_fuchsia_time_external::TimeSample,
         futures::{channel::mpsc::channel, future::ready, stream::StreamExt, task::Poll as FPoll},
-        httpdate_hyper::HttpsDateError,
         lazy_static::lazy_static,
         pull_source::UpdateAlgorithm as _,
         push_source::UpdateAlgorithm as _,

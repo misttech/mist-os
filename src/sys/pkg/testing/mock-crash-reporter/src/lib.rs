@@ -8,13 +8,7 @@ use {
         FilingError,
     },
     fuchsia_async::Task,
-    futures::{
-        channel::mpsc,
-        future::{self, BoxFuture},
-        lock::Mutex,
-        prelude::*,
-        TryStreamExt,
-    },
+    futures::{channel::mpsc, future::BoxFuture, lock::Mutex, prelude::*, TryStreamExt},
     std::sync::Arc,
 };
 

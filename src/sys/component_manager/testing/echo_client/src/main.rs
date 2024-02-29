@@ -2,10 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow;
 use fidl_fidl_examples_routing_echo::EchoMarker;
 use fuchsia_component::client::connect_to_protocol;
-use tracing;
 
 #[fuchsia::main]
 async fn main() -> Result<(), anyhow::Error> {

@@ -14,7 +14,6 @@ use {
     futures::prelude::*,
     paste::paste,
     pretty_assertions::assert_eq,
-    serde_json,
     std::collections::BTreeSet,
     test_manager_test_lib::{GroupRunEventByTestCase, RunEvent},
 };

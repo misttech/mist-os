@@ -9,7 +9,6 @@ use {
         matcher::EventMatcher,
     },
     anyhow::{format_err, Error},
-    std::convert::TryFrom,
 };
 
 /// Determines whether an EventGroup allows events to be verified in any order

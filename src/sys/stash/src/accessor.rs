@@ -373,12 +373,8 @@ fn field_has_been_deleted<T>(f: Option<&Option<T>>) -> bool {
 #[cfg(test)]
 mod tests {
     use crate::accessor::*;
-    use crate::store;
     use fidl::client::QueryResponseFut;
     use fidl::endpoints::create_proxy;
-    use fidl_fuchsia_stash::{ListItem, Value};
-    use futures::lock::Mutex;
-    use std::sync::Arc;
     use tempfile::TempDir;
 
     fn get_tmp_store_manager(tmp_dir: &TempDir) -> store::StoreManager {

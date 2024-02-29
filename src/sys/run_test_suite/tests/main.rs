@@ -12,7 +12,6 @@ use fidl_fuchsia_test_manager::{
 use fuchsia_component::client::connect_to_protocol;
 use regex::Regex;
 use run_test_suite_lib::{output, Outcome, RunTestSuiteError, TestParams};
-use std::convert::TryInto;
 use std::ops::Deref;
 use std::str::from_utf8;
 use std::sync::Arc;

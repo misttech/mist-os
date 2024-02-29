@@ -119,7 +119,6 @@ mod tests {
         super::*,
         crate::{
             builtin_environment::BuiltinEnvironment,
-            capability::CapabilityProvider,
             model::{
                 events::{source::EventSource, stream::EventStream},
                 hooks::EventType,
@@ -127,7 +126,7 @@ mod tests {
             },
         },
         assert_matches::assert_matches,
-        cm_rust::{self, ComponentDecl},
+        cm_rust::ComponentDecl,
         cm_rust_testing::*,
         cm_util::TaskGroup,
         fidl::{client::Client, handle::AsyncChannel},

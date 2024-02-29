@@ -1440,7 +1440,7 @@ mod test_real_file_system {
     use assert_matches::assert_matches;
     use proptest::prelude::*;
     use std::fs;
-    use std::io::{self, Write};
+    use std::io::Write;
 
     #[test]
     fn test_read_to_string_errors_on_missing_file() {

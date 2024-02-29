@@ -16,7 +16,6 @@ use omaha_client::{
 use std::collections::HashMap;
 use std::fs;
 use std::io;
-use std::iter::FromIterator;
 use tracing::{error, info, warn};
 use version::Version;
 
@@ -324,8 +323,7 @@ impl VbMetaData {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::app_set::AppMetadata;
-    use eager_package_config::omaha_client::{EagerPackageConfig, OmahaServer};
+    use eager_package_config::omaha_client::OmahaServer;
     use fidl::endpoints::create_proxy_and_stream;
     use fidl_fuchsia_boot::ArgumentsRequest;
     use fidl_fuchsia_pkg::CupRequest;
@@ -339,7 +337,6 @@ mod tests {
             PublicKeyAndId, PublicKeys,
         },
     };
-    use std::{collections::HashMap, convert::TryInto};
 
     #[fasync::run_singlethreaded(test)]
     async fn test_get_config() {

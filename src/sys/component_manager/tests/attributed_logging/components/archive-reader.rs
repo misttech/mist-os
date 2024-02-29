@@ -5,7 +5,7 @@
 use tracing::info;
 use {
     diagnostics_data::Logs, diagnostics_reader::ArchiveReader, futures::stream::StreamExt,
-    std::collections::HashMap, std::vec::Vec,
+    std::collections::HashMap,
 };
 
 #[fuchsia::main(logging_tags = ["archive-reader"])]

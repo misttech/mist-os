@@ -10,7 +10,6 @@ use {
     proptest::prelude::*,
     proptest_derive::Arbitrary,
     serde::{Deserialize, Serialize},
-    std::convert::{TryFrom, TryInto},
     thiserror::Error,
     typed_builder::TypedBuilder,
 };

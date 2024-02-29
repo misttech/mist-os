@@ -13,7 +13,6 @@ use fuchsia_component::server::ServiceFs;
 use fuchsia_inspect::{self as inspect, health::Reporter};
 use futures::lock::Mutex;
 use futures::{StreamExt, TryFutureExt, TryStreamExt};
-use std::convert::{TryFrom, TryInto};
 use std::env;
 use std::path::PathBuf;
 use std::process;

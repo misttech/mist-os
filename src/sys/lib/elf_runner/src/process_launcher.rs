@@ -14,7 +14,7 @@ use {
     process_builder::{
         BuiltProcess, NamespaceEntry, ProcessBuilder, ProcessBuilderError, StartupHandle,
     },
-    std::{convert::TryFrom, ffi::CString, fmt::Debug, sync::Arc},
+    std::{ffi::CString, fmt::Debug, sync::Arc},
     thiserror::Error,
     tracing::{error, warn},
 };

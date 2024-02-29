@@ -11,7 +11,6 @@ use {
     std::cmp::max,
     std::cmp::{Eq, Ord, PartialEq, PartialOrd},
     std::collections::BinaryHeap,
-    std::iter::DoubleEndedIterator,
     std::ops::{AddAssign, SubAssign},
     std::sync::Arc,
 };
@@ -273,9 +272,8 @@ impl MeasurementsQueue {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::diagnostics::task_metrics::constants::COMPONENT_CPU_MAX_SAMPLES;
     use fuchsia_zircon::{Duration as ZxDuration, Time};
-    use injectable_time::{FakeTime, TimeSource};
+    use injectable_time::FakeTime;
     use std::time::Duration;
 
     fn insert_default(q: &mut MeasurementsQueue, clock: &FakeTime) {

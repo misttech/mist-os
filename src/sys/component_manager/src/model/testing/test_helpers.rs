@@ -32,7 +32,6 @@ use {
     futures::{channel::mpsc::Receiver, lock::Mutex, StreamExt, TryStreamExt},
     moniker::{ChildName, Moniker},
     std::collections::HashSet,
-    std::default::Default,
     std::sync::Arc,
     vfs::{directory::entry::DirectoryEntry, service},
 };

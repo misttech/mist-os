@@ -282,7 +282,7 @@ fn ensure_directory_exists(dir: &Path) -> Result<(), Error> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use std::{io::Write, path::Path};
+    use std::io::Write;
     use tempfile::tempdir;
 
     fn validate_against_schema(version: SchemaVersion, root: &Path) {

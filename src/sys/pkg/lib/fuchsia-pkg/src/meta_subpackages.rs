@@ -10,7 +10,6 @@ use {
     std::{
         collections::{BTreeMap, HashMap},
         io,
-        iter::FromIterator,
     },
 };
 

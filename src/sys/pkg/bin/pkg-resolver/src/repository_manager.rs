@@ -909,7 +909,7 @@ mod tests {
         fuchsia_async as fasync,
         http::Uri,
         maplit::hashmap,
-        std::{borrow::Borrow, fs::File, io::Write, path::Path},
+        std::{borrow::Borrow, fs::File, io::Write},
     };
 
     const DYNAMIC_CONFIG_NAME: &str = "dynamic-config.json";

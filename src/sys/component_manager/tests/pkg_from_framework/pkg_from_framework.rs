@@ -8,7 +8,6 @@ use {
     fuchsia_component_test::new::{
         Capability, ChildOptions, LocalComponentHandles, RealmBuilder, Ref, Route,
     },
-    fuchsia_fs,
     futures::{channel::mpsc, FutureExt, SinkExt, StreamExt},
 };
 

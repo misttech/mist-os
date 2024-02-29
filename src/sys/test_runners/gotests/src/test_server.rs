@@ -446,12 +446,9 @@ mod tests {
         super::*,
         anyhow::{Context as _, Error},
         assert_matches::assert_matches,
-        fidl_fuchsia_test::{
-            Result_ as TestResult, RunListenerMarker, RunOptions, Status, SuiteMarker,
-        },
+        fidl_fuchsia_test::{Result_ as TestResult, RunListenerMarker, RunOptions, SuiteMarker},
         itertools::Itertools as _,
         pretty_assertions::assert_eq,
-        test_runners_lib::cases::TestCaseInfo,
         test_runners_test_lib::{
             assert_event_ord, collect_listener_event, names_to_invocation, test_component,
             ListenerEvent,

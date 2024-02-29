@@ -7,7 +7,7 @@ use {
     crate::rule::Rule,
     fidl_fuchsia_pkg_rewrite::{EditTransactionProxy, EngineProxy},
     fuchsia_zircon_status as zx,
-    std::{convert::TryFrom, future::Future},
+    std::future::Future,
 };
 
 const RETRY_ATTEMPTS: usize = 100;
@@ -101,16 +101,13 @@ mod tests {
         assert_matches::assert_matches,
         fidl::endpoints::create_proxy_and_stream,
         fidl_fuchsia_pkg_rewrite::{
-            EditTransactionRequest, EngineMarker, EngineProxy, EngineRequest, RuleIteratorRequest,
+            EditTransactionRequest, EngineMarker, EngineRequest, RuleIteratorRequest,
         },
         fuchsia_async as fasync,
         futures::TryStreamExt,
-        std::{
-            convert::TryInto,
-            sync::{
-                atomic::{AtomicUsize, Ordering},
-                Arc, Mutex,
-            },
+        std::sync::{
+            atomic::{AtomicUsize, Ordering},
+            Arc, Mutex,
         },
     };
 

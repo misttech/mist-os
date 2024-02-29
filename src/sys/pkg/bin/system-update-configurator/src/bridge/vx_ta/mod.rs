@@ -12,13 +12,9 @@ use std::ptr;
 use thiserror::Error;
 use tracing::debug;
 
-use self::tee_client_api::{
-    teec_operation_impl, TEEC_Operation as TeecOperation, TEEC_Value as TeecValue,
-};
+use self::tee_client_api::{TEEC_Operation as TeecOperation, TEEC_Value as TeecValue};
 
-use self::tee_client_api::{
-    TEEC_Parameter as TeecParameter, TEEC_NONE, TEEC_VALUE_INPUT, TEEC_VALUE_OUTPUT,
-};
+use self::tee_client_api::TEEC_Parameter as TeecParameter;
 
 const TA_VX_CMD_OTA_CONFIG_SET: u32 = 24;
 const TA_VX_CMD_OTA_CONFIG_GET: u32 = 25;

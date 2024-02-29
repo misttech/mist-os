@@ -33,7 +33,6 @@ use {
     http::Uri,
     shell_process::ProcessOutput,
     std::{
-        convert::TryFrom,
         fs::{create_dir, File},
         io::Write,
         path::PathBuf,

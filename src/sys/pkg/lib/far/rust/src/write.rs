@@ -118,14 +118,8 @@ pub fn write(
 #[cfg(test)]
 mod tests {
     use {
-        super::*,
-        crate::tests::example_archive,
-        assert_matches::assert_matches,
-        itertools::assert_equal,
-        std::{
-            collections::BTreeMap,
-            io::{Cursor, Read},
-        },
+        super::*, crate::tests::example_archive, assert_matches::assert_matches,
+        itertools::assert_equal, std::io::Cursor,
     };
 
     #[test]

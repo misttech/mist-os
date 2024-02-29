@@ -8,7 +8,7 @@ use {
         matcher::EventMatcher,
     },
     fidl::endpoints::{create_endpoints, ClientEnd, DiscoverableProtocolMarker as _},
-    fidl_fidl_test_components as ftest, fidl_fuchsia_io as fio, fuchsia_fs,
+    fidl_fidl_test_components as ftest, fidl_fuchsia_io as fio,
     futures::StreamExt,
     maplit::hashmap,
 };

@@ -306,10 +306,8 @@ mod tests {
     use {
         super::*,
         assert_matches::assert_matches,
-        cm_config::{
-            AllowlistEntryBuilder, ChildPolicyAllowlists, JobPolicyAllowlists, SecurityPolicy,
-        },
-        moniker::{ChildName, Moniker, MonikerBase},
+        cm_config::{AllowlistEntryBuilder, ChildPolicyAllowlists, JobPolicyAllowlists},
+        moniker::ChildName,
         std::collections::HashMap,
     };
 

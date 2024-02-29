@@ -271,7 +271,6 @@ mod tests {
         fuchsia_pkg_testing::{blobfs::Fake as FakeBlobfs, PackageBuilder},
         maplit::{btreeset, convert_args, hashmap},
         std::str::FromStr,
-        vfs::directory::entry_container::Directory,
     };
 
     impl PkgfsPackagesVariants {

@@ -37,8 +37,8 @@ use {
     fuchsia_zircon as zx,
     futures::{channel::mpsc, future::pending, join, lock::Mutex, prelude::*},
     moniker::{ChildName, Moniker, MonikerBase},
+    std::collections::HashSet,
     std::sync::{Arc, Weak},
-    std::{collections::HashSet, convert::TryFrom},
 };
 
 async fn new_model(

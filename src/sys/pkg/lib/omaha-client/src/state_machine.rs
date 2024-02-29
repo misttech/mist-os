@@ -24,7 +24,7 @@ use crate::{
 use anyhow::anyhow;
 use futures::{
     channel::{mpsc, oneshot},
-    future::{self, BoxFuture, Fuse},
+    future::{BoxFuture, Fuse},
     lock::Mutex,
     prelude::*,
     select,
@@ -34,7 +34,6 @@ use p256::ecdsa::DerSignature;
 use std::{
     cmp::min,
     collections::HashMap,
-    convert::TryInto,
     rc::Rc,
     str::Utf8Error,
     time::{Duration, Instant, SystemTime},
@@ -1465,9 +1464,7 @@ mod tests {
     use super::*;
     use crate::{
         app_set::VecAppSet,
-        common::{
-            App, CheckOptions, PersistedApp, ProtocolState, UpdateCheckSchedule, UserCounting,
-        },
+        common::{PersistedApp, ProtocolState, UpdateCheckSchedule, UserCounting},
         configuration::Updater,
         cup_ecdsa::test_support::{make_cup_handler_for_test, MockCupv2Handler},
         http_request::mock::MockHttpRequest,
@@ -1481,7 +1478,7 @@ mod tests {
         storage::MemStorage,
         time::{
             timers::{BlockingTimer, MockTimer, RequestedWait},
-            MockTimeSource, PartialComplexTime,
+            MockTimeSource,
         },
     };
     use assert_matches::assert_matches;
@@ -1491,7 +1488,6 @@ mod tests {
     use pretty_assertions::assert_eq;
     use serde_json::json;
     use std::cell::RefCell;
-    use std::time::Duration;
     use tracing::info;
     use version::Version;
 

@@ -13,7 +13,7 @@ use {
     cm_rust::{FidlIntoNative, RegistrationSource, ResolverRegistration},
     fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_component_resolution as fresolution,
     fidl_fuchsia_io as fio, fidl_fuchsia_mem as fmem,
-    std::{collections::HashMap, convert::TryInto, sync::Arc},
+    std::{collections::HashMap, sync::Arc},
     tracing::error,
 };
 
@@ -216,7 +216,7 @@ mod tests {
         super::*,
         crate::model::{
             actions::{resolve::sandbox_construction::ComponentInput, DiscoverAction},
-            component::{ComponentInstance, ComponentManagerInstance, WeakExtendedInstance},
+            component::{ComponentManagerInstance, WeakExtendedInstance},
             context::ModelContext,
             environment::Environment,
             hooks::Hooks,
@@ -231,9 +231,9 @@ mod tests {
         lazy_static::lazy_static,
         moniker::MonikerBase,
         routing::environment::{DebugRegistry, RunnerRegistry},
-        routing::resolving::{ComponentAddress, ComponentResolutionContext},
+        routing::resolving::ComponentResolutionContext,
         serde_json::json,
-        std::sync::{Arc, Mutex, Weak},
+        std::sync::{Mutex, Weak},
     };
 
     #[derive(Debug)]

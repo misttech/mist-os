@@ -129,7 +129,7 @@ where
 #[cfg(test)]
 mod test {
     use super::*;
-    use event_queue::{ClosedClient, Event, Notify};
+    use event_queue::{ClosedClient, Event};
     use fidl_fuchsia_update_ext::random_version_available;
     use fuchsia_async as fasync;
     use fuchsia_sync::Mutex;
@@ -355,7 +355,7 @@ mod test {
 mod test_inspect {
     use super::*;
     use diagnostics_assertions::assert_data_tree;
-    use event_queue::{ClosedClient, Notify};
+    use event_queue::ClosedClient;
     use fuchsia_async as fasync;
 
     #[derive(Clone, Debug)]

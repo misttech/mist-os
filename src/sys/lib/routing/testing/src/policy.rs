@@ -22,7 +22,6 @@ use {
     },
     std::{
         collections::{HashMap, HashSet},
-        iter::FromIterator,
         sync::{Arc, Weak},
     },
 };

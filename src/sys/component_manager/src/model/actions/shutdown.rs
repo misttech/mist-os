@@ -880,18 +880,15 @@ mod tests {
             },
         },
         cm_rust::{
-            Availability, ChildDecl, ComponentDecl, DependencyType, ExposeDecl, ExposeProtocolDecl,
-            ExposeRunnerDecl, ExposeSource, ExposeTarget, OfferDecl, OfferProtocolDecl,
-            OfferResolverDecl, OfferSource, OfferStorageDecl, OfferTarget, StorageDecl,
-            StorageDirectorySource, UseDecl, UseSource,
+            Availability, ChildDecl, ComponentDecl, DependencyType, ExposeProtocolDecl,
+            ExposeRunnerDecl, ExposeSource, ExposeTarget, StorageDecl,
         },
         cm_rust_testing::*,
         cm_types::AllowedOffers,
         fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
         maplit::{btreeset, hashmap, hashset},
-        moniker::{ChildName, Moniker},
-        std::collections::{BTreeSet, HashMap},
-        std::convert::TryFrom,
+        moniker::Moniker,
+        std::collections::BTreeSet,
         test_case::test_case,
     };
 

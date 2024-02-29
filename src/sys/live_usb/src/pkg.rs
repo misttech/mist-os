@@ -57,7 +57,6 @@ mod tests {
         fuchsia_async as fasync,
         fuchsia_url::AbsolutePackageUrl,
         futures::prelude::*,
-        std::convert::TryInto,
     };
 
     /// A mock implementation of fuchsia.pkg.rewrite.Engine.

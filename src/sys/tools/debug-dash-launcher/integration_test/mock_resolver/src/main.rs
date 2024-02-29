@@ -7,7 +7,6 @@ use fidl_fuchsia_pkg::{
 };
 use fuchsia_component::server::ServiceFs;
 use futures::prelude::*;
-use std::clone::Clone;
 use tempfile::TempDir;
 
 enum IncomingRequest {

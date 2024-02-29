@@ -4,9 +4,8 @@
 
 use {
     anyhow::Error,
-    cm_rust, fidl, fidl_fuchsia_component_decl as fdecl,
-    fidl_fuchsia_component_resolution as fresolution, fidl_fuchsia_mem as fmem,
-    fuchsia_async as fasync,
+    fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_component_resolution as fresolution,
+    fidl_fuchsia_mem as fmem, fuchsia_async as fasync,
     fuchsia_component::server as fserver,
     fuchsia_component_test::new::{ChildOptions, LocalComponentHandles, RealmBuilder},
     futures::{channel::mpsc, FutureExt, SinkExt, StreamExt, TryStreamExt},

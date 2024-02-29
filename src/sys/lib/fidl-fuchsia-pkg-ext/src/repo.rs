@@ -8,7 +8,6 @@ use {
     http::Uri,
     http_uri_ext::HttpUriExt as _,
     serde::{Deserialize, Serialize},
-    std::convert::TryFrom,
     std::{fmt, mem},
 };
 
@@ -1314,7 +1313,7 @@ mod tests {
 }
 
 mod hex_serde {
-    use {hex, serde::Deserialize};
+    use serde::Deserialize;
 
     pub fn serialize<S>(bytes: &[u8], serializer: S) -> Result<S::Ok, S::Error>
     where

@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use {
-    anyhow, fidl_fuchsia_sys2 as fuchsia_sys2, fuchsia_component::client as component_client,
+    fidl_fuchsia_sys2 as fuchsia_sys2, fuchsia_component::client as component_client,
     tracing::error,
 };
 

@@ -153,11 +153,10 @@ mod tests {
     use crate::bridge;
     use assert_matches::assert_matches;
     use fidl_fuchsia_update_config::{
-        OptOutAdminError, OptOutAdminMarker, OptOutAdminProxy, OptOutMarker,
+        OptOutAdminMarker, OptOutAdminProxy, OptOutMarker,
         OptOutPreference as FidlOptOutPreference, OptOutProxy,
     };
     use fuchsia_async::Task;
-    use futures::channel::mpsc;
 
     fn spawn_serve(mut storage: impl Bridge + 'static) -> (Connector, Task<()>) {
         let (send, recv) = mpsc::unbounded();

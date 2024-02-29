@@ -6,7 +6,7 @@ use {
     anyhow::Error,
     fidl_fidl_test_components as ftest, fidl_fuchsia_io as fio, fuchsia_async as fasync,
     fuchsia_component::server::ServiceFs,
-    fuchsia_fs::{self, OpenFlags},
+    fuchsia_fs::OpenFlags,
     futures::{StreamExt, TryStreamExt},
 };
 

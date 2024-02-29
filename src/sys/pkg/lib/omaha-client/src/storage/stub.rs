@@ -5,7 +5,6 @@
 #![cfg(test)]
 
 use super::*;
-use futures::future::BoxFuture;
 use futures::prelude::*;
 use thiserror::Error;
 

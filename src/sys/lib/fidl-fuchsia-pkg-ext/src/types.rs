@@ -9,7 +9,7 @@ use {
     fidl_fuchsia_pkg as fidl,
     proptest_derive::Arbitrary,
     serde::{Deserialize, Serialize},
-    std::{convert::TryFrom, fmt, str},
+    std::{fmt, str},
     typed_builder::TypedBuilder,
 };
 

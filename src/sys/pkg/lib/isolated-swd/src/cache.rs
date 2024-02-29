@@ -40,7 +40,7 @@ impl Cache {
 pub(crate) mod for_tests {
     use {
         super::*,
-        anyhow::{Context as _, Error},
+        anyhow::Context as _,
         blobfs_ramdisk::BlobfsRamdisk,
         fidl_fuchsia_io as fio, fidl_fuchsia_metrics as fmetrics, fuchsia_async as fasync,
         fuchsia_component_test::{

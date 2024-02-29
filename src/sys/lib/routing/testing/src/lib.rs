@@ -38,7 +38,6 @@ use {
     },
     std::{
         collections::HashSet,
-        convert::TryInto,
         marker::PhantomData,
         path::{Path, PathBuf},
         sync::Arc,

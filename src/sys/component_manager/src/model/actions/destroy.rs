@@ -139,11 +139,7 @@ pub mod tests {
     use {
         super::*,
         crate::model::{
-            actions::{
-                test_utils::{is_child_deleted, is_destroyed},
-                ShutdownAction,
-            },
-            component::StartReason,
+            actions::test_utils::{is_child_deleted, is_destroyed},
             events::{registry::EventSubscription, stream::EventStream},
             hooks::EventType,
             testing::{
@@ -159,7 +155,7 @@ pub mod tests {
         cm_rust_testing::*,
         fidl_fuchsia_component_decl as fdecl, fuchsia_async as fasync, fuchsia_zircon as zx,
         futures::{channel::mpsc, StreamExt},
-        moniker::{ChildName, Moniker, MonikerBase},
+        moniker::{ChildName, Moniker},
         std::sync::atomic::Ordering,
     };
 

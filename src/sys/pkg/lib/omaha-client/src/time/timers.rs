@@ -22,7 +22,6 @@ pub use stub::StubTimer;
 
 mod stub {
     use super::super::*;
-    use futures::future::BoxFuture;
     use futures::prelude::*;
 
     pub struct StubTimer;
@@ -42,7 +41,6 @@ mod stub {
     mod tests {
         use super::*;
         use futures::executor::block_on;
-        use std::time::Duration;
 
         #[test]
         fn test_wait_always_ready() {
@@ -57,7 +55,6 @@ pub use mock::MockTimer;
 mod mock {
     use super::super::*;
     use super::{ExpectedWait, RequestedWait};
-    use futures::future::BoxFuture;
     use futures::prelude::*;
     use std::{cell::RefCell, collections::VecDeque, fmt::Debug, rc::Rc};
 
@@ -159,7 +156,6 @@ mod mock {
         use super::*;
         use futures::executor::{block_on, LocalPool};
         use futures::task::LocalSpawnExt;
-        use std::time::Duration;
 
         #[test]
         fn test_wait_until_expected() {
@@ -277,7 +273,6 @@ mod blocking {
     use super::super::*;
     use super::RequestedWait;
     use futures::channel::{mpsc, oneshot};
-    use futures::future::BoxFuture;
     use futures::prelude::*;
 
     /// A mock timer that will notify a channel when creating a timer.

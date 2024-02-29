@@ -153,7 +153,6 @@ impl From<MerkleTreeBuilder> for MerkleTree {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::cmp::min;
     use test_case::test_case;
 
     #[allow(clippy::unused_unit)]

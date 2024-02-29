@@ -115,7 +115,6 @@ mod tests {
         crate::metadata::errors::VerifyFailureReason,
         assert_matches::assert_matches,
         fidl_fuchsia_update_verify as verify, fuchsia_async as fasync,
-        fuchsia_zircon::Status,
         mock_paver::{hooks as mphooks, MockPaverServiceBuilder, PaverEvent},
         std::sync::Arc,
     };

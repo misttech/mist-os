@@ -32,13 +32,11 @@ use {
         prelude::*,
     },
     std::{
-        boxed::Box,
         collections::{HashMap, HashSet},
         mem,
         sync::{Arc, Mutex as SyncMutex},
     },
     tracing::warn,
-    version_history,
     vfs::{
         directory::entry_container::Directory, execution_scope::ExecutionScope,
         file::vmo::read_only, pseudo_directory,

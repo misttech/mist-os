@@ -2,14 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fuchsia_hyper;
-use hyper;
 use rustls::Certificate;
 use std::cell::RefCell;
 use std::sync::{Arc, Mutex};
 use thiserror::Error;
-use webpki;
-use webpki_roots_fuchsia;
 
 type DateTime = chrono::DateTime<chrono::FixedOffset>;
 #[derive(Debug, PartialEq, Clone, Copy, Hash, Eq)]

@@ -5,10 +5,9 @@
 //! Wrapper types for the Options table.
 
 use {
-    fidl_fuchsia_update_installer, fuchsia_inspect as inspect,
+    fuchsia_inspect as inspect,
     proptest_derive::Arbitrary,
     serde::{Deserialize, Serialize},
-    std::convert::TryFrom,
     thiserror::Error,
 };
 
@@ -124,11 +123,7 @@ impl From<Initiator> for fidl_fuchsia_update_installer::Initiator {
 #[cfg(test)]
 mod tests {
 
-    use {
-        super::*,
-        proptest::prelude::*,
-        std::convert::{TryFrom, TryInto},
-    };
+    use {super::*, proptest::prelude::*};
 
     proptest! {
         #[test]

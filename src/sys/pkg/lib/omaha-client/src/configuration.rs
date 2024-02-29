@@ -38,10 +38,9 @@ pub struct Config {
 pub mod test_support {
 
     use super::*;
-    use crate::cup_ecdsa::{PublicKeyAndId, PublicKeys};
+    use crate::cup_ecdsa::PublicKeyAndId;
     use p256::ecdsa::{SigningKey, VerifyingKey};
     use signature::rand_core::OsRng;
-    use std::convert::TryInto;
 
     /// Handy generator for an updater configuration.  Used to reduce test boilerplate.
     pub fn config_generator() -> Config {

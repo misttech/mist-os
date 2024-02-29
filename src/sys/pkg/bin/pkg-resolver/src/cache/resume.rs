@@ -11,10 +11,7 @@ use {
         stream::{Stream, TryStreamExt as _},
     },
     hyper::{body::HttpBody, Body, Request, StatusCode},
-    std::{
-        convert::{TryFrom, TryInto as _},
-        str::FromStr,
-    },
+    std::{convert::TryInto as _, str::FromStr},
     tracing::warn,
 };
 

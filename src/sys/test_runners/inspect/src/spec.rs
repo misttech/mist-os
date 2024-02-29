@@ -3,11 +3,8 @@
 // found in the LICENSE file.
 
 use {
-    crate::error::ComponentError,
-    fidl_fuchsia_data as fdata,
-    selectors::{self, VerboseError},
+    crate::error::ComponentError, fidl_fuchsia_data as fdata, selectors::VerboseError,
     std::collections::BTreeMap,
-    std::convert::TryFrom,
 };
 
 #[derive(Debug)]

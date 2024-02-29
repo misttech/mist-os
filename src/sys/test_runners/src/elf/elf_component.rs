@@ -24,8 +24,6 @@ use {
     futures::{future::BoxFuture, prelude::*},
     namespace::Namespace,
     std::{
-        boxed::Box,
-        convert::{TryFrom, TryInto},
         mem,
         ops::Deref,
         path::Path,
@@ -611,11 +609,10 @@ mod tests {
         },
         anyhow::Error,
         assert_matches::assert_matches,
-        fidl::endpoints::{self, ClientEnd, Proxy},
+        fidl::endpoints::{self},
         fidl_fuchsia_test::{Invocation, RunListenerProxy},
-        fuchsia_runtime::job_default,
         futures::future::{AbortHandle, Aborted},
-        namespace::{Namespace, NamespaceError},
+        namespace::NamespaceError,
         std::sync::Weak,
     };
 

@@ -169,7 +169,6 @@ mod tests {
             distributions::{Alphanumeric, DistString as _},
             thread_rng,
         },
-        std::mem::drop,
         test_case::test_case,
     };
 

@@ -11,7 +11,6 @@
 
 use anyhow::{format_err, Context, Error};
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
-use fidl_fuchsia_mem;
 use fidl_fuchsia_stash::{KeyValue, ListItem, Value, ValueType};
 use fuchsia_zircon as zx;
 use std::collections::HashMap;

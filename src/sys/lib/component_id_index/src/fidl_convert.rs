@@ -7,7 +7,6 @@ use crate::{
 };
 use fidl_fuchsia_component_internal as fcomponent_internal;
 use moniker::{Moniker, MonikerBase, MonikerError};
-use std::convert::TryFrom;
 use thiserror::Error;
 
 #[derive(Error, Clone, Debug, PartialEq)]

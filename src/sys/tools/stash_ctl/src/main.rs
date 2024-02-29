@@ -8,12 +8,11 @@
 
 use anyhow::{format_err, Error};
 use fidl::endpoints::create_proxy;
-use fidl_fuchsia_mem;
 use fuchsia_async as fasync;
 use fuchsia_component::client::connect_to_protocol;
 use fuchsia_zircon as zx;
 use futures::FutureExt;
-use std::convert::{TryFrom, TryInto};
+
 use std::env;
 use std::str;
 

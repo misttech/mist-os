@@ -19,7 +19,6 @@ use {
     std::{
         collections::HashMap,
         convert::Infallible,
-        convert::TryInto,
         io,
         net::{Ipv6Addr, SocketAddr},
         pin::Pin,

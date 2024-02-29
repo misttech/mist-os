@@ -41,7 +41,6 @@ use {
     serde::Serialize,
     std::{
         collections::HashMap,
-        convert::TryInto,
         fs::File,
         io::{self, BufWriter, Write},
         path::{Path, PathBuf},

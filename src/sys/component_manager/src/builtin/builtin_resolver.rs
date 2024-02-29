@@ -70,7 +70,6 @@ struct ManifestNotFoundError(pub BuiltinUrl);
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::model::resolver;
     use assert_matches::assert_matches;
     use fidl_fuchsia_data as fdata;
 

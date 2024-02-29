@@ -19,7 +19,6 @@ use {
     fidl::endpoints::ServerEnd,
     fidl_fuchsia_component_resolution as fresolution, fidl_fuchsia_component_runner as fcrunner,
     fuchsia_component::client as fclient,
-    std::convert::TryInto,
     std::sync::Arc,
 };
 

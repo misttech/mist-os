@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::{self, format_err, Error};
+use anyhow::{format_err, Error};
 use fidl::endpoints::ClientEnd;
 use fidl_fuchsia_dash::LauncherError;
 use fidl_fuchsia_hardware_pty as pty;

@@ -363,10 +363,7 @@ impl<W: 'static + Write + Send + Sync> Reporter for ShellReporter<W> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use {
-        crate::output::{CaseId, RunReporter, SuiteId},
-        std::io::Write,
-    };
+    use crate::output::{CaseId, RunReporter, SuiteId};
 
     #[fuchsia::test]
     async fn report_case_events() {

@@ -310,10 +310,7 @@ mod tests {
         fuchsia_url::RepositoryUrl,
         futures::{channel::mpsc, stream::StreamExt},
         http_sse::Event,
-        std::{
-            path::{Path, PathBuf},
-            sync::Arc,
-        },
+        std::path::{Path, PathBuf},
         tuf::metadata::MetadataPath,
         updating_tuf_client::METADATA_CACHE_STALE_TIMEOUT,
     };
@@ -712,7 +709,6 @@ mod inspect_tests {
         fuchsia_url::RepositoryUrl,
         futures::stream::StreamExt,
         http_sse::Event,
-        std::sync::Arc,
     };
 
     const TEST_REPO_URL: &str = "fuchsia-pkg://test";

@@ -62,7 +62,6 @@ mod tests {
         super::*,
         fuchsia_fs::directory::open_in_namespace,
         std::sync::Arc,
-        version_history::AbiRevision,
         vfs::{
             directory::entry_container::Directory, execution_scope, file::vmo::read_only,
             pseudo_directory,

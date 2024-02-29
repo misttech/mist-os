@@ -11,7 +11,6 @@ use {
     fuchsia_component_test::{
         error::Error as RealmBuilderError, Capability, RealmBuilder, Ref, Route, SubRealmBuilder,
     },
-    fuchsia_fs,
     std::collections::HashMap,
 };
 

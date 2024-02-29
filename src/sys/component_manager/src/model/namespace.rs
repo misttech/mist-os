@@ -20,7 +20,7 @@ use {
         component_instance::ComponentInstanceInterface, mapper::NoopRouteMapper, rights::Rights,
         route_to_storage_decl, verify_instance_in_component_id_index, RouteRequest,
     },
-    cm_rust::{self, ComponentDecl, UseDecl, UseStorageDecl},
+    cm_rust::{ComponentDecl, UseDecl, UseStorageDecl},
     cm_types::IterablePath,
     cm_util::TaskGroup,
     fidl::{endpoints::ClientEnd, prelude::*},

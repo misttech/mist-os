@@ -15,7 +15,6 @@ use fuchsia_async as fasync;
 use fuchsia_url::RepositoryUrl;
 use fuchsia_zircon::Status;
 use futures::prelude::*;
-use std::convert::TryFrom;
 use std::sync::Arc;
 use tracing::{error, info};
 
@@ -150,12 +149,9 @@ impl RepositoryService {
 #[cfg(test)]
 mod tests {
     use {
-        super::*,
-        crate::repository_manager::RepositoryManagerBuilder,
-        fidl::endpoints::create_proxy_and_stream,
-        fidl_fuchsia_pkg::RepositoryIteratorMarker,
-        fidl_fuchsia_pkg_ext::{RepositoryConfig, RepositoryConfigBuilder},
-        std::convert::TryInto,
+        super::*, crate::repository_manager::RepositoryManagerBuilder,
+        fidl::endpoints::create_proxy_and_stream, fidl_fuchsia_pkg::RepositoryIteratorMarker,
+        fidl_fuchsia_pkg_ext::RepositoryConfigBuilder,
     };
 
     async fn list(service: &RepositoryService) -> Vec<RepositoryConfig> {

@@ -9,7 +9,7 @@ use {
     fuchsia_component::client::connect_to_protocol_at_path,
     fuchsia_zircon as zx,
     lazy_static::lazy_static,
-    std::{collections::VecDeque, convert::TryFrom},
+    std::collections::VecDeque,
     thiserror::Error,
 };
 

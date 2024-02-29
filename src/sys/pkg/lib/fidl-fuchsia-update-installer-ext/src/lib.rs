@@ -28,7 +28,7 @@ use {
         task::{Context, Poll},
     },
     pin_project::pin_project,
-    std::{convert::TryInto, fmt, pin::Pin},
+    std::{fmt, pin::Pin},
     thiserror::Error,
     tracing::info,
 };

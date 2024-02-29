@@ -188,7 +188,6 @@ impl SampleMetric {
 mod test {
     use super::*;
     use crate::datatypes::Poll;
-    use crate::diagnostics::Event;
     use diagnostics_assertions::{assert_data_tree, AnyProperty};
     use fuchsia_inspect::Inspector;
     use fuchsia_zircon as zx;

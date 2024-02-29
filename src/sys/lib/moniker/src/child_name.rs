@@ -4,9 +4,8 @@
 
 use {
     crate::error::MonikerError,
-    cm_rust,
     cm_types::{LongName, Name},
-    core::cmp::{Ord, Ordering},
+    core::cmp::Ordering,
     std::fmt,
 };
 

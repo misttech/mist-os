@@ -202,8 +202,8 @@ pub async fn run_cmd<W: std::io::Write>(
 #[cfg(test)]
 mod test {
     use {
-        super::*, anyhow::Result, fidl::endpoints::create_proxy_and_stream,
-        fidl_fuchsia_sys2 as fsys, futures::TryStreamExt,
+        super::*, fidl::endpoints::create_proxy_and_stream, fidl_fuchsia_sys2 as fsys,
+        futures::TryStreamExt,
     };
 
     fn setup_fake_lifecycle_controller_ok(

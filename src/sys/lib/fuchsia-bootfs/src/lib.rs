@@ -11,7 +11,6 @@ use {
     },
     byteorder::{ByteOrder, LittleEndian},
     fuchsia_zircon as zx,
-    std::convert::TryFrom,
     std::{ffi::CStr, mem::size_of, str::Utf8Error},
     thiserror::Error,
     zerocopy::{ByteSlice, Ref},

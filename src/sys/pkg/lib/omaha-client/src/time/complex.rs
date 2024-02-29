@@ -72,7 +72,7 @@ pub mod complex_time_impls {
         use super::super::super::PartialComplexTime;
         use super::super::system_time_conversion;
         use super::*;
-        use std::time::{Duration, Instant, SystemTime};
+        use std::time::{Instant, SystemTime};
 
         #[test]
         fn test_truncate_submicrosecond_walltime() {
@@ -561,7 +561,7 @@ pub mod partial_complex_time_type_conversions {
     #[cfg(test)]
     mod tests {
         use super::*;
-        use std::time::{Duration, Instant, SystemTime};
+        use std::time::Duration;
 
         #[test]
         fn test_from_complex_time_for_partial_complex_time() {
@@ -717,7 +717,6 @@ pub mod partial_complex_time_type_conversions {
 
 /// Module to ease the conversion betwee SystemTime and i64 microseconds from the from UNIX Epoch.
 pub mod system_time_conversion {
-    use std::convert::TryFrom;
     use std::time::{Duration, SystemTime};
 
     /// Convert a SystemTime into microseconds from the unix epoch, returning None on overflow.

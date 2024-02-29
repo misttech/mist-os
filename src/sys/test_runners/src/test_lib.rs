@@ -24,7 +24,6 @@ use {
     namespace::Namespace,
     namespace::NamespaceError,
     std::collections::HashMap,
-    std::convert::TryFrom,
     std::sync::Arc,
     test_manager_test_lib::RunEvent,
     test_runners_lib::elf::{BuilderArgs, Component},

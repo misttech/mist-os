@@ -671,7 +671,6 @@ mod stub {
         observer::FuchsiaObserver,
     };
     use fuchsia_inspect::Inspector;
-    use futures::future::BoxFuture;
     use omaha_client::{
         common::{App, CheckTiming, ProtocolState, UpdateCheckSchedule},
         cup_ecdsa::StandardCupv2Handler,
@@ -684,7 +683,6 @@ mod stub {
         storage::MemStorage,
         time::{timers::InfiniteTimer, MockTimeSource, TimeSource},
     };
-    use std::time::Duration;
 
     #[derive(Clone)]
     pub struct MockStateMachineController {
@@ -941,8 +939,7 @@ mod tests {
     use diagnostics_assertions::assert_data_tree;
     use fidl::endpoints::{create_proxy_and_stream, create_request_stream};
     use fidl_fuchsia_update::{
-        self as update, AttemptsMonitorRequest, ManagerMarker, MonitorMarker, MonitorRequest,
-        MonitorRequestStream,
+        self as update, AttemptsMonitorRequest, ManagerMarker, MonitorRequest, MonitorRequestStream,
     };
     use fidl_fuchsia_update_channel::ProviderMarker;
     use fidl_fuchsia_update_channelcontrol::ChannelControlMarker;

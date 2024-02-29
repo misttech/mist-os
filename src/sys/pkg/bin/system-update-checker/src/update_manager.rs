@@ -674,8 +674,6 @@ pub(crate) mod tests {
     use fuchsia_sync::Mutex;
     use fuchsia_zircon::prelude::*;
     use futures::channel::mpsc::{channel, Receiver, Sender};
-    use futures::channel::oneshot;
-    use futures::future::BoxFuture;
     use futures::lock::Mutex as AsyncMutex;
     use std::sync::atomic::{AtomicU64, Ordering};
 

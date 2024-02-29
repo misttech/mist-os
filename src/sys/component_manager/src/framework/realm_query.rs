@@ -33,10 +33,7 @@ use {
         environment::EnvironmentInterface,
         resolving::ComponentAddress,
     },
-    std::{
-        convert::TryFrom,
-        sync::{Arc, Weak},
-    },
+    std::sync::{Arc, Weak},
     tracing::{trace, warn},
     vfs::directory::entry_container::Directory,
 };

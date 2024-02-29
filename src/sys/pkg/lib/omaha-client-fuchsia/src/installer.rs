@@ -468,9 +468,9 @@ mod tests {
         fuchsia_async as fasync,
         fuchsia_sync::Mutex,
         futures::future::BoxFuture,
-        omaha_client::protocol::response::{App, Manifest, Package, Packages, UpdateCheck},
+        omaha_client::protocol::response::{App, Manifest, Package, Packages},
         serde_json::Map,
-        std::{convert::TryInto, sync::Arc, task::Poll},
+        std::{sync::Arc, task::Poll},
     };
 
     const TEST_URL: &str = "fuchsia-pkg://fuchsia.test/update/0?hash=0000000000000000000000000000000000000000000000000000000000000000";

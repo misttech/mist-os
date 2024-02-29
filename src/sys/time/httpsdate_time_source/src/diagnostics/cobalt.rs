@@ -165,10 +165,10 @@ mod test {
     use {
         super::*,
         crate::datatypes::Poll,
-        fidl_fuchsia_metrics::{MetricEvent, MetricEventPayload},
+        fidl_fuchsia_metrics::MetricEventPayload,
         futures::{channel::mpsc, stream::StreamExt},
         lazy_static::lazy_static,
-        std::{collections::HashSet, iter::FromIterator},
+        std::collections::HashSet,
     };
 
     const TEST_INITIAL_PHASE: Phase = Phase::Initial;

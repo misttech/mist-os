@@ -7,7 +7,7 @@ use serde::{de::Deserializer, ser::Serializer, Deserialize, Serialize};
 use {
     crate::{error::RightsRoutingError, walk_state::WalkStateUnit},
     fidl_fuchsia_io as fio,
-    std::{convert::From, fmt},
+    std::fmt,
 };
 
 /// All the fio rights required to represent fio::OpenFlags::RIGHT_READABLE.

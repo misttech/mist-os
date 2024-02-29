@@ -11,7 +11,6 @@ use fuchsia_sync::Mutex;
 use fuchsia_url::AbsolutePackageUrl;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
-use std::convert::TryInto;
 use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
@@ -215,7 +214,6 @@ mod tests {
     use fidl_fuchsia_pkg_ext::RepositoryConfigBuilder;
     use fuchsia_async as fasync;
     use fuchsia_component::server::ServiceFs;
-    use fuchsia_sync::Mutex;
     use fuchsia_url::RepositoryUrl;
     use futures::prelude::*;
     use futures::stream::StreamExt;

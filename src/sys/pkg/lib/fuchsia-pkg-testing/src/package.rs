@@ -748,10 +748,7 @@ impl PackageDir {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*, assert_matches::assert_matches, fuchsia_merkle::MerkleTree,
-        fuchsia_pkg::MetaPackage, std::io::Read,
-    };
+    use {super::*, assert_matches::assert_matches, fuchsia_pkg::MetaPackage};
 
     #[test]
     #[should_panic(expected = "adding blob to succeed")]

@@ -17,7 +17,6 @@ use crate::{
         PROTOCOL_V3,
     },
 };
-use http;
 use std::fmt::Display;
 use std::result;
 use thiserror::Error;

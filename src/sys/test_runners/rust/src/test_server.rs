@@ -552,7 +552,6 @@ mod tests {
         },
         itertools::Itertools,
         pretty_assertions::assert_eq,
-        test_runners_lib::cases::TestCaseInfo,
         test_runners_test_lib::{
             assert_event_ord, collect_listener_event, names_to_invocation, test_component,
             ListenerEvent,

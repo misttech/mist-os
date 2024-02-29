@@ -16,7 +16,7 @@ use {
     namespace::{Namespace, Path},
     once_cell::unsync::OnceCell,
     socket_parsing::{NewlineChunker, NewlineChunkerError},
-    std::{boxed::Box, sync::Arc},
+    std::sync::Arc,
     tracing::{info, warn, Subscriber},
     zx::HandleBased,
 };
@@ -174,15 +174,12 @@ mod tests {
         fidl_fuchsia_logger::LogSinkRequest,
         fuchsia_async::Task,
         fuchsia_zircon as zx,
-        futures::{channel::mpsc, try_join, FutureExt, SinkExt, StreamExt},
+        futures::{channel::mpsc, try_join, FutureExt, SinkExt},
         rand::{
             distributions::{Alphanumeric, DistString as _},
             thread_rng,
         },
-        std::{
-            convert::TryFrom,
-            sync::{Arc, Mutex},
-        },
+        std::sync::Mutex,
     };
 
     #[async_trait]

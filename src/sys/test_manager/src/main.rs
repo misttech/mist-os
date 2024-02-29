@@ -8,10 +8,7 @@ use {
     fuchsia_component::client::connect_to_protocol,
     fuchsia_component::server::ServiceFs,
     futures::StreamExt,
-    std::{
-        convert::{TryFrom, TryInto},
-        sync::Arc,
-    },
+    std::sync::Arc,
     test_manager_lib::{constants, AboveRootCapabilitiesForTest, RootDiagnosticNode},
     tracing::{info, warn},
 };

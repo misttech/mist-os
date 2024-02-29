@@ -4,7 +4,7 @@
 
 use {
     crate::instanced_child_name::InstancedChildName,
-    core::cmp::{self, Ord, Ordering},
+    core::cmp::{self, Ordering},
     moniker::{ChildName, ChildNameBase, Moniker, MonikerBase, MonikerError},
     std::{fmt, hash::Hash},
 };
@@ -117,11 +117,7 @@ impl fmt::Debug for InstancedMoniker {
 mod tests {
     use std::str::FromStr;
 
-    use {
-        super::*,
-        cm_types::Name,
-        moniker::{ChildNameBase, MonikerBase, MonikerError},
-    };
+    use {super::*, cm_types::Name};
 
     #[test]
     fn from_moniker() {

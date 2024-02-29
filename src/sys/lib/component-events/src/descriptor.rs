@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {crate::events::ExitStatus, fidl_fuchsia_component as fcomponent, std::convert::TryFrom};
+use {crate::events::ExitStatus, fidl_fuchsia_component as fcomponent};
 
 #[derive(Clone, Eq, PartialEq, PartialOrd, Ord, Debug)]
 pub struct EventDescriptor {

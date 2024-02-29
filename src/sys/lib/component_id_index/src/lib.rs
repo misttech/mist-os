@@ -11,7 +11,6 @@ use {
     fidl_fuchsia_component_internal as fcomponent_internal,
     moniker::Moniker,
     std::collections::{HashMap, HashSet},
-    std::convert::TryFrom,
     thiserror::Error,
 };
 

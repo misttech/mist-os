@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use {
-    anyhow, fidl_fuchsia_component as fcomponent, fidl_fuchsia_test_manager::LaunchError,
+    fidl_fuchsia_component as fcomponent, fidl_fuchsia_test_manager::LaunchError,
     fuchsia_component_test::error::Error as RealmBuilderError, thiserror::Error, tracing::warn,
 };
 

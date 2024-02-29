@@ -7,7 +7,6 @@ use {
     fidl_fuchsia_process_lifecycle::{LifecycleRequest, LifecycleRequestStream},
     fuchsia_async::{self as fasync},
     // fuchsia_component::server::ServiceFs,
-    fuchsia_component,
     fuchsia_runtime::{self as fruntime, HandleInfo, HandleType},
     fuchsia_zircon::{self as zx},
     futures_util::stream::{StreamExt, TryStreamExt},

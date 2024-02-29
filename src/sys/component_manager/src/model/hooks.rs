@@ -18,7 +18,6 @@ use {
     sandbox::{Receiver, Sender},
     std::{
         collections::HashMap,
-        convert::TryFrom,
         fmt,
         sync::{Arc, Mutex as StdMutex, Weak},
     },

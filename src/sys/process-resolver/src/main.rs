@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::{self, Context, Error};
+use anyhow::{Context, Error};
 use fidl_fuchsia_process::ResolverRequestStream;
 use fuchsia_component::server::ServiceFs;
 use futures::prelude::*;

@@ -16,7 +16,6 @@ use fidl_fuchsia_update::{
 };
 use fidl_fuchsia_update_ext::{AttemptOptions, CheckOptions, State};
 use futures::prelude::*;
-use std::convert::TryInto;
 
 pub type RealTargetChannelUpdater = TargetChannelManager<ServiceConnector>;
 pub type RealUpdateManager = UpdateManager<

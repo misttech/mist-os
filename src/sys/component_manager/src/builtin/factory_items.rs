@@ -9,7 +9,7 @@ use {
     fuchsia_zircon::{self as zx, HandleBased},
     futures::prelude::*,
     lazy_static::lazy_static,
-    std::{collections::HashMap, convert::TryInto, sync::Arc},
+    std::{collections::HashMap, sync::Arc},
 };
 
 lazy_static! {

@@ -4,7 +4,7 @@
 
 use {
     super::{context_authenticator::ContextAuthenticator, ResolverError},
-    anyhow::{self, Context as _},
+    anyhow::Context as _,
     fidl::endpoints::Proxy as _,
     fidl_fuchsia_component_decl as fcomponent_decl,
     fidl_fuchsia_component_resolution as fcomponent_resolution, fidl_fuchsia_io as fio,

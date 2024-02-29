@@ -10,7 +10,7 @@ use rand::{thread_rng, Rng};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use sha2::{digest, Digest, Sha256};
 use signature::Signature;
-use std::{collections::HashMap, convert::TryInto, fmt, fmt::Debug};
+use std::{collections::HashMap, fmt, fmt::Debug};
 
 /// Error enum listing different kinds of CUPv2 decoration errors.
 #[derive(Debug, thiserror::Error)]
@@ -359,7 +359,7 @@ pub mod test_support {
         request_builder::Intermediate,
     };
     use p256::ecdsa::SigningKey;
-    use std::{convert::TryInto, str::FromStr};
+    use std::str::FromStr;
 
     pub const RAW_PRIVATE_KEY_FOR_TEST: &str = include_str!("testing_keys/test_private_key.pem");
     pub const RAW_PUBLIC_KEY_FOR_TEST: &str = include_str!("testing_keys/test_public_key.pem");

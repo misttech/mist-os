@@ -5,7 +5,7 @@
 use {
     super::errors::{VerifyError, VerifyErrors, VerifyFailureReason, VerifySource},
     fuchsia_inspect as finspect,
-    std::{convert::TryInto, time::Duration},
+    std::time::Duration,
 };
 
 fn reason_to_string(reason: &VerifyFailureReason) -> &'static str {

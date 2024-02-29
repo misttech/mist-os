@@ -7,7 +7,6 @@ use {
     fidl_fuchsia_pkg_rewrite as fidl,
     fuchsia_url::{AbsolutePackageUrl, ParseError, RepositoryUrl},
     serde::{Deserialize, Serialize},
-    std::convert::TryFrom,
 };
 
 /// A `Rule` can be used to re-write parts of a [`AbsolutePackageUrl`].

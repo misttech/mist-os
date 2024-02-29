@@ -133,7 +133,7 @@ mod tests {
     use fidl::endpoints::{create_endpoints, create_proxy_and_stream, Proxy};
     use fidl_fuchsia_component_sandbox as fsandbox;
     use fidl_fuchsia_unknown as funknown;
-    use fuchsia_zircon::{self as zx, AsHandleRef, HandleBased};
+    use fuchsia_zircon::{self as zx, HandleBased};
     use futures::try_join;
 
     /// Tests that the OneShotHandle implementation of the HandleCapability.GetHandle method

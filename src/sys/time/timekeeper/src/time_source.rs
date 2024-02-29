@@ -485,10 +485,7 @@ impl PullSource for FakePullTimeSource {
 
 #[cfg(test)]
 mod test {
-    use {
-        super::*, fidl::prelude::*, fuchsia_async as fasync, futures::stream::StreamExt,
-        lazy_static::lazy_static,
-    };
+    use {super::*, fidl::prelude::*, fuchsia_async as fasync, lazy_static::lazy_static};
 
     const STATUS_1: Status = Status::Initializing;
     const SAMPLE_1_UTC_NANOS: i64 = 1234567;

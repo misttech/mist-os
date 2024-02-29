@@ -239,7 +239,7 @@ mod tests {
         super::*,
         fidl::endpoints::{create_proxy, create_proxy_and_stream, create_request_stream},
         fidl_fuchsia_fuzzer as fuzz, fuchsia_async as fasync, fuchsia_zircon as zx,
-        futures::{channel::oneshot, join, Future, TryStreamExt},
+        futures::{join, Future, TryStreamExt},
     };
 
     // Test fixtures and helpers.

@@ -10,7 +10,7 @@ use {
     ftest_manager::{CaseStatus, SuiteStatus},
     maplit::hashset,
     pretty_assertions::assert_eq,
-    std::{collections::HashSet, iter::FromIterator},
+    std::collections::HashSet,
     test_manager_test_lib::{GroupRunEventByTestCase, RunEvent},
 };
 

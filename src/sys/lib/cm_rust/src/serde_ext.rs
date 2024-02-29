@@ -188,7 +188,7 @@ mod tests {
             serialize_opt_fio_operations,
         },
         fidl_fuchsia_io as fio,
-        serde_json::{self, Deserializer, Serializer},
+        serde_json::{Deserializer, Serializer},
         std::str::from_utf8,
     };
 

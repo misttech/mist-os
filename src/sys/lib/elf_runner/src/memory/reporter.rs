@@ -97,7 +97,6 @@ mod tests {
     use freport::{Identifier, Resources};
     use moniker::Moniker;
     use routing::policy::ScopedPolicyChecker;
-    use std::sync::Arc;
 
     /// Test that the ELF runner can tell us about the resources used by the component it runs.
     #[fuchsia::test]

@@ -23,7 +23,7 @@ use {
         Body, Method, Request, Response, StatusCode,
     },
     std::{
-        convert::{Infallible, TryFrom, TryInto as _},
+        convert::{Infallible, TryInto as _},
         io::{Cursor, Read as _, Seek as _},
         net::{IpAddr, Ipv6Addr, SocketAddr},
         path::{Path, PathBuf},

@@ -17,7 +17,7 @@ use {
     fuchsia_component::server::{ServiceFs, ServiceObjLocal},
     fuchsia_sync::Mutex,
     futures::prelude::*,
-    std::{convert::TryInto, sync::Arc},
+    std::sync::Arc,
     tracing::{error, info},
 };
 

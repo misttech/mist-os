@@ -325,10 +325,10 @@ mod test {
     use {
         super::*,
         crate::enums::{
-            ClockUpdateReason, FrequencyDiscardReason, InitializeRtcOutcome, Role,
-            SampleValidationError, TimeSourceError, WriteRtcOutcome,
+            FrequencyDiscardReason, InitializeRtcOutcome, Role, SampleValidationError,
+            TimeSourceError, WriteRtcOutcome,
         },
-        fidl_fuchsia_metrics::{MetricEvent, MetricEventPayload},
+        fidl_fuchsia_metrics::MetricEventPayload,
         futures::{channel::mpsc, FutureExt, StreamExt},
         test_util::{assert_geq, assert_leq},
     };

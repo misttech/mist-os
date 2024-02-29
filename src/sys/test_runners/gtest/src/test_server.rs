@@ -12,7 +12,7 @@ use {
     },
     fuchsia_async as fasync, fuchsia_zircon as zx,
     futures::{
-        future::{abortable, join, AbortHandle, Future, FutureExt as _},
+        future::{abortable, join, AbortHandle, FutureExt as _},
         lock::Mutex,
         prelude::*,
         TryStreamExt,

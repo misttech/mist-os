@@ -7,7 +7,7 @@ use {
     fidl_fuchsia_update::{CommitStatusProviderRequest, CommitStatusProviderRequestStream},
     fuchsia_component::server::{ServiceFs, ServiceObjLocal},
     fuchsia_zircon::{self as zx, EventPair, HandleBased},
-    futures::{channel::oneshot, future, prelude::*},
+    futures::{channel::oneshot, prelude::*},
     std::sync::Arc,
     tracing::warn,
 };

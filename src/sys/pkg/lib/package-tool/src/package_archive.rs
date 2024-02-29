@@ -216,10 +216,8 @@ mod tests {
         crate::convert_to_depfile_filepath,
         camino::Utf8PathBuf,
         fuchsia_archive::Utf8Reader,
-        fuchsia_pkg::PackageBuilder,
         pretty_assertions::assert_eq,
         std::{collections::BTreeMap, io::Write, process::Command},
-        tempfile::TempDir,
     };
 
     const PM_BIN: &str = concat!(env!("ROOT_OUT_DIR"), "/test_data/package-tool/pm");

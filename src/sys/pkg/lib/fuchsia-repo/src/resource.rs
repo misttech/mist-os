@@ -10,7 +10,7 @@ use {
         future::ready,
         stream::{once, BoxStream, StreamExt},
     },
-    std::{convert::TryFrom, io},
+    std::io,
 };
 
 /// [Resource] represents some resource as a stream of [Bytes] as provided from

@@ -6,10 +6,9 @@ use {
     cm_stress_tests_lib::{create_child, stop_child, Child},
     fidl_test_componentmanager_stresstests as fstresstests, fuchsia_async as fasync,
     futures::prelude::*,
-    futures::stream,
 };
 
-const NUM_CHILDREN: u16 = 128 ;
+const NUM_CHILDREN: u16 = 128;
 
 /// Creates NUM_CHILDREN children, makes sure they are running and finally stops them.
 #[fasync::run_singlethreaded(test)]

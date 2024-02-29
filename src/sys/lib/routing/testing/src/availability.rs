@@ -13,7 +13,6 @@ use {
     fidl_fuchsia_io as fio, fuchsia_zircon_status as zx_status,
     moniker::{Moniker, MonikerBase},
     std::{
-        convert::TryInto,
         marker::PhantomData,
         path::{Path, PathBuf},
     },

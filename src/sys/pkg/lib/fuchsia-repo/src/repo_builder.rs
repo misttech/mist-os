@@ -815,20 +815,13 @@ mod tests {
     use {
         super::*,
         crate::{
-            repo_client::RepoClient,
             repository::{FileSystemRepository, PmRepository},
             test_utils,
         },
         assert_matches::assert_matches,
-        camino::Utf8Path,
         fuchsia_pkg::PackageBuilder,
         pretty_assertions::{assert_eq, assert_ne},
-        std::{
-            collections::{BTreeMap, BTreeSet, HashMap},
-            fs,
-            io::Write as _,
-            os::unix::fs::PermissionsExt as _,
-        },
+        std::{collections::BTreeSet, io::Write as _, os::unix::fs::PermissionsExt as _},
         tuf::{
             crypto::Ed25519PrivateKey,
             metadata::{Metadata as _, MetadataPath},
