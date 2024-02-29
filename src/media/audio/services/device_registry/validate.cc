@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include "src/media/audio/services/device_registry/validate.h"
+
 #include <fidl/fuchsia.audio.device/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.audio/cpp/fidl.h>
 #include <lib/syslog/cpp/macros.h>
@@ -19,11 +21,6 @@ namespace media_audio {
 // Frame rates must be listed in ascending order, but some drivers don't do this.
 // TODO(https://fxbug.dev/42068180): once this is fixed, clean out this workaround.
 inline constexpr bool kStrictFrameRateOrdering = true;
-
-// We define these here only temporarily, as we publish no frame-rate limits for audio devices.
-// TODO(https://fxbug.dev/42068183): officially define frame-rate limits/expectations for audio devices.
-const uint32_t kMinFrameRate = 1000;
-const uint32_t kMaxFrameRate = 192000;
 
 namespace {
 
@@ -228,9 +225,10 @@ zx_status_t ValidateSupportedFormats(
     // While testing frame_rates, we can determine max_supported_frame_rate.
     uint32_t prev_frame_rate = 0, max_supported_frame_rate = 0;
     for (const auto& rate : *pcm_format_set.frame_rates()) {
-      if (rate < kMinFrameRate || rate > kMaxFrameRate) {
+      if (rate < kMinSupportedRingBufferFrameRate || rate > kMaxSupportedRingBufferFrameRate) {
         FX_LOGS(WARNING) << "GetSupportedFormats: frame_rate (" << rate << ") out of range ["
-                         << kMinFrameRate << "," << kMaxFrameRate << "] ";
+                         << kMinSupportedRingBufferFrameRate << ","
+                         << kMaxSupportedRingBufferFrameRate << "] ";
         return ZX_ERR_OUT_OF_RANGE;
       }
       // Checking for "strictly ascending" also eliminates duplicate entries.
@@ -368,6 +366,207 @@ zx_status_t ValidateSupportedFormats(
     }
   }
 
+  return ZX_OK;
+}
+
+zx_status_t ValidateCodecProperties(
+    const fuchsia_hardware_audio::CodecProperties& props,
+    std::optional<const fuchsia_hardware_audio::PlugState> plug_state) {
+  LogCodecProperties(props);
+  ADR_LOG(kLogDeviceMethods);
+
+  if (!props.plug_detect_capabilities()) {
+    FX_LOGS(WARNING) << "Incomplete Codec/GetProperties response";
+    return ZX_ERR_INVALID_ARGS;
+  }
+
+  // If we already have this device's PlugState, double-check against that.
+  if (plug_state && !(*plug_state->plugged()) &&
+      *props.plug_detect_capabilities() ==
+          fuchsia_hardware_audio::PlugDetectCapabilities::kHardwired) {
+    FX_LOGS(WARNING) << "GetProperties reports HARDWIRED, but Codec reports as UNPLUGGED";
+    return ZX_ERR_INVALID_ARGS;
+  }
+
+  return ZX_OK;
+}
+
+zx_status_t ValidateDaiFormatSets(
+    const std::vector<fuchsia_hardware_audio::DaiSupportedFormats>& formats) {
+  LogDaiFormatSets(formats);
+  ADR_LOG(kLogDeviceMethods);
+
+  if (formats.empty()) {
+    FX_LOGS(WARNING) << "GetDaiSupportedFormats: response is empty";
+    return ZX_ERR_INVALID_ARGS;
+  }
+
+  for (const auto& format_set : formats) {
+    if (format_set.number_of_channels().empty()) {
+      FX_LOGS(WARNING) << "Non-compliant DaiSupportedFormats: empty number_of_channels vector";
+      return ZX_ERR_INVALID_ARGS;
+    }
+    uint32_t previous_chans = 0;
+    for (const auto& chans : format_set.number_of_channels()) {
+      if (chans <= previous_chans ||
+          chans > fuchsia_hardware_audio::kMaxCountDaiSupportedNumberOfChannels) {
+        FX_LOGS(WARNING) << "Non-compliant DaiSupportedFormats number_of_channels: " << chans;
+        return ZX_ERR_INVALID_ARGS;
+      }
+      previous_chans = chans;
+    }
+    if (format_set.sample_formats().empty()) {
+      FX_LOGS(WARNING) << "Non-compliant DaiSupportedFormats: empty sample_formats vector";
+      return ZX_ERR_INVALID_ARGS;
+    }
+    for (const auto& fmt : format_set.sample_formats()) {
+      if (std::count(format_set.sample_formats().begin(), format_set.sample_formats().end(), fmt) >
+          1) {
+        FX_LOGS(WARNING) << "Duplicate DaiSupportedFormats sample_format: " << fmt;
+        return ZX_ERR_INVALID_ARGS;
+      }
+    }
+    if (format_set.frame_formats().empty()) {
+      FX_LOGS(WARNING) << "Non-compliant DaiSupportedFormats: empty frame_formats vector";
+      return ZX_ERR_INVALID_ARGS;
+    }
+    for (const auto& fmt : format_set.frame_formats()) {
+      if (std::count(format_set.frame_formats().begin(), format_set.frame_formats().end(), fmt) >
+          1) {
+        FX_LOGS(WARNING) << "Duplicate DaiSupportedFormats frame_format: " << fmt;
+        return ZX_ERR_INVALID_ARGS;
+      }
+    }
+    if (format_set.frame_rates().empty()) {
+      FX_LOGS(WARNING) << "Non-compliant DaiSupportedFormats: empty frame_rates vector";
+      return ZX_ERR_INVALID_ARGS;
+    }
+    uint32_t previous_rate = 0;
+    for (const auto& rate : format_set.frame_rates()) {
+      if (rate <= previous_rate || rate < kMinSupportedDaiFrameRate ||
+          rate > kMaxSupportedDaiFrameRate) {
+        FX_LOGS(WARNING) << "Non-compliant DaiSupportedFormats frame_rate: " << rate;
+        return ZX_ERR_INVALID_ARGS;
+      }
+      previous_rate = rate;
+    }
+    if (format_set.bits_per_slot().empty()) {
+      FX_LOGS(WARNING) << "Non-compliant DaiSupportedFormats: empty bits_per_slot vector";
+      return ZX_ERR_INVALID_ARGS;
+    }
+    uint32_t previous_bits_per_slot = 0;
+    uint32_t max_bits_per_slot = 0;
+    for (const auto& bits : format_set.bits_per_slot()) {
+      if (bits <= previous_bits_per_slot || bits == 0 || bits > kMaxSupportedDaiFormatBitsPerSlot) {
+        FX_LOGS(WARNING) << "Non-compliant DaiSupportedFormats bits_per_slot: "
+                         << static_cast<uint16_t>(bits);
+        return ZX_ERR_INVALID_ARGS;
+      }
+      max_bits_per_slot = std::max<uint32_t>(bits, max_bits_per_slot);
+      previous_bits_per_slot = bits;
+    }
+    if (format_set.bits_per_sample().empty()) {
+      FX_LOGS(WARNING) << "Non-compliant DaiSupportedFormats: empty bits_per_sample vector";
+      return ZX_ERR_INVALID_ARGS;
+    }
+    uint32_t previous_bits_per_sample = 0;
+    for (const auto& bits : format_set.bits_per_sample()) {
+      if (bits <= previous_bits_per_sample || bits > max_bits_per_slot || bits == 0) {
+        FX_LOGS(WARNING) << "Non-compliant DaiSupportedFormats bits_per_sample: "
+                         << static_cast<uint16_t>(bits);
+        return ZX_ERR_INVALID_ARGS;
+      }
+      previous_bits_per_sample = bits;
+    }
+  }
+
+  return ZX_OK;
+}
+
+zx_status_t ValidateDaiFormat(const fuchsia_hardware_audio::DaiFormat& format) {
+  LogDaiFormat(format);
+  ADR_LOG(kLogDeviceMethods);
+
+  if (format.number_of_channels() == 0 ||
+      format.number_of_channels() > fuchsia_hardware_audio::kMaxCountDaiSupportedNumberOfChannels) {
+    FX_LOGS(WARNING) << "Non-compliant DaiFormat number_of_channels: "
+                     << format.number_of_channels();
+    return ZX_ERR_INVALID_ARGS;
+  }
+
+  if (format.channels_to_use_bitmask() == 0) {
+    FX_LOGS(WARNING) << "Non-compliant DaiFormat channels_to_use_bitmask: 0";
+    return ZX_ERR_INVALID_ARGS;
+  }
+  if (format.number_of_channels() < 64 &&
+      (format.channels_to_use_bitmask() >> format.number_of_channels()) > 0) {
+    FX_LOGS(WARNING) << "Non-compliant DaiFormat channels_to_use_bitmask: 0x" << std::hex
+                     << format.channels_to_use_bitmask() << " is too large for " << std::dec
+                     << format.number_of_channels() << " channels";
+    return ZX_ERR_INVALID_ARGS;
+  }
+
+  switch (format.sample_format()) {
+    case fuchsia_hardware_audio::DaiSampleFormat::kPdm:
+    case fuchsia_hardware_audio::DaiSampleFormat::kPcmSigned:
+    case fuchsia_hardware_audio::DaiSampleFormat::kPcmUnsigned:
+    case fuchsia_hardware_audio::DaiSampleFormat::kPcmFloat:
+      break;
+    default:
+      FX_LOGS(WARNING) << "Non-compliant DaiFormat sample_format: UNKNOWN enum";
+      return ZX_ERR_INVALID_ARGS;
+  }
+
+  if (!format.frame_format().frame_format_custom().has_value() &&
+      !format.frame_format().frame_format_standard().has_value()) {
+    FX_LOGS(WARNING) << "Non-compliant DaiFormat frame_format: UNKNOWN union enum";
+    return ZX_ERR_INVALID_ARGS;
+  }
+  switch (format.frame_format().Which()) {
+    case fuchsia_hardware_audio::DaiFrameFormat::Tag::kFrameFormatStandard:
+    case fuchsia_hardware_audio::DaiFrameFormat::Tag::kFrameFormatCustom:
+      break;
+    default:
+      FX_LOGS(WARNING) << "Non-compliant DaiFormat frame_format: UNKNOWN union tag";
+      return ZX_ERR_INVALID_ARGS;
+  }
+
+  if (format.frame_rate() < kMinSupportedDaiFrameRate ||
+      format.frame_rate() > kMaxSupportedDaiFrameRate) {
+    FX_LOGS(WARNING) << "Non-compliant DaiFormat frame_rate: " << format.frame_rate();
+    return ZX_ERR_INVALID_ARGS;
+  }
+
+  if (format.bits_per_slot() == 0 || format.bits_per_slot() > kMaxSupportedDaiFormatBitsPerSlot) {
+    FX_LOGS(WARNING) << "Non-compliant DaiFormat bits_per_slot: "
+                     << static_cast<uint16_t>(format.bits_per_slot());
+    return ZX_ERR_INVALID_ARGS;
+  }
+
+  if (format.bits_per_sample() == 0 || format.bits_per_sample() > format.bits_per_slot()) {
+    FX_LOGS(WARNING) << "Non-compliant DaiFormat bits_per_sample: "
+                     << static_cast<uint16_t>(format.bits_per_sample());
+    return ZX_ERR_INVALID_ARGS;
+  }
+  return ZX_OK;
+}
+
+zx_status_t ValidateCodecFormatInfo(const fuchsia_hardware_audio::CodecFormatInfo& format_info) {
+  LogCodecFormatInfo(format_info);
+  ADR_LOG(kLogDeviceMethods);
+
+  if (format_info.external_delay() && *format_info.external_delay() < 0) {
+    FX_LOGS(WARNING) << "Invalid Codec::SetDaiFormat response - external_delay cannot be negative";
+    return ZX_ERR_INVALID_ARGS;
+  }
+  if (format_info.turn_on_delay() && *format_info.turn_on_delay() < 0) {
+    FX_LOGS(WARNING) << "Invalid Codec::SetDaiFormat response - turn_on_delay cannot be negative";
+    return ZX_ERR_INVALID_ARGS;
+  }
+  if (format_info.turn_off_delay() && *format_info.turn_off_delay() < 0) {
+    FX_LOGS(WARNING) << "Invalid Codec::SetDaiFormat response - turn_off_delay cannot be negative";
+    return ZX_ERR_INVALID_ARGS;
+  }
   return ZX_OK;
 }
 
@@ -522,10 +721,11 @@ zx_status_t ValidateRingBufferFormat(const fuchsia_hardware_audio::Format& forma
     return ZX_ERR_OUT_OF_RANGE;
   }
 
-  if (format.pcm_format()->frame_rate() > kMaxFrameRate ||
-      format.pcm_format()->frame_rate() < kMinFrameRate) {
+  if (format.pcm_format()->frame_rate() > kMaxSupportedRingBufferFrameRate ||
+      format.pcm_format()->frame_rate() < kMinSupportedRingBufferFrameRate) {
     FX_LOGS(WARNING) << "RingBuffer frame rate (" << format.pcm_format()->frame_rate()
-                     << ") must be within range [" << kMinFrameRate << ", " << kMaxFrameRate << "]";
+                     << ") must be within range [" << kMinSupportedRingBufferFrameRate << ", "
+                     << kMaxSupportedRingBufferFrameRate << "]";
     return ZX_ERR_OUT_OF_RANGE;
   }
 

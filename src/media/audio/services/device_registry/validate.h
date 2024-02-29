@@ -10,6 +10,16 @@
 
 namespace media_audio {
 
+// TODO(https://fxbug.dev/42068183): official frame-rate limits/expectations for audio devices.
+constexpr uint32_t kMinSupportedDaiFrameRate = 1000;
+constexpr uint32_t kMaxSupportedDaiFrameRate = 192000 * 8 * 64;
+constexpr uint8_t kMaxSupportedDaiFormatBitsPerSlot = 64;
+
+// We define these here only temporarily, as we do not publish frame-rate limits for audio devices.
+// TODO(https://fxbug.dev/42068183): official frame-rate limits/expectations for audio devices.
+const uint32_t kMinSupportedRingBufferFrameRate = 1000;
+const uint32_t kMaxSupportedRingBufferFrameRate = 192000;
+
 // Utility functions to validate direct responses from audio drivers.
 std::vector<fuchsia_audio_device::PcmFormatSet> TranslateFormatSets(
     std::vector<fuchsia_hardware_audio::SupportedFormats>& formats);
@@ -26,6 +36,15 @@ zx_status_t ValidateGainState(
 zx_status_t ValidatePlugState(const fuchsia_hardware_audio::PlugState& plug_state,
                               std::optional<fuchsia_hardware_audio::PlugDetectCapabilities>
                                   plug_detect_capabilities = std::nullopt);
+
+zx_status_t ValidateCodecProperties(
+    const fuchsia_hardware_audio::CodecProperties& props,
+    std::optional<const fuchsia_hardware_audio::PlugState> plug_state = std::nullopt);
+zx_status_t ValidateDaiFormatSets(
+    const std::vector<fuchsia_hardware_audio::DaiSupportedFormats>& formats);
+zx_status_t ValidateDaiFormat(const fuchsia_hardware_audio::DaiFormat& formats);
+zx_status_t ValidateCodecFormatInfo(const fuchsia_hardware_audio::CodecFormatInfo& format_info);
+
 bool ValidateDeviceInfo(const fuchsia_audio_device::Info& device_info);
 
 zx_status_t ValidateRingBufferProperties(

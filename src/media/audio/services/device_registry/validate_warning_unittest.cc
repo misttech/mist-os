@@ -33,7 +33,7 @@ fuchsia_hardware_audio::StreamProperties ValidStreamProperties() {
       .clock_domain = fuchsia_hardware_audio::kClockDomainMonotonic,
   }};
 }
-TEST(ValidateTest, BadStreamProperties) {
+TEST(ValidateWarningTest, BadStreamProperties) {
   auto stream_properties = ValidStreamProperties();
   ASSERT_EQ(ValidateStreamProperties(stream_properties), ZX_OK) << "Baseline setup unsuccessful";
 
@@ -825,6 +825,324 @@ TEST(ValidateWarningTest, BadExternalDelayInfo) {
                 .external_delay = -1,
             }}),
             ZX_ERR_OUT_OF_RANGE);
+}
+
+// Unittest ValidateCodecProperties -- the missing, minimal and maximal possibilities
+TEST(ValidateWarningTest, BadCodecProperties) {
+  EXPECT_EQ(ValidateCodecProperties(fuchsia_hardware_audio::CodecProperties{{
+                .is_input = false,
+                .manufacturer = "manufacturer",
+                .product = "product",
+                .unique_id = "0000000000000000",
+                // plug_detect_capabilities missing
+            }}),
+            ZX_ERR_INVALID_ARGS)
+      << "missing plug_detect_capabilities";
+}
+
+// Unittest ValidateDaiFormatSets
+TEST(ValidateWarningTest, BadDaiSupportedFormats) {
+  // Entirely empty
+  EXPECT_EQ(ValidateDaiFormatSets(std::vector<fuchsia_hardware_audio::DaiSupportedFormats>{}),
+            ZX_ERR_INVALID_ARGS);
+
+  // each empty
+  EXPECT_EQ(
+      ValidateDaiFormatSets({{
+          {{
+              // .number_of_channels = {1},
+              .sample_formats = {fuchsia_hardware_audio::DaiSampleFormat::kPcmSigned},
+              .frame_formats = {fuchsia_hardware_audio::DaiFrameFormat::WithFrameFormatStandard(
+                  fuchsia_hardware_audio::DaiFrameFormatStandard::kI2S)},
+              .frame_rates = {48000},
+              .bits_per_slot = {32},
+              .bits_per_sample = {16},
+          }},
+      }}),
+      ZX_ERR_INVALID_ARGS);
+  EXPECT_EQ(
+      ValidateDaiFormatSets({{
+          {{
+              .number_of_channels = {1},
+              // .sample_formats = {fuchsia_hardware_audio::DaiSampleFormat::kPcmSigned},
+              .frame_formats = {fuchsia_hardware_audio::DaiFrameFormat::WithFrameFormatStandard(
+                  fuchsia_hardware_audio::DaiFrameFormatStandard::kI2S)},
+              .frame_rates = {48000},
+              .bits_per_slot = {32},
+              .bits_per_sample = {16},
+          }},
+      }}),
+      ZX_ERR_INVALID_ARGS);
+  EXPECT_EQ(
+      ValidateDaiFormatSets({{
+          {{
+              .number_of_channels = {1},
+              .sample_formats = {fuchsia_hardware_audio::DaiSampleFormat::kPcmSigned},
+              // .frame_formats = {fuchsia_hardware_audio::DaiFrameFormat::WithFrameFormatStandard(
+              //     fuchsia_hardware_audio::DaiFrameFormatStandard::kI2S)},
+              .frame_rates = {48000},
+              .bits_per_slot = {32},
+              .bits_per_sample = {16},
+          }},
+      }}),
+      ZX_ERR_INVALID_ARGS);
+  EXPECT_EQ(
+      ValidateDaiFormatSets({{
+          {{
+              .number_of_channels = {1},
+              .sample_formats = {fuchsia_hardware_audio::DaiSampleFormat::kPcmSigned},
+              .frame_formats = {fuchsia_hardware_audio::DaiFrameFormat::WithFrameFormatStandard(
+                  fuchsia_hardware_audio::DaiFrameFormatStandard::kI2S)},
+              // .frame_rates = {48000},
+              .bits_per_slot = {32},
+              .bits_per_sample = {16},
+          }},
+      }}),
+      ZX_ERR_INVALID_ARGS);
+  EXPECT_EQ(
+      ValidateDaiFormatSets({{
+          {{
+              .number_of_channels = {1},
+              .sample_formats = {fuchsia_hardware_audio::DaiSampleFormat::kPcmSigned},
+              .frame_formats = {fuchsia_hardware_audio::DaiFrameFormat::WithFrameFormatStandard(
+                  fuchsia_hardware_audio::DaiFrameFormatStandard::kI2S)},
+              .frame_rates = {48000},
+              // .bits_per_slot = {32},
+              .bits_per_sample = {16},
+          }},
+      }}),
+      ZX_ERR_INVALID_ARGS);
+  EXPECT_EQ(
+      ValidateDaiFormatSets({{
+          {{
+              .number_of_channels = {1},
+              .sample_formats = {fuchsia_hardware_audio::DaiSampleFormat::kPcmSigned},
+              .frame_formats = {fuchsia_hardware_audio::DaiFrameFormat::WithFrameFormatStandard(
+                  fuchsia_hardware_audio::DaiFrameFormatStandard::kI2S)},
+              .frame_rates = {48000},
+              .bits_per_slot = {32},
+              // .bits_per_sample = {16},
+          }},
+      }}),
+      ZX_ERR_INVALID_ARGS);
+
+  const fuchsia_hardware_audio::DaiSupportedFormats valid = {{
+      .number_of_channels = {1},
+      .sample_formats = {fuchsia_hardware_audio::DaiSampleFormat::kPcmSigned},
+      .frame_formats = {fuchsia_hardware_audio::DaiFrameFormat::WithFrameFormatStandard(
+          fuchsia_hardware_audio::DaiFrameFormatStandard::kI2S)},
+      .frame_rates = {48000},
+      .bits_per_slot = {32},
+      .bits_per_sample = {16},
+  }};
+
+  // values too small
+  fuchsia_hardware_audio::DaiSupportedFormats fmts = valid;
+  EXPECT_EQ(ValidateDaiFormatSets({{
+                fmts.number_of_channels({0, 1, 2}),
+            }}),
+            ZX_ERR_INVALID_ARGS);
+  fmts = valid;
+  EXPECT_EQ(ValidateDaiFormatSets({{
+                fmts.frame_rates({0, 48000}),
+            }}),
+            ZX_ERR_INVALID_ARGS);
+  fmts = valid;
+  EXPECT_EQ(ValidateDaiFormatSets({{
+                fmts.bits_per_slot({0, 32}),
+            }}),
+            ZX_ERR_INVALID_ARGS);
+  fmts = valid;
+  EXPECT_EQ(ValidateDaiFormatSets({{
+                fmts.bits_per_sample({0, 16}),
+            }}),
+            ZX_ERR_INVALID_ARGS);
+
+  // values too large
+  fmts = valid;
+  EXPECT_EQ(ValidateDaiFormatSets({{
+                fmts.number_of_channels({1, 2, 65}),
+            }}),
+            ZX_ERR_INVALID_ARGS);
+  fmts = valid;
+  EXPECT_EQ(ValidateDaiFormatSets({{
+                fmts.frame_rates({48000, 2'000'000'000}),
+            }}),
+            ZX_ERR_INVALID_ARGS);
+  fmts = valid;
+  EXPECT_EQ(ValidateDaiFormatSets({{
+                fmts.bits_per_slot({32, 65}),
+            }}),
+            ZX_ERR_INVALID_ARGS);
+  fmts = valid;
+  EXPECT_EQ(ValidateDaiFormatSets({{
+                fmts.bits_per_sample({16, 33}),
+            }}),
+            ZX_ERR_INVALID_ARGS);
+
+  // values out of order
+  fmts = valid;
+  EXPECT_EQ(ValidateDaiFormatSets({{
+                fmts.number_of_channels({2, 1}),
+            }}),
+            ZX_ERR_INVALID_ARGS);
+  fmts = valid;
+  EXPECT_EQ(ValidateDaiFormatSets({{
+                fmts.frame_rates({48000, 44100}),
+            }}),
+            ZX_ERR_INVALID_ARGS);
+  fmts = valid;
+  EXPECT_EQ(ValidateDaiFormatSets({{
+                fmts.bits_per_slot({32, 16}),
+            }}),
+            ZX_ERR_INVALID_ARGS);
+  fmts = valid;
+  EXPECT_EQ(ValidateDaiFormatSets({{
+                fmts.bits_per_sample({16, 8}),
+            }}),
+            ZX_ERR_INVALID_ARGS);
+}
+
+// Unittest ValidateDaiFormat
+TEST(ValidateWarningTest, BadDaiFormat) {
+  // empty
+  EXPECT_EQ(ValidateDaiFormat({{}}), ZX_ERR_INVALID_ARGS);
+
+  // each missing
+  EXPECT_EQ(ValidateDaiFormat({{
+                // .number_of_channels = 2,
+                .channels_to_use_bitmask = 0x03,
+                .sample_format = fuchsia_hardware_audio::DaiSampleFormat::kPcmSigned,
+                .frame_format = fuchsia_hardware_audio::DaiFrameFormat::WithFrameFormatStandard(
+                    fuchsia_hardware_audio::DaiFrameFormatStandard::kI2S),
+                .frame_rate = 48000,
+                .bits_per_slot = 32,
+                .bits_per_sample = 16,
+            }}),
+            ZX_ERR_INVALID_ARGS);
+  EXPECT_EQ(ValidateDaiFormat({{
+                .number_of_channels = 2,
+                // .channels_to_use_bitmask = 0x03,
+                .sample_format = fuchsia_hardware_audio::DaiSampleFormat::kPcmSigned,
+                .frame_format = fuchsia_hardware_audio::DaiFrameFormat::WithFrameFormatStandard(
+                    fuchsia_hardware_audio::DaiFrameFormatStandard::kI2S),
+                .frame_rate = 48000,
+                .bits_per_slot = 32,
+                .bits_per_sample = 16,
+            }}),
+            ZX_ERR_INVALID_ARGS);
+
+  EXPECT_EQ(ValidateDaiFormat({{
+                .number_of_channels = 2,
+                .channels_to_use_bitmask = 0x03,
+                // .sample_format = fuchsia_hardware_audio::DaiSampleFormat::kPcmSigned,
+                .frame_format = fuchsia_hardware_audio::DaiFrameFormat::WithFrameFormatStandard(
+                    fuchsia_hardware_audio::DaiFrameFormatStandard::kI2S),
+                .frame_rate = 48000,
+                .bits_per_slot = 32,
+                .bits_per_sample = 16,
+            }}),
+            ZX_ERR_INVALID_ARGS);
+
+  // Missing FrameFormat is impossible since DaiFrameFormat (and thus DaiFormat) has a custom ctor.
+
+  EXPECT_EQ(ValidateDaiFormat({{
+                .number_of_channels = 2,
+                .channels_to_use_bitmask = 0x03,
+                .sample_format = fuchsia_hardware_audio::DaiSampleFormat::kPcmSigned,
+                .frame_format = fuchsia_hardware_audio::DaiFrameFormat::WithFrameFormatStandard(
+                    fuchsia_hardware_audio::DaiFrameFormatStandard::kI2S),
+                // .frame_rate = 48000,
+                .bits_per_slot = 32,
+                .bits_per_sample = 16,
+            }}),
+            ZX_ERR_INVALID_ARGS);
+
+  EXPECT_EQ(ValidateDaiFormat({{
+                .number_of_channels = 2,
+                .channels_to_use_bitmask = 0x03,
+                .sample_format = fuchsia_hardware_audio::DaiSampleFormat::kPcmSigned,
+                .frame_format = fuchsia_hardware_audio::DaiFrameFormat::WithFrameFormatStandard(
+                    fuchsia_hardware_audio::DaiFrameFormatStandard::kI2S),
+                .frame_rate = 48000,
+                // .bits_per_slot = 32,
+                .bits_per_sample = 16,
+            }}),
+            ZX_ERR_INVALID_ARGS);
+  EXPECT_EQ(ValidateDaiFormat({{
+                .number_of_channels = 2,
+                .channels_to_use_bitmask = 0x03,
+                .sample_format = fuchsia_hardware_audio::DaiSampleFormat::kPcmSigned,
+                .frame_format = fuchsia_hardware_audio::DaiFrameFormat::WithFrameFormatStandard(
+                    fuchsia_hardware_audio::DaiFrameFormatStandard::kI2S),
+                .frame_rate = 48000,
+                .bits_per_slot = 32,
+                // .bits_per_sample = 16,
+            }}),
+            ZX_ERR_INVALID_ARGS);
+
+  // Values too low
+  const fuchsia_hardware_audio::DaiFormat valid = {{
+      .number_of_channels = 2,
+      .channels_to_use_bitmask = 0x03,
+      .sample_format = fuchsia_hardware_audio::DaiSampleFormat::kPcmSigned,
+      .frame_format = fuchsia_hardware_audio::DaiFrameFormat::WithFrameFormatStandard(
+          fuchsia_hardware_audio::DaiFrameFormatStandard::kI2S),
+      .frame_rate = 48000,
+      .bits_per_slot = 32,
+      .bits_per_sample = 16,
+  }};
+  fuchsia_hardware_audio::DaiFormat fmt = valid;
+  EXPECT_EQ(ValidateDaiFormat(fmt.number_of_channels(0)), ZX_ERR_INVALID_ARGS);
+  fmt = valid;
+  EXPECT_EQ(ValidateDaiFormat(fmt.channels_to_use_bitmask(0x00)), ZX_ERR_INVALID_ARGS);
+  fmt = valid;
+  EXPECT_EQ(ValidateDaiFormat(fmt.frame_rate(0)), ZX_ERR_INVALID_ARGS);
+  fmt = valid;
+  EXPECT_EQ(ValidateDaiFormat(fmt.bits_per_slot(0).bits_per_sample(0)), ZX_ERR_INVALID_ARGS);
+  fmt = valid;
+  EXPECT_EQ(ValidateDaiFormat(fmt.bits_per_sample(0)), ZX_ERR_INVALID_ARGS);
+
+  // values too large
+  fmt = valid;
+  EXPECT_EQ(ValidateDaiFormat(fmt.number_of_channels(65)), ZX_ERR_INVALID_ARGS);
+  fmt = valid;
+  EXPECT_EQ(ValidateDaiFormat(fmt.channels_to_use_bitmask(0x04)), ZX_ERR_INVALID_ARGS);
+  fmt = valid;
+  EXPECT_EQ(ValidateDaiFormat(fmt.frame_rate(2'000'000'000)), ZX_ERR_INVALID_ARGS);
+  fmt = valid;
+  EXPECT_EQ(ValidateDaiFormat(fmt.bits_per_slot(kMaxSupportedDaiFormatBitsPerSlot + 1)),
+            ZX_ERR_INVALID_ARGS);
+  fmt = valid;
+  EXPECT_EQ(ValidateDaiFormat(fmt.bits_per_sample(33)), ZX_ERR_INVALID_ARGS);
+}
+
+// Unittest ValidateCodecFormatInfo
+TEST(ValidateWarningTest, BadCodecFormatInfo) {
+  EXPECT_EQ(ValidateCodecFormatInfo(fuchsia_hardware_audio::CodecFormatInfo{{
+                .external_delay = -1,
+            }}),
+            ZX_ERR_INVALID_ARGS);
+  EXPECT_EQ(ValidateCodecFormatInfo(fuchsia_hardware_audio::CodecFormatInfo{{
+                .turn_on_delay = -1,
+            }}),
+            ZX_ERR_INVALID_ARGS);
+  EXPECT_EQ(ValidateCodecFormatInfo(fuchsia_hardware_audio::CodecFormatInfo{{
+                .turn_off_delay = -1,
+            }}),
+            ZX_ERR_INVALID_ARGS);
+  EXPECT_EQ(ValidateCodecFormatInfo(fuchsia_hardware_audio::CodecFormatInfo{{
+                .external_delay = zx::time::infinite_past().get(),
+            }}),
+            ZX_ERR_INVALID_ARGS);
+  EXPECT_EQ(ValidateCodecFormatInfo(fuchsia_hardware_audio::CodecFormatInfo{{
+                .turn_on_delay = zx::time::infinite_past().get(),
+            }}),
+            ZX_ERR_INVALID_ARGS);
+  EXPECT_EQ(ValidateCodecFormatInfo(fuchsia_hardware_audio::CodecFormatInfo{{
+                .turn_off_delay = zx::time::infinite_past().get(),
+            }}),
+            ZX_ERR_INVALID_ARGS);
 }
 
 }  // namespace media_audio

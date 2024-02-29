@@ -9,9 +9,9 @@
 #include <lib/syslog/cpp/macros.h>
 #include <lib/zx/time.h>
 
+#include <array>
 #include <iomanip>
-#include <memory>
-#include <sstream>
+#include <string>
 
 #include "src/media/audio/services/device_registry/basic_types.h"
 #include "src/media/audio/services/device_registry/control_creator_server.h"
@@ -222,6 +222,134 @@ void LogPlugState(const fuchsia_hardware_audio::PlugState& plug_state) {
   FX_LOGS(INFO) << "    plug_state_time  "
                 << (plug_state.plug_state_time() ? std::to_string(*plug_state.plug_state_time())
                                                  : "NONE (non-compliant)");
+}
+
+void LogCodecProperties(const fuchsia_hardware_audio::CodecProperties& props) {
+  if constexpr (!kLogCodecFidlResponseValues) {
+    return;
+  }
+
+  FX_LOGS(INFO) << "fuchsia_hardware_audio/CodecProperties:";
+
+  FX_LOGS(INFO) << "    is_input          "
+                << (props.is_input() ? (*props.is_input() ? "TRUE" : "FALSE")
+                                     : "NONE (non-compliant)");
+  FX_LOGS(INFO) << "    manufacturer      "
+                << (props.manufacturer()
+                        ? ("'" +
+                           std::string(props.manufacturer()->data(), props.manufacturer()->size()) +
+                           "'")
+                        : "NONE");
+  FX_LOGS(INFO) << "    product           "
+                << (props.product()
+                        ? ("'" + std::string(props.product()->data(), props.product()->size()) +
+                           "'")
+                        : "NONE");
+  if (props.unique_id()) {
+    std::array<unsigned char, fuchsia_audio_device::kUniqueInstanceIdSize> uid{};
+    strncpy(reinterpret_cast<char*>(uid.data()), props.unique_id()->data(),
+            fuchsia_audio_device::kUniqueInstanceIdSize);
+    FX_LOGS(INFO) << "    unique_id         " << UidToString(uid);
+  } else {
+    FX_LOGS(INFO) << "    unique_id         NONE";
+  }
+  if (props.plug_detect_capabilities()) {
+    FX_LOGS(INFO) << "    plug_detect_caps  " << *props.plug_detect_capabilities();
+  } else {
+    FX_LOGS(INFO) << "    plug_detect_caps  NONE (non-compliant)";
+  }
+}
+
+void LogDaiFormatSets(
+    const std::vector<fuchsia_hardware_audio::DaiSupportedFormats>& dai_format_sets) {
+  if constexpr (!kLogCodecFidlResponseValues) {
+    return;
+  }
+
+  FX_LOGS(INFO) << "fuchsia_hardware_audio/DaiSupportedFormats:";
+  FX_LOGS(INFO) << "    dai_supported_formats[" << dai_format_sets.size() << "]:";
+  for (auto idx = 0u; idx < dai_format_sets.size(); ++idx) {
+    auto format_set = dai_format_sets[idx];
+    FX_LOGS(INFO) << "      [" << idx << "]";
+
+    const auto& channel_counts = format_set.number_of_channels();
+    FX_LOGS(INFO) << "        number_of_channels[" << channel_counts.size() << "]:";
+    for (auto idx = 0u; idx < channel_counts.size(); ++idx) {
+      FX_LOGS(INFO) << "          [" << idx << "]:   " << channel_counts[idx];
+    }
+
+    const auto& sample_formats = format_set.sample_formats();
+    FX_LOGS(INFO) << "        sample_formats[" << sample_formats.size() << "]:";
+    for (auto idx = 0u; idx < sample_formats.size(); ++idx) {
+      FX_LOGS(INFO) << "          [" << idx << "]    " << sample_formats[idx];
+    }
+
+    const auto& frame_formats = format_set.frame_formats();
+    FX_LOGS(INFO) << "        frame_formats[" << frame_formats.size() << "]:";
+    for (auto idx = 0u; idx < frame_formats.size(); ++idx) {
+      FX_LOGS(INFO) << "          [" << idx << "]    " << frame_formats[idx];
+    }
+
+    const auto& frame_rates = format_set.frame_rates();
+    FX_LOGS(INFO) << "        frame_rates[" << frame_rates.size() << "]:";
+    for (auto idx = 0u; idx < frame_rates.size(); ++idx) {
+      FX_LOGS(INFO) << "          [" << idx << "]    " << frame_rates[idx];
+    }
+
+    const auto& bits_per_slot = format_set.bits_per_slot();
+    FX_LOGS(INFO) << "        bits_per_slot[" << bits_per_slot.size() << "]:";
+    for (auto idx = 0u; idx < bits_per_slot.size(); ++idx) {
+      FX_LOGS(INFO) << "          [" << idx << "]    " << static_cast<int16_t>(bits_per_slot[idx]);
+    }
+
+    const auto& bits_per_sample = format_set.bits_per_sample();
+    FX_LOGS(INFO) << "        bits_per_sample[" << bits_per_sample.size() << "]:";
+    for (auto idx = 0u; idx < bits_per_sample.size(); ++idx) {
+      FX_LOGS(INFO) << "          [" << idx << "]    "
+                    << static_cast<int16_t>(bits_per_sample[idx]);
+    }
+  }
+}
+
+void LogDaiFormat(std::optional<fuchsia_hardware_audio::DaiFormat> format) {
+  if constexpr (!kLogCodecFidlResponseValues) {
+    return;
+  }
+
+  FX_LOGS(INFO) << "fuchsia_hardware_audio/DaiFormat:";
+  if (!format) {
+    FX_LOGS(INFO) << "    UNSET";
+    return;
+  }
+  FX_LOGS(INFO) << "    number_of_channels      " << format->number_of_channels();
+  FX_LOGS(INFO) << "    channels_to_use_bitmask " << std::hex << format->channels_to_use_bitmask();
+  FX_LOGS(INFO) << "    sample_format           " << format->sample_format();
+  FX_LOGS(INFO) << "    frame_format            " << format->frame_format();
+  FX_LOGS(INFO) << "    frame_rate              " << format->frame_rate();
+  FX_LOGS(INFO) << "    bits_per_slot           " << static_cast<uint16_t>(format->bits_per_slot());
+  FX_LOGS(INFO) << "    bits_per_sample         "
+                << static_cast<uint16_t>(format->bits_per_sample());
+}
+
+void LogCodecFormatInfo(std::optional<fuchsia_hardware_audio::CodecFormatInfo> format_info) {
+  if constexpr (!kLogCodecFidlResponseValues) {
+    return;
+  }
+
+  FX_LOGS(INFO) << "fuchsia_hardware_audio/CodecFormatInfo:";
+  if (!format_info) {
+    FX_LOGS(INFO) << "    UNSET";
+    return;
+  }
+  FX_LOGS(INFO) << "    external_delay (ns)   "
+                << (format_info->external_delay() ? std::to_string(*format_info->external_delay())
+                                                  : "NONE");
+  FX_LOGS(INFO) << "    turn_on_delay  (ns)   "
+                << (format_info->turn_on_delay() ? std::to_string(*format_info->turn_on_delay())
+                                                 : "NONE");
+  FX_LOGS(INFO) << "    turn_off_delay (ns)   "
+                << (format_info->turn_off_delay() ? std::to_string(*format_info->turn_off_delay())
+                                                  : "NONE");
 }
 
 void LogDeviceInfo(const fuchsia_audio_device::Info& device_info) {

@@ -462,4 +462,138 @@ TEST(ValidateTest, ValidateDelayInfo) {
             ZX_OK);
 }
 
+// Unittest ValidateCodecProperties -- the missing, minimal and maximal possibilities
+TEST(ValidateTest, ValidateCodecProperties) {
+  EXPECT_EQ(
+      ValidateCodecProperties(fuchsia_hardware_audio::CodecProperties{{
+          // is_input missing
+          .manufacturer = "",  // minimal value
+          .product =           // maximal value
+          "Maximum allowed Product name is 256 characters long; Maximum allowed Product name is 256 characters long; Maximum allowed Product name is 256 characters long; Maximum allowed Product name is 256 characters long; Maximum allowed Product name extends to 321X",
+          // unique_id missing
+          .plug_detect_capabilities = fuchsia_hardware_audio::PlugDetectCapabilities::kHardwired,
+      }}),
+      ZX_OK);
+  EXPECT_EQ(
+      ValidateCodecProperties(fuchsia_hardware_audio::CodecProperties{{
+          .is_input = false,
+          .manufacturer =  // maximal value
+          "Maximum allowed Manufacturer name is 256 characters long; Maximum allowed Manufacturer name is 256 characters long; Maximum allowed Manufacturer name is 256 characters long; Maximum allowed Manufacturer name is 256 characters long, which extends to... 321X",
+          // product missing
+          .unique_id = "",  // minimal value
+          .plug_detect_capabilities =
+              fuchsia_hardware_audio::PlugDetectCapabilities::kCanAsyncNotify,
+      }}),
+      ZX_OK);
+  EXPECT_EQ(ValidateCodecProperties(fuchsia_hardware_audio::CodecProperties{{
+                .is_input = true,
+                // manufacturer missing
+                .product = "",  // minimal value
+                .unique_id = std::string() + char(255) + char(255) + char(255) + char(255) +
+                             char(255) + char(255) + char(255) + char(255) + char(255) + char(255) +
+                             char(255) + char(255) + char(255) + char(255) + char(255) + char(255),
+                .plug_detect_capabilities =
+                    fuchsia_hardware_audio::PlugDetectCapabilities::kCanAsyncNotify,
+            }}),
+            ZX_OK);
+}
+
+// Unittest ValidateDaiFormatSets
+TEST(ValidateTest, ValidateDaiFormatSets) {
+  EXPECT_EQ(
+      ValidateDaiFormatSets({{
+          {{
+              .number_of_channels = {1},
+              .sample_formats = {fuchsia_hardware_audio::DaiSampleFormat::kPcmSigned},
+              .frame_formats = {fuchsia_hardware_audio::DaiFrameFormat::WithFrameFormatStandard(
+                  fuchsia_hardware_audio::DaiFrameFormatStandard::kI2S)},
+              .frame_rates = {48000},
+              .bits_per_slot = {32},
+              .bits_per_sample = {16},
+          }},
+      }}),
+      ZX_OK);
+}
+
+// Unittest ValidateDaiFormat
+TEST(ValidateTest, ValidateDaiFormat) {
+  // Normal values
+  EXPECT_EQ(ValidateDaiFormat({{
+                .number_of_channels = 2,
+                .channels_to_use_bitmask = 0x03,
+                .sample_format = fuchsia_hardware_audio::DaiSampleFormat::kPcmSigned,
+                .frame_format = fuchsia_hardware_audio::DaiFrameFormat::WithFrameFormatStandard(
+                    fuchsia_hardware_audio::DaiFrameFormatStandard::kI2S),
+                .frame_rate = 48000,
+                .bits_per_slot = 32,
+                .bits_per_sample = 16,
+            }}),
+            ZX_OK);
+  // Minimal values
+  EXPECT_EQ(ValidateDaiFormat({{
+                .number_of_channels = 1,
+                .channels_to_use_bitmask = 0x01,
+                .sample_format = fuchsia_hardware_audio::DaiSampleFormat::kPdm,
+                .frame_format = fuchsia_hardware_audio::DaiFrameFormat::WithFrameFormatStandard(
+                    fuchsia_hardware_audio::DaiFrameFormatStandard::kNone),
+                .frame_rate = 1000,
+                .bits_per_slot = 8,
+                .bits_per_sample = 1,
+            }}),
+            ZX_OK);
+  // Maximal values
+  EXPECT_EQ(ValidateDaiFormat({{
+                .number_of_channels = 32,
+                .channels_to_use_bitmask = 0xFFFFFFFF,
+                .sample_format = fuchsia_hardware_audio::DaiSampleFormat::kPcmSigned,
+                .frame_format = fuchsia_hardware_audio::DaiFrameFormat::WithFrameFormatCustom({{
+                    .left_justified = true,
+                    .sclk_on_raising = false,
+                    .frame_sync_sclks_offset = 0,
+                    .frame_sync_size = 1,
+                }}),
+                .frame_rate = 192000,
+                .bits_per_slot = 32,
+                .bits_per_sample = 32,
+            }}),
+            ZX_OK);
+  // Maximal values
+  EXPECT_EQ(ValidateDaiFormat({{
+                .number_of_channels = 64,
+                .channels_to_use_bitmask = 0xFFFFFFFFFFFFFFFF,
+                .sample_format = fuchsia_hardware_audio::DaiSampleFormat::kPcmFloat,
+                .frame_format = fuchsia_hardware_audio::DaiFrameFormat::WithFrameFormatCustom({{
+                    .left_justified = true,
+                    .sclk_on_raising = false,
+                    .frame_sync_sclks_offset = -128,
+                    .frame_sync_size = 255,
+                }}),
+                .frame_rate = 192000 * 64 * 8,
+                .bits_per_slot = kMaxSupportedDaiFormatBitsPerSlot,
+                .bits_per_sample = kMaxSupportedDaiFormatBitsPerSlot,
+            }}),
+            ZX_OK);
+}
+
+// Unittest ValidateCodecFormatInfo
+TEST(ValidateTest, ValidateCodecFormatInfo) {
+  EXPECT_EQ(ValidateCodecFormatInfo(fuchsia_hardware_audio::CodecFormatInfo{}), ZX_OK);
+  // For all three fields, test missing, minimal and maximal values.
+  EXPECT_EQ(ValidateCodecFormatInfo(fuchsia_hardware_audio::CodecFormatInfo{{
+                .external_delay = 0,
+                .turn_off_delay = zx::time::infinite().get(),
+            }}),
+            ZX_OK);
+  EXPECT_EQ(ValidateCodecFormatInfo(fuchsia_hardware_audio::CodecFormatInfo{{
+                .external_delay = zx::time::infinite().get(),
+                .turn_on_delay = 0,
+            }}),
+            ZX_OK);
+  EXPECT_EQ(ValidateCodecFormatInfo(fuchsia_hardware_audio::CodecFormatInfo{{
+                .turn_on_delay = zx::time::infinite().get(),
+                .turn_off_delay = 0,
+            }}),
+            ZX_OK);
+}
+
 }  // namespace media_audio
