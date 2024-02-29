@@ -8,7 +8,7 @@ use ffx_setui_setup_args::Setup;
 use fho::{moniker, AvailabilityFlag, FfxMain, FfxTool, SimpleWriter};
 use fidl_fuchsia_settings::{ConfigurationInterfaces, SetupProxy, SetupSettings};
 use utils::handle_mixed_result;
-use utils::{self, Either, WatchOrSetResult};
+use utils::{Either, WatchOrSetResult};
 
 #[derive(FfxTool)]
 #[check(AvailabilityFlag("setui"))]

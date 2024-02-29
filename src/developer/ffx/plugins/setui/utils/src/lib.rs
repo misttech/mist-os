@@ -98,15 +98,15 @@ where
 macro_rules! assert_watch {
     ($expr:expr) => {
         match $expr.await? {
-            crate::utils::Either::Watch(mut stream) => {
+            $crate::Either::Watch(mut stream) => {
                 $crate::macro_deps::TryStreamExt::try_next(&mut stream)
                     .await?
                     .expect("Watch should have a result")
             }
-            crate::utils::Either::Set(_) => {
+            $crate::Either::Set(_) => {
                 panic!("Did not expect a set result for a watch call")
             }
-            crate::utils::Either::Get(_) => {
+            $crate::Either::Get(_) => {
                 panic!("Did not expect a get result for a watch call")
             }
         }
@@ -118,11 +118,11 @@ macro_rules! assert_watch {
 macro_rules! assert_set {
     ($expr:expr) => {
         match $expr.await? {
-            crate::utils::Either::Set(output) => output,
-            crate::utils::Either::Watch(_) => {
+            $crate::Either::Set(output) => output,
+            $crate::Either::Watch(_) => {
                 panic!("Did not expect a watch result for a set call")
             }
-            crate::utils::Either::Get(_) => {
+            $crate::Either::Get(_) => {
                 panic!("Did not expect a get result for a set call")
             }
         }
@@ -134,11 +134,11 @@ macro_rules! assert_set {
 macro_rules! assert_get {
     ($expr:expr) => {
         match $expr.await? {
-            crate::utils::Either::Get(output) => output,
-            crate::utils::Either::Watch(_) => {
+            $crate::Either::Get(output) => output,
+            $crate::Either::Watch(_) => {
                 panic!("Did not expect a watch result for a get call")
             }
-            crate::utils::Either::Set(_) => {
+            $crate::Either::Set(_) => {
                 panic!("Did not expect a set result for a get call")
             }
         }

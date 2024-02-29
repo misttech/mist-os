@@ -5,7 +5,7 @@
 use anyhow::Result;
 use fidl_fuchsia_settings::AccessibilityProxy;
 use utils::handle_mixed_result;
-use utils::{self, Either, WatchOrSetResult};
+use utils::{Either, WatchOrSetResult};
 
 pub async fn watch<W: std::io::Write>(
     accessibility_proxy: AccessibilityProxy,

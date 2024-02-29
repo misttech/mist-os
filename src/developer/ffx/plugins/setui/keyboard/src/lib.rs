@@ -9,7 +9,7 @@ use ffx_setui_keyboard_args::Keyboard;
 use fho::{moniker, AvailabilityFlag, FfxMain, FfxTool, SimpleWriter};
 use fidl_fuchsia_settings::{KeyboardProxy, KeyboardSettings};
 use utils::handle_mixed_result;
-use utils::{self, Either, WatchOrSetResult};
+use utils::{Either, WatchOrSetResult};
 
 #[derive(FfxTool)]
 #[check(AvailabilityFlag("setui"))]

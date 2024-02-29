@@ -6,7 +6,7 @@ use anyhow::{format_err, Result};
 use ffx_setui_accessibility_args::SetArgs;
 use fidl_fuchsia_settings::{AccessibilityProxy, AccessibilitySettings};
 use utils::handle_mixed_result;
-use utils::{self, Either, WatchOrSetResult};
+use utils::{Either, WatchOrSetResult};
 
 pub async fn set<W: std::io::Write>(
     accessibility_proxy: AccessibilityProxy,

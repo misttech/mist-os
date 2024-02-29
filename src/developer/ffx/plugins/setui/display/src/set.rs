@@ -5,7 +5,7 @@
 use anyhow::{format_err, Result};
 use ffx_setui_display_args::SetArgs;
 use fidl_fuchsia_settings::{DisplayProxy, DisplaySettings};
-use utils::{self, handle_mixed_result, Either, WatchOrSetResult};
+use utils::{handle_mixed_result, Either, WatchOrSetResult};
 
 pub async fn set<W: std::io::Write>(proxy: DisplayProxy, args: SetArgs, w: &mut W) -> Result<()> {
     handle_mixed_result("DisplaySet", command(proxy, DisplaySettings::from(args)).await, w).await

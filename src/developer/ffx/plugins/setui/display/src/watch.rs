@@ -4,7 +4,7 @@
 
 use anyhow::Result;
 use fidl_fuchsia_settings::DisplayProxy;
-use utils::{self, handle_mixed_result, Either, WatchOrSetResult};
+use utils::{handle_mixed_result, Either, WatchOrSetResult};
 
 pub async fn watch<W: std::io::Write>(proxy: DisplayProxy, w: &mut W) -> Result<()> {
     handle_mixed_result("DisplayWatch", command(proxy).await, w).await
