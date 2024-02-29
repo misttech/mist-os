@@ -4,6 +4,9 @@
 
 //! IP protocol types.
 
+// TODO(https://fxbug.dev/326330182): this import seems actually necessary. Is this a bug on the
+// lint?
+#[allow(unused_imports)]
 use alloc::vec::Vec;
 use core::cmp::PartialEq;
 use core::convert::Infallible as Never;

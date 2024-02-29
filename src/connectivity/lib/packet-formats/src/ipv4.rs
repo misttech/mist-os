@@ -10,7 +10,6 @@
 
 use alloc::vec::Vec;
 use core::borrow::Borrow;
-use core::convert::TryFrom;
 use core::fmt::{self, Debug, Formatter};
 use core::ops::Range;
 
@@ -1124,14 +1123,13 @@ pub mod testutil {
 #[cfg(test)]
 mod tests {
     use net_types::ethernet::Mac;
-    use packet::{Buf, FragmentedBuffer, InnerPacketBuilder, ParseBuffer, Serializer};
+    use packet::{Buf, FragmentedBuffer, ParseBuffer};
 
     use super::*;
     use crate::ethernet::{
         EtherType, EthernetFrame, EthernetFrameBuilder, EthernetFrameLengthCheck,
         ETHERNET_MIN_BODY_LEN_NO_TAG,
     };
-    use crate::ip::IpProto;
     use crate::testutil::*;
 
     const DEFAULT_SRC_MAC: Mac = Mac::new([1, 2, 3, 4, 5, 6]);

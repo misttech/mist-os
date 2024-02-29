@@ -4,7 +4,6 @@
 
 //! ICMPv4
 
-use core::convert::TryFrom;
 use core::fmt;
 
 use net_types::ip::{Ipv4, Ipv4Addr};

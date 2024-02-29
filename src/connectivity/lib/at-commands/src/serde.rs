@@ -11,7 +11,6 @@
 pub use crate::parser::common::ParseError;
 use {
     crate::{highlevel, lowlevel},
-    pest,
     std::io,
     thiserror::Error,
 };

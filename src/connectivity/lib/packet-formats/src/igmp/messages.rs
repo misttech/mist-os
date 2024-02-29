@@ -4,7 +4,6 @@
 
 //! Implementation of IGMP Messages.
 
-use core::convert::TryFrom;
 use core::ops::Deref;
 
 use net_types::ip::Ipv4Addr;
@@ -511,7 +510,6 @@ mod tests {
 
     use packet::{InnerPacketBuilder, ParseBuffer, Serializer};
 
-    use super::super::IgmpMessage;
     use super::*;
     use crate::igmp::testdata::*;
     use crate::testutil::set_logger_for_test;

@@ -15,12 +15,7 @@ use {
         },
         BufferView, BufferViewMut, InnerPacketBuilder, ParsablePacket, ParseMetadata,
     },
-    std::{
-        convert::{Infallible as Never, TryFrom, TryInto},
-        mem,
-        slice::Iter,
-        str,
-    },
+    std::{convert::Infallible as Never, mem, slice::Iter, str},
     thiserror::Error,
     uuid::Uuid,
     zerocopy::{
@@ -582,7 +577,6 @@ impl<'a, B: ByteSlice> IaPrefixData<B> {
 }
 
 mod checked {
-    use std::convert::TryFrom;
     use std::str::FromStr;
 
     use mdns::protocol::{DomainBuilder, EmbeddedPacketBuilder};

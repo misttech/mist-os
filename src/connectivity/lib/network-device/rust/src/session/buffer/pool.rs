@@ -12,11 +12,7 @@ use std::num::TryFromIntError;
 use std::ops::{Deref, DerefMut};
 use std::ptr::NonNull;
 use std::sync::Arc;
-use std::{
-    convert::{TryFrom, TryInto as _},
-    fmt::Debug,
-    iter::FromIterator,
-};
+use std::{convert::TryInto as _, fmt::Debug};
 
 use explicit::ResultExt as _;
 use fidl_fuchsia_hardware_network as netdev;

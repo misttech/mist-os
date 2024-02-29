@@ -4,7 +4,6 @@
 
 //! Parsing and serialization of ARP packets.
 
-use core::convert::TryFrom;
 #[cfg(test)]
 use core::fmt::{self, Debug, Formatter};
 use core::hash::Hash;
@@ -316,7 +315,7 @@ impl<B, HwAddr, ProtoAddr> Debug for ArpPacket<B, HwAddr, ProtoAddr> {
 
 #[cfg(test)]
 mod tests {
-    use packet::{InnerPacketBuilder, ParseBuffer, Serializer};
+    use packet::{ParseBuffer, Serializer};
 
     use super::*;
     use crate::ethernet::{EthernetFrame, EthernetFrameLengthCheck};

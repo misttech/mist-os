@@ -8,7 +8,7 @@
 //!
 //! [RFC 8200 Section 4]: https://datatracker.ietf.org/doc/html/rfc8200#section-4
 
-use core::convert::{Infallible as Never, TryFrom};
+use core::convert::Infallible as Never;
 use core::marker::PhantomData;
 
 use byteorder::{ByteOrder, NetworkEndian};
@@ -1200,9 +1200,9 @@ fn get_empty_tuple_mut_ref<'a>() -> &'a mut () {
 
 #[cfg(test)]
 mod tests {
-    use packet::records::{AlignedRecordSequenceBuilder, RecordBuilder, Records};
+    use packet::records::{AlignedRecordSequenceBuilder, RecordBuilder};
 
-    use crate::ip::{IpProto, Ipv4Proto};
+    use crate::ip::Ipv4Proto;
 
     use super::*;
 

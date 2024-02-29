@@ -891,8 +891,7 @@ pub mod options {
         OptionBuilder, OptionLayout, OptionParseErr, OptionParseLayout, OptionsImpl,
     };
     use packet::BufferViewMut as _;
-    use zerocopy::byteorder::network_endian::U32;
-    use zerocopy::{AsBytes, FromBytes, FromZeros, NoCell, Ref, Unaligned};
+    use zerocopy::{AsBytes, FromBytes, FromZeros, NoCell, Unaligned};
 
     use super::*;
 
@@ -1091,9 +1090,8 @@ impl<B> Debug for TcpSegment<B> {
 #[cfg(test)]
 mod tests {
     use byteorder::{ByteOrder, NetworkEndian};
-    use core::num::NonZeroU16;
     use net_types::ip::{Ipv4, Ipv4Addr, Ipv6Addr};
-    use packet::{Buf, InnerPacketBuilder, ParseBuffer, Serializer};
+    use packet::{Buf, ParseBuffer};
 
     use super::*;
     use crate::compute_transport_checksum;

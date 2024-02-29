@@ -4,6 +4,9 @@
 
 //! Testing-related utilities.
 
+// TODO(https://fxbug.dev/326330182): this import seems actually necessary. Is this a bug on the
+// lint?
+#[allow(unused_imports)]
 use alloc::vec::Vec;
 use core::num::NonZeroU16;
 use core::ops::Range;
@@ -348,7 +351,7 @@ mod crateonly {
 
 #[cfg(test)]
 mod tests {
-    use net_types::ip::{Ipv4, Ipv4Addr, Ipv6, Ipv6Addr};
+    use net_types::ip::{Ipv4, Ipv6};
 
     use crate::icmp::{IcmpDestUnreachable, IcmpEchoReply, Icmpv4DestUnreachableCode};
     use crate::ip::Ipv6Proto;

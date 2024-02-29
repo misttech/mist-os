@@ -8,7 +8,6 @@
 //!
 //! [RFC 768]: https://datatracker.ietf.org/doc/html/rfc768
 
-use core::convert::TryInto;
 use core::fmt::Debug;
 #[cfg(test)]
 use core::fmt::{self, Formatter};
@@ -503,9 +502,8 @@ impl<B> Debug for UdpPacket<B> {
 #[cfg(test)]
 mod tests {
     use byteorder::{ByteOrder, NetworkEndian};
-    use core::num::NonZeroU16;
     use net_types::ip::{Ipv4, Ipv4Addr, Ipv6, Ipv6Addr};
-    use packet::{Buf, FragmentedBytesMut, InnerPacketBuilder, ParseBuffer, Serializer};
+    use packet::{Buf, ParseBuffer};
 
     use super::*;
     use crate::ethernet::{EthernetFrame, EthernetFrameLengthCheck};

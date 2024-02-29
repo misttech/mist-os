@@ -12,7 +12,6 @@ pub mod ext_hdrs;
 
 use alloc::vec::Vec;
 use core::borrow::Borrow;
-use core::convert::TryFrom;
 use core::fmt::{self, Debug, Formatter};
 use core::ops::Range;
 
@@ -1214,10 +1213,9 @@ pub(crate) fn reassemble_fragmented_packet<
 mod tests {
     use assert_matches::assert_matches;
     use packet::FragmentedBuffer;
-    use packet::{Buf, InnerPacketBuilder, ParseBuffer, Serializer};
+    use packet::{Buf, ParseBuffer};
 
     use crate::ethernet::{EthernetFrame, EthernetFrameLengthCheck};
-    use crate::ip::{IpProto, Ipv4Proto, Ipv6ExtHdrType};
     use crate::testutil::*;
 
     use super::ext_hdrs::*;

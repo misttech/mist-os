@@ -4,7 +4,6 @@
 
 //! Messages used for NDP (ICMPv6).
 
-use core::convert::{From, TryFrom};
 use core::num::NonZeroU8;
 use core::time::Duration;
 
@@ -447,7 +446,6 @@ impl_icmp_message!(Ipv6, Redirect, Redirect, IcmpUnusedCode, Options<B>);
 
 /// Parsing and serialization of NDP options.
 pub mod options {
-    use core::convert::TryFrom;
     use core::num::NonZeroUsize;
     use core::time::Duration;
 
@@ -1108,7 +1106,6 @@ pub mod options {
 
 #[cfg(test)]
 mod tests {
-    use core::convert::TryFrom;
 
     use byteorder::{ByteOrder, NetworkEndian};
     use net_types::ip::{Ip, IpAddress, Subnet};
@@ -1118,7 +1115,7 @@ mod tests {
     use zerocopy::Ref;
 
     use super::*;
-    use crate::icmp::{IcmpPacket, IcmpPacketBuilder, IcmpParseArgs};
+    use crate::icmp::{IcmpPacketBuilder, IcmpParseArgs};
     use crate::ipv6::{Ipv6Header, Ipv6Packet};
 
     #[test]

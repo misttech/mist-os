@@ -55,7 +55,6 @@
 //! This modules also provides composite types such as [`Subnet`] and
 //! [`AddrSubnet`].
 
-use core::convert::TryFrom;
 use core::fmt::{self, Debug, Display, Formatter};
 use core::hash::Hash;
 use core::mem;
@@ -3327,12 +3326,8 @@ where
 
 #[cfg(test)]
 mod tests {
-    use core::convert::TryInto;
-
     use super::*;
     use test_case::test_case;
-
-    use crate::NonMappedAddr;
 
     #[test]
     fn test_map_ip_associated_constant() {
@@ -4144,8 +4139,6 @@ mod tests {
 
     #[cfg(feature = "std")]
     mod std_tests {
-        use std::net;
-
         use super::*;
 
         #[test]

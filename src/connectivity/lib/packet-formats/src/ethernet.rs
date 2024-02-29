@@ -318,8 +318,7 @@ pub mod testutil {
 mod tests {
     use byteorder::{ByteOrder, NetworkEndian};
     use packet::{
-        AsFragmentedByteSlice, Buf, GrowBufferMut, InnerPacketBuilder, ParseBuffer,
-        SerializeTarget, Serializer,
+        AsFragmentedByteSlice, Buf, GrowBufferMut, InnerPacketBuilder, ParseBuffer, Serializer,
     };
 
     use super::*;

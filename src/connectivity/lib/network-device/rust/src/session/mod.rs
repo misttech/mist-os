@@ -10,7 +10,7 @@ use std::fmt::Debug;
 use std::num::{NonZeroU16, NonZeroU32, NonZeroU64, TryFromIntError};
 use std::pin::Pin;
 use std::sync::{Arc, Weak};
-use std::{convert::TryFrom, mem::MaybeUninit, ops::Range, task::Waker};
+use std::{mem::MaybeUninit, ops::Range, task::Waker};
 
 use explicit::{PollExt as _, ResultExt as _};
 use fidl_fuchsia_hardware_network as netdev;

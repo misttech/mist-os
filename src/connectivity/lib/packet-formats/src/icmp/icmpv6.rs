@@ -4,7 +4,6 @@
 
 //! ICMPv6
 
-use core::convert::TryFrom;
 use core::fmt;
 
 use net_types::ip::{Ipv6, Ipv6Addr};
@@ -276,7 +275,7 @@ mod tests {
     use packet::{InnerPacketBuilder, ParseBuffer, Serializer};
 
     use super::*;
-    use crate::icmp::{IcmpMessage, IcmpPacket, MessageBody};
+    use crate::icmp::{IcmpMessage, MessageBody};
     use crate::ipv6::{Ipv6Header, Ipv6Packet, Ipv6PacketBuilder};
 
     fn serialize_to_bytes<B: ByteSlice + Debug, M: IcmpMessage<Ipv6> + Debug>(

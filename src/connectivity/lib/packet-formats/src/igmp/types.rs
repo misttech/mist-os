@@ -4,7 +4,6 @@
 
 //! IGMP parsing and serialization helper types.
 
-use core::convert::{From, TryFrom, TryInto};
 use core::time::Duration;
 
 use super::IgmpMaxRespCode;

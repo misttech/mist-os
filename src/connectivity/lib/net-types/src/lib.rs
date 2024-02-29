@@ -75,7 +75,6 @@ pub mod ethernet;
 pub mod ip;
 
 use core::{
-    convert::TryFrom,
     fmt::{self, Debug, Display, Formatter},
     ops::Deref,
 };

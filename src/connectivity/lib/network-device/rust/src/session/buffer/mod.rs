@@ -7,7 +7,6 @@
 pub(super) mod pool;
 pub mod sys;
 
-use std::convert::TryFrom;
 use std::iter;
 use std::num::{NonZeroU16, NonZeroU64};
 use std::ops::{Deref, DerefMut};
@@ -500,7 +499,6 @@ impl<K: AllocKind> DerefMut for DescRefMut<'_, K> {
 /// with struct literal syntax.
 mod types {
     use super::{netdev, AllocKind, Error, Result};
-    use std::convert::{TryFrom, TryInto as _};
     use std::fmt::Debug;
     use std::num::TryFromIntError;
     use zerocopy::{AsBytes, FromBytes, FromZeros, NoCell};

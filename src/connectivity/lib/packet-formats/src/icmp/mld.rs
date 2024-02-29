@@ -6,11 +6,9 @@
 //!
 //! Wire serialization and deserialization functions.
 
-use core::convert::TryFrom;
 use core::fmt::Debug;
 use core::mem::size_of;
 use core::ops::Deref;
-use core::result::Result;
 use core::time::Duration;
 
 use net_types::ip::{Ipv6, Ipv6Addr};
@@ -420,13 +418,11 @@ impl<M: Mldv1MessageType> InnerPacketBuilder for Mldv1MessageBuilder<M> {
 
 #[cfg(test)]
 mod tests {
-    use core::convert::TryInto;
-    use core::fmt::Debug;
 
-    use packet::{InnerPacketBuilder, ParseBuffer, Serializer};
+    use packet::{ParseBuffer, Serializer};
 
     use super::*;
-    use crate::icmp::{IcmpPacket, IcmpPacketBuilder, IcmpParseArgs, MessageBody};
+    use crate::icmp::{IcmpPacketBuilder, IcmpParseArgs};
     use crate::ip::Ipv6Proto;
     use crate::ipv6::ext_hdrs::{
         ExtensionHeaderOptionAction, HopByHopOption, HopByHopOptionData, Ipv6ExtensionHeaderData,

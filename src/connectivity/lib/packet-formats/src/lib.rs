@@ -75,7 +75,6 @@ pub mod testutil;
 pub mod udp;
 pub mod utils;
 
-use core::convert::TryInto;
 use core::num::TryFromIntError;
 
 use byteorder::{ByteOrder, NetworkEndian};
