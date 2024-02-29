@@ -184,7 +184,7 @@ pub(crate) struct TcpState<I: DualStackIpExt, D: device::WeakId, BT: TcpBindings
 
 impl<I: DualStackIpExt, D: device::WeakId, BT: TcpBindingsTypes> TcpState<I, D, BT> {
     pub(crate) fn new(now: BT::Instant, rng: &mut impl RngCore) -> Self {
-        Self { isn_generator: IsnGenerator::new(now, rng), sockets: Sockets::new(rng) }
+        Self { isn_generator: IsnGenerator::new(now, rng), sockets: Sockets::new() }
     }
 }
 

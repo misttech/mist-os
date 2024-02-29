@@ -188,6 +188,26 @@ impl<I: PortAllocImpl + ?Sized> EphemeralPort<I> {
     }
 }
 
+/// Implements the [algorithm 1] as described in RFC 6056.
+///
+/// [algorithm 1]: https://datatracker.ietf.org/doc/html/rfc6056#section-3.3.1
+pub(crate) fn simple_randomized_port_alloc<I: PortAllocImpl + ?Sized, R: RngCore>(
+    rng: &mut R,
+    id: &I::Id,
+    state: &I,
+    arg: &I::PortAvailableArg,
+) -> Option<PortNumber> {
+    let num_ephemeral = u32::from(I::EPHEMERAL_RANGE.end() - I::EPHEMERAL_RANGE.start()) + 1;
+    let mut candidate = EphemeralPort::<I>::new_random(rng);
+    for _ in 0..num_ephemeral {
+        if state.is_port_available(id, candidate.get(), arg) {
+            return Some(candidate.get());
+        }
+        candidate.next();
+    }
+    None
+}
+
 impl<I: PortAllocImpl> PortAlloc<I> {
     /// Creates a new `PortAlloc` port allocation provider.
     ///

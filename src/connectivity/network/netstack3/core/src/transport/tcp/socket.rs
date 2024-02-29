@@ -40,15 +40,16 @@ use net_types::{
     AddrAndZone, SpecifiedAddr, ZonedAddr,
 };
 use packet_formats::ip::IpProto;
-use rand::RngCore;
 use smallvec::{smallvec, SmallVec};
 use thiserror::Error;
 use tracing::{debug, error, trace};
 
 use crate::{
-    algorithm::{PortAlloc, PortAllocImpl},
+    algorithm::{self, PortAllocImpl},
     base::ContextPair,
-    context::{CtxPair, InstantBindingsTypes, TimerContext, TimerHandler, TracingContext},
+    context::{
+        CtxPair, InstantBindingsTypes, RngContext, TimerContext, TimerHandler, TracingContext,
+    },
     convert::{BidirectionalConverter as _, OwnedOrRefsBidirectionalConverter},
     data_structures::socketmap::{IterShadows as _, SocketMap},
     device::{self, AnyDevice, DeviceIdContext},
@@ -432,14 +433,18 @@ pub trait TcpBindingsTypes: InstantBindingsTypes + 'static {
 ///
 /// TCP timers are scoped by weak device IDs.
 pub trait TcpBindingsContext<I: DualStackIpExt, D: device::WeakId>:
-    Sized + TimerContext<WeakTcpSocketId<I, D, Self>> + TracingContext + TcpBindingsTypes
+    Sized + TimerContext<WeakTcpSocketId<I, D, Self>> + TracingContext + RngContext + TcpBindingsTypes
 {
 }
 
 impl<I, D, O> TcpBindingsContext<I, D> for O
 where
     I: DualStackIpExt,
-    O: TimerContext<WeakTcpSocketId<I, D, Self>> + TracingContext + TcpBindingsTypes + Sized,
+    O: TimerContext<WeakTcpSocketId<I, D, Self>>
+        + TracingContext
+        + RngContext
+        + TcpBindingsTypes
+        + Sized,
     D: device::WeakId,
 {
 }
@@ -1397,7 +1402,6 @@ impl<I: DualStackIpExt, D: device::WeakId, BT: TcpBindingsTypes> Drop for TcpSoc
 }
 
 pub struct DemuxState<I: DualStackIpExt, D: device::WeakId, BT: TcpBindingsTypes> {
-    port_alloc: PortAlloc<BoundSocketMap<I, D, TcpPortSpec, TcpSocketSpec<I, D, BT>>>,
     socketmap: BoundSocketMap<I, D, TcpPortSpec, TcpSocketSpec<I, D, BT>>,
 }
 
@@ -1468,12 +1472,9 @@ impl<I: DualStackIpExt, D: device::WeakId, BT: TcpBindingsTypes> PortAllocImpl
 }
 
 impl<I: DualStackIpExt, D: device::WeakId, BT: TcpBindingsTypes> Sockets<I, D, BT> {
-    pub(crate) fn new(rng: &mut impl RngCore) -> Self {
+    pub(crate) fn new() -> Self {
         Self {
-            demux: RwLock::new(DemuxState {
-                socketmap: Default::default(),
-                port_alloc: PortAlloc::new(rng),
-            }),
+            demux: RwLock::new(DemuxState { socketmap: Default::default() }),
             all_sockets: Default::default(),
         }
     }
@@ -1709,6 +1710,7 @@ impl HandshakeStatus {
 
 fn bind_inner<I, BC, DC>(
     core_ctx: &mut DC,
+    bindings_ctx: &mut BC,
     demux_socket_id: I::DemuxSocketId<DC::WeakDeviceId, BC>,
     addr: Option<ZonedAddr<SocketIpAddr<I::Addr>, DC::DeviceId>>,
     bound_device: &Option<DC::WeakDeviceId>,
@@ -1720,7 +1722,7 @@ fn bind_inner<I, BC, DC>(
 >
 where
     I: DualStackIpExt,
-    BC: TcpBindingsTypes,
+    BC: TcpBindingsTypes + RngContext,
     DC: TransportIpContext<I, BC>
         + DeviceIpSocketHandler<I, BC>
         + TcpDemuxContext<I, DC::WeakDeviceId, BC>,
@@ -1751,9 +1753,14 @@ where
     };
 
     let weak_device = device.map(|d| d.as_weak(core_ctx).into_owned());
-    core_ctx.with_demux_mut(move |DemuxState { socketmap, port_alloc }| {
+    core_ctx.with_demux_mut(move |DemuxState { socketmap }| {
         let port = match port {
-            None => match port_alloc.try_alloc(&local_ip, &socketmap) {
+            None => match algorithm::simple_randomized_port_alloc(
+                &mut bindings_ctx.rng(),
+                &local_ip,
+                socketmap,
+                &None,
+            ) {
                 Some(port) => NonZeroU16::new(port).expect("ephemeral ports must be non-zero"),
                 None => {
                     return Err(LocalAddressError::FailedToAllocateLocalPort);
@@ -1794,7 +1801,7 @@ where
 {
     match core_ctx {
         MaybeDualStack::NotDualStack((core_ctx, converter)) => {
-            core_ctx.with_demux_mut(|DemuxState { socketmap, .. }| {
+            core_ctx.with_demux_mut(|DemuxState { socketmap }| {
                 let entry = socketmap
                     .listeners_mut()
                     .entry(&I::into_demux_socket_id(id.clone()), converter.convert(addr))
@@ -1803,21 +1810,20 @@ where
             })
         }
         MaybeDualStack::DualStack((core_ctx, converter)) => match converter.convert(addr) {
-            EitherStack::ThisStack(addr) => TcpDemuxContext::<I, _, _>::with_demux_mut(
-                core_ctx,
-                |DemuxState { socketmap, .. }| {
+            EitherStack::ThisStack(addr) => {
+                TcpDemuxContext::<I, _, _>::with_demux_mut(core_ctx, |DemuxState { socketmap }| {
                     let entry = socketmap
                         .listeners_mut()
                         .entry(&I::into_demux_socket_id(id.clone()), addr)
                         .expect("invalid listener id");
                     entry.try_update_sharing(sharing, new_sharing)
-                },
-            ),
+                })
+            }
             EitherStack::OtherStack(addr) => {
                 let demux_id = core_ctx.into_other_demux_socket_id(id.clone());
                 TcpDemuxContext::<I::OtherVersion, _, _>::with_demux_mut(
                     core_ctx,
-                    |DemuxState { socketmap, .. }| {
+                    |DemuxState { socketmap }| {
                         let entry = socketmap
                             .listeners_mut()
                             .entry(&demux_id, addr)
@@ -1918,7 +1924,8 @@ where
         };
 
         // TODO(https://fxbug.dev/42055442): Check if local_ip is a unicast address.
-        self.core_ctx().with_socket_mut_transport_demux(id, |core_ctx, socket_state| {
+        let (core_ctx, bindings_ctx) = self.contexts();
+        core_ctx.with_socket_mut_transport_demux(id, |core_ctx, socket_state| {
             let TcpSocketState { socket_state, ip_options } = socket_state;
             let Unbound { bound_device, buffer_sizes, socket_options, sharing, socket_extra } =
                 match socket_state {
@@ -1937,6 +1944,7 @@ where
                     EitherStack::ThisStack(local_addr) => {
                         let (addr, sharing) = bind_inner(
                             core_ctx,
+                            bindings_ctx,
                             I::into_demux_socket_id(id.clone()),
                             local_addr,
                             bound_device,
@@ -1953,6 +1961,7 @@ where
                     EitherStack::ThisStack(addr) => {
                         let (addr, sharing) = bind_inner::<I, _, _>(
                             core_ctx,
+                            bindings_ctx,
                             I::into_demux_socket_id(id.clone()),
                             addr,
                             bound_device,
@@ -1967,6 +1976,7 @@ where
                         }
                         let (addr, sharing) = bind_inner::<I::OtherVersion, _, _>(
                             core_ctx,
+                            bindings_ctx,
                             core_ctx.into_other_demux_socket_id(id.clone()),
                             addr,
                             bound_device,
@@ -2319,7 +2329,7 @@ where
                             EitherStack::ThisStack((core_ctx, demux_id, addr)) => {
                                 TcpDemuxContext::<I, _, _>::with_demux_mut(
                                     core_ctx,
-                                    |DemuxState { socketmap, .. }| {
+                                    |DemuxState { socketmap }| {
                                         assert_matches!(
                                             socketmap.listeners_mut().remove(&demux_id, &addr),
                                             Ok(())
@@ -2330,7 +2340,7 @@ where
                             EitherStack::OtherStack((core_ctx, demux_id, addr)) => {
                                 TcpDemuxContext::<I::OtherVersion, _, _>::with_demux_mut(
                                     core_ctx,
-                                    |DemuxState { socketmap, .. }| {
+                                    |DemuxState { socketmap }| {
                                         assert_matches!(
                                             socketmap.listeners_mut().remove(&demux_id, &addr),
                                             Ok(())
@@ -2377,7 +2387,7 @@ where
                                 Ok(()) => matches!(conn.state, State::Closed(_)),
                             };
                             if already_closed {
-                                core_ctx.with_demux_mut(|DemuxState { socketmap, .. }| {
+                                core_ctx.with_demux_mut(|DemuxState { socketmap }| {
                                     assert_matches!(
                                         socketmap.conns_mut().remove(demux_id, addr),
                                         Ok(())
@@ -2600,7 +2610,7 @@ where
                 Default::default(),
             )
             .map_err(|_: (IpSockCreationError, DefaultSendOptions)| SetDeviceError::Unroutable)?;
-        core_ctx.with_demux_mut(|DemuxState { socketmap, .. }| {
+        core_ctx.with_demux_mut(|DemuxState { socketmap }| {
             let entry = socketmap
                 .conns_mut()
                 .entry(demux_id, addr)
@@ -2630,7 +2640,7 @@ where
         CC: TransportIpContext<WireI, C::BindingsContext>
             + TcpDemuxContext<WireI, CC::WeakDeviceId, C::BindingsContext>,
     {
-        core_ctx.with_demux_mut(move |DemuxState { socketmap, .. }| {
+        core_ctx.with_demux_mut(move |DemuxState { socketmap }| {
             let entry = socketmap.listeners_mut().entry(demux_id, addr).expect("invalid ID");
             let ListenerAddr { device: old_device, ip: ip_addr } = addr;
             let ListenerIpAddr { identifier: _, addr: ip } = ip_addr;
@@ -2881,7 +2891,7 @@ where
                 {
                     do_send_inner(id, conn, addr, core_ctx, bindings_ctx);
                     if conn.defunct && matches!(conn.state, State::Closed(_)) {
-                        core_ctx.with_demux_mut(|DemuxState { socketmap, .. }| {
+                        core_ctx.with_demux_mut(|DemuxState { socketmap }| {
                             assert_matches!(socketmap.conns_mut().remove(demux_id, addr), Ok(()));
                         });
                         let _: Option<_> = bindings_ctx.cancel_timer(weak_id);
@@ -3235,7 +3245,7 @@ where
                             EitherStack::ThisStack((core_ctx, demux_id, addr)) => {
                                 TcpDemuxContext::<I, _, _>::with_demux_mut(
                                     core_ctx,
-                                    |DemuxState { socketmap, .. }| {
+                                    |DemuxState { socketmap }| {
                                         assert_matches!(
                                             socketmap.conns_mut().remove(&demux_id, addr),
                                             Ok(())
@@ -3246,7 +3256,7 @@ where
                             EitherStack::OtherStack((core_ctx, demux_id, addr)) => {
                                 TcpDemuxContext::<I::OtherVersion, _, _>::with_demux_mut(
                                     core_ctx,
-                                    |DemuxState { socketmap, .. }| {
+                                    |DemuxState { socketmap }| {
                                         assert_matches!(
                                             socketmap.conns_mut().remove(&demux_id, addr),
                                             Ok(())
@@ -3305,19 +3315,18 @@ where
             }
         };
 
-        let id =
-            TcpDemuxContext::<I, _, _>::with_demux(core_ctx, |DemuxState { socketmap, .. }| {
-                socketmap
-                    .conns()
-                    .get_by_addr(&ConnAddr {
-                        ip: ConnIpAddr {
-                            local: (orig_src_ip, orig_src_port),
-                            remote: (orig_dst_ip, orig_dst_port),
-                        },
-                        device: None,
-                    })
-                    .map(|ConnAddrState { sharing: _, id }| id.clone())
-            });
+        let id = TcpDemuxContext::<I, _, _>::with_demux(core_ctx, |DemuxState { socketmap }| {
+            socketmap
+                .conns()
+                .get_by_addr(&ConnAddr {
+                    ip: ConnIpAddr {
+                        local: (orig_src_ip, orig_src_port),
+                        remote: (orig_dst_ip, orig_dst_port),
+                    },
+                    device: None,
+                })
+                .map(|ConnAddrState { sharing: _, id }| id.clone())
+        });
 
         let id = match id {
             Some(id) => id,
@@ -3607,7 +3616,7 @@ fn close_pending_socket<WireI, DC, BT>(
         + TcpDemuxContext<WireI, DC::WeakDeviceId, BT>,
     BT: TcpBindingsTypes,
 {
-    core_ctx.with_demux_mut(|DemuxState { socketmap, .. }| {
+    core_ctx.with_demux_mut(|DemuxState { socketmap }| {
         assert_matches!(socketmap.conns_mut().remove(demux_id, conn_addr), Ok(()));
     });
 
@@ -3951,7 +3960,7 @@ where
             ConnectError::NoRoute
         })?;
     let conn_addr = core_ctx.with_demux_mut(|demux| {
-        let DemuxState { port_alloc, socketmap } = demux;
+        let DemuxState { socketmap } = demux;
 
         let local_port = local_port.map_or_else(
             // NB: Pass the remote port into the allocator to avoid unexpected
@@ -3959,7 +3968,8 @@ where
             // optimized by checking if the IP socket has resolved to local
             // delivery, but excluding a single port should be enough here and
             // avoids adding more dependencies.
-            || match port_alloc.try_alloc_with(
+            || match algorithm::simple_randomized_port_alloc(
+                &mut bindings_ctx.rng(),
                 &Some(*ip_sock.local_ip()),
                 socketmap,
                 &Some(remote_port),
@@ -4305,10 +4315,7 @@ mod tests {
             Self {
                 isn_generator: Default::default(),
                 all_sockets: Default::default(),
-                demux: DemuxState {
-                    socketmap: Default::default(),
-                    port_alloc: PortAlloc::new(&mut FakeCryptoRng::new_xorshift(0)),
-                },
+                demux: DemuxState { socketmap: Default::default() },
             }
         }
     }
@@ -4491,6 +4498,13 @@ mod tests {
 
     impl<D: FakeStrongDeviceId> FilterBindingsTypes for TcpBindingsCtx<D> {
         type DeviceClass = ();
+    }
+
+    impl<D: FakeStrongDeviceId> RngContext for TcpBindingsCtx<D> {
+        type Rng<'a> = &'a mut FakeCryptoRng<XorShiftRng>;
+        fn rng(&mut self) -> Self::Rng<'_> {
+            &mut self.rng
+        }
     }
 
     impl<D: FakeStrongDeviceId> TcpBindingsTypes for TcpBindingsCtx<D> {
