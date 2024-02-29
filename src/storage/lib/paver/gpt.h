@@ -67,7 +67,7 @@ class GptDevicePartitioner {
                                                             size_t optional_reserve_bytes) const;
 
   struct FindPartitionResult {
-    std::unique_ptr<BlockDevicePartitionClient> partition;
+    std::unique_ptr<BlockPartitionClient> partition;
     gpt_partition_t* gpt_partition;
   };
 

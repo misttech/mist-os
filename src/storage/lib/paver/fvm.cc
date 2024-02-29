@@ -386,8 +386,10 @@ namespace {
 // On success, returns the VolumeManager for the zxcrypt instance, and writes the inner block
 // device's into |part|.
 zx::result<zxcrypt::VolumeManager> ZxcryptCreate(PartitionInfo* part) {
-  // TODO(security): https://fxbug.dev/42106007. We need to bind with channel in order to pass a key here.
-  // TODO(security): https://fxbug.dev/42106740. The created volume must marked as needing key rotation.
+  // TODO(security): https://fxbug.dev/42106007. We need to bind with channel in order to pass a key
+  // here.
+  // TODO(security): https://fxbug.dev/42106740. The created volume must marked as needing key
+  // rotation.
 
   fbl::unique_fd devfs_root;
   if (zx_status_t status = fdio_open_fd("/dev", 0, devfs_root.reset_and_get_address());
@@ -742,7 +744,7 @@ zx::result<> FvmStreamPartitions(const fbl::unique_fd& devfs_root,
   if (block_or.is_error()) {
     return block_or.take_error();
   }
-  BlockDeviceClient& block = block_or.value().get();
+  BlockPartitionClient& block = block_or.value().get();
 
   std::unique_ptr<fvm::SparseReader> reader;
   zx::result<> status = zx::ok();

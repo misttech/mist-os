@@ -83,7 +83,7 @@ struct SparseIoBuffer {
 
 struct SparseIoContext {
   PartitionClient& partition;
-  BlockDeviceClient& block;
+  BlockPartitionClient& block;
   uint64_t block_size;
   fzl::OwnedVmoMapper transfer_vmo;
   storage::OwnedVmoid transfer_vmoid;

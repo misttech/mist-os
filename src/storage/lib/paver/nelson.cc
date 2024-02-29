@@ -122,7 +122,7 @@ zx::result<std::unique_ptr<PartitionClient>> NelsonPartitioner::GetBootloaderPar
   if (block_or.is_error()) {
     return block_or.take_error();
   }
-  BlockDeviceClient& block = block_or.value();
+  BlockPartitionClient& block = block_or.value();
 
   fidl::ClientEnd<fuchsia_device::Controller> controller;
   zx::result controller_server = fidl::CreateEndpoints(&controller);
