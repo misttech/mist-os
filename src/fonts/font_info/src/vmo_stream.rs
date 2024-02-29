@@ -46,6 +46,9 @@ impl VmoStreamInternal {
         count: c_ulong,
     ) -> c_ulong {
         let wrapper = &mut *((*stream).descriptor as *mut VmoStreamInternal);
+        if buffer.is_null() || count == 0 {
+            return 0;
+        }
         let buffer_slice = slice::from_raw_parts_mut(buffer as *mut u8, count as usize);
         wrapper.read(offset as u64, buffer_slice) as c_ulong
     }
