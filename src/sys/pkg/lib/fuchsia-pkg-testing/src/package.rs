@@ -162,13 +162,22 @@ impl Package {
         })
     }
 
-    /// Returns a set of all unique blobs contained in this package including subpackage blobs.
+    /// Returns a set of all unique blobs contained in this package, including meta.far and
+    /// subpackage blobs.
+    /// Errors if there are unknown subpackage blobs.
     pub fn list_blobs(&self) -> Result<BTreeSet<Hash>, Error> {
         Ok(self
-            .meta_contents()?
+            .meta_contents()
+            .context("loading meta/contents")?
             .into_hashes_undeduplicated()
             .chain([self.meta_far_merkle])
-            .chain(self.subpackage_blobs.iter().flat_map(|m| m.keys().copied()))
+            .chain(
+                self.subpackage_blobs
+                    .as_ref()
+                    .ok_or_else(|| anyhow::anyhow!("subpackage blobs are not known"))?
+                    .keys()
+                    .copied(),
+            )
             .collect())
     }
 

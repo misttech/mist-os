@@ -193,6 +193,13 @@ impl PackageIndex {
         all
     }
 
+    /// Returns all blobs protected by this index except those protected only by the dynamic index.
+    pub fn all_blobs_ignoring_dynamic_index(&self) -> HashSet<Hash> {
+        let mut all = self.retained.all_blobs();
+        all.extend(self.writing.all_blobs());
+        all
+    }
+
     /// Returns a callback to be given to `finspect::Node::record_lazy_child`.
     /// The callback holds a weak reference to the PackageIndex.
     pub fn record_lazy_inspect(

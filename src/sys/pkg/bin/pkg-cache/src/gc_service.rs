@@ -24,7 +24,8 @@ pub async fn serve(
     cache_packages: Arc<CachePackages>,
     package_index: Arc<async_lock::RwLock<PackageIndex>>,
     open_packages: package_directory::RootDirCache<blobfs::Client>,
-    protect_open_packages: bool,
+    protect_dynamic_packages: crate::DynamicProtection,
+    protect_open_packages: crate::OpenProtection,
     commit_status_provider: CommitStatusProviderProxy,
     mut stream: SpaceManagerRequestStream,
 ) -> Result<(), anyhow::Error> {
@@ -42,6 +43,7 @@ pub async fn serve(
                 cache_packages.as_ref(),
                 &package_index,
                 &open_packages,
+                protect_dynamic_packages,
                 protect_open_packages,
                 &event_pair,
             )
@@ -57,7 +59,8 @@ async fn gc(
     cache_packages: &CachePackages,
     package_index: &Arc<async_lock::RwLock<PackageIndex>>,
     open_packages: &package_directory::RootDirCache<blobfs::Client>,
-    protect_open_packages: bool,
+    protect_dynamic_packages: crate::DynamicProtection,
+    protect_open_packages: crate::OpenProtection,
     event_pair: &zx::EventPair,
 ) -> Result<(), SpaceErrorCode> {
     info!("performing gc");
@@ -93,9 +96,18 @@ async fn gc(
         // the index until we are done deleting blobs guarantees we will never delete a blob
         // that resolution thinks it can skip fetching.
         let package_index = package_index.read().await;
-        let () = package_index.all_blobs().iter().for_each(|blob| {
-            eligible_blobs.remove(blob);
-        });
+        match protect_dynamic_packages {
+            crate::DynamicProtection::Enabled => {
+                let () = package_index.all_blobs().iter().for_each(|blob| {
+                    eligible_blobs.remove(blob);
+                });
+            }
+            crate::DynamicProtection::Disabled => {
+                let () = package_index.all_blobs_ignoring_dynamic_index().iter().for_each(|blob| {
+                    eligible_blobs.remove(blob);
+                });
+            }
+        }
 
         let () = base_packages.list_blobs().iter().for_each(|blob| {
             eligible_blobs.remove(blob);
@@ -105,7 +117,7 @@ async fn gc(
             eligible_blobs.remove(blob);
         });
 
-        if protect_open_packages {
+        if matches!(protect_open_packages, crate::OpenProtection::Enabled) {
             let () = protect_open_blobs(&mut eligible_blobs, open_packages).await;
         }
 

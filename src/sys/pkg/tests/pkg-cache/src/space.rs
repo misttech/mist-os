@@ -58,9 +58,11 @@ async fn gc_error_pending_commit() {
 }
 
 /// Create a TestEnv and SystemImage package from the supplied static packages.
+/// Enable dynamic index protection.
 async fn setup_test_env(static_packages: &[&Package]) -> (TestEnv, Package) {
     let system_image = SystemImageBuilder::new().static_packages(static_packages).build().await;
     let env = TestEnv::builder()
+        .protect_dynamic_packages(true)
         .blobfs_from_system_image_and_extra_packages(&system_image, static_packages)
         .await
         .build()
@@ -78,11 +80,16 @@ async fn gc_noop_system_image() {
         .build()
         .await
         .unwrap();
-    let (env, _) = setup_test_env(&[&static_package]).await;
-    let original_blobs = env.blobfs.list_blobs().expect("to get an initial list of blobs");
+    let (env, system_image) = setup_test_env(&[&static_package]).await;
+    let mut expected_base_blobs = static_package.list_blobs().unwrap();
+    expected_base_blobs.extend(system_image.list_blobs().unwrap());
+    // static-package meta.far and content blob, system_image meta.far and static packages manifest
+    assert_eq!(expected_base_blobs.len(), 4);
+    assert_eq!(env.blobfs.list_blobs().unwrap(), expected_base_blobs);
 
     assert_matches!(env.proxies.space_manager.gc().await, Ok(Ok(())));
-    assert_eq!(env.blobfs.list_blobs().expect("to get new blobs"), original_blobs);
+
+    assert_eq!(env.blobfs.list_blobs().unwrap(), expected_base_blobs);
 }
 
 /// Assert that any blobs protected by the dynamic index are ineligible for garbage collection.
@@ -102,6 +109,7 @@ async fn gc_dynamic_index_protected() {
         crate::get_and_verify_package(&env.proxies.package_cache, &pkg).await;
 
     // Ensure that the just-fetched blobs are not reaped by a GC cycle.
+    let () = env.wait_for_package_to_close(pkg.hash()).await;
     let mut test_blobs = env.blobfs.list_blobs().expect("to get an initial list of blobs");
 
     assert_matches!(env.proxies.space_manager.gc().await, Ok(Ok(())));
@@ -261,6 +269,7 @@ async fn gc_updated_static_package() {
         crate::get_and_verify_package(&env.proxies.package_cache, &pkg).await;
 
     // Ensure that the just-fetched blobs are not reaped by a GC cycle.
+    let () = env.wait_for_package_to_close(pkg.hash()).await;
     let mut test_blobs = env.blobfs.list_blobs().expect("to get an initial list of blobs");
 
     assert_matches!(env.proxies.space_manager.gc().await, Ok(Ok(())));
@@ -425,7 +434,7 @@ async fn gc_frees_space_so_write_can_succeed_fxblob() {
 }
 
 async fn blobs_protected_from_gc_during_get(gc_protection: fpkg::GcProtection) {
-    let env = TestEnv::builder().build().await;
+    let env = TestEnv::builder().protect_dynamic_packages(false).build().await;
     let initial_blobs = env.blobfs.list_blobs().unwrap();
 
     let subsubpackage = PackageBuilder::new("subsubpackage")
@@ -476,9 +485,6 @@ async fn blobs_protected_from_gc_during_get(gc_protection: fpkg::GcProtection) {
             )
             .await
         }
-
-        // Ephemeral packages are added to the dynamic index unless they are already in the
-        // retained index.
         fpkg::GcProtection::OpenPackageTracking => (),
     }
     let meta_blob_info =
@@ -585,19 +591,6 @@ async fn blobs_protected_from_gc_during_get(gc_protection: fpkg::GcProtection) {
             crate::replace_retained_packages(&env.proxies.retained_packages, &[]).await
         }
         fpkg::GcProtection::OpenPackageTracking => {
-            // This has the same name as the originally protected package, so will evict it from
-            // the dynamic index, and it does not have any blobs in common.
-            let evictor = PackageBuilder::new("superpackage").build().await.unwrap();
-            assert!(to_be_fetched_hashes.is_disjoint(&evictor.list_blobs().unwrap()));
-            let _: fio::DirectoryProxy =
-                crate::get_and_verify_package(&env.proxies.package_cache, &evictor).await;
-        }
-    }
-    // With open package tracking, also need to wait until pkg-cache notices that the package
-    // connection closed.
-    match gc_protection {
-        fpkg::GcProtection::Retained => (),
-        fpkg::GcProtection::OpenPackageTracking => {
             drop(dir);
             let () = env.wait_for_package_to_close(superpackage.hash()).await;
         }
@@ -636,12 +629,7 @@ async fn blobs_protected_from_gc_by_open_package_tracking() {
         .unwrap();
 
     // The four blobs protected from GC by pkg0.
-    let pkg0_protected = BTreeSet::from_iter([
-        *pkg0.hash(),
-        pkg0.contents().1.into_iter().next().unwrap().0,
-        *subpkg0.hash(),
-        subpkg0.contents().1.into_iter().next().unwrap().0,
-    ]);
+    let pkg0_protected = pkg0.list_blobs().unwrap();
     assert_eq!(pkg0_protected.len(), 4);
     assert!(env.blobfs.list_blobs().unwrap().is_disjoint(&pkg0_protected));
 
@@ -717,14 +705,14 @@ async fn writing_index_protects_packages() {
     );
 }
 
-// The dynamic index and the writing index both protect packages while they are being written.
-// This test uses inspect to make sure the writing index is activating.
-// When the dynamic index is removed this test can also be removed and the writing index will be
-// tested by the other tests that actually try to delete blobs.
 #[fuchsia_async::run_singlethreaded(test)]
 async fn writing_index_clears_on_get_error() {
-    let env = TestEnv::builder().build().await;
-    let pkg = PackageBuilder::new("ephemeral").build().await.unwrap();
+    let env = TestEnv::builder().protect_dynamic_packages(false).build().await;
+    let pkg = PackageBuilder::new("ephemeral")
+        .add_resource_at("content-blob", &b"some-content"[..])
+        .build()
+        .await
+        .unwrap();
     let (needed_blobs, needed_blobs_server_end) =
         fidl::endpoints::create_proxy::<NeededBlobsMarker>().unwrap();
     let get_fut = env
@@ -737,31 +725,32 @@ async fn writing_index_clears_on_get_error() {
             None,
         )
         .map_ok(|res| res.map_err(Status::from_raw));
-    let _ = needed_blobs.open_meta_blob(fpkg::BlobType::Delivery).await.unwrap().unwrap().unwrap();
-    let hash_str = &pkg.hash().to_string();
-
-    // NeededBlobs.OpenMetaBlob has responded, so the package should be in the index.
+    let (meta_far, content_blobs) = pkg.contents();
+    let meta_blob =
+        needed_blobs.open_meta_blob(fpkg::BlobType::Delivery).await.unwrap().unwrap().unwrap();
+    let () = compress_and_write_blob(&meta_far.contents, *meta_blob).await.unwrap();
+    let () = blob_written(&needed_blobs, meta_far.merkle).await;
+    assert_matches!(env.proxies.space_manager.gc().await, Ok(Ok(())));
+    // The meta.far is in blobfs after GC.
+    assert!(env.blobfs.list_blobs().unwrap().contains(pkg.hash()));
     assert_eq!(
-        env.inspect_hierarchy()
-            .await
-            .get_property_by_path(&vec!["index", "writing", hash_str, "count"])
-            .unwrap()
-            .number_as_int()
-            .unwrap(),
-        1
+        get_missing_blobs(&needed_blobs).await,
+        Vec::from_iter(
+            content_blobs
+                .into_iter()
+                .map(|(h, _)| fpkg::BlobInfo { blob_id: BlobId::from(h).into(), length: 0 })
+        )
     );
 
-    // It is a protocol violation to call GetMissingBlobs before the meta.far is written, doing so
-    // will fail the Get with an error, but the package should still be removed from the writing
-    // index.
+    // It is a protocol violation to call GetMissingBlobs a second time. Doing so will fail the Get
+    // with an error, but the package should still be removed from the writing index.
     let (_, blob_iterator_server_end) =
         fidl::endpoints::create_proxy::<fpkg::BlobInfoIteratorMarker>().unwrap();
     let () = needed_blobs.get_missing_blobs(blob_iterator_server_end).unwrap();
     assert_matches!(get_fut.await.unwrap(), Err(Status::UNAVAILABLE));
 
-    // PackageCache.Get has responded, so the index should be empty.
-    assert_eq!(
-        env.inspect_hierarchy().await.get_property_by_path(&vec!["index", "writing", hash_str]),
-        None
-    );
+    // PackageCache.Get has responded, so the index should be empty and GC should now remove the
+    // meta.far.
+    assert_matches!(env.proxies.space_manager.gc().await, Ok(Ok(())));
+    assert!(!env.blobfs.list_blobs().unwrap().contains(pkg.hash()));
 }

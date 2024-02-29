@@ -120,6 +120,9 @@
         },
     ],
     config: {
+        // If true, then pkg-cache will not garbage collect active dynamic index packages.
+        protect_dynamic_packages: { type: "bool" },
+
         // If true, then pkg-cache will not garbage collect packages that have open connections.
         protect_open_packages: { type: "bool" },
 

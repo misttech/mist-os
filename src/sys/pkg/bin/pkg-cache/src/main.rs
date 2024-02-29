@@ -117,7 +117,20 @@ async fn main_inner() -> Result<(), Error> {
     inspector
         .root()
         .record_child("structured_config", |config_node| config.record_inspect(config_node));
-    let pkg_cache_config::Config { protect_open_packages, use_fxblob, use_system_image } = config;
+    let pkg_cache_config::Config {
+        protect_dynamic_packages,
+        protect_open_packages,
+        use_fxblob,
+        use_system_image,
+    } = config;
+    let protect_dynamic_packages = match protect_dynamic_packages {
+        true => DynamicProtection::Enabled,
+        false => DynamicProtection::Disabled,
+    };
+    let protect_open_packages = match protect_open_packages {
+        true => OpenProtection::Enabled,
+        false => OpenProtection::Disabled,
+    };
     let mut package_index = PackageIndex::new();
     let builder = blobfs::Client::builder().readable().writable().executable();
     let blobfs = if use_fxblob { builder.use_creator().use_reader() } else { builder }
@@ -270,6 +283,7 @@ async fn main_inner() -> Result<(), Error> {
                         Arc::clone(&cache_packages),
                         Arc::clone(&package_index),
                         open_packages.clone(),
+                        protect_dynamic_packages,
                         protect_open_packages,
                         commit_status_provider.clone(),
                         stream,
@@ -393,4 +407,16 @@ async fn shell_commands_bin_dir(
     .await
     .context("serving shell-commands bin dir")?;
     Ok(client)
+}
+
+#[derive(Debug, Clone, Copy)]
+enum DynamicProtection {
+    Enabled,
+    Disabled,
+}
+
+#[derive(Debug, Clone, Copy)]
+enum OpenProtection {
+    Enabled,
+    Disabled,
 }

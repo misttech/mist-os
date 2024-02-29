@@ -133,6 +133,7 @@ fuchsia_structured_config_rust_lib("config_lib") {
 fuchsia_structured_config_values("config_values_from_gn") {
   cm_label = ":manifest"
   values = {
+    protect_dynamic_packages = true
     protect_open_packages = true
 
     # LINT.IfChange
@@ -147,6 +148,7 @@ fuchsia_structured_config_values("config_values_from_gn") {
 fuchsia_structured_config_values("config_values_from_gn-ignore-system-image") {
   cm_label = ":manifest"
   values = {
+    protect_dynamic_packages = true
     protect_open_packages = true
 
     # TODO(https://fxbug.dev/42081210) Recovery should use fxblob if available.
@@ -159,6 +161,7 @@ fuchsia_structured_config_values("config_values_from_gn-ignore-system-image") {
 fuchsia_structured_config_values("config_values_from_gn-cpp-blobfs") {
   cm_label = ":manifest"
   values = {
+    protect_dynamic_packages = true
     protect_open_packages = true
     use_fxblob = false
     use_system_image = true
@@ -169,6 +172,7 @@ fuchsia_structured_config_values("config_values_from_gn-cpp-blobfs") {
 fuchsia_structured_config_values("config_values_from_gn-fxblob") {
   cm_label = ":manifest"
   values = {
+    protect_dynamic_packages = true
     protect_open_packages = true
     use_fxblob = true
     use_system_image = true

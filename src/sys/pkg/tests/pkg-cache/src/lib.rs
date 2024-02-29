@@ -376,6 +376,7 @@ struct TestEnvBuilder<BlobfsAndSystemImageFut> {
         Box<dyn FnOnce(blobfs_ramdisk::Implementation) -> BlobfsAndSystemImageFut>,
     ignore_system_image: bool,
     blob_implementation: Option<blobfs_ramdisk::Implementation>,
+    protect_dynamic_packages: Option<bool>,
     protect_open_packages: Option<bool>,
 }
 
@@ -396,6 +397,7 @@ impl TestEnvBuilder<BoxFuture<'static, (BlobfsRamdisk, Option<Hash>)>> {
             paver_service_builder: None,
             ignore_system_image: false,
             blob_implementation: None,
+            protect_dynamic_packages: None,
             protect_open_packages: None,
         }
     }
@@ -423,6 +425,7 @@ where
             paver_service_builder: self.paver_service_builder,
             ignore_system_image: self.ignore_system_image,
             blob_implementation: self.blob_implementation,
+            protect_dynamic_packages: self.protect_dynamic_packages,
             protect_open_packages: self.protect_open_packages,
         }
     }
@@ -458,6 +461,7 @@ where
             paver_service_builder: self.paver_service_builder,
             ignore_system_image: self.ignore_system_image,
             blob_implementation: Some(blobfs_ramdisk::Implementation::from_env()),
+            protect_dynamic_packages: self.protect_dynamic_packages,
             protect_open_packages: self.protect_open_packages,
         }
     }
@@ -480,6 +484,11 @@ where
     fn blobfs_impl(self, impl_: blobfs_ramdisk::Implementation) -> Self {
         assert_eq!(self.blob_implementation, None);
         Self { blob_implementation: Some(impl_), ..self }
+    }
+
+    fn protect_dynamic_packages(self, protect_dynamic_packages: bool) -> Self {
+        assert_eq!(self.protect_dynamic_packages, None);
+        Self { protect_dynamic_packages: Some(protect_dynamic_packages), ..self }
     }
 
     fn protect_open_packages(self, protect_open_packages: bool) -> Self {
@@ -613,6 +622,7 @@ where
             .unwrap();
         if self.ignore_system_image
             || blob_implementation_overridden
+            || self.protect_dynamic_packages.is_some()
             || self.protect_open_packages.is_some()
         {
             builder.init_mutable_config_from_package(&pkg_cache).await.unwrap();
@@ -629,6 +639,16 @@ where
                         "use_fxblob",
                         matches!(blob_implementation, blobfs_ramdisk::Implementation::Fxblob)
                             .into(),
+                    )
+                    .await
+                    .unwrap();
+            }
+            if let Some(protect_dynamic_packages) = self.protect_dynamic_packages {
+                builder
+                    .set_config_value(
+                        &pkg_cache,
+                        "protect_dynamic_packages",
+                        protect_dynamic_packages.into(),
                     )
                     .await
                     .unwrap();
