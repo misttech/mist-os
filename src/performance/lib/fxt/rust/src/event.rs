@@ -267,7 +267,7 @@ impl EventPayload<Ticks> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{string::STRING_REF_INLINE_BIT, RawTraceRecord};
+    use crate::RawTraceRecord;
     use std::num::{NonZeroU16, NonZeroU8};
 
     #[test]

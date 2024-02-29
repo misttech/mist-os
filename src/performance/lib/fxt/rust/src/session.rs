@@ -17,7 +17,6 @@ use flyweights::FlyStr;
 use futures::{AsyncRead, AsyncReadExt, SinkExt, Stream};
 use std::{
     collections::BTreeMap,
-    marker::Unpin,
     num::{NonZeroU16, NonZeroU8},
 };
 
@@ -361,7 +360,7 @@ mod tests {
         fxt_builder::FxtBuilder,
         scheduling::{LegacyContextSwitchEvent, SchedulingRecord, ThreadState},
     };
-    use futures::{SinkExt, StreamExt, TryStreamExt};
+    use futures::{StreamExt, TryStreamExt};
 
     static SIMPLE_TRACE_FXT: &[u8] =
         include_bytes!("../../../../trace2json/test_data/simple_trace.fxt");

@@ -113,7 +113,6 @@ trace_header! {
 mod tests {
     use super::*;
     use crate::RawTraceRecord;
-    use std::num::NonZeroU8;
 
     #[test]
     fn process_ref_index() {

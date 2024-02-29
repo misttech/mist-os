@@ -287,10 +287,8 @@ mod tests {
     use futures::pin_mut;
     use heapdump_vmo::{
         allocations_table_v1::AllocationsTableWriter, resources_table_v1::ResourcesTableWriter,
-        stack_trace_compression,
     };
     use itertools::{assert_equal, Itertools};
-    use std::collections::HashMap;
     use std::pin::Pin;
     use test_case::test_case;
 

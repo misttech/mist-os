@@ -406,7 +406,6 @@ arg_header! {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::string::STRING_REF_INLINE_BIT;
     use std::num::NonZeroU16;
 
     #[test]
