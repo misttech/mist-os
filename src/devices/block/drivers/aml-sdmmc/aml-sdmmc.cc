@@ -363,7 +363,8 @@ void AmlSdmmc::ClearStatus() {
       .WriteTo(&*mmio_);
 }
 
-void AmlSdmmc::Inspect::Init(const pdev_device_info_t& device_info, inspect::Node& parent) {
+void AmlSdmmc::Inspect::Init(const pdev_device_info_t& device_info, inspect::Node& parent,
+                             bool is_power_suspended) {
   std::string root_name = "aml-sdmmc-port";
   if (device_info.did == PDEV_DID_AMLOGIC_SDMMC_A) {
     root_name += 'A';
@@ -386,6 +387,7 @@ void AmlSdmmc::Inspect::Init(const pdev_device_info_t& device_info, inspect::Nod
   longest_window_size = root.CreateUint("longest_window_size", 0);
   longest_window_adj_delay = root.CreateUint("longest_window_adj_delay", 0);
   distance_to_failing_point = root.CreateUint("distance_to_failing_point", 0);
+  power_suspended = root.CreateBool("power_suspended", is_power_suspended);
 }
 
 zx::result<std::array<uint32_t, AmlSdmmc::kResponseCount>> AmlSdmmc::WaitForInterrupt(
@@ -656,6 +658,7 @@ zx_status_t AmlSdmmc::SuspendPower() {
   }
 
   power_suspended_ = true;
+  inspect_.power_suspended.Set(power_suspended_);
   return ZX_OK;
 }
 
@@ -686,6 +689,7 @@ zx_status_t AmlSdmmc::ResumePower() {
   clk.set_cfg_div(clk_div_saved_).WriteTo(&*mmio_);
 
   power_suspended_ = false;
+  inspect_.power_suspended.Set(power_suspended_);
   return ZX_OK;
 }
 
@@ -1617,19 +1621,17 @@ zx_status_t AmlSdmmc::SdmmcRequestLocked(const sdmmc_req_t* req, uint32_t out_re
 }
 
 zx_status_t AmlSdmmc::Init(const pdev_device_info_t& device_info) {
-  {
-    fbl::AutoLock lock(&lock_);
+  fbl::AutoLock lock(&lock_);
 
-    // The core clock must be enabled before attempting to access the start register.
-    ConfigureDefaultRegs();
+  // The core clock must be enabled before attempting to access the start register.
+  ConfigureDefaultRegs();
 
-    // Stop processing DMA descriptors before releasing quarantine.
-    AmlSdmmcStart::Get().ReadFrom(&*mmio_).set_desc_busy(0).WriteTo(&*mmio_);
-    zx_status_t status = bti_.release_quarantine();
-    if (status != ZX_OK) {
-      FDF_LOGL(ERROR, logger(), "Failed to release quarantined pages");
-      return status;
-    }
+  // Stop processing DMA descriptors before releasing quarantine.
+  AmlSdmmcStart::Get().ReadFrom(&*mmio_).set_desc_busy(0).WriteTo(&*mmio_);
+  zx_status_t status = bti_.release_quarantine();
+  if (status != ZX_OK) {
+    FDF_LOGL(ERROR, logger(), "Failed to release quarantined pages");
+    return status;
   }
 
   dev_info_.caps = SDMMC_HOST_CAP_BUS_WIDTH_8 | SDMMC_HOST_CAP_VOLTAGE_330 | SDMMC_HOST_CAP_SDR104 |
@@ -1640,7 +1642,7 @@ zx_status_t AmlSdmmc::Init(const pdev_device_info_t& device_info) {
   max_freq_ = board_config_.max_freq;
   min_freq_ = board_config_.min_freq;
 
-  inspect_.Init(device_info, inspector().root());
+  inspect_.Init(device_info, inspector().root(), power_suspended_);
   inspect_.max_delay.Set(AmlSdmmcClock::kMaxDelay + 1);
 
   return ZX_OK;

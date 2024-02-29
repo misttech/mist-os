@@ -48,6 +48,15 @@ class TestAmlSdmmc : public AmlSdmmc {
     return inspector_.hierarchy().GetByPath({"aml-sdmmc-port" + suffix});
   }
 
+  void ExpectInspectBoolPropertyValue(const std::string& name, bool value) {
+    const auto* root = GetInspectRoot("-unknown");
+    ASSERT_NOT_NULL(root);
+
+    const auto* property = root->node().get_property<inspect::BoolPropertyValue>(name);
+    ASSERT_NOT_NULL(property);
+    EXPECT_EQ(property->value(), value);
+  }
+
   void ExpectInspectPropertyValue(const std::string& name, uint64_t value) {
     const auto* root = GetInspectRoot("-unknown");
     ASSERT_NOT_NULL(root);
@@ -2060,19 +2069,19 @@ TEST_F(AmlSdmmcTest, PowerSuspendResume) {
   auto clock = AmlSdmmcClock::Get().FromValue(0).WriteTo(&*mmio_);
 
   ASSERT_OK(dut_->Init({}));
-  EXPECT_FALSE(dut_->power_suspended());
+  dut_->ExpectInspectBoolPropertyValue("power_suspended", false);
   EXPECT_NE(clock.ReadFrom(&*mmio_).cfg_div(), 0);
   EXPECT_TRUE(incoming_.SyncCall(
       [](IncomingNamespace* incoming) { return incoming->clock_server.enabled(); }));
 
   EXPECT_OK(dut_->SuspendPower());
-  EXPECT_TRUE(dut_->power_suspended());
+  dut_->ExpectInspectBoolPropertyValue("power_suspended", true);
   EXPECT_EQ(clock.ReadFrom(&*mmio_).cfg_div(), 0);
   EXPECT_FALSE(incoming_.SyncCall(
       [](IncomingNamespace* incoming) { return incoming->clock_server.enabled(); }));
 
   EXPECT_OK(dut_->ResumePower());
-  EXPECT_FALSE(dut_->power_suspended());
+  dut_->ExpectInspectBoolPropertyValue("power_suspended", false);
   EXPECT_NE(clock.ReadFrom(&*mmio_).cfg_div(), 0);
   EXPECT_TRUE(incoming_.SyncCall(
       [](IncomingNamespace* incoming) { return incoming->clock_server.enabled(); }));

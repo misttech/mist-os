@@ -120,10 +120,6 @@ class AmlSdmmc : public fdf::DriverBase,
   // Visible for tests
   zx_status_t Init(const pdev_device_info_t& device_info) TA_EXCL(lock_);
   void set_board_config(const aml_sdmmc_config_t& board_config) { board_config_ = board_config; }
-  bool power_suspended() TA_EXCL(lock_) {
-    fbl::AutoLock lock(&lock_);
-    return power_suspended_;
-  }
 
  protected:
   virtual zx_status_t WaitForInterruptImpl();
@@ -187,8 +183,10 @@ class AmlSdmmc : public fdf::DriverBase,
     inspect::UintProperty longest_window_size;
     inspect::UintProperty longest_window_adj_delay;
     inspect::UintProperty distance_to_failing_point;
+    inspect::BoolProperty power_suspended;
 
-    void Init(const pdev_device_info_t& device_info, inspect::Node& parent);
+    void Init(const pdev_device_info_t& device_info, inspect::Node& parent,
+              bool is_power_suspended);
   };
 
   struct TuneContext {
