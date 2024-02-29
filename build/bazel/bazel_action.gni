@@ -575,8 +575,8 @@ template("bazel_action") {
       args += [ "--features=ubsan" ]
     }
 
-    # Forward GN test coverage configuration to Bazel
-    if (is_coverage) {
+    # Only clang toolchain has coverage support in Bazel at the moment.
+    if (is_clang_coverage) {
       args += [ "--features=coverage" ]
     }
 
