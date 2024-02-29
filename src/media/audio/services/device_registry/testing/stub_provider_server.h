@@ -16,23 +16,9 @@
 
 #include "src/media/audio/services/common/base_fidl_server.h"
 #include "src/media/audio/services/common/fidl_thread.h"
+#include "src/media/audio/services/device_registry/logging.h"
 
 namespace media_audio {
-
-inline std::ostream& operator<<(
-    std::ostream& out, const std::optional<fuchsia_audio_device::DeviceType>& device_type) {
-  if (device_type) {
-    switch (*device_type) {
-      case fuchsia_audio_device::DeviceType::kInput:
-        return (out << " INPUT");
-      case fuchsia_audio_device::DeviceType::kOutput:
-        return (out << "OUTPUT");
-      default:
-        return (out << "OTHER (unknown enum)");
-    }
-  }
-  return (out << "NONE (non-compliant)");
-}
 
 // FIDL server for fuchsia_audio_device/Provider (a stub "do-nothing" implementation).
 class StubProviderServer

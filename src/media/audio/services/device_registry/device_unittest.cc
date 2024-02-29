@@ -16,7 +16,7 @@
 #include <gtest/gtest.h>
 
 #include "src/media/audio/services/device_registry/device_unittest.h"
-#include "src/media/audio/services/device_registry/testing/fake_audio_driver.h"
+#include "src/media/audio/services/device_registry/testing/fake_stream_config.h"
 
 namespace media_audio {
 
@@ -96,8 +96,8 @@ TEST_F(DeviceTest, DistinctTokenIds) {
   zx::channel server_end, client_end;
   ASSERT_EQ(ZX_OK, zx::channel::create(0, &server_end, &client_end));
 
-  auto fake_driver2 =
-      std::make_unique<FakeAudioDriver>(std::move(server_end), std::move(client_end), dispatcher());
+  auto fake_driver2 = std::make_unique<FakeStreamConfig>(std::move(server_end),
+                                                         std::move(client_end), dispatcher());
   fake_driver2->set_is_input(true);
 
   auto device2 = InitializeDeviceForFakeDriver(fake_driver2);

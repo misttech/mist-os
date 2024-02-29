@@ -37,7 +37,7 @@ TEST_F(ProviderServerTest, AddDeviceThatOutlivesProvider) {
   auto provider = CreateTestProviderServer();
   EXPECT_EQ(ProviderServer::count(), 1u);
 
-  auto fake_driver = CreateFakeDriver();
+  auto fake_driver = CreateFakeStreamConfigOutput();
   auto stream_config_client_end =
       fidl::ClientEnd<fuchsia_hardware_audio::StreamConfig>(fake_driver->Enable());
 
@@ -69,14 +69,14 @@ TEST_F(ProviderServerTest, ProviderCanOutliveDevice) {
   auto provider = CreateTestProviderServer();
   EXPECT_EQ(ProviderServer::count(), 1u);
 
-  auto fake_driver = CreateFakeDriver();
+  auto fake_driver = CreateFakeStreamConfigInput();
   auto stream_config_client_end =
       fidl::ClientEnd<fuchsia_hardware_audio::StreamConfig>(fake_driver->Enable());
   auto received_callback = false;
   provider->client()
       ->AddDevice({{
           .device_name = "Test device name",
-          .device_type = fuchsia_audio_device::DeviceType::kOutput,
+          .device_type = fuchsia_audio_device::DeviceType::kInput,
           .stream_config = std::move(stream_config_client_end),
       }})
       .Then([&received_callback](fidl::Result<Provider::AddDevice>& result) {
@@ -105,7 +105,7 @@ TEST_F(ProviderServerTest, ProviderAddThenWatch) {
   auto registry_wrapper = CreateTestRegistryServer();
   EXPECT_EQ(RegistryServer::count(), 1u);
 
-  auto fake_driver = CreateFakeDriver();
+  auto fake_driver = CreateFakeStreamConfigOutput();
   auto stream_config_client_end =
       fidl::ClientEnd<fuchsia_hardware_audio::StreamConfig>(fake_driver->Enable());
   auto received_callback = false;
@@ -160,14 +160,14 @@ TEST_F(ProviderServerTest, WatchThenProviderAdd) {
   RunLoopUntilIdle();
   EXPECT_FALSE(added_device);
 
-  auto fake_driver = CreateFakeDriver();
+  auto fake_driver = CreateFakeStreamConfigInput();
   auto stream_config_client_end =
       fidl::ClientEnd<fuchsia_hardware_audio::StreamConfig>(fake_driver->Enable());
   auto received_callback = false;
   provider->client()
       ->AddDevice({{
           .device_name = "Test device name",
-          .device_type = fuchsia_audio_device::DeviceType::kOutput,
+          .device_type = fuchsia_audio_device::DeviceType::kInput,
           .stream_config = std::move(stream_config_client_end),
       }})
       .Then([&received_callback](fidl::Result<Provider::AddDevice>& result) {

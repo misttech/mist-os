@@ -14,7 +14,7 @@
 #include <gtest/gtest.h>
 
 #include "src/media/audio/services/device_registry/adr_server_unittest_base.h"
-#include "src/media/audio/services/device_registry/testing/fake_audio_driver.h"
+#include "src/media/audio/services/device_registry/testing/fake_stream_config.h"
 
 namespace media_audio {
 
@@ -31,7 +31,7 @@ class ObserverServerTest : public AudioDeviceRegistryServerTestBase,
       .frames_per_second = 48000,
   }};
 
-  std::unique_ptr<FakeAudioDriver> CreateAndEnableDriverWithDefaults();
+  std::unique_ptr<FakeStreamConfig> CreateAndEnableStreamConfigWithDefaults();
 
   std::optional<TokenId> WaitForAddedDeviceTokenId(
       fidl::Client<fuchsia_audio_device::Registry>& registry_client);
@@ -46,12 +46,8 @@ class ObserverServerTest : public AudioDeviceRegistryServerTestBase,
       fidl::Client<fuchsia_audio_device::Registry>& registry_client, TokenId token_id);
 };
 
-std::unique_ptr<FakeAudioDriver> ObserverServerTest::CreateAndEnableDriverWithDefaults() {
-  EXPECT_EQ(dispatcher(), test_loop().dispatcher());
-  zx::channel server_end, client_end;
-  EXPECT_EQ(ZX_OK, zx::channel::create(0, &server_end, &client_end));
-  auto fake_driver =
-      std::make_unique<FakeAudioDriver>(std::move(server_end), std::move(client_end), dispatcher());
+std::unique_ptr<FakeStreamConfig> ObserverServerTest::CreateAndEnableStreamConfigWithDefaults() {
+  auto fake_driver = CreateFakeStreamConfigOutput();
 
   adr_service_->AddDevice(Device::Create(
       adr_service_, dispatcher(), "Test output name", fuchsia_audio_device::DeviceType::kOutput,
@@ -125,7 +121,7 @@ fidl::Client<fuchsia_audio_device::Observer> ObserverServerTest::ConnectToObserv
 
 // Validate that an Observer client can drop cleanly (without generating a WARNING or ERROR).
 TEST_F(ObserverServerTest, CleanClientDrop) {
-  auto fake_driver = CreateAndEnableDriverWithDefaults();
+  auto fake_driver = CreateAndEnableStreamConfigWithDefaults();
   auto observer = CreateTestObserverServer(*adr_service_->devices().begin());
   ASSERT_EQ(ObserverServer::count(), 1u);
 
@@ -134,7 +130,7 @@ TEST_F(ObserverServerTest, CleanClientDrop) {
 
 // Validate that an Observer server can shutdown cleanly (without generating a WARNING or ERROR).
 TEST_F(ObserverServerTest, CleanServerShutdown) {
-  auto fake_driver = CreateAndEnableDriverWithDefaults();
+  auto fake_driver = CreateAndEnableStreamConfigWithDefaults();
   auto observer = CreateTestObserverServer(*adr_service_->devices().begin());
   ASSERT_EQ(ObserverServer::count(), 1u);
 
@@ -144,7 +140,7 @@ TEST_F(ObserverServerTest, CleanServerShutdown) {
 // Validate creation of an Observer via the Registry/CreateObserver method. Most other test cases
 // directly creeate an Observer server and client synthetically via CreateTestObserverServer.
 TEST_F(ObserverServerTest, Creation) {
-  auto fake_driver = CreateAndEnableDriverWithDefaults();
+  auto fake_driver = CreateAndEnableStreamConfigWithDefaults();
   ASSERT_EQ(adr_service_->devices().size(), 1u);
   ASSERT_EQ(adr_service_->unhealthy_devices().size(), 0u);
 
@@ -180,7 +176,7 @@ TEST_F(ObserverServerTest, Creation) {
 
 // Validate that when an observed device is removed, the Observer is dropped.
 TEST_F(ObserverServerTest, ObservedDeviceRemoved) {
-  auto fake_driver = CreateAndEnableDriverWithDefaults();
+  auto fake_driver = CreateAndEnableStreamConfigWithDefaults();
   ASSERT_EQ(adr_service_->devices().size(), 1u);
   ASSERT_EQ(adr_service_->unhealthy_devices().size(), 0u);
 
@@ -205,10 +201,8 @@ TEST_F(ObserverServerTest, ObservedDeviceRemoved) {
 
 // Validate that the Observer receives the initial gain state of the observed device.
 TEST_F(ObserverServerTest, InitialGainState) {
-  zx::channel server_end, client_end;
-  EXPECT_EQ(ZX_OK, zx::channel::create(0, &server_end, &client_end));
-  auto fake_driver =
-      std::make_unique<FakeAudioDriver>(std::move(server_end), std::move(client_end), dispatcher());
+  auto fake_driver = CreateFakeStreamConfigOutput();
+
   constexpr float kGainDb = -2.0f;
   fake_driver->InjectGainChange({{
       .muted = true,
@@ -251,7 +245,7 @@ TEST_F(ObserverServerTest, InitialGainState) {
 
 // Validate that the Observer receives changes in the gain state of the observed device.
 TEST_F(ObserverServerTest, GainChange) {
-  auto fake_driver = CreateAndEnableDriverWithDefaults();
+  auto fake_driver = CreateAndEnableStreamConfigWithDefaults();
   ASSERT_EQ(adr_service_->devices().size(), 1u);
   ASSERT_EQ(adr_service_->unhealthy_devices().size(), 0u);
 
@@ -305,10 +299,8 @@ TEST_F(ObserverServerTest, GainChange) {
 
 // Validate that the Observer receives the initial plug state of the observed device.
 TEST_F(ObserverServerTest, InitialPlugState) {
-  zx::channel server_end, client_end;
-  EXPECT_EQ(ZX_OK, zx::channel::create(0, &server_end, &client_end));
-  auto fake_driver =
-      std::make_unique<FakeAudioDriver>(std::move(server_end), std::move(client_end), dispatcher());
+  auto fake_driver = CreateFakeStreamConfigOutput();
+
   auto initial_plug_time = zx::clock::get_monotonic();
   fake_driver->InjectPlugChange(false, initial_plug_time);
   RunLoopUntilIdle();
@@ -345,7 +337,7 @@ TEST_F(ObserverServerTest, InitialPlugState) {
 
 // Validate that the Observer receives changes in the plug state of the observed device.
 TEST_F(ObserverServerTest, PlugChange) {
-  auto fake_driver = CreateAndEnableDriverWithDefaults();
+  auto fake_driver = CreateAndEnableStreamConfigWithDefaults();
   ASSERT_EQ(adr_service_->devices().size(), 1u);
   ASSERT_EQ(adr_service_->unhealthy_devices().size(), 0u);
 
@@ -394,7 +386,7 @@ TEST_F(ObserverServerTest, PlugChange) {
 
 // Validate that the Observer receives the observed device's reference clock, and that it is valid.
 TEST_F(ObserverServerTest, GetReferenceClock) {
-  auto fake_driver = CreateAndEnableDriverWithDefaults();
+  auto fake_driver = CreateAndEnableStreamConfigWithDefaults();
   ASSERT_EQ(adr_service_->devices().size(), 1u);
   ASSERT_EQ(adr_service_->unhealthy_devices().size(), 0u);
 
@@ -423,7 +415,7 @@ TEST_F(ObserverServerTest, GetReferenceClock) {
 
 // Validate that an Observer does not drop, if the observed device's driver RingBuffer is dropped.
 TEST_F(ObserverServerTest, ObserverDoesNotDropIfDriverRingBufferDrops) {
-  auto fake_driver = CreateAndEnableDriverWithDefaults();
+  auto fake_driver = CreateAndEnableStreamConfigWithDefaults();
   fake_driver->AllocateRingBuffer(8192);
 
   auto registry = CreateTestRegistryServer();
@@ -462,7 +454,7 @@ TEST_F(ObserverServerTest, ObserverDoesNotDropIfDriverRingBufferDrops) {
 
 // Validate that an Observer does not drop, if the observed device's RingBuffer client is dropped.
 TEST_F(ObserverServerTest, ObserverDoesNotDropIfClientRingBufferDrops) {
-  auto fake_driver = CreateAndEnableDriverWithDefaults();
+  auto fake_driver = CreateAndEnableStreamConfigWithDefaults();
   fake_driver->AllocateRingBuffer(8192);
 
   auto registry = CreateTestRegistryServer();
@@ -500,7 +492,7 @@ TEST_F(ObserverServerTest, ObserverDoesNotDropIfClientRingBufferDrops) {
 
 // Validate that an Observer does not drop, if the observed device's Control client is dropped.
 TEST_F(ObserverServerTest, ObserverDoesNotDropIfClientControlDrops) {
-  auto fake_driver = CreateAndEnableDriverWithDefaults();
+  auto fake_driver = CreateAndEnableStreamConfigWithDefaults();
   fake_driver->AllocateRingBuffer(8192);
 
   auto registry = CreateTestRegistryServer();

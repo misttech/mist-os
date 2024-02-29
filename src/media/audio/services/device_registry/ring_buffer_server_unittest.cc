@@ -16,6 +16,7 @@
 
 #include "src/media/audio/services/common/testing/test_server_and_async_client.h"
 #include "src/media/audio/services/device_registry/adr_server_unittest_base.h"
+#include "src/media/audio/services/device_registry/testing/fake_stream_config.h"
 
 namespace media_audio {
 namespace {
@@ -34,8 +35,7 @@ class RingBufferServerTest : public AudioDeviceRegistryServerTestBase,
       .ring_buffer_min_bytes = 2000,
   }};
 
-  std::unique_ptr<FakeAudioDriver> CreateFakeDriverWithDefaults();
-  void EnableDriverAndAddDevice(const std::unique_ptr<FakeAudioDriver>& fake_driver);
+  void EnableDriverAndAddDevice(const std::unique_ptr<FakeStreamConfig>& fake_driver);
 
   std::optional<TokenId> WaitForAddedDeviceTokenId(
       fidl::Client<fuchsia_audio_device::Registry>& reg_client);
@@ -49,15 +49,8 @@ class RingBufferServerTest : public AudioDeviceRegistryServerTestBase,
   SetupForCleanShutdownTesting();
 };
 
-std::unique_ptr<FakeAudioDriver> RingBufferServerTest::CreateFakeDriverWithDefaults() {
-  EXPECT_EQ(dispatcher(), test_loop().dispatcher());
-  zx::channel server_end, client_end;
-  EXPECT_EQ(ZX_OK, zx::channel::create(0, &server_end, &client_end));
-  return std::make_unique<FakeAudioDriver>(std::move(server_end), std::move(client_end),
-                                           dispatcher());
-}
 void RingBufferServerTest::EnableDriverAndAddDevice(
-    const std::unique_ptr<FakeAudioDriver>& fake_driver) {
+    const std::unique_ptr<FakeStreamConfig>& fake_driver) {
   adr_service_->AddDevice(Device::Create(
       adr_service_, dispatcher(), "Test output name", fuchsia_audio_device::DeviceType::kOutput,
       fidl::ClientEnd<fuchsia_hardware_audio::StreamConfig>(fake_driver->Enable())));
@@ -121,7 +114,7 @@ RingBufferServerTest::SetupForCleanShutdownTesting() {
 
 // Validate that RingBuffer clients and servers shutdown cleanly (without warnings).
 TEST_F(RingBufferServerTest, CleanClientDrop) {
-  auto fake_driver = CreateFakeDriverWithDefaults();
+  auto fake_driver = CreateFakeStreamConfigOutput();
   fake_driver->AllocateRingBuffer(8192);
   EnableDriverAndAddDevice(fake_driver);
   auto [control, ring_buffer_client] = SetupForCleanShutdownTesting();
@@ -133,7 +126,7 @@ TEST_F(RingBufferServerTest, CleanClientDrop) {
 }
 
 TEST_F(RingBufferServerTest, DriverRingBufferDropCausesCleanRingBufferServerShutdown) {
-  auto fake_driver = CreateFakeDriverWithDefaults();
+  auto fake_driver = CreateFakeStreamConfigOutput();
   fake_driver->AllocateRingBuffer(8192);
   EnableDriverAndAddDevice(fake_driver);
   auto [control, ring_buffer_client] = SetupForCleanShutdownTesting();
@@ -145,7 +138,7 @@ TEST_F(RingBufferServerTest, DriverRingBufferDropCausesCleanRingBufferServerShut
 }
 
 TEST_F(RingBufferServerTest, DriverStreamConfigDropCausesCleanRingBufferServerShutdown) {
-  auto fake_driver = CreateFakeDriverWithDefaults();
+  auto fake_driver = CreateFakeStreamConfigOutput();
   fake_driver->AllocateRingBuffer(8192);
   EnableDriverAndAddDevice(fake_driver);
   auto [control, ring_buffer_client] = SetupForCleanShutdownTesting();
@@ -158,7 +151,7 @@ TEST_F(RingBufferServerTest, DriverStreamConfigDropCausesCleanRingBufferServerSh
 
 // Validate that Control/CreateRingBuffer succeeds and returns the expected parameters.
 TEST_F(RingBufferServerTest, CreateRingBufferReturnParameters) {
-  auto fake_driver = CreateFakeDriverWithDefaults();
+  auto fake_driver = CreateFakeStreamConfigOutput();
   fake_driver->AllocateRingBuffer(8192);
   EnableDriverAndAddDevice(fake_driver);
 
@@ -209,7 +202,7 @@ TEST_F(RingBufferServerTest, CreateRingBufferReturnParameters) {
 
 // Validate that RingBuffer/SetActiveChannels succeeds and returns an expected set_time.
 TEST_F(RingBufferServerTest, DriverSupportsSetActiveChannels) {
-  auto fake_driver = CreateFakeDriverWithDefaults();
+  auto fake_driver = CreateFakeStreamConfigOutput();
   fake_driver->AllocateRingBuffer(8192);
   EnableDriverAndAddDevice(fake_driver);
 
@@ -260,7 +253,7 @@ TEST_F(RingBufferServerTest, DriverSupportsSetActiveChannels) {
 }
 
 TEST_F(RingBufferServerTest, DriverDoesNotSupportSetActiveChannels) {
-  auto fake_driver = CreateFakeDriverWithDefaults();
+  auto fake_driver = CreateFakeStreamConfigOutput();
   fake_driver->AllocateRingBuffer(8192);
   // Set this fake hardware to NOT support powering-down channels.
   fake_driver->set_active_channels_supported(false);
@@ -309,7 +302,7 @@ TEST_F(RingBufferServerTest, DriverDoesNotSupportSetActiveChannels) {
 
 // Validate that RingBuffer/Start and /Stop function as expected, including start_time.
 TEST_F(RingBufferServerTest, StartAndStop) {
-  auto fake_driver = CreateFakeDriverWithDefaults();
+  auto fake_driver = CreateFakeStreamConfigOutput();
   fake_driver->set_active_channels_supported(false);
   fake_driver->AllocateRingBuffer(8192);
   EnableDriverAndAddDevice(fake_driver);
@@ -386,7 +379,7 @@ TEST_F(RingBufferServerTest, StartAndStop) {
 // Validate that RingBuffer/WatchDelayInfo notifies of the delay received during initialization.
 // While we are here, validate a non-default value for turn_on_delay.
 TEST_F(RingBufferServerTest, WatchDelayInfo) {
-  auto fake_driver = CreateFakeDriverWithDefaults();
+  auto fake_driver = CreateFakeStreamConfigOutput();
   fake_driver->set_turn_on_delay(zx::msec(42));
   fake_driver->InjectDelayUpdate(zx::nsec(987'654'321), zx::nsec(123'456'789));
   fake_driver->AllocateRingBuffer(8192);
@@ -437,7 +430,7 @@ TEST_F(RingBufferServerTest, WatchDelayInfo) {
 
 // Validate that RingBuffer/WatchDelayInfo notifies of delay changes after initialization.
 TEST_F(RingBufferServerTest, DynamicDelayUpdate) {
-  auto fake_driver = CreateFakeDriverWithDefaults();
+  auto fake_driver = CreateFakeStreamConfigOutput();
   fake_driver->AllocateRingBuffer(8192);
   EnableDriverAndAddDevice(fake_driver);
 
@@ -500,7 +493,7 @@ TEST_F(RingBufferServerTest, DynamicDelayUpdate) {
 
 // Validate that the RingBufferServer is destructed if the client drops the Control.
 TEST_F(RingBufferServerTest, ControlClientDropCausesRingBufferDrop) {
-  auto fake_driver = CreateFakeDriverWithDefaults();
+  auto fake_driver = CreateFakeStreamConfigOutput();
   fake_driver->AllocateRingBuffer(8192);
   EnableDriverAndAddDevice(fake_driver);
 
@@ -535,7 +528,7 @@ TEST_F(RingBufferServerTest, ControlClientDropCausesRingBufferDrop) {
 
 // Validate that the RingBufferServer is destructed if the ControlServer shuts down.
 TEST_F(RingBufferServerTest, ControlServerShutdownCausesRingBufferDrop) {
-  auto fake_driver = CreateFakeDriverWithDefaults();
+  auto fake_driver = CreateFakeStreamConfigOutput();
   fake_driver->AllocateRingBuffer(8192);
   EnableDriverAndAddDevice(fake_driver);
 

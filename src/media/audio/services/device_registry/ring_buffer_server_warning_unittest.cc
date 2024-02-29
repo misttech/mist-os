@@ -15,6 +15,7 @@
 #include "src/media/audio/services/common/testing/test_server_and_async_client.h"
 #include "src/media/audio/services/device_registry/adr_server_unittest_base.h"
 #include "src/media/audio/services/device_registry/ring_buffer_server.h"
+#include "src/media/audio/services/device_registry/testing/fake_stream_config.h"
 
 namespace media_audio {
 namespace {
@@ -36,8 +37,7 @@ class RingBufferServerWarningTest
       .ring_buffer_min_bytes = 2000,
   }};
 
-  std::unique_ptr<FakeAudioDriver> CreateFakeDriverWithDefaults();
-  void EnableDriverAndAddDevice(const std::unique_ptr<FakeAudioDriver>& fake_driver);
+  void EnableInputAndAddDevice(const std::unique_ptr<FakeStreamConfig>& fake_driver);
 
   std::optional<TokenId> WaitForAddedDeviceTokenId(
       fidl::Client<fuchsia_audio_device::Registry>& reg_client);
@@ -47,18 +47,10 @@ class RingBufferServerWarningTest
   CreateRingBufferClient();
 };
 
-std::unique_ptr<FakeAudioDriver> RingBufferServerWarningTest::CreateFakeDriverWithDefaults() {
-  EXPECT_EQ(dispatcher(), test_loop().dispatcher());
-  zx::channel server_end, client_end;
-  EXPECT_EQ(ZX_OK, zx::channel::create(0, &server_end, &client_end));
-  return std::make_unique<FakeAudioDriver>(std::move(server_end), std::move(client_end),
-                                           dispatcher());
-}
-
-void RingBufferServerWarningTest::EnableDriverAndAddDevice(
-    const std::unique_ptr<FakeAudioDriver>& fake_driver) {
+void RingBufferServerWarningTest::EnableInputAndAddDevice(
+    const std::unique_ptr<FakeStreamConfig>& fake_driver) {
   adr_service_->AddDevice(Device::Create(
-      adr_service_, dispatcher(), "Test output name", fuchsia_audio_device::DeviceType::kOutput,
+      adr_service_, dispatcher(), "Test input name", fuchsia_audio_device::DeviceType::kInput,
       fidl::ClientEnd<fuchsia_hardware_audio::StreamConfig>(fake_driver->Enable())));
   RunLoopUntilIdle();
 }
@@ -91,9 +83,9 @@ RingBufferServerWarningTest::CreateRingBufferClient() {
 }
 
 TEST_F(RingBufferServerWarningTest, SetActiveChannelsMissingChannelBitmask) {
-  auto fake_driver = CreateFakeDriverWithDefaults();
+  auto fake_driver = CreateFakeStreamConfigInput();
   fake_driver->AllocateRingBuffer(8192);
-  EnableDriverAndAddDevice(fake_driver);
+  EnableInputAndAddDevice(fake_driver);
 
   auto registry = CreateTestRegistryServer();
   auto token_id = WaitForAddedDeviceTokenId(registry->client());
@@ -142,9 +134,9 @@ TEST_F(RingBufferServerWarningTest, SetActiveChannelsMissingChannelBitmask) {
 }
 
 TEST_F(RingBufferServerWarningTest, SetActiveChannelsBadChannelBitmask) {
-  auto fake_driver = CreateFakeDriverWithDefaults();
+  auto fake_driver = CreateFakeStreamConfigInput();
   fake_driver->AllocateRingBuffer(8192);
-  EnableDriverAndAddDevice(fake_driver);
+  EnableInputAndAddDevice(fake_driver);
 
   auto registry = CreateTestRegistryServer();
   auto token_id = WaitForAddedDeviceTokenId(registry->client());
@@ -193,9 +185,9 @@ TEST_F(RingBufferServerWarningTest, SetActiveChannelsBadChannelBitmask) {
 
 // Test calling SetActiveChannels, before the previous SetActiveChannels has completed.
 TEST_F(RingBufferServerWarningTest, SetActiveChannelsWhilePending) {
-  auto fake_driver = CreateFakeDriverWithDefaults();
+  auto fake_driver = CreateFakeStreamConfigInput();
   fake_driver->AllocateRingBuffer(8192);
-  EnableDriverAndAddDevice(fake_driver);
+  EnableInputAndAddDevice(fake_driver);
 
   auto registry = CreateTestRegistryServer();
   auto token_id = WaitForAddedDeviceTokenId(registry->client());
@@ -247,10 +239,10 @@ TEST_F(RingBufferServerWarningTest, SetActiveChannelsWhilePending) {
 
 // Test Start-Start, when the second Start is called before the first Start completes.
 TEST_F(RingBufferServerWarningTest, StartWhilePending) {
-  auto fake_driver = CreateFakeDriverWithDefaults();
+  auto fake_driver = CreateFakeStreamConfigInput();
   fake_driver->set_active_channels_supported(false);
   fake_driver->AllocateRingBuffer(8192);
-  EnableDriverAndAddDevice(fake_driver);
+  EnableInputAndAddDevice(fake_driver);
 
   auto registry = CreateTestRegistryServer();
   auto token_id = WaitForAddedDeviceTokenId(registry->client());
@@ -302,10 +294,10 @@ TEST_F(RingBufferServerWarningTest, StartWhilePending) {
 
 // Test Start-Start, when the second Start occurs after the first has successfully completed.
 TEST_F(RingBufferServerWarningTest, StartWhileStarted) {
-  auto fake_driver = CreateFakeDriverWithDefaults();
+  auto fake_driver = CreateFakeStreamConfigInput();
   fake_driver->set_active_channels_supported(false);
   fake_driver->AllocateRingBuffer(8192);
-  EnableDriverAndAddDevice(fake_driver);
+  EnableInputAndAddDevice(fake_driver);
 
   auto registry = CreateTestRegistryServer();
   auto token_id = WaitForAddedDeviceTokenId(registry->client());
@@ -362,10 +354,10 @@ TEST_F(RingBufferServerWarningTest, StartWhileStarted) {
 
 // Test Stop when not yet Started.
 TEST_F(RingBufferServerWarningTest, StopBeforeStarted) {
-  auto fake_driver = CreateFakeDriverWithDefaults();
+  auto fake_driver = CreateFakeStreamConfigInput();
   fake_driver->set_active_channels_supported(false);
   fake_driver->AllocateRingBuffer(8192);
-  EnableDriverAndAddDevice(fake_driver);
+  EnableInputAndAddDevice(fake_driver);
 
   auto registry = CreateTestRegistryServer();
   auto token_id = WaitForAddedDeviceTokenId(registry->client());
@@ -407,10 +399,10 @@ TEST_F(RingBufferServerWarningTest, StopBeforeStarted) {
 
 // Test Start-Stop-Stop, when the second Stop is called before the first one completes.
 TEST_F(RingBufferServerWarningTest, StopWhilePending) {
-  auto fake_driver = CreateFakeDriverWithDefaults();
+  auto fake_driver = CreateFakeStreamConfigInput();
   fake_driver->set_active_channels_supported(false);
   fake_driver->AllocateRingBuffer(8192);
-  EnableDriverAndAddDevice(fake_driver);
+  EnableInputAndAddDevice(fake_driver);
 
   auto registry = CreateTestRegistryServer();
   auto token_id = WaitForAddedDeviceTokenId(registry->client());
@@ -469,10 +461,10 @@ TEST_F(RingBufferServerWarningTest, StopWhilePending) {
 
 // Test Start-Stop-Stop, when the first Stop successfully completed before the second is called.
 TEST_F(RingBufferServerWarningTest, StopAfterStopped) {
-  auto fake_driver = CreateFakeDriverWithDefaults();
+  auto fake_driver = CreateFakeStreamConfigInput();
   fake_driver->set_active_channels_supported(false);
   fake_driver->AllocateRingBuffer(8192);
-  EnableDriverAndAddDevice(fake_driver);
+  EnableInputAndAddDevice(fake_driver);
 
   auto registry = CreateTestRegistryServer();
   auto token_id = WaitForAddedDeviceTokenId(registry->client());
@@ -537,9 +529,9 @@ TEST_F(RingBufferServerWarningTest, StopAfterStopped) {
 
 // Test WatchDelayInfo when already watching - should fail with kAlreadyPending.
 TEST_F(RingBufferServerWarningTest, WatchDelayInfoWhilePending) {
-  auto fake_driver = CreateFakeDriverWithDefaults();
+  auto fake_driver = CreateFakeStreamConfigInput();
   fake_driver->AllocateRingBuffer(8192);
-  EnableDriverAndAddDevice(fake_driver);
+  EnableInputAndAddDevice(fake_driver);
 
   auto registry = CreateTestRegistryServer();
   auto token_id = WaitForAddedDeviceTokenId(registry->client());

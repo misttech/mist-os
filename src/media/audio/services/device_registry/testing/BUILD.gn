@@ -16,13 +16,14 @@ source_set("fakes") {
   testonly = true
 
   sources = [
-    "fake_audio_driver.cc",
-    "fake_audio_driver.h",
     "fake_device_presence_watcher.h",
+    "fake_stream_config.cc",
+    "fake_stream_config.h",
   ]
 
   public_deps = [
     "//sdk/fidl/fuchsia.hardware.audio:fuchsia.hardware.audio_hlcpp",
+    "//sdk/fidl/fuchsia.hardware.audio.signalprocessing:fuchsia.hardware.audio.signalprocessing_hlcpp",
     "//sdk/lib/fit-promise",
     "//zircon/system/ulib/fzl",
   ]
@@ -33,6 +34,7 @@ source_set("fakes") {
     "//src/lib/fxl/test:gtest_main",
     "//src/media/audio/drivers/lib/audio-proto-utils",
     "//src/media/audio/lib/format",
+    "//src/media/audio/services/device_registry:common",
     "//src/media/audio/services/device_registry:device_registry_lib",
     "//zircon/system/public",
     "//zircon/system/ulib/async-testing",
@@ -53,6 +55,7 @@ executable("stub_adr") {
     "//sdk/fidl/fuchsia.audio.device:fuchsia.audio.device_cpp",
     "//sdk/lib/component/outgoing/cpp",
     "//src/media/audio/services/common",
+    "//src/media/audio/services/device_registry:common",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/async-loop:async-loop-default",
   ]

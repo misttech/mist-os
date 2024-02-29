@@ -144,7 +144,7 @@ TEST_F(RegistryServerWarningTest, CreateObserverBadToken) {
 
 // If the required 'observer_server' field is not set, we should fail.
 TEST_F(RegistryServerWarningTest, CreateObserverMissingObserver) {
-  auto fake_driver = CreateFakeDriver();
+  auto fake_driver = CreateFakeStreamConfigOutput();
   adr_service_->AddDevice(Device::Create(
       adr_service_, dispatcher(), "Test output name", fuchsia_audio_device::DeviceType::kOutput,
       fidl::ClientEnd<fuchsia_hardware_audio::StreamConfig>(fake_driver->Enable())));
@@ -192,9 +192,9 @@ TEST_F(RegistryServerWarningTest, CreateObserverMissingObserver) {
 
 // If 'observer_server' is not set to a valid handle, we should fail.
 TEST_F(RegistryServerWarningTest, CreateObserverBadObserver) {
-  auto fake_driver = CreateFakeDriver();
+  auto fake_driver = CreateFakeStreamConfigInput();
   adr_service_->AddDevice(Device::Create(
-      adr_service_, dispatcher(), "Test output name", fuchsia_audio_device::DeviceType::kOutput,
+      adr_service_, dispatcher(), "Test input name", fuchsia_audio_device::DeviceType::kInput,
       fidl::ClientEnd<fuchsia_hardware_audio::StreamConfig>(fake_driver->Enable())));
   RunLoopUntilIdle();
   EXPECT_EQ(adr_service_->devices().size(), 1u);

@@ -22,13 +22,14 @@ TEST_F(ProviderServerWarningTest, MissingDeviceName) {
   auto provider = CreateTestProviderServer();
   EXPECT_EQ(ProviderServer::count(), 1u);
 
-  auto fake_driver = CreateFakeDriver();
+  auto fake_driver = CreateFakeStreamConfigOutput();
   auto stream_config_client_end =
       fidl::ClientEnd<fuchsia_hardware_audio::StreamConfig>(fake_driver->Enable());
 
   auto received_callback = false;
   provider->client()
       ->AddDevice({{
+          // No device_name
           .device_type = fuchsia_audio_device::DeviceType::kOutput,
           .stream_config = std::move(stream_config_client_end),
       }})
@@ -52,15 +53,15 @@ TEST_F(ProviderServerWarningTest, EmptyDeviceName) {
   auto provider = CreateTestProviderServer();
   EXPECT_EQ(ProviderServer::count(), 1u);
 
-  auto fake_driver = CreateFakeDriver();
+  auto fake_driver = CreateFakeStreamConfigInput();
   auto stream_config_client_end =
       fidl::ClientEnd<fuchsia_hardware_audio::StreamConfig>(fake_driver->Enable());
 
   auto received_callback = false;
   provider->client()
       ->AddDevice({{
-          .device_name = "",
-          .device_type = fuchsia_audio_device::DeviceType::kOutput,
+          .device_name = "",  // Empty device_name
+          .device_type = fuchsia_audio_device::DeviceType::kInput,
           .stream_config = std::move(stream_config_client_end),
       }})
       .Then([&received_callback](fidl::Result<Provider::AddDevice>& result) {
@@ -83,14 +84,15 @@ TEST_F(ProviderServerWarningTest, MissingDeviceType) {
   auto provider = CreateTestProviderServer();
   EXPECT_EQ(ProviderServer::count(), 1u);
 
-  auto fake_driver = CreateFakeDriver();
+  auto fake_driver = CreateFakeStreamConfigOutput();
   auto stream_config_client_end =
       fidl::ClientEnd<fuchsia_hardware_audio::StreamConfig>(fake_driver->Enable());
 
   auto received_callback = false;
   provider->client()
       ->AddDevice({{
-          .device_name = "Test device name",
+          .device_name = "Test output name",
+          // No device_type
           .stream_config = std::move(stream_config_client_end),
       }})
       .Then([&received_callback](fidl::Result<Provider::AddDevice>& result) {
@@ -116,8 +118,9 @@ TEST_F(ProviderServerWarningTest, MissingStreamConfig) {
   auto received_callback = false;
   provider->client()
       ->AddDevice({{
-          .device_name = "Test device name",
+          .device_name = "Test output name",
           .device_type = fuchsia_audio_device::DeviceType::kOutput,
+          // No stream_config
       }})
       .Then([&received_callback](fidl::Result<Provider::AddDevice>& result) {
         received_callback = true;
@@ -142,7 +145,7 @@ TEST_F(ProviderServerWarningTest, InvalidStreamConfig) {
   auto received_callback = false;
   provider->client()
       ->AddDevice({{
-          .device_name = "Test device name",
+          .device_name = "Test output name",
           .device_type = fuchsia_audio_device::DeviceType::kOutput,
           .stream_config = fidl::ClientEnd<fuchsia_hardware_audio::StreamConfig>(),
       }})

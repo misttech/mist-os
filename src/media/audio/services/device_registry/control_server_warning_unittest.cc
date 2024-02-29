@@ -17,6 +17,7 @@
 #include "src/media/audio/services/common/testing/test_server_and_async_client.h"
 #include "src/media/audio/services/device_registry/adr_server_unittest_base.h"
 #include "src/media/audio/services/device_registry/control_server.h"
+#include "src/media/audio/services/device_registry/testing/fake_stream_config.h"
 
 namespace media_audio {
 namespace {
@@ -27,12 +28,8 @@ class ControlServerWarningTest : public AudioDeviceRegistryServerTestBase,
                                  public fidl::AsyncEventHandler<fuchsia_audio_device::Control>,
                                  public fidl::AsyncEventHandler<fuchsia_audio_device::RingBuffer> {
  protected:
-  std::unique_ptr<FakeAudioDriver> CreateAndEnableDriverWithDefaults() {
-    EXPECT_EQ(dispatcher(), test_loop().dispatcher());
-    zx::channel server_end, client_end;
-    EXPECT_EQ(ZX_OK, zx::channel::create(0, &server_end, &client_end));
-    auto fake_driver = std::make_unique<FakeAudioDriver>(std::move(server_end),
-                                                         std::move(client_end), dispatcher());
+  std::unique_ptr<FakeStreamConfig> CreateAndEnableDriverWithDefaults() {
+    auto fake_driver = CreateFakeStreamConfigOutput();
 
     adr_service_->AddDevice(Device::Create(
         adr_service_, dispatcher(), "Test output name", fuchsia_audio_device::DeviceType::kOutput,
@@ -98,11 +95,8 @@ class ControlServerWarningTest : public AudioDeviceRegistryServerTestBase,
 void ControlServerWarningTest::TestSetGainBadState(
     const std::optional<fuchsia_audio_device::GainState>& bad_state,
     fuchsia_audio_device::ControlSetGainError expected_error) {
-  EXPECT_EQ(dispatcher(), test_loop().dispatcher());
-  zx::channel server_end, client_end;
-  EXPECT_EQ(ZX_OK, zx::channel::create(0, &server_end, &client_end));
-  auto fake_driver =
-      std::make_unique<FakeAudioDriver>(std::move(server_end), std::move(client_end), dispatcher());
+  auto fake_driver = CreateFakeStreamConfigOutput();
+
   fake_driver->set_can_mute(false);
   fake_driver->set_can_agc(false);
   fake_driver->AllocateRingBuffer(8192);
@@ -444,11 +438,7 @@ TEST_F(ControlServerWarningTest, CreateRingBufferWhilePending) {
 //   This is not high-priority since even at the service's highest supported bitrate (192kHz,
 //   8-channel, float64), a 4Gb ring-buffer would be 5.8 minutes long!
 TEST_F(ControlServerWarningTest, DISABLED_CreateRingBufferHugeRingBufferMinBytes) {
-  EXPECT_EQ(dispatcher(), test_loop().dispatcher());
-  zx::channel server_end, client_end;
-  EXPECT_EQ(ZX_OK, zx::channel::create(0, &server_end, &client_end));
-  auto fake_driver =
-      std::make_unique<FakeAudioDriver>(std::move(server_end), std::move(client_end), dispatcher());
+  auto fake_driver = CreateFakeStreamConfigOutput();
 
   fake_driver->clear_formats();
   std::vector<fuchsia::hardware::audio::ChannelAttributes> channel_vector;

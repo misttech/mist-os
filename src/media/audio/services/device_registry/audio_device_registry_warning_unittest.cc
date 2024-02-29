@@ -9,7 +9,7 @@
 
 #include "src/media/audio/services/device_registry/adr_server_unittest_base.h"
 #include "src/media/audio/services/device_registry/audio_device_registry.h"
-#include "src/media/audio/services/device_registry/testing/fake_audio_driver.h"
+#include "src/media/audio/services/device_registry/testing/fake_stream_config.h"
 
 namespace media_audio {
 namespace {
@@ -17,7 +17,7 @@ namespace {
 class AudioDeviceRegistryServerWarningTest : public AudioDeviceRegistryServerTestBase {};
 
 TEST_F(AudioDeviceRegistryServerWarningTest, UnhealthyDevice) {
-  auto fake_driver = CreateFakeDriver();
+  auto fake_driver = CreateFakeStreamConfigOutput();
   fake_driver->set_health_state(false);
   auto stream_config_client =
       fidl::ClientEnd<fuchsia_hardware_audio::StreamConfig>(fake_driver->Enable());
@@ -30,11 +30,11 @@ TEST_F(AudioDeviceRegistryServerWarningTest, UnhealthyDevice) {
 }
 
 TEST_F(AudioDeviceRegistryServerWarningTest, FindDeviceByTokenIdError) {
-  auto fake_driver = CreateFakeDriver();
+  auto fake_driver = CreateFakeStreamConfigInput();
   fake_driver->set_health_state(false);
   auto stream_config_client =
       fidl::ClientEnd<fuchsia_hardware_audio::StreamConfig>(fake_driver->Enable());
-  AddDeviceForDetection("test output", fuchsia_audio_device::DeviceType::kOutput,
+  AddDeviceForDetection("test input", fuchsia_audio_device::DeviceType::kInput,
                         std::move(stream_config_client));
 
   RunLoopUntilIdle();
@@ -52,7 +52,7 @@ TEST_F(AudioDeviceRegistryServerWarningTest, FindDeviceByTokenIdUnknown) {
 }
 
 TEST_F(AudioDeviceRegistryServerWarningTest, FindDeviceByTokenIdRemoved) {
-  auto fake_driver = CreateFakeDriver();
+  auto fake_driver = CreateFakeStreamConfigOutput();
   auto stream_config_client =
       fidl::ClientEnd<fuchsia_hardware_audio::StreamConfig>(fake_driver->Enable());
   AddDeviceForDetection("test output", fuchsia_audio_device::DeviceType::kOutput,

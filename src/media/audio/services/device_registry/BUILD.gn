@@ -105,11 +105,27 @@ executable("device_registry_warning_unittests_bin") {
 }
 
 ## Source sets
+source_set("common") {
+  sources = [
+    "basic_types.h",
+    "logging.h",
+  ]
+
+  public_deps = [
+    "//sdk/fidl/fuchsia.audio.device:fuchsia.audio.device_cpp",
+    "//sdk/fidl/fuchsia.hardware.audio:fuchsia.hardware.audio_cpp",
+  ]
+
+  deps = [
+    "//sdk/lib/syslog/cpp",
+    "//zircon/system/ulib/zx",
+  ]
+}
+
 source_set("device_registry_lib") {
   sources = [
     "audio_device_registry.cc",
     "audio_device_registry.h",
-    "basic_types.h",
     "control_creator_server.cc",
     "control_creator_server.h",
     "control_notify.h",
@@ -121,7 +137,6 @@ source_set("device_registry_lib") {
     "device_detector.h",
     "device_presence_watcher.h",
     "logging.cc",
-    "logging.h",
     "observer_notify.h",
     "observer_server.cc",
     "observer_server.h",
@@ -136,6 +151,7 @@ source_set("device_registry_lib") {
   ]
 
   public_deps = [
+    ":common",
     "//sdk/fidl/fuchsia.audio.device:fuchsia.audio.device_cpp",
     "//sdk/fidl/fuchsia.hardware.audio:fuchsia.hardware.audio_cpp",
     "//sdk/lib/component/incoming/cpp",
@@ -162,6 +178,7 @@ source_set("unittest_base") {
   ]
 
   public_deps = [
+    ":common",
     ":device_registry_lib",
     "testing:fakes",
     "//src/lib/fxl/test:gtest_main",

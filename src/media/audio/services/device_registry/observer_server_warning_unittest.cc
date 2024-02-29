@@ -13,19 +13,15 @@
 
 #include "src/media/audio/services/device_registry/adr_server_unittest_base.h"
 #include "src/media/audio/services/device_registry/observer_server.h"
-#include "src/media/audio/services/device_registry/testing/fake_audio_driver.h"
+#include "src/media/audio/services/device_registry/testing/fake_stream_config.h"
 
 namespace media_audio {
 
 class ObserverServerWarningTest : public AudioDeviceRegistryServerTestBase,
                                   public fidl::AsyncEventHandler<fuchsia_audio_device::Observer> {
  protected:
-  std::unique_ptr<FakeAudioDriver> CreateAndEnableDriverWithDefaults() {
-    EXPECT_EQ(dispatcher(), test_loop().dispatcher());
-    zx::channel server_end, client_end;
-    EXPECT_EQ(ZX_OK, zx::channel::create(0, &server_end, &client_end));
-    auto fake_driver = std::make_unique<FakeAudioDriver>(std::move(server_end),
-                                                         std::move(client_end), dispatcher());
+  std::unique_ptr<FakeStreamConfig> CreateAndEnableDriverWithDefaults() {
+    auto fake_driver = CreateFakeStreamConfigOutput();
 
     adr_service_->AddDevice(Device::Create(
         adr_service_, dispatcher(), "Test output name", fuchsia_audio_device::DeviceType::kOutput,

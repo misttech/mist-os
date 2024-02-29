@@ -2,10 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_MEDIA_AUDIO_SERVICES_DEVICE_REGISTRY_TESTING_FAKE_AUDIO_DRIVER_H_
-#define SRC_MEDIA_AUDIO_SERVICES_DEVICE_REGISTRY_TESTING_FAKE_AUDIO_DRIVER_H_
+#ifndef SRC_MEDIA_AUDIO_SERVICES_DEVICE_REGISTRY_TESTING_FAKE_STREAM_CONFIG_H_
+#define SRC_MEDIA_AUDIO_SERVICES_DEVICE_REGISTRY_TESTING_FAKE_STREAM_CONFIG_H_
 
 #include <fidl/fuchsia.hardware.audio/cpp/markers.h>
+#include <fidl/fuchsia.hardware.audio/cpp/natural_types.h>
 #include <fuchsia/hardware/audio/cpp/fidl.h>
 #include <lib/async/cpp/time.h>
 #include <lib/fidl/cpp/binding_set.h>
@@ -27,13 +28,13 @@
 namespace media_audio {
 
 // This driver implements the audio driver interface and is configurable to simulate audio hardware.
-class FakeAudioDriver : public fuchsia::hardware::audio::StreamConfig,
-                        public fuchsia::hardware::audio::RingBuffer {
-  static inline constexpr bool kLogFakeAudioDriver = false;
+class FakeStreamConfig : public fuchsia::hardware::audio::StreamConfig,
+                         public fuchsia::hardware::audio::RingBuffer {
+  static inline constexpr bool kLogFakeStreamConfig = false;
 
  public:
-  FakeAudioDriver(zx::channel server_end, zx::channel client_end, async_dispatcher_t* dispatcher);
-  ~FakeAudioDriver() override;
+  FakeStreamConfig(zx::channel server_end, zx::channel client_end, async_dispatcher_t* dispatcher);
+  ~FakeStreamConfig() override;
 
   // This returns a fidl::client_end<StreamConfig). The driver will not start serving requests until
   // Enable is called, which is why the construction/Enable separation exists.
@@ -137,7 +138,7 @@ class FakeAudioDriver : public fuchsia::hardware::audio::StreamConfig,
   void set_health_state(std::optional<bool> healthy) { healthy_ = healthy; }
 
   // Explicitly trigger a gain or plug change, including notification.
-  void InjectGainChange(fuchsia_hardware_audio::GainState new_state);
+  void InjectGainChange(fuchsia_hardware_audio::GainState gain_state);
   void InjectPlugChange(bool plugged, zx::time plug_time);
 
   void set_active_channels_supported(bool supported) { active_channels_supported_ = supported; }
@@ -165,7 +166,7 @@ class FakeAudioDriver : public fuchsia::hardware::audio::StreamConfig,
   }
 
  private:
-  static inline const std::string_view kClassName = "FakeAudioDriver";
+  static inline const std::string_view kClassName = "FakeStreamConfig";
 
   // fuchsia hardware audio StreamConfig Interface
   void GetProperties(fuchsia::hardware::audio::StreamConfig::GetPropertiesCallback callback) final;
@@ -210,8 +211,8 @@ class FakeAudioDriver : public fuchsia::hardware::audio::StreamConfig,
   std::optional<float> gain_step_db_ = 1.0f;
   std::optional<fuchsia::hardware::audio::PlugDetectCapabilities> plug_detect_capabilities_ =
       fuchsia::hardware::audio::PlugDetectCapabilities::CAN_ASYNC_NOTIFY;
-  std::optional<std::string> manufacturer_ = "fake_audio_driver device manufacturer";
-  std::optional<std::string> product_ = "fake_audio_driver device product";
+  std::optional<std::string> manufacturer_ = "fake stream_config device manufacturer";
+  std::optional<std::string> product_ = "fake stream_config device product";
   std::optional<ClockDomain> clock_domain_ = fuchsia::hardware::audio::CLOCK_DOMAIN_MONOTONIC;
 
   std::optional<bool> healthy_ = true;
@@ -281,4 +282,4 @@ class FakeAudioDriver : public fuchsia::hardware::audio::StreamConfig,
 
 }  // namespace media_audio
 
-#endif  // SRC_MEDIA_AUDIO_SERVICES_DEVICE_REGISTRY_TESTING_FAKE_AUDIO_DRIVER_H_
+#endif  // SRC_MEDIA_AUDIO_SERVICES_DEVICE_REGISTRY_TESTING_FAKE_STREAM_CONFIG_H_

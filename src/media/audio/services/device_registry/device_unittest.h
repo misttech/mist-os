@@ -25,8 +25,8 @@
 #include "src/media/audio/services/device_registry/control_notify.h"
 #include "src/media/audio/services/device_registry/device.h"
 #include "src/media/audio/services/device_registry/observer_notify.h"
-#include "src/media/audio/services/device_registry/testing/fake_audio_driver.h"
 #include "src/media/audio/services/device_registry/testing/fake_device_presence_watcher.h"
+#include "src/media/audio/services/device_registry/testing/fake_stream_config.h"
 
 namespace media_audio {
 
@@ -40,8 +40,8 @@ class DeviceTestBase : public gtest::TestLoopFixture {
 
     fake_device_presence_watcher_ = std::make_shared<FakeDevicePresenceWatcher>();
 
-    fake_driver_ = std::make_unique<FakeAudioDriver>(std::move(server_end), std::move(client_end),
-                                                     dispatcher());
+    fake_driver_ = std::make_unique<FakeStreamConfig>(std::move(server_end), std::move(client_end),
+                                                      dispatcher());
   }
   void TearDown() override { fake_device_presence_watcher_.reset(); }
 
@@ -50,7 +50,7 @@ class DeviceTestBase : public gtest::TestLoopFixture {
   void InitializeDeviceForFakeDriver() { device_ = InitializeDeviceForFakeDriver(fake_driver_); }
 
   std::shared_ptr<Device> InitializeDeviceForFakeDriver(
-      const std::unique_ptr<FakeAudioDriver>& driver) {
+      const std::unique_ptr<FakeStreamConfig>& driver) {
     auto device_type = *driver->is_input() ? fuchsia_audio_device::DeviceType::kInput
                                            : fuchsia_audio_device::DeviceType::kOutput;
     auto stream_config_client_end = driver->Enable();
@@ -296,7 +296,7 @@ class DeviceTestBase : public gtest::TestLoopFixture {
 
   // While |device_| is the object under test, this object simulates the channel messages that
   // normally come from the actual driver instance.
-  std::unique_ptr<FakeAudioDriver> fake_driver_;
+  std::unique_ptr<FakeStreamConfig> fake_driver_;
 };
 
 }  // namespace media_audio

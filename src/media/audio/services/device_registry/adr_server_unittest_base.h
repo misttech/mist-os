@@ -27,7 +27,7 @@
 #include "src/media/audio/services/device_registry/provider_server.h"
 #include "src/media/audio/services/device_registry/registry_server.h"
 #include "src/media/audio/services/device_registry/ring_buffer_server.h"
-#include "src/media/audio/services/device_registry/testing/fake_audio_driver.h"
+#include "src/media/audio/services/device_registry/testing/fake_stream_config.h"
 
 namespace media_audio {
 
@@ -42,14 +42,11 @@ inline void LogFidlClientError(fidl::UnbindInfo error, std::string tag = "") {
 // This provides shared unittest functions for AudioDeviceRegistry and the six FIDL server classes.
 class AudioDeviceRegistryServerTestBase : public gtest::TestLoopFixture {
  protected:
-  // Create a FakeAudioDriver that can mock a real device that has been detected, using default
-  // settings. From here, the fake driver can be customized before calling EnableFakeDriver().
-  std::unique_ptr<FakeAudioDriver> CreateFakeDriver() {
-    EXPECT_EQ(dispatcher(), test_loop().dispatcher());
-    zx::channel server_end, client_end;
-    EXPECT_EQ(ZX_OK, zx::channel::create(0, &server_end, &client_end));
-    return std::make_unique<FakeAudioDriver>(std::move(server_end), std::move(client_end),
-                                             dispatcher());
+  std::unique_ptr<FakeStreamConfig> CreateFakeStreamConfigInput() {
+    return CreateFakeStreamConfig(true);
+  }
+  std::unique_ptr<FakeStreamConfig> CreateFakeStreamConfigOutput() {
+    return CreateFakeStreamConfig(false);
   }
 
   // Device
@@ -215,6 +212,17 @@ class AudioDeviceRegistryServerTestBase : public gtest::TestLoopFixture {
 
   std::shared_ptr<media_audio::AudioDeviceRegistry> adr_service_ =
       std::make_shared<media_audio::AudioDeviceRegistry>(server_thread_);
+
+ private:
+  // Create a FakeStreamConfig that can mock a real device that has been detected, using default
+  // settings. From here, the fake StreamConfig can be customized before it is enabled.
+  std::unique_ptr<FakeStreamConfig> CreateFakeStreamConfig(bool is_input = false) {
+    EXPECT_EQ(dispatcher(), test_loop().dispatcher());
+    zx::channel server_end, client_end;
+    EXPECT_EQ(ZX_OK, zx::channel::create(0, &server_end, &client_end));
+    return std::make_unique<FakeStreamConfig>(std::move(server_end), std::move(client_end),
+                                              dispatcher());
+  }
 };
 
 }  // namespace media_audio

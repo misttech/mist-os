@@ -6,7 +6,7 @@
 
 #include "src/media/audio/services/device_registry/device.h"
 #include "src/media/audio/services/device_registry/device_unittest.h"
-#include "src/media/audio/services/device_registry/testing/fake_audio_driver.h"
+#include "src/media/audio/services/device_registry/testing/fake_stream_config.h"
 
 namespace media_audio {
 

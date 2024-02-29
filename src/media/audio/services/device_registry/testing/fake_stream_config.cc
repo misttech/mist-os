@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/media/audio/services/device_registry/testing/fake_audio_driver.h"
+#include "src/media/audio/services/device_registry/testing/fake_stream_config.h"
 
 #include <fuchsia/hardware/audio/cpp/fidl.h>
 #include <lib/fidl/cpp/binding.h>
@@ -21,20 +21,24 @@
 
 namespace media_audio {
 
-FakeAudioDriver::FakeAudioDriver(zx::channel server_end, zx::channel client_end,
-                                 async_dispatcher_t* dispatcher)
+namespace fha = fuchsia::hardware::audio;
+
+FakeStreamConfig::FakeStreamConfig(zx::channel server_end, zx::channel client_end,
+                                   async_dispatcher_t* dispatcher)
     : dispatcher_(dispatcher),
       stream_config_server_end_(std::move(server_end)),
       stream_config_client_end_(std::move(client_end)) {
-  ADR_LOG_OBJECT(kLogFakeAudioDriver || kLogObjectLifetimes);
+  ADR_LOG_OBJECT(kLogFakeStreamConfig || kLogObjectLifetimes);
 
   SetDefaultFormats();
 }
 
-FakeAudioDriver::~FakeAudioDriver() { ADR_LOG_OBJECT(kLogFakeAudioDriver || kLogObjectLifetimes); }
+FakeStreamConfig::~FakeStreamConfig() {
+  ADR_LOG_OBJECT(kLogFakeStreamConfig || kLogObjectLifetimes);
+}
 
-zx::channel FakeAudioDriver::Enable() {
-  ADR_LOG_OBJECT(kLogFakeAudioDriver);
+zx::channel FakeStreamConfig::Enable() {
+  ADR_LOG_OBJECT(kLogFakeStreamConfig);
 
   EXPECT_FALSE(stream_config_binding_);
   stream_config_binding_.emplace(this, std::move(stream_config_server_end_), dispatcher_);
@@ -43,15 +47,15 @@ zx::channel FakeAudioDriver::Enable() {
   return std::move(stream_config_client_end_);
 }
 
-void FakeAudioDriver::DropStreamConfig() {
-  ADR_LOG_OBJECT(kLogFakeAudioDriver);
+void FakeStreamConfig::DropStreamConfig() {
+  ADR_LOG_OBJECT(kLogFakeStreamConfig);
 
   stream_config_binding_->Close(ZX_ERR_PEER_CLOSED);
 }
 
-void FakeAudioDriver::InjectGainChange(fuchsia_hardware_audio::GainState gain_state) {
-  ADR_LOG_OBJECT(kLogFakeAudioDriver);
-  fuchsia::hardware::audio::GainState new_state;
+void FakeStreamConfig::InjectGainChange(fuchsia_hardware_audio::GainState gain_state) {
+  ADR_LOG_OBJECT(kLogFakeStreamConfig);
+  fha::GainState new_state;
   gain_state.gain_db() ? new_state.set_gain_db(*gain_state.gain_db()) : new_state;
   gain_state.muted() ? new_state.set_muted(*gain_state.muted()) : new_state;
   gain_state.agc_enabled() ? new_state.set_agc_enabled(*gain_state.agc_enabled()) : new_state;
@@ -59,8 +63,8 @@ void FakeAudioDriver::InjectGainChange(fuchsia_hardware_audio::GainState gain_st
   SetGain(std::move(new_state));
 }
 
-void FakeAudioDriver::InjectPlugChange(bool plugged, zx::time plug_time) {
-  ADR_LOG_OBJECT(kLogFakeAudioDriver)
+void FakeStreamConfig::InjectPlugChange(bool plugged, zx::time plug_time) {
+  ADR_LOG_OBJECT(kLogFakeStreamConfig)
       << "(" << (plugged ? "plugged" : "unplugged") << ", " << plug_time.get() << ")";
   if (!plugged_ || (*plugged_ != plugged && plug_time > plug_state_time_)) {
     plugged_ = plugged;
@@ -73,15 +77,15 @@ void FakeAudioDriver::InjectPlugChange(bool plugged, zx::time plug_time) {
   }
 }
 
-void FakeAudioDriver::DropRingBuffer() {
-  ADR_LOG_OBJECT(kLogFakeAudioDriver);
+void FakeStreamConfig::DropRingBuffer() {
+  ADR_LOG_OBJECT(kLogFakeStreamConfig);
   if (ring_buffer_binding_) {
     ring_buffer_binding_->Close(ZX_ERR_PEER_CLOSED);
   }
 }
 
-fzl::VmoMapper FakeAudioDriver::AllocateRingBuffer(size_t size) {
-  ADR_LOG_OBJECT(kLogFakeAudioDriver);
+fzl::VmoMapper FakeStreamConfig::AllocateRingBuffer(size_t size) {
+  ADR_LOG_OBJECT(kLogFakeStreamConfig);
 
   FX_CHECK(!ring_buffer_) << "Calling AllocateRingBuffer multiple times is not supported";
 
@@ -92,20 +96,18 @@ fzl::VmoMapper FakeAudioDriver::AllocateRingBuffer(size_t size) {
   return mapper;
 }
 
-void FakeAudioDriver::GetHealthState(
-    fuchsia::hardware::audio::StreamConfig::GetHealthStateCallback callback) {
-  fuchsia::hardware::audio::HealthState health_state;
+void FakeStreamConfig::GetHealthState(fha::StreamConfig::GetHealthStateCallback callback) {
+  fha::HealthState health_state;
   if (healthy_) {
     health_state.set_healthy(*healthy_);
   }
   callback(std::move(health_state));
 }
 
-void FakeAudioDriver::GetProperties(
-    fuchsia::hardware::audio::StreamConfig::GetPropertiesCallback callback) {
-  ADR_LOG_OBJECT(kLogFakeAudioDriver);
+void FakeStreamConfig::GetProperties(fha::StreamConfig::GetPropertiesCallback callback) {
+  ADR_LOG_OBJECT(kLogFakeStreamConfig);
 
-  fuchsia::hardware::audio::StreamProperties props = {};
+  fha::StreamProperties props = {};
 
   uid_ ? (void)std::memcpy(props.mutable_unique_id()->data(), uid_->data(), sizeof(uid_))
        : props.clear_unique_id();
@@ -142,35 +144,34 @@ void FakeAudioDriver::GetProperties(
   callback(std::move(props));
 }
 
-void FakeAudioDriver::GetSupportedFormats(
-    fuchsia::hardware::audio::StreamConfig::GetSupportedFormatsCallback callback) {
-  ADR_LOG_OBJECT(kLogFakeAudioDriver);
+void FakeStreamConfig::GetSupportedFormats(
+    fha::StreamConfig::GetSupportedFormatsCallback callback) {
+  ADR_LOG_OBJECT(kLogFakeStreamConfig);
 
-  auto supported_formats_count = channel_sets_.size();
-  if (sample_formats_.size() != supported_formats_count ||
-      bytes_per_sample_.size() != supported_formats_count ||
-      valid_bits_per_sample_.size() != supported_formats_count ||
-      frame_rates_.size() != supported_formats_count) {
+  auto ring_buffer_format_sets_count = channel_sets_.size();
+  if (sample_formats_.size() != ring_buffer_format_sets_count ||
+      bytes_per_sample_.size() != ring_buffer_format_sets_count ||
+      valid_bits_per_sample_.size() != ring_buffer_format_sets_count ||
+      frame_rates_.size() != ring_buffer_format_sets_count) {
     FX_LOGS(ERROR) << "Format vectors must be the same size";
   }
 
-  auto supported_formats =
-      std::vector<fuchsia::hardware::audio::SupportedFormats>(supported_formats_count);
-  for (auto supported_format_idx = 0u; supported_format_idx < supported_formats_count;
+  auto supported_formats = std::vector<fha::SupportedFormats>(ring_buffer_format_sets_count);
+  for (auto supported_format_idx = 0u; supported_format_idx < ring_buffer_format_sets_count;
        ++supported_format_idx) {
-    fuchsia::hardware::audio::SupportedFormats supported_format;
+    fha::SupportedFormats supported_format;
     if (channel_sets_[supported_format_idx] || sample_formats_[supported_format_idx] ||
         bytes_per_sample_[supported_format_idx] || valid_bits_per_sample_[supported_format_idx] ||
         frame_rates_[supported_format_idx]) {
-      fuchsia::hardware::audio::PcmSupportedFormats pcm_supported_formats;
+      fha::PcmSupportedFormats pcm_supported_formats;
       if (channel_sets_[supported_format_idx]) {
-        auto channel_sets = std::vector<fuchsia::hardware::audio::ChannelSet>(
-            channel_sets_[supported_format_idx]->size());
+        auto channel_sets =
+            std::vector<fha::ChannelSet>(channel_sets_[supported_format_idx]->size());
         for (auto channel_sets_idx = 0u;
              channel_sets_idx < channel_sets_[supported_format_idx]->size(); ++channel_sets_idx) {
-          fuchsia::hardware::audio::ChannelSet channel_set;
+          fha::ChannelSet channel_set;
           if (channel_sets_[supported_format_idx]->at(channel_sets_idx)) {
-            auto attribs = std::vector<fuchsia::hardware::audio::ChannelAttributes>(
+            auto attribs = std::vector<fha::ChannelAttributes>(
                 channel_sets_[supported_format_idx]->at(channel_sets_idx)->size());
             for (auto attributes_idx = 0u;
                  attributes_idx < channel_sets_[supported_format_idx]->at(channel_sets_idx)->size();
@@ -220,12 +221,11 @@ void FakeAudioDriver::GetSupportedFormats(
   callback(std::move(supported_formats));
 }
 
-void FakeAudioDriver::WatchGainState(
-    fuchsia::hardware::audio::StreamConfig::WatchGainStateCallback callback) {
-  ADR_LOG_OBJECT(kLogFakeAudioDriver);
+void FakeStreamConfig::WatchGainState(fha::StreamConfig::WatchGainStateCallback callback) {
+  ADR_LOG_OBJECT(kLogFakeStreamConfig);
 
   if (gain_has_changed_) {
-    fuchsia::hardware::audio::GainState gain_state = {};
+    fha::GainState gain_state = {};
     if (current_mute_) {
       gain_state.set_muted(*current_mute_);
     }
@@ -242,12 +242,11 @@ void FakeAudioDriver::WatchGainState(
   }
 }
 
-void FakeAudioDriver::WatchPlugState(
-    fuchsia::hardware::audio::StreamConfig::WatchPlugStateCallback callback) {
-  ADR_LOG_OBJECT(kLogFakeAudioDriver);
+void FakeStreamConfig::WatchPlugState(fha::StreamConfig::WatchPlugStateCallback callback) {
+  ADR_LOG_OBJECT(kLogFakeStreamConfig);
 
   if (plug_has_changed_) {
-    fuchsia::hardware::audio::PlugState plug_state = {};
+    fha::PlugState plug_state = {};
     if (plugged_) {
       plug_state.set_plugged(*plugged_);
     }
@@ -260,8 +259,8 @@ void FakeAudioDriver::WatchPlugState(
 }
 
 // Only generate a WatchGainState notification if this SetGain call represents an actual change.
-void FakeAudioDriver::SetGain(fuchsia::hardware::audio::GainState target_state) {
-  ADR_LOG_OBJECT(kLogFakeAudioDriver);
+void FakeStreamConfig::SetGain(fha::GainState target_state) {
+  ADR_LOG_OBJECT(kLogFakeStreamConfig);
   bool gain_notification_needed = false;
   if (target_state.has_gain_db() &&
       (!current_gain_db_ || *current_gain_db_ != target_state.gain_db())) {
@@ -285,10 +284,9 @@ void FakeAudioDriver::SetGain(fuchsia::hardware::audio::GainState target_state) 
   }
 }
 
-void FakeAudioDriver::CreateRingBuffer(
-    fuchsia::hardware::audio::Format format,
-    fidl::InterfaceRequest<fuchsia::hardware::audio::RingBuffer> ring_buffer_request) {
-  ADR_LOG_OBJECT(kLogFakeAudioDriver);
+void FakeStreamConfig::CreateRingBuffer(
+    fha::Format format, fidl::InterfaceRequest<fha::RingBuffer> ring_buffer_request) {
+  ADR_LOG_OBJECT(kLogFakeStreamConfig);
 
   ring_buffer_binding_.emplace(this, ring_buffer_request.TakeChannel(), dispatcher_);
   selected_format_ = format.pcm_format();
@@ -298,18 +296,16 @@ void FakeAudioDriver::CreateRingBuffer(
 }
 
 // For now, don't do anything with this. No response is needed so this should be OK even if called.
-void FakeAudioDriver::SignalProcessingConnect(
-    fidl::InterfaceRequest<fuchsia::hardware::audio::signalprocessing::SignalProcessing>
-        signal_processing_request) {
-  ADR_LOG_OBJECT(kLogFakeAudioDriver);
+void FakeStreamConfig::SignalProcessingConnect(
+    fidl::InterfaceRequest<fha::signalprocessing::SignalProcessing> signal_processing_request) {
+  ADR_LOG_OBJECT(kLogFakeStreamConfig);
 }
 
 // RingBuffer methods
-void FakeAudioDriver::GetProperties(
-    fuchsia::hardware::audio::RingBuffer::GetPropertiesCallback callback) {
-  ADR_LOG_OBJECT(kLogFakeAudioDriver);
+void FakeStreamConfig::GetProperties(fha::RingBuffer::GetPropertiesCallback callback) {
+  ADR_LOG_OBJECT(kLogFakeStreamConfig);
 
-  fuchsia::hardware::audio::RingBufferProperties props = {};
+  fha::RingBufferProperties props = {};
 
   if (needs_cache_flush_or_invalidate_.has_value()) {
     props.set_needs_cache_flush_or_invalidate(*needs_cache_flush_or_invalidate_);
@@ -323,8 +319,8 @@ void FakeAudioDriver::GetProperties(
   callback(std::move(props));
 }
 
-void FakeAudioDriver::SendPositionNotification(zx::time timestamp, uint32_t position) {
-  ADR_LOG_OBJECT(kLogFakeAudioDriver);
+void FakeStreamConfig::SendPositionNotification(zx::time timestamp, uint32_t position) {
+  ADR_LOG_OBJECT(kLogFakeStreamConfig);
 
   position_notify_timestamp_mono_ = timestamp;
   position_notify_position_bytes_ = position;
@@ -335,9 +331,9 @@ void FakeAudioDriver::SendPositionNotification(zx::time timestamp, uint32_t posi
   }
 }
 
-void FakeAudioDriver::WatchClockRecoveryPositionInfo(
-    fuchsia::hardware::audio::RingBuffer::WatchClockRecoveryPositionInfoCallback callback) {
-  ADR_LOG_OBJECT(kLogFakeAudioDriver);
+void FakeStreamConfig::WatchClockRecoveryPositionInfo(
+    fha::RingBuffer::WatchClockRecoveryPositionInfoCallback callback) {
+  ADR_LOG_OBJECT(kLogFakeStreamConfig);
 
   position_notify_callback_ = std::move(callback);
 
@@ -346,8 +342,8 @@ void FakeAudioDriver::WatchClockRecoveryPositionInfo(
   }
 }
 
-void FakeAudioDriver::PositionNotification() {
-  ADR_LOG_OBJECT(kLogFakeAudioDriver);
+void FakeStreamConfig::PositionNotification() {
+  ADR_LOG_OBJECT(kLogFakeStreamConfig);
 
   FX_CHECK(position_notify_callback_);
   FX_CHECK(position_notification_values_are_set_);
@@ -359,7 +355,7 @@ void FakeAudioDriver::PositionNotification() {
     auto callback = *std::move(position_notify_callback_);
     position_notify_callback_.reset();
 
-    fuchsia::hardware::audio::RingBufferPositionInfo info{
+    fha::RingBufferPositionInfo info{
         .timestamp = position_notify_timestamp_mono_.get(),
         .position = position_notify_position_bytes_,
     };
@@ -368,9 +364,9 @@ void FakeAudioDriver::PositionNotification() {
   }
 }
 
-void FakeAudioDriver::GetVmo(uint32_t min_frames, uint32_t clock_recovery_notifications_per_ring,
-                             fuchsia::hardware::audio::RingBuffer::GetVmoCallback callback) {
-  ADR_LOG_OBJECT(kLogFakeAudioDriver);
+void FakeStreamConfig::GetVmo(uint32_t min_frames, uint32_t clock_recovery_notifications_per_ring,
+                              fha::RingBuffer::GetVmoCallback callback) {
+  ADR_LOG_OBJECT(kLogFakeStreamConfig);
 
   // This should be true since it's set as part of creating the channel that's carrying these
   // messages.
@@ -391,16 +387,16 @@ void FakeAudioDriver::GetVmo(uint32_t min_frames, uint32_t clock_recovery_notifi
   auto frame_size = selected_format_->number_of_channels * selected_format_->bytes_per_sample;
   auto ring_buffer_frames = ring_buffer_size_ / frame_size;
 
-  fuchsia::hardware::audio::RingBuffer_GetVmo_Result result = {};
-  fuchsia::hardware::audio::RingBuffer_GetVmo_Response response = {};
+  fha::RingBuffer_GetVmo_Result result = {};
+  fha::RingBuffer_GetVmo_Response response = {};
   response.num_frames = static_cast<uint32_t>(ring_buffer_frames);
   response.ring_buffer = std::move(dup);
   result.set_response(std::move(response));
   callback(std::move(result));
 }
 
-void FakeAudioDriver::Start(fuchsia::hardware::audio::RingBuffer::StartCallback callback) {
-  ADR_LOG_OBJECT(kLogFakeAudioDriver);
+void FakeStreamConfig::Start(fha::RingBuffer::StartCallback callback) {
+  ADR_LOG_OBJECT(kLogFakeStreamConfig);
 
   EXPECT_TRUE(!is_running_);
   mono_start_time_ = zx::clock::get_monotonic();
@@ -409,8 +405,8 @@ void FakeAudioDriver::Start(fuchsia::hardware::audio::RingBuffer::StartCallback 
   callback(mono_start_time_.get());
 }
 
-void FakeAudioDriver::Stop(fuchsia::hardware::audio::RingBuffer::StopCallback callback) {
-  ADR_LOG_OBJECT(kLogFakeAudioDriver);
+void FakeStreamConfig::Stop(fha::RingBuffer::StopCallback callback) {
+  ADR_LOG_OBJECT(kLogFakeStreamConfig);
 
   EXPECT_TRUE(is_running_);
   is_running_ = false;
@@ -421,10 +417,9 @@ void FakeAudioDriver::Stop(fuchsia::hardware::audio::RingBuffer::StopCallback ca
   callback();
 }
 
-void FakeAudioDriver::SetActiveChannels(
-    uint64_t active_channels_bitmask,
-    fuchsia::hardware::audio::RingBuffer::SetActiveChannelsCallback callback) {
-  ADR_LOG_OBJECT(kLogFakeAudioDriver);
+void FakeStreamConfig::SetActiveChannels(uint64_t active_channels_bitmask,
+                                         fha::RingBuffer::SetActiveChannelsCallback callback) {
+  ADR_LOG_OBJECT(kLogFakeStreamConfig);
 
   if (active_channels_supported_) {
     if (active_channels_bitmask != active_channels_bitmask_) {
@@ -440,11 +435,11 @@ void FakeAudioDriver::SetActiveChannels(
   }
 }
 
-void FakeAudioDriver::WatchDelayInfo(WatchDelayInfoCallback callback) {
-  ADR_LOG_OBJECT(kLogFakeAudioDriver);
+void FakeStreamConfig::WatchDelayInfo(WatchDelayInfoCallback callback) {
+  ADR_LOG_OBJECT(kLogFakeStreamConfig);
 
   if (delay_has_changed_) {
-    fuchsia::hardware::audio::DelayInfo delay_info = {};
+    fha::DelayInfo delay_info = {};
 
     if (internal_delay_) {
       delay_info.set_internal_delay(internal_delay_->to_nsecs());
@@ -461,8 +456,8 @@ void FakeAudioDriver::WatchDelayInfo(WatchDelayInfoCallback callback) {
 }
 
 // Trigger a delay-changed event, based on current internal_delay_/external_delay_ values.
-void FakeAudioDriver::InjectDelayUpdate(std::optional<zx::duration> internal_delay,
-                                        std::optional<zx::duration> external_delay) {
+void FakeStreamConfig::InjectDelayUpdate(std::optional<zx::duration> internal_delay,
+                                         std::optional<zx::duration> external_delay) {
   internal_delay_ = internal_delay;
   external_delay_ = external_delay;
 
