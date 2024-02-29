@@ -1,7 +1,8 @@
 {
   "name": "test.protocols",
   "experiments": [
-    "output_index_json"
+    "output_index_json",
+    "transitional_allow_list"
   ],
   "available": {
     "fuchsia": "LEGACY"
@@ -137,7 +138,7 @@
       "name": "test.protocols/AnotherDiscoverableProtocol",
       "location": {
         "filename": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
-        "line": 86,
+        "line": 105,
         "column": 17,
         "length": 27
       },
@@ -160,7 +161,7 @@
               },
               "location": {
                 "filename": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
-                "line": 85,
+                "line": 104,
                 "column": 15,
                 "length": 27
               }
@@ -168,7 +169,7 @@
           ],
           "location": {
             "filename": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
-            "line": 85,
+            "line": 104,
             "column": 1,
             "length": 42
           }
@@ -401,7 +402,7 @@
       "name": "test.protocols/DiscoverableProtocol",
       "location": {
         "filename": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
-        "line": 81,
+        "line": 100,
         "column": 17,
         "length": 20
       },
@@ -411,7 +412,7 @@
           "arguments": [],
           "location": {
             "filename": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
-            "line": 80,
+            "line": 99,
             "column": 1,
             "length": 13
           }
@@ -426,7 +427,7 @@
           "strict": true,
           "location": {
             "filename": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
-            "line": 82,
+            "line": 101,
             "column": 12,
             "length": 6
           },
@@ -441,7 +442,7 @@
       "name": "test.protocols/HandleRightsProtocol",
       "location": {
         "filename": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
-        "line": 88,
+        "line": 107,
         "column": 17,
         "length": 20
       },
@@ -454,7 +455,7 @@
           "strict": true,
           "location": {
             "filename": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
-            "line": 89,
+            "line": 108,
             "column": 12,
             "length": 16
           },
@@ -483,7 +484,7 @@
           "strict": true,
           "location": {
             "filename": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
-            "line": 92,
+            "line": 111,
             "column": 12,
             "length": 14
           },
@@ -526,7 +527,7 @@
           "strict": true,
           "location": {
             "filename": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
-            "line": 97,
+            "line": 116,
             "column": 15,
             "length": 7
           },
@@ -555,7 +556,7 @@
       "name": "test.protocols/ManyParameters",
       "location": {
         "filename": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
-        "line": 127,
+        "line": 146,
         "column": 17,
         "length": 14
       },
@@ -568,7 +569,7 @@
           "strict": true,
           "location": {
             "filename": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
-            "line": 128,
+            "line": 147,
             "column": 12,
             "length": 7
           },
@@ -597,7 +598,7 @@
       "name": "test.protocols/MethodWithUnion",
       "location": {
         "filename": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
-        "line": 151,
+        "line": 170,
         "column": 17,
         "length": 15
       },
@@ -610,7 +611,7 @@
           "strict": true,
           "location": {
             "filename": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
-            "line": 152,
+            "line": 171,
             "column": 12,
             "length": 11
           },
@@ -719,6 +720,156 @@
             }
           },
           "has_response": false,
+          "is_composed": false,
+          "has_error": false
+        }
+      ]
+    },
+    {
+      "name": "test.protocols/Transitional",
+      "location": {
+        "filename": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
+        "line": 80,
+        "column": 17,
+        "length": 12
+      },
+      "openness": "closed",
+      "composed_protocols": [],
+      "methods": [
+        {
+          "ordinal": 5849263021838298888,
+          "name": "Request",
+          "strict": true,
+          "location": {
+            "filename": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
+            "line": 82,
+            "column": 12,
+            "length": 7
+          },
+          "has_request": true,
+          "maybe_attributes": [
+            {
+              "name": "transitional",
+              "arguments": [],
+              "location": {
+                "filename": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
+                "line": 81,
+                "column": 5,
+                "length": 13
+              }
+            }
+          ],
+          "maybe_request_payload": {
+            "kind": "identifier",
+            "identifier": "test.protocols/TransitionalRequestRequest",
+            "nullable": false,
+            "type_shape_v2": {
+              "inline_size": 8,
+              "alignment": 8,
+              "depth": 0,
+              "max_handles": 0,
+              "max_out_of_line": 0,
+              "has_padding": false,
+              "has_flexible_envelope": false
+            }
+          },
+          "has_response": true,
+          "maybe_response_payload": {
+            "kind": "identifier",
+            "identifier": "test.protocols/TransitionalRequestResponse",
+            "nullable": false,
+            "type_shape_v2": {
+              "inline_size": 8,
+              "alignment": 8,
+              "depth": 0,
+              "max_handles": 0,
+              "max_out_of_line": 0,
+              "has_padding": false,
+              "has_flexible_envelope": false
+            }
+          },
+          "is_composed": false,
+          "has_error": false
+        },
+        {
+          "ordinal": 4336658926562441191,
+          "name": "OneWay",
+          "strict": true,
+          "location": {
+            "filename": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
+            "line": 89,
+            "column": 12,
+            "length": 6
+          },
+          "has_request": true,
+          "maybe_attributes": [
+            {
+              "name": "transitional",
+              "arguments": [],
+              "location": {
+                "filename": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
+                "line": 88,
+                "column": 5,
+                "length": 13
+              }
+            }
+          ],
+          "maybe_request_payload": {
+            "kind": "identifier",
+            "identifier": "test.protocols/TransitionalOneWayRequest",
+            "nullable": false,
+            "type_shape_v2": {
+              "inline_size": 8,
+              "alignment": 8,
+              "depth": 0,
+              "max_handles": 0,
+              "max_out_of_line": 0,
+              "has_padding": false,
+              "has_flexible_envelope": false
+            }
+          },
+          "has_response": false,
+          "is_composed": false,
+          "has_error": false
+        },
+        {
+          "ordinal": 8507647465196374081,
+          "name": "Event",
+          "strict": true,
+          "location": {
+            "filename": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
+            "line": 94,
+            "column": 15,
+            "length": 5
+          },
+          "has_request": false,
+          "maybe_attributes": [
+            {
+              "name": "transitional",
+              "arguments": [],
+              "location": {
+                "filename": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
+                "line": 93,
+                "column": 5,
+                "length": 13
+              }
+            }
+          ],
+          "has_response": true,
+          "maybe_response_payload": {
+            "kind": "identifier",
+            "identifier": "test.protocols/TransitionalEventRequest",
+            "nullable": false,
+            "type_shape_v2": {
+              "inline_size": 8,
+              "alignment": 8,
+              "depth": 0,
+              "max_handles": 0,
+              "max_out_of_line": 0,
+              "has_padding": false,
+              "has_flexible_envelope": false
+            }
+          },
           "is_composed": false,
           "has_error": false
         }
@@ -1183,7 +1334,7 @@
       "name": "test.protocols/WithProtocolEnds",
       "location": {
         "filename": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
-        "line": 109,
+        "line": 128,
         "column": 17,
         "length": 16
       },
@@ -1196,7 +1347,7 @@
           "strict": true,
           "location": {
             "filename": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
-            "line": 110,
+            "line": 129,
             "column": 12,
             "length": 10
           },
@@ -1239,7 +1390,7 @@
           "strict": true,
           "location": {
             "filename": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
-            "line": 115,
+            "line": 134,
             "column": 12,
             "length": 10
           },
@@ -1282,7 +1433,7 @@
           "strict": true,
           "location": {
             "filename": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
-            "line": 120,
+            "line": 139,
             "column": 12,
             "length": 20
           },
@@ -1794,7 +1945,7 @@
       ],
       "location": {
         "filename": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
-        "line": 97,
+        "line": 116,
         "column": 23,
         "length": 95
       },
@@ -1820,7 +1971,7 @@
           "name": "h",
           "location": {
             "filename": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
-            "line": 98,
+            "line": 117,
             "column": 9,
             "length": 1
           },
@@ -1851,7 +2002,7 @@
       ],
       "location": {
         "filename": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
-        "line": 89,
+        "line": 108,
         "column": 29,
         "length": 95
       },
@@ -1877,7 +2028,7 @@
           "name": "h",
           "location": {
             "filename": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
-            "line": 90,
+            "line": 109,
             "column": 9,
             "length": 1
           },
@@ -1908,7 +2059,7 @@
       ],
       "location": {
         "filename": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
-        "line": 92,
+        "line": 111,
         "column": 27,
         "length": 95
       },
@@ -1934,7 +2085,7 @@
           "name": "h",
           "location": {
             "filename": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
-            "line": 93,
+            "line": 112,
             "column": 9,
             "length": 1
           },
@@ -1965,7 +2116,7 @@
       ],
       "location": {
         "filename": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
-        "line": 94,
+        "line": 113,
         "column": 12,
         "length": 73
       },
@@ -1991,7 +2142,7 @@
           "name": "h",
           "location": {
             "filename": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
-            "line": 95,
+            "line": 114,
             "column": 9,
             "length": 1
           },
@@ -2022,7 +2173,7 @@
       ],
       "location": {
         "filename": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
-        "line": 128,
+        "line": 147,
         "column": 20,
         "length": 275
       },
@@ -2044,7 +2195,7 @@
           "name": "p1",
           "location": {
             "filename": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
-            "line": 129,
+            "line": 148,
             "column": 9,
             "length": 2
           },
@@ -2070,7 +2221,7 @@
           "name": "p2",
           "location": {
             "filename": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
-            "line": 130,
+            "line": 149,
             "column": 9,
             "length": 2
           },
@@ -2096,7 +2247,7 @@
           "name": "p3",
           "location": {
             "filename": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
-            "line": 131,
+            "line": 150,
             "column": 9,
             "length": 2
           },
@@ -2122,7 +2273,7 @@
           "name": "p4",
           "location": {
             "filename": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
-            "line": 132,
+            "line": 151,
             "column": 9,
             "length": 2
           },
@@ -2148,7 +2299,7 @@
           "name": "p5",
           "location": {
             "filename": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
-            "line": 133,
+            "line": 152,
             "column": 9,
             "length": 2
           },
@@ -2174,7 +2325,7 @@
           "name": "p6",
           "location": {
             "filename": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
-            "line": 134,
+            "line": 153,
             "column": 9,
             "length": 2
           },
@@ -2200,7 +2351,7 @@
           "name": "p7",
           "location": {
             "filename": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
-            "line": 135,
+            "line": 154,
             "column": 9,
             "length": 2
           },
@@ -2226,7 +2377,7 @@
           "name": "p8",
           "location": {
             "filename": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
-            "line": 136,
+            "line": 155,
             "column": 9,
             "length": 2
           },
@@ -2252,7 +2403,7 @@
           "name": "p9",
           "location": {
             "filename": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
-            "line": 137,
+            "line": 156,
             "column": 9,
             "length": 2
           },
@@ -2278,7 +2429,7 @@
           "name": "p10",
           "location": {
             "filename": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
-            "line": 138,
+            "line": 157,
             "column": 9,
             "length": 3
           },
@@ -2304,7 +2455,7 @@
           "name": "p11",
           "location": {
             "filename": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
-            "line": 139,
+            "line": 158,
             "column": 9,
             "length": 3
           },
@@ -2330,7 +2481,7 @@
           "name": "p12",
           "location": {
             "filename": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
-            "line": 140,
+            "line": 159,
             "column": 9,
             "length": 3
           },
@@ -2356,7 +2507,7 @@
           "name": "p13",
           "location": {
             "filename": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
-            "line": 141,
+            "line": 160,
             "column": 9,
             "length": 3
           },
@@ -2382,7 +2533,7 @@
           "name": "p14",
           "location": {
             "filename": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
-            "line": 142,
+            "line": 161,
             "column": 9,
             "length": 3
           },
@@ -2408,7 +2559,7 @@
           "name": "p15",
           "location": {
             "filename": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
-            "line": 143,
+            "line": 162,
             "column": 9,
             "length": 3
           },
@@ -2439,7 +2590,7 @@
       ],
       "location": {
         "filename": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
-        "line": 152,
+        "line": 171,
         "column": 24,
         "length": 34
       },
@@ -2462,7 +2613,7 @@
           "name": "u",
           "location": {
             "filename": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
-            "line": 153,
+            "line": 172,
             "column": 9,
             "length": 1
           },
@@ -2493,7 +2644,7 @@
       ],
       "location": {
         "filename": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
-        "line": 154,
+        "line": 173,
         "column": 12,
         "length": 43
       },
@@ -2516,7 +2667,7 @@
           "name": "u",
           "location": {
             "filename": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
-            "line": 155,
+            "line": 174,
             "column": 9,
             "length": 1
           },
@@ -2545,7 +2696,7 @@
       ],
       "location": {
         "filename": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
-        "line": 102,
+        "line": 121,
         "column": 6,
         "length": 12
       },
@@ -2569,7 +2720,7 @@
           "name": "client",
           "location": {
             "filename": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
-            "line": 103,
+            "line": 122,
             "column": 5,
             "length": 6
           },
@@ -2597,7 +2748,7 @@
           "name": "server",
           "location": {
             "filename": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
-            "line": 104,
+            "line": 123,
             "column": 5,
             "length": 6
           },
@@ -2625,7 +2776,7 @@
           "name": "client_opt",
           "location": {
             "filename": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
-            "line": 105,
+            "line": 124,
             "column": 5,
             "length": 10
           },
@@ -2653,7 +2804,7 @@
           "name": "server_opt",
           "location": {
             "filename": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
-            "line": 106,
+            "line": 125,
             "column": 5,
             "length": 10
           },
@@ -2746,6 +2897,218 @@
       "is_empty_success_struct": false,
       "type_shape_v2": {
         "inline_size": 16,
+        "alignment": 8,
+        "depth": 0,
+        "max_handles": 0,
+        "max_out_of_line": 0,
+        "has_padding": false,
+        "has_flexible_envelope": false
+      }
+    },
+    {
+      "name": "test.protocols/TransitionalEventRequest",
+      "naming_context": [
+        "Transitional",
+        "Event",
+        "Request"
+      ],
+      "location": {
+        "filename": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
+        "line": 94,
+        "column": 21,
+        "length": 31
+      },
+      "members": [
+        {
+          "type": {
+            "kind": "primitive",
+            "subtype": "int64",
+            "type_shape_v2": {
+              "inline_size": 8,
+              "alignment": 8,
+              "depth": 0,
+              "max_handles": 0,
+              "max_out_of_line": 0,
+              "has_padding": false,
+              "has_flexible_envelope": false
+            }
+          },
+          "name": "x",
+          "location": {
+            "filename": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
+            "line": 95,
+            "column": 9,
+            "length": 1
+          },
+          "field_shape_v2": {
+            "offset": 0,
+            "padding": 0
+          }
+        }
+      ],
+      "resource": false,
+      "is_empty_success_struct": false,
+      "type_shape_v2": {
+        "inline_size": 8,
+        "alignment": 8,
+        "depth": 0,
+        "max_handles": 0,
+        "max_out_of_line": 0,
+        "has_padding": false,
+        "has_flexible_envelope": false
+      }
+    },
+    {
+      "name": "test.protocols/TransitionalOneWayRequest",
+      "naming_context": [
+        "Transitional",
+        "OneWay",
+        "Request"
+      ],
+      "location": {
+        "filename": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
+        "line": 89,
+        "column": 19,
+        "length": 31
+      },
+      "members": [
+        {
+          "type": {
+            "kind": "primitive",
+            "subtype": "int64",
+            "type_shape_v2": {
+              "inline_size": 8,
+              "alignment": 8,
+              "depth": 0,
+              "max_handles": 0,
+              "max_out_of_line": 0,
+              "has_padding": false,
+              "has_flexible_envelope": false
+            }
+          },
+          "name": "x",
+          "location": {
+            "filename": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
+            "line": 90,
+            "column": 9,
+            "length": 1
+          },
+          "field_shape_v2": {
+            "offset": 0,
+            "padding": 0
+          }
+        }
+      ],
+      "resource": false,
+      "is_empty_success_struct": false,
+      "type_shape_v2": {
+        "inline_size": 8,
+        "alignment": 8,
+        "depth": 0,
+        "max_handles": 0,
+        "max_out_of_line": 0,
+        "has_padding": false,
+        "has_flexible_envelope": false
+      }
+    },
+    {
+      "name": "test.protocols/TransitionalRequestRequest",
+      "naming_context": [
+        "Transitional",
+        "Request",
+        "Request"
+      ],
+      "location": {
+        "filename": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
+        "line": 82,
+        "column": 20,
+        "length": 31
+      },
+      "members": [
+        {
+          "type": {
+            "kind": "primitive",
+            "subtype": "int64",
+            "type_shape_v2": {
+              "inline_size": 8,
+              "alignment": 8,
+              "depth": 0,
+              "max_handles": 0,
+              "max_out_of_line": 0,
+              "has_padding": false,
+              "has_flexible_envelope": false
+            }
+          },
+          "name": "x",
+          "location": {
+            "filename": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
+            "line": 83,
+            "column": 9,
+            "length": 1
+          },
+          "field_shape_v2": {
+            "offset": 0,
+            "padding": 0
+          }
+        }
+      ],
+      "resource": false,
+      "is_empty_success_struct": false,
+      "type_shape_v2": {
+        "inline_size": 8,
+        "alignment": 8,
+        "depth": 0,
+        "max_handles": 0,
+        "max_out_of_line": 0,
+        "has_padding": false,
+        "has_flexible_envelope": false
+      }
+    },
+    {
+      "name": "test.protocols/TransitionalRequestResponse",
+      "naming_context": [
+        "Transitional",
+        "Request",
+        "Response"
+      ],
+      "location": {
+        "filename": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
+        "line": 84,
+        "column": 12,
+        "length": 31
+      },
+      "members": [
+        {
+          "type": {
+            "kind": "primitive",
+            "subtype": "int64",
+            "type_shape_v2": {
+              "inline_size": 8,
+              "alignment": 8,
+              "depth": 0,
+              "max_handles": 0,
+              "max_out_of_line": 0,
+              "has_padding": false,
+              "has_flexible_envelope": false
+            }
+          },
+          "name": "y",
+          "location": {
+            "filename": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
+            "line": 85,
+            "column": 9,
+            "length": 1
+          },
+          "field_shape_v2": {
+            "offset": 0,
+            "padding": 0
+          }
+        }
+      ],
+      "resource": false,
+      "is_empty_success_struct": false,
+      "type_shape_v2": {
+        "inline_size": 8,
         "alignment": 8,
         "depth": 0,
         "max_handles": 0,
@@ -3299,7 +3662,7 @@
       ],
       "location": {
         "filename": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
-        "line": 110,
+        "line": 129,
         "column": 23,
         "length": 67
       },
@@ -3323,7 +3686,7 @@
           "name": "in",
           "location": {
             "filename": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
-            "line": 111,
+            "line": 130,
             "column": 9,
             "length": 2
           },
@@ -3354,7 +3717,7 @@
       ],
       "location": {
         "filename": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
-        "line": 112,
+        "line": 131,
         "column": 12,
         "length": 80
       },
@@ -3378,7 +3741,7 @@
           "name": "out",
           "location": {
             "filename": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
-            "line": 113,
+            "line": 132,
             "column": 9,
             "length": 3
           },
@@ -3409,7 +3772,7 @@
       ],
       "location": {
         "filename": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
-        "line": 115,
+        "line": 134,
         "column": 23,
         "length": 79
       },
@@ -3433,7 +3796,7 @@
           "name": "in",
           "location": {
             "filename": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
-            "line": 116,
+            "line": 135,
             "column": 9,
             "length": 2
           },
@@ -3464,7 +3827,7 @@
       ],
       "location": {
         "filename": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
-        "line": 117,
+        "line": 136,
         "column": 12,
         "length": 68
       },
@@ -3488,7 +3851,7 @@
           "name": "out",
           "location": {
             "filename": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
-            "line": 118,
+            "line": 137,
             "column": 9,
             "length": 3
           },
@@ -3519,7 +3882,7 @@
       ],
       "location": {
         "filename": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
-        "line": 120,
+        "line": 139,
         "column": 33,
         "length": 48
       },
@@ -3542,7 +3905,7 @@
           "name": "in",
           "location": {
             "filename": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
-            "line": 121,
+            "line": 140,
             "column": 9,
             "length": 2
           },
@@ -3573,7 +3936,7 @@
       ],
       "location": {
         "filename": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
-        "line": 122,
+        "line": 141,
         "column": 12,
         "length": 49
       },
@@ -3596,7 +3959,7 @@
           "name": "out",
           "location": {
             "filename": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
-            "line": 123,
+            "line": 142,
             "column": 9,
             "length": 3
           },
@@ -3629,7 +3992,7 @@
       ],
       "location": {
         "filename": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
-        "line": 147,
+        "line": 166,
         "column": 6,
         "length": 8
       },
@@ -3653,7 +4016,7 @@
           },
           "location": {
             "filename": "../../tools/fidl/fidlc/testdata/protocols.test.fidl",
-            "line": 148,
+            "line": 167,
             "column": 8,
             "length": 1
           }
@@ -4003,6 +4366,11 @@
     "test.protocols/WithAndWithoutRequestResponseOnWithResponseRequest",
     "test.protocols/WithAndWithoutRequestResponseNoRequestWithResponseResponse",
     "test.protocols/WithAndWithoutRequestResponse",
+    "test.protocols/TransitionalRequestResponse",
+    "test.protocols/TransitionalRequestRequest",
+    "test.protocols/TransitionalOneWayRequest",
+    "test.protocols/TransitionalEventRequest",
+    "test.protocols/Transitional",
     "test.protocols/TheUnion",
     "test.protocols/MethodWithUnionUnionMethodRequest",
     "test.protocols/SyscallProtocolMethodCRequest",
@@ -4043,6 +4411,7 @@
     "test.protocols/ManyParameters": "protocol",
     "test.protocols/MethodWithUnion": "protocol",
     "test.protocols/SyscallProtocol": "protocol",
+    "test.protocols/Transitional": "protocol",
     "test.protocols/WithAndWithoutRequestResponse": "protocol",
     "test.protocols/WithErrorSyntax": "protocol",
     "test.protocols/WithProtocolEnds": "protocol",
@@ -4062,6 +4431,10 @@
     "test.protocols/MethodWithUnionUnionMethodResponse": "struct",
     "test.protocols/ProtocolEnds": "struct",
     "test.protocols/SyscallProtocolMethodCRequest": "struct",
+    "test.protocols/TransitionalEventRequest": "struct",
+    "test.protocols/TransitionalOneWayRequest": "struct",
+    "test.protocols/TransitionalRequestRequest": "struct",
+    "test.protocols/TransitionalRequestResponse": "struct",
     "test.protocols/WithAndWithoutRequestResponseNoRequestWithResponseResponse": "struct",
     "test.protocols/WithAndWithoutRequestResponseOnWithResponseRequest": "struct",
     "test.protocols/WithAndWithoutRequestResponseWithRequestEmptyResponseRequest": "struct",

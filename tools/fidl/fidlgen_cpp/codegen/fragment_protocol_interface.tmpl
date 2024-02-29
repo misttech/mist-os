@@ -46,7 +46,12 @@ class {{ .WireServer }} : public ::fidl::internal::IncomingMessageDispatcher
     {{- if eq .Transport.Name "Driver" }}
        fdf::Arena& arena,
     {{- end }}
-    {{ .WireCompleterArg }}& completer) = 0;
+    {{ .WireCompleterArg }}& completer)
+    {{- if .Transitional -}}
+      { completer.Close(ZX_ERR_NOT_SUPPORTED); }
+    {{- else -}}
+      = 0;
+    {{- end }}
 {{ "" }}
     {{- end }}
   {{- end }}
@@ -114,7 +119,12 @@ class {{ .NaturalServer }} : public ::fidl::internal::IncomingMessageDispatcher
         {{- .NaturalRequestAlias.Self }}& request,
       {{- end }}
       {{ .NaturalCompleterArg }}& completer
-  ) = 0;
+  )
+    {{- if .Transitional -}}
+      { completer.Close(ZX_ERR_NOT_SUPPORTED); }
+    {{- else -}}
+      = 0;
+    {{- end }}
 {{ "" }}
   {{- end }}
 

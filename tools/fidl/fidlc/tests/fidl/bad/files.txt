@@ -190,6 +190,7 @@ fi-0191.test.fidl
 fi-0192.test.fidl
 fi-0193.test.fidl
 fi-0201.test.fidl
+fi-0202.test.fidl
 fi-0203.test.fidl
 fi-0204.test.fidl
 fi-0205.test.fidl

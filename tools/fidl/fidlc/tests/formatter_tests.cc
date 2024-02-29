@@ -310,7 +310,7 @@ library foo.bar;
 
 protocol MyProtocol {
     /// Foo
-@custom // Bar
+@transitional // Bar
         MyMethod();
 };
 )FIDL";
@@ -321,7 +321,7 @@ library foo.bar;
 
 protocol MyProtocol {
     /// Foo
-    @custom // Bar
+    @transitional // Bar
     MyMethod();
 };
 )FIDL";

@@ -1,7 +1,8 @@
 {
   "name": "test.bitsconstants",
   "experiments": [
-    "output_index_json"
+    "output_index_json",
+    "transitional_allow_list"
   ],
   "available": {
     "fuchsia": "LEGACY"

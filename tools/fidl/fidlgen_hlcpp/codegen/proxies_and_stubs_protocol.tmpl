@@ -86,7 +86,11 @@ class {{ .Name }} {
     {{- end }}
     {{- if .HasRequest }}
       {{ .Docs }}
+      {{- if .Transitional }}
+  virtual void {{ template "RequestMethodSignature" . }} { }
+      {{- else }}
   virtual void {{ template "RequestMethodSignature" . }} = 0;
+      {{- end }}
     {{- end }}
   {{- end }}
 

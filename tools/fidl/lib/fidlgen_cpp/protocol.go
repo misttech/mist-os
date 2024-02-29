@@ -674,6 +674,7 @@ type methodInner struct {
 	ResponseIsResource        bool
 	ResponseName              fidlgen.EncodedCompoundIdentifier
 	ResponseAnonymousChildren []ScopedLayout
+	Transitional              bool
 	Result                    *Result
 }
 
@@ -1182,6 +1183,7 @@ func (c *compiler) compileProtocol(p fidlgen.Protocol) *Protocol {
 			ResponseIsResource:        responseIsResource,
 			ResponseName:              responsePayloadName,
 			ResponseAnonymousChildren: responseChildren,
+			Transitional:              v.IsTransitional(),
 			Result:                    result,
 		}, hlMessaging, wireTypeNames, p)
 		methods = append(methods, method)

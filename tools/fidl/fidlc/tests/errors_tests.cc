@@ -229,15 +229,11 @@ protocol Example {
   ASSERT_EQ(error_id->type_decl->kind, Decl::Kind::kTable);
 }
 
-TEST(ErrorsTests, TransitionalRemoved) {
-  TestLibrary library(R"FIDL(
-library example;
-protocol Example {
-    @transitional
-    Method();
-};
-)FIDL");
-  library.ExpectFail(ErrDeprecatedAttribute, "transitional");
+TEST(ErrorsTests, TransitionalAllowList) {
+  TestLibrary library;
+  library.AddFile("bad/fi-0202.test.fidl");
+  library.EnableFlag(ExperimentalFlag::kTransitionalAllowList);
+  library.ExpectFail(ErrTransitionalNotAllowed, "NewMethod");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 

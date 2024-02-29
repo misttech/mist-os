@@ -22,6 +22,7 @@ const (
 	WithCtxInterfaceSuffix        = "WithCtxInterface"
 	WithCtxInterfaceRequestSuffix = "WithCtxInterfaceRequest"
 	WithCtxStubSuffix             = "WithCtxStub"
+	WithCtxTransitionalBaseSuffix = "WithCtxTransitionalBase"
 
 	SyscallZxPackage = "syscall/zx"
 	SyscallZxAlias   = "_zx"
@@ -41,6 +42,7 @@ var reservedSuffixes = []string{
 	WithCtxInterfaceSuffix,
 	WithCtxInterfaceRequestSuffix,
 	WithCtxStubSuffix,
+	WithCtxTransitionalBaseSuffix,
 }
 
 // Type represents a golang type.
@@ -345,6 +347,10 @@ type Protocol struct {
 	// EventProxyName is the name of the event proxy type for this FIDL protocol.
 	EventProxyName string
 
+	// TransitionalBaseName is the name of the base implementation for transitional methods
+	// for this FIDL protocol.
+	TransitionalBaseName string
+
 	// RequestName is the name of the protocol request type for this FIDL protocol.
 	RequestName string
 
@@ -381,6 +387,9 @@ type Method struct {
 	// IsEvent is set to true if the method is an event. In this case, Response will always be
 	// non-nil while Request will always be nil. EventExpectName will also be non-empty.
 	IsEvent bool
+
+	// IsTransitional is set to true if the method has the Transitional attribute.
+	IsTransitional bool
 }
 
 // Payload is a method request or response. It can be a struct, table, or union.
@@ -1054,6 +1063,7 @@ func (c *compiler) compileMethod(protocolName fidlgen.EncodedCompoundIdentifier,
 		Response:        c.compilePayload(val.ResponsePayload),
 		EventExpectName: "Expect" + methodName,
 		IsEvent:         !val.HasRequest && val.HasResponse,
+		IsTransitional:  val.IsTransitional(),
 	}
 }
 
@@ -1108,6 +1118,7 @@ func (c *compiler) compileProtocol(val fidlgen.Protocol) Protocol {
 		Attributes:           val.Attributes,
 		Name:                 c.compileCompoundIdentifier(val.Name, true, WithCtxSuffix),
 		Openness:             val.Openness,
+		TransitionalBaseName: c.compileCompoundIdentifier(val.Name, true, WithCtxTransitionalBaseSuffix),
 		ProxyName:            c.compileCompoundIdentifier(val.Name, true, WithCtxInterfaceSuffix),
 		ProxyType:            proxyType,
 		StubName:             c.compileCompoundIdentifier(val.Name, true, WithCtxStubSuffix),
