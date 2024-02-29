@@ -439,6 +439,8 @@ sdk_molecule("core_bindlib") {
     "//src/devices/bind/fuchsia:fuchsia_sdk",
     "//src/devices/bind/fuchsia.arm.platform:fuchsia.arm.platform_sdk",
     "//src/devices/bind/fuchsia.devicetree:fuchsia.devicetree_sdk",
+    "//src/devices/bind/fuchsia.google.platform:fuchsia.google.platform_sdk",
+    "//src/devices/bind/fuchsia.khadas.platform:fuchsia.khadas.platform_sdk",
     "//src/devices/bind/fuchsia.nxp.platform:fuchsia.nxp.platform_sdk",
     "//src/devices/bind/fuchsia.platform:fuchsia.platform_sdk",
     "//src/devices/bind/fuchsia.sysmem:fuchsia.sysmem_sdk",

@@ -1,6 +1,8 @@
 bind_library://bind/fuchsia
 bind_library://bind/fuchsia.arm.platform
 bind_library://bind/fuchsia.devicetree
+bind_library://bind/fuchsia.google.platform
+bind_library://bind/fuchsia.khadas.platform
 bind_library://bind/fuchsia.nxp.platform
 bind_library://bind/fuchsia.platform
 bind_library://bind/fuchsia.sysmem
