@@ -32,7 +32,6 @@ group("tests") {
     "memory:tests",
     "process_explorer:tests",
     "remote-control:tests",
-    "ssh-key-manager:tests",
     "sshd-host:tests",
     "sys_info:tests",
   ]
