@@ -11,7 +11,7 @@ use {
     },
     bitflags::bitflags,
     fuchsia_zircon_sys as sys,
-    std::io::SeekFrom,
+    std::{io::SeekFrom, mem::MaybeUninit},
 };
 
 /// An object representing a Zircon [stream](https://fuchsia.dev/fuchsia-src/concepts/objects/stream.md).
@@ -57,23 +57,26 @@ impl Stream {
         unsafe { Ok(Stream::from(Handle::from_raw(handle))) }
     }
 
-    /// See [zx_stream_readv](https://fuchsia.dev/fuchsia-src/reference/syscalls/stream_readv)
-    pub fn readv(
+    /// Wraps the
+    /// [`zx_stream_readv`](https://fuchsia.dev/fuchsia-src/reference/syscalls/stream_readv)
+    /// syscall.
+    ///
+    /// # Safety
+    ///
+    /// The caller is responsible for ensuring that the buffers in `iovecs` point to valid (albeit
+    /// not necessarily initialized) memory.
+    pub unsafe fn readv(
         &self,
         options: StreamReadOptions,
-        buffers: &[&mut [u8]],
+        iovecs: &mut [sys::zx_iovec_t],
     ) -> Result<usize, Status> {
-        let mut iovec: Vec<_> = buffers
-            .iter()
-            .map(|b| sys::zx_iovec_t { buffer: b.as_ptr(), capacity: b.len() })
-            .collect();
         let mut actual = 0;
         let status = unsafe {
             sys::zx_stream_readv(
                 self.raw_handle(),
                 options.bits(),
-                iovec.as_mut_ptr(),
-                iovec.len(),
+                iovecs.as_mut_ptr(),
+                iovecs.len(),
                 &mut actual,
             )
         };
@@ -81,30 +84,107 @@ impl Stream {
         Ok(actual)
     }
 
-    /// See [zx_stream_readv_at](https://fuchsia.dev/fuchsia-src/reference/syscalls/stream_readv_at)
-    pub fn readv_at(
+    /// Attempts to read `buffer.len()` bytes from the stream starting at the stream's current seek
+    /// offset. Only the number of bytes read from the stream will be initialized in `buffer`.
+    /// Returns the number of bytes read from the stream.
+    ///
+    /// See [zx_stream_readv](https://fuchsia.dev/fuchsia-src/reference/syscalls/stream_readv).
+    pub fn read_uninit(
+        &self,
+        options: StreamReadOptions,
+        buffer: &mut [MaybeUninit<u8>],
+    ) -> Result<usize, Status> {
+        // TODO(https://fxbug.dev/42079723) use MaybeUninit::slice_as_mut_ptr when stable
+        let mut iovec =
+            [sys::zx_iovec_t { buffer: buffer.as_mut_ptr() as *mut u8, capacity: buffer.len() }];
+        // SAFETY: The buffer in `iovec` comes from a mutable slice so we know it's safe to pass it
+        // to `readv`.
+        unsafe { self.readv(options, &mut iovec) }
+    }
+
+    /// Attempts to read `length` bytes from the stream starting at the stream's current seek
+    /// offset. Returns the read bytes as a `Vec`.
+    ///
+    /// See [zx_stream_readv](https://fuchsia.dev/fuchsia-src/reference/syscalls/stream_readv).
+    pub fn read_to_vec(
+        &self,
+        options: StreamReadOptions,
+        length: usize,
+    ) -> Result<Vec<u8>, Status> {
+        let mut data = Vec::with_capacity(length);
+        let buffer = &mut data.spare_capacity_mut()[0..length];
+        let actual = self.read_uninit(options, buffer)?;
+        // SAFETY: read_uninit returns the number of bytes that were initialized.
+        unsafe { data.set_len(actual) };
+        Ok(data)
+    }
+
+    /// Wraps the
+    /// [`zx_stream_readv_at`](https://fuchsia.dev/fuchsia-src/reference/syscalls/stream_readv_at)
+    /// syscall.
+    ///
+    /// # Safety
+    ///
+    /// The caller is responsible for ensuring that the buffers in `iovecs` point to valid (albeit
+    /// not necessarily initialized) memory.
+    pub unsafe fn readv_at(
         &self,
         options: StreamReadOptions,
         offset: u64,
-        buffers: &[&mut [u8]],
+        iovecs: &mut [sys::zx_iovec_t],
     ) -> Result<usize, Status> {
-        let mut iovec: Vec<_> = buffers
-            .iter()
-            .map(|b| sys::zx_iovec_t { buffer: b.as_ptr(), capacity: b.len() })
-            .collect();
         let mut actual = 0;
         let status = unsafe {
             sys::zx_stream_readv_at(
                 self.raw_handle(),
                 options.bits(),
                 offset,
-                iovec.as_mut_ptr(),
-                iovec.len(),
+                iovecs.as_mut_ptr(),
+                iovecs.len(),
                 &mut actual,
             )
         };
         ok(status)?;
         Ok(actual)
+    }
+
+    /// Attempts to read `buffer.len()` bytes from the stream starting at `offset`. Only the number
+    /// of bytes read from the stream will be initialized in `buffer`. Returns the number of bytes
+    /// read from the stream.
+    ///
+    /// See
+    /// [zx_stream_readv_at](https://fuchsia.dev/fuchsia-src/reference/syscalls/stream_readv_at).
+    pub fn read_at_uninit(
+        &self,
+        options: StreamReadOptions,
+        offset: u64,
+        buffer: &mut [MaybeUninit<u8>],
+    ) -> Result<usize, Status> {
+        // TODO(https://fxbug.dev/42079723) Use MaybeUninit::slice_as_mut_ptr when stable.
+        let mut iovec =
+            [sys::zx_iovec_t { buffer: buffer.as_mut_ptr() as *mut u8, capacity: buffer.len() }];
+        // SAFETY: The buffer in `iovec` comes from a mutable slice so we know it's safe to pass it
+        // to `readv_at`.
+        unsafe { self.readv_at(options, offset, &mut iovec) }
+    }
+
+    /// Attempts to read `length` bytes from the stream starting at `offset`. Returns the read bytes
+    /// as a `Vec`.
+    ///
+    /// See
+    /// [zx_stream_readv_at](https://fuchsia.dev/fuchsia-src/reference/syscalls/stream_readv_at).
+    pub fn read_at_to_vec(
+        &self,
+        options: StreamReadOptions,
+        offset: u64,
+        length: usize,
+    ) -> Result<Vec<u8>, Status> {
+        let mut data = Vec::with_capacity(length);
+        let buffer = &mut data.spare_capacity_mut()[0..length];
+        let actual = self.read_at_uninit(options, offset, buffer)?;
+        // SAFETY: read_at_uninit returns the number of bytes that were initialized.
+        unsafe { data.set_len(actual) };
+        Ok(data)
     }
 
     /// See [zx_stream_seek](https://fuchsia.dev/fuchsia-src/reference/syscalls/stream_seek)
@@ -123,19 +203,21 @@ impl Stream {
         Ok(pos)
     }
 
-    /// See [zx_stream_writev](https://fuchsia.dev/fuchsia-src/reference/syscalls/stream_writev)
-    pub fn writev(&self, options: StreamWriteOptions, buffers: &[&[u8]]) -> Result<usize, Status> {
-        let iovec: Vec<_> = buffers
-            .iter()
-            .map(|b| sys::zx_iovec_t { buffer: b.as_ptr(), capacity: b.len() })
-            .collect();
+    /// Wraps the
+    /// [`zx_stream_writev`](https://fuchsia.dev/fuchsia-src/reference/syscalls/stream_writev)
+    /// syscall.
+    pub fn writev(
+        &self,
+        options: StreamWriteOptions,
+        iovecs: &[sys::zx_iovec_t],
+    ) -> Result<usize, Status> {
         let mut actual = 0;
         let status = unsafe {
             sys::zx_stream_writev(
                 self.raw_handle(),
                 options.bits(),
-                iovec.as_ptr(),
-                iovec.len(),
+                iovecs.as_ptr(),
+                iovecs.len(),
                 &mut actual,
             )
         };
@@ -143,30 +225,51 @@ impl Stream {
         Ok(actual)
     }
 
-    /// See [zx_stream_writev_at](https://fuchsia.dev/fuchsia-src/reference/syscalls/stream_writev_at)
+    /// Writes `buffer` to the stream at the stream's current seek offset. Returns the number of
+    /// bytes written.
+    ///
+    /// See [zx_stream_writev](https://fuchsia.dev/fuchsia-src/reference/syscalls/stream_writev).
+    pub fn write(&self, options: StreamWriteOptions, buffer: &[u8]) -> Result<usize, Status> {
+        let iovec = [sys::zx_iovec_t { buffer: buffer.as_ptr(), capacity: buffer.len() }];
+        self.writev(options, &iovec)
+    }
+
+    /// Wraps the
+    /// [`zx_stream_writev_at`](https://fuchsia.dev/fuchsia-src/reference/syscalls/stream_writev_at)
+    /// syscall.
     pub fn writev_at(
         &self,
         options: StreamWriteOptions,
         offset: u64,
-        buffers: &[&[u8]],
+        iovecs: &[sys::zx_iovec_t],
     ) -> Result<usize, Status> {
-        let iovec: Vec<_> = buffers
-            .iter()
-            .map(|b| sys::zx_iovec_t { buffer: b.as_ptr(), capacity: b.len() })
-            .collect();
         let mut actual = 0;
         let status = unsafe {
             sys::zx_stream_writev_at(
                 self.raw_handle(),
                 options.bits(),
                 offset,
-                iovec.as_ptr(),
-                iovec.len(),
+                iovecs.as_ptr(),
+                iovecs.len(),
                 &mut actual,
             )
         };
         ok(status)?;
         Ok(actual)
+    }
+
+    /// Writes `buffer` to the stream at `offset``. Returns the number of bytes written.
+    ///
+    /// See
+    /// [zx_stream_writev_at](https://fuchsia.dev/fuchsia-src/reference/syscalls/stream_writev_at).
+    pub fn write_at(
+        &self,
+        options: StreamWriteOptions,
+        offset: u64,
+        buffer: &[u8],
+    ) -> Result<usize, Status> {
+        let iovec = [sys::zx_iovec_t { buffer: buffer.as_ptr(), capacity: buffer.len() }];
+        self.writev_at(options, offset, &iovec)
     }
 }
 
@@ -239,5 +342,123 @@ mod tests {
         assert_eq!(stream.get_mode_append().unwrap(), 1);
         stream.set_mode_append(&0).unwrap();
         assert_eq!(stream.get_mode_append().unwrap(), 0);
+    }
+
+    #[test]
+    fn read_uninit() {
+        const DATA: &'static [u8] = b"vmo-contents";
+        let vmo = zx::Vmo::create(DATA.len() as u64).unwrap();
+        vmo.write(DATA, 0).unwrap();
+        let stream = Stream::create(StreamOptions::MODE_READ, &vmo, 0).unwrap();
+
+        // Read from the stream.
+        let mut data = Vec::with_capacity(5);
+        let bytes_read =
+            stream.read_uninit(StreamReadOptions::empty(), data.spare_capacity_mut()).unwrap();
+        assert_eq!(bytes_read, 5);
+        unsafe { data.set_len(5) };
+        assert_eq!(data, DATA[0..5]);
+
+        // Try to read more data than is available in the stream.
+        let mut data = Vec::with_capacity(10);
+        let bytes_read =
+            stream.read_uninit(StreamReadOptions::empty(), data.spare_capacity_mut()).unwrap();
+        assert_eq!(bytes_read, 7);
+        unsafe { data.set_len(7) };
+        assert_eq!(data, DATA[5..]);
+
+        // Try to read at the end of the stream.
+        let mut data = Vec::with_capacity(10);
+        let bytes_read =
+            stream.read_uninit(StreamReadOptions::empty(), data.spare_capacity_mut()).unwrap();
+        assert_eq!(bytes_read, 0);
+    }
+
+    #[test]
+    fn read_to_vec() {
+        const DATA: &'static [u8] = b"vmo-contents";
+        let vmo = zx::Vmo::create(DATA.len() as u64).unwrap();
+        vmo.write(DATA, 0).unwrap();
+        let stream = Stream::create(StreamOptions::MODE_READ, &vmo, 0).unwrap();
+
+        let data = stream.read_to_vec(StreamReadOptions::empty(), DATA.len()).unwrap();
+        assert_eq!(data, DATA);
+    }
+
+    #[test]
+    fn read_at_uninit() {
+        const DATA: &'static [u8] = b"vmo-contents";
+        let vmo = zx::Vmo::create(DATA.len() as u64).unwrap();
+        vmo.write(DATA, 0).unwrap();
+        let stream = Stream::create(StreamOptions::MODE_READ, &vmo, 0).unwrap();
+
+        // Read from the stream.
+        let mut data = Vec::with_capacity(5);
+        let bytes_read = stream
+            .read_at_uninit(StreamReadOptions::empty(), 0, data.spare_capacity_mut())
+            .unwrap();
+        assert_eq!(bytes_read, 5);
+        unsafe { data.set_len(5) };
+        assert_eq!(data, DATA[0..5]);
+
+        // Try to read beyond the end of the stream.
+        let mut data = Vec::with_capacity(10);
+        let bytes_read = stream
+            .read_at_uninit(StreamReadOptions::empty(), 5, data.spare_capacity_mut())
+            .unwrap();
+        assert_eq!(bytes_read, 7);
+        unsafe { data.set_len(7) };
+        assert_eq!(data, DATA[5..]);
+
+        // Try to read starting beyond the end of the stream.
+        let mut data = Vec::with_capacity(10);
+        let bytes_read = stream
+            .read_at_uninit(StreamReadOptions::empty(), 20, data.spare_capacity_mut())
+            .unwrap();
+        assert_eq!(bytes_read, 0);
+    }
+
+    #[test]
+    fn read_at_to_vec() {
+        const DATA: &'static [u8] = b"vmo-contents";
+        let vmo = zx::Vmo::create(DATA.len() as u64).unwrap();
+        vmo.write(DATA, 0).unwrap();
+        let stream = Stream::create(StreamOptions::MODE_READ, &vmo, 0).unwrap();
+
+        let data = stream.read_at_to_vec(StreamReadOptions::empty(), 5, DATA.len()).unwrap();
+        assert_eq!(data, DATA[5..]);
+    }
+
+    #[test]
+    fn write() {
+        const DATA: &'static [u8] = b"vmo-contents";
+        let vmo = zx::Vmo::create_with_opts(zx::VmoOptions::RESIZABLE, 0).unwrap();
+        let stream =
+            Stream::create(StreamOptions::MODE_READ | StreamOptions::MODE_WRITE, &vmo, 0).unwrap();
+
+        let bytes_written = stream.write(zx::StreamWriteOptions::empty(), DATA).unwrap();
+        assert_eq!(bytes_written, DATA.len());
+
+        let data = stream.read_at_to_vec(StreamReadOptions::empty(), 0, DATA.len()).unwrap();
+        assert_eq!(data, DATA);
+    }
+
+    #[test]
+    fn write_at() {
+        const DATA: &'static [u8] = b"vmo-contents";
+        let vmo = zx::Vmo::create_with_opts(zx::VmoOptions::RESIZABLE, 0).unwrap();
+        let stream =
+            Stream::create(StreamOptions::MODE_READ | StreamOptions::MODE_WRITE, &vmo, 0).unwrap();
+
+        let bytes_written =
+            stream.write_at(zx::StreamWriteOptions::empty(), 0, &DATA[0..3]).unwrap();
+        assert_eq!(bytes_written, 3);
+
+        let bytes_written =
+            stream.write_at(zx::StreamWriteOptions::empty(), 3, &DATA[3..]).unwrap();
+        assert_eq!(bytes_written, DATA.len() - 3);
+
+        let data = stream.read_at_to_vec(StreamReadOptions::empty(), 0, DATA.len()).unwrap();
+        assert_eq!(data, DATA);
     }
 }

@@ -389,23 +389,14 @@ mod stream_io {
     impl<T: 'static + File + GetVmo> IoOpHandler for StreamIoConnection<T> {
         async fn read(&mut self, count: u64) -> Result<Vec<u8>, Status> {
             let stream = self.stream.temp_clone();
-            unblock(move || {
-                let mut data = vec![0u8; count as usize];
-                let actual = stream.readv(zx::StreamReadOptions::empty(), &[&mut data])?;
-                data.truncate(actual);
-                Ok(data)
-            })
-            .await
+            unblock(move || stream.read_to_vec(zx::StreamReadOptions::empty(), count as usize))
+                .await
         }
 
         async fn read_at(&self, offset: u64, count: u64) -> Result<Vec<u8>, Status> {
             let stream = self.stream.temp_clone();
             unblock(move || {
-                let mut data = vec![0u8; count as usize];
-                let actual =
-                    stream.readv_at(zx::StreamReadOptions::empty(), offset, &[&mut data])?;
-                data.truncate(actual);
-                Ok(data)
+                stream.read_at_to_vec(zx::StreamReadOptions::empty(), offset, count as usize)
             })
             .await
         }
@@ -413,7 +404,7 @@ mod stream_io {
         async fn write(&mut self, data: Vec<u8>) -> Result<u64, Status> {
             let stream = self.stream.temp_clone();
             unblock(move || {
-                let actual = stream.writev(zx::StreamWriteOptions::empty(), &[&data])?;
+                let actual = stream.write(zx::StreamWriteOptions::empty(), &data)?;
                 Ok(actual as u64)
             })
             .await
@@ -422,7 +413,7 @@ mod stream_io {
         async fn write_at(&self, offset: u64, data: Vec<u8>) -> Result<u64, Status> {
             let stream = self.stream.temp_clone();
             unblock(move || {
-                let actual = stream.writev_at(zx::StreamWriteOptions::empty(), offset, &[&data])?;
+                let actual = stream.write_at(zx::StreamWriteOptions::empty(), offset, &data)?;
                 Ok(actual as u64)
             })
             .await
@@ -2064,12 +2055,9 @@ mod tests {
             else {
                 panic!("Missing stream")
             };
-            let mut buf = [0; 20];
-            assert_eq!(
-                stream.readv(zx::StreamReadOptions::empty(), &[&mut buf]).expect("readv failed"),
-                VMO_CONTENTS.len()
-            );
-            assert_eq!(&buf[..VMO_CONTENTS.len()], &VMO_CONTENTS[..]);
+            let contents =
+                stream.read_to_vec(zx::StreamReadOptions::empty(), 20).expect("read failed");
+            assert_eq!(contents, VMO_CONTENTS);
         }
 
         #[fuchsia::test]

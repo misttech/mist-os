@@ -307,7 +307,7 @@ pub async fn write_at(file: &FxFile, offset: u64, content: &[u8]) -> Result<usiz
     let content = content.to_vec();
     unblock(move || {
         stream
-            .writev_at(zx::StreamWriteOptions::empty(), offset, &[&content])
+            .write_at(zx::StreamWriteOptions::empty(), offset, &content)
             .context("stream write failed")
     })
     .await

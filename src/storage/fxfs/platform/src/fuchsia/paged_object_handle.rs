@@ -1283,7 +1283,7 @@ mod tests {
             let write_count: u64 = (FLUSH_BATCH_SIZE / page_size) * 2 + 10;
             for i in 0..write_count {
                 stream
-                    .writev_at(zx::StreamWriteOptions::empty(), i * page_size, &[&[0, 1, 2, 3, 4]])
+                    .write_at(zx::StreamWriteOptions::empty(), i * page_size, &[0, 1, 2, 3, 4])
                     .expect("write should succeed");
             }
         })
@@ -1330,7 +1330,7 @@ mod tests {
             let write_count: u64 = (FLUSH_BATCH_SIZE / page_size) * 2 + 10;
             for i in 0..write_count {
                 stream
-                    .writev_at(zx::StreamWriteOptions::empty(), i * page_size, &[&i.to_le_bytes()])
+                    .write_at(zx::StreamWriteOptions::empty(), i * page_size, &i.to_le_bytes())
                     .expect("write should succeed");
             }
         })
@@ -1381,11 +1381,7 @@ mod tests {
                 // Dirty lots of pages so multiple transactions are required.
                 for i in 0..(write_count * 2) {
                     stream
-                        .writev_at(
-                            zx::StreamWriteOptions::empty(),
-                            i * page_size,
-                            &[&[0, 1, 2, 3, 4]],
-                        )
+                        .write_at(zx::StreamWriteOptions::empty(), i * page_size, &[0, 1, 2, 3, 4])
                         .unwrap();
                 }
             })
@@ -1402,10 +1398,10 @@ mod tests {
                 // Write to every other page to force alternating zero and dirty pages.
                 for i in 0..write_count {
                     stream
-                        .writev_at(
+                        .write_at(
                             zx::StreamWriteOptions::empty(),
                             i * page_size * 2,
-                            &[&[0, 1, 2, 3, 4]],
+                            &[0, 1, 2, 3, 4],
                         )
                         .unwrap();
                 }
@@ -1417,7 +1413,7 @@ mod tests {
 
         // Touch a single page so another flush is required.
         unblock(move || {
-            stream.writev_at(zx::StreamWriteOptions::empty(), 0, &[&[0, 1, 2, 3, 4]]).unwrap()
+            stream.write_at(zx::StreamWriteOptions::empty(), 0, &[0, 1, 2, 3, 4]).unwrap()
         })
         .await;
 
@@ -1562,10 +1558,10 @@ mod tests {
 
         unblock(move || {
             stream
-                .writev_at(zx::StreamWriteOptions::empty(), MAX_FILE_SIZE - 1, &[&[1]])
+                .write_at(zx::StreamWriteOptions::empty(), MAX_FILE_SIZE - 1, &[1])
                 .expect("write should succeed");
             stream
-                .writev_at(zx::StreamWriteOptions::empty(), MAX_FILE_SIZE, &[&[1]])
+                .write_at(zx::StreamWriteOptions::empty(), MAX_FILE_SIZE, &[1])
                 .expect_err("write should fail");
         })
         .await;
