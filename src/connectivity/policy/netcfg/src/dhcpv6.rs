@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use std::{
-    boxed::Box,
     collections::{HashMap, HashSet},
     num::NonZeroU64,
     pin::Pin,

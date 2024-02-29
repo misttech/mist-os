@@ -129,11 +129,8 @@ mod test {
     use std::net::{Ipv4Addr, SocketAddr};
 
     use {
-        anyhow::Context,
         fuchsia_async::{self as fasync, net::TcpListener},
-        futures::{
-            future::Fuse, io::BufReader, AsyncBufReadExt, AsyncWriteExt, FutureExt, StreamExt,
-        },
+        futures::{future::Fuse, io::BufReader, AsyncBufReadExt, FutureExt, StreamExt},
         test_case::test_case,
     };
 

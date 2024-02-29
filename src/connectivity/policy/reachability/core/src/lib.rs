@@ -20,8 +20,7 @@ use {
     crate::route_table::{Route, RouteTable},
     crate::telemetry::{TelemetryEvent, TelemetrySender},
     anyhow::anyhow,
-    fidl_fuchsia_hardware_network, fidl_fuchsia_net_ext as fnet_ext,
-    fidl_fuchsia_net_interfaces as fnet_interfaces,
+    fidl_fuchsia_net_ext as fnet_ext, fidl_fuchsia_net_interfaces as fnet_interfaces,
     fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext, fuchsia_async as fasync,
     fuchsia_inspect::{Inspector, Node as InspectNode},
     fuchsia_zircon as zx,
@@ -1442,8 +1441,6 @@ mod tests {
             fetch::Fetch,
             neighbor_cache::{NeighborHealth, NeighborState},
             ping::Ping,
-            route_table::Route,
-            testutil,
         },
         async_trait::async_trait,
         diagnostics_assertions::assert_data_tree,
@@ -1451,7 +1448,7 @@ mod tests {
         futures::StreamExt as _,
         net_declare::{fidl_ip, fidl_subnet, std_ip, std_socket_addr},
         net_types::ip,
-        std::{net::IpAddr, task::Poll},
+        std::task::Poll,
         test_case::test_case,
     };
 

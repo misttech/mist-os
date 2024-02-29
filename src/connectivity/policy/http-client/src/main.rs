@@ -11,8 +11,6 @@ use {
     fuchsia_hyper as fhyper,
     fuchsia_zircon::{self as zx, AsHandleRef},
     futures::{prelude::*, StreamExt},
-    hyper,
-    std::convert::TryFrom,
     std::str::FromStr as _,
     tracing::{debug, error, info, trace},
 };

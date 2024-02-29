@@ -15,7 +15,6 @@ mod virtualization;
 
 use ::dhcpv4::protocol::FromFidlExt as _;
 use std::{
-    boxed::Box,
     collections::{hash_map::Entry, HashMap, HashSet},
     fs, io,
     num::NonZeroU64,
