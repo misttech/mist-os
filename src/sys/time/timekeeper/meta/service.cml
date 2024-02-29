@@ -26,6 +26,19 @@
             ],
         },
         {
+            // Power management protocols.
+            protocol: [
+                "fuchsia.power.broker.Topology",
+                "fuchsia.power.system.ActivityGovernor",
+            ],
+
+            // Only used if the structured config option is set:
+            //      `power_topology_integration_enabled: true`
+            // See:
+            //      `//src/sys/time/timekeeper/config.shard.cml`
+            availability: "optional",
+        },
+        {
             directory: "dev-rtc",
             rights: [ "r*" ],
             path: "/dev/class/rtc",
