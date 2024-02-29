@@ -53,6 +53,7 @@ impl PlatformBacking {
         // TODO(b/319328255) -- Fix usage so lint no longer applies
         // TODO(https://fxbug.dev//327272548): remove `static_mut_ref` when we roll the toolchain.
         // `static_mut_refs` is the new name.
+        #[allow(renamed_and_removed_lints)]
         #[allow(unknown_lints)]
         #[allow(static_mut_refs)]
         #[allow(static_mut_ref)]

@@ -52,7 +52,9 @@ impl<OT: openthread::ot::Trel> DriverState<OT> {
     //         thread anyway, so it is going to be safe regardless.
     unsafe fn trel_enabled_ref() -> &'static mut bool {
         static mut TREL_ENABLED: bool = false;
+        #[allow(renamed_and_removed_lints)]
         #[allow(unknown_lints)]
+        #[allow(static_mut_refs)]
         #[allow(static_mut_ref)]
         &mut TREL_ENABLED
     }
