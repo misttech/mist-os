@@ -9,6 +9,7 @@ use linux_uapi::bpf_insn;
 
 pub type Register = u8;
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Source {
     Reg(Register),
     Value(u64),
@@ -24,220 +25,403 @@ impl From<&bpf_insn> for Source {
     }
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum DataWidth {
+    U8,
+    U16,
+    U32,
+    U64,
+}
+
+impl DataWidth {
+    pub fn bits(&self) -> usize {
+        match self {
+            Self::U8 => 8,
+            Self::U16 => 16,
+            Self::U32 => 32,
+            Self::U64 => 64,
+        }
+    }
+
+    pub fn bytes(&self) -> usize {
+        match self {
+            Self::U8 => 1,
+            Self::U16 => 2,
+            Self::U32 => 4,
+            Self::U64 => 8,
+        }
+    }
+
+    pub fn str(&self) -> &'static str {
+        match self {
+            Self::U8 => "b",
+            Self::U16 => "h",
+            Self::U32 => "w",
+            Self::U64 => "dw",
+        }
+    }
+}
+
 pub trait BpfVisitor {
-    type Context;
+    type Context<'a>;
 
-    fn add(&mut self, context: Self::Context, dst: Register, src: Source) -> Result<(), String>;
-    fn add64(&mut self, context: Self::Context, dst: Register, src: Source) -> Result<(), String>;
-    fn and(&mut self, context: Self::Context, dst: Register, src: Source) -> Result<(), String>;
-    fn and64(&mut self, context: Self::Context, dst: Register, src: Source) -> Result<(), String>;
-    fn arsh(&mut self, context: Self::Context, dst: Register, src: Source) -> Result<(), String>;
-    fn arsh64(&mut self, context: Self::Context, dst: Register, src: Source) -> Result<(), String>;
-    fn div(&mut self, context: Self::Context, dst: Register, src: Source) -> Result<(), String>;
-    fn div64(&mut self, context: Self::Context, dst: Register, src: Source) -> Result<(), String>;
-    fn lsh(&mut self, context: Self::Context, dst: Register, src: Source) -> Result<(), String>;
-    fn lsh64(&mut self, context: Self::Context, dst: Register, src: Source) -> Result<(), String>;
-    fn r#mod(&mut self, context: Self::Context, dst: Register, src: Source) -> Result<(), String>;
-    fn mod64(&mut self, context: Self::Context, dst: Register, src: Source) -> Result<(), String>;
-    fn mov(&mut self, context: Self::Context, dst: Register, src: Source) -> Result<(), String>;
-    fn mov64(&mut self, context: Self::Context, dst: Register, src: Source) -> Result<(), String>;
-    fn mul(&mut self, context: Self::Context, dst: Register, src: Source) -> Result<(), String>;
-    fn mul64(&mut self, context: Self::Context, dst: Register, src: Source) -> Result<(), String>;
-    fn or(&mut self, context: Self::Context, dst: Register, src: Source) -> Result<(), String>;
-    fn or64(&mut self, context: Self::Context, dst: Register, src: Source) -> Result<(), String>;
-    fn rsh(&mut self, context: Self::Context, dst: Register, src: Source) -> Result<(), String>;
-    fn rsh64(&mut self, context: Self::Context, dst: Register, src: Source) -> Result<(), String>;
-    fn sub(&mut self, context: Self::Context, dst: Register, src: Source) -> Result<(), String>;
-    fn sub64(&mut self, context: Self::Context, dst: Register, src: Source) -> Result<(), String>;
-    fn xor(&mut self, context: Self::Context, dst: Register, src: Source) -> Result<(), String>;
-    fn xor64(&mut self, context: Self::Context, dst: Register, src: Source) -> Result<(), String>;
-
-    fn neg(&mut self, context: Self::Context, dst: Register) -> Result<(), String>;
-    fn neg64(&mut self, context: Self::Context, dst: Register) -> Result<(), String>;
-
-    fn be(&mut self, context: Self::Context, dst: Register, width: u8) -> Result<(), String>;
-    fn le(&mut self, context: Self::Context, dst: Register, width: u8) -> Result<(), String>;
-
-    fn call_external(&mut self, context: Self::Context, index: u32) -> Result<(), String>;
-
-    fn exit(&mut self, context: Self::Context) -> Result<(), String>;
-
-    fn jump(&mut self, context: Self::Context, offset: i16) -> Result<(), String>;
-
-    fn jeq(
+    fn add<'a>(
         &mut self,
-        context: Self::Context,
+        context: &mut Self::Context<'a>,
         dst: Register,
         src: Source,
-        offset: i16,
     ) -> Result<(), String>;
-    fn jeq64(
+    fn add64<'a>(
         &mut self,
-        context: Self::Context,
+        context: &mut Self::Context<'a>,
         dst: Register,
         src: Source,
-        offset: i16,
     ) -> Result<(), String>;
-    fn jne(
+    fn and<'a>(
         &mut self,
-        context: Self::Context,
+        context: &mut Self::Context<'a>,
         dst: Register,
         src: Source,
-        offset: i16,
     ) -> Result<(), String>;
-    fn jne64(
+    fn and64<'a>(
         &mut self,
-        context: Self::Context,
+        context: &mut Self::Context<'a>,
         dst: Register,
         src: Source,
-        offset: i16,
     ) -> Result<(), String>;
-    fn jge(
+    fn arsh<'a>(
         &mut self,
-        context: Self::Context,
+        context: &mut Self::Context<'a>,
         dst: Register,
         src: Source,
-        offset: i16,
     ) -> Result<(), String>;
-    fn jge64(
+    fn arsh64<'a>(
         &mut self,
-        context: Self::Context,
+        context: &mut Self::Context<'a>,
         dst: Register,
         src: Source,
-        offset: i16,
     ) -> Result<(), String>;
-    fn jgt(
+    fn div<'a>(
         &mut self,
-        context: Self::Context,
+        context: &mut Self::Context<'a>,
         dst: Register,
         src: Source,
-        offset: i16,
     ) -> Result<(), String>;
-    fn jgt64(
+    fn div64<'a>(
         &mut self,
-        context: Self::Context,
+        context: &mut Self::Context<'a>,
         dst: Register,
         src: Source,
-        offset: i16,
     ) -> Result<(), String>;
-    fn jle(
+    fn lsh<'a>(
         &mut self,
-        context: Self::Context,
+        context: &mut Self::Context<'a>,
         dst: Register,
         src: Source,
-        offset: i16,
     ) -> Result<(), String>;
-    fn jle64(
+    fn lsh64<'a>(
         &mut self,
-        context: Self::Context,
+        context: &mut Self::Context<'a>,
         dst: Register,
         src: Source,
-        offset: i16,
     ) -> Result<(), String>;
-    fn jlt(
+    fn r#mod<'a>(
         &mut self,
-        context: Self::Context,
+        context: &mut Self::Context<'a>,
         dst: Register,
         src: Source,
-        offset: i16,
     ) -> Result<(), String>;
-    fn jlt64(
+    fn mod64<'a>(
         &mut self,
-        context: Self::Context,
+        context: &mut Self::Context<'a>,
         dst: Register,
         src: Source,
-        offset: i16,
     ) -> Result<(), String>;
-    fn jsge(
+    fn mov<'a>(
         &mut self,
-        context: Self::Context,
+        context: &mut Self::Context<'a>,
         dst: Register,
         src: Source,
-        offset: i16,
     ) -> Result<(), String>;
-    fn jsge64(
+    fn mov64<'a>(
         &mut self,
-        context: Self::Context,
+        context: &mut Self::Context<'a>,
         dst: Register,
         src: Source,
-        offset: i16,
     ) -> Result<(), String>;
-    fn jsgt(
+    fn mul<'a>(
         &mut self,
-        context: Self::Context,
+        context: &mut Self::Context<'a>,
         dst: Register,
         src: Source,
-        offset: i16,
     ) -> Result<(), String>;
-    fn jsgt64(
+    fn mul64<'a>(
         &mut self,
-        context: Self::Context,
+        context: &mut Self::Context<'a>,
         dst: Register,
         src: Source,
-        offset: i16,
     ) -> Result<(), String>;
-    fn jsle(
+    fn or<'a>(
         &mut self,
-        context: Self::Context,
+        context: &mut Self::Context<'a>,
         dst: Register,
         src: Source,
-        offset: i16,
     ) -> Result<(), String>;
-    fn jsle64(
+    fn or64<'a>(
         &mut self,
-        context: Self::Context,
+        context: &mut Self::Context<'a>,
         dst: Register,
         src: Source,
-        offset: i16,
     ) -> Result<(), String>;
-    fn jslt(
+    fn rsh<'a>(
         &mut self,
-        context: Self::Context,
+        context: &mut Self::Context<'a>,
         dst: Register,
         src: Source,
-        offset: i16,
     ) -> Result<(), String>;
-    fn jslt64(
+    fn rsh64<'a>(
         &mut self,
-        context: Self::Context,
+        context: &mut Self::Context<'a>,
         dst: Register,
         src: Source,
-        offset: i16,
     ) -> Result<(), String>;
-    fn jset(
+    fn sub<'a>(
         &mut self,
-        context: Self::Context,
+        context: &mut Self::Context<'a>,
         dst: Register,
         src: Source,
-        offset: i16,
     ) -> Result<(), String>;
-    fn jset64(
+    fn sub64<'a>(
         &mut self,
-        context: Self::Context,
+        context: &mut Self::Context<'a>,
         dst: Register,
         src: Source,
-        offset: i16,
+    ) -> Result<(), String>;
+    fn xor<'a>(
+        &mut self,
+        context: &mut Self::Context<'a>,
+        dst: Register,
+        src: Source,
+    ) -> Result<(), String>;
+    fn xor64<'a>(
+        &mut self,
+        context: &mut Self::Context<'a>,
+        dst: Register,
+        src: Source,
     ) -> Result<(), String>;
 
-    fn load(
+    fn neg<'a>(&mut self, context: &mut Self::Context<'a>, dst: Register) -> Result<(), String>;
+    fn neg64<'a>(&mut self, context: &mut Self::Context<'a>, dst: Register) -> Result<(), String>;
+
+    fn be<'a>(
         &mut self,
-        context: Self::Context,
+        context: &mut Self::Context<'a>,
+        dst: Register,
+        width: DataWidth,
+    ) -> Result<(), String>;
+    fn le<'a>(
+        &mut self,
+        context: &mut Self::Context<'a>,
+        dst: Register,
+        width: DataWidth,
+    ) -> Result<(), String>;
+
+    fn call_external<'a>(
+        &mut self,
+        context: &mut Self::Context<'a>,
+        index: u32,
+    ) -> Result<(), String>;
+
+    fn exit<'a>(&mut self, context: &mut Self::Context<'a>) -> Result<(), String>;
+
+    fn jump<'a>(&mut self, context: &mut Self::Context<'a>, offset: i16) -> Result<(), String>;
+
+    fn jeq<'a>(
+        &mut self,
+        context: &mut Self::Context<'a>,
+        dst: Register,
+        src: Source,
+        offset: i16,
+    ) -> Result<(), String>;
+    fn jeq64<'a>(
+        &mut self,
+        context: &mut Self::Context<'a>,
+        dst: Register,
+        src: Source,
+        offset: i16,
+    ) -> Result<(), String>;
+    fn jne<'a>(
+        &mut self,
+        context: &mut Self::Context<'a>,
+        dst: Register,
+        src: Source,
+        offset: i16,
+    ) -> Result<(), String>;
+    fn jne64<'a>(
+        &mut self,
+        context: &mut Self::Context<'a>,
+        dst: Register,
+        src: Source,
+        offset: i16,
+    ) -> Result<(), String>;
+    fn jge<'a>(
+        &mut self,
+        context: &mut Self::Context<'a>,
+        dst: Register,
+        src: Source,
+        offset: i16,
+    ) -> Result<(), String>;
+    fn jge64<'a>(
+        &mut self,
+        context: &mut Self::Context<'a>,
+        dst: Register,
+        src: Source,
+        offset: i16,
+    ) -> Result<(), String>;
+    fn jgt<'a>(
+        &mut self,
+        context: &mut Self::Context<'a>,
+        dst: Register,
+        src: Source,
+        offset: i16,
+    ) -> Result<(), String>;
+    fn jgt64<'a>(
+        &mut self,
+        context: &mut Self::Context<'a>,
+        dst: Register,
+        src: Source,
+        offset: i16,
+    ) -> Result<(), String>;
+    fn jle<'a>(
+        &mut self,
+        context: &mut Self::Context<'a>,
+        dst: Register,
+        src: Source,
+        offset: i16,
+    ) -> Result<(), String>;
+    fn jle64<'a>(
+        &mut self,
+        context: &mut Self::Context<'a>,
+        dst: Register,
+        src: Source,
+        offset: i16,
+    ) -> Result<(), String>;
+    fn jlt<'a>(
+        &mut self,
+        context: &mut Self::Context<'a>,
+        dst: Register,
+        src: Source,
+        offset: i16,
+    ) -> Result<(), String>;
+    fn jlt64<'a>(
+        &mut self,
+        context: &mut Self::Context<'a>,
+        dst: Register,
+        src: Source,
+        offset: i16,
+    ) -> Result<(), String>;
+    fn jsge<'a>(
+        &mut self,
+        context: &mut Self::Context<'a>,
+        dst: Register,
+        src: Source,
+        offset: i16,
+    ) -> Result<(), String>;
+    fn jsge64<'a>(
+        &mut self,
+        context: &mut Self::Context<'a>,
+        dst: Register,
+        src: Source,
+        offset: i16,
+    ) -> Result<(), String>;
+    fn jsgt<'a>(
+        &mut self,
+        context: &mut Self::Context<'a>,
+        dst: Register,
+        src: Source,
+        offset: i16,
+    ) -> Result<(), String>;
+    fn jsgt64<'a>(
+        &mut self,
+        context: &mut Self::Context<'a>,
+        dst: Register,
+        src: Source,
+        offset: i16,
+    ) -> Result<(), String>;
+    fn jsle<'a>(
+        &mut self,
+        context: &mut Self::Context<'a>,
+        dst: Register,
+        src: Source,
+        offset: i16,
+    ) -> Result<(), String>;
+    fn jsle64<'a>(
+        &mut self,
+        context: &mut Self::Context<'a>,
+        dst: Register,
+        src: Source,
+        offset: i16,
+    ) -> Result<(), String>;
+    fn jslt<'a>(
+        &mut self,
+        context: &mut Self::Context<'a>,
+        dst: Register,
+        src: Source,
+        offset: i16,
+    ) -> Result<(), String>;
+    fn jslt64<'a>(
+        &mut self,
+        context: &mut Self::Context<'a>,
+        dst: Register,
+        src: Source,
+        offset: i16,
+    ) -> Result<(), String>;
+    fn jset<'a>(
+        &mut self,
+        context: &mut Self::Context<'a>,
+        dst: Register,
+        src: Source,
+        offset: i16,
+    ) -> Result<(), String>;
+    fn jset64<'a>(
+        &mut self,
+        context: &mut Self::Context<'a>,
+        dst: Register,
+        src: Source,
+        offset: i16,
+    ) -> Result<(), String>;
+
+    fn load<'a>(
+        &mut self,
+        context: &mut Self::Context<'a>,
         dst: Register,
         offset: i16,
         src: Register,
-        width: u8,
+        width: DataWidth,
     ) -> Result<(), String>;
 
-    fn store(
+    fn load64<'a>(
         &mut self,
-        context: Self::Context,
+        context: &mut Self::Context<'a>,
+        dst: Register,
+        value: u64,
+        jump_offset: i16,
+    ) -> Result<(), String>;
+
+    fn store<'a>(
+        &mut self,
+        context: &mut Self::Context<'a>,
         dst: Register,
         offset: i16,
         src: Source,
-        width: u8,
+        width: DataWidth,
     ) -> Result<(), String>;
 
-    fn visit(&mut self, context: Self::Context, code: &[bpf_insn]) -> Result<(), String> {
+    fn visit<'a>(
+        &mut self,
+        context: &mut Self::Context<'a>,
+        code: &[bpf_insn],
+    ) -> Result<(), String> {
         if code.is_empty() {
             return Err("incomplete instruction".to_string());
         }
@@ -442,7 +626,9 @@ pub trait BpfVisitor {
                     EBPF_ALU_OP_ENDIANNESS => {
                         let is_be = instruction.code & EBPF_SRC_REG == EBPF_SRC_REG;
                         let width = match instruction.imm {
-                            16 | 32 | 64 => instruction.imm as u8,
+                            16 => DataWidth::U16,
+                            32 => DataWidth::U32,
+                            64 => DataWidth::U64,
                             _ => {
                                 return Err(format!(
                                     "invalid width for endianness operation: {}",
@@ -679,7 +865,7 @@ pub trait BpfVisitor {
                     let next_instruction = &code[1];
                     let value: u64 =
                         (instruction.imm as u64) | ((next_instruction.imm as u64) << 32);
-                    return self.mov64(context, instruction.dst_reg(), Source::Value(value));
+                    return self.load64(context, instruction.dst_reg(), value, 1);
                 }
                 // Other ld are not supported.
                 return invalid_op_code();
@@ -689,11 +875,11 @@ pub trait BpfVisitor {
                     // Unsupported instruction.
                     return invalid_op_code();
                 }
-                let width: u8 = match instruction.code & EBPF_SIZE_MASK {
-                    EBPF_SIZE_B => 1,
-                    EBPF_SIZE_H => 2,
-                    EBPF_SIZE_W => 4,
-                    EBPF_SIZE_DW => 8,
+                let width = match instruction.code & EBPF_SIZE_MASK {
+                    EBPF_SIZE_B => DataWidth::U8,
+                    EBPF_SIZE_H => DataWidth::U16,
+                    EBPF_SIZE_W => DataWidth::U32,
+                    EBPF_SIZE_DW => DataWidth::U64,
                     _ => unreachable!(),
                 };
                 if class == EBPF_CLS_LDX {
