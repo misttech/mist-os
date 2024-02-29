@@ -1802,7 +1802,7 @@ where
     match core_ctx {
         MaybeDualStack::NotDualStack((core_ctx, converter)) => {
             core_ctx.with_demux_mut(|DemuxState { socketmap }| {
-                let entry = socketmap
+                let mut entry = socketmap
                     .listeners_mut()
                     .entry(&I::into_demux_socket_id(id.clone()), converter.convert(addr))
                     .expect("invalid listener id");
@@ -1812,7 +1812,7 @@ where
         MaybeDualStack::DualStack((core_ctx, converter)) => match converter.convert(addr) {
             EitherStack::ThisStack(addr) => {
                 TcpDemuxContext::<I, _, _>::with_demux_mut(core_ctx, |DemuxState { socketmap }| {
-                    let entry = socketmap
+                    let mut entry = socketmap
                         .listeners_mut()
                         .entry(&I::into_demux_socket_id(id.clone()), addr)
                         .expect("invalid listener id");
@@ -1824,7 +1824,7 @@ where
                 TcpDemuxContext::<I::OtherVersion, _, _>::with_demux_mut(
                     core_ctx,
                     |DemuxState { socketmap }| {
-                        let entry = socketmap
+                        let mut entry = socketmap
                             .listeners_mut()
                             .entry(&demux_id, addr)
                             .expect("invalid listener id");

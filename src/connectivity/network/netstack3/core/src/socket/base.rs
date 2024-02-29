@@ -761,7 +761,7 @@ where
     }
 
     pub(crate) fn try_update_sharing(
-        self,
+        &mut self,
         old_sharing_state: &SocketType::SharingState,
         new_sharing_state: SocketType::SharingState,
     ) -> Result<(), UpdateSharingError>
@@ -769,7 +769,7 @@ where
         SocketType::AddrState: SocketMapAddrStateUpdateSharingSpec,
         S: SocketMapUpdateSharingPolicy<SocketType::Addr, SocketType::SharingState, I, D, A>,
     {
-        let Self { id, mut addr_entry, _marker } = self;
+        let Self { id, addr_entry, _marker } = self;
         let addr = SocketType::from_addr_vec_ref(addr_entry.key());
 
         S::allows_sharing_update(
@@ -790,7 +790,7 @@ where
                 };
 
                 value.try_update_sharing(
-                    SocketType::from_socket_id_ref(&id).clone(),
+                    SocketType::from_socket_id_ref(id).clone(),
                     &new_sharing_state,
                 )
             })
@@ -1557,7 +1557,7 @@ mod tests {
         let mut map = FakeBoundSocketMap::default();
         let mut fake_id_gen = FakeSocketIdGen::default();
         let addr = CONN_ADDR;
-        let entry = map
+        let mut entry = map
             .conns_mut()
             .try_insert(addr.clone(), 'a', Conn(fake_id_gen.next()))
             .expect("failed to insert");
@@ -1565,7 +1565,7 @@ mod tests {
         entry.try_update_sharing(&'a', 'd').expect("worked");
         // Updating sharing is only allowed if there are no other occupants at
         // the address.
-        let second_conn = map
+        let mut second_conn = map
             .conns_mut()
             .try_insert(addr.clone(), 'd', Conn(fake_id_gen.next()))
             .expect("can insert");
