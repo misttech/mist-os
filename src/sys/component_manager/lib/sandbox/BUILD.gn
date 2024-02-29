@@ -51,7 +51,6 @@ rustc_library("sandbox") {
     "src/handle.rs",
     "src/lib.rs",
     "src/open.rs",
-    "src/optional.rs",
     "src/receiver.rs",
     "src/registry.rs",
     "src/sender.rs",

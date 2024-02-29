@@ -44,7 +44,6 @@ pub enum Capability {
     Data(crate::Data),
     Directory(crate::Directory),
     OneShotHandle(crate::OneShotHandle),
-    Optional(crate::Optional),
     // The Router type is defined outside of this crate, so it needs to still be an
     // AnyCapability.
     // TODO(b/324870669): Move Router to the bedrock library.
@@ -70,7 +69,6 @@ impl Capability {
             Capability::Unit(s) => s.try_into_open(),
             Capability::Directory(s) => s.try_into_open(),
             Capability::OneShotHandle(s) => s.try_into_open(),
-            Capability::Optional(s) => s.try_into_open(),
         }
     }
 
@@ -85,7 +83,6 @@ impl Capability {
             Capability::Unit(s) => s.into_fidl(),
             Capability::Directory(s) => s.into_fidl(),
             Capability::OneShotHandle(s) => s.into_fidl(),
-            Capability::Optional(s) => s.into_fidl(),
         }
     }
 }
@@ -186,10 +183,6 @@ impl TryFrom<fsandbox::Capability> for Capability {
                 }
                 Ok(any)
             }
-            fsandbox::Capability::Optional(optional) => match optional.value {
-                Some(capability) => (*capability).try_into(),
-                None => Ok(crate::Optional::void().into()),
-            },
             fsandbox::CapabilityUnknown!() => Err(RemoteError::UnknownVariant),
         }
     }

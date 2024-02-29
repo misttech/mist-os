@@ -29,22 +29,16 @@ type DataCapability = flexible union {
     4: uint64 uint64;
 };
 
-type OptionalCapability = resource struct {
-    value Capability:optional;
-};
-
 type Capability = flexible resource union {
     1: unit @generated_name("UnitCapability") struct {};
-    2: opaque zx.Handle:EVENT;
-    3: handle client_end:HandleCapability;
-    4: data DataCapability;
-    5: cloneable client_end:fuchsia.unknown.Cloneable;
-    6: dictionary client_end:Dictionary;
-    7: sender client_end:Sender;
-    8: receiver server_end:Receiver;
-    9: open client_end:fuchsia.io.Openable;
-   10: directory client_end:fuchsia.io.Directory;
-   11: optional OptionalCapability;
+    2: handle client_end:HandleCapability;
+    3: data DataCapability;
+    4: cloneable client_end:fuchsia.unknown.Cloneable;
+    5: dictionary client_end:Dictionary;
+    6: sender client_end:Sender;
+    7: receiver server_end:Receiver;
+    8: open client_end:fuchsia.io.Openable;
+    9: directory client_end:fuchsia.io.Directory;
 };
 
 /// The key of a [`DictionaryItem`].
