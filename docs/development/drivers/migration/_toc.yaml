@@ -15,3 +15,7 @@ toc:
 - title: "2. Migrate from DFv1 to DFv2"
   path: /docs/development/drivers/migration/migrate-from-dfv1-to-dfv2.md
   step_group: driver_migration
+- title: "Extension"
+  section:
+  - title: "Set up the compat device server in a DFv2 driver"
+    path: /docs/development/drivers/migration/set-up-compat-device-server.md

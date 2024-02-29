@@ -15,7 +15,7 @@ enable your now-DFv2 driver to talk to other DFv1 drivers in the system.
 DFv1-to-DFv2 migration tasks are:
 
 - [Update dependencies from DDK to DFv2](#update-dependencies-from-ddk-to-dfv2)
-- ([Optional) Update dependencies for the compatibility shim](#update-dependencies-for-the-compatibility-shim)
+- [(Optional) Update dependencies for the compatibility shim](#update-dependencies-for-the-compatibility-shim)
 - [Update the driver interfaces from DFv1 to DFv2](#update-the-driver-interfaces-from-dfv1-to-dfv2)
 - [Use the DFv2 service discovery](#use-the-dfv2-service-discovery)
 - [Update component manifests of other drivers](#update-component-manifests-of-other-drivers)
@@ -62,6 +62,11 @@ or edge cases that may apply to your driver.
     (see [`banjo_server.h`][banjo-server-h]).
   - `compat::ConnectBanjo` makes it easier to connect to Banjo
     (see [`banjo_client.h`][banjo-client-h]).
+
+  Note: For more details on using the compatibility shim in a DFv2 driver
+  to talk to its descendant DFv1 drivers, see the
+  [Set up the compat device server in a DFv2 driver][set-up-compat-device-server]
+  guide under the Extension section.
 
 - **Can DFv2 drivers use the compatibility shim for composite nodes?**
 
@@ -1034,5 +1039,4 @@ All the **documentation pages** mentioned in this section:
 [driver-communication]: /docs/concepts/drivers/driver_communication.md
 [banjo-server-h]: https://cs.opensource.google/fuchsia/fuchsia/+/main:sdk/lib/driver/compat/cpp/banjo_server.h
 [banjo-client-h]: https://cs.opensource.google/fuchsia/fuchsia/+/main:sdk/lib/driver/compat/cpp/banjo_client.h
-
-
+[set-up-compat-device-server]: set-up-compat-device-server.md
