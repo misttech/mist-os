@@ -23,5 +23,12 @@
             to: "#audio_device_registry",
             subdir: "audio-output",
         },
+        {
+            directory: "dev-class",
+            from: "parent",
+            as: "dev-codec",
+            to: "#audio_device_registry",
+            subdir: "codec",
+        },
     ],
 }

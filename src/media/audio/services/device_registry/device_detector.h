@@ -6,6 +6,7 @@
 #define SRC_MEDIA_AUDIO_SERVICES_DEVICE_REGISTRY_DEVICE_DETECTOR_H_
 
 #include <fidl/fuchsia.audio.device/cpp/common_types.h>
+#include <fidl/fuchsia.audio.device/cpp/natural_types.h>
 #include <fidl/fuchsia.hardware.audio/cpp/fidl.h>
 #include <lib/fit/function.h>
 #include <lib/zx/result.h>
@@ -19,9 +20,8 @@
 
 namespace media_audio {
 
-using DeviceDetectionHandler =
-    std::function<void(std::string_view, fuchsia_audio_device::DeviceType,
-                       fidl::ClientEnd<fuchsia_hardware_audio::StreamConfig>)>;
+using DeviceDetectionHandler = std::function<void(
+    std::string_view, fuchsia_audio_device::DeviceType, fuchsia_audio_device::AudioDriverClient)>;
 
 // This class detects devices and invokes the provided handler for those devices. It uses two
 // file-system watchers that focus on the device file system (devfs), specifically the locations
@@ -41,10 +41,12 @@ class DeviceDetector {
 
   zx_status_t StartDeviceWatchers();
 
-  // Open a devnode at the given path; use its FDIO device channel as a StreamConfigConnector to
-  // connect (retrieve) the device's StreamConfig.
-  void StreamConfigFromDevFs(const fidl::ClientEnd<fuchsia_io::Directory>& dir,
-                             const std::string& name, fuchsia_audio_device::DeviceType device_type);
+  // Open a devnode at the given path; use its FDIO device channel as a Connector to
+  // connect (retrieve) the device's primary protocol (StreamConfig, etc).
+  template <typename ConnectorProtocolT, typename ProtocolT>
+  void AudioDriverClientFromDevFs(const fidl::ClientEnd<fuchsia_io::Directory>& dir,
+                                  const std::string& name,
+                                  fuchsia_audio_device::DeviceType device_type);
 
   DeviceDetectionHandler handler_;
   std::vector<std::unique_ptr<fsl::DeviceWatcher>> watchers_;

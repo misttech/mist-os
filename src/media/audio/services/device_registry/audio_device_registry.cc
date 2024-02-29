@@ -5,7 +5,7 @@
 #include "src/media/audio/services/device_registry/audio_device_registry.h"
 
 #include <fidl/fuchsia.audio.device/cpp/markers.h>
-#include <fidl/fuchsia.audio.device/cpp/wire.h>
+#include <fidl/fuchsia.audio.device/cpp/natural_types.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/fidl/cpp/wire/internal/transport.h>
 #include <lib/syslog/cpp/macros.h>
@@ -39,11 +39,30 @@ AudioDeviceRegistry::~AudioDeviceRegistry() { ADR_LOG_OBJECT(kLogObjectLifetimes
 zx_status_t AudioDeviceRegistry::StartDeviceDetection() {
   DeviceDetectionHandler device_detection_handler =
       [this](std::string_view name, fuchsia_audio_device::DeviceType device_type,
-             fidl::ClientEnd<fuchsia_hardware_audio::StreamConfig> stream_config_client) {
+             fuchsia_audio_device::AudioDriverClient audio_driver_client) {
         ADR_LOG_OBJECT(kLogDeviceDetection)
             << "detected Audio " << device_type << " '" << name << "'";
-        FX_CHECK(stream_config_client);
 
+        switch (audio_driver_client.Which()) {
+          case fuchsia_audio_device::AudioDriverClient::Tag::kCodecClient:
+            FX_CHECK(audio_driver_client.codec_client()->is_valid());
+            ADR_LOG_OBJECT(kLogDeviceDetection) << "Detected Codec device - doing nothing for now";
+            return;
+          case fuchsia_audio_device::AudioDriverClient::Tag::kStreamConfigClient:
+            FX_CHECK(audio_driver_client.stream_config_client()->is_valid());
+            break;
+          case fuchsia_audio_device::AudioDriverClient::Tag::kCompositeClient:
+            ADR_WARN_OBJECT() << "Composite device detection not yet supported";
+            return;
+          case fuchsia_audio_device::AudioDriverClient::Tag::kDaiClient:
+            ADR_WARN_OBJECT() << "Dai device detection not yet supported";
+            return;
+          default:
+            FX_CHECK(!audio_driver_client.IsUnknown());
+        }
+        // Eventually we will simply pass the audio_driver_client onward.
+        fidl::ClientEnd<fuchsia_hardware_audio::StreamConfig> stream_config_client{
+            audio_driver_client.stream_config_client()->TakeChannel()};
         AddDevice(Device::Create(this->shared_from_this(), thread_->dispatcher(), name, device_type,
                                  std::move(stream_config_client)));
       };

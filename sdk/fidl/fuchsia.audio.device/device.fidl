@@ -34,13 +34,43 @@ const MAX_COUNT_CHANNELS uint32 = fuchsia.hardware.audio.MAX_COUNT_CHANNELS_IN_R
 /// Maximum length of the strings for device, manufacturer and product names.
 const MAX_STRING_SIZE uint32 = fuchsia.hardware.audio.MAX_UI_STRING_SIZE;
 
-/// The device's type (e.g. directionality).
-type DeviceType = flexible enum {
-    /// The device is a source of audio streams.
-    INPUT = 1;
+/// The protocol channel used to configure and observe a device.
+type AudioDriverClient = flexible resource union {
+    /// Populated for drivers that use the `fuchsia_hardware_audio.Codec` interface.
+    1: codec_client client_end:fuchsia.hardware.audio.Codec;
 
-    /// The device is a destination for audio streams.
-    OUTPUT = 2;
+    /// Populated for drivers that use the `fuchsia_hardware_audio.Composite` interface.
+    2: composite_client client_end:fuchsia.hardware.audio.Composite;
+
+    /// Populated for drivers that use the `fuchsia_hardware_audio.Dai` interface.
+    3: dai_client client_end:fuchsia.hardware.audio.Dai;
+
+    /// Populated for drivers that use the `fuchsia_hardware_audio.StreamConfig` interface.
+    4: stream_config_client client_end:fuchsia.hardware.audio.StreamConfig;
+};
+
+/// The protocol used by the driver, and (if StreamConfig) its directionality.
+type DeviceType = flexible enum {
+    /// The device uses the `fuchsia.hardware.audio/Codec` protocol.
+    CODEC = 1;
+
+    /// The device uses the `fuchsia.hardware.audio/Composite` protocol.
+    COMPOSITE = 2;
+
+    /// The device uses the `fuchsia.hardware.audio/Dai` protocol.
+    DAI = 3;
+
+    /// The device uses `fuchsia.hardware.audio/StreamConfig` and is a source of audio streams.
+    // We maintain this enum as entirely distinct from `OUTPUT`, despite their using the same
+    // protocol, because the two device types are detected at entirely different devfs locations
+    // (`dev/class/audio-input` vs. `dev/class/audio-output`).
+    INPUT = 4;
+
+    /// Device uses `fuchsia.hardware.audio/StreamConfig` and is a destination for audio streams.
+    // We maintain this enum as entirely distinct from `INPUT`, despite their using the same
+    // protocol, because the two device types are detected at entirely different devfs locations
+    // (`dev/class/audio-output` vs. `dev/class/audio-input`).
+    OUTPUT = 5;
 };
 
 /// This table contains vectors representing three dimensions of device

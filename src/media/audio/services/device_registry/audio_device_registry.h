@@ -13,9 +13,7 @@
 
 #include <cstdint>
 #include <memory>
-#include <unordered_map>
 #include <unordered_set>
-#include <vector>
 
 #include "src/media/audio/services/common/fidl_thread.h"
 #include "src/media/audio/services/common/vector_of_weak_ptr.h"

@@ -27,6 +27,11 @@
             rights: [ "r*" ],
             path: "/dev/class/audio-output",
         },
+        {
+            directory: "dev-codec",
+            rights: [ "r*" ],
+            path: "/dev/class/codec",
+        },
     ],
     expose: [
         {
