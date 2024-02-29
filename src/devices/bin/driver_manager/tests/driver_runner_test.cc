@@ -392,6 +392,28 @@ class DriverRunnerTest : public gtest::TestLoopFixture {
   TestDirectory& driver_dir() { return driver_dir_; }
   TestDriverHost& driver_host() { return driver_host_; }
 
+  fidl::WireClient<fuchsia_device::Controller> ConnectToDeviceController(
+      std::string_view child_name) {
+    fs::SynchronousVfs vfs(dispatcher());
+    zx::result dev_res = devfs().Connect(vfs);
+    EXPECT_EQ(dev_res.status_value(), ZX_OK);
+    fidl::WireClient<fuchsia_io::Directory> dev{std::move(*dev_res), dispatcher()};
+    zx::result controller_endpoints = fidl::CreateEndpoints<fuchsia_device::Controller>();
+    EXPECT_EQ(controller_endpoints.status_value(), ZX_OK);
+
+    auto device_controller_path = std::string(child_name) + "/device_controller";
+    EXPECT_EQ(
+        dev->Open(fuchsia_io::OpenFlags::kNotDirectory, {},
+                  fidl::StringView::FromExternal(device_controller_path),
+                  fidl::ServerEnd<fuchsia_io::Node>(controller_endpoints->server.TakeChannel()))
+            .status(),
+        ZX_OK);
+    EXPECT_TRUE(RunLoopUntilIdle());
+
+    return fidl::WireClient<fuchsia_device::Controller>{std::move(controller_endpoints->client),
+                                                        dispatcher()};
+  }
+
   fidl::ClientEnd<fuchsia_component::Realm> ConnectToRealm() {
     zx::result realm_endpoints = fidl::CreateEndpoints<fcomponent::Realm>();
     ZX_ASSERT(ZX_OK == realm_endpoints.status_value());
@@ -2076,24 +2098,14 @@ TEST_F(DriverRunnerTest, ConnectToDeviceController) {
   auto root_driver = StartRootDriver();
   ASSERT_EQ(ZX_OK, root_driver.status_value());
 
+  const char* kChildName = "node-1";
   std::shared_ptr<CreatedChild> created_child =
-      root_driver->driver->AddChild("node-1", true, false);
+      root_driver->driver->AddChild(kChildName, true, false);
   EXPECT_TRUE(RunLoopUntilIdle());
 
-  fs::SynchronousVfs vfs(dispatcher());
-  zx::result dev_res = devfs().Connect(vfs);
-  ASSERT_TRUE(dev_res.is_ok());
-  fidl::WireClient<fuchsia_io::Directory> dev{std::move(*dev_res), dispatcher()};
-  zx::result controller_endpoints = fidl::CreateEndpoints<fuchsia_device::Controller>();
-  ASSERT_FALSE(controller_endpoints.is_error());
+  auto device_controller = ConnectToDeviceController(kChildName);
 
-  ASSERT_TRUE(
-      dev->Open(fuchsia_io::OpenFlags::kNotDirectory, {}, "node-1/device_controller",
-                fidl::ServerEnd<fuchsia_io::Node>(controller_endpoints->server.TakeChannel()))
-          .ok());
-  EXPECT_TRUE(RunLoopUntilIdle());
-  fidl::WireClient<fuchsia_device::Controller> device_controller{
-      std::move(controller_endpoints->client), dispatcher()};
+  // Call one of the device controller's method in order to verify that the controller works.
   device_controller->GetTopologicalPath().Then(
       [](fidl::WireUnownedResult<fuchsia_device::Controller::GetTopologicalPath>& reply) {
         ASSERT_EQ(reply.status(), ZX_OK);
@@ -2101,6 +2113,54 @@ TEST_F(DriverRunnerTest, ConnectToDeviceController) {
         ASSERT_EQ(reply.value()->path.get(), "dev/node-1");
       });
   EXPECT_TRUE(RunLoopUntilIdle());
+}
+
+// Start the root driver, add a child node, and verify that calling the child's device controller's
+// `ConnectToController` FIDL method works.
+TEST_F(DriverRunnerTest, ConnectToControllerFidlMethod) {
+  SetupDriverRunner();
+
+  auto root_driver = StartRootDriver();
+  ASSERT_EQ(ZX_OK, root_driver.status_value());
+
+  const char* kChildName = "node-1";
+  std::shared_ptr<CreatedChild> created_child =
+      root_driver->driver->AddChild(kChildName, true, false);
+  EXPECT_TRUE(RunLoopUntilIdle());
+
+  auto device_controller_1 = ConnectToDeviceController(kChildName);
+
+  zx::result controller_endpoints = fidl::CreateEndpoints<fuchsia_device::Controller>();
+  ASSERT_EQ(controller_endpoints.status_value(), ZX_OK);
+  fidl::OneWayStatus result =
+      device_controller_1->ConnectToController(std::move(controller_endpoints->server));
+  ASSERT_TRUE(RunLoopUntilIdle());
+  ASSERT_EQ(result.status(), ZX_OK);
+
+  fidl::WireClient<fuchsia_device::Controller> device_controller_2{
+      std::move(controller_endpoints->client), dispatcher()};
+
+  // Verify that the two device controllers connect to the same device server.
+  // This is done by verifying the topological paths returned by the device controllers are the
+  // same.
+  std::string topological_path_1;
+  device_controller_1->GetTopologicalPath().Then(
+      [&](fidl::WireUnownedResult<fuchsia_device::Controller::GetTopologicalPath>& reply) {
+        ASSERT_EQ(reply.status(), ZX_OK);
+        ASSERT_TRUE(reply->is_ok());
+        topological_path_1 = reply.value()->path.get();
+      });
+
+  std::string topological_path_2;
+  device_controller_2->GetTopologicalPath().Then(
+      [&](fidl::WireUnownedResult<fuchsia_device::Controller::GetTopologicalPath>& reply) {
+        ASSERT_EQ(reply.status(), ZX_OK);
+        ASSERT_TRUE(reply->is_ok());
+        topological_path_2 = reply.value()->path.get();
+      });
+
+  ASSERT_TRUE(RunLoopUntilIdle());
+  ASSERT_EQ(topological_path_1, topological_path_2);
 }
 
 TEST(CompositeServiceOfferTest, WorkingOffer) {

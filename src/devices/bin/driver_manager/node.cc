@@ -1261,7 +1261,9 @@ void Node::ConnectToDeviceFidl(ConnectToDeviceFidlRequestView request,
 
 void Node::ConnectToController(ConnectToControllerRequestView request,
                                ConnectToControllerCompleter::Sync& completer) {
-  completer.Close(ZX_ERR_NOT_SUPPORTED);
+  dev_controller_bindings_.AddBinding(
+      dispatcher_, fidl::ServerEnd<fuchsia_device::Controller>{std::move(request->server)}, this,
+      fidl::kIgnoreBindingClosure);
 }
 
 void Node::Bind(BindRequestView request, BindCompleter::Sync& completer) {
