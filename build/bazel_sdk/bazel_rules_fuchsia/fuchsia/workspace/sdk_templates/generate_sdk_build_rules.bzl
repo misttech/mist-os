@@ -476,6 +476,7 @@ _FUCHSIA_CPU_CONSTRAINT_MAP = {
 _FUCHSIA_CLANG_VARIANT_MAP = {
     "": "@fuchsia_clang//:novariant",
     "asan": "@fuchsia_clang//:asan_variant",
+    "hwasan": "@fuchsia_clang//:hwasan_variant",
 }
 
 # Maps a Fuchsia API level to the corresponding config_setting() label in

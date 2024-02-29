@@ -137,8 +137,13 @@ if (current_toolchain == default_toolchain) {
       # enough to fix the issue.
       exclude_variant_tags = [ "fuzzer" ]
 
-      # The Asan-based variant is needed to generate binaries for the SDK.
+      # The Asan-based variants are needed to generate binaries for the SDK.
       enable_variants = [ "asan" ]
+
+      # TODO(https://fxbug.dev/327442322): Support hwasan for x64 and riscv64.
+      if (target_cpu == "arm64") {
+        enable_variants += [ "hwasan" ]
+      }
     }
   }
 } else if (toolchain_variant.base ==

@@ -308,11 +308,17 @@ foreach(lib,
 # (and non-instrumented) version of the C library.
 
 sysroot_instrumented_libc_entries = []
-foreach(variant,
-        [
-          "",
-          "asan",
-        ]) {
+sysroot_variants = [
+  "",
+  "asan",
+]
+
+if (target_cpu == "arm64") {
+  # TODO(https://fxbug.dev/327442322): Support hwasan for x64 and riscv64.
+  sysroot_variants += [ "hwasan" ]
+}
+
+foreach(variant, sysroot_variants) {
   if (variant == "") {
     # Ensure that the non-instrumented version of libc.so distributed with
     # the SDK is the same as the system one (i.e. potentially built with

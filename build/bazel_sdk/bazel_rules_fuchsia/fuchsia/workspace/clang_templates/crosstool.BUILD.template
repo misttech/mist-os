@@ -118,6 +118,9 @@ filegroup(
             "lib/%s-unknown-fuchsia/asan/libc++.*" % cpu,
             "lib/%s-unknown-fuchsia/asan/libc++abi.*" % cpu,
             "lib/%s-unknown-fuchsia/asan/libunwind.*" % cpu,
+            "lib/%s-unknown-fuchsia/hwasan/libc++.*" % cpu,
+            "lib/%s-unknown-fuchsia/hwasan/libc++abi.*" % cpu,
+            "lib/%s-unknown-fuchsia/hwasan/libunwind.*" % cpu,
         ]),
     )
     for cpu in TARGET_CPUS
@@ -231,9 +234,13 @@ filegroup(
             # definition. An alternative would be to use a custom build_setting() target to set the sanitizer mode
             # instead, and use transitions to change it whenever needed.
             #
+            # asan runtime libraries
             "//:lib/clang/%{CLANG_VERSION}/lib/%s-unknown-fuchsia/libclang_rt.asan.so" % cpu,
             "//:lib/clang/%{CLANG_VERSION}/lib/%s-unknown-fuchsia/libclang_rt.asan-preinit.a" % cpu,
-            "//:lib/clang/%{CLANG_VERSION}/lib/%s-unknown-fuchsia/libclang_rt.asan_static.a" % cpu,
+
+            # hwasan runtime libraries
+            "//:lib/clang/%{CLANG_VERSION}/lib/%s-unknown-fuchsia/libclang_rt.hwasan.so" % cpu,
+            "//:lib/clang/%{CLANG_VERSION}/lib/%s-unknown-fuchsia/libclang_rt.hwasan-preinit.a" % cpu,
         ],
     )
     for cpu in TARGET_CPUS
@@ -306,6 +313,11 @@ fuchsia_package_resource_group(
                     "//:lib/aarch64-unknown-fuchsia/asan/libc++abi.so.1",
                     "//:lib/aarch64-unknown-fuchsia/asan/libunwind.so.1",
                 ],
+                ":arm_hwasan_variant": [
+                    "//:lib/aarch64-unknown-fuchsia/hwasan/libc++.so.2",
+                    "//:lib/aarch64-unknown-fuchsia/hwasan/libc++abi.so.1",
+                    "//:lib/aarch64-unknown-fuchsia/hwasan/libunwind.so.1",
+                ],
             },
             "x64": {
                 ":x86_novariant": [
@@ -318,6 +330,11 @@ fuchsia_package_resource_group(
                     "//:lib/x86_64-unknown-fuchsia/asan/libc++abi.so.1",
                     "//:lib/x86_64-unknown-fuchsia/asan/libunwind.so.1",
                 ],
+                ":x86_hwasan_variant": [
+                    "//:lib/x86_64-unknown-fuchsia/hwasan/libc++.so.2",
+                    "//:lib/x86_64-unknown-fuchsia/hwasan/libc++abi.so.1",
+                    "//:lib/x86_64-unknown-fuchsia/hwasan/libunwind.so.1",
+                ],
             },
             "riscv64": {
                 ":riscv64_novariant": [
@@ -329,6 +346,11 @@ fuchsia_package_resource_group(
                     "//:lib/riscv64-unknown-fuchsia/asan/libc++.so.2",
                     "//:lib/riscv64-unknown-fuchsia/asan/libc++abi.so.1",
                     "//:lib/riscv64-unknown-fuchsia/asan/libunwind.so.1",
+                ],
+                ":riscv64_hwasan_variant": [
+                    "//:lib/riscv64-unknown-fuchsia/hwasan/libc++.so.2",
+                    "//:lib/riscv64-unknown-fuchsia/hwasan/libc++abi.so.1",
+                    "//:lib/riscv64-unknown-fuchsia/hwasan/libunwind.so.1",
                 ],
             },
         },
@@ -343,14 +365,17 @@ fuchsia_package_resource_group(
             "arm64": {
                 ":arm_novariant": "../fuchsia_clang/lib/aarch64-unknown-fuchsia",
                 ":arm_asan_variant": "../fuchsia_clang/lib/aarch64-unknown-fuchsia/asan",
+                ":arm_hwasan_variant": "../fuchsia_clang/lib/aarch64-unknown-fuchsia/hwasan",
             },
             "x64": {
                 ":x86_novariant": "../fuchsia_clang/lib/x86_64-unknown-fuchsia",
                 ":x86_asan_variant": "../fuchsia_clang/lib/x86_64-unknown-fuchsia/asan",
+                ":x86_hwasan_variant": "../fuchsia_clang/lib/x86_64-unknown-fuchsia/hwasan",
             },
             "riscv64": {
                 ":riscv64_novariant": "../fuchsia_clang/lib/riscv64-unknown-fuchsia",
                 ":riscv64_asan_variant": "../fuchsia_clang/lib/riscv64-unknown-fuchsia/asan",
+                ":riscv64_hwasan_variant": "../fuchsia_clang/lib/riscv64-unknown-fuchsia/hwasan",
             },
         },
         sdk_constants.target_cpus,
@@ -366,15 +391,24 @@ fuchsia_package_resource_group(
                 ":arm_asan_variant": [
                     "//:lib/clang/%{CLANG_VERSION}/lib/aarch64-unknown-fuchsia/libclang_rt.asan.so",
                 ],
+                ":arm_hwasan_variant": [
+                    "//:lib/clang/%{CLANG_VERSION}/lib/aarch64-unknown-fuchsia/libclang_rt.hwasan.so",
+                ],
             },
             "x64": {
                 ":x86_asan_variant": [
                     "//:lib/clang/%{CLANG_VERSION}/lib/x86_64-unknown-fuchsia/libclang_rt.asan.so",
                 ],
+                ":x86_hwasan_variant": [
+                    "//:lib/clang/%{CLANG_VERSION}/lib/x86_64-unknown-fuchsia/libclang_rt.hwasan.so",
+                ],
             },
             "riscv64": {
                 ":riscv64_asan_variant": [
                     "//:lib/clang/%{CLANG_VERSION}/lib/riscv64-unknown-fuchsia/libclang_rt.asan.so",
+                ],
+                ":riscv64_hwasan_variant": [
+                    "//:lib/clang/%{CLANG_VERSION}/lib/riscv64-unknown-fuchsia/libclang_rt.hwasan.so",
                 ],
             },
         },
@@ -383,6 +417,7 @@ fuchsia_package_resource_group(
     ),
     dest = "lib" + select({
         ":asan_variant": "/asan",
+        ":hwasan_variant": "/hwasan",
         "//conditions:default": "",
     }),
     strip_prefix = fuchsia_cpu_select(
@@ -459,18 +494,37 @@ feature_flag(
     visibility = ["//visibility:private"],
 )
 
+feature_flag(
+    name = "hwasan_flag",
+    feature_name = "hwasan",
+    visibility = ["//visibility:private"],
+)
+
 config_setting(
     name = "novariant",
     flag_values = {
         ":asan_flag": "False",
+        ":hwasan_flag": "False",
+    },
+    visibility = ["//visibility:public"],
+)
+
+# IMPORTANT: The hwasan feature takes precedence over the asan one.
+# Keep this in sync with the definition of sanitizer_features in
+# @fuchsia_sdk_common/toolchains/clang/sanitizer.bzl
+config_setting(
+    name = "asan_variant",
+    flag_values = {
+        ":asan_flag": "True",
+        ":hwasan_flag": "False",
     },
     visibility = ["//visibility:public"],
 )
 
 config_setting(
-    name = "asan_variant",
+    name = "hwasan_variant",
     flag_values = {
-        ":asan_flag": "True",
+        ":hwasan_flag": "True",
     },
     visibility = ["//visibility:public"],
 )
@@ -492,6 +546,14 @@ selects.config_setting_group(
 )
 
 selects.config_setting_group(
+    name = "arm_hwasan_variant",
+    match_all = [
+        ":arm_build",
+        ":hwasan_variant",
+    ],
+)
+
+selects.config_setting_group(
     name = "x86_novariant",
     match_all = [
         ":x86_build",
@@ -508,6 +570,15 @@ selects.config_setting_group(
 )
 
 selects.config_setting_group(
+    name = "x86_hwasan_variant",
+    match_all = [
+        ":x86_build",
+        ":hwasan_variant",
+    ],
+)
+
+
+selects.config_setting_group(
     name = "riscv64_novariant",
     match_all = [
         ":riscv64_build",
@@ -520,5 +591,13 @@ selects.config_setting_group(
     match_all = [
         ":riscv64_build",
         ":asan_variant",
+    ],
+)
+
+selects.config_setting_group(
+    name = "riscv64_hwasan_variant",
+    match_all = [
+        ":riscv64_build",
+        ":hwasan_variant",
     ],
 )

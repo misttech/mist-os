@@ -557,7 +557,9 @@ template("bazel_action") {
     # Below are extra args to Bazel
 
     # Forward GN sanitizer configuration to Bazel
-    if (is_asan) {
+    if (is_hwasan) {
+      args += [ "--features=hwasan" ]
+    } else if (is_asan) {
       args += [ "--features=asan" ]
     }
     if (is_lsan) {
