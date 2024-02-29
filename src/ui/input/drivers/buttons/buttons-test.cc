@@ -29,6 +29,12 @@ static const buttons_gpio_config_t gpios_direct[] = {
      0,
      {.interrupt = {static_cast<uint32_t>(fuchsia_hardware_gpio::GpioFlags::kNoPull)}}}};
 
+static const buttons_gpio_config_t gpios_wakeable[] = {
+    {BUTTONS_GPIO_TYPE_INTERRUPT,
+     BUTTONS_GPIO_FLAG_WAKE_VECTOR,
+     {.interrupt = {static_cast<uint32_t>(fuchsia_hardware_gpio::GpioFlags::kNoPull)}}},
+};
+
 static const buttons_button_config_t buttons_multiple[] = {
     {BUTTONS_TYPE_DIRECT, BUTTONS_ID_VOLUME_UP, 0, 0, 0},
     {BUTTONS_TYPE_DIRECT, BUTTONS_ID_MIC_MUTE, 1, 0, 0},
@@ -103,17 +109,31 @@ static constexpr size_t kMaxGpioServers = 4;
 
 enum MetadataVersion : uint8_t {
   kMetadataSingleButtonDirect = 0,
+  kMetadataWakeable,
   kMetadataMultiple,
   kMetadataDuplicate,
   kMetadataMatrix,
   kMetadataPolled,
 };
 
+class LocalFakeGpio : public fake_gpio::FakeGpio {
+ public:
+  LocalFakeGpio() = default;
+  void SetExpectedInterruptFlags(uint32_t flags) { expected_interrupt_flags_ = flags; }
+
+ private:
+  void GetInterrupt(GetInterruptRequestView request,
+                    GetInterruptCompleter::Sync& completer) override {
+    EXPECT_EQ(request->flags, expected_interrupt_flags_);
+    FakeGpio::GetInterrupt(request, completer);
+  }
+  uint32_t expected_interrupt_flags_ = ZX_INTERRUPT_MODE_EDGE_HIGH;
+};
 struct IncomingNamespace {
   fdf_testing::TestNode node_{std::string("root")};
   fdf_testing::TestEnvironment env_{fdf::Dispatcher::GetCurrent()->get()};
   compat::DeviceServer device_server_;
-  fake_gpio::FakeGpio fake_gpio_servers_[kMaxGpioServers];
+  LocalFakeGpio fake_gpio_servers_[kMaxGpioServers];
 };
 
 class ButtonsTest : public zxtest::Test {
@@ -139,6 +159,11 @@ class ButtonsTest : public zxtest::Test {
           buttons_names = {"volume-up"};
           buttons = {buttons_direct, std::size(buttons_direct)};
           gpios = {gpios_direct, std::size(gpios_direct)};
+        } break;
+        case kMetadataWakeable: {
+          buttons_names = {"volume-up"};
+          buttons = {buttons_direct, std::size(buttons_direct)};
+          gpios = {gpios_wakeable, std::size(gpios_wakeable)};
         } break;
         case kMetadataMultiple: {
           buttons_names = {"volume-up", "mic-privacy", "cam-mute"};
@@ -254,6 +279,12 @@ class ButtonsTest : public zxtest::Test {
   void SetDefaultGpioReadResponse(size_t gpio_index, uint8_t read_data) {
     incoming_.SyncCall([&](IncomingNamespace* incoming) {
       incoming->fake_gpio_servers_[gpio_index].SetDefaultReadResponse(zx::ok(read_data));
+    });
+  }
+
+  void SetExpectedInterruptFlags(uint32_t flags) {
+    incoming_.SyncCall([&](IncomingNamespace* incoming) {
+      incoming->fake_gpio_servers_[0].SetExpectedInterruptFlags(flags);
     });
   }
 
@@ -565,6 +596,57 @@ TEST_F(ButtonsTest, CamMute) {
 
   fake_gpio_interrupts_[2].trigger(0, zx::clock::get_monotonic());
 
+  {
+    auto result = reader->ReadInputReports();
+    ASSERT_TRUE(result.ok());
+    ASSERT_TRUE(result->is_ok());
+    auto& reports = result->value()->reports;
+
+    ASSERT_EQ(reports.count(), 1);
+    auto& report = reports[0];
+
+    ASSERT_TRUE(report.has_event_time());
+    ASSERT_TRUE(report.has_consumer_control());
+    auto& consumer_control = report.consumer_control();
+
+    ASSERT_TRUE(consumer_control.has_pressed_buttons());
+    ASSERT_EQ(consumer_control.pressed_buttons().count(), 0);
+  }
+}
+
+TEST_F(ButtonsTest, DirectButtonWakeable) {
+  SetExpectedInterruptFlags(ZX_INTERRUPT_MODE_EDGE_HIGH | ZX_INTERRUPT_WAKE_VECTOR);
+
+  Init(kMetadataWakeable);
+
+  auto reader = GetReader();
+
+  // Push.
+  SetDefaultGpioReadResponse(0, 1);
+
+  fake_gpio_interrupts_[0].trigger(0, zx::clock::get_monotonic());
+  {
+    auto result = reader->ReadInputReports();
+    ASSERT_TRUE(result.ok());
+    ASSERT_TRUE(result->is_ok());
+    auto& reports = result->value()->reports;
+
+    ASSERT_EQ(reports.count(), 1);
+    auto& report = reports[0];
+
+    ASSERT_TRUE(report.has_event_time());
+    ASSERT_TRUE(report.has_consumer_control());
+    auto& consumer_control = report.consumer_control();
+
+    ASSERT_TRUE(consumer_control.has_pressed_buttons());
+    ASSERT_EQ(consumer_control.pressed_buttons().count(), 1);
+    EXPECT_EQ(consumer_control.pressed_buttons()[0],
+              fuchsia_input_report::wire::ConsumerControlButton::kVolumeUp);
+  }
+
+  // Release.
+  SetDefaultGpioReadResponse(0, 0);
+  fake_gpio_interrupts_[0].trigger(0, zx::clock::get_monotonic());
   {
     auto result = reader->ReadInputReports();
     ASSERT_TRUE(result.ok());

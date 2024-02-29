@@ -31,7 +31,7 @@ static const buttons_button_config_t buttons[] = {
 
 static const buttons_gpio_config_t gpios[] = {
     {BUTTONS_GPIO_TYPE_INTERRUPT,
-     BUTTONS_GPIO_FLAG_INVERTED,
+     BUTTONS_GPIO_FLAG_INVERTED | BUTTONS_GPIO_FLAG_WAKE_VECTOR,
      {.interrupt = {static_cast<uint32_t>(GpioFlags::kNoPull)}}},
 };
 

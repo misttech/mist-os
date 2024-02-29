@@ -31,6 +31,7 @@
 #define BUTTONS_GPIO_TYPE_POLL           0x03
 
 #define BUTTONS_GPIO_FLAG_INVERTED       0x80
+#define BUTTONS_GPIO_FLAG_WAKE_VECTOR    0x40
 // clang-format on
 
 typedef struct ButtonConfig {

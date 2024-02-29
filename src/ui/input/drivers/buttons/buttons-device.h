@@ -14,6 +14,7 @@
 #include <lib/zx/interrupt.h>
 #include <lib/zx/port.h>
 #include <lib/zx/timer.h>
+#include <zircon/syscalls-next.h>
 #include <zircon/threads.h>
 
 #include <ddk/metadata/buttons.h>

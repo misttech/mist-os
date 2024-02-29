@@ -434,8 +434,11 @@ zx_status_t ButtonsDevice::ConfigureInterrupt(uint32_t idx, uint64_t int_port) {
   }
 
   // We setup a trigger for the opposite of the current GPIO value.
-  fidl::WireResult interrupt_result =
-      gpio.client->GetInterrupt(current ? ZX_INTERRUPT_MODE_EDGE_LOW : ZX_INTERRUPT_MODE_EDGE_HIGH);
+  uint32_t flags =
+      (current ? ZX_INTERRUPT_MODE_EDGE_LOW : ZX_INTERRUPT_MODE_EDGE_HIGH) |
+      ((gpio.config.flags & BUTTONS_GPIO_FLAG_WAKE_VECTOR) ? ZX_INTERRUPT_WAKE_VECTOR : 0);
+
+  fidl::WireResult interrupt_result = gpio.client->GetInterrupt(flags);
   if (!interrupt_result.ok()) {
     FDF_LOG(ERROR, "Failed to send GetInterrupt request to gpio %u: %s", idx,
             interrupt_result.status_string());
