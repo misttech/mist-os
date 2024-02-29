@@ -54,20 +54,22 @@ def main():
     with open(main_file, "w", encoding="utf-8") as main_file_out:
         main_file_out.write(
             f"""
+from importlib.abc import Loader
 import importlib.util
 import importlib.machinery
 import os
 
-def _init():
+def _init() -> object:
     finder = importlib.machinery.PathFinder()
     spec = finder.find_spec('{shlib_source}', path=['{shlib_source_dir}', os.getcwd()])
     if spec is None:
         raise Exception('Couldn\\'t load library "{shlib_source}" from {shlib_source_dir} or CWD"')
     mod = importlib.util.module_from_spec(spec)
+    assert isinstance(spec.loader, Loader)
     spec.loader.exec_module(mod)
     return mod
 
-__all__ = _init().__dict__
+__all__ = list(_init().__dict__.keys())
 """
         )
     return 0

@@ -141,7 +141,6 @@ template("python_library") {
                ] + _full_source_paths
       script = "//build/python/mypy_checker.py"
       outputs = [ "${target_out_dir}/${target_name}.mypy_checked" ]
-      deps = [ ":${_library_infos_target}" ]
       args =
           # This source list includes only direct library sources, excluding
           # any dependencies.
@@ -151,6 +150,13 @@ template("python_library") {
             "--library_infos",
             rebase_path(_library_infos_json, root_build_dir),
           ]
+      deps = [ ":${_library_infos_target}" ]
+
+      # Required for generated sources like C extension wrappers.
+      deps += library_deps
+      if (defined(invoker.deps)) {
+        deps += invoker.deps
+      }
     }
   }
 }
