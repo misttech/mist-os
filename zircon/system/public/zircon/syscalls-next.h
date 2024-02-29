@@ -108,6 +108,12 @@ typedef struct zx_info_memory_attribution {
 
 // ====== End of kernel-based memory attribution support ====== //
 
+// ====== Wake vector support ====== //
+
+#define ZX_INTERRUPT_WAKE_VECTOR ((uint32_t)0x20)
+
+// ====== End wake vector support ====== //
+
 #ifndef _KERNEL
 
 #include <zircon/syscalls.h>

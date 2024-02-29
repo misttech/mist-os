@@ -11,6 +11,7 @@
 
 #include <dev/interrupt.h>
 #include <kernel/auto_preempt_disabler.h>
+#include <kernel/idle_power_thread.h>
 #include <object/port_dispatcher.h>
 #include <object/process_dispatcher.h>
 
@@ -132,6 +133,11 @@ void InterruptDispatcher::InterruptHandler() {
     }
     Signal();
     state_ = InterruptState::TRIGGERED;
+  }
+  if ((flags_ & INTERRUPT_WAKE_VECTOR) &&
+      (state_ == InterruptState::TRIGGERED || state_ == InterruptState::NEEDACK)) {
+    // Wake the system if it is in suspend. Ignored if the system is not in suspend.
+    IdlePowerThread::TriggerSystemWake();
   }
 }
 

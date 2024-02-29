@@ -9,6 +9,7 @@
 #include <lib/counters.h>
 #include <platform.h>
 #include <zircon/rights.h>
+#include <zircon/syscalls-next.h>
 
 #include <dev/interrupt.h>
 #include <fbl/alloc_checker.h>
@@ -40,7 +41,7 @@ zx_status_t InterruptEventDispatcher::Create(KernelHandle<InterruptDispatcher>* 
 
   uint32_t interrupt_flags = 0;
 
-  if (options & ~(ZX_INTERRUPT_REMAP_IRQ | ZX_INTERRUPT_MODE_MASK)) {
+  if (options & ~(ZX_INTERRUPT_REMAP_IRQ | ZX_INTERRUPT_MODE_MASK | ZX_INTERRUPT_WAKE_VECTOR)) {
     return ZX_ERR_INVALID_ARGS;
   }
 
@@ -85,7 +86,11 @@ zx_status_t InterruptEventDispatcher::Create(KernelHandle<InterruptDispatcher>* 
   }
 
   if (tm == IRQ_TRIGGER_MODE_LEVEL) {
-    interrupt_flags = INTERRUPT_UNMASK_PREWAIT | INTERRUPT_MASK_POSTWAIT;
+    interrupt_flags |= INTERRUPT_UNMASK_PREWAIT | INTERRUPT_MASK_POSTWAIT;
+  }
+
+  if (options & ZX_INTERRUPT_WAKE_VECTOR) {
+    interrupt_flags |= INTERRUPT_WAKE_VECTOR;
   }
 
   if (!default_mode) {

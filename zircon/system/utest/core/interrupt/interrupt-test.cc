@@ -10,6 +10,7 @@
 #include <lib/zx/vcpu.h>
 #include <lib/zx/vmar.h>
 #include <zircon/errors.h>
+#include <zircon/syscalls-next.h>
 #include <zircon/syscalls.h>
 #include <zircon/syscalls/iommu.h>
 #include <zircon/syscalls/object.h>
@@ -78,6 +79,14 @@ __asm__(
 #endif
     ".size ThreadEntry, . - ThreadEntry\n"
     ".popsection");
+
+// Tests that creating a virtual interrupt with wakeable set fails.
+TEST_F(InterruptTest, VirtualNotWakeable) {
+  zx::interrupt interrupt;
+  ASSERT_EQ(ZX_ERR_INVALID_ARGS,
+            zx::interrupt::create(*root_resource(), 0,
+                                  ZX_INTERRUPT_VIRTUAL | ZX_INTERRUPT_WAKE_VECTOR, &interrupt));
+}
 
 // Tests to bind interrupt to a non-bindable port
 TEST_F(InterruptTest, NonBindablePort) {

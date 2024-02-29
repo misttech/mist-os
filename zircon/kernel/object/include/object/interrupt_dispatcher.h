@@ -64,6 +64,8 @@ class InterruptDispatcher
   static constexpr uint32_t INTERRUPT_UNMASK_PREWAIT_UNLOCKED = (1u << 2);
   // The interrupt should be masked following waiting.
   static constexpr uint32_t INTERRUPT_MASK_POSTWAIT = (1u << 4);
+  // The interrupt may wake the system from suspend.
+  static constexpr uint32_t INTERRUPT_WAKE_VECTOR = (1u << 5);
 
  private:
   AutounsignalEvent event_;
