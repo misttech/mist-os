@@ -146,6 +146,25 @@ class Dispatcher {
 
   Unowned<Dispatcher> borrow() const { return Unowned<Dispatcher>(dispatcher_); }
 
+  // Removes the allow_sync option that was set on the dispatcher during creation.
+  // Calling this will remove the ability of the dispatcher to make any more synchronous calls.
+  //
+  // # Thread requirements
+  //
+  // This must be called from the |dispatcher|'s own context.
+  //
+  // # Errors
+  //
+  // ZX_ERR_BAD_STATE: Not called from the same context as the given dispatcher or the dispatcher
+  // is not in a running state.
+  //
+  // ZX_ERR_ALREADY_EXISTS: The dispatcher did not contain the allow_sync option. This can happen
+  // if this is called more than once, or if it was not created with that option.
+  zx::result<> SealAllowSync() {
+    return zx::make_result(
+        fdf_dispatcher_seal(dispatcher_, FDF_DISPATCHER_OPTION_ALLOW_SYNC_CALLS));
+  }
+
  protected:
   // Friend declaration is needed because the |DispatcherShutdownContext| is private.
   friend class fdf_env::DispatcherBuilder;

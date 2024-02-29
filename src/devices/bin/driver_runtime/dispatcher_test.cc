@@ -541,6 +541,73 @@ TEST_F(DispatcherTest, AllowSyncCallsDoesNotDirectlyCall) {
   WaitUntilIdle(blocking_dispatcher);
 }
 
+// Tests that a blocking dispatcher will not directly call into the next driver, but after sealing
+// the allow_sync option, it will.
+TEST_F(DispatcherTest, AllowSyncCallsDoesNotDirectlyCallUntilSealed) {
+  const void* blocking_driver = CreateFakeDriver();
+  fdf_dispatcher_t* blocking_dispatcher;
+  ASSERT_NO_FATAL_FAILURE(CreateDispatcher(FDF_DISPATCHER_OPTION_ALLOW_SYNC_CALLS, __func__, "",
+                                           blocking_driver, &blocking_dispatcher));
+
+  // Queue a blocking request.
+  libsync::Completion entered_callback;
+  libsync::Completion complete_blocking_read;
+  ASSERT_NO_FATAL_FAILURE(RegisterAsyncReadBlock(remote_ch_, blocking_dispatcher, &entered_callback,
+                                                 &complete_blocking_read));
+
+  {
+    // Simulate a driver writing a message to the driver with the blocking dispatcher.
+    driver_context::PushDriver(CreateFakeDriver());
+    auto pop_driver = fit::defer([]() { driver_context::PopDriver(); });
+
+    // This is a non reentrant call, but we still shouldn't call into the driver directly.
+    ASSERT_EQ(ZX_OK, fdf_channel_write(local_ch_, 0, nullptr, nullptr, 0, nullptr, 0));
+  }
+
+  ASSERT_OK(entered_callback.Wait(zx::time::infinite()));
+
+  // Signal and wait for the blocking read handler to return.
+  complete_blocking_read.Signal();
+
+  // RegisterAsyncReadBlock doesn't do a read on its callback so we have to read here so we have a
+  // clear channel for the next write+read.
+  ASSERT_NO_FATAL_FAILURE(AssertRead(remote_ch_, nullptr, 0, nullptr, 0));
+
+  WaitUntilIdle(blocking_dispatcher);
+
+  // Seal
+  libsync::Completion seal_completion;
+  async::PostTask(fdf_dispatcher_get_async_dispatcher(blocking_dispatcher),
+                  [&seal_completion, blocking_dispatcher]() {
+                    ASSERT_EQ(ZX_OK, fdf_dispatcher_seal(blocking_dispatcher,
+                                                         FDF_DISPATCHER_OPTION_ALLOW_SYNC_CALLS));
+                    seal_completion.Signal();
+                  });
+  ASSERT_OK(seal_completion.Wait(zx::time::infinite()));
+
+  WaitUntilIdle(blocking_dispatcher);
+
+  // Queue a read that should be called into directly now that the dispatcher doesn't
+  // allow sync calls.
+  fbl::Mutex driver_lock;
+  entered_callback.Reset();
+  ASSERT_NO_FATAL_FAILURE(RegisterAsyncReadSignal(remote_ch_, blocking_dispatcher, &driver_lock,
+                                                  entered_callback.get()));
+
+  {
+    driver_context::PushDriver(CreateFakeDriver());
+    auto pop_driver = fit::defer([]() { driver_context::PopDriver(); });
+
+    // This should call directly into the channel_read callback.
+    ASSERT_FALSE(entered_callback.signaled());
+    ASSERT_EQ(ZX_OK, fdf_channel_write(local_ch_, 0, nullptr, nullptr, 0, nullptr, 0));
+
+    // Validate the read did happen. Try the lock as well since the read should have completed.
+    fbl::AutoLock lock(&driver_lock);
+    ASSERT_TRUE(entered_callback.signaled());
+  }
+}
+
 // Tests that a blocking dispatcher does not block the global async loop shared between
 // all dispatchers in a process.
 // We will register a blocking callback, and ensure we can receive other callbacks
@@ -1907,8 +1974,8 @@ TEST_F(DispatcherTest, UnbindIrqImmediatelyAfterTriggering) {
   static constexpr uint32_t kNumIrqs = 3000;
   static constexpr uint32_t kNumThreads = 10;
 
-  // TODO(https://fxbug.dev/42053861): this can be replaced by |fdf_env::DriverShutdown| once it works
-  // properly.
+  // TODO(https://fxbug.dev/42053861): this can be replaced by |fdf_env::DriverShutdown| once it
+  // works properly.
   libsync::Completion shutdown_completion;
   std::atomic_int num_destructed = 0;
   auto destructed_handler = [&](fdf_dispatcher_t* dispatcher) {

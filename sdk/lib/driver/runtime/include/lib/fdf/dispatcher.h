@@ -148,6 +148,29 @@ void fdf_dispatcher_shutdown_async(fdf_dispatcher_t* dispatcher);
 // |dispatcher| must not be used after calling this function.
 void fdf_dispatcher_destroy(fdf_dispatcher_t* dispatcher);
 
+// Removes an option set on the dispatcher during creation. The provided |option| parameter
+// is removed from the |dispatcher| given. For example if the dispatcher was created with options
+// that contained `FDF_DISPATCHER_OPTION_ALLOW_SYNC_CALLS`, calling this with that option will
+// remove the ability of the dispatcher to make any more synchronous calls.
+//
+// The following options are supported for sealing (aka removal):
+//  - `FDF_DISPATCHER_OPTION_ALLOW_SYNC_CALLS`
+//
+// # Thread requirements
+//
+// This must be called from the |dispatcher|'s own context.
+//
+// # Errors
+//
+// ZX_ERR_INVALID_ARGS: The |option| being removed is not a supported option.
+//
+// ZX_ERR_BAD_STATE: Not called from the same context as the given dispatcher or the dispatcher
+// is not in a running state.
+//
+// ZX_ERR_ALREADY_EXISTS: The option did not exist on the dispatcher. This can happen if this is
+// called more than once with the same option, or if it was not created with the option.
+zx_status_t fdf_dispatcher_seal(fdf_dispatcher_t* dispatcher, uint32_t option);
+
 __END_CDECLS
 
 #endif  // LIB_FDF_DISPATCHER_H_

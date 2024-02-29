@@ -111,8 +111,9 @@ class Dispatcher : public async_dispatcher_t,
     // The default pool is for the dispatchers with no specified scheduler role.
     static constexpr std::string_view kNoSchedulerRole = "";
 
-    explicit ThreadPool(std::string_view scheduler_role = kNoSchedulerRole)
+    explicit ThreadPool(std::string_view scheduler_role = kNoSchedulerRole, bool unmanaged = false)
         : scheduler_role_(scheduler_role),
+          is_unmanaged_(unmanaged),
           config_(MakeConfig(this, scheduler_role)),
           loop_(&config_) {}
 
@@ -123,9 +124,15 @@ class Dispatcher : public async_dispatcher_t,
     // there are not enough threads running.
     zx_status_t AddThread();
 
+    // Decrements the number of required threads. Currently this doesn't spin down the extra thread
+    // but for now that is ok since more often than not it can be used by another dispatcher on the
+    // thread-pool. If it is not used, there will simply be one more thread than needed.
+    // TODO(https://fxbug.dev/326266527): Use a timer to spin down un-necessary thread.
+    zx_status_t RemoveThread();
+
     void OnDispatcherAdded();
     // Updates the number of threads needed in the thread pool.
-    void OnDispatcherRemoved(Dispatcher& dispatcher, bool is_unmanaged);
+    void OnDispatcherRemoved(Dispatcher& dispatcher);
     // Requests the profile provider set the role profile.
     zx_status_t SetRoleProfile();
 
@@ -169,6 +176,8 @@ class Dispatcher : public async_dispatcher_t,
       fbl::AutoLock al(&lock_);
       return num_dispatchers_;
     }
+
+    bool is_unmanaged() const { return is_unmanaged_; }
 
     std::string_view scheduler_role() const { return scheduler_role_; }
     async::Loop* loop() { return &loop_; }
@@ -247,12 +256,14 @@ class Dispatcher : public async_dispatcher_t,
     // Tracks the number of threads we've spawned via |loop_|.
     uint32_t num_threads_ __TA_GUARDED(&lock_) = 0;
     // Total number of threads we will spawn.
-    // TODO(https://fxbug.dev/42085539): We are clamping number_threads_ to 10 to avoid spawning too many
-    // threads. Technically this can result in a deadlock scenario in a very complex driver host. We
-    // need better support for dynamically starting threads as necessary.
+    // TODO(https://fxbug.dev/42085539): We are clamping number_threads_ to 10 to avoid spawning too
+    // many threads. Technically this can result in a deadlock scenario in a very complex driver
+    // host. We need better support for dynamically starting threads as necessary.
     uint32_t max_threads_ __TA_GUARDED(&lock_) = 10;
 
     uint32_t num_dispatchers_ __TA_GUARDED(&lock_) = 0;
+
+    bool is_unmanaged_;
 
     // Stores unbound irqs which will be garbage collected at a later time.
     CachedIrqs cached_irqs_;
@@ -330,6 +341,7 @@ class Dispatcher : public async_dispatcher_t,
   async_dispatcher_t* GetAsyncDispatcher();
   void ShutdownAsync();
   void Destroy();
+  zx_status_t Seal(uint32_t option);
 
   // async_dispatcher_t implementation
   zx_time_t GetTime();
@@ -421,7 +433,8 @@ class Dispatcher : public async_dispatcher_t,
   // Queues a |CallbackRequest| for the token transfer callback and removes |token|
   // from the pending list. This is called when |fdf_token_register| and |fdf_token_transfer|
   // have been called for the same token.
-  // TODO(https://fxbug.dev/42056822): replace fdf::Channel with a generic C++ handle type when available.
+  // TODO(https://fxbug.dev/42056822): replace fdf::Channel with a generic C++ handle type when
+  // available.
   zx_status_t ScheduleTokenCallback(fdf_token_t* token, zx_status_t status, fdf::Channel channel);
 
   // Dumps the dispatcher state as a vector of formatted strings.
@@ -824,9 +837,9 @@ class DispatcherCoordinator {
   Dispatcher::ThreadPool* default_thread_pool() { return &default_thread_pool_; }
 
   // Returns the unmanaged thread pool. Creates it first if it doesn't exist.
-  Dispatcher::ThreadPool* unmanaged_thread_pool() {
+  Dispatcher::ThreadPool* GetOrCreateUnmanagedThreadPool() {
     if (!unmanaged_thread_pool_.has_value()) {
-      unmanaged_thread_pool_.emplace();
+      unmanaged_thread_pool_.emplace(Dispatcher::ThreadPool::kNoSchedulerRole, /*unmanaged*/ true);
     }
 
     return &unmanaged_thread_pool_.value();

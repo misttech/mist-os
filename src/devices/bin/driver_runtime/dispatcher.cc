@@ -413,16 +413,12 @@ zx_status_t Dispatcher::Create(uint32_t options, std::string_view name,
 zx_status_t Dispatcher::CreateUnmanagedDispatcher(
     uint32_t options, std::string_view name, fdf_dispatcher_shutdown_observer_t* shutdown_observer,
     Dispatcher** out_dispatcher) {
-  auto unmanaged_thread_pool = GetDispatcherCoordinator().unmanaged_thread_pool();
+  auto unmanaged_thread_pool = GetDispatcherCoordinator().GetOrCreateUnmanagedThreadPool();
   return CreateWithAdder(
       options, name, ThreadPool::kNoSchedulerRole, driver_context::GetCurrentDriver(),
       unmanaged_thread_pool, unmanaged_thread_pool->loop()->dispatcher(),
-      []() {
-        // We want the Test dispatchers to have the allow_sync option on them which leads to this
-        // adder being called. So we return success even though this is a no-op.
-        return ZX_OK;
-      },
-      shutdown_observer, out_dispatcher);
+      [unmanaged_thread_pool]() { return unmanaged_thread_pool->AddThread(); }, shutdown_observer,
+      out_dispatcher);
 }
 
 // static
@@ -614,6 +610,31 @@ void Dispatcher::Destroy() {
   // Recover the reference created in |CreateWithAdder|.
   auto dispatcher_ref = fbl::ImportFromRawPtr(this);
   GetDispatcherCoordinator().RemoveDispatcher(*this);
+}
+
+zx_status_t Dispatcher::Seal(uint32_t option) {
+  if (option != FDF_DISPATCHER_OPTION_ALLOW_SYNC_CALLS) {
+    return ZX_ERR_INVALID_ARGS;
+  }
+
+  {
+    fbl::AutoLock lock(&callback_lock_);
+
+    if (driver_context::GetCurrentDispatcher() != this || !IsRunningLocked()) {
+      return ZX_ERR_BAD_STATE;
+    }
+
+    if (!allow_sync_calls_) {
+      return ZX_ERR_ALREADY_EXISTS;
+    }
+
+    // Set our field.
+    allow_sync_calls_ = false;
+  }
+
+  // Tell our thread pool to remove a thread as we no longer have allow_sync_calls_, which caused
+  // an extra thread to be added when this dispatcher was initially created.
+  return thread_pool()->RemoveThread();
 }
 
 // async_dispatcher_t implementation
@@ -1690,9 +1711,7 @@ void DispatcherCoordinator::RemoveDispatcher(Dispatcher& dispatcher) {
   ZX_ASSERT(driver_state != drivers_.end());
 
   auto thread_pool = dispatcher.thread_pool();
-  bool is_unmanaged =
-      unmanaged_thread_pool_.has_value() ? thread_pool == &unmanaged_thread_pool_.value() : false;
-  thread_pool->OnDispatcherRemoved(dispatcher, is_unmanaged);
+  thread_pool->OnDispatcherRemoved(dispatcher);
   if (thread_pool->num_dispatchers() == 0) {
     DestroyThreadPool(thread_pool);
   }
@@ -1822,6 +1841,11 @@ zx_status_t Dispatcher::ThreadPool::SetRoleProfile() {
 }
 
 zx_status_t Dispatcher::ThreadPool::AddThread() {
+  if (is_unmanaged_) {
+    // No-op for the unmanaged thread-pool.
+    return ZX_OK;
+  }
+
   fbl::AutoLock lock(&lock_);
   dispatcher_threads_needed_++;
 
@@ -1848,16 +1872,28 @@ zx_status_t Dispatcher::ThreadPool::AddThread() {
   return status;
 }
 
+zx_status_t Dispatcher::ThreadPool::RemoveThread() {
+  if (is_unmanaged_) {
+    // No-op for the unmanaged thread-pool.
+    return ZX_OK;
+  }
+
+  fbl::AutoLock lock(&lock_);
+  ZX_ASSERT(dispatcher_threads_needed_ > 0);
+  dispatcher_threads_needed_--;
+  return ZX_OK;
+}
+
 void Dispatcher::ThreadPool::OnDispatcherAdded() {
   fbl::AutoLock lock(&lock_);
   num_dispatchers_++;
 }
 
-void Dispatcher::ThreadPool::OnDispatcherRemoved(Dispatcher& dispatcher, bool is_unmanaged) {
+void Dispatcher::ThreadPool::OnDispatcherRemoved(Dispatcher& dispatcher) {
   fbl::AutoLock lock(&lock_);
 
   // We need to check the process shared dispatcher matches as tests inject their own.
-  if (!is_unmanaged && dispatcher.allow_sync_calls() &&
+  if (!is_unmanaged_ && dispatcher.allow_sync_calls() &&
       dispatcher.process_shared_dispatcher() == loop()->dispatcher()) {
     ZX_ASSERT(dispatcher_threads_needed_ > 0);
     dispatcher_threads_needed_--;

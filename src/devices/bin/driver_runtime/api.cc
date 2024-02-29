@@ -164,6 +164,10 @@ __EXPORT fdf_dispatcher_t* fdf_dispatcher_get_current_dispatcher() {
   return static_cast<fdf_dispatcher_t*>(driver_context::GetCurrentDispatcher());
 }
 
+__EXPORT zx_status_t fdf_dispatcher_seal(fdf_dispatcher_t* dispatcher, uint32_t option) {
+  return dispatcher->Seal(option);
+}
+
 __EXPORT zx_status_t fdf_token_register(zx_handle_t token, fdf_dispatcher_t* dispatcher,
                                         fdf_token_t* handler) {
   return driver_runtime::DispatcherCoordinator::TokenRegister(token, dispatcher, handler);
