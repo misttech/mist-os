@@ -60,6 +60,13 @@ struct __llvm_profile_data {
 #include <profile/InstrProfData.inc>
 };
 
+#if INSTR_PROF_RAW_VERSION >= 10
+struct alignas(INSTR_PROF_DATA_ALIGNMENT) VTableProfData {
+#define INSTR_PROF_VTABLE_DATA(Type, LLVMType, Name, Initializer) Type Name;
+#include <profile/InstrProfData.inc>
+};
+#endif
+
 extern "C" {
 
 // This is sometimes emitted by the compiler with a different value.
@@ -134,6 +141,11 @@ PECOFF_SECTION_RW(.lprfd, Data, __llvm_profile_data)
 
 PECOFF_SECTION_RO(.lprfn, Names, char)
 
+#if INSTR_PROF_RAW_VERSION >= 10
+PECOFF_SECTION_RW(.lprfvt, VTableData, VTableProfData)
+PECOFF_SECTION_RO(.lprfvns, VNames, char)
+#endif
+
 PECOFF_SECTION_RW(.lprfc, Counters, uint64_t)
 
 PECOFF_SECTION_RW(.lprfb, Bitmap, char)
@@ -151,6 +163,18 @@ extern "C" {
     "section$start$__DATA$" INSTR_PROF_NAME_SECT_NAME);
 [[gnu::visibility("hidden")]] extern const char NamesEnd[] __asm__(
     "section$end$__DATA$" INSTR_PROF_NAME_SECT_NAME);
+
+#if INSTR_PROF_RAW_VERSION >= 10
+[[gnu::visibility("hidden")]] extern const VTableProfData VTableDataBegin[] __asm__(
+    "section$start$__DATA$" INSTR_PROF_VTAB_SECT_NAME);
+[[gnu::visibility("hidden")]] extern const VTableProfData VTableDataEnd[] __asm__(
+    "section$end$__DATA$" INSTR_PROF_VTAB_SECT_NAME);
+
+[[gnu::visibility("hidden")]] extern const char VNamesBegin[] __asm__(
+    "section$start$__DATA$" INSTR_PROF_VNAME_SECT_NAME);
+[[gnu::visibility("hidden")]] extern const char VNamesEnd[] __asm__(
+    "section$end$__DATA$" INSTR_PROF_VNAME_SECT_NAME);
+#endif
 
 [[gnu::visibility("hidden")]] extern uint64_t CountersBegin[] __asm__(
     "section$start$__DATA$" INSTR_PROF_CNTS_SECT_NAME);
@@ -200,6 +224,11 @@ PROFDATA_SECTION(const __llvm_profile_data, DataBegin, DataEnd, INSTR_PROF_DATA_
 
 PROFDATA_SECTION(const char, NamesBegin, NamesEnd, INSTR_PROF_NAME_COMMON, "");
 
+#if INSTR_PROF_RAW_VERSION >= 10
+PROFDATA_SECTION(const VTableProfData, VTableDataBegin, VTableDataEnd, INSTR_PROF_VTAB_COMMON, "");
+PROFDATA_SECTION(const char, VNamesBegin, VNamesEnd, INSTR_PROF_VNAME_COMMON, "");
+#endif
+
 PROFDATA_SECTION(uint64_t, CountersBegin, CountersEnd, INSTR_PROF_CNTS_COMMON, "w");
 
 PROFDATA_SECTION(char, BitmapBegin, BitmapEnd, INSTR_PROF_BITS_COMMON, "w");
@@ -238,14 +267,19 @@ constexpr size_t BinaryIdsSize(cpp20::span<const std::byte> build_id) {
   return sizeof(uint64_t) + build_id.size_bytes() + PaddingSize(build_id);
 }
 
-[[gnu::const]] cpp20::span<const __llvm_profile_data> ProfDataArray() {
-  return {
-      DataBegin,
-      (reinterpret_cast<const std::byte*>(DataEnd) - reinterpret_cast<const std::byte*>(DataBegin) +
-       sizeof(__llvm_profile_data) - 1) /
-          sizeof(__llvm_profile_data),
-  };
+template <typename T>
+[[gnu::const]] cpp20::span<T> GetArray(T* begin, T* end) {
+  auto begin_bytes = reinterpret_cast<const std::byte*>(begin);
+  auto end_bytes = reinterpret_cast<const std::byte*>(end);
+  size_t size_bytes = end_bytes - begin_bytes;
+  return {begin, (size_bytes + sizeof(T) - 1) / sizeof(T)};
 }
+
+[[gnu::const]] auto ProfDataArray() { return GetArray(DataBegin, DataEnd); }
+
+#if INSTR_PROF_RAW_VERSION >= 10
+[[gnu::const]] auto VTableDataArray() { return GetArray(VTableDataBegin, VTableDataEnd); }
+#endif
 
 // This is the .bss data that gets updated live by instrumented code when the
 // bias is set to zero.
@@ -266,6 +300,10 @@ constexpr size_t BinaryIdsSize(cpp20::span<const std::byte> build_id) {
   const uint64_t NumBitmapBytes = ProfBitmapData().size();
   const uint64_t PaddingBytesAfterBitmapBytes = 0;
   const uint64_t NamesSize = NamesEnd - NamesBegin;
+#if INSTR_PROF_RAW_VERSION >= 10
+  const uint64_t NumVTables = VTableDataArray().size();
+  const uint64_t VNamesSize = VNamesEnd - VNamesBegin;
+#endif
   auto __llvm_profile_get_magic = []() -> uint64_t { return kMagic; };
   auto __llvm_profile_get_version = []() -> uint64_t { return INSTR_PROF_RAW_VERSION_VAR; };
   auto __llvm_write_binary_ids = [build_id](void* ignored) -> uint64_t {
@@ -329,6 +367,12 @@ void LlvmProfdata::Init(cpp20::span<const std::byte> build_id) {
 
   const size_t PaddingBytesAfterNames = PaddingSize(static_cast<size_t>(header.NamesSize));
   size_bytes_ += header.NamesSize + PaddingBytesAfterNames;
+
+#if INSTR_PROF_RAW_VERSION >= 10
+  const size_t VTableSectionSize = header.NumVTables * sizeof(VTableProfData);
+  size_bytes_ += VTableSectionSize + PaddingSize(VTableSectionSize);
+  size_bytes_ += header.VNamesSize + PaddingSize(header.VNamesSize);
+#endif
 }
 
 LlvmProfdata::LiveData LlvmProfdata::DoFixedData(cpp20::span<std::byte> data, bool match) {
@@ -370,8 +414,7 @@ LlvmProfdata::LiveData LlvmProfdata::DoFixedData(cpp20::span<std::byte> data, bo
     write_bytes(kPadding.subspan(0, PaddingSize(build_id_)), kPaddingDoc);
   }
 
-  auto prof_data = cpp20::span(DataBegin, DataEnd - DataBegin);
-  write_bytes(cpp20::as_bytes(prof_data), INSTR_PROF_DATA_SECT_NAME);
+  write_bytes(cpp20::as_bytes(ProfDataArray()), INSTR_PROF_DATA_SECT_NAME);
   write_bytes(kPadding.subspan(0, static_cast<size_t>(header.PaddingBytesBeforeCounters)),
               kPaddingDoc);
 
@@ -402,6 +445,16 @@ LlvmProfdata::LiveData LlvmProfdata::DoFixedData(cpp20::span<std::byte> data, bo
   const size_t PaddingBytesAfterNames = PaddingSize(static_cast<size_t>(header.NamesSize));
   write_bytes(cpp20::as_bytes(prof_names), INSTR_PROF_NAME_SECT_NAME);
   write_bytes(kPadding.subspan(0, PaddingBytesAfterNames), kPaddingDoc);
+
+#if INSTR_PROF_RAW_VERSION >= 10
+  auto vtable_data = VTableDataArray();
+  write_bytes(cpp20::as_bytes(vtable_data), INSTR_PROF_VTAB_SECT_NAME);
+  write_bytes(kPadding.subspan(0, PaddingSize(vtable_data.size_bytes())), kPaddingDoc);
+
+  auto vnames = cpp20::span(VNamesBegin, VNamesEnd - VNamesBegin);
+  write_bytes(cpp20::as_bytes(vnames), INSTR_PROF_VNAME_SECT_NAME);
+  write_bytes(kPadding.subspan(0, PaddingSize(vnames.size_bytes())), kPaddingDoc);
+#endif
 
   return {counters_data, bitmap_data};
 }
