@@ -6124,6 +6124,64 @@ mod tests {
         assert_eq!(second_bind_error, Either::Right(LocalAddressError::AddressInUse));
     }
 
+    // Verifies that port availability in both the IPv4 and IPv6 bound socket
+    // maps is considered when allocating a local port for a dual-stack UDP
+    // socket listening in both stacks.
+    #[test_case(IpVersion::V4; "v4_is_constrained")]
+    #[test_case(IpVersion::V6; "v6_is_constrained")]
+    fn dual_stack_local_port_alloc(ip_version_with_constrained_ports: IpVersion) {
+        let mut ctx =
+            FakeCtxWithCoreCtx::with_core_ctx(FakeUdpCoreCtx::with_local_remote_ip_addrs(
+                vec![
+                    SpecifiedAddr::new(V4_LOCAL_IP.to_ip_addr()).unwrap(),
+                    SpecifiedAddr::new(V6_LOCAL_IP.to_ip_addr()).unwrap(),
+                ],
+                vec![],
+            ));
+
+        // Specifically selected to be in the `EPHEMERAL_RANGE`.
+        const AVAILABLE_PORT: NonZeroU16 = const_unwrap_option(NonZeroU16::new(54321));
+
+        // Densely pack the port space for one IP Version.
+        for port in 1..=u16::MAX {
+            let port = NonZeroU16::new(port).unwrap();
+            if port == AVAILABLE_PORT {
+                continue;
+            }
+            match ip_version_with_constrained_ports {
+                IpVersion::V4 => {
+                    let mut api = UdpApi::<Ipv4, _>::new(ctx.as_mut());
+                    let listener = api.create();
+                    api.listen(
+                        &listener,
+                        SpecifiedAddr::new(V4_LOCAL_IP).map(|a| ZonedAddr::Unzoned(a)),
+                        Some(port),
+                    )
+                    .expect("listen v4 should succeed")
+                }
+                IpVersion::V6 => {
+                    let mut api = UdpApi::<Ipv6, _>::new(ctx.as_mut());
+                    let listener = api.create();
+                    api.listen(
+                        &listener,
+                        SpecifiedAddr::new(V6_LOCAL_IP).map(|a| ZonedAddr::Unzoned(a)),
+                        Some(port),
+                    )
+                    .expect("listen v6 should succeed")
+                }
+            }
+        }
+
+        // Create a listener on the dualstack any address, expecting it to be
+        // allocated `AVAILABLE_PORT`.
+        let mut api = UdpApi::<Ipv6, _>::new(ctx.as_mut());
+        let listener = api.create();
+        api.listen(&listener, None, None).expect("dualstack listen should succeed");
+        let port =
+            assert_matches!(api.get_info(&listener), SocketInfo::Listener(info) => info.local_port);
+        assert_eq!(port, AVAILABLE_PORT);
+    }
+
     #[test_case(DualStackBindAddr::V4Any; "v4 any")]
     #[test_case(DualStackBindAddr::V4Specific; "v4 specific")]
     fn dual_stack_enable(bind_addr: DualStackBindAddr) {
