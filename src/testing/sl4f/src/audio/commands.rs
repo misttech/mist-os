@@ -13,7 +13,6 @@ use fidl_fuchsia_test_audio_recording::{AudioRecordingControlMarker, AudioRecord
 use fuchsia_component::client::connect_to_protocol;
 use futures::lock::Mutex;
 use serde_json::{to_value, Value};
-use std::convert::TryInto;
 use tracing::info;
 
 #[async_trait(?Send)]

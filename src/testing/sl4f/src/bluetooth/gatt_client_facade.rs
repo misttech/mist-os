@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use anyhow::{format_err, Context as _, Error};
-use fidl;
 use fidl::endpoints;
 use fidl_fuchsia_bluetooth_gatt2::{
     Characteristic, CharacteristicNotifierMarker, CharacteristicNotifierRequest,
@@ -24,7 +23,6 @@ use std::str::FromStr;
 use std::sync::Arc;
 use tracing::*;
 
-use fidl_fuchsia_bluetooth;
 use fuchsia_bluetooth::types::{le::Peer, PeerId, Uuid};
 
 use crate::bluetooth::types::{BleScanResponse, SerializableReadByTypeResult};

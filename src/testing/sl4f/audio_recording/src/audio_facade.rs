@@ -4,16 +4,13 @@
 
 use anyhow::{anyhow, format_err, Context, Error};
 use async_lock::RwLock;
-use fdio;
 use fidl::endpoints::create_endpoints;
 use fidl_fuchsia_media::*;
-use fidl_fuchsia_virtualaudio;
 use fuchsia_async as fasync;
 use fuchsia_zircon as zx;
 use futures::channel::mpsc;
 use futures::lock::Mutex;
 use futures::{select, StreamExt, TryFutureExt, TryStreamExt};
-use std::convert::{TryFrom, TryInto};
 use std::io::Write;
 use std::sync::Arc;
 use tracing::trace;

@@ -18,7 +18,6 @@ use {
         cmp::max,
         collections::{hash_map::DefaultHasher, BTreeMap},
         hash::{Hash, Hasher},
-        iter::FromIterator,
         mem,
         rc::Rc,
     },
@@ -349,7 +348,7 @@ pub mod tests {
         fidl_fuchsia_kernel::{CpuStats, PerCpuStats},
         fuchsia_zbi_abi::{
             ArchitectureInfo, Entity, ZbiTopologyArchitecture, ZbiTopologyArm64Info,
-            ZbiTopologyCluster, ZbiTopologyEntityType, ZbiTopologyNode, ZbiTopologyProcessor,
+            ZbiTopologyCluster, ZbiTopologyProcessor,
         },
         futures::{task::Poll, FutureExt, TryStreamExt},
         std::{cell::Cell, pin::Pin},

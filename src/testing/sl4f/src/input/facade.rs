@@ -8,7 +8,7 @@ use crate::input::types::{
 };
 use anyhow::{Context, Error};
 use serde_json::{from_value, Value};
-use std::{convert::TryFrom, time::Duration};
+use std::time::Duration;
 use tracing::info;
 
 const DEFAULT_DIMENSION: u32 = 1000;

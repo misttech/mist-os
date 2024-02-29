@@ -299,22 +299,17 @@ impl AvrcpFacade {
 
 #[cfg(test)]
 mod tests {
-    use crate::bluetooth::types::CustomBatteryStatus;
 
     use super::super::types::{
         CustomCustomAttributeValue, CustomCustomPlayerApplicationSetting, CustomEqualizer,
-        CustomPlayStatus, CustomPlayerApplicationSettings,
-        CustomPlayerApplicationSettingsAttributeIds, CustomRepeatStatusMode, CustomScanMode,
+        CustomRepeatStatusMode, CustomScanMode,
     };
     use super::*;
     use assert_matches::assert_matches;
     use fidl::endpoints::create_proxy_and_stream;
-    use fidl_fuchsia_bluetooth_avrcp::{
-        BatteryStatus, ControllerRequest, Notifications, PlayStatus,
-    };
+    use fidl_fuchsia_bluetooth_avrcp::{BatteryStatus, ControllerRequest, PlayStatus};
     use fuchsia_async as fasync;
     use futures::prelude::*;
-    use futures::Future;
     use lazy_static::lazy_static;
 
     lazy_static! {

@@ -36,7 +36,6 @@ use {
     std::{
         cell::RefCell,
         collections::{HashMap, HashSet},
-        iter::FromIterator,
         pin::Pin,
         rc::Rc,
     },
@@ -647,7 +646,7 @@ mod tests {
         fmetrics::{
             CpuLoad, GpuUsage, Metric, NetworkActivity, Power, StatisticsArgs, Temperature,
         },
-        futures::{task::Poll, FutureExt},
+        futures::task::Poll,
     };
 
     // A helper struct to create Fuchsia Executor and optionally add drivers for different logging

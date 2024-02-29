@@ -748,10 +748,7 @@ pub mod tests {
         assert_matches::assert_matches,
         diagnostics_assertions::{assert_data_tree, HistogramAssertion},
         futures::{task::Poll, FutureExt, TryStreamExt},
-        std::{
-            cell::{Cell, OnceCell},
-            pin::Pin,
-        },
+        std::{cell::OnceCell, pin::Pin},
     };
 
     fn setup_fake_temperature_driver(

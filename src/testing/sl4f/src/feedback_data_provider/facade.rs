@@ -8,7 +8,6 @@ use {
     fidl_fuchsia_feedback::{DataProviderMarker, GetSnapshotParameters},
     fuchsia_component::client::connect_to_protocol,
     fuchsia_zircon::DurationNum,
-    serde_json,
 };
 
 /// Facade providing access to feedback interface.

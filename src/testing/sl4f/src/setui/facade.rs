@@ -284,9 +284,7 @@ impl SetUiFacade {
 mod tests {
     use super::*;
     use crate::common_utils::test::assert_value_round_trips_as;
-    use crate::setui::types::{
-        HourCycle, IntlInfo, LocaleId, MicStates, MicStates::Muted, TemperatureUnit,
-    };
+    use crate::setui::types::{HourCycle, LocaleId, MicStates::Muted, TemperatureUnit};
     use fidl::endpoints::create_proxy_and_stream;
     use fidl_fuchsia_settings::InputDevice;
     use fuchsia_async as fasync;

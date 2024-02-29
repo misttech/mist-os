@@ -4,7 +4,6 @@
 
 use anyhow::Error;
 use fuchsia_zircon::{self as zx, AsHandleRef};
-use std::convert::TryInto;
 use std::time::SystemTime;
 
 const NANOS_IN_MILLIS: u64 = 1000000;

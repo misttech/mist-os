@@ -15,7 +15,6 @@ use fuchsia_sync::Mutex;
 use futures::channel::mpsc;
 use futures::prelude::*;
 use std::collections::HashSet;
-use std::iter::FromIterator;
 use std::ops::DerefMut;
 use tracing::*;
 

@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use serde::Serialize;
-use std::vec::Vec;
 
 /// Result returned by `EnableDevTools` API
 #[derive(Serialize)]

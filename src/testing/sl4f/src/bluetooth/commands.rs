@@ -12,7 +12,6 @@ use fidl_fuchsia_bluetooth_hfp::{CallDirection, CallState, NetworkInformation, S
 use fidl_fuchsia_bluetooth_le::Filter;
 use fidl_fuchsia_bluetooth_sys::{LeSecurityMode, Settings};
 use serde_json::{from_value, to_value, Value};
-use std::convert::{TryFrom, TryInto};
 use test_call_manager::TestCallManager as HfpFacade;
 use test_rfcomm_client::RfcommManager as RfcommFacade;
 

@@ -8,7 +8,6 @@ use async_trait::async_trait;
 use fidl_fuchsia_wlan_common as fidl_common;
 use ieee80211::{MacAddr, Ssid, NULL_ADDR};
 use serde_json::{from_value, to_value, Value};
-use std::convert::TryFrom;
 use tracing::*;
 
 // Testing helper methods

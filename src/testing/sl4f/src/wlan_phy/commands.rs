@@ -6,7 +6,6 @@ use crate::{server::Facade, wlan_phy::facade::WlanPhyFacade};
 use anyhow::{format_err, Error};
 use async_trait::async_trait;
 use serde_json::{to_value, Value};
-use std::convert::TryInto;
 
 #[async_trait(?Send)]
 impl Facade for WlanPhyFacade {

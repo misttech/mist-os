@@ -11,7 +11,7 @@ use {
     },
     fidl_fuchsia_test_intl_manager::{PropertyManagerRequest, PropertyManagerRequestStream},
     fuchsia_component::server::{ServiceFs, ServiceObjLocal},
-    futures::{self, lock::Mutex, prelude::*},
+    futures::{lock::Mutex, prelude::*},
     std::{
         collections::HashMap,
         fmt::{self, Debug},

@@ -214,7 +214,6 @@ mod test {
     use fidl_fuchsia_testing_proxy::{TcpProxyControlMarker, TcpProxyControlProxy};
     use fuchsia_async::DurationExt;
     use fuchsia_zircon as zx;
-    use futures::future::TryFutureExt;
     use hyper::server::{accept::from_stream, Server};
     use hyper::{Body, Response, Uri};
     use std::{convert::Infallible, net::SocketAddr};

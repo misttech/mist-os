@@ -12,7 +12,6 @@ use fuchsia_sync::RwLock;
 use fuchsia_zircon as zx;
 use ieee80211::{MacAddr, Ssid};
 use std::collections::HashMap;
-use std::convert::{TryFrom, TryInto};
 use wlan_common::scan::ScanResult;
 
 // WlanFacade: proxies commands from sl4f test to proper fidl APIs

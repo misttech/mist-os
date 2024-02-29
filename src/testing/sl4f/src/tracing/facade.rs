@@ -11,12 +11,11 @@ use fidl_fuchsia_tracing_controller::{
     ControllerMarker, ControllerProxy, StartErrorCode, StartOptions, StopOptions, TerminateOptions,
     TraceConfig,
 };
-use fuchsia_async;
 use fuchsia_component::{self as app};
 use fuchsia_sync::RwLock;
 use fuchsia_zircon as zx;
 use futures::{future, io::AsyncReadExt, TryFutureExt};
-use serde_json::{self, from_value, to_value, Value};
+use serde_json::{from_value, to_value, Value};
 
 // This list should be kept in sync with defaultCategories in //src/performance/traceutil/actions.go
 const DEFAULT_CATEGORIES: &[&'static str] = &[

@@ -8,7 +8,6 @@ use fidl_fuchsia_camera_test_virtualcamera::{
 };
 use fuchsia_component::client::connect_to_protocol;
 use serde_json::{to_value, Value};
-use std::convert::TryInto;
 use tracing::*;
 
 /// Facade providing access to Virtual Camera interfaces.

@@ -11,7 +11,6 @@ use fidl_fuchsia_weave::{
     PairingStateWatcherProxy, ResetConfigFlags, StackMarker, StackProxy,
 };
 use serde_json::Value;
-use std::convert::From;
 
 /// Perform Weave FIDL operations.
 ///
@@ -106,13 +105,13 @@ mod tests {
     use assert_matches::assert_matches;
     use fidl::endpoints::create_proxy_and_stream;
     use fidl_fuchsia_weave::{
-        FactoryDataManagerRequest, PairingStateWatcherRequest, QrCode, ResetConfigFlags,
-        StackGetQrCodeResult, StackRequest, StackResetConfigResult,
+        FactoryDataManagerRequest, PairingStateWatcherRequest, QrCode, StackGetQrCodeResult,
+        StackRequest, StackResetConfigResult,
     };
     use fuchsia_async as fasync;
     use futures::prelude::*;
     use lazy_static::lazy_static;
-    use serde_json::{json, Value};
+    use serde_json::json;
 
     const PAIRING_CODE: &'static [u8] = b"ABC1234";
 

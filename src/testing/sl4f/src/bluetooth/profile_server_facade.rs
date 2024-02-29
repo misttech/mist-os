@@ -21,7 +21,7 @@ use futures::select;
 use futures::stream::StreamExt;
 use futures::FutureExt;
 use serde_json::value::Value;
-use std::{collections::HashMap, convert::TryFrom};
+use std::collections::HashMap;
 use tracing::*;
 
 #[derive(Debug)]

@@ -14,7 +14,6 @@ use fuchsia_component as app;
 use fuchsia_sync::RwLock;
 use futures::{pin_mut, select, FutureExt, StreamExt};
 use serde_json::Value;
-use std::convert::TryInto;
 use std::{collections::HashMap, sync::Arc};
 use tracing::{debug, error, info, warn};
 
