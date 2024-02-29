@@ -21,21 +21,6 @@ driver_bind_rules("amlogic_display_bind") {
   ]
 }
 
-group("bind_rules") {
-  public_deps = []
-  if (board_name == "astro") {
-    public_deps += [ ":amlogic_display_bind" ]
-  } else if (board_name == "sherlock") {
-    public_deps += [ ":amlogic_display_bind" ]
-  } else if (board_name == "nelson") {
-    public_deps += [ ":amlogic_display_bind" ]
-  } else if (board_name == "vim3") {
-    public_deps += [ ":amlogic_display_bind" ]
-  } else {
-    # Unsupported board.
-  }
-}
-
 source_set("common_srcs") {
   configs += [
     "//build/config:all_source",
@@ -148,7 +133,7 @@ source_set("common_srcs") {
 fuchsia_driver("amlogic-display-driver") {
   output_name = "amlogic-display"
   deps = [
-    ":bind_rules",
+    ":amlogic_display_bind",
     ":common_srcs",
   ]
 }
