@@ -39,7 +39,7 @@ use packet::{Buf, BufferMut};
 use packet_formats::ip::IpProto;
 #[cfg(test)]
 use rand::Rng as _;
-use rand::{self, CryptoRng, RngCore, SeedableRng};
+use rand::{CryptoRng, RngCore, SeedableRng};
 use rand_xorshift::XorShiftRng;
 #[cfg(test)]
 use tracing::Subscriber;
@@ -1742,7 +1742,7 @@ impl Default for MonotonicIdentifier {
 mod tests {
     use ip_test_macro::ip_test;
 
-    use packet::{Buf, Serializer};
+    use packet::Serializer;
     use packet_formats::{
         icmp::{IcmpEchoRequest, IcmpPacketBuilder, IcmpUnusedCode},
         ip::Ipv4Proto,
@@ -1756,7 +1756,6 @@ mod tests {
             IpLayerHandler,
         },
         socket::address::SocketIpAddr,
-        UnlockedCoreCtx,
     };
 
     #[test]

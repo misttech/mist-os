@@ -4907,11 +4907,8 @@ pub(crate) fn get_ip_transparent<
 pub(crate) mod testutil {
     use super::*;
 
-    use alloc::{vec, vec::Vec};
-    use net_types::{
-        ip::{IpAddr, Ipv4, Ipv6},
-        SpecifiedAddr, Witness,
-    };
+    use alloc::vec;
+    use net_types::{ip::IpAddr, Witness};
 
     use crate::{
         context::testutil::FakeCtxWithCoreCtx, device::testutil::FakeStrongDeviceId,
@@ -4975,14 +4972,14 @@ pub(crate) mod testutil {
 mod test {
     use core::{convert::Infallible as Never, ops::DerefMut as _};
 
-    use alloc::{vec, vec::Vec};
+    use alloc::vec;
     use assert_matches::assert_matches;
     use const_unwrap::const_unwrap_option;
     use derivative::Derivative;
     use ip_test_macro::ip_test;
     use net_declare::{net_ip_v4, net_ip_v6};
     use net_types::{
-        ip::{Ip, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr},
+        ip::{Ipv4Addr, Ipv6Addr},
         Witness,
     };
     use packet::Buf;
@@ -5000,8 +4997,7 @@ mod test {
             IpLayerIpExt, DEFAULT_HOP_LIMITS,
         },
         socket::{
-            Bound, IncompatibleError, InsertError, ListenerAddrInfo, RemoveResult,
-            SocketMapAddrStateSpec,
+            Bound, IncompatibleError, ListenerAddrInfo, RemoveResult, SocketMapAddrStateSpec,
         },
         testutil::TestIpExt,
         uninstantiable::UninstantiableWrapper,

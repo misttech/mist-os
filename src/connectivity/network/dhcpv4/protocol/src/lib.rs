@@ -10,9 +10,7 @@ use net_types::{
 use num_derive::FromPrimitive;
 use serde::{Deserialize, Serialize};
 use std::{
-    convert::{TryFrom, TryInto},
     fmt,
-    iter::Iterator,
     net::Ipv4Addr,
     num::{NonZeroU16, NonZeroU8},
 };
@@ -2360,7 +2358,7 @@ fn trunc_string_to_n_and_push(s: &str, n: usize, buffer: &mut Vec<u8>) {
 mod tests {
     use net_declare::{net::prefix_length_v4, std::ip_v4};
     use rand::Rng as _;
-    use std::{net::Ipv4Addr, str::FromStr};
+    use std::str::FromStr;
     use test_case::test_case;
     use {super::identifier::ClientIdentifier, super::*};
 

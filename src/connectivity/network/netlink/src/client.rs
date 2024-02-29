@@ -248,10 +248,7 @@ impl<F: ProtocolFamily, S: Sender<F::InnerMessage>> ClientTable<F, S> {
 #[cfg(test)]
 pub(crate) mod testutil {
     use super::*;
-    use crate::{
-        messaging::testutil::{FakeSender, FakeSenderSink},
-        protocol_family::ProtocolFamily,
-    };
+    use crate::messaging::testutil::{FakeSender, FakeSenderSink};
 
     pub(crate) const CLIENT_ID_1: ClientId = ClientId(1);
     pub(crate) const CLIENT_ID_2: ClientId = ClientId(2);

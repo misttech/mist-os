@@ -13,9 +13,7 @@
 //!   * Allow waiting for all strongly-held references to be dropped after
 //!     marking the data.
 
-use alloc::boxed::Box;
 use core::{
-    convert::AsRef,
     hash::{Hash, Hasher},
     ops::Deref,
     panic::Location,

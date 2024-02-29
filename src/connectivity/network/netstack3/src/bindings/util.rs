@@ -1387,13 +1387,10 @@ impl IntoFidl<fnet_interfaces_admin::ArpConfiguration> for ArpConfiguration {
 
 #[cfg(test)]
 mod tests {
-    use std::fmt::Debug;
-
     use fidl_fuchsia_net as fidl_net;
     use fidl_fuchsia_net_ext::IntoExt;
 
     use net_declare::{net_ip_v4, net_ip_v6};
-    use net_types::ip::{Ipv4Addr, Ipv6Addr};
     use test_case::test_case;
 
     use crate::bindings::integration_tests::TestStack;

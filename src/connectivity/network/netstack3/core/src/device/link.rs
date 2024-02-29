@@ -65,7 +65,6 @@ pub trait LinkDevice: Device + Debug {
 /// Utilities for testing link devices.
 #[cfg(test)]
 pub(crate) mod testutil {
-    use core::convert::TryInto;
 
     use zerocopy::{AsBytes, FromBytes, FromZeros, NoCell, Unaligned};
 

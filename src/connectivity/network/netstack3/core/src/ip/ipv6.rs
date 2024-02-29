@@ -4,8 +4,6 @@
 
 //! IPv6 specific functionality.
 
-use core::iter::Iterator;
-
 use packet_formats::ipv6::{
     ext_hdrs::{
         DestinationOptionData, ExtensionHeaderOption, FragmentData, HopByHopOptionData,
@@ -206,10 +204,7 @@ mod tests {
         serialize::{Buf, Serializer},
         ParseBuffer,
     };
-    use packet_formats::{
-        ip::IpProto,
-        ipv6::{Ipv6Packet, Ipv6PacketBuilder},
-    };
+    use packet_formats::{ip::IpProto, ipv6::Ipv6PacketBuilder};
 
     use super::*;
     use crate::{

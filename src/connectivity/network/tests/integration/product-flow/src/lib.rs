@@ -21,10 +21,7 @@ use netstack_testing_common::{
     realms::{KnownServiceProvider, Netstack, TestSandboxExt as _},
 };
 use netstack_testing_macros::netstack_test;
-use packet_formats::{
-    self,
-    icmp::ndp::options::{NdpOptionBuilder, PrefixInformation},
-};
+use packet_formats::icmp::ndp::options::{NdpOptionBuilder, PrefixInformation};
 use test_case::test_case;
 
 #[allow(dead_code)]

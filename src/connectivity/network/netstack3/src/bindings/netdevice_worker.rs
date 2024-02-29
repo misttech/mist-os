@@ -713,10 +713,7 @@ mod tests {
     use super::*;
     use ip_test_macro::ip_test;
     use net_declare::net_mac;
-    use net_types::{
-        ip::{Ip, Ipv4, Ipv6},
-        Witness as _,
-    };
+    use net_types::Witness as _;
     use packet::{Buf, InnerPacketBuilder as _, Serializer as _};
     use packet_formats::{
         ethernet::EthernetFrameBuilder,

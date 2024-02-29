@@ -1645,15 +1645,13 @@ mod test {
         advance, run_until_next_timers_fire, FakeRngProvider, FakeSocket, FakeSocketProvider,
         FakeTimeController,
     };
-    use crate::deps::{Clock as _, DatagramInfo};
+    use crate::deps::Clock as _;
     use assert_matches::assert_matches;
     use const_unwrap::const_unwrap_option;
     use fuchsia_async as fasync;
-    use futures::channel::mpsc;
     use futures::{join, Future};
     use itertools::Itertools as _;
     use net_declare::{net::prefix_length_v4, net_mac, std_ip_v4};
-    use net_types::ethernet::Mac;
     use net_types::ip::{Ipv4, PrefixLength};
     use std::cell::RefCell;
     use std::rc::Rc;

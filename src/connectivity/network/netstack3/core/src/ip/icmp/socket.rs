@@ -977,18 +977,17 @@ pub enum SocketInfo<A: IpAddress, D> {
 
 #[cfg(test)]
 mod tests {
-    use alloc::{vec, vec::Vec};
-    use core::num::NonZeroU16;
+    use alloc::vec;
 
     use assert_matches::assert_matches;
     use ip_test_macro::ip_test;
     use net_declare::net_ip_v6;
     use net_types::{
-        ip::{Ip, Ipv4, Ipv6, Mtu},
-        Witness, ZonedAddr,
+        ip::{Ipv4, Ipv6, Mtu},
+        Witness,
     };
-    use packet::{Buf, Serializer};
-    use packet_formats::icmp::{IcmpEchoRequest, IcmpUnusedCode};
+    use packet::Buf;
+    use packet_formats::icmp::IcmpUnusedCode;
     use test_case::test_case;
 
     use super::*;

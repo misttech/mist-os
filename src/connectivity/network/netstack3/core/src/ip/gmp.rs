@@ -40,7 +40,7 @@ pub(crate) mod mld;
 use alloc::vec::Vec;
 #[cfg(test)]
 use core::num::NonZeroUsize;
-use core::{convert::TryFrom, fmt::Debug, time::Duration};
+use core::{fmt::Debug, time::Duration};
 
 use assert_matches::assert_matches;
 use net_types::{

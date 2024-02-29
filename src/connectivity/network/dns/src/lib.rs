@@ -7,7 +7,7 @@ use {
     fuchsia_async::{self as fasync, TimeoutExt},
     fuchsia_zircon as zx,
     futures::{future::FutureExt, Future},
-    std::{convert::TryFrom, io, time::Duration},
+    std::{io, time::Duration},
     trust_dns_proto::{Executor, Time},
 };
 

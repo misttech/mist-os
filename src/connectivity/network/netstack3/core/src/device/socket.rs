@@ -1069,17 +1069,11 @@ mod testutil {
 
 #[cfg(test)]
 mod tests {
-    use alloc::{
-        collections::{HashMap, HashSet},
-        vec,
-        vec::Vec,
-    };
+    use alloc::{collections::HashMap, vec, vec::Vec};
 
     use const_unwrap::const_unwrap_option;
     use derivative::Derivative;
-    use net_types::ethernet::Mac;
-    use packet::{Buf, BufferMut, FragmentedBuffer as _, ParsablePacket};
-    use packet_formats::ethernet::EthernetFrameLengthCheck;
+    use packet::{Buf, FragmentedBuffer as _, ParsablePacket};
     use test_case::test_case;
 
     use crate::{
@@ -1088,7 +1082,6 @@ mod tests {
             testutil::{FakeStrongDeviceId, FakeWeakDeviceId, MultipleDevicesId},
             Id,
         },
-        sync::Mutex,
     };
 
     use super::*;

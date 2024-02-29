@@ -543,16 +543,9 @@ impl<I: Instant> GmpStateMachine<I, Igmpv2ProtocolSpecific> {
 mod tests {
     use alloc::vec::Vec;
     use assert_matches::assert_matches;
-    use core::convert::TryInto;
 
-    use net_types::{
-        ethernet::Mac,
-        ip::{AddrSubnet, Ip as _},
-    };
-    use packet::{
-        serialize::{Buf, InnerPacketBuilder, Serializer},
-        ParsablePacket as _,
-    };
+    use net_types::{ethernet::Mac, ip::Ip as _};
+    use packet::{serialize::Buf, ParsablePacket as _};
     use packet_formats::{
         ethernet::EthernetFrameLengthCheck,
         igmp::messages::IgmpMembershipQueryV2,
@@ -577,7 +570,7 @@ mod tests {
                 Ipv4DeviceTimerId,
             },
             gmp::{
-                GmpHandler as _, GroupJoinResult, GroupLeaveResult, MemberState, MulticastGroupSet,
+                GmpHandler as _, GroupJoinResult, GroupLeaveResult, MemberState,
                 QueryReceivedActions, ReportReceivedActions, ReportTimerExpiredActions,
             },
             testutil::FakeIpDeviceIdCtx,

@@ -75,7 +75,7 @@ impl AsyncWrite for DnsTcpStream {
 mod test {
     use super::*;
 
-    use crate::{FuchsiaExec, FuchsiaTime};
+    use crate::FuchsiaExec;
     use net_declare::std::ip;
 
     #[test]

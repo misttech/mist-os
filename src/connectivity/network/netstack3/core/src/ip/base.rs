@@ -3049,7 +3049,7 @@ pub(crate) mod testutil {
 
     use alloc::collections::HashSet;
 
-    use net_types::{ip::IpInvariant, MulticastAddr};
+    use net_types::ip::IpInvariant;
 
     use crate::{
         context::{testutil::FakeInstant, RngContext},
@@ -3247,15 +3247,14 @@ pub(crate) mod testutil {
 #[cfg(test)]
 mod tests {
     use alloc::vec;
-    use core::{convert::TryFrom, num::NonZeroU16, time::Duration};
+    use core::{num::NonZeroU16, time::Duration};
 
     use ip_test_macro::ip_test;
     use net_types::{
         ethernet::Mac,
-        ip::{AddrSubnet, IpAddr, Ipv4Addr, Ipv6Addr},
-        MulticastAddr, UnicastAddr,
+        ip::{AddrSubnet, IpAddr},
     };
-    use packet::{Buf, ParseBuffer};
+    use packet::ParseBuffer;
     use packet_formats::{
         ethernet::{
             EthernetFrame, EthernetFrameBuilder, EthernetFrameLengthCheck,
@@ -3281,7 +3280,6 @@ mod tests {
             ethernet::{EthernetCreationProperties, EthernetLinkDevice, RecvEthernetFrameMeta},
             loopback::{LoopbackCreationProperties, LoopbackDevice},
             testutil::set_forwarding_enabled,
-            DeviceId, FrameDestination,
         },
         ip::{
             device::{
@@ -3293,7 +3291,6 @@ mod tests {
             },
             types::{AddableEntryEither, AddableMetric, RawMetric},
         },
-        state::StackState,
         testutil::{
             assert_empty, new_rng, set_logger_for_test, Ctx, FakeBindingsCtx, FakeCtx,
             FakeEventDispatcherBuilder, TestIpExt, DEFAULT_INTERFACE_METRIC, FAKE_CONFIG_V4,

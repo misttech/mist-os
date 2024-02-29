@@ -55,7 +55,7 @@ pub(crate) async fn run_client_provider<Fut, F>(
 mod tests {
     use fidl::endpoints::create_endpoints;
     use fidl_fuchsia_net_dhcpv6::ClientProviderMarker;
-    use fidl_fuchsia_net_dhcpv6_ext::{ClientConfig, NewClientParams};
+    use fidl_fuchsia_net_dhcpv6_ext::ClientConfig;
     use fuchsia_async as fasync;
     use futures::join;
 

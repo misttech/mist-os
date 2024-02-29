@@ -650,7 +650,7 @@ mod tests {
     use super::*;
     use crate::bindings::integration_tests::set_logger_for_test;
     use assert_matches::assert_matches;
-    use futures::{channel::mpsc, Future, StreamExt};
+    use futures::{Future, StreamExt};
     use netstack3_core::sync::Mutex;
     use std::{sync::Arc, task::Poll};
     use test_case::test_case;

@@ -1007,15 +1007,11 @@ mod tests {
 
     use assert_matches::assert_matches;
     use net_declare::{net_ip_v4, net_ip_v6};
-    use net_types::{
-        ip::{Ipv4, Ipv4Addr, Ipv6, Ipv6Addr},
-        SpecifiedAddr,
-    };
+    use net_types::ip::{Ipv4Addr, Ipv6, Ipv6Addr};
     use test_case::test_case;
 
     use crate::{
         device::testutil::{FakeDeviceId, FakeWeakDeviceId},
-        socket::address::{ConnIpAddr, ListenerIpAddr, SocketIpAddr},
         testutil::set_logger_for_test,
     };
 

@@ -554,12 +554,11 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::LoopbackTxDequeue>
 
 #[cfg(test)]
 mod tests {
-    use alloc::vec::Vec;
 
     use assert_matches::assert_matches;
     use ip_test_macro::ip_test;
 
-    use net_types::ip::{AddrSubnet, Ip, Ipv4, Ipv6, Mtu};
+    use net_types::ip::{AddrSubnet, Ipv4, Ipv6};
     use packet::ParseBuffer;
 
     use crate::{

@@ -14,7 +14,6 @@ use alloc::{
 use core::{
     fmt::Debug,
     hash::Hash,
-    iter::Iterator,
     marker::PhantomData,
     num::{NonZeroU16, NonZeroU32},
 };
@@ -2516,17 +2515,17 @@ where
 #[cfg(test)]
 mod tests {
     use alloc::collections::HashSet;
-    use alloc::{vec, vec::Vec};
+    use alloc::vec;
     use core::num::{NonZeroU16, NonZeroUsize};
 
     use ip_test_macro::ip_test;
 
     use net_declare::{net_ip_v4, net_ip_v6};
     use net_types::{
-        ip::{AddrSubnet, IpAddress as _, IpInvariant, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Subnet},
+        ip::{AddrSubnet, IpAddress as _, IpInvariant, Ipv4Addr, Ipv6Addr, Subnet},
         UnicastAddr, Witness as _,
     };
-    use packet::{Buf, InnerPacketBuilder as _, Serializer as _};
+    use packet::{InnerPacketBuilder as _, Serializer as _};
     use packet_formats::{
         ethernet::{EtherType, EthernetFrameLengthCheck},
         icmp::{

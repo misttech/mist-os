@@ -55,7 +55,6 @@ use netstack_testing_common::{
 use netstack_testing_macros::netstack_test;
 use packet::{InnerPacketBuilder as _, ParsablePacket as _, Serializer as _};
 use packet_formats::{
-    self,
     arp::{ArpOp, ArpPacketBuilder},
     ethernet::{EtherType, EthernetFrameBuilder, ETHERNET_MIN_BODY_LEN_NO_TAG},
     icmp::{

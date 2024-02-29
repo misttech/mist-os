@@ -509,8 +509,6 @@ pub enum DeviceSendFrameError<T> {
 pub(crate) mod testutil {
     use super::*;
 
-    use net_types::ip::{Ipv4, Ipv6};
-
     use crate::ip::device::config::{
         IpDeviceConfigurationUpdate, Ipv4DeviceConfigurationUpdate, Ipv6DeviceConfigurationUpdate,
     };
@@ -648,7 +646,6 @@ pub(crate) mod testutil {
 
 #[cfg(test)]
 mod tests {
-    use alloc::vec::Vec;
     use core::{
         num::{NonZeroU16, NonZeroU8},
         time::Duration,
@@ -657,7 +654,7 @@ mod tests {
     use const_unwrap::const_unwrap_option;
     use net_declare::net_mac;
     use net_types::{
-        ip::{AddrSubnet, Ipv4, Ipv6, Mtu},
+        ip::{AddrSubnet, Mtu},
         SpecifiedAddr, UnicastAddr, Witness as _,
     };
     use test_case::test_case;

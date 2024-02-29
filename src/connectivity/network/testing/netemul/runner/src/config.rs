@@ -11,7 +11,6 @@ use fidl_fuchsia_netemul_network as fnetemul_network;
 use fidl_fuchsia_sys2 as fsys2;
 use std::{
     collections::{hash_map, HashMap, HashSet},
-    convert::TryFrom,
     str::FromStr,
 };
 use tracing::{debug, info};

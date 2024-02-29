@@ -1515,7 +1515,6 @@ async fn do_netstack_migration<W: std::io::Write, C: NetCliDepsConnector>(
 mod tests {
     use super::*;
 
-    use anyhow::Error;
     use assert_matches::assert_matches;
     use fidl::endpoints::ProtocolMarker;
     use fidl_fuchsia_hardware_network as fhardware_network;

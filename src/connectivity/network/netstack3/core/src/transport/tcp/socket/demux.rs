@@ -7,7 +7,7 @@
 
 use alloc::collections::hash_map;
 use assert_matches::assert_matches;
-use core::{convert::TryFrom, fmt::Debug, num::NonZeroU16};
+use core::{fmt::Debug, num::NonZeroU16};
 use tracing::{error, trace};
 
 use net_types::{ip::IpAddress, SpecifiedAddr};
@@ -1108,10 +1108,7 @@ mod test {
     use packet::ParseBuffer as _;
     use test_case::test_case;
 
-    use crate::{
-        testutil::TestIpExt,
-        transport::tcp::{seqnum::SeqNum, Mss},
-    };
+    use crate::{testutil::TestIpExt, transport::tcp::Mss};
 
     use super::*;
 

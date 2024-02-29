@@ -235,11 +235,10 @@ impl<'a> BufferAlloc<Buf<Vec<u8>>> for &'a mut BufVecU8Allocator {
 mod tests {
     use super::*;
 
-    use alloc::{vec, vec::Vec};
+    use alloc::vec;
 
     use net_declare::net_mac;
     use net_types::ethernet::Mac;
-    use packet::Buf;
     use test_case::test_case;
 
     use crate::{

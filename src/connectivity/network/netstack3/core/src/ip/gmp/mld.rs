@@ -453,17 +453,13 @@ fn send_mld_packet<
 
 #[cfg(test)]
 mod tests {
-    use core::convert::TryInto;
 
     use assert_matches::assert_matches;
     use net_types::ethernet::Mac;
     use packet::ParseBuffer;
     use packet_formats::{
         ethernet::EthernetFrameLengthCheck,
-        icmp::{
-            mld::{MulticastListenerDone, MulticastListenerQuery, MulticastListenerReport},
-            IcmpParseArgs, Icmpv6MessageType, Icmpv6Packet,
-        },
+        icmp::{mld::MulticastListenerQuery, IcmpParseArgs, Icmpv6MessageType, Icmpv6Packet},
         testutil::parse_icmp_packet_in_ip_packet_in_ethernet_frame,
     };
 
@@ -485,7 +481,7 @@ mod tests {
                 Ipv6DeviceTimerId,
             },
             gmp::{
-                GmpHandler as _, GroupJoinResult, GroupLeaveResult, MemberState, MulticastGroupSet,
+                GmpHandler as _, GroupJoinResult, GroupLeaveResult, MemberState,
                 QueryReceivedActions, QueryReceivedGenericAction,
             },
             testutil::FakeIpDeviceIdCtx,

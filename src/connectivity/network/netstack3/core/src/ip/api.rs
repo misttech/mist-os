@@ -5,7 +5,6 @@
 //! Defines the public API exposed to bindings by the IP module.
 
 use alloc::vec::Vec;
-use core::{cmp::Ord, iter::Extend};
 use net_types::{
     ip::{Ip, IpAddr, IpVersionMarker, Ipv4, Ipv6},
     SpecifiedAddr, Witness as _,

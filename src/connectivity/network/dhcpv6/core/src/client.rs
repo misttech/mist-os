@@ -14,8 +14,6 @@ use rand::{thread_rng, Rng};
 use std::{
     cmp::{Eq, Ord, PartialEq, PartialOrd},
     collections::{hash_map::Entry, BinaryHeap, HashMap, HashSet},
-    convert::TryFrom,
-    default::Default,
     fmt::Debug,
     hash::Hash,
     marker::PhantomData,
@@ -5059,12 +5057,9 @@ impl<I: Instant, R: Rng> ClientStateMachine<I, R> {
 
 #[cfg(test)]
 pub(crate) mod testconsts {
+    use super::*;
     use const_unwrap::const_unwrap_option;
     use net_declare::{net_ip_v6, net_subnet_v6};
-    use net_types::ip::{Ipv6Addr, Subnet};
-    use packet_formats_dhcp::v6;
-
-    use super::*;
 
     pub(super) trait IaValueTestExt: IaValue {
         const CONFIGURED: [Self; 3];

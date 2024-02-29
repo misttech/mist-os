@@ -16,7 +16,6 @@ use {
     },
     fidl_fuchsia_net_routes as fnet_routes, fuchsia_async as fasync,
     fuchsia_component::server::{ServiceFs, ServiceFsDir},
-    fuchsia_inspect, fuchsia_scheduler,
     fuchsia_sync::RwLock,
     fuchsia_zircon as zx,
     futures::{
@@ -1187,9 +1186,8 @@ pub async fn main() -> Result<(), Error> {
 #[cfg(test)]
 mod tests {
     use std::{
-        net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr},
+        net::{Ipv4Addr, Ipv6Addr, SocketAddr},
         str::FromStr,
-        sync::Arc,
     };
 
     use assert_matches::assert_matches;
@@ -1203,9 +1201,9 @@ mod tests {
     use test_case::test_case;
     use trust_dns_proto::{
         op::Query,
-        rr::{Name, RData, Record},
+        rr::{Name, Record},
     };
-    use trust_dns_resolver::{error::ResolveErrorKind, lookup::Lookup, lookup::ReverseLookup};
+    use trust_dns_resolver::{lookup::Lookup, lookup::ReverseLookup};
 
     use super::*;
 

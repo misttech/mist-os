@@ -103,7 +103,7 @@ mod tests {
 
     use alloc::{collections::HashSet, vec, vec::Vec};
     use core::{
-        convert::{TryFrom, TryInto as _},
+        convert::TryInto as _,
         fmt::Debug,
         num::{NonZeroU16, NonZeroU8},
         time::Duration,

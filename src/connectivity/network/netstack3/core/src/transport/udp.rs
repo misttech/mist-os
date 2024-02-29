@@ -2586,7 +2586,6 @@ mod tests {
         borrow::ToOwned,
         collections::{HashMap, HashSet},
         vec,
-        vec::Vec,
     };
     use const_unwrap::const_unwrap_option;
     use core::{
@@ -2602,10 +2601,10 @@ mod tests {
     use net_declare::net_ip_v4 as ip_v4;
     use net_declare::net_ip_v6;
     use net_types::{
-        ip::{IpAddr, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Ipv6SourceAddr},
+        ip::{IpAddr, Ipv4, Ipv6, Ipv6SourceAddr},
         AddrAndZone, LinkLocalAddr, MulticastAddr, Scope as _, ScopeableAddress as _, ZonedAddr,
     };
-    use packet::{Buf, ParsablePacket, Serializer};
+    use packet::Buf;
     use test_case::test_case;
 
     use super::*;

@@ -47,8 +47,6 @@ use packet_formats_dhcp::v6;
 use rand::{rngs::StdRng, SeedableRng};
 use tracing::{debug, error, warn};
 
-use dhcpv6_core;
-
 /// A thin wrapper around `zx::Time` that implements `dhcpv6_core::Instant`.
 #[derive(PartialEq, Eq, PartialOrd, Ord, Copy, Clone, Debug)]
 pub(crate) struct MonotonicTime(zx::Time);
@@ -734,7 +732,7 @@ pub(crate) async fn serve_client(
 
 #[cfg(test)]
 mod tests {
-    use std::{collections::HashSet, pin::Pin, task::Poll};
+    use std::{pin::Pin, task::Poll};
 
     use fidl::endpoints::{
         create_proxy, create_proxy_and_stream, create_request_stream, ClientEnd,

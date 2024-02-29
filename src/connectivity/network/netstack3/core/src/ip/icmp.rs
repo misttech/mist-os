@@ -3051,24 +3051,16 @@ fn receive_icmp_echo_reply<
 mod tests {
     use alloc::{vec, vec::Vec};
     use core::{
-        convert::TryInto,
         fmt::Debug,
-        num::NonZeroU16,
         ops::{Deref, DerefMut},
         time::Duration,
     };
 
-    use net_types::{
-        ip::{Ip, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Subnet},
-        ZonedAddr,
-    };
-    use packet::{Buf, Serializer};
+    use net_types::{ip::Subnet, ZonedAddr};
+    use packet::Buf;
     use packet_formats::{
         ethernet::EthernetFrameLengthCheck,
-        icmp::{
-            mld::MldPacket, IcmpEchoRequest, IcmpMessage, IcmpPacket, IcmpUnusedCode,
-            Icmpv4TimestampRequest, MessageBody,
-        },
+        icmp::{mld::MldPacket, Icmpv4TimestampRequest},
         ip::{IpPacketBuilder, IpProto},
         testutil::parse_icmp_packet_in_ip_packet_in_ethernet_frame,
         udp::UdpPacketBuilder,
@@ -3080,25 +3072,20 @@ mod tests {
         context::testutil::{
             FakeBindingsCtx, FakeCoreCtx, FakeCtxWithCoreCtx, FakeInstant, Wrapped,
         },
-        context::CounterContext,
         device::{
             testutil::{set_forwarding_enabled, FakeDeviceId, FakeWeakDeviceId},
-            DeviceId, FrameDestination,
+            DeviceId,
         },
         ip::{
-            device::{
-                route_discovery::Ipv6DiscoveredRoute, state::IpDeviceStateIpExt, IpDeviceAddr,
-                IpDeviceHandler,
-            },
+            device::{state::IpDeviceStateIpExt, IpDeviceAddr},
             icmp::socket::{
-                IcmpEchoBindingsTypes, IcmpEchoSocketApi, IcmpSocketId, IcmpSocketSet,
-                IcmpSocketState, StateContext,
+                IcmpEchoSocketApi, IcmpSocketId, IcmpSocketSet, IcmpSocketState, StateContext,
             },
             path_mtu::testutil::FakePmtuState,
             socket::testutil::{FakeDeviceConfig, FakeDualStackIpSocketCtx},
             testutil::DualStackSendIpPacketMeta,
             types::RoutableIpAddr,
-            IpCounters, IpLayerIpExt, SendIpPacketMeta,
+            IpCounters, IpLayerIpExt,
         },
         state::StackStateBuilder,
         testutil::{assert_empty, Ctx, TestIpExt, FAKE_CONFIG_V4, FAKE_CONFIG_V6},

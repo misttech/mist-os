@@ -19,9 +19,8 @@ use fuchsia_async::TimeoutExt;
 use fuchsia_zircon_status as zx_status;
 use futures::{FutureExt, StreamExt};
 use net_declare::{fidl_ip, fidl_ip_v4, fidl_mac, fidl_subnet, net_subnet_v4, net_subnet_v6};
-use net_types::{
-    self,
-    ip::{GenericOverIp, Ip, IpAddress, IpInvariant, IpVersion, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr},
+use net_types::ip::{
+    GenericOverIp, Ip, IpAddress, IpInvariant, IpVersion, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr,
 };
 use netemul::{InStack, InterfaceConfig};
 use netstack_testing_common::{

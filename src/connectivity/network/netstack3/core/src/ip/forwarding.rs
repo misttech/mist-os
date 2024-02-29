@@ -227,11 +227,9 @@ pub(crate) mod testutil {
     #[cfg(test)]
     pub(crate) use super::testutil_testonly::*;
 
-    use net_types::ip::Subnet;
-
     use crate::ip::{
-        types::{AddableMetric, Entry, EntryAndGeneration, Generation, Metric},
-        IpLayerBindingsContext, IpLayerIpExt, IpStateContext,
+        types::{AddableMetric, Generation, Metric},
+        IpStateContext,
     };
 
     use super::*;
@@ -435,14 +433,11 @@ mod testutil_testonly {
 
 #[cfg(test)]
 mod tests {
-    use fakealloc::{collections::HashSet, vec::Vec};
+    use fakealloc::collections::HashSet;
     use ip_test_macro::ip_test;
     use itertools::Itertools;
     use net_declare::{net_ip_v4, net_ip_v6, net_subnet_v4, net_subnet_v6};
-    use net_types::{
-        ip::{IpAddress as _, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr},
-        SpecifiedAddr,
-    };
+    use net_types::ip::{IpAddress as _, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr};
     use test_case::test_case;
     use tracing::trace;
 
@@ -456,7 +451,7 @@ mod tests {
         error,
         ip::{
             forwarding::testutil::FakeIpForwardingCtx,
-            types::{AddableEntryEither, AddableMetric, Metric, RawMetric},
+            types::{AddableEntryEither, AddableMetric, Metric},
         },
         testutil::FakeEventDispatcherConfig,
     };

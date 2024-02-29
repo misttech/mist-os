@@ -4154,19 +4154,14 @@ where
 #[cfg(test)]
 mod tests {
     use alloc::{format, rc::Rc, string::String, sync::Arc, vec, vec::Vec};
-    use core::{
-        ffi::CStr,
-        num::NonZeroU16,
-        ops::{Deref, DerefMut},
-        time::Duration,
-    };
+    use core::{ffi::CStr, num::NonZeroU16, time::Duration};
 
     use const_unwrap::const_unwrap_option;
     use ip_test_macro::ip_test;
     use net_declare::net_ip_v6;
     use net_types::{
-        ip::{AddrSubnet, Ip, IpVersion, Ipv4, Ipv6, Ipv6SourceAddr, Mtu},
-        AddrAndZone, LinkLocalAddr, Witness,
+        ip::{AddrSubnet, Ip, Ipv4, Ipv6, Ipv6SourceAddr, Mtu},
+        LinkLocalAddr, Witness,
     };
     use packet::{Buf, BufferMut, ParseBuffer as _, Serializer};
     use packet_formats::{
@@ -4211,7 +4206,7 @@ mod tests {
             },
             testutil::DualStackSendIpPacketMeta,
             types::{ResolvedRoute, RoutableIpAddr},
-            HopLimits, IpTransportContext, ResolveRouteError, SendIpPacketMeta, TransportIpContext,
+            HopLimits, IpTransportContext, ResolveRouteError, SendIpPacketMeta,
         },
         sync::Mutex,
         testutil::ContextPair,

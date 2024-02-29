@@ -6,7 +6,6 @@ use argh::{ArgsInfo, FromArgs};
 
 use fidl_fuchsia_net_ext::MacAddress as MacAddr;
 use std::net::Ipv4Addr;
-use std::string::ToString;
 
 #[derive(ArgsInfo, FromArgs, Clone, Debug, PartialEq)]
 #[argh(subcommand, name = "dhcpd")]

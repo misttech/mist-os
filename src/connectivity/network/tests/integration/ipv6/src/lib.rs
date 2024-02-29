@@ -15,7 +15,7 @@ use fidl_fuchsia_net_routes_ext as fnet_routes_ext;
 use fuchsia_async::{DurationExt as _, TimeoutExt as _};
 use fuchsia_zircon as zx;
 
-use anyhow::{self, Context as _};
+use anyhow::Context as _;
 use futures::{
     future, Future, FutureExt as _, StreamExt as _, TryFutureExt as _, TryStreamExt as _,
 };

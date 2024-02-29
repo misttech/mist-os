@@ -2299,14 +2299,11 @@ mod tests {
     use packet::Serializer as _;
     use packet_formats::icmp::IcmpIpExt;
 
-    use crate::bindings::socket::{
-        queue::MIN_OUTSTANDING_APPLICATION_MESSAGES_SIZE, testutil::TestSockAddr,
-    };
     use crate::bindings::{
         integration_tests::{
             test_ep_name, StackSetupBuilder, TestSetup, TestSetupBuilder, TestStack,
         },
-        util::IntoFidl,
+        socket::{queue::MIN_OUTSTANDING_APPLICATION_MESSAGES_SIZE, testutil::TestSockAddr},
     };
     use net_types::{
         ip::{IpAddr, IpAddress},

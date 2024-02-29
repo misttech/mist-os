@@ -10,7 +10,6 @@ pub(crate) mod rx;
 pub(crate) mod tx;
 
 use alloc::collections::VecDeque;
-use core::convert::From;
 
 use crate::{device::DeviceSendFrameError, work_queue::WorkQueueReport};
 

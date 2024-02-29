@@ -37,7 +37,7 @@ use alloc::{
     },
     vec::Vec,
 };
-use core::{cmp::Ordering, convert::TryFrom, marker::PhantomData, time::Duration};
+use core::{cmp::Ordering, marker::PhantomData, time::Duration};
 
 use assert_matches::assert_matches;
 use net_types::ip::{Ip, IpAddr, IpAddress};
@@ -810,14 +810,14 @@ mod tests {
     use assert_matches::assert_matches;
     use ip_test_macro::ip_test;
     use net_types::{
-        ip::{IpAddress, Ipv4, Ipv6},
+        ip::{Ipv4, Ipv6},
         Witness,
     };
     use packet::{Buf, ParseBuffer, Serializer};
     use packet_formats::{
         ip::{IpProto, Ipv6ExtHdrType},
-        ipv4::{Ipv4Packet, Ipv4PacketBuilder},
-        ipv6::{Ipv6Packet, Ipv6PacketBuilder},
+        ipv4::Ipv4PacketBuilder,
+        ipv6::Ipv6PacketBuilder,
     };
 
     use super::*;

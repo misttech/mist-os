@@ -636,9 +636,9 @@ mod tests {
     use alloc::{vec, vec::Vec};
     use core::iter;
 
-    use net_types::{ethernet::Mac, ip::Ipv4Addr};
-    use packet::{Buf, ParseBuffer, Serializer};
-    use packet_formats::arp::{peek_arp_types, ArpHardwareType, ArpNetworkType, ArpPacketBuilder};
+    use net_types::ethernet::Mac;
+    use packet::{Buf, ParseBuffer};
+    use packet_formats::arp::{peek_arp_types, ArpHardwareType, ArpNetworkType};
     use test_case::test_case;
 
     use super::*;
@@ -660,7 +660,7 @@ mod tests {
                 assert_dynamic_neighbor_state, assert_dynamic_neighbor_with_addr,
                 assert_neighbor_unknown,
             },
-            DynamicNeighborState, NudCounters, NudHandler, NudIcmpContext, Reachable, Stale,
+            DynamicNeighborState, NudCounters, NudIcmpContext, Reachable, Stale,
         },
         socket::address::SocketIpAddr,
         testutil::assert_empty,

@@ -784,7 +784,6 @@ pub(crate) mod ipv6_source_address_selection {
     #[cfg(test)]
     mod tests {
         use net_declare::net_ip_v6;
-        use net_types::ip::AddrSubnet;
 
         use super::*;
 
@@ -932,7 +931,7 @@ pub(crate) mod testutil {
     use crate::{
         context::{
             testutil::{FakeBindingsCtx, FakeCoreCtx, FakeInstant},
-            RngContext, SendFrameContext, TracingContext,
+            RngContext, SendFrameContext,
         },
         device::testutil::{FakeStrongDeviceId, FakeWeakDeviceId},
         ip::{
@@ -944,8 +943,7 @@ pub(crate) mod testutil {
             icmp::{IcmpRxCounters, IcmpTxCounters, NdpCounters},
             testutil::FakeIpDeviceIdCtx,
             types::Destination,
-            HopLimits, IpCounters, MulticastMembershipHandler, SendIpPacketMeta,
-            TransportIpContext, DEFAULT_HOP_LIMITS,
+            HopLimits, MulticastMembershipHandler, TransportIpContext, DEFAULT_HOP_LIMITS,
         },
         sync::PrimaryRc,
         testutil::DEFAULT_INTERFACE_METRIC,
@@ -1805,9 +1803,7 @@ mod tests {
     use ip_test_macro::ip_test;
 
     use net_types::{
-        ip::{
-            AddrSubnet, GenericOverIp, IpAddr, IpAddress, IpInvariant, Ipv4, Ipv4Addr, Ipv6, Mtu,
-        },
+        ip::{AddrSubnet, GenericOverIp, IpAddr, IpAddress, IpInvariant, Ipv4, Ipv4Addr, Ipv6},
         Witness,
     };
     use packet::{Buf, InnerPacketBuilder, ParseBuffer};
@@ -1831,7 +1827,7 @@ mod tests {
         ip::{
             device::IpDeviceConfigurationContext as DeviceIpDeviceConfigurationContext,
             types::{AddableEntryEither, AddableMetric, RawMetric},
-            IpDeviceContext, IpLayerEvent, IpLayerIpExt, IpStateContext,
+            IpLayerEvent, IpStateContext,
         },
         testutil::*,
         UnlockedCoreCtx,

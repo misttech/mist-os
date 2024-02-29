@@ -9,7 +9,6 @@
 use alloc::{vec, vec::Vec};
 use core::{
     cmp,
-    convert::TryFrom,
     fmt::Debug,
     num::{NonZeroUsize, TryFromIntError},
     ops::Range,
@@ -662,7 +661,7 @@ impl<R: Default + ReceiveBuffer, S: Default + SendBuffer> IntoBuffers<R, S> for 
 pub(crate) mod testutil {
     use super::*;
 
-    use alloc::{sync::Arc, vec::Vec};
+    use alloc::sync::Arc;
 
     use crate::sync::Mutex;
     use crate::transport::tcp::socket::ListenerNotifier;
@@ -1370,7 +1369,7 @@ mod test {
     }
     mod send_payload {
         use super::*;
-        use alloc::{borrow::ToOwned as _, vec::Vec};
+        use alloc::borrow::ToOwned as _;
 
         pub(super) fn with_index() -> impl Strategy<Value = (SendPayload<'static>, usize)> {
             proptest::prop_oneof![

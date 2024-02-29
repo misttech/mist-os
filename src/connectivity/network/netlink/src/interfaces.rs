@@ -1732,7 +1732,7 @@ pub(crate) mod testutil {
 mod tests {
     use super::{testutil::*, *};
 
-    use std::{num::NonZeroU64, pin::Pin};
+    use std::pin::Pin;
 
     use fidl::endpoints::{ControlHandle as _, RequestStream as _, Responder as _};
     use fidl_fuchsia_net as fnet;

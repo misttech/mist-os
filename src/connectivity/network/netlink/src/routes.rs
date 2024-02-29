@@ -1218,8 +1218,6 @@ fn select_route_for_deletion<I: Ip>(
 mod tests {
     use super::*;
 
-    use std::collections::HashSet;
-
     use fidl::endpoints::{ControlHandle, RequestStream};
     use fidl_fuchsia_net_routes as fnet_routes;
     use fidl_fuchsia_net_routes_admin as fnet_routes_admin;
@@ -1228,7 +1226,7 @@ mod tests {
     use futures::{future::Future, sink::SinkExt as _, Stream};
     use net_declare::{net_ip_v4, net_ip_v6, net_subnet_v4, net_subnet_v6};
     use net_types::{
-        ip::{GenericOverIp, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Subnet},
+        ip::{GenericOverIp, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr},
         SpecifiedAddr,
     };
     use netlink_packet_core::NetlinkPayload;

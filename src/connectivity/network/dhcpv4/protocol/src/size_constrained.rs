@@ -4,7 +4,6 @@
 
 use crate::size_of_contents::SizeOfContents;
 use serde::{Deserialize, Serialize};
-use std::convert::TryFrom;
 use std::ops::Deref;
 
 pub const U8_MAX_AS_USIZE: usize = u8::MAX as usize;
@@ -222,7 +221,7 @@ pub enum Error {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::{cmp::PartialEq, fmt::Debug};
+    use std::fmt::Debug;
 
     fn run_edge_case<T: Copy + Debug + PartialEq>(item: T, max_number_allowed: impl Into<usize>) {
         let max_number_allowed = max_number_allowed.into();

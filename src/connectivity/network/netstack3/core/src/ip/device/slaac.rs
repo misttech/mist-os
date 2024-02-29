@@ -9,9 +9,7 @@
 //! [RFC 8981]: https://datatracker.ietf.org/doc/html/rfc8981
 
 use alloc::{boxed::Box, vec::Vec};
-use core::{
-    convert::TryFrom, marker::PhantomData, num::NonZeroU16, ops::ControlFlow, time::Duration,
-};
+use core::{marker::PhantomData, num::NonZeroU16, ops::ControlFlow, time::Duration};
 
 use assert_matches::assert_matches;
 use const_unwrap::const_unwrap_option;

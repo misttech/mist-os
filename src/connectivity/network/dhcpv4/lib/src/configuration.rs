@@ -13,14 +13,7 @@ use std::convert::Infallible as Never;
 
 use net_types::ip::{IpAddress as _, Ipv4, PrefixLength};
 use serde::{Deserialize, Serialize};
-use serde_json;
-use std::{
-    collections::HashMap,
-    convert::{TryFrom, TryInto},
-    io,
-    net::Ipv4Addr,
-    num::TryFromIntError,
-};
+use std::{collections::HashMap, io, net::Ipv4Addr, num::TryFromIntError};
 use thiserror::Error;
 
 /// A collection of the basic configuration parameters needed by the server.

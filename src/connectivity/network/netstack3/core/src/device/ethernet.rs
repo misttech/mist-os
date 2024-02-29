@@ -1464,12 +1464,11 @@ impl DeviceStateSpec for EthernetLinkDevice {
 
 #[cfg(test)]
 mod tests {
-    use alloc::{vec, vec::Vec};
+    use alloc::vec;
 
     use ip_test_macro::ip_test;
     use net_declare::net_mac;
-    use net_types::ip::{AddrSubnet, Ip, IpAddr, IpVersion};
-    use packet::Buf;
+    use net_types::ip::{AddrSubnet, IpAddr, IpVersion};
     use packet_formats::{
         ethernet::ETHERNET_MIN_BODY_LEN_NO_TAG,
         icmp::IcmpDestUnreachable,

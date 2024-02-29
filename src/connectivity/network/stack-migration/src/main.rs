@@ -10,7 +10,6 @@ use fuchsia_component::server::{ServiceFs, ServiceFsDir};
 use fuchsia_inspect::Property as _;
 use futures::StreamExt as _;
 use networking_metrics_registry::networking_metrics_registry as metrics_registry;
-use std::convert::From;
 use tracing::{error, info, warn};
 
 const DEFAULT_NETSTACK: NetstackVersion = NetstackVersion::Netstack2;

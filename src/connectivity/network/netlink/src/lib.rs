@@ -301,7 +301,6 @@ mod tests {
     use super::*;
 
     use assert_matches::assert_matches;
-    use futures::channel::mpsc;
 
     use crate::{
         messaging::testutil::SentMessage,

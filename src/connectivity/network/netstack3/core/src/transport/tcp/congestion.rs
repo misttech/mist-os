@@ -281,7 +281,6 @@ impl FastRecovery {
 
 #[cfg(test)]
 mod test {
-    use core::{num::NonZeroU32, time::Duration};
 
     use super::*;
     use crate::{

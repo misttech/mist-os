@@ -451,14 +451,14 @@ pub(crate) mod testutil {
     use alloc::{boxed::Box, collections::BinaryHeap, format, string::String, sync::Arc, vec::Vec};
     #[cfg(test)]
     use alloc::{collections::HashMap, vec};
+    #[cfg(test)]
+    use core::marker::PhantomData;
     use core::{
         convert::Infallible as Never,
         fmt::{self, Debug, Formatter},
         hash::Hash,
         ops::{self, RangeBounds},
     };
-    #[cfg(test)]
-    use core::{iter::FromIterator, marker::PhantomData};
 
     #[cfg(test)]
     use assert_matches::assert_matches;
@@ -478,7 +478,6 @@ pub(crate) mod testutil {
         ip::device::nud::{LinkResolutionContext, LinkResolutionNotifier},
         sync::Mutex,
         testutil::FakeCryptoRng,
-        Instant,
     };
 
     /// A fake implementation of `Instant` for use in testing.

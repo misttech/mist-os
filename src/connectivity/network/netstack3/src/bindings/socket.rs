@@ -471,10 +471,7 @@ impl From<psocket::Ipv6MulticastMembership> for IpMulticastMembership {
 
 #[cfg(test)]
 mod testutil {
-    use net_types::{
-        ip::{AddrSubnetEither, IpAddr},
-        ZonedAddr,
-    };
+    use net_types::ip::{AddrSubnetEither, IpAddr};
 
     use super::*;
 

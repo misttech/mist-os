@@ -907,7 +907,7 @@ mod tests {
     use const_unwrap::const_unwrap_option;
     use fidl_fuchsia_hardware_network as fhardware_network;
     use fixture::fixture;
-    use futures::{Future, Stream};
+    use futures::Stream;
     use itertools::Itertools as _;
     use net_types::{
         ip::{AddrSubnet, IpAddress as _, Ipv6, Ipv6Addr},

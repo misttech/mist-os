@@ -69,7 +69,7 @@ pub(crate) fn ip_addr_from_bytes<I: Ip>(addr_bytes: &[u8]) -> Result<I::Addr, Er
 
 pub(crate) mod errno {
     use const_unwrap::const_unwrap_option;
-    use net_types::ip::{GenericOverIp, Ip};
+    use net_types::ip::GenericOverIp;
 
     use super::*;
 
@@ -172,7 +172,7 @@ mod tests {
     use super::*;
 
     use assert_matches::assert_matches;
-    use netlink_packet_core::{constants::NLM_F_MULTIPART, NetlinkBuffer, NLMSG_DONE, NLMSG_ERROR};
+    use netlink_packet_core::{NetlinkBuffer, NLMSG_DONE, NLMSG_ERROR};
     use netlink_packet_route::RtnlMessage;
     use netlink_packet_utils::Parseable as _;
     use test_case::test_case;

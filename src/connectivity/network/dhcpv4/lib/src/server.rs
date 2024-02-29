@@ -19,9 +19,6 @@ use anyhow::{Context as _, Error};
 use fuchsia_zircon::Status;
 
 #[cfg(target_os = "fuchsia")]
-use std::convert::TryFrom;
-
-#[cfg(target_os = "fuchsia")]
 use tracing::info;
 
 use net_types::{

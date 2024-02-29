@@ -1729,7 +1729,6 @@ pub(crate) mod testutil {
 
     use crate::{
         device::DeviceId,
-        ip::device::config::IpDeviceConfigurationUpdate,
         testutil::{FakeBindingsCtx, FakeCtx},
     };
 
@@ -1804,7 +1803,7 @@ mod tests {
     use test_case::test_case;
 
     use net_declare::{net_ip_v4, net_ip_v6, net_mac};
-    use net_types::{ip::Ipv6, LinkLocalAddr};
+    use net_types::LinkLocalAddr;
 
     use crate::{
         context::testutil::FakeInstant,
@@ -1815,11 +1814,8 @@ mod tests {
         },
         ip::{
             device::{
-                api::SetIpAddressPropertiesError,
-                config::{IpDeviceConfigurationUpdate, UpdateIpConfigurationError},
-                nud::LinkResolutionResult,
-                slaac::SlaacConfiguration,
-                state::Lifetime,
+                api::SetIpAddressPropertiesError, config::UpdateIpConfigurationError,
+                nud::LinkResolutionResult, slaac::SlaacConfiguration,
                 testutil::set_ip_device_enabled,
             },
             gmp::GmpDelayedReportTimerId,

@@ -1933,7 +1933,6 @@ mod tests {
     use crate::bindings::{
         integration_tests::{StackSetupBuilder, TestSetup, TestSetupBuilder},
         interfaces_watcher::{InterfaceEvent, InterfaceUpdate},
-        util::IntoFidl,
     };
 
     // Verifies that when an an interface is removed, its addresses are
