@@ -2,6 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/bazel/export_fuchsia_package_to_bazel.gni")
 import("//build/bind/bind.gni")
 import("//build/components.gni")
 import("//build/drivers.gni")
@@ -71,6 +72,12 @@ fuchsia_driver_package("package") {
     ":platform-bus",
     ":platform-bus.proxy",
   ]
+}
+
+# Define Bazel input resource so it can be used
+export_fuchsia_package_to_bazel("platform-bus-package-bazel") {
+  package = ":package"
+  package_name = "platform-bus"
 }
 
 fuchsia_driver("platform-bus.proxy-driver") {

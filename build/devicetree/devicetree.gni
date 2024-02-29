@@ -320,7 +320,8 @@ template("devicetree_visitor") {
       ldflags = []
     }
 
-    _version_script = "//build/devicetree/visitor.ld"
+    _version_script =
+        "//build/bazel_sdk/bazel_rules_fuchsia/fuchsia/private/visitor.ld"
     ldflags += [ "-Wl,--version-script=" +
                  rebase_path(_version_script, root_build_dir) ]
     metadata = {

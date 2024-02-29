@@ -4,12 +4,15 @@
 
 load(
     "@fuchsia_sdk//fuchsia:defs.bzl",
-    "fuchsia_board_driver",
     "fuchsia_cc_driver",
+    "fuchsia_cc_test",
     "fuchsia_component_manifest",
     "fuchsia_driver_bind_bytecode",
     "fuchsia_driver_component",
-    "fuchsia_platforms",
+    "fuchsia_package",
+    "fuchsia_package_resource",
+    "fuchsia_test_component",
+    "fuchsia_test_package",
 )
 
 fuchsia_driver_bind_bytecode(
@@ -58,13 +61,71 @@ fuchsia_driver_component(
     manifest = ":manifest",
 )
 
-fuchsia_board_driver(
+fuchsia_package(
     name = "example-board",
     package_name = "example-board",
     components = [":component"],
     fuchsia_api_level = "HEAD",
     package_repository_name = "fuchsia.com",
-    platform = fuchsia_platforms.arm64,
+    resources = ["//sdk/lib/driver/devicetree/examples/example-visitor"],
     visibility = ["//visibility:public"],
-    visitors = ["//sdk/lib/driver/devicetree/examples/example-visitor"],
+)
+
+fuchsia_package_resource(
+    name = "test-dtb",
+    src = "@legacy_ninja_build_outputs//:test-dtb",
+    dest = "test-data/example-board.dtb",
+)
+
+fuchsia_cc_test(
+    name = "example-board-test-bin",
+    size = "small",
+    srcs = [
+        "integration-test.cc",
+    ],
+    copts = [
+        "-Wno-vla-cxx-extension",
+    ],
+    deps = [
+        "@fuchsia_sdk//pkg/async-loop-cpp",
+        "@fuchsia_sdk//pkg/async-loop-default",
+        "@internal_sdk//pkg/board-test-helper",
+        "@internal_sdk//pkg/ddk-platform-defs",
+        "@internal_sdk//pkg/zxtest",
+    ],
+)
+
+fuchsia_component_manifest(
+    name = "test-manifest",
+    src = "meta/example-board-test.cml",
+    includes = [
+        "@internal_sdk//pkg/sys/component:realm_builder",
+    ],
+)
+
+fuchsia_test_component(
+    name = "example-board-test-component",
+    manifest = ":test-manifest",
+    deps = [":example-board-test-bin"],
+)
+
+fuchsia_test_package(
+    name = "example-board-test-package",
+    package_name = "example-board-test",
+    components = [
+        ":component",
+    ],
+    fuchsia_api_level = "HEAD",
+    resources = [
+        ":test-dtb",
+        "//sdk/lib/driver/devicetree/examples/example-visitor",
+    ],
+    subpackages_to_flatten = [
+        "//sdk/lib/driver/devicetree/testing:platform-bus-driver",
+        "//sdk/lib/driver/devicetree/testing:driver_test_realm",
+    ],
+    test_components = [
+        ":example-board-test-component",
+    ],
+    visibility = ["//visibility:public"],
 )

@@ -12,6 +12,7 @@ exports_files(
 exports_files(
     [
         "driver.ld",
+        "visitor.ld",
     ] + glob([
         "templates/*",
     ]),

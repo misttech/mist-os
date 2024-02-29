@@ -117,8 +117,26 @@ def _unpack_prebuilt_package_impl(ctx):
         FuchsiaPackageInfo(
             package_manifest = rebased_package_manifest_json,
             far_file = ctx.files.archive,
-            packaged_components = [FuchsiaPackagedComponentInfo(dest = d, component_info = FuchsiaComponentInfo(is_driver = True, is_test = False)) for d in ctx.attr.drivers] +
-                                  [FuchsiaPackagedComponentInfo(dest = c, component_info = FuchsiaComponentInfo(is_driver = False, is_test = False)) for c in ctx.attr.components],
+            packaged_components = [
+                                      FuchsiaPackagedComponentInfo(
+                                          dest = d,
+                                          component_info = FuchsiaComponentInfo(
+                                              is_driver = True,
+                                              is_test = False,
+                                          ),
+                                      )
+                                      for d in ctx.attr.drivers
+                                  ] +
+                                  [
+                                      FuchsiaPackagedComponentInfo(
+                                          dest = c,
+                                          component_info = FuchsiaComponentInfo(
+                                              is_driver = False,
+                                              is_test = False,
+                                          ),
+                                      )
+                                      for c in ctx.attr.components
+                                  ],
             files = output_files,
         ),
     ]

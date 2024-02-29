@@ -10,7 +10,7 @@ group("drivers-not-templates") {
   testonly = true
   deps = [
     "//examples/drivers",
-    "//sdk/lib/driver/devicetree/examples/example-board",
+    "//sdk/lib/driver/devicetree/examples/example-board:bazel_package",
     "//sdk/lib/driver_test_realm/fake_driver:component",
     "//src/camera:drivers",
     "//src/connectivity/bundles:drivers",

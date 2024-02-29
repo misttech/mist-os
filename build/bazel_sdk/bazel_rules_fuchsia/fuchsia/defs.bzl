@@ -33,10 +33,6 @@ load(
     _fuchsia_bind_library = "fuchsia_bind_library",
 )
 load(
-    "//fuchsia/private:fuchsia_board_driver.bzl",
-    _fuchsia_board_driver = "fuchsia_board_driver",
-)
-load(
     "//fuchsia/private:fuchsia_cc.bzl",
     _fuchsia_cc_binary = "fuchsia_cc_binary",
     _fuchsia_cc_test = "fuchsia_cc_test",
@@ -67,6 +63,10 @@ load(
 load(
     "//fuchsia/private:fuchsia_debug_symbols.bzl",
     _fuchsia_debug_symbols = "fuchsia_debug_symbols",
+)
+load(
+    "//fuchsia/private:fuchsia_devicetree_visitor.bzl",
+    _fuchsia_devicetree_visitor = "fuchsia_devicetree_visitor",
 )
 load(
     "//fuchsia/private:fuchsia_driver_bind_rules.bzl",
@@ -161,13 +161,13 @@ fuchsia_package_group = _fuchsia_package_group
 fuchsia_select = _fuchsia_select
 fuchsia_cpu_select = _fuchsia_cpu_select
 fuchsia_cpu_filter_dict = _fuchsia_cpu_filter_dict
+fuchsia_devicetree_visitor = _fuchsia_devicetree_visitor
 get_component_manifests = _get_component_manifests
 get_fuchsia_api_levels = _get_fuchsia_api_levels
 get_driver_component_manifests = _get_driver_component_manifests
 if_fuchsia = _if_fuchsia
 clangd_compilation_database = _clangd_compilation_database
 fuchsia_toolchain_info = _fuchsia_toolchain_info
-fuchsia_board_driver = _fuchsia_board_driver
 
 # Platform definitions
 fuchsia_platforms = _fuchsia_platforms
