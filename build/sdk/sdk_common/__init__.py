@@ -133,7 +133,6 @@ _AREA_OPTIONAL_TYPES = [
     "data",
     "documentation",
     "ffx_tool",
-    "fidl_library",
     "host_tool",
     "loadable_module",
     "package",
