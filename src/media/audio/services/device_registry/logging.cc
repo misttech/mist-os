@@ -46,61 +46,63 @@ std::string UidToString(std::optional<UniqueId> unique_instance_id) {
   return str;
 }
 
-void LogStreamProperties(const fuchsia_hardware_audio::StreamProperties& props) {
+void LogStreamProperties(const fuchsia_hardware_audio::StreamProperties& stream_props) {
   if constexpr (!kLogStreamConfigFidlResponseValues) {
     return;
   }
 
   FX_LOGS(INFO) << "fuchsia_hardware_audio/StreamProperties:";
 
-  FX_LOGS(INFO) << "    unique_id         " << UidToString(props.unique_id());
+  FX_LOGS(INFO) << "    unique_id         " << UidToString(stream_props.unique_id());
   FX_LOGS(INFO) << "    is_input          "
-                << (props.is_input() ? (*props.is_input() ? "TRUE" : "FALSE")
-                                     : "NONE (non-compliant)");
+                << (stream_props.is_input() ? (*stream_props.is_input() ? "TRUE" : "FALSE")
+                                            : "NONE (non-compliant)");
   FX_LOGS(INFO) << "    can_mute          "
-                << (props.can_mute() ? (*props.can_mute() ? "TRUE" : "FALSE")
-                                     : "NONE (cannot mute)");
+                << (stream_props.can_mute() ? (*stream_props.can_mute() ? "TRUE" : "FALSE")
+                                            : "NONE (cannot mute)");
   FX_LOGS(INFO) << "    can_agc           "
-                << (props.can_agc() ? (*props.can_agc() ? "TRUE" : "FALSE")
-                                    : "NONE (cannot enable AGC)");
-  if (props.min_gain_db()) {
-    FX_LOGS(INFO) << "    min_gain_db       " << *props.min_gain_db() << " dB";
+                << (stream_props.can_agc() ? (*stream_props.can_agc() ? "TRUE" : "FALSE")
+                                           : "NONE (cannot enable AGC)");
+  if (stream_props.min_gain_db()) {
+    FX_LOGS(INFO) << "    min_gain_db       " << *stream_props.min_gain_db() << " dB";
   } else {
     FX_LOGS(INFO) << "    min_gain_db       NONE (non-compliant)";
   }
-  if (props.max_gain_db()) {
-    FX_LOGS(INFO) << "    max_gain_db       " << *props.max_gain_db() << " dB";
+  if (stream_props.max_gain_db()) {
+    FX_LOGS(INFO) << "    max_gain_db       " << *stream_props.max_gain_db() << " dB";
   } else {
     FX_LOGS(INFO) << "    max_gain_db       NONE (non-compliant)";
   }
-  if (props.gain_step_db()) {
-    FX_LOGS(INFO) << "    gain_step_db      " << *props.gain_step_db() << " dB";
+  if (stream_props.gain_step_db()) {
+    FX_LOGS(INFO) << "    gain_step_db      " << *stream_props.gain_step_db() << " dB";
   } else {
     FX_LOGS(INFO) << "    gain_step_db      NONE (non-compliant)";
   }
-  if (props.plug_detect_capabilities()) {
-    FX_LOGS(INFO) << "    plug_detect_caps  " << *props.plug_detect_capabilities();
+  if (stream_props.plug_detect_capabilities()) {
+    FX_LOGS(INFO) << "    plug_detect_caps  " << *stream_props.plug_detect_capabilities();
   } else {
     FX_LOGS(INFO) << "    plug_detect_caps  NONE (non-compliant)";
   }
   FX_LOGS(INFO) << "    manufacturer      "
-                << (props.manufacturer()
+                << (stream_props.manufacturer()
                         ? ("'" +
-                           std::string(props.manufacturer()->data(), props.manufacturer()->size()) +
+                           std::string(stream_props.manufacturer()->data(),
+                                       stream_props.manufacturer()->size()) +
                            "'")
                         : "NONE");
   FX_LOGS(INFO) << "    product           "
-                << (props.product()
-                        ? ("'" + std::string(props.product()->data(), props.product()->size()) +
-                           "'")
-                        : "NONE");
+                << (stream_props.product() ? ("'" +
+                                              std::string(stream_props.product()->data(),
+                                                          stream_props.product()->size()) +
+                                              "'")
+                                           : "NONE");
 
   std::string clock_domain_str{"   clock _domain     "};
-  if (props.clock_domain()) {
-    clock_domain_str += std::to_string(*props.clock_domain());
-    if (*props.clock_domain() == fuchsia_hardware_audio::kClockDomainMonotonic) {
+  if (stream_props.clock_domain()) {
+    clock_domain_str += std::to_string(*stream_props.clock_domain());
+    if (*stream_props.clock_domain() == fuchsia_hardware_audio::kClockDomainMonotonic) {
       clock_domain_str += "  (CLOCK_DOMAIN_MONOTONIC)";
-    } else if (*props.clock_domain() == fuchsia_hardware_audio::kClockDomainExternal) {
+    } else if (*stream_props.clock_domain() == fuchsia_hardware_audio::kClockDomainExternal) {
       clock_domain_str += "  (CLOCK_DOMAIN_EXTERNAL)";
     }
   } else {
@@ -109,23 +111,24 @@ void LogStreamProperties(const fuchsia_hardware_audio::StreamProperties& props) 
   FX_LOGS(INFO) << clock_domain_str;
 }
 
-void LogSupportedFormats(const std::vector<fuchsia_hardware_audio::SupportedFormats>& formats) {
+void LogRingBufferFormatSets(
+    const std::vector<fuchsia_hardware_audio::SupportedFormats>& ring_buffer_format_sets) {
   if constexpr (!kLogStreamConfigFidlResponseValues) {
     return;
   }
 
   FX_LOGS(INFO) << "fuchsia_hardware_audio/SupportedFormats:";
-  FX_LOGS(INFO) << "    supported_formats[" << formats.size() << "]:";
-  for (auto idx = 0u; idx < formats.size(); ++idx) {
-    auto supported_formats = formats[idx];
-    if (!supported_formats.pcm_supported_formats()) {
+  FX_LOGS(INFO) << "    ring_buffer_format_sets[" << ring_buffer_format_sets.size() << "]:";
+  for (auto idx = 0u; idx < ring_buffer_format_sets.size(); ++idx) {
+    auto ring_buffer_format_set = ring_buffer_format_sets[idx];
+    if (!ring_buffer_format_set.pcm_supported_formats()) {
       FX_LOGS(INFO) << "      [" << idx << "] NONE (non-compliant)";
       continue;
     }
     FX_LOGS(INFO) << "      [" << idx << "] pcm_supported_formats:";
-    const auto& pcm_formats = *supported_formats.pcm_supported_formats();
-    if (pcm_formats.channel_sets()) {
-      const auto& channel_sets = *pcm_formats.channel_sets();
+    const auto& pcm_format_set = *ring_buffer_format_set.pcm_supported_formats();
+    if (pcm_format_set.channel_sets()) {
+      const auto& channel_sets = *pcm_format_set.channel_sets();
       FX_LOGS(INFO) << "            channel_sets[" << channel_sets.size() << "]:";
       for (auto idx = 0u; idx < channel_sets.size(); ++idx) {
         if (!channel_sets[idx].attributes()) {
@@ -150,8 +153,8 @@ void LogSupportedFormats(const std::vector<fuchsia_hardware_audio::SupportedForm
       FX_LOGS(INFO) << "            NONE (non-compliant)";
     }
 
-    if (pcm_formats.sample_formats()) {
-      const auto& sample_formats = *pcm_formats.sample_formats();
+    if (pcm_format_set.sample_formats()) {
+      const auto& sample_formats = *pcm_format_set.sample_formats();
       FX_LOGS(INFO) << "            sample_formats[" << sample_formats.size() << "]:";
       for (auto idx = 0u; idx < sample_formats.size(); ++idx) {
         FX_LOGS(INFO) << "              [" << idx << "]    " << sample_formats[idx];
@@ -159,8 +162,8 @@ void LogSupportedFormats(const std::vector<fuchsia_hardware_audio::SupportedForm
     } else {
       FX_LOGS(INFO) << "            NONE (non-compliant)";
     }
-    if (pcm_formats.bytes_per_sample()) {
-      const auto& bytes_per_sample = *pcm_formats.bytes_per_sample();
+    if (pcm_format_set.bytes_per_sample()) {
+      const auto& bytes_per_sample = *pcm_format_set.bytes_per_sample();
       FX_LOGS(INFO) << "            bytes_per_sample[" << bytes_per_sample.size() << "]:";
       for (auto idx = 0u; idx < bytes_per_sample.size(); ++idx) {
         FX_LOGS(INFO) << "              [" << idx << "]    "
@@ -169,8 +172,8 @@ void LogSupportedFormats(const std::vector<fuchsia_hardware_audio::SupportedForm
     } else {
       FX_LOGS(INFO) << "            NONE (non-compliant)";
     }
-    if (pcm_formats.valid_bits_per_sample()) {
-      const auto& valid_bits_per_sample = *pcm_formats.valid_bits_per_sample();
+    if (pcm_format_set.valid_bits_per_sample()) {
+      const auto& valid_bits_per_sample = *pcm_format_set.valid_bits_per_sample();
       FX_LOGS(INFO) << "            valid_bits_per_sample[" << valid_bits_per_sample.size() << "]:";
       for (auto idx = 0u; idx < valid_bits_per_sample.size(); ++idx) {
         FX_LOGS(INFO) << "              [" << idx << "]    "
@@ -179,8 +182,8 @@ void LogSupportedFormats(const std::vector<fuchsia_hardware_audio::SupportedForm
     } else {
       FX_LOGS(INFO) << "            NONE (non-compliant)";
     }
-    if (pcm_formats.frame_rates()) {
-      const auto& frame_rates = *pcm_formats.frame_rates();
+    if (pcm_format_set.frame_rates()) {
+      const auto& frame_rates = *pcm_format_set.frame_rates();
       FX_LOGS(INFO) << "            frame_rates[" << frame_rates.size() << "]:";
       for (auto idx = 0u; idx < frame_rates.size(); ++idx) {
         FX_LOGS(INFO) << "              [" << idx << "]    " << frame_rates[idx];
@@ -224,7 +227,7 @@ void LogPlugState(const fuchsia_hardware_audio::PlugState& plug_state) {
                                                  : "NONE (non-compliant)");
 }
 
-void LogCodecProperties(const fuchsia_hardware_audio::CodecProperties& props) {
+void LogCodecProperties(const fuchsia_hardware_audio::CodecProperties& codec_props) {
   if constexpr (!kLogCodecFidlResponseValues) {
     return;
   }
@@ -232,29 +235,30 @@ void LogCodecProperties(const fuchsia_hardware_audio::CodecProperties& props) {
   FX_LOGS(INFO) << "fuchsia_hardware_audio/CodecProperties:";
 
   FX_LOGS(INFO) << "    is_input          "
-                << (props.is_input() ? (*props.is_input() ? "TRUE" : "FALSE")
-                                     : "NONE (non-compliant)");
+                << (codec_props.is_input() ? (*codec_props.is_input() ? "TRUE" : "FALSE")
+                                           : "NONE (non-compliant)");
   FX_LOGS(INFO) << "    manufacturer      "
-                << (props.manufacturer()
-                        ? ("'" +
-                           std::string(props.manufacturer()->data(), props.manufacturer()->size()) +
-                           "'")
-                        : "NONE");
+                << (codec_props.manufacturer() ? ("'" +
+                                                  std::string(codec_props.manufacturer()->data(),
+                                                              codec_props.manufacturer()->size()) +
+                                                  "'")
+                                               : "NONE");
   FX_LOGS(INFO) << "    product           "
-                << (props.product()
-                        ? ("'" + std::string(props.product()->data(), props.product()->size()) +
-                           "'")
-                        : "NONE");
-  if (props.unique_id()) {
+                << (codec_props.product() ? ("'" +
+                                             std::string(codec_props.product()->data(),
+                                                         codec_props.product()->size()) +
+                                             "'")
+                                          : "NONE");
+  if (codec_props.unique_id()) {
     std::array<unsigned char, fuchsia_audio_device::kUniqueInstanceIdSize> uid{};
-    strncpy(reinterpret_cast<char*>(uid.data()), props.unique_id()->data(),
+    strncpy(reinterpret_cast<char*>(uid.data()), codec_props.unique_id()->data(),
             fuchsia_audio_device::kUniqueInstanceIdSize);
     FX_LOGS(INFO) << "    unique_id         " << UidToString(uid);
   } else {
     FX_LOGS(INFO) << "    unique_id         NONE";
   }
-  if (props.plug_detect_capabilities()) {
-    FX_LOGS(INFO) << "    plug_detect_caps  " << *props.plug_detect_capabilities();
+  if (codec_props.plug_detect_capabilities()) {
+    FX_LOGS(INFO) << "    plug_detect_caps  " << *codec_props.plug_detect_capabilities();
   } else {
     FX_LOGS(INFO) << "    plug_detect_caps  NONE (non-compliant)";
   }
@@ -269,40 +273,40 @@ void LogDaiFormatSets(
   FX_LOGS(INFO) << "fuchsia_hardware_audio/DaiSupportedFormats:";
   FX_LOGS(INFO) << "    dai_supported_formats[" << dai_format_sets.size() << "]:";
   for (auto idx = 0u; idx < dai_format_sets.size(); ++idx) {
-    auto format_set = dai_format_sets[idx];
+    auto dai_format_set = dai_format_sets[idx];
     FX_LOGS(INFO) << "      [" << idx << "]";
 
-    const auto& channel_counts = format_set.number_of_channels();
+    const auto& channel_counts = dai_format_set.number_of_channels();
     FX_LOGS(INFO) << "        number_of_channels[" << channel_counts.size() << "]:";
     for (auto idx = 0u; idx < channel_counts.size(); ++idx) {
       FX_LOGS(INFO) << "          [" << idx << "]:   " << channel_counts[idx];
     }
 
-    const auto& sample_formats = format_set.sample_formats();
+    const auto& sample_formats = dai_format_set.sample_formats();
     FX_LOGS(INFO) << "        sample_formats[" << sample_formats.size() << "]:";
     for (auto idx = 0u; idx < sample_formats.size(); ++idx) {
       FX_LOGS(INFO) << "          [" << idx << "]    " << sample_formats[idx];
     }
 
-    const auto& frame_formats = format_set.frame_formats();
+    const auto& frame_formats = dai_format_set.frame_formats();
     FX_LOGS(INFO) << "        frame_formats[" << frame_formats.size() << "]:";
     for (auto idx = 0u; idx < frame_formats.size(); ++idx) {
       FX_LOGS(INFO) << "          [" << idx << "]    " << frame_formats[idx];
     }
 
-    const auto& frame_rates = format_set.frame_rates();
+    const auto& frame_rates = dai_format_set.frame_rates();
     FX_LOGS(INFO) << "        frame_rates[" << frame_rates.size() << "]:";
     for (auto idx = 0u; idx < frame_rates.size(); ++idx) {
       FX_LOGS(INFO) << "          [" << idx << "]    " << frame_rates[idx];
     }
 
-    const auto& bits_per_slot = format_set.bits_per_slot();
+    const auto& bits_per_slot = dai_format_set.bits_per_slot();
     FX_LOGS(INFO) << "        bits_per_slot[" << bits_per_slot.size() << "]:";
     for (auto idx = 0u; idx < bits_per_slot.size(); ++idx) {
       FX_LOGS(INFO) << "          [" << idx << "]    " << static_cast<int16_t>(bits_per_slot[idx]);
     }
 
-    const auto& bits_per_sample = format_set.bits_per_sample();
+    const auto& bits_per_sample = dai_format_set.bits_per_sample();
     FX_LOGS(INFO) << "        bits_per_sample[" << bits_per_sample.size() << "]:";
     for (auto idx = 0u; idx < bits_per_sample.size(); ++idx) {
       FX_LOGS(INFO) << "          [" << idx << "]    "
@@ -311,24 +315,26 @@ void LogDaiFormatSets(
   }
 }
 
-void LogDaiFormat(std::optional<fuchsia_hardware_audio::DaiFormat> format) {
+void LogDaiFormat(std::optional<fuchsia_hardware_audio::DaiFormat> dai_format) {
   if constexpr (!kLogCodecFidlResponseValues) {
     return;
   }
 
   FX_LOGS(INFO) << "fuchsia_hardware_audio/DaiFormat:";
-  if (!format) {
+  if (!dai_format) {
     FX_LOGS(INFO) << "    UNSET";
     return;
   }
-  FX_LOGS(INFO) << "    number_of_channels      " << format->number_of_channels();
-  FX_LOGS(INFO) << "    channels_to_use_bitmask " << std::hex << format->channels_to_use_bitmask();
-  FX_LOGS(INFO) << "    sample_format           " << format->sample_format();
-  FX_LOGS(INFO) << "    frame_format            " << format->frame_format();
-  FX_LOGS(INFO) << "    frame_rate              " << format->frame_rate();
-  FX_LOGS(INFO) << "    bits_per_slot           " << static_cast<uint16_t>(format->bits_per_slot());
+  FX_LOGS(INFO) << "    number_of_channels      " << dai_format->number_of_channels();
+  FX_LOGS(INFO) << "    channels_to_use_bitmask " << std::hex
+                << dai_format->channels_to_use_bitmask();
+  FX_LOGS(INFO) << "    sample_format           " << dai_format->sample_format();
+  FX_LOGS(INFO) << "    frame_format            " << dai_format->frame_format();
+  FX_LOGS(INFO) << "    frame_rate              " << dai_format->frame_rate();
+  FX_LOGS(INFO) << "    bits_per_slot           "
+                << static_cast<uint16_t>(dai_format->bits_per_slot());
   FX_LOGS(INFO) << "    bits_per_sample         "
-                << static_cast<uint16_t>(format->bits_per_sample());
+                << static_cast<uint16_t>(dai_format->bits_per_sample());
 }
 
 void LogCodecFormatInfo(std::optional<fuchsia_hardware_audio::CodecFormatInfo> format_info) {
@@ -489,54 +495,57 @@ void LogDeviceInfo(const fuchsia_audio_device::Info& device_info) {
   FX_LOGS(INFO) << clock_domain_str;
 }
 
-void LogRingBufferProperties(const fuchsia_hardware_audio::RingBufferProperties& props) {
+void LogRingBufferProperties(const fuchsia_hardware_audio::RingBufferProperties& rb_props) {
   if constexpr (!kLogRingBufferFidlResponseValues) {
     return;
   }
 
   FX_LOGS(INFO) << "fuchsia_hardware_audio/RingBufferProperties:";
   FX_LOGS(INFO) << "    needs_cache_flush       "
-                << (props.needs_cache_flush_or_invalidate()
-                        ? (*props.needs_cache_flush_or_invalidate() ? "TRUE" : "FALSE")
+                << (rb_props.needs_cache_flush_or_invalidate()
+                        ? (*rb_props.needs_cache_flush_or_invalidate() ? "TRUE" : "FALSE")
                         : "NONE (non-compliant)");
 
-  if (props.turn_on_delay()) {
-    FX_LOGS(INFO) << "    turn_on_delay           " << *props.turn_on_delay() << " ns";
+  if (rb_props.turn_on_delay()) {
+    FX_LOGS(INFO) << "    turn_on_delay           " << *rb_props.turn_on_delay() << " ns";
   } else {
     FX_LOGS(INFO) << "    turn_on_delay           NONE (0 ns)";
   }
 
-  if (props.driver_transfer_bytes()) {
-    FX_LOGS(INFO) << "    driver_transfer_bytes   " << *props.driver_transfer_bytes() << " bytes";
+  if (rb_props.driver_transfer_bytes()) {
+    FX_LOGS(INFO) << "    driver_transfer_bytes   " << *rb_props.driver_transfer_bytes()
+                  << " bytes";
   } else {
     FX_LOGS(INFO) << "    driver_transfer_bytes   NONE (non-compliant)";
   }
 }
 
-void LogRingBufferFormat(const fuchsia_hardware_audio::Format& format) {
+void LogRingBufferFormat(const fuchsia_hardware_audio::Format& ring_buffer_format) {
   if constexpr (!kLogRingBufferFidlResponseValues) {
     return;
   }
 
   FX_LOGS(INFO) << "fuchsia_hardware_audio/Format:";
-  if (!format.pcm_format()) {
+  if (!ring_buffer_format.pcm_format()) {
     FX_LOGS(INFO) << "    pcm_format           NONE (non-compliant)";
     return;
   }
 
   FX_LOGS(INFO) << "    pcm_format:";
   FX_LOGS(INFO) << "        number_of_channels    "
-                << static_cast<uint16_t>(format.pcm_format()->number_of_channels());
-  FX_LOGS(INFO) << "        sample_format         " << format.pcm_format()->sample_format();
+                << static_cast<uint16_t>(ring_buffer_format.pcm_format()->number_of_channels());
+  FX_LOGS(INFO) << "        sample_format         "
+                << ring_buffer_format.pcm_format()->sample_format();
   FX_LOGS(INFO) << "        bytes_per_sample      "
-                << static_cast<uint16_t>(format.pcm_format()->bytes_per_sample());
+                << static_cast<uint16_t>(ring_buffer_format.pcm_format()->bytes_per_sample());
   FX_LOGS(INFO) << "        valid_bits_per_sample "
-                << static_cast<uint16_t>(format.pcm_format()->valid_bits_per_sample());
-  FX_LOGS(INFO) << "        frame_rate            " << format.pcm_format()->frame_rate();
+                << static_cast<uint16_t>(ring_buffer_format.pcm_format()->valid_bits_per_sample());
+  FX_LOGS(INFO) << "        frame_rate            "
+                << ring_buffer_format.pcm_format()->frame_rate();
 }
 
 void LogRingBufferVmo(const zx::vmo& vmo, uint32_t num_frames,
-                      fuchsia_hardware_audio::Format format) {
+                      fuchsia_hardware_audio::Format rb_format) {
   if constexpr (!kLogRingBufferFidlResponseValues) {
     return;
   }
@@ -557,13 +566,13 @@ void LogRingBufferVmo(const zx::vmo& vmo, uint32_t num_frames,
   FX_LOGS(INFO) << "    koid                 0x" << std::hex << info.koid;
   FX_LOGS(INFO) << "    size                 " << size << " bytes";
   FX_LOGS(INFO) << "    calculated_size      "
-                << num_frames * format.pcm_format()->number_of_channels() *
-                       format.pcm_format()->bytes_per_sample();
+                << num_frames * rb_format.pcm_format()->number_of_channels() *
+                       rb_format.pcm_format()->bytes_per_sample();
   FX_LOGS(INFO) << "        num_frames           " << num_frames;
   FX_LOGS(INFO) << "        num_channels         "
-                << static_cast<uint16_t>(format.pcm_format()->number_of_channels());
+                << static_cast<uint16_t>(rb_format.pcm_format()->number_of_channels());
   FX_LOGS(INFO) << "        bytes_per_sample     "
-                << static_cast<uint16_t>(format.pcm_format()->bytes_per_sample());
+                << static_cast<uint16_t>(rb_format.pcm_format()->bytes_per_sample());
 }
 
 void LogActiveChannels(uint64_t channel_bitmask, zx::time set_time) {

@@ -77,24 +77,25 @@ inline constexpr bool kLogRingBufferServerResponses = false;
 
 std::string UidToString(std::optional<UniqueId> unique_instance_id);
 
-void LogStreamProperties(const fuchsia_hardware_audio::StreamProperties& props);
-void LogSupportedFormats(const std::vector<fuchsia_hardware_audio::SupportedFormats>& formats);
+void LogStreamProperties(const fuchsia_hardware_audio::StreamProperties& stream_props);
 void LogGainState(const fuchsia_hardware_audio::GainState& gain_state);
 void LogPlugState(const fuchsia_hardware_audio::PlugState& plug_state);
 
-void LogCodecProperties(const fuchsia_hardware_audio::CodecProperties& props);
+void LogCodecProperties(const fuchsia_hardware_audio::CodecProperties& codec_props);
 void LogCodecFormatInfo(std::optional<fuchsia_hardware_audio::CodecFormatInfo> format_info);
 
 void LogDeviceInfo(const fuchsia_audio_device::Info& device_info);
 
+void LogRingBufferFormatSets(
+    const std::vector<fuchsia_hardware_audio::SupportedFormats>& ring_buffer_format_sets);
+void LogRingBufferFormat(const fuchsia_hardware_audio::Format& ring_buffer_format);
 void LogDaiFormatSets(
     const std::vector<fuchsia_hardware_audio::DaiSupportedFormats>& dai_format_sets);
-void LogDaiFormat(std::optional<fuchsia_hardware_audio::DaiFormat> format);
+void LogDaiFormat(std::optional<fuchsia_hardware_audio::DaiFormat> dai_format);
 
-void LogRingBufferProperties(const fuchsia_hardware_audio::RingBufferProperties& props);
-void LogRingBufferFormat(const fuchsia_hardware_audio::Format& format);
+void LogRingBufferProperties(const fuchsia_hardware_audio::RingBufferProperties& rb_props);
 void LogRingBufferVmo(const zx::vmo& vmo, uint32_t num_frames,
-                      fuchsia_hardware_audio::Format format);
+                      fuchsia_hardware_audio::Format rb_format);
 void LogDelayInfo(const fuchsia_hardware_audio::DelayInfo& info);
 void LogActiveChannels(uint64_t channel_bitmask, zx::time set_time);
 
@@ -105,8 +106,8 @@ void LogObjectCounts();
 
 // fuchsia_hardware_audio types
 inline std::ostream& operator<<(std::ostream& out,
-                                const fuchsia_hardware_audio::SampleFormat& format) {
-  switch (format) {
+                                const fuchsia_hardware_audio::SampleFormat& rb_sample_format) {
+  switch (rb_sample_format) {
     case fuchsia_hardware_audio::SampleFormat::kPcmSigned:
       return (out << "PCM_SIGNED");
     case fuchsia_hardware_audio::SampleFormat::kPcmUnsigned:
@@ -116,11 +117,12 @@ inline std::ostream& operator<<(std::ostream& out,
   }
 }
 inline std::ostream& operator<<(std::ostream& out,
-                                const fuchsia_hardware_audio::PcmFormat& format) {
-  return (out << "[" << static_cast<uint16_t>(format.number_of_channels()) << "-channel, "
-              << format.sample_format() << ", " << static_cast<uint16_t>(format.bytes_per_sample())
-              << " bytes/sample, " << static_cast<uint16_t>(format.valid_bits_per_sample())
-              << " valid bits per sample, " << format.frame_rate() << " Hz]");
+                                const fuchsia_hardware_audio::PcmFormat& pcm_format) {
+  return (out << "[" << static_cast<uint16_t>(pcm_format.number_of_channels()) << "-channel, "
+              << pcm_format.sample_format() << ", "
+              << static_cast<uint16_t>(pcm_format.bytes_per_sample()) << " bytes/sample, "
+              << static_cast<uint16_t>(pcm_format.valid_bits_per_sample())
+              << " valid bits per sample, " << pcm_format.frame_rate() << " Hz]");
 }
 inline std::ostream& operator<<(std::ostream& out,
                                 const fuchsia_hardware_audio::PlugDetectCapabilities& plug_caps) {
@@ -132,8 +134,8 @@ inline std::ostream& operator<<(std::ostream& out,
   }
 }
 inline std::ostream& operator<<(std::ostream& out,
-                                const fuchsia_hardware_audio::DaiSampleFormat& sample_format) {
-  switch (sample_format) {
+                                const fuchsia_hardware_audio::DaiSampleFormat& dai_sample_format) {
+  switch (dai_sample_format) {
     case fuchsia_hardware_audio::DaiSampleFormat::kPdm:
       return (out << "PDM");
     case fuchsia_hardware_audio::DaiSampleFormat::kPcmSigned:
@@ -147,26 +149,28 @@ inline std::ostream& operator<<(std::ostream& out,
   }
 }
 inline std::ostream& operator<<(std::ostream& out,
-                                const fuchsia_hardware_audio::DaiFrameFormat& frame_format) {
-  if (!frame_format.frame_format_custom().has_value() &&
-      !frame_format.frame_format_standard().has_value()) {
+                                const fuchsia_hardware_audio::DaiFrameFormat& dai_frame_format) {
+  if (!dai_frame_format.frame_format_custom().has_value() &&
+      !dai_frame_format.frame_format_standard().has_value()) {
     return (out << "FrameFormat UNKNOWN union value");
   }
 
-  if (frame_format.Which() == fuchsia_hardware_audio::DaiFrameFormat::Tag::kFrameFormatCustom) {
+  if (dai_frame_format.Which() == fuchsia_hardware_audio::DaiFrameFormat::Tag::kFrameFormatCustom) {
     return (out << "FrameFormatCustom(left_justified "
-                << frame_format.frame_format_custom()->left_justified() << ", sclk_on_raising "
-                << frame_format.frame_format_custom()->sclk_on_raising()
+                << dai_frame_format.frame_format_custom()->left_justified() << ", sclk_on_raising "
+                << dai_frame_format.frame_format_custom()->sclk_on_raising()
                 << ", frame_sync_sclks_offset "
                 << static_cast<int16_t>(
-                       frame_format.frame_format_custom()->frame_sync_sclks_offset()))
+                       dai_frame_format.frame_format_custom()->frame_sync_sclks_offset()))
            << ", frame_sync_size "
-           << static_cast<uint16_t>(frame_format.frame_format_custom()->frame_sync_size()) << ")";
+           << static_cast<uint16_t>(dai_frame_format.frame_format_custom()->frame_sync_size())
+           << ")";
   }
 
-  if (frame_format.Which() == fuchsia_hardware_audio::DaiFrameFormat::Tag::kFrameFormatStandard) {
+  if (dai_frame_format.Which() ==
+      fuchsia_hardware_audio::DaiFrameFormat::Tag::kFrameFormatStandard) {
     out << "FrameFormatStandard::";
-    switch (frame_format.frame_format_standard().value()) {
+    switch (dai_frame_format.frame_format_standard().value()) {
       case fuchsia_hardware_audio::DaiFrameFormatStandard::kNone:
         return (out << "NONE");
       case fuchsia_hardware_audio::DaiFrameFormatStandard::kI2S:

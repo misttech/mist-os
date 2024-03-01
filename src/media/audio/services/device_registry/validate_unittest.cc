@@ -93,9 +93,9 @@ fuchsia_hardware_audio::SupportedFormats CompliantFormatSet() {
   }};
 }
 
-// Unittest ValidateSupportedFormats
-TEST(ValidateTest, ValidateSupportedFormats) {
-  EXPECT_EQ(ValidateSupportedFormats({CompliantFormatSet()}), ZX_OK);
+// Unittest ValidateRingBufferFormatSets
+TEST(ValidateTest, ValidateRingBufferFormatSets) {
+  EXPECT_EQ(ValidateRingBufferFormatSets({CompliantFormatSet()}), ZX_OK);
 
   fuchsia_hardware_audio::SupportedFormats minimal_values_format_set;
   minimal_values_format_set.pcm_supported_formats() = {{
@@ -109,7 +109,7 @@ TEST(ValidateTest, ValidateSupportedFormats) {
       .valid_bits_per_sample = {{1}},
       .frame_rates = {{1000}},
   }};
-  EXPECT_EQ(ValidateSupportedFormats({minimal_values_format_set}), ZX_OK);
+  EXPECT_EQ(ValidateRingBufferFormatSets({minimal_values_format_set}), ZX_OK);
 
   fuchsia_hardware_audio::SupportedFormats maximal_values_format_set;
   maximal_values_format_set.pcm_supported_formats() = {{
@@ -124,7 +124,7 @@ TEST(ValidateTest, ValidateSupportedFormats) {
       .valid_bits_per_sample = {{64}},
       .frame_rates = {{192000}},
   }};
-  EXPECT_EQ(ValidateSupportedFormats({maximal_values_format_set}), ZX_OK);
+  EXPECT_EQ(ValidateRingBufferFormatSets({maximal_values_format_set}), ZX_OK);
 
   // Probe fully-populated values, in multiple format sets.
   fuchsia_hardware_audio::SupportedFormats signed_format_set;
@@ -156,7 +156,7 @@ TEST(ValidateTest, ValidateSupportedFormats) {
       .frame_rates = {{1000, 2000, 4000, 8000, 11025, 16000, 22050, 24000, 44100, 48000, 88200,
                        96000, 192000}},
   }};
-  EXPECT_EQ(ValidateSupportedFormats({signed_format_set}), ZX_OK);
+  EXPECT_EQ(ValidateRingBufferFormatSets({signed_format_set}), ZX_OK);
 
   fuchsia_hardware_audio::SupportedFormats unsigned_format_set;
   unsigned_format_set.pcm_supported_formats() = {{
@@ -186,7 +186,7 @@ TEST(ValidateTest, ValidateSupportedFormats) {
       .frame_rates = {{1000, 2000, 4000, 8000, 11025, 16000, 22050, 24000, 44100, 48000, 88200,
                        96000, 192000}},
   }};
-  EXPECT_EQ(ValidateSupportedFormats({unsigned_format_set}), ZX_OK);
+  EXPECT_EQ(ValidateRingBufferFormatSets({unsigned_format_set}), ZX_OK);
 
   fuchsia_hardware_audio::SupportedFormats float_format_set;
   float_format_set.pcm_supported_formats() = {{
@@ -217,7 +217,7 @@ TEST(ValidateTest, ValidateSupportedFormats) {
       .frame_rates = {{1000, 2000, 4000, 8000, 11025, 16000, 22050, 24000, 44100, 48000, 88200,
                        96000, 192000}},
   }};
-  EXPECT_EQ(ValidateSupportedFormats({float_format_set}), ZX_OK);
+  EXPECT_EQ(ValidateRingBufferFormatSets({float_format_set}), ZX_OK);
 
   std::vector supported_formats = {CompliantFormatSet()};
   supported_formats.push_back(signed_format_set);
@@ -225,7 +225,7 @@ TEST(ValidateTest, ValidateSupportedFormats) {
   supported_formats.push_back(float_format_set);
   supported_formats.push_back(minimal_values_format_set);
   supported_formats.push_back(maximal_values_format_set);
-  EXPECT_EQ(ValidateSupportedFormats(supported_formats), ZX_OK);
+  EXPECT_EQ(ValidateRingBufferFormatSets(supported_formats), ZX_OK);
 }
 
 // Unittest ValidateGainState
@@ -413,10 +413,10 @@ TEST(ValidateTest, ValidateRingBufferFormat) {
   }
 }
 
-// Unittest ValidateFormatCompatibility
-TEST(ValidateTest, ValidateFormatCompatibility) {
+// Unittest ValidateSampleFormatCompatibility
+TEST(ValidateTest, ValidateSampleFormatCompatibility) {
   for (auto [bytes, sample_format] : kFormats) {
-    EXPECT_EQ(ValidateFormatCompatibility(bytes, sample_format), ZX_OK);
+    EXPECT_EQ(ValidateSampleFormatCompatibility(bytes, sample_format), ZX_OK);
   }
 }
 

@@ -141,7 +141,7 @@ TEST(ValidateWarningTest, BadStreamProperties) {
   EXPECT_EQ(ValidateStreamProperties(stream_properties), ZX_ERR_INVALID_ARGS);
 }
 
-// Negative-test ValidateSupportedFormats
+// Negative-test ValidateRingBufferFormatSets
 fuchsia_hardware_audio::SupportedFormats CompliantFormatSet() {
   return fuchsia_hardware_audio::SupportedFormats{{
       .pcm_supported_formats = fuchsia_hardware_audio::PcmSupportedFormats{{
@@ -166,57 +166,57 @@ TEST(ValidateWarningTest, BadSupportedFormats) {
   std::vector<fuchsia_hardware_audio::SupportedFormats> supported_formats;
 
   // Empty top-level vector
-  EXPECT_EQ(ValidateSupportedFormats(supported_formats), ZX_ERR_INVALID_ARGS);
+  EXPECT_EQ(ValidateRingBufferFormatSets(supported_formats), ZX_ERR_INVALID_ARGS);
   supported_formats.push_back(CompliantFormatSet());
-  EXPECT_EQ(ValidateSupportedFormats(supported_formats), ZX_OK);
+  EXPECT_EQ(ValidateRingBufferFormatSets(supported_formats), ZX_OK);
 
   // No pcm_supported_formats (one supported_formats[] vector entry, but it is empty)
   supported_formats.emplace_back();
-  EXPECT_EQ(ValidateSupportedFormats(supported_formats), ZX_ERR_INVALID_ARGS);
+  EXPECT_EQ(ValidateRingBufferFormatSets(supported_formats), ZX_ERR_INVALID_ARGS);
 }
 
-// Negative-test ValidateSupportedFormats for frame_rates
+// Negative-test ValidateRingBufferFormatSets for frame_rates
 TEST(ValidateWarningTest, BadSupportedFormatsFrameRates) {
   std::vector<fuchsia_hardware_audio::SupportedFormats> supported_formats{CompliantFormatSet()};
 
   // Missing frame_rates
   supported_formats.at(0).pcm_supported_formats()->frame_rates() = std::nullopt;
-  EXPECT_EQ(ValidateSupportedFormats(supported_formats), ZX_ERR_INVALID_ARGS);
+  EXPECT_EQ(ValidateRingBufferFormatSets(supported_formats), ZX_ERR_INVALID_ARGS);
 
   // Empty frame_rates vector
   supported_formats.at(0).pcm_supported_formats()->frame_rates() = {{}};
-  EXPECT_EQ(ValidateSupportedFormats(supported_formats), ZX_ERR_INVALID_ARGS);
+  EXPECT_EQ(ValidateRingBufferFormatSets(supported_formats), ZX_ERR_INVALID_ARGS);
 
   // Too low frame_rate
   supported_formats.at(0).pcm_supported_formats()->frame_rates() = {{999}};
-  EXPECT_EQ(ValidateSupportedFormats(supported_formats), ZX_ERR_OUT_OF_RANGE);
+  EXPECT_EQ(ValidateRingBufferFormatSets(supported_formats), ZX_ERR_OUT_OF_RANGE);
 
   // Too high frame_rate
   supported_formats.at(0).pcm_supported_formats()->frame_rates() = {{192001}};
-  EXPECT_EQ(ValidateSupportedFormats(supported_formats), ZX_ERR_OUT_OF_RANGE);
+  EXPECT_EQ(ValidateRingBufferFormatSets(supported_formats), ZX_ERR_OUT_OF_RANGE);
 
   // Out-of-order frame_rates
   supported_formats.at(0).pcm_supported_formats()->frame_rates() = {{48000, 44100}};
-  EXPECT_EQ(ValidateSupportedFormats(supported_formats), ZX_ERR_INVALID_ARGS);
+  EXPECT_EQ(ValidateRingBufferFormatSets(supported_formats), ZX_ERR_INVALID_ARGS);
 }
 
-// Negative-test ValidateSupportedFormats for channel_sets
+// Negative-test ValidateRingBufferFormatSets for channel_sets
 TEST(ValidateWarningTest, BadSupportedFormatsChannelSets) {
   std::vector<fuchsia_hardware_audio::SupportedFormats> supported_formats{CompliantFormatSet()};
 
   // Missing channel_sets
   supported_formats.at(0).pcm_supported_formats()->channel_sets() = std::nullopt;
-  EXPECT_EQ(ValidateSupportedFormats(supported_formats), ZX_ERR_INVALID_ARGS);
+  EXPECT_EQ(ValidateRingBufferFormatSets(supported_formats), ZX_ERR_INVALID_ARGS);
 
   // Empty channel_sets vector
   supported_formats.at(0).pcm_supported_formats()->channel_sets() = {{}};
-  EXPECT_EQ(ValidateSupportedFormats(supported_formats), ZX_ERR_INVALID_ARGS);
+  EXPECT_EQ(ValidateRingBufferFormatSets(supported_formats), ZX_ERR_INVALID_ARGS);
 
   // Missing attributes
   supported_formats.at(0).pcm_supported_formats()->channel_sets() = {{
       {},
   }};
-  EXPECT_EQ(ValidateSupportedFormats(supported_formats), ZX_ERR_INVALID_ARGS);
+  EXPECT_EQ(ValidateRingBufferFormatSets(supported_formats), ZX_ERR_INVALID_ARGS);
 
   // Empty attributes vector
   supported_formats.at(0).pcm_supported_formats()->channel_sets() = {{
@@ -224,7 +224,7 @@ TEST(ValidateWarningTest, BadSupportedFormatsChannelSets) {
           .attributes = {{}},
       },
   }};
-  EXPECT_EQ(ValidateSupportedFormats(supported_formats), ZX_ERR_INVALID_ARGS);
+  EXPECT_EQ(ValidateRingBufferFormatSets(supported_formats), ZX_ERR_INVALID_ARGS);
 
   // Duplicate channel_set lengths
   // Two channel_sets entries - both with a single channel
@@ -240,122 +240,122 @@ TEST(ValidateWarningTest, BadSupportedFormatsChannelSets) {
           }},
       }},
   }};
-  EXPECT_EQ(ValidateSupportedFormats(supported_formats), ZX_ERR_INVALID_ARGS);
+  EXPECT_EQ(ValidateRingBufferFormatSets(supported_formats), ZX_ERR_INVALID_ARGS);
   supported_formats.at(0)
       .pcm_supported_formats()
       ->channel_sets()
       ->at(0)
       .attributes()
       ->emplace_back();
-  ASSERT_EQ(ValidateSupportedFormats(supported_formats), ZX_OK);
+  ASSERT_EQ(ValidateRingBufferFormatSets(supported_formats), ZX_OK);
 
   // Too high min_frequency
   supported_formats.at(0).pcm_supported_formats()->channel_sets()->at(1).attributes()->at(0) = {{
       .min_frequency = 24001,
   }};
-  EXPECT_EQ(ValidateSupportedFormats(supported_formats), ZX_ERR_OUT_OF_RANGE);
+  EXPECT_EQ(ValidateRingBufferFormatSets(supported_formats), ZX_ERR_OUT_OF_RANGE);
 
   // Min > max
   supported_formats.at(0).pcm_supported_formats()->channel_sets()->at(1).attributes()->at(0) = {{
       .min_frequency = 16001,
       .max_frequency = 16000,
   }};
-  EXPECT_EQ(ValidateSupportedFormats(supported_formats), ZX_ERR_INVALID_ARGS);
+  EXPECT_EQ(ValidateRingBufferFormatSets(supported_formats), ZX_ERR_INVALID_ARGS);
 
   // Too high max_frequency (passes but emits WARNING, thus is in the "warning" suite)
   supported_formats.at(0).pcm_supported_formats()->channel_sets()->at(1).attributes()->at(0) = {{
       .max_frequency = 192000,
   }};
-  EXPECT_EQ(ValidateSupportedFormats(supported_formats), ZX_OK);
+  EXPECT_EQ(ValidateRingBufferFormatSets(supported_formats), ZX_OK);
 }
 
-// Negative-test ValidateSupportedFormats for sample_formats
+// Negative-test ValidateRingBufferFormatSets for sample_formats
 TEST(ValidateWarningTest, BadSupportedFormatsSampleFormats) {
   std::vector<fuchsia_hardware_audio::SupportedFormats> supported_formats{CompliantFormatSet()};
   // Missing sample_formats
   supported_formats.at(0).pcm_supported_formats()->sample_formats() = std::nullopt;
-  EXPECT_EQ(ValidateSupportedFormats(supported_formats), ZX_ERR_INVALID_ARGS);
+  EXPECT_EQ(ValidateRingBufferFormatSets(supported_formats), ZX_ERR_INVALID_ARGS);
 
   // Empty sample_formats vector
   supported_formats.at(0).pcm_supported_formats()->sample_formats() = {{}};
-  EXPECT_EQ(ValidateSupportedFormats(supported_formats), ZX_ERR_INVALID_ARGS);
+  EXPECT_EQ(ValidateRingBufferFormatSets(supported_formats), ZX_ERR_INVALID_ARGS);
 
   // Duplicate sample_format
   supported_formats.at(0).pcm_supported_formats()->sample_formats() = {{
       fuchsia_hardware_audio::SampleFormat::kPcmSigned,
       fuchsia_hardware_audio::SampleFormat::kPcmSigned,
   }};
-  EXPECT_EQ(ValidateSupportedFormats(supported_formats), ZX_ERR_INVALID_ARGS);
+  EXPECT_EQ(ValidateRingBufferFormatSets(supported_formats), ZX_ERR_INVALID_ARGS);
 }
 
-// Negative-test ValidateSupportedFormats for bytes_per_sample
+// Negative-test ValidateRingBufferFormatSets for bytes_per_sample
 TEST(ValidateWarningTest, BadSupportedFormatsBytesPerSample) {
   std::vector<fuchsia_hardware_audio::SupportedFormats> supported_formats{CompliantFormatSet()};
 
   // Missing bytes_per_sample
   supported_formats.at(0).pcm_supported_formats()->bytes_per_sample() = std::nullopt;
-  EXPECT_EQ(ValidateSupportedFormats(supported_formats), ZX_ERR_INVALID_ARGS);
+  EXPECT_EQ(ValidateRingBufferFormatSets(supported_formats), ZX_ERR_INVALID_ARGS);
 
   // Empty bytes_per_sample vector
   supported_formats.at(0).pcm_supported_formats()->bytes_per_sample() = {{}};
-  EXPECT_EQ(ValidateSupportedFormats(supported_formats), ZX_ERR_INVALID_ARGS);
+  EXPECT_EQ(ValidateRingBufferFormatSets(supported_formats), ZX_ERR_INVALID_ARGS);
 
   // Out-of-order bytes_per_sample
   supported_formats.at(0).pcm_supported_formats()->bytes_per_sample() = {{4, 2}};
-  EXPECT_EQ(ValidateSupportedFormats(supported_formats), ZX_ERR_INVALID_ARGS);
+  EXPECT_EQ(ValidateRingBufferFormatSets(supported_formats), ZX_ERR_INVALID_ARGS);
 
   // Bad bytes_per_sample - unsigned
   supported_formats.at(0).pcm_supported_formats()->sample_formats() = {
       {fuchsia_hardware_audio::SampleFormat::kPcmUnsigned}};
   supported_formats.at(0).pcm_supported_formats()->bytes_per_sample() = {{0, 1}};
-  EXPECT_EQ(ValidateSupportedFormats(supported_formats), ZX_ERR_INVALID_ARGS);
+  EXPECT_EQ(ValidateRingBufferFormatSets(supported_formats), ZX_ERR_INVALID_ARGS);
   supported_formats.at(0).pcm_supported_formats()->bytes_per_sample() = {{1, 2}};
-  EXPECT_EQ(ValidateSupportedFormats(supported_formats), ZX_ERR_INVALID_ARGS);
+  EXPECT_EQ(ValidateRingBufferFormatSets(supported_formats), ZX_ERR_INVALID_ARGS);
 
   // Bad bytes_per_sample - signed
   supported_formats.at(0).pcm_supported_formats()->sample_formats() = {
       {fuchsia_hardware_audio::SampleFormat::kPcmSigned}};
   supported_formats.at(0).pcm_supported_formats()->bytes_per_sample() = {{1, 2}};
-  EXPECT_EQ(ValidateSupportedFormats(supported_formats), ZX_ERR_INVALID_ARGS);
+  EXPECT_EQ(ValidateRingBufferFormatSets(supported_formats), ZX_ERR_INVALID_ARGS);
   supported_formats.at(0).pcm_supported_formats()->bytes_per_sample() = {{3, 4}};
-  EXPECT_EQ(ValidateSupportedFormats(supported_formats), ZX_ERR_INVALID_ARGS);
+  EXPECT_EQ(ValidateRingBufferFormatSets(supported_formats), ZX_ERR_INVALID_ARGS);
   supported_formats.at(0).pcm_supported_formats()->bytes_per_sample() = {{2, 8}};
-  EXPECT_EQ(ValidateSupportedFormats(supported_formats), ZX_ERR_INVALID_ARGS);
+  EXPECT_EQ(ValidateRingBufferFormatSets(supported_formats), ZX_ERR_INVALID_ARGS);
 
   // Bad bytes_per_sample - float
   supported_formats.at(0).pcm_supported_formats()->sample_formats() = {
       {fuchsia_hardware_audio::SampleFormat::kPcmFloat}};
   supported_formats.at(0).pcm_supported_formats()->bytes_per_sample() = {{2, 4}};
-  EXPECT_EQ(ValidateSupportedFormats(supported_formats), ZX_ERR_INVALID_ARGS);
+  EXPECT_EQ(ValidateRingBufferFormatSets(supported_formats), ZX_ERR_INVALID_ARGS);
   supported_formats.at(0).pcm_supported_formats()->bytes_per_sample() = {{6, 8}};
-  EXPECT_EQ(ValidateSupportedFormats(supported_formats), ZX_ERR_INVALID_ARGS);
+  EXPECT_EQ(ValidateRingBufferFormatSets(supported_formats), ZX_ERR_INVALID_ARGS);
   supported_formats.at(0).pcm_supported_formats()->bytes_per_sample() = {{4, 16}};
-  EXPECT_EQ(ValidateSupportedFormats(supported_formats), ZX_ERR_INVALID_ARGS);
+  EXPECT_EQ(ValidateRingBufferFormatSets(supported_formats), ZX_ERR_INVALID_ARGS);
 }
 
-// Negative-test ValidateSupportedFormats for valid_bits_per_sample
+// Negative-test ValidateRingBufferFormatSets for valid_bits_per_sample
 TEST(ValidateWarningTest, BadSupportedFormatsValidBitsPerSample) {
   std::vector<fuchsia_hardware_audio::SupportedFormats> supported_formats{CompliantFormatSet()};
 
   // Missing valid_bits_per_sample
   supported_formats.at(0).pcm_supported_formats()->valid_bits_per_sample() = std::nullopt;
-  EXPECT_EQ(ValidateSupportedFormats(supported_formats), ZX_ERR_INVALID_ARGS);
+  EXPECT_EQ(ValidateRingBufferFormatSets(supported_formats), ZX_ERR_INVALID_ARGS);
 
   // Empty valid_bits_per_sample vector
   supported_formats.at(0).pcm_supported_formats()->valid_bits_per_sample() = {{}};
-  EXPECT_EQ(ValidateSupportedFormats(supported_formats), ZX_ERR_INVALID_ARGS);
+  EXPECT_EQ(ValidateRingBufferFormatSets(supported_formats), ZX_ERR_INVALID_ARGS);
 
   // Out-of-order valid_bits_per_sample
   supported_formats.at(0).pcm_supported_formats()->valid_bits_per_sample() = {{16, 15}};
-  EXPECT_EQ(ValidateSupportedFormats(supported_formats), ZX_ERR_INVALID_ARGS);
+  EXPECT_EQ(ValidateRingBufferFormatSets(supported_formats), ZX_ERR_INVALID_ARGS);
 
   // Too low valid_bits_per_sample
   supported_formats.at(0).pcm_supported_formats()->valid_bits_per_sample() = {{0, 16}};
-  EXPECT_EQ(ValidateSupportedFormats(supported_formats), ZX_ERR_OUT_OF_RANGE);
+  EXPECT_EQ(ValidateRingBufferFormatSets(supported_formats), ZX_ERR_OUT_OF_RANGE);
 
   // Too high valid_bits_per_sample
   supported_formats.at(0).pcm_supported_formats()->valid_bits_per_sample() = {{16, 18}};
-  EXPECT_EQ(ValidateSupportedFormats(supported_formats), ZX_ERR_OUT_OF_RANGE);
+  EXPECT_EQ(ValidateRingBufferFormatSets(supported_formats), ZX_ERR_OUT_OF_RANGE);
 }
 
 // Negative-test ValidateGainState
@@ -734,7 +734,7 @@ TEST(ValidateWarningTest, BadRingBufferFormat) {
             ZX_ERR_OUT_OF_RANGE);
 }
 
-// Negative-test ValidateFormatCompatibility
+// Negative-test ValidateSampleFormatCompatibility
 TEST(ValidateWarningTest, BadFormatCompatibility) {
   const std::set<std::pair<uint8_t, fuchsia_hardware_audio::SampleFormat>> kAllowedFormats{
       {1, fuchsia_hardware_audio::SampleFormat::kPcmUnsigned},
@@ -755,7 +755,8 @@ TEST(ValidateWarningTest, BadFormatCompatibility) {
   for (auto sample_size : kSampleSizesToTest) {
     for (auto sample_format : kSampleFormatsToTest) {
       if (kAllowedFormats.find({sample_size, sample_format}) == kAllowedFormats.end()) {
-        EXPECT_EQ(ValidateFormatCompatibility(sample_size, sample_format), ZX_ERR_INVALID_ARGS);
+        EXPECT_EQ(ValidateSampleFormatCompatibility(sample_size, sample_format),
+                  ZX_ERR_INVALID_ARGS);
       }
     }
   }
@@ -793,7 +794,7 @@ TEST(ValidateWarningTest, BadRingBufferVmo) {
   format.pcm_format()->frame_rate() = 192001;
   EXPECT_EQ(ValidateRingBufferVmo(vmo, num_frames, format), ZX_ERR_OUT_OF_RANGE);
 
-  // Bad format (flagged by the encapsulated ValidateFormatCompatibility)
+  // Bad format (flagged by the encapsulated ValidateSampleFormatCompatibility)
   format.pcm_format()->frame_rate() = 48000;
   format.pcm_format()->sample_format() = fuchsia_hardware_audio::SampleFormat::kPcmFloat;
   EXPECT_EQ(ValidateRingBufferVmo(vmo, num_frames, format), ZX_ERR_INVALID_ARGS);
@@ -1119,6 +1120,7 @@ TEST(ValidateWarningTest, BadDaiFormat) {
 
 // Unittest ValidateCodecFormatInfo
 TEST(ValidateWarningTest, BadCodecFormatInfo) {
+  // These durations cannot be negative.
   EXPECT_EQ(ValidateCodecFormatInfo(fuchsia_hardware_audio::CodecFormatInfo{{
                 .external_delay = -1,
             }}),
@@ -1131,6 +1133,7 @@ TEST(ValidateWarningTest, BadCodecFormatInfo) {
                 .turn_off_delay = -1,
             }}),
             ZX_ERR_INVALID_ARGS);
+  // ...that includes INT64_MIN (check for erroneously treating it as unsigned).
   EXPECT_EQ(ValidateCodecFormatInfo(fuchsia_hardware_audio::CodecFormatInfo{{
                 .external_delay = zx::time::infinite_past().get(),
             }}),
