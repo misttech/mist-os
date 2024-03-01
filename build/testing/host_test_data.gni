@@ -19,6 +19,12 @@
 #       dependencies.
 #     - Type: list(path relative to $root_build_dir)
 #
+#   * testonly
+#     - Optional: GN Usual. Allow option to set to false for IDK inclusion.
+#       See https://cs.opensource.google/fuchsia/fuchsia/+/main:sdk/BUILD.gn;l=161-167;drc=aa7ba9d998556f7124fe8e2edc6604c9c1592d01
+#     - Type: boolean
+#     - Default: true
+#
 #   * deps
 #   * visibility
 #     - Optional: Usual GN meanings.
@@ -28,6 +34,11 @@ template("host_test_data") {
   assert(
       !is_fuchsia,
       "host_test_data should only be used on host, to fix this, wrap you target with `if (is_host) { ... }`")
+
+  _testonly = true
+  if (defined(invoker.testonly)) {
+    _testonly = invoker.testonly
+  }
 
   if (defined(invoker.outputs)) {
     main_target_name = target_name
@@ -39,7 +50,7 @@ template("host_test_data") {
     # The copy rule is the main target so that clients can still
     # call `get_target_outputs` on it.
     copy(main_target_name) {
-      testonly = true
+      testonly = _testonly
       forward_variables_from(invoker, "*")
       if (!defined(deps)) {
         deps = []
@@ -59,7 +70,7 @@ template("host_test_data") {
     # generated within the copy() action, as 'process_file_pattern()' rejects
     # 'source_path_relative', which is valid for 'copy()'.
     group(metadata_target_name) {
-      testonly = true
+      testonly = _testonly
       visibility = [ ":$main_target_name" ]
       metadata = {
         test_runtime_deps = get_target_outputs(":$main_target_name")
@@ -69,7 +80,7 @@ template("host_test_data") {
     # This group exists only to carry the `test_runtime_deps` metadata, which
     # is aggregated by test_spec().
     group(target_name) {
-      testonly = true
+      testonly = _testonly
       forward_variables_from(invoker,
                              [
                                "deps",

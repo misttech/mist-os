@@ -135,6 +135,12 @@ import("//build/testing/host_test_data.gni")
 #     Type: boolean
 #     Default: False
 #
+#   testonly (optional)
+#     GN Usual. Allow option to set to false for IDK inclusion.
+#     See https://cs.opensource.google/fuchsia/fuchsia/+/main:sdk/BUILD.gn;l=161-167;drc=aa7ba9d998556f7124fe8e2edc6604c9c1592d01
+#     Type: boolean
+#     Default: true
+#
 #  deps
 #  visibility
 
@@ -144,6 +150,11 @@ template("python_mobly_test") {
   assert(
       invoker.transport == "sl4f" || invoker.transport == "fuchsia-controller",
       "transport should be either 'sl4f' or 'fuchsia-controller' but received: " + invoker.transport)
+
+  _testonly = true
+  if (defined(invoker.testonly)) {
+    _testonly = invoker.testonly
+  }
 
   #
   # Define Mobly test python_binary().
@@ -162,7 +173,7 @@ template("python_mobly_test") {
                              "enable_pytype",
                            ])
 
-    testonly = true
+    testonly = _testonly
     visibility = [ ":*" ]
 
     output_name = _test_binary_name
@@ -187,7 +198,7 @@ template("python_mobly_test") {
   _mobly_test_data_target = "${_test_name}_test_data"
   host_test_data(_mobly_test_data_target) {
     visibility = [ ":*" ]
-
+    testonly = _testonly
     sources = [ get_label_info(":${_test_binary_target}", "target_out_dir") +
                 "/${_test_binary_name}" ]
     outputs = [ "${_test_dir}/${_test_binary_name}" ]
@@ -209,6 +220,7 @@ template("python_mobly_test") {
 
   _fastboot_test_data_target = "${_test_name}_fastboot_bin_test_data"
   host_test_data(_fastboot_test_data_target) {
+    testonly = _testonly
     sources = [ "${prebuilt_fastboot}" ]
     outputs = [ "${_test_dir}/fastboot" ]
   }
@@ -265,6 +277,7 @@ template("python_mobly_test") {
   if (defined(_params_source)) {
     _param_yaml_data_target = "${_test_name}_params_data"
     host_test_data(_param_yaml_data_target) {
+      testonly = _testonly
       sources = [ _params_source ]
       outputs = [ "${_test_dir}/test_params.yaml" ]
       deps = _params_deps
@@ -282,6 +295,7 @@ template("python_mobly_test") {
   if (defined(invoker.local_config_source)) {
     _config_yaml_data_target = "${_test_name}_config_data"
     host_test_data(_config_yaml_data_target) {
+      testonly = _testonly
       sources = [ invoker.local_config_source ]
       outputs = [ "${_test_dir}/config.yaml" ]
     }
