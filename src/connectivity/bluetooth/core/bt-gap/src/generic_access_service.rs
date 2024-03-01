@@ -54,7 +54,7 @@ fn build_generic_access_service_info() -> gatt::ServiceInfo {
     }
 }
 
-/// A GasProxy forwards peer Generic Accesss Service requests received by a BT host to the local GAS
+/// A GasProxy forwards peer Generic Access Service requests received by a BT host to the local GAS
 /// task. A GasProxy will be spawned as a task by HostDispatcher whenever a new host is detected.
 /// Passing the requests through proxies is preferable to the  task maintaining host state so that
 /// we can limit host state to one place, HostDispatcher. This will simplify supporting multiple
