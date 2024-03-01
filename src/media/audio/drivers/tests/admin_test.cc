@@ -764,7 +764,7 @@ void RegisterAdminTestsForDevice(const DeviceEntry& device_entry,
 
 // TODO(https://fxbug.dev/42075676): Add more Composite testing (e.g. Reset, SetDaiFormat).
 
-// TODO(b/302704556): Add tests for Watch-while-still-pending (specifically delay and position).
+// TODO(https://fxbug.dev/302704556): Add Watch-while-still-pending tests (delay and position).
 
 // TODO(https://fxbug.dev/42075676): Add remaining tests for Codec protocol methods.
 //

@@ -19,7 +19,7 @@ class AudioCapturerErrorTest : public AudioCapturerTest {};
 // AudioCapturer implements the base classes StreamBufferSet and StreamSource, in addition to its
 // own FIDL methods.
 
-// TODO(b/318431483): more extensively test StreamBufferSet
+// TODO(https://fxbug.dev/318431483): more extensively test StreamBufferSet
 // - AddPayloadBuffer(uint32 id, handle<vmo> payload_buffer);
 //     Also: null or bad handle
 // - RemovePayloadBuffer(uint32 id);
@@ -27,7 +27,7 @@ class AudioCapturerErrorTest : public AudioCapturerTest {};
 // - also, apply same tests to AudioRenderer and AudioCapturer
 //     (although their implementations within AudioCore differ somewhat).
 
-// TODO(b/318432150): more extensively test StreamSource
+// TODO(https://fxbug.dev/318432150): more extensively test StreamSource
 // - ->OnPacketProduced(StreamPacket packet);
 //     Always received for every packet - even malformed ones?
 // - ->OnEndOfStream();
@@ -35,7 +35,7 @@ class AudioCapturerErrorTest : public AudioCapturerTest {};
 // - DiscardAllPacketsNoReply() post-stop
 // - all capture StreamPacket flags
 
-// TODO(b/318433705): more extensively test capture data pipeline methods
+// TODO(https://fxbug.dev/318433705): more extensively test capture data pipeline methods
 // - SetPcmStreamType(AudioStreamType stream_type);
 //     Also when already set, when packets submitted, when started, malformed StreamType
 // - CaptureAt(uint32 id, uint32 offset, uint32 num_frames)
