@@ -2782,7 +2782,7 @@ assembly_input_bundle("audio_development_support") {
     },
   ]
 
-  base_packages = [ "//src/media/audio/services/ffxdaemon:audio_ffx_daemon" ]
+  cache_packages = [ "//src/media/audio/services/ffxdaemon:audio_ffx_daemon" ]
   compiled_packages = [
     {
       name = "core"
@@ -2809,6 +2809,11 @@ assembly_input_bundle("video_development_support") {
   ]
 }
 
+# Component that routes audio on Smart Displays
+#
+# feature_set_levels: minimal
+# build-types: all
+#
 assembly_input_bundle("audio_core") {
   base_packages = [ "//src/media/audio/audio_core" ]
 }
@@ -2845,8 +2850,13 @@ assembly_input_bundle("audio_core_use_adc_device") {
   ]
 }
 
+# Component that manages platform audio devices
+#
+# feature_set_levels: minimal
+# build-types: all
+#
 assembly_input_bundle("audio_device_registry") {
-  base_packages = [ "//src/media/audio/services/device_registry" ]
+  flexible_packages = [ "//src/media/audio/services/device_registry" ]
   compiled_packages = [
     {
       name = "core"
