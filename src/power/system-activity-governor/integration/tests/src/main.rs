@@ -58,6 +58,12 @@ async fn test_activity_governor_returns_expected_power_elements() -> Result<()> 
     let aa_active_token = aa_element.active_dependency_token.unwrap();
     assert!(!aa_active_token.is_invalid_handle());
 
+    let wh_element = power_elements.wake_handling.unwrap();
+    let wh_passive_token = wh_element.passive_dependency_token.unwrap();
+    assert!(!wh_passive_token.is_invalid_handle());
+    let wh_active_token = wh_element.active_dependency_token.unwrap();
+    assert!(!wh_active_token.is_invalid_handle());
+
     Ok(())
 }
 
@@ -78,6 +84,25 @@ async fn create_suspend_topology(realm: &RealmProxyClient) -> Result<PowerElemen
         .await?;
 
     Ok(suspend_controller)
+}
+
+async fn create_wake_topology(realm: &RealmProxyClient) -> Result<PowerElementContext> {
+    let topology = realm.connect_to_protocol::<fbroker::TopologyMarker>().await?;
+    let activity_governor = realm.connect_to_protocol::<fsystem::ActivityGovernorMarker>().await?;
+    let power_elements = activity_governor.get_power_elements().await?;
+    let wh_token = power_elements.wake_handling.unwrap().active_dependency_token.unwrap();
+
+    let wake_controller = PowerElementContext::builder(&topology, "wake_controller", &[0, 1])
+        .dependencies(vec![fbroker::LevelDependency {
+            dependency_type: fbroker::DependencyType::Active,
+            dependent_level: 1,
+            requires_token: wh_token,
+            requires_level: 1,
+        }])
+        .build()
+        .await?;
+
+    Ok(wake_controller)
 }
 
 async fn lease(suspend_controller: &PowerElementContext) -> Result<fbroker::LeaseControlProxy> {
@@ -129,7 +154,8 @@ macro_rules! block_until_inspect_matches {
 }
 
 #[fuchsia::test]
-async fn test_activity_governor_increments_suspend_success_on_lease_drop() -> Result<()> {
+async fn test_activity_governor_increments_suspend_success_on_application_activity_lease_drop(
+) -> Result<()> {
     let realm_options = ftest::RealmOptions { ..Default::default() };
     let (realm, activity_governor_moniker) = create_realm(realm_options).await?;
     let stats = realm.connect_to_protocol::<fsuspend::StatsMarker>().await?;
@@ -149,6 +175,9 @@ async fn test_activity_governor_increments_suspend_success_on_lease_drop() -> Re
                     power_level: 0u64,
                 },
                 application_activity: {
+                    power_level: 0u64,
+                },
+                wake_handling: {
                     power_level: 0u64,
                 },
             },
@@ -177,6 +206,9 @@ async fn test_activity_governor_increments_suspend_success_on_lease_drop() -> Re
                 },
                 application_activity: {
                     power_level: 1u64,
+                },
+                wake_handling: {
+                    power_level: 0u64,
                 },
             },
             suspend_stats: {
@@ -210,6 +242,9 @@ async fn test_activity_governor_increments_suspend_success_on_lease_drop() -> Re
                 application_activity: {
                     power_level: 0u64,
                 },
+                wake_handling: {
+                    power_level: 0u64,
+                },
             },
             suspend_stats: {
                 success_count: 1u64,
@@ -236,6 +271,9 @@ async fn test_activity_governor_increments_suspend_success_on_lease_drop() -> Re
                 },
                 application_activity: {
                     power_level: 1u64,
+                },
+                wake_handling: {
+                    power_level: 0u64,
                 },
             },
             suspend_stats: {
@@ -269,6 +307,9 @@ async fn test_activity_governor_increments_suspend_success_on_lease_drop() -> Re
                 application_activity: {
                     power_level: 0u64,
                 },
+                wake_handling: {
+                    power_level: 0u64,
+                },
             },
             suspend_stats: {
                 success_count: 2u64,
@@ -286,4 +327,79 @@ async fn test_activity_governor_increments_suspend_success_on_lease_drop() -> Re
     Ok(())
 }
 
+#[fuchsia::test]
+async fn test_activity_governor_raises_execution_state_power_level_on_wake_handling_claim(
+) -> Result<()> {
+    let realm_options = ftest::RealmOptions { ..Default::default() };
+    let (realm, activity_governor_moniker) = create_realm(realm_options).await?;
+    let stats = realm.connect_to_protocol::<fsuspend::StatsMarker>().await?;
+
+    // First watch should return immediately with default values.
+    let current_stats = stats.watch().await?;
+    assert_eq!(Some(0), current_stats.success_count);
+    assert_eq!(Some(0), current_stats.fail_count);
+    assert_eq!(None, current_stats.last_failed_error);
+    assert_eq!(None, current_stats.last_time_in_suspend);
+
+    let wake_controller = create_wake_topology(&realm).await?;
+    let wake_handling_lease_control = lease(&wake_controller).await?;
+
+    block_until_inspect_matches!(
+        activity_governor_moniker,
+        root: {
+            power_elements: {
+                execution_state: {
+                    power_level: 1u64,
+                },
+                application_activity: {
+                    power_level: 0u64,
+                },
+                wake_handling: {
+                    power_level: 1u64,
+                },
+            },
+            suspend_stats: {
+                success_count: 0u64,
+                fail_count: 0u64,
+                last_failed_error: 0u64,
+                last_time_in_suspend: -1i64,
+                last_time_in_suspend_operations: -1i64,
+            },
+            "fuchsia.inspect.Health": contains {
+                status: "OK",
+            },
+        }
+    );
+
+    drop(wake_handling_lease_control);
+
+    block_until_inspect_matches!(
+        activity_governor_moniker,
+        root: {
+            power_elements: {
+                execution_state: {
+                    power_level: 0u64,
+                },
+                application_activity: {
+                    power_level: 0u64,
+                },
+                wake_handling: {
+                    power_level: 0u64,
+                },
+            },
+            suspend_stats: {
+                success_count: 1u64,
+                fail_count: 0u64,
+                last_failed_error: 0u64,
+                last_time_in_suspend: 0u64,
+                last_time_in_suspend_operations: -1i64,
+            },
+            "fuchsia.inspect.Health": contains {
+                status: "OK",
+            },
+        }
+    );
+
+    Ok(())
+}
 // TODO(b/306171083): Add more test cases when passive dependencies are supported.

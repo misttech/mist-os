@@ -9,6 +9,7 @@ use fidl_fuchsia_power_suspend as fsuspend;
 use fidl_fuchsia_power_system::{
     self as fsystem, APPLICATION_ACTIVITY_ACTIVE, APPLICATION_ACTIVITY_INACTIVE,
     EXECUTION_STATE_ACTIVE, EXECUTION_STATE_INACTIVE, EXECUTION_STATE_WAKE_HANDLING,
+    WAKE_HANDLING_ACTIVE, WAKE_HANDLING_INACTIVE,
 };
 use fuchsia_async as fasync;
 use fuchsia_component::server::ServiceFs;
@@ -118,6 +119,7 @@ pub struct SystemActivityGovernor {
     inspect_root: fuchsia_inspect::Node,
     execution_state: PowerElementContext,
     application_activity: PowerElementContext,
+    wake_handling: PowerElementContext,
     suspend_stats: SuspendStatsManager,
 }
 
@@ -148,9 +150,29 @@ impl SystemActivityGovernor {
         .build()
         .await?;
 
+        let wake_handling = PowerElementContext::builder(
+            topology,
+            "wake_handling",
+            &[WAKE_HANDLING_INACTIVE, WAKE_HANDLING_ACTIVE],
+        )
+        .dependencies(vec![fbroker::LevelDependency {
+            dependency_type: fbroker::DependencyType::Active,
+            dependent_level: WAKE_HANDLING_ACTIVE,
+            requires_token: execution_state.active_dependency_token(),
+            requires_level: EXECUTION_STATE_WAKE_HANDLING,
+        }])
+        .build()
+        .await?;
+
         let suspend_stats = SuspendStatsManager::new(inspect_root.create_child("suspend_stats"));
 
-        Ok(Rc::new(Self { inspect_root, execution_state, application_activity, suspend_stats }))
+        Ok(Rc::new(Self {
+            inspect_root,
+            execution_state,
+            application_activity,
+            wake_handling,
+            suspend_stats,
+        }))
     }
 
     /// Runs a FIDL server to handle fuchsia.power.suspend and fuchsia.power.system API requests.
@@ -159,6 +181,7 @@ impl SystemActivityGovernor {
             node.record_child("power_elements", |elements_node| {
                 self.run_execution_state(&elements_node);
                 self.run_application_activity(&elements_node);
+                self.run_wake_handling(&elements_node);
             });
         });
         self.run_fidl_server().await
@@ -203,6 +226,22 @@ impl SystemActivityGovernor {
                 &this.application_activity,
                 APPLICATION_ACTIVITY_INACTIVE,
                 application_activity_node,
+                |_| {},
+            )
+            .await;
+        })
+        .detach();
+    }
+
+    fn run_wake_handling(self: &Rc<Self>, inspect_node: &fuchsia_inspect::Node) {
+        let wake_handling_node = inspect_node.create_child("wake_handling");
+        let this = self.clone();
+
+        fasync::Task::local(async move {
+            Self::run_power_element(
+                &this.wake_handling,
+                WAKE_HANDLING_INACTIVE,
+                wake_handling_node,
                 |_| {},
             )
             .await;
@@ -299,7 +338,7 @@ impl SystemActivityGovernor {
         while let Ok(Some(request)) = stream.try_next().await {
             match request {
                 fsystem::ActivityGovernorRequest::GetPowerElements { responder } => {
-                    let _ = responder.send(fsystem::PowerElements {
+                    let result = responder.send(fsystem::PowerElements {
                         execution_state: Some(fsystem::ExecutionState {
                             passive_dependency_token: Some(
                                 self.execution_state.passive_dependency_token(),
@@ -315,8 +354,24 @@ impl SystemActivityGovernor {
                             ),
                             ..Default::default()
                         }),
+                        wake_handling: Some(fsystem::WakeHandling {
+                            passive_dependency_token: Some(
+                                self.wake_handling.passive_dependency_token(),
+                            ),
+                            active_dependency_token: Some(
+                                self.wake_handling.active_dependency_token(),
+                            ),
+                            ..Default::default()
+                        }),
                         ..Default::default()
                     });
+
+                    if let Err(error) = result {
+                        tracing::warn!(
+                            ?error,
+                            "Encountered error while responding to GetPowerElements request"
+                        );
+                    }
                 }
                 fsystem::ActivityGovernorRequest::RegisterListener { responder, .. } => {
                     // TODO(mbrunson): Implement RegisterListener.
