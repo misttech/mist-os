@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use addr::TargetAddr;
+use ffx_target::Description;
 use rcs::RcsConnection;
 use std::{net::SocketAddr, time::Instant};
 
@@ -13,35 +13,13 @@ pub trait TryIntoTargetEventInfo: Sized {
     /// received message was from a Fuchsia target, and if so, what kind. Attempts
     /// to fill in as much information as possible given the message, consuming
     /// the underlying object in the process.
-    fn try_into_target_event_info(self, src: SocketAddr) -> Result<TargetEventInfo, Self::Error>;
-}
-
-#[derive(Debug, Hash, Copy, Clone, PartialEq, Eq)]
-pub enum FastbootInterface {
-    Usb,
-    Udp,
-    Tcp,
-}
-
-/// Represents a target that an event has produced. Not to be confused with the FIDL equivalent
-/// under fuchsia.developer.ffx.
-#[derive(Debug, Default, Hash, Clone, PartialEq, Eq)]
-pub struct TargetEventInfo {
-    pub nodename: Option<String>,
-    pub addresses: Vec<TargetAddr>,
-    pub serial: Option<String>,
-    pub ssh_port: Option<u16>,
-    pub fastboot_interface: Option<FastbootInterface>,
-    // So far this is only used in testing. It's unclear what the reasoning is
-    // for the SSH host address being stored as a string rather than a struct
-    // elsewhere in the code, so this is being done for the sake of congruity.
-    pub ssh_host_address: Option<String>,
+    fn try_into_target_event_info(self, src: SocketAddr) -> Result<Description, Self::Error>;
 }
 
 // TODO(b/287780199): Remove once the usage in Zedboot discovery is removed/refactored.
 #[derive(Debug, Hash, Clone, PartialEq, Eq)]
 pub enum WireTrafficType {
-    Zedboot(TargetEventInfo),
+    Zedboot(Description),
 }
 
 /// Encapsulates an event that occurs on the daemon.
@@ -54,10 +32,10 @@ pub enum DaemonEvent {
     /// A peer with the contained NodeId has been dropped from the
     /// Overnet mesh (there are no remaining known routes to this peer).
     OvernetPeerLost(u64),
-    NewTarget(TargetEventInfo),
+    NewTarget(Description),
     /// An event when a target (which is not necessarily new) has been
     /// updated with more information.
-    UpdatedTarget(TargetEventInfo),
+    UpdatedTarget(Description),
     // TODO(awdavies): Stale target event, target shutdown event, etc.
 }
 

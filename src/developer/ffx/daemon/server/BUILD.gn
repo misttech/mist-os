@@ -29,6 +29,7 @@ rustc_library("lib") {
     "//src/developer/ffx/lib/protocols:lib",
     "//src/developer/ffx/lib/rcs:lib",
     "//src/developer/ffx/lib/stream_util:lib",
+    "//src/developer/ffx/lib/target:lib",
     "//src/developer/ffx/lib/version:lib",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia-async",

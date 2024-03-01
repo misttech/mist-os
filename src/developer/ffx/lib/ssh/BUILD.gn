@@ -11,15 +11,22 @@ rustc_library("lib") {
 
   deps = [
     "//src/developer/ffx/config:lib",
+    "//src/developer/ffx/lib/compat_info:lib",
+    "//src/lib/fuchsia-async",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:base64",
+    "//third_party/rust_crates:chrono",
     "//third_party/rust_crates:ring",
     "//third_party/rust_crates:serde",
+    "//third_party/rust_crates:serde_json",
+    "//third_party/rust_crates:thiserror",
+    "//third_party/rust_crates:tokio",
     "//third_party/rust_crates:tracing",
   ]
 
   test_deps = [
     "//src/lib/fuchsia-async",
+    "//third_party/rust_crates:assert_matches",
     "//third_party/rust_crates:pretty_assertions",
     "//third_party/rust_crates:serde_json",
     "//third_party/rust_crates:tempfile",
@@ -28,6 +35,7 @@ rustc_library("lib") {
   sources = [
     "src/config.rs",
     "src/lib.rs",
+    "src/parse.rs",
     "src/ssh.rs",
     "src/ssh_key.rs",
   ]

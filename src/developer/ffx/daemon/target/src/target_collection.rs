@@ -15,7 +15,8 @@ use async_trait::async_trait;
 use async_utils::event::Event;
 use chrono::Utc;
 use ffx_daemon_core::events::{self, EventSynthesizer};
-use ffx_daemon_events::{DaemonEvent, TargetEvent, TargetEventInfo};
+use ffx_daemon_events::{DaemonEvent, TargetEvent};
+use ffx_target::TargetInfoQuery;
 use fidl_fuchsia_developer_ffx as ffx;
 use netext::IsLocalAddr;
 use std::{
@@ -81,7 +82,7 @@ impl TargetCollection {
 
     // TODO(b/297896647): Filter discovered targets and introduce `discover_targets` as the new
     // multi-target discovery method.
-    pub fn targets(&self, query: Option<&TargetQuery>) -> Vec<ffx::TargetInfo> {
+    pub fn targets(&self, query: Option<&TargetInfoQuery>) -> Vec<ffx::TargetInfo> {
         // Merge targets by shared identity.
 
         #[derive(Clone, Debug, PartialEq)]
@@ -141,7 +142,7 @@ impl TargetCollection {
 
         for target in self.targets.borrow().values() {
             if let Some(query) = query {
-                if !query.matches(target) {
+                if !query.match_description(&target.target_info()) {
                     continue;
                 }
             }
@@ -864,11 +865,11 @@ impl TargetCollection {
 
     fn query_any_target<B>(
         &self,
-        query: &TargetQuery,
+        query: &TargetInfoQuery,
         mut f: impl FnMut(&Rc<Target>) -> ControlFlow<B>,
     ) -> Option<B> {
         for target in self.targets.borrow().values() {
-            if !query.matches(target) {
+            if !query.match_description(&target.target_info()) {
                 continue;
             }
 
@@ -909,7 +910,7 @@ impl TargetCollection {
 
     fn query_any_single_target(
         &self,
-        query: &TargetQuery,
+        query: &TargetInfoQuery,
         predicate: impl Fn(&Target) -> bool,
     ) -> Result<Option<Rc<Target>>, ()> {
         let mut selected: Option<Rc<Target>> = None;
@@ -955,7 +956,7 @@ impl TargetCollection {
     // enabled by `use_target`.
     pub fn query_enabled_targets<B>(
         &self,
-        query: &TargetQuery,
+        query: &TargetInfoQuery,
         mut f: impl FnMut(&Rc<Target>) -> ControlFlow<B>,
     ) -> Option<B> {
         self.query_any_target(query, move |target| {
@@ -970,7 +971,7 @@ impl TargetCollection {
 
     pub fn query_single_enabled_target(
         &self,
-        query: &TargetQuery,
+        query: &TargetInfoQuery,
     ) -> Result<Option<Rc<Target>>, ()> {
         self.query_any_single_target(query, |target| {
             if !target.is_enabled() {
@@ -989,7 +990,7 @@ impl TargetCollection {
     /// Returns an error if multiple targets match. In an environment where targets are discovered
     /// asynchronously this error will not consistently fire.
     #[tracing::instrument(skip(self))]
-    pub async fn discover_target(&self, query: &TargetQuery) -> Result<DiscoveredTarget, ()> {
+    pub async fn discover_target(&self, query: &TargetInfoQuery) -> Result<DiscoveredTarget, ()> {
         tracing::debug!("Using query: {:?}", query);
 
         // A timeout is not needed here as timeouts are handled downstream and may be
@@ -1034,121 +1035,7 @@ impl TargetCollection {
     }
 }
 
-#[derive(Debug, Clone)]
-pub enum TargetQuery {
-    /// Attempts to match the nodename, falling back to serial (in that order).
-    /// TODO(b/299345828): Make this an exact match by default, fall back to substring matching
-    NodenameOrSerial(String),
-    Addr(SocketAddr),
-    First,
-}
-
-impl TargetQuery {
-    fn is_query_on_identity(&self) -> bool {
-        matches!(self, TargetQuery::NodenameOrSerial(..) | TargetQuery::First)
-    }
-
-    fn is_query_on_address(&self) -> bool {
-        matches!(self, TargetQuery::Addr(..))
-    }
-
-    pub fn match_info(&self, t: &TargetEventInfo) -> bool {
-        match self {
-            Self::NodenameOrSerial(arg) => {
-                if let Some(ref nodename) = t.nodename {
-                    if nodename.contains(arg) {
-                        return true;
-                    }
-                }
-                if let Some(ref serial) = t.serial {
-                    if serial.contains(arg) {
-                        return true;
-                    }
-                }
-                false
-            }
-            Self::Addr(addr) => {
-                let ssh_port = t.ssh_port.unwrap_or(22);
-                t.addresses.iter().any(|a| {
-                    let mut a = SocketAddr::from(a);
-
-                    // Use the SSH port if the target address' port is 0
-                    if a.port() == 0 {
-                        a.set_port(ssh_port)
-                    }
-
-                    // Clear the target address' port if the query has no port
-                    if addr.port() == 0 {
-                        a.set_port(0)
-                    }
-
-                    // Clear the target address' scope if the query has no scope
-                    if let (SocketAddr::V6(addr), SocketAddr::V6(a)) = (&addr, &mut a) {
-                        if addr.scope_id() == 0 {
-                            a.set_scope_id(0)
-                        }
-                    }
-
-                    &a == addr
-                })
-            }
-            Self::First => true,
-        }
-    }
-
-    pub fn matches(&self, t: &Target) -> bool {
-        self.match_info(&t.target_info())
-    }
-}
-
-impl<T> From<Option<T>> for TargetQuery
-where
-    T: Into<TargetQuery>,
-{
-    fn from(o: Option<T>) -> Self {
-        o.map(Into::into).unwrap_or(Self::First)
-    }
-}
-
-impl From<&str> for TargetQuery {
-    fn from(s: &str) -> Self {
-        String::from(s).into()
-    }
-}
-
-impl From<String> for TargetQuery {
-    /// If the string can be parsed as some kind of IP address, will attempt to
-    /// match based on that, else fall back to the nodename or serial matches.
-    #[tracing::instrument]
-    fn from(s: String) -> Self {
-        if s == "" {
-            return Self::First;
-        }
-        let (addr, scope, port) = match netext::parse_address_parts(s.as_str()) {
-            Ok(r) => r,
-            Err(e) => {
-                tracing::trace!(
-                    "Failed to parse address from '{s}'. Interpreting as nodename: {:?}",
-                    e
-                );
-                return Self::NodenameOrSerial(s);
-            }
-        };
-        // If no such interface exists, just return 0 for a best effort search.
-        // This does mean it might be possible to include arbitrary inaccurate scope names for
-        // looking up a target, however (like `fe80::1%nonsense`).
-        let scope = scope.map(|s| netext::get_verified_scope_id(s).unwrap_or(0)).unwrap_or(0);
-        Self::Addr(TargetAddr::new(addr, scope, port.unwrap_or(0)).into())
-    }
-}
-
-impl From<TargetAddr> for TargetQuery {
-    fn from(t: TargetAddr) -> Self {
-        Self::Addr(t.into())
-    }
-}
-
-/// A filter to select targets to update. Unlike `TargetQuery`, this cannot be parsed from a string.
+/// A filter to select targets to update. Unlike `TargetInfoQuery`, this cannot be parsed from a string.
 #[derive(Clone, Debug)]
 pub enum TargetUpdateFilter<'a> {
     /// Update a target by ID.
@@ -1209,6 +1096,7 @@ mod tests {
     use crate::target::{TargetProtocol, TargetTransport, TargetUpdateBuilder};
     use chrono::TimeZone;
     use ffx_daemon_events::TargetConnectionState;
+    use ffx_target::Description;
     use fuchsia_async::Task;
     use futures::prelude::*;
     use std::{
@@ -1226,33 +1114,33 @@ mod tests {
     const IPV4_PRIVATE: Ipv4Addr = Ipv4Addr::new(192, 168, 0, 1);
 
     #[track_caller]
-    fn expect_target(tc: &TargetCollection, query: &TargetQuery) -> Rc<Target> {
+    fn expect_target(tc: &TargetCollection, query: &TargetInfoQuery) -> Rc<Target> {
         tc.query_any_single_target(query, |_| true)
             .expect("Multiple targets found")
             .expect("No target found")
     }
 
     #[track_caller]
-    fn expect_enabled_target(tc: &TargetCollection, query: &TargetQuery) -> Rc<Target> {
+    fn expect_enabled_target(tc: &TargetCollection, query: &TargetInfoQuery) -> Rc<Target> {
         tc.query_single_enabled_target(query)
             .expect("Multiple targets found")
             .expect("No target found")
     }
 
     #[track_caller]
-    fn expect_no_target(tc: &TargetCollection, query: &TargetQuery) {
+    fn expect_no_target(tc: &TargetCollection, query: &TargetInfoQuery) {
         let opt = tc.query_any_single_target(query, |_| true).expect("Multiple targets found");
         assert!(opt.is_none(), "Target found")
     }
 
     #[track_caller]
-    fn expect_no_enabled_target(tc: &TargetCollection, query: &TargetQuery) {
+    fn expect_no_enabled_target(tc: &TargetCollection, query: &TargetInfoQuery) {
         let opt = tc.query_single_enabled_target(query).expect("Multiple targets found");
         assert!(opt.is_none(), "Target found")
     }
 
     #[track_caller]
-    fn expect_ambiguous_target(tc: &TargetCollection, query: &TargetQuery) {
+    fn expect_ambiguous_target(tc: &TargetCollection, query: &TargetInfoQuery) {
         tc.query_single_enabled_target(query).expect_err("Query not ambiguous");
     }
 
@@ -1398,14 +1286,14 @@ mod tests {
         );
 
         // The most recent matching target should be returned for both queries.
-        let query_name = expect_target(&tc, &TargetQuery::NodenameOrSerial(NODENAME.into()));
-        let query_serial = expect_target(&tc, &TargetQuery::NodenameOrSerial(SERIAL.into()));
+        let query_name = expect_target(&tc, &TargetInfoQuery::NodenameOrSerial(NODENAME.into()));
+        let query_serial = expect_target(&tc, &TargetInfoQuery::NodenameOrSerial(SERIAL.into()));
         // Both targets have updated
         assert!(Rc::ptr_eq(&query_name, &t1) || Rc::ptr_eq(&query_name, &t2));
         // Target returned from queries should be consistent.
         assert!(Rc::ptr_eq(&query_name, &query_serial));
 
-        // The state of both targets are merged together when requesting TargetEventInfo:
+        // The state of both targets are merged together when requesting Description:
         let targets = tc.targets(None);
         let [target_info] = &targets[..] else {
             panic!("Too many target info structs: {targets:?}");
@@ -1457,8 +1345,8 @@ mod tests {
         let tc = TargetCollection::new_with_queue();
         tc.merge_insert(t.clone());
 
-        let ipv4_query = TargetQuery::Addr(ipv4_addr.into());
-        let ipv6_query = TargetQuery::Addr(ipv6_addr.into());
+        let ipv4_query = TargetInfoQuery::Addr(ipv4_addr.into());
+        let ipv6_query = TargetInfoQuery::Addr(ipv6_addr.into());
 
         assert_eq!(expect_target(&tc, &ipv4_query), t);
         expect_no_target(&tc, &ipv6_query);
@@ -1483,7 +1371,7 @@ mod tests {
         assert_eq!(vec.len(), 1);
         assert_eq!(
             vec.iter().next().expect("events empty"),
-            &DaemonEvent::NewTarget(TargetEventInfo {
+            &DaemonEvent::NewTarget(Description {
                 nodename: Some("clopperdoop".to_owned()),
                 ..Default::default()
             })
@@ -1505,17 +1393,17 @@ mod tests {
         let events = tc.synthesize_events().await;
         assert_eq!(events.len(), 3);
         assert!(events.iter().any(|e| e
-            == &DaemonEvent::NewTarget(TargetEventInfo {
+            == &DaemonEvent::NewTarget(Description {
                 nodename: Some("clam-chowder-is-tasty".to_owned()),
                 ..Default::default()
             })));
         assert!(events.iter().any(|e| e
-            == &DaemonEvent::NewTarget(TargetEventInfo {
+            == &DaemonEvent::NewTarget(Description {
                 nodename: Some("this-is-a-crunchy-falafel".to_owned()),
                 ..Default::default()
             })));
         assert!(events.iter().any(|e| e
-            == &DaemonEvent::NewTarget(TargetEventInfo {
+            == &DaemonEvent::NewTarget(Description {
                 nodename: Some("i-should-probably-eat-lunch".to_owned()),
                 ..Default::default()
             })));
@@ -1552,7 +1440,7 @@ mod tests {
     #[async_trait(?Send)]
     impl events::EventHandler<DaemonEvent> for EventPusher {
         async fn on_event(&self, event: DaemonEvent) -> Result<events::Status> {
-            if let DaemonEvent::NewTarget(TargetEventInfo { nodename: Some(s), .. }) = event {
+            if let DaemonEvent::NewTarget(Description { nodename: Some(s), .. }) = event {
                 self.got.send(s).await.unwrap();
                 Ok(events::Status::Waiting)
             } else {
@@ -1589,24 +1477,24 @@ mod tests {
         let tc = TargetCollection::new_with_queue();
         tc.merge_insert(t.clone());
 
-        let query = TargetQuery::from(default.to_owned());
+        let query = TargetInfoQuery::from(default.to_owned());
         assert_eq!(tc.discover_target(&query).await.unwrap(), t);
-        assert_eq!(tc.discover_target(&TargetQuery::First).await.unwrap(), t);
+        assert_eq!(tc.discover_target(&TargetInfoQuery::First).await.unwrap(), t);
 
-        let query2 = TargetQuery::from(t2.nodename());
+        let query2 = TargetInfoQuery::from(t2.nodename());
         tc.merge_insert(t2.clone());
 
         assert_eq!(tc.discover_target(&query).await.unwrap(), t);
         assert_eq!(tc.discover_target(&query2).await.unwrap(), t2);
 
         // Targets in use are preferred
-        assert_eq!(tc.discover_target(&TargetQuery::First).await.unwrap(), t);
+        assert_eq!(tc.discover_target(&TargetInfoQuery::First).await.unwrap(), t);
 
         // Find by partial match
-        assert_eq!(tc.discover_target(&TargetQuery::from("clam".to_owned())).await.unwrap(), t);
+        assert_eq!(tc.discover_target(&TargetInfoQuery::from("clam".to_owned())).await.unwrap(), t);
 
         tc.merge_insert(Target::new_autoconnected("this-is-a-crunchy-falafel"));
-        tc.discover_target(&TargetQuery::First).await.unwrap_err(); // Too many targets found
+        tc.discover_target(&TargetInfoQuery::First).await.unwrap_err(); // Too many targets found
     }
 
     struct TargetUpdatedFut<F> {
@@ -1689,7 +1577,7 @@ mod tests {
         let target_name = "fesenjoon-is-my-jam";
         let wait_fut = Box::pin(async {
             tc.use_target(
-                tc.discover_target(&TargetQuery::from(target_name.to_owned())).await.unwrap(),
+                tc.discover_target(&TargetInfoQuery::from(target_name.to_owned())).await.unwrap(),
                 "test",
             )
         });
@@ -1985,7 +1873,8 @@ mod tests {
         let t = Target::new_for_usb(string);
         let tc = TargetCollection::new_with_queue();
         tc.merge_insert(t.clone());
-        let found_target = expect_target(&tc, &TargetQuery::NodenameOrSerial(string.to_owned()));
+        let found_target =
+            expect_target(&tc, &TargetInfoQuery::NodenameOrSerial(string.to_owned()));
         assert_eq!(string, found_target.serial().expect("target should have serial number"));
         assert!(found_target.nodename().is_none());
     }
@@ -1997,13 +1886,14 @@ mod tests {
         tc.merge_insert(Target::new_named("this-is-not-connected"));
         tc.merge_insert(Target::new_autoconnected("this-is-connected"));
 
-        let found_target = expect_enabled_target(&tc, &TargetQuery::First);
+        let found_target = expect_enabled_target(&tc, &TargetInfoQuery::First);
         assert_eq!(
             "this-is-connected",
             found_target.nodename().expect("target should have nodename")
         );
 
-        let found_target = expect_enabled_target(&tc, &TargetQuery::from("connected".to_owned()));
+        let found_target =
+            expect_enabled_target(&tc, &TargetInfoQuery::from("connected".to_owned()));
         assert_eq!(
             "this-is-connected",
             found_target.nodename().expect("target should have nodename")
@@ -2025,7 +1915,8 @@ mod tests {
             updated
         });
 
-        for query in [TargetQuery::from("this-is-connected".to_owned()), TargetQuery::First] {
+        for query in [TargetInfoQuery::from("this-is-connected".to_owned()), TargetInfoQuery::First]
+        {
             let found_target = expect_enabled_target(&tc, &query);
             assert!(
                 Rc::ptr_eq(&connected, &found_target),
@@ -2039,7 +1930,7 @@ mod tests {
             updated
         });
 
-        for query in [TargetQuery::from("connected".to_owned()), TargetQuery::First] {
+        for query in [TargetInfoQuery::from("connected".to_owned()), TargetInfoQuery::First] {
             expect_ambiguous_target(&tc, &query);
         }
     }
@@ -2048,169 +1939,169 @@ mod tests {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_target_query_matches_nodename() {
-        let query = TargetQuery::from("foo");
+        let query = TargetInfoQuery::from("foo");
         let target = Rc::new(Target::new_named("foo"));
-        assert!(query.matches(&target));
+        assert!(query.match_description(&target.target_info()));
     }
 
     #[test]
     fn test_target_query_from_socketaddr_both_zero_port() {
-        let tq = TargetQuery::from("127.0.0.1:0");
-        let ti = TargetEventInfo {
+        let tq = TargetInfoQuery::from("127.0.0.1:0");
+        let desc = Description {
             addresses: vec![TargetAddr::new(Ipv4Addr::LOCALHOST.into(), 0, 0)],
             ssh_port: None,
             ..Default::default()
         };
         assert!(
-            matches!(tq, TargetQuery::Addr(addr) if addr == SocketAddr::new(Ipv4Addr::LOCALHOST.into(), 0))
+            matches!(tq, TargetInfoQuery::Addr(addr) if addr == SocketAddr::new(Ipv4Addr::LOCALHOST.into(), 0))
         );
-        assert!(tq.match_info(&ti));
+        assert!(tq.match_description(&desc));
     }
 
     #[test]
     fn test_target_query_from_socketaddr_zero_port_to_standard_ssh_port() {
-        let tq = TargetQuery::from("127.0.0.1:0");
-        let ti = TargetEventInfo {
+        let tq = TargetInfoQuery::from("127.0.0.1:0");
+        let desc = Description {
             addresses: vec![TargetAddr::new(Ipv4Addr::LOCALHOST.into(), 0, 0)],
             ssh_port: Some(22),
             ..Default::default()
         };
         assert!(
-            matches!(tq, TargetQuery::Addr(addr) if addr == SocketAddr::new(Ipv4Addr::LOCALHOST.into(), 0))
+            matches!(tq, TargetInfoQuery::Addr(addr) if addr == SocketAddr::new(Ipv4Addr::LOCALHOST.into(), 0))
         );
-        assert!(tq.match_info(&ti));
+        assert!(tq.match_description(&desc));
     }
 
     #[test]
     fn test_target_query_from_socketaddr_standard_port_to_no_port() {
-        let tq = TargetQuery::from("127.0.0.1:22");
-        let ti = TargetEventInfo {
+        let tq = TargetInfoQuery::from("127.0.0.1:22");
+        let desc = Description {
             addresses: vec![TargetAddr::new(Ipv4Addr::LOCALHOST.into(), 0, 0)],
             ssh_port: None,
             ..Default::default()
         };
         assert!(
-            matches!(tq, TargetQuery::Addr(addr) if addr == SocketAddr::new(Ipv4Addr::LOCALHOST.into(), 22))
+            matches!(tq, TargetInfoQuery::Addr(addr) if addr == SocketAddr::new(Ipv4Addr::LOCALHOST.into(), 22))
         );
-        assert!(tq.match_info(&ti));
+        assert!(tq.match_description(&desc));
     }
 
     #[test]
     fn test_target_query_from_socketaddr_both_standard_port() {
-        let tq = TargetQuery::from("127.0.0.1:22");
-        let ti = TargetEventInfo {
+        let tq = TargetInfoQuery::from("127.0.0.1:22");
+        let desc = Description {
             addresses: vec![TargetAddr::new("127.0.0.1".parse::<IpAddr>().unwrap(), 0, 0)],
             ssh_port: Some(22),
             ..Default::default()
         };
         assert!(
-            matches!(tq, TargetQuery::Addr(addr) if addr == SocketAddr::new(Ipv4Addr::LOCALHOST.into(), 22))
+            matches!(tq, TargetInfoQuery::Addr(addr) if addr == SocketAddr::new(Ipv4Addr::LOCALHOST.into(), 22))
         );
-        assert!(tq.match_info(&ti));
+        assert!(tq.match_description(&desc));
     }
 
     #[test]
     fn test_target_query_from_socketaddr_random_port_no_target_port() {
-        let tq = TargetQuery::from("127.0.0.1:2342");
-        let ti = TargetEventInfo {
+        let tq = TargetInfoQuery::from("127.0.0.1:2342");
+        let desc = Description {
             addresses: vec![TargetAddr::new("127.0.0.1".parse::<IpAddr>().unwrap(), 0, 0)],
             ssh_port: None,
             ..Default::default()
         };
         assert!(
-            matches!(tq, TargetQuery::Addr(addr) if addr == SocketAddr::new(Ipv4Addr::LOCALHOST.into(), 2342))
+            matches!(tq, TargetInfoQuery::Addr(addr) if addr == SocketAddr::new(Ipv4Addr::LOCALHOST.into(), 2342))
         );
-        assert!(!tq.match_info(&ti));
+        assert!(!tq.match_description(&desc));
     }
 
     #[test]
     fn test_target_query_from_socketaddr_zero_port_to_random_target_port() {
-        let tq = TargetQuery::from("127.0.0.1:0");
-        let ti = TargetEventInfo {
+        let tq = TargetInfoQuery::from("127.0.0.1:0");
+        let desc = Description {
             addresses: vec![TargetAddr::new("127.0.0.1".parse::<IpAddr>().unwrap(), 0, 0)],
             ssh_port: Some(2223),
             ..Default::default()
         };
         assert!(
-            matches!(tq, TargetQuery::Addr(addr) if addr == SocketAddr::new(Ipv4Addr::LOCALHOST.into(), 0))
+            matches!(tq, TargetInfoQuery::Addr(addr) if addr == SocketAddr::new(Ipv4Addr::LOCALHOST.into(), 0))
         );
-        assert!(tq.match_info(&ti));
+        assert!(tq.match_description(&desc));
     }
 
     #[test]
     fn test_target_query_from_sockaddr() {
-        let tq = TargetQuery::from("127.0.0.1:8022");
-        let ti = TargetEventInfo {
+        let tq = TargetInfoQuery::from("127.0.0.1:8022");
+        let desc = Description {
             addresses: vec![TargetAddr::new("127.0.0.1".parse::<IpAddr>().unwrap(), 0, 0)],
             ssh_port: Some(8022),
             ..Default::default()
         };
         assert!(
-            matches!(tq, TargetQuery::Addr(addr) if addr == SocketAddr::new(Ipv4Addr::LOCALHOST.into(), 8022))
+            matches!(tq, TargetInfoQuery::Addr(addr) if addr == SocketAddr::new(Ipv4Addr::LOCALHOST.into(), 8022))
         );
-        assert!(tq.match_info(&ti));
+        assert!(tq.match_description(&desc));
 
-        let tq = TargetQuery::from("[::1]:8022");
-        let ti = TargetEventInfo {
+        let tq = TargetInfoQuery::from("[::1]:8022");
+        let desc = Description {
             addresses: vec![TargetAddr::new("::1".parse::<IpAddr>().unwrap(), 0, 0)],
             ssh_port: Some(8022),
             ..Default::default()
         };
         assert!(
-            matches!(tq, TargetQuery::Addr(addr) if addr == SocketAddr::new(Ipv6Addr::LOCALHOST.into(), 8022))
+            matches!(tq, TargetInfoQuery::Addr(addr) if addr == SocketAddr::new(Ipv6Addr::LOCALHOST.into(), 8022))
         );
-        assert!(tq.match_info(&ti));
+        assert!(tq.match_description(&desc));
 
-        let tq = TargetQuery::from("[::1]");
-        let ti = TargetEventInfo {
+        let tq = TargetInfoQuery::from("[::1]");
+        let desc = Description {
             addresses: vec![TargetAddr::new("::1".parse::<IpAddr>().unwrap(), 0, 0)],
             ssh_port: None,
             ..Default::default()
         };
         assert!(
-            matches!(tq, TargetQuery::Addr(addr) if addr == SocketAddr::new(Ipv6Addr::LOCALHOST.into(), 0))
+            matches!(tq, TargetInfoQuery::Addr(addr) if addr == SocketAddr::new(Ipv6Addr::LOCALHOST.into(), 0))
         );
-        assert!(tq.match_info(&ti));
+        assert!(tq.match_description(&desc));
 
-        let tq = TargetQuery::from("[fe80::1]:22");
-        let ti = TargetEventInfo {
+        let tq = TargetInfoQuery::from("[fe80::1]:22");
+        let desc = Description {
             addresses: vec![TargetAddr::new("fe80::1".parse::<IpAddr>().unwrap(), 0, 0)],
             ssh_port: Some(22),
             ..Default::default()
         };
         assert!(
-            matches!(tq, TargetQuery::Addr(addr) if addr == SocketAddr::new(IPV6_ULA.into(), 22))
+            matches!(tq, TargetInfoQuery::Addr(addr) if addr == SocketAddr::new(IPV6_ULA.into(), 22))
         );
-        assert!(tq.match_info(&ti));
+        assert!(tq.match_description(&desc));
 
-        let tq = TargetQuery::from("192.168.0.1:22");
-        let ti = TargetEventInfo {
+        let tq = TargetInfoQuery::from("192.168.0.1:22");
+        let desc = Description {
             addresses: vec![TargetAddr::new("192.168.0.1".parse::<IpAddr>().unwrap(), 0, 0)],
             ssh_port: Some(22),
             ..Default::default()
         };
         assert!(
-            matches!(tq, TargetQuery::Addr(addr) if addr == SocketAddr::new(IPV4_PRIVATE.into(), 22))
+            matches!(tq, TargetInfoQuery::Addr(addr) if addr == SocketAddr::new(IPV4_PRIVATE.into(), 22))
         );
-        assert!(tq.match_info(&ti));
+        assert!(tq.match_description(&desc));
 
         // Note: socketaddr only supports numeric scopes
-        let tq = TargetQuery::from("[fe80::1%1]:22");
-        let ti = TargetEventInfo {
+        let tq = TargetInfoQuery::from("[fe80::1%1]:22");
+        let desc = Description {
             addresses: vec![TargetAddr::new("fe80::1".parse::<IpAddr>().unwrap(), 1, 0)],
             ssh_port: Some(22),
             ..Default::default()
         };
         assert!(
-            matches!(tq, TargetQuery::Addr(addr) if addr == SocketAddrV6::new(IPV6_ULA.into(), 22, 0, 1).into())
+            matches!(tq, TargetInfoQuery::Addr(addr) if addr == SocketAddrV6::new(IPV6_ULA.into(), 22, 0, 1).into())
         );
-        assert!(tq.match_info(&ti));
+        assert!(tq.match_description(&desc));
     }
 
     #[test]
     fn test_target_query_from_empty_string() {
-        let query = TargetQuery::from(Some(""));
-        assert!(matches!(query, TargetQuery::First));
+        let query = TargetInfoQuery::from(Some(""));
+        assert!(matches!(query, TargetInfoQuery::First));
     }
 
     #[test]
@@ -2220,7 +2111,7 @@ mod tests {
             3,
             0,
         );
-        let tq = TargetQuery::from("fe80::dead:beef:beef:beef");
-        assert!(tq.match_info(&TargetEventInfo { addresses: vec![addr], ..Default::default() }))
+        let tq = TargetInfoQuery::from("fe80::dead:beef:beef:beef");
+        assert!(tq.match_description(&Description { addresses: vec![addr], ..Default::default() }))
     }
 }

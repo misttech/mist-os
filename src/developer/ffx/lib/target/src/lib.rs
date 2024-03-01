@@ -2,22 +2,39 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use addr::TargetAddr;
 use anyhow::{Context as _, Result};
 use errors::{ffx_bail, FfxError};
 use ffx_config::{keys::TARGET_DEFAULT_KEY, EnvironmentContext};
 use fidl::{endpoints::create_proxy, prelude::*};
 use fidl_fuchsia_developer_ffx::{
-    self as ffx, DaemonError, DaemonProxy, TargetCollectionMarker, TargetCollectionProxy,
-    TargetInfo, TargetMarker, TargetQuery,
+    self as ffx, DaemonError, DaemonProxy, TargetAddrInfo, TargetCollectionMarker,
+    TargetCollectionProxy, TargetInfo, TargetIp, TargetMarker, TargetQuery,
 };
 use fidl_fuchsia_developer_remotecontrol::{RemoteControlMarker, RemoteControlProxy};
 use fidl_fuchsia_net as net;
 use futures::{select, Future, FutureExt, TryStreamExt};
-use std::net::IpAddr;
+use itertools::Itertools;
+use netext::IsLocalAddr;
+use std::cmp::Ordering;
+use std::net::{IpAddr, Ipv6Addr};
+use std::net::{SocketAddr, SocketAddrV6};
+use std::sync::Arc;
 use std::time::Duration;
 use thiserror::Error;
 use timeout::timeout;
 use tracing::{debug, info};
+
+mod desc;
+mod fidl_pipe;
+mod query;
+
+const SSH_PORT_DEFAULT: u16 = 22;
+
+pub use desc::{Description, FastbootInterface};
+pub use fidl_pipe::overnet_pipe;
+pub use fidl_pipe::FidlPipe;
+pub use query::TargetInfoQuery;
 
 /// Re-export of [`fidl_fuchsia_developer_ffx::TargetProxy`] for ease of use
 pub use fidl_fuchsia_developer_ffx::TargetProxy;
@@ -162,6 +179,75 @@ pub async fn resolve_default_target(
     Ok(maybe_inline_target(t, &env_context).await)
 }
 
+pub(crate) fn target_addr_info_to_socket(ti: &TargetAddrInfo) -> SocketAddr {
+    let (target_ip, port) = match ti {
+        TargetAddrInfo::Ip(a) => (a.clone(), 0),
+        TargetAddrInfo::IpPort(ip) => (TargetIp { ip: ip.ip, scope_id: ip.scope_id }, ip.port),
+    };
+    let socket = match target_ip {
+        TargetIp { ip: net::IpAddress::Ipv4(net::Ipv4Address { addr }), .. } => {
+            SocketAddr::new(IpAddr::from(addr), port)
+        }
+        TargetIp { ip: net::IpAddress::Ipv6(net::Ipv6Address { addr }), scope_id, .. } => {
+            SocketAddr::V6(SocketAddrV6::new(Ipv6Addr::from(addr), port, 0, scope_id))
+        }
+    };
+    socket
+}
+
+/// Attempts to resolve the default target's ssh-able address. Returns Some(_) if a target has been
+/// found, None otherwise.
+pub async fn resolve_default_target_address(
+    env_context: &EnvironmentContext,
+) -> Result<Option<SocketAddr>> {
+    let t = resolve_default_target(env_context).await?;
+    let query = TargetInfoQuery::from(t.as_ref().map(|t| t.to_string()));
+    match query {
+        TargetInfoQuery::First => {
+            return Ok(None);
+        }
+        TargetInfoQuery::NodenameOrSerial(_) => {}
+        TargetInfoQuery::Addr(a) => {
+            let scope_id = if let SocketAddr::V6(addr) = a { addr.scope_id() } else { 0 };
+            return Ok(Some(TargetAddr::new(a.ip(), scope_id, SSH_PORT_DEFAULT).into()));
+        }
+    }
+    // If we're here then we have to discover the target as it is either a nodename or serial
+    // number.
+    let info = mdns_discovery::discover_target_by(
+        mdns_discovery::MDNS_ONESHOT_DISCOVERY_TIMEOUT,
+        mdns_discovery::MDNS_PORT,
+        move |target_info| query.match_target_info(target_info),
+    )
+    .await?;
+    match info.ssh_address {
+        None => {}
+        Some(addr) => return Ok(Some(target_addr_info_to_socket(&addr))),
+    }
+    match info.addresses {
+        None => Ok(None),
+        Some(addresses) => {
+            let addrs = addresses
+                .iter()
+                .map(target_addr_info_to_socket)
+                .sorted_by(|a1, a2| {
+                    match (a1.ip().is_link_local_addr(), a2.ip().is_link_local_addr()) {
+                        (true, true) | (false, false) => Ordering::Equal,
+                        (true, false) => Ordering::Less,
+                        (false, true) => Ordering::Greater,
+                    }
+                })
+                .collect::<Vec<_>>();
+            Ok(addrs.into_iter().next().map(|mut addr| {
+                if addr.port() == 0 {
+                    addr.set_port(SSH_PORT_DEFAULT)
+                }
+                addr
+            }))
+        }
+    }
+}
+
 /// In the event that a default target is supplied and there needs to be additional Fastboot
 /// inlining, this will handle wrapping the additional information for use in the FFX injector.
 pub async fn maybe_inline_target(
@@ -250,6 +336,92 @@ pub async fn knock_target_by_name(
     })?;
 
     knock_target_with_timeout(&target_proxy, rcs_timeout).await
+}
+
+struct OvernetClient {
+    node: Arc<overnet_core::Router>,
+}
+
+impl OvernetClient {
+    async fn locate_remote_control_node(&self) -> Result<overnet_core::NodeId> {
+        let lpc = self.node.new_list_peers_context().await;
+        let node_id;
+        'found: loop {
+            let new_peers = lpc.list_peers().await?;
+            for peer in &new_peers {
+                let peer_has_remote_control =
+                    peer.services.contains(&RemoteControlMarker::PROTOCOL_NAME.to_string());
+                if peer_has_remote_control {
+                    node_id = peer.node_id;
+                    break 'found;
+                }
+            }
+        }
+        Ok(node_id)
+    }
+
+    /// This is the remote control proxy that should be used for everything.
+    ///
+    /// If this is dropped, it will close the FidlPipe connection.
+    pub(crate) async fn connect_remote_control(&self) -> Result<RemoteControlProxy> {
+        let (server, client) = fidl::Channel::create();
+        let node_id = self.locate_remote_control_node().await?;
+        let _ = self
+            .node
+            .connect_to_service(node_id, RemoteControlMarker::PROTOCOL_NAME, server)
+            .await?;
+        let proxy = RemoteControlProxy::new(fidl::AsyncChannel::from_channel(client));
+        Ok(proxy)
+    }
+}
+
+/// Identical to the above "knock" but does not use the daemon.
+///
+/// Unlike other errors, this is not intended to be run in a tight loop.
+pub async fn knock_target_daemonless(context: &EnvironmentContext) -> Result<(), KnockError> {
+    let target = resolve_default_target(&context).await.context("resolving default target")?;
+    if target.is_none() {
+        return Err(anyhow::anyhow!("Cannot knock unknown target").into());
+    }
+    let addr = resolve_default_target_address(&context)
+        .await?
+        .ok_or_else(|| {
+            anyhow::anyhow!(
+                "Unable to resolve address of target '{}'",
+                target.as_ref().map(|t| t.to_string()).unwrap_or("[unknown]".to_owned())
+            )
+        })
+        .context("resolving target address")?;
+    let node = overnet_core::Router::new(None)?;
+    let fidl_pipe =
+        FidlPipe::new(context.clone(), addr, node.clone()).await.context("starting fidl pipe")?;
+    let error_stream = fidl_pipe.error_stream();
+    let client = OvernetClient { node };
+    // These are the two places where errors can propagate to the user. For other code using the FIDL
+    // pipe it might be trickier to ensure that errors from the pipe are caught. For things like
+    // FHO integration these errors will probably just be handled outside of the main subtool.
+    let result = async {
+        let rcs_proxy = client.connect_remote_control().await?;
+        rcs::knock_rcs(&rcs_proxy)
+            .await
+            .map_err(|e| KnockError::CriticalError(anyhow::anyhow!("{e:?}")))
+    }
+    .await;
+    match result {
+        Ok(()) => Ok(()),
+        Err(e) => {
+            let mut pipe_errors = Vec::new();
+            while let Ok(Some(err)) = error_stream.try_recv() {
+                pipe_errors.push(err);
+            }
+            if !pipe_errors.is_empty() {
+                return Err(
+                    anyhow::anyhow!("Error getting RCS proxy: {e:?}\n{:?}", pipe_errors).into()
+                );
+            }
+            Err(KnockError::CriticalError(anyhow::anyhow!("{:?}", e)))
+        }
+    }
 }
 
 /// Get the default target.  This uses the normal config mechanism which

@@ -5,7 +5,7 @@
 use chrono::Utc;
 use ffx_daemon_events::TargetConnectionState;
 
-use crate::overnet::host_pipe::HostAddr;
+use ffx_ssh::parse::HostAddr;
 use std::net::{Ipv4Addr, Ipv6Addr};
 
 use super::{

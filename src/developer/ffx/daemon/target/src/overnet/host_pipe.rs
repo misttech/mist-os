@@ -3,15 +3,16 @@
 // found in the LICENSE file.
 
 use crate::{target::Target, RETRY_DELAY};
-use anyhow::{anyhow, Context};
+use anyhow::anyhow;
 use async_trait::async_trait;
-use compat_info::{CompatibilityInfo, ConnectionInfo};
+use compat_info::CompatibilityInfo;
 use ffx_daemon_core::events;
 use ffx_daemon_events::{HostPipeErr, TargetEvent};
+use ffx_ssh::parse::{
+    parse_ssh_output, read_ssh_line, HostAddr, ParseSshConnectionError, PipeError,
+};
 use ffx_ssh::ssh::build_ssh_command_with_ssh_path;
 use fuchsia_async::{unblock, Task, TimeoutExt, Timer};
-use futures::FutureExt;
-use futures_lite::stream::StreamExt;
 use nix::{
     errno::Errno,
     sys::{
@@ -23,7 +24,7 @@ use nix::{
 use std::{
     cell::RefCell,
     collections::VecDeque,
-    fmt, io,
+    io,
     io::Write,
     net::SocketAddr,
     process::Stdio,
@@ -32,31 +33,11 @@ use std::{
     time::Duration,
 };
 use tokio::{
-    io::{copy_buf, AsyncBufRead, AsyncRead, AsyncReadExt, BufReader},
-    process::{Child, ChildStderr, ChildStdout},
+    io::{copy_buf, BufReader},
+    process::Child,
 };
 
 const BUFFER_SIZE: usize = 65536;
-
-#[derive(thiserror::Error, Debug)]
-pub(crate) enum PipeError {
-    #[error("compatibility check not supported")]
-    NoCompatibilityCheck,
-    #[error("could not establish connection: {0}")]
-    ConnectionFailed(String),
-    #[error("io error: {0}")]
-    IoError(#[from] io::Error),
-    #[error("error {0}")]
-    Error(String),
-    #[error("target referenced has gone")]
-    TargetGone,
-    #[error("creating pipe to ['{1}'] failed: {0}")]
-    PipeCreationFailed(String, String),
-    #[error("no ssh address to {0}")]
-    NoAddress(String),
-    #[error("running target overnet pipe: {0}")]
-    SpawnError(String),
-}
 
 #[derive(Debug)]
 pub struct LogBuffer {
@@ -86,27 +67,6 @@ impl LogBuffer {
     pub fn clear(&self) {
         let mut buf = self.buf.borrow_mut();
         buf.truncate(0);
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct HostAddr(String);
-
-impl fmt::Display for HostAddr {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.0.fmt(f)
-    }
-}
-
-impl From<&str> for HostAddr {
-    fn from(s: &str) -> Self {
-        HostAddr(s.to_string())
-    }
-}
-
-impl From<String> for HostAddr {
-    fn from(s: String) -> Self {
-        HostAddr(s)
     }
 }
 
@@ -346,12 +306,13 @@ impl HostPipeChild {
 
         let mut ssh = ssh_cmd.spawn().map_err(|e| PipeError::SpawnError(e.to_string()))?;
 
-        let (pipe_rx, mut pipe_tx) = tokio::io::split(overnet_pipe(node).map_err(|e| {
-            PipeError::PipeCreationFailed(
-                format!("creating local overnet pipe: {e}"),
-                addr.to_string(),
-            )
-        })?);
+        let (pipe_rx, mut pipe_tx) =
+            tokio::io::split(ffx_target::overnet_pipe(node).map_err(|e| {
+                PipeError::PipeCreationFailed(
+                    format!("creating local overnet pipe: {e}"),
+                    addr.to_string(),
+                )
+            })?);
 
         let stdout = ssh
             .stdout
@@ -391,7 +352,7 @@ impl HostPipeChild {
                 Err(e) => {
                     ssh.kill().await?;
                     // Flush any remaining lines, but let's not wait more than one second
-                    let mut lb = LineBuffer::new();
+                    let mut lb = ffx_ssh::parse::LineBuffer::new();
                     while let Ok(line) = read_ssh_line(&mut lb, &mut stderr)
                         .on_timeout(Duration::from_secs(1), || {
                             Err(ParseSshConnectionError::Timeout)
@@ -437,7 +398,7 @@ impl HostPipeChild {
         };
 
         let log_stderr = async move {
-            let mut lb = LineBuffer::new();
+            let mut lb = ffx_ssh::parse::LineBuffer::new();
             loop {
                 let result = read_ssh_line(&mut lb, &mut stderr).await;
                 match result {
@@ -483,280 +444,6 @@ impl HostPipeChild {
                 address: addr,
             },
         ))
-    }
-}
-
-#[derive(Debug, thiserror::Error)]
-enum ParseSshConnectionError {
-    #[error(transparent)]
-    Io(#[from] std::io::Error),
-    #[error("Parse error: {:?}", .0)]
-    Parse(String),
-    #[error("Unexpected EOF: {:?}", .0)]
-    UnexpectedEOF(String),
-    #[error("Read-line timeout")]
-    Timeout,
-}
-
-const BUFSIZE: usize = 1024;
-struct LineBuffer {
-    buffer: [u8; BUFSIZE],
-    pos: usize,
-}
-
-// 1K should be enough for the initial line, which just looks something like
-//    "++ 192.168.1.1 1234 10.0.0.1 22 ++\n"
-impl LineBuffer {
-    fn new() -> Self {
-        Self { buffer: [0; BUFSIZE], pos: 0 }
-    }
-    fn line(&self) -> &[u8] {
-        &self.buffer[..self.pos]
-    }
-}
-
-impl ToString for LineBuffer {
-    fn to_string(&self) -> String {
-        String::from_utf8_lossy(self.line()).into()
-    }
-}
-
-#[tracing::instrument(skip(lb, rdr))]
-async fn read_ssh_line<R: AsyncRead + Unpin>(
-    lb: &mut LineBuffer,
-    rdr: &mut R,
-) -> std::result::Result<String, ParseSshConnectionError> {
-    loop {
-        // We're reading a byte at a time, which would be bad if we were doing it a lot,
-        // but it's only used for stderr (which should normally not produce much data),
-        // and the first line of stdout.
-        let mut b = [0u8];
-        let n = rdr.read(&mut b[..]).await.map_err(ParseSshConnectionError::Io)?;
-        let b = b[0];
-        if n == 0 {
-            return Err(ParseSshConnectionError::UnexpectedEOF(lb.to_string()));
-        }
-        lb.buffer[lb.pos] = b;
-        lb.pos += 1;
-        if lb.pos >= lb.buffer.len() {
-            return Err(ParseSshConnectionError::Parse(format!(
-                "Buffer full: {:?}...",
-                &lb.buffer[..64]
-            )));
-        }
-        if b == b'\n' {
-            let s = lb.to_string();
-            // Clear for next read
-            lb.pos = 0;
-            return Ok(s);
-        }
-    }
-}
-
-#[tracing::instrument(skip(rdr))]
-async fn read_ssh_line_with_timeouts<R: AsyncBufRead + Unpin>(
-    rdr: &mut R,
-) -> Result<String, ParseSshConnectionError> {
-    let mut time = 0;
-    let wait_time = 2;
-    let mut lb = LineBuffer::new();
-    loop {
-        match read_ssh_line(&mut lb, rdr)
-            .on_timeout(Duration::from_secs(wait_time), || Err(ParseSshConnectionError::Timeout))
-            .await
-        {
-            Ok(s) => {
-                return Ok(s);
-            }
-            Err(ParseSshConnectionError::Timeout) => {
-                time += wait_time;
-                tracing::debug!("No line after {time}, line so far: {:?}", lb.line());
-            }
-            Err(e) => {
-                return Err(e);
-            }
-        }
-    }
-}
-
-#[tracing::instrument(skip(stdout))]
-async fn parse_ssh_connection<R: AsyncBufRead + Unpin>(
-    stdout: &mut R,
-    verbose: bool,
-) -> std::result::Result<(String, Option<CompatibilityInfo>), ParseSshConnectionError> {
-    let line = read_ssh_line_with_timeouts(stdout).await?;
-    if line.is_empty() {
-        tracing::error!("Failed to read first line from stdout");
-        return Err(std::io::Error::from(std::io::ErrorKind::UnexpectedEof).into());
-    }
-
-    if verbose {
-        write_ssh_log("O", &line).await;
-    }
-
-    if line.starts_with("{") {
-        parse_ssh_connection_with_info(&line)
-    } else {
-        parse_ssh_connection_legacy(&line)
-    }
-}
-
-fn parse_ssh_connection_with_info(
-    line: &str,
-) -> std::result::Result<(String, Option<CompatibilityInfo>), ParseSshConnectionError> {
-    let connection_info: ConnectionInfo =
-        serde_json::from_str(&line).map_err(|e| ParseSshConnectionError::Parse(e.to_string()))?;
-    let mut parts = connection_info.ssh_connection.split(" ");
-    // SSH_CONNECTION identifies the client and server ends of the connection.
-    // The variable contains four space-separated values: client IP address,
-    // client port number, server IP address, and server port number.
-    if let Some(client_address) = parts.nth(0) {
-        Ok((client_address.to_string(), Some(connection_info.compatibility)))
-    } else {
-        Err(ParseSshConnectionError::Parse(line.into()))
-    }
-}
-fn parse_ssh_connection_legacy(
-    line: &str,
-) -> std::result::Result<(String, Option<CompatibilityInfo>), ParseSshConnectionError> {
-    let mut parts = line.split(" ");
-    // The first part should be our anchor.
-    match parts.next() {
-        Some("++") => {}
-        Some(_) | None => {
-            tracing::error!("Failed to read first anchor: {line}");
-            return Err(ParseSshConnectionError::Parse(line.into()));
-        }
-    }
-
-    // SSH_CONNECTION identifies the client and server ends of the connection.
-    // The variable contains four space-separated values: client IP address,
-    // client port number, server IP address, and server port number.
-    // This is left as a string since std::net::IpAddr does not support string scope_ids.
-    let client_address = if let Some(part) = parts.next() {
-        part
-    } else {
-        tracing::error!("Failed to read client_address: {line}");
-        return Err(ParseSshConnectionError::Parse(line.into()));
-    };
-
-    // Followed by the client port.
-    let _client_port = if let Some(part) = parts.next() {
-        part
-    } else {
-        tracing::error!("Failed to read port: {line}");
-        return Err(ParseSshConnectionError::Parse(line.into()));
-    };
-
-    // Followed by the server address.
-    let _server_address = if let Some(part) = parts.next() {
-        part
-    } else {
-        tracing::error!("Failed to read port: {line}");
-        return Err(ParseSshConnectionError::Parse(line.into()));
-    };
-
-    // Followed by the server port.
-    let _server_port = if let Some(part) = parts.next() {
-        part
-    } else {
-        tracing::error!("Failed to read server_port: {line}");
-        return Err(ParseSshConnectionError::Parse(line.into()));
-    };
-
-    // The last part should be our anchor.
-    match parts.next() {
-        Some("++\n") => {}
-        None | Some(_) => {
-            return Err(ParseSshConnectionError::Parse(line.into()));
-        }
-    };
-
-    // Finally, there should be nothing left.
-    if let Some(_) = parts.next() {
-        tracing::error!("Extra data: {line}");
-        return Err(ParseSshConnectionError::Parse(line.into()));
-    }
-
-    Ok((client_address.to_string(), None))
-}
-
-#[tracing::instrument(skip(stderr))]
-async fn parse_ssh_error<R: AsyncBufRead + Unpin>(stderr: &mut R, verbose: bool) -> PipeError {
-    loop {
-        let l = match read_ssh_line_with_timeouts(stderr).await {
-            Err(e) => {
-                tracing::warn!("SSH stderr: {e:?}");
-                return PipeError::NoCompatibilityCheck;
-            }
-            Ok(l) => l,
-        };
-        // Sadly, this is just reading buffered data, so timestamps in the log will be
-        // incorrect
-        if verbose {
-            write_ssh_log("E", &l).await;
-        }
-        // If we are running with "ssh -v", the stderr will also contain the initial
-        // "OpenSSH" line.
-        if l.contains("OpenSSH") {
-            continue;
-        }
-        // It also may contain a warning about adding an address to the list of known hosts
-        if l.starts_with("Warning: Permanently added") {
-            continue;
-        }
-        // Or a warning about authentication
-        if l.starts_with("Authenticated to ") {
-            continue;
-        }
-        // Additional debugging messages will begin with "debug1" or "debug2".
-        if l.starts_with("debug1:") || l.starts_with("debug2:") {
-            continue;
-        }
-        // At this point, we just want to look at one line to see if it is the compatibility
-        // failure.
-        tracing::debug!("Reading stderr:  {l}");
-        return if l.contains("Unrecognized argument: --abi-revision") {
-            // It is an older image, so use the legacy command.
-            tracing::info!(
-                "Target does not support abi compatibility check, reverting to legacy connection"
-            );
-            PipeError::NoCompatibilityCheck
-        } else {
-            PipeError::ConnectionFailed(format!("{:?}", l))
-        };
-    }
-}
-
-async fn parse_ssh_output(
-    stdout: &mut BufReader<ChildStdout>,
-    stderr: &mut BufReader<ChildStderr>,
-    verbose_ssh: bool,
-) -> std::result::Result<(HostAddr, Option<CompatibilityInfo>), PipeError> {
-    let res =
-        match parse_ssh_connection(stdout, verbose_ssh).await.context("reading ssh connection") {
-            Ok((addr, compatibility_status)) => (Some(HostAddr(addr)), compatibility_status),
-            Err(_e) => {
-                // Upon a successful connection, OpenSSH sets several environment variables.
-                // SSH_CONNECTION shows the address of the client, the outgoing port on the client,
-                // the address of the server and the incoming port on the server. In this error
-                // message, parse_ssh_connection_with_info function failed to parse the client
-                // address.
-                //
-                // No need to print the error because we are parsing it again and printing it in
-                // the logic below in parse_ssh_error function.
-                tracing::warn!("Could not parse the client address from $SSH_CONNECTION.");
-                (None, None)
-            }
-        };
-    // Check for early exit.
-    if let (Some(addr), compat) = res {
-        Ok((addr, compat))
-    } else {
-        // If we failed to parse the ssh connection, there might be information in stderr
-        // We seem to always come here even if the error above was successfully parsed because we
-        // return (None, None) for res.
-        Err(parse_ssh_error(stderr, verbose_ssh).await)
     }
 }
 
@@ -967,52 +654,6 @@ where
     pub fn get_address(&self) -> SocketAddr {
         self.inner.address
     }
-}
-
-/// creates the socket for overnet. IoError is possible from socket operations.
-fn overnet_pipe(node: Arc<overnet_core::Router>) -> Result<fidl::AsyncSocket, io::Error> {
-    let (local_socket, remote_socket) = fidl::Socket::create_stream();
-    let local_socket = fidl::AsyncSocket::from_socket(local_socket);
-    let (errors_sender, errors) = futures::channel::mpsc::unbounded();
-    Task::spawn(
-        futures::future::join(
-            async move {
-                if let Err(e) = async move {
-                    let (mut rx, mut tx) = futures::AsyncReadExt::split(
-                        fuchsia_async::Socket::from_socket(remote_socket),
-                    );
-                    circuit::multi_stream::multi_stream_node_connection_to_async(
-                        node.circuit_node(),
-                        &mut rx,
-                        &mut tx,
-                        false,
-                        circuit::Quality::LOCAL_SOCKET,
-                        errors_sender,
-                        "remote_control_runner".to_owned(),
-                    )
-                    .await?;
-                    Result::<(), anyhow::Error>::Ok(())
-                }
-                .await
-                {
-                    // The error has enough context without mentioning "Host pipe circuit failed."
-                    // Keeping it as a warning rather than an error because we usually trigger this
-                    // error with the other end of the overnet connection is terminated. For
-                    // example, when the target is shutdown.
-                    tracing::warn!("{e:?}");
-                }
-            },
-            errors
-                .map(|e| {
-                    tracing::warn!("A host pipe circuit stream failed: {e:?}");
-                })
-                .collect::<()>(),
-        )
-        .map(|((), ())| ()),
-    )
-    .detach();
-
-    Ok(local_socket)
 }
 
 #[cfg(test)]
@@ -1226,59 +867,6 @@ mod test {
         task.await;
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
-    async fn test_parse_ssh_connection_works() {
-        for (line, expected) in [
-            (&"++ 192.168.1.1 1234 10.0.0.1 22 ++\n"[..], ("192.168.1.1".to_string(), None)),
-            (
-                &"++ fe80::111:2222:3333:444 56671 10.0.0.1 22 ++\n",
-                ("fe80::111:2222:3333:444".to_string(), None),
-            ),
-            (
-                &"++ fe80::111:2222:3333:444%ethxc2 56671 10.0.0.1 22 ++\n",
-                ("fe80::111:2222:3333:444%ethxc2".to_string(), None),
-            ),
-        ] {
-            match parse_ssh_connection(&mut line.as_bytes(), false).await {
-                Ok(actual) => assert_eq!(expected, actual),
-                res => panic!(
-                    "unexpected result for {:?}: expected {:?}, got {:?}",
-                    line, expected, res
-                ),
-            }
-        }
-    }
-
-    #[fuchsia_async::run_singlethreaded(test)]
-    async fn test_parse_ssh_connection_errors() {
-        for line in [
-            // Test for invalid anchors
-            &"192.168.1.1 1234 10.0.0.1 22\n"[..],
-            &"++192.168.1.1 1234 10.0.0.1 22++\n"[..],
-            &"++192.168.1.1 1234 10.0.0.1 22 ++\n"[..],
-            &"++ 192.168.1.1 1234 10.0.0.1 22++\n"[..],
-            &"++ ++\n"[..],
-            &"## 192.168.1.1 1234 10.0.0.1 22 ##\n"[..],
-        ] {
-            let res = parse_ssh_connection(&mut line.as_bytes(), false).await;
-            assert_matches!(res, Err(ParseSshConnectionError::Parse(_)));
-        }
-        for line in [
-            // Truncation
-            &"++"[..],
-            &"++ 192.168.1.1"[..],
-            &"++ 192.168.1.1 1234"[..],
-            &"++ 192.168.1.1 1234 "[..],
-            &"++ 192.168.1.1 1234 10.0.0.1"[..],
-            &"++ 192.168.1.1 1234 10.0.0.1 22"[..],
-            &"++ 192.168.1.1 1234 10.0.0.1 22 "[..],
-            &"++ 192.168.1.1 1234 10.0.0.1 22 ++"[..],
-        ] {
-            let res = parse_ssh_connection(&mut line.as_bytes(), false).await;
-            assert_matches!(res, Err(ParseSshConnectionError::UnexpectedEOF(_)));
-        }
-    }
-
     #[test]
     fn test_log_buffer_empty() {
         let buf = LogBuffer::new(2);
@@ -1306,42 +894,6 @@ mod test {
         buf.clear();
 
         assert!(buf.lines().is_empty());
-    }
-
-    #[fuchsia_async::run_singlethreaded(test)]
-    async fn test_read_ssh_line() {
-        // async fn read_ssh_line<R: AsyncBufRead + Unpin>(
-        //     lb: &mut LineBuffer,
-        //     rdr: &mut R,
-        // ) -> std::result::Result<bool, ParseSshConnectionError> {
-        let mut lb = LineBuffer::new();
-        let input = &"++ 192.168.1.1 1234 10.0.0.1 22 ++\n"[..];
-        match read_ssh_line(&mut lb, &mut input.as_bytes()).await {
-            Ok(s) => assert_eq!(s, String::from("++ 192.168.1.1 1234 10.0.0.1 22 ++\n")),
-            res => panic!("unexpected result: {res:?}"),
-        }
-
-        let mut lb = LineBuffer::new();
-        let input = &"no newline"[..];
-        let res = read_ssh_line(&mut lb, &mut input.as_bytes()).await;
-        assert_matches!(res, Err(ParseSshConnectionError::UnexpectedEOF(_)));
-
-        let mut lb = LineBuffer::new();
-        let input = [b'A'; 1024];
-        let res = read_ssh_line(&mut lb, &mut &input[..]).await;
-        assert_matches!(res, Err(ParseSshConnectionError::Parse(_)));
-
-        // Can continue after reading partial result
-        let mut lb = LineBuffer::new();
-        let input1 = &"foo"[..];
-        let _ = read_ssh_line(&mut lb, &mut input1.as_bytes()).await;
-        // We'll get a no-newline error, but it has the same semantics as
-        // being interrupted due to a timeout
-        let input2 = &"bar\n"[..];
-        match read_ssh_line(&mut lb, &mut input2.as_bytes()).await {
-            Ok(s) => assert_eq!(s, String::from("foobar\n")),
-            res => panic!("unexpected result: {res:?}"),
-        }
     }
 
     #[fuchsia::test]

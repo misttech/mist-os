@@ -7,16 +7,17 @@ use addr::TargetAddr;
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use emulator_instance::targets as emulator_targets;
-use emulator_instance::targets::EmulatorTargetAction;
-use ffx_daemon_events::{FastbootInterface, TargetConnectionState};
+use emulator_targets::EmulatorTargetAction;
+use ffx_daemon_events::TargetConnectionState;
 use ffx_daemon_target::{
     target::{
         self, target_addr_info_to_socketaddr, Target, TargetProtocol, TargetTransport,
         TargetUpdateBuilder,
     },
-    target_collection::{TargetCollection, TargetQuery, TargetUpdateFilter},
+    target_collection::{TargetCollection, TargetUpdateFilter},
 };
 use ffx_stream_util::TryStreamUtilExt;
+use ffx_target::{FastbootInterface, TargetInfoQuery};
 use fidl::endpoints::ProtocolMarker;
 use fidl_fuchsia_developer_ffx as ffx;
 use fidl_fuchsia_developer_remotecontrol::RemoteControlMarker;
@@ -154,7 +155,7 @@ async fn add_manual_target(
     });
 
     let target = tc
-        .query_single_enabled_target(&TargetQuery::Addr(addr.into()))
+        .query_single_enabled_target(&TargetInfoQuery::Addr(addr.into()))
         .expect("Query by address cannot be ambiguous")
         .expect("Could not find inserted manual target");
 
@@ -269,7 +270,7 @@ impl FidlProtocol for TargetCollectionProtocol {
             ffx::TargetCollectionRequest::ListTargets { reader, query, .. } => {
                 let reader = reader.into_proxy()?;
                 let query = match query.string_matcher.clone() {
-                    Some(query) if !query.is_empty() => Some(TargetQuery::from(query)),
+                    Some(query) if !query.is_empty() => Some(TargetInfoQuery::from(query)),
                     _ => None,
                 };
 
@@ -295,7 +296,7 @@ impl FidlProtocol for TargetCollectionProtocol {
             ffx::TargetCollectionRequest::OpenTarget { query, responder, target_handle } => {
                 tracing::trace!("Open Target {query:?}");
 
-                let query = TargetQuery::from(query.string_matcher.clone());
+                let query = TargetInfoQuery::from(query.string_matcher.clone());
 
                 // Get a previously used target first, otherwise fall back to discovery + use.
                 let result = match target_collection.query_single_enabled_target(&query) {
@@ -1048,7 +1049,7 @@ mod tests {
         target_add_fut.await.unwrap();
         let target_collection = Context::new(fake_daemon).get_target_collection().await.unwrap();
         let target = target_collection
-            .query_single_enabled_target(&TargetQuery::Addr(target_addr.into()))
+            .query_single_enabled_target(&TargetInfoQuery::Addr(target_addr.into()))
             .unwrap()
             .expect("Target not found");
         assert_eq!(target.addrs().len(), 1);
@@ -1071,7 +1072,7 @@ mod tests {
         proxy.add_ephemeral_target(&target_addr.into(), 3600).await.unwrap();
         let target_collection = Context::new(fake_daemon).get_target_collection().await.unwrap();
         let target = target_collection
-            .query_single_enabled_target(&TargetQuery::Addr(target_addr.into()))
+            .query_single_enabled_target(&TargetInfoQuery::Addr(target_addr.into()))
             .unwrap()
             .expect("Target not found");
         assert_eq!(target.addrs().len(), 1);
@@ -1098,7 +1099,7 @@ mod tests {
         target_add_fut.await.unwrap();
         let target_collection = Context::new(fake_daemon).get_target_collection().await.unwrap();
         let target = target_collection
-            .query_single_enabled_target(&TargetQuery::Addr(target_addr.into()))
+            .query_single_enabled_target(&TargetInfoQuery::Addr(target_addr.into()))
             .unwrap()
             .expect("Target not found");
         assert_eq!(target.addrs().len(), 1);
@@ -1121,7 +1122,7 @@ mod tests {
         proxy.add_ephemeral_target(&target_addr.into(), 3600).await.unwrap();
         let target_collection = Context::new(fake_daemon).get_target_collection().await.unwrap();
         let target = target_collection
-            .query_single_enabled_target(&TargetQuery::Addr(target_addr.into()))
+            .query_single_enabled_target(&TargetInfoQuery::Addr(target_addr.into()))
             .unwrap()
             .expect("Target not found");
         assert_eq!(target.addrs().len(), 1);

@@ -9,8 +9,9 @@ use crate::{
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use ffx::DaemonError;
-use ffx_daemon_events::{TargetConnectionState, TargetEventInfo};
+use ffx_daemon_events::TargetConnectionState;
 use ffx_daemon_target::{target::Target, target_collection::TargetCollection};
+use ffx_target::Description;
 use fidl::{
     endpoints::{DiscoverableProtocolMarker, ProtocolMarker, Proxy, Request, RequestStream},
     server::ServeInner,
@@ -252,7 +253,7 @@ impl FakeDaemonBuilder {
     }
 
     pub fn target(self, target: ffx::TargetInfo) -> Self {
-        let t = TargetEventInfo {
+        let t = Description {
             nodename: target.nodename,
             addresses: target
                 .addresses

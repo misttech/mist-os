@@ -31,6 +31,7 @@ use zerocopy::ByteSlice;
 /// Default mDNS port
 pub const MDNS_PORT: u16 = 5353;
 
+pub const MDNS_ONESHOT_DISCOVERY_TIMEOUT: Duration = Duration::from_secs(1);
 pub const MDNS_BROADCAST_INTERVAL: Duration = Duration::from_secs(10);
 pub const MDNS_INTERFACE_DISCOVERY_INTERVAL: Duration = Duration::from_secs(1);
 pub const MDNS_TTL: u32 = 255;
@@ -157,6 +158,18 @@ pub async fn discover_target(
     listen_duration: Duration,
     mdns_port: u16,
 ) -> Result<ffx::TargetInfo> {
+    discover_target_by(listen_duration, mdns_port, |t| t.nodename.as_ref() == Some(&target_name))
+        .await
+}
+
+pub async fn discover_target_by<F>(
+    listen_duration: Duration,
+    mdns_port: u16,
+    filter: F,
+) -> Result<ffx::TargetInfo>
+where
+    F: Fn(&ffx::TargetInfo) -> bool,
+{
     let (sender, receiver) = async_channel::bounded::<ffx::MdnsEventType>(1);
     let inner = Rc::new(MdnsProtocol { events_out: sender, target_cache: Default::default() });
 
@@ -178,7 +191,7 @@ pub async fn discover_target(
 
     //  Okay have a loop that will pull from the receiver until it has a target that matches the
     //  given one
-    let loop_task = timeout(listen_duration, loop_for_target(receiver, target_name.clone())).fuse();
+    let loop_task = timeout(listen_duration, loop_for_target(receiver, filter)).fuse();
     let loop_task = Box::pin(loop_task);
 
     // Wait on either the discovery or the timeout
@@ -193,15 +206,18 @@ pub async fn discover_target(
     }
 }
 
-async fn loop_for_target(
+async fn loop_for_target<F>(
     receiver: async_channel::Receiver<ffx::MdnsEventType>,
-    target_name: String,
-) -> Result<ffx::TargetInfo> {
+    filter: F,
+) -> Result<ffx::TargetInfo>
+where
+    F: Fn(&ffx::TargetInfo) -> bool,
+{
     loop {
         match receiver.recv().await {
             Ok(mdns_event) => match mdns_event {
                 ffx::MdnsEventType::TargetFound(target_info) => {
-                    if target_info.nodename == Some(target_name.clone()) {
+                    if filter(&target_info) {
                         return Ok(target_info);
                     }
                 }

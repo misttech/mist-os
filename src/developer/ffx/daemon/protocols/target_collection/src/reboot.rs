@@ -5,7 +5,7 @@
 use addr::TargetAddr;
 use anyhow::{anyhow, Result};
 use async_utils::async_once::Once;
-use ffx_daemon_events::{FastbootInterface, TargetConnectionState};
+use ffx_daemon_events::TargetConnectionState;
 use ffx_daemon_target::{
     target::Target,
     zedboot::{reboot, reboot_to_bootloader, reboot_to_recovery},
@@ -15,6 +15,7 @@ use ffx_fastboot::common::fastboot::{
 };
 use ffx_fastboot_interface::fastboot_interface::RebootEvent;
 use ffx_ssh::ssh::build_ssh_command;
+use ffx_target::FastbootInterface;
 use fidl::{endpoints::DiscoverableProtocolMarker as _, Error};
 use fidl_fuchsia_developer_ffx::{TargetRebootError, TargetRebootResponder, TargetRebootState};
 use fidl_fuchsia_developer_remotecontrol::RemoteControlProxy;

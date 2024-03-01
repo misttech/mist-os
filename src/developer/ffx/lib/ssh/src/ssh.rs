@@ -2,17 +2,27 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 use crate::config::SshConfig;
+use anyhow::Context as _;
 use anyhow::{anyhow, Result};
+use ffx_config::EnvironmentContext;
 use std::{net::SocketAddr, path::PathBuf, process::Command};
+
+const SSH_PRIV: &str = "ssh.priv";
 
 #[cfg(not(test))]
 pub async fn get_ssh_key_paths() -> Result<Vec<String>> {
     use anyhow::Context;
-    const SSH_PRIV: &str = "ssh.priv";
     ffx_config::query(SSH_PRIV)
         .get_file()
         .await
         .context("getting path to an ssh private key from ssh.priv")
+}
+
+pub async fn get_ssh_key_paths_from_env(env: &EnvironmentContext) -> Result<Vec<String>> {
+    env.query(SSH_PRIV)
+        .get_file()
+        .await
+        .context("getting path to an ssh private key from ssh.priv from env context")
 }
 
 #[cfg(test)]
@@ -38,18 +48,42 @@ pub async fn build_ssh_command_with_ssh_path(
     build_ssh_command_with_ssh_config(ssh_path, addr, &config, command).await
 }
 
-/// Builds the ssh command using the specified ssh configuration and path to the ssh command.
+pub async fn build_ssh_command_with_env(
+    ssh_path: &str,
+    addr: SocketAddr,
+    env: &EnvironmentContext,
+    command: Vec<&str>,
+) -> Result<Command> {
+    let config = SshConfig::new()?;
+    build_ssh_command_with_ssh_config_and_env(ssh_path, addr, &config, command, Some(env)).await
+}
+
 pub async fn build_ssh_command_with_ssh_config(
     ssh_path: &str,
     addr: SocketAddr,
     config: &SshConfig,
     command: Vec<&str>,
 ) -> Result<Command> {
+    build_ssh_command_with_ssh_config_and_env(ssh_path, addr, config, command, None).await
+}
+
+/// Builds the ssh command using the specified ssh configuration and path to the ssh command.
+pub async fn build_ssh_command_with_ssh_config_and_env(
+    ssh_path: &str,
+    addr: SocketAddr,
+    config: &SshConfig,
+    command: Vec<&str>,
+    env: Option<&EnvironmentContext>,
+) -> Result<Command> {
     if ssh_path.is_empty() {
         return Err(anyhow!("missing SSH command"));
     }
 
-    let keys = get_ssh_key_paths().await?;
+    let keys = if let Some(env) = env {
+        get_ssh_key_paths_from_env(env).await?
+    } else {
+        get_ssh_key_paths().await?
+    };
 
     let mut c = Command::new(ssh_path);
     apply_auth_sock(&mut c).await;

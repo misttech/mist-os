@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::{
-    overnet::host_pipe::{spawn, HostAddr, LogBuffer},
+    overnet::host_pipe::{spawn, LogBuffer},
     FASTBOOT_MAX_AGE, MDNS_MAX_AGE, ZEDBOOT_MAX_AGE,
 };
 use addr::TargetAddr;
@@ -13,10 +13,12 @@ use chrono::{DateTime, Utc};
 use compat_info::{CompatibilityInfo, CompatibilityState};
 use ffx::{TargetAddrInfo, TargetIpPort};
 use ffx_daemon_core::events::{self, EventSynthesizer};
-use ffx_daemon_events::{FastbootInterface, TargetConnectionState, TargetEvent, TargetEventInfo};
+use ffx_daemon_events::{TargetConnectionState, TargetEvent};
 use ffx_fastboot::common::fastboot::{
     ConnectionFactory, FastbootConnectionFactory, FastbootConnectionKind,
 };
+use ffx_ssh::parse::HostAddr;
+use ffx_target::{Description, FastbootInterface};
 use fidl_fuchsia_developer_ffx as ffx;
 use fidl_fuchsia_developer_ffx::TargetState;
 use fidl_fuchsia_developer_remotecontrol::{IdentifyHostResponse, RemoteControlProxy};
@@ -455,7 +457,7 @@ impl Target {
         target
     }
 
-    pub fn from_target_event_info(mut t: TargetEventInfo) -> Rc<Self> {
+    pub fn from_target_event_info(mut t: Description) -> Rc<Self> {
         if let Some(s) = t.serial {
             Self::new_for_usb(&s)
         } else {
@@ -466,11 +468,11 @@ impl Target {
         }
     }
 
-    pub fn from_netsvc_target_info(mut t: TargetEventInfo) -> Rc<Self> {
+    pub fn from_netsvc_target_info(mut t: Description) -> Rc<Self> {
         Self::new_with_netsvc_addrs(t.nodename.take(), t.addresses.drain(..).collect())
     }
 
-    pub fn from_fastboot_target_info(mut t: TargetEventInfo) -> Result<Rc<Self>> {
+    pub fn from_fastboot_target_info(mut t: Description) -> Result<Rc<Self>> {
         Ok(Self::new_with_fastboot_addrs(
             t.nodename.take(),
             t.serial.take(),
@@ -509,10 +511,10 @@ impl Target {
         }
     }
 
-    pub fn target_info(&self) -> TargetEventInfo {
+    pub fn target_info(&self) -> Description {
         let fastboot_interface = self.infer_fastboot_interface();
 
-        TargetEventInfo {
+        Description {
             nodename: self.nodename(),
             addresses: self.addrs(),
             serial: self.serial(),

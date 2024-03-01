@@ -9,9 +9,7 @@ use errors::ffx_error;
 use ffx_build_version::build_info;
 use ffx_config::EnvironmentContext;
 use ffx_daemon_core::events::{self, EventHandler};
-use ffx_daemon_events::{
-    DaemonEvent, TargetConnectionState, TargetEvent, TargetEventInfo, WireTrafficType,
-};
+use ffx_daemon_events::{DaemonEvent, TargetConnectionState, TargetEvent, WireTrafficType};
 use ffx_daemon_protocols::create_protocol_register_map;
 use ffx_daemon_target::{
     target::{self, Target, TargetProtocol, TargetTransport},
@@ -20,6 +18,7 @@ use ffx_daemon_target::{
 };
 use ffx_metrics::{add_daemon_launch_event, add_daemon_metrics_event};
 use ffx_stream_util::TryStreamUtilExt;
+use ffx_target::Description;
 use fidl::prelude::*;
 use fidl_fuchsia_developer_ffx::{
     self as ffx, DaemonError, DaemonMarker, DaemonRequest, DaemonRequestStream,
@@ -175,7 +174,7 @@ impl DaemonEventHandler {
     }
 
     #[tracing::instrument(skip(self))]
-    async fn handle_zedboot(&self, t: TargetEventInfo) {
+    async fn handle_zedboot(&self, t: Description) {
         tracing::trace!(
             "Found new target via zedboot: {}",
             t.nodename.as_deref().unwrap_or("<unknown>")

@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 pub mod config;
+pub mod parse;
 pub mod ssh;
 mod ssh_key;
 

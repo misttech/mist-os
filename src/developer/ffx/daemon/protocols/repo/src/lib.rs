@@ -2,41 +2,41 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    async_lock::RwLock,
-    async_trait::async_trait,
-    ffx_daemon_core::events::{EventHandler, Status as EventStatus},
-    ffx_daemon_events::{DaemonEvent, TargetEvent, TargetEventInfo},
-    ffx_daemon_target::target::Target,
-    ffx_ssh::ssh::build_ssh_command,
-    fidl::endpoints::ServerEnd,
-    fidl_fuchsia_developer_ffx as ffx,
-    fidl_fuchsia_developer_ffx_ext::{
-        self as ffx_ext, PackageEntry, RepositoryPackage, RepositoryRegistrationAliasConflictMode,
-        RepositoryTarget, ServerStatus,
-    },
-    fidl_fuchsia_net_ext::SocketAddress,
-    fidl_fuchsia_pkg::RepositoryManagerMarker,
-    fidl_fuchsia_pkg_rewrite::{EngineMarker as RewriteEngineMarker, EngineProxy},
-    fidl_fuchsia_pkg_rewrite_ext::RuleConfig,
-    fuchsia_async as fasync,
-    fuchsia_repo::{
-        repo_client::RepoClient,
-        repository::{self, RepoProvider, RepositorySpec},
-    },
-    fuchsia_zircon_types::ZX_CHANNEL_MAX_MSG_BYTES,
-    futures::{FutureExt as _, StreamExt as _},
-    measure_fuchsia_developer_ffx::Measurable,
-    pkg::config as pkg_config,
-    pkg::metrics,
-    pkg::repo::{
-        aliases_to_rules, create_repo_host, register_target_with_fidl_proxies,
-        repo_spec_to_backend, update_repository, Registrar, RepoInner, SaveConfig, ServerState,
-    },
-    protocols::prelude::*,
-    shared_child::SharedChild,
-    std::{net::SocketAddr, rc::Rc, sync::Arc, time::Duration},
+use async_lock::RwLock;
+use async_trait::async_trait;
+use ffx_daemon_core::events::{EventHandler, Status as EventStatus};
+use ffx_daemon_events::{DaemonEvent, TargetEvent};
+use ffx_daemon_target::target::Target;
+use ffx_ssh::ssh::build_ssh_command;
+use ffx_target::Description;
+use fidl::endpoints::ServerEnd;
+use fidl_fuchsia_developer_ffx as ffx;
+use fidl_fuchsia_developer_ffx_ext::{
+    self as ffx_ext, PackageEntry, RepositoryPackage, RepositoryRegistrationAliasConflictMode,
+    RepositoryTarget, ServerStatus,
 };
+use fidl_fuchsia_net_ext::SocketAddress;
+use fidl_fuchsia_pkg::RepositoryManagerMarker;
+use fidl_fuchsia_pkg_rewrite::{EngineMarker as RewriteEngineMarker, EngineProxy};
+use fidl_fuchsia_pkg_rewrite_ext::RuleConfig;
+use fuchsia_async as fasync;
+use fuchsia_repo::{
+    repo_client::RepoClient,
+    repository::{self, RepoProvider, RepositorySpec},
+};
+use fuchsia_zircon_types::ZX_CHANNEL_MAX_MSG_BYTES;
+use futures::{FutureExt as _, StreamExt as _};
+use measure_fuchsia_developer_ffx::Measurable;
+use pkg::config as pkg_config;
+use pkg::metrics;
+use pkg::repo::repo_spec_to_backend;
+use pkg::repo::{
+    aliases_to_rules, create_repo_host, register_target_with_fidl_proxies, update_repository,
+    Registrar, RepoInner, SaveConfig, ServerState,
+};
+use protocols::prelude::*;
+use shared_child::SharedChild;
+use std::{convert::TryFrom, net::SocketAddr, rc::Rc, sync::Arc, time::Duration};
 
 const PKG_RESOLVER_MONIKER: &str = "/core/pkg-resolver";
 
@@ -1140,7 +1140,7 @@ struct DaemonEventHandler<R: Registrar> {
 
 impl<R: Registrar> DaemonEventHandler<R> {
     /// pub(crate) so that this is visible to tests.
-    pub(crate) fn build_matcher(t: TargetEventInfo) -> Option<String> {
+    pub(crate) fn build_matcher(t: Description) -> Option<String> {
         if let Some(nodename) = t.nodename {
             Some(nodename)
         } else {
@@ -1295,37 +1295,37 @@ where
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        addr::TargetAddr,
-        assert_matches::assert_matches,
-        ffx_config::ConfigLevel,
-        fidl::endpoints::Request,
-        fidl_fuchsia_developer_ffx as ffx,
-        fidl_fuchsia_developer_ffx_ext::RepositoryStorageType,
-        fidl_fuchsia_developer_remotecontrol as rcs,
-        fidl_fuchsia_net::{IpAddress, Ipv4Address},
-        fidl_fuchsia_pkg::{
-            MirrorConfig, RepositoryConfig, RepositoryKeyConfig, RepositoryManagerRequest,
-        },
-        fidl_fuchsia_pkg_rewrite::{
-            EditTransactionRequest, EngineMarker as RewriteEngineMarker,
-            EngineRequest as RewriteEngineRequest, RuleIteratorRequest,
-        },
-        fidl_fuchsia_pkg_rewrite_ext::Rule,
-        fidl_fuchsia_posix_socket as fsock,
-        futures::TryStreamExt,
-        pretty_assertions::assert_eq,
-        protocols::testing::FakeDaemonBuilder,
-        std::{
-            cell::RefCell,
-            collections::BTreeSet,
-            fs,
-            future::Future,
-            net::{IpAddr, Ipv4Addr, Ipv6Addr},
-            str::FromStr,
-            sync::Mutex,
-        },
+    use super::*;
+    use addr::TargetAddr;
+    use assert_matches::assert_matches;
+    use ffx_config::ConfigLevel;
+    use fidl::{self, endpoints::Request};
+    use fidl_fuchsia_developer_ffx as ffx;
+    use fidl_fuchsia_developer_ffx_ext::RepositoryStorageType;
+    use fidl_fuchsia_developer_remotecontrol as rcs;
+    use fidl_fuchsia_net::{IpAddress, Ipv4Address};
+    use fidl_fuchsia_pkg::{
+        MirrorConfig, RepositoryConfig, RepositoryKeyConfig, RepositoryManagerRequest,
+    };
+    use fidl_fuchsia_pkg_rewrite::{
+        EditTransactionRequest, EngineMarker as RewriteEngineMarker,
+        EngineRequest as RewriteEngineRequest, RuleIteratorRequest,
+    };
+    use fidl_fuchsia_pkg_rewrite_ext::Rule;
+    use fidl_fuchsia_posix_socket as fsock;
+    use futures::TryStreamExt;
+    use pretty_assertions::assert_eq;
+    use protocols::testing::FakeDaemonBuilder;
+    use std::{
+        cell::RefCell,
+        collections::BTreeSet,
+        convert::TryInto,
+        fs,
+        future::Future,
+        net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr},
+        rc::Rc,
+        str::FromStr,
+        sync::{Arc, Mutex},
     };
 
     const REPO_NAME: &str = "some-repo";
@@ -4615,18 +4615,18 @@ mod tests {
     #[test]
     fn test_build_matcher_nodename() {
         assert_eq!(
-            DaemonEventHandler::<RealRegistrar>::build_matcher(TargetEventInfo {
+            DaemonEventHandler::<RealRegistrar>::build_matcher(Description {
                 nodename: Some(TARGET_NODENAME.to_string()),
-                ..TargetEventInfo::default()
+                ..Description::default()
             }),
             Some(TARGET_NODENAME.to_string())
         );
 
         assert_eq!(
-            DaemonEventHandler::<RealRegistrar>::build_matcher(TargetEventInfo {
+            DaemonEventHandler::<RealRegistrar>::build_matcher(Description {
                 nodename: Some(TARGET_NODENAME.to_string()),
                 addresses: vec![TargetAddr::from_str("[fe80::1%1000]:0").unwrap()],
-                ..TargetEventInfo::default()
+                ..Description::default()
             }),
             Some(TARGET_NODENAME.to_string())
         )
@@ -4635,9 +4635,9 @@ mod tests {
     #[test]
     fn test_build_matcher_missing_nodename_no_port() {
         assert_eq!(
-            DaemonEventHandler::<RealRegistrar>::build_matcher(TargetEventInfo {
+            DaemonEventHandler::<RealRegistrar>::build_matcher(Description {
                 addresses: vec![TargetAddr::from_str("[fe80::1%1000]:0").unwrap()],
-                ..TargetEventInfo::default()
+                ..Description::default()
             }),
             Some("fe80::1%1000".to_string())
         )
@@ -4646,10 +4646,10 @@ mod tests {
     #[test]
     fn test_build_matcher_missing_nodename_with_port() {
         assert_eq!(
-            DaemonEventHandler::<RealRegistrar>::build_matcher(TargetEventInfo {
+            DaemonEventHandler::<RealRegistrar>::build_matcher(Description {
                 addresses: vec![TargetAddr::from_str("[fe80::1%1000]:0").unwrap()],
                 ssh_port: Some(9182),
-                ..TargetEventInfo::default()
+                ..Description::default()
             }),
             Some("[fe80::1%1000]:9182".to_string())
         )
