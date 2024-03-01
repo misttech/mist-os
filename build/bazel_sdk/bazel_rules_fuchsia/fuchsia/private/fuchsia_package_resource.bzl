@@ -52,6 +52,26 @@ will be added to the final package contents.
     },
 )
 
+def _fuchsia_package_resource_collection_impl(ctx):
+    resources = []
+
+    for dep in ctx.attr.resources:
+        resources.extend(dep[FuchsiaPackageResourcesInfo].resources)
+
+    return _package_resources_providers(ctx, resources)
+
+fuchsia_package_resource_collection = rule(
+    doc = """Declares a collection of resources to be included in a Fuchsia package.
+""",
+    implementation = _fuchsia_package_resource_collection_impl,
+    attrs = {
+        "resources": attr.label_list(
+            doc = "The resources to include in the package.",
+            mandatory = True,
+        ),
+    },
+)
+
 def _fuchsia_package_resource_group_impl(ctx):
     resources = []
     dest = ctx.attr.dest.removesuffix("/")

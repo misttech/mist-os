@@ -99,6 +99,7 @@ load(
 load(
     "//fuchsia/private:fuchsia_package_resource.bzl",
     _fuchsia_package_resource = "fuchsia_package_resource",
+    _fuchsia_package_resource_collection = "fuchsia_package_resource_collection",
     _fuchsia_package_resource_group = "fuchsia_package_resource_group",
 )
 load(
@@ -156,6 +157,7 @@ fuchsia_test_package = _fuchsia_test_package
 fuchsia_unittest_package = _fuchsia_unittest_package
 fuchsia_prebuilt_package = _fuchsia_prebuilt_package
 fuchsia_package_resource = _fuchsia_package_resource
+fuchsia_package_resource_collection = _fuchsia_package_resource_collection
 fuchsia_package_resource_group = _fuchsia_package_resource_group
 fuchsia_package_group = _fuchsia_package_group
 fuchsia_select = _fuchsia_select
