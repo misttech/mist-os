@@ -47,11 +47,12 @@ type Child = table {
 
 /// Describes under what conditions the component may be started.
 type StartupMode = strict enum {
-    /// Start component instance only when another instance binds to it.
+    /// Start component instance only when it receives an incoming capability request or it's
+    /// started directly with `fuchsia.component.Controller/Start`.
     LAZY = 0;
-    /// Start component instance as soon as parent starts. This mode is only
-    /// supported for statically declared children -- a dynamic instance may only be
-    /// started by binding to it.
+
+    /// Start component instance automatically when the parent starts or (for dynamic
+    /// components) when the component is created.
     EAGER = 1;
 };
 
