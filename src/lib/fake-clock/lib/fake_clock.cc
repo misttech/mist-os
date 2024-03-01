@@ -9,6 +9,7 @@
 #include <lib/zx/port.h>
 #include <zircon/syscalls.h>
 #include <zircon/syscalls/port.h>
+#include <zircon/utc.h>
 
 #include <thread>
 
@@ -278,4 +279,14 @@ __EXPORT bool create_named_deadline(char* component, size_t component_len, char*
   ZX_ASSERT_MSG(result.ok(), "%s", result.FormatDescription().c_str());
   *out = result.value().deadline;
   return true;
+}
+
+__EXPORT zx_handle_t zx_utc_reference_get() {
+#ifdef FAKE_CLOCK_ALLOW_UTC
+  return _zx_utc_reference_get();
+#else
+  FX_LOGS(FATAL) << "UTC clock may interact in unexpected ways with the fake-clock library. "
+                 << "See //src/lib/fake-clock/README.md for ways to fix this.";
+  return ZX_HANDLE_INVALID;
+#endif  // FAKE_CLOCK_ALLOW_UTC
 }

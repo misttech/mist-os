@@ -92,6 +92,35 @@ The test may then connect to
 
 See the [examples][examples] directory for example setups.
 
+## Troubleshooting
+
+### "UTC clock may interact in unexpected ways with the fake-clock library"
+
+If your test binary crashes with this message, this means that your tests are
+attempting to use the `fake-clock` library together with a real UTC
+clock. This can happen even if your code does not explicitly get the UTC clock
+handle, for example if one of your dependencies does so instead.
+
+Having this happen in your `fake-clock` test is not a good idea. Your tests
+may be subtly wrong as a result of the interaction of the fake monotonic clock
+and the real UTC clock, depending on whether there is a code path in which this
+interaction is important.
+
+You should make a choice that determines what happens next. Your options to
+fix this are:
+
+1. Use the [Timekeeper Test Realm Factory][ttrf] to spin up a [Test Realm][tr]
+   that wires all the clock-related dependencies properly. It is slightly more
+   involved to set up, but will work correctly.
+
+2. Use the dependency `//src/lib/fake-clock/lib:lib_with_utc` instead of
+   `//src/lib/fake-clock/lib`. This dependency ignores the potential UTC
+   problems. To use this you must accept the possibility that your test
+   might be subtly broken as a result.
+
 [vdso]: /docs/concepts/kernel/vdso.md
 [fidl]: fidl/fake_clock.fidl
 [examples]: examples/
+[ttrf]: /src/sys/time/testing/realm-proxy/README.md
+[tr]: https://fuchsia.dev/fuchsia-src/development/testing/components/test_realm_factory
+
