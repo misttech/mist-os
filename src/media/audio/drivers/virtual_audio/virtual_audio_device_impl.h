@@ -23,7 +23,7 @@ class VirtualAudioDriver;
 
 // Controller for a `VirtualAudioDriver`.
 //
-// Each instance of this class represents a two objects:
+// Each instance of this class represents two objects:
 //
 // 1. A virtual audio device in the device tree, represented by a `VirtualAudioDriver` object.
 //    This device appears under `/dev/class/audio-{input,output}`, `/dev/class/dai`,

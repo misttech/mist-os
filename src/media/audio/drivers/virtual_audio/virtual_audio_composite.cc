@@ -20,7 +20,7 @@ int VirtualAudioComposite::instance_count_ = 0;
 // static
 fuchsia_virtualaudio::Configuration VirtualAudioComposite::GetDefaultConfig() {
   constexpr uint64_t kDefaultRingBufferId = 123;
-  constexpr uint64_t kDefauttDaiId = 456;
+  constexpr uint64_t kDefaultDaiId = 456;
   constexpr uint64_t kDefaultTopologyId = 789;
 
   fuchsia_virtualaudio::Configuration config;
@@ -68,7 +68,7 @@ fuchsia_virtualaudio::Configuration VirtualAudioComposite::GetDefaultConfig() {
   // DAI interconnect.
   fuchsia_virtualaudio::DaiInterconnect dai_interconnect = {};
 
-  // By default we expose one DAI format: 48kHz I2S (sterep 16-in-32, 8 bytes/frame total).
+  // By default we expose one DAI format: 48kHz I2S (stereo 16-in-32, 8 bytes/frame total).
   fuchsia_hardware_audio::DaiSupportedFormats item = {};
   item.number_of_channels(std::vector<uint32_t>{2});
   item.sample_formats(std::vector{fuchsia_hardware_audio::DaiSampleFormat::kPcmSigned});
@@ -82,7 +82,7 @@ fuchsia_virtualaudio::Configuration VirtualAudioComposite::GetDefaultConfig() {
       std::optional<std::vector<fuchsia_hardware_audio::DaiSupportedFormats>>{std::in_place,
                                                                               {item}});
 
-  composite_dai_interconnect.id(kDefauttDaiId);
+  composite_dai_interconnect.id(kDefaultDaiId);
   composite_dai_interconnect.dai_interconnect(std::move(dai_interconnect));
   std::vector<fuchsia_virtualaudio::CompositeDaiInterconnect> composite_dai_interconnects = {};
   composite_dai_interconnects.push_back(std::move(composite_dai_interconnect));
@@ -93,7 +93,7 @@ fuchsia_virtualaudio::Configuration VirtualAudioComposite::GetDefaultConfig() {
   topology.id(kDefaultTopologyId);
   fuchsia_hardware_audio_signalprocessing::EdgePair edge;
 
-  edge.processing_element_id_from(kDefaultRingBufferId).processing_element_id_to(kDefauttDaiId);
+  edge.processing_element_id_from(kDefaultRingBufferId).processing_element_id_to(kDefaultDaiId);
   topology.processing_elements_edge_pairs(std::vector({std::move(edge)}));
   composite.topologies(
       std::optional<std::vector<fuchsia_hardware_audio_signalprocessing::Topology>>{
