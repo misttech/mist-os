@@ -445,7 +445,7 @@ TEST(IntelI915Display, ImportImage) {
   const image_t kDefaultImage = {
       .width = 32,
       .height = 32,
-      .type = IMAGE_TYPE_SIMPLE,
+      .tiling_type = IMAGE_TILING_TYPE_LINEAR,
       .handle = 0u,
   };
   EXPECT_OK(display.DisplayControllerImplSetBufferCollectionConstraints(&kDefaultImage,
@@ -469,7 +469,7 @@ TEST(IntelI915Display, ImportImage) {
 
   // Invalid import: bad type
   invalid_image = kDefaultImage;
-  invalid_image.type = IMAGE_TYPE_CAPTURE;
+  invalid_image.tiling_type = IMAGE_TILING_TYPE_CAPTURE;
   EXPECT_EQ(display.DisplayControllerImplImportImage(&invalid_image, kBanjoBufferCollectionId,
                                                      /*index=*/0, &image_handle),
             ZX_ERR_INVALID_ARGS);
@@ -529,7 +529,7 @@ TEST_F(ControllerWithFakeSysmemTest, SysmemInvalidType) {
   loop_.RunUntilIdle();
 
   image_t image = {};
-  image.type = 1000000;
+  image.tiling_type = 1000000;
 
   EXPECT_EQ(ZX_ERR_INVALID_ARGS, display_.DisplayControllerImplSetBufferCollectionConstraints(
                                      &image, kBanjoBufferCollectionId));
@@ -578,8 +578,8 @@ TEST_F(IntegrationTest, InitFailsIfBootloaderGetInfoFails) {
   EXPECT_EQ(0u, addr);
 }
 
-// TODO(https://fxbug.dev/42166779): Add tests for DisplayPort display enumeration by InitOp, covering the
-// following cases:
+// TODO(https://fxbug.dev/42166779): Add tests for DisplayPort display enumeration by InitOp,
+// covering the following cases:
 //   - Display found during start up but not already powered.
 //   - Display found during start up but already powered up.
 //   - Display added and removed in a hotplug event.
@@ -681,7 +681,7 @@ TEST_F(IntegrationTest, SysmemRotated) {
   image.width = 128;
   image.height = kImageHeight;
   // Must match set_format_modifier above, and also be y or yf tiled so rotation is allowed.
-  image.type = IMAGE_TYPE_Y_LEGACY_TILED;
+  image.tiling_type = IMAGE_TILING_TYPE_Y_LEGACY_TILED;
 
   EXPECT_OK(
       ctx->DisplayControllerImplSetBufferCollectionConstraints(&image, kBanjoBufferCollectionId));
@@ -689,7 +689,7 @@ TEST_F(IntegrationTest, SysmemRotated) {
   RunLoopUntilIdle();
   EXPECT_TRUE(collection->set_constraints_called());
 
-  image.type = IMAGE_TYPE_Y_LEGACY_TILED;
+  image.tiling_type = IMAGE_TILING_TYPE_Y_LEGACY_TILED;
   uint64_t image_handle = 0;
   PerformBlockingWork([&]() mutable {
     EXPECT_OK(ctx->DisplayControllerImplImportImage(&image, kBanjoBufferCollectionId, /*index=*/0,

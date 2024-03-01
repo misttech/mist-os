@@ -266,7 +266,7 @@ zx_status_t DisplayEngine::DisplayControllerImplImportImage(
 zx::result<display::DriverImageId> DisplayEngine::Import(
     zx::vmo vmo, const image_t* image, size_t offset, uint32_t pixel_size, uint32_t row_bytes,
     fuchsia_images2::wire::PixelFormat pixel_format) {
-  if (image->type != IMAGE_TYPE_SIMPLE) {
+  if (image->tiling_type != IMAGE_TILING_TYPE_LINEAR) {
     return zx::error(ZX_ERR_INVALID_ARGS);
   }
 

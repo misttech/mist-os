@@ -385,7 +385,7 @@ zx_status_t capture_setup() {
 
   // set buffer constraints
   fhdt::wire::ImageConfig image_config = {};
-  image_config.type = fhdt::wire::kTypeCapture;
+  image_config.tiling_type = fhdt::wire::kImageTilingTypeCapture;
   auto constraints_resp = dc->SetBufferCollectionConstraints(
       display::ToFidlBufferCollectionId(kBufferCollectionId), image_config);
   if (constraints_resp.status() != ZX_OK) {

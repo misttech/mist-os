@@ -75,7 +75,7 @@ layer_t CreatePrimaryLayerConfig(uint64_t handle, uint32_t z_index = 1u) {
           {
               .width = kWidth,
               .height = kHeight,
-              .type = IMAGE_TYPE_SIMPLE,
+              .tiling_type = IMAGE_TILING_TYPE_LINEAR,
               .handle = handle,
           },
       .alpha_mode = ALPHA_DISABLE,

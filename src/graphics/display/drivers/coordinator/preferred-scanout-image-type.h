@@ -7,24 +7,24 @@
 
 #include <cstdint>
 
-// display-controller.fidl states that TYPE_SIMPLE is the only universally-supported image type
-// defined by the API, and that any other value must be agreed upon by all parties (e.g. the image
-// producer, the display driver, etc.) through some other means, perhaps a future negotiation API.
-// For now, this header serves the role of "some other means".
+// display-controller.fidl states that IMAGE_TILING_TYPE_LINEAR is the only universally-supported
+// image type defined by the API, and that any other value must be agreed upon by all parties (e.g.
+// the image producer, the display driver, etc.) through some other means, perhaps a future
+// negotiation API. For now, this header serves the role of "some other means".
 
 #if defined(__x86_64__)
-// `fuchsia.hardware.intelgpucore/IMAGE_TYPE_X_TILED` from the Banjo API.
-constexpr uint32_t IMAGE_TYPE_PREFERRED_SCANOUT = 1;
+// `fuchsia.hardware.intelgpucore/IMAGE_TILING_TYPE_X_TILED` from the Banjo API.
+constexpr uint32_t IMAGE_TILING_TYPE_PREFERRED_SCANOUT = 1;
 #elif defined(__aarch64__)
-// `fuchsia.hardware.display.types/TYPE_SIMPLE` from the FIDL API.
-// `fuchsia.hardware.display.controller/ImageType.SIMPLE` from the Banjo API.
-constexpr uint32_t IMAGE_TYPE_PREFERRED_SCANOUT = 0;
+// `fuchsia.hardware.display.types/IMAGE_TILING_TYPE_LINEAR` from the FIDL API.
+// `fuchsia.hardware.display.controller/ImageTilingType.SIMPLE` from the Banjo API.
+constexpr uint32_t IMAGE_TILING_TYPE_PREFERRED_SCANOUT = 0;
 #elif defined(__riscv)
-// `fuchsia.hardware.display.types/TYPE_SIMPLE` from the FIDL API.
-// `fuchsia.hardware.display.controller/ImageType.SIMPLE` from the Banjo API.
+// `fuchsia.hardware.display.types/IMAGE_TILING_TYPE_LINEAR` from the FIDL API.
+// `fuchsia.hardware.display.controller/ImageTilingType.SIMPLE` from the Banjo API.
 //
 // This may be revisited, depending on the hardware that we end supporting.
-constexpr uint32_t IMAGE_TYPE_PREFERRED_SCANOUT = 0;
+constexpr uint32_t IMAGE_TILING_TYPE_PREFERRED_SCANOUT = 0;
 #else
 #error "Preferred scanout image format not defined for this platform."
 #endif

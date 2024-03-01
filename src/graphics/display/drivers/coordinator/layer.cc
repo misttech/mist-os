@@ -46,7 +46,7 @@ static void EarlyRetireUpTo(Image::DoublyLinkedList& list, Image::DoublyLinkedLi
 static void populate_image(const fhdt::wire::ImageConfig& image, image_t* image_out) {
   image_out->width = image.width;
   image_out->height = image.height;
-  image_out->type = image.type;
+  image_out->tiling_type = image.tiling_type;
 }
 
 }  // namespace

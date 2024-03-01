@@ -114,7 +114,11 @@ impl Drop for Image {
 
 impl From<&ImageParameters> for fdisplay_types::ImageConfig {
     fn from(src: &ImageParameters) -> Self {
-        Self { width: src.width, height: src.height, type_: fdisplay_types::TYPE_SIMPLE }
+        Self {
+            width: src.width,
+            height: src.height,
+            tiling_type: fdisplay_types::IMAGE_TILING_TYPE_LINEAR,
+        }
     }
 }
 

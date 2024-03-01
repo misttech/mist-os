@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use display_types::IMAGE_TILING_TYPE_CAPTURE;
+
 use {
     fidl::endpoints::ClientEnd,
     fidl_fuchsia_hardware_display::{self as display, CoordinatorEvent, LayerId as FidlLayerId},
@@ -279,7 +281,11 @@ impl Coordinator {
         proxy
             .set_buffer_collection_constraints(
                 &id.into(),
-                &display_types::ImageConfig { width: 0, height: 0, type_: 0 },
+                &display_types::ImageConfig {
+                    width: 0,
+                    height: 0,
+                    tiling_type: IMAGE_TILING_TYPE_CAPTURE,
+                },
             )
             .await?
             .map_err(zx::Status::from_raw)?;

@@ -6,11 +6,11 @@ library fuchsia.hardware.display.controller;
 using fuchsia.hardware.i2cimpl;
 using zx;
 
-type ImageType = strict enum : uint32 {
+type ImageTilingType = strict enum : uint32 {
     /// The image is linear and VMO backed.
-    SIMPLE = 0;
+    LINEAR = 0;
 
-    // Intentionally left some gap between SIMPLE and CAPTURE.
+    // Intentionally left some gap between LINEAR and CAPTURE.
 
     /// The image is used for capture
     CAPTURE = 10;
@@ -23,9 +23,9 @@ type Image = struct {
     height uint32;
 
     /// The type conveys information about what is providing the pixel data. If this is not
-    /// IMAGE_TYPE_SIMPLE, it is up to the driver and buffer producer to agree on the meaning
+    /// IMAGE_TILING_TYPE_LINEAR, it is up to the driver and buffer producer to agree on the meaning
     /// of the value through some mechanism outside the scope of this API.
-    type uint32;
+    tiling_type uint32;
 
     /// A driver-defined handle to the image. Each handle must be unique.
     handle uint64;

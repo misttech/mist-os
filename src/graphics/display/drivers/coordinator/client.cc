@@ -128,7 +128,8 @@ void Client::ImportImage(ImportImageRequestView request, ImportImageCompleter::S
     return;
   }
 
-  if (request->image_config.type == fuchsia_hardware_display_types::wire::kTypeCapture) {
+  if (request->image_config.tiling_type ==
+      fuchsia_hardware_display_types::wire::kImageTilingTypeCapture) {
     zx_status_t import_status =
         ImportImageForCapture(request->image_config, ToBufferId(request->buffer_id), image_id);
     if (import_status == ZX_OK) {
@@ -151,7 +152,8 @@ void Client::ImportImage(ImportImageRequestView request, ImportImageCompleter::S
 zx_status_t Client::ImportImageForDisplay(
     const fuchsia_hardware_display_types::wire::ImageConfig& image_config, BufferId buffer_id,
     ImageId image_id) {
-  ZX_DEBUG_ASSERT(image_config.type != fuchsia_hardware_display_types::wire::kTypeCapture);
+  ZX_DEBUG_ASSERT(image_config.tiling_type !=
+                  fuchsia_hardware_display_types::wire::kImageTilingTypeCapture);
   ZX_DEBUG_ASSERT(!images_.find(image_id).IsValid());
   ZX_DEBUG_ASSERT(!capture_images_.find(image_id).IsValid());
 
@@ -164,7 +166,7 @@ zx_status_t Client::ImportImageForDisplay(
   image_t dc_image = {};
   dc_image.height = image_config.height;
   dc_image.width = image_config.width;
-  dc_image.type = image_config.type;
+  dc_image.tiling_type = image_config.tiling_type;
 
   zx_status_t status = controller_->driver()->ImportImage(
       &dc_image, collections.driver_buffer_collection_id, buffer_id.buffer_index);
@@ -289,7 +291,7 @@ void Client::SetBufferCollectionConstraints(
   image_t dc_image;
   dc_image.height = request->config.height;
   dc_image.width = request->config.width;
-  dc_image.type = request->config.type;
+  dc_image.tiling_type = request->config.tiling_type;
 
   zx_status_t status = ZX_ERR_INTERNAL;
 
@@ -746,7 +748,8 @@ void Client::IsCaptureSupported(IsCaptureSupportedCompleter::Sync& completer) {
 zx_status_t Client::ImportImageForCapture(
     const fuchsia_hardware_display_types::wire::ImageConfig& image_config, BufferId buffer_id,
     ImageId image_id) {
-  ZX_DEBUG_ASSERT(image_config.type == fuchsia_hardware_display_types::wire::kTypeCapture);
+  ZX_DEBUG_ASSERT(image_config.tiling_type ==
+                  fuchsia_hardware_display_types::wire::kImageTilingTypeCapture);
   ZX_DEBUG_ASSERT(!images_.find(image_id).IsValid());
   ZX_DEBUG_ASSERT(!capture_images_.find(image_id).IsValid());
 

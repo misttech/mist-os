@@ -251,7 +251,7 @@ TEST_F(VirtioGpuTest, ImportVmo) {
   const image_t kDefaultImage = {
       .width = 4,
       .height = 4,
-      .type = IMAGE_TYPE_SIMPLE,
+      .tiling_type = IMAGE_TILING_TYPE_LINEAR,
       .handle = 0,
   };
   EXPECT_OK(proto.ops->set_buffer_collection_constraints(device_.get(), &kDefaultImage,
@@ -288,7 +288,7 @@ TEST_F(VirtioGpuTest, SetConstraints) {
   const image_t kDefaultImage = {
       .width = 4,
       .height = 4,
-      .type = IMAGE_TYPE_SIMPLE,
+      .tiling_type = IMAGE_TILING_TYPE_LINEAR,
       .handle = 0,
   };
   EXPECT_OK(proto.ops->set_buffer_collection_constraints(device_.get(), &kDefaultImage,
@@ -405,7 +405,7 @@ TEST_F(VirtioGpuTest, ImportImage) {
   const image_t kDefaultImage = {
       .width = 800,
       .height = 600,
-      .type = IMAGE_TYPE_SIMPLE,
+      .tiling_type = IMAGE_TILING_TYPE_LINEAR,
       .handle = 0,
   };
   EXPECT_OK(proto.ops->set_buffer_collection_constraints(device_.get(), &kDefaultImage,

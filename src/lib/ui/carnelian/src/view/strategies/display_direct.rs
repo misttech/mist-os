@@ -321,7 +321,11 @@ impl DisplayDirectViewStrategy {
             )),
         };
 
-        let mut image_config = ImageConfig { width: unsize.width, height: unsize.height, type_: 0 };
+        let mut image_config = ImageConfig {
+            width: unsize.width,
+            height: unsize.height,
+            tiling_type: fidl_fuchsia_hardware_display_types::IMAGE_TILING_TYPE_LINEAR,
+        };
 
         let coordinator_token = buffer_allocator.duplicate_token().await?;
         display
@@ -346,18 +350,18 @@ impl DisplayDirectViewStrategy {
             "Buffers do not match frame count"
         );
 
-        let image_type =
+        let image_tiling_type =
             if buffers.settings.image_format_constraints.pixel_format.has_format_modifier {
                 match buffers.settings.image_format_constraints.pixel_format.format_modifier.value {
                     fidl_fuchsia_sysmem::FORMAT_MODIFIER_INTEL_I915_X_TILED => 1,
                     fidl_fuchsia_sysmem::FORMAT_MODIFIER_INTEL_I915_Y_TILED => 2,
-                    _ => 0,
+                    _ => fidl_fuchsia_hardware_display_types::IMAGE_TILING_TYPE_LINEAR,
                 }
             } else {
-                0
+                fidl_fuchsia_hardware_display_types::IMAGE_TILING_TYPE_LINEAR
             };
 
-        image_config.type_ = image_type;
+        image_config.tiling_type = image_tiling_type;
 
         let mut image_ids = BTreeSet::new();
         let mut image_indexes = BTreeMap::new();

@@ -418,7 +418,7 @@ class DisplayCompositorPixelTest : public DisplayCompositorTestBase {
 
     // Set up buffer collection and image for recording a snapshot.
     fuchsia::hardware::display::types::ImageConfig image_config = {
-        .type = fuchsia::hardware::display::types::TYPE_CAPTURE};
+        .tiling_type = fuchsia::hardware::display::types::IMAGE_TILING_TYPE_CAPTURE};
 
     auto tokens = SysmemTokens::Create(sysmem_allocator_.get());
     auto result = scenic_impl::ImportBufferCollection(collection_id, *display_coordinator.get(),

@@ -368,7 +368,7 @@ TEST(SimpleDisplay, ImportKernelFramebufferImage) {
   const image_t kDefaultImage = {
       .width = kWidth,
       .height = kHeight,
-      .type = IMAGE_TYPE_SIMPLE,
+      .tiling_type = IMAGE_TILING_TYPE_LINEAR,
       .handle = 0,
   };
   EXPECT_OK(display.DisplayControllerImplSetBufferCollectionConstraints(&kDefaultImage,

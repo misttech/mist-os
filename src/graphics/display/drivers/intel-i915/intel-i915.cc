@@ -79,11 +79,11 @@ constexpr fuchsia_images2_pixel_format_enum_value_t kSupportedFormats[] = {
         fuchsia_images2::wire::PixelFormat::kR8G8B8A8),
 };
 
-constexpr uint32_t kImageTypes[4] = {
-    IMAGE_TYPE_SIMPLE,
-    IMAGE_TYPE_X_TILED,
-    IMAGE_TYPE_Y_LEGACY_TILED,
-    IMAGE_TYPE_YF_TILED,
+constexpr uint32_t kImageTilingTypes[4] = {
+    IMAGE_TILING_TYPE_LINEAR,
+    IMAGE_TILING_TYPE_X_TILED,
+    IMAGE_TILING_TYPE_Y_LEGACY_TILED,
+    IMAGE_TILING_TYPE_YF_TILED,
 };
 
 constexpr fuchsia_sysmem::wire::PixelFormatType kPixelFormatTypes[2] = {
@@ -834,7 +834,8 @@ void Controller::DisplayControllerImplSetDisplayControllerInterface(
   }
 }
 
-static bool ConvertPixelFormatToType(fuchsia_sysmem::wire::PixelFormat format, uint32_t* type_out) {
+static bool ConvertPixelFormatToTilingType(fuchsia_sysmem::wire::PixelFormat format,
+                                           uint32_t* image_tiling_type_out) {
   if (format.type != fuchsia_sysmem::wire::PixelFormatType::kBgra32 &&
       format.type != fuchsia_sysmem::wire::PixelFormatType::kR8G8B8A8) {
     return false;
@@ -846,19 +847,19 @@ static bool ConvertPixelFormatToType(fuchsia_sysmem::wire::PixelFormat format, u
 
   switch (format.format_modifier.value) {
     case fuchsia_sysmem::wire::kFormatModifierIntelI915XTiled:
-      *type_out = IMAGE_TYPE_X_TILED;
+      *image_tiling_type_out = IMAGE_TILING_TYPE_X_TILED;
       return true;
 
     case fuchsia_sysmem::wire::kFormatModifierIntelI915YTiled:
-      *type_out = IMAGE_TYPE_Y_LEGACY_TILED;
+      *image_tiling_type_out = IMAGE_TILING_TYPE_Y_LEGACY_TILED;
       return true;
 
     case fuchsia_sysmem::wire::kFormatModifierIntelI915YfTiled:
-      *type_out = IMAGE_TYPE_YF_TILED;
+      *image_tiling_type_out = IMAGE_TILING_TYPE_YF_TILED;
       return true;
 
     case fuchsia_sysmem::wire::kFormatModifierLinear:
-      *type_out = IMAGE_TYPE_SIMPLE;
+      *image_tiling_type_out = IMAGE_TILING_TYPE_LINEAR;
       return true;
 
     default:
@@ -925,8 +926,10 @@ zx_status_t Controller::DisplayControllerImplImportImage(const image_t* image,
   }
   const fidl::WireSyncClient<fuchsia_sysmem::BufferCollection>& collection = it->second;
 
-  if (!(image->type == IMAGE_TYPE_SIMPLE || image->type == IMAGE_TYPE_X_TILED ||
-        image->type == IMAGE_TYPE_Y_LEGACY_TILED || image->type == IMAGE_TYPE_YF_TILED)) {
+  if (!(image->tiling_type == IMAGE_TILING_TYPE_LINEAR ||
+        image->tiling_type == IMAGE_TILING_TYPE_X_TILED ||
+        image->tiling_type == IMAGE_TILING_TYPE_Y_LEGACY_TILED ||
+        image->tiling_type == IMAGE_TILING_TYPE_YF_TILED)) {
     return ZX_ERR_INVALID_ARGS;
   }
 
@@ -985,14 +988,15 @@ zx_status_t Controller::DisplayControllerImplImportImage(const image_t* image,
                       fuchsia_sysmem::wire::PixelFormatType::kI420 &&
                   collection_info.settings.image_format_constraints.pixel_format.type !=
                       fuchsia_sysmem::wire::PixelFormatType::kNv12);
-  uint32_t type;
-  if (!ConvertPixelFormatToType(collection_info.settings.image_format_constraints.pixel_format,
-                                &type)) {
+  uint32_t image_tiling_type;
+  if (!ConvertPixelFormatToTilingType(
+          collection_info.settings.image_format_constraints.pixel_format, &image_tiling_type)) {
     zxlogf(ERROR, "Invalid pixel format modifier");
     return ZX_ERR_INVALID_ARGS;
   }
-  if (image->type != type) {
-    zxlogf(ERROR, "Incompatible image type from image %d and sysmem %d", image->type, type);
+  if (image->tiling_type != image_tiling_type) {
+    zxlogf(ERROR, "Incompatible image type from image %d and sysmem %d", image->tiling_type,
+           image_tiling_type);
     return ZX_ERR_INVALID_ARGS;
   }
 
@@ -1019,14 +1023,14 @@ zx_status_t Controller::DisplayControllerImplImportImage(const image_t* image,
 
   const uint32_t bytes_per_pixel = ImageFormatStrideBytesPerWidthPixel(format.value().pixel_format);
 
-  ZX_DEBUG_ASSERT(length >= width_in_tiles(image->type, image->width, bytes_per_pixel) *
-                                height_in_tiles(image->type, image->height) *
-                                get_tile_byte_size(image->type));
+  ZX_DEBUG_ASSERT(length >= width_in_tiles(image->tiling_type, image->width, bytes_per_pixel) *
+                                height_in_tiles(image->tiling_type, image->height) *
+                                get_tile_byte_size(image->tiling_type));
 
   uint32_t align;
-  if (image->type == IMAGE_TYPE_SIMPLE) {
+  if (image->tiling_type == IMAGE_TILING_TYPE_LINEAR) {
     align = registers::PlaneSurface::kLinearAlignment;
-  } else if (image->type == IMAGE_TYPE_X_TILED) {
+  } else if (image->tiling_type == IMAGE_TILING_TYPE_X_TILED) {
     align = registers::PlaneSurface::kXTilingAlignment;
   } else {
     align = registers::PlaneSurface::kYTilingAlignment;
@@ -1162,7 +1166,8 @@ bool Controller::CalculateMinimumAllocations(
       ZX_ASSERT(layer->type == LAYER_TYPE_PRIMARY);
       const primary_layer_t* primary = &layer->cfg.primary;
 
-      if (primary->image.type == IMAGE_TYPE_SIMPLE || primary->image.type == IMAGE_TYPE_X_TILED) {
+      if (primary->image.tiling_type == IMAGE_TILING_TYPE_LINEAR ||
+          primary->image.tiling_type == IMAGE_TILING_TYPE_X_TILED) {
         min_allocs[pipe_id][plane_num] = 8;
       } else {
         uint32_t plane_source_width;
@@ -1666,8 +1671,8 @@ config_check_result_t Controller::DisplayControllerImplCheckConfiguration(
           if (primary->transform_mode == FRAME_TRANSFORM_ROT_90 ||
               primary->transform_mode == FRAME_TRANSFORM_ROT_270) {
             // Linear and x tiled images don't support 90/270 rotation
-            if (primary->image.type == IMAGE_TYPE_SIMPLE ||
-                primary->image.type == IMAGE_TYPE_X_TILED) {
+            if (primary->image.tiling_type == IMAGE_TILING_TYPE_LINEAR ||
+                primary->image.tiling_type == IMAGE_TILING_TYPE_X_TILED) {
               current_display_client_composition_opcodes[j] |= CLIENT_COMPOSITION_OPCODE_TRANSFORM;
             }
           } else if (primary->transform_mode != FRAME_TRANSFORM_IDENTITY &&
@@ -1682,8 +1687,8 @@ config_check_result_t Controller::DisplayControllerImplCheckConfiguration(
           // If the plane is too wide, force the client to do all composition
           // and just give us a simple configuration.
           uint32_t max_width;
-          if (primary->image.type == IMAGE_TYPE_SIMPLE ||
-              primary->image.type == IMAGE_TYPE_X_TILED) {
+          if (primary->image.tiling_type == IMAGE_TILING_TYPE_LINEAR ||
+              primary->image.tiling_type == IMAGE_TILING_TYPE_X_TILED) {
             max_width = 8192;
           } else {
             max_width = 4096;
@@ -1957,13 +1962,13 @@ zx_status_t Controller::DisplayControllerImplSetBufferCollectionConstraints(
   // Loop over all combinations of supported image types and pixel formats, adding
   // an image format constraints for each unless the config is asking for a specific
   // format or type.
-  static_assert(std::size(kImageTypes) * std::size(kPixelFormatTypes) <=
+  static_assert(std::size(kImageTilingTypes) * std::size(kPixelFormatTypes) <=
                 std::size(constraints.image_format_constraints));
-  for (uint32_t image_type : kImageTypes) {
+  for (uint32_t image_tiling_type : kImageTilingTypes) {
     // Skip if image type was specified and different from current type. This
     // makes it possible for a different participant to select preferred
     // modifiers.
-    if (config->type && config->type != image_type) {
+    if (config->tiling_type && config->tiling_type != image_tiling_type) {
       continue;
     }
     for (fuchsia_sysmem::wire::PixelFormatType pixel_format_type : kPixelFormatTypes) {
@@ -1972,26 +1977,26 @@ zx_status_t Controller::DisplayControllerImplSetBufferCollectionConstraints(
 
       image_constraints.pixel_format.type = pixel_format_type;
       image_constraints.pixel_format.has_format_modifier = true;
-      switch (image_type) {
-        case IMAGE_TYPE_SIMPLE:
+      switch (image_tiling_type) {
+        case IMAGE_TILING_TYPE_LINEAR:
           image_constraints.pixel_format.format_modifier.value =
               fuchsia_sysmem::wire::kFormatModifierLinear;
           image_constraints.bytes_per_row_divisor = 64;
           image_constraints.start_offset_divisor = 64;
           break;
-        case IMAGE_TYPE_X_TILED:
+        case IMAGE_TILING_TYPE_X_TILED:
           image_constraints.pixel_format.format_modifier.value =
               fuchsia_sysmem::wire::kFormatModifierIntelI915XTiled;
           image_constraints.start_offset_divisor = 4096;
           image_constraints.bytes_per_row_divisor = 1;  // Not meaningful
           break;
-        case IMAGE_TYPE_Y_LEGACY_TILED:
+        case IMAGE_TILING_TYPE_Y_LEGACY_TILED:
           image_constraints.pixel_format.format_modifier.value =
               fuchsia_sysmem::wire::kFormatModifierIntelI915YTiled;
           image_constraints.start_offset_divisor = 4096;
           image_constraints.bytes_per_row_divisor = 1;  // Not meaningful
           break;
-        case IMAGE_TYPE_YF_TILED:
+        case IMAGE_TILING_TYPE_YF_TILED:
           image_constraints.pixel_format.format_modifier.value =
               fuchsia_sysmem::wire::kFormatModifierIntelI915YfTiled;
           image_constraints.start_offset_divisor = 4096;
@@ -2003,7 +2008,7 @@ zx_status_t Controller::DisplayControllerImplSetBufferCollectionConstraints(
     }
   }
   if (image_constraints_count == 0) {
-    zxlogf(ERROR, "Config has unsupported type %d", config->type);
+    zxlogf(ERROR, "Config has unsupported tiling type %d", config->tiling_type);
     return ZX_ERR_INVALID_ARGS;
   }
   for (unsigned i = 0; i < std::size(kYuvPixelFormatTypes); ++i) {
@@ -2242,7 +2247,7 @@ void Controller::DdkSuspend(ddk::SuspendTxn txn) {
 
         auto plane_stride = pipe_regs.PlaneSurfaceStride(0).ReadFrom(mmio_space());
         plane_stride.set_stride(
-            width_in_tiles(IMAGE_TYPE_SIMPLE, fb_info.width, fb_info.bytes_per_pixel));
+            width_in_tiles(IMAGE_TILING_TYPE_LINEAR, fb_info.width, fb_info.bytes_per_pixel));
         plane_stride.WriteTo(mmio_space());
 
         auto plane_surface = pipe_regs.PlaneSurface(0).ReadFrom(mmio_space());

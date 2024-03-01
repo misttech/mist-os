@@ -185,8 +185,9 @@ zx_status_t FakeDisplay::ImportVmoImageForTesting(image_t* image, zx::vmo vmo, s
 
 namespace {
 
-bool IsAcceptableImageType(uint32_t image_type) {
-  return image_type == IMAGE_TYPE_PREFERRED_SCANOUT || image_type == IMAGE_TYPE_SIMPLE;
+bool IsAcceptableImageTilingType(uint32_t image_tiling_type) {
+  return image_tiling_type == IMAGE_TILING_TYPE_PREFERRED_SCANOUT ||
+         image_tiling_type == IMAGE_TILING_TYPE_LINEAR;
 }
 
 }  // namespace
@@ -250,8 +251,9 @@ zx_status_t FakeDisplay::DisplayControllerImplImportImage(
   const fidl::SyncClient<fuchsia_sysmem::BufferCollection>& collection = it->second;
 
   fbl::AutoLock lock(&image_mutex_);
-  if (!IsAcceptableImageType(image->type)) {
-    zxlogf(INFO, "ImportImage() will fail due to invalid Image type %" PRIu32, image->type);
+  if (!IsAcceptableImageTilingType(image->tiling_type)) {
+    zxlogf(INFO, "ImportImage() will fail due to invalid Image tiling type %" PRIu32,
+           image->tiling_type);
     return ZX_ERR_INVALID_ARGS;
   }
 
@@ -541,7 +543,7 @@ zx_status_t FakeDisplay::DisplayControllerImplSetBufferCollectionConstraints(
   }
   const fidl::SyncClient<fuchsia_sysmem::BufferCollection>& collection = it->second;
 
-  BufferCollectionUsage usage = (config->type == IMAGE_TYPE_CAPTURE)
+  BufferCollectionUsage usage = (config->tiling_type == IMAGE_TILING_TYPE_CAPTURE)
                                     ? BufferCollectionUsage::kCapture
                                     : BufferCollectionUsage::kPrimaryLayer;
   auto set_result = collection->SetConstraints({true, CreateBufferCollectionConstraints(usage)});

@@ -344,7 +344,7 @@ zx::result<display::DriverImageId> Display::ImportVmoImage(
     const image_t* image, const fuchsia_sysmem::PixelFormat& pixel_format, zx::vmo vmo,
     size_t offset) {
   auto color_buffer = std::make_unique<ColorBuffer>();
-  color_buffer->is_linear_format = image->type == IMAGE_TYPE_SIMPLE;
+  color_buffer->is_linear_format = image->tiling_type == IMAGE_TILING_TYPE_LINEAR;
   const uint32_t color_buffer_format = GetColorBufferFormatFromSysmemPixelFormat(pixel_format);
 
   fidl::Arena unused_arena;
@@ -495,7 +495,7 @@ zx_status_t Display::DisplayControllerImplImportImage(const image_t* image,
   }
 
   auto color_buffer = std::make_unique<ColorBuffer>();
-  color_buffer->is_linear_format = image->type == IMAGE_TYPE_SIMPLE;
+  color_buffer->is_linear_format = image->tiling_type == IMAGE_TILING_TYPE_LINEAR;
   color_buffer->vmo = std::move(vmo);
   const display::DriverImageId image_id(reinterpret_cast<uint64_t>(color_buffer.release()));
   *out_image_handle = display::ToBanjoDriverImageId(image_id);

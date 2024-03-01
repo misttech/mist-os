@@ -6,6 +6,7 @@
 
 #include <dirent.h>
 #include <errno.h>
+#include <fidl/fuchsia.hardware.display.types/cpp/wire.h>
 #include <fidl/fuchsia.hardware.display/cpp/wire.h>
 #include <fuchsia/hardware/display/cpp/fidl.h>
 #include <fuchsia/hardware/display/types/cpp/fidl.h>
@@ -288,10 +289,10 @@ bool ImagePipeSurfaceDisplay::CreateImage(VkDevice device, VkLayerDispatchTable*
   };
 #if defined(__x86_64__)
   // Must be consistent with intel-gpu-core.h
-  const uint32_t kImageTypeXTiled = 1;
-  image_config.type = kImageTypeXTiled;
+  const uint32_t kImageTilingTypeXTiled = 1;
+  image_config.tiling_type = kImageTilingTypeXTiled;
 #elif defined(__aarch64__)
-  image_config.type = 0;
+  image_config.tiling_type = fuchsia_hardware_display_types::wire::kImageTilingTypeLinear;
 #else
   // Unsupported display.
   return false;

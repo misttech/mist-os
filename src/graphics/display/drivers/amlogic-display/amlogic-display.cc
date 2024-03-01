@@ -278,7 +278,7 @@ zx_status_t AmlogicDisplay::DisplayControllerImplImportImage(
     return ZX_ERR_NO_MEMORY;
   }
 
-  if (image->type != IMAGE_TYPE_SIMPLE) {
+  if (image->tiling_type != IMAGE_TILING_TYPE_LINEAR) {
     status = ZX_ERR_INVALID_ARGS;
     return status;
   }
@@ -675,7 +675,7 @@ zx_status_t AmlogicDisplay::DisplayControllerImplSetBufferCollectionConstraints(
       buffer_collections_.at(driver_buffer_collection_id);
   fuchsia_sysmem::wire::BufferCollectionConstraints constraints = {};
   const char* buffer_name;
-  if (config->type == IMAGE_TYPE_CAPTURE) {
+  if (config->tiling_type == IMAGE_TILING_TYPE_CAPTURE) {
     constraints.usage.cpu =
         fuchsia_sysmem::wire::kCpuUsageReadOften | fuchsia_sysmem::wire::kCpuUsageWriteOften;
   } else {
@@ -693,7 +693,7 @@ zx_status_t AmlogicDisplay::DisplayControllerImplSetBufferCollectionConstraints(
   buffer_constraints.heap_permitted[0] = fuchsia_sysmem::wire::HeapType::kSystemRam;
   buffer_constraints.heap_permitted[1] = fuchsia_sysmem::wire::HeapType::kAmlogicSecure;
 
-  if (config->type == IMAGE_TYPE_CAPTURE) {
+  if (config->tiling_type == IMAGE_TILING_TYPE_CAPTURE) {
     constraints.image_format_constraints_count = 1;
     fuchsia_sysmem::wire::ImageFormatConstraints& image_constraints =
         constraints.image_format_constraints[0];

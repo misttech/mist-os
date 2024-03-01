@@ -516,7 +516,7 @@ TEST_F(FakeSysmemTest, ImportImage) {
   const image_t kDefaultConfig = {
       .width = 1024,
       .height = 768,
-      .type = IMAGE_TYPE_SIMPLE,
+      .tiling_type = IMAGE_TILING_TYPE_LINEAR,
       .handle = 0,
   };
   EXPECT_OK(display_->DisplayControllerImplSetBufferCollectionConstraints(
@@ -531,7 +531,7 @@ TEST_F(FakeSysmemTest, ImportImage) {
 
   // Invalid import: Bad image type.
   image_t invalid_config = kDefaultConfig;
-  invalid_config.type = IMAGE_TYPE_CAPTURE;
+  invalid_config.tiling_type = IMAGE_TILING_TYPE_CAPTURE;
   uint64_t image_handle = 0;
   EXPECT_EQ(display_->DisplayControllerImplImportImage(&invalid_config, kBanjoBufferCollectionId,
                                                        /*index=*/0, &image_handle),
@@ -585,7 +585,7 @@ TEST_F(FakeSysmemTest, ImportImageForCapture) {
   const image_t kDefaultConfig = {
       .width = kWidth,
       .height = kHeight,
-      .type = IMAGE_TYPE_CAPTURE,
+      .tiling_type = IMAGE_TILING_TYPE_CAPTURE,
       .handle = 0,
   };
   EXPECT_OK(display_->DisplayControllerImplSetBufferCollectionConstraints(

@@ -5,9 +5,9 @@ library fuchsia.hardware.intelgpucore;
 
 using zx;
 
-const IMAGE_TYPE_X_TILED uint32 = 1;
-const IMAGE_TYPE_Y_LEGACY_TILED uint32 = 2;
-const IMAGE_TYPE_YF_TILED uint32 = 3;
+const IMAGE_TILING_TYPE_X_TILED uint32 = 1;
+const IMAGE_TILING_TYPE_Y_LEGACY_TILED uint32 = 2;
+const IMAGE_TILING_TYPE_YF_TILED uint32 = 3;
 
 @transport("Banjo")
 @banjo_layout("ddk-callback")

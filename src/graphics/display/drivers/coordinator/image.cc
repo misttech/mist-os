@@ -28,7 +28,7 @@ namespace display {
 Image::Image(Controller* controller, const image_t& info, zx::vmo vmo, inspect::Node* parent_node,
              ClientId client_id)
     : info_(info), controller_(controller), client_id_(client_id), vmo_(std::move(vmo)) {
-  ZX_DEBUG_ASSERT(info.type != IMAGE_TYPE_CAPTURE);
+  ZX_DEBUG_ASSERT(info.tiling_type != IMAGE_TILING_TYPE_CAPTURE);
   InitializeInspect(parent_node);
 }
 Image::~Image() {
@@ -43,7 +43,7 @@ void Image::InitializeInspect(inspect::Node* parent_node) {
   node_ = parent_node->CreateChild(fbl::StringPrintf("image-%p", this).c_str());
   node_.CreateUint("width", info_.width, &properties_);
   node_.CreateUint("height", info_.height, &properties_);
-  node_.CreateUint("type", info_.type, &properties_);
+  node_.CreateUint("tiling_type", info_.tiling_type, &properties_);
   presenting_property_ = node_.CreateBool("presenting", false);
   retiring_property_ = node_.CreateBool("retiring", false);
 }
@@ -173,7 +173,7 @@ bool Image::HasSameDisplayPropertiesAsLayer(const image_t& layer_config) const {
   // and compare this Image's sysmem buffer collection information against the
   // Layer's format support.
   return info_.width == layer_config.width && info_.height == layer_config.height &&
-         info_.type == layer_config.type;
+         info_.tiling_type == layer_config.tiling_type;
 }
 
 }  // namespace display

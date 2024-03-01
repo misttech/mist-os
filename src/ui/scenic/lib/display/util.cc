@@ -114,8 +114,8 @@ zx_status_t ImportImageForCapture(
     return 0;
   }
 
-  if (image_config.type != fuchsia::hardware::display::types::TYPE_CAPTURE) {
-    FX_LOGS(ERROR) << "Image config type must be TYPE_CAPTURE.";
+  if (image_config.tiling_type != fuchsia::hardware::display::types::IMAGE_TILING_TYPE_CAPTURE) {
+    FX_LOGS(ERROR) << "Image config tiling type must be IMAGE_TILING_TYPE_CAPTURE.";
     return 0;
   }
 

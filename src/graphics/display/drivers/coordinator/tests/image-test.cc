@@ -66,7 +66,7 @@ TEST_F(ImageTest, RetiredImagesAreAlwaysUsable) {
   image_t info = {};
   info.width = 1024;
   info.height = 600;
-  info.type = 0;
+  info.tiling_type = IMAGE_TILING_TYPE_LINEAR;
   auto image = ImportImage(std::move(vmo), info);
   auto image_cleanup = fit::defer([image]() {
     fbl::AutoLock l(image->mtx());

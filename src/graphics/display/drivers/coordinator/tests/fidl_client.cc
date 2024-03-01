@@ -41,7 +41,7 @@ TestFidlClient::Display::Display(const fhd::wire::Info& info) {
   monitor_serial_ = fbl::String(info.monitor_serial.data());
   image_config_.height = modes_[0].vertical_resolution;
   image_config_.width = modes_[0].horizontal_resolution;
-  image_config_.type = fhdt::wire::kTypeSimple;
+  image_config_.tiling_type = fhdt::wire::kImageTilingTypeLinear;
 }
 
 DisplayId TestFidlClient::display_id() const { return displays_[0].id_; }

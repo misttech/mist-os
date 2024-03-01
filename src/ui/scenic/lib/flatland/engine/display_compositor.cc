@@ -37,18 +37,19 @@ const std::array<float, 4> kGpuRenderingDebugColor = {0.9f, 0.5f, 0.5f, 1.f};
 // in the display coordinator FIDL API.
 // TODO(https://fxbug.dev/42108519): Remove this when image type is removed from the display
 // coordinator API.
-uint32_t BufferCollectionPixelFormatToImageType(const fuchsia::sysmem::PixelFormat& pixel_format) {
+uint32_t BufferCollectionPixelFormatToImageTilingType(
+    const fuchsia::sysmem::PixelFormat& pixel_format) {
   if (pixel_format.has_format_modifier) {
     switch (pixel_format.format_modifier.value) {
       case fuchsia::sysmem::FORMAT_MODIFIER_INTEL_I915_X_TILED:
-        return 1;  // IMAGE_TYPE_X_TILED
+        return 1;  // IMAGE_TILING_TYPE_X_TILED
       case fuchsia::sysmem::FORMAT_MODIFIER_INTEL_I915_Y_TILED:
-        return 2;  // IMAGE_TYPE_Y_LEGACY_TILED
+        return 2;  // IMAGE_TILING_TYPE_Y_LEGACY_TILED
       case fuchsia::sysmem::FORMAT_MODIFIER_INTEL_I915_YF_TILED:
-        return 3;  // IMAGE_TYPE_YF_TILED
+        return 3;  // IMAGE_TILING_TYPE_YF_TILED
     }
   }
-  return fuchsia::hardware::display::types::TYPE_SIMPLE;
+  return fuchsia::hardware::display::types::IMAGE_TILING_TYPE_LINEAR;
 }
 
 fuchsia::hardware::display::types::AlphaMode GetAlphaMode(
@@ -314,7 +315,8 @@ bool DisplayCompositor::ImportBufferCollection(
   return ImportBufferCollectionToDisplayCoordinator(
       collection_id, std::move(display_token),
       // Indicate that no specific size, format, or type is required.
-      fuchsia::hardware::display::types::ImageConfig{.type = 0});
+      fuchsia::hardware::display::types::ImageConfig{
+          .tiling_type = fuchsia::hardware::display::types::IMAGE_TILING_TYPE_LINEAR});
 }
 
 void DisplayCompositor::ReleaseBufferCollection(
@@ -353,7 +355,7 @@ fuchsia::hardware::display::types::ImageConfig DisplayCompositor::CreateImageCon
   return fuchsia::hardware::display::types::ImageConfig{
       .width = metadata.width,
       .height = metadata.height,
-      .type = BufferCollectionPixelFormatToImageType(pixel_format)};
+      .tiling_type = BufferCollectionPixelFormatToImageTilingType(pixel_format)};
 }
 
 bool DisplayCompositor::ImportBufferImage(const allocation::ImageMetadata& metadata,
