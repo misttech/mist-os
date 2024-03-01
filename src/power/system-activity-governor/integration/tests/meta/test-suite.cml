@@ -11,6 +11,7 @@
         binary: "bin/system_activity_governor_test",
     },
     use: [
+        { protocol: "fuchsia.diagnostics.ArchiveAccessor" },
         { protocol: "test.systemactivitygovernor.RealmFactory" },
     ],
 }

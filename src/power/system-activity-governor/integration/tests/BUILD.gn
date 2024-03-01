@@ -21,6 +21,8 @@ rustc_test("bin") {
     "../testing/fidl:test.systemactivitygovernor_rust",
     "//sdk/fidl/fuchsia.power.suspend:fuchsia.power.suspend_rust",
     "//sdk/fidl/fuchsia.power.system:fuchsia.power.system_rust",
+    "//src/lib/diagnostics/reader/rust",
+    "//src/lib/diagnostics/testing/diagnostics-assertions/rust:diagnostics-assertions",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-component",
@@ -29,6 +31,7 @@ rustc_test("bin") {
     "//src/power/broker/client",
     "//src/testing/realm_proxy/client",
     "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:tracing",
   ]
 }
 

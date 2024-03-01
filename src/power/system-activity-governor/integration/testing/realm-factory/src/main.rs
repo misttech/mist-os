@@ -7,10 +7,14 @@ use {
     fidl_test_systemactivitygovernor::*,
     fuchsia_async as fasync,
     fuchsia_component::server::ServiceFs,
-    fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route},
+    fuchsia_component_test::{
+        Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route, DEFAULT_COLLECTION_NAME,
+    },
     futures::{StreamExt, TryStreamExt},
     tracing::*,
 };
+
+const ACTIVITY_GOVERNOR_CHILD_NAME: &str = "system-activity-governor";
 
 #[fuchsia::main]
 async fn main() -> Result<(), Error> {
@@ -33,11 +37,18 @@ async fn handle_request_stream(mut stream: RealmFactoryRequestStream) -> Result<
         match request {
             RealmFactoryRequest::CreateRealm { options, realm_server, responder } => {
                 let realm = create_realm(options).await?;
+                let moniker = format!(
+                    "{}:{}/{}",
+                    DEFAULT_COLLECTION_NAME,
+                    realm.root.child_name(),
+                    ACTIVITY_GOVERNOR_CHILD_NAME
+                );
+
                 let request_stream = realm_server.into_stream()?;
                 task_group.spawn(async move {
                     realm_proxy::service::serve(realm, request_stream).await.unwrap();
                 });
-                responder.send(Ok(()))?;
+                responder.send(Ok(&moniker))?;
             }
 
             RealmFactoryRequest::_UnknownMethod { .. } => unreachable!(),
@@ -54,7 +65,7 @@ async fn create_realm(options: RealmOptions) -> Result<RealmInstance, Error> {
     let builder = RealmBuilder::new().await?;
     let component_ref = builder
         .add_child(
-            "system-activity-governor",
+            ACTIVITY_GOVERNOR_CHILD_NAME,
             "#meta/system-activity-governor.cm",
             ChildOptions::new(),
         )
