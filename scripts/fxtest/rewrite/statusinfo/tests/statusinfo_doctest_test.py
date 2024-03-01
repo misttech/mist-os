@@ -9,6 +9,10 @@ import unittest
 import statusinfo.statusinfo
 
 
-def load_tests(_loader, tests: unittest.TestSuite, _ignore):
+def load_tests(
+    _loader: unittest.TestLoader,
+    tests: unittest.TestSuite,
+    _ignore: unittest.TestLoader,
+) -> unittest.TestSuite:
     tests.addTests(doctest.DocTestSuite(statusinfo.statusinfo))
     return tests

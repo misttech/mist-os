@@ -142,13 +142,13 @@ class AsyncCommand:
 
     @classmethod
     async def create(
-        cls,
+        cls: typing.Type["AsyncCommand"],
         program: str,
         *args: str,
         symbolizer_args: typing.List[str] | None = None,
         env: typing.Dict[str, str] | None = None,
         timeout: float | None = None,
-    ):
+    ) -> "AsyncCommand":
         """Create a new AsyncCommand that runs the given program.
 
         Args:
@@ -189,7 +189,7 @@ class AsyncCommand:
 
             async def make_process(
                 output_pipe: typing.Union[int, typing.TextIO]
-            ):
+            ) -> asyncio.subprocess.Process:
                 return await asyncio.subprocess.create_subprocess_exec(
                     program,
                     *args,
@@ -230,7 +230,7 @@ class AsyncCommand:
         except Exception as e:
             raise AsyncCommandError(f"An unknown error occurred: {e}")
 
-    def send_signal(self, sig: int):
+    def send_signal(self, sig: int) -> None:
         """Send the given signal to the underlying process(es) and their
         children in the same process group.
 
@@ -246,11 +246,11 @@ class AsyncCommand:
             pg = os.getpgid(self._wrapped_process.pid)
             os.killpg(pg, sig)
 
-    def terminate(self):
+    def terminate(self) -> None:
         """Terminate the underlying process(es) by sending SIGTERM."""
         self.send_signal(signal.SIGTERM)
 
-    def kill(self):
+    def kill(self) -> None:
         """Immediately kill the underlying process(es) by sending SIGKILL."""
         self.send_signal(signal.SIGKILL)
 
@@ -294,11 +294,11 @@ class AsyncCommand:
 
         raise AsyncCommandError("Event stream unexpectedly stopped")
 
-    async def _task(self):
+    async def _task(self) -> None:
         # Make sure that the child process group is killed when this process
         # exits. Otherwise the child process group keeps running if a user
         # does Ctrl+C on this script.
-        def kill_async_process():
+        def kill_async_process() -> None:
             self.kill()
 
         atexit.register(kill_async_process)
@@ -308,7 +308,7 @@ class AsyncCommand:
         async def read_stream(
             input_stream: asyncio.StreamReader,
             event_type: typing.Type[typing.Union[StderrEvent, StdoutEvent]],
-        ):
+        ) -> None:
             """Wrap reading from a stream and emitting a specific type of event.
 
             Args:
@@ -320,7 +320,7 @@ class AsyncCommand:
 
         async def timeout_handler(
             timeout: float, timeout_signal: asyncio.Event
-        ):
+        ) -> None:
             """Handle timeouts.
 
             We first send SIGTERM after the timeout, and if the program has
@@ -338,7 +338,7 @@ class AsyncCommand:
             await asyncio.sleep(min(timeout, 5))
             self.kill()
 
-        timeout_task: asyncio.Task | None = None
+        timeout_task: asyncio.Task[None] | None = None
         did_timeout = asyncio.Event()
         if self._timeout is not None:
             timeout_task = asyncio.create_task(
@@ -403,10 +403,10 @@ class AsyncCommand:
             self._done_iterating = True
         return ret
 
-    def __aiter__(self):
+    def __aiter__(self) -> typing.Self:
         return self
 
-    async def __anext__(self):
+    async def __anext__(self) -> CommandEvent:
         ret = await self.next_event()
         if ret is None:
             raise StopAsyncIteration()

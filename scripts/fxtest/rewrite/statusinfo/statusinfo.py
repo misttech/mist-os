@@ -92,8 +92,8 @@ def ellipsize(input: str, width: int) -> str:
             char: str
             is_ansi: bool
 
-        def each_character(input: str):
-            match: re.Match
+        def each_character(input: str) -> typing.Iterator[Character]:
+            match: re.Match[str]
             cur_index: int = 0
             for match in _ANSI_REGEX.finditer(input):
                 for ch in input[cur_index : match.start()]:
@@ -265,7 +265,7 @@ def _make_progress_bar(proportion: float, width: int) -> str:
     return f"[{ret}]"
 
 
-def _pad_to_size(input: str, width: int, left=False) -> str:
+def _pad_to_size(input: str, width: int, left: bool = False) -> str:
     """Ensure that the input takes exactly the given width of characters.
 
     Args:
@@ -333,7 +333,7 @@ def _wrap(
         return string
 
 
-def highlight(input: str, style=True) -> str:
+def highlight(input: str, style: bool = True) -> str:
     """Highlight the input string.
 
     Args:
@@ -346,7 +346,7 @@ def highlight(input: str, style=True) -> str:
     return _wrap([colorama.Style.BRIGHT], input, style=style)
 
 
-def error_highlight(input: str, style=True) -> str:
+def error_highlight(input: str, style: bool = True) -> str:
     """Color the input string red and highlight it.
 
     Args:
@@ -359,7 +359,7 @@ def error_highlight(input: str, style=True) -> str:
     return _wrap([colorama.Style.BRIGHT, colorama.Fore.RED], input, style=style)
 
 
-def warning(input: str, style=True) -> str:
+def warning(input: str, style: bool = True) -> str:
     """Color the input string yellow.
 
     Args:
@@ -372,7 +372,7 @@ def warning(input: str, style=True) -> str:
     return _wrap([colorama.Fore.YELLOW], input, style=style)
 
 
-def green(input: str, style=True) -> str:
+def green(input: str, style: bool = True) -> str:
     """Color the input string green.
 
     Args:
@@ -385,7 +385,7 @@ def green(input: str, style=True) -> str:
     return _wrap([colorama.Fore.GREEN], input, style=style)
 
 
-def green_highlight(input: str, style=True) -> str:
+def green_highlight(input: str, style: bool = True) -> str:
     """Color the input string green and make it highlighted.
 
     Args:
@@ -400,7 +400,7 @@ def green_highlight(input: str, style=True) -> str:
     )
 
 
-def dim(input: str, style=True) -> str:
+def dim(input: str, style: bool = True) -> str:
     """Dim the input string.
 
     Args:

@@ -21,7 +21,7 @@ class TestConsoleOutput(unittest.IsolatedAsyncioTestCase):
     )
     async def test_console(
         self, _is_valid_mock: mock.Mock, _terminal_size_mock: mock.Mock
-    ):
+    ) -> None:
         """Test that a few different types of events provide some output for the terminal."""
 
         output = io.StringIO()

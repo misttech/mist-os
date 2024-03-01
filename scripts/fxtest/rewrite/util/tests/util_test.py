@@ -18,7 +18,7 @@ import util.signals
 
 
 class TestArgOptions(unittest.TestCase):
-    def test_selection_action(self):
+    def test_selection_action(self) -> None:
         """Test SelectionAction.
 
         This test ensures that multiple arguments can all write to the
@@ -56,7 +56,7 @@ class TestArgOptions(unittest.TestCase):
 
 
 class TestCommand(unittest.IsolatedAsyncioTestCase):
-    def assertStdout(self, event: command.CommandEvent, line: bytes):
+    def assertStdout(self, event: command.CommandEvent, line: bytes) -> None:
         """Helper to assert on contents of a StdoutEvent.
 
         Args:
@@ -68,7 +68,7 @@ class TestCommand(unittest.IsolatedAsyncioTestCase):
         e: command.StdoutEvent = event
         self.assertEqual(e.text, line)
 
-    def assertStderr(self, event: command.CommandEvent, line: bytes):
+    def assertStderr(self, event: command.CommandEvent, line: bytes) -> None:
         """Helper to assert on contents of a StderrEvent.
 
         Args:
@@ -80,7 +80,9 @@ class TestCommand(unittest.IsolatedAsyncioTestCase):
         e: command.StderrEvent = event
         self.assertEqual(e.text, line)
 
-    def assertTermination(self, event: command.CommandEvent, return_code: int):
+    def assertTermination(
+        self, event: command.CommandEvent, return_code: int
+    ) -> None:
         """Helper to assert on contents of a TerminationEvent.
 
         Args:
@@ -92,7 +94,7 @@ class TestCommand(unittest.IsolatedAsyncioTestCase):
         e: command.TerminationEvent = event
         self.assertEqual(e.return_code, return_code)
 
-    async def test_basic_command(self):
+    async def test_basic_command(self) -> None:
         """Test running a basic command and getting the output.
 
         We create a file in a temporary directory and simply assert that `ls`
@@ -115,7 +117,7 @@ class TestCommand(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(complete.stdout, "temp-file.txt\n")
             self.assertEqual(complete.return_code, 0)
 
-    async def test_basic_command_with_long_timeout(self):
+    async def test_basic_command_with_long_timeout(self) -> None:
         """Test running a basic command and getting the output.
 
         We create a file in a temporary directory and simply assert that `ls`
@@ -141,7 +143,7 @@ class TestCommand(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(complete.return_code, 0)
             self.assertFalse(complete.was_timeout)
 
-    async def test_with_stderr(self):
+    async def test_with_stderr(self) -> None:
         """Test running a command with stderr output.
 
         We create a temporary directory and try to `ls` a file we know does not
@@ -156,7 +158,7 @@ class TestCommand(unittest.IsolatedAsyncioTestCase):
             self.assertNotEqual(complete.stderr, "")
             self.assertNotEqual(complete.return_code, 0)
 
-    async def test_symbolized_command(self):
+    async def test_symbolized_command(self) -> None:
         """Test piping output through another program.
 
         We run `ls` as in the above tests, but this time we pipe the output
@@ -180,7 +182,7 @@ class TestCommand(unittest.IsolatedAsyncioTestCase):
             self.assertStdout(events[0], b"temporary-file.txt\n")
             self.assertTermination(events[1], 0)
 
-    async def test_terminate_and_kill(self):
+    async def test_terminate_and_kill(self) -> None:
         """Test that we can terminate and kill programs.
 
         We spawn `sleep` to run for over a day, then terminate it. We expect
@@ -217,7 +219,7 @@ class TestCommand(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(out.return_code, -9)
         self.assertEqual(out.wrapper_return_code, -9)
 
-    async def test_kill_process_groups(self):
+    async def test_kill_process_groups(self) -> None:
         """Test that terminating a program kills the entire process group."""
 
         BASH_SHORT = "#!/usr/bin/env bash\nsleep .1\necho 'OK'"
@@ -281,7 +283,7 @@ class TestCommand(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(len(events), 1, f"Events was actually {events}")
             self.assertTermination(events[0], -9)
 
-    async def test_timeout(self):
+    async def test_timeout(self) -> None:
         """Test that commands timeout"""
         cmd = await command.AsyncCommand.create("sleep", "100000", timeout=0.1)
         task = asyncio.create_task(cmd.run_to_completion())
@@ -289,7 +291,7 @@ class TestCommand(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(out.return_code, -15)
         self.assertTrue(out.was_timeout)
 
-    def test_invalid_program(self):
+    def test_invalid_program(self) -> None:
         """Test running a program that doesn't exist, and expect an error."""
         self.assertRaises(
             command.AsyncCommandError,
@@ -298,7 +300,7 @@ class TestCommand(unittest.IsolatedAsyncioTestCase):
 
 
 class TestSignals(unittest.TestCase):
-    def test_async_signal_handler(self):
+    def test_async_signal_handler(self) -> None:
         """Test that registered signal handlers work appropriately."""
 
         multiprocessing.set_start_method("fork", force=True)
@@ -307,8 +309,8 @@ class TestSignals(unittest.TestCase):
         self.addCleanup(output_directory.cleanup)
         output_file_name = os.path.join(output_directory.name, "output.txt")
 
-        def main(output_file_name: str):
-            async def internal_main():
+        def main(output_file_name: str) -> None:
+            async def internal_main() -> None:
                 os.kill(os.getpid(), signal.SIGTERM)
                 await asyncio.sleep(120)
 
@@ -317,7 +319,7 @@ class TestSignals(unittest.TestCase):
 
             fut = asyncio.ensure_future(internal_main())
 
-            def write_output():
+            def write_output() -> None:
                 with open(output_file_name, "a") as f:
                     f.write("Handler printed message\n")
                 fut.cancel()

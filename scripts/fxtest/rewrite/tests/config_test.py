@@ -11,7 +11,7 @@ import config
 
 
 class TestConfig(unittest.TestCase):
-    def test_config_loading(self):
+    def test_config_loading(self) -> None:
         with tempfile.TemporaryDirectory() as td:
             config_path = os.path.join(td, "testrc")
             with open(config_path, "w") as f:
@@ -36,7 +36,7 @@ class TestConfig(unittest.TestCase):
             self.assertEqual(config_file.default_flags.style, False)
             self.assertEqual(config_file.default_flags.status_lines, 40)
 
-    def test_config_load_fails(self):
+    def test_config_load_fails(self) -> None:
         with tempfile.TemporaryDirectory() as td:
             missing_path = os.path.join(td, "missing")
             config_file = config.load_config(missing_path)
@@ -45,12 +45,12 @@ class TestConfig(unittest.TestCase):
             self.assertEqual(missing_path, config_file.path)
 
     @mock.patch.dict(os.environ, {}, clear=True)
-    def test_no_home_dir(self):
+    def test_no_home_dir(self) -> None:
         config_file = config.load_config()
         self.assertFalse(config_file.is_loaded())
         self.assertIsNone(config_file.path)
 
-    def test_load_from_home(self):
+    def test_load_from_home(self) -> None:
         with tempfile.TemporaryDirectory() as td:
             with open(os.path.join(td, ".fxtestrc"), "w") as f:
                 f.writelines(
@@ -65,7 +65,7 @@ class TestConfig(unittest.TestCase):
                 assert config_file.default_flags is not None
                 self.assertEqual(config_file.default_flags.parallel, 100)
 
-    def test_invalid_flags(self):
+    def test_invalid_flags(self) -> None:
         with tempfile.TemporaryDirectory() as td:
             config_path = os.path.join(td, "config")
             with open(config_path, "w") as f:

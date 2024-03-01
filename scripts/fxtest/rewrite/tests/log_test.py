@@ -13,7 +13,7 @@ import log
 
 
 class TestLogOutput(unittest.IsolatedAsyncioTestCase):
-    async def test_logs_json(self):
+    async def test_logs_json(self) -> None:
         """Test that logs are properly serialized to JSON."""
         recorder = event.EventRecorder()
         output = io.StringIO()

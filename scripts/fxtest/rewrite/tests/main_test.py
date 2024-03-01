@@ -38,7 +38,7 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
         self.addCleanup(self.fuchsia_dir.cleanup)
 
         # Set up mocks
-        self.mocks = []  # type:ignore
+        self.mocks = []
 
         # Retain the real build dir, if one exists.
         real_fuchsia_dir = os.getenv("FUCHSIA_DIR")
@@ -162,13 +162,13 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
         self.addCleanup(patch.stop)
         return m
 
-    def _mock_has_device_connected(self, value: bool):
+    def _mock_has_device_connected(self, value: bool) -> None:
         m = mock.AsyncMock(return_value=value)
         patch = mock.patch("main.has_device_connected", m)
         patch.start()
         self.addCleanup(patch.stop)
 
-    def _mock_has_tests_in_base(self, test_packages: typing.List[str]):
+    def _mock_has_tests_in_base(self, test_packages: list[str]) -> None:
         with open(os.path.join(self.out_dir, "base_packages.list"), "w") as f:
             json.dump(
                 {
@@ -181,7 +181,7 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
 
     def _make_call_args_prefix_set(
         self, call_list: mock._CallList
-    ) -> typing.Set[typing.Tuple]:
+    ) -> set[tuple[str, ...]]:
         """Given a list of mock calls, turn them into a set of prefixes for comparison.
 
         For instance, if the mock call is ("fx", "run", "command") the output
@@ -197,9 +197,9 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
             call_list (mock._CallList): Calls to process.
 
         Returns:
-            typing.Set[typing.List[typing.Any]]: Set of prefixes to calls.
+            set[list[typing.Any]]: Set of prefixes to calls.
         """
-        ret: typing.Set[typing.Tuple] = set()
+        ret: set[tuple[str, ...]] = set()
         for call in call_list:
             args, _ = call
             cur = []
@@ -224,14 +224,14 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
         return m
 
     def assertIsSubset(
-        self, subset: typing.Set[typing.Any], full: typing.Set[typing.Any]
-    ):
+        self, subset: set[typing.Any], full: set[typing.Any]
+    ) -> None:
         inter = full.intersection(subset)
         self.assertEqual(
             inter, subset, f"Full set was\n {self.prettyFormatPrefixes(full)}"
         )
 
-    def prettyFormatPrefixes(self, vals: typing.Set[typing.Any]) -> str:
+    def prettyFormatPrefixes(self, vals: set[typing.Any]) -> str:
         return "\n ".join(map(lambda x: " ".join(x), sorted(vals)))
 
     async def test_dry_run(self) -> None:
@@ -242,7 +242,7 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(ret, 0)
 
-        selection_events: typing.List[event.TestSelectionPayload] = [
+        selection_events: list[event.TestSelectionPayload] = [
             e.payload.test_selections
             async for e in recorder.iter()
             if e.payload is not None and e.payload.test_selections is not None
@@ -263,7 +263,7 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(ret, 0)
 
-        selection_events: typing.List[event.TestSelectionPayload] = [
+        selection_events: list[event.TestSelectionPayload] = [
             e.payload.test_selections
             async for e in recorder.iter()
             if e.payload is not None and e.payload.test_selections is not None
@@ -273,10 +273,12 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
         selection_event = selection_events[0]
         self.assertEqual(len(selection_event.selected), 1)
 
-    @parameterized.expand(
+    @parameterized.expand(  # type: ignore[misc]
         [("--host", HOST_TESTS_IN_INPUT), ("--device", DEVICE_TESTS_IN_INPUT)]
     )
-    async def test_selection_flags(self, flag_name: str, expected_count: int):
+    async def test_selection_flags(
+        self, flag_name: str, expected_count: int
+    ) -> None:
         """Test that the correct --device or --host tests are selected"""
 
         recorder = event.EventRecorder()
@@ -286,7 +288,7 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(ret, 0)
 
-        selection_events: typing.List[event.TestSelectionPayload] = [
+        selection_events: list[event.TestSelectionPayload] = [
             e.payload.test_selections
             async for e in recorder.iter()
             if e.payload is not None and e.payload.test_selections is not None
@@ -296,7 +298,7 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
         selection_event = selection_events[0]
         self.assertEqual(len(selection_event.selected), expected_count)
 
-    @parameterized.expand(
+    @parameterized.expand(  # type: ignore[misc]
         [
             ("--use-package-hash", DEVICE_TESTS_IN_INPUT),
             ("--no-use-package-hash", 0),
@@ -304,7 +306,7 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
     )
     async def test_use_package_hash(
         self, flag_name: str, expected_hash_matches: int
-    ):
+    ) -> None:
         """Test ?hash= is used only when --use-package-hash is set"""
 
         command_mock = self._mock_run_command(0)
@@ -340,7 +342,7 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
             f"Prefixes were\n{self.prettyFormatPrefixes(call_prefixes)}",
         )
 
-    @parameterized.expand(
+    @parameterized.expand(  # type: ignore[misc]
         [
             ("default suggestions", [], 6),
             ("custom suggestion count", ["--suggestion-count=10"], 10),
@@ -348,7 +350,10 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
         ]
     )
     async def test_suggestions(
-        self, _unused_name, extra_flags, expected_suggestion_count
+        self,
+        _unused_name: str,
+        extra_flags: list[str],
+        expected_suggestion_count: int,
     ) -> None:
         """Test that targets are suggested when there are no test matches."""
         mocked_commands = self._mock_run_commands_in_parallel("No matches")
@@ -376,7 +381,7 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
 
         # TODO(b/295340412): Test that suggestions are suppressed.
 
-    async def test_full_success(self):
+    async def test_full_success(self) -> None:
         """Test that we can run all tests and report success"""
 
         command_mock = self._mock_run_command(0)
@@ -413,7 +418,7 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(any(["bar_test" in v[0] for v in call_prefixes]))
         self.assertTrue(any(["baz_test" in v[0] for v in call_prefixes]))
 
-    async def test_no_build(self):
+    async def test_no_build(self) -> None:
         """Test that we can run all tests and report success"""
 
         command_mock = self._mock_run_command(0)
@@ -445,7 +450,7 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(any(["bar_test" in v[0] for v in call_prefixes]))
         self.assertTrue(any(["baz_test" in v[0] for v in call_prefixes]))
 
-    async def test_first_failure(self):
+    async def test_first_failure(self) -> None:
         """Test that one failing test aborts the rest with --fail"""
 
         command_mock = self._mock_run_command(1)
@@ -474,7 +479,7 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(any(["bar_test" in v[0] for v in call_prefixes]))
         self.assertFalse(any(["baz_test" in v[0] for v in call_prefixes]))
 
-    async def test_count(self):
+    async def test_count(self) -> None:
         """Test that we can re-run a test multiple times with --count"""
 
         command_mock = self._mock_run_command(0)
@@ -511,7 +516,7 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
             command_mock.call_args_list,
         )
 
-    async def test_count_with_timeout(self):
+    async def test_count_with_timeout(self) -> None:
         """Test that we abort running the rest of the tests in a --count group if a timeout occurs."""
 
         command_mock = self._mock_run_command(1)
@@ -556,7 +561,7 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
             command_mock.call_args_list,
         )
 
-    async def test_list_command(self):
+    async def test_list_command(self) -> None:
         """Test that we can list test cases using --list"""
 
         command_mock = self._mock_run_commands_in_parallel(
@@ -593,7 +598,7 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
         )
 
     @mock.patch("main.run_build_with_suspended_output", side_effect=[0])
-    async def test_updateifinbase(self, _build_mock: mock.AsyncMock):
+    async def test_updateifinbase(self, _build_mock: mock.AsyncMock) -> None:
         """Test that we appropriately update tests in base"""
 
         command_mock = self._mock_run_command(0)

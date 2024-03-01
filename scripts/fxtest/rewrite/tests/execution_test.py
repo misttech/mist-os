@@ -24,7 +24,7 @@ import util.command as command
 class TestExecution(unittest.IsolatedAsyncioTestCase):
     def assertContainsSublist(
         self, target: typing.List[typing.Any], data: typing.List[typing.Any]
-    ):
+    ) -> None:
         """Helper method to assert that one list is contained in the other, in order.
 
         Args:
@@ -38,7 +38,7 @@ class TestExecution(unittest.IsolatedAsyncioTestCase):
                 return
         self.assertTrue(False, f"List {target} is not a sublist of {data}")
 
-    async def test_run_command(self):
+    async def test_run_command(self) -> None:
         """Test that run_command works with and without events"""
         with tempfile.TemporaryDirectory() as tmp:
             open(os.path.join(tmp, "temp-file.txt"), "w").close()
@@ -64,7 +64,7 @@ class TestExecution(unittest.IsolatedAsyncioTestCase):
             # Ensure we got init, end, and at least one sub-event start/stop
             self.assertGreater(len(events), 4)
 
-    async def test_run_command_failure(self):
+    async def test_run_command_failure(self) -> None:
         """Test that running an invalid command emits an error event"""
         recorder = event.EventRecorder()
         recorder.emit_init()
@@ -78,7 +78,7 @@ class TestExecution(unittest.IsolatedAsyncioTestCase):
         self.assertIsNone(output)
         self.assertTrue(any([e.error is not None for e in events]))
 
-    @parameterized.expand(
+    @parameterized.expand(  # type: ignore[misc]
         [
             (
                 "with default log severity",
@@ -144,11 +144,11 @@ class TestExecution(unittest.IsolatedAsyncioTestCase):
     )
     async def test_test_execution_component(
         self,
-        _unused_name,
+        _unused_name: str,
         flag_list: typing.List[str],
         expected_present_flag_lists: typing.List[typing.List[str]],
         expected_not_present_flags: typing.List[str],
-    ):
+    ) -> None:
         """Test the usage of the TestExecution wrapper on a component test"""
 
         exec_env = environment.ExecutionEnvironment(
@@ -195,7 +195,7 @@ class TestExecution(unittest.IsolatedAsyncioTestCase):
         self.assertIsNone(test.environment())
         self.assertTrue(test.should_symbolize())
 
-    @parameterized.expand(
+    @parameterized.expand(  # type: ignore[misc]
         [
             (
                 "test execution does not pass a --parallel by default",
@@ -219,11 +219,12 @@ class TestExecution(unittest.IsolatedAsyncioTestCase):
     )
     async def test_test_execution_parallel_cases(
         self,
-        _unused_name,
+        _unused_name: str,
         spec_parallel: int | None,
         flag_parallel: int | None,
         expected_args: typing.List[str],
-    ):
+    ) -> None:
+        """Test the usage of the TestExecution wrapper on a component test"""
         exec_env = environment.ExecutionEnvironment(
             "/fuchsia", "/out/fuchsia", None, "", ""
         )
@@ -281,7 +282,7 @@ class TestExecution(unittest.IsolatedAsyncioTestCase):
         self.assertIsNone(test.environment())
         self.assertTrue(test.should_symbolize())
 
-    async def test_test_execution_host(self):
+    async def test_test_execution_host(self) -> None:
         """Test the usage of the TestExecution wrapper on a host test, and actually run it"""
 
         with tempfile.TemporaryDirectory() as tmp:
@@ -329,7 +330,7 @@ class TestExecution(unittest.IsolatedAsyncioTestCase):
                 any([e.error is not None async for e in recorder.iter()])
             )
 
-    @parameterized.expand(
+    @parameterized.expand(  # type: ignore[misc]
         [
             ("without --e2e enabled", ["--no-e2e"], execution.TestSkipped),
             ("with --e2e enabled", ["--e2e"], execution.TestFailed),
@@ -337,8 +338,12 @@ class TestExecution(unittest.IsolatedAsyncioTestCase):
     )
     @mock.patch("execution.run_command", return_value=None)
     async def test_test_execution_e2e(
-        self, _unused_name, extra_flags, expected_exception, command_mock
-    ):
+        self,
+        _unused_name: str,
+        extra_flags: list[str],
+        expected_exception: type,
+        command_mock: mock.MagicMock,
+    ) -> None:
         """Test that execution of e2e depends on the --e2e flag"""
 
         exec_env = environment.ExecutionEnvironment(
@@ -386,7 +391,9 @@ class TestExecution(unittest.IsolatedAsyncioTestCase):
         recorder.emit_end()
 
     @mock.patch("execution.run_command", return_value=None)
-    async def test_test_execution_skip_boot_tests(self, command_mock):
+    async def test_test_execution_skip_boot_tests(
+        self, command_mock: mock.MagicMock
+    ) -> None:
         """Test that boot tests are skipped"""
 
         exec_env = environment.ExecutionEnvironment(
@@ -433,7 +440,7 @@ class TestExecution(unittest.IsolatedAsyncioTestCase):
             self.assertIsInstance(e, execution.TestSkipped)
         recorder.emit_end()
 
-    async def test_test_execution_with_package_hash(self):
+    async def test_test_execution_with_package_hash(self) -> None:
         """Ensure that test execution respects --use-package-hash"""
         with tempfile.TemporaryDirectory() as tmp:
             with open(os.path.join(tmp, "package-repositories.json"), "w") as f:
@@ -479,7 +486,7 @@ class TestExecution(unittest.IsolatedAsyncioTestCase):
                 error_regex: str,
                 test: test_list_file.Test,
                 exec_env: environment.ExecutionEnvironment,
-            ):
+            ) -> None:
                 self.assertRaisesRegex(
                     execution.TestCouldNotRun,
                     error_regex,
@@ -584,7 +591,7 @@ class TestExecutionUtils(unittest.IsolatedAsyncioTestCase):
     @mock.patch("execution.run_command")
     async def test_get_device_environment_success(
         self, command_patch: mock.AsyncMock
-    ):
+    ) -> None:
         command_patch.side_effect = [
             self._make_command_output("127.0.0.1:6000"),
             self._make_command_output("foo-bar"),
@@ -605,7 +612,7 @@ class TestExecutionUtils(unittest.IsolatedAsyncioTestCase):
     @mock.patch("execution.run_command")
     async def test_get_device_environment_ipv6(
         self, command_patch: mock.AsyncMock
-    ):
+    ) -> None:
         command_patch.side_effect = [
             self._make_command_output("[::1]:6000"),
             self._make_command_output("foo-bar"),
@@ -626,7 +633,7 @@ class TestExecutionUtils(unittest.IsolatedAsyncioTestCase):
     @mock.patch("execution.run_command")
     async def test_get_device_environment_ssh_error(
         self, command_patch: mock.AsyncMock
-    ):
+    ) -> None:
         command_patch.side_effect = [
             self._make_command_output("", return_code=1),
         ]
@@ -642,7 +649,7 @@ class TestExecutionUtils(unittest.IsolatedAsyncioTestCase):
     @mock.patch("execution.run_command")
     async def test_get_device_environment_bad_ip_format(
         self, command_patch: mock.AsyncMock
-    ):
+    ) -> None:
         command_patch.side_effect = [
             self._make_command_output("foo"),
         ]
@@ -658,7 +665,7 @@ class TestExecutionUtils(unittest.IsolatedAsyncioTestCase):
     @mock.patch("execution.run_command")
     async def test_get_device_environment_no_target_name(
         self, command_patch: mock.AsyncMock
-    ):
+    ) -> None:
         command_patch.side_effect = [
             self._make_command_output("127.0.0.1:6000"),
             self._make_command_output("", return_code=1),

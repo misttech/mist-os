@@ -40,10 +40,15 @@ class Terminal:
         """
         return self._current_write.write(value)
 
-    def writelines(self, value: typing.List[str]):
+    def writelines(self, value: typing.List[str]) -> None:
+        """Implementation of io writelines.
+
+        Args:
+            value (List[str]): Value to write.
+        """
         self.write("".join(value))
 
-    def flush(self):
+    def flush(self) -> None:
         """Implementation of io flush.
 
         To ensure that the library flushes appropriately, the lines field

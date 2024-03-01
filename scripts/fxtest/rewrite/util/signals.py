@@ -7,14 +7,14 @@ import signal
 import typing
 
 
-def register_on_terminate_signal(fn: typing.Callable):
+def register_on_terminate_signal(fn: typing.Callable[[], None]) -> None:
     """Run a callable when a termination signal is caught by this program.
 
     When either SIGTERM or SIGINT is caught by this program, call
     the given function.
 
     Args:
-        fn (typing.Callable): The function to call.
+        fn (typing.Callable[[typing.Any | None], None]): The function to call.
     """
     loop = asyncio.get_event_loop()
     for s in [signal.SIGTERM, signal.SIGINT]:

@@ -54,7 +54,7 @@ def main() -> None:
     fut = asyncio.ensure_future(
         async_main_wrapper(real_flags, config_file=config_file)
     )
-    util.signals.register_on_terminate_signal(fut.cancel)
+    util.signals.register_on_terminate_signal(fut.cancel)  # type: ignore[arg-type]
     try:
         loop = asyncio.get_event_loop()
         loop.run_until_complete(fut)
@@ -85,7 +85,7 @@ async def async_main_wrapper(
     Returns:
         The return code of the program.
     """
-    tasks: typing.List[asyncio.Task] = []
+    tasks: typing.List[asyncio.Task[None]] = []
     if recorder is None:
         recorder = event.EventRecorder()
 
@@ -103,7 +103,7 @@ async def async_main_wrapper(
 
 async def async_main(
     flags: args.Flags,
-    tasks: typing.List[asyncio.Task],
+    tasks: typing.List[asyncio.Task[None]],
     recorder: event.EventRecorder,
     config_file: config.ConfigFile | None = None,
 ) -> int:
@@ -814,7 +814,7 @@ async def run_all_tests(
     abort_all_tests_event = asyncio.Event()
     test_failure_observed: bool = False
 
-    maybe_debugger: subprocess.Popen | None = None
+    maybe_debugger: subprocess.Popen[bytes] | None = None
     if flags.has_debugger():
         # Turn the cursor back on before handing control over to the debugger. This doesn't control
         # whether or not the cursor appears while in the zxdb prompt (https://fxbug.dev/322420507),
@@ -1017,7 +1017,7 @@ async def run_commands_in_parallel(
     output: typing.List[typing.Optional[command.CommandOutput]] = [None] * len(
         commands
     )
-    in_progress: typing.Set[asyncio.Task] = set()
+    in_progress: typing.Set[asyncio.Task[None]] = set()
 
     index = 0
 

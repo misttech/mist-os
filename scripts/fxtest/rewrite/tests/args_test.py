@@ -27,11 +27,11 @@ class TestArgs(unittest.TestCase):
         GLOBAL_TEMP_DIRECTORY.cleanup()
         return super().tearDownClass()
 
-    def test_empty(self):
+    def test_empty(self) -> None:
         flags = args.parse_args([])
         flags.validate()
 
-    @parameterized.expand(
+    @parameterized.expand(  # type: ignore[misc]
         [
             (
                 "cannot show status with --simple",
@@ -81,8 +81,8 @@ class TestArgs(unittest.TestCase):
     )
     @mock.patch("args.termout.is_valid", return_value=False)
     def test_validation_errors(
-        self, _unused_name, arg_list: typing.List[str], _mock: mock.Mock
-    ):
+        self, _unused_name: str, arg_list: typing.List[str], _mock: mock.Mock
+    ) -> None:
         flags = args.parse_args(arg_list)
         try:
             with self.assertRaises(args.FlagError):
@@ -90,19 +90,19 @@ class TestArgs(unittest.TestCase):
         except AssertionError:
             raise AssertionError("Expected FlagError from " + str(arg_list))
 
-    def test_simple(self):
+    def test_simple(self) -> None:
         flags = args.parse_args(["--simple"])
         flags.validate()
         self.assertEqual(flags.style, False)
         self.assertEqual(flags.status, False)
 
-    def test_e2e(self):
+    def test_e2e(self) -> None:
         flags = args.parse_args(["--only-e2e"])
         flags.validate()
         self.assertEqual(flags.e2e, True)
         self.assertEqual(flags.only_e2e, True)
 
-    def test_default_merging(self):
+    def test_default_merging(self) -> None:
         config_file = config.ConfigFile(
             "path", args.parse_args(["--parallel=10"])
         )
@@ -111,7 +111,7 @@ class TestArgs(unittest.TestCase):
         flags = args.parse_args(["--parallel=1"], config_file.default_flags)
         self.assertEqual(flags.parallel, 1)
 
-    @parameterized.expand(
+    @parameterized.expand(  # type: ignore[misc]
         [
             ("default is None", [], [], None),
             ("config file overrides output", [], ["--output"], True),
@@ -128,11 +128,11 @@ class TestArgs(unittest.TestCase):
     )
     def test_output_toggle(
         self,
-        _unused_name,
+        _unused_name: str,
         arguments: typing.List[str],
         config_arguments: typing.List[str],
         expected_value: bool,
-    ):
+    ) -> None:
         config_file = config.ConfigFile(
             "path", args.parse_args(config_arguments)
         )

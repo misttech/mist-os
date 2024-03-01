@@ -18,7 +18,7 @@ def spawn(
     tests: typing.List[test_list_file.Test],
     break_on_failure: bool = False,
     breakpoints: typing.List[str] = [],
-) -> subprocess.Popen:
+) -> subprocess.Popen[bytes]:
     """Spawn zxdb in a subprocess.
 
     Spawn zxdb and attach to |tests|, while waiting for a test failure reported by either
@@ -99,7 +99,7 @@ def spawn(
         args=zxdb_args, start_new_session=True, stderr=subprocess.STDOUT
     )
 
-    def _cleanup():
+    def _cleanup() -> None:
         # Close stdout. This may have already been done at the end of all the tests in main.py, but
         # we do it again here to catch the ctrl+c case and still try to cleanly restore the terminal
         # and clean up the socket to DebugAgent.

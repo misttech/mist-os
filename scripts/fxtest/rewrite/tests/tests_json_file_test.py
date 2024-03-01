@@ -16,7 +16,7 @@ from tests_json_file import TestSection
 class TestFileTest(unittest.TestCase):
     """Test processing tests.json"""
 
-    def test_from_file(self):
+    def test_from_file(self) -> None:
         """Test basic loading of a tests.json file."""
         contents = [
             TestEntry(
@@ -45,7 +45,7 @@ class TestFileTest(unittest.TestCase):
                 [t.test.name for t in entries], ["my_test", "my_test2"]
             )
 
-    def test_duplicate_name_error(self):
+    def test_duplicate_name_error(self) -> None:
         """Ensure that loading a tests.json file with duplicate names raises an exception."""
         contents = [
             TestEntry(
@@ -71,7 +71,7 @@ class TestFileTest(unittest.TestCase):
 
             self.assertRaises(TestFileError, lambda: TestEntry.from_file(path))
 
-    def test_invalid_format(self):
+    def test_invalid_format(self) -> None:
         """Ensure an exception is raised if the top-level JSON field is not a list."""
         with tempfile.TemporaryDirectory() as tmp:
             path = os.path.join(tmp, "tests.json")
@@ -80,7 +80,7 @@ class TestFileTest(unittest.TestCase):
 
             self.assertRaises(TestFileError, lambda: TestEntry.from_file(path))
 
-    def test_invalid_json(self):
+    def test_invalid_json(self) -> None:
         """Ensure an exception is raised if the file does not contain valid JSON."""
         with tempfile.TemporaryDirectory() as tmp:
             path = os.path.join(tmp, "tests.json")
@@ -91,7 +91,7 @@ class TestFileTest(unittest.TestCase):
                 json.JSONDecodeError, lambda: TestEntry.from_file(path)
             )
 
-    def test_missing_file(self):
+    def test_missing_file(self) -> None:
         """Ensure an exception is raised if the file does not exist."""
         with tempfile.TemporaryDirectory() as tmp:
             path = os.path.join(tmp, "tests.json")

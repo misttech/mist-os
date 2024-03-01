@@ -2,7 +2,6 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import typing
 import unittest
 
 import args
@@ -15,7 +14,7 @@ import tests_json_file
 class MatchGroupTest(unittest.TestCase):
     """Test creating and printing MatchGroups."""
 
-    def test_parse_empty(self):
+    def test_parse_empty(self) -> None:
         """Ensure that an empty selection produces no groups."""
         groups = selection._parse_selection_command_line([])
         self.assertEqual(len(groups), 0)
@@ -23,23 +22,23 @@ class MatchGroupTest(unittest.TestCase):
     def assertMatchContents(
         self,
         group: selection_types.MatchGroup,
-        names: typing.Set[str],
-        packages: typing.Set[str],
-        components: typing.Set[str],
-    ):
+        names: set[str],
+        packages: set[str],
+        components: set[str],
+    ) -> None:
         """Helper to assert string sets against MatchGroup fields.
 
         Args:
             group (MatchGroup): Group to check.
-            names (typing.Set[str]): Expected names.
-            packages (typing.Set[str]): Expected packages.
-            components (typing.Set[str]): Expected components.
+            names (set[str]): Expected names.
+            packages (set[str]): Expected packages.
+            components (set[str]): Expected components.
         """
         self.assertSetEqual(group.names, names)
         self.assertSetEqual(group.packages, packages)
         self.assertSetEqual(group.components, components)
 
-    def test_parse_single(self):
+    def test_parse_single(self) -> None:
         """Test parsing and formatting single arguments."""
         name_group = selection._parse_selection_command_line(["name"])
         package_group = selection._parse_selection_command_line(
@@ -57,7 +56,7 @@ class MatchGroupTest(unittest.TestCase):
         self.assertEqual(str(package_group[0]), "--package name")
         self.assertEqual(str(component_group[0]), "--component name")
 
-    def test_parse_and(self):
+    def test_parse_and(self) -> None:
         """Test logical AND parsing and formatting."""
         groups = selection._parse_selection_command_line(
             [
@@ -80,7 +79,7 @@ class MatchGroupTest(unittest.TestCase):
             "name --and --package package --and --component component",
         )
 
-    def test_parse_or(self):
+    def test_parse_or(self) -> None:
         """Test spreading arguments across multiple MatchGroups."""
         groups = selection._parse_selection_command_line(
             ["name", "--component", "component", "--package", "package"]
@@ -91,7 +90,7 @@ class MatchGroupTest(unittest.TestCase):
         self.assertMatchContents(groups[1], set(), set(), {"component"})
         self.assertMatchContents(groups[2], set(), {"package"}, set())
 
-    def test_all_together(self):
+    def test_all_together(self) -> None:
         """Test combination of values, ANDs, and ORs."""
         groups = selection._parse_selection_command_line(
             [
@@ -114,7 +113,7 @@ class MatchGroupTest(unittest.TestCase):
         self.assertMatchContents(groups[1], {"name3"}, set(), {"component"})
         self.assertMatchContents(groups[2], {"name4"}, {"package"}, set())
 
-    def test_parse_errors(self):
+    def test_parse_errors(self) -> None:
         """Test various invalid scenarios."""
 
         # Invalid to start an expression with AND
@@ -213,7 +212,7 @@ class SelectTestsTest(unittest.IsolatedAsyncioTestCase):
             ),
         )
 
-    async def test_select_all(self):
+    async def test_select_all(self) -> None:
         """Test that empty selection selects all mode-matching tests with perfect scores"""
         tests = [
             self._make_package_test("src/tests", "foo", "bar"),
@@ -259,7 +258,7 @@ class SelectTestsTest(unittest.IsolatedAsyncioTestCase):
         )
         self.assertTrue(device_selected.has_device_test())
 
-    async def test_select_all_fails_on_exact(self):
+    async def test_select_all_fails_on_exact(self) -> None:
         """Test that empty selection fails if exact_match is used"""
         tests = [
             self._make_package_test("src/tests", "foo", "bar"),
@@ -276,7 +275,7 @@ class SelectTestsTest(unittest.IsolatedAsyncioTestCase):
         except selection.SelectionError:
             pass
 
-    async def test_prefix_matches(self):
+    async def test_prefix_matches(self) -> None:
         """Test that selecting prefixes of tests results in a perfect match."""
 
         tests = [
@@ -315,7 +314,7 @@ class SelectTestsTest(unittest.IsolatedAsyncioTestCase):
             [s.name() for s in full_path.selected], [t.name() for t in tests]
         )
 
-    async def test_contains_matches(self):
+    async def test_contains_matches(self) -> None:
         """Test that selecting substrings of tests results in a perfect match."""
 
         tests = [
@@ -350,7 +349,7 @@ class SelectTestsTest(unittest.IsolatedAsyncioTestCase):
             [s.name() for s in full_path.selected], [t.name() for t in tests]
         )
 
-    async def test_approximate_matches(self):
+    async def test_approximate_matches(self) -> None:
         """Test that fuzzy matching catches common issues."""
 
         tests = [
@@ -365,7 +364,7 @@ class SelectTestsTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(host_fuzzy.best_score["host_x64/binary_test"], 1)
         self.assertEqual(host_fuzzy.fuzzy_distance_threshold, 3)
 
-    async def test_exact_does_not_match(self):
+    async def test_exact_does_not_match(self) -> None:
         """Test that fuzzy matching catches common issues."""
 
         tests = [
@@ -384,7 +383,7 @@ class SelectTestsTest(unittest.IsolatedAsyncioTestCase):
             selection.NO_MATCH_DISTANCE,
         )
 
-    async def test_exact_matches(self):
+    async def test_exact_matches(self) -> None:
         """Test that exact_mode matching mode works correctly"""
 
         tests = [
@@ -479,7 +478,7 @@ class SelectTestsTest(unittest.IsolatedAsyncioTestCase):
             selection.PERFECT_MATCH_DISTANCE,
         )
 
-    async def test_perfect_match_omits_approximate_match(self):
+    async def test_perfect_match_omits_approximate_match(self) -> None:
         """Test that fuzzy matching is not used if there is a perfect match."""
 
         tests = [
@@ -499,7 +498,7 @@ class SelectTestsTest(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(host_fuzzy.fuzzy_distance_threshold, 3)
 
-    async def test_approximate_match_multiple(self):
+    async def test_approximate_match_multiple(self) -> None:
         """Test that fuzzy matching matches multiple imperfect
         matches if there is no perfect match."""
 
@@ -516,7 +515,7 @@ class SelectTestsTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(host_fuzzy.best_score["host_x64/binaryytest"], 1)
         self.assertEqual(host_fuzzy.best_score["host_x64/binary_test"], 1)
 
-    async def test_flag_mutation(self):
+    async def test_flag_mutation(self) -> None:
         """Test that we can apply command line flag behavior to selections"""
 
         tests = [

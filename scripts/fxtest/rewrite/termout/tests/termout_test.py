@@ -18,45 +18,45 @@ import termout
 
 
 class TestTermout(unittest.TestCase):
-    def test_single_line_overwrite(self):
+    def test_single_line_overwrite(self) -> None:
         """Test that we can overwrite the contents of a single line."""
         size = termout.Size(25, 25)
         termout.reset()
         terminal = termsim.Terminal(size.columns)
-        with contextlib.redirect_stdout(terminal):  # type:ignore
+        with contextlib.redirect_stdout(terminal):
             termout.write_lines(["Hello"], size=size)
             self.assertListEqual(terminal.lines, ["Hello"])
             termout.write_lines(["World"], size=size)
             self.assertListEqual(terminal.lines, ["World"])
 
-    def test_single_line_cannot_overflow(self):
+    def test_single_line_cannot_overflow(self) -> None:
         """Test that single lines are truncated to the window width."""
         size = termout.Size(3, 25)
         termout.reset()
         terminal = termsim.Terminal(size.columns)
-        with contextlib.redirect_stdout(terminal):  # type:ignore
+        with contextlib.redirect_stdout(terminal):
             termout.write_lines(["Hello"], size=size)
             self.assertListEqual(terminal.lines, ["Hel"])
             termout.write_lines(["World"], size=size)
             self.assertListEqual(terminal.lines, ["Wor"])
 
-    def test_multiple_line_overwrite(self):
+    def test_multiple_line_overwrite(self) -> None:
         """Test that we can update multiple lines"""
         size = termout.Size(25, 25)
         termout.reset()
         terminal = termsim.Terminal(size.columns)
-        with contextlib.redirect_stdout(terminal):  # type:ignore
+        with contextlib.redirect_stdout(terminal):
             termout.write_lines(["Hello", "World"], size=size)
             self.assertListEqual(terminal.lines, ["Hello", "World"])
             termout.write_lines(["Hello 2", "Different"], size=size)
             self.assertListEqual(terminal.lines, ["Hello 2", "Different"])
 
-    def test_overwrite_with_different_counts(self):
+    def test_overwrite_with_different_counts(self) -> None:
         """Test that we can change the number of lines displayed"""
         size = termout.Size(25, 25)
         termout.reset()
         terminal = termsim.Terminal(size.columns)
-        with contextlib.redirect_stdout(terminal):  # type:ignore
+        with contextlib.redirect_stdout(terminal):
             termout.write_lines(["Hello"], size=size)
             self.assertListEqual(terminal.lines, ["Hello"])
             termout.write_lines(["Hello", "World"], size=size)
@@ -65,12 +65,12 @@ class TestTermout(unittest.TestCase):
             # An extra line is left, which is expected.
             self.assertListEqual(terminal.lines, ["Hello 2", ""])
 
-    def test_with_prepending_lines(self):
+    def test_with_prepending_lines(self) -> None:
         """Test that we can keep a status view and prepend info lines"""
         size = termout.Size(25, 25)
         termout.reset()
         terminal = termsim.Terminal(size.columns)
-        with contextlib.redirect_stdout(terminal):  # type:ignore
+        with contextlib.redirect_stdout(terminal):
             termout.write_lines(["Hello"], size=size)
             self.assertListEqual(terminal.lines, ["Hello"])
             termout.write_lines(

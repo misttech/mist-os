@@ -106,7 +106,7 @@ class TestSelections:
         """
         return any([entry.is_e2e_test() for entry in self.selected])
 
-    def apply_flags(self, flags: args.Flags):
+    def apply_flags(self, flags: args.Flags) -> None:
         """Mutate the set of selected tests based on flags.
 
         Args:

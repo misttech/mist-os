@@ -23,8 +23,12 @@ class SelectionAction(argparse.Action):
     """
 
     def __init__(
-        self, option_strings: typing.List[str], dest: str, nargs=None, **kwargs
-    ):
+        self,
+        option_strings: typing.List[str],
+        dest: str,
+        nargs: int | str | None = None,
+        **kwargs: typing.Any,
+    ) -> None:
         """Create a SelectionAction.
 
         Args:
@@ -45,7 +49,13 @@ class SelectionAction(argparse.Action):
             nargs = "*"
         super().__init__(list(option_strings), dest, nargs=nargs, **kwargs)
 
-    def __call__(self, parser, namespace, values, option_string):
+    def __call__(
+        self,
+        parser: argparse.ArgumentParser,
+        namespace: argparse.Namespace,
+        values: typing.Sequence[str] | None,
+        option_string: str | None = None,
+    ) -> None:
         """Call this parser.
 
         See argparse documentation for details.
@@ -54,4 +64,5 @@ class SelectionAction(argparse.Action):
         if getattr(namespace, self._dest) is None:
             setattr(namespace, self._dest, [])
         lst: typing.List[str] = getattr(namespace, self._dest)
-        lst += self._canonical + values
+        if values is not None:
+            lst += self._canonical + list(values)

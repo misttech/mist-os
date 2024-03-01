@@ -13,7 +13,7 @@ import environment
 
 
 class TestExecutionEnvironment(unittest.TestCase):
-    def _make_test_files(self, tmp):
+    def _make_test_files(self, tmp: str) -> None:
         out_dir = os.path.join(tmp, "out", "foo")
         os.makedirs(out_dir)
         with open(os.path.join(tmp, ".fx-build-dir"), "w") as f:
@@ -23,7 +23,7 @@ class TestExecutionEnvironment(unittest.TestCase):
         open(os.path.join(out_dir, "test-list.json"), "a").close()
         open(os.path.join(out_dir, "package-repositories.json"), "a").close()
 
-    def test_process_environment(self):
+    def test_process_environment(self) -> None:
         """Test that we can load and use an environment."""
         with tempfile.TemporaryDirectory() as tmp:
             self._make_test_files(tmp)
@@ -55,7 +55,7 @@ class TestExecutionEnvironment(unittest.TestCase):
                     os.path.join("foo", "bar"),
                 )
 
-    def test_no_fuchsia_dir(self):
+    def test_no_fuchsia_dir(self) -> None:
         with mock.patch.dict(os.environ, {"FUCHSIA_DIR": ""}):
             default_flags = args.parse_args([])
             self.assertRaisesRegex(
@@ -66,7 +66,7 @@ class TestExecutionEnvironment(unittest.TestCase):
                 ),
             )
 
-    def test_missing_build_dir_file(self):
+    def test_missing_build_dir_file(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             self._make_test_files(tmp)
             os.remove(os.path.join(tmp, ".fx-build-dir"))
@@ -81,7 +81,7 @@ class TestExecutionEnvironment(unittest.TestCase):
                     ),
                 )
 
-    def test_missing_build_dir(self):
+    def test_missing_build_dir(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             self._make_test_files(tmp)
             shutil.rmtree(os.path.join(tmp, "out", "foo"))
@@ -96,7 +96,7 @@ class TestExecutionEnvironment(unittest.TestCase):
                     ),
                 )
 
-    def test_missing_tests_file(self):
+    def test_missing_tests_file(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             self._make_test_files(tmp)
             os.remove(os.path.join(tmp, "out", "foo", "tests.json"))
@@ -111,7 +111,7 @@ class TestExecutionEnvironment(unittest.TestCase):
                     ),
                 )
 
-    def test_missing_test_list_file(self):
+    def test_missing_test_list_file(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             self._make_test_files(tmp)
             os.remove(os.path.join(tmp, "out", "foo", "test-list.json"))

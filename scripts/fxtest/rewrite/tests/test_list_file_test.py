@@ -19,7 +19,7 @@ from tests_json_file import TestSection
 class TestListFileParsingTest(unittest.TestCase):
     """Test processing test-list.json"""
 
-    def test_from_file(self):
+    def test_from_file(self) -> None:
         """Test basic loading of a test-list.json file."""
         contents = TestListFile(
             data=[
@@ -42,7 +42,7 @@ class TestListFileParsingTest(unittest.TestCase):
 class TestListFileJoiningTest(unittest.TestCase):
     """Test joining tests.json with test-list.json"""
 
-    def test_joining_files(self):
+    def test_joining_files(self) -> None:
         """Test joining the contents of tests.json and test-list.json into Test objects."""
 
         tests_file = [
@@ -82,7 +82,7 @@ class TestListFileJoiningTest(unittest.TestCase):
         # Test implements hash.
         set(joined)
 
-    def test_missing_from_test_list(self):
+    def test_missing_from_test_list(self) -> None:
         """It is an error for tests.json to contain a test test-list.json omits."""
 
         tests_file = [
@@ -103,7 +103,7 @@ class TestListFileJoiningTest(unittest.TestCase):
 class TestListEntryMethodTest(unittest.TestCase):
     """Test methods on TestListEntry"""
 
-    def test_hermetic(self):
+    def test_hermetic(self) -> None:
         hermetic = TestListEntry(
             "foo", tags=[TestListTagKV(key="hermetic", value="true")]
         )

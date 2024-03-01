@@ -158,7 +158,7 @@ async def select_tests(
 
     for group in match_groups:
 
-        async def task_handler(group: selection_types.MatchGroup):
+        async def task_handler(group: selection_types.MatchGroup) -> None:
             id: event.Id | None = None
             if recorder is not None:
                 # Hide the children of this event group. The runtime
@@ -305,7 +305,7 @@ class _TestDistanceMeasurer:
         self,
         tests: typing.List[Test],
         extractor: typing.Callable[[Test], str | None],
-    ):
+    ) -> None:
         self._test_and_key = [
             (test, y) for test in tests if (y := extractor(test)) is not None
         ]
@@ -395,7 +395,7 @@ def _parse_selection_command_line(
     output_groups: typing.List[selection_types.MatchGroup] = []
     cur_group: selection_types.MatchGroup | None = None
 
-    def pop_for_arg(arg: str):
+    def pop_for_arg(arg: str) -> None:
         """Mutate the outer cur_group variable depending on the contents of the argument.
 
         This closure handles parameters that take a value.
@@ -419,7 +419,7 @@ def _parse_selection_command_line(
         except IndexError:
             raise SelectionError(f"Missing value for flag {arg}")
 
-    def rotate_group():
+    def rotate_group() -> None:
         """Start populating a new MatchGroup. If the current group
         is not empty, keep track of it first.
         """

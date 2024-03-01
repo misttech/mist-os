@@ -38,11 +38,28 @@ autoflake \
 echo "Sorting imports..."
 isort $FXTEST_SRC \
     --sg '.venvs**'
+
 echo "Formatting code..."
-black  \
-    $FXTEST_SRC \
-    --exclude '\.venvs'
+fx format-code
+
 echo "Checking types..."
-mypy \
-    $FXTEST_SRC \
-    --config-file=${FXTEST_SRC}/pyproject.toml
+OLD_PYTHONPATH=$PYTHONPATH
+PYTHONPATH="$FUCHSIA_DIR"/third_party/pylibs/mypy_extensions/src:"$FUCHSIA_DIR"/third_party/pylibs/typing_extensions/src/src:"$FUCHSIA_DIR"/third_party/pylibs/mypy/src:$PYTHONPATH
+
+# Execute the Mypy command with python path
+MYPY_CMD="python3 -S -m mypy --config-file $FUCHSIA_DIR/pyproject.toml $FXTEST_SRC"
+$MYPY_CMD >/dev/null 2>&1
+if [ $? -eq 0 ]; then
+    echo "Code is 'mypy' compliant"
+else
+    echo
+    echo "ERROR: Code is not 'mypy' compliant!"
+    echo "ERROR: Please run below command sequence, fix all the issues and then rerun this script"
+    echo "*************************************"
+    echo "$ source $VENV_PATH/bin/activate"
+    echo "$ PYTHONPATH=$PYTHONPATH $MYPY_CMD"
+    echo "*************************************"
+    echo
+    exit 1
+fi
+PYTHONPATH=$OLD_PYTHONPATH

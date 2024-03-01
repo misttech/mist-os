@@ -43,7 +43,7 @@ class Weather:
 
 
 class TestDataParse(unittest.TestCase):
-    def test_from_dict(self):
+    def test_from_dict(self) -> None:
         """Test basic from_dict.
 
         This test instantiates a Weather object from a dictionary and asserts that
@@ -63,7 +63,7 @@ class TestDataParse(unittest.TestCase):
         self.assertEqual(weather.description, "scattered showers")
         self.assertEqual(weather.city.name, "San Francisco")
 
-    def test_to_dict(self):
+    def test_to_dict(self) -> None:
         """Test basic to_dict.
 
         This test instantiates a Weather object and asserts that it can be
@@ -87,7 +87,7 @@ class TestDataParse(unittest.TestCase):
             },
         )
 
-    def test_with_collections(self):
+    def test_with_collections(self) -> None:
         """Test advanced collection to/from dict.
 
         This test instantiates a Weather object from a dictionary containing
@@ -146,7 +146,7 @@ class TestDataParse(unittest.TestCase):
         )
         self.assertDictEqual(weather_dict, weather.to_dict())  # type:ignore
 
-    def test_unsortable_set(self):
+    def test_unsortable_set(self) -> None:
         """Test dataparse with a set of unsortable values.
 
         Dataparse stores sets as lists in the output for better JSON
@@ -172,7 +172,7 @@ class TestDataParse(unittest.TestCase):
             set([v.name for v in new_val.set_of_ids]),
         )
 
-    def test_renames(self):
+    def test_renames(self) -> None:
         """Test that field renames are respected by to_dict and from_dict."""
 
         @dataparse
@@ -182,7 +182,7 @@ class TestDataParse(unittest.TestCase):
             the_value: str
 
             @classmethod
-            def dataparse_renames(cls):
+            def dataparse_renames(cls) -> dict[str, str]:
                 return {"the_key": "The Key", "the_value": "The Value"}
 
         input = {"The Key": "foo", "The Value": "bar"}
@@ -193,7 +193,7 @@ class TestDataParse(unittest.TestCase):
         out: typing.Dict[str, typing.Any] = kv.to_dict()  # type:ignore
         self.assertDictEqual(input, out)
 
-    def test_nulls(self):
+    def test_nulls(self) -> None:
         """Test null handling for dataparse.
 
         None (JSON: null) values in the input are passed verbatim as
@@ -203,7 +203,7 @@ class TestDataParse(unittest.TestCase):
         @dataparse
         @dataclass
         class HasNull:
-            value: typing.Optional[int] = None
+            value: int | None = None
 
         has_null: HasNull = HasNull.from_dict({"value": None})  # type:ignore
         self.assertEqual(has_null, HasNull())
@@ -215,7 +215,7 @@ class TestDataParse(unittest.TestCase):
 
 
 class TestDataParseErrors(unittest.TestCase):
-    def test_unknown_union(self):
+    def test_unknown_union(self) -> None:
         """Test for failure when we do not expect the union type.
 
         dataparse only supports optional (Union[Any, None]) unions.
@@ -229,13 +229,15 @@ class TestDataParseErrors(unittest.TestCase):
 
         self.assertRaises(
             DataParseError,
-            lambda: BadUnion.from_dict({"val": 30}),  # type:ignore
-        )  # type:ignore
+            lambda: BadUnion.from_dict(  # type:ignore[attr-defined]
+                {"val": 30}
+            ),
+        )
 
-    def test_invalid_class(self):
+    def test_invalid_class(self) -> None:
         """Test that we cannot wrap a non-dataclass with dataparse."""
 
-        def wrap_a_non_dataclass():
+        def wrap_a_non_dataclass() -> None:
             @dataparse
             class Bad:
                 pass
@@ -255,25 +257,27 @@ class ContainsEnum:
 
 
 class TestDataParseEnums(unittest.TestCase):
-    def test_valid_enum_type(self):
+    def test_valid_enum_type(self) -> None:
         """Test that we can serialize and deserialize enum values."""
 
         value = ContainsEnum(status=StatusEnum.Failure)
         value2 = ContainsEnum(status=StatusEnum.OK)
 
-        value_dict = value.to_dict()  # type:ignore
+        value_dict = value.to_dict()  # type:ignore[attr-defined]
         self.assertEqual(value_dict["status"], "FAILURE")
-        value2_dict = value2.to_dict()  # type:ignore
+        value2_dict = value2.to_dict()  # type:ignore[attr-defined]
         self.assertEqual(value2_dict["status"], "OK")
 
         self.assertEqual(
-            value, ContainsEnum.from_dict(value_dict)
-        )  # type:ignore
+            value,
+            ContainsEnum.from_dict(value_dict),  # type:ignore[attr-defined]
+        )
         self.assertEqual(
-            value2, ContainsEnum.from_dict(value2_dict)
-        )  # type:ignore
+            value2,
+            ContainsEnum.from_dict(value2_dict),  # type:ignore[attr-defined]
+        )
 
-    def test_invalid_enum_parsing(self):
+    def test_invalid_enum_parsing(self) -> None:
         """Test that we throw an error when we encounter an unexpected enum value."""
         value_to_parse = {"status": "NOT VALID"}
         self.assertRaises(

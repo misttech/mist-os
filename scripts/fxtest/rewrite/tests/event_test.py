@@ -12,7 +12,7 @@ import tests_json_file
 
 
 class TestEvents(unittest.IsolatedAsyncioTestCase):
-    def test_invalid_payload(self):
+    def test_invalid_payload(self) -> None:
         """Test that an event payload may have only one field set."""
         self.assertRaises(
             ValueError,
@@ -21,7 +21,7 @@ class TestEvents(unittest.IsolatedAsyncioTestCase):
             ),
         )
 
-    async def test_empty_run(self):
+    async def test_empty_run(self) -> None:
         """Test that a simple run consisting of start/stop is populated correctly."""
         recorder = event.EventRecorder()
         recorder.emit_init()
@@ -48,7 +48,7 @@ class TestEvents(unittest.IsolatedAsyncioTestCase):
             raw_events[0].timestamp, recorder._monotonic_time_start
         )
 
-    async def test_empty_run_async(self):
+    async def test_empty_run_async(self) -> None:
         """Test a start/end run, but ensure that we receive at least one event asynchronously."""
         recorder = event.EventRecorder()
         recorder.emit_init()
@@ -59,7 +59,7 @@ class TestEvents(unittest.IsolatedAsyncioTestCase):
         # and read.
         wait_to_emit = asyncio.Event()
 
-        async def emit_end_task():
+        async def emit_end_task() -> None:
             await wait_to_emit.wait()
             recorder.emit_end()
 
@@ -74,7 +74,7 @@ class TestEvents(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(len(events), 2)
 
-    async def test_full_example(self):
+    async def test_full_example(self) -> None:
         """Run through a representative example of events for fx test"""
 
         recorder = event.EventRecorder()

@@ -204,7 +204,7 @@ class TestExecution:
         """Format environment variables needed to run the test.
 
         Returns:
-            typing.Optional[typing.Dict[str, str]]: Environment for
+            typing.Dict[str, str] | None: Environment for
                 the test, or None if no environment is needed.
         """
         env = {}
@@ -271,7 +271,7 @@ class TestExecution:
         env = self.environment() or {}
 
         outdir = self._outdir
-        maybe_temp_dir: tempfile.TemporaryDirectory | None = None
+        maybe_temp_dir: tempfile.TemporaryDirectory[str] | None = None
         if not outdir:
             maybe_temp_dir = tempfile.TemporaryDirectory()
             outdir = maybe_temp_dir.name
@@ -443,7 +443,7 @@ async def run_command(
     symbolize: bool = False,
     env: typing.Dict[str, str] | None = None,
     timeout: float | None = None,
-) -> typing.Optional[command.CommandOutput]:
+) -> command.CommandOutput | None:
     """Utility method to run a test command asynchronously.
 
     Args:
