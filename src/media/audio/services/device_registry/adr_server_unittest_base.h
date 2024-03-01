@@ -55,8 +55,9 @@ class AudioDeviceRegistryServerTestBase : public gtest::TestLoopFixture {
   void AddDeviceForDetection(
       std::string_view name, fuchsia_audio_device::DeviceType device_type,
       fidl::ClientEnd<fuchsia_hardware_audio::StreamConfig> stream_config_client_end) {
-    adr_service_->AddDevice(Device::Create(adr_service_, dispatcher(), name, device_type,
-                                           std::move(stream_config_client_end)));
+    adr_service_->AddDevice(Device::Create(
+        adr_service_, dispatcher(), name, device_type,
+        fuchsia_audio_device::DriverClient::WithStreamConfig(std::move(stream_config_client_end))));
   }
 
   class FidlHandler {

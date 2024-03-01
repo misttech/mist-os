@@ -24,6 +24,7 @@ namespace {
 using ::testing::Optional;
 using Control = fuchsia_audio_device::Control;
 using RingBuffer = fuchsia_audio_device::RingBuffer;
+using DriverClient = fuchsia_audio_device::DriverClient;
 
 class RingBufferServerTest : public AudioDeviceRegistryServerTestBase,
                              public fidl::AsyncEventHandler<fuchsia_audio_device::RingBuffer> {
@@ -53,7 +54,8 @@ void RingBufferServerTest::EnableDriverAndAddDevice(
     const std::unique_ptr<FakeStreamConfig>& fake_driver) {
   adr_service_->AddDevice(Device::Create(
       adr_service_, dispatcher(), "Test output name", fuchsia_audio_device::DeviceType::kOutput,
-      fidl::ClientEnd<fuchsia_hardware_audio::StreamConfig>(fake_driver->Enable())));
+      DriverClient::WithStreamConfig(
+          fidl::ClientEnd<fuchsia_hardware_audio::StreamConfig>(fake_driver->Enable()))));
   RunLoopUntilIdle();
 }
 

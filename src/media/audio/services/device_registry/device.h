@@ -34,14 +34,13 @@
 namespace media_audio {
 
 // This class represents a driver and audio device, once it is detected.
-class Device : public std::enable_shared_from_this<Device>,
-               public fidl::AsyncEventHandler<fuchsia_hardware_audio::StreamConfig> {
+class Device : public std::enable_shared_from_this<Device> {
  public:
-  static std::shared_ptr<Device> Create(
-      std::weak_ptr<DevicePresenceWatcher> presence_watcher, async_dispatcher_t* dispatcher,
-      std::string_view name, fuchsia_audio_device::DeviceType device_type,
-      fidl::ClientEnd<fuchsia_hardware_audio::StreamConfig> stream_config);
-  ~Device() override;
+  static std::shared_ptr<Device> Create(std::weak_ptr<DevicePresenceWatcher> presence_watcher,
+                                        async_dispatcher_t* dispatcher, std::string_view name,
+                                        fuchsia_audio_device::DeviceType device_type,
+                                        fuchsia_audio_device::DriverClient driver_client);
+  ~Device();
 
   // This is the const subset available to device observers.
   //
@@ -57,6 +56,7 @@ class Device : public std::enable_shared_from_this<Device>,
 
   void ForEachObserver(fit::function<void(std::shared_ptr<ObserverNotify>)> action);
 
+  // This also calls AddObserver for the same Notify.
   bool SetControl(std::shared_ptr<ControlNotify> control_notify);
   bool DropControl();
   void DropRingBuffer();
@@ -116,23 +116,7 @@ class Device : public std::enable_shared_from_this<Device>,
 
   Device(std::weak_ptr<DevicePresenceWatcher> presence_watcher, async_dispatcher_t* dispatcher,
          std::string_view name, fuchsia_audio_device::DeviceType device_type,
-         fidl::ClientEnd<fuchsia_hardware_audio::StreamConfig> stream_config);
-
-  // fidl::AsyncEventHandler<fuchsia_hardware_audio::StreamConfig> implementation,
-  // called when the underlying driver disconnects its StreamConfig channel.
-  void on_fidl_error(fidl::UnbindInfo info) override;
-
-  // Needed when the underlying driver disconnects its RingBuffer channel.
-  class RingBufferErrorHandler
-      : public fidl::AsyncEventHandler<fuchsia_hardware_audio::RingBuffer> {
-   public:
-    explicit RingBufferErrorHandler(Device* device) : device_(device) {}
-    RingBufferErrorHandler() = default;
-    void on_fidl_error(fidl::UnbindInfo info) override;
-
-   private:
-    Device* device_;
-  };
+         fuchsia_audio_device::DriverClient driver_client);
 
   //
   // Actions during the initialization process. We use 'Retrieve...' for internal methods, to avoid
@@ -145,6 +129,7 @@ class Device : public std::enable_shared_from_this<Device>,
   void RetrieveHealthState();
 
   void OnInitializationResponse();
+  bool IsFullyInitialized();
   void OnError(zx_status_t error);
   // Otherwise-normal departure of a device, such as USB device unplug-removal.
   void OnRemoval();
@@ -181,9 +166,9 @@ class Device : public std::enable_shared_from_this<Device>,
   //
   // - Device health is automatically checked at initialization. This may result in OnError
   //   (detailed above). Note that a successful health check is one of the "graduation
-  //   requirements" for transitioning to the DeviceInitialized state. https://fxbug.dev/42068381 tracks the
-  //   work to proactively call GetHealthState at some point. This will always be surfaced to the
-  //   client by an error notification, rather than their calling GetHealthState directly.
+  //   requirements" for transitioning to the DeviceInitialized state. https://fxbug.dev/42068381
+  //   tracks the work to proactively call GetHealthState at some point. We will always surface this
+  //   to the client by an error notification, rather than their calling GetHealthState directly.
   //
   enum class State {
     Error,
@@ -233,7 +218,8 @@ class Device : public std::enable_shared_from_this<Device>,
   // The three values provided upon a successful devfs detection or a Provider/AddDevice call.
   const std::string name_;
   const fuchsia_audio_device::DeviceType device_type_;
-  fidl::Client<fuchsia_hardware_audio::StreamConfig> stream_config_;
+  fuchsia_audio_device::DriverClient driver_client_;
+  std::optional<fidl::Client<fuchsia_hardware_audio::StreamConfig>> stream_config_client_;
 
   // Assigned by this service, guaranteed unique for this boot session, but not across reboots.
   const TokenId token_id_;
@@ -258,16 +244,30 @@ class Device : public std::enable_shared_from_this<Device>,
   // Members related to being controlled.
   std::optional<std::weak_ptr<ControlNotify>> control_notify_;
 
+  template <typename ProtocolT>
+  class FidlErrorHandler : public fidl::AsyncEventHandler<ProtocolT> {
+   public:
+    FidlErrorHandler(Device* device, const std::string& name) : device_(device), name_(name) {}
+    FidlErrorHandler() = default;
+    void on_fidl_error(fidl::UnbindInfo info) override;
+
+   private:
+    Device* device_;
+    std::string_view name_;
+  };
+
+  FidlErrorHandler<fuchsia_hardware_audio::StreamConfig> stream_config_handler_;
+
   // Members related to driver RingBuffer.
   fidl::Client<fuchsia_hardware_audio::RingBuffer> ring_buffer_client_;
-  RingBufferErrorHandler ring_buffer_handler_;
+  FidlErrorHandler<fuchsia_hardware_audio::RingBuffer> ring_buffer_handler_;
 
   fit::callback<void(RingBufferInfo)> create_ring_buffer_callback_;
   // TODO(https://fxbug.dev/42069015): Consider using media_audio::Format internally.
   fuchsia_audio::Format vmo_format_;
   zx::vmo ring_buffer_vmo_;
 
-  // TODO(https://fxbug.dev/42069014): consider using an optional<struct> to minimize separate optionals.
+  // TODO(https://fxbug.dev/42069014): consider optional<struct>, to minimize separate optionals.
   std::optional<fuchsia_hardware_audio::RingBufferProperties> ring_buffer_properties_;
   std::optional<uint32_t> num_ring_buffer_frames_;
   std::optional<fuchsia_hardware_audio::DelayInfo> delay_info_;

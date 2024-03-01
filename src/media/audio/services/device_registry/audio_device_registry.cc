@@ -28,6 +28,8 @@
 
 namespace media_audio {
 
+using DriverClient = fuchsia_audio_device::DriverClient;
+
 AudioDeviceRegistry::AudioDeviceRegistry(std::shared_ptr<FidlThread> server_thread)
     : thread_(std::move(server_thread)),
       outgoing_(component::OutgoingDirectory(thread_->dispatcher())) {
@@ -61,10 +63,10 @@ zx_status_t AudioDeviceRegistry::StartDeviceDetection() {
             FX_CHECK(!driver_client.IsUnknown());
         }
         // Eventually we will simply pass the driver_client onward.
-        fidl::ClientEnd<fuchsia_hardware_audio::StreamConfig> stream_config_client{
+        fidl::ClientEnd<fuchsia_hardware_audio::StreamConfig> stream_config{
             driver_client.stream_config()->TakeChannel()};
         AddDevice(Device::Create(this->shared_from_this(), thread_->dispatcher(), name, device_type,
-                                 std::move(stream_config_client)));
+                                 DriverClient::WithStreamConfig(std::move(stream_config))));
       };
 
   auto detector_result =

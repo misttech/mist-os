@@ -19,6 +19,7 @@ namespace media_audio {
 namespace {
 
 using Control = fuchsia_audio_device::Control;
+using DriverClient = fuchsia_audio_device::DriverClient;
 
 class ControlServerTest : public AudioDeviceRegistryServerTestBase {
  protected:
@@ -27,7 +28,8 @@ class ControlServerTest : public AudioDeviceRegistryServerTestBase {
 
     adr_service_->AddDevice(Device::Create(
         adr_service_, dispatcher(), "Test output name", fuchsia_audio_device::DeviceType::kOutput,
-        fidl::ClientEnd<fuchsia_hardware_audio::StreamConfig>(fake_driver->Enable())));
+        DriverClient::WithStreamConfig(
+            fidl::ClientEnd<fuchsia_hardware_audio::StreamConfig>(fake_driver->Enable()))));
     RunLoopUntilIdle();
     return fake_driver;
   }

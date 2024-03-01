@@ -16,6 +16,8 @@
 
 namespace media_audio {
 
+using DriverClient = fuchsia_audio_device::DriverClient;
+
 // static
 std::shared_ptr<ProviderServer> ProviderServer::Create(
     std::shared_ptr<const FidlThread> thread,
@@ -64,8 +66,9 @@ void ProviderServer::AddDevice(AddDeviceRequest& request, AddDeviceCompleter::Sy
       << "request to add " << *request.device_type() << " '" << *request.device_name() << "'";
 
   // This kicks off device initialization, which notifies the parent when it completes.
-  parent_->AddDevice(Device::Create(parent_, thread().dispatcher(), *request.device_name(),
-                                    *request.device_type(), std::move(*request.stream_config())));
+  parent_->AddDevice(
+      Device::Create(parent_, thread().dispatcher(), *request.device_name(), *request.device_type(),
+                     DriverClient::WithStreamConfig(std::move(*request.stream_config()))));
 
   fuchsia_audio_device::ProviderAddDeviceResponse response{};
   completer.Reply(fit::success(response));

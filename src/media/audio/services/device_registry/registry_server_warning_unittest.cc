@@ -15,6 +15,8 @@
 namespace media_audio {
 namespace {
 
+using DriverClient = fuchsia_audio_device::DriverClient;
+
 class RegistryServerWarningTest : public AudioDeviceRegistryServerTestBase {};
 
 // A subsequent call to WatchDevicesAdded before the previous one completes should fail.
@@ -147,7 +149,8 @@ TEST_F(RegistryServerWarningTest, CreateObserverMissingObserver) {
   auto fake_driver = CreateFakeStreamConfigOutput();
   adr_service_->AddDevice(Device::Create(
       adr_service_, dispatcher(), "Test output name", fuchsia_audio_device::DeviceType::kOutput,
-      fidl::ClientEnd<fuchsia_hardware_audio::StreamConfig>(fake_driver->Enable())));
+      DriverClient::WithStreamConfig(
+          fidl::ClientEnd<fuchsia_hardware_audio::StreamConfig>(fake_driver->Enable()))));
   RunLoopUntilIdle();
   EXPECT_EQ(adr_service_->devices().size(), 1u);
 
@@ -195,7 +198,8 @@ TEST_F(RegistryServerWarningTest, CreateObserverBadObserver) {
   auto fake_driver = CreateFakeStreamConfigInput();
   adr_service_->AddDevice(Device::Create(
       adr_service_, dispatcher(), "Test input name", fuchsia_audio_device::DeviceType::kInput,
-      fidl::ClientEnd<fuchsia_hardware_audio::StreamConfig>(fake_driver->Enable())));
+      DriverClient::WithStreamConfig(
+          fidl::ClientEnd<fuchsia_hardware_audio::StreamConfig>(fake_driver->Enable()))));
   RunLoopUntilIdle();
   EXPECT_EQ(adr_service_->devices().size(), 1u);
 

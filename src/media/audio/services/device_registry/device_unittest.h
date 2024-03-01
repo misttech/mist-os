@@ -54,10 +54,12 @@ class DeviceTestBase : public gtest::TestLoopFixture {
     auto device_type = *driver->is_input() ? fuchsia_audio_device::DeviceType::kInput
                                            : fuchsia_audio_device::DeviceType::kOutput;
     auto stream_config_client_end = driver->Enable();
-    auto device = Device::Create(
-        std::weak_ptr<FakeDevicePresenceWatcher>(fake_device_presence_watcher_), dispatcher(),
-        "Device name", device_type,
-        fidl::ClientEnd<fuchsia_hardware_audio::StreamConfig>(std::move(stream_config_client_end)));
+    auto device =
+        Device::Create(std::weak_ptr<FakeDevicePresenceWatcher>(fake_device_presence_watcher_),
+                       dispatcher(), "Device name", device_type,
+                       fuchsia_audio_device::DriverClient::WithStreamConfig(
+                           fidl::ClientEnd<fuchsia_hardware_audio::StreamConfig>(
+                               std::move(stream_config_client_end))));
 
     RunLoopUntilIdle();
     EXPECT_FALSE(device->state_ == Device::State::DeviceInitializing);

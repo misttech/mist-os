@@ -40,7 +40,8 @@ TEST_F(ControlCreatorServerTest, CreateControl) {
   auto fake_driver = CreateFakeStreamConfigOutput();
   adr_service_->AddDevice(Device::Create(
       adr_service_, dispatcher(), "Test output name", fuchsia_audio_device::DeviceType::kOutput,
-      fidl::ClientEnd<fuchsia_hardware_audio::StreamConfig>(fake_driver->Enable())));
+      fuchsia_audio_device::DriverClient::WithStreamConfig(
+          fidl::ClientEnd<fuchsia_hardware_audio::StreamConfig>(fake_driver->Enable()))));
   RunLoopUntilIdle();
   ASSERT_EQ(adr_service_->devices().size(), 1u);
   ASSERT_EQ(adr_service_->unhealthy_devices().size(), 0u);

@@ -21,6 +21,7 @@ namespace media_audio {
 using Control = fuchsia_audio_device::Control;
 using Observer = fuchsia_audio_device::Observer;
 using Registry = fuchsia_audio_device::Registry;
+using DriverClient = fuchsia_audio_device::DriverClient;
 
 class ObserverServerTest : public AudioDeviceRegistryServerTestBase,
                            public fidl::AsyncEventHandler<fuchsia_audio_device::Observer> {
@@ -51,7 +52,8 @@ std::unique_ptr<FakeStreamConfig> ObserverServerTest::CreateAndEnableStreamConfi
 
   adr_service_->AddDevice(Device::Create(
       adr_service_, dispatcher(), "Test output name", fuchsia_audio_device::DeviceType::kOutput,
-      fidl::ClientEnd<fuchsia_hardware_audio::StreamConfig>(fake_driver->Enable())));
+      DriverClient::WithStreamConfig(
+          fidl::ClientEnd<fuchsia_hardware_audio::StreamConfig>(fake_driver->Enable()))));
   RunLoopUntilIdle();
   return fake_driver;
 }
@@ -212,7 +214,8 @@ TEST_F(ObserverServerTest, InitialGainState) {
   RunLoopUntilIdle();
   adr_service_->AddDevice(Device::Create(
       adr_service_, dispatcher(), "Test output name", fuchsia_audio_device::DeviceType::kOutput,
-      fidl::ClientEnd<fuchsia_hardware_audio::StreamConfig>(fake_driver->Enable())));
+      DriverClient::WithStreamConfig(
+          fidl::ClientEnd<fuchsia_hardware_audio::StreamConfig>(fake_driver->Enable()))));
   RunLoopUntilIdle();
   ASSERT_EQ(adr_service_->devices().size(), 1u);
   ASSERT_EQ(adr_service_->unhealthy_devices().size(), 0u);
@@ -306,7 +309,8 @@ TEST_F(ObserverServerTest, InitialPlugState) {
   RunLoopUntilIdle();
   adr_service_->AddDevice(Device::Create(
       adr_service_, dispatcher(), "Test output name", fuchsia_audio_device::DeviceType::kOutput,
-      fidl::ClientEnd<fuchsia_hardware_audio::StreamConfig>(fake_driver->Enable())));
+      DriverClient::WithStreamConfig(
+          fidl::ClientEnd<fuchsia_hardware_audio::StreamConfig>(fake_driver->Enable()))));
   RunLoopUntilIdle();
   ASSERT_EQ(adr_service_->devices().size(), 1u);
   ASSERT_EQ(adr_service_->unhealthy_devices().size(), 0u);

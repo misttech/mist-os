@@ -17,6 +17,8 @@
 
 namespace media_audio {
 
+using DriverClient = fuchsia_audio_device::DriverClient;
+
 class ObserverServerWarningTest : public AudioDeviceRegistryServerTestBase,
                                   public fidl::AsyncEventHandler<fuchsia_audio_device::Observer> {
  protected:
@@ -25,7 +27,8 @@ class ObserverServerWarningTest : public AudioDeviceRegistryServerTestBase,
 
     adr_service_->AddDevice(Device::Create(
         adr_service_, dispatcher(), "Test output name", fuchsia_audio_device::DeviceType::kOutput,
-        fidl::ClientEnd<fuchsia_hardware_audio::StreamConfig>(fake_driver->Enable())));
+        DriverClient::WithStreamConfig(
+            fidl::ClientEnd<fuchsia_hardware_audio::StreamConfig>(fake_driver->Enable()))));
     RunLoopUntilIdle();
     return fake_driver;
   }

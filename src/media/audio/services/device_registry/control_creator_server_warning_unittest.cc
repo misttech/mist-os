@@ -15,6 +15,7 @@ namespace {
 
 using ControlCreator = fuchsia_audio_device::ControlCreator;
 using Registry = fuchsia_audio_device::Registry;
+using DriverClient = fuchsia_audio_device::DriverClient;
 
 class ControlCreatorServerWarningTest : public AudioDeviceRegistryServerTestBase {};
 
@@ -57,7 +58,8 @@ TEST_F(ControlCreatorServerWarningTest, BadId) {
   auto fake_driver = CreateFakeStreamConfigOutput();
   adr_service_->AddDevice(Device::Create(
       adr_service_, dispatcher(), "Test output name", fuchsia_audio_device::DeviceType::kOutput,
-      fidl::ClientEnd<fuchsia_hardware_audio::StreamConfig>(fake_driver->Enable())));
+      DriverClient::WithStreamConfig(
+          fidl::ClientEnd<fuchsia_hardware_audio::StreamConfig>(fake_driver->Enable()))));
   RunLoopUntilIdle();
   ASSERT_EQ(adr_service_->devices().size(), 1u);
   ASSERT_EQ(adr_service_->unhealthy_devices().size(), 0u);
@@ -109,7 +111,8 @@ TEST_F(ControlCreatorServerWarningTest, MissingServerEnd) {
   auto fake_driver = CreateFakeStreamConfigInput();
   adr_service_->AddDevice(Device::Create(
       adr_service_, dispatcher(), "Test input name", fuchsia_audio_device::DeviceType::kInput,
-      fidl::ClientEnd<fuchsia_hardware_audio::StreamConfig>(fake_driver->Enable())));
+      DriverClient::WithStreamConfig(
+          fidl::ClientEnd<fuchsia_hardware_audio::StreamConfig>(fake_driver->Enable()))));
   RunLoopUntilIdle();
   ASSERT_EQ(adr_service_->devices().size(), 1u);
   ASSERT_EQ(adr_service_->unhealthy_devices().size(), 0u);
@@ -158,7 +161,8 @@ TEST_F(ControlCreatorServerWarningTest, BadServerEnd) {
   auto fake_driver = CreateFakeStreamConfigOutput();
   adr_service_->AddDevice(Device::Create(
       adr_service_, dispatcher(), "Test output name", fuchsia_audio_device::DeviceType::kOutput,
-      fidl::ClientEnd<fuchsia_hardware_audio::StreamConfig>(fake_driver->Enable())));
+      DriverClient::WithStreamConfig(
+          fidl::ClientEnd<fuchsia_hardware_audio::StreamConfig>(fake_driver->Enable()))));
   RunLoopUntilIdle();
   ASSERT_EQ(adr_service_->devices().size(), 1u);
   ASSERT_EQ(adr_service_->unhealthy_devices().size(), 0u);
@@ -211,7 +215,8 @@ TEST_F(ControlCreatorServerWarningTest, IdAlreadyControlled) {
   auto fake_driver = CreateFakeStreamConfigInput();
   adr_service_->AddDevice(Device::Create(
       adr_service_, dispatcher(), "Test input name", fuchsia_audio_device::DeviceType::kInput,
-      fidl::ClientEnd<fuchsia_hardware_audio::StreamConfig>(fake_driver->Enable())));
+      DriverClient::WithStreamConfig(
+          fidl::ClientEnd<fuchsia_hardware_audio::StreamConfig>(fake_driver->Enable()))));
   RunLoopUntilIdle();
   ASSERT_EQ(adr_service_->devices().size(), 1u);
   ASSERT_EQ(adr_service_->unhealthy_devices().size(), 0u);
