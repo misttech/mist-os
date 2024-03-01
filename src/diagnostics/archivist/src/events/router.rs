@@ -66,9 +66,9 @@ impl EventRouter {
 
     /// Registers an event consumer with the given configuration specifying the types of events the
     /// given consumer will receive.
-    pub fn add_consumer<T: 'static>(&mut self, config: ConsumerConfig<'_, T>)
+    pub fn add_consumer<T>(&mut self, config: ConsumerConfig<'_, T>)
     where
-        T: EventConsumer + Send + Sync,
+        T: EventConsumer + Send + Sync + 'static,
     {
         let subscriber_weak = Arc::downgrade(config.consumer);
         for event_type in config.events {
@@ -136,12 +136,12 @@ impl EventRouter {
 
     fn validate_routing(&mut self) -> Result<(), RouterError> {
         for consumed_event in self.consumers.keys() {
-            if self.producers_registered.get(consumed_event).is_none() {
+            if !self.producers_registered.contains(consumed_event) {
                 return Err(RouterError::MissingProducer(consumed_event.clone()));
             }
         }
         for produced_event in &self.producers_registered {
-            if self.consumers.get(produced_event).is_none() {
+            if !self.consumers.contains_key(produced_event) {
                 return Err(RouterError::MissingConsumer(produced_event.clone()));
             }
         }

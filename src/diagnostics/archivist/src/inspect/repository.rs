@@ -352,7 +352,7 @@ mod tests {
                 }),
             });
             assert!(data_repo.inner.read().get(&identity).is_some());
-            assert!(pipeline.read().static_selectors_matchers().unwrap().get(&moniker).is_some())
+            assert!(pipeline.read().static_selectors_matchers().unwrap().contains_key(&moniker));
         }
 
         // When the directory disconnects, both the pipeline matchers and the repo are cleaned
@@ -361,7 +361,7 @@ mod tests {
             fasync::Timer::new(fasync::Time::after(100_i64.millis())).await;
         }
 
-        assert!(pipeline.read().static_selectors_matchers().unwrap().get(&moniker).is_none())
+        assert!(!pipeline.read().static_selectors_matchers().unwrap().contains_key(&moniker));
     }
 
     #[fuchsia::test]
