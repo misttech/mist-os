@@ -13,10 +13,8 @@
 #include <lib/fidl/cpp/wire/status.h>
 #include <zircon/errors.h>
 
-#include <iomanip>
 #include <memory>
 #include <sstream>
-#include <string>
 
 #include <gtest/gtest.h>
 
@@ -27,6 +25,7 @@
 #include "src/media/audio/services/device_registry/observer_notify.h"
 #include "src/media/audio/services/device_registry/testing/fake_device_presence_watcher.h"
 #include "src/media/audio/services/device_registry/testing/fake_stream_config.h"
+#include "src/media/audio/services/device_registry/validate.h"
 
 namespace media_audio {
 
@@ -35,21 +34,23 @@ class DeviceTestBase : public gtest::TestLoopFixture {
  public:
   void SetUp() override {
     notify_ = std::make_shared<NotifyStub>(*this);
-    zx::channel server_end, client_end;
-    ASSERT_EQ(ZX_OK, zx::channel::create(0, &server_end, &client_end));
-
     fake_device_presence_watcher_ = std::make_shared<FakeDevicePresenceWatcher>();
-
-    fake_driver_ = std::make_unique<FakeStreamConfig>(std::move(server_end), std::move(client_end),
-                                                      dispatcher());
   }
   void TearDown() override { fake_device_presence_watcher_.reset(); }
 
  protected:
-  // Used when device_ and fake_driver_ are used (which is the vast majority of cases).
-  void InitializeDeviceForFakeDriver() { device_ = InitializeDeviceForFakeDriver(fake_driver_); }
+  std::unique_ptr<FakeStreamConfig> MakeFakeStreamConfigInput() {
+    auto input = MakeFakeStreamConfig();
+    input->set_is_input(true);
+    return input;
+  }
+  std::unique_ptr<FakeStreamConfig> MakeFakeStreamConfigOutput() {
+    auto output = MakeFakeStreamConfig();
+    output->set_is_input(false);
+    return output;
+  }
 
-  std::shared_ptr<Device> InitializeDeviceForFakeDriver(
+  std::shared_ptr<Device> InitializeDeviceForFakeStreamConfig(
       const std::unique_ptr<FakeStreamConfig>& driver) {
     auto device_type = *driver->is_input() ? fuchsia_audio_device::DeviceType::kInput
                                            : fuchsia_audio_device::DeviceType::kOutput;
@@ -67,9 +68,9 @@ class DeviceTestBase : public gtest::TestLoopFixture {
     return device;
   }
 
-  void FakeDriverDropStreamConfig() { fake_driver_->DropStreamConfig(); }
-
-  fuchsia_audio_device::Info GetDeviceInfo() const { return *device_->info(); }
+  static fuchsia_audio_device::Info GetDeviceInfo(std::shared_ptr<Device> device) {
+    return *device->info();
+  }
 
   static bool HasError(std::shared_ptr<Device> device) {
     return device->state_ == Device::State::Error;
@@ -171,16 +172,17 @@ class DeviceTestBase : public gtest::TestLoopFixture {
   // A consolidated notify recipient for tests (ObserverNotify, and in future CL, ControlNotify).
   std::shared_ptr<NotifyStub> notify() { return notify_; }
 
-  bool SetDeviceGain(fuchsia_hardware_audio::GainState new_state) {
-    return device_->SetGain(new_state);
+  static bool SetDeviceGain(std::shared_ptr<Device> device,
+                            fuchsia_hardware_audio::GainState new_state) {
+    return device->SetGain(new_state);
   }
 
   bool AddObserver(std::shared_ptr<Device> device) { return notify()->AddObserver(device); }
   bool SetControl(std::shared_ptr<Device> device) { return notify()->SetControl(device); }
   bool DropControl(std::shared_ptr<Device> device) { return notify()->DropControl(device); }
 
-  void ConnectToRingBufferAndExpectValidClient() {
-    ASSERT_TRUE(device_->ConnectRingBufferFidl({{
+  void ConnectToRingBufferAndExpectValidClient(std::shared_ptr<Device> device) {
+    EXPECT_TRUE(device->ConnectRingBufferFidl({{
         fuchsia_hardware_audio::PcmFormat{{
             .number_of_channels = 2,
             .sample_format = fuchsia_hardware_audio::SampleFormat::kPcmSigned,
@@ -190,115 +192,112 @@ class DeviceTestBase : public gtest::TestLoopFixture {
         }},
     }}));
     RunLoopUntilIdle();
-    EXPECT_TRUE(device_->ring_buffer_client_.is_valid());
+    EXPECT_TRUE(device->ring_buffer_client_.is_valid());
   }
 
-  void GetRingBufferProperties() {
-    ASSERT_TRUE(device_->state_ == Device::State::CreatingRingBuffer ||
-                device_->state_ == Device::State::RingBufferStopped ||
-                device_->state_ == Device::State::RingBufferStarted);
+  void GetRingBufferProperties(std::shared_ptr<Device> device) {
+    ASSERT_TRUE(device->state_ == Device::State::CreatingRingBuffer ||
+                device->state_ == Device::State::RingBufferStopped ||
+                device->state_ == Device::State::RingBufferStarted);
 
-    device_->RetrieveRingBufferProperties();
+    device->RetrieveRingBufferProperties();
     RunLoopUntilIdle();
-    ASSERT_TRUE(device_->ring_buffer_properties_);
-    ring_buffer_props_ = *device_->ring_buffer_properties_;
+    ASSERT_TRUE(device->ring_buffer_properties_);
   }
 
-  void RetrieveDelayInfoAndExpect(std::optional<int64_t> internal_delay,
+  void RetrieveDelayInfoAndExpect(std::shared_ptr<Device> device,
+                                  std::optional<int64_t> internal_delay,
                                   std::optional<int64_t> external_delay) {
-    ASSERT_TRUE(device_->state_ == Device::State::CreatingRingBuffer ||
-                device_->state_ == Device::State::RingBufferStopped ||
-                device_->state_ == Device::State::RingBufferStarted);
-    device_->RetrieveDelayInfo();
+    ASSERT_TRUE(device->state_ == Device::State::CreatingRingBuffer ||
+                device->state_ == Device::State::RingBufferStopped ||
+                device->state_ == Device::State::RingBufferStarted);
+    device->RetrieveDelayInfo();
     RunLoopUntilIdle();
-    delay_info_ = *device_->delay_info_;
 
-    ASSERT_TRUE(device_->delay_info_);
-    EXPECT_EQ(device_->delay_info_->internal_delay().value_or(0), internal_delay.value_or(0));
-    EXPECT_EQ(device_->delay_info_->external_delay().value_or(0), external_delay.value_or(0));
+    ASSERT_TRUE(device->delay_info_);
+    EXPECT_EQ(device->delay_info_->internal_delay().value_or(0), internal_delay.value_or(0));
+    EXPECT_EQ(device->delay_info_->external_delay().value_or(0), external_delay.value_or(0));
   }
 
-  void GetDriverVmoAndExpectValid() {
-    ASSERT_TRUE(device_->state_ == Device::State::CreatingRingBuffer ||
-                device_->state_ == Device::State::RingBufferStopped ||
-                device_->state_ == Device::State::RingBufferStarted);
+  void GetDriverVmoAndExpectValid(std::shared_ptr<Device> device) {
+    ASSERT_TRUE(device->state_ == Device::State::CreatingRingBuffer ||
+                device->state_ == Device::State::RingBufferStopped ||
+                device->state_ == Device::State::RingBufferStarted);
 
-    device_->GetVmo(2000, 0);
+    device->GetVmo(2000, 0);
     RunLoopUntilIdle();
-    EXPECT_TRUE(device_->VmoReceived());
-    EXPECT_TRUE(device_->state_ == Device::State::CreatingRingBuffer ||
-                device_->state_ == Device::State::RingBufferStopped);
+    EXPECT_TRUE(device->VmoReceived());
+    EXPECT_TRUE(device->state_ == Device::State::CreatingRingBuffer ||
+                device->state_ == Device::State::RingBufferStopped);
   }
 
-  void SetActiveChannelsAndExpect(uint64_t expected_bitmask) {
-    ASSERT_TRUE(device_->state_ == Device::State::CreatingRingBuffer ||
-                device_->state_ == Device::State::RingBufferStopped ||
-                device_->state_ == Device::State::RingBufferStarted);
+  void SetActiveChannelsAndExpect(std::shared_ptr<Device> device, uint64_t expected_bitmask) {
+    ASSERT_TRUE(device->state_ == Device::State::CreatingRingBuffer ||
+                device->state_ == Device::State::RingBufferStopped ||
+                device->state_ == Device::State::RingBufferStarted);
 
     const auto now = zx::clock::get_monotonic();
-    device_->SetActiveChannels(expected_bitmask, [this](zx::result<zx::time> result) {
+    device->SetActiveChannels(expected_bitmask, [device](zx::result<zx::time> result) {
       EXPECT_TRUE(result.is_ok()) << result.status_string();
-      ASSERT_TRUE(device_->active_channels_set_time_);
-      EXPECT_EQ(result.value(), *device_->active_channels_set_time_);
+      ASSERT_TRUE(device->active_channels_set_time_);
+      EXPECT_EQ(result.value(), *device->active_channels_set_time_);
     });
     RunLoopUntilIdle();
-    ASSERT_TRUE(device_->active_channels_set_time_);
-    EXPECT_GT(*device_->active_channels_set_time_, now);
+    ASSERT_TRUE(device->active_channels_set_time_);
+    EXPECT_GT(*device->active_channels_set_time_, now);
 
-    ExpectActiveChannels(expected_bitmask);
+    ExpectActiveChannels(device, expected_bitmask);
   }
 
-  void ExpectActiveChannels(uint64_t expected_bitmask) {
-    EXPECT_EQ(device_->active_channels_bitmask_, expected_bitmask);
+  static void ExpectActiveChannels(std::shared_ptr<Device> device, uint64_t expected_bitmask) {
+    EXPECT_EQ(device->active_channels_bitmask_, expected_bitmask);
   }
 
-  void ExpectRingBufferReady() {
+  void ExpectRingBufferReady(std::shared_ptr<Device> device) {
     RunLoopUntilIdle();
-    EXPECT_TRUE(device_->state_ == Device::State::RingBufferStopped);
+    EXPECT_TRUE(device->state_ == Device::State::RingBufferStopped);
   }
 
-  void StartAndExpectValid() {
-    ASSERT_TRUE(device_->state_ == Device::State::RingBufferStopped);
+  void StartAndExpectValid(std::shared_ptr<Device> device) {
+    ASSERT_TRUE(device->state_ == Device::State::RingBufferStopped);
 
     const auto now = zx::clock::get_monotonic().get();
-    device_->StartRingBuffer([this](zx::result<zx::time> result) {
+    device->StartRingBuffer([device](zx::result<zx::time> result) {
       EXPECT_TRUE(result.is_ok()) << result.status_string();
-      ASSERT_TRUE(device_->start_time_);
-      EXPECT_EQ(result.value(), *device_->start_time_);
+      ASSERT_TRUE(device->start_time_);
+      EXPECT_EQ(result.value(), *device->start_time_);
     });
     RunLoopUntilIdle();
-    ASSERT_TRUE(device_->start_time_);
-    EXPECT_GT(device_->start_time_->get(), now);
-    EXPECT_TRUE(device_->state_ == Device::State::RingBufferStarted);
+    ASSERT_TRUE(device->start_time_);
+    EXPECT_GT(device->start_time_->get(), now);
+    EXPECT_TRUE(device->state_ == Device::State::RingBufferStarted);
   }
 
-  void StopAndExpectValid() {
-    ASSERT_TRUE(device_->state_ == Device::State::RingBufferStarted);
+  void StopAndExpectValid(std::shared_ptr<Device> device) {
+    ASSERT_TRUE(device->state_ == Device::State::RingBufferStarted);
 
-    device_->StopRingBuffer([](zx_status_t result) { EXPECT_EQ(result, ZX_OK); });
+    device->StopRingBuffer([](zx_status_t result) { EXPECT_EQ(result, ZX_OK); });
     RunLoopUntilIdle();
-    ASSERT_FALSE(device_->start_time_);
-    EXPECT_TRUE(device_->state_ == Device::State::RingBufferStopped);
+    ASSERT_FALSE(device->start_time_);
+    EXPECT_TRUE(device->state_ == Device::State::RingBufferStopped);
   }
 
-  std::optional<fuchsia_hardware_audio::RingBufferProperties> ring_buffer_props_;
+  static std::shared_ptr<Clock> device_clock(std::shared_ptr<Device> device) {
+    return device->device_clock_;
+  }
 
   std::shared_ptr<NotifyStub> notify_;
-  std::optional<fuchsia_audio_device::GainState> gain_state_;
-  std::optional<std::pair<fuchsia_audio_device::PlugState, zx::time>> plug_state_;
-  std::optional<fuchsia_hardware_audio::DelayInfo> delay_info_;
-
-  static inline constexpr zx::duration kCommandTimeout = zx::sec(0);  // zx::sec(10);
-
-  std::shared_ptr<Device> device_;
-  std::shared_ptr<Clock> device_clock() { return device_->device_clock_; }
 
   // Receives "OnInitCompletion", "DeviceHasError", "DeviceIsRemoved" notifications from Devices.
   std::shared_ptr<FakeDevicePresenceWatcher> fake_device_presence_watcher_;
 
-  // While |device_| is the object under test, this object simulates the channel messages that
-  // normally come from the actual driver instance.
-  std::unique_ptr<FakeStreamConfig> fake_driver_;
+ private:
+  std::unique_ptr<FakeStreamConfig> MakeFakeStreamConfig() {
+    zx::channel server_end, client_end;
+    EXPECT_EQ(ZX_OK, zx::channel::create(0, &server_end, &client_end));
+    return std::make_unique<FakeStreamConfig>(std::move(server_end), std::move(client_end),
+                                              dispatcher());
+  }
 };
 
 }  // namespace media_audio
