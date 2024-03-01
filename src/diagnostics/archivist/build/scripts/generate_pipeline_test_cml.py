@@ -28,7 +28,7 @@ COUNT_SELECTOR = "bootstrap/archivist:root/pipelines/{pipeline_name}/config_file
 CONFIG_FILE_SELECTOR = "bootstrap/archivist:root/pipelines/{pipeline_name}/config_files/{file_name}"
 
 
-def path_to_selector(pipeline_name, path):
+def path_to_selector(pipeline_name: str, path: str) -> str | None:
     """
     Creates an archivist selector for the given pipeline and selector config file.
 
@@ -47,11 +47,19 @@ def path_to_selector(pipeline_name, path):
     )
 
 
-def run(pipeline_name, files, output_path, expect_disabled):
-    selectors = (path_to_selector(pipeline_name, path) for path in files)
-    selectors = [s for s in selectors if s is not None]
-    count = len(selectors)
-    selectors = ",".join(['"{}"'.format(s) for s in selectors])
+def run(
+    pipeline_name: str,
+    files: list[str],
+    output_path: str,
+    expect_disabled: bool,
+) -> None:
+    selectors_list = [
+        f'"{selector}"'
+        for path in files
+        if (selector := path_to_selector(pipeline_name, path)) is not None
+    ]
+    count = len(selectors_list)
+    selectors = ",".join(selectors_list)
 
     count_selector = COUNT_SELECTOR.format(
         pipeline_name=pipeline_name, count=count
@@ -72,7 +80,7 @@ def run(pipeline_name, files, output_path, expect_disabled):
         f.write(cml)
 
 
-def main():
+def main() -> int:
     parser = argparse.ArgumentParser(
         description="Process the given selector pipeline files into selectors for Inspect."
     )
@@ -94,6 +102,7 @@ def main():
     )
     args = parser.parse_args()
     run(args.name, args.file, args.out, args.expect_disabled)
+    return 0
 
 
 if __name__ == "__main__":

@@ -23,7 +23,9 @@ import json
 import sys
 
 
-def extract_buckets(payload, current_path=[]):
+def extract_buckets(
+    payload: dict[str, object], current_path: list[str] = []
+) -> list[tuple[str, str]]:
     result = []
     for key, child in payload.items():
         if type(child) is not dict:

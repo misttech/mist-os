@@ -39,10 +39,10 @@ EXPECTED_DISABLED_CML = """{
 
 
 class GeneratePipelineTestCml(unittest.TestCase):
-    def setUp(self):
+    def setUp(self) -> None:
         self.temp_dir = tempfile.mkdtemp()
 
-    def testGenerateCml(self):
+    def testGenerateCml(self) -> None:
         out_path = os.path.join(self.temp_dir, "test.cml")
         generate_pipeline_test_cml.run(
             "feedback",
@@ -57,7 +57,7 @@ class GeneratePipelineTestCml(unittest.TestCase):
         with open(out_path, "r") as f:
             self.assertEqual(f.read(), EXPECTED_CML)
 
-    def testGenerateCmlExpectDisabled(self):
+    def testGenerateCmlExpectDisabled(self) -> None:
         out_path = os.path.join(self.temp_dir, "test.cml")
         generate_pipeline_test_cml.run(
             "feedback",

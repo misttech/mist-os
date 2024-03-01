@@ -19,7 +19,7 @@ import json
 import sys
 
 
-def measure(obj, depth=0):
+def measure(obj: dict[str, object], depth: int = 0) -> tuple[int, int, int]:
     """
     Returns the number of nodes, properties and the depth of an inspect tree.
     `obj` is a dict read from JSON that represents inspect data
@@ -41,13 +41,14 @@ def measure(obj, depth=0):
     return nodes, properties, max_depth
 
 
-def get_sort_index(sort_opt):
+def get_sort_index(sort_opt: str) -> int:
     if args.sort == "nodes":
         return 0
     elif args.sort == "properties":
         return 1
     elif args.sort == "depth":
         return 2
+    return -1
 
 
 if __name__ == "__main__":
