@@ -783,7 +783,7 @@ if (is_kernel) {
       "lib/boot-options/tests",
       "lib/devicetree/tests",
       "lib/efi:tests",
-      "lib/heap/cmpctmalloc/tests($host_toolchain)",
+      "lib/heap/cmpctmalloc:tests",
       "phys:tests",
       "phys/lib:tests",
       "target:tests",

@@ -11,7 +11,6 @@
 #ifdef _KERNEL
 #include <lib/counters.h>
 #endif
-#include <lib/heap.h>
 #include <lib/heap_internal.h>
 #include <lib/zircon-internal/align.h>
 #include <string.h>

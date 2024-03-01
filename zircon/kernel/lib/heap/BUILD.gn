@@ -4,14 +4,27 @@
 # license that can be found in the LICENSE file or at
 # https://opensource.org/licenses/MIT
 
-import("//build/zircon/migrated_targets.gni")
+import("//build/cpp/library_headers.gni")
 
-zx_library("heap") {
+library_headers("headers") {
+  headers = [ "lib/heap.h" ]
+}
+
+library_headers("headers.internal") {
+  visibility = [ "./*" ]
+
+  headers = [ "lib/heap_internal.h" ]
+}
+
+source_set("heap") {
+  public_deps = [ ":headers" ]
+
   sources = [
     "cxx_allocator.cc",
     "heap_wrapper.cc",
   ]
   deps = [
+    ":headers.internal",
     "cmpctmalloc",
     "//zircon/kernel/lib/console",
     "//zircon/kernel/lib/virtual_alloc",

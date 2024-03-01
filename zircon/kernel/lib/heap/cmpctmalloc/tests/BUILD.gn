@@ -7,19 +7,20 @@
 import("//build/test.gni")
 
 if (is_host) {
-  test("tests") {
-    output_name = "cmpctmalloc_test"
+  test("cmpctmalloc_test") {
     sources = [
       "cmpctmalloc_test.cc",
       "page_manager.cc",
     ]
     deps = [
+      "//zircon/kernel/lib/heap:headers",
       "//zircon/kernel/lib/heap/cmpctmalloc",
       "//zircon/system/ulib/zxtest",
     ]
-    include_dirs = [
-      "//zircon/kernel/lib/heap/cmpctmalloc/include/lib",
-      "//zircon/kernel/lib/heap/include",
-    ]
   }
+}
+
+group("tests") {
+  testonly = true
+  deps = [ ":cmpctmalloc_test($host_toolchain)" ]
 }

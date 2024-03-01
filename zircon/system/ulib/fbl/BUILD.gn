@@ -72,7 +72,9 @@ zx_library("fbl") {
   if (is_kernel) {
     # Anything using libc++ headers in the kernel needs this.
     public_deps += [ "//zircon/kernel/lib/ktl:headers" ]
-    if (toolchain_environment != "kernel") {
+    if (toolchain_environment == "kernel") {
+      deps += [ "//zircon/kernel/lib/heap:headers" ]
+    } else {
       deps += [
         "//zircon/kernel/lib/ktl",
         "//zircon/kernel/lib/libc",

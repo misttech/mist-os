@@ -69,6 +69,7 @@ source_set("impl") {
     "//zircon/kernel/lib/crypto",
     "//zircon/kernel/lib/fbl",
     "//zircon/kernel/lib/gfxconsole",
+    "//zircon/kernel/lib/heap",
     "//zircon/kernel/lib/io",
     "//zircon/kernel/lib/kpci",
     "//zircon/kernel/lib/ktl",

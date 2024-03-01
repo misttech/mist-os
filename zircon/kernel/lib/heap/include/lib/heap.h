@@ -14,11 +14,13 @@
 
 __BEGIN_CDECLS
 
-// define this to enable collection of all unique call sites with unique sizes
-#define HEAP_COLLECT_STATS 0
-
 // The underlying cmpctmalloc allocator defaults to 8 byte alignment.
 #define HEAP_DEFAULT_ALIGNMENT 8
+
+#ifdef _KERNEL
+
+// define this to enable collection of all unique call sites with unique sizes
+#define HEAP_COLLECT_STATS 0
 
 // standard heap definitions
 void* malloc(size_t size) __MALLOC __ALLOC_SIZE(1);
@@ -34,6 +36,8 @@ void heap_get_info(size_t* total_bytes, size_t* free_bytes);
 
 // called once at kernel initialization
 void heap_init(void);
+
+#endif  // _KERNEL
 
 __END_CDECLS
 

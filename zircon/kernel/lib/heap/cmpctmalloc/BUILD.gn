@@ -6,22 +6,28 @@
 
 import("//build/cpp/library_headers.gni")
 
-library_headers("cmpctmalloc_headers") {
+library_headers("headers") {
   headers = [ "lib/cmpctmalloc.h" ]
+  public_deps = [
+    # <lib/cmpctmalloc.h> has `#include <lib/zircon-internal/thread_annotations.h>`.
+    "//zircon/system/ulib/zircon-internal",
+
+    # <lib/cmpctmalloc.h> has `#include <fbl/enum_bits.h>'.
+    "//zircon/system/ulib/fbl",
+  ]
 }
 
 source_set("cmpctmalloc") {
   sources = [ "cmpctmalloc.cc" ]
   deps = [
+    "//zircon/kernel/lib/heap:headers.internal",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/pretty",
   ]
-  public_deps = [ ":cmpctmalloc_headers" ]
+  public_deps = [ ":headers" ]
 
   if (is_host) {
-    public_deps += [ "//zircon/system/ulib/zircon-internal" ]
-    include_dirs = [ "//zircon/kernel/lib/heap/include" ]
-    defines = [ "ZX_ASSERT_LEVEL=2" ]
+    configs += [ "//build/config/fuchsia:enable_zircon_asserts" ]
   } else if (is_kernel) {
     deps += [
       "//zircon/kernel/lib/counters",
@@ -30,4 +36,9 @@ source_set("cmpctmalloc") {
       "//zircon/kernel/lib/instrumentation:headers",
     ]
   }
+}
+
+group("tests") {
+  testonly = true
+  deps = [ "tests" ]
 }

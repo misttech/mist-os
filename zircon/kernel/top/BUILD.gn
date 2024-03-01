@@ -25,6 +25,7 @@ source_set("top") {
     "//zircon/kernel/lib/crashlog",
     "//zircon/kernel/lib/cxxabi-dynamic-init:headers",
     "//zircon/kernel/lib/debuglog",
+    "//zircon/kernel/lib/heap",
     "//zircon/kernel/lib/init",
     "//zircon/kernel/lib/io",
     "//zircon/kernel/lib/jtrace:headers",
