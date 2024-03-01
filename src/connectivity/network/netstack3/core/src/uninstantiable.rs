@@ -264,10 +264,20 @@ impl<
         P: tcp_socket::TcpDemuxContext<I, D, BT>,
     > tcp_socket::TcpDemuxContext<I, D, BT> for UninstantiableWrapper<P>
 {
+    type IpTransportCtx<'a> = P::IpTransportCtx<'a>;
     fn with_demux<O, F: FnOnce(&tcp_socket::DemuxState<I, D, BT>) -> O>(&mut self, _cb: F) -> O {
         self.uninstantiable_unreachable()
     }
     fn with_demux_mut<O, F: FnOnce(&mut tcp_socket::DemuxState<I, D, BT>) -> O>(
+        &mut self,
+        _cb: F,
+    ) -> O {
+        self.uninstantiable_unreachable()
+    }
+    fn with_demux_mut_and_ip_transport_ctx<
+        O,
+        F: FnOnce(&mut tcp_socket::DemuxState<I, D, BT>, &mut Self::IpTransportCtx<'_>) -> O,
+    >(
         &mut self,
         _cb: F,
     ) -> O {
@@ -353,10 +363,15 @@ impl<I: tcp_socket::DualStackIpExt> tcp_socket::DualStackDemuxIdConverter<I> for
     }
 }
 
-impl<I: tcp_socket::DualStackIpExt, P> tcp_socket::TcpDualStackContext<I>
-    for UninstantiableWrapper<P>
+impl<
+        I: tcp_socket::DualStackIpExt,
+        D: device::WeakId,
+        BT: TcpBindingsTypes,
+        P: tcp_socket::TcpDualStackContext<I::OtherVersion, D, BT>,
+    > tcp_socket::TcpDualStackContext<I, D, BT> for UninstantiableWrapper<P>
 {
     type Converter = Uninstantiable;
+    type DualStackIpTransportCtx<'a> = P::DualStackIpTransportCtx<'a>;
     fn other_demux_id_converter(&self) -> Self::Converter {
         self.uninstantiable_unreachable()
     }
@@ -366,6 +381,33 @@ impl<I: tcp_socket::DualStackIpExt, P> tcp_socket::TcpDualStackContext<I>
     }
 
     fn set_dual_stack_enabled(&self, _ip_options: &mut I::DualStackIpOptions, _value: bool) {
+        self.uninstantiable_unreachable()
+    }
+
+    fn with_both_demux_mut<
+        O,
+        F: FnOnce(
+            &mut tcp_socket::DemuxState<I, D, BT>,
+            &mut tcp_socket::DemuxState<I::OtherVersion, D, BT>,
+        ) -> O,
+    >(
+        &mut self,
+        _cb: F,
+    ) -> O {
+        self.uninstantiable_unreachable()
+    }
+
+    fn with_both_demux_mut_and_ip_transport_ctx<
+        O,
+        F: FnOnce(
+            &mut tcp_socket::DemuxState<I, D, BT>,
+            &mut tcp_socket::DemuxState<I::OtherVersion, D, BT>,
+            &mut Self::DualStackIpTransportCtx<'_>,
+        ) -> O,
+    >(
+        &mut self,
+        _cb: F,
+    ) -> O {
         self.uninstantiable_unreachable()
     }
 }

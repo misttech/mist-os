@@ -65,12 +65,12 @@ use crate::{
     socket::{
         self,
         address::{
-            AddrIsMappedError, ConnAddr, ConnIpAddr, DualStackRemoteIp, ListenerAddr,
-            ListenerIpAddr, SocketIpAddr, TryUnmapResult,
+            AddrIsMappedError, ConnAddr, ConnIpAddr, DualStackListenerIpAddr, DualStackRemoteIp,
+            ListenerAddr, ListenerIpAddr, SocketIpAddr, TryUnmapResult,
         },
-        AddrVec, Bound, BoundSocketMap, EitherStack, IncompatibleError, InsertError, Inserter,
-        ListenerAddrInfo, MaybeDualStack, NotDualStackCapableError, RemoveResult,
-        SetDualStackEnabledError, ShutdownType, SocketMapAddrSpec, SocketMapAddrStateSpec,
+        AddrVec, Bound, EitherStack, IncompatibleError, InsertError, Inserter, ListenerAddrInfo,
+        MaybeDualStack, NotDualStackCapableError, RemoveResult, SetDualStackEnabledError,
+        ShutdownType, SocketMapAddrSpec, SocketMapAddrStateSpec,
         SocketMapAddrStateUpdateSharingSpec, SocketMapConflictPolicy, SocketMapStateSpec,
         SocketMapUpdateSharingPolicy, UpdateSharingError,
     },
@@ -98,9 +98,9 @@ pub trait DualStackIpExt: crate::socket::DualStackIpExt {
     type ConnectionAndAddr<D: device::WeakId, BT: TcpBindingsTypes>: Send + Sync + Debug;
 
     /// The type for the address that the listener is listening on. This should
-    /// be just [`ListenerAddr`] for [`Ipv4`], but an [`EitherStack`] for
-    /// [`Ipv6`].
-    type ListenerAddr<D: device::WeakId>: Send + Sync + Debug + Clone + AsRef<Option<D>>;
+    /// be just [`ListenerIpAddr`] for [`Ipv4`], but a [`DualStackListenerIpAddr`]
+    /// for [`Ipv6`].
+    type ListenerIpAddr: Send + Sync + Debug + Clone;
 
     /// IP options unique to a particular IP version.
     type DualStackIpOptions: Send + Sync + Debug + Default + Clone + Copy;
@@ -138,7 +138,7 @@ pub trait DualStackIpExt: crate::socket::DualStackIpExt {
         conn_and_addr: &Self::ConnectionAndAddr<D, BT>,
     ) -> bool;
     fn get_bound_info<D: device::WeakId>(
-        listener_addr: &Self::ListenerAddr<D>,
+        listener_addr: &ListenerAddr<Self::ListenerIpAddr, D>,
     ) -> BoundInfo<Self::Addr, D>;
 }
 
@@ -147,7 +147,7 @@ impl DualStackIpExt for Ipv4 {
         EitherStack<TcpSocketId<Ipv4, D, BT>, TcpSocketId<Ipv6, D, BT>>;
     type ConnectionAndAddr<D: device::WeakId, BT: TcpBindingsTypes> =
         (Connection<Ipv4, Ipv4, D, BT>, ConnAddr<ConnIpAddr<Ipv4Addr, NonZeroU16, NonZeroU16>, D>);
-    type ListenerAddr<D: device::WeakId> = ListenerAddr<ListenerIpAddr<Ipv4Addr, NonZeroU16>, D>;
+    type ListenerIpAddr = ListenerIpAddr<Ipv4Addr, NonZeroU16>;
     type DualStackIpOptions = ();
 
     fn as_dual_stack_ip_socket<D: device::WeakId, BT: TcpBindingsTypes>(
@@ -190,7 +190,7 @@ impl DualStackIpExt for Ipv4 {
         conn.defunct
     }
     fn get_bound_info<D: device::WeakId>(
-        listener_addr: &Self::ListenerAddr<D>,
+        listener_addr: &ListenerAddr<Self::ListenerIpAddr, D>,
     ) -> BoundInfo<Self::Addr, D> {
         listener_addr.clone().into()
     }
@@ -210,13 +210,8 @@ impl DualStackIpExt for Ipv6 {
         (Connection<Ipv6, Ipv6, D, BT>, ConnAddr<ConnIpAddr<Ipv6Addr, NonZeroU16, NonZeroU16>, D>),
         (Connection<Ipv6, Ipv4, D, BT>, ConnAddr<ConnIpAddr<Ipv4Addr, NonZeroU16, NonZeroU16>, D>),
     >;
-    // TODO(https://issues.fuchsia.dev/319117141): Use [`DualStackListenerIpAddr`]
-    // when we support listening in both stacks.
-    type ListenerAddr<D: device::WeakId> = EitherStack<
-        ListenerAddr<ListenerIpAddr<Ipv6Addr, NonZeroU16>, D>,
-        ListenerAddr<ListenerIpAddr<Ipv4Addr, NonZeroU16>, D>,
-    >;
     type DualStackIpOptions = Ipv6Options;
+    type ListenerIpAddr = DualStackListenerIpAddr<Ipv6Addr, NonZeroU16>;
 
     fn as_dual_stack_ip_socket<D: device::WeakId, BT: TcpBindingsTypes>(
         id: &Self::DemuxSocketId<D, BT>,
@@ -282,13 +277,15 @@ impl DualStackIpExt for Ipv6 {
         }
     }
     fn get_bound_info<D: device::WeakId>(
-        listener_addr: &Self::ListenerAddr<D>,
+        ListenerAddr { ip, device }: &ListenerAddr<Self::ListenerIpAddr, D>,
     ) -> BoundInfo<Self::Addr, D> {
-        match listener_addr {
-            EitherStack::ThisStack(listener_addr) => listener_addr.clone().into(),
-            EitherStack::OtherStack(ListenerAddr {
-                ip: ListenerIpAddr { addr, identifier: local_port },
-                device,
+        match ip {
+            DualStackListenerIpAddr::ThisStack(ip) => {
+                ListenerAddr { ip: ip.clone(), device: device.clone() }.into()
+            }
+            DualStackListenerIpAddr::OtherStack(ListenerIpAddr {
+                addr,
+                identifier: local_port,
             }) => BoundInfo {
                 addr: Some(maybe_zoned(
                     addr.map(|a| a.addr()).unwrap_or(Ipv4::UNSPECIFIED_ADDRESS).to_ipv6_mapped(),
@@ -297,6 +294,9 @@ impl DualStackIpExt for Ipv6 {
                 port: *local_port,
                 device: device.clone(),
             },
+            DualStackListenerIpAddr::BothStacks(local_port) => {
+                BoundInfo { addr: None, port: *local_port, device: device.clone() }
+            }
         }
     }
 }
@@ -450,11 +450,27 @@ where
 }
 
 pub trait TcpDemuxContext<I: DualStackIpExt, D: device::WeakId, BT: TcpBindingsTypes> {
+    type IpTransportCtx<'a>: TransportIpContext<I, BT, DeviceId = D::Strong, WeakDeviceId = D>
+        + DeviceIpSocketHandler<I, BT>;
+
     /// Calls `f` with non-mutable access to the demux state.
     fn with_demux<O, F: FnOnce(&DemuxState<I, D, BT>) -> O>(&mut self, cb: F) -> O;
 
-    /// Calls `f` with non-mutable access to the demux state.
+    /// Calls `f` with mutable access to the demux state.
     fn with_demux_mut<O, F: FnOnce(&mut DemuxState<I, D, BT>) -> O>(&mut self, cb: F) -> O;
+
+    /// Calls `f` with mutable access to the demux state and a transport core
+    /// context.
+    // TODO(https://fxbug.dev/327489613): This function allows us doing IP-level
+    // operations while holding on to the demux lock. We might want to revisit
+    // when we enable multithreading.
+    fn with_demux_mut_and_ip_transport_ctx<
+        O,
+        F: FnOnce(&mut DemuxState<I, D, BT>, &mut Self::IpTransportCtx<'_>) -> O,
+    >(
+        &mut self,
+        cb: F,
+    ) -> O;
 }
 
 /// Provides access to the current stack of the context.
@@ -500,8 +516,9 @@ pub trait TcpContext<I: DualStackIpExt, BC: TcpBindingsTypes>:
                 Connection<I, I, Self::WeakDeviceId, BC>,
                 ConnAddr<ConnIpAddr<<I as Ip>::Addr, NonZeroU16, NonZeroU16>, Self::WeakDeviceId>,
             ),
-        > + OwnedOrRefsBidirectionalConverter<
-            I::ListenerAddr<Self::WeakDeviceId>,
+        > + OwnedOrRefsBidirectionalConverter<I::ListenerIpAddr, ListenerIpAddr<I::Addr, NonZeroU16>>
+        + OwnedOrRefsBidirectionalConverter<
+            ListenerAddr<I::ListenerIpAddr, Self::WeakDeviceId>,
             ListenerAddr<ListenerIpAddr<I::Addr, NonZeroU16>, Self::WeakDeviceId>,
         >;
 
@@ -516,7 +533,7 @@ pub trait TcpContext<I: DualStackIpExt, BC: TcpBindingsTypes>:
             WeakDeviceId = Self::WeakDeviceId,
         > + DeviceIpSocketHandler<I::OtherVersion, BC>
         + TcpDemuxContext<I::OtherVersion, Self::WeakDeviceId, BC>
-        + TcpDualStackContext<I>
+        + TcpDualStackContext<I, Self::WeakDeviceId, BC>
         + AsThisStack<Self::ThisStackIpTransportAndDemuxCtx<'a>>;
 
     /// A collection of type assertions that must be true in the dual stack
@@ -541,14 +558,11 @@ pub trait TcpContext<I: DualStackIpExt, BC: TcpBindingsTypes>:
                 ),
             >,
         > + OwnedOrRefsBidirectionalConverter<
-            I::ListenerAddr<Self::WeakDeviceId>,
-            EitherStack<
-                ListenerAddr<ListenerIpAddr<I::Addr, NonZeroU16>, Self::WeakDeviceId>,
-                ListenerAddr<
-                    ListenerIpAddr<<I::OtherVersion as Ip>::Addr, NonZeroU16>,
-                    Self::WeakDeviceId,
-                >,
-            >,
+            I::ListenerIpAddr,
+            DualStackListenerIpAddr<I::Addr, NonZeroU16>,
+        > + OwnedOrRefsBidirectionalConverter<
+            ListenerAddr<I::ListenerIpAddr, Self::WeakDeviceId>,
+            ListenerAddr<DualStackListenerIpAddr<I::Addr, NonZeroU16>, Self::WeakDeviceId>,
         >;
 
     /// Calls the function with mutable access to the set with all TCP sockets.
@@ -688,13 +702,18 @@ impl DualStackDemuxIdConverter<Ipv6> for Ipv6SocketIdToIpv4DemuxIdConverter {
 }
 
 /// A provider of dualstack socket functionality required by TCP sockets.
-pub trait TcpDualStackContext<I: DualStackIpExt> {
+pub trait TcpDualStackContext<I: DualStackIpExt, D: device::WeakId, BT: TcpBindingsTypes> {
     type Converter: DualStackDemuxIdConverter<I> + Clone + Copy;
+
+    type DualStackIpTransportCtx<'a>: TransportIpContext<I, BT, DeviceId = D::Strong, WeakDeviceId = D>
+        + DeviceIpSocketHandler<I, BT>
+        + TransportIpContext<I::OtherVersion, BT, DeviceId = D::Strong, WeakDeviceId = D>
+        + DeviceIpSocketHandler<I::OtherVersion, BT>;
 
     fn other_demux_id_converter(&self) -> Self::Converter;
 
     /// Turns a [`TcpSocketId`] into the demuxer ID of the other stack.
-    fn into_other_demux_socket_id<D: device::WeakId, BT: TcpBindingsTypes>(
+    fn into_other_demux_socket_id(
         &self,
         id: TcpSocketId<I, D, BT>,
     ) -> <I::OtherVersion as DualStackIpExt>::DemuxSocketId<D, BT> {
@@ -705,6 +724,32 @@ pub trait TcpDualStackContext<I: DualStackIpExt> {
     fn dual_stack_enabled(&self, ip_options: &I::DualStackIpOptions) -> bool;
     /// Sets the enabled state of dual stack operations on the given socket.
     fn set_dual_stack_enabled(&self, ip_options: &mut I::DualStackIpOptions, value: bool);
+
+    /// Calls `f` with mutable access to both demux states.
+    fn with_both_demux_mut<
+        O,
+        F: FnOnce(&mut DemuxState<I, D, BT>, &mut DemuxState<I::OtherVersion, D, BT>) -> O,
+    >(
+        &mut self,
+        cb: F,
+    ) -> O;
+
+    /// Calls `f` with mutable access to both demux states and a transport
+    /// core context can operate on both IP versions.
+    // TODO(https://fxbug.dev/327489613): This function allows us doing IP-level
+    // operations while holding on to the demux locks. We might want to revisit
+    // when we enable multithreading.
+    fn with_both_demux_mut_and_ip_transport_ctx<
+        O,
+        F: FnOnce(
+            &mut DemuxState<I, D, BT>,
+            &mut DemuxState<I::OtherVersion, D, BT>,
+            &mut Self::DualStackIpTransportCtx<'_>,
+        ) -> O,
+    >(
+        &mut self,
+        cb: F,
+    ) -> O;
 }
 
 /// Socket address includes the ip address and the port number.
@@ -842,8 +887,7 @@ enum ListenerAddrState<S> {
     Shared { listener: Option<S>, bound: SmallVec<[S; 1]> },
 }
 
-#[derive(Clone, Copy, Debug)]
-#[cfg_attr(test, derive(PartialEq))]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct ListenerSharingState {
     pub(crate) sharing: SharingState,
     pub(crate) listening: bool,
@@ -866,7 +910,7 @@ impl<'a, S> Inserter<S> for ListenerAddrInserter<'a, S> {
 #[derive(Derivative)]
 #[derivative(Debug(bound = "D: Debug"))]
 pub enum BoundSocketState<I: DualStackIpExt, D: device::WeakId, BT: TcpBindingsTypes> {
-    Listener((MaybeListener<I, D, BT>, ListenerSharingState, I::ListenerAddr<D>)),
+    Listener((MaybeListener<I, D, BT>, ListenerSharingState, ListenerAddr<I::ListenerIpAddr, D>)),
     Connected((I::ConnectionAndAddr<D, BT>, SharingState)),
 }
 
@@ -1401,8 +1445,10 @@ impl<I: DualStackIpExt, D: device::WeakId, BT: TcpBindingsTypes> Drop for TcpSoc
     }
 }
 
+type BoundSocketMap<I, D, BT> = socket::BoundSocketMap<I, D, TcpPortSpec, TcpSocketSpec<I, D, BT>>;
+
 pub struct DemuxState<I: DualStackIpExt, D: device::WeakId, BT: TcpBindingsTypes> {
-    socketmap: BoundSocketMap<I, D, TcpPortSpec, TcpSocketSpec<I, D, BT>>,
+    socketmap: BoundSocketMap<I, D, BT>,
 }
 
 /// Holds all the TCP socket states.
@@ -1433,7 +1479,7 @@ pub enum TcpSocketStateInner<I: DualStackIpExt, D: device::WeakId, BT: TcpBindin
 }
 
 impl<I: DualStackIpExt, D: device::WeakId, BT: TcpBindingsTypes> PortAllocImpl
-    for BoundSocketMap<I, D, TcpPortSpec, TcpSocketSpec<I, D, BT>>
+    for BoundSocketMap<I, D, BT>
 {
     const EPHEMERAL_RANGE: RangeInclusive<u16> = 49152..=65535;
     type Id = Option<SocketIpAddr<I::Addr>>;
@@ -1468,6 +1514,22 @@ impl<I: DualStackIpExt, D: device::WeakId, BT: TcpBindingsTypes> PortAllocImpl
                 unreachable!("no connection shall be included in an iteration from a listener")
             }
         }) && self.get_shadower_counts(&root_addr) == 0
+    }
+}
+
+/// When binding to IPv6 ANY address (::), we need to allocate a port that is
+/// available in both stacks.
+impl<'a, I: DualStackIpExt, D: device::WeakId, BT: TcpBindingsTypes> PortAllocImpl
+    for (&'a BoundSocketMap<I, D, BT>, &'a BoundSocketMap<I::OtherVersion, D, BT>)
+{
+    const EPHEMERAL_RANGE: RangeInclusive<u16> =
+        <BoundSocketMap<I, D, BT> as PortAllocImpl>::EPHEMERAL_RANGE;
+    type Id = ();
+    type PortAvailableArg = ();
+
+    fn is_port_available(&self, (): &Self::Id, port: u16, (): &Self::PortAvailableArg) -> bool {
+        let (this, other) = self;
+        this.is_port_available(&None, port, &None) && other.is_port_available(&None, port, &None)
     }
 }
 
@@ -1708,7 +1770,7 @@ impl HandshakeStatus {
     }
 }
 
-fn bind_inner<I, BC, DC>(
+fn bind_install_in_demux<I, BC, DC>(
     core_ctx: &mut DC,
     bindings_ctx: &mut BC,
     demux_socket_id: I::DemuxSocketId<DC::WeakDeviceId, BC>,
@@ -1716,6 +1778,7 @@ fn bind_inner<I, BC, DC>(
     bound_device: &Option<DC::WeakDeviceId>,
     port: Option<NonZeroU16>,
     sharing: SharingState,
+    DemuxState { socketmap }: &mut DemuxState<I, DC::WeakDeviceId, BC>,
 ) -> Result<
     (ListenerAddr<ListenerIpAddr<I::Addr, NonZeroU16>, DC::WeakDeviceId>, ListenerSharingState),
     LocalAddressError,
@@ -1723,9 +1786,7 @@ fn bind_inner<I, BC, DC>(
 where
     I: DualStackIpExt,
     BC: TcpBindingsTypes + RngContext,
-    DC: TransportIpContext<I, BC>
-        + DeviceIpSocketHandler<I, BC>
-        + TcpDemuxContext<I, DC::WeakDeviceId, BC>,
+    DC: TransportIpContext<I, BC> + DeviceIpSocketHandler<I, BC>,
 {
     let (local_ip, device) = match addr {
         Some(addr) => {
@@ -1753,9 +1814,9 @@ where
     };
 
     let weak_device = device.map(|d| d.as_weak(core_ctx).into_owned());
-    core_ctx.with_demux_mut(move |DemuxState { socketmap }| {
-        let port = match port {
-            None => match algorithm::simple_randomized_port_alloc(
+    let port = match port {
+        None => {
+            match algorithm::simple_randomized_port_alloc(
                 &mut bindings_ctx.rng(),
                 &local_ip,
                 socketmap,
@@ -1765,23 +1826,23 @@ where
                 None => {
                     return Err(LocalAddressError::FailedToAllocateLocalPort);
                 }
-            },
-            Some(port) => port,
-        };
+            }
+        }
+        Some(port) => port,
+    };
 
-        let addr = ListenerAddr {
-            ip: ListenerIpAddr { addr: local_ip, identifier: port },
-            device: weak_device,
-        };
-        let sharing = ListenerSharingState { sharing, listening: false };
+    let addr = ListenerAddr {
+        ip: ListenerIpAddr { addr: local_ip, identifier: port },
+        device: weak_device,
+    };
+    let sharing = ListenerSharingState { sharing, listening: false };
 
-        let _inserted = socketmap
-            .listeners_mut()
-            .try_insert(addr.clone(), sharing.clone(), demux_socket_id)
-            .map_err(|_: (InsertError, ListenerSharingState)| LocalAddressError::AddressInUse)?;
+    let _inserted = socketmap
+        .listeners_mut()
+        .try_insert(addr.clone(), sharing.clone(), demux_socket_id)
+        .map_err(|_: (InsertError, ListenerSharingState)| LocalAddressError::AddressInUse)?;
 
-        Ok((addr, sharing))
-    })
+    Ok((addr, sharing))
 }
 
 fn try_update_listener_sharing<I, CC, BT>(
@@ -1790,7 +1851,7 @@ fn try_update_listener_sharing<I, CC, BT>(
         (&mut CC::SingleStackIpTransportAndDemuxCtx<'_>, CC::SingleStackConverter),
     >,
     id: &TcpSocketId<I, CC::WeakDeviceId, BT>,
-    addr: &I::ListenerAddr<CC::WeakDeviceId>,
+    addr: ListenerAddr<I::ListenerIpAddr, CC::WeakDeviceId>,
     sharing: &ListenerSharingState,
     new_sharing: ListenerSharingState,
 ) -> Result<ListenerSharingState, UpdateSharingError>
@@ -1804,31 +1865,68 @@ where
             core_ctx.with_demux_mut(|DemuxState { socketmap }| {
                 let mut entry = socketmap
                     .listeners_mut()
-                    .entry(&I::into_demux_socket_id(id.clone()), converter.convert(addr))
+                    .entry(&I::into_demux_socket_id(id.clone()), &converter.convert(addr))
                     .expect("invalid listener id");
                 entry.try_update_sharing(sharing, new_sharing)
             })
         }
         MaybeDualStack::DualStack((core_ctx, converter)) => match converter.convert(addr) {
-            EitherStack::ThisStack(addr) => {
+            ListenerAddr { ip: DualStackListenerIpAddr::ThisStack(ip), device } => {
                 TcpDemuxContext::<I, _, _>::with_demux_mut(core_ctx, |DemuxState { socketmap }| {
                     let mut entry = socketmap
                         .listeners_mut()
-                        .entry(&I::into_demux_socket_id(id.clone()), addr)
+                        .entry(&I::into_demux_socket_id(id.clone()), &ListenerAddr { ip, device })
                         .expect("invalid listener id");
                     entry.try_update_sharing(sharing, new_sharing)
                 })
             }
-            EitherStack::OtherStack(addr) => {
+            ListenerAddr { ip: DualStackListenerIpAddr::OtherStack(ip), device } => {
                 let demux_id = core_ctx.into_other_demux_socket_id(id.clone());
                 TcpDemuxContext::<I::OtherVersion, _, _>::with_demux_mut(
                     core_ctx,
                     |DemuxState { socketmap }| {
                         let mut entry = socketmap
                             .listeners_mut()
-                            .entry(&demux_id, addr)
+                            .entry(&demux_id, &ListenerAddr { ip, device })
                             .expect("invalid listener id");
                         entry.try_update_sharing(sharing, new_sharing)
+                    },
+                )
+            }
+            ListenerAddr { ip: DualStackListenerIpAddr::BothStacks(port), device } => {
+                let other_demux_id = core_ctx.into_other_demux_socket_id(id.clone());
+                let demux_id = I::into_demux_socket_id(id.clone());
+                core_ctx.with_both_demux_mut(
+                    |DemuxState { socketmap: this_socketmap, .. },
+                     DemuxState { socketmap: other_socketmap, .. }| {
+                        let this_stack_listener_addr = ListenerAddr {
+                            ip: ListenerIpAddr { addr: None, identifier: port },
+                            device: device.clone(),
+                        };
+                        let mut this_stack_entry = this_socketmap
+                            .listeners_mut()
+                            .entry(&demux_id, &this_stack_listener_addr)
+                            .expect("invalid listener id");
+                        this_stack_entry.try_update_sharing(sharing, new_sharing)?;
+                        let mut other_stack_entry = other_socketmap
+                            .listeners_mut()
+                            .entry(
+                                &other_demux_id,
+                                &ListenerAddr {
+                                    ip: ListenerIpAddr { addr: None, identifier: port },
+                                    device,
+                                },
+                            )
+                            .expect("invalid listener id");
+                        match other_stack_entry.try_update_sharing(sharing, new_sharing) {
+                            Ok(()) => Ok(()),
+                            Err(err) => {
+                                this_stack_entry
+                                    .try_update_sharing(&new_sharing, *sharing)
+                                    .expect("failed to revert the sharing setting");
+                                Err(err)
+                            }
+                        }
                     },
                 )
             }
@@ -1912,14 +2010,31 @@ where
         >,
         port: Option<NonZeroU16>,
     ) -> Result<(), BindError> {
+        #[derive(GenericOverIp)]
+        #[generic_over_ip(I, Ip)]
+        enum BindAddr<I: DualStackIpExt, D> {
+            BindInBothStacks,
+            BindInOneStack(
+                EitherStack<
+                    Option<ZonedAddr<SocketIpAddr<I::Addr>, D>>,
+                    Option<ZonedAddr<SocketIpAddr<<I::OtherVersion as Ip>::Addr>, D>>,
+                >,
+            ),
+        }
         debug!("bind {id:?} to {addr:?}:{port:?}");
         let bind_addr = match addr {
-            // TODO(issues.fuchsia.dev/319117141): Should bind in both stacks
-            // for unspecified local address.
-            None => EitherStack::ThisStack(None),
+            None => I::map_ip(
+                (),
+                |()| BindAddr::BindInOneStack(EitherStack::ThisStack(None)),
+                |()| BindAddr::BindInBothStacks,
+            ),
             Some(addr) => match socket::address::try_unmap(addr) {
-                TryUnmapResult::CannotBeUnmapped(addr) => EitherStack::ThisStack(Some(addr)),
-                TryUnmapResult::Mapped(addr) => EitherStack::OtherStack(addr),
+                TryUnmapResult::CannotBeUnmapped(addr) => {
+                    BindAddr::BindInOneStack(EitherStack::ThisStack(Some(addr)))
+                }
+                TryUnmapResult::Mapped(addr) => {
+                    BindAddr::BindInOneStack(EitherStack::OtherStack(addr))
+                }
             },
         };
 
@@ -1939,51 +2054,165 @@ where
                 socket_extra: socket_extra.clone(),
             };
 
+            // TODO(https://fxbug.dev/327489613): We have some code duplication
+            // below calling `bind_install_in_demux` because we want to only
+            // take the other stack's demux lock when necessary.
+            // TODO(https://fxbug.dev/327488712): To maximize code reuse,
+            // `bind_install_in_demux` doesn't acquire locks directly, but this
+            // may cause worse contention down the road when multithreading is
+            // enabled.
             let (listener_addr, sharing) = match core_ctx {
                 MaybeDualStack::NotDualStack((core_ctx, converter)) => match bind_addr {
-                    EitherStack::ThisStack(local_addr) => {
-                        let (addr, sharing) = bind_inner(
-                            core_ctx,
-                            bindings_ctx,
-                            I::into_demux_socket_id(id.clone()),
-                            local_addr,
-                            bound_device,
-                            port,
-                            *sharing,
-                        )?;
+                    BindAddr::BindInOneStack(EitherStack::ThisStack(local_addr)) => {
+                        let (addr, sharing) =
+                            core_ctx.with_demux_mut_and_ip_transport_ctx(|demux, core_ctx| {
+                                bind_install_in_demux(
+                                    core_ctx,
+                                    bindings_ctx,
+                                    I::into_demux_socket_id(id.clone()),
+                                    local_addr,
+                                    bound_device,
+                                    port,
+                                    *sharing,
+                                    demux,
+                                )
+                            })?;
                         (converter.convert_back(addr), sharing)
                     }
-                    EitherStack::OtherStack(_addr) => {
+                    BindAddr::BindInOneStack(EitherStack::OtherStack(_)) | BindAddr::BindInBothStacks => {
                         return Err(LocalAddressError::CannotBindToAddress.into());
                     }
                 },
-                MaybeDualStack::DualStack((core_ctx, converter)) => match bind_addr {
-                    EitherStack::ThisStack(addr) => {
-                        let (addr, sharing) = bind_inner::<I, _, _>(
-                            core_ctx,
-                            bindings_ctx,
-                            I::into_demux_socket_id(id.clone()),
-                            addr,
-                            bound_device,
-                            port,
-                            *sharing,
-                        )?;
-                        (converter.convert_back(EitherStack::ThisStack(addr)), sharing)
-                    }
-                    EitherStack::OtherStack(addr) => {
-                        if !core_ctx.dual_stack_enabled(ip_options) {
-                            return Err(LocalAddressError::CannotBindToAddress.into());
+                MaybeDualStack::DualStack((core_ctx, converter)) => {
+                    let bind_addr = match (
+                            core_ctx.dual_stack_enabled(&ip_options),
+                            bind_addr
+                        ) {
+                        // Allow binding in both stacks when dual stack is
+                        // enabled.
+                        (true, BindAddr::BindInBothStacks)
+                            => BindAddr::<I, _>::BindInBothStacks,
+                        // Only bind in this stack if dual stack is not enabled.
+                        (false, BindAddr::BindInBothStacks)
+                            => BindAddr::BindInOneStack(EitherStack::ThisStack(None)),
+                        // Binding to this stack is always allowed.
+                        (true | false, BindAddr::BindInOneStack(EitherStack::ThisStack(ip)))
+                            => BindAddr::BindInOneStack(EitherStack::ThisStack(ip)),
+                        // Can bind to the other stack only when dual stack is
+                        // enabled, otherwise an error is returned.
+                        (true, BindAddr::BindInOneStack(EitherStack::OtherStack(ip)))
+                            => BindAddr::BindInOneStack(EitherStack::OtherStack(ip)),
+                        (false, BindAddr::BindInOneStack(EitherStack::OtherStack(_)))
+                            => return Err(LocalAddressError::CannotBindToAddress.into()),
+                    };
+                    match bind_addr {
+                        BindAddr::BindInOneStack(EitherStack::ThisStack(addr)) => {
+                            let (ListenerAddr { ip, device }, sharing) =
+                                TcpDemuxContext::<I, _, _>::with_demux_mut_and_ip_transport_ctx(core_ctx, |demux, core_ctx| {
+                                    bind_install_in_demux(
+                                        core_ctx,
+                                        bindings_ctx,
+                                        I::into_demux_socket_id(id.clone()),
+                                        addr,
+                                        bound_device,
+                                        port,
+                                        *sharing,
+                                        demux,
+                                    )
+                                })?;
+                            (
+                                converter.convert_back(ListenerAddr {
+                                    ip: DualStackListenerIpAddr::ThisStack(ip),
+                                    device,
+                                }),
+                                sharing,
+                            )
                         }
-                        let (addr, sharing) = bind_inner::<I::OtherVersion, _, _>(
-                            core_ctx,
-                            bindings_ctx,
-                            core_ctx.into_other_demux_socket_id(id.clone()),
-                            addr,
-                            bound_device,
-                            port,
-                            *sharing,
-                        )?;
-                        (converter.convert_back(EitherStack::OtherStack(addr)), sharing)
+                        BindAddr::BindInOneStack(EitherStack::OtherStack(addr)) => {
+                            let other_demux_id = core_ctx.into_other_demux_socket_id(id.clone());
+                            let (ListenerAddr { ip, device }, sharing) =
+                                TcpDemuxContext::<I::OtherVersion, _, _>::with_demux_mut_and_ip_transport_ctx(core_ctx, |demux, core_ctx| {
+                                    bind_install_in_demux(
+                                        core_ctx,
+                                        bindings_ctx,
+                                        other_demux_id,
+                                        addr,
+                                        bound_device,
+                                        port,
+                                        *sharing,
+                                        demux,
+                                    )
+                                })?;
+                            (
+                                converter.convert_back(ListenerAddr {
+                                    ip: DualStackListenerIpAddr::OtherStack(ip),
+                                    device,
+                                }),
+                                sharing,
+                            )
+                        }
+                        BindAddr::BindInBothStacks => {
+                            let other_demux_id = core_ctx.into_other_demux_socket_id(id.clone());
+                            let (port, device, sharing) =
+                                core_ctx.with_both_demux_mut_and_ip_transport_ctx(|demux, other_demux, core_ctx| {
+                                    // We need to allocate the port for both
+                                    // stacks before `bind_inner` tries to make
+                                    // a decision, because it might give two
+                                    // unrelated ports which is undesired.
+                                    let port = match port {
+                                        Some(port) => port,
+                                        None => match algorithm::simple_randomized_port_alloc(
+                                            &mut bindings_ctx.rng(),
+                                            &(),
+                                            &(&demux.socketmap, &other_demux.socketmap),
+                                            &(),
+                                        ){
+                                            Some(port) => NonZeroU16::new(port)
+                                                .expect("ephemeral ports must be non-zero"),
+                                            None => {
+                                                return Err(LocalAddressError::FailedToAllocateLocalPort);
+                                            }
+                                        }
+                                    };
+                                    let (this_stack_addr, this_stack_sharing) = bind_install_in_demux(
+                                        core_ctx,
+                                        bindings_ctx,
+                                        I::into_demux_socket_id(id.clone()),
+                                        None,
+                                        bound_device,
+                                        Some(port),
+                                        *sharing,
+                                        demux,
+                                    )?;
+                                    match bind_install_in_demux(
+                                        core_ctx,
+                                        bindings_ctx,
+                                        other_demux_id,
+                                        None,
+                                        bound_device,
+                                        Some(port),
+                                        *sharing,
+                                        other_demux,
+                                    ) {
+                                        Ok((ListenerAddr { ip, device }, other_stack_sharing)) => {
+                                            assert_eq!(this_stack_addr.ip.identifier, ip.identifier);
+                                            assert_eq!(this_stack_sharing, other_stack_sharing);
+                                            Ok((port, device, this_stack_sharing))
+                                        }
+                                        Err(err) => {
+                                            demux.socketmap.listeners_mut().remove(&I::into_demux_socket_id(id.clone()), &this_stack_addr).expect("failed to unbind");
+                                            Err(err)
+                                        }
+                                    }
+                                })?;
+                            (
+                                ListenerAddr {
+                                    ip: converter.convert_back(DualStackListenerIpAddr::BothStacks(port)),
+                                    device,
+                                },
+                                sharing,
+                            )
+                        }
                     }
                 },
             };
@@ -2024,7 +2253,7 @@ where
             *listener_sharing = try_update_listener_sharing::<_, C::CoreContext, _>(
                 core_ctx,
                 id,
-                addr,
+                addr.clone(),
                 listener_sharing,
                 new_sharing,
             )
@@ -2119,6 +2348,47 @@ where
         >,
         remote_port: NonZeroU16,
     ) -> Result<(), ConnectError> {
+        #[derive(Clone)]
+        enum LocalAddr<I: DualStackIpExt, D> {
+            BoundInOneStack(
+                EitherStack<
+                    ListenerAddr<ListenerIpAddr<I::Addr, NonZeroU16>, D>,
+                    ListenerAddr<ListenerIpAddr<<I::OtherVersion as Ip>::Addr, NonZeroU16>, D>,
+                >,
+            ),
+            BoundInBothStacks {
+                port: NonZeroU16,
+                device: Option<D>,
+            },
+            NotBound,
+        }
+        impl<I: DualStackIpExt, D> LocalAddr<I, D> {
+            fn as_this_stack_listener_addr(
+                self,
+            ) -> Option<ListenerAddr<ListenerIpAddr<I::Addr, NonZeroU16>, D>> {
+                match self {
+                    Self::BoundInOneStack(EitherStack::ThisStack(local_addr)) => Some(local_addr),
+                    Self::BoundInBothStacks { port, device } => Some(ListenerAddr {
+                        ip: ListenerIpAddr { addr: None, identifier: port },
+                        device,
+                    }),
+                    Self::BoundInOneStack(EitherStack::OtherStack(_)) | Self::NotBound => None,
+                }
+            }
+            fn as_other_stack_listener_addr(
+                self,
+            ) -> Option<ListenerAddr<ListenerIpAddr<<I::OtherVersion as Ip>::Addr, NonZeroU16>, D>>
+            {
+                match self {
+                    Self::BoundInOneStack(EitherStack::OtherStack(local_addr)) => Some(local_addr),
+                    Self::BoundInBothStacks { port, device } => Some(ListenerAddr {
+                        ip: ListenerIpAddr { addr: None, identifier: port },
+                        device,
+                    }),
+                    Self::BoundInOneStack(EitherStack::ThisStack(_)) | Self::NotBound => None,
+                }
+            }
+        }
         let (core_ctx, bindings_ctx) = self.contexts();
         core_ctx.with_socket_mut_isn_transport_demux(id, |core_ctx, socket_state, isn| {
             let TcpSocketState { socket_state, ip_options } = socket_state;
@@ -2162,13 +2432,13 @@ where
                         buffer_sizes,
                         socket_options,
                         sharing,
-                    }) => {
-                        let local_addr = match remote_ip {
-                            DualStackRemoteIp::ThisStack(_) => EitherStack::ThisStack(None),
-                            DualStackRemoteIp::OtherStack(_) => EitherStack::OtherStack(None),
-                        };
-                        (local_addr, *sharing, *socket_options, *buffer_sizes, socket_extra.clone())
-                    }
+                    }) => (
+                        LocalAddr::<I, _>::NotBound,
+                        *sharing,
+                        *socket_options,
+                        *buffer_sizes,
+                        socket_extra.clone(),
+                    ),
                     TcpSocketStateInner::Bound(BoundSocketState::Listener((
                         listener,
                         ListenerSharingState { sharing, listening: _ },
@@ -2177,16 +2447,28 @@ where
                         let local_addr = match &core_ctx {
                             MaybeDualStack::DualStack((_core_ctx, converter)) => {
                                 match converter.convert(addr.clone()) {
-                                    EitherStack::ThisStack(addr) => {
-                                        EitherStack::ThisStack(Some(addr))
-                                    }
-                                    EitherStack::OtherStack(addr) => {
-                                        EitherStack::OtherStack(Some(addr))
-                                    }
+                                    ListenerAddr {
+                                        ip: DualStackListenerIpAddr::ThisStack(ip),
+                                        device,
+                                    } => LocalAddr::BoundInOneStack(EitherStack::ThisStack(
+                                        ListenerAddr { ip, device },
+                                    )),
+                                    ListenerAddr {
+                                        ip: DualStackListenerIpAddr::OtherStack(ip),
+                                        device,
+                                    } => LocalAddr::BoundInOneStack(EitherStack::OtherStack(
+                                        ListenerAddr { ip, device },
+                                    )),
+                                    ListenerAddr {
+                                        ip: DualStackListenerIpAddr::BothStacks(port),
+                                        device,
+                                    } => LocalAddr::BoundInBothStacks { port, device },
                                 }
                             }
                             MaybeDualStack::NotDualStack((_core_ctx, converter)) => {
-                                EitherStack::ThisStack(Some(converter.convert(addr.clone())))
+                                LocalAddr::BoundInOneStack(EitherStack::ThisStack(
+                                    converter.convert(addr.clone()),
+                                ))
                             }
                         };
                         match listener {
@@ -2205,86 +2487,243 @@ where
                         }
                     }
                 };
+            fn single_stack_remover<
+                WireI: DualStackIpExt,
+                D: device::WeakId,
+                BT: TcpBindingsTypes,
+            >(
+                socketmap: &mut BoundSocketMap<WireI, D, BT>,
+                demux_id: &WireI::DemuxSocketId<D, BT>,
+                listener_addr: &ListenerAddr<ListenerIpAddr<WireI::Addr, NonZeroU16>, D>,
+            ) {
+                socketmap
+                    .listeners_mut()
+                    .remove(demux_id, listener_addr)
+                    .expect("failed to remove a bound socket");
+            }
+            // TODO(https://fxbug.dev/327489613): We have some code duplication
+            // below calling `connect_inner` because we want to only take the
+            // other stack's demux lock when necessary.
+            // TODO(https://fxbug.dev/327488712): To maximize code reuse,
+            // `connect_inner` doesn't acquire locks directly, but this may cause
+            // worse contention down the road when multithreading is enabled.
             match (core_ctx, local_addr, remote_ip) {
+                // If not dual stack, we allow the connect operation if socket
+                // was not bound or bound to a this-stack local address before,
+                // and the remote address also belongs to this stack.
                 (
                     MaybeDualStack::NotDualStack((core_ctx, converter)),
-                    EitherStack::ThisStack(local_addr),
+                    local_addr @ (LocalAddr::BoundInOneStack(EitherStack::ThisStack(_))
+                    | LocalAddr::NotBound),
                     DualStackRemoteIp::ThisStack(remote_ip),
                 ) => {
-                    let conn_and_addr = connect_inner(
+                    core_ctx.with_demux_mut_and_ip_transport_ctx(|demux, core_ctx| {
+                        connect_inner(
+                            core_ctx,
+                            bindings_ctx,
+                            id,
+                            &I::into_demux_socket_id(id.clone()),
+                            isn,
+                            local_addr.as_this_stack_listener_addr(),
+                            remote_ip,
+                            remote_port,
+                            socket_extra,
+                            buffer_sizes,
+                            socket_options,
+                            sharing,
+                            demux,
+                            single_stack_remover,
+                            |conn, addr| converter.convert_back((conn, addr)),
+                            socket_state,
+                        )
+                    })?;
+                    Ok(())
+                }
+                // If dual stack, we can perform a this-stack only connection
+                // if both the local and remote IP addresses belong to this
+                // stack, or it was never bound to any local address.
+                (
+                    MaybeDualStack::DualStack((core_ctx, converter)),
+                    local_addr @ (LocalAddr::BoundInOneStack(EitherStack::ThisStack(_))
+                    | LocalAddr::NotBound),
+                    DualStackRemoteIp::ThisStack(remote_ip),
+                ) => core_ctx.with_demux_mut_and_ip_transport_ctx(|demux, core_ctx| {
+                    connect_inner(
                         core_ctx,
                         bindings_ctx,
                         id,
                         &I::into_demux_socket_id(id.clone()),
                         isn,
-                        local_addr,
+                        local_addr.as_this_stack_listener_addr(),
                         remote_ip,
                         remote_port,
                         socket_extra,
                         buffer_sizes,
                         socket_options,
                         sharing,
-                    )?;
-                    *socket_state = TcpSocketStateInner::Bound(BoundSocketState::Connected((
-                        converter.convert_back(conn_and_addr),
-                        sharing,
-                    )));
-                    Ok(())
-                }
+                        demux,
+                        single_stack_remover,
+                        |conn, addr| converter.convert_back(EitherStack::ThisStack((conn, addr))),
+                        socket_state,
+                    )
+                }),
+                // If dual stack, we can perform an other-stack only connection
+                // if both the local and remote IP addresses belong to other
+                // stack, or it was never bound to any local address.
                 (
                     MaybeDualStack::DualStack((core_ctx, converter)),
-                    EitherStack::ThisStack(local_addr),
-                    DualStackRemoteIp::ThisStack(remote_ip),
-                ) => {
-                    let conn_and_addr = connect_inner(
-                        core_ctx,
-                        bindings_ctx,
-                        id,
-                        &I::into_demux_socket_id(id.clone()),
-                        isn,
-                        local_addr,
-                        remote_ip,
-                        remote_port,
-                        socket_extra,
-                        buffer_sizes,
-                        socket_options,
-                        sharing,
-                    )?;
-                    *socket_state = TcpSocketStateInner::Bound(BoundSocketState::Connected((
-                        converter.convert_back(EitherStack::ThisStack(conn_and_addr)),
-                        sharing,
-                    )));
-                    Ok(())
-                }
-                (
-                    MaybeDualStack::DualStack((core_ctx, converter)),
-                    EitherStack::OtherStack(listener_addr),
+                    local_addr @ (LocalAddr::BoundInOneStack(EitherStack::OtherStack(_))
+                    | LocalAddr::NotBound),
                     DualStackRemoteIp::OtherStack(remote_ip),
                 ) => {
                     if !core_ctx.dual_stack_enabled(ip_options) {
                         return Err(ConnectError::NoRoute);
                     }
-                    let conn_and_addr = connect_inner(
-                        core_ctx,
-                        bindings_ctx,
-                        id,
-                        &core_ctx.into_other_demux_socket_id(id.clone()),
-                        isn,
-                        listener_addr,
-                        remote_ip,
-                        remote_port,
-                        socket_extra,
-                        buffer_sizes,
-                        socket_options,
-                        sharing,
-                    )?;
-                    *socket_state = TcpSocketStateInner::Bound(BoundSocketState::Connected((
-                        converter.convert_back(EitherStack::OtherStack(conn_and_addr)),
-                        sharing,
-                    )));
-                    Ok(())
+                    let other_demux_id = core_ctx.into_other_demux_socket_id(id.clone());
+                    core_ctx.with_demux_mut_and_ip_transport_ctx(|demux, core_ctx| {
+                        connect_inner(
+                            core_ctx,
+                            bindings_ctx,
+                            id,
+                            &other_demux_id,
+                            isn,
+                            local_addr.as_other_stack_listener_addr(),
+                            remote_ip,
+                            remote_port,
+                            socket_extra,
+                            buffer_sizes,
+                            socket_options,
+                            sharing,
+                            demux,
+                            single_stack_remover,
+                            |conn, addr| {
+                                converter.convert_back(EitherStack::OtherStack((conn, addr)))
+                            },
+                            socket_state,
+                        )
+                    })
                 }
-                _ => Err(ConnectError::NoRoute),
+                // If dual stack, we can perform a this-stack only connection
+                // if remote IP addresses belong to this stack, but it was bound
+                // in both stacks, we need to remove it from both demux states.
+                (
+                    MaybeDualStack::DualStack((core_ctx, converter)),
+                    LocalAddr::BoundInBothStacks { port, device },
+                    DualStackRemoteIp::ThisStack(remote_ip),
+                ) => {
+                    let other_demux_id = core_ctx.into_other_demux_socket_id(id.clone());
+                    core_ctx.with_both_demux_mut_and_ip_transport_ctx(
+                        |demux, other_demux, core_ctx| {
+                            connect_inner(
+                                core_ctx,
+                                bindings_ctx,
+                                id,
+                                &I::into_demux_socket_id(id.clone()),
+                                isn,
+                                Some(ListenerAddr {
+                                    ip: ListenerIpAddr { addr: None, identifier: port },
+                                    device: device.clone(),
+                                }),
+                                remote_ip,
+                                remote_port,
+                                socket_extra,
+                                buffer_sizes,
+                                socket_options,
+                                sharing,
+                                demux,
+                                |socketmap, demux_id, listener_addr| {
+                                    single_stack_remover(socketmap, demux_id, listener_addr);
+                                    single_stack_remover(
+                                        &mut other_demux.socketmap,
+                                        &other_demux_id,
+                                        &ListenerAddr {
+                                            ip: ListenerIpAddr { addr: None, identifier: port },
+                                            device,
+                                        },
+                                    );
+                                },
+                                |conn, addr| {
+                                    converter.convert_back(EitherStack::ThisStack((conn, addr)))
+                                },
+                                socket_state,
+                            )
+                        },
+                    )
+                }
+                // If dual stack, we can perform an other-stack only connection
+                // if remote IP addresses belong to the other stack, but it was
+                // bound in both stacks, we need to remove it from both demux
+                // states.
+                (
+                    MaybeDualStack::DualStack((core_ctx, converter)),
+                    LocalAddr::BoundInBothStacks { port, device },
+                    DualStackRemoteIp::OtherStack(remote_ip),
+                ) => {
+                    let other_demux_id = core_ctx.into_other_demux_socket_id(id.clone());
+                    core_ctx.with_both_demux_mut_and_ip_transport_ctx(
+                        |demux, other_demux, core_ctx| {
+                            connect_inner(
+                                core_ctx,
+                                bindings_ctx,
+                                id,
+                                &other_demux_id,
+                                isn,
+                                Some(ListenerAddr {
+                                    ip: ListenerIpAddr { addr: None, identifier: port },
+                                    device: device.clone(),
+                                }),
+                                remote_ip,
+                                remote_port,
+                                socket_extra,
+                                buffer_sizes,
+                                socket_options,
+                                sharing,
+                                other_demux,
+                                |socketmap, demux_id, listener_addr| {
+                                    single_stack_remover(socketmap, demux_id, listener_addr);
+                                    single_stack_remover(
+                                        &mut demux.socketmap,
+                                        &I::into_demux_socket_id(id.clone()),
+                                        &ListenerAddr {
+                                            ip: ListenerIpAddr { addr: None, identifier: port },
+                                            device,
+                                        },
+                                    );
+                                },
+                                |conn, addr| {
+                                    converter.convert_back(EitherStack::OtherStack((conn, addr)))
+                                },
+                                socket_state,
+                            )
+                        },
+                    )
+                }
+                // Not possible for a non-dual-stack socket to bind in the other
+                // stack.
+                (
+                    MaybeDualStack::NotDualStack(_),
+                    LocalAddr::BoundInOneStack(EitherStack::OtherStack(_))
+                    | LocalAddr::BoundInBothStacks { .. },
+                    DualStackRemoteIp::ThisStack(_) | DualStackRemoteIp::OtherStack(_),
+                ) => unreachable!("The socket cannot be bound in the other stack"),
+                // Can't connect from one stack to the other.
+                (
+                    MaybeDualStack::DualStack(_),
+                    LocalAddr::BoundInOneStack(EitherStack::OtherStack(_)),
+                    DualStackRemoteIp::ThisStack(_),
+                ) => Err(ConnectError::NoRoute),
+                // Can't connect from one stack to the other.
+                (
+                    MaybeDualStack::DualStack(_) | MaybeDualStack::NotDualStack(_),
+                    LocalAddr::BoundInOneStack(EitherStack::ThisStack(_)),
+                    DualStackRemoteIp::OtherStack(_),
+                ) => Err(ConnectError::NoRoute),
+                // Can't connect to the other stack for non-dual-stack sockets.
+                (
+                    MaybeDualStack::NotDualStack(_),
+                    LocalAddr::NotBound,
+                    DualStackRemoteIp::OtherStack(_),
+                ) => Err(ConnectError::NoRoute),
             }
         })
     }
@@ -2302,53 +2741,97 @@ where
                         _sharing,
                         addr,
                     ))) => {
-                        let this_or_other_stack = match core_ctx {
+                        match core_ctx {
                             MaybeDualStack::NotDualStack((core_ctx, converter)) => {
-                                EitherStack::ThisStack((
-                                    core_ctx.as_this_stack(),
-                                    I::into_demux_socket_id(id.clone()),
-                                    converter.convert(addr),
-                                ))
+                                TcpDemuxContext::<I, _, _>::with_demux_mut(
+                                    core_ctx,
+                                    |DemuxState { socketmap }| {
+                                        socketmap
+                                            .listeners_mut()
+                                            .remove(
+                                                &I::into_demux_socket_id(id.clone()),
+                                                &converter.convert(addr),
+                                            )
+                                            .expect("failed to remove from socketmap");
+                                    },
+                                );
                             }
                             MaybeDualStack::DualStack((core_ctx, converter)) => {
-                                match converter.convert(addr) {
-                                    EitherStack::ThisStack(addr) => EitherStack::ThisStack((
-                                        core_ctx.as_this_stack(),
-                                        I::into_demux_socket_id(id.clone()),
-                                        addr,
-                                    )),
-                                    EitherStack::OtherStack(addr) => {
-                                        let demux_id =
+                                match converter.convert(addr.clone()) {
+                                    ListenerAddr {
+                                        ip: DualStackListenerIpAddr::ThisStack(ip),
+                                        device,
+                                    } => TcpDemuxContext::<I, _, _>::with_demux_mut(
+                                        core_ctx,
+                                        |DemuxState { socketmap }| {
+                                            socketmap
+                                                .listeners_mut()
+                                                .remove(
+                                                    &I::into_demux_socket_id(id.clone()),
+                                                    &ListenerAddr { ip, device },
+                                                )
+                                                .expect("failed to remove from socketmap");
+                                        },
+                                    ),
+                                    ListenerAddr {
+                                        ip: DualStackListenerIpAddr::OtherStack(ip),
+                                        device,
+                                    } => {
+                                        let other_demux_id =
                                             core_ctx.into_other_demux_socket_id(id.clone());
-                                        EitherStack::OtherStack((core_ctx, demux_id, addr))
+                                        TcpDemuxContext::<I::OtherVersion, _, _>::with_demux_mut(
+                                            core_ctx,
+                                            |DemuxState { socketmap }| {
+                                                socketmap
+                                                    .listeners_mut()
+                                                    .remove(
+                                                        &other_demux_id,
+                                                        &ListenerAddr { ip, device },
+                                                    )
+                                                    .expect("failed to remove from socketmap");
+                                            },
+                                        );
+                                    }
+                                    ListenerAddr {
+                                        ip: DualStackListenerIpAddr::BothStacks(port),
+                                        device,
+                                    } => {
+                                        let other_demux_id =
+                                            core_ctx.into_other_demux_socket_id(id.clone());
+                                        core_ctx.with_both_demux_mut(|demux, other_demux| {
+                                            demux
+                                                .socketmap
+                                                .listeners_mut()
+                                                .remove(
+                                                    &I::into_demux_socket_id(id.clone()),
+                                                    &ListenerAddr {
+                                                        ip: ListenerIpAddr {
+                                                            addr: None,
+                                                            identifier: port,
+                                                        },
+                                                        device: device.clone(),
+                                                    },
+                                                )
+                                                .expect("failed to remove from socketmap");
+                                            other_demux
+                                                .socketmap
+                                                .listeners_mut()
+                                                .remove(
+                                                    &other_demux_id,
+                                                    &ListenerAddr {
+                                                        ip: ListenerIpAddr {
+                                                            addr: None,
+                                                            identifier: port,
+                                                        },
+                                                        device,
+                                                    },
+                                                )
+                                                .expect("failed to remove from socketmap");
+                                        });
                                     }
                                 }
                             }
                         };
-                        match this_or_other_stack {
-                            EitherStack::ThisStack((core_ctx, demux_id, addr)) => {
-                                TcpDemuxContext::<I, _, _>::with_demux_mut(
-                                    core_ctx,
-                                    |DemuxState { socketmap }| {
-                                        assert_matches!(
-                                            socketmap.listeners_mut().remove(&demux_id, &addr),
-                                            Ok(())
-                                        );
-                                    },
-                                );
-                            }
-                            EitherStack::OtherStack((core_ctx, demux_id, addr)) => {
-                                TcpDemuxContext::<I::OtherVersion, _, _>::with_demux_mut(
-                                    core_ctx,
-                                    |DemuxState { socketmap }| {
-                                        assert_matches!(
-                                            socketmap.listeners_mut().remove(&demux_id, &addr),
-                                            Ok(())
-                                        );
-                                    },
-                                );
-                            }
-                        }
                         let pending = match maybe_listener {
                             MaybeListener::Bound(_) => None,
                             MaybeListener::Listener(listener) => {
@@ -2388,10 +2871,10 @@ where
                             };
                             if already_closed {
                                 core_ctx.with_demux_mut(|DemuxState { socketmap }| {
-                                    assert_matches!(
-                                        socketmap.conns_mut().remove(demux_id, addr),
-                                        Ok(())
-                                    );
+                                    socketmap
+                                        .conns_mut()
+                                        .remove(demux_id, addr)
+                                        .expect("failed to remove from socketmap");
                                 });
                                 let _: Option<_> = bindings_ctx.cancel_timer(id.downgrade());
                             } else {
@@ -2539,7 +3022,7 @@ where
                         *sharing = try_update_listener_sharing::<_, C::CoreContext, _>(
                             core_ctx,
                             id,
-                            addr,
+                            addr.clone(),
                             sharing,
                             new_sharing,
                         )
@@ -2628,41 +3111,42 @@ where
         })
     }
 
-    fn set_device_listener<WireI, CC>(
-        core_ctx: &mut CC,
-        addr: &mut ListenerAddr<ListenerIpAddr<WireI::Addr, NonZeroU16>, CC::WeakDeviceId>,
-        demux_id: &WireI::DemuxSocketId<CC::WeakDeviceId, C::BindingsContext>,
-        new_device: Option<CC::DeviceId>,
-        weak_device: Option<CC::WeakDeviceId>,
+    /// Updates the `old_device` to the new device if it is allowed. Note that
+    /// this `old_device` will be updated in-place, so it should come from the
+    /// outside socketmap address.
+    fn set_device_listener<WireI, D>(
+        demux_id: &WireI::DemuxSocketId<D, C::BindingsContext>,
+        ip_addr: ListenerIpAddr<WireI::Addr, NonZeroU16>,
+        old_device: &mut Option<D>,
+        new_device: Option<&D::Strong>,
+        weak_device: Option<D>,
+        DemuxState { socketmap }: &mut DemuxState<WireI, D, C::BindingsContext>,
     ) -> Result<(), SetDeviceError>
     where
         WireI: DualStackIpExt,
-        CC: TransportIpContext<WireI, C::BindingsContext>
-            + TcpDemuxContext<WireI, CC::WeakDeviceId, C::BindingsContext>,
+        D: device::WeakId,
     {
-        core_ctx.with_demux_mut(move |DemuxState { socketmap }| {
-            let entry = socketmap.listeners_mut().entry(demux_id, addr).expect("invalid ID");
-            let ListenerAddr { device: old_device, ip: ip_addr } = addr;
-            let ListenerIpAddr { identifier: _, addr: ip } = ip_addr;
+        let entry = socketmap
+            .listeners_mut()
+            .entry(demux_id, &ListenerAddr { ip: ip_addr, device: old_device.clone() })
+            .expect("invalid ID");
 
-            if !crate::socket::can_device_change(
-                ip.as_ref().map(|a| a.as_ref()), /* local_ip */
-                None,                            /* remote_ip */
-                old_device.as_ref(),
-                new_device.as_ref(),
-            ) {
-                return Err(SetDeviceError::ZoneChange);
-            }
+        if !crate::socket::can_device_change(
+            ip_addr.addr.as_ref().map(|a| a.as_ref()), /* local_ip */
+            None,                                      /* remote_ip */
+            old_device.as_ref(),
+            new_device,
+        ) {
+            return Err(SetDeviceError::ZoneChange);
+        }
 
-            let ip = *ip_addr;
-            match entry.try_update_addr(ListenerAddr { device: weak_device, ip }) {
-                Ok(entry) => {
-                    *addr = entry.get_addr().clone();
-                    Ok(())
-                }
-                Err((ExistsError, _entry)) => Err(SetDeviceError::Conflict),
+        match entry.try_update_addr(ListenerAddr { device: weak_device, ip: ip_addr }) {
+            Ok(entry) => {
+                *old_device = entry.get_addr().device.clone();
+                Ok(())
             }
-        })
+            Err((ExistsError, _entry)) => Err(SetDeviceError::Conflict),
+        }
     }
 
     /// Sets the device on a socket.
@@ -2745,46 +3229,105 @@ where
                     _sharing,
                     addr,
                 ))) => {
-                    let this_or_other_stack = match core_ctx {
+                    let new_device = new_device.as_ref();
+                    match core_ctx {
                         MaybeDualStack::NotDualStack((core_ctx, converter)) => {
-                            EitherStack::ThisStack((
-                                core_ctx.as_this_stack(),
-                                converter.convert(addr),
-                                I::into_demux_socket_id(id.clone()),
-                            ))
+                            let ListenerAddr { ip, device } = converter.convert(addr);
+                            core_ctx.with_demux_mut(|demux| {
+                                Self::set_device_listener(
+                                    &I::into_demux_socket_id(id.clone()),
+                                    ip.clone(),
+                                    device,
+                                    new_device,
+                                    weak_device,
+                                    demux,
+                                )
+                            })
                         }
                         MaybeDualStack::DualStack((core_ctx, converter)) => {
                             match converter.convert(addr) {
-                                EitherStack::ThisStack(addr) => EitherStack::ThisStack((
-                                    core_ctx.as_this_stack(),
-                                    addr,
-                                    I::into_demux_socket_id(id.clone()),
-                                )),
-                                EitherStack::OtherStack(addr) => {
-                                    let demux_id = core_ctx.into_other_demux_socket_id(id.clone());
-                                    EitherStack::OtherStack((core_ctx, addr, demux_id))
+                                ListenerAddr {
+                                    ip: DualStackListenerIpAddr::ThisStack(ip),
+                                    device,
+                                } => {
+                                    TcpDemuxContext::<I, _, _>::with_demux_mut(core_ctx, |demux| {
+                                        Self::set_device_listener(
+                                            &I::into_demux_socket_id(id.clone()),
+                                            ip.clone(),
+                                            device,
+                                            new_device,
+                                            weak_device,
+                                            demux,
+                                        )
+                                    })
+                                }
+                                ListenerAddr {
+                                    ip: DualStackListenerIpAddr::OtherStack(ip),
+                                    device,
+                                } => {
+                                    let other_demux_id =
+                                        core_ctx.into_other_demux_socket_id(id.clone());
+                                    TcpDemuxContext::<I::OtherVersion, _, _>::with_demux_mut(
+                                        core_ctx,
+                                        |demux| {
+                                            Self::set_device_listener(
+                                                &other_demux_id,
+                                                ip.clone(),
+                                                device,
+                                                new_device,
+                                                weak_device,
+                                                demux,
+                                            )
+                                        },
+                                    )
+                                }
+                                ListenerAddr {
+                                    ip: DualStackListenerIpAddr::BothStacks(port),
+                                    device,
+                                } => {
+                                    let other_demux_id =
+                                        core_ctx.into_other_demux_socket_id(id.clone());
+                                    let old_device = device
+                                        .as_ref()
+                                        .and_then(|d| core_ctx.upgrade_weak_device_id(d));
+                                    let old_weak_device = device.clone();
+                                    core_ctx.with_both_demux_mut(|demux, other_demux| {
+                                        Self::set_device_listener(
+                                            &I::into_demux_socket_id(id.clone()),
+                                            ListenerIpAddr { addr: None, identifier: *port },
+                                            device,
+                                            new_device.clone(),
+                                            weak_device.clone(),
+                                            demux,
+                                        )?;
+                                        match Self::set_device_listener(
+                                            &other_demux_id,
+                                            ListenerIpAddr { addr: None, identifier: *port },
+                                            device,
+                                            new_device,
+                                            weak_device,
+                                            other_demux,
+                                        ) {
+                                            Ok(()) => Ok(()),
+                                            Err(e) => {
+                                                Self::set_device_listener(
+                                                    &I::into_demux_socket_id(id.clone()),
+                                                    ListenerIpAddr {
+                                                        addr: None,
+                                                        identifier: *port,
+                                                    },
+                                                    device,
+                                                    old_device.as_ref(),
+                                                    old_weak_device,
+                                                    demux,
+                                                )
+                                                .expect("failed to revert back the device setting");
+                                                Err(e)
+                                            }
+                                        }
+                                    })
                                 }
                             }
-                        }
-                    };
-                    match this_or_other_stack {
-                        EitherStack::ThisStack((core_ctx, addr, demux_id)) => {
-                            Self::set_device_listener::<I, _>(
-                                core_ctx,
-                                addr,
-                                &demux_id,
-                                new_device,
-                                weak_device,
-                            )
-                        }
-                        EitherStack::OtherStack((core_ctx, addr, demux_id)) => {
-                            Self::set_device_listener::<I::OtherVersion, _>(
-                                core_ctx,
-                                addr,
-                                &demux_id,
-                                new_device,
-                                weak_device,
-                            )
                         }
                     }
                 }
@@ -2892,7 +3435,10 @@ where
                     do_send_inner(id, conn, addr, core_ctx, bindings_ctx);
                     if conn.defunct && matches!(conn.state, State::Closed(_)) {
                         core_ctx.with_demux_mut(|DemuxState { socketmap }| {
-                            assert_matches!(socketmap.conns_mut().remove(demux_id, addr), Ok(()));
+                            socketmap
+                                .conns_mut()
+                                .remove(demux_id, addr)
+                                .expect("failed to remove from socketmap");
                         });
                         let _: Option<_> = bindings_ctx.cancel_timer(weak_id);
                         true
@@ -3094,7 +3640,7 @@ where
                     *old_sharing = try_update_listener_sharing::<_, C::CoreContext, _>(
                         core_ctx,
                         id,
-                        addr,
+                        addr.clone(),
                         old_sharing,
                         new_sharing,
                     )
@@ -3246,10 +3792,10 @@ where
                                 TcpDemuxContext::<I, _, _>::with_demux_mut(
                                     core_ctx,
                                     |DemuxState { socketmap }| {
-                                        assert_matches!(
-                                            socketmap.conns_mut().remove(&demux_id, addr),
-                                            Ok(())
-                                        );
+                                        socketmap
+                                            .conns_mut()
+                                            .remove(&demux_id, addr)
+                                            .expect("failed to remove from socketmap");
                                     },
                                 );
                             }
@@ -3257,10 +3803,10 @@ where
                                 TcpDemuxContext::<I::OtherVersion, _, _>::with_demux_mut(
                                     core_ctx,
                                     |DemuxState { socketmap }| {
-                                        assert_matches!(
-                                            socketmap.conns_mut().remove(&demux_id, addr),
-                                            Ok(())
-                                        );
+                                        socketmap
+                                            .conns_mut()
+                                            .remove(&demux_id, addr)
+                                            .expect("failed to remove from socketmap");
                                     },
                                 );
                             }
@@ -3617,7 +4163,7 @@ fn close_pending_socket<WireI, DC, BT>(
     BT: TcpBindingsTypes,
 {
     core_ctx.with_demux_mut(|DemuxState { socketmap }| {
-        assert_matches!(socketmap.conns_mut().remove(demux_id, conn_addr), Ok(()));
+        socketmap.conns_mut().remove(demux_id, conn_addr).expect("failed to remove from socketmap");
     });
 
     if let Some(reset) = state.abort() {
@@ -3917,20 +4463,23 @@ fn connect_inner<CC, BC, SockI, WireI>(
     buffer_sizes: BufferSizes,
     socket_options: SocketOptions,
     sharing: SharingState,
-) -> Result<
-    (
+    DemuxState { socketmap }: &mut DemuxState<WireI, CC::WeakDeviceId, BC>,
+    remove_op: impl FnOnce(
+        &mut BoundSocketMap<WireI, CC::WeakDeviceId, BC>,
+        &WireI::DemuxSocketId<CC::WeakDeviceId, BC>,
+        &ListenerAddr<ListenerIpAddr<WireI::Addr, NonZeroU16>, CC::WeakDeviceId>,
+    ),
+    convert_back_op: impl FnOnce(
         Connection<SockI, WireI, CC::WeakDeviceId, BC>,
         ConnAddr<ConnIpAddr<WireI::Addr, NonZeroU16, NonZeroU16>, CC::WeakDeviceId>,
-    ),
-    ConnectError,
->
+    ) -> SockI::ConnectionAndAddr<CC::WeakDeviceId, BC>,
+    socket_state: &mut TcpSocketStateInner<SockI, CC::WeakDeviceId, BC>,
+) -> Result<(), ConnectError>
 where
     SockI: DualStackIpExt,
     WireI: DualStackIpExt,
     BC: TcpBindingsContext<SockI, CC::WeakDeviceId>,
-    CC: TransportIpContext<WireI, BC>
-        + DeviceIpSocketHandler<WireI, BC>
-        + TcpDemuxContext<WireI, CC::WeakDeviceId, BC>,
+    CC: TransportIpContext<WireI, BC> + DeviceIpSocketHandler<WireI, BC>,
 {
     let local_ip = listener_addr.as_ref().and_then(|la| la.ip.addr);
     let bound_device = listener_addr.as_ref().and_then(|la| la.device.clone());
@@ -3959,59 +4508,51 @@ where
             // the route cannot handle the smallest TCP/IP packet.
             ConnectError::NoRoute
         })?;
-    let conn_addr = core_ctx.with_demux_mut(|demux| {
-        let DemuxState { socketmap } = demux;
 
-        let local_port = local_port.map_or_else(
-            // NB: Pass the remote port into the allocator to avoid unexpected
-            // self-connections when allocating a local port. This could be
-            // optimized by checking if the IP socket has resolved to local
-            // delivery, but excluding a single port should be enough here and
-            // avoids adding more dependencies.
-            || match algorithm::simple_randomized_port_alloc(
-                &mut bindings_ctx.rng(),
-                &Some(*ip_sock.local_ip()),
-                socketmap,
-                &Some(remote_port),
-            ) {
-                Some(port) => Ok(NonZeroU16::new(port).expect("ephemeral ports must be non-zero")),
-                None => Err(ConnectError::NoPort),
-            },
-            Ok,
-        )?;
+    let local_port = local_port.map_or_else(
+        // NB: Pass the remote port into the allocator to avoid unexpected
+        // self-connections when allocating a local port. This could be
+        // optimized by checking if the IP socket has resolved to local
+        // delivery, but excluding a single port should be enough here and
+        // avoids adding more dependencies.
+        || match algorithm::simple_randomized_port_alloc(
+            &mut bindings_ctx.rng(),
+            &Some(*ip_sock.local_ip()),
+            socketmap,
+            &Some(remote_port),
+        ) {
+            Some(port) => Ok(NonZeroU16::new(port).expect("ephemeral ports must be non-zero")),
+            None => Err(ConnectError::NoPort),
+        },
+        Ok,
+    )?;
 
-        let conn_addr = ConnAddr {
-            ip: ConnIpAddr {
-                local: (*ip_sock.local_ip(), local_port),
-                remote: (*ip_sock.remote_ip(), remote_port),
-            },
-            device: ip_sock.device().cloned(),
-        };
+    let conn_addr = ConnAddr {
+        ip: ConnIpAddr {
+            local: (*ip_sock.local_ip(), local_port),
+            remote: (*ip_sock.remote_ip(), remote_port),
+        },
+        device: ip_sock.device().cloned(),
+    };
 
-        let _entry = socketmap
-            .conns_mut()
-            .try_insert(conn_addr.clone(), sharing, demux_id.clone())
-            .map_err(|(err, _sharing)| match err {
-                // The connection will conflict with an existing one.
-                InsertError::Exists | InsertError::ShadowerExists => ConnectError::ConnectionExists,
-                // Connections don't conflict with listeners, and we should not
-                // observe the following errors.
-                InsertError::ShadowAddrExists | InsertError::IndirectConflict => {
-                    panic!("failed to insert connection: {:?}", err)
-                }
-            })?;
+    let _entry = socketmap
+        .conns_mut()
+        .try_insert(conn_addr.clone(), sharing, demux_id.clone())
+        .map_err(|(err, _sharing)| match err {
+            // The connection will conflict with an existing one.
+            InsertError::Exists | InsertError::ShadowerExists => ConnectError::ConnectionExists,
+            // Connections don't conflict with listeners, and we should not
+            // observe the following errors.
+            InsertError::ShadowAddrExists | InsertError::IndirectConflict => {
+                panic!("failed to insert connection: {:?}", err)
+            }
+        })?;
 
-        // If we managed to install ourselves in the demux, we need to remove
-        // the previous listening form if any.
-        if let Some(listener_addr) = listener_addr {
-            socketmap
-                .listeners_mut()
-                .remove(&demux_id, &listener_addr)
-                .expect("failed to remove a bound socket");
-        }
-
-        Result::<_, ConnectError>::Ok(conn_addr)
-    })?;
+    // If we managed to install ourselves in the demux, we need to remove
+    // the previous listening form if any.
+    if let Some(listener_addr) = &listener_addr {
+        remove_op(socketmap, demux_id, listener_addr);
+    }
 
     let isn = isn.generate::<SocketIpAddr<WireI::Addr>, NonZeroU16>(
         bindings_ctx.now(),
@@ -4041,18 +4582,22 @@ where
 
     assert_eq!(bindings_ctx.schedule_timer_instant(poll_send_at, sock_id.downgrade()), None);
 
-    Ok((
-        Connection {
-            accept_queue: None,
-            state,
-            ip_sock,
-            defunct: false,
-            socket_options,
-            soft_error: None,
-            handshake_status: HandshakeStatus::Pending,
-        },
-        conn_addr,
-    ))
+    *socket_state = TcpSocketStateInner::Bound(BoundSocketState::Connected((
+        convert_back_op(
+            Connection {
+                accept_queue: None,
+                state,
+                ip_sock,
+                defunct: false,
+                socket_options,
+                soft_error: None,
+                handshake_status: HandshakeStatus::Pending,
+            },
+            conn_addr,
+        ),
+        sharing,
+    )));
+    Ok(())
 }
 
 /// Information about a socket.
@@ -4164,7 +4709,7 @@ where
 #[cfg(test)]
 mod tests {
     use alloc::{format, rc::Rc, string::String, sync::Arc, vec, vec::Vec};
-    use core::{ffi::CStr, num::NonZeroU16, time::Duration};
+    use core::{cell::RefCell, ffi::CStr, num::NonZeroU16, time::Duration};
 
     use const_unwrap::const_unwrap_option;
     use ip_test_macro::ip_test;
@@ -4298,7 +4843,7 @@ mod tests {
 
     struct FakeTcpState<I: TcpTestIpExt, D: FakeStrongDeviceId, BT: TcpBindingsTypes> {
         isn_generator: Rc<IsnGenerator<BT::Instant>>,
-        demux: DemuxState<I, D::Weak, BT>,
+        demux: Rc<RefCell<DemuxState<I, D::Weak, BT>>>,
         // Always destroy all sockets last so the strong references in the demux
         // are gone.
         all_sockets: TcpSocketSet<I, D::Weak, BT>,
@@ -4315,7 +4860,7 @@ mod tests {
             Self {
                 isn_generator: Default::default(),
                 all_sockets: Default::default(),
-                demux: DemuxState { socketmap: Default::default() },
+                demux: Rc::new(RefCell::new(DemuxState { socketmap: Default::default() })),
             }
         }
     }
@@ -4627,15 +5172,28 @@ mod tests {
         D: FakeStrongDeviceId,
         BC: TcpBindingsTypes + IpSocketBindingsContext,
     {
+        type IpTransportCtx<'a> = Self;
         fn with_demux<O, F: FnOnce(&DemuxState<Ipv4, D::Weak, BC>) -> O>(&mut self, cb: F) -> O {
-            cb(&self.outer.v4.demux)
+            cb(&self.outer.v4.demux.borrow())
         }
 
         fn with_demux_mut<O, F: FnOnce(&mut DemuxState<Ipv4, D::Weak, BC>) -> O>(
             &mut self,
             cb: F,
         ) -> O {
-            cb(&mut self.outer.v4.demux)
+            cb(&mut self.outer.v4.demux.borrow_mut())
+        }
+
+        fn with_demux_mut_and_ip_transport_ctx<
+            O,
+            F: FnOnce(&mut DemuxState<Ipv4, D::Weak, BC>, &mut Self::IpTransportCtx<'_>) -> O,
+        >(
+            &mut self,
+            cb: F,
+        ) -> O {
+            let demux = Rc::clone(&self.outer.v4.demux);
+            let mut demux = demux.borrow_mut();
+            cb(&mut *demux, self)
         }
     }
 
@@ -4644,15 +5202,28 @@ mod tests {
         D: FakeStrongDeviceId,
         BC: TcpBindingsTypes + IpSocketBindingsContext,
     {
+        type IpTransportCtx<'a> = Self;
         fn with_demux<O, F: FnOnce(&DemuxState<Ipv6, D::Weak, BC>) -> O>(&mut self, cb: F) -> O {
-            cb(&self.outer.v6.demux)
+            cb(&self.outer.v6.demux.borrow())
         }
 
         fn with_demux_mut<O, F: FnOnce(&mut DemuxState<Ipv6, D::Weak, BC>) -> O>(
             &mut self,
             cb: F,
         ) -> O {
-            cb(&mut self.outer.v6.demux)
+            cb(&mut self.outer.v6.demux.borrow_mut())
+        }
+
+        fn with_demux_mut_and_ip_transport_ctx<
+            O,
+            F: FnOnce(&mut DemuxState<Ipv6, D::Weak, BC>, &mut Self::IpTransportCtx<'_>) -> O,
+        >(
+            &mut self,
+            cb: F,
+        ) -> O {
+            let demux = Rc::clone(&self.outer.v6.demux);
+            let mut demux = demux.borrow_mut();
+            cb(&mut *demux, self)
         }
     }
 
@@ -4809,9 +5380,10 @@ mod tests {
     }
 
     impl<D: FakeStrongDeviceId, BT: TcpBindingsTypes + IpSocketBindingsContext>
-        TcpDualStackContext<Ipv6> for TcpCoreCtx<D, BT>
+        TcpDualStackContext<Ipv6, FakeWeakDeviceId<D>, BT> for TcpCoreCtx<D, BT>
     {
         type Converter = Ipv6SocketIdToIpv4DemuxIdConverter;
+        type DualStackIpTransportCtx<'a> = Self;
         fn other_demux_id_converter(&self) -> Ipv6SocketIdToIpv4DemuxIdConverter {
             Ipv6SocketIdToIpv4DemuxIdConverter
         }
@@ -4820,6 +5392,35 @@ mod tests {
         }
         fn set_dual_stack_enabled(&self, ip_options: &mut Ipv6Options, value: bool) {
             ip_options.dual_stack_enabled = value;
+        }
+        fn with_both_demux_mut<
+            O,
+            F: FnOnce(
+                &mut DemuxState<Ipv6, FakeWeakDeviceId<D>, BT>,
+                &mut DemuxState<Ipv4, FakeWeakDeviceId<D>, BT>,
+            ) -> O,
+        >(
+            &mut self,
+            cb: F,
+        ) -> O {
+            cb(&mut self.outer.v6.demux.borrow_mut(), &mut self.outer.v4.demux.borrow_mut())
+        }
+        fn with_both_demux_mut_and_ip_transport_ctx<
+            O,
+            F: FnOnce(
+                &mut DemuxState<Ipv6, FakeWeakDeviceId<D>, BT>,
+                &mut DemuxState<Ipv4, FakeWeakDeviceId<D>, BT>,
+                &mut Self::DualStackIpTransportCtx<'_>,
+            ) -> O,
+        >(
+            &mut self,
+            cb: F,
+        ) -> O {
+            let demux_v6 = Rc::clone(&self.outer.v6.demux);
+            let demux_v4 = Rc::clone(&self.outer.v4.demux);
+            let mut demux_v6 = demux_v6.borrow_mut();
+            let mut demux_v4 = demux_v4.borrow_mut();
+            cb(&mut demux_v6, &mut demux_v4, self)
         }
     }
 
@@ -7227,32 +7828,43 @@ mod tests {
         });
     }
 
-    #[test]
-    fn dual_stack_connect() {
+    #[test_case::test_matrix(
+        [None, Some(ZonedAddr::Unzoned((*Ipv4::FAKE_CONFIG.remote_ip).to_ipv6_mapped()))],
+        [None, Some(PORT_1)],
+        [true, false]
+    )]
+    fn dual_stack_connect(
+        server_bind_ip: Option<ZonedAddr<SpecifiedAddr<Ipv6Addr>, FakeDeviceId>>,
+        server_bind_port: Option<NonZeroU16>,
+        bind_client: bool,
+    ) {
         set_logger_for_test();
         let mut net = new_test_net::<Ipv4>();
         let backlog = NonZeroUsize::new(1).unwrap();
-        let server = net.with_context(REMOTE, |ctx| {
+        let (server, listen_port) = net.with_context(REMOTE, |ctx| {
             let mut api = ctx.tcp_api::<Ipv6>();
             let server = api.create(Default::default());
-            api.bind(
-                &server,
-                Some(ZonedAddr::Unzoned((*Ipv4::FAKE_CONFIG.remote_ip).to_ipv6_mapped())),
-                Some(PORT_1),
-            )
-            .expect("failed to bind the server socket");
+            api.bind(&server, server_bind_ip, server_bind_port)
+                .expect("failed to bind the server socket");
             api.listen(&server, backlog).expect("can listen");
-            server
+            let port = assert_matches!(
+                api.get_info(&server),
+                SocketInfo::Bound(info) => info.port
+            );
+            (server, port)
         });
 
         let client_ends = WriteBackClientBuffers::default();
         let client = net.with_context(LOCAL, |ctx| {
             let mut api = ctx.tcp_api::<Ipv6>();
             let socket = api.create(ProvidedBuffers::Buffers(client_ends.clone()));
+            if bind_client {
+                api.bind(&socket, None, None).expect("failed to bind");
+            }
             api.connect(
                 &socket,
                 Some(ZonedAddr::Unzoned((*Ipv4::FAKE_CONFIG.remote_ip).to_ipv6_mapped())),
-                PORT_1,
+                listen_port,
             )
             .expect("failed to connect");
             socket
@@ -7291,16 +7903,17 @@ mod tests {
             net.with_context(LOCAL, |ctx| ctx.tcp_api().get_info(&client)),
             SocketInfo::Connection(info) => info
         );
-        let (local_ip, remote_ip) = assert_matches!(
+        let (local_ip, remote_ip, port) = assert_matches!(
             info,
             ConnectionInfo {
                 local_addr: SocketAddr { ip: local_ip, port: _ },
-                remote_addr: SocketAddr { ip: remote_ip, port: PORT_1 },
+                remote_addr: SocketAddr { ip: remote_ip, port },
                 device: _
-            } => (local_ip.addr(), remote_ip.addr())
+            } => (local_ip.addr(), remote_ip.addr(), port)
         );
         assert_eq!(remote_ip, Ipv4::FAKE_CONFIG.remote_ip.to_ipv6_mapped());
         assert_matches!(local_ip.to_ipv4_mapped(), Some(_));
+        assert_eq!(port, listen_port);
     }
 
     #[test]

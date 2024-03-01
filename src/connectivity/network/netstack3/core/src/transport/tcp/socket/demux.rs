@@ -223,7 +223,7 @@ fn handle_incoming_packet<I, BC, CC>(
                             bindings_ctx,
                             conn_id,
                             incoming,
-                            // TODO(https://issues.fuchsia.dev/319117141): Support
+                            // TODO(https://issues.fuchsia.dev/42085913): Support
                             // TimeWait reuse for dual stack listeners in the
                             // other stack.
                             &mut None,
@@ -315,7 +315,7 @@ fn handle_incoming_packet<I, BC, CC>(
                                             incoming,
                                             conn_addr,
                                             incoming_device,
-                                            // TODO(https://issues.fuchsia.dev/319117141):
+                                            // TODO(https://issues.fuchsia.dev/42085913):
                                             // Support TimeWait reuse for dual
                                             // stack listeners in the other stack.
                                             &mut None,
@@ -334,7 +334,7 @@ fn handle_incoming_packet<I, BC, CC>(
                             core_ctx,
                             bindings_ctx,
                             disposition,
-                            // TODO(https://issues.fuchsia.dev/319117141):
+                            // TODO(https://issues.fuchsia.dev/42085913):
                             // Support TimeWait reuse for dual stack listeners
                             // in the other stack.
                             &mut None,
@@ -517,7 +517,7 @@ where
                         incoming,
                     );
 
-                    // TODO(https://issues.fuchsia.dev/319117141): Support
+                    // TODO(https://issues.fuchsia.dev/42085913): Support
                     // TimeWait reuse when we support dual stack listeners.
                     if disposition
                         == ConnectionIncomingSegmentDisposition::ReuseCandidateForListener

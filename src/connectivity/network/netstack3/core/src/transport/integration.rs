@@ -25,14 +25,14 @@ use crate::{
     BindingsContext, BindingsTypes, CoreCtx, StackState,
 };
 
+#[netstack3_macros::instantiate_ip_impl_block(I)]
 impl<I, L, BC> tcp::socket::TcpDemuxContext<I, WeakDeviceId<BC>, BC> for CoreCtx<'_, BC, L>
 where
-    I: crate::ip::IpExt
-        + crate::ip::device::IpDeviceIpExt
-        + crate::transport::tcp::socket::DualStackIpExt,
+    I: Ip,
     BC: BindingsContext,
     L: LockBefore<crate::lock_ordering::TcpDemux<I>>,
 {
+    type IpTransportCtx<'a> = CoreCtx<'a, BC, crate::lock_ordering::TcpDemux<I>>;
     fn with_demux<O, F: FnOnce(&tcp::socket::DemuxState<I, WeakDeviceId<BC>, BC>) -> O>(
         &mut self,
         cb: F,
@@ -45,6 +45,21 @@ where
         cb: F,
     ) -> O {
         cb(&mut self.write_lock::<crate::lock_ordering::TcpDemux<I>>())
+    }
+
+    fn with_demux_mut_and_ip_transport_ctx<
+        O,
+        F: FnOnce(
+            &mut tcp::socket::DemuxState<I, WeakDeviceId<BC>, BC>,
+            &mut Self::IpTransportCtx<'_>,
+        ) -> O,
+    >(
+        &mut self,
+        cb: F,
+    ) -> O {
+        let (mut demux_state, mut restricted) =
+            self.write_lock_and::<crate::lock_ordering::TcpDemux<I>>();
+        cb(&mut demux_state, &mut restricted)
     }
 }
 
@@ -224,8 +239,11 @@ where
     }
 }
 
-impl<L, BC: BindingsContext> tcp::socket::TcpDualStackContext<Ipv6> for CoreCtx<'_, BC, L> {
+impl<L: LockBefore<crate::lock_ordering::TcpDemux<Ipv4>>, BC: BindingsContext>
+    tcp::socket::TcpDualStackContext<Ipv6, WeakDeviceId<BC>, BC> for CoreCtx<'_, BC, L>
+{
     type Converter = tcp::socket::Ipv6SocketIdToIpv4DemuxIdConverter;
+    type DualStackIpTransportCtx<'a> = CoreCtx<'a, BC, crate::lock_ordering::TcpDemux<Ipv6>>;
     fn other_demux_id_converter(&self) -> Self::Converter {
         tcp::socket::Ipv6SocketIdToIpv4DemuxIdConverter
     }
@@ -236,6 +254,40 @@ impl<L, BC: BindingsContext> tcp::socket::TcpDualStackContext<Ipv6> for CoreCtx<
 
     fn set_dual_stack_enabled(&self, ip_options: &mut tcp::socket::Ipv6Options, value: bool) {
         ip_options.dual_stack_enabled = value;
+    }
+
+    fn with_both_demux_mut<
+        O,
+        F: FnOnce(
+            &mut tcp::socket::DemuxState<Ipv6, WeakDeviceId<BC>, BC>,
+            &mut tcp::socket::DemuxState<Ipv4, WeakDeviceId<BC>, BC>,
+        ) -> O,
+    >(
+        &mut self,
+        cb: F,
+    ) -> O {
+        let (mut demux_v4, mut locked) =
+            self.write_lock_and::<crate::lock_ordering::TcpDemux<Ipv4>>();
+        let mut demux_v6 = locked.write_lock::<crate::lock_ordering::TcpDemux<Ipv6>>();
+        cb(&mut demux_v6, &mut demux_v4)
+    }
+
+    fn with_both_demux_mut_and_ip_transport_ctx<
+        O,
+        F: FnOnce(
+            &mut tcp::socket::DemuxState<Ipv6, WeakDeviceId<BC>, BC>,
+            &mut tcp::socket::DemuxState<Ipv4, WeakDeviceId<BC>, BC>,
+            &mut Self::DualStackIpTransportCtx<'_>,
+        ) -> O,
+    >(
+        &mut self,
+        cb: F,
+    ) -> O {
+        let (mut demux_v4, mut locked) =
+            self.write_lock_and::<crate::lock_ordering::TcpDemux<Ipv4>>();
+        let (mut demux_v6, mut locked) =
+            locked.write_lock_and::<crate::lock_ordering::TcpDemux<Ipv6>>();
+        cb(&mut demux_v6, &mut demux_v4, &mut locked)
     }
 }
 
