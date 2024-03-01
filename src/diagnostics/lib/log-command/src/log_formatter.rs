@@ -11,11 +11,11 @@ use anyhow::{Context, Result};
 use async_trait::async_trait;
 use chrono::{Local, TimeZone};
 use diagnostics_data::{
-    LogTextColor, LogTextDisplayOptions, LogTextPresenter, LogTimeDisplayFormat, LogsData,
-    Timestamp, Timezone,
+    Data, LogTextColor, LogTextDisplayOptions, LogTextPresenter, LogTimeDisplayFormat, Logs,
+    LogsData, Timestamp, Timezone,
 };
 use ffx_writer::ToolIO;
-use futures_util::StreamExt;
+use futures_util::{future::Either, select, stream::FuturesUnordered, StreamExt};
 use serde::{Deserialize, Serialize};
 use std::{
     fmt::Display,
@@ -104,17 +104,10 @@ pub trait Symbolize {
     async fn symbolize(&self, entry: LogEntry) -> Option<LogEntry>;
 }
 
-async fn handle_value<F, S>(
-    one: diagnostics_data::Data<diagnostics_data::Logs>,
-    formatter: &mut F,
-    symbolizer: &S,
-) -> Result<(), JsonDeserializeError>
+async fn handle_value<S>(one: Data<Logs>, boot_ts: i64, symbolizer: &S) -> Option<LogEntry>
 where
-    F: LogFormatter + BootTimeAccessor,
     S: Symbolize + ?Sized,
 {
-    let boot_ts = formatter.get_boot_timestamp();
-
     let entry = LogEntry {
         timestamp: {
             let monotonic = one.metadata.timestamp;
@@ -122,11 +115,7 @@ where
         },
         data: one.into(),
     };
-    let Some(symbolized) = symbolizer.symbolize(entry).await else {
-        return Ok(());
-    };
-    formatter.push_log(symbolized).await?;
-    Ok(())
+    symbolizer.symbolize(entry).await
 }
 
 /// Reads logs from a socket and formats them using the given formatter and symbolizer.
@@ -139,9 +128,23 @@ where
     F: LogFormatter + BootTimeAccessor,
     S: Symbolize + ?Sized,
 {
-    let mut decoder = Box::pin(LogsDataStream::new(socket));
-    while let Some(log) = decoder.next().await {
-        handle_value(log, formatter, symbolizer).await?;
+    let boot_ts = formatter.get_boot_timestamp();
+    let mut decoder = Box::pin(LogsDataStream::new(socket).fuse());
+    let mut symbolize_pending = FuturesUnordered::new();
+    while let Some(value) = select! {
+        res = decoder.next() => Some(Either::Left(res)),
+        res = symbolize_pending.next() => Some(Either::Right(res)),
+        complete => None,
+    } {
+        match value {
+            Either::Left(Some(log)) => {
+                symbolize_pending.push(handle_value(log, boot_ts, symbolizer));
+            }
+            Either::Right(Some(Some(symbolized))) => {
+                formatter.push_log(symbolized).await?;
+            }
+            _ => {}
+        }
     }
     Ok(())
 }
@@ -489,8 +492,9 @@ pub trait LogFormatter {
 mod test {
     use crate::parse_time;
     use assert_matches::assert_matches;
-    use diagnostics_data::{LogsDataBuilder, Severity};
+    use diagnostics_data::{Data, Logs, LogsDataBuilder, Severity};
     use ffx_writer::{Format, MachineWriter, TestBuffers};
+    use std::cell::Cell;
 
     use super::*;
 
@@ -535,6 +539,36 @@ mod test {
                 ),
                 timestamp: entry.timestamp,
             })
+        }
+    }
+
+    struct FakeSymbolizerCallback {
+        should_discard: Cell<bool>,
+    }
+
+    impl FakeSymbolizerCallback {
+        fn new() -> Self {
+            Self { should_discard: Cell::new(true) }
+        }
+    }
+
+    #[async_trait(?Send)]
+    impl Symbolize for FakeSymbolizerCallback {
+        async fn symbolize(&self, input: LogEntry) -> Option<LogEntry> {
+            self.should_discard.set(!self.should_discard.get());
+            if self.should_discard.get() {
+                None
+            } else {
+                let timestamp = input.timestamp;
+                Some(LogEntry {
+                    timestamp,
+                    data: LogData::SymbolizedTargetLog(
+                        input.data.as_target_log().unwrap().clone(),
+                        "symbolized log".into(),
+                    ),
+                    ..log_entry()
+                })
+            }
         }
     }
 
@@ -866,6 +900,65 @@ mod test {
         assert_eq!(
             buffers.into_stdout_str(),
             "[1615535969.000000][1][2][some/moniker][tag1,tag2] WARN: symbolized\n"
+        );
+    }
+
+    fn emit_log(
+        sender: &mut fuchsia_zircon::Socket,
+        msg: &str,
+        timestamp_nanos: i32,
+    ) -> Data<Logs> {
+        let target_log = LogsDataBuilder::new(diagnostics_data::BuilderArgs {
+            moniker: "ffx".into(),
+            timestamp_nanos: Timestamp::from(timestamp_nanos),
+            component_url: Some("ffx".into()),
+            severity: Severity::Info,
+        })
+        .set_message(msg)
+        .build();
+
+        sender
+            .write(serde_json::to_string(&target_log).unwrap().as_bytes())
+            .expect("failed to write target log");
+        target_log
+    }
+
+    #[fuchsia::test]
+    async fn test_default_formatter_discards_when_told_by_symbolizer() {
+        let mut formatter = FakeFormatter::new();
+        let (mut sender, receiver) = fuchsia_zircon::Socket::create_stream();
+        let target_log_0 = emit_log(&mut sender, "Hello world!", 0);
+        emit_log(&mut sender, "Dropped world!", 1);
+        let target_log_2 = emit_log(&mut sender, "Hello world!", 2);
+        emit_log(&mut sender, "Dropped world!", 3);
+        let target_log_4 = emit_log(&mut sender, "Hello world!", 4);
+        drop(sender);
+        // Drop every other log.
+        let symbolizer = FakeSymbolizerCallback::new();
+
+        dump_logs_from_socket(
+            fuchsia_async::Socket::from_socket(receiver),
+            &mut formatter,
+            &symbolizer,
+        )
+        .await
+        .unwrap();
+        assert_eq!(
+            formatter.logs,
+            vec![
+                LogEntry {
+                    data: LogData::SymbolizedTargetLog(target_log_0, "symbolized log".into()),
+                    timestamp: Timestamp::from(0)
+                },
+                LogEntry {
+                    data: LogData::SymbolizedTargetLog(target_log_2, "symbolized log".into()),
+                    timestamp: Timestamp::from(2)
+                },
+                LogEntry {
+                    data: LogData::SymbolizedTargetLog(target_log_4, "symbolized log".into()),
+                    timestamp: Timestamp::from(4)
+                }
+            ],
         );
     }
 

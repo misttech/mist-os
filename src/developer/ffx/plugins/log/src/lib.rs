@@ -19,7 +19,7 @@ use log_command::{
 };
 use log_symbolizer::{LogSymbolizer, Symbolizer};
 use std::io::Write;
-use symbolizer::SymbolizerChannel;
+use symbolizer::NonTransactionalSymbolizer;
 
 // NOTE: This is required for the legacy ffx toolchain
 // which automatically adds ffx_core even though we don't use it.
@@ -190,7 +190,7 @@ where
     W: ToolIO<OutputItem = LogEntry> + Write,
 {
     let symbolizer_channel: Box<dyn Symbolize> = match symbolizer {
-        Some(inner) => Box::new(SymbolizerChannel::new(inner).await?),
+        Some(inner) => Box::new(NonTransactionalSymbolizer::new(inner).await?),
         None => Box::new(NoOpSymoblizer {}),
     };
     let mut stream_mode = get_stream_mode(cmd.clone())?;

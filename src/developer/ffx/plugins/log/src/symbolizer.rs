@@ -3,32 +3,52 @@
 // found in the LICENSE file.
 use anyhow::Result;
 use async_trait::async_trait;
+use derivative::Derivative;
+use futures::channel::oneshot;
 use log_command::log_formatter;
 use log_formatter::{LogData, LogEntry, Symbolize};
 use log_symbolizer::{is_symbolizer_context_marker, Symbolizer};
-use std::fmt::Debug;
+use std::{cell::Cell, fmt::Debug};
 use thiserror::Error;
 
 use crate::error::LogError;
 
 /// Connection to a symbolizer.
-#[derive(Debug)]
-pub struct SymbolizerChannel<T>
+#[derive(Derivative)]
+#[derivative(Debug)]
+pub struct NonTransactionalSymbolizer<T>
 where
     T: Symbolizer,
 {
     sender: async_channel::Sender<String>,
     receiver: async_channel::Receiver<String>,
+    #[derivative(Debug = "ignore")]
+    pending_symbolize_tasks: Cell<Option<oneshot::Receiver<()>>>,
     _symbolizer: T,
 }
 
 #[async_trait(?Send)]
-impl<T> Symbolize for SymbolizerChannel<T>
+impl<T> Symbolize for NonTransactionalSymbolizer<T>
 where
     T: Symbolizer,
 {
     async fn symbolize(&self, entry: LogEntry) -> Option<LogEntry> {
-        Some(self.symbolize_message(entry).await)
+        // The legacy symbolizer only allows one pending operation at a time
+        // as it isn't transactional. If an operation is pending,
+        // wait for it to complete before trying to symbolize another line.
+        let (cv, waiter) = oneshot::channel();
+        if let Some(prev) = self.pending_symbolize_tasks.take() {
+            self.pending_symbolize_tasks.set(Some(waiter));
+            // Intentionally ignored, if other future is dropped we can still proceed.
+            let _ = prev.await;
+        } else {
+            self.pending_symbolize_tasks.set(Some(waiter));
+        }
+        let ret = Some(self.symbolize_message(entry).await);
+        // Intentionally ignored, there might not be anyone waiting.
+        let _ = cv.send(());
+        // Wake any blocked symbolize tasks
+        ret
     }
 }
 
@@ -42,17 +62,22 @@ enum SymbolizerError {
     RecvError(#[from] async_channel::RecvError),
 }
 
-impl<T> SymbolizerChannel<T>
+impl<T> NonTransactionalSymbolizer<T>
 where
     T: Symbolizer,
 {
-    /// Constructs a SymbolizerChannel from the given symbolizer
+    /// Constructs a NonTransactionalSymbolizer from the given symbolizer
     /// and starts the symbolizer process, opening a channel for communication.
-    pub async fn new(symbolizer: T) -> Result<SymbolizerChannel<T>, LogError> {
+    pub async fn new(symbolizer: T) -> Result<NonTransactionalSymbolizer<T>, LogError> {
         let (sender_tx, sender_rx) = async_channel::bounded(1);
         let (reader_tx, reader_rx) = async_channel::bounded(1);
         symbolizer.start(sender_rx, reader_tx, vec![]).await?;
-        Ok(SymbolizerChannel { _symbolizer: symbolizer, sender: sender_tx, receiver: reader_rx })
+        Ok(NonTransactionalSymbolizer {
+            _symbolizer: symbolizer,
+            sender: sender_tx,
+            receiver: reader_rx,
+            pending_symbolize_tasks: Cell::new(None),
+        })
     }
 
     /// Symbolizes the message if a target log, or returns the entry
@@ -194,7 +219,9 @@ mod tests {
     #[fuchsia::test]
     async fn symbolizer_replaces_markers_with_symbolized_logs() {
         let symbolizer =
-            SymbolizerChannel::new(FakeSymbolizerForTest::new(LOG_PREFIX, vec![])).await.unwrap();
+            NonTransactionalSymbolizer::new(FakeSymbolizerForTest::new(LOG_PREFIX, vec![]))
+                .await
+                .unwrap();
         let log = symbolizer.symbolize(make_log_entry("{{{reset}}}\n".to_string())).await.unwrap();
         let (_, out) = log.data.as_symbolized_log().unwrap();
         assert_eq!(out, "cool-logger{{{reset}}}\n");
@@ -223,13 +250,16 @@ mod tests {
     #[fuchsia::test]
     async fn symbolizer_returns_error_if_start_fails() {
         let config = BrokenSymbolizer {};
-        assert_matches!(SymbolizerChannel::new(config).await, Err(LogError::UnknownError(_)));
+        assert_matches!(
+            NonTransactionalSymbolizer::new(config).await,
+            Err(LogError::UnknownError(_))
+        );
     }
 
     #[fuchsia::test]
     async fn symbolizer_does_nothing_if_process_exits() {
         let config = ClosedSymbolizer {};
-        let symbolizer = SymbolizerChannel::new(config).await.unwrap();
+        let symbolizer = NonTransactionalSymbolizer::new(config).await.unwrap();
         let out = symbolizer
             .symbolize(make_log_entry("{{{reset}}}\n".to_string()))
             .await
@@ -272,7 +302,7 @@ mod tests {
     async fn symbolizer_does_nothing_if_stdout_hangs_up() {
         let config = HalfOpenSymbolizer::new(LOG_PREFIX, vec![]);
 
-        let symbolizer = SymbolizerChannel::new(config).await.unwrap();
+        let symbolizer = NonTransactionalSymbolizer::new(config).await.unwrap();
         let out = symbolizer
             .symbolize(make_log_entry("{{{reset}}}\n".to_string()))
             .await
