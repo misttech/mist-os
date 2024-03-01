@@ -229,6 +229,10 @@ impl ConnectionNode {
         connection_reader: stream::Reader,
         connection_writer: stream::Writer,
     ) -> Result<Connection> {
+        if &*self.node.node_id() == node_id {
+            return Err(Error::LoopbackUnsupported);
+        }
+
         let id = random();
 
         // Create stream 0 automatically. This will have the side effect of verifying connectivity

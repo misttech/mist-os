@@ -664,3 +664,16 @@ async fn connection_node_test_with_router_massively_parallel() {
 
     futures::future::join(senders, receivers).await;
 }
+
+#[fuchsia::test]
+async fn connection_node_test_loopback() {
+    let (new_peer_sender_a, _new_peers) = channel(1);
+    let (a, _a_incoming_conns) =
+        connection::ConnectionNode::new("a", "test", new_peer_sender_a).unwrap();
+    let (_reader, peer_writer) = stream::stream();
+    let (peer_reader, _writer) = stream::stream();
+    assert!(matches!(
+        a.connect_to_peer("a", peer_reader, peer_writer).await,
+        Err(Error::LoopbackUnsupported)
+    ));
+}

@@ -35,6 +35,8 @@ pub enum Error {
     NoSuchPeer(String),
     #[error("IO Error")]
     IO(#[from] std::io::Error),
+    #[error("Loopback connections are unsupported")]
+    LoopbackUnsupported,
 }
 
 pub(crate) trait ExtendBufferTooShortError {

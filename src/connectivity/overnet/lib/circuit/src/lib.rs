@@ -522,6 +522,11 @@ impl Node {
             }
         }
     }
+
+    /// Get the node ID of this node.
+    pub fn node_id(&self) -> &str {
+        self.node_id.as_str()
+    }
 }
 
 /// Given the reader and writer for an incoming connection, forward that
