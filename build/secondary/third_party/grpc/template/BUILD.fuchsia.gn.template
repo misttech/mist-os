@@ -93,6 +93,7 @@
   config("grpc_config_private") {
     cflags = [
       "-Wno-c++98-compat-extra-semi",
+      "-Wno-enum-enum-conversion",
       "-Wno-extra-semi",
       "-Wno-float-conversion",
       "-Wno-implicit-fallthrough",
