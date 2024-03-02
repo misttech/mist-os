@@ -541,7 +541,7 @@ mod tests {
             device::{FakeDevice, FakeDeviceState},
             test_utils::{fake_wlan_channel, MockWlanRxInfo},
         },
-        fidl_fuchsia_wlan_common as fidl_common, fuchsia_async as fasync,
+        fidl_fuchsia_wlan_common as fidl_common,
         fuchsia_sync::Mutex,
         ieee80211::{MacAddrBytes, Ssid},
         lazy_static::lazy_static,
@@ -659,10 +659,9 @@ mod tests {
         }
     }
 
-    #[test]
-    fn test_handle_scan_req_reject_if_busy() {
-        let exec = fasync::TestExecutor::new();
-        let mut m = MockObjects::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn test_handle_scan_req_reject_if_busy() {
+        let mut m = MockObjects::new().await;
         let mut ctx = m.make_ctx();
         let mut scanner = Scanner::new(*IFACE_MAC);
 
@@ -676,10 +675,9 @@ mod tests {
             .expect_err("unexpected MLME ScanEnd from BoundScanner");
     }
 
-    #[test]
-    fn test_handle_scan_req_reject_if_disabled() {
-        let exec = fasync::TestExecutor::new();
-        let mut m = MockObjects::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn test_handle_scan_req_reject_if_disabled() {
+        let mut m = MockObjects::new().await;
         let mut ctx = m.make_ctx();
         let mut scanner = Scanner::new(*IFACE_MAC);
 
@@ -696,10 +694,9 @@ mod tests {
         scanner.bind(&mut ctx).on_sme_scan(passive_scan_req()).expect("expect scan req accepted");
     }
 
-    #[test]
-    fn test_handle_scan_req_empty_channel_list() {
-        let exec = fasync::TestExecutor::new();
-        let mut m = MockObjects::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn test_handle_scan_req_empty_channel_list() {
+        let mut m = MockObjects::new().await;
         let mut ctx = m.make_ctx();
         let mut scanner = Scanner::new(*IFACE_MAC);
 
@@ -712,10 +709,9 @@ mod tests {
             .expect_err("unexpected MLME ScanEnd from BoundScanner");
     }
 
-    #[test]
-    fn test_handle_scan_req_invalid_channel_time() {
-        let exec = fasync::TestExecutor::new();
-        let mut m = MockObjects::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn test_handle_scan_req_invalid_channel_time() {
+        let mut m = MockObjects::new().await;
         let mut ctx = m.make_ctx();
         let mut scanner = Scanner::new(*IFACE_MAC);
 
@@ -732,10 +728,9 @@ mod tests {
             .expect_err("unexpected MLME ScanEnd from BoundScanner");
     }
 
-    #[test]
-    fn test_start_offload_passive_scan_success() {
-        let exec = fasync::TestExecutor::new();
-        let mut m = MockObjects::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn test_start_offload_passive_scan_success() {
+        let mut m = MockObjects::new().await;
         let mut ctx = m.make_ctx();
         let mut scanner = Scanner::new(*IFACE_MAC);
         let test_start_timestamp_nanos = zx::Time::get_monotonic().into_nanos();
@@ -832,13 +827,13 @@ mod tests {
                                0x02, 0x04, 0x0b, 0x16, 0x30, 0x60, 0x7e, 0x7f, // Supported Rates
                     ],
                 }); "multiple bands")]
-    fn test_start_active_scan_success(
+    #[fuchsia::test(allow_stalls = false)]
+    async fn test_start_active_scan_success(
         channel_list: &[u8],
         expected_two_ghz_dynamic_args: Option<ExpectedDynamicActiveScanRequest>,
         expected_five_ghz_dynamic_args: Option<ExpectedDynamicActiveScanRequest>,
     ) {
-        let exec = fasync::TestExecutor::new();
-        let mut m = MockObjects::new(&exec);
+        let mut m = MockObjects::new().await;
         let mut ctx = m.make_ctx();
         let mut scanner = Scanner::new(*IFACE_MAC);
         let test_start_timestamp_nanos = zx::Time::get_monotonic().into_nanos();
@@ -918,10 +913,9 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_start_passive_scan_fails() {
-        let exec = fasync::TestExecutor::new();
-        let mut m = MockObjects::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn test_start_passive_scan_fails() {
+        let mut m = MockObjects::new().await;
         m.fake_device_state.lock().config.start_passive_scan_fails = true;
         let mut ctx = m.make_ctx();
         let mut scanner = Scanner::new(*IFACE_MAC);
@@ -937,10 +931,9 @@ mod tests {
             .expect_err("unexpected MLME ScanEnd from BoundScanner");
     }
 
-    #[test]
-    fn test_start_active_scan_fails() {
-        let exec = fasync::TestExecutor::new();
-        let mut m = MockObjects::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn test_start_active_scan_fails() {
+        let mut m = MockObjects::new().await;
         m.fake_device_state.lock().config.start_active_scan_fails = true;
         let mut ctx = m.make_ctx();
         let mut scanner = Scanner::new(*IFACE_MAC);
@@ -956,10 +949,9 @@ mod tests {
             .expect_err("unexpected MLME ScanEnd from BoundScanner");
     }
 
-    #[test]
-    fn test_start_passive_scan_canceled() {
-        let exec = fasync::TestExecutor::new();
-        let mut m = MockObjects::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn test_start_passive_scan_canceled() {
+        let mut m = MockObjects::new().await;
         let mut ctx = m.make_ctx();
         let mut scanner = Scanner::new(*IFACE_MAC);
         let test_start_timestamp_nanos = zx::Time::get_monotonic().into_nanos();
@@ -998,10 +990,9 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_start_active_scan_canceled() {
-        let exec = fasync::TestExecutor::new();
-        let mut m = MockObjects::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn test_start_active_scan_canceled() {
+        let mut m = MockObjects::new().await;
         let mut ctx = m.make_ctx();
         let mut scanner = Scanner::new(*IFACE_MAC);
         let test_start_timestamp_nanos = zx::Time::get_monotonic().into_nanos();
@@ -1042,10 +1033,9 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_handle_ap_advertisement() {
-        let exec = fasync::TestExecutor::new();
-        let mut m = MockObjects::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn test_handle_ap_advertisement() {
+        let mut m = MockObjects::new().await;
         let mut ctx = m.make_ctx();
         let mut scanner = Scanner::new(*IFACE_MAC);
         let test_start_timestamp_nanos = zx::Time::get_monotonic().into_nanos();
@@ -1075,10 +1065,9 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_handle_ap_advertisement_multiple() {
-        let exec = fasync::TestExecutor::new();
-        let mut m = MockObjects::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn test_handle_ap_advertisement_multiple() {
+        let mut m = MockObjects::new().await;
         let mut ctx = m.make_ctx();
         let mut scanner = Scanner::new(*IFACE_MAC);
         let test_start_timestamp_nanos = zx::Time::get_monotonic().into_nanos();
@@ -1120,10 +1109,9 @@ mod tests {
         );
     }
 
-    #[test]
-    fn not_scanning_vs_scanning() {
-        let exec = fasync::TestExecutor::new();
-        let mut m = MockObjects::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn not_scanning_vs_scanning() {
+        let mut m = MockObjects::new().await;
         let mut ctx = m.make_ctx();
         let mut scanner = Scanner::new(*IFACE_MAC);
         assert_eq!(false, scanner.is_scanning());
@@ -1160,9 +1148,12 @@ mod tests {
     }
 
     impl MockObjects {
-        fn new(exec: &fasync::TestExecutor) -> Self {
+        // TODO(https://fxbug.dev/327499461): This function is async to ensure MLME functions will
+        // run in an async context and not call `wlan_common::timer::Timer::now` without an
+        // executor.
+        async fn new() -> Self {
             let (timer, _time_stream) = create_timer();
-            let (fake_device, fake_device_state) = FakeDevice::new(exec);
+            let (fake_device, fake_device_state) = FakeDevice::new().await;
             Self { fake_device, fake_device_state, _time_stream, timer: Some(timer) }
         }
 

@@ -631,18 +631,17 @@ mod tests {
         }};
     }
 
-    #[test]
-    fn bootstrap_generic_sme_fails_to_retrieve_usme_bootstrap_handle() {
-        let mut exec = TestExecutor::new();
+    #[fuchsia::test(allow_stalls = false)]
+    async fn bootstrap_generic_sme_fails_to_retrieve_usme_bootstrap_handle() {
         let (mut fake_device, _fake_device_state) = FakeDevice::new_with_config(
-            &exec,
             FakeDeviceConfig::default().with_mock_start_result(Err(zx::Status::INTERRUPTED_RETRY)),
-        );
+        )
+        .await;
         let (driver_event_sink, _driver_event_stream) = DriverEventSink::new();
 
         let (mut bootstrap_generic_sme_fut, _harness) =
             make_bootstrap_generic_sme_test_harness!(&mut fake_device, driver_event_sink);
-        match exec.run_until_stalled(&mut bootstrap_generic_sme_fut) {
+        match TestExecutor::poll_until_stalled(&mut bootstrap_generic_sme_fut).await {
             Poll::Ready(Err(zx::Status::INTERRUPTED_RETRY)) => (),
             Poll::Ready(Err(status)) => panic!("Failed with wrong status: {}", status),
             Poll::Ready(Ok(_)) => panic!("Succeeded unexpectedly"),
@@ -650,16 +649,18 @@ mod tests {
         }
     }
 
-    #[test]
-    fn boostrap_generic_sme_fails_on_error_from_bootstrap_stream() {
-        let mut exec = TestExecutor::new();
+    #[fuchsia::test(allow_stalls = false)]
+    async fn boostrap_generic_sme_fails_on_error_from_bootstrap_stream() {
         let (mut fake_device, fake_device_state) =
-            FakeDevice::new_with_config(&exec, FakeDeviceConfig::default());
+            FakeDevice::new_with_config(FakeDeviceConfig::default()).await;
         let (driver_event_sink, _driver_event_stream) = DriverEventSink::new();
 
         let (mut bootstrap_generic_sme_fut, _harness) =
             make_bootstrap_generic_sme_test_harness!(&mut fake_device, driver_event_sink);
-        assert!(matches!(exec.run_until_stalled(&mut bootstrap_generic_sme_fut), Poll::Pending));
+        assert!(matches!(
+            TestExecutor::poll_until_stalled(&mut bootstrap_generic_sme_fut).await,
+            Poll::Pending
+        ));
 
         // Write an invalid FIDL message to the USME bootstrap channel.
         let usme_bootstrap_channel =
@@ -667,41 +668,45 @@ mod tests {
         usme_bootstrap_channel.write(&[], &mut []).unwrap();
 
         assert!(matches!(
-            exec.run_until_stalled(&mut bootstrap_generic_sme_fut),
+            TestExecutor::poll_until_stalled(&mut bootstrap_generic_sme_fut).await,
             Poll::Ready(Err(zx::Status::INTERNAL))
         ));
     }
 
-    #[test]
-    fn boostrap_generic_sme_fails_on_closed_bootstrap_stream() {
-        let mut exec = TestExecutor::new();
+    #[fuchsia::test(allow_stalls = false)]
+    async fn boostrap_generic_sme_fails_on_closed_bootstrap_stream() {
         let (mut fake_device, fake_device_state) =
-            FakeDevice::new_with_config(&exec, FakeDeviceConfig::default());
+            FakeDevice::new_with_config(FakeDeviceConfig::default()).await;
         let (driver_event_sink, _driver_event_stream) = DriverEventSink::new();
 
         let (mut bootstrap_generic_sme_fut, _harness) =
             make_bootstrap_generic_sme_test_harness!(&mut fake_device, driver_event_sink);
-        assert!(matches!(exec.run_until_stalled(&mut bootstrap_generic_sme_fut), Poll::Pending));
+        assert!(matches!(
+            TestExecutor::poll_until_stalled(&mut bootstrap_generic_sme_fut).await,
+            Poll::Pending
+        ));
 
         // Drop the client end of USME bootstrap channel.
         let _ = fake_device_state.lock().usme_bootstrap_client_end.take().unwrap();
 
         assert!(matches!(
-            exec.run_until_stalled(&mut bootstrap_generic_sme_fut),
+            TestExecutor::poll_until_stalled(&mut bootstrap_generic_sme_fut).await,
             Poll::Ready(Err(zx::Status::INTERNAL))
         ));
     }
 
-    #[test]
-    fn boostrap_generic_sme_succeeds() {
-        let mut exec = TestExecutor::new();
+    #[fuchsia::test(allow_stalls = false)]
+    async fn boostrap_generic_sme_succeeds() {
         let (mut fake_device, fake_device_state) =
-            FakeDevice::new_with_config(&exec, FakeDeviceConfig::default());
+            FakeDevice::new_with_config(FakeDeviceConfig::default()).await;
         let (driver_event_sink, _driver_event_stream) = DriverEventSink::new();
 
         let (mut bootstrap_generic_sme_fut, _harness) =
             make_bootstrap_generic_sme_test_harness!(&mut fake_device, driver_event_sink);
-        assert!(matches!(exec.run_until_stalled(&mut bootstrap_generic_sme_fut), Poll::Pending));
+        assert!(matches!(
+            TestExecutor::poll_until_stalled(&mut bootstrap_generic_sme_fut).await,
+            Poll::Pending
+        ));
 
         let usme_bootstrap_proxy = fake_device_state
             .lock()
@@ -718,17 +723,20 @@ mod tests {
         let inspect_vmo_fut =
             usme_bootstrap_proxy.start(generic_sme_server, &sent_legacy_privacy_support);
         pin_mut!(inspect_vmo_fut);
-        assert!(matches!(exec.run_until_stalled(&mut inspect_vmo_fut), Poll::Pending));
+        assert!(matches!(
+            TestExecutor::poll_until_stalled(&mut inspect_vmo_fut).await,
+            Poll::Pending
+        ));
 
         let BootstrappedGenericSme {
             mut generic_sme_request_stream,
             legacy_privacy_support: received_legacy_privacy_support,
             inspect_node,
-        } = match exec.run_until_stalled(&mut bootstrap_generic_sme_fut) {
+        } = match TestExecutor::poll_until_stalled(&mut bootstrap_generic_sme_fut).await {
             Poll::Pending => panic!("bootstrap_generic_sme_fut() did not complete!"),
             Poll::Ready(x) => x.unwrap(),
         };
-        let inspect_vmo = match exec.run_until_stalled(&mut inspect_vmo_fut) {
+        let inspect_vmo = match TestExecutor::poll_until_stalled(&mut inspect_vmo_fut).await {
             Poll::Pending => panic!("Failed to receive an inspect VMO."),
             Poll::Ready(x) => x.unwrap(),
         };
@@ -737,11 +745,11 @@ mod tests {
         // and generic_sme_stream are connected.
         let query_fut = generic_sme_proxy.query();
         pin_mut!(query_fut);
-        assert!(matches!(exec.run_until_stalled(&mut query_fut), Poll::Pending));
+        assert!(matches!(TestExecutor::poll_until_stalled(&mut query_fut).await, Poll::Pending));
         let next_generic_sme_request_fut = generic_sme_request_stream.next();
         pin_mut!(next_generic_sme_request_fut);
         assert!(matches!(
-            exec.run_until_stalled(&mut next_generic_sme_request_fut),
+            TestExecutor::poll_until_stalled(&mut next_generic_sme_request_fut).await,
             Poll::Ready(Some(Ok(fidl_sme::GenericSmeRequest::Query { .. })))
         ));
 
@@ -795,17 +803,16 @@ mod tests {
         }
     }
 
-    #[test]
-    fn start_fails_on_bad_bootstrap() {
-        let mut exec = TestExecutor::new();
+    #[fuchsia::test(allow_stalls = false)]
+    async fn start_fails_on_bad_bootstrap() {
         let (fake_device, _fake_device_state) = FakeDevice::new_with_config(
-            &exec,
             FakeDeviceConfig::default().with_mock_start_result(Err(zx::Status::INTERRUPTED_RETRY)),
-        );
+        )
+        .await;
         let (mut start_fut, _harness) = StartTestHarness::new(fake_device);
 
         assert!(matches!(
-            exec.run_until_stalled(&mut start_fut),
+            TestExecutor::poll_until_stalled(&mut start_fut).await,
             Poll::Ready(Err(zx::Status::INTERRUPTED_RETRY))
         ));
     }
@@ -830,13 +837,13 @@ mod tests {
     #[test_case(FakeDeviceConfig::default().with_mock_security_support(Err(zx::Status::IO_DATA_INTEGRITY)), zx::Status::IO_DATA_INTEGRITY)]
     #[test_case(FakeDeviceConfig::default().with_mock_spectrum_management_support(Err(zx::Status::IO_DATA_INTEGRITY)), zx::Status::IO_DATA_INTEGRITY)]
     #[test_case(FakeDeviceConfig::default().with_mock_mac_role(fidl_common::WlanMacRole::__SourceBreaking { unknown_ordinal: 0 }), zx::Status::INTERNAL)]
-    fn start_fails_on_query_error(
+    #[fuchsia::test(allow_stalls = false)]
+    async fn start_fails_on_query_error(
         fake_device_config: FakeDeviceConfig,
         expected_status: zx::Status,
     ) {
-        let mut exec = TestExecutor::new();
         let (fake_device, fake_device_state) =
-            FakeDevice::new_with_config(&exec, fake_device_config);
+            FakeDevice::new_with_config(fake_device_config).await;
         let (mut start_fut, _harness) = StartTestHarness::new(fake_device);
 
         let usme_bootstrap_client_end =
@@ -844,17 +851,16 @@ mod tests {
         let (_generic_sme_proxy, _inspect_vmo_fut) =
             bootstrap_generic_sme_proxy_and_inspect_vmo(usme_bootstrap_client_end);
 
-        match exec.run_until_stalled(&mut start_fut) {
+        match TestExecutor::poll_until_stalled(&mut start_fut).await {
             Poll::Ready(Err(status)) => assert_eq!(status, expected_status),
             Poll::Pending => panic!("start_fut still pending!"),
             Poll::Ready(Ok(_)) => panic!("start_fut completed with Ok value"),
         }
     }
 
-    #[test]
-    fn start_fail_on_dropped_mlme_event_stream() {
-        let mut exec = TestExecutor::new();
-        let (fake_device, fake_device_state) = FakeDevice::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn start_fail_on_dropped_mlme_event_stream() {
+        let (fake_device, fake_device_state) = FakeDevice::new().await;
         let (mut start_fut, _harness) = StartTestHarness::new(fake_device);
 
         let usme_bootstrap_client_end =
@@ -863,22 +869,21 @@ mod tests {
             bootstrap_generic_sme_proxy_and_inspect_vmo(usme_bootstrap_client_end);
 
         let _ = fake_device_state.lock().mlme_event_stream.take();
-        match exec.run_until_stalled(&mut start_fut) {
+        match TestExecutor::poll_until_stalled(&mut start_fut).await {
             Poll::Ready(Err(status)) => assert_eq!(status, zx::Status::INTERNAL),
             Poll::Pending => panic!("start_fut still pending!"),
             Poll::Ready(Ok(_)) => panic!("start_fut completed with Ok value"),
         }
     }
 
-    #[test]
-    fn start_succeeds() {
-        let mut exec = TestExecutor::new();
+    #[fuchsia::test(allow_stalls = false)]
+    async fn start_succeeds() {
         let (fake_device, fake_device_state) = FakeDevice::new_with_config(
-            &exec,
             FakeDeviceConfig::default()
                 .with_mock_sta_addr([2u8; 6])
                 .with_mock_mac_role(fidl_common::WlanMacRole::Client),
-        );
+        )
+        .await;
         let (mut start_fut, mut harness) = StartTestHarness::new(fake_device);
 
         let usme_bootstrap_client_end =
@@ -890,7 +895,7 @@ mod tests {
             softmac_ifc_bridge_request_stream: _softmac_ifc_bridge_request_stream,
             mut mlme,
             sme,
-        } = match exec.run_until_stalled(&mut start_fut) {
+        } = match TestExecutor::poll_until_stalled(&mut start_fut).await {
             Poll::Ready(Ok(x)) => x,
             Poll::Ready(Err(status)) => {
                 panic!("start_fut unexpectedly failed; {}", status)
@@ -898,22 +903,25 @@ mod tests {
             Poll::Pending => panic!("start_fut still pending!"),
         };
 
-        assert_variant!(exec.run_until_stalled(&mut mlme), Poll::Pending);
+        assert_variant!(TestExecutor::poll_until_stalled(&mut mlme).await, Poll::Pending);
         assert!(matches!(
-            exec.run_until_stalled(&mut harness.mlme_init_receiver),
+            TestExecutor::poll_until_stalled(&mut harness.mlme_init_receiver).await,
             Poll::Ready(Ok(Ok(())))
         ));
 
         let resp_fut = generic_sme_proxy.query();
         pin_mut!(resp_fut);
-        assert_variant!(exec.run_until_stalled(&mut resp_fut), Poll::Pending);
+        assert_variant!(TestExecutor::poll_until_stalled(&mut resp_fut).await, Poll::Pending);
 
         let sme_and_mlme = [sme, mlme].into_iter().collect::<FuturesUnordered<_>>();
         pin_mut!(sme_and_mlme);
-        assert!(matches!(exec.run_until_stalled(&mut sme_and_mlme.next()), Poll::Pending));
+        assert!(matches!(
+            TestExecutor::poll_until_stalled(&mut sme_and_mlme.next()).await,
+            Poll::Pending
+        ));
 
         assert!(matches!(
-            exec.run_until_stalled(&mut resp_fut),
+            TestExecutor::poll_until_stalled(&mut resp_fut).await,
             Poll::Ready(Ok(fidl_sme::GenericSmeQuery {
                 role: fidl_common::WlanMacRole::Client,
                 sta_addr: [2, 2, 2, 2, 2, 2],
@@ -921,9 +929,8 @@ mod tests {
         ));
     }
 
-    #[test]
-    fn serve_wlansoftmac_ifc_bridge_fails_on_request_stream_error() {
-        let mut exec = TestExecutor::new();
+    #[fuchsia::test(allow_stalls = false)]
+    async fn serve_wlansoftmac_ifc_bridge_fails_on_request_stream_error() {
         let (driver_event_sink, _driver_event_stream) = DriverEventSink::new();
         let (softmac_ifc_bridge_client, softmac_ifc_bridge_server) =
             fidl::endpoints::create_endpoints::<fidl_softmac::WlanSoftmacIfcBridgeMarker>();
@@ -933,15 +940,17 @@ mod tests {
         let server_fut =
             serve_wlan_softmac_ifc_bridge(driver_event_sink, softmac_ifc_bridge_request_stream);
         pin_mut!(server_fut);
-        assert_variant!(exec.run_until_stalled(&mut server_fut), Poll::Pending);
+        assert_variant!(TestExecutor::poll_until_stalled(&mut server_fut).await, Poll::Pending);
 
         softmac_ifc_bridge_channel.write(&[], &mut []).unwrap();
-        assert_variant!(exec.run_until_stalled(&mut server_fut), Poll::Ready(Err(_)));
+        assert_variant!(
+            TestExecutor::poll_until_stalled(&mut server_fut).await,
+            Poll::Ready(Err(_))
+        );
     }
 
-    #[test]
-    fn serve_wlansoftmac_ifc_bridge_exits_on_request_stream_end() {
-        let mut exec = TestExecutor::new();
+    #[fuchsia::test(allow_stalls = false)]
+    async fn serve_wlansoftmac_ifc_bridge_exits_on_request_stream_end() {
         let (driver_event_sink, _driver_event_stream) = DriverEventSink::new();
         let (softmac_ifc_bridge_client, softmac_ifc_bridge_server) =
             fidl::endpoints::create_endpoints::<fidl_softmac::WlanSoftmacIfcBridgeMarker>();
@@ -950,10 +959,13 @@ mod tests {
         let server_fut =
             serve_wlan_softmac_ifc_bridge(driver_event_sink, softmac_ifc_bridge_request_stream);
         pin_mut!(server_fut);
-        assert_variant!(exec.run_until_stalled(&mut server_fut), Poll::Pending);
+        assert_variant!(TestExecutor::poll_until_stalled(&mut server_fut).await, Poll::Pending);
 
         drop(softmac_ifc_bridge_client);
-        assert_variant!(exec.run_until_stalled(&mut server_fut), Poll::Ready(Ok(())));
+        assert_variant!(
+            TestExecutor::poll_until_stalled(&mut server_fut).await,
+            Poll::Ready(Ok(()))
+        );
     }
 
     #[test_case(fidl_softmac::WlanSoftmacIfcBaseNotifyScanCompleteRequest {
@@ -966,10 +978,10 @@ mod tests {
                 scan_id: None,
                 ..Default::default()
             })]
-    fn serve_wlansoftmac_ifc_bridge_exits_on_invalid_notify_scan_complete_request(
+    #[fuchsia::test(allow_stalls = false)]
+    async fn serve_wlansoftmac_ifc_bridge_exits_on_invalid_notify_scan_complete_request(
         request: fidl_softmac::WlanSoftmacIfcBaseNotifyScanCompleteRequest,
     ) {
-        let mut exec = TestExecutor::new();
         let (driver_event_sink, mut driver_event_stream) = DriverEventSink::new();
         let (softmac_ifc_bridge_proxy, softmac_ifc_bridge_server) =
             fidl::endpoints::create_proxy::<fidl_softmac::WlanSoftmacIfcBridgeMarker>().unwrap();
@@ -981,15 +993,17 @@ mod tests {
 
         let resp_fut = softmac_ifc_bridge_proxy.notify_scan_complete(&request);
         pin_mut!(resp_fut);
-        assert_variant!(exec.run_until_stalled(&mut resp_fut), Poll::Pending);
-        assert_variant!(exec.run_until_stalled(&mut server_fut), Poll::Ready(Err(_)));
-        assert_variant!(exec.run_until_stalled(&mut resp_fut), Poll::Ready(Ok(())));
+        assert_variant!(TestExecutor::poll_until_stalled(&mut resp_fut).await, Poll::Pending);
+        assert_variant!(
+            TestExecutor::poll_until_stalled(&mut server_fut).await,
+            Poll::Ready(Err(_))
+        );
+        assert_variant!(TestExecutor::poll_until_stalled(&mut resp_fut).await, Poll::Ready(Ok(())));
         assert!(matches!(driver_event_stream.try_next(), Ok(None)));
     }
 
-    #[test]
-    fn serve_wlansoftmac_ifc_bridge_enqueues_notify_scan_complete() {
-        let mut exec = TestExecutor::new();
+    #[fuchsia::test(allow_stalls = false)]
+    async fn serve_wlansoftmac_ifc_bridge_enqueues_notify_scan_complete() {
         let (driver_event_sink, mut driver_event_stream) = DriverEventSink::new();
         let (softmac_ifc_bridge_proxy, softmac_ifc_bridge_server) =
             fidl::endpoints::create_proxy::<fidl_softmac::WlanSoftmacIfcBridgeMarker>().unwrap();
@@ -1007,9 +1021,9 @@ mod tests {
             },
         );
         pin_mut!(resp_fut);
-        assert_variant!(exec.run_until_stalled(&mut resp_fut), Poll::Pending);
-        assert_variant!(exec.run_until_stalled(&mut server_fut), Poll::Pending);
-        assert_variant!(exec.run_until_stalled(&mut resp_fut), Poll::Ready(Ok(())));
+        assert_variant!(TestExecutor::poll_until_stalled(&mut resp_fut).await, Poll::Pending);
+        assert_variant!(TestExecutor::poll_until_stalled(&mut server_fut).await, Poll::Pending);
+        assert_variant!(TestExecutor::poll_until_stalled(&mut resp_fut).await, Poll::Ready(Ok(())));
 
         assert!(matches!(
             driver_event_stream.try_next(),
@@ -1067,9 +1081,8 @@ mod tests {
         }
     }
 
-    #[test]
-    fn serve_wlansoftmac_ifc_bridge_enqueues_report_tx_result() {
-        let mut exec = TestExecutor::new();
+    #[fuchsia::test(allow_stalls = false)]
+    async fn serve_wlansoftmac_ifc_bridge_enqueues_report_tx_result() {
         let (driver_event_sink, mut driver_event_stream) = DriverEventSink::new();
         let (softmac_ifc_bridge_proxy, softmac_ifc_bridge_server) =
             fidl::endpoints::create_proxy::<fidl_softmac::WlanSoftmacIfcBridgeMarker>().unwrap();
@@ -1088,9 +1101,9 @@ mod tests {
             result_code: fidl_common::WlanTxResultCode::Failed,
         });
         pin_mut!(resp_fut);
-        assert_variant!(exec.run_until_stalled(&mut resp_fut), Poll::Pending);
-        assert_variant!(exec.run_until_stalled(&mut server_fut), Poll::Pending);
-        assert_variant!(exec.run_until_stalled(&mut resp_fut), Poll::Ready(Ok(())));
+        assert_variant!(TestExecutor::poll_until_stalled(&mut resp_fut).await, Poll::Pending);
+        assert_variant!(TestExecutor::poll_until_stalled(&mut server_fut).await, Poll::Pending);
+        assert_variant!(TestExecutor::poll_until_stalled(&mut resp_fut).await, Poll::Ready(Ok(())));
 
         match driver_event_stream.try_next().unwrap().unwrap() {
             DriverEvent::TxResultReport { tx_result } => {
@@ -1111,128 +1124,133 @@ mod tests {
         }
     }
 
-    #[test]
-    fn serve_exits_with_error_if_mlme_init_sender_dropped() {
-        let mut exec = TestExecutor::new();
+    #[fuchsia::test(allow_stalls = false)]
+    async fn serve_exits_with_error_if_mlme_init_sender_dropped() {
         let (mut serve_fut, mut harness) = ServeTestHarness::new();
 
-        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_variant!(TestExecutor::poll_until_stalled(&mut serve_fut).await, Poll::Pending);
         drop(harness.mlme_init_sender);
         assert_variant!(
-            exec.run_until_stalled(&mut serve_fut),
+            TestExecutor::poll_until_stalled(&mut serve_fut).await,
             Poll::Ready(Err(zx::Status::INTERNAL))
         );
 
         assert_variant!(
-            exec.run_until_stalled(&mut harness.init_complete_receiver),
+            TestExecutor::poll_until_stalled(&mut harness.init_complete_receiver).await,
             Poll::Ready(Ok(Err(zx::Status::INTERNAL)))
         );
     }
 
-    #[test]
-    fn serve_exits_with_error_on_init_failure() {
-        let mut exec = TestExecutor::new();
+    #[fuchsia::test(allow_stalls = false)]
+    async fn serve_exits_with_error_on_init_failure() {
         let (mut serve_fut, mut harness) = ServeTestHarness::new();
 
-        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_variant!(TestExecutor::poll_until_stalled(&mut serve_fut).await, Poll::Pending);
         harness.mlme_init_sender.send(Err(zx::Status::IO_NOT_PRESENT)).unwrap();
         assert_variant!(
-            exec.run_until_stalled(&mut serve_fut),
+            TestExecutor::poll_until_stalled(&mut serve_fut).await,
             Poll::Ready(Err(zx::Status::IO_NOT_PRESENT))
         );
         assert_variant!(
-            exec.run_until_stalled(&mut harness.init_complete_receiver),
+            TestExecutor::poll_until_stalled(&mut harness.init_complete_receiver).await,
             Poll::Ready(Ok(Err(zx::Status::IO_NOT_PRESENT)))
         );
     }
 
     #[test_case(Ok(()))]
     #[test_case(Err(format_err!("")))]
-    fn serve_exits_with_error_if_mlme_completes_before_init(early_mlme_result: Result<(), Error>) {
-        let mut exec = TestExecutor::new();
+    #[fuchsia::test(allow_stalls = false)]
+    async fn serve_exits_with_error_if_mlme_completes_before_init(
+        early_mlme_result: Result<(), Error>,
+    ) {
         let (mut serve_fut, mut harness) = ServeTestHarness::new();
 
-        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_variant!(TestExecutor::poll_until_stalled(&mut serve_fut).await, Poll::Pending);
         harness.complete_mlme_sender.send(early_mlme_result).unwrap();
         assert_variant!(
-            exec.run_until_stalled(&mut serve_fut),
+            TestExecutor::poll_until_stalled(&mut serve_fut).await,
             Poll::Ready(Err(zx::Status::INTERNAL))
         );
         assert_variant!(
-            exec.run_until_stalled(&mut harness.init_complete_receiver),
+            TestExecutor::poll_until_stalled(&mut harness.init_complete_receiver).await,
             Poll::Ready(Ok(Err(zx::Status::INTERNAL)))
         );
     }
 
     #[test_case(Ok(()))]
     #[test_case(Err(format_err!("")))]
-    fn serve_exits_with_error_if_sme_shuts_down_before_mlme(early_sme_result: Result<(), Error>) {
-        let mut exec = TestExecutor::new();
+    #[fuchsia::test(allow_stalls = false)]
+    async fn serve_exits_with_error_if_sme_shuts_down_before_mlme(
+        early_sme_result: Result<(), Error>,
+    ) {
         let (mut serve_fut, mut harness) = ServeTestHarness::new();
 
-        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_variant!(TestExecutor::poll_until_stalled(&mut serve_fut).await, Poll::Pending);
         harness.mlme_init_sender.send(Ok(())).unwrap();
-        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_variant!(TestExecutor::poll_until_stalled(&mut serve_fut).await, Poll::Pending);
         assert_variant!(
-            exec.run_until_stalled(&mut harness.init_complete_receiver),
+            TestExecutor::poll_until_stalled(&mut harness.init_complete_receiver).await,
             Poll::Ready(Ok(Ok(())))
         );
         harness.complete_sme_sender.send(early_sme_result).unwrap();
         assert_variant!(
-            exec.run_until_stalled(&mut serve_fut),
+            TestExecutor::poll_until_stalled(&mut serve_fut).await,
             Poll::Ready(Err(zx::Status::INTERNAL))
         );
     }
 
-    #[test]
-    fn serve_exits_with_error_if_mlme_completes_with_error() {
-        let mut exec = TestExecutor::new();
+    #[fuchsia::test(allow_stalls = false)]
+    async fn serve_exits_with_error_if_mlme_completes_with_error() {
         let (mut serve_fut, mut harness) = ServeTestHarness::new();
 
-        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_variant!(TestExecutor::poll_until_stalled(&mut serve_fut).await, Poll::Pending);
         harness.mlme_init_sender.send(Ok(())).unwrap();
-        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_variant!(TestExecutor::poll_until_stalled(&mut serve_fut).await, Poll::Pending);
         assert_variant!(
-            exec.run_until_stalled(&mut harness.init_complete_receiver),
+            TestExecutor::poll_until_stalled(&mut harness.init_complete_receiver).await,
             Poll::Ready(Ok(Ok(())))
         );
         harness.complete_mlme_sender.send(Err(format_err!("mlme error"))).unwrap();
-        assert_eq!(exec.run_until_stalled(&mut serve_fut), Poll::Ready(Err(zx::Status::INTERNAL)));
+        assert_eq!(
+            TestExecutor::poll_until_stalled(&mut serve_fut).await,
+            Poll::Ready(Err(zx::Status::INTERNAL))
+        );
     }
 
-    #[test]
-    fn serve_exits_with_error_if_sme_shuts_down_with_error() {
-        let mut exec = TestExecutor::new();
+    #[fuchsia::test(allow_stalls = false)]
+    async fn serve_exits_with_error_if_sme_shuts_down_with_error() {
         let (mut serve_fut, mut harness) = ServeTestHarness::new();
 
-        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_variant!(TestExecutor::poll_until_stalled(&mut serve_fut).await, Poll::Pending);
         harness.mlme_init_sender.send(Ok(())).unwrap();
-        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_variant!(TestExecutor::poll_until_stalled(&mut serve_fut).await, Poll::Pending);
         assert_variant!(
-            exec.run_until_stalled(&mut harness.init_complete_receiver),
+            TestExecutor::poll_until_stalled(&mut harness.init_complete_receiver).await,
             Poll::Ready(Ok(Ok(())))
         );
         harness.complete_mlme_sender.send(Ok(())).unwrap();
         harness.complete_sme_sender.send(Err(format_err!("sme error"))).unwrap();
-        assert_eq!(exec.run_until_stalled(&mut serve_fut), Poll::Ready(Err(zx::Status::INTERNAL)));
+        assert_eq!(
+            TestExecutor::poll_until_stalled(&mut serve_fut).await,
+            Poll::Ready(Err(zx::Status::INTERNAL))
+        );
     }
 
-    #[test]
-    fn serve_shuts_down_gracefully() {
-        let mut exec = TestExecutor::new();
+    #[fuchsia::test(allow_stalls = false)]
+    async fn serve_shuts_down_gracefully() {
         let (mut serve_fut, mut harness) = ServeTestHarness::new();
 
-        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_variant!(TestExecutor::poll_until_stalled(&mut serve_fut).await, Poll::Pending);
         harness.mlme_init_sender.send(Ok(())).unwrap();
-        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_variant!(TestExecutor::poll_until_stalled(&mut serve_fut).await, Poll::Pending);
         assert_variant!(
-            exec.run_until_stalled(&mut harness.init_complete_receiver),
+            TestExecutor::poll_until_stalled(&mut harness.init_complete_receiver).await,
             Poll::Ready(Ok(Ok(())))
         );
         harness.complete_mlme_sender.send(Ok(())).unwrap();
-        assert_eq!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_eq!(TestExecutor::poll_until_stalled(&mut serve_fut).await, Poll::Pending);
         harness.complete_sme_sender.send(Ok(())).unwrap();
-        assert_eq!(exec.run_until_stalled(&mut serve_fut), Poll::Ready(Ok(())));
+        assert_eq!(TestExecutor::poll_until_stalled(&mut serve_fut).await, Poll::Ready(Ok(())));
     }
 
     #[derive(Debug)]
@@ -1256,8 +1274,7 @@ mod tests {
     ///
     /// An Err value will be returned if start_and_serve() encounters an error completing the bootstrap
     /// of the SME server.
-    fn start_and_serve_with_device(
-        exec: &mut TestExecutor,
+    async fn start_and_serve_with_device(
         fake_device: FakeDevice,
     ) -> Result<StartAndServeTestHarness<impl Future<Output = Result<(), zx::Status>>>, zx::Status>
     {
@@ -1279,7 +1296,7 @@ mod tests {
         match usme_bootstrap_client_end {
             // Simulate an errant initialization case where the UsmeBootstrap client end has been dropped
             // during initialization.
-            None => match exec.run_until_stalled(&mut start_and_serve_fut) {
+            None => match TestExecutor::poll_until_stalled(&mut start_and_serve_fut).await {
                 Poll::Pending => panic!(
                     "start_and_serve() failed to panic when the UsmeBootstrap client was dropped."
                 ),
@@ -1289,7 +1306,7 @@ mod tests {
                     assert_eq!(
                         status,
                         assert_variant!(
-                            exec.run_until_stalled(&mut softmac_handle_receiver),
+                            TestExecutor::poll_until_stalled(&mut softmac_handle_receiver).await,
                             Poll::Ready(Ok(Err(status))) => status
                         )
                     );
@@ -1301,7 +1318,11 @@ mod tests {
             Some(usme_bootstrap_client_end) => {
                 let (generic_sme_proxy, inspect_vmo_fut) =
                     bootstrap_generic_sme_proxy_and_inspect_vmo(usme_bootstrap_client_end);
-                let start_and_serve_fut = match exec.run_until_stalled(&mut start_and_serve_fut) {
+                let start_and_serve_fut = match TestExecutor::poll_until_stalled(
+                    &mut start_and_serve_fut,
+                )
+                .await
+                {
                     Poll::Pending => start_and_serve_fut,
                     Poll::Ready(result) => {
                         // Assert the same initialization error appears in the receiver too.
@@ -1309,7 +1330,7 @@ mod tests {
                         assert_eq!(
                             status,
                             assert_variant!(
-                                exec.run_until_stalled(&mut softmac_handle_receiver),
+                                TestExecutor::poll_until_stalled(&mut softmac_handle_receiver).await,
                                 Poll::Ready(Ok(Err(status))) => status
                             )
                         );
@@ -1317,8 +1338,7 @@ mod tests {
                     }
                 };
 
-                let inspect_vmo = exec.run_singlethreaded(inspect_vmo_fut);
-                inspect_vmo.expect("Failed to bootstrap USME.");
+                inspect_vmo_fut.await.expect("Failed to bootstrap USME.");
 
                 Ok(StartAndServeTestHarness {
                     start_and_serve_fut,
@@ -1329,12 +1349,11 @@ mod tests {
         }
     }
 
-    #[test]
-    fn start_and_serve_fails_on_dropped_usme_bootstrap_client() {
-        let mut exec = TestExecutor::new();
-        let (fake_device, fake_device_state) = FakeDevice::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn start_and_serve_fails_on_dropped_usme_bootstrap_client() {
+        let (fake_device, fake_device_state) = FakeDevice::new().await;
         fake_device_state.lock().usme_bootstrap_client_end = None;
-        match start_and_serve_with_device(&mut exec, fake_device.clone()) {
+        match start_and_serve_with_device(fake_device.clone()).await {
             Ok(_) => panic!(
                 "start_and_serve() does not fail when the UsmeBootstrap client end is dropped."
             ),
@@ -1343,16 +1362,15 @@ mod tests {
     }
 
     // Exhaustive feature tests are unit tested on start()
-    #[test]
-    fn start_and_serve_fails_with_wrong_mac_implementation_type() {
-        let mut exec = TestExecutor::new();
+    #[fuchsia::test(allow_stalls = false)]
+    async fn start_and_serve_fails_with_wrong_mac_implementation_type() {
         let (fake_device, _fake_device_state) = FakeDevice::new_with_config(
-            &exec,
             FakeDeviceConfig::default()
                 .with_mock_mac_implementation_type(fidl_common::MacImplementationType::Fullmac),
-        );
+        )
+        .await;
 
-        match start_and_serve_with_device(&mut exec, fake_device) {
+        match start_and_serve_with_device(fake_device).await {
             Ok(_) => panic!(
                 "start_and_serve() future did not terminate before attempting bootstrap SME."
             ),
@@ -1360,12 +1378,11 @@ mod tests {
         };
     }
 
-    #[test]
-    fn start_and_serve_fails_on_dropped_mlme_event_stream() {
-        let mut exec = TestExecutor::new();
-        let (mut fake_device, _fake_device_state) = FakeDevice::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn start_and_serve_fails_on_dropped_mlme_event_stream() {
+        let (mut fake_device, _fake_device_state) = FakeDevice::new().await;
         let _ = fake_device.take_mlme_event_stream();
-        match start_and_serve_with_device(&mut exec, fake_device.clone()) {
+        match start_and_serve_with_device(fake_device.clone()).await {
             Ok(_) => {
                 panic!("start_and_serve() does not fail when the MLME event stream is missing.")
             }
@@ -1373,63 +1390,58 @@ mod tests {
         }
     }
 
-    #[test]
-    fn start_and_serve_fails_on_dropped_generic_sme_client() {
-        let mut exec = TestExecutor::new();
-        let (fake_device, _fake_device_state) = FakeDevice::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn start_and_serve_fails_on_dropped_generic_sme_client() {
+        let (fake_device, _fake_device_state) = FakeDevice::new().await;
         let StartAndServeTestHarness {
             mut start_and_serve_fut,
             mut softmac_handle_receiver,
             generic_sme_proxy,
-        } = start_and_serve_with_device(&mut exec, fake_device)
+        } = start_and_serve_with_device(fake_device)
+            .await
             .expect("Failed to initiate wlansoftmac setup.");
-        let _handle = assert_variant!(exec.run_until_stalled(&mut softmac_handle_receiver), Poll::Ready(Ok(Ok(handle))) => handle);
-        assert_eq!(exec.run_until_stalled(&mut start_and_serve_fut), Poll::Pending);
+        let _handle = assert_variant!(TestExecutor::poll_until_stalled(&mut softmac_handle_receiver).await, Poll::Ready(Ok(Ok(handle))) => handle);
+        assert_eq!(TestExecutor::poll_until_stalled(&mut start_and_serve_fut).await, Poll::Pending);
 
         drop(generic_sme_proxy);
 
         assert_eq!(
-            exec.run_until_stalled(&mut start_and_serve_fut),
+            TestExecutor::poll_until_stalled(&mut start_and_serve_fut).await,
             Poll::Ready(Err(zx::Status::INTERNAL))
         );
     }
 
-    #[test]
-    fn start_and_serve_shuts_down_gracefully() {
-        let mut exec = TestExecutor::new();
-        let (fake_device, _fake_device_state) = FakeDevice::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn start_and_serve_shuts_down_gracefully() {
+        let (fake_device, _fake_device_state) = FakeDevice::new().await;
         let StartAndServeTestHarness {
             mut start_and_serve_fut,
             mut softmac_handle_receiver,
             generic_sme_proxy: _generic_sme_proxy,
-        } = start_and_serve_with_device(&mut exec, fake_device)
+        } = start_and_serve_with_device(fake_device)
+            .await
             .expect("Failed to initiate wlansoftmac setup.");
-        assert_eq!(exec.run_until_stalled(&mut start_and_serve_fut), Poll::Pending);
-        let handle = assert_variant!(exec.run_until_stalled(&mut softmac_handle_receiver), Poll::Ready(Ok(Ok(handle))) => handle);
+        assert_eq!(TestExecutor::poll_until_stalled(&mut start_and_serve_fut).await, Poll::Pending);
+        let handle = assert_variant!(TestExecutor::poll_until_stalled(&mut softmac_handle_receiver).await, Poll::Ready(Ok(Ok(handle))) => handle);
 
         let (shutdown_sender, shutdown_receiver) = oneshot::channel::<()>();
         handle.stop(StopCompleter::new(Box::new(move || {
             shutdown_sender.send(()).expect("Failed to signal shutdown completion.")
         })));
-        assert_variant!(
-            exec.run_singlethreaded(async {
-                futures::join!(start_and_serve_fut, shutdown_receiver)
-            }),
-            (Ok(()), Ok(()))
-        );
+        assert_variant!(futures::join!(start_and_serve_fut, shutdown_receiver), (Ok(()), Ok(())));
     }
 
-    #[test]
-    fn start_and_serve_responds_to_generic_sme_requests() {
-        let mut exec = TestExecutor::new();
-        let (fake_device, _fake_device_state) = FakeDevice::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn start_and_serve_responds_to_generic_sme_requests() {
+        let (fake_device, _fake_device_state) = FakeDevice::new().await;
         let StartAndServeTestHarness {
             mut start_and_serve_fut,
             mut softmac_handle_receiver,
             generic_sme_proxy,
-        } = start_and_serve_with_device(&mut exec, fake_device)
+        } = start_and_serve_with_device(fake_device)
+            .await
             .expect("Failed to initiate wlansoftmac setup.");
-        let handle = assert_variant!(exec.run_until_stalled(&mut softmac_handle_receiver), Poll::Ready(Ok(Ok(handle))) => handle);
+        let handle = assert_variant!(TestExecutor::poll_until_stalled(&mut softmac_handle_receiver).await, Poll::Ready(Ok(Ok(handle))) => handle);
 
         let (sme_telemetry_proxy, sme_telemetry_server) =
             fidl::endpoints::create_proxy().expect("Failed to create_proxy");
@@ -1441,31 +1453,27 @@ mod tests {
 
         // First poll `get_sme_telemetry` to send a `GetSmeTelemetry` request to the SME server, and then
         // poll the SME server process it. Finally, expect `get_sme_telemetry` to complete with `Ok(())`.
-        assert_variant!(exec.run_until_stalled(&mut resp_fut), Poll::Pending);
-        assert_eq!(exec.run_until_stalled(&mut start_and_serve_fut), Poll::Pending);
-        assert_variant!(exec.run_until_stalled(&mut resp_fut), Poll::Ready(Ok(Ok(()))));
+        assert_variant!(TestExecutor::poll_until_stalled(&mut resp_fut).await, Poll::Pending);
+        assert_eq!(TestExecutor::poll_until_stalled(&mut start_and_serve_fut).await, Poll::Pending);
+        assert_variant!(
+            TestExecutor::poll_until_stalled(&mut resp_fut).await,
+            Poll::Ready(Ok(Ok(())))
+        );
 
         let resp_fut = generic_sme_proxy.get_client_sme(client_sme_server);
         pin_mut!(resp_fut);
 
         // First poll `get_client_sme` to send a `GetClientSme` request to the SME server, and then poll the
         // SME server process it. Finally, expect `get_client_sme` to complete with `Ok(())`.
-        assert_variant!(exec.run_until_stalled(&mut resp_fut), Poll::Pending);
-        assert_eq!(exec.run_until_stalled(&mut start_and_serve_fut), Poll::Pending);
-        exec.run_singlethreaded(resp_fut)
-            .expect("Generic SME proxy failed")
-            .expect("Client SME request failed");
+        assert_variant!(TestExecutor::poll_until_stalled(&mut resp_fut).await, Poll::Pending);
+        assert_eq!(TestExecutor::poll_until_stalled(&mut start_and_serve_fut).await, Poll::Pending);
+        resp_fut.await.expect("Generic SME proxy failed").expect("Client SME request failed");
 
         let (shutdown_sender, shutdown_receiver) = oneshot::channel::<()>();
         handle.stop(StopCompleter::new(Box::new(move || {
             shutdown_sender.send(()).expect("Failed to signal shutdown completion.")
         })));
-        assert_variant!(
-            exec.run_singlethreaded(async {
-                futures::join!(start_and_serve_fut, shutdown_receiver)
-            }),
-            (Ok(()), Ok(()))
-        );
+        assert_variant!(futures::join!(start_and_serve_fut, shutdown_receiver), (Ok(()), Ok(())));
 
         // All SME proxies should shutdown.
         assert!(generic_sme_proxy.is_closed());
@@ -1477,34 +1485,40 @@ mod tests {
     // are much more complex to mock and sufficiently covered by other testing. For example, queueing an
     // Ethernet frame requires mocking an association first, and the outcome of a reported Tx result cannot
     // be confirmed because the Minstrel is internal to MLME.
-    #[test]
-    fn start_and_serve_responds_to_passive_scan_request() {
-        let mut exec = TestExecutor::new();
-        let (fake_device, fake_device_state) = FakeDevice::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn start_and_serve_responds_to_passive_scan_request() {
+        let (fake_device, fake_device_state) = FakeDevice::new().await;
         let StartAndServeTestHarness {
             mut start_and_serve_fut,
             mut softmac_handle_receiver,
             generic_sme_proxy,
-        } = start_and_serve_with_device(&mut exec, fake_device)
+        } = start_and_serve_with_device(fake_device)
+            .await
             .expect("Failed to initiate wlansoftmac setup.");
-        let handle = assert_variant!(exec.run_until_stalled(&mut softmac_handle_receiver), Poll::Ready(Ok(Ok(handle))) => handle);
+        let handle = assert_variant!(TestExecutor::poll_until_stalled(&mut softmac_handle_receiver).await, Poll::Ready(Ok(Ok(handle))) => handle);
 
         let (client_sme_proxy, client_sme_server) =
             fidl::endpoints::create_proxy().expect("Failed to create_proxy");
 
         let resp_fut = generic_sme_proxy.get_client_sme(client_sme_server);
         pin_mut!(resp_fut);
-        assert_variant!(exec.run_until_stalled(&mut resp_fut), Poll::Pending);
-        assert_eq!(exec.run_until_stalled(&mut start_and_serve_fut), Poll::Pending);
-        assert!(matches!(exec.run_until_stalled(&mut resp_fut), Poll::Ready(Ok(Ok(())))));
+        assert_variant!(TestExecutor::poll_until_stalled(&mut resp_fut).await, Poll::Pending);
+        assert_eq!(TestExecutor::poll_until_stalled(&mut start_and_serve_fut).await, Poll::Pending);
+        assert!(matches!(
+            TestExecutor::poll_until_stalled(&mut resp_fut).await,
+            Poll::Ready(Ok(Ok(())))
+        ));
 
         let scan_response_fut =
             client_sme_proxy.scan(&fidl_sme::ScanRequest::Passive(fidl_sme::PassiveScanRequest {}));
         pin_mut!(scan_response_fut);
-        assert!(matches!(exec.run_until_stalled(&mut scan_response_fut), Poll::Pending));
+        assert!(matches!(
+            TestExecutor::poll_until_stalled(&mut scan_response_fut).await,
+            Poll::Pending
+        ));
 
         assert!(fake_device_state.lock().captured_passive_scan_request.is_none());
-        assert_eq!(exec.run_until_stalled(&mut start_and_serve_fut), Poll::Pending);
+        assert_eq!(TestExecutor::poll_until_stalled(&mut start_and_serve_fut).await, Poll::Pending);
         assert!(fake_device_state.lock().captured_passive_scan_request.is_some());
 
         let wlan_softmac_ifc_bridge_proxy =
@@ -1516,20 +1530,18 @@ mod tests {
                 ..Default::default()
             },
         );
-        assert!(matches!(exec.run_singlethreaded(notify_scan_complete_fut), Ok(())));
-        assert_eq!(exec.run_until_stalled(&mut start_and_serve_fut), Poll::Pending);
-        assert!(matches!(exec.run_until_stalled(&mut scan_response_fut), Poll::Ready(Ok(_))));
+        notify_scan_complete_fut.await.expect("Failed to receive NotifyScanComplete response");
+        assert_eq!(TestExecutor::poll_until_stalled(&mut start_and_serve_fut).await, Poll::Pending);
+        assert!(matches!(
+            TestExecutor::poll_until_stalled(&mut scan_response_fut).await,
+            Poll::Ready(Ok(_))
+        ));
 
         let (shutdown_sender, shutdown_receiver) = oneshot::channel::<()>();
         handle.stop(StopCompleter::new(Box::new(move || {
             shutdown_sender.send(()).expect("Failed to signal shutdown completion.")
         })));
-        assert_variant!(
-            exec.run_singlethreaded(async {
-                futures::join!(start_and_serve_fut, shutdown_receiver)
-            }),
-            (Ok(()), Ok(()))
-        );
+        assert_variant!(futures::join!(start_and_serve_fut, shutdown_receiver), (Ok(()), Ok(())));
 
         // All SME proxies should shutdown.
         assert!(generic_sme_proxy.is_closed());

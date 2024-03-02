@@ -879,7 +879,8 @@ mod tests {
     use {
         super::*,
         crate::{test_utils::*, MlmeStream, Station},
-        fidl_fuchsia_wlan_mlme as fidl_mlme, fuchsia_async as fasync,
+        fidl_fuchsia_wlan_mlme as fidl_mlme,
+        ieee80211::MacAddr,
         lazy_static::lazy_static,
         test_case::test_case,
         wlan_common::{
@@ -1013,10 +1014,9 @@ mod tests {
         }
     }
 
-    #[test]
-    fn authenticate_while_sme_is_idle() {
-        let exec = fasync::TestExecutor::new();
-        let (mut sme, mut mlme_stream, _) = create_sme(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn authenticate_while_sme_is_idle() {
+        let (mut sme, mut mlme_stream, _) = create_sme().await;
         let client = Client::default();
         sme.on_mlme_event(client.create_auth_ind(fidl_mlme::AuthenticationTypes::OpenSystem));
 
@@ -1026,17 +1026,15 @@ mod tests {
     }
 
     // Check status when sme is idle
-    #[test]
-    fn status_when_sme_is_idle() {
-        let exec = fasync::TestExecutor::new();
-        let (sme, _, _) = create_sme(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn status_when_sme_is_idle() {
+        let (sme, _, _) = create_sme().await;
         assert_eq!(None, sme.get_running_ap());
     }
 
-    #[test]
-    fn ap_starts_success() {
-        let exec = fasync::TestExecutor::new();
-        let (mut sme, mut mlme_stream, _) = create_sme(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn ap_starts_success() {
+        let (mut sme, mut mlme_stream, _) = create_sme().await;
         let mut receiver = sme.on_start_command(unprotected_config());
 
         assert_variant!(mlme_stream.try_next(), Ok(Some(MlmeRequest::Start(start_req))) => {
@@ -1061,10 +1059,9 @@ mod tests {
     }
 
     // Check status when Ap starting and started
-    #[test]
-    fn ap_starts_success_get_running_ap() {
-        let exec = fasync::TestExecutor::new();
-        let (mut sme, mut mlme_stream, _) = create_sme(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn ap_starts_success_get_running_ap() {
+        let (mut sme, mut mlme_stream, _) = create_sme().await;
         let mut receiver = sme.on_start_command(unprotected_config());
         assert_variant!(mlme_stream.try_next(), Ok(Some(MlmeRequest::Start(_start_req))) => {});
         // status should be Starting
@@ -1083,10 +1080,9 @@ mod tests {
     }
 
     // Check status after channel change
-    #[test]
-    fn ap_check_status_after_channel_change() {
-        let exec = fasync::TestExecutor::new();
-        let (mut sme, _, _) = start_unprotected_ap(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn ap_check_status_after_channel_change() {
+        let (mut sme, _, _) = start_unprotected_ap().await;
         // Check status
         assert_eq!(
             Some(fidl_sme::Ap {
@@ -1104,10 +1100,9 @@ mod tests {
         );
     }
 
-    #[test]
-    fn ap_starts_timeout() {
-        let exec = fasync::TestExecutor::new();
-        let (mut sme, _, mut time_stream) = create_sme(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn ap_starts_timeout() {
+        let (mut sme, _, mut time_stream) = create_sme().await;
         let mut receiver = sme.on_start_command(unprotected_config());
 
         let (_, event) = time_stream.try_next().unwrap().expect("expect timer message");
@@ -1118,10 +1113,10 @@ mod tests {
         assert_eq!(None, sme.get_running_ap());
     }
 
-    #[test]
-    fn ap_starts_fails() {
-        let exec = fasync::TestExecutor::new();
-        let (mut sme, _, _) = create_sme(&exec);
+    // Disable logging to prevent failure from emitted error logs.
+    #[fuchsia::test(allow_stalls = false, logging = false)]
+    async fn ap_starts_fails() {
+        let (mut sme, _, _) = create_sme().await;
         let mut receiver = sme.on_start_command(unprotected_config());
 
         sme.on_mlme_event(create_start_conf(fidl_mlme::StartResultCode::NotSupported));
@@ -1130,10 +1125,9 @@ mod tests {
         assert_eq!(None, sme.get_running_ap());
     }
 
-    #[test]
-    fn start_req_while_ap_is_starting() {
-        let exec = fasync::TestExecutor::new();
-        let (mut sme, _, _) = create_sme(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn start_req_while_ap_is_starting() {
+        let (mut sme, _, _) = create_sme().await;
         let mut receiver_one = sme.on_start_command(unprotected_config());
 
         // While SME is starting, any start request receives an error immediately
@@ -1145,20 +1139,18 @@ mod tests {
         assert_eq!(Ok(Some(StartResult::Success)), receiver_one.try_recv());
     }
 
-    #[test]
-    fn start_req_while_ap_is_stopping() {
-        let exec = fasync::TestExecutor::new();
-        let (mut sme, _, _) = start_unprotected_ap(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn start_req_while_ap_is_stopping() {
+        let (mut sme, _, _) = start_unprotected_ap().await;
         let mut stop_receiver = sme.on_stop_command();
         let mut start_receiver = sme.on_start_command(unprotected_config());
         assert_eq!(Ok(None), stop_receiver.try_recv());
         assert_eq!(Ok(Some(StartResult::Canceled)), start_receiver.try_recv());
     }
 
-    #[test]
-    fn ap_stops_while_idle() {
-        let exec = fasync::TestExecutor::new();
-        let (mut sme, mut mlme_stream, _) = create_sme(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn ap_stops_while_idle() {
+        let (mut sme, mut mlme_stream, _) = create_sme().await;
         let mut receiver = sme.on_stop_command();
         assert_variant!(mlme_stream.try_next(), Ok(Some(MlmeRequest::Stop(stop_req))) => {
             assert!(stop_req.ssid.is_empty());
@@ -1169,10 +1161,9 @@ mod tests {
         assert_eq!(Ok(Some(fidl_sme::StopApResultCode::Success)), receiver.try_recv());
     }
 
-    #[test]
-    fn stop_req_while_ap_is_starting_then_succeeds() {
-        let exec = fasync::TestExecutor::new();
-        let (mut sme, mut mlme_stream, _) = create_sme(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn stop_req_while_ap_is_starting_then_succeeds() {
+        let (mut sme, mut mlme_stream, _) = create_sme().await;
         let mut start_receiver = sme.on_start_command(unprotected_config());
         let mut stop_receiver = sme.on_stop_command();
         assert_eq!(Ok(None), start_receiver.try_recv());
@@ -1197,10 +1188,9 @@ mod tests {
         assert_eq!(Ok(Some(fidl_sme::StopApResultCode::Success)), stop_receiver.try_recv());
     }
 
-    #[test]
-    fn stop_req_while_ap_is_starting_then_times_out() {
-        let exec = fasync::TestExecutor::new();
-        let (mut sme, mut mlme_stream, mut time_stream) = create_sme(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn stop_req_while_ap_is_starting_then_times_out() {
+        let (mut sme, mut mlme_stream, mut time_stream) = create_sme().await;
         let mut start_receiver = sme.on_start_command(unprotected_config());
         let mut stop_receiver = sme.on_stop_command();
         assert_eq!(Ok(None), start_receiver.try_recv());
@@ -1226,10 +1216,9 @@ mod tests {
         assert_eq!(Ok(Some(fidl_sme::StopApResultCode::Success)), stop_receiver.try_recv());
     }
 
-    #[test]
-    fn ap_stops_after_started() {
-        let exec = fasync::TestExecutor::new();
-        let (mut sme, mut mlme_stream, _) = start_unprotected_ap(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn ap_stops_after_started() {
+        let (mut sme, mut mlme_stream, _) = start_unprotected_ap().await;
         let mut receiver = sme.on_stop_command();
 
         assert_variant!(mlme_stream.try_next(), Ok(Some(MlmeRequest::Stop(stop_req))) => {
@@ -1240,10 +1229,9 @@ mod tests {
         assert_eq!(Ok(Some(fidl_sme::StopApResultCode::Success)), receiver.try_recv());
     }
 
-    #[test]
-    fn ap_stops_after_started_and_deauths_all_clients() {
-        let exec = fasync::TestExecutor::new();
-        let (mut sme, mut mlme_stream, _) = start_unprotected_ap(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn ap_stops_after_started_and_deauths_all_clients() {
+        let (mut sme, mut mlme_stream, _) = start_unprotected_ap().await;
         let client = Client::default();
         sme.on_mlme_event(client.create_auth_ind(fidl_mlme::AuthenticationTypes::OpenSystem));
         client.verify_auth_resp(&mut mlme_stream, fidl_mlme::AuthenticateResultCode::Success);
@@ -1276,10 +1264,9 @@ mod tests {
         assert_eq!(None, sme.get_running_ap());
     }
 
-    #[test]
-    fn ap_queues_concurrent_stop_requests() {
-        let exec = fasync::TestExecutor::new();
-        let (mut sme, _, _) = start_unprotected_ap(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn ap_queues_concurrent_stop_requests() {
+        let (mut sme, _, _) = start_unprotected_ap().await;
         let mut receiver1 = sme.on_stop_command();
         let mut receiver2 = sme.on_stop_command();
 
@@ -1291,10 +1278,9 @@ mod tests {
         assert_eq!(Ok(Some(fidl_sme::StopApResultCode::Success)), receiver2.try_recv());
     }
 
-    #[test]
-    fn uncleaned_stopping_state() {
-        let exec = fasync::TestExecutor::new();
-        let (mut sme, mut mlme_stream, _) = start_unprotected_ap(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn uncleaned_stopping_state() {
+        let (mut sme, mut mlme_stream, _) = start_unprotected_ap().await;
         let mut stop_receiver1 = sme.on_stop_command();
         // Clear out the stop request
         assert_variant!(mlme_stream.try_next(), Ok(Some(MlmeRequest::Stop(stop_req))) => {
@@ -1324,29 +1310,27 @@ mod tests {
         assert_eq!(Ok(Some(fidl_sme::StopApResultCode::Success)), stop_receiver2.try_recv());
     }
 
-    #[test]
-    fn client_authenticates_supported_authentication_type() {
-        let exec = fasync::TestExecutor::new();
-        let (mut sme, mut mlme_stream, _) = start_unprotected_ap(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn client_authenticates_supported_authentication_type() {
+        let (mut sme, mut mlme_stream, _) = start_unprotected_ap().await;
         let client = Client::default();
         sme.on_mlme_event(client.create_auth_ind(fidl_mlme::AuthenticationTypes::OpenSystem));
         client.verify_auth_resp(&mut mlme_stream, fidl_mlme::AuthenticateResultCode::Success);
     }
 
-    #[test]
-    fn client_authenticates_unsupported_authentication_type() {
-        let exec = fasync::TestExecutor::new();
-        let (mut sme, mut mlme_stream, _) = start_unprotected_ap(&exec);
+    // Disable logging to prevent failure from emitted error logs.
+    #[fuchsia::test(allow_stalls = false, logging = false)]
+    async fn client_authenticates_unsupported_authentication_type() {
+        let (mut sme, mut mlme_stream, _) = start_unprotected_ap().await;
         let client = Client::default();
         let auth_ind = client.create_auth_ind(fidl_mlme::AuthenticationTypes::FastBssTransition);
         sme.on_mlme_event(auth_ind);
         client.verify_auth_resp(&mut mlme_stream, fidl_mlme::AuthenticateResultCode::Refused);
     }
 
-    #[test]
-    fn client_associates_unprotected_network() {
-        let exec = fasync::TestExecutor::new();
-        let (mut sme, mut mlme_stream, _) = start_unprotected_ap(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn client_associates_unprotected_network() {
+        let (mut sme, mut mlme_stream, _) = start_unprotected_ap().await;
         let client = Client::default();
         sme.on_mlme_event(client.create_auth_ind(fidl_mlme::AuthenticationTypes::OpenSystem));
         client.verify_auth_resp(&mut mlme_stream, fidl_mlme::AuthenticateResultCode::Success);
@@ -1360,10 +1344,9 @@ mod tests {
         );
     }
 
-    #[test]
-    fn client_associates_valid_rsne() {
-        let exec = fasync::TestExecutor::new();
-        let (mut sme, mut mlme_stream, _) = start_protected_ap(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn client_associates_valid_rsne() {
+        let (mut sme, mut mlme_stream, _) = start_protected_ap().await;
         let client = Client::default();
         client.authenticate_and_drain_mlme(&mut sme, &mut mlme_stream);
 
@@ -1377,10 +1360,10 @@ mod tests {
         client.verify_eapol_req(&mut mlme_stream);
     }
 
-    #[test]
-    fn client_associates_invalid_rsne() {
-        let exec = fasync::TestExecutor::new();
-        let (mut sme, mut mlme_stream, _) = start_protected_ap(&exec);
+    // Disable logging to prevent failure from emitted error logs.
+    #[fuchsia::test(allow_stalls = false, logging = false)]
+    async fn client_associates_invalid_rsne() {
+        let (mut sme, mut mlme_stream, _) = start_protected_ap().await;
         let client = Client::default();
         client.authenticate_and_drain_mlme(&mut sme, &mut mlme_stream);
 
@@ -1391,10 +1374,9 @@ mod tests {
         );
     }
 
-    #[test]
-    fn rsn_handshake_timeout() {
-        let exec = fasync::TestExecutor::new();
-        let (mut sme, mut mlme_stream, mut time_stream) = start_protected_ap(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn rsn_handshake_timeout() {
+        let (mut sme, mut mlme_stream, mut time_stream) = start_protected_ap().await;
         let client = Client::default();
         client.authenticate_and_drain_mlme(&mut sme, &mut mlme_stream);
 
@@ -1432,10 +1414,9 @@ mod tests {
         );
     }
 
-    #[test]
-    fn client_restarts_authentication_flow() {
-        let exec = fasync::TestExecutor::new();
-        let (mut sme, mut mlme_stream, _) = start_unprotected_ap(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn client_restarts_authentication_flow() {
+        let (mut sme, mut mlme_stream, _) = start_unprotected_ap().await;
         let client = Client::default();
         client.authenticate_and_drain_mlme(&mut sme, &mut mlme_stream);
         client.associate_and_drain_mlme(&mut sme, &mut mlme_stream, None);
@@ -1452,10 +1433,9 @@ mod tests {
         );
     }
 
-    #[test]
-    fn multiple_clients_associate() {
-        let exec = fasync::TestExecutor::new();
-        let (mut sme, mut mlme_stream, _) = start_protected_ap(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn multiple_clients_associate() {
+        let (mut sme, mut mlme_stream, _) = start_protected_ap().await;
         let client1 = Client::default();
         let client2 = Client { addr: *CLIENT_ADDR2 };
 
@@ -1610,23 +1590,25 @@ mod tests {
         }
     }
 
-    fn start_protected_ap(
-        exec: &fasync::TestExecutor,
-    ) -> (ApSme, crate::MlmeStream, timer::EventStream<Event>) {
-        start_ap(true, exec)
+    // TODO(https://fxbug.dev/327499461): This function is async to ensure SME functions will
+    // run in an async context and not call `wlan_common::timer::Timer::now` without an
+    // executor.
+    async fn start_protected_ap() -> (ApSme, crate::MlmeStream, timer::EventStream<Event>) {
+        start_ap(true).await
     }
 
-    fn start_unprotected_ap(
-        exec: &fasync::TestExecutor,
-    ) -> (ApSme, crate::MlmeStream, timer::EventStream<Event>) {
-        start_ap(false, exec)
+    // TODO(https://fxbug.dev/327499461): This function is async to ensure SME functions will
+    // run in an async context and not call `wlan_common::timer::Timer::now` without an
+    // executor.
+    async fn start_unprotected_ap() -> (ApSme, crate::MlmeStream, timer::EventStream<Event>) {
+        start_ap(false).await
     }
 
-    fn start_ap(
-        protected: bool,
-        exec: &fasync::TestExecutor,
-    ) -> (ApSme, crate::MlmeStream, timer::EventStream<Event>) {
-        let (mut sme, mut mlme_stream, mut time_stream) = create_sme(exec);
+    // TODO(https://fxbug.dev/327499461): This function is async to ensure SME functions will
+    // run in an async context and not call `wlan_common::timer::Timer::now` without an
+    // executor.
+    async fn start_ap(protected: bool) -> (ApSme, crate::MlmeStream, timer::EventStream<Event>) {
+        let (mut sme, mut mlme_stream, mut time_stream) = create_sme().await;
         let config = if protected { protected_config() } else { unprotected_config() };
         let mut receiver = sme.on_start_command(config);
         assert_eq!(Ok(None), receiver.try_recv());
@@ -1639,7 +1621,10 @@ mod tests {
         (sme, mlme_stream, time_stream)
     }
 
-    fn create_sme(_exec: &fasync::TestExecutor) -> (ApSme, MlmeStream, timer::EventStream<Event>) {
+    // TODO(https://fxbug.dev/327499461): This function is async to ensure SME functions will
+    // run in an async context and not call `wlan_common::timer::Timer::now` without an
+    // executor.
+    async fn create_sme() -> (ApSme, MlmeStream, timer::EventStream<Event>) {
         let (ap_sme, _mlme_sink, mlme_stream, time_stream) =
             ApSme::new(fake_device_info(*AP_ADDR), fake_mac_sublayer_support());
         (ap_sme, mlme_stream, time_stream)

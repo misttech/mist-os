@@ -54,6 +54,11 @@ impl<E> Timer<E> {
         Timer { sender, next_id: 0 }
     }
 
+    /// Returns the current time according to the global executor.
+    ///
+    /// # Panics
+    ///
+    /// This function will panic if it's called when no executor is set up.
     pub fn now(&self) -> zx::Time {
         // We use fasync to support time manipulation in tests.
         fasync::Time::now().into_zx()

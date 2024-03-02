@@ -623,7 +623,7 @@ mod tests {
             buffer::FakeCBufferProvider,
             device::{FakeDevice, FakeDeviceConfig, FakeDeviceState},
         },
-        fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fuchsia_async as fasync,
+        fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211,
         fuchsia_sync::Mutex,
         ieee80211::Bssid,
         lazy_static::lazy_static,
@@ -680,10 +680,9 @@ mod tests {
         .expect("expected InfraBss::new ok")
     }
 
-    #[test]
-    fn new() {
-        let exec = fasync::TestExecutor::new();
-        let (fake_device, fake_device_state) = FakeDevice::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn new() {
+        let (fake_device, fake_device_state) = FakeDevice::new().await;
         let (mut ctx, _) = make_context(fake_device);
         InfraBss::new(
             &mut ctx,
@@ -731,20 +730,18 @@ mod tests {
         );
     }
 
-    #[test]
-    fn stop() {
-        let exec = fasync::TestExecutor::new();
-        let (fake_device, fake_device_state) = FakeDevice::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn stop() {
+        let (fake_device, fake_device_state) = FakeDevice::new().await;
         let (mut ctx, _) = make_context(fake_device);
         let bss = make_infra_bss(&mut ctx);
         bss.stop(&mut ctx).expect("expected InfraBss::stop ok");
         assert!(fake_device_state.lock().beacon_config.is_none());
     }
 
-    #[test]
-    fn handle_mlme_auth_resp() {
-        let exec = fasync::TestExecutor::new();
-        let (fake_device, fake_device_state) = FakeDevice::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn handle_mlme_auth_resp() {
+        let (fake_device, fake_device_state) = FakeDevice::new().await;
         let (mut ctx, _) = make_context(fake_device);
         let mut bss = make_infra_bss(&mut ctx);
 
@@ -777,10 +774,9 @@ mod tests {
         );
     }
 
-    #[test]
-    fn handle_mlme_auth_resp_no_such_client() {
-        let exec = fasync::TestExecutor::new();
-        let (fake_device, _) = FakeDevice::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn handle_mlme_auth_resp_no_such_client() {
+        let (fake_device, _) = FakeDevice::new().await;
         let (mut ctx, _) = make_context(fake_device);
         let mut bss = make_infra_bss(&mut ctx);
 
@@ -799,10 +795,9 @@ mod tests {
         );
     }
 
-    #[test]
-    fn handle_mlme_deauth_req() {
-        let exec = fasync::TestExecutor::new();
-        let (fake_device, fake_device_state) = FakeDevice::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn handle_mlme_deauth_req() {
+        let (fake_device, fake_device_state) = FakeDevice::new().await;
         let (mut ctx, _) = make_context(fake_device);
         let mut bss = make_infra_bss(&mut ctx);
 
@@ -835,10 +830,9 @@ mod tests {
         assert!(!bss.clients.contains_key(&CLIENT_ADDR));
     }
 
-    #[test]
-    fn handle_mlme_assoc_resp() {
-        let exec = fasync::TestExecutor::new();
-        let (fake_device, fake_device_state) = FakeDevice::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn handle_mlme_assoc_resp() {
+        let (fake_device, fake_device_state) = FakeDevice::new().await;
         let (mut ctx, _) = make_context(fake_device);
         let mut bss = make_infra_bss(&mut ctx);
 
@@ -878,10 +872,9 @@ mod tests {
         assert!(fake_device_state.lock().assocs.contains_key(&CLIENT_ADDR));
     }
 
-    #[test]
-    fn handle_mlme_assoc_resp_with_caps() {
-        let exec = fasync::TestExecutor::new();
-        let (fake_device, fake_device_state) = FakeDevice::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn handle_mlme_assoc_resp_with_caps() {
+        let (fake_device, fake_device_state) = FakeDevice::new().await;
         let (mut ctx, _) = make_context(fake_device);
         let mut bss = InfraBss::new(
             &mut ctx,
@@ -932,10 +925,9 @@ mod tests {
         assert!(fake_device_state.lock().assocs.contains_key(&CLIENT_ADDR));
     }
 
-    #[test]
-    fn handle_mlme_disassoc_req() {
-        let exec = fasync::TestExecutor::new();
-        let (fake_device, fake_device_state) = FakeDevice::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn handle_mlme_disassoc_req() {
+        let (fake_device, fake_device_state) = FakeDevice::new().await;
         let (mut ctx, _) = make_context(fake_device);
         let mut bss = make_infra_bss(&mut ctx);
 
@@ -966,10 +958,9 @@ mod tests {
         );
     }
 
-    #[test]
-    fn handle_mlme_set_controlled_port_req() {
-        let exec = fasync::TestExecutor::new();
-        let (fake_device, _) = FakeDevice::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn handle_mlme_set_controlled_port_req() {
+        let (fake_device, _) = FakeDevice::new().await;
         let (mut ctx, _) = make_context(fake_device);
         let mut bss = make_protected_infra_bss(&mut ctx);
 
@@ -994,10 +985,9 @@ mod tests {
         .expect("expected InfraBss::handle_mlme_set_controlled_port_req ok");
     }
 
-    #[test]
-    fn handle_mlme_eapol_req() {
-        let exec = fasync::TestExecutor::new();
-        let (fake_device, fake_device_state) = FakeDevice::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn handle_mlme_eapol_req() {
+        let (fake_device, fake_device_state) = FakeDevice::new().await;
         let (mut ctx, _) = make_context(fake_device);
         let mut bss = make_infra_bss(&mut ctx);
 
@@ -1039,10 +1029,9 @@ mod tests {
         assert_eq!(&confirm.dst_addr, CLIENT_ADDR.as_array());
     }
 
-    #[test]
-    fn handle_mgmt_frame_auth() {
-        let exec = fasync::TestExecutor::new();
-        let (fake_device, fake_device_state) = FakeDevice::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn handle_mgmt_frame_auth() {
+        let (fake_device, fake_device_state) = FakeDevice::new().await;
         let (mut ctx, _) = make_context(fake_device);
         let mut bss = make_infra_bss(&mut ctx);
 
@@ -1086,10 +1075,9 @@ mod tests {
         );
     }
 
-    #[test]
-    fn handle_mgmt_frame_assoc_req() {
-        let exec = fasync::TestExecutor::new();
-        let (fake_device, fake_device_state) = FakeDevice::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn handle_mgmt_frame_assoc_req() {
+        let (fake_device, fake_device_state) = FakeDevice::new().await;
         let (mut ctx, _) = make_context(fake_device);
         let mut bss = make_infra_bss(&mut ctx);
 
@@ -1146,10 +1134,9 @@ mod tests {
         );
     }
 
-    #[test]
-    fn handle_mgmt_frame_bad_ds_bits_to_ds() {
-        let exec = fasync::TestExecutor::new();
-        let (fake_device, _) = FakeDevice::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn handle_mgmt_frame_bad_ds_bits_to_ds() {
+        let (fake_device, _) = FakeDevice::new().await;
         let (mut ctx, _) = make_context(fake_device);
         let mut bss = make_infra_bss(&mut ctx);
 
@@ -1185,10 +1172,9 @@ mod tests {
         assert_eq!(bss.clients.contains_key(&CLIENT_ADDR), false);
     }
 
-    #[test]
-    fn handle_mgmt_frame_bad_ds_bits_from_ds() {
-        let exec = fasync::TestExecutor::new();
-        let (fake_device, _) = FakeDevice::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn handle_mgmt_frame_bad_ds_bits_from_ds() {
+        let (fake_device, _) = FakeDevice::new().await;
         let (mut ctx, _) = make_context(fake_device);
         let mut bss = make_infra_bss(&mut ctx);
 
@@ -1224,10 +1210,9 @@ mod tests {
         assert_eq!(bss.clients.contains_key(&CLIENT_ADDR), false);
     }
 
-    #[test]
-    fn handle_mgmt_frame_no_such_client() {
-        let exec = fasync::TestExecutor::new();
-        let (fake_device, _) = FakeDevice::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn handle_mgmt_frame_no_such_client() {
+        let (fake_device, _) = FakeDevice::new().await;
         let (mut ctx, _) = make_context(fake_device);
         let mut bss = make_infra_bss(&mut ctx);
 
@@ -1260,10 +1245,9 @@ mod tests {
         assert_eq!(bss.clients.contains_key(&CLIENT_ADDR), false);
     }
 
-    #[test]
-    fn handle_mgmt_frame_bogus() {
-        let exec = fasync::TestExecutor::new();
-        let (fake_device, _) = FakeDevice::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn handle_mgmt_frame_bogus() {
+        let (fake_device, _) = FakeDevice::new().await;
         let (mut ctx, _) = make_context(fake_device);
         let mut bss = make_infra_bss(&mut ctx);
 
@@ -1294,10 +1278,9 @@ mod tests {
         assert_eq!(bss.clients.contains_key(&CLIENT_ADDR), false);
     }
 
-    #[test]
-    fn handle_data_frame() {
-        let exec = fasync::TestExecutor::new();
-        let (fake_device, fake_device_state) = FakeDevice::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn handle_data_frame() {
+        let (fake_device, fake_device_state) = FakeDevice::new().await;
         let (mut ctx, _) = make_context(fake_device);
         let mut bss = make_infra_bss(&mut ctx);
 
@@ -1357,10 +1340,9 @@ mod tests {
         );
     }
 
-    #[test]
-    fn handle_data_frame_bad_ds_bits() {
-        let exec = fasync::TestExecutor::new();
-        let (fake_device, fake_device_state) = FakeDevice::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn handle_data_frame_bad_ds_bits() {
+        let (fake_device, fake_device_state) = FakeDevice::new().await;
         let (mut ctx, _) = make_context(fake_device);
         let mut bss = make_infra_bss(&mut ctx);
 
@@ -1394,10 +1376,9 @@ mod tests {
         assert_eq!(fake_device_state.lock().eth_queue.len(), 0);
     }
 
-    #[test]
-    fn handle_client_event() {
-        let exec = fasync::TestExecutor::new();
-        let (fake_device, fake_device_state) = FakeDevice::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn handle_client_event() {
+        let (fake_device, fake_device_state) = FakeDevice::new().await;
         let (mut ctx, mut time_stream) = make_context(fake_device);
         let mut bss = make_infra_bss(&mut ctx);
 
@@ -1460,10 +1441,9 @@ mod tests {
         );
     }
 
-    #[test]
-    fn handle_data_frame_no_such_client() {
-        let exec = fasync::TestExecutor::new();
-        let (fake_device, fake_device_state) = FakeDevice::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn handle_data_frame_no_such_client() {
+        let (fake_device, fake_device_state) = FakeDevice::new().await;
         let (mut ctx, _) = make_context(fake_device);
         let mut bss = make_infra_bss(&mut ctx);
 
@@ -1513,10 +1493,9 @@ mod tests {
         );
     }
 
-    #[test]
-    fn handle_data_frame_client_not_associated() {
-        let exec = fasync::TestExecutor::new();
-        let (fake_device, fake_device_state) = FakeDevice::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn handle_data_frame_client_not_associated() {
+        let (fake_device, fake_device_state) = FakeDevice::new().await;
         let (mut ctx, _) = make_context(fake_device);
         let mut bss = make_infra_bss(&mut ctx);
 
@@ -1577,10 +1556,9 @@ mod tests {
         );
     }
 
-    #[test]
-    fn handle_eth_frame_no_rsn() {
-        let exec = fasync::TestExecutor::new();
-        let (fake_device, fake_device_state) = FakeDevice::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn handle_eth_frame_no_rsn() {
+        let (fake_device, fake_device_state) = FakeDevice::new().await;
         let (mut ctx, _) = make_context(fake_device);
         let mut bss = make_infra_bss(&mut ctx);
         bss.clients.insert(*CLIENT_ADDR, RemoteClient::new(*CLIENT_ADDR));
@@ -1634,10 +1612,9 @@ mod tests {
         );
     }
 
-    #[test]
-    fn handle_eth_frame_no_client() {
-        let exec = fasync::TestExecutor::new();
-        let (fake_device, fake_device_state) = FakeDevice::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn handle_eth_frame_no_client() {
+        let (fake_device, fake_device_state) = FakeDevice::new().await;
         let (mut ctx, _) = make_context(fake_device);
         let mut bss = make_infra_bss(&mut ctx);
 
@@ -1659,10 +1636,9 @@ mod tests {
         assert_eq!(fake_device_state.lock().wlan_queue.len(), 0);
     }
 
-    #[test]
-    fn handle_eth_frame_is_rsn_eapol_controlled_port_closed() {
-        let exec = fasync::TestExecutor::new();
-        let (fake_device, fake_device_state) = FakeDevice::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn handle_eth_frame_is_rsn_eapol_controlled_port_closed() {
+        let (fake_device, fake_device_state) = FakeDevice::new().await;
         let (mut ctx, _) = make_context(fake_device);
         let mut bss = make_protected_infra_bss(&mut ctx);
         bss.clients.insert(*CLIENT_ADDR, RemoteClient::new(*CLIENT_ADDR));
@@ -1700,10 +1676,9 @@ mod tests {
         );
     }
 
-    #[test]
-    fn handle_eth_frame_is_rsn_eapol_controlled_port_open() {
-        let exec = fasync::TestExecutor::new();
-        let (fake_device, fake_device_state) = FakeDevice::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn handle_eth_frame_is_rsn_eapol_controlled_port_open() {
+        let (fake_device, fake_device_state) = FakeDevice::new().await;
         let (mut ctx, _) = make_context(fake_device);
         let mut bss = make_protected_infra_bss(&mut ctx);
         bss.clients.insert(*CLIENT_ADDR, RemoteClient::new(*CLIENT_ADDR));
@@ -1763,9 +1738,9 @@ mod tests {
 
     #[test_case(false; "Controlled port closed")]
     #[test_case(true; "Controlled port open")]
-    fn handle_data_frame_is_rsn_eapol(controlled_port_open: bool) {
-        let exec = fasync::TestExecutor::new();
-        let (fake_device, fake_device_state) = FakeDevice::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn handle_data_frame_is_rsn_eapol(controlled_port_open: bool) {
+        let (fake_device, fake_device_state) = FakeDevice::new().await;
         let (mut ctx, _) = make_context(fake_device);
         let mut bss = make_protected_infra_bss(&mut ctx);
         bss.clients.insert(*CLIENT_ADDR, RemoteClient::new(*CLIENT_ADDR));
@@ -1942,10 +1917,9 @@ mod tests {
         .expect("expected OK");
     }
 
-    #[test]
-    fn handle_multiple_complete_associations() {
-        let exec = fasync::TestExecutor::new();
-        let (fake_device, fake_device_state) = FakeDevice::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn handle_multiple_complete_associations() {
+        let (fake_device, fake_device_state) = FakeDevice::new().await;
         let (mut ctx, _) = make_context(fake_device);
         let mut bss = make_infra_bss(&mut ctx);
 
@@ -1964,10 +1938,9 @@ mod tests {
         assert_eq!(fake_device_state.lock().wlan_queue.len(), 2);
     }
 
-    #[test]
-    fn handle_ps_poll() {
-        let exec = fasync::TestExecutor::new();
-        let (fake_device, fake_device_state) = FakeDevice::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn handle_ps_poll() {
+        let (fake_device, fake_device_state) = FakeDevice::new().await;
         let (mut ctx, _) = make_context(fake_device);
         let mut bss = make_infra_bss(&mut ctx);
         bss.clients.insert(*CLIENT_ADDR, RemoteClient::new(*CLIENT_ADDR));
@@ -2035,10 +2008,9 @@ mod tests {
         );
     }
 
-    #[test]
-    fn handle_mlme_setkeys_req() {
-        let exec = fasync::TestExecutor::new();
-        let (fake_device, fake_device_state) = FakeDevice::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn handle_mlme_setkeys_req() {
+        let (fake_device, fake_device_state) = FakeDevice::new().await;
         let (mut ctx, _) = make_context(fake_device);
         let mut bss = make_protected_infra_bss(&mut ctx);
         bss.handle_mlme_setkeys_req(
@@ -2070,10 +2042,9 @@ mod tests {
         );
     }
 
-    #[test]
-    fn handle_mlme_setkeys_req_no_rsne() {
-        let exec = fasync::TestExecutor::new();
-        let (fake_device, fake_device_state) = FakeDevice::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn handle_mlme_setkeys_req_no_rsne() {
+        let (fake_device, fake_device_state) = FakeDevice::new().await;
         let (mut ctx, _) = make_context(fake_device);
         let mut bss = make_infra_bss(&mut ctx);
         assert_variant!(
@@ -2096,10 +2067,9 @@ mod tests {
         assert!(fake_device_state.lock().keys.is_empty());
     }
 
-    #[test]
-    fn handle_probe_req() {
-        let exec = fasync::TestExecutor::new();
-        let (fake_device, fake_device_state) = FakeDevice::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn handle_probe_req() {
+        let (fake_device, fake_device_state) = FakeDevice::new().await;
         let (mut ctx, _) = make_context(fake_device);
         let mut bss = InfraBss::new(
             &mut ctx,
@@ -2139,15 +2109,14 @@ mod tests {
         );
     }
 
-    #[test]
-    fn handle_probe_req_has_offload() {
-        let exec = fasync::TestExecutor::new();
+    #[fuchsia::test(allow_stalls = false)]
+    async fn handle_probe_req_has_offload() {
         let (fake_device, _fake_device_state) = FakeDevice::new_with_config(
-            &exec,
             FakeDeviceConfig::default().with_mock_probe_response_offload(
                 fidl_common::ProbeResponseOffloadExtension { supported: true },
             ),
-        );
+        )
+        .await;
 
         let (mut ctx, _) = make_context(fake_device);
         let mut bss = InfraBss::new(
@@ -2183,10 +2152,9 @@ mod tests {
         .expect_err("expected InfraBss::handle_mgmt_frame error");
     }
 
-    #[test]
-    fn handle_probe_req_wildcard_ssid() {
-        let exec = fasync::TestExecutor::new();
-        let (fake_device, fake_device_state) = FakeDevice::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn handle_probe_req_wildcard_ssid() {
+        let (fake_device, fake_device_state) = FakeDevice::new().await;
         let (mut ctx, _) = make_context(fake_device);
         let mut bss = InfraBss::new(
             &mut ctx,
@@ -2246,10 +2214,9 @@ mod tests {
         );
     }
 
-    #[test]
-    fn handle_probe_req_matching_ssid() {
-        let exec = fasync::TestExecutor::new();
-        let (fake_device, fake_device_state) = FakeDevice::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn handle_probe_req_matching_ssid() {
+        let (fake_device, fake_device_state) = FakeDevice::new().await;
         let (mut ctx, _) = make_context(fake_device);
         let mut bss = InfraBss::new(
             &mut ctx,
@@ -2307,10 +2274,9 @@ mod tests {
         );
     }
 
-    #[test]
-    fn handle_probe_req_mismatching_ssid() {
-        let exec = fasync::TestExecutor::new();
-        let (fake_device, _) = FakeDevice::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn handle_probe_req_mismatching_ssid() {
+        let (fake_device, _) = FakeDevice::new().await;
         let (mut ctx, _) = make_context(fake_device);
         let mut bss = InfraBss::new(
             &mut ctx,
@@ -2348,10 +2314,9 @@ mod tests {
         );
     }
 
-    #[test]
-    fn make_tim() {
-        let exec = fasync::TestExecutor::new();
-        let (fake_device, _) = FakeDevice::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn make_tim() {
+        let (fake_device, _) = FakeDevice::new().await;
         let (mut ctx, _) = make_context(fake_device);
         let mut bss = make_infra_bss(&mut ctx);
         bss.clients.insert(*CLIENT_ADDR, RemoteClient::new(*CLIENT_ADDR));
@@ -2391,10 +2356,9 @@ mod tests {
         assert_eq!(pvb_bitmap, &[0b00000010][..]);
     }
 
-    #[test]
-    fn make_tim_empty() {
-        let exec = fasync::TestExecutor::new();
-        let (fake_device, _) = FakeDevice::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn make_tim_empty() {
+        let (fake_device, _) = FakeDevice::new().await;
         let (mut ctx, _) = make_context(fake_device);
         let bss = make_infra_bss(&mut ctx);
 

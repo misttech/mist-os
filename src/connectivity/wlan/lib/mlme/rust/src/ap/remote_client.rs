@@ -1108,7 +1108,6 @@ mod tests {
     use {
         super::*,
         crate::{buffer::FakeCBufferProvider, device::FakeDevice},
-        fuchsia_async as fasync,
         ieee80211::Bssid,
         lazy_static::lazy_static,
         test_case::test_case,
@@ -1136,10 +1135,9 @@ mod tests {
         (Context::new(fake_device, FakeCBufferProvider::new(), timer, *AP_ADDR), time_stream)
     }
 
-    #[test]
-    fn handle_mlme_auth_resp() {
-        let exec = fasync::TestExecutor::new();
-        let (fake_device, fake_device_state) = FakeDevice::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn handle_mlme_auth_resp() {
+        let (fake_device, fake_device_state) = FakeDevice::new().await;
         let mut r_sta = make_remote_client();
         let (mut ctx, _) = make_context(fake_device);
         r_sta
@@ -1163,10 +1161,9 @@ mod tests {
         ][..]);
     }
 
-    #[test]
-    fn handle_mlme_auth_resp_failure() {
-        let exec = fasync::TestExecutor::new();
-        let (fake_device, fake_device_state) = FakeDevice::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn handle_mlme_auth_resp_failure() {
+        let (fake_device, fake_device_state) = FakeDevice::new().await;
         let mut r_sta = make_remote_client();
         let (mut ctx, _) = make_context(fake_device);
         r_sta
@@ -1201,9 +1198,9 @@ mod tests {
             active_timeout_event_id: None,
             ps_state: PowerSaveState::Awake,
         }; "in associated state")]
-    fn handle_mlme_deauth_req(init_state: State) {
-        let exec = fasync::TestExecutor::new();
-        let (fake_device, fake_device_state) = FakeDevice::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn handle_mlme_deauth_req(init_state: State) {
+        let (fake_device, fake_device_state) = FakeDevice::new().await;
         let mut r_sta = make_remote_client();
         r_sta.state = StateMachine::new(init_state);
         let (mut ctx, _) = make_context(fake_device);
@@ -1226,10 +1223,9 @@ mod tests {
         ][..]);
     }
 
-    #[test]
-    fn handle_mlme_assoc_resp() {
-        let exec = fasync::TestExecutor::new();
-        let (fake_device, fake_device_state) = FakeDevice::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn handle_mlme_assoc_resp() {
+        let (fake_device, fake_device_state) = FakeDevice::new().await;
         let mut r_sta = make_remote_client();
         let (mut ctx, mut time_stream) = make_context(fake_device);
         r_sta
@@ -1289,10 +1285,9 @@ mod tests {
         assert!(fake_device_state.lock().assocs.contains_key(&CLIENT_ADDR));
     }
 
-    #[test]
-    fn handle_mlme_assoc_resp_then_handle_mlme_disassoc_req() {
-        let exec = fasync::TestExecutor::new();
-        let (fake_device, fake_device_state) = FakeDevice::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn handle_mlme_assoc_resp_then_handle_mlme_disassoc_req() {
+        let (fake_device, fake_device_state) = FakeDevice::new().await;
         let mut r_sta = make_remote_client();
         let (mut ctx, _) = make_context(fake_device);
 
@@ -1318,10 +1313,9 @@ mod tests {
         assert!(!fake_device_state.lock().assocs.contains_key(&CLIENT_ADDR));
     }
 
-    #[test]
-    fn handle_mlme_assoc_resp_then_handle_mlme_deauth_req() {
-        let exec = fasync::TestExecutor::new();
-        let (fake_device, fake_device_state) = FakeDevice::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn handle_mlme_assoc_resp_then_handle_mlme_deauth_req() {
+        let (fake_device, fake_device_state) = FakeDevice::new().await;
         let mut r_sta = make_remote_client();
         let (mut ctx, _) = make_context(fake_device);
 
@@ -1344,10 +1338,9 @@ mod tests {
         assert!(!fake_device_state.lock().assocs.contains_key(&CLIENT_ADDR));
     }
 
-    #[test]
-    fn handle_mlme_assoc_resp_no_rsn() {
-        let exec = fasync::TestExecutor::new();
-        let (fake_device, _) = FakeDevice::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn handle_mlme_assoc_resp_no_rsn() {
+        let (fake_device, _) = FakeDevice::new().await;
         let mut r_sta = make_remote_client();
         let (mut ctx, _) = make_context(fake_device);
         r_sta
@@ -1367,10 +1360,9 @@ mod tests {
         );
     }
 
-    #[test]
-    fn handle_mlme_assoc_resp_failure_reason_unspecified() {
-        let exec = fasync::TestExecutor::new();
-        let (fake_device, fake_device_state) = FakeDevice::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn handle_mlme_assoc_resp_failure_reason_unspecified() {
+        let (fake_device, fake_device_state) = FakeDevice::new().await;
         let mut r_sta = make_remote_client();
         let (mut ctx, _) = make_context(fake_device);
         r_sta
@@ -1402,10 +1394,9 @@ mod tests {
         ][..]);
     }
 
-    #[test]
-    fn handle_mlme_assoc_resp_failure_emergency_services_not_supported() {
-        let exec = fasync::TestExecutor::new();
-        let (fake_device, fake_device_state) = FakeDevice::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn handle_mlme_assoc_resp_failure_emergency_services_not_supported() {
+        let (fake_device, fake_device_state) = FakeDevice::new().await;
         let mut r_sta = make_remote_client();
         let (mut ctx, _) = make_context(fake_device);
         r_sta
@@ -1437,10 +1428,9 @@ mod tests {
         ][..]);
     }
 
-    #[test]
-    fn handle_mlme_disassoc_req() {
-        let exec = fasync::TestExecutor::new();
-        let (fake_device, fake_device_state) = FakeDevice::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn handle_mlme_disassoc_req() {
+        let (fake_device, fake_device_state) = FakeDevice::new().await;
         let mut r_sta = make_remote_client();
         let (mut ctx, _) = make_context(fake_device);
         r_sta
@@ -1544,10 +1534,9 @@ mod tests {
         );
     }
 
-    #[test]
-    fn handle_mlme_eapol_req() {
-        let exec = fasync::TestExecutor::new();
-        let (fake_device, fake_device_state) = FakeDevice::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn handle_mlme_eapol_req() {
+        let (fake_device, fake_device_state) = FakeDevice::new().await;
         let mut r_sta = make_remote_client();
         let (mut ctx, _) = make_context(fake_device);
         r_sta.handle_mlme_eapol_req(&mut ctx, *CLIENT_ADDR2, &[1, 2, 3][..]).expect("expected OK");
@@ -1569,10 +1558,9 @@ mod tests {
         ][..]);
     }
 
-    #[test]
-    fn handle_disassoc_frame() {
-        let exec = fasync::TestExecutor::new();
-        let (fake_device, fake_device_state) = FakeDevice::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn handle_disassoc_frame() {
+        let (fake_device, fake_device_state) = FakeDevice::new().await;
         let mut r_sta = make_remote_client();
         let (mut ctx, _) = make_context(fake_device);
         r_sta
@@ -1605,9 +1593,9 @@ mod tests {
             active_timeout_event_id: None,
             ps_state: PowerSaveState::Awake,
         }; "in associated state")]
-    fn handle_assoc_req_frame(init_state: State) {
-        let exec = fasync::TestExecutor::new();
-        let (fake_device, fake_device_state) = FakeDevice::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn handle_assoc_req_frame(init_state: State) {
+        let (fake_device, fake_device_state) = FakeDevice::new().await;
         let mut r_sta = make_remote_client();
         r_sta.state = StateMachine::new(init_state);
         let (mut ctx, _) = make_context(fake_device);
@@ -1647,9 +1635,9 @@ mod tests {
             active_timeout_event_id: None,
             ps_state: PowerSaveState::Awake,
         }; "in associated state")]
-    fn handle_auth_frame(init_state: State) {
-        let exec = fasync::TestExecutor::new();
-        let (fake_device, fake_device_state) = FakeDevice::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn handle_auth_frame(init_state: State) {
+        let (fake_device, fake_device_state) = FakeDevice::new().await;
         let mut r_sta = make_remote_client();
         r_sta.state = StateMachine::new(init_state);
         let (mut ctx, _) = make_context(fake_device);
@@ -1668,10 +1656,9 @@ mod tests {
         );
     }
 
-    #[test]
-    fn handle_auth_frame_unknown_algorithm() {
-        let exec = fasync::TestExecutor::new();
-        let (fake_device, fake_device_state) = FakeDevice::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn handle_auth_frame_unknown_algorithm() {
+        let (fake_device, fake_device_state) = FakeDevice::new().await;
         let mut r_sta = make_remote_client();
         let (mut ctx, _) = make_context(fake_device);
 
@@ -1696,9 +1683,9 @@ mod tests {
 
     #[test_case(false; "from idle state")]
     #[test_case(true; "while already authenticated")]
-    fn handle_deauth_frame(already_authenticated: bool) {
-        let exec = fasync::TestExecutor::new();
-        let (fake_device, fake_device_state) = FakeDevice::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn handle_deauth_frame(already_authenticated: bool) {
+        let (fake_device, fake_device_state) = FakeDevice::new().await;
         let mut r_sta = make_remote_client();
         if already_authenticated {
             r_sta.state = StateMachine::new(State::Authenticated);
@@ -1731,10 +1718,9 @@ mod tests {
         // TODO(https://fxbug.dev/42113580): Implement me!
     }
 
-    #[test]
-    fn handle_ps_poll() {
-        let exec = fasync::TestExecutor::new();
-        let (fake_device, fake_device_state) = FakeDevice::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn handle_ps_poll() {
+        let (fake_device, fake_device_state) = FakeDevice::new().await;
         let (mut ctx, _) = make_context(fake_device);
 
         let mut r_sta = make_remote_client();
@@ -1816,10 +1802,9 @@ mod tests {
         assert_eq!(fake_device_state.lock().wlan_queue.len(), 2);
     }
 
-    #[test]
-    fn handle_ps_poll_not_buffered() {
-        let exec = fasync::TestExecutor::new();
-        let (fake_device, _) = FakeDevice::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn handle_ps_poll_not_buffered() {
+        let (fake_device, _) = FakeDevice::new().await;
         let (mut ctx, _) = make_context(fake_device);
 
         let mut r_sta = make_remote_client();
@@ -1835,10 +1820,9 @@ mod tests {
         r_sta.handle_ps_poll(&mut ctx, 1).expect("expected handle_ps_poll OK");
     }
 
-    #[test]
-    fn handle_ps_poll_wrong_aid() {
-        let exec = fasync::TestExecutor::new();
-        let (fake_device, _) = FakeDevice::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn handle_ps_poll_wrong_aid() {
+        let (fake_device, _) = FakeDevice::new().await;
         let (mut ctx, _) = make_context(fake_device);
 
         let mut r_sta = make_remote_client();
@@ -1857,10 +1841,9 @@ mod tests {
         );
     }
 
-    #[test]
-    fn handle_ps_poll_not_dozing() {
-        let exec = fasync::TestExecutor::new();
-        let (fake_device, _) = FakeDevice::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn handle_ps_poll_not_dozing() {
+        let (fake_device, _) = FakeDevice::new().await;
         let (mut ctx, _) = make_context(fake_device);
 
         let mut r_sta = make_remote_client();
@@ -1877,10 +1860,9 @@ mod tests {
         );
     }
 
-    #[test]
-    fn handle_eapol_llc_frame() {
-        let exec = fasync::TestExecutor::new();
-        let (fake_device, fake_device_state) = FakeDevice::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn handle_eapol_llc_frame() {
+        let (fake_device, fake_device_state) = FakeDevice::new().await;
         let mut r_sta = make_remote_client();
         let (mut ctx, _) = make_context(fake_device);
 
@@ -1907,10 +1889,9 @@ mod tests {
         );
     }
 
-    #[test]
-    fn handle_llc_frame() {
-        let exec = fasync::TestExecutor::new();
-        let (fake_device, fake_device_state) = FakeDevice::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn handle_llc_frame() {
+        let (fake_device, fake_device_state) = FakeDevice::new().await;
         let mut r_sta = make_remote_client();
         let (mut ctx, _) = make_context(fake_device);
 
@@ -1934,10 +1915,9 @@ mod tests {
         ][..]);
     }
 
-    #[test]
-    fn handle_eth_frame_no_eapol_controlled_port() {
-        let exec = fasync::TestExecutor::new();
-        let (fake_device, fake_device_state) = FakeDevice::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn handle_eth_frame_no_eapol_controlled_port() {
+        let (fake_device, fake_device_state) = FakeDevice::new().await;
         let mut r_sta = make_remote_client();
         let (mut ctx, _) = make_context(fake_device);
 
@@ -1975,10 +1955,9 @@ mod tests {
         ][..]);
     }
 
-    #[test]
-    fn handle_eth_frame_not_associated() {
-        let exec = fasync::TestExecutor::new();
-        let (fake_device, _) = FakeDevice::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn handle_eth_frame_not_associated() {
+        let (fake_device, _) = FakeDevice::new().await;
         let mut r_sta = make_remote_client();
         let (mut ctx, _) = make_context(fake_device);
 
@@ -1998,10 +1977,9 @@ mod tests {
         );
     }
 
-    #[test]
-    fn handle_eth_frame_eapol_controlled_port_closed() {
-        let exec = fasync::TestExecutor::new();
-        let (fake_device, _) = FakeDevice::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn handle_eth_frame_eapol_controlled_port_closed() {
+        let (fake_device, _) = FakeDevice::new().await;
         let mut r_sta = make_remote_client();
         let (mut ctx, _) = make_context(fake_device);
 
@@ -2026,10 +2004,9 @@ mod tests {
         );
     }
 
-    #[test]
-    fn handle_eth_frame_eapol_controlled_port_open() {
-        let exec = fasync::TestExecutor::new();
-        let (fake_device, fake_device_state) = FakeDevice::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn handle_eth_frame_eapol_controlled_port_open() {
+        let (fake_device, fake_device_state) = FakeDevice::new().await;
         let mut r_sta = make_remote_client();
         let (mut ctx, _) = make_context(fake_device);
 
@@ -2067,10 +2044,9 @@ mod tests {
         ][..]);
     }
 
-    #[test]
-    fn handle_data_frame_not_permitted() {
-        let exec = fasync::TestExecutor::new();
-        let (fake_device, fake_device_state) = FakeDevice::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn handle_data_frame_not_permitted() {
+        let (fake_device, fake_device_state) = FakeDevice::new().await;
         let mut r_sta = make_remote_client();
         r_sta.state = StateMachine::new(State::Authenticating);
         let (mut ctx, _) = make_context(fake_device);
@@ -2131,10 +2107,9 @@ mod tests {
         );
     }
 
-    #[test]
-    fn handle_data_frame_not_permitted_disassoc() {
-        let exec = fasync::TestExecutor::new();
-        let (fake_device, fake_device_state) = FakeDevice::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn handle_data_frame_not_permitted_disassoc() {
+        let (fake_device, fake_device_state) = FakeDevice::new().await;
         let mut r_sta = make_remote_client();
         r_sta.state = StateMachine::new(State::Authenticated);
         let (mut ctx, _) = make_context(fake_device);
@@ -2195,10 +2170,9 @@ mod tests {
         );
     }
 
-    #[test]
-    fn handle_data_frame_single_llc() {
-        let exec = fasync::TestExecutor::new();
-        let (fake_device, fake_device_state) = FakeDevice::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn handle_data_frame_single_llc() {
+        let (fake_device, fake_device_state) = FakeDevice::new().await;
         let mut r_sta = make_remote_client();
         r_sta.state = StateMachine::new(State::Associated {
             aid: 1,
@@ -2241,10 +2215,9 @@ mod tests {
         )
     }
 
-    #[test]
-    fn handle_data_frame_amsdu() {
-        let exec = fasync::TestExecutor::new();
-        let (fake_device, fake_device_state) = FakeDevice::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn handle_data_frame_amsdu() {
+        let (fake_device, fake_device_state) = FakeDevice::new().await;
         let mut r_sta = make_remote_client();
         r_sta.state = StateMachine::new(State::Associated {
             aid: 1,
@@ -2300,10 +2273,9 @@ mod tests {
         )
     }
 
-    #[test]
-    fn handle_mgmt_frame() {
-        let exec = fasync::TestExecutor::new();
-        let (fake_device, _) = FakeDevice::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn handle_mgmt_frame() {
+        let (fake_device, _) = FakeDevice::new().await;
         let mut r_sta = make_remote_client();
         r_sta.state = StateMachine::new(State::Authenticating);
         let (mut ctx, _) = make_context(fake_device);
@@ -2337,9 +2309,9 @@ mod tests {
     #[test_case(Ssid::try_from("coolnet").unwrap(), true; "with ssid and rsne")]
     #[test_case(Ssid::try_from("").unwrap(), true; "with empty ssid")]
     #[test_case(Ssid::try_from("coolnet").unwrap(), false; "without rsne")]
-    fn handle_mgmt_frame_assoc_req(ssid: Ssid, has_rsne: bool) {
-        let exec = fasync::TestExecutor::new();
-        let (fake_device, fake_device_state) = FakeDevice::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn handle_mgmt_frame_assoc_req(ssid: Ssid, has_rsne: bool) {
+        let (fake_device, fake_device_state) = FakeDevice::new().await;
         let mut r_sta = make_remote_client();
         r_sta.state = StateMachine::new(State::Authenticated);
         let (mut ctx, _) = make_context(fake_device);
@@ -2409,14 +2381,13 @@ mod tests {
     #[test_case(vec![1, 9, 1, 2, 3, 4, 5, 6, 7, 8, 9],
                 vec![50, 9, 10],
                 vec![1, 2, 3, 4, 5, 6, 7, 8, 9] ; "when too many supported rates")]
-    #[fuchsia::test]
-    fn assoc_req_with_bad_rates_still_passed_to_sme(
+    #[fuchsia::test(allow_stalls = false)]
+    async fn assoc_req_with_bad_rates_still_passed_to_sme(
         supported_rates_ie: Vec<u8>,
         extended_supported_rates_ie: Vec<u8>,
         expected_rates: Vec<u8>,
     ) {
-        let exec = fasync::TestExecutor::new();
-        let (fake_device, fake_device_state) = FakeDevice::new(&exec);
+        let (fake_device, fake_device_state) = FakeDevice::new().await;
         let mut r_sta = make_remote_client();
         r_sta.state = StateMachine::new(State::Authenticated);
         let (mut ctx, _) = make_context(fake_device);
@@ -2465,10 +2436,9 @@ mod tests {
         );
     }
 
-    #[test]
-    fn handle_mgmt_frame_not_permitted() {
-        let exec = fasync::TestExecutor::new();
-        let (fake_device, fake_device_state) = FakeDevice::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn handle_mgmt_frame_not_permitted() {
+        let (fake_device, fake_device_state) = FakeDevice::new().await;
         let mut r_sta = make_remote_client();
         r_sta.state = StateMachine::new(State::Authenticating);
         let (mut ctx, _) = make_context(fake_device);
@@ -2530,10 +2500,9 @@ mod tests {
         );
     }
 
-    #[test]
-    fn handle_mgmt_frame_not_handled() {
-        let exec = fasync::TestExecutor::new();
-        let (fake_device, _) = FakeDevice::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn handle_mgmt_frame_not_handled() {
+        let (fake_device, _) = FakeDevice::new().await;
         let mut r_sta = make_remote_client();
         r_sta.state = StateMachine::new(State::Associated {
             aid: 1,
@@ -2572,10 +2541,9 @@ mod tests {
         );
     }
 
-    #[test]
-    fn handle_mgmt_frame_resets_active_timer() {
-        let exec = fasync::TestExecutor::new();
-        let (fake_device, _) = FakeDevice::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn handle_mgmt_frame_resets_active_timer() {
+        let (fake_device, _) = FakeDevice::new().await;
         let mut r_sta = make_remote_client();
         r_sta.state = StateMachine::new(State::Associated {
             aid: 1,
@@ -2617,10 +2585,9 @@ mod tests {
         )
     }
 
-    #[test]
-    fn handle_bss_idle_timeout() {
-        let exec = fasync::TestExecutor::new();
-        let (fake_device, fake_device_state) = FakeDevice::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn handle_bss_idle_timeout() {
+        let (fake_device, fake_device_state) = FakeDevice::new().await;
         let (mut ctx, _) = make_context(fake_device);
 
         let mut r_sta = make_remote_client();
@@ -2661,10 +2628,9 @@ mod tests {
         );
     }
 
-    #[test]
-    fn doze_then_wake() {
-        let exec = fasync::TestExecutor::new();
-        let (fake_device, fake_device_state) = FakeDevice::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn doze_then_wake() {
+        let (fake_device, fake_device_state) = FakeDevice::new().await;
         let (mut ctx, _) = make_context(fake_device);
 
         let mut r_sta = make_remote_client();
@@ -2744,10 +2710,9 @@ mod tests {
         );
     }
 
-    #[test]
-    fn doze_then_doze() {
-        let exec = fasync::TestExecutor::new();
-        let (fake_device, _) = FakeDevice::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn doze_then_doze() {
+        let (fake_device, _) = FakeDevice::new().await;
         let (mut ctx, _) = make_context(fake_device);
 
         let mut r_sta = make_remote_client();
@@ -2762,10 +2727,9 @@ mod tests {
         r_sta.set_power_state(&mut ctx, mac::PowerState::DOZE).expect("expected doze OK");
     }
 
-    #[test]
-    fn wake_then_wake() {
-        let exec = fasync::TestExecutor::new();
-        let (fake_device, _) = FakeDevice::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn wake_then_wake() {
+        let (fake_device, _) = FakeDevice::new().await;
         let (mut ctx, _) = make_context(fake_device);
 
         let mut r_sta = make_remote_client();
@@ -2780,10 +2744,9 @@ mod tests {
         r_sta.set_power_state(&mut ctx, mac::PowerState::AWAKE).expect("expected wake OK");
     }
 
-    #[test]
-    fn doze_not_associated() {
-        let exec = fasync::TestExecutor::new();
-        let (fake_device, _) = FakeDevice::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn doze_not_associated() {
+        let (fake_device, _) = FakeDevice::new().await;
         let (mut ctx, _) = make_context(fake_device);
 
         let mut r_sta = make_remote_client();
@@ -2797,10 +2760,9 @@ mod tests {
         );
     }
 
-    #[test]
-    fn wake_not_associated() {
-        let exec = fasync::TestExecutor::new();
-        let (fake_device, _) = FakeDevice::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn wake_not_associated() {
+        let (fake_device, _) = FakeDevice::new().await;
         let (mut ctx, _) = make_context(fake_device);
 
         let mut r_sta = make_remote_client();

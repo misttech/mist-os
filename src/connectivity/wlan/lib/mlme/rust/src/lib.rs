@@ -586,10 +586,9 @@ mod tests {
         }
     }
 
-    #[test]
-    fn start_and_stop_main_loop() {
-        let mut exec = TestExecutor::new();
-        let (fake_device, _fake_device_state) = FakeDevice::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn start_and_stop_main_loop() {
+        let (fake_device, _fake_device_state) = FakeDevice::new().await;
         let buffer_provider = FakeCBufferProvider::new();
         let (device_sink, device_stream) = mpsc::unbounded();
         let (_mlme_request_sink, mlme_request_stream) = mpsc::unbounded();
@@ -603,16 +602,25 @@ mod tests {
             mlme_request_stream,
             device_stream,
         ));
-        assert_variant!(exec.run_until_stalled(&mut main_loop), Poll::Pending);
-        assert_eq!(exec.run_until_stalled(&mut init_receiver), Poll::Ready(Ok(Ok(()))));
+        assert_variant!(TestExecutor::poll_until_stalled(&mut main_loop).await, Poll::Pending);
+        assert_eq!(
+            TestExecutor::poll_until_stalled(&mut init_receiver).await,
+            Poll::Ready(Ok(Ok(())))
+        );
 
         device_sink
             .unbounded_send(DriverEvent::Stop(StopCompleter::new(Box::new(move || {
                 shutdown_sender.send(()).expect("Failed to signal shutdown completion.")
             }))))
             .expect("Failed to send stop event");
-        assert_variant!(exec.run_until_stalled(&mut main_loop), Poll::Ready(Ok(())));
-        assert_eq!(exec.run_until_stalled(&mut shutdown_receiver), Poll::Ready(Ok(())));
+        assert_variant!(
+            TestExecutor::poll_until_stalled(&mut main_loop).await,
+            Poll::Ready(Ok(()))
+        );
+        assert_eq!(
+            TestExecutor::poll_until_stalled(&mut shutdown_receiver).await,
+            Poll::Ready(Ok(()))
+        );
         assert!(device_sink.is_closed());
     }
 }

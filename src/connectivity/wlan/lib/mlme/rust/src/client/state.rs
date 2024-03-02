@@ -1481,7 +1481,6 @@ mod tests {
         },
         akm::AkmAlgorithm,
         banjo_fuchsia_wlan_common as banjo_common, fidl_fuchsia_wlan_common as fidl_common,
-        fuchsia_async as fasync,
         fuchsia_sync::Mutex,
         fuchsia_zircon as zx,
         lazy_static::lazy_static,
@@ -1520,9 +1519,12 @@ mod tests {
     }
 
     impl MockObjects {
-        fn new(exec: &fasync::TestExecutor) -> Self {
+        // TODO(https://fxbug.dev/327499461): This function is async to ensure MLME functions will
+        // run in an async context and not call `wlan_common::timer::Timer::now` without an
+        // executor.
+        async fn new() -> Self {
             let (timer, time_stream) = create_timer();
-            let (fake_device, fake_device_state) = FakeDevice::new(exec);
+            let (fake_device, fake_device_state) = FakeDevice::new().await;
             Self {
                 fake_device,
                 fake_device_state,
@@ -1657,10 +1659,9 @@ mod tests {
         auth
     }
 
-    #[test]
-    fn connect_authenticate_tx_failure() {
-        let exec = fasync::TestExecutor::new();
-        let mut m = MockObjects::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn connect_authenticate_tx_failure() {
+        let mut m = MockObjects::new().await;
         m.fake_device_state.lock().config.send_wlan_frame_fails = true;
         let mut ctx = m.make_ctx();
         let mut sta = make_client_station();
@@ -1689,10 +1690,9 @@ mod tests {
         );
     }
 
-    #[test]
-    fn joined_no_authentication_algorithm() {
-        let exec = fasync::TestExecutor::new();
-        let mut m = MockObjects::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn joined_no_authentication_algorithm() {
+        let mut m = MockObjects::new().await;
         let mut ctx = m.make_ctx_with_bss();
         let connect_req = ParsedConnectRequest {
             selected_bss: fake_bss_description!(Open, bssid: BSSID.to_array()),
@@ -1729,10 +1729,9 @@ mod tests {
         assert!(m.fake_device_state.lock().join_bss_request.is_none());
     }
 
-    #[test]
-    fn authenticating_state_auth_rejected() {
-        let exec = fasync::TestExecutor::new();
-        let mut m = MockObjects::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn authenticating_state_auth_rejected() {
+        let mut m = MockObjects::new().await;
         let mut ctx = m.make_ctx_with_bss();
         let mut sta = make_client_station();
         let mut sta = sta.bind(&mut ctx, &mut m.scanner, &mut m.channel_state);
@@ -1774,10 +1773,9 @@ mod tests {
         assert!(m.fake_device_state.lock().join_bss_request.is_none());
     }
 
-    #[test]
-    fn authenticating_state_deauth_frame() {
-        let exec = fasync::TestExecutor::new();
-        let mut m = MockObjects::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn authenticating_state_deauth_frame() {
+        let mut m = MockObjects::new().await;
         let mut ctx = m.make_ctx_with_bss();
         let mut sta = make_client_station();
         let mut sta = sta.bind(&mut ctx, &mut m.scanner, &mut m.channel_state);
@@ -1807,10 +1805,9 @@ mod tests {
         assert!(m.fake_device_state.lock().join_bss_request.is_none());
     }
 
-    #[test]
-    fn associating_success_unprotected() {
-        let exec = fasync::TestExecutor::new();
-        let mut m = MockObjects::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn associating_success_unprotected() {
+        let mut m = MockObjects::new().await;
         let mut ctx = m.make_ctx_with_bss();
         let mut sta = make_client_station();
         let mut sta = sta.bind(&mut ctx, &mut m.scanner, &mut m.channel_state);
@@ -1858,10 +1855,9 @@ mod tests {
         assert!(m.fake_device_state.lock().join_bss_request.is_some());
     }
 
-    #[test]
-    fn associating_success_protected() {
-        let exec = fasync::TestExecutor::new();
-        let mut m = MockObjects::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn associating_success_protected() {
+        let mut m = MockObjects::new().await;
         let mut ctx = m.make_ctx_with_bss();
         let mut sta = make_protected_client_station();
         sta.client_capabilities.0.capability_info =
@@ -1934,10 +1930,9 @@ mod tests {
         assert!(m.fake_device_state.lock().join_bss_request.is_some());
     }
 
-    #[test]
-    fn associating_failure_due_to_failed_status_code() {
-        let exec = fasync::TestExecutor::new();
-        let mut m = MockObjects::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn associating_failure_due_to_failed_status_code() {
+        let mut m = MockObjects::new().await;
         let mut ctx = m.make_ctx_with_bss();
         let mut sta = make_client_station();
         let mut sta = sta.bind(&mut ctx, &mut m.scanner, &mut m.channel_state);
@@ -1971,10 +1966,9 @@ mod tests {
         assert!(m.fake_device_state.lock().join_bss_request.is_some());
     }
 
-    #[test]
-    fn associating_failure_due_to_incompatibility() {
-        let exec = fasync::TestExecutor::new();
-        let mut m = MockObjects::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn associating_failure_due_to_incompatibility() {
+        let mut m = MockObjects::new().await;
         let mut ctx = m.make_ctx_with_bss();
         let mut sta = make_client_station();
         let mut sta = sta.bind(&mut ctx, &mut m.scanner, &mut m.channel_state);
@@ -2010,10 +2004,9 @@ mod tests {
         assert!(m.fake_device_state.lock().join_bss_request.is_some());
     }
 
-    #[test]
-    fn associating_deauth_frame() {
-        let exec = fasync::TestExecutor::new();
-        let mut m = MockObjects::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn associating_deauth_frame() {
+        let mut m = MockObjects::new().await;
         let mut ctx = m.make_ctx_with_bss();
         let mut sta = make_client_station();
         let mut sta = sta.bind(&mut ctx, &mut m.scanner, &mut m.channel_state);
@@ -2036,10 +2029,9 @@ mod tests {
         assert!(m.fake_device_state.lock().join_bss_request.is_none());
     }
 
-    #[test]
-    fn associating_disassociation() {
-        let exec = fasync::TestExecutor::new();
-        let mut m = MockObjects::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn associating_disassociation() {
+        let mut m = MockObjects::new().await;
         let mut ctx = m.make_ctx_with_bss();
         let mut sta = make_client_station();
         let mut sta = sta.bind(&mut ctx, &mut m.scanner, &mut m.channel_state);
@@ -2067,10 +2059,9 @@ mod tests {
         MockWlanRxInfo::with_channel(channel).into()
     }
 
-    #[test]
-    fn associated_block_ack_frame() {
-        let exec = fasync::TestExecutor::new();
-        let mut mock = MockObjects::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn associated_block_ack_frame() {
+        let mut mock = MockObjects::new().await;
         let mut ctx = mock.make_ctx();
         let mut station = make_client_station();
         let mut client = station.bind(&mut ctx, &mut mock.scanner, &mut mock.channel_state);
@@ -2121,10 +2112,9 @@ mod tests {
         }
     }
 
-    #[test]
-    fn associated_deauth_frame() {
-        let exec = fasync::TestExecutor::new();
-        let mut m = MockObjects::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn associated_deauth_frame() {
+        let mut m = MockObjects::new().await;
         let mut ctx = m.make_ctx_with_bss();
         let mut sta = make_client_station();
         let mut sta = sta.bind(&mut ctx, &mut m.scanner, &mut m.channel_state);
@@ -2166,10 +2156,9 @@ mod tests {
         assert!(m.fake_device_state.lock().join_bss_request.is_none());
     }
 
-    #[test]
-    fn associated_disassociation() {
-        let exec = fasync::TestExecutor::new();
-        let mut m = MockObjects::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn associated_disassociation() {
+        let mut m = MockObjects::new().await;
         let mut ctx = m.make_ctx_with_bss();
         let mut sta = make_client_station();
         let mut sta = sta.bind(&mut ctx, &mut m.scanner, &mut m.channel_state);
@@ -2212,10 +2201,9 @@ mod tests {
         assert!(m.fake_device_state.lock().join_bss_request.is_some());
     }
 
-    #[test]
-    fn associated_move_data_closed_controlled_port() {
-        let exec = fasync::TestExecutor::new();
-        let mut m = MockObjects::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn associated_move_data_closed_controlled_port() {
+        let mut m = MockObjects::new().await;
         let mut ctx = m.make_ctx();
         let mut sta = make_client_station();
         let mut sta = sta.bind(&mut ctx, &mut m.scanner, &mut m.channel_state);
@@ -2229,10 +2217,9 @@ mod tests {
         assert_eq!(m.fake_device_state.lock().eth_queue.len(), 0);
     }
 
-    #[test]
-    fn associated_move_data_opened_controlled_port() {
-        let exec = fasync::TestExecutor::new();
-        let mut m = MockObjects::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn associated_move_data_opened_controlled_port() {
+        let mut m = MockObjects::new().await;
         let mut ctx = m.make_ctx();
         let mut sta = make_client_station();
         let mut sta = sta.bind(&mut ctx, &mut m.scanner, &mut m.channel_state);
@@ -2254,10 +2241,9 @@ mod tests {
         ]);
     }
 
-    #[test]
-    fn associated_skip_empty_data() {
-        let exec = fasync::TestExecutor::new();
-        let mut m = MockObjects::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn associated_skip_empty_data() {
+        let mut m = MockObjects::new().await;
         let mut ctx = m.make_ctx();
         let mut sta = make_client_station();
         let mut sta = sta.bind(&mut ctx, &mut m.scanner, &mut m.channel_state);
@@ -2276,12 +2262,12 @@ mod tests {
     #[test_case(false, true; "port closed and protected")]
     #[test_case(true, false; "port open and unprotected")]
     #[test_case(false, false; "port closed and unprotected (not a typical state)")]
-    fn associated_send_keep_alive_after_null_data_frame(
+    #[fuchsia::test(allow_stalls = false)]
+    async fn associated_send_keep_alive_after_null_data_frame(
         controlled_port_open: bool,
         protected: bool,
     ) {
-        let exec = fasync::TestExecutor::new();
-        let mut m = MockObjects::new(&exec);
+        let mut m = MockObjects::new().await;
         let mut ctx = m.make_ctx();
         let mut sta =
             if protected { make_protected_client_station() } else { make_client_station() };
@@ -2303,10 +2289,9 @@ mod tests {
         assert!(resp_body.is_empty());
     }
 
-    #[test]
-    fn associated_handle_eapol_closed_controlled_port() {
-        let exec = fasync::TestExecutor::new();
-        let mut m = MockObjects::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn associated_handle_eapol_closed_controlled_port() {
+        let mut m = MockObjects::new().await;
         let mut ctx = m.make_ctx();
         let mut sta = make_protected_client_station();
         let mut sta = sta.bind(&mut ctx, &mut m.scanner, &mut m.channel_state);
@@ -2335,10 +2320,9 @@ mod tests {
         );
     }
 
-    #[test]
-    fn associated_handle_eapol_open_controlled_port() {
-        let exec = fasync::TestExecutor::new();
-        let mut m = MockObjects::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn associated_handle_eapol_open_controlled_port() {
+        let mut m = MockObjects::new().await;
         let mut ctx = m.make_ctx();
         let mut sta = make_protected_client_station();
         let mut sta = sta.bind(&mut ctx, &mut m.scanner, &mut m.channel_state);
@@ -2367,10 +2351,9 @@ mod tests {
         );
     }
 
-    #[test]
-    fn associated_handle_amsdus_open_controlled_port() {
-        let exec = fasync::TestExecutor::new();
-        let mut m = MockObjects::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn associated_handle_amsdus_open_controlled_port() {
+        let mut m = MockObjects::new().await;
         let mut ctx = m.make_ctx();
         let mut sta = make_protected_client_station();
         let mut sta = sta.bind(&mut ctx, &mut m.scanner, &mut m.channel_state);
@@ -2401,10 +2384,9 @@ mod tests {
         assert_eq!(queue[1], &expected_second_eth_frame[..]);
     }
 
-    #[test]
-    fn associated_request_bu_data_frame() {
-        let exec = fasync::TestExecutor::new();
-        let mut m = MockObjects::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn associated_request_bu_data_frame() {
+        let mut m = MockObjects::new().await;
         let mut ctx = m.make_ctx();
         let mut sta = make_client_station();
         let mut sta = sta.bind(&mut ctx, &mut m.scanner, &mut m.channel_state);
@@ -2431,10 +2413,9 @@ mod tests {
         ][..]);
     }
 
-    #[test]
-    fn associated_request_bu_mgmt_frame() {
-        let exec = fasync::TestExecutor::new();
-        let mut m = MockObjects::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn associated_request_bu_mgmt_frame() {
+        let mut m = MockObjects::new().await;
         let mut ctx = m.make_ctx();
         let mut sta = make_client_station();
         let mut sta = sta.bind(&mut ctx, &mut m.scanner, &mut m.channel_state);
@@ -2471,10 +2452,9 @@ mod tests {
         ][..]);
     }
 
-    #[test]
-    fn associated_no_bu_request() {
-        let exec = fasync::TestExecutor::new();
-        let mut m = MockObjects::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn associated_no_bu_request() {
+        let mut m = MockObjects::new().await;
         let mut ctx = m.make_ctx();
         let mut sta = make_client_station();
         let mut sta = sta.bind(&mut ctx, &mut m.scanner, &mut m.channel_state);
@@ -2508,10 +2488,9 @@ mod tests {
         assert_eq!(m.fake_device_state.lock().wlan_queue.len(), 0);
     }
 
-    #[test]
-    fn associated_drop_foreign_data_frames() {
-        let exec = fasync::TestExecutor::new();
-        let mut m = MockObjects::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn associated_drop_foreign_data_frames() {
+        let mut m = MockObjects::new().await;
         let mut ctx = m.make_ctx();
         let mut sta = make_client_station();
         let mut sta = sta.bind(&mut ctx, &mut m.scanner, &mut m.channel_state);
@@ -2548,10 +2527,9 @@ mod tests {
         assert_eq!(m.fake_device_state.lock().eth_queue.len(), 0);
     }
 
-    #[test]
-    fn state_transitions_joined_state_reconnect_denied() {
-        let exec = fasync::TestExecutor::new();
-        let mut m = MockObjects::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn state_transitions_joined_state_reconnect_denied() {
+        let mut m = MockObjects::new().await;
         let mut ctx = m.make_ctx();
         let mut sta = make_client_station();
         let mut sta = sta.bind(&mut ctx, &mut m.scanner, &mut m.channel_state);
@@ -2582,10 +2560,9 @@ mod tests {
         );
     }
 
-    #[test]
-    fn state_transitions_authing_success() {
-        let exec = fasync::TestExecutor::new();
-        let mut m = MockObjects::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn state_transitions_authing_success() {
+        let mut m = MockObjects::new().await;
         let mut ctx = m.make_ctx();
         let mut sta = make_client_station();
         let mut sta = sta.bind(&mut ctx, &mut m.scanner, &mut m.channel_state);
@@ -2612,10 +2589,9 @@ mod tests {
         assert_variant!(state, States::Associating(_), "not in associating state");
     }
 
-    #[test]
-    fn state_transitions_authing_failure() {
-        let exec = fasync::TestExecutor::new();
-        let mut m = MockObjects::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn state_transitions_authing_failure() {
+        let mut m = MockObjects::new().await;
         let mut ctx = m.make_ctx_with_bss();
         let mut sta = make_client_station();
         let mut sta = sta.bind(&mut ctx, &mut m.scanner, &mut m.channel_state);
@@ -2644,10 +2620,9 @@ mod tests {
         assert!(m.fake_device_state.lock().join_bss_request.is_none());
     }
 
-    #[test]
-    fn state_transitions_authing_deauth() {
-        let exec = fasync::TestExecutor::new();
-        let mut m = MockObjects::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn state_transitions_authing_deauth() {
+        let mut m = MockObjects::new().await;
         let mut ctx = m.make_ctx_with_bss();
         let mut sta = make_client_station();
         let mut sta = sta.bind(&mut ctx, &mut m.scanner, &mut m.channel_state);
@@ -2674,10 +2649,9 @@ mod tests {
         assert!(m.fake_device_state.lock().join_bss_request.is_none());
     }
 
-    #[test]
-    fn state_transitions_foreign_auth_resp() {
-        let exec = fasync::TestExecutor::new();
-        let mut m = MockObjects::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn state_transitions_foreign_auth_resp() {
+        let mut m = MockObjects::new().await;
         let mut ctx = m.make_ctx();
         let mut sta = make_client_station();
         let mut sta = sta.bind(&mut ctx, &mut m.scanner, &mut m.channel_state);
@@ -2724,10 +2698,9 @@ mod tests {
         assert_variant!(state, States::Associating(_), "not in associating state");
     }
 
-    #[test]
-    fn state_transitions_authing_state_reconnect_denied() {
-        let exec = fasync::TestExecutor::new();
-        let mut m = MockObjects::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn state_transitions_authing_state_reconnect_denied() {
+        let mut m = MockObjects::new().await;
         let mut ctx = m.make_ctx();
         let mut sta = make_client_station();
         let mut sta = sta.bind(&mut ctx, &mut m.scanner, &mut m.channel_state);
@@ -2759,10 +2732,9 @@ mod tests {
         );
     }
 
-    #[test]
-    fn state_transitions_authing_state_wrong_algorithm() {
-        let exec = fasync::TestExecutor::new();
-        let mut m = MockObjects::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn state_transitions_authing_state_wrong_algorithm() {
+        let mut m = MockObjects::new().await;
         let mut ctx = m.make_ctx();
         let mut sta = make_client_station();
         let mut sta = sta.bind(&mut ctx, &mut m.scanner, &mut m.channel_state);
@@ -2789,10 +2761,9 @@ mod tests {
         assert!(m.fake_device_state.lock().join_bss_request.is_none());
     }
 
-    #[test]
-    fn state_transitions_associng_success() {
-        let exec = fasync::TestExecutor::new();
-        let mut m = MockObjects::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn state_transitions_associng_success() {
+        let mut m = MockObjects::new().await;
         let mut ctx = m.make_ctx();
         let mut sta = make_client_station();
         let mut sta = sta.bind(&mut ctx, &mut m.scanner, &mut m.channel_state);
@@ -2828,10 +2799,9 @@ mod tests {
         assert_variant!(state, States::Associated(_), "not in associated state");
     }
 
-    #[test]
-    fn state_transitions_associng_failure() {
-        let exec = fasync::TestExecutor::new();
-        let mut m = MockObjects::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn state_transitions_associng_failure() {
+        let mut m = MockObjects::new().await;
         let mut ctx = m.make_ctx_with_bss();
         let mut sta = make_client_station();
         let mut sta = sta.bind(&mut ctx, &mut m.scanner, &mut m.channel_state);
@@ -2859,10 +2829,9 @@ mod tests {
         assert!(m.fake_device_state.lock().join_bss_request.is_some());
     }
 
-    #[test]
-    fn state_transitions_associng_deauthing() {
-        let exec = fasync::TestExecutor::new();
-        let mut m = MockObjects::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn state_transitions_associng_deauthing() {
+        let mut m = MockObjects::new().await;
         let mut ctx = m.make_ctx_with_bss();
         let mut sta = make_client_station();
         let mut sta = sta.bind(&mut ctx, &mut m.scanner, &mut m.channel_state);
@@ -2888,10 +2857,9 @@ mod tests {
         assert!(m.fake_device_state.lock().join_bss_request.is_none());
     }
 
-    #[test]
-    fn state_transitions_associng_reconnect_no_op() {
-        let exec = fasync::TestExecutor::new();
-        let mut m = MockObjects::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn state_transitions_associng_reconnect_no_op() {
+        let mut m = MockObjects::new().await;
         let mut ctx = m.make_ctx_with_bss();
         let mut sta = make_client_station();
         let mut sta = sta.bind(&mut ctx, &mut m.scanner, &mut m.channel_state);
@@ -2913,10 +2881,9 @@ mod tests {
             .expect_err("unexpected Connect.confirm");
     }
 
-    #[test]
-    fn state_transitions_associng_reconnect_denied() {
-        let exec = fasync::TestExecutor::new();
-        let mut m = MockObjects::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn state_transitions_associng_reconnect_denied() {
+        let mut m = MockObjects::new().await;
         let mut ctx = m.make_ctx_with_bss();
         let mut sta = make_client_station();
         let mut sta = sta.bind(&mut ctx, &mut m.scanner, &mut m.channel_state);
@@ -2949,10 +2916,9 @@ mod tests {
         );
     }
 
-    #[test]
-    fn state_transitions_assoced_disassoc_connect_success() {
-        let exec = fasync::TestExecutor::new();
-        let mut m = MockObjects::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn state_transitions_assoced_disassoc_connect_success() {
+        let mut m = MockObjects::new().await;
         let mut ctx = m.make_ctx_with_bss();
         let mut sta = make_client_station();
         let mut sta = sta.bind(&mut ctx, &mut m.scanner, &mut m.channel_state);
@@ -3054,10 +3020,9 @@ mod tests {
         assert_eq!(connect_conf.association_id, 11);
     }
 
-    #[test]
-    fn state_transitions_assoced_disassoc_reconnect_timeout() {
-        let exec = fasync::TestExecutor::new();
-        let mut m = MockObjects::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn state_transitions_assoced_disassoc_reconnect_timeout() {
+        let mut m = MockObjects::new().await;
         let mut ctx = m.make_ctx_with_bss();
         let mut sta = make_client_station();
         let mut sta = sta.bind(&mut ctx, &mut m.scanner, &mut m.channel_state);
@@ -3125,10 +3090,9 @@ mod tests {
         );
     }
 
-    #[test]
-    fn state_transitions_assoced_disassoc_reconnect_denied() {
-        let exec = fasync::TestExecutor::new();
-        let mut m = MockObjects::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn state_transitions_assoced_disassoc_reconnect_denied() {
+        let mut m = MockObjects::new().await;
         let mut ctx = m.make_ctx_with_bss();
         let mut sta = make_client_station();
         let mut sta = sta.bind(&mut ctx, &mut m.scanner, &mut m.channel_state);
@@ -3186,10 +3150,9 @@ mod tests {
         );
     }
 
-    #[test]
-    fn state_transitions_assoced_reconnect_no_op() {
-        let exec = fasync::TestExecutor::new();
-        let mut m = MockObjects::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn state_transitions_assoced_reconnect_no_op() {
+        let mut m = MockObjects::new().await;
         let mut ctx = m.make_ctx_with_bss();
         let mut sta = make_client_station();
         let mut sta = sta.bind(&mut ctx, &mut m.scanner, &mut m.channel_state);
@@ -3224,10 +3187,9 @@ mod tests {
         assert_eq!(connect_conf.association_id, 42);
     }
 
-    #[test]
-    fn state_transitions_assoced_deauthing() {
-        let exec = fasync::TestExecutor::new();
-        let mut m = MockObjects::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn state_transitions_assoced_deauthing() {
+        let mut m = MockObjects::new().await;
         let mut ctx = m.make_ctx_with_bss();
         let mut sta = make_client_station();
         let mut sta = sta.bind(&mut ctx, &mut m.scanner, &mut m.channel_state);
@@ -3270,9 +3232,9 @@ mod tests {
     #[test_case(true, false; "protected bss, not scanning")]
     #[test_case(false, true; "unprotected bss, scanning")]
     #[test_case(true, true; "protected bss, scanning")]
-    fn assoc_send_eth_frame_becomes_data_frame(protected: bool, scanning: bool) {
-        let exec = fasync::TestExecutor::new();
-        let mut m = MockObjects::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn assoc_send_eth_frame_becomes_data_frame(protected: bool, scanning: bool) {
+        let mut m = MockObjects::new().await;
         let mut ctx = m.make_ctx();
         let mut sta =
             if protected { make_protected_client_station() } else { make_client_station() };
@@ -3334,10 +3296,9 @@ mod tests {
         )
     }
 
-    #[test]
-    fn eth_frame_dropped_when_off_channel() {
-        let exec = fasync::TestExecutor::new();
-        let mut m = MockObjects::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn eth_frame_dropped_when_off_channel() {
+        let mut m = MockObjects::new().await;
         let mut ctx = m.make_ctx();
         let mut sta = make_client_station();
         let mut sta = sta.bind(&mut ctx, &mut m.scanner, &mut m.channel_state);
@@ -3363,10 +3324,9 @@ mod tests {
         );
     }
 
-    #[test]
-    fn assoc_eth_frame_too_short_dropped() {
-        let exec = fasync::TestExecutor::new();
-        let mut m = MockObjects::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn assoc_eth_frame_too_short_dropped() {
+        let mut m = MockObjects::new().await;
         let mut ctx = m.make_ctx();
         let mut sta = make_client_station();
         let mut sta = sta.bind(&mut ctx, &mut m.scanner, &mut m.channel_state);
@@ -3384,10 +3344,9 @@ mod tests {
         );
     }
 
-    #[test]
-    fn assoc_controlled_port_closed_eth_frame_dropped() {
-        let exec = fasync::TestExecutor::new();
-        let mut m = MockObjects::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn assoc_controlled_port_closed_eth_frame_dropped() {
+        let mut m = MockObjects::new().await;
         let mut ctx = m.make_ctx();
         let mut sta = make_client_station();
         let mut sta = sta.bind(&mut ctx, &mut m.scanner, &mut m.channel_state);
@@ -3405,10 +3364,9 @@ mod tests {
         );
     }
 
-    #[test]
-    fn not_assoc_eth_frame_dropped() {
-        let exec = fasync::TestExecutor::new();
-        let mut m = MockObjects::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn not_assoc_eth_frame_dropped() {
+        let mut m = MockObjects::new().await;
         let mut ctx = m.make_ctx();
         let mut sta = make_client_station();
         let mut sta = sta.bind(&mut ctx, &mut m.scanner, &mut m.channel_state);
@@ -3425,11 +3383,10 @@ mod tests {
         );
     }
 
-    #[test]
     #[allow(deprecated)] // Raw MLME messages are deprecated.
-    fn joined_sme_deauth() {
-        let exec = fasync::TestExecutor::new();
-        let mut m = MockObjects::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn joined_sme_deauth() {
+        let mut m = MockObjects::new().await;
         let mut ctx = m.make_ctx_with_bss();
         let mut sta = make_client_station();
         let mut sta = sta.bind(&mut ctx, &mut m.scanner, &mut m.channel_state);
@@ -3446,10 +3403,9 @@ mod tests {
         assert!(m.fake_device_state.lock().join_bss_request.is_none());
     }
 
-    #[test]
-    fn authenticating_sme_deauth() {
-        let exec = fasync::TestExecutor::new();
-        let mut m = MockObjects::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn authenticating_sme_deauth() {
+        let mut m = MockObjects::new().await;
         let mut ctx = m.make_ctx_with_bss();
         let mut sta = make_client_station();
         let mut sta = sta.bind(&mut ctx, &mut m.scanner, &mut m.channel_state);
@@ -3468,10 +3424,9 @@ mod tests {
         assert!(m.fake_device_state.lock().join_bss_request.is_none());
     }
 
-    #[test]
-    fn associating_sme_deauth() {
-        let exec = fasync::TestExecutor::new();
-        let mut m = MockObjects::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn associating_sme_deauth() {
+        let mut m = MockObjects::new().await;
         let mut ctx = m.make_ctx_with_bss();
         let mut sta = make_client_station();
         let mut sta = sta.bind(&mut ctx, &mut m.scanner, &mut m.channel_state);
@@ -3490,10 +3445,9 @@ mod tests {
         assert!(m.fake_device_state.lock().join_bss_request.is_none());
     }
 
-    #[test]
-    fn associated_sme_deauth() {
-        let exec = fasync::TestExecutor::new();
-        let mut m = MockObjects::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn associated_sme_deauth() {
+        let mut m = MockObjects::new().await;
         let mut ctx = m.make_ctx_with_bss();
         let mut sta = make_client_station();
         let mut sta = sta.bind(&mut ctx, &mut m.scanner, &mut m.channel_state);
@@ -3544,11 +3498,10 @@ mod tests {
         })
     }
 
-    #[test]
     #[allow(deprecated)]
-    fn mlme_eapol_not_associated() {
-        let exec = fasync::TestExecutor::new();
-        let mut m = MockObjects::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn mlme_eapol_not_associated() {
+        let mut m = MockObjects::new().await;
         let mut ctx = m.make_ctx();
         let mut sta = make_protected_client_station();
         let mut sta = sta.bind(&mut ctx, &mut m.scanner, &mut m.channel_state);
@@ -3567,11 +3520,10 @@ mod tests {
         assert_eq!(m.fake_device_state.lock().wlan_queue.len(), 0);
     }
 
-    #[test]
     #[allow(deprecated)]
-    fn mlme_eapol_associated_not_protected() {
-        let exec = fasync::TestExecutor::new();
-        let mut m = MockObjects::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn mlme_eapol_associated_not_protected() {
+        let mut m = MockObjects::new().await;
         let mut ctx = m.make_ctx();
         let mut sta = make_client_station();
         let mut sta = sta.bind(&mut ctx, &mut m.scanner, &mut m.channel_state);
@@ -3582,11 +3534,10 @@ mod tests {
         assert_eq!(m.fake_device_state.lock().wlan_queue.len(), 0);
     }
 
-    #[test]
     #[allow(deprecated)]
-    fn mlme_eapol_associated() {
-        let exec = fasync::TestExecutor::new();
-        let mut m = MockObjects::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn mlme_eapol_associated() {
+        let mut m = MockObjects::new().await;
         let mut ctx = m.make_ctx();
         let mut sta = make_protected_client_station();
         let mut sta = sta.bind(&mut ctx, &mut m.scanner, &mut m.channel_state);
@@ -3614,11 +3565,10 @@ mod tests {
         );
     }
 
-    #[test]
     #[allow(deprecated)]
-    fn mlme_set_keys_not_associated() {
-        let exec = fasync::TestExecutor::new();
-        let mut m = MockObjects::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn mlme_set_keys_not_associated() {
+        let mut m = MockObjects::new().await;
         let mut ctx = m.make_ctx();
         let mut sta = make_protected_client_station();
         let mut sta = sta.bind(&mut ctx, &mut m.scanner, &mut m.channel_state);
@@ -3636,11 +3586,10 @@ mod tests {
         assert_eq!(m.fake_device_state.lock().keys.len(), 0);
     }
 
-    #[test]
     #[allow(deprecated)]
-    fn mlme_set_keys_associated_not_protected() {
-        let exec = fasync::TestExecutor::new();
-        let mut m = MockObjects::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn mlme_set_keys_associated_not_protected() {
+        let mut m = MockObjects::new().await;
         let mut ctx = m.make_ctx();
         let mut sta = make_client_station();
         let mut sta = sta.bind(&mut ctx, &mut m.scanner, &mut m.channel_state);
@@ -3651,11 +3600,10 @@ mod tests {
         assert_eq!(m.fake_device_state.lock().keys.len(), 0);
     }
 
-    #[test]
     #[allow(deprecated)]
-    fn mlme_set_keys_associated() {
-        let exec = fasync::TestExecutor::new();
-        let mut m = MockObjects::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn mlme_set_keys_associated() {
+        let mut m = MockObjects::new().await;
         let mut ctx = m.make_ctx();
         let mut sta = make_protected_client_station();
         let mut sta = sta.bind(&mut ctx, &mut m.scanner, &mut m.channel_state);
@@ -3687,11 +3635,10 @@ mod tests {
         );
     }
 
-    #[test]
     #[allow(deprecated)]
-    fn mlme_set_keys_failure() {
-        let exec = fasync::TestExecutor::new();
-        let mut m = MockObjects::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn mlme_set_keys_failure() {
+        let mut m = MockObjects::new().await;
         let mut ctx = m.make_ctx();
         let mut sta = make_protected_client_station();
         let mut sta = sta.bind(&mut ctx, &mut m.scanner, &mut m.channel_state);
@@ -3732,10 +3679,9 @@ mod tests {
         })
     }
 
-    #[test]
-    fn mlme_set_controlled_port_not_associated() {
-        let exec = fasync::TestExecutor::new();
-        let mut m = MockObjects::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn mlme_set_controlled_port_not_associated() {
+        let mut m = MockObjects::new().await;
         let mut ctx = m.make_ctx();
         let mut sta = make_protected_client_station();
         let mut sta = sta.bind(&mut ctx, &mut m.scanner, &mut m.channel_state);
@@ -3753,10 +3699,9 @@ mod tests {
         assert_eq!(m.fake_device_state.lock().link_status, crate::device::LinkStatus::DOWN);
     }
 
-    #[test]
-    fn mlme_set_controlled_port_associated_not_protected() {
-        let exec = fasync::TestExecutor::new();
-        let mut m = MockObjects::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn mlme_set_controlled_port_associated_not_protected() {
+        let mut m = MockObjects::new().await;
         let mut ctx = m.make_ctx();
         let mut sta = make_client_station();
         let mut sta = sta.bind(&mut ctx, &mut m.scanner, &mut m.channel_state);
@@ -3767,10 +3712,9 @@ mod tests {
         assert_eq!(m.fake_device_state.lock().link_status, crate::device::LinkStatus::DOWN);
     }
 
-    #[test]
-    fn mlme_set_controlled_port_associated() {
-        let exec = fasync::TestExecutor::new();
-        let mut m = MockObjects::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn mlme_set_controlled_port_associated() {
+        let mut m = MockObjects::new().await;
         let mut ctx = m.make_ctx();
         let mut sta = make_protected_client_station();
         let mut sta = sta.bind(&mut ctx, &mut m.scanner, &mut m.channel_state);
@@ -3786,9 +3730,9 @@ mod tests {
 
     #[test_case(true; "while scanning")]
     #[test_case(false; "while not scanning")]
-    fn associated_rx_succeeds(scanning: bool) {
-        let exec = fasync::TestExecutor::new();
-        let mut m = MockObjects::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn associated_rx_succeeds(scanning: bool) {
+        let mut m = MockObjects::new().await;
         let mut ctx = m.make_ctx();
         let mut sta = make_client_station();
         let mut sta = sta.bind(&mut ctx, &mut m.scanner, &mut m.channel_state);
@@ -3840,10 +3784,9 @@ mod tests {
         assert_eq!(m.fake_device_state.lock().eth_queue.len(), 1);
     }
 
-    #[test]
-    fn associated_rx_with_wrong_cbw_succeeds() {
-        let exec = fasync::TestExecutor::new();
-        let mut m = MockObjects::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn associated_rx_with_wrong_cbw_succeeds() {
+        let mut m = MockObjects::new().await;
         let mut ctx = m.make_ctx();
         let mut sta = make_client_station();
         let mut sta = sta.bind(&mut ctx, &mut m.scanner, &mut m.channel_state);
@@ -3882,10 +3825,9 @@ mod tests {
         assert_eq!(m.fake_device_state.lock().eth_queue.len(), 1);
     }
 
-    #[test]
-    fn associated_request_bu_if_tim_indicates_buffered_frame() {
-        let exec = fasync::TestExecutor::new();
-        let mut m = MockObjects::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn associated_request_bu_if_tim_indicates_buffered_frame() {
+        let mut m = MockObjects::new().await;
         let mut ctx = m.make_ctx();
         let mut sta = make_client_station();
         let mut sta = sta.bind(&mut ctx, &mut m.scanner, &mut m.channel_state);
@@ -3924,10 +3866,9 @@ mod tests {
         );
     }
 
-    #[test]
-    fn associated_does_not_request_bu_if_tim_indicates_no_buffered_frame() {
-        let exec = fasync::TestExecutor::new();
-        let mut m = MockObjects::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn associated_does_not_request_bu_if_tim_indicates_no_buffered_frame() {
+        let mut m = MockObjects::new().await;
         let mut ctx = m.make_ctx();
         let mut sta = make_client_station();
         let mut sta = sta.bind(&mut ctx, &mut m.scanner, &mut m.channel_state);
@@ -3965,10 +3906,9 @@ mod tests {
         rx_info
     }
 
-    #[test]
-    fn signal_report() {
-        let exec = fasync::TestExecutor::new();
-        let mut m = MockObjects::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn signal_report() {
+        let mut m = MockObjects::new().await;
         let mut ctx = m.make_ctx();
         let mut sta = make_protected_client_station();
         let mut sta = sta.bind(&mut ctx, &mut m.scanner, &mut m.channel_state);

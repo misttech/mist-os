@@ -480,7 +480,7 @@ mod tests {
         },
         banjo_fuchsia_wlan_common as banjo_common, fidl_fuchsia_wlan_common as fidl_common,
         fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_softmac as fidl_softmac,
-        fuchsia_async as fasync,
+        fuchsia_async::TestExecutor,
         fuchsia_sync::Mutex,
         futures::task::Poll,
         ieee80211::MacAddrBytes,
@@ -521,16 +521,18 @@ mod tests {
         buffer
     }
 
-    fn make_ap(
-        exec: &fasync::TestExecutor,
+    // TODO(https://fxbug.dev/327499461): This function is async to ensure MLME functions will
+    // run in an async context and not call `wlan_common::timer::Timer::now` without an
+    // executor.
+    async fn make_ap(
     ) -> (Ap<FakeDevice>, Arc<Mutex<FakeDeviceState>>, timer::EventStream<TimedEvent>) {
         let (timer, time_stream) = timer::create_timer();
         let (fake_device, fake_device_state) = FakeDevice::new_with_config(
-            &exec,
             FakeDeviceConfig::default()
                 .with_mock_mac_role(fidl_common::WlanMacRole::Ap)
                 .with_mock_sta_addr((*BSSID).to_array()),
-        );
+        )
+        .await;
         (
             Ap::new(fake_device, FakeCBufferProvider::new(), timer, *BSSID),
             fake_device_state,
@@ -538,10 +540,9 @@ mod tests {
         )
     }
 
-    #[test]
-    fn ap_handle_eth_frame() {
-        let exec = fasync::TestExecutor::new();
-        let (mut ap, fake_device_state, _) = make_ap(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn ap_handle_eth_frame() {
+        let (mut ap, fake_device_state, _) = make_ap().await;
         ap.bss.replace(
             InfraBss::new(
                 &mut ap.ctx,
@@ -599,10 +600,9 @@ mod tests {
         );
     }
 
-    #[test]
-    fn ap_handle_eth_frame_no_such_client() {
-        let exec = fasync::TestExecutor::new();
-        let (mut ap, _, _) = make_ap(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn ap_handle_eth_frame_no_such_client() {
+        let (mut ap, _, _) = make_ap().await;
         ap.bss.replace(
             InfraBss::new(
                 &mut ap.ctx,
@@ -631,10 +631,9 @@ mod tests {
         MockWlanRxInfo::with_channel(channel).into()
     }
 
-    #[test]
-    fn ap_handle_mac_frame() {
-        let exec = fasync::TestExecutor::new();
-        let (mut ap, fake_device_state, _) = make_ap(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn ap_handle_mac_frame() {
+        let (mut ap, fake_device_state, _) = make_ap().await;
         ap.bss.replace(
             InfraBss::new(
                 &mut ap.ctx,
@@ -681,10 +680,9 @@ mod tests {
         );
     }
 
-    #[test]
-    fn ap_handle_mac_frame_ps_poll() {
-        let exec = fasync::TestExecutor::new();
-        let (mut ap, fake_device_state, _) = make_ap(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn ap_handle_mac_frame_ps_poll() {
+        let (mut ap, fake_device_state, _) = make_ap().await;
         ap.bss.replace(
             InfraBss::new(
                 &mut ap.ctx,
@@ -770,10 +768,9 @@ mod tests {
         );
     }
 
-    #[test]
-    fn ap_handle_mac_frame_no_such_client() {
-        let exec = fasync::TestExecutor::new();
-        let (mut ap, _, _) = make_ap(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn ap_handle_mac_frame_no_such_client() {
+        let (mut ap, _, _) = make_ap().await;
         ap.bss.replace(
             InfraBss::new(
                 &mut ap.ctx,
@@ -806,10 +803,9 @@ mod tests {
         assert_eq!(ap.bss.as_mut().unwrap().clients.contains_key(&CLIENT_ADDR), false);
     }
 
-    #[test]
-    fn ap_handle_mac_frame_bogus() {
-        let exec = fasync::TestExecutor::new();
-        let (mut ap, _, _) = make_ap(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn ap_handle_mac_frame_bogus() {
+        let (mut ap, _, _) = make_ap().await;
         ap.bss.replace(
             InfraBss::new(
                 &mut ap.ctx,
@@ -843,10 +839,9 @@ mod tests {
         );
     }
 
-    #[test]
-    fn ap_handle_mac_frame_wrong_channel_drop() {
-        let exec = fasync::TestExecutor::new();
-        let (mut ap, fake_device_state, _) = make_ap(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn ap_handle_mac_frame_wrong_channel_drop() {
+        let (mut ap, fake_device_state, _) = make_ap().await;
         ap.bss.replace(
             InfraBss::new(
                 &mut ap.ctx,
@@ -904,10 +899,9 @@ mod tests {
         assert_eq!(fake_device_state.lock().wlan_queue.len(), 1);
     }
 
-    #[test]
-    fn ap_handle_mlme_start_req() {
-        let exec = fasync::TestExecutor::new();
-        let (mut ap, fake_device_state, _) = make_ap(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn ap_handle_mlme_start_req() {
+        let (mut ap, fake_device_state, _) = make_ap().await;
         ap.handle_mlme_start_req(fidl_mlme::StartRequest {
             ssid: Ssid::try_from("coolnet").unwrap().into(),
             bss_type: fidl_common::BssType::Infrastructure,
@@ -945,10 +939,9 @@ mod tests {
         );
     }
 
-    #[test]
-    fn ap_handle_mlme_start_req_already_started() {
-        let exec = fasync::TestExecutor::new();
-        let (mut ap, fake_device_state, _) = make_ap(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn ap_handle_mlme_start_req_already_started() {
+        let (mut ap, fake_device_state, _) = make_ap().await;
         ap.bss.replace(
             InfraBss::new(
                 &mut ap.ctx,
@@ -991,10 +984,9 @@ mod tests {
         );
     }
 
-    #[test]
-    fn ap_handle_mlme_stop_req() {
-        let exec = fasync::TestExecutor::new();
-        let (mut ap, fake_device_state, _) = make_ap(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn ap_handle_mlme_stop_req() {
+        let (mut ap, fake_device_state, _) = make_ap().await;
         ap.bss.replace(
             InfraBss::new(
                 &mut ap.ctx,
@@ -1022,10 +1014,9 @@ mod tests {
         assert_eq!(msg, fidl_mlme::StopConfirm { result_code: fidl_mlme::StopResultCode::Success },);
     }
 
-    #[test]
-    fn ap_handle_mlme_stop_req_already_stopped() {
-        let exec = fasync::TestExecutor::new();
-        let (mut ap, fake_device_state, _) = make_ap(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn ap_handle_mlme_stop_req_already_stopped() {
+        let (mut ap, fake_device_state, _) = make_ap().await;
 
         ap.handle_mlme_stop_req(fidl_mlme::StopRequest {
             ssid: Ssid::try_from("coolnet").unwrap().into(),
@@ -1043,10 +1034,9 @@ mod tests {
         );
     }
 
-    #[test]
-    fn ap_handle_mlme_setkeys_req() {
-        let exec = fasync::TestExecutor::new();
-        let (mut ap, fake_device_state, _) = make_ap(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn ap_handle_mlme_setkeys_req() {
+        let (mut ap, fake_device_state, _) = make_ap().await;
         ap.bss.replace(
             InfraBss::new(
                 &mut ap.ctx,
@@ -1089,10 +1079,9 @@ mod tests {
         );
     }
 
-    #[test]
-    fn ap_handle_mlme_setkeys_req_no_bss() {
-        let exec = fasync::TestExecutor::new();
-        let (mut ap, _, _) = make_ap(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn ap_handle_mlme_setkeys_req_no_bss() {
+        let (mut ap, _, _) = make_ap().await;
         assert_variant!(
             ap.handle_mlme_setkeys_req(fidl_mlme::SetKeysRequest {
                 keylist: vec![fidl_mlme::SetKeyDescriptor {
@@ -1111,10 +1100,9 @@ mod tests {
         );
     }
 
-    #[test]
-    fn ap_handle_mlme_setkeys_req_bss_no_rsne() {
-        let exec = fasync::TestExecutor::new();
-        let (mut ap, _, _) = make_ap(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn ap_handle_mlme_setkeys_req_bss_no_rsne() {
+        let (mut ap, _, _) = make_ap().await;
         ap.bss.replace(
             InfraBss::new(
                 &mut ap.ctx,
@@ -1147,10 +1135,9 @@ mod tests {
         );
     }
 
-    #[test]
-    fn ap_handle_mlme_req_handle_mlme_auth_resp() {
-        let exec = fasync::TestExecutor::new();
-        let (mut ap, fake_device_state, _) = make_ap(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn ap_handle_mlme_req_handle_mlme_auth_resp() {
+        let (mut ap, fake_device_state, _) = make_ap().await;
         ap.bss.replace(
             InfraBss::new(
                 &mut ap.ctx,
@@ -1190,10 +1177,9 @@ mod tests {
         );
     }
 
-    #[test]
-    fn ap_handle_mlme_req_handle_mlme_auth_resp_no_bss() {
-        let exec = fasync::TestExecutor::new();
-        let (mut ap, _, _) = make_ap(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn ap_handle_mlme_req_handle_mlme_auth_resp_no_bss() {
+        let (mut ap, _, _) = make_ap().await;
 
         assert_eq!(
             zx::Status::from(
@@ -1211,10 +1197,9 @@ mod tests {
         );
     }
 
-    #[test]
-    fn ap_handle_mlme_req_handle_mlme_auth_resp_no_such_client() {
-        let exec = fasync::TestExecutor::new();
-        let (mut ap, _, _) = make_ap(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn ap_handle_mlme_req_handle_mlme_auth_resp_no_such_client() {
+        let (mut ap, _, _) = make_ap().await;
         ap.bss.replace(
             InfraBss::new(
                 &mut ap.ctx,
@@ -1245,10 +1230,9 @@ mod tests {
         );
     }
 
-    #[test]
-    fn ap_handle_mlme_req_handle_mlme_deauth_req() {
-        let exec = fasync::TestExecutor::new();
-        let (mut ap, fake_device_state, _) = make_ap(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn ap_handle_mlme_req_handle_mlme_deauth_req() {
+        let (mut ap, fake_device_state, _) = make_ap().await;
         ap.bss.replace(
             InfraBss::new(
                 &mut ap.ctx,
@@ -1288,10 +1272,9 @@ mod tests {
         );
     }
 
-    #[test]
-    fn ap_handle_mlme_req_handle_mlme_assoc_resp() {
-        let exec = fasync::TestExecutor::new();
-        let (mut ap, fake_device_state, _) = make_ap(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn ap_handle_mlme_req_handle_mlme_assoc_resp() {
+        let (mut ap, fake_device_state, _) = make_ap().await;
         ap.bss.replace(
             InfraBss::new(
                 &mut ap.ctx,
@@ -1338,10 +1321,9 @@ mod tests {
         );
     }
 
-    #[test]
-    fn ap_handle_mlme_req_handle_mlme_disassoc_req() {
-        let exec = fasync::TestExecutor::new();
-        let (mut ap, fake_device_state, _) = make_ap(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn ap_handle_mlme_req_handle_mlme_disassoc_req() {
+        let (mut ap, fake_device_state, _) = make_ap().await;
         ap.bss.replace(
             InfraBss::new(
                 &mut ap.ctx,
@@ -1379,10 +1361,9 @@ mod tests {
         );
     }
 
-    #[test]
-    fn ap_handle_mlme_req_handle_mlme_set_controlled_port_req() {
-        let exec = fasync::TestExecutor::new();
-        let (mut ap, _, _) = make_ap(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn ap_handle_mlme_req_handle_mlme_set_controlled_port_req() {
+        let (mut ap, _, _) = make_ap().await;
         ap.bss.replace(
             InfraBss::new(
                 &mut ap.ctx,
@@ -1416,10 +1397,9 @@ mod tests {
         .expect("expected Ap::handle_mlme_msg(fidl_mlme::MlmeRequest::SetControlledPort) ok");
     }
 
-    #[test]
-    fn ap_handle_mlme_req_handle_mlme_eapol_req() {
-        let exec = fasync::TestExecutor::new();
-        let (mut ap, fake_device_state, _) = make_ap(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn ap_handle_mlme_req_handle_mlme_eapol_req() {
+        let (mut ap, fake_device_state, _) = make_ap().await;
         ap.bss.replace(
             InfraBss::new(
                 &mut ap.ctx,
@@ -1461,17 +1441,16 @@ mod tests {
         );
     }
 
-    #[test]
-    fn ap_mlme_respond_to_query_device_info() {
-        let mut exec = fasync::TestExecutor::new();
-        let (mut ap, _, _) = make_ap(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn ap_mlme_respond_to_query_device_info() {
+        let (mut ap, _, _) = make_ap().await;
 
         let (responder, mut receiver) = Responder::new();
         assert_variant!(
             ap.handle_mlme_req(wlan_sme::MlmeRequest::QueryDeviceInfo(responder)),
             Ok(())
         );
-        let info = assert_variant!(exec.run_until_stalled(&mut receiver), Poll::Ready(Ok(r)) => r);
+        let info = assert_variant!(TestExecutor::poll_until_stalled(&mut receiver).await, Poll::Ready(Ok(r)) => r);
         assert_eq!(
             info,
             fidl_mlme::DeviceInfo {
@@ -1484,32 +1463,30 @@ mod tests {
         );
     }
 
-    #[test]
-    fn ap_mlme_respond_to_query_discovery_support() {
-        let mut exec = fasync::TestExecutor::new();
-        let (mut ap, _, _) = make_ap(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn ap_mlme_respond_to_query_discovery_support() {
+        let (mut ap, _, _) = make_ap().await;
 
         let (responder, mut receiver) = Responder::new();
         assert_variant!(
             ap.handle_mlme_req(wlan_sme::MlmeRequest::QueryDiscoverySupport(responder)),
             Ok(())
         );
-        let resp = assert_variant!(exec.run_until_stalled(&mut receiver), Poll::Ready(Ok(r)) => r);
+        let resp = assert_variant!(TestExecutor::poll_until_stalled(&mut receiver).await, Poll::Ready(Ok(r)) => r);
         assert_eq!(resp.scan_offload.supported, true);
         assert_eq!(resp.probe_response_offload.supported, false);
     }
 
-    #[test]
-    fn ap_mlme_respond_to_query_mac_sublayer_support() {
-        let mut exec = fasync::TestExecutor::new();
-        let (mut ap, _, _) = make_ap(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn ap_mlme_respond_to_query_mac_sublayer_support() {
+        let (mut ap, _, _) = make_ap().await;
 
         let (responder, mut receiver) = Responder::new();
         assert_variant!(
             ap.handle_mlme_req(wlan_sme::MlmeRequest::QueryMacSublayerSupport(responder)),
             Ok(())
         );
-        let resp = assert_variant!(exec.run_until_stalled(&mut receiver), Poll::Ready(Ok(r)) => r);
+        let resp = assert_variant!(TestExecutor::poll_until_stalled(&mut receiver).await, Poll::Ready(Ok(r)) => r);
         assert_eq!(resp.rate_selection_offload.supported, false);
         assert_eq!(resp.data_plane.data_plane_type, fidl_common::DataPlaneType::EthernetDevice);
         assert_eq!(resp.device.is_synthetic, true);
@@ -1520,33 +1497,31 @@ mod tests {
         assert_eq!(resp.device.tx_status_report_supported, true);
     }
 
-    #[test]
-    fn ap_mlme_respond_to_query_security_support() {
-        let mut exec = fasync::TestExecutor::new();
-        let (mut ap, _, _) = make_ap(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn ap_mlme_respond_to_query_security_support() {
+        let (mut ap, _, _) = make_ap().await;
 
         let (responder, mut receiver) = Responder::new();
         assert_variant!(
             ap.handle_mlme_req(wlan_sme::MlmeRequest::QuerySecuritySupport(responder)),
             Ok(())
         );
-        let resp = assert_variant!(exec.run_until_stalled(&mut receiver), Poll::Ready(Ok(r)) => r);
+        let resp = assert_variant!(TestExecutor::poll_until_stalled(&mut receiver).await, Poll::Ready(Ok(r)) => r);
         assert_eq!(resp.mfp.supported, false);
         assert_eq!(resp.sae.driver_handler_supported, false);
         assert_eq!(resp.sae.sme_handler_supported, false);
     }
 
-    #[test]
-    fn ap_mlme_respond_to_query_spectrum_management_support() {
-        let mut exec = fasync::TestExecutor::new();
-        let (mut ap, _, _) = make_ap(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn ap_mlme_respond_to_query_spectrum_management_support() {
+        let (mut ap, _, _) = make_ap().await;
 
         let (responder, mut receiver) = Responder::new();
         assert_variant!(
             ap.handle_mlme_req(wlan_sme::MlmeRequest::QuerySpectrumManagementSupport(responder)),
             Ok(())
         );
-        let resp = assert_variant!(exec.run_until_stalled(&mut receiver), Poll::Ready(Ok(r)) => r);
+        let resp = assert_variant!(TestExecutor::poll_until_stalled(&mut receiver).await, Poll::Ready(Ok(r)) => r);
         assert_eq!(resp.dfs.supported, true);
     }
 

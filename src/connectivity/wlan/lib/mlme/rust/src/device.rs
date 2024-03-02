@@ -861,7 +861,6 @@ pub mod test_utils {
         },
         fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211,
         fidl_fuchsia_wlan_internal as fidl_internal, fidl_fuchsia_wlan_sme as fidl_sme,
-        fuchsia_async as fasync,
         fuchsia_sync::Mutex,
         fuchsia_zircon::HandleBased,
         paste::paste,
@@ -1170,12 +1169,17 @@ pub mod test_utils {
     }
 
     impl FakeDevice {
-        pub fn new(executor: &fasync::TestExecutor) -> (FakeDevice, Arc<Mutex<FakeDeviceState>>) {
-            Self::new_with_config(executor, FakeDeviceConfig::default())
+        // TODO(https://fxbug.dev/327499461): This function is async to ensure MLME functions will
+        // run in an async context and not call `wlan_common::timer::Timer::now` without an
+        // executor.
+        pub async fn new() -> (FakeDevice, Arc<Mutex<FakeDeviceState>>) {
+            Self::new_with_config(FakeDeviceConfig::default()).await
         }
 
-        pub fn new_with_config(
-            _executor: &fasync::TestExecutor,
+        // TODO(https://fxbug.dev/327499461): This function is async to ensure MLME functions will
+        // run in an async context and not call `wlan_common::timer::Timer::now` without an
+        // executor.
+        pub async fn new_with_config(
             config: FakeDeviceConfig,
         ) -> (FakeDevice, Arc<Mutex<FakeDeviceState>>) {
             // Create a channel for SME requests, to be surfaced by start().
@@ -1543,7 +1547,6 @@ mod tests {
         super::*,
         crate::{ddk_converter, WlanTxPacketExt as _},
         fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211,
-        fuchsia_async as fasync,
         ieee80211::Ssid,
         wlan_common::assert_variant,
     };
@@ -1552,17 +1555,15 @@ mod tests {
         fidl_mlme::DeauthenticateConfirm { peer_sta_address: [1; 6] }
     }
 
-    #[test]
-    fn state_method_returns_correct_pointer() {
-        let exec = fasync::TestExecutor::new();
-        let (fake_device, fake_device_state) = FakeDevice::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn state_method_returns_correct_pointer() {
+        let (fake_device, fake_device_state) = FakeDevice::new().await;
         assert_eq!(Arc::as_ptr(&fake_device.state()), Arc::as_ptr(&fake_device_state));
     }
 
-    #[test]
-    fn fake_device_returns_expected_wlan_softmac_query_response() {
-        let exec = fasync::TestExecutor::new();
-        let (mut fake_device, _) = FakeDevice::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn fake_device_returns_expected_wlan_softmac_query_response() {
+        let (mut fake_device, _) = FakeDevice::new().await;
         let query_response = fake_device.wlan_softmac_query_response().unwrap();
         assert_eq!(query_response.sta_addr, [7u8; 6].into());
         assert_eq!(query_response.mac_role, Some(fidl_common::WlanMacRole::Client));
@@ -1634,10 +1635,9 @@ mod tests {
         }
     }
 
-    #[test]
-    fn fake_device_returns_expected_discovery_support() {
-        let exec = fasync::TestExecutor::new();
-        let (mut fake_device, _) = FakeDevice::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn fake_device_returns_expected_discovery_support() {
+        let (mut fake_device, _) = FakeDevice::new().await;
         let discovery_support = fake_device.discovery_support().unwrap();
         assert_eq!(
             discovery_support,
@@ -1653,10 +1653,9 @@ mod tests {
         );
     }
 
-    #[test]
-    fn fake_device_returns_expected_mac_sublayer_support() {
-        let exec = fasync::TestExecutor::new();
-        let (mut fake_device, _) = FakeDevice::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn fake_device_returns_expected_mac_sublayer_support() {
+        let (mut fake_device, _) = FakeDevice::new().await;
         let mac_sublayer_support = fake_device.mac_sublayer_support().unwrap();
         assert_eq!(
             mac_sublayer_support,
@@ -1676,10 +1675,9 @@ mod tests {
         );
     }
 
-    #[test]
-    fn fake_device_returns_expected_security_support() {
-        let exec = fasync::TestExecutor::new();
-        let (mut fake_device, _) = FakeDevice::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn fake_device_returns_expected_security_support() {
+        let (mut fake_device, _) = FakeDevice::new().await;
         let security_support = fake_device.security_support().unwrap();
         assert_eq!(
             security_support,
@@ -1693,10 +1691,9 @@ mod tests {
         );
     }
 
-    #[test]
-    fn fake_device_returns_expected_spectrum_management_support() {
-        let exec = fasync::TestExecutor::new();
-        let (mut fake_device, _) = FakeDevice::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn fake_device_returns_expected_spectrum_management_support() {
+        let (mut fake_device, _) = FakeDevice::new().await;
         let spectrum_management_support = fake_device.spectrum_management_support().unwrap();
         assert_eq!(
             spectrum_management_support,
@@ -1706,13 +1703,12 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_can_dynamically_change_fake_device_state() {
-        let exec = fasync::TestExecutor::new();
+    #[fuchsia::test(allow_stalls = false)]
+    async fn test_can_dynamically_change_fake_device_state() {
         let (mut fake_device, fake_device_state) = FakeDevice::new_with_config(
-            &exec,
             FakeDeviceConfig::default().with_mock_mac_role(fidl_common::WlanMacRole::Client),
-        );
+        )
+        .await;
         let query_response = fake_device.wlan_softmac_query_response().unwrap();
         assert_eq!(query_response.mac_role, Some(fidl_common::WlanMacRole::Client));
 
@@ -1723,10 +1719,9 @@ mod tests {
         assert_eq!(query_response.mac_role, Some(fidl_common::WlanMacRole::Ap));
     }
 
-    #[test]
-    fn send_mlme_message() {
-        let exec = fasync::TestExecutor::new();
-        let (mut fake_device, fake_device_state) = FakeDevice::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn send_mlme_message() {
+        let (mut fake_device, fake_device_state) = FakeDevice::new().await;
         fake_device
             .send_mlme_event(fidl_mlme::MlmeEvent::DeauthenticateConf {
                 resp: make_deauth_confirm_msg(),
@@ -1741,10 +1736,9 @@ mod tests {
         assert_eq!(msg, make_deauth_confirm_msg());
     }
 
-    #[test]
-    fn send_mlme_message_peer_already_closed() {
-        let exec = fasync::TestExecutor::new();
-        let (mut fake_device, fake_device_state) = FakeDevice::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn send_mlme_message_peer_already_closed() {
+        let (mut fake_device, fake_device_state) = FakeDevice::new().await;
         fake_device_state.lock().mlme_event_stream.take();
 
         fake_device
@@ -1754,10 +1748,9 @@ mod tests {
             .expect_err("Mlme event should fail");
     }
 
-    #[test]
-    fn fake_device_deliver_eth_frame() {
-        let exec = fasync::TestExecutor::new();
-        let (mut fake_device, fake_device_state) = FakeDevice::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn fake_device_deliver_eth_frame() {
+        let (mut fake_device, fake_device_state) = FakeDevice::new().await;
         assert_eq!(fake_device_state.lock().eth_queue.len(), 0);
         let first_frame = [5; 32];
         let second_frame = [6; 32];
@@ -1768,10 +1761,9 @@ mod tests {
         assert_eq!(&fake_device_state.lock().eth_queue[1], &second_frame);
     }
 
-    #[test]
-    fn set_channel() {
-        let exec = fasync::TestExecutor::new();
-        let (mut fake_device, fake_device_state) = FakeDevice::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn set_channel() {
+        let (mut fake_device, fake_device_state) = FakeDevice::new().await;
         fake_device
             .set_channel(fidl_common::WlanChannel {
                 primary: 2,
@@ -1790,10 +1782,9 @@ mod tests {
         );
     }
 
-    #[test]
-    fn install_key() {
-        let exec = fasync::TestExecutor::new();
-        let (mut fake_device, fake_device_state) = FakeDevice::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn install_key() {
+        let (mut fake_device, fake_device_state) = FakeDevice::new().await;
         fake_device
             .install_key(&fidl_softmac::WlanKeyConfiguration {
                 protection: Some(fidl_softmac::WlanProtection::None),
@@ -1810,10 +1801,9 @@ mod tests {
         assert_eq!(fake_device_state.lock().keys.len(), 1);
     }
 
-    #[test]
-    fn start_passive_scan() {
-        let exec = fasync::TestExecutor::new();
-        let (mut fake_device, fake_device_state) = FakeDevice::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn start_passive_scan() {
+        let (mut fake_device, fake_device_state) = FakeDevice::new().await;
 
         let result =
             fake_device.start_passive_scan(&fidl_softmac::WlanSoftmacBaseStartPassiveScanRequest {
@@ -1837,10 +1827,9 @@ mod tests {
         );
     }
 
-    #[test]
-    fn start_active_scan() {
-        let exec = fasync::TestExecutor::new();
-        let (mut fake_device, fake_device_state) = FakeDevice::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn start_active_scan() {
+        let (mut fake_device, fake_device_state) = FakeDevice::new().await;
 
         let result =
             fake_device.start_active_scan(&fidl_softmac::WlanSoftmacStartActiveScanRequest {
@@ -1910,10 +1899,9 @@ mod tests {
         );
     }
 
-    #[test]
-    fn join_bss() {
-        let exec = fasync::TestExecutor::new();
-        let (mut fake_device, fake_device_state) = FakeDevice::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn join_bss() {
+        let (mut fake_device, fake_device_state) = FakeDevice::new().await;
         fake_device
             .join_bss(&fidl_common::JoinBssRequest {
                 bssid: Some([1, 2, 3, 4, 5, 6]),
@@ -1926,10 +1914,9 @@ mod tests {
         assert!(fake_device_state.lock().join_bss_request.is_some());
     }
 
-    #[test]
-    fn enable_disable_beaconing() {
-        let exec = fasync::TestExecutor::new();
-        let (mut fake_device, fake_device_state) = FakeDevice::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn enable_disable_beaconing() {
+        let (mut fake_device, fake_device_state) = FakeDevice::new().await;
         let mut buffer =
             fake_device_state.lock().buffer_provider.get_buffer(4).expect("error getting buffer");
         buffer.copy_from_slice(&[1, 2, 3, 4][..]);
@@ -1954,10 +1941,9 @@ mod tests {
         assert_variant!(fake_device_state.lock().beacon_config.as_ref(), None);
     }
 
-    #[test]
-    fn set_ethernet_status() {
-        let exec = fasync::TestExecutor::new();
-        let (mut fake_device, fake_device_state) = FakeDevice::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn set_ethernet_status() {
+        let (mut fake_device, fake_device_state) = FakeDevice::new().await;
         fake_device.set_ethernet_up().expect("failed setting status");
         assert_eq!(fake_device_state.lock().link_status, LinkStatus::UP);
 
@@ -1965,10 +1951,9 @@ mod tests {
         assert_eq!(fake_device_state.lock().link_status, LinkStatus::DOWN);
     }
 
-    #[test]
-    fn notify_association_complete() {
-        let exec = fasync::TestExecutor::new();
-        let (mut fake_device, fake_device_state) = FakeDevice::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn notify_association_complete() {
+        let (mut fake_device, fake_device_state) = FakeDevice::new().await;
         fake_device
             .notify_association_complete(fidl_softmac::WlanAssociationConfig {
                 bssid: Some([1, 2, 3, 4, 5, 6]),
@@ -1993,10 +1978,9 @@ mod tests {
         assert!(fake_device_state.lock().assocs.contains_key(&[1, 2, 3, 4, 5, 6].into()));
     }
 
-    #[test]
-    fn clear_association() {
-        let exec = fasync::TestExecutor::new();
-        let (mut fake_device, fake_device_state) = FakeDevice::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn clear_association() {
+        let (mut fake_device, fake_device_state) = FakeDevice::new().await;
         fake_device
             .join_bss(&fidl_common::JoinBssRequest {
                 bssid: Some([1, 2, 3, 4, 5, 6]),
@@ -2031,10 +2015,9 @@ mod tests {
         assert!(fake_device_state.lock().join_bss_request.is_none());
     }
 
-    #[test]
-    fn fake_device_captures_update_wmm_parameters_request() {
-        let exec = fasync::TestExecutor::new();
-        let (mut fake_device, fake_device_state) = FakeDevice::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn fake_device_captures_update_wmm_parameters_request() {
+        let (mut fake_device, fake_device_state) = FakeDevice::new().await;
 
         let request = fidl_softmac::WlanSoftmacBaseUpdateWmmParametersRequest {
             ac: Some(fidl_ieee80211::WlanAccessCategory::Background),

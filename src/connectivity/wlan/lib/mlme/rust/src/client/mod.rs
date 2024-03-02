@@ -1311,7 +1311,8 @@ mod tests {
             test_utils::{fake_wlan_channel, MockWlanRxInfo},
         },
         banjo_fuchsia_wlan_common as banjo_common, fidl_fuchsia_wlan_common as fidl_common,
-        fidl_fuchsia_wlan_internal as fidl_internal, fuchsia_async as fasync,
+        fidl_fuchsia_wlan_internal as fidl_internal,
+        fuchsia_async::TestExecutor,
         fuchsia_sync::Mutex,
         futures::task::Poll,
         lazy_static::lazy_static,
@@ -1372,14 +1373,17 @@ mod tests {
     }
 
     impl MockObjects {
-        fn new(executor: &fasync::TestExecutor) -> Self {
+        // TODO(https://fxbug.dev/327499461): This function is async to ensure MLME functions will
+        // run in an async context and not call `wlan_common::timer::Timer::now` without an
+        // executor.
+        async fn new() -> Self {
             let (timer, time_stream) = create_timer();
             let (fake_device, fake_device_state) = FakeDevice::new_with_config(
-                executor,
                 FakeDeviceConfig::default()
                     .with_mock_mac_role(fidl_common::WlanMacRole::Client)
                     .with_mock_sta_addr((*IFACE_MAC).to_array()),
-            );
+            )
+            .await;
             Self { fake_device, fake_device_state, timer: Some(timer), time_stream }
         }
 
@@ -1485,10 +1489,9 @@ mod tests {
         }
     }
 
-    #[test]
-    fn spawns_new_sta_on_connect_request_from_sme() {
-        let exec = fasync::TestExecutor::new();
-        let mut m = MockObjects::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn spawns_new_sta_on_connect_request_from_sme() {
+        let mut m = MockObjects::new().await;
         let mut me = m.make_mlme();
         assert!(me.get_bound_client().is_none(), "MLME should not contain client, yet");
         me.on_sme_connect(fidl_mlme::ConnectRequest {
@@ -1503,10 +1506,9 @@ mod tests {
         me.get_bound_client().expect("client sta should have been created by now.");
     }
 
-    #[test]
-    fn fails_to_connect_if_channel_unknown() {
-        let exec = fasync::TestExecutor::new();
-        let mut m = MockObjects::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn fails_to_connect_if_channel_unknown() {
+        let mut m = MockObjects::new().await;
         let mut me = m.make_mlme();
         assert!(me.get_bound_client().is_none(), "MLME should not contain client, yet");
         let mut req = fidl_mlme::ConnectRequest {
@@ -1523,10 +1525,9 @@ mod tests {
         assert!(me.get_bound_client().is_none());
     }
 
-    #[test]
-    fn rsn_ie_implies_sta_eapol_required() {
-        let exec = fasync::TestExecutor::new();
-        let mut m = MockObjects::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn rsn_ie_implies_sta_eapol_required() {
+        let mut m = MockObjects::new().await;
         let mut me = m.make_mlme();
         assert!(me.get_bound_client().is_none(), "MLME should not contain client, yet");
         me.on_sme_connect(fidl_mlme::ConnectRequest {
@@ -1542,10 +1543,9 @@ mod tests {
         assert!(client.sta.eapol_required());
     }
 
-    #[test]
-    fn wpa1_implies_sta_eapol_required() {
-        let exec = fasync::TestExecutor::new();
-        let mut m = MockObjects::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn wpa1_implies_sta_eapol_required() {
+        let mut m = MockObjects::new().await;
         let mut me = m.make_mlme();
         assert!(me.get_bound_client().is_none(), "MLME should not contain client, yet");
         me.on_sme_connect(fidl_mlme::ConnectRequest {
@@ -1561,10 +1561,9 @@ mod tests {
         assert!(client.sta.eapol_required());
     }
 
-    #[test]
-    fn no_wpa_or_rsn_ie_implies_sta_eapol_not_required() {
-        let exec = fasync::TestExecutor::new();
-        let mut m = MockObjects::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn no_wpa_or_rsn_ie_implies_sta_eapol_not_required() {
+        let mut m = MockObjects::new().await;
         let mut me = m.make_mlme();
         assert!(me.get_bound_client().is_none(), "MLME should not contain client, yet");
         me.on_sme_connect(fidl_mlme::ConnectRequest {
@@ -1610,10 +1609,9 @@ mod tests {
         }
     }
 
-    #[test]
-    fn test_auto_deauth_uninterrupted_interval() {
-        let exec = fasync::TestExecutor::new();
-        let mut mock_objects = MockObjects::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn test_auto_deauth_uninterrupted_interval() {
+        let mut mock_objects = MockObjects::new().await;
         let mut mlme = mock_objects.make_mlme();
         mlme.make_client_station();
         let mut client = mlme.get_bound_client().expect("client should be present");
@@ -1668,10 +1666,9 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_auto_deauth_received_beacon() {
-        let exec = fasync::TestExecutor::new();
-        let mut mock_objects = MockObjects::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn test_auto_deauth_received_beacon() {
+        let mut mock_objects = MockObjects::new().await;
         let mut mlme = mock_objects.make_mlme();
         mlme.make_client_station();
         let mut client = mlme.get_bound_client().expect("client should be present");
@@ -1753,10 +1750,9 @@ mod tests {
         );
     }
 
-    #[test]
-    fn client_send_open_auth_frame() {
-        let exec = fasync::TestExecutor::new();
-        let mut m = MockObjects::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn client_send_open_auth_frame() {
+        let mut m = MockObjects::new().await;
         let mut me = m.make_mlme();
         me.make_client_station();
         let mut client = me.get_bound_client().expect("client should be present");
@@ -1778,10 +1774,9 @@ mod tests {
         ][..]);
     }
 
-    #[test]
-    fn client_send_assoc_req_frame() {
-        let exec = fasync::TestExecutor::new();
-        let mut m = MockObjects::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn client_send_assoc_req_frame() {
+        let mut m = MockObjects::new().await;
         let mut me = m.make_mlme();
         let connect_req = ParsedConnectRequest {
             selected_bss: fake_bss_description!(Wpa2,
@@ -1846,10 +1841,9 @@ mod tests {
         );
     }
 
-    #[test]
-    fn client_send_keep_alive_resp_frame() {
-        let exec = fasync::TestExecutor::new();
-        let mut m = MockObjects::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn client_send_keep_alive_resp_frame() {
+        let mut m = MockObjects::new().await;
         let mut me = m.make_mlme();
         me.make_client_station();
         let mut client = me.get_bound_client().expect("client should be present");
@@ -1867,11 +1861,10 @@ mod tests {
         ][..]);
     }
 
-    #[test]
-    fn client_send_data_frame() {
+    #[fuchsia::test(allow_stalls = false)]
+    async fn client_send_data_frame() {
         let payload = vec![5; 8];
-        let exec = fasync::TestExecutor::new();
-        let mut m = MockObjects::new(&exec);
+        let mut m = MockObjects::new().await;
         let mut me = m.make_mlme();
         me.make_client_station();
         let mut client = me.get_bound_client().expect("client should be present");
@@ -1897,10 +1890,9 @@ mod tests {
         ][..]);
     }
 
-    #[test]
-    fn client_send_data_frame_ipv4_qos() {
-        let exec = fasync::TestExecutor::new();
-        let mut m = MockObjects::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn client_send_data_frame_ipv4_qos() {
+        let mut m = MockObjects::new().await;
         let mut me = m.make_mlme();
         let mut client = make_client_station();
         client
@@ -1935,10 +1927,9 @@ mod tests {
         ][..]);
     }
 
-    #[test]
-    fn client_send_data_frame_ipv6_qos() {
-        let exec = fasync::TestExecutor::new();
-        let mut m = MockObjects::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn client_send_data_frame_ipv6_qos() {
+        let mut m = MockObjects::new().await;
         let mut me = m.make_mlme();
         let mut client = make_client_station();
         client
@@ -1973,11 +1964,10 @@ mod tests {
         ][..]);
     }
 
-    #[test]
-    fn client_send_data_frame_from_ds() {
+    #[fuchsia::test(allow_stalls = false)]
+    async fn client_send_data_frame_from_ds() {
         let payload = vec![5; 8];
-        let exec = fasync::TestExecutor::new();
-        let mut m = MockObjects::new(&exec);
+        let mut m = MockObjects::new().await;
         let mut me = m.make_mlme();
         me.make_client_station();
         let mut client = me.get_bound_client().expect("client should be present");
@@ -2004,10 +1994,9 @@ mod tests {
         ][..]);
     }
 
-    #[test]
-    fn client_send_deauthentication_notification() {
-        let exec = fasync::TestExecutor::new();
-        let mut m = MockObjects::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn client_send_deauthentication_notification() {
+        let mut m = MockObjects::new().await;
         let mut me = m.make_mlme();
         me.make_client_station();
         let mut client = me.get_bound_client().expect("client should be present");
@@ -2034,8 +2023,8 @@ mod tests {
         MockWlanRxInfo::with_channel(channel).into()
     }
 
-    #[test]
-    fn respond_to_keep_alive_request() {
+    #[fuchsia::test(allow_stalls = false)]
+    async fn respond_to_keep_alive_request() {
         #[rustfmt::skip]
         let data_frame = vec![
             // Data header:
@@ -2046,8 +2035,7 @@ mod tests {
             42, 42, 42, 42, 42, 42, // addr3
             0x10, 0, // Sequence Control
         ];
-        let exec = fasync::TestExecutor::new();
-        let mut m = MockObjects::new(&exec);
+        let mut m = MockObjects::new().await;
         let mut me = m.make_mlme();
         me.make_client_station();
         let mut client = me.get_bound_client().expect("client should be present");
@@ -2068,15 +2056,14 @@ mod tests {
         ][..]);
     }
 
-    #[test]
-    fn data_frame_to_ethernet_single_llc() {
+    #[fuchsia::test(allow_stalls = false)]
+    async fn data_frame_to_ethernet_single_llc() {
         let mut data_frame = make_data_frame_single_llc(None, None);
         data_frame[1] = 0b00000010; // from_ds = 1, to_ds = 0 when AP sends to client (us)
         data_frame[4..10].copy_from_slice(IFACE_MAC.as_array()); // addr1 - receiver - client (us)
         data_frame[10..16].copy_from_slice(BSSID.as_array()); // addr2 - bssid
 
-        let exec = fasync::TestExecutor::new();
-        let mut m = MockObjects::new(&exec);
+        let mut m = MockObjects::new().await;
         let mut me = m.make_mlme();
         me.make_client_station();
         let mut client = me.get_bound_client().expect("client should be present");
@@ -2094,15 +2081,14 @@ mod tests {
         ]);
     }
 
-    #[test]
-    fn data_frame_to_ethernet_amsdu() {
+    #[fuchsia::test(allow_stalls = false)]
+    async fn data_frame_to_ethernet_amsdu() {
         let mut data_frame = make_data_frame_amsdu();
         data_frame[1] = 0b00000010; // from_ds = 1, to_ds = 0 when AP sends to client (us)
         data_frame[4..10].copy_from_slice(IFACE_MAC.as_array()); // addr1 - receiver - client (us)
         data_frame[10..16].copy_from_slice(BSSID.as_array()); // addr2 - bssid
 
-        let exec = fasync::TestExecutor::new();
-        let mut m = MockObjects::new(&exec);
+        let mut m = MockObjects::new().await;
         let mut me = m.make_mlme();
         me.make_client_station();
         let mut client = me.get_bound_client().expect("client should be present");
@@ -2130,15 +2116,14 @@ mod tests {
         assert_eq!(queue[1], &expected_second_eth_frame[..]);
     }
 
-    #[test]
-    fn data_frame_to_ethernet_amsdu_padding_too_short() {
+    #[fuchsia::test(allow_stalls = false)]
+    async fn data_frame_to_ethernet_amsdu_padding_too_short() {
         let mut data_frame = make_data_frame_amsdu_padding_too_short();
         data_frame[1] = 0b00000010; // from_ds = 1, to_ds = 0 when AP sends to client (us)
         data_frame[4..10].copy_from_slice(IFACE_MAC.as_array()); // addr1 - receiver - client (us)
         data_frame[10..16].copy_from_slice(BSSID.as_array()); // addr2 - bssid
 
-        let exec = fasync::TestExecutor::new();
-        let mut m = MockObjects::new(&exec);
+        let mut m = MockObjects::new().await;
         let mut me = m.make_mlme();
         me.make_client_station();
         let mut client = me.get_bound_client().expect("client should be present");
@@ -2158,15 +2143,14 @@ mod tests {
         assert_eq!(queue[0], &expected_first_eth_frame[..]);
     }
 
-    #[test]
-    fn data_frame_controlled_port_closed() {
+    #[fuchsia::test(allow_stalls = false)]
+    async fn data_frame_controlled_port_closed() {
         let mut data_frame = make_data_frame_single_llc(None, None);
         data_frame[1] = 0b00000010; // from_ds = 1, to_ds = 0 when AP sends to client (us)
         data_frame[4..10].copy_from_slice(IFACE_MAC.as_array()); // addr1 - receiver - client (us)
         data_frame[10..16].copy_from_slice(BSSID.as_array()); // addr2 - bssid
 
-        let exec = fasync::TestExecutor::new();
-        let mut m = MockObjects::new(&exec);
+        let mut m = MockObjects::new().await;
         let mut me = m.make_mlme();
         me.make_client_station_protected();
         let mut client = me.get_bound_client().expect("client should be present");
@@ -2179,15 +2163,14 @@ mod tests {
         assert_eq!(m.fake_device_state.lock().eth_queue.len(), 0);
     }
 
-    #[test]
-    fn eapol_frame_controlled_port_closed() {
+    #[fuchsia::test(allow_stalls = false)]
+    async fn eapol_frame_controlled_port_closed() {
         let (src_addr, dst_addr, mut eapol_frame) = make_eapol_frame(*IFACE_MAC);
         eapol_frame[1] = 0b00000010; // from_ds = 1, to_ds = 0 when AP sends to client (us)
         eapol_frame[4..10].copy_from_slice(IFACE_MAC.as_array()); // addr1 - receiver - client (us)
         eapol_frame[10..16].copy_from_slice(BSSID.as_array()); // addr2 - bssid
 
-        let exec = fasync::TestExecutor::new();
-        let mut m = MockObjects::new(&exec);
+        let mut m = MockObjects::new().await;
         let mut me = m.make_mlme();
         me.make_client_station_protected();
         let mut client = me.get_bound_client().expect("client should be present");
@@ -2215,15 +2198,14 @@ mod tests {
         );
     }
 
-    #[test]
-    fn eapol_frame_is_controlled_port_open() {
+    #[fuchsia::test(allow_stalls = false)]
+    async fn eapol_frame_is_controlled_port_open() {
         let (src_addr, dst_addr, mut eapol_frame) = make_eapol_frame(*IFACE_MAC);
         eapol_frame[1] = 0b00000010; // from_ds = 1, to_ds = 0 when AP sends to client (us)
         eapol_frame[4..10].copy_from_slice(IFACE_MAC.as_array()); // addr1 - receiver - client (us)
         eapol_frame[10..16].copy_from_slice(BSSID.as_array()); // addr2 - bssid
 
-        let exec = fasync::TestExecutor::new();
-        let mut m = MockObjects::new(&exec);
+        let mut m = MockObjects::new().await;
         let mut me = m.make_mlme();
         me.make_client_station();
         let mut client = me.get_bound_client().expect("client should be present");
@@ -2250,10 +2232,9 @@ mod tests {
         );
     }
 
-    #[test]
-    fn send_eapol_ind_success() {
-        let exec = fasync::TestExecutor::new();
-        let mut m = MockObjects::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn send_eapol_ind_success() {
+        let mut m = MockObjects::new().await;
         let mut me = m.make_mlme();
         me.make_client_station();
         let mut client = me.get_bound_client().expect("client should be present");
@@ -2275,10 +2256,9 @@ mod tests {
         );
     }
 
-    #[test]
-    fn send_eapol_frame_success() {
-        let exec = fasync::TestExecutor::new();
-        let mut m = MockObjects::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn send_eapol_frame_success() {
+        let mut m = MockObjects::new().await;
         let mut me = m.make_mlme();
         me.make_client_station();
         let mut client = me.get_bound_client().expect("client should be present");
@@ -2317,10 +2297,9 @@ mod tests {
         ][..]);
     }
 
-    #[test]
-    fn send_eapol_frame_failure() {
-        let exec = fasync::TestExecutor::new();
-        let mut m = MockObjects::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn send_eapol_frame_failure() {
+        let mut m = MockObjects::new().await;
         m.fake_device_state.lock().config.send_wlan_frame_fails = true;
         let mut me = m.make_mlme();
         me.make_client_station();
@@ -2345,10 +2324,9 @@ mod tests {
         assert!(m.fake_device_state.lock().wlan_queue.is_empty());
     }
 
-    #[test]
-    fn send_keys() {
-        let exec = fasync::TestExecutor::new();
-        let mut m = MockObjects::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn send_keys() {
+        let mut m = MockObjects::new().await;
         let mut me = m.make_mlme();
         me.make_client_station_protected();
         let mut client = me.get_bound_client().expect("client should be present");
@@ -2365,20 +2343,18 @@ mod tests {
         assert_eq!(received_key.key_type, Some(fidl_common::WlanKeyType::Pairwise));
     }
 
-    #[test]
-    fn send_ps_poll_frame() {
-        let exec = fasync::TestExecutor::new();
-        let mut m = MockObjects::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn send_ps_poll_frame() {
+        let mut m = MockObjects::new().await;
         let mut me = m.make_mlme();
         me.make_client_station();
         let mut client = me.get_bound_client().expect("client should be present");
         client.send_ps_poll_frame(0xABCD).expect("failed sending PS POLL frame");
     }
 
-    #[test]
-    fn send_power_state_doze_frame_success() {
-        let exec = fasync::TestExecutor::new();
-        let mut m = MockObjects::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn send_power_state_doze_frame_success() {
+        let mut m = MockObjects::new().await;
         let mut me = m.make_mlme();
         let mut client = make_client_station();
         client
@@ -2389,10 +2365,9 @@ mod tests {
             .expect("failed sending awake frame");
     }
 
-    #[test]
-    fn send_addba_req_frame() {
-        let exec = fasync::TestExecutor::new();
-        let mut mock = MockObjects::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn send_addba_req_frame() {
+        let mut mock = MockObjects::new().await;
         let mut mlme = mock.make_mlme();
         mlme.make_client_station();
         let mut client = mlme.get_bound_client().expect("client should be present");
@@ -2423,10 +2398,9 @@ mod tests {
         );
     }
 
-    #[test]
-    fn send_addba_resp_frame() {
-        let exec = fasync::TestExecutor::new();
-        let mut mock = MockObjects::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn send_addba_resp_frame() {
+        let mut mock = MockObjects::new().await;
         let mut mlme = mock.make_mlme();
         mlme.make_client_station();
         let mut client = mlme.get_bound_client().expect("client should be present");
@@ -2457,10 +2431,9 @@ mod tests {
         );
     }
 
-    #[test]
-    fn client_send_successful_connect_conf() {
-        let exec = fasync::TestExecutor::new();
-        let mut m = MockObjects::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn client_send_successful_connect_conf() {
+        let mut m = MockObjects::new().await;
         let mut me = m.make_mlme();
         me.make_client_station();
         let mut client = me.get_bound_client().expect("client should be present");
@@ -2482,10 +2455,9 @@ mod tests {
         );
     }
 
-    #[test]
-    fn client_send_failed_connect_conf() {
-        let exec = fasync::TestExecutor::new();
-        let mut m = MockObjects::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn client_send_failed_connect_conf() {
+        let mut m = MockObjects::new().await;
         let mut me = m.make_mlme();
         me.make_client_station();
         let mut client = me.get_bound_client().expect("client should be present");
@@ -2506,10 +2478,9 @@ mod tests {
         );
     }
 
-    #[test]
-    fn client_send_scan_end_on_mlme_scan_busy() {
-        let exec = fasync::TestExecutor::new();
-        let mut m = MockObjects::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn client_send_scan_end_on_mlme_scan_busy() {
+        let mut m = MockObjects::new().await;
         let mut me = m.make_mlme();
         me.make_client_station();
 
@@ -2528,10 +2499,9 @@ mod tests {
         );
     }
 
-    #[test]
-    fn client_send_scan_end_on_scan_busy() {
-        let exec = fasync::TestExecutor::new();
-        let mut m = MockObjects::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn client_send_scan_end_on_scan_busy() {
+        let mut m = MockObjects::new().await;
         let mut me = m.make_mlme();
         me.make_client_station();
 
@@ -2550,10 +2520,9 @@ mod tests {
         );
     }
 
-    #[test]
-    fn client_send_scan_end_on_mlme_scan_invalid_args() {
-        let exec = fasync::TestExecutor::new();
-        let mut m = MockObjects::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn client_send_scan_end_on_mlme_scan_invalid_args() {
+        let mut m = MockObjects::new().await;
         let mut me = m.make_mlme();
 
         me.make_client_station();
@@ -2577,10 +2546,9 @@ mod tests {
         );
     }
 
-    #[test]
-    fn client_send_scan_end_on_scan_invalid_args() {
-        let exec = fasync::TestExecutor::new();
-        let mut m = MockObjects::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn client_send_scan_end_on_scan_invalid_args() {
+        let mut m = MockObjects::new().await;
         let mut me = m.make_mlme();
 
         me.make_client_station();
@@ -2604,10 +2572,9 @@ mod tests {
         );
     }
 
-    #[test]
-    fn client_send_scan_end_on_passive_scan_fails() {
-        let exec = fasync::TestExecutor::new();
-        let mut m = MockObjects::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn client_send_scan_end_on_passive_scan_fails() {
+        let mut m = MockObjects::new().await;
         m.fake_device_state.lock().config.start_passive_scan_fails = true;
         let mut me = m.make_mlme();
 
@@ -2624,10 +2591,9 @@ mod tests {
         );
     }
 
-    #[test]
-    fn mlme_respond_to_query_device_info() {
-        let mut exec = fasync::TestExecutor::new();
-        let mut mock_objects = MockObjects::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn mlme_respond_to_query_device_info() {
+        let mut mock_objects = MockObjects::new().await;
         let mut mlme = mock_objects.make_mlme();
 
         let (responder, mut receiver) = Responder::new();
@@ -2635,7 +2601,7 @@ mod tests {
             mlme.handle_mlme_req(wlan_sme::MlmeRequest::QueryDeviceInfo(responder)),
             Ok(())
         );
-        let info = assert_variant!(exec.run_until_stalled(&mut receiver), Poll::Ready(Ok(r)) => r);
+        let info = assert_variant!(TestExecutor::poll_until_stalled(&mut receiver).await, Poll::Ready(Ok(r)) => r);
         assert_eq!(
             info,
             fidl_mlme::DeviceInfo {
@@ -2648,10 +2614,9 @@ mod tests {
         );
     }
 
-    #[test]
-    fn mlme_respond_to_query_discovery_support() {
-        let mut exec = fasync::TestExecutor::new();
-        let mut m = MockObjects::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn mlme_respond_to_query_discovery_support() {
+        let mut m = MockObjects::new().await;
         let mut me = m.make_mlme();
 
         let (responder, mut receiver) = Responder::new();
@@ -2659,15 +2624,14 @@ mod tests {
             me.handle_mlme_req(wlan_sme::MlmeRequest::QueryDiscoverySupport(responder)),
             Ok(())
         );
-        let resp = assert_variant!(exec.run_until_stalled(&mut receiver), Poll::Ready(Ok(r)) => r);
+        let resp = assert_variant!(TestExecutor::poll_until_stalled(&mut receiver).await, Poll::Ready(Ok(r)) => r);
         assert_eq!(resp.scan_offload.supported, true);
         assert_eq!(resp.probe_response_offload.supported, false);
     }
 
-    #[test]
-    fn mlme_respond_to_query_mac_sublayer_support() {
-        let mut exec = fasync::TestExecutor::new();
-        let mut m = MockObjects::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn mlme_respond_to_query_mac_sublayer_support() {
+        let mut m = MockObjects::new().await;
         let mut me = m.make_mlme();
 
         let (responder, mut receiver) = Responder::new();
@@ -2675,7 +2639,7 @@ mod tests {
             me.handle_mlme_req(wlan_sme::MlmeRequest::QueryMacSublayerSupport(responder)),
             Ok(())
         );
-        let resp = assert_variant!(exec.run_until_stalled(&mut receiver), Poll::Ready(Ok(r)) => r);
+        let resp = assert_variant!(TestExecutor::poll_until_stalled(&mut receiver).await, Poll::Ready(Ok(r)) => r);
         assert_eq!(resp.rate_selection_offload.supported, false);
         assert_eq!(resp.data_plane.data_plane_type, fidl_common::DataPlaneType::EthernetDevice);
         assert_eq!(resp.device.is_synthetic, true);
@@ -2686,10 +2650,9 @@ mod tests {
         assert_eq!(resp.device.tx_status_report_supported, true);
     }
 
-    #[test]
-    fn mlme_respond_to_query_security_support() {
-        let mut exec = fasync::TestExecutor::new();
-        let mut m = MockObjects::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn mlme_respond_to_query_security_support() {
+        let mut m = MockObjects::new().await;
         let mut me = m.make_mlme();
 
         let (responder, mut receiver) = Responder::new();
@@ -2697,16 +2660,15 @@ mod tests {
             me.handle_mlme_req(wlan_sme::MlmeRequest::QuerySecuritySupport(responder)),
             Ok(())
         );
-        let resp = assert_variant!(exec.run_until_stalled(&mut receiver), Poll::Ready(Ok(r)) => r);
+        let resp = assert_variant!(TestExecutor::poll_until_stalled(&mut receiver).await, Poll::Ready(Ok(r)) => r);
         assert_eq!(resp.mfp.supported, false);
         assert_eq!(resp.sae.driver_handler_supported, false);
         assert_eq!(resp.sae.sme_handler_supported, false);
     }
 
-    #[test]
-    fn mlme_respond_to_query_spectrum_management_support() {
-        let mut exec = fasync::TestExecutor::new();
-        let mut m = MockObjects::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn mlme_respond_to_query_spectrum_management_support() {
+        let mut m = MockObjects::new().await;
         let mut me = m.make_mlme();
 
         let (responder, mut receiver) = Responder::new();
@@ -2714,14 +2676,13 @@ mod tests {
             me.handle_mlme_req(wlan_sme::MlmeRequest::QuerySpectrumManagementSupport(responder)),
             Ok(())
         );
-        let resp = assert_variant!(exec.run_until_stalled(&mut receiver), Poll::Ready(Ok(r)) => r);
+        let resp = assert_variant!(TestExecutor::poll_until_stalled(&mut receiver).await, Poll::Ready(Ok(r)) => r);
         assert_eq!(resp.dfs.supported, true);
     }
 
-    #[test]
-    fn mlme_connect_unprotected_happy_path() {
-        let exec = fasync::TestExecutor::new();
-        let mut m = MockObjects::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn mlme_connect_unprotected_happy_path() {
+        let mut m = MockObjects::new().await;
         let mut me = m.make_mlme();
         let channel = Channel::new(6, Cbw::Cbw40);
         let connect_req = fidl_mlme::ConnectRequest {
@@ -2875,10 +2836,9 @@ mod tests {
         assert_eq!(m.fake_device_state.lock().link_status, LinkStatus::UP);
     }
 
-    #[test]
-    fn mlme_connect_protected_happy_path() {
-        let exec = fasync::TestExecutor::new();
-        let mut m = MockObjects::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn mlme_connect_protected_happy_path() {
+        let mut m = MockObjects::new().await;
         let mut me = m.make_mlme();
         let channel = Channel::new(6, Cbw::Cbw40);
         let connect_req = fidl_mlme::ConnectRequest {
@@ -3065,10 +3025,9 @@ mod tests {
         assert_eq!(m.fake_device_state.lock().link_status, LinkStatus::UP);
     }
 
-    #[test]
-    fn mlme_connect_vht() {
-        let exec = fasync::TestExecutor::new();
-        let mut m = MockObjects::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn mlme_connect_vht() {
+        let mut m = MockObjects::new().await;
         let mut me = m.make_mlme();
         let channel = Channel::new(36, Cbw::Cbw40);
         let connect_req = fidl_mlme::ConnectRequest {
@@ -3146,10 +3105,9 @@ mod tests {
         assert_eq!(&frame[..], &expected[..]);
     }
 
-    #[test]
-    fn mlme_connect_timeout() {
-        let exec = fasync::TestExecutor::new();
-        let mut m = MockObjects::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn mlme_connect_timeout() {
+        let mut m = MockObjects::new().await;
         let mut me = m.make_mlme();
         let connect_req = fidl_mlme::ConnectRequest {
             selected_bss: fake_fidl_bss_description!(Open, bssid: BSSID.to_array()),
@@ -3192,10 +3150,9 @@ mod tests {
         );
     }
 
-    #[test]
-    fn mlme_reconnect_no_sta() {
-        let exec = fasync::TestExecutor::new();
-        let mut m = MockObjects::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn mlme_reconnect_no_sta() {
+        let mut m = MockObjects::new().await;
         let mut me = m.make_mlme();
 
         let reconnect_req = fidl_mlme::ReconnectRequest { peer_sta_address: [1, 2, 3, 4, 5, 6] };
@@ -3219,10 +3176,9 @@ mod tests {
         );
     }
 
-    #[test]
-    fn mlme_respond_to_get_iface_counter_stats_with_error_status() {
-        let mut exec = fasync::TestExecutor::new();
-        let mut m = MockObjects::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn mlme_respond_to_get_iface_counter_stats_with_error_status() {
+        let mut m = MockObjects::new().await;
         let mut me = m.make_mlme();
 
         let (responder, mut receiver) = Responder::new();
@@ -3230,17 +3186,16 @@ mod tests {
             me.handle_mlme_req(wlan_sme::MlmeRequest::GetIfaceCounterStats(responder)),
             Ok(())
         );
-        let resp = assert_variant!(exec.run_until_stalled(&mut receiver), Poll::Ready(Ok(r)) => r);
+        let resp = assert_variant!(TestExecutor::poll_until_stalled(&mut receiver).await, Poll::Ready(Ok(r)) => r);
         assert_eq!(
             resp,
             fidl_mlme::GetIfaceCounterStatsResponse::ErrorStatus(zx::sys::ZX_ERR_NOT_SUPPORTED)
         );
     }
 
-    #[test]
-    fn mlme_respond_to_get_iface_histogram_stats_with_error_status() {
-        let mut exec = fasync::TestExecutor::new();
-        let mut m = MockObjects::new(&exec);
+    #[fuchsia::test(allow_stalls = false)]
+    async fn mlme_respond_to_get_iface_histogram_stats_with_error_status() {
+        let mut m = MockObjects::new().await;
         let mut me = m.make_mlme();
 
         let (responder, mut receiver) = Responder::new();
@@ -3248,7 +3203,7 @@ mod tests {
             me.handle_mlme_req(wlan_sme::MlmeRequest::GetIfaceHistogramStats(responder)),
             Ok(())
         );
-        let resp = assert_variant!(exec.run_until_stalled(&mut receiver), Poll::Ready(Ok(r)) => r);
+        let resp = assert_variant!(TestExecutor::poll_until_stalled(&mut receiver).await, Poll::Ready(Ok(r)) => r);
         assert_eq!(
             resp,
             fidl_mlme::GetIfaceHistogramStatsResponse::ErrorStatus(zx::sys::ZX_ERR_NOT_SUPPORTED)
