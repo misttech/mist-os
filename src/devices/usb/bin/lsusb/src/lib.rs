@@ -216,7 +216,7 @@ async fn list_device(
                         })
                         .await
                         .context(format!("DeviceGetStringDescriptor failed for {}", devname))?;
-                    println!("{:>6}{:<29}{}{}", "", "iInterface", info.i_interface, interface_str);
+                    println!("{:>6}{:<29}{} {}", "", "iInterface", info.i_interface, interface_str);
                 }
                 Descriptor::Endpoint(info) => {
                     println!("{:>6}Endpoint Descriptor:", "");
