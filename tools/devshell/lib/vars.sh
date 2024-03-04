@@ -295,6 +295,9 @@ function fx-config-read {
 
 function _query_product_bundle_path {
   local args_json_path="${FUCHSIA_BUILD_DIR}/args.json"
+  if [[ ! -f "${args_json_path}" ]]; then
+    return 0
+  fi
   local product=$(fx-command-run jq .build_info_product ${args_json_path})
   local board=$(fx-command-run jq .build_info_board ${args_json_path})
   local product_name="\"${product//\"}.${board//\"}\""
