@@ -277,7 +277,10 @@
             ],
         },
         {
-            protocol: [ "fuchsia.kernel.InfoResource" ],
+            protocol: [
+                "fuchsia.kernel.InfoResource",
+                "fuchsia.kernel.ProfileResource",
+            ],
             from: "parent",
             to: [ "#console-launcher" ],
         },

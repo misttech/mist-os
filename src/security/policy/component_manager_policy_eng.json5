@@ -195,6 +195,7 @@
                     "/core/sshd-host/shell:**",
                     "/core/testing/system-tests:**",
                     "/bootstrap/role_manager",
+                    "/bootstrap/console-launcher",
                 ],
             },
             {
