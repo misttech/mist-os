@@ -38,18 +38,6 @@
     {
       "kind": {
         "Option": {
-          "arg_name": "abi-revision"
-        }
-      },
-      "optionality": "optional",
-      "long": "--abi-revision",
-      "short": null,
-      "description": "package ABI revision",
-      "hidden": false
-    },
-    {
-      "kind": {
-        "Option": {
           "arg_name": "published-name"
         }
       },

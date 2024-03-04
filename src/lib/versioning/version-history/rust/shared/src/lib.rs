@@ -288,16 +288,6 @@ impl VersionHistory {
         }
     }
 
-    /// The packaging tools currently allow specifying an ABI revision directly
-    /// on the command line, and validate that that ABI revision _exists_, but
-    /// nothing else about it.
-    ///
-    /// TODO: https://fxbug.dev/326095523 - Figure out if this behavior makes
-    /// sense, or if ffx package should even accept --abi-revision.
-    pub fn abi_revision_matches_some_api_level(&self, abi_revision: AbiRevision) -> bool {
-        self.version_from_abi_revision(abi_revision).is_some()
-    }
-
     fn supported_versions(&self) -> impl Iterator<Item = Version> + '_ {
         self.versions.iter().filter(|v| v.is_supported()).cloned()
     }
@@ -709,19 +699,5 @@ mod tests {
             FAKE_VERSION_HISTORY.get_misleading_version_for_ffx(),
             FAKE_VERSION_HISTORY.versions[3].clone()
         );
-    }
-
-    #[test]
-    fn test_valid_abi_checker() {
-        for i in 0xabcd0004..=0xabcd0007 {
-            assert!(
-                FAKE_VERSION_HISTORY.abi_revision_matches_some_api_level(AbiRevision::from_u64(i))
-            );
-        }
-        for i in 0xabcd0008..=0xabcd000a {
-            assert!(
-                !FAKE_VERSION_HISTORY.abi_revision_matches_some_api_level(AbiRevision::from_u64(i))
-            );
-        }
     }
 }

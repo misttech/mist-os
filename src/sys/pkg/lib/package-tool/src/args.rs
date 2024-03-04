@@ -8,7 +8,7 @@ use {
     chrono::{DateTime, Utc},
     fuchsia_repo::repository::CopyMode,
     std::path::PathBuf,
-    version_history::{AbiRevision, ApiLevel},
+    version_history::ApiLevel,
 };
 
 #[derive(Eq, ArgsInfo, FromArgs, PartialEq, Debug)]
@@ -107,10 +107,6 @@ pub struct PackageBuildCommand {
     /// package API level
     #[argh(option)]
     pub api_level: Option<ApiLevel>,
-
-    /// package ABI revision
-    #[argh(option)]
-    pub abi_revision: Option<AbiRevision>,
 
     /// name of the package
     #[argh(option)]
