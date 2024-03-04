@@ -8,7 +8,6 @@ use fidl::unpersist;
 use fidl_fuchsia_component_decl::*;
 use fidl_fuchsia_data as fdata;
 use fidl_fuchsia_io as fio;
-use std::cmp::PartialEq;
 use std::fmt::Debug;
 use std::fs::File;
 use std::io::Read;

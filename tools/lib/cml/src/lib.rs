@@ -4419,9 +4419,7 @@ mod tests {
     use {
         assert_matches::assert_matches,
         difference::Changeset,
-        error::{Error, Location},
-        serde_json::{self, json, to_string_pretty, to_value},
-        serde_json5,
+        serde_json::{json, to_string_pretty, to_value},
         std::path::Path,
         test_case::test_case,
     };

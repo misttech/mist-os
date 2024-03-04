@@ -8,7 +8,6 @@ use {
     proc_macro2::{Ident, TokenStream as TokenStream2},
     quote::{quote, ToTokens, TokenStreamExt},
     std::collections::HashSet,
-    syn,
 };
 
 pub fn impl_derive_ref(ast: syn::DeriveInput) -> Result<TokenStream2, syn::Error> {

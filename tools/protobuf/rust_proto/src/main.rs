@@ -4,7 +4,6 @@
 
 use anyhow::{bail, Context, Result};
 use argh::FromArgs;
-use prost_build;
 use std::collections::HashSet;
 use std::fs::File;
 use std::os::unix::io::AsRawFd;

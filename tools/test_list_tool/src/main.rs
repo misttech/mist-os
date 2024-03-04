@@ -9,11 +9,10 @@ use {
     camino::{Utf8Path, Utf8PathBuf},
     fidl::unpersist,
     fidl_fuchsia_component_decl::Component,
-    fidl_fuchsia_data as fdata, fuchsia_archive, fuchsia_pkg,
+    fidl_fuchsia_data as fdata,
     fuchsia_url::AbsoluteComponentUrl,
     maplit::btreeset,
     serde::{Deserialize, Serialize},
-    serde_json,
     std::{
         cmp::{Eq, PartialEq},
         collections::HashMap,

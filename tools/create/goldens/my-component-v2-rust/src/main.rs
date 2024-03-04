@@ -2,11 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::{self, Context};
+use anyhow::Context;
 use fuchsia_component::server::ServiceFs;
 use fuchsia_inspect::{component, health::Reporter};
 use futures::prelude::*;
-use tracing;
 
 /// Wraps all hosted protocols into a single type that can be matched against
 /// and dispatched.
@@ -24,7 +23,7 @@ async fn main() -> Result<(), anyhow::Error> {
     // Initialize inspect
     let _inspect_server_task = inspect_runtime::publish(
         component::inspector(),
-        inspect_runtime::PublishOptions::default()
+        inspect_runtime::PublishOptions::default(),
     );
     component::health().set_starting_up();
 

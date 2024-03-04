@@ -217,7 +217,6 @@ impl GenerateBuildArchive {
 mod tests {
     use super::*;
 
-    use assembly_manifest::Image;
     use assembly_partitions_config::PartitionsConfig;
     use camino::Utf8Path;
     use sdk_metadata::ProductBundleV2;

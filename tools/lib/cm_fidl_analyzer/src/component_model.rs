@@ -1231,7 +1231,7 @@ mod tests {
             error::ComponentInstanceError,
             RouteRequest,
         },
-        std::{collections::HashMap, iter::FromIterator, sync::Arc},
+        std::{collections::HashMap, sync::Arc},
         url::Url,
     };
 

@@ -8,7 +8,6 @@ use {
     crate::{BlackoutError, CommandError, RebootError, Seed},
     anyhow::{bail, ensure, Context},
     async_trait::async_trait,
-    ffx_isolate,
     serde_json::Value,
     std::{
         fs::OpenOptions,

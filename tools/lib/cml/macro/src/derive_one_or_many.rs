@@ -9,7 +9,6 @@ use {
     },
     proc_macro2::TokenStream as TokenStream2,
     quote::{quote, ToTokens, TokenStreamExt},
-    syn,
 };
 
 pub fn impl_derive_one_or_many(ast: syn::DeriveInput) -> Result<TokenStream2, syn::Error> {

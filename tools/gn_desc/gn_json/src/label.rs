@@ -6,11 +6,7 @@
 //! output, and GN itself provides helper functions that does the same tasks
 //! that are here.
 
-use std::{
-    convert::{TryFrom, TryInto},
-    fmt::Display,
-    str::FromStr,
-};
+use std::{fmt::Display, str::FromStr};
 use thiserror::Error;
 
 // The TargetLabel is capable of representing a complete "canonical" GN label.

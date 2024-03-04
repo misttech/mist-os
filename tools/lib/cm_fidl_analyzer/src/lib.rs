@@ -241,7 +241,7 @@ mod tests {
         cm_rust_testing::ComponentDeclBuilder,
         fuchsia_url::AbsoluteComponentUrl,
         routing::environment::RunnerRegistry,
-        std::{collections::HashMap, iter::FromIterator, sync::Arc},
+        std::{collections::HashMap, sync::Arc},
         url::Url,
     };
 

@@ -5,7 +5,6 @@
 use {
     proc_macro2::TokenStream as TokenStream2,
     quote::{quote, TokenStreamExt},
-    syn,
 };
 
 pub fn gen_visit_str(ty: Option<TokenStream2>, expected: &syn::LitStr) -> TokenStream2 {

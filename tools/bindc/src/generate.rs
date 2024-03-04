@@ -8,7 +8,6 @@ use bind::linter;
 use bind::parser::bind_library;
 use bind::parser::common::Include;
 use std::collections::HashSet;
-use std::convert::TryFrom;
 
 use crate::cpp_generator;
 use crate::rust_generator;

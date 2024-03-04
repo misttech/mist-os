@@ -2,10 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow;
 use json5format::*;
 use serde_json::Value;
-use serde_json5;
 use std::fs::File;
 use std::path::PathBuf;
 
@@ -48,7 +46,6 @@ mod tests {
     use std::fs::OpenOptions;
     use std::io::prelude::*;
     use std::io::Cursor;
-    use std::path::PathBuf;
 
     /*
     The following test fails with the current implementation.

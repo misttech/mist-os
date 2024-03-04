@@ -5,7 +5,6 @@
 //! Types used for parsing `gn desc --format=json` output.
 
 use anyhow::Context;
-use serde_json;
 use std::path::Path;
 
 pub mod label;

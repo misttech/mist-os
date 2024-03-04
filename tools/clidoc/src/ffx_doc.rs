@@ -5,7 +5,6 @@
 use crate::{md_path, HEADER};
 use anyhow::{bail, Context, Result};
 use ffx_command::{CliArgsInfo, ErrorCodeInfo, FlagInfo, SubCommandInfo};
-use serde_json;
 use std::{
     fs::File,
     io::{BufWriter, Write},

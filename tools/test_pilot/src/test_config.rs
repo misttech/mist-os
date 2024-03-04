@@ -4,7 +4,6 @@
 
 use serde::{Deserialize, Serialize};
 use serde_json::from_str;
-use std::convert::TryFrom;
 use std::fs;
 use std::path::Path;
 

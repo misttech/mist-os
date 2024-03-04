@@ -20,7 +20,6 @@ use argh::FromArgs;
 use camino::Utf8PathBuf;
 use gn_json::target::{AllTargets, ConfigValues, Public, TargetDescription};
 use pretty_assertions::assert_eq;
-use serde_json;
 use std::{ffi::OsStr, process::Command};
 use tempfile::tempdir;
 

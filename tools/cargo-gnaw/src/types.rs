@@ -6,7 +6,6 @@ use {
     crate::gn::add_version_suffix,
     anyhow::{anyhow, Error},
     cargo_metadata::Package,
-    std::convert::TryFrom,
 };
 
 pub type Feature = String;

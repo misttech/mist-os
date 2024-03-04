@@ -7,7 +7,6 @@ use camino::Utf8PathBuf;
 use component_id_index::Index;
 use fidl::persist;
 use fidl_fuchsia_component_internal as fcomponent_internal;
-use serde_json;
 use std::fs;
 use std::io::{BufRead, BufReader};
 use std::path::PathBuf;
@@ -82,11 +81,10 @@ fn main() -> anyhow::Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use component_id_index::{Index, InstanceId};
+    use component_id_index::InstanceId;
     use moniker::{Moniker, MonikerBase};
     use pretty_assertions::assert_eq;
     use std::io::Write;
-    use tempfile;
 
     fn gen_index(start: u32, end: u32) -> Index {
         let mut index = Index::default();

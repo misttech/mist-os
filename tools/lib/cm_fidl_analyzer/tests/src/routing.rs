@@ -33,8 +33,6 @@ use {
     },
     std::{
         collections::{HashMap, HashSet},
-        convert::TryInto,
-        iter::FromIterator,
         path::Path,
         sync::Arc,
     },
@@ -525,11 +523,7 @@ impl RoutingTestModel for RoutingTestForAnalyzer {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        cm_rust::{EventScope, EventStreamDecl, OfferEventStreamDecl},
-        routing_test_helpers::instantiate_common_routing_tests,
-    };
+    use {super::*, routing_test_helpers::instantiate_common_routing_tests};
 
     instantiate_common_routing_tests! { RoutingTestBuilderForAnalyzer }
 

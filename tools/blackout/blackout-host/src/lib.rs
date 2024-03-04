@@ -7,7 +7,6 @@
 #![deny(missing_docs)]
 
 use {
-    ffx_isolate,
     rand::random,
     std::{
         fmt,

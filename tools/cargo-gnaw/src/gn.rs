@@ -16,7 +16,6 @@ use {
     std::fmt::Display,
     std::io::{self, Write},
     std::path::Path,
-    std::string::ToString,
     walkdir::WalkDir,
 };
 

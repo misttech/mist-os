@@ -9,7 +9,6 @@ use {
     camino::Utf8PathBuf,
     rayon::prelude::*,
     serde::{Deserialize, Serialize},
-    serde_json,
     std::{
         cmp::{Eq, PartialEq},
         collections::HashMap,

@@ -182,9 +182,7 @@ impl GenerateTransferManifest {
 mod tests {
     use super::*;
 
-    use assembly_manifest::Image;
     use assembly_partitions_config::PartitionsConfig;
-    use camino::Utf8Path;
     use fuchsia_repo::test_utils;
     use sdk_metadata::virtual_device::Hardware;
     use sdk_metadata::{ProductBundleV2, Repository, VirtualDevice, VirtualDeviceV1};

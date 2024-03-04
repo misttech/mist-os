@@ -16,7 +16,7 @@ use fidl_ir_lib::fidl::*;
 use std::fmt::Write;
 use std::fs::File;
 use std::io::prelude::*;
-use std::io::{self, BufRead, Write as IoWrite};
+use std::io::{self, Write as IoWrite};
 use std::path::PathBuf;
 use structopt::StructOpt;
 

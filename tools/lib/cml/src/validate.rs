@@ -12,7 +12,7 @@ use {
         Offer, OfferFromRef, OfferToRef, OneOrMany, Program, RegistrationRef, Rights,
         RootDictionaryRef, SourceAvailability, Use, UseFromRef,
     },
-    directed_graph::{self, DirectedGraph},
+    directed_graph::DirectedGraph,
     std::{
         collections::{BTreeMap, HashMap, HashSet},
         fmt,

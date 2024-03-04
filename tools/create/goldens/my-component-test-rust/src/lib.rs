@@ -2,10 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{self, Error},
-    tracing,
-};
+use anyhow::Error;
 
 #[fuchsia::test]
 async fn my_component_test_rust_test() -> Result<(), Error> {
@@ -31,7 +28,6 @@ async fn my_component_test_rust_test() -> Result<(), Error> {
     // let _: fcomponent::BinderProxy = fclient::connect_to_protocol_at_dir_root::<fcomponent::BinderMarker>(&exposed_directory)?;
     // ```
 
-
     // Use the ArchiveReader to access inspect data, e.g.
     // ```
     // use diagnostics_reader::{ArchiveReader, Inspect};
@@ -39,7 +35,6 @@ async fn my_component_test_rust_test() -> Result<(), Error> {
     // let reader = ArchiveReader::new().add_selector("hello-world:root");
     // let results = reader.snapshot::<Inspect>().await?;
     // ```
-
 
     // Add test conditions here, e.g.
     // ```

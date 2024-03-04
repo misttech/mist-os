@@ -85,7 +85,6 @@ impl Opt {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::str::FromStr;
     use tempfile::{tempdir, NamedTempFile};
 
     #[test]

@@ -7,7 +7,7 @@ use crate::composite_device_desc::*;
 use crate::library::*;
 use regex::Regex;
 use std::collections::{HashMap, HashSet};
-use std::convert::TryFrom;
+
 use std::fmt::Write;
 use std::fs::OpenOptions;
 use std::io::Read;

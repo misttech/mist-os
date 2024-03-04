@@ -8,7 +8,7 @@ use {
     fidl_fuchsia_component_decl as fdecl,
     std::path::Path,
     std::str::Utf8Error,
-    std::{convert::TryFrom, error, fmt, io},
+    std::{error, fmt, io},
 };
 
 /// The location in the file where an error was detected.

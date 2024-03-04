@@ -3,14 +3,12 @@
 // found in the LICENSE file.
 
 use {
-    crate::{cml, error::Error},
+    crate::error::Error,
     cm_rust::ComponentDecl,
     fidl::unpersist,
     fidl_fuchsia_component_decl::Component,
     serde_json::Value,
-    serde_json5,
     std::{
-        convert::{TryFrom, TryInto},
         fs,
         io::{Read, Write},
         path::{Path, PathBuf},
@@ -128,7 +126,6 @@ pub fn ensure_directory_exists(output: &PathBuf) -> Result<(), Error> {
 mod tests {
     use super::*;
     use std::fs::File;
-    use std::io::Read;
     use tempfile::TempDir;
 
     #[test]

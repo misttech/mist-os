@@ -6,7 +6,6 @@ use {
     darling::{ast, FromDeriveInput, FromField, FromMeta},
     proc_macro2::TokenStream as TokenStream2,
     quote::{quote, ToTokens, TokenStreamExt},
-    syn,
 };
 
 const LIST_INDENT_SPACES: usize = 4;

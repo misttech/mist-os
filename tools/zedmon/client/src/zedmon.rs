@@ -809,7 +809,6 @@ pub fn zedmon(serial: Option<&str>) -> Result<Client<usb_bulk::Interface>, InitE
 mod tests {
     use {
         super::*,
-        anyhow::Error,
         num_traits::FromPrimitive,
         protocol::{tests::serialize_reports, PacketType, Report, ScalarType},
         std::collections::VecDeque,
@@ -960,8 +959,7 @@ mod tests {
     mod fake_device {
         use {
             super::*,
-            num_traits::FromPrimitive,
-            protocol::{tests::*, PacketType, Unit},
+            protocol::{tests::*, Unit},
         };
 
         // Coordinates interactions between FakeZedmonInterface and a test.

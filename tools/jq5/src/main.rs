@@ -2,8 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow;
-use fuchsia_async;
 use futures::future::join_all;
 use io::BufWriter;
 use json5format::{Json5Format, ParsedDocument};

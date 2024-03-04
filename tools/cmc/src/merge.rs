@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use {
-    crate::cml,
     crate::error::Error,
     crate::util,
     crate::util::write_depfile,
@@ -78,7 +77,7 @@ mod tests {
     use super::*;
     use serde_json::json;
     use std::fs::File;
-    use std::io::{LineWriter, Read, Write};
+    use std::io::{LineWriter, Read};
     use tempfile::TempDir;
 
     #[test]

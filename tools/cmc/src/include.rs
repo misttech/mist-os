@@ -11,7 +11,6 @@ use {
         collections::HashSet,
         fs,
         io::{BufRead, BufReader, Write},
-        iter::FromIterator,
         path::PathBuf,
     },
 };

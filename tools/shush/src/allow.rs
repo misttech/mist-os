@@ -217,7 +217,6 @@ fn apply_insertions(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::lint::Lint;
 
     fn lint(name: String, start: (usize, usize), end: (usize, usize)) -> Lint {
         Lint { name, span: crate::span::span(start, end) }

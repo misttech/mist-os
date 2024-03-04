@@ -967,10 +967,7 @@ fn write_abr(disk: &mut File, offset: u64, boot_part: BootPart) -> Result<(), Er
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        camino::{Utf8Path, Utf8PathBuf},
-    };
+    use super::*;
 
     fn compare_golden(test_data_dir: &Utf8Path, image_path: &Utf8Path) {
         let image = std::fs::read(&image_path).expect("Unable to read image");

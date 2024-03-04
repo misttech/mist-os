@@ -8,7 +8,6 @@ use {
     },
     proc_macro2::TokenStream as TokenStream2,
     quote::{quote, ToTokens, TokenStreamExt},
-    syn,
 };
 
 pub fn impl_derive_checked_vec(ast: syn::DeriveInput) -> Result<TokenStream2, syn::Error> {

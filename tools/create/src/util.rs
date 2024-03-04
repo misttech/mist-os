@@ -39,7 +39,6 @@ pub fn filename_to_string(filename: impl AsRef<OsStr>) -> io::Result<String> {
 mod tests {
     use super::*;
     use crate::test_util::lock_test_environment;
-    use std::env;
     use std::os::unix;
 
     #[test]

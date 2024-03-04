@@ -4,10 +4,8 @@
 
 use {
     argh::FromArgs,
-    scrutiny_config, scrutiny_frontend,
     serde::Deserialize,
     serde::Serialize,
-    serde_json,
     std::{
         collections::HashMap,
         io::{self, Write},

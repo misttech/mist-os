@@ -14,7 +14,6 @@ use {
     pretty_assertions::assert_eq,
     std::fmt::{Debug, Display},
     std::path::{Path, PathBuf},
-    tempfile,
 };
 
 #[derive(FromArgs, Debug)]
