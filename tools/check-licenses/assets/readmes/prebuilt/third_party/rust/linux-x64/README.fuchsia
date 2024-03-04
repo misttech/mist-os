@@ -1,20 +1,5 @@
 Name: Rust
 
-License File: share/doc/rust/COPYRIGHT
- -> License File Format: Single License
- -> License Classifications: Apache-2.0, BSD-2-Clause, Copyright, NCSA, Unicode-DFS-2016
-
-License File: share/doc/rust/LICENSE-APACHE
- -> License File Format: Single License
-
-License File: share/doc/rust/LICENSE-MIT
- -> License File Format: Single License
- -> License Classifications: MIT
-
-License File: share/doc/rust/LICENSE-THIRD-PARTY
- -> License File Format: Single License
- -> License Classifications: BSD-3-Clause, Copyright, GPL-2.0, LGPL-2.1, MIT, OpenSSL, Unlicense, Zlib
-
 License File: lib/rustlib/src/rust/library/backtrace/LICENSE-APACHE
  -> License File Format: Single License
  -> License Classifications: Apache-2.0
