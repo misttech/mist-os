@@ -1372,10 +1372,14 @@ where
                 respond_not_supported!("syncudp::GetIpMulticastInterface", responder)
             }
             fposix_socket::SynchronousDatagramSocketRequest::SetIpMulticastLoopback {
-                value: _,
+                value,
                 responder,
             } => {
-                respond_not_supported!("syncudp::SetIpMulticastLoopback", responder)
+                // TODO(https://fxbug.dev/42058186): add support for
+                // looping back sent packets.
+                responder
+                    .send((!value).then_some(()).ok_or(fposix::Errno::Enoprotoopt))
+                    .unwrap_or_else(|e| error!("failed to respond: {e:?}"));
             }
             fposix_socket::SynchronousDatagramSocketRequest::GetIpMulticastLoopback {
                 responder,
