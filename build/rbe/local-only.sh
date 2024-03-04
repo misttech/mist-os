@@ -23,6 +23,7 @@ EOF
 # /usr/bin/env, in case command starts with an environment variable.
 cmd=( /usr/bin/env )
 
+prev_opt=""
 for opt
 do
   # handle --option arg
@@ -52,5 +53,10 @@ do
   esac
   shift
 done
+
+[[ -z "$prev_opt" ]] || {
+  echo "Error: missing expected argument after last option"
+  exit 1
+}
 
 exec "${cmd[@]}"

@@ -413,12 +413,14 @@ def last_value_of_dict_flag(
     return last_value_or_default(d.get(key, []), default)
 
 
-def filter_out_pseudo_flag(
+def filter_out_option_with_arg(
     args: Iterable[str], prefix_flag: str
 ) -> Iterable[str]:
     """Remove option and arguments that start with a given prefix.
 
-    This is useful for filter out pseudo-flags from a command.
+    Example (with prefix_flag="--foo"):
+      removes "--foo=bar" and ("--foo" "bar") from the token sequence.
+      This also removes "--foo" at the end of the sequence.
 
     Args:
       args: command tokens

@@ -976,7 +976,7 @@ class RemoteAction(object):
         # Hide --local-only options from remote execution, so they don't affect
         # the command_digest.
         self._remote_only_command = list(
-            cl_utils.filter_out_pseudo_flag(command, "--local-only")
+            cl_utils.filter_out_option_with_arg(command, "--local-only")
         )
         self._remote_disable = disable
         self._verbose = verbose
