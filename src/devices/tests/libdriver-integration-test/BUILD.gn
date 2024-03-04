@@ -14,7 +14,6 @@ test("tests") {
   sources = [
     "action-list.cc",
     "basic-lifecycle-test.cc",
-    "composite-device-test.cc",
     "device-add-tests.cc",
     "integration-test.cc",
     "mock-device-hooks.cc",

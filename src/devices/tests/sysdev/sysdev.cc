@@ -76,14 +76,6 @@ zx_status_t Sysdev::Create(void* ctx, zx_device_t* parent, const char* name,
     return status;
   }
 
-  // Create a composite out of "well-known" devices that the libdriver-integration-test may create.
-  // These are children with
-  // the PLATFORM_DEV properties
-  // (PDEV_VID_TEST, PDEV_PID_LIBDRIVER_TEST, PDEV_DID_TEST_CHILD_1) and
-  // (PDEV_VID_TEST, PDEV_PID_LIBDRIVER_TEST, PDEV_DID_TEST_CHILD_2).
-  // The resulting composite will have PLATFORM_DEV properties
-  // (PDEV_VID_TEST, PDEV_PID_LIBDRIVER_TEST, PDEV_DID_TEST_COMPOSITE).
-  status = sysdev->MakeComposite();
   ZX_ASSERT(status == ZX_OK);
 
   status = TestParent::Create(sysdev->zxdev());
@@ -92,50 +84,6 @@ zx_status_t Sysdev::Create(void* ctx, zx_device_t* parent, const char* name,
   [[maybe_unused]] auto ptr = sysdev.release();
 
   return status;
-}
-
-zx_status_t Sysdev::MakeComposite() {
-  // Composite binding rules for the well-known composite that
-  // libdriver-integration-test uses.
-  const zx_bind_inst_t fragment1_match[] = {
-      BI_ABORT_IF(NE, BIND_PLATFORM_DEV_VID, PDEV_VID_TEST),
-      BI_ABORT_IF(NE, BIND_PLATFORM_DEV_PID, PDEV_PID_LIBDRIVER_TEST),
-      BI_MATCH_IF(EQ, BIND_PLATFORM_DEV_DID, PDEV_DID_TEST_CHILD_1),
-  };
-  const zx_bind_inst_t fragment2_match[] = {
-      BI_ABORT_IF(NE, BIND_PLATFORM_DEV_VID, PDEV_VID_TEST),
-      BI_ABORT_IF(NE, BIND_PLATFORM_DEV_PID, PDEV_PID_LIBDRIVER_TEST),
-      BI_MATCH_IF(EQ, BIND_PLATFORM_DEV_DID, PDEV_DID_TEST_CHILD_2),
-  };
-  const device_fragment_part_t fragment1[] = {
-      {std::size(fragment1_match), fragment1_match},
-  };
-  const device_fragment_part_t fragment2[] = {
-      {std::size(fragment2_match), fragment2_match},
-  };
-  const device_fragment_t fragments[] = {
-      {"fragment-1", std::size(fragment1), fragment1},
-      {"fragment-2", std::size(fragment2), fragment2},
-  };
-
-  const zx_device_prop_t props[] = {
-      {BIND_PLATFORM_DEV_VID, 0, PDEV_VID_TEST},
-      {BIND_PLATFORM_DEV_PID, 0, PDEV_PID_LIBDRIVER_TEST},
-      {BIND_PLATFORM_DEV_DID, 0, PDEV_DID_TEST_COMPOSITE},
-  };
-
-  const composite_device_desc_t comp_desc = {
-      .props = props,
-      .props_count = std::size(props),
-      .fragments = fragments,
-      .fragments_count = std::size(fragments),
-      .primary_fragment = "fragment-1",
-      .spawn_colocated = false,
-      .metadata_list = nullptr,
-      .metadata_count = 0,
-  };
-
-  return device_add_composite_deprecated(zxdev(), "composite", &comp_desc);
 }
 
 static constexpr zx_driver_ops_t driver_ops = []() {
