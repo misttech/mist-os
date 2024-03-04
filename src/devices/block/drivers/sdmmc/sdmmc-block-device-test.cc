@@ -41,6 +41,7 @@ namespace sdmmc {
 class TestSdmmcRootDevice : public SdmmcRootDevice {
  public:
   // Modify these static variables to configure the behaviour of this test device.
+  static bool use_fidl_;
   static bool is_sd_;
   static FakeSdmmcDevice sdmmc_;
 
@@ -51,8 +52,18 @@ class TestSdmmcRootDevice : public SdmmcRootDevice {
  protected:
   zx_status_t Init(
       fidl::ObjectView<fuchsia_hardware_sdmmc::wire::SdmmcMetadata> metadata) override {
+    std::unique_ptr<SdmmcDevice> sdmmc;
+    if (use_fidl_) {
+      zx::result client_end = sdmmc_.GetFidlClientEnd();
+      if (client_end.is_error()) {
+        return client_end.error_value();
+      }
+      sdmmc = std::make_unique<SdmmcDevice>(this, std::move(*client_end));
+    } else {
+      sdmmc = std::make_unique<SdmmcDevice>(this, sdmmc_.GetClient());
+    }
+
     zx_status_t status;
-    auto sdmmc = std::make_unique<SdmmcDevice>(this, sdmmc_.GetClient());
     if (status = sdmmc->RefreshHostInfo(); status != ZX_OK) {
       return status;
     }
@@ -76,6 +87,7 @@ class TestSdmmcRootDevice : public SdmmcRootDevice {
   }
 };
 
+bool TestSdmmcRootDevice::use_fidl_;
 bool TestSdmmcRootDevice::is_sd_;
 FakeSdmmcDevice TestSdmmcRootDevice::sdmmc_;
 
@@ -85,7 +97,7 @@ struct IncomingNamespace {
   compat::DeviceServer device_server;
 };
 
-class SdmmcBlockDeviceTest : public zxtest::Test {
+class SdmmcBlockDeviceTest : public zxtest::TestWithParam<bool> {
  public:
   SdmmcBlockDeviceTest()
       : env_dispatcher_(runtime_.StartBackgroundDispatcher()),
@@ -131,6 +143,7 @@ class SdmmcBlockDeviceTest : public zxtest::Test {
   zx_status_t StartDriverForSd() { return StartDriver(/*is_sd=*/true); }
 
   zx_status_t StartDriver(bool is_sd) {
+    TestSdmmcRootDevice::use_fidl_ = GetParam();
     TestSdmmcRootDevice::is_sd_ = is_sd;
     if (is_sd) {
       sdmmc_.set_command_callback(SD_SEND_IF_COND,
@@ -207,6 +220,8 @@ class SdmmcBlockDeviceTest : public zxtest::Test {
 
   void QueueBlockOps();
   void QueueRpmbRequests();
+  fidl::WireSharedClient<fuchsia_hardware_rpmb::Rpmb>& rpmb_client() { return rpmb_client_; }
+  std::atomic<bool>& run_threads() { return run_threads_; }
 
  protected:
   static constexpr size_t kBlockOpSize = BlockOperation::OperationSize(sizeof(block_op_t));
@@ -375,7 +390,7 @@ class SdmmcBlockDeviceTest : public zxtest::Test {
   std::optional<fidl::ServerBindingRef<fuchsia_hardware_rpmb::Rpmb>> binding_;
 };
 
-TEST_F(SdmmcBlockDeviceTest, BlockImplQuery) {
+TEST_P(SdmmcBlockDeviceTest, BlockImplQuery) {
   ASSERT_OK(StartDriverForMmc());
 
   size_t block_op_size;
@@ -388,7 +403,7 @@ TEST_F(SdmmcBlockDeviceTest, BlockImplQuery) {
   EXPECT_FALSE(info.flags & FLAG_REMOVABLE);
 }
 
-TEST_F(SdmmcBlockDeviceTest, BlockImplQuerySdRemovable) {
+TEST_P(SdmmcBlockDeviceTest, BlockImplQuerySdRemovable) {
   ASSERT_OK(StartDriverForSd());
 
   size_t block_op_size;
@@ -400,7 +415,7 @@ TEST_F(SdmmcBlockDeviceTest, BlockImplQuerySdRemovable) {
   EXPECT_TRUE(info.flags & FLAG_REMOVABLE);
 }
 
-TEST_F(SdmmcBlockDeviceTest, BlockImplQueue) {
+TEST_P(SdmmcBlockDeviceTest, BlockImplQueue) {
   ASSERT_OK(StartDriverForMmc());
 
   std::optional<block::Operation<OperationContext>> op1;
@@ -431,7 +446,8 @@ TEST_F(SdmmcBlockDeviceTest, BlockImplQueue) {
   user_.Queue(op4->operation(), OperationCallback, &ctx);
   user_.Queue(op5->operation(), OperationCallback, &ctx);
 
-  EXPECT_OK(sync_completion_wait(&ctx.completion, zx::duration::infinite().get()));
+  runtime_.PerformBlockingWork(
+      [&] { EXPECT_OK(sync_completion_wait(&ctx.completion, zx::duration::infinite().get())); });
 
   EXPECT_TRUE(op1->private_storage()->completed);
   EXPECT_TRUE(op2->private_storage()->completed);
@@ -451,7 +467,7 @@ TEST_F(SdmmcBlockDeviceTest, BlockImplQueue) {
   ASSERT_NO_FATAL_FAILURE(CheckVmo(op5->private_storage()->mapper, 10));
 }
 
-TEST_F(SdmmcBlockDeviceTest, BlockImplQueueOutOfRange) {
+TEST_P(SdmmcBlockDeviceTest, BlockImplQueueOutOfRange) {
   ASSERT_OK(StartDriverForMmc());
 
   std::optional<block::Operation<OperationContext>> op1;
@@ -485,7 +501,8 @@ TEST_F(SdmmcBlockDeviceTest, BlockImplQueueOutOfRange) {
   user_.Queue(op6->operation(), OperationCallback, &ctx);
   user_.Queue(op7->operation(), OperationCallback, &ctx);
 
-  EXPECT_OK(sync_completion_wait(&ctx.completion, zx::duration::infinite().get()));
+  runtime_.PerformBlockingWork(
+      [&] { EXPECT_OK(sync_completion_wait(&ctx.completion, zx::duration::infinite().get())); });
 
   EXPECT_TRUE(op1->private_storage()->completed);
   EXPECT_TRUE(op2->private_storage()->completed);
@@ -504,7 +521,7 @@ TEST_F(SdmmcBlockDeviceTest, BlockImplQueueOutOfRange) {
   EXPECT_OK(op7->private_storage()->status);
 }
 
-TEST_F(SdmmcBlockDeviceTest, NoCmd12ForSdBlockTransfer) {
+TEST_P(SdmmcBlockDeviceTest, NoCmd12ForSdBlockTransfer) {
   ASSERT_OK(StartDriverForSd());
 
   std::optional<block::Operation<OperationContext>> op1;
@@ -537,13 +554,14 @@ TEST_F(SdmmcBlockDeviceTest, NoCmd12ForSdBlockTransfer) {
   user_.Queue(op4->operation(), OperationCallback, &ctx);
   user_.Queue(op5->operation(), OperationCallback, &ctx);
 
-  EXPECT_OK(sync_completion_wait(&ctx.completion, zx::duration::infinite().get()));
+  runtime_.PerformBlockingWork(
+      [&] { EXPECT_OK(sync_completion_wait(&ctx.completion, zx::duration::infinite().get())); });
 
   const std::map<uint32_t, uint32_t> command_counts = sdmmc_.command_counts();
   EXPECT_EQ(command_counts.find(SDMMC_STOP_TRANSMISSION), command_counts.end());
 }
 
-TEST_F(SdmmcBlockDeviceTest, NoCmd12ForMmcBlockTransfer) {
+TEST_P(SdmmcBlockDeviceTest, NoCmd12ForMmcBlockTransfer) {
   ASSERT_OK(StartDriverForMmc());
 
   std::optional<block::Operation<OperationContext>> op1;
@@ -576,13 +594,14 @@ TEST_F(SdmmcBlockDeviceTest, NoCmd12ForMmcBlockTransfer) {
   user_.Queue(op4->operation(), OperationCallback, &ctx);
   user_.Queue(op5->operation(), OperationCallback, &ctx);
 
-  EXPECT_OK(sync_completion_wait(&ctx.completion, zx::duration::infinite().get()));
+  runtime_.PerformBlockingWork(
+      [&] { EXPECT_OK(sync_completion_wait(&ctx.completion, zx::duration::infinite().get())); });
 
   const std::map<uint32_t, uint32_t> command_counts = sdmmc_.command_counts();
   EXPECT_EQ(command_counts.find(SDMMC_STOP_TRANSMISSION), command_counts.end());
 }
 
-TEST_F(SdmmcBlockDeviceTest, ErrorsPropagate) {
+TEST_P(SdmmcBlockDeviceTest, ErrorsPropagate) {
   ASSERT_OK(StartDriverForMmc());
 
   std::optional<block::Operation<OperationContext>> op1;
@@ -612,7 +631,8 @@ TEST_F(SdmmcBlockDeviceTest, ErrorsPropagate) {
   user_.Queue(op4->operation(), OperationCallback, &ctx);
   user_.Queue(op5->operation(), OperationCallback, &ctx);
 
-  EXPECT_OK(sync_completion_wait(&ctx.completion, zx::duration::infinite().get()));
+  runtime_.PerformBlockingWork(
+      [&] { EXPECT_OK(sync_completion_wait(&ctx.completion, zx::duration::infinite().get())); });
 
   EXPECT_TRUE(op1->private_storage()->completed);
   EXPECT_TRUE(op2->private_storage()->completed);
@@ -627,7 +647,7 @@ TEST_F(SdmmcBlockDeviceTest, ErrorsPropagate) {
   EXPECT_NOT_OK(op5->private_storage()->status);
 }
 
-TEST_F(SdmmcBlockDeviceTest, SendCmd12OnCommandFailure) {
+TEST_P(SdmmcBlockDeviceTest, SendCmd12OnCommandFailure) {
   sdmmc_.set_host_info({
       .caps = 0,
       .max_transfer_size = fuchsia_hardware_block::wire::kMaxTransferUnbounded,
@@ -644,12 +664,13 @@ TEST_F(SdmmcBlockDeviceTest, SendCmd12OnCommandFailure) {
 
   user_.Queue(op1->operation(), OperationCallback, &ctx1);
 
-  EXPECT_OK(sync_completion_wait(&ctx1.completion, zx::duration::infinite().get()));
+  runtime_.PerformBlockingWork(
+      [&] { EXPECT_OK(sync_completion_wait(&ctx1.completion, zx::duration::infinite().get())); });
   EXPECT_TRUE(op1->private_storage()->completed);
   EXPECT_EQ(sdmmc_.command_counts().at(SDMMC_STOP_TRANSMISSION), 10);
 }
 
-TEST_F(SdmmcBlockDeviceTest, SendCmd12OnCommandFailureWhenAutoCmd12) {
+TEST_P(SdmmcBlockDeviceTest, SendCmd12OnCommandFailureWhenAutoCmd12) {
   sdmmc_.set_host_info({
       .caps = SDMMC_HOST_CAP_AUTO_CMD12,
       .max_transfer_size = fuchsia_hardware_block::wire::kMaxTransferUnbounded,
@@ -666,12 +687,13 @@ TEST_F(SdmmcBlockDeviceTest, SendCmd12OnCommandFailureWhenAutoCmd12) {
 
   user_.Queue(op2->operation(), OperationCallback, &ctx2);
 
-  EXPECT_OK(sync_completion_wait(&ctx2.completion, zx::duration::infinite().get()));
+  runtime_.PerformBlockingWork(
+      [&] { EXPECT_OK(sync_completion_wait(&ctx2.completion, zx::duration::infinite().get())); });
   EXPECT_TRUE(op2->private_storage()->completed);
   EXPECT_EQ(sdmmc_.command_counts().at(SDMMC_STOP_TRANSMISSION), 10);
 }
 
-TEST_F(SdmmcBlockDeviceTest, Trim) {
+TEST_P(SdmmcBlockDeviceTest, Trim) {
   ASSERT_OK(StartDriverForMmc());
 
   std::optional<block::Operation<OperationContext>> op1;
@@ -707,7 +729,8 @@ TEST_F(SdmmcBlockDeviceTest, Trim) {
   user_.Queue(op6->operation(), OperationCallback, &ctx);
   user_.Queue(op7->operation(), OperationCallback, &ctx);
 
-  EXPECT_OK(sync_completion_wait(&ctx.completion, zx::duration::infinite().get()));
+  runtime_.PerformBlockingWork(
+      [&] { EXPECT_OK(sync_completion_wait(&ctx.completion, zx::duration::infinite().get())); });
 
   ASSERT_NO_FATAL_FAILURE(CheckVmo(op3->private_storage()->mapper, 10, 0));
 
@@ -730,7 +753,7 @@ TEST_F(SdmmcBlockDeviceTest, Trim) {
   EXPECT_OK(op7->private_storage()->status);
 }
 
-TEST_F(SdmmcBlockDeviceTest, TrimErrors) {
+TEST_P(SdmmcBlockDeviceTest, TrimErrors) {
   ASSERT_OK(StartDriverForMmc());
 
   std::optional<block::Operation<OperationContext>> op1;
@@ -772,7 +795,8 @@ TEST_F(SdmmcBlockDeviceTest, TrimErrors) {
   user_.Queue(op4->operation(), OperationCallback, &ctx);
   user_.Queue(op5->operation(), OperationCallback, &ctx);
 
-  EXPECT_OK(sync_completion_wait(&ctx.completion, zx::duration::infinite().get()));
+  runtime_.PerformBlockingWork(
+      [&] { EXPECT_OK(sync_completion_wait(&ctx.completion, zx::duration::infinite().get())); });
 
   EXPECT_OK(op1->private_storage()->status);
   EXPECT_NOT_OK(op2->private_storage()->status);
@@ -781,7 +805,7 @@ TEST_F(SdmmcBlockDeviceTest, TrimErrors) {
   EXPECT_NOT_OK(op5->private_storage()->status);
 }
 
-TEST_F(SdmmcBlockDeviceTest, OnlyUserDataPartitionExists) {
+TEST_P(SdmmcBlockDeviceTest, OnlyUserDataPartitionExists) {
   sdmmc_.set_command_callback(MMC_SEND_EXT_CSD, [](cpp20::span<uint8_t> out_data) {
     out_data[MMC_EXT_CSD_CACHE_CTRL] = 1;
     out_data[MMC_EXT_CSD_CACHE_SIZE_LSB] = 0x78;
@@ -800,7 +824,7 @@ TEST_F(SdmmcBlockDeviceTest, OnlyUserDataPartitionExists) {
   EXPECT_EQ(block_device_->child_rpmb_device(), nullptr);
 }
 
-TEST_F(SdmmcBlockDeviceTest, BootPartitionsExistButNotUsed) {
+TEST_P(SdmmcBlockDeviceTest, BootPartitionsExistButNotUsed) {
   sdmmc_.set_command_callback(MMC_SEND_EXT_CSD, [](cpp20::span<uint8_t> out_data) {
     out_data[MMC_EXT_CSD_CACHE_CTRL] = 1;
     out_data[MMC_EXT_CSD_CACHE_SIZE_LSB] = 0x78;
@@ -820,7 +844,7 @@ TEST_F(SdmmcBlockDeviceTest, BootPartitionsExistButNotUsed) {
   EXPECT_EQ(block_device_->child_rpmb_device(), nullptr);
 }
 
-TEST_F(SdmmcBlockDeviceTest, WithBootPartitions) {
+TEST_P(SdmmcBlockDeviceTest, WithBootPartitions) {
   sdmmc_.set_command_callback(MMC_SEND_EXT_CSD, [](cpp20::span<uint8_t> out_data) {
     out_data[MMC_EXT_CSD_CACHE_CTRL] = 1;
     out_data[MMC_EXT_CSD_CACHE_SIZE_LSB] = 0x78;
@@ -842,7 +866,7 @@ TEST_F(SdmmcBlockDeviceTest, WithBootPartitions) {
   EXPECT_EQ(block_device_->child_rpmb_device(), nullptr);
 }
 
-TEST_F(SdmmcBlockDeviceTest, WithBootAndRpmbPartitions) {
+TEST_P(SdmmcBlockDeviceTest, WithBootAndRpmbPartitions) {
   sdmmc_.set_command_callback(MMC_SEND_EXT_CSD, [](cpp20::span<uint8_t> out_data) {
     out_data[MMC_EXT_CSD_CACHE_CTRL] = 1;
     out_data[MMC_EXT_CSD_CACHE_SIZE_LSB] = 0x78;
@@ -866,7 +890,7 @@ TEST_F(SdmmcBlockDeviceTest, WithBootAndRpmbPartitions) {
   EXPECT_NE(block_device_->child_rpmb_device(), nullptr);
 }
 
-TEST_F(SdmmcBlockDeviceTest, CompleteTransactions) {
+TEST_P(SdmmcBlockDeviceTest, CompleteTransactions) {
   ASSERT_OK(StartDriverForMmc());
 
   std::optional<block::Operation<OperationContext>> op1;
@@ -892,7 +916,8 @@ TEST_F(SdmmcBlockDeviceTest, CompleteTransactions) {
   user_.Queue(op4->operation(), OperationCallback, &ctx);
   user_.Queue(op5->operation(), OperationCallback, &ctx);
 
-  EXPECT_OK(sync_completion_wait(&ctx.completion, zx::duration::infinite().get()));
+  runtime_.PerformBlockingWork(
+      [&] { EXPECT_OK(sync_completion_wait(&ctx.completion, zx::duration::infinite().get())); });
 
   EXPECT_TRUE(op1->private_storage()->completed);
   EXPECT_TRUE(op2->private_storage()->completed);
@@ -901,7 +926,7 @@ TEST_F(SdmmcBlockDeviceTest, CompleteTransactions) {
   EXPECT_TRUE(op5->private_storage()->completed);
 }
 
-TEST_F(SdmmcBlockDeviceTest, CompleteTransactionsOnStop) {
+TEST_P(SdmmcBlockDeviceTest, CompleteTransactionsOnStop) {
   ASSERT_OK(StartDriverForMmc());
   // Stop the worker dispatcher so queued requests don't get completed.
   block_device_->StopWorkerDispatcher();
@@ -934,7 +959,8 @@ TEST_F(SdmmcBlockDeviceTest, CompleteTransactionsOnStop) {
   EXPECT_OK(dut_.Stop());
   block_device_ = nullptr;
 
-  EXPECT_OK(sync_completion_wait(&ctx.completion, zx::duration::infinite().get()));
+  runtime_.PerformBlockingWork(
+      [&] { EXPECT_OK(sync_completion_wait(&ctx.completion, zx::duration::infinite().get())); });
 
   EXPECT_TRUE(op1->private_storage()->completed);
   EXPECT_TRUE(op2->private_storage()->completed);
@@ -943,7 +969,7 @@ TEST_F(SdmmcBlockDeviceTest, CompleteTransactionsOnStop) {
   EXPECT_TRUE(op5->private_storage()->completed);
 }
 
-TEST_F(SdmmcBlockDeviceTest, ProbeMmcSendStatusRetry) {
+TEST_P(SdmmcBlockDeviceTest, ProbeMmcSendStatusRetry) {
   sdmmc_.set_command_callback(MMC_SEND_EXT_CSD, [](cpp20::span<uint8_t> out_data) {
     out_data[MMC_EXT_CSD_CACHE_CTRL] = 1;
     out_data[MMC_EXT_CSD_CACHE_SIZE_LSB] = 0x78;
@@ -967,7 +993,7 @@ TEST_F(SdmmcBlockDeviceTest, ProbeMmcSendStatusRetry) {
   EXPECT_OK(StartDriverForMmc());
 }
 
-TEST_F(SdmmcBlockDeviceTest, ProbeMmcSendStatusFail) {
+TEST_P(SdmmcBlockDeviceTest, ProbeMmcSendStatusFail) {
   sdmmc_.set_command_callback(MMC_SEND_EXT_CSD, [](cpp20::span<uint8_t> out_data) {
     out_data[MMC_EXT_CSD_CACHE_CTRL] = 1;
     out_data[MMC_EXT_CSD_CACHE_SIZE_LSB] = 0x78;
@@ -983,7 +1009,7 @@ TEST_F(SdmmcBlockDeviceTest, ProbeMmcSendStatusFail) {
   EXPECT_NOT_OK(StartDriverForMmc());
 }
 
-TEST_F(SdmmcBlockDeviceTest, QueryBootPartitions) {
+TEST_P(SdmmcBlockDeviceTest, QueryBootPartitions) {
   ASSERT_OK(StartDriverForMmc());
 
   ASSERT_TRUE(boot1_.is_valid());
@@ -1004,7 +1030,7 @@ TEST_F(SdmmcBlockDeviceTest, QueryBootPartitions) {
   EXPECT_EQ(boot2_op_size, kBlockOpSize);
 }
 
-TEST_F(SdmmcBlockDeviceTest, AccessBootPartitions) {
+TEST_P(SdmmcBlockDeviceTest, AccessBootPartitions) {
   ASSERT_OK(StartDriverForMmc());
 
   ASSERT_TRUE(boot1_.is_valid());
@@ -1033,7 +1059,8 @@ TEST_F(SdmmcBlockDeviceTest, AccessBootPartitions) {
   });
 
   boot1_.Queue(op1->operation(), OperationCallback, &ctx);
-  EXPECT_OK(sync_completion_wait(&ctx.completion, zx::duration::infinite().get()));
+  runtime_.PerformBlockingWork(
+      [&] { EXPECT_OK(sync_completion_wait(&ctx.completion, zx::duration::infinite().get())); });
 
   ctx.expected_operations.store(1);
   sync_completion_reset(&ctx.completion);
@@ -1046,7 +1073,8 @@ TEST_F(SdmmcBlockDeviceTest, AccessBootPartitions) {
   });
 
   boot2_.Queue(op2->operation(), OperationCallback, &ctx);
-  EXPECT_OK(sync_completion_wait(&ctx.completion, zx::duration::infinite().get()));
+  runtime_.PerformBlockingWork(
+      [&] { EXPECT_OK(sync_completion_wait(&ctx.completion, zx::duration::infinite().get())); });
 
   ctx.expected_operations.store(1);
   sync_completion_reset(&ctx.completion);
@@ -1059,7 +1087,8 @@ TEST_F(SdmmcBlockDeviceTest, AccessBootPartitions) {
   });
 
   user_.Queue(op3->operation(), OperationCallback, &ctx);
-  EXPECT_OK(sync_completion_wait(&ctx.completion, zx::duration::infinite().get()));
+  runtime_.PerformBlockingWork(
+      [&] { EXPECT_OK(sync_completion_wait(&ctx.completion, zx::duration::infinite().get())); });
 
   EXPECT_TRUE(op1->private_storage()->completed);
   EXPECT_TRUE(op2->private_storage()->completed);
@@ -1074,7 +1103,7 @@ TEST_F(SdmmcBlockDeviceTest, AccessBootPartitions) {
   ASSERT_NO_FATAL_FAILURE(CheckSdmmc(10, 500));
 }
 
-TEST_F(SdmmcBlockDeviceTest, BootPartitionRepeatedAccess) {
+TEST_P(SdmmcBlockDeviceTest, BootPartitionRepeatedAccess) {
   ASSERT_OK(StartDriverForMmc());
 
   ASSERT_TRUE(boot2_.is_valid());
@@ -1102,7 +1131,8 @@ TEST_F(SdmmcBlockDeviceTest, BootPartitionRepeatedAccess) {
   });
 
   boot2_.Queue(op1->operation(), OperationCallback, &ctx);
-  EXPECT_OK(sync_completion_wait(&ctx.completion, zx::duration::infinite().get()));
+  runtime_.PerformBlockingWork(
+      [&] { EXPECT_OK(sync_completion_wait(&ctx.completion, zx::duration::infinite().get())); });
 
   ctx.expected_operations.store(2);
   sync_completion_reset(&ctx.completion);
@@ -1113,7 +1143,8 @@ TEST_F(SdmmcBlockDeviceTest, BootPartitionRepeatedAccess) {
   boot2_.Queue(op2->operation(), OperationCallback, &ctx);
   boot2_.Queue(op3->operation(), OperationCallback, &ctx);
 
-  EXPECT_OK(sync_completion_wait(&ctx.completion, zx::duration::infinite().get()));
+  runtime_.PerformBlockingWork(
+      [&] { EXPECT_OK(sync_completion_wait(&ctx.completion, zx::duration::infinite().get())); });
 
   EXPECT_TRUE(op1->private_storage()->completed);
   EXPECT_TRUE(op2->private_storage()->completed);
@@ -1128,7 +1159,7 @@ TEST_F(SdmmcBlockDeviceTest, BootPartitionRepeatedAccess) {
   ASSERT_NO_FATAL_FAILURE(CheckSdmmc(2, 5));
 }
 
-TEST_F(SdmmcBlockDeviceTest, AccessBootPartitionOutOfRange) {
+TEST_P(SdmmcBlockDeviceTest, AccessBootPartitionOutOfRange) {
   ASSERT_OK(StartDriverForMmc());
 
   ASSERT_TRUE(boot1_.is_valid());
@@ -1160,7 +1191,8 @@ TEST_F(SdmmcBlockDeviceTest, AccessBootPartitionOutOfRange) {
   boot1_.Queue(op5->operation(), OperationCallback, &ctx);
   boot1_.Queue(op6->operation(), OperationCallback, &ctx);
 
-  EXPECT_OK(sync_completion_wait(&ctx.completion, zx::duration::infinite().get()));
+  runtime_.PerformBlockingWork(
+      [&] { EXPECT_OK(sync_completion_wait(&ctx.completion, zx::duration::infinite().get())); });
 
   EXPECT_TRUE(op1->private_storage()->completed);
   EXPECT_TRUE(op2->private_storage()->completed);
@@ -1177,7 +1209,7 @@ TEST_F(SdmmcBlockDeviceTest, AccessBootPartitionOutOfRange) {
   EXPECT_OK(op6->private_storage()->status);
 }
 
-TEST_F(SdmmcBlockDeviceTest, ProbeUsesPrefsHs) {
+TEST_P(SdmmcBlockDeviceTest, ProbeUsesPrefsHs) {
   sdmmc_.set_command_callback(MMC_SEND_EXT_CSD, [](cpp20::span<uint8_t> out_data) {
     out_data[MMC_EXT_CSD_CACHE_CTRL] = 1;
     out_data[MMC_EXT_CSD_CACHE_SIZE_LSB] = 0x78;
@@ -1199,7 +1231,7 @@ TEST_F(SdmmcBlockDeviceTest, ProbeUsesPrefsHs) {
   EXPECT_EQ(sdmmc_.timing(), SDMMC_TIMING_HS);
 }
 
-TEST_F(SdmmcBlockDeviceTest, ProbeUsesPrefsHsDdr) {
+TEST_P(SdmmcBlockDeviceTest, ProbeUsesPrefsHsDdr) {
   sdmmc_.set_command_callback(MMC_SEND_EXT_CSD, [](cpp20::span<uint8_t> out_data) {
     out_data[MMC_EXT_CSD_CACHE_CTRL] = 1;
     out_data[MMC_EXT_CSD_CACHE_SIZE_LSB] = 0x78;
@@ -1220,7 +1252,7 @@ TEST_F(SdmmcBlockDeviceTest, ProbeUsesPrefsHsDdr) {
   EXPECT_EQ(sdmmc_.timing(), SDMMC_TIMING_HSDDR);
 }
 
-TEST_F(SdmmcBlockDeviceTest, ProbeHs400) {
+TEST_P(SdmmcBlockDeviceTest, ProbeHs400) {
   sdmmc_.set_command_callback(MMC_SEND_EXT_CSD, [](cpp20::span<uint8_t> out_data) {
     out_data[MMC_EXT_CSD_CACHE_CTRL] = 1;
     out_data[MMC_EXT_CSD_CACHE_SIZE_LSB] = 0x78;
@@ -1260,7 +1292,7 @@ TEST_F(SdmmcBlockDeviceTest, ProbeHs400) {
   EXPECT_EQ(sdmmc_.timing(), SDMMC_TIMING_HS400);
 }
 
-TEST_F(SdmmcBlockDeviceTest, ProbeSd) {
+TEST_P(SdmmcBlockDeviceTest, ProbeSd) {
   ASSERT_OK(StartDriverForSd());
 
   size_t block_op_size;
@@ -1271,7 +1303,7 @@ TEST_F(SdmmcBlockDeviceTest, ProbeSd) {
   EXPECT_EQ(info.block_count, 0x38'1235 * 1024ul);
 }
 
-TEST_F(SdmmcBlockDeviceTest, RpmbPartition) {
+TEST_P(SdmmcBlockDeviceTest, RpmbPartition) {
   sdmmc_.set_command_callback(MMC_SEND_EXT_CSD, [](cpp20::span<uint8_t> out_data) {
     out_data[MMC_EXT_CSD_CACHE_CTRL] = 1;
     out_data[MMC_EXT_CSD_CACHE_SIZE_LSB] = 0x78;
@@ -1317,8 +1349,7 @@ TEST_F(SdmmcBlockDeviceTest, RpmbPartition) {
                                           &rx_frames));
 
   fuchsia_hardware_rpmb::wire::Request write_read_request = {};
-  ASSERT_OK(tx_frames.duplicate(ZX_RIGHT_READ | ZX_RIGHT_TRANSFER | ZX_RIGHT_MAP,
-                                &write_read_request.tx_frames.vmo));
+  ASSERT_OK(tx_frames.duplicate(ZX_RIGHT_SAME_RIGHTS, &write_read_request.tx_frames.vmo));
 
   write_read_request.tx_frames.offset = 1024;
   write_read_request.tx_frames.size = 1024;
@@ -1356,8 +1387,7 @@ TEST_F(SdmmcBlockDeviceTest, RpmbPartition) {
   ASSERT_NO_FATAL_FAILURE(CheckVmo(rx_frames_mapper, 2, 1));
 
   fuchsia_hardware_rpmb::wire::Request write_request = {};
-  ASSERT_OK(tx_frames.duplicate(ZX_RIGHT_READ | ZX_RIGHT_TRANSFER | ZX_RIGHT_MAP,
-                                &write_request.tx_frames.vmo));
+  ASSERT_OK(tx_frames.duplicate(ZX_RIGHT_SAME_RIGHTS, &write_request.tx_frames.vmo));
 
   write_request.tx_frames.offset = 0;
   write_request.tx_frames.size = 2048;
@@ -1386,7 +1416,7 @@ TEST_F(SdmmcBlockDeviceTest, RpmbPartition) {
   ASSERT_NO_FATAL_FAILURE(CheckSdmmc(4, 0));
 }
 
-TEST_F(SdmmcBlockDeviceTest, RpmbRequestLimit) {
+TEST_P(SdmmcBlockDeviceTest, RpmbRequestLimit) {
   sdmmc_.set_command_callback(MMC_SEND_EXT_CSD, [](cpp20::span<uint8_t> out_data) {
     out_data[MMC_EXT_CSD_CACHE_CTRL] = 1;
     out_data[MMC_EXT_CSD_CACHE_SIZE_LSB] = 0x78;
@@ -1531,7 +1561,7 @@ void SdmmcBlockDeviceTest::QueueRpmbRequests() {
   }
 }
 
-TEST_F(SdmmcBlockDeviceTest, RpmbRequestsGetToRun) {
+TEST_P(SdmmcBlockDeviceTest, RpmbRequestsGetToRun) {
   sdmmc_.set_command_callback(MMC_SEND_EXT_CSD, [](cpp20::span<uint8_t> out_data) {
     *reinterpret_cast<uint32_t*>(&out_data[212]) = htole32(FakeSdmmcDevice::kBlockCount);
     out_data[MMC_EXT_CSD_CACHE_CTRL] = 1;
@@ -1552,50 +1582,59 @@ TEST_F(SdmmcBlockDeviceTest, RpmbRequestsGetToRun) {
   ASSERT_TRUE(boot1_.is_valid());
   ASSERT_TRUE(boot2_.is_valid());
 
-  thrd_t block_thread;
-  EXPECT_EQ(thrd_create_with_name(
-                &block_thread,
-                [](void* ctx) -> int {
-                  reinterpret_cast<SdmmcBlockDeviceTest*>(ctx)->QueueBlockOps();
-                  return thrd_success;
-                },
-                this, "block-queue-thread"),
-            thrd_success);
+  thrd_t rpmb_thread;
+  EXPECT_EQ(
+      thrd_create_with_name(
+          &rpmb_thread,
+          [](void* ctx) -> int {
+            auto test = reinterpret_cast<SdmmcBlockDeviceTest*>(ctx);
 
-  zx::vmo vmo;
-  ASSERT_OK(zx::vmo::create(512, 0, &vmo));
+            zx::vmo vmo;
+            if (zx::vmo::create(512, 0, &vmo) != ZX_OK) {
+              return thrd_error;
+            }
 
-  std::atomic<uint32_t> ops_completed = 0;
-  sync_completion_t completion;
+            std::atomic<uint32_t> ops_completed = 0;
+            sync_completion_t completion;
 
-  for (uint32_t i = 0; i < kMaxOutstandingOps; i++) {
-    fuchsia_hardware_rpmb::wire::Request request = {};
-    EXPECT_OK(vmo.duplicate(ZX_RIGHT_SAME_RIGHTS, &request.tx_frames.vmo));
-    request.tx_frames.offset = 0;
-    request.tx_frames.size = 512;
+            for (uint32_t i = 0; i < kMaxOutstandingOps; i++) {
+              fuchsia_hardware_rpmb::wire::Request request = {};
+              EXPECT_OK(vmo.duplicate(ZX_RIGHT_SAME_RIGHTS, &request.tx_frames.vmo));
+              request.tx_frames.offset = 0;
+              request.tx_frames.size = 512;
 
-    rpmb_client_->Request(std::move(request))
-        .ThenExactlyOnce(
-            [&](fidl::WireUnownedResult<fuchsia_hardware_rpmb::Rpmb::Request>& result) {
-              if (!result.ok()) {
-                FAIL("Request failed: %s", result.error().FormatDescription().c_str());
-                return;
-              }
+              test->rpmb_client()
+                  ->Request(std::move(request))
+                  .ThenExactlyOnce(
+                      [&](fidl::WireUnownedResult<fuchsia_hardware_rpmb::Rpmb::Request>& result) {
+                        if (!result.ok()) {
+                          FAIL("Request failed: %s", result.error().FormatDescription().c_str());
+                          return;
+                        }
 
-              EXPECT_FALSE(result->is_error());
-              if ((ops_completed.fetch_add(1) + 1) == kMaxOutstandingOps) {
-                sync_completion_signal(&completion);
-              }
-            });
-  }
+                        EXPECT_FALSE(result->is_error());
+                        if ((ops_completed.fetch_add(1) + 1) == kMaxOutstandingOps) {
+                          sync_completion_signal(&completion);
+                        }
+                      });
+            }
 
-  sync_completion_wait(&completion, zx::duration::infinite().get());
+            sync_completion_wait(&completion, zx::duration::infinite().get());
 
-  run_threads_.store(false);
-  EXPECT_EQ(thrd_join(block_thread, nullptr), thrd_success);
+            test->run_threads().store(false);
+
+            return thrd_success;
+          },
+          this, "rpmb-queue-thread"),
+      thrd_success);
+
+  // Choose to run QueueBlockOps() using the foreground dispatcher, while
+  // fuchsia_hardware_sdmmc::Sdmmc is being served by the background dispatcher.
+  runtime_.PerformBlockingWork([this] { QueueBlockOps(); });
+  EXPECT_EQ(thrd_join(rpmb_thread, nullptr), thrd_success);
 }
 
-TEST_F(SdmmcBlockDeviceTest, BlockOpsGetToRun) {
+TEST_P(SdmmcBlockDeviceTest, BlockOpsGetToRun) {
   sdmmc_.set_command_callback(MMC_SEND_EXT_CSD, [](cpp20::span<uint8_t> out_data) {
     *reinterpret_cast<uint32_t*>(&out_data[212]) = htole32(FakeSdmmcDevice::kBlockCount);
     out_data[MMC_EXT_CSD_CACHE_CTRL] = 1;
@@ -1657,13 +1696,14 @@ TEST_F(SdmmcBlockDeviceTest, BlockOpsGetToRun) {
     user_.Queue(bop, op_callback, &context);
   }
 
-  sync_completion_wait(&context.completion, zx::duration::infinite().get());
+  runtime_.PerformBlockingWork(
+      [&] { sync_completion_wait(&context.completion, zx::duration::infinite().get()); });
 
   run_threads_.store(false);
   EXPECT_EQ(thrd_join(rpmb_thread, nullptr), thrd_success);
 }
 
-TEST_F(SdmmcBlockDeviceTest, GetRpmbClient) {
+TEST_P(SdmmcBlockDeviceTest, GetRpmbClient) {
   sdmmc_.set_command_callback(MMC_SEND_EXT_CSD, [](cpp20::span<uint8_t> out_data) {
     *reinterpret_cast<uint32_t*>(&out_data[212]) = htole32(FakeSdmmcDevice::kBlockCount);
     out_data[MMC_EXT_CSD_CACHE_CTRL] = 1;
@@ -1703,7 +1743,7 @@ TEST_F(SdmmcBlockDeviceTest, GetRpmbClient) {
   sync_completion_reset(&completion);
 }
 
-TEST_F(SdmmcBlockDeviceTest, Inspect) {
+TEST_P(SdmmcBlockDeviceTest, Inspect) {
   sdmmc_.set_command_callback(MMC_SEND_EXT_CSD, [](cpp20::span<uint8_t> out_data) {
     *reinterpret_cast<uint32_t*>(&out_data[212]) = htole32(FakeSdmmcDevice::kBlockCount);
     out_data[MMC_EXT_CSD_CACHE_CTRL] = 1;
@@ -1789,7 +1829,8 @@ TEST_F(SdmmcBlockDeviceTest, Inspect) {
 
   user_.Queue(op1->operation(), OperationCallback, &ctx1);
 
-  EXPECT_OK(sync_completion_wait(&ctx1.completion, zx::duration::infinite().get()));
+  runtime_.PerformBlockingWork(
+      [&] { EXPECT_OK(sync_completion_wait(&ctx1.completion, zx::duration::infinite().get())); });
 
   EXPECT_TRUE(op1->private_storage()->completed);
   EXPECT_OK(op1->private_storage()->status);
@@ -1818,7 +1859,8 @@ TEST_F(SdmmcBlockDeviceTest, Inspect) {
 
   user_.Queue(op2->operation(), OperationCallback, &ctx2);
 
-  EXPECT_OK(sync_completion_wait(&ctx2.completion, zx::duration::infinite().get()));
+  runtime_.PerformBlockingWork(
+      [&] { EXPECT_OK(sync_completion_wait(&ctx2.completion, zx::duration::infinite().get())); });
 
   EXPECT_TRUE(op2->private_storage()->completed);
   EXPECT_NOT_OK(op2->private_storage()->status);
@@ -1837,7 +1879,7 @@ TEST_F(SdmmcBlockDeviceTest, Inspect) {
   EXPECT_EQ(io_retries->value(), 9);
 }
 
-TEST_F(SdmmcBlockDeviceTest, InspectInvalidLifetime) {
+TEST_P(SdmmcBlockDeviceTest, InspectInvalidLifetime) {
   sdmmc_.set_command_callback(MMC_SEND_EXT_CSD, [](cpp20::span<uint8_t> out_data) {
     *reinterpret_cast<uint32_t*>(&out_data[212]) = htole32(FakeSdmmcDevice::kBlockCount);
     out_data[MMC_EXT_CSD_CACHE_CTRL] = 1;
@@ -1876,7 +1918,7 @@ TEST_F(SdmmcBlockDeviceTest, InspectInvalidLifetime) {
   EXPECT_EQ(max_lifetime->value(), 6);  // Only the valid value should be used.
 }
 
-TEST_F(SdmmcBlockDeviceTest, PowerSuspendResume) {
+TEST_P(SdmmcBlockDeviceTest, PowerSuspendResume) {
   sdmmc_.set_command_callback(MMC_SLEEP_AWAKE,
                               [](const sdmmc_req_t& req, uint32_t out_response[4]) {
                                 const bool sleep = (req.arg >> 15) & 0x1;
@@ -1896,6 +1938,8 @@ TEST_F(SdmmcBlockDeviceTest, PowerSuspendResume) {
   EXPECT_OK(block_device_->ResumePower());
   EXPECT_FALSE(block_device_->power_suspended());
 }
+
+INSTANTIATE_TEST_SUITE_P(SdmmcProtocolUsingFidlTest, SdmmcBlockDeviceTest, zxtest::Bool());
 
 }  // namespace sdmmc
 
