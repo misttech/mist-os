@@ -1066,7 +1066,7 @@ zx_status_t VmMapping::PageFaultLocked(vaddr_t va, const uint pf_flags,
 
     // Query aspace and adjust the mapping if there is already a page mapped here.
     zx::result map_result = AdjustMapping(va, pages[0], range.mmu_flags);
-    if (result.is_error()) {
+    if (map_result.is_error()) {
       return map_result.status_value();
     } else {
       already_mapped = map_result.value();
