@@ -291,7 +291,7 @@ def cmd_gn_label_to_ninja_paths(args: argparse.Namespace) -> int:
     for label in args.labels:
         paths = outputs.gn_label_to_paths(label)
         if not paths:
-            _error(f"Unknown GN label: {label}")
+            _error(f"Unknown GN label (not in the configured graph): {label}")
             failure = True
             continue
         all_paths.extend(paths)

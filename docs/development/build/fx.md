@@ -278,15 +278,25 @@ To view a list of all cache packages, you can run `fx list-packages --cache`.
 
 ### Building a specific target {#building-a-specific-target}
 
-`fx build` can be given the name of a specific target or file to build. For
-example, a target with the label `//examples/hello_world:hello_world` can be built with
-`fx build examples/hello_world:hello_world`.
+`fx build` can be given the name of a specific target or file to build.
 
-Note that this only works for targets declared in the default GN toolchain. For
-targets in other toolchains, the path of an output file may be used instead. For
-example, an executable target with the label
-`//foo/bar:blah(//build/toolchain:host_x64)` can be built with
-`fx build host_x64/blah`.
+If the experimental [build-with-labels] feature is enabled,
+one can pass the GN label directly to `fx build`. For example
+`fx build //examples/hello_world` will build the `//examples/hello_world:hello_world`
+GN target for Fuchsia, and `fx build --host //examples/hello_world` will build
+it for the host machine.
+
+If the feature is not enable, you can also pass a Ninja target path for one of your
+GN target's output. For GN targets defined in the default toolchain, GN defines Ninja
+aliases that look like the GN label without a starting `//` prefix, thus
+`fx build examples/hello_world:hello_world` will build the outputs of the GN
+target `//examples/hello_world` in the default toolchain.
+
+If the targets are declared in a non-default toolchain though, you will have to
+guess the Ninja output path, which is generally very tricky. For host binaries
+though, it is typically under the `host_x64` sub-directory. Hence
+`//foo/bar:blah(//build/toolchain:host_x64)` can be built with `fx build host_x64/blah`
+if that target is defined as an `executable()` only.
 
 See the [build system overview][build-overview] for a more detailed discussion
 of build targets.
@@ -679,6 +689,7 @@ To suppress the inclusion of `local/args.gn`, run `fx set ... --skip-local-args`
 <!-- Reference links -->
 
 [build-overview]: /docs/development/build/build_system/fuchsia_build_system_overview.md
+[build-with-labels]: /docs/development/build/build_with_labels.md
 [executing-tests]: /docs/development/testing/run_fuchsia_tests.md
 [ffx-target-flash]: https://fuchsia.dev/reference/tools/sdk/ffx#flash
 [fxb94507]: https://bugs.fuchsia.dev/p/fuchsia/issues/detail?id=94507

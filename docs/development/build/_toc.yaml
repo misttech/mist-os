@@ -22,6 +22,8 @@ toc:
     path: /docs/development/build/rust_toolchain.md
   - title: "Build Fuchsia with custom Rust"
     path: /docs/development/build/fuchsia_custom_rust.md
+  - title: "Build with GN labels"
+    path: /docs/development/build/build_with_labels.md
   - title: "Run the Rust test suite"
     path: /docs/development/build/rust_test_suite.md
   - title: "Run Clang static analysis"

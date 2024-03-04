@@ -226,7 +226,7 @@ tests=tests.json
         self.assert_output(
             ["gn_label_to_ninja_paths", "//unknown:label"],
             "",
-            expected_err="ERROR: Unknown GN label: //unknown:label\n",
+            expected_err="ERROR: Unknown GN label (not in the configured graph): //unknown:label\n",
             expected_status=1,
         )
 
