@@ -400,10 +400,8 @@ audio_core_test_package("virtualization_sound_tests_pkg") {
       max_severity = "ERROR"
     }
   }
-  audio_core_manifest_shards = [
-    "//src/media/audio/audio_core/meta/audio_core.shard.for_integration_tests.cml",
-    "//src/media/audio/audio_core/meta/audio_core.shard.ultrasound.cml",
-  ]
+  audio_core_manifest_shards =
+      [ "//src/media/audio/audio_core/meta/audio_core.shard.ultrasound.cml" ]
 }
 
 executable("virtualization_vsock_tests") {

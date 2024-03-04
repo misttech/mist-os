@@ -236,10 +236,8 @@ audio_core_api_test_component("volume-control-test") {
 # These tests can run anywhere, including in emulators.
 audio_core_test_package("audio-core-api-tests") {
   package_deps = [ ":audio-core-api-test-effects" ]
-  audio_core_manifest_shards = [
-    "//src/media/audio/audio_core/meta/audio_core.shard.for_integration_tests.cml",
-    "//src/media/audio/audio_core/meta/audio_core.shard.ultrasound.cml",
-  ]
+  audio_core_manifest_shards =
+      [ "//src/media/audio/audio_core/meta/audio_core.shard.ultrasound.cml" ]
 
   test_components = [
     ":activity-reporter-test",
@@ -265,10 +263,8 @@ audio_core_test_package("audio-core-api-tests") {
 # These tests can run anywhere, including in emulators.
 audio_core_test_package("audio-core-api-error-tests") {
   package_deps = [ ":audio-core-api-test-effects" ]
-  audio_core_manifest_shards = [
-    "//src/media/audio/audio_core/meta/audio_core.shard.for_integration_tests.cml",
-    "//src/media/audio/audio_core/meta/audio_core.shard.ultrasound.cml",
-  ]
+  audio_core_manifest_shards =
+      [ "//src/media/audio/audio_core/meta/audio_core.shard.ultrasound.cml" ]
 
   test_components = [
     ":audio-capturer-error-test",
@@ -290,10 +286,8 @@ audio_core_test_package("audio-core-api-error-tests") {
 # These tests have real-time constraints and must run on real hardware (emulators are too slow).
 audio_core_test_package("audio-core-api-pipeline-tests") {
   package_deps = [ ":audio-core-api-test-effects" ]
-  audio_core_manifest_shards = [
-    "//src/media/audio/audio_core/meta/audio_core.shard.for_integration_tests.cml",
-    "//src/media/audio/audio_core/meta/audio_core.shard.ultrasound.cml",
-  ]
+  audio_core_manifest_shards =
+      [ "//src/media/audio/audio_core/meta/audio_core.shard.ultrasound.cml" ]
 
   test_components = [
     ":audio-capturer-pipeline-test",
@@ -314,10 +308,8 @@ audio_core_test_package("audio-core-api-pipeline-tests") {
 # These tests have real-time constraints and must run on real hardware (emulators are too slow).
 audio_core_test_package("audio-core-api-pipeline-error-tests") {
   package_deps = [ ":audio-core-api-test-effects" ]
-  audio_core_manifest_shards = [
-    "//src/media/audio/audio_core/meta/audio_core.shard.for_integration_tests.cml",
-    "//src/media/audio/audio_core/meta/audio_core.shard.ultrasound.cml",
-  ]
+  audio_core_manifest_shards =
+      [ "//src/media/audio/audio_core/meta/audio_core.shard.ultrasound.cml" ]
 
   test_components = [ ":audio-renderer-pipeline-error-test" ]
 
@@ -333,10 +325,8 @@ audio_core_test_package("audio-core-api-pipeline-error-tests") {
 
 # These tests have real-time constraints and must run on real hardware (emulators are too slow).
 audio_core_test_package("audio_core_fidelity_tests") {
-  audio_core_manifest_shards = [
-    "//src/media/audio/audio_core/meta/audio_core.shard.for_integration_tests.cml",
-    "//src/media/audio/audio_core/meta/audio_core.shard.ultrasound.cml",
-  ]
+  audio_core_manifest_shards =
+      [ "//src/media/audio/audio_core/meta/audio_core.shard.ultrasound.cml" ]
 
   test_components = [ ":audio_core_fidelity_test" ]
 
@@ -354,7 +344,6 @@ audio_core_test_package("audio_core_thermal_tests") {
   package_deps = [ ":audio-core-api-test-effects" ]
   audio_core_manifest_shards = [
     "//sdk/lib/syslog/client.shard.cml",
-    "//src/media/audio/audio_core/meta/audio_core.shard.for_integration_tests.cml",
     "//src/media/audio/audio_core/meta/audio_core.shard.ultrasound.cml",
   ]
 

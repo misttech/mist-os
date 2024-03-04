@@ -342,20 +342,6 @@ HermeticAudioRealm::CtorArgs HermeticAudioRealm::BuildRealm(Options options,
       .targets = {ChildRef{kMockCobalt}},
   });
 
-  // Make audio_core's fuchsia.inspect.Tree readable by the test.
-  //
-  // Each component that includes //sdk/lib/inspect/client.shard.cml exposes a "/diagnostics"
-  // directory with a file named "/diagnostics/fuchsia.inspect.Tree", through which we can
-  // connect to the protocol with that name. Hence we map "/diagnostics" into this process.
-  builder.AddRoute({
-      .capabilities = {Directory{
-          .name = "diagnostics-for-integration-tests",
-          .as = "diagnostics-audio-core",
-      }},
-      .source = ChildRef{kAudioCore},
-      .targets = {ParentRef()},
-  });
-
   // Lastly, allow further customization.
   if (options.customize_realm) {
     auto status = options.customize_realm(builder);
