@@ -13,8 +13,8 @@ use crate::{
 };
 use starnix_logging::{log_error, log_warn, track_stub};
 use starnix_uapi::{
-    bpf_attr__bindgen_ty_4, bpf_insn, bpf_prog_type_BPF_PROG_TYPE_SOCKET_FILTER, errno, error,
-    errors::Errno,
+    bpf_attr__bindgen_ty_4, bpf_insn, bpf_prog_type_BPF_PROG_TYPE_KPROBE,
+    bpf_prog_type_BPF_PROG_TYPE_SOCKET_FILTER, errno, error, errors::Errno,
 };
 use ubpf::{
     error::EbpfError,
@@ -27,6 +27,7 @@ use ubpf::{
 #[derive(Debug, Eq, PartialEq)]
 pub enum ProgramType {
     SocketFilter,
+    KProbe,
     /// Unhandled program type.
     Unknown(u32),
 }
@@ -36,6 +37,7 @@ impl From<u32> for ProgramType {
         match program_type {
             #![allow(non_upper_case_globals)]
             bpf_prog_type_BPF_PROG_TYPE_SOCKET_FILTER => Self::SocketFilter,
+            bpf_prog_type_BPF_PROG_TYPE_KPROBE => Self::KProbe,
             program_type @ _ => {
                 track_stub!(
                     TODO("https://fxbug.dev/324043750"),
