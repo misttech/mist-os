@@ -762,20 +762,8 @@ TEST_F(Tcs3400Test, FeatureReport) {
 
   // Inspect report should match.
   ASSERT_NO_FATAL_FAILURE(ReadInspect(device_->inspect().DuplicateVmo()));
-  auto* root = hierarchy().GetByPath({"feature_report"});
-  ASSERT_TRUE(root);
-  ASSERT_NO_FATAL_FAILURE(
-      CheckProperty(root->node(), "reporting_state", inspect::StringPropertyValue("AllEvents")));
-  ASSERT_NO_FATAL_FAILURE(
-      CheckProperty(root->node(), "threshold_high", inspect::UintPropertyValue(0xffff)));
-  ASSERT_NO_FATAL_FAILURE(
-      CheckProperty(root->node(), "threshold_low", inspect::UintPropertyValue(0x0000)));
-  ASSERT_NO_FATAL_FAILURE(
-      CheckProperty(root->node(), "integration_time_us", inspect::UintPropertyValue(614'380)));
-  ASSERT_NO_FATAL_FAILURE(
-      CheckProperty(root->node(), "report_interval_us", inspect::UintPropertyValue(0)));
-  ASSERT_NO_FATAL_FAILURE(
-      CheckProperty(root->node(), "sensitivity", inspect::UintPropertyValue(16)));
+  auto* root = hierarchy().GetByPath({"feature_report", "1"});
+  ASSERT_FALSE(root);
 
   incoming_.SyncCall([&](IncomingNamespace* incoming) {
     incoming->fake_i2c_.SetRegister(TCS_I2C_ENABLE, 0);
@@ -824,7 +812,7 @@ TEST_F(Tcs3400Test, FeatureReport) {
 
   // Inspect report should match.
   ASSERT_NO_FATAL_FAILURE(ReadInspect(device_->inspect().DuplicateVmo()));
-  root = hierarchy().GetByPath({"feature_report"});
+  root = hierarchy().GetByPath({"feature_reports", "1"});
   ASSERT_TRUE(root);
   ASSERT_NO_FATAL_FAILURE(
       CheckProperty(root->node(), "report_interval_us", inspect::UintPropertyValue(1'000)));

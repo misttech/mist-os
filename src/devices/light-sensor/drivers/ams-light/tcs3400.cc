@@ -21,6 +21,7 @@
 #include <ddktl/metadata/light-sensor.h>
 #include <fbl/auto_lock.h>
 
+#include "lib/inspect/cpp/vmo/types.h"
 #include "tcs3400-regs.h"
 
 namespace {
@@ -88,6 +89,38 @@ bool FeatureValueValid(int64_t value, const T& axis) {
   return value >= axis.range.min && value <= axis.range.max;
 }
 
+constexpr size_t kMaxFeatureReports = 10;
+const inspect::StringReference kEventTime("event_time");
+const inspect::StringReference kReportingIntervalUs("report_interval_us");
+const inspect::StringReference kReportingState("reporting_state");
+const inspect::StringReference kSensitivity("sensitivity");
+const inspect::StringReference kThresholdHigh("threshold_high");
+const inspect::StringReference kThresholdLow("threshold_low");
+const inspect::StringReference kIntegrationTimeUs("integration_time_us");
+
+void RecordReport(inspect::Node& n, tcs::Tcs3400FeatureReport report) {
+  n.RecordUint(kEventTime, (report.event_time - zx::time()).to_nsecs());
+  n.RecordUint(kReportingIntervalUs, report.report_interval_us);
+  n.RecordUint(kSensitivity, report.sensitivity);
+  n.RecordUint(kThresholdHigh, report.threshold_high);
+  n.RecordUint(kThresholdLow, report.threshold_low);
+  n.RecordUint(kIntegrationTimeUs, report.integration_time_us);
+  switch (report.reporting_state) {
+    case fuchsia_input_report::SensorReportingState::kReportNoEvents:
+      n.RecordString(kReportingState, "NoEvents");
+      break;
+    case fuchsia_input_report::SensorReportingState::kReportAllEvents:
+      n.RecordString(kReportingState, "AllEvents");
+      break;
+    case fuchsia_input_report::SensorReportingState::kReportThresholdEvents:
+      n.RecordString(kReportingState, "ThresholdEvents");
+      break;
+    default:
+      n.RecordString(kReportingState, "Unknown");
+      break;
+  }
+}
+
 }  // namespace
 
 namespace tcs {
@@ -131,27 +164,46 @@ fuchsia_input_report::wire::FeatureReport Tcs3400FeatureReport::ToFidlFeatureRep
       .Build();
 }
 
-void Tcs3400FeatureReport::UpdateInspect(InspectTcs3400FeatureReport* inspect) const {
-  inspect->threshold_low.Set(threshold_low);
-  inspect->threshold_high.Set(threshold_high);
-  inspect->sensitivity.Set(sensitivity);
-  inspect->report_interval_us.Set(report_interval_us);
-  switch (reporting_state) {
+InspectTcs3400FeatureReport::InspectTcs3400FeatureReport(inspect::Node n,
+                                                         const Tcs3400FeatureReport& report)
+    : node(std::move(n)),
+      event_time(node.CreateUint(kEventTime, 0)),
+      report_interval_us(node.CreateUint(kReportingIntervalUs, 0)),
+      reporting_state(node.CreateString(kReportingState, "Unknown")),
+      sensitivity(node.CreateUint(kSensitivity, 0)),
+      threshold_high(node.CreateUint(kThresholdHigh, 0)),
+      threshold_low(node.CreateUint(kThresholdLow, 0)),
+      integration_time_us(node.CreateUint(kIntegrationTimeUs, 0)) {
+  event_time.Set((zx::clock::get_monotonic() - zx::time()).to_nsecs());
+  threshold_low.Set(report.threshold_low);
+  threshold_high.Set(report.threshold_high);
+  sensitivity.Set(report.sensitivity);
+  report_interval_us.Set(report.report_interval_us);
+  switch (report.reporting_state) {
     case fuchsia_input_report::SensorReportingState::kReportNoEvents:
-      inspect->reporting_state.Set("NoEvents");
+      reporting_state.Set("NoEvents");
       break;
     case fuchsia_input_report::SensorReportingState::kReportAllEvents:
-      inspect->reporting_state.Set("AllEvents");
+      reporting_state.Set("AllEvents");
       break;
     case fuchsia_input_report::SensorReportingState::kReportThresholdEvents:
-      inspect->reporting_state.Set("ThresholdEvents");
+      reporting_state.Set("ThresholdEvents");
       break;
     default:
-      inspect->reporting_state.Set("Unknown");
+      reporting_state.Set("Unknown");
       break;
   }
-  inspect->integration_time_us.Set(integration_time_us);
+  integration_time_us.Set(report.integration_time_us);
 }
+
+Tcs3400Device::Tcs3400Device(zx_device_t* device, async_dispatcher_t* dispatcher,
+                             ddk::I2cChannel i2c, fidl::ClientEnd<fuchsia_hardware_gpio::Gpio> gpio)
+    : DeviceType(device),
+      dispatcher_(dispatcher),
+      i2c_(std::move(i2c)),
+      gpio_(std::move(gpio)),
+      inspect_reports_(inspect::contrib::BoundedListNode(
+          inspect_.GetRoot().CreateChild("feature_reports"), kMaxFeatureReports)) {}
 
 zx::result<Tcs3400InputReport> Tcs3400Device::ReadInputRpt() {
   Tcs3400InputReport report{.event_time = zx::clock::get_monotonic()};
@@ -461,6 +513,7 @@ void Tcs3400Device::SetFeatureReport(SetFeatureReportRequestView request,
   Tcs3400FeatureReport feature_report;
   {
     fbl::AutoLock lock(&feature_lock_);
+    feature_rpt_.event_time = zx::clock::get_monotonic();
     feature_rpt_.report_interval_us = report.sensor().report_interval();
     feature_rpt_.reporting_state = report.sensor().reporting_state();
     feature_rpt_.sensitivity = report.sensor().sensitivity()[0];
@@ -469,7 +522,8 @@ void Tcs3400Device::SetFeatureReport(SetFeatureReportRequestView request,
     feature_rpt_.integration_time_us = atime * kIntegrationTimeStepSizeMicroseconds;
     feature_report = feature_rpt_;
   }
-  feature_report.UpdateInspect(&inspect_report_);
+  inspect_reports_.CreateEntry(
+      [feature_report](inspect::Node& n) { RecordReport(n, feature_report); });
 
   Configure();
   completer.ReplySuccess();
@@ -617,7 +671,8 @@ zx_status_t Tcs3400Device::InitMetadata() {
     feature_rpt_.integration_time_us = atime * kIntegrationTimeStepSizeMicroseconds;
     feature_report = feature_rpt_;
   }
-  feature_report.UpdateInspect(&inspect_report_);
+  inspect_reports_.CreateEntry(
+      [feature_report](inspect::Node& n) { RecordReport(n, feature_report); });
 
   Configure();
   return ZX_OK;
