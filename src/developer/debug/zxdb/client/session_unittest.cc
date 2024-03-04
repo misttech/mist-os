@@ -9,6 +9,7 @@
 
 #include <gtest/gtest.h>
 
+#include "src/developer/debug/shared/stream_buffer.h"
 #include "src/developer/debug/zxdb/client/breakpoint.h"
 #include "src/developer/debug/zxdb/client/breakpoint_settings.h"
 #include "src/developer/debug/zxdb/client/filter.h"
@@ -26,6 +27,12 @@ namespace {
 using debug::MessageLoop;
 
 class SessionTest;
+
+// An implementation of StreamBuffer::Writer that discards all data.
+class NullStreamBufferWriter : public debug::StreamBuffer::Writer {
+ public:
+  size_t ConsumeStreamBufferData(const char* data, size_t len) override { return len; }
+};
 
 class SessionSink : public RemoteAPI {
  public:
@@ -504,6 +511,22 @@ TEST_F(SessionTest, DisableAutoAttachToLimbo) {
   // Not automatically attached because |kAutoAttachLimbo| was explicitly set to false.
   ASSERT_EQ(targets.size(), 1u);
   EXPECT_EQ(targets[0]->GetState(), Target::State::kNone);
+}
+
+// Tests that certain operations requiring the architecture work as soon as a Session is created for
+// a "local" connection with a StreamBuffer. This sends an internal "hello" message but the Session
+// is in a partially constructed state until the asynchronous hello reply is handled.
+TEST(SessionRaw, ArchOnInit) {
+  // This buffer doesn't need to go anywhere since this test expects to run before any data is
+  // "received" back from the remote side.
+  NullStreamBufferWriter null_writer;
+  debug::StreamBuffer buffer;
+  buffer.set_writer(&null_writer);
+
+  Session session(&buffer);
+  // Platform is "unknown" before hello reply.
+  EXPECT_EQ(debug::Arch::kUnknown, session.arch());
+  EXPECT_EQ(debug::Arch::kUnknown, session.arch_info().arch());
 }
 
 }  // namespace zxdb

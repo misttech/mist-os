@@ -308,6 +308,10 @@ Session::Session(debug::StreamBuffer* stream)
       remote_api_(std::make_unique<RemoteAPIImpl>(this)),
       system_(this),
       weak_factory_(this) {
+  // The architecture will get set by the "local hello" reply but that's asynchronous. We want to
+  // be sure the architecture pointer is guaranteed non-null during that time.
+  SetArch(debug::Arch::kUnknown, debug::Platform::kUnknown, 0);
+
   ListenForSystemSettings();
   SendLocalHello([](const Err&) {});
 }
