@@ -49,6 +49,12 @@ EOF
   else
     btf::make_mock "${_FUCHSIA_DIR}/tools/devshell/lib/metrics.sh"
     cat > "${_FUCHSIA_DIR}/tools/devshell/lib/metrics.sh.mock_side_effects" <<EOF
+  function metrics-init {
+    :
+  }
+  function track-feature-status {
+    :
+  }
   function track-command-execution {
    :
   }

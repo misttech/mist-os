@@ -65,11 +65,9 @@ RBE_WRAPPER=( "$FUCHSIA_DIR"/build/rbe/fuchsia-reproxy-wrap.sh -- )
 # NOTE: this function depends on FUCHSIA_BUILD_DIR which is set only after
 # initialization.
 function fx-rbe-enabled {
-  fx-build-dir-if-present || {
-    fx-error "No build directory found."
-    fx-error "Run \"fx set\" to create a new build directory, or specify one with --dir"
-    exit 1
-  }
+  # This function is called during tests without a build directory.
+  # Return failure ot indicate that RBE is not enabled.
+  fx-build-dir-if-present || return 1
   if grep -q -w -e "enable_rbe" "${FUCHSIA_BUILD_DIR}/args.gn" ; then
     fx-warn "The 'enable_rbe' GN arg has been renamed to 'rust_rbe_enable'."
     fx-warn "Please update your ${FUCHSIA_BUILD_DIR}/args.gn file (fx args)."

@@ -33,7 +33,13 @@ BT_SET_UP() {
   BT_ASSERT_FILE_EXISTS "${fx}"
 
   cat > "${_FUCHSIA_DIR}/tools/devshell/lib/metrics.sh.mock_side_effects" <<EOF
+  function metrics-init {
+    echo ""
+  }
   function track-command-execution {
+    echo ""
+  }
+  function track-feature-status {
     echo ""
   }
   function track-command-finished {

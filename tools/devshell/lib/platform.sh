@@ -3,6 +3,19 @@
 # Copyright 2019 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
+
+# This file can be sourced multiple times, since it defines readonly
+# variables, the second source will create Bash warnings, so use a
+# guard variable to avoid this.
+#
+# NOTE: This file can be sourced with `set -u` in effect, so
+# simply expanding _lib_platform_sh_sourced when not defined will
+# result in an error.
+
+if [[ -z "${_lib_platform_sh_sourced:-}" ]]; then
+
+readonly _lib_platform_sh_sourced=true
+
 # Use the OSTYPE and MACHTYPE Bash builtin variables to determine host
 # machine type.
 case "$OSTYPE" in
@@ -77,3 +90,5 @@ PREBUILT_ALL_PATHS+="${PREBUILT_PYTHON3_DIR}/bin:"
 PREBUILT_ALL_PATHS+="${PREBUILT_QEMU_DIR}/bin:"
 PREBUILT_ALL_PATHS+="${PREBUILT_RUST_DIR}/bin"
 readonly PREBUILT_ALL_PATHS
+
+fi  # !_lib_platform_sh_sourced
