@@ -2,38 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-/// A pair of core and bindings contexts.
-///
-/// This trait exists so implementers can be agnostic on the storage of the
-/// contexts, since all we need from a context pair is mutable references from
-/// both contexts.
-pub trait ContextPair {
-    type CoreContext;
-    type BindingsContext;
+//! Base type definitions for netstack3 core.
+//!
+//! This crate contains definitions common to the other netstack3 core crates
+//! and is the base dependency for most of them.
 
-    /// Gets a mutable reference to both contexts.
-    fn contexts(&mut self) -> (&mut Self::CoreContext, &mut Self::BindingsContext);
+mod context;
 
-    /// Gets a mutable reference to the core context.
-    fn core_ctx(&mut self) -> &mut Self::CoreContext {
-        let (core_ctx, _) = self.contexts();
-        core_ctx
-    }
-
-    /// Gets a mutable reference to the bindings context.
-    fn bindings_ctx(&mut self) -> &mut Self::BindingsContext {
-        let (_, bindings_ctx) = self.contexts();
-        bindings_ctx
-    }
-}
-
-impl<'a, C> ContextPair for &'a mut C
-where
-    C: ContextPair,
-{
-    type CoreContext = C::CoreContext;
-    type BindingsContext = C::BindingsContext;
-    fn contexts(&mut self) -> (&mut Self::CoreContext, &mut Self::BindingsContext) {
-        C::contexts(self)
-    }
-}
+pub use context::ContextPair;
