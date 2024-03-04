@@ -16,7 +16,6 @@ import (
 	"runtime"
 	"sync"
 
-	versionHistory "go.fuchsia.dev/fuchsia/src/lib/versioning/version-history/go"
 	"go.fuchsia.dev/fuchsia/src/sys/pkg/bin/pm/pkg"
 	far "go.fuchsia.dev/fuchsia/src/sys/pkg/lib/far/go"
 	"go.fuchsia.dev/fuchsia/src/sys/pkg/lib/merkle"
@@ -248,7 +247,7 @@ func Update(cfg *Config) error {
 }
 
 func writeABIRevision(cfg *Config, manifest *Manifest) error {
-	// Read the ABI file from the manifest, if it exists, and validate it.
+	// Read the ABI file from the manifest, if it exists.
 	manifestABIRevision, err := readABIRevision(manifest)
 	if err != nil {
 		return err
@@ -329,14 +328,7 @@ func ReadABIRevisionFromFile(abiPath string) (*uint64, error) {
 
 	abiRevision := binary.LittleEndian.Uint64(abiRevisionBytes)
 
-	// Make sure the ABI revision is a known value.
-	for _, version := range versionHistory.Versions() {
-		if version.ABIRevision == abiRevision {
-			return &abiRevision, nil
-		}
-	}
-
-	return nil, fmt.Errorf("ABI Revision %d is not defined in the SDK", abiRevision)
+	return &abiRevision, nil
 }
 
 // ErrRequiredFileMissing is returned by operations when the operation depends

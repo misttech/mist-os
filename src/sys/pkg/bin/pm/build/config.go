@@ -84,42 +84,13 @@ func (c *Config) InitFlags(fs *flag.FlagSet) {
 	fs.StringVar(&c.PkgRepository, "r", c.PkgRepository, "repository of the packages")
 	fs.StringVar(&c.SubpackagesPath, "subpackages", c.SubpackagesPath, "metafile of subpackages")
 	fs.Func("api-level", "package API level", func(value string) error {
-		if c.PkgABIRevision != 0 {
-			return fmt.Errorf("cannot specify both --api-level and --abi-revision")
-		}
-
 		apiLevel, err := strconv.ParseUint(value, 0, 64)
 		if err != nil {
 			return err
 		}
 
-		for _, version := range versionHistory.Versions() {
-			if version.APILevel == apiLevel {
-				c.PkgABIRevision = version.ABIRevision
-				return nil
-			}
-		}
-
-		return fmt.Errorf("API level %d is not defined in the SDK", apiLevel)
-	})
-	fs.Func("abi-revision", "package ABI revision", func(value string) error {
-		if c.PkgABIRevision != 0 {
-			return fmt.Errorf("cannot specify both --api-level and --abi-revision")
-		}
-
-		abiRevision, err := strconv.ParseUint(value, 0, 64)
-		if err != nil {
-			return err
-		}
-
-		for _, version := range versionHistory.Versions() {
-			if version.ABIRevision == abiRevision {
-				c.PkgABIRevision = abiRevision
-				return nil
-			}
-		}
-
-		return fmt.Errorf("ABI Revision %d is not defined in the SDK", abiRevision)
+		c.PkgABIRevision, err = versionHistory.History().CheckApiLevelForBuild(apiLevel)
+		return err
 	})
 }
 

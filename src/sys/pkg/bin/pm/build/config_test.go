@@ -6,13 +6,10 @@ package build
 
 import (
 	"flag"
-	"fmt"
 	"os"
 	"path/filepath"
 	"reflect"
 	"testing"
-
-	versionHistory "go.fuchsia.dev/fuchsia/src/lib/versioning/version-history/go"
 )
 
 func TestRepository(t *testing.T) {
@@ -58,18 +55,6 @@ func TestOrderedBlobInfo(t *testing.T) {
 	}
 }
 
-func TestCannotParseAPILevelAndABIRevision(t *testing.T) {
-	cfg := TestConfig()
-	defer os.RemoveAll(filepath.Dir(cfg.TempDir))
-
-	fs := flag.NewFlagSet("test", flag.ContinueOnError)
-	cfg.InitFlags(fs)
-
-	if err := fs.Parse([]string{"--api-level", "6", "--abi-revision", fmt.Sprintf("%d", TestABIRevision)}); err == nil {
-		t.Fatalf("expected an error, but parsed ABI revision %x", cfg.PkgABIRevision)
-	}
-}
-
 func TestParseAPILevelIntoABIRevision(t *testing.T) {
 	cfg := TestConfig()
 	defer os.RemoveAll(filepath.Dir(cfg.TempDir))
@@ -84,65 +69,5 @@ func TestParseAPILevelIntoABIRevision(t *testing.T) {
 	}
 	if cfg.PkgABIRevision != TestABIRevision {
 		t.Fatalf("expected ABI revision %x, not %x", TestABIRevision, cfg.PkgABIRevision)
-	}
-}
-
-func TestParseABIRevisionAsDecimal(t *testing.T) {
-	cfg := TestConfig()
-	defer os.RemoveAll(filepath.Dir(cfg.TempDir))
-
-	cfg.PkgABIRevision = 0
-
-	fs := flag.NewFlagSet("test", flag.ContinueOnError)
-	cfg.InitFlags(fs)
-
-	if err := fs.Parse([]string{"--abi-revision", fmt.Sprintf("%d", TestABIRevision)}); err != nil {
-		t.Fatal(err)
-	}
-	if cfg.PkgABIRevision != TestABIRevision {
-		t.Fatalf("expected ABI revision %x, not %x", TestABIRevision, cfg.PkgABIRevision)
-	}
-}
-
-func TestParseABIRevisionAsHex(t *testing.T) {
-	cfg := TestConfig()
-	defer os.RemoveAll(filepath.Dir(cfg.TempDir))
-
-	cfg.PkgABIRevision = 0
-
-	fs := flag.NewFlagSet("test", flag.ContinueOnError)
-	cfg.InitFlags(fs)
-
-	if err := fs.Parse([]string{"--abi-revision", fmt.Sprintf("0x%x", TestABIRevision)}); err != nil {
-		t.Fatal(err)
-	}
-	if cfg.PkgABIRevision != TestABIRevision {
-		t.Fatalf("expected ABI revision %x, not %x", TestABIRevision, cfg.PkgABIRevision)
-	}
-}
-
-func TestParseUnknownABIRevision(t *testing.T) {
-	cfg := TestConfig()
-	defer os.RemoveAll(filepath.Dir(cfg.TempDir))
-
-	fs := flag.NewFlagSet("test", flag.ContinueOnError)
-	cfg.InitFlags(fs)
-
-	// Find an unknown ABI revision by first making a set of all the known
-	// versions, and picking one that's not in the set.
-	abiRevisions := make(map[uint64]struct{})
-	for _, version := range versionHistory.Versions() {
-		abiRevisions[version.ABIRevision] = struct{}{}
-	}
-	var abiRevision uint64 = 1
-	for {
-		if _, ok := abiRevisions[abiRevision]; !ok {
-			break
-		}
-		abiRevision += 1
-	}
-
-	if err := fs.Parse([]string{"--abi-revision", fmt.Sprintf("%d", abiRevision)}); err == nil {
-		t.Fatalf("expected an error, but parsed ABI revision %x", cfg.PkgABIRevision)
 	}
 }

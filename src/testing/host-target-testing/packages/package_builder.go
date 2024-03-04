@@ -122,7 +122,7 @@ func tempConfig(dir string, name string, version string, repository string) (*bu
 		PkgName:        name,
 		PkgVersion:     version,
 		PkgRepository:  repository,
-		PkgABIRevision: latestABIRevision(),
+		PkgABIRevision: versionHistory.History().ExampleSupportedAbiRevisionForTests(),
 	}
 
 	for _, d := range []string{cfg.OutputDir, cfg.TempDir} {
@@ -132,14 +132,6 @@ func tempConfig(dir string, name string, version string, repository string) (*bu
 	}
 
 	return cfg, nil
-}
-
-// Find and return the latest ABI revision,
-func latestABIRevision() uint64 {
-	versions := versionHistory.Versions()
-
-	// Use the most recent ABI version, which is the last one in the list.
-	return versions[len(versions)-1].ABIRevision
 }
 
 // Publish the package to the repository. Returns the TUF package path and

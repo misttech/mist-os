@@ -14,7 +14,7 @@ import (
 
 //go:embed version_history.json
 var versionHistoryBytes []byte
-var versions []Version
+var history VersionHistory
 
 const versionHistorySchemaId string = "https://fuchsia.dev/schema/version_history-22rnd667.json"
 const versionHistoryName string = "Platform version map"
@@ -34,12 +34,12 @@ type Version struct {
 	Status      Status
 }
 
-type versionHistory struct {
-	SchemaId string             `json:"schema_id"`
-	Data     versionHistoryData `json:"data"`
+type versionHistoryJson struct {
+	SchemaId string                 `json:"schema_id"`
+	Data     versionHistoryDataJson `json:"data"`
 }
 
-type versionHistoryData struct {
+type versionHistoryDataJson struct {
 	Name      string              `json:"name"`
 	Type      string              `json:"type"`
 	APILevels map[string]apiLevel `json:"api_levels"`
@@ -51,7 +51,7 @@ type apiLevel struct {
 }
 
 func parseVersionHistory(b []byte) ([]Version, error) {
-	var vh versionHistory
+	var vh versionHistoryJson
 
 	// Load external JSON of SDK version history
 	if err := json.Unmarshal(b, &vh); err != nil {
@@ -94,14 +94,68 @@ func parseVersionHistory(b []byte) ([]Version, error) {
 	return vs, nil
 }
 
+// VersionHistory stores the history of Fuchsia API levels, and lets callers
+// query the support status of API levels and ABI revisions.
+type VersionHistory struct {
+	versions []Version
+}
+
+// NewForTesting constructs a new VersionHistory instance, so you can have your
+// own hermetic "alternate history" that doesn't change over time. Outside of
+// tests, callers should use the History() top-level function in this package.
+//
+// If you're not testing versioning in particular, and you just want an API
+// level/ABI revision that works, see ExampleSupportedAbiRevisionForTests.
+func NewForTesting(versions []Version) *VersionHistory {
+	return &VersionHistory{versions: versions}
+}
+
+// ExampleSupportedAbiRevisionForTests returns an ABI revision to be used in
+// tests that create components on the fly and need to specify a supported ABI
+// revision, but don't particularly care which. The returned ABI revision will
+// be consistent within a given build, but may change from build to build.
+func (vh *VersionHistory) ExampleSupportedAbiRevisionForTests() uint64 {
+	return vh.versions[len(vh.versions)-1].ABIRevision
+}
+
+// CheckApiLevelForBuild checks whether the platform supports building
+// components that target the given API level, and if so, returns the ABI
+// revision associated with that API level.
+//
+// TODO: https://fxbug.dev/326096347 - This doesn't actually check that the API
+// level is supported, merely that it exists. At time of writing, this is the
+// behavior implemented by `pm`, so I'm keeping it consistent in the interest of
+// no-op refactoring.
+func (vh *VersionHistory) CheckApiLevelForBuild(apiLevel uint64) (abiRevision uint64, err error) {
+	v := vh.versionFromApiLevel(apiLevel)
+	if v == nil {
+		return 0, fmt.Errorf(
+			"Unknown target API level: %d. The SDK may be too old to support it?",
+			apiLevel)
+	}
+
+	return v.ABIRevision, nil
+}
+
+func (vh *VersionHistory) versionFromApiLevel(apiLevel uint64) *Version {
+	for _, v := range vh.versions {
+		if v.APILevel == apiLevel {
+			return &v
+		}
+	}
+	return nil
+}
+
 func init() {
 	v, err := parseVersionHistory(versionHistoryBytes)
 	if err != nil {
 		panic(fmt.Sprintf("failed to parse version_history.json: %s", err))
 	}
-	versions = v
+	history.versions = v
 }
 
-func Versions() []Version {
-	return versions
+// History returns the global VersionHistory instance generated at build-time
+// from the contents of `//sdk/version_history.json`.
+func History() *VersionHistory {
+	return &history
 }

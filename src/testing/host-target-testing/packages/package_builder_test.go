@@ -14,6 +14,7 @@ import (
 	"runtime"
 	"testing"
 
+	versionHistory "go.fuchsia.dev/fuchsia/src/lib/versioning/version-history/go"
 	"go.fuchsia.dev/fuchsia/src/sys/pkg/bin/pm/build"
 	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/ffx"
 )
@@ -32,7 +33,7 @@ func createTestPackage(t *testing.T, dir string) (*Repository, build.MerkleRoot)
 	config := build.TestConfig()
 	t.Logf("Creating meta.far in %s", config.OutputDir)
 
-	config.PkgABIRevision = latestABIRevision()
+	config.PkgABIRevision = versionHistory.History().ExampleSupportedAbiRevisionForTests()
 
 	build.BuildTestPackage(config)
 	defer os.RemoveAll(filepath.Dir(config.OutputDir))

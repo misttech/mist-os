@@ -28,9 +28,9 @@ func TestCompiledVersionMatchesBuildVersion(t *testing.T) {
 }
 
 func TestParseHistoryWorks(t *testing.T) {
-	b, err := json.Marshal(versionHistory{
+	b, err := json.Marshal(versionHistoryJson{
 		SchemaId: versionHistorySchemaId,
-		Data: versionHistoryData{
+		Data: versionHistoryDataJson{
 			Name: versionHistoryName,
 			Type: versionHistoryType,
 			APILevels: map[string]apiLevel{
@@ -59,9 +59,9 @@ func TestParseHistoryWorks(t *testing.T) {
 }
 
 func TestParseHistoryRejectsInvalidSchema(t *testing.T) {
-	b, err := json.Marshal(&versionHistory{
+	b, err := json.Marshal(&versionHistoryJson{
 		SchemaId: "some-schema",
-		Data: versionHistoryData{
+		Data: versionHistoryDataJson{
 			Name:      versionHistoryName,
 			Type:      versionHistoryType,
 			APILevels: map[string]apiLevel{},
@@ -78,9 +78,9 @@ func TestParseHistoryRejectsInvalidSchema(t *testing.T) {
 }
 
 func TestParseHistoryRejectsInvalidName(t *testing.T) {
-	b, err := json.Marshal(&versionHistory{
+	b, err := json.Marshal(&versionHistoryJson{
 		SchemaId: versionHistorySchemaId,
-		Data: versionHistoryData{
+		Data: versionHistoryDataJson{
 			Name:      "some-name",
 			Type:      versionHistoryType,
 			APILevels: map[string]apiLevel{},
@@ -97,9 +97,9 @@ func TestParseHistoryRejectsInvalidName(t *testing.T) {
 }
 
 func TestParseHistoryRejectsInvalidType(t *testing.T) {
-	b, err := json.Marshal(&versionHistory{
+	b, err := json.Marshal(&versionHistoryJson{
 		SchemaId: versionHistorySchemaId,
-		Data: versionHistoryData{
+		Data: versionHistoryDataJson{
 			Name:      versionHistoryName,
 			Type:      "some-type",
 			APILevels: map[string]apiLevel{},
@@ -122,9 +122,9 @@ func TestParseHistoryRejectsInvalidVersions(t *testing.T) {
 		"1":            {ABIRevision: "some-revision", Status: Supported},
 		"2":            {ABIRevision: "-1", Status: Supported},
 	} {
-		b, err := json.Marshal(&versionHistory{
+		b, err := json.Marshal(&versionHistoryJson{
 			SchemaId: versionHistorySchemaId,
-			Data: versionHistoryData{
+			Data: versionHistoryDataJson{
 				Name:      versionHistoryName,
 				Type:      versionHistoryType,
 				APILevels: map[string]apiLevel{k: v},
@@ -138,5 +138,71 @@ func TestParseHistoryRejectsInvalidVersions(t *testing.T) {
 		if err == nil {
 			t.Fatalf("expected error, got: %+v", vs)
 		}
+	}
+}
+
+func fakeVersionHistory() *VersionHistory {
+	return NewForTesting([]Version{
+		{
+			APILevel:    4,
+			ABIRevision: 0xabcd0004,
+			Status:      Unsupported,
+		},
+		{
+			APILevel:    5,
+			ABIRevision: 0xabcd0005,
+			Status:      Supported,
+		},
+		{
+			APILevel:    6,
+			ABIRevision: 0xabcd0006,
+			Status:      Supported,
+		},
+		{
+			APILevel:    7,
+			ABIRevision: 0xabcd0007,
+			Status:      InDevelopment,
+		},
+	})
+}
+
+func TestCheckApiLevel(t *testing.T) {
+	versions := fakeVersionHistory()
+
+	tcs := []struct {
+		apiLevel    uint64
+		abiRevision uint64
+		hasError    bool
+	}{
+		{apiLevel: 42, hasError: true},
+		// This currently says API 4 is supported, but it shouldn't.
+		//
+		// TODO: https://fxbug.dev/326096347 - Uncomment this once it passes.
+		// {apiLevel: 4, hasError: true},
+		{apiLevel: 5, abiRevision: 0xabcd0005},
+		{apiLevel: 6, abiRevision: 0xabcd0006},
+		{apiLevel: 7, abiRevision: 0xabcd0007},
+	}
+
+	for _, tc := range tcs {
+		abiRevision, err := versions.CheckApiLevelForBuild(tc.apiLevel)
+		if abiRevision != tc.abiRevision {
+			t.Errorf("CheckApiLevelForBuild(%d) = %x; want %x", tc.apiLevel, abiRevision, tc.abiRevision)
+		}
+		if err == nil && tc.hasError {
+			t.Errorf("CheckApiLevelForBuild(%d) = %x; want error", tc.apiLevel, abiRevision)
+		}
+		if err != nil && !tc.hasError {
+			t.Errorf("CheckApiLevelForBuild(%d) gives error %v", tc.apiLevel, err)
+		}
+	}
+}
+
+func TestGetExampleAbiRevision(t *testing.T) {
+	versions := fakeVersionHistory()
+
+	exampleAbi := versions.ExampleSupportedAbiRevisionForTests()
+	if exampleAbi != 0xabcd0007 {
+		t.Errorf("ExampleSupportedAbiRevisionForTests() = %x; want 0xabcd0007", exampleAbi)
 	}
 }
