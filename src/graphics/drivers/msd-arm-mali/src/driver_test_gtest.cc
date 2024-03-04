@@ -36,3 +36,9 @@ zx_status_t magma_indriver_test(ParentDevice* device) {
   test_thread.join();
   return status;
 }
+
+// Should never happen.
+extern "C" void _Exit(int value) {
+  fprintf(stderr, "GTEST called _Exit\n");
+  while (true) {}
+}

@@ -35,3 +35,10 @@ zx_status_t magma_indriver_test(zx_device_t* device) {
   printf("[DRV END===]\n[==========]\n");
   return status;
 }
+
+// Should never happen.
+extern "C" void _Exit(int value) {
+  fprintf(stderr, "GTEST called _Exit\n");
+  while (true) {
+  }
+}
