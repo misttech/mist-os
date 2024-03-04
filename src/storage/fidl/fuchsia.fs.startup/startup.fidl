@@ -47,6 +47,14 @@ type StartOptions = resource struct {
     /// An optional eviction policy specifier for the filesystem to use for in-memory structures
     /// (if the filesystem supports it), specifically for pager-backed files.
     cache_eviction_policy_override EvictionPolicyOverride;
+
+    /// Set greater than zero to use profiling for the first N seconds after filesystem start.
+    /// Records the access patterns of objects for N seconds and if the profile already exists,
+    /// prefetch data and hold the vmos in cache for N seconds. Functionally this means that the
+    /// first launch with this option records the profile and all other launches with this option
+    /// will replay that profile.
+    /// TODO(https://fxbug.dev/328071060): Enable profile recordings access and handling.
+    startup_profiling_seconds uint32;
 };
 
 /// Options for how to format filesystems.

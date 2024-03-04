@@ -178,6 +178,7 @@ impl FSConfig for Blobfs {
                     write_compression_level: self.write_compression_level.unwrap_or(-1),
                     write_compression_algorithm: CompressionAlgorithm::ZstdChunked,
                     cache_eviction_policy_override: EvictionPolicyOverride::None,
+                    startup_profiling_seconds: 0,
                 };
                 if let Some(compression) = &self.write_compression_algorithm {
                     start_options.write_compression_algorithm = match compression {
@@ -252,6 +253,7 @@ impl FSConfig for Minfs {
                 write_compression_level: -1,
                 write_compression_algorithm: CompressionAlgorithm::ZstdChunked,
                 cache_eviction_policy_override: EvictionPolicyOverride::None,
+                startup_profiling_seconds: 0,
             },
             component_type: self.component_type.clone(),
         }
@@ -320,6 +322,7 @@ impl FSConfig for Fxfs {
                 write_compression_level: -1,
                 write_compression_algorithm: CompressionAlgorithm::ZstdChunked,
                 cache_eviction_policy_override: EvictionPolicyOverride::None,
+                startup_profiling_seconds: 0,
             },
             component_type: self.component_type.clone(),
         }
@@ -375,6 +378,7 @@ impl FSConfig for F2fs {
                 write_compression_level: -1,
                 write_compression_algorithm: CompressionAlgorithm::ZstdChunked,
                 cache_eviction_policy_override: EvictionPolicyOverride::None,
+                startup_profiling_seconds: 0,
             },
             component_type: self.component_type.clone(),
         }

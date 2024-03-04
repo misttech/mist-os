@@ -60,6 +60,8 @@ pub struct VolumesDirectory {
     mounted_volumes: futures::lock::Mutex<HashMap<u64, (String, FxVolumeAndRoot)>>,
     inspect_tree: Weak<FsInspectTree>,
     mem_monitor: Option<MemoryPressureMonitor>,
+    // The state of profile recordings. Should be locked *after* mounted_volumes.
+    profiling_state: futures::lock::Mutex<Option<(String, fasync::Task<()>)>>,
 
     /// A running estimate of the number of dirty bytes outstanding in all pager-backed VMOs across
     /// all volumes.
@@ -114,7 +116,19 @@ impl MountedVolumesGuard<'_> {
             FxfsError::AlreadyBound
         );
         if as_blob {
-            self.mount_store::<BlobDirectory>(name, store, MemoryPressureConfig::default()).await
+            let volume = self
+                .mount_store::<BlobDirectory>(name, store, MemoryPressureConfig::default())
+                .await?;
+            if let Some((profile_name, _)) = &(*self.volumes_directory.profiling_state.lock().await)
+            {
+                if let Err(e) = volume.volume().record_or_replay_profile(profile_name).await {
+                    error!(
+                        "Failed to record or replay profile '{}' for volume {}: {:?}",
+                        profile_name, name, e
+                    );
+                }
+            }
+            Ok(volume)
         } else {
             self.mount_store::<FxDirectory>(name, store, MemoryPressureConfig::default()).await
         }
@@ -230,6 +244,7 @@ impl VolumesDirectory {
             mounted_volumes: futures::lock::Mutex::new(HashMap::default()),
             inspect_tree,
             mem_monitor,
+            profiling_state: futures::lock::Mutex::new(None),
             pager_dirty_bytes_count: AtomicU64::new(0),
             on_volume_added: OnceLock::new(),
         });
@@ -242,6 +257,45 @@ impl VolumesDirectory {
             iter.advance().await?;
         }
         Ok(me)
+    }
+
+    pub async fn record_or_replay_profile(
+        self: Arc<Self>,
+        name: String,
+        duration_secs: u32,
+    ) -> Result<(), Error> {
+        // Volumes lock is taken first to provide consistent lock ordering with mounting a volume.
+        let volumes = self.mounted_volumes.lock().await;
+        let mut state = self.profiling_state.lock().await;
+        if state.is_none() {
+            for (_, (volume_name, volume_and_root)) in &*volumes {
+                if volume_and_root.root().clone().into_any().downcast::<BlobDirectory>().is_ok() {
+                    // Just log the errors, don't stop half-way.
+                    if let Err(e) = volume_and_root.volume().record_or_replay_profile(&name).await {
+                        error!(
+                            "Failed to record or replay profile '{}' for volume {}: {:?}",
+                            &name, volume_name, e
+                        );
+                    }
+                }
+            }
+            let this = self.clone();
+            let timer_task = fasync::Task::spawn(async move {
+                fasync::Timer::new(fasync::Duration::from_seconds(duration_secs.into())).await;
+                let volumes = this.mounted_volumes.lock().await;
+                let mut state = this.profiling_state.lock().await;
+                for (_, (_, volume_and_root)) in &*volumes {
+                    volume_and_root.volume().stop_profiler();
+                }
+                *state = None;
+            });
+            *state = Some((name, timer_task));
+            Ok(())
+        } else {
+            // Consistency in the recording and replaying cannot be ensured at the volume level
+            // if more than one operation can be in flight at a time.
+            Err(anyhow!(FxfsError::AlreadyExists).context("Profile operation already in progress."))
+        }
     }
 
     /// Returns the directory node which can be used to provide connections for e.g. enumerating
@@ -309,6 +363,7 @@ impl VolumesDirectory {
 
     /// Terminates all opened volumes.
     pub async fn terminate(self: &Arc<Self>) {
+        *self.profiling_state.lock().await = None;
         self.lock().await.terminate().await
     }
 
@@ -1622,5 +1677,109 @@ mod tests {
         volumes_directory.terminate().await;
         std::mem::drop(volumes_directory);
         filesystem.close().await.expect("close filesystem failed");
+    }
+
+    #[fuchsia::test(threads = 10)]
+    async fn test_profile_start() {
+        let device = {
+            let device = DeviceHolder::new(FakeDevice::new(8192, 512));
+            let filesystem = FxFilesystem::new_empty(device).await.unwrap();
+            let volumes_directory = VolumesDirectory::new(
+                root_volume(filesystem.clone()).await.unwrap(),
+                Weak::new(),
+                None,
+            )
+            .await
+            .unwrap();
+            volumes_directory.create_and_mount_volume("premount_blob", None, true).await.unwrap();
+            volumes_directory
+                .create_and_mount_volume("premount_noblob", None, false)
+                .await
+                .unwrap();
+            volumes_directory.create_and_mount_volume("live_blob", None, true).await.unwrap();
+            volumes_directory.create_and_mount_volume("live_noblob", None, false).await.unwrap();
+
+            volumes_directory.terminate().await;
+            std::mem::drop(volumes_directory);
+            filesystem.close().await.expect("Filesystem close");
+            filesystem.take_device().await
+        };
+
+        device.ensure_unique();
+
+        device.reopen(false);
+        let filesystem = FxFilesystem::open(device as DeviceHolder).await.unwrap();
+        let volumes_directory = VolumesDirectory::new(
+            root_volume(filesystem.clone()).await.unwrap(),
+            Weak::new(),
+            None,
+        )
+        .await
+        .unwrap();
+
+        // Premount two volumes.
+        let premount_blob = volumes_directory
+            .mount_volume("premount_blob", None, true)
+            .await
+            .expect("Reopen volume");
+        let premount_noblob = volumes_directory
+            .mount_volume("premount_noblob", None, false)
+            .await
+            .expect("Reopen volume");
+
+        // Start the recording, let it run a really long time, it doesn't need to end for this test.
+        // If it does wait this long then it should trigger test timeouts.
+        volumes_directory
+            .clone()
+            .record_or_replay_profile("foo".to_owned(), 600)
+            .await
+            .expect("Recording");
+
+        // Live mount two volumes.
+        let live_blob =
+            volumes_directory.mount_volume("live_blob", None, true).await.expect("Reopen volume");
+        let live_noblob = volumes_directory
+            .mount_volume("live_noblob", None, false)
+            .await
+            .expect("Reopen volume");
+
+        // Only activated for blob volumes.
+        assert!(premount_blob.into_volume().profile_state_mut().busy());
+        assert!(live_blob.into_volume().profile_state_mut().busy());
+        assert!(!premount_noblob.into_volume().profile_state_mut().busy());
+        assert!(!live_noblob.into_volume().profile_state_mut().busy());
+
+        volumes_directory.terminate().await;
+        std::mem::drop(volumes_directory);
+        filesystem.close().await.expect("Filesystem close");
+    }
+
+    #[fuchsia::test(threads = 10)]
+    async fn test_profile_stop() {
+        let device = DeviceHolder::new(FakeDevice::new(8192, 512));
+        let filesystem = FxFilesystem::new_empty(device).await.unwrap();
+        let volumes_directory = VolumesDirectory::new(
+            root_volume(filesystem.clone()).await.unwrap(),
+            Weak::new(),
+            None,
+        )
+        .await
+        .unwrap();
+        let volume = volumes_directory.create_and_mount_volume("foo", None, true).await.unwrap();
+
+        // Run the recording with no time at all and ensure that it still shuts down properly.
+        volumes_directory
+            .clone()
+            .record_or_replay_profile("foo".to_owned(), 0)
+            .await
+            .expect("Recording");
+        while volume.volume().profile_state_mut().busy() {
+            fasync::Timer::new(Duration::from_millis(10)).await;
+        }
+
+        std::mem::drop(volume);
+        volumes_directory.terminate().await;
+        std::mem::drop(volumes_directory);
+        filesystem.close().await.expect("Filesystem close");
     }
 }

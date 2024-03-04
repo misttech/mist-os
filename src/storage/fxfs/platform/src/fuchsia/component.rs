@@ -37,8 +37,10 @@ use {
         serialized_types::LATEST_VERSION,
     },
     remote_block_device::{BlockClient as _, RemoteBlockClient},
-    std::ops::Deref,
-    std::sync::{Arc, Weak},
+    std::{
+        ops::Deref,
+        sync::{Arc, Weak},
+    },
     storage_device::{block_device::BlockDevice, DeviceHolder},
     vfs::{
         directory::{entry_container::Directory, helper::DirectlyMutable},
@@ -324,12 +326,22 @@ impl Component {
             "Mounted"
         );
 
+        if options.startup_profiling_seconds > 0 {
+            // Unwrap ok, shouldn't have anything else recording or replaying this early in startup.
+            volumes
+                .clone()
+                .record_or_replay_profile(".boot".to_owned(), options.startup_profiling_seconds)
+                .await
+                .unwrap();
+        }
+
         *state = State::Running(RunningState {
             fs,
             volumes,
             _debug: debug,
             _inspect_tree: inspect_tree,
         });
+
         Ok(())
     }
 
@@ -559,6 +571,7 @@ mod tests {
                         write_compression_algorithm: CompressionAlgorithm::ZstdChunked,
                         write_compression_level: 0,
                         cache_eviction_policy_override: EvictionPolicyOverride::None,
+                        startup_profiling_seconds: 0,
                     },
                 )
                 .await
