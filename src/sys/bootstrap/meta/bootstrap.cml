@@ -557,6 +557,11 @@
                 "#full-pkg-drivers",
                 "#pkg-drivers",
             ],
+
+            // system-activity-governor depends on the suspend HAL but not all
+            // drivers depend on system-activity-governor.
+            // Weak to resolve dependency cycles.
+            dependency: "weak",
         },
         {
             protocol: [
@@ -882,6 +887,13 @@
             as: "dev-class-block",
             to: "#live_usb",
             subdir: "block",
+        },
+        {
+            directory: "dev-class",
+            from: "#devfs",
+            as: "dev-class-suspend",
+            to: "#system-activity-governor",
+            subdir: "suspend",
         },
         {
             directory: "dev-class",

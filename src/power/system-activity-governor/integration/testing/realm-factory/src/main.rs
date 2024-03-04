@@ -4,13 +4,16 @@
 
 use {
     anyhow::{Error, Result},
+    fidl_fuchsia_io as fio,
     fidl_test_systemactivitygovernor::*,
     fuchsia_async as fasync,
     fuchsia_component::server::ServiceFs,
     fuchsia_component_test::{
-        Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route, DEFAULT_COLLECTION_NAME,
+        Capability, ChildOptions, LocalComponentHandles, RealmBuilder, RealmInstance, Ref, Route,
+        DEFAULT_COLLECTION_NAME,
     },
-    futures::{StreamExt, TryStreamExt},
+    fuchsia_zircon as zx,
+    futures::{FutureExt, StreamExt, TryStreamExt},
     tracing::*,
 };
 
@@ -59,10 +62,36 @@ async fn handle_request_stream(mut stream: RealmFactoryRequestStream) -> Result<
     Ok(())
 }
 
+async fn serve_suspend_dir(
+    handles: LocalComponentHandles,
+    handler: SuspenderHandlerProxy,
+) -> Result<()> {
+    let mut fs = ServiceFs::new();
+    fs.dir("dev").add_service_at("000", move |channel: zx::Channel| {
+        handler.handle(channel.into()).unwrap();
+        None
+    });
+
+    fs.serve_connection(handles.outgoing_dir.into_channel().into()).unwrap();
+    fs.collect::<()>().await;
+    Ok(())
+}
+
 async fn create_realm(options: RealmOptions) -> Result<RealmInstance, Error> {
     info!("building the realm using options {:?}", options);
 
     let builder = RealmBuilder::new().await?;
+    let suspender_handler = options.suspender_handler.unwrap().into_proxy().unwrap();
+
+    // TODO(mbrunson): Replace this implementation with driver-test-realm.
+    let suspend_devices = builder
+        .add_local_child(
+            "suspend-devices",
+            move |h| serve_suspend_dir(h, suspender_handler.clone()).boxed(),
+            ChildOptions::new(),
+        )
+        .await?;
+
     let component_ref = builder
         .add_child(
             ACTIVITY_GOVERNOR_CHILD_NAME,
@@ -94,18 +123,23 @@ async fn create_realm(options: RealmOptions) -> Result<RealmInstance, Error> {
         )
         .await?;
 
+    // Expose capabilities from suspend-devices to system-activity-governor.
+    builder
+        .add_route(
+            Route::new()
+                .capability(
+                    Capability::directory("dev-class-suspend").path("/dev").rights(fio::R_STAR_DIR),
+                )
+                .from(&suspend_devices)
+                .to(&component_ref),
+        )
+        .await?;
+
     // Expose capabilities from system-activity-governor.
     builder
         .add_route(
             Route::new()
                 .capability(Capability::protocol_by_name("fuchsia.power.suspend.Stats"))
-                .from(&component_ref)
-                .to(Ref::parent()),
-        )
-        .await?;
-    builder
-        .add_route(
-            Route::new()
                 .capability(Capability::protocol_by_name("fuchsia.power.system.ActivityGovernor"))
                 .from(&component_ref)
                 .to(Ref::parent()),

@@ -22,6 +22,11 @@
         {
             protocol: [ "fuchsia.power.broker.Topology" ],
         },
+        {
+            directory: "dev-class-suspend",
+            rights: [ "r*" ],
+            path: "/dev/class/suspend",
+        },
     ],
     expose: [
         {
