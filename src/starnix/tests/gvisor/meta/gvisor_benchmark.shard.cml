@@ -2,10 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 {
-    include: [
-        "//src/starnix/containers/debian/meta/debian_container_for_test.shard.cml",
-        "//src/starnix/tests/starnix_test.shard.cml",
-    ],
+    include: [ "//src/starnix/tests/starnix_test.shard.cml" ],
     program: {
         test_type: "gbenchmark",
         test_suite_label: "fuchsia.starnix.gvisor_benchmarks",

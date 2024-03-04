@@ -1,0 +1,487 @@
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import(
+    "//src/lib/testing/expectation/fuchsia_test_with_expectations_package.gni")
+import("//src/starnix/kernel/args.gni")
+import("//src/starnix/kernel/starnix.gni")
+import("//src/starnix/tests/starnix_test_subpackages.gni")
+import("//src/storage/fshost/generated_fshost_config.gni")
+
+gvisor_tests = [
+  "32bit_test",
+  "accept_bind_stream_test",
+  "accept_bind_test",
+  "access_test",
+  "aio_test",
+  "bad_test",
+  "bind_test",
+  "brk_test",
+  "chdir_test",
+  "chmod_test",
+  "clock_getres_test",
+  "clock_gettime_test",
+  "clock_nanosleep_test",
+  "close_range_test",
+  "concurrency_test",
+  "creat_test",
+  "dev_test",
+  "dup_test",
+  "epoll_test",
+  "eventfd_test",
+  "exceptions_test",
+  "exec_binary_test",
+  "exit_test",
+  "fadvise64_test",
+  "fallocate_test",
+  "fault_test",
+  "fchdir_test",
+  "fifo_test",
+  "flock_test",
+  "fork_test",
+  "fpsig_fork_test",
+  "fpsig_nested_test",
+  "fsync_test",
+  "getcpu_host_test",
+  "getcpu_test",
+  "getdents_test",
+  "getrandom_test",
+  "getrusage_test",
+  "inotify_test",
+  "ioctl_test",
+  "itimer_test",
+  "kill_test",
+  "lseek_test",
+  "madvise_test",
+  "membarrier_test",
+  "memfd_test",
+  "memory_accounting_test",
+  "mempolicy_test",
+  "mincore_test",
+  "mkdir_test",
+  "mknod_test",
+  "mlock_test",
+  "mmap_test",
+  "mremap_test",
+  "msgqueue_test",
+  "msync_test",
+  "munmap_test",
+  "open_create_test",
+  "open_test",
+  "partial_bad_buffer_test",
+  "pause_test",
+  "ping_socket_test",
+  "pipe_test",
+  "poll_test",
+  "ppoll_test",
+  "prctl_test",
+  "pread64_test",
+  "proc_isolated_test",
+  "proc_net_tcp_test",
+  "proc_net_udp_test",
+  "proc_net_unix_test",
+  "proc_pid_smaps_test",
+  "proc_pid_uid_gid_map_test",
+  "pselect_test",
+  "pty_root_test",
+  "pty_test",
+  "pwrite64_test",
+  "pwritev2_test",
+  "readahead_test",
+  "read_test",
+  "readv_socket_test",
+  "readv_test",
+  "rename_test",
+  "rtsignal_test",
+  "sched_test",
+  "sched_yield_test",
+  "seccomp_test",
+  "select_test",
+  "semaphore_test",
+  "sendfile_test",
+  "sendfile_socket_test",
+  "sigaction_test",
+  "sigaltstack_test",
+  "signalfd_test",
+  "sigprocmask_test",
+  "sigstop_test",
+  "sigtimedwait_test",
+  "socket_abstract_non_blocking_test",
+  "socket_abstract_test",
+  "socket_blocking_ip_test",
+  "socket_blocking_local_test",
+  "socket_capability_test",
+  "socket_domain_non_blocking_test",
+  "socket_domain_test",
+  "socket_filesystem_non_blocking_test",
+  "socket_filesystem_test",
+  "socket_inet_loopback_isolated_test",
+  "socket_inet_loopback_nogotsan_test",
+  "socket_ip_tcp_loopback_non_blocking_test",
+  "socket_ip_tcp_loopback_test",
+  "socket_ip_tcp_udp_generic_loopback_test",
+  "socket_ip_udp_loopback_non_blocking_test",
+  "socket_ip_udp_loopback_test",
+  "socket_ip_unbound_test",
+  "socket_ipv4_udp_unbound_external_networking_test",
+  "socket_ipv4_udp_unbound_loopback_netlink_test",
+  "socket_ipv4_udp_unbound_loopback_nogotsan_test",
+  "socket_ipv4_udp_unbound_loopback_test",
+  "socket_ipv6_udp_unbound_external_networking_test",
+  "socket_ipv6_udp_unbound_loopback_netlink_test",
+  "socket_ipv6_udp_unbound_loopback_test",
+  "socket_ipv6_unbound_test",
+  "socket_netdevice_test",
+  "socket_netlink_test",
+  "socket_netlink_uevent_test",
+  "socket_non_stream_blocking_local_test",
+  "socket_non_stream_blocking_udp_test",
+  "socket_stream_blocking_local_test",
+  "socket_stream_blocking_tcp_test",
+  "socket_stream_local_test",
+  "socket_stream_nonblock_local_test",
+  "socket_stress_test",
+  "socket_test",
+  "socket_unix_dgram_local_test",
+  "socket_unix_dgram_non_blocking_test",
+  "socket_unix_pair_test",
+  "socket_unix_seqpacket_local_test",
+  "socket_unix_stream_test",
+  "socket_unix_unbound_abstract_test",
+  "socket_unix_unbound_dgram_test",
+  "socket_unix_unbound_filesystem_test",
+  "socket_unix_unbound_seqpacket_test",
+  "socket_unix_unbound_stream_test",
+  "splice_test",
+  "statfs_test",
+  "stat_test",
+  "stat_times_test",
+  "symlink_test",
+  "sync_file_range_test",
+  "sync_test",
+  "sysinfo_test",
+  "sysret_test",
+  "tcp_socket_test",
+  "tgkill_test",
+  "timerfd_test",
+  "timers_test",
+  "time_test",
+  "tkill_test",
+  "truncate_test",
+  "tuntap_hostinet_test",
+  "udp_bind_test",
+  "udp_socket_test",
+  "unlink_test",
+  "unshare_test",
+  "utimes_test",
+  "vdso_clock_gettime_test",
+  "vdso_test",
+  "vfork_test",
+  "vsyscall_test",
+  "wait_test",
+  "write_test",
+  "xattr_test",
+]
+
+gvisor_tests_run_as_root = [
+  "affinity_test",
+  "chown_test",
+  "chroot_test",
+  "fcntl_test",
+  "fuse_test",
+  "ip6tables_test",
+  "iptables_test",
+  "kcov_test",
+  "link_test",
+  "mount_test",
+  "network_namespace_test",
+  "packet_socket_dgram_test",
+  "packet_socket_test",
+  "packet_socket_raw_test",
+  "pivot_root_test",
+  "prctl_setuid_test",
+  "preadv2_test",
+  "preadv_test",
+  "priority_test",
+  "proc_net_test",
+  "proc_pid_oomscore_test",
+  "proc_test",
+  "processes_test",
+  "ptrace_test",
+  "raw_socket_icmp_test",
+  "raw_socket_test",
+  "rlimits_test",
+  "socket_bind_to_device_distribution_test",
+  "socket_bind_to_device_sequence_test",
+  "socket_bind_to_device_test",
+  "socket_ip_unbound_netlink_test",
+  "socket_ipv4_datagram_based_socket_unbound_loopback_test",
+  "socket_netlink_route_test",
+  "sticky_test",
+  "tuntap_test",
+  "uidgid_test",
+  "uname_test",
+  "syslog_test",
+]
+
+if (current_cpu == "riscv64") {
+  # The following tests are not compiled for RISC-V yet.
+  gvisor_tests -= [
+    "exec_binary_test",
+    "fpsig_fork_test",
+    "fpsig_nested_test",
+    "seccomp_test",
+    "sigaltstack_test",
+  ]
+  gvisor_tests_run_as_root -= [ "ptrace_test" ]
+}
+
+gvisor_tests_custom_manifest = [
+  {
+    test_name = "cgroup_test"
+    capabilities = [ "SYS_ADMIN" ]
+  },
+  {
+    test_name = "exec_test"
+    args = [ "--runfile_workspace_root=runfiles" ]
+  },
+  {
+    test_name = "futex_test"
+    capabilities = [ "SYS_PTRACE" ]
+  },
+  {
+    test_name = "setgid_test"
+    capabilities = [
+      "SETGID",
+      "CHOWN",
+    ]
+    environ = [ "TEST_ON_GVISOR=1" ]
+  },
+  {
+    test_name = "syslog_cap_syslog_test"
+    binary = "syslog_test"
+    capabilities = [ "SYS_ADMIN" ]
+  },
+  {
+    test_name = "syslog_cap_sys_admin_test"
+    binary = "syslog_test"
+    capabilities = [ "SYSLOG" ]
+  },
+]
+
+# Creates a fuchsia_test_component for a gVisor binary.
+#
+# Parameters
+#   binary (optional)
+#     Test binary name.
+#   use_persistent_storage (optional)
+#     If true, includes dependencies for persistent storage.
+#     Default: false
+#   is_benchmark (optional)
+#     True if the test is a benchmark.
+#     Default: false
+#   run_as_root (optional)
+#     If true, sets `uid` to `0` in manifest.
+#     Default: false
+#   program_extra (optional)
+#     Extra parameters to add to the `program` section of the manifest.
+#   container_shard (optional)
+#     Manifest shard that defines the container for the test.
+#   suffix (optional)
+#     Suffix to add to the component name.
+template("gvisor_test_component") {
+  test_name = target_name
+
+  _container_shard =
+      "//src/starnix/containers/debian/meta/debian_container_for_test.shard.cml"
+  if (defined(invoker.container_shard)) {
+    _container_shard = invoker.container_shard
+  }
+
+  _is_benchmark = defined(invoker.is_benchmark) && invoker.is_benchmark
+  if (_is_benchmark) {
+    _base_shard = "//src/starnix/tests/gvisor/meta/gvisor_benchmark.shard.cml"
+  } else {
+    _base_shard =
+        "//src/starnix/tests/gvisor/meta/gvisor_with_expectations.shard.cml"
+  }
+
+  _suffix = ""
+  if (defined(invoker.suffix)) {
+    _suffix = invoker.suffix
+  }
+
+  _manifest_label = "${test_name}${_suffix}.cml"
+  _component_name = "${target_name}${_suffix}"
+
+  _suffix = ""
+  if (defined(invoker.suffix)) {
+    _suffix = invoker.suffix
+  }
+
+  _manifest_label = "${test_name}${_suffix}.cml"
+  _component_name = "${target_name}${_suffix}"
+  _use_persistent_storage =
+      defined(invoker.use_persistent_storage) && invoker.use_persistent_storage
+  if (_use_persistent_storage) {
+    _storage_shard = "//src/starnix/tests/gvisor/meta/gvisor_use_persistent_storage.shard.cml"
+  } else {
+    _storage_shard =
+        "//src/starnix/tests/gvisor/meta/gvisor_use_tmp_storage.shard.cml"
+  }
+
+  _suffix = ""
+  if (defined(invoker.suffix)) {
+    _suffix = invoker.suffix
+  }
+  _manifest_label = "${test_name}${_suffix}.cml"
+  _component_name = "${target_name}${_suffix}"
+
+  _binary = test_name
+  if (defined(invoker.binary)) {  # import("//build/dist/zip_resource.gni")
+    _binary = invoker.binary
+  }
+  _binary_path = "data/tests/${_binary}"
+
+  resource("${_component_name}_bin") {
+    sources = [ "${gvisor_prebuilt_directory}/stripped/${_binary}" ]
+    outputs = [ _binary_path ]
+  }
+
+  _manifest_file = "$target_gen_dir/${_manifest_label}"
+
+  generated_file(_manifest_label) {
+    outputs = [ _manifest_file ]
+    output_conversion = "json"
+
+    _program = {
+      binary = _binary_path
+      if (defined(invoker.program_extra)) {
+        forward_variables_from(invoker.program_extra, "*")
+      }
+    }
+
+    if (defined(invoker.run_as_root) && invoker.run_as_root) {
+      _program.uid = "0"
+    }
+
+    contents = {
+      include = [
+        rebase_path(_container_shard, root_build_dir),
+        rebase_path(_base_shard, root_build_dir),
+        rebase_path(_storage_shard, root_build_dir),
+      ]
+      program = _program
+    }
+  }
+
+  fuchsia_test_component(_component_name) {
+    forward_variables_from(invoker, "*")
+    testonly = true
+    check_references = false
+    manifest = _manifest_file
+    deps = [
+      ":${_component_name}_bin",
+      ":${_manifest_label}",
+    ]
+    test_type = "starnix"
+  }
+}
+
+# Defines a GVisor tests package.
+#
+# Parameters
+#  expectations (optional)
+#    Custom expectations file
+#  use_persistent_storage (optional)
+#    True if the tests should use persistent storage.
+#  suffix (optional)
+#    Suffix to add to the test name.
+#  container_shard (optional)
+#     Manifest shard that defines the container for the test. Debian container
+#     is used by default.
+#  container_package (optional)
+#     Custom Starnix container package to run the tests. Debian container
+#     is used by default.
+template("gvisor_tests_package") {
+  _suffix = ""
+  if (defined(invoker.suffix)) {
+    _suffix = invoker.suffix
+  }
+
+  _container_package = "//src/starnix/containers/debian:debian_package"
+  if (defined(invoker.container_package)) {
+    _container_package = invoker.container_package
+  }
+
+  _expectations =
+      "//src/starnix/tests/gvisor/expectations/default_no_unified_aspace.json5"
+  if (defined(invoker.expectations)) {
+    _expectations = invoker.expectations
+  }
+
+  foreach(test_name, gvisor_tests) {
+    gvisor_test_component(test_name) {
+      forward_variables_from(invoker, "*")
+      run_as_root = false
+    }
+  }
+
+  foreach(test_name, gvisor_tests_run_as_root) {
+    gvisor_test_component(test_name) {
+      forward_variables_from(invoker, "*")
+      run_as_root = true
+    }
+  }
+
+  foreach(test, gvisor_tests_custom_manifest) {
+    gvisor_test_component(test.test_name) {
+      forward_variables_from(invoker, "*")
+      if (defined(test.binary)) {
+        binary = test.binary
+      }
+      program_extra = {
+        forward_variables_from(test,
+                               [
+                                 "args",
+                                 "capabilities",
+                                 "environ",
+                               ])
+      }
+      run_as_root = false
+    }
+  }
+
+  fuchsia_test_with_expectations_package(target_name) {
+    deps = [ "//src/starnix/tests/gvisor:gvisor_runfiles" ]
+
+    subpackages = starnix_test_subpackages + [ _container_package ]
+
+    test_components = []
+    foreach(test_name, gvisor_tests) {
+      test_components += [ ":${test_name}${_suffix}" ]
+    }
+    foreach(test_name, gvisor_tests_run_as_root) {
+      test_components += [ ":${test_name}${_suffix}" ]
+    }
+    foreach(test, gvisor_tests_custom_manifest) {
+      test_components += [ ":${test.test_name}${_suffix}" ]
+    }
+
+    expectations = _expectations
+    test_specs = {
+      log_settings = {
+        max_severity = "ERROR"
+      }
+
+      # It takes a while to download the blobs. Debug builders are slower than
+      # their release counterparts.
+      if (is_debug) {
+        timeout_secs = 900
+      } else {
+        timeout_secs = 600
+      }
+    }
+  }
+}
