@@ -34,7 +34,7 @@ const UBPF_STACK_SIZE: usize = crate::ubpf::UBPF_STACK_SIZE as usize;
 // The number of registers
 const REGISTER_COUNT: u8 = 11;
 // The number of general r/w registers.
-const GENERAL_REGISTER_COUNT: u8 = 11;
+const GENERAL_REGISTER_COUNT: u8 = 10;
 
 #[derive(Clone, Debug)]
 pub enum Type {
@@ -1564,7 +1564,7 @@ impl BpfVisitor for ComputationContext {
         offset: i16,
     ) -> Result<(), String> {
         self.conditional_jump("jset32", context, dst, src, offset, JumpType::Unknown, |x, y| {
-            comp32(x, y, |x, y| x & y == 0)
+            comp32(x, y, |x, y| x & y != 0)
         })
     }
     fn jset64<'a>(
@@ -1575,7 +1575,7 @@ impl BpfVisitor for ComputationContext {
         offset: i16,
     ) -> Result<(), String> {
         self.conditional_jump("jset", context, dst, src, offset, JumpType::Unknown, |x, y| {
-            x & y == 0
+            x & y != 0
         })
     }
 
