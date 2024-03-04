@@ -348,14 +348,15 @@ impl ElementManager {
             }
         };
 
-        let mut element =
-            self.launch_element(&component_url, &child_name).await.map_err(|err| match err {
+        let mut element = self.launch_element(&component_url, &child_name.clone()).await.map_err(
+            |err| match err {
                 ElementManagerError::NotCreated { .. } => felement::ProposeElementError::NotFound,
                 err => {
                     error!(?err, "ProposeElement() failed to launch element");
                     felement::ProposeElementError::InvalidArgs
                 }
-            })?;
+            },
+        )?;
 
         let (annotation_controller_client_end, annotation_controller_stream) =
             create_request_stream::<felement::AnnotationControllerMarker>().unwrap();
@@ -397,6 +398,9 @@ impl ElementManager {
             element_controller_stream,
             annotation_controller_stream,
             view_controller_proxy,
+            child_name.clone(),
+            element.collection().to_string(),
+            self.realm.clone(),
         ))
         .detach();
 
@@ -421,6 +425,9 @@ async fn run_element_until_closed(
     controller_stream: Option<felement::ControllerRequestStream>,
     annotation_controller_stream: felement::AnnotationControllerRequestStream,
     view_controller_proxy: Option<felement::ViewControllerProxy>,
+    child_name: String,
+    collection: String,
+    realm: fcomponent::RealmProxy,
 ) {
     let annotation_holder = Arc::new(Mutex::new(annotation_holder));
 
@@ -448,6 +455,17 @@ async fn run_element_until_closed(
                 wait_for_view_controller_close_or_timeout(view_controller_proxy, timeout).await;
             },
         );
+    } else {
+        // The proposer has decided they want to shut down the element.
+        handle_element_controller_stream(annotation_holder.clone(), controller_stream).fuse().await;
+        if let Err(e) =
+            realm_management::destroy_child_component(&child_name, &collection, &realm).await
+        {
+            warn!(
+                "Failed to destroy child component with name \"{}\" in collection \"{}\": {:?}",
+                child_name, collection, e
+            );
+        }
     }
 }
 
