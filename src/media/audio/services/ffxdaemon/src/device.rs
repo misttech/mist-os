@@ -6,7 +6,8 @@ use {
     crate::{error::ControllerError, socket, stop_listener, RingBuffer, SECONDS_PER_NANOSECOND},
     anyhow::{Context, Error},
     async_trait::async_trait,
-    fidl::endpoints::{Proxy, ServerEnd},
+    camino::Utf8PathBuf,
+    fidl::endpoints::{create_proxy, Proxy, ServerEnd},
     fidl_fuchsia_audio_controller::{
         CompositeDeviceInfo, DeviceInfo,
         DeviceInfo::{Composite, StreamConfig},
@@ -19,6 +20,7 @@ use {
         RingBufferMarker, StreamConfigProxy, StreamProperties, SupportedFormats,
     },
     fidl_fuchsia_io as fio, fuchsia_async as fasync,
+    fuchsia_component::client::connect_to_protocol_at_path,
     fuchsia_zircon::{self as zx},
     futures::{AsyncWriteExt, StreamExt},
 };
@@ -180,53 +182,46 @@ fn validate_format(
     }
 }
 
-pub fn get_device_controller(
-    path: String,
+/// Connects to the device protocol for the device of the provided type at the namespace `path`.
+pub fn connect_to_device_controller(
+    device_path: Utf8PathBuf,
     device_type: fidl_fuchsia_hardware_audio::DeviceType,
 ) -> Result<Box<dyn DeviceControl>, Error> {
+    let protocol_path = device_path.join("device_protocol");
+
     match device_type {
         fidl_fuchsia_hardware_audio::DeviceType::StreamConfig => {
-            // Connect to a StreamConfig channel.
-            let (connector_client, connector_server) = fidl::endpoints::create_proxy::<
+            let connector_proxy = connect_to_protocol_at_path::<
                 fidl_fuchsia_hardware_audio::StreamConfigConnectorMarker,
-            >()
-            .map_err(|e| anyhow::anyhow!("Failed to create StreamConfigConnector: {}", e))?;
+            >(protocol_path.as_str())
+            .context("Failed to connect to StreamConfigConnector")?;
+            let (proxy, server_end) = create_proxy()?;
+            connector_proxy.connect(server_end).context("Failed to call Connect")?;
 
-            let (stream_config_client, stream_config_connector) =
-                fidl::endpoints::create_proxy::<fidl_fuchsia_hardware_audio::StreamConfigMarker>()
-                    .map_err(|e| anyhow::anyhow!("Failed to create StreamConfig: {}", e))?;
-
-            fdio::service_connect(&path, connector_server.into_channel()).map_err(|e| {
-                anyhow::anyhow!("Failed to connect to service at path {}: {}", &path, e)
-            })?;
-
-            // Using StreamConfigConnector client, pass the server end of StreamConfig
-            // channel to the device so that device can respond to StreamConfig requests.
-            connector_client
-                .connect(stream_config_connector)
-                .map_err(|e| anyhow::anyhow!("Failed to connect to StreamConfig: {}", e))?;
-
-            Ok(Box::new(StreamConfigDevice { proxy: stream_config_client }))
+            Ok(Box::new(StreamConfigDevice { proxy }))
         }
         fidl_fuchsia_hardware_audio::DeviceType::Composite => {
-            // DFv2 drivers do not use a connector/trampoline as the DFv1 StreamConfig type above.
-            let (composite_client, server_end) =
-                fidl::endpoints::create_proxy::<fidl_fuchsia_hardware_audio::CompositeMarker>()
-                    .map_err(|e| anyhow::anyhow!("Failed to create CompositeProxy: {e}"))?;
+            // DFv2 Composite drivers do not use a connector/trampoline as StreamConfig above.
+            // TODO(https://fxbug.dev/326339971): Fall back to CompositeConnector for DFv1 drivers
+            let proxy =
+                connect_to_protocol_at_path::<fidl_fuchsia_hardware_audio::CompositeMarker>(
+                    protocol_path.as_str(),
+                )
+                .context("Failed to connect to Composite")?;
 
-            fdio::service_connect(&path, server_end.into_channel()).map_err(|e| {
-                anyhow::anyhow!("Failed to connect to service at path {}: {}", &path, e)
-            })?;
-
-            Ok(Box::new(CompositeDevice { proxy: composite_client }))
+            Ok(Box::new(CompositeDevice { proxy }))
         }
-        _ => Err(anyhow::anyhow!("Unsupported Device type for get_device_controller()")),
+        _ => Err(anyhow::anyhow!("Unsupported DeviceType for connect_to_device_controller()")),
     }
 }
 
 impl Device {
-    pub fn new(device_controller: Box<dyn DeviceControl>) -> Device {
-        Device { device_controller }
+    pub fn new_from_selector(selector: &DeviceSelector) -> Result<Self, Error> {
+        let device_controller = connect_to_device_controller(
+            format_utils::path_for_selector(&selector)?,
+            selector.device_type.ok_or(anyhow::anyhow!("Device type not specified"))?,
+        )?;
+        Ok(Self { device_controller })
     }
 
     pub async fn get_info(&mut self) -> Result<DeviceInfo, Error> {
@@ -286,7 +281,7 @@ impl Device {
 
         // Create ring buffer channel.
         let (ring_buffer_client, ring_buffer_server) =
-            fidl::endpoints::create_proxy::<fidl_fuchsia_hardware_audio::RingBufferMarker>()
+            create_proxy::<fidl_fuchsia_hardware_audio::RingBufferMarker>()
                 .map_err(|e| anyhow::anyhow!("Failed to create ring buffer channel: {e}"))?;
 
         self.device_controller.create_ring_buffer(
@@ -454,13 +449,12 @@ impl Device {
 
         // Create ring buffer channel.
         let (ring_buffer_client, ring_buffer_server) =
-            fidl::endpoints::create_proxy::<fidl_fuchsia_hardware_audio::RingBufferMarker>()
-                .map_err(|e| {
-                    ControllerError::new(
-                        fidl_fuchsia_audio_controller::Error::UnknownFatal,
-                        format!("Failed to create ring buffer channel: {e}"),
-                    )
-                })?;
+            create_proxy::<fidl_fuchsia_hardware_audio::RingBufferMarker>().map_err(|e| {
+                ControllerError::new(
+                    fidl_fuchsia_audio_controller::Error::UnknownFatal,
+                    format!("Failed to create ring buffer channel: {e}"),
+                )
+            })?;
 
         self.device_controller
             .create_ring_buffer(

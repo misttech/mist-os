@@ -20,6 +20,7 @@ rustc_library("ffx_audio_common") {
     "//src/media/audio/services/ffxdaemon:listener-utils",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:blocking",
+    "//third_party/rust_crates:camino",
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:serde",
   ]

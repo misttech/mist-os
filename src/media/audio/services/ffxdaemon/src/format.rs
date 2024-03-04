@@ -4,6 +4,7 @@
 
 use {
     anyhow::{Error, Result},
+    camino::Utf8PathBuf,
     fidl_fuchsia_audio_controller::DeviceSelector,
     fidl_fuchsia_media::AudioSampleFormat,
     regex::Regex,
@@ -310,26 +311,27 @@ pub fn parse_duration(value: &str) -> Result<Duration, String> {
     }
 }
 
-pub fn path_for_selector(device_selector: &DeviceSelector) -> Result<String, Error> {
-    let input = device_selector.is_input.map(|is_input| if is_input { "input" } else { "output" });
+/// Returns the devfs path for the device that matches the `DeviceSelector`.
+///
+/// The selector must have Some values for the `id`, `device_type`,
+/// and, for StreamConfig devices, `is_input`.
+pub fn path_for_selector(device_selector: &DeviceSelector) -> Result<Utf8PathBuf, Error> {
+    let id = device_selector.id.as_ref().ok_or(anyhow::anyhow!("Device ID missing"))?;
+    let device_type =
+        device_selector.device_type.ok_or_else(|| anyhow::anyhow!("Device type not specified."))?;
 
-    let id = device_selector.id.clone().ok_or(anyhow::anyhow!("Device id missing"))?;
+    let class = match device_type {
+        fidl_fuchsia_hardware_audio::DeviceType::StreamConfig => device_selector
+            .is_input
+            .map(|is_input| if is_input { "audio-input" } else { "audio-output" })
+            .ok_or_else(|| {
+                anyhow::anyhow!("Device direction not specified for StreamConfig device.")
+            }),
+        fidl_fuchsia_hardware_audio::DeviceType::Composite => Ok("audio-composite"),
+        _ => Err(anyhow::anyhow!("Unexpected device type.")),
+    }?;
 
-    match device_selector.device_type {
-        Some(device_type) => match device_type {
-            fidl_fuchsia_hardware_audio::DeviceType::StreamConfig => match input {
-                Some(input) => Ok(format!("/dev/class/audio-{}/{}", input, id)),
-                None => {
-                    Err(anyhow::anyhow!("Device direction not specified for StreamConfig device."))
-                }
-            },
-            fidl_fuchsia_hardware_audio::DeviceType::Composite => {
-                Ok(format!("/dev/class/audio-composite/{}", id))
-            }
-            _ => Err(anyhow::anyhow!("Unexpected device type.")),
-        },
-        None => Err(anyhow::anyhow!("Device type not specified.")),
-    }
+    Ok(Utf8PathBuf::from("/dev/class").join(class).join(id))
 }
 
 pub fn device_id_for_path(path: &std::path::Path) -> Result<String> {

@@ -412,7 +412,7 @@ impl AudioDaemon {
             let packet_fut = audio_renderer_proxy.send_packet(&fidl_fuchsia_media::StreamPacket {
                 pts: fidl_fuchsia_media::NO_TIMESTAMP,
                 payload_buffer_id: 0,
-                payload_offset: payload_offset,
+                payload_offset,
                 payload_size: total_bytes_read as u64,
                 flags: 0,
                 buffer_config: 0,
@@ -535,15 +535,10 @@ impl AudioDaemon {
             })?;
 
         let data_socket = request.wav_source.ok_or(anyhow::anyhow!("Socket argument missing."))?;
-
-        let device_controller = device::get_device_controller(
-            format_utils::path_for_selector(&device_selector)?,
-            device_selector.device_type.ok_or(anyhow::anyhow!("Decice type not specified"))?,
-        )?;
-
-        let mut device = device::Device::new(device_controller);
-
         let async_socket = fasync::Socket::from_socket(data_socket);
+
+        let mut device = device::Device::new_from_selector(&device_selector)?;
+
         device.play(async_socket).await
     }
 
@@ -578,29 +573,21 @@ impl AudioDaemon {
         let duration =
             request.duration.map(|duration| std::time::Duration::from_nanos(duration as u64));
 
-        let device_controller = device::get_device_controller(
-            format_utils::path_for_selector(&device_selector)?,
-            device_selector.device_type.ok_or(anyhow::anyhow!("Decice type not specified"))?,
-        );
-
-        match device_controller {
-            Err(e) => Err(error::ControllerError::new(
+        let mut device = device::Device::new_from_selector(&device_selector).map_err(|err| {
+            error::ControllerError::new(
                 fidl_fuchsia_audio_controller::Error::DeviceNotReachable,
-                format!("Failed to connect to device with error: {e}",),
-            )),
-            Ok(device_controller) => {
-                let mut device = device::Device::new(device_controller);
+                format!("Failed to connect to device with error: {err}"),
+            )
+        })?;
 
-                device
-                    .record(
-                        format_utils::Format::from(&stream_type),
-                        fasync::Socket::from_socket(wav_socket),
-                        duration,
-                        cancel_server,
-                    )
-                    .await
-            }
-        }
+        device
+            .record(
+                format_utils::Format::from(&stream_type),
+                fasync::Socket::from_socket(wav_socket),
+                duration,
+                cancel_server,
+            )
+            .await
     }
 
     async fn serve_player(&mut self, mut stream: PlayerRequestStream) -> Result<(), Error> {
@@ -736,14 +723,7 @@ impl AudioDaemon {
                     let device_selector =
                         payload.device.ok_or(anyhow::anyhow!("No device specified"))?;
 
-                    let device_controller = device::get_device_controller(
-                        format_utils::path_for_selector(&device_selector)?,
-                        device_selector
-                            .device_type
-                            .ok_or(anyhow::anyhow!("Decice type not specified"))?,
-                    )?;
-
-                    let mut device = device::Device::new(device_controller);
+                    let mut device = device::Device::new_from_selector(&device_selector)?;
 
                     let info = device.get_info().await;
                     match info {
@@ -770,14 +750,7 @@ impl AudioDaemon {
                         payload.gain_state.ok_or(anyhow::anyhow!("No gain state specified"))?,
                     );
 
-                    let device_controller = device::get_device_controller(
-                        format_utils::path_for_selector(&device_selector)?,
-                        device_selector
-                            .device_type
-                            .ok_or(anyhow::anyhow!("Device type not specified"))?,
-                    )?;
-
-                    let mut device = device::Device::new(device_controller);
+                    let mut device = device::Device::new_from_selector(&device_selector)?;
 
                     device.set_gain(gain_state)?;
                     responder

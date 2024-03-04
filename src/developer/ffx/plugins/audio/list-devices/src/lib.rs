@@ -24,7 +24,7 @@ pub struct DeviceSelectorWrapper {
     device_id: Option<String>,
     is_input: Option<bool>,
     device_type: DeviceTypeWrapper,
-    path: String,
+    path: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -54,6 +54,7 @@ async fn list_devices_impl(
     audio_proxy: DeviceControlProxy,
     mut writer: MachineWriter<ListDeviceResult>,
 ) -> Result<(), anyhow::Error> {
+    // TODO(https://fxbug.dev/298683668): Move ListDevices implementation to ffx client
     let response = audio_proxy
         .list_devices()
         .await
@@ -69,10 +70,10 @@ async fn list_devices_impl(
                         .into_iter()
                         .map(|device| DeviceSelectorWrapper {
                             device_id: device.id.clone(),
+                            // TODO(https://fxbug.dev/327490666): Fix incorrect STREAMCONFIG device_type
                             device_type: DeviceTypeWrapper::STREAMCONFIG,
                             is_input: device.is_input,
-                            path: format_utils::path_for_selector(&device)
-                                .unwrap_or(format!("Path not available")),
+                            path: format_utils::path_for_selector(&device).map(String::from).ok(),
                         })
                         .collect(),
                 },

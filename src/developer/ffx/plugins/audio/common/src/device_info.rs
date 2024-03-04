@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use {
+    camino::Utf8PathBuf,
     fidl_fuchsia_audio_controller::{DeviceInfo, DeviceSelector},
     fidl_fuchsia_hardware_audio::{ChannelSet, PlugDetectCapabilities, SampleFormat},
     serde::{Deserialize, Serialize},
@@ -151,7 +152,7 @@ impl Display for PcmSupportedFormatsWrapper {
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
 pub struct DeviceInfoResult {
-    pub device_path: Option<String>,
+    pub device_path: Option<Utf8PathBuf>,
     pub manufacturer: Option<String>,
     pub product_name: Option<String>,
     pub current_gain_db: Option<f32>,
