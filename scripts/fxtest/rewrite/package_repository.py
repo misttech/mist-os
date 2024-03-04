@@ -17,11 +17,11 @@ class PackageRepositoryError(Exception):
 class PackageRepository:
     """Wrapper for package repository data created during the build process."""
 
-    def __init__(self, name_to_merkle: typing.Dict[str, str]):
+    def __init__(self, name_to_merkle: dict[str, str]):
         """Create a representation of a package directory.
 
         Args:
-            name_to_merkle (typing.Dict[str, str]): Mapping of package name to merkle hash.
+            name_to_merkle (dict[str, str]): Mapping of package name to merkle hash.
         """
         self.name_to_merkle = name_to_merkle
 
@@ -52,11 +52,11 @@ class PackageRepository:
                     json.load(f)[0]["targets"],
                 )
 
-            name_to_merkle: typing.Dict[str, str] = dict()
+            name_to_merkle: dict[str, str] = dict()
             with open(targets_path, "r") as f:
                 entries = json.load(f)
                 key: str
-                value: typing.Dict[str, typing.Any]
+                value: dict[str, typing.Any]
                 for key, value in entries["signed"]["targets"].items():
                     if "custom" in value:
                         name, _ = key.split("/")

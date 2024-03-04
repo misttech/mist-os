@@ -69,17 +69,17 @@ class TestSelections:
     """
 
     # The list of tests selected, ordered by presence in tests.json.
-    selected: typing.List[Test]
+    selected: list[Test]
 
     # Tests that were selected but will not be run due to flags.
     # (e.g. --count)
-    selected_but_not_run: typing.List[Test]
+    selected_but_not_run: list[Test]
 
     # The best score calculated for each test in tests.json, including non-selected tests.
-    best_score: typing.Dict[str, int]
+    best_score: dict[str, int]
 
     # List of match groups with the set of tests selected by that match group.
-    group_matches: typing.List[typing.Tuple[MatchGroup, typing.List[str]]]
+    group_matches: list[tuple[MatchGroup, list[str]]]
 
     # The threshold used to match these tests.
     fuzzy_distance_threshold: int

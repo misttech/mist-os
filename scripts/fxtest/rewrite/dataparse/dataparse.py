@@ -85,9 +85,9 @@ def dataparse(cls: T) -> T:
 
     if not hasattr(cls, "dataparse_renames"):
         setattr(cls, "dataparse_renames", classmethod(lambda self: dict()))
-    renames: typing.Dict[str, str] = getattr(cls, "dataparse_renames")()
+    renames: dict[str, str] = getattr(cls, "dataparse_renames")()
 
-    def to_dict(self: T) -> typing.Dict[str, typing.Any]:
+    def to_dict(self: T) -> dict[str, typing.Any]:
         out_dict = {}
         f: dataclasses.Field  # type: ignore
         for f in class_fields:
@@ -126,20 +126,20 @@ def dataparse(cls: T) -> T:
     if not hasattr(cls, "to_dict"):
         setattr(cls, "to_dict", to_dict)
 
-    def from_dict(_: typing.Any, input: typing.Dict[str, typing.Any]) -> T:
-        build_args: typing.Dict[str, typing.Any] = dict()
+    def from_dict(_: typing.Any, input: dict[str, typing.Any]) -> T:
+        build_args: dict[str, typing.Any] = dict()
 
         f: dataclasses.Field  # type: ignore
         for f in class_fields:
 
             def load_real_type(
                 incoming_type: typing.Any,
-            ) -> typing.Tuple[typing.Any, typing.Any]:
+            ) -> tuple[typing.Any, typing.Any]:
                 """Recursively determine the real type of an incoming type.
 
                 Some field types refer to typing-module aliases
                 rather than the real type at hand, specifically
-                list (typing.List[T]), set (typing.Set[T]), and
+                list (list[T]), set (typing.Set[T]), and
                 optional types (typing.Optional[T]).
 
                 This method determines two type values: the actual
@@ -147,7 +147,7 @@ def dataparse(cls: T) -> T:
                 the case of collections.
 
                 Examples:
-                >>> load_real_type(typing.List[int])
+                >>> load_real_type(list[int])
                 (list, int)
                 >>> load_real_type(typing.Set[float])
                 (set, float)

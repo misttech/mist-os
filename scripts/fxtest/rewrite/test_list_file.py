@@ -58,7 +58,7 @@ class TestListEntry:
     name: str
 
     # A list of tags for the test, stored as KV pairs.
-    tags: typing.List[TestListTagKV]
+    tags: list[TestListTagKV]
 
     # Execution details for the test.
     execution: TestListExecutionEntry | None = None
@@ -87,10 +87,10 @@ class TestListFile:
     """Top-level data model for test-list.json files."""
 
     # The list of test list entries stored in the file.
-    data: typing.List[TestListEntry]
+    data: list[TestListEntry]
 
     @staticmethod
-    def entries_from_file(file: str) -> typing.Dict[str, TestListEntry]:
+    def entries_from_file(file: str) -> dict[str, TestListEntry]:
         """Parse the file at the given path as a test-list.json file.
 
         This method converts the flat list in the file into a dictionary
@@ -100,7 +100,7 @@ class TestListFile:
             file (os.PathLike): The file path to parse.
 
         Returns:
-            typing.Dict[str, TestListEntry]: Map from test name to entry for that test in the file.
+            dict[str, TestListEntry]: Map from test name to entry for that test in the file.
 
         Raises:
             IOError: If the file could not be read.
@@ -198,9 +198,9 @@ class Test:
     @classmethod
     def join_test_descriptions(
         cls: typing.Type[typing.Self],
-        test_entries: typing.List[tests_json_file.TestEntry],
-        test_list_entries: typing.Dict[str, TestListEntry],
-    ) -> typing.List[typing.Self]:
+        test_entries: list[tests_json_file.TestEntry],
+        test_list_entries: dict[str, TestListEntry],
+    ) -> list[typing.Self]:
         """Join the contents of tests.json with the contents of test-list.json.
 
         Args:
@@ -214,7 +214,7 @@ class Test:
             List[Test]: List of joined contents for all tests in tests.json.
         """
         try:
-            ret: typing.List[Test] = [
+            ret: list[Test] = [
                 cls(entry, test_list_entries[entry.test.name])
                 for entry in test_entries
             ]

@@ -6,7 +6,6 @@ from dataclasses import dataclass
 from dataclasses import field
 import os
 import re
-import typing
 
 import args
 
@@ -20,7 +19,7 @@ class ConfigFile:
     default_flags: args.Flags | None = None
 
     # The command line arguments provided in the config file.
-    command_line: typing.List[str] = field(default_factory=list)
+    command_line: list[str] = field(default_factory=list)
 
     def is_loaded(self) -> bool:
         """Determine if a config was loaded.
@@ -55,11 +54,11 @@ def load_config(path: str | None = None) -> ConfigFile:
     if not os.path.exists(path):
         return ConfigFile(path)
 
-    lines: typing.List[str]
+    lines: list[str]
     with open(path) as f:
         lines = f.readlines()
 
-    command_line: typing.List[str] = []
+    command_line: list[str] = []
     line_num = 0
     for line in lines:
         line_num += 1

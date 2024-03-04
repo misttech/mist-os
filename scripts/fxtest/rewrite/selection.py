@@ -48,8 +48,8 @@ PERFECT_MATCH_DISTANCE: int = 0
 
 
 async def select_tests(
-    entries: typing.List[Test],
-    selection: typing.List[str],
+    entries: list[Test],
+    selection: list[str],
     mode: SelectionMode = SelectionMode.ANY,
     fuzzy_distance_threshold: int = DEFAULT_FUZZY_DISTANCE_THRESHOLD,
     recorder: event.EventRecorder | None = None,
@@ -63,8 +63,8 @@ async def select_tests(
     The --package and --component arguments each take a single argument.
 
     Args:
-        entries (typing.List[Test]): Tests to select from.
-        selection (typing.List[str]): Selection command line.
+        entries (list[Test]): Tests to select from.
+        selection (list[str]): Selection command line.
         mode (SelectionMode, optional): Selection mode. Defaults to ANY.
         fuzzy_distance_threshold (int, optional): Distance threshold for including tests in selection.
         recorder (EventRecorder, optional): If set, record match duration events.
@@ -78,7 +78,7 @@ async def select_tests(
         TestSelections: Description of the selection process outcome.
     """
 
-    filtered_entry_scores: typing.Dict[str, int] = {}
+    filtered_entry_scores: dict[str, int] = {}
     if mode == SelectionMode.HOST:
         filtered_entry_scores = {
             test.info.name: NO_MATCH_DISTANCE
@@ -101,9 +101,7 @@ async def select_tests(
         }
         entries = list(filter(Test.is_e2e_test, entries))
 
-    def make_final_scores(
-        partial: typing.Dict[str, int]
-    ) -> typing.Dict[str, int]:
+    def make_final_scores(partial: dict[str, int]) -> dict[str, int]:
         filtered_entry_scores.update(partial)
         return filtered_entry_scores
 
@@ -125,10 +123,8 @@ async def select_tests(
     match_groups = _parse_selection_command_line(selection)
 
     tests_to_run: typing.Set[Test] = set()
-    group_matches: typing.List[
-        typing.Tuple[selection_types.MatchGroup, typing.List[str]]
-    ] = []
-    best_matches: typing.Dict[str, int] = defaultdict(lambda: NO_MATCH_DISTANCE)
+    group_matches: list[tuple[selection_types.MatchGroup, list[str]]] = []
+    best_matches: dict[str, int] = defaultdict(lambda: NO_MATCH_DISTANCE)
     TRAILING_PATH = re.compile(r"/([\w\-_\.]+)$")
     COMPONENT_REGEX = re.compile(r"#meta/([\w\-_]+)\.cm")
 
@@ -153,7 +149,7 @@ async def select_tests(
     def extract_package(entry: Test) -> str | None:
         return entry.package_name()
 
-    matched: typing.List[str] = []
+    matched: list[str] = []
     match_tasks = []
 
     for group in match_groups:
@@ -177,7 +173,7 @@ async def select_tests(
                 entries, extract_trailing_path
             )
 
-            async def closest_name_match() -> typing.List[_TestDistance]:
+            async def closest_name_match() -> list[_TestDistance]:
                 lowest_score_dict: defaultdict[Test, int] = defaultdict(
                     lambda: NO_MATCH_DISTANCE
                 )
@@ -206,9 +202,9 @@ async def select_tests(
                         name.distances(n, recorder, id, exact=True)
                         for n in group.names
                     ]
-                results: typing.List[
-                    typing.List[_TestDistance]
-                ] = await asyncio.gather(*tasks)
+                results: list[list[_TestDistance]] = await asyncio.gather(
+                    *tasks
+                )
                 for result in itertools.chain(*results):
                     if result.test not in lowest_score_dict:
                         tests.append(result.test)
@@ -230,9 +226,9 @@ async def select_tests(
                 + [package.distances(p, recorder, id) for p in group.packages]
             )
 
-            distances: typing.List[
-                typing.List[_TestDistance]
-            ] = await asyncio.gather(*match_tries)
+            distances: list[list[_TestDistance]] = await asyncio.gather(
+                *match_tries
+            )
             match_distances: defaultdict[Test, int] = defaultdict(
                 lambda: NO_MATCH_DISTANCE
             )
@@ -268,7 +264,7 @@ async def select_tests(
 
     await asyncio.wait(match_tasks, return_when=asyncio.FIRST_EXCEPTION)
 
-    omitted_fuzzy_matches: typing.List[Test] = []
+    omitted_fuzzy_matches: list[Test] = []
     if PERFECT_MATCH_DISTANCE in best_matches.values():
         # There was a perfect match. Omit any test that is not a perfect match.
         omitted_fuzzy_matches = [
@@ -303,7 +299,7 @@ class _TestDistance:
 class _TestDistanceMeasurer:
     def __init__(
         self,
-        tests: typing.List[Test],
+        tests: list[Test],
         extractor: typing.Callable[[Test], str | None],
     ) -> None:
         self._test_and_key = [
@@ -316,7 +312,7 @@ class _TestDistanceMeasurer:
         recorder: event.EventRecorder | None,
         parent_id: event.Id | None,
         exact: bool = False,
-    ) -> typing.List[_TestDistance]:
+    ) -> list[_TestDistance]:
         """Process and return the list of match distances for the list.
 
         Args:
@@ -329,7 +325,7 @@ class _TestDistanceMeasurer:
             RuntimeError: The required matching script is missing.
 
         Returns:
-            typing.List[_TestDistance]: Description of distances from contained set
+            list[_TestDistance]: Description of distances from contained set
             of tests to the input value.
         """
         with tempfile.TemporaryDirectory() as td:
@@ -389,10 +385,10 @@ class _TestDistanceMeasurer:
 
 
 def _parse_selection_command_line(
-    selection: typing.List[str],
-) -> typing.List[selection_types.MatchGroup]:
+    selection: list[str],
+) -> list[selection_types.MatchGroup]:
     selection = selection.copy()  # Do not affect input list.
-    output_groups: typing.List[selection_types.MatchGroup] = []
+    output_groups: list[selection_types.MatchGroup] = []
     cur_group: selection_types.MatchGroup | None = None
 
     def pop_for_arg(arg: str) -> None:

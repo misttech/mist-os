@@ -145,8 +145,8 @@ class AsyncCommand:
         cls: typing.Type["AsyncCommand"],
         program: str,
         *args: str,
-        symbolizer_args: typing.List[str] | None = None,
-        env: typing.Dict[str, str] | None = None,
+        symbolizer_args: list[str] | None = None,
+        env: dict[str, str] | None = None,
         timeout: float | None = None,
     ) -> "AsyncCommand":
         """Create a new AsyncCommand that runs the given program.

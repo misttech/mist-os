@@ -9,15 +9,14 @@ import string
 import subprocess
 import sys
 import tempfile
-import typing
 
 import test_list_file
 
 
 def spawn(
-    tests: typing.List[test_list_file.Test],
+    tests: list[test_list_file.Test],
     break_on_failure: bool = False,
-    breakpoints: typing.List[str] = [],
+    breakpoints: list[str] = [],
 ) -> subprocess.Popen[bytes]:
     """Spawn zxdb in a subprocess.
 
@@ -29,7 +28,7 @@ def spawn(
     output from the spawned process.
 
     Args:
-        tests (typing.List[test_list_file.Test]): List of tests selected to be executed.
+        tests (list[test_list_file.Test]): List of tests selected to be executed.
 
     Returns:
         subprocess.Popen: process handle for the zxdb process group.

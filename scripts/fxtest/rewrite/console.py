@@ -62,10 +62,10 @@ class ConsoleState:
 
     def __init__(self) -> None:
         self.root_path: str | None = None
-        self.active_durations: typing.Dict[event.Id, DurationInfo] = dict()
-        self.complete_durations: typing.Dict[event.Id, DurationInfo] = dict()
+        self.active_durations: dict[event.Id, DurationInfo] = dict()
+        self.complete_durations: dict[event.Id, DurationInfo] = dict()
         self.end_duration: float | None = None
-        self.test_results: typing.Dict[
+        self.test_results: dict[
             event.TestSuiteStatus, typing.Set[str]
         ] = defaultdict(set)
 
@@ -97,7 +97,7 @@ async def console_printer(
     print("")  # To align with the original tool's output.
 
     state = ConsoleState()
-    print_queue: asyncio.Queue[typing.List[str]] = asyncio.Queue()
+    print_queue: asyncio.Queue[list[str]] = asyncio.Queue()
 
     # Spawn an asynchronous task to actually process incoming events.
     # The rest of this method simply displays the status output and prints
@@ -194,7 +194,7 @@ class TaskStatus:
     tasks_queued_but_not_running: int
 
     # Detailed information to print a status line for each in-progress duration.
-    duration_infos: typing.List[DurationPrintInfo]
+    duration_infos: list[DurationPrintInfo]
 
     def total_tasks(self) -> int:
         return (
@@ -206,7 +206,7 @@ class TaskStatus:
 
 def _create_status_lines_from_state(
     flags: args.Flags, state: ConsoleState
-) -> typing.List[str]:
+) -> list[str]:
     """Process the overall console state into a list of lines to present to the user.
 
     Args:
@@ -214,7 +214,7 @@ def _create_status_lines_from_state(
         state (ConsoleState): The console state to process.
 
     Returns:
-        typing.List[str]: List of lines to present to the user.
+        list[str]: List of lines to present to the user.
     """
 
     # Process the state
@@ -268,10 +268,8 @@ def _create_status_lines_from_state(
 
 def _produce_task_status_from_state(state: ConsoleState) -> TaskStatus:
     # Generate a mapping of each duration to its children.
-    duration_children: typing.Dict[
-        event.Id, typing.List[event.Id]
-    ] = defaultdict(list)
-    all_durations: typing.Dict[event.Id, DurationInfo] = dict()
+    duration_children: dict[event.Id, list[event.Id]] = defaultdict(list)
+    all_durations: dict[event.Id, DurationInfo] = dict()
 
     for id, duration in chain(
         state.active_durations.items(), state.complete_durations.items()
@@ -295,14 +293,12 @@ def _produce_task_status_from_state(state: ConsoleState) -> TaskStatus:
     # starting from the root, taking account only of those
     # durations that are active and sorting by descending
     # timestamp.
-    duration_print_infos: typing.List[DurationPrintInfo] = []
+    duration_print_infos: list[DurationPrintInfo] = []
     assert event.GLOBAL_RUN_ID in all_durations
 
     # Stack of duration event.Ids to process. Second
     # element of the tuple tracks indent level.
-    work_stack: typing.List[typing.Tuple[event.Id, int]] = [
-        (event.GLOBAL_RUN_ID, 0)
-    ]
+    work_stack: list[tuple[event.Id, int]] = [(event.GLOBAL_RUN_ID, 0)]
     while work_stack:
         id, indent = work_stack.pop()
         info: DurationInfo | None = None
@@ -351,9 +347,7 @@ def _produce_task_status_from_state(state: ConsoleState) -> TaskStatus:
     )
 
 
-def _format_duration_lines(
-    flags: args.Flags, status: TaskStatus
-) -> typing.List[str]:
+def _format_duration_lines(flags: args.Flags, status: TaskStatus) -> list[str]:
     """Given the processed status for all tasks, format output based
     on the flags.
 
@@ -362,10 +356,10 @@ def _format_duration_lines(
         status (TaskStatus): Processed task status.
 
     Returns:
-        typing.List[str]: A list of lines to present to the user.
+        list[str]: A list of lines to present to the user.
     """
     monotonic = time.monotonic()
-    duration_lines: typing.List[str] = []
+    duration_lines: list[str] = []
     for print_info in status.duration_infos:
         prefix = " " * (print_info.indent * 2)
         if print_info.progress is not None:
@@ -412,10 +406,10 @@ async def _console_event_loop(
     # First, we need the name to report success or failure.
     # Second, we flatten the status display so that commands run
     # as part of a test execution are not shown.
-    test_suite_names: typing.Dict[event.Id, str] = dict()
+    test_suite_names: dict[event.Id, str] = dict()
     next_event: event.Event
     async for next_event in recorder.iter():
-        lines_to_print: typing.List[str] = []
+        lines_to_print: list[str] = []
 
         # If set, and we do verbose printing, append this suffix to the output.
         verbose_suffix: str = ""

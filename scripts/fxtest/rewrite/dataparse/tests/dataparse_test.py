@@ -37,7 +37,7 @@ class Weather:
     chance_of_rain: float
     description: str
     city: City
-    temperature_by_hour: typing.List[TemperatureDataPoint] | None = None
+    temperature_by_hour: list[TemperatureDataPoint] | None = None
     weather_station_ids: typing.Set[int] | None = None
     suggested_cities: typing.Set[City] | None = None
 
@@ -76,7 +76,7 @@ class TestDataParse(unittest.TestCase):
             description="sunny",
             city=City(name="San Diego"),
         )
-        d: typing.Dict[str, typing.Any] = weather.to_dict()  # type:ignore
+        d: dict[str, typing.Any] = weather.to_dict()  # type:ignore
         self.assertDictEqual(
             d,
             {
@@ -190,7 +190,7 @@ class TestDataParse(unittest.TestCase):
         self.assertEqual(kv.the_key, "foo")
         self.assertEqual(kv.the_value, "bar")
 
-        out: typing.Dict[str, typing.Any] = kv.to_dict()  # type:ignore
+        out: dict[str, typing.Any] = kv.to_dict()  # type:ignore
         self.assertDictEqual(input, out)
 
     def test_nulls(self) -> None:
@@ -207,9 +207,7 @@ class TestDataParse(unittest.TestCase):
 
         has_null: HasNull = HasNull.from_dict({"value": None})  # type:ignore
         self.assertEqual(has_null, HasNull())
-        out_dict: typing.Dict[
-            str, typing.Any
-        ] = has_null.to_dict()  # type:ignore
+        out_dict: dict[str, typing.Any] = has_null.to_dict()  # type:ignore
         # Omit nulls in output.
         self.assertFalse(hasattr(out_dict, "value"))
 

@@ -9,7 +9,6 @@ import os
 import signal
 import stat
 import tempfile
-import typing
 import unittest
 
 from util import arg_option
@@ -335,7 +334,7 @@ class TestSignals(unittest.TestCase):
         proc.start()
         proc.join()
 
-        lines: typing.List[str]
+        lines: list[str]
         with open(output_file_name, "r") as f:
             lines = [line.strip() for line in f.readlines()]
 

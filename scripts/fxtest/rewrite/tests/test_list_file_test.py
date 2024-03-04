@@ -5,7 +5,6 @@
 import json
 import os
 import tempfile
-import typing
 import unittest
 
 from test_list_file import Test
@@ -63,7 +62,7 @@ class TestListFileJoiningTest(unittest.TestCase):
             "extra_test": TestListEntry("extra_test", tags=[]),
         }
 
-        joined: typing.List[Test] = Test.join_test_descriptions(
+        joined: list[Test] = Test.join_test_descriptions(
             tests_file, test_list_file
         )
         self.assertSetEqual(
@@ -92,7 +91,7 @@ class TestListFileJoiningTest(unittest.TestCase):
                 )
             ),
         ]
-        test_list_file: typing.Dict[str, TestListEntry] = {}
+        test_list_file: dict[str, TestListEntry] = {}
 
         self.assertRaises(
             ValueError,

@@ -5,7 +5,6 @@
 import asyncio
 import io
 import json
-import typing
 import unittest
 
 import event
@@ -26,7 +25,7 @@ class TestLogOutput(unittest.IsolatedAsyncioTestCase):
 
         await log_task
 
-        events: typing.List[event.Event] = [
+        events: list[event.Event] = [
             event.Event.from_dict(json.loads(line))  # type:ignore
             for line in output.getvalue().splitlines()
         ]

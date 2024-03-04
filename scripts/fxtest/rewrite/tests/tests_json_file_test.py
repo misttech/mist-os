@@ -5,7 +5,6 @@
 import json
 import os
 import tempfile
-import typing
 import unittest
 
 from tests_json_file import TestEntry
@@ -40,7 +39,7 @@ class TestFileTest(unittest.TestCase):
             with open(path, "w") as f:
                 json.dump(contents, f)
 
-            entries: typing.List[TestEntry] = TestEntry.from_file(path)
+            entries: list[TestEntry] = TestEntry.from_file(path)
             self.assertListEqual(
                 [t.test.name for t in entries], ["my_test", "my_test2"]
             )

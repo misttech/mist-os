@@ -4,7 +4,6 @@
 
 import io
 import re
-import typing
 
 _UP_REGEX = re.compile(r"\[(\d+)A")
 
@@ -25,7 +24,7 @@ class Terminal:
 
     def __init__(self, width: int):
         self._width = width
-        self.lines: typing.List[str] = [""]
+        self.lines: list[str] = [""]
         self._line_position: int = 0
         self._current_write = io.StringIO()
 
@@ -40,7 +39,7 @@ class Terminal:
         """
         return self._current_write.write(value)
 
-    def writelines(self, value: typing.List[str]) -> None:
+    def writelines(self, value: list[str]) -> None:
         """Implementation of io writelines.
 
         Args:

@@ -83,7 +83,7 @@ class TestEntry:
     test: TestSection
 
     # The "environments" field for a specific entry in the file.
-    environments: typing.List[EnvironmentEntry] | None = None
+    environments: list[EnvironmentEntry] | None = None
 
     # Optional field that is set for boot tests only.
     product_bundle: str | None = None
@@ -91,7 +91,7 @@ class TestEntry:
     @classmethod
     def from_file(
         cls: typing.Type[typing.Self], file: str
-    ) -> typing.List[typing.Self]:
+    ) -> list[typing.Self]:
         """Parse the file at the given path into a list of TestEntry.
 
         This returns a list of entries because the ordering of the
@@ -107,7 +107,7 @@ class TestEntry:
             TestFileError: If the tests.json file was found to be invalid.
 
         Returns:
-            typing.List[TestEntry]: List of test entries contained in the file.
+            list[TestEntry]: List of test entries contained in the file.
         """
         with open(file, "r") as f:
             vals = json.load(f)
@@ -116,7 +116,7 @@ class TestEntry:
                     "Expected a list at top-level of tests.json, found "
                     + str(type(vals))
                 )
-            ret: typing.List[typing.Self] = list(
+            ret: list[typing.Self] = list(
                 map(TestEntry.from_dict, vals)  # type:ignore
             )
             names: typing.Set[str] = set()

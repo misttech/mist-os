@@ -34,7 +34,6 @@ import shutil
 import sys
 import termios
 import threading
-import typing
 
 import colorama
 
@@ -151,8 +150,8 @@ _CLEAR_SCREEN_TO_END_MODE = 0
 
 
 def write_lines(
-    lines: typing.List[str],
-    prepend: typing.List[str] | None = None,
+    lines: list[str],
+    prepend: list[str] | None = None,
     size: Size | None = None,
 ) -> None:
     """Write a list of lines to the terminal.
@@ -189,7 +188,7 @@ def write_lines(
         for line in prepend or []:
             print(line + colorama.Style.RESET_ALL, file=write_buffer)
 
-        formatted_lines: typing.List[str] = []
+        formatted_lines: list[str] = []
 
         for line in lines:
             printing = True

@@ -85,7 +85,7 @@ async def async_main_wrapper(
     Returns:
         The return code of the program.
     """
-    tasks: typing.List[asyncio.Task[None]] = []
+    tasks: list[asyncio.Task[None]] = []
     if recorder is None:
         recorder = event.EventRecorder()
 
@@ -103,7 +103,7 @@ async def async_main_wrapper(
 
 async def async_main(
     flags: args.Flags,
-    tasks: typing.List[asyncio.Task[None]],
+    tasks: list[asyncio.Task[None]],
     recorder: event.EventRecorder,
     config_file: config.ConfigFile | None = None,
 ) -> int:
@@ -316,7 +316,7 @@ To go back to the old fx test, use `fx --enable=legacy_fxtest test`, and please 
 
 async def load_test_list(
     recorder: event.EventRecorder, exec_env: environment.ExecutionEnvironment
-) -> typing.List[test_list_file.Test]:
+) -> list[test_list_file.Test]:
     """Load the input files listing tests and parse them into a list of Tests.
 
     Args:
@@ -332,7 +332,7 @@ async def load_test_list(
             incompatible for some reason.
 
     Returns:
-        typing.List[test_list_file.Test]: List of available tests to execute.
+        list[test_list_file.Test]: List of available tests to execute.
     """
 
     # Load the tests.json file.
@@ -341,7 +341,7 @@ async def load_test_list(
             exec_env.relative_to_root(exec_env.test_json_file),
             exec_env.test_json_file,
         )
-        test_file_entries: typing.List[
+        test_file_entries: list[
             tests_json_file.TestEntry
         ] = tests_json_file.TestEntry.from_file(exec_env.test_json_file)
         recorder.emit_test_file_loaded(
@@ -401,7 +401,7 @@ async def validate_test_selections(
         SelectionValidationError: If the selections are invalid.
     """
 
-    missing_groups: typing.List[selection_types.MatchGroup] = []
+    missing_groups: list[selection_types.MatchGroup] = []
 
     for group, matches in selections.group_matches:
         if not matches:
@@ -422,7 +422,7 @@ async def validate_test_selections(
 
             def suggestion_args(
                 arg: str, threshold: float | None = None
-            ) -> typing.List[str]:
+            ) -> list[str]:
                 name = "fx"
                 suggestion_args = [
                     "search-tests",
@@ -604,7 +604,7 @@ def read_delivery_blob_type(
         return None
 
     with open(expected_path) as f:
-        val: typing.Dict[str, typing.Any] = json.load(f)
+        val: dict[str, typing.Any] = json.load(f)
         recorder.emit_end(id=id)
         return int(val["type"]) if "type" in val else None
 
@@ -617,7 +617,7 @@ def has_tests_in_base(
     base_file = os.path.join(exec_env.out_dir, "base_packages.list")
     parse_id = recorder.emit_start_file_parsing("base_packages.list", base_file)
 
-    manifests: typing.List[str]
+    manifests: list[str]
     try:
         with open(base_file) as f:
             contents = json.load(f)
@@ -669,7 +669,7 @@ async def has_device_connected(
 
 
 async def run_build_with_suspended_output(
-    build_command_line: typing.List[str],
+    build_command_line: list[str],
 ) -> int:
     # Allow display to update.
     await asyncio.sleep(0.1)
@@ -861,7 +861,7 @@ async def run_all_tests(
                 to_run.exec.name(), not was_non_hermetic, parent=test_group
             )
             status: event.TestSuiteStatus
-            message: typing.Optional[str] = None
+            message: str | None = None
             try:
                 if not to_run.abort_group.is_set():
                     # Only run if this group was not already aborted.
@@ -1006,17 +1006,15 @@ async def enumerate_test_cases(
 
 
 async def run_commands_in_parallel(
-    commands: typing.List[typing.List[str]],
+    commands: list[list[str]],
     group_name: str,
-    recorder: typing.Optional[event.EventRecorder] = None,
-    maximum_parallel: typing.Optional[int] = None,
-) -> typing.List[typing.Optional[command.CommandOutput]]:
+    recorder: event.EventRecorder | None = None,
+    maximum_parallel: int | None = None,
+) -> list[command.CommandOutput | None]:
     assert recorder
 
     parent = recorder.emit_event_group(group_name, queued_events=len(commands))
-    output: typing.List[typing.Optional[command.CommandOutput]] = [None] * len(
-        commands
-    )
+    output: list[command.CommandOutput | None] = [None] * len(commands)
     in_progress: typing.Set[asyncio.Task[None]] = set()
 
     index = 0

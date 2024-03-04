@@ -5,7 +5,6 @@
 import os
 import re
 import tempfile
-import typing
 
 import args
 import environment
@@ -96,14 +95,14 @@ class TestExecution:
         """
         return self._test.info.is_hermetic()
 
-    def command_line(self) -> typing.List[str]:
+    def command_line(self) -> list[str]:
         """Format the command line required to execute this test.
 
         Raises:
             TestCouldNotRun: If we do not know how to run this type of test.
 
         Returns:
-            typing.List[str]: The command line for the test.
+            list[str]: The command line for the test.
         """
         if self._test.info.execution is not None:
             execution = self._test.info.execution
@@ -111,7 +110,7 @@ class TestExecution:
             component_url = self._get_component_url()
             assert component_url is not None
 
-            min_severity_logs: typing.List[str] = []
+            min_severity_logs: list[str] = []
             if self._flags.min_severity_logs:
                 min_severity_logs = self._flags.min_severity_logs
             elif execution.min_severity_logs is not None:
@@ -173,14 +172,14 @@ class TestExecution:
                 f"We do not know how to run this test: {str(self._test)}"
             )
 
-    def enumerate_cases_command_line(self) -> typing.List[str] | None:
+    def enumerate_cases_command_line(self) -> list[str] | None:
         """Get the command line to enumerate all test cases in this test.
 
         If this type of test does not support test case enumeration,
         return None.
 
         Returns:
-            typing.List[str] | None: Command line to enumerate cases
+            list[str] | None: Command line to enumerate cases
                 if possible, None otherwise.
         """
 
@@ -200,11 +199,11 @@ class TestExecution:
             ["fx", "ffx", "test", "list-cases"] + extra_args + [component_url]
         )
 
-    def environment(self) -> typing.Dict[str, str] | None:
+    def environment(self) -> dict[str, str] | None:
         """Format environment variables needed to run the test.
 
         Returns:
-            typing.Dict[str, str] | None: Environment for
+            dict[str, str] | None: Environment for
                 the test, or None if no environment is needed.
         """
         env = {}
@@ -292,7 +291,7 @@ class TestExecution:
         )
 
         if maybe_temp_dir is not None:
-            files: typing.List[str] = []
+            files: list[str] = []
             for prefix, _, names in os.walk(maybe_temp_dir.name):
                 files.extend(
                     [
@@ -441,14 +440,14 @@ async def run_command(
     parent: event.Id | None = None,
     print_verbatim: bool = False,
     symbolize: bool = False,
-    env: typing.Dict[str, str] | None = None,
+    env: dict[str, str] | None = None,
     timeout: float | None = None,
 ) -> command.CommandOutput | None:
     """Utility method to run a test command asynchronously.
 
     Args:
         name (str): Command to run.
-        args (typing.List[str]): Arguments to the command.
+        args (list[str]): Arguments to the command.
         recorder (event.EventRecorder | None):
             Recorder for events. Defaults to None.
         parent (event.Id | None): Parent event ID for reporting.
@@ -457,7 +456,7 @@ async def run_command(
             output events for stdout and stderr. Defaults to False.
         symbolize (bool, optional): If true, pipe output through
             symbolizer. Defaults to False.
-        env (typing.Dict[str, str], optional):
+        env (dict[str, str], optional):
             Environment to pass to the command. Defaults to None.
         timeout (float, optional): The number of seconds to wait before timing out.
 

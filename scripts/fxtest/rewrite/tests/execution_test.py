@@ -23,13 +23,13 @@ import util.command as command
 
 class TestExecution(unittest.IsolatedAsyncioTestCase):
     def assertContainsSublist(
-        self, target: typing.List[typing.Any], data: typing.List[typing.Any]
+        self, target: list[typing.Any], data: list[typing.Any]
     ) -> None:
         """Helper method to assert that one list is contained in the other, in order.
 
         Args:
-            target (typing.List[typing.Any]): The sublist to search for.
-            data (typing.List[typing.Any]): The list to search in.
+            target (list[typing.Any]): The sublist to search for.
+            data (list[typing.Any]): The list to search in.
         """
         self.assertNotEqual(len(target), 0, "Target list cannot be empty")
         starts = [i for i, v in enumerate(data) if v == target[0]]
@@ -145,9 +145,9 @@ class TestExecution(unittest.IsolatedAsyncioTestCase):
     async def test_test_execution_component(
         self,
         _unused_name: str,
-        flag_list: typing.List[str],
-        expected_present_flag_lists: typing.List[typing.List[str]],
-        expected_not_present_flags: typing.List[str],
+        flag_list: list[str],
+        expected_present_flag_lists: list[list[str]],
+        expected_not_present_flags: list[str],
     ) -> None:
         """Test the usage of the TestExecution wrapper on a component test"""
 
@@ -222,7 +222,7 @@ class TestExecution(unittest.IsolatedAsyncioTestCase):
         _unused_name: str,
         spec_parallel: int | None,
         flag_parallel: int | None,
-        expected_args: typing.List[str],
+        expected_args: list[str],
     ) -> None:
         """Test the usage of the TestExecution wrapper on a component test"""
         exec_env = environment.ExecutionEnvironment(

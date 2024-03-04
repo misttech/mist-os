@@ -4,7 +4,6 @@
 
 import os
 import tempfile
-import typing
 import unittest
 import unittest.mock as mock
 
@@ -81,7 +80,7 @@ class TestArgs(unittest.TestCase):
     )
     @mock.patch("args.termout.is_valid", return_value=False)
     def test_validation_errors(
-        self, _unused_name: str, arg_list: typing.List[str], _mock: mock.Mock
+        self, _unused_name: str, arg_list: list[str], _mock: mock.Mock
     ) -> None:
         flags = args.parse_args(arg_list)
         try:
@@ -129,8 +128,8 @@ class TestArgs(unittest.TestCase):
     def test_output_toggle(
         self,
         _unused_name: str,
-        arguments: typing.List[str],
-        config_arguments: typing.List[str],
+        arguments: list[str],
+        config_arguments: list[str],
         expected_value: bool,
     ) -> None:
         config_file = config.ConfigFile(

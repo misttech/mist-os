@@ -24,7 +24,7 @@ class SelectionAction(argparse.Action):
 
     def __init__(
         self,
-        option_strings: typing.List[str],
+        option_strings: list[str],
         dest: str,
         nargs: int | str | None = None,
         **kwargs: typing.Any,
@@ -32,7 +32,7 @@ class SelectionAction(argparse.Action):
         """Create a SelectionAction.
 
         Args:
-            option_strings (typing.List[str]): List of options. See argparse documentation.
+            option_strings (list[str]): List of options. See argparse documentation.
             dest (str): Destination variable. See argparse documentation.
             nargs (Optional[Union[int, str]]): Number of arguments. See argparse documentation.
         """
@@ -63,6 +63,6 @@ class SelectionAction(argparse.Action):
 
         if getattr(namespace, self._dest) is None:
             setattr(namespace, self._dest, [])
-        lst: typing.List[str] = getattr(namespace, self._dest)
+        lst: list[str] = getattr(namespace, self._dest)
         if values is not None:
             lst += self._canonical + list(values)

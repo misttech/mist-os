@@ -81,7 +81,7 @@ class TestsJsonFilePayload:
     # The complete list of entries parsed from the file.
     # This output is in the format parsed by tests_json_file, not the
     # verbatim input.
-    test_entries: typing.List[tests_json_file.TestEntry]
+    test_entries: list[tests_json_file.TestEntry]
 
     # The path of the tests.json file that was parsed.
     file_path: str
@@ -96,10 +96,10 @@ class ProgramExecutionPayload:
     command: str
 
     # List of flags passed to the command.
-    flags: typing.List[str]
+    flags: list[str]
 
     # The environment passed to the command.
-    environment: typing.Dict[str, str]
+    environment: dict[str, str]
 
     def to_formatted_command_line(self) -> str:
         """Format this program execution to an approximation of the command line.
@@ -158,13 +158,13 @@ class TestSelectionPayload:
     """
 
     # Map of selected test names to their score that was below the threshold.
-    selected: typing.Dict[str, int]
+    selected: dict[str, int]
 
     # Map of not selected test names to their score that was above the threshold.
-    not_selected: typing.Dict[str, int]
+    not_selected: dict[str, int]
 
     # Map of selected but not run test names to their score that was below the threshold.
-    selected_but_not_run: typing.Dict[str, int]
+    selected_but_not_run: dict[str, int]
 
     # The distance threshold this selection run was configured with.
     fuzzy_distance_threshold: int
@@ -205,7 +205,7 @@ class TestGroupPayload(EventGroupPayload):
         )
 
     @classmethod
-    def from_dict(cls, dict: typing.Dict[str, typing.Any]) -> typing.Self:
+    def from_dict(cls, dict: dict[str, typing.Any]) -> typing.Self:
         s: EventGroupPayload = super().from_dict(dict)  # type:ignore
         ret: typing.Self = cls(0)
         ret.name = s.name
@@ -265,7 +265,7 @@ class EnumerateTestCasesPayload:
     test_name: str
 
     # The names of the test cases in the test.
-    test_case_names: typing.List[str]
+    test_case_names: list[str]
 
 
 @dataparse
@@ -277,10 +277,10 @@ class LoadConfigPayload:
     path: str
 
     # The flag defaults parsed from the config file.
-    flags: typing.Dict[str, typing.Any]
+    flags: dict[str, typing.Any]
 
     # The command line provided in the config file.
-    command_line: typing.List[str]
+    command_line: list[str]
 
 
 @dataparse
@@ -323,12 +323,12 @@ class EventPayloadUnion:
     # This event denotes parsing command line flags.
     #
     # The parsed command line flags are included in the value.
-    parse_flags: typing.Dict[str, typing.Any] | None = None
+    parse_flags: dict[str, typing.Any] | None = None
 
     # This event denotes processing the execution environment.
     #
     # The parsed environment is included in the value.
-    process_env: typing.Dict[str, typing.Any] | None = None
+    process_env: dict[str, typing.Any] | None = None
 
     # This event denotes a message to be shown to the user.
     #
@@ -373,7 +373,7 @@ class EventPayloadUnion:
     # This event denotes the beginning of a build operation.
     #
     # The value lists the targets being built.
-    build_targets: typing.List[str] | None = None
+    build_targets: list[str] | None = None
 
     # This event denotes the beginning of a group of test suites.
     #
@@ -445,10 +445,10 @@ class EventRecorder:
         self._monotonic_time_start: float = time.monotonic()
 
         # Keep track of all events that were emitted as part of execution.
-        self._events: typing.List[Event] = []
+        self._events: list[Event] = []
 
         # Keep track of each asynchronous event consumer queue.
-        self._queues: typing.List[asyncio.Queue[Event | None]] = []
+        self._queues: list[asyncio.Queue[Event | None]] = []
 
         # Async event designating that this recorder is done.
         self._done: asyncio.Event = asyncio.Event()
@@ -534,7 +534,7 @@ class EventRecorder:
 
         class Iter:
             def __aiter__(self) -> typing.Self:
-                self._init_items: typing.List[Event] = parent._events.copy()
+                self._init_items: list[Event] = parent._events.copy()
                 self._queue: asyncio.Queue[Event | None] = asyncio.Queue()
                 if not parent._done.is_set():
                     parent._queues.append(self._queue)
@@ -685,15 +685,15 @@ class EventRecorder:
     def emit_load_config(
         self,
         path: str,
-        flags: typing.Dict[str, typing.Any],
-        command_line: typing.List[str],
+        flags: dict[str, typing.Any],
+        command_line: list[str],
     ) -> None:
         """Emit a load_config event with details on the config.
 
         Args:
             path (str): The path to the loaded config file.
-            flags (typing.Dict[str, typing.Any]): The flags passed to this invocation.
-            command_line (typing.List[str]): The command line parsed from the config file.
+            flags (dict[str, typing.Any]): The flags passed to this invocation.
+            command_line (list[str]): The command line parsed from the config file.
         """
         self._emit(
             Event(
@@ -705,11 +705,11 @@ class EventRecorder:
             )
         )
 
-    def emit_parse_flags(self, flags: typing.Dict[str, typing.Any]) -> None:
+    def emit_parse_flags(self, flags: dict[str, typing.Any]) -> None:
         """Emit a parse_flags event with details on the flags.
 
         Args:
-            flags (typing.Dict[str, typing.Any]): The flags passed to this invocation.
+            flags (dict[str, typing.Any]): The flags passed to this invocation.
         """
         self._emit(
             Event(
@@ -719,11 +719,11 @@ class EventRecorder:
             )
         )
 
-    def emit_process_env(self, env: typing.Dict[str, typing.Any]) -> None:
+    def emit_process_env(self, env: dict[str, typing.Any]) -> None:
         """Emit a process_env event with details of the environment.
 
         Args:
-            env (typing.Dict[str, typing.Any]): The environment parsed by this invocation.
+            env (dict[str, typing.Any]): The environment parsed by this invocation.
         """
         self._emit(
             Event(
@@ -817,8 +817,8 @@ class EventRecorder:
     def emit_program_start(
         self,
         command: str,
-        args: typing.List[str],
-        environment: typing.Dict[str, str] | None = None,
+        args: list[str],
+        environment: dict[str, str] | None = None,
         parent: Id | None = None,
     ) -> Id:
         """A program is starting execution.
@@ -828,8 +828,8 @@ class EventRecorder:
 
         Args:
             command (str): The command being executed.
-            args (typing.List[str]): The flags passed to the command.
-            environment (typing.Dict[str, str] | None):
+            args (listsed to the command.
+            environment (dict[str, str] | None):
                 The environment passed to the command.  Defaults to None.
             parent (Id, | None): Parent for this event. Defaults
                 to the global run.
@@ -907,12 +907,12 @@ class EventRecorder:
         )
 
     def emit_test_file_loaded(
-        self, entries: typing.List[tests_json_file.TestEntry], file_path: str
+        self, entries: list[tests_json_file.TestEntry], file_path: str
     ) -> None:
         """Event with details of loading the tests.json file.
 
         Args:
-            entries (typing.List[tests_json_file.TestEntry]): Parsed file contents.
+            entries (list[tests_json_file.TestEntry]): Parsed file contents.
             file_path (str): Path to the tests.json file.
         """
         self._emit(
@@ -1000,13 +1000,13 @@ class EventRecorder:
         )
         return id
 
-    def emit_build_start(self, targets: typing.List[str]) -> Id:
+    def emit_build_start(self, targets: list[str]) -> Id:
         """A build process is starting.
 
         The returned Id must be passed to a subsequent emit_end call.
 
         Args:
-            targets (typing.List[str]): List of targets being built.
+            targets (list[str]): List of targets being built.
 
         Returns:
             Id: New Id for the build event.
@@ -1099,7 +1099,7 @@ class EventRecorder:
         )
 
     def emit_enumerate_test_cases(
-        self, test_name: str, test_case_names: typing.List[str]
+        self, test_name: str, test_case_names: list[str]
     ) -> None:
         id = self._new_id()
         self._emit(

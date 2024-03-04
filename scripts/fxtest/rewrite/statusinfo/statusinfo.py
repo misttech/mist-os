@@ -158,7 +158,7 @@ def format_duration(seconds: float) -> str:
         return f"{seconds % 60:.1f}s"
 
 
-def _split_by_weights(weights: typing.List[int], size: int) -> typing.List[int]:
+def _split_by_weights(weights: list[int], size: int) -> list[int]:
     """Split the given size into an array of sizes by the given weights.
 
     Weights do not need to sum to a specific number, and the overall size
@@ -167,11 +167,11 @@ def _split_by_weights(weights: typing.List[int], size: int) -> typing.List[int]:
     The output list will be the same length as the weight list.
 
     Args:
-        weights (typing.List[int]): How much to weight each element of the array.
+        weights (list[int]): How much to weight each element of the array.
         size (int): The total length being distributed.
 
     Returns:
-        typing.List[int]: Array containing amount of |size| assigned to each weight.
+        list[int]: Array containing amount of |size| assigned to each weight.
 
     >>> _split_by_weights([10, 20, 70], 100)
     [10, 20, 70]
@@ -308,13 +308,11 @@ def _pad_to_size(input: str, width: int, left: bool = False) -> str:
     return input
 
 
-def _wrap(
-    style_list: typing.List[typing.Any], string: str, style: bool = True
-) -> str:
+def _wrap(style_list: list[typing.Any], string: str, style: bool = True) -> str:
     """Wrap a string in a style, resetting the style after the string is printed.
 
     Args:
-        style_list (typing.List[typing.Any]): List of colorama styles to wrap with.
+        style_list (list[typing.Any]): List of colorama styles to wrap with.
         string (str): String to wrap.
         style (bool, optional): If False, don't actually style. Defaults to True.
 
