@@ -2336,16 +2336,13 @@ async fn ping_self<N: Netstack>(name: &str, addr: AddrSubnetEither) {
     match addr {
         AddrSubnetEither::V4(v4) => {
             realm
-                .ping::<::ping::Ipv4>(std::net::SocketAddrV4::new(
-                    v4.addr().get().into(),
-                    UNSPECIFIED_PORT,
-                ))
+                .ping::<Ipv4>(std::net::SocketAddrV4::new(v4.addr().get().into(), UNSPECIFIED_PORT))
                 .await
         }
         AddrSubnetEither::V6(v6) => {
             let v6 = v6.addr().get();
             realm
-                .ping::<::ping::Ipv6>(std::net::SocketAddrV6::new(
+                .ping::<Ipv6>(std::net::SocketAddrV6::new(
                     v6.into(),
                     UNSPECIFIED_PORT,
                     0,

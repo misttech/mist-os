@@ -12,7 +12,7 @@ use fuchsia_zircon::{self as zx, HandleBased as _};
 use futures::{Future, FutureExt as _, StreamExt as _, TryStreamExt as _};
 use itertools::Itertools as _;
 use net_declare::{fidl_mac, std_ip_v6};
-use net_types::Witness as _;
+use net_types::{ip::Ipv6, Witness as _};
 use netemul::RealmUdpSocket as _;
 use netstack_testing_common::{
     interfaces::TestInterfaceExt as _,
@@ -1459,9 +1459,7 @@ async fn replies_to_ping(name: &str, unicast: bool) {
         None,
         name,
         DEFAULT_NETSVC_ARGS,
-        |realm| {
-            async move { realm.icmp_socket::<ping::Ipv6>().await.expect("icmp socket") }.boxed()
-        },
+        |realm| async move { realm.icmp_socket::<Ipv6>().await.expect("icmp socket") }.boxed(),
         |sock, scope_id, icmp_socket| async move {
             let device = discover(&sock, scope_id).await;
 
@@ -1475,8 +1473,8 @@ async fn replies_to_ping(name: &str, unicast: bool) {
             let addr = std::net::SocketAddrV6::new(dst, PORT, /* flowinfo */ 0, scope_id);
 
             let mut ping_stream =
-                ping::PingStream::<ping::Ipv6, _, BUFFER_SIZE>::new(&icmp_socket).fuse();
-            let ping_sink = ping::PingSink::<ping::Ipv6, _>::new(&icmp_socket);
+                ping::PingStream::<Ipv6, _, BUFFER_SIZE>::new(&icmp_socket).fuse();
+            let ping_sink = ping::PingSink::<Ipv6, _>::new(&icmp_socket);
 
             // Create a future that tries to ping regularly so we don't suffer
             // flakes in case of bad neighbor resolution. We'll always send

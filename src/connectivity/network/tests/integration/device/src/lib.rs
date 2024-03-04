@@ -16,6 +16,7 @@ use fidl_fuchsia_net_ext::IntoExt as _;
 use fuchsia_async::TimeoutExt as _;
 use futures::{FutureExt as _, SinkExt as _, StreamExt as _, TryStreamExt as _};
 use net_declare::{fidl_mac, fidl_subnet, std_socket_addr_v4};
+use net_types::ip::Ipv4;
 use netstack_testing_common::{
     realms::{Netstack, TestSandboxExt as _},
     ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT,
@@ -268,7 +269,7 @@ async fn ping_succeeds_with_expected_payload<N: Netstack>(
     })
     .await;
 
-    expect_successful_ping::<ping::Ipv4>(
+    expect_successful_ping::<Ipv4>(
         &source_realm,
         // TODO(https://github.com/rust-lang/rust/issues/67390): Make the
         // address const.

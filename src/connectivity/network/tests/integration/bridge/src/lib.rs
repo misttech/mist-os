@@ -12,6 +12,7 @@ use anyhow::anyhow;
 use assert_matches::assert_matches;
 use futures::{SinkExt as _, StreamExt as _, TryFutureExt as _};
 use net_declare::{fidl_subnet, std_socket_addr_v4};
+use net_types::ip::Ipv4;
 use netstack_testing_common::{
     interfaces, ping as ping_helper,
     realms::{Netstack, TestSandboxExt as _},
@@ -410,7 +411,7 @@ async fn test_remove_bridge_interface_disabled<N: Netstack>(name: &str) {
     );
     // Ensure that attempting to ping the switch results in a non-response.
     let () = gateway_realm
-        .ping_once::<ping::Ipv4>(std_socket_addr_v4!("192.168.254.1:0"), gen_seq())
+        .ping_once::<Ipv4>(std_socket_addr_v4!("192.168.254.1:0"), gen_seq())
         .and_then(|()| futures::future::err(anyhow!("ping succeeded unexpectedly")))
         .on_timeout(ASYNC_EVENT_NEGATIVE_CHECK_TIMEOUT.after_now(), || Ok(()))
         .await
@@ -419,10 +420,10 @@ async fn test_remove_bridge_interface_disabled<N: Netstack>(name: &str) {
     // Ensure that the interface that was detached from the bridge is still
     // disabled by asserting that it cannot be used to ping the gateway.
     let icmp_sock = switch_realm
-        .icmp_socket::<ping::Ipv4>()
+        .icmp_socket::<Ipv4>()
         .await
         .expect("failed to create ICMP socket in switch realm");
-    let mut sink = ping::PingSink::<ping::Ipv4, _>::new(&icmp_sock);
+    let mut sink = ping::PingSink::<Ipv4, _>::new(&icmp_sock);
     assert_matches!(
         sink.send(ping::PingData {
             addr: std_socket_addr_v4!("192.168.255.1:0"),

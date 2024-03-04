@@ -4,14 +4,14 @@
 
 #![deny(missing_docs)]
 
-use crate::{IcmpSocket, Ip, Ipv4, Ipv6};
+use crate::{IcmpSocket, Ipv4, Ipv6};
 use core::task::{Context, Poll};
 use fuchsia_async as fasync;
 use futures::ready;
 
 impl<I> IcmpSocket<I> for fasync::net::DatagramSocket
 where
-    I: Ip,
+    I: crate::IpExt,
 {
     /// Async method for receiving an ICMP packet.
     ///
@@ -20,9 +20,9 @@ where
         &self,
         buf: &mut [u8],
         cx: &mut Context<'_>,
-    ) -> Poll<std::io::Result<(usize, I::Addr)>> {
+    ) -> Poll<std::io::Result<(usize, I::SockAddr)>> {
         Poll::Ready(ready!(self.async_recv_from(buf, cx)).and_then(|(len, addr)| {
-            <I::Addr as crate::TryFromSockAddr>::try_from(addr).map(|addr| (len, addr))
+            <I::SockAddr as crate::TryFromSockAddr>::try_from(addr).map(|addr| (len, addr))
         }))
     }
 
@@ -32,7 +32,7 @@ where
     fn async_send_to_vectored(
         &self,
         bufs: &[std::io::IoSlice<'_>],
-        addr: &I::Addr,
+        addr: &I::SockAddr,
         cx: &mut Context<'_>,
     ) -> Poll<std::io::Result<usize>> {
         self.async_send_to_vectored(bufs, &(*addr).clone().into(), cx)
@@ -50,12 +50,12 @@ where
 }
 
 /// Create a new ICMP socket.
-pub fn new_icmp_socket<I: Ip>() -> std::io::Result<fasync::net::DatagramSocket> {
+pub fn new_icmp_socket<I: IpExt>() -> std::io::Result<fasync::net::DatagramSocket> {
     fasync::net::DatagramSocket::new(I::DOMAIN, Some(I::PROTOCOL))
 }
 
-/// Extension trait on [`Ip`] for Fuchsia-specific functionality.
-pub trait IpExt: Ip {
+/// Extension trait on [`crate::IpExt`] for Fuchsia-specific functionality.
+pub trait IpExt: crate::IpExt {
     /// Socket domain.
     const DOMAIN_FIDL: fidl_fuchsia_posix_socket::Domain;
 }

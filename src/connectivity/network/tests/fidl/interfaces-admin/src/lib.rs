@@ -27,7 +27,7 @@ use fuchsia_zircon::{self as zx, AsHandleRef};
 use fuchsia_zircon_status as zx_status;
 use futures::{FutureExt as _, StreamExt as _, TryFutureExt as _, TryStreamExt as _};
 use net_declare::{fidl_ip, fidl_mac, fidl_subnet, std_ip, std_ip_v6, std_socket_addr};
-use net_types::ip::{IpAddress as _, IpVersion, Ipv4};
+use net_types::ip::{IpAddress as _, IpVersion, Ipv4, Ipv6};
 use netemul::{InterfaceConfig, RealmUdpSocket as _};
 use netstack_testing_common::{
     devices::{
@@ -3338,11 +3338,11 @@ async fn nud_max_multicast_solicitations<N: Netstack, I: net_types::ip::Ip>(name
     // solicitations.
     let ping_fut = match server_addr {
         std::net::IpAddr::V4(v4) => {
-            realm.ping_once::<::ping::Ipv4>(std::net::SocketAddrV4::new(v4, 1), 1).left_future()
+            realm.ping_once::<Ipv4>(std::net::SocketAddrV4::new(v4, 1), 1).left_future()
         }
-        std::net::IpAddr::V6(v6) => realm
-            .ping_once::<::ping::Ipv6>(std::net::SocketAddrV6::new(v6, 1, 0, 0), 1)
-            .right_future(),
+        std::net::IpAddr::V6(v6) => {
+            realm.ping_once::<Ipv6>(std::net::SocketAddrV6::new(v6, 1, 0, 0), 1).right_future()
+        }
     }
     .fuse();
     futures::pin_mut!(ping_fut);

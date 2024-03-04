@@ -42,7 +42,6 @@ rustc_library("netstack_testing_common") {
     "//src/connectivity/lib/net-types",
     "//src/connectivity/lib/packet-formats",
     "//src/connectivity/lib/packet-formats-dhcp",
-    "//src/connectivity/lib/ping",
     "//src/connectivity/network/dhcpv4/lib",
     "//src/connectivity/network/testing/netemul/fidl:fuchsia.netemul_rust",
     "//src/connectivity/network/testing/netemul/rust:lib",

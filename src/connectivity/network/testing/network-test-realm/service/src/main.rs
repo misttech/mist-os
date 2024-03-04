@@ -28,6 +28,7 @@ use fuchsia_async::{self as fasync, TimeoutExt as _};
 use fuchsia_zircon as zx;
 use futures::{FutureExt as _, SinkExt as _, StreamExt as _, TryFutureExt as _, TryStreamExt as _};
 use futures_lite::FutureExt as _;
+use net_types::ip::{Ipv4, Ipv6};
 use std::collections::{hash_map::Entry, HashMap};
 use std::convert::TryFrom as _;
 use std::num::NonZeroU64;
@@ -654,8 +655,8 @@ async fn get_interface_scope_id(
 }
 
 /// Sends a single ICMP echo request to `address`.
-async fn ping_once<Ip: ping::IpExt>(
-    address: Ip::Addr,
+async fn ping_once<Ip: ping::FuchsiaIpExt>(
+    address: Ip::SockAddr,
     payload_length: usize,
     interface_name: Option<String>,
     timeout: zx::Duration,
@@ -1289,7 +1290,7 @@ impl Controller {
             std::net::IpAddr::V4(addr) =>
             {
                 #[allow(clippy::large_futures)]
-                ping_once::<ping::Ipv4>(
+                ping_once::<Ipv4>(
                     std::net::SocketAddrV4::new(addr, UNSPECIFIED_PORT),
                     payload_length.into(),
                     interface_name,
@@ -1304,7 +1305,7 @@ impl Controller {
                     get_interface_scope_id(&interface_name, &addr, hermetic_network_connector)
                         .await?;
                 #[allow(clippy::large_futures)]
-                ping_once::<ping::Ipv6>(
+                ping_once::<Ipv6>(
                     std::net::SocketAddrV6::new(
                         addr,
                         UNSPECIFIED_PORT,

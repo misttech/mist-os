@@ -21,9 +21,10 @@
 mod fuchsia;
 
 #[cfg(target_os = "fuchsia")]
-pub use fuchsia::{new_icmp_socket, IpExt};
+pub use fuchsia::{new_icmp_socket, IpExt as FuchsiaIpExt};
 
 use futures::{ready, Sink, SinkExt as _, Stream, TryStreamExt as _};
+use net_types::ip::{Ip, Ipv4, Ipv6};
 use std::{
     marker::PhantomData,
     pin::Pin,
@@ -47,7 +48,7 @@ struct IcmpHeader {
 }
 
 impl IcmpHeader {
-    fn new<I: Ip>(sequence: u16) -> Self {
+    fn new<I: IpExt>(sequence: u16) -> Self {
         Self {
             r#type: I::ECHO_REQUEST_TYPE,
             code: 0,
@@ -131,23 +132,9 @@ impl TryFromSockAddr for std::net::SocketAddrV6 {
 }
 
 /// Trait for IP protocol versions.
-pub trait Ip:
-    Sized
-    + Clone
-    + Copy
-    + std::fmt::Debug
-    + Eq
-    + std::hash::Hash
-    + Ord
-    + PartialEq
-    + PartialOrd
-    + Send
-    + Sync
-    + Unpin
-    + 'static
-{
+pub trait IpExt: Ip + Unpin {
     /// IP Socket address type.
-    type Addr: Into<socket2::SockAddr>
+    type SockAddr: Into<socket2::SockAddr>
         + TryFromSockAddr
         + Clone
         + Unpin
@@ -168,14 +155,10 @@ pub trait Ip:
     const ECHO_REPLY_TYPE: u8;
 }
 
-/// Uninstantiable type representing IPv4.
-#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub enum Ipv4 {}
-
 // TODO(https://fxbug.dev/323955204): Implement ext trait on net_types::ip::Ipv4
 // instead and remove the Ipv4 type.
-impl Ip for Ipv4 {
-    type Addr = std::net::SocketAddrV4;
+impl IpExt for Ipv4 {
+    type SockAddr = std::net::SocketAddrV4;
 
     const DOMAIN: socket2::Domain = socket2::Domain::IPV4;
     const PROTOCOL: socket2::Protocol = socket2::Protocol::ICMPV4;
@@ -184,14 +167,10 @@ impl Ip for Ipv4 {
     const ECHO_REPLY_TYPE: u8 = 0;
 }
 
-/// Uninstantiable type representing IPv6.
-#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub enum Ipv6 {}
-
 // TODO(https://fxbug.dev/323955204): Implement ext trait on net_types::ip::Ipv6
 // instead and remove the Ipv6 type.
-impl Ip for Ipv6 {
-    type Addr = std::net::SocketAddrV6;
+impl IpExt for Ipv6 {
+    type SockAddr = std::net::SocketAddrV6;
 
     const DOMAIN: socket2::Domain = socket2::Domain::IPV6;
     const PROTOCOL: socket2::Protocol = socket2::Protocol::ICMPV6;
@@ -203,7 +182,7 @@ impl Ip for Ipv6 {
 /// Async ICMP socket.
 pub trait IcmpSocket<I>: Unpin
 where
-    I: Ip,
+    I: IpExt,
 {
     /// Async method for receiving an ICMP packet.
     ///
@@ -212,7 +191,7 @@ where
         &self,
         buf: &mut [u8],
         cx: &mut Context<'_>,
-    ) -> Poll<std::io::Result<(usize, I::Addr)>>;
+    ) -> Poll<std::io::Result<(usize, I::SockAddr)>>;
 
     /// Async method for sending an ICMP packet.
     ///
@@ -220,7 +199,7 @@ where
     fn async_send_to_vectored(
         &self,
         bufs: &[std::io::IoSlice<'_>],
-        addr: &I::Addr,
+        addr: &I::SockAddr,
         cx: &mut Context<'_>,
     ) -> Poll<std::io::Result<usize>>;
 
@@ -233,9 +212,9 @@ where
 
 /// Parameters of a ping request/reply.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub struct PingData<I: Ip> {
+pub struct PingData<I: IpExt> {
     /// The destination address of a ping request; or the source address of a ping reply.
-    pub addr: I::Addr,
+    pub addr: I::SockAddr,
     /// The sequence number in the ICMP header.
     pub sequence: u16,
     /// The body of the echo request/reply.
@@ -251,11 +230,11 @@ pub struct PingData<I: Ip> {
 /// replies with a body not equal to `body` will result in an error on the stream.
 pub fn new_unicast_sink_and_stream<'a, I, S, const N: usize>(
     socket: &'a S,
-    addr: &'a I::Addr,
+    addr: &'a I::SockAddr,
     body: &'a [u8],
 ) -> (impl Sink<u16, Error = PingError> + 'a, impl Stream<Item = Result<u16, PingError>> + 'a)
 where
-    I: Ip,
+    I: IpExt,
     S: IcmpSocket<I>,
 {
     (
@@ -283,7 +262,7 @@ where
 /// Stream of received ping replies.
 pub struct PingStream<'a, I, S, const N: usize>
 where
-    I: Ip,
+    I: IpExt,
     S: IcmpSocket<I>,
 {
     socket: &'a S,
@@ -293,7 +272,7 @@ where
 
 impl<'a, I, S, const N: usize> PingStream<'a, I, S, N>
 where
-    I: Ip,
+    I: IpExt,
     S: IcmpSocket<I>,
 {
     /// Construct a stream from an `IcmpSocket`.
@@ -310,7 +289,7 @@ where
 
 impl<'a, I, S, const N: usize> futures::stream::Stream for PingStream<'a, I, S, N>
 where
-    I: Ip,
+    I: IpExt,
     S: IcmpSocket<I>,
 {
     type Item = Result<PingData<I>, PingError>;
@@ -330,17 +309,17 @@ where
 /// Sink for sending ping requests.
 pub struct PingSink<'a, I, S>
 where
-    I: Ip,
+    I: IpExt,
     S: IcmpSocket<I>,
 {
     socket: &'a S,
-    packet: Option<(I::Addr, IcmpHeader, Vec<u8>)>,
+    packet: Option<(I::SockAddr, IcmpHeader, Vec<u8>)>,
     _marker: PhantomData<I>,
 }
 
 impl<'a, I, S> PingSink<'a, I, S>
 where
-    I: Ip,
+    I: IpExt,
     S: IcmpSocket<I>,
 {
     /// Construct a sink from an `IcmpSocket`.
@@ -351,7 +330,7 @@ where
 
 impl<'a, I, S> futures::sink::Sink<PingData<I>> for PingSink<'a, I, S>
 where
-    I: Ip,
+    I: IpExt,
     S: IcmpSocket<I>,
 {
     type Error = PingError;
@@ -405,7 +384,7 @@ where
     }
 }
 
-fn verify_packet<I: Ip>(addr: I::Addr, packet: &[u8]) -> Result<PingData<I>, PingError> {
+fn verify_packet<I: IpExt>(addr: I::SockAddr, packet: &[u8]) -> Result<PingData<I>, PingError> {
     let (reply, body): (zerocopy::Ref<_, IcmpHeader>, _) =
         zerocopy::Ref::new_unaligned_from_prefix(packet).ok_or_else(|| PingError::Parse)?;
 
@@ -431,7 +410,7 @@ fn verify_packet<I: Ip>(addr: I::Addr, packet: &[u8]) -> Result<PingData<I>, Pin
 
 #[cfg(test)]
 mod test {
-    use super::{IcmpHeader, IcmpSocket, Ip, Ipv4, Ipv6, PingData, PingSink, PingStream};
+    use super::{IcmpHeader, IcmpSocket, Ipv4, Ipv6, PingData, PingSink, PingStream};
 
     use futures::{FutureExt as _, SinkExt as _, StreamExt as _, TryStreamExt as _};
     use net_declare::{std_socket_addr_v4, std_socket_addr_v6};
@@ -446,24 +425,24 @@ mod test {
     // which is then returned when `recv_from` is called. The order in which replies are returned
     // is guaranteed to be FIFO.
     #[derive(Default, Debug)]
-    struct FakeSocket<I: Ip> {
+    struct FakeSocket<I: IpExt> {
         // NB: interior mutability is necessary here because the `IcmpSocket` trait's methods
         // operate on &self.
-        buffer: RefCell<VecDeque<(Vec<u8>, I::Addr)>>,
+        buffer: RefCell<VecDeque<(Vec<u8>, I::SockAddr)>>,
     }
 
-    impl<I: Ip> FakeSocket<I> {
+    impl<I: IpExt> FakeSocket<I> {
         fn new() -> Self {
             Self { buffer: RefCell::new(VecDeque::new()) }
         }
     }
 
-    impl<I: Ip> IcmpSocket<I> for FakeSocket<I> {
+    impl<I: IpExt> IcmpSocket<I> for FakeSocket<I> {
         fn async_recv_from(
             &self,
             buf: &mut [u8],
             _cx: &mut Context<'_>,
-        ) -> Poll<std::io::Result<(usize, I::Addr)>> {
+        ) -> Poll<std::io::Result<(usize, I::SockAddr)>> {
             Poll::Ready(
                 self.buffer
                     .borrow_mut()
@@ -495,7 +474,7 @@ mod test {
         fn async_send_to_vectored(
             &self,
             bufs: &[std::io::IoSlice<'_>],
-            addr: &I::Addr,
+            addr: &I::SockAddr,
             _cx: &mut Context<'_>,
         ) -> Poll<std::io::Result<usize>> {
             let mut buf = bufs
@@ -525,14 +504,14 @@ mod test {
         }
     }
 
-    trait IpExt: Ip {
+    trait IpExt: super::IpExt {
         // NB: This is only a function because there is no way to create a constant for any of the
         // socket address types.
-        fn test_addr() -> Self::Addr;
+        fn test_addr() -> Self::SockAddr;
     }
 
     impl IpExt for Ipv4 {
-        fn test_addr() -> Self::Addr {
+        fn test_addr() -> Self::SockAddr {
             // A port must be specified in the socket addr, but it is irrelevant for ICMP sockets,
             // so just set it to 0.
             std_socket_addr_v4!("1.2.3.4:0")
@@ -540,7 +519,7 @@ mod test {
     }
 
     impl IpExt for Ipv6 {
-        fn test_addr() -> Self::Addr {
+        fn test_addr() -> Self::SockAddr {
             // A port must be specified in the socket addr, but it is irrelevant for ICMP sockets,
             // so just set it to 0.
             std_socket_addr_v6!("[abcd::1]:0")

@@ -11,6 +11,7 @@ use std::convert::TryFrom as _;
 use anyhow::Context as _;
 use futures::{FutureExt as _, StreamExt as _};
 use itertools::Itertools as _;
+use net_types::ip::{Ipv4, Ipv6};
 
 /// A realm and associated data as a helper for issuing pings in tests.
 pub struct Node<'a> {
@@ -153,7 +154,7 @@ impl<'a> Node<'a> {
                                 UNSPECIFIED_PORT,
                             );
                             realm
-                                .ping::<::ping::Ipv4>(dst_sockaddr)
+                                .ping::<Ipv4>(dst_sockaddr)
                                 .map(move |r| {
                                     r.with_context(|| {
                                         format!("failed to ping {} from {:?}", dst_sockaddr, realm)
@@ -176,7 +177,7 @@ impl<'a> Node<'a> {
                                 },
                             );
                             realm
-                                .ping::<::ping::Ipv6>(dst_sockaddr)
+                                .ping::<Ipv6>(dst_sockaddr)
                                 .map(move |r| {
                                     r.with_context(|| {
                                         format!("failed to ping {} from {:?}", dst_sockaddr, realm)

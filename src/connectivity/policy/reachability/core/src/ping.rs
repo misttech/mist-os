@@ -6,6 +6,7 @@ use anyhow::{anyhow, Context as _};
 use async_trait::async_trait;
 use fuchsia_async::{self as fasync, TimeoutExt as _};
 use futures::{FutureExt as _, SinkExt as _, TryFutureExt as _, TryStreamExt as _};
+use net_types::ip::{Ipv4, Ipv6};
 use std::net::SocketAddr;
 use tracing::warn;
 
@@ -14,10 +15,10 @@ const SEQ_MIN: u16 = 1;
 const SEQ_MAX: u16 = 3;
 const TIMEOUT: fasync::Duration = fasync::Duration::from_seconds(1);
 
-async fn ping<I>(interface_name: &str, addr: I::Addr) -> anyhow::Result<()>
+async fn ping<I>(interface_name: &str, addr: I::SockAddr) -> anyhow::Result<()>
 where
-    I: ping::Ip,
-    I::Addr: std::fmt::Display + Copy,
+    I: ping::FuchsiaIpExt,
+    I::SockAddr: std::fmt::Display + Copy,
 {
     let socket = ping::new_icmp_socket::<I>().context("failed to create socket")?;
     let () = socket
@@ -68,8 +69,8 @@ pub struct Pinger;
 impl Ping for Pinger {
     async fn ping(&self, interface_name: &str, addr: SocketAddr) -> bool {
         let r = match addr {
-            SocketAddr::V4(addr_v4) => ping::<ping::Ipv4>(interface_name, addr_v4).await,
-            SocketAddr::V6(addr_v6) => ping::<ping::Ipv6>(interface_name, addr_v6).await,
+            SocketAddr::V4(addr_v4) => ping::<Ipv4>(interface_name, addr_v4).await,
+            SocketAddr::V6(addr_v6) => ping::<Ipv6>(interface_name, addr_v6).await,
         };
         match r {
             Ok(()) => true,

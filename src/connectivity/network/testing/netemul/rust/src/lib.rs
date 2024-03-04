@@ -543,7 +543,9 @@ impl<'a> TestRealm<'a> {
     }
 
     /// Constructs an ICMP socket.
-    pub async fn icmp_socket<Ip: ping::IpExt>(&self) -> Result<fuchsia_async::net::DatagramSocket> {
+    pub async fn icmp_socket<Ip: ping::FuchsiaIpExt>(
+        &self,
+    ) -> Result<fuchsia_async::net::DatagramSocket> {
         let sock = self
             .datagram_socket(Ip::DOMAIN_FIDL, fposix_socket::DatagramSocketProtocol::IcmpEcho)
             .await
@@ -553,7 +555,7 @@ impl<'a> TestRealm<'a> {
     }
 
     /// Sends a single ICMP echo request to `addr`, and waits for the echo reply.
-    pub async fn ping_once<Ip: ping::IpExt>(&self, addr: Ip::Addr, seq: u16) -> Result {
+    pub async fn ping_once<Ip: ping::FuchsiaIpExt>(&self, addr: Ip::SockAddr, seq: u16) -> Result {
         let icmp_sock = self.icmp_socket::<Ip>().await?;
 
         const MESSAGE: &'static str = "hello, world";
@@ -581,7 +583,7 @@ impl<'a> TestRealm<'a> {
     // once is free from NUD-related issues and is guaranteed to succeed.
     /// Sends ICMP echo requests to `addr` on a 1-second interval until a response
     /// is received.
-    pub async fn ping<Ip: ping::IpExt>(&self, addr: Ip::Addr) -> Result {
+    pub async fn ping<Ip: ping::FuchsiaIpExt>(&self, addr: Ip::SockAddr) -> Result {
         let icmp_sock = self.icmp_socket::<Ip>().await?;
 
         const MESSAGE: &'static str = "hello, world";
