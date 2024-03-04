@@ -666,6 +666,30 @@ class ExpandPathsFromFilesTests(unittest.TestCase):
             self.assertEqual(all_paths, [Path(p) for p in paths1 + paths2])
 
 
+class FilterOutPseudoFlagTests(unittest.TestCase):
+    def test_no_change(self):
+        actual = list(
+            cl_utils.filter_out_pseudo_flag(["keep", "--all"], "--delete-me")
+        )
+        self.assertEqual(actual, ["keep", "--all"])
+
+    def test_remove_fused_optarg(self):
+        actual = list(
+            cl_utils.filter_out_pseudo_flag(
+                ["sleep", "--delete-me=--all", "foo"], "--delete-me"
+            )
+        )
+        self.assertEqual(actual, ["sleep", "foo"])
+
+    def test_remove_separate_optarg(self):
+        actual = list(
+            cl_utils.filter_out_pseudo_flag(
+                ["creep", "--erase-me", "--foo=baz", "--bar"], "--erase-me"
+            )
+        )
+        self.assertEqual(actual, ["creep", "--bar"])
+
+
 class FlagForwarderTests(unittest.TestCase):
     def test_no_transform(self):
         f = cl_utils.FlagForwarder([])

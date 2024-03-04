@@ -413,6 +413,37 @@ def last_value_of_dict_flag(
     return last_value_or_default(d.get(key, []), default)
 
 
+def filter_out_pseudo_flag(
+    args: Iterable[str], prefix_flag: str
+) -> Iterable[str]:
+    """Remove option and arguments that start with a given prefix.
+
+    This is useful for filter out pseudo-flags from a command.
+
+    Args:
+      args: command tokens
+      prefix_flag: the flag that should be filtered out (along with its argument).
+
+    Yields:
+      a filtered command
+    """
+    fused_prefix_flag = prefix_flag + "="
+    delete_optarg = False
+    for arg in args:
+        if delete_optarg:
+            delete_optarg = False
+            continue
+
+        if arg == prefix_flag:
+            delete_optarg = True
+            continue
+
+        if arg.startswith(fused_prefix_flag):
+            continue
+
+        yield arg
+
+
 @dataclasses.dataclass
 class ForwardedFlag(object):
     # The original name of the flag to match (including leading '-' or '--').

@@ -973,7 +973,11 @@ class RemoteAction(object):
         self._working_dir = (working_dir or Path(os.curdir)).absolute()
         self._exec_root = (exec_root or PROJECT_ROOT).absolute()
         # Parse and strip out --remote-* flags from command.
-        self._remote_only_command = command
+        # Hide --local-only options from remote execution, so they don't affect
+        # the command_digest.
+        self._remote_only_command = list(
+            cl_utils.filter_out_pseudo_flag(command, "--local-only")
+        )
         self._remote_disable = disable
         self._verbose = verbose
         self._label = label
@@ -996,9 +1000,7 @@ class RemoteAction(object):
         # circumstances that require them to be different.  It is the caller's
         # responsibility to ensure that they produce consistent results
         # (which can be verified with --compare [compare_with_local]).
-        self._local_only_command = (
-            local_only_command or self._remote_only_command
-        )
+        self._local_only_command = local_only_command or command
 
         # Detect some known rewrapper options
         (
