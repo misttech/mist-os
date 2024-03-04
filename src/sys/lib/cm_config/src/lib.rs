@@ -1304,7 +1304,7 @@ mod tests {
                 status: version_history::Status::Supported,
             },
         ];
-        let version_history = VersionHistory::new_for_testing(&VERSIONS);
+        let version_history = VersionHistory::new(&VERSIONS);
 
         let test_scenarios = vec![
             (AbiRevisionPolicy::AllowAll, None, Ok(())),

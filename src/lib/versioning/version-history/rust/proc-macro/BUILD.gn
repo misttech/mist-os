@@ -8,22 +8,18 @@ rustc_macro("version-history-macro") {
   edition = "2021"
   with_unit_tests = true
 
-  deps = [ "shared:version-history-shared" ]
+  deps = [
+    "//src/lib/versioning/version-history/rust/shared:version-history-shared",
+  ]
 
   sources = [ "src/lib.rs" ]
 
-  visibility = [
-    ":*",
-    "//src/lib/versioning/version-history/rust:*",
-  ]
+  visibility = [ "//src/lib/versioning/version-history/rust/*" ]
 
   configs -= [ "//build/config/rust/lints:allow_unused_results" ]
 }
 
 group("tests") {
   testonly = true
-  deps = [
-    ":version-history-macro_test($host_toolchain)",
-    "shared:tests",
-  ]
+  deps = [ ":version-history-macro_test($host_toolchain)" ]
 }

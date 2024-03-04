@@ -17,17 +17,14 @@ rustc_library("version-history-shared") {
   rustenv = [ "SDK_VERSION_HISTORY=$rebased_version_history_path" ]
 
   deps = [
+    "//third_party/rust_crates:itertools",
     "//third_party/rust_crates:serde",
     "//third_party/rust_crates:serde_json",
   ]
 
   sources = [ "src/lib.rs" ]
   inputs = [ "//sdk/version_history.json" ]
-  visibility = [
-    ":*",
-    "//src/lib/versioning/version-history/rust:*",
-    "//src/lib/versioning/version-history/rust/proc-macro:*",
-  ]
+  visibility = [ "//src/lib/versioning/version-history/rust/*" ]
 }
 
 group("tests") {

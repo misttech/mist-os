@@ -11,8 +11,7 @@ rustc_library("version-history") {
 
   deps = [
     "proc-macro:version-history-macro",
-    "proc-macro/shared:version-history-shared",
-    "//third_party/rust_crates:itertools",
+    "shared:version-history-shared",
   ]
 
   sources = [ "src/lib.rs" ]
@@ -25,5 +24,6 @@ group("tests") {
   deps = [
     ":version-history_test($host_toolchain)",
     "proc-macro:tests",
+    "shared:tests",
   ]
 }
