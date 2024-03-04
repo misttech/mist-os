@@ -27,16 +27,6 @@
                 // Netstack3 does not have complete support for multicast UDP sockets.
                 "IPv4UDPSockets/IPv4UDPUnboundSocketTest.IpMulticastIPPacketInfo/*",
                 "IPv4UDPSockets/IPv4UDPUnboundSocketTest.IpMulticastLoopbackAddrNoDefaultSendIf/*",
-                "IPv4UDPSockets/IPv4UDPUnboundSocketTest.IpMulticastLoopbackIfAddr/*",
-                "IPv4UDPSockets/IPv4UDPUnboundSocketTest.IpMulticastLoopbackIfAddrConnect/*",
-                "IPv4UDPSockets/IPv4UDPUnboundSocketTest.IpMulticastLoopbackIfAddrSelf/*",
-                "IPv4UDPSockets/IPv4UDPUnboundSocketTest.IpMulticastLoopbackIfAddrSelfConnect/*",
-                "IPv4UDPSockets/IPv4UDPUnboundSocketTest.IpMulticastLoopbackIfAddrSelfNoLoop/*",
-                "IPv4UDPSockets/IPv4UDPUnboundSocketTest.IpMulticastLoopbackIfNic/*",
-                "IPv4UDPSockets/IPv4UDPUnboundSocketTest.IpMulticastLoopbackIfNicConnect/*",
-                "IPv4UDPSockets/IPv4UDPUnboundSocketTest.IpMulticastLoopbackIfNicSelf/*",
-                "IPv4UDPSockets/IPv4UDPUnboundSocketTest.IpMulticastLoopbackIfNicSelfConnect/*",
-                "IPv4UDPSockets/IPv4UDPUnboundSocketTest.IpMulticastLoopbackIfNicSelfNoLoop/*",
                 "IPv4UDPSockets/IPv4UDPUnboundSocketTest.IpMulticastLoopbackNicNoDefaultSendIf/*",
 
                 // Uncategorized
@@ -49,11 +39,7 @@
                 "IPv4UDPSockets/IPv4UDPUnboundSocketTest.SetSocketSendBufBelowMin/*",
                 "IPv4UDPSockets/IPv4UDPUnboundSocketTest.TestBindToBcastThenReceive/*",
                 "IPv4UDPSockets/IPv4UDPUnboundSocketTest.TestBindToBcastThenSend/*",
-                "IPv4UDPSockets/IPv4UDPUnboundSocketTest.TestBindToMcastThenJoinThenReceive/*",
-                "IPv4UDPSockets/IPv4UDPUnboundSocketTest.TestBindToMcastThenNoJoinThenNoReceive/*",
                 "IPv4UDPSockets/IPv4UDPUnboundSocketTest.TestBindToMcastThenSend/*",
-                "IPv4UDPSockets/IPv4UDPUnboundSocketTest.TestMcastReceptionOnTwoSockets/*",
-                "IPv4UDPSockets/IPv4UDPUnboundSocketTest.TestMcastReceptionWhenDroppingMemberships/*",
                 "IPv6UDPSockets/IPv6UDPUnboundSocketTest.SetAndReceiveIPReceiveOrigDstAddr/*",
             ],
         },

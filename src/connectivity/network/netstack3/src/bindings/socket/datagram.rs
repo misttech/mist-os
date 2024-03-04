@@ -1364,7 +1364,8 @@ where
                 address: _,
                 responder,
             } => {
-                respond_not_supported!("syncudp::SetIpMulticastInterface", responder)
+                warn!("TODO(https://fxbug.dev/42059016): implement IP_MULTICAST_IF socket option");
+                responder.send(Ok(())).unwrap_or_else(|e| error!("failed to respond: {e:?}"));
             }
             fposix_socket::SynchronousDatagramSocketRequest::GetIpMulticastInterface {
                 responder,
