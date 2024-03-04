@@ -526,14 +526,6 @@ template("clang_toolchain") {
       if (outfile != unstripped_outfile) {
         outputs += [ unstripped_outfile ]
       }
-      if (defined(breakpad_name) && host_os != "mac") {
-        command_suffix += " && $dump_syms -r {{BREAKPAD_NAME}}-o Fuchsia \"{{UNSTRIPPED_OUTFILE}}\" > \"$outfile.sym\""
-        outputs += [ "$outfile.sym" ]
-      }
-      if (output_gsym && invoker.toolchain_os == "fuchsia") {
-        outputs += [ "$outfile.gsym" ]
-        command_suffix += " && $gsymutil --convert=\"{{UNSTRIPPED_OUTFILE}}\" --out-file=\"$outfile.gsym\""
-      }
       if (use_strip) {
         if (rust_rbe_enable || _link_rbe_enable) {
           _remote_strip_prefix_common = [
@@ -570,12 +562,33 @@ template("clang_toolchain") {
           command_suffix += " && {{REMOTE_STRIP_PREFIX}}$strip {{STRIP_ARGS}} \"{{UNSTRIPPED_OUTFILE}}\" \"$outfile\""
         }
         if (use_buildidtool) {
-          outputs += [ "$outfile.build-id.stamp" ]
+          buildid_stampfile = "${outfile}.build-id.stamp"
+          outputs += [ buildid_stampfile ]
           command_suffix +=
               " && $buildidtool -build-id-dir .build-id" +
-              " -stamp \"$outfile.build-id.stamp\"" + " -entry \"=$outfile\"" +
+              " -stamp \"$buildid_stampfile\"" + " -entry \"=$outfile\"" +
               " -entry \".debug={{UNSTRIPPED_OUTFILE}}\""
         }
+      }
+
+      if (defined(breakpad_name) && host_os != "mac") {
+        assert(use_buildidtool)
+        breakpad_outfile = "${outfile}.sym"
+        outputs += [ breakpad_outfile ]
+
+        # dump_syms will fail if there is no build ID.  buildidtool succeeds and
+        # writes an empty stamp file for that case, so use it to tell whether
+        # dump_syms should be run. In any case always create a .sym because we
+        # told ninja we would create one above.
+        # TODO(b/321834013): Cases that clearly do not have a build-id should
+        # ideally not attempt to dump_syms.
+        command_suffix += " && { " + "test ! -s \"$buildid_stampfile\" && " +
+                          "touch \"$outfile.sym\" || " + "$dump_syms -r {{BREAKPAD_NAME}}-o Fuchsia \"{{UNSTRIPPED_OUTFILE}}\" > \"$breakpad_outfile\"" + " ;}"
+      }
+      if (output_gsym && invoker.toolchain_os == "fuchsia") {
+        gsym_outfile = "${outfile}.gsym"
+        outputs += [ "$gsym_outfile" ]
+        command_suffix += " && $gsymutil --convert=\"{{UNSTRIPPED_OUTFILE}}\" --out-file=\"$gsym_outfile\""
       }
     }
 
