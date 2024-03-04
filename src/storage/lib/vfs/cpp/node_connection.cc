@@ -27,7 +27,10 @@ namespace internal {
 
 NodeConnection::NodeConnection(fs::FuchsiaVfs* vfs, fbl::RefPtr<fs::Vnode> vnode,
                                VnodeProtocol protocol, VnodeConnectionOptions options)
-    : Connection(vfs, std::move(vnode), protocol, options) {}
+    : Connection(vfs, std::move(vnode), protocol, options) {
+  ZX_DEBUG_ASSERT(protocol == VnodeProtocol::kNode);
+  ZX_DEBUG_ASSERT(options.flags.node_reference);
+}
 
 std::unique_ptr<Binding> NodeConnection::Bind(async_dispatcher_t* dispatcher, zx::channel channel,
                                               OnUnbound on_unbound) {
@@ -47,14 +50,7 @@ void NodeConnection::Close(CloseCompleter::Sync& completer) {
 }
 
 void NodeConnection::Query(QueryCompleter::Sync& completer) {
-  if (options().flags.node_reference) {
-    const std::string_view kProtocol = fio::wire::kNodeProtocolName;
-    // TODO(https://fxbug.dev/42052765): avoid the const cast.
-    uint8_t* data = reinterpret_cast<uint8_t*>(const_cast<char*>(kProtocol.data()));
-    completer.Reply(fidl::VectorView<uint8_t>::FromExternal(data, kProtocol.size()));
-  } else {
-    completer.Reply(Connection::NodeQuery());
-  }
+  completer.Reply(Connection::NodeQuery());
 }
 
 void NodeConnection::GetConnectionInfo(GetConnectionInfoCompleter::Sync& completer) {

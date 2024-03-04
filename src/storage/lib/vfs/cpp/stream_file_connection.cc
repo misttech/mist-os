@@ -33,14 +33,13 @@ namespace internal {
 StreamFileConnection::StreamFileConnection(fs::FuchsiaVfs* vfs, fbl::RefPtr<fs::Vnode> vnode,
                                            zx::stream stream, VnodeProtocol protocol,
                                            VnodeConnectionOptions options, zx_koid_t koid)
-    : FileConnection(vfs, std::move(vnode), protocol, options, koid), stream_(std::move(stream)) {}
+    : FileConnection(vfs, std::move(vnode), protocol, options, koid), stream_(std::move(stream)) {
+  ZX_DEBUG_ASSERT(protocol == VnodeProtocol::kFile);
+  ZX_DEBUG_ASSERT(!options.flags.node_reference);
+}
 
 zx_status_t StreamFileConnection::ReadInternal(void* data, size_t len, size_t* out_actual) {
   FS_PRETTY_TRACE_DEBUG("[FileRead] options: ", options());
-
-  if (options().flags.node_reference) {
-    return ZX_ERR_BAD_HANDLE;
-  }
   if (!options().rights.read) {
     return ZX_ERR_BAD_HANDLE;
   }
@@ -72,10 +71,6 @@ void StreamFileConnection::Read(ReadRequestView request, ReadCompleter::Sync& co
 zx_status_t StreamFileConnection::ReadAtInternal(void* data, size_t len, size_t offset,
                                                  size_t* out_actual) {
   FS_PRETTY_TRACE_DEBUG("[FileReadAt] options: ", options());
-
-  if (options().flags.node_reference) {
-    return ZX_ERR_BAD_HANDLE;
-  }
   if (!options().rights.read) {
     return ZX_ERR_BAD_HANDLE;
   }
@@ -106,10 +101,6 @@ void StreamFileConnection::ReadAt(ReadAtRequestView request, ReadAtCompleter::Sy
 
 zx_status_t StreamFileConnection::WriteInternal(const void* data, size_t len, size_t* out_actual) {
   FS_PRETTY_TRACE_DEBUG("[FileWrite] options: ", options());
-
-  if (options().flags.node_reference) {
-    return ZX_ERR_BAD_HANDLE;
-  }
   if (!options().rights.write) {
     return ZX_ERR_BAD_HANDLE;
   }
@@ -138,10 +129,6 @@ void StreamFileConnection::Write(WriteRequestView request, WriteCompleter::Sync&
 zx_status_t StreamFileConnection::WriteAtInternal(const void* data, size_t len, size_t offset,
                                                   size_t* out_actual) {
   FS_PRETTY_TRACE_DEBUG("[FileWriteAt] options: ", options());
-
-  if (options().flags.node_reference) {
-    return ZX_ERR_BAD_HANDLE;
-  }
   if (!options().rights.write) {
     return ZX_ERR_BAD_HANDLE;
   }
@@ -170,12 +157,6 @@ void StreamFileConnection::WriteAt(WriteAtRequestView request, WriteAtCompleter:
 
 void StreamFileConnection::Seek(SeekRequestView request, SeekCompleter::Sync& completer) {
   FS_PRETTY_TRACE_DEBUG("[FileSeek] options: ", options());
-
-  if (options().flags.node_reference) {
-    completer.ReplyError(ZX_ERR_BAD_HANDLE);
-    return;
-  }
-
   zx_off_t seek = 0u;
   zx_status_t status =
       stream_.seek(static_cast<zx_stream_seek_origin_t>(request->origin), request->offset, &seek);

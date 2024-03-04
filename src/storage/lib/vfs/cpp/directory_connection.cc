@@ -57,10 +57,10 @@ void OpenAt(FuchsiaVfs* vfs, const fbl::RefPtr<Vnode>& parent,
                              std::move(server_end));
         } else if constexpr (std::is_same_v<ResultT, OpenResult::Ok>) {
           VnodeConnectionOptions options = *result.validated_options;
-          // TODO(https://fxbug.dev/42051879): Remove this when web_engine with SDK 13.20230626.3.1 or
-          // later is rolled. The important commit is in the private integration repo, but the next
-          // Fuchsia commit is b615ff398580f3b47c050beb9e8f0fc28907ac67 which can be used with the
-          // sdkrevisions tool.
+          // TODO(https://fxbug.dev/42051879): Remove this when web_engine with SDK 13.20230626.3.1
+          // or later is rolled. The important commit is in the private integration repo, but the
+          // next Fuchsia commit is b615ff398580f3b47c050beb9e8f0fc28907ac67 which can be used with
+          // the sdkrevisions tool.
           if (options.ToIoV1Flags() == fio::OpenFlags::kRightReadable) {
             bool is_device =
                 path.length() == 8 &&
@@ -83,7 +83,10 @@ namespace internal {
 DirectoryConnection::DirectoryConnection(fs::FuchsiaVfs* vfs, fbl::RefPtr<fs::Vnode> vnode,
                                          VnodeProtocol protocol, VnodeConnectionOptions options,
                                          zx_koid_t koid)
-    : Connection(vfs, std::move(vnode), protocol, options), koid_(koid) {}
+    : Connection(vfs, std::move(vnode), protocol, options), koid_(koid) {
+  ZX_DEBUG_ASSERT(protocol == VnodeProtocol::kDirectory);
+  ZX_DEBUG_ASSERT(!options.flags.node_reference);
+}
 
 DirectoryConnection::~DirectoryConnection() { vnode()->DeleteFileLockInTeardown(koid_); }
 
@@ -116,18 +119,13 @@ void DirectoryConnection::Query(QueryCompleter::Sync& completer) {
 void DirectoryConnection::GetConnectionInfo(GetConnectionInfoCompleter::Sync& completer) {
   using fuchsia_io::Operations;
   using fuchsia_io::wire::ConnectionInfo;
-
-  Operations rights;
-  if (options().flags.node_reference) {
-    rights = Operations::kGetAttributes;
-  } else {
-    if (options().rights.read)
-      rights |= fio::wire::kRStarDir;
-    if (options().rights.write)
-      rights |= fio::wire::kWStarDir;
-    if (options().rights.execute)
-      rights |= fio::wire::kXStarDir;
-  }
+  Operations rights = {};
+  if (options().rights.read)
+    rights |= fio::wire::kRStarDir;
+  if (options().rights.write)
+    rights |= fio::wire::kWStarDir;
+  if (options().rights.execute)
+    rights |= fio::wire::kXStarDir;
   fidl::Arena arena;
   completer.Reply(ConnectionInfo::Builder(arena).rights(rights).Build());
 }
@@ -216,9 +214,7 @@ void DirectoryConnection::Open(OpenRequestView request, OpenCompleter::Sync& com
 
   FS_PRETTY_TRACE_DEBUG("[DirectoryOpen] our options: ", options(),
                         ", incoming options: ", open_options, ", path: ", request->path);
-  if (options().flags.node_reference) {
-    return write_error(std::move(request->object), ZX_ERR_BAD_HANDLE);
-  }
+
   if (open_options.flags.clone_same_rights) {
     return write_error(std::move(request->object), ZX_ERR_INVALID_ARGS);
   }
@@ -233,11 +229,6 @@ void DirectoryConnection::Open(OpenRequestView request, OpenCompleter::Sync& com
 
 void DirectoryConnection::Unlink(UnlinkRequestView request, UnlinkCompleter::Sync& completer) {
   FS_PRETTY_TRACE_DEBUG("[DirectoryUnlink] our options: ", options(), ", name: ", request->name);
-
-  if (options().flags.node_reference) {
-    completer.ReplyError(ZX_ERR_BAD_HANDLE);
-    return;
-  }
   if (!options().rights.write) {
     completer.ReplyError(ZX_ERR_BAD_HANDLE);
     return;
@@ -262,11 +253,6 @@ void DirectoryConnection::Unlink(UnlinkRequestView request, UnlinkCompleter::Syn
 void DirectoryConnection::ReadDirents(ReadDirentsRequestView request,
                                       ReadDirentsCompleter::Sync& completer) {
   FS_PRETTY_TRACE_DEBUG("[DirectoryReadDirents] our options: ", options());
-
-  if (options().flags.node_reference) {
-    completer.Reply(ZX_ERR_BAD_HANDLE, fidl::VectorView<uint8_t>());
-    return;
-  }
   if (request->max_bytes > fio::wire::kMaxBuf) {
     completer.Reply(ZX_ERR_BAD_HANDLE, fidl::VectorView<uint8_t>());
     return;
@@ -280,11 +266,6 @@ void DirectoryConnection::ReadDirents(ReadDirentsRequestView request,
 
 void DirectoryConnection::Rewind(RewindCompleter::Sync& completer) {
   FS_PRETTY_TRACE_DEBUG("[DirectoryRewind] our options: ", options());
-
-  if (options().flags.node_reference) {
-    completer.Reply(ZX_ERR_BAD_HANDLE);
-    return;
-  }
   dircookie_ = VdirCookie();
   completer.Reply(ZX_OK);
 }
@@ -304,13 +285,8 @@ void DirectoryConnection::GetToken(GetTokenCompleter::Sync& completer) {
 void DirectoryConnection::Rename(RenameRequestView request, RenameCompleter::Sync& completer) {
   FS_PRETTY_TRACE_DEBUG("[DirectoryRename] our options: ", options(), ", src: ", request->src,
                         ", dst: ", request->dst);
-
   if (request->src.empty() || request->dst.empty()) {
     completer.ReplyError(ZX_ERR_INVALID_ARGS);
-    return;
-  }
-  if (options().flags.node_reference) {
-    completer.ReplyError(ZX_ERR_BAD_HANDLE);
     return;
   }
   if (!options().rights.write) {
@@ -330,16 +306,10 @@ void DirectoryConnection::Rename(RenameRequestView request, RenameCompleter::Syn
 void DirectoryConnection::Link(LinkRequestView request, LinkCompleter::Sync& completer) {
   FS_PRETTY_TRACE_DEBUG("[DirectoryLink] our options: ", options(), ", src: ", request->src,
                         ", dst: ", request->dst);
-
   // |fuchsia.io/Directory.Rename| only specified the token to be a generic handle; casting it here.
   zx::event token(request->dst_parent_token.release());
-
   if (request->src.empty() || request->dst.empty()) {
     completer.Reply(ZX_ERR_INVALID_ARGS);
-    return;
-  }
-  if (options().flags.node_reference) {
-    completer.Reply(ZX_ERR_BAD_HANDLE);
     return;
   }
   if (!options().rights.write) {
@@ -354,11 +324,6 @@ void DirectoryConnection::Link(LinkRequestView request, LinkCompleter::Sync& com
 
 void DirectoryConnection::Watch(WatchRequestView request, WatchCompleter::Sync& completer) {
   FS_PRETTY_TRACE_DEBUG("[DirectoryWatch] our options: ", options());
-
-  if (options().flags.node_reference) {
-    completer.Reply(ZX_ERR_BAD_HANDLE);
-    return;
-  }
   zx_status_t status =
       vnode()->WatchDir(vfs(), request->mask, request->options, std::move(request->watcher));
   completer.Reply(status);

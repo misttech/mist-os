@@ -74,7 +74,7 @@ zx_status_t EnforceHierarchicalRights(Rights parent_rights, VnodeConnectionOptio
 
 Connection::Connection(FuchsiaVfs* vfs, fbl::RefPtr<Vnode> vnode, VnodeProtocol protocol,
                        VnodeConnectionOptions options)
-    : vnode_is_open_(!options.flags.node_reference),
+    : vnode_is_open_(protocol != VnodeProtocol::kNode),
       vfs_(vfs),
       vnode_(std::move(vnode)),
       protocol_(protocol),
@@ -172,11 +172,8 @@ zx::result<> Connection::NodeClose() {
 }
 
 fidl::VectorView<uint8_t> Connection::NodeQuery() {
-  const std::string_view kProtocol = [this]() {
-    if (options().flags.node_reference) {
-      return fio::wire::kNodeProtocolName;
-    }
-    switch (protocol()) {
+  const std::string_view kProtocol = [protocol = protocol_]() {
+    switch (protocol) {
       case VnodeProtocol::kDirectory: {
         return fio::wire::kDirectoryProtocolName;
       }
@@ -202,7 +199,7 @@ fidl::VectorView<uint8_t> Connection::NodeQuery() {
 void Connection::NodeSync(fit::callback<void(zx_status_t)> callback) {
   FS_PRETTY_TRACE_DEBUG("[NodeSync] options: ", options());
 
-  if (options().flags.node_reference) {
+  if (protocol_ == VnodeProtocol::kNode) {
     callback(ZX_ERR_BAD_HANDLE);
     return;
   }
@@ -223,7 +220,7 @@ zx::result<> Connection::NodeSetAttr(fio::wire::NodeAttributeFlags flags,
                                      const fio::wire::NodeAttributes& attributes) {
   FS_PRETTY_TRACE_DEBUG("[NodeSetAttr] our options: ", options(), ", incoming flags: ", flags);
 
-  if (options().flags.node_reference) {
+  if (protocol_ == VnodeProtocol::kNode) {
     return zx::error(ZX_ERR_BAD_HANDLE);
   }
   if (!options().rights.write) {
@@ -245,7 +242,7 @@ zx::result<fio::wire::OpenFlags> Connection::NodeGetFlags() {
 }
 
 zx::result<> Connection::NodeSetFlags(fio::wire::OpenFlags flags) {
-  if (options().flags.node_reference) {
+  if (protocol_ == VnodeProtocol::kNode) {
     return zx::error(ZX_ERR_BAD_HANDLE);
   }
   auto options = VnodeConnectionOptions::FromIoV1Flags(flags);

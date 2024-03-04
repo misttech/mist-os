@@ -149,9 +149,7 @@ class Connection : public fbl::DoublyLinkedListable<std::unique_ptr<Connection>>
   // State related to FIDL message dispatching. See |Binding|.
   std::unique_ptr<Binding> binding_;
 
-  // The operational protocol that is used to interact with the vnode over this connection. It
-  // provides finer grained information than the FIDL protocol, e.g. both a regular file and a
-  // vmo-file could speak |fuchsia.io/File|.
+  // The operational protocol that is used to interact with the vnode over this connection.
   VnodeProtocol protocol_;
 
   // Client-specified connection options containing flags and rights passed during the

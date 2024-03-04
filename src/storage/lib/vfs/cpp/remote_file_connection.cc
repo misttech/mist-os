@@ -29,21 +29,19 @@ namespace internal {
 RemoteFileConnection::RemoteFileConnection(fs::FuchsiaVfs* vfs, fbl::RefPtr<fs::Vnode> vnode,
                                            VnodeProtocol protocol, VnodeConnectionOptions options,
                                            zx_koid_t koid)
-    : FileConnection(vfs, std::move(vnode), protocol, options, koid) {}
+    : FileConnection(vfs, std::move(vnode), protocol, options, koid) {
+  ZX_DEBUG_ASSERT(protocol == VnodeProtocol::kFile);
+  ZX_DEBUG_ASSERT(!options.flags.node_reference);
+}
 
 zx_status_t RemoteFileConnection::ReadInternal(void* data, size_t len, size_t* out_actual) {
   FS_PRETTY_TRACE_DEBUG("[FileRead] options: ", options());
-
-  if (options().flags.node_reference) {
-    return ZX_ERR_BAD_HANDLE;
-  }
   if (!options().rights.read) {
     return ZX_ERR_BAD_HANDLE;
   }
   if (len > fio::wire::kMaxTransferSize) {
     return ZX_ERR_OUT_OF_RANGE;
   }
-
   zx_status_t status = vnode()->Read(data, len, offset_, out_actual);
   if (status == ZX_OK) {
     ZX_DEBUG_ASSERT(*out_actual <= len);
@@ -66,10 +64,6 @@ void RemoteFileConnection::Read(ReadRequestView request, ReadCompleter::Sync& co
 zx_status_t RemoteFileConnection::ReadAtInternal(void* data, size_t len, size_t offset,
                                                  size_t* out_actual) {
   FS_PRETTY_TRACE_DEBUG("[FileReadAt] options: ", options());
-
-  if (options().flags.node_reference) {
-    return ZX_ERR_BAD_HANDLE;
-  }
   if (!options().rights.read) {
     return ZX_ERR_BAD_HANDLE;
   }
@@ -96,10 +90,6 @@ void RemoteFileConnection::ReadAt(ReadAtRequestView request, ReadAtCompleter::Sy
 
 zx_status_t RemoteFileConnection::WriteInternal(const void* data, size_t len, size_t* out_actual) {
   FS_PRETTY_TRACE_DEBUG("[FileWrite] options: ", options());
-
-  if (options().flags.node_reference) {
-    return ZX_ERR_BAD_HANDLE;
-  }
   if (!options().rights.write) {
     return ZX_ERR_BAD_HANDLE;
   }
@@ -135,10 +125,6 @@ void RemoteFileConnection::Write(WriteRequestView request, WriteCompleter::Sync&
 zx_status_t RemoteFileConnection::WriteAtInternal(const void* data, size_t len, size_t offset,
                                                   size_t* out_actual) {
   FS_PRETTY_TRACE_DEBUG("[FileWriteAt] options: ", options());
-
-  if (options().flags.node_reference) {
-    return ZX_ERR_BAD_HANDLE;
-  }
   if (!options().rights.write) {
     return ZX_ERR_BAD_HANDLE;
   }
@@ -163,10 +149,6 @@ void RemoteFileConnection::WriteAt(WriteAtRequestView request, WriteAtCompleter:
 zx_status_t RemoteFileConnection::SeekInternal(fuchsia_io::wire::SeekOrigin origin,
                                                int64_t requested_offset) {
   FS_PRETTY_TRACE_DEBUG("[FileSeek] options: ", options());
-
-  if (options().flags.node_reference) {
-    return ZX_ERR_BAD_HANDLE;
-  }
   fs::VnodeAttributes attr;
   if (zx_status_t status = vnode()->GetAttributes(&attr); status != ZX_OK) {
     return ZX_ERR_STOP;

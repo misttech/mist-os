@@ -30,7 +30,10 @@ namespace internal {
 FileConnection::FileConnection(fs::FuchsiaVfs* vfs, fbl::RefPtr<fs::Vnode> vnode,
                                VnodeProtocol protocol, VnodeConnectionOptions options,
                                zx_koid_t koid)
-    : Connection(vfs, std::move(vnode), protocol, options), koid_(koid) {}
+    : Connection(vfs, std::move(vnode), protocol, options), koid_(koid) {
+  ZX_DEBUG_ASSERT(protocol == VnodeProtocol::kFile);
+  ZX_DEBUG_ASSERT(!options.flags.node_reference);
+}
 
 FileConnection::~FileConnection() { vnode()->DeleteFileLockInTeardown(koid_); }
 
@@ -84,13 +87,11 @@ void FileConnection::Describe(DescribeCompleter::Sync& completer) {
 
 void FileConnection::GetConnectionInfo(GetConnectionInfoCompleter::Sync& completer) {
   fio::Operations rights = fio::Operations::kGetAttributes;
-  if (!options().flags.node_reference) {
-    rights |= options().rights.read ? fio::Operations::kReadBytes : fio::Operations();
-    rights |= options().rights.write
-                  ? fio::Operations::kWriteBytes | fio::Operations::kUpdateAttributes
-                  : fio::Operations();
-    rights |= options().rights.execute ? fio::Operations::kExecute : fio::Operations();
-  }
+  rights |= options().rights.read ? fio::Operations::kReadBytes : fio::Operations();
+  rights |= options().rights.write
+                ? fio::Operations::kWriteBytes | fio::Operations::kUpdateAttributes
+                : fio::Operations();
+  rights |= options().rights.execute ? fio::Operations::kExecute : fio::Operations();
   fidl::Arena arena;
   completer.Reply(fio::wire::ConnectionInfo::Builder(arena).rights(rights).Build());
 }
@@ -133,14 +134,9 @@ void FileConnection::QueryFilesystem(QueryFilesystemCompleter::Sync& completer) 
 
 zx_status_t FileConnection::ResizeInternal(uint64_t length) {
   FS_PRETTY_TRACE_DEBUG("[FileTruncate] options: ", options());
-
-  if (options().flags.node_reference) {
-    return ZX_ERR_BAD_HANDLE;
-  }
   if (!options().rights.write) {
     return ZX_ERR_BAD_HANDLE;
   }
-
   return vnode()->Truncate(length);
 }
 
@@ -154,9 +150,6 @@ void FileConnection::Resize(ResizeRequestView request, ResizeCompleter::Sync& co
 }
 
 zx_status_t FileConnection::GetBackingMemoryInternal(fio::wire::VmoFlags flags, zx::vmo* out_vmo) {
-  if (options().flags.node_reference) {
-    return ZX_ERR_BAD_HANDLE;
-  }
   if ((flags & fio::wire::VmoFlags::kPrivateClone) &&
       (flags & fio::wire::VmoFlags::kSharedBuffer)) {
     return ZX_ERR_INVALID_ARGS;
