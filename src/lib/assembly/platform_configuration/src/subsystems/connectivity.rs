@@ -6,7 +6,8 @@ use crate::subsystems::prelude::*;
 use crate::util;
 use anyhow::bail;
 use assembly_config_schema::platform_config::connectivity_config::{
-    NetstackVersion, NetworkingConfig, PlatformConnectivityConfig, WlanRecoveryProfile,
+    NetstackVersion, NetworkingConfig, PlatformConnectivityConfig, WlanPolicyLayer,
+    WlanRecoveryProfile,
 };
 use assembly_util::{FileEntry, PackageDestination, PackageSetDestination};
 
@@ -154,7 +155,43 @@ impl DefineSubsystemConfiguration<PlatformConnectivityConfig> for ConnectivitySu
             let has_fullmac = context.board_info.provides_feature("fuchsia::wlan_fullmac");
             let has_softmac = context.board_info.provides_feature("fuchsia::wlan_softmac");
             if has_fullmac || has_softmac {
-                builder.platform_bundle("wlan_policy");
+                // Select the policy layer
+                match connectivity_config.wlan.policy_layer {
+                    WlanPolicyLayer::ViaWlanix => {
+                        builder.platform_bundle("wlan_wlanix");
+
+                        // Ensure we don't have invalid recovery settings
+                        if connectivity_config.wlan.recovery_profile.is_some() {
+                            bail!(
+                                "wlan.recovery_profile is invalid with wlan.policy_layer ViaWlanix"
+                            )
+                        }
+                        if connectivity_config.wlan.recovery_enabled {
+                            bail!(
+                                "wlan.recovery_enabled is invalid with wlan.policy_layer ViaWlanix"
+                            )
+                        }
+                    }
+                    WlanPolicyLayer::Platform => {
+                        builder.platform_bundle("wlan_policy");
+
+                        // Add in the recovery characteristics specified by the product config.
+                        let recovery_profile = match connectivity_config.wlan.recovery_profile {
+                            None => String::from(""),
+                            Some(WlanRecoveryProfile::ThresholdedRecovery) => {
+                                String::from("thresholded_recovery")
+                            }
+                        };
+                        builder
+                            .package("wlancfg") // Added by platform_bundle("wlan_policy")
+                            .component("meta/wlancfg.cm")?
+                            .field("recovery_profile", recovery_profile)?
+                            .field(
+                                "recovery_enabled",
+                                connectivity_config.wlan.recovery_enabled.clone(),
+                            )?;
+                    }
+                }
 
                 // Add development support on eng and userdebug systems if we have wlan.
                 match context.build_type {
@@ -178,20 +215,6 @@ impl DefineSubsystemConfiguration<PlatformConnectivityConfig> for ConnectivitySu
                 if has_softmac {
                     builder.platform_bundle("wlan_softmac_support");
                 }
-
-                // Add in the recovery characteristics specified by the product config.
-                let recovery_profile = match connectivity_config.wlan.recovery_profile {
-                    None => String::from(""),
-                    Some(WlanRecoveryProfile::ThresholdedRecovery) => {
-                        String::from("thresholded_recovery")
-                    }
-                };
-
-                builder
-                    .package("wlancfg")
-                    .component("meta/wlancfg.cm")?
-                    .field("recovery_profile", recovery_profile)?
-                    .field("recovery_enabled", connectivity_config.wlan.recovery_enabled.clone())?;
             }
 
             if connectivity_config.network.include_tun {

@@ -88,6 +88,20 @@ pub struct PlatformWlanConfig {
     pub recovery_profile: Option<WlanRecoveryProfile>,
     #[serde(default)]
     pub recovery_enabled: bool,
+    #[serde(default)]
+    pub policy_layer: WlanPolicyLayer,
+}
+
+#[derive(Debug, Default, Deserialize, Serialize, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum WlanPolicyLayer {
+    /// Use the Fuchsia platform's built-in policy layer, `wlancfg`, to configure and manage the
+    /// Fuchsia WLAN stack.
+    #[default]
+    Platform,
+    /// Use an external policy layer, which uses `wlanix` to communicate with the Fuchsia WLAN
+    /// stack.
+    ViaWlanix,
 }
 
 #[derive(Copy, Clone, Debug, Deserialize, Serialize, PartialEq)]
