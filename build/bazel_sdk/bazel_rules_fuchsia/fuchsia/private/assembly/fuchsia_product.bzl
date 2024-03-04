@@ -55,19 +55,19 @@ $FFX \
 def _fuchsia_product_assembly_impl(ctx):
     fuchsia_toolchain = ctx.toolchains["@fuchsia_sdk//fuchsia:toolchain"]
     ffx_tool = fuchsia_toolchain.ffx
-    legacy_aib = ctx.attr.legacy_aib[FuchsiaProductAssemblyBundleInfo]
-    platform_aibs = ctx.attr.platform_aibs[FuchsiaProductAssemblyBundleInfo]
+    legacy_bundle = ctx.attr.legacy_bundle[FuchsiaProductAssemblyBundleInfo]
+    platform_artifacts = ctx.attr.platform_artifacts[FuchsiaProductAssemblyBundleInfo]
     out_dir = ctx.actions.declare_directory(ctx.label.name + "_out")
     platform_aibs_file = ctx.actions.declare_file(ctx.label.name + "_platform_assembly_input_bundles.json")
 
     # Create platform_assembly_input_bundles.json file
     ctx.actions.run(
         outputs = [platform_aibs_file],
-        inputs = platform_aibs.files,
+        inputs = platform_artifacts.files,
         executable = ctx.executable._create_platform_aibs_file,
         arguments = [
             "--platform-aibs",
-            platform_aibs.root.dirname,
+            platform_artifacts.root,
             "--output",
             platform_aibs_file.path,
         ],
@@ -108,14 +108,14 @@ def _fuchsia_product_assembly_impl(ctx):
     build_type = ctx.attr.product_config[FuchsiaProductConfigInfo].build_type
 
     shell_src = _PRODUCT_ASSEMBLY_RUNNER_SH_TEMPLATE.format(
-        mode_arg = "--mode " + ctx.attr.mode if ctx.attr.mode else "",
+        mode_arg = "--mode " + ctx.attr.package_mode if ctx.attr.package_mode else "",
     )
 
     ffx_inputs = get_ffx_assembly_inputs(fuchsia_toolchain)
     ffx_inputs += ctx.files.product_config
     ffx_inputs += board_config_input
-    ffx_inputs += legacy_aib.files
-    ffx_inputs += platform_aibs.files
+    ffx_inputs += legacy_bundle.files
+    ffx_inputs += platform_artifacts.files
     ffx_isolate_dir = ctx.actions.declare_directory(ctx.label.name + "_ffx_isolate_dir")
 
     shell_env = {
@@ -125,8 +125,8 @@ def _fuchsia_product_assembly_impl(ctx):
         "OUTDIR": out_dir.path,
         "PRODUCT_CONFIG_PATH": product_config_file.path,
         "BOARD_CONFIG_PATH": board_config_file_path,
-        "LEGACY_AIB": legacy_aib.root.dirname,
-        "PLATFORM_AIB_DIR": platform_aibs.root.dirname,
+        "LEGACY_AIB": legacy_bundle.root,
+        "PLATFORM_AIB_DIR": platform_artifacts.root,
     }
 
     for (key, value) in shell_env.items():
@@ -194,17 +194,17 @@ fuchsia_product_assembly = rule(
             providers = [[FuchsiaBoardConfigInfo], [FuchsiaBoardConfigDirectoryInfo]],
             mandatory = True,
         ),
-        "mode": attr.string(
+        "package_mode": attr.string(
             doc = "Mode indicating where to place packages.",
             values = [PACKAGE_MODE.DISK, PACKAGE_MODE.EMBED_IN_ZBI, PACKAGE_MODE.BOOTFS],
         ),
-        "legacy_aib": attr.label(
+        "legacy_bundle": attr.label(
             doc = "Legacy AIB for this product.",
             providers = [FuchsiaProductAssemblyBundleInfo],
             mandatory = True,
         ),
-        "platform_aibs": attr.label(
-            doc = "Platform AIBs for this product.",
+        "platform_artifacts": attr.label(
+            doc = "Platform artifacts to use for this product.",
             providers = [FuchsiaProductAssemblyBundleInfo],
             mandatory = True,
         ),
@@ -239,7 +239,7 @@ def _fuchsia_product_create_system_impl(ctx):
     ffx_isolate_dir = ctx.actions.declare_directory(ctx.label.name + "_ffx_isolate_dir")
 
     shell_src = _CREATE_SYSTEM_RUNNER_SH_TEMPLATE.format(
-        mode_arg = "--mode " + ctx.attr.mode if ctx.attr.mode else "",
+        mode_arg = "--mode " + ctx.attr.package_mode if ctx.attr.package_mode else "",
     )
 
     shell_env = {
@@ -287,7 +287,7 @@ _fuchsia_product_create_system = rule(
             providers = [FuchsiaProductAssemblyInfo],
             mandatory = True,
         ),
-        "mode": attr.string(
+        "package_mode": attr.string(
             doc = "Mode indicating where to place packages.",
         ),
         "_sdk_manifest": attr.label(
@@ -297,27 +297,32 @@ _fuchsia_product_create_system = rule(
     },
 )
 
-# TODO(http://b/327134851): Rename this to fuchsia_product.
-def fuchsia_product_image(
+def fuchsia_product(
         name,
-        product_config,
-        legacy_aib,
-        platform_aibs,
         board_config,
+        product_config,
+        # TODO: Deprecated. Use platform_artifacts.
+        platform_aibs = None,
+        # TODO: Deprecated. Use legacy_bundle.
+        legacy_aib = None,
+        # TODO: Deprecated. Use package_mode.
         create_system_mode = None,
+        package_mode = None,
+        platform_artifacts = None,
+        legacy_bundle = None,
         **kwargs):
     fuchsia_product_assembly(
         name = name + "_product_assembly",
         board_config = board_config,
         product_config = product_config,
-        mode = create_system_mode,
-        legacy_aib = legacy_aib,
-        platform_aibs = platform_aibs,
+        platform_artifacts = platform_artifacts or platform_aibs,
+        legacy_bundle = legacy_bundle or legacy_aib,
+        package_mode = package_mode or create_system_mode,
     )
 
     _fuchsia_product_create_system(
         name = name,
         product_assembly = ":" + name + "_product_assembly",
-        mode = create_system_mode,
+        package_mode = create_system_mode,
         **kwargs
     )

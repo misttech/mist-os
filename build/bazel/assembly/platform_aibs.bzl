@@ -22,7 +22,7 @@ def _platform_aibs_impl(ctx):
     for aib in ctx.attr.aibs:
         aib_info = aib[FuchsiaProductAssemblyBundleInfo]
 
-        aib_dir_path = aib_info.root.dirname
+        aib_dir_path = aib_info.root
         for file in aib_info.files:
             relative_to_root = paths.relativize(
                 path = file.path,
@@ -35,7 +35,7 @@ def _platform_aibs_impl(ctx):
     return [
         DefaultInfo(files = depset(direct = all_outputs)),
         FuchsiaProductAssemblyBundleInfo(
-            root = root,
+            root = root.dirname,
             files = all_outputs,
         ),
     ]

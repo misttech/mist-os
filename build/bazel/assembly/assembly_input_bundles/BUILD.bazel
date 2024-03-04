@@ -2,7 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-load("@fuchsia_sdk//fuchsia/private/assembly:assembly_bundle.bzl", "assembly_bundle")
+load("@fuchsia_sdk//fuchsia:assembly.bzl", "fuchsia_legacy_bundle", "fuchsia_platform_artifacts")
 load(
     "//:bundles/assembly/platform_aib_names.bzl",
     "BRINGUP_PLATFORM_AIB_NAMES",
@@ -14,35 +14,33 @@ load("//build/bazel/assembly:platform_aibs.bzl", "platform_aibs")
 
 package(default_visibility = ["//visibility:public"])
 
-assembly_bundle(
+fuchsia_legacy_bundle(
     name = "legacy_fuchsia",
     applicable_licenses = ["@legacy_ninja_build_outputs//:license"],
-    config = "@legacy_ninja_build_outputs//:obj/build/images/fuchsia/fuchsia/fuchsia.bazel_legacy_aib/assembly_config.json",
+    directory = "@legacy_ninja_build_outputs//:obj/build/images/fuchsia/fuchsia/fuchsia.bazel_legacy_aib",
     files = "@legacy_ninja_build_outputs//:fuchsia.bazel_legacy_aib",
 )
 
-assembly_bundle(
+fuchsia_legacy_bundle(
     name = "legacy_bringup",
     applicable_licenses = ["@legacy_ninja_build_outputs//:license"],
-    config = "@legacy_ninja_build_outputs//:obj/build/images/bringup/bringup/bringup.bazel_legacy_aib/assembly_config.json",
+    directory = "@legacy_ninja_build_outputs//:obj/build/images/bringup/bringup/bringup.bazel_legacy_aib",
     files = "@legacy_ninja_build_outputs//:bringup.bazel_legacy_aib",
 )
 
-assembly_bundle(
+fuchsia_legacy_bundle(
     name = "legacy_zedboot",
     applicable_licenses = ["@legacy_ninja_build_outputs//:license"],
-    config = "@legacy_ninja_build_outputs//:obj/build/images/zedboot/zedboot/zedboot.bazel_legacy_aib/assembly_config.json",
+    directory = "@legacy_ninja_build_outputs//:obj/build/images/zedboot/zedboot/zedboot.bazel_legacy_aib",
     files = "@legacy_ninja_build_outputs//:zedboot.bazel_legacy_aib",
 )
 
 [
-    assembly_bundle(
+    fuchsia_platform_artifacts(
         name = aib,
         applicable_licenses = ["@legacy_ninja_build_outputs//:license"],
-        config =
-            "@legacy_ninja_build_outputs//:obj/bundles/assembly/{}/assembly_config.json".format(aib),
-        files =
-            "@legacy_ninja_build_outputs//:{}_bazel_inputs".format(aib),
+        directory = "@legacy_ninja_build_outputs//:obj/bundles/assembly/{}".format(aib),
+        files = "@legacy_ninja_build_outputs//:{}_bazel_inputs".format(aib),
     )
     for aib in ENG_PLATFORM_AIB_NAMES
 ]

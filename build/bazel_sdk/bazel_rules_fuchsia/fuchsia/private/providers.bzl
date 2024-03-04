@@ -149,18 +149,6 @@ FuchsiaAssemblyConfigInfo = provider(
     },
 )
 
-FuchsiaProductAssemblyBundleInfo = provider(
-    doc = """
-A bundle of files used by product assembly.
-This should only be provided by the single exported target of a
-fuchsia_product_assembly_bundle repository.
-""",
-    fields = {
-        "root": "A blank file at the root of the bundle directory",
-        "files": "All files contained in the bundle",
-    },
-)
-
 FuchsiaProductBundleConfigInfo = provider(
     doc = "Config data used for pbm creation",
     fields = {

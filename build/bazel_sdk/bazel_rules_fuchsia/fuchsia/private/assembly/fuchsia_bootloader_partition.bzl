@@ -35,7 +35,8 @@ fuchsia_bootloader_partition = rule(
             mandatory = True,
         ),
         "type": attr.string(
-            doc = "The firmware type provided to the update system.",
+            doc = """The firmware type provided to the update system.
+            This value is a unique identifier for a partition known by the paver driver.""",
             mandatory = True,
         ),
     },

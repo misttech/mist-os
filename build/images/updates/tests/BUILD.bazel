@@ -5,8 +5,8 @@
 load(
     "@fuchsia_sdk//fuchsia:assembly.bzl",
     "BUILD_TYPES",
-    "assembly_bundle",
     "fuchsia_board_configuration",
+    "fuchsia_legacy_bundle",
     "fuchsia_product_assembly",
     "fuchsia_product_configuration",
 )
@@ -16,7 +16,7 @@ fuchsia_board_configuration(
     board_name = "fake_board",
 )
 
-assembly_bundle(
+fuchsia_legacy_bundle(
     name = "legacy_gn_aib",
     config = "@legacy_ninja_build_outputs//:obj/build/images/updates/tests/fx_publish_test.gn_assembly/fx_publish_test.gn_assembly.bazel_legacy_aib/assembly_config.json",
     files = "@legacy_ninja_build_outputs//:fx_publish_test.gn_assembly.bazel_legacy_aib",
@@ -41,7 +41,7 @@ fuchsia_product_assembly(
     name = "fake_product_assembly",
     testonly = True,
     board_config = ":board_config",
-    legacy_aib = ":legacy_gn_aib",
-    platform_aibs = "//build/bazel/assembly/assembly_input_bundles:platform_eng",
+    legacy_bundle = ":legacy_gn_aib",
+    platform_artifacts = "//build/bazel/assembly/assembly_input_bundles:platform_eng",
     product_config = ":product_assembly_config",
 )

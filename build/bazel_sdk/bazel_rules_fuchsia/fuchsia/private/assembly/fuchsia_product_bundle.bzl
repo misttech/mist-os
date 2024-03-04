@@ -16,13 +16,20 @@ load(
     "FuchsiaVirtualDeviceInfo",
 )
 
+DELIVERY_BLOB_TYPE = struct(
+    UNCOMPRESSED = "0",
+    COMPRESSED = "1",
+)
+
 def fuchsia_product_bundle(
         *,
         name,
         board_name = None,
-        partitions_config = None,
-        product_image = None,
         product_name = None,
+        partitions_config = None,
+        # Deprecated. Use main.
+        product_image = None,
+        main = None,
         **kwargs):
     """Build a fuchsia product bundle.
 
@@ -36,9 +43,9 @@ def fuchsia_product_bundle(
     fuchsia_product_bundle(
         name = "product_bundle",
         board_name = "<your_board>",
-        partitions_config = ":your_partitions_config",
-        product_image = ":your_image",
         product_name = "<your_product_name>",
+        partitions_config = ":your_partitions_config",
+        product = ":your_image",
     )
     ```
     - product_bundle.flash: Calling run on this target will flash the device with the created product_bundle.
@@ -51,7 +58,7 @@ def fuchsia_product_bundle(
         name = name,
         board_name = board_name,
         partitions_config = partitions_config,
-        product_image = product_image,
+        product_image = main or product_image,
         product_name = product_name,
         **kwargs
     )
@@ -530,16 +537,19 @@ def _extract_structured_config(ctx, ffx_tool, pb_out_dir, is_recovery):
 def _build_fuchsia_product_bundle_impl(ctx):
     fuchsia_toolchain = ctx.toolchains["@fuchsia_sdk//fuchsia:toolchain"]
     partitions_configuration = ctx.attr.partitions_config[FuchsiaAssemblyConfigInfo].config
-    system_a_out = ctx.attr.product_image[FuchsiaProductImageInfo].images_out
+    if ctx.attr.main:
+        system_a_out = ctx.attr.main[FuchsiaProductImageInfo].images_out
+    else:
+        system_a_out = ctx.attr.product_image[FuchsiaProductImageInfo].images_out
     ffx_tool = fuchsia_toolchain.ffx
     pb_out_dir = ctx.actions.declare_directory(ctx.label.name + "_out")
     ffx_isolate_dir = ctx.actions.declare_directory(ctx.label.name + "_ffx_isolate_dir")
-    product_name = "{}.{}".format(ctx.attr.product_name, ctx.attr.board_name)
+    product_name = "{}.{}".format(ctx.attr.product_bundle_name or ctx.attr.product_name, ctx.attr.board_name)
     delivery_blob_type = ctx.attr.delivery_blob_type
 
     # In the future, the product bundles should be versioned independently of
     # the sdk version. So far they have been the same value.
-    product_version = ctx.attr.product_version or fuchsia_toolchain.sdk_id
+    product_version = ctx.attr.product_bundle_version or ctx.attr.product_version or fuchsia_toolchain.sdk_id
     if not product_version:
         fail("product_version string must not be empty.")
 
@@ -573,7 +583,7 @@ def _build_fuchsia_product_bundle_impl(ctx):
     }
 
     # Gather all the inputs.
-    inputs = ctx.files.partitions_config + ctx.files.product_image + get_ffx_product_bundle_inputs(fuchsia_toolchain)
+    inputs = ctx.files.partitions_config + ctx.files.product_image + ctx.files.main + get_ffx_product_bundle_inputs(fuchsia_toolchain)
 
     # Add virtual devices.
     for virtual_device in ctx.attr.virtual_devices:
@@ -622,20 +632,24 @@ def _build_fuchsia_product_bundle_impl(ctx):
         env = env,
         progress_message = "Creating product bundle for %s" % ctx.label.name,
     )
-    deps = [pb_out_dir] + ctx.files.partitions_config + ctx.files.product_image
+    deps = [pb_out_dir] + ctx.files.partitions_config + ctx.files.product_image + ctx.files.main
 
     # Scrutiny Validation
-    if ctx.attr.product_image_scrutiny_config:
-        build_type = ctx.attr.product_image[FuchsiaProductImageInfo].build_type
+    main_config = ctx.attr.main_scrutiny_config or ctx.attr.product_image_scrutiny_config
+    if main_config:
+        if ctx.attr.main:
+            build_type = ctx.attr.main[FuchsiaProductImageInfo].build_type
+        else:
+            build_type = ctx.attr.product_image[FuchsiaProductImageInfo].build_type
         if build_type == "user":
             platform_scrutiny_config = ctx.attr._platform_user_scrutiny_config[FuchsiaScrutinyConfigInfo]
         elif build_type == "userdebug":
             platform_scrutiny_config = ctx.attr._platform_userdebug_scrutiny_config[FuchsiaScrutinyConfigInfo]
         else:
-            fail("scrutiny cannot run on 'product_image' because it is an eng build type")
+            fail("scrutiny cannot run on 'product' because it is an eng build type")
 
-        product_image_scrutiny_config = ctx.attr.product_image_scrutiny_config[FuchsiaScrutinyConfigInfo]
-        deps += _scrutiny_validation(ctx, ffx_tool, pb_out_dir, product_image_scrutiny_config, platform_scrutiny_config)
+        main_scrutiny_config = main_config[FuchsiaScrutinyConfigInfo]
+        deps += _scrutiny_validation(ctx, ffx_tool, pb_out_dir, main_scrutiny_config, platform_scrutiny_config)
     if ctx.attr.recovery_scrutiny_config:
         build_type = ctx.attr.recovery[FuchsiaProductImageInfo].build_type
         if build_type == "user":
@@ -662,24 +676,36 @@ _build_fuchsia_product_bundle = rule(
             doc = "Name of the board this PB runs on. E.g. qemu-x64.",
             mandatory = True,
         ),
+        # Deprecated. Use product_bundle_name.
+        "product_name": attr.string(
+            doc = "Name of the Fuchsia product. E.g. workstation_eng.",
+        ),
+        "product_bundle_name": attr.string(
+            doc = "Name of the Fuchsia product. E.g. workstation_eng.",
+        ),
+        # Deprecated. Use product_bundle_version.
+        "product_version": attr.string(
+            doc = "Version of the Fuchsia product. E.g. 35.20221231.0.1.",
+        ),
+        "product_bundle_version": attr.string(
+            doc = "Version of the Fuchsia product. E.g. 35.20221231.0.1.",
+        ),
         "delivery_blob_type": attr.string(
             doc = "Delivery blob type of the product bundle.",
+            values = [DELIVERY_BLOB_TYPE.UNCOMPRESSED, DELIVERY_BLOB_TYPE.COMPRESSED],
         ),
         "partitions_config": attr.label(
             doc = "Partitions config to use.",
             mandatory = True,
         ),
+        # Deprecated. Use main.
         "product_image": attr.label(
-            doc = "fuchsia_product_image target to put in slot A.",
+            doc = "fuchsia_product target to put in slot A.",
             providers = [FuchsiaProductImageInfo],
-            mandatory = True,
         ),
-        "product_name": attr.string(
-            doc = "Name of the Fuchsia product. E.g. workstation_eng.",
-            mandatory = True,
-        ),
-        "product_version": attr.string(
-            doc = "Version of the Fuchsia product. E.g. 35.20221231.0.1.",
+        "main": attr.label(
+            doc = "fuchsia_product target to put in slot A.",
+            providers = [FuchsiaProductImageInfo],
         ),
         "recovery": attr.label(
             doc = "fuchsia_product_image target to put in slot R.",
@@ -699,7 +725,12 @@ _build_fuchsia_product_bundle = rule(
             doc = "Epoch needed to create update package.",
             default = "1",
         ),
+        # Deprecated. Use main_scrutiny_config.
         "product_image_scrutiny_config": attr.label(
+            doc = "Scrutiny config for slot A.",
+            providers = [FuchsiaScrutinyConfigInfo],
+        ),
+        "main_scrutiny_config": attr.label(
             doc = "Scrutiny config for slot A.",
             providers = [FuchsiaScrutinyConfigInfo],
         ),

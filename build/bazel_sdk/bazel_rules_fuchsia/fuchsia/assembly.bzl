@@ -9,8 +9,9 @@ load(
     _fuchsia_prebuilt_package = "fuchsia_prebuilt_package",
 )
 load(
-    "//fuchsia/private/assembly:assembly_bundle.bzl",
-    _assembly_bundle = "assembly_bundle",
+    "//fuchsia/private/assembly:fuchsia_platform_artifacts.bzl",
+    _fuchsia_legacy_bundle = "fuchsia_legacy_bundle",
+    _fuchsia_platform_artifacts = "fuchsia_platform_artifacts",
 )
 load(
     "//fuchsia/private/assembly:fuchsia_assemble_package.bzl",
@@ -53,6 +54,7 @@ load(
 )
 load(
     "//fuchsia/private/assembly:fuchsia_product_bundle.bzl",
+    _DELIVERY_BLOB_TYPE = "DELIVERY_BLOB_TYPE",
     _fuchsia_product_bundle = "fuchsia_product_bundle",
 )
 load(
@@ -62,9 +64,9 @@ load(
     _fuchsia_product_configuration = "fuchsia_product_configuration",
 )
 load(
-    "//fuchsia/private/assembly:fuchsia_product_image.bzl",
+    "//fuchsia/private/assembly:fuchsia_product.bzl",
+    _fuchsia_product = "fuchsia_product",
     _fuchsia_product_assembly = "fuchsia_product_assembly",
-    _fuchsia_product_image = "fuchsia_product_image",
 )
 load(
     "//fuchsia/private/assembly:fuchsia_product_ota_config.bzl",
@@ -111,16 +113,17 @@ load(
 )
 
 # Rules
-assembly_bundle = _assembly_bundle
+fuchsia_legacy_bundle = _fuchsia_legacy_bundle
+fuchsia_platform_artifacts = _fuchsia_platform_artifacts
 fuchsia_prebuilt_package = _fuchsia_prebuilt_package
 fuchsia_package_directory = _fuchsia_package_directory
-fuchsia_assemble_package = _fuchsia_assemble_package
+fuchsia_package_with_configs = _fuchsia_assemble_package
 fuchsia_product_configuration = _fuchsia_product_configuration
 fuchsia_product_ota_config = _fuchsia_product_ota_config
 fuchsia_virtual_device = _fuchsia_virtual_device
 fuchsia_board_configuration = _fuchsia_board_configuration
 fuchsia_prebuilt_board_configuration = _fuchsia_prebuilt_board_configuration
-fuchsia_product_image = _fuchsia_product_image
+fuchsia_product = _fuchsia_product
 fuchsia_product_assembly = _fuchsia_product_assembly
 fuchsia_partitions_configuration = _fuchsia_partitions_configuration
 fuchsia_product_bundle = _fuchsia_product_bundle
@@ -132,6 +135,11 @@ fuchsia_update_package = _fuchsia_update_package
 fuchsia_repository_keys = _fuchsia_repository_keys
 fuchsia_task_flash = _fuchsia_task_flash
 fuchsia_scrutiny_config = _fuchsia_scrutiny_config
+
+# Deprecated rules
+assembly_bundle = _fuchsia_legacy_bundle
+fuchsia_assemble_package = _fuchsia_assemble_package
+fuchsia_product_image = _fuchsia_product
 
 fuchsia_bootstrap_partition = _fuchsia_bootstrap_partition
 fuchsia_bootloader_partition = _fuchsia_bootloader_partition
@@ -149,6 +157,7 @@ PARTITION_TYPE = _PARTITION_TYPE
 SLOT = _SLOT
 ARCH = _ARCH
 INPUT_DEVICE_TYPE = _INPUT_DEVICE_TYPE
+DELIVERY_BLOB_TYPE = _DELIVERY_BLOB_TYPE
 
 # Helper functions
 ota_realm = _ota_realm

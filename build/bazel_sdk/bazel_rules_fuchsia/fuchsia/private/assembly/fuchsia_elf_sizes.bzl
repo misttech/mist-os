@@ -35,7 +35,7 @@ def _fuchsia_elf_sizes_impl(ctx):
     elf_sizes_json = ctx.actions.declare_file(ctx.label.name + "_elf_sizes.json")
 
     ctx.actions.run(
-        inputs = ctx.files.product_image + [
+        inputs = ctx.files.product_image + ctx.files.product + [
             extracted_zbi_bootfs_dir,
             extracted_zbi_json,
         ],
@@ -60,14 +60,18 @@ def _fuchsia_elf_sizes_impl(ctx):
     ]
 
 fuchsia_elf_sizes = rule(
-    doc = """Create a ELF sizes summary file for a Fuchsia image.""",
+    doc = """Create a ELF sizes summary file for a Fuchsia product.""",
     implementation = _fuchsia_elf_sizes_impl,
     toolchains = ["@fuchsia_sdk//fuchsia:toolchain"],
     attrs = {
+        # Deprecated.
         "product_image": attr.label(
-            doc = "The fuchsia_product_image target to check the size of.",
+            doc = "The fuchsia_lroduct to check the size of.",
             providers = [FuchsiaProductImageInfo],
-            mandatory = True,
+        ),
+        "product": attr.label(
+            doc = "The fuchsia product to check the size of.",
+            providers = [FuchsiaProductImageInfo],
         ),
         "_elf_sizes_py": attr.label(
             default = "//fuchsia/tools:elf_sizes",

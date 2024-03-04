@@ -83,13 +83,9 @@ FuchsiaVirtualDeviceInfo = provider(
 )
 
 FuchsiaProductAssemblyBundleInfo = provider(
-    doc = """
-A bundle of files used by product assembly.
-This should only be provided by the single exported target of a
-fuchsia_product_assembly_bundle repository.
-""",
+    doc = """A bundle of files used by product assembly.""",
     fields = {
-        "root": "A file located at the root of this AIB",
+        "root": "The root directory for these artifacts",
         "files": "All files contained in the bundle",
     },
 )

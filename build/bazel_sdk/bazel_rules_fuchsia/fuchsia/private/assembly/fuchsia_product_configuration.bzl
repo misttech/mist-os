@@ -170,7 +170,9 @@ _fuchsia_product_configuration = rule(
 
 def fuchsia_product_configuration(
         name,
+        # Deprecated.
         json_config = None,
+        product_config_json = None,
         base_packages = None,
         cache_packages = None,
         base_driver_packages = None,
@@ -181,7 +183,7 @@ def fuchsia_product_configuration(
     Args:
         name: Name of the rule.
         TODO(https://fxbug.dev/42073826): Point to document instead of Rust definition
-        json_config: product assembly json config, as a starlark dictionary.
+        product_config_json: product assembly json config, as a starlark dictionary.
             Format of this JSON config can be found in this Rust definitions:
                //src/lib/assembly/config_schema/src/assembly_config.rs
 
@@ -206,6 +208,7 @@ def fuchsia_product_configuration(
         **kwarg: Common bazel rule args passed through to the implementation rule.
     """
 
+    json_config = product_config_json or json_config
     if not json_config:
         json_config = {}
     if type(json_config) != "dict":
