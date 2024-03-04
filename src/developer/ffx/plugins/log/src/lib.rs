@@ -25,6 +25,7 @@ use symbolizer::NonTransactionalSymbolizer;
 // which automatically adds ffx_core even though we don't use it.
 use ffx_core as _;
 
+mod condition_variable;
 mod error;
 mod symbolizer;
 #[cfg(test)]

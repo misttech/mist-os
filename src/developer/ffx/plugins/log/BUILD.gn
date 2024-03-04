@@ -39,6 +39,7 @@ ffx_plugin("ffx_log") {
   args_sources = [ "src/args.rs" ]
 
   sources = [
+    "src/condition_variable.rs",
     "src/error.rs",
     "src/lib.rs",
     "src/symbolizer.rs",

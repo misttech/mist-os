@@ -4,14 +4,13 @@
 use anyhow::Result;
 use async_trait::async_trait;
 use derivative::Derivative;
-use futures::channel::oneshot;
 use log_command::log_formatter;
 use log_formatter::{LogData, LogEntry, Symbolize};
 use log_symbolizer::{is_symbolizer_context_marker, Symbolizer};
 use std::{cell::Cell, fmt::Debug};
 use thiserror::Error;
 
-use crate::error::LogError;
+use crate::{condition_variable::LocalConditionVariable, error::LogError};
 
 /// Connection to a symbolizer.
 #[derive(Derivative)]
@@ -23,7 +22,7 @@ where
     sender: async_channel::Sender<String>,
     receiver: async_channel::Receiver<String>,
     #[derivative(Debug = "ignore")]
-    pending_symbolize_tasks: Cell<Option<oneshot::Receiver<()>>>,
+    pending_symbolize_tasks: Cell<Option<LocalConditionVariable>>,
     _symbolizer: T,
 }
 
@@ -36,17 +35,15 @@ where
         // The legacy symbolizer only allows one pending operation at a time
         // as it isn't transactional. If an operation is pending,
         // wait for it to complete before trying to symbolize another line.
-        let (cv, waiter) = oneshot::channel();
+        let cv = LocalConditionVariable::new();
         if let Some(prev) = self.pending_symbolize_tasks.take() {
-            self.pending_symbolize_tasks.set(Some(waiter));
-            // Intentionally ignored, if other future is dropped we can still proceed.
-            let _ = prev.await;
+            self.pending_symbolize_tasks.set(Some(cv.clone()));
+            prev.await;
         } else {
-            self.pending_symbolize_tasks.set(Some(waiter));
+            self.pending_symbolize_tasks.set(Some(cv.clone()));
         }
         let ret = Some(self.symbolize_message(entry).await);
-        // Intentionally ignored, there might not be anyone waiting.
-        let _ = cv.send(());
+        cv.notify_one();
         // Wake any blocked symbolize tasks
         ret
     }
