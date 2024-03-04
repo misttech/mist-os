@@ -30,7 +30,6 @@
         {
             protocol: [
                 "fuchsia.metrics.MetricEventLoggerFactory",
-                "fuchsia.scheduler.ProfileProvider",
                 "fuchsia.scheduler.RoleManager",
                 "fuchsia.thermal.ClientStateConnector",
             ],

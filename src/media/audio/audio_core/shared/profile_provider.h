@@ -36,7 +36,7 @@ class ProfileProvider : public fuchsia::media::ProfileProvider {
   fidl::BindingSet<fuchsia::media::ProfileProvider, ProfileProvider*> bindings_;
   sys::ComponentContext& context_;
   zx::duration mix_profile_period_;
-  fuchsia::scheduler::ProfileProviderPtr profile_provider_;
+  fuchsia::scheduler::RoleManagerPtr role_manager_;
 };
 
 }  // namespace media::audio

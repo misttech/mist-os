@@ -220,7 +220,7 @@ HermeticAudioRealm::CtorArgs HermeticAudioRealm::BuildRealm(Options options,
       .capabilities =
           {
               Protocol{"fuchsia.logger.LogSink"},
-              Protocol{"fuchsia.scheduler.ProfileProvider"},
+              Protocol{"fuchsia.scheduler.RoleManager"},
               // Not necessary for tests but can be useful when debugging tests.
               Protocol{"fuchsia.tracing.provider.Registry"},
           },

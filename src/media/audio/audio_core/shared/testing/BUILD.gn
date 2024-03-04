@@ -8,7 +8,7 @@ source_set("testing") {
   testonly = true
 
   sources = [
-    "fake_profile_provider.h",
+    "fake_role_manager.h",
     "matchers.h",
     "null_audio_capturer.h",
     "null_audio_renderer.h",

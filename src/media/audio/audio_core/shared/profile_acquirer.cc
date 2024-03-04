@@ -20,37 +20,31 @@ namespace media::audio {
 
 namespace {
 
-zx::result<fidl::SyncClient<fuchsia_scheduler::ProfileProvider>> ConnectToProfileProvider() {
-  auto client_end_result = component::Connect<fuchsia_scheduler::ProfileProvider>();
+zx::result<fidl::SyncClient<fuchsia_scheduler::RoleManager>> ConnectToRoleManager() {
+  auto client_end_result = component::Connect<fuchsia_scheduler::RoleManager>();
   if (!client_end_result.is_ok()) {
     return client_end_result.take_error();
   }
   return zx::ok(fidl::SyncClient(std::move(*client_end_result)));
 }
 
-zx::result<> ApplyProfile(zx::unowned_handle handle, const std::string& role) {
-  auto client = ConnectToProfileProvider();
+zx::result<> ApplyProfile(fuchsia_scheduler::RoleTarget target, const std::string& role) {
+  auto client = ConnectToRoleManager();
   if (!client.is_ok()) {
-    FX_PLOGS(ERROR, client.status_value())
-        << "Failed to connect to fuchsia.scheduler.ProfileProvider";
+    FX_PLOGS(ERROR, client.status_value()) << "Failed to connect to fuchsia.scheduler.RoleManager";
     return zx::error(client.status_value());
   }
 
-  zx::handle dup_handle;
-  const zx_status_t dup_status = handle->duplicate(ZX_RIGHT_SAME_RIGHTS, &dup_handle);
-  if (dup_status != ZX_OK) {
-    FX_PLOGS(ERROR, dup_status) << "Failed to duplicate handle";
-    return zx::error(dup_status);
-  }
-
-  auto result = (*client)->SetProfileByRole({{.handle = std::move(dup_handle), .role = role}});
+  auto request = std::move(fuchsia_scheduler::RoleManagerSetRoleRequest()
+                               .target(std::move(target))
+                               .role(fuchsia_scheduler::RoleName{role}));
+  auto result = (*client)->SetRole(std::move(request));
   if (!result.is_ok()) {
-    FX_LOGS(ERROR) << "Failed to call SetProfileByRole, error=" << result.error_value();
-    return zx::error(result.error_value().status());
-  }
-  if (result->status() != ZX_OK) {
-    FX_PLOGS(ERROR, result->status()) << "Failed to set profile based on this role: " << role;
-    return zx::error(result->status());
+    FX_LOGS(ERROR) << "Failed to call SetRole, error=" << result.error_value();
+    if (result.error_value().is_domain_error()) {
+      return zx::error(result.error_value().domain_error());
+    }
+    return zx::error(result.error_value().framework_error().status());
   }
   return zx::ok();
 }
@@ -59,12 +53,24 @@ zx::result<> ApplyProfile(zx::unowned_handle handle, const std::string& role) {
 
 zx::result<> AcquireSchedulerRole(zx::unowned_thread thread, const std::string& role) {
   TRACE_DURATION("audio", "AcquireSchedulerRole", "role", TA_STRING(role.c_str()));
-  return ApplyProfile(zx::unowned_handle(thread->get()), role);
+  zx::thread duplicate;
+  const zx_status_t dup_status = thread->duplicate(ZX_RIGHT_SAME_RIGHTS, &duplicate);
+  if (dup_status != ZX_OK) {
+    FX_PLOGS(ERROR, dup_status) << "Failed to duplicate thread handle";
+    return zx::error(dup_status);
+  }
+  return ApplyProfile(fuchsia_scheduler::RoleTarget::WithThread(std::move(duplicate)), role);
 }
 
 zx::result<> AcquireMemoryRole(zx::unowned_vmar vmar, const std::string& role) {
   TRACE_DURATION("audio", "AcquireMemoryRole", "role", TA_STRING(role.c_str()));
-  return ApplyProfile(zx::unowned_handle(vmar->get()), role);
+  zx::vmar duplicate;
+  const zx_status_t dup_status = vmar->duplicate(ZX_RIGHT_SAME_RIGHTS, &duplicate);
+  if (dup_status != ZX_OK) {
+    FX_PLOGS(ERROR, dup_status) << "Failed to duplicate vmar handle";
+    return zx::error(dup_status);
+  }
+  return ApplyProfile(fuchsia_scheduler::RoleTarget::WithVmar(std::move(duplicate)), role);
 }
 
 }  // namespace media::audio

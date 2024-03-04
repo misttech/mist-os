@@ -11,7 +11,7 @@
 
 #include "src/lib/testing/loop_fixture/test_loop_fixture.h"
 #include "src/media/audio/audio_core/shared/mix_profile_config.h"
-#include "src/media/audio/audio_core/shared/testing/fake_profile_provider.h"
+#include "src/media/audio/audio_core/shared/testing/fake_role_manager.h"
 
 namespace media::audio {
 
@@ -21,12 +21,12 @@ class ProfileProviderTest : public gtest::TestLoopFixture {
     profile_provider_ = std::make_unique<ProfileProvider>(*context(), mix_profile_config_);
 
     auto svc = context_provider_.service_directory_provider();
-    ASSERT_EQ(ZX_OK, svc->AddService(fake_profile_provider_.GetHandler()));
+    ASSERT_EQ(ZX_OK, svc->AddService(fake_role_manager_.GetHandler()));
   }
 
  protected:
   sys::ComponentContext* context() { return context_provider_.context(); }
-  FakeProfileProvider fake_profile_provider_;
+  FakeRoleManager fake_role_manager_;
   MixProfileConfig mix_profile_config_;
   std::unique_ptr<ProfileProvider> profile_provider_;
   sys::testing::ComponentContextProvider context_provider_;
