@@ -22,6 +22,8 @@ use {
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_element as felement, fidl_fuchsia_io as fio,
     fidl_fuchsia_ui_app as fuiapp,
     fuchsia_async::{self as fasync, DurationExt},
+    fuchsia_component,
+    fuchsia_fs::directory as ffs_dir,
     fuchsia_scenic as scenic, fuchsia_zircon as zx,
     futures::{lock::Mutex, select, FutureExt, StreamExt, TryStreamExt},
     rand::{
@@ -29,7 +31,7 @@ use {
         thread_rng,
     },
     std::{collections::HashMap, sync::Arc},
-    tracing::{error, info},
+    tracing::{error, info, warn},
 };
 
 // Timeout duration for a ViewControllerProxy to close, in seconds.
@@ -204,6 +206,20 @@ impl ElementManager {
             }
         };
 
+        // Determine whether or not ViewProvider is exposed.
+        let use_view_provider = match ffs_dir::dir_contains(
+            &exposed_directory,
+            "fuchsia.ui.app.ViewProvider",
+        )
+        .await
+        {
+            Ok(result) => result,
+            Err(e) => {
+                warn!("could not read directory contents; assuming fuchsia.ui.app.ViewProvider is unavailable: {:?}", e);
+                false
+            }
+        };
+
         // Connect to fuchsia.component.Binder in order to start the component.
         let _ = fuchsia_component::client::connect_to_protocol_at_dir_root::<
             fcomponent::BinderMarker,
@@ -222,6 +238,7 @@ impl ElementManager {
             child_name,
             child_url,
             collection,
+            use_view_provider,
         ))
     }
 
@@ -344,18 +361,28 @@ impl ElementManager {
             create_request_stream::<felement::AnnotationControllerMarker>().unwrap();
         let initial_view_annotations = annotation_holder.get_annotations().unwrap();
 
-        let view_controller_proxy = self
-            .present_view_for_element(
-                &mut element,
-                initial_view_annotations,
-                Some(annotation_controller_client_end),
-            )
-            .await
-            .map_err(|err| {
-                // TODO(https://fxbug.dev/42163510): ProposeElement should propagate GraphicalPresenter errors back to caller
-                error!(?err, "ProposeElement() failed to present element");
-                felement::ProposeElementError::InvalidArgs
-            })?;
+        let view_controller_proxy = match element.use_view_provider() {
+            true => {
+                Some(
+                    self.present_view_for_element(
+                        &mut element,
+                        initial_view_annotations,
+                        Some(annotation_controller_client_end),
+                    )
+                    .await
+                    .map_err(|err| {
+                        // TODO(https://fxbug.dev/42163510): ProposeElement should propagate GraphicalPresenter errors back to caller
+                        error!(?err, "ProposeElement() failed to present element");
+                        felement::ProposeElementError::InvalidArgs
+                    })?,
+                )
+            }
+            false => {
+                // Instead of connecting to fuchsia.ui.app.ViewProvider, wait
+                // for the child to call fuchsia.element.GraphicalPresenter.
+                None
+            }
+        };
 
         let element_controller_stream = match element_controller {
             Some(controller) => match controller.into_stream() {
@@ -393,7 +420,7 @@ async fn run_element_until_closed(
     annotation_holder: AnnotationHolder,
     controller_stream: Option<felement::ControllerRequestStream>,
     annotation_controller_stream: felement::AnnotationControllerRequestStream,
-    view_controller_proxy: felement::ViewControllerProxy,
+    view_controller_proxy: Option<felement::ViewControllerProxy>,
 ) {
     let annotation_holder = Arc::new(Mutex::new(annotation_holder));
 
@@ -403,23 +430,25 @@ async fn run_element_until_closed(
         annotation_controller_stream,
     ));
 
-    select!(
-        _ = wait_for_view_controller_close(view_controller_proxy.clone()).fuse() =>  {
-            // signals that the presenter would like to close the element.
-            // We do not need to do anything here but exit which will cause
-            // the element to be dropped and will kill the component.
-        },
-        _ = handle_element_controller_stream(annotation_holder.clone(), controller_stream).fuse() => {
-            // the proposer has decided they want to shut down the element.
+    if let Some(view_controller_proxy) = view_controller_proxy {
+        select!(
+            _ = wait_for_view_controller_close(view_controller_proxy.clone()).fuse() =>  {
+                // signals that the presenter would like to close the element.
+                // We do not need to do anything here but exit which will cause
+                // the element to be dropped and will kill the component.
+            },
+            _ = handle_element_controller_stream(annotation_holder.clone(), controller_stream).fuse() => {
+                // the proposer has decided they want to shut down the element.
 
-            // We want to allow the presenter the ability to dismiss
-            // the view so we tell it to dismiss and then wait for
-            // the view controller stream to close.
-            let _ = view_controller_proxy.dismiss();
-            let timeout = fuchsia_async::Timer::new(VIEW_CONTROLLER_DISMISS_TIMEOUT.after_now());
-            wait_for_view_controller_close_or_timeout(view_controller_proxy, timeout).await;
-        },
-    );
+                // We want to allow the presenter the ability to dismiss
+                // the view so we tell it to dismiss and then wait for
+                // the view controller stream to close.
+                let _ = view_controller_proxy.dismiss();
+                let timeout = fuchsia_async::Timer::new(VIEW_CONTROLLER_DISMISS_TIMEOUT.after_now());
+                wait_for_view_controller_close_or_timeout(view_controller_proxy, timeout).await;
+            },
+        );
+    }
 }
 
 /// Waits for this view controller to close.
@@ -534,7 +563,13 @@ mod tests {
                 })
                 .detach()
             }
-            _ => panic!("Directory handler received an unexpected request"),
+            fio::DirectoryRequest::ReadDirents { responder, .. } => {
+                responder.send(zx::sys::ZX_OK, &[]).expect("Failed to service ReadDirents");
+            }
+            fio::DirectoryRequest::Rewind { responder } => {
+                responder.send(zx::sys::ZX_OK).expect("Failed to service Rewind");
+            }
+            req => panic!("Directory handler received an unexpected request: {:?}", req),
         };
 
         let realm = spawn_stream_handler(move |realm_request| {
@@ -590,6 +625,12 @@ mod tests {
                     let _ = result_sender.send(capability_path).await;
                 })
                 .detach()
+            }
+            fio::DirectoryRequest::ReadDirents { responder, .. } => {
+                responder.send(zx::sys::ZX_OK, &[]).expect("Failed to service ReadDirents");
+            }
+            fio::DirectoryRequest::Rewind { responder } => {
+                responder.send(zx::sys::ZX_OK).expect("Failed to service Rewind");
             }
             _ => panic!("Directory handler received an unexpected request"),
         };
@@ -779,8 +820,9 @@ mod tests {
         let element_manager = ElementManager::new(realm, None, example_collection_config());
 
         let element = element_manager.launch_element(component_url, "").await.unwrap();
-        let exposed_dir = element.directory_channel();
 
+        assert_eq!(element.use_view_provider(), false);
+        let exposed_dir = element.directory_channel();
         exposed_dir
             .wait_handle(zx::Signals::CHANNEL_PEER_CLOSED, zx::Time::INFINITE_PAST)
             .expect("exposed_dir should be closed");

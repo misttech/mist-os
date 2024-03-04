@@ -30,6 +30,10 @@ pub struct Element {
     // TODO(https://fxbug.dev/42165549)
     #[allow(unused)]
     collection: String,
+
+    // Whether or not the child exposes fuchsia.ui.app.ViewProvider.
+    #[allow(unused)]
+    use_view_provider: bool,
 }
 
 /// A component launched in response to `ElementManager::ProposeElement()`.
@@ -49,12 +53,14 @@ impl Element {
         name: &str,
         url: &str,
         collection: &str,
+        use_view_provider: bool,
     ) -> Element {
         Element {
             exposed_capabilities,
             url: url.to_string(),
             name: name.to_string(),
             collection: collection.to_string(),
+            use_view_provider,
         }
     }
 
@@ -66,6 +72,11 @@ impl Element {
     #[allow(unused)]
     pub fn collection(&self) -> &str {
         &self.collection
+    }
+
+    #[allow(unused)]
+    pub fn use_view_provider(&self) -> bool {
+        self.use_view_provider
     }
 
     // # Note

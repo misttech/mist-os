@@ -96,6 +96,7 @@ mod tests {
         fidl_connector::Connect,
         fidl_fuchsia_component as fcomponent, fidl_fuchsia_element as felement,
         fidl_fuchsia_io as fio, fuchsia_async as fasync,
+        fuchsia_zircon::sys::ZX_OK,
         lazy_static::lazy_static,
         session_testing::spawn_directory_server,
         std::collections::HashMap,
@@ -162,6 +163,12 @@ mod tests {
                 if path == fcomponent::BinderMarker::DEBUG_NAME {
                     BINDER_CONNECTION_COUNT.inc();
                 }
+            }
+            fio::DirectoryRequest::ReadDirents { responder, .. } => {
+                responder.send(ZX_OK, &[]).expect("Failed to service ReadDirents");
+            }
+            fio::DirectoryRequest::Rewind { responder } => {
+                responder.send(ZX_OK).expect("Failed to service Rewind");
             }
             _ => panic!("Directory handler received an unexpected request"),
         };
