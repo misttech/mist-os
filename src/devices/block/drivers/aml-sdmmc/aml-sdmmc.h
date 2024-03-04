@@ -261,7 +261,6 @@ class AmlSdmmc : public fdf::DriverBase,
 
   sdmmc_host_info_t dev_info_;
   std::unique_ptr<dma_buffer::ContiguousBuffer> descs_buffer_ TA_GUARDED(lock_);
-  uint32_t max_freq_, min_freq_;
   bool power_suspended_ TA_GUARDED(lock_) = false;
   uint32_t clk_div_saved_ = 0;
 

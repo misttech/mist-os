@@ -52,8 +52,6 @@ static const std::vector<fpbus::Bti> sd_btis{
 };
 
 static aml_sdmmc_config_t config = {
-    .min_freq = 400'000,
-    .max_freq = 50'000'000,
     .prefs = 0,
 };
 
@@ -70,6 +68,7 @@ zx_status_t Vim3::SdInit() {
 
   fit::result sdmmc_metadata =
       fidl::Persist(fuchsia_hardware_sdmmc::wire::SdmmcMetadata::Builder(fidl_arena)
+                        .max_frequency(50'000'000)
                         .removable(true)
                         // TODO(https://fxbug.dev/42084501): Use the FIDL SDMMC protocol.
                         .use_fidl(false)

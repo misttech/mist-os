@@ -28,8 +28,6 @@ typedef struct {
 } aml_sdmmc_desc_t;
 
 typedef struct {
-  uint32_t min_freq;
-  uint32_t max_freq;
   uint32_t prefs;
 } aml_sdmmc_config_t;
 

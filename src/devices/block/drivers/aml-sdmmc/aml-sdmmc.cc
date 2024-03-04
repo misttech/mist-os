@@ -611,11 +611,6 @@ zx_status_t AmlSdmmc::SdmmcSetBusFreq(uint32_t freq) {
     return ZX_OK;
   }
 
-  if (freq > max_freq_) {
-    freq = max_freq_;
-  } else if (freq < min_freq_) {
-    freq = min_freq_;
-  }
   if (freq < AmlSdmmcClock::kFClkDiv2MinFreq) {
     clk_src = AmlSdmmcClock::kCtsOscinClkSrc;
     clk = AmlSdmmcClock::kCtsOscinClkFreq;
@@ -1639,8 +1634,6 @@ zx_status_t AmlSdmmc::Init(const pdev_device_info_t& device_info) {
 
   dev_info_.max_transfer_size = kMaxDmaDescriptors * zx_system_get_page_size();
   dev_info_.max_transfer_size_non_dma = AML_SDMMC_MAX_PIO_DATA_SIZE;
-  max_freq_ = board_config_.max_freq;
-  min_freq_ = board_config_.min_freq;
 
   inspect_.Init(device_info, inspector().root(), power_suspended_);
   inspect_.max_delay.Set(AmlSdmmcClock::kMaxDelay + 1);

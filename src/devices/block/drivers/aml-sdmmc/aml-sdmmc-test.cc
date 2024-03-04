@@ -235,8 +235,6 @@ class AmlSdmmcTest : public zxtest::Test {
     fuchsia_driver_framework::DriverStartArgs start_args;
     fidl::ClientEnd<fuchsia_io::Directory> outgoing_directory_client;
     aml_sdmmc_config_t metadata = {
-        .min_freq = 400000,
-        .max_freq = 120000000,
         .prefs = 0,
     };
     incoming_.SyncCall([&, bti = std::move(bti)](IncomingNamespace* incoming) mutable {
@@ -288,8 +286,6 @@ class AmlSdmmcTest : public zxtest::Test {
     descs_ = dut_->SetTestHooks();
 
     dut_->set_board_config({
-        .min_freq = 400000,
-        .max_freq = 120000000,
         .prefs = 0,
     });
 
@@ -369,8 +365,6 @@ TEST_F(AmlSdmmcTest, Init) {
   StartDriver();
 
   dut_->set_board_config({
-      .min_freq = 400000,
-      .max_freq = 120000000,
       .prefs = 0,
   });
 
@@ -413,8 +407,6 @@ TEST_F(AmlSdmmcTest, DelayLineTuningAllPass) {
   StartDriver();
 
   dut_->set_board_config({
-      .min_freq = 400000,
-      .max_freq = 120000000,
       .prefs = 0,
   });
   ASSERT_OK(dut_->Init({}));
@@ -472,8 +464,6 @@ TEST_F(AmlSdmmcTest, DelayLineTuningFailingPoint) {
       "||||||||||||||||||||||||||||||||||||||||------------------------");
 
   dut_->set_board_config({
-      .min_freq = 400000,
-      .max_freq = 120000000,
       .prefs = 0,
   });
   ASSERT_OK(dut_->Init({}));
@@ -531,8 +521,6 @@ TEST_F(AmlSdmmcTest, DelayLineTuningEvenDivider) {
       "||||||||||||||||||||||||||||||-------------------------------|||");
 
   dut_->set_board_config({
-      .min_freq = 400000,
-      .max_freq = 120000000,
       .prefs = 0,
   });
   ASSERT_OK(dut_->Init({}));
@@ -589,8 +577,6 @@ TEST_F(AmlSdmmcTest, DelayLineTuningOddDivider) {
       "||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||");
 
   dut_->set_board_config({
-      .min_freq = 400000,
-      .max_freq = 120000000,
       .prefs = 0,
   });
   ASSERT_OK(dut_->Init({}));
@@ -642,8 +628,6 @@ TEST_F(AmlSdmmcTest, DelayLineTuningCorrectFailingWindowIfLastOne) {
       "||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||");
 
   dut_->set_board_config({
-      .min_freq = 400000,
-      .max_freq = 120000000,
       .prefs = 0,
   });
   ASSERT_OK(dut_->Init({}));
@@ -692,12 +676,6 @@ TEST_F(AmlSdmmcTest, SetBusFreq) {
   EXPECT_EQ(clock.ReadFrom(&*mmio_).cfg_div(), 10);
   EXPECT_EQ(clock.cfg_src(), 1);
   dut_->ExpectInspectPropertyValue("bus_clock_frequency", 100'000'000);
-
-  // Greater than the max, will be capped at 120 MHz.
-  EXPECT_OK(dut_->SdmmcSetBusFreq(200'000'000));
-  EXPECT_EQ(clock.ReadFrom(&*mmio_).cfg_div(), 9);
-  EXPECT_EQ(clock.cfg_src(), 1);
-  dut_->ExpectInspectPropertyValue("bus_clock_frequency", 111'111'111);
 
   EXPECT_OK(dut_->SdmmcSetBusFreq(0));
   EXPECT_EQ(clock.ReadFrom(&*mmio_).cfg_div(), 0);

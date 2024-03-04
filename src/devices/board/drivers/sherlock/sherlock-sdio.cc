@@ -90,8 +90,6 @@ static const std::vector<fpbus::Bti> sd_emmc_btis{
 };
 
 constexpr aml_sdmmc_config_t sd_emmc_config = {
-    .min_freq = 500'000,      // 500KHz
-    .max_freq = 208'000'000,  // 208MHz
     .prefs = 0,
 };
 
@@ -224,6 +222,7 @@ zx_status_t Sherlock::SdioInit() {
 
   fit::result sdmmc_metadata =
       fidl::Persist(fuchsia_hardware_sdmmc::wire::SdmmcMetadata::Builder(fidl_arena)
+                        .max_frequency(208'000'000)
                         // TODO(https://fxbug.dev/42084501): Use the FIDL SDMMC protocol.
                         .use_fidl(false)
                         .Build());

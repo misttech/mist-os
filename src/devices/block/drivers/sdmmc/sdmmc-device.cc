@@ -849,6 +849,10 @@ zx_status_t SdmmcDevice::SetBusWidth(sdmmc_bus_width_t bus_width) {
 }
 
 zx_status_t SdmmcDevice::SetBusFreq(uint32_t bus_freq) {
+  if (bus_freq > max_frequency_) {
+    bus_freq = max_frequency_;
+  }
+
   if (!using_fidl_) {
     return host_.SetBusFreq(bus_freq);
   }

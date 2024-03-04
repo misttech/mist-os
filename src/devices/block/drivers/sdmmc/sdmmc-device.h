@@ -30,7 +30,9 @@ class SdmmcDevice {
  public:
   static constexpr uint32_t kTryAttempts = 10;  // 1 initial + 9 retries.
 
-  explicit SdmmcDevice(SdmmcRootDevice* root_device) : root_device_(root_device) {}
+  explicit SdmmcDevice(SdmmcRootDevice* root_device,
+                       const fuchsia_hardware_sdmmc::wire::SdmmcMetadata& metadata)
+      : root_device_(root_device), max_frequency_(metadata.max_frequency()) {}
 
   // For testing using Banjo.
   explicit SdmmcDevice(SdmmcRootDevice* root_device, const ddk::SdmmcProtocolClient& host)
@@ -139,6 +141,7 @@ class SdmmcDevice {
 
   sdmmc_host_info_t host_info_ = {};
   sdmmc_voltage_t signal_voltage_ = SDMMC_VOLTAGE_V330;
+  uint32_t max_frequency_ = UINT32_MAX;
   uint16_t rca_ = 0;  // APP_CMD requires the initial RCA to be zero.
   uint32_t retries_ = 0;
 };

@@ -60,8 +60,6 @@ static const std::vector<fpbus::Bti> emmc_btis{
 
 static aml_sdmmc_config_t config = {
     // As per AMlogic, on S912 chipset, HS400 mode can be operated at 125MHZ or low.
-    .min_freq = 400'000,
-    .max_freq = 166'666'667,
     .prefs = SDMMC_HOST_PREFS_DISABLE_HS400,
 };
 
@@ -174,6 +172,7 @@ zx_status_t Sherlock::EmmcInit() {
 
   fit::result sdmmc_metadata = fidl::Persist(
       fuchsia_hardware_sdmmc::wire::SdmmcMetadata::Builder(fidl_arena)
+          .max_frequency(166'666'667)
           .enable_trim(true)
           // Maintain the current Sherlock behavior until we determine that cache is needed.
           .enable_cache(false)

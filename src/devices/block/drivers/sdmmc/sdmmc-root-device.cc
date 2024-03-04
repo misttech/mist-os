@@ -125,6 +125,7 @@ SdmmcRootDevice::GetMetadata(fidl::AnyArena& arena) {
       FDF_LOGL(INFO, logger(), "No metadata provided");
       return zx::ok(
           fidl::ObjectView(arena, fuchsia_hardware_sdmmc::wire::SdmmcMetadata::Builder(arena)
+                                      .max_frequency(UINT32_MAX)
                                       .enable_trim(true)
                                       .enable_cache(true)
                                       .removable(false)
@@ -140,6 +141,7 @@ SdmmcRootDevice::GetMetadata(fidl::AnyArena& arena) {
   return zx::ok(fidl::ObjectView(
       arena,
       fuchsia_hardware_sdmmc::wire::SdmmcMetadata::Builder(arena)
+          .max_frequency(decoded->has_max_frequency() ? decoded->max_frequency() : UINT32_MAX)
           .enable_trim(!decoded->has_enable_trim() || decoded->enable_trim())
           .enable_cache(!decoded->has_enable_cache() || decoded->enable_cache())
           .removable(decoded->has_removable() && decoded->removable())
@@ -151,7 +153,7 @@ SdmmcRootDevice::GetMetadata(fidl::AnyArena& arena) {
 
 zx_status_t SdmmcRootDevice::Init(
     fidl::ObjectView<fuchsia_hardware_sdmmc::wire::SdmmcMetadata> metadata) {
-  auto sdmmc = std::make_unique<SdmmcDevice>(this);
+  auto sdmmc = std::make_unique<SdmmcDevice>(this, *metadata);
 
   // Probe for SDIO first, then SD/MMC.
   zx::result<std::unique_ptr<SdmmcDevice>> result =
@@ -171,7 +173,8 @@ zx_status_t SdmmcRootDevice::Init(
   if (metadata->removable()) {
     // This controller is connected to a removable card slot, and no card was inserted. Indicate
     // success so that our device remains available.
-    // TODO(https://fxbug.dev/42080592): Enable detection of card insert/removal after initialization.
+    // TODO(https://fxbug.dev/42080592): Enable detection of card insert/removal after
+    // initialization.
     FDF_LOGL(INFO, logger(), "failed to probe removable device");
     return ZX_OK;
   }
