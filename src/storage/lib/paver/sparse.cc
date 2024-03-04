@@ -83,7 +83,7 @@ struct SparseIoBuffer {
 
 struct SparseIoContext {
   PartitionClient& partition;
-  BlockPartitionClient& block;
+  BlockPartitionClient block;
   uint64_t block_size;
   fzl::OwnedVmoMapper transfer_vmo;
   storage::OwnedVmoid transfer_vmoid;
@@ -97,21 +97,23 @@ struct SparseIoContext {
       ERROR("Failed to create transfer VMO: %s\n", zx_status_get_string(status));
       return zx::error(status);
     }
-    zx::result block = client.GetBlockDevice();
-    if (block.is_error()) {
-      return block.take_error();
+    if (!client.SupportsBlockPartition()) {
+      ERROR("tlp partition is not a block device\n");
+      return zx::error(ZX_ERR_NOT_SUPPORTED);
     }
+    BlockPartitionClient* block = reinterpret_cast<BlockPartitionClient*>(&client);
+
     zx::result block_size = client.GetBlockSize();
     if (block_size.is_error()) {
       ERROR("Failed to get block size: %s\n", block_size.status_string());
       return block_size.take_error();
     }
-    zx::result vmoid = block->get().RegisterVmoid(transfer_vmo.vmo());
+    zx::result vmoid = block->RegisterVmoid(transfer_vmo.vmo());
     if (vmoid.is_error()) {
       return vmoid.take_error();
     }
-    return zx::ok(
-        SparseIoContext{client, *block, *block_size, std::move(transfer_vmo), std::move(*vmoid)});
+    return zx::ok(SparseIoContext{client, std::move(*block), *block_size, std::move(transfer_vmo),
+                                  std::move(*vmoid)});
   }
 
   bool Write(uint64_t device_offset, const zx::vmo& src, uint64_t src_offset, size_t size) {

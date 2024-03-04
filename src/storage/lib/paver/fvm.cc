@@ -740,11 +740,11 @@ zx::result<> AllocateEmptyPartitions(
 zx::result<> FvmStreamPartitions(const fbl::unique_fd& devfs_root,
                                  std::unique_ptr<PartitionClient> partition_client,
                                  std::unique_ptr<fvm::ReaderInterface> payload) {
-  zx::result block_or = partition_client->GetBlockDevice();
-  if (block_or.is_error()) {
-    return block_or.take_error();
+  if (!partition_client->SupportsBlockPartition()) {
+    ERROR("tlp partition is not a block device\n");
+    return zx::error(ZX_ERR_NOT_SUPPORTED);
   }
-  BlockPartitionClient& block = block_or.value().get();
+  BlockPartitionClient* block = reinterpret_cast<BlockPartitionClient*>(partition_client.get());
 
   std::unique_ptr<fvm::SparseReader> reader;
   zx::result<> status = zx::ok();
@@ -758,8 +758,8 @@ zx::result<> FvmStreamPartitions(const fbl::unique_fd& devfs_root,
   fvm::SparseImage* hdr = reader->Image();
   // Acquire an fd to the FVM, either by finding one that already
   // exists, or formatting a new one.
-  zx::result fvm = FvmPartitionFormat(devfs_root, block.block_channel(), block.controller_channel(),
-                                      *hdr, BindOption::TryBind);
+  zx::result fvm = FvmPartitionFormat(devfs_root, block->block_channel(),
+                                      block->controller_channel(), *hdr, BindOption::TryBind);
   if (fvm.is_error()) {
     ERROR("Couldn't find FVM partition: %s\n", fvm.status_string());
     return fvm.take_error();
@@ -816,7 +816,7 @@ zx::result<> FvmStreamPartitions(const fbl::unique_fd& devfs_root,
   if (free_slices < requested_slices) {
     Warn("Not enough space to non-destructively pave",
          "Automatically reinitializing FVM; Expect data loss");
-    fvm = FvmPartitionFormat(devfs_root, block.block_channel(), block.controller_channel(), *hdr,
+    fvm = FvmPartitionFormat(devfs_root, block->block_channel(), block->controller_channel(), *hdr,
                              BindOption::Reformat);
     if (fvm.is_error()) {
       ERROR("Couldn't reformat FVM partition: %s\n", fvm.status_string());

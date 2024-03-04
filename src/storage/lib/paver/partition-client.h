@@ -53,11 +53,8 @@ class PartitionClient {
   // Flushes all previous operations to persistent storage.
   virtual zx::result<> Flush() = 0;
 
-  // Attempt to get the underlying block client.
-  // Returns ZX_ERR_NOT_SUPPORTED if this partition is not a block device.
-  virtual zx::result<std::reference_wrapper<BlockPartitionClient>> GetBlockDevice() {
-    return zx::error(ZX_ERR_NOT_SUPPORTED);
-  }
+  // Indicates whether the derrived class supports block operations.
+  virtual bool SupportsBlockPartition() { return false; }
 
   virtual ~PartitionClient() = default;
 };
@@ -93,17 +90,14 @@ class BlockPartitionClient : public PartitionClient {
 
   fidl::UnownedClientEnd<fuchsia_hardware_block::Block> block_channel();
   fidl::UnownedClientEnd<fuchsia_device::Controller> controller_channel();
-  fidl::ClientEnd<fuchsia_hardware_block::Block> GetChannel();
 
-  // No copy, no move.
+  // No copy.
   BlockPartitionClient(const BlockPartitionClient&) = delete;
   BlockPartitionClient& operator=(const BlockPartitionClient&) = delete;
-  BlockPartitionClient(BlockPartitionClient&&) = delete;
-  BlockPartitionClient& operator=(BlockPartitionClient&&) = delete;
+  BlockPartitionClient(BlockPartitionClient&& o) = default;
+  BlockPartitionClient& operator=(BlockPartitionClient&&) = default;
 
-  zx::result<std::reference_wrapper<BlockPartitionClient>> GetBlockDevice() override {
-    return zx::ok(std::reference_wrapper(*this));
-  }
+  bool SupportsBlockPartition() override { return true; }
 
  private:
   zx::result<> RegisterFastBlockIo();
@@ -134,6 +128,13 @@ class FixedOffsetBlockPartitionClient final : public BlockPartitionClient {
                                            size_t offset_partition_in_blocks,
                                            size_t offset_buffer_in_blocks)
       : BlockPartitionClient(std::move(connection)),
+        offset_partition_in_blocks_(offset_partition_in_blocks),
+        offset_buffer_in_blocks_(offset_buffer_in_blocks) {}
+
+  explicit FixedOffsetBlockPartitionClient(BlockPartitionClient client,
+                                           size_t offset_partition_in_blocks,
+                                           size_t offset_buffer_in_blocks)
+      : BlockPartitionClient(std::move(client)),
         offset_partition_in_blocks_(offset_partition_in_blocks),
         offset_buffer_in_blocks_(offset_buffer_in_blocks) {}
 

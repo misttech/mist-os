@@ -111,32 +111,21 @@ zx::result<std::unique_ptr<PartitionClient>> NelsonPartitioner::GetBootloaderPar
     ERROR("Failed to find tpl partition\n");
     return tpl_status.take_error();
   }
-
   auto tpl_block_size_status = tpl_status.value()->GetBlockSize();
   if (tpl_block_size_status.is_error()) {
     ERROR("Failed to get block size for tpl\n");
     return tpl_block_size_status.take_error();
   }
   size_t block_size = tpl_block_size_status.value();
-  zx::result block_or = tpl_status.value()->GetBlockDevice();
-  if (block_or.is_error()) {
-    return block_or.take_error();
-  }
-  BlockPartitionClient& block = block_or.value();
 
-  fidl::ClientEnd<fuchsia_device::Controller> controller;
-  zx::result controller_server = fidl::CreateEndpoints(&controller);
-  if (controller_server.is_error()) {
-    return controller_server.take_error();
+  if (!tpl_status.value()->SupportsBlockPartition()) {
+    ERROR("tlp partition is not a block device\n");
+    return zx::error(ZX_ERR_NOT_SUPPORTED);
   }
-  if (fidl::OneWayStatus status = fidl::WireCall(block.controller_channel())
-                                      ->ConnectToController(std::move(*controller_server));
-      !status.ok()) {
-    return zx::error(status.status());
-  }
+  BlockPartitionClient* block = reinterpret_cast<BlockPartitionClient*>(tpl_status.value().get());
 
   std::unique_ptr tpl = std::make_unique<FixedOffsetBlockPartitionClient>(
-      std::move(controller), block.GetChannel(), 0, kNelsonBL2Size / block_size);
+      std::move(*block), 0, kNelsonBL2Size / block_size);
   return zx::ok(std::make_unique<NelsonBootloaderPartitionClient>(std::move(boot_status.value()),
                                                                   std::move(tpl)));
 }
