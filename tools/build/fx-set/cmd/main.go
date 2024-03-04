@@ -199,6 +199,7 @@ type setArgs struct {
 	basePackages     []string
 	cachePackages    []string
 	hostLabels       []string
+	testLabels       []string
 	variants         []string
 	fuzzSanitizers   []string
 	ideFiles         []string
@@ -259,6 +260,7 @@ func parseArgsAndEnv(args []string, env map[string]string) (*setArgs, error) {
 	flagSet.StringSliceVar(&cmd.basePackages, "with-base", []string{}, "")
 	flagSet.StringSliceVar(&cmd.cachePackages, "with-cache", []string{}, "")
 	flagSet.StringSliceVar(&cmd.hostLabels, "with-host", []string{}, "")
+	flagSet.StringSliceVar(&cmd.testLabels, "with-test", []string{}, "")
 	flagSet.StringSliceVar(&cmd.variants, "variant", []string{}, "")
 	flagSet.StringSliceVar(&cmd.fuzzSanitizers, "fuzz-with", []string{}, "")
 	flagSet.StringSliceVar(&cmd.ideFiles, "ide", []string{}, "")
@@ -463,23 +465,24 @@ func constructStaticSpec(ctx context.Context, fx fxRunner, checkoutDir string, a
 	}
 
 	return &fintpb.Static{
-		Board:             boardPath,
-		Product:           productPath,
-		Optimize:          optimize,
-		BasePackages:      args.basePackages,
-		CachePackages:     args.cachePackages,
-		UniversePackages:  args.universePackages,
-		HostLabels:        hostLabels,
-		Variants:          variants,
-		GnArgs:            gnArgs,
-		UseGoma:           useGomaFinal,
-		RustRbeEnable:     args.enableRustRbe,
-		CxxRbeEnable:      useCxxRbeFinal,
-		LinkRbeEnable:     args.enableLinkRbe,
-		BazelRbeEnable:    args.enableBazelRbe,
-		IdeFiles:          args.ideFiles,
-		JsonIdeScripts:    args.jsonIDEScripts,
-		ExportRustProject: true,
+		Board:               boardPath,
+		Product:             productPath,
+		Optimize:            optimize,
+		BasePackages:        args.basePackages,
+		CachePackages:       args.cachePackages,
+		UniversePackages:    args.universePackages,
+		HostLabels:          hostLabels,
+		DeveloperTestLabels: args.testLabels,
+		Variants:            variants,
+		GnArgs:              gnArgs,
+		UseGoma:             useGomaFinal,
+		RustRbeEnable:       args.enableRustRbe,
+		CxxRbeEnable:        useCxxRbeFinal,
+		LinkRbeEnable:       args.enableLinkRbe,
+		BazelRbeEnable:      args.enableBazelRbe,
+		IdeFiles:            args.ideFiles,
+		JsonIdeScripts:      args.jsonIDEScripts,
+		ExportRustProject:   true,
 	}, nil
 }
 

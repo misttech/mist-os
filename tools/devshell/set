@@ -110,6 +110,14 @@
 ##                         Multiple labels can be provided delimited by commas
 ##                         or the --with-cache argument can be provided
 ##                         multiple times.
+##   --with-test  GNLABEL  Labels of additional tests to include in the build.
+##                         When run by 'fx test', these tests are ephemeral. To
+##                         add host tests, either use '--with-host' qualify the
+##                         the label with the host toolchain, or add a group
+##                         which depends on the host tests in the host
+##                         toolchain.  Multiple labels can be provided delimited
+##                         by commas or the '--with-test' argument can be
+##                         provided multiple times.
 ##   --with-host GNLABEL   Labels of additional host-only targets to be
 ##                         produced by the build. Multiple labels can be
 ##                         provided delimited by commas or the --with-host
