@@ -68,9 +68,14 @@ OutputBuffer FormatLocation(const Location& loc, const FormatLocationOptions& op
     result.Append(FormatIdentifier(symbol->GetIdentifier(), opts));
 
     // The address might not be at the beginning of the symbol.
-    if (uint64_t offset =
-            loc.address() - loc.symbol_context().RelativeToAbsolute(elf_symbol->relative_address()))
+    if (uint64_t offset = loc.address() -
+                          loc.symbol_context().RelativeToAbsolute(elf_symbol->relative_address())) {
       result.Append(fxl::StringPrintf(" + 0x%" PRIx64, offset));
+    }
+
+    if (show_file_line) {
+      result.Append(" " + GetBullet() + " ");
+    }
   } else {
     // All other symbol types. This case must handle all other symbol types, some of which might
     // not have identifiers.

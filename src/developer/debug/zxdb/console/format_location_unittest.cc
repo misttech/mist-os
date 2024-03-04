@@ -102,6 +102,14 @@ TEST(FormatLocation, FormatLocation_ELF) {
             FormatLocation(
                 Location(kFunctionAddress + 6, FileLine(), 0, symbol_context, elf_symbol), options)
                 .AsString());
+
+  // ELF address with a file name (this happens when the symbols are "line tables only" and there
+  // are no function DIEs for the binary).
+  EXPECT_EQ("$plt(memset) + 0x6 • foo.cc:6",
+            FormatLocation(Location(kFunctionAddress + 6, FileLine("foo.cc", 6), 0, symbol_context,
+                                    elf_symbol),
+                           options)
+                .AsString());
 }
 
 // This implicitly tests FormatFileName() also.
