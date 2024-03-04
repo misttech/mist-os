@@ -516,8 +516,7 @@ pub(crate) enum SocketId<S: SocketMapStateSpec> {
 /// address).
 #[derive(Derivative)]
 #[derivative(Default(bound = ""))]
-pub(crate) struct BoundSocketMap<I: Ip, D: device::Id, A: SocketMapAddrSpec, S: SocketMapStateSpec>
-{
+pub struct BoundSocketMap<I: Ip, D: device::Id, A: SocketMapAddrSpec, S: SocketMapStateSpec> {
     addr_to_state: SocketMap<AddrVec<I, D, A>, Bound<S>>,
 }
 

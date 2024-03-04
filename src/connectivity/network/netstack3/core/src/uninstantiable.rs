@@ -27,11 +27,10 @@ use crate::{
     socket::{
         address::SocketIpAddr,
         datagram::{
-            self, DatagramBoundStateContext, DatagramFlowId, DatagramSocketMapSpec,
-            DatagramSocketSpec, DualStackDatagramBoundStateContext,
-            NonDualStackDatagramBoundStateContext,
+            self, DatagramBoundStateContext, DatagramSocketMapSpec, DatagramSocketSpec,
+            DualStackDatagramBoundStateContext, NonDualStackDatagramBoundStateContext,
         },
-        BoundSocketMap, MaybeDualStack, SocketMapAddrSpec, SocketMapStateSpec,
+        MaybeDualStack,
     },
     transport::tcp::socket::{self as tcp_socket, TcpBindingsTypes},
 };
@@ -51,19 +50,6 @@ impl<I, O> BidirectionalConverter<I, O> for Uninstantiable {
         self.uninstantiable_unreachable()
     }
     fn convert(&self, _: I) -> O {
-        self.uninstantiable_unreachable()
-    }
-}
-
-impl<I: Ip, D: device::Id, A: SocketMapAddrSpec, C, S: SocketMapStateSpec>
-    datagram::LocalIdentifierAllocator<I, D, A, C, S> for Uninstantiable
-{
-    fn try_alloc_local_id(
-        &mut self,
-        _bound: &BoundSocketMap<I, D, A, S>,
-        _ctx: &mut C,
-        _flow: DatagramFlowId<I::Addr, A::RemoteIdentifier>,
-    ) -> Option<A::LocalIdentifier> {
         self.uninstantiable_unreachable()
     }
 }
@@ -103,7 +89,6 @@ impl<I: datagram::IpExt, S: DatagramSocketSpec, P: DatagramBoundStateContext<I, 
     type IpSocketsCtx<'a> = P::IpSocketsCtx<'a>;
     type DualStackContext = P::DualStackContext;
     type NonDualStackContext = P::NonDualStackContext;
-    type LocalIdAllocator = P::LocalIdAllocator;
     fn dual_stack_context(
         &mut self,
     ) -> MaybeDualStack<&mut Self::DualStackContext, &mut Self::NonDualStackContext> {
@@ -136,7 +121,6 @@ impl<I: datagram::IpExt, S: DatagramSocketSpec, P: DatagramBoundStateContext<I, 
                 <S as DatagramSocketSpec>::AddrSpec,
                 <S as DatagramSocketSpec>::SocketMapSpec<I, Self::WeakDeviceId>,
             >,
-            &mut Self::LocalIdAllocator,
         ) -> O,
     >(
         &mut self,
@@ -202,9 +186,6 @@ where
         self.uninstantiable_unreachable()
     }
 
-    type LocalIdAllocator = Uninstantiable;
-    type OtherLocalIdAllocator = Uninstantiable;
-
     fn with_both_bound_sockets_mut<
         O,
         F: FnOnce(
@@ -221,8 +202,6 @@ where
                 S::AddrSpec,
                 S::SocketMapSpec<I::OtherVersion, Self::WeakDeviceId>,
             >,
-            &mut Self::LocalIdAllocator,
-            &mut Self::OtherLocalIdAllocator,
         ) -> O,
     >(
         &mut self,

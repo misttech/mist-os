@@ -28,7 +28,7 @@ use packet_formats::{
 };
 
 use crate::{
-    algorithm::{PortAlloc, PortAllocImpl},
+    algorithm::{self, PortAllocImpl},
     base::ContextPair,
     context::RngContext,
     data_structures::socketmap::IterShadows as _,
@@ -376,6 +376,16 @@ impl<BT: IcmpEchoBindingsTypes> DatagramSocketSpec for Icmp<BT> {
         let datagram::ConnState { addr, .. } = state;
         addr.clone()
     }
+
+    fn try_alloc_local_id<I: IpExt, D: device::WeakId, BC: RngContext>(
+        bound: &IcmpBoundSockets<I, D, BT>,
+        bindings_ctx: &mut BC,
+        flow: datagram::DatagramFlowId<I::Addr, ()>,
+    ) -> Option<NonZeroU16> {
+        let mut rng = bindings_ctx.rng();
+        algorithm::simple_randomized_port_alloc(&mut rng, &flow, bound, &())
+            .map(|p| NonZeroU16::new(p).expect("ephemeral ports should be non-zero"))
+    }
 }
 
 /// Uninstantiatable type for implementing [`SocketMapAddrSpec`].
@@ -413,31 +423,10 @@ impl<I: IpExt, D: device::WeakId, BT: IcmpEchoBindingsTypes> PortAllocImpl
     }
 }
 
-// TODO(https://fxbug.dev/42083786): Remove the laziness by dropping `Option`.
-type LocalIdAllocator<I, D, BT> = Option<PortAlloc<IcmpBoundSockets<I, D, BT>>>;
-
 #[derive(Derivative)]
 #[derivative(Default(bound = ""))]
 pub struct BoundSockets<I: IpExt, D: device::WeakId, BT: IcmpEchoBindingsTypes> {
     pub(crate) socket_map: IcmpBoundSockets<I, D, BT>,
-    pub(crate) allocator: LocalIdAllocator<I, D, BT>,
-}
-
-impl<I: IpExt, D: device::WeakId, BC: RngContext + IcmpEchoBindingsTypes>
-    datagram::LocalIdentifierAllocator<I, D, IcmpAddrSpec, BC, (Icmp<BC>, I, D)>
-    for LocalIdAllocator<I, D, BC>
-{
-    fn try_alloc_local_id(
-        &mut self,
-        bound: &socket::BoundSocketMap<I, D, IcmpAddrSpec, (Icmp<BC>, I, D)>,
-        bindings_ctx: &mut BC,
-        flow: datagram::DatagramFlowId<I::Addr, ()>,
-    ) -> Option<NonZeroU16> {
-        let mut rng = bindings_ctx.rng();
-        // Lazily init port_alloc if it hasn't been inited yet.
-        let port_alloc = self.get_or_insert_with(|| PortAlloc::new(&mut rng));
-        port_alloc.try_alloc(&flow, bound).and_then(NonZeroU16::new)
-    }
 }
 
 impl<I, BC, CC> datagram::NonDualStackDatagramBoundStateContext<I, BC, Icmp<BC>> for CC
@@ -465,8 +454,6 @@ where
 
     type NonDualStackContext = Self;
 
-    type LocalIdAllocator = LocalIdAllocator<I, Self::WeakDeviceId, BC>;
-
     fn with_bound_sockets<
         O,
         F: FnOnce(&mut Self::IpSocketsCtx<'_>, &IcmpBoundSockets<I, Self::WeakDeviceId, BC>) -> O,
@@ -474,27 +461,21 @@ where
         &mut self,
         cb: F,
     ) -> O {
-        InnerIcmpContext::with_icmp_ctx_and_sockets_mut(
-            self,
-            |ctx, BoundSockets { socket_map, allocator: _ }| cb(ctx, &socket_map),
-        )
+        InnerIcmpContext::with_icmp_ctx_and_sockets_mut(self, |ctx, BoundSockets { socket_map }| {
+            cb(ctx, &socket_map)
+        })
     }
 
     fn with_bound_sockets_mut<
         O,
-        F: FnOnce(
-            &mut Self::IpSocketsCtx<'_>,
-            &mut IcmpBoundSockets<I, Self::WeakDeviceId, BC>,
-            &mut Self::LocalIdAllocator,
-        ) -> O,
+        F: FnOnce(&mut Self::IpSocketsCtx<'_>, &mut IcmpBoundSockets<I, Self::WeakDeviceId, BC>) -> O,
     >(
         &mut self,
         cb: F,
     ) -> O {
-        InnerIcmpContext::with_icmp_ctx_and_sockets_mut(
-            self,
-            |ctx, BoundSockets { socket_map, allocator }| cb(ctx, socket_map, allocator),
-        )
+        InnerIcmpContext::with_icmp_ctx_and_sockets_mut(self, |ctx, BoundSockets { socket_map }| {
+            cb(ctx, socket_map)
+        })
     }
 
     fn dual_stack_context(

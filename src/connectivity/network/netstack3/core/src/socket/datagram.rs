@@ -546,24 +546,9 @@ fn leave_all_joined_groups<A: IpAddress, BC, CC: MulticastMembershipHandler<A::V
     }
 }
 
-pub(crate) trait LocalIdentifierAllocator<
-    I: Ip,
-    D: device::Id,
-    A: SocketMapAddrSpec,
-    C,
-    S: SocketMapStateSpec,
->
-{
-    fn try_alloc_local_id(
-        &mut self,
-        bound: &BoundSocketMap<I, D, A, S>,
-        ctx: &mut C,
-        flow: DatagramFlowId<I::Addr, A::RemoteIdentifier>,
-    ) -> Option<A::LocalIdentifier>;
-}
-
+/// Identifies a flow for a datagram socket.
 #[derive(Hash)]
-pub(crate) struct DatagramFlowId<A: IpAddress, RI> {
+pub struct DatagramFlowId<A: IpAddress, RI> {
     pub(crate) local_ip: SocketIpAddr<A>,
     pub(crate) remote_ip: SocketIpAddr<A>,
     pub(crate) remote_id: RI,
@@ -650,16 +635,6 @@ pub(crate) trait DatagramBoundStateContext<I: IpExt + DualStackIpExt, BC, S: Dat
         WeakDeviceId = Self::WeakDeviceId,
     >;
 
-    /// The additional allocator passed to the callback provided to
-    /// `with_sockets_mut`.
-    type LocalIdAllocator: LocalIdentifierAllocator<
-        I,
-        Self::WeakDeviceId,
-        S::AddrSpec,
-        BC,
-        S::SocketMapSpec<I, Self::WeakDeviceId>,
-    >;
-
     /// Calls the function with an immutable reference to the datagram sockets.
     fn with_bound_sockets<
         O,
@@ -688,7 +663,6 @@ pub(crate) trait DatagramBoundStateContext<I: IpExt + DualStackIpExt, BC, S: Dat
                 S::AddrSpec,
                 S::SocketMapSpec<I, Self::WeakDeviceId>,
             >,
-            &mut Self::LocalIdAllocator,
         ) -> O,
     >(
         &mut self,
@@ -807,25 +781,6 @@ pub(crate) trait DualStackDatagramBoundStateContext<I: IpExt, BC, S: DatagramSoc
     #[allow(dead_code)]
     fn from_other_ip_addr(&self, addr: <I::OtherVersion as Ip>::Addr) -> I::Addr;
 
-    /// The local id allocator for sockets in the `I` stack.
-    type LocalIdAllocator: LocalIdentifierAllocator<
-        I,
-        Self::WeakDeviceId,
-        S::AddrSpec,
-        BC,
-        S::SocketMapSpec<I, Self::WeakDeviceId>,
-    >;
-
-    /// The local id allocator for sockets in the `I::OtherVersion` stack
-    type OtherLocalIdAllocator: LocalIdentifierAllocator<
-        I::OtherVersion,
-        Self::WeakDeviceId,
-        S::AddrSpec,
-        BC,
-        S::SocketMapSpec<I::OtherVersion, Self::WeakDeviceId>,
-    >;
-
-    /// Calls the provided callback with mutable access to both the
     /// demultiplexing maps.
     fn with_both_bound_sockets_mut<
         O,
@@ -843,8 +798,6 @@ pub(crate) trait DualStackDatagramBoundStateContext<I: IpExt, BC, S: DatagramSoc
                 S::AddrSpec,
                 S::SocketMapSpec<I::OtherVersion, Self::WeakDeviceId>,
             >,
-            &mut Self::LocalIdAllocator,
-            &mut Self::OtherLocalIdAllocator,
         ) -> O,
     >(
         &mut self,
@@ -1260,6 +1213,13 @@ pub trait DatagramSocketSpec: Sized {
     fn conn_addr_from_state<I: IpExt, D: Clone + Debug + Eq + Hash + Send + Sync>(
         state: &Self::ConnState<I, D>,
     ) -> ConnAddr<Self::ConnIpAddr<I>, D>;
+
+    /// Tries to allocate a local identifier.
+    fn try_alloc_local_id<I: IpExt, D: device::WeakId, BC: RngContext>(
+        bound: &BoundSocketMap<I, D, Self::AddrSpec, Self::SocketMapSpec<I, D>>,
+        bindings_ctx: &mut BC,
+        flow: DatagramFlowId<I::Addr, <Self::AddrSpec as SocketMapAddrSpec>::RemoteIdentifier>,
+    ) -> Option<<Self::AddrSpec as SocketMapAddrSpec>::LocalIdentifier>;
 }
 
 pub struct InUseError;
@@ -1334,17 +1294,15 @@ pub(crate) fn close<
                 MaybeDualStack::DualStack(dual_stack) => {
                     let op = DualStackRemoveOperation::new_from_state(dual_stack, &id, state);
                     dual_stack
-                        .with_both_bound_sockets_mut(
-                            |_core_ctx, sockets, other_sockets, _alloc, _other_alloc| {
-                                op.apply(sockets, other_sockets)
-                            },
-                        )
+                        .with_both_bound_sockets_mut(|_core_ctx, sockets, other_sockets| {
+                            op.apply(sockets, other_sockets)
+                        })
                         .into_options_and_info()
                 }
                 MaybeDualStack::NotDualStack(not_dual_stack) => {
                     let op = SingleStackRemoveOperation::new_from_state(not_dual_stack, &id, state);
                     core_ctx
-                        .with_bound_sockets_mut(|_core_ctx, sockets, _allocator| op.apply(sockets))
+                        .with_bound_sockets_mut(|_core_ctx, sockets| op.apply(sockets))
                         .into_options_and_info()
                 }
             },
@@ -2355,7 +2313,7 @@ fn listen_inner<
         BoundOperation::OnlyCurrentStack(either_dual_stack, addr) => {
             let converter = either_dual_stack.to_converter();
             core_ctx
-                .with_bound_sockets_mut(|core_ctx, bound, _allocator| {
+                .with_bound_sockets_mut(|core_ctx, bound| {
                     let id = S::make_bound_socket_map_id(id);
 
                     try_bind_single_stack::<I, S, _, _>(
@@ -2411,37 +2369,34 @@ fn listen_inner<
                 other: core_ctx.to_other_bound_socket_id(id),
             };
             core_ctx
-                .with_both_bound_sockets_mut(
-                    |core_ctx, bound, other_bound, _alloc, _other_alloc| {
-                        let mut bound_pair = PairedSocketMapMut { bound, other_bound };
-                        let sharing = sharing.clone();
+                .with_both_bound_sockets_mut(|core_ctx, bound, other_bound| {
+                    let mut bound_pair = PairedSocketMapMut { bound, other_bound };
+                    let sharing = sharing.clone();
 
-                        let identifier = match local_id {
-                            Some(id) => Some(id),
-                            None => try_pick_identifier::<I, S, _, _, _>(
-                                DualStackUnspecifiedAddr,
-                                &bound_pair,
-                                bindings_ctx,
-                                &sharing,
-                            ),
-                        }
-                        .ok_or(LocalAddressError::FailedToAllocateLocalPort)?;
-                        let (_addr, device, identifier) = try_pick_bound_address::<I, _, _, _>(
-                            None, device, core_ctx, identifier,
-                        )?;
-                        let weak_device = device.map(|d| d.as_weak(core_ctx).into_owned());
-
-                        BoundStateHandler::<_, S, _>::try_insert_listener(
-                            &mut bound_pair,
+                    let identifier = match local_id {
+                        Some(id) => Some(id),
+                        None => try_pick_identifier::<I, S, _, _, _>(
                             DualStackUnspecifiedAddr,
-                            identifier,
-                            weak_device.clone(),
-                            sharing,
-                            ids,
-                        )
-                        .map(|()| (identifier, weak_device))
-                    },
-                )
+                            &bound_pair,
+                            bindings_ctx,
+                            &sharing,
+                        ),
+                    }
+                    .ok_or(LocalAddressError::FailedToAllocateLocalPort)?;
+                    let (_addr, device, identifier) =
+                        try_pick_bound_address::<I, _, _, _>(None, device, core_ctx, identifier)?;
+                    let weak_device = device.map(|d| d.as_weak(core_ctx).into_owned());
+
+                    BoundStateHandler::<_, S, _>::try_insert_listener(
+                        &mut bound_pair,
+                        DualStackUnspecifiedAddr,
+                        identifier,
+                        weak_device.clone(),
+                        sharing,
+                        ids,
+                    )
+                    .map(|()| (identifier, weak_device))
+                })
                 .map(|(identifier, device)| ListenerAddr {
                     ip: core_ctx
                         .converter()
@@ -2528,15 +2483,13 @@ fn connect_inner<
     D: device::WeakId,
     S: DatagramSocketSpec,
     R,
-    BC,
+    BC: RngContext,
     CC: IpSocketHandler<WireI, BC, WeakDeviceId = D, DeviceId = D::Strong>,
-    A: LocalIdentifierAllocator<WireI, D, S::AddrSpec, BC, S::SocketMapSpec<WireI, D>>,
 >(
     connect_params: ConnectParameters<WireI, SocketI, D, S>,
     core_ctx: &mut CC,
     bindings_ctx: &mut BC,
     sockets: &mut BoundSocketMap<WireI, D, S::AddrSpec, S::SocketMapSpec<WireI, D>>,
-    allocator: &mut A,
     remove_original: impl FnOnce(
         &mut BoundSocketMap<WireI, D, S::AddrSpec, S::SocketMapSpec<WireI, D>>,
     ) -> R,
@@ -2580,17 +2533,16 @@ fn connect_inner<
 
     let local_port = match local_port {
         Some(id) => id.clone(),
-        None => allocator
-            .try_alloc_local_id(
-                sockets,
-                bindings_ctx,
-                DatagramFlowId {
-                    local_ip: *ip_sock.local_ip(),
-                    remote_ip: *ip_sock.remote_ip(),
-                    remote_id: remote_port.clone(),
-                },
-            )
-            .ok_or(ConnectError::CouldNotAllocateLocalPort)?,
+        None => S::try_alloc_local_id(
+            sockets,
+            bindings_ctx,
+            DatagramFlowId {
+                local_ip: *ip_sock.local_ip(),
+                remote_ip: *ip_sock.remote_ip(),
+                remote_id: remote_port.clone(),
+            },
+        )
+        .ok_or(ConnectError::CouldNotAllocateLocalPort)?,
     };
     let conn_addr = ConnAddr {
         ip: ConnIpAddr {
@@ -2738,16 +2690,11 @@ impl<I: IpExt, D: device::WeakId, S: DatagramSocketSpec> SingleStackConnectOpera
     ///
     /// Returns a tuple containing the state, and sharing state for the new
     /// connection.
-    fn apply<
-        BC,
-        CC: IpSocketHandler<I, BC, WeakDeviceId = D, DeviceId = D::Strong>,
-        A: LocalIdentifierAllocator<I, D, S::AddrSpec, BC, S::SocketMapSpec<I, D>>,
-    >(
+    fn apply<BC: RngContext, CC: IpSocketHandler<I, BC, WeakDeviceId = D, DeviceId = D::Strong>>(
         self,
         core_ctx: &mut CC,
         bindings_ctx: &mut BC,
         socket_map: &mut BoundSocketMap<I, D, S::AddrSpec, S::SocketMapSpec<I, D>>,
-        allocator: &mut A,
     ) -> Result<(ConnState<I, I, D, S>, S::SharingState), ConnectError> {
         let SingleStackConnectOperation { params, remove_op, sharing } = self;
         let remove_fn =
@@ -2761,15 +2708,8 @@ impl<I: IpExt, D: device::WeakId, S: DatagramSocketSpec> SingleStackConnectOpera
                     remove_info.reinsert(sockets)
                 }
             };
-        let conn_state = connect_inner(
-            params,
-            core_ctx,
-            bindings_ctx,
-            socket_map,
-            allocator,
-            remove_fn,
-            reinsert_fn,
-        )?;
+        let conn_state =
+            connect_inner(params, core_ctx, bindings_ctx, socket_map, remove_fn, reinsert_fn)?;
         Ok((conn_state, sharing))
     }
 }
@@ -3057,17 +2997,9 @@ impl<I: DualStackIpExt, D: device::WeakId, S: DatagramSocketSpec>
     /// Returns a tuple containing the state, and sharing state for the new
     /// connection.
     fn apply<
-        BC,
+        BC: RngContext,
         CC: IpSocketHandler<I, BC, WeakDeviceId = D, DeviceId = D::Strong>
             + IpSocketHandler<I::OtherVersion, BC, WeakDeviceId = D, DeviceId = D::Strong>,
-        A: LocalIdentifierAllocator<I, D, S::AddrSpec, BC, S::SocketMapSpec<I, D>>,
-        OA: LocalIdentifierAllocator<
-            I::OtherVersion,
-            D,
-            S::AddrSpec,
-            BC,
-            S::SocketMapSpec<I::OtherVersion, D>,
-        >,
     >(
         self,
         core_ctx: &mut CC,
@@ -3079,8 +3011,6 @@ impl<I: DualStackIpExt, D: device::WeakId, S: DatagramSocketSpec>
             S::AddrSpec,
             S::SocketMapSpec<I::OtherVersion, D>,
         >,
-        allocator: &mut A,
-        other_allocator: &mut OA,
     ) -> Result<(DualStackConnState<I, D, S>, S::SharingState), ConnectError> {
         let DualStackConnectOperation { params, remove_op, sharing } = self;
         let conn_state = match params {
@@ -3111,16 +3041,8 @@ impl<I: DualStackIpExt, D: device::WeakId, S: DatagramSocketSpec>
                             remove_info.reinsert(sockets, other_sockets)
                         }
                     };
-                connect_inner(
-                    params,
-                    core_ctx,
-                    bindings_ctx,
-                    socket_map,
-                    allocator,
-                    remove_fn,
-                    reinsert_fn,
-                )
-                .map(DualStackConnState::ThisStack)
+                connect_inner(params, core_ctx, bindings_ctx, socket_map, remove_fn, reinsert_fn)
+                    .map(DualStackConnState::ThisStack)
             }
             EitherStack::OtherStack(params) => {
                 // NB: Because we're connecting in the other stack, we receive
@@ -3157,7 +3079,6 @@ impl<I: DualStackIpExt, D: device::WeakId, S: DatagramSocketSpec>
                     core_ctx,
                     bindings_ctx,
                     other_socket_map,
-                    other_allocator,
                     remove_fn,
                     reinsert_fn,
                 )
@@ -3191,18 +3112,10 @@ pub(crate) fn connect<
                     ds, id, state, remote_ip, remote_id, extra,
                 )?;
                 let converter = ds.converter();
-                let (conn_state, sharing) = ds.with_both_bound_sockets_mut(
-                    |core_ctx, bound, other_bound, alloc, other_alloc| {
-                        connect_op.apply(
-                            core_ctx,
-                            bindings_ctx,
-                            bound,
-                            other_bound,
-                            alloc,
-                            other_alloc,
-                        )
-                    },
-                )?;
+                let (conn_state, sharing) =
+                    ds.with_both_bound_sockets_mut(|core_ctx, bound, other_bound| {
+                        connect_op.apply(core_ctx, bindings_ctx, bound, other_bound)
+                    })?;
                 Ok((converter.convert_back(conn_state), sharing))
             }
             (MaybeDualStack::NotDualStack(nds), DualStackRemoteIp::ThisStack(remote_ip)) => {
@@ -3211,8 +3124,8 @@ pub(crate) fn connect<
                 );
                 let converter = nds.converter();
                 let (conn_state, sharing) =
-                    core_ctx.with_bound_sockets_mut(|core_ctx, bound, alloc| {
-                        connect_op.apply(core_ctx, bindings_ctx, bound, alloc)
+                    core_ctx.with_bound_sockets_mut(|core_ctx, bound| {
+                        connect_op.apply(core_ctx, bindings_ctx, bound)
                     })?;
                 Ok((converter.convert_back(conn_state), sharing))
             }
@@ -3317,17 +3230,14 @@ fn disconnect_to_unbound<
     let (ip_options, sharing, mut device) = match core_ctx.dual_stack_context() {
         MaybeDualStack::NotDualStack(nds) => {
             let remove_op = SingleStackRemoveOperation::new_from_state(nds, id, socket_state);
-            let info = core_ctx
-                .with_bound_sockets_mut(|_core_ctx, bound, _allocator| remove_op.apply(bound));
+            let info = core_ctx.with_bound_sockets_mut(|_core_ctx, bound| remove_op.apply(bound));
             info.into_options_sharing_and_device()
         }
         MaybeDualStack::DualStack(ds) => {
             let remove_op = DualStackRemoveOperation::new_from_state(ds, id, socket_state);
-            let info = ds.with_both_bound_sockets_mut(
-                |_core_ctx, bound, other_bound, _allocator, _other_allocator| {
-                    remove_op.apply(bound, other_bound)
-                },
-            );
+            let info = ds.with_both_bound_sockets_mut(|_core_ctx, bound, other_bound| {
+                remove_op.apply(bound, other_bound)
+            });
             info.into_options_sharing_and_device()
         }
     };
@@ -3357,7 +3267,7 @@ fn disconnect_to_listener<
         MaybeDualStack::NotDualStack(nds) => {
             let ListenerIpAddr { addr, identifier } = nds.converter().convert(listener_ip.clone());
             let remove_op = SingleStackRemoveOperation::new_from_state(nds, id, socket_state);
-            core_ctx.with_bound_sockets_mut(|_core_ctx, bound, _allocator| {
+            core_ctx.with_bound_sockets_mut(|_core_ctx, bound| {
                 let (ip_options, sharing, mut device) =
                     remove_op.apply(bound).into_options_sharing_and_device();
                 if clear_device_on_disconnect {
@@ -3380,53 +3290,50 @@ fn disconnect_to_listener<
             let other_id = ds.to_other_bound_socket_id(id);
             let id = S::make_bound_socket_map_id(id);
             let converter = ds.converter();
-            ds.with_both_bound_sockets_mut(
-                |_core_ctx, bound, other_bound, _allocator, _other_allocator| {
-                    let (ip_options, sharing, mut device) =
-                        remove_op.apply(bound, other_bound).into_options_sharing_and_device();
-                    if clear_device_on_disconnect {
-                        device = None;
-                    }
+            ds.with_both_bound_sockets_mut(|_core_ctx, bound, other_bound| {
+                let (ip_options, sharing, mut device) =
+                    remove_op.apply(bound, other_bound).into_options_sharing_and_device();
+                if clear_device_on_disconnect {
+                    device = None;
+                }
 
-                    match converter.convert(listener_ip.clone()) {
-                        DualStackListenerIpAddr::ThisStack(ListenerIpAddr { addr, identifier }) => {
-                            BoundStateHandler::<_, S, _>::try_insert_listener(
-                                bound,
-                                addr,
-                                identifier,
-                                device.clone(),
-                                sharing.clone(),
-                                id,
-                            )
-                        }
-                        DualStackListenerIpAddr::OtherStack(ListenerIpAddr {
+                match converter.convert(listener_ip.clone()) {
+                    DualStackListenerIpAddr::ThisStack(ListenerIpAddr { addr, identifier }) => {
+                        BoundStateHandler::<_, S, _>::try_insert_listener(
+                            bound,
                             addr,
                             identifier,
-                        }) => BoundStateHandler::<_, S, _>::try_insert_listener(
+                            device.clone(),
+                            sharing.clone(),
+                            id,
+                        )
+                    }
+                    DualStackListenerIpAddr::OtherStack(ListenerIpAddr { addr, identifier }) => {
+                        BoundStateHandler::<_, S, _>::try_insert_listener(
                             other_bound,
                             addr,
                             identifier,
                             device.clone(),
                             sharing.clone(),
                             other_id,
-                        ),
-                        DualStackListenerIpAddr::BothStacks(identifier) => {
-                            let ids = PairedBoundSocketIds { this: id, other: other_id };
-                            let mut bound_pair = PairedSocketMapMut { bound, other_bound };
-                            BoundStateHandler::<_, S, _>::try_insert_listener(
-                                &mut bound_pair,
-                                DualStackUnspecifiedAddr,
-                                identifier,
-                                device.clone(),
-                                sharing.clone(),
-                                ids,
-                            )
-                        }
+                        )
                     }
-                    .expect("inserting listener for disconnected socket should succeed");
-                    (ip_options, sharing, device)
-                },
-            )
+                    DualStackListenerIpAddr::BothStacks(identifier) => {
+                        let ids = PairedBoundSocketIds { this: id, other: other_id };
+                        let mut bound_pair = PairedSocketMapMut { bound, other_bound };
+                        BoundStateHandler::<_, S, _>::try_insert_listener(
+                            &mut bound_pair,
+                            DualStackUnspecifiedAddr,
+                            identifier,
+                            device.clone(),
+                            sharing.clone(),
+                            ids,
+                        )
+                    }
+                }
+                .expect("inserting listener for disconnected socket should succeed");
+                (ip_options, sharing, device)
+            })
         }
     };
     BoundSocketState {
@@ -4320,7 +4227,7 @@ pub(crate) fn set_device<
                         let socket_id = S::make_bound_socket_map_id(id);
                         DatagramBoundStateContext::<I, _, _>::with_bound_sockets_mut(
                             core_ctx,
-                            |core_ctx, bound, _allocator| {
+                            |core_ctx, bound| {
                                 set_bound_device_single_stack(
                                     bindings_ctx,
                                     core_ctx,
@@ -4350,17 +4257,15 @@ pub(crate) fn set_device<
                             this: S::make_bound_socket_map_id(id),
                             other: core_ctx.to_other_bound_socket_id(id),
                         };
-                        core_ctx.with_both_bound_sockets_mut(
-                            |core_ctx, bound, other_bound, _allocator, _other_allocator| {
-                                set_bound_device_listener_both_stacks(
-                                    device,
-                                    identifier,
-                                    PairedSocketMapMut { bound, other_bound },
-                                    socket_id,
-                                    new_device.map(|d| core_ctx.downgrade_device_id(d)),
-                                )
-                            },
-                        )
+                        core_ctx.with_both_bound_sockets_mut(|core_ctx, bound, other_bound| {
+                            set_bound_device_listener_both_stacks(
+                                device,
+                                identifier,
+                                PairedSocketMapMut { bound, other_bound },
+                                socket_id,
+                                new_device.map(|d| core_ctx.downgrade_device_id(d)),
+                            )
+                        })
                     }
                 }
             }
@@ -5147,6 +5052,26 @@ mod test {
         ) -> ConnAddr<Self::ConnIpAddr<I>, D> {
             I::conn_addr_from_state(state)
         }
+
+        fn try_alloc_local_id<I: IpExt, D: device::WeakId, BC: RngContext>(
+            bound: &BoundSocketMap<I, D, FakeAddrSpec, (FakeStateSpec, I, D)>,
+            _bindings_ctx: &mut BC,
+            _flow: DatagramFlowId<I::Addr, <FakeAddrSpec as SocketMapAddrSpec>::RemoteIdentifier>,
+        ) -> Option<<FakeAddrSpec as SocketMapAddrSpec>::LocalIdentifier> {
+            (0..u8::MAX).find_map(|identifier| {
+                bound
+                    .listeners()
+                    .could_insert(
+                        &ListenerAddr {
+                            device: None,
+                            ip: ListenerIpAddr { addr: None, identifier },
+                        },
+                        &Default::default(),
+                    )
+                    .is_ok()
+                    .then_some(identifier)
+            })
+        }
     }
 
     impl<I: IpExt, D: device::WeakId> DatagramSocketMapSpec<I, D, FakeAddrSpec>
@@ -5453,7 +5378,6 @@ mod test {
         for Wrapped<FakeBoundSockets<D>, FakeInnerCoreCtx<D>>
     {
         type IpSocketsCtx<'a> = FakeInnerCoreCtx<D>;
-        type LocalIdAllocator = ();
         type DualStackContext = I::DualStackContext;
         type NonDualStackContext = I::NonDualStackContext;
 
@@ -5485,14 +5409,13 @@ mod test {
                     FakeAddrSpec,
                     (FakeStateSpec, I, Self::WeakDeviceId),
                 >,
-                &mut Self::LocalIdAllocator,
             ) -> O,
         >(
             &mut self,
             cb: F,
         ) -> O {
             let Self { outer, inner } = self;
-            cb(inner, outer.as_mut(), &mut ())
+            cb(inner, outer.as_mut())
         }
 
         fn with_transport_context<O, F: FnOnce(&mut Self::IpSocketsCtx<'_>) -> O>(
@@ -5566,9 +5489,6 @@ mod test {
             EitherIpSocket::V6(id.clone())
         }
 
-        type LocalIdAllocator = ();
-        type OtherLocalIdAllocator = ();
-
         fn with_both_bound_sockets_mut<
             O,
             F: FnOnce(
@@ -5585,8 +5505,6 @@ mod test {
                     FakeAddrSpec,
                     (FakeStateSpec, Ipv4, Self::WeakDeviceId),
                 >,
-                &mut Self::LocalIdAllocator,
-                &mut Self::OtherLocalIdAllocator,
             ) -> O,
         >(
             &mut self,
@@ -5594,7 +5512,7 @@ mod test {
         ) -> O {
             let Self { ref mut outer, inner } = self;
             let FakeBoundSockets { v4, v6 } = outer;
-            cb(inner, v6, v4, &mut (), &mut ())
+            cb(inner, v6, v4)
         }
 
         fn with_other_bound_sockets_mut<
@@ -5622,42 +5540,6 @@ mod test {
         ) -> O {
             let Self { outer: _, inner } = self;
             cb(inner)
-        }
-    }
-
-    impl<I: Ip + IpExt + IpDeviceStateIpExt, D: FakeStrongDeviceId>
-        LocalIdentifierAllocator<
-            I,
-            FakeWeakDeviceId<D>,
-            FakeAddrSpec,
-            FakeBindingsCtx<(), (), ()>,
-            (FakeStateSpec, I, FakeWeakDeviceId<D>),
-        > for ()
-    {
-        fn try_alloc_local_id(
-            &mut self,
-            bound: &BoundSocketMap<
-                I,
-                FakeWeakDeviceId<D>,
-                FakeAddrSpec,
-                (FakeStateSpec, I, FakeWeakDeviceId<D>),
-            >,
-            _bindings_ctx: &mut FakeBindingsCtx<(), (), ()>,
-            _flow: DatagramFlowId<I::Addr, <FakeAddrSpec as SocketMapAddrSpec>::RemoteIdentifier>,
-        ) -> Option<<FakeAddrSpec as SocketMapAddrSpec>::LocalIdentifier> {
-            (0..u8::MAX).find_map(|identifier| {
-                bound
-                    .listeners()
-                    .could_insert(
-                        &ListenerAddr {
-                            device: None,
-                            ip: ListenerIpAddr { addr: None, identifier },
-                        },
-                        &Default::default(),
-                    )
-                    .is_ok()
-                    .then_some(identifier)
-            })
         }
     }
 

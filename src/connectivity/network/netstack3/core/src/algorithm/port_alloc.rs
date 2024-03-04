@@ -4,21 +4,12 @@
 
 //! Ephemeral port allocation provider.
 //!
-//! Defines the [`PortAlloc`] structure and [`PortAllocImpl`] trait, used for
-//! ephemeral port allocations in transport protocols.
+//! Defines [`PortAllocImpl`] trait and [`simple_randomized_port_alloc`], used
+//! for ephemeral port allocations in transport protocols.
 
-use alloc::vec::Vec;
-use core::{
-    hash::{Hash, Hasher},
-    marker::PhantomData,
-    num::NonZeroUsize,
-    ops::RangeInclusive,
-};
+use core::{hash::Hash, marker::PhantomData, ops::RangeInclusive};
 
-use hmac::Mac;
 use rand::RngCore;
-
-type HmacSha256 = hmac::Hmac<sha2::Sha256>;
 
 /// A port number.
 // NOTE(brunodalbo): `PortNumber` could be a trait, but given the expected use
@@ -29,8 +20,8 @@ pub(crate) type PortNumber = u16;
 /// A common implementation of `HashableId` providing usual 3-tuple flow
 /// identifiers.
 ///
-/// `ProtocolFlowId` provides the most common 3-tuple needed to be used with a
-/// [`PortAlloc`] structure: local IP, remote IP, and remote port number.
+/// `ProtocolFlowId` provides the most common 3-tuple needed to be used when
+/// allocating ports: local IP, remote IP, and remote port number.
 #[derive(Hash, Debug)]
 pub(crate) struct ProtocolFlowId<A, P> {
     local_addr: A,
@@ -60,28 +51,17 @@ impl<A, P> ProtocolFlowId<A, P> {
     }
 }
 
-/// Length, in bytes, of secret numbers used for port allocations.
-const SECRET_LEN: usize = 16;
-
-/// Trait that configures the behavior of a [`PortAlloc`] structure.
+/// Trait that configures the behavior of port allocation.
 ///
 /// `PortAllocImpl` provides the types, custom behaviors, and port availability
-/// checks necessary to operate the port allocation algorithm provided by
-/// [`PortAlloc`].
+/// checks necessary to operate the port allocation algorithm.
 pub(crate) trait PortAllocImpl {
-    /// The number of different incremental ranges used by [`PortAlloc`]. If
-    /// `TABLE_SIZE` is 1, the algorithm used by [`PortAlloc`] is Algorithm 3,
-    /// as described in [RFC 6056]. Otherwise, [`PortAlloc`] will use Algorithm
-    /// 4.
-    ///
-    /// [RFC 6056]: https://tools.ietf.org/html/rfc6056
-    const TABLE_SIZE: NonZeroUsize = const_unwrap::const_unwrap_option(NonZeroUsize::new(20));
-    /// The range of ports that can be allocated by [`PortAlloc`].
+    /// The range of ports that can be allocated.
     ///
     /// Local ports used in transport protocols are called [Ephemeral Ports].
     /// Different transport protocols may define different ranges for the issued
-    /// ports. [`PortAlloc`] is guaranteed to return a port in this range as a
-    /// result of [`PortAlloc::try_alloc`].
+    /// ports. Port allocation algorithms should guarantee to return a port in
+    /// this range.
     ///
     /// [Ephemeral Ports]: https://tools.ietf.org/html/rfc6056#section-2
     const EPHEMERAL_RANGE: RangeInclusive<PortNumber>;
@@ -122,37 +102,6 @@ pub(crate) trait PortAllocImpl {
         port: PortNumber,
         arg: &Self::PortAvailableArg,
     ) -> bool;
-}
-
-/// Provides a port allocation algorithm, following the guidelines in [RFC
-/// 6056].
-///
-/// `PortAlloc` provides the port allocation algorithms 3 or 4 (depending on the
-/// [`PortAllocImpl`] type parameter) described in [`RFC 6056`].
-///
-/// The algorithm consists of 2 sources of obfuscation:
-/// - For a given flow identifier, a base offset is calculated from an HMAC.
-/// - For a given flow identifier, a *different* hash provides an index into an
-///   internal table that keeps monotonically increasing port numbers.
-///
-/// The tentative port is acquired by selecting a port in the provided
-/// `EPHEMERAL_RANGE` using the two obfuscated offsets described above, and then
-/// a check for conflicts is performed. A simple linear scan from the initial
-/// calculated port is performed from that point, until an available port is
-/// found.
-///
-/// `PortAlloc` holds two secrets internally, that are used to generate the 2
-/// sources of obfuscation above. The secrets can be updated periodically using
-/// [`PortAlloc::update_secrets`].
-///
-/// [RFC 6056]: https://tools.ietf.org/html/rfc6056
-pub(crate) struct PortAlloc<I: PortAllocImpl> {
-    // TODO(brunodalbo): Table can be made an array once we can declare
-    // arrays with associated consts.
-    table: Vec<PortNumber>,
-    secret_a: [u8; SECRET_LEN],
-    secret_b: [u8; SECRET_LEN],
-    _marker: core::marker::PhantomData<I>,
 }
 
 /// A witness type for a port within some ephemeral port range.
@@ -208,108 +157,8 @@ pub(crate) fn simple_randomized_port_alloc<I: PortAllocImpl + ?Sized, R: RngCore
     None
 }
 
-impl<I: PortAllocImpl> PortAlloc<I> {
-    /// Creates a new `PortAlloc` port allocation provider.
-    ///
-    /// `rng` is used to generate the initial secrets and random offsets in the
-    /// internal table.
-    // TODO(brunodalbo) make R: RngCore + CryptoRng when we tighten the security
-    // around this algorithm.
-    pub(crate) fn new<R: RngCore>(rng: &mut R) -> Self {
-        let mut table = Vec::with_capacity(I::TABLE_SIZE.into());
-        for _ in 0..I::TABLE_SIZE.into() {
-            table.push(rng.next_u32() as PortNumber);
-        }
-        let mut secret_a = [0; SECRET_LEN];
-        let mut secret_b = [0; SECRET_LEN];
-        rng.fill_bytes(&mut secret_a[..]);
-        rng.fill_bytes(&mut secret_b[..]);
-        Self { table, secret_a, secret_b, _marker: core::marker::PhantomData }
-    }
-
-    /// Attempts to allocate a new port for a flow with the given `id`.
-    ///
-    /// `try_alloc` performs the algorithm 3 or 4, as described in [RFC 6056]
-    /// and returns `Some(PortNumber)` if an available port could be selected
-    /// (`state` provides the availability checks) or `None` otherwise.
-    ///
-    /// [RFC 6056]: https://tools.ietf.org/html/rfc6056
-    pub(crate) fn try_alloc_with(
-        &mut self,
-        id: &I::Id,
-        state: &I,
-        arg: &I::PortAvailableArg,
-    ) -> Option<PortNumber> {
-        let num_ephemeral = I::num_ephemeral();
-        let offset = hmac_with_secret(id, &self.secret_a[..]);
-        let table_index = hmac_with_secret(id, &self.secret_b[..]) % self.table.len();
-        let table_val = &mut self.table[table_index];
-        for _ in 0..num_ephemeral {
-            let local_off = offset.wrapping_add(*table_val as usize) % num_ephemeral;
-            // We can safely cast `local_off` to `PortNumber` because of the %
-            // num_ephemeral operation above.
-            let port = I::EPHEMERAL_RANGE.start() + (local_off as PortNumber);
-            *table_val = table_val.wrapping_add(1);
-            if state.is_port_available(id, port, arg) {
-                return Some(port);
-            }
-        }
-        None
-    }
-
-    /// Like `try_alloc_with`, but uses the default value for `arg`.
-    pub(crate) fn try_alloc(&mut self, id: &I::Id, state: &I) -> Option<PortNumber>
-    where
-        I::PortAvailableArg: Default,
-    {
-        self.try_alloc_with(id, state, &Default::default())
-    }
-
-    /// Updates the internal secrets used in the Hash-Based port selection.
-    ///
-    /// It is interesting to update the internal secrets periodically, making a
-    /// remote attack involving port number predictions harder. [RFC 6056
-    /// section 3.4] suggest this can be done periodically. Care must be taken
-    /// in doing so, because the new offsets calculated from refreshed secrets
-    /// can cause collisions of instance-ids.
-    ///
-    /// [RFC 6056 section 3.4]: https://tools.ietf.org/html/rfc6056#section-3.4
-    // TODO(brunodalbo) make R: RngCore + CryptoRng when we tighten the security
-    // around this algorithm.
-    // TODO(rheacock): Remove _ prefix when this function is used.
-    pub(crate) fn _update_secrets<R: RngCore>(&mut self, rng: &mut R) {
-        rng.fill_bytes(&mut self.secret_a[..]);
-        rng.fill_bytes(&mut self.secret_b[..]);
-    }
-}
-
-/// Helper function to hash an `id` with a given `secret` into a `usize`.
-fn hmac_with_secret<I: Hash>(id: &I, secret: &[u8]) -> usize {
-    use core::convert::TryInto as _;
-
-    struct MacHasher<'a, M>(&'a mut M);
-
-    impl<'a, M: Mac> Hasher for MacHasher<'a, M> {
-        fn finish(&self) -> u64 {
-            unimplemented!()
-        }
-
-        fn write(&mut self, bytes: &[u8]) {
-            self.0.update(bytes);
-        }
-    }
-
-    let mut hmac = HmacSha256::new_from_slice(secret).expect("create new HmacSha256");
-    id.hash(&mut MacHasher(&mut hmac));
-
-    let bytes: [u8; 32] = hmac.finalize().into_bytes().into();
-    usize::from_ne_bytes(bytes[..core::mem::size_of::<usize>()].try_into().unwrap())
-}
-
 #[cfg(test)]
 mod tests {
-    use const_unwrap::const_unwrap_option;
-
     use super::*;
     use crate::testutil::{with_fake_rngs, FakeCryptoRng};
 
@@ -328,8 +177,6 @@ mod tests {
         DenyAll,
         /// Only even-numbered ports are available.
         AllowEvens,
-        /// All ports are available.
-        AllowAll,
     }
 
     /// Fake implementation of [`PortAllocImpl`].
@@ -342,7 +189,6 @@ mod tests {
     }
 
     impl PortAllocImpl for FakeImpl {
-        const TABLE_SIZE: NonZeroUsize = const_unwrap_option(NonZeroUsize::new(2));
         const EPHEMERAL_RANGE: RangeInclusive<u16> = 100..=200;
         type Id = FakeId;
         type PortAvailableArg = ();
@@ -352,7 +198,6 @@ mod tests {
                 FakeAvailable::AllowEvens => (port & 1) == 0,
                 FakeAvailable::DenyAll => false,
                 FakeAvailable::AllowSingle(p) => port == p,
-                FakeAvailable::AllowAll => true,
             }
         }
     }
@@ -362,8 +207,7 @@ mod tests {
     fn test_allow_single(single: u16) {
         with_fake_rngs(RNG_ROUNDS, |mut rng| {
             let fake = FakeImpl { available: FakeAvailable::AllowSingle(single) };
-            let mut alloc = PortAlloc::<FakeImpl>::new(&mut rng);
-            let port = alloc.try_alloc(&FakeId(0), &fake);
+            let port = simple_randomized_port_alloc(&mut rng, &FakeId(0), &fake, &());
             assert_eq!(port.unwrap(), single);
         });
     }
@@ -391,8 +235,7 @@ mod tests {
         // Test that if no ports are available, try_alloc must return none.
         with_fake_rngs(RNG_ROUNDS, |mut rng| {
             let fake = FakeImpl { available: FakeAvailable::DenyAll };
-            let mut alloc = PortAlloc::<FakeImpl>::new(&mut rng);
-            let port = alloc.try_alloc(&FakeId(0), &fake);
+            let port = simple_randomized_port_alloc(&mut rng, &FakeId(0), &fake, &());
             assert_eq!(port, None);
         });
     }
@@ -403,55 +246,10 @@ mod tests {
         // the specified range, and they'll always be even.
         with_fake_rngs(RNG_ROUNDS, |mut rng| {
             let fake = FakeImpl { available: FakeAvailable::AllowEvens };
-            let mut alloc = PortAlloc::<FakeImpl>::new(&mut rng);
-            let port = alloc.try_alloc(&FakeId(0), &fake).unwrap();
+            let port = simple_randomized_port_alloc(&mut rng, &FakeId(0), &fake, &()).unwrap();
             assert!(FakeImpl::EPHEMERAL_RANGE.contains(&port));
             assert_eq!(port & 1, 0);
         });
-    }
-
-    #[test]
-    fn test_sequential_allocs() {
-        // Test that for a single flow ID, we get sequential ports that can span
-        // the entire ephemeral range.
-        with_fake_rngs(RNG_ROUNDS, |mut rng| {
-            let fake = FakeImpl { available: FakeAvailable::AllowAll };
-            let mut alloc = PortAlloc::<FakeImpl>::new(&mut rng);
-            let mut port = alloc.try_alloc(&FakeId(0), &fake).unwrap();
-            assert!(FakeImpl::EPHEMERAL_RANGE.contains(&port));
-            for _ in FakeImpl::EPHEMERAL_RANGE {
-                let next = alloc.try_alloc(&FakeId(0), &fake).unwrap();
-                let expect = if port == *FakeImpl::EPHEMERAL_RANGE.end() {
-                    *FakeImpl::EPHEMERAL_RANGE.start()
-                } else {
-                    port + 1
-                };
-                assert_eq!(next, expect);
-                port = next;
-            }
-        });
-    }
-
-    #[test]
-    fn test_different_tables() {
-        // Test that different IDs can hash to different offsets in internal
-        // tables, which increase independently.
-        let fake = FakeImpl { available: FakeAvailable::AllowAll };
-        let mut alloc = PortAlloc::<FakeImpl>::new(&mut FakeCryptoRng::new_xorshift(2));
-        let table_a = alloc.table[0];
-        let table_b = alloc.table[1];
-        let id_a = FakeId(0);
-        let id_b = FakeId(1);
-        assert_eq!(hmac_with_secret(&id_a, &alloc.secret_b[..]) % 2, 0);
-        assert_eq!(hmac_with_secret(&id_b, &alloc.secret_b[..]) % 2, 1);
-        let _ = alloc.try_alloc(&id_a, &fake).unwrap();
-        // A single allocation should've moved offset a but not b.
-        assert_eq!(table_a.wrapping_add(1), alloc.table[0]);
-        assert_eq!(table_b, alloc.table[1]);
-        let _ = alloc.try_alloc(&id_b, &fake).unwrap();
-        // Now offset b should've moved, and a remained just one forward.
-        assert_eq!(table_a.wrapping_add(1), alloc.table[0]);
-        assert_eq!(table_b.wrapping_add(1), alloc.table[1]);
     }
 
     #[test]

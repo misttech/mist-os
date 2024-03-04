@@ -34,7 +34,7 @@ use thiserror::Error;
 use tracing::{debug, trace};
 
 use crate::{
-    algorithm::{PortAlloc, PortAllocImpl, ProtocolFlowId},
+    algorithm::{self, PortAllocImpl, ProtocolFlowId},
     base::ContextPair,
     context::{
         CounterContext, InstantContext, NonTestCtxMarker, ReferenceNotifiers, RngContext,
@@ -62,11 +62,11 @@ use crate::{
             DatagramFlowId, DatagramSocketMapSpec, DatagramSocketSet, DatagramSocketSpec,
             DatagramStateContext, DualStackConnState, DualStackDatagramBoundStateContext,
             DualStackIpExt, EitherIpSocket, ExpectedConnError, ExpectedUnboundError, FoundSockets,
-            InUseError, IpExt, IpOptions, LocalIdentifierAllocator,
-            MulticastMembershipInterfaceSelector, NonDualStackDatagramBoundStateContext,
-            SendError as DatagramSendError, SetMulticastMembershipError, SocketHopLimits,
-            SocketInfo as DatagramSocketInfo, SocketState as DatagramSocketState,
-            WrapOtherStackIpOptions, WrapOtherStackIpOptionsMut,
+            InUseError, IpExt, IpOptions, MulticastMembershipInterfaceSelector,
+            NonDualStackDatagramBoundStateContext, SendError as DatagramSendError,
+            SetMulticastMembershipError, SocketHopLimits, SocketInfo as DatagramSocketInfo,
+            SocketState as DatagramSocketState, WrapOtherStackIpOptions,
+            WrapOtherStackIpOptionsMut,
         },
         AddrVec, Bound, IncompatibleError, InsertError, ListenerAddrInfo, MaybeDualStack,
         NotDualStackCapableError, RemoveResult, SetDualStackEnabledError, ShutdownType,
@@ -138,8 +138,6 @@ impl<I: IpExt, NewIp: IpExt, D: device::WeakId, BT: UdpBindingsTypes> GenericOve
 #[derivative(Default(bound = ""))]
 pub struct BoundSockets<I: IpExt, D: device::WeakId, BT: UdpBindingsTypes> {
     bound_sockets: UdpBoundSocketMap<I, D, BT>,
-    /// lazy_port_alloc is lazy-initialized when it's used.
-    lazy_port_alloc: Option<PortAlloc<UdpBoundSocketMap<I, D, BT>>>,
 }
 
 /// A collection of UDP sockets.
@@ -612,6 +610,18 @@ impl<BT: UdpBindingsTypes> DatagramSocketSpec for Udp<BT> {
         state: &Self::ConnState<I, D>,
     ) -> ConnAddr<Self::ConnIpAddr<I>, D> {
         I::conn_addr_from_state(state)
+    }
+
+    fn try_alloc_local_id<I: IpExt, D: device::WeakId, BC: RngContext>(
+        bound: &UdpBoundSocketMap<I, D, BT>,
+        bindings_ctx: &mut BC,
+        flow: datagram::DatagramFlowId<I::Addr, UdpRemotePort>,
+    ) -> Option<NonZeroU16> {
+        let DatagramFlowId { local_ip, remote_ip, remote_id } = flow;
+        let id = ProtocolFlowId::new(local_ip, remote_ip, remote_id);
+        let mut rng = bindings_ctx.rng();
+        algorithm::simple_randomized_port_alloc(&mut rng, &id, bound, &())
+            .map(|p| NonZeroU16::new(p).expect("ephemeral ports should be non-zero"))
     }
 }
 
@@ -2373,8 +2383,6 @@ impl<
     > DatagramBoundStateContext<I, BC, Udp<BC>> for CC
 {
     type IpSocketsCtx<'a> = CC::IpSocketsCtx<'a>;
-    // TODO(https://fxbug.dev/42083786): Remove the laziness by dropping `Option`.
-    type LocalIdAllocator = Option<PortAlloc<UdpBoundSocketMap<I, CC::WeakDeviceId, BC>>>;
 
     fn with_bound_sockets<
         O,
@@ -2391,7 +2399,7 @@ impl<
         &mut self,
         cb: F,
     ) -> O {
-        self.with_bound_sockets(|core_ctx, BoundSockets { bound_sockets, lazy_port_alloc: _ }| {
+        self.with_bound_sockets(|core_ctx, BoundSockets { bound_sockets }| {
             cb(core_ctx, bound_sockets)
         })
     }
@@ -2406,14 +2414,13 @@ impl<
                 UdpAddrSpec,
                 (Udp<BC>, I, CC::WeakDeviceId),
             >,
-            &mut Self::LocalIdAllocator,
         ) -> O,
     >(
         &mut self,
         cb: F,
     ) -> O {
-        self.with_bound_sockets_mut(|core_ctx, BoundSockets { bound_sockets, lazy_port_alloc }| {
-            cb(core_ctx, bound_sockets, lazy_port_alloc)
+        self.with_bound_sockets_mut(|core_ctx, BoundSockets { bound_sockets }| {
+            cb(core_ctx, bound_sockets)
         })
     }
 
@@ -2472,17 +2479,12 @@ impl<
         EitherIpSocket::V6(id.clone())
     }
 
-    type LocalIdAllocator = Option<PortAlloc<UdpBoundSocketMap<Ipv6, CC::WeakDeviceId, BC>>>;
-    type OtherLocalIdAllocator = Option<PortAlloc<UdpBoundSocketMap<Ipv4, CC::WeakDeviceId, BC>>>;
-
     fn with_both_bound_sockets_mut<
         O,
         F: FnOnce(
             &mut Self::IpSocketsCtx<'_>,
             &mut UdpBoundSocketMap<Ipv6, Self::WeakDeviceId, BC>,
             &mut UdpBoundSocketMap<Ipv4, Self::WeakDeviceId, BC>,
-            &mut Self::LocalIdAllocator,
-            &mut Self::OtherLocalIdAllocator,
         ) -> O,
     >(
         &mut self,
@@ -2490,10 +2492,9 @@ impl<
     ) -> O {
         self.with_both_bound_sockets_mut(
             |core_ctx,
-             BoundSockets { bound_sockets: bound_first, lazy_port_alloc: alloc_first },
-             BoundSockets { bound_sockets: bound_second, lazy_port_alloc: alloc_second }
-            | {
-                cb(core_ctx, bound_first, bound_second, alloc_first, alloc_second)
+             BoundSockets { bound_sockets: bound_first },
+             BoundSockets { bound_sockets: bound_second }| {
+                cb(core_ctx, bound_first, bound_second)
             },
         )
     }
@@ -2508,11 +2509,9 @@ impl<
         &mut self,
         cb: F,
     ) -> O {
-        self.with_other_bound_sockets_mut(
-            |core_ctx, BoundSockets { bound_sockets, lazy_port_alloc: _ }| {
-                cb(core_ctx, bound_sockets)
-            },
-        )
+        self.with_other_bound_sockets_mut(|core_ctx, BoundSockets { bound_sockets }| {
+            cb(core_ctx, bound_sockets)
+        })
     }
 
     fn with_transport_context<O, F: FnOnce(&mut Self::IpSocketsCtx<'_>) -> O>(
@@ -2531,25 +2530,6 @@ impl<
     type Converter = ();
     fn converter(&self) -> Self::Converter {
         ()
-    }
-}
-
-impl<I: IpExt, BC: UdpBindingsContext<I, D::Strong>, D: device::WeakId>
-    LocalIdentifierAllocator<I, D, UdpAddrSpec, BC, (Udp<BC>, I, D)>
-    for Option<PortAlloc<UdpBoundSocketMap<I, D, BC>>>
-{
-    fn try_alloc_local_id(
-        &mut self,
-        bound: &UdpBoundSocketMap<I, D, BC>,
-        bindings_ctx: &mut BC,
-        flow: datagram::DatagramFlowId<I::Addr, UdpRemotePort>,
-    ) -> Option<NonZeroU16> {
-        let DatagramFlowId { local_ip, remote_ip, remote_id } = flow;
-        let id = ProtocolFlowId::new(local_ip, remote_ip, remote_id);
-        let mut rng = bindings_ctx.rng();
-        // Lazily init port_alloc if it hasn't been inited yet.
-        let port_alloc = self.get_or_insert_with(|| PortAlloc::new(&mut rng));
-        port_alloc.try_alloc(&id, bound).and_then(NonZeroU16::new)
     }
 }
 
