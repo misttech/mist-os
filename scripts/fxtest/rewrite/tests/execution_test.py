@@ -580,8 +580,6 @@ class TestExecutionUtils(unittest.IsolatedAsyncioTestCase):
         self._env = environment.ExecutionEnvironment(
             self._temp_dir.name, "", None, "", "", None
         )
-        with open(os.path.join(self._temp_dir.name, ".fx-ssh-path"), "w") as f:
-            f.write("/foo/path")
         return super().setUp()
 
     def tearDown(self) -> None:
@@ -595,6 +593,8 @@ class TestExecutionUtils(unittest.IsolatedAsyncioTestCase):
         command_patch.side_effect = [
             self._make_command_output("127.0.0.1:6000"),
             self._make_command_output("foo-bar"),
+            # config get ssh.priv
+            self._make_command_output("/foo/path"),
         ]
         device_env = await execution.get_device_environment_from_exec_env(
             self._env
@@ -616,6 +616,8 @@ class TestExecutionUtils(unittest.IsolatedAsyncioTestCase):
         command_patch.side_effect = [
             self._make_command_output("[::1]:6000"),
             self._make_command_output("foo-bar"),
+            # config get ssh.priv
+            self._make_command_output("/foo/path"),
         ]
         device_env = await execution.get_device_environment_from_exec_env(
             self._env

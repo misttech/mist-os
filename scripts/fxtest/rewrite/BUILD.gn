@@ -98,7 +98,6 @@ if (is_host) {
 
   host_test_data("test_data") {
     sources = [
-      "tests/test_data/build_output/fx-ssh-path",
       "tests/test_data/build_output/package-repositories.json",
       "tests/test_data/build_output/package-targets.json",
       "tests/test_data/build_output/test-list.json",

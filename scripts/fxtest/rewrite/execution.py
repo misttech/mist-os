@@ -424,9 +424,19 @@ async def get_device_environment_from_exec_env(
         raise DeviceConfigError("Failed to get the target name")
     target_name = target_output.stdout.strip()
 
-    with open(os.path.join(exec_env.fuchsia_dir, ".fx-ssh-path")) as f:
-        lines = f.readlines()
-        ssh_path = lines[0].strip()
+    # get the configured private key. Ideally, the private key usage
+    # should be an implementation detail internal to ffx commands.
+    ssh_key_output = await run_command(
+        "fx", "ffx", "config", "get", "ssh.priv", recorder=recorder
+    )
+    if not ssh_key_output or ssh_key_output.return_code != 0:
+        msg = "No return information"
+        if ssh_key_output:
+            msg = ssh_key_output.stderr
+        raise DeviceConfigError(f"Failed to get private ssh key: {msg}")
+    ssh_path = ssh_key_output.stdout.strip()
+    # remove any double quotes around the path
+    ssh_path = ssh_path.replace('"', "")
 
     return environment.DeviceEnvironment(
         address=ip, port=port, name=target_name, private_key_path=ssh_path

@@ -98,20 +98,11 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
             ),
             f"path was {self.test_data_path} for {__file__}",
         )
-        self.assertTrue(
-            os.path.isfile(os.path.join(self.test_data_path, "fx-ssh-path")),
-            f"path was {self.test_data_path} for {__file__}",
-        )
 
         with open(
             os.path.join(self.fuchsia_dir.name, ".fx-build-dir"), "w"
         ) as f:
             f.write("out/default")
-
-        shutil.copy(
-            os.path.join(self.test_data_path, "fx-ssh-path"),
-            os.path.join(self.fuchsia_dir.name, ".fx-ssh-path"),
-        )
 
         self.out_dir = os.path.join(self.fuchsia_dir.name, "out/default")
         os.makedirs(self.out_dir)
