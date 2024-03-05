@@ -49,13 +49,11 @@ class SkipBlockPartitionClient : public PartitionClient {
   zx::result<> Trim() override;
   zx::result<> Flush() override;
 
-  fidl::ClientEnd<fuchsia_hardware_skipblock::SkipBlock> GetChannel();
-
-  // No copy, no move.
+  // No copy
   SkipBlockPartitionClient(const SkipBlockPartitionClient&) = delete;
   SkipBlockPartitionClient& operator=(const SkipBlockPartitionClient&) = delete;
-  SkipBlockPartitionClient(SkipBlockPartitionClient&&) = delete;
-  SkipBlockPartitionClient& operator=(SkipBlockPartitionClient&&) = delete;
+  SkipBlockPartitionClient(SkipBlockPartitionClient&&) = default;
+  SkipBlockPartitionClient& operator=(SkipBlockPartitionClient&&) = default;
 
  protected:
   zx::result<> WriteBytes(const zx::vmo& vmo, zx_off_t offset, size_t vmo_size);

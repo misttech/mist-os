@@ -111,6 +111,9 @@ class Bl2PartitionClient final : public SkipBlockPartitionClient {
   explicit Bl2PartitionClient(fidl::ClientEnd<fuchsia_hardware_skipblock::SkipBlock> partition)
       : SkipBlockPartitionClient(std::move(partition)) {}
 
+  explicit Bl2PartitionClient(SkipBlockPartitionClient&& client)
+      : SkipBlockPartitionClient(std::move(client)) {}
+
   zx::result<size_t> GetBlockSize() final;
   zx::result<size_t> GetPartitionSize() final;
   zx::result<> Read(const zx::vmo& vmo, size_t size) final;

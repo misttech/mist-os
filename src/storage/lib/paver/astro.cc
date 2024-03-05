@@ -220,11 +220,9 @@ zx::result<std::unique_ptr<PartitionClient>> AstroPartitioner::FindPartition(
         if (auto status = skip_block_->FindPartition(GUID_BL2_VALUE); status.is_error()) {
           return status.take_error();
         } else {
-          std::unique_ptr<SkipBlockPartitionClient>& bl2_skip_block = status.value();
-
           // Upgrade this into a more specialized partition client for custom
           // handling required by BL2.
-          return zx::ok(new Bl2PartitionClient(bl2_skip_block->GetChannel()));
+          return zx::ok(std::make_unique<Bl2PartitionClient>(std::move(*status.value())));
         }
       }
       // If we get here, we must have added another type to SupportsPartition()

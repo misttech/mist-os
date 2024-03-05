@@ -230,8 +230,4 @@ zx::result<> SkipBlockPartitionClient::Trim() { return zx::error(ZX_ERR_NOT_SUPP
 
 zx::result<> SkipBlockPartitionClient::Flush() { return zx::ok(); }
 
-fidl::ClientEnd<fuchsia_hardware_skipblock::SkipBlock> SkipBlockPartitionClient::GetChannel() {
-  return component::MaybeClone(partition_.client_end(), component::AssumeProtocolComposesNode);
-}
-
 }  // namespace paver
