@@ -60,8 +60,8 @@ fn get_mac_identifier_from_octets(
 // 00:14:0 following "/PCI0/bus/" represents BDF (Bus Device Function)
 //
 // USB over DWC:
-// "/dev/sys/platform/05:03:2d/vim3_usb_phy/dwc2/dwc2_phy/dwc2/usb-peripheral/function-000/cdc-eth-function/netdevice-migration/network-device"
-// 05:03:2d following "platform" represents
+// "/dev/sys/platform/05:00:18/usb-phy-composite/aml_usb_phy/dwc2/dwc2_phy/dwc2/usb-peripheral/function-000/cdc-eth-function/netdevice-migration/network-device"
+// 05:00:18 following "platform" represents
 // vid(vendor id):pid(product id):did(device id) and are defined in each board file
 //
 // SDIO
@@ -904,11 +904,11 @@ mod tests {
         "pci_usb_match"
     )]
     #[test_case(
-        "/dev/sys/platform/05:03:2d/vim3_usb_phy/dwc2/dwc2_phy/dwc2/usb-peripheral/function-000/cdc-eth-function/netdevice-migration/network-device",
+        "/dev/sys/platform/05:00:18/usb-phy-composite/aml_usb_phy/dwc2/dwc2_phy/dwc2/usb-peripheral/function-000/cdc-eth-function/netdevice-migration/network-device",
         vec![BusType::USB],
         BusType::USB,
         true,
-        "05032d";
+        "050018";
         "dwc_usb_match"
     )]
     // Same topological path as the case for USB, but with
@@ -1351,10 +1351,10 @@ mod tests {
         ],
         DeviceInfoRef {
             device_class: fhwnet::DeviceClass::Ethernet,
-            topological_path: "/dev/sys/platform/05:03:2d/vim3_usb_phy/dwc2/dwc2_phy/dwc2/usb-peripheral/function-000/cdc-eth-function/netdevice-migration/network-device",
+            topological_path: "/dev/sys/platform/05:00:18/usb-phy-composite/aml_usb_phy/dwc2/dwc2_phy/dwc2/usb-peripheral/function-000/cdc-eth-function/netdevice-migration/network-device",
             ..default_device_info()
         },
-        "ethu05032d";
+        "ethu050018";
         "device_class_with_dwc_usb_bus_type_with_bus_path"
     )]
     #[test_case(
@@ -1371,7 +1371,7 @@ mod tests {
         vec![NameCompositionRule::Default],
         DeviceInfoRef {
             device_class: fhwnet::DeviceClass::Ethernet,
-            topological_path: "/dev/sys/platform/05:03:2d/vim3_usb_phy/dwc2/dwc2_phy/dwc2/usb-peripheral/function-000/cdc-eth-function/netdevice-migration/network-device",
+            topological_path: "/dev/sys/platform/05:00:18/usb-phy-composite/aml_usb_phy/dwc2/dwc2_phy/dwc2/usb-peripheral/function-000/cdc-eth-function/netdevice-migration/network-device",
             mac: &fidl_fuchsia_net_ext::MacAddress { octets: [0x1, 0x1, 0x1, 0x1, 0x1, 0x3] },
         },
         "ethx3";

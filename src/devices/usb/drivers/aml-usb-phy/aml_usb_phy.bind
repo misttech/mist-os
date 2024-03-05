@@ -7,15 +7,14 @@ composite aml_usb_phy;
 using fuchsia.amlogic.platform;
 using fuchsia.clock;
 using fuchsia.gpio;
-using fuchsia.khadas.platform;
 using fuchsia.platform;
 using fuchsia.register;
 
 primary node "pdev" {
     fuchsia.BIND_PROTOCOL == fuchsia.platform.BIND_PROTOCOL.DEVICE;
-    fuchsia.BIND_PLATFORM_DEV_PID == fuchsia.khadas.platform.BIND_PLATFORM_DEV_PID.VIM3;
     fuchsia.BIND_PLATFORM_DEV_VID == fuchsia.amlogic.platform.BIND_PLATFORM_DEV_VID.AMLOGIC;
-    fuchsia.BIND_PLATFORM_DEV_DID == fuchsia.amlogic.platform.BIND_PLATFORM_DEV_DID.VIM3_USB_PHY;
+    fuchsia.BIND_PLATFORM_DEV_PID == fuchsia.platform.BIND_PLATFORM_DEV_PID.GENERIC;
+    fuchsia.BIND_PLATFORM_DEV_DID == fuchsia.amlogic.platform.BIND_PLATFORM_DEV_DID.USB_PHY_V2;
     fuchsia.BIND_PLATFORM_DEV_INSTANCE_ID == 0;
 }
 

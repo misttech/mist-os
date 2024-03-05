@@ -15,6 +15,7 @@
 
 #include <cstring>
 
+#include <bind/fuchsia/amlogic/platform/cpp/bind.h>
 #include <bind/fuchsia/clock/cpp/bind.h>
 #include <bind/fuchsia/cpp/bind.h>
 #include <bind/fuchsia/gpio/cpp/bind.h>
@@ -112,9 +113,9 @@ static const std::vector<fpbus::Metadata> usb_phy_metadata{
 static const fpbus::Node usb_phy_dev = []() {
   fpbus::Node dev = {};
   dev.name() = "usb-phy-pdev";
-  dev.pid() = PDEV_PID_VIM3;
-  dev.vid() = PDEV_VID_AMLOGIC;
-  dev.did() = PDEV_DID_VIM3_USB_PHY;
+  dev.pid() = bind_fuchsia_platform::BIND_PLATFORM_DEV_PID_GENERIC;
+  dev.vid() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_VID_AMLOGIC;
+  dev.did() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_DID_USB_PHY_V2;
   dev.mmio() = usb_phy_mmios;
   dev.irq() = usb_phy_irqs;
   dev.bti() = usb_btis;

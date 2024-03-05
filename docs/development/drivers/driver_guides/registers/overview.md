@@ -223,7 +223,7 @@ us to share `RESET1_REGISTER` among multiple drivers including the EMMC
 driver and the USB driver.
 
 See [vim3-registers][vim3-registers] for the board file changes made for reset
-registers and [vim3-usb][vim3-usb] - `vim3_usb_phy` device for adding reset
+registers and [vim3-usb][vim3-usb] - `aml_usb_phy` device for adding reset
 register fragments. `AmlUsbPhy::InitPhy()` of [aml-usb-phy][aml-usb-phy] uses
 the FIDL client to write to the reset register.
 
