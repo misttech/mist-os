@@ -289,6 +289,17 @@ class Dispatcher : public async_dispatcher_t,
   };
 
   struct DebugStats {
+    // Counts the number of occurrences of each reason for why a request was not-inlined.
+    struct NonInlinedStats {
+      size_t allow_sync_calls = 0;
+      size_t parallel_dispatch = 0;
+      size_t task = 0;
+      size_t unknown_thread = 0;
+      size_t reentrant = 0;
+    };
+
+    NonInlinedStats non_inlined = {};
+
     size_t num_inlined_requests = 0;
     size_t num_total_requests = 0;
   };

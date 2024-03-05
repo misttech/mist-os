@@ -1036,6 +1036,26 @@ void Dispatcher::QueueRegisteredCallback(driver_runtime::CallbackRequest* reques
       if (event_waiter_ && !event_waiter_->signaled()) {
         event_waiter_->signal();
       }
+
+      switch (should_inline.error_value()) {
+        case kAllowSyncCalls:
+          debug_stats_.non_inlined.allow_sync_calls++;
+          break;
+        case kDispatchingOnAnotherThread:
+          debug_stats_.non_inlined.parallel_dispatch++;
+          break;
+        case kTask:
+          debug_stats_.non_inlined.task++;
+          break;
+        case kUnknownThread:
+          debug_stats_.non_inlined.unknown_thread++;
+          break;
+        case kReentrant:
+          debug_stats_.non_inlined.reentrant++;
+          break;
+        default:
+          LOGF(ERROR, "Unhandled NonInlinedReason");
+      };
       return;
     }
     dispatching_sync_ = true;
