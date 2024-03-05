@@ -21,6 +21,7 @@
         RunEvent::case_stdout("SampleTest1.SimpleFail", "Value of: true"),
         RunEvent::case_stdout("SampleTest1.SimpleFail", "  Actual: true"),
         RunEvent::case_stdout("SampleTest1.SimpleFail", "Expected: false"),
+        RunEvent::case_stdout("SampleTest1.SimpleFail", ""),
         RunEvent::case_stopped("SampleTest1.SimpleFail", CaseStatus::Failed),
         RunEvent::case_finished("SampleTest1.SimpleFail"),
 
@@ -61,6 +62,7 @@
             "SampleDisabled.DynamicSkip",
             "../../src/sys/test_runners/gtest/test_data/sample_tests.cc:25: Skipped",
         ),
+        RunEvent::case_stdout("SampleDisabled.DynamicSkip", ""),
         RunEvent::case_stdout("SampleDisabled.DynamicSkip", ""),
         RunEvent::case_stopped("SampleDisabled.DynamicSkip", CaseStatus::Skipped),
         RunEvent::case_finished("SampleDisabled.DynamicSkip"),
@@ -109,6 +111,7 @@
         RunEvent::case_stdout("WriteToStd.TestFail", "Value of: true"),
         RunEvent::case_stdout("WriteToStd.TestFail", "  Actual: true"),
         RunEvent::case_stdout("WriteToStd.TestFail", "Expected: false"),
+        RunEvent::case_stdout("WriteToStd.TestFail", ""),
         RunEvent::case_stdout("WriteToStd.TestFail", "third msg"),
         RunEvent::case_stderr("WriteToStd.TestFail", "fourth msg"),
         RunEvent::case_stopped("WriteToStd.TestFail", CaseStatus::Failed),

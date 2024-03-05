@@ -283,8 +283,6 @@ async fn launch_and_test_no_on_finished() {
     assert_eq!(logs, Vec::new());
 }
 
-// TODO(https://fxbug.dev/42178254): Reenable after soft transition.
-#[ignore]
 #[fuchsia::test]
 async fn launch_and_test_gtest_runner_sample_test() {
     let test_url = "fuchsia-pkg://fuchsia.com/gtest-runner-example-tests#meta/sample_tests.cm";
@@ -415,8 +413,6 @@ async fn positive_and_negative_filter_test() {
     assert_eq!(&expected_events, &events);
 }
 
-// TODO(https://fxbug.dev/42178254): Reenable after soft transition.
-#[ignore]
 #[fuchsia::test]
 async fn parallel_tests() {
     let test_url = "fuchsia-pkg://fuchsia.com/gtest-runner-example-tests#meta/sample_tests.cm";
@@ -434,8 +430,6 @@ async fn parallel_tests() {
     assert_eq!(&expected_events, &events);
 }
 
-// TODO(https://fxbug.dev/42178254): Reenable after soft transition.
-#[ignore]
 #[fuchsia::test]
 async fn multiple_test() {
     let gtest_test_url =

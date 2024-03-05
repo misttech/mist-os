@@ -26,8 +26,6 @@ fn default_options() -> ftest_manager::RunOptions {
     }
 }
 
-// TODO(https://fxbug.dev/42178254): Reenable after soft transition.
-#[ignore]
 #[fuchsia_async::run_singlethreaded(test)]
 async fn launch_and_run_sample_test() {
     let test_url = "fuchsia-pkg://fuchsia.com/gtest-runner-example-tests#meta/sample_tests.cm";
@@ -61,8 +59,6 @@ async fn launch_and_run_test_with_custom_args() {
     assert_eq!(expected_events, events);
 }
 
-// TODO(https://fxbug.dev/42178254): Reenable after soft transition.
-#[ignore]
 #[fuchsia_async::run_singlethreaded(test)]
 async fn launch_and_run_test_with_environ() {
     let test_url = "fuchsia-pkg://fuchsia.com/gtest-runner-example-tests#meta/test_with_environ.cm";
@@ -79,8 +75,6 @@ async fn launch_and_run_test_with_environ() {
     assert_eq!(expected_events, events);
 }
 
-// TODO(https://fxbug.dev/42178254): Reenable after soft transition.
-#[ignore]
 #[fuchsia_async::run_singlethreaded(test)]
 async fn launch_and_run_sample_test_no_concurrent() {
     let test_url = "fuchsia-pkg://fuchsia.com/gtest-runner-example-tests#meta/sample_tests.cm";
@@ -96,8 +90,6 @@ async fn launch_and_run_sample_test_no_concurrent() {
     assert_events_eq(&events, &expected_events);
 }
 
-// TODO(https://fxbug.dev/42178254): Reenable after soft transition.
-#[ignore]
 #[fuchsia_async::run_singlethreaded(test)]
 async fn launch_and_run_sample_test_include_disabled() {
     const TEST_URL: &str =
@@ -128,6 +120,7 @@ async fn launch_and_run_sample_test_include_disabled() {
             "SampleDisabled.DynamicSkip",
             "../../src/sys/test_runners/gtest/test_data/sample_tests.cc:25: Skipped",
         ),
+        RunEvent::case_stdout("SampleDisabled.DynamicSkip", ""),
         RunEvent::case_stdout("SampleDisabled.DynamicSkip", ""),
         // gtest does not force run test skipped with `GTEST_SKIP()`
         // https://github.com/google/googletest/issues/3831
