@@ -1,5 +1,4 @@
 include /src/devices/OWNERS
 
 # For WLAN protocols
-rsakthi@google.com
 silberst@google.com
