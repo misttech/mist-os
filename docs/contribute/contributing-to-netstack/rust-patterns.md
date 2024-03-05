@@ -303,6 +303,69 @@ instead of all possible `Foo<A, B, C>`s. Avoiding defaulted type parameters puts
 the onus on the author to make sure any impls, blanket or otherwise, cover the
 correct set of types.
 
+## Logging
+
+Logs are a critical debugging resource for developers, but unfortunately, there
+are several pitfalls to logging that reduce their value and signal. Log too
+frequently, or at too high of a severity, and the logs become noisy, diluting
+the actually important debugging signal for a given problem. Conversely, logging
+too infrequently, or with too low of a severity, means that the debugging signal
+might not make it into the logs to begin with. Striking a balance is essential
+for cultivating useful logs.
+
+Netstack3 makes use of the
+[tracing](https://docs.rs/tracing/latest/tracing/)
+crate for logging, which exposes several log levels. Before diving into the
+logging guidance for the Netstack3 component, it's important to known a few
+default configurations for log severity:
+
+  * The minimum log severity (i.e. log levels below this value are suppressed)
+    is set to `info` in production settings, and `debug` when using the debug
+    netstack component (e.g. in tests).  This can be configured lower by
+    developers when running Netstack3 locally.
+  * The test maximum log severity (i.e. log levels above this value cause an
+    otherwise passing test to be reported as having failed) is set to `warn` by
+    default. Individual tests suites can configure this threshold up or down.
+
+Now, when should you use each log level?
+
+* `error`: Reserved for severe failures with a high probability of manifesting
+  in user-visible problems. Examples:
+  * Removing an interface because the underlying port unexpectedly closed.
+  * Observing FIDL errors other than `PEER_CLOSED`.
+* `warn`: Events or failures that are not so severe as to justify `error`, but
+  that may still manifest in user-visible problems or problems in other
+  components. Examples:
+  * Returning successfully from APIs that are unimplemented.
+  * Rejecting API requests that had incorrect semantics (e.g. invalid args).
+  * Observing that the underlying port's physical status changes to offline.
+* `info`: Notable Events, and cheap debugging signals. Examples
+  * Changes to the network state: i.e. adding/removing addresses, routes, or
+    interfaces.
+  * Interesting network events (e.g. Duplicate Address Detection fails).
+* `debug`: Events and debugging signals that are relevant only to Netstack
+  developers, or are too noisy to justify putting on production devices.
+  * Control events from the network, such as Router Advertisements.
+  * Incoming API calls (e.g. socket operations or FIDL methods), as well as
+    the result returned to the caller.
+  * Starting/stopping of periodic tasks, such as the Neighbor Table garbage
+    collector.
+* `trace`: Debugging signals that are prohibitively expensive outside of toy
+  environments (i.e. unit tests). Examples
+  * Extremely frequent messages such as messages tied to sending/receiving
+    datapath packets, or messages tied to high frequency timers firing.
+
+The intention is for instances of `error` and `trace` in our code to be
+exceptionally rare, and for instances of `warn` to be uncommon. The majority of
+log instances should be either `info` or `debug`.
+
+Consider `debug` to be the default log level choice. Before deciding to promote
+a message to `info`, ask yourself what the frequency of the message is expected
+to be, and what value this message will provide when triaging a field issue.
+Before deciding to promote a message to `warn`, ask yourself how likely this is
+to represent an issue to another team (i.e. would it be appropriate for another
+team to assign you a bug because they saw this warning in the logs?).
+
 ## Process for changes to this page
 
 All are invited and welcome to propose changes to the patterns adopted by the
