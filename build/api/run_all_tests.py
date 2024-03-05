@@ -20,6 +20,11 @@ def main():
         help="Source directory (default is current one)",
     )
     parser.add_argument(
+        "--quiet",
+        action="store_true",
+        help="Do not print anything, except errors.",
+    )
+    parser.add_argument(
         "--stamp", type=Path, help="Stamp file to write on success."
     )
 
@@ -35,7 +40,8 @@ def main():
     )
     failures = []
     for test_file in test_files:
-        print(f"Running {test_file}", file=sys.stderr)
+        if not args.quiet:
+            print(f"Running {test_file}", file=sys.stderr)
         ret = subprocess.run(
             [sys.executable, source_dir / test_file],
             text=True,
@@ -57,7 +63,8 @@ def main():
         )
         return 1
 
-    print(f"SUCCESS: {count} tests passed.")
+    if not args.quiet:
+        print(f"SUCCESS: {count} tests passed.")
 
     if args.stamp:
         args.stamp.write_text("ok")

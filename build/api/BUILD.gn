@@ -23,6 +23,7 @@ if (current_toolchain == host_toolchain) {
     ]
     outputs = [ "$target_out_dir/$target_name.check" ]
     args = [
+      "--quiet",
       "--stamp",
       rebase_path(outputs[0], root_build_dir),
     ]
