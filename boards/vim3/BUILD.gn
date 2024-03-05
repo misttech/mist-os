@@ -198,9 +198,9 @@ board_input_bundle("main_bundle") {
       driver_components = [ "meta/dwc2.cm" ]
     },
     {
-      package_target = "//src/devices/usb/drivers/vim3-usb-phy:package"
+      package_target = "//src/devices/usb/drivers/aml-usb-phy:package"
       package_set = "bootfs"
-      driver_components = [ "meta/vim3-usb-phy.cm" ]
+      driver_components = [ "meta/aml-usb-phy.cm" ]
     },
     {
       package_target = "//src/graphics/display/drivers/aml-canvas:package"

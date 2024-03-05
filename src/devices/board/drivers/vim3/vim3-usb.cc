@@ -80,7 +80,7 @@ static const uint32_t pll_settings[] = {
     0x09400414, 0x927e0000, 0xac5f69e5, 0xfe18, 0x8000fff, 0x78000, 0xe0004, 0xe000c,
 };
 
-// vim3_usb_phy manages 3 different controllers:
+// aml_usb_phy manages 3 different controllers:
 //  - One USB 2.0 controller that is only supports host mode.
 //  - One USB 2.0 controller that supports OTG (both host and device mode).
 //  - One USB 3.0 controller that only supports host mode.

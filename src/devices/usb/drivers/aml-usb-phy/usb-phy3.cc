@@ -2,13 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/devices/usb/drivers/vim3-usb-phy/usb-phy3.h"
+#include "src/devices/usb/drivers/aml-usb-phy/usb-phy3.h"
 
 #include <lib/driver/logging/cpp/logger.h>
 
-#include "src/devices/usb/drivers/vim3-usb-phy/usb-phy-regs.h"
+#include "src/devices/usb/drivers/aml-usb-phy/usb-phy-regs.h"
 
-namespace vim3_usb_phy {
+namespace aml_usb_phy {
 
 zx_status_t UsbPhy3::CrBusAddr(uint32_t addr) {
   auto phy3_r4 = PHY3_R4::Get().FromValue(0).set_phy_cr_data_in(addr);
@@ -213,4 +213,4 @@ zx_status_t UsbPhy3::Init(fdf::MmioBuffer& usbctrl_mmio) {
   return ZX_OK;
 }
 
-}  // namespace vim3_usb_phy
+}  // namespace aml_usb_phy

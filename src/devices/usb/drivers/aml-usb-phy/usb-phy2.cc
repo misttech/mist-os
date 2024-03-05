@@ -2,13 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/devices/usb/drivers/vim3-usb-phy/usb-phy2.h"
+#include "src/devices/usb/drivers/aml-usb-phy/usb-phy2.h"
 
 #include <lib/driver/logging/cpp/logger.h>
 
-#include "src/devices/usb/drivers/vim3-usb-phy/usb-phy-regs.h"
+#include "src/devices/usb/drivers/aml-usb-phy/usb-phy-regs.h"
 
-namespace vim3_usb_phy {
+namespace aml_usb_phy {
 
 // Based on set_usb_pll() in phy-aml-new-usb2-v2.c
 void UsbPhy2::InitPll(const std::array<uint32_t, 8>& pll_settings) {
@@ -87,4 +87,4 @@ void UsbPhy2::SetModeInternal(UsbMode mode, fdf::MmioBuffer& usbctrl_mmio,
   }
 }
 
-}  // namespace vim3_usb_phy
+}  // namespace aml_usb_phy

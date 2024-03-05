@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/devices/usb/drivers/vim3-usb-phy/vim3-usb-phy-device.h"
+#include "src/devices/usb/drivers/aml-usb-phy/aml-usb-phy-device.h"
 
 #include <fidl/fuchsia.hardware.registers/cpp/wire.h>
 #include <lib/ddk/binding_priv.h>
@@ -14,9 +14,9 @@
 #include <fbl/auto_lock.h>
 #include <soc/aml-common/aml-usb-phy.h>
 
-#include "src/devices/usb/drivers/vim3-usb-phy/vim3-usb-phy.h"
+#include "src/devices/usb/drivers/aml-usb-phy/aml-usb-phy.h"
 
-namespace vim3_usb_phy {
+namespace aml_usb_phy {
 
 namespace {
 
@@ -86,7 +86,7 @@ zx::result<PhyMetadata> ParseMetadata(
 
 }  // namespace
 
-zx::result<> Vim3UsbPhyDevice::Start() {
+zx::result<> AmlUsbPhyDevice::Start() {
   // Get Reset Register.
   fidl::ClientEnd<fuchsia_hardware_registers::Device> reset_register;
   {
@@ -189,9 +189,9 @@ zx::result<> Vim3UsbPhyDevice::Start() {
   }
 
   // Create and initialize device
-  device_ = std::make_unique<Vim3UsbPhy>(this, std::move(reset_register),
-                                         parsed_metadata.pll_settings, std::move(*usbctrl_mmio),
-                                         std::move(irq), std::move(usbphy2), std::move(usbphy3));
+  device_ = std::make_unique<AmlUsbPhy>(this, std::move(reset_register),
+                                        parsed_metadata.pll_settings, std::move(*usbctrl_mmio),
+                                        std::move(irq), std::move(usbphy2), std::move(usbphy3));
 
   // Serve fuchsia_hardware_usb_phy.
   {
@@ -225,8 +225,8 @@ zx::result<> Vim3UsbPhyDevice::Start() {
   return zx::ok();
 }
 
-zx::result<> Vim3UsbPhyDevice::CreateNode() {
-  // Add node for vim3-usb-phy.
+zx::result<> AmlUsbPhyDevice::CreateNode() {
+  // Add node for aml-usb-phy.
   fidl::Arena arena;
   auto args =
       fuchsia_driver_framework::wire::NodeAddArgs::Builder(arena).name(arena, kDeviceName).Build();
@@ -253,7 +253,7 @@ zx::result<> Vim3UsbPhyDevice::CreateNode() {
   return zx::ok();
 }
 
-zx::result<> Vim3UsbPhyDevice::AddDevice(ChildNode& node) {
+zx::result<> AmlUsbPhyDevice::AddDevice(ChildNode& node) {
   fbl::AutoLock _(&node.lock_);
   node.count_++;
   if (node.count_ != 1) {
@@ -299,7 +299,7 @@ zx::result<> Vim3UsbPhyDevice::AddDevice(ChildNode& node) {
   return zx::ok();
 }
 
-zx::result<> Vim3UsbPhyDevice::RemoveDevice(ChildNode& node) {
+zx::result<> AmlUsbPhyDevice::RemoveDevice(ChildNode& node) {
   fbl::AutoLock _(&node.lock_);
   if (node.count_ == 0) {
     // Nothing to remove.
@@ -315,13 +315,13 @@ zx::result<> Vim3UsbPhyDevice::RemoveDevice(ChildNode& node) {
   return zx::ok();
 }
 
-void Vim3UsbPhyDevice::Stop() {
+void AmlUsbPhyDevice::Stop() {
   auto status = controller_->Remove();
   if (!status.ok()) {
     FDF_LOG(ERROR, "Could not remove child: %s", status.status_string());
   }
 }
 
-}  // namespace vim3_usb_phy
+}  // namespace aml_usb_phy
 
-FUCHSIA_DRIVER_EXPORT(vim3_usb_phy::Vim3UsbPhyDevice);
+FUCHSIA_DRIVER_EXPORT(aml_usb_phy::AmlUsbPhyDevice);

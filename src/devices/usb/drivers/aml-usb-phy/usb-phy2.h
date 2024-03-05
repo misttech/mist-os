@@ -2,18 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_DEVICES_USB_DRIVERS_VIM3_USB_PHY_USB_PHY2_H_
-#define SRC_DEVICES_USB_DRIVERS_VIM3_USB_PHY_USB_PHY2_H_
+#ifndef SRC_DEVICES_USB_DRIVERS_AML_USB_PHY_USB_PHY2_H_
+#define SRC_DEVICES_USB_DRIVERS_AML_USB_PHY_USB_PHY2_H_
 
 #include <lib/mmio/mmio.h>
 
 #include <usb/usb.h>
 
-#include "src/devices/usb/drivers/vim3-usb-phy/usb-phy-base.h"
+#include "src/devices/usb/drivers/aml-usb-phy/usb-phy-base.h"
 
-namespace vim3_usb_phy {
+namespace aml_usb_phy {
 
-class Vim3UsbPhy;
+class AmlUsbPhy;
 
 class UsbPhy2 final : public UsbPhyBase {
  public:
@@ -31,6 +31,6 @@ class UsbPhy2 final : public UsbPhyBase {
   const uint8_t idx_;  // For indexing into usbctrl_mmio.
 };
 
-}  // namespace vim3_usb_phy
+}  // namespace aml_usb_phy
 
-#endif  // SRC_DEVICES_USB_DRIVERS_VIM3_USB_PHY_USB_PHY2_H_
+#endif  // SRC_DEVICES_USB_DRIVERS_AML_USB_PHY_USB_PHY2_H_

@@ -9,8 +9,8 @@
     ],
     program: {
         runner: "driver",
-        binary: "driver/vim3-usb-phy.so",
-        bind: "meta/bind/vim3-usb-phy.bindbc",
+        binary: "driver/aml-usb-phy.so",
+        bind: "meta/bind/aml-usb-phy.bindbc",
         colocate: "false",
         default_dispatcher_opts: [ "allow_sync_calls" ],
         fallback: "false",

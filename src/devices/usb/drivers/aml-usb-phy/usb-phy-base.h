@@ -2,14 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_DEVICES_USB_DRIVERS_VIM3_USB_PHY_USB_PHY_BASE_H_
-#define SRC_DEVICES_USB_DRIVERS_VIM3_USB_PHY_USB_PHY_BASE_H_
+#ifndef SRC_DEVICES_USB_DRIVERS_AML_USB_PHY_USB_PHY_BASE_H_
+#define SRC_DEVICES_USB_DRIVERS_AML_USB_PHY_USB_PHY_BASE_H_
 
 #include <lib/mmio/mmio.h>
 
 #include <usb/usb.h>
 
-namespace vim3_usb_phy {
+namespace aml_usb_phy {
 
 enum class UsbMode {
   UNKNOWN,
@@ -46,6 +46,6 @@ class UsbPhyBase {
       UsbMode::UNKNOWN;  // Physical USB mode. Must hold parent's lock_ while accessing.
 };
 
-}  // namespace vim3_usb_phy
+}  // namespace aml_usb_phy
 
-#endif  // SRC_DEVICES_USB_DRIVERS_VIM3_USB_PHY_USB_PHY_BASE_H_
+#endif  // SRC_DEVICES_USB_DRIVERS_AML_USB_PHY_USB_PHY_BASE_H_

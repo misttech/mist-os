@@ -77,8 +77,8 @@ TEST_F(DeviceEnumerationTest, Vim3Test) {
 
       // USB
       "sys/platform/05:03:2d/usb-phy-composite",
-      "sys/platform/05:03:2d/usb-phy-composite/vim3_usb_phy/dwc2/dwc2-composite/dwc2/usb-peripheral/function-000/cdc-eth-function",
-      "sys/platform/05:03:2d/usb-phy-composite/vim3_usb_phy/xhci",
+      "sys/platform/05:03:2d/usb-phy-composite/aml_usb_phy/dwc2/dwc2-composite/dwc2/usb-peripheral/function-000/cdc-eth-function",
+      "sys/platform/05:03:2d/usb-phy-composite/aml_usb_phy/xhci",
       "sys/platform/00:00:2/xhci-composite/xhci",
 
       // USB 2.0 Hub

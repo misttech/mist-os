@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/devices/usb/drivers/vim3-usb-phy/vim3-usb-phy.h"
+#include "src/devices/usb/drivers/aml-usb-phy/aml-usb-phy.h"
 
 #include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
 #include <lib/ddk/metadata.h>
@@ -19,9 +19,9 @@
 
 #include "src/devices/bus/testing/fake-pdev/fake-pdev.h"
 #include "src/devices/registers/testing/mock-registers/mock-registers.h"
-#include "src/devices/usb/drivers/vim3-usb-phy/usb-phy-regs.h"
+#include "src/devices/usb/drivers/aml-usb-phy/usb-phy-regs.h"
 
-namespace vim3_usb_phy {
+namespace aml_usb_phy {
 
 constexpr auto kRegisterBanks = 4;
 constexpr auto kRegisterCount = 2048;
@@ -52,8 +52,8 @@ struct IncomingNamespace {
   mock_registers::MockRegisters registers{fdf::Dispatcher::GetCurrent()->async_dispatcher()};
 };
 
-// Fixture that supports tests of Vim3UsbPhy::Create.
-class Vim3UsbPhyTest : public zxtest::Test {
+// Fixture that supports tests of AmlUsbPhy::Create.
+class AmlUsbPhyTest : public zxtest::Test {
  public:
   void SetUp() override {
     static constexpr uint32_t kMagicNumbers[8] = {};
@@ -132,19 +132,19 @@ class Vim3UsbPhyTest : public zxtest::Test {
   }
 
   // This method fires the irq and then waits for the side effects of SetMode to have taken place.
-  void TriggerInterruptAndCheckMode(Vim3UsbPhy::UsbMode mode) {
+  void TriggerInterruptAndCheckMode(AmlUsbPhy::UsbMode mode) {
     auto& phy = dut_->device_;
     // Switch to appropriate mode. This will be read by the irq thread.
     USB_R5_V2::Get()
         .FromValue(0)
-        .set_iddig_curr(mode == Vim3UsbPhy::UsbMode::PERIPHERAL)
+        .set_iddig_curr(mode == AmlUsbPhy::UsbMode::PERIPHERAL)
         .WriteTo(&phy->usbctrl_mmio_);
     // Wake up the irq thread.
     ASSERT_OK(irq_->trigger(0, zx::clock::get_monotonic()));
     runtime_.RunUntilIdle();
 
     // Check that mode is as expected.
-    EXPECT_EQ(phy->usbphy2_[0].mode(), Vim3UsbPhy::UsbMode::HOST);
+    EXPECT_EQ(phy->usbphy2_[0].mode(), AmlUsbPhy::UsbMode::HOST);
     EXPECT_EQ(phy->usbphy2_[1].mode(), mode);
   }
 
@@ -155,25 +155,25 @@ class Vim3UsbPhyTest : public zxtest::Test {
       env_dispatcher_->async_dispatcher(), std::in_place};
 
  private:
-  fdf_testing::DriverUnderTest<Vim3UsbPhyDevice> dut_;
+  fdf_testing::DriverUnderTest<AmlUsbPhyDevice> dut_;
   FakeMmio mmio_[kRegisterBanks];
   zx::unowned_interrupt irq_;
 };
 
-TEST_F(Vim3UsbPhyTest, SetMode) {
+TEST_F(AmlUsbPhyTest, SetMode) {
   fdf_testing::TestNode* phy;
   incoming_.SyncCall([&](IncomingNamespace* incoming) {
-    // The vim3_usb_phy device should be added.
+    // The aml_usb_phy device should be added.
     ASSERT_EQ(incoming->node_.children().size(), 1);
-    ASSERT_NE(incoming->node_.children().find("vim3_usb_phy"), incoming->node_.children().end());
-    phy = &incoming->node_.children().at("vim3_usb_phy");
+    ASSERT_NE(incoming->node_.children().find("aml_usb_phy"), incoming->node_.children().end());
+    phy = &incoming->node_.children().at("aml_usb_phy");
     // The xhci device child should be added.
     ASSERT_EQ(phy->children().size(), 1);
     EXPECT_NE(phy->children().find("xhci"), phy->children().end());
   });
 
   // Trigger interrupt configuring initial Host mode.
-  TriggerInterruptAndCheckMode(Vim3UsbPhy::UsbMode::HOST);
+  TriggerInterruptAndCheckMode(AmlUsbPhy::UsbMode::HOST);
   // Nothing should've changed.
   incoming_.SyncCall([&](IncomingNamespace* incoming) {
     ASSERT_EQ(phy->children().size(), 1);
@@ -182,7 +182,7 @@ TEST_F(Vim3UsbPhyTest, SetMode) {
   });
 
   // Trigger interrupt, and switch to Peripheral mode.
-  TriggerInterruptAndCheckMode(Vim3UsbPhy::UsbMode::PERIPHERAL);
+  TriggerInterruptAndCheckMode(AmlUsbPhy::UsbMode::PERIPHERAL);
   // The dwc2 device should be added.
   incoming_.SyncCall([&](IncomingNamespace* incoming) {
     ASSERT_EQ(phy->children().size(), 2);
@@ -193,7 +193,7 @@ TEST_F(Vim3UsbPhyTest, SetMode) {
   });
 
   // Trigger interrupt, and switch (back) to Host mode.
-  TriggerInterruptAndCheckMode(Vim3UsbPhy::UsbMode::HOST);
+  TriggerInterruptAndCheckMode(AmlUsbPhy::UsbMode::HOST);
   // The dwc2 device should be removed.
   incoming_.SyncCall([&](IncomingNamespace* incoming) {
     ASSERT_EQ(phy->children().size(), 1);
@@ -202,4 +202,4 @@ TEST_F(Vim3UsbPhyTest, SetMode) {
   });
 }
 
-}  // namespace vim3_usb_phy
+}  // namespace aml_usb_phy

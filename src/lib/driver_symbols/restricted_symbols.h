@@ -192,7 +192,7 @@ const std::set<std::string> kCreateThreadSymbolsDriversAllowlist = {
     "#meta/usb-two-endpoint-hid-fake-usb.cm",
     "#meta/usb_video.cm",
     "#meta/usb-virtual-bus.cm",
-    "#meta/vim3-usb-phy.cm",
+    "#meta/aml-usb-phy.cm",
     "#meta/virtio_block.cm",
     "#meta/virtio_console.cm",
     "#meta/virtio_gpu.cm",

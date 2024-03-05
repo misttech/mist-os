@@ -7,9 +7,9 @@ import("//build/components.gni")
 import("//build/drivers.gni")
 import("//build/test.gni")
 
-driver_bind_rules("vim3_usb_phy_bind") {
-  rules = "vim3_usb_phy.bind"
-  bind_output = "vim3-usb-phy.bindbc"
+driver_bind_rules("aml_usb_phy_bind") {
+  rules = "aml_usb_phy.bind"
+  bind_output = "aml-usb-phy.bindbc"
   tests = "test_bind.json"
   deps = [
     "//src/devices/bind/fuchsia.amlogic.platform",
@@ -27,13 +27,13 @@ source_set("common") {
     "//build/config/fuchsia:enable_zircon_asserts",
   ]
   sources = [
+    "aml-usb-phy-device.cc",
+    "aml-usb-phy.cc",
     "usb-phy2.cc",
     "usb-phy3.cc",
-    "vim3-usb-phy-device.cc",
-    "vim3-usb-phy.cc",
   ]
   deps = [
-    ":vim3_usb_phy_bind",
+    ":aml_usb_phy_bind",
     "//sdk/fidl/fuchsia.driver.compat:fuchsia.driver.compat_cpp",
     "//sdk/fidl/fuchsia.hardware.registers:fuchsia.hardware.registers_cpp",
     "//sdk/fidl/fuchsia.hardware.usb.phy:fuchsia.hardware.usb.phy_cpp",
@@ -50,8 +50,8 @@ source_set("common") {
   ]
 }
 
-fuchsia_driver("vim3-usb-phy-driver") {
-  output_name = "vim3-usb-phy"
+fuchsia_driver("aml-usb-phy-driver") {
+  output_name = "aml-usb-phy"
   configs += [
     "//build/config:all_source",
     "//build/config/fuchsia:enable_zircon_asserts",
@@ -62,22 +62,22 @@ fuchsia_driver("vim3-usb-phy-driver") {
   ]
 }
 
-fuchsia_driver_component("vim3-usb-phy") {
-  info = "vim3-usb-phy-info.json"
-  component_name = "vim3-usb-phy"
-  deps = [ ":vim3-usb-phy-driver" ]
-  manifest = "meta/vim3-usb-phy.cml"
+fuchsia_driver_component("aml-usb-phy") {
+  info = "aml-usb-phy-info.json"
+  component_name = "aml-usb-phy"
+  deps = [ ":aml-usb-phy-driver" ]
+  manifest = "meta/aml-usb-phy.cml"
 }
 
 fuchsia_driver_package("package") {
-  package_name = "vim3-usb-phy"
-  driver_components = [ ":vim3-usb-phy" ]
+  package_name = "aml-usb-phy"
+  driver_components = [ ":aml-usb-phy" ]
 }
 
-test("vim3-usb-phy-test-bin") {
+test("aml-usb-phy-test-bin") {
   configs += [ "//build/config:all_source" ]
-  sources = [ "vim3-usb-phy-test.cc" ]
-  output_name = "vim3-usb-phy-test"
+  sources = [ "aml-usb-phy-test.cc" ]
+  output_name = "aml-usb-phy-test"
   deps = [
     ":common",
     "//sdk/lib/async_patterns/testing/cpp",
@@ -89,8 +89,8 @@ test("vim3-usb-phy-test-bin") {
   ]
 }
 
-fuchsia_unittest_package("vim3-usb-phy-test") {
-  deps = [ ":vim3-usb-phy-test-bin" ]
+fuchsia_unittest_package("aml-usb-phy-test") {
+  deps = [ ":aml-usb-phy-test-bin" ]
   test_specs = {
     log_settings = {
       max_severity = "ERROR"
@@ -100,5 +100,5 @@ fuchsia_unittest_package("vim3-usb-phy-test") {
 
 group("tests") {
   testonly = true
-  deps = [ ":vim3_usb_phy_bind_test" ]
+  deps = [ ":aml_usb_phy_bind_test" ]
 }

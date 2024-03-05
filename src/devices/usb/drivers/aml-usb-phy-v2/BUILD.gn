@@ -7,8 +7,8 @@ import("//build/components.gni")
 import("//build/drivers.gni")
 import("//build/test.gni")
 
-driver_bind_rules("aml_usb_phy_bind") {
-  rules = "aml_usb_phy.bind"
+driver_bind_rules("aml_usb_phy_v2_bind") {
+  rules = "aml_usb_phy_v2.bind"
   bind_output = "aml-usb-phy-v2.bindbc"
   tests = "test_bind.json"
   deps = [
@@ -26,7 +26,7 @@ fuchsia_driver("aml-usb-phy-v2-driver") {
   ]
   sources = [ "aml-usb-phy.cc" ]
   deps = [
-    ":aml_usb_phy_bind",
+    ":aml_usb_phy_v2_bind",
     "//sdk/banjo/fuchsia.hardware.usb.phy:fuchsia.hardware.usb.phy_banjo_cpp",
     "//sdk/fidl/fuchsia.hardware.registers:fuchsia.hardware.registers_cpp",
     "//src/devices/bus/lib/device-protocol-pdev",
@@ -62,7 +62,7 @@ test("aml-usb-phy-test-bin") {
   ]
   output_name = "aml-usb-phy-test"
   deps = [
-    ":aml_usb_phy_bind",
+    ":aml_usb_phy_v2_bind",
     "//sdk/banjo/fuchsia.hardware.usb:fuchsia.hardware.usb_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.usb.phy:fuchsia.hardware.usb.phy_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.usb.request:fuchsia.hardware.usb.request_banjo_cpp",
@@ -104,6 +104,6 @@ group("tests") {
   testonly = true
   deps = [
     ":aml-usb-phy-test",
-    ":aml_usb_phy_bind_test",
+    ":aml_usb_phy_v2_bind_test",
   ]
 }

@@ -8,6 +8,7 @@ group("tests") {
   deps = [
     "a1-usb-phy:tests",
     "aml-usb-crg-phy-v2:tests",
+    "aml-usb-phy:tests",
     "aml-usb-phy-v2:tests",
     "crg-udc:tests",
     "dwc2:tests",
@@ -19,7 +20,6 @@ group("tests") {
     "usb-peripheral:tests",
     "usb-peripheral-test:tests",
     "usb-virtual-bus:tests",
-    "vim3-usb-phy:tests",
     "xhci:tests",
   ]
 }

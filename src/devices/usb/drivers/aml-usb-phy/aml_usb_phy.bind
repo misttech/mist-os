@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-composite vim3_usb_phy;
+composite aml_usb_phy;
 
 using fuchsia.amlogic.platform;
 using fuchsia.clock;

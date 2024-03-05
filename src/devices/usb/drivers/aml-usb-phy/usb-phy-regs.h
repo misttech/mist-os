@@ -2,14 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_DEVICES_USB_DRIVERS_VIM3_USB_PHY_USB_PHY_REGS_H_
-#define SRC_DEVICES_USB_DRIVERS_VIM3_USB_PHY_USB_PHY_REGS_H_
+#ifndef SRC_DEVICES_USB_DRIVERS_AML_USB_PHY_USB_PHY_REGS_H_
+#define SRC_DEVICES_USB_DRIVERS_AML_USB_PHY_USB_PHY_REGS_H_
 
 #include <zircon/types.h>
 
 #include <hwreg/bitfields.h>
 
-namespace vim3_usb_phy {
+namespace aml_usb_phy {
 
 constexpr uint32_t RESET1_REGISTER_OFFSET = 0x8;
 constexpr uint32_t RESET1_LEVEL_OFFSET = 0x84;
@@ -194,6 +194,6 @@ class PHY3_R5 : public hwreg::RegisterBase<PHY3_R5, uint32_t> {
   static auto Get() { return hwreg::RegisterAddr<PHY3_R5>(PHY3_R5_OFFSET); }
 };
 
-}  // namespace vim3_usb_phy
+}  // namespace aml_usb_phy
 
-#endif  // SRC_DEVICES_USB_DRIVERS_VIM3_USB_PHY_USB_PHY_REGS_H_
+#endif  // SRC_DEVICES_USB_DRIVERS_AML_USB_PHY_USB_PHY_REGS_H_

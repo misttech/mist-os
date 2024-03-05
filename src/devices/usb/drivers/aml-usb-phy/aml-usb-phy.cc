@@ -2,17 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/devices/usb/drivers/vim3-usb-phy/vim3-usb-phy.h"
+#include "src/devices/usb/drivers/aml-usb-phy/aml-usb-phy.h"
 
 #include <fidl/fuchsia.driver.compat/cpp/wire.h>
 
 #include <soc/aml-common/aml-registers.h>
 
-#include "src/devices/usb/drivers/vim3-usb-phy/usb-phy-regs.h"
+#include "src/devices/usb/drivers/aml-usb-phy/usb-phy-regs.h"
 
-namespace vim3_usb_phy {
+namespace aml_usb_phy {
 
-zx_status_t Vim3UsbPhy::InitPhy2() {
+zx_status_t AmlUsbPhy::InitPhy2() {
   auto* usbctrl_mmio = &usbctrl_mmio_;
 
   // first reset USB
@@ -86,7 +86,7 @@ zx_status_t Vim3UsbPhy::InitPhy2() {
     while (!u2p_r1.ReadFrom(usbctrl_mmio).phy_rdy()) {
       // wait phy ready max 5ms, common is 100us
       if (count > 1000) {
-        FDF_LOG(WARNING, "Vim3UsbPhy::InitPhy U2P_R1_PHY_RDY wait failed");
+        FDF_LOG(WARNING, "AmlUsbPhy::InitPhy U2P_R1_PHY_RDY wait failed");
         break;
       }
 
@@ -103,7 +103,7 @@ zx_status_t Vim3UsbPhy::InitPhy2() {
   return ZX_OK;
 }
 
-zx_status_t Vim3UsbPhy::InitOtg() {
+zx_status_t AmlUsbPhy::InitOtg() {
   auto* mmio = &usbctrl_mmio_;
 
   USB_R1_V2::Get().ReadFrom(mmio).set_u3h_fladj_30mhz_reg(0x20).WriteTo(mmio);
@@ -113,7 +113,7 @@ zx_status_t Vim3UsbPhy::InitOtg() {
   return ZX_OK;
 }
 
-zx_status_t Vim3UsbPhy::InitPhy3() {
+zx_status_t AmlUsbPhy::InitPhy3() {
   for (auto& usbphy3 : usbphy3_) {
     auto status = usbphy3.Init(usbctrl_mmio_);
     if (status != ZX_OK) {
@@ -125,7 +125,7 @@ zx_status_t Vim3UsbPhy::InitPhy3() {
   return ZX_OK;
 }
 
-void Vim3UsbPhy::ChangeMode(UsbPhyBase& phy, UsbMode new_mode) {
+void AmlUsbPhy::ChangeMode(UsbPhyBase& phy, UsbMode new_mode) {
   auto old_mode = phy.phy_mode();
   if (new_mode == old_mode) {
     FDF_LOG(ERROR, "Already in %d mode", static_cast<uint8_t>(new_mode));
@@ -158,8 +158,8 @@ void Vim3UsbPhy::ChangeMode(UsbPhyBase& phy, UsbMode new_mode) {
   }
 }
 
-void Vim3UsbPhy::HandleIrq(async_dispatcher_t* dispatcher, async::IrqBase* irq, zx_status_t status,
-                           const zx_packet_interrupt_t* interrupt) {
+void AmlUsbPhy::HandleIrq(async_dispatcher_t* dispatcher, async::IrqBase* irq, zx_status_t status,
+                          const zx_packet_interrupt_t* interrupt) {
   if (status == ZX_ERR_CANCELED) {
     return;
   }
@@ -186,7 +186,7 @@ void Vim3UsbPhy::HandleIrq(async_dispatcher_t* dispatcher, async::IrqBase* irq, 
   irq_.ack();
 }
 
-zx_status_t Vim3UsbPhy::Init(bool has_otg) {
+zx_status_t AmlUsbPhy::Init(bool has_otg) {
   auto status = InitPhy2();
   if (status != ZX_OK) {
     FDF_LOG(ERROR, "InitPhy2() error %s", zx_status_get_string(status));
@@ -240,8 +240,8 @@ zx_status_t Vim3UsbPhy::Init(bool has_otg) {
 }
 
 // PHY tuning based on connection state
-void Vim3UsbPhy::ConnectStatusChanged(ConnectStatusChangedRequest& request,
-                                      ConnectStatusChangedCompleter::Sync& completer) {
+void AmlUsbPhy::ConnectStatusChanged(ConnectStatusChangedRequest& request,
+                                     ConnectStatusChangedCompleter::Sync& completer) {
   if (dwc2_connected_ == request.connected())
     return;
 
@@ -262,4 +262,4 @@ void Vim3UsbPhy::ConnectStatusChanged(ConnectStatusChangedRequest& request,
   dwc2_connected_ = request.connected();
 }
 
-}  // namespace vim3_usb_phy
+}  // namespace aml_usb_phy
