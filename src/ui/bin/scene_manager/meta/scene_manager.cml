@@ -17,7 +17,6 @@
             protocol: [
                 "fuchsia.element.GraphicalPresenter",
                 "fuchsia.session.scene.Manager",
-                "fuchsia.ui.accessibility.view.Registry",
                 "fuchsia.ui.brightness.ColorAdjustment",
                 "fuchsia.ui.brightness.ColorAdjustmentHandler",
                 "fuchsia.ui.input.config.Features",
@@ -66,7 +65,6 @@
             protocol: [
                 "fuchsia.element.GraphicalPresenter",
                 "fuchsia.session.scene.Manager",
-                "fuchsia.ui.accessibility.view.Registry",
                 "fuchsia.ui.brightness.ColorAdjustment",
                 "fuchsia.ui.brightness.ColorAdjustmentHandler",
                 "fuchsia.ui.input.config.Features",

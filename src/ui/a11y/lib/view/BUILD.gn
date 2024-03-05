@@ -28,7 +28,6 @@ source_set("view") {
     "//sdk/fidl/fuchsia.accessibility.semantics:fuchsia.accessibility.semantics_hlcpp",
     "//sdk/fidl/fuchsia.accessibility.virtualkeyboard:fuchsia.accessibility.virtualkeyboard_hlcpp",
     "//sdk/fidl/fuchsia.math:fuchsia.math_hlcpp",
-    "//sdk/fidl/fuchsia.ui.accessibility.view:fuchsia.ui.accessibility.view_hlcpp",
     "//sdk/fidl/fuchsia.ui.composition:fuchsia.ui.composition_hlcpp",
     "//sdk/fidl/fuchsia.ui.observation.geometry:fuchsia.ui.observation.geometry_hlcpp",
     "//sdk/fidl/fuchsia.ui.observation.scope:fuchsia.ui.observation.scope_hlcpp",

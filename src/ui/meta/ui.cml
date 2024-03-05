@@ -24,13 +24,6 @@
             from: "parent",
             to: [ "#scene_manager" ],
         },
-
-        // TODO(https://fxbug.dev/42062029): Remove once gfx is deprecated.
-        {
-            protocol: [ "fuchsia.ui.accessibility.view.Registry" ],
-            from: "#scene_manager",
-            to: [ "#a11y_manager" ],
-        },
         {
             protocol: [
                 "fuchsia.factory.MiscFactoryStoreProvider",

@@ -31,7 +31,6 @@ icu_rustc_binary("scene_manager_bin") {
     "//sdk/fidl/fuchsia.recovery.ui:fuchsia.recovery.ui_rust",
     "//sdk/fidl/fuchsia.session.scene:fuchsia.session.scene_rust",
     "//sdk/fidl/fuchsia.settings:fuchsia.settings_rust",
-    "//sdk/fidl/fuchsia.ui.accessibility.view:fuchsia.ui.accessibility.view_rust",
     "//sdk/fidl/fuchsia.ui.brightness:fuchsia.ui.brightness_rust",
     "//sdk/fidl/fuchsia.ui.composition:fuchsia.ui.composition_rust",
     "//sdk/fidl/fuchsia.ui.composition.internal:fuchsia.ui.composition.internal_rust",

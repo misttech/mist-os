@@ -15,7 +15,6 @@
 #include <fuchsia/session/scene/cpp/fidl.h>
 #include <fuchsia/settings/cpp/fidl.h>
 #include <fuchsia/tracing/provider/cpp/fidl.h>
-#include <fuchsia/ui/accessibility/view/cpp/fidl.h>
 #include <fuchsia/ui/app/cpp/fidl.h>
 #include <fuchsia/ui/composition/cpp/fidl.h>
 #include <fuchsia/ui/composition/internal/cpp/fidl.h>
@@ -127,7 +126,6 @@ std::vector<std::string> SceneOwnerServices(const UITestRealm::Config& config) {
   }
 
   return {fuchsia::session::scene::Manager::Name_,
-          fuchsia::ui::accessibility::view::Registry::Name_,
           fuchsia::input::injection::InputDeviceRegistry::Name_,
           fuchsia::ui::policy::DeviceListenerRegistry::Name_};
 }

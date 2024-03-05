@@ -8,7 +8,6 @@ use {
         input_device::InputDeviceType, light_sensor::Configuration as LightSensorConfiguration,
     },
     anyhow::{Context, Error},
-    fidl::prelude::*,
     fidl_fuchsia_accessibility::{ColorTransformHandlerMarker, ColorTransformMarker},
     fidl_fuchsia_accessibility_scene as a11y_view,
     fidl_fuchsia_element::{
@@ -22,10 +21,6 @@ use {
         ManagerRequest as SceneManagerRequest, ManagerRequestStream as SceneManagerRequestStream,
         PresentRootViewError,
     },
-    fidl_fuchsia_ui_accessibility_view::{
-        RegistryRequest as A11yViewRegistryRequest,
-        RegistryRequestStream as A11yViewRegistryRequestStream,
-    },
     fidl_fuchsia_ui_brightness::{
         ColorAdjustmentHandlerRequestStream, ColorAdjustmentRequestStream,
     },
@@ -38,7 +33,7 @@ use {
     },
     fuchsia_async as fasync,
     fuchsia_component::{client::connect_to_protocol, server::ServiceFs},
-    fuchsia_inspect as inspect, fuchsia_zircon as zx,
+    fuchsia_inspect as inspect,
     futures::lock::Mutex,
     futures::{StreamExt, TryStreamExt},
     scene_management::{SceneManager, SceneManagerTrait, ViewingDistance},
@@ -58,7 +53,6 @@ mod light_sensor_server;
 mod media_buttons_listener_registry_server;
 
 enum ExposedServices {
-    AccessibilityViewRegistry(A11yViewRegistryRequestStream),
     ColorAdjustment(ColorAdjustmentRequestStream),
     ColorAdjustmentHandler(ColorAdjustmentHandlerRequestStream),
     MediaButtonsListenerRegistry(MediaButtonsListenerRegistryRequestStream),
@@ -115,7 +109,6 @@ async fn inner_main() -> Result<(), Error> {
 
     // Do not reorder the services below.
     fs.dir("svc")
-        .add_fidl_service(ExposedServices::AccessibilityViewRegistry)
         .add_fidl_service(ExposedServices::ColorAdjustmentHandler)
         .add_fidl_service(ExposedServices::ColorAdjustment)
         .add_fidl_service(ExposedServices::MediaButtonsListenerRegistry)
@@ -290,10 +283,6 @@ async fn inner_main() -> Result<(), Error> {
     // than a single client at a time.
     while let Some(service_request) = fs.next().await {
         match service_request {
-            ExposedServices::AccessibilityViewRegistry(request_stream) => fasync::Task::local(
-                handle_accessibility_view_registry_request_stream(request_stream),
-            )
-            .detach(),
             ExposedServices::ColorAdjustmentHandler(request_stream) => {
                 ColorTransformManager::handle_color_adjustment_handler_request_stream(
                     Arc::clone(&color_transform_manager),
@@ -401,32 +390,6 @@ async fn inner_main() -> Result<(), Error> {
     Ok(())
 }
 
-pub async fn handle_accessibility_view_registry_request_stream(
-    mut request_stream: A11yViewRegistryRequestStream,
-) {
-    while let Ok(Some(request)) = request_stream.try_next().await {
-        match request {
-            A11yViewRegistryRequest::CreateAccessibilityViewHolder {
-                a11y_view_ref: _,
-                a11y_view_token: _,
-                responder,
-                ..
-            } => {
-                warn!("Closing A11yViewRegistry connection because a11y should be configured to use Flatland, not Gfx");
-                responder.control_handle().shutdown_with_epitaph(zx::Status::PEER_CLOSED);
-            }
-            A11yViewRegistryRequest::CreateAccessibilityViewport {
-                viewport_creation_token: _,
-                responder,
-                ..
-            } => {
-                error!("A11yViewRegistry.CreateAccessibilityViewport not implemented!");
-                responder.control_handle().shutdown_with_epitaph(zx::Status::PEER_CLOSED);
-            }
-        };
-    }
-}
-
 pub async fn handle_scene_manager_request_stream(
     mut request_stream: SceneManagerRequestStream,
     scene_manager: Arc<Mutex<dyn SceneManagerTrait>>,
@@ -528,7 +491,7 @@ pub async fn handle_graphical_presenter_request_stream(
 
 mod tests {
     use {
-        super::*, fidl::endpoints::create_proxy_and_stream,
+        super::*, fidl::endpoints::create_proxy_and_stream, fidl::AsHandleRef,
         fidl_fuchsia_element::GraphicalPresenterMarker, fuchsia_scenic as scenic,
         scene_management_mocks::MockSceneManager,
     };
