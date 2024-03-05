@@ -52,6 +52,9 @@ pub enum WatcherStreamError {
 pub struct WatchEvent(fio::WatchEvent);
 
 assoc_values!(WatchEvent, [
+    /// The directory being watched has been deleted. The name returned for this event
+    /// will be `.` (dot), as it is referring to the directory itself.
+    DELETED     = fio::WatchEvent::Deleted;
     /// A file was added.
     ADD_FILE    = fio::WatchEvent::Added;
     /// A file was removed.
