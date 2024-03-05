@@ -94,12 +94,6 @@ Device& PciDeviceTests::CreateTestDevice(zx_device_t* parent, const uint8_t* cfg
 extern "C" {
 // MockDevice does not cover adding composite devices within a driver, but
 // BanjoDevice:Create only needs to think it succeeded.
-__EXPORT
-zx_status_t device_add_composite_deprecated(zx_device_t* dev, const char* name,
-                                            const composite_device_desc_t* comp_desc) {
-  return ZX_OK;
-}
-
 __EXPORT zx_status_t device_add_composite_spec(zx_device_t* dev, const char* name,
                                                const composite_node_spec_t* spec) {
   return ZX_OK;
@@ -109,8 +103,6 @@ __EXPORT zx_status_t device_add_composite_spec(zx_device_t* dev, const char* nam
 // All tests below
 
 TEST_F(PciDeviceTests, CreationTest) {
-  device_add_composite_deprecated(nullptr, nullptr, nullptr);
-
   // This test creates a device, goes through its init sequence, links it into
   // the toplogy, and then has it linger. It will be cleaned up by TearDown()
   // releasing all objects of upstream(). If creation succeeds here and no

@@ -91,7 +91,6 @@ class Device : public std::enable_shared_from_this<Device>, public devfs_fidl::D
   void InitReply(zx_status_t status);
   zx_status_t ConnectFragmentFidl(const char* fragment_name, const char* service_name,
                                   const char* protocol_name, zx::channel request);
-  zx_status_t AddComposite(const char* name, const composite_device_desc_t* composite);
   zx_status_t AddCompositeNodeSpec(const char* name, const composite_node_spec_t* spec);
   // Connects to the runtime service using the v2 protocol discovery with tokens.
   zx_status_t ConnectFragmentRuntime(const char* fragment_name, const char* service_name,

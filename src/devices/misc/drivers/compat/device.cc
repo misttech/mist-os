@@ -19,7 +19,6 @@
 #include <zircon/errors.h>
 
 #include "driver.h"
-#include "src/devices/misc/drivers/compat/composite.h"
 #include "src/devices/misc/drivers/compat/composite_node_spec_util.h"
 
 namespace fdf {
@@ -961,37 +960,6 @@ zx_status_t Device::ConnectFragmentFidl(const char* fragment_name, const char* s
   if (result.is_error()) {
     FDF_LOGL(ERROR, *logger_, "Error connecting: %s", result.status_string());
     return result.status_value();
-  }
-
-  return ZX_OK;
-}
-
-zx_status_t Device::AddComposite(const char* name, const composite_device_desc_t* comp_desc) {
-  auto creator =
-      driver_->driver_namespace().Connect<fuchsia_device_composite::DeprecatedCompositeCreator>();
-  if (creator.status_value() != ZX_OK) {
-    FDF_LOGL(ERROR, *logger_, "Error connecting: %s", creator.status_string());
-    return creator.status_value();
-  }
-
-  fidl::Arena allocator;
-  auto composite = CreateComposite(allocator, comp_desc);
-  if (composite.is_error()) {
-    FDF_LOGL(ERROR, *logger_, "Error creating composite: %s", composite.status_string());
-    return composite.error_value();
-  }
-
-  // TODO(https://fxbug.dev/42063200): Support metadata for AddComposite().
-  if (comp_desc->metadata_count > 0) {
-    FDF_LOGL(WARNING, *logger_,
-             "AddComposite() currently doesn't support metadata. See https://fxbug.dev/42063200.");
-  }
-
-  auto result = fidl::WireCall(*creator)->AddCompositeDevice(fidl::StringView::FromExternal(name),
-                                                             std::move(composite.value()));
-  if (result.status() != ZX_OK) {
-    FDF_LOGL(ERROR, *logger_, "Error calling connect fidl: %s", result.status_string());
-    return result.status();
   }
 
   return ZX_OK;

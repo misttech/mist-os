@@ -109,11 +109,6 @@ __EXPORT zx_status_t device_add_metadata(zx_device_t* dev, uint32_t type, const 
   return dev->AddMetadata(type, data, size);
 }
 
-__EXPORT zx_status_t device_add_composite_deprecated(zx_device_t* dev, const char* name,
-                                                     const composite_device_desc_t* comp_desc) {
-  return dev->AddComposite(name, comp_desc);
-}
-
 __EXPORT zx_status_t device_add_composite_spec(zx_device_t* dev, const char* name,
                                                const composite_node_spec_t* spec) {
   return dev->AddCompositeNodeSpec(name, spec);

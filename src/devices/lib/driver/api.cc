@@ -87,11 +87,6 @@ __EXPORT zx_status_t device_add_metadata(zx_device_t* dev, uint32_t type, const 
   return ZX_ERR_NOT_SUPPORTED;
 }
 
-__EXPORT zx_status_t device_add_composite_deprecated(zx_device_t* dev, const char* name,
-                                                     const composite_device_desc_t* comp_desc) {
-  return ZX_ERR_NOT_SUPPORTED;
-}
-
 __EXPORT bool driver_log_severity_enabled_internal(const zx_driver_t* drv, fx_log_severity_t flag) {
   return false;
 }

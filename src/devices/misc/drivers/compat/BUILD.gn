@@ -27,8 +27,6 @@ source_set("lib") {
     "api.cc",
     "compat_driver_server.cc",
     "compat_driver_server.h",
-    "composite.cc",
-    "composite.h",
     "composite_node_spec_util.h",
     "device.cc",
     "device.h",

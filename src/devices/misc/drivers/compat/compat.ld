@@ -25,7 +25,6 @@
     device_get_metadata;
     device_get_metadata_size;
     device_add_metadata;
-    device_add_composite_deprecated;
     device_add_composite_spec;
     driver_log_severity_enabled_internal;
     driver_logvf_internal;

@@ -344,38 +344,6 @@ typedef struct zx_device_str_prop {
   zx_device_str_prop_val_t property_value;
 } zx_device_str_prop_t;
 
-// A description of the composite device with properties |props| and made of
-// |fragments| devices. If |spawn_colocated| is true, the composite device will
-// reside in the same driver host as the driver which adds the |primary_fragment|,
-// otherwise it will spawn in a new driver host.
-// |metadata_list| contains the metadata to be added to the composite device, if any.
-typedef struct composite_device_desc {
-  const zx_device_prop_t* props;
-  size_t props_count;
-  const zx_device_str_prop_t* str_props;
-  size_t str_props_count;
-  const device_fragment_t* fragments;
-  size_t fragments_count;
-  const char* primary_fragment;
-  bool spawn_colocated;
-  const device_metadata_t* metadata_list;
-  size_t metadata_count;
-} composite_device_desc_t;
-
-// Create a composite device with the properties |comp_desc|.
-// Once all of the fragment devices are found, the composite
-// device will be published with device property fuchsia.BIND_COMPOSITE == 1 and
-// the given properties.  A driver may then bind to the created device, and
-// access its parents via device_get_fragment.
-//
-// |name| must be no longer than ZX_DEVICE_NAME_MAX, and is used primarily as a
-// diagnostic.
-//
-// |dev| must be the zx_device_t corresponding to the "sys" device (i.e., the
-// Platform Bus Driver's device).
-zx_status_t device_add_composite_deprecated(zx_device_t* dev, const char* name,
-                                            const composite_device_desc_t* comp_desc);
-
 // temporary accessor for root resource handle
 zx_handle_t get_root_resource(zx_device_t* dev);
 

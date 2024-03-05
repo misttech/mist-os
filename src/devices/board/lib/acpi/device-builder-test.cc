@@ -57,12 +57,6 @@ class DeviceBuilderTest : public zxtest::Test {
 
 extern "C" {
 // MockDevice does not cover adding composite devices within a driver.
-__EXPORT
-zx_status_t device_add_composite(zx_device_t* dev, const char* name,
-                                 const composite_device_desc_t* comp_desc) {
-  return ZX_OK;
-}
-
 __EXPORT zx_status_t device_add_composite_spec(zx_device_t* dev, const char* name,
                                                const composite_node_spec_t* spec) {
   return ZX_OK;
