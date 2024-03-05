@@ -28,6 +28,8 @@ class FidlController final : public pw::bluetooth::Controller {
 
   void SetReceiveAclFunction(DataFunction func) override { acl_cb_ = std::move(func); }
 
+  void SetReceiveIsoFunction(DataFunction func) override { iso_cb_ = std::move(func); }
+
   void Initialize(PwStatusCallback complete_callback, PwStatusCallback error_callback) override;
 
   void Close(PwStatusCallback callback) override;
@@ -35,6 +37,8 @@ class FidlController final : public pw::bluetooth::Controller {
   void SendCommand(pw::span<const std::byte> command) override;
 
   void SendAclData(pw::span<const std::byte> data) override;
+
+  void SendIsoData(pw::span<const std::byte> data) override;
 
   void SetReceiveScoFunction(DataFunction func) override {}
   void SendScoData(pw::span<const std::byte> data) override {}
@@ -54,8 +58,7 @@ class FidlController final : public pw::bluetooth::Controller {
 
   void InitializeWait(async::WaitBase& wait, zx::channel& channel);
 
-  void OnChannelSignal(const char* chan_name, zx_status_t status, async::WaitBase* wait,
-                       const zx_packet_signal_t* signal, pw::span<std::byte> buffer,
+  void OnChannelSignal(const char* chan_name, async::WaitBase* wait, pw::span<std::byte> buffer,
                        zx::channel& channel, DataFunction& data_cb);
 
   void OnAclSignal(async_dispatcher_t* dispatcher, async::WaitBase* wait, zx_status_t status,
@@ -63,6 +66,9 @@ class FidlController final : public pw::bluetooth::Controller {
 
   void OnCommandSignal(async_dispatcher_t* dispatcher, async::WaitBase* wait, zx_status_t status,
                        const zx_packet_signal_t* signal);
+
+  void OnIsoSignal(async_dispatcher_t* dispatcher, async::WaitBase* wait, zx_status_t status,
+                   const zx_packet_signal_t* signal);
 
   // Initializes HCI layer by binding |hci_handle| to |hci_| and opening two-way command channel and
   // ACL data channel
@@ -79,14 +85,17 @@ class FidlController final : public pw::bluetooth::Controller {
 
   zx::channel acl_channel_;
   zx::channel command_channel_;
+  zx::channel iso_channel_;
 
   DataFunction event_cb_;
   DataFunction acl_cb_;
+  DataFunction iso_cb_;
   PwStatusCallback initialize_complete_cb_;
   PwStatusCallback error_cb_;
 
   async::WaitMethod<FidlController, &FidlController::OnAclSignal> acl_wait_{this};
   async::WaitMethod<FidlController, &FidlController::OnCommandSignal> command_wait_{this};
+  async::WaitMethod<FidlController, &FidlController::OnIsoSignal> iso_wait_{this};
 };
 
 }  // namespace bt::controllers

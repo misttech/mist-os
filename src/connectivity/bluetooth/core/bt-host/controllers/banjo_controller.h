@@ -43,6 +43,8 @@ class BanjoController final : public pw::bluetooth::Controller {
 
   void SetReceiveScoFunction(DataFunction func) override { sco_cb_ = std::move(func); }
 
+  void SetReceiveIsoFunction(DataFunction func) override { iso_cb_ = std::move(func); }
+
   void Initialize(PwStatusCallback complete_callback, PwStatusCallback error_callback) override;
 
   void Close(PwStatusCallback callback) override;
@@ -52,6 +54,8 @@ class BanjoController final : public pw::bluetooth::Controller {
   void SendAclData(pw::span<const std::byte> data) override;
 
   void SendScoData(pw::span<const std::byte> data) override;
+
+  void SendIsoData(pw::span<const std::byte> data) override;
 
   void ConfigureSco(ScoCodingFormat coding_format, ScoEncoding encoding, ScoSampleRate sample_rate,
                     pw::Callback<void(pw::Status)> callback) override;
@@ -94,8 +98,7 @@ class BanjoController final : public pw::bluetooth::Controller {
 
   void InitializeWait(async::WaitBase& wait, zx::channel& channel);
 
-  void OnChannelSignal(const char* chan_name, zx_status_t status, async::WaitBase* wait,
-                       const zx_packet_signal_t* signal, pw::span<std::byte> buffer,
+  void OnChannelSignal(const char* chan_name, async::WaitBase* wait, pw::span<std::byte> buffer,
                        zx::channel& channel, DataFunction& data_cb);
 
   void OnAclSignal(async_dispatcher_t* dispatcher, async::WaitBase* wait, zx_status_t status,
@@ -107,6 +110,9 @@ class BanjoController final : public pw::bluetooth::Controller {
   void OnScoSignal(async_dispatcher_t* dispatcher, async::WaitBase* wait, zx_status_t status,
                    const zx_packet_signal_t* signal);
 
+  void OnIsoSignal(async_dispatcher_t* dispatcher, async::WaitBase* wait, zx_status_t status,
+                   const zx_packet_signal_t* signal);
+
   pw::bluetooth::Controller::FeaturesBits BanjoVendorFeaturesToFeaturesBits(
       bt_vendor_features_t features);
 
@@ -116,15 +122,18 @@ class BanjoController final : public pw::bluetooth::Controller {
   zx::channel acl_channel_;
   zx::channel command_channel_;
   zx::channel sco_channel_;
+  zx::channel iso_channel_;
 
   DataFunction event_cb_;
   DataFunction acl_cb_;
   DataFunction sco_cb_;
+  DataFunction iso_cb_;
   PwStatusCallback error_cb_;
 
   async::WaitMethod<BanjoController, &BanjoController::OnAclSignal> acl_wait_{this};
   async::WaitMethod<BanjoController, &BanjoController::OnCommandSignal> command_wait_{this};
   async::WaitMethod<BanjoController, &BanjoController::OnScoSignal> sco_wait_{this};
+  async::WaitMethod<BanjoController, &BanjoController::OnIsoSignal> iso_wait_{this};
 
   async_dispatcher_t* dispatcher_;
 

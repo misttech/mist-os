@@ -14,6 +14,7 @@
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/assert.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/log.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/trace.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/iso/iso_common.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/transport/slab_allocators.h"
 
 namespace bt::controllers {
@@ -140,6 +141,23 @@ void BanjoController::Initialize(PwStatusCallback complete_callback,
     sco_channel_.reset();
   }
 
+  zx::channel their_iso_chan;
+  status = zx::channel::create(0, &iso_channel_, &their_iso_chan);
+  if (status != ZX_OK) {
+    bt_log(ERROR, "controllers", "Failed to create ISO channel");
+    complete_callback(pw::Status::Internal());
+    return;
+  }
+
+  status = hci_proto_.OpenIsoChannel(std::move(their_iso_chan));
+  if (status == ZX_OK) {
+    InitializeWait(iso_wait_, iso_channel_);
+  } else {
+    // Failing to open an ISO channel is not fatal, it just indicates lack of ISO support.
+    bt_log(INFO, "controllers", "Failed to open ISO channel: %s", zx_status_get_string(status));
+    iso_channel_.reset();
+  }
+
   complete_callback(PW_STATUS_OK);
 }
 
@@ -179,6 +197,16 @@ void BanjoController::SendScoData(pw::span<const std::byte> data) {
   }
 }
 
+void BanjoController::SendIsoData(pw::span<const std::byte> data) {
+  zx_status_t status =
+      iso_channel_.write(/*flags=*/0, data.data(), static_cast<uint32_t>(data.size()),
+                         /*handles=*/nullptr, /*num_handles=*/0);
+  if (status != ZX_OK) {
+    bt_log(ERROR, "controllers", "failed to write ISO channel: %s", zx_status_get_string(status));
+    OnError(status);
+  }
+}
+
 void BanjoController::ConfigureSco(ScoCodingFormat coding_format, ScoEncoding encoding,
                                    ScoSampleRate sample_rate, PwStatusCallback callback) {
   hci_proto_.ConfigureSco(
@@ -205,7 +233,14 @@ void BanjoController::GetFeatures(pw::Callback<void(FeaturesBits)> callback) {
     callback(FeaturesBits{0});
     return;
   }
-  callback(BanjoVendorFeaturesToFeaturesBits(vendor_proto_->GetFeatures()));
+  FeaturesBits features_bits = BanjoVendorFeaturesToFeaturesBits(vendor_proto_->GetFeatures());
+  if (sco_channel_.is_valid()) {
+    features_bits |= FeaturesBits::kHciSco;
+  }
+  if (iso_channel_.is_valid()) {
+    features_bits |= FeaturesBits::kHciIso;
+  }
+  callback(features_bits);
 }
 
 void BanjoController::EncodeVendorCommand(
@@ -259,9 +294,11 @@ void BanjoController::CleanUp() {
   acl_wait_.Cancel();
   command_wait_.Cancel();
   sco_wait_.Cancel();
+  iso_wait_.Cancel();
 
   acl_channel_.reset();
   sco_channel_.reset();
+  iso_channel_.reset();
   command_channel_.reset();
 }
 
@@ -287,76 +324,152 @@ void BanjoController::InitializeWait(async::WaitBase& wait, zx::channel& channel
   BT_ASSERT(wait.Begin(dispatcher_) == ZX_OK);
 }
 
-void BanjoController::OnChannelSignal(const char* chan_name, zx_status_t status,
-                                      async::WaitBase* wait, const zx_packet_signal_t* signal,
+void BanjoController::OnChannelSignal(const char* chan_name, async::WaitBase* wait,
                                       pw::span<std::byte> buffer, zx::channel& channel,
                                       DataFunction& data_cb) {
-  if (status != ZX_OK) {
-    bt_log(ERROR, "controllers", "%s channel error: %s", chan_name, zx_status_get_string(status));
-    OnError(status);
-    return;
-  }
+  uint32_t actual_size;
+  zx_status_t read_status =
+      channel.read(/*flags=*/0u, /*bytes=*/buffer.data(), /*handles=*/nullptr,
+                   /*num_bytes=*/static_cast<uint32_t>(buffer.size()), /*num_handles=*/0,
+                   /*actual_bytes=*/&actual_size, /*actual_handles=*/nullptr);
 
-  if (signal->observed & ZX_CHANNEL_PEER_CLOSED) {
-    bt_log(ERROR, "controllers", "%s channel closed", chan_name);
-    OnError(ZX_ERR_PEER_CLOSED);
-    return;
-  }
-  BT_ASSERT(signal->observed & ZX_CHANNEL_READABLE);
-
-  uint32_t read_size;
-  zx_status_t read_status = channel.read(0u, buffer.data(), /*handles=*/nullptr,
-                                         static_cast<uint32_t>(buffer.size()), 0, &read_size,
-                                         /*actual_handles=*/nullptr);
   if (read_status != ZX_OK) {
     bt_log(ERROR, "controllers", "%s channel: failed to read RX bytes: %s", chan_name,
            zx_status_get_string(read_status));
     OnError(read_status);
     return;
   }
+
   if (data_cb) {
-    data_cb(buffer.subspan(0, read_size));
+    data_cb(buffer.subspan(0, actual_size));
   } else {
     bt_log(WARN, "controllers", "Dropping packet received on %s channel (no rx callback set)",
            chan_name);
   }
 
   // The wait needs to be restarted after every signal.
-  status = wait->Begin(dispatcher_);
-  if (status != ZX_OK) {
-    bt_log(ERROR, "controllers", "%s wait error: %s", chan_name, zx_status_get_string(status));
-    OnError(status);
+  zx_status_t wait_status = wait->Begin(dispatcher_);
+  if (wait_status != ZX_OK) {
+    bt_log(ERROR, "controllers", "%s wait error: %s", chan_name, zx_status_get_string(wait_status));
+    OnError(wait_status);
+    return;
   }
 }
 
 void BanjoController::OnAclSignal(async_dispatcher_t* dispatcher, async::WaitBase* wait,
                                   zx_status_t status, const zx_packet_signal_t* signal) {
+  const char* kChannelName = "ACL";
   TRACE_DURATION("bluetooth", "BanjoController::OnAclSignal");
+
+  if (status != ZX_OK) {
+    bt_log(ERROR, "controllers", "%s channel error: %s", kChannelName,
+           zx_status_get_string(status));
+    OnError(status);
+    return;
+  }
+  if (signal->observed & ZX_CHANNEL_PEER_CLOSED) {
+    bt_log(ERROR, "controllers", "%s channel closed", kChannelName);
+    OnError(ZX_ERR_PEER_CLOSED);
+    return;
+  }
+  BT_ASSERT(signal->observed & ZX_CHANNEL_READABLE);
 
   // Allocate a buffer for the packet. Since we don't know the size beforehand we allocate the
   // largest possible buffer.
   std::byte packet[hci::allocators::kLargeACLDataPacketSize];
-  OnChannelSignal("ACL", status, wait, signal, packet, acl_channel_, acl_cb_);
+  OnChannelSignal(kChannelName, wait, packet, acl_channel_, acl_cb_);
 }
 
 void BanjoController::OnCommandSignal(async_dispatcher_t* /*dispatcher*/, async::WaitBase* wait,
                                       zx_status_t status, const zx_packet_signal_t* signal) {
+  const char* kChannelName = "command";
   TRACE_DURATION("bluetooth", "BanjoController::OnCommandSignal");
+
+  if (status != ZX_OK) {
+    bt_log(ERROR, "controllers", "%s channel error: %s", kChannelName,
+           zx_status_get_string(status));
+    OnError(status);
+    return;
+  }
+  if (signal->observed & ZX_CHANNEL_PEER_CLOSED) {
+    bt_log(ERROR, "controllers", "%s channel closed", kChannelName);
+    OnError(ZX_ERR_PEER_CLOSED);
+    return;
+  }
+  BT_ASSERT(signal->observed & ZX_CHANNEL_READABLE);
 
   // Allocate a buffer for the packet. Since we don't know the size beforehand we allocate the
   // largest possible buffer.
   std::byte packet[hci_spec::kMaxEventPacketPayloadSize + sizeof(hci_spec::EventHeader)];
-  OnChannelSignal("command", status, wait, signal, packet, command_channel_, event_cb_);
+  OnChannelSignal(kChannelName, wait, packet, command_channel_, event_cb_);
 }
 
 void BanjoController::OnScoSignal(async_dispatcher_t* /*dispatcher*/, async::WaitBase* wait,
                                   zx_status_t status, const zx_packet_signal_t* signal) {
+  const char* kChannelName = "SCO";
   TRACE_DURATION("bluetooth", "BanjoController::OnScoSignal");
+
+  if (status != ZX_OK) {
+    bt_log(ERROR, "controllers", "%s channel error: %s", kChannelName,
+           zx_status_get_string(status));
+    OnError(status);
+    return;
+  }
+  if (signal->observed & ZX_CHANNEL_PEER_CLOSED) {
+    bt_log(ERROR, "controllers", "%s channel closed", kChannelName);
+    OnError(ZX_ERR_PEER_CLOSED);
+    return;
+  }
+  BT_ASSERT(signal->observed & ZX_CHANNEL_READABLE);
 
   // Allocate a buffer for the packet. Since we don't know the size beforehand we allocate the
   // largest possible buffer.
   std::byte packet[hci::allocators::kMaxScoDataPacketSize];
-  OnChannelSignal("SCO", status, wait, signal, packet, sco_channel_, sco_cb_);
+  OnChannelSignal(kChannelName, wait, packet, sco_channel_, sco_cb_);
+}
+
+void BanjoController::OnIsoSignal(async_dispatcher_t* /*dispatcher*/, async::WaitBase* wait,
+                                  zx_status_t status, const zx_packet_signal_t* signal) {
+  const char* kChannelName = "ISO";
+  TRACE_DURATION("bluetooth", "BanjoController::OnIsoSignal");
+
+  if (status != ZX_OK) {
+    bt_log(ERROR, "controllers", "%s channel error: %s", kChannelName,
+           zx_status_get_string(status));
+    OnError(status);
+    return;
+  }
+  if (signal->observed & ZX_CHANNEL_PEER_CLOSED) {
+    bt_log(ERROR, "controllers", "%s channel closed", kChannelName);
+    OnError(ZX_ERR_PEER_CLOSED);
+    return;
+  }
+  BT_ASSERT(signal->observed & ZX_CHANNEL_READABLE);
+
+  // Isochronous data frames can be quite large (16KB), so dynamically allocate only what is needed.
+  uint32_t read_size = 0;
+  status = iso_channel_.read(/*flags=*/0u, /*bytes=*/nullptr, /*handles=*/nullptr, /*num_bytes=*/0u,
+                             /*num_handles=*/0, &read_size, /*actual_handles=*/nullptr);
+  if (status == ZX_OK) {
+    bt_log(WARN, "controllers", "%s channel: read 0-length packet", kChannelName);
+    return;
+  }
+  if (status != ZX_ERR_BUFFER_TOO_SMALL) {
+    bt_log(ERROR, "controllers", "%s channel: failed to read packet size: %s", kChannelName,
+           zx_status_get_string(status));
+    OnError(status);
+    return;
+  }
+  if (read_size > iso::kMaxIsochronousDataPacketSize) {
+    bt_log(ERROR, "controllers", "%s channel: packet size (%d) exceeds maximum (%zu)", kChannelName,
+           read_size, iso::kMaxIsochronousDataPacketSize);
+    OnError(status);
+    return;
+  }
+
+  std::unique_ptr<std::byte[]> buffer_ptr = std::make_unique<std::byte[]>(read_size);
+  pw::span<std::byte> packet{buffer_ptr.get(), read_size};
+  OnChannelSignal(kChannelName, wait, packet, iso_channel_, iso_cb_);
 }
 
 pw::bluetooth::Controller::FeaturesBits BanjoController::BanjoVendorFeaturesToFeaturesBits(
@@ -367,9 +480,6 @@ pw::bluetooth::Controller::FeaturesBits BanjoController::BanjoVendorFeaturesToFe
   }
   if (features & BT_VENDOR_FEATURES_ANDROID_VENDOR_EXTENSIONS) {
     out |= FeaturesBits::kAndroidVendorExtensions;
-  }
-  if (sco_channel_.is_valid()) {
-    out |= FeaturesBits::kHciSco;
   }
   return out;
 }

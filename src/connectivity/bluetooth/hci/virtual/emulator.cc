@@ -125,6 +125,10 @@ constexpr bt_hci_protocol_ops_t hci_protocol_ops = {
                         void* cookie) { callback(cookie, ZX_ERR_NOT_SUPPORTED); },
     .reset_sco = [](void* ctx, bt_hci_reset_sco_callback callback,
                     void* cookie) { callback(cookie, ZX_ERR_NOT_SUPPORTED); },
+    .open_iso_channel = [](void* ctx, zx_handle_t channel) -> zx_status_t {
+      zx_handle_close(channel);
+      return ZX_ERR_NOT_SUPPORTED;
+    },
     .open_snoop_channel = [](void* ctx, zx_handle_t chan) -> zx_status_t {
       return DEV(ctx)->OpenChan(Channel::SNOOP, chan);
     },

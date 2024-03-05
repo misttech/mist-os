@@ -7,6 +7,7 @@
 #include <ddktl/device.h>
 
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/byte_buffer.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/iso/iso_common.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/testing/test_helpers.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/transport/slab_allocators.h"
 #include "src/devices/testing/mock-ddk/mock-device.h"
@@ -49,6 +50,11 @@ class FakeDevice : public ddk::BtHciProtocol<FakeDevice>, public ddk::BtVendorPr
                               /*handles=*/nullptr, /*num_handles=*/0);
   }
 
+  zx_status_t SendIso(BufferView buffer) {
+    return iso_channel_.write(/*flags=*/0, buffer.data(), static_cast<uint32_t>(buffer.size()),
+                              /*handles=*/nullptr, /*num_handles=*/0);
+  }
+
   void ResetCommandChannel() { command_channel_.reset(); }
 
   const std::vector<bt::DynamicByteBuffer>& commands_received() const { return commands_received_; }
@@ -57,6 +63,9 @@ class FakeDevice : public ddk::BtHciProtocol<FakeDevice>, public ddk::BtVendorPr
   }
   const std::vector<bt::DynamicByteBuffer>& sco_packets_received() const {
     return sco_packets_received_;
+  }
+  const std::vector<bt::DynamicByteBuffer>& iso_packets_received() const {
+    return iso_packets_received_;
   }
 
   bt_hci_protocol_t hci_proto() const {
@@ -79,6 +88,8 @@ class FakeDevice : public ddk::BtHciProtocol<FakeDevice>, public ddk::BtVendorPr
 
   void set_acl_channel_supported(bool supported) { acl_channel_supported_ = supported; }
 
+  void set_iso_supported(bool supported) { iso_supported_ = supported; }
+
   void set_features(bt_vendor_features_t features) { features_ = features; }
 
   void set_encode_command_status(zx_status_t status) { encode_command_status_ = status; }
@@ -92,6 +103,7 @@ class FakeDevice : public ddk::BtHciProtocol<FakeDevice>, public ddk::BtVendorPr
   bool command_channel_is_valid() const { return command_channel_.is_valid(); }
   bool acl_channel_is_valid() const { return acl_channel_.is_valid(); }
   bool sco_channel_is_valid() const { return sco_channel_.is_valid(); }
+  bool iso_channel_is_valid() const { return iso_channel_.is_valid(); }
 
   // ddk::BtHciProtocol mixins:
 
@@ -122,6 +134,15 @@ class FakeDevice : public ddk::BtHciProtocol<FakeDevice>, public ddk::BtVendorPr
     return ZX_OK;
   }
 
+  zx_status_t BtHciOpenIsoChannel(zx::channel in) {
+    if (!iso_supported_) {
+      return ZX_ERR_NOT_SUPPORTED;
+    }
+    iso_channel_ = std::move(in);
+    InitializeWait(iso_wait_, &iso_channel_);
+    return ZX_OK;
+  }
+
   void BtHciConfigureSco(sco_coding_format_t coding_format, sco_encoding_t encoding,
                          sco_sample_rate_t sample_rate, bt_hci_configure_sco_callback callback,
                          void* cookie) {
@@ -135,8 +156,6 @@ class FakeDevice : public ddk::BtHciProtocol<FakeDevice>, public ddk::BtVendorPr
       reset_sco_cb_(callback, cookie);
     }
   }
-
-  zx_status_t BtHciOpenIsoChannel(zx::channel in) { return ZX_ERR_NOT_SUPPORTED; }
 
   zx_status_t BtHciOpenSnoopChannel(zx::channel in) { return ZX_ERR_NOT_SUPPORTED; }
 
@@ -182,8 +201,8 @@ class FakeDevice : public ddk::BtHciProtocol<FakeDevice>, public ddk::BtVendorPr
     }
     ASSERT_TRUE(signal->observed & ZX_CHANNEL_READABLE);
 
-    // ACL packets are larger than all other packets.
-    bt::StaticByteBuffer<hci::allocators::kLargeACLDataPacketSize> buffer;
+    // ISO packets are larger than all other packets.
+    bt::StaticByteBuffer<iso::kMaxIsochronousDataPacketSize> buffer;
     uint32_t read_size = 0;
     zx_status_t read_status = channel->read(0u, buffer.mutable_data(), /*handles=*/nullptr,
                                             static_cast<uint32_t>(buffer.size()), 0, &read_size,
@@ -211,8 +230,15 @@ class FakeDevice : public ddk::BtHciProtocol<FakeDevice>, public ddk::BtVendorPr
     OnChannelSignal(&sco_channel_, wait, signal, &sco_packets_received_);
   }
 
+  void OnIsoSignal(async_dispatcher_t* dispatcher, async::WaitBase* wait, zx_status_t status,
+                   const zx_packet_signal_t* signal) {
+    ASSERT_TRUE(status == ZX_OK);
+    OnChannelSignal(&iso_channel_, wait, signal, &iso_packets_received_);
+  }
+
   bt_vendor_features_t features_{0};
   bool sco_supported_ = true;
+  bool iso_supported_ = true;
   bool command_channel_supported_ = true;
   bool acl_channel_supported_ = true;
   zx_status_t encode_command_status_ = ZX_OK;
@@ -230,6 +256,10 @@ class FakeDevice : public ddk::BtHciProtocol<FakeDevice>, public ddk::BtVendorPr
   zx::channel sco_channel_;
   async::WaitMethod<FakeDevice, &FakeDevice::OnScoSignal> sco_wait_{this};
   std::vector<bt::DynamicByteBuffer> sco_packets_received_;
+
+  zx::channel iso_channel_;
+  async::WaitMethod<FakeDevice, &FakeDevice::OnIsoSignal> iso_wait_{this};
+  std::vector<bt::DynamicByteBuffer> iso_packets_received_;
 
   async_dispatcher_t* dispatcher_;
 };
@@ -409,8 +439,45 @@ TEST_F(BanjoControllerTest, SendAndReceiveSco) {
   EXPECT_EQ(close_status.value(), PW_STATUS_OK);
 }
 
+TEST_F(BanjoControllerTest, SendAndReceiveIso) {
+  RETURN_IF_FATAL(InitializeController());
+
+  const StaticByteBuffer iso_packet_0(0x00, 0x01, 0x02, 0x03);
+  controller()->SendIsoData(iso_packet_0.subspan());
+  RunLoopUntilIdle();
+  ASSERT_EQ(fake_device()->iso_packets_received().size(), 1u);
+  EXPECT_THAT(fake_device()->iso_packets_received()[0], BufferEq(iso_packet_0));
+
+  const StaticByteBuffer iso_packet_1(0x04, 0x05, 0x06, 0x07);
+  controller()->SendIsoData(iso_packet_1.subspan());
+  RunLoopUntilIdle();
+  ASSERT_EQ(fake_device()->iso_packets_received().size(), 2u);
+  EXPECT_THAT(fake_device()->iso_packets_received()[1], BufferEq(iso_packet_1));
+
+  std::vector<DynamicByteBuffer> received_iso;
+  controller()->SetReceiveIsoFunction([&](pw::span<const std::byte> buffer) {
+    received_iso.emplace_back(BufferView(buffer.data(), buffer.size()));
+  });
+
+  fake_device()->SendIso(iso_packet_0.view());
+  RunLoopUntilIdle();
+  ASSERT_EQ(received_iso.size(), 1u);
+  EXPECT_THAT(received_iso[0], BufferEq(iso_packet_0));
+
+  fake_device()->SendIso(iso_packet_1.view());
+  RunLoopUntilIdle();
+  ASSERT_EQ(received_iso.size(), 2u);
+  EXPECT_THAT(received_iso[1], BufferEq(iso_packet_1));
+
+  std::optional<pw::Status> close_status;
+  controller()->Close([&](pw::Status status) { close_status = status; });
+  ASSERT_TRUE(close_status.has_value());
+  EXPECT_EQ(close_status.value(), PW_STATUS_OK);
+}
+
 TEST_F(BanjoControllerTest, GetFeatures) {
   fake_device()->set_sco_supported(true);
+  fake_device()->set_iso_supported(true);
   fake_device()->set_features(BT_VENDOR_FEATURES_SET_ACL_PRIORITY_COMMAND |
                               BT_VENDOR_FEATURES_ANDROID_VENDOR_EXTENSIONS);
   InitializeController(/*vendor_supported=*/true);
@@ -419,11 +486,14 @@ TEST_F(BanjoControllerTest, GetFeatures) {
   controller()->GetFeatures([&](FeaturesBits f) { features = f; });
   ASSERT_TRUE(features.has_value());
   EXPECT_EQ(features.value(), FeaturesBits::kSetAclPriorityCommand |
-                                  FeaturesBits::kAndroidVendorExtensions | FeaturesBits::kHciSco);
+                                  FeaturesBits::kAndroidVendorExtensions | FeaturesBits::kHciSco |
+                                  FeaturesBits::kHciIso);
 }
 
-TEST_F(BanjoControllerTest, ScoNotSupported) {
+TEST_F(BanjoControllerTest, NoFeaturesSupported) {
   fake_device()->set_sco_supported(false);
+  fake_device()->set_iso_supported(false);
+  fake_device()->set_features(0);
   RETURN_IF_FATAL(InitializeController());
   std::optional<FeaturesBits> features;
   controller()->GetFeatures([&](FeaturesBits f) { features = f; });
@@ -650,6 +720,7 @@ TEST_F(BanjoControllerTest, CloseClosesChannels) {
   RETURN_IF_FATAL(InitializeController());
   EXPECT_TRUE(fake_device()->acl_channel_is_valid());
   EXPECT_TRUE(fake_device()->sco_channel_is_valid());
+  EXPECT_TRUE(fake_device()->iso_channel_is_valid());
   EXPECT_TRUE(fake_device()->command_channel_is_valid());
 
   std::optional<pw::Status> close_status;
@@ -659,6 +730,7 @@ TEST_F(BanjoControllerTest, CloseClosesChannels) {
   RunLoopUntilIdle();
   EXPECT_FALSE(fake_device()->acl_channel_is_valid());
   EXPECT_FALSE(fake_device()->sco_channel_is_valid());
+  EXPECT_FALSE(fake_device()->iso_channel_is_valid());
   EXPECT_FALSE(fake_device()->command_channel_is_valid());
 }
 
@@ -667,13 +739,6 @@ TEST_F(BanjoControllerTest, DeviceClosesCommandChannel) {
   fake_device()->ResetCommandChannel();
   RunLoopUntilIdle();
   EXPECT_THAT(controller_error(), ::testing::Optional(pw::Status::Unavailable()));
-}
-
-TEST_F(BanjoControllerTest, GetFeaturesWithoutVendorProto) {
-  RETURN_IF_FATAL(InitializeController(/*vendor_supported=*/false));
-  std::optional<FeaturesBits> features;
-  controller()->GetFeatures([&](FeaturesBits cb_features) { features = cb_features; });
-  EXPECT_THAT(features, ::testing::Optional(FeaturesBits{0}));
 }
 
 }  // namespace bt::controllers

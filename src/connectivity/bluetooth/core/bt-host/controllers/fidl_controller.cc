@@ -9,6 +9,7 @@
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/assert.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/log.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/trace.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/iso/iso_common.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/transport/slab_allocators.h"
 #include "zircon/status.h"
 
@@ -127,6 +128,23 @@ void FidlController::InitializeHci(fuchsia::hardware::bluetooth::HciHandle hci_h
                            });
   InitializeWait(acl_wait_, acl_channel_);
 
+  zx::channel their_iso_chan;
+  status = zx::channel::create(0, &iso_channel_, &their_iso_chan);
+  if (status != ZX_OK) {
+    bt_log(ERROR, "controllers", "Failed to create ISO channel");
+    OnError(status);
+    return;
+  }
+
+  hci_->OpenIsoDataChannel(std::move(their_iso_chan),
+                           [](fhbt::Hci_OpenIsoDataChannel_Result result) {
+                             if (result.is_err()) {
+                               bt_log(INFO, "controllers", "Failed to open ISO data channel: %s",
+                                      zx_status_get_string(result.err()));
+                             }
+                           });
+  InitializeWait(iso_wait_, iso_channel_);
+
   initialize_complete_cb_(PW_STATUS_OK);
 }
 
@@ -158,15 +176,33 @@ void FidlController::SendAclData(pw::span<const std::byte> data) {
   }
 }
 
+void FidlController::SendIsoData(pw::span<const std::byte> data) {
+  zx_status_t status =
+      iso_channel_.write(/*flags=*/0, data.data(), static_cast<uint32_t>(data.size()),
+                         /*handles=*/nullptr, /*num_handles=*/0);
+
+  if (status != ZX_OK) {
+    bt_log(ERROR, "controllers", "failed to write ISO channel: %s", zx_status_get_string(status));
+    OnError(status);
+    return;
+  }
+}
+
 void FidlController::GetFeatures(pw::Callback<void(FidlController::FeaturesBits)> callback) {
   if (!vendor_) {
     callback(pw::bluetooth::Controller::FeaturesBits{0});
     return;
   }
 
-  vendor_->GetFeatures([cb = std::move(callback)](fhbt::Vendor_GetFeatures_Result result) mutable {
-    cb(VendorFeaturesToFeaturesBits(result.response().features));
-  });
+  vendor_->GetFeatures(
+      [cb = std::move(callback), this](fhbt::Vendor_GetFeatures_Result result) mutable {
+        FidlController::FeaturesBits features_bits =
+            VendorFeaturesToFeaturesBits(result.response().features);
+        if (iso_channel_.is_valid()) {
+          features_bits |= FeaturesBits::kHciIso;
+        }
+        cb(features_bits);
+      });
 }
 
 void FidlController::EncodeVendorCommand(
@@ -221,9 +257,11 @@ void FidlController::OnError(zx_status_t status) {
 void FidlController::CleanUp() {
   // Waits need to be canceled before the underlying channels are destroyed.
   acl_wait_.Cancel();
+  iso_wait_.Cancel();
   command_wait_.Cancel();
 
   acl_channel_.reset();
+  iso_channel_.reset();
   command_channel_.reset();
 }
 
@@ -235,67 +273,132 @@ void FidlController::InitializeWait(async::WaitBase& wait, zx::channel& channel)
   BT_ASSERT(wait.Begin(dispatcher_) == ZX_OK);
 }
 
-void FidlController::OnChannelSignal(const char* chan_name, zx_status_t status,
-                                     async::WaitBase* wait, const zx_packet_signal_t* signal,
+void FidlController::OnChannelSignal(const char* chan_name, async::WaitBase* wait,
                                      pw::span<std::byte> buffer, zx::channel& channel,
                                      DataFunction& data_cb) {
-  if (status != ZX_OK) {
-    bt_log(ERROR, "controllers", "%s channel error: %s", chan_name, zx_status_get_string(status));
-    OnError(status);
-    return;
-  }
+  uint32_t actual_size;
+  zx_status_t read_status =
+      channel.read(/*flags=*/0u, /*bytes=*/buffer.data(), /*handles=*/nullptr,
+                   /*num_bytes=*/static_cast<uint32_t>(buffer.size()), /*num_handles=*/0,
+                   /*actual_bytes=*/&actual_size,
+                   /*actual_handles=*/nullptr);
 
-  if (signal->observed & ZX_CHANNEL_PEER_CLOSED) {
-    bt_log(ERROR, "controllers", "%s channel closed", chan_name);
-    OnError(ZX_ERR_PEER_CLOSED);
-    return;
-  }
-  BT_ASSERT(signal->observed & ZX_CHANNEL_READABLE);
-
-  uint32_t read_size;
-  zx_status_t read_status = channel.read(0u, buffer.data(), /*handles=*/nullptr,
-                                         static_cast<uint32_t>(buffer.size()), 0, &read_size,
-                                         /*actual_handles=*/nullptr);
   if (read_status != ZX_OK) {
     bt_log(ERROR, "controllers", "%s channel: failed to read RX bytes: %s", chan_name,
            zx_status_get_string(read_status));
     OnError(read_status);
     return;
   }
+
   if (data_cb) {
-    data_cb(buffer.subspan(0, read_size));
+    data_cb(buffer.subspan(0, actual_size));
   } else {
     bt_log(WARN, "controllers", "Dropping packet received on %s channel (no rx callback set)",
            chan_name);
   }
 
   // The wait needs to be restarted after every signal.
-  status = wait->Begin(dispatcher_);
-  if (status != ZX_OK) {
-    bt_log(ERROR, "controllers", "%s wait error: %s", chan_name, zx_status_get_string(status));
-    OnError(status);
+  zx_status_t wait_status = wait->Begin(dispatcher_);
+  if (wait_status != ZX_OK) {
+    bt_log(ERROR, "controllers", "%s wait error: %s", chan_name, zx_status_get_string(wait_status));
+    OnError(wait_status);
     return;
   }
 }
 
 void FidlController::OnAclSignal(async_dispatcher_t* /*dispatcher*/, async::WaitBase* wait,
                                  zx_status_t status, const zx_packet_signal_t* signal) {
+  const char* kChannelName = "ACL";
   TRACE_DURATION("bluetooth", "FidlController::OnAclSignal");
+
+  if (status != ZX_OK) {
+    bt_log(ERROR, "controllers", "%s channel error: %s", kChannelName,
+           zx_status_get_string(status));
+    OnError(status);
+    return;
+  }
+  if (signal->observed & ZX_CHANNEL_PEER_CLOSED) {
+    bt_log(ERROR, "controllers", "%s channel closed", kChannelName);
+    OnError(ZX_ERR_PEER_CLOSED);
+    return;
+  }
+  BT_ASSERT(signal->observed & ZX_CHANNEL_READABLE);
 
   // Allocate a buffer for the packet. Since we don't know the size beforehand we allocate the
   // largest possible buffer.
   std::byte packet[hci::allocators::kLargeACLDataPacketSize];
-  OnChannelSignal("ACL", status, wait, signal, packet, acl_channel_, acl_cb_);
+  OnChannelSignal(kChannelName, wait, packet, acl_channel_, acl_cb_);
 }
 
 void FidlController::OnCommandSignal(async_dispatcher_t* /*dispatcher*/, async::WaitBase* wait,
                                      zx_status_t status, const zx_packet_signal_t* signal) {
+  const char* kChannelName = "command";
   TRACE_DURATION("bluetooth", "FidlController::OnCommandSignal");
+
+  if (status != ZX_OK) {
+    bt_log(ERROR, "controllers", "%s channel error: %s", kChannelName,
+           zx_status_get_string(status));
+    OnError(status);
+    return;
+  }
+  if (signal->observed & ZX_CHANNEL_PEER_CLOSED) {
+    bt_log(ERROR, "controllers", "%s channel closed", kChannelName);
+    OnError(ZX_ERR_PEER_CLOSED);
+    return;
+  }
+  BT_ASSERT(signal->observed & ZX_CHANNEL_READABLE);
 
   // Allocate a buffer for the packet. Since we don't know the size beforehand we allocate the
   // largest possible buffer.
-  std::byte packet[hci_spec::kMaxEventPacketPayloadSize + sizeof(hci_spec::EventHeader)];
-  OnChannelSignal("command", status, wait, signal, packet, command_channel_, event_cb_);
+  constexpr uint32_t kMaxEventPacketSize =
+      hci_spec::kMaxEventPacketPayloadSize + sizeof(hci_spec::EventHeader);
+  std::byte packet[kMaxEventPacketSize];
+  OnChannelSignal(kChannelName, wait, packet, command_channel_, event_cb_);
+}
+
+void FidlController::OnIsoSignal(async_dispatcher_t* /*dispatcher*/, async::WaitBase* wait,
+                                 zx_status_t status, const zx_packet_signal_t* signal) {
+  const char* kChannelName = "ISO";
+  TRACE_DURATION("bluetooth", "FidlController::OnIsoSignal");
+
+  if (status != ZX_OK) {
+    bt_log(ERROR, "controllers", "%s channel error: %s", kChannelName,
+           zx_status_get_string(status));
+    OnError(status);
+    return;
+  }
+  if (signal->observed & ZX_CHANNEL_PEER_CLOSED) {
+    bt_log(ERROR, "controllers", "%s channel closed", kChannelName);
+    OnError(ZX_ERR_PEER_CLOSED);
+    return;
+  }
+  BT_ASSERT(signal->observed & ZX_CHANNEL_READABLE);
+
+  // Isochronous data frames can be quite large (16KB), so dynamically allocate only what is needed.
+  uint32_t read_size = 0;
+  zx_status_t read_status =
+      iso_channel_.read(/*flags=*/0u, /*bytes=*/nullptr, /*handles=*/nullptr, /*num_bytes=*/0u,
+                        /*num_handles=*/0, &read_size, /*actual_handles=*/nullptr);
+  if (read_status == ZX_OK) {
+    bt_log(WARN, "controllers", "%s channel: read 0-length packet, ignoring", kChannelName);
+    return;
+  }
+  if (read_status != ZX_ERR_BUFFER_TOO_SMALL) {
+    bt_log(ERROR, "controllers", "%s channel: failed to read packet size: %s", kChannelName,
+           zx_status_get_string(read_status));
+    OnError(read_status);
+    return;
+  }
+  if (read_size > iso::kMaxIsochronousDataPacketSize) {
+    bt_log(ERROR, "controllers", "%s channel: packet size (%d) exceeds maximum (%zu)", kChannelName,
+           read_size, iso::kMaxIsochronousDataPacketSize);
+    OnError(read_status);
+    return;
+  }
+
+  std::unique_ptr<std::byte[]> buffer_ptr = std::make_unique<std::byte[]>(read_size);
+  pw::span<std::byte> packet{buffer_ptr.get(), read_size};
+  OnChannelSignal(kChannelName, wait, packet, iso_channel_, iso_cb_);
 }
 
 }  // namespace bt::controllers

@@ -18,12 +18,14 @@ using TestingBase = ::gtest::TestLoopFixture;
 static zx_status_t hosttest_open_command_channel(void *ctx, zx_handle_t in);
 static zx_status_t hosttest_open_acl_data_channel(void *ctx, zx_handle_t in);
 static zx_status_t hosttest_open_sco_data_channel(void *ctx, zx_handle_t in);
+static zx_status_t hosttest_open_iso_data_channel(void *ctx, zx_handle_t in);
 static zx_status_t hosttest_open_snoop_channel(void *ctx, zx_handle_t in);
 
 static bt_hci_protocol_ops_t hosttest_hci_protocol_ops = {
     .open_command_channel = hosttest_open_command_channel,
     .open_acl_data_channel = hosttest_open_acl_data_channel,
     .open_sco_channel = hosttest_open_sco_data_channel,
+    .open_iso_channel = hosttest_open_iso_data_channel,
     .open_snoop_channel = hosttest_open_snoop_channel,
 };
 
@@ -54,6 +56,12 @@ class HostTest : public TestingBase {
     return ZX_OK;
   }
 
+  zx_status_t OpenIsoDataChannel(zx_handle_t in) {
+    EXPECT_FALSE(iso_channel_.has_value());
+    iso_channel_ = in;
+    return ZX_OK;
+  }
+
   zx_status_t OpenSnoopChannel(zx_handle_t in) {
     EXPECT_FALSE(snoop_channel_.has_value());
     snoop_channel_ = in;
@@ -73,6 +81,7 @@ class HostTest : public TestingBase {
   // MockController.
   std::optional<zx_handle_t> cmd_channel_;
   std::optional<zx_handle_t> acl_channel_;
+  std::optional<zx_handle_t> iso_channel_;
   std::optional<zx_handle_t> snoop_channel_;
 
   bt_hci_protocol_t hci_proto() {
@@ -98,6 +107,11 @@ zx_status_t hosttest_open_acl_data_channel(void *ctx, zx_handle_t in) {
 zx_status_t hosttest_open_sco_data_channel(void *ctx, zx_handle_t in) {
   zx_handle_close(in);
   return ZX_ERR_NOT_SUPPORTED;
+}
+
+zx_status_t hosttest_open_iso_data_channel(void *ctx, zx_handle_t in) {
+  HostTest *test = static_cast<HostTest *>(ctx);
+  return test->OpenIsoDataChannel(in);
 }
 
 zx_status_t hosttest_open_snoop_channel(void *ctx, zx_handle_t in) {

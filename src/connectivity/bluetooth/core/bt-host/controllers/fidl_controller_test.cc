@@ -144,6 +144,44 @@ TEST_F(FidlControllerTest, SendCommandsAndReceiveEvents) {
   EXPECT_EQ(close_status.value(), PW_STATUS_OK);
 }
 
+TEST_F(FidlControllerTest, SendAndReceiveIso) {
+  RETURN_IF_FATAL(InitializeController());
+  RunLoopUntilIdle();
+  ASSERT_THAT(complete_status(), ::testing::Optional(PW_STATUS_OK));
+
+  const StaticByteBuffer iso_packet_0(0x00, 0x01, 0x02, 0x03);
+  controller()->SendIsoData(iso_packet_0.subspan());
+  RunLoopUntilIdle();
+  ASSERT_EQ(hci_server()->iso_packets_received().size(), 1u);
+  EXPECT_THAT(hci_server()->iso_packets_received()[0], BufferEq(iso_packet_0));
+
+  const StaticByteBuffer iso_packet_1(0x04, 0x05, 0x06, 0x07);
+  controller()->SendIsoData(iso_packet_1.subspan());
+  RunLoopUntilIdle();
+  ASSERT_EQ(hci_server()->iso_packets_received().size(), 2u);
+  EXPECT_THAT(hci_server()->iso_packets_received()[1], BufferEq(iso_packet_1));
+
+  std::vector<DynamicByteBuffer> received_iso;
+  controller()->SetReceiveIsoFunction([&](pw::span<const std::byte> buffer) {
+    received_iso.emplace_back(BufferView(buffer.data(), buffer.size()));
+  });
+
+  hci_server()->SendIso(iso_packet_0.view());
+  RunLoopUntilIdle();
+  ASSERT_EQ(received_iso.size(), 1u);
+  EXPECT_THAT(received_iso[0], BufferEq(iso_packet_0));
+
+  hci_server()->SendIso(iso_packet_1.view());
+  RunLoopUntilIdle();
+  ASSERT_EQ(received_iso.size(), 2u);
+  EXPECT_THAT(received_iso[1], BufferEq(iso_packet_1));
+
+  std::optional<pw::Status> close_status;
+  controller()->Close([&](pw::Status status) { close_status = status; });
+  ASSERT_TRUE(close_status.has_value());
+  EXPECT_EQ(close_status.value(), PW_STATUS_OK);
+}
+
 TEST_F(FidlControllerTest, CloseClosesChannels) {
   RETURN_IF_FATAL(InitializeController());
   RunLoopUntilIdle();
@@ -156,6 +194,7 @@ TEST_F(FidlControllerTest, CloseClosesChannels) {
   EXPECT_EQ(close_status.value(), PW_STATUS_OK);
   EXPECT_FALSE(hci_server()->acl_channel_valid());
   EXPECT_FALSE(hci_server()->command_channel_valid());
+  EXPECT_FALSE(hci_server()->iso_channel_valid());
 }
 
 TEST_F(FidlControllerTest, HciServerClosesChannel) {

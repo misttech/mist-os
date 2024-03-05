@@ -15,6 +15,7 @@
 #include "fuchsia/hardware/bluetooth/cpp/fidl.h"
 #include "gmock/gmock.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/byte_buffer.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/iso/iso_common.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/transport/slab_allocators.h"
 
 namespace bt::fidl::testing {
@@ -37,10 +38,17 @@ class FakeHciServer final : public fuchsia::hardware::bluetooth::testing::Hci_Te
     return acl_channel_.write(/*flags=*/0, buffer.data(), static_cast<uint32_t>(buffer.size()),
                               /*handles=*/nullptr, /*num_handles=*/0);
   }
+  zx_status_t SendIso(const BufferView& buffer) {
+    return iso_channel_.write(/*flags=*/0, buffer.data(), static_cast<uint32_t>(buffer.size()),
+                              /*handles=*/nullptr, /*num_handles=*/0);
+  }
 
   const std::vector<bt::DynamicByteBuffer>& commands_received() const { return commands_received_; }
   const std::vector<bt::DynamicByteBuffer>& acl_packets_received() const {
     return acl_packets_received_;
+  }
+  const std::vector<bt::DynamicByteBuffer>& iso_packets_received() const {
+    return iso_packets_received_;
   }
 
   bool CloseAclChannel() {
@@ -51,6 +59,7 @@ class FakeHciServer final : public fuchsia::hardware::bluetooth::testing::Hci_Te
 
   bool acl_channel_valid() const { return acl_channel_.is_valid(); }
   bool command_channel_valid() const { return command_channel_.is_valid(); }
+  bool iso_channel_valid() const { return iso_channel_.is_valid(); }
 
  private:
   void OpenCommandChannel(zx::channel channel, OpenCommandChannelCallback callback) override {
@@ -62,6 +71,12 @@ class FakeHciServer final : public fuchsia::hardware::bluetooth::testing::Hci_Te
   void OpenAclDataChannel(zx::channel channel, OpenAclDataChannelCallback callback) override {
     acl_channel_ = std::move(channel);
     InitializeWait(acl_wait_, acl_channel_);
+    callback(fpromise::ok());
+  }
+
+  void OpenIsoDataChannel(zx::channel channel, OpenIsoDataChannelCallback callback) override {
+    iso_channel_ = std::move(channel);
+    InitializeWait(iso_wait_, iso_channel_);
     callback(fpromise::ok());
   }
 
@@ -114,6 +129,25 @@ class FakeHciServer final : public fuchsia::hardware::bluetooth::testing::Hci_Te
     command_wait_.Begin(dispatcher_);
   }
 
+  void OnIsoSignal(async_dispatcher_t* dispatcher, async::WaitBase* wait, zx_status_t status,
+                   const zx_packet_signal_t* signal) {
+    ASSERT_TRUE(status == ZX_OK);
+    if (signal->observed & ZX_CHANNEL_PEER_CLOSED) {
+      iso_channel_.reset();
+      return;
+    }
+    ASSERT_TRUE(signal->observed & ZX_CHANNEL_READABLE);
+
+    bt::StaticByteBuffer<iso::kMaxIsochronousDataPacketSize> buffer;
+    uint32_t read_size = 0;
+    zx_status_t read_status = iso_channel_.read(0u, buffer.mutable_data(), /*handles=*/nullptr,
+                                                static_cast<uint32_t>(buffer.size()), 0, &read_size,
+                                                /*actual_handles=*/nullptr);
+    ASSERT_TRUE(read_status == ZX_OK);
+    iso_packets_received_.emplace_back(bt::BufferView(buffer, read_size));
+    iso_wait_.Begin(dispatcher_);
+  }
+
   ::fidl::Binding<fuchsia::hardware::bluetooth::Hci> binding_{this};
 
   zx::channel command_channel_;
@@ -122,8 +156,12 @@ class FakeHciServer final : public fuchsia::hardware::bluetooth::testing::Hci_Te
   zx::channel acl_channel_;
   std::vector<bt::DynamicByteBuffer> acl_packets_received_;
 
+  zx::channel iso_channel_;
+  std::vector<bt::DynamicByteBuffer> iso_packets_received_;
+
   async::WaitMethod<FakeHciServer, &FakeHciServer::OnAclSignal> acl_wait_{this};
   async::WaitMethod<FakeHciServer, &FakeHciServer::OnCommandSignal> command_wait_{this};
+  async::WaitMethod<FakeHciServer, &FakeHciServer::OnIsoSignal> iso_wait_{this};
 
   async_dispatcher_t* dispatcher_;
 };

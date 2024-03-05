@@ -128,7 +128,10 @@ source_set("fake_hci_test_fixture") {
 
   sources = [ "fake_hci_server.h" ]
 
-  deps = [ "//src/connectivity/bluetooth/core/bt-host/transport:transport" ]
+  deps = [
+    "//src/connectivity/bluetooth/core/bt-host/iso",
+    "//src/connectivity/bluetooth/core/bt-host/transport:transport",
+  ]
 }
 
 source_set("tests") {
