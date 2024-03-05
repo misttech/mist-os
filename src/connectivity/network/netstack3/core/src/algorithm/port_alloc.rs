@@ -75,11 +75,6 @@ pub(crate) trait PortAllocImpl {
     /// An extra argument passed to `is_port_available`.
     type PortAvailableArg;
 
-    /// Returns the number of ephemeral ports available in `EPHEMERAL_RANGE`.
-    fn num_ephemeral() -> usize {
-        usize::from(Self::EPHEMERAL_RANGE.end() - Self::EPHEMERAL_RANGE.start()) + 1
-    }
-
     /// Returns a random ephemeral port in `EPHEMERAL_RANGE`
     fn rand_ephemeral<R: RngCore>(rng: &mut R) -> EphemeralPort<Self> {
         EphemeralPort::new_random(rng)
