@@ -67,6 +67,13 @@ TEST(DriverCaptureImageIdTest, BanjoConversionRoundtrip) {
             ToDriverCaptureImageId(ToBanjoDriverCaptureImageId(kInvalidDriverCaptureImageId)));
 }
 
+TEST(DriverCaptureImageIdTest, ToFidlDriverCaptureImageId) {
+  EXPECT_EQ(1u, ToFidlDriverCaptureImageId(kOne).value);
+  EXPECT_EQ(2u, ToFidlDriverCaptureImageId(kTwo).value);
+  EXPECT_EQ(kLargeIdValue, ToFidlDriverCaptureImageId(kLargeId).value);
+  EXPECT_EQ(INVALID_ID, ToFidlDriverCaptureImageId(kInvalidDriverCaptureImageId).value);
+}
+
 }  // namespace
 
 }  // namespace display

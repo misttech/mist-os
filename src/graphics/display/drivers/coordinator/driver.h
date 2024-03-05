@@ -19,6 +19,8 @@
 
 namespace display {
 
+static constexpr fdf_arena_tag_t kArenaTag = 'DISP';
+
 class Controller;
 
 // Manages the state associated with a display coordinator driver connection.
@@ -67,6 +69,9 @@ class Driver : public ddk::Device<Driver> {
   zx_status_t GetSysmemConnection(zx::channel sysmem_handle);
 
  private:
+  // TODO(https://fxbug.dev/325474586): Revisit whether a single arena is the
+  // right approach.
+  fdf::Arena arena_;
   Controller* const controller_;
 
   // DFV1 Parent

@@ -5,6 +5,7 @@
 #ifndef SRC_GRAPHICS_DISPLAY_LIB_API_TYPES_CPP_DRIVER_CAPTURE_IMAGE_ID_H_
 #define SRC_GRAPHICS_DISPLAY_LIB_API_TYPES_CPP_DRIVER_CAPTURE_IMAGE_ID_H_
 
+#include <fidl/fuchsia.hardware.display.engine/cpp/wire.h>
 #include <fuchsia/hardware/display/controller/c/banjo.h>
 
 #include <cstdint>
@@ -27,6 +28,10 @@ constexpr DriverCaptureImageId ToDriverCaptureImageId(uint64_t banjo_driver_capt
 }
 constexpr uint64_t ToBanjoDriverCaptureImageId(DriverCaptureImageId driver_capture_image_id) {
   return driver_capture_image_id.value();
+}
+constexpr inline fuchsia_hardware_display_engine::wire::ImageId ToFidlDriverCaptureImageId(
+    DriverCaptureImageId driver_capture_image_id) {
+  return {.value = driver_capture_image_id.value()};
 }
 
 constexpr DriverCaptureImageId kInvalidDriverCaptureImageId(INVALID_ID);

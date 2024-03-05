@@ -12,12 +12,18 @@
 
 #include "src/graphics/display/lib/api-types-cpp/display-id.h"
 #include "src/graphics/display/lib/api-types-cpp/driver-buffer-collection-id.h"
+#include "src/graphics/display/lib/api-types-cpp/driver-buffer-id.h"
 #include "src/graphics/display/lib/api-types-cpp/driver-capture-image-id.h"
+#include "src/graphics/display/lib/api-types-cpp/driver-image-id.h"
+#include "src/graphics/display/lib/api-types-cpp/image-id.h"
 
 namespace display {
 
 Driver::Driver(Controller* controller, zx_device_t* parent)
-    : ddk::Device<Driver>(parent), controller_(controller), parent_(parent) {
+    : ddk::Device<Driver>(parent),
+      arena_(fdf::Arena(kArenaTag)),
+      controller_(controller),
+      parent_(parent) {
   ZX_DEBUG_ASSERT(controller);
 }
 
@@ -30,8 +36,7 @@ zx_status_t Driver::Bind() {
   if (display_fidl_client.is_ok()) {
     engine_ = fdf::WireSyncClient(std::move(*display_fidl_client));
     if (engine_.is_valid()) {
-      fdf::Arena arena('VGPU');
-      fdf::WireUnownedResult result = engine_.buffer(arena)->IsAvailable();
+      fdf::WireUnownedResult result = engine_.buffer(arena_)->IsAvailable();
       if (result.ok()) {
         zxlogf(INFO, "Using FIDL display controller protocol");
         // If the server responds, use it exclusively.
@@ -58,6 +63,11 @@ zx_status_t Driver::Bind() {
 
 void Driver::ReleaseImage(image_t* image) {
   if (use_engine_) {
+    fdf::WireUnownedResult result =
+        engine_.buffer(arena_)->ReleaseImage(ToFidlDriverImageId(DriverImageId(image->handle)));
+    if (!result.ok()) {
+      zxlogf(ERROR, "ReleaseImage failed: %s", result.status_string());
+    }
     return;
   }
 
@@ -67,7 +77,9 @@ void Driver::ReleaseImage(image_t* image) {
 
 zx_status_t Driver::ReleaseCapture(DriverCaptureImageId driver_capture_image_id) {
   if (use_engine_) {
-    return ZX_OK;
+    fdf::WireUnownedResult result =
+        engine_.buffer(arena_)->ReleaseCapture(ToFidlDriverCaptureImageId(driver_capture_image_id));
+    return result.status();
   }
 
   ZX_DEBUG_ASSERT(dc_.is_valid());
@@ -142,7 +154,16 @@ zx_status_t Driver::ImportImage(image_t* image, DriverBufferCollectionId collect
 zx_status_t Driver::ImportImageForCapture(DriverBufferCollectionId collection_id, uint32_t index,
                                           DriverCaptureImageId* capture_image_id) {
   if (use_engine_) {
-    return ZX_OK;
+    fdf::WireUnownedResult result =
+        engine_.buffer(arena_)->ImportImageForCapture(ToFidlDriverBufferId({
+            .buffer_collection_id = collection_id,
+            .buffer_index = index,
+        }));
+    if (result.ok()) {
+      fuchsia_hardware_display_engine::wire::ImageId image_id = result->value()->capture_image_id;
+      *capture_image_id = ToDriverCaptureImageId(image_id.value);
+    }
+    return result.status();
   }
 
   ZX_DEBUG_ASSERT(dc_.is_valid());
