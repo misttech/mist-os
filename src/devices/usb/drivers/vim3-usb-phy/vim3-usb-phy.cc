@@ -5,256 +5,18 @@
 #include "src/devices/usb/drivers/vim3-usb-phy/vim3-usb-phy.h"
 
 #include <fidl/fuchsia.driver.compat/cpp/wire.h>
-#include <lib/ddk/binding_priv.h>
-#include <lib/ddk/metadata.h>
-#include <lib/device-protocol/pdev-fidl.h>
-#include <lib/driver/component/cpp/driver_export.h>
-#include <lib/driver/component/cpp/node_add_args.h>
 
-#include <fbl/auto_lock.h>
 #include <soc/aml-common/aml-registers.h>
 
 #include "src/devices/usb/drivers/vim3-usb-phy/usb-phy-regs.h"
 
 namespace vim3_usb_phy {
 
-namespace {
-
-struct PhyMetadata {
-  std::array<uint32_t, 8> pll_settings;
-  usb_mode_t dr_mode = USB_MODE_OTG;
-};
-
-zx::result<PhyMetadata> ParseMetadata(
-    const fidl::VectorView<fuchsia_driver_compat::wire::Metadata>& metadata) {
-  PhyMetadata parsed_metadata;
-  bool found_pll_settings = false;
-  for (const auto& m : metadata) {
-    if (m.type == DEVICE_METADATA_PRIVATE) {
-      size_t size;
-      auto status = m.data.get_prop_content_size(&size);
-      if (status != ZX_OK) {
-        FDF_LOG(ERROR, "Failed to get_prop_content_size %s", zx_status_get_string(status));
-        continue;
-      }
-
-      if (size != sizeof(PhyMetadata::pll_settings)) {
-        FDF_LOG(ERROR, "Unexpected metadata size: got %zu, expected %zu", size, sizeof(uint32_t));
-        continue;
-      }
-
-      status =
-          m.data.read(parsed_metadata.pll_settings.data(), 0, sizeof(parsed_metadata.pll_settings));
-      if (status != ZX_OK) {
-        FDF_LOG(ERROR, "Failed to read %s", zx_status_get_string(status));
-        continue;
-      }
-
-      found_pll_settings = true;
-    }
-
-    if (m.type == DEVICE_METADATA_USB_MODE) {
-      size_t size;
-      auto status = m.data.get_prop_content_size(&size);
-      if (status != ZX_OK) {
-        FDF_LOG(ERROR, "Failed to get_prop_content_size %s", zx_status_get_string(status));
-        continue;
-      }
-
-      if (size != sizeof(parsed_metadata.dr_mode)) {
-        FDF_LOG(ERROR, "Unexpected metadata size: got %zu, expected %zu", size, sizeof(uint32_t));
-        continue;
-      }
-
-      status = m.data.read(&parsed_metadata.dr_mode, 0, sizeof(parsed_metadata.dr_mode));
-      if (status != ZX_OK) {
-        FDF_LOG(ERROR, "Failed to read %s", zx_status_get_string(status));
-        continue;
-      }
-    }
-  }
-
-  if (found_pll_settings) {
-    return zx::ok(parsed_metadata);
-  }
-
-  FDF_LOG(ERROR, "Failed to parse metadata. Metadata needs to at least have pll_settings.");
-  return zx::error(ZX_ERR_NOT_FOUND);
-}
-
-}  // namespace
-
-// Based on set_usb_pll() in phy-aml-new-usb2-v2.c
-void Vim3UsbPhy::InitPll(fdf::MmioBuffer* mmio) {
-  PLL_REGISTER_40::Get()
-      .FromValue(0)
-      .set_value(pll_settings_[0])
-      .set_enable(1)
-      .set_reset(1)
-      .WriteTo(mmio);
-
-  PLL_REGISTER::Get(0x44).FromValue(pll_settings_[1]).WriteTo(mmio);
-
-  PLL_REGISTER::Get(0x48).FromValue(pll_settings_[2]).WriteTo(mmio);
-
-  zx::nanosleep(zx::deadline_after(zx::usec(100)));
-
-  PLL_REGISTER_40::Get()
-      .FromValue(0)
-      .set_value(pll_settings_[0])
-      .set_enable(1)
-      .set_reset(0)
-      .WriteTo(mmio);
-
-  // Phy tuning for G12B
-  PLL_REGISTER::Get(0x50).FromValue(pll_settings_[3]).WriteTo(mmio);
-
-  PLL_REGISTER::Get(0x54).FromValue(0x2a).WriteTo(mmio);
-
-  PLL_REGISTER::Get(0x34).FromValue(0x70000).WriteTo(mmio);
-
-  // Disconnect threshold
-  PLL_REGISTER::Get(0xc).FromValue(0x34).WriteTo(mmio);
-}
-
-zx_status_t Vim3UsbPhy::CrBusAddr(uint32_t addr) {
-  auto* usbphy3_mmio = &usbphy3_mmio_;
-
-  auto phy3_r4 = PHY3_R4::Get().FromValue(0).set_phy_cr_data_in(addr);
-  phy3_r4.WriteTo(usbphy3_mmio);
-  phy3_r4.set_phy_cr_cap_addr(0);
-  phy3_r4.WriteTo(usbphy3_mmio);
-  phy3_r4.set_phy_cr_cap_addr(1);
-  phy3_r4.WriteTo(usbphy3_mmio);
-
-  auto timeout = zx::deadline_after(zx::msec(1000));
-  auto phy3_r5 = PHY3_R5::Get().FromValue(0);
-  do {
-    phy3_r5 = PHY3_R5::Get().ReadFrom(usbphy3_mmio);
-  } while (phy3_r5.phy_cr_ack() == 0 && timeout > zx::clock::get_monotonic());
-
-  if (phy3_r5.phy_cr_ack() != 1) {
-    FDF_LOG(WARNING, "Read set cap addr for addr %x timed out", addr);
-  }
-
-  phy3_r4.set_phy_cr_cap_addr(0);
-  phy3_r4.WriteTo(usbphy3_mmio);
-  timeout = zx::deadline_after(zx::msec(1000));
-  do {
-    phy3_r5 = PHY3_R5::Get().ReadFrom(usbphy3_mmio);
-  } while (phy3_r5.phy_cr_ack() == 1 && timeout > zx::clock::get_monotonic());
-
-  if (phy3_r5.phy_cr_ack() != 0) {
-    FDF_LOG(WARNING, "Read cap addr for addr %x timed out", addr);
-  }
-
-  return ZX_OK;
-}
-
-uint32_t Vim3UsbPhy::CrBusRead(uint32_t addr) {
-  auto* usbphy3_mmio = &usbphy3_mmio_;
-
-  CrBusAddr(addr);
-
-  auto phy3_r4 = PHY3_R4::Get().FromValue(0);
-  phy3_r4.set_phy_cr_read(0);
-  phy3_r4.WriteTo(usbphy3_mmio);
-  phy3_r4.set_phy_cr_read(1);
-  phy3_r4.WriteTo(usbphy3_mmio);
-
-  auto timeout = zx::deadline_after(zx::msec(1000));
-  auto phy3_r5 = PHY3_R5::Get().FromValue(0);
-  do {
-    phy3_r5 = PHY3_R5::Get().ReadFrom(usbphy3_mmio);
-  } while (phy3_r5.phy_cr_ack() == 0 && timeout > zx::clock::get_monotonic());
-
-  if (phy3_r5.phy_cr_ack() != 1) {
-    FDF_LOG(WARNING, "Read set for addr %x timed out", addr);
-  }
-
-  uint32_t data = phy3_r5.phy_cr_data_out();
-
-  phy3_r4.set_phy_cr_read(0);
-  phy3_r4.WriteTo(usbphy3_mmio);
-  timeout = zx::deadline_after(zx::msec(1000));
-  do {
-    phy3_r5 = PHY3_R5::Get().ReadFrom(usbphy3_mmio);
-  } while (phy3_r5.phy_cr_ack() == 1 && timeout > zx::clock::get_monotonic());
-
-  if (phy3_r5.phy_cr_ack() != 0) {
-    FDF_LOG(WARNING, "Read for addr %x timed out", addr);
-  }
-
-  return data;
-}
-
-zx_status_t Vim3UsbPhy::CrBusWrite(uint32_t addr, uint32_t data) {
-  auto* usbphy3_mmio = &usbphy3_mmio_;
-
-  CrBusAddr(addr);
-
-  auto phy3_r4 = PHY3_R4::Get().FromValue(0);
-  phy3_r4.set_phy_cr_data_in(data);
-  phy3_r4.WriteTo(usbphy3_mmio);
-
-  phy3_r4.set_phy_cr_cap_data(0);
-  phy3_r4.WriteTo(usbphy3_mmio);
-  phy3_r4.set_phy_cr_cap_data(1);
-  phy3_r4.WriteTo(usbphy3_mmio);
-
-  auto timeout = zx::deadline_after(zx::msec(1000));
-  auto phy3_r5 = PHY3_R5::Get().FromValue(0);
-  do {
-    phy3_r5 = PHY3_R5::Get().ReadFrom(usbphy3_mmio);
-  } while (phy3_r5.phy_cr_ack() == 0 && timeout > zx::clock::get_monotonic());
-
-  if (phy3_r5.phy_cr_ack() != 1) {
-    FDF_LOG(WARNING, "Write cap data for addr %x timed out", addr);
-  }
-
-  phy3_r4.set_phy_cr_cap_data(0);
-  phy3_r4.WriteTo(usbphy3_mmio);
-  timeout = zx::deadline_after(zx::msec(1000));
-  do {
-    phy3_r5 = PHY3_R5::Get().ReadFrom(usbphy3_mmio);
-  } while (phy3_r5.phy_cr_ack() == 1 && timeout > zx::clock::get_monotonic());
-
-  if (phy3_r5.phy_cr_ack() != 0) {
-    FDF_LOG(WARNING, "Write cap data reset for addr %x timed out", addr);
-  }
-
-  phy3_r4.set_phy_cr_write(0);
-  phy3_r4.WriteTo(usbphy3_mmio);
-  phy3_r4.set_phy_cr_write(1);
-  phy3_r4.WriteTo(usbphy3_mmio);
-  timeout = zx::deadline_after(zx::msec(1000));
-  do {
-    phy3_r5 = PHY3_R5::Get().ReadFrom(usbphy3_mmio);
-  } while (phy3_r5.phy_cr_ack() == 0 && timeout > zx::clock::get_monotonic());
-
-  if (phy3_r5.phy_cr_ack() != 1) {
-    FDF_LOG(WARNING, "Write for addr %x timed out", addr);
-  }
-
-  phy3_r4.set_phy_cr_write(0);
-  phy3_r4.WriteTo(usbphy3_mmio);
-  timeout = zx::deadline_after(zx::msec(1000));
-  do {
-    phy3_r5 = PHY3_R5::Get().ReadFrom(usbphy3_mmio);
-  } while (phy3_r5.phy_cr_ack() == 1 && timeout > zx::clock::get_monotonic());
-
-  if (phy3_r5.phy_cr_ack() != 0) {
-    FDF_LOG(WARNING, "Disable write for addr %x timed out", addr);
-  }
-
-  return ZX_OK;
-}
-
-zx_status_t Vim3UsbPhy::InitPhy() {
+zx_status_t Vim3UsbPhy::InitPhy2() {
   auto* usbctrl_mmio = &usbctrl_mmio_;
 
   // first reset USB
-  int portnum = USB2PHY_PORTCOUNT;
+  auto portnum = usbphy2_.size();
   uint32_t reset_level = 0;
   while (portnum) {
     portnum--;
@@ -335,87 +97,8 @@ zx_status_t Vim3UsbPhy::InitPhy() {
 
   // One time PLL initialization
   for (auto& phy : usbphy2_) {
-    InitPll(&phy.mmio());
+    phy.InitPll(pll_settings_);
   }
-
-  return ZX_OK;
-}
-
-zx_status_t Vim3UsbPhy::InitPhy3() {
-  auto* usbphy3_mmio = &usbphy3_mmio_;
-  auto* usbctrl_mmio = &usbctrl_mmio_;
-
-  auto reg = usbphy3_mmio->Read32(0);
-  reg = reg | (3 << 5);
-  usbphy3_mmio->Write32(reg, 0);
-
-  zx::nanosleep(zx::deadline_after(zx::usec(100)));
-
-  USB_R3_V2::Get()
-      .ReadFrom(usbctrl_mmio)
-      .set_p30_ssc_en(1)
-      .set_p30_ssc_range(2)
-      .set_p30_ref_ssp_en(1)
-      .WriteTo(usbctrl_mmio);
-
-  zx::nanosleep(zx::deadline_after(zx::usec(2)));
-
-  USB_R2_V2::Get()
-      .ReadFrom(usbctrl_mmio)
-      .set_p30_pcs_tx_deemph_3p5db(0x15)
-      .set_p30_pcs_tx_deemph_6db(0x20)
-      .WriteTo(usbctrl_mmio);
-
-  zx::nanosleep(zx::deadline_after(zx::usec(2)));
-
-  USB_R1_V2::Get()
-      .ReadFrom(usbctrl_mmio)
-      .set_u3h_host_port_power_control_present(1)
-      .set_u3h_fladj_30mhz_reg(0x20)
-      .set_p30_pcs_tx_swing_full(127)
-      .WriteTo(usbctrl_mmio);
-
-  zx::nanosleep(zx::deadline_after(zx::usec(2)));
-
-  auto phy3_r2 = PHY3_R2::Get().ReadFrom(usbphy3_mmio);
-  phy3_r2.set_phy_tx_vboost_lvl(0x4);
-  phy3_r2.WriteTo(usbphy3_mmio);
-  zx::nanosleep(zx::deadline_after(zx::usec(2)));
-
-  uint32_t data = CrBusRead(0x102d);
-  data |= (1 << 7);
-  CrBusWrite(0x102D, data);
-
-  data = CrBusRead(0x1010);
-  data &= ~0xff0;
-  data |= 0x20;
-  CrBusWrite(0x1010, data);
-
-  data = CrBusRead(0x1006);
-  data &= ~(1 << 6);
-  data |= (1 << 7);
-  data &= ~(0x7 << 8);
-  data |= (0x3 << 8);
-  data |= (0x1 << 11);
-  CrBusWrite(0x1006, data);
-
-  data = CrBusRead(0x1002);
-  data &= ~0x3f80;
-  data |= (0x16 << 7);
-  data &= ~0x7f;
-  data |= (0x7f | (1 << 14));
-  CrBusWrite(0x1002, data);
-
-  data = CrBusRead(0x30);
-  data &= ~(0xf << 4);
-  data |= (0x8 << 4);
-  CrBusWrite(0x30, data);
-  zx::nanosleep(zx::deadline_after(zx::usec(2)));
-
-  auto phy3_r1 = PHY3_R1::Get().ReadFrom(usbphy3_mmio);
-  phy3_r1.set_phy_los_bias(0x4);
-  phy3_r1.set_phy_los_level(0x9);
-  phy3_r1.WriteTo(usbphy3_mmio);
 
   return ZX_OK;
 }
@@ -430,51 +113,48 @@ zx_status_t Vim3UsbPhy::InitOtg() {
   return ZX_OK;
 }
 
-void Vim3UsbPhy::UsbPhy2::SetMode(UsbMode mode, Vim3UsbPhy* device) {
-  ZX_DEBUG_ASSERT(mode == UsbMode::HOST || mode == UsbMode::PERIPHERAL);
-  if ((dr_mode_ == USB_MODE_HOST && mode != UsbMode::HOST) ||
-      (dr_mode_ == USB_MODE_PERIPHERAL && mode != UsbMode::PERIPHERAL)) {
-    FDF_LOG(ERROR, "If dr_mode_ is not USB_MODE_OTG, dr_mode_ must match requested mode.");
-    return;
-  }
-
-  FDF_LOG(INFO, "Entering USB %s Mode", mode == UsbMode::HOST ? "Host" : "Peripheral");
-
-  if (mode == phy_mode_)
-    return;
-
-  if (is_otg_capable_) {
-    auto r0 = USB_R0_V2::Get().ReadFrom(&device->usbctrl_mmio_);
-    if (mode == UsbMode::HOST) {
-      r0.set_u2d_act(0);
-    } else {
-      r0.set_u2d_act(1);
-      r0.set_u2d_ss_scaledown_mode(0);
+zx_status_t Vim3UsbPhy::InitPhy3() {
+  for (auto& usbphy3 : usbphy3_) {
+    auto status = usbphy3.Init(usbctrl_mmio_);
+    if (status != ZX_OK) {
+      FDF_LOG(ERROR, "usbphy3.Init() error %s", zx_status_get_string(status));
+      return status;
     }
-    r0.WriteTo(&device->usbctrl_mmio_);
-
-    USB_R4_V2::Get()
-        .ReadFrom(&device->usbctrl_mmio_)
-        .set_p21_sleepm0(mode == UsbMode::PERIPHERAL)
-        .WriteTo(&device->usbctrl_mmio_);
   }
 
-  U2P_R0_V2::Get(idx_)
-      .ReadFrom(&device->usbctrl_mmio_)
-      .set_host_device(mode == UsbMode::HOST)
-      .set_por(0)
-      .WriteTo(&device->usbctrl_mmio_);
+  return ZX_OK;
+}
 
-  zx::nanosleep(zx::deadline_after(zx::usec(500)));
+void Vim3UsbPhy::ChangeMode(UsbPhyBase& phy, UsbMode new_mode) {
+  auto old_mode = phy.phy_mode();
+  if (new_mode == old_mode) {
+    FDF_LOG(ERROR, "Already in %d mode", static_cast<uint8_t>(new_mode));
+    return;
+  }
+  phy.SetMode(new_mode, usbctrl_mmio_, pll_settings_);
 
-  auto old_mode = phy_mode_;
-  phy_mode_ = mode;
-
-  if (is_otg_capable_ && old_mode != UsbMode::UNKNOWN) {
-    PLL_REGISTER::Get(0x38)
-        .FromValue(mode == UsbMode::HOST ? device->pll_settings_[6] : 0)
-        .WriteTo(&mmio_);
-    PLL_REGISTER::Get(0x34).FromValue(device->pll_settings_[5]).WriteTo(&mmio_);
+  if (new_mode == UsbMode::HOST) {
+    auto result = controller_->AddXhci();
+    if (result.is_error()) {
+      FDF_LOG(ERROR, "Failed to add xHCI, %s", result.status_string());
+    }
+    if (old_mode != UsbMode::UNKNOWN) {
+      result = controller_->RemoveDwc2();
+      if (result.is_error()) {
+        FDF_LOG(ERROR, "Failed to remove DWC2, %s", result.status_string());
+      }
+    }
+  } else {
+    auto result = controller_->AddDwc2();
+    if (result.is_error()) {
+      FDF_LOG(ERROR, "Failed to add DWC2, %s", result.status_string());
+    }
+    if (old_mode != UsbMode::UNKNOWN) {
+      result = controller_->RemoveXhci();
+      if (result.is_error()) {
+        FDF_LOG(ERROR, "Failed to remove xHCI, %s", result.status_string());
+      }
+    }
   }
 }
 
@@ -489,7 +169,6 @@ void Vim3UsbPhy::HandleIrq(async_dispatcher_t* dispatcher, async::IrqBase* irq, 
   }
 
   {
-    fbl::AutoLock _(&lock_);
     auto r5 = USB_R5_V2::Get().ReadFrom(&usbctrl_mmio_);
     // Acknowledge interrupt
     r5.set_usb_iddig_irq(0).WriteTo(&usbctrl_mmio_);
@@ -500,256 +179,17 @@ void Vim3UsbPhy::HandleIrq(async_dispatcher_t* dispatcher, async::IrqBase* irq, 
         continue;
       }
 
-      auto mode = r5.iddig_curr() == 0 ? UsbMode::HOST : UsbMode::PERIPHERAL;
-      phy.SetMode(mode, this);
-
-      if (mode == UsbMode::HOST) {
-        auto result = controller_->AddXhci();
-        if (result.is_error()) {
-          FDF_LOG(ERROR, "Failed to add xHCI, %s", result.status_string());
-        }
-        result = controller_->RemoveDwc2();
-        if (result.is_error()) {
-          FDF_LOG(ERROR, "Failed to remove DWC2, %s", result.status_string());
-        }
-      } else {
-        auto result = controller_->AddDwc2();
-        if (result.is_error()) {
-          FDF_LOG(ERROR, "Failed to add DWC2, %s", result.status_string());
-        }
-        result = controller_->RemoveXhci();
-        if (result.is_error()) {
-          FDF_LOG(ERROR, "Failed to remove xHCI, %s", result.status_string());
-        }
-      }
+      ChangeMode(phy, r5.iddig_curr() == 0 ? UsbMode::HOST : UsbMode::PERIPHERAL);
     }
   }
 
   irq_.ack();
 }
 
-zx::result<> Vim3UsbPhyDevice::Start() {
-  // Get Reset Register.
-  fidl::ClientEnd<fuchsia_hardware_registers::Device> reset_register;
-  {
-    zx::result result =
-        incoming()->Connect<fuchsia_hardware_registers::Service::Device>("register-reset");
-    if (result.is_error()) {
-      FDF_LOG(ERROR, "Failed to open i2c service: %s", result.status_string());
-      return result.take_error();
-    }
-    reset_register = std::move(result.value());
-  }
-
-  // Get metadata.
-  PhyMetadata parsed_metadata;
-  {
-    zx::result result = incoming()->Connect<fuchsia_driver_compat::Service::Device>("pdev");
-    if (result.is_error()) {
-      FDF_LOG(ERROR, "Failed to open compat service: %s", result.status_string());
-      return result.take_error();
-    }
-    auto compat = fidl::WireSyncClient(std::move(result.value()));
-    if (!compat.is_valid()) {
-      FDF_LOG(ERROR, "Failed to get compat");
-      return zx::error(ZX_ERR_NO_RESOURCES);
-    }
-
-    auto metadata = compat->GetMetadata();
-    if (!metadata.ok()) {
-      FDF_LOG(ERROR, "Failed to GetMetadata %s", metadata.error().FormatDescription().c_str());
-      return zx::error(metadata.error().status());
-    }
-    if (metadata->is_error()) {
-      FDF_LOG(ERROR, "Failed to GetMetadata %s", zx_status_get_string(metadata->error_value()));
-      return metadata->take_error();
-    }
-
-    auto vals = ParseMetadata(metadata.value()->metadata);
-    if (vals.is_error()) {
-      FDF_LOG(ERROR, "Failed to ParseMetadata %s", zx_status_get_string(vals.error_value()));
-      return vals.take_error();
-    }
-    parsed_metadata = vals.value();
-  }
-
-  // Get mmio.
-  std::optional<fdf::MmioBuffer> usbctrl_mmio, usbphy20_mmio, usbphy21_mmio, usbphy3_mmio;
-  zx::interrupt irq;
-  {
-    zx::result result =
-        incoming()->Connect<fuchsia_hardware_platform_device::Service::Device>("pdev");
-    if (result.is_error()) {
-      FDF_LOG(ERROR, "Failed to open pdev service: %s", result.status_string());
-      return result.take_error();
-    }
-    auto pdev = ddk::PDevFidl(std::move(result.value()));
-    if (!pdev.is_valid()) {
-      FDF_LOG(ERROR, "Failed to get pdev");
-      return zx::error(ZX_ERR_NO_RESOURCES);
-    }
-
-    auto status = pdev.MapMmio(0, &usbctrl_mmio);
-    if (status != ZX_OK) {
-      FDF_LOG(ERROR, "pdev.MapMmio(0) error %s", zx_status_get_string(status));
-      return zx::error(status);
-    }
-    status = pdev.MapMmio(1, &usbphy20_mmio);
-    if (status != ZX_OK) {
-      FDF_LOG(ERROR, "pdev.MapMmio(1) error %s", zx_status_get_string(status));
-      return zx::error(status);
-    }
-    status = pdev.MapMmio(2, &usbphy21_mmio);
-    if (status != ZX_OK) {
-      FDF_LOG(ERROR, "pdev.MapMmio(2) error %s", zx_status_get_string(status));
-      return zx::error(status);
-    }
-    status = pdev.MapMmio(3, &usbphy3_mmio);
-    if (status != ZX_OK) {
-      FDF_LOG(ERROR, "pdev.MapMmio(3) error %s", zx_status_get_string(status));
-      return zx::error(status);
-    }
-
-    status = pdev.GetInterrupt(0, &irq);
-    if (status != ZX_OK) {
-      FDF_LOG(ERROR, "pdev.GetInterrupt(0) error %s", zx_status_get_string(status));
-      return zx::error(status);
-    }
-  }
-
-  // Create and initialize device
-  device_ = std::make_unique<Vim3UsbPhy>(
-      this, std::move(reset_register), parsed_metadata.pll_settings, std::move(*usbctrl_mmio),
-      Vim3UsbPhy::UsbPhy2(0, std::move(*usbphy20_mmio), false, USB_MODE_HOST),
-      Vim3UsbPhy::UsbPhy2(1, std::move(*usbphy21_mmio), true, parsed_metadata.dr_mode),
-      std::move(*usbphy3_mmio), std::move(irq));
-
-  // Serve fuchsia_hardware_usb_phy.
-  {
-    auto result = outgoing()->AddService<fuchsia_hardware_usb_phy::Service>(
-        fuchsia_hardware_usb_phy::Service::InstanceHandler({
-            .device = bindings_.CreateHandler(device_.get(), fdf::Dispatcher::GetCurrent()->get(),
-                                              fidl::kIgnoreBindingClosure),
-        }));
-    if (result.is_error()) {
-      FDF_LOG(ERROR, "Failed to add Device service %s", result.status_string());
-      return zx::error(result.status_value());
-    }
-  }
-
-  {
-    auto result = CreateNode();
-    if (result.is_error()) {
-      FDF_LOG(ERROR, "Failed to create node %s", result.status_string());
-      return zx::error(result.status_value());
-    }
-  }
-
-  // Initialize device. Must come after CreateNode() because Init() will creates xHCI and DWC2
-  // nodes on top of node_.
-  auto status = device_->Init();
+zx_status_t Vim3UsbPhy::Init(bool has_otg) {
+  auto status = InitPhy2();
   if (status != ZX_OK) {
-    FDF_LOG(ERROR, "Init() error %s", zx_status_get_string(status));
-    return zx::error(status);
-  }
-
-  return zx::ok();
-}
-
-zx::result<> Vim3UsbPhyDevice::CreateNode() {
-  // Add node for vim3-usb-phy.
-  fidl::Arena arena;
-  auto args =
-      fuchsia_driver_framework::wire::NodeAddArgs::Builder(arena).name(arena, kDeviceName).Build();
-
-  zx::result controller_endpoints =
-      fidl::CreateEndpoints<fuchsia_driver_framework::NodeController>();
-  ZX_ASSERT_MSG(controller_endpoints.is_ok(), "Failed to create controller endpoints: %s",
-                controller_endpoints.status_string());
-  zx::result node_endpoints = fidl::CreateEndpoints<fuchsia_driver_framework::Node>();
-  ZX_ASSERT_MSG(node_endpoints.is_ok(), "Failed to create node endpoints: %s",
-                node_endpoints.status_string());
-
-  {
-    fidl::WireResult result = fidl::WireCall(node())->AddChild(
-        args, std::move(controller_endpoints->server), std::move(node_endpoints->server));
-    if (!result.ok()) {
-      FDF_LOG(ERROR, "Failed to add child %s", result.FormatDescription().c_str());
-      return zx::error(result.status());
-    }
-  }
-  controller_.Bind(std::move(controller_endpoints->client));
-  node_.Bind(std::move(node_endpoints->client));
-
-  return zx::ok();
-}
-
-zx::result<> Vim3UsbPhyDevice::AddDevice(ChildNode& node) {
-  fbl::AutoLock _(&node.lock_);
-  node.count_++;
-  if (node.count_ != 1) {
-    return zx::ok();
-  }
-
-  {
-    auto result = node.compat_server_.Initialize(incoming(), outgoing(), node_name(), node.name_,
-                                                 compat::ForwardMetadata::None(), std::nullopt,
-                                                 std::string(kDeviceName) + "/");
-    if (result.is_error()) {
-      return result.take_error();
-    }
-  }
-
-  fidl::Arena arena;
-  auto offers = node.compat_server_.CreateOffers2(arena);
-  offers.push_back(fdf::MakeOffer2<fuchsia_hardware_usb_phy::Service>(arena, node.name_));
-  auto args =
-      fuchsia_driver_framework::wire::NodeAddArgs::Builder(arena)
-          .name(arena, node.name_)
-          .offers2(arena, std::move(offers))
-          .properties(arena,
-                      std::vector{
-                          fdf::MakeProperty(arena, BIND_PLATFORM_DEV_VID, PDEV_VID_GENERIC),
-                          fdf::MakeProperty(arena, BIND_PLATFORM_DEV_PID, PDEV_PID_GENERIC),
-                          fdf::MakeProperty(arena, BIND_PLATFORM_DEV_DID, node.property_did_),
-                      })
-          .Build();
-
-  zx::result controller_endpoints =
-      fidl::CreateEndpoints<fuchsia_driver_framework::NodeController>();
-  ZX_ASSERT_MSG(controller_endpoints.is_ok(), "Failed to create controller endpoints: %s",
-                controller_endpoints.status_string());
-
-  fidl::WireResult result = node_->AddChild(args, std::move(controller_endpoints->server), {});
-  if (!result.ok()) {
-    FDF_LOG(ERROR, "Failed to add child %s", result.FormatDescription().c_str());
-    return zx::error(result.status());
-  }
-  node.controller_.Bind(std::move(controller_endpoints->client));
-
-  return zx::ok();
-}
-
-zx::result<> Vim3UsbPhyDevice::RemoveDevice(ChildNode& node) {
-  fbl::AutoLock _(&node.lock_);
-  if (node.count_ == 0) {
-    // Nothing to remove.
-    return zx::ok();
-  }
-  node.count_--;
-  if (node.count_ != 0) {
-    // Has more instances.
-    return zx::ok();
-  }
-
-  node.reset();
-  return zx::ok();
-}
-
-zx_status_t Vim3UsbPhy::Init() {
-  auto status = InitPhy();
-  if (status != ZX_OK) {
-    FDF_LOG(ERROR, "InitPhy() error %s", zx_status_get_string(status));
+    FDF_LOG(ERROR, "InitPhy2() error %s", zx_status_get_string(status));
     return status;
   }
   status = InitOtg();
@@ -757,49 +197,33 @@ zx_status_t Vim3UsbPhy::Init() {
     FDF_LOG(ERROR, "InitOtg() error %s", zx_status_get_string(status));
     return status;
   }
-
   status = InitPhy3();
   if (status != ZX_OK) {
     FDF_LOG(ERROR, "InitPhy3() error %s", zx_status_get_string(status));
     return status;
   }
 
-  bool has_otg = false;
   for (auto& phy : usbphy2_) {
     UsbMode mode;
     if (phy.dr_mode() != USB_MODE_OTG) {
       mode = phy.dr_mode() == USB_MODE_HOST ? UsbMode::HOST : UsbMode::PERIPHERAL;
-      lock_.Acquire();
     } else {
       has_otg = true;
       // Wait for PHY to stabilize before reading initial mode.
       zx::nanosleep(zx::deadline_after(zx::sec(1)));
-      lock_.Acquire();
       mode = USB_R5_V2::Get().ReadFrom(&usbctrl_mmio_).iddig_curr() == 0 ? UsbMode::HOST
                                                                          : UsbMode::PERIPHERAL;
     }
-    phy.SetMode(mode, this);
-    lock_.Release();
 
-    if (mode == UsbMode::HOST) {
-      auto result = controller_->AddXhci();
-      if (result.is_error()) {
-        FDF_LOG(ERROR, "Failed to add xHCI, %s", result.status_string());
-      }
-    } else {
-      auto result = controller_->AddDwc2();
-      if (result.is_error()) {
-        FDF_LOG(ERROR, "Failed to add DWC2, %s", result.status_string());
-      }
-    }
+    ChangeMode(phy, mode);
   }
 
-  // USB 3.0 phy is host mode only.
-  {
-    auto result = controller_->AddXhci();
-    if (result.is_error()) {
-      return result.status_value();
+  for (auto& phy : usbphy3_) {
+    if (phy.dr_mode() != USB_MODE_HOST) {
+      FDF_LOG(ERROR, "Not support USB3 in non-host mode yet");
     }
+
+    ChangeMode(phy, UsbMode::HOST);
   }
 
   if (has_otg) {
@@ -818,13 +242,11 @@ zx_status_t Vim3UsbPhy::Init() {
 // PHY tuning based on connection state
 void Vim3UsbPhy::ConnectStatusChanged(ConnectStatusChangedRequest& request,
                                       ConnectStatusChangedCompleter::Sync& completer) {
-  fbl::AutoLock lock(&lock_);
-
   if (dwc2_connected_ == request.connected())
     return;
 
   for (auto& phy : usbphy2_) {
-    if (phy.mode() != UsbMode::PERIPHERAL) {
+    if (phy.phy_mode() != UsbMode::PERIPHERAL) {
       continue;
     }
     auto* mmio = &phy.mmio();
@@ -833,20 +255,11 @@ void Vim3UsbPhy::ConnectStatusChanged(ConnectStatusChangedRequest& request,
       PLL_REGISTER::Get(0x38).FromValue(pll_settings_[7]).WriteTo(mmio);
       PLL_REGISTER::Get(0x34).FromValue(pll_settings_[5]).WriteTo(mmio);
     } else {
-      InitPll(mmio);
+      phy.InitPll(pll_settings_);
     }
   }
 
   dwc2_connected_ = request.connected();
 }
 
-void Vim3UsbPhyDevice::Stop() {
-  auto status = controller_->Remove();
-  if (!status.ok()) {
-    FDF_LOG(ERROR, "Could not remove child: %s", status.status_string());
-  }
-}
-
 }  // namespace vim3_usb_phy
-
-FUCHSIA_DRIVER_EXPORT(vim3_usb_phy::Vim3UsbPhyDevice);

@@ -13,7 +13,6 @@ namespace vim3_usb_phy {
 
 constexpr uint32_t RESET1_REGISTER_OFFSET = 0x8;
 constexpr uint32_t RESET1_LEVEL_OFFSET = 0x84;
-constexpr uint32_t USB2PHY_PORTCOUNT = 2;
 
 // PHY register offsets
 constexpr uint32_t U2P_REGISTER_OFFSET = 32;

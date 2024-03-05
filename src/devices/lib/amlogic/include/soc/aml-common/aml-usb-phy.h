@@ -5,6 +5,19 @@
 #ifndef SRC_DEVICES_LIB_AMLOGIC_INCLUDE_SOC_AML_COMMON_AML_USB_PHY_H_
 #define SRC_DEVICES_LIB_AMLOGIC_INCLUDE_SOC_AML_COMMON_AML_USB_PHY_H_
 
+#include <usb/usb.h>
+
+enum UsbProtocol : uint8_t {
+  Usb2_0 = 2,
+  Usb3_0 = 3,
+};
+
+struct UsbPhyMode {
+  UsbProtocol protocol;
+  usb_mode_t dr_mode;
+  bool is_otg_capable;
+};
+
 // size of phy port register block
 #define PHY_REGISTER_SIZE 32
 #define U2P_R0_OFFSET 0

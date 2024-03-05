@@ -26,7 +26,12 @@ source_set("common") {
     "//build/config:all_source",
     "//build/config/fuchsia:enable_zircon_asserts",
   ]
-  sources = [ "vim3-usb-phy.cc" ]
+  sources = [
+    "usb-phy2.cc",
+    "usb-phy3.cc",
+    "vim3-usb-phy-device.cc",
+    "vim3-usb-phy.cc",
+  ]
   deps = [
     ":vim3_usb_phy_bind",
     "//sdk/fidl/fuchsia.driver.compat:fuchsia.driver.compat_cpp",

@@ -25,12 +25,12 @@
 #include <ddk/usb-peripheral-config.h>
 #include <ddktl/device.h>
 #include <soc/aml-common/aml-registers.h>
+#include <soc/aml-common/aml-usb-phy.h>
 #include <soc/aml-meson/g12b-clk.h>
 #include <usb/cdc.h>
 #include <usb/dwc2/metadata.h>
 #include <usb/peripheral-config.h>
 #include <usb/peripheral.h>
-#include <usb/usb.h>
 
 #include "src/devices/board/drivers/vim3/vim3-gpios.h"
 #include "src/devices/board/drivers/vim3/vim3.h"
@@ -87,10 +87,12 @@ static const uint32_t pll_settings[] = {
 // The two USB-A ports both are connected to the USB 2.0 host only controller. The USB-A port
 // closest to the ethernet port is connected also the the USB 3.0 host only controller. The USB-C
 // port is connected to the USB 2.0 OTG controller, however, we only want the USB-C port to be in
-// peripheral mode to support USB-CDC use-case. dr_mode only refers to the OTG capable USB 2.0
-// controller that is on the Vim3. We define this to be peripheral mode only because we want to
-// support the USB-CDC use-case.
-static const usb_mode_t dr_mode = USB_MODE_PERIPHERAL;
+// peripheral mode to support USB-CDC use-case.
+static const std::vector<UsbPhyMode> phy_modes = {
+    {UsbProtocol::Usb2_0, USB_MODE_HOST, false},
+    {UsbProtocol::Usb2_0, USB_MODE_PERIPHERAL, true},
+    {UsbProtocol::Usb3_0, USB_MODE_HOST, false},
+};
 
 static const std::vector<fpbus::Metadata> usb_phy_metadata{
     {{
@@ -101,8 +103,9 @@ static const std::vector<fpbus::Metadata> usb_phy_metadata{
     }},
     {{
         .type = DEVICE_METADATA_USB_MODE,
-        .data = std::vector<uint8_t>(reinterpret_cast<const uint8_t*>(&dr_mode),
-                                     reinterpret_cast<const uint8_t*>(&dr_mode) + sizeof(dr_mode)),
+        .data = std::vector<uint8_t>(reinterpret_cast<const uint8_t*>(phy_modes.data()),
+                                     reinterpret_cast<const uint8_t*>(phy_modes.data()) +
+                                         phy_modes.size() * sizeof(UsbPhyMode)),
     }},
 };
 
