@@ -600,9 +600,12 @@ func (t *FFXTester) Test(ctx context.Context, test testsharder.Test, stdout, std
 }
 
 func (t *FFXTester) Reconnect(ctx context.Context) error {
-	return retry.Retry(ctx, retry.WithMaxDuration(retry.NewConstantBackoff(time.Second), 30*time.Second), func() error {
-		return t.ffx.RunWithTarget(ctx, "target", "wait", "-t", "10")
-	}, nil)
+	if t.EnabledForTesting() {
+		return retry.Retry(ctx, retry.WithMaxDuration(retry.NewConstantBackoff(time.Second), 30*time.Second), func() error {
+			return t.ffx.RunWithTarget(ctx, "target", "wait", "-t", "10")
+		}, nil)
+	}
+	return t.sshTester.Reconnect(ctx)
 }
 
 // testWithFile runs `ffx test` with -test-file and returns the test result.
