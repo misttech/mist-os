@@ -11,7 +11,7 @@ use super::{
     symbols::{ClassDefault, ClassDefaultRange},
 };
 
-use selinux_common::security_context::{SecurityContext, SecurityContextParseError};
+use super::{SecurityContext, SecurityContextParseError};
 use thiserror::Error;
 
 /// Structured errors that may be encountered parsing a binary policy.

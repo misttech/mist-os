@@ -10,10 +10,7 @@ rustc_library("common") {
   with_unit_tests = true
   edition = "2021"
   source_root = "lib.rs"
-  sources = [
-    "lib.rs",
-    "security_context.rs",
-  ]
+  sources = [ "lib.rs" ]
   configs += [ "//src/starnix/config:starnix_clippy_lints" ]
 }
 

@@ -27,6 +27,7 @@ policy = {
     "src/metadata.rs",
     "src/parsed_policy.rs",
     "src/parser.rs",
+    "src/security_context.rs",
     "src/symbols.rs",
   ]
 }

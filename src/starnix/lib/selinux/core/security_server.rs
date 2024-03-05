@@ -11,13 +11,10 @@ use crate::{
 
 use anyhow::Context as _;
 use fuchsia_zircon::{self as zx};
-use selinux_common::{
-    security_context::{SecurityContext, SecurityContextParseError},
-    AbstractObjectClass, ClassPermission, FileClass, Permission,
-};
+use selinux_common::{AbstractObjectClass, ClassPermission, FileClass, Permission};
 use selinux_policy::{
     metadata::HandleUnknown, parse_policy_by_value, parser::ByValue, AccessVector,
-    AccessVectorComputer, Policy,
+    AccessVectorComputer, Policy, SecurityContext, SecurityContextParseError,
 };
 use starnix_sync::Mutex;
 use std::{collections::HashMap, ops::DerefMut, sync::Arc};

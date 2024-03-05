@@ -11,7 +11,8 @@ use super::{
     ParsedPolicy,
 };
 
-use selinux_common::{self as sc, security_context::SecurityContext, ClassPermission as _};
+use super::SecurityContext;
+use selinux_common::{self as sc, ClassPermission as _};
 use std::collections::HashMap;
 
 /// An index for facilitating fast lookup of common abstractions inside parsed binary policy data

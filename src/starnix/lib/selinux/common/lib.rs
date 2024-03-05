@@ -2,8 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-pub mod security_context;
-
 /// A class that may appear in SELinux policy or an access vector cache query.
 #[derive(Clone, Debug, PartialEq)]
 pub enum AbstractObjectClass {

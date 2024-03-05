@@ -10,7 +10,10 @@ pub mod parser;
 
 mod arrays;
 mod extensible_bitmap;
+mod security_context;
 mod symbols;
+
+pub use security_context::{SecurityContext, SecurityContextParseError};
 
 use {
     error::{NewSecurityContextError, ParseError, QueryError},
@@ -23,9 +26,7 @@ use {
 use anyhow::Context as _;
 use once_cell::sync::Lazy;
 use parser::ByValue;
-use selinux_common::{
-    self as sc, security_context::SecurityContext, ClassPermission as _, FileClass,
-};
+use selinux_common::{self as sc, ClassPermission as _, FileClass};
 use std::{collections::BTreeMap, fmt::Debug, marker::PhantomData, ops::Deref};
 use zerocopy::{little_endian as le, ByteSlice, FromBytes, NoCell, Ref, Unaligned};
 
