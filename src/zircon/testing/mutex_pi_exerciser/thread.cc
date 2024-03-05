@@ -20,27 +20,28 @@ Thread::Thread(uint32_t prio) : prio_(prio) {
 }
 
 // static
-zx_status_t Thread::ConnectSchedulerService() {
-  if (profile_provider_ != nullptr) {
+zx_status_t Thread::InitializeProfileResource() {
+  if (profile_resource_.get() != ZX_HANDLE_INVALID) {
     return ZX_ERR_BAD_STATE;
   }
 
   zx::channel client_ep, server_ep;
-  zx::channel::create(0, &client_ep, &server_ep);
-  zx_status_t res;
-
-  res = fdio_service_connect(
-      (std::string("/svc/") + fuchsia::scheduler::ProfileProvider::Name_).c_str(),
-      server_ep.release());
+  zx_status_t res = zx::channel::create(0, &client_ep, &server_ep);
   if (res != ZX_OK) {
-    fprintf(stderr, "Failed to connect schedule.ProfileProvider! (res %d)\n", res);
+    fprintf(stderr, "Failed to create a channel to get the profile resource! (res: %d)\n", res);
     return res;
   }
 
-  profile_provider_ =
-      std::make_unique<fuchsia::scheduler::ProfileProvider_SyncProxy>(std::move(client_ep));
+  res =
+      fdio_service_connect((std::string("/svc/") + fuchsia::kernel::ProfileResource::Name_).c_str(),
+                           client_ep.release());
+  if (res != ZX_OK) {
+    fprintf(stderr, "Failed to connect to fuchsia.kernel.ProfileResource! (res %d)\n", res);
+    return res;
+  }
 
-  return res;
+  fuchsia::kernel::ProfileResource_SyncProxy proxy(std::move(server_ep));
+  return proxy.Get(&profile_resource_);
 }
 
 // static
@@ -54,18 +55,14 @@ zx_status_t Thread::EnsureProfile(uint32_t prio_level) {
     return ZX_OK;
   }
 
-  char name[32];
-  snprintf(name, sizeof(name), "mutex_pi_exerciser %02u", prio_level);
+  zx_profile_info_t info = {
+      .flags = ZX_PROFILE_INFO_FLAG_PRIORITY,
+      .priority = static_cast<int32_t>(prio_level),
+  };
 
-  zx_status_t get_profile_res;
-  zx_status_t res = profile_provider_->GetProfile(prio_level, name, &get_profile_res, &profile);
-
-  if ((res != ZX_OK) || (get_profile_res != ZX_OK)) {
-    fprintf(stderr, "Failed to obtain profile for priority %u (res = %d, gp_res = %d)\n",
-            prio_level, res, get_profile_res);
-    if (res == ZX_OK) {
-      res = get_profile_res;
-    }
+  zx_status_t res = zx::profile::create(profile_resource_, 0u, &info, &profile);
+  if (res != ZX_OK) {
+    fprintf(stderr, "Failed to obtain profile for priority %u (res = %d)\n", prio_level, res);
   }
 
   return res;

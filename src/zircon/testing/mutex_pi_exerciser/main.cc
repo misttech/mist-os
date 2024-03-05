@@ -405,9 +405,9 @@ int main(int argc, char** argv) {
     return -1;
   }
 
-  res = Thread::ConnectSchedulerService();
+  res = Thread::InitializeProfileResource();
   if (res != ZX_OK) {
-    fprintf(stderr, "Failed to start connect to scheduler service (res = %d)\n", res);
+    fprintf(stderr, "Failed to initialize profile resource (res = %d)\n", res);
     return -1;
   }
 
