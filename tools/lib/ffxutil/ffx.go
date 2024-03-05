@@ -142,11 +142,14 @@ func NewFFXInstance(
 		ffxCmds = append(ffxCmds, []string{"config", "set", "ssh.priv", fmt.Sprintf("[\"%s\"]", sshKey)})
 	}
 	for _, args := range ffxCmds {
-		ctx, cancel := context.WithTimeout(ctx, 20*time.Second)
+		configCtx, cancel := context.WithTimeout(ctx, 20*time.Second)
 		defer cancel()
 		// TODO(https://fxbug.dev/321754579): Remove when no longer needed for debugging.
 		args = append([]string{"-v", "--log-level", "TRACE"}, args...)
-		if err := ffx.Run(ctx, args...); err != nil {
+		if err := ffx.Run(configCtx, args...); err != nil {
+			if err := ffx.runner.Run(ctx, []string{"cat", "/proc/meminfo"}, subprocess.RunOptions{}); err != nil {
+				logger.Debugf(ctx, "failed to dump /proc/meminfo")
+			}
 			return nil, err
 		}
 	}
