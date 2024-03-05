@@ -32,7 +32,7 @@ use starnix_uapi::{
         SIGUSR2, SIGVTALRM, SIGWINCH, SIGXCPU, SIGXFSZ,
     },
     user_address::UserAddress,
-    SA_ONSTACK, SA_RESTART, SA_SIGINFO, SIG_DFL, SIG_IGN,
+    SA_NODEFER, SA_ONSTACK, SA_RESETHAND, SA_RESTART, SA_SIGINFO, SIG_DFL, SIG_IGN,
 };
 
 /// Indicates where in the signal queue a signal should go.  Signals
@@ -242,7 +242,7 @@ pub fn deliver_signal(
             DeliveryAction::Ignore => {}
             DeliveryAction::CallHandler => {
                 let signal = siginfo.signal;
-                if let Err(err) = dispatch_signal_handler(
+                match dispatch_signal_handler(
                     task,
                     registers,
                     extended_pstate,
@@ -250,32 +250,45 @@ pub fn deliver_signal(
                     siginfo,
                     sigaction,
                 ) {
-                    log_warn!("failed to deliver signal {:?}: {:?}", signal, err);
-
-                    siginfo = SignalInfo::default(SIGSEGV);
-                    // The behavior that we want is:
-                    //  1. If we failed to send a SIGSEGV, or SIGSEGV is masked, or SIGSEGV is
-                    //  ignored, we reset the signal disposition and unmask SIGSEGV.
-                    //  2. Send a SIGSEGV to the program, with the (possibly) updated signal
-                    //  disposition and mask.
-                    let sigaction = task.thread_group.signal_actions.get(siginfo.signal);
-                    let action = action_for_signal(&siginfo, sigaction);
-                    let masked_signals = task_state.signals.mask();
-                    if signal == SIGSEGV
-                        || masked_signals.has_signal(SIGSEGV)
-                        || action == DeliveryAction::Ignore
-                    {
-                        task_state.signals.set_mask(masked_signals & !SigSet::from(SIGSEGV));
-                        task.thread_group.signal_actions.set(SIGSEGV, sigaction_t::default());
+                    Ok(_) => {
+                        // Reset the signal handler if `SA_RESETHAND` was set.
+                        if sigaction.sa_flags & (SA_RESETHAND as u64) != 0 {
+                            let new_sigaction = sigaction_t {
+                                sa_handler: SIG_DFL,
+                                sa_flags: sigaction.sa_flags & !(SA_RESETHAND as u64),
+                                ..sigaction
+                            };
+                            task.thread_group.signal_actions.set(signal, new_sigaction);
+                        }
                     }
+                    Err(err) => {
+                        log_warn!("failed to deliver signal {:?}: {:?}", signal, err);
 
-                    // Try to deliver the SIGSEGV.
-                    // We already checked whether we needed to unmask or reset the signal
-                    // disposition.
-                    // This could not lead to an infinite loop, because if we had a SIGSEGV
-                    // handler, and we failed to send a SIGSEGV, we remove the handler and resend
-                    // the SIGSEGV.
-                    continue;
+                        siginfo = SignalInfo::default(SIGSEGV);
+                        // The behavior that we want is:
+                        //  1. If we failed to send a SIGSEGV, or SIGSEGV is masked, or SIGSEGV is
+                        //  ignored, we reset the signal disposition and unmask SIGSEGV.
+                        //  2. Send a SIGSEGV to the program, with the (possibly) updated signal
+                        //  disposition and mask.
+                        let sigaction = task.thread_group.signal_actions.get(siginfo.signal);
+                        let action = action_for_signal(&siginfo, sigaction);
+                        let masked_signals = task_state.signals.mask();
+                        if signal == SIGSEGV
+                            || masked_signals.has_signal(SIGSEGV)
+                            || action == DeliveryAction::Ignore
+                        {
+                            task_state.signals.set_mask(masked_signals & !SigSet::from(SIGSEGV));
+                            task.thread_group.signal_actions.set(SIGSEGV, sigaction_t::default());
+                        }
+
+                        // Try to deliver the SIGSEGV.
+                        // We already checked whether we needed to unmask or reset the signal
+                        // disposition.
+                        // This could not lead to an infinite loop, because if we had a SIGSEGV
+                        // handler, and we failed to send a SIGSEGV, we remove the handler and resend
+                        // the SIGSEGV.
+                        continue;
+                    }
                 }
             }
             DeliveryAction::Terminate => {
@@ -371,7 +384,12 @@ pub fn dispatch_signal_handler(
 
     // Write the signal stack frame at the updated stack pointer.
     task.write_memory(UserAddress::from(stack_pointer), signal_stack_frame.as_bytes())?;
-    signal_state.set_mask(action.sa_mask.into());
+
+    let mut mask: SigSet = action.sa_mask.into();
+    if action.sa_flags & (SA_NODEFER as u64) == 0 {
+        mask = mask | siginfo.signal.into();
+    }
+    signal_state.set_mask(mask);
 
     registers.set_stack_pointer_register(stack_pointer);
     registers.set_arg0_register(siginfo.signal.number() as u64);

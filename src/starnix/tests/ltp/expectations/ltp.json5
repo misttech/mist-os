@@ -174,7 +174,6 @@
                 "settimeofday01",
                 "settimeofday02",
                 "setxattr03",
-                "sigaction01",
                 "sigprocmask01",
                 "sigtimedwait01",
                 "sigwaitinfo01",
