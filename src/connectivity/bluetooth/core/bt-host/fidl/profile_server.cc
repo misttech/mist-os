@@ -25,7 +25,7 @@
 #include "zircon/errors.h"
 
 namespace fidlbredr = fuchsia::bluetooth::bredr;
-namespace hci_android = bt::hci_spec::vendor::android;
+namespace android_hci = pw::bluetooth::vendor::android_hci;
 using fidlbredr::DataElement;
 using fidlbredr::Profile;
 using pw::bluetooth::AclPriority;
@@ -272,8 +272,8 @@ void ProfileServer::AudioOffloadExt::GetSupportedFeatures(GetSupportedFeaturesCa
 
   const uint32_t a2dp_offload_capabilities =
       adapter_state.android_vendor_capabilities.a2dp_source_offload_capability_mask();
-  const uint32_t sbc_capability = static_cast<uint32_t>(hci_android::A2dpCodecType::kSbc);
-  const uint32_t aac_capability = static_cast<uint32_t>(hci_android::A2dpCodecType::kAac);
+  const uint32_t sbc_capability = static_cast<uint32_t>(android_hci::A2dpCodecType::SBC);
+  const uint32_t aac_capability = static_cast<uint32_t>(android_hci::A2dpCodecType::AAC);
 
   if (a2dp_offload_capabilities & sbc_capability) {
     fidlbredr::AudioSbcSupport audio_sbc_support;
@@ -381,9 +381,27 @@ ProfileServer::AudioOffloadExt::AudioOffloadConfigFromFidl(
   config->channel_mode =
       fidl_helpers::FidlToChannelMode(audio_offload_configuration.channel_mode());
   config->encoded_audio_bit_rate = audio_offload_configuration.encoded_bit_rate();
-  config->codec_information = fidl_helpers::FidlToEncoderSettings(
-      audio_offload_configuration.encoder_settings(),
-      audio_offload_configuration.sampling_frequency(), audio_offload_configuration.channel_mode());
+
+  if (audio_offload_configuration.encoder_settings().is_sbc()) {
+    if (audio_offload_configuration.sampling_frequency() ==
+            fuchsia::bluetooth::bredr::AudioSamplingFrequency::HZ_88200 ||
+        audio_offload_configuration.sampling_frequency() ==
+            fuchsia::bluetooth::bredr::AudioSamplingFrequency::HZ_96000) {
+      bt_log(WARN, "fidl", "%s: sbc encoder cannot use sampling frequency %hhu", __FUNCTION__,
+             static_cast<uint8_t>(audio_offload_configuration.sampling_frequency()));
+      return nullptr;
+    }
+
+    config->sbc_configuration =
+        fidl_helpers::FidlToEncoderSettingsSbc(audio_offload_configuration.encoder_settings(),
+                                               audio_offload_configuration.sampling_frequency(),
+                                               audio_offload_configuration.channel_mode());
+  } else if (audio_offload_configuration.encoder_settings().is_aac()) {
+    config->aac_configuration =
+        fidl_helpers::FidlToEncoderSettingsAac(audio_offload_configuration.encoder_settings(),
+                                               audio_offload_configuration.sampling_frequency(),
+                                               audio_offload_configuration.channel_mode());
+  }
 
   return config;
 }

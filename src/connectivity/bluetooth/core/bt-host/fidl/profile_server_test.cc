@@ -32,7 +32,8 @@ namespace bthost {
 namespace {
 
 namespace fidlbredr = fuchsia::bluetooth::bredr;
-namespace hci_android = bt::hci_spec::vendor::android;
+namespace android_hci = pw::bluetooth::vendor::android_hci;
+
 using bt::l2cap::testing::FakeChannel;
 using pw::bluetooth::AclPriority;
 using FeaturesBits = pw::bluetooth::Controller::FeaturesBits;
@@ -1391,7 +1392,7 @@ TEST_F(ProfileServerTestFakeAdapter, AudioOffloadExtRequestParametersClosedOnCha
   params.SetToZeros();
   params.view().status().Write(pw::bluetooth::emboss::StatusCode::SUCCESS);
   params.view().a2dp_source_offload_capability_mask().BackingStorage().UncheckedWriteUInt(
-      static_cast<uint32_t>(hci_android::A2dpCodecType::kAac));
+      static_cast<uint32_t>(android_hci::A2dpCodecType::AAC));
   adapter()->mutable_state().android_vendor_capabilities.Initialize(params.view());
 
   // Set L2CAP channel parameters
@@ -1434,6 +1435,101 @@ TEST_F(ProfileServerTestFakeAdapter, AudioOffloadExtRequestParametersClosedOnCha
   EXPECT_FALSE(result_features.has_value());
   audio_client.Unbind();
   RunLoopUntilIdle();
+}
+
+class ProfileServerInvalidSamplingFrequencyTest
+    : public ProfileServerTestFakeAdapter,
+      public ::testing::WithParamInterface<fidlbredr::AudioSamplingFrequency> {};
+
+const std::vector<fidlbredr::AudioSamplingFrequency> kInvalidSamplingFrequencies = {
+    fidlbredr::AudioSamplingFrequency::HZ_88200,
+    fidlbredr::AudioSamplingFrequency::HZ_96000,
+};
+
+INSTANTIATE_TEST_SUITE_P(ProfileServerTestFakeAdapter, ProfileServerInvalidSamplingFrequencyTest,
+                         ::testing::ValuesIn(kInvalidSamplingFrequencies));
+
+TEST_P(ProfileServerInvalidSamplingFrequencyTest, SbcInvalidSamplingFrequency) {
+  // enable a2dp offloading
+  adapter()->mutable_state().controller_features |= FeaturesBits::kAndroidVendorExtensions;
+
+  // enable offloaded sbc encoding
+  bt::StaticPacket<
+      pw::bluetooth::vendor::android_hci::LEGetVendorCapabilitiesCommandCompleteEventWriter>
+      params;
+  params.view().status().Write(pw::bluetooth::emboss::StatusCode::SUCCESS);
+  params.view().a2dp_source_offload_capability_mask().sbc().Write(true);
+  adapter()->mutable_state().android_vendor_capabilities.Initialize(params.view());
+
+  // set up a fake channel and connection
+  FakeChannel::WeakPtr fake_channel;
+  adapter()->fake_bredr()->set_l2cap_channel_callback(
+      [&](auto chan) { fake_channel = std::move(chan); });
+
+  const bt::PeerId peer_id(1);
+  const fuchsia::bluetooth::PeerId fidl_peer_id{peer_id.value()};
+
+  fidlbredr::L2capParameters l2cap_params;
+  l2cap_params.set_psm(fidlbredr::PSM_AVDTP);
+
+  fidlbredr::ChannelParameters chan_params;
+  l2cap_params.set_parameters(std::move(chan_params));
+
+  fidlbredr::ConnectParameters conn_params;
+  conn_params.set_l2cap(std::move(l2cap_params));
+
+  std::optional<fidlbredr::Channel> response_channel;
+  client()->Connect(fidl_peer_id, std::move(conn_params),
+                    [&response_channel](fidlbredr::Profile_Connect_Result result) {
+                      ASSERT_TRUE(result.is_response());
+                      response_channel = std::move(result.response().channel);
+                    });
+  RunLoopUntilIdle();
+  ASSERT_TRUE(response_channel.has_value());
+  ASSERT_TRUE(response_channel->has_ext_audio_offload());
+
+  // set up the bad configuration
+  std::unique_ptr<fidlbredr::AudioOffloadFeatures> codec = fidlbredr::AudioOffloadFeatures::New();
+  std::unique_ptr<fidlbredr::AudioSbcSupport> codec_value = fidlbredr::AudioSbcSupport::New();
+  codec->set_sbc(std::move(*codec_value));
+
+  std::unique_ptr<fidlbredr::AudioEncoderSettings> encoder_settings =
+      std::make_unique<fidlbredr::AudioEncoderSettings>();
+  std::unique_ptr<fuchsia::media::SbcEncoderSettings> encoder_settings_value =
+      fuchsia::media::SbcEncoderSettings::New();
+  encoder_settings->set_sbc(*encoder_settings_value);
+
+  std::unique_ptr<fidlbredr::AudioOffloadConfiguration> config =
+      std::make_unique<fidlbredr::AudioOffloadConfiguration>();
+  config->set_codec(std::move(*codec));
+  config->set_max_latency(10);
+  config->set_scms_t_enable(true);
+  config->set_sampling_frequency(GetParam());
+  config->set_bits_per_sample(fidlbredr::AudioBitsPerSample::BPS_16);
+  config->set_channel_mode(fidlbredr::AudioChannelMode::MONO);
+  config->set_encoded_bit_rate(10);
+  config->set_encoder_settings(std::move(*encoder_settings));
+
+  // attempt to start the audio offload
+  fidl::InterfaceHandle<fidlbredr::AudioOffloadController> controller_handle;
+  fidl::InterfaceRequest<fidlbredr::AudioOffloadController> controller_request =
+      controller_handle.NewRequest();
+  fidl::InterfacePtr<fidlbredr::AudioOffloadExt> audio_offload_ext_client =
+      response_channel->mutable_ext_audio_offload()->Bind();
+  audio_offload_ext_client->StartAudioOffload(std::move(*config), std::move(controller_request));
+
+  fidl::InterfacePtr<fidlbredr::AudioOffloadController> audio_offload_controller_client;
+  audio_offload_controller_client.Bind(std::move(controller_handle));
+
+  std::optional<zx_status_t> audio_offload_controller_epitaph;
+  audio_offload_controller_client.set_error_handler(
+      [&](zx_status_t status) { audio_offload_controller_epitaph = status; });
+
+  RunLoopUntilIdle();
+
+  // Verify that |audio_offload_controller_client| was closed with |ZX_ERR_INTERNAL| epitaph
+  ASSERT_TRUE(audio_offload_controller_epitaph.has_value());
+  EXPECT_EQ(audio_offload_controller_epitaph.value(), ZX_ERR_NOT_SUPPORTED);
 }
 
 class AndroidSupportedFeaturesTest
@@ -1499,8 +1595,8 @@ TEST_P(AndroidSupportedFeaturesTest, AudioOffloadExtGetSupportedFeatures) {
   EXPECT_EQ(audio_offload_features_size, audio_offload_features.size());
 
   uint32_t capabilities = 0;
-  const uint32_t sbc_capability = static_cast<uint32_t>(hci_android::A2dpCodecType::kSbc);
-  const uint32_t aac_capability = static_cast<uint32_t>(hci_android::A2dpCodecType::kAac);
+  const uint32_t sbc_capability = static_cast<uint32_t>(android_hci::A2dpCodecType::SBC);
+  const uint32_t aac_capability = static_cast<uint32_t>(android_hci::A2dpCodecType::AAC);
   for (const fidlbredr::AudioOffloadFeatures& feature : audio_offload_features) {
     if (feature.is_sbc()) {
       capabilities |= sbc_capability;
@@ -1886,10 +1982,10 @@ TEST_P(AndroidSupportedFeaturesTest, AudioOffloadExtStartAudioOffloadControllerE
 }
 
 const std::vector<std::pair<bool, uint32_t>> kVendorCapabilitiesParams = {
-    {{true, static_cast<uint32_t>(hci_android::A2dpCodecType::kSbc)},
-     {true, static_cast<uint32_t>(hci_android::A2dpCodecType::kAac)},
-     {true, static_cast<uint32_t>(hci_android::A2dpCodecType::kSbc) |
-                static_cast<uint32_t>(hci_android::A2dpCodecType::kAac)},
+    {{true, static_cast<uint32_t>(android_hci::A2dpCodecType::SBC)},
+     {true, static_cast<uint32_t>(android_hci::A2dpCodecType::AAC)},
+     {true, static_cast<uint32_t>(android_hci::A2dpCodecType::SBC) |
+                static_cast<uint32_t>(android_hci::A2dpCodecType::AAC)},
      {true, 0},
      {false, 0}}};
 INSTANTIATE_TEST_SUITE_P(ProfileServerTestFakeAdapter, AndroidSupportedFeaturesTest,

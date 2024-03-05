@@ -16,7 +16,6 @@
 #include "fuchsia/bluetooth/le/cpp/fidl.h"
 #include "fuchsia/bluetooth/sys/cpp/fidl.h"
 #include "fuchsia/media/cpp/fidl.h"
-#include "gtest/gtest.h"
 #include "lib/fidl/cpp/comparison.h"
 #include "src/connectivity/bluetooth/core/bt-host/fidl/adapter_test_fixture.h"
 #include "src/connectivity/bluetooth/core/bt-host/fidl/fake_adapter_test_fixture.h"
@@ -37,6 +36,7 @@ namespace fbg = fuchsia::bluetooth::gatt;
 namespace fbg2 = fuchsia::bluetooth::gatt2;
 namespace fbredr = fuchsia::bluetooth::bredr;
 namespace faudio = fuchsia::hardware::audio;
+namespace android_hci = pw::bluetooth::vendor::android_hci;
 
 namespace fuchsia::bluetooth {
 // Make UUIDs equality comparable for advanced testing matchers. ADL rules mandate the namespace.
@@ -168,13 +168,15 @@ TEST(HelpersTest, UuidFromFidl) {
 }
 
 TEST(HelpersTest, FidlToScmsTEnableTest) {
-  bt::hci_spec::vendor::android::A2dpScmsTEnable result_enable = FidlToScmsTEnable(true);
-  EXPECT_EQ(result_enable.enabled, pw::bluetooth::emboss::GenericEnableParam::ENABLE);
-  EXPECT_EQ(result_enable.header, 0x0);
+  bt::StaticPacket<android_hci::A2dpScmsTEnableWriter> result_enable = FidlToScmsTEnable(true);
+  EXPECT_EQ(result_enable.view().enabled().Read(),
+            pw::bluetooth::emboss::GenericEnableParam::ENABLE);
+  EXPECT_EQ(result_enable.view().header().Read(), 0x0);
 
-  bt::hci_spec::vendor::android::A2dpScmsTEnable result_disable = FidlToScmsTEnable(false);
-  EXPECT_EQ(result_disable.enabled, pw::bluetooth::emboss::GenericEnableParam::DISABLE);
-  EXPECT_EQ(result_disable.header, 0x0);
+  bt::StaticPacket<android_hci::A2dpScmsTEnableWriter> result_disable = FidlToScmsTEnable(false);
+  EXPECT_EQ(result_disable.view().enabled().Read(),
+            pw::bluetooth::emboss::GenericEnableParam::DISABLE);
+  EXPECT_EQ(result_disable.view().header().Read(), 0x0);
 }
 
 TEST(HelpersTest, FidlToEncoderSettingsSbcTest) {
@@ -187,16 +189,16 @@ TEST(HelpersTest, FidlToEncoderSettingsSbcTest) {
   fbredr::AudioSamplingFrequency sampling_frequency = fbredr::AudioSamplingFrequency::HZ_44100;
   fbredr::AudioChannelMode channel_mode = fbredr::AudioChannelMode::MONO;
 
-  bt::hci_spec::vendor::android::A2dpOffloadCodecInformation result_sbc =
-      FidlToEncoderSettings(*encoder_settings, sampling_frequency, channel_mode);
+  bt::StaticPacket<android_hci::SbcCodecInformationWriter> result =
+      FidlToEncoderSettingsSbc(*encoder_settings, sampling_frequency, channel_mode);
 
-  EXPECT_EQ(result_sbc.sbc.blocklen_subbands_alloc_method, 0x48);  // 0x48 = 0100 1000
-  EXPECT_EQ(result_sbc.sbc.min_bitpool_value, 0);
-  EXPECT_EQ(result_sbc.sbc.max_bitpool_value, 0);
-  EXPECT_EQ(result_sbc.sbc.sampling_freq_channel_mode, 0x10);
-  for (auto i : result_sbc.sbc.reserved) {
-    EXPECT_EQ(i, 0);
-  }
+  EXPECT_EQ(android_hci::SbcAllocationMethod::LOUDNESS, result.view().allocation_method().Read());
+  EXPECT_EQ(android_hci::SbcSubBands::SUBBANDS_8, result.view().subbands().Read());
+  EXPECT_EQ(android_hci::SbcBlockLen::BLOCK_LEN_4, result.view().block_length().Read());
+  EXPECT_EQ(0, result.view().min_bitpool_value().Read());
+  EXPECT_EQ(0, result.view().max_bitpool_value().Read());
+  EXPECT_EQ(android_hci::SbcSamplingFrequency::HZ_44100, result.view().sampling_frequency().Read());
+  EXPECT_EQ(android_hci::SbcChannelMode::MONO, result.view().channel_mode().Read());
 }
 
 TEST(HelpersTest, FidlToEncoderSettingsAacTest) {
@@ -211,15 +213,12 @@ TEST(HelpersTest, FidlToEncoderSettingsAacTest) {
   fbredr::AudioSamplingFrequency sampling_frequency = fbredr::AudioSamplingFrequency::HZ_44100;
   fbredr::AudioChannelMode channel_mode = fbredr::AudioChannelMode::MONO;
 
-  bt::hci_spec::vendor::android::A2dpOffloadCodecInformation result_aac =
-      FidlToEncoderSettings(*encoder_settings, sampling_frequency, channel_mode);
+  bt::StaticPacket<android_hci::AacCodecInformationWriter> result =
+      FidlToEncoderSettingsAac(*encoder_settings, sampling_frequency, channel_mode);
 
-  EXPECT_EQ(result_aac.aac.object_type, 1);
-  EXPECT_EQ(result_aac.aac.variable_bit_rate,
-            bt::hci_spec::vendor::android::A2dpAacEnableVariableBitRate::kEnable);
-  for (auto i : result_aac.aac.reserved) {
-    EXPECT_EQ(i, 0);
-  }
+  EXPECT_EQ(result.view().object_type().Read(), 1);
+  EXPECT_EQ(result.view().variable_bit_rate().Read(),
+            android_hci::AacEnableVariableBitRate::ENABLE);
 }
 
 template <typename T>
