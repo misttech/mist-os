@@ -5,7 +5,7 @@
 use crate::{
     device::{
         input::{add_and_register_input_device, InputFile},
-        input_event_conversion::LinuxKeyboardEventParser,
+        input_event_conversion::{LinuxKeyboardEventParser, LinuxTouchEventParser},
         kobject::Device,
         DeviceOps,
     },
@@ -54,7 +54,7 @@ pub fn create_uinput_device(
 enum CreatedDevice {
     None,
     Keyboard(futinput::KeyboardSynchronousProxy, LinuxKeyboardEventParser),
-    Touchscreen(futinput::TouchScreenSynchronousProxy),
+    Touchscreen(futinput::TouchScreenSynchronousProxy, LinuxTouchEventParser),
 }
 
 struct UinputDeviceMutableState {
@@ -191,7 +191,10 @@ impl UinputDevice {
                     DeviceType::Touchscreen => {
                         let (touch_client, touch_server) =
                             fidl::endpoints::create_sync_proxy::<futinput::TouchScreenMarker>();
-                        inner.created_device = CreatedDevice::Touchscreen(touch_client);
+                        inner.created_device = CreatedDevice::Touchscreen(
+                            touch_client,
+                            LinuxTouchEventParser::create(),
+                        );
 
                         // Register a touchscreen
                         let register_res = proxy.register_touch_screen(
@@ -328,7 +331,22 @@ impl FileOps for Arc<UinputDevice> {
                     Err(e) => return Err(e),
                 }
             }
-            CreatedDevice::Touchscreen(_) | CreatedDevice::None => return error!(EINVAL),
+            CreatedDevice::Touchscreen(proxy, parser) => {
+                let input_report = parser.handle(event);
+                match input_report {
+                    Ok(Some(report)) => {
+                        if let Some(touch_report) = report.touch {
+                            let res = proxy.simulate_touch_event(&touch_report, zx::Time::INFINITE);
+                            if res.is_err() {
+                                return error!(EIO);
+                            }
+                        }
+                    }
+                    Ok(None) => (),
+                    Err(e) => return Err(e),
+                }
+            }
+            CreatedDevice::None => return error!(EINVAL),
         }
 
         Ok(content.len())
@@ -388,6 +406,7 @@ mod test {
     };
     use fidl::endpoints::create_sync_proxy_and_stream;
     use fidl_fuchsia_input::Key;
+    use fidl_fuchsia_input_report as fir;
     use fuchsia_async as fasync;
     use futures::StreamExt;
     use starnix_sync::Unlocked;
@@ -411,6 +430,29 @@ mod test {
         )
         .expect("FileObject::new failed");
         (kernel, current_task, file_object, locked)
+    }
+
+    fn make_write_input_buffer(ty: u32, code: u32, value: i32) -> VecInputBuffer {
+        let buffer_data: VecInputBuffer =
+            uapi::input_event { type_: ty as u16, code: code as u16, value, ..Default::default() }
+                .as_bytes()
+                .to_vec()
+                .into();
+
+        buffer_data
+    }
+
+    fn assert_write(
+        dev: &Arc<UinputDevice>,
+        locked_write: &mut Locked<'_, WriteOps>,
+        file_object: &vfs::FileObject,
+        current_task: &crate::task::CurrentTask,
+        offset: usize,
+        data: &mut dyn vfs::buffers::InputBuffer,
+    ) -> () {
+        let expected_res = data.available();
+        let res = dev.write(locked_write, &file_object, &current_task, offset, data);
+        assert_eq!(res, Ok(expected_res));
     }
 
     #[::fuchsia::test]
@@ -764,11 +806,7 @@ mod test {
                         futinput::KeyboardRequest::SimulateKeyEvent {
                             payload:
                                 KeyboardSimulateKeyEventRequest {
-                                    report:
-                                        Some(fidl_fuchsia_input_report::KeyboardInputReport {
-                                            pressed_keys3,
-                                            ..
-                                        }),
+                                    report: Some(fir::KeyboardInputReport { pressed_keys3, .. }),
                                     ..
                                 },
                             responder,
@@ -788,45 +826,10 @@ mod test {
             })
         });
 
-        let mut press_a_ev: VecInputBuffer = uapi::input_event {
-            type_: uapi::EV_KEY as u16,
-            code: uapi::KEY_A as u16,
-            value: 1,
-            ..Default::default()
-        }
-        .as_bytes()
-        .to_vec()
-        .into();
-
-        let mut press_b_ev: VecInputBuffer = uapi::input_event {
-            type_: uapi::EV_KEY as u16,
-            code: uapi::KEY_B as u16,
-            value: 1,
-            ..Default::default()
-        }
-        .as_bytes()
-        .to_vec()
-        .into();
-
-        let mut release_a_ev: VecInputBuffer = uapi::input_event {
-            type_: uapi::EV_KEY as u16,
-            code: uapi::KEY_A as u16,
-            value: 0,
-            ..Default::default()
-        }
-        .as_bytes()
-        .to_vec()
-        .into();
-
-        let mut release_b_ev: VecInputBuffer = uapi::input_event {
-            type_: uapi::EV_KEY as u16,
-            code: uapi::KEY_B as u16,
-            value: 0,
-            ..Default::default()
-        }
-        .as_bytes()
-        .to_vec()
-        .into();
+        let mut press_a_ev = make_write_input_buffer(uapi::EV_KEY, uapi::KEY_A, 1);
+        let mut press_b_ev = make_write_input_buffer(uapi::EV_KEY, uapi::KEY_B, 1);
+        let mut release_a_ev = make_write_input_buffer(uapi::EV_KEY, uapi::KEY_A, 0);
+        let mut release_b_ev = make_write_input_buffer(uapi::EV_KEY, uapi::KEY_B, 0);
 
         let sync_ev = uapi::input_event {
             type_: uapi::EV_SYN as u16,
@@ -837,26 +840,21 @@ mod test {
 
         let mut locked_write = locked.cast_locked::<WriteOps>();
 
-        let mut res = dev.write(&mut locked_write, &file_object, &current_task, 0, &mut press_a_ev);
-        assert_eq!(res, Ok(24));
+        assert_write(&dev, &mut locked_write, &file_object, &current_task, 0, &mut press_a_ev);
         let mut sync_buff: VecInputBuffer = sync_ev.clone().as_bytes().to_vec().into();
-        res = dev.write(&mut locked_write, &file_object, &current_task, 0, &mut sync_buff);
-        assert_eq!(res, Ok(24));
-        res = dev.write(&mut locked_write, &file_object, &current_task, 0, &mut press_b_ev);
-        assert_eq!(res, Ok(24));
+        assert_write(&dev, &mut locked_write, &file_object, &current_task, 0, &mut sync_buff);
+
+        assert_write(&dev, &mut locked_write, &file_object, &current_task, 0, &mut press_b_ev);
         sync_buff = sync_ev.clone().as_bytes().to_vec().into();
-        res = dev.write(&mut locked_write, &file_object, &current_task, 0, &mut sync_buff);
-        assert_eq!(res, Ok(24));
-        res = dev.write(&mut locked_write, &file_object, &current_task, 0, &mut release_a_ev);
-        assert_eq!(res, Ok(24));
+        assert_write(&dev, &mut locked_write, &file_object, &current_task, 0, &mut sync_buff);
+
+        assert_write(&dev, &mut locked_write, &file_object, &current_task, 0, &mut release_a_ev);
         sync_buff = sync_ev.clone().as_bytes().to_vec().into();
-        res = dev.write(&mut locked_write, &file_object, &current_task, 0, &mut sync_buff);
-        assert_eq!(res, Ok(24));
-        res = dev.write(&mut locked_write, &file_object, &current_task, 0, &mut release_b_ev);
-        assert_eq!(res, Ok(24));
+        assert_write(&dev, &mut locked_write, &file_object, &current_task, 0, &mut sync_buff);
+
+        assert_write(&dev, &mut locked_write, &file_object, &current_task, 0, &mut release_b_ev);
         sync_buff = sync_ev.as_bytes().to_vec().into();
-        res = dev.write(&mut locked_write, &file_object, &current_task, 0, &mut sync_buff);
-        assert_eq!(res, Ok(24));
+        assert_write(&dev, &mut locked_write, &file_object, &current_task, 0, &mut sync_buff);
 
         handle.join().expect("stream panic");
     }
@@ -933,5 +931,247 @@ mod test {
             dev.ioctl(&mut locked, &file_object, &current_task, uapi::UI_DEV_SETUP, address.into());
         let res = dev.ui_dev_create_inner(&current_task, None);
         assert_eq!(res, error!(EPERM))
+    }
+
+    // In practice Uinput write() will send converted events to Input Pipeline via input_helper,
+    // but for testing purposes we create a mock server end and verify that it receives the
+    // correct TouchScreen requests from Uinput's CreatedDevice when write() calls are made.
+    #[fasync::run(2, test)]
+    async fn touchscreen_write() {
+        let dev = UinputDevice::new();
+        let (_kernel, current_task, file_object, mut locked) = make_kernel_objects(dev.clone());
+        let mut locked_ioctl = locked.cast_locked::<FileOpsIoctl>();
+        let address = map_memory(
+            &current_task,
+            UserAddress::default(),
+            std::mem::size_of::<uapi::uinput_setup>() as u64,
+        );
+        let _ = dev.ioctl(
+            &mut locked_ioctl,
+            &file_object,
+            &current_task,
+            uapi::UI_SET_EVBIT,
+            SyscallArg::from(uapi::EV_ABS as u64),
+        );
+        let _ = dev.ioctl(
+            &mut locked_ioctl,
+            &file_object,
+            &current_task,
+            uapi::UI_DEV_SETUP,
+            address.into(),
+        );
+
+        let (touch_client, mut touch_server) =
+            fidl::endpoints::create_sync_proxy_and_stream::<futinput::TouchScreenMarker>()
+                .expect("create TouchScreen proxy and stream");
+        dev.inner.lock().created_device =
+            CreatedDevice::Touchscreen(touch_client, LinuxTouchEventParser::create());
+
+        let (input_id, device_type) = match dev.inner.lock().get_id_and_device_type() {
+            Some((id, dev)) => (id, dev),
+            None => panic!("Could not get device ID and type."),
+        };
+        add_and_register_input_device(&current_task, VirtualDevice { input_id, device_type });
+        new_device();
+
+        let expected_touch_contacts: Vec<Vec<fir::ContactInputReport>> = vec![
+            vec![fir::ContactInputReport {
+                contact_id: Some(0),
+                position_x: Some(10),
+                position_y: Some(20),
+                ..fir::ContactInputReport::default()
+            }],
+            vec![fir::ContactInputReport {
+                contact_id: Some(0),
+                position_x: Some(10),
+                position_y: Some(25),
+                ..fir::ContactInputReport::default()
+            }],
+            vec![],
+            vec![
+                fir::ContactInputReport {
+                    contact_id: Some(1),
+                    position_x: Some(20),
+                    position_y: Some(20),
+                    ..fir::ContactInputReport::default()
+                },
+                fir::ContactInputReport {
+                    contact_id: Some(2),
+                    position_x: Some(30),
+                    position_y: Some(20),
+                    ..fir::ContactInputReport::default()
+                },
+            ],
+            vec![
+                fir::ContactInputReport {
+                    contact_id: Some(1),
+                    position_x: Some(25),
+                    position_y: Some(30),
+                    ..fir::ContactInputReport::default()
+                },
+                fir::ContactInputReport {
+                    contact_id: Some(2),
+                    position_x: Some(35),
+                    position_y: Some(32),
+                    ..fir::ContactInputReport::default()
+                },
+            ],
+            vec![fir::ContactInputReport {
+                contact_id: Some(2),
+                position_x: Some(35),
+                position_y: Some(30),
+                ..fir::ContactInputReport::default()
+            }],
+            vec![],
+        ];
+        let mut expected_contacts = expected_touch_contacts.into_iter();
+
+        // Spawn a separate thread for TouchScreen's server to wait for TouchScreenRequests
+        // sent from write() calls
+        let handle = thread::spawn(move || {
+            fasync::LocalExecutor::new().run_singlethreaded(async {
+                let mut num_received_events = 0;
+                while let Some(Ok(request)) = touch_server.next().await {
+                    match request {
+                        futinput::TouchScreenRequest::SimulateTouchEvent {
+                            report: fir::TouchInputReport { contacts, .. },
+                            responder,
+                        } => {
+                            assert_eq!(contacts, expected_contacts.next());
+                            let _ = responder.send();
+                        }
+                        _ => panic!("Registry handler received an unexpected request"),
+                    }
+                    num_received_events += 1;
+
+                    // 7 expected incoming events
+                    if num_received_events > 6 {
+                        break;
+                    }
+                }
+            })
+        });
+
+        // first contact
+        let mut slot_0 = make_write_input_buffer(uapi::EV_ABS, uapi::ABS_MT_SLOT, 0);
+        let mut traking_id_0 = make_write_input_buffer(uapi::EV_ABS, uapi::ABS_MT_TRACKING_ID, 0);
+        let mut touch_x_0 = make_write_input_buffer(uapi::EV_ABS, uapi::ABS_MT_POSITION_X, 10);
+        let mut touch_y_0 = make_write_input_buffer(uapi::EV_ABS, uapi::ABS_MT_POSITION_Y, 20);
+        let sync_ev = uapi::input_event {
+            type_: uapi::EV_SYN as u16,
+            code: uapi::SYN_REPORT as u16,
+            value: 0,
+            ..Default::default()
+        };
+        let mut locked_write = locked.cast_locked::<WriteOps>();
+
+        assert_write(&dev, &mut locked_write, &file_object, &current_task, 0, &mut slot_0);
+        assert_write(&dev, &mut locked_write, &file_object, &current_task, 0, &mut traking_id_0);
+        assert_write(&dev, &mut locked_write, &file_object, &current_task, 0, &mut touch_x_0);
+        assert_write(&dev, &mut locked_write, &file_object, &current_task, 0, &mut touch_y_0);
+        let mut sync_buff: VecInputBuffer = sync_ev.clone().as_bytes().to_vec().into();
+        assert_write(&dev, &mut locked_write, &file_object, &current_task, 0, &mut sync_buff);
+
+        // first contact moved
+        slot_0 = make_write_input_buffer(uapi::EV_ABS, uapi::ABS_MT_SLOT, 0);
+        touch_x_0 = make_write_input_buffer(uapi::EV_ABS, uapi::ABS_MT_POSITION_X, 10);
+        touch_y_0 = make_write_input_buffer(uapi::EV_ABS, uapi::ABS_MT_POSITION_Y, 25);
+        assert_write(&dev, &mut locked_write, &file_object, &current_task, 0, &mut slot_0);
+        assert_write(&dev, &mut locked_write, &file_object, &current_task, 0, &mut touch_x_0);
+        assert_write(&dev, &mut locked_write, &file_object, &current_task, 0, &mut touch_y_0);
+        sync_buff = sync_ev.clone().as_bytes().to_vec().into();
+        assert_write(&dev, &mut locked_write, &file_object, &current_task, 0, &mut sync_buff);
+
+        // first contact lifted
+        let mut tracking_id_lifted =
+            make_write_input_buffer(uapi::EV_ABS, uapi::ABS_MT_TRACKING_ID, -1);
+        slot_0 = make_write_input_buffer(uapi::EV_ABS, uapi::ABS_MT_SLOT, 0);
+        assert_write(&dev, &mut locked_write, &file_object, &current_task, 0, &mut slot_0);
+        assert_write(
+            &dev,
+            &mut locked_write,
+            &file_object,
+            &current_task,
+            0,
+            &mut tracking_id_lifted,
+        );
+        sync_buff = sync_ev.clone().as_bytes().to_vec().into();
+        assert_write(&dev, &mut locked_write, &file_object, &current_task, 0, &mut sync_buff);
+
+        // multi-touch contacts
+        let mut slot_1 = make_write_input_buffer(uapi::EV_ABS, uapi::ABS_MT_SLOT, 1);
+        let mut traking_id_1 = make_write_input_buffer(uapi::EV_ABS, uapi::ABS_MT_TRACKING_ID, 1);
+        let mut touch_x_1 = make_write_input_buffer(uapi::EV_ABS, uapi::ABS_MT_POSITION_X, 20);
+        let mut touch_y_1 = make_write_input_buffer(uapi::EV_ABS, uapi::ABS_MT_POSITION_Y, 20);
+        let mut slot_2 = make_write_input_buffer(uapi::EV_ABS, uapi::ABS_MT_SLOT, 2);
+        let mut traking_id_2 = make_write_input_buffer(uapi::EV_ABS, uapi::ABS_MT_TRACKING_ID, 2);
+        let mut touch_x_2 = make_write_input_buffer(uapi::EV_ABS, uapi::ABS_MT_POSITION_X, 30);
+        let mut touch_y_2 = make_write_input_buffer(uapi::EV_ABS, uapi::ABS_MT_POSITION_Y, 20);
+
+        assert_write(&dev, &mut locked_write, &file_object, &current_task, 0, &mut slot_1);
+        assert_write(&dev, &mut locked_write, &file_object, &current_task, 0, &mut traking_id_1);
+        assert_write(&dev, &mut locked_write, &file_object, &current_task, 0, &mut touch_x_1);
+        assert_write(&dev, &mut locked_write, &file_object, &current_task, 0, &mut touch_y_1);
+        assert_write(&dev, &mut locked_write, &file_object, &current_task, 0, &mut slot_2);
+        assert_write(&dev, &mut locked_write, &file_object, &current_task, 0, &mut traking_id_2);
+        assert_write(&dev, &mut locked_write, &file_object, &current_task, 0, &mut touch_x_2);
+        assert_write(&dev, &mut locked_write, &file_object, &current_task, 0, &mut touch_y_2);
+        sync_buff = sync_ev.clone().as_bytes().to_vec().into();
+        assert_write(&dev, &mut locked_write, &file_object, &current_task, 0, &mut sync_buff);
+
+        // multi-touch contacts moved
+        slot_1 = make_write_input_buffer(uapi::EV_ABS, uapi::ABS_MT_SLOT, 1);
+        touch_x_1 = make_write_input_buffer(uapi::EV_ABS, uapi::ABS_MT_POSITION_X, 25);
+        touch_y_1 = make_write_input_buffer(uapi::EV_ABS, uapi::ABS_MT_POSITION_Y, 30);
+        slot_2 = make_write_input_buffer(uapi::EV_ABS, uapi::ABS_MT_SLOT, 2);
+        touch_x_2 = make_write_input_buffer(uapi::EV_ABS, uapi::ABS_MT_POSITION_X, 35);
+        touch_y_2 = make_write_input_buffer(uapi::EV_ABS, uapi::ABS_MT_POSITION_Y, 32);
+
+        assert_write(&dev, &mut locked_write, &file_object, &current_task, 0, &mut slot_1);
+        assert_write(&dev, &mut locked_write, &file_object, &current_task, 0, &mut touch_x_1);
+        assert_write(&dev, &mut locked_write, &file_object, &current_task, 0, &mut touch_y_1);
+        assert_write(&dev, &mut locked_write, &file_object, &current_task, 0, &mut slot_2);
+        assert_write(&dev, &mut locked_write, &file_object, &current_task, 0, &mut touch_x_2);
+        assert_write(&dev, &mut locked_write, &file_object, &current_task, 0, &mut touch_y_2);
+        sync_buff = sync_ev.clone().as_bytes().to_vec().into();
+        assert_write(&dev, &mut locked_write, &file_object, &current_task, 0, &mut sync_buff);
+
+        // first multi-touch contact lifted
+        slot_1 = make_write_input_buffer(uapi::EV_ABS, uapi::ABS_MT_SLOT, 1);
+        tracking_id_lifted = make_write_input_buffer(uapi::EV_ABS, uapi::ABS_MT_TRACKING_ID, -1);
+        slot_2 = make_write_input_buffer(uapi::EV_ABS, uapi::ABS_MT_SLOT, 2);
+        touch_x_2 = make_write_input_buffer(uapi::EV_ABS, uapi::ABS_MT_POSITION_X, 35);
+        touch_y_2 = make_write_input_buffer(uapi::EV_ABS, uapi::ABS_MT_POSITION_Y, 30);
+        assert_write(&dev, &mut locked_write, &file_object, &current_task, 0, &mut slot_1);
+        assert_write(
+            &dev,
+            &mut locked_write,
+            &file_object,
+            &current_task,
+            0,
+            &mut tracking_id_lifted,
+        );
+        assert_write(&dev, &mut locked_write, &file_object, &current_task, 0, &mut slot_2);
+        assert_write(&dev, &mut locked_write, &file_object, &current_task, 0, &mut touch_x_2);
+        assert_write(&dev, &mut locked_write, &file_object, &current_task, 0, &mut touch_y_2);
+        sync_buff = sync_ev.clone().as_bytes().to_vec().into();
+        assert_write(&dev, &mut locked_write, &file_object, &current_task, 0, &mut sync_buff);
+
+        // second multi-touch contact lifted
+        slot_2 = make_write_input_buffer(uapi::EV_ABS, uapi::ABS_MT_SLOT, 2);
+        tracking_id_lifted = make_write_input_buffer(uapi::EV_ABS, uapi::ABS_MT_TRACKING_ID, -1);
+        assert_write(&dev, &mut locked_write, &file_object, &current_task, 0, &mut slot_2);
+        assert_write(
+            &dev,
+            &mut locked_write,
+            &file_object,
+            &current_task,
+            0,
+            &mut tracking_id_lifted,
+        );
+        sync_buff = sync_ev.clone().as_bytes().to_vec().into();
+        assert_write(&dev, &mut locked_write, &file_object, &current_task, 0, &mut sync_buff);
+
+        handle.join().expect("stream panic");
     }
 }

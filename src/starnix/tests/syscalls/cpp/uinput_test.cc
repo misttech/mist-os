@@ -285,4 +285,53 @@ TEST_F(UinputTest, WriteEVKEY) {
   EXPECT_EQ(res, static_cast<ssize_t>(sizeof(sync_e)));
 }
 
+TEST_F(UinputTest, WriteEVABS) {
+  // Need to create Touchscreen device first
+  int r = ioctl(uinput_fd_.get(), UI_SET_EVBIT, EV_ABS);
+  ASSERT_EQ(r, 0);
+
+  uinput_setup usetup{.id = {.bustype = BUS_USB, .vendor = GOOGLE_VENDOR_ID, .product = 2}};
+  strcpy(usetup.name, "Example device");
+  r = ioctl(uinput_fd_.get(), UI_DEV_SETUP, &usetup);
+  ASSERT_EQ(r, 0);
+
+  r = ioctl(uinput_fd_.get(), UI_DEV_CREATE);
+  EXPECT_EQ(r, 0);
+
+  /* timestamp values are ignored */
+  struct timeval t = {.tv_sec = 0, .tv_usec = 0};
+
+  // Touch contact
+  struct input_event ev_slot = {.time = t, .type = EV_ABS, .code = ABS_MT_SLOT, .value = 0};
+  struct input_event ev_tracking_id = {
+      .time = t, .type = EV_ABS, .code = ABS_MT_TRACKING_ID, .value = 0};
+  struct input_event ev_pos_x = {.time = t, .type = EV_ABS, .code = ABS_MT_POSITION_X, .value = 10};
+  struct input_event ev_pos_y = {.time = t, .type = EV_ABS, .code = ABS_MT_POSITION_Y, .value = 10};
+  auto res = write(uinput_fd_.get(), &ev_slot, sizeof(ev_slot));
+  EXPECT_EQ(res, static_cast<ssize_t>(sizeof(ev_slot)));
+  res = write(uinput_fd_.get(), &ev_tracking_id, sizeof(ev_tracking_id));
+  EXPECT_EQ(res, static_cast<ssize_t>(sizeof(ev_tracking_id)));
+  res = write(uinput_fd_.get(), &ev_pos_x, sizeof(ev_pos_x));
+  EXPECT_EQ(res, static_cast<ssize_t>(sizeof(ev_pos_x)));
+  res = write(uinput_fd_.get(), &ev_pos_y, sizeof(ev_pos_y));
+  EXPECT_EQ(res, static_cast<ssize_t>(sizeof(ev_pos_y)));
+
+  // Report the event
+  struct input_event sync_e = {.time = t, .type = EV_SYN, .code = SYN_REPORT, .value = 0};
+  res = write(uinput_fd_.get(), &sync_e, sizeof(sync_e));
+  EXPECT_EQ(res, static_cast<ssize_t>(sizeof(sync_e)));
+
+  // Touch contact released
+  struct input_event ev_tracking_id_lifted = {
+      .time = t, .type = EV_ABS, .code = ABS_MT_TRACKING_ID, .value = -1};
+  res = write(uinput_fd_.get(), &ev_slot, sizeof(ev_slot));
+  EXPECT_EQ(res, static_cast<ssize_t>(sizeof(ev_slot)));
+  res = write(uinput_fd_.get(), &ev_tracking_id_lifted, sizeof(ev_tracking_id_lifted));
+  EXPECT_EQ(res, static_cast<ssize_t>(sizeof(ev_tracking_id_lifted)));
+
+  // Report the event
+  res = write(uinput_fd_.get(), &sync_e, sizeof(sync_e));
+  EXPECT_EQ(res, static_cast<ssize_t>(sizeof(sync_e)));
+}
+
 }  // namespace
