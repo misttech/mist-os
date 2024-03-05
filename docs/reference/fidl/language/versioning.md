@@ -45,9 +45,8 @@ to 2^63-1 (inclusive), or one of the special versions `HEAD` and `LEGACY`. The
 `HEAD` version is used for the latest unstable changes. The `LEGACY` version is
 like `HEAD`, but it also includes [legacy elements](#legacy).
 
-If a FIDL library doesn't have any `@available` attributes, it is unversioned.
-The behavior of an unversioned library is similar to a library annotated with
-`@available(added=HEAD)`, except it belongs to a unique, unnameable platform.
+If a FIDL library doesn't have any `@available` attributes, it belongs to the
+`unversioned` platform. This platform only has one version, `HEAD`.
 
 ## Command line
 

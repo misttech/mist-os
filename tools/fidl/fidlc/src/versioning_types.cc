@@ -12,6 +12,7 @@
 
 namespace fidlc {
 
+// static
 std::optional<Platform> Platform::Parse(std::string str) {
   if (IsValidLibraryComponent(str)) {
     return Platform(std::move(str));
@@ -345,18 +346,18 @@ std::string Availability::Debug() const {
 }
 
 bool VersionSelection::Insert(Platform platform, Version version) {
-  ZX_ASSERT_MSG(!platform.is_anonymous(), "anonymous platforms do not allow version selection");
+  ZX_ASSERT_MSG(!platform.is_unversioned(), "version selection cannot contain 'unversioned'");
   auto [_, inserted] = map_.emplace(std::move(platform), version);
   return inserted;
 }
 
 bool VersionSelection::Contains(const Platform& platform) const {
-  ZX_ASSERT_MSG(!platform.is_anonymous(), "anonymous platforms do not allow version selection");
+  ZX_ASSERT_MSG(!platform.is_unversioned(), "version selection cannot contain 'unversioned'");
   return map_.count(platform) != 0;
 }
 
 Version VersionSelection::Lookup(const Platform& platform) const {
-  if (platform.is_anonymous()) {
+  if (platform.is_unversioned()) {
     return Version::Head();
   }
   const auto iter = map_.find(platform);

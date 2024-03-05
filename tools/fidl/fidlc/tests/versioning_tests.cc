@@ -19,24 +19,24 @@ namespace {
 // Largest numeric version accepted by Version::Parse.
 const std::string kMaxNumericVersion = std::to_string((1ull << 63) - 1);
 
-TEST(VersioningTests, GoodAnonymousPlatformOneComponent) {
+TEST(VersioningTests, GoodUnversionedPlatformOneComponent) {
   TestLibrary library(R"FIDL(
 library example;
 )FIDL");
   ASSERT_COMPILED(library);
 
   auto example = library.LookupLibrary("example");
-  EXPECT_TRUE(example->platform.value().is_anonymous());
+  EXPECT_TRUE(example->platform.value().is_unversioned());
 }
 
-TEST(VersioningTests, GoodAnonymousPlatformTwoComponents) {
+TEST(VersioningTests, GoodUnversionedPlatformTwoComponents) {
   TestLibrary library(R"FIDL(
 library example.something;
 )FIDL");
   ASSERT_COMPILED(library);
 
   auto example = library.LookupLibrary("example.something");
-  EXPECT_TRUE(example->platform.value().is_anonymous());
+  EXPECT_TRUE(example->platform.value().is_unversioned());
 }
 
 TEST(VersioningTests, GoodImplicitPlatformOneComponent) {
@@ -49,7 +49,7 @@ library example;
 
   auto example = library.LookupLibrary("example");
   EXPECT_EQ(example->platform, Platform::Parse("example").value());
-  EXPECT_FALSE(example->platform.value().is_anonymous());
+  EXPECT_FALSE(example->platform.value().is_unversioned());
 }
 
 TEST(VersioningTests, GoodImplicitPlatformTwoComponents) {
@@ -62,7 +62,7 @@ library example.something;
 
   auto example = library.LookupLibrary("example.something");
   EXPECT_EQ(example->platform, Platform::Parse("example").value());
-  EXPECT_FALSE(example->platform.value().is_anonymous());
+  EXPECT_FALSE(example->platform.value().is_unversioned());
 }
 
 TEST(VersioningTests, GoodExplicitPlatform) {
@@ -75,7 +75,7 @@ library example;
 
   auto example = library.LookupLibrary("example");
   EXPECT_EQ(example->platform, Platform::Parse("someplatform").value());
-  EXPECT_FALSE(example->platform.value().is_anonymous());
+  EXPECT_FALSE(example->platform.value().is_unversioned());
 }
 
 TEST(VersioningTests, BadInvalidPlatform) {
@@ -83,6 +83,13 @@ TEST(VersioningTests, BadInvalidPlatform) {
   library.AddFile("bad/fi-0152.test.fidl");
   library.SelectVersion("test", "HEAD");
   library.ExpectFail(ErrInvalidPlatform, "Spaces are not allowed");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
+}
+
+TEST(VersioningTests, BadReservedPlatform) {
+  TestLibrary library;
+  library.AddFile("bad/fi-0208.test.fidl");
+  library.ExpectFail(ErrReservedPlatform, "unversioned");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -3362,7 +3369,7 @@ type Foo = struct {
   ASSERT_COMPILER_DIAGNOSTICS(example);
 }
 
-TEST(VersioningTests, GoodMultiplePlatformsNamedAndAnonymous) {
+TEST(VersioningTests, GoodMixVersionedAndUnversioned) {
   SharedAmongstLibraries shared;
   shared.SelectVersion("example", "1");
 
@@ -3374,19 +3381,19 @@ type Foo = struct {};
 )FIDL");
   ASSERT_COMPILED(versioned);
 
-  TestLibrary unversioned(&shared, "unversioned.fidl", R"FIDL(
-library example.unversioned;
+  TestLibrary not_versioned(&shared, "not_versioned.fidl", R"FIDL(
+library example.notversioned;
 
 using example.versioned;
 
 alias Foo = example.versioned.Foo;
 )FIDL");
-  ASSERT_COMPILED(unversioned);
+  ASSERT_COMPILED(not_versioned);
 
-  // The example.unversioned library is added=HEAD by default, but not HEAD of
-  // the "example" platform -- that would confusingly result in empty IR, since
-  // we selected "example" version 1 -- rather HEAD of an anonymous platform.
-  ASSERT_NE(unversioned.LookupAlias("Foo"), nullptr);
+  // The example.notversioned library is considered added=HEAD in the special
+  // "unversioned" platform. (If it were instead in the "example" platform, it
+  // would appear empty because we're using `--available example:1`.)
+  ASSERT_NE(not_versioned.LookupAlias("Foo"), nullptr);
 }
 
 }  // namespace

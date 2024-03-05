@@ -453,6 +453,11 @@ int main(int argc, char* argv[]) {
       if (!version.has_value()) {
         FailWithUsage("Invalid version `%s`\n", version_str.c_str());
       }
+      if (platform->is_unversioned()) {
+        FailWithUsage(
+            "Invalid flag `--available %s:%s`; selecting a version for '%s' is not allowed\n",
+            platform_str.c_str(), version_str.c_str(), platform_str.c_str());
+      }
       version_selection.Insert(platform.value(), version.value());
     } else if (behavior_argument == "--name") {
       library_name = args->Claim();

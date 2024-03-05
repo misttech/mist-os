@@ -420,6 +420,9 @@ constexpr ErrorDef<206, std::string_view, Version> ErrReplacedWithoutReplacement
     "added={1}; change the replaced={1} to removed={1}");
 constexpr ErrorDef<207, uint32_t, char, uint32_t> ErrTypeShapeIntegerOverflow(
     "cannot calculate type shape because of integer overflow in {0} {1} {2}");
+constexpr ErrorDef<208, Platform> ErrReservedPlatform(
+    "platform '{0}' is reserved; choose a different platform name using "
+    "@available(platform=\"...\", added=...)");
 
 // To add a new error:
 //
@@ -640,6 +643,7 @@ static constexpr const DiagnosticDef *kAllDiagnosticDefs[] = {
     /* fi-0205 */ &ErrRemovedWithReplacement,
     /* fi-0206 */ &ErrReplacedWithoutReplacement,
     /* fi-0207 */ &ErrTypeShapeIntegerOverflow,
+    /* fi-0208 */ &ErrReservedPlatform,
 };
 
 // In reporter.h we assert that reported error IDs are <= kNumDiagnosticDefs.

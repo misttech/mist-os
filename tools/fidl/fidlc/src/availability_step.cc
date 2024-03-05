@@ -106,7 +106,7 @@ void AvailabilityStep::CompileAvailability(Element* element) {
   std::optional<Version> default_added;
   if (element->kind == Element::Kind::kLibrary) {
     ZX_ASSERT(element == library());
-    library()->platform = Platform::Anonymous();
+    library()->platform = Platform::Unversioned();
     default_added = Version::Head();
   }
   bool valid = element->availability.Init({.added = default_added});
@@ -176,7 +176,9 @@ void AvailabilityStep::CompileAvailabilityFromAttribute(Element* element, Attrib
   if (is_library) {
     const auto library_platform = GetPlatform(platform).value_or(GetDefaultPlatform());
     library()->platform = library_platform;
-    if (!version_selection()->Contains(library_platform)) {
+    if (library_platform.is_unversioned()) {
+      reporter()->Fail(ErrReservedPlatform, attribute->span, library_platform);
+    } else if (!version_selection()->Contains(library_platform)) {
       reporter()->Fail(ErrPlatformVersionNotSelected, attribute->span, library()->name,
                        library_platform);
     }

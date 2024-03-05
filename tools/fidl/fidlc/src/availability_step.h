@@ -11,7 +11,7 @@ namespace fidlc {
 
 // The AvailabilityStep sets library->platform and element->availability for
 // every element based on @available attributes. If there are none, the platform
-// with be Platform::Anonymous() and all availabilities will be added=HEAD. This
+// with be Platform::Unversioned() and all availabilities will be added=HEAD. This
 // step also checks for name collisions on overlapping availabilities.
 class AvailabilityStep : public Compiler::Step {
  public:
