@@ -23,35 +23,35 @@ std::shared_ptr<ControlCreatorServer> ControlCreatorServer::Create(
     std::shared_ptr<const FidlThread> thread,
     fidl::ServerEnd<fuchsia_audio_device::ControlCreator> server_end,
     std::shared_ptr<AudioDeviceRegistry> parent) {
-  ADR_LOG_CLASS(kLogControlCreatorServerMethods) << " parent " << parent;
+  ADR_LOG_STATIC(kLogControlCreatorServerMethods) << " parent " << parent;
 
   return BaseFidlServer::Create(std::move(thread), std::move(server_end), parent);
 }
 
 ControlCreatorServer::ControlCreatorServer(std::shared_ptr<AudioDeviceRegistry> parent)
     : parent_(parent) {
-  ADR_LOG_OBJECT(kLogObjectLifetimes);
+  ADR_LOG_METHOD(kLogObjectLifetimes);
   ++count_;
   LogObjectCounts();
 }
 
 ControlCreatorServer::~ControlCreatorServer() {
-  ADR_LOG_OBJECT(kLogObjectLifetimes);
+  ADR_LOG_METHOD(kLogObjectLifetimes);
   --count_;
   LogObjectCounts();
 }
 
 void ControlCreatorServer::Create(CreateRequest& request, CreateCompleter::Sync& completer) {
-  ADR_LOG_OBJECT(kLogControlCreatorServerMethods);
+  ADR_LOG_METHOD(kLogControlCreatorServerMethods);
 
   if (!request.token_id()) {
-    ADR_WARN_OBJECT() << "required 'token_id' is absent";
+    ADR_WARN_METHOD() << "required 'token_id' is absent";
     completer.Reply(fit::error(fuchsia_audio_device::ControlCreatorError::kInvalidTokenId));
     return;
   }
 
   if (!request.control_server()) {
-    ADR_WARN_OBJECT() << "required 'control_server' is absent";
+    ADR_WARN_METHOD() << "required 'control_server' is absent";
     completer.Reply(fit::error(fuchsia_audio_device::ControlCreatorError::kInvalidControl));
     return;
   }

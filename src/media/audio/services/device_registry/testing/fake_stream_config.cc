@@ -28,17 +28,17 @@ FakeStreamConfig::FakeStreamConfig(zx::channel server_end, zx::channel client_en
     : dispatcher_(dispatcher),
       stream_config_server_end_(std::move(server_end)),
       stream_config_client_end_(std::move(client_end)) {
-  ADR_LOG_OBJECT(kLogFakeStreamConfig || kLogObjectLifetimes);
+  ADR_LOG_METHOD(kLogFakeStreamConfig || kLogObjectLifetimes);
 
   SetDefaultFormats();
 }
 
 FakeStreamConfig::~FakeStreamConfig() {
-  ADR_LOG_OBJECT(kLogFakeStreamConfig || kLogObjectLifetimes);
+  ADR_LOG_METHOD(kLogFakeStreamConfig || kLogObjectLifetimes);
 }
 
 zx::channel FakeStreamConfig::Enable() {
-  ADR_LOG_OBJECT(kLogFakeStreamConfig);
+  ADR_LOG_METHOD(kLogFakeStreamConfig);
 
   EXPECT_FALSE(stream_config_binding_);
   stream_config_binding_.emplace(this, std::move(stream_config_server_end_), dispatcher_);
@@ -48,13 +48,13 @@ zx::channel FakeStreamConfig::Enable() {
 }
 
 void FakeStreamConfig::DropStreamConfig() {
-  ADR_LOG_OBJECT(kLogFakeStreamConfig);
+  ADR_LOG_METHOD(kLogFakeStreamConfig);
 
   stream_config_binding_->Close(ZX_ERR_PEER_CLOSED);
 }
 
 void FakeStreamConfig::InjectGainChange(fuchsia_hardware_audio::GainState gain_state) {
-  ADR_LOG_OBJECT(kLogFakeStreamConfig);
+  ADR_LOG_METHOD(kLogFakeStreamConfig);
   fha::GainState new_state;
   gain_state.gain_db() ? new_state.set_gain_db(*gain_state.gain_db()) : new_state;
   gain_state.muted() ? new_state.set_muted(*gain_state.muted()) : new_state;
@@ -64,7 +64,7 @@ void FakeStreamConfig::InjectGainChange(fuchsia_hardware_audio::GainState gain_s
 }
 
 void FakeStreamConfig::InjectPlugChange(bool plugged, zx::time plug_time) {
-  ADR_LOG_OBJECT(kLogFakeStreamConfig)
+  ADR_LOG_METHOD(kLogFakeStreamConfig)
       << "(" << (plugged ? "plugged" : "unplugged") << ", " << plug_time.get() << ")";
   if (!plugged_ || (*plugged_ != plugged && plug_time > plug_state_time_)) {
     plugged_ = plugged;
@@ -78,14 +78,14 @@ void FakeStreamConfig::InjectPlugChange(bool plugged, zx::time plug_time) {
 }
 
 void FakeStreamConfig::DropRingBuffer() {
-  ADR_LOG_OBJECT(kLogFakeStreamConfig);
+  ADR_LOG_METHOD(kLogFakeStreamConfig);
   if (ring_buffer_binding_) {
     ring_buffer_binding_->Close(ZX_ERR_PEER_CLOSED);
   }
 }
 
 fzl::VmoMapper FakeStreamConfig::AllocateRingBuffer(size_t size) {
-  ADR_LOG_OBJECT(kLogFakeStreamConfig);
+  ADR_LOG_METHOD(kLogFakeStreamConfig);
 
   FX_CHECK(!ring_buffer_) << "Calling AllocateRingBuffer multiple times is not supported";
 
@@ -105,7 +105,7 @@ void FakeStreamConfig::GetHealthState(fha::StreamConfig::GetHealthStateCallback 
 }
 
 void FakeStreamConfig::GetProperties(fha::StreamConfig::GetPropertiesCallback callback) {
-  ADR_LOG_OBJECT(kLogFakeStreamConfig);
+  ADR_LOG_METHOD(kLogFakeStreamConfig);
 
   fha::StreamProperties props = {};
 
@@ -146,7 +146,7 @@ void FakeStreamConfig::GetProperties(fha::StreamConfig::GetPropertiesCallback ca
 
 void FakeStreamConfig::GetSupportedFormats(
     fha::StreamConfig::GetSupportedFormatsCallback callback) {
-  ADR_LOG_OBJECT(kLogFakeStreamConfig);
+  ADR_LOG_METHOD(kLogFakeStreamConfig);
 
   auto ring_buffer_format_sets_count = channel_sets_.size();
   if (sample_formats_.size() != ring_buffer_format_sets_count ||
@@ -222,7 +222,7 @@ void FakeStreamConfig::GetSupportedFormats(
 }
 
 void FakeStreamConfig::WatchGainState(fha::StreamConfig::WatchGainStateCallback callback) {
-  ADR_LOG_OBJECT(kLogFakeStreamConfig);
+  ADR_LOG_METHOD(kLogFakeStreamConfig);
 
   if (gain_has_changed_) {
     fha::GainState gain_state = {};
@@ -243,7 +243,7 @@ void FakeStreamConfig::WatchGainState(fha::StreamConfig::WatchGainStateCallback 
 }
 
 void FakeStreamConfig::WatchPlugState(fha::StreamConfig::WatchPlugStateCallback callback) {
-  ADR_LOG_OBJECT(kLogFakeStreamConfig);
+  ADR_LOG_METHOD(kLogFakeStreamConfig);
 
   if (plug_has_changed_) {
     fha::PlugState plug_state = {};
@@ -260,7 +260,7 @@ void FakeStreamConfig::WatchPlugState(fha::StreamConfig::WatchPlugStateCallback 
 
 // Only generate a WatchGainState notification if this SetGain call represents an actual change.
 void FakeStreamConfig::SetGain(fha::GainState target_state) {
-  ADR_LOG_OBJECT(kLogFakeStreamConfig);
+  ADR_LOG_METHOD(kLogFakeStreamConfig);
   bool gain_notification_needed = false;
   if (target_state.has_gain_db() &&
       (!current_gain_db_ || *current_gain_db_ != target_state.gain_db())) {
@@ -286,7 +286,7 @@ void FakeStreamConfig::SetGain(fha::GainState target_state) {
 
 void FakeStreamConfig::CreateRingBuffer(
     fha::Format format, fidl::InterfaceRequest<fha::RingBuffer> ring_buffer_request) {
-  ADR_LOG_OBJECT(kLogFakeStreamConfig);
+  ADR_LOG_METHOD(kLogFakeStreamConfig);
 
   ring_buffer_binding_.emplace(this, ring_buffer_request.TakeChannel(), dispatcher_);
   selected_format_ = format.pcm_format();
@@ -298,12 +298,12 @@ void FakeStreamConfig::CreateRingBuffer(
 // For now, don't do anything with this. No response is needed so this should be OK even if called.
 void FakeStreamConfig::SignalProcessingConnect(
     fidl::InterfaceRequest<fha::signalprocessing::SignalProcessing> signal_processing_request) {
-  ADR_LOG_OBJECT(kLogFakeStreamConfig);
+  ADR_LOG_METHOD(kLogFakeStreamConfig);
 }
 
 // RingBuffer methods
 void FakeStreamConfig::GetProperties(fha::RingBuffer::GetPropertiesCallback callback) {
-  ADR_LOG_OBJECT(kLogFakeStreamConfig);
+  ADR_LOG_METHOD(kLogFakeStreamConfig);
 
   fha::RingBufferProperties props = {};
 
@@ -320,7 +320,7 @@ void FakeStreamConfig::GetProperties(fha::RingBuffer::GetPropertiesCallback call
 }
 
 void FakeStreamConfig::SendPositionNotification(zx::time timestamp, uint32_t position) {
-  ADR_LOG_OBJECT(kLogFakeStreamConfig);
+  ADR_LOG_METHOD(kLogFakeStreamConfig);
 
   position_notify_timestamp_mono_ = timestamp;
   position_notify_position_bytes_ = position;
@@ -333,7 +333,7 @@ void FakeStreamConfig::SendPositionNotification(zx::time timestamp, uint32_t pos
 
 void FakeStreamConfig::WatchClockRecoveryPositionInfo(
     fha::RingBuffer::WatchClockRecoveryPositionInfoCallback callback) {
-  ADR_LOG_OBJECT(kLogFakeStreamConfig);
+  ADR_LOG_METHOD(kLogFakeStreamConfig);
 
   position_notify_callback_ = std::move(callback);
 
@@ -343,7 +343,7 @@ void FakeStreamConfig::WatchClockRecoveryPositionInfo(
 }
 
 void FakeStreamConfig::PositionNotification() {
-  ADR_LOG_OBJECT(kLogFakeStreamConfig);
+  ADR_LOG_METHOD(kLogFakeStreamConfig);
 
   FX_CHECK(position_notify_callback_);
   FX_CHECK(position_notification_values_are_set_);
@@ -366,7 +366,7 @@ void FakeStreamConfig::PositionNotification() {
 
 void FakeStreamConfig::GetVmo(uint32_t min_frames, uint32_t clock_recovery_notifications_per_ring,
                               fha::RingBuffer::GetVmoCallback callback) {
-  ADR_LOG_OBJECT(kLogFakeStreamConfig);
+  ADR_LOG_METHOD(kLogFakeStreamConfig);
 
   // This should be true since it's set as part of creating the channel that's carrying these
   // messages.
@@ -396,7 +396,7 @@ void FakeStreamConfig::GetVmo(uint32_t min_frames, uint32_t clock_recovery_notif
 }
 
 void FakeStreamConfig::Start(fha::RingBuffer::StartCallback callback) {
-  ADR_LOG_OBJECT(kLogFakeStreamConfig);
+  ADR_LOG_METHOD(kLogFakeStreamConfig);
 
   EXPECT_TRUE(!is_running_);
   mono_start_time_ = zx::clock::get_monotonic();
@@ -406,7 +406,7 @@ void FakeStreamConfig::Start(fha::RingBuffer::StartCallback callback) {
 }
 
 void FakeStreamConfig::Stop(fha::RingBuffer::StopCallback callback) {
-  ADR_LOG_OBJECT(kLogFakeStreamConfig);
+  ADR_LOG_METHOD(kLogFakeStreamConfig);
 
   EXPECT_TRUE(is_running_);
   is_running_ = false;
@@ -419,7 +419,7 @@ void FakeStreamConfig::Stop(fha::RingBuffer::StopCallback callback) {
 
 void FakeStreamConfig::SetActiveChannels(uint64_t active_channels_bitmask,
                                          fha::RingBuffer::SetActiveChannelsCallback callback) {
-  ADR_LOG_OBJECT(kLogFakeStreamConfig);
+  ADR_LOG_METHOD(kLogFakeStreamConfig);
 
   if (active_channels_supported_) {
     if (active_channels_bitmask != active_channels_bitmask_) {
@@ -436,7 +436,7 @@ void FakeStreamConfig::SetActiveChannels(uint64_t active_channels_bitmask,
 }
 
 void FakeStreamConfig::WatchDelayInfo(WatchDelayInfoCallback callback) {
-  ADR_LOG_OBJECT(kLogFakeStreamConfig);
+  ADR_LOG_METHOD(kLogFakeStreamConfig);
 
   if (delay_has_changed_) {
     fha::DelayInfo delay_info = {};

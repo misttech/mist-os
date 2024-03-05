@@ -23,7 +23,7 @@ std::shared_ptr<RingBufferServer> RingBufferServer::Create(
     std::shared_ptr<const FidlThread> thread,
     fidl::ServerEnd<fuchsia_audio_device::RingBuffer> server_end,
     std::shared_ptr<ControlServer> parent, std::shared_ptr<Device> device) {
-  ADR_LOG_CLASS(kLogObjectLifetimes);
+  ADR_LOG_STATIC(kLogObjectLifetimes);
 
   return BaseFidlServer::Create(std::move(thread), std::move(server_end), parent, device);
 }
@@ -31,24 +31,24 @@ std::shared_ptr<RingBufferServer> RingBufferServer::Create(
 RingBufferServer::RingBufferServer(std::shared_ptr<ControlServer> parent,
                                    std::shared_ptr<Device> device)
     : parent_(parent), device_(device) {
-  ADR_LOG_OBJECT(kLogObjectLifetimes);
+  ADR_LOG_METHOD(kLogObjectLifetimes);
   ++count_;
   LogObjectCounts();
 }
 
 RingBufferServer::~RingBufferServer() {
-  ADR_LOG_OBJECT(kLogObjectLifetimes);
+  ADR_LOG_METHOD(kLogObjectLifetimes);
   --count_;
   LogObjectCounts();
 }
 
 // Called when the client drops the connection first.
 void RingBufferServer::OnShutdown(fidl::UnbindInfo info) {
-  ADR_LOG_OBJECT(kLogObjectLifetimes);
+  ADR_LOG_METHOD(kLogObjectLifetimes);
   if (!info.is_peer_closed() && !info.is_user_initiated()) {
-    ADR_WARN_OBJECT() << "shutdown with unexpected status: " << info;
+    ADR_WARN_METHOD() << "shutdown with unexpected status: " << info;
   } else {
-    ADR_LOG_OBJECT(kLogRingBufferServerResponses || kLogObjectLifetimes) << "with status: " << info;
+    ADR_LOG_METHOD(kLogRingBufferServerResponses || kLogObjectLifetimes) << "with status: " << info;
   }
 
   if (!device_dropped_ring_buffer_) {
@@ -59,7 +59,7 @@ void RingBufferServer::OnShutdown(fidl::UnbindInfo info) {
 }
 
 void RingBufferServer::ClientDroppedControl() {
-  ADR_LOG_OBJECT(kLogObjectLifetimes);
+  ADR_LOG_METHOD(kLogObjectLifetimes);
 
   Shutdown(ZX_ERR_PEER_CLOSED);
   // Nothing else is needed: OnShutdown may call DropRingBuffer; our dtor will clear parent_.
@@ -67,7 +67,7 @@ void RingBufferServer::ClientDroppedControl() {
 
 // Called when the Device drops the RingBuffer FIDL.
 void RingBufferServer::DeviceDroppedRingBuffer() {
-  ADR_LOG_OBJECT(kLogRingBufferServerMethods || kLogNotifyMethods);
+  ADR_LOG_METHOD(kLogRingBufferServerMethods || kLogNotifyMethods);
 
   device_dropped_ring_buffer_ = true;
   Shutdown(ZX_ERR_PEER_CLOSED);
@@ -80,17 +80,17 @@ void RingBufferServer::DeviceDroppedRingBuffer() {
 //
 void RingBufferServer::SetActiveChannels(SetActiveChannelsRequest& request,
                                          SetActiveChannelsCompleter::Sync& completer) {
-  ADR_LOG_OBJECT(kLogRingBufferServerMethods);
+  ADR_LOG_METHOD(kLogRingBufferServerMethods);
 
   if (parent_->ControlledDeviceReceivedError()) {
-    ADR_WARN_OBJECT() << "device has an error";
+    ADR_WARN_METHOD() << "device has an error";
     completer.Reply(
         fit::error(fuchsia_audio_device::RingBufferSetActiveChannelsError::kDeviceError));
     return;
   }
 
   if (active_channels_completer_) {
-    ADR_WARN_OBJECT() << "previous `SetActiveChannels` request has not yet completed";
+    ADR_WARN_METHOD() << "previous `SetActiveChannels` request has not yet completed";
     completer.Reply(
         fit::error(fuchsia_audio_device::RingBufferSetActiveChannelsError::kAlreadyPending));
     return;
@@ -99,14 +99,14 @@ void RingBufferServer::SetActiveChannels(SetActiveChannelsRequest& request,
   // By this time, the Device should know whether the driver supports this method.
   FX_CHECK(device_->supports_set_active_channels().has_value());
   if (!*device_->supports_set_active_channels()) {
-    ADR_LOG_OBJECT(kLogRingBufferServerMethods) << "device does not support SetActiveChannels";
+    ADR_LOG_METHOD(kLogRingBufferServerMethods) << "device does not support SetActiveChannels";
     completer.Reply(
         fit::error(fuchsia_audio_device::RingBufferSetActiveChannelsError::kMethodNotSupported));
     return;
   }
 
   if (!request.channel_bitmask()) {
-    ADR_WARN_OBJECT() << "required field 'channel_bitmask' is missing";
+    ADR_WARN_METHOD() << "required field 'channel_bitmask' is missing";
     completer.Reply(
         fit::error(fuchsia_audio_device::RingBufferSetActiveChannelsError::kInvalidChannelBitmask));
     return;
@@ -114,7 +114,7 @@ void RingBufferServer::SetActiveChannels(SetActiveChannelsRequest& request,
 
   FX_CHECK(device_->ring_buffer_format().channel_count());
   if (*request.channel_bitmask() >= (1u << *device_->ring_buffer_format().channel_count())) {
-    ADR_WARN_OBJECT() << "channel_bitmask (0x0" << std::hex << *request.channel_bitmask()
+    ADR_WARN_METHOD() << "channel_bitmask (0x0" << std::hex << *request.channel_bitmask()
                       << ") too large, for this " << std::dec
                       << *device_->ring_buffer_format().channel_count() << "-channel format";
     completer.Reply(
@@ -127,7 +127,7 @@ void RingBufferServer::SetActiveChannels(SetActiveChannelsRequest& request,
     ADR_LOG_OBJECT(kLogRingBufferFidlResponses) << "Device/SetActiveChannels response";
     // If we have no async completer, maybe we're shutting down and it was cleared. Just exit.
     if (!active_channels_completer_) {
-      ADR_WARN_OBJECT()
+      ADR_WARN_METHOD()
           << "active_channels_completer_ gone by the time the StartRingBuffer callback ran";
       return;
     }
@@ -135,7 +135,7 @@ void RingBufferServer::SetActiveChannels(SetActiveChannelsRequest& request,
     auto completer = std::move(active_channels_completer_);
     active_channels_completer_.reset();
     if (result.is_error()) {
-      ADR_WARN_OBJECT() << "SetActiveChannels callback: device has an error";
+      ADR_WARN_METHOD() << "SetActiveChannels callback: device has an error";
       completer->Reply(
           fit::error(fuchsia_audio_device::RingBufferSetActiveChannelsError::kDeviceError));
     }
@@ -147,22 +147,22 @@ void RingBufferServer::SetActiveChannels(SetActiveChannelsRequest& request,
 }
 
 void RingBufferServer::Start(StartRequest& request, StartCompleter::Sync& completer) {
-  ADR_LOG_OBJECT(kLogRingBufferServerMethods);
+  ADR_LOG_METHOD(kLogRingBufferServerMethods);
 
   if (parent_->ControlledDeviceReceivedError()) {
-    ADR_WARN_OBJECT() << "device has an error";
+    ADR_WARN_METHOD() << "device has an error";
     completer.Reply(fit::error(fuchsia_audio_device::RingBufferStartError::kDeviceError));
     return;
   }
 
   if (start_completer_) {
-    ADR_WARN_OBJECT() << "previous `Start` request has not yet completed";
+    ADR_WARN_METHOD() << "previous `Start` request has not yet completed";
     completer.Reply(fit::error(fuchsia_audio_device::RingBufferStartError::kAlreadyPending));
     return;
   }
 
   if (started_) {
-    ADR_WARN_OBJECT() << "device is already started";
+    ADR_WARN_METHOD() << "device is already started";
     completer.Reply(fit::error(fuchsia_audio_device::RingBufferStartError::kAlreadyStarted));
     return;
   }
@@ -191,22 +191,22 @@ void RingBufferServer::Start(StartRequest& request, StartCompleter::Sync& comple
 }
 
 void RingBufferServer::Stop(StopRequest& request, StopCompleter::Sync& completer) {
-  ADR_LOG_OBJECT(kLogRingBufferServerMethods);
+  ADR_LOG_METHOD(kLogRingBufferServerMethods);
 
   if (parent_->ControlledDeviceReceivedError()) {
-    ADR_WARN_OBJECT() << "device has an error";
+    ADR_WARN_METHOD() << "device has an error";
     completer.Reply(fit::error(fuchsia_audio_device::RingBufferStopError::kDeviceError));
     return;
   }
 
   if (stop_completer_) {
-    ADR_WARN_OBJECT() << "previous `Stop` request has not yet completed";
+    ADR_WARN_METHOD() << "previous `Stop` request has not yet completed";
     completer.Reply(fit::error(fuchsia_audio_device::RingBufferStopError::kAlreadyPending));
     return;
   }
 
   if (!started_) {
-    ADR_WARN_OBJECT() << "device is not started";
+    ADR_WARN_METHOD() << "device is not started";
     completer.Reply(fit::error(fuchsia_audio_device::RingBufferStopError::kAlreadyStopped));
     return;
   }
@@ -234,16 +234,16 @@ void RingBufferServer::Stop(StopRequest& request, StopCompleter::Sync& completer
 }
 
 void RingBufferServer::WatchDelayInfo(WatchDelayInfoCompleter::Sync& completer) {
-  ADR_LOG_OBJECT(kLogRingBufferServerMethods);
+  ADR_LOG_METHOD(kLogRingBufferServerMethods);
 
   if (parent_->ControlledDeviceReceivedError()) {
-    ADR_WARN_OBJECT() << "device has an error";
+    ADR_WARN_METHOD() << "device has an error";
     completer.Reply(fit::error(fuchsia_audio_device::RingBufferWatchDelayInfoError::kDeviceError));
     return;
   }
 
   if (delay_info_completer_) {
-    ADR_WARN_OBJECT() << "previous `WatchDelayInfo` request has not yet completed";
+    ADR_WARN_METHOD() << "previous `WatchDelayInfo` request has not yet completed";
     completer.Reply(
         fit::error(fuchsia_audio_device::RingBufferWatchDelayInfoError::kAlreadyPending));
     return;
@@ -261,7 +261,7 @@ void RingBufferServer::WatchDelayInfo(WatchDelayInfoCompleter::Sync& completer) 
 }
 
 void RingBufferServer::DelayInfoChanged(const fuchsia_audio_device::DelayInfo& delay_info) {
-  ADR_LOG_OBJECT(kLogRingBufferFidlResponses || kLogNotifyMethods);
+  ADR_LOG_METHOD(kLogRingBufferFidlResponses || kLogNotifyMethods);
 
   if (!delay_info_completer_) {
     new_delay_info_to_notify_ = delay_info;

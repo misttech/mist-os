@@ -21,13 +21,13 @@ std::shared_ptr<ObserverServer> ObserverServer::Create(
     std::shared_ptr<const FidlThread> thread,
     fidl::ServerEnd<fuchsia_audio_device::Observer> server_end,
     std::shared_ptr<const Device> device) {
-  ADR_LOG_CLASS(kLogObserverServerMethods);
+  ADR_LOG_STATIC(kLogObserverServerMethods);
 
   return BaseFidlServer::Create(std::move(thread), std::move(server_end), device);
 }
 
 ObserverServer::ObserverServer(std::shared_ptr<const Device> device) : device_(device) {
-  ADR_LOG_OBJECT(kLogObjectLifetimes);
+  ADR_LOG_METHOD(kLogObjectLifetimes);
 
   // TODO(https://fxbug.dev/42068381): Consider Health-check if this can change post-initialization.
 
@@ -36,13 +36,13 @@ ObserverServer::ObserverServer(std::shared_ptr<const Device> device) : device_(d
 }
 
 ObserverServer::~ObserverServer() {
-  ADR_LOG_OBJECT(kLogObjectLifetimes);
+  ADR_LOG_METHOD(kLogObjectLifetimes);
   --count_;
   LogObjectCounts();
 }
 
 void ObserverServer::DeviceHasError() {
-  ADR_LOG_OBJECT(kLogObserverServerMethods || kLogNotifyMethods);
+  ADR_LOG_METHOD(kLogObserverServerMethods || kLogNotifyMethods);
 
   has_error_ = true;
   DeviceIsRemoved();
@@ -50,7 +50,7 @@ void ObserverServer::DeviceHasError() {
 
 // Called when the Device shuts down first.
 void ObserverServer::DeviceIsRemoved() {
-  ADR_LOG_OBJECT(kLogObserverServerMethods || kLogNotifyMethods);
+  ADR_LOG_METHOD(kLogObserverServerMethods || kLogNotifyMethods);
 
   Shutdown(ZX_ERR_PEER_CLOSED);
 
@@ -58,7 +58,7 @@ void ObserverServer::DeviceIsRemoved() {
 }
 
 void ObserverServer::GainStateChanged(const fuchsia_audio_device::GainState& new_gain_state) {
-  ADR_LOG_OBJECT(kLogObserverServerMethods || kLogNotifyMethods);
+  ADR_LOG_METHOD(kLogObserverServerMethods || kLogNotifyMethods);
 
   if (watch_gain_state_completer_) {
     new_gain_state_to_notify_.reset();
@@ -74,7 +74,7 @@ void ObserverServer::GainStateChanged(const fuchsia_audio_device::GainState& new
 }
 
 void ObserverServer::WatchGainState(WatchGainStateCompleter::Sync& completer) {
-  ADR_LOG_OBJECT(kLogObserverServerMethods);
+  ADR_LOG_METHOD(kLogObserverServerMethods);
 
   if (has_error_) {
     completer.Reply(fit::error<fuchsia_audio_device::ObserverWatchGainStateError>(
@@ -83,7 +83,7 @@ void ObserverServer::WatchGainState(WatchGainStateCompleter::Sync& completer) {
   }
 
   if (watch_gain_state_completer_) {
-    ADR_WARN_OBJECT() << "previous `WatchGainState` request has not yet completed";
+    ADR_WARN_METHOD() << "previous `WatchGainState` request has not yet completed";
     completer.Reply(fit::error<fuchsia_audio_device::ObserverWatchGainStateError>(
         fuchsia_audio_device::ObserverWatchGainStateError::kAlreadyPending));
     return;
@@ -102,7 +102,7 @@ void ObserverServer::WatchGainState(WatchGainStateCompleter::Sync& completer) {
 
 void ObserverServer::PlugStateChanged(const fuchsia_audio_device::PlugState& new_plug_state,
                                       zx::time plug_change_time) {
-  ADR_LOG_OBJECT(kLogObserverServerMethods || kLogNotifyMethods)
+  ADR_LOG_METHOD(kLogObserverServerMethods || kLogNotifyMethods)
       << new_plug_state << " @ " << plug_change_time.get();
 
   new_plug_state_to_notify_ = fuchsia_audio_device::ObserverWatchPlugStateResponse{{
@@ -122,7 +122,7 @@ void ObserverServer::PlugStateChanged(const fuchsia_audio_device::PlugState& new
 }
 
 void ObserverServer::WatchPlugState(WatchPlugStateCompleter::Sync& completer) {
-  ADR_LOG_OBJECT(kLogObserverServerMethods);
+  ADR_LOG_METHOD(kLogObserverServerMethods);
 
   if (has_error_) {
     completer.Reply(fit::error<fuchsia_audio_device::ObserverWatchPlugStateError>(
@@ -130,7 +130,7 @@ void ObserverServer::WatchPlugState(WatchPlugStateCompleter::Sync& completer) {
     return;
   }
   if (watch_plug_state_completer_) {
-    ADR_WARN_OBJECT() << "previous `WatchPlugState` request has not yet completed";
+    ADR_WARN_METHOD() << "previous `WatchPlugState` request has not yet completed";
     completer.Reply(fit::error<fuchsia_audio_device::ObserverWatchPlugStateError>(
         fuchsia_audio_device::ObserverWatchPlugStateError::kAlreadyPending));
     return;
@@ -147,7 +147,7 @@ void ObserverServer::WatchPlugState(WatchPlugStateCompleter::Sync& completer) {
 }
 
 void ObserverServer::GetReferenceClock(GetReferenceClockCompleter::Sync& completer) {
-  ADR_LOG_OBJECT(kLogObserverServerMethods);
+  ADR_LOG_METHOD(kLogObserverServerMethods);
 
   if (has_error_) {
     completer.Reply(fit::error<fuchsia_audio_device::ObserverGetReferenceClockError>(

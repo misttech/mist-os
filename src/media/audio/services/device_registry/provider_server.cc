@@ -23,46 +23,46 @@ std::shared_ptr<ProviderServer> ProviderServer::Create(
     std::shared_ptr<const FidlThread> thread,
     fidl::ServerEnd<fuchsia_audio_device::Provider> server_end,
     std::shared_ptr<AudioDeviceRegistry> parent) {
-  ADR_LOG_CLASS(kLogProviderServerMethods);
+  ADR_LOG_STATIC(kLogProviderServerMethods);
 
   return BaseFidlServer::Create(std::move(thread), std::move(server_end), parent);
 }
 
 ProviderServer::ProviderServer(std::shared_ptr<AudioDeviceRegistry> parent) : parent_(parent) {
-  ADR_LOG_OBJECT(kLogObjectLifetimes);
+  ADR_LOG_METHOD(kLogObjectLifetimes);
   ++count_;
   LogObjectCounts();
 }
 
 ProviderServer::~ProviderServer() {
-  ADR_LOG_OBJECT(kLogObjectLifetimes);
+  ADR_LOG_METHOD(kLogObjectLifetimes);
   --count_;
   LogObjectCounts();
 }
 
 void ProviderServer::AddDevice(AddDeviceRequest& request, AddDeviceCompleter::Sync& completer) {
-  ADR_LOG_OBJECT(kLogProviderServerMethods);
+  ADR_LOG_METHOD(kLogProviderServerMethods);
 
   if (!request.device_name() || request.device_name()->empty()) {
-    ADR_WARN_OBJECT() << "device_name was absent/empty";
+    ADR_WARN_METHOD() << "device_name was absent/empty";
     completer.Reply(fit::error(fuchsia_audio_device::ProviderAddDeviceError::kInvalidName));
     return;
   }
 
   if (!request.device_type()) {
-    ADR_WARN_OBJECT() << "device_type was absent";
+    ADR_WARN_METHOD() << "device_type was absent";
     completer.Reply(fit::error(fuchsia_audio_device::ProviderAddDeviceError::kInvalidType));
     return;
   }
 
   if (!request.stream_config()) {
-    ADR_WARN_OBJECT() << "stream_config was absent";
+    ADR_WARN_METHOD() << "stream_config was absent";
 
     completer.Reply(fit::error(fuchsia_audio_device::ProviderAddDeviceError::kInvalidStreamConfig));
     return;
   }
 
-  ADR_LOG_OBJECT(kLogDeviceDetection)
+  ADR_LOG_METHOD(kLogDeviceDetection)
       << "request to add " << *request.device_type() << " '" << *request.device_name() << "'";
 
   // This kicks off device initialization, which notifies the parent when it completes.

@@ -28,27 +28,27 @@ std::shared_ptr<RegistryServer> RegistryServer::Create(
     std::shared_ptr<const FidlThread> thread,
     fidl::ServerEnd<fuchsia_audio_device::Registry> server_end,
     std::shared_ptr<AudioDeviceRegistry> parent) {
-  ADR_LOG_CLASS(kLogRegistryServerMethods);
+  ADR_LOG_STATIC(kLogRegistryServerMethods);
 
   return BaseFidlServer::Create(std::move(thread), std::move(server_end), parent);
 }
 
 RegistryServer::RegistryServer(std::shared_ptr<AudioDeviceRegistry> parent) : parent_(parent) {
-  ADR_LOG_OBJECT(kLogObjectLifetimes);
+  ADR_LOG_METHOD(kLogObjectLifetimes);
   ++count_;
   LogObjectCounts();
 }
 
 RegistryServer::~RegistryServer() {
-  ADR_LOG_OBJECT(kLogObjectLifetimes);
+  ADR_LOG_METHOD(kLogObjectLifetimes);
   --count_;
   LogObjectCounts();
 }
 
 void RegistryServer::WatchDevicesAdded(WatchDevicesAddedCompleter::Sync& completer) {
-  ADR_LOG_OBJECT(kLogRegistryServerMethods);
+  ADR_LOG_METHOD(kLogRegistryServerMethods);
   if (watch_devices_added_completer_) {
-    ADR_WARN_OBJECT() << "previous `WatchDevicesAdded` request has not yet completed";
+    ADR_WARN_METHOD() << "previous `WatchDevicesAdded` request has not yet completed";
     completer.Reply(fit::error<fuchsia_audio_device::RegistryWatchDevicesAddedError>(
         fuchsia_audio_device::RegistryWatchDevicesAddedError::kAlreadyPending));
     return;
@@ -59,7 +59,7 @@ void RegistryServer::WatchDevicesAdded(WatchDevicesAddedCompleter::Sync& complet
 }
 
 void RegistryServer::DeviceWasAdded(std::shared_ptr<const Device> new_device) {
-  ADR_LOG_OBJECT(kLogRegistryServerMethods);
+  ADR_LOG_METHOD(kLogRegistryServerMethods);
 
   auto id = *new_device->info()->token_id();
   auto token_match = [id](fuchsia_audio_device::Info& info) { return info.token_id() == id; };
@@ -79,20 +79,20 @@ void RegistryServer::DeviceWasAdded(std::shared_ptr<const Device> new_device) {
 // We just got either a completer, or a newly-added device. If now we have both, Reply.
 void RegistryServer::ReplyWithAddedDevices() {
   if (!watch_devices_added_completer_) {
-    ADR_LOG_OBJECT(kLogRegistryServerMethods) << "no pending completer; just adding to our list";
+    ADR_LOG_METHOD(kLogRegistryServerMethods) << "no pending completer; just adding to our list";
     return;
   }
   if (devices_added_since_notify_.empty()) {
-    ADR_LOG_OBJECT(kLogRegistryServerMethods) << "devices_added_since_notify_ is empty";
+    ADR_LOG_METHOD(kLogRegistryServerMethods) << "devices_added_since_notify_ is empty";
     return;
   }
 
   auto completer = *std::move(watch_devices_added_completer_);
   watch_devices_added_completer_.reset();
-  ADR_LOG_OBJECT(kLogRegistryServerResponses) << "responding to WatchDevicesAdded with "
+  ADR_LOG_METHOD(kLogRegistryServerResponses) << "responding to WatchDevicesAdded with "
                                               << devices_added_since_notify_.size() << " devices:";
   for (auto& info : devices_added_since_notify_) {
-    ADR_LOG_OBJECT(kLogRegistryServerResponses) << "    token_id " << *info.token_id();
+    ADR_LOG_METHOD(kLogRegistryServerResponses) << "    token_id " << *info.token_id();
   }
   completer.Reply(fit::success(fuchsia_audio_device::RegistryWatchDevicesAddedResponse{{
       .devices = std::move(devices_added_since_notify_),
@@ -101,9 +101,9 @@ void RegistryServer::ReplyWithAddedDevices() {
 
 // TODO(https://fxbug.dev/42068345): is WatchDevicesRemoved (returning a vector) more ergonomic?
 void RegistryServer::WatchDeviceRemoved(WatchDeviceRemovedCompleter::Sync& completer) {
-  ADR_LOG_OBJECT(kLogRegistryServerMethods);
+  ADR_LOG_METHOD(kLogRegistryServerMethods);
   if (watch_device_removed_completer_) {
-    ADR_WARN_OBJECT() << "previous `WatchDeviceRemoved` request has not yet completed";
+    ADR_WARN_METHOD() << "previous `WatchDeviceRemoved` request has not yet completed";
     completer.Reply(fit::error<fuchsia_audio_device::RegistryWatchDeviceRemovedError>(
         fuchsia_audio_device::RegistryWatchDeviceRemovedError::kAlreadyPending));
     return;
@@ -114,7 +114,7 @@ void RegistryServer::WatchDeviceRemoved(WatchDeviceRemovedCompleter::Sync& compl
 }
 
 void RegistryServer::DeviceWasRemoved(uint64_t removed_id) {
-  ADR_LOG_OBJECT(kLogRegistryServerMethods);
+  ADR_LOG_METHOD(kLogRegistryServerMethods);
   auto already_in_queue = false;
   for (auto i = devices_removed_since_notify_.size(); i > 0; --i) {
     auto id = devices_removed_since_notify_.front();
@@ -132,7 +132,7 @@ void RegistryServer::DeviceWasRemoved(uint64_t removed_id) {
       devices_added_since_notify_.begin(), devices_added_since_notify_.end(),
       [removed_id](fuchsia_audio_device::Info& info) { return info.token_id() == removed_id; });
   if (match != devices_added_since_notify_.end()) {
-    ADR_LOG_OBJECT(kLogRegistryServerResponses)
+    ADR_LOG_METHOD(kLogRegistryServerResponses)
         << "Device (" << removed_id << ") added then removed before notified!";
     devices_added_since_notify_.erase(match);
     return;
@@ -145,16 +145,16 @@ void RegistryServer::DeviceWasRemoved(uint64_t removed_id) {
 // We just got either a completer, or a newly-removed device. If now we have both, Reply.
 void RegistryServer::ReplyWithNextRemovedDevice() {
   if (devices_removed_since_notify_.empty()) {
-    ADR_LOG_OBJECT(kLogRegistryServerMethods) << "devices_removed_since_notify_ is empty";
+    ADR_LOG_METHOD(kLogRegistryServerMethods) << "devices_removed_since_notify_ is empty";
     return;
   }
   if (!watch_device_removed_completer_) {
-    ADR_LOG_OBJECT(kLogRegistryServerMethods) << "no WatchDeviceRemoved completer";
+    ADR_LOG_METHOD(kLogRegistryServerMethods) << "no WatchDeviceRemoved completer";
     return;
   }
   auto next_removed_id = devices_removed_since_notify_.front();
   devices_removed_since_notify_.pop();
-  ADR_LOG_OBJECT(kLogRegistryServerResponses) << "responding with token_id " << next_removed_id;
+  ADR_LOG_METHOD(kLogRegistryServerResponses) << "responding with token_id " << next_removed_id;
   auto completer = *std::move(watch_device_removed_completer_);
   watch_device_removed_completer_.reset();
   completer.Reply(fit::success(
@@ -163,15 +163,15 @@ void RegistryServer::ReplyWithNextRemovedDevice() {
 
 void RegistryServer::CreateObserver(CreateObserverRequest& request,
                                     CreateObserverCompleter::Sync& completer) {
-  ADR_LOG_OBJECT(kLogRegistryServerMethods);
+  ADR_LOG_METHOD(kLogRegistryServerMethods);
 
   if (!request.token_id()) {
-    ADR_WARN_OBJECT() << "required field 'id' is missing";
+    ADR_WARN_METHOD() << "required field 'id' is missing";
     completer.Reply(fit::error(fuchsia_audio_device::RegistryCreateObserverError::kInvalidTokenId));
     return;
   }
   if (!request.observer_server()) {
-    ADR_WARN_OBJECT() << "required field 'observer_server' is missing";
+    ADR_WARN_METHOD() << "required field 'observer_server' is missing";
     completer.Reply(
         fit::error(fuchsia_audio_device::RegistryCreateObserverError::kInvalidObserver));
     return;
@@ -181,13 +181,13 @@ void RegistryServer::CreateObserver(CreateObserverRequest& request,
   switch (presence) {
     // We could break these out into separate error codes if needed.
     case AudioDeviceRegistry::DevicePresence::Unknown:
-      ADR_WARN_OBJECT() << "no device found with 'id' " << token_id;
+      ADR_WARN_METHOD() << "no device found with 'id' " << token_id;
       completer.Reply(
           fit::error(fuchsia_audio_device::RegistryCreateObserverError::kDeviceNotFound));
       return;
 
     case AudioDeviceRegistry::DevicePresence::Error:
-      ADR_WARN_OBJECT() << "device with 'id' " << token_id << " has an error";
+      ADR_WARN_METHOD() << "device with 'id' " << token_id << " has an error";
       completer.Reply(fit::error(fuchsia_audio_device::RegistryCreateObserverError::kDeviceError));
       return;
 

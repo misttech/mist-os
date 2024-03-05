@@ -30,7 +30,7 @@ std::shared_ptr<ControlServer> ControlServer::Create(
     std::shared_ptr<const FidlThread> thread,
     fidl::ServerEnd<fuchsia_audio_device::Control> server_end,
     std::shared_ptr<AudioDeviceRegistry> parent, std::shared_ptr<Device> device) {
-  ADR_LOG_CLASS(kLogControlServerMethods);
+  ADR_LOG_STATIC(kLogControlServerMethods);
 
   return BaseFidlServer::Create(std::move(thread), std::move(server_end), parent, device);
 }
@@ -38,24 +38,24 @@ std::shared_ptr<ControlServer> ControlServer::Create(
 ControlServer::ControlServer(std::shared_ptr<AudioDeviceRegistry> parent,
                              std::shared_ptr<Device> device)
     : parent_(parent), device_(device) {
-  ADR_LOG_OBJECT(kLogObjectLifetimes);
+  ADR_LOG_METHOD(kLogObjectLifetimes);
   ++count_;
   LogObjectCounts();
 }
 
 ControlServer::~ControlServer() {
-  ADR_LOG_OBJECT(kLogObjectLifetimes);
+  ADR_LOG_METHOD(kLogObjectLifetimes);
   --count_;
   LogObjectCounts();
 }
 
 // Called when the client shuts down first.
 void ControlServer::OnShutdown(fidl::UnbindInfo info) {
-  ADR_LOG_OBJECT(kLogObjectLifetimes);
+  ADR_LOG_METHOD(kLogObjectLifetimes);
   if (!info.is_peer_closed() && !info.is_user_initiated()) {
-    ADR_WARN_OBJECT() << "shutdown with unexpected status: " << info;
+    ADR_WARN_METHOD() << "shutdown with unexpected status: " << info;
   } else {
-    ADR_LOG_OBJECT(kLogRingBufferFidlResponses || kLogObjectLifetimes) << "with status: " << info;
+    ADR_LOG_METHOD(kLogRingBufferFidlResponses || kLogObjectLifetimes) << "with status: " << info;
   }
 
   if (auto ring_buffer = GetRingBufferServer(); ring_buffer) {
@@ -66,7 +66,7 @@ void ControlServer::OnShutdown(fidl::UnbindInfo info) {
 
 // Called when Device drops its RingBuffer FIDL. Tell RingBufferServer and drop our reference.
 void ControlServer::DeviceDroppedRingBuffer() {
-  ADR_LOG_OBJECT(kLogControlServerMethods || kLogNotifyMethods);
+  ADR_LOG_METHOD(kLogControlServerMethods || kLogNotifyMethods);
 
   if (auto ring_buffer = GetRingBufferServer(); ring_buffer) {
     ring_buffer->DeviceDroppedRingBuffer();
@@ -75,7 +75,7 @@ void ControlServer::DeviceDroppedRingBuffer() {
 }
 
 void ControlServer::DeviceHasError() {
-  ADR_LOG_OBJECT(kLogControlServerMethods);
+  ADR_LOG_METHOD(kLogControlServerMethods);
 
   device_has_error_ = true;
   DeviceIsRemoved();
@@ -83,7 +83,7 @@ void ControlServer::DeviceHasError() {
 
 // Upon exiting this method, we drop our connection to the client.
 void ControlServer::DeviceIsRemoved() {
-  ADR_LOG_OBJECT(kLogControlServerMethods);
+  ADR_LOG_METHOD(kLogControlServerMethods);
 
   if (auto ring_buffer = GetRingBufferServer(); ring_buffer) {
     ring_buffer->ClientDroppedControl();
@@ -95,7 +95,7 @@ void ControlServer::DeviceIsRemoved() {
 }
 
 std::shared_ptr<RingBufferServer> ControlServer::GetRingBufferServer() {
-  ADR_LOG_OBJECT(kLogControlServerMethods);
+  ADR_LOG_METHOD(kLogControlServerMethods);
   if (ring_buffer_server_) {
     if (auto sh_ptr_ring_buffer_server = ring_buffer_server_->lock(); sh_ptr_ring_buffer_server) {
       return sh_ptr_ring_buffer_server;
@@ -107,43 +107,43 @@ std::shared_ptr<RingBufferServer> ControlServer::GetRingBufferServer() {
 
 // fuchsia.audio.device.Control implementation
 void ControlServer::SetGain(SetGainRequest& request, SetGainCompleter::Sync& completer) {
-  ADR_LOG_OBJECT(kLogControlServerMethods);
+  ADR_LOG_METHOD(kLogControlServerMethods);
 
   if (device_has_error_) {
-    ADR_WARN_OBJECT() << "device has an error";
+    ADR_WARN_METHOD() << "device has an error";
     completer.Reply(fit::error(fuchsia_audio_device::ControlSetGainError::kDeviceError));
     return;
   }
 
   if (!request.target_state()) {
-    ADR_WARN_OBJECT() << "required field 'target_state' is missing";
+    ADR_WARN_METHOD() << "required field 'target_state' is missing";
     completer.Reply(fit::error(fuchsia_audio_device::ControlSetGainError::kInvalidGainState));
     return;
   }
 
   auto& gain_caps = *device_->info()->gain_caps();
   if (!request.target_state()->gain_db()) {
-    ADR_WARN_OBJECT() << "required field `target_state.gain_db` is missing";
+    ADR_WARN_METHOD() << "required field `target_state.gain_db` is missing";
     completer.Reply(fit::error(fuchsia_audio_device::ControlSetGainError::kInvalidGainDb));
     return;
   }
 
   if (*request.target_state()->gain_db() > *gain_caps.max_gain_db() ||
       *request.target_state()->gain_db() < *gain_caps.min_gain_db()) {
-    ADR_WARN_OBJECT() << "gain_db (" << *request.target_state()->gain_db() << ") is out of range ["
+    ADR_WARN_METHOD() << "gain_db (" << *request.target_state()->gain_db() << ") is out of range ["
                       << *gain_caps.min_gain_db() << ", " << *gain_caps.max_gain_db() << "]";
     completer.Reply(fit::error(fuchsia_audio_device::ControlSetGainError::kGainOutOfRange));
     return;
   }
 
   if (request.target_state()->muted().value_or(false) && !(*gain_caps.can_mute())) {
-    ADR_WARN_OBJECT() << "device cannot MUTE";
+    ADR_WARN_METHOD() << "device cannot MUTE";
     completer.Reply(fit::error(fuchsia_audio_device::ControlSetGainError::kMuteUnavailable));
     return;
   }
 
   if (request.target_state()->agc_enabled().value_or(false) && !(*gain_caps.can_agc())) {
-    ADR_WARN_OBJECT() << "device cannot AGC";
+    ADR_WARN_METHOD() << "device cannot AGC";
     completer.Reply(fit::error(fuchsia_audio_device::ControlSetGainError::kAgcUnavailable));
     return;
   }
@@ -162,17 +162,17 @@ void ControlServer::SetGain(SetGainRequest& request, SetGainCompleter::Sync& com
 
 void ControlServer::CreateRingBuffer(CreateRingBufferRequest& request,
                                      CreateRingBufferCompleter::Sync& completer) {
-  ADR_LOG_OBJECT(kLogControlServerMethods);
+  ADR_LOG_METHOD(kLogControlServerMethods);
 
   // Fail if device has error.
   if (device_has_error_) {
-    ADR_WARN_OBJECT() << "device has an error";
+    ADR_WARN_METHOD() << "device has an error";
     completer.Reply(fit::error(fuchsia_audio_device::ControlCreateRingBufferError::kDeviceError));
     return;
   }
 
   if (create_ring_buffer_completer_) {
-    ADR_WARN_OBJECT() << "previous `CreateRingBuffer` request has not yet completed";
+    ADR_WARN_METHOD() << "previous `CreateRingBuffer` request has not yet completed";
     completer.Reply(
         fit::error(fuchsia_audio_device::ControlCreateRingBufferError::kAlreadyPending));
     return;
@@ -180,7 +180,7 @@ void ControlServer::CreateRingBuffer(CreateRingBufferRequest& request,
 
   // Fail on missing parameters.
   if (!request.options()) {
-    ADR_WARN_OBJECT() << "required field 'options' is missing";
+    ADR_WARN_METHOD() << "required field 'options' is missing";
     completer.Reply(
         fit::error(fuchsia_audio_device::ControlCreateRingBufferError::kInvalidOptions));
     return;
@@ -188,24 +188,24 @@ void ControlServer::CreateRingBuffer(CreateRingBufferRequest& request,
   if (!request.options()->format() || !request.options()->format()->sample_type() ||
       !request.options()->format()->channel_count() ||
       !request.options()->format()->frames_per_second()) {
-    ADR_WARN_OBJECT() << "required 'options.format' (or one of its required members) is missing";
+    ADR_WARN_METHOD() << "required 'options.format' (or one of its required members) is missing";
     completer.Reply(fit::error(fuchsia_audio_device::ControlCreateRingBufferError::kInvalidFormat));
     return;
   }
   if (!request.options()->ring_buffer_min_bytes()) {
-    ADR_WARN_OBJECT() << "required field 'options.ring_buffer_min_bytes' is missing";
+    ADR_WARN_METHOD() << "required field 'options.ring_buffer_min_bytes' is missing";
     completer.Reply(
         fit::error(fuchsia_audio_device::ControlCreateRingBufferError::kInvalidMinBytes));
     return;
   }
   if (!request.ring_buffer_server()) {
-    ADR_WARN_OBJECT() << "required field 'ring_buffer_server' is missing";
+    ADR_WARN_METHOD() << "required field 'ring_buffer_server' is missing";
     completer.Reply(
         fit::error(fuchsia_audio_device::ControlCreateRingBufferError::kInvalidRingBuffer));
     return;
   }
   if (GetRingBufferServer()) {
-    ADR_WARN_OBJECT() << "device RingBuffer already exists";
+    ADR_WARN_METHOD() << "device RingBuffer already exists";
     completer.Reply(
         fit::error(fuchsia_audio_device::wire::ControlCreateRingBufferError::kAlreadyAllocated));
   }
@@ -213,7 +213,7 @@ void ControlServer::CreateRingBuffer(CreateRingBufferRequest& request,
   auto driver_format = device_->SupportedDriverFormatForClientFormat(*request.options()->format());
   // Fail if device cannot satisfy the requested format.
   if (!driver_format) {
-    ADR_WARN_OBJECT() << "device does not support the specified options";
+    ADR_WARN_METHOD() << "device does not support the specified options";
     completer.Reply(
         fit::error(fuchsia_audio_device::ControlCreateRingBufferError::kFormatMismatch));
     return;
@@ -226,7 +226,7 @@ void ControlServer::CreateRingBuffer(CreateRingBufferRequest& request,
       [this](Device::RingBufferInfo info) {
         // If we have no async completer, maybe we're shutting down. Just exit.
         if (!create_ring_buffer_completer_) {
-          ADR_WARN_OBJECT()
+          ADR_WARN_METHOD()
               << "create_ring_buffer_completer_ gone by the time the CreateRingBuffer callback ran";
           if (auto ring_buffer_server = GetRingBufferServer(); ring_buffer_server) {
             ring_buffer_server_.reset();
@@ -244,7 +244,7 @@ void ControlServer::CreateRingBuffer(CreateRingBufferRequest& request,
       });
 
   if (!created) {
-    ADR_WARN_OBJECT() << "device cannot create a ring buffer with the specified options";
+    ADR_WARN_METHOD() << "device cannot create a ring buffer with the specified options";
     ring_buffer_server_.reset();
     create_ring_buffer_completer_->Reply(
         fidl::Response<fuchsia_audio_device::Control::CreateRingBuffer>(
@@ -265,7 +265,7 @@ void ControlServer::PlugStateChanged(const fuchsia_audio_device::PlugState& new_
 // We receive delay values for the first time during the configuration process. Once we have these
 // values, we can calculate the required ring-buffer size and request the VMO.
 void ControlServer::DelayInfoChanged(const fuchsia_audio_device::DelayInfo& delay_info) {
-  ADR_LOG_OBJECT(kLogControlServerResponses || kLogNotifyMethods);
+  ADR_LOG_METHOD(kLogControlServerResponses || kLogNotifyMethods);
 
   // Initialization is complete, so this represents a delay update. Eventually, notify watchers.
   if (auto ring_buffer_server = GetRingBufferServer(); ring_buffer_server) {

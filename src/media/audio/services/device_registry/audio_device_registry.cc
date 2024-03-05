@@ -33,10 +33,10 @@ using DriverClient = fuchsia_audio_device::DriverClient;
 AudioDeviceRegistry::AudioDeviceRegistry(std::shared_ptr<FidlThread> server_thread)
     : thread_(std::move(server_thread)),
       outgoing_(component::OutgoingDirectory(thread_->dispatcher())) {
-  ADR_LOG_OBJECT(kLogObjectLifetimes);
+  ADR_LOG_METHOD(kLogObjectLifetimes);
 }
 
-AudioDeviceRegistry::~AudioDeviceRegistry() { ADR_LOG_OBJECT(kLogObjectLifetimes); }
+AudioDeviceRegistry::~AudioDeviceRegistry() { ADR_LOG_METHOD(kLogObjectLifetimes); }
 
 zx_status_t AudioDeviceRegistry::StartDeviceDetection() {
   DeviceDetectionHandler device_detection_handler =
@@ -72,7 +72,7 @@ zx_status_t AudioDeviceRegistry::StartDeviceDetection() {
   auto detector_result =
       media_audio::DeviceDetector::Create(device_detection_handler, thread_->dispatcher());
 
-  ADR_LOG_OBJECT(kLogDeviceDetection) << "returning " << detector_result.status_value();
+  ADR_LOG_METHOD(kLogDeviceDetection) << "returning " << detector_result.status_value();
 
   if (detector_result.is_ok()) {
     device_detector_ = detector_result.value();
@@ -86,7 +86,7 @@ void AudioDeviceRegistry::AddDevice(const std::shared_ptr<Device>& initializing_
 }
 
 void AudioDeviceRegistry::DeviceIsReady(std::shared_ptr<media_audio::Device> ready_device) {
-  ADR_LOG_OBJECT(kLogAudioDeviceRegistryMethods) << "for device " << ready_device;
+  ADR_LOG_METHOD(kLogAudioDeviceRegistryMethods) << "for device " << ready_device;
 
   if (!pending_devices_.erase(ready_device)) {
     FX_LOGS(ERROR) << __func__ << ": device " << ready_device << " not found in pending list";
@@ -112,44 +112,44 @@ void AudioDeviceRegistry::DeviceIsReady(std::shared_ptr<media_audio::Device> rea
 
 void AudioDeviceRegistry::DeviceHasError(std::shared_ptr<media_audio::Device> device_with_error) {
   if (devices_.erase(device_with_error)) {
-    ADR_WARN_OBJECT() << "for previously-initialized device " << device_with_error;
+    ADR_WARN_METHOD() << "for previously-initialized device " << device_with_error;
 
     // Device should have already notified any other associated objects.
     NotifyRegistriesOfDeviceRemoval(device_with_error->token_id());
   }
 
   if (pending_devices_.erase(device_with_error)) {
-    ADR_WARN_OBJECT() << "for pending (initializing) device " << device_with_error;
+    ADR_WARN_METHOD() << "for pending (initializing) device " << device_with_error;
   }
 
   if (!unhealthy_devices_.insert(device_with_error).second) {
-    ADR_WARN_OBJECT() << "device " << device_with_error
+    ADR_WARN_METHOD() << "device " << device_with_error
                       << " had previously encountered an error - no change";
     return;
   }
 
-  ADR_WARN_OBJECT() << "added device " << device_with_error << " to unhealthy list";
+  ADR_WARN_METHOD() << "added device " << device_with_error << " to unhealthy list";
 }
 
 // Entirely remove the device, including from the unhealthy list.
 void AudioDeviceRegistry::DeviceIsRemoved(std::shared_ptr<media_audio::Device> device_to_remove) {
-  ADR_LOG_OBJECT(kLogAudioDeviceRegistryMethods) << "for device " << device_to_remove;
+  ADR_LOG_METHOD(kLogAudioDeviceRegistryMethods) << "for device " << device_to_remove;
 
   if (devices_.erase(device_to_remove)) {
     // Device should have already notified any other associated objects.
     NotifyRegistriesOfDeviceRemoval(device_to_remove->token_id());
 
-    ADR_LOG_OBJECT(kLogObjectLifetimes)
+    ADR_LOG_METHOD(kLogObjectLifetimes)
         << "removed " << device_to_remove << " from active device list";
   }
 
   if (pending_devices_.erase(device_to_remove)) {
-    ADR_LOG_OBJECT(kLogObjectLifetimes)
+    ADR_LOG_METHOD(kLogObjectLifetimes)
         << "removed " << device_to_remove << " from pending (initializing) device list";
   }
 
   if (unhealthy_devices_.erase(device_to_remove)) {
-    ADR_LOG_OBJECT(kLogObjectLifetimes)
+    ADR_LOG_METHOD(kLogObjectLifetimes)
         << "removed " << device_to_remove << " from unhealthy device list";
   }
 }
@@ -158,24 +158,24 @@ std::pair<AudioDeviceRegistry::DevicePresence, std::shared_ptr<Device>>
 AudioDeviceRegistry::FindDeviceByTokenId(TokenId token_id) {
   for (auto& device : devices_) {
     if (device->token_id() == token_id) {
-      ADR_LOG_CLASS(kLogAudioDeviceRegistryMethods) << "active (token_id " << token_id << ")";
+      ADR_LOG_STATIC(kLogAudioDeviceRegistryMethods) << "active (token_id " << token_id << ")";
       return std::make_pair(DevicePresence::Active, device);
     }
   }
   for (auto& device : unhealthy_devices_) {
     if (device->token_id() == token_id) {
-      ADR_WARN_OBJECT() << "device (token_id " << token_id << ") has an error";
+      ADR_WARN_METHOD() << "device (token_id " << token_id << ") has an error";
       return std::make_pair(DevicePresence::Error, nullptr);
     }
   }
   // For initializing devices and completely unknown devices, we return the same error.
   for (auto& device : pending_devices_) {
     if (device->token_id() == token_id) {
-      ADR_WARN_OBJECT() << "device not yet ready (token_id " << token_id << ")";
+      ADR_WARN_METHOD() << "device not yet ready (token_id " << token_id << ")";
       break;
     }
   }
-  ADR_WARN_OBJECT() << "no known device (token_id " << token_id << ")";
+  ADR_WARN_METHOD() << "no known device (token_id " << token_id << ")";
   return std::make_pair(DevicePresence::Unknown, nullptr);
 }
 
@@ -186,7 +186,7 @@ bool AudioDeviceRegistry::ClaimDeviceForControl(std::shared_ptr<Device> device,
 
 // Notify registry clients of this device departure (whether from surprise-removal or error).
 void AudioDeviceRegistry::NotifyRegistriesOfDeviceRemoval(uint64_t removed_device_id) {
-  ADR_LOG_OBJECT(kLogAudioDeviceRegistryMethods);
+  ADR_LOG_METHOD(kLogAudioDeviceRegistryMethods);
 
   for (auto& weak_registry : registries_) {
     if (auto registry = weak_registry.lock(); registry) {
@@ -196,7 +196,7 @@ void AudioDeviceRegistry::NotifyRegistriesOfDeviceRemoval(uint64_t removed_devic
 }
 
 zx_status_t AudioDeviceRegistry::RegisterAndServeOutgoing() {
-  ADR_LOG_OBJECT(kLogAudioDeviceRegistryMethods);
+  ADR_LOG_METHOD(kLogAudioDeviceRegistryMethods);
 
   auto status = outgoing_.AddUnmanagedProtocol<fuchsia_audio_device::Provider>(
       [this](fidl::ServerEnd<fuchsia_audio_device::Provider> server_end) mutable {
@@ -248,14 +248,14 @@ zx_status_t AudioDeviceRegistry::RegisterAndServeOutgoing() {
 // out to not be the case, we will remove this at that time.
 std::shared_ptr<ProviderServer> AudioDeviceRegistry::CreateProviderServer(
     fidl::ServerEnd<fuchsia_audio_device::Provider> server_end) {
-  ADR_LOG_OBJECT(kLogAudioDeviceRegistryMethods || kLogProviderServerMethods);
+  ADR_LOG_METHOD(kLogAudioDeviceRegistryMethods || kLogProviderServerMethods);
 
   return ProviderServer::Create(thread_, std::move(server_end), shared_from_this());
 }
 
 std::shared_ptr<RegistryServer> AudioDeviceRegistry::CreateRegistryServer(
     fidl::ServerEnd<fuchsia_audio_device::Registry> server_end) {
-  ADR_LOG_OBJECT(kLogAudioDeviceRegistryMethods || kLogRegistryServerMethods);
+  ADR_LOG_METHOD(kLogAudioDeviceRegistryMethods || kLogRegistryServerMethods);
 
   auto new_registry = RegistryServer::Create(thread_, std::move(server_end), shared_from_this());
   registries_.push_back(new_registry);
@@ -268,7 +268,7 @@ std::shared_ptr<RegistryServer> AudioDeviceRegistry::CreateRegistryServer(
 
 std::shared_ptr<ControlCreatorServer> AudioDeviceRegistry::CreateControlCreatorServer(
     fidl::ServerEnd<fuchsia_audio_device::ControlCreator> server_end) {
-  ADR_LOG_OBJECT(kLogAudioDeviceRegistryMethods || kLogControlCreatorServerMethods);
+  ADR_LOG_METHOD(kLogAudioDeviceRegistryMethods || kLogControlCreatorServerMethods);
 
   return ControlCreatorServer::Create(thread_, std::move(server_end), shared_from_this());
 }
@@ -276,7 +276,7 @@ std::shared_ptr<ControlCreatorServer> AudioDeviceRegistry::CreateControlCreatorS
 std::shared_ptr<ObserverServer> AudioDeviceRegistry::CreateObserverServer(
     fidl::ServerEnd<fuchsia_audio_device::Observer> server_end,
     std::shared_ptr<Device> observed_device) {
-  ADR_LOG_OBJECT(kLogAudioDeviceRegistryMethods || kLogObserverServerMethods);
+  ADR_LOG_METHOD(kLogAudioDeviceRegistryMethods || kLogObserverServerMethods);
 
   auto observer = ObserverServer::Create(thread_, std::move(server_end), observed_device);
   observed_device->AddObserver(observer);
@@ -286,7 +286,7 @@ std::shared_ptr<ObserverServer> AudioDeviceRegistry::CreateObserverServer(
 std::shared_ptr<ControlServer> AudioDeviceRegistry::CreateControlServer(
     fidl::ServerEnd<fuchsia_audio_device::Control> server_end,
     std::shared_ptr<Device> device_to_control) {
-  ADR_LOG_OBJECT(kLogAudioDeviceRegistryMethods || kLogControlServerMethods);
+  ADR_LOG_METHOD(kLogAudioDeviceRegistryMethods || kLogControlServerMethods);
 
   auto control =
       ControlServer::Create(thread_, std::move(server_end), shared_from_this(), device_to_control);
@@ -302,7 +302,7 @@ std::shared_ptr<RingBufferServer> AudioDeviceRegistry::CreateRingBufferServer(
     fidl::ServerEnd<fuchsia_audio_device::RingBuffer> server_end,
     const std::shared_ptr<ControlServer>& parent,
     const std::shared_ptr<Device>& device_to_control) {
-  ADR_LOG_OBJECT(kLogAudioDeviceRegistryMethods || kLogRingBufferServerMethods);
+  ADR_LOG_METHOD(kLogAudioDeviceRegistryMethods || kLogRingBufferServerMethods);
 
   return RingBufferServer::Create(thread_, std::move(server_end), parent, device_to_control);
 }

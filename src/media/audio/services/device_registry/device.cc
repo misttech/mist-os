@@ -44,7 +44,7 @@ std::shared_ptr<Device> Device::Create(std::weak_ptr<DevicePresenceWatcher> pres
                                        async_dispatcher_t* dispatcher, std::string_view name,
                                        fuchsia_audio_device::DeviceType device_type,
                                        fuchsia_audio_device::DriverClient driver_client) {
-  ADR_LOG_CLASS(kLogObjectLifetimes);
+  ADR_LOG_STATIC(kLogObjectLifetimes);
 
   // The constructor is private, forcing clients to use Device::Create().
   class MakePublicCtor : public Device {
@@ -74,7 +74,7 @@ Device::Device(std::weak_ptr<DevicePresenceWatcher> presence_watcher,
       device_type_(device_type),
       driver_client_(std::move(driver_client)),
       token_id_(NextTokenId()) {
-  ADR_LOG_OBJECT(kLogObjectLifetimes);
+  ADR_LOG_METHOD(kLogObjectLifetimes);
   ++count_;
   LogObjectCounts();
 
@@ -88,18 +88,18 @@ Device::Device(std::weak_ptr<DevicePresenceWatcher> presence_watcher,
       ring_buffer_handler_ = {this, "RingBuffer"};
       break;
     case fuchsia_audio_device::DeviceType::kCodec:
-      ADR_LOG_OBJECT(kLogObjectLifetimes) << "Codec support is not yet implemented";
+      ADR_LOG_METHOD(kLogObjectLifetimes) << "Codec support is not yet implemented";
       return;
     case fuchsia_audio_device::DeviceType::kComposite:
-      ADR_WARN_OBJECT() << "Composite device type is not yet implemented";
+      ADR_WARN_METHOD() << "Composite device type is not yet implemented";
       OnError(ZX_ERR_WRONG_TYPE);
       return;
     case fuchsia_audio_device::DeviceType::kDai:
-      ADR_WARN_OBJECT() << "Dai device type is not yet implemented";
+      ADR_WARN_METHOD() << "Dai device type is not yet implemented";
       OnError(ZX_ERR_WRONG_TYPE);
       return;
     default:
-      ADR_WARN_OBJECT() << "Unknown DeviceType" << device_type_;
+      ADR_WARN_METHOD() << "Unknown DeviceType" << device_type_;
       // Set device to error state
       OnError(ZX_ERR_WRONG_TYPE);
       return;
@@ -111,7 +111,7 @@ Device::Device(std::weak_ptr<DevicePresenceWatcher> presence_watcher,
 }
 
 Device::~Device() {
-  ADR_LOG_OBJECT(kLogObjectLifetimes);
+  ADR_LOG_METHOD(kLogObjectLifetimes);
   --count_;
   LogObjectCounts();
 }
@@ -120,18 +120,18 @@ Device::~Device() {
 template <>
 void Device::FidlErrorHandler<fuchsia_hardware_audio::RingBuffer>::on_fidl_error(
     fidl::UnbindInfo info) {
-  ADR_LOG_OBJECT(kLogRingBufferFidlResponses || kLogDeviceState) << "(RingBuffer)";
+  ADR_LOG_METHOD(kLogRingBufferFidlResponses || kLogDeviceState) << "(RingBuffer)";
 
   if (device_->state_ == State::Error) {
-    ADR_WARN_OBJECT() << "device already has an error; no device state to unwind";
+    ADR_WARN_METHOD() << "device already has an error; no device state to unwind";
     return;
   }
 
   if (!info.is_peer_closed() && !info.is_user_initiated()) {
-    ADR_WARN_OBJECT() << name_ << " disconnected: " << info.FormatDescription();
+    ADR_WARN_METHOD() << name_ << " disconnected: " << info.FormatDescription();
     device_->OnError(info.status());
   } else {
-    ADR_LOG_OBJECT(kLogRingBufferFidlResponses)
+    ADR_LOG_METHOD(kLogRingBufferFidlResponses)
         << name_ << " disconnected: " << info.FormatDescription();
     device_->DeviceDroppedRingBuffer();
   }
@@ -141,19 +141,19 @@ void Device::FidlErrorHandler<fuchsia_hardware_audio::RingBuffer>::on_fidl_error
 template <typename T>
 void Device::FidlErrorHandler<T>::on_fidl_error(fidl::UnbindInfo info) {
   if (!info.is_peer_closed() && !info.is_user_initiated() && !info.is_dispatcher_shutdown()) {
-    ADR_WARN_OBJECT() << name_ << " disconnected: " << info;
+    ADR_WARN_METHOD() << name_ << " disconnected: " << info;
     device_->OnError(info.status());
   } else {
-    ADR_LOG_OBJECT(kLogStreamConfigFidlResponses || kLogDeviceState || kLogObjectLifetimes)
+    ADR_LOG_METHOD(kLogStreamConfigFidlResponses || kLogDeviceState || kLogObjectLifetimes)
         << name_ << " disconnected: " << info;
   }
   device_->OnRemoval();
 }
 
 void Device::OnRemoval() {
-  ADR_LOG_OBJECT(kLogDeviceState);
+  ADR_LOG_METHOD(kLogDeviceState);
   if (state_ == State::Error) {
-    ADR_WARN_OBJECT() << "device already has an error; no device state to unwind";
+    ADR_WARN_METHOD() << "device already has an error; no device state to unwind";
     --unhealthy_count_;
   } else if (state_ != State::DeviceInitializing) {
     --initialized_count_;
@@ -170,7 +170,7 @@ void Device::OnRemoval() {
 }
 
 void Device::ForEachObserver(fit::function<void(std::shared_ptr<ObserverNotify>)> action) {
-  ADR_LOG_OBJECT(kLogNotifyMethods);
+  ADR_LOG_METHOD(kLogNotifyMethods);
   for (auto weak_obs = observers_.begin(); weak_obs < observers_.end(); ++weak_obs) {
     if (auto observer = weak_obs->lock(); observer) {
       action(observer);
@@ -180,9 +180,9 @@ void Device::ForEachObserver(fit::function<void(std::shared_ptr<ObserverNotify>)
 
 // Unwind any operational state or configuration the device might be in, and remove this device.
 void Device::OnError(zx_status_t error) {
-  ADR_LOG_OBJECT(kLogDeviceState);
+  ADR_LOG_METHOD(kLogDeviceState);
   if (state_ == State::Error) {
-    ADR_WARN_OBJECT() << "device already has an error; ignoring subsequent error (" << error << ")";
+    ADR_WARN_METHOD() << "device already has an error; ignoring subsequent error (" << error << ")";
     return;
   }
 
@@ -207,19 +207,20 @@ bool Device::IsFullyInitialized() {
   switch (device_type_) {
     case fuchsia_audio_device::DeviceType::kInput:
     case fuchsia_audio_device::DeviceType::kOutput:
-      return stream_config_properties_ && ring_buffer_format_sets_ &&  // signalprocessing_ &&
-             gain_state_ && plug_state_ && health_state_;
-    default:
+      return stream_config_properties_ && ring_buffer_format_sets_ && gain_state_ &&
+             plug_state_ &&  // signalprocessing_ &&
+             health_state_;
     case fuchsia_audio_device::DeviceType::kCodec:
-      ADR_WARN_OBJECT() << "Don't yet support Codec";
+      ADR_WARN_METHOD() << "Don't yet support Codec";
       return false;
     case fuchsia_audio_device::DeviceType::kComposite:
-      ADR_WARN_OBJECT() << "Don't yet support Composite";
+      ADR_WARN_METHOD() << "Don't yet support Composite";
       return false;
     case fuchsia_audio_device::DeviceType::kDai:
-      ADR_WARN_OBJECT() << "Don't yet support Dai";
+      ADR_WARN_METHOD() << "Don't yet support Dai";
       return false;
-      ADR_WARN_OBJECT() << "Invalid device_type_";
+    default:
+      ADR_WARN_METHOD() << "Invalid device_type_";
       return false;
   }
 }
@@ -227,18 +228,18 @@ bool Device::IsFullyInitialized() {
 // An initialization command returned a successful response. Is initialization complete?
 void Device::OnInitializationResponse() {
   if (state_ == State::Error) {
-    ADR_WARN_OBJECT() << "device has already encountered a problem; ignoring this";
+    ADR_WARN_METHOD() << "device has already encountered a problem; ignoring this";
     return;
   }
 
   if (state_ != State::DeviceInitializing) {
-    ADR_WARN_OBJECT() << "unexpected device initialization response when not Initializing";
+    ADR_WARN_METHOD() << "unexpected device initialization response when not Initializing";
   }
 
   switch (device_type_) {
     case fuchsia_audio_device::DeviceType::kInput:
     case fuchsia_audio_device::DeviceType::kOutput:
-      ADR_LOG_OBJECT(kLogDeviceInitializationProgress)
+      ADR_LOG_METHOD(kLogDeviceInitializationProgress)
           << " (RECEIVED|pending)"                                         //
           << "    " << (stream_config_properties_ ? "PROPS" : "props")     //
           << "    " << (ring_buffer_format_sets_ ? "FORMATS" : "formats")  //
@@ -250,7 +251,7 @@ void Device::OnInitializationResponse() {
     case fuchsia_audio_device::DeviceType::kComposite:
     case fuchsia_audio_device::DeviceType::kDai:
     default:
-      ADR_WARN_OBJECT() << "Invalid device_type_";
+      ADR_WARN_METHOD() << "Invalid device_type_";
       return;
   }
 
@@ -267,21 +268,21 @@ void Device::OnInitializationResponse() {
 }
 
 bool Device::SetControl(std::shared_ptr<ControlNotify> control_notify) {
-  ADR_LOG_OBJECT(kLogDeviceState || kLogNotifyMethods);
+  ADR_LOG_METHOD(kLogDeviceState || kLogNotifyMethods);
   FX_CHECK(state_ != State::DeviceInitializing);
 
   if (state_ == State::Error) {
-    ADR_WARN_OBJECT() << "device has an error; cannot set control";
+    ADR_WARN_METHOD() << "device has an error; cannot set control";
     return false;
   }
 
   if (GetControlNotify()) {
-    ADR_WARN_OBJECT() << "already controlled";
+    ADR_WARN_METHOD() << "already controlled";
     return false;
   }
 
   if (state_ != State::DeviceInitialized) {
-    ADR_WARN_OBJECT() << "wrong state for this call (" << state_ << ")";
+    ADR_WARN_METHOD() << "wrong state for this call (" << state_ << ")";
     return false;
   }
 
@@ -293,12 +294,12 @@ bool Device::SetControl(std::shared_ptr<ControlNotify> control_notify) {
 }
 
 bool Device::DropControl() {
-  ADR_LOG_OBJECT(kLogDeviceMethods || kLogNotifyMethods);
+  ADR_LOG_METHOD(kLogDeviceMethods || kLogNotifyMethods);
   FX_CHECK(state_ != State::DeviceInitializing);
 
   auto control_notify = GetControlNotify();
   if (!control_notify) {
-    ADR_LOG_OBJECT(kLogNotifyMethods) << "already not controlled";
+    ADR_LOG_METHOD(kLogNotifyMethods) << "already not controlled";
     return false;
   }
 
@@ -310,7 +311,7 @@ bool Device::DropControl() {
 }
 
 bool Device::AddObserver(std::shared_ptr<ObserverNotify> observer_to_add) {
-  ADR_LOG_OBJECT(kLogDeviceMethods || kLogNotifyMethods) << " (" << observer_to_add << ")";
+  ADR_LOG_METHOD(kLogDeviceMethods || kLogNotifyMethods) << " (" << observer_to_add << ")";
 
   FX_CHECK(state_ != State::DeviceInitializing);
 
@@ -354,7 +355,7 @@ bool Device::AddObserver(std::shared_ptr<ObserverNotify> observer_to_add) {
 
 // The Device dropped the driver RingBuffer FIDL. Notify any clients.
 void Device::DeviceDroppedRingBuffer() {
-  ADR_LOG_OBJECT(kLogDeviceState);
+  ADR_LOG_METHOD(kLogDeviceState);
 
   // This is distinct from DropRingBuffer in case we must notify our RingBuffer (via our Control).
   // We do so if we have 1) a Control and 2) a driver_format_ (thus a client-configured RingBuffer).
@@ -366,7 +367,7 @@ void Device::DeviceDroppedRingBuffer() {
 
 // Whether client- or device-originated, reset any state associated with an active RingBuffer.
 void Device::DropRingBuffer() {
-  ADR_LOG_OBJECT(kLogDeviceState);
+  ADR_LOG_METHOD(kLogDeviceState);
 
   // If we've already cleaned out any state with the underlying driver RingBuffer, then we're done.
   if (!ring_buffer_client_.is_valid()) {
@@ -390,22 +391,22 @@ void Device::DropRingBuffer() {
 }
 
 void Device::SetError(zx_status_t error) {
-  ADR_LOG_OBJECT(kLogDeviceState) << ": " << error;
+  ADR_LOG_METHOD(kLogDeviceState) << ": " << error;
   state_ = State::Error;
 }
 
 void Device::SetState(State state) {
   if (state_ == State::Error) {
-    ADR_WARN_OBJECT() << "device already has an error; ignoring this";
+    ADR_WARN_METHOD() << "device already has an error; ignoring this";
     return;
   }
 
-  ADR_LOG_OBJECT(kLogDeviceState) << state;
+  ADR_LOG_METHOD(kLogDeviceState) << state;
   state_ = state;
 }
 
 void Device::Initialize() {
-  ADR_LOG_OBJECT(kLogDeviceMethods);
+  ADR_LOG_METHOD(kLogDeviceMethods);
 
   if (device_type_ == fuchsia_audio_device::DeviceType::kInput ||
       device_type_ == fuchsia_audio_device::DeviceType::kOutput) {
@@ -425,14 +426,14 @@ void Device::Initialize() {
 template <typename ResultT>
 bool Device::LogResultError(const ResultT& result, const char* debug_context) {
   if (state_ == State::Error) {
-    ADR_WARN_OBJECT() << debug_context << ": device already has an error";
+    ADR_WARN_METHOD() << debug_context << ": device already has an error";
     return true;
   }
   if (!result.is_ok()) {
     if (result.error_value().is_framework_error()) {
       if (result.error_value().framework_error().is_canceled() ||
           result.error_value().framework_error().is_peer_closed()) {
-        ADR_LOG_OBJECT(kLogStreamConfigFidlResponses)
+        ADR_LOG_METHOD(kLogStreamConfigFidlResponses)
             << debug_context << ": will take no action on "
             << result.error_value().FormatDescription();
       } else {
@@ -453,12 +454,12 @@ bool Device::LogResultError(const ResultT& result, const char* debug_context) {
 template <typename ResultT>
 bool Device::LogResultFrameworkError(const ResultT& result, const char* debug_context) {
   if (state_ == State::Error) {
-    ADR_WARN_OBJECT() << "device already has an error; ignoring this";
+    ADR_WARN_METHOD() << "device already has an error; ignoring this";
     return true;
   }
   if (!result.is_ok()) {
     if (result.error_value().is_canceled() || result.error_value().is_peer_closed()) {
-      ADR_LOG_OBJECT(kLogStreamConfigFidlResponses) << debug_context << ": will take no action on "
+      ADR_LOG_METHOD(kLogStreamConfigFidlResponses) << debug_context << ": will take no action on "
                                                     << result.error_value().FormatDescription();
     } else {
       FX_LOGS(ERROR) << debug_context << " failed: " << result.error_value().status() << " ("
@@ -471,7 +472,7 @@ bool Device::LogResultFrameworkError(const ResultT& result, const char* debug_co
 }
 
 void Device::RetrieveStreamProperties() {
-  ADR_LOG_OBJECT(kLogStreamConfigFidlCalls);
+  ADR_LOG_METHOD(kLogStreamConfigFidlCalls);
 
   if (state_ == State::Error) {
     return;
@@ -524,7 +525,7 @@ void Device::SanitizeStreamPropertiesStrings(
 }
 
 void Device::RetrieveInitialRingBufferFormatSets() {
-  ADR_LOG_OBJECT(kLogStreamConfigFidlCalls);
+  ADR_LOG_METHOD(kLogStreamConfigFidlCalls);
 
   RetrieveRingBufferFormatSets(
       [this](std::vector<fuchsia_hardware_audio::SupportedFormats> ring_buffer_format_sets) {
@@ -554,7 +555,7 @@ void Device::RetrieveInitialRingBufferFormatSets() {
 void Device::RetrieveRingBufferFormatSets(
     fit::callback<void(std::vector<fuchsia_hardware_audio::SupportedFormats>)>
         ring_buffer_format_sets_callback) {
-  ADR_LOG_OBJECT(kLogRingBufferMethods);
+  ADR_LOG_METHOD(kLogRingBufferMethods);
 
   // TODO(https://fxbug.dev/42064765): handle command timeouts
 
@@ -580,7 +581,7 @@ void Device::RetrieveRingBufferFormatSets(
 }
 
 void Device::RetrieveGainState() {
-  ADR_LOG_OBJECT(kLogStreamConfigFidlCalls);
+  ADR_LOG_METHOD(kLogStreamConfigFidlCalls);
 
   if (state_ == State::Error) {
     return;
@@ -609,10 +610,10 @@ void Device::RetrieveGainState() {
         gain_state_->agc_enabled() = gain_state_->agc_enabled().value_or(false);
 
         if (!old_gain_state) {
-          ADR_LOG_CLASS(kLogStreamConfigFidlResponses) << "WatchGainState received initial value";
+          ADR_LOG_OBJECT(kLogStreamConfigFidlResponses) << "WatchGainState received initial value";
           OnInitializationResponse();
         } else {
-          ADR_LOG_CLASS(kLogStreamConfigFidlResponses) << "WatchGainState received update";
+          ADR_LOG_OBJECT(kLogStreamConfigFidlResponses) << "WatchGainState received update";
           ForEachObserver([gain_state = *gain_state_](auto obs) {
             obs->GainStateChanged({{
                 .gain_db = *gain_state.gain_db(),
@@ -627,7 +628,7 @@ void Device::RetrieveGainState() {
 }
 
 void Device::RetrieveStreamPlugState() {
-  ADR_LOG_OBJECT(kLogStreamConfigFidlCalls);
+  ADR_LOG_METHOD(kLogStreamConfigFidlCalls);
 
   if (state_ == State::Error) {
     return;
@@ -676,7 +677,7 @@ void Device::RetrieveStreamPlugState() {
 
 // TODO(https://fxbug.dev/42068381): Decide when we proactively call GetHealthState, if at all.
 void Device::RetrieveStreamHealthState() {
-  ADR_LOG_OBJECT(kLogStreamConfigFidlCalls);
+  ADR_LOG_METHOD(kLogStreamConfigFidlCalls);
 
   if (state_ == State::Error) {
     return;
@@ -715,7 +716,7 @@ void Device::RetrieveStreamHealthState() {
 // Required fields (guaranteed for the caller) include: token_id, device_type, device_name.
 // Other fields are required for some driver types but optional or absent for others.
 fuchsia_audio_device::Info Device::CreateDeviceInfo() {
-  ADR_LOG_OBJECT(kLogDeviceMethods);
+  ADR_LOG_METHOD(kLogDeviceMethods);
 
   auto info = fuchsia_audio_device::Info{{
       // Required for all device types:
@@ -754,14 +755,14 @@ fuchsia_audio_device::Info Device::CreateDeviceInfo() {
 }
 
 void Device::SetDeviceInfo() {
-  ADR_LOG_OBJECT(kLogDeviceMethods);
+  ADR_LOG_METHOD(kLogDeviceMethods);
 
   device_info_ = CreateDeviceInfo();
   ValidateDeviceInfo(*device_info_);
 }
 
 void Device::CreateDeviceClock() {
-  ADR_LOG_OBJECT(kLogDeviceMethods);
+  ADR_LOG_METHOD(kLogDeviceMethods);
   FX_CHECK(stream_config_properties_->clock_domain()) << "Clock domain is required";
 
   device_clock_ = RealClock::CreateFromMonotonic("'" + name_ + "' device clock",
@@ -773,7 +774,7 @@ void Device::CreateDeviceClock() {
 // Create a duplicate handle to our clock with limited rights. We can transfer it to a client who
 // can only read and duplicate. Specifically, they cannot change this clock's rate or offset.
 zx::result<zx::clock> Device::GetReadOnlyClock() const {
-  ADR_LOG_OBJECT(kLogDeviceMethods);
+  ADR_LOG_METHOD(kLogDeviceMethods);
 
   auto dupe_clock = device_clock_->DuplicateZxClockReadOnly();
   if (!dupe_clock) {
@@ -858,7 +859,7 @@ std::optional<fuchsia_hardware_audio::Format> Device::SupportedDriverFormatForCl
     return {};
   }
 
-  ADR_LOG_OBJECT(kLogRingBufferFidlResponseValues)
+  ADR_LOG_METHOD(kLogRingBufferFidlResponseValues)
       << "successful match for client format: " << channel_count << "-chan " << frame_rate << "hz "
       << client_sample_type << " (valid_bits " << static_cast<uint16_t>(best_valid_bits) << ")";
 
@@ -874,15 +875,15 @@ std::optional<fuchsia_hardware_audio::Format> Device::SupportedDriverFormatForCl
 }
 
 bool Device::SetGain(fuchsia_hardware_audio::GainState& gain_state) {
-  ADR_LOG_OBJECT(kLogStreamConfigFidlCalls);
+  ADR_LOG_METHOD(kLogStreamConfigFidlCalls);
   FX_CHECK(state_ != State::DeviceInitializing);
 
   if (state_ == State::Error) {
-    ADR_WARN_OBJECT() << "Device has previous error; cannot set gain";
+    ADR_WARN_METHOD() << "Device has previous error; cannot set gain";
     return false;
   }
   if (!GetControlNotify()) {
-    ADR_WARN_OBJECT() << "Device must be allocated before this method can be called";
+    ADR_WARN_METHOD() << "Device must be allocated before this method can be called";
     return false;
   }
 
@@ -890,7 +891,7 @@ bool Device::SetGain(fuchsia_hardware_audio::GainState& gain_state) {
   if (status.is_error()) {
     if (status.error_value().is_canceled()) {
       // These indicate that we are already shutting down, so they aren't error conditions.
-      ADR_LOG_OBJECT(kLogStreamConfigFidlResponses)
+      ADR_LOG_METHOD(kLogStreamConfigFidlResponses)
           << "SetGain response will take no action on error "
           << status.error_value().FormatDescription();
 
@@ -902,7 +903,7 @@ bool Device::SetGain(fuchsia_hardware_audio::GainState& gain_state) {
     return false;
   }
 
-  ADR_LOG_OBJECT(kLogStreamConfigFidlResponses) << " is_ok";
+  ADR_LOG_METHOD(kLogStreamConfigFidlResponses) << " is_ok";
 
   // We don't notify anyone - we wait for the driver to notify us via WatchGainState.
   return true;
@@ -928,7 +929,7 @@ std::shared_ptr<ControlNotify> Device::GetControlNotify() {
 bool Device::CreateRingBuffer(const fuchsia_hardware_audio::Format& format,
                               uint32_t requested_ring_buffer_bytes,
                               fit::callback<void(RingBufferInfo)> create_ring_buffer_callback) {
-  ADR_LOG_OBJECT(kLogRingBufferMethods);
+  ADR_LOG_METHOD(kLogRingBufferMethods);
   if (!ConnectRingBufferFidl(format)) {
     return false;
   }
@@ -943,7 +944,7 @@ bool Device::CreateRingBuffer(const fuchsia_hardware_audio::Format& format,
 }
 
 bool Device::ConnectRingBufferFidl(fuchsia_hardware_audio::Format driver_format) {
-  ADR_LOG_OBJECT(kLogRingBufferMethods || kLogRingBufferFidlCalls);
+  ADR_LOG_METHOD(kLogRingBufferMethods || kLogRingBufferFidlCalls);
 
   auto status = ValidateRingBufferFormat(driver_format);
   if (status != ZX_OK) {
@@ -1010,11 +1011,12 @@ bool Device::ConnectRingBufferFidl(fuchsia_hardware_audio::Format driver_format)
   active_channels_bitmask_ = (1 << *vmo_format_.channel_count()) - 1;
   SetActiveChannels(active_channels_bitmask_, [this](zx::result<zx::time> result) {
     if (result.is_ok()) {
-      ADR_LOG_CLASS(kLogRingBufferFidlResponses) << "RingBuffer/SetActiveChannels IS supported";
+      ADR_LOG_OBJECT(kLogRingBufferFidlResponses) << "RingBuffer/SetActiveChannels IS supported";
       return;
     }
     if (result.status_value() == ZX_ERR_NOT_SUPPORTED) {
-      ADR_LOG_CLASS(kLogRingBufferFidlResponses) << "RingBuffer/SetActiveChannels IS NOT supported";
+      ADR_LOG_OBJECT(kLogRingBufferFidlResponses)
+          << "RingBuffer/SetActiveChannels IS NOT supported";
       return;
     }
     ADR_WARN_OBJECT() << "RingBuffer/SetActiveChannels returned error: " << result.status_string();
@@ -1026,7 +1028,7 @@ bool Device::ConnectRingBufferFidl(fuchsia_hardware_audio::Format driver_format)
 }
 
 void Device::RetrieveRingBufferProperties() {
-  ADR_LOG_OBJECT(kLogRingBufferMethods || kLogRingBufferFidlCalls);
+  ADR_LOG_METHOD(kLogRingBufferMethods || kLogRingBufferFidlCalls);
 
   ring_buffer_client_->GetProperties().Then(
       [this](fidl::Result<fuchsia_hardware_audio::RingBuffer::GetProperties>& result) {
@@ -1049,7 +1051,7 @@ void Device::RetrieveRingBufferProperties() {
 }
 
 void Device::RetrieveDelayInfo() {
-  ADR_LOG_OBJECT(kLogRingBufferMethods || kLogRingBufferFidlCalls);
+  ADR_LOG_METHOD(kLogRingBufferMethods || kLogRingBufferFidlCalls);
   FX_CHECK(ring_buffer_client_.is_valid());
 
   ring_buffer_client_->WatchDelayInfo().Then(
@@ -1093,7 +1095,7 @@ void Device::RetrieveDelayInfo() {
 }
 
 void Device::GetVmo(uint32_t min_frames, uint32_t position_notifications_per_ring) {
-  ADR_LOG_OBJECT(kLogRingBufferMethods || kLogRingBufferFidlCalls);
+  ADR_LOG_METHOD(kLogRingBufferMethods || kLogRingBufferFidlCalls);
   FX_CHECK(ring_buffer_client_.is_valid());
   FX_CHECK(driver_format_);
 
@@ -1122,9 +1124,9 @@ void Device::GetVmo(uint32_t min_frames, uint32_t position_notifications_per_rin
 
 // RingBuffer FIDL successful-response handlers.
 void Device::CheckForRingBufferReady() {
-  ADR_LOG_OBJECT(kLogRingBufferFidlResponses);
+  ADR_LOG_METHOD(kLogRingBufferFidlResponses);
   if (state_ == State::Error) {
-    ADR_WARN_OBJECT() << "device has previous error; cannot CheckForRingBufferReady";
+    ADR_WARN_METHOD() << "device has previous error; cannot CheckForRingBufferReady";
     return;
   }
 
@@ -1140,7 +1142,7 @@ void Device::CheckForRingBufferReady() {
 
   auto ref_clock = GetReadOnlyClock();
   if (!ref_clock.is_ok()) {
-    ADR_WARN_OBJECT() << "reference clock is not ok";
+    ADR_WARN_METHOD() << "reference clock is not ok";
     return;
   }
 
@@ -1170,7 +1172,7 @@ void Device::CheckForRingBufferReady() {
 void Device::SetActiveChannels(
     uint64_t channel_bitmask,
     fit::callback<void(zx::result<zx::time>)> set_active_channels_callback) {
-  ADR_LOG_OBJECT(kLogRingBufferFidlCalls);
+  ADR_LOG_METHOD(kLogRingBufferFidlCalls);
   FX_CHECK(ring_buffer_client_.is_valid());
 
   // If we already know this device doesn't support SetActiveChannels, do nothing.
@@ -1206,7 +1208,7 @@ void Device::SetActiveChannels(
 }
 
 void Device::StartRingBuffer(fit::callback<void(zx::result<zx::time>)> start_callback) {
-  ADR_LOG_OBJECT(kLogRingBufferFidlCalls);
+  ADR_LOG_METHOD(kLogRingBufferFidlCalls);
   FX_CHECK(ring_buffer_client_.is_valid());
 
   ring_buffer_client_->Start().Then(
@@ -1225,7 +1227,7 @@ void Device::StartRingBuffer(fit::callback<void(zx::result<zx::time>)> start_cal
 }
 
 void Device::StopRingBuffer(fit::callback<void(zx_status_t)> stop_callback) {
-  ADR_LOG_OBJECT(kLogRingBufferFidlCalls);
+  ADR_LOG_METHOD(kLogRingBufferFidlCalls);
   FX_CHECK(ring_buffer_client_.is_valid());
 
   ring_buffer_client_->Stop().Then(
@@ -1246,7 +1248,7 @@ void Device::StopRingBuffer(fit::callback<void(zx_status_t)> stop_callback) {
 // Uses the VMO format and ring buffer properties, to set bytes_per_frame_,
 // requested_ring_buffer_frames_, ring_buffer_consumer_bytes_ and ring_buffer_producer_bytes_.
 void Device::CalculateRequiredRingBufferSizes() {
-  ADR_LOG_OBJECT(kLogRingBufferMethods);
+  ADR_LOG_METHOD(kLogRingBufferMethods);
 
   FX_CHECK(vmo_format_.channel_count());
   FX_CHECK(vmo_format_.sample_type());
@@ -1294,15 +1296,15 @@ void Device::CalculateRequiredRingBufferSizes() {
 
   // TODO(https://fxbug.dev/42069012): validate this case; we don't surface an error to the caller.
   if (requested_ring_buffer_frames_ > std::numeric_limits<uint32_t>::max()) {
-    ADR_WARN_OBJECT() << "requested_ring_buffer_frames_ cannot exceed uint32_t::max()";
+    ADR_WARN_METHOD() << "requested_ring_buffer_frames_ cannot exceed uint32_t::max()";
     requested_ring_buffer_frames_ = std::numeric_limits<uint32_t>::max();
   }
 }
 
 // TODO(https://fxbug.dev/42069013): implement, via RingBuffer/WatchClockRecoveryPositionInfo.
-void Device::RecoverDeviceClockFromPositionInfo() { ADR_LOG_OBJECT(kLogRingBufferMethods); }
+void Device::RecoverDeviceClockFromPositionInfo() { ADR_LOG_METHOD(kLogRingBufferMethods); }
 
 // TODO(https://fxbug.dev/42069013): implement this.
-void Device::StopDeviceClockRecovery() { ADR_LOG_OBJECT(kLogRingBufferMethods); }
+void Device::StopDeviceClockRecovery() { ADR_LOG_METHOD(kLogRingBufferMethods); }
 
 }  // namespace media_audio
