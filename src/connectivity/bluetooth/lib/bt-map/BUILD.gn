@@ -12,8 +12,11 @@ rustc_library("bt-map") {
 
   deps = [
     "//src/connectivity/bluetooth/lib/bt-obex/objects",
+    "//src/connectivity/bluetooth/lib/packet-encoding",
+    "//third_party/rust_crates:bitflags",
     "//third_party/rust_crates:chrono",
     "//third_party/rust_crates:hex",
+    "//third_party/rust_crates:thiserror",
     "//third_party/rust_crates:tracing",
     "//third_party/rust_crates:xml-rs",
   ]

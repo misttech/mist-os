@@ -25,7 +25,7 @@ impl From<bredr::ConnectParameters> for TransportType {
 
 /// The Attribute ID associated with the GoepL2capPsm attribute.
 /// Defined in https://www.bluetooth.com/specifications/assigned-numbers/service-discovery
-const GOEP_L2CAP_PSM_ATTRIBUTE: u16 = 0x0200;
+pub const GOEP_L2CAP_PSM_ATTRIBUTE: u16 = 0x0200;
 
 /// Returns true if the provided `protocol` is OBEX.
 ///

@@ -14,6 +14,8 @@ use xml::reader::{ParserConfig, XmlEvent};
 use xml::writer::{EmitterConfig, XmlEvent as XmlWriteEvent};
 use xml::EventWriter;
 
+use crate::MessageType;
+
 // From MAP v1.4.2 section 3.1.6 Message-Listing Object:
 //
 // <!DTD for the MAP Messages-Listing Object-->
@@ -82,43 +84,6 @@ const ATTACHMENT_MIME_TYPES_ATTR: &str = "attachment_mime_types";
 /// The ISO 8601 time format used in the Time Header packet.
 /// The format is YYYYMMDDTHHMMSS where "T" delimits the date from the time.
 const ISO_8601_TIME_FORMAT: &str = "%Y%m%dT%H%M%S";
-
-#[derive(Clone, Debug, PartialEq)]
-pub enum MessageType {
-    Email,
-    SmsGsm,
-    SmsCdma,
-    Mms,
-    // Note: `Im` is only available in v1.1 msg-listing while the remaining
-    // types are available in v1.0 as well.
-    Im,
-}
-
-impl fmt::Display for MessageType {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Email => write!(f, "EMAIL"),
-            Self::SmsGsm => write!(f, "SMS_GSM"),
-            Self::SmsCdma => write!(f, "SMS_CDMA"),
-            Self::Mms => write!(f, "MMS"),
-            Self::Im => write!(f, "IM"),
-        }
-    }
-}
-
-impl FromStr for MessageType {
-    type Err = Error;
-    fn from_str(src: &str) -> Result<Self, Self::Err> {
-        match src {
-            "EMAIL" => Ok(Self::Email),
-            "SMS_GSM" => Ok(Self::SmsGsm),
-            "SMS_CDMA" => Ok(Self::SmsCdma),
-            "MMS" => Ok(Self::Mms),
-            "IM" => Ok(Self::Im),
-            v => Err(Error::invalid_data(v)),
-        }
-    }
-}
 
 #[derive(Debug, PartialEq)]
 pub enum ReceptionStatus {

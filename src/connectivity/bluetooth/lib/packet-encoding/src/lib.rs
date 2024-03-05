@@ -90,16 +90,53 @@ pub trait Encodable: ::core::marker::Sized {
     fn encode(&self, buf: &mut [u8]) -> ::core::result::Result<(), Self::Error>;
 }
 
+#[macro_export]
+macro_rules! codable_as_bitmask {
+    ($type:ty, $raw_type:ty, $error_type:ident, $error_path:ident) => {
+        impl $type {
+            pub fn from_bits(
+                v: $raw_type,
+            ) -> impl ::std::iter::Iterator<Item = ::core::result::Result<$type, $error_type>> {
+                (0..<$raw_type>::BITS).map(|bit| 1 << bit).filter(move |val| (v & val) != 0).map(
+                    |val| {
+                        ::std::convert::TryInto::<$type>::try_into(val)
+                            .map_err(|_| $error_type::$error_path)
+                    },
+                )
+            }
+
+            pub fn to_bits<'a>(
+                mut it: impl ::std::iter::Iterator<Item = &'a $type>,
+            ) -> ::core::result::Result<$raw_type, $error_type> {
+                it.try_fold(0, |acc, item| {
+                    let v = ::std::convert::Into::<$raw_type>::into(item);
+                    if v == 0 {
+                        return ::core::result::Result::Err($error_type::$error_path);
+                    }
+                    if (v as f64).log2().ceil() != (v as f64).log2().floor() {
+                        return ::core::result::Result::Err($error_type::$error_path);
+                    }
+                    ::core::result::Result::Ok(acc | v)
+                })
+            }
+        }
+    };
+}
+
 #[cfg(test)]
 #[no_implicit_prelude]
 mod test {
     use ::assert_matches::assert_matches;
+    use ::core::result::Result;
     use ::core::{
         assert, assert_eq,
         convert::{From, TryFrom},
         option::Option::Some,
         panic,
     };
+    use ::std::collections::HashSet;
+    use ::std::iter::{IntoIterator, Iterator};
+    use ::std::vec;
 
     #[derive(Debug, PartialEq)]
     pub(crate) enum TestError {
@@ -108,11 +145,21 @@ mod test {
 
     decodable_enum! {
         pub(crate) enum TestEnum<u16, TestError, OutOfRange> {
-            One = 1,
-            Two = 2,
-            Max = 65535,
+            One = 0x0001,
+            Two = 0x0002,
+            Max = 0xFFFF,
         }
     }
+    codable_as_bitmask!(TestEnum, u16, TestError, OutOfRange);
+
+    decodable_enum! {
+        pub(crate) enum TestEnum2<u16, TestError, OutOfRange> {
+            One = 0x0001,  // bit 0
+            Two = 0x0002,  // bit 1
+            Big = 0x4000,  // bit 14
+        }
+    }
+    codable_as_bitmask!(TestEnum2, u16, TestError, OutOfRange);
 
     #[test]
     fn try_from_success() {
@@ -150,6 +197,9 @@ mod test {
         assert_eq!(1, v[0]);
         assert_eq!(2, v[1]);
         assert_eq!(65535, v[2]);
+
+        let v = TestEnum2::VALUES.to_vec();
+        assert_eq!(v, vec![1, 2, 16384]);
     }
 
     #[test]
@@ -166,5 +216,43 @@ mod test {
         assert_eq!("One", TestEnum::One.name());
         assert_eq!("Two", TestEnum::Two.name());
         assert_eq!("Max", TestEnum::Max.name());
+        assert_eq!("Big", TestEnum2::Big.name());
+    }
+
+    #[test]
+    fn as_bitmask() {
+        let one_and_big = 0x4001;
+
+        let enums: HashSet<TestEnum2> = TestEnum2::from_bits(one_and_big)
+            .collect::<Result<HashSet<_>, _>>()
+            .expect("should not fail");
+
+        assert_eq!(2, enums.len());
+
+        let expected_enums = [TestEnum2::One, TestEnum2::Big].into_iter().collect();
+
+        assert_eq!(enums, expected_enums);
+
+        let all = TestEnum2::VARIANTS;
+        let value = TestEnum2::to_bits(all.iter()).expect("should work");
+        assert_eq!(0x4003, value);
+    }
+
+    #[test]
+    fn bitmask_errors() {
+        // Max value has both bit one and two set which are valid TestEnum variants.
+        // The rest of the set bits are not valid TestEnum variants.
+        let max = 65535;
+        // Collecting as result shows failure.
+        let res: Result<HashSet<TestEnum>, _> = TestEnum::from_bits(max).collect();
+        let _ = res.expect_err("should have failed");
+        // Collecting as vector of results show only 2 "bit" values were valid enums.
+        let res: vec::Vec<Result<TestEnum, TestError>> = TestEnum::from_bits(max).collect();
+        let valid: vec::Vec<TestEnum> = res.into_iter().filter_map(|v| v.ok()).collect();
+        assert_eq!(valid.len(), 2);
+
+        // Fails because TestEnum::Max variant is not a bitwise flag value.
+        let all = TestEnum::VARIANTS;
+        let _ = TestEnum::to_bits(all.iter()).expect_err("should fail");
     }
 }

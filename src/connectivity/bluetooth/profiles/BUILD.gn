@@ -12,6 +12,7 @@ group("profiles") {
     "bt-device-id",
     "bt-hfp-audio-gateway",
     "bt-hfp-hands-free",
+    "bt-map-mce",
     "bt-peripheral-hub",
     "bt-rfcomm",
   ]
@@ -27,6 +28,7 @@ group("tests") {
     "bt-fastpair-provider:tests",
     "bt-hfp-audio-gateway:tests",
     "bt-hfp-hands-free:tests",
+    "bt-map-mce:tests",
     "bt-peripheral-hub:tests",
     "bt-rfcomm:tests",
     "tests",
