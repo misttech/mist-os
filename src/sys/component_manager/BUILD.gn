@@ -233,6 +233,7 @@ rustc_binary("bin") {
     "src/model/routing/router.rs",
     "src/model/routing/service.rs",
     "src/model/routing_fns.rs",
+    "src/model/start.rs",
     "src/model/storage/admin_protocol.rs",
     "src/model/storage/mod.rs",
     "src/model/testing/echo_service.rs",

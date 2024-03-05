@@ -3,12 +3,14 @@
 // found in the LICENSE file.
 
 use {
-    crate::capability::{CapabilityProvider, FrameworkCapability, InternalCapabilityProvider},
-    crate::model::{
-        actions::{ActionSet, StopAction},
-        component::{IncomingCapabilities, StartReason, WeakComponentInstance},
-        error::ModelError,
-        model::Model,
+    crate::{
+        capability::{CapabilityProvider, FrameworkCapability, InternalCapabilityProvider},
+        model::{
+            actions::{ActionSet, StopAction},
+            component::{IncomingCapabilities, StartReason, WeakComponentInstance},
+            error::ModelError,
+            model::Model,
+        },
     },
     ::routing::capability_source::InternalCapability,
     async_trait::async_trait,
@@ -20,7 +22,10 @@ use {
     futures::prelude::*,
     lazy_static::lazy_static,
     moniker::{ChildName, Moniker, MonikerBase, MonikerError},
-    std::sync::{Arc, Weak},
+    std::{
+        convert::TryFrom,
+        sync::{Arc, Weak},
+    },
     tracing::warn,
 };
 

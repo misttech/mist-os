@@ -31,6 +31,7 @@ use {
             RoutingError,
         },
         routing_fns::route_fn,
+        start::Start,
         token::{InstanceToken, InstanceTokenState},
     },
     crate::sandbox_util::DictExt,
@@ -1124,11 +1125,7 @@ impl ComponentInstance {
         let f = async move {
             let futures: Vec<_> = instances_to_bind
                 .iter()
-                .map(|component| async move {
-                    component
-                        .start(&StartReason::Eager, None, IncomingCapabilities::default())
-                        .await
-                })
+                .map(|component| async move { component.ensure_started(&StartReason::Eager).await })
                 .collect();
             join_all(futures).await.into_iter().fold(Ok(()), |acc, r| acc.and_then(|_| r))?;
             Ok(())

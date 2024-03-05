@@ -6,10 +6,7 @@ use {
     crate::{
         capability::{CapabilityProvider, CapabilitySource},
         model::{
-            component::{
-                ComponentInstance, ExtendedInstance, IncomingCapabilities, StartReason,
-                WeakComponentInstance,
-            },
+            component::{ComponentInstance, ExtendedInstance, StartReason, WeakComponentInstance},
             error::{ModelError, OpenError},
             routing::{
                 providers::{
@@ -22,6 +19,7 @@ use {
                 },
                 RouteSource,
             },
+            start::Start,
             storage::{self, BackingDirectoryInfo},
         },
     },
@@ -233,14 +231,10 @@ impl<'a> OpenRequest<'a> {
                 };
 
                 source_component_instance
-                    .start(
-                        &StartReason::AccessCapability {
-                            target: target.moniker.clone(),
-                            name: capability.source_name().clone(),
-                        },
-                        None,
-                        IncomingCapabilities::default(),
-                    )
+                    .ensure_started(&StartReason::AccessCapability {
+                        target: target.moniker.clone(),
+                        name: capability.source_name().clone(),
+                    })
                     .await?;
 
                 // If there is an existing collection service directory, provide it.

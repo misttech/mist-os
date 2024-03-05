@@ -5,17 +5,17 @@ use {
     crate::{
         capability::CapabilityProvider,
         model::{
-            component::{IncomingCapabilities, StartReason, WeakComponentInstance},
+            component::{StartReason, WeakComponentInstance},
             error::{CapabilityProviderError, ComponentProviderError},
             hooks::{CapabilityReceiver, Event, EventPayload},
+            start::Start,
         },
     },
     ::routing::path::PathBufExt,
     async_trait::async_trait,
     clonable_error::ClonableError,
     cm_types::{Name, Path},
-    cm_util::channel,
-    cm_util::TaskGroup,
+    cm_util::{channel, TaskGroup},
     fidl::endpoints::ServerEnd,
     fidl_fuchsia_component_sandbox as fsandbox, fidl_fuchsia_io as fio, fuchsia_zircon as zx,
     sandbox::Message,
@@ -57,14 +57,10 @@ impl CapabilityProvider for DefaultComponentCapabilityProvider {
         let source =
             self.source.upgrade().map_err(|_| ComponentProviderError::SourceInstanceNotFound)?;
         source
-            .start(
-                &StartReason::AccessCapability {
-                    target: self.target.moniker.clone(),
-                    name: self.name.clone(),
-                },
-                None,
-                IncomingCapabilities::default(),
-            )
+            .ensure_started(&StartReason::AccessCapability {
+                target: self.target.moniker.clone(),
+                name: self.name.clone(),
+            })
             .await
             .map_err(Into::<ComponentProviderError>::into)?;
 

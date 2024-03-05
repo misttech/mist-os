@@ -623,9 +623,13 @@ impl<T: Send + Sync + 'static> DirectoryEntry for ServiceInstanceDirectoryEntry<
 mod tests {
     use {
         super::*,
-        crate::model::{
-            component::{IncomingCapabilities, StartReason},
-            testing::routing_test_helpers::{RoutingTest, RoutingTestBuilder},
+        crate::{
+            capability::CapabilitySource,
+            model::{
+                component::StartReason,
+                start::Start,
+                testing::routing_test_helpers::{RoutingTest, RoutingTestBuilder},
+            },
         },
         ::routing::{
             capability_source::{ComponentCapability, FilteredAggregateCapabilityRouteData},
@@ -1258,10 +1262,7 @@ mod tests {
 
         // Test that starting an instance results in the collection service directory adding the
         // relevant instances.
-        foo_component
-            .start(&StartReason::Eager, None, IncomingCapabilities::default())
-            .await
-            .unwrap();
+        foo_component.ensure_started(&StartReason::Eager).await.unwrap();
         let entries = wait_for_dir_content_change(&dir_proxy, entries).await;
         assert_eq!(entries.len(), 1);
 
@@ -1269,10 +1270,7 @@ mod tests {
             root.find_and_maybe_resolve(&vec!["coll2:baz"].try_into().unwrap()).await.unwrap();
 
         // Test with second collection
-        baz_component
-            .start(&StartReason::Eager, None, IncomingCapabilities::default())
-            .await
-            .unwrap();
+        baz_component.ensure_started(&StartReason::Eager).await.unwrap();
         let entries = wait_for_dir_content_change(&dir_proxy, entries).await;
         assert_eq!(entries.len(), 3);
 
@@ -1280,10 +1278,7 @@ mod tests {
             root.find_and_maybe_resolve(&vec!["static_a"].try_into().unwrap()).await.unwrap();
 
         // Test with static child
-        static_a_component
-            .start(&StartReason::Eager, None, IncomingCapabilities::default())
-            .await
-            .unwrap();
+        static_a_component.ensure_started(&StartReason::Eager).await.unwrap();
         let entries = wait_for_dir_content_change(&dir_proxy, entries).await;
         assert_eq!(entries.len(), 4);
     }

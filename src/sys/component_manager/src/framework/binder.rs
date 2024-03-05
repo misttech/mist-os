@@ -6,9 +6,10 @@ use {
     crate::{
         capability::{CapabilityProvider, FrameworkCapability, InternalCapabilityProvider},
         model::{
-            component::{IncomingCapabilities, StartReason, WeakComponentInstance},
+            component::{StartReason, WeakComponentInstance},
             error::ModelError,
             routing::report_routing_failure,
+            start::Start,
         },
     },
     ::routing::RouteRequest,
@@ -56,7 +57,7 @@ impl BinderCapabilityProvider {
             target: self.target.moniker.clone(),
             name: BINDER_SERVICE.clone(),
         };
-        match source.start(&start_reason, None, IncomingCapabilities::default()).await {
+        match source.ensure_started(&start_reason).await {
             Ok(_) => {
                 source.scope_to_runtime(server_end).await;
             }
