@@ -3,6 +3,9 @@
 # found in the LICENSE file.
 
 import("//build/python/python_mobly_test.gni")
+import("//build/testing/environments.gni")
+
+assert(is_host, "Python E2E tests are host-only")
 
 python_mobly_test("lacewing") {
   main_source = "fastboot.py"
@@ -13,4 +16,6 @@ python_mobly_test("lacewing") {
 
   # fuchsia-controller is the preferred transport when sl4f isn't needed.
   transport = "fuchsia-controller"
+
+  environments = [ vim3_env ]
 }
