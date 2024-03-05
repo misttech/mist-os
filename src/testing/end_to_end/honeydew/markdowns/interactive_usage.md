@@ -42,13 +42,14 @@ in interactive python terminal, you need to run the below commands.
 >>> import os
 >>> FUCHSIA_ROOT = os.environ.get("FUCHSIA_DIR")
 >>> FFX_BIN = f"{FUCHSIA_ROOT}/.jiri_root/bin/ffx"
+>>> FFX_PLUGINS_PATH=f"{FUCHSIA_ROOT}/out/default/host-tools"
 >>> from honeydew.transports import ffx
 >>> ffx_config = ffx.FfxConfig()
->>> ffx_config.setup(binary_path=FFX_BIN, isolate_dir=None, logs_dir="/tmp/logs/honeydew/", logs_level="debug", enable_mdns=True)
+>>> ffx_config.setup(binary_path=FFX_BIN, isolate_dir=None, logs_dir="/tmp/logs/honeydew/", logs_level="debug", enable_mdns=True, subtools_search_path=FFX_PLUGINS_PATH)
 
 # Create Honeydew device object for a local device
 >>> import honeydew
-emu = honeydew.create_device("fuchsia-emulator", transport=honeydew.honeydew.typing.custom_types.TRANSPORT.SL4F, ffx_config=ffx_config.get_config())
+>>> emu = honeydew.create_device("fuchsia-emulator", transport=honeydew.typing.custom_types.TRANSPORT.SL4F, ffx_config=ffx_config.get_config())
 # Note - Depending on whether you want to use SL4F or Fuchsia-Controller as a primary transport to perform the host-(fuchsia) target communications, set `transport` variable accordingly
 
 # Create Honeydew device object for a remote/wfh device
