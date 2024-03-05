@@ -8,6 +8,7 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 
 use fuchsia_zircon::{self as zx, AsHandleRef, MessageBuf, MessageBufEtc};
+use futures::ready;
 
 use crate::{OnSignals, RWHandle, ReadableHandle as _};
 
@@ -68,6 +69,7 @@ impl Channel {
         bytes: &mut Vec<u8>,
         handles: &mut Vec<zx::Handle>,
     ) -> Poll<Result<(), zx::Status>> {
+        ready!(self.0.poll_readable(cx))?;
         let res = self.0.get_ref().read_split(bytes, handles);
         if res == Err(zx::Status::SHOULD_WAIT) {
             self.0.need_readable(cx)?;
@@ -87,6 +89,7 @@ impl Channel {
         bytes: &mut Vec<u8>,
         handles: &mut Vec<zx::HandleInfo>,
     ) -> Poll<Result<(), zx::Status>> {
+        ready!(self.0.poll_readable(cx))?;
         let res = self.0.get_ref().read_etc_split(bytes, handles);
         if res == Err(zx::Status::SHOULD_WAIT) {
             self.0.need_readable(cx)?;
@@ -196,9 +199,8 @@ mod tests {
     use super::*;
     use crate::TestExecutor;
     use fuchsia_zircon::{self as zx};
-    use futures::task::{waker, ArcWake};
     use pin_utils::pin_mut;
-    use std::{future::poll_fn, mem, pin::pin, sync::Arc};
+    use std::mem;
 
     #[test]
     fn can_receive() {
@@ -282,35 +284,5 @@ mod tests {
         pin_mut!(receiver);
 
         assert!(exec.run_until_stalled(&mut receiver).is_pending());
-    }
-
-    #[test]
-    fn test_always_polls_channel() {
-        let mut exec = TestExecutor::new();
-
-        let (rx, tx) = zx::Channel::create();
-        let rx_channel = Channel::from_channel(rx);
-
-        let mut fut = pin!(poll_fn(|cx| {
-            let mut bytes = Vec::with_capacity(64);
-            let mut handles = Vec::new();
-            rx_channel.read(cx, &mut bytes, &mut handles)
-        }));
-
-        assert_eq!(exec.run_until_stalled(&mut fut), Poll::Pending);
-
-        tx.write(b"hello", &mut []).expect("write failed");
-
-        struct Waker;
-        impl ArcWake for Waker {
-            fn wake_by_ref(_arc_self: &Arc<Self>) {}
-        }
-
-        // Poll the future directly which guarantees the port notification for the write hasn't
-        // arrived.
-        assert_eq!(
-            fut.poll(&mut Context::from_waker(&waker(Arc::new(Waker)))),
-            Poll::Ready(Ok(()))
-        );
     }
 }

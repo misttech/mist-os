@@ -57,9 +57,8 @@ impl PacketReceiver for OnSignalsReceiver {
 /// A future that completes when some set of signals become available on a Handle.
 #[must_use = "futures do nothing unless polled"]
 pub struct OnSignals<'a> {
-    handle: zx::HandleRef<'a>,
-    signals: zx::Signals,
-    registration: Option<ReceiverRegistration<OnSignalsReceiver>>,
+    state: Result<ReceiverRegistration<OnSignalsReceiver>, zx::Status>,
+    handle: Option<(zx::HandleRef<'a>, EHandle)>,
 }
 
 impl<'a> OnSignals<'a> {
@@ -75,18 +74,23 @@ impl<'a> OnSignals<'a> {
     /// resulting OnSignals is tied to the lifetime of the HandleRef itself and not the handle it
     /// refers to. Use this instead when you need to pass a HandleRef.
     pub fn from_ref(handle: zx::HandleRef<'a>, signals: zx::Signals) -> Self {
-        // We don't register for the signals until first polled.  When we are first polled, we'll
-        // check to see if the signals are set and if they are, we're done.  If they aren't, we then
-        // register for an asynchronous notification via the port.
-        //
-        // We could change the code to register for the asynchronous notification here, but then
-        // when first polled, if the notification hasn't arrived, we'll still check to see if the
-        // signals are set (see below for the reason why).  Given that the time between construction
-        // and when we first poll is typically small, registering here probably won't make much
-        // difference (and on a single-threaded executor, a notification is unlikely to be processed
-        // before the first poll anyway).  The way we have it now means we don't have to register at
-        // all if the signals are already set, which will be a win some of the time.
-        OnSignals { handle, signals, registration: None }
+        let ehandle = EHandle::local();
+        let receiver = ehandle.register_receiver(Arc::new(OnSignalsReceiver {
+            maybe_signals: AtomicUsize::new(0),
+            task: AtomicWaker::new(),
+        }));
+
+        let res = handle.wait_async_handle(
+            receiver.port(),
+            receiver.key(),
+            signals,
+            zx::WaitAsyncOpts::empty(),
+        );
+
+        OnSignals {
+            state: res.map(|()| receiver).map_err(Into::into),
+            handle: Some((handle, ehandle)),
+        }
     }
 
     /// This function allows the `OnSignals` object to live for the `'static` lifetime, at the cost
@@ -107,63 +111,18 @@ impl<'a> OnSignals<'a> {
     /// Note that `OnSignals` will not fire if the handle that was used to create it is dropped or
     /// transferred to another process.
     // TODO(https://fxbug.dev/42182035): Try to remove this footgun.
-    pub fn extend_lifetime(mut self) -> LeakedOnSignals {
-        match self.registration.take() {
-            Some(r) => LeakedOnSignals { registration: Ok(r) },
-            None => LeakedOnSignals { registration: self.register() },
-        }
-    }
-
-    fn register(&self) -> Result<ReceiverRegistration<OnSignalsReceiver>, zx::Status> {
-        let registration = EHandle::local().register_receiver(Arc::new(OnSignalsReceiver {
-            maybe_signals: AtomicUsize::new(0),
-            task: AtomicWaker::new(),
-        }));
-
-        self.handle.wait_async_handle(
-            registration.port(),
-            registration.key(),
-            self.signals,
-            zx::WaitAsyncOpts::empty(),
-        )?;
-
-        Ok(registration)
+    pub fn extend_lifetime(mut self) -> OnSignals<'static> {
+        OnSignals { state: std::mem::replace(&mut self.state, Err(zx::Status::OK)), handle: None }
     }
 }
+
+impl Unpin for OnSignals<'_> {}
 
 impl Future for OnSignals<'_> {
     type Output = Result<zx::Signals, zx::Status>;
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        match &self.registration {
-            None => match self.handle.wait_handle(self.signals, zx::Time::INFINITE_PAST) {
-                Ok(signals) => Poll::Ready(Ok(signals)),
-                Err(zx::Status::TIMED_OUT) => {
-                    let registration = self.register()?;
-                    registration.task.register(cx.waker());
-                    self.registration = Some(registration);
-                    Poll::Pending
-                }
-                Err(e) => Poll::Ready(Err(e)),
-            },
-            Some(r) => match r.receiver().get_signals(cx) {
-                Poll::Ready(signals) => Poll::Ready(Ok(signals)),
-                Poll::Pending => {
-                    // We haven't received a notification for the signals, but we still want to poll
-                    // the kernel in case the notification hasn't been processed yet by the
-                    // executor.  This behaviour is relied upon in some cases: in Component Manager,
-                    // in some shutdown paths, it wants to drain and process all messages in
-                    // channels before it closes them.  There is no other reliable way to flush a
-                    // pending notification (particularly on a multi-threaded executor).  This will
-                    // incur a small performance penalty in the case that this future has been
-                    // polled when no notification was actually received (such as can be the case
-                    // with some futures combinators).
-                    match self.handle.wait_handle(self.signals, zx::Time::INFINITE_PAST) {
-                        Ok(signals) => Poll::Ready(Ok(signals)),
-                        Err(_) => Poll::Pending,
-                    }
-                }
-            },
-        }
+        let reg = self.state.as_mut().map_err(|e| mem::replace(e, zx::Status::OK))?;
+        reg.receiver().get_signals(cx).map(Ok)
     }
 }
 
@@ -175,39 +134,21 @@ impl fmt::Debug for OnSignals<'_> {
 
 impl Drop for OnSignals<'_> {
     fn drop(&mut self) {
-        if let Some(registration) = &self.registration {
-            if registration.receiver().maybe_signals.load(Ordering::SeqCst) == 0 {
+        if let (Ok(receiver), Some((handle, ehandle))) = (&self.state, &self.handle) {
+            if receiver.receiver().maybe_signals.load(Ordering::SeqCst) == 0 {
                 // Ignore the error from zx_port_cancel, because it might just be a race condition.
                 // If the packet is handled between the above maybe_signals check and the port
                 // cancel, it will fail with ZX_ERR_NOT_FOUND, and we can't do anything about it.
-                let _ = registration.port().cancel(&self.handle, registration.key());
+                let _ = ehandle.port().cancel(&*handle, receiver.key());
             }
         }
-    }
-}
-
-pub struct LeakedOnSignals {
-    registration: Result<ReceiverRegistration<OnSignalsReceiver>, zx::Status>,
-}
-
-impl Future for LeakedOnSignals {
-    type Output = Result<zx::Signals, zx::Status>;
-    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        let reg = self.registration.as_mut().map_err(|e| mem::replace(e, zx::Status::OK))?;
-        reg.receiver().get_signals(cx).map(Ok)
     }
 }
 
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::TestExecutor;
-    use assert_matches::assert_matches;
-    use futures::{
-        future::{pending, FutureExt},
-        task::{waker, ArcWake},
-    };
-    use std::{pin::pin, sync::Arc};
+    use futures::future::{pending, FutureExt};
 
     #[test]
     fn wait_for_event() -> Result<(), zx::Status> {
@@ -237,50 +178,23 @@ mod test {
     }
 
     #[test]
-    fn drop_before_event() {
-        let mut fut = std::pin::pin!(async {
-            let ehandle = EHandle::local();
+    fn drop_before_event() -> Result<(), zx::Status> {
+        let _exec = crate::TestExecutor::new();
+        let ehandle = EHandle::local();
 
-            let event = zx::Event::create();
-            let mut signals = OnSignals::new(&event, zx::Signals::EVENT_SIGNALED);
-            assert_eq!(futures::poll!(&mut signals), Poll::Pending);
-            let key = signals.registration.as_ref().unwrap().key();
+        let event = zx::Event::create();
+        let signals = OnSignals::new(&event, zx::Signals::EVENT_SIGNALED);
+        let key = signals.state.as_ref().unwrap().key();
 
-            std::mem::drop(signals);
-            assert!(ehandle.port().cancel(&event, key) == Err(zx::Status::NOT_FOUND));
+        std::mem::drop(signals);
+        assert!(ehandle.port().cancel(&event, key) == Err(zx::Status::NOT_FOUND));
 
-            // try again but with extend_lifetime
-            let signals = OnSignals::new(&event, zx::Signals::EVENT_SIGNALED).extend_lifetime();
-            let key = signals.registration.as_ref().unwrap().key();
-            std::mem::drop(signals);
-            assert!(ehandle.port().cancel(&event, key) == Ok(()));
-        });
+        // try again but with extend_lifetime
+        let signals = OnSignals::new(&event, zx::Signals::EVENT_SIGNALED).extend_lifetime();
+        let key = signals.state.as_ref().unwrap().key();
+        std::mem::drop(signals);
+        assert!(ehandle.port().cancel(&event, key) == Ok(()));
 
-        assert!(TestExecutor::new().run_until_stalled(&mut fut).is_ready());
-    }
-
-    #[test]
-    fn test_always_polls() {
-        let mut exec = TestExecutor::new();
-
-        let (rx, tx) = zx::Channel::create();
-
-        let mut fut = pin!(OnSignals::new(&rx, zx::Signals::CHANNEL_READABLE));
-
-        assert_eq!(exec.run_until_stalled(&mut fut), Poll::Pending);
-
-        tx.write(b"hello", &mut []).expect("write failed");
-
-        struct Waker;
-        impl ArcWake for Waker {
-            fn wake_by_ref(_arc_self: &Arc<Self>) {}
-        }
-
-        // Poll the future directly which guarantees the port notification for the write hasn't
-        // arrived.
-        assert_matches!(
-            fut.poll(&mut Context::from_waker(&waker(Arc::new(Waker)))),
-            Poll::Ready(Ok(signals)) if signals.contains(zx::Signals::CHANNEL_READABLE)
-        );
+        Ok(())
     }
 }
