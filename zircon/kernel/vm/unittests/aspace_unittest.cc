@@ -1627,17 +1627,20 @@ static bool arch_noncontiguous_map() {
   }
 
   {
+    constexpr vaddr_t base = USER_ASPACE_BASE + 10 * PAGE_SIZE;
+
     ArchVmAspace aspace(USER_ASPACE_BASE, USER_ASPACE_SIZE, 0);
     status = aspace.Init();
     ASSERT_EQ(ZX_OK, status, "failed to init aspace\n");
 
     // Attempt to map a set of vm_page_t
-    size_t mapped;
-    vaddr_t base = USER_ASPACE_BASE + 10 * PAGE_SIZE;
+    size_t mapped = 0u;  // `Map` doesn't set `mapped` when it fails.
     status = aspace.Map(base, phys, ktl::size(phys), ARCH_MMU_FLAG_PERM_READ,
                         ArchVmAspace::ExistingEntryAction::Error, &mapped);
     ASSERT_EQ(ZX_OK, status, "failed first map\n");
     EXPECT_EQ(ktl::size(phys), mapped, "weird first map\n");
+
+    // Expect that the map succeeded
     for (size_t i = 0; i < ktl::size(phys); ++i) {
       paddr_t paddr;
       uint mmu_flags;
@@ -1652,7 +1655,7 @@ static bool arch_noncontiguous_map() {
                         ArchVmAspace::ExistingEntryAction::Error, &mapped);
     EXPECT_EQ(ZX_ERR_ALREADY_EXISTS, status, "double map\n");
 
-    // Attempt to map partially ovelapping, should fail
+    // Attempt to map partially overlapping, should fail
     status = aspace.Map(base + 2 * PAGE_SIZE, phys, ktl::size(phys), ARCH_MMU_FLAG_PERM_READ,
                         ArchVmAspace::ExistingEntryAction::Error, &mapped);
     EXPECT_EQ(ZX_ERR_ALREADY_EXISTS, status, "double map\n");
@@ -1670,9 +1673,14 @@ static bool arch_noncontiguous_map() {
     status = aspace.Query(base + 4 * PAGE_SIZE, nullptr, nullptr);
     EXPECT_EQ(ZX_ERR_NOT_FOUND, status, "bad first map\n");
 
+    // Unmap all remaining entries
+    // The partial failures did not create any new entries, so only entries
+    // created by the first map should be unmapped.
+    mapped = 0u;  // `Unmap` doesn't set `unmapped` when it fails.
     status = aspace.Unmap(base, ktl::size(phys), ArchVmAspace::EnlargeOperation::Yes, &mapped);
     ASSERT_EQ(ZX_OK, status, "failed unmap\n");
     EXPECT_EQ(ktl::size(phys), mapped, "weird unmap\n");
+
     status = aspace.Destroy();
     EXPECT_EQ(ZX_OK, status, "failed to destroy aspace\n");
   }
