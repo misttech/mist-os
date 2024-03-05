@@ -635,7 +635,7 @@ async fn neigh_clear_entries<N: Netstack>(name: &str) {
     alice.ep.apply_nud_flake_workaround().await.expect("nud flake workaround");
     bob.ep.apply_nud_flake_workaround().await.expect("nud flake workaround");
 
-    let controller = alice
+    let alice_controller = alice
         .realm
         .connect_to_protocol::<fidl_fuchsia_net_neighbor::ControllerMarker>()
         .expect("failed to connect to Controller");
@@ -657,7 +657,7 @@ async fn neigh_clear_entries<N: Netstack>(name: &str) {
         .await;
 
     // Clear entries and verify they go away.
-    let () = controller
+    let () = alice_controller
         .clear_entries(alice.ep.id(), fidl_fuchsia_net::IpVersion::V4)
         .await
         .expect("clear_entries FIDL error")
@@ -689,7 +689,7 @@ async fn neigh_clear_entries<N: Netstack>(name: &str) {
     );
     assert!(entries.is_empty(), "unexpected neighbors remaining in list: {:?}", entries);
 
-    let () = controller
+    let () = alice_controller
         .clear_entries(alice.ep.id(), fidl_fuchsia_net::IpVersion::V6)
         .await
         .expect("clear_entries FIDL error")
@@ -707,11 +707,15 @@ async fn neigh_clear_entries<N: Netstack>(name: &str) {
     )
     .await;
 
+    let bob_controller = bob
+        .realm
+        .connect_to_protocol::<fidl_fuchsia_net_neighbor::ControllerMarker>()
+        .expect("failed to connect to Controller");
     for ip in [&alice.ipv6, &ALICE_IP] {
         // Add static entries on Bob so that it will never send out neighbor
         // solicitations that could cause confusion for the assertions at the
         // end of this test.
-        let () = controller
+        let () = bob_controller
             .add_entry(bob.ep.id(), ip, &ALICE_MAC)
             .await
             .expect("add_entry FIDL error")
@@ -868,6 +872,10 @@ async fn neigh_add_remove_entry<N: Netstack>(name: &str) {
         });
 
     let (alice, bob) = create_neighbor_realms::<N>(&sandbox, &network, name).await;
+    // Apply the NUD flake workaround, since we expect all neighbor resolution
+    // to succeed in this test case.
+    alice.ep.apply_nud_flake_workaround().await.expect("nud flake workaround");
+    bob.ep.apply_nud_flake_workaround().await.expect("nud flake workaround");
 
     let controller = alice
         .realm
