@@ -221,14 +221,22 @@ pub fn convert_authenticate_indication(
 }
 
 pub fn convert_deauthenticate_confirm(
-    peer_sta_address: *const u8,
+    peer_sta_address_ptr: *const u8,
 ) -> fidl_mlme::DeauthenticateConfirm {
-    let as_slice = unsafe {
-        std::slice::from_raw_parts(peer_sta_address, banjo_wlan_ieee80211::MAC_ADDR_LEN as usize)
+    let peer_sta_address = if peer_sta_address_ptr.is_null() {
+        warn!("Got null pointer for peer_sta_address when converting DeauthConf. Substituting all zeros.");
+        [0 as u8; banjo_wlan_ieee80211::MAC_ADDR_LEN as usize]
+    } else {
+        unsafe {
+            std::slice::from_raw_parts(
+                peer_sta_address_ptr,
+                banjo_wlan_ieee80211::MAC_ADDR_LEN as usize,
+            )
+            .try_into()
+            .expect("Could not convert")
+        }
     };
-    fidl_mlme::DeauthenticateConfirm {
-        peer_sta_address: as_slice.try_into().expect("Could not convert"),
-    }
+    fidl_mlme::DeauthenticateConfirm { peer_sta_address }
 }
 
 pub fn convert_deauthenticate_indication(
@@ -537,18 +545,13 @@ pub fn convert_iface_histogram_stats(
     stats: banjo_wlan_fullmac::WlanFullmacIfaceHistogramStats,
 ) -> fidl_stats::IfaceHistogramStats {
     // TODO(https://fxbug.dev/42068282): DRY these with macros
-    let original_noise_floor_histograms = unsafe {
-        std::slice::from_raw_parts(
-            stats.noise_floor_histograms_list,
-            stats.noise_floor_histograms_count,
-        )
-    };
+    let original_noise_floor_histograms =
+        unsafe_slice_to_vec(stats.noise_floor_histograms_list, stats.noise_floor_histograms_count);
     let noise_floor_histograms = original_noise_floor_histograms
         .iter()
         .map(|h| {
-            let original_samples = unsafe {
-                std::slice::from_raw_parts(h.noise_floor_samples_list, h.noise_floor_samples_count)
-            };
+            let original_samples =
+                unsafe_slice_to_vec(h.noise_floor_samples_list, h.noise_floor_samples_count);
             let (hist_scope, antenna_id) =
                 convert_hist_scope_and_antenna_id(h.hist_scope, h.antenna_id);
             fidl_stats::NoiseFloorHistogram {
@@ -568,14 +571,12 @@ pub fn convert_iface_histogram_stats(
         })
         .collect();
 
-    let original_rssi_histograms = unsafe {
-        std::slice::from_raw_parts(stats.rssi_histograms_list, stats.rssi_histograms_count)
-    };
+    let original_rssi_histograms =
+        unsafe_slice_to_vec(stats.rssi_histograms_list, stats.rssi_histograms_count);
     let rssi_histograms = original_rssi_histograms
         .iter()
         .map(|h| {
-            let original_samples =
-                unsafe { std::slice::from_raw_parts(h.rssi_samples_list, h.rssi_samples_count) };
+            let original_samples = unsafe_slice_to_vec(h.rssi_samples_list, h.rssi_samples_count);
             let (hist_scope, antenna_id) =
                 convert_hist_scope_and_antenna_id(h.hist_scope, h.antenna_id);
             fidl_stats::RssiHistogram {
@@ -595,21 +596,15 @@ pub fn convert_iface_histogram_stats(
         })
         .collect();
 
-    let original_rx_rate_index_histograms = unsafe {
-        std::slice::from_raw_parts(
-            stats.rx_rate_index_histograms_list,
-            stats.rx_rate_index_histograms_count,
-        )
-    };
+    let original_rx_rate_index_histograms = unsafe_slice_to_vec(
+        stats.rx_rate_index_histograms_list,
+        stats.rx_rate_index_histograms_count,
+    );
     let rx_rate_index_histograms = original_rx_rate_index_histograms
         .iter()
         .map(|h| {
-            let original_samples = unsafe {
-                std::slice::from_raw_parts(
-                    h.rx_rate_index_samples_list,
-                    h.rx_rate_index_samples_count,
-                )
-            };
+            let original_samples =
+                unsafe_slice_to_vec(h.rx_rate_index_samples_list, h.rx_rate_index_samples_count);
             let (hist_scope, antenna_id) =
                 convert_hist_scope_and_antenna_id(h.hist_scope, h.antenna_id);
             fidl_stats::RxRateIndexHistogram {
@@ -629,14 +624,12 @@ pub fn convert_iface_histogram_stats(
         })
         .collect();
 
-    let original_snr_histograms = unsafe {
-        std::slice::from_raw_parts(stats.snr_histograms_list, stats.snr_histograms_count)
-    };
+    let original_snr_histograms =
+        unsafe_slice_to_vec(stats.snr_histograms_list, stats.snr_histograms_count);
     let snr_histograms = original_snr_histograms
         .iter()
         .map(|h| {
-            let original_samples =
-                unsafe { std::slice::from_raw_parts(h.snr_samples_list, h.snr_samples_count) };
+            let original_samples = unsafe_slice_to_vec(h.snr_samples_list, h.snr_samples_count);
             let (hist_scope, antenna_id) =
                 convert_hist_scope_and_antenna_id(h.hist_scope, h.antenna_id);
             fidl_stats::SnrHistogram {
@@ -780,5 +773,13 @@ mod tests {
                 qos_capable: false,
             }
         );
+    }
+
+    #[test]
+    fn test_conversion_does_not_crash_on_uninit_banjo() {
+        let iface_histogram_stats: banjo_wlan_fullmac::WlanFullmacIfaceHistogramStats =
+            unsafe { std::mem::zeroed() };
+        let _ = convert_iface_histogram_stats(iface_histogram_stats);
+        let _ = convert_deauthenticate_confirm(std::ptr::null() as *const u8);
     }
 }
