@@ -911,7 +911,7 @@ mod tests {
                 GroupJoinResult::Joined(())
             );
             let now = bindings_ctx.now();
-            bindings_ctx.timer_ctx().assert_timers_installed([(
+            bindings_ctx.timer_ctx().assert_timers_installed_range([(
                 TIMER_ID,
                 now..=(now + DEFAULT_UNSOLICITED_REPORT_INTERVAL),
             )]);
@@ -955,7 +955,7 @@ mod tests {
                 GroupJoinResult::Joined(())
             );
             let now = bindings_ctx.now();
-            bindings_ctx.timer_ctx().assert_timers_installed([(
+            bindings_ctx.timer_ctx().assert_timers_installed_range([(
                 TIMER_ID,
                 now..=(now + DEFAULT_UNSOLICITED_REPORT_INTERVAL),
             )]);
@@ -1086,7 +1086,7 @@ mod tests {
             assert_eq!(core_ctx.frames().len(), 1);
             let now = bindings_ctx.now();
             let range = now..=(now + DEFAULT_UNSOLICITED_REPORT_INTERVAL);
-            bindings_ctx.timer_ctx().assert_timers_installed([(TIMER_ID, range.clone())]);
+            bindings_ctx.timer_ctx().assert_timers_installed_range([(TIMER_ID, range.clone())]);
             let frame = &core_ctx.frames().last().unwrap().1;
             ensure_frame(frame, 131, GROUP_ADDR, GROUP_ADDR);
             ensure_slice_addr(frame, 8, 24, Ipv6::UNSPECIFIED_ADDRESS);
@@ -1097,7 +1097,7 @@ mod tests {
             );
             assert_gmp_state!(core_ctx, &GROUP_ADDR, Delaying);
             assert_eq!(core_ctx.frames().len(), 1);
-            bindings_ctx.timer_ctx().assert_timers_installed([(TIMER_ID, range.clone())]);
+            bindings_ctx.timer_ctx().assert_timers_installed_range([(TIMER_ID, range.clone())]);
 
             assert_eq!(
                 core_ctx.gmp_leave_group(&mut bindings_ctx, &FakeDeviceId, GROUP_ADDR),
@@ -1105,7 +1105,7 @@ mod tests {
             );
             assert_gmp_state!(core_ctx, &GROUP_ADDR, Delaying);
             assert_eq!(core_ctx.frames().len(), 1);
-            bindings_ctx.timer_ctx().assert_timers_installed([(TIMER_ID, range)]);
+            bindings_ctx.timer_ctx().assert_timers_installed_range([(TIMER_ID, range)]);
 
             assert_eq!(
                 core_ctx.gmp_leave_group(&mut bindings_ctx, &FakeDeviceId, GROUP_ADDR),
@@ -1335,7 +1335,7 @@ mod tests {
         set_config(&mut ctx, TestConfig { ip_enabled: true, gmp_enabled: true });
         ctx.bindings_ctx
             .timer_ctx()
-            .assert_timers_installed([(snmc_timer_id.clone(), range.clone())]);
+            .assert_timers_installed_range([(snmc_timer_id.clone(), range.clone())]);
         check_sent_report(&mut ctx.bindings_ctx, false);
 
         // Disable MLD.
@@ -1361,7 +1361,7 @@ mod tests {
         set_config(&mut ctx, TestConfig { ip_enabled: true, gmp_enabled: true });
         ctx.bindings_ctx
             .timer_ctx()
-            .assert_timers_installed([(snmc_timer_id.clone(), range.clone())]);
+            .assert_timers_installed_range([(snmc_timer_id.clone(), range.clone())]);
         check_sent_report(&mut ctx.bindings_ctx, true);
 
         // Disable IPv6.
@@ -1371,7 +1371,7 @@ mod tests {
 
         // Enable IPv6.
         set_config(&mut ctx, TestConfig { ip_enabled: true, gmp_enabled: true });
-        ctx.bindings_ctx.timer_ctx().assert_timers_installed([(snmc_timer_id, range)]);
+        ctx.bindings_ctx.timer_ctx().assert_timers_installed_range([(snmc_timer_id, range)]);
         check_sent_report(&mut ctx.bindings_ctx, false);
 
         // Remove the device to cleanup all dangling references.

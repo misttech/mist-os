@@ -334,7 +334,7 @@ mod tests {
         let now = bindings_ctx.now();
         bindings_ctx
             .timer_ctx()
-            .assert_timers_installed([(RS_TIMER_ID, now..=now + MAX_RTR_SOLICITATION_DELAY)]);
+            .assert_timers_installed_range([(RS_TIMER_ID, now..=now + MAX_RTR_SOLICITATION_DELAY)]);
 
         RsHandler::stop_router_solicitation(&mut core_ctx, &mut bindings_ctx, &FakeDeviceId);
         bindings_ctx.timer_ctx().assert_no_timers_installed();
@@ -400,7 +400,9 @@ mod tests {
                 NonZeroU8::new(max_router_solicitations - i)
             );
             let now = bindings_ctx.now();
-            bindings_ctx.timer_ctx().assert_timers_installed([(RS_TIMER_ID, now..=now + duration)]);
+            bindings_ctx
+                .timer_ctx()
+                .assert_timers_installed_range([(RS_TIMER_ID, now..=now + duration)]);
 
             assert_eq!(bindings_ctx.trigger_next_timer(&mut core_ctx), Some(RS_TIMER_ID));
             let frames = core_ctx.frames();

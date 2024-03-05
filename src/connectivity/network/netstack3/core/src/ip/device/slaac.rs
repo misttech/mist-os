@@ -1674,8 +1674,7 @@ mod tests {
     use super::*;
     use crate::{
         context::testutil::{
-            FakeBindingsCtx, FakeCoreCtx, FakeCtx, FakeInstant, FakeInstantRange as _,
-            FakeTimerCtxExt as _,
+            FakeBindingsCtx, FakeCoreCtx, FakeCtx, FakeInstant, FakeTimerCtxExt as _,
         },
         device::{
             ethernet::{EthernetCreationProperties, EthernetLinkDevice},
@@ -2863,14 +2862,25 @@ mod tests {
         let temp_addr_preferred_until_end = now + ONE_HOUR.get();
         let temp_addr_preferred_until_start =
             temp_addr_preferred_until_end - ((ONE_HOUR.get() * 3) / 5);
-        ctx.bindings_ctx.timer_ctx().assert_some_timers_installed([
+
+        fn value_as_bounds<T: Copy>(value: T) -> (core::ops::Bound<T>, core::ops::Bound<T>) {
+            (core::ops::Bound::Included(value), core::ops::Bound::Included(value))
+        }
+
+        fn as_bounds<T: Copy, R: core::ops::RangeBounds<T>>(
+            range: R,
+        ) -> (core::ops::Bound<T>, core::ops::Bound<T>) {
+            (range.start_bound().map(|t| *t), range.end_bound().map(|t| *t))
+        }
+
+        ctx.bindings_ctx.timer_ctx().assert_some_timers_installed_range([
             (
                 SlaacTimerId::new_invalidate_slaac_address(
                     device_id.clone(),
                     stable_addr_sub.addr(),
                 )
                 .into(),
-                stable_addr_lifetime_until.as_dyn(),
+                value_as_bounds(stable_addr_lifetime_until),
             ),
             (
                 SlaacTimerId::new_deprecate_slaac_address(
@@ -2878,17 +2888,17 @@ mod tests {
                     stable_addr_sub.addr(),
                 )
                 .into(),
-                stable_addr_lifetime_until.as_dyn(),
+                value_as_bounds(stable_addr_lifetime_until),
             ),
             (
                 SlaacTimerId::new_invalidate_slaac_address(device_id.clone(), temp_addr_sub.addr())
                     .into(),
-                temp_addr_lifetime_until.as_dyn(),
+                value_as_bounds(temp_addr_lifetime_until),
             ),
             (
                 SlaacTimerId::new_deprecate_slaac_address(device_id.clone(), temp_addr_sub.addr())
                     .into(),
-                (temp_addr_preferred_until_start..temp_addr_preferred_until_end).as_dyn(),
+                as_bounds(temp_addr_preferred_until_start..temp_addr_preferred_until_end),
             ),
             (
                 SlaacTimerId::new_regenerate_temporary_slaac_address(
@@ -2896,9 +2906,10 @@ mod tests {
                     temp_addr_sub,
                 )
                 .into(),
-                (temp_addr_preferred_until_start - MIN_REGEN_ADVANCE.get()
-                    ..temp_addr_preferred_until_end - MIN_REGEN_ADVANCE.get())
-                    .as_dyn(),
+                as_bounds(
+                    temp_addr_preferred_until_start - MIN_REGEN_ADVANCE.get()
+                        ..temp_addr_preferred_until_end - MIN_REGEN_ADVANCE.get(),
+                ),
             ),
         ]);
 

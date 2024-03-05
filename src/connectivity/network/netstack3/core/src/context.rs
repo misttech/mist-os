@@ -457,7 +457,7 @@ pub(crate) mod testutil {
         convert::Infallible as Never,
         fmt::{self, Debug, Formatter},
         hash::Hash,
-        ops::{self, RangeBounds},
+        ops,
     };
 
     #[cfg(test)]
@@ -655,51 +655,9 @@ pub(crate) mod testutil {
         }
     }
 
-    #[allow(dead_code)]
-    pub(crate) trait FakeInstantRange: Debug {
-        fn contains(&self, i: FakeInstant) -> bool;
-
-        /// Converts `&self` to a type-erased trait object reference.
-        ///
-        /// This makes it more ergonomic to construct a `&dyn
-        /// FakeInstantRange`, which is necessary in order to use different
-        /// range types in a context in which a single concrete type is
-        /// expected.
-        fn as_dyn(&self) -> &dyn FakeInstantRange
-        where
-            Self: Sized,
-        {
-            self
-        }
-    }
-
-    impl FakeInstantRange for FakeInstant {
-        fn contains(&self, i: FakeInstant) -> bool {
-            self == &i
-        }
-    }
-
-    impl<B: RangeBounds<FakeInstant> + Debug> FakeInstantRange for B {
-        fn contains(&self, i: FakeInstant) -> bool {
-            RangeBounds::contains(self, &i)
-        }
-    }
-
-    // This impl is necessary in order to allow passing different range types
-    // to `assert_timers_installed` and friends in a single call.
-    impl<'a> FakeInstantRange for &'a dyn FakeInstantRange {
-        fn contains(&self, i: FakeInstant) -> bool {
-            <dyn FakeInstantRange as FakeInstantRange>::contains(*self, i)
-        }
-    }
-
     #[cfg(test)]
     impl<Id: Debug + Clone + Hash + Eq> FakeTimerCtx<Id> {
         /// Asserts that `self` contains exactly the timers in `timers`.
-        ///
-        /// Each timer must be present, and its deadline must fall into the
-        /// specified range. Ranges may be specified either as a specific
-        /// [`FakeInstant`] or as any [`RangeBounds<FakeInstant>`].
         ///
         /// # Panics
         ///
@@ -708,8 +666,23 @@ pub(crate) mod testutil {
         ///
         /// [`RangeBounds<FakeInstant>`]: core::ops::RangeBounds
         #[track_caller]
-        pub(crate) fn assert_timers_installed<
-            R: FakeInstantRange,
+        pub(crate) fn assert_timers_installed<I: IntoIterator<Item = (Id, FakeInstant)>>(
+            &self,
+            timers: I,
+        ) {
+            self.assert_timers_installed_range(
+                timers.into_iter().map(|(id, instant)| (id, instant..=instant)),
+            );
+        }
+
+        /// Like [`assert_timers_installed`] but receives a range instants to
+        /// match.
+        ///
+        /// Each timer must be present, and its deadline must fall into the
+        /// specified range.
+        #[track_caller]
+        pub(crate) fn assert_timers_installed_range<
+            R: ops::RangeBounds<FakeInstant> + Debug,
             I: IntoIterator<Item = (Id, R)>,
         >(
             &self,
@@ -724,8 +697,20 @@ pub(crate) mod testutil {
         /// a subset of the timers installed; other timers may be installed in
         /// addition to those in `timers`.
         #[track_caller]
-        pub(crate) fn assert_some_timers_installed<
-            R: FakeInstantRange,
+        pub(crate) fn assert_some_timers_installed<I: IntoIterator<Item = (Id, FakeInstant)>>(
+            &self,
+            timers: I,
+        ) {
+            self.assert_some_timers_installed_range(
+                timers.into_iter().map(|(id, instant)| (id, instant..=instant)),
+            );
+        }
+
+        /// Like [`assert_some_timers_installed`] but receives instant ranges
+        /// to match like [`assert_timers_installed_range`].
+        #[track_caller]
+        pub(crate) fn assert_some_timers_installed_range<
+            R: ops::RangeBounds<FakeInstant> + Debug,
             I: IntoIterator<Item = (Id, R)>,
         >(
             &self,
@@ -741,11 +726,14 @@ pub(crate) mod testutil {
         /// Panics if any timers are installed.
         #[track_caller]
         pub(crate) fn assert_no_timers_installed(&self) {
-            self.assert_timers_installed::<FakeInstant, _>([]);
+            self.assert_timers_installed([]);
         }
 
         #[track_caller]
-        fn assert_timers_installed_inner<R: FakeInstantRange, I: IntoIterator<Item = (Id, R)>>(
+        fn assert_timers_installed_inner<
+            R: ops::RangeBounds<FakeInstant> + Debug,
+            I: IntoIterator<Item = (Id, R)>,
+        >(
             &self,
             timers: I,
             exact: bool,
@@ -755,7 +743,7 @@ pub(crate) mod testutil {
                 timers
             });
 
-            enum Error<Id, R: FakeInstantRange> {
+            enum Error<Id, R: ops::RangeBounds<FakeInstant>> {
                 ExpectedButMissing { id: Id, range: R },
                 UnexpectedButPresent { id: Id, instant: FakeInstant },
                 UnexpectedInstant { id: Id, range: R, instant: FakeInstant },
@@ -773,7 +761,7 @@ pub(crate) mod testutil {
                         }
                     }
                     Some(range) => {
-                        if !range.contains(instant) {
+                        if !range.contains(&instant) {
                             errors.push(Error::UnexpectedInstant { id, range, instant })
                         }
                     }

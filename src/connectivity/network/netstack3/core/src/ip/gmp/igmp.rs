@@ -894,7 +894,7 @@ mod tests {
                 GroupJoinResult::Joined(())
             );
             let now = bindings_ctx.now();
-            bindings_ctx.timer_ctx().assert_timers_installed([(
+            bindings_ctx.timer_ctx().assert_timers_installed_range([(
                 REPORT_DELAY_TIMER_ID,
                 now..=(now + DEFAULT_UNSOLICITED_REPORT_INTERVAL),
             )]);
@@ -917,7 +917,7 @@ mod tests {
             // Two timers: one for the delayed report, one for the v1 router
             // timer.
             let now = bindings_ctx.now();
-            bindings_ctx.timer_ctx().assert_timers_installed([
+            bindings_ctx.timer_ctx().assert_timers_installed_range([
                 (REPORT_DELAY_TIMER_ID, now..=(now + DEFAULT_UNSOLICITED_REPORT_INTERVAL)),
                 (V1_ROUTER_PRESENT_TIMER_ID, now..=(now + DEFAULT_V1_ROUTER_PRESENT_TIMEOUT)),
             ]);
@@ -964,7 +964,7 @@ mod tests {
             GroupJoinResult::Joined(())
         );
         let now = bindings_ctx.now();
-        bindings_ctx.timer_ctx().assert_timers_installed([(
+        bindings_ctx.timer_ctx().assert_timers_installed_range([(
             REPORT_DELAY_TIMER_ID,
             now..=(now + DEFAULT_UNSOLICITED_REPORT_INTERVAL),
         )]);
@@ -977,7 +977,7 @@ mod tests {
         let now = bindings_ctx.now();
         bindings_ctx
             .timer_ctx()
-            .assert_timers_installed([(REPORT_DELAY_TIMER_ID, now..=(now + duration))]);
+            .assert_timers_installed_range([(REPORT_DELAY_TIMER_ID, now..=(now + duration))]);
         let instant2 = bindings_ctx.timer_ctx().timers()[0].0.clone();
         // Because of the message, our timer should be reset to a nearer future.
         assert!(instant2 <= instant1);
@@ -998,7 +998,7 @@ mod tests {
                 GroupJoinResult::Joined(())
             );
             let now = bindings_ctx.now();
-            bindings_ctx.timer_ctx().assert_timers_installed([(
+            bindings_ctx.timer_ctx().assert_timers_installed_range([(
                 REPORT_DELAY_TIMER_ID,
                 now..=(now + DEFAULT_UNSOLICITED_REPORT_INTERVAL),
             )]);
@@ -1036,7 +1036,7 @@ mod tests {
                 GroupJoinResult::Joined(())
             );
             let now = bindings_ctx.now();
-            bindings_ctx.timer_ctx().assert_timers_installed([(
+            bindings_ctx.timer_ctx().assert_timers_installed_range([(
                 REPORT_DELAY_TIMER_ID,
                 now..=(now + DEFAULT_UNSOLICITED_REPORT_INTERVAL),
             )]);
@@ -1070,7 +1070,7 @@ mod tests {
             );
             let now = bindings_ctx.now();
             let range = now..=(now + DEFAULT_UNSOLICITED_REPORT_INTERVAL);
-            bindings_ctx.timer_ctx().assert_timers_installed([
+            bindings_ctx.timer_ctx().assert_timers_installed_range([
                 (REPORT_DELAY_TIMER_ID, range.clone()),
                 (REPORT_DELAY_TIMER_ID_2, range),
             ]);
@@ -1086,7 +1086,7 @@ mod tests {
             // Two new timers should be there.
             let now = bindings_ctx.now();
             let range = now..=(now + RESP_TIME);
-            bindings_ctx.timer_ctx().assert_timers_installed([
+            bindings_ctx.timer_ctx().assert_timers_installed_range([
                 (REPORT_DELAY_TIMER_ID, range.clone()),
                 (REPORT_DELAY_TIMER_ID_2, range),
             ]);
@@ -1163,7 +1163,7 @@ mod tests {
             let range = now..=(now + DEFAULT_UNSOLICITED_REPORT_INTERVAL);
             bindings_ctx
                 .timer_ctx()
-                .assert_timers_installed([(REPORT_DELAY_TIMER_ID, range.clone())]);
+                .assert_timers_installed_range([(REPORT_DELAY_TIMER_ID, range.clone())]);
             ensure_ttl_ihl_rtr(&core_ctx);
 
             assert_eq!(
@@ -1174,7 +1174,7 @@ mod tests {
             assert_eq!(core_ctx.frames().len(), 1);
             bindings_ctx
                 .timer_ctx()
-                .assert_timers_installed([(REPORT_DELAY_TIMER_ID, range.clone())]);
+                .assert_timers_installed_range([(REPORT_DELAY_TIMER_ID, range.clone())]);
 
             assert_eq!(
                 core_ctx.gmp_leave_group(&mut bindings_ctx, &FakeDeviceId, GROUP_ADDR),
@@ -1182,7 +1182,9 @@ mod tests {
             );
             assert_gmp_state!(core_ctx, &GROUP_ADDR, Delaying);
             assert_eq!(core_ctx.frames().len(), 1);
-            bindings_ctx.timer_ctx().assert_timers_installed([(REPORT_DELAY_TIMER_ID, range)]);
+            bindings_ctx
+                .timer_ctx()
+                .assert_timers_installed_range([(REPORT_DELAY_TIMER_ID, range)]);
 
             assert_eq!(
                 core_ctx.gmp_leave_group(&mut bindings_ctx, &FakeDeviceId, GROUP_ADDR),
@@ -1388,7 +1390,9 @@ mod tests {
         // Should send report for the all-systems multicast group that all
         // interfaces join.
         set_config(&mut ctx, TestConfig { ip_enabled: true, gmp_enabled: true });
-        ctx.bindings_ctx.timer_ctx().assert_timers_installed([(timer_id.clone(), range.clone())]);
+        ctx.bindings_ctx
+            .timer_ctx()
+            .assert_timers_installed_range([(timer_id.clone(), range.clone())]);
         check_sent_report(&mut ctx.bindings_ctx);
 
         // Disable IGMP.
@@ -1412,7 +1416,9 @@ mod tests {
 
         // Enable IGMP.
         set_config(&mut ctx, TestConfig { ip_enabled: true, gmp_enabled: true });
-        ctx.bindings_ctx.timer_ctx().assert_timers_installed([(timer_id.clone(), range.clone())]);
+        ctx.bindings_ctx
+            .timer_ctx()
+            .assert_timers_installed_range([(timer_id.clone(), range.clone())]);
         check_sent_report(&mut ctx.bindings_ctx);
 
         // Disable IPv4.
@@ -1422,7 +1428,7 @@ mod tests {
 
         // Enable IPv4.
         set_config(&mut ctx, TestConfig { ip_enabled: true, gmp_enabled: true });
-        ctx.bindings_ctx.timer_ctx().assert_timers_installed([(timer_id, range)]);
+        ctx.bindings_ctx.timer_ctx().assert_timers_installed_range([(timer_id, range)]);
         check_sent_report(&mut ctx.bindings_ctx);
 
         core::mem::drop(device_id);

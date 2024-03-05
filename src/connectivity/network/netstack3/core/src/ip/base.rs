@@ -3812,7 +3812,7 @@ mod tests {
         process_ip_fragment::<I>(&mut ctx, &device, fragment_id, 0, 3);
 
         // Make sure a timer got added.
-        ctx.bindings_ctx.timer_ctx().assert_timers_installed([(
+        ctx.bindings_ctx.timer_ctx().assert_timers_installed_range([(
             IpLayerTimerId::from(FragmentCacheKey::new(
                 I::FAKE_CONFIG.remote_ip.get(),
                 I::FAKE_CONFIG.local_ip.get(),

@@ -2090,7 +2090,7 @@ mod tests {
                     ..,
                 ))
             }
-            ctx.bindings_ctx.timer_ctx().assert_timers_installed(timers);
+            ctx.bindings_ctx.timer_ctx().assert_timers_installed_range(timers);
         };
         test_enable_device(&mut ctx, None, false);
         let weak_device_id = device_id.downgrade();

@@ -1542,7 +1542,7 @@ mod tests {
 
         // Send the first router solicitation.
         assert_empty(ctx.bindings_ctx.frames_sent().iter());
-        ctx.bindings_ctx.timer_ctx().assert_timers_installed([(timer_id.clone(), ..)]);
+        ctx.bindings_ctx.timer_ctx().assert_timers_installed_range([(timer_id.clone(), ..)]);
 
         assert_eq!(ctx.trigger_next_timer().unwrap(), timer_id);
 
@@ -1556,7 +1556,7 @@ mod tests {
                 |_| {},
             )
             .unwrap();
-        ctx.bindings_ctx.timer_ctx().assert_timers_installed([(timer_id.clone(), ..)]);
+        ctx.bindings_ctx.timer_ctx().assert_timers_installed_range([(timer_id.clone(), ..)]);
 
         // Enable routing on device.
         set_forwarding_enabled::<_, Ipv6>(&mut ctx, &device, true);
@@ -1571,7 +1571,7 @@ mod tests {
         set_forwarding_enabled::<_, Ipv6>(&mut ctx, &device, false);
         assert!(!is_forwarding_enabled::<_, Ipv6>(&mut ctx, &device));
         assert_eq!(ctx.bindings_ctx.frames_sent().len(), 1);
-        ctx.bindings_ctx.timer_ctx().assert_timers_installed([(timer_id.clone(), ..)]);
+        ctx.bindings_ctx.timer_ctx().assert_timers_installed_range([(timer_id.clone(), ..)]);
 
         // Send the first router solicitation after being turned into a host.
         assert_eq!(ctx.trigger_next_timer().unwrap(), timer_id);
@@ -1586,7 +1586,7 @@ mod tests {
             ),
             Ok((_, _, _, _, _, _, _))
         );
-        ctx.bindings_ctx.timer_ctx().assert_timers_installed([(timer_id, ..)]);
+        ctx.bindings_ctx.timer_ctx().assert_timers_installed_range([(timer_id, ..)]);
 
         // Clear all device references.
         core::mem::drop(device);
