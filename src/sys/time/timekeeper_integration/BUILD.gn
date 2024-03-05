@@ -34,7 +34,6 @@ group("timekeeper_integration") {
     ":faketime-integration-test-root",
     ":timekeeper-integration-test-root",
     ":timekeeper_integration_lib",
-    "//src/cobalt/bin/testing/mock_cobalt",
   ]
 }
 
