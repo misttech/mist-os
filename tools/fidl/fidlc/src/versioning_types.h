@@ -349,8 +349,9 @@ class VersionSelection final {
   // unversioned platform. Otherwise, assumes the platform was inserted.
   Version Lookup(const Platform& platform) const;
 
-  // Runs a function on each selected (platform, version) pair.
-  void ForEach(const fit::function<void(const Platform&, Version)>& fn) const;
+  // Iterator over the (platform, version) pairs.
+  auto begin() const { return map_.begin(); }
+  auto end() const { return map_.end(); }
 
  private:
   std::map<Platform, Version, Platform::Compare> map_;

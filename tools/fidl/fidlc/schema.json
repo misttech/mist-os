@@ -987,6 +987,16 @@
             "pattern": "^[a-z][a-z0-9]*(\\.[a-z][a-z0-9]*)*$",
             "type": "string"
         },
+        "platform-identifier": {
+            "description": "Definition of platform identifier",
+            "pattern": "^[a-z][a-z0-9]*$",
+            "type": "string"
+        },
+        "version-identifier": {
+            "description": "Definition of a version identifier",
+            "pattern": "^([1-9][0-9]*|HEAD|LEGACY)$",
+            "type": "string"
+        },
         "literal-constant": {
             "additionalProperties": false,
             "description": "Definition of a constant value (using a literal)",
@@ -2040,8 +2050,9 @@
             "description": "Platforms and versions that were available when compiling the library.",
             "type": "object",
             "patternProperties": {
-                ".*": {
-                    "type": "string"
+                "^[a-z][a-z0-9]*$": {
+                    "$ref": "#/definitions/version-identifier",
+                    "description": "Version selected for this platform"
                 }
             }
         },
@@ -2120,6 +2131,10 @@
             "$ref": "#/definitions/library-identifier",
             "description": "Name of the library"
         },
+        "platform": {
+            "$ref": "#/definitions/platform-identifier",
+            "description": "Platform the library is versioned under"
+        },
         "service_declarations": {
             "description": "List of services, sorted by fully qualified name",
             "items": {
@@ -2175,6 +2190,8 @@
     },
     "required": [
         "name",
+        "platform",
+        "available",
         "bits_declarations",
         "const_declarations",
         "enum_declarations",

@@ -32,10 +32,10 @@ std::optional<std::string> GetSpaceBefore(std::string_view line, std::string_vie
   return std::nullopt;
 }
 
-// Erases all "location" and "maybe_attributes" fields from a JSON IR string.
-// These are the only things can change when manually decomposing a library.
-// Also removes all end-of-line commas since these can cause spurious diffs.
-// Note that this means the returned string is not valid JSON.
+// Erases all "platform", "location" and "maybe_attributes" fields from a JSON
+// IR string. These are the only things can change when manually decomposing a
+// library. Also removes all end-of-line commas since these can cause spurious
+// diffs. Note that this means the returned string is not valid JSON.
 std::string ScrubJson(const std::string& json) {
   // We scan the JSON line by line, filtering out the undesired lines. To do
   // this, we rely on JsonWriter emitting correct indentation and newlines.
@@ -53,7 +53,7 @@ std::string ScrubJson(const std::string& json) {
         skip_until.value().push_back('}');
       } else if ((skip_until = GetSpaceBefore(line, "\"maybe_attributes\": ["))) {
         skip_until.value().push_back(']');
-      } else {
+      } else if (!GetSpaceBefore(line, "\"platform\": \"").has_value()) {
         if (line.back() == ',') {
           line.pop_back();
         }

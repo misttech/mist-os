@@ -1,12 +1,13 @@
 {
   "name": "test.drivertwoway",
+  "platform": "unversioned",
+  "available": {
+    "fuchsia": "LEGACY"
+  },
   "experiments": [
     "output_index_json",
     "transitional_allow_list"
   ],
-  "available": {
-    "fuchsia": "LEGACY"
-  },
   "library_dependencies": [],
   "bits_declarations": [],
   "const_declarations": [],

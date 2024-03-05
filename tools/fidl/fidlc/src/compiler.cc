@@ -467,6 +467,7 @@ std::unique_ptr<Compilation> Libraries::Filter(const VersionSelection* version_s
   ZX_ASSERT(!libraries_.empty());
   auto library = libraries_.back().get();
   auto compilation = std::make_unique<Compilation>();
+  compilation->platform = &library->platform.value();
   compilation->library_name = library->name;
   compilation->library_declarations = library->library_name_declarations;
   compilation->library_attributes = library->attributes.get();

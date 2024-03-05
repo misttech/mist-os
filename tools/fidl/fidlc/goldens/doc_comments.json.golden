@@ -1,5 +1,9 @@
 {
   "name": "test.doccomments",
+  "platform": "unversioned",
+  "available": {
+    "fuchsia": "LEGACY"
+  },
   "maybe_attributes": [
     {
       "name": "doc",
@@ -37,9 +41,6 @@
     "output_index_json",
     "transitional_allow_list"
   ],
-  "available": {
-    "fuchsia": "LEGACY"
-  },
   "library_dependencies": [],
   "bits_declarations": [
     {

@@ -1,13 +1,14 @@
 {
   "name": "test.experimentalzxctypes",
+  "platform": "unversioned",
+  "available": {
+    "fuchsia": "LEGACY"
+  },
   "experiments": [
     "output_index_json",
     "transitional_allow_list",
     "zx_c_types"
   ],
-  "available": {
-    "fuchsia": "LEGACY"
-  },
   "library_dependencies": [],
   "bits_declarations": [],
   "const_declarations": [

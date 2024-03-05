@@ -366,10 +366,4 @@ Version VersionSelection::Lookup(const Platform& platform) const {
   return iter->second;
 }
 
-void VersionSelection::ForEach(const fit::function<void(const Platform&, Version)>& fn) const {
-  for (const auto& [platform, version] : map_) {
-    fn(platform, version);
-  }
-}
-
 }  // namespace fidlc

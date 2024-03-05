@@ -1715,11 +1715,20 @@ type Library struct {
 	Decls DeclInfoMap              `json:"declarations"`
 }
 
+// Platform identifies a group of FIDL libraries that are versioned together.
+type Platform string
+
+// Version represents a version of a platform.
+// It is either a decimal number, "HEAD", or "LEGACY".
+type Version string
+
 // Root is the top-level object for a FIDL library.
 // It contains lists of all declarations and dependencies within the library.
 type Root struct {
 	Attributes
 	Name            EncodedLibraryIdentifier    `json:"name"`
+	Platform        Platform                    `json:"platform"`
+	Available       map[Platform]Version        `json:"available"`
 	Experiments     Experiments                 `json:"experiments,omitempty"`
 	Consts          []Const                     `json:"const_declarations"`
 	Bits            []Bits                      `json:"bits_declarations"`

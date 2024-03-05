@@ -1,12 +1,13 @@
 {
   "name": "test.placementofattributes",
+  "platform": "unversioned",
+  "available": {
+    "fuchsia": "LEGACY"
+  },
   "experiments": [
     "output_index_json",
     "transitional_allow_list"
   ],
-  "available": {
-    "fuchsia": "LEGACY"
-  },
   "library_dependencies": [
     {
       "name": "test.exampleusing",

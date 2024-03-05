@@ -995,6 +995,17 @@ std::ostringstream JSONGenerator::Produce() {
   ResetIndentLevel();
   GenerateObject([&]() {
     GenerateObjectMember("name", LibraryName(compilation_->library_name, "."), Position::kFirst);
+    GenerateObjectMember("platform", compilation_->platform->name());
+
+    GenerateObjectPunctuation(Position::kSubsequent);
+    EmitObjectKey("available");
+    GenerateObject([&]() {
+      auto position = Position::kFirst;
+      for (auto& [platform, version] : *compilation_->version_selection_) {
+        GenerateObjectMember(platform.name(), version.ToString(), position);
+        position = Position::kSubsequent;
+      };
+    });
 
     if (!compilation_->library_attributes->Empty()) {
       GenerateObjectMember("maybe_attributes", compilation_->library_attributes);
@@ -1007,23 +1018,7 @@ std::ostringstream JSONGenerator::Produce() {
     }
     GenerateObjectMember("experiments", active_experiments);
 
-    if (compilation_->version_selection_) {
-      GenerateObjectPunctuation(Position::kSubsequent);
-      EmitObjectKey("available");
-      GenerateObject([&]() {
-        Position p = Position::kFirst;
-        compilation_->version_selection_->ForEach([&](const Platform& platform, Version version) {
-          GenerateObjectMember(platform.name(), version.ToString(), p);
-          if (p == Position::kFirst) {
-            p = Position::kSubsequent;
-          }
-        });
-      });
-    }
-
-    GenerateObjectPunctuation(Position::kSubsequent);
-    EmitObjectKey("library_dependencies");
-    GenerateArray(compilation_->direct_and_composed_dependencies);
+    GenerateObjectMember("library_dependencies", compilation_->direct_and_composed_dependencies);
 
     GenerateObjectMember("bits_declarations", compilation_->declarations.bits);
     GenerateObjectMember("const_declarations", compilation_->declarations.consts);
