@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci/extended_low_energy_scanner.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci/fake_local_address_delegate.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci/legacy_low_energy_scanner.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/testing/controller_test.h"
@@ -76,6 +77,12 @@ class LowEnergyScannerTest : public TestingBase,
     scanner_ = nullptr;
     this->test_device()->Stop();
     TestingBase::TearDown();
+  }
+
+  template <bool same = std::is_same_v<T, ExtendedLowEnergyScanner>>
+  std::enable_if_t<same, ExtendedLowEnergyScanner>* CreateScannerInternal() {
+    return new ExtendedLowEnergyScanner(
+        fake_address_delegate(), transport()->GetWeakPtr(), dispatcher());
   }
 
   template <bool same = std::is_same_v<T, LegacyLowEnergyScanner>>
@@ -183,7 +190,8 @@ class LowEnergyScannerTest : public TestingBase,
   BT_DISALLOW_COPY_AND_ASSIGN_ALLOW_MOVE(LowEnergyScannerTest);
 };
 
-using Implementations = ::testing::Types<LegacyLowEnergyScanner>;
+using Implementations =
+    ::testing::Types<LegacyLowEnergyScanner, ExtendedLowEnergyScanner>;
 TYPED_TEST_SUITE(LowEnergyScannerTest, Implementations);
 
 TYPED_TEST(LowEnergyScannerTest, StartScanHCIErrors) {
@@ -194,6 +202,9 @@ TYPED_TEST(LowEnergyScannerTest, StartScanHCIErrors) {
   // Set Scan Parameters will fail.
   this->test_device()->SetDefaultResponseStatus(
       hci_spec::kLESetScanParameters,
+      pw::bluetooth::emboss::StatusCode::HARDWARE_FAILURE);
+  this->test_device()->SetDefaultResponseStatus(
+      hci_spec::kLESetExtendedScanParameters,
       pw::bluetooth::emboss::StatusCode::HARDWARE_FAILURE);
   EXPECT_EQ(0, this->test_device()->le_scan_state().scan_interval);
 
@@ -214,8 +225,13 @@ TYPED_TEST(LowEnergyScannerTest, StartScanHCIErrors) {
   // Set Scan Parameters will succeed but Set Scan Enable will fail.
   this->test_device()->ClearDefaultResponseStatus(
       hci_spec::kLESetScanParameters);
+  this->test_device()->ClearDefaultResponseStatus(
+      hci_spec::kLESetExtendedScanParameters);
   this->test_device()->SetDefaultResponseStatus(
       hci_spec::kLESetScanEnable,
+      pw::bluetooth::emboss::StatusCode::HARDWARE_FAILURE);
+  this->test_device()->SetDefaultResponseStatus(
+      hci_spec::kLESetExtendedScanEnable,
       pw::bluetooth::emboss::StatusCode::HARDWARE_FAILURE);
 
   EXPECT_TRUE(this->StartScan(false));
