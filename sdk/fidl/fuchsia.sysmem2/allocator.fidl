@@ -6,6 +6,8 @@ library fuchsia.sysmem2;
 using zx;
 
 /// Allocates system memory buffers.
+///
+/// Epitaphs are not used in this protocol.
 @available(added=HEAD)
 @discoverable
 open protocol Allocator {
@@ -203,18 +205,21 @@ open protocol Allocator {
     ///   response arrives at the client. A client that isn't prepared to handle
     ///   weak sysmem VMOs, on seeing this field set, can close all handles to
     ///   the buffer and fail any associated request.
-    /// * error `ZX_ERR_NOT_FOUND` - the vmo isn't a sysmem VMO. Both strong and
-    ///   weak sysmem VMOs can be passed to this call, and the VMO handle passed
-    ///   in to this call itself keeps the VMO's info alive for purposes of
-    ///   responding to this call. Because of this, ZX_ERR_NOT_FOUND errors are
-    ///   unambiguous (even if there are no other handles to the VMO when
-    ///   calling; even if other handles are closed before the GetVmoInfo
-    ///   response arrives at the client).
-    /// * error `ZX_ERR_ACCESS_DENIED` The vmo isn't capable of being used with
-    ///   GetVmoInfo due to rights/capability attenuation.
-    /// * error `ZX_ERR_INTERNAL` The request failed for an unspecified reason.
-    /// * error `ZX_ERR_INVALID_ARGS` The vmo field wasn't set, or there was
-    ///   some other problem with the request field(s).
+    /// * error `[fuchsia.sysmem2/Error.NOT_FOUND]` - the vmo isn't a sysmem
+    ///   VMO. Both strong and weak sysmem VMOs can be passed to this call, and
+    ///   the VMO handle passed in to this call itself keeps the VMO's info
+    ///   alive for purposes of responding to this call. Because of this,
+    ///   ZX_ERR_NOT_FOUND errors are unambiguous (even if there are no other
+    ///   handles to the VMO when calling; even if other handles are closed
+    ///   before the GetVmoInfo response arrives at the client).
+    /// * error `[fuchsia.sysmem2/Error.HANDLE_ACCESS_DENIED]` The vmo isn't
+    ///   capable of being used with GetVmoInfo due to rights/capability
+    ///   attenuation. The VMO needs to be usable with [`zx_vmo_get_info`] with
+    ///   topic [`ZX_INFO_HANDLE_BASIC`].
+    /// * error `[fuchsia.sysmem2/Error.UNSPECIFIED]` The request failed for an
+    ///   unspecified reason. See the log for more info.
+    /// * error `[fuchsia.sysmem2/Error.PROTOCOL_DEVIATION]` The vmo field
+    ///   wasn't set, or there was some other problem with the request field(s).
     flexible GetVmoInfo(resource table {
         /// `vmo` is required to be set; ownership is transferred to the server
         /// so in most cases a client will duplicate a handle and transfer the
@@ -224,5 +229,5 @@ open protocol Allocator {
         1: buffer_collection_id uint64;
         2: buffer_index uint64;
         3: close_weak_asap zx.Handle:EVENTPAIR;
-    }) error zx.Status;
+    }) error Error;
 };

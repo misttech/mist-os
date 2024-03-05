@@ -12,7 +12,7 @@ namespace sysmem_driver {
 
 struct AllocationResult {
   const fuchsia_sysmem2::BufferCollectionInfo* buffer_collection_info = nullptr;
-  const zx_status_t status = ZX_OK;
+  const std::optional<fuchsia_sysmem2::Error> maybe_error;
 };
 
 }  // namespace sysmem_driver

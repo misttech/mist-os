@@ -14,6 +14,7 @@ fidl("fuchsia.sysmem2") {
     "allocator.fidl",
     "collection.fidl",
     "constraints.fidl",
+    "error.fidl",
     "overview.fidl",
     "results.fidl",
     "usages.fidl",

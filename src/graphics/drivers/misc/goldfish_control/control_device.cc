@@ -13,6 +13,7 @@
 #include <lib/ddk/platform-defs.h>
 #include <lib/ddk/trace/event.h>
 #include <lib/fit/defer.h>
+#include <lib/sysmem-version/sysmem-version.h>
 #include <zircon/syscalls.h>
 
 #include <memory>
@@ -978,12 +979,13 @@ fit::result<zx_status_t, BufferKey> Control::GetBufferKeyForVmo(const zx::vmo& v
   auto get_result = sysmem_->GetVmoInfo(std::move(request));
   if (!get_result.is_ok()) {
     if (get_result.error_value().is_domain_error() &&
-        get_result.error_value().domain_error() == ZX_ERR_NOT_FOUND) {
+        get_result.error_value().domain_error() == fuchsia_sysmem2::Error::kNotFound) {
       return fit::error(ZX_ERR_NOT_FOUND);
     }
-    zx_status_t get_vmo_info_status = get_result.error_value().is_domain_error()
-                                          ? get_result.error_value().domain_error()
-                                          : get_result.error_value().framework_error().status();
+    zx_status_t get_vmo_info_status =
+        get_result.error_value().is_domain_error()
+            ? sysmem::V1CopyFromV2Error(get_result.error_value().domain_error())
+            : get_result.error_value().framework_error().status();
     zxlogf(ERROR, "%s: GetVmoInfo failed: %d", kTag, get_vmo_info_status);
     return fit::error(get_vmo_info_status);
   }

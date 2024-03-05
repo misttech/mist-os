@@ -16,28 +16,29 @@
 namespace sysmem_driver {
 
 void BufferCollectionTokenGroup::V1::Sync(SyncCompleter::Sync& completer) {
-  parent_.SyncImpl(completer);
+  parent_.SyncImpl(ConnectionVersion::kVersion1, completer);
 }
 
 void BufferCollectionTokenGroup::V2::Sync(SyncCompleter::Sync& completer) {
-  parent_.SyncImpl(completer);
+  parent_.SyncImpl(ConnectionVersion::kVersion2, completer);
 }
 
 void BufferCollectionTokenGroup::V1::Close(CloseCompleter::Sync& completer) {
   if (!parent_.ReadyForAllocation()) {
-    parent_.FailSync(FROM_HERE, completer, ZX_ERR_BAD_STATE, "Close() before AllChildrenPresent()");
+    parent_.FailSync(FROM_HERE, ConnectionVersion::kVersion1, completer, ZX_ERR_BAD_STATE,
+                     "Close() before AllChildrenPresent()");
     return;
   }
-  parent_.ReleaseImpl(completer);
+  parent_.ReleaseImpl(ConnectionVersion::kVersion1, completer);
 }
 
 void BufferCollectionTokenGroup::V2::Release(ReleaseCompleter::Sync& completer) {
   if (!parent_.ReadyForAllocation()) {
-    parent_.FailSync(FROM_HERE, completer, ZX_ERR_BAD_STATE,
+    parent_.FailSync(FROM_HERE, ConnectionVersion::kVersion2, completer, ZX_ERR_BAD_STATE,
                      "Release() before AllChildrenPresent()");
     return;
   }
-  parent_.ReleaseImpl(completer);
+  parent_.ReleaseImpl(ConnectionVersion::kVersion2, completer);
 }
 
 void BufferCollectionTokenGroup::V1::GetNodeRef(GetNodeRefCompleter::Sync& completer) {
@@ -106,24 +107,25 @@ void BufferCollectionTokenGroup::V2::SetDebugTimeoutLogDeadline(
 
 void BufferCollectionTokenGroup::V1::SetVerboseLogging(
     SetVerboseLoggingCompleter::Sync& completer) {
-  parent_.SetVerboseLoggingImpl(completer);
+  parent_.SetVerboseLoggingImpl(ConnectionVersion::kVersion1, completer);
 }
 
 void BufferCollectionTokenGroup::V2::SetVerboseLogging(
     SetVerboseLoggingCompleter::Sync& completer) {
-  parent_.SetVerboseLoggingImpl(completer);
+  parent_.SetVerboseLoggingImpl(ConnectionVersion::kVersion2, completer);
 }
 
 template <typename Completer>
 bool BufferCollectionTokenGroup::CommonCreateChildStage1(
-    Completer& completer, std::optional<uint32_t> input_rights_attenuation_mask,
-    NodeProperties** out_node_properties) {
+    ConnectionVersion version, Completer& completer,
+    std::optional<uint32_t> input_rights_attenuation_mask, NodeProperties** out_node_properties) {
   if (is_done_) {
-    FailSync(FROM_HERE, completer, ZX_ERR_BAD_STATE, "CreateChild() after Close()");
+    FailSync(FROM_HERE, version, completer, ZX_ERR_BAD_STATE, "CreateChild() after Close()");
     return false;
   }
   if (is_all_children_present_) {
-    FailSync(FROM_HERE, completer, ZX_ERR_BAD_STATE, "CreateChild() after AllChildrenPresent()");
+    FailSync(FROM_HERE, version, completer, ZX_ERR_BAD_STATE,
+             "CreateChild() after AllChildrenPresent()");
     return false;
   }
   uint32_t rights_attenuation_mask = ZX_RIGHT_SAME_RIGHTS;
@@ -131,7 +133,7 @@ bool BufferCollectionTokenGroup::CommonCreateChildStage1(
     rights_attenuation_mask = input_rights_attenuation_mask.value();
   }
   if (rights_attenuation_mask == 0) {
-    FailSync(FROM_HERE, completer, ZX_ERR_INVALID_ARGS,
+    FailSync(FROM_HERE, version, completer, ZX_ERR_INVALID_ARGS,
              "CreateChild() rights_attenuation_mask 0 not permitted");
     return false;
   }
@@ -146,7 +148,7 @@ bool BufferCollectionTokenGroup::CommonCreateChildStage1(
 void BufferCollectionTokenGroup::V1::CreateChild(CreateChildRequest& request,
                                                  CreateChildCompleter::Sync& completer) {
   if (!request.token_request().has_value()) {
-    parent_.FailSync(FROM_HERE, completer, ZX_ERR_INVALID_ARGS,
+    parent_.FailSync(FROM_HERE, ConnectionVersion::kVersion1, completer, ZX_ERR_INVALID_ARGS,
                      "CreateChild() requires token_request set");
     return;
   }
@@ -156,7 +158,8 @@ void BufferCollectionTokenGroup::V1::CreateChild(CreateChildRequest& request,
     rights_attenuation_mask = request.rights_attenuation_mask().value();
   }
   NodeProperties* new_node_properties;
-  if (!parent_.CommonCreateChildStage1(completer, rights_attenuation_mask, &new_node_properties)) {
+  if (!parent_.CommonCreateChildStage1(ConnectionVersion::kVersion1, completer,
+                                       rights_attenuation_mask, &new_node_properties)) {
     return;
   }
 
@@ -168,7 +171,7 @@ void BufferCollectionTokenGroup::V1::CreateChild(CreateChildRequest& request,
 void BufferCollectionTokenGroup::V2::CreateChild(CreateChildRequest& request,
                                                  CreateChildCompleter::Sync& completer) {
   if (!request.token_request().has_value()) {
-    parent_.FailSync(FROM_HERE, completer, ZX_ERR_INVALID_ARGS,
+    parent_.FailSync(FROM_HERE, ConnectionVersion::kVersion2, completer, ZX_ERR_INVALID_ARGS,
                      "CreateChild() requires token_request set");
     return;
   }
@@ -182,7 +185,8 @@ void BufferCollectionTokenGroup::V2::CreateChild(CreateChildRequest& request,
     rights_attenuation_mask = request.rights_attenuation_mask().value();
   }
   NodeProperties* new_node_properties;
-  if (!parent_.CommonCreateChildStage1(completer, rights_attenuation_mask, &new_node_properties)) {
+  if (!parent_.CommonCreateChildStage1(ConnectionVersion::kVersion2, completer,
+                                       rights_attenuation_mask, &new_node_properties)) {
     return;
   }
 
@@ -194,17 +198,18 @@ void BufferCollectionTokenGroup::V2::CreateChild(CreateChildRequest& request,
 void BufferCollectionTokenGroup::V1::CreateChildrenSync(
     CreateChildrenSyncRequest& request, CreateChildrenSyncCompleter::Sync& completer) {
   if (parent_.is_done_) {
-    parent_.FailSync(FROM_HERE, completer, ZX_ERR_BAD_STATE, "CreateChildrenSync() after Close()");
+    parent_.FailSync(FROM_HERE, ConnectionVersion::kVersion1, completer, ZX_ERR_BAD_STATE,
+                     "CreateChildrenSync() after Close()");
     return;
   }
   if (parent_.is_all_children_present_) {
-    parent_.FailSync(FROM_HERE, completer, ZX_ERR_BAD_STATE,
+    parent_.FailSync(FROM_HERE, ConnectionVersion::kVersion1, completer, ZX_ERR_BAD_STATE,
                      "CreateChildrenSync() after AllChildrenPresent()");
     return;
   }
   for (auto& rights_attenuation_mask : request.rights_attenuation_masks()) {
     if (rights_attenuation_mask == 0) {
-      parent_.FailSync(FROM_HERE, completer, ZX_ERR_INVALID_ARGS,
+      parent_.FailSync(FROM_HERE, ConnectionVersion::kVersion1, completer, ZX_ERR_INVALID_ARGS,
                        "CreateChildrenSync() rights_attenuation_mask 0 not permitted");
       return;
     }
@@ -214,7 +219,7 @@ void BufferCollectionTokenGroup::V1::CreateChildrenSync(
     auto token_endpoints = fidl::CreateEndpoints<fuchsia_sysmem::BufferCollectionToken>();
     if (!token_endpoints.is_ok()) {
       parent_.FailSync(
-          FROM_HERE, completer, token_endpoints.status_value(),
+          FROM_HERE, ConnectionVersion::kVersion1, completer, token_endpoints.status_value(),
           "BufferCollectionTokenGroup::CreateChildrenSync() failed to create token channel.");
       return;
     }
@@ -235,11 +240,12 @@ void BufferCollectionTokenGroup::V1::CreateChildrenSync(
 void BufferCollectionTokenGroup::V2::CreateChildrenSync(
     CreateChildrenSyncRequest& request, CreateChildrenSyncCompleter::Sync& completer) {
   if (parent_.is_done_) {
-    parent_.FailSync(FROM_HERE, completer, ZX_ERR_BAD_STATE, "CreateChildrenSync() after Close()");
+    parent_.FailSync(FROM_HERE, ConnectionVersion::kVersion2, completer, ZX_ERR_BAD_STATE,
+                     "CreateChildrenSync() after Close()");
     return;
   }
   if (parent_.is_all_children_present_) {
-    parent_.FailSync(FROM_HERE, completer, ZX_ERR_BAD_STATE,
+    parent_.FailSync(FROM_HERE, ConnectionVersion::kVersion2, completer, ZX_ERR_BAD_STATE,
                      "CreateChildrenSync() after AllChildrenPresent()");
     return;
   }
@@ -248,13 +254,13 @@ void BufferCollectionTokenGroup::V2::CreateChildrenSync(
     // set, despite it sometimes requiring the client to send a few ZX_RIGHT_SAME_RIGHTS, just to
     // get the right number of children created (such as when the client is attenuating rights via
     // a separate Duplicate() / DuplicateSync()).
-    parent_.FailSync(FROM_HERE, completer, ZX_ERR_BAD_STATE,
+    parent_.FailSync(FROM_HERE, ConnectionVersion::kVersion2, completer, ZX_ERR_BAD_STATE,
                      "CreateChildrenSync() requires rights_attenuation_masks set");
     return;
   }
   for (auto& rights_attenuation_mask : *request.rights_attenuation_masks()) {
     if (rights_attenuation_mask == 0) {
-      parent_.FailSync(FROM_HERE, completer, ZX_ERR_INVALID_ARGS,
+      parent_.FailSync(FROM_HERE, ConnectionVersion::kVersion2, completer, ZX_ERR_INVALID_ARGS,
                        "CreateChildrenSync() rights_attenuation_mask 0 not permitted");
       return;
     }
@@ -264,7 +270,7 @@ void BufferCollectionTokenGroup::V2::CreateChildrenSync(
     auto token_endpoints = fidl::CreateEndpoints<fuchsia_sysmem2::BufferCollectionToken>();
     if (!token_endpoints.is_ok()) {
       parent_.FailSync(
-          FROM_HERE, completer, token_endpoints.status_value(),
+          FROM_HERE, ConnectionVersion::kVersion2, completer, token_endpoints.status_value(),
           "BufferCollectionTokenGroup::CreateChildrenSync() failed to create token channel.");
       return;
     }
@@ -285,13 +291,14 @@ void BufferCollectionTokenGroup::V2::CreateChildrenSync(
 }
 
 template <typename Completer>
-void BufferCollectionTokenGroup::CommonAllChildrenPresent(Completer& completer) {
+void BufferCollectionTokenGroup::CommonAllChildrenPresent(ConnectionVersion version,
+                                                          Completer& completer) {
   if (is_done_) {
-    FailSync(FROM_HERE, completer, ZX_ERR_BAD_STATE, "AllChildrenPresent() after Close()");
+    FailSync(FROM_HERE, version, completer, ZX_ERR_BAD_STATE, "AllChildrenPresent() after Close()");
     return;
   }
   if (is_all_children_present_) {
-    FailSync(FROM_HERE, completer, ZX_ERR_BAD_STATE,
+    FailSync(FROM_HERE, version, completer, ZX_ERR_BAD_STATE,
              "AllChildrenPresent() after AllChildrenPresent()");
     return;
   }
@@ -300,7 +307,8 @@ void BufferCollectionTokenGroup::CommonAllChildrenPresent(Completer& completer) 
     // children under a group if a client indicates that it may happen for a specific group. For now
     // a client can add a child that sets empty constraints, if it turns out after creating a group
     // that the group won't need to have any children.
-    FailSync(FROM_HERE, completer, ZX_ERR_BAD_STATE, "AllChildrenPresent() without any children");
+    FailSync(FROM_HERE, version, completer, ZX_ERR_BAD_STATE,
+             "AllChildrenPresent() without any children");
     return;
   }
   is_all_children_present_ = true;
@@ -309,18 +317,18 @@ void BufferCollectionTokenGroup::CommonAllChildrenPresent(Completer& completer) 
 
 void BufferCollectionTokenGroup::V1::AllChildrenPresent(
     AllChildrenPresentCompleter::Sync& completer) {
-  parent_.CommonAllChildrenPresent(completer);
+  parent_.CommonAllChildrenPresent(ConnectionVersion::kVersion1, completer);
 }
 
 void BufferCollectionTokenGroup::V2::AllChildrenPresent(
     AllChildrenPresentCompleter::Sync& completer) {
-  parent_.CommonAllChildrenPresent(completer);
+  parent_.CommonAllChildrenPresent(ConnectionVersion::kVersion2, completer);
 }
 
 void BufferCollectionTokenGroup::V2::handle_unknown_method(
     fidl::UnknownMethodMetadata<fuchsia_sysmem2::BufferCollectionTokenGroup> metadata,
     fidl::UnknownMethodCompleter::Sync& completer) {
-  parent_.FailSync(FROM_HERE, completer, ZX_ERR_NOT_SUPPORTED,
+  parent_.FailSync(FROM_HERE, ConnectionVersion::kVersion2, completer, ZX_ERR_NOT_SUPPORTED,
                    "token group unknown method - ordinal: %" PRIx64, metadata.method_ordinal);
 }
 
@@ -420,7 +428,7 @@ void BufferCollectionTokenGroup::CloseServerBinding(zx_status_t epitaph) {
     server_binding_v1_->Close(epitaph);
   }
   if (server_binding_v2_.has_value()) {
-    server_binding_v2_->Close(epitaph);
+    server_binding_v2_->Close(ZX_ERR_INTERNAL);
   }
   server_binding_v1_ = {};
   server_binding_v2_ = {};

@@ -29,7 +29,11 @@ BufferCollectionToken::~BufferCollectionToken() {
 
 void BufferCollectionToken::CloseServerBinding(zx_status_t epitaph) {
   if (server_binding_.has_value()) {
-    server_binding_->Close(epitaph);
+    if (last_seen_version_ == ConnectionVersion::kVersion1) {
+      server_binding_->Close(epitaph);
+    } else {
+      server_binding_->Close(ZX_ERR_INTERNAL);
+    }
   }
   server_binding_ = {};
   parent_device()->UntrackToken(this);
@@ -79,7 +83,7 @@ void BufferCollectionToken::CombinedTokenServer::DuplicateSyncV1(
   if (parent_.is_done_) {
     // Probably a Close() followed by DuplicateSync(), which is illegal and
     // causes the whole LogicalBufferCollection to fail.
-    parent_.FailSync(FROM_HERE, completer, ZX_ERR_BAD_STATE,
+    parent_.FailSync(FROM_HERE, ConnectionVersion::kVersion1, completer, ZX_ERR_BAD_STATE,
                      "BufferCollectionToken::DuplicateSync() attempted when is_done_");
     return;
   }
@@ -87,7 +91,7 @@ void BufferCollectionToken::CombinedTokenServer::DuplicateSyncV1(
 
   for (auto& rights_attenuation_mask : request.rights_attenuation_masks()) {
     if (rights_attenuation_mask == 0) {
-      parent_.FailSync(FROM_HERE, completer, ZX_ERR_INVALID_ARGS,
+      parent_.FailSync(FROM_HERE, ConnectionVersion::kVersion1, completer, ZX_ERR_INVALID_ARGS,
                        "DuplicateSync() rights_attenuation_mask 0 not permitted");
       return;
     }
@@ -96,7 +100,8 @@ void BufferCollectionToken::CombinedTokenServer::DuplicateSyncV1(
   for (auto& rights_attenuation_mask : request.rights_attenuation_masks()) {
     auto token_endpoints = fidl::CreateEndpoints<fuchsia_sysmem::BufferCollectionToken>();
     if (!token_endpoints.is_ok()) {
-      parent_.FailSync(FROM_HERE, completer, token_endpoints.status_value(),
+      parent_.FailSync(FROM_HERE, ConnectionVersion::kVersion1, completer,
+                       token_endpoints.status_value(),
                        "BufferCollectionToken::DuplicateSync() failed to create token channel.");
       return;
     }
@@ -126,19 +131,19 @@ void BufferCollectionToken::CombinedTokenServer::DuplicateSyncV2(
   if (parent_.is_done_) {
     // Probably a Close() followed by DuplicateSync(), which is illegal and
     // causes the whole LogicalBufferCollection to fail.
-    parent_.FailSync(FROM_HERE, completer, ZX_ERR_BAD_STATE,
+    parent_.FailSync(FROM_HERE, ConnectionVersion::kVersion2, completer, ZX_ERR_BAD_STATE,
                      "DuplicateSync() attempted when is_done_");
     return;
   }
   if (!request.rights_attenuation_masks().has_value()) {
-    parent_.FailSync(FROM_HERE, completer, ZX_ERR_BAD_STATE,
+    parent_.FailSync(FROM_HERE, ConnectionVersion::kVersion2, completer, ZX_ERR_BAD_STATE,
                      "DuplicateSync() requires rights_attenuation_masks set");
     return;
   }
 
   for (auto& rights_attenuation_mask : *request.rights_attenuation_masks()) {
     if (rights_attenuation_mask == 0) {
-      parent_.FailSync(FROM_HERE, completer, ZX_ERR_INVALID_ARGS,
+      parent_.FailSync(FROM_HERE, ConnectionVersion::kVersion2, completer, ZX_ERR_INVALID_ARGS,
                        "DuplicateSync() rights_attenuation_mask 0 not permitted");
       return;
     }
@@ -148,7 +153,8 @@ void BufferCollectionToken::CombinedTokenServer::DuplicateSyncV2(
   for (auto& rights_attenuation_mask : request.rights_attenuation_masks().value()) {
     auto token_endpoints = fidl::CreateEndpoints<fuchsia_sysmem2::BufferCollectionToken>();
     if (!token_endpoints.is_ok()) {
-      parent_.FailSync(FROM_HERE, completer, token_endpoints.status_value(),
+      parent_.FailSync(FROM_HERE, ConnectionVersion::kVersion2, completer,
+                       token_endpoints.status_value(),
                        "BufferCollectionToken::DuplicateSync() failed to create token channel.");
       return;
     }
@@ -172,12 +178,12 @@ void BufferCollectionToken::CombinedTokenServer::DuplicateSyncV2(
 
 template <typename Completer>
 bool BufferCollectionToken::CommonDuplicateStage1(uint32_t rights_attenuation_mask,
-                                                  Completer& completer,
+                                                  ConnectionVersion version, Completer& completer,
                                                   NodeProperties** out_node_properties) {
   if (is_done_) {
     // Probably a Close() followed by Duplicate(), which is illegal and
     // causes the whole LogicalBufferCollection to fail.
-    FailSync(FROM_HERE, completer, ZX_ERR_BAD_STATE,
+    FailSync(FROM_HERE, version, completer, ZX_ERR_BAD_STATE,
              "BufferCollectionToken::Duplicate() attempted when is_done_");
     return false;
   }
@@ -201,7 +207,8 @@ void BufferCollectionToken::CombinedTokenServer::DuplicateV1(
                  "logical_buffer_collection", &parent_.logical_buffer_collection());
   parent_.last_seen_version_ = ConnectionVersion::kVersion1;
   NodeProperties* new_node_properties;
-  if (!parent_.CommonDuplicateStage1(request.rights_attenuation_mask(), completer,
+  if (!parent_.CommonDuplicateStage1(request.rights_attenuation_mask(),
+                                     ConnectionVersion::kVersion1, completer,
                                      &new_node_properties)) {
     return;
   }
@@ -216,17 +223,18 @@ void BufferCollectionToken::CombinedTokenServer::DuplicateV2(
                  "logical_buffer_collection", &parent_.logical_buffer_collection());
   parent_.last_seen_version_ = ConnectionVersion::kVersion2;
   if (!request.rights_attenuation_mask().has_value()) {
-    parent_.FailSync(FROM_HERE, completer, ZX_ERR_BAD_STATE,
+    parent_.FailSync(FROM_HERE, ConnectionVersion::kVersion2, completer, ZX_ERR_BAD_STATE,
                      "Duplicate() requires rights_attenuation_mask set");
     return;
   }
   if (!request.token_request().has_value()) {
-    parent_.FailSync(FROM_HERE, completer, ZX_ERR_BAD_STATE,
+    parent_.FailSync(FROM_HERE, ConnectionVersion::kVersion2, completer, ZX_ERR_BAD_STATE,
                      "Duplicate() requires token_request set");
     return;
   }
   NodeProperties* new_node_properties;
-  if (!parent_.CommonDuplicateStage1(request.rights_attenuation_mask().value(), completer,
+  if (!parent_.CommonDuplicateStage1(request.rights_attenuation_mask().value(),
+                                     ConnectionVersion::kVersion2, completer,
                                      &new_node_properties)) {
     return;
   }
@@ -237,35 +245,35 @@ void BufferCollectionToken::CombinedTokenServer::DuplicateV2(
 
 void BufferCollectionToken::CombinedTokenServer::SyncV1(SyncV1Completer::Sync& completer) {
   parent_.last_seen_version_ = ConnectionVersion::kVersion1;
-  parent_.SyncImpl(completer);
+  parent_.SyncImpl(ConnectionVersion::kVersion1, completer);
 }
 
 void BufferCollectionToken::CombinedTokenServer::SyncV2(SyncV2Completer::Sync& completer) {
   parent_.last_seen_version_ = ConnectionVersion::kVersion2;
-  parent_.SyncImpl(completer);
+  parent_.SyncImpl(ConnectionVersion::kVersion2, completer);
 }
 
 void BufferCollectionToken::CombinedTokenServer::DeprecatedSyncV1(
     DeprecatedSyncV1Completer::Sync& completer) {
   parent_.last_seen_version_ = ConnectionVersion::kVersion1;
-  parent_.SyncImpl(completer);
+  parent_.SyncImpl(ConnectionVersion::kVersion1, completer);
 }
 
 // Clean token close without causing LogicalBufferCollection failure.
 void BufferCollectionToken::CombinedTokenServer::CloseV1(CloseV1Completer::Sync& completer) {
   parent_.last_seen_version_ = ConnectionVersion::kVersion1;
-  parent_.TokenReleaseImpl(completer);
+  parent_.TokenReleaseImpl(ConnectionVersion::kVersion1, completer);
 }
 
 void BufferCollectionToken::CombinedTokenServer::ReleaseV2(ReleaseV2Completer::Sync& completer) {
   parent_.last_seen_version_ = ConnectionVersion::kVersion2;
-  parent_.TokenReleaseImpl(completer);
+  parent_.TokenReleaseImpl(ConnectionVersion::kVersion2, completer);
 }
 
 void BufferCollectionToken::CombinedTokenServer::DeprecatedCloseV1(
     DeprecatedCloseV1Completer::Sync& completer) {
   parent_.last_seen_version_ = ConnectionVersion::kVersion1;
-  parent_.TokenReleaseImpl(completer);
+  parent_.TokenReleaseImpl(ConnectionVersion::kVersion1, completer);
 }
 
 void BufferCollectionToken::OnServerKoid() {
@@ -368,7 +376,7 @@ void BufferCollectionToken::CombinedTokenServer::SetDispensableV2(
 void BufferCollectionToken::CombinedTokenServer::handle_unknown_method(
     fidl::UnknownMethodMetadata<fuchsia_sysmem2_internal::CombinedBufferCollectionToken> metadata,
     fidl::UnknownMethodCompleter::Sync& completer) {
-  parent_.FailSync(FROM_HERE, completer, ZX_ERR_NOT_SUPPORTED,
+  parent_.FailSync(FROM_HERE, parent_.last_seen_version_, completer, ZX_ERR_NOT_SUPPORTED,
                    "token unknown method - ordinal: %" PRIx64, metadata.method_ordinal);
 }
 
@@ -381,11 +389,11 @@ void BufferCollectionToken::SetDispensableInternal() {
 
 template <typename Completer>
 bool BufferCollectionToken::CommonCreateBufferCollectionTokenGroupStage1(
-    Completer& completer, NodeProperties** out_node_properties) {
+    ConnectionVersion version, Completer& completer, NodeProperties** out_node_properties) {
   if (is_done_) {
     // Probably a Close() followed by Duplicate(), which is illegal and
     // causes the whole LogicalBufferCollection to fail.
-    FailSync(FROM_HERE, completer, ZX_ERR_BAD_STATE,
+    FailSync(FROM_HERE, version, completer, ZX_ERR_BAD_STATE,
              "BufferCollectionToken::CreateBufferCollectionTokenGroup() attempted when is_done_");
     return false;
   }
@@ -401,7 +409,8 @@ void BufferCollectionToken::CombinedTokenServer::CreateBufferCollectionTokenGrou
                  this, "logical_buffer_collection", &parent_.logical_buffer_collection());
   parent_.last_seen_version_ = ConnectionVersion::kVersion1;
   NodeProperties* new_node_properties;
-  if (!parent_.CommonCreateBufferCollectionTokenGroupStage1(completer, &new_node_properties)) {
+  if (!parent_.CommonCreateBufferCollectionTokenGroupStage1(ConnectionVersion::kVersion1, completer,
+                                                            &new_node_properties)) {
     return;
   }
   parent_.logical_buffer_collection().CreateBufferCollectionTokenGroupV1(
@@ -416,12 +425,13 @@ void BufferCollectionToken::CombinedTokenServer::CreateBufferCollectionTokenGrou
                  this, "logical_buffer_collection", &parent_.logical_buffer_collection());
   parent_.last_seen_version_ = ConnectionVersion::kVersion2;
   if (!request.group_request().has_value()) {
-    parent_.FailSync(FROM_HERE, completer, ZX_ERR_BAD_STATE,
+    parent_.FailSync(FROM_HERE, ConnectionVersion::kVersion2, completer, ZX_ERR_BAD_STATE,
                      "CreateBufferCollectionTokenGroup() requires group_request set");
     return;
   }
   NodeProperties* new_node_properties;
-  if (!parent_.CommonCreateBufferCollectionTokenGroupStage1(completer, &new_node_properties)) {
+  if (!parent_.CommonCreateBufferCollectionTokenGroupStage1(ConnectionVersion::kVersion2, completer,
+                                                            &new_node_properties)) {
     return;
   }
   parent_.logical_buffer_collection().CreateBufferCollectionTokenGroupV2(
@@ -432,13 +442,13 @@ void BufferCollectionToken::CombinedTokenServer::CreateBufferCollectionTokenGrou
 void BufferCollectionToken::CombinedTokenServer::SetVerboseLoggingV1(
     SetVerboseLoggingV1Completer::Sync& completer) {
   parent_.last_seen_version_ = ConnectionVersion::kVersion1;
-  parent_.SetVerboseLoggingImpl(completer);
+  parent_.SetVerboseLoggingImpl(ConnectionVersion::kVersion1, completer);
 }
 
 void BufferCollectionToken::CombinedTokenServer::SetVerboseLoggingV2(
     SetVerboseLoggingV2Completer::Sync& completer) {
   parent_.last_seen_version_ = ConnectionVersion::kVersion2;
-  parent_.SetVerboseLoggingImpl(completer);
+  parent_.SetVerboseLoggingImpl(ConnectionVersion::kVersion2, completer);
 }
 
 void BufferCollectionToken::CombinedTokenServer::GetNodeRefV1(

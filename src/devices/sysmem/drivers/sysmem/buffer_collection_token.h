@@ -29,16 +29,16 @@ class BufferCollectionToken : public Node, public LoggingMixin {
       NodeProperties* new_node_properties, const TokenServerEnd& server_end);
 
   template <class CompleterSync>
-  void TokenReleaseImpl(CompleterSync& completer) {
+  void TokenReleaseImpl(ConnectionVersion version, CompleterSync& completer) {
     // BufferCollectionToken has one additional error case we want to check, so check before calling
     // Node::CloseImpl().
     if (buffer_collection_request_) {
-      FailSync(FROM_HERE, completer, ZX_ERR_BAD_STATE,
+      FailSync(FROM_HERE, version, completer, ZX_ERR_BAD_STATE,
                "BufferCollectionToken::Close()/Release() when buffer_collection_request_");
       // We're failing async - no need to try to fail sync.
       return;
     }
-    ReleaseImpl(completer);
+    ReleaseImpl(version, completer);
   }
 
   void OnServerKoid();
@@ -172,11 +172,11 @@ class BufferCollectionToken : public Node, public LoggingMixin {
   void FailAsync(Location location, zx_status_t status, const char* format, ...);
 
   template <typename Completer>
-  bool CommonDuplicateStage1(uint32_t rights_attenuation_mask, Completer& completer,
-                             NodeProperties** out_node_properties);
+  bool CommonDuplicateStage1(uint32_t rights_attenuation_mask, ConnectionVersion version,
+                             Completer& completer, NodeProperties** out_node_properties);
 
   template <typename Completer>
-  bool CommonCreateBufferCollectionTokenGroupStage1(Completer& completer,
+  bool CommonCreateBufferCollectionTokenGroupStage1(ConnectionVersion version, Completer& completer,
                                                     NodeProperties** out_node_properties);
 
   std::optional<CombinedTokenServer> server_;

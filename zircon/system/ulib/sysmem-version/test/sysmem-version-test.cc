@@ -278,7 +278,8 @@ void random(bool* field) {
 
 template <>
 void random<v1::HeapType>(v1::HeapType* field) {
-  // TODO(https://fxbug.dev/42130439): Use generated-code array of valid values instead, when/if available.
+  // TODO(https://fxbug.dev/42130439): Use generated-code array of valid values instead, when/if
+  // available.
   static constexpr uint64_t valid[] = {
       /*SYSTEM_RAM =*/0u,
       /*AMLOGIC_SECURE =*/1152921504606912512u,
@@ -299,7 +300,8 @@ static_assert(std::is_same_v<v1::wire::HeapType, v1::HeapType>);
 
 template <>
 void random<v1::PixelFormatType>(v1::PixelFormatType* field) {
-  // TODO(https://fxbug.dev/42130439): Use generated-code array of valid values instead, when/if available.
+  // TODO(https://fxbug.dev/42130439): Use generated-code array of valid values instead, when/if
+  // available.
   static constexpr uint32_t valid[] = {
       /*INVALID =*/0u,
       /*R8G8B8A8 =*/1u,
@@ -333,7 +335,8 @@ static_assert(std::is_same_v<v1::wire::PixelFormatType, v1::PixelFormatType>);
 
 template <>
 void random<v1::ColorSpaceType>(v1::ColorSpaceType* field) {
-  // TODO(https://fxbug.dev/42130439): Use generated-code array of valid values instead, when/if available.
+  // TODO(https://fxbug.dev/42130439): Use generated-code array of valid values instead, when/if
+  // available.
   static constexpr uint32_t valid[] = {
       /*INVALID =*/0u,
       /*SRGB =*/1u,
@@ -357,7 +360,8 @@ static_assert(std::is_same_v<v1::wire::ColorSpaceType, v1::ColorSpaceType>);
 
 template <>
 void random<v1::CoherencyDomain>(v1::CoherencyDomain* field) {
-  // TODO(https://fxbug.dev/42130439): Use generated-code array of valid values instead, when/if available.
+  // TODO(https://fxbug.dev/42130439): Use generated-code array of valid values instead, when/if
+  // available.
   static constexpr uint32_t valid[] = {
       /*CPU =*/0u,
       /*RAM =*/1u,
@@ -1230,5 +1234,25 @@ TEST(SysmemVersion, HeapType) {
     EXPECT_EQ(v2_1, v2_2);
     uint64_t heap_type_v2_2 = static_cast<uint64_t>(v2_2);
     EXPECT_EQ(heap_type_v2_2, heap_type_v2);
+  }
+}
+
+TEST(SysmemVersion, ErrorSpaceConversion) {
+  using Error = fuchsia_sysmem2::Error;
+  const std::pair<Error, zx_status_t> errors[] = {
+      {Error::kUnspecified, ZX_ERR_INTERNAL},
+      {Error::kProtocolDeviation, ZX_ERR_INVALID_ARGS},
+      {Error::kNotFound, ZX_ERR_NOT_FOUND},
+      {Error::kHandleAccessDenied, ZX_ERR_ACCESS_DENIED},
+      {Error::kNoMemory, ZX_ERR_NO_MEMORY},
+      {Error::kConstraintsIntersectionEmpty, ZX_ERR_NOT_SUPPORTED},
+      {Error::kPending, ZX_ERR_UNAVAILABLE},
+      {Error::kTooManyGroupChildCombinations, ZX_ERR_OUT_OF_RANGE},
+  };
+  for (auto& pair : errors) {
+    zx_status_t zx_status = sysmem::V1CopyFromV2Error(pair.first);
+    EXPECT_EQ(pair.second, zx_status);
+    Error error = sysmem::V2CopyFromV1Error(pair.second);
+    EXPECT_EQ(pair.first, error);
   }
 }

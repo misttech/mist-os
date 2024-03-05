@@ -57,8 +57,10 @@ class Node : public fbl::RefCounted<Node> {
 
   void SetErrorHandler(fit::function<void(zx_status_t)> error_handler);
 
-  // The Node must have 0 children to call Fail().
-  void Fail(zx_status_t epitaph);
+  // The Node must have 0 children to call Fail(). The maybe_error is translated to an epitaph for
+  // sysmem(1), and ignored for sysmem2 (epitaph always ZX_ERR_INTERNAL). In both cases the channel
+  // is closed.
+  void Fail(fuchsia_sysmem2::Error error);
 
   // Not all Node(s) that are ReadyForAllocation() have buffer_collection_constraints().  In
   // particular an OrphanedNode is always ReadyForAllocation(), but may or may not have
@@ -142,25 +144,29 @@ class Node : public fbl::RefCounted<Node> {
                                            ErrorHandlerWrapper error_handler_wrapper) = 0;
 
   template <typename Completer>
-  void FailSync(Location location, Completer& completer, zx_status_t status, const char* format,
-                ...) {
+  void FailSync(Location location, ConnectionVersion version, Completer& completer,
+                zx_status_t status, const char* format, ...) {
     va_list args;
     va_start(args, format);
     logical_buffer_collection().VLogClientError(location, &node_properties(), format, args);
     va_end(args);
 
-    completer.Close(status);
+    if (version == ConnectionVersion::kVersion1) {
+      completer.Close(status);
+    } else {
+      completer.Close(ZX_ERR_INTERNAL);
+    }
     async_failure_result_ = status;
   }
 
   template <class SyncCompleterSync>
-  void SyncImpl(SyncCompleterSync& completer) {
+  void SyncImpl(ConnectionVersion version, SyncCompleterSync& completer) {
     TRACE_DURATION("gfx", "Node::SyncImpl", "this", this, "logical_buffer_collection",
                    &logical_buffer_collection());
     if (is_done_) {
       // Probably a Release() followed by Sync(), which is illegal and
       // causes the whole LogicalBufferCollection to fail.
-      FailSync(FROM_HERE, completer, ZX_ERR_BAD_STATE, "Sync() after Close()/Release()");
+      FailSync(FROM_HERE, version, completer, ZX_ERR_BAD_STATE, "Sync() after Close()/Release()");
       return;
     }
 
@@ -168,9 +174,10 @@ class Node : public fbl::RefCounted<Node> {
   }
 
   template <class ReleaseCompleterSync>
-  void ReleaseImpl(ReleaseCompleterSync& completer) {
+  void ReleaseImpl(ConnectionVersion version, ReleaseCompleterSync& completer) {
     if (is_done_) {
-      FailSync(FROM_HERE, completer, ZX_ERR_BAD_STATE, "Close()/Release() after Close()/Release()");
+      FailSync(FROM_HERE, version, completer, ZX_ERR_BAD_STATE,
+               "Close()/Release() after Close()/Release()");
       return;
     }
     // We still want to enforce that the client doesn't send any other messages
@@ -183,7 +190,8 @@ class Node : public fbl::RefCounted<Node> {
   template <class SetNameRequestView, class SetNameCompleterSync>
   void SetNameImplV1(SetNameRequestView request, SetNameCompleterSync& completer) {
     if (is_done_) {
-      FailSync(FROM_HERE, completer, ZX_ERR_BAD_STATE, "SetName() after Close()");
+      FailSync(FROM_HERE, ConnectionVersion::kVersion1, completer, ZX_ERR_BAD_STATE,
+               "SetName() after Close()");
       return;
     }
     logical_buffer_collection().SetName(request.priority(),
@@ -193,15 +201,18 @@ class Node : public fbl::RefCounted<Node> {
   template <class SetNameRequest, class SetNameCompleterSync>
   void SetNameImplV2(SetNameRequest& request, SetNameCompleterSync& completer) {
     if (is_done_) {
-      FailSync(FROM_HERE, completer, ZX_ERR_BAD_STATE, "SetName() after Release()");
+      FailSync(FROM_HERE, ConnectionVersion::kVersion2, completer, ZX_ERR_BAD_STATE,
+               "SetName() after Release()");
       return;
     }
     if (!request.priority().has_value()) {
-      FailSync(FROM_HERE, completer, ZX_ERR_BAD_STATE, "SetName() requires priority set");
+      FailSync(FROM_HERE, ConnectionVersion::kVersion2, completer, ZX_ERR_BAD_STATE,
+               "SetName() requires priority set");
       return;
     }
     if (!request.name().has_value()) {
-      FailSync(FROM_HERE, completer, ZX_ERR_BAD_STATE, "SetName() requires name set");
+      FailSync(FROM_HERE, ConnectionVersion::kVersion2, completer, ZX_ERR_BAD_STATE,
+               "SetName() requires name set");
       return;
     }
     logical_buffer_collection().SetName(
@@ -213,7 +224,8 @@ class Node : public fbl::RefCounted<Node> {
   void SetDebugClientInfoImplV1(SetDebugClientInfoRequestView request,
                                 SetDebugClientInfoCompleterSync& completer) {
     if (is_done_) {
-      FailSync(FROM_HERE, completer, ZX_ERR_BAD_STATE, "SetDebugClientInfo() after Close()");
+      FailSync(FROM_HERE, ConnectionVersion::kVersion1, completer, ZX_ERR_BAD_STATE,
+               "SetDebugClientInfo() after Close()");
       return;
     }
 
@@ -228,11 +240,13 @@ class Node : public fbl::RefCounted<Node> {
   void SetDebugClientInfoImplV2(SetDebugClientInfoRequest& request,
                                 SetDebugClientInfoCompleterSync& completer) {
     if (is_done_) {
-      FailSync(FROM_HERE, completer, ZX_ERR_BAD_STATE, "SetDebugClientInfo() after Release()");
+      FailSync(FROM_HERE, ConnectionVersion::kVersion2, completer, ZX_ERR_BAD_STATE,
+               "SetDebugClientInfo() after Release()");
       return;
     }
     if (!request.name().has_value()) {
-      FailSync(FROM_HERE, completer, ZX_ERR_BAD_STATE, "SetDebugClientInfo() requires name set");
+      FailSync(FROM_HERE, ConnectionVersion::kVersion2, completer, ZX_ERR_BAD_STATE,
+               "SetDebugClientInfo() requires name set");
       return;
     }
 
@@ -253,7 +267,7 @@ class Node : public fbl::RefCounted<Node> {
   void SetDebugTimeoutLogDeadlineImplV1(SetDebugTimeoutLogDeadlineRequestView request,
                                         SetDebugTimeoutLogDeadlineCompleterSync& completer) {
     if (is_done_) {
-      FailSync(FROM_HERE, completer, ZX_ERR_BAD_STATE,
+      FailSync(FROM_HERE, ConnectionVersion::kVersion1, completer, ZX_ERR_BAD_STATE,
                "SetDebugTimeoutLogDeadline() after Close()");
       return;
     }
@@ -264,12 +278,12 @@ class Node : public fbl::RefCounted<Node> {
   void SetDebugTimeoutLogDeadlineImplV2(SetDebugTimeoutLogDeadlineRequest& request,
                                         SetDebugTimeoutLogDeadlineCompleterSync& completer) {
     if (is_done_) {
-      FailSync(FROM_HERE, completer, ZX_ERR_BAD_STATE,
+      FailSync(FROM_HERE, ConnectionVersion::kVersion2, completer, ZX_ERR_BAD_STATE,
                "SetDebugTimeoutLogDeadline() after Release()");
       return;
     }
     if (!request.deadline().has_value()) {
-      FailSync(FROM_HERE, completer, ZX_ERR_BAD_STATE,
+      FailSync(FROM_HERE, ConnectionVersion::kVersion2, completer, ZX_ERR_BAD_STATE,
                "SetDebugTimeoutLogDeadline() requires deadline set");
       return;
     }
@@ -277,9 +291,9 @@ class Node : public fbl::RefCounted<Node> {
   }
 
   template <class SetVerboseLoggingCompleterSync>
-  void SetVerboseLoggingImpl(SetVerboseLoggingCompleterSync& completer) {
+  void SetVerboseLoggingImpl(ConnectionVersion version, SetVerboseLoggingCompleterSync& completer) {
     if (is_done_) {
-      FailSync(FROM_HERE, completer, ZX_ERR_BAD_STATE,
+      FailSync(FROM_HERE, version, completer, ZX_ERR_BAD_STATE,
                "SetVerboseLogging() after Close()/Release()");
       return;
     }
@@ -287,9 +301,11 @@ class Node : public fbl::RefCounted<Node> {
   }
 
   template <typename GetNodeRefCompleterSync>
-  bool CommonGetNodeRefImplStage1(GetNodeRefCompleterSync& completer, zx::event* out_to_vend) {
+  bool CommonGetNodeRefImplStage1(ConnectionVersion version, GetNodeRefCompleterSync& completer,
+                                  zx::event* out_to_vend) {
     if (is_done_) {
-      FailSync(FROM_HERE, completer, ZX_ERR_BAD_STATE, "GetNodeRef() after Close()/Release()");
+      FailSync(FROM_HERE, version, completer, ZX_ERR_BAD_STATE,
+               "GetNodeRef() after Close()/Release()");
       return false;
     }
     // No process actually needs to wait on or signal this event.  It's just a generic handle that
@@ -306,7 +322,7 @@ class Node : public fbl::RefCounted<Node> {
   template <class GetNodeRefCompleterSync>
   void GetNodeRefImplV1(GetNodeRefCompleterSync& completer) {
     zx::event to_vend;
-    if (!CommonGetNodeRefImplStage1(completer, &to_vend)) {
+    if (!CommonGetNodeRefImplStage1(ConnectionVersion::kVersion1, completer, &to_vend)) {
       return;
     }
     completer.Reply(std::move(to_vend));
@@ -315,7 +331,7 @@ class Node : public fbl::RefCounted<Node> {
   template <class GetNodeRefCompleterSync, class Response = fuchsia_sysmem2::NodeGetNodeRefResponse>
   void GetNodeRefImplV2(GetNodeRefCompleterSync& completer) {
     zx::event to_vend;
-    if (!CommonGetNodeRefImplStage1(completer, &to_vend)) {
+    if (!CommonGetNodeRefImplStage1(ConnectionVersion::kVersion2, completer, &to_vend)) {
       return;
     }
     Response response;
@@ -324,9 +340,10 @@ class Node : public fbl::RefCounted<Node> {
   }
 
   template <typename Completer>
-  bool CommonIsAlternateFor(zx::event node_ref, Completer& completer, bool* out_result) {
+  bool CommonIsAlternateFor(zx::event node_ref, ConnectionVersion version, Completer& completer,
+                            bool* out_result) {
     if (is_done_) {
-      FailSync(FROM_HERE, completer, ZX_ERR_BAD_STATE, "IsAlternateFor() after Release()");
+      FailSync(FROM_HERE, version, completer, ZX_ERR_BAD_STATE, "IsAlternateFor() after Release()");
       return false;
     }
     zx_koid_t node_ref_koid;
@@ -377,7 +394,8 @@ class Node : public fbl::RefCounted<Node> {
   void IsAlternateForImplV1(IsAlternateForRequest& request,
                             IsAlternateForCompleterSync& completer) {
     bool is_alternate_for;
-    if (!CommonIsAlternateFor(std::move(request.node_ref()), completer, &is_alternate_for)) {
+    if (!CommonIsAlternateFor(std::move(request.node_ref()), ConnectionVersion::kVersion1,
+                              completer, &is_alternate_for)) {
       return;
     }
     Response response;
@@ -390,11 +408,13 @@ class Node : public fbl::RefCounted<Node> {
   void IsAlternateForImplV2(IsAlternateForRequest& request,
                             IsAlternateForCompleterSync& completer) {
     if (!request.node_ref().has_value()) {
-      FailSync(FROM_HERE, completer, ZX_ERR_BAD_STATE, "IsAlternateFor() requires node_ref set");
+      FailSync(FROM_HERE, ConnectionVersion::kVersion2, completer, ZX_ERR_BAD_STATE,
+               "IsAlternateFor() requires node_ref set");
       return;
     }
     bool is_alernate_for;
-    if (!CommonIsAlternateFor(std::move(request.node_ref().value()), completer, &is_alernate_for)) {
+    if (!CommonIsAlternateFor(std::move(request.node_ref().value()), ConnectionVersion::kVersion2,
+                              completer, &is_alernate_for)) {
       return;
     }
     Response response;
@@ -406,7 +426,8 @@ class Node : public fbl::RefCounted<Node> {
             class Response = fuchsia_sysmem2::NodeGetBufferCollectionIdResponse>
   void GetBufferCollectionIdImplV2(GetBufferCollectionIdCompleterSync& completer) {
     if (is_done_) {
-      FailSync(FROM_HERE, completer, ZX_ERR_BAD_STATE, "GetBufferCollectionId after Release");
+      FailSync(FROM_HERE, ConnectionVersion::kVersion2, completer, ZX_ERR_BAD_STATE,
+               "GetBufferCollectionId after Release");
       return;
     }
     Response response;
@@ -417,13 +438,15 @@ class Node : public fbl::RefCounted<Node> {
   template <class SetWeakCompleterSync>
   void SetWeakImplV2(SetWeakCompleterSync& completer) {
     if (is_done_) {
-      FailSync(FROM_HERE, completer, ZX_ERR_BAD_STATE, "SetWeak after Release");
+      FailSync(FROM_HERE, ConnectionVersion::kVersion2, completer, ZX_ERR_BAD_STATE,
+               "SetWeak after Release");
       return;
     }
     if (ReadyForAllocation()) {
       // BufferCollection after SetConstraints, or BufferCollectionTokenGroup after
       // AllChildrenPresent.
-      FailSync(FROM_HERE, completer, ZX_ERR_BAD_STATE, "SetWeak after ready for allocation");
+      FailSync(FROM_HERE, ConnectionVersion::kVersion2, completer, ZX_ERR_BAD_STATE,
+               "SetWeak after ready for allocation");
       return;
     }
     node_properties().SetWeak();
@@ -435,7 +458,8 @@ class Node : public fbl::RefCounted<Node> {
   template <class SetWeakOkRequest, class SetWeakOkCompleterSync>
   void SetWeakOkImplV2(SetWeakOkRequest& request, SetWeakOkCompleterSync& completer) {
     if (is_done_) {
-      FailSync(FROM_HERE, completer, ZX_ERR_BAD_STATE, "SetWeakOk() when already is_done_");
+      FailSync(FROM_HERE, ConnectionVersion::kVersion2, completer, ZX_ERR_BAD_STATE,
+               "SetWeakOk() when already is_done_");
       return;
     }
     bool for_child_nodes_also =
@@ -443,7 +467,7 @@ class Node : public fbl::RefCounted<Node> {
     node_properties().SetWeakOk(for_child_nodes_also);
   }
 
-  void CloseChannel(zx_status_t epitaph);
+  void CloseChannel(fuchsia_sysmem2::Error error);
 
   virtual void CloseServerBinding(zx_status_t epitaph) = 0;
 

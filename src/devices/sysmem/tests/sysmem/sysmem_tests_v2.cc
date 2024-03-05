@@ -39,6 +39,7 @@ using GroupV2 = fidl::SyncClient<v2::BufferCollectionTokenGroup>;
 using SharedTokenV2 = std::shared_ptr<TokenV2>;
 using SharedCollectionV2 = std::shared_ptr<CollectionV2>;
 using SharedGroupV2 = std::shared_ptr<GroupV2>;
+using Error = fuchsia_sysmem2::Error;
 
 zx::result<fidl::SyncClient<fuchsia_sysmem2::Allocator>> connect_to_sysmem_service_v2();
 zx_status_t verify_connectivity_v2(fidl::SyncClient<fuchsia_sysmem2::Allocator>& allocator);
@@ -701,13 +702,13 @@ bool AttachTokenSucceedsV2(
   auto check_1_result = collection_1->CheckAllBuffersAllocated();
   EXPECT_FALSE(check_1_result.is_ok());
   EXPECT_TRUE(check_1_result.error_value().is_domain_error());
-  EXPECT_EQ(check_1_result.error_value().domain_error(), ZX_ERR_UNAVAILABLE);
+  EXPECT_EQ(check_1_result.error_value().domain_error(), fuchsia_sysmem2::Error::kPending);
   IF_FAILURES_RETURN_FALSE();
 
   auto check_2_result = collection_2->CheckAllBuffersAllocated();
   EXPECT_FALSE(check_2_result.is_ok());
   EXPECT_TRUE(check_2_result.error_value().is_domain_error());
-  EXPECT_EQ(check_2_result.error_value().domain_error(), ZX_ERR_UNAVAILABLE);
+  EXPECT_EQ(check_2_result.error_value().domain_error(), fuchsia_sysmem2::Error::kPending);
   IF_FAILURES_RETURN_FALSE();
 
   fidl::ClientEnd<v2::BufferCollectionToken> token_client_3;
@@ -1854,11 +1855,11 @@ TEST(Sysmem, MultipleParticipantsV2) {
   auto check_result_1 = collection_1->CheckAllBuffersAllocated();
   ASSERT_FALSE(check_result_1.is_ok());
   ASSERT_TRUE(check_result_1.error_value().is_domain_error());
-  EXPECT_EQ(check_result_1.error_value().domain_error(), ZX_ERR_UNAVAILABLE);
+  EXPECT_EQ(check_result_1.error_value().domain_error(), fuchsia_sysmem2::Error::kPending);
   auto check_result_2 = collection_2->CheckAllBuffersAllocated();
   ASSERT_FALSE(check_result_2.is_ok());
   ASSERT_TRUE(check_result_2.error_value().is_domain_error());
-  EXPECT_EQ(check_result_2.error_value().domain_error(), ZX_ERR_UNAVAILABLE);
+  EXPECT_EQ(check_result_2.error_value().domain_error(), fuchsia_sysmem2::Error::kPending);
 
   v2::BufferCollectionSetConstraintsRequest set_constraints_request3;
   set_constraints_request3.constraints() = std::move(constraints_2);
@@ -2652,7 +2653,7 @@ TEST(Sysmem, ConstraintsRetainedBeyondReleaseV2) {
   auto check_result_2 = collection_2->CheckAllBuffersAllocated();
   ASSERT_FALSE(check_result_2.is_ok());
   ASSERT_TRUE(check_result_2.error_value().is_domain_error());
-  EXPECT_EQ(check_result_2.error_value().domain_error(), ZX_ERR_UNAVAILABLE);
+  EXPECT_EQ(check_result_2.error_value().domain_error(), fuchsia_sysmem2::Error::kPending);
 
   v2::BufferCollectionSetConstraintsRequest set_constraints_request2;
   set_constraints_request2.constraints() = std::move(constraints_2);
@@ -7122,6 +7123,40 @@ TEST(Sysmem, RequireBytesPerRowAtPixelBoundary) {
                         ->require_bytes_per_row_at_pixel_boundary()
                         .value());
     ASSERT_EQ(12, info.settings()->image_format_constraints()->bytes_per_row_divisor().value());
+  }
+}
+
+// TODO(b/316646315): This test can be converted to using the normal variant not the "New" variant
+// (after the non-"New" variant uses Error and is covered by the other tests as well).
+TEST(Sysmem, WaitForAllBuffersAllocatedError) {
+  {
+    // test success
+    auto parent_token = create_initial_token_v2();
+    auto parent = convert_token_to_collection_v2(std::move(parent_token));
+    set_min_camping_constraints_v2(parent, 1);
+    auto wait_new_result = parent->WaitForAllBuffersAllocatedNew();
+    EXPECT_TRUE(wait_new_result.is_ok());
+    EXPECT_EQ(1ull, wait_new_result->buffer_collection_info()->buffers()->size());
+  }
+
+  {
+    auto parent_token = create_initial_token_v2();
+    auto child_token = create_token_under_token_v2(parent_token);
+
+    auto parent = convert_token_to_collection_v2(std::move(parent_token));
+    set_picky_constraints_v2(parent, zx_system_get_page_size());
+
+    auto child = convert_token_to_collection_v2(std::move(child_token));
+    // won't work with parent's constraints
+    set_picky_constraints_v2(child, 2 * zx_system_get_page_size());
+
+    auto wait_new_result = parent->WaitForAllBuffersAllocatedNew();
+    EXPECT_FALSE(wait_new_result.is_ok());
+    // The sysmem2 protocols don't use epitaphs, so if a WaitForAllBuffersAllocated[New] is too
+    // late, it'll just see that the channel closed, not any particular error code.
+    EXPECT_TRUE(!wait_new_result.error_value().is_domain_error() ||
+                wait_new_result.error_value().domain_error() ==
+                    Error::kConstraintsIntersectionEmpty);
   }
 }
 

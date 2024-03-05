@@ -418,6 +418,16 @@ V2CloneBufferCollectionInfo(fidl::AnyArena& allocator,
 [[nodiscard]] fuchsia_sysmem2::wire::BufferMemoryConstraints V2CloneBufferMemoryConstraints(
     fidl::AnyArena& allocator, const fuchsia_sysmem2::wire::BufferMemoryConstraints& src);
 
+///////////////////////
+// V2 error translation
+///////////////////////
+
+// Passing in INVALID is not permitted - will assert in debug.
+[[nodiscard]] zx_status_t V1CopyFromV2Error(fuchsia_sysmem2::Error error);
+// Passing in ZX_OK will assert in release and debug. Passing in any unexpected
+// error value, including any positive value, will return UNSPECIFIED.
+[[nodiscard]] fuchsia_sysmem2::Error V2CopyFromV1Error(zx_status_t error);
+
 #else
 
 [[nodiscard]] fpromise::result<fuchsia_sysmem2::ImageFormatConstraints>

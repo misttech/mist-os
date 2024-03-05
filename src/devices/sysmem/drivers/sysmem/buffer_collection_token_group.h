@@ -123,12 +123,12 @@ class BufferCollectionTokenGroup : public Node {
                              NodeProperties* new_node_properties, const GroupServerEnd& server_end);
 
   template <typename Completer>
-  bool CommonCreateChildStage1(Completer& completer,
+  bool CommonCreateChildStage1(ConnectionVersion version, Completer& completer,
                                std::optional<uint32_t> input_rights_attenuation_mask,
                                NodeProperties** out_node_properties);
 
   template <typename Completer>
-  void CommonAllChildrenPresent(Completer& completer);
+  void CommonAllChildrenPresent(ConnectionVersion version, Completer& completer);
 
   std::optional<V1> v1_server_;
   std::optional<V2> v2_server_;

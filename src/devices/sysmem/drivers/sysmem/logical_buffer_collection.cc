@@ -55,6 +55,8 @@ namespace sysmem_driver {
 
 namespace {
 
+using Error = fuchsia_sysmem2::Error;
+
 // Sysmem is creating the VMOs, so sysmem can have all the rights and just not
 // mis-use any rights.  Remove ZX_RIGHT_EXECUTE though.
 const uint32_t kSysmemVmoRights = ZX_DEFAULT_VMO_RIGHTS & ~ZX_RIGHT_EXECUTE;
@@ -669,13 +671,13 @@ void LogicalBufferCollection::HandleTokenFailure(BufferCollectionToken& token, z
     token.node_properties().LogError(FROM_HERE, "token failure - status: %d", status);
     if (tree_to_fail == root_.get()) {
       LogAndFailDownFrom(
-          FROM_HERE, tree_to_fail, status,
+          FROM_HERE, tree_to_fail, Error::kUnspecified,
           "Token failure causing LogicalBufferCollection failure - status: %d client: %s:%" PRIu64,
           status, token.node_properties().client_debug_info().name.c_str(),
           token.node_properties().client_debug_info().id);
     } else {
       LogAndFailDownFrom(
-          FROM_HERE, tree_to_fail, status,
+          FROM_HERE, tree_to_fail, Error::kUnspecified,
           "Token failure causing AttachToken() sub-tree failure - status: %d client: %s:%" PRIu64,
           status, token.node_properties().client_debug_info().name.c_str(),
           token.node_properties().client_debug_info().id);
@@ -730,7 +732,7 @@ bool LogicalBufferCollection::CommonCreateBufferCollectionTokenStage1(
   token.SetErrorHandler([this, &token](zx_status_t status) { HandleTokenFailure(token, status); });
 
   if (token.create_status() != ZX_OK) {
-    LogAndFailNode(FROM_HERE, &token.node_properties(), token.create_status(),
+    LogAndFailNode(FROM_HERE, &token.node_properties(), Error::kUnspecified,
                    "token.status() failed - create_status: %d", token.create_status());
     return false;
   }
@@ -809,13 +811,13 @@ bool LogicalBufferCollection::CommonCreateBufferCollectionTokenGroupStage1(
       NodeProperties* tree_to_fail = FindTreeToFail(&group.node_properties());
       if (tree_to_fail == root_.get()) {
         LogAndFailDownFrom(
-            FROM_HERE, tree_to_fail, status,
+            FROM_HERE, tree_to_fail, Error::kUnspecified,
             "Group failure causing LogicalBufferCollection failure - status: %d client: %s:%" PRIu64,
             status, group.node_properties().client_debug_info().name.c_str(),
             group.node_properties().client_debug_info().id);
       } else {
         LogAndFailDownFrom(
-            FROM_HERE, tree_to_fail, status,
+            FROM_HERE, tree_to_fail, Error::kUnspecified,
             "Group failure causing failure domain sub-tree failure - status: %d client: %s:%" PRIu64,
             status, group.node_properties().client_debug_info().name.c_str(),
             group.node_properties().client_debug_info().id);
@@ -860,7 +862,7 @@ bool LogicalBufferCollection::CommonCreateBufferCollectionTokenGroupStage1(
   });
 
   if (group.create_status() != ZX_OK) {
-    LogAndFailNode(FROM_HERE, new_node_properties, group.create_status(),
+    LogAndFailNode(FROM_HERE, new_node_properties, Error::kUnspecified,
                    "get_handle_koids() failed - status: %d", group.create_status());
     return false;
   }
@@ -951,16 +953,16 @@ uint64_t LogicalBufferCollection::CreateDispensableOrdinal() { return next_dispe
 
 AllocationResult LogicalBufferCollection::allocation_result() {
   ZX_DEBUG_ASSERT(has_allocation_result_ ||
-                  (allocation_result_status_ == ZX_OK && !allocation_result_info_.has_value()));
+                  (!maybe_allocation_error_.has_value() && !allocation_result_info_.has_value()));
   // If this assert fails, it mean we've already done ::Fail().  This should be impossible since
   // Fail() clears all BufferCollection views so they shouldn't be able to call
   // ::allocation_result().
-  ZX_DEBUG_ASSERT(!(has_allocation_result_ && allocation_result_status_ == ZX_OK &&
+  ZX_DEBUG_ASSERT(!(has_allocation_result_ && !maybe_allocation_error_.has_value() &&
                     !allocation_result_info_.has_value()));
   return {
       .buffer_collection_info =
           allocation_result_info_.has_value() ? &allocation_result_info_.value() : nullptr,
-      .status = allocation_result_status_,
+      .maybe_error = maybe_allocation_error_,
   };
 }
 
@@ -1009,27 +1011,27 @@ LogicalBufferCollection::~LogicalBufferCollection() {
   parent_device_->RemoveLogicalBufferCollection(this);
 }
 
-void LogicalBufferCollection::LogAndFailRootNode(Location location, zx_status_t epitaph,
-                                                 const char* format, ...) {
+void LogicalBufferCollection::LogAndFailRootNode(Location location, Error error, const char* format,
+                                                 ...) {
   ZX_DEBUG_ASSERT(format);
   va_list args;
   va_start(args, format);
   vLog(true, location.file(), location.line(), "LogicalBufferCollection", "fail", format, args);
   va_end(args);
-  FailRootNode(epitaph);
+  FailRootNode(error);
 }
 
-void LogicalBufferCollection::FailRootNode(zx_status_t epitaph) {
+void LogicalBufferCollection::FailRootNode(Error error) {
   if (!root_) {
     // This can happen for example when we're failing due to zero strong VMOs remaining, but all
     // Node(s) happen to already be gone so the root node was already removed.
     return;
   }
-  FailDownFrom(root_.get(), epitaph);
+  FailDownFrom(root_.get(), error);
 }
 
 void LogicalBufferCollection::LogAndFailDownFrom(Location location, NodeProperties* tree_to_fail,
-                                                 zx_status_t epitaph, const char* format, ...) {
+                                                 Error error, const char* format, ...) {
   ZX_DEBUG_ASSERT(format);
   va_list args;
   va_start(args, format);
@@ -1037,10 +1039,10 @@ void LogicalBufferCollection::LogAndFailDownFrom(Location location, NodeProperti
   vLog(is_error, location.file(), location.line(), "LogicalBufferCollection",
        is_error ? "root fail" : "sub-tree fail", format, args);
   va_end(args);
-  FailDownFrom(tree_to_fail, epitaph);
+  FailDownFrom(tree_to_fail, error);
 }
 
-void LogicalBufferCollection::FailDownFrom(NodeProperties* tree_to_fail, zx_status_t epitaph) {
+void LogicalBufferCollection::FailDownFrom(NodeProperties* tree_to_fail, Error error) {
   // Keep self alive until this method is done.
   auto self = fbl::RefPtr(this);
   bool is_root = (tree_to_fail == root_.get());
@@ -1049,7 +1051,7 @@ void LogicalBufferCollection::FailDownFrom(NodeProperties* tree_to_fail, zx_stat
     NodeProperties* child_most = breadth_first_order.back();
     breadth_first_order.pop_back();
     ZX_DEBUG_ASSERT(child_most->child_count() == 0);
-    child_most->node()->Fail(epitaph);
+    child_most->node()->Fail(error);
     child_most->RemoveFromTreeAndDelete();
   }
   if (is_root) {
@@ -1071,7 +1073,7 @@ void LogicalBufferCollection::FailDownFrom(NodeProperties* tree_to_fail, zx_stat
 }
 
 void LogicalBufferCollection::LogAndFailNode(Location location, NodeProperties* member_node,
-                                             zx_status_t epitaph, const char* format, ...) {
+                                             Error error, const char* format, ...) {
   ZX_DEBUG_ASSERT(format);
   auto tree_to_fail = FindTreeToFail(member_node);
   va_list args;
@@ -1080,12 +1082,12 @@ void LogicalBufferCollection::LogAndFailNode(Location location, NodeProperties* 
   vLog(is_error, location.file(), location.line(), "LogicalBufferCollection",
        is_error ? "root fail" : "sub-tree fail", format, args);
   va_end(args);
-  FailDownFrom(tree_to_fail, epitaph);
+  FailDownFrom(tree_to_fail, error);
 }
 
-void LogicalBufferCollection::FailNode(NodeProperties* member_node, zx_status_t epitaph) {
+void LogicalBufferCollection::FailNode(NodeProperties* member_node, Error error) {
   auto tree_to_fail = FindTreeToFail(member_node);
-  FailDownFrom(tree_to_fail, epitaph);
+  FailDownFrom(tree_to_fail, error);
 }
 
 namespace {
@@ -1347,7 +1349,7 @@ void LogicalBufferCollection::MaybeAllocate() {
           // This may fail the parent failure domain, possibly including the root, depending on
           // error_propagation_mode() and possibly is_allocate_attempted_.  If that happens,
           // FailNode() will log INFO saying so (FindTreeToFail() will log INFO).
-          FailNode(node_properties, ZX_ERR_PEER_CLOSED);
+          FailNode(node_properties, Error::kUnspecified);
           if (is_root) {
             return;
           }
@@ -1429,7 +1431,7 @@ void LogicalBufferCollection::MaybeAllocate() {
 
       bool was_allocate_attempted = is_allocate_attempted_;
       // By default, aggregation failure, unless we get a more immediate failure or success.
-      zx_status_t subtree_status = ZX_ERR_NOT_SUPPORTED;
+      std::optional<Error> maybe_subtree_error = Error::kConstraintsIntersectionEmpty;
       uint32_t combination_ordinal = 0;
       bool done_with_subtree;
       for (done_with_subtree = false, InitGroupChildSelection(groups_by_priority);
@@ -1440,7 +1442,7 @@ void LogicalBufferCollection::MaybeAllocate() {
         if (combination_ordinal == kMaxGroupChildCombinations) {
           LogInfo(FROM_HERE,
                   "hit kMaxGroupChildCombinations before successful constraint aggregation");
-          subtree_status = ZX_ERR_OUT_OF_RANGE;
+          maybe_subtree_error = Error::kTooManyGroupChildCombinations;
           done_with_subtree = true;
           break;
         }
@@ -1456,22 +1458,23 @@ void LogicalBufferCollection::MaybeAllocate() {
 
         if (is_allocate_attempted_) {
           // Allocate was already previously attempted.
-          zx_status_t status = TryLateLogicalAllocation(nodes);
-          if (status != ZX_OK) {
-            switch (status) {
-              case ZX_ERR_NOT_SUPPORTED:
+          std::optional<Error> maybe_error = TryLateLogicalAllocation(nodes);
+          if (maybe_error.has_value()) {
+            switch (*maybe_error) {
+              case Error::kConstraintsIntersectionEmpty:
                 // next child selections (next iteration of the enclosing loop)
-                ZX_DEBUG_ASSERT(subtree_status == ZX_ERR_NOT_SUPPORTED);
+                ZX_DEBUG_ASSERT(maybe_subtree_error.has_value() &&
+                                *maybe_subtree_error == Error::kConstraintsIntersectionEmpty);
                 break;
               default:
-                subtree_status = status;
+                maybe_subtree_error = *maybe_error;
                 done_with_subtree = true;
                 break;
             }
             // next child selections or done_with_subtree
             continue;
           }
-          subtree_status = ZX_OK;
+          maybe_subtree_error.reset();
           done_with_subtree = true;
           // Succeed the nodes of the subtree that aren't currently hidden by which_child()
           // selections, and fail the rest of the subtree as if ZX_ERR_NOT_SUPPORTED (like
@@ -1492,25 +1495,26 @@ void LogicalBufferCollection::MaybeAllocate() {
         auto result = TryAllocate(nodes);
         if (!result.is_ok()) {
           switch (result.error()) {
-            case ZX_ERR_NOT_SUPPORTED:
-              ZX_DEBUG_ASSERT(subtree_status == ZX_ERR_NOT_SUPPORTED);
+            case Error::kConstraintsIntersectionEmpty:
+              ZX_DEBUG_ASSERT(maybe_subtree_error.has_value() &&
+                              *maybe_subtree_error == Error::kConstraintsIntersectionEmpty);
               // next child selections
               break;
-            case ZX_ERR_SHOULD_WAIT:
+            case Error::kPending:
               // OnDependencyReady will call MaybeAllocate again later after all secure allocators
               // are ready
-              subtree_status = ZX_ERR_SHOULD_WAIT;
+              maybe_subtree_error = Error::kPending;
               done_with_subtree = true;
               break;
             default:
-              subtree_status = result.error();
+              maybe_subtree_error = result.error();
               done_with_subtree = true;
               break;
           }
           // next child selections or done_with_subtree
           continue;
         }
-        subtree_status = ZX_OK;
+        maybe_subtree_error.reset();
         done_with_subtree = true;
         is_allocate_attempted_ = true;
         // Succeed portion of pruned subtree indicated by current group child selections; fail
@@ -1534,9 +1538,10 @@ void LogicalBufferCollection::MaybeAllocate() {
       // failure and never got success, or this can be some other more immediate failure (still
       // needs to be handled/propagated here), or this can be ZX_OK if we already handled success,
       // or can be ZX_ERR_SHOULD_WAIT if not all secure allocators are ready yet.
-      did_something = did_something || (subtree_status != ZX_ERR_SHOULD_WAIT);
-      if (subtree_status != ZX_OK) {
-        if (subtree_status == ZX_ERR_SHOULD_WAIT) {
+      did_something = did_something ||
+                      (!maybe_subtree_error.has_value() || *maybe_subtree_error != Error::kPending);
+      if (maybe_subtree_error.has_value()) {
+        if (*maybe_subtree_error == Error::kPending) {
           // next sub-tree
           //
           // OnDependencyReady will call MaybeAllocate again later after all secure allocators are
@@ -1546,19 +1551,19 @@ void LogicalBufferCollection::MaybeAllocate() {
         if (was_allocate_attempted) {
           // fail entire logical allocation, including all pruned subtree nodes, regardless of
           // group child selections
-          SetFailedLateLogicalAllocationResult(all_subtree_nodes[0], subtree_status);
+          SetFailedLateLogicalAllocationResult(all_subtree_nodes[0], *maybe_subtree_error);
         } else {
           // fail the initial allocation from root_ down
           LogInfo(FROM_HERE, "fail the initial allocation from root_ down");
-          SetFailedAllocationResult(subtree_status);
+          SetFailedAllocationResult(*maybe_subtree_error);
         }
       }
     }
   } while (did_something);
 }
 
-fpromise::result<fuchsia_sysmem2::BufferCollectionInfo, zx_status_t>
-LogicalBufferCollection::TryAllocate(std::vector<NodeProperties*> nodes) {
+fpromise::result<fuchsia_sysmem2::BufferCollectionInfo, Error> LogicalBufferCollection::TryAllocate(
+    std::vector<NodeProperties*> nodes) {
   TRACE_DURATION("gfx", "LogicalBufferCollection::TryAllocate", "this", this);
 
   // If we're here it means we have connected clients.
@@ -1595,7 +1600,7 @@ LogicalBufferCollection::TryAllocate(std::vector<NodeProperties*> nodes) {
     // It's impossible to combine the constraints due to incompatible
     // constraints, or all participants set null constraints.
     LogInfo(FROM_HERE, "CombineConstraints() failed");
-    return fpromise::error(ZX_ERR_NOT_SUPPORTED);
+    return fpromise::error(Error::kConstraintsIntersectionEmpty);
   }
   ZX_DEBUG_ASSERT(combine_result.is_ok());
   ZX_DEBUG_ASSERT(constraints_list.empty());
@@ -1606,7 +1611,7 @@ LogicalBufferCollection::TryAllocate(std::vector<NodeProperties*> nodes) {
     // parent_device_ will call OnDependencyReady when all secure heaps/allocators are ready
     LogInfo(FROM_HERE, "secure_required && !is_secure_mem_ready");
     waiting_for_secure_allocators_ready_ = true;
-    return fpromise::error(ZX_ERR_SHOULD_WAIT);
+    return fpromise::error(Error::kPending);
   }
 
   auto generate_result = GenerateUnpopulatedBufferCollectionInfo(combined_constraints);
@@ -1616,7 +1621,7 @@ LogicalBufferCollection::TryAllocate(std::vector<NodeProperties*> nodes) {
       LogError(FROM_HERE, "GenerateUnpopulatedBufferCollectionInfo() failed");
     }
     // This error code allows a BufferCollectionTokenGroup (if any) to try its next child.
-    return fpromise::error(ZX_ERR_NOT_SUPPORTED);
+    return fpromise::error(Error::kConstraintsIntersectionEmpty);
   }
   ZX_DEBUG_ASSERT(generate_result.is_ok());
   auto buffer_collection_info = generate_result.take_value();
@@ -1637,15 +1642,15 @@ LogicalBufferCollection::TryAllocate(std::vector<NodeProperties*> nodes) {
     ZX_DEBUG_ASSERT(clone_result.error() != ZX_OK);
     ZX_DEBUG_ASSERT(clone_result.error() != ZX_ERR_NOT_SUPPORTED);
     LogError(FROM_HERE, "V2CloneBufferCollectionInfo() failed");
-    return clone_result;
+    return fpromise::error(Error::kUnspecified);
   }
   buffer_collection_info_before_population_.emplace(clone_result.take_value());
 
-  fpromise::result<fuchsia_sysmem2::BufferCollectionInfo, zx_status_t> result =
+  fpromise::result<fuchsia_sysmem2::BufferCollectionInfo, Error> result =
       Allocate(combined_constraints, &buffer_collection_info);
   if (!result.is_ok()) {
-    ZX_DEBUG_ASSERT(result.error() != ZX_OK);
-    ZX_DEBUG_ASSERT(result.error() != ZX_ERR_NOT_SUPPORTED);
+    ZX_DEBUG_ASSERT(result.error() != Error::kInvalid);
+    ZX_DEBUG_ASSERT(result.error() != Error::kConstraintsIntersectionEmpty);
     return result;
   }
 
@@ -1664,7 +1669,8 @@ LogicalBufferCollection::TryAllocate(std::vector<NodeProperties*> nodes) {
 }
 
 // This requires that nodes have the sub-tree's root-most node at nodes[0].
-zx_status_t LogicalBufferCollection::TryLateLogicalAllocation(std::vector<NodeProperties*> nodes) {
+std::optional<Error> LogicalBufferCollection::TryLateLogicalAllocation(
+    std::vector<NodeProperties*> nodes) {
   TRACE_DURATION("gfx", "LogicalBufferCollection::TryLateLogicalAllocation", "this", this);
 
   // The initial allocation was attempted, or we wouldn't be here.
@@ -1673,7 +1679,7 @@ zx_status_t LogicalBufferCollection::TryLateLogicalAllocation(std::vector<NodePr
   // The initial allocation succeeded, or we wouldn't be here.  If the initial allocation fails, it
   // responds to any already-pending late allocation attempts also, and clears out all allocation
   // attempts including late allocation attempts.
-  ZX_DEBUG_ASSERT(allocation_result().status == ZX_OK &&
+  ZX_DEBUG_ASSERT(!allocation_result().maybe_error.has_value() &&
                   allocation_result().buffer_collection_info != nullptr);
 
   // If we're here it means we still have connected clients.
@@ -1803,7 +1809,7 @@ zx_status_t LogicalBufferCollection::TryLateLogicalAllocation(std::vector<NodePr
     //
     // While nodes are from the pruned tree, if a parent can't allocate, then its child can't
     // allocate either, so this fails the whole sub-tree.
-    return ZX_ERR_NOT_SUPPORTED;
+    return Error::kConstraintsIntersectionEmpty;
   }
 
   ZX_DEBUG_ASSERT(combine_result.is_ok());
@@ -1820,7 +1826,7 @@ zx_status_t LogicalBufferCollection::TryLateLogicalAllocation(std::vector<NodePr
                generate_result.error());
     }
     // This error code allows a BufferCollectionTokenGroup (if any) to try its next child.
-    return ZX_ERR_NOT_SUPPORTED;
+    return Error::kConstraintsIntersectionEmpty;
   }
   ZX_DEBUG_ASSERT(generate_result.is_ok());
   fuchsia_sysmem2::BufferCollectionInfo unpopulated_buffer_collection_info =
@@ -1830,7 +1836,7 @@ zx_status_t LogicalBufferCollection::TryLateLogicalAllocation(std::vector<NodePr
                                                       unpopulated_buffer_collection_info);
   if (comparison.is_error()) {
     LogInfo(FROM_HERE, "Failed to compare buffer collection info, %s", comparison.status_string());
-    return comparison.error_value();
+    return Error::kUnspecified;
   }
   if (!comparison.value()) {
     LogInfo(FROM_HERE,
@@ -1838,7 +1844,7 @@ zx_status_t LogicalBufferCollection::TryLateLogicalAllocation(std::vector<NodePr
             "unpopulated_buffer_collection_info");
     LogDiffsBufferCollectionInfo(*buffer_collection_info_before_population_,
                                  unpopulated_buffer_collection_info);
-    return ZX_ERR_NOT_SUPPORTED;
+    return Error::kConstraintsIntersectionEmpty;
   }
 
   // Now that we know the new participants can be added without changing the BufferCollectionInfo,
@@ -1850,7 +1856,9 @@ zx_status_t LogicalBufferCollection::TryLateLogicalAllocation(std::vector<NodePr
   // which_child() selections will still be handled as if they are ZX_ERR_NOT_SUPPORTED aggregation
   // failure (despite the possibility that perhaps a lower-priority list of selections could have
   // succeeded if the current list of selections hadn't).
-  return ZX_OK;
+  //
+  // no error == success
+  return std::nullopt;
 }
 
 zx::result<bool> LogicalBufferCollection::CompareBufferCollectionInfo(
@@ -1894,17 +1902,16 @@ zx::result<bool> LogicalBufferCollection::CompareBufferCollectionInfo(
   return zx::ok(encoded_lhs.message().BytesMatch(encoded_rhs.message()));
 }
 
-void LogicalBufferCollection::SetFailedAllocationResult(zx_status_t status) {
-  ZX_DEBUG_ASSERT(status != ZX_OK);
+void LogicalBufferCollection::SetFailedAllocationResult(Error error) {
+  ZX_DEBUG_ASSERT(error != Error::kInvalid);
 
   // Only set result once.
   ZX_DEBUG_ASSERT(!has_allocation_result_);
-  // allocation_result_status_ is initialized to ZX_OK, so should still be set
-  // that way.
-  ZX_DEBUG_ASSERT(allocation_result_status_ == ZX_OK);
+  // maybe_allocation_error_ is initialized to std::nullopt, so should still be set that way.
+  ZX_DEBUG_ASSERT(!maybe_allocation_error_.has_value());
 
   creation_timer_.Cancel();
-  allocation_result_status_ = status;
+  maybe_allocation_error_ = error;
   // Was initialized to nullptr.
   ZX_DEBUG_ASSERT(!allocation_result_info_.has_value());
   has_allocation_result_ = true;
@@ -1923,12 +1930,10 @@ void LogicalBufferCollection::SetAllocationResult(
   // Only set result once.
   ZX_DEBUG_ASSERT(!has_allocation_result_);
 
-  // allocation_result_status_ is initialized to ZX_OK, so should still be set
-  // that way.
-  ZX_DEBUG_ASSERT(allocation_result_status_ == ZX_OK);
+  // maybe_allocation_error_ is initialized to std::nullopt, so should still be set that way.
+  ZX_ASSERT(!maybe_allocation_error_.has_value());
 
   creation_timer_.Cancel();
-  allocation_result_status_ = ZX_OK;
   allocation_result_info_.emplace(std::move(info));
   has_allocation_result_ = true;
   SendAllocationResult(std::move(visible_pruned_sub_tree));
@@ -1944,7 +1949,12 @@ void LogicalBufferCollection::SetAllocationResult(
       continue;
     }
     np.error_propagation_mode() = ErrorPropagationMode::kDoNotPropagate;
-    FailDownFrom(&np, ZX_ERR_NOT_SUPPORTED);
+    // Using this error code helps make a failure-domain subtree under a group look as much like a
+    // normal (failed in this case) allocation as possible from a client's point of view. This seems
+    // better than a special error code for "different group child chosen", since that would
+    // explicitly allow a client to tell whether its token was under a group, which could lead to
+    // inconsistent client behavior when under a group or not.
+    FailDownFrom(&np, Error::kConstraintsIntersectionEmpty);
   }
 }
 
@@ -1959,8 +1969,8 @@ void LogicalBufferCollection::SendAllocationResult(std::vector<NodeProperties*> 
     ZX_DEBUG_ASSERT(node_properties->buffers_logically_allocated());
   }
 
-  if (allocation_result_status_ != ZX_OK) {
-    LogAndFailRootNode(FROM_HERE, allocation_result_status_,
+  if (maybe_allocation_error_.has_value()) {
+    LogAndFailRootNode(FROM_HERE, *maybe_allocation_error_,
                        "LogicalBufferCollection::SendAllocationResult() done sending allocation "
                        "failure - now auto-failing self.");
     return;
@@ -1968,11 +1978,11 @@ void LogicalBufferCollection::SendAllocationResult(std::vector<NodeProperties*> 
 }
 
 void LogicalBufferCollection::SetFailedLateLogicalAllocationResult(NodeProperties* tree,
-                                                                   zx_status_t status_param) {
-  ZX_DEBUG_ASSERT(status_param != ZX_OK);
+                                                                   Error error) {
+  ZX_DEBUG_ASSERT(error != Error::kInvalid);
   AllocationResult logical_allocation_result{
       .buffer_collection_info = nullptr,
-      .status = status_param,
+      .maybe_error = error,
   };
   auto nodes_to_notify_and_fail = tree->BreadthFirstOrder();
   for (auto node_properties : nodes_to_notify_and_fail) {
@@ -1980,14 +1990,15 @@ void LogicalBufferCollection::SetFailedLateLogicalAllocationResult(NodePropertie
     node_properties->node()->OnBuffersAllocated(logical_allocation_result);
     ZX_DEBUG_ASSERT(node_properties->buffers_logically_allocated());
   }
-  LogAndFailDownFrom(FROM_HERE, tree, status_param,
-                     "AttachToken() sequence failed logical allocation - status: %d", status_param);
+  LogAndFailDownFrom(FROM_HERE, tree, error,
+                     "AttachToken() sequence failed logical allocation - error: %u",
+                     static_cast<uint32_t>(error));
 }
 
 void LogicalBufferCollection::SetSucceededLateLogicalAllocationResult(
     std::vector<NodeProperties*> visible_pruned_sub_tree,
     std::vector<NodeProperties*> whole_pruned_sub_tree) {
-  ZX_DEBUG_ASSERT(allocation_result().status == ZX_OK);
+  ZX_DEBUG_ASSERT(!allocation_result().maybe_error.has_value());
   for (auto node_properties : visible_pruned_sub_tree) {
     ZX_DEBUG_ASSERT(!node_properties->buffers_logically_allocated());
     node_properties->node()->OnBuffersAllocated(allocation_result());
@@ -2003,7 +2014,9 @@ void LogicalBufferCollection::SetSucceededLateLogicalAllocationResult(
       continue;
     }
     np.error_propagation_mode() = ErrorPropagationMode::kDoNotPropagate;
-    FailDownFrom(&np, ZX_ERR_NOT_SUPPORTED);
+    // Using this error code makes a token under a group behave as much as possible like a token not
+    // under a group.
+    FailDownFrom(&np, Error::kConstraintsIntersectionEmpty);
   }
 }
 
@@ -2048,20 +2061,21 @@ void LogicalBufferCollection::BindSharedCollectionInternal(
       if (tree_to_fail == root_.get()) {
         // A LogicalBufferCollection intentionally treats any error (other than errors explicitly
         // ignored using SetDispensable() or AttachToken()) that might be triggered by a client
-        // failure as a LogicalBufferCollection failure, because a LogicalBufferCollection can
-        // use a lot of RAM and can tend to block creating a replacement LogicalBufferCollection.
+        // failure as a LogicalBufferCollection failure, because a LogicalBufferCollection can use a
+        // lot of RAM and can tend to block creating a replacement LogicalBufferCollection.
         //
-        // In rare cases, an initiator might choose to use Close() to avoid this failure, but more
-        // typically initiators will just close their BufferCollection view without Close() first,
-        // and this failure results.  This is considered acceptable partly because it helps exercise
-        // code in participants that may see BufferCollection channel closure before closure of
-        // related channels, and it helps get the VMO handles closed ASAP to avoid letting those
-        // continue to use space of a MemoryAllocator's pool of pre-reserved space (for example).
+        // In rare cases, an initiator might choose to use Release()/Close() to avoid this failure,
+        // but more typically initiators will just close their BufferCollection view without
+        // Release()/Close() first, and this failure results.  This is considered acceptable partly
+        // because it helps exercise code in participants that may see BufferCollection channel
+        // closure before closure of related channels, and it helps get the VMO handles closed ASAP
+        // to avoid letting those continue to use space of a MemoryAllocator's pool of pre-reserved
+        // space (for example).
         //
         // We don't complain when a non-initiator participant closes first, since even if we prefer
         // that the initiator close first, the channels are separate so we could see some
         // reordering.
-        FailDownFrom(tree_to_fail, status);
+        FailDownFrom(tree_to_fail, Error::kUnspecified);
       } else {
         // This also removes the sub-tree, which can reduce SUM(min_buffer_count_for_camping) (or
         // similar for other constraints) to make room for a replacement sub-tree.  The replacement
@@ -2069,7 +2083,7 @@ void LogicalBufferCollection::BindSharedCollectionInternal(
         // in a separate failure domain by using SetDispensable() or AttachToken().
         //
         // Hopefully this won't be too noisy.
-        LogAndFailDownFrom(FROM_HERE, tree_to_fail, status,
+        LogAndFailDownFrom(FROM_HERE, tree_to_fail, Error::kUnspecified,
                            "BufferCollection failure causing sub-tree failure (SetDispensable() or "
                            "AttachToken() was used) - status: %d client: %s:%" PRIu64,
                            status, collection.node_properties().client_debug_info().name.c_str(),
@@ -2100,7 +2114,7 @@ void LogicalBufferCollection::BindSharedCollectionInternal(
   });
 
   if (collection.create_status() != ZX_OK) {
-    LogAndFailNode(FROM_HERE, &collection.node_properties(), collection.create_status(),
+    LogAndFailNode(FROM_HERE, &collection.node_properties(), Error::kUnspecified,
                    "token.status() failed - create_status: %d", collection.create_status());
     return;
   }
@@ -3682,9 +3696,9 @@ LogicalBufferCollection::GenerateUnpopulatedBufferCollectionInfo(
   return fpromise::ok(std::move(result));
 }
 
-fpromise::result<fuchsia_sysmem2::BufferCollectionInfo, zx_status_t>
-LogicalBufferCollection::Allocate(const fuchsia_sysmem2::BufferCollectionConstraints& constraints,
-                                  fuchsia_sysmem2::BufferCollectionInfo* builder) {
+fpromise::result<fuchsia_sysmem2::BufferCollectionInfo, Error> LogicalBufferCollection::Allocate(
+    const fuchsia_sysmem2::BufferCollectionConstraints& constraints,
+    fuchsia_sysmem2::BufferCollectionInfo* builder) {
   TRACE_DURATION("gfx", "LogicalBufferCollection:Allocate", "this", this);
 
   fuchsia_sysmem2::BufferCollectionInfo& result = *builder;
@@ -3696,13 +3710,13 @@ LogicalBufferCollection::Allocate(const fuchsia_sysmem2::BufferCollectionConstra
   MemoryAllocator* allocator = parent_device_->GetAllocator(buffer_settings);
   if (!allocator) {
     LogError(FROM_HERE, "No memory allocator for buffer settings");
-    return fpromise::error(ZX_ERR_NO_MEMORY);
+    return fpromise::error(Error::kNoMemory);
   }
   memory_allocator_ = allocator;
 
   // Register failure handler with memory allocator.
   allocator->AddDestroyCallback(reinterpret_cast<intptr_t>(this), [this]() {
-    LogAndFailRootNode(FROM_HERE, ZX_ERR_BAD_STATE,
+    LogAndFailRootNode(FROM_HERE, Error::kUnspecified,
                        "LogicalBufferCollection memory allocator gone - now auto-failing self.");
   });
 
@@ -3752,7 +3766,7 @@ LogicalBufferCollection::Allocate(const fuchsia_sysmem2::BufferCollectionConstra
     auto allocate_result = AllocateVmo(allocator, settings, i);
     if (!allocate_result.is_ok()) {
       LogError(FROM_HERE, "AllocateVmo() failed");
-      return fpromise::error(ZX_ERR_NO_MEMORY);
+      return fpromise::error(Error::kNoMemory);
     }
     zx::vmo vmo = allocate_result.take_value();
     auto& vmo_buffer = result.buffers()->at(i);
@@ -4512,7 +4526,7 @@ void LogicalBufferCollection::CheckForZeroStrongNodes() {
               return;
             }
             LogAndFailRootNode(
-                FROM_HERE, ZX_ERR_BAD_STATE,
+                FROM_HERE, Error::kUnspecified,
                 "Zero strong nodes remaining before allocation; failing LogicalBufferCollection");
           }
           // ~ref_this
@@ -4532,7 +4546,7 @@ void LogicalBufferCollection::CheckForZeroStrongParentVmoCount() {
   if (strong_parent_vmo_count_ == 0) {
     auto post_result =
         async::PostTask(parent_device_->dispatcher(), [this, ref_this = fbl::RefPtr(this)] {
-          FailRootNode(ZX_ERR_BAD_STATE);
+          FailRootNode(Error::kUnspecified);
           // ~ref_this
         });
     ZX_ASSERT(post_result == ZX_OK);

@@ -1581,6 +1581,62 @@ fuchsia_sysmem2::wire::BufferMemoryConstraints V2CloneBufferMemoryConstraints(
   return fidl::ToWire(allocator, src_natural);
 }
 
+zx_status_t V1CopyFromV2Error(fuchsia_sysmem2::Error error) {
+  // Caller must specify a valid error code. This translates to ZX_ERR_INTERNAL
+  // in release, but asserts in debug.
+  ZX_DEBUG_ASSERT(error != fuchsia_sysmem2::Error::kInvalid);
+  switch (error) {
+    case fuchsia_sysmem2::Error::kProtocolDeviation:
+      return ZX_ERR_INVALID_ARGS;
+    case fuchsia_sysmem2::Error::kNotFound:
+      return ZX_ERR_NOT_FOUND;
+    case fuchsia_sysmem2::Error::kHandleAccessDenied:
+      return ZX_ERR_ACCESS_DENIED;
+    case fuchsia_sysmem2::Error::kNoMemory:
+      return ZX_ERR_NO_MEMORY;
+    case fuchsia_sysmem2::Error::kConstraintsIntersectionEmpty:
+      return ZX_ERR_NOT_SUPPORTED;
+    case fuchsia_sysmem2::Error::kPending:
+      return ZX_ERR_UNAVAILABLE;
+    case fuchsia_sysmem2::Error::kTooManyGroupChildCombinations:
+      return ZX_ERR_OUT_OF_RANGE;
+    case fuchsia_sysmem2::Error::kInvalid:
+    case fuchsia_sysmem2::Error::kUnspecified:
+    default:
+      return ZX_ERR_INTERNAL;
+  }
+}
+
+fuchsia_sysmem2::Error V2CopyFromV1Error(zx_status_t error) {
+  // This function must never be passed a success code. It's only for errors.
+  // We assert rather than returning failure from an error translation function,
+  // just because returning failure from an error translation function would get
+  // confusing enough that it seems as likely as not to result in another bug
+  // anyway.
+  ZX_ASSERT(error != ZX_OK);
+  switch (error) {
+    case ZX_ERR_INTERNAL:
+      return fuchsia_sysmem2::Error::kUnspecified;
+    case ZX_ERR_INVALID_ARGS:
+      return fuchsia_sysmem2::Error::kProtocolDeviation;
+    case ZX_ERR_NOT_FOUND:
+      return fuchsia_sysmem2::Error::kNotFound;
+    case ZX_ERR_ACCESS_DENIED:
+      return fuchsia_sysmem2::Error::kHandleAccessDenied;
+    case ZX_ERR_NO_MEMORY:
+      return fuchsia_sysmem2::Error::kNoMemory;
+    case ZX_ERR_NOT_SUPPORTED:
+      return fuchsia_sysmem2::Error::kConstraintsIntersectionEmpty;
+    case ZX_ERR_UNAVAILABLE:
+      return fuchsia_sysmem2::Error::kPending;
+    case ZX_ERR_OUT_OF_RANGE:
+      return fuchsia_sysmem2::Error::kTooManyGroupChildCombinations;
+    default:
+      // This also happens if the caller passes in ZX_OK in release.
+      return fuchsia_sysmem2::Error::kInvalid;
+  }
+}
+
 #endif  // __Fuchsia_API_level__ >= FUCHSIA_HEAD
 
 }  // namespace sysmem

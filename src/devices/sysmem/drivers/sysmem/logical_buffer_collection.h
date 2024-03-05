@@ -384,37 +384,39 @@ class LogicalBufferCollection : public fbl::RefCounted<LogicalBufferCollection> 
   explicit LogicalBufferCollection(Device* parent_device);
 
   // Will log an error, and then FailRoot().
-  void LogAndFailRootNode(Location location, zx_status_t epitaph, const char* format, ...)
+  void LogAndFailRootNode(Location location, fuchsia_sysmem2::Error error, const char* format, ...)
       __PRINTFLIKE(4, 5);
   // This fails the entire LogicalBufferCollection, by failing the root Node, which propagates that
   // failure to the entire Node tree, and also results in zero remaining Node(s).  Then once all
   // outstanding VMOs have been closed, the LogicalBufferCollection is deleted.
   //
   // This cleans out a lot of state that's unnecessary after a failure.
-  void FailRootNode(zx_status_t epitaph);
+  void FailRootNode(fuchsia_sysmem2::Error error);
 
   NodeProperties* FindTreeToFail(NodeProperties* failing_node);
 
   // Fails the tree rooted at tree_to_fail.  The tree_to_fail is allowed to be the root_, or it can
-  // be a sub-tree. All the Node(s) from tree_to_fail down are Fail()ed.  Any Node(s) that still
-  // have channels open will send epitaph just before the Node('s) channel closes.  All Node(s) from
-  // tree_to_fail downward are also removed from the tree. If tree_to_fail is the root, then when
-  // all child VMOs have been closed, the LogicalBufferCollection will be deleted.
+  // be a sub-tree. All the Node(s) from tree_to_fail down are Fail()ed.  Any sysmem(1) Node(s) that
+  // still have channels open will send epitaph. Sysmem2 Node(s) always send ZX_ERR_INTERNAL as the
+  // epitaph (mainly because an epitaph is required by FIDL bindings). In either case the channel is
+  // closed. All Node(s) from tree_to_fail downward are also removed from the tree. If tree_to_fail
+  // is the root, then when all child VMOs have been closed, the LogicalBufferCollection will be
+  // deleted.
   //
   // Node(s) are Fail()ed and removed from the tree in child-first order.
   //
   // These two are only appropriate to use if it's already known which node should fail.  If it's
   // not yet known which node should fail, call FindTreeToFail() first, or use LogAndFailNode() /
   // FailNode().
-  void LogAndFailDownFrom(Location location, NodeProperties* tree_to_fail, zx_status_t epitaph,
-                          const char* format, ...) __PRINTFLIKE(5, 6);
-  void FailDownFrom(NodeProperties* tree_to_fail, zx_status_t epitaph);
+  void LogAndFailDownFrom(Location location, NodeProperties* tree_to_fail,
+                          fuchsia_sysmem2::Error error, const char* format, ...) __PRINTFLIKE(5, 6);
+  void FailDownFrom(NodeProperties* tree_to_fail, fuchsia_sysmem2::Error error);
 
   // Find the root-most node of member_node's failure domain, and fail that whole failure domain and
   // any of its child failure domains.
-  void LogAndFailNode(Location location, NodeProperties* member_node, zx_status_t epitaph,
+  void LogAndFailNode(Location location, NodeProperties* member_node, fuchsia_sysmem2::Error error,
                       const char* format, ...) __PRINTFLIKE(5, 6);
-  void FailNode(NodeProperties* member_node, zx_status_t epitaph);
+  void FailNode(NodeProperties* member_node, fuchsia_sysmem2::Error error);
 
   void LogInfo(Location location, const char* format, ...) const;
   static void LogErrorStatic(Location location, const ClientDebugInfo* client_debug_info,
@@ -432,17 +434,18 @@ class LogicalBufferCollection : public fbl::RefCounted<LogicalBufferCollection> 
   // likely to want to keep "this" alive longer than MaybeAllocate() could anyway.
   void MaybeAllocate();
 
-  fpromise::result<fuchsia_sysmem2::BufferCollectionInfo, zx_status_t> TryAllocate(
+  fpromise::result<fuchsia_sysmem2::BufferCollectionInfo, fuchsia_sysmem2::Error> TryAllocate(
       std::vector<NodeProperties*> nodes);
 
-  zx_status_t TryLateLogicalAllocation(std::vector<NodeProperties*> nodes);
+  std::optional<fuchsia_sysmem2::Error> TryLateLogicalAllocation(
+      std::vector<NodeProperties*> nodes);
 
   zx::result<bool> CompareBufferCollectionInfo(fuchsia_sysmem2::BufferCollectionInfo& lhs,
                                                fuchsia_sysmem2::BufferCollectionInfo& rhs);
 
   void InitializeConstraintSnapshots(const ConstraintsList& constraints_list);
 
-  void SetFailedAllocationResult(zx_status_t status);
+  void SetFailedAllocationResult(fuchsia_sysmem2::Error error);
 
   void SetAllocationResult(std::vector<NodeProperties*> visible_pruned_sub_tree,
                            fuchsia_sysmem2::BufferCollectionInfo info,
@@ -450,7 +453,8 @@ class LogicalBufferCollection : public fbl::RefCounted<LogicalBufferCollection> 
 
   void SendAllocationResult(std::vector<NodeProperties*> nodes);
 
-  void SetFailedLateLogicalAllocationResult(NodeProperties* tree, zx_status_t status_param);
+  void SetFailedLateLogicalAllocationResult(NodeProperties* tree,
+                                            fuchsia_sysmem2::Error status_param);
 
   void SetSucceededLateLogicalAllocationResult(std::vector<NodeProperties*> visible_pruned_sub_tree,
                                                std::vector<NodeProperties*> whole_pruned_sub_tree);
@@ -505,7 +509,7 @@ class LogicalBufferCollection : public fbl::RefCounted<LogicalBufferCollection> 
   GenerateUnpopulatedBufferCollectionInfo(
       const fuchsia_sysmem2::BufferCollectionConstraints& constraints);
 
-  fpromise::result<fuchsia_sysmem2::BufferCollectionInfo, zx_status_t> Allocate(
+  fpromise::result<fuchsia_sysmem2::BufferCollectionInfo, fuchsia_sysmem2::Error> Allocate(
       const fuchsia_sysmem2::BufferCollectionConstraints& constraints,
       fuchsia_sysmem2::BufferCollectionInfo* buffer_collection_info);
 
@@ -832,7 +836,7 @@ class LogicalBufferCollection : public fbl::RefCounted<LogicalBufferCollection> 
   // not meaningful until has_allocation_result_ is true.
   bool has_allocation_result_ = false;
   std::optional<fuchsia_sysmem2::BufferCollectionInfo> buffer_collection_info_before_population_;
-  zx_status_t allocation_result_status_ = ZX_OK;
+  std::optional<fuchsia_sysmem2::Error> maybe_allocation_error_;
   std::optional<fuchsia_sysmem2::BufferCollectionInfo> allocation_result_info_;
 
   MemoryAllocator* memory_allocator_ = nullptr;

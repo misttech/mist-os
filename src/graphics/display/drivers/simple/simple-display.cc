@@ -205,10 +205,10 @@ zx_status_t SimpleDisplay::DisplayControllerImplImportImage(
   }
   const auto& check_response = check_result.value();
   if (check_response.is_error()) {
-    if (check_response.error_value() == ZX_ERR_UNAVAILABLE) {
+    if (check_response.error_value() == fuchsia_sysmem2::Error::kPending) {
       return ZX_ERR_SHOULD_WAIT;
     }
-    return check_response.error_value();
+    return sysmem::V1CopyFromV2Error(check_response.error_value());
   }
 
   fidl::WireResult wait_result = collection->WaitForAllBuffersAllocated();
@@ -259,7 +259,7 @@ zx_status_t SimpleDisplay::DisplayControllerImplImportImage(
     return vmo_info_result.error().status();
   }
   if (!vmo_info_result->is_ok()) {
-    return vmo_info_result->error_value();
+    return sysmem::V1CopyFromV2Error(vmo_info_result->error_value());
   }
   auto& vmo_info = vmo_info_result->value();
   BufferKey buffer_key(vmo_info->buffer_collection_id(), vmo_info->buffer_index());

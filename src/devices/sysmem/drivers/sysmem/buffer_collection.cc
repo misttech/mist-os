@@ -30,6 +30,8 @@ namespace sysmem_driver {
 
 namespace {
 
+using Error = fuchsia_sysmem2::Error;
+
 // For max client vmo rights, we specify the RIGHT bits individually to avoid
 // picking up any newly-added rights unintentionally.  This is based on
 // ZX_DEFAULT_VMO_RIGHTS, but with a few rights removed.
@@ -80,7 +82,7 @@ void BufferCollection::CloseServerBinding(zx_status_t epitaph) {
     server_binding_v1_->Close(epitaph);
   }
   if (server_binding_v2_.has_value()) {
-    server_binding_v2_->Close(epitaph);
+    server_binding_v2_->Close(ZX_ERR_INTERNAL);
   }
   server_binding_v1_ = {};
   server_binding_v2_ = {};
@@ -121,23 +123,29 @@ void BufferCollection::BindInternalCombinedV1AndV2(zx::channel server_end,
   ZX_PANIC("BufferCollection only serves V1 or V2 separately - never combined V1 and V2");
 }
 
-void BufferCollection::V1::Sync(SyncCompleter::Sync& completer) { parent_.SyncImpl(completer); }
+void BufferCollection::V1::Sync(SyncCompleter::Sync& completer) {
+  parent_.SyncImpl(ConnectionVersion::kVersion1, completer);
+}
 
-void BufferCollection::V2::Sync(SyncCompleter::Sync& completer) { parent_.SyncImpl(completer); }
+void BufferCollection::V2::Sync(SyncCompleter::Sync& completer) {
+  parent_.SyncImpl(ConnectionVersion::kVersion2, completer);
+}
 
 void BufferCollection::V1::DeprecatedSync(DeprecatedSyncCompleter::Sync& completer) {
-  parent_.SyncImpl(completer);
+  parent_.SyncImpl(ConnectionVersion::kVersion1, completer);
 }
 
 template <typename Completer>
 bool BufferCollection::CommonSetConstraintsStage1(Completer& completer) {
   if (is_set_constraints_seen_) {
-    FailSync(FROM_HERE, completer, ZX_ERR_NOT_SUPPORTED, "2nd SetConstraints() causes failure.");
+    FailSync(FROM_HERE, completer, Error::kProtocolDeviation,
+             "2nd SetConstraints() causes failure.");
     return false;
   }
   is_set_constraints_seen_ = true;
   if (is_done_) {
-    FailSync(FROM_HERE, completer, ZX_ERR_BAD_STATE, "SetConstraints() when already is_done_");
+    FailSync(FROM_HERE, completer, Error::kProtocolDeviation,
+             "SetConstraints() when already is_done_");
     // We're failing async - no need to try to fail sync.
     return false;
   }
@@ -167,7 +175,7 @@ void BufferCollection::V1::SetConstraints(SetConstraintsRequest& request,
     auto result = sysmem::V2CopyFromV1BufferCollectionConstraints(
         local_constraints.has_value() ? &local_constraints.value() : nullptr);
     if (!result.is_ok()) {
-      parent_.FailSync(FROM_HERE, completer, ZX_ERR_INVALID_ARGS,
+      parent_.FailSync(FROM_HERE, completer, Error::kProtocolDeviation,
                        "V2CopyFromV1BufferCollectionConstraints() failed");
       return;
     }
@@ -232,7 +240,7 @@ bool BufferCollection::CommonWaitForAllBuffersAllocatedStage1(
     bool enforce_set_constraints_before_wait, Completer& completer,
     trace_async_id_t* out_event_id) {
   if (is_done_) {
-    FailSync(FROM_HERE, completer, ZX_ERR_BAD_STATE,
+    FailSync(FROM_HERE, completer, Error::kProtocolDeviation,
              "BufferCollection::WaitForAllBuffersAllocated() when already is_done_");
     return false;
   }
@@ -243,7 +251,7 @@ bool BufferCollection::CommonWaitForAllBuffersAllocatedStage1(
       logical_buffer_collection().LogClientError(
           FROM_HERE, &node_properties(),
           "#############################################################################################");
-      FailSync(FROM_HERE, completer, ZX_ERR_BAD_STATE,
+      FailSync(FROM_HERE, completer, Error::kProtocolDeviation,
                "WaitForAllBuffersAllocated before SetConstraints not permitted (in sysmem2)");
       return false;
     } else {
@@ -266,7 +274,7 @@ bool BufferCollection::CommonWaitForAllBuffersAllocatedStage1(
   if (!node_properties().is_weak_ok() && node_properties().is_weak()) {
     // If this failure happens, the client should make sure to also pay attention to close_weak_asap
     // ZX_EVENTPAIR_PEER_CLOSED, in addition to sending SetWeakOk().
-    FailSync(FROM_HERE, completer, ZX_ERR_BAD_STATE,
+    FailSync(FROM_HERE, completer, Error::kProtocolDeviation,
              "weak BufferCollection needs SetWeakOk before WaitForAllBuffersAllocated");
     return false;
   }
@@ -312,43 +320,68 @@ void BufferCollection::V2::WaitForAllBuffersAllocated(
   parent_.MaybeCompleteWaitForBuffersAllocated();
 }
 
+void BufferCollection::V2::WaitForAllBuffersAllocatedNew(
+    WaitForAllBuffersAllocatedNewCompleter::Sync& completer) {
+  TRACE_DURATION("gfx", "BufferCollection::V2::WaitForAllBuffersAllocatedNew", "this", this,
+                 "logical_buffer_collection", &parent_.logical_buffer_collection());
+
+  trace_async_id_t current_event_id = TRACE_NONCE();
+  if (!parent_.CommonWaitForAllBuffersAllocatedStage1(true, completer, &current_event_id)) {
+    return;
+  }
+
+  parent_.pending_wait_for_buffers_allocated_v2_new_.emplace_back(
+      std::make_pair(current_event_id, completer.ToAsync()));
+  // The allocation is a one-shot (once true, remains true) and may already be done, in which case
+  // this immediately completes txn.
+  parent_.MaybeCompleteWaitForBuffersAllocated();
+}
+
 template <typename Completer>
-bool BufferCollection::CommonCheckAllBuffersAllocatedStage1(Completer& completer,
-                                                            zx_status_t* result) {
+bool BufferCollection::CommonCheckAllBuffersAllocatedStage1(
+    Completer& completer, std::optional<fuchsia_sysmem2::Error>* result) {
   if (is_done_) {
-    FailSync(FROM_HERE, completer, ZX_ERR_BAD_STATE,
+    FailSync(FROM_HERE, completer, Error::kProtocolDeviation,
              "BufferCollectionToken::V1::CheckBuffersAllocated() when "
              "already is_done_");
     // We're failing async - no need to try to fail sync.
     return false;
   }
   if (!logical_allocation_result_.has_value()) {
-    *result = ZX_ERR_UNAVAILABLE;
+    *result = fuchsia_sysmem2::Error::kPending;
     return true;
   }
   // Buffer collection has either been allocated or failed.
-  *result = logical_allocation_result_->status;
+  *result = logical_allocation_result_->maybe_error;
   return true;
 }
 
 void BufferCollection::V1::CheckBuffersAllocated(CheckBuffersAllocatedCompleter::Sync& completer) {
-  zx_status_t result;
+  std::optional<fuchsia_sysmem2::Error> result;
   if (!parent_.CommonCheckAllBuffersAllocatedStage1(completer, &result)) {
     return;
   }
-  completer.Reply(result);
+
+  zx_status_t v1_status;
+  if (!result.has_value()) {
+    v1_status = ZX_OK;
+  } else {
+    v1_status = sysmem::V1CopyFromV2Error(*result);
+  }
+
+  completer.Reply(v1_status);
 }
 
 void BufferCollection::V2::CheckAllBuffersAllocated(
     CheckAllBuffersAllocatedCompleter::Sync& completer) {
-  zx_status_t result;
+  std::optional<fuchsia_sysmem2::Error> result;
   if (!parent_.CommonCheckAllBuffersAllocatedStage1(completer, &result)) {
     return;
   }
-  if (result == ZX_OK) {
+  if (!result.has_value()) {
     completer.Reply(fit::ok());
   } else {
-    completer.Reply(fit::error(result));
+    completer.Reply(fit::error(*result));
   }
 }
 
@@ -359,13 +392,13 @@ bool BufferCollection::CommonAttachTokenStage1(uint32_t rights_attenuation_mask,
   if (is_done_) {
     // This is Release() followed by AttachToken(), which is not permitted and causes the
     // BufferCollection to fail.
-    FailSync(FROM_HERE, completer, ZX_ERR_BAD_STATE,
+    FailSync(FROM_HERE, completer, Error::kProtocolDeviation,
              "BufferCollection::AttachToken() attempted when is_done_");
     return false;
   }
 
   if (rights_attenuation_mask == 0) {
-    FailSync(FROM_HERE, completer, ZX_ERR_INVALID_ARGS,
+    FailSync(FROM_HERE, completer, Error::kProtocolDeviation,
              "rights_attenuation_mask of 0 is forbidden");
     return false;
   }
@@ -374,7 +407,7 @@ bool BufferCollection::CommonAttachTokenStage1(uint32_t rights_attenuation_mask,
   // SetWeak later on a descendant will fail a different check.
   if (node_properties().is_weak()) {
     // If this is needed in a real scenario, please reach out.
-    FailSync(FROM_HERE, completer, ZX_ERR_BAD_STATE,
+    FailSync(FROM_HERE, completer, Error::kProtocolDeviation,
              "AttachToken on weak collection not (yet?) supported");
     return false;
   }
@@ -426,13 +459,13 @@ void BufferCollection::V2::AttachToken(AttachTokenRequest& request,
                  "logical_buffer_collection", &parent_.logical_buffer_collection());
 
   if (!request.rights_attenuation_mask().has_value()) {
-    parent_.FailSync(FROM_HERE, completer, ZX_ERR_INVALID_ARGS,
+    parent_.FailSync(FROM_HERE, completer, Error::kProtocolDeviation,
                      "V2::AttachToken() requires rights_attenuation_mask set");
     return;
   }
 
   if (!request.token_request().has_value()) {
-    parent_.FailSync(FROM_HERE, completer, ZX_ERR_INVALID_ARGS,
+    parent_.FailSync(FROM_HERE, completer, Error::kProtocolDeviation,
                      "V2::AttachToken() requires token_request set");
     return;
   }
@@ -457,7 +490,7 @@ void BufferCollection::CommonAttachLifetimeTracking(zx::eventpair server_end,
   if (is_done_) {
     // This is Release() followed by AttachLifetimeTracking() which is not permitted and causes the
     // BufferCollection to fail.
-    FailSync(FROM_HERE, completer, ZX_ERR_BAD_STATE,
+    FailSync(FROM_HERE, completer, Error::kProtocolDeviation,
              "BufferCollection::AttachLifetimeTracking() attempted when is_done_");
     return;
   }
@@ -475,12 +508,12 @@ void BufferCollection::V1::AttachLifetimeTracking(
 void BufferCollection::V2::AttachLifetimeTracking(
     AttachLifetimeTrackingRequest& request, AttachLifetimeTrackingCompleter::Sync& completer) {
   if (!request.server_end().has_value()) {
-    parent_.FailSync(FROM_HERE, completer, ZX_ERR_BAD_STATE,
+    parent_.FailSync(FROM_HERE, completer, Error::kProtocolDeviation,
                      "AttachLifetimeTracking() requires server_end set");
     return;
   }
   if (!request.buffers_remaining().has_value()) {
-    parent_.FailSync(FROM_HERE, completer, ZX_ERR_BAD_STATE,
+    parent_.FailSync(FROM_HERE, completer, Error::kProtocolDeviation,
                      "AttachLifetimeTracking() requires buffers_remaining set");
     return;
   }
@@ -489,11 +522,11 @@ void BufferCollection::V2::AttachLifetimeTracking(
 }
 
 void BufferCollection::V1::SetVerboseLogging(SetVerboseLoggingCompleter::Sync& completer) {
-  parent_.SetVerboseLoggingImpl(completer);
+  parent_.SetVerboseLoggingImpl(ConnectionVersion::kVersion1, completer);
 }
 
 void BufferCollection::V2::SetVerboseLogging(SetVerboseLoggingCompleter::Sync& completer) {
-  parent_.SetVerboseLoggingImpl(completer);
+  parent_.SetVerboseLoggingImpl(ConnectionVersion::kVersion2, completer);
 }
 
 void BufferCollection::V1::GetNodeRef(GetNodeRefCompleter::Sync& completer) {
@@ -527,7 +560,7 @@ void BufferCollection::V2::SetWeak(SetWeakCompleter::Sync& completer) {
 void BufferCollection::V2::SetWeakOk(SetWeakOkRequest& request,
                                      SetWeakOkCompleter::Sync& completer) {
   if (parent_.wait_for_buffers_seen_) {
-    parent_.FailSync(FROM_HERE, completer, ZX_ERR_BAD_STATE,
+    parent_.FailSync(FROM_HERE, completer, Error::kProtocolDeviation,
                      "SetWeakOk() after WaitForAllBuffersAllocated()");
     return;
   }
@@ -537,20 +570,20 @@ void BufferCollection::V2::SetWeakOk(SetWeakOkRequest& request,
 void BufferCollection::V2::handle_unknown_method(
     fidl::UnknownMethodMetadata<fuchsia_sysmem2::BufferCollection> metadata,
     fidl::UnknownMethodCompleter::Sync& completer) {
-  parent_.FailSync(FROM_HERE, completer, ZX_ERR_NOT_SUPPORTED,
+  parent_.FailSync(FROM_HERE, completer, Error::kProtocolDeviation,
                    "BufferCollection unknown method - ordinal: %" PRIx64, metadata.method_ordinal);
 }
 
 void BufferCollection::V1::Close(CloseCompleter::Sync& completer) {
-  parent_.ReleaseImpl(completer);
+  parent_.ReleaseImpl(ConnectionVersion::kVersion1, completer);
 }
 
 void BufferCollection::V2::Release(ReleaseCompleter::Sync& completer) {
-  parent_.ReleaseImpl(completer);
+  parent_.ReleaseImpl(ConnectionVersion::kVersion2, completer);
 }
 
 void BufferCollection::V1::DeprecatedClose(DeprecatedCloseCompleter::Sync& completer) {
-  parent_.ReleaseImpl(completer);
+  parent_.ReleaseImpl(ConnectionVersion::kVersion1, completer);
 }
 
 void BufferCollection::V1::SetName(SetNameRequest& request, SetNameCompleter::Sync& completer) {
@@ -594,7 +627,7 @@ void BufferCollection::V2::SetDebugTimeoutLogDeadline(
   parent_.SetDebugTimeoutLogDeadlineImplV2(request, completer);
 }
 
-void BufferCollection::FailAsync(Location location, zx_status_t status, const char* format, ...) {
+void BufferCollection::FailAsync(Location location, Error error, const char* format, ...) {
   va_list args;
   va_start(args, format);
   logical_buffer_collection().VLogClientError(location, &node_properties(), format, args);
@@ -606,28 +639,36 @@ void BufferCollection::FailAsync(Location location, zx_status_t status, const ch
   }
   ZX_DEBUG_ASSERT(!!server_binding_v1_.has_value() ^ !!server_binding_v2_.has_value());
 
-  async_failure_result_ = status;
+  zx_status_t epitaph = sysmem::V1CopyFromV2Error(error);
+  async_failure_result_ = epitaph;
 
   if (server_binding_v1_.has_value()) {
-    server_binding_v1_->Close(status);
+    server_binding_v1_->Close(epitaph);
     server_binding_v1_ = {};
   } else {
     ZX_DEBUG_ASSERT(server_binding_v2_.has_value());
-    server_binding_v2_->Close(status);
+    server_binding_v2_->Close(ZX_ERR_INTERNAL);
     server_binding_v2_ = {};
   }
 }
 
 template <typename Completer>
-void BufferCollection::FailSync(Location location, Completer& completer, zx_status_t status,
+void BufferCollection::FailSync(Location location, Completer& completer, Error error,
                                 const char* format, ...) {
   va_list args;
   va_start(args, format);
   logical_buffer_collection().VLogClientError(location, &node_properties(), format, args);
   va_end(args);
 
-  completer.Close(status);
-  async_failure_result_ = status;
+  zx_status_t epitaph = sysmem::V1CopyFromV2Error(error);
+
+  if (server_binding_v1_.has_value()) {
+    completer.Close(epitaph);
+  } else {
+    completer.Close(ZX_ERR_INTERNAL);
+  }
+
+  async_failure_result_ = epitaph;
 }
 
 fpromise::result<fuchsia_sysmem2::BufferCollectionInfo> BufferCollection::CloneResultForSendingV2(
@@ -657,7 +698,7 @@ fpromise::result<fuchsia_sysmem2::BufferCollectionInfo> BufferCollection::CloneR
 #endif
   auto clone_result = sysmem::V2CloneBufferCollectionInfo(buffer_collection_info, vmo_rights_mask);
   if (!clone_result.is_ok()) {
-    FailAsync(FROM_HERE, clone_result.error(),
+    FailAsync(FROM_HERE, Error::kUnspecified,
               "CloneResultForSendingV1() V2CloneBufferCollectionInfo() failed - status: %d",
               clone_result.error());
     return fpromise::error();
@@ -674,7 +715,7 @@ fpromise::result<fuchsia_sysmem2::BufferCollectionInfo> BufferCollection::CloneR
         auto weak_vmo_result = logical_buffer_collection().CreateWeakVmo(
             buffer_index, node_properties().client_debug_info());
         if (weak_vmo_result.is_error()) {
-          FailAsync(FROM_HERE, weak_vmo_result.error_value(), "CreateWeakVmo() failed");
+          FailAsync(FROM_HERE, Error::kUnspecified, "CreateWeakVmo() failed");
           return fpromise::error();
         }
         // This is moving std::optional<zx::vmo>; if zero strong VMO handles remain, the moved-into
@@ -685,7 +726,7 @@ fpromise::result<fuchsia_sysmem2::BufferCollectionInfo> BufferCollection::CloneR
       }
       auto close_weak_asap = logical_buffer_collection().DupCloseWeakAsapClientEnd(buffer_index);
       if (close_weak_asap.is_error()) {
-        FailAsync(FROM_HERE, close_weak_asap.error_value(), "DupCloseWeakAsapClientEnd() failed");
+        FailAsync(FROM_HERE, Error::kUnspecified, "DupCloseWeakAsapClientEnd() failed");
         return fpromise::error();
       }
       // This is moving std::optional<zx::eventpair>; if zero strong VMO handles remain, the
@@ -698,7 +739,7 @@ fpromise::result<fuchsia_sysmem2::BufferCollectionInfo> BufferCollection::CloneR
       auto attenuated_vmo_buffer_result =
           sysmem::V2CloneVmoBuffer(vmo_buffer, GetClientVmoRights());
       if (attenuated_vmo_buffer_result.is_error()) {
-        FailAsync(FROM_HERE, attenuated_vmo_buffer_result.error(), "V2CloneVmoBuffer failed");
+        FailAsync(FROM_HERE, Error::kUnspecified, "V2CloneVmoBuffer failed");
         return fpromise::error();
       }
       auto& attenuated_vmo_buffer = attenuated_vmo_buffer_result.value();
@@ -717,7 +758,7 @@ fpromise::result<fuchsia_sysmem::BufferCollectionInfo2> BufferCollection::CloneR
     // It doesn't work to set for_child_nodes_also true on a v2 Node then convert that Node to a v1
     // Node then get VMO handles via that v1 Node. Instead, an _ancestor_ v2 Node must have set
     // for_child_nodes_also true - only then can a descendant v1 Node be sent weak VMO handles.
-    FailAsync(FROM_HERE, ZX_ERR_INVALID_ARGS,
+    FailAsync(FROM_HERE, Error::kProtocolDeviation,
               "sysmem v1 can't do weak unless for_child_nodes_also=true from _ancestor_ v2 node");
     return fpromise::error();
   }
@@ -728,7 +769,7 @@ fpromise::result<fuchsia_sysmem::BufferCollectionInfo2> BufferCollection::CloneR
   }
   auto v1_result = sysmem::V1MoveFromV2BufferCollectionInfo(v2_result.take_value());
   if (!v1_result.is_ok()) {
-    FailAsync(FROM_HERE, ZX_ERR_INVALID_ARGS,
+    FailAsync(FROM_HERE, Error::kProtocolDeviation,
               "CloneResultForSendingV1() V1MoveFromV2BufferCollectionInfo() failed");
     return fpromise::error();
   }
@@ -736,10 +777,13 @@ fpromise::result<fuchsia_sysmem::BufferCollectionInfo2> BufferCollection::CloneR
 }
 
 void BufferCollection::OnBuffersAllocated(const AllocationResult& allocation_result) {
-  TRACE_DURATION("gfx", "BufferCollection::OnBuffersAllocated", "status", allocation_result.status);
+  TRACE_DURATION("gfx", "BufferCollection::OnBuffersAllocated", "status",
+                 allocation_result.maybe_error.has_value()
+                     ? static_cast<uint32_t>(*allocation_result.maybe_error)
+                     : ZX_OK);
   ZX_DEBUG_ASSERT(!logical_allocation_result_.has_value());
 
-  ZX_DEBUG_ASSERT((allocation_result.status == ZX_OK) ==
+  ZX_DEBUG_ASSERT(!allocation_result.maybe_error.has_value() ==
                   !!allocation_result.buffer_collection_info);
 
   node_properties().SetBuffersLogicallyAllocated();
@@ -821,7 +865,7 @@ void BufferCollection::MaybeCompleteWaitForBuffersAllocated() {
     pending_wait_for_buffers_allocated_v1_.pop_front();
 
     fuchsia_sysmem::BufferCollectionInfo2 v1;
-    if (logical_allocation_result_->status == ZX_OK) {
+    if (!logical_allocation_result_->maybe_error.has_value()) {
       ZX_DEBUG_ASSERT(logical_allocation_result_->buffer_collection_info);
       auto v1_result = CloneResultForSendingV1(*logical_allocation_result_->buffer_collection_info);
       if (!v1_result.is_ok()) {
@@ -834,13 +878,17 @@ void BufferCollection::MaybeCompleteWaitForBuffersAllocated() {
                     this, "logical_buffer_collection", &logical_buffer_collection());
 
     fuchsia_sysmem::BufferCollectionWaitForBuffersAllocatedResponse response;
-    response.status() = logical_allocation_result_->status;
+    if (logical_allocation_result_->maybe_error.has_value()) {
+      response.status() = sysmem::V1CopyFromV2Error(*logical_allocation_result_->maybe_error);
+    } else {
+      response.status() = ZX_OK;
+    }
     response.buffer_collection_info() = std::move(v1);
     txn.Reply(std::move(response));
 
     fidl::Status reply_status = txn.result_of_reply();
     if (!reply_status.ok()) {
-      FailAsync(FROM_HERE, reply_status.status(),
+      FailAsync(FROM_HERE, Error::kUnspecified,
                 "fuchsia_sysmem_BufferCollectionWaitForBuffersAllocated_"
                 "reply failed - status: %s",
                 reply_status.FormatDescription().c_str());
@@ -853,7 +901,7 @@ void BufferCollection::MaybeCompleteWaitForBuffersAllocated() {
     pending_wait_for_buffers_allocated_v2_.pop_front();
 
     fuchsia_sysmem2::BufferCollectionInfo v2;
-    if (logical_allocation_result_->status == ZX_OK) {
+    if (!logical_allocation_result_->maybe_error.has_value()) {
       ZX_DEBUG_ASSERT(logical_allocation_result_->buffer_collection_info);
       auto v2_result = CloneResultForSendingV2(*logical_allocation_result_->buffer_collection_info);
       if (!v2_result.is_ok()) {
@@ -864,8 +912,8 @@ void BufferCollection::MaybeCompleteWaitForBuffersAllocated() {
     }
     TRACE_ASYNC_END("gfx", "BufferCollection::WaitForAllBuffersAllocated async", async_id, "this",
                     this, "logical_buffer_collection", &logical_buffer_collection());
-    if (logical_allocation_result_->status != ZX_OK) {
-      txn.Reply(fit::error(logical_allocation_result_->status));
+    if (logical_allocation_result_->maybe_error.has_value()) {
+      txn.Reply(fit::error(sysmem::V1CopyFromV2Error(*logical_allocation_result_->maybe_error)));
     } else {
       fuchsia_sysmem2::BufferCollectionWaitForAllBuffersAllocatedResponse response;
       response.buffer_collection_info() = std::move(v2);
@@ -873,7 +921,40 @@ void BufferCollection::MaybeCompleteWaitForBuffersAllocated() {
     }
     fidl::Status reply_status = txn.result_of_reply();
     if (!reply_status.ok()) {
-      FailAsync(FROM_HERE, reply_status.status(),
+      FailAsync(FROM_HERE, Error::kUnspecified,
+                "fuchsia_sysmem2::BufferCollectionWaitForBuffersAllocated "
+                "reply failed - status: %s",
+                reply_status.FormatDescription().c_str());
+      return;
+    }
+    // ~txn
+  }
+  while (!pending_wait_for_buffers_allocated_v2_new_.empty()) {
+    auto [async_id, txn] = std::move(pending_wait_for_buffers_allocated_v2_new_.front());
+    pending_wait_for_buffers_allocated_v2_new_.pop_front();
+
+    fuchsia_sysmem2::BufferCollectionInfo v2;
+    if (!logical_allocation_result_->maybe_error.has_value()) {
+      ZX_DEBUG_ASSERT(logical_allocation_result_->buffer_collection_info);
+      auto v2_result = CloneResultForSendingV2(*logical_allocation_result_->buffer_collection_info);
+      if (!v2_result.is_ok()) {
+        // FailAsync() already called.
+        return;
+      }
+      v2 = v2_result.take_value();
+    }
+    TRACE_ASYNC_END("gfx", "BufferCollection::WaitForAllBuffersAllocatedNew async", async_id,
+                    "this", this, "logical_buffer_collection", &logical_buffer_collection());
+    if (logical_allocation_result_->maybe_error.has_value()) {
+      txn.Reply(fit::error(*logical_allocation_result_->maybe_error));
+    } else {
+      fuchsia_sysmem2::BufferCollectionWaitForAllBuffersAllocatedNewResponse response;
+      response.buffer_collection_info() = std::move(v2);
+      txn.Reply(fit::ok(std::move(response)));
+    }
+    fidl::Status reply_status = txn.result_of_reply();
+    if (!reply_status.ok()) {
+      FailAsync(FROM_HERE, Error::kUnspecified,
                 "fuchsia_sysmem2::BufferCollectionWaitForBuffersAllocated "
                 "reply failed - status: %s",
                 reply_status.FormatDescription().c_str());
@@ -887,7 +968,7 @@ void BufferCollection::MaybeFlushPendingLifetimeTracking() {
   if (!node_properties().buffers_logically_allocated()) {
     return;
   }
-  if (logical_allocation_result_->status != ZX_OK) {
+  if (logical_allocation_result_->maybe_error.has_value()) {
     // We close these immediately if logical allocation failed, regardless of
     // the number of buffers potentially allocated in the overall
     // LogicalBufferCollection.  This is for behavior consistency between

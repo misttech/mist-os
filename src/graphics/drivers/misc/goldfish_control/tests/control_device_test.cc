@@ -361,7 +361,7 @@ void FakeSysmemAllocator::GetVmoInfo(::fuchsia_sysmem2::wire::AllocatorGetVmoInf
                                      GetVmoInfoCompleter::Sync& completer) {
   auto buffer_key = parent_.LookupFakeVmoInfo(request->vmo());
   if (!buffer_key.has_value()) {
-    completer.ReplyError(ZX_ERR_NOT_FOUND);
+    completer.ReplyError(fuchsia_sysmem2::Error::kNotFound);
     return;
   }
   fidl::Arena arena;

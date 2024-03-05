@@ -12,11 +12,14 @@
 
 namespace sysmem_driver {
 
+using Error = fuchsia_sysmem2::Error;
+
 Node::Node(fbl::RefPtr<LogicalBufferCollection> logical_buffer_collection,
            NodeProperties* node_properties, zx::unowned_channel server_end)
     : logical_buffer_collection_(std::move(logical_buffer_collection)),
       node_properties_(node_properties),
       server_end_(std::move(server_end)) {
+  ZX_DEBUG_ASSERT(node_properties_);
   if (*server_end_) {
     zx_koid_t server_koid;
     zx_koid_t client_koid;
@@ -88,7 +91,7 @@ void Node::SetErrorHandler(fit::function<void(zx_status_t)> error_handler) {
   error_handler_ = std::move(error_handler);
 }
 
-void Node::Fail(zx_status_t epitaph) { CloseChannel(epitaph); }
+void Node::Fail(Error error) { CloseChannel(error); }
 
 void Node::SetDebugClientInfoInternal(ClientDebugInfo debug_info) {
   node_properties().client_debug_info() = debug_info;
@@ -153,11 +156,14 @@ zx_koid_t Node::server_koid() const {
 
 Device* Node::parent_device() const { return logical_buffer_collection_->parent_device(); }
 
-void Node::CloseChannel(zx_status_t epitaph) {
+void Node::CloseChannel(Error error) {
   // This essentially converts the OnUnboundFn semantic of getting called regardless of channel-fail
   // vs. server-driven-fail into the more typical semantic where error_handler_ only gets called
   // on channel-fail but not on server-driven-fail.
   error_handler_ = {};
+  zx_status_t epitaph = sysmem::V1CopyFromV2Error(error);
+  // Passing an epitaph here specifies the epitaph for sysmem(1), but sysmem2 always sends
+  // ZX_ERR_INTERNAL as the epitaph.
   CloseServerBinding(epitaph);
 }
 

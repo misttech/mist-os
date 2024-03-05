@@ -14,6 +14,8 @@
 
 namespace sysmem_driver {
 
+using Error = fuchsia_sysmem2::Error;
+
 Allocator::Allocator(Device* parent_device)
     : LoggingMixin("allocator"), parent_device_(parent_device) {
   // nothing else to do here
@@ -69,7 +71,7 @@ fit::result<std::monostate, fidl::Endpoints<Protocol>> Allocator::CommonAllocate
     // Returning an error here causes the sysmem connection to drop also,
     // which seems like a good idea (more likely to recover overall) given
     // the nature of the error.
-    completer.Close(endpoints.error_value());
+    completer.Close(ZX_ERR_INTERNAL);
     return fit::error(std::monostate{});
   }
 
@@ -112,7 +114,7 @@ void Allocator::V2::AllocateNonSharedCollection(
 
   if (!request.collection_request().has_value()) {
     allocator_->LogError(FROM_HERE, "AllocateNonSharedCollection requires collection_request set");
-    completer.Close(ZX_ERR_INVALID_ARGS);
+    completer.Close(ZX_ERR_INTERNAL);
     return;
   }
 
@@ -166,7 +168,7 @@ void Allocator::V2::AllocateSharedCollection(AllocateSharedCollectionRequest& re
 
   if (!request.token_request().has_value()) {
     allocator_->LogError(FROM_HERE, "AllocateSharedCollection requires token_request set");
-    completer.Close(ZX_ERR_INVALID_ARGS);
+    completer.Close(ZX_ERR_INTERNAL);
     return;
   }
 
@@ -209,13 +211,13 @@ void Allocator::V2::BindSharedCollection(BindSharedCollectionRequest& request,
 
   if (!request.token().has_value()) {
     allocator_->LogError(FROM_HERE, "BindSharedCollection requires token set");
-    completer.Close(ZX_ERR_INVALID_ARGS);
+    completer.Close(ZX_ERR_INTERNAL);
     return;
   }
 
   if (!request.buffer_collection_request().has_value()) {
     allocator_->LogError(FROM_HERE, "BindSharedCollection requires buffer_collection_request set");
-    completer.Close(ZX_ERR_INVALID_ARGS);
+    completer.Close(ZX_ERR_INTERNAL);
     return;
   }
 
@@ -246,7 +248,7 @@ void Allocator::V2::ValidateBufferCollectionToken(
     ValidateBufferCollectionTokenCompleter::Sync& completer) {
   if (!request.token_server_koid().has_value()) {
     allocator_->LogError(FROM_HERE, "ValidateBufferCollectionToken requires token_server_koid set");
-    completer.Close(ZX_ERR_INVALID_ARGS);
+    completer.Close(ZX_ERR_INTERNAL);
     return;
   }
   zx_status_t status = LogicalBufferCollection::ValidateBufferCollectionToken(
@@ -268,7 +270,7 @@ void Allocator::V2::SetDebugClientInfo(SetDebugClientInfoRequest& request,
                                        SetDebugClientInfoCompleter::Sync& completer) {
   if (!request.name().has_value()) {
     allocator_->LogError(FROM_HERE, "SetDebugClientInfo requires name set");
-    completer.Close(ZX_ERR_INVALID_ARGS);
+    completer.Close(ZX_ERR_INTERNAL);
     return;
   }
   uint64_t id = 0;
@@ -284,12 +286,12 @@ void Allocator::V2::SetDebugClientInfo(SetDebugClientInfoRequest& request,
 void Allocator::V2::GetVmoInfo(GetVmoInfoRequest& request, GetVmoInfoCompleter::Sync& completer) {
   if (!request.vmo().has_value()) {
     allocator_->LogError(FROM_HERE, "GetVmoInfo requires vmo handle (!has_value)");
-    completer.Reply(fit::error(ZX_ERR_INVALID_ARGS));
+    completer.Reply(fit::error(Error::kProtocolDeviation));
     return;
   }
   if (!request.vmo()->is_valid()) {
     allocator_->LogError(FROM_HERE, "GetVmoInfo requires vmo handle (!is_valid)");
-    completer.Reply(fit::error(ZX_ERR_INVALID_ARGS));
+    completer.Reply(fit::error(Error::kProtocolDeviation));
     return;
   }
   auto& vmo = *request.vmo();
@@ -298,13 +300,21 @@ void Allocator::V2::GetVmoInfo(GetVmoInfoRequest& request, GetVmoInfoCompleter::
       vmo.get_info(ZX_INFO_HANDLE_BASIC, &basic_info, sizeof(basic_info), nullptr, nullptr);
   if (status != ZX_OK) {
     allocator_->LogError(FROM_HERE, "GetVmoInfo couldn't vmo.get_info to get koid");
-    completer.Reply(fit::error(ZX_ERR_INVALID_ARGS));
+
+    Error translated_status;
+    if (status == ZX_ERR_ACCESS_DENIED) {
+      translated_status = Error::kHandleAccessDenied;
+    } else {
+      translated_status = Error::kUnspecified;
+    }
+
+    completer.Reply(fit::error(translated_status));
     return;
   }
   // Possibly redundant with FIDL generated code.
   if (basic_info.type != ZX_OBJ_TYPE_VMO) {
     allocator_->LogError(FROM_HERE, "GetVmoInfo requires VMO handle");
-    completer.Reply(fit::error(ZX_ERR_INVALID_ARGS));
+    completer.Reply(fit::error(Error::kProtocolDeviation));
     return;
   }
   zx_koid_t vmo_koid = basic_info.koid;
@@ -312,7 +322,7 @@ void Allocator::V2::GetVmoInfo(GetVmoInfoRequest& request, GetVmoInfoCompleter::
   if (!logical_buffer_result.logical_buffer) {
     // We don't log anything in this path because a client may just be checking if a VMO is a
     // sysmem VMO, which could make a LogInfo() here noisy.
-    completer.Reply(fit::error(ZX_ERR_NOT_FOUND));
+    completer.Reply(fit::error(Error::kNotFound));
     return;
   }
   auto& logical_buffer = *logical_buffer_result.logical_buffer;
@@ -324,7 +334,7 @@ void Allocator::V2::GetVmoInfo(GetVmoInfoRequest& request, GetVmoInfoCompleter::
     auto dup_result = logical_buffer.logical_buffer_collection().DupCloseWeakAsapClientEnd(
         logical_buffer.buffer_index());
     if (dup_result.is_error()) {
-      completer.Close(dup_result.error_value());
+      completer.Reply(fit::error{Error::kUnspecified});
       return;
     }
     response.close_weak_asap() = std::move(dup_result.value());
@@ -337,7 +347,7 @@ void Allocator::V2::handle_unknown_method(
     fidl::UnknownMethodCompleter::Sync& completer) {
   allocator_->LogError(FROM_HERE, "token group unknown method - ordinal: %" PRIx64,
                        metadata.method_ordinal);
-  completer.Close(ZX_ERR_NOT_SUPPORTED);
+  completer.Close(ZX_ERR_INTERNAL);
 }
 
 }  // namespace sysmem_driver

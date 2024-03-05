@@ -27,11 +27,13 @@ const MAX_COUNT_CREATE_CHILDREN int32 = 64;
 @available(added=HEAD)
 const MAX_CLIENT_NAME_LENGTH int32 = 256;
 
-// This protocol is the parent protocol for all nodes in the tree established by
-// [`fuchsia.sysmem2/BufferCollectionToken`] creation and
-// [`fuchsia.sysmem2/BufferCollectionTokenGroup`] creation, including
-// [`fuchsia.sysmem2/BufferCollectionToken`](s) which have since been converted
-// to a [`fuchsia.sysmem2/BufferCollection`] channel.
+/// This protocol is the parent protocol for all nodes in the tree established
+/// by [`fuchsia.sysmem2/BufferCollectionToken`] creation and
+/// [`fuchsia.sysmem2/BufferCollectionTokenGroup`] creation, including
+/// [`fuchsia.sysmem2/BufferCollectionToken`](s) which have since been converted
+/// to a [`fuchsia.sysmem2/BufferCollection`] channel.
+///
+/// Epitaphs are not used in this protocol.
 @available(added=HEAD)
 open protocol Node {
     /// Ensure that previous messages have been received server side. This is
@@ -306,14 +308,14 @@ open protocol Node {
     ///     `Node`(s) has a direct or indirect parent
     ///     `BufferCollectionTokenGroup` which selects a child subtree other
     ///     than the subtree containing the calling `Node` or `node_ref` `Node`.
-    /// * error `ZX_ERR_NOT_FOUND` The node_ref wasn't associated with the same
-    ///   buffer collection as the calling `Node`. Another reason for this error
-    ///   is if the `node_ref` is an [`zx.Handle.EVENT`] handle with sufficient
-    ///   rights, but isn't actually a real `node_ref` obtained from
-    ///   `GetNodeRef`.
-    /// * error `ZX_ERR_INVALID_ARGS` The caller passed a `node_ref` that isn't
-    ///   a [`zx.Handle:EVENT`] handle , or doesn't have the needed rights
-    ///   expected on a real `node_ref`.
+    /// * error `[fuchsia.sysmem2/Error.NOT_FOUND]` The node_ref wasn't
+    ///   associated with the same buffer collection as the calling `Node`.
+    ///   Another reason for this error is if the `node_ref` is an
+    ///   [`zx.Handle.EVENT`] handle with sufficient rights, but isn't actually
+    ///   a real `node_ref` obtained from `GetNodeRef`.
+    /// * error `[fuchsia.sysmem2/Error.PROTOCOL_DEVIATION]` The caller passed a
+    ///   `node_ref` that isn't a [`zx.Handle:EVENT`] handle , or doesn't have
+    ///   the needed rights expected on a real `node_ref`.
     /// * No other failing status codes are returned by this call.  However,
     ///   sysmem may add additional codes in future, so the client should have
     ///   sensible default handling for any failing status code.
@@ -321,7 +323,7 @@ open protocol Node {
         1: node_ref zx.Handle:EVENT;
     }) -> (table {
         1: is_alternate bool;
-    }) error zx.Status;
+    }) error Error;
 
     /// Get the buffer collection ID. This ID is also available from
     /// [`fuchsia.sysmem2/Allocator.GetVmoInfo`] (along with the `buffer_index`
@@ -451,6 +453,8 @@ open protocol Node {
 /// and a way to distribute that potential shared buffer collection to
 /// additional participants prior to the buffer collection allocating any
 /// buffers.
+///
+/// Epitaphs are not used in this protocol.
 ///
 /// We use a channel for the `BufferCollectionToken` instead of a single
 /// `eventpair` (pair) because this way we can detect error conditions like a
@@ -701,6 +705,8 @@ open protocol BufferCollectionToken {
 /// [`fuchsia.sysmem2/BufferCollection.AttachLifetimeTracking`] so that the
 /// initiator can tell when enough buffers of the buffer collection have been
 /// fully deallocated prior to the initiator allocating a new buffer collection.
+///
+/// Epitaphs are not used in this protocol.
 @available(added=HEAD)
 open protocol BufferCollection {
     compose Node;
@@ -747,30 +753,45 @@ open protocol BufferCollection {
     ///
     /// - result `buffer_collection_info` The VMO handles and other related
     ///   info.
-    /// * error `ZX_ERR_NO_MEMORY` The request is valid but cannot be fulfilled
-    ///   due to resource exhaustion.
-    /// * error `ZX_ERR_ACCESS_DENIED` The caller is not permitted to obtain the
-    ///   buffers it requested.
-    /// * error `ZX_ERR_INVALID_ARGS` The request is malformed.
-    /// * error `ZX_ERR_NOT_SUPPORTED` The request is valid but cannot be
-    ///   satisfied, perhaps due to hardware limitations.
+    /// * error `[fuchsia.sysmem2/Error.NO_MEMORY]` The request is valid but
+    ///   cannot be fulfilled due to resource exhaustion.
+    /// * error `[fuchsia.sysmem2/Error.PROTOCOL_DEVIATION`] The request is
+    ///   malformed.
+    /// * error `[fuchsia.sysmem2/Error.CONSTRAINTS_INTERSECTION_EMPTY`] The
+    ///   request is valid but cannot be satisfied, perhaps due to hardware
+    ///   limitations. This can happen if participants have incompatible
+    ///   constraints (empty intersection, roughly speaking). See the log for
+    ///   more info. In cases where a participant could potentially be treated
+    ///   as optional, see [`BufferCollectionTokenGroup`]. When using
+    ///   [`fuchsia.sysmem2/BufferCollection.AttachToken`], this will be the
+    ///   error code if there aren't enough buffers in the pre-existing
+    ///   collection to satisfy the constraints set on the attached token and
+    ///   any sub-tree of tokens derived from the attached token.
+    //
+    // TODO(b/316646315): After soft migration, we'll be left with
+    // WaitForAllBuffersAllocated that returns Error.
+    @selector("fuchsia.sysmem2/BufferCollection.WaitForAllBuffersAllocatedDeprecated")
     flexible WaitForAllBuffersAllocated() -> (resource table {
         1: buffer_collection_info BufferCollectionInfo;
     }) error zx.Status;
+    @selector("fuchsia.sysmem2/BufferCollection.WaitForAllBuffersAllocated")
+    flexible WaitForAllBuffersAllocatedNew() -> (resource table {
+        1: buffer_collection_info BufferCollectionInfo;
+    }) error Error;
 
     /// Checks whether all the buffers have been allocated, in a polling
     /// fashion.
     ///
     /// * If the buffer collection has been allocated, returns success.
-    /// * If the buffer collection failed allocation, returns the same failure
-    ///   `zx.Status` as
+    /// * If the buffer collection failed allocation, returns the same
+    ///   [`fuchsia.sysmem2/Error`] as
     ///   [`fuchsia.sysmem2/BufferCollection/WaitForAllBuffersAllocated`] would
     ///   return.
-    /// * error `ZX_ERR_UNAVAILABLE` The buffer collection hasn't attempted
-    ///   allocation yet. This means that WaitForAllBuffersAllocated would not
-    ///   respond quickly.
+    /// * error [`fuchsia.sysmem2/Error.PENDING`] The buffer collection hasn't
+    ///   attempted allocation yet. This means that WaitForAllBuffersAllocated
+    ///   would not respond quickly.
     @available(added=HEAD)
-    flexible CheckAllBuffersAllocated() -> () error zx.Status;
+    flexible CheckAllBuffersAllocated() -> () error Error;
 
     /// Create a new token to add a new participant to an existing logical
     /// buffer collection, if the existing collection's buffer counts,
@@ -1036,6 +1057,8 @@ open protocol BufferCollection {
 /// [`fuchsia.sysmem2/BufferCollection.AttachToken`] and the
 /// `BufferCollectionTokenGroup` is part of a subtree under such a node that
 /// doesn't propagate failure to its parent).
+///
+/// Epitaphs are not used in this protocol.
 @available(added=HEAD)
 open protocol BufferCollectionTokenGroup {
     compose Node;

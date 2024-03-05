@@ -156,6 +156,8 @@ class BufferCollection : public Node {
     void SetConstraints(SetConstraintsRequest& request,
                         SetConstraintsCompleter::Sync& completer) override;
     void WaitForAllBuffersAllocated(WaitForAllBuffersAllocatedCompleter::Sync& completer) override;
+    void WaitForAllBuffersAllocatedNew(
+        WaitForAllBuffersAllocatedNewCompleter::Sync& completer) override;
     void CheckAllBuffersAllocated(CheckAllBuffersAllocatedCompleter::Sync& completer) override;
     void AttachToken(AttachTokenRequest& request, AttachTokenCompleter::Sync& completer) override;
     void AttachLifetimeTracking(AttachLifetimeTrackingRequest& request,
@@ -183,12 +185,13 @@ class BufferCollection : public Node {
   void MaybeCompleteWaitForBuffersAllocated();
   void MaybeFlushPendingLifetimeTracking();
 
-  void FailAsync(Location location, zx_status_t status, const char* format, ...) __PRINTFLIKE(4, 5);
+  void FailAsync(Location location, fuchsia_sysmem2::Error error, const char* format, ...)
+      __PRINTFLIKE(4, 5);
   // FailSync must be used instead of FailAsync if the current method has a completer that needs a
   // reply.
   template <typename Completer>
-  void FailSync(Location location, Completer& completer, zx_status_t status, const char* format,
-                ...) __PRINTFLIKE(5, 6);
+  void FailSync(Location location, Completer& completer, fuchsia_sysmem2::Error error,
+                const char* format, ...) __PRINTFLIKE(5, 6);
 
   fpromise::result<fuchsia_sysmem2::BufferCollectionInfo> CloneResultForSendingV2(
       const fuchsia_sysmem2::BufferCollectionInfo& buffer_collection_info);
@@ -204,7 +207,8 @@ class BufferCollection : public Node {
                                               Completer& completer, trace_async_id_t* out_event_id);
 
   template <typename Completer>
-  bool CommonCheckAllBuffersAllocatedStage1(Completer& completer, zx_status_t* result);
+  bool CommonCheckAllBuffersAllocatedStage1(Completer& completer,
+                                            std::optional<fuchsia_sysmem2::Error>* result);
 
   template <typename Completer>
   bool CommonAttachTokenStage1(uint32_t rights_attenuation_mask, Completer& completer,
@@ -224,7 +228,8 @@ class BufferCollection : public Node {
       pending_wait_for_buffers_allocated_v1_;
   std::list<std::pair</*async_id*/ uint64_t, V2::WaitForAllBuffersAllocatedCompleter::Async>>
       pending_wait_for_buffers_allocated_v2_;
-
+  std::list<std::pair</*async_id*/ uint64_t, V2::WaitForAllBuffersAllocatedNewCompleter::Async>>
+      pending_wait_for_buffers_allocated_v2_new_;
   std::optional<fidl::ServerBindingRef<fuchsia_sysmem::BufferCollection>> server_binding_v1_;
   std::optional<fidl::ServerBindingRef<fuchsia_sysmem2::BufferCollection>> server_binding_v2_;
 
