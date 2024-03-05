@@ -254,10 +254,19 @@ func (t *QEMU) Start(ctx context.Context, images []bootserver.Image, args []stri
 		return fmt.Errorf("missing product bundle")
 	}
 
-	// If a QEMU kernel override was specified, use that; else, unless we want
-	// to boot via a UEFI disk image (which does not require one), then we
-	// surely want a QEMU kernel, so use the default.
+	// If a QEMU kernel was specified, use that; else, a UEFI disk image (which does not
+	// require a QEMU kernel) must be specified in the product bundle to use.
 	var qemuKernel, efiDisk *bootserver.Image
+	// `ffx product get-image-path` prints an error message if it can't find the
+	// requested image in the product bundle, which is ok. Since the error message
+	// is confusing, we'll discard the output and only return an error if a
+	// required image is missing.
+	resetStdoutStderr := func() {
+		origStdout := t.ffx.Stdout()
+		origStderr := t.ffx.Stderr()
+		t.ffx.SetStdoutStderr(origStdout, origStderr)
+	}
+	t.ffx.SetStdoutStderr(io.Discard, io.Discard)
 	qemuKernel, err = t.ffx.GetImageFromPB(ctx, pbPath, "a", "qemu-kernel", "")
 	if err != nil {
 		return err
@@ -309,6 +318,7 @@ func (t *QEMU) Start(ctx context.Context, images []bootserver.Image, args []stri
 	if err != nil {
 		return err
 	}
+	resetStdoutStderr()
 
 	if err := copyImagesToDir(ctx, workdir, false, qemuKernel, zbi, efiDisk, fvmImage, fxfsImage); err != nil {
 		return err
