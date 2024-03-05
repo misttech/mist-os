@@ -76,7 +76,14 @@ rustc_test("tuf_lib_test") {
     "//third_party/rust_crates/vendor/tuf-0.3.0-beta11/tests/ed25519/ed25519-6.pk8.der",
   ]
 
-  rustflags = [ "--cap-lints=allow" ]
+  rustflags = [
+    # TODO(https://fxbug.dev/326330182): warn for unused imports once that is fixed in the TUF crate
+    "-Aunused_imports",
+
+    # TODO(https://fxbug.dev/326330182): warn for dead code once that is fixed in the TUF crate
+    "-Adead_code",
+    "--cap-lints=allow",
+  ]
 }
 
 fuchsia_component("test-component") {
