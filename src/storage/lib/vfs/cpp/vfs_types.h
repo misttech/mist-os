@@ -8,6 +8,7 @@
 #include <fidl/fuchsia.io/cpp/natural_types.h>
 #include <fidl/fuchsia.io/cpp/wire_types.h>
 #include <lib/fdio/vfs.h>
+#include <lib/zx/result.h>
 #include <zircon/compiler.h>
 #include <zircon/types.h>
 
@@ -108,14 +109,32 @@ constexpr Rights operator&(Rights lhs, Rights rhs) { return Rights(lhs.raw_value
 
 // Identifies a single type of node protocol where required for protocol negotiation/resolution.
 enum class VnodeProtocol : uint8_t {
-  kDirectory,
-  kFile,
-  kNode,
-  kService,
+  kNode = 0,  // All Vnodes support fuchsia.io/Node, so it does not have an explicit representation.
+  kService = uint64_t{fuchsia_io::NodeProtocolKinds::kConnector},
+  kDirectory = uint64_t{fuchsia_io::NodeProtocolKinds::kDirectory},
+  kFile = uint64_t{fuchsia_io::NodeProtocolKinds::kFile},
 #if __Fuchsia_API_level__ >= FUCHSIA_HEAD
-  kSymlink,
+  kSymlink = uint64_t{fuchsia_io::NodeProtocolKinds::kSymlink},
 #endif
 };
+
+inline zx::result<VnodeProtocol> NegotiateProtocol(fuchsia_io::NodeProtocolKinds protocols) {
+  if (protocols & fuchsia_io::NodeProtocolKinds::kConnector) {
+    return zx::ok(VnodeProtocol::kService);
+  }
+  if (protocols & fuchsia_io::NodeProtocolKinds::kDirectory) {
+    return zx::ok(VnodeProtocol::kDirectory);
+  }
+  if (protocols & fuchsia_io::NodeProtocolKinds::kFile) {
+    return zx::ok(VnodeProtocol::kFile);
+  }
+#if __Fuchsia_API_level__ >= FUCHSIA_HEAD
+  if (protocols & fuchsia_io::NodeProtocolKinds::kSymlink) {
+    return zx::ok(VnodeProtocol::kSymlink);
+  }
+#endif
+  return zx::error(ZX_ERR_NOT_SUPPORTED);
+}
 
 // Options specified during opening and cloning.
 struct VnodeConnectionOptions {

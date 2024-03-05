@@ -101,7 +101,6 @@ class Devnode {
     zx_status_t Readdir(fs::VdirCookie* cookie, void* dirents, size_t len,
                         size_t* out_actual) final;
     zx_status_t ConnectService(zx::channel channel) final;
-    bool IsService() const final;
 
     PseudoDir& children() const { return *children_; }
 

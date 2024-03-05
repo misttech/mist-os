@@ -97,8 +97,6 @@ class Connection : public fbl::DoublyLinkedListable<std::unique_ptr<Connection>>
   Connection(fs::FuchsiaVfs* vfs, fbl::RefPtr<fs::Vnode> vnode, VnodeProtocol protocol,
              VnodeConnectionOptions options);
 
-  VnodeProtocol protocol() const { return protocol_; }
-
   const VnodeConnectionOptions& options() const { return options_; }
 
   void set_append(bool append) { options_.flags.append = append; }

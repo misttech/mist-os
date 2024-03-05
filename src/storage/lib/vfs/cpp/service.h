@@ -58,7 +58,6 @@ class Service : public Vnode {
   fuchsia_io::NodeProtocolKinds GetProtocols() const final;
   zx_status_t GetAttributes(fs::VnodeAttributes* a) final;
   zx_status_t ConnectService(zx::channel channel) final;
-  bool IsService() const override { return true; }
 
  protected:
   friend fbl::internal::MakeRefCountedHelper<Service>;

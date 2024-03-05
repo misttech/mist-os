@@ -102,10 +102,6 @@ bool Vnode::DeleteFileLockInTeardown(zx_koid_t owner) {
 
 #endif  // __Fuchsia__
 
-bool Vnode::Supports(fuchsia_io::NodeProtocolKinds protocols) const {
-  return static_cast<bool>(GetProtocols() & protocols);
-}
-
 bool Vnode::ValidateRights([[maybe_unused]] Rights rights) const { return true; }
 
 zx::result<Vnode::ValidatedOptions> Vnode::ValidateOptions(VnodeConnectionOptions options) const {
@@ -121,24 +117,6 @@ zx::result<Vnode::ValidatedOptions> Vnode::ValidateOptions(VnodeConnectionOption
     return zx::error(ZX_ERR_ACCESS_DENIED);
   }
   return zx::ok(Validated(options));
-}
-
-VnodeProtocol Vnode::Negotiate(fuchsia_io::NodeProtocolKinds protocols) const {
-  if (protocols & fuchsia_io::NodeProtocolKinds::kConnector) {
-    return VnodeProtocol::kService;
-  }
-  if (protocols & fuchsia_io::NodeProtocolKinds::kDirectory) {
-    return VnodeProtocol::kDirectory;
-  }
-  if (protocols & fuchsia_io::NodeProtocolKinds::kFile) {
-    return VnodeProtocol::kFile;
-  }
-#if __Fuchsia_API_level__ >= FUCHSIA_HEAD
-  if (protocols & fuchsia_io::NodeProtocolKinds::kSymlink) {
-    return VnodeProtocol::kSymlink;
-  }
-#endif
-  ZX_PANIC("Unhandled NodeProtocolKinds variant!");
 }
 
 zx_status_t Vnode::Open(ValidatedOptions options, fbl::RefPtr<Vnode>* out_redirect) {

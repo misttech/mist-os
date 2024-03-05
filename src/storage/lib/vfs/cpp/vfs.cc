@@ -96,12 +96,13 @@ Vfs::OpenResult Vfs::OpenLocked(fbl::RefPtr<Vnode> vndir, std::string_view path,
     return OpenResult::Remote{.vnode = std::move(vn), .path = "."};
   }
 
-  if (!vn->IsService() && ReadonlyLocked() && options.rights.write) {
+  if (ReadonlyLocked() && options.rights.write &&
+      !vn->Supports(fuchsia_io::NodeProtocolKinds::kConnector)) {
     return ZX_ERR_ACCESS_DENIED;
   }
 
-  if (vn->Supports(fuchsia_io::NodeProtocolKinds::kDirectory) &&
-      (options.flags.posix_write || options.flags.posix_execute)) {
+  if ((options.flags.posix_write || options.flags.posix_execute) &&
+      vn->Supports(fuchsia_io::NodeProtocolKinds::kDirectory)) {
     // This is such that POSIX open() can open a directory with O_RDONLY, and still get the
     // write/execute right if the parent directory connection has the write/execute right
     // respectively.  With the execute right in particular, the resulting connection may be passed

@@ -117,8 +117,6 @@ zx_status_t Devnode::VnodeImpl::ConnectService(zx::channel channel) {
   return (*target_->connect.get())(std::move(channel), target_->default_connection_type);
 }
 
-bool Devnode::VnodeImpl::IsService() const { return target_.has_value(); }
-
 zx_status_t Devnode::VnodeImpl::GetAttributes(fs::VnodeAttributes* a) {
   return children().GetAttributes(a);
 }

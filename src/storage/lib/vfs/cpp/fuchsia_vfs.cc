@@ -32,10 +32,14 @@ namespace fio = fuchsia_io;
 namespace fs {
 namespace {
 
-zx_koid_t GetTokenKoid(const zx::event& token) {
+zx::result<zx_koid_t> GetObjectKoid(const zx::object_base& object) {
   zx_info_handle_basic_t info = {};
-  token.get_info(ZX_INFO_HANDLE_BASIC, &info, sizeof(info), nullptr, nullptr);
-  return info.koid;
+  if (zx_status_t status =
+          object.get_info(ZX_INFO_HANDLE_BASIC, &info, sizeof(info), nullptr, nullptr);
+      status != ZX_OK) {
+    return zx::error(status);
+  }
+  return zx::ok(info.koid);
 }
 
 uint32_t ToStreamOptions(const VnodeConnectionOptions& options) {
@@ -52,17 +56,40 @@ uint32_t ToStreamOptions(const VnodeConnectionOptions& options) {
   return stream_options;
 }
 
+zx_status_t ConnectService(const fbl::RefPtr<fs::Vnode>& vnode, Vnode::ValidatedOptions options,
+                           fidl::ServerEnd<fio::Node> server_end) {
+  // For service connections, we don't know the final protocol that will be spoken over |server_end|
+  // as it is dependent on the service Vnode type/connector. However, if |options.describe|
+  // is set, the channel first speaks |fuchsia.io/Node| to send the OnOpen event, then switches to
+  // the service protocol.
+  //
+  // TODO(https://fxbug.dev/324111653): In io2/Open2, service connections do not support the
+  // OnRepresentation event, and use of epitaphs when closing channels is explicitly defined.
+  // We will likely need to remove support for protocol switching in io1 to support the migration.
+  if (options->ToIoV1Flags() & ~(fio::OpenFlags::kDescribe | fio::OpenFlags::kNotDirectory)) {
+    constexpr zx_status_t kStatus = ZX_ERR_INVALID_ARGS;
+    if (options->flags.describe) {
+      [[maybe_unused]] fidl::Status status = fidl::WireSendEvent(server_end)->OnOpen(kStatus, {});
+    } else {
+      [[maybe_unused]] zx_status_t status = server_end.Close(kStatus);
+    }
+    return kStatus;
+  }
+  if (options->flags.describe) {
+    fidl::Status status = fidl::WireSendEvent(server_end)
+                              ->OnOpen(ZX_OK, fio::wire::NodeInfoDeprecated::WithService({}));
+    if (!status.ok()) {
+      return status.status();
+    }
+  }
+  return vnode->ConnectService(server_end.TakeChannel());
+}
+
 }  // namespace
 
 void FilesystemInfo::SetFsId(const zx::event& event) {
-  zx_info_handle_basic_t handle_info;
-  if (zx_status_t status =
-          event.get_info(ZX_INFO_HANDLE_BASIC, &handle_info, sizeof(handle_info), nullptr, nullptr);
-      status == ZX_OK) {
-    fs_id = handle_info.koid;
-  } else {
-    fs_id = ZX_KOID_INVALID;
-  }
+  zx::result koid = GetObjectKoid(event);
+  fs_id = koid.is_ok() ? *koid : ZX_KOID_INVALID;
 }
 
 fuchsia_io::wire::FilesystemInfo FilesystemInfo::ToFidl() const {
@@ -115,7 +142,12 @@ void FuchsiaVfs::TokenDiscard(zx::event ios_token) {
     //
     // By cleared the token cookie, any remaining handles to the event will be ignored by the
     // filesystem server.
-    auto rename_request = vnode_tokens_.erase(GetTokenKoid(ios_token));
+    //
+    // This is called from a destructor, so there isn't much we can do if this fails.
+    zx::result koid = GetObjectKoid(ios_token);
+    if (koid.is_ok()) {
+      vnode_tokens_.erase(*koid);
+    }
   }
 }
 
@@ -137,8 +169,11 @@ zx_status_t FuchsiaVfs::VnodeToToken(fbl::RefPtr<Vnode> vn, zx::event* ios_token
   if (zx_status_t status = new_ios_token.duplicate(ZX_RIGHTS_BASIC, &new_token); status != ZX_OK) {
     return status;
   }
-  auto koid = GetTokenKoid(new_ios_token);
-  vnode_tokens_.insert(std::make_unique<VnodeToken>(koid, std::move(vn)));
+  zx::result koid = GetObjectKoid(new_ios_token);
+  if (koid.is_error()) {
+    return koid.error_value();
+  }
+  vnode_tokens_.insert(std::make_unique<VnodeToken>(*koid, std::move(vn)));
   *ios_token = std::move(new_ios_token);
   *out = std::move(new_token);
   return ZX_OK;
@@ -161,7 +196,11 @@ zx::result<bool> FuchsiaVfs::EnsureExists(fbl::RefPtr<Vnode> vndir, std::string_
 }
 
 zx_status_t FuchsiaVfs::TokenToVnode(zx::event token, fbl::RefPtr<Vnode>* out) {
-  const auto& vnode_token = vnode_tokens_.find(GetTokenKoid(token));
+  zx::result koid = GetObjectKoid(token);
+  if (koid.is_error()) {
+    return koid.error_value();
+  }
+  const auto& vnode_token = vnode_tokens_.find(*koid);
   if (vnode_token == vnode_tokens_.end()) {
     return ZX_ERR_INVALID_ARGS;
   }
@@ -289,92 +328,59 @@ zx_status_t FuchsiaVfs::Serve(fbl::RefPtr<Vnode> vnode, zx::channel server_end,
 zx_status_t FuchsiaVfs::Serve(fbl::RefPtr<Vnode> vnode, zx::channel server_end,
                               Vnode::ValidatedOptions options) {
   VnodeProtocol protocol;
-  if (!options->flags.node_reference) {
-    auto candidate_protocols = options->protocols() & vnode->GetProtocols();
-    ZX_DEBUG_ASSERT(
-        candidate_protocols);  // |options| should ensure at least one supported protocol
-    protocol = vnode->Negotiate(candidate_protocols);
-  } else {
-    // If |node_reference| is specified, serve |fuchsia.io/Node| regardless of the desired protocol.
+  if (options->flags.node_reference) {
     protocol = VnodeProtocol::kNode;
+  } else {
+    zx::result negotiated = NegotiateProtocol(options->protocols() & vnode->GetProtocols());
+    if (negotiated.is_error()) {
+      return negotiated.error_value();
+    }
+    protocol = *negotiated;
   }
   fidl::ServerEnd<fuchsia_io::Node> node(std::move(server_end));
-
-  if (protocol == VnodeProtocol::kService) {
-    // *NOTE*: This special handling is required to maintain io1 compatibility.
-    //
-    // For service connections, we don't know the final protocol that will be spoken over
-    // |node| as it is dependent on the service Vnode type/connector. However, if |options.describe|
-    // is set, the channel first speaks |fuchsia.io/Node| to send the OnOpen event, then switches to
-    // the service protocol.
-    //
-    // However, we are not consistent with the use of epitaphs for Open implementations, nor does
-    // io1 specify that they should be sent. However, but doing so provides better error
-    // reporting to clients, and. This is also the behavior of the Rust VFS.
-    //
-    // TODO(https://fxbug.dev/324111653): In io2/Open2, service connections do not support the
-    // OnRepresentation event, and use of epitaphs when closing channels is explicitly defined.
-    // As such, we can remove this special handling and consolidate it with other node types when
-    // we remove support for io1/Open.
-    if (options->ToIoV1Flags() & ~(fio::OpenFlags::kDescribe | fio::OpenFlags::kNotDirectory)) {
-      constexpr zx_status_t kStatus = ZX_ERR_INVALID_ARGS;
-      if (options->flags.describe) {
-        [[maybe_unused]] fidl::Status status = fidl::WireSendEvent(node)->OnOpen(kStatus, {});
-      } else {
-        [[maybe_unused]] zx_status_t status = node.Close(kStatus);
-      }
-      return kStatus;
-    }
-    if (options->flags.describe) {
-      fidl::Status status =
-          fidl::WireSendEvent(node)->OnOpen(ZX_OK, fio::wire::NodeInfoDeprecated::WithService({}));
-      if (!status.ok()) {
-        return status.status();
-      }
-    }
-  }
-
   std::unique_ptr<internal::Connection> connection;
-  zx_status_t status = ([&] {
-    zx_info_handle_basic_t info;
-    if (zx_status_t status =
-            node.channel().get_info(ZX_INFO_HANDLE_BASIC, &info, sizeof(info), nullptr, nullptr);
-        status != ZX_OK) {
-      return status;
-    }
-    switch (protocol) {
-      case VnodeProtocol::kFile: {
-        zx::result<zx::stream> stream = vnode->CreateStream(ToStreamOptions(*options));
-        if (stream.is_ok()) {
-          connection = std::make_unique<internal::StreamFileConnection>(
-              this, std::move(vnode), std::move(*stream), protocol, *options, info.koid);
-          return ZX_OK;
-        }
-        if (stream.error_value() != ZX_ERR_NOT_SUPPORTED) {
-          return stream.error_value();
-        }
-        connection = std::make_unique<internal::RemoteFileConnection>(
-            this, std::move(vnode), protocol, *options, info.koid);
-        return ZX_OK;
+
+  switch (protocol) {
+    case VnodeProtocol::kFile: {
+      zx::result koid = GetObjectKoid(node.channel());
+      if (koid.is_error()) {
+        return koid.error_value();
       }
-      case VnodeProtocol::kDirectory:
-        connection = std::make_unique<internal::DirectoryConnection>(this, std::move(vnode),
-                                                                     protocol, *options, info.koid);
-        return ZX_OK;
-      case VnodeProtocol::kNode:
-        connection =
-            std::make_unique<internal::NodeConnection>(this, std::move(vnode), protocol, *options);
-        return ZX_OK;
-      case VnodeProtocol::kService:
-        return vnode->ConnectService(node.TakeChannel());
-#if __Fuchsia_API_level__ >= FUCHSIA_HEAD
-      case VnodeProtocol::kSymlink:
-        return ZX_ERR_NOT_SUPPORTED;
-#endif
+      zx::result<zx::stream> stream = vnode->CreateStream(ToStreamOptions(*options));
+      if (stream.is_ok()) {
+        connection = std::make_unique<internal::StreamFileConnection>(
+            this, std::move(vnode), std::move(*stream), protocol, *options, *koid);
+        break;
+      }
+      if (stream.error_value() != ZX_ERR_NOT_SUPPORTED) {
+        return stream.error_value();
+      }
+      connection = std::make_unique<internal::RemoteFileConnection>(this, std::move(vnode),
+                                                                    protocol, *options, *koid);
+      break;
     }
-  }());
-  if (status != ZX_OK || protocol == VnodeProtocol::kService) {
-    return status;
+    case VnodeProtocol::kDirectory: {
+      zx::result koid = GetObjectKoid(node.channel());
+      if (koid.is_error()) {
+        return koid.error_value();
+      }
+      connection = std::make_unique<internal::DirectoryConnection>(this, std::move(vnode), protocol,
+                                                                   *options, *koid);
+      break;
+    }
+    case VnodeProtocol::kNode: {
+      connection =
+          std::make_unique<internal::NodeConnection>(this, std::move(vnode), protocol, *options);
+      break;
+    }
+    case VnodeProtocol::kService: {
+      return ConnectService(vnode, options, std::move(node));
+    }
+#if __Fuchsia_API_level__ >= FUCHSIA_HEAD
+    case VnodeProtocol::kSymlink: {
+      return ZX_ERR_NOT_SUPPORTED;
+    }
+#endif
   }
 
   // Send an |fuchsia.io/OnOpen| event if requested. At this point we know the connection is either

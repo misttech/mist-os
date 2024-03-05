@@ -115,8 +115,10 @@ class Vnode : public VnodeRefCounted<Vnode>, public fbl::Recyclable<Vnode> {
   // Returns the set of all protocols supported by the vnode.
   virtual fuchsia_io::NodeProtocolKinds GetProtocols() const = 0;
 
-  // Returns true iff the vnode supports _any_ protocol requested by |protocols|.
-  bool Supports(fuchsia_io::NodeProtocolKinds protocols) const;
+  // Returns true if the vnode supports at least one protocol specified in |protocols|.
+  bool Supports(fuchsia_io::NodeProtocolKinds protocols) const {
+    return static_cast<bool>(GetProtocols() & protocols);
+  }
 
   // To be overridden by implementations to check that it is valid to access the vnode with the
   // given |rights|. The default implementation always returns true. The vnode will only be opened
@@ -133,12 +135,6 @@ class Vnode : public VnodeRefCounted<Vnode>, public fbl::Recyclable<Vnode> {
   // The |zx::error| variant of the return value contains a suitable error code
   // when validation fails.
   zx::result<ValidatedOptions> ValidateOptions(VnodeConnectionOptions options) const;
-
-  // Picks one protocol from |protocols| that the node supports. |protocols| is guaranteed to be a
-  // subset of the supported protocols. If multiple protocols are specified, the default
-  // implementation performs tie-breaking in the following order:
-  // kService, kDirectory, kFile, kSymlink.
-  virtual VnodeProtocol Negotiate(fuchsia_io::NodeProtocolKinds protocols) const;
 
   // Opens the vnode. This is a callback to signal that a new connection is about to be created and
   // I/O operations will follow. In addition, it provides an opportunity to redirect subsequent I/O.
@@ -343,12 +339,6 @@ class Vnode : public VnodeRefCounted<Vnode>, public fbl::Recyclable<Vnode> {
   // builds (the remote handling below is all Fuchsia-only) but this can exist and just return false
   // on host builds to simplify platform handling.
   virtual bool IsRemote() const;
-
-  // Returns true if this node is a service.  One implication of this is that read/write connections
-  // will be allowed (services are typically connected in this way using fdio_connect_service) to
-  // this node even if the filesystem is considered read-only (although the parent connection rights
-  // are still honored).
-  virtual bool IsService() const { return false; }
 
  protected:
   DISALLOW_COPY_ASSIGN_AND_MOVE(Vnode);
