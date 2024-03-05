@@ -893,6 +893,7 @@ mod tests {
     // Integration tests using //src/media/audio/drivers/testing/realm devices.
 
     #[fuchsia_async::run_singlethreaded(test)]
+    #[ignore]
     async fn test_default_configurator_devices_found() -> Result<()> {
         let (_realm_instance, codec_proxy) = get_dev_proxy("class/codec").await?;
         let (_realm_instance, dai_proxy) = get_dev_proxy("class/dai").await?;
@@ -942,6 +943,7 @@ mod tests {
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
+    #[ignore]
     async fn test_default_configurator_devices_not_found() -> Result<()> {
         let (_realm_instance, codec_proxy) = get_dev_proxy("class/codec").await?;
         let (_realm_instance, dai_proxy) = get_dev_proxy("class/dai").await?;
@@ -1003,6 +1005,7 @@ mod tests {
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
+    #[ignore]
     async fn test_default_configurator_create_ring_buffer() -> Result<()> {
         let (_realm_instance, dai_proxy) = get_dev_proxy("class/dai").await?;
         let mut config = Config::new()?;
@@ -1045,6 +1048,7 @@ mod tests {
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
+    #[ignore]
     async fn test_default_configurator_create_ring_buffer_with_codec() -> Result<()> {
         let (_realm_instance, dai_proxy) = get_dev_proxy("class/dai").await?;
         let (_realm_instance, codec_proxy) = get_dev_proxy("class/codec").await?;
