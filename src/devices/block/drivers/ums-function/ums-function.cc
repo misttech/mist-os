@@ -136,27 +136,25 @@ void UmsFunction::ContinueTransfer() {
     size_t result = req->CopyTo(static_cast<char*>(storage_) + data_offset_, length, 0);
     ZX_ASSERT(result == length);
     QueueData(req);
-  } else if (data_state_ == DATA_STATE_WRITE) {
+  } else if (data_state_ == DATA_STATE_WRITE || data_state_ == DATA_STATE_UNMAP) {
     QueueData(req);
   } else {
     zxlogf(ERROR, "ContinueTransfer: bad data state %d", data_state_);
   }
 }
 
-void UmsFunction::StartTransfer(DataState state, uint64_t lba, uint32_t blocks) {
+void UmsFunction::StartTransfer(DataState state, uint32_t transfer_bytes, uint64_t lba) {
   zx_off_t offset = lba * kBlockSize;
-  size_t length = blocks * kBlockSize;
-
-  if (offset + length > kStorageSize) {
-    zxlogf(ERROR, "StartTransfer: transfer out of range state: %d, lba: %zu blocks: %u", state, lba,
-           blocks);
+  if (offset + transfer_bytes > kStorageSize) {
+    zxlogf(ERROR, "StartTransfer: transfer out of range state: %d, lba: %zu transfer_bytes: %u",
+           state, lba, transfer_bytes);
     // TODO(voydanoff) report error to host
     return;
   }
 
   data_state_ = state;
-  data_offset_ = offset;
-  data_remaining_ = length;
+  data_offset_ = offset;  // Not applicable for the DATA_STATE_UNMAP case.
+  data_remaining_ = transfer_bytes;
 
   ContinueTransfer();
 }
@@ -283,7 +281,7 @@ void UmsFunction::HandleRead10(ums_cbw_t* cbw) {
   scsi::Read10CDB* command = reinterpret_cast<scsi::Read10CDB*>(cbw->CBWCB);
   uint64_t lba = be32toh(command->logical_block_address);
   uint32_t blocks = be16toh(command->transfer_length);
-  StartTransfer(DATA_STATE_READ, lba, blocks);
+  StartTransfer(DATA_STATE_READ, blocks * kBlockSize, lba);
 }
 
 void UmsFunction::HandleRead12(ums_cbw_t* cbw) {
@@ -292,7 +290,7 @@ void UmsFunction::HandleRead12(ums_cbw_t* cbw) {
   scsi::Read12CDB* command = reinterpret_cast<scsi::Read12CDB*>(cbw->CBWCB);
   uint64_t lba = be32toh(command->logical_block_address);
   uint32_t blocks = be32toh(command->transfer_length);
-  StartTransfer(DATA_STATE_READ, lba, blocks);
+  StartTransfer(DATA_STATE_READ, blocks * kBlockSize, lba);
 }
 
 void UmsFunction::HandleRead16(ums_cbw_t* cbw) {
@@ -301,7 +299,7 @@ void UmsFunction::HandleRead16(ums_cbw_t* cbw) {
   scsi::Read16CDB* command = reinterpret_cast<scsi::Read16CDB*>(cbw->CBWCB);
   uint64_t lba = be64toh(command->logical_block_address);
   uint32_t blocks = be32toh(command->transfer_length);
-  StartTransfer(DATA_STATE_READ, lba, blocks);
+  StartTransfer(DATA_STATE_READ, blocks * kBlockSize, lba);
 }
 
 void UmsFunction::HandleWrite10(ums_cbw_t* cbw) {
@@ -310,7 +308,7 @@ void UmsFunction::HandleWrite10(ums_cbw_t* cbw) {
   scsi::Write10CDB* command = reinterpret_cast<scsi::Write10CDB*>(cbw->CBWCB);
   uint64_t lba = be32toh(command->logical_block_address);
   uint32_t blocks = be16toh(command->transfer_length);
-  StartTransfer(DATA_STATE_WRITE, lba, blocks);
+  StartTransfer(DATA_STATE_WRITE, blocks * kBlockSize, lba);
 }
 
 void UmsFunction::HandleWrite12(ums_cbw_t* cbw) {
@@ -319,7 +317,7 @@ void UmsFunction::HandleWrite12(ums_cbw_t* cbw) {
   scsi::Write12CDB* command = reinterpret_cast<scsi::Write12CDB*>(cbw->CBWCB);
   uint64_t lba = be32toh(command->logical_block_address);
   uint32_t blocks = be32toh(command->transfer_length);
-  StartTransfer(DATA_STATE_WRITE, lba, blocks);
+  StartTransfer(DATA_STATE_WRITE, blocks * kBlockSize, lba);
 }
 
 void UmsFunction::HandleWrite16(ums_cbw_t* cbw) {
@@ -328,7 +326,21 @@ void UmsFunction::HandleWrite16(ums_cbw_t* cbw) {
   scsi::Write16CDB* command = reinterpret_cast<scsi::Write16CDB*>(cbw->CBWCB);
   uint64_t lba = be64toh(command->logical_block_address);
   uint32_t blocks = be32toh(command->transfer_length);
-  StartTransfer(DATA_STATE_WRITE, lba, blocks);
+  StartTransfer(DATA_STATE_WRITE, blocks * kBlockSize, lba);
+}
+
+void UmsFunction::HandleUnmap(ums_cbw_t* cbw) {
+  scsi::UnmapCDB* command = reinterpret_cast<scsi::UnmapCDB*>(cbw->CBWCB);
+  uint16_t unmap_data_length =
+      sizeof(scsi::UnmapParameterListHeader) + sizeof(scsi::UnmapBlockDescriptor);
+  if (betoh16(command->parameter_list_length) != unmap_data_length) {
+    zxlogf(ERROR, "Command parameter list length is invalid: %u != %u",
+           betoh16(command->parameter_list_length), unmap_data_length);
+    QueueCsw(CSW_FAILED);
+    return;
+  }
+
+  StartTransfer(DATA_STATE_UNMAP, unmap_data_length);
 }
 
 void UmsFunction::HandleCbw(ums_cbw_t* cbw) {
@@ -383,8 +395,11 @@ void UmsFunction::HandleCbw(ums_cbw_t* cbw) {
       // TODO: This is presently untestable.
       // Implement this once we have a means of testing this.
       break;
+    case scsi::Opcode::UNMAP:
+      HandleUnmap(cbw);
+      break;
     default:
-      zxlogf(DEBUG, "HandleCbw: unsupported opcode %02Xh", cbw->CBWCB[0]);
+      zxlogf(ERROR, "HandleCbw: unsupported opcode %02Xh", cbw->CBWCB[0]);
       if (cbw->dCBWDataTransferLength) {
         // queue zero length packet to satisfy data phase
         usb::Request<>* req = &data_req_.value();
@@ -418,6 +433,16 @@ void UmsFunction::DataComplete(usb::Request<>* req) {
     size_t result = req->CopyFrom(static_cast<char*>(storage_) + data_offset_,
                                   req->request()->response.actual, 0);
     ZX_ASSERT(result == req->request()->response.actual);
+  } else if (data_state_ == DATA_STATE_UNMAP) {
+    // Overwrite the unmapped blocks with zeros.
+    usb::Request<>* req = &data_req_.value();
+    uint8_t* data;
+    req->Mmap(reinterpret_cast<void**>(&data));
+    scsi::UnmapBlockDescriptor* block_descriptor = reinterpret_cast<scsi::UnmapBlockDescriptor*>(
+        data + sizeof(scsi::UnmapParameterListHeader));
+    size_t block_count = betoh32(block_descriptor->blocks);
+    uint64_t start_lba = betoh64(block_descriptor->logical_block_address);
+    memset(static_cast<char*>(storage_) + start_lba * kBlockSize, 0, block_count * kBlockSize);
   } else if (data_state_ == DATA_STATE_FAILED) {
     data_state_ = DATA_STATE_NONE;
     QueueCsw(CSW_FAILED);

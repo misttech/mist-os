@@ -102,7 +102,7 @@ static zx_status_t ControlIn(void* ctx, uint8_t request_type, uint8_t request, u
         *out_read_actual = 0;
         return ZX_OK;
       }
-      *reinterpret_cast<unsigned char*>(out_read_buffer) = 3;
+      *reinterpret_cast<unsigned char*>(out_read_buffer) = 1; // Max lun number
       *out_read_actual = 1;
       return ZX_OK;
     }
@@ -254,6 +254,20 @@ static void RequestQueue(void* ctx, usb_request_t* usb_request,
           complete_cb->callback(complete_cb->ctx, usb_request);
           break;
         }
+        case scsi::Opcode::UNMAP: {
+          // Push CSW
+          fbl::Array<unsigned char> csw(new unsigned char[sizeof(ums_csw_t)], sizeof(ums_csw_t));
+          context->csw.dCSWDataResidue = 0;
+          context->csw.dCSWTag = context->tag++;
+          context->csw.bmCSWStatus = CSW_SUCCESS;
+          context->transfer_lun = cbw.bCBWLUN;
+          context->transfer_type = opcode;
+          memcpy(csw.data(), &context->csw, sizeof(context->csw));
+          context->pending_packets.push_back(fbl::MakeRefCounted<Packet>(std::move(csw)));
+          usb_request->response.status = ZX_OK;
+          complete_cb->callback(complete_cb->ctx, usb_request);
+          break;
+        }
         case scsi::Opcode::INQUIRY: {
           scsi::InquiryCDB cmd;
           memcpy(&cmd, cbw.CBWCB, sizeof(cmd));
@@ -323,7 +337,7 @@ static void RequestQueue(void* ctx, usb_request_t* usb_request,
           break;
         }
         case scsi::Opcode::READ_CAPACITY_16: {
-          if (cbw.bCBWLUN == 3) {
+          if (cbw.bCBWLUN == 1) {
             // Push reply
             fbl::Array<unsigned char> reply(
                 new unsigned char[sizeof(scsi::ReadCapacity16ParameterData)],
@@ -354,7 +368,7 @@ static void RequestQueue(void* ctx, usb_request_t* usb_request,
           scsi::ReadCapacity10ParameterData scsi;
           scsi.block_length_in_bytes = htobe32(kBlockSize);
           scsi.returned_logical_block_address = htobe32(976562 * (1 + cbw.bCBWLUN));
-          if (cbw.bCBWLUN == 3) {
+          if (cbw.bCBWLUN == 1) {
             scsi.returned_logical_block_address = -1;
           }
           memcpy(reply.data(), &scsi, sizeof(scsi));
@@ -541,7 +555,7 @@ class UmsTest : public zxtest::Test {
     EXPECT_TRUE(ums_->InitReplyCalled());
 
     while (true) {
-      if (ums_->child_count() >= 3) {
+      if (ums_->child_count() >= 2) {
         break;
       }
       usleep(10);
@@ -569,7 +583,7 @@ TEST_F(UmsTest, TestRead) {
   EXPECT_EQ(ZX_OK, zx_vmar_map(zx_vmar_root_self(), ZX_VM_PERM_READ, 0, vmo, 0, size, &mapped),
             "Failed to map VMO");
   // Perform read transactions
-  uint32_t i = 0;
+  uint32_t lun = 0;
   for (auto const& it : ums_->children()) {
     scsi::Disk* block_dev = it->GetDeviceContext<scsi::Disk>();
     ZX_ASSERT(block_dev);
@@ -577,32 +591,24 @@ TEST_F(UmsTest, TestRead) {
     size_t block_op_size;
     block_dev->BlockImplQuery(&info, &block_op_size);
 
-    // Use the READ_10 command instead of READ_12
-    // TODO: Consider setting use_read_write_12 to false during scsi::Disk::Bind() instead.
-    if (i == 0) {
-      block_dev->GetDiskOptions().use_read_write_12 = false;
-    }
-
     auto block_op = std::make_unique<uint8_t[]>(block_op_size);
     block_op_t& op = *reinterpret_cast<block_op_t*>(block_op.get());
     op = {};
     op.command = {.opcode = BLOCK_OPCODE_READ, .flags = 0};
-    op.rw.offset_dev = i;
-    op.rw.length = (i + 1) * 65534;
+    op.rw.offset_dev = lun;
+    op.rw.length = (lun + 1) * 65534;
     op.rw.offset_vmo = 0;
     op.rw.vmo = vmo;
 
     block_dev->BlockImplQueue(&op, CompletionCallback, &context_);
     sync_completion_wait(&context_.completion, ZX_TIME_INFINITE);
     sync_completion_reset(&context_.completion);
-    scsi::Opcode xfer_type = i == 0   ? scsi::Opcode::READ_10
-                             : i == 3 ? scsi::Opcode::READ_16
-                                      : scsi::Opcode::READ_12;
-    EXPECT_EQ(i, context_.transfer_lun);
+    scsi::Opcode xfer_type = lun == 1 ? scsi::Opcode::READ_16 : scsi::Opcode::READ_10;
+    EXPECT_EQ(lun, context_.transfer_lun);
     EXPECT_EQ(xfer_type, context_.transfer_type);
     EXPECT_EQ(0, memcmp(reinterpret_cast<void*>(mapped), context_.last_transfer->data.data(),
                         context_.last_transfer->data.size()));
-    i++;
+    ++lun;
   }
 }
 
@@ -626,7 +632,7 @@ TEST_F(UmsTest, TestWrite) {
     reinterpret_cast<size_t*>(mapped)[i] = i;
   }
   // Perform write transactions
-  uint32_t i = 0;
+  uint32_t lun = 0;
   for (auto const& it : ums_->children()) {
     scsi::Disk* block_dev = it->GetDeviceContext<scsi::Disk>();
     ZX_ASSERT(block_dev);
@@ -634,32 +640,24 @@ TEST_F(UmsTest, TestWrite) {
     size_t block_op_size;
     block_dev->BlockImplQuery(&info, &block_op_size);
 
-    // Use the WRITE_10 command instead of READ_12
-    // TODO: Consider setting use_read_write_12 to false during scsi::Disk::Bind() instead.
-    if (i == 0) {
-      block_dev->GetDiskOptions().use_read_write_12 = false;
-    }
-
     auto block_op = std::make_unique<uint8_t[]>(block_op_size);
     block_op_t& op = *reinterpret_cast<block_op_t*>(block_op.get());
     op = {};
     op.command = {.opcode = BLOCK_OPCODE_WRITE, .flags = 0};
-    op.rw.offset_dev = i;
-    op.rw.length = (i + 1) * 65534;
+    op.rw.offset_dev = lun;
+    op.rw.length = (lun + 1) * 65534;
     op.rw.offset_vmo = 0;
     op.rw.vmo = vmo;
 
     block_dev->BlockImplQueue(&op, CompletionCallback, &context_);
     sync_completion_wait(&context_.completion, ZX_TIME_INFINITE);
     sync_completion_reset(&context_.completion);
-    scsi::Opcode xfer_type = i == 0   ? scsi::Opcode::WRITE_10
-                             : i == 3 ? scsi::Opcode::WRITE_16
-                                      : scsi::Opcode::WRITE_12;
-    EXPECT_EQ(i, context_.transfer_lun);
+    scsi::Opcode xfer_type = lun == 1 ? scsi::Opcode::WRITE_16 : scsi::Opcode::WRITE_10;
+    EXPECT_EQ(lun, context_.transfer_lun);
     EXPECT_EQ(xfer_type, context_.transfer_type);
     EXPECT_EQ(0, memcmp(reinterpret_cast<void*>(mapped), context_.last_transfer->data.data(),
                         op.rw.length * kBlockSize));
-    i++;
+    ++lun;
   }
 }
 
@@ -669,7 +667,7 @@ TEST_F(UmsTest, TestFlush) {
   Setup();
 
   // Perform flush transactions
-  uint32_t i = 0;
+  uint32_t lun = 0;
   for (auto const& it : ums_->children()) {
     scsi::Disk* block_dev = it->GetDeviceContext<scsi::Disk>();
     ZX_ASSERT(block_dev);
@@ -686,9 +684,40 @@ TEST_F(UmsTest, TestFlush) {
     sync_completion_wait(&context_.completion, ZX_TIME_INFINITE);
     sync_completion_reset(&context_.completion);
     scsi::Opcode xfer_type = scsi::Opcode::SYNCHRONIZE_CACHE_10;
-    EXPECT_EQ(i, context_.transfer_lun);
+    EXPECT_EQ(lun, context_.transfer_lun);
     EXPECT_EQ(xfer_type, context_.transfer_type);
-    i++;
+    ++lun;
+  }
+}
+
+// This test validates the trim functionality on multiple LUNS
+// of a USB mass storage device.
+TEST_F(UmsTest, TestTrim) {
+  Setup();
+
+  // Perform trim transactions
+  uint32_t lun = 0;
+  for (auto const& it : ums_->children()) {
+    scsi::Disk* block_dev = it->GetDeviceContext<scsi::Disk>();
+    ZX_ASSERT(block_dev);
+    block_info_t info;
+    size_t block_op_size;
+    block_dev->BlockImplQuery(&info, &block_op_size);
+
+    auto block_op = std::make_unique<uint8_t[]>(block_op_size);
+    block_op_t& op = *reinterpret_cast<block_op_t*>(block_op.get());
+    op = {};
+    op.command = {.opcode = BLOCK_OPCODE_TRIM, .flags = 0};
+    op.trim.offset_dev = 0;
+    op.trim.length = 1;
+
+    block_dev->BlockImplQueue(&op, CompletionCallback, &context_);
+    sync_completion_wait(&context_.completion, ZX_TIME_INFINITE);
+    sync_completion_reset(&context_.completion);
+    scsi::Opcode xfer_type = scsi::Opcode::UNMAP;
+    EXPECT_EQ(lun, context_.transfer_lun);
+    EXPECT_EQ(xfer_type, context_.transfer_type);
+    ++lun;
   }
 }
 

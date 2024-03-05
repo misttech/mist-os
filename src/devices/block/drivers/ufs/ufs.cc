@@ -306,7 +306,7 @@ void Ufs::ExecuteCommandAsync(uint8_t target, uint16_t lun, iovec cdb, bool is_w
       return;
     }
     memcpy(io_cmd->data_buffer, data.iov_base, data.iov_len);
-    io_cmd->data_length = safemath::checked_cast<uint8_t>(data.iov_len);
+    io_cmd->data_length = static_cast<uint8_t>(data.iov_len);
   }
 
   // Queue transaction.

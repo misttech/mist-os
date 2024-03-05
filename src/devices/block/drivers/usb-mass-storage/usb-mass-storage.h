@@ -11,6 +11,7 @@
 #include <inttypes.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
+#include <lib/fzl/vmo-mapper.h>
 #include <lib/scsi/controller.h>
 #include <lib/scsi/disk.h>
 #include <lib/sync/completion.h>
@@ -53,6 +54,10 @@ struct Transaction {
   uint8_t cdb_length;
   uint8_t lun;
   uint32_t block_size_bytes;
+
+  // Currently, data_buffer is only used by the UNMAP command and has a maximum size of 24 byte.
+  uint8_t data_buffer[24];
+  zx::vmo data_vmo;
 
   list_node_t node;
 };
@@ -120,6 +125,8 @@ class UsbMassStorageDevice : public scsi::Controller, public MassStorageDeviceTy
   int WorkerThread(ddk::InitTxn&& txn);
 
   void RequestQueue(usb_request_t* request, const usb_request_complete_callback_t* completion);
+
+  zx::result<> AllocatePages(zx::vmo& vmo, fzl::VmoMapper& mapper, size_t size);
 
   usb::UsbDevice usb_;
 

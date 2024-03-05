@@ -14,8 +14,10 @@
 #include <string.h>
 #include <zircon/assert.h>
 
+#include <fbl/algorithm.h>
 #include <fbl/alloc_checker.h>
 #include <fbl/auto_lock.h>
+#include <safemath/safe_conversions.h>
 #include <usb/ums.h>
 #include <usb/usb.h>
 
@@ -57,6 +59,18 @@ void UsbMassStorageDevice::ExecuteCommandAsync(uint8_t target, uint16_t lun, iov
   txn->cdb_length = static_cast<uint8_t>(cdb.iov_len);
   txn->lun = static_cast<uint8_t>(lun);
   txn->block_size_bytes = block_size_bytes;
+
+  // Currently, data is only used in the UNMAP command.
+  if (disk_op->op.command.opcode == BLOCK_OPCODE_TRIM && data.iov_len != 0) {
+    if (sizeof(txn->data_buffer) != data.iov_len) {
+      zxlogf(ERROR,
+             "The size of the requested data buffer(%zu) and data_buffer(%lu) are different.",
+             data.iov_len, sizeof(txn->data_buffer));
+      disk_op->Complete(ZX_ERR_INVALID_ARGS);
+      return;
+    }
+    memcpy(txn->data_buffer, data.iov_base, data.iov_len);
+  }
 
   // Queue transaction.
   {
@@ -488,7 +502,10 @@ zx_status_t UsbMassStorageDevice::DataTransfer(zx_handle_t vmo_handle, zx_off_t 
 zx_status_t UsbMassStorageDevice::DoTransaction(Transaction* txn, uint8_t flags, uint8_t ep_address,
                                                 const std::string& action) {
   const block_op_t& op = txn->disk_op.op;
-  const size_t num_bytes = op.rw.length * txn->block_size_bytes;
+
+  const size_t num_bytes = op.command.opcode == BLOCK_OPCODE_TRIM
+                               ? sizeof(txn->data_buffer)
+                               : op.rw.length * txn->block_size_bytes;
 
   zx_status_t status =
       SendCbw(txn->lun, static_cast<uint32_t>(num_bytes), flags, txn->cdb_length, txn->cdb_buffer);
@@ -499,8 +516,13 @@ zx_status_t UsbMassStorageDevice::DoTransaction(Transaction* txn, uint8_t flags,
   }
 
   if (num_bytes) {
-    zx_off_t vmo_offset = op.rw.offset_vmo * txn->block_size_bytes;
-    status = DataTransfer(op.rw.vmo, vmo_offset, num_bytes, ep_address);
+    if (op.command.opcode == BLOCK_OPCODE_TRIM) {
+      status = DataTransfer(txn->data_vmo.get(), 0, num_bytes, ep_address);
+    } else {
+      zx_off_t vmo_offset = op.rw.offset_vmo * txn->block_size_bytes;
+      status = DataTransfer(op.rw.vmo, vmo_offset, num_bytes, ep_address);
+    }
+
     if (status != ZX_OK) {
       return status;
     }
@@ -537,8 +559,10 @@ zx_status_t UsbMassStorageDevice::CheckLunsReady() {
       break;
     }
     if (ready && !block_devs_[lun]) {
-      zx::result disk = scsi::Disk::Bind(zxdev(), this, kPlaceholderTarget, lun,
-                                         max_transfer_bytes_, scsi::DiskOptions::Default());
+      scsi::DiskOptions options(/*check_unmap_support*/ true, /*use_mode_sense_6*/ true,
+                                /*use_read_write_12*/ false);
+      zx::result disk =
+          scsi::Disk::Bind(zxdev(), this, kPlaceholderTarget, lun, max_transfer_bytes_, options);
       if (disk.is_ok() && disk->block_size_bytes() != 0) {
         block_devs_[lun] = disk.value();
         scsi::Disk* dev = block_devs_[lun].get();
@@ -561,6 +585,21 @@ zx_status_t UsbMassStorageDevice::CheckLunsReady() {
   }
 
   return status;
+}
+
+zx::result<> UsbMassStorageDevice::AllocatePages(zx::vmo& vmo, fzl::VmoMapper& mapper,
+                                                 size_t size) {
+  const uint32_t data_size =
+      fbl::round_up(safemath::checked_cast<uint32_t>(size), zx_system_get_page_size());
+  if (zx_status_t status = zx::vmo::create(data_size, 0, &vmo); status != ZX_OK) {
+    return zx::error(status);
+  }
+
+  if (zx_status_t status = mapper.Map(vmo, 0, data_size); status != ZX_OK) {
+    zxlogf(ERROR, "Failed to map IO buffer: %s", zx_status_get_string(status));
+    return zx::error(status);
+  }
+  return zx::ok();
 }
 
 int UsbMassStorageDevice::WorkerThread(ddk::InitTxn&& init_txn) {
@@ -633,6 +672,26 @@ int UsbMassStorageDevice::WorkerThread(ddk::InitTxn&& init_txn) {
             zxlogf(ERROR, "UMS: Flush failed: %s", zx_status_get_string(status));
           }
           break;
+        case BLOCK_OPCODE_TRIM: {
+          // For the UNMAP command, a data buffer is required for the parameter list.
+          // TODO: The data_vmo should be modified to recycle.
+          zx::vmo data_vmo;
+          fzl::VmoMapper mapper;
+          if (zx::result<> result = AllocatePages(data_vmo, mapper, sizeof(txn->data_buffer));
+              result.is_error()) {
+            zxlogf(ERROR, "Failed to allocate data buffer (command %p): %s", txn,
+                   result.status_string());
+            status = result.status_value();
+            break;
+          }
+          memcpy(mapper.start(), txn->data_buffer, sizeof(txn->data_buffer));
+          txn->data_vmo = std::move(data_vmo);
+
+          if ((status = DoTransaction(txn, USB_DIR_OUT, bulk_out_addr_, "Trim")) != ZX_OK) {
+            zxlogf(ERROR, "UMS: Trim failed: %s", zx_status_get_string(status));
+          }
+          break;
+        }
         default:
           status = ZX_ERR_INVALID_ARGS;
           break;
@@ -642,6 +701,7 @@ int UsbMassStorageDevice::WorkerThread(ddk::InitTxn&& init_txn) {
       fbl::AutoLock l(&txn_lock_);
       if (current_txn == txn) {
         zxlogf(DEBUG, "UMS DONE %d (%p)", status, &op);
+        txn->data_vmo.reset();
         txn->disk_op.Complete(status);
         current_txn = nullptr;
       }

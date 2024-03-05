@@ -31,6 +31,9 @@ fuchsia_driver("usb-mass-storage-driver") {
     "//src/devices/lib/driver",
     "//src/devices/usb/lib/usb",
     "//src/devices/usb/lib/usb:ums",
+    "//zircon/system/ulib/fbl",
+    "//zircon/system/ulib/fzl",
+    "//zircon/third_party/ulib/safemath",
   ]
 }
 
@@ -64,7 +67,10 @@ test("ums") {
     "//src/devices/testing/mock-ddk",
     "//src/devices/usb/lib/usb",
     "//src/devices/usb/lib/usb:ums",
+    "//zircon/system/ulib/fbl",
+    "//zircon/system/ulib/fzl",
     "//zircon/system/ulib/zxtest",
+    "//zircon/third_party/ulib/safemath",
   ]
 }
 

@@ -30,7 +30,7 @@ struct DiskOp {
 struct DiskOptions {
   static DiskOptions Default() {
     return DiskOptions(/*check_unmap_support=*/false, /*use_mode_sense_6*/ true,
-                       /*use_read_write_12*/ true);
+                       /*use_read_write_12*/ false);
   }
 
   explicit DiskOptions(bool check_unmap_support, bool use_mode_sense_6, bool use_read_write_12)

@@ -49,7 +49,13 @@ class UmsFunction : public DeviceType, public ddk::UsbFunctionInterfaceProtocol<
   zx_status_t UsbFunctionInterfaceSetInterface(uint8_t interface, uint8_t alt_setting);
 
  private:
-  enum DataState { DATA_STATE_NONE, DATA_STATE_READ, DATA_STATE_WRITE, DATA_STATE_FAILED };
+  enum DataState {
+    DATA_STATE_NONE,
+    DATA_STATE_READ,
+    DATA_STATE_WRITE,
+    DATA_STATE_UNMAP,
+    DATA_STATE_FAILED
+  };
 
   void RequestQueue(usb::Request<>* req, const usb_request_complete_callback_t* completion);
   static void CompletionCallback(void* ctx, usb_request_t* req);
@@ -60,7 +66,7 @@ class UmsFunction : public DeviceType, public ddk::UsbFunctionInterfaceProtocol<
   void QueueData(usb::Request<>* req);
   void QueueCsw(uint8_t status);
   void ContinueTransfer();
-  void StartTransfer(DataState state, uint64_t lba, uint32_t blocks);
+  void StartTransfer(DataState state, uint32_t transfer_bytes, uint64_t lba = 0);
 
   void HandleInquiry(ums_cbw_t* cbw);
   void HandleTestUnitReady(ums_cbw_t* cbw);
@@ -74,6 +80,7 @@ class UmsFunction : public DeviceType, public ddk::UsbFunctionInterfaceProtocol<
   void HandleWrite10(ums_cbw_t* cbw);
   void HandleWrite12(ums_cbw_t* cbw);
   void HandleWrite16(ums_cbw_t* cbw);
+  void HandleUnmap(ums_cbw_t* cbw);
 
   void HandleCbw(ums_cbw_t* cbw);
   void CbwComplete(usb::Request<>* req);
