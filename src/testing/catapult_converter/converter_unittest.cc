@@ -36,6 +36,8 @@ void TestConverter(const char* json_input_string, rapidjson::Document* output,
   args.bots = "example_bots";
   args.log_url = "https://ci.example.com/build/100";
   args.use_test_guids = true;
+  args.integration_internal_git_commit = "7106610114a0e86f6c94be3724fb4d4c30141e40";
+  args.integration_public_git_commit = "d08625a8cfe15085ff22887db0c2d9f2f2b23432";
   if (product_versions_available) {
     args.product_versions = "0.001.20.3";
   }
@@ -126,6 +128,61 @@ void AssertJsonEqual(const rapidjson::Document& doc1, const rapidjson::Document&
   }
 }
 
+const char kExpectedSharedDiagnostics[] = R"(
+    {
+        "guid": "dummy_guid_0",
+        "type": "GenericSet",
+        "values": [
+            123004005006
+        ]
+    },
+    {
+        "guid": "dummy_guid_1",
+        "type": "GenericSet",
+        "values": [
+            "example_bots"
+        ]
+    },
+    {
+        "guid": "dummy_guid_2",
+        "type": "GenericSet",
+        "values": [
+            "example_masters"
+        ]
+    },
+    {
+        "guid": "dummy_guid_3",
+        "type": "GenericSet",
+        "values": [
+            "7106610114a0e86f6c94be3724fb4d4c30141e40"
+        ]
+    },
+    {
+        "guid": "dummy_guid_4",
+        "type": "GenericSet",
+        "values": [
+            "d08625a8cfe15085ff22887db0c2d9f2f2b23432"
+        ]
+    },
+    {
+        "guid": "dummy_guid_5",
+        "type": "GenericSet",
+        "values": [
+            [
+                "Build Log",
+                "https://ci.example.com/build/100"
+            ]
+        ]
+    },
+    {
+        "guid": "dummy_guid_6",
+        "type": "GenericSet",
+        "values": [
+            "my_test_suite"
+        ]
+    },
+)";
+
 TEST(TestTools, SplitLines) {
   auto lines = SplitLines(" aa \n  bb\n\ncc \n");
   ASSERT_EQ(lines.size(), 5u);
@@ -157,46 +214,8 @@ TEST(CatapultConverter, Convert) {
 ]
 )JSON";
 
-  const char* expected_output_str = R"JSON(
-[
-    {
-        "guid": "dummy_guid_0",
-        "type": "GenericSet",
-        "values": [
-            123004005006
-        ]
-    },
-    {
-        "guid": "dummy_guid_1",
-        "type": "GenericSet",
-        "values": [
-            "example_bots"
-        ]
-    },
-    {
-        "guid": "dummy_guid_2",
-        "type": "GenericSet",
-        "values": [
-            "example_masters"
-        ]
-    },
-    {
-        "guid": "dummy_guid_3",
-        "type": "GenericSet",
-        "values": [
-            [
-                "Build Log",
-                "https://ci.example.com/build/100"
-            ]
-        ]
-    },
-    {
-        "guid": "dummy_guid_4",
-        "type": "GenericSet",
-        "values": [
-            "my_test_suite"
-        ]
-    },
+  const std::string expected_output_str = std::string{"["} + kExpectedSharedDiagnostics +
+                                          R"JSON(
     {
         "name": "ExampleNullSyscall",
         "unit": "ms_smallerIsBetter",
@@ -205,8 +224,10 @@ TEST(CatapultConverter, Convert) {
             "pointId": "dummy_guid_0",
             "bots": "dummy_guid_1",
             "masters": "dummy_guid_2",
-            "logUrls": "dummy_guid_3",
-            "benchmarks": "dummy_guid_4"
+            "fuchsiaIntegrationInternalRevisions": "dummy_guid_3",
+            "fuchsiaIntegrationPublicRevisions":  "dummy_guid_4",
+            "logUrls": "dummy_guid_5",
+            "benchmarks": "dummy_guid_6"
         },
         "running": [
             5,
@@ -217,7 +238,7 @@ TEST(CatapultConverter, Convert) {
             "compared_elsewhere",
             "compared_elsewhere"
         ],
-        "guid": "dummy_guid_5",
+        "guid": "dummy_guid_7",
         "maxNumSampleValues": 5,
         "numNans": 0
     },
@@ -229,8 +250,10 @@ TEST(CatapultConverter, Convert) {
             "pointId": "dummy_guid_0",
             "bots": "dummy_guid_1",
             "masters": "dummy_guid_2",
-            "logUrls": "dummy_guid_3",
-            "benchmarks": "dummy_guid_4"
+            "fuchsiaIntegrationInternalRevisions": "dummy_guid_3",
+            "fuchsiaIntegrationPublicRevisions":  "dummy_guid_4",
+            "logUrls": "dummy_guid_5",
+            "benchmarks": "dummy_guid_6"
         },
         "running": [
             4,
@@ -241,7 +264,7 @@ TEST(CatapultConverter, Convert) {
             "compared_elsewhere",
             "compared_elsewhere"
         ],
-        "guid": "dummy_guid_6",
+        "guid": "dummy_guid_8",
         "maxNumSampleValues": 4,
         "numNans": 0
     }
@@ -254,19 +277,19 @@ TEST(CatapultConverter, Convert) {
   rapidjson::Document output;
   TestConverter(input_str, &output);
 
-  AssertApproxEqual(&output, &output[5]["running"][1], 0.000105);
-  AssertApproxEqual(&output, &output[5]["running"][2], -9.180875);
-  AssertApproxEqual(&output, &output[5]["running"][3], 0.000103);
-  AssertApproxEqual(&output, &output[5]["running"][4], 0.000101);
-  AssertApproxEqual(&output, &output[5]["running"][5], 0.000515);
-  AssertApproxEqual(&output, &output[5]["running"][6], 2.5e-12);
+  AssertApproxEqual(&output, &output[7]["running"][1], 0.000105);
+  AssertApproxEqual(&output, &output[7]["running"][2], -9.180875);
+  AssertApproxEqual(&output, &output[7]["running"][3], 0.000103);
+  AssertApproxEqual(&output, &output[7]["running"][4], 0.000101);
+  AssertApproxEqual(&output, &output[7]["running"][5], 0.000515);
+  AssertApproxEqual(&output, &output[7]["running"][6], 2.5e-12);
 
-  AssertApproxEqual(&output, &output[6]["running"][1], 200);
-  AssertApproxEqual(&output, &output[6]["running"][2], 4.098931);
-  AssertApproxEqual(&output, &output[6]["running"][3], 104);
-  AssertApproxEqual(&output, &output[6]["running"][4], 6);
-  AssertApproxEqual(&output, &output[6]["running"][5], 416);
-  AssertApproxEqual(&output, &output[6]["running"][6], 6290.666);
+  AssertApproxEqual(&output, &output[8]["running"][1], 200);
+  AssertApproxEqual(&output, &output[8]["running"][2], 4.098931);
+  AssertApproxEqual(&output, &output[8]["running"][3], 104);
+  AssertApproxEqual(&output, &output[8]["running"][4], 6);
+  AssertApproxEqual(&output, &output[8]["running"][5], 416);
+  AssertApproxEqual(&output, &output[8]["running"][6], 6290.666);
 
   AssertJsonEqual(output, expected_output);
 }
@@ -294,46 +317,8 @@ TEST(CatapultConverter, ConvertWithNewJsonFormat) {
 ]
 )JSON";
 
-  const char* expected_output_str = R"JSON(
-[
-    {
-        "guid": "dummy_guid_0",
-        "type": "GenericSet",
-        "values": [
-            123004005006
-        ]
-    },
-    {
-        "guid": "dummy_guid_1",
-        "type": "GenericSet",
-        "values": [
-            "example_bots"
-        ]
-    },
-    {
-        "guid": "dummy_guid_2",
-        "type": "GenericSet",
-        "values": [
-            "example_masters"
-        ]
-    },
-    {
-        "guid": "dummy_guid_3",
-        "type": "GenericSet",
-        "values": [
-            [
-                "Build Log",
-                "https://ci.example.com/build/100"
-            ]
-        ]
-    },
-    {
-        "guid": "dummy_guid_4",
-        "type": "GenericSet",
-        "values": [
-            "my_test_suite"
-        ]
-    },
+  const std::string expected_output_str = std::string{"["} + kExpectedSharedDiagnostics +
+                                          R"JSON(
     {
         "name": "ExampleWithRealTimeMetric",
         "unit": "ms_smallerIsBetter",
@@ -342,8 +327,10 @@ TEST(CatapultConverter, ConvertWithNewJsonFormat) {
             "pointId": "dummy_guid_0",
             "bots": "dummy_guid_1",
             "masters": "dummy_guid_2",
-            "logUrls": "dummy_guid_3",
-            "benchmarks": "dummy_guid_4"
+            "fuchsiaIntegrationInternalRevisions": "dummy_guid_3",
+            "fuchsiaIntegrationPublicRevisions":  "dummy_guid_4",
+            "logUrls": "dummy_guid_5",
+            "benchmarks": "dummy_guid_6"
         },
         "running": [
             5,
@@ -354,7 +341,7 @@ TEST(CatapultConverter, ConvertWithNewJsonFormat) {
             "compared_elsewhere",
             "compared_elsewhere"
         ],
-        "guid": "dummy_guid_5",
+        "guid": "dummy_guid_7",
         "maxNumSampleValues": 5,
         "numNans": 0
     },
@@ -366,8 +353,10 @@ TEST(CatapultConverter, ConvertWithNewJsonFormat) {
             "pointId": "dummy_guid_0",
             "bots": "dummy_guid_1",
             "masters": "dummy_guid_2",
-            "logUrls": "dummy_guid_3",
-            "benchmarks": "dummy_guid_4"
+            "fuchsiaIntegrationInternalRevisions": "dummy_guid_3",
+            "fuchsiaIntegrationPublicRevisions":  "dummy_guid_4",
+            "logUrls": "dummy_guid_5",
+            "benchmarks": "dummy_guid_6"
         },
         "running": [
             4,
@@ -378,7 +367,7 @@ TEST(CatapultConverter, ConvertWithNewJsonFormat) {
             "compared_elsewhere",
             "compared_elsewhere"
         ],
-        "guid": "dummy_guid_6",
+        "guid": "dummy_guid_8",
         "maxNumSampleValues": 4,
         "numNans": 0
     }
@@ -390,19 +379,19 @@ TEST(CatapultConverter, ConvertWithNewJsonFormat) {
   rapidjson::Document output;
   TestConverter(input_str, &output);
 
-  AssertApproxEqual(&output, &output[5]["running"][1], 0.000105);
-  AssertApproxEqual(&output, &output[5]["running"][2], -9.180875);
-  AssertApproxEqual(&output, &output[5]["running"][3], 0.000103);
-  AssertApproxEqual(&output, &output[5]["running"][4], 0.000101);
-  AssertApproxEqual(&output, &output[5]["running"][5], 0.000515);
-  AssertApproxEqual(&output, &output[5]["running"][6], 2.5e-12);
+  AssertApproxEqual(&output, &output[7]["running"][1], 0.000105);
+  AssertApproxEqual(&output, &output[7]["running"][2], -9.180875);
+  AssertApproxEqual(&output, &output[7]["running"][3], 0.000103);
+  AssertApproxEqual(&output, &output[7]["running"][4], 0.000101);
+  AssertApproxEqual(&output, &output[7]["running"][5], 0.000515);
+  AssertApproxEqual(&output, &output[7]["running"][6], 2.5e-12);
 
-  AssertApproxEqual(&output, &output[6]["running"][1], 200);
-  AssertApproxEqual(&output, &output[6]["running"][2], 4.098931);
-  AssertApproxEqual(&output, &output[6]["running"][3], 104);
-  AssertApproxEqual(&output, &output[6]["running"][4], 6);
-  AssertApproxEqual(&output, &output[6]["running"][5], 416);
-  AssertApproxEqual(&output, &output[6]["running"][6], 6290.666);
+  AssertApproxEqual(&output, &output[8]["running"][1], 200);
+  AssertApproxEqual(&output, &output[8]["running"][2], 4.098931);
+  AssertApproxEqual(&output, &output[8]["running"][3], 104);
+  AssertApproxEqual(&output, &output[8]["running"][4], 6);
+  AssertApproxEqual(&output, &output[8]["running"][5], 416);
+  AssertApproxEqual(&output, &output[8]["running"][6], 6290.666);
 
   AssertJsonEqual(output, expected_output);
 }
@@ -460,6 +449,20 @@ TEST(CatapultConverter, ConvertWithReleaseVersion) {
         "guid": "dummy_guid_4",
         "type": "GenericSet",
         "values": [
+            "7106610114a0e86f6c94be3724fb4d4c30141e40"
+        ]
+    },
+    {
+        "guid": "dummy_guid_5",
+        "type": "GenericSet",
+        "values": [
+            "d08625a8cfe15085ff22887db0c2d9f2f2b23432"
+        ]
+    },
+    {
+        "guid": "dummy_guid_6",
+        "type": "GenericSet",
+        "values": [
             [
                 "Build Log",
                 "https://ci.example.com/build/100"
@@ -467,7 +470,7 @@ TEST(CatapultConverter, ConvertWithReleaseVersion) {
         ]
     },
     {
-        "guid": "dummy_guid_5",
+        "guid": "dummy_guid_7",
         "type": "GenericSet",
         "values": [
             "my_test_suite"
@@ -482,8 +485,10 @@ TEST(CatapultConverter, ConvertWithReleaseVersion) {
             "bots": "dummy_guid_1",
             "masters": "dummy_guid_2",
             "a_productVersions": "dummy_guid_3",
-            "logUrls": "dummy_guid_4",
-            "benchmarks": "dummy_guid_5"
+            "fuchsiaIntegrationInternalRevisions": "dummy_guid_4",
+            "fuchsiaIntegrationPublicRevisions":  "dummy_guid_5",
+            "logUrls": "dummy_guid_6",
+            "benchmarks": "dummy_guid_7"
         },
         "running": [
             5,
@@ -494,7 +499,7 @@ TEST(CatapultConverter, ConvertWithReleaseVersion) {
             "compared_elsewhere",
             "compared_elsewhere"
         ],
-        "guid": "dummy_guid_6",
+        "guid": "dummy_guid_8",
         "maxNumSampleValues": 5,
         "numNans": 0
     },
@@ -507,8 +512,10 @@ TEST(CatapultConverter, ConvertWithReleaseVersion) {
             "bots": "dummy_guid_1",
             "masters": "dummy_guid_2",
             "a_productVersions": "dummy_guid_3",
-            "logUrls": "dummy_guid_4",
-            "benchmarks": "dummy_guid_5"
+            "fuchsiaIntegrationInternalRevisions": "dummy_guid_4",
+            "fuchsiaIntegrationPublicRevisions":  "dummy_guid_5",
+            "logUrls": "dummy_guid_6",
+            "benchmarks": "dummy_guid_7"
         },
         "running": [
             4,
@@ -519,7 +526,7 @@ TEST(CatapultConverter, ConvertWithReleaseVersion) {
             "compared_elsewhere",
             "compared_elsewhere"
         ],
-        "guid": "dummy_guid_7",
+        "guid": "dummy_guid_9",
         "maxNumSampleValues": 4,
         "numNans": 0
     }
@@ -531,19 +538,19 @@ TEST(CatapultConverter, ConvertWithReleaseVersion) {
 
   rapidjson::Document output;
   TestConverter(input_str, &output, true /* product_versions_available */);
-  AssertApproxEqual(&output, &output[6]["running"][1], 0.000105);
-  AssertApproxEqual(&output, &output[6]["running"][2], -9.180875);
-  AssertApproxEqual(&output, &output[6]["running"][3], 0.000103);
-  AssertApproxEqual(&output, &output[6]["running"][4], 0.000101);
-  AssertApproxEqual(&output, &output[6]["running"][5], 0.000515);
-  AssertApproxEqual(&output, &output[6]["running"][6], 2.5e-12);
+  AssertApproxEqual(&output, &output[8]["running"][1], 0.000105);
+  AssertApproxEqual(&output, &output[8]["running"][2], -9.180875);
+  AssertApproxEqual(&output, &output[8]["running"][3], 0.000103);
+  AssertApproxEqual(&output, &output[8]["running"][4], 0.000101);
+  AssertApproxEqual(&output, &output[8]["running"][5], 0.000515);
+  AssertApproxEqual(&output, &output[8]["running"][6], 2.5e-12);
 
-  AssertApproxEqual(&output, &output[7]["running"][1], 200);
-  AssertApproxEqual(&output, &output[7]["running"][2], 4.098931);
-  AssertApproxEqual(&output, &output[7]["running"][3], 104);
-  AssertApproxEqual(&output, &output[7]["running"][4], 6);
-  AssertApproxEqual(&output, &output[7]["running"][5], 416);
-  AssertApproxEqual(&output, &output[7]["running"][6], 6290.666);
+  AssertApproxEqual(&output, &output[9]["running"][1], 200);
+  AssertApproxEqual(&output, &output[9]["running"][2], 4.098931);
+  AssertApproxEqual(&output, &output[9]["running"][3], 104);
+  AssertApproxEqual(&output, &output[9]["running"][4], 6);
+  AssertApproxEqual(&output, &output[9]["running"][5], 416);
+  AssertApproxEqual(&output, &output[9]["running"][6], 6290.666);
 
   AssertJsonEqual(output, expected_output);
 }
@@ -569,46 +576,8 @@ TEST(CatapultConverter, ConvertThroughputUnits) {
 ]
 )JSON";
 
-  const char* expected_output_str = R"JSON(
-[
-    {
-        "guid": "dummy_guid_0",
-        "type": "GenericSet",
-        "values": [
-            123004005006
-        ]
-    },
-    {
-        "guid": "dummy_guid_1",
-        "type": "GenericSet",
-        "values": [
-            "example_bots"
-        ]
-    },
-    {
-        "guid": "dummy_guid_2",
-        "type": "GenericSet",
-        "values": [
-            "example_masters"
-        ]
-    },
-    {
-        "guid": "dummy_guid_3",
-        "type": "GenericSet",
-        "values": [
-            [
-                "Build Log",
-                "https://ci.example.com/build/100"
-            ]
-        ]
-    },
-    {
-        "guid": "dummy_guid_4",
-        "type": "GenericSet",
-        "values": [
-            "my_test_suite"
-        ]
-    },
+  const std::string expected_output_str = std::string{"["} + kExpectedSharedDiagnostics +
+                                          R"JSON(
     {
         "name": "ExampleThroughput",
         "unit": "unitless_biggerIsBetter",
@@ -617,8 +586,10 @@ TEST(CatapultConverter, ConvertThroughputUnits) {
             "pointId": "dummy_guid_0",
             "bots": "dummy_guid_1",
             "masters": "dummy_guid_2",
-            "logUrls": "dummy_guid_3",
-            "benchmarks": "dummy_guid_4"
+            "fuchsiaIntegrationInternalRevisions": "dummy_guid_3",
+            "fuchsiaIntegrationPublicRevisions":  "dummy_guid_4",
+            "logUrls": "dummy_guid_5",
+            "benchmarks": "dummy_guid_6"
         },
         "running": [
             1,
@@ -629,7 +600,7 @@ TEST(CatapultConverter, ConvertThroughputUnits) {
             "compared_elsewhere",
             "compared_elsewhere"
         ],
-        "guid": "dummy_guid_5",
+        "guid": "dummy_guid_7",
         "maxNumSampleValues": 1,
         "numNans": 0
     },
@@ -641,8 +612,10 @@ TEST(CatapultConverter, ConvertThroughputUnits) {
             "pointId": "dummy_guid_0",
             "bots": "dummy_guid_1",
             "masters": "dummy_guid_2",
-            "logUrls": "dummy_guid_3",
-            "benchmarks": "dummy_guid_4"
+            "fuchsiaIntegrationInternalRevisions": "dummy_guid_3",
+            "fuchsiaIntegrationPublicRevisions":  "dummy_guid_4",
+            "logUrls": "dummy_guid_5",
+            "benchmarks": "dummy_guid_6"
         },
         "running": [
             1,
@@ -653,7 +626,7 @@ TEST(CatapultConverter, ConvertThroughputUnits) {
             "compared_elsewhere",
             "compared_elsewhere"
         ],
-        "guid": "dummy_guid_6",
+        "guid": "dummy_guid_8",
         "maxNumSampleValues": 1,
         "numNans": 0
     }
@@ -666,19 +639,19 @@ TEST(CatapultConverter, ConvertThroughputUnits) {
   rapidjson::Document output;
   TestConverter(input_str, &output);
 
-  AssertApproxEqual(&output, &output[5]["running"][1], 99);
-  AssertApproxEqual(&output, &output[5]["running"][2], 4.595119);
-  AssertApproxEqual(&output, &output[5]["running"][3], 99);
-  AssertApproxEqual(&output, &output[5]["running"][4], 99);
-  AssertApproxEqual(&output, &output[5]["running"][5], 99);
-  AssertApproxEqual(&output, &output[5]["running"][6], 0);
+  AssertApproxEqual(&output, &output[7]["running"][1], 99);
+  AssertApproxEqual(&output, &output[7]["running"][2], 4.595119);
+  AssertApproxEqual(&output, &output[7]["running"][3], 99);
+  AssertApproxEqual(&output, &output[7]["running"][4], 99);
+  AssertApproxEqual(&output, &output[7]["running"][5], 99);
+  AssertApproxEqual(&output, &output[7]["running"][6], 0);
 
-  AssertApproxEqual(&output, &output[6]["running"][1], 87000000);
-  AssertApproxEqual(&output, &output[6]["running"][2], 18.28141);
-  AssertApproxEqual(&output, &output[6]["running"][3], 87000000);
-  AssertApproxEqual(&output, &output[6]["running"][4], 87000000);
-  AssertApproxEqual(&output, &output[6]["running"][5], 87000000);
-  AssertApproxEqual(&output, &output[6]["running"][6], 0);
+  AssertApproxEqual(&output, &output[8]["running"][1], 87000000);
+  AssertApproxEqual(&output, &output[8]["running"][2], 18.28141);
+  AssertApproxEqual(&output, &output[8]["running"][3], 87000000);
+  AssertApproxEqual(&output, &output[8]["running"][4], 87000000);
+  AssertApproxEqual(&output, &output[8]["running"][5], 87000000);
+  AssertApproxEqual(&output, &output[8]["running"][6], 0);
 
   AssertJsonEqual(output, expected_output);
 }
@@ -695,46 +668,8 @@ TEST(CatapultConverter, ConvertBytesUnit) {
 ]
 )JSON";
 
-  const char* expected_output_str = R"JSON(
-[
-    {
-        "guid": "dummy_guid_0",
-        "type": "GenericSet",
-        "values": [
-            123004005006
-        ]
-    },
-    {
-        "guid": "dummy_guid_1",
-        "type": "GenericSet",
-        "values": [
-            "example_bots"
-        ]
-    },
-    {
-        "guid": "dummy_guid_2",
-        "type": "GenericSet",
-        "values": [
-            "example_masters"
-        ]
-    },
-    {
-        "guid": "dummy_guid_3",
-        "type": "GenericSet",
-        "values": [
-            [
-                "Build Log",
-                "https://ci.example.com/build/100"
-            ]
-        ]
-    },
-    {
-        "guid": "dummy_guid_4",
-        "type": "GenericSet",
-        "values": [
-            "my_test_suite"
-        ]
-    },
+  const std::string expected_output_str = std::string{"["} + kExpectedSharedDiagnostics +
+                                          R"JSON(
     {
         "name": "ExampleWithBytes",
         "unit": "sizeInBytes_smallerIsBetter",
@@ -743,8 +678,10 @@ TEST(CatapultConverter, ConvertBytesUnit) {
             "pointId": "dummy_guid_0",
             "bots": "dummy_guid_1",
             "masters": "dummy_guid_2",
-            "logUrls": "dummy_guid_3",
-            "benchmarks": "dummy_guid_4"
+            "fuchsiaIntegrationInternalRevisions": "dummy_guid_3",
+            "fuchsiaIntegrationPublicRevisions":  "dummy_guid_4",
+            "logUrls": "dummy_guid_5",
+            "benchmarks": "dummy_guid_6"
         },
         "running": [
             4,
@@ -755,7 +692,7 @@ TEST(CatapultConverter, ConvertBytesUnit) {
             "compared_elsewhere",
             "compared_elsewhere"
         ],
-        "guid": "dummy_guid_5",
+        "guid": "dummy_guid_7",
         "maxNumSampleValues": 4,
         "numNans": 0
     }]
@@ -767,12 +704,12 @@ TEST(CatapultConverter, ConvertBytesUnit) {
   rapidjson::Document output;
   TestConverter(input_str, &output);
 
-  AssertApproxEqual(&output, &output[5]["running"][1], 200);
-  AssertApproxEqual(&output, &output[5]["running"][2], 4.098931);
-  AssertApproxEqual(&output, &output[5]["running"][3], 104);
-  AssertApproxEqual(&output, &output[5]["running"][4], 6);
-  AssertApproxEqual(&output, &output[5]["running"][5], 416);
-  AssertApproxEqual(&output, &output[5]["running"][6], 6290.666);
+  AssertApproxEqual(&output, &output[7]["running"][1], 200);
+  AssertApproxEqual(&output, &output[7]["running"][2], 4.098931);
+  AssertApproxEqual(&output, &output[7]["running"][3], 104);
+  AssertApproxEqual(&output, &output[7]["running"][4], 6);
+  AssertApproxEqual(&output, &output[7]["running"][5], 416);
+  AssertApproxEqual(&output, &output[7]["running"][6], 6290.666);
 
   AssertJsonEqual(output, expected_output);
 }
@@ -789,46 +726,8 @@ TEST(CatapultConverter, ConvertPercentageUnit) {
 ]
 )JSON";
 
-  const char* expected_output_str = R"JSON(
-[
-    {
-        "guid": "dummy_guid_0",
-        "type": "GenericSet",
-        "values": [
-            123004005006
-        ]
-    },
-    {
-        "guid": "dummy_guid_1",
-        "type": "GenericSet",
-        "values": [
-            "example_bots"
-        ]
-    },
-    {
-        "guid": "dummy_guid_2",
-        "type": "GenericSet",
-        "values": [
-            "example_masters"
-        ]
-    },
-    {
-        "guid": "dummy_guid_3",
-        "type": "GenericSet",
-        "values": [
-            [
-                "Build Log",
-                "https://ci.example.com/build/100"
-            ]
-        ]
-    },
-    {
-        "guid": "dummy_guid_4",
-        "type": "GenericSet",
-        "values": [
-            "my_test_suite"
-        ]
-    },
+  const std::string expected_output_str = std::string{"["} + kExpectedSharedDiagnostics +
+                                          R"JSON(
     {
         "name": "ExampleWithPercentages",
         "unit": "n%_smallerIsBetter",
@@ -837,8 +736,10 @@ TEST(CatapultConverter, ConvertPercentageUnit) {
             "pointId": "dummy_guid_0",
             "bots": "dummy_guid_1",
             "masters": "dummy_guid_2",
-            "logUrls": "dummy_guid_3",
-            "benchmarks": "dummy_guid_4"
+            "fuchsiaIntegrationInternalRevisions": "dummy_guid_3",
+            "fuchsiaIntegrationPublicRevisions":  "dummy_guid_4",
+            "logUrls": "dummy_guid_5",
+            "benchmarks": "dummy_guid_6"
         },
         "running": [
             3,
@@ -849,7 +750,7 @@ TEST(CatapultConverter, ConvertPercentageUnit) {
             "compared_elsewhere",
             "compared_elsewhere"
         ],
-        "guid": "dummy_guid_5",
+        "guid": "dummy_guid_7",
         "maxNumSampleValues": 3,
         "numNans": 0
     }]
@@ -861,12 +762,12 @@ TEST(CatapultConverter, ConvertPercentageUnit) {
   rapidjson::Document output;
   TestConverter(input_str, &output);
 
-  AssertApproxEqual(&output, &output[5]["running"][1], 100);
-  AssertApproxEqual(&output, &output[5]["running"][2], 0.21955998);
-  AssertApproxEqual(&output, &output[5]["running"][3], 39.7741);
-  AssertApproxEqual(&output, &output[5]["running"][4], 0.001);
-  AssertApproxEqual(&output, &output[5]["running"][5], 119.3224);
-  AssertApproxEqual(&output, &output[5]["running"][6], 2813.705);
+  AssertApproxEqual(&output, &output[7]["running"][1], 100);
+  AssertApproxEqual(&output, &output[7]["running"][2], 0.21955998);
+  AssertApproxEqual(&output, &output[7]["running"][3], 39.7741);
+  AssertApproxEqual(&output, &output[7]["running"][4], 0.001);
+  AssertApproxEqual(&output, &output[7]["running"][5], 119.3224);
+  AssertApproxEqual(&output, &output[7]["running"][6], 2813.705);
 
   AssertJsonEqual(output, expected_output);
 }
@@ -889,7 +790,7 @@ TEST(CatapultConverter, ZeroValues) {
   TestConverter(input_str, &output);
 
   rapidjson::Value null;
-  rapidjson::Value& meanlogs_field = output[5]["running"][2];
+  rapidjson::Value& meanlogs_field = output[7]["running"][2];
   EXPECT_EQ(meanlogs_field, null);
 }
 
@@ -911,7 +812,7 @@ TEST(CatapultConverter, NegativeValues) {
   TestConverter(input_str, &output);
 
   rapidjson::Value null;
-  rapidjson::Value& meanlogs_field = output[5]["running"][2];
+  rapidjson::Value& meanlogs_field = output[7]["running"][2];
   EXPECT_EQ(meanlogs_field, null);
 }
 

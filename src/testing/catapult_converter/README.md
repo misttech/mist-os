@@ -53,6 +53,19 @@ the dashboard:
   Catapult dashboard does not require the logUrls field in the
   HistogramSet data.
 
+* fuchsiaIntegrationInternalRevisions/fuchsiaIntegrationPublicRevisions:
+  Unlike Catapult, which uses the above pointId, Skia Perf is provided with
+  Git commit hashes. To be compatible, use `--integration-internal-git-commit`
+  and optionally `--integration-public-git-commit` to provide the commit
+  hash the results were recorded from.
+
+  Example: `7106610114a0e86f6c94be3724fb4d4c30141e40`
+
+  As the results are intended to be uploaded from infra,
+  `--integration_internal_git_commit` should refer to the private
+  integration.git commit hash while `--integration_public_git_commit` should
+  refer to the public integration.git commit hash if there is one.
+
 
 This is an optional parameter that the Catapult dashboard accepts:
 

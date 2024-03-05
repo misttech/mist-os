@@ -132,7 +132,6 @@ void ComputeStatistics(const std::vector<double>& vals, rapidjson::Value* output
 // available at:
 // https://github.com/catapult-project/catapult/blob/8dc09eb0703647db9ca37b26f2d01a0a4dc0285c/tracing/tracing/value/histogram.py#L478
 std::string ConvertUnits(const char* input_unit, std::vector<double>* vals) {
-  std::string catapult_unit;
   if (strcmp(input_unit, "nanoseconds") == 0 || strcmp(input_unit, "ns") == 0) {
     // Convert from nanoseconds to milliseconds.
     for (auto& val : *vals) {
@@ -316,6 +315,16 @@ void Convert(rapidjson::Document* input, rapidjson::Document* output, const Conv
     AddSharedDiagnostic("a_productVersions", helper.MakeString(args->product_versions));
   }
 
+  // Provide the git commit hashes the results were taken from.
+  if (args->integration_internal_git_commit) {
+    AddSharedDiagnostic("fuchsiaIntegrationInternalRevisions",
+                        helper.MakeString(args->integration_internal_git_commit));
+  }
+  if (args->integration_public_git_commit) {
+    AddSharedDiagnostic("fuchsiaIntegrationPublicRevisions",
+                        helper.MakeString(args->integration_public_git_commit));
+  }
+
   // The "logUrls" diagnostic contains a list of [name, url] tuples.
   rapidjson::Value log_url_array;
   log_url_array.SetArray();
@@ -353,10 +362,11 @@ void Convert(rapidjson::Document* input, rapidjson::Document* output, const Conv
     } else {
       fprintf(stderr,
               "Expect json element to have either label field (old version) or test_name field "
-              "(new version). (http://https://fxbug.dev/42137976)\n");
+              "(new version). (See https://fxbug.dev/42137976)\n");
       exit(1);
     }
-    // TODO(https://fxbug.dev/42137976): Make "metric" field required once all the producers provide it.
+    // TODO(https://fxbug.dev/42137976): Make "metric" field required once all the producers provide
+    // it.
     if (element.HasMember("metric")) {
       std::string metric = element["metric"].GetString();
       if (metric != "real_time") {
@@ -411,6 +421,10 @@ int ConverterMain(int argc, char** argv) {
       "  --masters STRING\n"
       "  --bots STRING\n"
       "  --log-url URL\n"
+      "\n"
+      "The following are optional and may be provided to include additional information:\n"
+      "  --integration-internal-git-commit STRING\n"
+      "  --public-internal-git-commit STRING\n"
       "See README.md for the meanings of these parameters.\n";
 
   // Parse command line arguments.
@@ -423,6 +437,8 @@ int ConverterMain(int argc, char** argv) {
       {"bots", required_argument, nullptr, 'b'},
       {"log-url", required_argument, nullptr, 'l'},
       {"product-versions", required_argument, nullptr, 'v'},
+      {"integration-internal-git-commit", required_argument, nullptr, 'g'},
+      {"integration-public-git-commit", required_argument, nullptr, 'p'},
   };
   ConverterArgs args;
   const char* input_filename = nullptr;
@@ -457,6 +473,12 @@ int ConverterMain(int argc, char** argv) {
       case 'v':
         args.product_versions = optarg;
         break;
+      case 'g':
+        args.integration_internal_git_commit = optarg;
+        break;
+      case 'p':
+        args.integration_public_git_commit = optarg;
+        break;
     }
   }
   if (optind < argc) {
@@ -486,6 +508,7 @@ int ConverterMain(int argc, char** argv) {
     fprintf(stderr, "--log-url argument is required\n");
     failed = true;
   }
+
   if (failed) {
     fprintf(stderr, "\n");
     fprintf(stderr, usage, argv[0]);
