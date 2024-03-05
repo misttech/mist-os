@@ -6,6 +6,7 @@ import("//build/python/python_library.gni")
 
 if (is_host) {
   python_library("fuchsia_base_test") {
+    enable_pytype = true
     testonly = true
     library_name = "fuchsia_base_test"
     sources = [

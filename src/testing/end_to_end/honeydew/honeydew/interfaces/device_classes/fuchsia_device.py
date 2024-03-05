@@ -297,7 +297,7 @@ class FuchsiaDevice(abc.ABC):
         """Register a function that will be called in on_device_boot."""
 
     @abc.abstractmethod
-    def snapshot(self, directory: str, snapshot_file: str | None) -> str:
+    def snapshot(self, directory: str, snapshot_file: str | None = None) -> str:
         """Captures the snapshot of the device.
 
         Args:

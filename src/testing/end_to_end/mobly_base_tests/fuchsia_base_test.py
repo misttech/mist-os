@@ -31,7 +31,7 @@ class SnapshotOn(enum.Enum):
     ON_FAIL = enum.auto()
 
 
-class FuchsiaBaseTest(base_test.BaseTestClass):
+class FuchsiaBaseTest(base_test.BaseTestClass):  # type: ignore[misc]
     """Fuchsia base test class.
 
     Attributes:
@@ -116,21 +116,20 @@ class FuchsiaBaseTest(base_test.BaseTestClass):
               "<log_path>/teardown_class<_on_fail>" directory if `snapshot_on`
               test param is set to "teardown_class" or "teardown_class_on_fail".
         """
+        self._teardown_class_artifacts: str
         if self.snapshot_on == SnapshotOn.TEARDOWN_CLASS:
-            self._teardown_class_artifacts: str = (
-                f"{self.log_path}/teardown_class"
-            )
+            self._teardown_class_artifacts = f"{self.log_path}/teardown_class"
             self._collect_snapshot(directory=self._teardown_class_artifacts)
         elif (
             self.snapshot_on == SnapshotOn.TEARDOWN_CLASS_ON_FAIL
             and self._any_test_failed
         ):
-            self._teardown_class_artifacts: str = (
+            self._teardown_class_artifacts = (
                 f"{self.log_path}/teardown_class_on_fail"
             )
             self._collect_snapshot(directory=self._teardown_class_artifacts)
 
-    def on_fail(self, _) -> None:
+    def on_fail(self, _) -> None:  # type: ignore[no-untyped-def]
         """on_fail is called once when a test case fails.
 
         It does the following things:
