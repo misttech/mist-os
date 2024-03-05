@@ -53,11 +53,10 @@ where
     let _ignore = activity.send(()).await;
     if let Some(execution_state) = power_elements.execution_state {
         if let Some(token) = execution_state.passive_dependency_token {
-            let token_dup = token.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("never fails");
             let deps = vec![fpb::LevelDependency {
                 dependency_type: fpb::DependencyType::Passive,
                 dependent_level: POWER_ON,
-                requires_token: token_dup,
+                requires_token: token,
                 requires_level: REQUIRED_LEVEL,
             }];
 
@@ -68,7 +67,7 @@ where
                     &vec![POWER_ON, POWER_OFF],
                     deps,
                     vec![],
-                    vec![token],
+                    vec![],
                 )
                 .await
                 .context("while calling fuchsia.power.broker.Topology/AddElement")?;
