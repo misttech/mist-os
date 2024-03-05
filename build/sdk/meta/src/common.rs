@@ -6,14 +6,6 @@ use serde::{Deserialize, Serialize};
 
 pub type File = String;
 
-pub type FidlLibraryName = String;
-
-pub type CcLibraryName = String;
-
-pub type BanjoLibraryName = String;
-
-pub type BindLibraryName = String;
-
 /// Shortcut for adding fmt::Display and FromStr to an enumeration.
 ///
 /// fmt::Display is used to enable printing the values as they would be
