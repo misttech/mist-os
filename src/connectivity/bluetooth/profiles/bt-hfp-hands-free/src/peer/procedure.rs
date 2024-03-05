@@ -16,6 +16,9 @@ pub mod test;
 pub mod codec_connection_setup;
 use codec_connection_setup::CodecConnectionSetupProcedure;
 
+pub mod initiate_call;
+use initiate_call::InitiateCallProcedure;
+
 pub mod phone_status;
 use phone_status::PhoneStatusProcedure;
 
@@ -51,13 +54,13 @@ pub(crate) use at_cmd;
 #[derive(Clone, Debug, PartialEq)]
 pub enum CommandFromHf {
     CallActionDialFromNumber { number: String },
+    CallActionDialFromMemory { memory: String },
+    CallActionRedialLast,
 }
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum ProcedureInput {
     AtResponseFromAg(at::Response),
-    // TODO(https://fxbug.dev/42077657) Use this in task.rs.
-    #[allow(unused)]
     CommandFromHf(CommandFromHf),
 }
 
@@ -84,15 +87,29 @@ impl ProcedureInputT<ProcedureOutput> for ProcedureInput {
         match self {
             // TODO(https://fxbug.dev/42081254) This is wrong--we need to start SLCI ourselves, not wait for an AT command.
             at_resp!(Brsf) => Some(Box::new(SlcInitProcedure::new())),
+
             at_resp!(Ciev) => Some(Box::new(PhoneStatusProcedure::new())),
+
             at_resp!(Bcs) => Some(Box::new(CodecConnectionSetupProcedure::new())),
+
+            ProcedureInput::CommandFromHf(CommandFromHf::CallActionDialFromNumber { .. })
+            | ProcedureInput::CommandFromHf(CommandFromHf::CallActionDialFromMemory { .. })
+            | ProcedureInput::CommandFromHf(CommandFromHf::CallActionRedialLast) => {
+                Some(Box::new(InitiateCallProcedure::new()))
+            }
+
             _ => None,
         }
     }
 
     fn can_start_procedure(&self) -> bool {
         match self {
-            at_resp!(Brsf) | at_resp!(Ciev) | at_resp!(Bcs) => true,
+            at_resp!(Brsf)
+            | at_resp!(Ciev)
+            | at_resp!(Bcs)
+            | ProcedureInput::CommandFromHf(CommandFromHf::CallActionDialFromNumber { .. })
+            | ProcedureInput::CommandFromHf(CommandFromHf::CallActionDialFromMemory { .. })
+            | ProcedureInput::CommandFromHf(CommandFromHf::CallActionRedialLast) => true,
             _ => false,
         }
     }

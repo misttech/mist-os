@@ -188,7 +188,7 @@ where
         peer_id: PeerId,
         protocol: Option<Vec<ProtocolDescriptor>>,
     ) {
-        debug!("Hnadle search results timer expired for peer {:?}", peer_id);
+        debug!("Handle search results timer expired for peer {:?}", peer_id);
 
         let peer_result = self.peers.get_mut(&peer_id);
 

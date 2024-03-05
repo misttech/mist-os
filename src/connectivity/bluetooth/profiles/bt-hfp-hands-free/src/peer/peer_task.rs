@@ -92,27 +92,32 @@ impl PeerTask {
         &mut self,
         peer_handler_request: fidl_hfp::PeerHandlerRequest,
     ) -> Result<()> {
-        match peer_handler_request {
+        // TODO(b/321278917) Refactor this method to be testable.
+        // TODO(fxbug.dev/136796) asynchronously respond to requests when a procedure completes.
+        let (command_from_hf, responder) = match peer_handler_request {
             fidl_hfp::PeerHandlerRequest::RequestOutgoingCall {
                 action: fidl_hfp::CallAction::DialFromNumber(number),
                 responder,
-            } => {
-                let procedure_input =
-                    ProcedureInput::CommandFromHf(CommandFromHf::CallActionDialFromNumber {
-                        number,
-                    });
-                self.procedure_manager.enqueue(procedure_input);
-                // TODO(fxbug.dev/42086445) asynchronously respond to this request when the procedure
-                // completes.
-                let send_result = responder.send(Ok(()));
-                if let Err(err) = send_result {
-                    warn!("Error {:?} sending result to peer {}", err, self.peer_id);
-                }
-                ()
-            }
+            } => (CommandFromHf::CallActionDialFromNumber { number }, responder),
+            fidl_hfp::PeerHandlerRequest::RequestOutgoingCall {
+                action: fidl_hfp::CallAction::DialFromLocation(memory),
+                responder,
+            } => (CommandFromHf::CallActionDialFromMemory { memory }, responder),
+            fidl_hfp::PeerHandlerRequest::RequestOutgoingCall {
+                action: fidl_hfp::CallAction::RedialLast(_),
+                responder,
+            } => (CommandFromHf::CallActionRedialLast, responder),
             _ => unimplemented!(),
+        };
+
+        // TODO(fxbug.dev/136796) asynchronously respond to this request when the procedure
+        // completes.
+        let send_result = responder.send(Ok(()));
+        if let Err(err) = send_result {
+            warn!("Error {:?} sending result to peer {:}", err, self.peer_id);
         }
 
+        self.procedure_manager.enqueue(ProcedureInput::CommandFromHf(command_from_hf));
         Ok(())
     }
 
@@ -126,5 +131,5 @@ impl PeerTask {
     // TODO(https://fxbug.dev/42077657) Handle procedure outputs.
     fn handle_procedure_output(&self, _procedure_output: ProcedureOutput) {
         unimplemented!("handle_procedure_output");
-    }
+            }
 }
