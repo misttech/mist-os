@@ -12,20 +12,18 @@ use crate::atomic_future::{AtomicFuture, AttemptPollResult};
 use crossbeam::queue::SegQueue;
 use fuchsia_sync::Mutex;
 use fuchsia_zircon::{self as zx};
-use futures::{
-    future::{FutureObj, LocalFutureObj},
-    task::{waker_ref, ArcWake},
-};
+use futures::future::{FutureObj, LocalFutureObj};
 use rustc_hash::FxHashMap as HashMap;
 use std::{
     any::Any,
     cell::RefCell,
     fmt,
     future::Future,
+    mem::ManuallyDrop,
     panic::Location,
     sync::atomic::{AtomicBool, AtomicI64, AtomicU16, AtomicU64, AtomicUsize, Ordering},
     sync::{Arc, Weak},
-    task::Context,
+    task::{Context, RawWaker, RawWakerVTable, Waker},
     u64, usize,
 };
 
@@ -653,17 +651,18 @@ impl Task {
         #[cfg(not(trace_level_logging))]
         let source = None;
 
-        Arc::new(Self {
+        let this = Arc::new(Self {
             id,
             future: AtomicFuture::new(future),
             executor,
             notifier: Notifier::default(),
             source,
-        })
-    }
+        });
 
-    fn waker(self: &Arc<Self>) -> Arc<TaskWaker> {
-        Arc::new(TaskWaker { task: Arc::downgrade(self) })
+        // Take a weak reference now to be used as a waker.
+        let _ = Arc::downgrade(&this).into_raw();
+
+        this
     }
 
     fn wake(self: &Arc<Self>) {
@@ -674,22 +673,62 @@ impl Task {
     }
 
     fn try_poll(self: &Arc<Self>) -> bool {
-        let task_waker = self.waker();
-        let w = waker_ref(&task_waker);
+        // SAFETY: We meet the contract for RawWaker/RawWakerVtable.
+        let task_waker = unsafe {
+            Waker::from_raw(RawWaker::new(Arc::as_ptr(self) as *const (), &BORROWED_VTABLE))
+        };
         self.notifier.reset();
-        self.future.try_poll(&mut Context::from_waker(&w)) == AttemptPollResult::IFinished
+        self.future.try_poll(&mut Context::from_waker(&task_waker)) == AttemptPollResult::IFinished
     }
 }
 
-struct TaskWaker {
-    task: Weak<Task>,
+impl Drop for Task {
+    fn drop(&mut self) {
+        // SAFETY: This balances the `into_raw` in `new`.
+        unsafe {
+            // TODO(https://fxbug.dev/328126836): We might need to revisit this when pointer
+            // provenance lands.
+            Weak::from_raw(self);
+        }
+    }
 }
 
-impl ArcWake for TaskWaker {
-    fn wake_by_ref(arc_self: &Arc<Self>) {
-        if let Some(task) = Weak::upgrade(&arc_self.task) {
-            task.wake();
-        }
+// This vtable is used for the waker that exists for the lifetime of the task, which gets dropped
+// above, so these functions never drop.
+static BORROWED_VTABLE: RawWakerVTable =
+    RawWakerVTable::new(waker_clone, waker_wake_by_ref, waker_wake_by_ref, waker_noop);
+
+static VTABLE: RawWakerVTable =
+    RawWakerVTable::new(waker_clone, waker_wake, waker_wake_by_ref, waker_drop);
+
+fn waker_clone(weak_raw: *const ()) -> RawWaker {
+    // SAFETY: `weak_raw` comes from a previous call to `into_raw`.
+    let weak = ManuallyDrop::new(unsafe { Weak::from_raw(weak_raw as *const Task) });
+    RawWaker::new((*weak).clone().into_raw() as *const _, &VTABLE)
+}
+
+fn waker_wake(weak_raw: *const ()) {
+    // SAFETY: `weak_raw` comes from a previous call to `into_raw`.
+    if let Some(task) = unsafe { Weak::from_raw(weak_raw as *const Task) }.upgrade() {
+        task.wake();
+    }
+}
+
+fn waker_wake_by_ref(weak_raw: *const ()) {
+    // SAFETY: `weak_raw` comes from a previous call to `into_raw`.
+    if let Some(task) =
+        ManuallyDrop::new(unsafe { Weak::from_raw(weak_raw as *const Task) }).upgrade()
+    {
+        task.wake();
+    }
+}
+
+fn waker_noop(_weak_raw: *const ()) {}
+
+fn waker_drop(weak_raw: *const ()) {
+    // SAFETY: `weak_raw` comes from a previous call to `into_raw`.
+    unsafe {
+        Weak::from_raw(weak_raw as *const Task);
     }
 }
 
