@@ -816,12 +816,6 @@ async def run_all_tests(
 
     maybe_debugger: subprocess.Popen[bytes] | None = None
     if flags.has_debugger():
-        # Turn the cursor back on before handing control over to the debugger. This doesn't control
-        # whether or not the cursor appears while in the zxdb prompt (https://fxbug.dev/322420507),
-        # but it does make sure that the cursor is enabled when the user is returned to the shell
-        # afterwards. The cleanup routine that is normally installed will no longer have the correct
-        # file descriptor and cannot restore the terminal settings as normal.
-        termout.cursor_show(True)
         maybe_debugger = debugger.spawn(
             tests.selected,
             break_on_failure=flags.break_on_failure,

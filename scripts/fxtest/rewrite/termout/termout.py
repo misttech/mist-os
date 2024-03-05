@@ -52,16 +52,6 @@ def is_valid() -> bool:
     return os.isatty(sys.stdout.fileno())
 
 
-def cursor_show(show: bool) -> None:
-    """Show or hide the cursor.
-
-    Args:
-        show (bool): Whether to show the cursor or hide it.
-    """
-    s = f'\033[?25{"h" if show else "l"}'
-    sys.stdout.write(s)
-
-
 def _suspend_echo() -> None:
     """Stop echoing to the terminal and hide the cursor.
 
@@ -73,12 +63,10 @@ def _suspend_echo() -> None:
     new_flags = termios.tcgetattr(fd)
     new_flags[3] = new_flags[3] & ~termios.ECHO
     termios.tcsetattr(fd, termios.TCSANOW, new_flags)
-    cursor_show(False)
 
     def cleanup() -> None:
         print("\r")
         termios.tcsetattr(fd, termios.TCSANOW, orig_flags)
-        cursor_show(True)
 
     atexit.register(cleanup)
 
