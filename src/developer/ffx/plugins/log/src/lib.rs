@@ -30,6 +30,8 @@ mod error;
 mod symbolizer;
 #[cfg(test)]
 mod testing_utils;
+#[cfg(test)]
+mod transactional_symbolizer;
 
 const ARCHIVIST_MONIKER: &str = "bootstrap/archivist";
 const TIMEOUT: std::time::Duration = std::time::Duration::from_secs(15);

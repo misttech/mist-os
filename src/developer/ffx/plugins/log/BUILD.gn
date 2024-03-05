@@ -44,6 +44,7 @@ ffx_plugin("ffx_log") {
     "src/lib.rs",
     "src/symbolizer.rs",
     "src/testing_utils.rs",
+    "src/transactional_symbolizer.rs",
   ]
 
   test_deps = [
