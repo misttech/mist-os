@@ -773,7 +773,7 @@ open protocol BufferCollection {
     @selector("fuchsia.sysmem2/BufferCollection.WaitForAllBuffersAllocatedDeprecated")
     flexible WaitForAllBuffersAllocated() -> (resource table {
         1: buffer_collection_info BufferCollectionInfo;
-    }) error zx.Status;
+    }) error Error;
     @selector("fuchsia.sysmem2/BufferCollection.WaitForAllBuffersAllocated")
     flexible WaitForAllBuffersAllocatedNew() -> (resource table {
         1: buffer_collection_info BufferCollectionInfo;

@@ -222,7 +222,7 @@ zx_status_t SimpleDisplay::DisplayControllerImplImportImage(
   }
   auto& wait_response = wait_result.value();
   if (wait_response.is_error()) {
-    return wait_response.error_value();
+    return sysmem::V1CopyFromV2Error(wait_response.error_value());
   }
   fuchsia_sysmem2::wire::BufferCollectionInfo& collection_info =
       wait_response->buffer_collection_info();

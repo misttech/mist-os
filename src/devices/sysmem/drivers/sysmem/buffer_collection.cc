@@ -913,7 +913,7 @@ void BufferCollection::MaybeCompleteWaitForBuffersAllocated() {
     TRACE_ASYNC_END("gfx", "BufferCollection::WaitForAllBuffersAllocated async", async_id, "this",
                     this, "logical_buffer_collection", &logical_buffer_collection());
     if (logical_allocation_result_->maybe_error.has_value()) {
-      txn.Reply(fit::error(sysmem::V1CopyFromV2Error(*logical_allocation_result_->maybe_error)));
+      txn.Reply(fit::error(*logical_allocation_result_->maybe_error));
     } else {
       fuchsia_sysmem2::BufferCollectionWaitForAllBuffersAllocatedResponse response;
       response.buffer_collection_info() = std::move(v2);

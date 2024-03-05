@@ -2260,9 +2260,11 @@ TEST(Sysmem,
                 allocation_result) {
           EXPECT_FALSE(allocation_result.is_ok());
           EXPECT_TRUE(allocation_result.error_value().is_domain_error());
-          EXPECT_STATUS(allocation_result.error_value().domain_error(), ZX_ERR_NOT_SUPPORTED);
+          EXPECT_EQ(allocation_result.error_value().domain_error(),
+                    Error::kConstraintsIntersectionEmpty);
           if (allocation_result.is_error() && allocation_result.error_value().is_domain_error() &&
-              allocation_result.error_value().domain_error() == ZX_ERR_NOT_SUPPORTED) {
+              allocation_result.error_value().domain_error() ==
+                  Error::kConstraintsIntersectionEmpty) {
             ++clean_failure_seen_count;
           }
         };
@@ -3148,7 +3150,7 @@ TEST(Sysmem, OnlyNoneUsageFailsV2) {
   //
   // TODO(dustingreen): Issue async client request to put the wait in flight
   // before the SetConstraints() so we can verify that the wait succeeds but
-  // the allocation_status is ZX_ERR_NOT_SUPPORTED.
+  // the allocation_status is Error::kConstraintsIntersectionEmpty.
   ASSERT_FALSE(allocate_result.is_ok());
 }
 
@@ -3194,7 +3196,7 @@ TEST(Sysmem, NoneUsageAndOtherUsageFromSingleParticipantFailsV2) {
   //
   // TODO(dustingreen): Issue async client request to put the wait in flight
   // before the SetConstraints() so we can verify that the wait succeeds but
-  // the allocation_status is ZX_ERR_NOT_SUPPORTED.
+  // the allocation_status is Error::kConstraintsIntersectionEmpty.
   ASSERT_FALSE(allocate_result.is_ok());
 }
 
@@ -4136,8 +4138,8 @@ bool BasicAllocationSucceedsV2(
       printf("WaitForBuffersAllocated failed - framework status: %d\n",
              allocate_result.error_value().framework_error().status());
     } else {
-      printf("WaitForBuffersAllocated failed - domain status: %d\n",
-             allocate_result.error_value().domain_error());
+      printf("WaitForBuffersAllocated failed - domain status: %u\n",
+             static_cast<uint32_t>(allocate_result.error_value().domain_error()));
     }
     return false;
   }
@@ -4708,7 +4710,8 @@ TEST(Sysmem, GroupPrefersFirstChildV2) {
   ASSERT_TRUE(wait_result3.error_value().is_framework_error() &&
                   wait_result3.error_value().framework_error().status() == ZX_ERR_PEER_CLOSED ||
               wait_result3.error_value().is_domain_error() &&
-                  wait_result3.error_value().domain_error() == ZX_ERR_NOT_SUPPORTED);
+                  wait_result3.error_value().domain_error() ==
+                      Error::kConstraintsIntersectionEmpty);
 }
 
 TEST(Sysmem, GroupPriorityV2) {
@@ -5058,7 +5061,8 @@ TEST(Sysmem, Group_MiniStressV2) {
         if (!node->is_compatible) {
           EXPECT_FALSE(wait_result.is_ok());
           if (wait_result.error_value().is_domain_error()) {
-            EXPECT_STATUS(wait_result.error_value().domain_error(), ZX_ERR_NOT_SUPPORTED);
+            EXPECT_EQ(wait_result.error_value().domain_error(),
+                      Error::kConstraintsIntersectionEmpty);
           } else {
             EXPECT_STATUS(wait_result.error_value().framework_error().status(), ZX_ERR_PEER_CLOSED);
           }
@@ -5159,7 +5163,8 @@ TEST(Sysmem, SkipUnreachableChildSelectionsV2) {
     ASSERT_TRUE(wait_result.error_value().is_framework_error() &&
                     wait_result.error_value().framework_error().status() == ZX_ERR_PEER_CLOSED ||
                 wait_result.error_value().is_domain_error() &&
-                    wait_result.error_value().domain_error() == ZX_ERR_NOT_SUPPORTED);
+                    wait_result.error_value().domain_error() ==
+                        Error::kConstraintsIntersectionEmpty);
   }
 }
 
@@ -5209,7 +5214,8 @@ TEST(Sysmem, GroupChildSelectionCombinationCountLimitV2) {
     ASSERT_TRUE(wait_result.error_value().is_framework_error() &&
                     wait_result.error_value().framework_error().status() == ZX_ERR_PEER_CLOSED ||
                 wait_result.error_value().is_domain_error() &&
-                    wait_result.error_value().domain_error() == ZX_ERR_OUT_OF_RANGE);
+                    wait_result.error_value().domain_error() ==
+                        Error::kTooManyGroupChildCombinations);
   }
 }
 
@@ -5259,11 +5265,11 @@ TEST(Sysmem, GroupCreateChildrenSyncV2) {
       auto wait_result = collection->WaitForAllBuffersAllocated();
       if (!is_compatible(index)) {
         ASSERT_FALSE(wait_result.is_ok());
-        ASSERT_TRUE(wait_result.error_value().is_framework_error() &&
-                        wait_result.error_value().framework_error().status() ==
-                            ZX_ERR_PEER_CLOSED ||
-                    wait_result.error_value().is_domain_error() &&
-                        wait_result.error_value().domain_error() == ZX_ERR_NOT_SUPPORTED);
+        ASSERT_TRUE(
+            wait_result.error_value().is_framework_error() &&
+                wait_result.error_value().framework_error().status() == ZX_ERR_PEER_CLOSED ||
+            wait_result.error_value().is_domain_error() &&
+                wait_result.error_value().domain_error() == Error::kConstraintsIntersectionEmpty);
         continue;
       }
       ASSERT_TRUE(wait_result.is_ok());
@@ -5319,9 +5325,9 @@ TEST(Sysmem, SetVerboseLoggingV2) {
   auto check_wait_result = [](decltype(root->WaitForAllBuffersAllocated())& result) {
     EXPECT_FALSE(result.is_ok());
     auto& error = result.error_value();
-    EXPECT_TRUE(error.is_framework_error() &&
-                    error.framework_error().status() == ZX_ERR_PEER_CLOSED ||
-                error.is_domain_error() && error.domain_error() == ZX_ERR_NOT_SUPPORTED);
+    EXPECT_TRUE(
+        error.is_framework_error() && error.framework_error().status() == ZX_ERR_PEER_CLOSED ||
+        error.is_domain_error() && error.domain_error() == Error::kConstraintsIntersectionEmpty);
   };
 
   auto root_result = root->WaitForAllBuffersAllocated();
@@ -7126,20 +7132,19 @@ TEST(Sysmem, RequireBytesPerRowAtPixelBoundary) {
   }
 }
 
-// TODO(b/316646315): This test can be converted to using the normal variant not the "New" variant
-// (after the non-"New" variant uses Error and is covered by the other tests as well).
 TEST(Sysmem, WaitForAllBuffersAllocatedError) {
   {
     // test success
     auto parent_token = create_initial_token_v2();
     auto parent = convert_token_to_collection_v2(std::move(parent_token));
     set_min_camping_constraints_v2(parent, 1);
-    auto wait_new_result = parent->WaitForAllBuffersAllocatedNew();
+    auto wait_new_result = parent->WaitForAllBuffersAllocated();
     EXPECT_TRUE(wait_new_result.is_ok());
     EXPECT_EQ(1ull, wait_new_result->buffer_collection_info()->buffers()->size());
   }
 
   {
+    // test failure
     auto parent_token = create_initial_token_v2();
     auto child_token = create_token_under_token_v2(parent_token);
 
@@ -7150,7 +7155,7 @@ TEST(Sysmem, WaitForAllBuffersAllocatedError) {
     // won't work with parent's constraints
     set_picky_constraints_v2(child, 2 * zx_system_get_page_size());
 
-    auto wait_new_result = parent->WaitForAllBuffersAllocatedNew();
+    auto wait_new_result = parent->WaitForAllBuffersAllocated();
     EXPECT_FALSE(wait_new_result.is_ok());
     // The sysmem2 protocols don't use epitaphs, so if a WaitForAllBuffersAllocated[New] is too
     // late, it'll just see that the channel closed, not any particular error code.
