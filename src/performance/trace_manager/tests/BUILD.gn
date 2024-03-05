@@ -25,6 +25,7 @@ executable("trace_manager_tests_bin") {
     "terminate_tests.cc",
     "trace_manager_test.cc",
     "trace_manager_test.h",
+    "util_tests.cc",
   ]
 
   deps = [
