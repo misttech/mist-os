@@ -360,7 +360,8 @@ template("devicetree_visitor") {
       non_sdk_deps += invoker.public_deps
     }
 
-    _sdk_binaries = [ "arch/${target_cpu}/dist/${_output_file_name}" ]
+    _sdk_binaries =
+        [ "arch/${target_cpu}/dist/devicetree-visitors-${_output_file_name}" ]
 
     meta = {
       dest = "pkg/${_sdk_pkg_name}/meta.json"
@@ -371,7 +372,7 @@ template("devicetree_visitor") {
         root = "pkg/${_sdk_pkg_name}"
         binaries = {
         }
-        resources = _sdk_binaries
+        resources = []
         if (target_cpu == "arm64") {
           binaries.arm64 = _sdk_binaries
         } else if (target_cpu == "x64") {

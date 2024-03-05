@@ -1,0 +1,14 @@
+load(
+    "@fuchsia_sdk//fuchsia:defs.bzl",
+    "fuchsia_package_resource_group",
+)
+
+fuchsia_package_resource_group(
+    name = "{{name}}",
+    srcs = [
+        {{srcs}}
+    ],
+    dest = "{{dest}}",
+    basename_only = True,
+    target_compatible_with = [ "@platforms//os:fuchsia" ]
+)

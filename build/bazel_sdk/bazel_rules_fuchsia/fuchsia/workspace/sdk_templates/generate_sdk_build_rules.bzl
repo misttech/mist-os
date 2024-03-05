@@ -7,7 +7,7 @@
 load("//fuchsia/workspace:utils.bzl", "symlink_or_copy", "workspace_path")
 
 def _header():
-    return """# Copyright 2021 The Fuchsia Authors. All rights reserved.
+    return """# Copyright 2024 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
@@ -33,6 +33,8 @@ _SDK_TEMPLATES = {
     "fidl_library": "//fuchsia/workspace/sdk_templates:fidl_library.BUILD.template",
     "filegroup": "//fuchsia/workspace/sdk_templates:filegroup.BUILD.template",
     "host_tool": "//fuchsia/workspace/sdk_templates:host_tool.BUILD.template",
+    "loadable_module": "//fuchsia/workspace/sdk_templates:loadable_module.BUILD.template",
+    "loadable_module_sub": "//fuchsia/workspace/sdk_templates:loadable_module_sub.BUILD.template",
     "package": "//fuchsia/workspace/sdk_templates:package.BUILD.template",
     "repository": "//fuchsia/workspace/sdk_templates:repository.BUILD.template",
     "select_alias": "//fuchsia/workspace/sdk_templates:select_alias.BUILD.template",
@@ -615,6 +617,48 @@ def _generate_config_build_rules(ctx, meta, relative_dir, build_file, process_co
         "{{srcs}}": _get_starlark_list([_bazel_file_path(relative_dir, src) for src in meta["data"]]),
     })
 
+# buildifier: disable=unused-variable
+def _generate_loadable_module_build_rules(ctx, meta, relative_dir, build_file, process_context, parent_sdk_contents):
+    arch_list = process_context.constants.target_cpus
+    files = []
+    files.extend(meta["resources"])
+    name = _get_target_name(meta["name"])
+    dest_prefix = "lib/"
+
+    # Special handling for devicetree visitors
+    if name.startswith("devicetree"):
+        dest_prefix += "visitors/"
+    for arch in arch_list:
+        files.extend(meta["binaries"][arch])
+
+        # Create sub BUILD file
+        per_arch_build_file = build_file.dirname.get_child(arch).get_child("BUILD.bazel")
+        ctx.file(per_arch_build_file, content = _header(), executable = False)
+        _merge_template(
+            ctx,
+            per_arch_build_file,
+            _sdk_template_path(ctx, "loadable_module_sub"),
+            {
+                "{{name}}": name,
+                "{{srcs}}": _get_starlark_list([_bazel_file_path(relative_dir, src) for src in meta["binaries"][arch]]),
+                "{{dest}}": dest_prefix,
+            },
+        )
+
+    process_context.files_to_copy[meta["_meta_sdk_root"]].extend(files)
+
+    _merge_template(
+        ctx,
+        build_file,
+        _sdk_template_path(ctx, "loadable_module"),
+        {
+            "{{name}}": name,
+            "{{relative_dir}}": relative_dir,
+            "{{resources}}": _get_starlark_list([_bazel_file_path(relative_dir, data) for data in meta["resources"]]),
+            "{{dest}}": dest_prefix,
+        },
+    )
+
 def _merge_template(ctx, target_build_file, template_file, subs = {}):
     if ctx.path(target_build_file).exists:
         existing_content = ctx.read(target_build_file)
@@ -641,6 +685,7 @@ def _process_dir(ctx, relative_dir, libraries, process_context, parent_sdk_conte
         "component_manifest": _generate_component_manifest_rules,
         "version_history": _generate_api_version_rules,
         "package": _generate_package_build_rules,
+        "loadable_module": _generate_loadable_module_build_rules,
     }
 
     build_file = ctx.path(relative_dir).get_child("BUILD.bazel")

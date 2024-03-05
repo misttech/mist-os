@@ -77,7 +77,11 @@ def _fuchsia_package_resource_group_impl(ctx):
     dest = ctx.attr.dest.removesuffix("/")
 
     for src in ctx.files.srcs:
-        name = src.short_path.removeprefix(ctx.label.package + "/").removeprefix(ctx.attr.strip_prefix).removeprefix("/")
+        if ctx.attr.basename_only:
+            name = src.basename
+        else:
+            name = src.short_path.removeprefix(ctx.label.package + "/").removeprefix(ctx.attr.strip_prefix).removeprefix("/")
+
         resources.append(
             make_resource_struct(src = src, dest = dest + "/" + name),
         )
@@ -101,6 +105,9 @@ fuchsia_package_resource_group = rule(
         "strip_prefix": attr.string(
             doc = "A path to remove from the srcs",
             default = "",
+        ),
+        "basename_only": attr.bool(
+            doc = "The dir will be removed from srcs attribute, and installed in dest + basename",
         ),
     },
 )
