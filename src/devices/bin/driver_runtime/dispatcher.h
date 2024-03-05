@@ -274,6 +274,20 @@ class Dispatcher : public async_dispatcher_t,
     async::Loop loop_;
   };
 
+  // Why a request was not inlined.
+  enum NonInlinedReason : uint8_t {
+    // Dispatcher has the ALLOW_SYNC_CALLS option set.
+    kAllowSyncCalls,
+    // The dispatcher is already handling a request on another thread.
+    kDispatchingOnAnotherThread,
+    // It was a posted task.
+    kTask,
+    // We are queueing to a dispatcher that is running on a non-runtime managed thread.
+    kUnknownThread,
+    // We are queueing to a dispatcher that is already in the callstack.
+    kReentrant,
+  };
+
   struct DebugStats {
     size_t num_inlined_requests = 0;
     size_t num_total_requests = 0;
@@ -374,7 +388,8 @@ class Dispatcher : public async_dispatcher_t,
       std::unique_ptr<CallbackRequest> callback_request);
 
   // Returns whether a request should be inlined, or queued for later processing.
-  bool ShouldInline(std::unique_ptr<CallbackRequest>& request) __TA_REQUIRES(&callback_lock_);
+  fit::result<NonInlinedReason> ShouldInline(std::unique_ptr<CallbackRequest>& request)
+      __TA_REQUIRES(&callback_lock_);
 
   // Queues a previously registered callback to be invoked by the dispatcher.
   // Asserts if no such callback is found.
