@@ -621,6 +621,13 @@ zx_status_t VmMappingCoalescer<NumPages>::Flush() {
     return ZX_OK;
   }
 
+  // Assert that we're not accidentally mapping the zero page writable. Unless called from a kernel
+  // aspace, as the zero page can be mapped writeable from the kernel aspace in mexec.
+  DEBUG_ASSERT(
+      !(mmu_flags_ & ARCH_MMU_FLAG_PERM_WRITE) ||
+      ktl::all_of(phys_, &phys_[count_], [](paddr_t p) { return p != vm_get_zero_page_paddr(); }) ||
+      !mapping_->aspace()->is_user());
+
   if (mmu_flags_ & ARCH_MMU_FLAG_PERM_RWX_MASK) {
     size_t mapped;
     zx_status_t ret = mapping_->aspace()->arch_aspace().Map(base_, phys_, count_, mmu_flags_,
