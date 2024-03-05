@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use std::collections::HashSet;
+
 use anyhow::{anyhow, Error, Result};
 use fidl::endpoints::{create_endpoints, DiscoverableProtocolMarker, ServiceMarker};
 use fidl_fuchsia_basicdriver_ctftest as ctf;
@@ -11,6 +13,7 @@ use fidl_fuchsia_io as fio;
 use fuchsia_async as fasync;
 use fuchsia_component::client::connect_to_protocol;
 use fuchsia_component::server::ServiceFs;
+use fuchsia_fs::directory::WatchEvent;
 use futures::channel::mpsc;
 use futures::prelude::*;
 use realm_proxy_client::RealmProxyClient;
@@ -22,17 +25,6 @@ async fn run_waiter_server(mut stream: ctf::WaiterRequestStream, mut sender: mps
         info!("Received Ack request");
         sender.try_send(()).expect("Sender failed")
     }
-}
-
-async fn query_service_instances(service_dir: &fio::DirectoryProxy) -> Result<Vec<String>, Error> {
-    let instances = fuchsia_fs::directory::readdir(service_dir)
-        .await
-        .map_err(|e| anyhow!("{e:?}"))?
-        .into_iter()
-        .map(|entry| entry.name)
-        .collect::<Vec<_>>();
-
-    Ok(instances)
 }
 
 async fn run_offers_server(
@@ -108,25 +100,36 @@ async fn test_basic_driver() -> Result<()> {
     device_watcher::recursive_wait(&devfs_client, "sys/test").await?;
 
     // Connect to the device. We have already received an ack from the driver, but sometimes
-    // seeing the item in the service directory doesn't happen immediately. So we loop until it
-    // shows up.
-    let mut instances: Vec<String>;
-    let mut attempts: u32 = 0;
-    loop {
-        let service = realm.open_service::<ctf::ServiceMarker>().await?;
-        instances = query_service_instances(&service).await?;
-        if instances.len() == 1 {
-            break;
+    // seeing the item in the service directory doesn't happen immediately. So we wait for a
+    // corresponding directory watcher event.
+    let service = realm.open_service::<ctf::ServiceMarker>().await?;
+    let mut watcher = fuchsia_fs::directory::Watcher::new(&service).await?;
+    let mut instances: HashSet<String> = Default::default();
+    let mut event = None;
+    while instances.len() != 1 {
+        event = watcher.next().await;
+        let Some(Ok(ref message)) = event else { break };
+        let filename = message.filename.as_path().to_str().unwrap().to_owned();
+        if filename == "." {
+            continue;
         }
-
-        attempts += 1;
-        if attempts > 100 {
-            return Err(anyhow!("No instance found within the service directory."));
+        match message.event {
+            WatchEvent::ADD_FILE | WatchEvent::EXISTING => _ = instances.insert(filename),
+            WatchEvent::REMOVE_FILE => _ = instances.remove(&filename),
+            WatchEvent::IDLE => {}
+            WatchEvent::DELETED => break,
         }
     }
+    if instances.len() != 1 {
+        return Err(anyhow!(
+            "Expected to find one instance within the service directory. \
+            Last event: {event:?}. Instances: {instances:?}"
+        ));
+    }
 
-    let service_instance =
-        realm.connect_to_service_instance::<ctf::ServiceMarker>(instances.first().unwrap()).await?;
+    let service_instance = realm
+        .connect_to_service_instance::<ctf::ServiceMarker>(instances.iter().next().unwrap())
+        .await?;
     let device = service_instance.connect_to_device()?;
 
     // Talk to the device!
