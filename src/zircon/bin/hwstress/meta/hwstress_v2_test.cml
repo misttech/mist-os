@@ -15,10 +15,9 @@
     use: [
         {
             protocol: [
+                "fuchsia.kernel.ProfileResource",
                 "fuchsia.kernel.Stats",
                 "fuchsia.process.Launcher",
-                "fuchsia.scheduler.ProfileProvider",
-                "fuchsia.scheduler.RoleManager",
             ],
         },
     ],

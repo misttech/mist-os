@@ -5,9 +5,10 @@
 #ifndef SRC_ZIRCON_BIN_HWSTRESS_PROFILE_MANAGER_H_
 #define SRC_ZIRCON_BIN_HWSTRESS_PROFILE_MANAGER_H_
 
-#include <fuchsia/scheduler/cpp/fidl.h>
+#include <fuchsia/kernel/cpp/fidl.h>
 #include <lib/sys/cpp/service_directory.h>
 #include <lib/zx/profile.h>
+#include <lib/zx/resource.h>
 #include <lib/zx/result.h>
 #include <lib/zx/thread.h>
 #include <zircon/compiler.h>
@@ -31,7 +32,7 @@ class ProfileManager {
   static std::unique_ptr<ProfileManager> CreateFromEnvironment();
 
   // Create a new profile manager.
-  explicit ProfileManager(fuchsia::scheduler::ProfileProviderSyncPtr profile_provider);
+  explicit ProfileManager(zx::resource profile_resource_);
 
   // Apply a given affinity mask to the given thread.
   //
@@ -57,7 +58,7 @@ class ProfileManager {
                                     std::function<zx::result<zx::profile>(T)> create_fn,
                                     const zx::thread& thread);
 
-  fuchsia::scheduler::ProfileProviderSyncPtr profile_provider_;
+  zx::resource profile_resource_;
   std::mutex mutex_;
   std::unordered_map<uint32_t, zx::profile> affinity_profiles_ __TA_GUARDED(mutex_);
   std::unordered_map<uint32_t, zx::profile> priority_profiles_ __TA_GUARDED(mutex_);

@@ -4,8 +4,7 @@
 
 #include "profile_manager.h"
 
-#include <fuchsia/scheduler/cpp/fidl.h>
-#include <lib/sys/cpp/service_directory.h>
+#include <lib/fdio/directory.h>
 #include <lib/zx/profile.h>
 #include <lib/zx/result.h>
 #include <threads.h>
@@ -29,36 +28,45 @@ zx::unowned<zx::thread> HandleFromThread(std::thread* thread) {
 }
 
 std::unique_ptr<ProfileManager> ProfileManager::CreateFromEnvironment() {
-  std::shared_ptr<sys::ServiceDirectory> svc = sys::ServiceDirectory::CreateFromNamespace();
-  if (svc == nullptr) {
-    return nullptr;
-  }
+  zx::channel channel0, channel1;
+  zx_status_t status;
 
-  fuchsia::scheduler::ProfileProviderSyncPtr profile_provider;
-  zx_status_t status = svc->Connect(profile_provider.NewRequest());
+  status = zx::channel::create(0u, &channel0, &channel1);
   if (status != ZX_OK) {
     return nullptr;
   }
 
-  return std::make_unique<ProfileManager>(std::move(profile_provider));
+  status = fdio_service_connect(
+      (std::string("/svc/") + fuchsia::kernel::ProfileResource::Name_).c_str(), channel0.release());
+  if (status != ZX_OK) {
+    return nullptr;
+  }
+
+  zx::resource profile_resource;
+  fuchsia::kernel::ProfileResource_SyncProxy proxy(std::move(channel1));
+  status = proxy.Get(&profile_resource);
+  if (status != ZX_OK) {
+    return nullptr;
+  }
+
+  return std::make_unique<ProfileManager>(std::move(profile_resource));
 }
 
-ProfileManager::ProfileManager(fuchsia::scheduler::ProfileProviderSyncPtr profile_provider)
-    : profile_provider_(std::move(profile_provider)) {}
+ProfileManager::ProfileManager(zx::resource profile_resource)
+    : profile_resource_(std::move(profile_resource)) {}
 
 zx_status_t ProfileManager::SetThreadAffinity(const zx::thread& thread, uint32_t mask) {
   return CreateAndApplyProfile<uint32_t>(
       &affinity_profiles_, mask,
       [this](uint32_t mask) -> zx::result<zx::profile> {
         zx::profile profile;
-        zx_status_t server_status;
-        zx_status_t status =
-            profile_provider_->GetCpuAffinityProfile({mask}, &server_status, &profile);
+        zx_profile_info_t info = {
+            .flags = ZX_PROFILE_INFO_FLAG_CPU_MASK,
+            .cpu_affinity_mask = {mask},
+        };
+        zx_status_t status = zx::profile::create(profile_resource_, 0u, &info, &profile);
         if (status != ZX_OK) {
           return zx::error(status);
-        }
-        if (server_status != ZX_OK) {
-          return zx::error(server_status);
         }
         return zx::ok(std::move(profile));
       },
@@ -74,15 +82,13 @@ zx_status_t ProfileManager::SetThreadPriority(const zx::thread& thread, uint32_t
       &priority_profiles_, priority,
       [this](uint32_t priority) -> zx::result<zx::profile> {
         zx::profile profile;
-        zx_status_t server_status;
-        zx_status_t status = profile_provider_->GetProfile(
-            priority, fxl::StringPrintf("hwstress-priority-%d", priority), &server_status,
-            &profile);
+        zx_profile_info_t info = {
+            .flags = ZX_PROFILE_INFO_FLAG_PRIORITY,
+            .priority = static_cast<int32_t>(priority),
+        };
+        zx_status_t status = zx::profile::create(profile_resource_, 0u, &info, &profile);
         if (status != ZX_OK) {
           return zx::error(status);
-        }
-        if (server_status != ZX_OK) {
-          return zx::error(server_status);
         }
         return zx::ok(std::move(profile));
       },

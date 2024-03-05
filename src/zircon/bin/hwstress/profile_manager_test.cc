@@ -80,32 +80,5 @@ struct FakeProfileProvider : public fuchsia::scheduler::ProfileProvider {
   fuchsia::scheduler::CpuSet requested_mask{};
 };
 
-TEST(ProfileManager, ProfileProviderCalled) {
-  testing::LoopbackConnectionFactory factory;
-
-  // Create a connection to a FakeProfileProvider.
-  FakeProfileProvider provider;
-  ProfileManager manager(factory.CreateSyncPtrTo<fuchsia::scheduler::ProfileProvider>(&provider));
-
-  // Create a child thread that just blocks on a future.
-  std::promise<bool> should_wake;
-  auto worker =
-      std::make_unique<std::thread>([wake = should_wake.get_future()]() mutable { wake.get(); });
-
-  // Set thread priority. The fake gives us an invalid handle, so ignore the error.
-  (void)manager.SetThreadPriority(worker.get(), /*priority=*/13);
-  EXPECT_TRUE(provider.get_profile_called);
-  EXPECT_EQ(provider.requested_priority, 13u);
-
-  // Set thread affinity. The fake gives us an invalid handle, so ignore the error.
-  (void)manager.SetThreadAffinity(worker.get(), /*mask=*/0xaa55);
-  EXPECT_TRUE(provider.get_affinity_profile_called);
-  EXPECT_EQ(provider.requested_mask.mask[0], 0xaa55ul);
-
-  // Clean up our child thread.
-  should_wake.set_value(true);
-  worker->join();
-}
-
 }  // namespace
 }  // namespace hwstress
