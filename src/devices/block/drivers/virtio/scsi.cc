@@ -17,6 +17,7 @@
 #include <zircon/compiler.h>
 
 #include <algorithm>
+#include <optional>
 #include <utility>
 
 #include <fbl/algorithm.h>
@@ -58,6 +59,7 @@ ScsiDevice::scsi_io_slot* ScsiDevice::GetIO() {
 }
 
 void ScsiDevice::FreeIO(scsi_io_slot* io_slot) {
+  io_slot->trim_data_vmo.reset();
   io_slot->avail = true;
   active_ios_--;
   ioslot_cv_.Signal();
@@ -166,12 +168,47 @@ static void DiskOpCompletionCb(void* cookie, zx_status_t status) {
   disk_op->Complete(status);
 }
 
+zx::result<> ScsiDevice::AllocatePages(zx::vmo& vmo, fzl::VmoMapper& mapper, size_t size) {
+  const uint32_t data_size =
+      fbl::round_up(safemath::checked_cast<uint32_t>(size), zx_system_get_page_size());
+  if (zx_status_t status = zx::vmo::create(data_size, 0, &vmo); status != ZX_OK) {
+    return zx::error(status);
+  }
+
+  if (zx_status_t status = mapper.Map(vmo, 0, data_size); status != ZX_OK) {
+    zxlogf(ERROR, "Failed to map IO buffer: %s", zx_status_get_string(status));
+    return zx::error(status);
+  }
+  return zx::ok();
+}
+
 void ScsiDevice::ExecuteCommandAsync(uint8_t target, uint16_t lun, iovec cdb, bool is_write,
                                      uint32_t block_size_bytes, scsi::DiskOp* disk_op, iovec data) {
-  const block_read_write_t& rw = disk_op->op.rw;
-  const zx_handle_t data_vmo = rw.vmo;
-  const zx_off_t vmo_offset_bytes = rw.offset_vmo * block_size_bytes;
-  const size_t transfer_bytes = rw.length * block_size_bytes;
+  zx_handle_t data_vmo;
+  zx_off_t vmo_offset_bytes;
+  size_t transfer_bytes;
+  std::optional<zx::vmo> trim_data_vmo;
+
+  if (disk_op->op.command.opcode == BLOCK_OPCODE_TRIM) {
+    zx::vmo vmo;
+    trim_data_vmo = std::move(vmo);
+    fzl::VmoMapper mapper;
+    if (zx::result<> result = AllocatePages(trim_data_vmo.value(), mapper, data.iov_len);
+        result.is_error()) {
+      zxlogf(ERROR, "Failed to allocate data buffer: %s", result.status_string());
+      return;
+    }
+    memcpy(mapper.start(), data.iov_base, data.iov_len);
+
+    data_vmo = trim_data_vmo->get();
+    vmo_offset_bytes = 0;
+    transfer_bytes = data.iov_len;
+  } else {
+    const block_read_write_t& rw = disk_op->op.rw;
+    data_vmo = rw.vmo;
+    vmo_offset_bytes = rw.offset_vmo * block_size_bytes;
+    transfer_bytes = rw.length * block_size_bytes;
+  }
 
   // Map IO data into process memory.
   void* rw_data = nullptr;
@@ -208,13 +245,13 @@ void ScsiDevice::ExecuteCommandAsync(uint8_t target, uint16_t lun, iovec cdb, bo
 
   return QueueCommand(target, lun, cdb, is_write, zx::unowned_vmo(data_vmo), vmo_offset_bytes,
                       transfer_bytes, DiskOpCompletionCb, static_cast<void*>(disk_op), rw_data,
-                      vmar_mapped);
+                      vmar_mapped, std::move(trim_data_vmo));
 }
 
 void ScsiDevice::QueueCommand(uint8_t target, uint16_t lun, iovec cdb, bool is_write,
                               zx::unowned_vmo data_vmo, zx_off_t vmo_offset_bytes,
                               size_t transfer_bytes, void (*cb)(void*, zx_status_t), void* cookie,
-                              void* data, bool vmar_mapped) {
+                              void* data, bool vmar_mapped, std::optional<zx::vmo> trim_data_vmo) {
   auto cleanup = fit::defer([=] {
     if (data_vmo->is_valid() && !vmar_mapped) {
       free(data);
@@ -332,6 +369,7 @@ void ScsiDevice::QueueCommand(uint8_t target, uint16_t lun, iovec cdb, bool is_w
   io_slot->cookie = cookie;
   io_slot->request_buffers = request_buffers;
   io_slot->response = response;
+  io_slot->trim_data_vmo = std::move(trim_data_vmo);
 
   cleanup.cancel();
 
@@ -361,7 +399,7 @@ zx_status_t ScsiDevice::WorkerThread() {
     max_sectors = std::min(config_.max_sectors, SCSI_MAX_XFER_SECTORS);
   }
 
-  scsi::DiskOptions options(/*check_unmap_support=*/false, /*use_mode_sense_6=*/true,
+  scsi::DiskOptions options(/*check_unmap_support=*/true, /*use_mode_sense_6=*/true,
                             /*use_read_write_12=*/false);
 
   // virtio-scsi nominally supports multiple channels, but the device support is not

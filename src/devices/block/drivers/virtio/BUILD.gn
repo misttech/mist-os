@@ -68,6 +68,8 @@ source_set("scsi_lib") {
     "//src/devices/block/lib/scsi",
     "//src/devices/bus/lib/virtio",
     "//src/lib/ddktl",
+    "//zircon/system/ulib/fbl",
+    "//zircon/system/ulib/fzl",
     "//zircon/third_party/ulib/safemath",
   ]
 }

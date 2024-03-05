@@ -5,6 +5,7 @@
 #ifndef SRC_DEVICES_BLOCK_DRIVERS_VIRTIO_SCSI_H_
 #define SRC_DEVICES_BLOCK_DRIVERS_VIRTIO_SCSI_H_
 
+#include <lib/fzl/vmo-mapper.h>
 #include <lib/scsi/controller.h>
 #include <lib/scsi/disk.h>
 #include <lib/sync/completion.h>
@@ -18,6 +19,7 @@
 
 #include <atomic>
 #include <memory>
+#include <optional>
 
 #include <ddktl/device.h>
 #include <fbl/auto_lock.h>
@@ -66,9 +68,12 @@ class ScsiDevice : public virtio::Device, public scsi::Controller, public ddk::D
  private:
   void QueueCommand(uint8_t target, uint16_t lun, iovec cdb, bool is_write,
                     zx::unowned_vmo data_vmo, zx_off_t vmo_offset_bytes, size_t transfer_bytes,
-                    void (*cb)(void*, zx_status_t), void* cookie, void* data, bool vmar_mapped);
+                    void (*cb)(void*, zx_status_t), void* cookie, void* data, bool vmar_mapped,
+                    std::optional<zx::vmo> trim_data_vmo = std::nullopt);
 
   zx_status_t WorkerThread();
+
+  zx::result<> AllocatePages(zx::vmo& vmo, fzl::VmoMapper& mapper, size_t size);
 
   // Latched copy of virtio-scsi device configuration.
   struct virtio_scsi_config config_ TA_GUARDED(lock_) = {};
@@ -88,6 +93,8 @@ class ScsiDevice : public virtio::Device, public scsi::Controller, public ddk::D
     void* data_in_region;
     io_buffer_t* request_buffers;
     struct virtio_scsi_resp_cmd* response;
+    // Sustains the lifetime of the trim data while it is being used.
+    std::optional<zx::vmo> trim_data_vmo;
   };
   scsi_io_slot* GetIO() TA_REQ(lock_);
   void FreeIO(scsi_io_slot* io_slot) TA_REQ(lock_);

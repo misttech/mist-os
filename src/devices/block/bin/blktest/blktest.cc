@@ -22,6 +22,7 @@
 #include <zircon/syscalls.h>
 
 #include <climits>
+#include <iostream>
 #include <iterator>
 #include <limits>
 #include <memory>
@@ -719,16 +720,24 @@ TEST(BlkdevTests, blkdev_test_fifo_trim) {
     ASSERT_OK(block_client.Transaction(&request, 1));
     ASSERT_OK(vmo.read(out.get(), 0, vmo_size));
 
-    // Depending on device characteristics, reading an unmapped area will return 0xff or 0x0.
-    ASSERT_TRUE(out.get()[0] == 0x0 || out.get()[0] == 0xff, "Invalid trimmed data[0] = [0x%x]",
-                out.get()[0]);
+    if (memcmp(random_buf.get(), out.get(), vmo_size) == 0) {
+      // The data returned for unmapped blocks depends on the LBPRZ field of the Logical Block
+      // Provisioning VPD page. For now, we handle the case where some devices ignore it (e.g.,
+      // virtio-scsi with `discard=ignore` option).
+      std::cerr << "[  WARNING ] "
+                << "The TRIM command was issued, but the blocks were not trimmed. " << std::endl;
+    } else {
+      // Depending on device characteristics, reading an unmapped area will return 0xff or 0x0.
+      ASSERT_TRUE(out.get()[0] == 0x0 || out.get()[0] == 0xff, "Invalid trimmed data[0] = [0x%x]",
+                  out.get()[0]);
 
-    // Initialize check_buffer values to 0x0 or 0xff
-    std::unique_ptr<uint8_t[]> check_buf(new uint8_t[vmo_size]());
-    memset(check_buf.get(), out.get()[0], vmo_size);
+      // Initialize check_buffer values to 0x0 or 0xff
+      std::unique_ptr<uint8_t[]> check_buf(new uint8_t[vmo_size]());
+      memset(check_buf.get(), out.get()[0], vmo_size);
 
-    ASSERT_EQ(memcmp(check_buf.get(), out.get(), vmo_size), 0,
-              "Read data not equal to trimmed data(0x%x)", out.get()[0]);
+      ASSERT_EQ(memcmp(check_buf.get(), out.get(), vmo_size), 0,
+                "Read data not equal to trimmed data(0x%x)", out.get()[0]);
+    }
   }
 
   // Close the current vmo
