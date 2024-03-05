@@ -378,6 +378,7 @@ class CatapultConverterTest(unittest.TestCase):
             publish.CatapultConverter.from_env(
                 [self._test_fuchsia_perf_json],
                 _EXPECTED_METRICS_FILE,
+                env={},
                 current_time=12345,
                 runtime_deps_dir=self._temp_dir.name,
                 subprocess_check_call=subprocess_check_call,
