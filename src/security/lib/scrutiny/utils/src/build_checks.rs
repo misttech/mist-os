@@ -17,7 +17,7 @@ use {
     std::fmt::Display,
     std::fs::read_to_string,
     std::path::Path,
-    std::str::from_utf8,
+    std::str::{from_utf8, FromStr},
     thiserror::Error,
 };
 
@@ -56,6 +56,23 @@ pub enum ValidationError {
     FailedToParseContentsToString { content_source: String, error: String },
     #[error("Validation error: Content could not be parsed as a key-value map. Content source: {content_source}, error: {error}")]
     FailedToParseContentsAsKeyValueMap { content_source: String, error: String },
+    #[error("Validation error: Content could not be parsed as valid JSON. Content source: {content_source}, error: {error}")]
+    FailedToParseContentsAsJson { content_source: String, error: String },
+    #[error("Validation error: Cannot handle JSON key-value pair where value is an array or object. Found value: {found}, Content source: {content_source}")]
+    UnableToHandleJsonContent { found: String, content_source: String },
+    #[error("Validation error: The value type found in a JSON key-value check does not match the policy type. Found value: {found}, Found type: {found_type}, Policy value: {policy}, Content source: {content_source}")]
+    ContentAndPolicyJsonTypeMismatch {
+        found: String,
+        found_type: String,
+        policy: String,
+        content_source: String,
+    },
+    #[error("Validation failure: Content MUST contain JSON key-value \"{expected_key}\":{expected_value} but does not.\nContent source: {content_source}")]
+    ContentMustContainsJsonKeyValueMissingOrIncorrect {
+        expected_key: String,
+        expected_value: String,
+        content_source: String,
+    },
     #[error("Validation failure: Content MUST contain {expected_key}={expected_value}, but is missing key {expected_key}. Content source: {content_source}")]
     ContentMustContainsKeyValueKeyMissing {
         expected_key: String,
@@ -69,7 +86,13 @@ pub enum ValidationError {
         found_value: String,
         content_source: String,
     },
-    #[error("Validation failure: additional_boot_args MUST NOT contain {expected_key}={expected_value}, but does. Content source: {content_source}")]
+    #[error("Validation failure: Content MUST NOT contain JSON key-value \"{expected_key}\":{expected_value}, but does. Content source: {content_source}")]
+    ContentMustNotContainsJsonHasKeyValue {
+        expected_key: String,
+        expected_value: String,
+        content_source: String,
+    },
+    #[error("Validation failure: Content MUST NOT contain {expected_key}={expected_value}, but does. Content source: {content_source}")]
     ContentMustNotContainsHasKeyValue {
         expected_key: String,
         expected_value: String,
@@ -101,11 +124,36 @@ impl ValidationError {
             _ => self,
         }
     }
+
+    /// Replaces `self` with another error that also stores the provided `content_source`.
+    fn with_content_source(self, content_source: String) -> Self {
+        match self {
+            ValidationError::FailedToParseContentsAsJson { content_source: _, error } => {
+                ValidationError::FailedToParseContentsAsJson { content_source, error }
+            }
+            ValidationError::UnableToHandleJsonContent { found, .. } => {
+                ValidationError::UnableToHandleJsonContent { found, content_source }
+            }
+            ValidationError::ContentAndPolicyJsonTypeMismatch {
+                found, found_type, policy, ..
+            } => ValidationError::ContentAndPolicyJsonTypeMismatch {
+                found,
+                found_type,
+                policy,
+                content_source,
+            },
+            _ => self,
+        }
+    }
 }
 
 /// The type of content to expect when performing ContentChecks.
 #[derive(Deserialize, Serialize)]
 pub enum ContentType {
+    /// JsonKeyValue currently handles bool, number, or string values from target JSON files.
+    /// The value in the policy file is the expected value as a string, e.g. "true" for bool.
+    JsonKeyValue(String, String),
+    /// KeyValuePair expects the delimiter to be `=`, for example `key=value`.
     KeyValuePair(String, String),
     String(String),
 }
@@ -491,6 +539,26 @@ fn file_contents_must_contain(
     if let Some(must_contain) = &checks.must_contain {
         for check in must_contain {
             match check {
+                ContentType::JsonKeyValue(key, value) => {
+                    match json_contents_contain_key_value_pair(key, value, content_str) {
+                        Ok(contains) => {
+                            if !contains {
+                                errors.push(
+                                    ValidationError::ContentMustContainsJsonKeyValueMissingOrIncorrect {
+                                        expected_key: key.to_string(),
+                                        expected_value: value.to_string(),
+                                        content_source: content_source.to_string(),
+                                    },
+                                );
+                                continue;
+                            }
+                        }
+                        Err(e) => {
+                            errors.push(e.with_content_source(content_source.to_string()));
+                            continue;
+                        }
+                    }
+                }
                 ContentType::KeyValuePair(key, value) => {
                     let mapping = match parse_key_value(content_str) {
                         Ok(map) => map,
@@ -548,6 +616,26 @@ fn file_contents_must_not_contain(
     if let Some(must_not_contain) = &checks.must_not_contain {
         for check in must_not_contain {
             match check {
+                ContentType::JsonKeyValue(key, value) => {
+                    match json_contents_contain_key_value_pair(key, value, content_str) {
+                        Ok(contains) => {
+                            if contains {
+                                errors.push(
+                                    ValidationError::ContentMustNotContainsJsonHasKeyValue {
+                                        expected_key: key.to_string(),
+                                        expected_value: value.to_string(),
+                                        content_source: content_source.to_string(),
+                                    },
+                                );
+                                continue;
+                            }
+                        }
+                        Err(e) => {
+                            errors.push(e.with_content_source(content_source.to_string()));
+                            continue;
+                        }
+                    }
+                }
                 ContentType::KeyValuePair(key, value) => {
                     let mapping = match parse_key_value(content_str) {
                         Ok(map) => map,
@@ -630,6 +718,96 @@ fn file_contents_match_golden(
     errors
 }
 
+fn json_contents_contain_key_value_pair(
+    key: &str,
+    value: &str,
+    content_str: &str,
+) -> Result<bool, ValidationError> {
+    let mapping: serde_json::Value = match serde_json::from_str(content_str) {
+        Ok(map) => map,
+        Err(e) => {
+            return Err(ValidationError::FailedToParseContentsAsJson {
+                content_source: String::new(),
+                error: e.to_string(),
+            });
+        }
+    };
+
+    match &mapping[key] {
+        serde_json::Value::Null => {
+            // Assumption: found null values are treated as absent from the found mapping.
+            // This logic will need to be updated if we actually need to check for
+            // presence of null values, e.g. {"key": null}.
+            Ok(false)
+        }
+        serde_json::Value::Bool(found_value) => {
+            // Policy specifies boolean values as string. Parse and compare here.
+            match value {
+                "true" => Ok(*found_value),
+                "false" => Ok(!found_value),
+                _ => Err(ValidationError::ContentAndPolicyJsonTypeMismatch {
+                    found: found_value.to_string(),
+                    found_type: "Bool".to_string(),
+                    policy: value.to_string(),
+                    content_source: String::new(),
+                }),
+            }
+        }
+        serde_json::Value::Number(found_value) => {
+            // Per serde_json implementation and docs, Number may be i64, u64, or f64.
+            if found_value.is_i64() {
+                match i64::from_str(value) {
+                    Ok(policy_val) => return Ok(policy_val == found_value.as_i64().unwrap()),
+                    Err(_) => {
+                        return Err(ValidationError::ContentAndPolicyJsonTypeMismatch {
+                            found: found_value.to_string(),
+                            found_type: "Number i64".to_string(),
+                            policy: value.to_string(),
+                            content_source: String::new(),
+                        });
+                    }
+                }
+            }
+            if found_value.is_u64() {
+                match u64::from_str(value) {
+                    Ok(policy_val) => return Ok(policy_val == found_value.as_u64().unwrap()),
+                    Err(_) => {
+                        return Err(ValidationError::ContentAndPolicyJsonTypeMismatch {
+                            found: found_value.to_string(),
+                            found_type: "Number u64".to_string(),
+                            policy: value.to_string(),
+                            content_source: String::new(),
+                        });
+                    }
+                }
+            }
+            if found_value.is_f64() {
+                match f64::from_str(value) {
+                    Ok(policy_val) => return Ok(policy_val == found_value.as_f64().unwrap()),
+                    Err(_) => {
+                        return Err(ValidationError::ContentAndPolicyJsonTypeMismatch {
+                            found: found_value.to_string(),
+                            found_type: "Number f64".to_string(),
+                            policy: value.to_string(),
+                            content_source: String::new(),
+                        });
+                    }
+                }
+            }
+            // Reaching this error likely means a bug in serde_json.
+            Err(ValidationError::UnableToHandleJsonContent {
+                found: found_value.to_string(),
+                content_source: String::new(),
+            })
+        }
+        serde_json::Value::String(found_value) => Ok(found_value == value),
+        val => Err(ValidationError::UnableToHandleJsonContent {
+            found: val.to_string(),
+            content_source: String::new(),
+        }),
+    }
+}
+
 impl FileValidator for PackageFileValidator {
     fn validate_file(
         check: &FileCheckSpec,
@@ -710,6 +888,7 @@ mod tests {
         anyhow::{anyhow, Result},
         fuchsia_archive::write as far_write,
         maplit::hashmap,
+        serde_json::json,
         std::{
             collections::{BTreeMap, HashMap, HashSet},
             io::{BufWriter, Cursor, Read, Write},
@@ -1324,6 +1503,92 @@ mod tests {
     }
 
     #[test]
+    fn test_validate_file_contents_invalid_json_error() {
+        let expected_json_kvp =
+            ContentType::JsonKeyValue("some_config_value".to_string(), "true".to_string());
+        let checks = ContentCheckSpec {
+            must_contain: Some(vec![expected_json_kvp]),
+            must_not_contain: None,
+            matches_golden: None,
+        };
+        let content_string = "some text that is not valid json";
+        let content_bytes = content_string.as_bytes().to_vec();
+        let content_source = "content_source".to_string();
+
+        let errors = validate_file_contents(&checks, content_bytes, &content_source);
+
+        assert_eq!(errors.len(), 1);
+        match &errors[0] {
+            ValidationError::FailedToParseContentsAsJson { content_source: reported, error: _ } => {
+                // Check that the error reports the content source.
+                assert_eq!(content_source, *reported)
+            }
+            e => assert!(false, "Unexpected error from failure or error case test: {}", e),
+        };
+    }
+
+    #[test]
+    fn test_validate_file_contents_must_contain_json_kvp_success() {
+        let expected_json_kvp =
+            ContentType::JsonKeyValue("some_config_value".to_string(), "true".to_string());
+        let checks = ContentCheckSpec {
+            must_contain: Some(vec![expected_json_kvp]),
+            must_not_contain: None,
+            matches_golden: None,
+        };
+
+        // A policy specifying "true" will match both the string and bool forms of json content.
+        for content_string in [
+            json!({"some_config_value": true}).to_string(),
+            json!({"some_config_value": "true"}).to_string(),
+        ]
+        .into_iter()
+        {
+            let content_bytes = content_string.as_bytes().to_vec();
+            let content_source = "content_source".to_string();
+
+            let errors = validate_file_contents(&checks, content_bytes, &content_source);
+
+            assert_eq!(errors.len(), 0);
+        }
+    }
+
+    #[test]
+    fn test_validate_file_contents_must_contain_json_kvp_failure() {
+        let expected_key = "some_config_value".to_string();
+        let expected_value = "true".to_string();
+        let expected_json_kvp =
+            ContentType::JsonKeyValue(expected_key.clone(), expected_value.clone());
+        let checks = ContentCheckSpec {
+            must_contain: Some(vec![expected_json_kvp]),
+            must_not_contain: None,
+            matches_golden: None,
+        };
+        let content_string = json!({
+            "some_config_value": false
+        })
+        .to_string();
+        let content_bytes = content_string.as_bytes().to_vec();
+        let content_source = "content_source".to_string();
+
+        let errors = validate_file_contents(&checks, content_bytes, &content_source);
+
+        assert_eq!(errors.len(), 1);
+        match &errors[0] {
+            ValidationError::ContentMustContainsJsonKeyValueMissingOrIncorrect {
+                expected_key: reported_key,
+                expected_value: reported_value,
+                content_source: reported,
+            } => {
+                assert_eq!(expected_key.to_string(), *reported_key);
+                assert_eq!(expected_value.to_string(), *reported_value);
+                assert_eq!(content_source, *reported)
+            }
+            e => assert!(false, "Unexpected error from failure or error case test: {}", e),
+        };
+    }
+
+    #[test]
     fn test_validate_file_contents_must_contain_kvp_success() {
         let expected_key = "key";
         let expected_value = "value";
@@ -1450,6 +1715,67 @@ mod tests {
             }
             e => assert!(false, "Unexpected error from failure or error case test: {}", e),
         }
+    }
+
+    #[test]
+    fn test_validate_file_contents_must_not_contain_json_kvp_success() {
+        let expected_key = "key";
+        let expected_value = "value";
+        let checks = ContentCheckSpec {
+            must_contain: None,
+            must_not_contain: Some(vec![ContentType::JsonKeyValue(
+                expected_key.to_string(),
+                expected_value.to_string(),
+            )]),
+            matches_golden: None,
+        };
+        let content_string = json!({
+            "some_other_key": "some_other_value"
+        })
+        .to_string();
+        let content_bytes = content_string.as_bytes().to_vec();
+        let content_source = "content_source".to_string();
+
+        let errors = validate_file_contents(&checks, content_bytes, &content_source);
+
+        assert_eq!(errors.len(), 0);
+    }
+
+    #[test]
+    fn test_validate_file_contents_must_not_contain_json_kvp_failure() {
+        let expected_key = "key";
+        let expected_value = "value";
+        let checks = ContentCheckSpec {
+            must_contain: None,
+            must_not_contain: Some(vec![ContentType::JsonKeyValue(
+                expected_key.to_string(),
+                expected_value.to_string(),
+            )]),
+            matches_golden: None,
+        };
+        let content_string = json!({
+            expected_key.to_string(): expected_value.to_string()
+        })
+        .to_string();
+
+        let content_bytes = content_string.as_bytes().to_vec();
+        let content_source = "content_source".to_string();
+
+        let errors = validate_file_contents(&checks, content_bytes, &content_source);
+
+        assert_eq!(errors.len(), 1);
+        match &errors[0] {
+            ValidationError::ContentMustNotContainsJsonHasKeyValue {
+                expected_key: reported_key,
+                expected_value: reported_value,
+                content_source: reported,
+            } => {
+                assert_eq!(expected_key.to_string(), *reported_key);
+                assert_eq!(expected_value.to_string(), *reported_value);
+                assert_eq!(content_source, *reported)
+            }
+            e => assert!(false, "Unexpected error from failure or error case test: {}", e),
+        };
     }
 
     #[test]
@@ -1664,6 +1990,218 @@ mod tests {
                 assert_eq!(golden_file_path, golden_path);
             }
             e => assert!(false, "Unexpected error from failure or error case test: {}", e),
+        }
+    }
+
+    #[test]
+    fn test_json_contents_contains_parse_error() {
+        let key = "key";
+        let value = "value";
+        let content_str = "non valid json";
+
+        let res = json_contents_contain_key_value_pair(key, value, content_str);
+
+        match res {
+            Ok(_) => assert!(
+                false,
+                "Unexpectedly did not return error from attempting to parse invalid json"
+            ),
+            Err(e) => match e {
+                ValidationError::FailedToParseContentsAsJson { content_source: _, error: _ } => {}
+                e => assert!(false, "Unexpected error from failure or error case test: {}", e),
+            },
+        }
+    }
+
+    #[test]
+    fn test_json_contents_contains_handles_u64_number_success() {
+        let key = "key";
+        // Must be able to parse value as u64.
+        let value = "15";
+        let content_str = json!({
+            "key": 15
+        })
+        .to_string();
+
+        let res = json_contents_contain_key_value_pair(key, value, &content_str)
+            .expect("failed to check json containing number value");
+
+        assert!(res)
+    }
+
+    #[test]
+    fn test_json_contents_contains_handles_u64_number_failure() {
+        let key = "key";
+        // Must be able to parse value as u64.
+        let value = "32";
+        let content_str = json!({
+            "key": 15
+        })
+        .to_string();
+
+        let res = json_contents_contain_key_value_pair(key, value, &content_str)
+            .expect("failed to check json containing number value");
+
+        assert!(!res)
+    }
+
+    #[test]
+    fn test_json_contents_contains_handles_i64_number_success() {
+        let key = "key";
+        // Must be able to parse value as i64. This means negative values in serde_json's definition.
+        let value = "-15";
+        let content_str = json!({
+            "key": -15
+        })
+        .to_string();
+
+        let res = json_contents_contain_key_value_pair(key, value, &content_str)
+            .expect("failed to check json containing number value");
+
+        assert!(res)
+    }
+
+    #[test]
+    fn test_json_contents_contains_handles_i64_number_failure() {
+        let key = "key";
+        // Must be able to parse value as i64. This means negative values in serde_json's definition.
+        let value = "-32";
+        let content_str = json!({
+            "key": -15
+        })
+        .to_string();
+
+        let res = json_contents_contain_key_value_pair(key, value, &content_str)
+            .expect("failed to check json containing number value");
+
+        assert!(!res)
+    }
+
+    #[test]
+    fn test_json_contents_contains_handles_f64_number_success() {
+        let key = "key";
+        // Must be able to parse value as f64.
+        let value = "1.5";
+        let content_str = json!({
+            "key": 1.5
+        })
+        .to_string();
+
+        let res = json_contents_contain_key_value_pair(key, value, &content_str)
+            .expect("failed to check json containing number value");
+
+        assert!(res)
+    }
+
+    #[test]
+    fn test_json_contents_contains_handles_f64_number_failure() {
+        let key = "key";
+        // Must be able to parse value as f64.
+        let value = "3.245";
+        let content_str = json!({
+            "key": 1.5
+        })
+        .to_string();
+
+        let res = json_contents_contain_key_value_pair(key, value, &content_str)
+            .expect("failed to check json containing number value");
+
+        assert!(!res)
+    }
+
+    #[test]
+    fn test_json_contents_contains_handles_number_type_mismatch() {
+        // Policy has float, content has u64.
+        let key = "key";
+        let value = "3.245";
+        let content_str = json!({
+            "key": 15
+        })
+        .to_string();
+
+        let res = json_contents_contain_key_value_pair(key, value, &content_str);
+
+        match res {
+            Ok(_) => assert!(
+                false,
+                "Unexpectedly did not return error from attempting to compare different json types"
+            ),
+            Err(e) => match e {
+                ValidationError::ContentAndPolicyJsonTypeMismatch { .. } => {}
+                e => assert!(false, "Unexpected error from failure or error case test: {}", e),
+            },
+        }
+    }
+
+    #[test]
+    fn test_json_contents_contains_handles_bool_type_mismatch() {
+        // Policy expects something other than bool, content has bool.
+        let key = "key";
+        let value = "3.245";
+        let content_str = json!({
+            "key": true
+        })
+        .to_string();
+
+        let res = json_contents_contain_key_value_pair(key, value, &content_str);
+
+        match res {
+            Ok(_) => assert!(
+                false,
+                "Unexpectedly did not return error from attempting to compare different json types"
+            ),
+            Err(e) => match e {
+                ValidationError::ContentAndPolicyJsonTypeMismatch { .. } => {}
+                e => assert!(false, "Unexpected error from failure or error case test: {}", e),
+            },
+        }
+    }
+
+    #[test]
+    fn test_json_contents_contains_does_not_handle_array() {
+        let key = "key";
+        let value = "value";
+        let content_str = json!({
+            "key": ["array", "of", "values"]
+        })
+        .to_string();
+
+        let res = json_contents_contain_key_value_pair(key, value, &content_str);
+
+        match res {
+            Ok(_) => assert!(
+                false,
+                "Unexpectedly did not return error from attempting to compare different json types"
+            ),
+            Err(e) => match e {
+                ValidationError::UnableToHandleJsonContent { .. } => {}
+                e => assert!(false, "Unexpected error from failure or error case test: {}", e),
+            },
+        }
+    }
+
+    #[test]
+    fn test_json_contents_contains_does_not_handle_object() {
+        let key = "key";
+        let value = "value";
+        let content_str = json!({
+            "key": {
+                "some_other_object_key": "value"
+            }
+        })
+        .to_string();
+
+        let res = json_contents_contain_key_value_pair(key, value, &content_str);
+
+        match res {
+            Ok(_) => assert!(
+                false,
+                "Unexpectedly did not return error from attempting to compare different json types"
+            ),
+            Err(e) => match e {
+                ValidationError::UnableToHandleJsonContent { .. } => {}
+                e => assert!(false, "Unexpected error from failure or error case test: {}", e),
+            },
         }
     }
 
