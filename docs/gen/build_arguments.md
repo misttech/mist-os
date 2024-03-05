@@ -6380,6 +6380,16 @@ From //third_party/pigweed/src/third_party/boringssl/boringssl.gni:25
 
 From //third_party/pigweed/src/third_party/emboss/emboss.gni:24
 
+### pw_third_party_emboss_USE_NEW_SOURCES
+
+If true, use latest `sources` list in emboss_cc_library target.
+If false, use old `sources` list (for compatibility with Emboss versions
+earlier than v2024.0304.184309).
+
+**Current value (from the default):** `true`
+
+From //third_party/pigweed/src/third_party/emboss/emboss.gni:29
+
 ### pw_third_party_mbedtls_CONFIG_HEADER
 
 **Current value (from the default):** `"//third_party/pigweed/src/third_party/mbedtls/configs/config_default.h"`
