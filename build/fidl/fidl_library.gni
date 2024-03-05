@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 import("//build/config/fuchsia/platform_version.gni")
+import("//build/config/fuchsia/target_api_level.gni")
 import("//build/fidl/fidl_ir.gni")
 import("//build/fidl/toolchain.gni")
 import("//build/json/validate_json.gni")
@@ -114,7 +115,7 @@ template("fidl_library") {
     fidl_library_name = library_name
     gen_dir = target_gen_dir
     json_representation = fidl_ir_json
-    target_api_level = platform_version.fidl_fuchsia_api_level
+    target_api_level = fidl_fuchsia_api_level
   }
 
   summary_file_json = "$target_gen_dir/$target_name.api_summary.json"

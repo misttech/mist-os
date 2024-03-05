@@ -2,6 +2,11 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+# This file should only be imported by build files that need to know the current
+# set of API levels or to update that set. This includes IDK, SDK, and FIDL.
+# For the target API level of the current build, see
+# //build/config/fuchsia/target_api_level.gni.
+
 _script = "get_platform_version.py"
 version_history_path = "//sdk/version_history.json"
 _process_versions_args = [
@@ -15,40 +20,11 @@ platform_version =
     exec_script(python_exe_src, _process_versions_args, "json", [ _script ])
 
 declare_args() {
-  # If true, build for N+1 api level, where N is platform_version.in_development_api_level
+  # If true, build for N+1 api level, where N is
+  # platform_version.in_development_api_level.
   bump_api_level = false
 
-  # Allows building the platform source code for a specific API level.
-  override_target_api_level = -1
-
   freeze_api_level = false
-}
-
-# TODO(https://fxbug.dev/325448727): Move this value back into the if
-# statement below and prefix it with `_` once the bug is fixed.
-# Due to limitations in Clang, we use `UINT32_MAX` to represent the HEAD API
-# level. See zircon/availability.h.
-# TODO(https://fxbug.dev/321269965): Resolve this FIDL-Clang discrepancy.
-# LINT.IfChange(fuchsia_head_c_value)
-CLANG_FUCHSIA_HEAD_VALUE = 4294967295
-
-# LINT.ThenChange(//zircon/system/public/zircon/availability.h:fuchsia_head_c_value)
-
-if (override_target_api_level == -1) {
-  # The platform is built for "HEAD" by default. "HEAD" is an artificial API
-  # level that represents the bleeding edge of the Fuchsia API surface. It is
-  # not really meant to be used by SDK users unless they want to try some
-  # unreleased APIs.
-  platform_version.clang_fuchsia_api_level = CLANG_FUCHSIA_HEAD_VALUE
-
-  # By default the FIDL APIs are compiled at the "LEGACY" level. This level is
-  # only meant to be used in the platform itself, SDK users aren't expected to
-  # target it. It's a higher level than the "HEAD" API level, in other words,
-  # "HEAD" is a subset of "LEGACY".
-  platform_version.fidl_fuchsia_api_level = "LEGACY"
-} else {
-  platform_version.clang_fuchsia_api_level = override_target_api_level
-  platform_version.fidl_fuchsia_api_level = "$override_target_api_level"
 }
 
 declare_args() {

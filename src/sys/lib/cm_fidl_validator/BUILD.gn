@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
+import("//build/config/fuchsia/target_api_level.gni")
 import("//build/rust/rustc_library.gni")
 
 rustc_library("cm_fidl_validator") {
@@ -27,7 +28,7 @@ rustc_library("cm_fidl_validator") {
 
   # TODO: https://fxbug.dev/325448727 - Make Rust support for API levels more systematic.
   features = []
-  if (platform_version.clang_fuchsia_api_level == CLANG_FUCHSIA_HEAD_VALUE) {
+  if (clang_fuchsia_api_level == CLANG_FUCHSIA_HEAD_VALUE) {
     features += [ "target_api_level_head" ]
   }
 

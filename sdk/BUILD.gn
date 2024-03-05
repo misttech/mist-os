@@ -6,6 +6,7 @@
 
 import("//build/config/build_api_module.gni")
 import("//build/config/fuchsia/platform_version.gni")
+import("//build/config/fuchsia/target_api_level.gni")
 import("//build/dart/toolchain.gni")
 import("//build/fidl/toolchain.gni")
 import("//build/sdk/config.gni")
@@ -22,6 +23,19 @@ visibility = [ ":*" ]
 
 assert(sdk_inside_supported_api_sub_build ==
        (sdk_inside_sub_build && override_target_api_level != -1))
+
+# Verify that `override_target_api_level` is actually supported.
+if (override_target_api_level != -1) {
+  _override_is_supported = false
+  foreach(supported_level, platform_version.build_time_supported_api_levels) {
+    if (supported_level == override_target_api_level) {
+      _override_is_supported = true
+    }
+  }
+  assert(
+      _override_is_supported,
+      "`override_target_api_level` (${override_target_api_level}) is not one of the supported API levels: ${platform_version.build_time_supported_api_levels}")
+}
 
 # A list of sdk_collection() targets that correspond to all
 # IDK targets in the "public" and "partner" category. For now

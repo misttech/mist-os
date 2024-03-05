@@ -3,7 +3,6 @@
 # found in the LICENSE file.
 
 import("//build/config/build_api_module.gni")
-import("//build/config/fuchsia/platform_version.gni")
 import("//build/testing/golden_files.gni")
 import("//sdk/ctf/build/ctf.gni")
 

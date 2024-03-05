@@ -9,6 +9,7 @@
 #
 # Note however that both files parse the same inputs collected from
 # sysroot_entries.gni files. See below for details.
+import("//build/config/fuchsia/target_api_level.gni")
 import("//build/sdk/sdk_atom.gni")
 
 # Collect the metadata for the SDK.

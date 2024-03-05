@@ -3,7 +3,7 @@
 # found in the LICENSE file.
 
 import("//build/config/clang/clang.gni")
-import("//build/config/fuchsia/platform_version.gni")
+import("//build/config/fuchsia/target_api_level.gni")
 import("//build/config/sysroot.gni")
 import("//build/host.gni")
 import("//build/sdk/sdk_host_tool.gni")
@@ -369,9 +369,7 @@ template("go_build") {
     }
 
     if (is_fuchsia) {
-      args += [
-        "--clang-fuchsia-api-level=${platform_version.clang_fuchsia_api_level}",
-      ]
+      args += [ "--clang-fuchsia-api-level=${clang_fuchsia_api_level}" ]
 
       # When building with an instrumented variant, ensure the binary embeds a reference
       # to the right dynamic linker path.

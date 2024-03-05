@@ -15,7 +15,7 @@
 // TODO(https://fxbug.dev/321269965): Resolve this FIDL-Clang discrepancy.
 // LINT.IfChange(fuchsia_head_c_value)
 #define FUCHSIA_HEAD 4294967295
-// LINT.ThenChange(//build/config/fuchsia/platform_version.gni:fuchsia_head_c_value)
+// LINT.ThenChange(//build/config/fuchsia/target_api_level.gni:fuchsia_head_c_value)
 
 #if defined(__Fuchsia_API_level__) && defined(__clang__)
 

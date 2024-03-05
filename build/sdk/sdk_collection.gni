@@ -3,7 +3,6 @@
 # found in the LICENSE file.
 
 import("//build/compiled_action.gni")
-import("//build/config/fuchsia/platform_version.gni")
 import("//build/json/validate_json.gni")
 import("//build/python/python_action.gni")
 import("config.gni")

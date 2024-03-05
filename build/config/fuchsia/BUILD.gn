@@ -6,7 +6,7 @@ import("//build/board.gni")
 import("//build/config/build_id.gni")
 import("//build/config/clang/clang.gni")
 import("//build/config/current_target_tuple.gni")
-import("//build/config/fuchsia/platform_version.gni")
+import("//build/config/fuchsia/target_api_level.gni")
 import("//build/config/sanitizers/sanitizer_default_options.gni")
 import("//build/config/sysroot.gni")
 import("//build/icu/third_party_icu_headers.gni")
@@ -143,11 +143,9 @@ config("compiler_target") {
 
 config("compiler_fuchsia_api_level") {
   if (is_gcc || !is_fuchsia) {
-    defines =
-        [ "__Fuchsia_API_level__=${platform_version.clang_fuchsia_api_level}" ]
+    defines = [ "__Fuchsia_API_level__=${clang_fuchsia_api_level}" ]
   } else {
-    cflags =
-        [ "-ffuchsia-api-level=${platform_version.clang_fuchsia_api_level}" ]
+    cflags = [ "-ffuchsia-api-level=${clang_fuchsia_api_level}" ]
     asmflags = cflags
     ldflags = cflags
   }
