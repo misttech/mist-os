@@ -29,7 +29,7 @@ use net_types::{
 use netemul::InterfaceConfig;
 use netstack_testing_common::{
     constants::{eth as eth_consts, ipv6 as ipv6_consts},
-    interfaces::{self, TestInterfaceExt as _},
+    interfaces,
     ndp::{
         self, assert_dad_failed, assert_dad_success, expect_dad_neighbor_solicitation,
         fail_dad_with_na, fail_dad_with_ns, send_ra, send_ra_with_router_lifetime, DadState,

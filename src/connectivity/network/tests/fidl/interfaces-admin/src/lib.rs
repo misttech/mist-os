@@ -2376,7 +2376,7 @@ async fn interface_routing_metric<N: Netstack, I: net_types::ip::Ip>(
             .join_network_with_if_config(
                 network,
                 name,
-                netemul::InterfaceConfig { name: None, metric },
+                netemul::InterfaceConfig { name: None, metric, ..Default::default() },
             )
             .await
             .expect("install interface");

@@ -235,6 +235,8 @@ pub struct InterfaceConfig<'a> {
     pub name: Option<Cow<'a, str>>,
     /// Optional default route metric.
     pub metric: Option<u32>,
+    /// Number of DAD transmits to use before marking an address as Assigned.
+    pub dad_transmits: Option<u16>,
 }
 
 /// A realm within a netemul sandbox.
@@ -887,7 +889,7 @@ impl<'a> TestEndpoint<'a> {
     pub async fn add_to_stack(
         &self,
         realm: &TestRealm<'a>,
-        InterfaceConfig { name, metric }: InterfaceConfig<'_>,
+        InterfaceConfig { name, metric, dad_transmits }: InterfaceConfig<'a>,
     ) -> Result<(
         u64,
         fnet_interfaces_ext::admin::Control,
@@ -917,6 +919,11 @@ impl<'a> TestEndpoint<'a> {
                 &fnet_interfaces_admin::Options { name, metric, ..Default::default() },
             )
             .context("create interface")?;
+        if let Some(dad_transmits) = dad_transmits {
+            let _: Option<u16> =
+                set_dad_transmits(&control, dad_transmits).await.context("set dad transmits")?;
+        }
+
         let id = control.get_id().await.context("get id")?;
         Ok((id, control, Some(device_control)))
     }
@@ -931,10 +938,10 @@ impl<'a> TestEndpoint<'a> {
     pub async fn into_interface_in_realm_with_name(
         self,
         realm: &TestRealm<'a>,
-        if_config: InterfaceConfig<'_>,
+        config: InterfaceConfig<'a>,
     ) -> Result<TestInterface<'a>> {
         let (id, control, device_control) = self
-            .add_to_stack(realm, if_config)
+            .add_to_stack(realm, config)
             .await
             .with_context(|| format!("failed to add {} to realm {}", self.name, realm.name))?;
         Ok(TestInterface {
@@ -1498,6 +1505,36 @@ impl<'a> TestInterface<'a> {
             fnet_interfaces_ext::admin::TerminalError::Terminal(reason) => Ok(reason),
         }
     }
+
+    /// Sets the number of DAD transmits on this interface.
+    ///
+    /// Returns the previous configuration value, if reported by the API.
+    pub async fn set_dad_transmits(&self, dad_transmits: u16) -> Result<Option<u16>> {
+        set_dad_transmits(self.control(), dad_transmits).await
+    }
+}
+
+async fn set_dad_transmits(
+    control: &fnet_interfaces_ext::admin::Control,
+    dad_transmits: u16,
+) -> Result<Option<u16>> {
+    control
+        .set_configuration(&fnet_interfaces_admin::Configuration {
+            ipv6: Some(fnet_interfaces_admin::Ipv6Configuration {
+                ndp: Some(fnet_interfaces_admin::NdpConfiguration {
+                    dad: Some(fnet_interfaces_admin::DadConfiguration {
+                        transmits: Some(dad_transmits),
+                        ..Default::default()
+                    }),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            }),
+            ..Default::default()
+        })
+        .await?
+        .map(|config| config.ipv6?.ndp?.dad?.transmits)
+        .map_err(|e| anyhow::anyhow!("set configuration error {e:?}"))
 }
 
 /// Get the [`socket2::Domain`] for `addr`.

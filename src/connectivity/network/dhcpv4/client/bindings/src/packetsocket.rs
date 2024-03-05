@@ -345,7 +345,7 @@ mod test {
                     mtu: netemul::DEFAULT_MTU,
                     mac: Some(Box::new(fnet_ext::MacAddress { octets: MAC_A.bytes() }.into())),
                 },
-                netemul::InterfaceConfig { name: Some("iface_a".into()), metric: None },
+                netemul::InterfaceConfig { name: Some("iface_a".into()), ..Default::default() },
             )
             .await
             .expect("join network with realm_a");
@@ -357,7 +357,7 @@ mod test {
                     mtu: netemul::DEFAULT_MTU,
                     mac: Some(Box::new(fnet_ext::MacAddress { octets: MAC_B.bytes() }.into())),
                 },
-                netemul::InterfaceConfig { name: Some("iface_b".into()), metric: None },
+                netemul::InterfaceConfig { name: Some("iface_b".into()), ..Default::default() },
             )
             .await
             .expect("join network with realm_b");
@@ -435,7 +435,7 @@ mod test {
                     mtu: netemul::DEFAULT_MTU,
                     mac: Some(Box::new(fnet_ext::MacAddress { octets: MAC.bytes() }.into())),
                 },
-                netemul::InterfaceConfig { name: Some("iface".into()), metric: None },
+                netemul::InterfaceConfig { name: Some("iface".into()), ..Default::default() },
             )
             .await
             .expect("join network with realm");

@@ -11,9 +11,7 @@ use std::{collections::HashMap, convert::TryFrom as _};
 use fidl_fuchsia_posix_socket as fposix_socket;
 
 use net_declare::{fidl_mac, fidl_subnet};
-use netstack_testing_common::{
-    constants, get_inspect_data, interfaces::TestInterfaceExt as _, realms::TestSandboxExt as _,
-};
+use netstack_testing_common::{constants, get_inspect_data, realms::TestSandboxExt as _};
 use netstack_testing_macros::netstack_test;
 use packet_formats::ethernet::testutil::ETHERNET_HDR_LEN_NO_TAG;
 
@@ -175,18 +173,19 @@ async fn inspect_devices(name: &str) {
             &network,
             "netdev-ep",
             netemul::new_endpoint_config(max_frame_size, Some(fidl_mac!("02:00:00:00:00:01"))),
-            netemul::InterfaceConfig { name: Some(NETDEV_NAME.into()), metric: None },
+            netemul::InterfaceConfig {
+                name: Some(NETDEV_NAME.into()),
+                metric: None,
+                dad_transmits: Some(u16::MAX),
+            },
         )
         .await
         .expect("failed to join network with netdevice endpoint");
+
     netdev
         .add_address_and_subnet_route(fidl_subnet!("192.168.0.1/24"))
         .await
         .expect("configure address");
-    // Set DAD transmits very high so that DAD will not complete during the test,
-    // and we can count on the link-local address that is auto-assigned to the
-    // interface to always be tentative.
-    let _: Option<u16> = netdev.set_dad_transmits(u16::MAX).await.expect("increase DAD transmits");
 
     let data =
         get_inspect_data(&realm, "netstack", "root", constants::inspect::DEFAULT_INSPECT_TREE_NAME)

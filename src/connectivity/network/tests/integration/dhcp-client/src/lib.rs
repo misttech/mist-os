@@ -173,7 +173,7 @@ async fn create_test_realm<'a, N: Netstack>(
                 mtu: netemul::DEFAULT_MTU,
                 mac: Some(Box::new(fnet_ext::MacAddress { octets: MAC.bytes() }.into())),
             },
-            netemul::InterfaceConfig { name: Some("clientiface".into()), metric: None },
+            netemul::InterfaceConfig { name: Some("clientiface".into()), ..Default::default() },
         )
         .await
         .expect("join network with realm should succeed");
@@ -194,7 +194,7 @@ async fn create_test_realm<'a, N: Netstack>(
                 mtu: netemul::DEFAULT_MTU,
                 mac: Some(Box::new(fnet_ext::MacAddress { octets: SERVER_MAC.bytes() }.into())),
             },
-            netemul::InterfaceConfig { name: Some("serveriface".into()), metric: None },
+            netemul::InterfaceConfig { name: Some("serveriface".into()), ..Default::default() },
         )
         .await
         .expect("join network with realm should succeed");

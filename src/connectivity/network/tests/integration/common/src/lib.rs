@@ -286,7 +286,7 @@ where
         .join_network_with_if_config(
             &network,
             name,
-            netemul::InterfaceConfig { name: Some(name.into()), metric },
+            netemul::InterfaceConfig { name: Some(name.into()), metric, ..Default::default() },
         )
         .await
         .context("failed to configure networking")?;

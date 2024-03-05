@@ -74,7 +74,7 @@ async fn interface_disruption<N: Netstack>(name: &str, ip_supported: IpSupported
         .join_network_with_if_config(
             &net,
             "server_ep",
-            netemul::InterfaceConfig { name: Some(SERVER_IF_NAME.into()), metric: None },
+            netemul::InterfaceConfig { name: Some(SERVER_IF_NAME.into()), ..Default::default() },
         )
         .await
         .expect("failed to join network in server realm");
