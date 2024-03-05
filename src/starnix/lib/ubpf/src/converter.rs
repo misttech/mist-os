@@ -3,10 +3,9 @@
 // found in the LICENSE file.
 
 use linux_uapi::{
-    bpf_insn, sock_filter, BPF_A, BPF_ABS, BPF_ADD, BPF_ALU, BPF_AND, BPF_DIV, BPF_DW, BPF_EXIT,
-    BPF_IMM, BPF_JA, BPF_JMP, BPF_JMP32, BPF_K, BPF_LD, BPF_LDX, BPF_LSH, BPF_MEM, BPF_MISC,
-    BPF_MOV, BPF_MUL, BPF_NEG, BPF_OR, BPF_RET, BPF_RSH, BPF_ST, BPF_SUB, BPF_TAX, BPF_TXA, BPF_X,
-    BPF_XOR,
+    bpf_insn, sock_filter, BPF_A, BPF_ABS, BPF_ADD, BPF_ALU, BPF_AND, BPF_DIV, BPF_EXIT, BPF_IMM,
+    BPF_JA, BPF_JMP, BPF_JMP32, BPF_K, BPF_LD, BPF_LDX, BPF_LSH, BPF_MEM, BPF_MISC, BPF_MOV,
+    BPF_MUL, BPF_NEG, BPF_OR, BPF_RET, BPF_RSH, BPF_ST, BPF_SUB, BPF_TAX, BPF_TXA, BPF_X, BPF_XOR,
 };
 use std::collections::HashMap;
 
@@ -289,21 +288,13 @@ pub(crate) fn cbpf_to_ebpf(bpf_code: &[sock_filter]) -> Result<Vec<bpf_insn>, Ub
                     // We're returning a particular value instead of the contents
                     // of the return register, so load that value into the return
                     // register
-                    // NB: ubpf only supports loading 64-bit immediates.  This op ors
-                    // together this instruction's immediate for the low 32
-                    // bits with the following instruction's immediate for the high
-                    // 32 bits.
                     let mut ld_instr = bpf_insn {
-                        code: (BPF_LD | BPF_IMM | BPF_DW) as u8,
+                        code: (BPF_ALU | BPF_MOV | BPF_IMM) as u8,
                         imm: bpf_instruction.k as i32,
                         ..Default::default()
                     };
                     ld_instr.set_dst_reg(REG_A);
                     ebpf_code.push(ld_instr);
-
-                    // And the high 32 bits...
-                    let dummy_instr: bpf_insn = Default::default();
-                    ebpf_code.push(dummy_instr);
                 }
 
                 let ret_instr = bpf_insn { code: (BPF_JMP | BPF_EXIT) as u8, ..Default::default() };
