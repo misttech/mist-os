@@ -232,7 +232,7 @@ void platform_mexec_prep(uintptr_t final_bootimage_addr, size_t final_bootimage_
   static_assert(kNumL3PageTables == 1, "Only 1 L3 page table is supported at this time.");
   static_assert(kNumL4PageTables == 1, "Only 1 L4 page table is supported at this time.");
 
-  // Identity map the first 8GiB of RAM
+  // Identity map the first 16GiB of RAM
   mexec_identity_aspace = VmAspace::Create(VmAspace::Type::LowKernel, "x86-64 mexec 1:1");
   DEBUG_ASSERT(mexec_identity_aspace);
 
