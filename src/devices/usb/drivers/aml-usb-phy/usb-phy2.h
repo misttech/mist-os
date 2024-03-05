@@ -7,8 +7,6 @@
 
 #include <lib/mmio/mmio.h>
 
-#include <usb/usb.h>
-
 #include "src/devices/usb/drivers/aml-usb-phy/usb-phy-base.h"
 
 namespace aml_usb_phy {
@@ -20,7 +18,7 @@ class UsbPhy2 final : public UsbPhyBase {
   UsbPhy2(uint8_t idx, fdf::MmioBuffer mmio, bool is_otg_capable, usb_mode_t dr_mode)
       : UsbPhyBase(std::move(mmio), is_otg_capable, dr_mode), idx_(idx) {}
 
-  void InitPll(const std::array<uint32_t, 8>& pll_settings);
+  void InitPll(PhyType type, const std::array<uint32_t, 8>& pll_settings);
 
   uint8_t idx() const { return idx_; }
 

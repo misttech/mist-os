@@ -11,7 +11,7 @@
 namespace aml_usb_phy {
 
 // Based on set_usb_pll() in phy-aml-new-usb2-v2.c
-void UsbPhy2::InitPll(const std::array<uint32_t, 8>& pll_settings) {
+void UsbPhy2::InitPll(PhyType type, const std::array<uint32_t, 8>& pll_settings) {
   PLL_REGISTER_40::Get()
       .FromValue(0)
       .set_value(pll_settings[0])
@@ -35,12 +35,26 @@ void UsbPhy2::InitPll(const std::array<uint32_t, 8>& pll_settings) {
   // Phy tuning for G12B
   PLL_REGISTER::Get(0x50).FromValue(pll_settings[3]).WriteTo(&mmio());
 
-  PLL_REGISTER::Get(0x54).FromValue(0x2a).WriteTo(&mmio());
+  if (type == PhyType::kG12A) {
+    PLL_REGISTER::Get(0x10).FromValue(pll_settings[4]).WriteTo(&mmio());
 
-  PLL_REGISTER::Get(0x34).FromValue(0x70000).WriteTo(&mmio());
+    // Recovery state
+    PLL_REGISTER::Get(0x38).FromValue(0).WriteTo(&mmio());
+    PLL_REGISTER::Get(0x34).FromValue(pll_settings[5]).WriteTo(&mmio());
+  } else if (type == PhyType::kG12B) {
+    PLL_REGISTER::Get(0x54).FromValue(0x2a).WriteTo(&mmio());
+    PLL_REGISTER::Get(0x34).FromValue(0x70000).WriteTo(&mmio());
+  }
 
   // Disconnect threshold
-  PLL_REGISTER::Get(0xc).FromValue(0x34).WriteTo(&mmio());
+  PLL_REGISTER::Get(0xc).FromValue(type == PhyType::kG12A ? 0x3c : 0x34).WriteTo(&mmio());
+
+  if (type == PhyType::kG12A) {
+    zx::nanosleep(zx::deadline_after(zx::usec(100)));
+    PLL_REGISTER::Get(0x38).FromValue(pll_settings[6]).WriteTo(&mmio());
+    PLL_REGISTER::Get(0x34).FromValue(pll_settings[5]).WriteTo(&mmio());
+    zx::nanosleep(zx::deadline_after(zx::usec(100)));
+  }
 }
 
 void UsbPhy2::SetModeInternal(UsbMode mode, fdf::MmioBuffer& usbctrl_mmio,

@@ -18,11 +18,12 @@ namespace aml_usb_phy {
 
 class AmlUsbPhy : public fdf::Server<fuchsia_hardware_usb_phy::UsbPhy> {
  public:
-  AmlUsbPhy(AmlUsbPhyDevice* controller,
+  AmlUsbPhy(AmlUsbPhyDevice* controller, PhyType type,
             fidl::ClientEnd<fuchsia_hardware_registers::Device> reset_register,
             std::array<uint32_t, 8> pll_settings, fdf::MmioBuffer usbctrl_mmio, zx::interrupt irq,
             std::vector<UsbPhy2> usbphy2, std::vector<UsbPhy3> usbphy3)
-      : controller_(controller),
+      : type_(type),
+        controller_(controller),
         reset_register_(std::move(reset_register)),
         usbctrl_mmio_(std::move(usbctrl_mmio)),
         usbphy2_(std::move(usbphy2)),
@@ -56,6 +57,7 @@ class AmlUsbPhy : public fdf::Server<fuchsia_hardware_usb_phy::UsbPhy> {
   void HandleIrq(async_dispatcher_t* dispatcher, async::IrqBase* irq, zx_status_t status,
                  const zx_packet_interrupt_t* interrupt);
 
+  const PhyType type_;
   AmlUsbPhyDevice* controller_;
 
   fidl::WireSyncClient<fuchsia_hardware_registers::Device> reset_register_;

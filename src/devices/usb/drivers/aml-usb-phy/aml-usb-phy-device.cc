@@ -12,7 +12,6 @@
 #include <lib/driver/component/cpp/node_add_args.h>
 
 #include <fbl/auto_lock.h>
-#include <soc/aml-common/aml-usb-phy.h>
 
 #include "src/devices/usb/drivers/aml-usb-phy/aml-usb-phy.h"
 
@@ -22,6 +21,7 @@ namespace {
 
 struct PhyMetadata {
   std::array<uint32_t, 8> pll_settings;
+  PhyType type;
   std::vector<UsbPhyMode> phy_modes;
 };
 
@@ -29,6 +29,7 @@ zx::result<PhyMetadata> ParseMetadata(
     const fidl::VectorView<fuchsia_driver_compat::wire::Metadata>& metadata) {
   PhyMetadata parsed_metadata;
   bool found_pll_settings = false;
+  bool found_phy_type = false;
   for (const auto& m : metadata) {
     if (m.type == DEVICE_METADATA_PRIVATE) {
       size_t size;
@@ -51,6 +52,28 @@ zx::result<PhyMetadata> ParseMetadata(
       }
 
       found_pll_settings = true;
+    }
+
+    if (m.type == (DEVICE_METADATA_PRIVATE_PHY_TYPE | DEVICE_METADATA_PRIVATE)) {
+      size_t size;
+      auto status = m.data.get_prop_content_size(&size);
+      if (status != ZX_OK) {
+        FDF_LOG(ERROR, "Failed to get_prop_content_size %s", zx_status_get_string(status));
+        continue;
+      }
+
+      if (size != sizeof(PhyType)) {
+        FDF_LOG(ERROR, "Unexpected metadata size: got %zu, expected %zu", size, sizeof(PhyType));
+        continue;
+      }
+
+      status = m.data.read(&parsed_metadata.type, 0, size);
+      if (status != ZX_OK) {
+        FDF_LOG(ERROR, "Failed to read %s", zx_status_get_string(status));
+        continue;
+      }
+
+      found_phy_type = true;
     }
 
     if (m.type == DEVICE_METADATA_USB_MODE) {
@@ -76,11 +99,11 @@ zx::result<PhyMetadata> ParseMetadata(
     }
   }
 
-  if (found_pll_settings) {
+  if (found_pll_settings && found_phy_type) {
     return zx::ok(parsed_metadata);
   }
 
-  FDF_LOG(ERROR, "Failed to parse metadata. Metadata needs to at least have pll_settings.");
+  FDF_LOG(ERROR, "Failed to parse metadata. Metadata needs to have pll_settings and phy_type.");
   return zx::error(ZX_ERR_NOT_FOUND);
 }
 
@@ -189,7 +212,7 @@ zx::result<> AmlUsbPhyDevice::Start() {
   }
 
   // Create and initialize device
-  device_ = std::make_unique<AmlUsbPhy>(this, std::move(reset_register),
+  device_ = std::make_unique<AmlUsbPhy>(this, parsed_metadata.type, std::move(reset_register),
                                         parsed_metadata.pll_settings, std::move(*usbctrl_mmio),
                                         std::move(irq), std::move(usbphy2), std::move(usbphy3));
 

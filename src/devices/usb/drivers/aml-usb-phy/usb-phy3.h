@@ -7,8 +7,6 @@
 
 #include <lib/mmio/mmio.h>
 
-#include <usb/usb.h>
-
 #include "src/devices/usb/drivers/aml-usb-phy/usb-phy-base.h"
 
 namespace aml_usb_phy {

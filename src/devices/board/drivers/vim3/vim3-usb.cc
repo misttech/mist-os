@@ -80,6 +80,7 @@ static const std::vector<fpbus::Bti> usb_btis{
 static const uint32_t pll_settings[] = {
     0x09400414, 0x927e0000, 0xac5f69e5, 0xfe18, 0x8000fff, 0x78000, 0xe0004, 0xe000c,
 };
+static const PhyType type = kG12B;
 
 // aml_usb_phy manages 3 different controllers:
 //  - One USB 2.0 controller that is only supports host mode.
@@ -101,6 +102,11 @@ static const std::vector<fpbus::Metadata> usb_phy_metadata{
         .data = std::vector<uint8_t>(
             reinterpret_cast<const uint8_t*>(&pll_settings),
             reinterpret_cast<const uint8_t*>(&pll_settings) + sizeof(pll_settings)),
+    }},
+    {{
+        .type = DEVICE_METADATA_PRIVATE_PHY_TYPE | DEVICE_METADATA_PRIVATE,
+        .data = std::vector<uint8_t>(reinterpret_cast<const uint8_t*>(&type),
+                                     reinterpret_cast<const uint8_t*>(&type) + sizeof(type)),
     }},
     {{
         .type = DEVICE_METADATA_USB_MODE,

@@ -97,7 +97,7 @@ zx_status_t AmlUsbPhy::InitPhy2() {
 
   // One time PLL initialization
   for (auto& phy : usbphy2_) {
-    phy.InitPll(pll_settings_);
+    phy.InitPll(type_, pll_settings_);
   }
 
   return ZX_OK;
@@ -255,7 +255,7 @@ void AmlUsbPhy::ConnectStatusChanged(ConnectStatusChangedRequest& request,
       PLL_REGISTER::Get(0x38).FromValue(pll_settings_[7]).WriteTo(mmio);
       PLL_REGISTER::Get(0x34).FromValue(pll_settings_[5]).WriteTo(mmio);
     } else {
-      phy.InitPll(pll_settings_);
+      phy.InitPll(type_, pll_settings_);
     }
   }
 

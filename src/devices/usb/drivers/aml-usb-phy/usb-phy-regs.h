@@ -59,6 +59,12 @@ class U2P_R1_V2 : public hwreg::RegisterBase<U2P_R1_V2, uint32_t> {
 
 class USB_R0_V2 : public hwreg::RegisterBase<USB_R0_V2, uint32_t> {
  public:
+  DEF_FIELD(5, 0, p30_fsel);
+  DEF_BIT(6, p30_phy_reset);
+  DEF_BIT(7, p30_test_powerdown_hsp);
+  DEF_BIT(8, p30_test_powerdown_ssp);
+  DEF_FIELD(13, 9, p30_acjt_level);
+  DEF_FIELD(16, 14, p30_tx_vboost_lvl);
   DEF_BIT(17, p30_lane0_tx2rx_loopback);
   DEF_BIT(18, p30_lane0_ext_pclk_reg);
   DEF_FIELD(28, 19, p30_pcs_rx_los_mask_val);
@@ -72,8 +78,8 @@ class USB_R1_V2 : public hwreg::RegisterBase<USB_R1_V2, uint32_t> {
   DEF_BIT(0, u3h_bigendian_gs);
   DEF_BIT(1, u3h_pme_en);
   DEF_FIELD(3, 2, u3h_hub_port_overcurrent);
-  DEF_FIELD(8, 6, u3h_hub_port_perm_attach);
-  DEF_FIELD(12, 11, u3h_host_u2_port_disable);
+  DEF_FIELD(9, 7, u3h_hub_port_perm_attach);
+  DEF_FIELD(13, 12, u3h_host_u2_port_disable);
   DEF_BIT(16, u3h_host_u3_port_disable);
   DEF_BIT(17, u3h_host_port_power_control_present);
   DEF_BIT(18, u3h_host_msi_enable);
@@ -84,6 +90,11 @@ class USB_R1_V2 : public hwreg::RegisterBase<USB_R1_V2, uint32_t> {
 
 class USB_R2_V2 : public hwreg::RegisterBase<USB_R2_V2, uint32_t> {
  public:
+  DEF_FIELD(15, 0, p30_cr_data_in);
+  DEF_BIT(16, p30_cr_read);
+  DEF_BIT(17, p30_cr_write);
+  DEF_BIT(18, p30_cr_cap_addr);
+  DEF_BIT(19, p30_cr_cap_data);
   DEF_FIELD(25, 20, p30_pcs_tx_deemph_3p5db);
   DEF_FIELD(31, 26, p30_pcs_tx_deemph_6db);
   static auto Get() { return hwreg::RegisterAddr<USB_R2_V2>(USB_R2_OFFSET); }
@@ -95,6 +106,9 @@ class USB_R3_V2 : public hwreg::RegisterBase<USB_R3_V2, uint32_t> {
   DEF_FIELD(3, 1, p30_ssc_range);
   DEF_FIELD(12, 4, p30_ssc_ref_clk_sel);
   DEF_BIT(13, p30_ref_ssp_en);
+  DEF_FIELD(18, 16, p30_los_bias);
+  DEF_FIELD(23, 19, p30_los_level);
+  DEF_FIELD(31, 24, p30_mpll_multiplier);
   static auto Get() { return hwreg::RegisterAddr<USB_R3_V2>(USB_R3_OFFSET); }
 };
 
@@ -119,6 +133,13 @@ class USB_R5_V2 : public hwreg::RegisterBase<USB_R5_V2, uint32_t> {
   DEF_FIELD(15, 8, iddig_th);
   DEF_FIELD(23, 16, iddig_cnt);
   static auto Get() { return hwreg::RegisterAddr<USB_R5_V2>(USB_R5_OFFSET); }
+};
+
+class USB_R6_V2 : public hwreg::RegisterBase<USB_R6_V2, uint32_t> {
+ public:
+  DEF_FIELD(15, 0, p30_cr_data_out);
+  DEF_BIT(16, p30_cr_ack);
+  static auto Get() { return hwreg::RegisterAddr<USB_R6_V2>(USB_R5_OFFSET); }
 };
 
 class USB_PHY_REG21 : public hwreg::RegisterBase<USB_PHY_REG21, uint32_t> {
