@@ -538,7 +538,10 @@ void Device::RetrieveInitialRingBufferFormatSets() {
           ring_buffer_format_sets_->emplace_back(rb_format_set);
         }
 
-        if (TranslateRingBufferFormatSets(*ring_buffer_format_sets_).empty()) {
+        // Required for StreamConfig and Dai, absent for Codec and Composite.
+        translated_ring_buffer_format_sets_ =
+            TranslateRingBufferFormatSets(*ring_buffer_format_sets_);
+        if (translated_ring_buffer_format_sets_.empty()) {
           ADR_WARN_OBJECT() << "RingBuffer format sets could not be translated";
           OnError(ZX_ERR_INVALID_ARGS);
           return;
@@ -724,7 +727,7 @@ fuchsia_audio_device::Info Device::CreateDeviceInfo() {
       .product = stream_config_properties_->product(),
       .unique_instance_id = stream_config_properties_->unique_id(),
       // Required for StreamConfig and Dai, absent for Codec and Composite.
-      .supported_formats = TranslateRingBufferFormatSets(*ring_buffer_format_sets_),
+      .ring_buffer_format_sets = translated_ring_buffer_format_sets_,
       // Required for StreamConfig; absent for Codec, Composite and Dai:
       .gain_caps = fuchsia_audio_device::GainCapabilities{{
           .min_gain_db = stream_config_properties_->min_gain_db(),
@@ -863,21 +866,6 @@ std::optional<fuchsia_hardware_audio::Format> Device::SupportedDriverFormatForCl
           .frame_rate = frame_rate,
       }},
   }};
-}
-
-void Device::GetCurrentlyPermittedFormats(
-    fit::callback<void(std::vector<fuchsia_audio_device::PcmFormatSet>)>
-        permitted_formats_callback) {
-  ADR_LOG_OBJECT(kLogRingBufferMethods);
-
-  RetrieveRingBufferFormatSets(
-      [this, callback = std::move(permitted_formats_callback)](
-          std::vector<fuchsia_hardware_audio::SupportedFormats> ring_buffer_format_sets) mutable {
-        ADR_LOG_OBJECT(kLogStreamConfigFidlResponses);
-        translated_ring_buffer_format_sets_ =
-            TranslateRingBufferFormatSets(ring_buffer_format_sets);
-        callback(*translated_ring_buffer_format_sets_);
-      });
 }
 
 bool Device::SetGain(fuchsia_hardware_audio::GainState& gain_state) {

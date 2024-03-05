@@ -234,15 +234,15 @@ inline std::ostream& operator<<(
   if (device_type) {
     switch (*device_type) {
       case fuchsia_audio_device::DeviceType::kCodec:
-        return (out << "  CODEC  ");
+        return (out << "CODEC");
       case fuchsia_audio_device::DeviceType::kComposite:
         return (out << "COMPOSITE");
       case fuchsia_audio_device::DeviceType::kDai:
-        return (out << "   DAI   ");
+        return (out << "DAI");
       case fuchsia_audio_device::DeviceType::kInput:
-        return (out << "  INPUT  ");
+        return (out << "INPUT");
       case fuchsia_audio_device::DeviceType::kOutput:
-        return (out << "  OUTPUT ");
+        return (out << "OUTPUT");
       default:
         return (out << "[UNKNOWN]");
     }

@@ -71,9 +71,6 @@ class Device : public std::enable_shared_from_this<Device> {
   }
 
   bool SetGain(fuchsia_hardware_audio::GainState& gain_state);
-  void GetCurrentlyPermittedFormats(
-      fit::callback<void(std::vector<fuchsia_audio_device::PcmFormatSet>)>
-          permitted_formats_callback);
   // Translate from the specified client format to the fuchsia_hardware_audio format that the driver
   // can support, including valid_bits_per_sample (which clients don't specify). If the driver
   // cannot satisfy the requested format, `.pcm_format` will be missing in the returned table.
@@ -101,6 +98,10 @@ class Device : public std::enable_shared_from_this<Device> {
   void StartRingBuffer(fit::callback<void(zx::result<zx::time>)> start_callback);
   // Stop the device ring buffer now (including device clock recovery).
   void StopRingBuffer(fit::callback<void(zx_status_t)> stop_callback);
+
+  const std::vector<fuchsia_audio_device::PcmFormatSet>& ring_buffer_format_sets() const {
+    return translated_ring_buffer_format_sets_;
+  }
 
   // Static object counts, for debugging purposes.
   static inline uint64_t count() { return count_; }
@@ -227,8 +228,7 @@ class Device : public std::enable_shared_from_this<Device> {
   // Initialization is complete when these 5 optionals are populated.
   std::optional<fuchsia_hardware_audio::StreamProperties> stream_config_properties_;
   std::optional<std::vector<fuchsia_hardware_audio::SupportedFormats>> ring_buffer_format_sets_;
-  std::optional<std::vector<fuchsia_audio_device::PcmFormatSet>>
-      translated_ring_buffer_format_sets_;
+  std::vector<fuchsia_audio_device::PcmFormatSet> translated_ring_buffer_format_sets_;
   std::optional<fuchsia_hardware_audio::GainState> gain_state_;
   std::optional<fuchsia_hardware_audio::PlugState> plug_state_;
   std::optional<bool> health_state_;

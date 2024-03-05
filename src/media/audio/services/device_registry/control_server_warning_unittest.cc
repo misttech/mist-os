@@ -193,39 +193,6 @@ TEST_F(ControlServerWarningTest, SetGainBadAgc) {
                       fuchsia_audio_device::ControlSetGainError::kAgcUnavailable);
 }
 
-TEST_F(ControlServerWarningTest, GetCurrentFormatsWhilePending) {
-  auto fake_driver = CreateAndEnableDriverWithDefaults();
-  fake_driver->AllocateRingBuffer(8192);
-  auto registry = CreateTestRegistryServer();
-  auto added_id = WaitForAddedDeviceTokenId(registry->client());
-  auto control_creator = CreateTestControlCreatorServer();
-  auto control_client = ConnectToControl(control_creator->client(), *added_id);
-  RunLoopUntilIdle();
-
-  bool received_callback_1 = false, received_callback_2 = false;
-  control_client->GetCurrentlyPermittedFormats().Then(
-      [&received_callback_1](fidl::Result<Control::GetCurrentlyPermittedFormats>& result) {
-        ASSERT_TRUE(result.is_ok()) << result.error_value().FormatDescription();
-        received_callback_1 = true;
-      });
-
-  control_client->GetCurrentlyPermittedFormats().Then(
-      [&received_callback_2](fidl::Result<Control::GetCurrentlyPermittedFormats>& result) {
-        ASSERT_TRUE(result.is_error());
-        ASSERT_TRUE(result.error_value().is_domain_error())
-            << result.error_value().FormatDescription();
-        EXPECT_EQ(result.error_value().domain_error(),
-                  fuchsia_audio_device::ControlGetCurrentlyPermittedFormatsError::kAlreadyPending)
-            << result.error_value().FormatDescription();
-        received_callback_2 = true;
-      });
-
-  RunLoopUntilIdle();
-  EXPECT_TRUE(received_callback_1 && received_callback_2);
-  EXPECT_EQ(ControlServer::count(), 1u);
-  EXPECT_TRUE(control_client.is_valid());
-}
-
 void ControlServerWarningTest::TestCreateRingBufferBadOptions(
     const std::optional<fuchsia_audio_device::RingBufferOptions>& bad_options,
     fuchsia_audio_device::ControlCreateRingBufferError expected_error) {
@@ -617,9 +584,6 @@ TEST_F(ControlServerWarningTest, CreateRingBufferBadRingBufferServerEnd) {
 
 // TODO(https://fxbug.dev/42068381): If Health can change post-initialization, test: device becomes
 //   unhealthy before SetGain. Expect Observer/Control/RingBuffer to drop, Reg/WatchRemoved.
-
-// TODO(https://fxbug.dev/42068381): If Health can change post-initialization, test: device becomes
-//   unhealthy before GetCurrentlyPermittedFormats. Expect Obs/Ctl/RBr to drop, Reg/WatchRemoved.
 
 // TODO(https://fxbug.dev/42068381): If Health can change post-initialization, test: device becomes
 //   unhealthy before CreateRingBuffer. Expect Obs/Ctl to drop, Reg/WatchRemoved.

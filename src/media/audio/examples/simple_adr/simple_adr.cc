@@ -184,12 +184,16 @@ void MediaApp::WaitForFirstAudioOutput() {
             }
             std::cout << "    unique_instance_id        " << uid_str << '\n';
 
-            std::cout << "    supported_formats[" << device.supported_formats()->size() << "]"
-                      << '\n';
-            channels_per_frame_ =
-                device.supported_formats()->front().channel_sets()->front().attributes()->size();
-            for (auto idx = 0u; idx < device.supported_formats()->size(); ++idx) {
-              auto format = (*device.supported_formats())[idx];
+            std::cout << "    ring_buffer_format_sets[" << device.ring_buffer_format_sets()->size()
+                      << "]" << '\n';
+            channels_per_frame_ = device.ring_buffer_format_sets()
+                                      ->front()
+                                      .channel_sets()
+                                      ->front()
+                                      .attributes()
+                                      ->size();
+            for (auto idx = 0u; idx < device.ring_buffer_format_sets()->size(); ++idx) {
+              auto format = (*device.ring_buffer_format_sets())[idx];
               std::cout << "        [" << idx << "] channel_sets[" << format.channel_sets()->size()
                         << "]" << '\n';
               for (auto cs = 0u; cs < format.channel_sets()->size(); ++cs) {

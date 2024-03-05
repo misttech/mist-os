@@ -30,8 +30,8 @@ const std::vector<std::pair<uint8_t, fuchsia_hardware_audio::SampleFormat>> kFor
 };
 const std::vector<uint32_t> kFrameRates = {1000, 44100, 48000, 19200};
 
-// TODO(https://fxbug.dev/42069012): Unittest TranslateFormatSets
-// TEST(ValidateTest, TranslateFormatSets) {}
+// TODO(https://fxbug.dev/42069012): Unittest TranslateRingBufferFormatSets
+// TEST(ValidateTest, TranslateRingBufferFormatSets) {}
 
 // Unittest ValidateStreamProperties
 TEST(ValidateTest, ValidateStreamProperties) {

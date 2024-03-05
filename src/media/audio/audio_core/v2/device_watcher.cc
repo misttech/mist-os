@@ -89,12 +89,12 @@ void DeviceWatcher::WatchDevicesRemoved() {
 void DeviceWatcher::AddDevice(fuchsia_audio_device::wire::Info info) {
   // Ignore invalid device infos.
   if (!info.has_token_id() || !info.has_device_type() || !info.has_device_name() ||
-      !info.has_supported_formats() || info.supported_formats().count() == 0 ||
+      !info.has_ring_buffer_format_sets() || info.ring_buffer_format_sets().count() == 0 ||
       !info.has_gain_caps() || !info.has_plug_detect_caps() || !info.has_clock_domain()) {
     FX_LOGS(ERROR) << "fuchsia.audio.device.Info missing required field";
     return;
   }
-  for (auto format : info.supported_formats()) {
+  for (auto format : info.ring_buffer_format_sets()) {
     if (!format.has_channel_sets() || format.channel_sets().count() == 0 ||
         !format.has_sample_types() || format.sample_types().count() == 0 ||
         !format.has_frame_rates() || format.frame_rates().count() == 0) {
@@ -191,7 +191,7 @@ void DeviceWatcher::AddOutputDevice(fuchsia_audio_device::wire::Info info,
 
   // Select the format to use for this device.
   const auto format =
-      media::audio::SelectBestFormat(*fidl::ToNatural(info.supported_formats()), pref_format);
+      media::audio::SelectBestFormat(*fidl::ToNatural(info.ring_buffer_format_sets()), pref_format);
   if (!format.is_ok()) {
     FX_LOGS(WARNING) << "output device with token_id '" << info.token_id()
                      << "' cannot select a format given the pipeline format '" << pref_format
@@ -259,7 +259,7 @@ void DeviceWatcher::AddInputDevice(fuchsia_audio_device::wire::Info info,
       .frames_per_second = profile.rate(),
   });
   const auto format =
-      media::audio::SelectBestFormat(*fidl::ToNatural(info.supported_formats()), pref_format);
+      media::audio::SelectBestFormat(*fidl::ToNatural(info.ring_buffer_format_sets()), pref_format);
   if (!format.is_ok()) {
     FX_LOGS(WARNING) << "input device with token_id '" << info.token_id()
                      << "' cannot select a format given the pipeline format '" << pref_format

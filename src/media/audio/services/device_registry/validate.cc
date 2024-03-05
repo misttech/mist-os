@@ -84,6 +84,10 @@ std::vector<fuchsia_audio_device::PcmFormatSet> TranslateRingBufferFormatSets(
       }
       channel_sets.push_back({{.attributes = attributes}});
     }
+    if (channel_sets.empty()) {
+      FX_LOGS(WARNING) << "Could not translate a format set - channel_sets was empty";
+      continue;
+    }
 
     // Construct our sample_types by intersecting vectors received from the device.
     // fuchsia_audio::SampleType defines a sparse set of types, so we populate the vector
@@ -113,9 +117,18 @@ std::vector<fuchsia_audio_device::PcmFormatSet> TranslateRingBufferFormatSets(
         sample_types.push_back(fuchsia_audio::SampleType::kFloat64);
       }
     }
+    if (sample_types.empty()) {
+      FX_LOGS(WARNING) << "Could not translate a format set - sample_types was empty";
+      continue;
+    }
 
     // Construct frame_rates on-the-fly.
     std::sort(pcm_formats.frame_rates()->begin(), pcm_formats.frame_rates()->end());
+    if (pcm_formats.frame_rates()->empty()) {
+      FX_LOGS(WARNING) << "Could not translate a format set - frame_rates was empty";
+      continue;
+    }
+
     fuchsia_audio_device::PcmFormatSet pcm_format_set = {{
         .channel_sets = channel_sets,
         .sample_types = sample_types,
@@ -653,8 +666,8 @@ bool ValidateDeviceInfo(const fuchsia_audio_device::Info& device_info) {
 
   // Validate top-level required members.
   if (!device_info.token_id() || !device_info.device_type() || !device_info.device_name() ||
-      device_info.device_name()->empty() || !device_info.supported_formats() ||
-      device_info.supported_formats()->empty() || !device_info.gain_caps() ||
+      device_info.device_name()->empty() || !device_info.ring_buffer_format_sets() ||
+      device_info.ring_buffer_format_sets()->empty() || !device_info.gain_caps() ||
       !device_info.plug_detect_caps() || !device_info.clock_domain()) {
     FX_LOGS(WARNING) << __func__ << ": incomplete DeviceInfo instance";
     return false;

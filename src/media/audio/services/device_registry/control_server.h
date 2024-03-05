@@ -51,7 +51,6 @@ class ControlServer
   // fuchsia.audio.device.Control
   //
   void SetGain(SetGainRequest& request, SetGainCompleter::Sync& completer) final;
-  void GetCurrentlyPermittedFormats(GetCurrentlyPermittedFormatsCompleter::Sync& completer) final;
   void CreateRingBuffer(CreateRingBufferRequest& request,
                         CreateRingBufferCompleter::Sync& completer) final;
 
@@ -83,8 +82,6 @@ class ControlServer
   std::shared_ptr<AudioDeviceRegistry> parent_;
   std::shared_ptr<Device> device_;
 
-  std::optional<GetCurrentlyPermittedFormatsCompleter::Async>
-      currently_permitted_formats_completer_;
   std::optional<CreateRingBufferCompleter::Async> create_ring_buffer_completer_;
 
   // Locks weak_ptr ring_buffer_server_ to shared_ptr and returns it.

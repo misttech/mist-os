@@ -391,10 +391,11 @@ void LogDeviceInfo(const fuchsia_audio_device::Info& device_info) {
 
   FX_LOGS(INFO) << "   unique_instance_id " << UidToString(device_info.unique_instance_id());
 
-  if (device_info.supported_formats()) {
-    FX_LOGS(INFO) << "   supported_formats[" << device_info.supported_formats()->size() << "]";
-    for (auto idx = 0u; idx < device_info.supported_formats()->size(); ++idx) {
-      const auto& pcm_format_set = device_info.supported_formats()->at(idx);
+  if (device_info.ring_buffer_format_sets()) {
+    FX_LOGS(INFO) << "   ring_buffer_format_sets[" << device_info.ring_buffer_format_sets()->size()
+                  << "]";
+    for (auto idx = 0u; idx < device_info.ring_buffer_format_sets()->size(); ++idx) {
+      const auto& pcm_format_set = device_info.ring_buffer_format_sets()->at(idx);
       if (pcm_format_set.channel_sets()) {
         FX_LOGS(INFO) << "    [" << idx << "]  channel_sets["
                       << pcm_format_set.channel_sets()->size() << "]";
@@ -406,24 +407,24 @@ void LogDeviceInfo(const fuchsia_audio_device::Info& device_info) {
             for (auto idx = 0u; idx < channel_set.attributes()->size(); ++idx) {
               const auto& attributes = channel_set.attributes()->at(idx);
               if (attributes.min_frequency()) {
-                FX_LOGS(INFO) << "                [" << idx << "]  min_frequency  "
+                FX_LOGS(INFO) << "                [" << idx << "]  min_frequency   "
                               << *attributes.min_frequency();
               } else {
-                FX_LOGS(INFO) << "                [" << idx << "]  min_frequency  NONE";
+                FX_LOGS(INFO) << "                [" << idx << "]  min_frequency   NONE";
               }
               if (attributes.max_frequency()) {
-                FX_LOGS(INFO) << "                     max_frequency  "
+                FX_LOGS(INFO) << "                     max_frequency   "
                               << *attributes.max_frequency();
               } else {
-                FX_LOGS(INFO) << "                     max_frequency  NONE";
+                FX_LOGS(INFO) << "                     max_frequency   NONE";
               }
             }
           } else {
-            FX_LOGS(INFO) << "          [" << idx << "]  attributes  NONE  (non-compliant)";
+            FX_LOGS(INFO) << "          [" << idx << "]  attributes   NONE  (non-compliant)";
           }
         }
       } else {
-        FX_LOGS(INFO) << "    [" << idx << "]  channel_sets     NONE (non-compliant)";
+        FX_LOGS(INFO) << "    [" << idx << "]  channel_sets      NONE (non-compliant)";
       }
 
       if (pcm_format_set.sample_types()) {
@@ -432,7 +433,7 @@ void LogDeviceInfo(const fuchsia_audio_device::Info& device_info) {
           FX_LOGS(INFO) << "          [" << idx << "]  " << pcm_format_set.sample_types()->at(idx);
         }
       } else {
-        FX_LOGS(INFO) << "         sample_types     NONE (non-compliant)";
+        FX_LOGS(INFO) << "         sample_types      NONE (non-compliant)";
       }
       if (pcm_format_set.frame_rates()) {
         FX_LOGS(INFO) << "         frame_rates[" << pcm_format_set.frame_rates()->size() << "]";
@@ -440,11 +441,11 @@ void LogDeviceInfo(const fuchsia_audio_device::Info& device_info) {
           FX_LOGS(INFO) << "          [" << idx << "]  " << pcm_format_set.frame_rates()->at(idx);
         }
       } else {
-        FX_LOGS(INFO) << "         frame_rates      NONE (non-compliant)";
+        FX_LOGS(INFO) << "         frame_rates       NONE (non-compliant)";
       }
     }
   } else {
-    FX_LOGS(INFO) << "    supported_formats     NONE (non-compliant)";
+    FX_LOGS(INFO) << "    ring_buffer_format_sets  NONE (non-compliant)";
   }
 
   if (device_info.gain_caps()) {

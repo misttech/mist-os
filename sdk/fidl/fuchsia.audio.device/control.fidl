@@ -66,7 +66,7 @@ type DelayInfo = table {
 /// to a single device. A device can only be bound to one `Control` at any time.
 @discoverable
 closed protocol ControlCreator {
-    // Create a `Control` for the specified device.
+    /// Create a `Control` for the specified device.
     strict Create(resource table {
         /// The token id for the device to be controlled.
         ///
@@ -92,7 +92,7 @@ type ControlCreatorError = flexible enum {
     /// used, or the device with `token_id` has been removed.
     DEVICE_NOT_FOUND = 3;
 
-    /// The device with `token_id` encountered an error and cannot be observed.
+    /// The device with `token_id` encountered an error and cannot be controlled.
     DEVICE_ERROR = 4;
 
     /// A `Control` associated with `token_id` already exists. This device is
@@ -120,13 +120,6 @@ closed protocol Control {
         /// Required.
         1: target_state GainState;
     }) -> (table {}) error ControlSetGainError;
-
-    /// Retrieve the subset of formats that are possible, as the device is
-    /// currently configured.
-    strict GetCurrentlyPermittedFormats() -> (table {
-        /// Possible formats, as configured. Must contain at least one entry.
-        1: permitted_formats vector<PcmFormatSet>:MAX_COUNT_FORMATS;
-    }) error ControlGetCurrentlyPermittedFormatsError;
 
     /// Create the ring buffer used to pass audio to/from this device.
     strict CreateRingBuffer(resource table {
@@ -169,15 +162,6 @@ type ControlSetGainError = flexible enum {
 
     /// Enabling AGC is requested, but the device has no AGC.
     AGC_UNAVAILABLE = 6;
-};
-
-/// Errors returned by `Control/GetCurrentlyPermittedFormats`.
-type ControlGetCurrentlyPermittedFormatsError = flexible enum {
-    /// This device has encountered an error and can no longer be queried.
-    DEVICE_ERROR = 1;
-
-    /// The previous `GetCurrentlyPermittedFormats` call has not yet completed.
-    ALREADY_PENDING = 2;
 };
 
 /// Errors returned by `Control/CreateRingBuffer`.
