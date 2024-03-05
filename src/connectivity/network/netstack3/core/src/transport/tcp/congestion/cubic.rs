@@ -139,7 +139,7 @@ impl<I: Instant, const FAST_CONVERGENCE: bool> Cubic<I, FAST_CONVERGENCE> {
 
         // In a *very* rare case, we might overflow the counter if the acks
         // keep coming in and we can't increase our congestion window. Use
-        // wrapping add here as a defense so that we don't lost ack counts
+        // saturating add here as a defense so that we don't lost ack counts
         // by accident.
         self.bytes_acked = self.bytes_acked.saturating_add(bytes_acked.get());
 
@@ -160,13 +160,23 @@ impl<I: Instant, const FAST_CONVERGENCE: bool> Cubic<I, FAST_CONVERGENCE> {
         // and it doesn't make much sense to have byte number not to be a whole
         // number.
         // [1]: (https://www.cs.princeton.edu/courses/archive/fall16/cos561/papers/Cubic08.pdf)
-        if target >= *cwnd + u32::from(*mss) // An increase to cwnd is needed
-            && self.bytes_acked >= *cwnd / (target - *cwnd) * u32::from(*mss)
-        // And the # of acked bytes is at least the required amount of bytes for
-        // increasing 1 MSS.
+
         {
-            self.bytes_acked -= *cwnd / (target - *cwnd) * u32::from(*mss);
-            *cwnd += u32::from(*mss);
+            let mss = u32::from(*mss);
+            // `saturating_add` avoids overflow in `cwnd`. See https://fxbug.dev/327628809.
+            let increased_cwnd = cwnd.saturating_add(mss);
+            if target >= increased_cwnd {
+                // Ensure the divisor is at least `mss` in case `target` and `cwnd`
+                // are both u32::MAX to avoid divide-by-zero.
+                let divisor = (target - *cwnd).max(mss);
+                let to_subtract_from_bytes_acked = *cwnd / divisor * mss;
+                // And the # of acked bytes is at least the required amount of bytes for
+                // increasing 1 MSS.
+                if self.bytes_acked >= to_subtract_from_bytes_acked {
+                    self.bytes_acked -= to_subtract_from_bytes_acked;
+                    *cwnd = increased_cwnd;
+                }
+            }
         }
 
         // Per RFC 8312 (https://www.rfc-editor.org/rfc/rfc8312#section-4.2):
@@ -392,5 +402,18 @@ mod tests {
             u32::from(params.rounded_cwnd()),
             6 * u32::from(DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE)
         );
+    }
+
+    // This is a regression test for https://fxbug.dev/327628809.
+    #[test_case(u32::MAX ; "cwnd is u32::MAX")]
+    #[test_case(u32::MAX - 1; "cwnd is u32::MAX - 1")]
+    fn repro_overflow_b327628809(cwnd: u32) {
+        let clock = FakeInstantCtx::default();
+        let mut cubic = Cubic::<_, true /* FAST_CONVERGENCE */>::default();
+        let mut params =
+            CongestionControlParams { ssthresh: 0, cwnd, mss: DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE };
+        const RTT: Duration = Duration::from_millis(100);
+
+        cubic.on_ack(&mut params, NonZeroU32::MIN, clock.now(), RTT);
     }
 }
