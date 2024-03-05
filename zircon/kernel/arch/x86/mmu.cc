@@ -863,6 +863,7 @@ zx_status_t X86ArchVmAspace::MapContiguous(vaddr_t vaddr, paddr_t paddr, size_t 
 
 zx_status_t X86ArchVmAspace::Map(vaddr_t vaddr, paddr_t* phys, size_t count, uint mmu_flags,
                                  ExistingEntryAction existing_action, size_t* mapped) {
+  DEBUG_ASSERT(ENABLE_PAGE_FAULT_UPGRADE || existing_action != ExistingEntryAction::Upgrade);
   DEBUG_ASSERT(!pt_->IsUnified());
   if (!IsValidVaddr(vaddr))
     return ZX_ERR_INVALID_ARGS;

@@ -1413,6 +1413,7 @@ zx_status_t ArmArchVmAspace::Map(vaddr_t vaddr, paddr_t* phys, size_t count, uin
   canary_.Assert();
   LTRACEF("vaddr %#" PRIxPTR " count %zu flags %#x\n", vaddr, count, mmu_flags);
 
+  DEBUG_ASSERT(ENABLE_PAGE_FAULT_UPGRADE || existing_action != ExistingEntryAction::Upgrade);
   DEBUG_ASSERT(tt_virt_);
 
   DEBUG_ASSERT(IsValidVaddr(vaddr));

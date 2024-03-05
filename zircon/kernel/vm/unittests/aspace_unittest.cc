@@ -5,7 +5,9 @@
 // https://opensource.org/licenses/MIT
 
 #include <lib/fit/defer.h>
+#include <zircon/errors.h>
 
+#include <arch/defines.h>
 #include <arch/kernel_aspace.h>
 #include <ktl/initializer_list.h>
 #include <ktl/limits.h>
@@ -1680,6 +1682,126 @@ static bool arch_noncontiguous_map() {
   END_TEST;
 }
 
+static bool arch_noncontiguous_map_with_upgrade() {
+  BEGIN_TEST;
+
+  // Skip this test if `Upgrade` behavior is not enabled for this arch.
+  if constexpr (!ENABLE_PAGE_FAULT_UPGRADE) {
+    END_TEST;
+  }
+
+  // Get some phys pages to test on
+  paddr_t phys[3];
+  struct list_node phys_list = LIST_INITIAL_VALUE(phys_list);
+  zx_status_t status = pmm_alloc_pages(ktl::size(phys), 0, &phys_list);
+  ASSERT_EQ(ZX_OK, status, "non contig map alloc");
+  {
+    size_t i = 0;
+    vm_page_t* p;
+    list_for_every_entry (&phys_list, p, vm_page_t, queue_node) {
+      phys[i] = p->paddr();
+      ++i;
+    }
+  }
+
+  {
+    constexpr vaddr_t base = USER_ASPACE_BASE + 10 * PAGE_SIZE;
+    constexpr vaddr_t window_base = base - 2 * PAGE_SIZE;
+
+    ArchVmAspace aspace(USER_ASPACE_BASE, USER_ASPACE_SIZE, 0);
+    status = aspace.Init();
+    ASSERT_EQ(ZX_OK, status, "failed to init aspace\n");
+
+    // Attempt to map a set of vm_page_t
+    size_t mapped = 0u;  // `Map` doesn't set `mapped` when it fails.
+    status = aspace.Map(base, phys, ktl::size(phys), ARCH_MMU_FLAG_PERM_READ,
+                        ArchVmAspace::ExistingEntryAction::Error, &mapped);
+    ASSERT_EQ(ZX_OK, status, "failed first map\n");
+    EXPECT_EQ(ktl::size(phys), mapped, "weird first map\n");
+
+    // Attempt to map with upgrades allowed, should succeed
+    mapped = 0u;  // `Map` doesn't set `mapped` when it fails.
+    status =
+        aspace.Map(base, phys, ktl::size(phys), ARCH_MMU_FLAG_PERM_READ | ARCH_MMU_FLAG_PERM_WRITE,
+                   ArchVmAspace::ExistingEntryAction::Upgrade, &mapped);
+    EXPECT_EQ(ZX_OK, status, "map upgrade failed\n");
+    EXPECT_EQ(ktl::size(phys), mapped, "weird map upgrade\n");
+
+    // Attempt to map with upgrades allowed, should succeed but not remap anything
+    // b/c downgrade to read not allowed
+    mapped = 0u;  // `Map` doesn't set `mapped` when it fails.
+    status = aspace.Map(base, phys, ktl::size(phys), ARCH_MMU_FLAG_PERM_READ,
+                        ArchVmAspace::ExistingEntryAction::Upgrade, &mapped);
+    EXPECT_EQ(ZX_OK, status, "map upgrade failed\n");
+    EXPECT_EQ(ktl::size(phys), mapped, "weird map upgrade\n");
+
+    // Expect that the upgrade maps succeeded
+    for (size_t i = 0; i < ktl::size(phys); ++i) {
+      const uint MAP_WINDOW_PADDR_INDEX[ktl::size(phys)] = {0, 1, 2};
+      constexpr uint MAP_WINDOW_MMU_FLAGS[ktl::size(phys)] = {
+          ARCH_MMU_FLAG_PERM_READ | ARCH_MMU_FLAG_PERM_WRITE,
+          ARCH_MMU_FLAG_PERM_READ | ARCH_MMU_FLAG_PERM_WRITE,
+          ARCH_MMU_FLAG_PERM_READ | ARCH_MMU_FLAG_PERM_WRITE};
+
+      paddr_t paddr;
+      uint mmu_flags;
+      status = aspace.Query(base + i * PAGE_SIZE, &paddr, &mmu_flags);
+      EXPECT_EQ(ZX_OK, status, "bad map upgrade\n");
+      EXPECT_EQ(phys[MAP_WINDOW_PADDR_INDEX[i]], paddr, "bad map upgrade\n");
+      EXPECT_EQ(MAP_WINDOW_MMU_FLAGS[i], mmu_flags, "bad map upgrade\n");
+    }
+
+    // Attempt to map partially overlapping with upgrades allowed, should succeed
+    mapped = 0u;  // `Map` doesn't set `mapped` when it fails.
+    status = aspace.Map(base + 2 * PAGE_SIZE, phys, ktl::size(phys),
+                        ARCH_MMU_FLAG_PERM_READ | ARCH_MMU_FLAG_PERM_WRITE,
+                        ArchVmAspace::ExistingEntryAction::Upgrade, &mapped);
+    EXPECT_EQ(ZX_OK, status, "map upgrade failed\n");
+    EXPECT_EQ(ktl::size(phys), mapped, "weird map upgrade\n");
+    mapped = 0u;  // `Map` doesn't set `mapped` when it fails.
+    status = aspace.Map(base - 2 * PAGE_SIZE, phys, ktl::size(phys), ARCH_MMU_FLAG_PERM_READ,
+                        ArchVmAspace::ExistingEntryAction::Upgrade, &mapped);
+    EXPECT_EQ(ZX_OK, status, "map upgrade failed\n");
+    EXPECT_EQ(ktl::size(phys), mapped, "weird map upgrade\n");
+
+    // Expect that the `Upgrade` maps succeeded
+    // We check the entire [base - 2, base + 4] "window" covered by the partial maps
+    constexpr size_t MAP_WINDOW_SIZE = 7;
+    for (size_t i = 0; i < MAP_WINDOW_SIZE; ++i) {
+      const uint MAP_WINDOW_PADDR_INDEX[MAP_WINDOW_SIZE] = {0, 1, 2, 1, 0, 1, 2};
+      constexpr uint MAP_WINDOW_MMU_FLAGS[MAP_WINDOW_SIZE] = {
+          ARCH_MMU_FLAG_PERM_READ,
+          ARCH_MMU_FLAG_PERM_READ,
+          ARCH_MMU_FLAG_PERM_READ,
+          ARCH_MMU_FLAG_PERM_READ | ARCH_MMU_FLAG_PERM_WRITE,
+          ARCH_MMU_FLAG_PERM_READ | ARCH_MMU_FLAG_PERM_WRITE,
+          ARCH_MMU_FLAG_PERM_READ | ARCH_MMU_FLAG_PERM_WRITE,
+          ARCH_MMU_FLAG_PERM_READ | ARCH_MMU_FLAG_PERM_WRITE};
+
+      paddr_t paddr;
+      uint mmu_flags;
+      status = aspace.Query(window_base + i * PAGE_SIZE, &paddr, &mmu_flags);
+      EXPECT_EQ(ZX_OK, status, "bad map upgrade\n");
+      EXPECT_EQ(phys[MAP_WINDOW_PADDR_INDEX[i]], paddr, "bad map upgrade\n");
+      EXPECT_EQ(MAP_WINDOW_MMU_FLAGS[i], mmu_flags, "bad map upgrade\n");
+    }
+
+    // Unmap any remaining entries
+    mapped = 0u;  // `Unmap` doesn't set `unmapped` when it fails.
+    status =
+        aspace.Unmap(window_base, MAP_WINDOW_SIZE, ArchVmAspace::EnlargeOperation::Yes, &mapped);
+    ASSERT_EQ(ZX_OK, status, "failed unmap\n");
+    EXPECT_EQ(MAP_WINDOW_SIZE, mapped, "weird unmap\n");
+
+    status = aspace.Destroy();
+    EXPECT_EQ(ZX_OK, status, "failed to destroy aspace\n");
+  }
+
+  pmm_free(&phys_list);
+
+  END_TEST;
+}
+
 // Get the mmu_flags of the given vaddr of the given aspace.
 //
 // Return 0 if the page is unmapped or on error.
@@ -2541,6 +2663,7 @@ VM_UNITTEST(vm_mapping_sparse_mapping_test)
 VM_UNITTEST(arch_is_user_accessible_range)
 VM_UNITTEST(validate_user_address_range)
 VM_UNITTEST(arch_noncontiguous_map)
+VM_UNITTEST(arch_noncontiguous_map_with_upgrade)
 VM_UNITTEST(arch_vm_aspace_protect_split_pages)
 VM_UNITTEST(arch_vm_aspace_protect_split_pages_out_of_memory)
 VM_UNITTEST(vm_kernel_region_test)

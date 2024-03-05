@@ -20,6 +20,7 @@
 #include <vm/fault.h>
 #include <vm/physmap.h>
 #include <vm/vm.h>
+#include <vm/vm_address_region.h>
 #include <vm/vm_aspace.h>
 #include <vm/vm_object.h>
 #include <vm/vm_object_paged.h>
@@ -864,6 +865,15 @@ zx_status_t VmMapping::DestroyLocked() {
 }
 
 zx::result<bool> VmMapping::AdjustMapping(vaddr_t va, paddr_t pa, uint mmu_flags) {
+  // Using the `Upgrade` action for `Map` accounts for existing mappings, so
+  // when we are using it, strip out the 2 cases in this method (Protect and Unmap+Map).
+  //
+  // TODO(https://issues.fuchsia.dev/issues/42182886)
+  // When `ENABLE_PAGE_FAULT_UPGRADE` is always true, remove this method.
+  if constexpr (ENABLE_PAGE_FAULT_UPGRADE) {
+    return zx::ok(false);
+  }
+
   // see if something is mapped here now
   // this may happen if we are one of multiple threads racing on a single address
   uint page_flags;
@@ -1117,9 +1127,12 @@ zx_status_t VmMapping::PageFaultLocked(vaddr_t va, const uint pf_flags,
                  ktl::all_of(pages, &pages[out_pages],
                              [](paddr_t p) { return p != vm_get_zero_page_paddr(); }));
 
+    constexpr ArchVmAspace::ExistingEntryAction existing_action =
+        ENABLE_PAGE_FAULT_UPGRADE ? ArchVmAspace::ExistingEntryAction::Upgrade
+                                  : ArchVmAspace::ExistingEntryAction::Skip;
     size_t mapped;
-    zx_status_t status = aspace_->arch_aspace().Map(
-        va, pages, out_pages, range.mmu_flags, ArchVmAspace::ExistingEntryAction::Skip, &mapped);
+    zx_status_t status =
+        aspace_->arch_aspace().Map(va, pages, out_pages, range.mmu_flags, existing_action, &mapped);
     if (status != ZX_OK) {
       ASSERT_MSG(status == ZX_ERR_NO_MEMORY, "Unexpected failure from map: %d\n", status);
       TRACEF("failed to map page %d\n", status);

@@ -14,6 +14,16 @@
 #include <fbl/macros.h>
 #include <vm/page.h>
 
+// Define this to enable the new `Upgrade` behavior when mapping pages.
+//
+// This allows remapping existing page table entries without first needing
+// to unmap them, which boosts page fault performance.
+// See https://issues.fuchsia.dev/issues/42182886.
+//
+// TODO(https://issues.fuchsia.dev/issues/42182886): Remove this flag which
+// `Upgrade` is the default page fault behavior on all architectures.
+#define ENABLE_PAGE_FAULT_UPGRADE false
+
 // Flags
 const uint ARCH_MMU_FLAG_CACHED = (0u << 0);
 const uint ARCH_MMU_FLAG_UNCACHED = (1u << 0);
@@ -103,14 +113,22 @@ class ArchVmAspaceInterface {
 
   // Map the given array of pages into the virtual address space starting at
   // |vaddr|, in the order they appear in |phys|.
+  //
   // If any address in the range [vaddr, vaddr + count * PAGE_SIZE) is already
-  // mapped when this is called, and the |existing_action| is |Error| then this
-  // returns ZX_ERR_ALREADY_EXISTS, otherwise they are skipped. Skipped pages
-  // are stil counted in |mapped|. On failure some pages may still be mapped,
-  // the number of which will be reported in |mapped|.
-  enum class ExistingEntryAction : bool {
+  // mapped when this is called, |existing_action| controls the behavior used:
+  //  - |Skip| - Skip updating any existing mappings.
+  //  - |Error| - Existing mappings result in a ZX_ERR_ALREADY_EXISTS error.
+  //  - |Upgrade| - Upgrade any existing mappings, meaning a read-only mapping
+  //                can be converted to read-write, or the mapping can have its
+  //                paddr changed. Only valid if `ENABLE_PAGE_FAULT_UPGRADE` is
+  //                true, otherwise the call to `Map` will assert.
+  //
+  // Skipped pages are still counted in |mapped|. On failure some pages may
+  // still be mapped, the number of which will be reported in |mapped|.
+  enum class ExistingEntryAction : uint8_t {
     Skip,
     Error,
+    Upgrade,
   };
   virtual zx_status_t Map(vaddr_t vaddr, paddr_t* phys, size_t count, uint mmu_flags,
                           ExistingEntryAction existing_action, size_t* mapped) = 0;

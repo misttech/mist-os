@@ -10,6 +10,7 @@
 #include <lib/arch/x86/boot-cpuid.h>
 #include <lib/fit/defer.h>
 #include <trace.h>
+#include <zircon/errors.h>
 
 #include <arch/x86/feature.h>
 #include <arch/x86/page_tables/constants.h>
@@ -17,6 +18,7 @@
 #include <fbl/algorithm.h>
 #include <ktl/algorithm.h>
 #include <ktl/iterator.h>
+#include <page_tables/x86/constants.h>
 #include <vm/physmap.h>
 #include <vm/pmm.h>
 
@@ -837,17 +839,18 @@ bool X86PageTableBase::check_equal_ignore_flags(pt_entry_t left, pt_entry_t righ
 /**
  * @brief Creates mappings for the range specified by start_cursor
  *
- * Level must be top_level() when invoked.
+ * `level` must be top_level() when invoked from external code.
  *
- * @param table The top-level paging structure's virtual address.
- * @param start_cursor A cursor describing the range of address space to
- * act on within table
- * @param new_cursor A returned cursor describing how much work was not
- * completed.  Must be non-null.
+ * @param table The current paging structure's virtual address.
+ * @param mmu_flags MMU flags describing attributes of the mapping.
+ * @param level Page table level which the current `table` is located at.
+ * @param existing_action Action to take if a mapping is already present.
+ * @param cursor A cursor describing the range of address space to act on.
+ * @param cm Object to manage consistency of page table entries and cache+TLB.
  *
  * @return ZX_OK if successful
- * @return ZX_ERR_ALREADY_EXISTS if the range overlaps an existing mapping and existing_action is
- * set to Error
+ * @return ZX_ERR_ALREADY_EXISTS if the range overlaps an existing mapping and
+ *         `existing_action` is set to `Error`
  * @return ZX_ERR_NO_MEMORY if intermediate page tables could not be allocated
  */
 zx_status_t X86PageTableBase::AddMapping(volatile pt_entry_t* table, uint mmu_flags,
@@ -951,6 +954,7 @@ zx_status_t X86PageTableBase::AddMapping(volatile pt_entry_t* table, uint mmu_fl
 
       ret = AddMapping(get_next_table_from_entry(pt_val), mmu_flags, lower_level(level),
                        existing_action, cursor, cm);
+
       if (ret != ZX_OK) {
         return ret;
       }
@@ -966,18 +970,34 @@ zx_status_t X86PageTableBase::AddMappingL0(volatile pt_entry_t* table, uint mmu_
                                            MappingCursor& cursor, ConsistencyManager* cm) {
   DEBUG_ASSERT(IS_PAGE_ALIGNED(cursor.size()));
 
-  PtFlags term_flags = terminal_flags(PageTableLevel::PT_L, mmu_flags);
-
+  const PtFlags term_flags = terminal_flags(PageTableLevel::PT_L, mmu_flags);
   uint index = vaddr_to_index(PageTableLevel::PT_L, cursor.vaddr());
+
   for (; index != NO_OF_PT_ENTRIES && cursor.size() != 0; ++index) {
-    volatile pt_entry_t* e = table + index;
-    if (IS_PAGE_PRESENT(*e)) {
-      if (existing_action == ExistingEntryAction::Error) {
+    volatile pt_entry_t* existing_entry = table + index;
+
+    if (IS_PAGE_PRESENT(*existing_entry)) {
+      if (existing_action == ExistingEntryAction::Upgrade) {
+        const paddr_t existing_paddr = (*existing_entry) & X86_PG_FRAME;
+        const bool remapping_same_address = existing_paddr == cursor.paddr();
+        const bool mmu_flags_ro =
+            (mmu_flags & ARCH_MMU_FLAG_PERM_RWX_MASK) == ARCH_MMU_FLAG_PERM_READ;
+
+        // If the physical page we are trying to map is already present, and
+        // we would be marking it read only, then don't.
+        // Either:
+        //   1. it is already read-only - we can skip the work.
+        //   2. it is already writable - we shouldn't downgrade permissions.
+        if (!remapping_same_address || !mmu_flags_ro) {
+          UpdateEntry(cm, PageTableLevel::PT_L, cursor.vaddr(), existing_entry, cursor.paddr(),
+                      term_flags, /*was_terminal=*/false);
+        }
+      } else if (existing_action == ExistingEntryAction::Error) {
         return ZX_ERR_ALREADY_EXISTS;
       }
     } else {
-      UpdateEntry(cm, PageTableLevel::PT_L, cursor.vaddr(), e, cursor.paddr(), term_flags,
-                  /*was_terminal=*/false);
+      UpdateEntry(cm, PageTableLevel::PT_L, cursor.vaddr(), existing_entry, cursor.paddr(),
+                  term_flags, /*was_terminal=*/false);
     }
     cursor.ConsumePAddr(PAGE_SIZE);
   }
@@ -1308,7 +1328,6 @@ zx_status_t X86PageTableBase::MapPages(vaddr_t vaddr, paddr_t* phys, size_t coun
   if (!allowed_flags(mmu_flags))
     return ZX_ERR_INVALID_ARGS;
 
-  PageTableLevel top = top_level();
   __UNINITIALIZED ConsistencyManager cm(this);
   {
     Guard<Mutex> a{AssertOrderedLock, &lock_, LockOrder()};
@@ -1316,7 +1335,7 @@ zx_status_t X86PageTableBase::MapPages(vaddr_t vaddr, paddr_t* phys, size_t coun
 
     MappingCursor cursor(/*paddrs=*/phys, /*paddr_count=*/count, /*page_size=*/PAGE_SIZE,
                          /*vaddr=*/vaddr, /*size=*/count * PAGE_SIZE);
-    zx_status_t status = AddMapping(virt_, mmu_flags, top, existing_action, cursor, &cm);
+    zx_status_t status = AddMapping(virt_, mmu_flags, top_level(), existing_action, cursor, &cm);
     cm.Finish();
     if (status != ZX_OK) {
       dprintf(SPEW, "Add mapping failed with err=%d\n", status);

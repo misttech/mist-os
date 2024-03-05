@@ -1134,6 +1134,7 @@ zx_status_t Riscv64ArchVmAspace::Map(vaddr_t vaddr, paddr_t* phys, size_t count,
                                      ExistingEntryAction existing_action, size_t* mapped) {
   canary_.Assert();
 
+  DEBUG_ASSERT(ENABLE_PAGE_FAULT_UPGRADE || existing_action != ExistingEntryAction::Upgrade);
   DEBUG_ASSERT(tt_virt_);
 
   DEBUG_ASSERT(IsValidVaddr(vaddr));
