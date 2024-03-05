@@ -113,7 +113,7 @@ From //build/images/args.gni:141
 
 **Current value (from the default):** `true`
 
-From //build/config/fuchsia/platform_version.gni:61
+From //build/config/fuchsia/platform_version.gni:37
 
 ### archivist_max_cached_logs_bytes
 
@@ -894,11 +894,12 @@ From //build/images/args.gni:35
 
 ### bump_api_level
 
-If true, build for N+1 api level, where N is platform_version.in_development_api_level
+If true, build for N+1 api level, where N is
+platform_version.in_development_api_level.
 
 **Current value (from the default):** `false`
 
-From //build/config/fuchsia/platform_version.gni:19
+From //build/config/fuchsia/platform_version.gni:25
 
 ### cache_package_labels
 
@@ -3288,7 +3289,7 @@ From //src/fonts/build/font_args.gni:12
 
 **Current value (from the default):** `false`
 
-From //build/config/fuchsia/platform_version.gni:24
+From //build/config/fuchsia/platform_version.gni:27
 
 ### fuchsia_async_trace_level_logging
 
@@ -3876,7 +3877,7 @@ platform-version-roller when the API level is incremented.
 
 **Current value (from the default):** `false`
 
-From //build/config/fuchsia/platform_version.gni:60
+From //build/config/fuchsia/platform_version.gni:36
 
 ### include_shell_commands_package
 
@@ -5207,11 +5208,17 @@ From //build/config/BUILDCONFIG.gn:32
 
 ### override_target_api_level
 
-Allows building the platform source code for a specific API level.
+Specify a specific target API level for the platform build.
+When set to -1, the platform is built targeting HEAD with runtime support
+for all supported and sunset API levels.
+Must be -1 or a positive integer corresponding to currently supported
+(not sunset) API level. This is primarily used by the SDK.
+Not all targets support the non-default value. In particular, `:default`
+currently fails.
 
 **Current value (from the default):** `-1`
 
-From //build/config/fuchsia/platform_version.gni:22
+From //build/config/fuchsia/target_api_level.gni:13
 
 ### package_flavor_selections
 
@@ -8602,7 +8609,7 @@ From //build/images/args.gni:106
 
 **Current value (from the default):** `false`
 
-From //build/config/fuchsia/BUILD.gn:180
+From //build/config/fuchsia/BUILD.gn:178
 
 ### zircon_b_partition
 
