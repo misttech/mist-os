@@ -173,11 +173,10 @@ zx::result<HdmiPllConfigForMipiDsi> Clock::GenerateHPLL(
             // Calculate pll_multiplier such that
             // kExternalOscillatorFrequencyHz x pll_multiplier =
             // voltage_controlled_oscillator_output_frequency_hz
-            pll_cfg.pll_multiplier_integer =
-                static_cast<int32_t>(voltage_controlled_oscillator_output_frequency_hz * 1000 /
-                                     kExternalOscillatorFrequencyHz);
-            pll_cfg.pll_multiplier_fraction = (voltage_controlled_oscillator_output_frequency_hz *
-                                               1000 % kExternalOscillatorFrequencyHz) *
+            pll_cfg.pll_multiplier_integer = static_cast<int32_t>(
+                voltage_controlled_oscillator_output_frequency_hz / kExternalOscillatorFrequencyHz);
+            pll_cfg.pll_multiplier_fraction = (voltage_controlled_oscillator_output_frequency_hz %
+                                               kExternalOscillatorFrequencyHz) *
                                               PLL_FRAC_RANGE / kExternalOscillatorFrequencyHz;
 
             zxlogf(TRACE, "m=%d, n=%d, frac=0x%x", pll_cfg.pll_multiplier_integer,
