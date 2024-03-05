@@ -18,21 +18,9 @@ use {
     fidl_fuchsia_io as fio, fuchsia_async as fasync, fuchsia_zircon as zx,
     futures::stream::StreamExt,
     moniker::Moniker,
-    std::{
-        sync::{Arc, Weak},
-        time::Duration,
-    },
+    std::sync::{Arc, Weak},
     thiserror::Error,
 };
-
-// TODO(https://fxbug.dev/42126139): The out/diagnostics directory propagation for runners includes a retry.
-// The reason of this is that flutter fills the out/ directory *after*
-// serving it. Therefore we need to watch that directory to notify.
-// Sadly the PseudoDir exposed in the SDK (and used by flutter) returns ZX_ERR_NOT_SUPPORTED on
-// Watch.
-const OPEN_OUT_SUBDIR_RETRY_INITIAL_DELAY_MS: u64 = 500;
-const OPEN_OUT_SUBDIR_RETRY_MAX_DELAY_MS: u64 = 15000;
-const OPEN_OUT_SUBDIR_MAX_RETRIES: usize = 30;
 
 /// Awaits for `Started` events and for each capability exposed to framework, dispatches a
 /// `DirectoryReady` event.
@@ -186,53 +174,17 @@ impl DirectoryReadyNotifier {
         target_name: &Name,
     ) -> Option<Event> {
         let target_name = target_name.to_string();
-
-        let node_result = async move {
-            // DirProxy.open fails on absolute paths.
-            let source_path = source_path.to_string();
-
-            let outgoing_dir = outgoing_dir_result.map_err(|e| e.clone())?;
-
-            let mut current_delay = 0;
-            let mut retries = 0;
-            loop {
-                match self.try_opening(&outgoing_dir, &source_path, &rights).await {
-                    Ok(node) => return Ok(node),
-                    Err(TryOpenError::Fidl(_)) | Err(TryOpenError::Enumerate(_)) => {
-                        break Err(ModelError::open_directory_error(
-                            target.moniker.clone(),
-                            source_path.clone(),
-                        ));
-                    }
-                    Err(TryOpenError::Status(status)) => {
-                        // If the directory doesn't exist, retry.
-                        if status == zx::Status::NOT_FOUND {
-                            if retries < OPEN_OUT_SUBDIR_MAX_RETRIES {
-                                retries += 1;
-                                current_delay = std::cmp::min(
-                                    OPEN_OUT_SUBDIR_RETRY_MAX_DELAY_MS,
-                                    current_delay + OPEN_OUT_SUBDIR_RETRY_INITIAL_DELAY_MS,
-                                );
-                                fasync::Timer::new(Duration::from_millis(current_delay)).await;
-                                continue;
-                            }
-                        }
-                        break Err(ModelError::open_directory_error(
-                            target.moniker.clone(),
-                            source_path.clone(),
-                        ));
-                    }
-                }
-            }
-        }
-        .await;
-
-        match node_result {
-            Ok(node) => {
-                Some(Event::new(&target, EventPayload::DirectoryReady { name: target_name, node }))
-            }
-            Err(_) => None,
-        }
+        // DirProxy.open fails on absolute paths.
+        let source_path = source_path.to_string();
+        let Ok(outgoing_dir) = outgoing_dir_result.map_err(|e| e.clone()) else {
+            return None;
+        };
+        self.try_opening(&outgoing_dir, &source_path, &rights)
+            .await
+            .map(|node| {
+                Event::new(&target, EventPayload::DirectoryReady { name: target_name, node })
+            })
+            .ok()
     }
 
     async fn try_opening(
@@ -373,119 +325,5 @@ impl Hook for DirectoryReadyNotifier {
             _ => {}
         }
         Ok(())
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::model::{
-        context::ModelContext,
-        environment::Environment,
-        testing::test_helpers::{TestEnvironmentBuilder, TestModelResult},
-    };
-    use cm_rust_testing::ComponentDeclBuilder;
-    use moniker::MonikerBase;
-    use zerocopy::{AsBytes, NoCell};
-
-    #[fuchsia::test]
-    async fn verify_get_event_retry() {
-        let (proxy, stream) =
-            fidl::endpoints::create_proxy_and_stream::<fio::DirectoryMarker>().unwrap();
-        let _task = fasync::Task::spawn(async move {
-            serve_fake_dir(stream).await;
-        });
-
-        let components = vec![("root", ComponentDeclBuilder::new().build())];
-        let TestModelResult { model, .. } =
-            TestEnvironmentBuilder::new().set_components(components).build().await;
-
-        let component = Arc::new(ComponentInstance::new_root(
-            Environment::empty(),
-            Arc::new(ModelContext::new_for_test()),
-            Weak::new(),
-            "test:///root".to_string(),
-        ));
-        let notifier = DirectoryReadyNotifier::new(Arc::downgrade(&model));
-        let event = notifier
-            .create_event(
-                &component,
-                Ok(&proxy),
-                Rights::from(fio::R_STAR_DIR),
-                &"/foo".parse().unwrap(),
-                &"foo".parse().unwrap(),
-            )
-            .await
-            .unwrap();
-        assert_eq!(event.target_moniker, Moniker::root().into());
-        assert_eq!(event.component_url, "test:///root");
-        let payload = event.payload;
-
-        match payload {
-            EventPayload::DirectoryReady { name, .. } => {
-                assert_eq!(name, "foo");
-            }
-            other => {
-                panic!("Unexpected payload: {:?}", other);
-            }
-        }
-    }
-
-    /// Serves a fake directory that returns NOT_FOUND for the given path until the third request.
-    async fn serve_fake_dir(mut request_stream: fio::DirectoryRequestStream) {
-        let mut requests = 0;
-        let mut at_end = true;
-        while let Some(Ok(req)) = request_stream.next().await {
-            match req {
-                fio::DirectoryRequest::Rewind { responder, .. } => {
-                    at_end = false;
-                    responder.send(zx::Status::OK.into_raw()).unwrap();
-                }
-                fio::DirectoryRequest::ReadDirents { responder, .. } => {
-                    const SIZE: usize = 3;
-                    #[derive(AsBytes, NoCell)]
-                    #[repr(C, packed)]
-                    struct Dirent {
-                        ino: u64,
-                        size: u8,
-                        kind: u8,
-                        name: [u8; SIZE],
-                    }
-
-                    if at_end {
-                        responder.send(zx::Status::OK.into_raw(), &[]).unwrap();
-                        continue;
-                    }
-                    let dirent = Dirent {
-                        ino: fio::INO_UNKNOWN,
-                        size: SIZE as u8,
-                        kind: fio::DirentType::Directory.into_primitive(),
-                        name: "foo".as_bytes().try_into().unwrap(),
-                    };
-                    let buf = dirent.as_bytes();
-                    at_end = true;
-                    responder.send(zx::Status::OK.into_raw(), &buf).unwrap();
-                }
-                fio::DirectoryRequest::Open { path, object, .. } => {
-                    assert_eq!("foo", path);
-                    let (_stream, control_handle) =
-                        object.into_stream_and_control_handle().unwrap();
-                    if requests >= 3 {
-                        control_handle
-                            .send_on_open_(
-                                zx::Status::OK.into_raw(),
-                                Some(fio::NodeInfoDeprecated::Directory(fio::DirectoryObject {})),
-                            )
-                            .unwrap();
-                    } else {
-                        control_handle
-                            .send_on_open_(zx::Status::NOT_FOUND.into_raw(), None)
-                            .unwrap();
-                    }
-                    requests += 1;
-                }
-                _ => {}
-            }
-        }
     }
 }
