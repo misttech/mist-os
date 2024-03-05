@@ -71,7 +71,7 @@ class DsiHost {
   // The DesignWare setup could technically be moved to the dw_mipi_dsi driver. However,
   // given the highly configurable nature of this block, we'd have to provide a lot of
   // information to the generic driver. Therefore, it's just simpler to configure it here
-  zx::result<> Enable(uint32_t bitrate);
+  zx::result<> Enable(int64_t dphy_data_lane_bits_per_second);
 
   // This function will turn off DSI Host. It is a "best-effort" function. We will attempt
   // to shutdown whatever we can. Error during shutdown path is ignored and function proceeds

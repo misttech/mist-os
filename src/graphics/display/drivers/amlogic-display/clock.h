@@ -52,16 +52,16 @@ class Clock {
   void SetVideoOn(bool on);
 
   // This is only safe to call when the clock is Enable'd.
-  uint32_t GetBitrate() const {
+  int64_t GetBitrate() const {
     ZX_DEBUG_ASSERT(clock_enabled_);
-    return pll_cfg_.bitrate;
+    return pll_cfg_.dphy_data_lane_bits_per_second;
   }
 
   static LcdTiming CalculateLcdTiming(const display::DisplayTiming& display_timing);
   // This function calculates the required pll configurations needed to generate
   // the desired lcd clock
-  static zx::result<PllConfig> GenerateHPLL(int32_t pixel_clock_frequency_khz,
-                                            int64_t maximum_per_data_lane_bit_per_second);
+  static zx::result<HdmiPllConfigForMipiDsi> GenerateHPLL(
+      int64_t pixel_clock_frequency_khz, int64_t maximum_per_data_lane_bit_per_second);
 
  private:
   zx::result<> WaitForHdmiPllToLock();
@@ -69,7 +69,7 @@ class Clock {
   fdf::MmioBuffer vpu_mmio_;
   fdf::MmioBuffer hhi_mmio_;
 
-  PllConfig pll_cfg_ = {};
+  HdmiPllConfigForMipiDsi pll_cfg_ = {};
   LcdTiming lcd_timing_ = {};
 
   bool clock_enabled_;

@@ -17,22 +17,22 @@
 namespace amlogic_display {
 
 template <typename T>
-constexpr inline uint8_t NsToLaneByte(T x, uint32_t lanebytetime) {
+constexpr inline uint8_t NsToLaneByte(T x, int64_t lanebytetime) {
   return (static_cast<uint8_t>((x + lanebytetime - 1) / lanebytetime) & 0xFF);
 }
 
-constexpr uint32_t kUnit = (1 * 1000 * 1000 * 100);
+constexpr int64_t kUnit = int64_t{1} * 1000 * 1000 * 100;
 
-zx::result<> MipiPhy::PhyCfgLoad(uint32_t bitrate) {
+zx::result<> MipiPhy::PhyCfgLoad(int64_t bitrate) {
   // According to MIPI -PHY Spec, we need to define Unit Interval (UI).
   // This UI is defined as the time it takes to send a bit (i.e. bitrate)
   // The x100 is to ensure the ui is not rounded too much (i.e. 2.56 --> 256)
   // However, since we have introduced x100, we need to make sure we include x100
   // to all the PHY timings that are in ns units.
-  const uint32_t ui = kUnit / (bitrate / 1000);
+  const int64_t ui = kUnit / (bitrate / 1000);
 
   // Calculate values will be rounded by the lanebyteclk
-  const uint32_t lanebytetime = ui * 8;
+  const int64_t lanebytetime = ui * 8;
 
   // lp_tesc:TX Escape Clock Division factor (from linebyteclk). Round up to units of ui
   dsi_phy_cfg_.lp_tesc = NsToLaneByte(DPHY_TIME_LP_TESC, lanebytetime);

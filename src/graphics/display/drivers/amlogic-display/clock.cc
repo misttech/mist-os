@@ -8,6 +8,8 @@
 #include <lib/mmio/mmio-buffer.h>
 #include <zircon/status.h>
 
+#include <cstdint>
+
 #include <fbl/alloc_checker.h>
 
 #include "src/graphics/display/drivers/amlogic-display/board-resources.h"
@@ -95,14 +97,12 @@ zx::result<> Clock::WaitForHdmiPllToLock() {
 }
 
 // static
-zx::result<PllConfig> Clock::GenerateHPLL(int32_t pixel_clock_frequency_khz,
-                                          int64_t maximum_per_data_lane_bit_per_second) {
-  PllConfig pll_cfg;
-  uint32_t pll_fout;
+zx::result<HdmiPllConfigForMipiDsi> Clock::GenerateHPLL(
+    int64_t pixel_clock_frequency_khz, int64_t maximum_per_data_lane_bit_per_second) {
+  HdmiPllConfigForMipiDsi pll_cfg;
   // Requested Pixel clock
-  pll_cfg.fout = pixel_clock_frequency_khz;
-  if (pll_cfg.fout > MAX_PIXEL_CLK_KHZ) {
-    zxlogf(ERROR, "Pixel clock out of range (%u KHz)", pll_cfg.fout);
+  if (pixel_clock_frequency_khz > MAX_PIXEL_CLK_KHZ) {
+    zxlogf(ERROR, "Pixel clock out of range (%" PRId64 " KHz)", pixel_clock_frequency_khz);
     return zx::error(ZX_ERR_OUT_OF_RANGE);
   }
 
@@ -119,65 +119,83 @@ zx::result<PllConfig> Clock::GenerateHPLL(int32_t pixel_clock_frequency_khz,
     pll_cfg.clock_factor = clock_factor;
 
     // Desired PLL Frequency based on pixel clock needed
-    pll_fout = pll_cfg.fout * pll_cfg.clock_factor;
+    const int64_t requested_pll_frequency_khz = pixel_clock_frequency_khz * pll_cfg.clock_factor;
 
     // Make sure all clocks are within range
     // If these values are not within range, we will not have a valid display
-    const int64_t dsi_bit_rate_max_khz = maximum_per_data_lane_bit_per_second / kKHZ;
-    const int64_t dsi_bit_rate_min_khz = dsi_bit_rate_max_khz - pll_cfg.fout;
-    if ((pll_fout < dsi_bit_rate_min_khz) || (pll_fout > dsi_bit_rate_max_khz)) {
+    const int64_t dphy_data_lane_bit_rate_max_khz = maximum_per_data_lane_bit_per_second / kKHZ;
+    const int64_t dphy_data_lane_bit_rate_min_khz =
+        dphy_data_lane_bit_rate_max_khz - pixel_clock_frequency_khz;
+    if ((requested_pll_frequency_khz < dphy_data_lane_bit_rate_min_khz) ||
+        (requested_pll_frequency_khz > dphy_data_lane_bit_rate_max_khz)) {
       zxlogf(TRACE, "Calculated clocks out of range for xd = %u, skipped", clock_factor);
       continue;
     }
 
     // Now that we have valid frequency ranges, let's calculated all the PLL-related
     // multipliers/dividers
-    // [fin] * [m/n] = [pll_vco]
-    // [pll_vco] / [od1] / [od2] / [od3] = pll_fout
-    // [fvco] --->[OD1] --->[OD2] ---> [OD3] --> pll_fout
-    uint32_t od3, od2, od1;
-    od3 = (1 << (MAX_OD_SEL - 1));
-    while (od3) {
-      uint32_t fod3 = pll_fout * od3;
-      od2 = od3;
-      while (od2) {
-        uint32_t fod2 = fod3 * od2;
-        od1 = od2;
-        while (od1) {
-          uint32_t fod1 = fod2 * od1;
-          if ((fod1 >= MIN_PLL_VCO_KHZ) && (fod1 <= MAX_PLL_VCO_KHZ)) {
+    // [fin] * [m/n] = [voltage_controlled_oscillator_output_frequency_khz]
+    // [voltage_controlled_oscillator_output_frequency_khz] / [output_divider1]
+    // / [output_divider2] / [output_divider3]
+    // = requested_pll_frequency
+    //
+    // The PLL output is used for the MIPI D-PHY clock lane; its frequency
+    // must be equal to the MIPI D-PHY data lane bit rate.
+    int32_t output_divider3 = (1 << (MAX_OD_SEL - 1));
+    while (output_divider3 != 0) {
+      const int64_t output_divider3_input_frequency_khz =
+          requested_pll_frequency_khz * output_divider3;
+      int32_t output_divider2 = output_divider3;
+      while (output_divider2 != 0) {
+        const int64_t output_divider2_input_frequency_khz =
+            output_divider3_input_frequency_khz * output_divider2;
+        int32_t output_divider1 = output_divider2;
+        while (output_divider1 != 0) {
+          const int64_t output_divider1_input_frequency_khz =
+              output_divider2_input_frequency_khz * output_divider1;
+          const int64_t voltage_controlled_oscillator_output_frequency_khz =
+              output_divider1_input_frequency_khz;
+
+          if ((voltage_controlled_oscillator_output_frequency_khz >= MIN_PLL_VCO_KHZ) &&
+              (voltage_controlled_oscillator_output_frequency_khz <= MAX_PLL_VCO_KHZ)) {
             // within range!
-            pll_cfg.pll_od1_sel = od1 >> 1;
-            pll_cfg.pll_od2_sel = od2 >> 1;
-            pll_cfg.pll_od3_sel = od3 >> 1;
-            pll_cfg.pll_fout = pll_fout;
-            zxlogf(TRACE, "od1=%d, od2=%d, od3=%d", (od1 >> 1), (od2 >> 1), (od3 >> 1));
-            zxlogf(TRACE, "pll_fvco=%d", fod1);
-            pll_cfg.pll_fvco = fod1;
-            // for simplicity, assume n = 1
-            // calculate m such that fin x m = fod1
-            uint32_t m;
-            uint32_t pll_frac;
-            fod1 = fod1 / 1;
-            m = fod1 / FIN_FREQ_KHZ;
-            pll_frac = (fod1 % FIN_FREQ_KHZ) * PLL_FRAC_RANGE / FIN_FREQ_KHZ;
-            pll_cfg.pll_m = m;
-            pll_cfg.pll_n = 1;
-            pll_cfg.pll_frac = pll_frac;
-            zxlogf(TRACE, "m=%d, n=%d, frac=0x%x", m, 1, pll_frac);
-            pll_cfg.bitrate = pll_fout * kKHZ;  // Hz
+            pll_cfg.output_divider1_selection = output_divider1 >> 1;
+            pll_cfg.output_divider2_selection = output_divider2 >> 1;
+            pll_cfg.output_divider3_selection = output_divider3 >> 1;
+            pll_cfg.pll_frequency_khz = requested_pll_frequency_khz;
+            zxlogf(TRACE, "od1=%d, od2=%d, od3=%d", (output_divider1 >> 1), (output_divider2 >> 1),
+                   (output_divider3 >> 1));
+            zxlogf(TRACE, "pll_fvco=%" PRId64, voltage_controlled_oscillator_output_frequency_khz);
+            pll_cfg.pll_voltage_controlled_oscillator_output_frequency_khz =
+                voltage_controlled_oscillator_output_frequency_khz;
+
+            // For simplicity, assume pll_divider = 1.
+            pll_cfg.pll_divider = 1;
+
+            // Calculate pll_multiplier such that
+            // FIN_FREQ_KHZ x pll_multiplier = voltage_controlled_oscillator_output_frequency_khz
+            pll_cfg.pll_multiplier_integer = static_cast<int32_t>(
+                voltage_controlled_oscillator_output_frequency_khz / FIN_FREQ_KHZ);
+            pll_cfg.pll_multiplier_fraction =
+                (voltage_controlled_oscillator_output_frequency_khz % FIN_FREQ_KHZ) *
+                PLL_FRAC_RANGE / FIN_FREQ_KHZ;
+
+            zxlogf(TRACE, "m=%d, n=%d, frac=0x%x", pll_cfg.pll_multiplier_integer,
+                   pll_cfg.pll_divider, pll_cfg.pll_multiplier_fraction);
+            pll_cfg.dphy_data_lane_bits_per_second = pll_cfg.pll_frequency_khz * kKHZ;  // Hz
+
             return zx::ok(std::move(pll_cfg));
           }
-          od1 >>= 1;
+          output_divider1 >>= 1;
         }
-        od2 >>= 1;
+        output_divider2 >>= 1;
       }
-      od3 >>= 1;
+      output_divider3 >>= 1;
     }
   }
 
   zxlogf(ERROR, "Could not generate correct PLL values for: ");
-  zxlogf(ERROR, "  pixel_clock_frequency_khz = %" PRId32, pixel_clock_frequency_khz);
+  zxlogf(ERROR, "  pixel_clock_frequency_khz = %" PRId64, pixel_clock_frequency_khz);
   zxlogf(ERROR, "  max_per_data_lane_bit_rate_hz = %" PRId64, maximum_per_data_lane_bit_per_second);
   return zx::error(ZX_ERR_INTERNAL);
 }
@@ -217,7 +235,7 @@ zx::result<> Clock::Enable(const PanelConfig& panel_config) {
 
   // Populate internal LCD timing structure based on predefined tables
   lcd_timing_ = CalculateLcdTiming(panel_config.display_timing);
-  zx::result<PllConfig> pll_result =
+  zx::result<HdmiPllConfigForMipiDsi> pll_result =
       GenerateHPLL(panel_config.display_timing.pixel_clock_frequency_khz,
                    panel_config.maximum_per_data_lane_bit_per_second());
   if (pll_result.is_error()) {
@@ -228,17 +246,18 @@ zx::result<> Clock::Enable(const PanelConfig& panel_config) {
   pll_cfg_ = std::move(pll_result).value();
 
   uint32_t regVal;
-  PllConfig* pll_cfg = &pll_cfg_;
-  bool useFrac = !!pll_cfg->pll_frac;
+  bool useFrac = pll_cfg_.pll_multiplier_fraction != 0;
 
   regVal = ((1 << LCD_PLL_EN_HPLL_G12A) | (1 << LCD_PLL_OUT_GATE_CTRL_G12A) |  // clk out gate
-            (pll_cfg->pll_n << LCD_PLL_N_HPLL_G12A) | (pll_cfg->pll_m << LCD_PLL_M_HPLL_G12A) |
-            (pll_cfg->pll_od1_sel << LCD_PLL_OD1_HPLL_G12A) |
-            (pll_cfg->pll_od2_sel << LCD_PLL_OD2_HPLL_G12A) |
-            (pll_cfg->pll_od3_sel << LCD_PLL_OD3_HPLL_G12A) | (useFrac ? (1 << 27) : (0 << 27)));
+            (pll_cfg_.pll_divider << LCD_PLL_N_HPLL_G12A) |
+            (pll_cfg_.pll_multiplier_integer << LCD_PLL_M_HPLL_G12A) |
+            (pll_cfg_.output_divider1_selection << LCD_PLL_OD1_HPLL_G12A) |
+            (pll_cfg_.output_divider2_selection << LCD_PLL_OD2_HPLL_G12A) |
+            (pll_cfg_.output_divider3_selection << LCD_PLL_OD3_HPLL_G12A) |
+            (useFrac ? (1 << 27) : (0 << 27)));
   hhi_mmio_.Write32(regVal, HHI_HDMI_PLL_CNTL0);
 
-  hhi_mmio_.Write32(pll_cfg->pll_frac, HHI_HDMI_PLL_CNTL1);
+  hhi_mmio_.Write32(pll_cfg_.pll_multiplier_fraction, HHI_HDMI_PLL_CNTL1);
   hhi_mmio_.Write32(0x00, HHI_HDMI_PLL_CNTL2);
   // Magic numbers from U-Boot.
   hhi_mmio_.Write32(useFrac ? 0x6a285c00 : 0x48681c00, HHI_HDMI_PLL_CNTL3);

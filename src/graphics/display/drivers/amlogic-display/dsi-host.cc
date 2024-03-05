@@ -320,7 +320,7 @@ void DsiHost::Disable() {
   enabled_ = false;
 }
 
-zx::result<> DsiHost::Enable(uint32_t bitrate) {
+zx::result<> DsiHost::Enable(int64_t dphy_data_lane_bits_per_second) {
   if (enabled_) {
     return zx::ok();
   }
@@ -330,7 +330,7 @@ zx::result<> DsiHost::Enable(uint32_t bitrate) {
     PhyEnable();
 
     // Load Phy configuration
-    zx::result<> phy_config_load_result = phy_->PhyCfgLoad(bitrate);
+    zx::result<> phy_config_load_result = phy_->PhyCfgLoad(dphy_data_lane_bits_per_second);
     if (!phy_config_load_result.is_ok()) {
       zxlogf(ERROR, "Error during phy config calculations: %s",
              phy_config_load_result.status_string());

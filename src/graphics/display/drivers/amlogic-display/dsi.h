@@ -136,7 +136,7 @@
 
 // HS_PREPARE + time that the transmitter drives the HS-0 state prior to transmitting
 // the Sync sequence  (>145+10*ui)
-#define DPHY_TIME_HS_ZERO(ui) (145 * UI_X_100 + 10 * (ui)-DPHY_TIME_HS_PREPARE(ui))
+#define DPHY_TIME_HS_ZERO(ui) (145 * UI_X_100 + 10 * (ui) - DPHY_TIME_HS_PREPARE(ui))
 
 // Time that the transmitter drives the flipped differential state after last
 // payload data bit of a HS transmission burst  max(n*8*ui, 60+n*4*ui) <n = 1>
@@ -183,23 +183,26 @@ struct LcdTiming {
 };
 
 // This structure holds the calculated pll values based on desired pixel clock
-struct PllConfig {  // unit: kHz
-  // IN-OUT parameters
-  uint32_t fin;
-  uint32_t fout;
+//
+// TODO(https://fxbug.dev/328135383): Unify the PLL configuration logic for
+// HDMI and MIPI-DSI output.
+struct HdmiPllConfigForMipiDsi {
+  // Output frequency of the HDMI PLL.
+  int64_t pll_frequency_khz;
 
-  // calculated bitrate
-  uint32_t bitrate;
+  // Calculated bitrate of the D-PHY lane on the high speed mode.
+  int64_t dphy_data_lane_bits_per_second;
 
   // pll parameters
-  uint32_t pll_m;
-  uint32_t pll_n;
-  uint32_t pll_fvco;
-  uint32_t pll_od1_sel;
-  uint32_t pll_od2_sel;
-  uint32_t pll_od3_sel;
-  uint32_t pll_frac;
-  uint32_t pll_fout;
+  uint32_t pll_multiplier_integer;
+  uint32_t pll_multiplier_fraction;
+  uint32_t pll_divider;
+
+  int64_t pll_voltage_controlled_oscillator_output_frequency_khz;
+
+  uint32_t output_divider1_selection;
+  uint32_t output_divider2_selection;
+  uint32_t output_divider3_selection;
 
   // divisor parameters
   uint32_t clock_factor;

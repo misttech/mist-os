@@ -60,7 +60,7 @@ class MipiPhy {
   zx::result<> Startup();
   // This function stops Mipi Phy
   void Shutdown();
-  zx::result<> PhyCfgLoad(uint32_t bitrate);
+  zx::result<> PhyCfgLoad(int64_t dphy_data_lane_bits_per_second);
   void Dump();
   uint32_t GetLowPowerEscaseTime() { return dsi_phy_cfg_.lp_tesc; }
 
