@@ -14,6 +14,7 @@ use crate::peer::procedure_manipulated_state::ProcedureManipulatedState;
 pub mod test;
 
 // Individual procedures
+pub mod audio_connection_setup;
 pub mod codec_connection_setup;
 use codec_connection_setup::CodecConnectionSetupProcedure;
 
@@ -65,6 +66,7 @@ pub enum CommandFromHf {
     CallActionDialFromNumber { number: String },
     CallActionDialFromMemory { memory: String },
     CallActionRedialLast,
+    StartAudioConnection,
 }
 
 #[derive(Clone, Debug, PartialEq)]

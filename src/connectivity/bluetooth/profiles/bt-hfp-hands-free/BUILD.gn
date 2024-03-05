@@ -54,6 +54,7 @@ rustc_binary("bin") {
     "src/peer/hf_indicators.rs",
     "src/peer/peer_task.rs",
     "src/peer/procedure.rs",
+    "src/peer/procedure/audio_connection_setup.rs",
     "src/peer/procedure/codec_connection_setup.rs",
     "src/peer/procedure/initiate_call.rs",
     "src/peer/procedure/slc_initialization.rs",

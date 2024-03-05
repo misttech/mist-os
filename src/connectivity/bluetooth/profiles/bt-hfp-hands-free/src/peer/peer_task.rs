@@ -149,4 +149,11 @@ impl PeerTask {
 
         Ok(())
     }
+
+    // TODO(fxb/134161) Implement call setup and call transfers.
+    #[allow(unused)]
+    fn start_audio_connection(&mut self) {
+        self.procedure_manager
+            .enqueue(ProcedureInput::CommandFromHf(CommandFromHf::StartAudioConnection))
+    }
 }

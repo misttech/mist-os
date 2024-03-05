@@ -24,6 +24,10 @@ pub struct CodecConnectionSetupProcedure {
     state: State,
 }
 
+/// HFP v1.8 §4.11.3
+///
+/// The second phase of audio connection setup, following Audio Connection Setup and followed by
+/// SCO connection setup. This phase  may be skipped if the codec has already been selected.
 impl Procedure<ProcedureInput, ProcedureOutput> for CodecConnectionSetupProcedure {
     fn new() -> Self {
         Self { state: State::WaitingForBcs }
