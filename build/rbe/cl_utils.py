@@ -446,6 +446,40 @@ def filter_out_option_with_arg(
         yield arg
 
 
+def strip_option_prefix(args: Iterable[str], prefix_flag: str) -> Iterable[str]:
+    """Copy over flags, but strip away the prefix from a specific flag.
+
+    Example (with prefix_flag="--foo"):
+      Both "--foo=bar" and ("--foo" "bar") become just "bar".
+      This also removes "--foo" at the end of the sequence.
+
+    Args:
+      args: command tokens
+      prefix_flag: the flag that should be stripped away while preserving
+        its argument.
+
+    Yields:
+      a filtered command
+    """
+    fused_prefix_flag = prefix_flag + "="
+    keep_optarg = False
+    for arg in args:
+        if keep_optarg:
+            keep_optarg = False
+            yield arg
+            continue
+
+        if arg == prefix_flag:
+            keep_optarg = True
+            continue
+
+        if arg.startswith(fused_prefix_flag):
+            yield arg.removeprefix(fused_prefix_flag)
+            continue
+
+        yield arg
+
+
 @dataclasses.dataclass
 class ForwardedFlag(object):
     # The original name of the flag to match (including leading '-' or '--').

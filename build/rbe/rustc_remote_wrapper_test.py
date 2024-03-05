@@ -161,6 +161,10 @@ class RustRemoteActionPrepareTests(unittest.TestCase):
         )
 
         self.assertIsNone(r.clang_cxx_stdlibdir)
+        self.assertEqual(
+            r.dep_only_command,
+            list(r._rust_action.dep_only_command(r.local_depfile)),
+        )
 
         mocks = self.generate_prepare_mocks(
             depfile_contents=depfile_contents,
@@ -292,6 +296,37 @@ class RustRemoteActionPrepareTests(unittest.TestCase):
             remote_inputs, set([compiler, shlib_rel, source, rsp] + deps)
         )
         self.assertEqual(remote_output_files, {rlib})
+
+    def test_dep_only_command_filtered(self):
+        exec_root = Path("/home/project")
+        working_dir = exec_root / "build-here"
+        compiler = Path("../tools/bin/rustc")
+        shlib = Path("tools/lib/librusteze.so")
+        shlib_abs = exec_root / shlib
+        shlib_rel = cl_utils.relpath(shlib_abs, start=working_dir)
+        source = Path("../foo/src/lib.rs")
+        rlib = Path("obj/foo.rlib")
+        deps = [Path("../foo/src/other.rs")]
+        depfile_path = Path("obj/foo.rlib.d")
+        depfile_contents = [str(d) + ":" for d in deps]
+        command = _strs(
+            [
+                compiler,
+                source,
+                "--local-only=--foo=bar",
+                "-o",
+                rlib,
+                f"--emit=dep-info={depfile_path}",
+            ]
+        )
+        r = rustc_remote_wrapper.RustRemoteAction(
+            ["--"] + command,
+            exec_root=exec_root,
+            working_dir=working_dir,
+            auto_reproxy=False,
+        )
+        self.assertIn("--foo=bar", r.dep_only_command)
+        self.assertNotIn("--local-only=--foo=bar", r.dep_only_command)
 
     def test_prepare_depfile(self):
         exec_root = Path("/home/project")

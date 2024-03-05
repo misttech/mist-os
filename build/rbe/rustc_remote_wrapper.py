@@ -152,6 +152,10 @@ class RemoteInputProcessingError(RuntimeError):
         super().__init__(message)
 
 
+def _filter_local_command(args: Iterable[str]) -> Sequence[str]:
+    return list(cl_utils.strip_option_prefix(args, "--local-only"))
+
+
 class RustRemoteAction(object):
     def __init__(
         self,
@@ -426,6 +430,20 @@ class RustRemoteAction(object):
             normpath = os.path.normpath(right)
             return prefix + normpath
 
+    @property
+    def local_depfile(self) -> Path:
+        return Path(str(self.depfile) + ".nolink")
+
+    @property
+    def dep_only_command(self) -> Sequence[str]:
+        return cl_utils.auto_env_prefix_command(
+            list(
+                _filter_local_command(
+                    self._rust_action.dep_only_command(self.local_depfile)
+                )
+            )
+        )
+
     def remote_compile_command(self) -> Iterable[str]:
         """Transforms a local command into the remotely executed command.
 
@@ -484,12 +502,9 @@ class RustRemoteAction(object):
     def _local_depfile_inputs(self) -> Iterable[Path]:
         # Generate a local depfile for the purposes of discovering
         # all transitive inputs.
-        local_depfile = Path(str(self.depfile) + ".nolink")
-        self._cleanup_files.append(local_depfile)
+        self._cleanup_files.append(self.local_depfile)
 
-        dep_only_command = cl_utils.auto_env_prefix_command(
-            list(self._rust_action.dep_only_command(local_depfile))
-        )
+        dep_only_command = self.dep_only_command
         self.vmsg(f"scan-deps-only command: {dep_only_command}")
         dep_status = _make_local_depfile(dep_only_command)
         if dep_status != 0:
@@ -507,7 +522,9 @@ class RustRemoteAction(object):
                 )
 
         # There is a phony dep for each input that is needed.
-        deps = list(depfile.parse_lines(_readlines_from_file(local_depfile)))
+        deps = list(
+            depfile.parse_lines(_readlines_from_file(self.local_depfile))
+        )
         target_paths = [dep.target_paths for dep in deps if dep.is_phony]
         remote_depfile_inputs = [
             target for paths in target_paths for target in paths
@@ -966,7 +983,9 @@ class RustRemoteAction(object):
         # don't bother with remote action preparation
         # or any of the remote action features.
         export_dir = self.miscomparison_export_dir
-        command = cl_utils.auto_env_prefix_command(self.original_command)
+        command = cl_utils.auto_env_prefix_command(
+            _filter_local_command(self.original_command)
+        )
         if self.check_determinism:
             self.vmsg("Comparing two local runs of the original command.")
             command = fuchsia.check_determinism_command(

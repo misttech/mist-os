@@ -692,6 +692,30 @@ class FilterOutOptionWithArgTests(unittest.TestCase):
         self.assertEqual(actual, ["creep", "--bar"])
 
 
+class StripOptionPrefixTests(unittest.TestCase):
+    def test_no_change(self):
+        actual = list(
+            cl_utils.strip_option_prefix(["keep", "--all"], "--keep-me")
+        )
+        self.assertEqual(actual, ["keep", "--all"])
+
+    def test_remove_fused_optarg(self):
+        actual = list(
+            cl_utils.strip_option_prefix(
+                ["sleep", "--keep-me=--all", "foo"], "--keep-me"
+            )
+        )
+        self.assertEqual(actual, ["sleep", "--all", "foo"])
+
+    def test_remove_separate_optarg(self):
+        actual = list(
+            cl_utils.strip_option_prefix(
+                ["creep", "--keep-me", "--foo=baz", "--bar"], "--keep-me"
+            )
+        )
+        self.assertEqual(actual, ["creep", "--foo=baz", "--bar"])
+
+
 class FlagForwarderTests(unittest.TestCase):
     def test_no_transform(self):
         f = cl_utils.FlagForwarder([])
