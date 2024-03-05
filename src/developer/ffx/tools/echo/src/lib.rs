@@ -6,6 +6,7 @@ use async_trait::async_trait;
 use fho::{daemon_protocol, FfxContext, FfxMain, FfxTool, MachineWriter, Result, ToolIO};
 use fidl_fuchsia_developer_ffx as ffx;
 
+// [START command_struct]
 #[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(subcommand, name = "echo", description = "run echo test against the daemon")]
 pub struct EchoCommand {
@@ -13,7 +14,9 @@ pub struct EchoCommand {
     /// text string to echo back and forth
     pub text: Option<String>,
 }
+// [END command_struct]
 
+// [START tool_struct]
 #[derive(FfxTool)]
 pub struct EchoTool {
     #[command]
@@ -21,7 +24,9 @@ pub struct EchoTool {
     #[with(daemon_protocol())]
     echo_proxy: ffx::EchoProxy,
 }
+// [END tool_struct]
 
+// [START tool_impl]
 #[async_trait(?Send)]
 impl FfxMain for EchoTool {
     type Writer = MachineWriter<String>;
@@ -36,6 +41,7 @@ impl FfxMain for EchoTool {
         Ok(())
     }
 }
+// [END tool_impl]
 
 #[cfg(test)]
 mod tests {
@@ -43,6 +49,7 @@ mod tests {
     use fho::macro_deps::ffx_writer::TestBuffer;
     use futures_lite::stream::StreamExt;
 
+    // [START fake_proxy]
     fn setup_fake_echo_proxy() -> ffx::EchoProxy {
         let (proxy, mut stream) =
             fidl::endpoints::create_proxy_and_stream::<ffx::EchoMarker>().unwrap();
@@ -58,8 +65,10 @@ mod tests {
         .detach();
         proxy
     }
+    // [END fake_proxy]
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    // [START echo_test]
+    #[fuchsia::test]
     async fn test_regular_run() {
         const ECHO: &'static str = "foo";
         let cmd = EchoCommand { text: Some(ECHO.to_owned()) };
@@ -70,4 +79,5 @@ mod tests {
         tool.main(writer).await.unwrap();
         assert_eq!(format!("{ECHO}\n"), test_stdout.into_string());
     }
+    // [END echo_test]
 }

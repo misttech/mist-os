@@ -69,53 +69,7 @@ simple wrapper around the `rustc_binary` action, but adds some extra targets
 for generating metadata, producing a host tool, and producing sdk atoms.
 
 ```gn
-import("//build/rust/rustc_library.gni")
-import("//src/developer/ffx/build/ffx_tool.gni")
-
-rustc_library("lib") {
-  name = "ffx_echo"
-  edition = "2021"
-  with_unit_tests = true
-
-  deps = [
-    "//src/developer/ffx/lib/fho:lib",
-    "//third_party/rust_crates:argh",
-    "//third_party/rust_crates:async-trait",
-  ]
-
-  test_deps = [
-    #...
-  ]
-
-  sources = [ "src/lib.rs" ]
-}
-
-ffx_tool("ffx_echo") {
-  edition = "2021"
-  output_name = "ffx-echo"
-  deps = [
-    ":lib",
-    "//src/developer/ffx/lib/fho:lib",
-    "//src/lib/fuchsia-async",
-  ]
-  sources = [ "src/main.rs" ]
-
-  # sdk_category = "partner"    # Add an sdk_category when your tool is no longer experimental
-  sdk_target_name = "sdk"
-}
-
-group("echo") {
-  deps = [
-    ":ffx_echo",
-    ":ffx_echo_host_tool",
-    ":ffx_echo_sdk",
-  ]
-}
-
-group("tests") {
-  testonly = true
-  deps = [ ":lib_test" ]
-}
+{% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="src/developer/ffx/tools/echo/BUILD.gn" %}
 ```
 
 ### `main.rs`
@@ -125,13 +79,7 @@ the right types to act as an entry point that `ffx` knows how to communicate
 with:
 
 ```rust
-use ffx_tool_echo::EchoTool;
-use fho::FfxTool;
-
-#[fuchsia_async::run_singlethreaded]
-async fn main() {
-    EchoTool::execute_tool().await
-}
+{% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="src/developer/ffx/tools/echo/src/main.rs" %}
 ```
 
 ### `lib.rs`
@@ -143,13 +91,7 @@ implementation from a structure that will hold context your tool needs to run.
 #### Arguments
 
 ```rust
-#[derive(FromArgs, Debug, PartialEq)]
-#[argh(subcommand, name = "echo", description = "run echo test against the daemon")]
-pub struct EchoCommand {
-    #[argh(positional)]
-    /// text string to echo back and forth
-    pub text: Option<String>,
-}
+{% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="src/developer/ffx/tools/echo/src/lib.rs" region_tag="command_struct" %}
 ```
 
 This is the struct that defines any arguments your subtool needs after its
@@ -158,14 +100,7 @@ subcommand name.
 #### The tool structure
 
 ```rust
-#[derive(FfxTool)]
-#[check(AvailabilityFlag("echo.enabled"))]
-pub struct EchoTool {
-    #[command]
-    cmd: EchoCommand,
-    #[with(daemon_protocol())]
-    echo_proxy: ffx::EchoProxy,
-}
+{% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="src/developer/ffx/tools/echo/src/lib.rs" region_tag="tool_struct" %}
 ```
 
 This is the structure that holds context your tool needs. This includes things
@@ -191,20 +126,7 @@ on it before it's ready for wider use.
 #### The `FfxMain` implementation
 
 ```rust
-#[async_trait(?Send)]
-impl FfxMain for EchoTool {
-    type Writer = MachineWriter<String>;
-    async fn main(self, writer: Self::Writer) -> Result<()> {
-        let text = self.cmd.text.as_deref().unwrap_or("FFX");
-        let echo_out = self
-            .echo_proxy
-            .echo_string(text)
-            .await
-            .user_message("Error returned from echo service")?;
-        writer.item(&echo_out)?;
-        Ok(())
-    }
-}
+{% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="src/developer/ffx/tools/echo/src/lib.rs" region_tag="tool_impl" %}
 ```
 
 Here you can implement the actual tool logic. You can specify a type for the
@@ -223,9 +145,19 @@ in the [errors](errors.md) document.
 
 #### Tests
 
-Please add some tests! You can look at some existing examples of subtools to get
-a better idea of how to do this, but it is otherwise much like writing any other
-test for Fuchsia rust code.
+A common patten for testing subtools is to create a fake proxy for a FIDL protocol. This allows
+you to return the full variety of results from calling the proxy without actually having to deal
+with the complexity of an integration test.
+
+```rust
+{% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="src/developer/ffx/tools/echo/src/lib.rs" region_tag="fake_proxy" %}
+```
+
+Then use this fake proxy in a unit test
+
+```rust
+{% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="src/developer/ffx/tools/echo/src/lib.rs" region_tag="echo_test" %}
+```
 
 ### `OWNERS`
 
@@ -235,23 +167,11 @@ triage. It should look something like the following:
 
 ```OWNERS
 file:/path/to/authoritative/OWNERS
-
-# COMPONENT: SomeComponent
 ```
 
 It's better to add it as a reference (with `file:` or possible `include`) than
 as a direct list of people, so that it doesn't get stale due to being out of the
 way.
-
-If your subtool is elsewhere, you will need to add the maintainers of `ffx` to the `OWNERS`
-file for this directory so we can review updates to the interface between ffx
-and your subtool:
-
-```OWNERS
-file:/src/developer/ffx/OWNERS
-
-# any other project-specific things here
-```
 
 ## Adding to the build
 
@@ -303,16 +223,23 @@ the SDK and IDK:
    on to the SDK when you add a subtool to the SDK. (For details, see
    [Promoting an API to partner_internal][promoting-an-api-to-partner-internal].)
 
-2. Golden files - Used to check compatibility of command line arguments.
+2. Command line arguments - In order to test for breaking changes due to command line
+   option changes, the [ArgsInfo] derive macro is used to generate a JSON representation
+   of the command line.
 
-3. Machine Writer output - Tools and subcommands need to have machine output
-   whenever possible.
+   This is used in a [golden file test][golden-file-test] to detect
+   differences. Golden files. Eventually, this test will be enhanced to detect and warn
+   of changes that break backwards compatibility.
+
+3. Machine friendly output - Tools and subcommands need to have machine output
+   whenever possible, especially for tools that are used in test or build scripts.
+   The [MachineWriter] object is used to facilitate encoding the output in JSON format
+   and providing a schema that is used to detect changes to the output structure.
 
    Machine output must be stable along the current compatibility
    window. Eventually, there will be a golden check for the machine output format.
    The benefit of having machine writer output is that it frees you up to have
-   unstable output in free text. It is recommended that your machine output is
-   simple, even if dense, and human comprehensible.
+   unstable output in free text.
 
 ### Updating the subtool
 
@@ -348,3 +275,6 @@ the SDK and IDK. This documentation will be updated once design criteria gets pu
 [ffx-target-update]: /src/developer/ffx/plugins/target/update/src/lib.rs
 [promoting-an-api-to-partner-internal]: /docs/contribute/sdk#promoting_an_api_to_the_partner_internal_category
 [sdk-gn-file]: /sdk/BUILD.gn
+[ArgsInfo]: https://github.com/google/argh/blob/e901d3a1cc285db9740e0e68a1e4225234377015/argh/src/lib.rs#L338
+[golden-file-test]: /src/developer/ffx/tests/cli-goldens/README.md
+[MachineWriter]: /docs/development/tools/ffx/development/subtools/writers.md
