@@ -85,8 +85,7 @@ class FuchsiaDevice(base_fuchsia_device.BaseFuchsiaDevice):
     Raises:
         errors.SSHCommandError: if SSH connection check fails.
         errors.FFXCommandError: if FFX connection check fails.
-        errors.FuchsiaControllerError: if failed to instantiate
-            Fuchsia-Controller transport.
+        errors.FuchsiaControllerError: if FC connection check fails.
     """
 
     def __init__(

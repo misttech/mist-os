@@ -30,6 +30,9 @@ class TRANSPORT(enum.StrEnum):
     # use Fuchsia-Controller for Host-(Fuchsia)Target interactions.
     FUCHSIA_CONTROLLER = "fuchsia-controller"
 
+    # prioritize Fuchsia-Controller over SL4F for Host-(Fuchsia)Target interactions.
+    FUCHSIA_CONTROLLER_PREFERRED = "fuchsia-controller-preferred"
+
 
 @dataclass(frozen=True)
 class IpPort:

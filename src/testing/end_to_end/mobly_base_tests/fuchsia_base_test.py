@@ -334,17 +334,16 @@ class FuchsiaBaseTest(base_test.BaseTestClass):
                 f"{fx_device.device_name} is unhealthy and failed to recover it"
             ) from err
 
-    def _is_fuchsia_controller_based_device(
+    def _get_transport_from_device_config(
         self, fx_device: fuchsia_device.FuchsiaDevice
-    ) -> bool:
-        """Checks the testbed config and returns if the device is using
-        Fuchsia-Controller based transport.
+    ) -> custom_types.TRANSPORT:
+        """Return the transport listed in the device config.
 
         Args:
             fx_device: FuchsiaDevice object
 
         Returns:
-            True if transport is set to Fuchsia-Controller, else False
+            custom_types.TRANSPORT associated with the device
         """
         device_config: dict[str, str] = self._get_device_config(
             controller_type="FuchsiaDevice",
@@ -352,13 +351,7 @@ class FuchsiaBaseTest(base_test.BaseTestClass):
             identifier_value=fx_device.device_name,
         )
 
-        if (
-            device_config["transport"]
-            == custom_types.TRANSPORT.FUCHSIA_CONTROLLER
-        ):
-            return True
-
-        return False
+        return custom_types.TRANSPORT(device_config["transport"])
 
     def _log_message_to_devices(
         self, message: str, level: custom_types.LEVEL

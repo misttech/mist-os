@@ -148,8 +148,10 @@ template("python_mobly_test") {
   assert(defined(invoker.main_source), "main_source is required")
   assert(defined(invoker.transport), "transport is required")
   assert(
-      invoker.transport == "sl4f" || invoker.transport == "fuchsia-controller",
-      "transport should be either 'sl4f' or 'fuchsia-controller' but received: " + invoker.transport)
+      invoker.transport == "sl4f" ||
+          invoker.transport == "fuchsia-controller" ||
+          invoker.transport == "fuchsia-controller-preferred",
+      "transport should be either 'sl4f' or 'fuchsia-controller' or 'fuchsia-controller-preferred' but received: " + invoker.transport)
 
   _testonly = true
   if (defined(invoker.testonly)) {

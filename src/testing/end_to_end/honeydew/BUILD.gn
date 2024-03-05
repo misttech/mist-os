@@ -40,6 +40,8 @@ python_library("honeydew") {
     "fuchsia_device/base_fuchsia_device.py",
     "fuchsia_device/fuchsia_controller/__init__.py",
     "fuchsia_device/fuchsia_controller/fuchsia_device.py",
+    "fuchsia_device/fuchsia_controller_preferred/__init__.py",
+    "fuchsia_device/fuchsia_controller_preferred/fuchsia_device.py",
     "fuchsia_device/sl4f/__init__.py",
     "fuchsia_device/sl4f/fuchsia_device.py",
     "interfaces/__init__.py",

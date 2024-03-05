@@ -1,13 +1,13 @@
-# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
 import("//build/python/python_host_test.gni")
 
 if (is_host) {
-  python_host_test("base_fuchsia_device_test") {
+  python_host_test("fuchsia_device_fc_preferred_test") {
     enable_pytype = true
-    main_source = "base_fuchsia_device_test.py"
+    main_source = "fuchsia_device_test.py"
     libraries = [
       "//src/testing/end_to_end/honeydew",
       "//third_party/parameterized",
@@ -19,10 +19,5 @@ if (is_host) {
 
 group("tests") {
   testonly = true
-  public_deps = [
-    ":base_fuchsia_device_test($host_toolchain)",
-    "fuchsia_controller:tests",
-    "fuchsia_controller_preferred:tests",
-    "sl4f:tests",
-  ]
+  public_deps = [ ":fuchsia_device_fc_preferred_test($host_toolchain)" ]
 }

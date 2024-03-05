@@ -10,6 +10,9 @@ from honeydew import errors
 from honeydew.fuchsia_device.fuchsia_controller import (
     fuchsia_device as fc_fuchsia_device,
 )
+from honeydew.fuchsia_device.fuchsia_controller_preferred import (
+    fuchsia_device as fc_preferred_fuchsia_device,
+)
 from honeydew.fuchsia_device.sl4f import fuchsia_device as sl4f_fuchsia_device
 from honeydew.interfaces.device_classes import (
     fuchsia_device as fuchsia_device_interface,
@@ -71,16 +74,24 @@ def create_device(
             )
             ffx_transport.add_target()
 
-        if transport == custom_types.TRANSPORT.SL4F:
-            return sl4f_fuchsia_device.FuchsiaDevice(
+        if transport == custom_types.TRANSPORT.FUCHSIA_CONTROLLER:
+            return fc_fuchsia_device.FuchsiaDevice(
                 device_name,
                 ffx_config,
                 device_ip_port,
                 ssh_private_key,
                 ssh_user,
             )
-        else:  # custom_types.TRANSPORT.FUCHSIA_CONTROLLER
-            return fc_fuchsia_device.FuchsiaDevice(
+        elif transport == custom_types.TRANSPORT.FUCHSIA_CONTROLLER_PREFERRED:
+            return fc_preferred_fuchsia_device.FuchsiaDevice(
+                device_name,
+                ffx_config,
+                device_ip_port,
+                ssh_private_key,
+                ssh_user,
+            )
+        else:
+            return sl4f_fuchsia_device.FuchsiaDevice(
                 device_name,
                 ffx_config,
                 device_ip_port,

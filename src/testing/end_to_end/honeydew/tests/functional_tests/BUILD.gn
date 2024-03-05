@@ -59,6 +59,7 @@ if (is_host) {
     testonly = true
     public_deps = [
       "affordance_tests/test_tracing:tracing_test_sl4f($host_toolchain)",
+      "fuchsia_device_tests/test_fuchsia_device:x64_emu_test_fc_preferred($host_toolchain)",
       "fuchsia_device_tests/test_fuchsia_device:x64_emu_test_sl4f($host_toolchain)",
     ]
   }
@@ -80,6 +81,7 @@ if (is_host) {
     public_deps = [
       "affordance_tests/test_wlan:wlan_policy_test_sl4f($host_toolchain)",
       "affordance_tests/test_wlan:wlan_test_sl4f($host_toolchain)",
+      "fuchsia_device_tests/test_fuchsia_device:vim3_test_fc_preferred($host_toolchain)",
       "fuchsia_device_tests/test_fuchsia_device:vim3_test_sl4f($host_toolchain)",
     ]
   }
@@ -93,7 +95,10 @@ if (is_host) {
 
   group("stable_nuc_sl4f_tests") {
     testonly = true
-    public_deps = [ "fuchsia_device_tests/test_fuchsia_device:x64_nuc_test_sl4f($host_toolchain)" ]
+    public_deps = [
+      "fuchsia_device_tests/test_fuchsia_device:x64_nuc_test_fc_preferred($host_toolchain)",
+      "fuchsia_device_tests/test_fuchsia_device:x64_nuc_test_sl4f($host_toolchain)",
+    ]
   }
 
   group("stable_nuc_tests") {
