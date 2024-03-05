@@ -7,6 +7,8 @@
 
 #include <algorithm>
 
+namespace amlogic_display {
+
 // TOP MIPI_DSI AML Registers
 
 #define MIPI_DSI_TOP_SW_RESET (0x00 << 2)
@@ -70,11 +72,13 @@
 #define LP_WCHDOG_TIME (0x1000)
 #define TURN_WCHDOG_TIME (0x1000)
 
-// Frequency Ranges (in KHz) specific to AmLogic S905D2
-#define FIN_FREQ_KHZ (24 * 1000)
-#define MIN_PLL_VCO_KHZ (3000 * 1000)
-#define MAX_PLL_VCO_KHZ (6000 * 1000)
-#define MAX_PIXEL_CLK_KHZ (200 * 1000)
+// Frequency Ranges (in Hz) specific to AmLogic S905D2
+inline constexpr int64_t kExternalOscillatorFrequencyHz = int64_t{24} * 1'000 * 1'000;
+inline constexpr int64_t kMinVoltageControlledOscillatorFrequencyHz =
+    int64_t{3} * 1'000 * 1'000 * 1'000;
+inline constexpr int64_t kMaxVoltageControlledOscillatorFrequencyHz =
+    int64_t{6} * 1'000 * 1'000 * 1'000;
+inline constexpr int64_t kMaxPixelClockFrequencyHz = int64_t{200} * 1'000 * 1'000;
 #define MAX_OD_SEL (3)
 #define PLL_FRAC_RANGE (1 << 17)
 
@@ -188,7 +192,7 @@ struct LcdTiming {
 // HDMI and MIPI-DSI output.
 struct HdmiPllConfigForMipiDsi {
   // Output frequency of the HDMI PLL.
-  int64_t pll_frequency_khz;
+  int64_t pll_frequency_hz;
 
   // Calculated bitrate of the D-PHY lane on the high speed mode.
   int64_t dphy_data_lane_bits_per_second;
@@ -198,7 +202,7 @@ struct HdmiPllConfigForMipiDsi {
   uint32_t pll_multiplier_fraction;
   uint32_t pll_divider;
 
-  int64_t pll_voltage_controlled_oscillator_output_frequency_khz;
+  int64_t pll_voltage_controlled_oscillator_output_frequency_hz;
 
   uint32_t output_divider1_selection;
   uint32_t output_divider2_selection;
@@ -207,5 +211,7 @@ struct HdmiPllConfigForMipiDsi {
   // divisor parameters
   uint32_t clock_factor;
 };
+
+}  // namespace amlogic_display
 
 #endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_AMLOGIC_DISPLAY_DSI_H_

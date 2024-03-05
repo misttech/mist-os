@@ -61,7 +61,7 @@ class Clock {
   // This function calculates the required pll configurations needed to generate
   // the desired lcd clock
   static zx::result<HdmiPllConfigForMipiDsi> GenerateHPLL(
-      int64_t pixel_clock_frequency_khz, int64_t maximum_per_data_lane_bit_per_second);
+      int64_t pixel_clock_frequency_hz, int64_t maximum_per_data_lane_bit_per_second);
 
  private:
   zx::result<> WaitForHdmiPllToLock();

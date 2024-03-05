@@ -15,16 +15,12 @@
 #include "src/graphics/display/drivers/amlogic-display/board-resources.h"
 #include "src/graphics/display/drivers/amlogic-display/clock-regs.h"
 #include "src/graphics/display/drivers/amlogic-display/common.h"
+#include "src/graphics/display/drivers/amlogic-display/dsi.h"
 #include "src/graphics/display/drivers/amlogic-display/fixed-point-util.h"
 #include "src/graphics/display/drivers/amlogic-display/hhi-regs.h"
 #include "src/graphics/display/lib/api-types-cpp/display-timing.h"
 
 namespace amlogic_display {
-
-namespace {
-constexpr uint32_t kKHZ = 1000;
-
-}  // namespace
 
 Clock::Clock(fdf::MmioBuffer vpu_mmio, fdf::MmioBuffer hhi_mmio, bool clock_enabled)
     : vpu_mmio_(std::move(vpu_mmio)),
@@ -98,11 +94,11 @@ zx::result<> Clock::WaitForHdmiPllToLock() {
 
 // static
 zx::result<HdmiPllConfigForMipiDsi> Clock::GenerateHPLL(
-    int64_t pixel_clock_frequency_khz, int64_t maximum_per_data_lane_bit_per_second) {
+    int64_t pixel_clock_frequency_hz, int64_t maximum_per_data_lane_bit_per_second) {
   HdmiPllConfigForMipiDsi pll_cfg;
   // Requested Pixel clock
-  if (pixel_clock_frequency_khz > MAX_PIXEL_CLK_KHZ) {
-    zxlogf(ERROR, "Pixel clock out of range (%" PRId64 " KHz)", pixel_clock_frequency_khz);
+  if (pixel_clock_frequency_hz > kMaxPixelClockFrequencyHz) {
+    zxlogf(ERROR, "Pixel clock out of range (%" PRId64 " Hz)", pixel_clock_frequency_hz);
     return zx::error(ZX_ERR_OUT_OF_RANGE);
   }
 
@@ -119,22 +115,22 @@ zx::result<HdmiPllConfigForMipiDsi> Clock::GenerateHPLL(
     pll_cfg.clock_factor = clock_factor;
 
     // Desired PLL Frequency based on pixel clock needed
-    const int64_t requested_pll_frequency_khz = pixel_clock_frequency_khz * pll_cfg.clock_factor;
+    const int64_t requested_pll_frequency_hz = pixel_clock_frequency_hz * pll_cfg.clock_factor;
 
     // Make sure all clocks are within range
     // If these values are not within range, we will not have a valid display
-    const int64_t dphy_data_lane_bit_rate_max_khz = maximum_per_data_lane_bit_per_second / kKHZ;
-    const int64_t dphy_data_lane_bit_rate_min_khz =
-        dphy_data_lane_bit_rate_max_khz - pixel_clock_frequency_khz;
-    if ((requested_pll_frequency_khz < dphy_data_lane_bit_rate_min_khz) ||
-        (requested_pll_frequency_khz > dphy_data_lane_bit_rate_max_khz)) {
+    const int64_t dphy_data_lane_bit_rate_max_hz = maximum_per_data_lane_bit_per_second;
+    const int64_t dphy_data_lane_bit_rate_min_hz =
+        dphy_data_lane_bit_rate_max_hz - pixel_clock_frequency_hz;
+    if ((requested_pll_frequency_hz < dphy_data_lane_bit_rate_min_hz) ||
+        (requested_pll_frequency_hz > dphy_data_lane_bit_rate_max_hz)) {
       zxlogf(TRACE, "Calculated clocks out of range for xd = %u, skipped", clock_factor);
       continue;
     }
 
     // Now that we have valid frequency ranges, let's calculated all the PLL-related
     // multipliers/dividers
-    // [fin] * [m/n] = [voltage_controlled_oscillator_output_frequency_khz]
+    // [fin] * [m/n] = [voltage_controlled_oscillator_output_frequency_hz]
     // [voltage_controlled_oscillator_output_frequency_khz] / [output_divider1]
     // / [output_divider2] / [output_divider3]
     // = requested_pll_frequency
@@ -143,46 +139,50 @@ zx::result<HdmiPllConfigForMipiDsi> Clock::GenerateHPLL(
     // must be equal to the MIPI D-PHY data lane bit rate.
     int32_t output_divider3 = (1 << (MAX_OD_SEL - 1));
     while (output_divider3 != 0) {
-      const int64_t output_divider3_input_frequency_khz =
-          requested_pll_frequency_khz * output_divider3;
-      int32_t output_divider2 = output_divider3;
+      const int64_t output_divider3_input_frequency_hz =
+          requested_pll_frequency_hz * output_divider3;
+      int output_divider2 = output_divider3;
       while (output_divider2 != 0) {
-        const int64_t output_divider2_input_frequency_khz =
-            output_divider3_input_frequency_khz * output_divider2;
+        const int64_t output_divider2_input_frequency_hz =
+            output_divider3_input_frequency_hz * output_divider2;
         int32_t output_divider1 = output_divider2;
         while (output_divider1 != 0) {
-          const int64_t output_divider1_input_frequency_khz =
-              output_divider2_input_frequency_khz * output_divider1;
-          const int64_t voltage_controlled_oscillator_output_frequency_khz =
-              output_divider1_input_frequency_khz;
+          const int64_t output_divider1_input_frequency_hz =
+              output_divider2_input_frequency_hz * output_divider1;
+          const int64_t voltage_controlled_oscillator_output_frequency_hz =
+              output_divider1_input_frequency_hz;
 
-          if ((voltage_controlled_oscillator_output_frequency_khz >= MIN_PLL_VCO_KHZ) &&
-              (voltage_controlled_oscillator_output_frequency_khz <= MAX_PLL_VCO_KHZ)) {
+          if ((voltage_controlled_oscillator_output_frequency_hz >=
+               kMinVoltageControlledOscillatorFrequencyHz) &&
+              (voltage_controlled_oscillator_output_frequency_hz <=
+               kMaxVoltageControlledOscillatorFrequencyHz)) {
             // within range!
             pll_cfg.output_divider1_selection = output_divider1 >> 1;
             pll_cfg.output_divider2_selection = output_divider2 >> 1;
             pll_cfg.output_divider3_selection = output_divider3 >> 1;
-            pll_cfg.pll_frequency_khz = requested_pll_frequency_khz;
+            pll_cfg.pll_frequency_hz = requested_pll_frequency_hz;
             zxlogf(TRACE, "od1=%d, od2=%d, od3=%d", (output_divider1 >> 1), (output_divider2 >> 1),
                    (output_divider3 >> 1));
-            zxlogf(TRACE, "pll_fvco=%" PRId64, voltage_controlled_oscillator_output_frequency_khz);
-            pll_cfg.pll_voltage_controlled_oscillator_output_frequency_khz =
-                voltage_controlled_oscillator_output_frequency_khz;
+            zxlogf(TRACE, "pll_fvco=%" PRId64, voltage_controlled_oscillator_output_frequency_hz);
+            pll_cfg.pll_voltage_controlled_oscillator_output_frequency_hz =
+                voltage_controlled_oscillator_output_frequency_hz;
 
             // For simplicity, assume pll_divider = 1.
             pll_cfg.pll_divider = 1;
 
             // Calculate pll_multiplier such that
-            // FIN_FREQ_KHZ x pll_multiplier = voltage_controlled_oscillator_output_frequency_khz
-            pll_cfg.pll_multiplier_integer = static_cast<int32_t>(
-                voltage_controlled_oscillator_output_frequency_khz / FIN_FREQ_KHZ);
-            pll_cfg.pll_multiplier_fraction =
-                (voltage_controlled_oscillator_output_frequency_khz % FIN_FREQ_KHZ) *
-                PLL_FRAC_RANGE / FIN_FREQ_KHZ;
+            // kExternalOscillatorFrequencyHz x pll_multiplier =
+            // voltage_controlled_oscillator_output_frequency_hz
+            pll_cfg.pll_multiplier_integer =
+                static_cast<int32_t>(voltage_controlled_oscillator_output_frequency_hz * 1000 /
+                                     kExternalOscillatorFrequencyHz);
+            pll_cfg.pll_multiplier_fraction = (voltage_controlled_oscillator_output_frequency_hz *
+                                               1000 % kExternalOscillatorFrequencyHz) *
+                                              PLL_FRAC_RANGE / kExternalOscillatorFrequencyHz;
 
             zxlogf(TRACE, "m=%d, n=%d, frac=0x%x", pll_cfg.pll_multiplier_integer,
                    pll_cfg.pll_divider, pll_cfg.pll_multiplier_fraction);
-            pll_cfg.dphy_data_lane_bits_per_second = pll_cfg.pll_frequency_khz * kKHZ;  // Hz
+            pll_cfg.dphy_data_lane_bits_per_second = pll_cfg.pll_frequency_hz;  // Hz
 
             return zx::ok(std::move(pll_cfg));
           }
@@ -195,7 +195,7 @@ zx::result<HdmiPllConfigForMipiDsi> Clock::GenerateHPLL(
   }
 
   zxlogf(ERROR, "Could not generate correct PLL values for: ");
-  zxlogf(ERROR, "  pixel_clock_frequency_khz = %" PRId64, pixel_clock_frequency_khz);
+  zxlogf(ERROR, "  pixel_clock_frequency_hz = %" PRId64, pixel_clock_frequency_hz);
   zxlogf(ERROR, "  max_per_data_lane_bit_rate_hz = %" PRId64, maximum_per_data_lane_bit_per_second);
   return zx::error(ZX_ERR_INTERNAL);
 }
@@ -236,7 +236,8 @@ zx::result<> Clock::Enable(const PanelConfig& panel_config) {
   // Populate internal LCD timing structure based on predefined tables
   lcd_timing_ = CalculateLcdTiming(panel_config.display_timing);
   zx::result<HdmiPllConfigForMipiDsi> pll_result =
-      GenerateHPLL(panel_config.display_timing.pixel_clock_frequency_khz,
+      GenerateHPLL(/*pixel_clock_frequency_hz=*/
+                   int64_t{panel_config.display_timing.pixel_clock_frequency_khz} * 1'000,
                    panel_config.maximum_per_data_lane_bit_per_second());
   if (pll_result.is_error()) {
     zxlogf(ERROR, "Failed to generate HDMI PLL and Video clock tree configuration: %s",
