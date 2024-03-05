@@ -11,7 +11,15 @@ use futures::{FutureExt, TryStreamExt};
 use std::collections::VecDeque;
 use std::fmt::Debug;
 use std::sync::Arc;
-use vfs::{common::send_on_open_with_error, execution_scope::ExecutionScope};
+use vfs::{
+    common::send_on_open_with_error,
+    directory::{
+        entry::{DirectoryEntry, EntryInfo},
+        simple::OpenRequest,
+    },
+    execution_scope::ExecutionScope,
+    remote::RemoteLike,
+};
 
 use crate::{registry, CapabilityTrait, ConversionError, Directory};
 
@@ -43,8 +51,34 @@ use crate::{registry, CapabilityTrait, ConversionError, Directory};
 /// Intuitively this is akin to mounting a remote VFS node in a directory.
 #[derive(Clone)]
 pub struct Open {
-    open_fn: Arc<OpenFn>,
+    inner: Arc<OpenRemote>,
+}
+
+struct OpenRemote {
+    open_fn: Box<OpenFn>,
     entry_type: fio::DirentType,
+}
+
+impl vfs::directory::entry::DirectoryEntry for OpenRemote {
+    fn entry_info(&self) -> EntryInfo {
+        EntryInfo::new(fio::INO_UNKNOWN, self.entry_type)
+    }
+
+    fn open_entry(self: Arc<Self>, request: OpenRequest<'_>) -> Result<(), zx::Status> {
+        request.open_remote(self)
+    }
+}
+
+impl RemoteLike for OpenRemote {
+    fn open(
+        self: Arc<Self>,
+        scope: ExecutionScope,
+        flags: fio::OpenFlags,
+        path: vfs::path::Path,
+        server_end: ServerEnd<fio::NodeMarker>,
+    ) {
+        (self.open_fn)(scope, flags, path, server_end.into());
+    }
 }
 
 /// The function that will be called when this capability is opened.
@@ -69,7 +103,7 @@ impl Open {
             + Sync
             + 'static,
     {
-        Open { open_fn: Arc::new(open), entry_type }
+        Open { inner: Arc::new(OpenRemote { open_fn: Box::new(open), entry_type }) }
     }
 
     /// Converts the [Open] capability into a [Directory] capability such that it will be
@@ -91,7 +125,7 @@ impl Open {
     ) {
         let path = path.validate();
         match path {
-            Ok(path) => (self.open_fn)(scope.clone(), flags, path, server_end.into()),
+            Ok(path) => (self.inner.open_fn)(scope.clone(), flags, path, server_end.into()),
             Err(error) => {
                 let describe = flags.intersects(fio::OpenFlags::DESCRIBE);
                 send_on_open_with_error(describe, server_end.into(), error);
@@ -120,26 +154,15 @@ impl Open {
     ///
     /// Both `into_remote` and FIDL conversion will let us open the capability:
     ///
-    /// * `into_remote` returns a [vfs::remote::Remote] that supports
-    ///   [DirectoryEntry::open].
+    /// * `into_remote` returns a type that implements `RemoteLike` and `DirectoryEntry` which
+    ///   supports [RemoteLike::open].
     /// * FIDL conversion returns a client endpoint and calls
     ///   [DirectoryEntry::open] with the server endpoint given open requests.
     ///
     /// `into_remote` avoids a round trip through FIDL and channels, and is used as an
     /// internal performance optimization by `Dict` when building a directory tree.
-    pub(crate) fn into_remote(self) -> Arc<vfs::remote::Remote> {
-        let open = self.open_fn;
-        vfs::remote::remote_boxed_with_type(
-            Box::new(
-                move |scope: ExecutionScope,
-                      flags: fio::OpenFlags,
-                      relative_path: vfs::path::Path,
-                      server_end: ServerEnd<fio::NodeMarker>| {
-                    open(scope, flags, relative_path, server_end.into_channel().into())
-                },
-            ),
-            self.entry_type,
-        )
+    pub(crate) fn into_remote(self) -> Arc<impl RemoteLike + DirectoryEntry> {
+        self.inner
     }
 
     /// Serves the `fuchsia.io.Openable` protocol for this Open and moves it into the registry.
@@ -176,7 +199,7 @@ impl fmt::Debug for Open {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Open")
             .field("open", &"[open function]")
-            .field("entry_type", &self.entry_type)
+            .field("entry_type", &self.inner.entry_type)
             .finish()
     }
 }

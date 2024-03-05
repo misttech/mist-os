@@ -7,15 +7,16 @@
 #[cfg(test)]
 mod tests;
 
-use crate::{
-    common::send_on_open_with_error,
-    directory::entry::{DirectoryEntry, EntryInfo, OpenRequest},
-    execution_scope::ExecutionScope,
-    path::Path,
-};
-
 use {
-    fidl::endpoints::ServerEnd, fidl_fuchsia_io as fio, fuchsia_zircon_status::Status,
+    crate::{
+        common::send_on_open_with_error,
+        directory::entry::{DirectoryEntry, EntryInfo, OpenRequest},
+        execution_scope::ExecutionScope,
+        path::Path,
+    },
+    fidl::endpoints::ServerEnd,
+    fidl_fuchsia_io as fio,
+    fuchsia_zircon_status::Status,
     std::sync::Arc,
 };
 
@@ -31,13 +32,13 @@ pub trait RemoteLike {
 
 /// The type for the callback function used to create new connections to the remote object. The
 /// arguments mirror DirectoryEntry::open.
-pub type RoutingFn =
+type RoutingFn =
     Box<dyn Fn(ExecutionScope, fio::OpenFlags, Path, ServerEnd<fio::NodeMarker>) + Send + Sync>;
 
 /// Create a new [`Remote`] node that forwards requests to the provided [`RoutingFn`]. This routing
 /// function is called once per open request. The dirent type is set to the provided
 /// `dirent_type`, which should be one of the `DIRENT_TYPE_*` values defined in fuchsia.io.
-pub fn remote_boxed_with_type(open_fn: RoutingFn, dirent_type: fio::DirentType) -> Arc<Remote> {
+fn remote_boxed_with_type(open_fn: RoutingFn, dirent_type: fio::DirentType) -> Arc<Remote> {
     Arc::new(Remote { open_fn, dirent_type })
 }
 
@@ -45,23 +46,12 @@ pub fn remote_boxed_with_type(open_fn: RoutingFn, dirent_type: fio::DirentType) 
 /// routing function is called once per open request. The dirent type is set as
 /// `DirentType::Unknown`. If the remote node is a known `DIRENT_TYPE_*` type, you may wish to use
 /// [`remote_boxed_with_type`] instead.
-pub fn remote_boxed(open: RoutingFn) -> Arc<Remote> {
+fn remote_boxed(open: RoutingFn) -> Arc<Remote> {
     remote_boxed_with_type(open, fio::DirentType::Unknown)
 }
 
-/// Create a new [`Remote`] node that forwards open requests to the provided callback. This routing
-/// function is called once per open request. The dirent type is set as `DirentType::Unknown`. If
-/// the remote node is a known `DIRENT_TYPE_*` type, you may wish to use [`remote_boxed_with_type`]
-/// instead.
-pub fn remote<Open>(open: Open) -> Arc<Remote>
-where
-    Open: Fn(ExecutionScope, fio::OpenFlags, Path, ServerEnd<fio::NodeMarker>)
-        + Send
-        + Sync
-        + 'static,
-{
-    remote_boxed(Box::new(open))
-}
+// TODO(b/325540563): consider adding `remote_lazy_dir` which takes a generic function that
+// returns the directory proxy. This will be useful, for example, in session_manager.
 
 /// Create a new [`Remote`] node that forwards open requests to the provided [`DirectoryProxy`],
 /// effectively handing off the handling of any further requests to the remote fidl server.

@@ -137,10 +137,7 @@ mod tests {
     use std::sync::Mutex;
     use test_util::Counter;
     use vfs::{
-        directory::entry_container::Directory as VfsDirectory,
-        path::Path,
-        pseudo_directory,
-        remote::{remote_boxed_with_type, RoutingFn},
+        directory::entry_container::Directory as VfsDirectory, path::Path, pseudo_directory,
     };
 
     fn serve_vfs_dir(root: Arc<impl VfsDirectory>) -> ClientEnd<fio::DirectoryMarker> {
@@ -213,13 +210,20 @@ mod tests {
         let open_tx = Arc::new(Mutex::new(open_tx));
 
         let open_tx = open_tx.clone();
-        let routing_fn: RoutingFn = Box::new(move |_scope, flags, relative_path, _server_end| {
-            assert_eq!(relative_path.into_string(), "");
-            assert_eq!(flags, fio::OpenFlags::DIRECTORY);
-            open_tx.lock().unwrap().try_send(()).unwrap();
-        });
+        let open = Open::new(
+            move |_scope: ExecutionScope,
+                  flags: fio::OpenFlags,
+                  relative_path: Path,
+                  _server_end: zx::Channel| {
+                assert_eq!(relative_path.into_string(), "");
+                assert_eq!(flags, fio::OpenFlags::DIRECTORY);
+                open_tx.lock().unwrap().try_send(()).unwrap();
+            },
+            fio::DirentType::Directory,
+        );
+
         let fs = pseudo_directory! {
-            "foo" => remote_boxed_with_type(routing_fn, fio::DirentType::Directory),
+            "foo" => open.into_remote(),
         };
 
         // Create a Directory capability, and a clone.

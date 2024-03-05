@@ -86,15 +86,22 @@ pub enum DataError {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use async_trait::async_trait;
     use fidl::endpoints::{create_proxy, ServerEnd};
+    use fuchsia_zircon_status::Status;
     use futures::StreamExt;
     use std::sync::Arc;
     use vfs::{
-        directory::entry_container::Directory,
+        directory::{
+            entry::{DirectoryEntry, EntryInfo},
+            entry_container::Directory,
+            simple::OpenRequest,
+        },
         execution_scope::ExecutionScope,
         file::vmo::read_only,
-        pseudo_directory,
-        remote::{remote_boxed_with_type, RoutingFn},
+        file::{FileLike, FileOptions},
+        object_request::Representation,
+        pseudo_directory, ObjectRequestRef,
     };
 
     #[fuchsia::test]
@@ -115,42 +122,15 @@ mod tests {
     /// Test that we get a VMO when the server supports `File/GetBackingMemory`.
     #[fuchsia::test]
     async fn bytes_from_vmo_from_get_buffer() {
-        let channel_only_foo: RoutingFn = Box::new(|scope, _flags, _path, server_end| {
-            let server_end: ServerEnd<fio::FileMarker> = ServerEnd::new(server_end.into_channel());
-            let (mut file_requests, control) = server_end.into_stream_and_control_handle().unwrap();
-
-            // ack the open request
-            control
-                .send_on_open_(
-                    zxs::Status::OK.into_raw(),
-                    Some(fio::NodeInfoDeprecated::File(fio::FileObject {
-                        event: None,
-                        stream: None,
-                    })),
-                )
-                .unwrap();
-
-            scope.spawn(async move {
-                while let Some(Ok(request)) = file_requests.next().await {
-                    let vmo = fidl::Vmo::create(13).unwrap();
-                    vmo.write(b"hello, world!", 0).unwrap();
-                    match request {
-                        fio::FileRequest::GetBackingMemory { flags: _, responder } => {
-                            responder.send(Ok(vmo)).unwrap()
-                        }
-                        unexpected => unimplemented!("{:#?}", unexpected),
-                    }
-                }
-            });
-        });
+        let vmo_data = b"hello, world!";
         let fs = pseudo_directory! {
-            "foo" => remote_boxed_with_type(channel_only_foo, fio::DirentType::File),
+            "foo" => read_only(vmo_data),
         };
         let directory = serve_vfs_dir(fs);
 
         let data = open_file_data(&directory, "foo").await.unwrap();
         match bytes_from_data(&data).unwrap() {
-            Cow::Owned(b) => assert_eq!(b, b"hello, world!"),
+            Cow::Owned(b) => assert_eq!(b, vmo_data),
             _ => panic!("must produce an owned value from reading contents of fmem::Data::Buffer"),
         }
     }
@@ -159,45 +139,88 @@ mod tests {
     /// doesn't support returning a VMO.
     #[fuchsia::test]
     async fn bytes_from_channel_fallback() {
-        // create a fuchsia.io.Node which returns NOT_SUPPORTED on `File/GetBackingMemory`.
-        let channel_only_foo: RoutingFn = Box::new(|scope, _flags, _path, server_end| {
-            let server_end: ServerEnd<fio::FileMarker> = ServerEnd::new(server_end.into_channel());
-            let (mut file_requests, control) = server_end.into_stream_and_control_handle().unwrap();
+        // This test File does not handle `File/GetBackingMemory` request, but will return
+        // b"hello, world!" on File/Read`.
+        struct NonVMOTestFile;
 
-            // ack the open request
-            control
-                .send_on_open_(
-                    zxs::Status::OK.into_raw(),
-                    Some(fio::NodeInfoDeprecated::File(fio::FileObject {
-                        event: None,
-                        stream: None,
-                    })),
-                )
-                .unwrap();
+        impl DirectoryEntry for NonVMOTestFile {
+            fn entry_info(&self) -> EntryInfo {
+                EntryInfo::new(fio::INO_UNKNOWN, fio::DirentType::File)
+            }
 
-            scope.spawn(async move {
-                let mut have_sent_bytes = false;
-                while let Some(Ok(request)) = file_requests.next().await {
-                    match request {
-                        fio::FileRequest::GetBackingMemory { flags: _, responder } => {
-                            responder.send(Err(zxs::Status::NOT_SUPPORTED.into_raw())).unwrap()
-                        }
-                        fio::FileRequest::Read { count: _, responder } => {
-                            let to_send: &[u8] = if !have_sent_bytes {
-                                have_sent_bytes = true;
-                                b"hello, world!"
-                            } else {
-                                &[]
-                            };
-                            responder.send(Ok(to_send)).unwrap();
-                        }
-                        unexpected => unimplemented!("{:#?}", unexpected),
+            fn open_entry(self: Arc<Self>, request: OpenRequest<'_>) -> Result<(), Status> {
+                request.open_file(self)
+            }
+        }
+
+        #[async_trait]
+        impl vfs::node::Node for NonVMOTestFile {
+            async fn get_attrs(&self) -> Result<fio::NodeAttributes, Status> {
+                Err(Status::NOT_SUPPORTED)
+            }
+
+            async fn get_attributes(
+                &self,
+                _requested_attributes: fio::NodeAttributesQuery,
+            ) -> Result<fio::NodeAttributes2, Status> {
+                Err(Status::NOT_SUPPORTED)
+            }
+        }
+
+        impl FileLike for NonVMOTestFile {
+            fn open(
+                self: Arc<Self>,
+                scope: ExecutionScope,
+                _options: FileOptions,
+                object_request: ObjectRequestRef<'_>,
+            ) -> Result<(), Status> {
+                struct Connection;
+                impl Representation for Connection {
+                    type Protocol = fio::FileMarker;
+
+                    async fn get_representation(
+                        &self,
+                        _requested_attributes: fio::NodeAttributesQuery,
+                    ) -> Result<fio::Representation, Status> {
+                        unreachable!()
+                    }
+
+                    async fn node_info(&self) -> Result<fio::NodeInfoDeprecated, Status> {
+                        unreachable!()
                     }
                 }
-            });
-        });
+                let connection = Connection;
+                let object_request = object_request.take();
+                scope.spawn(async move {
+                    if let Ok(mut file_requests) =
+                        object_request.into_request_stream(&connection).await
+                    {
+                        let mut have_sent_bytes = false;
+                        while let Some(Ok(request)) = file_requests.next().await {
+                            match request {
+                                fio::FileRequest::GetBackingMemory { flags: _, responder } => {
+                                    responder.send(Err(Status::NOT_SUPPORTED.into_raw())).unwrap()
+                                }
+                                fio::FileRequest::Read { count: _, responder } => {
+                                    let to_send: &[u8] = if !have_sent_bytes {
+                                        have_sent_bytes = true;
+                                        b"hello, world!"
+                                    } else {
+                                        &[]
+                                    };
+                                    responder.send(Ok(to_send)).unwrap();
+                                }
+                                unexpected => unimplemented!("{:#?}", unexpected),
+                            }
+                        }
+                    }
+                });
+                Ok(())
+            }
+        }
+
         let fs = pseudo_directory! {
-            "foo" => remote_boxed_with_type(channel_only_foo, fio::DirentType::File),
+            "foo" => Arc::new(NonVMOTestFile),
         };
         let directory = serve_vfs_dir(fs);
 

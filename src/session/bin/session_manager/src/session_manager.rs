@@ -13,7 +13,11 @@ use {
     futures::{lock::Mutex, StreamExt, TryFutureExt, TryStreamExt},
     std::sync::Arc,
     tracing::{error, warn},
-    vfs::{execution_scope::ExecutionScope, remote::remote_boxed_with_type},
+    vfs::{
+        directory::{entry::EntryInfo, simple::OpenRequest},
+        execution_scope::ExecutionScope,
+        remote::RemoteLike,
+    },
 };
 
 /// Maximum number of concurrent connections to the protocols served by SessionManager.
@@ -147,22 +151,39 @@ impl SessionManagerState {
         }
         Ok(())
     }
+}
 
-    /// Opens a path in the session's exposed dir.
-    ///
-    /// If the session is in the Pending state, the request will be buffered until the session
-    /// is started.
-    fn open_exposed_dir(
-        &self,
+struct SessionExposedDir {
+    state: Arc<Mutex<SessionManagerState>>,
+}
+
+impl vfs::directory::entry::DirectoryEntry for SessionExposedDir {
+    fn entry_info(&self) -> EntryInfo {
+        EntryInfo::new(fio::INO_UNKNOWN, fio::DirentType::Directory)
+    }
+
+    fn open_entry(self: Arc<Self>, request: OpenRequest<'_>) -> Result<(), zx::Status> {
+        request.open_remote(self)
+    }
+}
+
+impl RemoteLike for SessionExposedDir {
+    fn open(
+        self: Arc<Self>,
+        scope: ExecutionScope,
         flags: fio::OpenFlags,
         path: vfs::path::Path,
         server_end: ServerEnd<fio::NodeMarker>,
     ) {
-        let exposed_dir = match &self.session {
-            Session::Pending(pending) => &pending.exposed_dir,
-            Session::Started(started) => &started.exposed_dir,
-        };
-        let _ = exposed_dir.open(flags, fio::ModeType::empty(), path.as_ref(), server_end);
+        let state = self.state.clone();
+        scope.spawn(async move {
+            let state = state.lock().await;
+            let exposed_dir = match &state.session {
+                Session::Pending(pending) => &pending.exposed_dir,
+                Session::Started(started) => &started.exposed_dir,
+            };
+            let _ = exposed_dir.open(flags, fio::ModeType::empty(), path.as_ref(), server_end);
+        });
     }
 }
 
@@ -226,12 +247,7 @@ impl SessionManager {
         let session_manager = self.clone();
         fs.add_entry_at(
             "svc_from_session",
-            remote_boxed_with_type(
-                Box::new(move |scope, flags, path, server_end| {
-                    session_manager.open_svc_for_session(scope, flags, path, server_end);
-                }),
-                fio::DirentType::Directory,
-            ),
+            Arc::new(SessionExposedDir { state: session_manager.state }),
         );
 
         fs.take_and_serve_directory_handle()?;
@@ -276,22 +292,6 @@ impl SessionManager {
         }
 
         Ok(())
-    }
-
-    /// Handles a fuchsia.io.Directory/Open request for the /svc_from_session directory,
-    /// forwarding the request to the session's exposed directory.
-    fn open_svc_for_session(
-        &self,
-        scope: ExecutionScope,
-        flags: fio::OpenFlags,
-        path: vfs::path::Path,
-        server_end: ServerEnd<fio::NodeMarker>,
-    ) {
-        let state = self.state.clone();
-        scope.spawn(async move {
-            let state = state.lock().await;
-            state.open_exposed_dir(flags, path, server_end);
-        });
     }
 
     /// Serves a specified [`LauncherRequestStream`].
@@ -441,7 +441,7 @@ impl SessionManager {
 #[cfg(test)]
 mod tests {
     use {
-        super::SessionManager,
+        super::{SessionExposedDir, SessionManager},
         anyhow::{anyhow, Error},
         diagnostics_assertions::assert_data_tree,
         diagnostics_assertions::AnyProperty,
@@ -452,8 +452,9 @@ mod tests {
         futures::prelude::*,
         lazy_static::lazy_static,
         session_testing::{spawn_directory_server, spawn_noop_directory_server, spawn_server},
+        std::sync::Arc,
         test_util::Counter,
-        vfs::execution_scope::ExecutionScope,
+        vfs::{execution_scope::ExecutionScope, remote::RemoteLike},
     };
 
     fn serve_launcher(session_manager: SessionManager) -> fsession::LauncherProxy {
@@ -517,6 +518,17 @@ mod tests {
                 unimplemented!()
             }
         });
+    }
+
+    fn open_session_exposed_dir(
+        session_manager: SessionManager,
+        scope: ExecutionScope,
+        flags: fio::OpenFlags,
+        path: vfs::path::Path,
+        server_end: ServerEnd<fio::NodeMarker>,
+    ) {
+        let exposed_directory = Arc::new(SessionExposedDir { state: session_manager.state });
+        exposed_directory.open(scope, flags, path, server_end);
     }
 
     /// Verifies that Launcher.Launch creates a new session.
@@ -828,8 +840,8 @@ mod tests {
         });
     }
 
-    /// Verifies that `open_svc_for_session` can open a node in the session's exposed dir
-    /// before the session is started, and that it is connected once the session is started.
+    /// Verifies that a node can be opened in the session's exposed dir before the session is
+    /// started, and that it is connected once the session is started.
     #[fuchsia::test]
     async fn test_svc_from_session_before_start() -> Result<(), Error> {
         let session_url = "session";
@@ -874,13 +886,13 @@ mod tests {
         let (_client_end, server_end) = fidl::endpoints::create_proxy::<fio::NodeMarker>().unwrap();
 
         let scope = ExecutionScope::new();
-        session_manager.open_svc_for_session(
+        open_session_exposed_dir(
+            session_manager,
             scope,
             fio::OpenFlags::empty(),
             vfs::path::Path::validate_and_split(svc_path)?,
             server_end,
         );
-
         // Start the session.
         lifecycle
             .start(&fsession::LifecycleStartRequest {
@@ -896,8 +908,8 @@ mod tests {
         Ok(())
     }
 
-    /// Verifies that `open_svc_for_session` can open a node in the session's exposed dir
-    /// after the session is started.
+    /// Verifies that a node in the session's exposed dir can be opened after the session has
+    /// started.
     #[fuchsia::test]
     async fn test_svc_from_session_after_start() -> Result<(), Error> {
         let session_url = "session";
@@ -950,7 +962,8 @@ mod tests {
         let (_client_end, server_end) = fidl::endpoints::create_proxy::<fio::NodeMarker>().unwrap();
 
         let scope = ExecutionScope::new();
-        session_manager.open_svc_for_session(
+        open_session_exposed_dir(
+            session_manager,
             scope,
             fio::OpenFlags::empty(),
             vfs::path::Path::validate_and_split(svc_path)?,
