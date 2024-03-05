@@ -108,7 +108,7 @@ futures-io = "=0.3.19"
 futures-lite = "1.11.3"
 futures-test = "=0.3.19"
 futures-util = "=0.3.19"
-getrandom = { version = "0.2.10", features = ["js"] }
+getrandom = { version = "0.2.10" }
 glob = "0.3.0"
 gpt = "3.0.0"
 half = "1.6.0"
@@ -225,7 +225,6 @@ url = "2.3"
 uuid = { version = "1.1.2", features = ["serde", "v4"] } # move ?
 valico = "2.4.2"
 vte = "0.3"
-wasm-bindgen = "0.2.63"
 webpki = "0.21"
 xml-rs = "0.8"
 unic-char-range = "0.9"
@@ -562,9 +561,6 @@ rustflags = ["--cfg=httparse_simd"]
 [gn.package.indexmap."1.9.2"]
 rustflags = ["--cfg=has_std"]
 
-[gn.package.js-sys."0.3.40"]
-env_vars = [ "CARGO_PKG_NAME=js-sys", "CARGO_PKG_VERSION=0.3.40", "CARGO_MANIFEST_DIR=${gn_source_root}/third_party/rust_crates/vendor/js-sys-0.3.40" ]
-
 [gn.package.libc."0.2.149"]
 rustflags = [
   "--cfg=libc_priv_mod_use",
@@ -880,13 +876,6 @@ env_vars = ["OUT_DIR=../../../../compat/valico"]
 
 [gn.package.valuable."0.1.0"]
 rustflags = []
-
-[gn.package.wasm-bindgen."0.2.63"]
-# Has build script but no config needed.
-
-[gn.package.wasm-bindgen-shared."0.2.63"]
-# Do not quote, this is embedded directly in .wasm sections and is needed by wasm-bindgen.
-env_vars = [ "CARGO_PKG_VERSION=0.2.63" ]
 
 [gn.package.zerocopy."0.8.0-alpha.5"]
 rustflags = [ "--cfg=zerocopy_generic_bounds_in_const_fn", "--cfg=zerocopy_aarch64_simd", "--cfg=zerocopy_panic_in_const" ]

@@ -1136,10 +1136,6 @@ group("walkdir") {
   public_deps = [ ":walkdir-v2_3_1" ]
 }
 
-group("wasm-bindgen") {
-  public_deps = [ ":wasm-bindgen-v0_2_63" ]
-}
-
 group("webpki") {
   public_deps = [ ":webpki-v0_21_0" ]
 }
@@ -6151,10 +6147,6 @@ rust_library("getrandom-v0_2_10") {
 
   deps = []
   deps += [ ":cfg-if-v1_0_0" ]
-  if ((current_cpu == "wasm32" || false) && current_os == "unknown") {
-    deps += [ ":js-sys-v0_3_40" ]
-    deps += [ ":wasm-bindgen-v0_2_63" ]
-  }
   if (false) {
     deps += [ ":wasi-v0_11_0+wasi-snapshot-preview1" ]
   }
@@ -6173,10 +6165,7 @@ rust_library("getrandom-v0_2_10") {
     "--edition=2018",
     "-Cmetadata=fbe0538dc0c6360c",
     "-Cextra-filename=-fbe0538dc0c6360c",
-    "--cfg=feature=\"js\"",
-    "--cfg=feature=\"js-sys\"",
     "--cfg=feature=\"std\"",
-    "--cfg=feature=\"wasm-bindgen\"",
   ]
 
   visibility = [ ":*" ]
@@ -7425,41 +7414,6 @@ rust_library("itoa-v1_0_5") {
   visibility = [ ":*" ]
 
   applicable_licenses = [ ":itoa-v1_0_5.license" ]
-}
-
-license("js-sys-v0_3_40.license") {
-  public_package_name = "js_sys"
-  license_files = [
-    "//third_party/rust_crates/vendor/js-sys-0.3.40/LICENSE-APACHE",
-    "//third_party/rust_crates/vendor/js-sys-0.3.40/LICENSE-MIT",
-  ]
-}
-
-rust_library("js-sys-v0_3_40") {
-  crate_name = "js_sys"
-  crate_root = "//third_party/rust_crates/vendor/js-sys-0.3.40/src/lib.rs"
-  output_name = "js_sys-178adb05182c818e"
-  configs -= [ "//build/config/rust:2018_idioms" ]
-
-  deps = []
-  deps += [ ":wasm-bindgen-v0_2_63" ]
-
-  rustenv = [
-    "CARGO_PKG_NAME=js-sys",
-    "CARGO_PKG_VERSION=0.3.40",
-    "CARGO_MANIFEST_DIR=${gn_source_root}/third_party/rust_crates/vendor/js-sys-0.3.40",
-  ]
-
-  rustflags = [
-    "--cap-lints=allow",
-    "--edition=2018",
-    "-Cmetadata=178adb05182c818e",
-    "-Cextra-filename=-178adb05182c818e",
-  ]
-
-  visibility = [ ":*" ]
-
-  applicable_licenses = [ ":js-sys-v0_3_40.license" ]
 }
 
 license("json5format-v0_2_6.license") {
@@ -17546,181 +17500,6 @@ rust_library("wasi-v0_11_0+wasi-snapshot-preview1") {
   visibility = [ ":*" ]
 
   applicable_licenses = [ "//build/licenses:fuchsia_license" ]
-}
-
-license("wasm-bindgen-v0_2_63.license") {
-  public_package_name = "wasm_bindgen"
-  license_files = [
-    "//third_party/rust_crates/vendor/wasm-bindgen-0.2.63/LICENSE-APACHE",
-    "//third_party/rust_crates/vendor/wasm-bindgen-0.2.63/LICENSE-MIT",
-  ]
-}
-
-rust_library("wasm-bindgen-v0_2_63") {
-  crate_name = "wasm_bindgen"
-  crate_root = "//third_party/rust_crates/vendor/wasm-bindgen-0.2.63/src/lib.rs"
-  output_name = "wasm_bindgen-24d3c296138f9dea"
-  configs -= [ "//build/config/rust:2018_idioms" ]
-
-  deps = []
-  deps += [ ":cfg-if-v0_1_10" ]
-  deps += [ ":wasm-bindgen-macro-v0_2_63($host_toolchain)" ]
-
-  rustenv = []
-
-  rustflags = [
-    "--cap-lints=allow",
-    "--edition=2018",
-    "-Cmetadata=24d3c296138f9dea",
-    "-Cextra-filename=-24d3c296138f9dea",
-    "--cfg=feature=\"default\"",
-    "--cfg=feature=\"spans\"",
-    "--cfg=feature=\"std\"",
-  ]
-
-  visibility = [ ":*" ]
-
-  applicable_licenses = [ ":wasm-bindgen-v0_2_63.license" ]
-}
-
-license("wasm-bindgen-backend-v0_2_63.license") {
-  public_package_name = "wasm_bindgen_backend"
-  license_files = [
-    "//third_party/rust_crates/vendor/wasm-bindgen-backend-0.2.63/LICENSE-APACHE",
-    "//third_party/rust_crates/vendor/wasm-bindgen-backend-0.2.63/LICENSE-MIT",
-  ]
-}
-
-rust_library("wasm-bindgen-backend-v0_2_63") {
-  crate_name = "wasm_bindgen_backend"
-  crate_root =
-      "//third_party/rust_crates/vendor/wasm-bindgen-backend-0.2.63/src/lib.rs"
-  output_name = "wasm_bindgen_backend-c28eac4de645d2d9"
-  configs -= [ "//build/config/rust:2018_idioms" ]
-
-  deps = []
-  deps += [ ":bumpalo-v3_2_1" ]
-  deps += [ ":lazy_static-v1_4_0" ]
-  deps += [ ":log-v0_4_20" ]
-  deps += [ ":proc-macro2-v1_0_63" ]
-  deps += [ ":quote-v1_0_29" ]
-  deps += [ ":syn-v1_0_98" ]
-  deps += [ ":wasm-bindgen-shared-v0_2_63" ]
-
-  rustenv = []
-
-  rustflags = [
-    "--cap-lints=allow",
-    "--edition=2018",
-    "-Cmetadata=c28eac4de645d2d9",
-    "-Cextra-filename=-c28eac4de645d2d9",
-    "--cfg=feature=\"spans\"",
-  ]
-
-  visibility = [ ":*" ]
-
-  applicable_licenses = [ ":wasm-bindgen-backend-v0_2_63.license" ]
-}
-
-license("wasm-bindgen-macro-v0_2_63.license") {
-  public_package_name = "wasm_bindgen_macro"
-  license_files = [
-    "//third_party/rust_crates/vendor/wasm-bindgen-macro-0.2.63/LICENSE-APACHE",
-    "//third_party/rust_crates/vendor/wasm-bindgen-macro-0.2.63/LICENSE-MIT",
-  ]
-}
-
-rust_proc_macro("wasm-bindgen-macro-v0_2_63") {
-  crate_name = "wasm_bindgen_macro"
-  crate_root =
-      "//third_party/rust_crates/vendor/wasm-bindgen-macro-0.2.63/src/lib.rs"
-  output_name = "wasm_bindgen_macro-1a1689162be0fefa"
-  configs -= [ "//build/config/rust:2018_idioms" ]
-
-  deps = []
-  deps += [ ":quote-v1_0_29" ]
-  deps += [ ":wasm-bindgen-macro-support-v0_2_63" ]
-
-  rustenv = []
-
-  rustflags = [
-    "--cap-lints=allow",
-    "--edition=2018",
-    "-Cmetadata=1a1689162be0fefa",
-    "-Cextra-filename=-1a1689162be0fefa",
-    "--cfg=feature=\"spans\"",
-  ]
-
-  visibility = [ ":*" ]
-
-  applicable_licenses = [ ":wasm-bindgen-macro-v0_2_63.license" ]
-}
-
-license("wasm-bindgen-macro-support-v0_2_63.license") {
-  public_package_name = "wasm_bindgen_macro_support"
-  license_files = [
-    "//third_party/rust_crates/vendor/wasm-bindgen-macro-support-0.2.63/LICENSE-APACHE",
-    "//third_party/rust_crates/vendor/wasm-bindgen-macro-support-0.2.63/LICENSE-MIT",
-  ]
-}
-
-rust_library("wasm-bindgen-macro-support-v0_2_63") {
-  crate_name = "wasm_bindgen_macro_support"
-  crate_root = "//third_party/rust_crates/vendor/wasm-bindgen-macro-support-0.2.63/src/lib.rs"
-  output_name = "wasm_bindgen_macro_support-3e362bc403b28171"
-  configs -= [ "//build/config/rust:2018_idioms" ]
-
-  deps = []
-  deps += [ ":proc-macro2-v1_0_63" ]
-  deps += [ ":quote-v1_0_29" ]
-  deps += [ ":syn-v1_0_98" ]
-  deps += [ ":wasm-bindgen-backend-v0_2_63" ]
-  deps += [ ":wasm-bindgen-shared-v0_2_63" ]
-
-  rustenv = []
-
-  rustflags = [
-    "--cap-lints=allow",
-    "--edition=2018",
-    "-Cmetadata=3e362bc403b28171",
-    "-Cextra-filename=-3e362bc403b28171",
-    "--cfg=feature=\"spans\"",
-  ]
-
-  visibility = [ ":*" ]
-
-  applicable_licenses = [ ":wasm-bindgen-macro-support-v0_2_63.license" ]
-}
-
-license("wasm-bindgen-shared-v0_2_63.license") {
-  public_package_name = "wasm_bindgen_shared"
-  license_files = [
-    "//third_party/rust_crates/vendor/wasm-bindgen-shared-0.2.63/LICENSE-APACHE",
-    "//third_party/rust_crates/vendor/wasm-bindgen-shared-0.2.63/LICENSE-MIT",
-  ]
-}
-
-rust_library("wasm-bindgen-shared-v0_2_63") {
-  crate_name = "wasm_bindgen_shared"
-  crate_root =
-      "//third_party/rust_crates/vendor/wasm-bindgen-shared-0.2.63/src/lib.rs"
-  output_name = "wasm_bindgen_shared-812e74ab5010cc31"
-  configs -= [ "//build/config/rust:2018_idioms" ]
-
-  deps = []
-
-  rustenv = [ "CARGO_PKG_VERSION=0.2.63" ]
-
-  rustflags = [
-    "--cap-lints=allow",
-    "--edition=2018",
-    "-Cmetadata=812e74ab5010cc31",
-    "-Cextra-filename=-812e74ab5010cc31",
-  ]
-
-  visibility = [ ":*" ]
-
-  applicable_licenses = [ ":wasm-bindgen-shared-v0_2_63.license" ]
 }
 
 rust_library("web-sys-v0_3_40") {
