@@ -21,8 +21,7 @@ namespace android_hci = pw::bluetooth::vendor::android_hci;
 AndroidExtendedLowEnergyAdvertiser::AndroidExtendedLowEnergyAdvertiser(
     hci::Transport::WeakPtr hci_ptr, uint8_t max_advertisements)
     : LowEnergyAdvertiser(std::move(hci_ptr)),
-      max_advertisements_(max_advertisements),
-      advertising_handle_map_(max_advertisements_),
+      advertising_handle_map_(max_advertisements),
       weak_self_(this) {
   auto self = weak_self_.GetWeakPtr();
   state_changed_event_handler_id_ =
@@ -67,7 +66,7 @@ EmbossCommandPacket AndroidExtendedLowEnergyAdvertiser::BuildEnablePacket(
   return packet;
 }
 
-CommandChannel::CommandPacketVariant
+std::optional<EmbossCommandPacket>
 AndroidExtendedLowEnergyAdvertiser::BuildSetAdvertisingParams(
     const DeviceAddress& address,
     pw::bluetooth::emboss::LEAdvertisingType type,
@@ -78,9 +77,9 @@ AndroidExtendedLowEnergyAdvertiser::BuildSetAdvertisingParams(
   if (!handle) {
     bt_log(WARN,
            "hci-le",
-           "could not (al)locate advertising handle for address: %s",
+           "could not allocate advertising handle for address: %s",
            bt_str(address));
-    return std::unique_ptr<CommandPacket>();
+    return std::nullopt;
   }
 
   auto packet = hci::EmbossCommandPacket::New<
@@ -109,8 +108,7 @@ AndroidExtendedLowEnergyAdvertiser::BuildSetAdvertisingParams(
   return packet;
 }
 
-CommandChannel::CommandPacketVariant
-AndroidExtendedLowEnergyAdvertiser::BuildSetAdvertisingData(
+EmbossCommandPacket AndroidExtendedLowEnergyAdvertiser::BuildSetAdvertisingData(
     const DeviceAddress& address, const AdvertisingData& data, AdvFlags flags) {
   std::optional<hci_spec::AdvertisingHandle> handle =
       advertising_handle_map_.GetHandle(address);
@@ -140,7 +138,7 @@ AndroidExtendedLowEnergyAdvertiser::BuildSetAdvertisingData(
   return packet;
 }
 
-CommandChannel::CommandPacketVariant
+EmbossCommandPacket
 AndroidExtendedLowEnergyAdvertiser::BuildUnsetAdvertisingData(
     const DeviceAddress& address) {
   std::optional<hci_spec::AdvertisingHandle> handle =
@@ -162,8 +160,7 @@ AndroidExtendedLowEnergyAdvertiser::BuildUnsetAdvertisingData(
   return packet;
 }
 
-CommandChannel::CommandPacketVariant
-AndroidExtendedLowEnergyAdvertiser::BuildSetScanResponse(
+EmbossCommandPacket AndroidExtendedLowEnergyAdvertiser::BuildSetScanResponse(
     const DeviceAddress& address, const AdvertisingData& scan_rsp) {
   std::optional<hci_spec::AdvertisingHandle> handle =
       advertising_handle_map_.GetHandle(address);
@@ -191,8 +188,7 @@ AndroidExtendedLowEnergyAdvertiser::BuildSetScanResponse(
   return packet;
 }
 
-CommandChannel::CommandPacketVariant
-AndroidExtendedLowEnergyAdvertiser::BuildUnsetScanResponse(
+EmbossCommandPacket AndroidExtendedLowEnergyAdvertiser::BuildUnsetScanResponse(
     const DeviceAddress& address) {
   std::optional<hci_spec::AdvertisingHandle> handle =
       advertising_handle_map_.GetHandle(address);
