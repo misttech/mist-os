@@ -94,6 +94,25 @@ static const fidl_metadata::registers::Register<uint32_t> kRegisters[]{
                 },
             },
     },
+
+    {
+        .name = aml_registers::REGISTER_USB_PHY_V2_RESET,
+        .mmio_id = RESET_MMIO,
+        .masks =
+            {
+                {
+                    .value = aml_registers::USB_RESET1_REGISTER_UNKNOWN_1_MASK |
+                             aml_registers::USB_RESET1_REGISTER_UNKNOWN_2_MASK,
+                    .mmio_offset = S905D3_RESET1_REGISTER,
+                },
+                {
+                    .value = aml_registers::USB_RESET1_REGISTER_UNKNOWN_1_MASK |
+                             aml_registers::USB_RESET1_LEVEL_UNKNOWN_MASK |
+                             aml_registers::USB_RESET1_LEVEL_MASK,
+                    .mmio_offset = S905D3_RESET1_LEVEL,
+                },
+            },
+    },
 };
 
 }  // namespace

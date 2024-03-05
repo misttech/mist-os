@@ -23,6 +23,9 @@ constexpr uint32_t USB_R3_OFFSET = 0x8c;
 constexpr uint32_t USB_R4_OFFSET = 0x90;
 constexpr uint32_t USB_R5_OFFSET = 0x94;
 
+constexpr uint32_t RESET1_REGISTER_OFFSET = 0x8;
+constexpr uint32_t RESET1_LEVEL_OFFSET = 0x84;
+
 class U2P_R0_V2 : public hwreg::RegisterBase<U2P_R0_V2, uint32_t> {
  public:
   DEF_BIT(0, host_device);
@@ -165,25 +168,6 @@ class UNKNOWN_REGISTER : public hwreg::RegisterBase<UNKNOWN_REGISTER, uint32_t> 
   DEF_BIT(30, unknown_30);
   DEF_BIT(31, unknown_31);
   static auto Get() { return hwreg::RegisterAddr<UNKNOWN_REGISTER>(0x0); }
-};
-
-// TODO: See https://fxbug.dev/42120085
-class UNKNOWN_REGISTER1 : public hwreg::RegisterBase<UNKNOWN_REGISTER1, uint32_t> {
- public:
-  DEF_BIT(2, unknown_2);
-  DEF_BIT(18, unknown_18);
-  DEF_BIT(19, unknown_19);
-  DEF_BIT(20, unknown_20);
-  DEF_BIT(21, unknown_21);
-  DEF_BIT(22, unknown_22);
-  DEF_BIT(23, unknown_23);
-  DEF_BIT(24, unknown_24);
-  DEF_BIT(25, unknown_25);
-  DEF_BIT(26, unknown_26);
-  DEF_BIT(27, unknown_27);
-  DEF_BIT(28, unknown_28);
-  DEF_BIT(29, unknown_29);
-  static auto Get() { return hwreg::RegisterAddr<UNKNOWN_REGISTER1>(0x7C); }
 };
 
 }  // namespace nelson_usb_phy

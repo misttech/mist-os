@@ -17,8 +17,10 @@
 
 #include <bind/fuchsia/cpp/bind.h>
 #include <bind/fuchsia/platform/cpp/bind.h>
+#include <bind/fuchsia/register/cpp/bind.h>
 #include <bind/fuchsia/usb/phy/cpp/bind.h>
 #include <ddk/usb-peripheral-config.h>
+#include <soc/aml-common/aml-registers.h>
 #include <soc/aml-s905d3/s905d3-hw.h>
 #include <usb/cdc.h>
 #include <usb/dwc2/metadata.h>
@@ -121,10 +123,6 @@ static const fpbus::Node xhci_dev = []() {
 
 static const std::vector<fpbus::Mmio> usb_phy_mmios{
     {{
-        .base = S905D3_RESET1_BASE,
-        .length = S905D3_RESET1_LENGTH,
-    }},
-    {{
         .base = S905D3_USBCTRL_BASE,
         .length = S905D3_USBCTRL_LENGTH,
     }},
@@ -179,6 +177,39 @@ static const fpbus::Node usb_phy_dev = []() {
   dev.metadata() = usb_phy_metadata;
   return dev;
 }();
+
+zx_status_t AddUsbPhyComposite(fdf::WireSyncClient<fpbus::PlatformBus>& pbus,
+                               fidl::AnyArena& fidl_arena, fdf::Arena& arena) {
+  const std::vector<fdf::BindRule> kResetRegisterRules = std::vector{
+      fdf::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
+                              bind_fuchsia_register::BIND_FIDL_PROTOCOL_DEVICE),
+      fdf::MakeAcceptBindRule(bind_fuchsia_register::NAME,
+                              aml_registers::REGISTER_USB_PHY_V2_RESET),
+  };
+
+  const std::vector<fdf::NodeProperty> kResetRegisterProperties = std::vector{
+      fdf::MakeProperty(bind_fuchsia::FIDL_PROTOCOL,
+                        bind_fuchsia_register::BIND_FIDL_PROTOCOL_DEVICE),
+      fdf::MakeProperty(bind_fuchsia_register::NAME, aml_registers::REGISTER_USB_PHY_V2_RESET),
+  };
+
+  std::vector<fdf::ParentSpec> parents{{kResetRegisterRules, kResetRegisterProperties}};
+  auto result = pbus.buffer(arena)->AddCompositeNodeSpec(
+      fidl::ToWire(fidl_arena, usb_phy_dev),
+      fidl::ToWire(fidl_arena, fuchsia_driver_framework::CompositeNodeSpec{
+                                   {.name = "aml_usb_phy_v2", .parents = parents}}));
+  if (!result.ok()) {
+    zxlogf(ERROR, "AddCompositeNodeSpec Usb(usb_phy_dev) request failed: %s",
+           result.FormatDescription().data());
+    return result.status();
+  }
+  if (result->is_error()) {
+    zxlogf(ERROR, "AddCompositeNodeSpec Usb(usb_phy_dev) failed: %s",
+           zx_status_get_string(result->error_value()));
+    return result->error_value();
+  }
+  return ZX_OK;
+}
 
 zx_status_t AddDwc2Composite(fdf::WireSyncClient<fpbus::PlatformBus>& pbus,
                              fidl::AnyArena& fidl_arena, fdf::Arena& arena,
@@ -273,20 +304,15 @@ zx_status_t AddXhciComposite(fdf::WireSyncClient<fpbus::PlatformBus>& pbus,
 zx_status_t Nelson::UsbInit() {
   fidl::Arena<> fidl_arena;
   fdf::Arena arena('USB_');
-  auto result = pbus_.buffer(arena)->NodeAdd(fidl::ToWire(fidl_arena, usb_phy_dev));
-  if (!result.ok()) {
-    zxlogf(ERROR, "%s: NodeAdd Usb(usb_phy_dev) request failed: %s", __func__,
-           result.FormatDescription().data());
-    return result.status();
-  }
-  if (result->is_error()) {
-    zxlogf(ERROR, "%s: NodeAdd Usb(usb_phy_dev) failed: %s", __func__,
-           zx_status_get_string(result->error_value()));
-    return result->error_value();
+
+  auto status = AddUsbPhyComposite(pbus_, fidl_arena, arena);
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "AddUsbPhyComposite failed: %d", status);
+    return status;
   }
 
   // Add XHCI and DWC2 to the same devhost as the aml-usb-phy.
-  auto status = AddXhciComposite(pbus_, fidl_arena, arena);
+  status = AddXhciComposite(pbus_, fidl_arena, arena);
   if (status != ZX_OK) {
     return status;
   }

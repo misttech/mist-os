@@ -18,7 +18,7 @@
 
 #include <fbl/algorithm.h>
 #include <fbl/auto_lock.h>
-#include <soc/aml-common/aml-g12-reset.h>
+#include <soc/aml-common/aml-registers.h>
 
 #include "src/devices/usb/drivers/nelson-usb-phy/usb-phy-regs.h"
 
@@ -76,7 +76,6 @@ void NelsonUsbPhy::InitPll(fdf::MmioBuffer* mmio) {
 }
 
 zx_status_t NelsonUsbPhy::InitPhy() {
-  auto& reset_mmio = *reset_mmio_;
   auto& usbctrl_mmio = *usbctrl_mmio_;
   auto& power_mmio = *power_mmio_;
 
@@ -90,26 +89,43 @@ zx_status_t NelsonUsbPhy::InitPhy() {
     UNKNOWN_REGISTER::Get().ReadFrom(&power_mmio).set_unknown_31(0).WriteTo(&power_mmio);
     zx::nanosleep(zx::deadline_after(zx::usec(100)));
 
-    UNKNOWN_REGISTER1::Get().ReadFrom(&reset_mmio).set_unknown_2(0).WriteTo(&reset_mmio);
+    {
+      auto result = reset_register_->WriteRegister32(
+          RESET1_LEVEL_OFFSET, aml_registers::USB_RESET1_REGISTER_UNKNOWN_1_MASK, 0);
+      if ((result.status() != ZX_OK) || result->is_error()) {
+        zxlogf(ERROR, "%s: Reset Level Write failed\n", __func__);
+        return ZX_ERR_INTERNAL;
+      }
+    }
     zx::nanosleep(zx::deadline_after(zx::usec(100)));
     A0_RTI_GEN_PWR_ISO0::Get()
         .ReadFrom(&sleep_mmio_.value())
         .set_usb_comb_isolation_enable(0)
         .WriteTo(&sleep_mmio_.value());
 
-    UNKNOWN_REGISTER1::Get().ReadFrom(&reset_mmio).set_unknown_2(1).WriteTo(&reset_mmio);
+    {
+      auto result = reset_register_->WriteRegister32(
+          RESET1_LEVEL_OFFSET, aml_registers::USB_RESET1_REGISTER_UNKNOWN_1_MASK,
+          aml_registers::USB_RESET1_REGISTER_UNKNOWN_1_MASK);
+      if ((result.status() != ZX_OK) || result->is_error()) {
+        zxlogf(ERROR, "%s: Reset Level Write failed\n", __func__);
+        return ZX_ERR_INTERNAL;
+      }
+    }
     zx::nanosleep(zx::deadline_after(zx::usec(100)));
     A0_RTI_GEN_PWR_SLEEP0::Get()
         .ReadFrom(&sleep_mmio_.value())
         .set_pci_comb_power_off(0)
         .WriteTo(&sleep_mmio_.value());
 
-    auto unknown_tmp_1 = UNKNOWN_REGISTER1::Get().ReadFrom(&reset_mmio);
-    unknown_tmp_1.set_unknown_26(0);
-    unknown_tmp_1.set_unknown_27(0);
-    unknown_tmp_1.set_unknown_28(0);
-    unknown_tmp_1.set_unknown_29(0);
-    unknown_tmp_1.WriteTo(&reset_mmio);
+    {
+      auto result = reset_register_->WriteRegister32(
+          RESET1_LEVEL_OFFSET, aml_registers::USB_RESET1_LEVEL_UNKNOWN_MASK, 0);
+      if ((result.status() != ZX_OK) || result->is_error()) {
+        zxlogf(ERROR, "%s: Reset Level Write failed\n", __func__);
+        return ZX_ERR_INTERNAL;
+      }
+    }
 
     A0_RTI_GEN_PWR_ISO0::Get()
         .ReadFrom(&sleep_mmio_.value())
@@ -129,7 +145,7 @@ zx_status_t NelsonUsbPhy::InitPhy() {
     unknown_tmp.set_unknown_23(0);
     unknown_tmp.set_unknown_24(0);
     unknown_tmp.set_unknown_25(0);
-    unknown_tmp_1.WriteTo(&power_mmio);
+    unknown_tmp.WriteTo(&power_mmio);
 
     A0_RTI_GEN_PWR_ISO0::Get()
         .ReadFrom(&sleep_mmio_.value())
@@ -149,7 +165,7 @@ zx_status_t NelsonUsbPhy::InitPhy() {
     unknown_tmp.set_unknown_23(1);
     unknown_tmp.set_unknown_24(1);
     unknown_tmp.set_unknown_25(1);
-    unknown_tmp_1.WriteTo(&power_mmio);
+    unknown_tmp.WriteTo(&power_mmio);
     A0_RTI_GEN_PWR_SLEEP0::Get()
         .ReadFrom(&sleep_mmio_.value())
         .set_ge2d_power_off(1)
@@ -157,14 +173,25 @@ zx_status_t NelsonUsbPhy::InitPhy() {
   }
 
   // first reset USB
-  auto reset_1_level = aml_reset::RESET_1::GetLevel().ReadFrom(&reset_mmio);
-  reset_1_level.set_unknown_field_a(1);
-  reset_1_level.set_unknown_field_b(1);
-  reset_1_level.WriteTo(&reset_mmio);
+  {
+    auto result =
+        reset_register_->WriteRegister32(RESET1_LEVEL_OFFSET, aml_registers::USB_RESET1_LEVEL_MASK,
+                                         aml_registers::USB_RESET1_LEVEL_MASK);
+    if ((result.status() != ZX_OK) || result->is_error()) {
+      zxlogf(ERROR, "%s: Reset Level Write failed\n", __func__);
+      return ZX_ERR_INTERNAL;
+    }
+  }
 
-  auto reset_1 = aml_reset::RESET_1::Get().ReadFrom(&reset_mmio);
-  reset_1.set_usb(1);
-  reset_1.WriteTo(&reset_mmio);
+  {
+    auto result = reset_register_->WriteRegister32(
+        RESET1_REGISTER_OFFSET, aml_registers::USB_RESET1_REGISTER_UNKNOWN_1_MASK,
+        aml_registers::USB_RESET1_REGISTER_UNKNOWN_1_MASK);
+    if ((result.status() != ZX_OK) || result->is_error()) {
+      zxlogf(ERROR, "%s: Reset Level Write failed\n", __func__);
+      return ZX_ERR_INTERNAL;
+    }
+  }
   zx::nanosleep(zx::deadline_after(zx::usec(500)));
   for (int i = 0; i < 2; i++) {
     auto u2p_r0 = U2P_R0_V2::Get(i).ReadFrom(&usbctrl_mmio);
@@ -178,9 +205,15 @@ zx_status_t NelsonUsbPhy::InitPhy() {
 
     zx::nanosleep(zx::deadline_after(zx::usec(10)));
 
-    reset_1.ReadFrom(&reset_mmio);
-    reset_1.set_unknown_field_a(1);
-    reset_1.WriteTo(&reset_mmio);
+    {
+      auto result = reset_register_->WriteRegister32(
+          RESET1_REGISTER_OFFSET, aml_registers::USB_RESET1_REGISTER_UNKNOWN_2_MASK,
+          aml_registers::USB_RESET1_REGISTER_UNKNOWN_2_MASK);
+      if ((result.status() != ZX_OK) || result->is_error()) {
+        zxlogf(ERROR, "%s: Reset Level Write failed\n", __func__);
+        return ZX_ERR_INTERNAL;
+      }
+    }
     zx::nanosleep(zx::deadline_after(zx::usec(50)));
 
     auto u2p_r1 = U2P_R1_V2::Get(i);
@@ -434,6 +467,17 @@ zx_status_t NelsonUsbPhy::Init() {
     zxlogf(ERROR, "NelsonUsbPhy::Init: could not get platform device protocol");
     return ZX_ERR_NOT_SUPPORTED;
   }
+
+  zx::result reset_register_client =
+      DdkConnectFragmentFidlProtocol<fuchsia_hardware_registers::Service::Device>(parent(),
+                                                                                  "register-reset");
+  if (reset_register_client.is_error() || !reset_register_client.value().is_valid()) {
+    zxlogf(ERROR, "%s: could not get reset_register fragment", __func__);
+    return ZX_ERR_NO_RESOURCES;
+  }
+
+  reset_register_.Bind(std::move(reset_register_client.value()));
+
   size_t actual;
   auto status =
       DdkGetMetadata(DEVICE_METADATA_PRIVATE, pll_settings_, sizeof(pll_settings_), &actual);
@@ -442,32 +486,27 @@ zx_status_t NelsonUsbPhy::Init() {
     return ZX_ERR_INTERNAL;
   }
 
-  status = pdev_.MapMmio(0, &reset_mmio_);
+  status = pdev_.MapMmio(0, &usbctrl_mmio_);
   if (status != ZX_OK) {
     return status;
   }
 
-  status = pdev_.MapMmio(1, &usbctrl_mmio_);
+  status = pdev_.MapMmio(1, &usbphy20_mmio_);
   if (status != ZX_OK) {
     return status;
   }
 
-  status = pdev_.MapMmio(2, &usbphy20_mmio_);
+  status = pdev_.MapMmio(2, &usbphy21_mmio_);
   if (status != ZX_OK) {
     return status;
   }
 
-  status = pdev_.MapMmio(3, &usbphy21_mmio_);
+  status = pdev_.MapMmio(3, &power_mmio_);
   if (status != ZX_OK) {
     return status;
   }
 
-  status = pdev_.MapMmio(4, &power_mmio_);
-  if (status != ZX_OK) {
-    return status;
-  }
-
-  status = pdev_.MapMmio(5, &sleep_mmio_);
+  status = pdev_.MapMmio(4, &sleep_mmio_);
   if (status != ZX_OK) {
     return status;
   }

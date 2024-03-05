@@ -5,6 +5,7 @@
 #ifndef SRC_DEVICES_USB_DRIVERS_NELSON_USB_PHY_NELSON_USB_PHY_H_
 #define SRC_DEVICES_USB_DRIVERS_NELSON_USB_PHY_NELSON_USB_PHY_H_
 
+#include <fidl/fuchsia.hardware.registers/cpp/wire.h>
 #include <fuchsia/hardware/usb/phy/cpp/banjo.h>
 #include <lib/device-protocol/pdev-fidl.h>
 #include <lib/mmio/mmio.h>
@@ -61,7 +62,7 @@ class NelsonUsbPhy : public NelsonUsbPhyType,
   int IrqThread();
 
   ddk::PDevFidl pdev_;
-  std::optional<fdf::MmioBuffer> reset_mmio_;
+  fidl::WireSyncClient<fuchsia_hardware_registers::Device> reset_register_;
   std::optional<fdf::MmioBuffer> usbctrl_mmio_;
   std::optional<fdf::MmioBuffer> usbphy20_mmio_;
   std::optional<fdf::MmioBuffer> usbphy21_mmio_;
