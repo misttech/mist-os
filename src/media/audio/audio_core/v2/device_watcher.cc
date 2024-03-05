@@ -16,6 +16,8 @@ namespace media_audio {
 
 namespace {
 
+#define USE_AUDIO_DEVICE_REGISTRY_DEVICES (1)
+
 template <typename ResultT>
 bool LogResultError(const ResultT& result, const char* debug_context) {
   if (!result.ok()) {
@@ -30,6 +32,7 @@ bool LogResultError(const ResultT& result, const char* debug_context) {
   return false;
 }
 
+#if (USE_AUDIO_DEVICE_REGISTRY_DEVICES)
 audio_stream_unique_id_t DeviceUniqueId(fuchsia_audio_device::wire::Info info) {
   audio_stream_unique_id_t unique_id{0};
   if (info.has_unique_instance_id()) {
@@ -37,6 +40,7 @@ audio_stream_unique_id_t DeviceUniqueId(fuchsia_audio_device::wire::Info info) {
   }
   return unique_id;
 }
+#endif  // USE_AUDIO_DEVICE_REGISTRY_DEVICES
 
 }  // namespace
 
@@ -94,6 +98,7 @@ void DeviceWatcher::AddDevice(fuchsia_audio_device::wire::Info info) {
     FX_LOGS(ERROR) << "fuchsia.audio.device.Info missing required field";
     return;
   }
+#if USE_AUDIO_DEVICE_REGISTRY_DEVICES
   for (auto format : info.ring_buffer_format_sets()) {
     if (!format.has_channel_sets() || format.channel_sets().count() == 0 ||
         !format.has_sample_types() || format.sample_types().count() == 0 ||
@@ -108,7 +113,7 @@ void DeviceWatcher::AddDevice(fuchsia_audio_device::wire::Info info) {
       }
     }
   }
-
+#endif  // USE_AUDIO_DEVICE_REGISTRY_DEVICES
   if (!info.gain_caps().has_min_gain_db() || !info.gain_caps().has_max_gain_db() ||
       !info.gain_caps().has_gain_step_db()) {
     FX_LOGS(ERROR) << "fuchsia.audio.device.GainCapabilities missing required field";
@@ -178,6 +183,7 @@ void DeviceWatcher::AddOutputDevice(fuchsia_audio_device::wire::Info info,
                                     fidl::ClientEnd<fuchsia_audio_device::Control> control_client) {
   FX_CHECK(info.device_type() == fuchsia_audio_device::DeviceType::kOutput);
 
+#if (USE_AUDIO_DEVICE_REGISTRY_DEVICES)
   auto profile = config_.output_device_profile(DeviceUniqueId(info));
 
   // The pipeline's preferred format, converted from media::audio::Format to media_audio::Format.
@@ -243,6 +249,10 @@ void DeviceWatcher::AddOutputDevice(fuchsia_audio_device::wire::Info info,
       .route_graph = route_graph_,
       .effects_loader = effects_loader_,
   });
+#else   // USE_AUDIO_DEVICE_REGISTRY_DEVICES
+  FX_LOGS(WARNING) << "For now, AudioCoreV2 is not connecting to devices";
+  return;
+#endif  // USE_AUDIO_DEVICE_REGISTRY_DEVICES
 }
 
 void DeviceWatcher::AddInputDevice(fuchsia_audio_device::wire::Info info,
@@ -250,6 +260,7 @@ void DeviceWatcher::AddInputDevice(fuchsia_audio_device::wire::Info info,
                                    fidl::ClientEnd<fuchsia_audio_device::Control> control_client) {
   FX_CHECK(info.device_type() == fuchsia_audio_device::DeviceType::kInput);
 
+#if (USE_AUDIO_DEVICE_REGISTRY_DEVICES)
   auto profile = config_.input_device_profile(DeviceUniqueId(info));
 
   // Select the format to use for this device.
@@ -285,6 +296,10 @@ void DeviceWatcher::AddInputDevice(fuchsia_audio_device::wire::Info info,
       .route_graph = route_graph_,
       .effects_loader = effects_loader_,
   });
+#else   // USE_AUDIO_DEVICE_REGISTRY_DEVICES
+  FX_LOGS(WARNING) << "For now, AudioCoreV2 is not connecting to devices";
+  return;
+#endif  // USE_AUDIO_DEVICE_REGISTRY_DEVICES
 }
 
 void DeviceWatcher::RemoveDevice(TokenId token_id) {

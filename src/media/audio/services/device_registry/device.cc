@@ -726,7 +726,9 @@ fuchsia_audio_device::Info Device::CreateDeviceInfo() {
       .manufacturer = stream_config_properties_->manufacturer(),
       .product = stream_config_properties_->product(),
       .unique_instance_id = stream_config_properties_->unique_id(),
-      // Required for StreamConfig and Dai, absent for Codec and Composite.
+      // Required for Dai and StreamConfig; optional for Codec:
+      .is_input = stream_config_properties_->is_input(),
+      // Required for Dai and StreamConfig; absent for Codec and Composite:
       .ring_buffer_format_sets = translated_ring_buffer_format_sets_,
       // Required for StreamConfig; absent for Codec, Composite and Dai:
       .gain_caps = fuchsia_audio_device::GainCapabilities{{
@@ -743,6 +745,9 @@ fuchsia_audio_device::Info Device::CreateDeviceInfo() {
                               : fuchsia_audio_device::PlugDetectCapabilities::kPluggable,
       // Required for Composite, Dai and StreamConfig; absent for Codec:
       .clock_domain = stream_config_properties_->clock_domain(),
+      // Required for Composite; optional for Codec, Dai and StreamConfig:
+      .signal_processing_elements = {},    // signalprocessing support
+      .signal_processing_topologies = {},  // remains to be completed
   }};
 
   return info;

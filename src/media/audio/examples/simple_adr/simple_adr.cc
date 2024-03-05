@@ -145,137 +145,156 @@ void MediaApp::ConnectToRegistry() {
 void MediaApp::WaitForFirstAudioOutput() {
   std::cout << __func__ << '\n';
 
-  registry_client_->WatchDevicesAdded().Then(
-      [this](fidl::Result<fuchsia_audio_device::Registry::WatchDevicesAdded>& result) {
-        std::cout << "Registry/WatchDevicesAdded callback" << '\n';
-        if (result.is_error()) {
-          std::cerr << "Registry/WatchDevicesAdded error: "
-                    << result.error_value().FormatDescription() << '\n';
+  registry_client_->WatchDevicesAdded().Then([this](fidl::Result<fuchsia_audio_device::Registry::
+                                                                     WatchDevicesAdded>& result) {
+    std::cout << "Registry/WatchDevicesAdded callback" << '\n';
+    if (result.is_error()) {
+      std::cerr << "Registry/WatchDevicesAdded error: " << result.error_value().FormatDescription()
+                << '\n';
+      Shutdown();
+      return;
+    }
+
+    for (const auto& device : *result->devices()) {
+      if (*device.device_type() == fuchsia_audio_device::DeviceType::kOutput) {
+        device_token_id_ = *device.token_id();
+        std::cout << "Connecting to audio device:" << '\n';
+        std::cout << "    token_id                  " << device_token_id_ << '\n';
+        std::cout << "    device_type               kOutput" << '\n';
+        std::cout << "    device_name               " << *device.device_name() << '\n';
+        std::cout << "    manufacturer              " << device.manufacturer().value_or("NONE")
+                  << '\n';
+        std::cout << "    product                   " << device.product().value_or("NONE") << '\n';
+
+        std::string uid_str;
+        if (!device.unique_instance_id()) {
+          uid_str = "NONE";
+        } else {
+          uid_str = fxl::StringPrintf(
+              "0x%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X",
+              (*device.unique_instance_id())[0], (*device.unique_instance_id())[1],
+              (*device.unique_instance_id())[2], (*device.unique_instance_id())[3],
+              (*device.unique_instance_id())[4], (*device.unique_instance_id())[5],
+              (*device.unique_instance_id())[6], (*device.unique_instance_id())[7],
+              (*device.unique_instance_id())[8], (*device.unique_instance_id())[9],
+              (*device.unique_instance_id())[10], (*device.unique_instance_id())[11],
+              (*device.unique_instance_id())[12], (*device.unique_instance_id())[13],
+              (*device.unique_instance_id())[14], (*device.unique_instance_id())[15]);
+        }
+        std::cout << "    unique_instance_id        " << uid_str << '\n';
+
+        std::cout << "    ring_buffer_format_sets[" << device.ring_buffer_format_sets()->size()
+                  << "]" << '\n';
+        for (auto idx = 0u; idx < device.ring_buffer_format_sets()->size(); ++idx) {
+          auto format = (*device.ring_buffer_format_sets())[idx];
+          std::cout << "        [" << idx << "] channel_sets[" << format.channel_sets()->size()
+                    << "]" << '\n';
+          for (auto cs = 0u; cs < format.channel_sets()->size(); ++cs) {
+            auto channel_set = (*format.channel_sets())[cs];
+            std::cout << "                [" << cs << "]   attributes["
+                      << channel_set.attributes()->size() << "]" << '\n';
+            for (auto a = 0u; a < channel_set.attributes()->size(); ++a) {
+              auto attribs = (*channel_set.attributes())[a];
+              std::cout << "                        [" << a << "]   min_frequency  "
+                        << (attribs.min_frequency().has_value()
+                                ? std::to_string(*attribs.min_frequency())
+                                : "NONE")
+                        << '\n';
+              std::cout << "                              max_frequency  "
+                        << (attribs.max_frequency().has_value()
+                                ? std::to_string(*attribs.max_frequency())
+                                : "NONE")
+                        << '\n';
+            }
+          }
+          std::cout << "            sample_types[" << format.sample_types()->size() << "]" << '\n';
+          for (auto st = 0u; st < format.sample_types()->size(); ++st) {
+            std::cout << "                [" << st << "]     " << (*format.sample_types())[st]
+                      << '\n';
+          }
+          std::cout << "            frame_rates [" << format.frame_rates()->size() << "]" << '\n';
+          for (auto fr = 0u; fr < format.frame_rates()->size(); ++fr) {
+            std::cout << "                [" << fr << "]     " << (*format.frame_rates())[fr]
+                      << '\n';
+          }
+        }
+        channels_per_frame_ =
+            device.ring_buffer_format_sets()->front().channel_sets()->front().attributes()->size();
+
+        std::cout << "    is_input                  "
+                  << (device.is_input() ? (*device.is_input() ? "true" : "false") : "UNSPECIFIED")
+                  << '\n';
+
+        std::cout << "    gain_caps" << '\n';
+        std::cout << "        min_gain_db           "
+                  << (device.gain_caps()->min_gain_db()
+                          ? std::to_string(*device.gain_caps()->min_gain_db()) + " dB"
+                          : "NONE (non-compliant)")
+                  << '\n';
+        std::cout << "        max_gain_db           "
+                  << (device.gain_caps()->max_gain_db()
+                          ? std::to_string(*device.gain_caps()->max_gain_db()) + " dB"
+                          : "NONE (non-compliant)")
+                  << '\n';
+        std::cout << "        gain_step_db          "
+                  << (device.gain_caps()->gain_step_db()
+                          ? std::to_string(*device.gain_caps()->gain_step_db()) + " dB"
+                          : "NONE (non-compliant)")
+                  << '\n';
+        std::cout << "        can_mute              "
+                  << (device.gain_caps()->can_mute()
+                          ? (*device.gain_caps()->can_mute() ? "TRUE" : "FALSE")
+                          : "NONE (FALSE)")
+                  << '\n';
+        std::cout << "        can_agc               "
+                  << (device.gain_caps()->can_agc()
+                          ? (*device.gain_caps()->can_agc() ? "TRUE" : "FALSE")
+                          : "NONE (FALSE)")
+                  << '\n';
+        max_gain_db_ = *device.gain_caps()->max_gain_db();  // This example chooses
+        max_gain_db_ = std::min(max_gain_db_, 0.0f);        // not to exceed 0 dB.
+        min_gain_db_ = *device.gain_caps()->min_gain_db();
+
+        std::cout << "    plug_caps                 " << device.plug_detect_caps() << '\n';
+
+        std::string clk_domain_str;
+        if (!device.clock_domain()) {
+          clk_domain_str = "unspecified (CLOCK_DOMAIN_EXTERNAL)";
+        } else if (*device.clock_domain() == 0xFFFFFFFF) {
+          clk_domain_str = "CLOCK_DOMAIN_EXTERNAL";
+        } else if (*device.clock_domain() == 0) {
+          clk_domain_str = "CLOCK_DOMAIN_MONOTONIC";
+        } else {
+          clk_domain_str = std::to_string(*device.clock_domain()) + " (not MONOTONIC)";
+        }
+        std::cout << "    clock_domain              " << clk_domain_str << '\n';
+
+        // Include `signal_processing_elements` here too.
+
+        // Include `signal_processing_topologies` here too.
+
+        // Determine the format we will use, then connect to the device.
+        if (device.ring_buffer_format_sets()->empty()) {
+          std::cout << "ring_buffer_format_sets EMPTY";
           Shutdown();
           return;
         }
+        // For convenience, just use the first channel configuration that they listed.
+        channels_per_frame_ =
+            device.ring_buffer_format_sets()->front().channel_sets()->front().attributes()->size();
 
-        for (const auto& device : *result->devices()) {
-          if (*device.device_type() == fuchsia_audio_device::DeviceType::kOutput) {
-            device_token_id_ = *device.token_id();
-            std::cout << "Connecting to audio device:" << '\n';
-            std::cout << "    token_id                  " << device_token_id_ << '\n';
-            std::cout << "    device_type               kOutput" << '\n';
-            std::cout << "    device_name               " << *device.device_name() << '\n';
-            std::cout << "    manufacturer              " << device.manufacturer().value_or("NONE")
-                      << '\n';
-            std::cout << "    product                   " << device.product().value_or("NONE")
-                      << '\n';
-
-            std::string uid_str;
-            if (!device.unique_instance_id()) {
-              uid_str = "NONE";
-            } else {
-              uid_str = fxl::StringPrintf(
-                  "0x%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X",
-                  (*device.unique_instance_id())[0], (*device.unique_instance_id())[1],
-                  (*device.unique_instance_id())[2], (*device.unique_instance_id())[3],
-                  (*device.unique_instance_id())[4], (*device.unique_instance_id())[5],
-                  (*device.unique_instance_id())[6], (*device.unique_instance_id())[7],
-                  (*device.unique_instance_id())[8], (*device.unique_instance_id())[9],
-                  (*device.unique_instance_id())[10], (*device.unique_instance_id())[11],
-                  (*device.unique_instance_id())[12], (*device.unique_instance_id())[13],
-                  (*device.unique_instance_id())[14], (*device.unique_instance_id())[15]);
-            }
-            std::cout << "    unique_instance_id        " << uid_str << '\n';
-
-            std::cout << "    ring_buffer_format_sets[" << device.ring_buffer_format_sets()->size()
-                      << "]" << '\n';
-            channels_per_frame_ = device.ring_buffer_format_sets()
-                                      ->front()
-                                      .channel_sets()
-                                      ->front()
-                                      .attributes()
-                                      ->size();
-            for (auto idx = 0u; idx < device.ring_buffer_format_sets()->size(); ++idx) {
-              auto format = (*device.ring_buffer_format_sets())[idx];
-              std::cout << "        [" << idx << "] channel_sets[" << format.channel_sets()->size()
-                        << "]" << '\n';
-              for (auto cs = 0u; cs < format.channel_sets()->size(); ++cs) {
-                auto channel_set = (*format.channel_sets())[cs];
-                std::cout << "                [" << cs << "]   attributes["
-                          << channel_set.attributes()->size() << "]" << '\n';
-                for (auto a = 0u; a < channel_set.attributes()->size(); ++a) {
-                  auto attribs = (*channel_set.attributes())[a];
-                  std::cout << "                        [" << a << "]   min_frequency  "
-                            << (attribs.min_frequency().has_value()
-                                    ? std::to_string(*attribs.min_frequency())
-                                    : "NONE")
-                            << '\n';
-                  std::cout << "                              max_frequency  "
-                            << (attribs.max_frequency().has_value()
-                                    ? std::to_string(*attribs.max_frequency())
-                                    : "NONE")
-                            << '\n';
-                }
-              }
-              std::cout << "            sample_types[" << format.sample_types()->size() << "]"
-                        << '\n';
-              for (auto st = 0u; st < format.sample_types()->size(); ++st) {
-                std::cout << "                [" << st << "]     " << (*format.sample_types())[st]
-                          << '\n';
-              }
-              std::cout << "            frame_rates [" << format.frame_rates()->size() << "]"
-                        << '\n';
-              for (auto fr = 0u; fr < format.frame_rates()->size(); ++fr) {
-                std::cout << "                [" << fr << "]     " << (*format.frame_rates())[fr]
-                          << '\n';
-              }
-            }
-            std::cout << "    gain_caps" << '\n';
-            std::cout << "        min_gain_db           "
-                      << (device.gain_caps()->min_gain_db()
-                              ? std::to_string(*device.gain_caps()->min_gain_db()) + " dB"
-                              : "NONE (non-compliant)")
-                      << '\n';
-            std::cout << "        max_gain_db           "
-                      << (device.gain_caps()->max_gain_db()
-                              ? std::to_string(*device.gain_caps()->max_gain_db()) + " dB"
-                              : "NONE (non-compliant)")
-                      << '\n';
-            std::cout << "        gain_step_db          "
-                      << (device.gain_caps()->gain_step_db()
-                              ? std::to_string(*device.gain_caps()->gain_step_db()) + " dB"
-                              : "NONE (non-compliant)")
-                      << '\n';
-            std::cout << "        can_mute              "
-                      << (device.gain_caps()->can_mute()
-                              ? (*device.gain_caps()->can_mute() ? "TRUE" : "FALSE")
-                              : "NONE (FALSE)")
-                      << '\n';
-            std::cout << "        can_agc               "
-                      << (device.gain_caps()->can_agc()
-                              ? (*device.gain_caps()->can_agc() ? "TRUE" : "FALSE")
-                              : "NONE (FALSE)")
-                      << '\n';
-            std::cout << "    plug_caps                 " << device.plug_detect_caps() << '\n';
-
-            std::string clk_domain_str;
-            if (!device.clock_domain()) {
-              clk_domain_str = "unspecified (CLOCK_DOMAIN_EXTERNAL)";
-            } else if (*device.clock_domain() == 0xFFFFFFFF) {
-              clk_domain_str = "CLOCK_DOMAIN_EXTERNAL";
-            } else if (*device.clock_domain() == 0) {
-              clk_domain_str = "CLOCK_DOMAIN_MONOTONIC";
-            } else {
-              clk_domain_str = std::to_string(*device.clock_domain()) + " (not MONOTONIC)";
-            }
-            std::cout << "    clock_domain              " << clk_domain_str << '\n';
-
-            max_gain_db_ = *device.gain_caps()->max_gain_db();  // This example chooses
-            max_gain_db_ = std::min(max_gain_db_, 0.0f);        // not to exceed 0 dB.
-            min_gain_db_ = *device.gain_caps()->min_gain_db();
-
-            ObserveDevice();
-            return;
-          }
+        // If we didn't get a valid overall format, then we shouldn't continue onward.
+        if (!channels_per_frame_) {
+          return;
         }
-      });
+
+        ObserveDevice();
+        ConnectToControlCreator();
+        // Create a RingBuffer and play a tone in that format to that RingBuffer.
+        ControlDevice();
+      }
+    }
+  });
 }
 
 void MediaApp::ObserveDevice() {
@@ -343,12 +362,6 @@ void MediaApp::ObserveDevice() {
                                                 : "NONE (non-compliant)")
                         << '\n';
             });
-
-        ConnectToControlCreator();
-        // If we didn't get a valid overall format, then we shouldn't continue onward.
-        if (channels_per_frame_) {
-          ControlDevice();
-        }
       });
 }
 
