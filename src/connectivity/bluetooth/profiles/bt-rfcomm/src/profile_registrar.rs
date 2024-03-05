@@ -139,7 +139,7 @@ impl ProfileRegistrar {
 
     /// Processes an incoming L2cap connection from the upstream server.
     ///
-    /// If the connection PSM is not RFCOMM, relays directly to the client.
+    /// Relays the connection directly to the FIDL client if the protocol is not RFCOMM.
     ///
     /// Returns an error if the `protocol` is invalidly formatted, or if the provided
     /// PSM is not represented by a client of the `ProfileRegistrar`.
@@ -151,6 +151,8 @@ impl ProfileRegistrar {
     ) -> Result<(), Error> {
         trace!(%peer_id, "Received incoming L2CAP connection request {protocol:?}");
         let local = protocol.iter().map(|p| p.into()).collect();
+        // TODO(b/327758656): The RFCOMM server cannot relay dynamic PSM connections to the correct
+        // FIDL client.
         match psm_from_protocol(&local).ok_or(format_err!("No PSM provided"))? {
             Psm::RFCOMM => self.rfcomm_server.new_l2cap_connection(peer_id, channel.try_into()?),
             psm => {
@@ -315,16 +317,16 @@ impl ProfileRegistrar {
         }
     }
 
-    /// Handles an incoming request to advertise a group of `services`.
+    /// Handles a request to advertise a group of profile `services` that will be managed by the
+    /// RFCOMM server.
     ///
-    /// At least one service in `services` must request RFCOMM.
+    /// At least one service in `services` must request RFCOMM. The RFCOMM-requesting services are
+    /// assigned ServerChannels. The services are registered together with any existing RFCOMM
+    /// services.
     ///
-    /// The RFCOMM-requesting services are assigned ServerChannels. The services are then
-    /// registered together with the currently registered services.
-    ///
-    /// Returns the event stream for the receiver tagged with a unique identifier for the
-    /// registered group of services. The event stream should be continuously polled in
-    /// order to detect when the client terminates the advertisement.
+    /// Returns a stream of incoming connection requests tagged with a unique identifier for the
+    /// registered group of services. The event stream should be actively polled in order to detect
+    /// when the client terminates the advertisement.
     async fn add_managed_advertisement(
         &mut self,
         mut services: Vec<ServiceDefinition>,
@@ -333,14 +335,16 @@ impl ProfileRegistrar {
         responder: bredr::ProfileAdvertiseResponder,
     ) -> Result<StreamWithEpitaph<bredr::ConnectionReceiverEventStream, ServiceGroupHandle>, Error>
     {
-        // Validate that the new PSMs are disjoint because we unregister and re-register as a group.
+        // The requested PSMs must be disjoint from the existing set of PSMs as only one group
+        // can allocate a specific PSM.
+        // TODO(b/327758656): L2CAP PSMs specified in the `attributes` section are not part of this
+        // set.
         let new_psms = psms_from_service_definitions(&services);
         if !self.is_disjoint_psms(&new_psms) {
             let _ = responder.send(Err(ErrorCode::Failed));
-            return Err(format_err!("New advertisement requesting pre-allocated PSMs"));
+            return Err(format_err!("New advertisement requests allocated PSMs"));
         }
 
-        // Create an entry for this group of services with a unique handle.
         let next_handle =
             self.registered_services.insert(ServiceGroup::new(receiver.clone(), parameters));
 
@@ -365,7 +369,7 @@ impl ProfileRegistrar {
         service_info.set_service_defs(services);
         service_info.set_responder(responder);
 
-        // Attempt to re-advertise the updated services.
+        // The services will be re-registered as a single group.
         self.refresh_advertisement().await;
 
         Ok(receiver.take_event_stream().with_epitaph(next_handle))
