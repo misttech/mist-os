@@ -114,12 +114,12 @@ impl From<AgUpdate> for ProcedureRequest {
             AgUpdate::IndicatorStatus(status) => vec![
                 at::success(at::Success::Cind {
                     service: status.service,
-                    call: status.call.into(),
-                    callsetup: status.callsetup as i64,
-                    callheld: status.callheld as i64,
+                    call: (&status.call).into(),
+                    callsetup: (&status.callsetup).into(),
+                    callheld: (&status.callheld).into(),
                     signal: status.signal as i64,
                     roam: status.roam,
-                    battchg: status.battchg as i64,
+                    battchg: status.battchg.into(),
                 }),
                 at::Response::Ok,
             ],

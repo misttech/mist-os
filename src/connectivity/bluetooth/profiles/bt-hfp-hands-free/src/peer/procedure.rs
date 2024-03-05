@@ -7,6 +7,7 @@ use at_commands as at;
 use std::fmt;
 use std::fmt::Debug;
 
+use crate::peer::ag_indicators::AgIndicatorIndex;
 use crate::peer::procedure_manipulated_state::ProcedureManipulatedState;
 
 #[cfg(test)]
@@ -18,9 +19,6 @@ use codec_connection_setup::CodecConnectionSetupProcedure;
 
 pub mod initiate_call;
 use initiate_call::InitiateCallProcedure;
-
-pub mod phone_status;
-use phone_status::PhoneStatusProcedure;
 
 pub mod slc_initialization;
 use slc_initialization::SlcInitProcedure;
@@ -51,6 +49,17 @@ macro_rules! at_cmd {
 }
 pub(crate) use at_cmd;
 
+// For use below
+macro_rules! make_from {
+    ($source: path, $destination: ident, $destination_variant: ident) => {
+        impl From<$source> for $destination {
+            fn from(source: $source) -> $destination {
+                $destination::$destination_variant(source)
+            }
+        }
+    };
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub enum CommandFromHf {
     CallActionDialFromNumber { number: String },
@@ -64,16 +73,23 @@ pub enum ProcedureInput {
     CommandFromHf(CommandFromHf),
 }
 
+make_from!(at::Response, ProcedureInput, AtResponseFromAg);
+make_from!(CommandFromHf, ProcedureInput, CommandFromHf);
+
 #[derive(Clone, Debug, PartialEq)]
-pub enum CommandToHf {}
+pub enum CommandToHf {
+    SetInitialAgIndicatorValues { values: Vec<i64> },
+    SetAgIndicatorIndex { indicator: AgIndicatorIndex, index: i64 },
+}
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum ProcedureOutput {
     AtCommandToAg(at::Command),
-    // TODO(https://fxbug.dev/42077657) use this in PeerTask and procedures.
-    #[allow(unused)]
     CommandToHf(CommandToHf),
 }
+
+make_from!(at::Command, ProcedureOutput, AtCommandToAg);
+make_from!(CommandToHf, ProcedureOutput, CommandToHf);
 
 pub trait ProcedureInputT<O: ProcedureOutputT>: Clone + Debug + PartialEq + Unpin {
     fn to_initialized_procedure(&self) -> Option<Box<dyn Procedure<Self, O>>>;
@@ -87,8 +103,6 @@ impl ProcedureInputT<ProcedureOutput> for ProcedureInput {
         match self {
             // TODO(https://fxbug.dev/42081254) This is wrong--we need to start SLCI ourselves, not wait for an AT command.
             at_resp!(Brsf) => Some(Box::new(SlcInitProcedure::new())),
-
-            at_resp!(Ciev) => Some(Box::new(PhoneStatusProcedure::new())),
 
             at_resp!(Bcs) => Some(Box::new(CodecConnectionSetupProcedure::new())),
 

@@ -35,14 +35,6 @@ impl<T: Clone + Copy + Debug> Default for Indicator<T> {
     }
 }
 
-impl<T: Clone + Copy + Debug> Indicator<T> {
-    pub fn set_if_enabled(&mut self, val: T) {
-        if self.enabled {
-            self.value = Some(val);
-        }
-    }
-}
-
 /// The supported HF indicators and their enabled/disabled status & values.
 /// The second bool determines whether the AG supports the indicator
 /// Defined in HFP v1.8 Section 4.36
@@ -60,48 +52,6 @@ impl Default for HfIndicators {
             enhanced_safety: (Indicator { enabled: false, value: None }, false),
             battery_level: (Indicator { enabled: false, value: None }, false),
         }
-    }
-}
-
-/// A collection of indicators supported by the AG.
-#[derive(Default, Clone)]
-pub struct AgIndicators {
-    pub service: Indicator<bool>,
-    pub call: Indicator<bool>,
-    pub callsetup: Indicator<u8>,
-    pub callheld: Indicator<u8>,
-    pub signal: Indicator<u8>,
-    pub roam: Indicator<bool>,
-    pub battchg: Indicator<u8>,
-}
-
-impl AgIndicators {
-    /// Update the Indicator values from the Cind response received from the AG.
-    pub fn update_indicator_values(&mut self, response: &at::Success) {
-        match response {
-            at::Success::Cind { service, call, callsetup, callheld, signal, roam, battchg } => {
-                self.service.set_if_enabled(*service);
-                self.call.set_if_enabled(*call);
-                self.callsetup.set_if_enabled(*callsetup as u8);
-                self.callheld.set_if_enabled(*callheld as u8);
-                self.signal.set_if_enabled(*signal as u8);
-                self.roam.set_if_enabled(*roam);
-                self.battchg.set_if_enabled(*battchg as u8);
-            }
-            _ => {}
-        }
-    }
-
-    #[cfg(test)]
-    /// Add default values to indicators.
-    pub fn set_default_values(&mut self) {
-        self.service.value = Some(false);
-        self.call.value = Some(false);
-        self.callsetup.value = Some(0);
-        self.callheld.value = Some(0);
-        self.signal.value = Some(0);
-        self.roam.value = Some(false);
-        self.battchg.value = Some(0);
     }
 }
 

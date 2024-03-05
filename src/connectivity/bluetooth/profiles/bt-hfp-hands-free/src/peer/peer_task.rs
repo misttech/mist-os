@@ -12,8 +12,9 @@ use futures::StreamExt;
 use tracing::{debug, info, warn};
 
 use crate::config::HandsFreeFeatureSupport;
+use crate::peer::ag_indicators::AgIndicatorTranslator;
 use crate::peer::at_connection::AtConnection;
-use crate::peer::procedure::{CommandFromHf, ProcedureInput, ProcedureOutput};
+use crate::peer::procedure::{CommandFromHf, CommandToHf, ProcedureInput, ProcedureOutput};
 use crate::peer::procedure_manager::ProcedureManager;
 
 pub struct PeerTask {
@@ -21,6 +22,7 @@ pub struct PeerTask {
     procedure_manager: ProcedureManager<ProcedureInput, ProcedureOutput>,
     peer_handler_request_stream: fidl_hfp::PeerHandlerRequestStream,
     at_connection: AtConnection,
+    ag_indicator_translator: AgIndicatorTranslator,
 }
 
 impl PeerTask {
@@ -32,9 +34,15 @@ impl PeerTask {
     ) -> fasync::Task<()> {
         let procedure_manager = ProcedureManager::new(peer_id, config);
         let at_connection = AtConnection::new(peer_id, rfcomm);
+        let ag_indicator_translator = AgIndicatorTranslator::new();
 
-        let peer_task =
-            Self { peer_id, procedure_manager, peer_handler_request_stream, at_connection };
+        let peer_task = Self {
+            peer_id,
+            procedure_manager,
+            peer_handler_request_stream,
+            at_connection,
+            ag_indicator_translator,
+        };
 
         let fasync_task = fasync::Task::local(peer_task.run());
         fasync_task
@@ -81,7 +89,7 @@ impl PeerTask {
                 let procedure_outputs = procedure_outputs_result?;
 
                 for procedure_output in procedure_outputs {
-                    self.handle_procedure_output(procedure_output);
+                    self.handle_procedure_output(procedure_output).await?;
                 }
             }
         }
@@ -128,8 +136,17 @@ impl PeerTask {
         self.procedure_manager.enqueue(procedure_input);
     }
 
-    // TODO(https://fxbug.dev/42077657) Handle procedure outputs.
-    fn handle_procedure_output(&self, _procedure_output: ProcedureOutput) {
-        unimplemented!("handle_procedure_output");
+    async fn handle_procedure_output(&mut self, procedure_output: ProcedureOutput) -> Result<()> {
+        match procedure_output {
+            ProcedureOutput::AtCommandToAg(command) => {
+                self.at_connection.write_commands(&vec![command]).await?
             }
+            ProcedureOutput::CommandToHf(CommandToHf::SetAgIndicatorIndex { indicator, index }) => {
+                self.ag_indicator_translator.set_index(indicator, index)?
+            }
+            _ => unimplemented!("Unimplemented ProcedureOutput"),
+        };
+
+        Ok(())
+    }
 }

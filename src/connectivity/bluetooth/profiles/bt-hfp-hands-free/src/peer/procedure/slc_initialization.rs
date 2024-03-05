@@ -6,10 +6,11 @@ use anyhow::{format_err, Result};
 use at_commands as at;
 
 use super::{at_cmd, at_ok, at_resp};
-use super::{Procedure, ProcedureInput, ProcedureOutput};
+use super::{CommandToHf, Procedure, ProcedureInput, ProcedureOutput};
 
 use crate::features::{extract_features_from_command, AgFeatures, CVSD, MSBC};
-use crate::peer::indicators::{BATTERY_LEVEL, ENHANCED_SAFETY, INDICATOR_REPORTING_MODE};
+use crate::peer::ag_indicators::AgIndicatorIndex;
+use crate::peer::hf_indicators::{BATTERY_LEVEL, ENHANCED_SAFETY, INDICATOR_REPORTING_MODE};
 use crate::peer::procedure_manipulated_state::ProcedureManipulatedState;
 
 #[derive(Debug, PartialEq)]
@@ -55,107 +56,125 @@ impl SlcInitProcedure {
         &mut self,
         state: &mut ProcedureManipulatedState,
         features: i64,
-    ) -> Option<ProcedureOutput> {
+    ) -> Vec<ProcedureOutput> {
         state.ag_features = AgFeatures::from_bits_truncate(features);
         self.state = State::ReceivedSupportedFeatures;
-        None
+        vec![]
     }
 
     fn send_available_codecs(
         &mut self,
         state: &mut ProcedureManipulatedState,
-    ) -> Option<ProcedureOutput> {
+    ) -> Vec<ProcedureOutput> {
         self.state = State::SentAvailableCodecs;
         state.supported_codecs.push(MSBC);
         // TODO(https://fxbug.dev/42081215) Make this configurable.
         // By default, we support the CVSD and MSBC codecs.
-        Some(at_cmd!(Bac { codecs: vec![CVSD.into(), MSBC.into()] }))
+        vec![at_cmd!(Bac { codecs: vec![CVSD.into(), MSBC.into()] })]
     }
 
-    fn test_supported_ag_indicators(&mut self) -> Option<ProcedureOutput> {
+    fn test_supported_ag_indicators(&mut self) -> Vec<ProcedureOutput> {
         self.state = State::TestedSupportedAgIndicators;
-        Some(at_cmd!(CindTest {}))
+        vec![at_cmd!(CindTest {})]
     }
 
-    fn receive_supported_ag_indicators(&mut self, _bytes: Vec<u8>) -> Option<ProcedureOutput> {
-        // TODO(https://fxbug.dev/42059744): Read additional indicators by parsing raw bytes instead
-        // ofjust checking for existence of raw bytes.
+    fn receive_supported_ag_indicators(&mut self, _bytes: Vec<u8>) -> Vec<ProcedureOutput> {
+        // TODO(fxbug.dev/108331): Read actual indicator values by parsing raw bytes.
         self.state = State::ReceivedSupportedAgIndicators;
-        None
+        vec![
+            CommandToHf::SetAgIndicatorIndex {
+                indicator: AgIndicatorIndex::ServiceAvailable,
+                index: 1,
+            }
+            .into(),
+            CommandToHf::SetAgIndicatorIndex { indicator: AgIndicatorIndex::Call, index: 2 }.into(),
+            CommandToHf::SetAgIndicatorIndex { indicator: AgIndicatorIndex::CallSetup, index: 3 }
+                .into(),
+            CommandToHf::SetAgIndicatorIndex { indicator: AgIndicatorIndex::CallHeld, index: 4 }
+                .into(),
+            CommandToHf::SetAgIndicatorIndex {
+                indicator: AgIndicatorIndex::SignalStrength,
+                index: 5,
+            }
+            .into(),
+            CommandToHf::SetAgIndicatorIndex { indicator: AgIndicatorIndex::Roaming, index: 6 }
+                .into(),
+            CommandToHf::SetAgIndicatorIndex {
+                indicator: AgIndicatorIndex::BatteryCharge,
+                index: 7,
+            }
+            .into(),
+        ]
     }
 
-    fn read_ag_indicator_statuses(&mut self) -> Option<ProcedureOutput> {
+    fn read_ag_indicator_statuses(&mut self) -> Vec<ProcedureOutput> {
         self.state = State::ReadAgIndicatorStatuses;
-        Some(at_cmd!(CindRead {}))
+        vec![at_cmd!(CindRead {})]
     }
 
-    fn receive_ag_indicator_statuses(
-        &mut self,
-        state: &mut ProcedureManipulatedState,
-        cmd: &at::Success,
-    ) -> Option<ProcedureOutput> {
-        state.ag_indicators.update_indicator_values(cmd);
+    fn receive_ag_indicator_statuses(&mut self, cmd: at::Success) -> Vec<ProcedureOutput> {
         self.state = State::ReceivedAgIndicatorStatuses;
-        None
+        let output = convert_cind_to_hf_command(cmd);
+        vec![output]
     }
 
-    fn send_ag_indicator_status_update(&mut self) -> Option<ProcedureOutput> {
+    fn send_ag_indicator_status_update(&mut self) -> Vec<ProcedureOutput> {
         self.state = State::SentAgIndicatorStatusUpdate;
-        Some(at_cmd!(Cmer { mode: INDICATOR_REPORTING_MODE, keyp: 0, disp: 0, ind: 1 }))
+        vec![at_cmd!(Cmer { mode: INDICATOR_REPORTING_MODE, keyp: 0, disp: 0, ind: 1 })]
     }
 
-    fn send_call_hold_and_multparty(&mut self) -> Option<ProcedureOutput> {
+    fn send_call_hold_and_multparty(&mut self) -> Vec<ProcedureOutput> {
         self.state = State::SentCallHoldAndMultiparty;
-        Some(at_cmd!(ChldTest {}))
+        vec![at_cmd!(ChldTest {})]
     }
 
     fn receive_call_hold_and_multiparty(
         &mut self,
         state: &mut ProcedureManipulatedState,
         commands: &Vec<String>,
-    ) -> Result<Option<ProcedureOutput>> {
+    ) -> Result<Vec<ProcedureOutput>> {
         state.three_way_features = extract_features_from_command(commands)?;
         self.state = State::ReceivedCallHoldAndMultiparty;
-        Ok(None)
+        Ok(vec![])
     }
 
-    fn send_supported_hf_indicators(&mut self) -> Option<ProcedureOutput> {
+    fn send_supported_hf_indicators(&mut self) -> Vec<ProcedureOutput> {
         self.state = State::SentSupportedHfIndicators;
-        Some(at_cmd!(Bind { indicators: vec![ENHANCED_SAFETY as i64, BATTERY_LEVEL as i64] }))
+        vec![at_cmd!(Bind { indicators: vec![ENHANCED_SAFETY as i64, BATTERY_LEVEL as i64] })]
     }
 
-    fn test_supported_hf_indicators(&mut self) -> Option<ProcedureOutput> {
+    fn test_supported_hf_indicators(&mut self) -> Vec<ProcedureOutput> {
         self.state = State::TestedSupportedHfIndicators;
-        Some(at_cmd!(BindTest {}))
+        vec![at_cmd!(BindTest {})]
     }
 
     fn receive_supported_hf_indicators(
         &mut self,
         state: &mut ProcedureManipulatedState,
         indicators: &Vec<at::BluetoothHFIndicator>,
-    ) -> Option<ProcedureOutput> {
+    ) -> Vec<ProcedureOutput> {
         state.hf_indicators.set_supported_indicators(indicators);
         self.state = State::ReceivedSupportedHfIndicators;
-        None
+        vec![]
     }
 
-    fn read_enabled_hf_indicators(&mut self) -> Option<ProcedureOutput> {
+    fn read_enabled_hf_indicators(&mut self) -> Vec<ProcedureOutput> {
         self.state = State::ReadEnabledHfIndicators;
-        Some(at_cmd!(BindRead {}))
+        vec![at_cmd!(BindRead {})]
     }
 
     fn receive_enabled_hf_indicator(
         &mut self,
         state: &mut ProcedureManipulatedState,
         cmd: &at::Success,
-    ) -> Result<Option<ProcedureOutput>> {
+    ) -> Result<Vec<ProcedureOutput>> {
         state.hf_indicators.change_indicator_state(cmd)?;
-        Ok(None)
+        Ok(vec![])
     }
 
-    fn terminate(&mut self) -> Option<ProcedureOutput> {
+    fn terminate(&mut self) -> Vec<ProcedureOutput> {
         self.state = State::Terminated;
-        None
+        vec![]
     }
 }
 
@@ -182,7 +201,7 @@ impl Procedure<ProcedureInput, ProcedureOutput> for SlcInitProcedure {
                 input
             ));
         }
-        let output_option = match (&self.state, input) {
+        let outputs = match (&self.state, input) {
             // Sent AT+BRSF, waiting for +BRSF /////////////////////////////////////////////////////
             (State::SentSupportedFeatures, at_resp!(Brsf { features })) => {
                 self.receive_supported_features(state, features)
@@ -215,7 +234,7 @@ impl Procedure<ProcedureInput, ProcedureOutput> for SlcInitProcedure {
                 ProcedureInput::AtResponseFromAg(at::Response::Success(
                     cmd @ at::Success::Cind { .. },
                 )),
-            ) => self.receive_ag_indicator_statuses(state, &cmd),
+            ) => self.receive_ag_indicator_statuses(cmd),
 
             // Received +CIND:, waiting for OK /////////////////////////////////////////////////////
             (State::ReceivedAgIndicatorStatuses, at_ok!()) => {
@@ -279,13 +298,34 @@ impl Procedure<ProcedureInput, ProcedureOutput> for SlcInitProcedure {
             }
         };
 
-        let outputs = output_option.into_iter().collect();
         Ok(outputs)
     }
 
     fn is_terminated(&self) -> bool {
         self.state == State::Terminated
     }
+}
+
+// Must be called with CIND.
+fn convert_cind_to_hf_command(cind: at::Success) -> ProcedureOutput {
+    let at::Success::Cind { service, call, callsetup, callheld, signal, roam, battchg } = cind
+    else {
+        panic!("convert_cind_to_hf_command called with non-CIND: {cind:?}");
+    };
+    // TODO(fxb/137097) We won't necessarily get the fields in this order, so we need to hand
+    // parse this +CIND.
+    CommandToHf::SetInitialAgIndicatorValues {
+        values: vec![
+            service as i64, // This should be fixed as part of hand-parsing the +CIND
+            call as i64,    // This should be fixed as part of hand-parsing the +CIND
+            callsetup,
+            callheld,
+            signal,
+            roam as i64, // This should be fixed as part of hand-parsing the +CIND
+            battchg,
+        ],
+    }
+    .into()
 }
 
 #[cfg(test)]
@@ -295,7 +335,52 @@ mod tests {
     use crate::{config::HandsFreeFeatureSupport, features::CallHoldAction, features::HfFeatures};
     use assert_matches::assert_matches;
 
-    // TODO(https://fxbug.dev/42151045) Stop using raw bytes.
+    fn supported_indicator_indices_output(
+        service_available: i64,
+        call: i64,
+        call_setup: i64,
+        call_held: i64,
+        signal_strength: i64,
+        roaming: i64,
+        battery_charge: i64,
+    ) -> Vec<ProcedureOutput> {
+        vec![
+            CommandToHf::SetAgIndicatorIndex {
+                indicator: AgIndicatorIndex::ServiceAvailable,
+                index: service_available,
+            }
+            .into(),
+            CommandToHf::SetAgIndicatorIndex { indicator: AgIndicatorIndex::Call, index: call }
+                .into(),
+            CommandToHf::SetAgIndicatorIndex {
+                indicator: AgIndicatorIndex::CallSetup,
+                index: call_setup,
+            }
+            .into(),
+            CommandToHf::SetAgIndicatorIndex {
+                indicator: AgIndicatorIndex::CallHeld,
+                index: call_held,
+            }
+            .into(),
+            CommandToHf::SetAgIndicatorIndex {
+                indicator: AgIndicatorIndex::SignalStrength,
+                index: signal_strength,
+            }
+            .into(),
+            CommandToHf::SetAgIndicatorIndex {
+                indicator: AgIndicatorIndex::Roaming,
+                index: roaming,
+            }
+            .into(),
+            CommandToHf::SetAgIndicatorIndex {
+                indicator: AgIndicatorIndex::BatteryCharge,
+                index: battery_charge,
+            }
+            .into(),
+        ]
+    }
+
+    // TODO(fxb/71668) Stop using raw bytes.
     const CIND_TEST_RESPONSE_BYTES: &[u8] = b"+CIND: \
     (\"service\",(0,1)),\
     (\"call\",(0,1)),\
@@ -325,9 +410,18 @@ mod tests {
 
         let indicator_msg = CIND_TEST_RESPONSE_BYTES.to_vec();
         let response2 = ProcedureInput::AtResponseFromAg(at::Response::RawBytes(indicator_msg));
+        let expected_output2 = supported_indicator_indices_output(
+            1, // service
+            2, // call
+            3, // callsetup
+            4, // callheld
+            5, // signal
+            6, // roam
+            7, // battchg
+        );
         let response2_ok = at_ok!();
         let expected_command2 = vec![at_cmd!(CindRead {})];
-        assert_eq!(procedure.transition(&mut state, response2).unwrap(), vec![]);
+        assert_eq!(procedure.transition(&mut state, response2).unwrap(), expected_output2);
 
         assert_eq!(procedure.transition(&mut state, response2_ok).unwrap(), expected_command2);
 
@@ -340,11 +434,23 @@ mod tests {
             roam: false,
             battchg: 0,
         });
-        let response3_ok = at_ok!();
         let update3 =
+            vec![ProcedureOutput::CommandToHf(CommandToHf::SetInitialAgIndicatorValues {
+                values: vec![
+                    0, // service
+                    0, // call
+                    0, // callsetup
+                    0, // callheld
+                    0, // signal
+                    0, // roam
+                    0, // battchg
+                ],
+            })];
+        let response3_ok = at_ok!();
+        let update3_from_ok =
             vec![at_cmd!(Cmer { mode: INDICATOR_REPORTING_MODE, keyp: 0, disp: 0, ind: 1 })];
-        assert_eq!(procedure.transition(&mut state, response3).unwrap(), vec![]);
-        assert_eq!(procedure.transition(&mut state, response3_ok).unwrap(), update3);
+        assert_eq!(procedure.transition(&mut state, response3).unwrap(), update3);
+        assert_eq!(procedure.transition(&mut state, response3_ok).unwrap(), update3_from_ok);
 
         let response4 = at_ok!();
         assert_eq!(procedure.transition(&mut state, response4).unwrap(), vec![]);
@@ -377,10 +483,19 @@ mod tests {
 
         let indicator_msg = CIND_TEST_RESPONSE_BYTES.to_vec();
         let response2 = ProcedureInput::AtResponseFromAg(at::Response::RawBytes(indicator_msg));
+        let expected_output2 = supported_indicator_indices_output(
+            1, // service
+            2, // call
+            3, // callsetup
+            4, // callheld
+            5, // signal
+            6, // roam
+            7, // battchg
+        );
         let response2_ok = at_ok!();
         let expected_command2 = vec![at_cmd!(CindRead {})];
 
-        assert_eq!(procedure.transition(&mut state, response2).unwrap(), vec![]);
+        assert_eq!(procedure.transition(&mut state, response2).unwrap(), expected_output2);
         assert_eq!(procedure.transition(&mut state, response2_ok).unwrap(), expected_command2);
 
         let response3 = at_resp!(Cind {
@@ -392,12 +507,26 @@ mod tests {
             roam: false,
             battchg: 0,
         });
-        let response3_ok = at_ok!();
         let expected_command3 =
+            vec![ProcedureOutput::CommandToHf(CommandToHf::SetInitialAgIndicatorValues {
+                values: vec![
+                    0, // service
+                    0, // call
+                    0, // callsetup
+                    0, // callheld
+                    0, // signal
+                    0, // roam
+                    0, // battchg
+                ],
+            })];
+        let response3_ok = at_ok!();
+        let expected_command3_from_ok =
             vec![at_cmd!(Cmer { mode: INDICATOR_REPORTING_MODE, keyp: 0, disp: 0, ind: 1 })];
-
-        assert_eq!(procedure.transition(&mut state, response3).unwrap(), vec![]);
-        assert_eq!(procedure.transition(&mut state, response3_ok).unwrap(), expected_command3);
+        assert_eq!(procedure.transition(&mut state, response3).unwrap(), expected_command3);
+        assert_eq!(
+            procedure.transition(&mut state, response3_ok).unwrap(),
+            expected_command3_from_ok
+        );
 
         let response4 = at_ok!();
         let expected_command4 =
@@ -479,9 +608,18 @@ mod tests {
 
         let indicator_msg = CIND_TEST_RESPONSE_BYTES.to_vec();
         let response2 = ProcedureInput::AtResponseFromAg(at::Response::RawBytes(indicator_msg));
+        let expected_output2 = supported_indicator_indices_output(
+            1, // service
+            2, // call
+            3, // callsetup
+            4, // callheld
+            5, // signal
+            6, // roam
+            7, // battchg
+        );
         let response2_ok = at_ok!();
         let expected_command2 = vec![at_cmd!(CindRead {})];
-        assert_eq!(procedure.transition(&mut state, response2).unwrap(), vec![]);
+        assert_eq!(procedure.transition(&mut state, response2).unwrap(), expected_output2);
         assert_eq!(procedure.transition(&mut state, response2_ok).unwrap(), expected_command2);
 
         let response3 = at_resp!(Cind {
@@ -493,11 +631,23 @@ mod tests {
             roam: false,
             battchg: 0,
         });
-        let response3_ok = at_ok!();
         let update3 =
+            vec![ProcedureOutput::CommandToHf(CommandToHf::SetInitialAgIndicatorValues {
+                values: vec![
+                    0, // service
+                    0, // call
+                    0, // callsetup
+                    0, // callheld
+                    0, // signal
+                    0, // roam
+                    0, // battchg
+                ],
+            })];
+        let response3_ok = at_ok!();
+        let update3_from_ok =
             vec![at_cmd!(Cmer { mode: INDICATOR_REPORTING_MODE, keyp: 0, disp: 0, ind: 1 })];
-        assert_eq!(procedure.transition(&mut state, response3).unwrap(), vec![]);
-        assert_eq!(procedure.transition(&mut state, response3_ok).unwrap(), update3);
+        assert_eq!(procedure.transition(&mut state, response3).unwrap(), update3);
+        assert_eq!(procedure.transition(&mut state, response3_ok).unwrap(), update3_from_ok);
 
         let response4 = at_ok!();
         let update4 = vec![at_cmd!(ChldTest {})];

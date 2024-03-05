@@ -3,14 +3,23 @@
 // found in the LICENSE file.
 
 use fidl_fuchsia_bluetooth_hfp::CallState;
+use packet_encoding::decodable_enum;
+use thiserror::Error;
 
+decodable_enum! {
 /// The Call Indicator as specified in HFP v1.8, Section 4.10.1
-#[derive(PartialEq, Clone, Copy, Debug)]
-pub enum Call {
-    /// There are no calls present in the AG (active or held).
-    None,
-    /// There is at least one call present in the AG (active or held).
-    Some,
+    pub enum Call<i64, CallIndicatorError, InvalidValue> {
+        /// There are no calls present in the AG (active or held).
+        None = 0,
+        /// There is at least one call present in the AG (active or held).
+        Some = 1,
+    }
+}
+
+#[derive(Debug, Error, PartialEq)]
+pub enum CallIndicatorError {
+    #[error("Invalid Call indicator value")]
+    InvalidValue,
 }
 
 impl Default for Call {
@@ -19,8 +28,8 @@ impl Default for Call {
     }
 }
 
-impl From<Call> for bool {
-    fn from(call: Call) -> Self {
+impl From<&Call> for bool {
+    fn from(call: &Call) -> Self {
         match call {
             Call::None => false,
             Call::Some => true,
@@ -48,17 +57,24 @@ impl Call {
     }
 }
 
+decodable_enum! {
 /// The Callsetup Indicator as specified in HFP v1.8, Section 4.10.2
-#[derive(PartialEq, Clone, Copy, Debug)]
-pub enum CallSetup {
-    /// No call setup in progress.
-    None = 0,
-    /// Incoming call setup in progress.
-    Incoming = 1,
-    /// Outgoing call setup in dialing state.
-    OutgoingDialing = 2,
-    /// Outgoing call setup in alerting state.
-    OutgoingAlerting = 3,
+    pub enum CallSetup<i64, CallSetupIndicatorError, InvalidValue> {
+        /// No call setup in progress.
+        None = 0,
+        /// Incoming call setup in progress.
+        Incoming = 1,
+        /// Outgoing call setup in dialing state.
+        OutgoingDialing = 2,
+        /// Outgoing call setup in alerting state.
+        OutgoingAlerting = 3,
+    }
+}
+
+#[derive(Debug, Error, PartialEq)]
+pub enum CallSetupIndicatorError {
+    #[error("Invalid Call Setup indicator value.")]
+    InvalidValue,
 }
 
 impl Default for CallSetup {
@@ -95,16 +111,23 @@ impl From<CallState> for CallSetup {
     }
 }
 
-/// The Callheld Indicator as specified in HFP v1.8, Section 4.10.3
-#[derive(PartialEq, Clone, Copy, Debug)]
-pub enum CallHeld {
-    /// No calls held.
-    None = 0,
-    /// Call is placed on hold or active/held calls swapped (The AG has both an active AND a held
-    /// call).
-    HeldAndActive = 1,
-    /// Call on hold, no active call.
-    Held = 2,
+decodable_enum! {
+    /// The Callheld Indicator as specified in HFP v1.8, Section 4.10.3
+    pub enum CallHeld<i64, CallHeldIndicatorError, InvalidValue> {
+        /// No calls held.
+        None = 0,
+        /// Call is placed on hold or active/held calls swapped (The AG has both an active AND a held
+        /// call).
+        HeldAndActive = 1,
+        /// Call on hold, no active call.
+        Held = 2,
+    }
+}
+
+#[derive(Debug, Error, PartialEq)]
+pub enum CallHeldIndicatorError {
+    #[error("Invalid Call Held indicator value")]
+    InvalidValue,
 }
 
 impl Default for CallHeld {
@@ -126,7 +149,7 @@ impl CallHeld {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Default)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct CallIndicators {
     pub call: Call,
     pub callsetup: CallSetup,
@@ -166,7 +189,7 @@ impl CallIndicators {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Default)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct CallIndicatorsUpdates {
     pub call: Option<Call>,
     pub callsetup: Option<CallSetup>,

@@ -18,7 +18,11 @@ rustc_library("bt-hfp") {
     "src/lib.rs",
   ]
 
-  deps = [ "//sdk/fidl/fuchsia.bluetooth.hfp:fuchsia.bluetooth.hfp_rust" ]
+  deps = [
+    "//sdk/fidl/fuchsia.bluetooth.hfp:fuchsia.bluetooth.hfp_rust",
+    "//src/connectivity/bluetooth/lib/packet-encoding",
+    "//third_party/rust_crates:thiserror",
+  ]
 
   test_deps = [ "//src/lib/fuchsia" ]
 

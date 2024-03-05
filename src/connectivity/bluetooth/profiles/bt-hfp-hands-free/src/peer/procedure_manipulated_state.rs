@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use super::indicators::{AgIndicators, HfIndicators};
+use super::hf_indicators::HfIndicators;
 
 use crate::config::HandsFreeFeatureSupport;
 use crate::features::{AgFeatures, CallHoldAction, HfFeatures, CVSD};
@@ -16,8 +16,6 @@ pub struct ProcedureManipulatedState {
     pub hf_features: HfFeatures,
     /// Features that the AG supports.
     pub ag_features: AgFeatures,
-    /// The current indicator status of the AG.
-    pub ag_indicators: AgIndicators,
     /// The current indicator status of the HF
     pub hf_indicators: HfIndicators,
     /// Determines whether the indicator status update function is enabled.
@@ -36,7 +34,6 @@ impl ProcedureManipulatedState {
             initialized: false,
             hf_features: config.into(),
             ag_features: AgFeatures::default(),
-            ag_indicators: AgIndicators::default(),
             hf_indicators: HfIndicators::default(),
             indicators_update_enabled: true,
             three_way_features: Vec::new(),

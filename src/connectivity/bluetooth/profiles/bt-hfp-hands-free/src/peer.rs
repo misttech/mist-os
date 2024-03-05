@@ -17,8 +17,9 @@ use peer_task::PeerTask;
 
 use crate::config::HandsFreeFeatureSupport;
 
+mod ag_indicators;
 mod at_connection;
-mod indicators;
+mod hf_indicators;
 mod peer_task;
 mod procedure;
 mod procedure_manager;
