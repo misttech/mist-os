@@ -54,7 +54,7 @@ impl TestResult {
         let written_blobs = self.blobfs.list_blobs().expect("Listing blobfs blobs");
         let mut all_package_blobs = BTreeSet::new();
         for package in self.packages.iter() {
-            all_package_blobs.append(&mut package.list_blobs().expect("Listing package blobs"));
+            all_package_blobs.append(&mut package.list_blobs());
         }
 
         assert_eq!(written_blobs, all_package_blobs);

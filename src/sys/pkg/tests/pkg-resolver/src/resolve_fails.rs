@@ -253,7 +253,7 @@ async fn missing_subpackage_meta_far_does_not_hang() {
     let startup_blobs = env.blobfs.list_blobs().unwrap();
 
     let subpackage = PackageBuilder::new("subpackage").build().await.unwrap();
-    assert_eq!(startup_blobs.intersection(&subpackage.list_blobs().unwrap()).count(), 0);
+    assert_eq!(startup_blobs.intersection(&subpackage.list_blobs()).count(), 0);
     let superpackage = PackageBuilder::new("superpackage")
         .add_subpackage("my-subpackage", &subpackage)
         .build()
@@ -266,7 +266,7 @@ async fn missing_subpackage_meta_far_does_not_hang() {
             .await
             .unwrap(),
     );
-    repo.purge_blobs(subpackage.list_blobs().unwrap().into_iter());
+    repo.purge_blobs(subpackage.list_blobs().into_iter());
     let served_repository = Arc::clone(&repo).server().start().unwrap();
     let repo_config = served_repository.make_repo_config("fuchsia-pkg://test".parse().unwrap());
     let () = env.proxies.repo_manager.add(&repo_config.into()).await.unwrap().unwrap();

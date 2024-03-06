@@ -79,7 +79,7 @@ async fn get_single_package_with_no_content_blobs(env: TestEnv, blob_type: fpkg:
     let () = pkg.verify_contents(&dir).await.unwrap();
 
     // All blobs in the package should now be present in blobfs.
-    let mut expected_blobs = pkg.list_blobs().unwrap();
+    let mut expected_blobs = pkg.list_blobs();
     expected_blobs.append(&mut initial_blobfs_blobs);
     assert_eq!(env.blobfs.list_blobs().unwrap(), expected_blobs);
 
@@ -628,7 +628,7 @@ async fn get_with_specific_blobfs_implementation(
     let () = pkg.verify_contents(&dir).await.unwrap();
 
     // All blobs in the package should now be present in blobfs.
-    let pkg_blobs = pkg.list_blobs().unwrap();
+    let pkg_blobs = pkg.list_blobs();
     assert!(initial_blobfs_blobs.is_disjoint(&pkg_blobs));
     assert!(env.blobfs.list_blobs().unwrap().is_superset(&pkg_blobs));
 

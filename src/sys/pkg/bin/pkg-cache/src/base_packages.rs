@@ -313,10 +313,9 @@ mod tests {
         let expected_blobs = env
             .system_image
             .list_blobs()
-            .unwrap()
             .into_iter()
-            .chain(a_base_package.list_blobs().unwrap())
-            .chain(base_subpackage.list_blobs().unwrap())
+            .chain(a_base_package.list_blobs())
+            .chain(base_subpackage.list_blobs())
             .collect();
         assert_eq!(base_packages.list_blobs(), &expected_blobs);
         // Six expected blobs:
@@ -540,7 +539,7 @@ mod tests {
         .unwrap();
 
         assert_eq!(cache_packages.packages, HashSet::from([*present.hash()]));
-        assert_eq!(cache_packages.blobs, HashSet::from_iter(present.list_blobs().unwrap()));
+        assert_eq!(cache_packages.blobs, HashSet::from_iter(present.list_blobs()));
         assert_eq!(
             cache_packages.root_package_urls_and_hashes(),
             &HashMap::from_iter([

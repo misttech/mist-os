@@ -761,10 +761,9 @@ mod tests {
             dynamic_index.all_blobs(),
             present_package0
                 .list_blobs()
-                .unwrap()
                 .into_iter()
-                .chain(present_package1.list_blobs().unwrap())
-                .chain(present_superpackage.list_blobs().unwrap())
+                .chain(present_package1.list_blobs())
+                .chain(present_superpackage.list_blobs())
                 .collect()
         );
     }

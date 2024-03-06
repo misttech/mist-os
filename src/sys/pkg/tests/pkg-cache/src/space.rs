@@ -81,8 +81,8 @@ async fn gc_noop_system_image() {
         .await
         .unwrap();
     let (env, system_image) = setup_test_env(&[&static_package]).await;
-    let mut expected_base_blobs = static_package.list_blobs().unwrap();
-    expected_base_blobs.extend(system_image.list_blobs().unwrap());
+    let mut expected_base_blobs = static_package.list_blobs();
+    expected_base_blobs.extend(system_image.list_blobs());
     // static-package meta.far and content blob, system_image meta.far and static packages manifest
     assert_eq!(expected_base_blobs.len(), 4);
     assert_eq!(env.blobfs.list_blobs().unwrap(), expected_base_blobs);
@@ -185,12 +185,8 @@ async fn gc_dynamic_index_protected() {
 
     // At this point, we expect blobfs to only contain the blobs from the system image package and
     // from pkgprime.
-    let expected_blobs = sysimg_pkg
-        .list_blobs()
-        .unwrap()
-        .union(&pkgprime.list_blobs().unwrap())
-        .cloned()
-        .collect::<BTreeSet<_>>();
+    let expected_blobs =
+        sysimg_pkg.list_blobs().union(&pkgprime.list_blobs()).cloned().collect::<BTreeSet<_>>();
 
     assert_eq!(env.blobfs.list_blobs().expect("all blobs"), expected_blobs);
 }
@@ -218,7 +214,7 @@ async fn gc_cache_packages_protected() {
         .await;
 
     // All blobs required for the cache package should be in blobfs.
-    let protected_blobs = cache_pkg.list_blobs().unwrap();
+    let protected_blobs = cache_pkg.list_blobs();
     assert!(env.blobfs.list_blobs().unwrap().is_superset(&protected_blobs));
 
     // Replace the cache package in the dynamic index with an alternate that does not share any
@@ -344,7 +340,7 @@ async fn gc_updated_static_package() {
     // At this point, we expect blobfs to only contain the blobs from the system image package and
     // from pkgprime.
     let expected_blobs =
-        initial_blobs.union(&pkgprime.list_blobs().unwrap()).cloned().collect::<BTreeSet<_>>();
+        initial_blobs.union(&pkgprime.list_blobs()).cloned().collect::<BTreeSet<_>>();
 
     assert_eq!(env.blobfs.list_blobs().expect("all blobs"), expected_blobs);
 }
@@ -629,7 +625,7 @@ async fn blobs_protected_from_gc_by_open_package_tracking() {
         .unwrap();
 
     // The four blobs protected from GC by pkg0.
-    let pkg0_protected = pkg0.list_blobs().unwrap();
+    let pkg0_protected = pkg0.list_blobs();
     assert_eq!(pkg0_protected.len(), 4);
     assert!(env.blobfs.list_blobs().unwrap().is_disjoint(&pkg0_protected));
 

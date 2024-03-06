@@ -164,21 +164,27 @@ impl Package {
 
     /// Returns a set of all unique blobs contained in this package, including meta.far and
     /// subpackage blobs.
-    /// Errors if there are unknown subpackage blobs.
-    pub fn list_blobs(&self) -> Result<BTreeSet<Hash>, Error> {
-        Ok(self
-            .meta_contents()
-            .context("loading meta/contents")?
+    ///
+    /// # Panics
+    /// If either there are unknown subpackage blobs or there is an error reading meta/contents.
+    pub fn list_blobs(&self) -> BTreeSet<Hash> {
+        self.meta_contents()
+            .expect("loading meta/contents")
             .into_hashes_undeduplicated()
             .chain([self.meta_far_merkle])
             .chain(
                 self.subpackage_blobs
                     .as_ref()
-                    .ok_or_else(|| anyhow::anyhow!("subpackage blobs are not known"))?
+                    .unwrap_or_else(|| {
+                        panic!(
+                            "cannot list blobs for package {} with unknown subpackage blobs",
+                            self.name()
+                        )
+                    })
                     .keys()
                     .copied(),
             )
-            .collect())
+            .collect()
     }
 
     /// Returns an iterator of merkle/File pairs for each content blob in the package.
@@ -811,7 +817,7 @@ mod tests {
         );
         assert_eq!(pkg.meta_far_merkle, MerkleTree::from_reader(pkg.meta_far()?)?.root());
         assert_eq!(
-            pkg.list_blobs()?,
+            pkg.list_blobs(),
             BTreeSet::from([
                 "de210ba39b8f597cc1986c37b369c990707649f63bb8fa23b244a38274018b78".parse()?,
                 "b5b34f6234631edc7ccaa25533e2050e5d597a7331c8974306b617a3682a3197".parse()?
@@ -1074,7 +1080,7 @@ mod tests {
             .chain([sub_pkg_meta_far.merkle])
             .chain(expected_subpackage_blobs.keys().copied())
             .collect();
-        assert_eq!(sub_pkg.list_blobs().unwrap(), expected_all_blobs);
+        assert_eq!(sub_pkg.list_blobs(), expected_all_blobs);
 
         // Package with subpackage that is a superpackage.
         let pkg = PackageBuilder::new("pkg")
@@ -1096,7 +1102,7 @@ mod tests {
             )])
         );
         expected_all_blobs.insert(*pkg.hash());
-        assert_eq!(pkg.list_blobs().unwrap(), expected_all_blobs);
+        assert_eq!(pkg.list_blobs(), expected_all_blobs);
     }
 
     #[fuchsia_async::run_singlethreaded(test)]

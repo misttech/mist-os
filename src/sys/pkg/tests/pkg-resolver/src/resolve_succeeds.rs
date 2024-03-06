@@ -916,7 +916,7 @@ async fn superpackage() {
         .build()
         .await
         .unwrap();
-    assert_eq!(startup_blobs.intersection(&subpackage.list_blobs().unwrap()).count(), 0);
+    assert_eq!(startup_blobs.intersection(&subpackage.list_blobs()).count(), 0);
     let superpackage = PackageBuilder::new("superpackage")
         .add_subpackage("my-subpackage", &subpackage)
         .build()
@@ -940,7 +940,7 @@ async fn superpackage() {
         .expect("package to resolve without error");
 
     superpackage.verify_contents(&package).await.unwrap();
-    assert!(env.blobfs.list_blobs().unwrap().is_superset(&subpackage.list_blobs().unwrap()));
+    assert!(env.blobfs.list_blobs().unwrap().is_superset(&subpackage.list_blobs()));
 
     env.stop().await;
 }
