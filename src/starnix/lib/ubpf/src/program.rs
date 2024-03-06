@@ -12,6 +12,7 @@ use crate::{
     UbpfError::*,
 };
 use linux_uapi::{bpf_insn, c_void, sock_filter};
+use zerocopy::{AsBytes, FromBytes, NoCell};
 
 // This file contains wrapper logic to build programs and execute
 // them in the ubpf VM.
@@ -139,14 +140,22 @@ impl UbpfVm {
     /// scratch memory must be provided by the caller to this
     /// function.  The translated CBPF program will use the last 16
     /// words of |data|.
-    pub fn run<T>(&self, data: &mut T) -> Result<u64, i32> {
-        let data_size: usize = std::mem::size_of::<T>();
+    pub fn run<T: AsBytes + FromBytes + NoCell>(&self, data: &mut T) -> Result<u64, i32> {
+        self.run_with_slice(data.as_bytes_mut())
+    }
+
+    /// Executes the current program on the provided data.  Warning: If
+    /// this program was a cbpf program, and it uses BPF_MEM, the
+    /// scratch memory must be provided by the caller to this
+    /// function.  The translated CBPF program will use the last 16
+    /// words of |data|.
+    pub fn run_with_slice(&self, data: &mut [u8]) -> Result<u64, i32> {
         let mut bpf_return_value: u64 = 0;
         let status = unsafe {
             ubpf_exec(
                 self.opaque_vm as *mut ubpf_vm,
-                data as *mut T as *mut c_void,
-                data_size,
+                data.as_mut_ptr() as *mut c_void,
+                data.len(),
                 &mut bpf_return_value,
             )
         };

@@ -22,6 +22,7 @@ use ubpf::{
     ubpf::EBPF_OP_LDDW,
     VerifierLogger,
 };
+use zerocopy::{AsBytes, FromBytes, NoCell};
 
 /// The different type of BPF programs.
 #[derive(Debug, Eq, PartialEq)]
@@ -99,7 +100,7 @@ impl Program {
         Program { info, vm: None, _objects: vec![] }
     }
 
-    pub fn run<T>(&self, data: &mut T) -> Result<u64, ()> {
+    pub fn run<T: AsBytes + FromBytes + NoCell>(&self, data: &mut T) -> Result<u64, ()> {
         if let Some(vm) = self.vm.as_ref() {
             vm.run(data).map_err(|e| {
                 log_warn!("bpf program returned with an error: {e:?}");
