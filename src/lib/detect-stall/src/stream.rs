@@ -181,6 +181,49 @@ mod tests {
     }
 
     #[fuchsia::test(allow_stalls = false)]
+    async fn pending_reply_blocks_stalling() {
+        let initial = fasync::Time::from_nanos(0);
+        TestExecutor::advance_to(initial).await;
+        const DURATION_NANOS: i64 = 1_000_000;
+        let idle_duration = Duration::from_nanos(DURATION_NANOS);
+
+        let (proxy, stream) =
+            fidl::endpoints::create_proxy_and_stream::<fio::DirectoryMarker>().unwrap();
+        let (stream, mut stalled) = until_stalled(stream, idle_duration);
+        let mut stream = stream.fuse();
+
+        let _ = proxy.get_flags();
+
+        // Do not reply to the request, but hold on to the responder, so that there is a
+        // pending reply in the connection.
+        let message_with_pending_reply = stream.next().await.unwrap();
+        let Ok(fio::DirectoryRequest::GetFlags { responder, .. }) = message_with_pending_reply
+        else {
+            panic!("Unexpected {message_with_pending_reply:?}");
+        };
+
+        // The connection does not stall, because there is a pending reply.
+        TestExecutor::advance_to(initial + idle_duration * 2).await;
+        futures::select! {
+            _ = stream.next() => unreachable!(),
+            _ = stalled => unreachable!(),
+            default => {},
+        }
+
+        // Now we resolve the pending reply.
+        responder.send(zx::Status::OK.into_raw(), fio::OpenFlags::empty()).unwrap();
+
+        // The connection should stall.
+        assert_matches!(
+            futures::join!(
+                stream.next(),
+                TestExecutor::advance_to(initial + idle_duration * 3).then(|()| stalled)
+            ),
+            (None, Ok(Some(_)))
+        );
+    }
+
+    #[fuchsia::test(allow_stalls = false)]
     async fn completed_stream() {
         let initial = fasync::Time::from_nanos(0);
         TestExecutor::advance_to(initial).await;
