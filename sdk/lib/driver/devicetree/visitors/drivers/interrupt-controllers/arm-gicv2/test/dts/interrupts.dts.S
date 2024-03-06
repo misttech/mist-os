@@ -8,11 +8,12 @@
 
 / {
     compatible = "fuchsia,test-dt";
+    model = "test";
     #address-cells = <2>;
     #size-cells = <2>;
     interrupt-parent = <&gic>;
 
-    gic: interrupt-controller@FFFFD0000 {
+    gic: interrupt-controller@ffffd0000 {
         compatible = "arm,gic-400";
         #interrupt-cells = <3>;
         interrupt-controller;

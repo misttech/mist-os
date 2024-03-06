@@ -4,6 +4,7 @@
 	#address-cells = <0x02>;
 	#size-cells = <0x02>;
 	compatible = "fuchsia,sample-dt";
+	model = "test";
 
 	another-device {
 		reference = <0x01>;

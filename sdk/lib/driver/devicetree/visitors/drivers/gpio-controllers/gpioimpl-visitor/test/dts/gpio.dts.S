@@ -17,13 +17,13 @@
       #gpio-cells = <2>;
       gpio-controller;
 
-      init-HOG_PIN1 {
+      init-hog-HOG_PIN1 {
         gpio-hog;
         gpios = <HOG_PIN1 0>;
         output-low;
       };
 
-      init-HOG_PIN2 {
+      init-hog-HOG_PIN2 {
         gpio-hog;
         gpios = <HOG_PIN2 HOG_PIN2_FLAG HOG_PIN3 HOG_PIN3_FLAG>;
         input;

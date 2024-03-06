@@ -8,6 +8,7 @@
 
 / {
     compatible = "fuchsia,test-dt";
+    model = "test";
     #address-cells = <2>;
     #size-cells = <2>;
 

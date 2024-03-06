@@ -8,15 +8,16 @@
 
 / {
     compatible = "fuchsia,test-dt";
+    model = "test";
     #address-cells = <2>;
     #size-cells = <2>;
 
     test-i2c {
-        compatible = "fuchsia, test-i2c";
+        compatible = "fuchsia,test-i2c";
         #address-cells = <2>;
         #size-cells = <0>;
         test-i2c-child-1@I2C_CHILD_UNIT {
-            compatible = "fuchsia, test-i2c-child";
+            compatible = "fuchsia,test-i2c-child";
             reg = <0x0 I2C_CHILD_ADDRESS>;
         };
     };

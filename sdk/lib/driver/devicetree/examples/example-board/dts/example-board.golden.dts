@@ -4,6 +4,7 @@
 	#address-cells = <0x02>;
 	#size-cells = <0x02>;
 	compatible = "fuchsia,sample-dt";
+	model = "example";
 
 	iommu {
 		#iommu-cells = <0x01>;
