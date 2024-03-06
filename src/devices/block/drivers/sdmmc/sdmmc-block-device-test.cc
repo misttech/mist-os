@@ -139,10 +139,14 @@ class SdmmcBlockDeviceTest : public zxtest::TestWithParam<bool> {
     }
   }
 
-  zx_status_t StartDriverForMmc() { return StartDriver(/*is_sd=*/false); }
-  zx_status_t StartDriverForSd() { return StartDriver(/*is_sd=*/true); }
+  zx_status_t StartDriverForMmc(uint64_t speed_capabilities = 0) {
+    return StartDriver(/*is_sd=*/false, speed_capabilities);
+  }
+  zx_status_t StartDriverForSd(uint64_t speed_capabilities = 0) {
+    return StartDriver(/*is_sd=*/true, speed_capabilities);
+  }
 
-  zx_status_t StartDriver(bool is_sd) {
+  zx_status_t StartDriver(bool is_sd, uint64_t speed_capabilities) {
     TestSdmmcRootDevice::use_fidl_ = GetParam();
     TestSdmmcRootDevice::is_sd_ = is_sd;
     if (is_sd) {
@@ -169,7 +173,7 @@ class SdmmcBlockDeviceTest : public zxtest::TestWithParam<bool> {
     // Initialize driver test environment.
     fuchsia_driver_framework::DriverStartArgs start_args;
     fidl::ClientEnd<fuchsia_io::Directory> outgoing_directory_client;
-    fit::result metadata = fidl::Persist(CreateMetadata(/*removable=*/is_sd));
+    fit::result metadata = fidl::Persist(CreateMetadata(/*removable=*/is_sd, speed_capabilities));
     if (!metadata.is_ok()) {
       return metadata.error_value().status();
     }
@@ -253,8 +257,10 @@ class SdmmcBlockDeviceTest : public zxtest::TestWithParam<bool> {
     }
   }
 
-  fuchsia_hardware_sdmmc::wire::SdmmcMetadata CreateMetadata(bool removable = false) {
+  fuchsia_hardware_sdmmc::wire::SdmmcMetadata CreateMetadata(bool removable,
+                                                             uint64_t speed_capabilities) {
     return fuchsia_hardware_sdmmc::wire::SdmmcMetadata::Builder(arena_)
+        .speed_capabilities(speed_capabilities)
         .enable_trim(true)
         .enable_cache(true)
         .removable(removable)
@@ -652,7 +658,6 @@ TEST_P(SdmmcBlockDeviceTest, SendCmd12OnCommandFailure) {
       .caps = 0,
       .max_transfer_size = fuchsia_hardware_block::wire::kMaxTransferUnbounded,
       .max_transfer_size_non_dma = 0,
-      .prefs = 0,
   });
 
   ASSERT_OK(StartDriverForMmc());
@@ -675,7 +680,6 @@ TEST_P(SdmmcBlockDeviceTest, SendCmd12OnCommandFailureWhenAutoCmd12) {
       .caps = SDMMC_HOST_CAP_AUTO_CMD12,
       .max_transfer_size = fuchsia_hardware_block::wire::kMaxTransferUnbounded,
       .max_transfer_size_non_dma = 0,
-      .prefs = 0,
   });
 
   ASSERT_OK(StartDriverForMmc());
@@ -1221,12 +1225,11 @@ TEST_P(SdmmcBlockDeviceTest, ProbeUsesPrefsHs) {
     out_data[MMC_EXT_CSD_GENERIC_CMD6_TIME] = 0;
   });
 
-  sdmmc_.set_host_info({
-      .prefs = SDMMC_HOST_PREFS_DISABLE_HS200 | SDMMC_HOST_PREFS_DISABLE_HS400 |
-               SDMMC_HOST_PREFS_DISABLE_HSDDR,
-  });
-
-  EXPECT_OK(StartDriverForMmc());
+  const uint64_t speed_capabilities =
+      static_cast<uint64_t>(fuchsia_hardware_sdmmc::SdmmcHostPrefs::kDisableHs200) |
+      static_cast<uint64_t>(fuchsia_hardware_sdmmc::SdmmcHostPrefs::kDisableHs400) |
+      static_cast<uint64_t>(fuchsia_hardware_sdmmc::SdmmcHostPrefs::kDisableHsddr);
+  EXPECT_OK(StartDriverForMmc(speed_capabilities));
 
   EXPECT_EQ(sdmmc_.timing(), SDMMC_TIMING_HS);
 }
@@ -1243,11 +1246,10 @@ TEST_P(SdmmcBlockDeviceTest, ProbeUsesPrefsHsDdr) {
     out_data[MMC_EXT_CSD_GENERIC_CMD6_TIME] = 0;
   });
 
-  sdmmc_.set_host_info({
-      .prefs = SDMMC_HOST_PREFS_DISABLE_HS200 | SDMMC_HOST_PREFS_DISABLE_HS400,
-  });
-
-  EXPECT_OK(StartDriverForMmc());
+  const uint64_t speed_capabilities =
+      static_cast<uint64_t>(fuchsia_hardware_sdmmc::SdmmcHostPrefs::kDisableHs200) |
+      static_cast<uint64_t>(fuchsia_hardware_sdmmc::SdmmcHostPrefs::kDisableHs400);
+  EXPECT_OK(StartDriverForMmc(speed_capabilities));
 
   EXPECT_EQ(sdmmc_.timing(), SDMMC_TIMING_HSDDR);
 }
@@ -1284,8 +1286,6 @@ TEST_P(SdmmcBlockDeviceTest, ProbeHs400) {
       timing = value;
     }
   });
-
-  sdmmc_.set_host_info({.prefs = 0});
 
   EXPECT_OK(StartDriverForMmc());
 

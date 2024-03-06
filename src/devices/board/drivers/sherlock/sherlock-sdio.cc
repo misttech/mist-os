@@ -89,10 +89,6 @@ static const std::vector<fpbus::Bti> sd_emmc_btis{
     }},
 };
 
-constexpr aml_sdmmc_config_t sd_emmc_config = {
-    .prefs = 0,
-};
-
 constexpr wifi_config_t wifi_config = {
     .oob_irq_mode = ZX_INTERRUPT_MODE_LEVEL_HIGH,
     .iovar_table =
@@ -233,12 +229,6 @@ zx_status_t Sherlock::SdioInit() {
   }
 
   const std::vector<fpbus::Metadata> sd_emmc_metadata{
-      {{
-          .type = DEVICE_METADATA_PRIVATE,
-          .data = std::vector<uint8_t>(
-              reinterpret_cast<const uint8_t*>(&sd_emmc_config),
-              reinterpret_cast<const uint8_t*>(&sd_emmc_config) + sizeof(sd_emmc_config)),
-      }},
       {{
           .type = DEVICE_METADATA_SDMMC,
           .data = std::move(sdmmc_metadata.value()),

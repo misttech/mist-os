@@ -352,7 +352,6 @@ void FakeSdmmcDevice::HostInfo(fdf::Arena& arena, HostInfoCompleter::Sync& compl
   wire_info.max_transfer_size = info.max_transfer_size;
   wire_info.max_transfer_size_non_dma = info.max_transfer_size_non_dma;
   wire_info.max_buffer_regions = info.max_buffer_regions;
-  wire_info.prefs = info.prefs;
   completer.buffer(arena).ReplySuccess(wire_info);
 }
 

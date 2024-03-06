@@ -12,6 +12,7 @@
 #include "sdhci.h"
 
 #include <fidl/fuchsia.hardware.block/cpp/wire.h>
+#include <fidl/fuchsia.hardware.sdmmc/cpp/wire.h>
 #include <fuchsia/hardware/block/driver/c/banjo.h>
 #include <inttypes.h>
 #include <lib/ddk/binding_driver.h>
@@ -943,12 +944,34 @@ zx_status_t Sdhci::Init() {
   info_.caps |= SDMMC_HOST_CAP_AUTO_CMD12;
 
   // Set controller preferences
+  uint64_t speed_capabilities = 0;
   if (quirks_ & SDHCI_QUIRK_NON_STANDARD_TUNING) {
     // Disable HS200 and HS400 if tuning cannot be performed as per the spec.
-    info_.prefs |= SDMMC_HOST_PREFS_DISABLE_HS200 | SDMMC_HOST_PREFS_DISABLE_HS400;
+    speed_capabilities =
+        static_cast<uint64_t>(fuchsia_hardware_sdmmc::SdmmcHostPrefs::kDisableHs200) |
+        static_cast<uint64_t>(fuchsia_hardware_sdmmc::SdmmcHostPrefs::kDisableHs400);
   }
   if (quirks_ & SDHCI_QUIRK_NO_DDR) {
-    info_.prefs |= SDMMC_HOST_PREFS_DISABLE_HSDDR | SDMMC_HOST_PREFS_DISABLE_HS400;
+    speed_capabilities =
+        static_cast<uint64_t>(fuchsia_hardware_sdmmc::SdmmcHostPrefs::kDisableHsddr) |
+        static_cast<uint64_t>(fuchsia_hardware_sdmmc::SdmmcHostPrefs::kDisableHs400);
+  }
+
+  fidl::Arena<> fidl_arena;
+  fit::result metadata =
+      fidl::Persist(fuchsia_hardware_sdmmc::wire::SdmmcMetadata::Builder(fidl_arena)
+                        .speed_capabilities(speed_capabilities)
+                        .Build());
+  if (!metadata.is_ok()) {
+    zxlogf(ERROR, "Failed to encode SDMMC metadata: %s",
+           metadata.error_value().FormatDescription().c_str());
+    return metadata.error_value().status();
+  }
+  status = device_add_metadata(zxdev(), DEVICE_METADATA_SDMMC, metadata.value().data(),
+                               metadata.value().size());
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "Failed to add SDMMC metadata: %s", zx_status_get_string(status));
+    return status;
   }
 
   // allocate and setup DMA descriptor

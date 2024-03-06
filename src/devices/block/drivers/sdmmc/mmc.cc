@@ -377,7 +377,7 @@ zx_status_t SdmmcBlockDevice::ProbeMmc(
 
     // Must perform tuning at HS200 first if HS400 is supported
     if (MmcSupportsHs200() && bus_width_ != SDMMC_BUS_WIDTH_ONE &&
-        !(sdmmc_->host_info().prefs & SDMMC_HOST_PREFS_DISABLE_HS200)) {
+        !(metadata.speed_capabilities() & fuchsia_hardware_sdmmc::SdmmcHostPrefs::kDisableHs200)) {
       if ((st = MmcSwitchTiming(SDMMC_TIMING_HS200)) != ZX_OK) {
         return st;
       }
@@ -392,7 +392,8 @@ zx_status_t SdmmcBlockDevice::ProbeMmc(
       }
 
       if (MmcSupportsHs400() && bus_width_ == SDMMC_BUS_WIDTH_EIGHT &&
-          !(sdmmc_->host_info().prefs & SDMMC_HOST_PREFS_DISABLE_HS400)) {
+          !(metadata.speed_capabilities() &
+            fuchsia_hardware_sdmmc::SdmmcHostPrefs::kDisableHs400)) {
         if ((st = MmcSwitchTimingHs200ToHs()) != ZX_OK) {
           return st;
         }
@@ -415,7 +416,8 @@ zx_status_t SdmmcBlockDevice::ProbeMmc(
       }
 
       if (MmcSupportsHsDdr() && (bus_width_ != SDMMC_BUS_WIDTH_ONE) &&
-          !(sdmmc_->host_info().prefs & SDMMC_HOST_PREFS_DISABLE_HSDDR)) {
+          !(metadata.speed_capabilities() &
+            fuchsia_hardware_sdmmc::SdmmcHostPrefs::kDisableHsddr)) {
         if ((st = MmcSwitchTiming(SDMMC_TIMING_HSDDR)) != ZX_OK) {
           return st;
         }

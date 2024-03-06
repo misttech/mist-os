@@ -5,7 +5,6 @@
 #include "aml-sdmmc.h"
 
 #include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
-#include <lib/driver/compat/cpp/device_server.h>
 #include <lib/driver/component/cpp/driver_export.h>
 #include <lib/driver/testing/cpp/driver_lifecycle.h>
 #include <lib/driver/testing/cpp/driver_runtime.h>
@@ -203,7 +202,6 @@ class FakeClock : public fidl::WireServer<fuchsia_hardware_clock::Clock> {
 struct IncomingNamespace {
   fdf_testing::TestNode node{"root"};
   fdf_testing::TestEnvironment env{fdf::Dispatcher::GetCurrent()->get()};
-  compat::DeviceServer device_server;
   fake_pdev::FakePDevFidl pdev_server;
   FakeClock clock_server;
 };
@@ -234,9 +232,6 @@ class AmlSdmmcTest : public zxtest::Test {
     // Initialize driver test environment.
     fuchsia_driver_framework::DriverStartArgs start_args;
     fidl::ClientEnd<fuchsia_io::Directory> outgoing_directory_client;
-    aml_sdmmc_config_t metadata = {
-        .prefs = 0,
-    };
     incoming_.SyncCall([&, bti = std::move(bti)](IncomingNamespace* incoming) mutable {
       auto start_args_result = incoming->node.CreateStartArgsAndServe();
       ASSERT_TRUE(start_args_result.is_ok());
@@ -244,13 +239,6 @@ class AmlSdmmcTest : public zxtest::Test {
       outgoing_directory_client = std::move(start_args_result->outgoing_directory_client);
 
       ASSERT_OK(incoming->env.Initialize(std::move(start_args_result->incoming_directory_server)));
-
-      incoming->device_server.Init("default", "");
-      // Serve metadata.
-      ASSERT_OK(incoming->device_server.AddMetadata(DEVICE_METADATA_PRIVATE, &metadata,
-                                                    sizeof(metadata)));
-      ASSERT_OK(incoming->device_server.Serve(fdf::Dispatcher::GetCurrent()->async_dispatcher(),
-                                              &incoming->env.incoming_directory()));
 
       // Serve (fake) pdev_server.
       fake_pdev::FakePDevFidl::Config config;
@@ -284,10 +272,6 @@ class AmlSdmmcTest : public zxtest::Test {
     ASSERT_OK(runtime_.RunToCompletion(dut_.Start(std::move(start_args))));
 
     descs_ = dut_->SetTestHooks();
-
-    dut_->set_board_config({
-        .prefs = 0,
-    });
 
     mmio_->Write32(0xff, kAmlSdmmcDelay1Offset);
     mmio_->Write32(0xff, kAmlSdmmcDelay2Offset);
@@ -364,10 +348,6 @@ class AmlSdmmcTest : public zxtest::Test {
 TEST_F(AmlSdmmcTest, Init) {
   StartDriver();
 
-  dut_->set_board_config({
-      .prefs = 0,
-  });
-
   AmlSdmmcClock::Get().FromValue(0).WriteTo(&*mmio_);
 
   ASSERT_OK(dut_->Init({}));
@@ -406,9 +386,6 @@ TEST_F(AmlSdmmcTest, Tuning) {
 TEST_F(AmlSdmmcTest, DelayLineTuningAllPass) {
   StartDriver();
 
-  dut_->set_board_config({
-      .prefs = 0,
-  });
   ASSERT_OK(dut_->Init({}));
 
   AmlSdmmcClock::Get().FromValue(0).set_cfg_div(10).WriteTo(&*mmio_);
@@ -463,9 +440,6 @@ TEST_F(AmlSdmmcTest, DelayLineTuningFailingPoint) {
       "||||||||||||||||||||-------------------------------|||||||||||||"
       "||||||||||||||||||||||||||||||||||||||||------------------------");
 
-  dut_->set_board_config({
-      .prefs = 0,
-  });
   ASSERT_OK(dut_->Init({}));
 
   AmlSdmmcClock::Get().FromValue(0).set_cfg_div(10).WriteTo(&*mmio_);
@@ -520,9 +494,6 @@ TEST_F(AmlSdmmcTest, DelayLineTuningEvenDivider) {
       "||||||||||-------------------------------|||||||||||||||||||||||"
       "||||||||||||||||||||||||||||||-------------------------------|||");
 
-  dut_->set_board_config({
-      .prefs = 0,
-  });
   ASSERT_OK(dut_->Init({}));
 
   AmlSdmmcClock::Get().FromValue(0).set_cfg_div(10).WriteTo(&*mmio_);
@@ -576,9 +547,6 @@ TEST_F(AmlSdmmcTest, DelayLineTuningOddDivider) {
       "||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||"
       "||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||");
 
-  dut_->set_board_config({
-      .prefs = 0,
-  });
   ASSERT_OK(dut_->Init({}));
 
   AmlSdmmcClock::Get().FromValue(0).set_cfg_div(9).WriteTo(&*mmio_);
@@ -627,9 +595,6 @@ TEST_F(AmlSdmmcTest, DelayLineTuningCorrectFailingWindowIfLastOne) {
       "||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||"
       "||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||");
 
-  dut_->set_board_config({
-      .prefs = 0,
-  });
   ASSERT_OK(dut_->Init({}));
 
   AmlSdmmcClock::Get().FromValue(0).set_cfg_div(5).WriteTo(&*mmio_);

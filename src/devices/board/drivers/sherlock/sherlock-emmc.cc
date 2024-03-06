@@ -58,11 +58,6 @@ static const std::vector<fpbus::Bti> emmc_btis{
     }},
 };
 
-static aml_sdmmc_config_t config = {
-    // As per AMlogic, on S912 chipset, HS400 mode can be operated at 125MHZ or low.
-    .prefs = SDMMC_HOST_PREFS_DISABLE_HS400,
-};
-
 static const struct {
   const fidl::StringView name;
   const fuchsia_hardware_block_partition::wire::Guid guid;
@@ -173,6 +168,8 @@ zx_status_t Sherlock::EmmcInit() {
   fit::result sdmmc_metadata = fidl::Persist(
       fuchsia_hardware_sdmmc::wire::SdmmcMetadata::Builder(fidl_arena)
           .max_frequency(166'666'667)
+          // As per AMlogic, on S912 chipset, HS400 mode can be operated at 125MHZ or low.
+          .speed_capabilities(fuchsia_hardware_sdmmc::SdmmcHostPrefs::kDisableHs400)
           .enable_trim(true)
           // Maintain the current Sherlock behavior until we determine that cache is needed.
           .enable_cache(false)
@@ -189,11 +186,6 @@ zx_status_t Sherlock::EmmcInit() {
   }
 
   static const std::vector<fpbus::Metadata> sherlock_emmc_metadata{
-      {{
-          .type = DEVICE_METADATA_PRIVATE,
-          .data = std::vector<uint8_t>(reinterpret_cast<const uint8_t*>(&config),
-                                       reinterpret_cast<const uint8_t*>(&config) + sizeof(config)),
-      }},
       {{
           .type = DEVICE_METADATA_GPT_INFO,
           .data = std::move(encoded.value()),

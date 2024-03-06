@@ -126,6 +126,7 @@ SdmmcRootDevice::GetMetadata(fidl::AnyArena& arena) {
       return zx::ok(
           fidl::ObjectView(arena, fuchsia_hardware_sdmmc::wire::SdmmcMetadata::Builder(arena)
                                       .max_frequency(UINT32_MAX)
+                                      .speed_capabilities(0)
                                       .enable_trim(true)
                                       .enable_cache(true)
                                       .removable(false)
@@ -142,6 +143,9 @@ SdmmcRootDevice::GetMetadata(fidl::AnyArena& arena) {
       arena,
       fuchsia_hardware_sdmmc::wire::SdmmcMetadata::Builder(arena)
           .max_frequency(decoded->has_max_frequency() ? decoded->max_frequency() : UINT32_MAX)
+          .speed_capabilities(decoded->has_speed_capabilities()
+                                  ? decoded->speed_capabilities()
+                                  : static_cast<fuchsia_hardware_sdmmc::SdmmcHostPrefs>(0))
           .enable_trim(!decoded->has_enable_trim() || decoded->enable_trim())
           .enable_cache(!decoded->has_enable_cache() || decoded->enable_cache())
           .removable(decoded->has_removable() && decoded->removable())

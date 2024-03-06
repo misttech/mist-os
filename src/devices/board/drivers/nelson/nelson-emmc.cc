@@ -59,10 +59,6 @@ static const std::vector<fpbus::Bti> emmc_btis{
     }},
 };
 
-static aml_sdmmc_config_t config = {
-    .prefs = SDMMC_HOST_PREFS_DISABLE_HS400,
-};
-
 static const struct {
   const fidl::StringView name;
   const fuchsia_hardware_block_partition::wire::Guid guid;
@@ -152,6 +148,7 @@ zx_status_t Nelson::EmmcInit() {
   fit::result sdmmc_metadata = fidl::Persist(
       fuchsia_hardware_sdmmc::wire::SdmmcMetadata::Builder(fidl_arena)
           .max_frequency(166'666'667)
+          .speed_capabilities(fuchsia_hardware_sdmmc::SdmmcHostPrefs::kDisableHs400)
           // Maintain the current Nelson behavior until we determine that trim is needed.
           .enable_trim(true)
           // Maintain the current Nelson behavior until we determine that cache is needed.
@@ -169,11 +166,6 @@ zx_status_t Nelson::EmmcInit() {
   }
 
   static const std::vector<fpbus::Metadata> emmc_metadata{
-      {{
-          .type = DEVICE_METADATA_PRIVATE,
-          .data = std::vector<uint8_t>(reinterpret_cast<const uint8_t*>(&config),
-                                       reinterpret_cast<const uint8_t*>(&config) + sizeof(config)),
-      }},
       {{
           .type = DEVICE_METADATA_GPT_INFO,
           .data = std::move(encoded.value()),

@@ -56,10 +56,6 @@ static const std::vector<fpbus::Bti> emmc_btis{
     }},
 };
 
-static aml_sdmmc_config_t config = {
-    .prefs = SDMMC_HOST_PREFS_DISABLE_HS400,
-};
-
 static const std::vector<fpbus::BootMetadata> emmc_boot_metadata{
     {{
         .zbi_type = DEVICE_METADATA_PARTITION_MAP,
@@ -102,6 +98,7 @@ zx_status_t Vim3::EmmcInit() {
   fit::result sdmmc_metadata =
       fidl::Persist(fuchsia_hardware_sdmmc::wire::SdmmcMetadata::Builder(fidl_arena)
                         .max_frequency(120'000'000)
+                        .speed_capabilities(fuchsia_hardware_sdmmc::SdmmcHostPrefs::kDisableHs400)
                         .Build());
   if (!sdmmc_metadata.is_ok()) {
     zxlogf(ERROR, "Failed to encode SDMMC metadata: %s",
@@ -110,11 +107,6 @@ zx_status_t Vim3::EmmcInit() {
   }
 
   const std::vector<fpbus::Metadata> emmc_metadata{
-      {{
-          .type = DEVICE_METADATA_PRIVATE,
-          .data = std::vector<uint8_t>(reinterpret_cast<const uint8_t*>(&config),
-                                       reinterpret_cast<const uint8_t*>(&config) + sizeof(config)),
-      }},
       {{
           .type = DEVICE_METADATA_SDMMC,
           .data = std::move(sdmmc_metadata.value()),

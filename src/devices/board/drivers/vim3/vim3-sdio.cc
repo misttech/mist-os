@@ -59,10 +59,6 @@ static const std::vector<fpbus::Bti> sdio_btis{
     }},
 };
 
-static aml_sdmmc_config_t config = {
-    .prefs = 0,
-};
-
 constexpr wifi_config_t wifi_config = {
     .oob_irq_mode = ZX_INTERRUPT_MODE_LEVEL_HIGH,
     .clm_needed = false,
@@ -195,11 +191,6 @@ zx_status_t Vim3::SdioInit() {
   }
 
   const std::vector<fpbus::Metadata> sdio_metadata{
-      {{
-          .type = DEVICE_METADATA_PRIVATE,
-          .data = std::vector<uint8_t>(reinterpret_cast<const uint8_t*>(&config),
-                                       reinterpret_cast<const uint8_t*>(&config) + sizeof(config)),
-      }},
       {{
           .type = DEVICE_METADATA_SDMMC,
           .data = std::move(sdmmc_metadata.value()),

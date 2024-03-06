@@ -236,7 +236,6 @@ TEST_F(SdhciTest, HostInfo) {
   EXPECT_EQ(host_info.caps, SDMMC_HOST_CAP_BUS_WIDTH_8 | SDMMC_HOST_CAP_VOLTAGE_330 |
                                 SDMMC_HOST_CAP_AUTO_CMD12 | SDMMC_HOST_CAP_SDR50 |
                                 SDMMC_HOST_CAP_SDR104);
-  EXPECT_EQ(host_info.prefs, 0);
 }
 
 TEST_F(SdhciTest, HostInfoNoDma) {
@@ -258,7 +257,6 @@ TEST_F(SdhciTest, HostInfoNoDma) {
   EXPECT_EQ(host_info.caps, SDMMC_HOST_CAP_BUS_WIDTH_8 | SDMMC_HOST_CAP_VOLTAGE_330 |
                                 SDMMC_HOST_CAP_AUTO_CMD12 | SDMMC_HOST_CAP_DDR50 |
                                 SDMMC_HOST_CAP_SDR50 | SDMMC_HOST_CAP_NO_TUNING_SDR50);
-  EXPECT_EQ(host_info.prefs, 0);
 }
 
 TEST_F(SdhciTest, HostInfoNoTuning) {
@@ -272,7 +270,6 @@ TEST_F(SdhciTest, HostInfoNoTuning) {
   sdmmc_host_info_t host_info = {};
   EXPECT_OK(dut_->SdmmcHostInfo(&host_info));
   EXPECT_EQ(host_info.caps, SDMMC_HOST_CAP_AUTO_CMD12 | SDMMC_HOST_CAP_NO_TUNING_SDR50);
-  EXPECT_EQ(host_info.prefs, SDMMC_HOST_PREFS_DISABLE_HS400 | SDMMC_HOST_PREFS_DISABLE_HS200);
 }
 
 TEST_F(SdhciTest, SetSignalVoltage) {

@@ -119,7 +119,6 @@ class AmlSdmmc : public fdf::DriverBase,
 
   // Visible for tests
   zx_status_t Init(const pdev_device_info_t& device_info) TA_EXCL(lock_);
-  void set_board_config(const aml_sdmmc_config_t& board_config) { board_config_ = board_config; }
 
  protected:
   virtual zx_status_t WaitForInterruptImpl();
@@ -257,7 +256,6 @@ class AmlSdmmc : public fdf::DriverBase,
   fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio> reset_gpio_;
   fidl::WireSyncClient<fuchsia_hardware_clock::Clock> clock_gate_;
   zx::interrupt irq_;
-  aml_sdmmc_config_t board_config_;
 
   sdmmc_host_info_t dev_info_;
   std::unique_ptr<dma_buffer::ContiguousBuffer> descs_buffer_ TA_GUARDED(lock_);

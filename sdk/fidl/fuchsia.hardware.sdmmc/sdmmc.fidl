@@ -86,7 +86,7 @@ type SdmmcReq = resource struct {
 /// (PAGE_SIZE / sizeof(zx_paddr_t))
 const SDMMC_PAGES_COUNT uint64 = 512;
 
-type SdmmcHostCap = strict enum : uint64 {
+type SdmmcHostCap = strict bits : uint64 {
     BUS_WIDTH_8 = 0x1;
     DMA = 0x2;
     VOLTAGE_330 = 0x4;
@@ -98,7 +98,7 @@ type SdmmcHostCap = strict enum : uint64 {
     NO_TUNING_SDR50 = 0x80;
 };
 
-type SdmmcHostPrefs = strict enum : uint64 {
+type SdmmcHostPrefs = strict bits : uint64 {
     DISABLE_HS400 = 0x1;
     DISABLE_HS200 = 0x2;
     DISABLE_HSDDR = 0x4;
@@ -112,11 +112,9 @@ type SdmmcHostInfo = struct {
     max_transfer_size_non_dma uint64;
     /// The number of buffer regions that may be used in a single request.
     max_buffer_regions uint64;
-    /// Host specific preferences
-    prefs uint64;
 };
 
-type SdmmcVmoRight = strict enum : uint32 {
+type SdmmcVmoRight = strict bits : uint32 {
     READ = 0x1; // The protocol implementation can read from this VMO (used for write requests).
     WRITE = 0x2; // The protocol implementation can write to this VMO (used for read requests).
 };

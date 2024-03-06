@@ -50,35 +50,6 @@ zx_paddr_t PageMask() {
   return page_size - 1;
 }
 
-zx::result<aml_sdmmc_config_t> ParseMetadata(
-    const fidl::VectorView<::fuchsia_driver_compat::wire::Metadata>& metadata_vector,
-    fdf::Logger& logger) {
-  for (const auto& metadata : metadata_vector) {
-    if (metadata.type == DEVICE_METADATA_PRIVATE) {
-      size_t size;
-      auto status = metadata.data.get_prop_content_size(&size);
-      if (status != ZX_OK) {
-        FDF_LOGL(ERROR, logger, "Failed to get_prop_content_size: %s",
-                 zx_status_get_string(status));
-        return zx::error(status);
-      }
-
-      if (size != sizeof(aml_sdmmc_config_t)) {
-        continue;
-      }
-
-      aml_sdmmc_config_t aml_sdmmc_config;
-      status = metadata.data.read(&aml_sdmmc_config, 0, sizeof(aml_sdmmc_config_t));
-      if (status != ZX_OK) {
-        FDF_LOGL(ERROR, logger, "Failed to read metadata: %s", zx_status_get_string(status));
-        return zx::error(status);
-      }
-      return zx::ok(aml_sdmmc_config);
-    }
-  }
-  return zx::error(ZX_ERR_NOT_FOUND);
-}
-
 zx::result<pdev_device_info_t> FidlToBanjoDeviceInfo(
     const fuchsia_hardware_platform_device::wire::NodeDeviceInfo& wire_dev_info) {
   pdev_device_info_t banjo_dev_info = {};
@@ -132,34 +103,6 @@ zx::result<> AmlSdmmc::Start() {
     if (result.is_error()) {
       return result.take_error();
     }
-  }
-
-  {
-    zx::result result = incoming()->Connect<fuchsia_driver_compat::Service::Device>();
-    if (result.is_error() || !result->is_valid()) {
-      FDF_LOGL(ERROR, logger(), "Failed to connect to compat service: %s", result.status_string());
-      return result.take_error();
-    }
-    auto parent_compat = fidl::WireSyncClient(std::move(result.value()));
-
-    fidl::WireResult metadata = parent_compat->GetMetadata();
-    if (!metadata.ok()) {
-      FDF_LOGL(ERROR, logger(), "Call to GetMetadata failed: %s", metadata.status_string());
-      return zx::error(metadata.status());
-    }
-    if (metadata->is_error()) {
-      FDF_LOGL(ERROR, logger(), "Failed to GetMetadata: %s",
-               zx_status_get_string(metadata->error_value()));
-      return metadata->take_error();
-    }
-
-    zx::result parsed_metadata = ParseMetadata(metadata.value()->metadata, logger());
-    if (parsed_metadata.is_error()) {
-      FDF_LOGL(ERROR, logger(), "Failed to ParseMetadata: %s",
-               zx_status_get_string(parsed_metadata.error_value()));
-      return parsed_metadata.take_error();
-    }
-    board_config_ = parsed_metadata.value();
   }
 
   {
@@ -508,12 +451,10 @@ void AmlSdmmc::HostInfo(fdf::Arena& arena, HostInfoCompleter::Sync& completer) {
   wire_info.max_transfer_size = info.max_transfer_size;
   wire_info.max_transfer_size_non_dma = info.max_transfer_size_non_dma;
   wire_info.max_buffer_regions = info.max_buffer_regions;
-  wire_info.prefs = info.prefs;
   completer.buffer(arena).ReplySuccess(wire_info);
 }
 
 zx_status_t AmlSdmmc::SdmmcHostInfo(sdmmc_host_info_t* info) {
-  dev_info_.prefs = board_config_.prefs;
   memcpy(info, &dev_info_, sizeof(dev_info_));
   return ZX_OK;
 }

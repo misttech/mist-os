@@ -51,10 +51,6 @@ static const std::vector<fpbus::Bti> sd_btis{
     }},
 };
 
-static aml_sdmmc_config_t config = {
-    .prefs = 0,
-};
-
 const std::vector<fdf::BindRule> kGpioInitRules = std::vector{
     fdf::MakeAcceptBindRule(bind_fuchsia::INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
 };
@@ -80,11 +76,6 @@ zx_status_t Vim3::SdInit() {
   }
 
   const std::vector<fpbus::Metadata> sd_metadata{
-      {{
-          .type = DEVICE_METADATA_PRIVATE,
-          .data = std::vector<uint8_t>(reinterpret_cast<const uint8_t*>(&config),
-                                       reinterpret_cast<const uint8_t*>(&config) + sizeof(config)),
-      }},
       {{
           .type = DEVICE_METADATA_SDMMC,
           .data = std::move(sdmmc_metadata.value()),
