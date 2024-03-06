@@ -1132,6 +1132,7 @@ mod tests {
             let target =
                 model.root().find_and_maybe_resolve(&"target".try_into().unwrap()).await.unwrap();
             target.ensure_started(&StartReason::Debug).await.unwrap();
+            mock_runner.wait_for_url("test:///target_resolved").await;
             let ns = mock_runner.get_namespace("test:///target_resolved").unwrap();
             let ns = ns.lock().await;
             // /pkg and /svc
