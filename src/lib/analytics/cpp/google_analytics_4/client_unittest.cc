@@ -35,6 +35,7 @@ namespace analytics::google_analytics_4 {
 
 class MockClient : public Client {
  public:
+  MockClient() : Client(2) {}
   void expectEqData(const std::vector<std::string>& data) {
     ASSERT_EQ(data.size(), data_.size());
     for (size_t i = 0; i < data.size(); i++) {
@@ -532,6 +533,69 @@ TEST_F(ClientTest, NullInEvents) {
   std::vector<std::string> data{body1, body2};
 
   client_.AddEvents(std::move(events), batch_size);
+  client_.expectEqData(data);
+}
+
+TEST_F(ClientTest, AddEventsToBatch) {
+  client_.SetUserProperty("user", "property");
+
+  auto event0 = std::make_unique<MockEvent>("test-event");
+  event0->SetParameter("order", 0);
+  auto event1 = std::make_unique<MockEvent>("other-event");
+  event1->SetParameter("order", 1);
+  auto event2 = std::make_unique<MockEvent>("test-event");
+  event2->SetParameter("order", 2);
+  std::string body1 = fxl::Substitute(R"JSON(
+      {
+        "client_id": "TEST-CLIENT",
+        "events": [
+          {
+            "name": "test-event",
+            "params": {
+              "order": 0
+            },
+            "timestamp_micros": $0
+          },
+          {
+            "name": "other-event",
+            "params": {
+              "order": 1
+            },
+            "timestamp_micros": $1
+          }
+    ],
+    "user_properties": {
+          "user": {"value": "property"}
+    }
+  }
+  )JSON",
+                                      std::to_string(event0->timestamp_micros().count()),
+                                      std::to_string(event1->timestamp_micros().count()));
+  std::string body2 = fxl::Substitute(R"JSON(
+      {
+        "client_id": "TEST-CLIENT",
+        "events": [
+          {
+            "name": "test-event",
+            "params": {
+              "order": 2
+            },
+            "timestamp_micros": $0
+          }
+    ],
+    "user_properties": {
+          "user": {"value": "property"}
+    }
+  }
+  )JSON",
+                                      std::to_string(event2->timestamp_micros().count()));
+
+  std::vector<std::string> data{body1, body2};
+
+  client_.AddEventToDefaultBatch(std::move(event0));
+  client_.AddEventToDefaultBatch(std::move(event1));
+  client_.AddEventToDefaultBatch(std::move(event2));
+  client_.SendDefaultBatch();
   client_.expectEqData(data);
 }
 

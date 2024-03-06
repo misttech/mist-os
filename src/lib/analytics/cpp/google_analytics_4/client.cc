@@ -8,6 +8,7 @@
 
 #include <cstddef>
 
+#include "src/lib/analytics/cpp/google_analytics_4/batch.h"
 #include "src/lib/analytics/cpp/google_analytics_4/measurement.h"
 #include "src/lib/fxl/strings/substitute.h"
 #include "third_party/rapidjson/include/rapidjson/stringbuffer.h"
@@ -93,6 +94,15 @@ std::string GeneratePostBody(const Measurement& measurement) {
 
 }  // namespace
 
+Client::Client(size_t batch_size)
+    : batch_(
+          [=](std::vector<std::unique_ptr<Event>> event_ptrs) {
+            this->AddEvents(std::move(event_ptrs), batch_size);
+          },
+          batch_size) {}
+
+Client::~Client() { batch_.Send(); }
+
 void Client::SetQueryParameters(std::string_view measurement_id, std::string_view key) {
   url_ = fxl::Substitute(kEndpoint, measurement_id, kParameter1, key);
 }
@@ -146,6 +156,12 @@ void Client::AddEvents(std::vector<std::unique_ptr<Event>> event_ptrs, size_t ba
     AddEventsInLoop(std::move(event_ptrs), batch_size);
   }
 }
+
+void Client::AddEventToDefaultBatch(std::unique_ptr<Event> event_ptr) {
+  batch_.AddEvent(std::move(event_ptr));
+}
+
+void Client::SendDefaultBatch() { batch_.Send(); }
 
 bool Client::IsReady() const { return !client_id_.empty() && !url_.empty(); }
 

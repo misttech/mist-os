@@ -9,6 +9,7 @@
 #include <string>
 #include <string_view>
 
+#include "src/lib/analytics/cpp/google_analytics_4/batch.h"
 #include "src/lib/analytics/cpp/google_analytics_4/event.h"
 #include "src/lib/analytics/cpp/google_analytics_4/measurement.h"
 
@@ -20,10 +21,10 @@ namespace analytics::google_analytics_4 {
 // To use this class, the embedding app only needs to implement the SendData() method.
 class Client {
  public:
-  Client() = default;
+  explicit Client(size_t batch_size = kMeasurementEventMaxCount);
   Client(const Client&) = delete;
 
-  virtual ~Client() = default;
+  virtual ~Client();
 
   // Set the query parameters needed by the GA4 Measurement Protocol.
   // We do not escape or validate the parameters. The tool analytics implementer is responsible
@@ -38,6 +39,16 @@ class Client {
   void AddEvents(std::vector<std::unique_ptr<Event>> event_ptrs,
                  size_t batch_size = kMeasurementEventMaxCount);
 
+  // Instead of sending an event immediately, add the event to a local
+  // buffer. When the number of events in the buffer reaches the batch
+  // size limit, the client will send all the events in batch and then
+  // clear the buffer.
+  void AddEventToDefaultBatch(std::unique_ptr<Event> event_ptr);
+
+  // Send all the events in the local buffer/batch, regardless of
+  // the number of events.
+  void SendDefaultBatch();
+
  protected:
   auto& url() { return url_; }
 
@@ -51,6 +62,7 @@ class Client {
   std::string url_;
   // Stores shared parameters
   std::map<std::string, Value> user_properties_;
+  Batch batch_;
 };
 
 }  // namespace analytics::google_analytics_4
