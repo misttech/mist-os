@@ -192,6 +192,20 @@ impl RamdiskClient {
         Ok(block_client_end)
     }
 
+    /// Get an open channel to the underlying ramdevice.
+    pub fn connect(
+        &self,
+        server_end: fidl::endpoints::ServerEnd<fhardware_block::BlockMarker>,
+    ) -> Result<(), Error> {
+        let block_dir = self.as_dir().ok_or_else(|| anyhow!("directory is invalid"))?;
+        Ok(block_dir.open(
+            fio::OpenFlags::empty(),
+            fio::ModeType::empty(),
+            ".",
+            server_end.into_channel().into(),
+        )?)
+    }
+
     /// Get an open channel to the underlying ramdevice's controller.
     pub fn open_controller(
         &self,

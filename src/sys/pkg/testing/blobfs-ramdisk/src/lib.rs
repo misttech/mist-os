@@ -472,10 +472,7 @@ impl RamdiskBuilder {
     pub async fn start(self) -> Result<Ramdisk, Error> {
         let client = ramdevice_client::RamdiskClient::builder(RAMDISK_BLOCK_SIZE, self.block_count);
         let client = client.build().await?;
-        let block = client.open().await?;
-        let client_end = ClientEnd::<fio::NodeMarker>::new(block.into_channel());
-        let proxy = client_end.into_proxy()?;
-        Ok(Ramdisk { proxy, client })
+        Ok(Ramdisk { client })
     }
 
     /// Create a [`BlobfsRamdiskBuilder`] that uses this as its backing ramdisk.
@@ -486,7 +483,6 @@ impl RamdiskBuilder {
 
 /// A virtual memory-backed block device.
 pub struct Ramdisk {
-    proxy: fio::NodeProxy,
     client: ramdevice_client::RamdiskClient,
 }
 
@@ -524,8 +520,7 @@ impl std::ops::Deref for FormattedRamdisk {
 impl FormattedRamdisk {
     /// Corrupt the blob given by merkle.
     pub async fn corrupt_blob(&self, merkle: &Hash) {
-        let ramdisk = Clone::clone(&self.0.proxy);
-        blobfs_corrupt_blob(ramdisk, merkle).await.unwrap();
+        blobfs_corrupt_blob(&self.0.client, merkle).await.unwrap();
     }
 
     /// Shuts down this ramdisk.
@@ -534,11 +529,13 @@ impl FormattedRamdisk {
     }
 }
 
-async fn blobfs_corrupt_blob(ramdisk: fio::NodeProxy, merkle: &Hash) -> Result<(), Error> {
+async fn blobfs_corrupt_blob(
+    ramdisk: &ramdevice_client::RamdiskClient,
+    merkle: &Hash,
+) -> Result<(), Error> {
     let mut fs = ServiceFs::new();
     fs.root_dir().add_service_at("block", move |channel: zx::Channel| {
-        let _: Result<(), fidl::Error> =
-            ramdisk.clone(fio::OpenFlags::CLONE_SAME_RIGHTS, channel.into());
+        let _: Result<(), Error> = ramdisk.connect(channel.into());
         None
     });
 
