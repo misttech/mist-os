@@ -66,6 +66,7 @@ type EventPayload = flexible resource union {
     2: purged PurgedPayload;
 
     /// Payload for DirectoryReady events
+    @available(deprecated=19)
     3: directory_ready DirectoryReadyPayload;
 
     /// Payload for Discovered events.
@@ -91,7 +92,7 @@ type EventPayload = flexible resource union {
 };
 
 /// Payload for DirectoryReady events
-@available(added=11)
+@available(added=11, deprecated=19)
 type DirectoryReadyPayload = resource table {
     /// The name of the capability.
     1: name name;
