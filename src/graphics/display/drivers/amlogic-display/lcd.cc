@@ -52,23 +52,43 @@ zx_status_t CheckDsiDeviceRegister(
   ZX_DEBUG_ASSERT(count > 0);
   ZX_DEBUG_ASSERT(count <= kReadRegisterMaximumValueCount);
 
-  const std::array<uint8_t, 1> payload = {
+  const std::array<uint8_t, 2> set_maximum_return_packet_size_payload = {
+      // `count` must not exceed kReadRegisterMaximumValueCount = 4, so the
+      // cast won't overflow which causes undefined behavior.
+      static_cast<uint8_t>(count),
+      0,
+  };
+  const std::array<uint8_t, 1> read_payload = {
       reg,
   };
   std::array<uint8_t, kReadRegisterMaximumValueCount> response_buffer = {};
   cpp20::span<uint8_t> response(response_buffer.data(), count);
 
-  mipi_dsi_cmd_t cmd{
-      .virt_chn_id = kMipiDsiVirtualChanId,
-      .dsi_data_type = kMipiDsiDtGenShortRead1,
-      .pld_data_list = payload.data(),
-      .pld_data_count = payload.size(),
-      .rsp_data_list = response.data(),
-      .rsp_data_count = response.size(),
-      .flags = MIPI_DSI_CMD_FLAGS_SET_MAX,
+  const mipi_dsi_cmd_t commands_array[] = {
+      // Sets the maximum return packet size to avoid read buffer overflow on the
+      // DSI host controller.
+      {
+          .virt_chn_id = kMipiDsiVirtualChanId,
+          .dsi_data_type = kMipiDsiDtSetMaxRetPkt,
+          .pld_data_list = set_maximum_return_packet_size_payload.data(),
+          .pld_data_count = set_maximum_return_packet_size_payload.size(),
+          .rsp_data_list = nullptr,
+          .rsp_data_count = 0,
+          .flags = 0,
+      },
+      {
+          .virt_chn_id = kMipiDsiVirtualChanId,
+          .dsi_data_type = kMipiDsiDtGenShortRead1,
+          .pld_data_list = read_payload.data(),
+          .pld_data_count = read_payload.size(),
+          .rsp_data_list = response.data(),
+          .rsp_data_count = response.size(),
+          .flags = 0,
+      },
   };
+  cpp20::span<const mipi_dsi_cmd_t> commands(commands_array);
 
-  zx_status_t status = designware_dsi_host_controller.SendCmd(&cmd, 1);
+  zx_status_t status = designware_dsi_host_controller.SendCmd(commands.data(), commands.size());
   if (status != ZX_OK) {
     zxlogf(ERROR, "Could not read register %d", reg);
     return status;
@@ -94,23 +114,40 @@ zx::result<uint32_t> GetMipiDsiDisplayId(
   constexpr uint8_t kCommandReadDisplayIdentificationInformation = 0x04;
   constexpr int kCommandReadDisplayIdentificationInformationResponseSize = 3;
 
-  const std::array<uint8_t, 1> payload = {
+  const std::array<uint8_t, 2> set_maximum_return_packet_size_payload = {
+      kCommandReadDisplayIdentificationInformationResponseSize & 0xff,
+      kCommandReadDisplayIdentificationInformationResponseSize >> 8,
+  };
+  const std::array<uint8_t, 1> read_display_identification_payload = {
       kCommandReadDisplayIdentificationInformation,
   };
   std::array<uint8_t, kCommandReadDisplayIdentificationInformationResponseSize> response;
 
-  // Create the command using mipi-dsi library
-  mipi_dsi_cmd_t cmd = {
-      .virt_chn_id = kMipiDsiVirtualChanId,
-      .dsi_data_type = kMipiDsiDtGenShortRead1,
-      .pld_data_list = payload.data(),
-      .pld_data_count = payload.size(),
-      .rsp_data_list = response.data(),
-      .rsp_data_count = response.size(),
-      .flags = MIPI_DSI_CMD_FLAGS_SET_MAX,
+  const mipi_dsi_cmd_t commands_array[] = {
+      // Sets the maximum return packet size to avoid read buffer overflow on the
+      // DSI host controller.
+      {
+          .virt_chn_id = kMipiDsiVirtualChanId,
+          .dsi_data_type = kMipiDsiDtSetMaxRetPkt,
+          .pld_data_list = set_maximum_return_packet_size_payload.data(),
+          .pld_data_count = set_maximum_return_packet_size_payload.size(),
+          .rsp_data_list = nullptr,
+          .rsp_data_count = 0,
+          .flags = 0,
+      },
+      {
+          .virt_chn_id = kMipiDsiVirtualChanId,
+          .dsi_data_type = kMipiDsiDtGenShortRead1,
+          .pld_data_list = read_display_identification_payload.data(),
+          .pld_data_count = read_display_identification_payload.size(),
+          .rsp_data_list = response.data(),
+          .rsp_data_count = response.size(),
+          .flags = 0,
+      },
   };
+  cpp20::span<const mipi_dsi_cmd_t> commands(commands_array);
 
-  zx_status_t status = designware_dsi_host_controller.SendCmd(&cmd, 1);
+  zx_status_t status = designware_dsi_host_controller.SendCmd(commands.data(), commands.size());
   if (status != ZX_OK) {
     zxlogf(ERROR, "Failed to read out Display ID: %s", zx_status_get_string(status));
     return zx::error(status);

@@ -566,20 +566,6 @@ zx_status_t DsiHostController::GenRead(const mipi_dsi_cmd_t& cmd) {
     return ZX_ERR_INVALID_ARGS;
   }
 
-  // Check whether max return packet size should be set
-  if (cmd.flags & MIPI_DSI_CMD_FLAGS_SET_MAX) {
-    // We will set the max return size as rlen
-    regVal |= GEN_HDR_VC(cmd.virt_chn_id);
-    regVal |= kMipiDsiDtSetMaxRetPkt;
-    regVal |= GEN_HDR_WC_LSB(static_cast<uint32_t>(cmd.rsp_data_count) & 0xFF);
-    regVal |= GEN_HDR_WC_MSB((static_cast<uint32_t>(cmd.rsp_data_count) >> 8) & 0xFF);
-
-    if ((status = GenericHdrWrite(regVal)) != ZX_OK) {
-      // no need to print extra info
-      return status;
-    }
-  }
-
   regVal = 0;
   regVal |= GEN_HDR_DT(cmd.dsi_data_type);
   regVal |= GEN_HDR_VC(cmd.virt_chn_id);
@@ -651,6 +637,7 @@ zx_status_t DsiHostController::SendCommand(const mipi_dsi_cmd_t& cmd) {
     case kMipiDsiDtGenShortWrite0:
     case kMipiDsiDtGenShortWrite1:
     case kMipiDsiDtGenShortWrite2:
+    case kMipiDsiDtSetMaxRetPkt:
       status = GenWriteShort(cmd);
       break;
     case kMipiDsiDtGenLongWrite:
