@@ -50,6 +50,8 @@ use crate::{
     sync, Instant,
 };
 
+pub use netstack3_base::{InstantBindingsTypes, InstantContext};
+
 /// A marker trait indicating that the implementor is not the [`FakeCoreCtx`]
 /// type found in test environments.
 ///
@@ -60,30 +62,6 @@ use crate::{
 pub(crate) trait NonTestCtxMarker {}
 
 impl<BC: BindingsContext, L> NonTestCtxMarker for CoreCtx<'_, BC, L> {}
-
-/// Trait defining the `Instant` type provided by bindings' [`InstantContext`]
-/// implementation.
-///
-/// It is a separate trait from `InstantContext` so the type stands by itself to
-/// be stored at rest in core structures.
-pub trait InstantBindingsTypes {
-    /// The type of an instant in time.
-    ///
-    /// All time is measured using `Instant`s, including scheduling timers
-    /// through [`TimerContext`]. This type may represent some sort of
-    /// real-world time (e.g., [`std::time::Instant`]), or may be faked in
-    /// testing using a fake clock.
-    type Instant: Instant + 'static;
-}
-
-/// A context that provides access to a monotonic clock.
-pub trait InstantContext: InstantBindingsTypes {
-    /// Returns the current instant.
-    ///
-    /// `now` guarantees that two subsequent calls to `now` will return
-    /// monotonically non-decreasing values.
-    fn now(&self) -> Self::Instant;
-}
 
 /// An [`InstantContext`] which stores a cached value for the current time.
 ///
@@ -451,14 +429,9 @@ pub(crate) mod testutil {
     use alloc::{boxed::Box, collections::BinaryHeap, format, string::String, sync::Arc, vec::Vec};
     #[cfg(test)]
     use alloc::{collections::HashMap, vec};
+    use core::{convert::Infallible as Never, fmt::Debug, hash::Hash};
     #[cfg(test)]
-    use core::marker::PhantomData;
-    use core::{
-        convert::Infallible as Never,
-        fmt::{self, Debug, Formatter},
-        hash::Hash,
-        ops,
-    };
+    use core::{marker::PhantomData, ops};
 
     #[cfg(test)]
     use assert_matches::assert_matches;
@@ -480,116 +453,7 @@ pub(crate) mod testutil {
         testutil::FakeCryptoRng,
     };
 
-    /// A fake implementation of `Instant` for use in testing.
-    #[derive(Default, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
-    pub struct FakeInstant {
-        // A FakeInstant is just an offset from some arbitrary epoch.
-        offset: Duration,
-    }
-
-    impl crate::inspect::InspectableValue for FakeInstant {
-        fn record<I: crate::inspect::Inspector>(&self, _name: &str, _inspector: &mut I) {
-            unimplemented!()
-        }
-    }
-
-    impl FakeInstant {
-        #[cfg(test)]
-        pub(crate) const LATEST: FakeInstant = FakeInstant { offset: Duration::MAX };
-
-        fn saturating_add(self, dur: Duration) -> FakeInstant {
-            FakeInstant { offset: self.offset.saturating_add(dur) }
-        }
-    }
-
-    impl From<Duration> for FakeInstant {
-        fn from(offset: Duration) -> FakeInstant {
-            FakeInstant { offset }
-        }
-    }
-
-    impl Instant for FakeInstant {
-        fn duration_since(&self, earlier: FakeInstant) -> Duration {
-            self.offset.checked_sub(earlier.offset).unwrap()
-        }
-
-        fn saturating_duration_since(&self, earlier: FakeInstant) -> Duration {
-            self.offset.saturating_sub(earlier.offset)
-        }
-
-        fn checked_add(&self, duration: Duration) -> Option<FakeInstant> {
-            self.offset.checked_add(duration).map(|offset| FakeInstant { offset })
-        }
-
-        fn checked_sub(&self, duration: Duration) -> Option<FakeInstant> {
-            self.offset.checked_sub(duration).map(|offset| FakeInstant { offset })
-        }
-    }
-
-    impl ops::Add<Duration> for FakeInstant {
-        type Output = FakeInstant;
-
-        fn add(self, dur: Duration) -> FakeInstant {
-            FakeInstant { offset: self.offset + dur }
-        }
-    }
-
-    impl ops::Sub<FakeInstant> for FakeInstant {
-        type Output = Duration;
-
-        fn sub(self, other: FakeInstant) -> Duration {
-            self.offset - other.offset
-        }
-    }
-
-    impl ops::Sub<Duration> for FakeInstant {
-        type Output = FakeInstant;
-
-        fn sub(self, dur: Duration) -> FakeInstant {
-            FakeInstant { offset: self.offset - dur }
-        }
-    }
-
-    impl Debug for FakeInstant {
-        fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-            write!(f, "{:?}", self.offset)
-        }
-    }
-
-    /// A fake [`InstantContext`] which stores the current time as a
-    /// [`FakeInstant`].
-    #[derive(Default)]
-    pub struct FakeInstantCtx {
-        time: FakeInstant,
-    }
-
-    impl FakeInstantCtx {
-        /// Advance the current time by the given duration.
-        #[cfg(test)]
-        pub(crate) fn sleep(&mut self, dur: Duration) {
-            self.time.offset += dur;
-        }
-    }
-
-    impl InstantBindingsTypes for FakeInstantCtx {
-        type Instant = FakeInstant;
-    }
-
-    impl InstantContext for FakeInstantCtx {
-        fn now(&self) -> FakeInstant {
-            self.time
-        }
-    }
-
-    impl<T: AsRef<FakeInstantCtx>> InstantBindingsTypes for T {
-        type Instant = FakeInstant;
-    }
-
-    impl<T: AsRef<FakeInstantCtx>> InstantContext for T {
-        fn now(&self) -> FakeInstant {
-            self.as_ref().now()
-        }
-    }
+    pub use netstack3_base::testutil::{FakeInstant, FakeInstantCtx};
 
     /// Arbitrary data of type `D` attached to a `FakeInstant`.
     ///

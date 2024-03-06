@@ -119,11 +119,7 @@ pub mod filter {
 
 /// Facilities for inspecting stack state for debugging.
 pub mod inspect {
-    pub(crate) mod base;
-    pub(crate) use base::*;
-
-    // Re-exported types.
-    pub use base::{InspectableValue, Inspector, InspectorDeviceExt};
+    pub use netstack3_base::{Inspectable, InspectableValue, Inspector, InspectorDeviceExt};
 }
 
 /// Methods for dealing with ICMP sockets.

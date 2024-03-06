@@ -49,7 +49,6 @@ rustc_library_with_features("netstack3-core") {
     "src/device/state.rs",
     "src/error.rs",
     "src/filter/integration.rs",
-    "src/inspect/base.rs",
     "src/ip/api.rs",
     "src/ip/base.rs",
     "src/ip/device.rs",

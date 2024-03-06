@@ -10,7 +10,9 @@
 /// contexts, since all we need from a context pair is mutable references from
 /// both contexts.
 pub trait ContextPair {
+    /// The core context type held by this pair.
     type CoreContext;
+    /// The bindings context type held by this pair.
     type BindingsContext;
 
     /// Gets a mutable reference to both contexts.

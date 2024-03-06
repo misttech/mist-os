@@ -4,7 +4,6 @@
 
 //! Types for dealing with time and timers.
 
-use core::fmt::Debug;
 use derivative::Derivative;
 
 use net_types::ip::{GenericOverIp, Ip, Ipv4, Ipv6};
@@ -13,7 +12,6 @@ use tracing::trace;
 use crate::{
     context::{TimerContext, TimerHandler},
     device::{DeviceId, DeviceLayerTimerId},
-    inspect::InspectableValue,
     ip::{
         device::{IpDeviceIpExt, IpDeviceTimerId},
         IpLayerTimerId,
@@ -21,6 +19,8 @@ use crate::{
     transport::TransportLayerTimerId,
     BindingsTypes,
 };
+
+pub use netstack3_base::Instant;
 
 /// The identifier for any timer event.
 #[derive(Derivative, GenericOverIp)]
@@ -174,45 +174,4 @@ where
             TimerId(TimerIdInner::Ipv6Device(x)) => self.handle_timer(bindings_ctx, x),
         }
     }
-}
-
-/// A type representing an instant in time.
-///
-/// `Instant` can be implemented by any type which represents an instant in
-/// time. This can include any sort of real-world clock time (e.g.,
-/// [`std::time::Instant`]) or fake time such as in testing.
-pub trait Instant:
-    Sized + Ord + Copy + Clone + Debug + Send + Sync + InspectableValue + 'static
-{
-    /// Returns the amount of time elapsed from another instant to this one.
-    ///
-    /// # Panics
-    ///
-    /// This function will panic if `earlier` is later than `self`.
-    fn duration_since(&self, earlier: Self) -> core::time::Duration;
-
-    /// Returns the amount of time elapsed from another instant to this one,
-    /// saturating at zero.
-    fn saturating_duration_since(&self, earlier: Self) -> core::time::Duration;
-
-    /// Returns `Some(t)` where `t` is the time `self + duration` if `t` can be
-    /// represented as `Instant` (which means it's inside the bounds of the
-    /// underlying data structure), `None` otherwise.
-    fn checked_add(&self, duration: core::time::Duration) -> Option<Self>;
-
-    /// Unwraps the result from `checked_add`.
-    ///
-    /// # Panics
-    ///
-    /// This function will panic if the addition makes the clock wrap around.
-    fn add(&self, duration: core::time::Duration) -> Self {
-        self.checked_add(duration).unwrap_or_else(|| {
-            panic!("clock wraps around when adding {:?} to {:?}", duration, *self);
-        })
-    }
-
-    /// Returns `Some(t)` where `t` is the time `self - duration` if `t` can be
-    /// represented as `Instant` (which means it's inside the bounds of the
-    /// underlying data structure), `None` otherwise.
-    fn checked_sub(&self, duration: core::time::Duration) -> Option<Self>;
 }

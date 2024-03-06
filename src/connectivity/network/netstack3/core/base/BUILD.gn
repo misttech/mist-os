@@ -10,9 +10,16 @@ rustc_library("netstack3-base") {
   configs -= [ "//build/config/rust/lints:allow_unused_results" ]
   sources = [
     "src/context.rs",
+    "src/counters.rs",
+    "src/inspect.rs",
     "src/lib.rs",
+    "src/time.rs",
+    "src/time/testutil.rs",
   ]
-  deps = []
+  deps = [
+    "//src/connectivity/lib/net-types",
+    "//src/lib/fakealloc",
+  ]
 
   if (!is_host) {
     configs += [ "//src/connectivity/network/netstack3:netstack3_configs" ]
