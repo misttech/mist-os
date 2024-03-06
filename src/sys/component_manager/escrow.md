@@ -64,11 +64,9 @@ will proxy accordingly.
 
 ## Handling component updates
 
-The framework will attempt to flush the escrow state, including pending
-connection requests to lazy capabilities, back to the component and then stop
-the component if the component is being unresolved. This is to ensure that the
-next version of the component do not get requests intended for the previous
-version of the component.
+The framework will discard the escrow state if the component is being
+unresolved. This is to ensure that the next version of the component do not get
+requests intended for the previous version of the component.
 
 Drawback: long-living connections will then be forcefully closed during an
 upgrade. The alternative is that we introduce ABI compatibility considerations
