@@ -2,88 +2,68 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <fidl/fuchsia.driver.framework/cpp/fidl.h>
-#include <fuchsia/examples/gizmo/cpp/banjo.h>
-#include <lib/driver/compat/cpp/compat.h>
-#include <lib/driver/compat/cpp/symbols.h>
-#include <lib/driver/component/cpp/driver_base.h>
+#include "examples/drivers/transport/banjo/v2/parent-driver.h"
+
 #include <lib/driver/component/cpp/driver_export.h>
 #include <lib/driver/logging/cpp/structured_logger.h>
 
+#include <bind/gizmo/example/cpp/bind.h>
+
 namespace banjo_transport {
 
-class ParentBanjoTransportDriver : public fdf::DriverBase,
-                                   public ddk::MiscProtocol<ParentBanjoTransportDriver> {
- public:
-  ParentBanjoTransportDriver(fdf::DriverStartArgs start_args,
-                             fdf::UnownedSynchronizedDispatcher driver_dispatcher)
-      : DriverBase("transport-parent", std::move(start_args), std::move(driver_dispatcher)) {}
+zx::result<> ParentBanjoTransportDriver::Start() {
+  node_.Bind(std::move(node()));
 
-  zx::result<> Start() override {
-    node_.Bind(std::move(node()));
+  auto child_name = "banjo-transport-child";
 
-    // Initialize our compat server.
-    {
-      zx::result<> result = child_.Initialize(incoming(), outgoing(), node_name(), name(),
-                                              compat::ForwardMetadata::None(), get_banjo_config());
-      if (result.is_error()) {
-        return result.take_error();
-      }
-    }
-
-    // Add a child device node and offer the service capabilities.
-    // Offer `fuchsia.examples.gizmo.Service` to the driver that binds to the node.
-    auto args = fuchsia_driver_framework::NodeAddArgs({
-        .name = std::string(name()),
-        .properties = {{banjo_server_.property()}},
-        .offers2 = child_.CreateOffers2(),
-    });
-
-    // Create endpoints of the `NodeController` for the node.
-    auto endpoints = fidl::CreateEndpoints<fuchsia_driver_framework::NodeController>();
-    if (endpoints.is_error()) {
-      FDF_SLOG(ERROR, "Failed to create endpoint", KV("status", endpoints.status_string()));
-      return zx::error(endpoints.status_value());
-    }
-
-    auto result = node_->AddChild({std::move(args), std::move(endpoints->server), {}});
+  // Initialize our compat server with a banjo config from |banjo_server_|.
+  {
+    zx::result<> result = child_.Initialize(incoming(), outgoing(), node_name(), child_name,
+                                            compat::ForwardMetadata::None(), get_banjo_config());
     if (result.is_error()) {
-      const auto& error = result.error_value();
-      FDF_SLOG(ERROR, "Failed to add child", KV("status", error.FormatDescription()));
-      return zx::error(error.is_domain_error() ? static_cast<uint32_t>(error.domain_error())
-                                               : error.framework_error().status());
+      return result.take_error();
     }
-    controller_.Bind(std::move(endpoints->client), dispatcher());
-
-    return zx::ok();
   }
 
-  zx_status_t MiscGetHardwareId(uint32_t* out_response) {
-    *out_response = 0x1234ABCD;
+  // Add a child device node and offer the service capabilities.
+  // Offer `fuchsia.examples.gizmo.Service` to the driver that binds to the node.
+  auto args = fuchsia_driver_framework::NodeAddArgs({
+      .name = child_name,
+      .properties = {{banjo_server_.property(),
+                      fdf::MakeProperty(bind_gizmo_example::TEST_NODE_ID, "banjo_child")}},
+      .offers2 = child_.CreateOffers2(),
+  });
 
-    return ZX_OK;
+  // Create endpoints of the `NodeController` for the node.
+  zx::result endpoints = fidl::CreateEndpoints<fuchsia_driver_framework::NodeController>();
+  if (endpoints.is_error()) {
+    FDF_SLOG(ERROR, "Failed to create endpoint", KV("status", endpoints.status_string()));
+    return zx::error(endpoints.status_value());
   }
 
-  zx_status_t MiscGetFirmwareVersion(uint32_t* out_major, uint32_t* out_minor) {
-    *out_major = 0x0;
-    *out_minor = 0x1;
-
-    return ZX_OK;
+  auto result = node_->AddChild({std::move(args), std::move(endpoints->server), {}});
+  if (result.is_error()) {
+    const auto& error = result.error_value();
+    FDF_SLOG(ERROR, "Failed to add child", KV("status", error.FormatDescription()));
+    return zx::error(error.is_domain_error() ? static_cast<uint32_t>(error.domain_error())
+                                             : error.framework_error().status());
   }
+  controller_.Bind(std::move(endpoints->client), dispatcher());
 
- private:
-  compat::DeviceServer::BanjoConfig get_banjo_config() {
-    compat::DeviceServer::BanjoConfig config{ZX_PROTOCOL_MISC};
-    config.callbacks[ZX_PROTOCOL_MISC] = banjo_server_.callback();
-    return config;
-  }
+  return zx::ok();
+}
 
-  fidl::SyncClient<fuchsia_driver_framework::Node> node_;
-  fidl::Client<fuchsia_driver_framework::NodeController> controller_;
+zx_status_t ParentBanjoTransportDriver::MiscGetHardwareId(uint32_t* out_response) {
+  *out_response = 0x1234ABCD;
+  return ZX_OK;
+}
 
-  compat::BanjoServer banjo_server_{ZX_PROTOCOL_MISC, this, &misc_protocol_ops_};
-  compat::SyncInitializedDeviceServer child_;
-};
+zx_status_t ParentBanjoTransportDriver::MiscGetFirmwareVersion(uint32_t* out_major,
+                                                               uint32_t* out_minor) {
+  *out_major = 0x0;
+  *out_minor = 0x1;
+  return ZX_OK;
+}
 
 }  // namespace banjo_transport
 

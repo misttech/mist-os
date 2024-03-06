@@ -3,5 +3,7 @@
 // found in the LICENSE file.
 
 using fuchsia.platform;
+using gizmo.example;
 
 fuchsia.BIND_PROTOCOL == fuchsia.platform.BIND_PROTOCOL.MISC;
+gizmo.example.TEST_NODE_ID == "banjo_child";
