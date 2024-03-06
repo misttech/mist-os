@@ -25,15 +25,8 @@ void DeviceServer::ConnectToController(fidl::ServerEnd<fuchsia_device::Controlle
 
 void DeviceServer::ConnectToDeviceFidl(zx::channel channel) { Serve(std::move(channel), &device_); }
 
-void DeviceServer::ServeMultiplexed(zx::channel channel, bool include_node,
-                                    bool include_controller) {
-  MessageDispatcher* message_dispatcher = [this, include_node, include_controller]() {
-    if (include_node) {
-      if (include_controller) {
-        return &device_and_node_and_controller_;
-      }
-      return &device_and_node_;
-    }
+void DeviceServer::ServeMultiplexed(zx::channel channel, bool include_controller) {
+  MessageDispatcher* message_dispatcher = [this, include_controller]() {
     if (include_controller) {
       return &device_and_controller_;
     }
@@ -85,112 +78,8 @@ void DeviceServer::Serve(zx::channel channel, fidl::internal::IncomingMessageDis
   });
 }
 
-DeviceServer::MessageDispatcher::Node::Node(MessageDispatcher& parent) : parent_(parent) {}
-
-void DeviceServer::MessageDispatcher::Node::Close(CloseCompleter::Sync& completer) {
-  completer.ReplySuccess();
-  completer.Close(ZX_OK);
-}
-
-void DeviceServer::MessageDispatcher::Node::Query(QueryCompleter::Sync& completer) {
-  const std::string_view kProtocol = fuchsia_io::wire::kNodeProtocolName;
-  // TODO(https://fxbug.dev/42052765): avoid the const cast.
-  uint8_t* data = reinterpret_cast<uint8_t*>(const_cast<char*>(kProtocol.data()));
-  completer.Reply(fidl::VectorView<uint8_t>::FromExternal(data, kProtocol.size()));
-}
-
-void DeviceServer::MessageDispatcher::Node::Clone(CloneRequestView request,
-                                                  CloneCompleter::Sync& completer) {
-  if (request->flags != fuchsia_io::wire::OpenFlags::kCloneSameRights) {
-    std::string error =
-        "Unsupported clone flags=0x" + std::to_string(static_cast<uint32_t>(request->flags));
-    parent_.parent_.controller_.LogError(error.c_str());
-    request->object.Close(ZX_ERR_NOT_SUPPORTED);
-    return;
-  }
-  parent_.parent_.ServeMultiplexed(request->object.TakeChannel(), parent_.multiplex_node_,
-                                   parent_.multiplex_controller_);
-}
-
-void DeviceServer::MessageDispatcher::Node::GetAttr(GetAttrCompleter::Sync& completer) {
-  parent_.parent_.controller_.LogError("Unsupported call to GetAttr");
-  completer.Close(ZX_ERR_NOT_SUPPORTED);
-}
-void DeviceServer::MessageDispatcher::Node::SetAttr(fuchsia_io::wire::Node1SetAttrRequest* request,
-                                                    SetAttrCompleter::Sync& completer) {
-  parent_.parent_.controller_.LogError("Unsupported call to SetAttr");
-  completer.Close(ZX_ERR_NOT_SUPPORTED);
-}
-void DeviceServer::MessageDispatcher::Node::GetFlags(GetFlagsCompleter::Sync& completer) {
-  parent_.parent_.controller_.LogError("Unsupported call to GetFlags");
-  completer.Close(ZX_ERR_NOT_SUPPORTED);
-}
-void DeviceServer::MessageDispatcher::Node::SetFlags(
-    fuchsia_io::wire::Node1SetFlagsRequest* request, SetFlagsCompleter::Sync& completer) {
-  parent_.parent_.controller_.LogError("Unsupported call to SetFlags");
-  completer.Close(ZX_ERR_NOT_SUPPORTED);
-}
-void DeviceServer::MessageDispatcher::Node::QueryFilesystem(
-    QueryFilesystemCompleter::Sync& completer) {
-  parent_.parent_.controller_.LogError("Unsupported call to QueryFilesystem");
-  completer.Close(ZX_ERR_NOT_SUPPORTED);
-}
-void DeviceServer::MessageDispatcher::Node::Reopen(fuchsia_io::wire::Node2ReopenRequest* request,
-                                                   ReopenCompleter::Sync& completer) {
-  parent_.parent_.controller_.LogError("Unsupported call to Reopen");
-  completer.Close(ZX_ERR_NOT_SUPPORTED);
-}
-void DeviceServer::MessageDispatcher::Node::GetConnectionInfo(
-    GetConnectionInfoCompleter::Sync& completer) {
-  parent_.parent_.controller_.LogError("Unsupported call to GetConnectionInfo");
-  completer.Close(ZX_ERR_NOT_SUPPORTED);
-}
-void DeviceServer::MessageDispatcher::Node::GetAttributes(
-    ::fuchsia_io::wire::Node2GetAttributesRequest* request,
-    GetAttributesCompleter::Sync& completer) {
-  parent_.parent_.controller_.LogError("Unsupported call to GetAttributes");
-  completer.Close(ZX_ERR_NOT_SUPPORTED);
-}
-void DeviceServer::MessageDispatcher::Node::UpdateAttributes(
-    ::fuchsia_io::wire::MutableNodeAttributes* request,
-    UpdateAttributesCompleter::Sync& completer) {
-  parent_.parent_.controller_.LogError("Unsupported call to UpdateAttributes");
-  completer.Close(ZX_ERR_NOT_SUPPORTED);
-}
-void DeviceServer::MessageDispatcher::Node::Sync(SyncCompleter::Sync& completer) {
-  parent_.parent_.controller_.LogError("Unsupported call to Sync");
-  completer.Close(ZX_ERR_NOT_SUPPORTED);
-}
-void DeviceServer::MessageDispatcher::Node::ListExtendedAttributes(
-    fuchsia_io::wire::Node2ListExtendedAttributesRequest* request,
-    ListExtendedAttributesCompleter::Sync& completer) {
-  parent_.parent_.controller_.LogError("Unsupported call to ListExtendedAttributes");
-  completer.Close(ZX_ERR_NOT_SUPPORTED);
-}
-void DeviceServer::MessageDispatcher::Node::GetExtendedAttribute(
-    fuchsia_io::wire::Node2GetExtendedAttributeRequest* request,
-    GetExtendedAttributeCompleter::Sync& completer) {
-  parent_.parent_.controller_.LogError("Unsupported call to GetExtendedAttribute");
-  completer.Close(ZX_ERR_NOT_SUPPORTED);
-}
-void DeviceServer::MessageDispatcher::Node::SetExtendedAttribute(
-    fuchsia_io::wire::Node2SetExtendedAttributeRequest* request,
-    SetExtendedAttributeCompleter::Sync& completer) {
-  parent_.parent_.controller_.LogError("Unsupported call to SetExtendedAttribute");
-  completer.Close(ZX_ERR_NOT_SUPPORTED);
-}
-void DeviceServer::MessageDispatcher::Node::RemoveExtendedAttribute(
-    fuchsia_io::wire::Node2RemoveExtendedAttributeRequest* request,
-    RemoveExtendedAttributeCompleter::Sync& completer) {
-  parent_.parent_.controller_.LogError("Unsupported call to RemoveExtendedAttribute");
-  completer.Close(ZX_ERR_NOT_SUPPORTED);
-}
-
-DeviceServer::MessageDispatcher::MessageDispatcher(DeviceServer& parent, bool multiplex_node,
-                                                   bool multiplex_controller)
-    : parent_(parent),
-      multiplex_node_(multiplex_node),
-      multiplex_controller_(multiplex_controller) {}
+DeviceServer::MessageDispatcher::MessageDispatcher(DeviceServer& parent, bool multiplex_controller)
+    : parent_(parent), multiplex_controller_(multiplex_controller) {}
 
 namespace {
 
@@ -243,12 +132,6 @@ void DeviceServer::MessageDispatcher::dispatch_message(
   if (parent_.controller_.IsUnbound()) {
     txn->Close(ZX_ERR_IO_NOT_PRESENT);
     return;
-  }
-
-  if (multiplex_node_) {
-    if (TryDispatch(&node_, msg, txn) == fidl::DispatchResult::kFound) {
-      return;
-    }
   }
 
   if (multiplex_controller_) {

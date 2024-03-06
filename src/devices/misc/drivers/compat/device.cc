@@ -202,7 +202,7 @@ Device::Device(device_t device, const zx_protocol_device_t* ops, Driver* driver,
                std::optional<Device*> parent, std::shared_ptr<fdf::Logger> logger,
                async_dispatcher_t* dispatcher)
     : devfs_connector_([this](fidl::ServerEnd<fuchsia_device::Controller> controller) {
-        devfs_server_.ServeMultiplexed(controller.TakeChannel(), true, true);
+        devfs_server_.ServeMultiplexed(controller.TakeChannel(), true);
       }),
       devfs_server_(*this, dispatcher),
       name_(device.name),
