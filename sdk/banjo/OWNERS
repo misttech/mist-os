@@ -1,4 +1,4 @@
-include /src/devices/OWNERS
+include /src/devices/driver_framework/OWNERS
 
 # For WLAN protocols
 silberst@google.com

@@ -1,5 +1,4 @@
-include /src/devices/OWNERS
+include /src/devices/driver_framework/OWNERS
 
 andresoportus@google.com
-dgilhooley@google.com
 surajmalhotra@google.com

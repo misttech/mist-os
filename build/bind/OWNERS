@@ -1,4 +1,3 @@
-alexlegg@google.com
-spqchan@google.com
+include /src/devices/driver_framework/OWNERS
 
-include /src/devices/OWNERS
+spqchan@google.com

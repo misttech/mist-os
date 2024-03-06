@@ -2,4 +2,4 @@ rquattle@google.com
 vaas@google.com
 
 # Driver Framework Team for refactoring.
-include /src/devices/OWNERS
+include /src/devices/driver_framework/OWNERS
