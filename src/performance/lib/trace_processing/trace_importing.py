@@ -436,6 +436,17 @@ def create_model_from_json(root_object: Dict[str, Any]) -> trace_model.Model:
         elif phase == "E":
             if duration_stack:
                 popped: trace_model.DurationEvent = duration_stack.pop()
+                # It's we drop the "Begin" or "End" part of a begin-end duration pair, or we get
+                # mismatched Begin-End pairs in general. We should attempt some form of error
+                # recovery. It's likely this is a local error due to either dropped events. The rest
+                # of the trace is likely still good.
+                if popped.duration != None:
+                    # We know that since we artificially insert the matching pairs for complete
+                    # duration events (ph == X), those must be correct and we can attempt to recover
+                    # using them. If we're attempting to match with a duration complete event (i.e.
+                    # it has a duration set already), drop this end event instead
+                    duration_stack.append(popped)
+                    continue
                 popped.duration = (
                     trace_time.TimePoint.from_epoch_delta(
                         trace_time.TimeDelta.from_microseconds(
@@ -449,7 +460,15 @@ def create_model_from_json(root_object: Dict[str, Any]) -> trace_model.Model:
                 result_events.append(popped)
         elif phase == "fuchsia_synthetic_end":
             assert duration_stack
-            duration_stack.pop()
+            popped: trace_model.DurationEvent = duration_stack.pop()
+            # We know that since we artificially insert the matching pairs for complete duration
+            # there must be a matching event. If we popped a non duration complete begin event (i.e.
+            # it has no duration set yet), we must have dropped a matching end somewhere.
+            #
+            # We'll attempt to recover by popping events until we find a duration complete begin
+            # event.
+            while popped.duration == None:
+                popped = duration_stack.pop()
         elif phase == "b":
             async_key: _AsyncKey = _AsyncKey.from_trace_event(trace_event)
             async_event: trace_model.AsyncEvent = (

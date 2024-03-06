@@ -61,6 +61,158 @@ class TraceImportingTest(unittest.TestCase):
         )
         self.assertEqual(len(list(model.all_events())), 0)
 
+    def test_missing_end_events(self) -> None:
+        model: trace_model.Model = trace_importing.create_model_from_string(
+            """
+{
+  "displayTimeUnit": "ns",
+  "traceEvents": [
+    {
+      "cat": "test",
+      "name": "name",
+      "ts": 0.0,
+      "ph": "B",
+      "tid": 0,
+      "pid": 0
+    },
+    {
+      "cat": "test",
+      "name": "complete",
+      "ts": 1.0,
+      "pid": 0,
+      "tid": 0,
+      "ph": "X",
+      "dur": 4.0
+    },
+    {
+      "cat": "test",
+      "name": "some_other_name",
+      "ts": 3.0,
+      "ph": "B",
+      "tid": 0,
+      "pid": 0
+    },
+    {
+      "cat": "test",
+      "name": "name",
+      "ts": 8.0,
+      "ph": "E",
+      "tid": 0,
+      "pid": 0
+    }
+  ],
+  "systemTraceEvents": {
+    "events": [],
+    "type": "fuchsia"
+  }
+}
+"""
+        )
+        self.assertEqual(len(list(model.all_events())), 2)
+        # some_other_name is missing an end and will be dropped
+        self.assertEqual(list(model.all_events())[0].name, "name")
+        self.assertEqual(list(model.all_events())[1].name, "complete")
+
+    def test_missing_begin_events(self) -> None:
+        model: trace_model.Model = trace_importing.create_model_from_string(
+            """
+{
+  "displayTimeUnit": "ns",
+  "traceEvents": [
+    {
+      "cat": "category",
+      "name": "name",
+      "ts": 0.0,
+      "ph": "B",
+      "tid": 0,
+      "pid": 0
+    },
+    {
+      "cat": "category",
+      "name": "some_other_name",
+      "ts": 1.0,
+      "ph": "E",
+      "tid": 0,
+      "pid": 0
+    },
+    {
+      "cat": "category",
+      "name": "some_other_other_name",
+      "ts": 2.0,
+      "ph": "E",
+      "tid": 0,
+      "pid": 0
+    },
+    {
+      "cat": "category",
+      "name": "name",
+      "ts": 3.0,
+      "ph": "E",
+      "tid": 0,
+      "pid": 0
+    }
+  ],
+  "systemTraceEvents": {
+    "events": [],
+    "type": "fuchsia"
+  }
+}
+"""
+        )
+        self.assertEqual(len(list(model.all_events())), 1)
+        self.assertEqual(list(model.all_events())[0].name, "name")
+
+    def test_missing_begin_events_recovery(self) -> None:
+        model: trace_model.Model = trace_importing.create_model_from_string(
+            """
+{
+  "displayTimeUnit": "ns",
+  "traceEvents": [
+    {
+      "cat": "category",
+      "name": "name",
+      "ts": 0.0,
+      "ph": "B",
+      "tid": 0,
+      "pid": 0
+    },
+    {
+      "cat": "test",
+      "name": "complete",
+      "ts": 1.0,
+      "pid": 0,
+      "tid": 0,
+      "ph": "X",
+      "dur": 4.0
+    },
+    {
+      "cat": "category",
+      "name": "some_other_name",
+      "ts": 2.0,
+      "ph": "E",
+      "tid": 0,
+      "pid": 0
+    },
+    {
+      "cat": "category",
+      "name": "name",
+      "ts": 9.0,
+      "ph": "E",
+      "tid": 0,
+      "pid": 0
+    }
+  ],
+  "systemTraceEvents": {
+    "events": [],
+    "type": "fuchsia"
+  }
+}
+"""
+        )
+        self.assertEqual(len(list(model.all_events())), 2)
+        self.assertEqual(list(model.all_events())[0].name, "name")
+        self.assertEqual(list(model.all_events())[1].name, "complete")
+
     def test_integral_timestamp_and_duration(self) -> None:
         model: trace_model.Model = trace_importing.create_model_from_string(
             """
