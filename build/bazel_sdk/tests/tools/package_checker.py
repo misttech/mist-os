@@ -9,8 +9,10 @@ import subprocess
 import tempfile
 import sys
 
+from typing import TypeVar, Iterable, Any, Optional
 
-def parse_args():
+
+def parse_args() -> argparse.Namespace:
     """Parses command-line arguments."""
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -63,7 +65,7 @@ def parse_args():
     return parser.parse_args()
 
 
-def run(*command):
+def run(*command: str) -> str:
     try:
         return subprocess.check_output(
             command,
@@ -74,19 +76,22 @@ def run(*command):
         raise e
 
 
-def _assert_in(value, iterable, msg):
+T = TypeVar("T")
+
+
+def _assert_in(value: T, iterable: Iterable[T], msg: str) -> None:
     if not value in iterable:
         print("{}, {} not found in {}".format(msg, value, iterable))
         sys.exit(1)
 
 
-def _assert_eq(a, b, msg):
+def _assert_eq(a: T, b: T, msg: str) -> None:
     if a != b:
         print(Exception("{}: {} != {}".format(msg, a, b)))
         sys.exit(1)
 
 
-def dest_merkle_pair_for_blobs(blobs, ffx):
+def dest_merkle_pair_for_blobs(blobs: list[str], ffx: str) -> list[str]:
     if len(blobs) == 0:
         return []
 
@@ -108,7 +113,7 @@ def dest_merkle_pair_for_blobs(blobs, ffx):
     return pairs
 
 
-def list_contents(args):
+def list_contents(args: argparse.Namespace) -> list[str]:
     return run(
         args.far,
         "list",
@@ -116,7 +121,7 @@ def list_contents(args):
     ).split("\n")
 
 
-def list_subpackage_names(args):
+def list_subpackage_names(args: argparse.Namespace) -> list[str]:
     return (
         json.loads(
             run(
@@ -131,12 +136,14 @@ def list_subpackage_names(args):
     )
 
 
-def check_contents_for_component_manifests(contents, manifests):
+def check_contents_for_component_manifests(
+    contents: list[str], manifests: list[str]
+) -> None:
     for manifest in manifests:
         _assert_in(manifest, contents, "Failed to find component manifest")
 
 
-def check_contents_for_subpackage_names(args):
+def check_contents_for_subpackage_names(args: argparse.Namespace) -> None:
     actual = list_subpackage_names(args)
     expected = args.subpackages
     _assert_eq(
@@ -146,12 +153,14 @@ def check_contents_for_subpackage_names(args):
     )
 
 
-def check_contents_for_bind_bytecode(contents, bind):
+def check_contents_for_bind_bytecode(
+    contents: list[str], bind: Optional[str]
+) -> None:
     if bind:
         _assert_in(bind, contents, "Failed to find bind bytecode")
 
 
-def check_for_abi_revision(contents):
+def check_for_abi_revision(contents: list[str]) -> None:
     # TODO: we should actually check the contents of this file to see if it is valid.
     _assert_in(
         "meta/fuchsia.abi/abi-revision",
@@ -160,7 +169,7 @@ def check_for_abi_revision(contents):
     )
 
 
-def check_package_name(args):
+def check_package_name(args: argparse.Namespace) -> None:
     contents = json.loads(
         run(
             args.far, "cat", "--archive=" + args.meta_far, "--file=meta/package"
@@ -172,7 +181,7 @@ def check_package_name(args):
     )
 
 
-def check_package_has_all_blobs(args):
+def check_package_has_all_blobs(args: argparse.Namespace) -> None:
     dest_to_merkle = dest_merkle_pair_for_blobs(args.blobs, args.ffx)
 
     contents_str = run(
@@ -187,7 +196,7 @@ def check_package_has_all_blobs(args):
     )
 
 
-def main():
+def main() -> None:
     args = parse_args()
     contents = list_contents(args)
 
