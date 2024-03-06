@@ -587,6 +587,7 @@ async fn on_terminate_exit_triggers_reboot() {
     root.start_instance(&vec!["system"].try_into().unwrap(), &StartReason::Debug).await.unwrap();
     let component = root.find_and_maybe_resolve(&vec!["system"].try_into().unwrap()).await.unwrap();
     let info = ComponentInfo::new(component.clone()).await;
+    test.mock_runner.wait_for_url("test:///system_resolved").await;
     test.mock_runner.abort_controller(&info.channel_id);
     let reason = match receiver.next().await.unwrap() {
         fstatecontrol::AdminRequest::Reboot { reason, .. } => reason,
@@ -667,6 +668,7 @@ async fn on_terminate_with_missing_reboot_protocol_panics() {
     root.start_instance(&vec!["system"].try_into().unwrap(), &StartReason::Debug).await.unwrap();
     let component = root.find_and_maybe_resolve(&vec!["system"].try_into().unwrap()).await.unwrap();
     let info = ComponentInfo::new(component.clone()).await;
+    test.mock_runner.wait_for_url("test:///system_resolved").await;
     test.mock_runner.abort_controller(&info.channel_id);
     let () = pending().await;
 }
@@ -717,6 +719,7 @@ async fn on_terminate_with_failed_reboot_panics() {
     root.start_instance(&vec!["system"].try_into().unwrap(), &StartReason::Debug).await.unwrap();
     let component = root.find_and_maybe_resolve(&vec!["system"].try_into().unwrap()).await.unwrap();
     let info = ComponentInfo::new(component.clone()).await;
+    test.mock_runner.wait_for_url("test:///system_resolved").await;
     test.mock_runner.abort_controller(&info.channel_id);
     match receiver.next().await.unwrap() {
         fstatecontrol::AdminRequest::Reboot { responder, .. } => {
