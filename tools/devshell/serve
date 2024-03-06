@@ -430,14 +430,14 @@ while true; do
         source_name="$(ffx-default-repository-name)"
       fi
 
+      # Start repository server in foreground, wait until it
+      # voluntarily exits
       fx-command-exec ffx ${ffx_flags[@]} repository serve \
         --address [::]:${port} \
         --repository "${source_name}" \
         --alias "fuchsia.com" \
-        --alias "chromium.org" &
-      foreground_repo_server_pid=$!
-
-      state="ready"
+        --alias "chromium.org"
+      exit 0
     else
       add_update_source_args=( "${persist}" --port "${port}" --server-mode "${server_mode}" )
       if [[ ! -z "${source_name}" ]]; then
@@ -462,15 +462,6 @@ while true; do
   fi
 
   if [[ "${state}" == "ready" ]]; then
-    # Check if foreground repo ever goes down.
-    if [[ -n "${foreground_repo_server_pid}" ]]; then
-      if ! kill -0 "${foreground_repo_server_pid}" 2> /dev/null; then
-        fx-error "Foreground server exited unexpectedly. Please retry."
-        foreground_repo_server_pid=
-        exit 1
-      fi
-    fi
-
     if [[ "${ping_result}" != 0 ]]; then
       log "Device lost"
 
