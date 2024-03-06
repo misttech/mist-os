@@ -26,7 +26,6 @@ zx_library("amlogic") {
     "soc/aml-common/aml-tdm-audio.h",
     "soc/aml-common/aml-loopback-audio.h",
     "soc/aml-common/aml-thermal.h",
-    "soc/aml-common/aml-usb-phy.h",
     "soc/aml-meson/aml-clk-common.h",
     "soc/aml-meson/aml-meson-pll.h",
     "soc/aml-meson/aml-pll.h",

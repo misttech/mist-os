@@ -542,3 +542,9 @@
   available_in_git: 'bb5c9f153220d19234a0ab272c80c87bb986c2e4'
   areas: ['Driver SDK']
   path: 'examples/drivers/v2/demo_libc'
+- short_description: 'AML USB Phy V2 Driver'
+  deletion_reason: 'Merged with aml-usb-phy (formerly vim3-usb-phy)'
+  gerrit_change_id: '986476'
+  available_in_git: '034ef9820f7fe31d4a32fc8082ae4f3791d7e386'
+  areas: ['USB']
+  path: '/src/devices/usb/drivers/aml-usb-phy-v2'

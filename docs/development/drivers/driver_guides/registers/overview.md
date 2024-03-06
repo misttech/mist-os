@@ -243,7 +243,7 @@ desired, we may still use the registers driver for isolation of resources.
 
 <!-- Reference links -->
 
-[aml-usb-phy]: /src/devices/usb/drivers/aml-usb-phy-v2/aml-usb-phy.cc
+[aml-usb-phy]: /src/devices/usb/drivers/aml-usb-phy/aml-usb-phy.cc
 [board-driver]: /docs/glossary/README.md#board-driver
 [fidl_metadata::registers]: /src/devices/lib/fidl-metadata/registers.h
 [metadata.fidl]: /sdk/fidl/fuchsia.hardware.registers/metadata.fidl

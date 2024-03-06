@@ -278,7 +278,6 @@
 //src/devices/tpm/drivers/tpm:fuchsia_driver
 //src/devices/usb/drivers/a1-usb-phy:a1-usb-phy-driver
 //src/devices/usb/drivers/aml-usb-crg-phy-v2:aml-usb-crg-phy-v2-driver
-//src/devices/usb/drivers/aml-usb-phy-v2:aml-usb-phy-v2-driver
 //src/devices/usb/drivers/crg-udc:crg-udc-driver
 //src/devices/usb/drivers/dwc2:dwc2-driver
 //src/devices/usb/drivers/dwc3:dwc3-driver

@@ -46,7 +46,6 @@ const std::set<std::string> kCreateThreadSymbolsDriversAllowlist = {
     "#meta/aml-thermal-s905d2g-legacy.cm",
     "#meta/aml-thermal.cm",
     "#meta/aml-usb-crg-phy-v2.cm",
-    "#meta/aml-usb-phy-v2.cm",
     "#meta/ams-light.cm",
     "#meta/arm_mali_iv009_isp.cm",
     "#meta/asix-88179.cm",
