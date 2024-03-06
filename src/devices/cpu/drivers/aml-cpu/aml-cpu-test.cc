@@ -2,8 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "aml-cpu.h"
-
 #include <fidl/fuchsia.hardware.clock/cpp/wire_test_base.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
@@ -22,12 +20,13 @@
 #include <zxtest/zxtest.h>
 
 #include "src/devices/bus/testing/fake-pdev/fake-pdev.h"
+#include "src/devices/cpu/drivers/aml-cpu/aml-cpu-v1.h"
 #include "src/devices/testing/mock-ddk/mock-device.h"
 
 namespace amlogic_cpu {
 
 using fuchsia_hardware_cpu_ctrl::wire::kMaxDevicePerformanceStates;
-using CpuCtrlClient = fidl::WireSyncClient<fuchsia_cpuctrl::Device>;
+using CpuCtrlClient = fidl::WireSyncClient<fuchsia_hardware_cpu_ctrl::Device>;
 using inspect::InspectTestHelper;
 
 #define MHZ(x) ((x) * 1000000)
@@ -308,7 +307,7 @@ TEST_F(AmlCpuBindingTest, TrivialBinding) {
   root_->SetMetadata(DEVICE_METADATA_AML_OP_POINTS, &kOperatingPointsMetadata,
                      sizeof(kOperatingPointsMetadata));
 
-  ASSERT_OK(AmlCpu::Create(nullptr, root_.get()));
+  ASSERT_OK(CreateV1Domains(nullptr, root_.get()));
   ASSERT_EQ(root_->child_count(), 1);
 }
 
@@ -325,14 +324,14 @@ TEST_F(AmlCpuBindingTest, UnorderedOperatingPoints) {
   root_->SetMetadata(DEVICE_METADATA_AML_OP_POINTS, &kOperatingPointsMetadata,
                      sizeof(kOperatingPointsMetadata));
 
-  ASSERT_OK(AmlCpu::Create(nullptr, root_.get()));
+  ASSERT_OK(CreateV1Domains(nullptr, root_.get()));
   ASSERT_EQ(root_->child_count(), 1);
 
   MockDevice* child = root_->GetLatestChild();
-  AmlCpu* dev = child->GetDeviceContext<AmlCpu>();
+  AmlCpuV1* dev = child->GetDeviceContext<AmlCpuV1>();
 
   uint32_t out_state;
-  EXPECT_OK(dev->SetPerformanceStateInternal(0, &out_state));
+  EXPECT_OK(dev->aml_cpu_for_testing().SetPerformanceStateInternal(0, &out_state));
   EXPECT_EQ(out_state, 0);
 
   incoming_.SyncCall([](IncomingNamespace* infra) {
@@ -388,24 +387,21 @@ class TestPowerDeviceWrapper {
                                                                      std::in_place};
 };
 
-class AmlCpuTest : public AmlCpu {
+class AmlCpuTest : public AmlCpuV1 {
  public:
-  AmlCpuTest(fidl::ClientEnd<fuchsia_hardware_clock::Clock> plldiv16,
-             fidl::ClientEnd<fuchsia_hardware_clock::Clock> cpudiv16,
-             fidl::ClientEnd<fuchsia_hardware_clock::Clock> cpuscaler,
-             fidl::ClientEnd<fuchsia_hardware_power::Device> pwr,
-             const std::vector<operating_point_t> operating_points, const uint32_t core_count)
-      : AmlCpu(nullptr, std::move(plldiv16), std::move(cpudiv16), std::move(cpuscaler),
-               std::move(pwr), operating_points, core_count) {}
+  AmlCpuTest(const std::vector<operating_point_t>& operating_points, const uint32_t core_count)
+      : AmlCpuV1(
+            nullptr, operating_points,
+            perf_domain_t{
+                .id = 0, .core_count = core_count, .relative_performance = 0, .name = "testpd"}) {}
 
-  zx::vmo inspect_vmo() { return inspector_.DuplicateVmo(); }
+  zx::vmo inspect_vmo() { return aml_cpu_for_testing().inspector_.DuplicateVmo(); }
 };
 
 class AmlCpuTestFixture : public InspectTestHelper, public zxtest::Test {
  public:
   AmlCpuTestFixture()
-      : dut_(pll_clock_.Connect(), cpu_clock_.Connect(), scaler_clock_.Connect(), power_.Connect(),
-             kTestOperatingPoints, kTestCoreCount),
+      : dut_(kTestOperatingPoints, kTestCoreCount),
         loop_(&kAsyncLoopConfigNoAttachToCurrentThread),
         operating_points_(kTestOperatingPoints) {}
 
@@ -424,12 +420,13 @@ class AmlCpuTestFixture : public InspectTestHelper, public zxtest::Test {
     // The DUT scales up to the fastest available pstate.
     power_.SetVoltage(fastest.volt_uv);
 
-    ASSERT_OK(dut_.Init());
+    ASSERT_OK(dut_.aml_cpu_for_testing().Init(pll_clock_.Connect(), cpu_clock_.Connect(),
+                                              scaler_clock_.Connect(), power_.Connect()));
 
     ASSERT_EQ(power_.min_needed_voltage(), slowest.volt_uv);
     ASSERT_EQ(power_.max_supported_voltage(), fastest.volt_uv);
 
-    auto endpoints = fidl::CreateEndpoints<fuchsia_cpuctrl::Device>();
+    auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_cpu_ctrl::Device>();
     fidl::BindServer(loop_.dispatcher(), std::move(endpoints->server), &dut_);
     loop_.StartThread("aml-cpu-test-thread");
 
@@ -489,13 +486,18 @@ TEST_F(AmlCpuTestFixture, TestSetPerformanceState) {
 
   power_.SetVoltage(min_pstate.volt_uv);
 
-  uint32_t out_state = UINT32_MAX;
-  zx_status_t result = dut_.SetPerformanceStateInternal(min_pstate_index, &out_state);
-  EXPECT_OK(result);
-  EXPECT_EQ(out_state, min_pstate_index);
+  auto min_result = cpu_client_->SetPerformanceState(min_pstate_index);
+  EXPECT_OK(min_result.status());
+  EXPECT_TRUE(min_result->is_ok());
+  EXPECT_EQ(min_result->value()->out_state, min_pstate_index);
   auto rate = scaler_clock_.rate();
   ASSERT_TRUE(rate.has_value());
   ASSERT_EQ(rate.value(), min_pstate.freq_hz);
+
+  // Check that we get the same value back from GetPerformanceState
+  auto min_result_again = cpu_client_->GetCurrentPerformanceState();
+  EXPECT_OK(min_result_again.status());
+  EXPECT_EQ(min_result_again.value().out_state, min_pstate_index);
 
   // Scale to the highest performance state.
   const uint32_t max_pstate_index = 0;
@@ -503,23 +505,34 @@ TEST_F(AmlCpuTestFixture, TestSetPerformanceState) {
 
   power_.SetVoltage(max_pstate.volt_uv);
 
-  out_state = UINT32_MAX;
-  result = dut_.SetPerformanceStateInternal(max_pstate_index, &out_state);
-  EXPECT_OK(result);
-  EXPECT_EQ(out_state, max_pstate_index);
+  auto max_result = cpu_client_->SetPerformanceState(max_pstate_index);
+  EXPECT_OK(max_result.status());
+  EXPECT_TRUE(max_result->is_ok());
+  EXPECT_EQ(max_result->value()->out_state, max_pstate_index);
   rate = scaler_clock_.rate();
   ASSERT_TRUE(rate.has_value());
   ASSERT_EQ(rate.value(), max_pstate.freq_hz);
 
+  // Check that we get the same value back from GetPerformanceState
+  auto max_result_again = cpu_client_->GetCurrentPerformanceState();
+  EXPECT_OK(max_result_again.status());
+  EXPECT_EQ(max_result_again.value().out_state, max_pstate_index);
+
   // Set to the pstate that we're already at and make sure that it's a no-op.
-  result = dut_.SetPerformanceStateInternal(max_pstate_index, &out_state);
-  EXPECT_OK(result);
-  EXPECT_EQ(out_state, max_pstate_index);
+  auto same_result = cpu_client_->SetPerformanceState(max_pstate_index);
+  EXPECT_OK(same_result.status());
+  EXPECT_TRUE(same_result->is_ok());
+  EXPECT_EQ(same_result->value()->out_state, max_pstate_index);
+
+  // Check that we get the same value back from GetPerformanceState
+  auto same_result_again = cpu_client_->GetCurrentPerformanceState();
+  EXPECT_OK(same_result_again.status());
+  EXPECT_EQ(same_result_again.value().out_state, max_pstate_index);
 }
 
 TEST_F(AmlCpuTestFixture, TestSetCpuInfo) {
   uint32_t test_cpu_version = 0x28200b02;
-  dut_.SetCpuInfo(test_cpu_version);
+  dut_.aml_cpu_for_testing().SetCpuInfo(test_cpu_version);
   ASSERT_NO_FATAL_FAILURE(ReadInspect(dut_.inspect_vmo()));
   auto* cpu_info = hierarchy().GetByPath({"cpu_info_service"});
   ASSERT_TRUE(cpu_info);

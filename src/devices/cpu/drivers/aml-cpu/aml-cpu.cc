@@ -4,47 +4,31 @@
 
 #include "aml-cpu.h"
 
-#include <lib/ddk/binding_driver.h>
-#include <lib/ddk/debug.h>
-#include <lib/ddk/driver.h>
+#ifdef DFV1
+#include <lib/ddk/debug.h>  // nogncheck
+#else
+#include <lib/driver/compat/cpp/logging.h>  // nogncheck
+#endif
+
 #include <lib/ddk/platform-defs.h>
-#include <lib/device-protocol/pdev-fidl.h>
-#include <lib/inspect/cpp/inspector.h>
 #include <lib/mmio/mmio.h>
 #include <zircon/syscalls/smc.h>
 
-#include <memory>
 #include <vector>
 
-#include <ddktl/fidl.h>
 #include <fbl/string_buffer.h>
 
 namespace amlogic_cpu {
 
 namespace {
-// Fragments are provided to this driver in groups of 4. Fragments are provided as follows:
-// [4 fragments for cluster 0]
-// [4 fragments for cluster 1]
-// [...]
-// [4 fragments for cluster n]
-// Each fragment is a combination of the fixed string + id.
-constexpr size_t kFragmentsPerPfDomain = 4;
-constexpr size_t kFragmentsPerPfDomainA5 = 2;
-constexpr size_t kFragmentsPerPfDomainA1 = 1;
-
-constexpr zx_off_t kCpuVersionOffset = 0x220;
-constexpr zx_off_t kCpuVersionOffsetA5 = 0x300;
-constexpr zx_off_t kCpuVersionOffsetA1 = 0x220;
-
 constexpr uint32_t kCpuGetDvfsTableIndexFuncId = 0x82000088;
 constexpr uint64_t kDefaultClusterId = 0;
 
-constexpr uint32_t kInitialPstate = fuchsia_cpuctrl::wire::kDevicePerformanceStateP0;
+constexpr uint32_t kInitialPstate = fuchsia_hardware_cpu_ctrl::wire::kDevicePerformanceStateP0;
 
 }  // namespace
 
-zx_status_t AmlCpu::GetPopularVoltageTable(const zx::resource& smc_resource,
-                                           uint32_t* metadata_type) {
+zx_status_t GetPopularVoltageTable(const zx::resource& smc_resource, uint32_t* metadata_type) {
   if (smc_resource.is_valid()) {
     zx_smc_parameters_t smc_params = {};
     smc_params.func_id = kCpuGetDvfsTableIndexFuncId;
@@ -77,184 +61,87 @@ zx_status_t AmlCpu::GetPopularVoltageTable(const zx::resource& smc_resource,
   return ZX_OK;
 }
 
-zx_status_t AmlCpu::Create(void* context, zx_device_t* parent) {
+zx::result<AmlCpuConfiguration> LoadConfiguration(ddk::PDevFidl& pdev) {
   zx_status_t st;
+  AmlCpuConfiguration config;
 
-  // Get the metadata for the performance domains.
-  auto perf_doms = ddk::GetMetadataArray<perf_domain_t>(parent, DEVICE_METADATA_AML_PERF_DOMAINS);
-  if (!perf_doms.is_ok()) {
-    zxlogf(ERROR, "%s: Failed to get performance domains from board driver, st = %d", __func__,
-           perf_doms.error_value());
-    return perf_doms.error_value();
-  }
-
-  // Map AOBUS registers
-  auto pdev = ddk::PDevFidl::FromFragment(parent);
-  if (!pdev.is_valid()) {
-    zxlogf(ERROR, "Failed to get platform device fragment");
-    return ZX_ERR_NO_RESOURCES;
-  }
   std::optional<fdf::MmioBuffer> mmio_buffer;
-  if ((st = pdev.MapMmio(0, &mmio_buffer)) != ZX_OK) {
-    zxlogf(ERROR, "aml-cpu: Failed to map mmio, st = %d", st);
-    return st;
+  st = pdev.MapMmio(0, &mmio_buffer);
+  if (st != ZX_OK) {
+    zxlogf(ERROR, "aml-cpu: Failed to map mmio: %s", zx_status_get_string(st));
+    return zx::error(st);
   }
 
-  pdev_device_info_t info = {};
-  st = pdev.GetDeviceInfo(&info);
+  config.info = {};
+  st = pdev.GetDeviceInfo(&config.info);
   if (st != ZX_OK) {
     zxlogf(ERROR, "Failed to get DeviceInfo: %s", zx_status_get_string(st));
-    return st;
+    return zx::error(st);
   }
 
   zx::resource smc_resource = {};
-  uint32_t metadata_type = DEVICE_METADATA_AML_OP_POINTS;
-  size_t fragments_per_pf_domain = kFragmentsPerPfDomain;
+  config.metadata_type = DEVICE_METADATA_AML_OP_POINTS;
+  config.fragments_per_pf_domain = kFragmentsPerPfDomain;
   zx_off_t cpu_version_offset = kCpuVersionOffset;
-  if (info.pid == PDEV_PID_AMLOGIC_A5) {
+  if (config.info.pid == PDEV_PID_AMLOGIC_A5) {
     st = pdev.GetSmc(0, &smc_resource);
     if (st != ZX_OK) {
       zxlogf(ERROR, "Failed to get smc: %s", zx_status_get_string(st));
-      return st;
+      return zx::error(st);
     }
-    st = GetPopularVoltageTable(smc_resource, &metadata_type);
+    st = GetPopularVoltageTable(smc_resource, &config.metadata_type);
     if (st != ZX_OK) {
       zxlogf(ERROR, "Failed to get popular voltage table: %s", zx_status_get_string(st));
-      return st;
+      return zx::error(st);
     }
-    fragments_per_pf_domain = kFragmentsPerPfDomainA5;
+    config.fragments_per_pf_domain = kFragmentsPerPfDomainA5;
     cpu_version_offset = kCpuVersionOffsetA5;
-  } else if (info.pid == PDEV_PID_AMLOGIC_A1) {
-    fragments_per_pf_domain = kFragmentsPerPfDomainA1;
+  } else if (config.info.pid == PDEV_PID_AMLOGIC_A1) {
+    config.fragments_per_pf_domain = kFragmentsPerPfDomainA1;
     cpu_version_offset = kCpuVersionOffsetA1;
   }
 
-  auto op_points = ddk::GetMetadataArray<operating_point_t>(parent, metadata_type);
-  if (!op_points.is_ok()) {
-    zxlogf(ERROR, "Failed to get operating point from board driver: %s", op_points.status_string());
-    return op_points.error_value();
-  }
+  config.cpu_version_packed = mmio_buffer->Read32(cpu_version_offset);
 
-  const uint32_t cpu_version_packed = mmio_buffer->Read32(cpu_version_offset);
+  config.has_div16_clients = config.fragments_per_pf_domain == kFragmentsPerPfDomain;
 
-  // Build and publish each performance domain.
-  for (const perf_domain_t& perf_domain : perf_doms.value()) {
-    fbl::StringBuffer<32> fragment_name;
-    fidl::ClientEnd<fuchsia_hardware_clock::Clock> pll_div16_client;
-    fidl::ClientEnd<fuchsia_hardware_clock::Clock> cpu_div16_client;
-    if (fragments_per_pf_domain == kFragmentsPerPfDomain) {
-      fragment_name.AppendPrintf("clock-pll-div16-%02d", perf_domain.id);
-      zx::result clock_client =
-          DdkConnectFragmentFidlProtocol<fuchsia_hardware_clock::Service::Clock>(
-              parent, fragment_name.c_str());
-      if (clock_client.is_error()) {
-        zxlogf(ERROR, "Failed to get clock protocol from fragment '%s': %s\n",
-               fragment_name.c_str(), clock_client.status_string());
-        return clock_client.status_value();
-      }
-      pll_div16_client = std::move(*clock_client);
+  // For A1, the CPU power is VDD_CORE, which share with other module.
+  // The fixed voltage is 0.8v, we can't adjust it dynamically.
+  config.has_power_client = config.info.pid != PDEV_PID_AMLOGIC_A1;
 
-      fragment_name.Resize(0);
-      fragment_name.AppendPrintf("clock-cpu-div16-%02d", perf_domain.id);
-      clock_client = DdkConnectFragmentFidlProtocol<fuchsia_hardware_clock::Service::Clock>(
-          parent, fragment_name.c_str());
-      if (clock_client.is_error()) {
-        zxlogf(ERROR, "Failed to get clock protocol from fragment '%s': %s\n",
-               fragment_name.c_str(), clock_client.status_string());
-        return clock_client.status_value();
-      }
-      cpu_div16_client = std::move(*clock_client);
-    }
-
-    fragment_name.Resize(0);
-    fragment_name.AppendPrintf("clock-cpu-scaler-%02d", perf_domain.id);
-    zx::result clock_client =
-        DdkConnectFragmentFidlProtocol<fuchsia_hardware_clock::Service::Clock>(
-            parent, fragment_name.c_str());
-    if (clock_client.is_error()) {
-      zxlogf(ERROR, "Failed to get clock protocol from fragment '%s': %s\n", fragment_name.c_str(),
-             clock_client.status_string());
-      return clock_client.status_value();
-    }
-    fidl::ClientEnd<fuchsia_hardware_clock::Clock> cpu_scaler_client{std::move(*clock_client)};
-
-    // For A1, the CPU power is VDD_CORE, which share with other module.
-    // The fixed voltage is 0.8v, we can't adjust it dynamically.
-    fidl::ClientEnd<fuchsia_hardware_power::Device> power_client;
-    if (info.pid != PDEV_PID_AMLOGIC_A1) {
-      fragment_name.Resize(0);
-      fragment_name.AppendPrintf("power-%02d", perf_domain.id);
-      zx::result client_end_result =
-          DdkConnectFragmentFidlProtocol<fuchsia_hardware_power::Service::Device>(
-              parent, fragment_name.c_str());
-      if (client_end_result.is_error()) {
-        zxlogf(ERROR, "%s: Failed to create power client, st = %s", __func__,
-               client_end_result.status_string());
-        return client_end_result.error_value();
-      }
-
-      power_client = std::move(client_end_result.value());
-    }
-
-    // Vector of operating points that belong to this power domain.
-    std::vector<operating_point_t> pd_op_points;
-    std::copy_if(
-        op_points->begin(), op_points->end(), std::back_inserter(pd_op_points),
-        [&perf_domain](const operating_point_t& op) { return op.pd_id == perf_domain.id; });
-
-    // Order operating points from highest frequency to lowest because Operating Point 0 is the
-    // fastest.
-    std::sort(pd_op_points.begin(), pd_op_points.end(),
-              [](const operating_point_t& a, const operating_point_t& b) {
-                // Use voltage as a secondary sorting key.
-                if (a.freq_hz == b.freq_hz) {
-                  return a.volt_uv > b.volt_uv;
-                }
-                return a.freq_hz > b.freq_hz;
-              });
-
-    auto device =
-        std::make_unique<AmlCpu>(parent, std::move(pll_div16_client), std::move(cpu_div16_client),
-                                 std::move(cpu_scaler_client), std::move(power_client),
-                                 std::move(pd_op_points), perf_domain.core_count);
-
-    st = device->Init();
-    if (st != ZX_OK) {
-      zxlogf(ERROR, "%s: Failed to initialize device, st = %d", __func__, st);
-      return st;
-    }
-
-    device->SetCpuInfo(cpu_version_packed);
-
-    st = device->DdkAdd(ddk::DeviceAddArgs(perf_domain.name)
-                            .set_flags(DEVICE_ADD_NON_BINDABLE)
-                            .set_proto_id(ZX_PROTOCOL_CPU_CTRL)
-                            .set_inspect_vmo(device->inspector_.DuplicateVmo()));
-
-    if (st != ZX_OK) {
-      zxlogf(ERROR, "%s: DdkAdd failed, st = %d", __func__, st);
-      return st;
-    }
-
-    [[maybe_unused]] auto ptr = device.release();
-  }
-
-  return ZX_OK;
+  return zx::ok(config);
 }
 
-void AmlCpu::DdkRelease() { delete this; }
+std::vector<operating_point_t> PerformanceDomainOpPoints(const perf_domain_t& perf_domain,
+                                                         std::vector<operating_point>& op_points) {
+  std::vector<operating_point_t> pd_op_points;
+  std::copy_if(op_points.begin(), op_points.end(), std::back_inserter(pd_op_points),
+               [&perf_domain](const operating_point_t& op) { return op.pd_id == perf_domain.id; });
+
+  // Order operating points from highest frequency to lowest because Operating Point 0 is the
+  // fastest.
+  std::sort(pd_op_points.begin(), pd_op_points.end(),
+            [](const operating_point_t& a, const operating_point_t& b) {
+              // Use voltage as a secondary sorting key.
+              if (a.freq_hz == b.freq_hz) {
+                return a.volt_uv > b.volt_uv;
+              }
+              return a.freq_hz > b.freq_hz;
+            });
+
+  return pd_op_points;
+}
 
 zx_status_t AmlCpu::SetPerformanceStateInternal(uint32_t requested_state, uint32_t* out_state) {
   std::scoped_lock lock(lock_);
 
   if (requested_state >= operating_points_.size()) {
-    zxlogf(ERROR, "%s: Requested performance state is out of bounds, state = %u\n", __func__,
-           requested_state);
+    zxlogf(ERROR, "Requested performance state is out of bounds, state = %u\n", requested_state);
     return ZX_ERR_OUT_OF_RANGE;
   }
 
   if (!out_state) {
-    zxlogf(ERROR, "%s: out_state may not be null", __func__);
+    zxlogf(ERROR, "out_state may not be null");
     return ZX_ERR_INVALID_ARGS;
   }
 
@@ -265,9 +152,8 @@ zx_status_t AmlCpu::SetPerformanceStateInternal(uint32_t requested_state, uint32
   const operating_point_t& target_state = operating_points_[requested_state];
   const operating_point_t& initial_state = operating_points_[current_pstate_];
 
-  zxlogf(INFO, "%s: Scaling from %u MHz %u mV to %u MHz %u mV", __func__,
-         initial_state.freq_hz / 1000000, initial_state.volt_uv / 1000,
-         target_state.freq_hz / 1000000, target_state.volt_uv / 1000);
+  zxlogf(INFO, "Scaling from %u MHz %u mV to %u MHz %u mV", initial_state.freq_hz / 1000000,
+         initial_state.volt_uv / 1000, target_state.freq_hz / 1000000, target_state.volt_uv / 1000);
 
   if (initial_state.freq_hz == target_state.freq_hz &&
       initial_state.volt_uv == target_state.volt_uv) {
@@ -281,21 +167,20 @@ zx_status_t AmlCpu::SetPerformanceStateInternal(uint32_t requested_state, uint32
     ZX_ASSERT(pwr_.is_valid());
     fidl::WireResult result = pwr_->RequestVoltage(target_state.volt_uv);
     if (!result.ok()) {
-      zxlogf(ERROR, "%s: Failed to send RequestVoltage request: %s", __func__,
-             result.status_string());
+      zxlogf(ERROR, "Failed to send RequestVoltage request: %s", result.status_string());
       return result.error().status();
     }
 
     if (result->is_error()) {
-      zxlogf(ERROR, "%s: RequestVoltage call returned error: %s", __func__,
+      zxlogf(ERROR, "RequestVoltage call returned error: %s",
              zx_status_get_string(result->error_value()));
       return result->error_value();
     }
 
     uint32_t actual_voltage = result->value()->actual_voltage;
     if (actual_voltage != target_state.volt_uv) {
-      zxlogf(ERROR, "%s: Actual voltage does not match, requested = %u, got = %u", __func__,
-             target_state.volt_uv, actual_voltage);
+      zxlogf(ERROR, "Actual voltage does not match, requested = %u, got = %u", target_state.volt_uv,
+             actual_voltage);
       return ZX_OK;
     }
   }
@@ -303,21 +188,19 @@ zx_status_t AmlCpu::SetPerformanceStateInternal(uint32_t requested_state, uint32
   // Set the frequency next.
   fidl::WireResult result = cpuscaler_->SetRate(target_state.freq_hz);
   if (!result.ok() || result->is_error()) {
-    zxlogf(ERROR, "%s: Could not set CPU frequency: %s", __func__,
-           result.FormatDescription().c_str());
+    zxlogf(ERROR, "Could not set CPU frequency: %s", result.FormatDescription().c_str());
 
     // Put the voltage back if frequency scaling fails.
     if (pwr_.is_valid()) {
       fidl::WireResult result = pwr_->RequestVoltage(initial_state.volt_uv);
       if (!result.ok()) {
-        zxlogf(ERROR, "%s: Failed to send RequestVoltage request: %s", __func__,
-               result.status_string());
+        zxlogf(ERROR, "Failed to send RequestVoltage request: %s", result.status_string());
         return result.error().status();
       }
 
       if (result->is_error()) {
-        zxlogf(ERROR, "%s: Failed to reset CPU voltage, st = %s, Voltage and frequency mismatch!",
-               __func__, zx_status_get_string(result->error_value()));
+        zxlogf(ERROR, "Failed to reset CPU voltage, st = %s, Voltage and frequency mismatch!",
+               zx_status_get_string(result->error_value()));
         return result->error_value();
       }
     }
@@ -334,13 +217,12 @@ zx_status_t AmlCpu::SetPerformanceStateInternal(uint32_t requested_state, uint32
     ZX_ASSERT(pwr_.is_valid());
     fidl::WireResult result = pwr_->RequestVoltage(target_state.volt_uv);
     if (!result.ok()) {
-      zxlogf(ERROR, "%s: Failed to send RequestVoltage request: %s", __func__,
-             result.status_string());
+      zxlogf(ERROR, "Failed to send RequestVoltage request: %s", result.status_string());
       return result.error().status();
     }
 
     if (result->is_error()) {
-      zxlogf(ERROR, "%s: RequestVoltage call returned error: %s", __func__,
+      zxlogf(ERROR, "RequestVoltage call returned error: %s",
              zx_status_get_string(result->error_value()));
       return result->error_value();
     }
@@ -348,22 +230,29 @@ zx_status_t AmlCpu::SetPerformanceStateInternal(uint32_t requested_state, uint32
     uint32_t actual_voltage = result->value()->actual_voltage;
     if (actual_voltage != target_state.volt_uv) {
       zxlogf(ERROR,
-             "%s: Failed to set cpu voltage, requested = %u, got = %u. "
+             "Failed to set cpu voltage, requested = %u, got = %u. "
              "Voltage and frequency mismatch!",
-             __func__, target_state.volt_uv, actual_voltage);
+             target_state.volt_uv, actual_voltage);
       return ZX_OK;
     }
   }
 
-  zxlogf(INFO, "%s: Success\n", __func__);
+  zxlogf(INFO, "Success\n");
 
   current_pstate_ = requested_state;
 
   return ZX_OK;
 }
 
-zx_status_t AmlCpu::Init() {
-  if (plldiv16_.is_valid()) {
+zx_status_t AmlCpu::Init(fidl::ClientEnd<fuchsia_hardware_clock::Clock> plldiv16,
+                         fidl::ClientEnd<fuchsia_hardware_clock::Clock> cpudiv16,
+                         fidl::ClientEnd<fuchsia_hardware_clock::Clock> cpuscaler,
+                         fidl::ClientEnd<fuchsia_hardware_power::Device> pwr) {
+  cpuscaler_.Bind(std::move(cpuscaler));
+
+  if (plldiv16.is_valid()) {
+    plldiv16_.Bind(std::move(plldiv16));
+
     fidl::WireResult result = plldiv16_->Enable();
     if (!result.ok()) {
       zxlogf(ERROR, "Failed to send request to enable plldiv16: %s", result.status_string());
@@ -375,7 +264,9 @@ zx_status_t AmlCpu::Init() {
     }
   }
 
-  if (cpudiv16_.is_valid()) {
+  if (cpudiv16.is_valid()) {
+    cpudiv16_.Bind(std::move(cpudiv16));
+
     fidl::WireResult result = cpudiv16_->Enable();
     if (!result.ok()) {
       zxlogf(ERROR, "Failed to send request to enable cpudiv16: %s", result.status_string());
@@ -387,7 +278,9 @@ zx_status_t AmlCpu::Init() {
     }
   }
 
-  if (pwr_.is_valid()) {
+  if (pwr.is_valid()) {
+    pwr_.Bind(std::move(pwr));
+
     fidl::WireResult voltage_range_result = pwr_->GetSupportedVoltageRange();
     if (!voltage_range_result.ok()) {
       zxlogf(ERROR, "Failed to send GetSupportedVoltageRange request: %s",
@@ -423,62 +316,17 @@ zx_status_t AmlCpu::Init() {
   zx_status_t result = SetPerformanceStateInternal(kInitialPstate, &actual);
 
   if (result != ZX_OK) {
-    zxlogf(ERROR, "%s: Failed to set initial performance state, st = %d", __func__, result);
+    zxlogf(ERROR, "Failed to set initial performance state, st = %d", result);
     return result;
   }
 
   if (actual != kInitialPstate) {
-    zxlogf(ERROR, "%s: Failed to set initial performance state, requested = %u, actual = %u",
-           __func__, kInitialPstate, actual);
+    zxlogf(ERROR, "Failed to set initial performance state, requested = %u, actual = %u",
+           kInitialPstate, actual);
     return ZX_ERR_INTERNAL;
   }
 
   return ZX_OK;
-}
-
-zx_status_t AmlCpu::DdkConfigureAutoSuspend(bool enable, uint8_t requested_sleep_state) {
-  return ZX_ERR_NOT_SUPPORTED;
-}
-
-void AmlCpu::GetPerformanceStateInfo(GetPerformanceStateInfoRequestView request,
-                                     GetPerformanceStateInfoCompleter::Sync& completer) {
-  if (request->state >= operating_points_.size()) {
-    zxlogf(INFO, "%s: Requested an operating point that's out of bounds, %u\n", __func__,
-           request->state);
-    completer.ReplyError(ZX_ERR_OUT_OF_RANGE);
-    return;
-  }
-
-  fuchsia_cpuctrl::wire::CpuPerformanceStateInfo result;
-  result.frequency_hz = operating_points_[request->state].freq_hz;
-  result.voltage_uv = operating_points_[request->state].volt_uv;
-
-  completer.ReplySuccess(result);
-}
-
-void AmlCpu::SetPerformanceState(SetPerformanceStateRequestView request,
-                                 SetPerformanceStateCompleter::Sync& completer) {
-  uint32_t out_state = 0;
-  zx_status_t status = SetPerformanceStateInternal(request->requested_state, &out_state);
-  if (status != ZX_OK) {
-    completer.ReplyError(status);
-  }
-  completer.ReplySuccess(out_state);
-}
-
-void AmlCpu::GetCurrentPerformanceState(GetCurrentPerformanceStateCompleter::Sync& completer) {
-  std::scoped_lock lock(lock_);
-  completer.Reply(current_pstate_);
-}
-
-void AmlCpu::GetNumLogicalCores(GetNumLogicalCoresCompleter::Sync& completer) {
-  completer.Reply(core_count_);
-}
-
-void AmlCpu::GetLogicalCoreId(GetLogicalCoreIdRequestView request,
-                              GetLogicalCoreIdCompleter::Sync& completer) {
-  // Placeholder.
-  completer.Reply(0);
 }
 
 void AmlCpu::SetCpuInfo(uint32_t cpu_version_packed) {
@@ -494,15 +342,45 @@ void AmlCpu::SetCpuInfo(uint32_t cpu_version_packed) {
   cpu_info_.CreateUint("cpu_package_id", cpu_package_id, &inspector_);
 }
 
+void AmlCpu::GetPerformanceStateInfo(GetPerformanceStateInfoRequestView request,
+                                     GetPerformanceStateInfoCompleter::Sync& completer) {
+  auto operating_points = GetOperatingPoints();
+  if (request->state >= operating_points.size()) {
+    zxlogf(INFO, "Requested an operating point that's out of bounds, %u\n", request->state);
+    completer.ReplyError(ZX_ERR_OUT_OF_RANGE);
+    return;
+  }
+
+  fuchsia_hardware_cpu_ctrl::wire::CpuPerformanceStateInfo result;
+  result.frequency_hz = operating_points[request->state].freq_hz;
+  result.voltage_uv = operating_points[request->state].volt_uv;
+
+  completer.ReplySuccess(result);
+}
+
+void AmlCpu::SetPerformanceState(SetPerformanceStateRequestView request,
+                                 SetPerformanceStateCompleter::Sync& completer) {
+  uint32_t out_state = 0;
+  zx_status_t status = SetPerformanceStateInternal(request->requested_state, &out_state);
+  if (status != ZX_OK) {
+    completer.ReplyError(status);
+  } else {
+    completer.ReplySuccess(out_state);
+  }
+}
+
+void AmlCpu::GetCurrentPerformanceState(GetCurrentPerformanceStateCompleter::Sync& completer) {
+  completer.Reply(GetCurrentPState());
+}
+
+void AmlCpu::GetNumLogicalCores(GetNumLogicalCoresCompleter::Sync& completer) {
+  completer.Reply(GetCoreCount());
+}
+
+void AmlCpu::GetLogicalCoreId(GetLogicalCoreIdRequestView request,
+                              GetLogicalCoreIdCompleter::Sync& completer) {
+  // Placeholder.
+  completer.Reply(0);
+}
+
 }  // namespace amlogic_cpu
-
-static constexpr zx_driver_ops_t aml_cpu_driver_ops = []() {
-  zx_driver_ops_t result = {};
-  result.version = DRIVER_OPS_VERSION;
-  result.bind = amlogic_cpu::AmlCpu::Create;
-  return result;
-}();
-
-// clang-format off
-ZIRCON_DRIVER(aml_cpu, aml_cpu_driver_ops, "zircon", "0.1");
-

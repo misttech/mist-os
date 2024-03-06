@@ -21,16 +21,23 @@ driver_bind_rules("aml-cpu-bind") {
   ]
 }
 
+config("dfv1") {
+  defines = [ "DFV1" ]
+}
+
 fuchsia_driver("aml-cpu-driver") {
   output_name = "aml-cpu"
   configs += [
+    ":dfv1",
     "//build/config:all_source",
     "//build/config/fuchsia:enable_zircon_asserts",
   ]
-  sources = [ "aml-cpu.cc" ]
+  sources = [
+    "aml-cpu-v1.cc",
+    "aml-cpu.cc",
+  ]
   deps = [
     ":aml-cpu-bind",
-    "//sdk/banjo/fuchsia.hardware.thermal:fuchsia.hardware.thermal_banjo_cpp",
     "//sdk/fidl/fuchsia.device:fuchsia.device_cpp",
     "//sdk/fidl/fuchsia.hardware.clock:fuchsia.hardware.clock_cpp",
     "//sdk/fidl/fuchsia.hardware.cpu.ctrl:fuchsia.hardware.cpu.ctrl_cpp",
@@ -63,8 +70,10 @@ fuchsia_driver_package("package") {
 }
 
 test("aml-cpu-test-bin") {
+  configs += [ ":dfv1" ]
   sources = [
     "aml-cpu-test.cc",
+    "aml-cpu-v1.cc",
     "aml-cpu.cc",
   ]
   output_name = "aml-cpu-test"

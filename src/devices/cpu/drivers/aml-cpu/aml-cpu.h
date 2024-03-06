@@ -9,57 +9,73 @@
 #include <fidl/fuchsia.hardware.clock/cpp/wire.h>
 #include <fidl/fuchsia.hardware.cpu.ctrl/cpp/wire.h>
 #include <fidl/fuchsia.hardware.power/cpp/wire.h>
+#include <lib/device-protocol/pdev-fidl.h>
 #include <lib/inspect/cpp/inspector.h>
 
 #include <mutex>
-#include <optional>
 #include <vector>
 
-#include <ddktl/device.h>
-#include <ddktl/protocol/empty-protocol.h>
 #include <fbl/macros.h>
 #include <soc/aml-common/aml-cpu-metadata.h>
 
 namespace amlogic_cpu {
 
-namespace fuchsia_cpuctrl = fuchsia_hardware_cpu_ctrl;
+// Fragments are provided to this driver in groups of 4. Fragments are provided as follows:
+// [4 fragments for cluster 0]
+// [4 fragments for cluster 1]
+// [...]
+// [4 fragments for cluster n]
+// Each fragment is a combination of the fixed string + id.
+constexpr size_t kFragmentsPerPfDomain = 4;
+constexpr size_t kFragmentsPerPfDomainA5 = 2;
+constexpr size_t kFragmentsPerPfDomainA1 = 1;
 
-class AmlCpu;
-using DeviceType =
-    ddk::Device<AmlCpu, ddk::Messageable<fuchsia_cpuctrl::Device>::Mixin, ddk::AutoSuspendable>;
+constexpr zx_off_t kCpuVersionOffset = 0x220;
+constexpr zx_off_t kCpuVersionOffsetA5 = 0x300;
+constexpr zx_off_t kCpuVersionOffsetA1 = 0x220;
 
-class AmlCpu : public DeviceType, public ddk::EmptyProtocol<ZX_PROTOCOL_CPU_CTRL> {
+struct AmlCpuConfiguration {
+  pdev_device_info_t info;
+  uint32_t metadata_type;
+  size_t fragments_per_pf_domain;
+  uint32_t cpu_version_packed;
+
+  bool has_div16_clients;
+  bool has_power_client;
+};
+
+class AmlCpu : public fidl::WireServer<fuchsia_hardware_cpu_ctrl::Device> {
  public:
   DISALLOW_COPY_AND_ASSIGN_ALLOW_MOVE(AmlCpu);
-  explicit AmlCpu(zx_device_t* parent, fidl::ClientEnd<fuchsia_hardware_clock::Clock> plldiv16,
-                  fidl::ClientEnd<fuchsia_hardware_clock::Clock> cpudiv16,
-                  fidl::ClientEnd<fuchsia_hardware_clock::Clock> cpuscaler,
-                  fidl::ClientEnd<fuchsia_hardware_power::Device> pwr,
-                  const std::vector<operating_point_t>& operating_points, const uint32_t core_count)
-      : DeviceType(parent),
-        plldiv16_(std::move(plldiv16)),
-        cpudiv16_(std::move(cpudiv16)),
-        cpuscaler_(std::move(cpuscaler)),
-        pwr_(std::move(pwr)),
-        current_pstate_(
+  explicit AmlCpu(const std::vector<operating_point_t>& operating_points,
+                  const perf_domain_t& perf_domain)
+      : current_pstate_(
             static_cast<uint32_t>(operating_points.size() -
                                   1))  // Assume the core is running at the slowest clock to begin.
         ,
         operating_points_(operating_points),
-        core_count_(core_count) {}
+        perf_domain_(perf_domain) {}
 
-  static zx_status_t Create(void* context, zx_device_t* device);
-
-  static zx_status_t GetPopularVoltageTable(const zx::resource& smc_resource,
-                                            uint32_t* metadata_type);
-
-  zx_status_t Init();
-
-  // Implements DDK Device Ops
-  void DdkRelease();
+  zx_status_t Init(fidl::ClientEnd<fuchsia_hardware_clock::Clock> plldiv16,
+                   fidl::ClientEnd<fuchsia_hardware_clock::Clock> cpudiv16,
+                   fidl::ClientEnd<fuchsia_hardware_clock::Clock> cpuscaler,
+                   fidl::ClientEnd<fuchsia_hardware_power::Device> pwr);
 
   zx_status_t SetPerformanceStateInternal(uint32_t requested_state, uint32_t* out_state);
-  zx_status_t DdkConfigureAutoSuspend(bool enable, uint8_t requested_sleep_state);
+
+  // Set CpuInfo in inspect.
+  void SetCpuInfo(uint32_t cpu_version_packed);
+
+  uint32_t GetCurrentPState() {
+    std::scoped_lock lock(lock_);
+    return current_pstate_;
+  }
+
+  const std::vector<operating_point_t>& GetOperatingPoints() { return operating_points_; }
+
+  uint32_t GetCoreCount() const { return perf_domain_.core_count; }
+  PerfDomainId GetDomainId() const { return perf_domain_.id; }
+  const char* GetName() const { return perf_domain_.name; }
 
   // Fidl server interface implementation.
   void GetPerformanceStateInfo(GetPerformanceStateInfoRequestView request,
@@ -71,10 +87,6 @@ class AmlCpu : public DeviceType, public ddk::EmptyProtocol<ZX_PROTOCOL_CPU_CTRL
   void GetLogicalCoreId(GetLogicalCoreIdRequestView request,
                         GetLogicalCoreIdCompleter::Sync& completer) override;
 
-  // Set CpuInfo in inspect.
-  void SetCpuInfo(uint32_t cpu_version_packed);
-
- protected:
   inspect::Inspector inspector_;
   inspect::Node cpu_info_ = inspector_.GetRoot().CreateChild("cpu_info_service");
 
@@ -90,8 +102,13 @@ class AmlCpu : public DeviceType, public ddk::EmptyProtocol<ZX_PROTOCOL_CPU_CTRL
   uint32_t current_pstate_ __TA_GUARDED(lock_);
   const std::vector<operating_point_t> operating_points_;
 
-  const uint32_t core_count_;
+  perf_domain_t perf_domain_;
 };
+
+std::vector<operating_point_t> PerformanceDomainOpPoints(const perf_domain_t& perf_domain,
+                                                         std::vector<operating_point>& op_points);
+zx_status_t GetPopularVoltageTable(const zx::resource& smc_resource, uint32_t* metadata_type);
+zx::result<AmlCpuConfiguration> LoadConfiguration(ddk::PDevFidl& pdev);
 
 }  // namespace amlogic_cpu
 
