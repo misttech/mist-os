@@ -242,7 +242,7 @@ zx::result<> DsiHost::PerformPowerOpSequence(cpp20::span<const PowerOp> commands
   return zx::ok();
 }
 
-zx::result<> DsiHost::ConfigureDsiHostController() {
+zx::result<> DsiHost::ConfigureDsiHostController(int64_t d_phy_data_lane_bitrate_bits_per_second) {
   // Setup relevant TOP_CNTL register -- Undocumented --
   mipi_dsi_top_mmio_.Write32(
       SetFieldValue32(mipi_dsi_top_mmio_.Read32(MIPI_DSI_TOP_CNTL), TOP_CNTL_DPI_CLR_MODE_START,
@@ -273,7 +273,7 @@ zx::result<> DsiHost::ConfigureDsiHostController() {
   dw_cfg.auto_clklane = 1;
   dsi_cfg.vendor_config_buffer = reinterpret_cast<uint8_t*>(&dw_cfg);
 
-  designware_dsi_host_controller_->Config(&dsi_cfg);
+  designware_dsi_host_controller_->Config(&dsi_cfg, d_phy_data_lane_bitrate_bits_per_second);
 
   return zx::ok();
 }
@@ -363,7 +363,8 @@ zx::result<> DsiHost::Enable(int64_t dphy_data_lane_bits_per_second) {
 
     // Initialize host in command mode first
     designware_dsi_host_controller_->SetMode(DSI_MODE_COMMAND);
-    zx::result<> dsi_host_config_result = ConfigureDsiHostController();
+    zx::result<> dsi_host_config_result =
+        ConfigureDsiHostController(dphy_data_lane_bits_per_second);
     if (!dsi_host_config_result.is_ok()) {
       zxlogf(ERROR, "Failed to configure the MIPI DSI Host Controller: %s",
              dsi_host_config_result.status_string());

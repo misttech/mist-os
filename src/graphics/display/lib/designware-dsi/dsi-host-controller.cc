@@ -7,6 +7,7 @@
 #include <fuchsia/hardware/dsiimpl/c/banjo.h>
 #include <lib/ddk/debug.h>
 #include <lib/mmio/mmio-buffer.h>
+#include <zircon/assert.h>
 #include <zircon/status.h>
 #include <zircon/types.h>
 
@@ -45,6 +46,35 @@ constexpr uint32_t kBitPldWEmpty = 2;
 constexpr uint32_t kBitCmdFull = 1;
 constexpr uint32_t kBitCmdEmpty = 0;
 
+// Computes the amount of time it takes to transmit a number of pixels across
+// the DPI interface between the display engine frontend and the DesignWare DSI
+// host controller.
+//
+// The result is expressed in D-PHY lane byte clock cycles, which is the
+// number of bytes that can be transmitted on a D-PHY data lane in High Speed
+// mode.
+//
+// `pixels` must be >= 0 and <= 2^23 - 1.
+//
+// The DPI pixel rate (Hz) must be divisble by the D-PHY data lane byte
+// transmission rate (bytes per second), and the quotient must be >= 1 and
+// <= 256.
+constexpr int32_t DpiPixelToDphyLaneByteClockCycle(int32_t pixels, int64_t dpi_pixel_rate_hz,
+                                                   int64_t dphy_data_lane_bytes_per_second) {
+  ZX_DEBUG_ASSERT(pixels >= 0);
+  ZX_DEBUG_ASSERT(pixels <= (1 << 23) - 1);
+
+  ZX_DEBUG_ASSERT(dphy_data_lane_bytes_per_second % dpi_pixel_rate_hz == 0);
+  int64_t dphy_data_lane_byte_rate_to_dpi_pixel_rate_ratio_i64 =
+      dphy_data_lane_bytes_per_second / dpi_pixel_rate_hz;
+  ZX_DEBUG_ASSERT(dphy_data_lane_byte_rate_to_dpi_pixel_rate_ratio_i64 >= 1);
+  ZX_DEBUG_ASSERT(dphy_data_lane_byte_rate_to_dpi_pixel_rate_ratio_i64 <= 256);
+
+  int32_t dphy_data_lane_byte_rate_to_dpi_pixel_rate_ratio =
+      static_cast<int32_t>(dphy_data_lane_byte_rate_to_dpi_pixel_rate_ratio_i64);
+  return pixels * dphy_data_lane_byte_rate_to_dpi_pixel_rate_ratio;
+}
+
 }  // namespace
 
 DsiHostController::DsiHostController(fdf::MmioBuffer dsi_mmio) : dsi_mmio_(std::move(dsi_mmio)) {}
@@ -59,6 +89,8 @@ zx_status_t DsiHostController::GetColorCode(color_code_t c, bool& packed, uint8_
     case COLOR_CODE_PACKED_18BIT_666:
       packed = true;
       code = 3;
+      // Converts the duration of transmitting `pixels` on the DPI interface to
+      // lane byte clock cycles (number of lane byte clock periods),
       break;
     case COLOR_CODE_LOOSE_24BIT_666:
       packed = false;
@@ -169,10 +201,14 @@ void DsiHostController::SetMode(dsi_mode_t mode) {
   DsiDwModeCfgReg::Get().ReadFrom(&dsi_mmio_).set_cmd_video_mode(mode).WriteTo(&dsi_mmio_);
 }
 
-zx_status_t DsiHostController::Config(const dsi_config_t* dsi_config) {
+zx_status_t DsiHostController::Config(const dsi_config_t* dsi_config,
+                                      int64_t dphy_data_lane_bits_per_second) {
   const display_setting_t disp_setting = dsi_config->display_setting;
   const designware_config_t dw_cfg =
       *(reinterpret_cast<designware_config_t*>(dsi_config->vendor_config_buffer));
+
+  static constexpr int kBitsPerByte = 8;
+  const int64_t dphy_data_lane_bytes_per_second = dphy_data_lane_bits_per_second / kBitsPerByte;
 
   bool packed;
   uint8_t code;
@@ -276,20 +312,32 @@ zx_status_t DsiHostController::Config(const dsi_config_t* dsi_config) {
   DsiDwVidNullSizeReg::Get().FromValue(0).set_reg_value(0).WriteTo(&dsi_mmio_);
 
   // 4 Configure the video relative parameters according to the output type
+  const int64_t pixel_clock_frequency_hz = disp_setting.lcd_clock;
 
+  const int32_t horizontal_sync_width_pixels = static_cast<int32_t>(disp_setting.hsync_width);
+  const int32_t horizontal_sync_width_duration_lane_byte_clock_cycles =
+      DpiPixelToDphyLaneByteClockCycle(horizontal_sync_width_pixels, pixel_clock_frequency_hz,
+                                       dphy_data_lane_bytes_per_second);
   DsiDwVidHsaTimeReg::Get()
       .ReadFrom(&dsi_mmio_)
-      .set_vid_hsa_time(disp_setting.hsync_width)
+      .set_vid_hsa_time(horizontal_sync_width_duration_lane_byte_clock_cycles)
       .WriteTo(&dsi_mmio_);
 
+  const int32_t horizontal_back_porch_pixels = static_cast<int32_t>(disp_setting.hsync_bp);
+  const int32_t horizontal_back_porch_duration_lane_byte_clock_cycles =
+      DpiPixelToDphyLaneByteClockCycle(horizontal_back_porch_pixels, pixel_clock_frequency_hz,
+                                       dphy_data_lane_bytes_per_second);
   DsiDwVidHbpTimeReg::Get()
       .ReadFrom(&dsi_mmio_)
-      .set_vid_hbp_time(disp_setting.hsync_bp)
+      .set_vid_hbp_time(horizontal_back_porch_duration_lane_byte_clock_cycles)
       .WriteTo(&dsi_mmio_);
 
+  const int32_t horizontal_total_pixels = static_cast<int32_t>(disp_setting.h_period);
+  const int32_t horizontal_total_duration_lane_byte_clock_cycles = DpiPixelToDphyLaneByteClockCycle(
+      horizontal_total_pixels, pixel_clock_frequency_hz, dphy_data_lane_bytes_per_second);
   DsiDwVidHlineTimeReg::Get()
       .ReadFrom(&dsi_mmio_)
-      .set_vid_hline_time(disp_setting.h_period)
+      .set_vid_hline_time(horizontal_total_duration_lane_byte_clock_cycles)
       .WriteTo(&dsi_mmio_);
 
   DsiDwVidVsaLinesReg::Get()

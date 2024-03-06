@@ -20,7 +20,7 @@ class DsiHostController {
  public:
   explicit DsiHostController(fdf::MmioBuffer dsi_mmio);
 
-  zx_status_t Config(const dsi_config_t* dsi_config);
+  zx_status_t Config(const dsi_config_t* dsi_config, int64_t dphy_data_lane_bits_per_second);
   void PowerUp();
   void PowerDown();
   void SetMode(dsi_mode_t mode);

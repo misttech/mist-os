@@ -71,6 +71,9 @@ class DsiHost {
   // The DesignWare setup could technically be moved to the dw_mipi_dsi driver. However,
   // given the highly configurable nature of this block, we'd have to provide a lot of
   // information to the generic driver. Therefore, it's just simpler to configure it here
+  //
+  // `dphy_data_lane_bits_per_second` is the bit transmission rate on each
+  // D-PHY data lane.
   zx::result<> Enable(int64_t dphy_data_lane_bits_per_second);
 
   // This function will turn off DSI Host. It is a "best-effort" function. We will attempt
@@ -87,7 +90,10 @@ class DsiHost {
 
   // Configures the MIPI DSI Host controller (transmitter) hardware for video
   // data transmission.
-  zx::result<> ConfigureDsiHostController();
+  //
+  // `dphy_data_lane_bits_per_second` is the bit transmission rate on each
+  // D-PHY data lane.
+  zx::result<> ConfigureDsiHostController(int64_t dphy_data_lane_bits_per_second);
 
   // Performs the Amlogic-specific power operation sequence.
   //
