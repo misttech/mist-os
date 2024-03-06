@@ -7,8 +7,8 @@
 
 #include <memory>
 #include <string>
+#include <vector>
 
-#include "lib/fit/function.h"
 #include "sdk/lib/syslog/cpp/macros.h"
 #include "src/lib/analytics/cpp/core_dev_tools/analytics_internal.h"
 #include "src/lib/analytics/cpp/core_dev_tools/analytics_messages.h"
@@ -18,7 +18,6 @@
 #include "src/lib/analytics/cpp/core_dev_tools/ga4_common_events.h"
 #include "src/lib/analytics/cpp/core_dev_tools/google_analytics_4_client.h"
 #include "src/lib/analytics/cpp/core_dev_tools/persistent_status.h"
-#include "src/lib/analytics/cpp/core_dev_tools/system_info.h"
 #include "src/lib/analytics/cpp/google_analytics_4/testing_client.h"
 #include "src/lib/analytics/cpp/metric_properties/metric_properties.h"
 
@@ -133,6 +132,25 @@ class Analytics {
     }
   }
 
+  static void IfEnabledSendGa4Events(
+      std::vector<std::unique_ptr<google_analytics_4::Event>> events) {
+    if (CanSend()) {
+      client_ga4_->AddEvents(std::move(events));
+    }
+  }
+
+  static void IfEnabledAddGa4EventToDefaultBatch(std::unique_ptr<google_analytics_4::Event> event) {
+    if (CanSend()) {
+      client_ga4_->AddEventToDefaultBatch(std::move(event));
+    }
+  }
+
+  static void IfEnabledSendDefaultBatch() {
+    if (CanSend()) {
+      client_ga4_->SendDefaultBatch();
+    }
+  }
+
   static void CleanUp() {
     delete client_ga4_;
     client_ga4_ = nullptr;
@@ -156,6 +174,19 @@ class Analytics {
       }
       client_ga4_->AddEvent(std::move(event));
     }
+  }
+
+  static bool CanSend() {
+    if (!IsEnabled()) {
+      return false;
+    }
+    if (!client_is_cleaned_up_) {
+      if (!client_ga4_) {
+        CreateAndPrepareGa4Client();
+      }
+      return true;
+    }
+    return false;
   }
 
   static bool ClientIsCleanedUp() { return client_is_cleaned_up_; }
