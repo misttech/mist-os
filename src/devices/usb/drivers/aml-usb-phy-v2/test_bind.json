@@ -3,8 +3,8 @@
         "node": "pdev",
         "tests": [
             {
-                "name": "Match",
-                "expected": "match",
+                "name": "Fail",
+                "expected": "abort",
                 "device": {
                     "fuchsia.BIND_PLATFORM_DEV_VID": "fuchsia.amlogic.platform.BIND_PLATFORM_DEV_VID.AMLOGIC",
                     "fuchsia.BIND_PROTOCOL": "fuchsia.platform.BIND_PROTOCOL.DEVICE",

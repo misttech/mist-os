@@ -17,11 +17,13 @@
 
 #include <bind/fuchsia/amlogic/platform/cpp/bind.h>
 #include <bind/fuchsia/cpp/bind.h>
+#include <bind/fuchsia/hardware/usb/phy/cpp/bind.h>
 #include <bind/fuchsia/platform/cpp/bind.h>
 #include <bind/fuchsia/register/cpp/bind.h>
 #include <bind/fuchsia/usb/phy/cpp/bind.h>
 #include <ddk/usb-peripheral-config.h>
 #include <soc/aml-common/aml-registers.h>
+#include <soc/aml-common/aml-usb-phy.h>
 #include <soc/aml-s905d2/s905d2-hw.h>
 #include <usb/cdc.h>
 #include <usb/dwc2/metadata.h>
@@ -161,6 +163,12 @@ static const std::vector<fpbus::Irq> usb_phy_irqs{
 static const uint32_t pll_settings[] = {
     0x09400414, 0x927E0000, 0xac5f49e5, 0xfe18, 0xfff, 0x78000, 0xe0004, 0xe000c,
 };
+static const PhyType type = kG12A;
+
+static const std::vector<UsbPhyMode> phy_modes = {
+    {UsbProtocol::Usb2_0, USB_MODE_HOST, false},
+    {UsbProtocol::Usb2_0, USB_MODE_PERIPHERAL, true},
+};
 
 static const std::vector<fpbus::Metadata> usb_phy_metadata{
     {{
@@ -169,11 +177,23 @@ static const std::vector<fpbus::Metadata> usb_phy_metadata{
             reinterpret_cast<const uint8_t*>(&pll_settings),
             reinterpret_cast<const uint8_t*>(&pll_settings) + sizeof(pll_settings)),
     }},
+    {{
+        .type = DEVICE_METADATA_PRIVATE_PHY_TYPE | DEVICE_METADATA_PRIVATE,
+        .data = std::vector<uint8_t>(reinterpret_cast<const uint8_t*>(&type),
+                                     reinterpret_cast<const uint8_t*>(&type) + sizeof(type)),
+    }},
+    {{
+        .type = DEVICE_METADATA_USB_MODE,
+        .data = std::vector<uint8_t>(reinterpret_cast<const uint8_t*>(phy_modes.data()),
+                                     reinterpret_cast<const uint8_t*>(phy_modes.data()) +
+                                         phy_modes.size() * sizeof(UsbPhyMode)),
+    }},
 };
 
 static const fpbus::Node usb_phy_dev = []() {
   fpbus::Node dev = {};
-  dev.name() = "aml-usb-phy-v2";
+  dev.name() = "aml-usb-phy";
+  dev.pid() = bind_fuchsia_platform::BIND_PLATFORM_DEV_PID_GENERIC;
   dev.vid() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_VID_AMLOGIC;
   dev.did() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_DID_USB_PHY_V2;
   dev.mmio() = usb_phy_mmios;
@@ -202,7 +222,7 @@ zx_status_t AddUsbPhyComposite(fdf::WireSyncClient<fpbus::PlatformBus>& pbus,
   auto result = pbus.buffer(arena)->AddCompositeNodeSpec(
       fidl::ToWire(fidl_arena, usb_phy_dev),
       fidl::ToWire(fidl_arena, fuchsia_driver_framework::CompositeNodeSpec{
-                                   {.name = "aml_usb_phy_v2", .parents = parents}}));
+                                   {.name = "aml_usb_phy", .parents = parents}}));
 
   if (!result.ok()) {
     zxlogf(ERROR, "AddCompositeNodeSpec Usb(usb_phy_dev) request failed: %s",
@@ -234,7 +254,8 @@ zx_status_t AddDwc2Composite(fdf::WireSyncClient<fpbus::PlatformBus>& pbus,
   }();
 
   const std::vector<fdf::BindRule> kDwc2PhyRules = std::vector{
-      fdf::MakeAcceptBindRule(bind_fuchsia::PROTOCOL, bind_fuchsia_usb_phy::BIND_PROTOCOL_DEVICE),
+      fdf::MakeAcceptBindRule(bind_fuchsia_hardware_usb_phy::SERVICE,
+                              bind_fuchsia_hardware_usb_phy::SERVICE_DRIVERTRANSPORT),
       fdf::MakeAcceptBindRule(bind_fuchsia::PLATFORM_DEV_VID,
                               bind_fuchsia_platform::BIND_PLATFORM_DEV_PID_GENERIC),
       fdf::MakeAcceptBindRule(bind_fuchsia::PLATFORM_DEV_PID,
@@ -244,7 +265,14 @@ zx_status_t AddDwc2Composite(fdf::WireSyncClient<fpbus::PlatformBus>& pbus,
   };
 
   const std::vector<fdf::NodeProperty> kDwc2PhyProperties = std::vector{
-      fdf::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_usb_phy::BIND_PROTOCOL_DEVICE),
+      fdf::MakeProperty(bind_fuchsia_hardware_usb_phy::SERVICE,
+                        bind_fuchsia_hardware_usb_phy::SERVICE_DRIVERTRANSPORT),
+      fdf::MakeProperty(bind_fuchsia::PLATFORM_DEV_VID,
+                        bind_fuchsia_platform::BIND_PLATFORM_DEV_PID_GENERIC),
+      fdf::MakeProperty(bind_fuchsia::PLATFORM_DEV_PID,
+                        bind_fuchsia_platform::BIND_PLATFORM_DEV_PID_GENERIC),
+      fdf::MakeProperty(bind_fuchsia::PLATFORM_DEV_DID,
+                        bind_fuchsia_platform::BIND_PLATFORM_DEV_DID_USB_DWC2),
   };
 
   const std::vector<fdf::ParentSpec> kDwc2Parents{{kDwc2PhyRules, kDwc2PhyProperties}};
@@ -269,7 +297,8 @@ zx_status_t AddDwc2Composite(fdf::WireSyncClient<fpbus::PlatformBus>& pbus,
 zx_status_t AddXhciComposite(fdf::WireSyncClient<fpbus::PlatformBus>& pbus,
                              fidl::AnyArena& fidl_arena, fdf::Arena& arena) {
   const std::vector<fuchsia_driver_framework::BindRule> kXhciCompositeRules = {
-      fdf::MakeAcceptBindRule(bind_fuchsia::PROTOCOL, bind_fuchsia_usb_phy::BIND_PROTOCOL_DEVICE),
+      fdf::MakeAcceptBindRule(bind_fuchsia_hardware_usb_phy::SERVICE,
+                              bind_fuchsia_hardware_usb_phy::SERVICE_DRIVERTRANSPORT),
       fdf::MakeAcceptBindRule(bind_fuchsia::PLATFORM_DEV_VID,
                               bind_fuchsia_platform::BIND_PLATFORM_DEV_PID_GENERIC),
       fdf::MakeAcceptBindRule(bind_fuchsia::PLATFORM_DEV_PID,
@@ -278,7 +307,8 @@ zx_status_t AddXhciComposite(fdf::WireSyncClient<fpbus::PlatformBus>& pbus,
                               bind_fuchsia_platform::BIND_PLATFORM_DEV_DID_XHCI),
   };
   const std::vector<fuchsia_driver_framework::NodeProperty> kXhciCompositeProperties = {
-      fdf::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_usb_phy::BIND_PROTOCOL_DEVICE),
+      fdf::MakeProperty(bind_fuchsia_hardware_usb_phy::SERVICE,
+                        bind_fuchsia_hardware_usb_phy::SERVICE_DRIVERTRANSPORT),
       fdf::MakeProperty(bind_fuchsia::PLATFORM_DEV_VID,
                         bind_fuchsia_platform::BIND_PLATFORM_DEV_PID_GENERIC),
       fdf::MakeProperty(bind_fuchsia::PLATFORM_DEV_PID,

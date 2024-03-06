@@ -22,10 +22,10 @@ node "register-reset" {
   fuchsia.BIND_FIDL_PROTOCOL == fuchsia.register.BIND_FIDL_PROTOCOL.DEVICE;
 }
 
-node "gpio-init" {
+optional node "gpio-init" {
   fuchsia.BIND_INIT_STEP == fuchsia.gpio.BIND_INIT_STEP.GPIO;
 }
 
-node "clock-init" {
+optional node "clock-init" {
   fuchsia.BIND_INIT_STEP == fuchsia.clock.BIND_INIT_STEP.CLOCK;
 }
