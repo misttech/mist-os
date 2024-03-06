@@ -68,8 +68,6 @@
                 "setjmp.setjmp_signal_mask",
                 "setjmp.sigsetjmp_1_signal_mask",
                 "signal.pthread_sigqueue_other",
-                "signal.sigsuspend64_sigpending64",
-                "signal.sigsuspend_sigpending",
                 "spawn.posix_spawn_POSIX_SPAWN_SETSIGDEF",
                 "spawn.posix_spawn_POSIX_SPAWN_SETSIGMASK",
                 "spawn.posix_spawn_dup2_CLOEXEC",

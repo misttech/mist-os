@@ -56,9 +56,9 @@ pub fn dispatch_syscall(
         },
         signals::syscalls::{
             sys_kill, sys_pidfd_send_signal, sys_restart_syscall, sys_rt_sigaction,
-            sys_rt_sigprocmask, sys_rt_sigqueueinfo, sys_rt_sigreturn, sys_rt_sigsuspend,
-            sys_rt_sigtimedwait, sys_rt_tgsigqueueinfo, sys_sigaltstack, sys_signalfd4, sys_tgkill,
-            sys_tkill, sys_wait4, sys_waitid,
+            sys_rt_sigpending, sys_rt_sigprocmask, sys_rt_sigqueueinfo, sys_rt_sigreturn,
+            sys_rt_sigsuspend, sys_rt_sigtimedwait, sys_rt_tgsigqueueinfo, sys_sigaltstack,
+            sys_signalfd4, sys_tgkill, sys_tkill, sys_wait4, sys_waitid,
         },
         syscalls::{
             misc::{
@@ -364,6 +364,7 @@ pub fn dispatch_syscall(
         restart_syscall[0],
         #[cfg(target_arch = "x86_64")] rmdir[1],
         rt_sigaction[4],
+        rt_sigpending[2],
         rt_sigprocmask[4],
         rt_sigqueueinfo[3],
         rt_sigreturn[0],

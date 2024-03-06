@@ -233,6 +233,10 @@ impl SignalState {
         self.queue.iter().filter(move |info| info.signal == signal)
     }
 
+    pub fn pending(&self) -> SigSet {
+        self.queue.iter().fold(SigSet::default(), |set, signal| set | signal.signal.into())
+    }
+
     /// Tests whether a signal with the given number is in the queue.
     pub fn has_queued(&self, signal: Signal) -> bool {
         self.iter_queued_by_number(signal).next().is_some()

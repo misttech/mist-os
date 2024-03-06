@@ -84,6 +84,21 @@ pub fn sys_rt_sigaction(
     Ok(())
 }
 
+pub fn sys_rt_sigpending(
+    _locked: &mut Locked<'_, Unlocked>,
+    current_task: &CurrentTask,
+    set: UserRef<SigSet>,
+    sigset_size: usize,
+) -> Result<(), Errno> {
+    if sigset_size != std::mem::size_of::<SigSet>() {
+        return error!(EINVAL);
+    }
+
+    let signals = current_task.read().signals.pending();
+    current_task.write_object(set, &signals)?;
+    Ok(())
+}
+
 pub fn sys_rt_sigprocmask(
     _locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
