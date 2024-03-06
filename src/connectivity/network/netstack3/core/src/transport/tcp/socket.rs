@@ -7797,8 +7797,6 @@ mod tests {
     #[ip_test]
     fn conn_addr_not_available<I: Ip + TcpTestIpExt + IcmpIpExt>()
     where
-        TcpCoreCtx<FakeDeviceId, TcpBindingsCtx<FakeDeviceId>>:
-            TcpContext<I, TcpBindingsCtx<FakeDeviceId>>,
         TcpCoreCtx<FakeDeviceId, TcpBindingsCtx<FakeDeviceId>>: TcpContext<
             I,
             TcpBindingsCtx<FakeDeviceId>,
