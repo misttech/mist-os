@@ -1,9 +1,4 @@
-include /src/devices/driver_framework/OWNERS
-
 andresoportus@google.com
-bradenkell@google.com
 cja@google.com
-curtisgalloway@google.com
-gkalsi@google.com
-hanbinyoon@google.com
-hansens@google.com
+spqchan@google.com
+surajmalhotra@google.com
