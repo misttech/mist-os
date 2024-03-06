@@ -6,8 +6,6 @@
 //!
 //! This module simply publishes implementations in child modules.
 
-mod core;
 mod stream;
 
-pub use core::{Progress, StallDetector, Unbind};
 pub use stream::{until_stalled, StallableRequestStream};

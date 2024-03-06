@@ -4,17 +4,19 @@
 
 //! Support for running FIDL request streams until stalled.
 
-use fidl::endpoints::{RequestStream, ServerEnd};
+use fidl::endpoints::RequestStream;
+use fuchsia_async as fasync;
 use fuchsia_zircon as zx;
-use futures::{stream::FusedStream, Future, FutureExt, Stream, StreamExt};
+use futures::{
+    channel::oneshot::{self, Receiver},
+    ready, FutureExt, Stream, StreamExt,
+};
 use std::{
     pin::Pin,
     sync::Arc,
     task::{Context, Poll},
 };
 use zx::Duration;
-
-use super::{Progress, StallDetector, Unbind};
 
 /// [`until_stalled`] wraps a FIDL request stream of type [`RS`] into another
 /// stream yielding the same requests, but could complete prematurely if it
@@ -28,122 +30,78 @@ use super::{Progress, StallDetector, Unbind};
 /// will complete with the server endpoint which has been unbound from the
 /// stream. The returned future will also complete if the request stream ended
 /// on its own without stalling.
-pub fn until_stalled<RS>(
+pub fn until_stalled<RS: RequestStream>(
     request_stream: RS,
     debounce_interval: Duration,
-) -> (
-    impl Stream<Item = <RS as Stream>::Item> + Unpin + FusedStream,
-    impl Future<Output = Option<ServerEnd<<RS as RequestStream>::Protocol>>>,
-)
-where
-    RS: Unpin + FusedStream + RequestStream + Stream,
-{
-    let (detector, progress) = StallDetector::new(debounce_interval);
-    let stream = StallableRequestStream::new(request_stream, progress);
-    (stream.fuse(), detector.wait().map(|option| option.map(Into::into)))
+) -> (impl Stream<Item = <RS as Stream>::Item>, Receiver<Option<zx::Channel>>) {
+    let (sender, receiver) = oneshot::channel();
+    let stream = StallableRequestStream::new(request_stream, debounce_interval, move |channel| {
+        let _ = sender.send(channel);
+    });
+    (stream, receiver)
 }
 
 /// The stream returned from [`until_stalled`].
-pub struct StallableRequestStream<RS> {
-    inner: State<RS>,
-    progress: Progress<NoPendingReply>,
+pub struct StallableRequestStream<RS, F> {
+    stream: Option<RS>,
+    debounce_interval: Duration,
+    unbind_callback: Option<F>,
+    timer: Option<fasync::Timer>,
 }
 
-impl<RS> StallableRequestStream<RS> {
-    /// Creates a new stallable request stream that reports progress via `progress`.
-    pub fn new(stream: RS, progress: Progress<NoPendingReply>) -> Self {
-        Self { inner: State::Active(ActiveRequestStream(stream)), progress }
-    }
-}
-
-enum State<RS> {
-    Active(ActiveRequestStream<RS>),
-    Stalled,
-}
-
-struct ActiveRequestStream<RS>(RS);
-
-impl<RS> ActiveRequestStream<RS>
-where
-    RS: Unpin + FusedStream + RequestStream + Stream,
-{
-    fn try_into_inner(self) -> Result<NoPendingReply, Self> {
-        // Note: we're relying on the fact that `RequestStream::into_inner` is
-        // purely moving data, and does not cancel notifications to the executor.
-        // This can be improved with better FIDL integrations.
-        let (inner, is_terminated) = self.0.into_inner();
-        match Arc::try_unwrap(inner) {
-            Ok(inner) => Ok(NoPendingReply { inner, is_terminated }),
-            Err(this) => return Err(Self(RS::from_inner(this, is_terminated))),
+impl<RS, F> StallableRequestStream<RS, F> {
+    /// Creates a new stallable request stream that will send the channel via `unbind_callback` when
+    /// stream is stalled.
+    pub fn new(stream: RS, debounce_interval: Duration, unbind_callback: F) -> Self {
+        Self {
+            stream: Some(stream),
+            debounce_interval,
+            unbind_callback: Some(unbind_callback),
+            timer: None,
         }
     }
-
-    fn from_inner(no_pending_reply: NoPendingReply) -> Self {
-        Self(RS::from_inner(Arc::new(no_pending_reply.inner), no_pending_reply.is_terminated))
-    }
 }
 
-/// A server endpoint that is unbound from a request stream and has no pending replies,
-/// but nonetheless can wake up executors when the underlying channel receives a signal.
-pub struct NoPendingReply {
-    inner: fidl::ServeInner,
-    is_terminated: bool,
-}
-
-impl Unbind for NoPendingReply {
-    type Item = zx::Channel;
-
-    fn unbind(self) -> zx::Channel {
-        self.inner.into_channel().into_zx_channel()
-    }
-}
-
-impl<RS> Stream for StallableRequestStream<RS>
-where
-    RS: Unpin + FusedStream + RequestStream + Stream,
+impl<RS: RequestStream + Unpin, F: FnOnce(Option<zx::Channel>) + Unpin> Stream
+    for StallableRequestStream<RS, F>
 {
     type Item = <RS as Stream>::Item;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        match std::mem::replace(&mut self.inner, State::Stalled) {
-            State::Active(mut stream) => match stream.0.poll_next_unpin(cx) {
-                Poll::Ready(message) => {
-                    self.inner = State::Active(stream);
-                    Poll::Ready(message)
+        match self.stream.as_mut().expect("Stream already resolved").poll_next_unpin(cx) {
+            Poll::Ready(message) => {
+                self.timer = None;
+                if message.is_none() {
+                    self.unbind_callback.take().unwrap()(None);
                 }
-                Poll::Pending => {
-                    match stream.try_into_inner() {
-                        Err(stream) => {
-                            // If there are outstanding responders or control handles, do not
-                            // consider as stalled.
-                            //
-                            // Note: pathological case, if the server always processes the request
-                            // concurrently as it reads more items from the stream, then we may
-                            // never be able to unbind because there's always a pending responder.
-                            // This should be rare if the server handles messages one at a time in
-                            // a loop. If there's a need to unbind those kind of connections,
-                            // we'll need to teach the FIDL bindings to wake us when the last
-                            // pending responder is dropped. Note^2: the above case doesn't happen
-                            // if one uses `for_each_concurrent` and responds inline, because the
-                            // resulting future will always poll the stream whenever the resulting
-                            // future is polled.
-                            self.inner = State::Active(stream);
+                Poll::Ready(message)
+            }
+            Poll::Pending => {
+                let debounce_interval = self.debounce_interval;
+                loop {
+                    let timer =
+                        self.timer.get_or_insert_with(|| fasync::Timer::new(debounce_interval));
+                    ready!(timer.poll_unpin(cx));
+                    self.timer = None;
+
+                    // Try and unbind, which will fail if there are outstanding responders or
+                    // control handles.
+                    let (inner, is_terminated) = self.stream.take().unwrap().into_inner();
+                    match Arc::try_unwrap(inner) {
+                        Ok(inner) => {
+                            self.unbind_callback.take().unwrap()(Some(
+                                inner.into_channel().into_zx_channel(),
+                            ));
+                            return Poll::Ready(None);
                         }
-                        Ok(no_pending_reply) => {
-                            self.inner = State::Stalled;
-                            self.progress.stalled(no_pending_reply, cx);
+                        Err(inner) => {
+                            // We can't unbind because there are outstanding responders or control
+                            // handles, so we'll try again after another debounce interval.
+                            self.stream = Some(RS::from_inner(inner, is_terminated));
                         }
                     }
-                    Poll::Pending
                 }
-            },
-            State::Stalled => match self.progress.resume() {
-                Some(no_pending_reply) => {
-                    self.inner = State::Active(ActiveRequestStream::from_inner(no_pending_reply));
-                    self.poll_next(cx)
-                }
-                None => Poll::Ready(None),
-            },
+            }
         }
     }
 }
@@ -160,177 +118,97 @@ mod tests {
     use fuchsia_zircon as zx;
     use futures::{pin_mut, TryStreamExt};
 
-    #[test]
-    fn no_message() {
-        let mut exec = fasync::TestExecutor::new_with_fake_time();
-        const START_NANOS: i64 = 1_000_000;
+    #[fuchsia::test(allow_stalls = false)]
+    async fn no_message() {
+        let initial = fasync::Time::from_nanos(0);
+        TestExecutor::advance_to(initial).await;
         const DURATION_NANOS: i64 = 1_000_000;
         let idle_duration = Duration::from_nanos(DURATION_NANOS);
-        let () = exec.set_fake_time(fasync::Time::from_nanos(START_NANOS));
 
         let (_proxy, stream) =
             fidl::endpoints::create_proxy_and_stream::<fio::DirectoryMarker>().unwrap();
         let (mut stream, stalled) = until_stalled(stream, idle_duration);
 
-        pin_mut!(stalled);
-        assert!(exec.run_until_stalled(&mut stalled).is_pending());
-
-        // Poll the stream such that it is stalled.
-        let message = stream.next();
-        pin_mut!(message);
-        assert_matches!(exec.run_until_stalled(&mut message), Poll::Pending);
-
-        // Now the detector should finish.
-        assert!(exec.run_until_stalled(&mut stalled).is_pending());
-        exec.set_fake_time(fasync::Time::after(idle_duration));
-        assert_matches!(exec.run_until_stalled(&mut stalled), Poll::Ready(Some(_)));
-
-        // Now the stream should be finished too, because the channel has been unbound.
-        let message = stream.next();
-        pin_mut!(message);
-        assert_matches!(exec.run_until_stalled(&mut message), Poll::Ready(None));
+        assert_matches!(
+            futures::join!(
+                stream.next(),
+                TestExecutor::advance_to(initial + idle_duration).then(|()| stalled)
+            ),
+            (None, Ok(Some(_)))
+        );
     }
 
-    #[test]
-    fn one_message() {
-        let mut exec = fasync::TestExecutor::new_with_fake_time();
-        const START_NANOS: i64 = 1_000_000;
+    #[fuchsia::test(allow_stalls = false)]
+    async fn one_message() {
+        let initial = fasync::Time::from_nanos(0);
+        TestExecutor::advance_to(initial).await;
         const DURATION_NANOS: i64 = 1_000_000;
         let idle_duration = Duration::from_nanos(DURATION_NANOS);
-        let () = exec.set_fake_time(fasync::Time::from_nanos(START_NANOS));
 
         let (proxy, stream) =
             fidl::endpoints::create_proxy_and_stream::<fio::DirectoryMarker>().unwrap();
         let (mut stream, stalled) = until_stalled(stream, idle_duration);
 
         pin_mut!(stalled);
-        assert!(exec.run_until_stalled(&mut stalled).is_pending());
+        assert_matches!(TestExecutor::poll_until_stalled(&mut stalled).await, Poll::Pending);
 
         let _ = proxy.get_flags();
 
         let message = stream.next();
         pin_mut!(message);
         // Reply to the request so that the stream doesn't have any pending replies.
-        let message = exec.run_until_stalled(&mut message);
+        let message = TestExecutor::poll_until_stalled(&mut message).await;
         let Poll::Ready(Some(Ok(fio::DirectoryRequest::GetFlags { responder }))) = message else {
             panic!("Unexpected {message:?}");
         };
         responder.send(zx::Status::OK.into_raw(), fio::OpenFlags::empty()).unwrap();
 
         // The stream hasn't stalled yet.
-        exec.set_fake_time(fasync::Time::after(idle_duration * 2));
-        assert!(exec.run_until_stalled(&mut stalled).is_pending());
+        TestExecutor::advance_to(initial + idle_duration * 2).await;
+        assert!(TestExecutor::poll_until_stalled(&mut stalled).await.is_pending());
 
         // Poll the stream such that it is stalled.
         let message = stream.next();
         pin_mut!(message);
-        assert_matches!(exec.run_until_stalled(&mut message), Poll::Pending);
+        assert_matches!(TestExecutor::poll_until_stalled(&mut message).await, Poll::Pending);
+        assert_matches!(TestExecutor::poll_until_stalled(&mut stalled).await, Poll::Pending);
 
-        // Now the detector should finish.
-        assert!(exec.run_until_stalled(&mut stalled).is_pending());
-        exec.set_fake_time(fasync::Time::after(idle_duration));
-        assert_matches!(exec.run_until_stalled(&mut stalled), Poll::Ready(Some(_)));
+        TestExecutor::advance_to(initial + idle_duration * 3).await;
 
-        // Now the stream should be finished too, because the channel has been unbound.
-        let message = stream.next();
-        pin_mut!(message);
-        assert_matches!(exec.run_until_stalled(&mut message), Poll::Ready(None));
+        // Now the the stream should be finished, because the channel has been unbound.
+        assert_matches!(message.await, None);
+        assert_matches!(stalled.await, Ok(Some(_)));
     }
 
-    #[test]
-    fn pending_reply_blocks_stalling() {
-        let mut exec = fasync::TestExecutor::new_with_fake_time();
-        const START_NANOS: i64 = 1_000_000;
+    #[fuchsia::test(allow_stalls = false)]
+    async fn completed_stream() {
+        let initial = fasync::Time::from_nanos(0);
+        TestExecutor::advance_to(initial).await;
         const DURATION_NANOS: i64 = 1_000_000;
         let idle_duration = Duration::from_nanos(DURATION_NANOS);
-        let () = exec.set_fake_time(fasync::Time::from_nanos(START_NANOS));
 
         let (proxy, stream) =
             fidl::endpoints::create_proxy_and_stream::<fio::DirectoryMarker>().unwrap();
         let (mut stream, stalled) = until_stalled(stream, idle_duration);
 
         pin_mut!(stalled);
-        assert!(exec.run_until_stalled(&mut stalled).is_pending());
-
-        let _ = proxy.get_flags();
-
-        let message = stream.next();
-        pin_mut!(message);
-        // Do not reply to the request, but hold on to the message, so that there is a
-        // pending reply in the connection.
-        let message_with_pending_reply = exec.run_until_stalled(&mut message);
-        assert_matches!(
-            &message_with_pending_reply,
-            Poll::Ready(Some(Ok(fio::DirectoryRequest::GetFlags { .. })))
-        );
-
-        // The detector hasn't finished yet.
-        exec.set_fake_time(fasync::Time::after(idle_duration * 2));
-        assert!(exec.run_until_stalled(&mut stalled).is_pending());
-
-        // Poll the stream such that it is pending.
-        let message = stream.next();
-        pin_mut!(message);
-        assert_matches!(exec.run_until_stalled(&mut message), Poll::Pending);
-
-        // Now the detector should still not finish, because there is a pending
-        // reply to `GetFlags`.
-        exec.set_fake_time(fasync::Time::after(idle_duration));
-        assert!(exec.run_until_stalled(&mut stalled).is_pending());
-
-        // Now we resolve the pending reply.
-        let Poll::Ready(Some(Ok(fio::DirectoryRequest::GetFlags { responder, .. }))) =
-            message_with_pending_reply
-        else {
-            panic!("Unexpected {message_with_pending_reply:?}");
-        };
-        responder.send(zx::Status::OK.into_raw(), fio::OpenFlags::empty()).unwrap();
-
-        // Run the stream and detector. The detector should now finish.
-        let message = stream.next();
-        pin_mut!(message);
-        assert_matches!(exec.run_until_stalled(&mut message), Poll::Pending);
-
-        assert!(exec.run_until_stalled(&mut stalled).is_pending());
-        exec.set_fake_time(fasync::Time::after(idle_duration));
-        assert_matches!(exec.run_until_stalled(&mut stalled), Poll::Ready(Some(_)));
-    }
-
-    #[test]
-    fn completed_stream() {
-        let mut exec = fasync::TestExecutor::new_with_fake_time();
-        const START_NANOS: i64 = 1_000_000;
-        const DURATION_NANOS: i64 = 1_000_000;
-        let idle_duration = Duration::from_nanos(DURATION_NANOS);
-        let () = exec.set_fake_time(fasync::Time::from_nanos(START_NANOS));
-
-        let (proxy, stream) =
-            fidl::endpoints::create_proxy_and_stream::<fio::DirectoryMarker>().unwrap();
-        let (mut stream, stalled) = until_stalled(stream, idle_duration);
-
-        pin_mut!(stalled);
-        assert!(exec.run_until_stalled(&mut stalled).is_pending());
+        assert_matches!(TestExecutor::poll_until_stalled(&mut stalled).await, Poll::Pending);
 
         // Close the proxy such that the stream completes.
         drop(proxy);
 
         {
             // Read the `None` from the stream.
-            let message = stream.next();
-            pin_mut!(message);
-            assert_matches!(exec.run_until_stalled(&mut message), Poll::Ready(None));
+            assert_matches!(stream.next().await, None);
 
             // In practice the async tasks reading from the stream will exit, thus
             // dropping the stream. We'll emulate that here.
-            drop(message);
             drop(stream);
         }
 
         // Now the future should finish with `None` because the connection has
         // terminated without stalling.
-        assert!(exec.run_until_stalled(&mut stalled).is_pending());
-        exec.set_fake_time(fasync::Time::after(idle_duration));
-        assert_matches!(exec.run_until_stalled(&mut stalled), Poll::Ready(None));
+        assert_matches!(stalled.await, Ok(None));
     }
 
     /// Simulate what would happen when a component serves a FIDL stream that's been
@@ -375,7 +253,6 @@ mod tests {
         deadline += idle_duration;
         TestExecutor::advance_to(deadline).await;
         let server_end = stalled.await;
-        assert!(server_end.is_some());
 
         // Ensure the server task can stop (by observing the completed stream).
         task.await;
@@ -384,7 +261,7 @@ mod tests {
         let client = proxy.into_channel().unwrap().into_zx_channel();
         assert_eq!(
             client.basic_info().unwrap().koid,
-            (*server_end).as_ref().unwrap().basic_info().unwrap().related_koid
+            (*server_end).as_ref().unwrap().as_ref().unwrap().basic_info().unwrap().related_koid
         );
     }
 }
