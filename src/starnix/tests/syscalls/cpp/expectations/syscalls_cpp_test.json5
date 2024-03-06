@@ -38,6 +38,12 @@
 
                 // TODO(https://fxbug.dev/307595538)
                 "SndRcvBufSockOpt/SndRcvBufSockOpt.DoubledOnGet/[01]",
+
+                // TODO(https://fxbug.dev/328270498)
+                "ProcSelfMemProts.CanWriteToPrivateAnonymousMappings/Execute",
+                "ProcSelfMemProts.CanWriteToPrivateAnonymousMappings/None",
+                "ProcSelfMemProts.CanWriteToPrivateAnonymousMappings/Read",
+                "ProcSelfMemProts.CanWriteToPrivateAnonymousMappings/ReadExecute",
             ],
         },
     ],

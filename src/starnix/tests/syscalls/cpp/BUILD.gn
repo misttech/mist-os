@@ -128,6 +128,7 @@ test("syscalls_cpp_test_bin") {
     "poll_test.cc",
     "prctl_test.cc",
     "proc_test.cc",
+    "procfs_mem_test.cc",
     "ptrace_test.cc",
     "read_write_test.cc",
     "restart_read_test.cc",
