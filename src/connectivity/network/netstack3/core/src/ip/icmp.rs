@@ -4092,10 +4092,6 @@ mod tests {
     }
 
     impl IpDeviceStateContext<Ipv6, FakeIcmpBindingsCtx<Ipv6>> for FakeIcmpInnerCoreCtx<Ipv6> {
-        fn with_next_packet_id<O, F: FnOnce(&()) -> O>(&self, cb: F) -> O {
-            cb(&())
-        }
-
         fn get_local_addr_for_remote(
             &mut self,
             _device_id: &Self::DeviceId,

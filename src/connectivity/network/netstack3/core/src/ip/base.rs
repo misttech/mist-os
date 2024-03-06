@@ -8,8 +8,7 @@ use core::{
     cmp::Ordering,
     fmt::Debug,
     hash::Hash,
-    num::{NonZeroU32, NonZeroU8},
-    sync::atomic::{self, AtomicU16},
+    num::{NonZeroU16, NonZeroU32, NonZeroU8},
 };
 
 use const_unwrap::const_unwrap_option;
@@ -36,12 +35,13 @@ use packet_formats::{
     ipv4::{Ipv4FragmentType, Ipv4Packet},
     ipv6::Ipv6Packet,
 };
+use rand::Rng as _;
 use thiserror::Error;
 use tracing::{debug, trace};
 
 use crate::{
     context::{
-        CounterContext, EventContext, InstantContext, NonTestCtxMarker, TimerHandler,
+        CounterContext, EventContext, InstantContext, NonTestCtxMarker, RngContext, TimerHandler,
         TracingContext,
     },
     counters::Counter,
@@ -470,37 +470,19 @@ pub trait IpLayerIpExt: IpExt {
     type State<StrongDeviceId: StrongId, BT: IpLayerBindingsTypes>: AsRef<
         IpStateInner<Self, BT::Instant, StrongDeviceId>,
     >;
-    type PacketIdState;
-    type PacketId;
     type RxCounters: Default + Inspectable;
-    fn next_packet_id_from_state(state: &Self::PacketIdState) -> Self::PacketId;
 }
 
 impl IpLayerIpExt for Ipv4 {
     type AddressStatus = Ipv4PresentAddressStatus;
     type State<StrongDeviceId: StrongId, BT: IpLayerBindingsTypes> = Ipv4State<StrongDeviceId, BT>;
-    type PacketIdState = AtomicU16;
-    type PacketId = u16;
     type RxCounters = Ipv4RxCounters;
-    fn next_packet_id_from_state(next_packet_id: &Self::PacketIdState) -> Self::PacketId {
-        // Relaxed ordering as we only need atomicity without synchronization. See
-        // https://en.cppreference.com/w/cpp/atomic/memory_order#Relaxed_ordering
-        // for more details.
-        //
-        // TODO(https://fxbug.dev/42168725): Generate IPv4 IDs unpredictably
-        next_packet_id.fetch_add(1, atomic::Ordering::Relaxed)
-    }
 }
 
 impl IpLayerIpExt for Ipv6 {
     type AddressStatus = Ipv6PresentAddressStatus;
     type State<StrongDeviceId: StrongId, BT: IpLayerBindingsTypes> = Ipv6State<StrongDeviceId, BT>;
-    type PacketIdState = ();
-    type PacketId = ();
     type RxCounters = Ipv6RxCounters;
-    fn next_packet_id_from_state((): &Self::PacketIdState) -> Self::PacketId {
-        ()
-    }
 }
 
 /// The state context provided to the IP layer.
@@ -530,9 +512,6 @@ pub trait IpStateContext<I: IpLayerIpExt, BC>: DeviceIdContext<AnyDevice> {
 
 /// Provices access to an IP device's state for the IP layer.
 pub trait IpDeviceStateContext<I: IpLayerIpExt, BC>: DeviceIdContext<AnyDevice> {
-    /// Calls the callback with the next packet ID.
-    fn with_next_packet_id<O, F: FnOnce(&I::PacketIdState) -> O>(&self, cb: F) -> O;
-
     /// Returns the best local address for communicating with the remote.
     fn get_local_addr_for_remote(
         &mut self,
@@ -610,13 +589,13 @@ pub enum IpLayerEvent<DeviceId, I: Ip> {
 
 /// The bindings execution context for the IP layer.
 pub trait IpLayerBindingsContext<I: Ip, DeviceId>:
-    InstantContext + EventContext<IpLayerEvent<DeviceId, I>> + TracingContext
+    InstantContext + EventContext<IpLayerEvent<DeviceId, I>> + TracingContext + RngContext
 {
 }
 impl<
         I: Ip,
         DeviceId,
-        BC: InstantContext + EventContext<IpLayerEvent<DeviceId, I>> + TracingContext,
+        BC: InstantContext + EventContext<IpLayerEvent<DeviceId, I>> + TracingContext + RngContext,
     > IpLayerBindingsContext<I, DeviceId> for BC
 {
 }
@@ -1128,7 +1107,6 @@ impl Ipv4StateBuilder {
         Ipv4State {
             inner: Default::default(),
             icmp: icmp.build(),
-            next_packet_id: Default::default(),
             filter: RwLock::new(crate::filter::ValidState::default()),
         }
     }
@@ -1158,7 +1136,6 @@ impl Ipv6StateBuilder {
 pub struct Ipv4State<StrongDeviceId: StrongId, BT: IpLayerBindingsTypes> {
     pub(super) inner: IpStateInner<Ipv4, BT::Instant, StrongDeviceId>,
     pub(super) icmp: Icmpv4State<StrongDeviceId::Weak, BT>,
-    pub(super) next_packet_id: AtomicU16,
     pub(super) filter: RwLock<crate::filter::ValidState<Ipv4, BT::DeviceClass>>,
 }
 
@@ -1184,10 +1161,8 @@ impl<StrongDeviceId: StrongId, BT: IpLayerBindingsTypes>
     }
 }
 
-pub(super) fn gen_ip_packet_id<I: IpLayerIpExt, BC, CC: IpDeviceStateContext<I, BC>>(
-    core_ctx: &mut CC,
-) -> I::PacketId {
-    core_ctx.with_next_packet_id(|state| I::next_packet_id_from_state(state))
+pub(super) fn gen_ipv4_packet_id<BC: RngContext>(bindings_ctx: &mut BC) -> NonZeroU16 {
+    bindings_ctx.rng().gen()
 }
 
 pub struct Ipv6State<StrongDeviceId: StrongId, BT: IpLayerBindingsTypes> {
@@ -1333,17 +1308,6 @@ where
 
     fn lock(&self) -> Self::Guard<'_> {
         self.inner_icmp_state::<I>().error_send_bucket.lock()
-    }
-}
-
-impl<BC: BindingsContext> UnlockedAccess<crate::lock_ordering::Ipv4StateNextPacketId>
-    for StackState<BC>
-{
-    type Data = AtomicU16;
-    type Guard<'l> = &'l AtomicU16 where Self: 'l;
-
-    fn access(&self) -> Self::Guard<'_> {
-        &self.ipv4.next_packet_id
     }
 }
 
@@ -2753,7 +2717,6 @@ where
     S::Buffer: BufferMut,
 {
     let SendIpPacketMeta { device, src_ip, dst_ip, next_hop, proto, ttl, mtu } = meta;
-    let next_packet_id = gen_ip_packet_id(core_ctx);
     let ttl = ttl.unwrap_or_else(|| core_ctx.get_hop_limit(device)).get();
     let src_ip = src_ip.map_or(I::UNSPECIFIED_ADDRESS, |a| a.get());
     assert!(
@@ -2766,15 +2729,14 @@ where
     #[generic_over_ip(I, Ip)]
     struct Wrap<'a, I: IpLayerIpExt> {
         builder: &'a mut I::PacketBuilder,
-        next_packet_id: I::PacketId,
     }
 
     I::map_ip::<_, ()>(
-        Wrap { builder: &mut builder, next_packet_id },
-        |Wrap { builder, next_packet_id }| {
-            builder.id(next_packet_id);
+        Wrap { builder: &mut builder },
+        |Wrap { builder }| {
+            builder.id(gen_ipv4_packet_id(bindings_ctx).get());
         },
-        |Wrap { builder: _, next_packet_id: () }| {
+        |Wrap { builder: _ }| {
             // IPv6 doesn't have packet IDs.
         },
     );
@@ -3247,7 +3209,7 @@ pub(crate) mod testutil {
 #[cfg(test)]
 mod tests {
     use alloc::vec;
-    use core::{num::NonZeroU16, time::Duration};
+    use core::time::Duration;
 
     use ip_test_macro::ip_test;
     use net_types::{
