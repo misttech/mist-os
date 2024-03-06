@@ -2,29 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::Error;
-
-/// Represents the sandboxed package resolver.
-pub struct Resolver {
-    _pkg_resolver_proxy: fidl_fuchsia_pkg::PackageResolverProxy,
-}
-
-impl Resolver {
-    pub fn new_with_proxy(
-        pkg_resolver_proxy: fidl_fuchsia_pkg::PackageResolverProxy,
-    ) -> Result<Self, Error> {
-        Ok(Self { _pkg_resolver_proxy: pkg_resolver_proxy })
-    }
-}
-
 #[cfg(test)]
 pub(crate) mod for_tests {
     use {
-        super::*,
         crate::cache::for_tests::CacheForTest,
+        anyhow::Error,
         anyhow::{anyhow, Context},
         blobfs_ramdisk::BlobfsRamdisk,
-        fidl_fuchsia_io as fio, fidl_fuchsia_metrics as fmetrics, fidl_fuchsia_pkg_ext as pkg,
+        fidl_fuchsia_io as fio, fidl_fuchsia_metrics as fmetrics, fidl_fuchsia_pkg as fpkg,
+        fidl_fuchsia_pkg_ext as pkg,
         fidl_fuchsia_pkg_ext::RepositoryConfigs,
         fuchsia_async as fasync,
         fuchsia_component_test::ChildRef,
@@ -40,6 +26,17 @@ pub(crate) mod for_tests {
     const SSL_TEST_CERTS_PATH: &str = "/pkg/data/ssl/cert.pem";
     const SSL_CERT_FILE_NAME: &str = "cert.pem";
     pub const EMPTY_REPO_PATH: &str = "/pkg/empty-repo";
+
+    /// Represents the sandboxed package resolver.
+    pub struct Resolver {
+        proxy: fpkg::PackageResolverProxy,
+    }
+
+    impl Resolver {
+        fn new_with_proxy(pkg_resolver_proxy: fpkg::PackageResolverProxy) -> Result<Self, Error> {
+            Ok(Self { proxy: pkg_resolver_proxy })
+        }
+    }
 
     /// This wraps the `Resolver` in order to reduce test boilerplate.
     pub struct ResolverForTest {
@@ -185,7 +182,9 @@ pub(crate) mod for_tests {
 
             let resolver_proxy = realm_instance
                 .root
-                .connect_to_named_protocol_at_exposed_dir::<fidl_fuchsia_pkg::PackageResolverMarker>("fuchsia.pkg.PackageResolver-ota")
+                .connect_to_named_protocol_at_exposed_dir::<fpkg::PackageResolverMarker>(
+                    "fuchsia.pkg.PackageResolver-ota",
+                )
                 .expect("connect to pkg resolver");
 
             let resolver = Resolver::new_with_proxy(resolver_proxy).unwrap();
@@ -203,7 +202,7 @@ pub(crate) mod for_tests {
             &self,
             url: &str,
         ) -> Result<(fio::DirectoryProxy, pkg::ResolutionContext), Error> {
-            let proxy = &self.resolver._pkg_resolver_proxy;
+            let proxy = &self.resolver.proxy;
             let (package, package_remote) =
                 fidl::endpoints::create_proxy().context("creating package directory endpoints")?;
             let resolved_context = proxy
@@ -220,8 +219,8 @@ pub(crate) mod for_tests {
 pub mod tests {
     use {
         super::for_tests::{ResolverForTest, EMPTY_REPO_PATH},
-        super::*,
         anyhow::Context,
+        anyhow::Error,
         fuchsia_async as fasync,
         fuchsia_component_test::RealmBuilder,
         fuchsia_pkg_testing::{PackageBuilder, RepositoryBuilder},
