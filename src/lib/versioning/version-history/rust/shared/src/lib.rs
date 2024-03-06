@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use anyhow::{self, bail};
 use itertools::Itertools;
 use serde::{
     de::{Error, Unexpected},
@@ -15,10 +16,20 @@ const VERSION_HISTORY_NAME: &str = "Platform version map";
 const VERSION_HISTORY_TYPE: &str = "version_history";
 
 /// An `ApiLevel` represents an API level of the Fuchsia platform.
-#[derive(Debug, Deserialize, PartialEq, Eq, PartialOrd, Ord, Hash, Copy, Clone)]
+#[derive(Deserialize, PartialEq, Eq, PartialOrd, Ord, Hash, Copy, Clone)]
 pub struct ApiLevel(u64);
 
 impl ApiLevel {
+    /// The `HEAD` pseudo-API level, representing the bleeding edge of
+    /// development.
+    const HEAD: ApiLevel = ApiLevel(0xFFFFFFFFFFFFFFFE);
+
+    /// The `LEGACY` pseudo-API level, which is used in platform builds.
+    ///
+    /// TODO: https://fxbug.dev/42085274 - Remove this once `LEGACY` is actually
+    /// gone, and use `HEAD` instead.
+    const LEGACY: ApiLevel = ApiLevel(0xFFFFFFFFFFFFFFFF);
+
     pub const fn from_u64(value: u64) -> Self {
         Self(value)
     }
@@ -28,9 +39,23 @@ impl ApiLevel {
     }
 }
 
+impl fmt::Debug for ApiLevel {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match *self {
+            ApiLevel::HEAD => write!(f, "ApiLevel::HEAD"),
+            ApiLevel::LEGACY => write!(f, "ApiLevel::LEGACY"),
+            ApiLevel(l) => f.debug_tuple("ApiLevel").field(&l).finish(),
+        }
+    }
+}
+
 impl fmt::Display for ApiLevel {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.0)
+        match *self {
+            ApiLevel::HEAD => write!(f, "HEAD"),
+            ApiLevel::LEGACY => write!(f, "LEGACY"),
+            ApiLevel(l) => write!(f, "{}", l),
+        }
     }
 }
 
@@ -38,7 +63,11 @@ impl std::str::FromStr for ApiLevel {
     type Err = std::num::ParseIntError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Ok(ApiLevel::from_u64(s.parse()?))
+        match s {
+            "HEAD" => Ok(ApiLevel::HEAD),
+            "LEGACY" => Ok(ApiLevel::LEGACY),
+            s => Ok(ApiLevel::from_u64(s.parse()?)),
+        }
     }
 }
 
@@ -221,7 +250,10 @@ impl VersionHistory {
     /// TODO: https://fxbug.dev/326096999 - Remove this, or turn it into
     /// something that makes more sense.
     pub fn get_misleading_version_for_ffx(&self) -> Version {
-        self.supported_versions().last().unwrap()
+        self.supported_versions()
+            .filter(|v| v.api_level != ApiLevel::HEAD && v.api_level != ApiLevel::LEGACY)
+            .last()
+            .unwrap()
     }
 
     /// The packaging tools currently stamp packages with a default ABI revision
@@ -320,13 +352,10 @@ impl std::fmt::Display for AbiRevisionError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let write_supported_versions =
             |f: &mut std::fmt::Formatter<'_>, supported_versions: &[Version]| -> std::fmt::Result {
-                write!(f, "The following API levels are supported: ")?;
+                write!(f, "The following API levels are supported:")?;
 
-                for (idx, version) in supported_versions.iter().enumerate() {
-                    write!(f, "\n└── {} ({})", version.api_level, version.abi_revision)?;
-                    if idx != supported_versions.len() - 1 {
-                        write!(f, ", ")?;
-                    }
+                for version in supported_versions.iter() {
+                    write!(f, "\n└── {} (0x{})", version.api_level, version.abi_revision)?;
                 }
                 Ok(())
             };
@@ -336,7 +365,7 @@ impl std::fmt::Display for AbiRevisionError {
             AbiRevisionError::Unknown { abi_revision, supported_versions } => {
                 write!(
                     f,
-                    "Unknown target ABI revision: {}. The OS may be too old to support it? ",
+                    "Unknown target ABI revision: 0x{}. Is the OS too old to support it? ",
                     abi_revision
                 )?;
                 write_supported_versions(f, supported_versions)
@@ -344,7 +373,7 @@ impl std::fmt::Display for AbiRevisionError {
             AbiRevisionError::Unsupported { version, supported_versions } => {
                 write!(
                     f,
-                    "Component targets API {} ({}), which is no longer supported. ",
+                    "API level {} (0x{}) is no longer supported. ",
                     version.api_level, version.abi_revision
                 )?;
                 write_supported_versions(f, supported_versions)
@@ -372,19 +401,19 @@ impl std::fmt::Display for ApiLevelError {
             ApiLevelError::Unknown { api_level, supported } => {
                 write!(
                     f,
-                    "Unknown target API level: {}. The SDK may be too old to support it?
+                    "Unknown target API level: {}. Is the SDK too old to support it?
 The following API levels are supported: {}",
                     api_level,
-                    supported.iter().join(",")
+                    supported.iter().join(", ")
                 )
             }
             ApiLevelError::Unsupported { version, supported } => {
                 write!(
                     f,
-                    "Building components targeting API level {} is no longer supported.
+                    "The SDK no longer supports API level {}.
 The following API levels are supported: {}",
                     version.api_level,
-                    supported.iter().join(",")
+                    supported.iter().join(", ")
                 )
             }
         }
@@ -411,46 +440,60 @@ struct ApiLevelJson {
     pub status: Status,
 }
 
-pub fn version_history() -> Result<Vec<Version>, serde_json::Error> {
+pub fn version_history() -> anyhow::Result<Vec<Version>> {
     parse_version_history(VERSION_HISTORY_BYTES)
 }
 
-fn parse_version_history(bytes: &[u8]) -> Result<Vec<Version>, serde_json::Error> {
+fn parse_version_history(bytes: &[u8]) -> anyhow::Result<Vec<Version>> {
     let v: VersionHistoryJson = serde_json::from_slice(bytes)?;
+
     if v.schema_id != VERSION_HISTORY_SCHEMA_ID {
-        return Err(serde_json::Error::invalid_value(
-            Unexpected::Str(&v.schema_id),
-            &VERSION_HISTORY_SCHEMA_ID,
-        ));
+        bail!("expected schema_id = {:?}; got {:?}", VERSION_HISTORY_SCHEMA_ID, v.schema_id)
     }
     if v.data.name != VERSION_HISTORY_NAME {
-        return Err(serde_json::Error::invalid_value(
-            Unexpected::Str(&v.data.name),
-            &VERSION_HISTORY_NAME,
-        ));
+        bail!("expected data.name = {:?}; got {:?}", VERSION_HISTORY_NAME, v.data.name)
     }
     if v.data.element_type != VERSION_HISTORY_TYPE {
-        return Err(serde_json::Error::invalid_value(
-            Unexpected::Str(&v.data.element_type),
-            &VERSION_HISTORY_TYPE,
-        ));
+        bail!("expected data.type = {:?}; got {:?}", VERSION_HISTORY_TYPE, v.data.element_type,)
     }
 
     let mut versions = Vec::new();
 
     for (key, value) in v.data.api_levels {
-        let api_level = key
-            .parse()
-            .map_err(|_| serde::de::Error::invalid_value(Unexpected::Str(&key), &"an integer"))?;
-
         versions.push(Version {
-            api_level,
+            api_level: key.parse()?,
             abi_revision: value.abi_revision,
             status: value.status,
         });
     }
 
     versions.sort_by_key(|s| s.api_level);
+
+    let Some(latest_api_version) = versions.last() else {
+        bail!("there must be at least one API level")
+    };
+
+    if latest_api_version.status == Status::Unsupported {
+        bail!("most recent API level must not be 'unsupported'")
+    }
+
+    // TODO: https://fxrev.dev/42082683 - the mutable pseudo-API-levels should
+    // use an ABI revision that corresponds to a specific release, rather than
+    // reusing the one from the "latest" API level.
+    let latest_abi_revision = latest_api_version.abi_revision;
+
+    // HEAD version.
+    versions.push(Version {
+        api_level: ApiLevel::HEAD,
+        abi_revision: latest_abi_revision,
+        status: Status::InDevelopment,
+    });
+    // LEGACY version.
+    versions.push(Version {
+        api_level: ApiLevel::LEGACY,
+        abi_revision: latest_abi_revision,
+        status: Status::InDevelopment,
+    });
 
     Ok(versions)
 }
@@ -505,6 +548,16 @@ mod tests {
                     abi_revision: 0x50CBC6E8A39E1E2C.into(),
                     status: Status::InDevelopment
                 },
+                Version {
+                    api_level: ApiLevel::HEAD,
+                    abi_revision: 0x50CBC6E8A39E1E2C.into(),
+                    status: Status::InDevelopment
+                },
+                Version {
+                    api_level: ApiLevel::LEGACY,
+                    abi_revision: 0x50CBC6E8A39E1E2C.into(),
+                    status: Status::InDevelopment
+                },
             ],
         );
     }
@@ -522,7 +575,7 @@ mod tests {
 
         assert_eq!(
             &parse_version_history(&expected_bytes[..]).unwrap_err().to_string(),
-            "invalid value: string \"some-schema\", expected https://fuchsia.dev/schema/version_history-22rnd667.json"
+            r#"expected schema_id = "https://fuchsia.dev/schema/version_history-22rnd667.json"; got "some-schema""#
         );
     }
 
@@ -539,7 +592,7 @@ mod tests {
 
         assert_eq!(
             &parse_version_history(&expected_bytes[..]).unwrap_err().to_string(),
-            "invalid value: string \"some-name\", expected Platform version map"
+            r#"expected data.name = "Platform version map"; got "some-name""#
         );
     }
 
@@ -556,7 +609,7 @@ mod tests {
 
         assert_eq!(
             &parse_version_history(&expected_bytes[..]).unwrap_err().to_string(),
-            "invalid value: string \"some-type\", expected version_history"
+            r#"expected data.type = "version_history"; got "some-type""#
         );
     }
 
@@ -566,12 +619,12 @@ mod tests {
             (
                 "some-version",
                 "1",
-                "invalid value: string \"some-version\", expected an integer",
+                "invalid digit found in string"                ,
             ),
             (
                 "-1",
                 "1",
-                 "invalid value: string \"-1\", expected an integer",
+                "invalid digit found in string"                ,
             ),
             (
                 "1",
@@ -606,22 +659,32 @@ mod tests {
         versions: &[
             Version {
                 api_level: ApiLevel::from_u64(4),
-                abi_revision: AbiRevision::from_u64(0xabcd0004),
+                abi_revision: AbiRevision::from_u64(0x58ea445e942a0004),
                 status: Status::Unsupported,
             },
             Version {
                 api_level: ApiLevel::from_u64(5),
-                abi_revision: AbiRevision::from_u64(0xabcd0005),
+                abi_revision: AbiRevision::from_u64(0x58ea445e942a0005),
                 status: Status::Supported,
             },
             Version {
                 api_level: ApiLevel::from_u64(6),
-                abi_revision: AbiRevision::from_u64(0xabcd0006),
+                abi_revision: AbiRevision::from_u64(0x58ea445e942a0006),
                 status: Status::Supported,
             },
             Version {
                 api_level: ApiLevel::from_u64(7),
-                abi_revision: AbiRevision::from_u64(0xabcd0007),
+                abi_revision: AbiRevision::from_u64(0x58ea445e942a0007),
+                status: Status::InDevelopment,
+            },
+            Version {
+                api_level: ApiLevel::HEAD,
+                abi_revision: AbiRevision::from_u64(0x58ea445e942a0007),
+                status: Status::InDevelopment,
+            },
+            Version {
+                api_level: ApiLevel::LEGACY,
+                abi_revision: AbiRevision::from_u64(0x58ea445e942a0007),
                 status: Status::InDevelopment,
             },
         ],
@@ -630,7 +693,7 @@ mod tests {
     #[test]
     fn test_check_abi_revision() {
         let supported_versions: Vec<Version> =
-            FAKE_VERSION_HISTORY.versions[1..4].iter().cloned().collect();
+            FAKE_VERSION_HISTORY.versions[1..6].iter().cloned().collect();
 
         assert_eq!(
             FAKE_VERSION_HISTORY.check_abi_revision_for_runtime(0x1234.into()),
@@ -642,7 +705,7 @@ mod tests {
         );
 
         assert_eq!(
-            FAKE_VERSION_HISTORY.check_abi_revision_for_runtime(0xabcd0004.into()),
+            FAKE_VERSION_HISTORY.check_abi_revision_for_runtime(0x58ea445e942a0004.into()),
             Err(AbiRevisionError::Unsupported {
                 version: FAKE_VERSION_HISTORY.versions[0].clone(),
 
@@ -651,16 +714,70 @@ mod tests {
         );
 
         FAKE_VERSION_HISTORY
-            .check_abi_revision_for_runtime(0xabcd0005.into())
+            .check_abi_revision_for_runtime(0x58ea445e942a0005.into())
             .expect("level 5 should be supported");
         FAKE_VERSION_HISTORY
-            .check_abi_revision_for_runtime(0xabcd0007.into())
+            .check_abi_revision_for_runtime(0x58ea445e942a0007.into())
             .expect("level 7 should be supported");
     }
 
     #[test]
+    fn test_pretty_print_abi_error() {
+        let supported_versions: Vec<Version> =
+            FAKE_VERSION_HISTORY.versions[1..6].iter().cloned().collect();
+
+        assert_eq!(
+                AbiRevisionError::Unknown {
+                    abi_revision: 0x1234.into(),
+                    supported_versions: supported_versions.clone()
+                }.to_string(),
+                "Unknown target ABI revision: 0x1234. Is the OS too old to support it? The following API levels are supported:
+└── 5 (0x58ea445e942a0005)
+└── 6 (0x58ea445e942a0006)
+└── 7 (0x58ea445e942a0007)
+└── HEAD (0x58ea445e942a0007)
+└── LEGACY (0x58ea445e942a0007)"
+            );
+        assert_eq!(
+                AbiRevisionError::Unsupported {
+                    version: FAKE_VERSION_HISTORY.versions[0].clone(),
+                    supported_versions: supported_versions.clone()
+                }.to_string(),
+                "API level 4 (0x58ea445e942a0004) is no longer supported. The following API levels are supported:
+└── 5 (0x58ea445e942a0005)
+└── 6 (0x58ea445e942a0006)
+└── 7 (0x58ea445e942a0007)
+└── HEAD (0x58ea445e942a0007)
+└── LEGACY (0x58ea445e942a0007)"
+            );
+    }
+
+    #[test]
+    fn test_pretty_print_api_error() {
+        let supported: Vec<ApiLevel> =
+            vec![5.into(), 6.into(), 7.into(), ApiLevel::HEAD, ApiLevel::LEGACY];
+
+        assert_eq!(
+            ApiLevelError::Unknown { api_level: 42.into(), supported: supported.clone() }
+                .to_string(),
+            "Unknown target API level: 42. Is the SDK too old to support it?
+The following API levels are supported: 5, 6, 7, HEAD, LEGACY",
+        );
+        assert_eq!(
+            ApiLevelError::Unsupported {
+                version: FAKE_VERSION_HISTORY.versions[0].clone(),
+                supported: supported.clone()
+            }
+            .to_string(),
+            "The SDK no longer supports API level 4.
+The following API levels are supported: 5, 6, 7, HEAD, LEGACY"
+        );
+    }
+
+    #[test]
     fn test_check_api_level() {
-        let supported: Vec<ApiLevel> = vec![5.into(), 6.into(), 7.into()];
+        let supported: Vec<ApiLevel> =
+            vec![5.into(), 6.into(), 7.into(), ApiLevel::HEAD, ApiLevel::LEGACY];
 
         assert_eq!(
             FAKE_VERSION_HISTORY.check_api_level_for_build(42.into()),
@@ -680,20 +797,37 @@ mod tests {
         //     })
         // );
 
-        assert_eq!(FAKE_VERSION_HISTORY.check_api_level_for_build(6.into()), Ok(0xabcd0006.into()));
-        assert_eq!(FAKE_VERSION_HISTORY.check_api_level_for_build(7.into()), Ok(0xabcd0007.into()));
+        assert_eq!(
+            FAKE_VERSION_HISTORY.check_api_level_for_build(6.into()),
+            Ok(0x58ea445e942a0006.into())
+        );
+        assert_eq!(
+            FAKE_VERSION_HISTORY.check_api_level_for_build(7.into()),
+            Ok(0x58ea445e942a0007.into())
+        );
+        assert_eq!(
+            FAKE_VERSION_HISTORY.check_api_level_for_build(ApiLevel::HEAD),
+            Ok(0x58ea445e942a0007.into())
+        );
+        assert_eq!(
+            FAKE_VERSION_HISTORY.check_api_level_for_build(ApiLevel::LEGACY),
+            Ok(0x58ea445e942a0007.into())
+        );
     }
 
     #[test]
     fn test_various_getters() {
         assert_eq!(
             FAKE_VERSION_HISTORY.get_abi_revision_for_platform_components(),
-            0xabcd0007.into()
+            0x58ea445e942a0007.into()
         );
-        assert_eq!(FAKE_VERSION_HISTORY.get_default_abi_revision_for_swd(), 0xabcd0007.into());
+        assert_eq!(
+            FAKE_VERSION_HISTORY.get_default_abi_revision_for_swd(),
+            0x58ea445e942a0007.into()
+        );
         assert_eq!(
             FAKE_VERSION_HISTORY.get_example_supported_version_for_tests(),
-            FAKE_VERSION_HISTORY.versions[3].clone()
+            FAKE_VERSION_HISTORY.versions[5].clone()
         );
         assert_eq!(
             FAKE_VERSION_HISTORY.get_misleading_version_for_ffx(),
