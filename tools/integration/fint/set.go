@@ -188,6 +188,9 @@ func runGen(
 		genCmd = append(genCmd, fmt.Sprintf("--json-ide-script=%s", s))
 	}
 
+	// Always generate the ninja_outputs.json file used by //build/api/client
+	genCmd = append(genCmd, "--ninja-outputs-file=ninja_outputs.json")
+
 	// When `gn gen` fails, it outputs a brief helpful error message to stdout.
 	var stdoutBuf bytes.Buffer
 	if err := runner.Run(ctx, genCmd, subprocess.RunOptions{Stdout: io.MultiWriter(&stdoutBuf, os.Stdout)}); err != nil {
