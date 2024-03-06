@@ -57,7 +57,7 @@ async fn assemble_realm(
     b.route_from_parent::<fidl_fuchsia_tracing_provider::RegistryMarker>(&scenic_test_realm).await;
     b.route_from_parent::<fidl_fuchsia_sysmem::AllocatorMarker>(&scenic_test_realm).await;
     b.route_from_parent::<fidl_fuchsia_vulkan_loader::LoaderMarker>(&scenic_test_realm).await;
-    b.route_from_parent::<fidl_fuchsia_scheduler::ProfileProviderMarker>(&scenic_test_realm).await;
+    b.route_from_parent::<fidl_fuchsia_scheduler::RoleManagerMarker>(&scenic_test_realm).await;
 
     // Allow the a11y manager to access the capabilities it needs.
     b.route_to_peer::<fidl_fuchsia_ui_scenic::ScenicMarker>(&scenic_test_realm, &a11y_test_realm)

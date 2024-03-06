@@ -85,11 +85,8 @@ constexpr auto kIntl = "intl";
 // Set of low-level system services that components in the realm can consume
 // from parent (test_manager).
 std::vector<std::string> DefaultSystemServices() {
-  return {fuchsia::logger::LogSink::Name_,
-          fuchsia::scheduler::ProfileProvider::Name_,
-          fuchsia::scheduler::RoleManager::Name_,
-          fuchsia::sysmem::Allocator::Name_,
-          fuchsia::tracing::provider::Registry::Name_,
+  return {fuchsia::logger::LogSink::Name_, fuchsia::scheduler::RoleManager::Name_,
+          fuchsia::sysmem::Allocator::Name_, fuchsia::tracing::provider::Registry::Name_,
           fuchsia::vulkan::loader::Loader::Name_};
 }
 

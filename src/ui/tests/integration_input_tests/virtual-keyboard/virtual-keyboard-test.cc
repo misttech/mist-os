@@ -433,7 +433,6 @@ class WebEngineTest : public VirtualKeyboardBase {
          .source = ParentRef(),
          .targets = {ChildRef{kMemoryPressureProvider}, target}},
         {.capabilities = {Protocol{fuchsia::tracing::provider::Registry::Name_},
-                          Protocol{fuchsia::scheduler::ProfileProvider::Name_},
                           Protocol{fuchsia::scheduler::RoleManager::Name_}},
          .source = ParentRef(),
          .targets = {ChildRef{kMemoryPressureProvider}}},

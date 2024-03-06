@@ -84,7 +84,6 @@ void InstallTestGraphicalPresenter(component_testing::Realm& realm) {
       .AddRoute(Route{.capabilities =
                           {
                               Protocol{fuchsia::logger::LogSink::Name_},
-                              Protocol{fuchsia::scheduler::ProfileProvider::Name_},
                               Protocol{fuchsia::scheduler::RoleManager::Name_},
                               Protocol{fuchsia::sysmem::Allocator::Name_},
                               Protocol{fuchsia::tracing::provider::Registry::Name_},
@@ -260,7 +259,6 @@ void EnclosedGuest::InstallInRealm(component_testing::Realm& realm,
       .AddRoute(Route{.capabilities =
                           {
                               Protocol{fuchsia::logger::LogSink::Name_},
-                              Protocol{fuchsia::scheduler::ProfileProvider::Name_},
                               Protocol{fuchsia::scheduler::RoleManager::Name_},
                               Protocol{fuchsia::sysmem::Allocator::Name_},
                               Protocol{fuchsia::tracing::provider::Registry::Name_},
