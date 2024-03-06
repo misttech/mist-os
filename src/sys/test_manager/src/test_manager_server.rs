@@ -256,7 +256,7 @@ pub async fn run_test_manager_query_server(
                     }
                 };
                 let enumeration_result = enumerate_test_cases(&suite, None).await;
-                let t = fasync::Task::spawn(suite_instance.destroy());
+                let t = fasync::Task::spawn(suite_instance.destroy(root_diagnostics.child()));
                 match enumeration_result {
                     Ok(invocations) => {
                         const NAMES_CHUNK: usize = 50;

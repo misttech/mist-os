@@ -424,7 +424,7 @@ impl RunningSuite {
 
     /// Mark the resources associated with the suite for destruction, then wait for destruction to
     /// complete. Returns an error only if destruction fails.
-    pub(crate) async fn destroy(self) -> Result<(), Error> {
+    pub(crate) async fn destroy(self, diagnostics: DiagnosticNode) -> Result<(), Error> {
         let exposed_dir_fut = self.exposed_dir.close();
         let exposed_dir_close_task = fasync::Task::spawn(async move {
             let _ = exposed_dir_fut.await;
@@ -441,14 +441,20 @@ impl RunningSuite {
         // that the server end of the log iterator served to the client will be received by
         // archivist. TODO(https://fxbug.dev/42056523): Remove this hack once component events are ordered.
         if let Some(archivist_ready_task) = self.archivist_ready_task {
+            info!(?diagnostics, "Wait archivist_ready_task");
             archivist_ready_task.await;
         }
         if let Some(mock_ready_task) = self.mock_ready_task {
+            info!(?diagnostics, "Wait mock_ready_task");
             mock_ready_task.await;
         }
+        info!(?diagnostics, "Wait tokens_closed_signals");
         futures::future::join_all(tokens_closed_signals).await;
 
+        info!(?diagnostics, "Wait exposed_dir_close_task");
         exposed_dir_close_task.await;
+
+        info!(?diagnostics, "Start destroy test realm");
 
         // TODO(https://fxbug.dev/42174479) Remove timeout once component manager hangs are removed.
         // This value is set to be slightly longer than the shutdown timeout for tests (30 sec).
