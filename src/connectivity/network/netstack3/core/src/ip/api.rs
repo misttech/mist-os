@@ -11,7 +11,7 @@ use net_types::{
 };
 
 use crate::{
-    base::ContextPair,
+    context::ContextPair,
     device::{AnyDevice, DeviceIdContext},
     inspect::{Inspector, InspectorDeviceExt},
     ip::{

@@ -17,8 +17,7 @@ use thiserror::Error;
 use tracing::trace;
 
 use crate::{
-    base::ContextPair,
-    context::{EventContext as _, InstantBindingsTypes},
+    context::{ContextPair, EventContext as _, InstantBindingsTypes},
     device::{AnyDevice, DeviceIdContext},
     error::ExistsError,
     error::NotFoundError,

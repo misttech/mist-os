@@ -238,13 +238,13 @@ mod tests {
     }
 
     /// A trait providing a shortcut to instantiate a [`TransmitQueueApi`] from a context.
-    trait ReceiveQueueApiExt: crate::base::ContextPair + Sized {
+    trait ReceiveQueueApiExt: crate::context::ContextPair + Sized {
         fn receive_queue_api<D>(&mut self) -> ReceiveQueueApi<D, &mut Self> {
             ReceiveQueueApi::new(self)
         }
     }
 
-    impl<O> ReceiveQueueApiExt for O where O: crate::base::ContextPair + Sized {}
+    impl<O> ReceiveQueueApiExt for O where O: crate::context::ContextPair + Sized {}
 
     #[test]
     fn queue_and_dequeue() {

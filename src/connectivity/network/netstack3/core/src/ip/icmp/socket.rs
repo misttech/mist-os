@@ -29,8 +29,7 @@ use packet_formats::{
 
 use crate::{
     algorithm::{self, PortAllocImpl},
-    base::ContextPair,
-    context::RngContext,
+    context::{ContextPair, RngContext},
     data_structures::socketmap::IterShadows as _,
     device::{self, AnyDevice, DeviceIdContext},
     error::{LocalAddressError, SocketError},

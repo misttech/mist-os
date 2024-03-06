@@ -22,8 +22,7 @@ use packet_formats::{
 };
 
 use crate::{
-    base::ContextPair,
-    context::SendFrameContext,
+    context::{ContextPair, SendFrameContext},
     device::{self, AnyDevice, Device, DeviceId, DeviceIdContext, FrameDestination, WeakDeviceId},
     for_any_device_id,
     sync::{Mutex, PrimaryRc, RwLock, StrongRc},
@@ -1178,13 +1177,13 @@ mod tests {
 
     /// A trait providing a shortcut to instantiate a [`DeviceSocketApi`] from a
     /// context.
-    trait DeviceSocketApiExt: crate::base::ContextPair + Sized {
+    trait DeviceSocketApiExt: crate::context::ContextPair + Sized {
         fn device_socket_api(&mut self) -> DeviceSocketApi<&mut Self> {
             DeviceSocketApi::new(self)
         }
     }
 
-    impl<O> DeviceSocketApiExt for O where O: crate::base::ContextPair + Sized {}
+    impl<O> DeviceSocketApiExt for O where O: crate::context::ContextPair + Sized {}
 
     #[derive(Debug, Derivative)]
     #[derivative(Default(bound = ""))]

@@ -39,7 +39,6 @@ use core::{convert::Infallible as Never, ffi::CStr, fmt::Debug, time::Duration};
 
 use lock_order::Unlocked;
 
-use netstack3_base::ContextPair;
 use packet::{BufferMut, Serializer};
 use rand::{CryptoRng, RngCore};
 
@@ -50,7 +49,7 @@ use crate::{
     sync, Instant,
 };
 
-pub use netstack3_base::{InstantBindingsTypes, InstantContext};
+pub use netstack3_base::{ContextPair, InstantBindingsTypes, InstantContext};
 
 /// A marker trait indicating that the implementor is not the [`FakeCoreCtx`]
 /// type found in test environments.

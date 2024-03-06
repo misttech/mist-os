@@ -149,7 +149,7 @@ impl<CC, BC> ContextPair<CC, BC> {
     }
 }
 
-impl<CC, BC> crate::base::ContextPair for ContextPair<CC, BC>
+impl<CC, BC> crate::context::ContextPair for ContextPair<CC, BC>
 where
     CC: crate::context::ContextProvider,
     BC: crate::context::ContextProvider,

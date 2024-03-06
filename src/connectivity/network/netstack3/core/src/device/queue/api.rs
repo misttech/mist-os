@@ -7,7 +7,7 @@
 use core::marker::PhantomData;
 
 use crate::{
-    base::ContextPair,
+    context::ContextPair,
     device::{
         queue::{
             fifo,

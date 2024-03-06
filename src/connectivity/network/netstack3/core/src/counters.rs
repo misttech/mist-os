@@ -7,8 +7,7 @@
 use net_types::ip::{Ip, Ipv4, Ipv6};
 
 use crate::{
-    base::ContextPair,
-    context::CounterContext,
+    context::{ContextPair, CounterContext},
     device::{arp::ArpCounters, DeviceCounters, EthernetDeviceCounters},
     inspect::Inspector,
     ip::{

@@ -46,9 +46,9 @@ use tracing::{debug, error, trace};
 
 use crate::{
     algorithm::{self, PortAllocImpl},
-    base::ContextPair,
     context::{
-        CtxPair, InstantBindingsTypes, RngContext, TimerContext, TimerHandler, TracingContext,
+        ContextPair, CtxPair, InstantBindingsTypes, RngContext, TimerContext, TimerHandler,
+        TracingContext,
     },
     convert::{BidirectionalConverter as _, OwnedOrRefsBidirectionalConverter},
     data_structures::socketmap::{IterShadows as _, SocketMap},
@@ -5609,13 +5609,13 @@ mod tests {
     }
 
     /// A trait providing a shortcut to instantiate a [`TcpApi`] from a context.
-    trait TcpApiExt: crate::base::ContextPair + Sized {
+    trait TcpApiExt: crate::context::ContextPair + Sized {
         fn tcp_api<I: Ip>(&mut self) -> TcpApi<I, &mut Self> {
             TcpApi::new(self)
         }
     }
 
-    impl<O> TcpApiExt for O where O: crate::base::ContextPair + Sized {}
+    impl<O> TcpApiExt for O where O: crate::context::ContextPair + Sized {}
 
     /// How to bind the client socket in `bind_listen_connect_accept_inner`.
     struct BindConfig {

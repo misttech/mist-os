@@ -35,10 +35,9 @@ use tracing::{debug, trace};
 
 use crate::{
     algorithm::{self, PortAllocImpl, ProtocolFlowId},
-    base::ContextPair,
     context::{
-        CounterContext, InstantContext, NonTestCtxMarker, ReferenceNotifiers, RngContext,
-        TracingContext,
+        ContextPair, CounterContext, InstantContext, NonTestCtxMarker, ReferenceNotifiers,
+        RngContext, TracingContext,
     },
     convert::BidirectionalConverter,
     counters::Counter,

@@ -11,8 +11,7 @@ use packet::BufferMut;
 use tracing::debug;
 
 use crate::{
-    base::ContextPair,
-    context::{RecvFrameContext, ReferenceNotifiers},
+    context::{ContextPair, RecvFrameContext, ReferenceNotifiers},
     device::{
         config::{
             ArpConfiguration, ArpConfigurationUpdate, DeviceConfiguration,
