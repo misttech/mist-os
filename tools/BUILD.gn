@@ -37,6 +37,7 @@ group("tools") {
     "//tools/pbtool($host_toolchain)",
     "//tools/pretty_serial:install($host_toolchain)",
     "//tools/rfc:install($host_toolchain)",
+    "//tools/rust_extract:install($host_toolchain)",
     "//tools/sdk-tools:tools($host_toolchain)",
     "//tools/shush:install($host_toolchain)",
     "//tools/symbolizer($host_toolchain)",
