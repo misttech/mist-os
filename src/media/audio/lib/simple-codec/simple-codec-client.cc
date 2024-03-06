@@ -158,7 +158,11 @@ zx::result<Info> SimpleCodecClient::GetInfo() {
   const fuchsia_hardware_audio::wire::CodecProperties& properties = result.value().properties;
 
   Info info;
-  info.unique_id = std::string(properties.unique_id().data(), properties.unique_id().size());
+  if (properties.has_unique_id()) {
+    info.unique_id.emplace();
+    std::memcpy(info.unique_id->data(), properties.unique_id().data(),
+                fuchsia_hardware_audio::wire::kUniqueIdSize);
+  }
   info.manufacturer =
       std::string(properties.manufacturer().data(), properties.manufacturer().size());
   info.product_name = std::string(properties.product().data(), properties.product().size());

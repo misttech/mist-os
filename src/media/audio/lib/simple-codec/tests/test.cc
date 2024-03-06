@@ -7,16 +7,21 @@
 #include <lib/simple-codec/simple-codec-server.h>
 #include <lib/sync/completion.h>
 
+#include <array>
+
 #include <zxtest/zxtest.h>
 
 #include "src/devices/testing/mock-ddk/mock-device.h"
 
 namespace {
-static const char* kTestId = "test id";
+const std::array<uint8_t, fuchsia::hardware::audio::UNIQUE_ID_SIZE> kTestUniqueId = {
+    0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15};
+static const char* kExpectedUniqueIdStr = "000102030405060708090A0B0C0D0E0F";
 static const char* kTestManufacturer = "test man";
 static const char* kTestProduct = "test prod";
 static const uint32_t kTestInstanceCount = 123;
 }  // namespace
+
 namespace audio {
 
 namespace audio_fidl = ::fuchsia::hardware::audio;
@@ -47,7 +52,11 @@ class TestCodec : public SimpleCodecServer {
   }
   zx_status_t Reset() override { return ZX_ERR_NOT_SUPPORTED; }
   Info GetInfo() override {
-    return {.unique_id = kTestId, .manufacturer = kTestManufacturer, .product_name = kTestProduct};
+    return {
+        .unique_id = kTestUniqueId,
+        .manufacturer = kTestManufacturer,
+        .product_name = kTestProduct,
+    };
   }
   zx_status_t Stop() override { return ZX_ERR_NOT_SUPPORTED; }
   zx_status_t Start() override { return ZX_OK; }
@@ -86,7 +95,11 @@ class TestCodecWithSignalProcessing : public SimpleCodecServer,
   }
   zx_status_t Reset() override { return ZX_ERR_NOT_SUPPORTED; }
   Info GetInfo() override {
-    return {.unique_id = kTestId, .manufacturer = kTestManufacturer, .product_name = kTestProduct};
+    return {
+        .unique_id = std::array<uint8_t, audio_fidl::UNIQUE_ID_SIZE>(kTestUniqueId),
+        .manufacturer = kTestManufacturer,
+        .product_name = kTestProduct,
+    };
   }
   zx_status_t Stop() override { return ZX_ERR_NOT_SUPPORTED; }
   zx_status_t Start() override { return ZX_OK; }
@@ -181,7 +194,8 @@ TEST_F(SimpleCodecTest, ChannelConnection) {
 
   auto info = client.GetInfo();
   ASSERT_TRUE(info.is_ok());
-  ASSERT_EQ(info->unique_id.compare(kTestId), 0);
+  ASSERT_TRUE(info->unique_id.has_value());
+  ASSERT_EQ(*info->unique_id, kTestUniqueId);
   ASSERT_EQ(info->manufacturer.compare(kTestManufacturer), 0);
   ASSERT_EQ(info->product_name.compare(kTestProduct), 0);
 }
@@ -507,8 +521,8 @@ TEST_F(SimpleCodecTest, InspectDefaultState) {
       CheckProperty(simple_codec->node(), "state", inspect::StringPropertyValue("created")));
   ASSERT_NO_FATAL_FAILURE(
       CheckProperty(simple_codec->node(), "start_time", inspect::IntPropertyValue(0)));
-  ASSERT_NO_FATAL_FAILURE(
-      CheckProperty(simple_codec->node(), "unique_id", inspect::StringPropertyValue("test id")));
+  ASSERT_NO_FATAL_FAILURE(CheckProperty(simple_codec->node(), "unique_id",
+                                        inspect::StringPropertyValue(kExpectedUniqueIdStr)));
 }
 
 TEST_F(SimpleCodecTest, InspectNoUniqueId) {

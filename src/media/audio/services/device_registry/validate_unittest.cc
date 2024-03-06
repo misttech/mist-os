@@ -51,8 +51,8 @@ TEST(ValidateTest, ValidateStreamProperties) {
   EXPECT_EQ(ValidateStreamProperties(stream_properties, gain_state, plug_state), ZX_OK);
 
   stream_properties = {{
-      .unique_id = {{255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
-                     255}},
+      .unique_id = {{255, 255, 255, 255, 255, 255, 255, 255,  //
+                     255, 255, 255, 255, 255, 255, 255, 255}},
       .is_input = true,
       .can_mute = true,
       .can_agc = true,
@@ -480,7 +480,7 @@ TEST(ValidateTest, ValidateCodecProperties) {
           .manufacturer =  // maximal value
           "Maximum allowed Manufacturer name is 256 characters long; Maximum allowed Manufacturer name is 256 characters long; Maximum allowed Manufacturer name is 256 characters long; Maximum allowed Manufacturer name is 256 characters long, which extends to... 321X",
           // product missing
-          .unique_id = "",  // minimal value
+          .unique_id = {{}},  // minimal value
           .plug_detect_capabilities =
               fuchsia_hardware_audio::PlugDetectCapabilities::kCanAsyncNotify,
       }}),
@@ -488,10 +488,9 @@ TEST(ValidateTest, ValidateCodecProperties) {
   EXPECT_EQ(ValidateCodecProperties(fuchsia_hardware_audio::CodecProperties{{
                 .is_input = true,
                 // manufacturer missing
-                .product = "",  // minimal value
-                .unique_id = std::string() + char(255) + char(255) + char(255) + char(255) +
-                             char(255) + char(255) + char(255) + char(255) + char(255) + char(255) +
-                             char(255) + char(255) + char(255) + char(255) + char(255) + char(255),
+                .product = "",                                                  // minimal value
+                .unique_id = {{0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,  //
+                               0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF}},
                 .plug_detect_capabilities =
                     fuchsia_hardware_audio::PlugDetectCapabilities::kCanAsyncNotify,
             }}),

@@ -100,7 +100,10 @@ class Max98373Test : public zxtest::Test {
 
 TEST_F(Max98373Test, GetInfo) {
   auto info = client_.GetInfo();
-  EXPECT_EQ(info.value().unique_id.compare(""), 0);
+  ASSERT_TRUE(info.value().unique_id.has_value());
+  for (const auto& b : *info.value().unique_id) {
+    EXPECT_EQ(b, 0u);
+  }
   EXPECT_EQ(info.value().manufacturer.compare("Maxim"), 0);
   EXPECT_EQ(info.value().product_name.compare("MAX98373"), 0);
 }

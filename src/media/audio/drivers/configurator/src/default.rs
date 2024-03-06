@@ -1497,7 +1497,7 @@ mod tests {
                 }
                 CodecRequest::GetProperties { responder } => {
                     let info = CodecProperties {
-                        unique_id: Some("".to_string()),
+                        unique_id: Some([0; fidl_fuchsia_hardware_audio::UNIQUE_ID_SIZE as usize]),
                         manufacturer: Some("test".to_string()),
                         product: Some("testy".to_string()),
                         is_input: Some(self.is_input),

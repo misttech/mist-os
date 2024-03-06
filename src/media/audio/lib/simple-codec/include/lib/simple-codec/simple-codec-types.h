@@ -30,7 +30,7 @@ using FrameFormat = ::fuchsia::hardware::audio::DaiFrameFormatStandard;
 using CodecFormatInfo = ::fuchsia::hardware::audio::CodecFormatInfo;
 
 struct Info {
-  std::string unique_id;
+  std::optional<std::array<uint8_t, ::fuchsia::hardware::audio::UNIQUE_ID_SIZE>> unique_id;
   std::string manufacturer;
   std::string product_name;
 };

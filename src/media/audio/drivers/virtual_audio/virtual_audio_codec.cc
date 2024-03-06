@@ -26,7 +26,7 @@ fuchsia_virtualaudio::Configuration VirtualAudioCodec::GetDefaultConfig(
                      (is_input ? (*is_input ? " (input)" : " (output)") : " (no direction)"));
   config.manufacturer_name("Fuchsia Virtual Audio Group");
   config.product_name("Virgil v2, a Virtual Volume Vessel");
-  config.unique_id(std::array<uint8_t, 16>({1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 0}));
+  config.unique_id({{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 0}});
 
   // Driver type is Codec.
   fuchsia_virtualaudio::Codec codec = {};
@@ -116,10 +116,7 @@ void VirtualAudioCodec::GetProperties(
   properties.manufacturer(config_.manufacturer_name());
   properties.product(config_.product_name());
   if (config_.unique_id()) {
-    properties.unique_id() = "";
-    for (auto i = 0; i < 16; ++i) {
-      properties.unique_id()->push_back(config_.unique_id()->at(i));
-    }
+    properties.unique_id() = *config_.unique_id();
   }
   if (config_.device_specific()) {
     ZX_ASSERT_MSG(

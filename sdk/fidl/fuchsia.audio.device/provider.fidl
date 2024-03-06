@@ -40,6 +40,6 @@ type ProviderAddDeviceError = flexible enum {
     /// The required `driver_client` is invalid or missing.
     INVALID_DRIVER_CLIENT = 3;
 
-    /// The required `driver_client` did not contain a StreamConfig.
+    /// The protocol in `driver_client` is incompatible with `device_type` or is not supported yet.
     WRONG_CLIENT_TYPE = 4;
 };

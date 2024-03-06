@@ -834,7 +834,7 @@ TEST(ValidateWarningTest, BadCodecProperties) {
                 .is_input = false,
                 .manufacturer = "manufacturer",
                 .product = "product",
-                .unique_id = "0000000000000000",
+                .unique_id = {{}},
                 // plug_detect_capabilities missing
             }}),
             ZX_ERR_INVALID_ARGS)

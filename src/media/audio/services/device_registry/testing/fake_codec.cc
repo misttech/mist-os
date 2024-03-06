@@ -119,12 +119,7 @@ void FakeCodec::GetProperties(GetPropertiesCompleter::Sync& completer) {
     codec_properties.product(*product_);
   }
   if (uid_) {
-    codec_properties.unique_id() = std::string{};
-    std::memcpy(codec_properties.unique_id()->data(), uid_->data(),
-                fuchsia_audio_device::kUniqueInstanceIdSize);
-    // std::string uid_str;
-    // std::memcpy(uid_str.data(), uid_->data(), fuchsia_audio_device::kUniqueInstanceIdSize);
-    // codec_properties.unique_id(uid_str);
+    codec_properties.unique_id() = *uid_;
   }
   if (plug_detect_capabilities_) {
     codec_properties.plug_detect_capabilities(*plug_detect_capabilities_);

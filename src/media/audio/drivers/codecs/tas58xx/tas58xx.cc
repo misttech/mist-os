@@ -290,7 +290,11 @@ Info Tas58xx::GetInfo() {
     printf("tas58xx: Found TAS5805m\n");
     name = "TAS5805m";
   }
-  return {.unique_id = "", .manufacturer = "Texas Instruments", .product_name = name};
+  return {
+      .unique_id = {{}},
+      .manufacturer = "Texas Instruments",
+      .product_name = name,
+  };
 }
 
 zx_status_t Tas58xx::Shutdown() { return ZX_OK; }
@@ -844,8 +848,8 @@ zx::result<CodecFormatInfo> Tas58xx::SetDaiFormat(const DaiFormat& format) {
     WriteReg(kRegSelectPage, 0x00);
     WriteReg(kRegSelectBook, 0x00);
     // Restore the gain/mute state for cases when the initialization sequence affects it.
-    // TODO(https://fxbug.dev/42067677): Create an alternative mechanism for external config to avoid
-    // having to restore state here.
+    // TODO(https://fxbug.dev/42067677): Create an alternative mechanism for external config to
+    // avoid having to restore state here.
     status = SetGain(gain_enabled_ ? gain_state_.gain : 0.0f);
     if (status != ZX_OK) {
       return zx::error(status);

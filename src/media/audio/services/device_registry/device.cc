@@ -589,10 +589,6 @@ void Device::SanitizeCodecPropertiesStrings(
         0, std::min<uint64_t>(codec_properties->product()->find('\0'),
                               fuchsia_hardware_audio::kMaxUiStringSize - 1)));
   }
-  if (codec_properties->unique_id()) {
-    codec_properties->unique_id(
-        codec_properties->unique_id()->substr(0, fuchsia_audio_device::kUniqueInstanceIdSize));
-  }
 }
 
 void Device::RetrieveInitialRingBufferFormatSets() {

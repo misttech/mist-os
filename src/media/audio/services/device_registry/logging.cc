@@ -13,7 +13,6 @@
 #include <iomanip>
 #include <string>
 
-#include "fidl/fuchsia.audio.device/cpp/common_types.h"
 #include "src/media/audio/services/device_registry/basic_types.h"
 #include "src/media/audio/services/device_registry/control_creator_server.h"
 #include "src/media/audio/services/device_registry/control_server.h"
@@ -250,14 +249,7 @@ void LogCodecProperties(const fuchsia_hardware_audio::CodecProperties& codec_pro
                                                          codec_props.product()->size()) +
                                              "'")
                                           : "<none>");
-  if (codec_props.unique_id()) {
-    std::array<unsigned char, fuchsia_audio_device::kUniqueInstanceIdSize> uid{};
-    strncpy(reinterpret_cast<char*>(uid.data()), codec_props.unique_id()->data(),
-            fuchsia_audio_device::kUniqueInstanceIdSize);
-    FX_LOGS(INFO) << "    unique_id         " << UidToString(uid);
-  } else {
-    FX_LOGS(INFO) << "    unique_id         <none>";
-  }
+  FX_LOGS(INFO) << "    unique_id         " << UidToString(codec_props.unique_id());
   if (codec_props.plug_detect_capabilities()) {
     FX_LOGS(INFO) << "    plug_detect_caps  " << *codec_props.plug_detect_capabilities();
   } else {

@@ -46,7 +46,7 @@ class FakeCodec : public audio::SimpleCodecServer, public signal_fidl::SignalPro
   zx_status_t Reset() override { return ZX_ERR_NOT_SUPPORTED; }
   audio::Info GetInfo() override {
     return {
-        .unique_id = "test id",
+        .unique_id = {{1, 2, 3, 4}},
         .manufacturer = "test man",
         .product_name = "test prod",
     };

@@ -13,6 +13,7 @@
 #include <fbl/algorithm.h>
 #include <fbl/alloc_checker.h>
 #include <fbl/auto_lock.h>
+#include <fbl/string_printf.h>
 
 namespace audio {
 
@@ -43,8 +44,15 @@ zx_status_t SimpleCodecServer::CreateAndAddToDdkInternal() {
   Info info = GetInfo();
   simple_codec_.CreateString("manufacturer", info.manufacturer, &inspect_);
   simple_codec_.CreateString("product", info.product_name, &inspect_);
-  if (!info.unique_id.empty()) {
-    simple_codec_.CreateString("unique_id", info.unique_id, &inspect_);
+  if (info.unique_id) {
+    auto uid_str = fbl::StringPrintf(  // Convert array into 32-char string displaying hex values.
+        "%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X", info.unique_id->at(0),
+        info.unique_id->at(1), info.unique_id->at(2), info.unique_id->at(3), info.unique_id->at(4),
+        info.unique_id->at(5), info.unique_id->at(6), info.unique_id->at(7), info.unique_id->at(8),
+        info.unique_id->at(9), info.unique_id->at(10), info.unique_id->at(11),
+        info.unique_id->at(12), info.unique_id->at(13), info.unique_id->at(14),
+        info.unique_id->at(15));
+    simple_codec_.CreateString("unique_id", uid_str.c_str(), &inspect_);
   }
 
   async_dispatcher_t* dispatcher =
@@ -76,7 +84,7 @@ zx_status_t SimpleCodecServer::CreateAndAddToDdkInternal() {
   };
 
   if (driver_ids_.instance_count != 0) {
-    if (info.unique_id.empty()) {
+    if (!info.unique_id) {
       simple_codec_.CreateString("unique_id", std::to_string(driver_ids_.instance_count),
                                  &inspect_);
     }
@@ -187,7 +195,9 @@ template <class T>
 void SimpleCodecServerInternal<T>::GetProperties(Codec::GetPropertiesCallback callback) {
   Info info = static_cast<T*>(this)->GetInfo();
   fuchsia::hardware::audio::CodecProperties properties;
-  properties.set_unique_id(info.unique_id);
+  if (info.unique_id) {
+    properties.set_unique_id(*info.unique_id);
+  }
   properties.set_product(info.product_name);
   properties.set_manufacturer(info.manufacturer);
   properties.set_plug_detect_capabilities(audio_fidl::PlugDetectCapabilities::HARDWIRED);

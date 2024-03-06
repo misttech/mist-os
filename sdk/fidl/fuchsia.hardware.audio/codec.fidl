@@ -41,7 +41,7 @@ type CodecProperties = table {
     /// If not included, there is no unique id for the Codec.
     ///
     /// Optional.
-    4: unique_id string:UNIQUE_ID_SIZE;
+    4: unique_id array<uint8, UNIQUE_ID_SIZE>;
 
     /// Plug Detect Capabilities.
     ///
