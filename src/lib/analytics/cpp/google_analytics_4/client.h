@@ -10,6 +10,7 @@
 #include <string_view>
 
 #include "src/lib/analytics/cpp/google_analytics_4/event.h"
+#include "src/lib/analytics/cpp/google_analytics_4/measurement.h"
 
 namespace analytics::google_analytics_4 {
 
@@ -34,6 +35,8 @@ class Client {
   void SetUserProperty(std::string name, Value value);
 
   void AddEvent(std::unique_ptr<Event> event_ptr);
+  void AddEvents(std::vector<std::unique_ptr<Event>> event_ptrs,
+                 size_t batch_size = kMeasurementEventMaxCount);
 
  protected:
   auto& url() { return url_; }
@@ -41,6 +44,8 @@ class Client {
  private:
   bool IsReady() const;
   virtual void SendData(std::string body) = 0;
+  void AddEventsDirectly(std::vector<std::unique_ptr<Event>> event_ptrs);
+  void AddEventsInLoop(std::vector<std::unique_ptr<Event>> event_ptrs, size_t batch_size);
 
   std::string client_id_;
   std::string url_;

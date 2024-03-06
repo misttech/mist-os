@@ -23,4 +23,8 @@ void Measurement::SetUserProperties(std::map<std::string, Value> user_properties
   user_properties_opt_ = std::move(user_properties);
 }
 
+void Measurement::SetEvents(std::vector<std::unique_ptr<Event>> event_ptrs) {
+  event_ptrs_ = std::move(event_ptrs);
+}
+
 }  // namespace analytics::google_analytics_4

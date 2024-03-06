@@ -6,6 +6,8 @@
 
 #include <lib/syslog/cpp/macros.h>
 
+#include <cstddef>
+
 #include "src/lib/analytics/cpp/google_analytics_4/measurement.h"
 #include "src/lib/fxl/strings/substitute.h"
 #include "third_party/rapidjson/include/rapidjson/stringbuffer.h"
@@ -48,6 +50,9 @@ std::string GeneratePostBody(const Measurement& measurement) {
   writer.Key("events");
   writer.StartArray();
   for (auto const& event_ptr : measurement.event_ptrs()) {
+    if (!event_ptr) {
+      continue;
+    }
     writer.StartObject();
     writer.Key("name");
     writer.String(event_ptr->name());
@@ -106,6 +111,40 @@ void Client::AddEvent(std::unique_ptr<Event> event_ptr) {
   }
   measurement.AddEvent(std::move(event_ptr));
   SendData(GeneratePostBody(measurement));
+}
+
+void Client::AddEventsDirectly(std::vector<std::unique_ptr<Event>> event_ptrs) {
+  Measurement measurement(client_id_);
+  if (!user_properties_.empty()) {
+    measurement.SetUserProperties(user_properties_);
+  }
+  measurement.SetEvents(std::move(event_ptrs));
+  SendData(GeneratePostBody(measurement));
+}
+
+void Client::AddEventsInLoop(std::vector<std::unique_ptr<Event>> event_ptrs, size_t batch_size) {
+  batch_size = (batch_size == 0) ? 1 : batch_size;
+  size_t loop_count = event_ptrs.size() / batch_size + (event_ptrs.size() % batch_size != 0);
+  size_t base = 0;
+  for (size_t i = 0; i < loop_count; i++, base += batch_size) {
+    Measurement measurement(client_id_);
+    if (!user_properties_.empty()) {
+      measurement.SetUserProperties(user_properties_);
+    }
+    for (size_t j = 0; j < batch_size && base + j < event_ptrs.size(); j++) {
+      measurement.AddEvent(std::move(event_ptrs[base + j]));
+    }
+    SendData(GeneratePostBody(measurement));
+  }
+}
+
+void Client::AddEvents(std::vector<std::unique_ptr<Event>> event_ptrs, size_t batch_size) {
+  FX_DCHECK(IsReady());
+  if (event_ptrs.size() <= batch_size) {
+    AddEventsDirectly(std::move(event_ptrs));
+  } else {
+    AddEventsInLoop(std::move(event_ptrs), batch_size);
+  }
 }
 
 bool Client::IsReady() const { return !client_id_.empty() && !url_.empty(); }

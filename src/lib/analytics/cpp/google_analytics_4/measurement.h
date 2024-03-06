@@ -5,6 +5,7 @@
 #ifndef SRC_LIB_ANALYTICS_CPP_GOOGLE_ANALYTICS_4_MEASUREMENT_H_
 #define SRC_LIB_ANALYTICS_CPP_GOOGLE_ANALYTICS_4_MEASUREMENT_H_
 
+#include <cstddef>
 #include <memory>
 #include <optional>
 #include <string>
@@ -13,6 +14,8 @@
 #include "src/lib/analytics/cpp/google_analytics_4/event.h"
 
 namespace analytics::google_analytics_4 {
+
+inline constexpr size_t kMeasurementEventMaxCount = 25;
 
 // Represents a JSON post body for GA4 measurement protocol as described in
 // https://developers.google.com/analytics/devguides/collection/protocol/ga4/reference?client_type=gtag#payload_post_body
@@ -32,6 +35,8 @@ class Measurement {
   void SetUserProperty(std::string name, Value value);
   // Replace the whole user_properties map. Previously set values will be lost.
   void SetUserProperties(std::map<std::string, Value> user_properties);
+  // Replace the whole events vector. Previously added events will be lost.
+  void SetEvents(std::vector<std::unique_ptr<Event>> event_ptrs);
 
  private:
   std::string client_id_;
