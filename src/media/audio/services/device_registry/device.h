@@ -70,17 +70,20 @@ class Device : public std::enable_shared_from_this<Device> {
     return driver_format_->pcm_format()->valid_bits_per_sample();
   }
 
-  bool SetGain(fuchsia_hardware_audio::GainState& gain_state);
   // Translate from the specified client format to the fuchsia_hardware_audio format that the driver
   // can support, including valid_bits_per_sample (which clients don't specify). If the driver
   // cannot satisfy the requested format, `.pcm_format` will be missing in the returned table.
   std::optional<fuchsia_hardware_audio::Format> SupportedDriverFormatForClientFormat(
       // TODO(https://fxbug.dev/42069015): Consider using media_audio::Format internally.
       const fuchsia_audio::Format& client_format);
+  bool SetGain(fuchsia_hardware_audio::GainState& gain_state);
 
   void RetrieveRingBufferFormatSets(
       fit::callback<void(std::vector<fuchsia_hardware_audio::SupportedFormats>)>
           ring_buffer_format_sets_callback);
+  void RetrieveDaiFormatSets(
+      fit::callback<void(std::vector<fuchsia_hardware_audio::DaiSupportedFormats>)>
+          dai_format_sets_callback);
 
   struct RingBufferInfo {
     fuchsia_audio::RingBuffer ring_buffer;
@@ -101,6 +104,9 @@ class Device : public std::enable_shared_from_this<Device> {
 
   const std::vector<fuchsia_audio_device::PcmFormatSet>& ring_buffer_format_sets() const {
     return translated_ring_buffer_format_sets_;
+  }
+  const std::vector<fuchsia_hardware_audio::DaiSupportedFormats>& dai_format_sets() const {
+    return *dai_format_sets_;
   }
 
   // Static object counts, for debugging purposes.
@@ -133,8 +139,13 @@ class Device : public std::enable_shared_from_this<Device> {
   void RetrieveStreamPlugState();
   void RetrieveStreamHealthState();
 
-  void OnInitializationResponse();
+  void RetrieveCodecProperties();
+  void RetrieveInitialDaiFormats();
+  void RetrieveCodecPlugState();
+  void RetrieveCodecHealthState();
+
   bool IsFullyInitialized();
+  void OnInitializationResponse();
   void OnError(zx_status_t error);
   // Otherwise-normal departure of a device, such as USB device unplug-removal.
   void OnRemoval();
@@ -146,6 +157,9 @@ class Device : public std::enable_shared_from_this<Device> {
 
   static void SanitizeStreamPropertiesStrings(
       std::optional<fuchsia_hardware_audio::StreamProperties>& stream_properties);
+  static void SanitizeCodecPropertiesStrings(
+      std::optional<fuchsia_hardware_audio::CodecProperties>& codec_properties);
+
   fuchsia_audio_device::Info CreateDeviceInfo();
   void SetDeviceInfo();
 
@@ -220,6 +234,7 @@ class Device : public std::enable_shared_from_this<Device> {
   const std::string name_;
   const fuchsia_audio_device::DeviceType device_type_;
   fuchsia_audio_device::DriverClient driver_client_;
+  std::optional<fidl::Client<fuchsia_hardware_audio::Codec>> codec_client_;
   std::optional<fidl::Client<fuchsia_hardware_audio::StreamConfig>> stream_config_client_;
 
   // Assigned by this service, guaranteed unique for this boot session, but not across reboots.
@@ -232,6 +247,9 @@ class Device : public std::enable_shared_from_this<Device> {
   std::optional<fuchsia_hardware_audio::GainState> gain_state_;
   std::optional<fuchsia_hardware_audio::PlugState> plug_state_;
   std::optional<bool> health_state_;
+
+  std::optional<fuchsia_hardware_audio::CodecProperties> codec_properties_;
+  std::optional<std::vector<fuchsia_hardware_audio::DaiSupportedFormats>> dai_format_sets_;
 
   State state_{State::DeviceInitializing};
 
@@ -257,6 +275,7 @@ class Device : public std::enable_shared_from_this<Device> {
     std::string_view name_;
   };
 
+  FidlErrorHandler<fuchsia_hardware_audio::Codec> codec_handler_;
   FidlErrorHandler<fuchsia_hardware_audio::StreamConfig> stream_config_handler_;
 
   // Members related to driver RingBuffer.

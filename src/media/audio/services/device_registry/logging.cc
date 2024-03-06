@@ -13,6 +13,7 @@
 #include <iomanip>
 #include <string>
 
+#include "fidl/fuchsia.audio.device/cpp/common_types.h"
 #include "src/media/audio/services/device_registry/basic_types.h"
 #include "src/media/audio/services/device_registry/control_creator_server.h"
 #include "src/media/audio/services/device_registry/control_server.h"
@@ -26,7 +27,7 @@ namespace media_audio {
 
 std::string UidToString(std::optional<UniqueId> unique_instance_id) {
   if (!unique_instance_id) {
-    return "NONE";
+    return "<none>";
   }
 
   auto id = *unique_instance_id;
@@ -56,32 +57,32 @@ void LogStreamProperties(const fuchsia_hardware_audio::StreamProperties& stream_
   FX_LOGS(INFO) << "    unique_id         " << UidToString(stream_props.unique_id());
   FX_LOGS(INFO) << "    is_input          "
                 << (stream_props.is_input() ? (*stream_props.is_input() ? "TRUE" : "FALSE")
-                                            : "NONE (non-compliant)");
+                                            : "<none> (non-compliant)");
   FX_LOGS(INFO) << "    can_mute          "
                 << (stream_props.can_mute() ? (*stream_props.can_mute() ? "TRUE" : "FALSE")
-                                            : "NONE (cannot mute)");
+                                            : "<none> (cannot mute)");
   FX_LOGS(INFO) << "    can_agc           "
                 << (stream_props.can_agc() ? (*stream_props.can_agc() ? "TRUE" : "FALSE")
-                                           : "NONE (cannot enable AGC)");
+                                           : "<none> (cannot enable AGC)");
   if (stream_props.min_gain_db()) {
     FX_LOGS(INFO) << "    min_gain_db       " << *stream_props.min_gain_db() << " dB";
   } else {
-    FX_LOGS(INFO) << "    min_gain_db       NONE (non-compliant)";
+    FX_LOGS(INFO) << "    min_gain_db       <none> (non-compliant)";
   }
   if (stream_props.max_gain_db()) {
     FX_LOGS(INFO) << "    max_gain_db       " << *stream_props.max_gain_db() << " dB";
   } else {
-    FX_LOGS(INFO) << "    max_gain_db       NONE (non-compliant)";
+    FX_LOGS(INFO) << "    max_gain_db       <none> (non-compliant)";
   }
   if (stream_props.gain_step_db()) {
     FX_LOGS(INFO) << "    gain_step_db      " << *stream_props.gain_step_db() << " dB";
   } else {
-    FX_LOGS(INFO) << "    gain_step_db      NONE (non-compliant)";
+    FX_LOGS(INFO) << "    gain_step_db      <none> (non-compliant)";
   }
   if (stream_props.plug_detect_capabilities()) {
     FX_LOGS(INFO) << "    plug_detect_caps  " << *stream_props.plug_detect_capabilities();
   } else {
-    FX_LOGS(INFO) << "    plug_detect_caps  NONE (non-compliant)";
+    FX_LOGS(INFO) << "    plug_detect_caps  <none> (non-compliant)";
   }
   FX_LOGS(INFO) << "    manufacturer      "
                 << (stream_props.manufacturer()
@@ -89,13 +90,13 @@ void LogStreamProperties(const fuchsia_hardware_audio::StreamProperties& stream_
                            std::string(stream_props.manufacturer()->data(),
                                        stream_props.manufacturer()->size()) +
                            "'")
-                        : "NONE");
+                        : "<none>");
   FX_LOGS(INFO) << "    product           "
                 << (stream_props.product() ? ("'" +
                                               std::string(stream_props.product()->data(),
                                                           stream_props.product()->size()) +
                                               "'")
-                                           : "NONE");
+                                           : "<none>");
 
   std::string clock_domain_str{"   clock _domain     "};
   if (stream_props.clock_domain()) {
@@ -106,7 +107,7 @@ void LogStreamProperties(const fuchsia_hardware_audio::StreamProperties& stream_
       clock_domain_str += "  (CLOCK_DOMAIN_EXTERNAL)";
     }
   } else {
-    clock_domain_str += "NONE (non-compliant)";
+    clock_domain_str += "<none> (non-compliant)";
   }
   FX_LOGS(INFO) << clock_domain_str;
 }
@@ -122,7 +123,7 @@ void LogRingBufferFormatSets(
   for (auto idx = 0u; idx < ring_buffer_format_sets.size(); ++idx) {
     auto ring_buffer_format_set = ring_buffer_format_sets[idx];
     if (!ring_buffer_format_set.pcm_supported_formats()) {
-      FX_LOGS(INFO) << "      [" << idx << "] NONE (non-compliant)";
+      FX_LOGS(INFO) << "      [" << idx << "] <none> (non-compliant)";
       continue;
     }
     FX_LOGS(INFO) << "      [" << idx << "] pcm_supported_formats:";
@@ -132,7 +133,7 @@ void LogRingBufferFormatSets(
       FX_LOGS(INFO) << "            channel_sets[" << channel_sets.size() << "]:";
       for (auto idx = 0u; idx < channel_sets.size(); ++idx) {
         if (!channel_sets[idx].attributes()) {
-          FX_LOGS(INFO) << "              [" << idx << "] NONE (non-compliant)";
+          FX_LOGS(INFO) << "              [" << idx << "] <none> (non-compliant)";
           continue;
         }
         const auto& attribs = *channel_sets[idx].attributes();
@@ -142,15 +143,15 @@ void LogRingBufferFormatSets(
           FX_LOGS(INFO) << "                     min_frequency   "
                         << (attribs[idx].min_frequency()
                                 ? std::to_string(*attribs[idx].min_frequency())
-                                : "NONE");
+                                : "<none>");
           FX_LOGS(INFO) << "                     max_frequency   "
                         << (attribs[idx].max_frequency()
                                 ? std::to_string(*attribs[idx].max_frequency())
-                                : "NONE");
+                                : "<none>");
         }
       }
     } else {
-      FX_LOGS(INFO) << "            NONE (non-compliant)";
+      FX_LOGS(INFO) << "            <none> (non-compliant)";
     }
 
     if (pcm_format_set.sample_formats()) {
@@ -160,7 +161,7 @@ void LogRingBufferFormatSets(
         FX_LOGS(INFO) << "              [" << idx << "]    " << sample_formats[idx];
       }
     } else {
-      FX_LOGS(INFO) << "            NONE (non-compliant)";
+      FX_LOGS(INFO) << "            <none> (non-compliant)";
     }
     if (pcm_format_set.bytes_per_sample()) {
       const auto& bytes_per_sample = *pcm_format_set.bytes_per_sample();
@@ -170,7 +171,7 @@ void LogRingBufferFormatSets(
                       << static_cast<int16_t>(bytes_per_sample[idx]);
       }
     } else {
-      FX_LOGS(INFO) << "            NONE (non-compliant)";
+      FX_LOGS(INFO) << "            <none> (non-compliant)";
     }
     if (pcm_format_set.valid_bits_per_sample()) {
       const auto& valid_bits_per_sample = *pcm_format_set.valid_bits_per_sample();
@@ -180,7 +181,7 @@ void LogRingBufferFormatSets(
                       << static_cast<int16_t>(valid_bits_per_sample[idx]);
       }
     } else {
-      FX_LOGS(INFO) << "            NONE (non-compliant)";
+      FX_LOGS(INFO) << "            <none> (non-compliant)";
     }
     if (pcm_format_set.frame_rates()) {
       const auto& frame_rates = *pcm_format_set.frame_rates();
@@ -189,7 +190,7 @@ void LogRingBufferFormatSets(
         FX_LOGS(INFO) << "              [" << idx << "]    " << frame_rates[idx];
       }
     } else {
-      FX_LOGS(INFO) << "            NONE (non-compliant)";
+      FX_LOGS(INFO) << "            <none> (non-compliant)";
     }
   }
 }
@@ -202,14 +203,14 @@ void LogGainState(const fuchsia_hardware_audio::GainState& gain_state) {
   FX_LOGS(INFO) << "fuchsia_hardware_audio/GainState:";
   FX_LOGS(INFO) << "    muted            "
                 << (gain_state.muted() ? (*gain_state.muted() ? "TRUE" : "FALSE")
-                                       : "NONE (Unmuted)");
+                                       : "<none> (Unmuted)");
   FX_LOGS(INFO) << "    agc_enabled      "
                 << (gain_state.agc_enabled() ? (*gain_state.agc_enabled() ? "TRUE" : "FALSE")
-                                             : "NONE (Disabled)");
+                                             : "<none> (Disabled)");
   if (gain_state.gain_db()) {
     FX_LOGS(INFO) << "    gain_db          " << *gain_state.gain_db() << " dB";
   } else {
-    FX_LOGS(INFO) << "    gain_db          NONE (non-compliant)";
+    FX_LOGS(INFO) << "    gain_db          <none> (non-compliant)";
   }
 }
 
@@ -221,10 +222,10 @@ void LogPlugState(const fuchsia_hardware_audio::PlugState& plug_state) {
   FX_LOGS(INFO) << "fuchsia_hardware_audio/PlugState:";
   FX_LOGS(INFO) << "    plugged          "
                 << (plug_state.plugged() ? (*plug_state.plugged() ? "TRUE" : "FALSE")
-                                         : "NONE (non-compliant)");
+                                         : "<none> (non-compliant)");
   FX_LOGS(INFO) << "    plug_state_time  "
                 << (plug_state.plug_state_time() ? std::to_string(*plug_state.plug_state_time())
-                                                 : "NONE (non-compliant)");
+                                                 : "<none> (non-compliant)");
 }
 
 void LogCodecProperties(const fuchsia_hardware_audio::CodecProperties& codec_props) {
@@ -236,31 +237,31 @@ void LogCodecProperties(const fuchsia_hardware_audio::CodecProperties& codec_pro
 
   FX_LOGS(INFO) << "    is_input          "
                 << (codec_props.is_input() ? (*codec_props.is_input() ? "TRUE" : "FALSE")
-                                           : "NONE (non-compliant)");
+                                           : "<none> (non-compliant)");
   FX_LOGS(INFO) << "    manufacturer      "
                 << (codec_props.manufacturer() ? ("'" +
                                                   std::string(codec_props.manufacturer()->data(),
                                                               codec_props.manufacturer()->size()) +
                                                   "'")
-                                               : "NONE");
+                                               : "<none>");
   FX_LOGS(INFO) << "    product           "
                 << (codec_props.product() ? ("'" +
                                              std::string(codec_props.product()->data(),
                                                          codec_props.product()->size()) +
                                              "'")
-                                          : "NONE");
+                                          : "<none>");
   if (codec_props.unique_id()) {
     std::array<unsigned char, fuchsia_audio_device::kUniqueInstanceIdSize> uid{};
     strncpy(reinterpret_cast<char*>(uid.data()), codec_props.unique_id()->data(),
             fuchsia_audio_device::kUniqueInstanceIdSize);
     FX_LOGS(INFO) << "    unique_id         " << UidToString(uid);
   } else {
-    FX_LOGS(INFO) << "    unique_id         NONE";
+    FX_LOGS(INFO) << "    unique_id         <none>";
   }
   if (codec_props.plug_detect_capabilities()) {
     FX_LOGS(INFO) << "    plug_detect_caps  " << *codec_props.plug_detect_capabilities();
   } else {
-    FX_LOGS(INFO) << "    plug_detect_caps  NONE (non-compliant)";
+    FX_LOGS(INFO) << "    plug_detect_caps  <none> (non-compliant)";
   }
 }
 
@@ -349,13 +350,13 @@ void LogCodecFormatInfo(std::optional<fuchsia_hardware_audio::CodecFormatInfo> f
   }
   FX_LOGS(INFO) << "    external_delay (ns)   "
                 << (format_info->external_delay() ? std::to_string(*format_info->external_delay())
-                                                  : "NONE");
+                                                  : "<none>");
   FX_LOGS(INFO) << "    turn_on_delay  (ns)   "
                 << (format_info->turn_on_delay() ? std::to_string(*format_info->turn_on_delay())
-                                                 : "NONE");
+                                                 : "<none>");
   FX_LOGS(INFO) << "    turn_off_delay (ns)   "
                 << (format_info->turn_off_delay() ? std::to_string(*format_info->turn_off_delay())
-                                                  : "NONE");
+                                                  : "<none>");
 }
 
 void LogDeviceInfo(const fuchsia_audio_device::Info& device_info) {
@@ -366,7 +367,7 @@ void LogDeviceInfo(const fuchsia_audio_device::Info& device_info) {
                           : "[nameless]")
                   << ", assigned token_id "
                   << (device_info.token_id() ? std::to_string(*device_info.token_id())
-                                             : "NONE (non-compliant)");
+                                             : "<none> (non-compliant)");
   }
   if constexpr (!kLogDetailedFinalDeviceInfo) {
     return;
@@ -374,23 +375,29 @@ void LogDeviceInfo(const fuchsia_audio_device::Info& device_info) {
 
   FX_LOGS(INFO) << "fuchsia_audio_device/Info:";
 
-  FX_LOGS(INFO) << "   token_id           "
+  FX_LOGS(INFO) << "   token_id                     "
                 << (device_info.token_id() ? std::to_string(*device_info.token_id())
-                                           : "NONE (non-compliant)");
+                                           : "<none> (non-compliant)");
 
-  FX_LOGS(INFO) << "   device_type       " << device_info.device_type();
+  FX_LOGS(INFO) << "   device_type                  " << device_info.device_type();
 
-  FX_LOGS(INFO) << "   device_name        "
+  FX_LOGS(INFO) << "   device_name                  "
                 << (device_info.device_name() ? std::string("'") + *device_info.device_name() + "'"
-                                              : "NONE");
+                                              : "<none>");
 
-  FX_LOGS(INFO) << "   manufacturer       "
-                << (device_info.manufacturer() ? "'" + *device_info.manufacturer() + "'" : "NONE");
+  FX_LOGS(INFO) << "   manufacturer                 "
+                << (device_info.manufacturer() ? "'" + *device_info.manufacturer() + "'"
+                                               : "<none>");
 
-  FX_LOGS(INFO) << "   product            "
-                << (device_info.product() ? "'" + *device_info.product() + "'" : "NONE");
+  FX_LOGS(INFO) << "   product                      "
+                << (device_info.product() ? "'" + *device_info.product() + "'" : "<none>");
 
-  FX_LOGS(INFO) << "   unique_instance_id " << UidToString(device_info.unique_instance_id());
+  FX_LOGS(INFO) << "   unique_instance_id           "
+                << UidToString(device_info.unique_instance_id());
+
+  FX_LOGS(INFO) << "   is_input                     "
+                << (device_info.is_input() ? (*device_info.is_input() ? "TRUE" : "FALSE")
+                                           : "<none>");
 
   if (device_info.ring_buffer_format_sets()) {
     FX_LOGS(INFO) << "   ring_buffer_format_sets[" << device_info.ring_buffer_format_sets()->size()
@@ -411,21 +418,21 @@ void LogDeviceInfo(const fuchsia_audio_device::Info& device_info) {
                 FX_LOGS(INFO) << "                [" << idx << "]  min_frequency   "
                               << *attributes.min_frequency();
               } else {
-                FX_LOGS(INFO) << "                [" << idx << "]  min_frequency   NONE";
+                FX_LOGS(INFO) << "                [" << idx << "]  min_frequency   <none>";
               }
               if (attributes.max_frequency()) {
                 FX_LOGS(INFO) << "                     max_frequency   "
                               << *attributes.max_frequency();
               } else {
-                FX_LOGS(INFO) << "                     max_frequency   NONE";
+                FX_LOGS(INFO) << "                     max_frequency   <none>";
               }
             }
           } else {
-            FX_LOGS(INFO) << "          [" << idx << "]  attributes   NONE  (non-compliant)";
+            FX_LOGS(INFO) << "          [" << idx << "]  attributes   <none>  (non-compliant)";
           }
         }
       } else {
-        FX_LOGS(INFO) << "    [" << idx << "]  channel_sets      NONE (non-compliant)";
+        FX_LOGS(INFO) << "    [" << idx << "]  channel_sets      <none> (non-compliant)";
       }
 
       if (pcm_format_set.sample_types()) {
@@ -434,7 +441,7 @@ void LogDeviceInfo(const fuchsia_audio_device::Info& device_info) {
           FX_LOGS(INFO) << "          [" << idx << "]  " << pcm_format_set.sample_types()->at(idx);
         }
       } else {
-        FX_LOGS(INFO) << "         sample_types      NONE (non-compliant)";
+        FX_LOGS(INFO) << "         sample_types      <none> (non-compliant)";
       }
       if (pcm_format_set.frame_rates()) {
         FX_LOGS(INFO) << "         frame_rates[" << pcm_format_set.frame_rates()->size() << "]";
@@ -442,50 +449,107 @@ void LogDeviceInfo(const fuchsia_audio_device::Info& device_info) {
           FX_LOGS(INFO) << "          [" << idx << "]  " << pcm_format_set.frame_rates()->at(idx);
         }
       } else {
-        FX_LOGS(INFO) << "         frame_rates       NONE (non-compliant)";
+        FX_LOGS(INFO) << "         frame_rates       <none> (non-compliant)";
       }
     }
   } else {
-    FX_LOGS(INFO) << "    ring_buffer_format_sets  NONE (non-compliant)";
+    FX_LOGS(INFO) << "   ring_buffer_format_sets      <none>"
+                  << ((device_info.device_type() == fuchsia_audio_device::DeviceType::kInput ||
+                       device_info.device_type() == fuchsia_audio_device::DeviceType::kOutput)
+                          ? " (non-compliant)"
+                          : "");
   }
 
-  FX_LOGS(INFO) << "   is_input           "
-                << (device_info.is_input() ? (*device_info.is_input() ? "TRUE" : "FALSE") : "NONE");
+  // dai_format_sets
+  if (device_info.dai_format_sets()) {
+    FX_LOGS(INFO) << "   dai_format_sets[" << device_info.dai_format_sets()->size() << "]:";
+    for (auto idx = 0u; idx < device_info.dai_format_sets()->size(); ++idx) {
+      auto dai_format_set = device_info.dai_format_sets()->at(idx);
+      FX_LOGS(INFO) << "      [" << idx << "]";
+
+      const auto& channel_counts = dai_format_set.number_of_channels();
+      FX_LOGS(INFO) << "        number_of_channels[" << channel_counts.size() << "]:";
+      for (auto idx = 0u; idx < channel_counts.size(); ++idx) {
+        FX_LOGS(INFO) << "          [" << idx << "]:   " << channel_counts[idx];
+      }
+
+      const auto& sample_formats = dai_format_set.sample_formats();
+      FX_LOGS(INFO) << "        sample_formats[" << sample_formats.size() << "]:";
+      for (auto idx = 0u; idx < sample_formats.size(); ++idx) {
+        FX_LOGS(INFO) << "          [" << idx << "]    " << sample_formats[idx];
+      }
+
+      const auto& frame_formats = dai_format_set.frame_formats();
+      FX_LOGS(INFO) << "        frame_formats[" << frame_formats.size() << "]:";
+      for (auto idx = 0u; idx < frame_formats.size(); ++idx) {
+        FX_LOGS(INFO) << "          [" << idx << "]    " << frame_formats[idx];
+      }
+
+      const auto& frame_rates = dai_format_set.frame_rates();
+      FX_LOGS(INFO) << "        frame_rates[" << frame_rates.size() << "]:";
+      for (auto idx = 0u; idx < frame_rates.size(); ++idx) {
+        FX_LOGS(INFO) << "          [" << idx << "]    " << frame_rates[idx];
+      }
+
+      const auto& bits_per_slot = dai_format_set.bits_per_slot();
+      FX_LOGS(INFO) << "        bits_per_slot[" << bits_per_slot.size() << "]:";
+      for (auto idx = 0u; idx < bits_per_slot.size(); ++idx) {
+        FX_LOGS(INFO) << "          [" << idx << "]    "
+                      << static_cast<int16_t>(bits_per_slot[idx]);
+      }
+
+      const auto& bits_per_sample = dai_format_set.bits_per_sample();
+      FX_LOGS(INFO) << "        bits_per_sample[" << bits_per_sample.size() << "]:";
+      for (auto idx = 0u; idx < bits_per_sample.size(); ++idx) {
+        FX_LOGS(INFO) << "          [" << idx << "]    "
+                      << static_cast<int16_t>(bits_per_sample[idx]);
+      }
+    }
+  } else {
+    FX_LOGS(INFO) << "   dai_format_sets              <none>"
+                  << ((device_info.device_type() == fuchsia_audio_device::DeviceType::kCodec)
+                          ? " (non-compliant)"
+                          : "");
+  }
 
   if (device_info.gain_caps()) {
     if (device_info.gain_caps()->min_gain_db()) {
-      FX_LOGS(INFO) << "   gain_caps          min_gain_db   "
+      FX_LOGS(INFO) << "   gain_caps                    min_gain_db   "
                     << *device_info.gain_caps()->min_gain_db() << " dB";
     } else {
-      FX_LOGS(INFO) << "   gain_caps          min_gain_db   NONE (non-compliant)";
+      FX_LOGS(INFO) << "   gain_caps                    min_gain_db   <none> (non-compliant)";
     }
     if (device_info.gain_caps()->max_gain_db()) {
       FX_LOGS(INFO) << "                      max_gain_db   "
                     << *device_info.gain_caps()->max_gain_db() << " dB";
     } else {
-      FX_LOGS(INFO) << "                      max_gain_db   NONE (non-compliant)";
+      FX_LOGS(INFO) << "                      max_gain_db   <none> (non-compliant)";
     }
     if (device_info.gain_caps()->gain_step_db()) {
       FX_LOGS(INFO) << "                      gain_step_db  "
                     << *device_info.gain_caps()->gain_step_db() << " dB";
     } else {
-      FX_LOGS(INFO) << "                      gain_step_db  NONE (non-compliant)";
+      FX_LOGS(INFO) << "                      gain_step_db  <none> (non-compliant)";
     }
     FX_LOGS(INFO) << "                      can_mute      "
                   << (device_info.gain_caps()->can_mute()
                           ? (*device_info.gain_caps()->can_mute() ? "true" : "false")
-                          : "NONE (false)");
+                          : "<none> (false)");
     FX_LOGS(INFO) << "                      can_agc       "
                   << (device_info.gain_caps()->can_agc()
                           ? (*device_info.gain_caps()->can_agc() ? "true" : "false")
-                          : "NONE (false)");
+                          : "<none> (false)");
   } else {
-    FX_LOGS(INFO) << "   gain_caps          NONE (non-compliant)";
+    FX_LOGS(INFO) << "   gain_caps                    <none>"
+                  << ((device_info.device_type() == fuchsia_audio_device::DeviceType::kInput ||
+                       device_info.device_type() == fuchsia_audio_device::DeviceType::kOutput)
+                          ? " (non-compliant)"
+                          : "");
   }
 
-  FX_LOGS(INFO) << "   plug_detect_caps   " << device_info.plug_detect_caps();
+  FX_LOGS(INFO) << "   plug_detect_caps             " << device_info.plug_detect_caps();
 
-  std::string clock_domain_str{"   clock_domain       "};
+  std::string clock_domain_str{"   clock_domain                 "};
   if (device_info.clock_domain()) {
     clock_domain_str += std::to_string(*device_info.clock_domain());
     if (*device_info.clock_domain() == fuchsia_hardware_audio::kClockDomainMonotonic) {
@@ -494,7 +558,11 @@ void LogDeviceInfo(const fuchsia_audio_device::Info& device_info) {
       clock_domain_str += "  (CLOCK_DOMAIN_EXTERNAL)";
     }
   } else {
-    clock_domain_str += "NONE (non-compliant)";
+    clock_domain_str += "<none>";
+    if (device_info.device_type() == fuchsia_audio_device::DeviceType::kInput ||
+        device_info.device_type() == fuchsia_audio_device::DeviceType::kOutput) {
+      clock_domain_str += " (non-compliant)";
+    }
   }
   FX_LOGS(INFO) << clock_domain_str;
 
@@ -507,7 +575,7 @@ void LogDeviceInfo(const fuchsia_audio_device::Info& device_info) {
                     << (*device_info.signal_processing_elements())[idx];
     }
   } else {
-    FX_LOGS(INFO) << "   signal_processing_elements   NONE";
+    FX_LOGS(INFO) << "   signal_processing_elements   <none>";
   }
 
   if (device_info.signal_processing_topologies()) {
@@ -520,7 +588,7 @@ void LogDeviceInfo(const fuchsia_audio_device::Info& device_info) {
                     << (*device_info.signal_processing_topologies())[idx];
     }
   } else {
-    FX_LOGS(INFO) << "   signal_processing_topologies NONE";
+    FX_LOGS(INFO) << "   signal_processing_topologies <none>";
   }
 }
 
@@ -533,19 +601,19 @@ void LogRingBufferProperties(const fuchsia_hardware_audio::RingBufferProperties&
   FX_LOGS(INFO) << "    needs_cache_flush       "
                 << (rb_props.needs_cache_flush_or_invalidate()
                         ? (*rb_props.needs_cache_flush_or_invalidate() ? "TRUE" : "FALSE")
-                        : "NONE (non-compliant)");
+                        : "<none> (non-compliant)");
 
   if (rb_props.turn_on_delay()) {
     FX_LOGS(INFO) << "    turn_on_delay           " << *rb_props.turn_on_delay() << " ns";
   } else {
-    FX_LOGS(INFO) << "    turn_on_delay           NONE (0 ns)";
+    FX_LOGS(INFO) << "    turn_on_delay           <none> (0 ns)";
   }
 
   if (rb_props.driver_transfer_bytes()) {
     FX_LOGS(INFO) << "    driver_transfer_bytes   " << *rb_props.driver_transfer_bytes()
                   << " bytes";
   } else {
-    FX_LOGS(INFO) << "    driver_transfer_bytes   NONE (non-compliant)";
+    FX_LOGS(INFO) << "    driver_transfer_bytes   <none> (non-compliant)";
   }
 }
 
@@ -556,7 +624,7 @@ void LogRingBufferFormat(const fuchsia_hardware_audio::Format& ring_buffer_forma
 
   FX_LOGS(INFO) << "fuchsia_hardware_audio/Format:";
   if (!ring_buffer_format.pcm_format()) {
-    FX_LOGS(INFO) << "    pcm_format           NONE (non-compliant)";
+    FX_LOGS(INFO) << "    pcm_format           <none> (non-compliant)";
     return;
   }
 
@@ -624,13 +692,13 @@ void LogDelayInfo(const fuchsia_hardware_audio::DelayInfo& info) {
   if (info.internal_delay()) {
     FX_LOGS(INFO) << "    internal_delay       " << *info.internal_delay() << " ns";
   } else {
-    FX_LOGS(INFO) << "    internal_delay       NONE (non-compliant)";
+    FX_LOGS(INFO) << "    internal_delay       <none> (non-compliant)";
   }
 
   if (info.external_delay()) {
     FX_LOGS(INFO) << "    external_delay       " << *info.external_delay() << " ns";
   } else {
-    FX_LOGS(INFO) << "    external_delay       NONE (0 ns)";
+    FX_LOGS(INFO) << "    external_delay       <none> (0 ns)";
   }
 }
 

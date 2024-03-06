@@ -23,6 +23,7 @@
 #include "src/media/audio/services/device_registry/control_notify.h"
 #include "src/media/audio/services/device_registry/device.h"
 #include "src/media/audio/services/device_registry/observer_notify.h"
+#include "src/media/audio/services/device_registry/testing/fake_codec.h"
 #include "src/media/audio/services/device_registry/testing/fake_device_presence_watcher.h"
 #include "src/media/audio/services/device_registry/testing/fake_stream_config.h"
 #include "src/media/audio/services/device_registry/validate.h"
@@ -40,15 +41,15 @@ class DeviceTestBase : public gtest::TestLoopFixture {
 
  protected:
   std::unique_ptr<FakeStreamConfig> MakeFakeStreamConfigInput() {
-    auto input = MakeFakeStreamConfig();
-    input->set_is_input(true);
-    return input;
+    return MakeFakeStreamConfig(true);
   }
   std::unique_ptr<FakeStreamConfig> MakeFakeStreamConfigOutput() {
-    auto output = MakeFakeStreamConfig();
-    output->set_is_input(false);
-    return output;
+    return MakeFakeStreamConfig(false);
   }
+
+  std::unique_ptr<FakeCodec> MakeFakeCodecInput() { return MakeFakeCodec(true); }
+  std::unique_ptr<FakeCodec> MakeFakeCodecOutput() { return MakeFakeCodec(false); }
+  std::unique_ptr<FakeCodec> MakeFakeCodecNoDirection() { return MakeFakeCodec(std::nullopt); }
 
   std::shared_ptr<Device> InitializeDeviceForFakeStreamConfig(
       const std::unique_ptr<FakeStreamConfig>& driver) {
@@ -64,6 +65,21 @@ class DeviceTestBase : public gtest::TestLoopFixture {
 
     RunLoopUntilIdle();
     EXPECT_FALSE(device->state_ == Device::State::DeviceInitializing);
+
+    return device;
+  }
+
+  std::shared_ptr<Device> InitializeDeviceForFakeCodec(const std::unique_ptr<FakeCodec>& driver) {
+    auto codec_client_end = driver->Enable();
+    EXPECT_TRUE(codec_client_end.is_valid());
+    auto device = Device::Create(
+        std::weak_ptr<FakeDevicePresenceWatcher>(fake_device_presence_watcher_), dispatcher(),
+        "Device name", fuchsia_audio_device::DeviceType::kCodec,
+        fuchsia_audio_device::DriverClient::WithCodec(
+            fidl::ClientEnd<fuchsia_hardware_audio::Codec>(std::move(codec_client_end))));
+
+    RunLoopUntilIdle();
+    EXPECT_FALSE(device->state_ == Device::State::DeviceInitializing) << "Device is initializing";
 
     return device;
   }
@@ -131,11 +147,23 @@ class DeviceTestBase : public gtest::TestLoopFixture {
     }
     std::optional<fuchsia_audio_device::DelayInfo>& delay_info() { return delay_info_; }
 
+    std::optional<fuchsia_hardware_audio::DaiFormat>& dai_format() { return dai_format_; }
+    std::optional<fuchsia_hardware_audio::CodecFormatInfo>& codec_format_info() {
+      return codec_format_info_;
+    }
+    std::optional<zx::time>& codec_start_time() { return codec_start_time_; }
+    std::optional<zx::time>& codec_stop_time() { return codec_stop_time_; }
+
    private:
     [[maybe_unused]] DeviceTestBase& parent_;
     std::optional<fuchsia_audio_device::GainState> gain_state_;
     std::optional<std::pair<fuchsia_audio_device::PlugState, zx::time>> plug_state_;
     std::optional<fuchsia_audio_device::DelayInfo> delay_info_;
+
+    std::optional<fuchsia_hardware_audio::DaiFormat> dai_format_;
+    std::optional<fuchsia_hardware_audio::CodecFormatInfo> codec_format_info_;
+    std::optional<zx::time> codec_start_time_;
+    std::optional<zx::time> codec_stop_time_;
   };
 
   static uint8_t ExpectFormatMatch(std::shared_ptr<Device> device,
@@ -286,17 +314,65 @@ class DeviceTestBase : public gtest::TestLoopFixture {
     return device->device_clock_;
   }
 
+  ////////////////////////
+  // Codec-related methods
+  static fuchsia_hardware_audio::DaiFormat SafeDaiFormatFromDaiSupportedFormats(
+      const std::vector<fuchsia_hardware_audio::DaiSupportedFormats>& dai_formats) {
+    if (dai_formats.empty()) {
+      ADD_FAILURE() << "empty DaiSupportedFormats";
+      return fuchsia_hardware_audio::DaiFormat{{}};
+    }
+    if (dai_formats[0].number_of_channels().empty() || dai_formats[0].sample_formats().empty() ||
+        dai_formats[0].frame_formats().empty() || dai_formats[0].frame_rates().empty() ||
+        dai_formats[0].bits_per_slot().empty() || dai_formats[0].bits_per_sample().empty()) {
+      ADD_FAILURE() << "empty sub-vector in DaiSupportedFormats";
+      return fuchsia_hardware_audio::DaiFormat{{}};
+    }
+
+    fuchsia_hardware_audio::DaiFormat dai_format{{
+        .number_of_channels = dai_formats[0].number_of_channels()[0],
+        .channels_to_use_bitmask = (dai_formats[0].number_of_channels()[0] < 64
+                                        ? (1ull << dai_formats[0].number_of_channels()[0]) - 1ull
+                                        : 0xFFFFFFFFFFFFFFFFull),
+        .sample_format = dai_formats[0].sample_formats()[0],
+        .frame_format = dai_formats[0].frame_formats()[0],
+        .frame_rate = dai_formats[0].frame_rates()[0],
+        .bits_per_slot = dai_formats[0].bits_per_slot()[0],
+        .bits_per_sample = dai_formats[0].bits_per_sample()[0],
+    }};
+    if (ValidateDaiFormat(dai_format) != ZX_OK) {
+      ADD_FAILURE() << "first entries did not create a valid DaiFormat";
+      return fuchsia_hardware_audio::DaiFormat{{}};
+    }
+    return dai_format;
+  }
+
+  /////////////////////////////
+  // General consts and members
+  static constexpr zx::duration kCommandTimeout = zx::sec(0);
+
   std::shared_ptr<NotifyStub> notify_;
 
   // Receives "OnInitCompletion", "DeviceHasError", "DeviceIsRemoved" notifications from Devices.
   std::shared_ptr<FakeDevicePresenceWatcher> fake_device_presence_watcher_;
 
  private:
-  std::unique_ptr<FakeStreamConfig> MakeFakeStreamConfig() {
+  std::unique_ptr<FakeStreamConfig> MakeFakeStreamConfig(bool is_input = false) {
     zx::channel server_end, client_end;
     EXPECT_EQ(ZX_OK, zx::channel::create(0, &server_end, &client_end));
-    return std::make_unique<FakeStreamConfig>(std::move(server_end), std::move(client_end),
-                                              dispatcher());
+    auto fake_stream = std::make_unique<FakeStreamConfig>(std::move(server_end),
+                                                          std::move(client_end), dispatcher());
+    fake_stream->set_is_input(is_input);
+    return fake_stream;
+  }
+
+  std::unique_ptr<FakeCodec> MakeFakeCodec(std::optional<bool> is_input = false) {
+    zx::channel server_end, client_end;
+    EXPECT_EQ(ZX_OK, zx::channel::create(0, &server_end, &client_end));
+    auto fake_codec =
+        std::make_unique<FakeCodec>(std::move(server_end), std::move(client_end), dispatcher());
+    fake_codec->set_is_input(is_input);
+    return fake_codec;
   }
 };
 

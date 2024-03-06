@@ -28,11 +28,6 @@ zx_status_t ValidateStreamProperties(
     const fuchsia_hardware_audio::StreamProperties& stream_props,
     std::optional<const fuchsia_hardware_audio::GainState> gain_state = std::nullopt,
     std::optional<const fuchsia_hardware_audio::PlugState> plug_state = std::nullopt);
-zx_status_t ValidateRingBufferFormatSets(
-    const std::vector<fuchsia_hardware_audio::SupportedFormats>& ring_buffer_format_sets);
-zx_status_t ValidateRingBufferFormat(const fuchsia_hardware_audio::Format& ring_buffer_format);
-zx_status_t ValidateSampleFormatCompatibility(uint8_t bytes_per_sample,
-                                              fuchsia_hardware_audio::SampleFormat sample_format);
 zx_status_t ValidateGainState(
     const fuchsia_hardware_audio::GainState& gain_state,
     std::optional<const fuchsia_hardware_audio::StreamProperties> stream_props = std::nullopt);
@@ -43,12 +38,19 @@ zx_status_t ValidatePlugState(const fuchsia_hardware_audio::PlugState& plug_stat
 zx_status_t ValidateCodecProperties(
     const fuchsia_hardware_audio::CodecProperties& codec_props,
     std::optional<const fuchsia_hardware_audio::PlugState> plug_state = std::nullopt);
-zx_status_t ValidateDaiFormatSets(
-    const std::vector<fuchsia_hardware_audio::DaiSupportedFormats>& dai_format_sets);
-zx_status_t ValidateDaiFormat(const fuchsia_hardware_audio::DaiFormat& dai_format);
 zx_status_t ValidateCodecFormatInfo(const fuchsia_hardware_audio::CodecFormatInfo& format_info);
 
 bool ValidateDeviceInfo(const fuchsia_audio_device::Info& device_info);
+
+zx_status_t ValidateRingBufferFormatSets(
+    const std::vector<fuchsia_hardware_audio::SupportedFormats>& ring_buffer_format_sets);
+zx_status_t ValidateRingBufferFormat(const fuchsia_hardware_audio::Format& ring_buffer_format);
+zx_status_t ValidateSampleFormatCompatibility(uint8_t bytes_per_sample,
+                                              fuchsia_hardware_audio::SampleFormat sample_format);
+
+zx_status_t ValidateDaiFormatSets(
+    const std::vector<fuchsia_hardware_audio::DaiSupportedFormats>& dai_format_sets);
+zx_status_t ValidateDaiFormat(const fuchsia_hardware_audio::DaiFormat& dai_format);
 
 zx_status_t ValidateRingBufferProperties(
     const fuchsia_hardware_audio::RingBufferProperties& rb_props);

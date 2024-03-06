@@ -27,6 +27,7 @@
 #include "src/media/audio/services/device_registry/provider_server.h"
 #include "src/media/audio/services/device_registry/registry_server.h"
 #include "src/media/audio/services/device_registry/ring_buffer_server.h"
+#include "src/media/audio/services/device_registry/testing/fake_codec.h"
 #include "src/media/audio/services/device_registry/testing/fake_stream_config.h"
 
 namespace media_audio {
@@ -42,6 +43,8 @@ inline void LogFidlClientError(fidl::UnbindInfo error, std::string tag = "") {
 // This provides shared unittest functions for AudioDeviceRegistry and the six FIDL server classes.
 class AudioDeviceRegistryServerTestBase : public gtest::TestLoopFixture {
  protected:
+  // Create a FakeStreamConfig that can mock a real device that has been detected, using default
+  // settings. From here, the fake StreamConfig can be customized before it is enabled.
   std::unique_ptr<FakeStreamConfig> CreateFakeStreamConfigInput() {
     return CreateFakeStreamConfig(true);
   }
@@ -49,15 +52,36 @@ class AudioDeviceRegistryServerTestBase : public gtest::TestLoopFixture {
     return CreateFakeStreamConfig(false);
   }
 
+  // Create a FakeCodec that can mock a real device that has been detected, using default settings.
+  // From here, the fake Codec can be customized before it is enabled.
+  std::unique_ptr<FakeCodec> CreateFakeCodecInput() { return CreateFakeCodec(true); }
+  std::unique_ptr<FakeCodec> CreateFakeCodecOutput() { return CreateFakeCodec(false); }
+  std::unique_ptr<FakeCodec> CreateFakeCodecNoDirection() { return CreateFakeCodec(std::nullopt); }
+
+  static bool ClientIsValidForDeviceType(const fuchsia_audio_device::DeviceType& device_type,
+                                         const fuchsia_audio_device::DriverClient& driver_client) {
+    switch (driver_client.Which()) {
+      case fuchsia_audio_device::DriverClient::Tag::kCodec:
+        return (device_type == fuchsia_audio_device::DeviceType::kCodec);
+      case fuchsia_audio_device::DriverClient::Tag::kComposite:
+        return (device_type == fuchsia_audio_device::DeviceType::kComposite);
+      case fuchsia_audio_device::DriverClient::Tag::kDai:
+        return (device_type == fuchsia_audio_device::DeviceType::kDai);
+      case fuchsia_audio_device::DriverClient::Tag::kStreamConfig:
+        return (device_type == fuchsia_audio_device::DeviceType::kInput ||
+                device_type == fuchsia_audio_device::DeviceType::kOutput);
+      default:
+        return false;
+    }
+  }
   // Device
   // Create a Device object (backed by a fake driver); insert it to ADR as if it had been detected.
   // Through the stream_config connection, this will communicate with the fake driver.
-  void AddDeviceForDetection(
-      std::string_view name, fuchsia_audio_device::DeviceType device_type,
-      fidl::ClientEnd<fuchsia_hardware_audio::StreamConfig> stream_config_client_end) {
-    adr_service_->AddDevice(Device::Create(
-        adr_service_, dispatcher(), name, device_type,
-        fuchsia_audio_device::DriverClient::WithStreamConfig(std::move(stream_config_client_end))));
+  void AddDeviceForDetection(std::string_view name, fuchsia_audio_device::DeviceType device_type,
+                             fuchsia_audio_device::DriverClient driver_client) {
+    ASSERT_TRUE(ClientIsValidForDeviceType(device_type, driver_client));
+    adr_service_->AddDevice(
+        Device::Create(adr_service_, dispatcher(), name, device_type, std::move(driver_client)));
   }
 
   class FidlHandler {
@@ -221,8 +245,20 @@ class AudioDeviceRegistryServerTestBase : public gtest::TestLoopFixture {
     EXPECT_EQ(dispatcher(), test_loop().dispatcher());
     zx::channel server_end, client_end;
     EXPECT_EQ(ZX_OK, zx::channel::create(0, &server_end, &client_end));
-    return std::make_unique<FakeStreamConfig>(std::move(server_end), std::move(client_end),
-                                              dispatcher());
+    auto fake_stream = std::make_unique<FakeStreamConfig>(std::move(server_end),
+                                                          std::move(client_end), dispatcher());
+    fake_stream->set_is_input(is_input);
+    return fake_stream;
+  }
+
+  std::unique_ptr<FakeCodec> CreateFakeCodec(std::optional<bool> is_input = false) {
+    EXPECT_EQ(dispatcher(), test_loop().dispatcher());
+    zx::channel server_end, client_end;
+    EXPECT_EQ(ZX_OK, zx::channel::create(0, &server_end, &client_end));
+    auto fake_codec =
+        std::make_unique<FakeCodec>(std::move(server_end), std::move(client_end), dispatcher());
+    fake_codec->set_is_input(is_input);
+    return fake_codec;
   }
 };
 

@@ -139,7 +139,8 @@ class FakeStreamConfig : public fuchsia::hardware::audio::StreamConfig,
 
   // Explicitly trigger a gain or plug change, including notification.
   void InjectGainChange(fuchsia_hardware_audio::GainState gain_state);
-  void InjectPlugChange(bool plugged, zx::time plug_time);
+  void InjectPluggedAt(zx::time plug_time);
+  void InjectUnpluggedAt(zx::time plug_time);
 
   void set_active_channels_supported(bool supported) { active_channels_supported_ = supported; }
   uint64_t active_channels_bitmask() const { return active_channels_bitmask_; }

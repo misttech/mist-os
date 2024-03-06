@@ -16,6 +16,8 @@ source_set("fakes") {
   testonly = true
 
   sources = [
+    "fake_codec.cc",
+    "fake_codec.h",
     "fake_device_presence_watcher.h",
     "fake_stream_config.cc",
     "fake_stream_config.h",

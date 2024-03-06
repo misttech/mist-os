@@ -63,11 +63,23 @@ void FakeStreamConfig::InjectGainChange(fuchsia_hardware_audio::GainState gain_s
   SetGain(std::move(new_state));
 }
 
-void FakeStreamConfig::InjectPlugChange(bool plugged, zx::time plug_time) {
-  ADR_LOG_METHOD(kLogFakeStreamConfig)
-      << "(" << (plugged ? "plugged" : "unplugged") << ", " << plug_time.get() << ")";
-  if (!plugged_ || (*plugged_ != plugged && plug_time > plug_state_time_)) {
-    plugged_ = plugged;
+void FakeStreamConfig::InjectPluggedAt(zx::time plug_time) {
+  ADR_LOG_METHOD(kLogFakeStreamConfig) << "(plugged, " << plug_time.get() << ")";
+  if (!plugged_ || (!*plugged_ && plug_time > plug_state_time_)) {
+    plugged_ = true;
+    plug_state_time_ = plug_time;
+    plug_has_changed_ = true;
+
+    if (pending_plug_callback_) {
+      WatchPlugState(std::move(pending_plug_callback_));
+    }
+  }
+}
+
+void FakeStreamConfig::InjectUnpluggedAt(zx::time plug_time) {
+  ADR_LOG_METHOD(kLogFakeStreamConfig) << "(unplugged, " << plug_time.get() << ")";
+  if (!plugged_ || (*plugged_ && plug_time > plug_state_time_)) {
+    plugged_ = false;
     plug_state_time_ = plug_time;
     plug_has_changed_ = true;
 

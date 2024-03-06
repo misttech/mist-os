@@ -16,7 +16,9 @@
 #include <gtest/gtest.h>
 
 #include "src/media/audio/services/device_registry/device_unittest.h"
+#include "src/media/audio/services/device_registry/testing/fake_codec.h"
 #include "src/media/audio/services/device_registry/testing/fake_stream_config.h"
+#include "src/media/audio/services/device_registry/validate.h"
 
 namespace media_audio {
 
@@ -35,11 +37,223 @@ class DeviceTest : public DeviceTestBase {
   }};
   // Accessor for a Device private member.
   static const std::optional<fuchsia_hardware_audio::DelayInfo>& DeviceDelayInfo(
-      std::shared_ptr<Device> device) {
+      const std::shared_ptr<Device>& device) {
     return device->delay_info_;
   }
 };
+class CodecTest : public DeviceTestBase {};
 class StreamConfigTest : public DeviceTest {};
+
+// Validate that a fake codec with default values is initialized successfully.
+TEST_F(CodecTest, Initialization) {
+  auto device = InitializeDeviceForFakeCodec(MakeFakeCodecOutput());
+  EXPECT_TRUE(InInitializedState(device));
+
+  EXPECT_EQ(fake_device_presence_watcher_->ready_devices().size(), 1u);
+  EXPECT_EQ(fake_device_presence_watcher_->error_devices().size(), 0u);
+
+  EXPECT_EQ(fake_device_presence_watcher_->on_ready_count(), 1u);
+  EXPECT_EQ(fake_device_presence_watcher_->on_error_count(), 0u);
+  EXPECT_EQ(fake_device_presence_watcher_->on_removal_count(), 0u);
+
+  EXPECT_TRUE(device->ring_buffer_format_sets().empty());
+  EXPECT_EQ(device->dai_format_sets(), FakeCodec::kDefaultDaiFormatSets);
+
+  ASSERT_TRUE(device->info().has_value());
+  EXPECT_TRUE(device->info()->is_input().has_value());
+  EXPECT_FALSE(*device->info()->is_input());
+
+  fake_device_presence_watcher_.reset();
+}
+
+TEST_F(CodecTest, InitializationNoDirection) {
+  auto fake_driver = MakeFakeCodecNoDirection();
+  auto device = InitializeDeviceForFakeCodec(fake_driver);
+  EXPECT_TRUE(InInitializedState(device));
+
+  EXPECT_EQ(fake_device_presence_watcher_->ready_devices().size(), 1u);
+  EXPECT_EQ(fake_device_presence_watcher_->error_devices().size(), 0u);
+
+  EXPECT_EQ(fake_device_presence_watcher_->on_ready_count(), 1u);
+  EXPECT_EQ(fake_device_presence_watcher_->on_error_count(), 0u);
+  EXPECT_EQ(fake_device_presence_watcher_->on_removal_count(), 0u);
+
+  ASSERT_TRUE(device->info().has_value());
+  EXPECT_FALSE(device->info()->is_input().has_value());
+
+  fake_device_presence_watcher_.reset();
+}
+
+// Validate that a fake codec with default values is initialized successfully.
+TEST_F(CodecTest, DeviceInfoValues) {
+  auto device = InitializeDeviceForFakeCodec(MakeFakeCodecOutput());
+  ASSERT_TRUE(InInitializedState(device));
+
+  ASSERT_EQ(fake_device_presence_watcher_->ready_devices().size(), 1u);
+  ASSERT_EQ(fake_device_presence_watcher_->on_ready_count(), 1u);
+
+  ASSERT_TRUE(device->info().has_value());
+  auto info = *device->info();
+  EXPECT_TRUE(info.token_id().has_value());
+  EXPECT_TRUE(info.device_type().has_value());
+  EXPECT_TRUE(info.device_name().has_value());
+  EXPECT_TRUE(info.manufacturer().has_value());
+  EXPECT_TRUE(info.product().has_value());
+  EXPECT_TRUE(info.unique_instance_id().has_value());
+  EXPECT_TRUE(info.is_input().has_value());
+  EXPECT_FALSE(info.ring_buffer_format_sets().has_value());
+  EXPECT_TRUE(info.dai_format_sets().has_value());
+  EXPECT_FALSE(info.gain_caps().has_value());
+  EXPECT_TRUE(info.plug_detect_caps().has_value());
+  EXPECT_FALSE(info.clock_domain().has_value());
+  EXPECT_FALSE(info.signal_processing_elements().has_value());
+  EXPECT_FALSE(info.signal_processing_topologies().has_value());
+
+  EXPECT_EQ(*info.device_type(), fuchsia_audio_device::DeviceType::kCodec);
+  EXPECT_TRUE(!info.device_name()->empty());
+  EXPECT_EQ(*info.manufacturer(), FakeCodec::kDefaultManufacturer);
+  EXPECT_EQ(*info.product(), FakeCodec::kDefaultProduct);
+  // EXPECT_EQ(*info.unique_instance_id(), FakeCodec::kDefaultUniqueInstanceId);
+  EXPECT_TRUE(!info.is_input().value());
+  EXPECT_EQ(*info.dai_format_sets(), FakeCodec::kDefaultDaiFormatSets);
+  EXPECT_EQ(*info.plug_detect_caps(), FakeCodec::kDefaultPlugCaps);
+
+  fake_device_presence_watcher_.reset();
+}
+
+// Validate that a driver's dropping the Codec causes a DeviceIsRemoved notification.
+TEST_F(CodecTest, Disconnect) {
+  auto fake_codec = MakeFakeCodecNoDirection();
+  auto device = InitializeDeviceForFakeCodec(fake_codec);
+  ASSERT_TRUE(InInitializedState(device));
+  ASSERT_EQ(fake_device_presence_watcher_->ready_devices().size(), 1u);
+  ASSERT_EQ(fake_device_presence_watcher_->error_devices().size(), 0u);
+
+  ASSERT_EQ(fake_device_presence_watcher_->on_ready_count(), 1u);
+  ASSERT_EQ(fake_device_presence_watcher_->on_error_count(), 0u);
+  ASSERT_EQ(fake_device_presence_watcher_->on_removal_count(), 0u);
+
+  fake_codec->DropCodec();
+  RunLoopUntilIdle();
+
+  EXPECT_EQ(fake_device_presence_watcher_->ready_devices().size(), 0u);
+  EXPECT_EQ(fake_device_presence_watcher_->error_devices().size(), 0u);
+
+  EXPECT_EQ(fake_device_presence_watcher_->on_ready_count(), 1u);
+  EXPECT_EQ(fake_device_presence_watcher_->on_error_count(), 0u);
+  EXPECT_EQ(fake_device_presence_watcher_->on_removal_count(), 1u);
+  EXPECT_EQ(fake_device_presence_watcher_->on_removal_from_ready_count(), 1u);
+}
+
+// Validate that a GetHealthState response of an empty struct is considered "healthy".
+TEST_F(CodecTest, EmptyHealthResponse) {
+  auto fake_codec = MakeFakeCodecOutput();
+  fake_codec->set_health_state(std::nullopt);
+  auto device = InitializeDeviceForFakeCodec(fake_codec);
+  EXPECT_TRUE(InInitializedState(device));
+
+  EXPECT_EQ(fake_device_presence_watcher_->ready_devices().size(), 1u);
+  EXPECT_EQ(fake_device_presence_watcher_->error_devices().size(), 0u);
+}
+
+TEST_F(CodecTest, DeviceInfo) {
+  auto fake_codec = MakeFakeCodecInput();
+  auto device = InitializeDeviceForFakeCodec(fake_codec);
+  ASSERT_TRUE(InInitializedState(device));
+  auto info = GetDeviceInfo(device);
+
+  EXPECT_TRUE(info.token_id());
+  EXPECT_TRUE(info.device_type());
+  EXPECT_EQ(*info.device_type(), fuchsia_audio_device::DeviceType::kCodec);
+  EXPECT_TRUE(info.device_name());
+  // manufacturer is optional, but it can't be an empty string
+  EXPECT_TRUE(!info.manufacturer().has_value() || !info.manufacturer()->empty());
+  // product is optional, but it can't be an empty string
+  EXPECT_TRUE(!info.product().has_value() || !info.product()->empty());
+  // unique_instance_id is optional
+  EXPECT_FALSE(info.gain_caps());
+  EXPECT_TRUE(info.plug_detect_caps());
+  EXPECT_FALSE(info.clock_domain());
+}
+
+TEST_F(CodecTest, Observer) {
+  auto fake_codec = MakeFakeCodecNoDirection();
+  auto device = InitializeDeviceForFakeCodec(fake_codec);
+  ASSERT_TRUE(InInitializedState(device));
+
+  EXPECT_TRUE(AddObserver(device));
+}
+
+TEST_F(CodecTest, Control) {
+  auto fake_codec = MakeFakeCodecOutput();
+  auto device = InitializeDeviceForFakeCodec(fake_codec);
+  ASSERT_TRUE(InInitializedState(device));
+  ASSERT_TRUE(SetControl(device));
+
+  EXPECT_TRUE(DropControl(device));
+}
+
+TEST_F(CodecTest, GetDaiFormats) {
+  auto fake_codec = MakeFakeCodecInput();
+  auto device = InitializeDeviceForFakeCodec(fake_codec);
+  ASSERT_TRUE(InInitializedState(device));
+  ASSERT_FALSE(IsControlled(device));
+
+  ASSERT_TRUE(AddObserver(device));
+
+  bool received_get_dai_formats_callback = false;
+  std::vector<fuchsia_hardware_audio::DaiSupportedFormats> dai_formats;
+  device->RetrieveDaiFormatSets(
+      [&received_get_dai_formats_callback,
+       &dai_formats](const std::vector<fuchsia_hardware_audio::DaiSupportedFormats>& formats) {
+        received_get_dai_formats_callback = true;
+        for (auto& dai_format_set : formats) {
+          dai_formats.push_back(dai_format_set);
+        }
+      });
+
+  RunLoopUntilIdle();
+  ASSERT_TRUE(received_get_dai_formats_callback);
+  EXPECT_EQ(ValidateDaiFormatSets(dai_formats), ZX_OK);
+}
+
+// This tests the driver's ability to inform its ObserverNotify of initial plug state.
+TEST_F(CodecTest, InitialPlugState) {
+  auto fake_codec = MakeFakeCodecNoDirection();
+  auto device = InitializeDeviceForFakeCodec(fake_codec);
+  ASSERT_TRUE(InInitializedState(device));
+  ASSERT_TRUE(AddObserver(device));
+
+  RunLoopUntilIdle();
+  EXPECT_TRUE(DevicePluggedState(device));
+  ASSERT_TRUE(notify_->plug_state());
+  EXPECT_EQ(notify_->plug_state()->first, fuchsia_audio_device::PlugState::kPlugged);
+  EXPECT_EQ(notify_->plug_state()->second.get(), zx::time::infinite_past().get());
+}
+
+// This tests the driver's ability to originate plug changes, such as from jack detection. It also
+// validates that plug notifications are delivered through ControlNotify (not just ObserverNotify).
+TEST_F(CodecTest, DynamicPlugUpdate) {
+  auto fake_codec = MakeFakeCodecOutput();
+  auto device = InitializeDeviceForFakeCodec(fake_codec);
+  ASSERT_TRUE(InInitializedState(device));
+  ASSERT_TRUE(SetControl(device));
+
+  RunLoopUntilIdle();
+  EXPECT_TRUE(DevicePluggedState(device));
+  ASSERT_TRUE(notify_->plug_state());
+  EXPECT_EQ(notify_->plug_state()->first, fuchsia_audio_device::PlugState::kPlugged);
+  EXPECT_EQ(notify_->plug_state()->second.get(), zx::time::infinite_past().get());
+  notify_->plug_state().reset();
+
+  auto unplug_time = zx::clock::get_monotonic();
+  fake_codec->InjectUnpluggedAt(unplug_time);
+  RunLoopUntilIdle();
+  EXPECT_FALSE(DevicePluggedState(device));
+  ASSERT_TRUE(notify_->plug_state());
+  EXPECT_EQ(notify_->plug_state()->first, fuchsia_audio_device::PlugState::kUnplugged);
+  EXPECT_EQ(notify_->plug_state()->second.get(), unplug_time.get());
+}
 
 // Validate that a fake stream_config with default values is initialized successfully.
 TEST_F(StreamConfigTest, Initialization) {
@@ -302,7 +516,7 @@ TEST_F(StreamConfigTest, InitialPlugState) {
   EXPECT_TRUE(DevicePluggedState(device));
   ASSERT_TRUE(notify_->plug_state());
   EXPECT_EQ(notify_->plug_state()->first, fuchsia_audio_device::PlugState::kPlugged);
-  EXPECT_EQ(notify_->plug_state()->second, zx::time(0));
+  EXPECT_EQ(notify_->plug_state()->second.get(), zx::time(0).get());
 }
 
 TEST_F(StreamConfigTest, DynamicPlugUpdate) {
@@ -315,16 +529,16 @@ TEST_F(StreamConfigTest, DynamicPlugUpdate) {
   EXPECT_TRUE(DevicePluggedState(device));
   ASSERT_TRUE(notify_->plug_state());
   EXPECT_EQ(notify_->plug_state()->first, fuchsia_audio_device::PlugState::kPlugged);
-  EXPECT_EQ(notify_->plug_state()->second, zx::time(0));
+  EXPECT_EQ(notify_->plug_state()->second.get(), zx::time(0).get());
   notify_->plug_state().reset();
 
   auto unplug_time = zx::clock::get_monotonic();
-  fake_stream_config->InjectPlugChange(false, unplug_time);
+  fake_stream_config->InjectUnpluggedAt(unplug_time);
   RunLoopUntilIdle();
   EXPECT_FALSE(DevicePluggedState(device));
   ASSERT_TRUE(notify_->plug_state());
   EXPECT_EQ(notify_->plug_state()->first, fuchsia_audio_device::PlugState::kUnplugged);
-  EXPECT_EQ(notify_->plug_state()->second, unplug_time);
+  EXPECT_EQ(notify_->plug_state()->second.get(), unplug_time.get());
 }
 
 // TODO(https://fxbug.dev/42069012): unittest RetrieveCurrentlyPermittedFormats

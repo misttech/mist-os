@@ -6,14 +6,156 @@
 
 #include "src/media/audio/services/device_registry/device.h"
 #include "src/media/audio/services/device_registry/device_unittest.h"
+#include "src/media/audio/services/device_registry/testing/fake_codec.h"
 #include "src/media/audio/services/device_registry/testing/fake_stream_config.h"
 
 namespace media_audio {
 
+class CodecWarningTest : public DeviceTestBase {};
 class StreamConfigWarningTest : public DeviceTestBase {};
 
 // TODO(https://fxbug.dev/42069012): test non-compliant driver behavior (e.g. min_gain>max_gain).
 
+TEST_F(CodecWarningTest, UnhealthyIsError) {
+  auto fake_codec = MakeFakeCodecOutput();
+  fake_codec->set_health_state(false);
+  auto device = InitializeDeviceForFakeCodec(fake_codec);
+
+  EXPECT_TRUE(HasError(device));
+  EXPECT_EQ(fake_device_presence_watcher_->ready_devices().size(), 0u);
+  EXPECT_EQ(fake_device_presence_watcher_->error_devices().size(), 1u);
+
+  EXPECT_EQ(fake_device_presence_watcher_->on_ready_count(), 0u);
+  EXPECT_EQ(fake_device_presence_watcher_->on_error_count(), 1u);
+  EXPECT_EQ(fake_device_presence_watcher_->on_removal_count(), 0u);
+}
+
+TEST_F(CodecWarningTest, UnhealthyCanBeRemoved) {
+  auto fake_codec = MakeFakeCodecInput();
+  fake_codec->set_health_state(false);
+  auto device = InitializeDeviceForFakeCodec(fake_codec);
+
+  ASSERT_TRUE(HasError(device));
+  ASSERT_EQ(fake_device_presence_watcher_->ready_devices().size(), 0u);
+  ASSERT_EQ(fake_device_presence_watcher_->error_devices().size(), 1u);
+
+  ASSERT_EQ(fake_device_presence_watcher_->on_ready_count(), 0u);
+  ASSERT_EQ(fake_device_presence_watcher_->on_error_count(), 1u);
+  ASSERT_EQ(fake_device_presence_watcher_->on_removal_count(), 0u);
+
+  fake_codec->DropCodec();
+  RunLoopUntilIdle();
+
+  EXPECT_EQ(fake_device_presence_watcher_->ready_devices().size(), 0u);
+  EXPECT_EQ(fake_device_presence_watcher_->error_devices().size(), 0u);
+
+  EXPECT_EQ(fake_device_presence_watcher_->on_ready_count(), 0u);
+  EXPECT_EQ(fake_device_presence_watcher_->on_error_count(), 1u);
+  EXPECT_EQ(fake_device_presence_watcher_->on_removal_count(), 1u);
+  EXPECT_EQ(fake_device_presence_watcher_->on_removal_from_error_count(), 1u);
+}
+
+TEST_F(CodecWarningTest, UnhealthyFailsSetControl) {
+  auto fake_codec = MakeFakeCodecNoDirection();
+  fake_codec->set_health_state(false);
+  auto device = InitializeDeviceForFakeCodec(fake_codec);
+  ASSERT_TRUE(HasError(device));
+
+  EXPECT_FALSE(SetControl(device));
+}
+
+TEST_F(CodecWarningTest, UnhealthyFailsAddObserver) {
+  auto fake_codec = MakeFakeCodecOutput();
+  fake_codec->set_health_state(false);
+  auto device = InitializeDeviceForFakeCodec(fake_codec);
+  ASSERT_TRUE(HasError(device));
+
+  EXPECT_FALSE(AddObserver(device));
+}
+
+// TODO(https://fxbug.dev/42068381): If Health can change post-initialization, test:
+//    * device becomes unhealthy before any Device method. Expect method-specific failure +
+//      State::Error notif.
+//    * device becomes unhealthy after being Observed / Controlled. Expect both to drop.
+//      for this reason, the only "UnhealthyCodec" tests needed are SetControl/AddObserver.
+
+TEST_F(CodecWarningTest, AlreadyControlledFailsSetControl) {
+  auto fake_codec = MakeFakeCodecInput();
+  auto device = InitializeDeviceForFakeCodec(fake_codec);
+  ASSERT_TRUE(InInitializedState(device));
+
+  EXPECT_TRUE(SetControl(device));
+
+  EXPECT_FALSE(SetControl(device));
+  EXPECT_TRUE(IsControlled(device));
+
+  // Even though SetControl failed, the device should still be healthy and configurable.
+  EXPECT_EQ(fake_device_presence_watcher_->ready_devices().size(), 1u);
+  EXPECT_EQ(fake_device_presence_watcher_->error_devices().size(), 0u);
+
+  EXPECT_EQ(fake_device_presence_watcher_->on_ready_count(), 1u);
+  EXPECT_EQ(fake_device_presence_watcher_->on_error_count(), 0u);
+  EXPECT_EQ(fake_device_presence_watcher_->on_removal_count(), 0u);
+}
+
+TEST_F(CodecWarningTest, AlreadyObservedFailsAddObserver) {
+  auto fake_codec = MakeFakeCodecNoDirection();
+  auto device = InitializeDeviceForFakeCodec(fake_codec);
+  ASSERT_TRUE(InInitializedState(device));
+  ASSERT_TRUE(AddObserver(device));
+
+  EXPECT_FALSE(AddObserver(device));
+
+  // Even though AddObserver failed, the device should still be healthy and configurable.
+  EXPECT_EQ(fake_device_presence_watcher_->ready_devices().size(), 1u);
+  EXPECT_EQ(fake_device_presence_watcher_->error_devices().size(), 0u);
+
+  EXPECT_EQ(fake_device_presence_watcher_->on_ready_count(), 1u);
+  EXPECT_EQ(fake_device_presence_watcher_->on_error_count(), 0u);
+  EXPECT_EQ(fake_device_presence_watcher_->on_removal_count(), 0u);
+}
+
+TEST_F(CodecWarningTest, CannotDropUnknownCodecControl) {
+  auto fake_codec = MakeFakeCodecOutput();
+  auto device = InitializeDeviceForFakeCodec(fake_codec);
+  ASSERT_TRUE(InInitializedState(device));
+
+  EXPECT_FALSE(DropControl(device));
+
+  // Even though DropControl failed, the device should still be healthy and configurable.
+  EXPECT_EQ(fake_device_presence_watcher_->ready_devices().size(), 1u);
+  EXPECT_EQ(fake_device_presence_watcher_->error_devices().size(), 0u);
+
+  EXPECT_EQ(fake_device_presence_watcher_->on_ready_count(), 1u);
+  EXPECT_EQ(fake_device_presence_watcher_->on_error_count(), 0u);
+  EXPECT_EQ(fake_device_presence_watcher_->on_removal_count(), 0u);
+}
+
+TEST_F(CodecWarningTest, CannotDropCodecControlTwice) {
+  auto fake_codec = MakeFakeCodecInput();
+  auto device = InitializeDeviceForFakeCodec(fake_codec);
+
+  ASSERT_TRUE(InInitializedState(device));
+  ASSERT_TRUE(SetControl(device));
+  ASSERT_TRUE(DropControl(device));
+
+  EXPECT_FALSE(DropControl(device));
+
+  // Even though DropControl failed, the device should still be healthy and configurable.
+  EXPECT_EQ(fake_device_presence_watcher_->ready_devices().size(), 1u);
+  EXPECT_EQ(fake_device_presence_watcher_->error_devices().size(), 0u);
+
+  EXPECT_EQ(fake_device_presence_watcher_->on_ready_count(), 1u);
+  EXPECT_EQ(fake_device_presence_watcher_->on_error_count(), 0u);
+  EXPECT_EQ(fake_device_presence_watcher_->on_removal_count(), 0u);
+}
+
+// GetDaiFormats for FakeCodec that fails the GetDaiFormats call
+// GetDaiFormats for FakeCodec that returns bad dai_format_sets
+
+////////////////////
+// StreamConfig tests
+//
 TEST_F(StreamConfigWarningTest, UnhealthyIsError) {
   auto fake_stream_config = MakeFakeStreamConfigOutput();
   fake_stream_config->set_health_state(false);

@@ -305,7 +305,7 @@ TEST_F(ObserverServerTest, InitialPlugState) {
   auto fake_driver = CreateFakeStreamConfigOutput();
 
   auto initial_plug_time = zx::clock::get_monotonic();
-  fake_driver->InjectPlugChange(false, initial_plug_time);
+  fake_driver->InjectUnpluggedAt(initial_plug_time);
   RunLoopUntilIdle();
   adr_service_->AddDevice(Device::Create(
       adr_service_, dispatcher(), "Test output name", fuchsia_audio_device::DeviceType::kOutput,
@@ -382,7 +382,7 @@ TEST_F(ObserverServerTest, PlugChange) {
   RunLoopUntilIdle();
   EXPECT_FALSE(received_callback);
 
-  fake_driver->InjectPlugChange(false, time_of_plug_change);
+  fake_driver->InjectUnpluggedAt(time_of_plug_change);
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback);
   EXPECT_FALSE(observer_fidl_error_status_);

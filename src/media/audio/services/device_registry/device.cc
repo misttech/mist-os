@@ -24,7 +24,6 @@
 #include <optional>
 #include <string_view>
 
-#include "fidl/fuchsia.hardware.audio/cpp/markers.h"
 #include "src/media/audio/lib/clock/real_clock.h"
 #include "src/media/audio/lib/timeline/timeline_rate.h"
 #include "src/media/audio/services/device_registry/device_presence_watcher.h"
@@ -79,6 +78,12 @@ Device::Device(std::weak_ptr<DevicePresenceWatcher> presence_watcher,
   LogObjectCounts();
 
   switch (device_type_) {
+    case fuchsia_audio_device::DeviceType::kCodec:
+      codec_handler_ = {this, "Codec"};
+      codec_client_ = fidl::Client(
+          fidl::ClientEnd<fuchsia_hardware_audio::Codec>{driver_client_.codec()->TakeChannel()},
+          dispatcher, &codec_handler_);
+      break;
     case fuchsia_audio_device::DeviceType::kInput:
     case fuchsia_audio_device::DeviceType::kOutput:
       stream_config_handler_ = {this, "StreamConfig"};
@@ -87,9 +92,6 @@ Device::Device(std::weak_ptr<DevicePresenceWatcher> presence_watcher,
                                dispatcher, &stream_config_handler_};
       ring_buffer_handler_ = {this, "RingBuffer"};
       break;
-    case fuchsia_audio_device::DeviceType::kCodec:
-      ADR_LOG_METHOD(kLogObjectLifetimes) << "Codec support is not yet implemented";
-      return;
     case fuchsia_audio_device::DeviceType::kComposite:
       ADR_WARN_METHOD() << "Composite device type is not yet implemented";
       OnError(ZX_ERR_WRONG_TYPE);
@@ -205,14 +207,15 @@ void Device::OnError(zx_status_t error) {
 
 bool Device::IsFullyInitialized() {
   switch (device_type_) {
+    case fuchsia_audio_device::DeviceType::kCodec:
+      return codec_properties_ && dai_format_sets_ && plug_state_ &&  // signalprocessing_ &&
+             health_state_;
+      break;
     case fuchsia_audio_device::DeviceType::kInput:
     case fuchsia_audio_device::DeviceType::kOutput:
       return stream_config_properties_ && ring_buffer_format_sets_ && gain_state_ &&
              plug_state_ &&  // signalprocessing_ &&
              health_state_;
-    case fuchsia_audio_device::DeviceType::kCodec:
-      ADR_WARN_METHOD() << "Don't yet support Codec";
-      return false;
     case fuchsia_audio_device::DeviceType::kComposite:
       ADR_WARN_METHOD() << "Don't yet support Composite";
       return false;
@@ -237,6 +240,14 @@ void Device::OnInitializationResponse() {
   }
 
   switch (device_type_) {
+    case fuchsia_audio_device::DeviceType::kCodec:
+      ADR_LOG_METHOD(kLogDeviceInitializationProgress)
+          << " (RECEIVED|pending)"                                 //
+          << "    " << (codec_properties_ ? "PROPS" : "props")     //
+          << "    " << (dai_format_sets_ ? "FORMATS" : "formats")  //
+          << "    " << (plug_state_ ? "PLUG" : "plug")             //
+          << "    " << (health_state_ ? "HEALTH" : "health");
+      break;
     case fuchsia_audio_device::DeviceType::kInput:
     case fuchsia_audio_device::DeviceType::kOutput:
       ADR_LOG_METHOD(kLogDeviceInitializationProgress)
@@ -247,7 +258,6 @@ void Device::OnInitializationResponse() {
           << "    " << (plug_state_ ? "PLUG" : "plug")                     //
           << "    " << (health_state_ ? "HEALTH" : "health");
       break;
-    case fuchsia_audio_device::DeviceType::kCodec:
     case fuchsia_audio_device::DeviceType::kComposite:
     case fuchsia_audio_device::DeviceType::kDai:
     default:
@@ -338,8 +348,9 @@ bool Device::AddObserver(std::shared_ptr<ObserverNotify> observer_to_add) {
         .agc_enabled = gain_state_->agc_enabled().value_or(false),
     }});
   }
-  // Only do this if StreamConfig.
-  if (device_type_ == fuchsia_audio_device::DeviceType::kInput ||
+  // Only do this if Codec or StreamConfig.
+  if (device_type_ == fuchsia_audio_device::DeviceType::kCodec ||
+      device_type_ == fuchsia_audio_device::DeviceType::kInput ||
       device_type_ == fuchsia_audio_device::DeviceType::kOutput) {
     observer_to_add->PlugStateChanged(*plug_state_->plugged()
                                           ? fuchsia_audio_device::PlugState::kPlugged
@@ -408,8 +419,14 @@ void Device::SetState(State state) {
 void Device::Initialize() {
   ADR_LOG_METHOD(kLogDeviceMethods);
 
-  if (device_type_ == fuchsia_audio_device::DeviceType::kInput ||
-      device_type_ == fuchsia_audio_device::DeviceType::kOutput) {
+  if (device_type_ == fuchsia_audio_device::DeviceType::kCodec) {
+    RetrieveCodecProperties();
+    RetrieveInitialDaiFormats();
+    RetrieveCodecPlugState();
+    RetrieveCodecHealthState();
+    // ... and RetrieveSignalProcessingState() when this is added
+  } else if (device_type_ == fuchsia_audio_device::DeviceType::kInput ||
+             device_type_ == fuchsia_audio_device::DeviceType::kOutput) {
     RetrieveStreamProperties();
     RetrieveInitialRingBufferFormatSets();
     RetrieveGainState();
@@ -524,6 +541,60 @@ void Device::SanitizeStreamPropertiesStrings(
   }
 }
 
+void Device::RetrieveCodecProperties() {
+  ADR_LOG_METHOD(kLogCodecFidlCalls);
+
+  if (state_ == State::Error) {
+    return;
+  }
+  // TODO(https://fxbug.dev/113429): handle command timeouts
+
+  (*codec_client_)
+      ->GetProperties()
+      .Then([this](fidl::Result<fuchsia_hardware_audio::Codec::GetProperties>& result) {
+        if (LogResultFrameworkError(result, "GetProperties response")) {
+          return;
+        }
+
+        ADR_LOG_OBJECT(kLogCodecFidlResponses) << "Codec/GetProperties: success";
+        auto status = ValidateCodecProperties(result->properties());
+        if (status != ZX_OK) {
+          OnError(status);
+          return;
+        }
+
+        FX_CHECK(!codec_properties_)
+            << "Codec/GetProperties response: stream_config_properties_ already set";
+        codec_properties_ = result->properties();
+        SanitizeCodecPropertiesStrings(codec_properties_);
+
+        OnInitializationResponse();
+      });
+}
+
+void Device::SanitizeCodecPropertiesStrings(
+    std::optional<fuchsia_hardware_audio::CodecProperties>& codec_properties) {
+  if (!codec_properties) {
+    FX_LOGS(ERROR) << __func__ << " called with unspecified CodecProperties";
+    return;
+  }
+
+  if (codec_properties->manufacturer()) {
+    codec_properties->manufacturer(codec_properties->manufacturer()->substr(
+        0, std::min<uint64_t>(codec_properties->manufacturer()->find('\0'),
+                              fuchsia_hardware_audio::kMaxUiStringSize - 1)));
+  }
+  if (codec_properties->product()) {
+    codec_properties->product(codec_properties->product()->substr(
+        0, std::min<uint64_t>(codec_properties->product()->find('\0'),
+                              fuchsia_hardware_audio::kMaxUiStringSize - 1)));
+  }
+  if (codec_properties->unique_id()) {
+    codec_properties->unique_id(
+        codec_properties->unique_id()->substr(0, fuchsia_audio_device::kUniqueInstanceIdSize));
+  }
+}
+
 void Device::RetrieveInitialRingBufferFormatSets() {
   ADR_LOG_METHOD(kLogStreamConfigFidlCalls);
 
@@ -577,6 +648,51 @@ void Device::RetrieveRingBufferFormatSets(
         }
 
         rb_formats_callback(result->supported_formats());
+      });
+}
+
+void Device::RetrieveInitialDaiFormats() {
+  ADR_LOG_METHOD(kLogCodecFidlCalls);
+  RetrieveDaiFormatSets(
+      [this](std::vector<fuchsia_hardware_audio::DaiSupportedFormats> dai_format_sets) {
+        if (state_ == State::Error) {
+          ADR_WARN_OBJECT() << "device has an error while retrieving initial DAI formats";
+          return;
+        }
+        dai_format_sets_ = std::vector<fuchsia_hardware_audio::DaiSupportedFormats>();
+        for (const auto& dai_format_set : dai_format_sets) {
+          dai_format_sets_->emplace_back(dai_format_set);
+        }
+        OnInitializationResponse();
+      });
+}
+
+void Device::RetrieveDaiFormatSets(
+    fit::callback<void(std::vector<fuchsia_hardware_audio::DaiSupportedFormats>)>
+        dai_format_sets_callback) {
+  ADR_LOG_METHOD(kLogCodecFidlCalls);
+
+  if (state_ == State::Error) {
+    return;
+  }
+
+  // TODO(https://fxbug.dev/113429): handle command timeouts
+
+  (*codec_client_)
+      ->GetDaiFormats()
+      .Then([this, callback = std::move(dai_format_sets_callback)](
+                fidl::Result<fuchsia_hardware_audio::Codec::GetDaiFormats>& result) mutable {
+        if (LogResultError(result, "GetDaiFormats response")) {
+          return;
+        }
+
+        ADR_LOG_OBJECT(kLogCodecFidlResponses) << "Codec/GetDaiFormats: success";
+
+        if (auto status = ValidateDaiFormatSets(result->formats()); status != ZX_OK) {
+          OnError(status);
+          return;
+        }
+        callback(result->formats());
       });
 }
 
@@ -658,7 +774,7 @@ void Device::RetrieveStreamPlugState() {
         auto old_plug_state = plug_state_;
         plug_state_ = result->plug_state();
 
-        if (!plug_state_) {
+        if (!old_plug_state) {
           ADR_LOG_OBJECT(kLogStreamConfigFidlResponses) << "WatchPlugState received initial value";
           OnInitializationResponse();
         } else {
@@ -672,6 +788,54 @@ void Device::RetrieveStreamPlugState() {
         }
         // Kick off the next watch.
         RetrieveStreamPlugState();
+      });
+}
+
+void Device::RetrieveCodecPlugState() {
+  ADR_LOG_METHOD(kLogCodecFidlCalls);
+
+  if (state_ == State::Error) {
+    return;
+  }
+  if (!plug_state_) {
+    // TODO(https://fxbug.dev/113429): handle command timeouts (but not on subsequent watches)
+  }
+
+  (*codec_client_)
+      ->WatchPlugState()
+      .Then([this](fidl::Result<fuchsia_hardware_audio::Codec::WatchPlugState>& result) {
+        if (LogResultFrameworkError(result, "Codec::PlugState response")) {
+          return;
+        }
+
+        ADR_LOG_OBJECT(kLogCodecFidlResponses) << "Codec::WatchPlugState response";
+        std::optional<fuchsia_hardware_audio::PlugDetectCapabilities> plug_detect_capabilities;
+        if (codec_properties_) {
+          plug_detect_capabilities = codec_properties_->plug_detect_capabilities();
+        }
+        auto status = ValidatePlugState(result->plug_state(), plug_detect_capabilities);
+        if (status != ZX_OK) {
+          OnError(status);
+          return;
+        }
+
+        auto old_plug_state = plug_state_;
+        plug_state_ = result->plug_state();
+
+        if (!old_plug_state) {
+          ADR_LOG_OBJECT(kLogCodecFidlResponses) << "Codec::WatchPlugState received initial value";
+          OnInitializationResponse();
+        } else {
+          ADR_LOG_OBJECT(kLogCodecFidlResponses) << "Codec::WatchPlugState received update";
+          ForEachObserver([plug_state = *plug_state_](auto obs) {
+            obs->PlugStateChanged(plug_state.plugged().value_or(true)
+                                      ? fuchsia_audio_device::PlugState::kPlugged
+                                      : fuchsia_audio_device::PlugState::kUnplugged,
+                                  zx::time(*plug_state.plug_state_time()));
+          });
+        }
+        // Kick off the next watch.
+        RetrieveCodecPlugState();
       });
 }
 
@@ -712,6 +876,41 @@ void Device::RetrieveStreamHealthState() {
       });
 }
 
+void Device::RetrieveCodecHealthState() {
+  ADR_LOG_METHOD(kLogCodecFidlCalls);
+
+  if (state_ == State::Error) {
+    return;
+  }
+
+  // TODO(https://fxbug.dev/113429): handle command timeouts, because that's the most likely
+  // indicator of an unhealthy driver/device.
+
+  (*codec_client_)
+      ->GetHealthState()
+      .Then([this](fidl::Result<fuchsia_hardware_audio::Codec::GetHealthState>& result) {
+        if (LogResultFrameworkError(result, "HealthState response")) {
+          return;
+        }
+
+        auto old_health_state = health_state_;
+
+        // An empty health state is permitted; it still indicates that the driver is responsive.
+        health_state_ = result->state().healthy().value_or(true);
+        // ...but if the driver actually self-reported as unhealthy, this is a problem.
+        if (!*health_state_) {
+          FX_LOGS(WARNING) << "RetrieveCodecHealthState response: .healthy is FALSE (unhealthy)";
+          OnError(ZX_ERR_IO);
+          return;
+        }
+
+        ADR_LOG_OBJECT(kLogCodecFidlResponses) << "RetrieveCodecHealthState response: healthy";
+        if (!old_health_state) {
+          OnInitializationResponse();
+        }
+      });
+}
+
 // Return a fuchsia_audio_device::Info object based on this device's member values.
 // Required fields (guaranteed for the caller) include: token_id, device_type, device_name.
 // Other fields are required for some driver types but optional or absent for others.
@@ -723,33 +922,57 @@ fuchsia_audio_device::Info Device::CreateDeviceInfo() {
       .token_id = token_id_,
       .device_type = device_type_,
       .device_name = name_,
-      // Optional for all device types:
-      .manufacturer = stream_config_properties_->manufacturer(),
-      .product = stream_config_properties_->product(),
-      .unique_instance_id = stream_config_properties_->unique_id(),
-      // Required for Dai and StreamConfig; optional for Codec:
-      .is_input = stream_config_properties_->is_input(),
-      // Required for Dai and StreamConfig; absent for Codec and Composite:
-      .ring_buffer_format_sets = translated_ring_buffer_format_sets_,
-      // Required for StreamConfig; absent for Codec, Composite and Dai:
-      .gain_caps = fuchsia_audio_device::GainCapabilities{{
-          .min_gain_db = stream_config_properties_->min_gain_db(),
-          .max_gain_db = stream_config_properties_->max_gain_db(),
-          .gain_step_db = stream_config_properties_->gain_step_db(),
-          .can_mute = stream_config_properties_->can_mute(),
-          .can_agc = stream_config_properties_->can_agc(),
-      }},
-      // Required for Codec and StreamConfig; absent for Composite and Dai:
-      .plug_detect_caps = *stream_config_properties_->plug_detect_capabilities() ==
-                                  fuchsia_hardware_audio::PlugDetectCapabilities::kHardwired
-                              ? fuchsia_audio_device::PlugDetectCapabilities::kHardwired
-                              : fuchsia_audio_device::PlugDetectCapabilities::kPluggable,
-      // Required for Composite, Dai and StreamConfig; absent for Codec:
-      .clock_domain = stream_config_properties_->clock_domain(),
       // Required for Composite; optional for Codec, Dai and StreamConfig:
       .signal_processing_elements = {},    // signalprocessing support
       .signal_processing_topologies = {},  // remains to be completed
   }};
+  if (device_type_ == fuchsia_audio_device::DeviceType::kCodec) {
+    // Optional for all device types.
+    info.manufacturer(codec_properties_->manufacturer())
+        .product(codec_properties_->product())
+        // Required for Dai and StreamConfig; optional for Codec:
+        .is_input(codec_properties_->is_input())
+        // Required for Codec, Dai and Composite; absent for StreamConfig:
+        .dai_format_sets(dai_format_sets())
+        // Required for Codec and StreamConfig; absent for Composite and Dai:
+        .plug_detect_caps(*codec_properties_->plug_detect_capabilities() ==
+                                  fuchsia_hardware_audio::PlugDetectCapabilities::kHardwired
+                              ? fuchsia_audio_device::PlugDetectCapabilities::kHardwired
+                              : fuchsia_audio_device::PlugDetectCapabilities::kPluggable);
+    // Codec properties stores unique_id as a string, so we must handle as a special case.
+    if (codec_properties_->unique_id()) {
+      std::array<unsigned char, fuchsia_audio_device::kUniqueInstanceIdSize> uid{};
+      memcpy(uid.data(), codec_properties_->unique_id()->data(),
+             fuchsia_audio_device::kUniqueInstanceIdSize);
+      info.unique_instance_id(uid);
+    }
+  }
+  if (device_type_ == fuchsia_audio_device::DeviceType::kInput ||
+      device_type_ == fuchsia_audio_device::DeviceType::kOutput) {
+    // Optional for all device types:
+    info.manufacturer(stream_config_properties_->manufacturer())
+        .product(stream_config_properties_->product())
+        .unique_instance_id(stream_config_properties_->unique_id())
+        // Required for Dai and StreamConfig; optional for Codec:
+        .is_input(stream_config_properties_->is_input())
+        // Required for Dai and StreamConfig; absent for Codec and Composite:
+        .ring_buffer_format_sets(translated_ring_buffer_format_sets_)
+        // Required for StreamConfig; absent for Codec, Composite and Dai:
+        .gain_caps(fuchsia_audio_device::GainCapabilities{{
+            .min_gain_db = stream_config_properties_->min_gain_db(),
+            .max_gain_db = stream_config_properties_->max_gain_db(),
+            .gain_step_db = stream_config_properties_->gain_step_db(),
+            .can_mute = stream_config_properties_->can_mute(),
+            .can_agc = stream_config_properties_->can_agc(),
+        }})
+        // Required for Codec and StreamConfig; absent for Composite and Dai:
+        .plug_detect_caps(*stream_config_properties_->plug_detect_capabilities() ==
+                                  fuchsia_hardware_audio::PlugDetectCapabilities::kHardwired
+                              ? fuchsia_audio_device::PlugDetectCapabilities::kHardwired
+                              : fuchsia_audio_device::PlugDetectCapabilities::kPluggable)
+        // Required for Composite, Dai and StreamConfig; absent for Codec:
+        .clock_domain(stream_config_properties_->clock_domain());
+  }
 
   return info;
 }

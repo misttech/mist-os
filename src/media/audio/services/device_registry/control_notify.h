@@ -8,8 +8,6 @@
 #include <fidl/fuchsia.audio.device/cpp/natural_types.h>
 #include <lib/zx/time.h>
 
-#include <vector>
-
 #include "src/media/audio/services/device_registry/observer_notify.h"
 
 namespace media_audio {

@@ -48,8 +48,7 @@ zx_status_t AudioDeviceRegistry::StartDeviceDetection() {
         switch (driver_client.Which()) {
           case fuchsia_audio_device::DriverClient::Tag::kCodec:
             FX_CHECK(driver_client.codec()->is_valid());
-            ADR_LOG_OBJECT(kLogDeviceDetection) << "Detected Codec device - doing nothing for now";
-            return;
+            break;
           case fuchsia_audio_device::DriverClient::Tag::kStreamConfig:
             FX_CHECK(driver_client.stream_config()->is_valid());
             break;
@@ -62,11 +61,8 @@ zx_status_t AudioDeviceRegistry::StartDeviceDetection() {
           default:
             FX_CHECK(!driver_client.IsUnknown());
         }
-        // Eventually we will simply pass the driver_client onward.
-        fidl::ClientEnd<fuchsia_hardware_audio::StreamConfig> stream_config{
-            driver_client.stream_config()->TakeChannel()};
         AddDevice(Device::Create(this->shared_from_this(), thread_->dispatcher(), name, device_type,
-                                 DriverClient::WithStreamConfig(std::move(stream_config))));
+                                 std::move(driver_client)));
       };
 
   auto detector_result =

@@ -666,18 +666,18 @@ bool ValidateDeviceInfo(const fuchsia_audio_device::Info& device_info) {
 
   // Validate top-level required members.
   if (!device_info.token_id() || !device_info.device_type() || !device_info.device_name() ||
-      device_info.device_name()->empty() || !device_info.is_input().has_value() ||
-      !device_info.ring_buffer_format_sets() || device_info.ring_buffer_format_sets()->empty() ||
-      !device_info.gain_caps() || !device_info.plug_detect_caps() || !device_info.clock_domain()) {
-    FX_LOGS(WARNING) << __func__ << ": incomplete DeviceInfo instance";
+      device_info.device_name()->empty()) {
+    FX_LOGS(WARNING) << __func__ << ": incomplete DeviceInfo instance (baseline props)";
     return false;
   }
+  // These strings must not be empty, if present.
   if ((device_info.manufacturer() && device_info.manufacturer()->empty()) ||
       (device_info.product() && device_info.product()->empty())) {
     FX_LOGS(WARNING) << __func__
                      << ": manufacturer and product, if present, must not be empty strings";
     return false;
   }
+  // These vectors must not be empty, if present.
   if ((device_info.signal_processing_elements() &&
        device_info.signal_processing_elements()->empty()) ||
       (device_info.signal_processing_topologies() &&
@@ -686,6 +686,34 @@ bool ValidateDeviceInfo(const fuchsia_audio_device::Info& device_info) {
         << __func__
         << ": signal_processing elements/topologies, if present, must have at least one entry";
     return false;
+  }
+  switch (*device_info.device_type()) {
+    case fuchsia_audio_device::DeviceType::kInput:
+    case fuchsia_audio_device::DeviceType::kOutput:
+      if (!device_info.is_input().has_value() || !device_info.gain_caps() ||
+          !device_info.ring_buffer_format_sets() ||
+          device_info.ring_buffer_format_sets()->empty() || !device_info.plug_detect_caps() ||
+          !device_info.clock_domain()) {
+        FX_LOGS(WARNING) << __func__ << ": incomplete DeviceInfo instance (StreamConfig)";
+        return false;
+      }
+      break;
+    case fuchsia_audio_device::DeviceType::kCodec:
+      if (!device_info.plug_detect_caps()) {
+        FX_LOGS(WARNING) << __func__ << ": incomplete DeviceInfo instance (Codec)";
+        return false;
+      }
+      if (device_info.ring_buffer_format_sets() || device_info.gain_caps() ||
+          device_info.clock_domain()) {
+        FX_LOGS(WARNING) << __func__ << ": invalid DeviceInfo fields are populated (Codec)";
+        return false;
+      }
+      break;
+    case fuchsia_audio_device::DeviceType::kComposite:
+    case fuchsia_audio_device::DeviceType::kDai:
+    default:
+      FX_LOGS(WARNING) << __func__ << ": unsupported DeviceType: " << device_info.device_type();
+      return false;
   }
 
   return true;
