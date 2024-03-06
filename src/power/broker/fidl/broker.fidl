@@ -262,20 +262,25 @@ type StatusError = flexible enum {
 /// PowerLevel name lengths are limited to reduce Inspect space usage
 const MAX_LEVEL_NAME_LEN uint16 = 16;
 
-/// Status client endpoint and stable identifier for a specific Power Element
+/// Status client endpoint and a plaintext name for a specific Power Element. Names are
+/// expected to be unique between elements and persistent across reboots of the same build,
+/// but consistency is not guaranteed between different builds.
 type ElementStatusEndpoint = resource table {
     1: identifier string:MAX_ELEMENT_NAME_LEN;
     2: status client_end:Status;
 };
 
-/// Mapping of a plaintext name to a PowerLevel
+/// Mapping of a plaintext name to a PowerLevel. Names are expected to be unique between
+/// elements and persistent across reboots of the same build, but consistency is not
+/// guaranteed between different builds.
 type PowerLevelName = table {
     1: level PowerLevel;
     2: name string:MAX_LEVEL_NAME_LEN;
 };
 
-/// Mapping of a vector of [`fuchsia.power.broker/PowerLevelName`] to a Power
-/// Element via its stable identifier
+/// Mapping of a vector of [`fuchsia.power.broker/PowerLevelName`] to a Power Element via
+/// its plaintext name. Names are expected to be unique between elements and persistent
+/// across reboots of the same build, but consistency is not guaranteed between different builds.
 type ElementPowerLevelNames = table {
     1: identifier string:MAX_ELEMENT_NAME_LEN;
     2: levels vector<PowerLevelName>:MAX_VALID_POWER_LEVELS;
