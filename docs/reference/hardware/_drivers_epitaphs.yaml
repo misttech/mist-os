@@ -548,3 +548,9 @@
   available_in_git: '034ef9820f7fe31d4a32fc8082ae4f3791d7e386'
   areas: ['USB']
   path: '/src/devices/usb/drivers/aml-usb-phy-v2'
+- short_description: 'Intel GSPI driver'
+  deletion_reason: 'Hardware is not actively supported'
+  gerrit_change_id: '1000414'
+  available_in_git: 'b7ca12e102bef96cb1487621983b3f1e3058b148'
+  areas: ['SPI']
+  path: 'src/devices/spi/drivers/intel-gspi'

@@ -938,7 +938,6 @@ config("Wno-conversion") {
     "//src/devices/pwm/drivers/aml-pwm:*",
     "//src/devices/rtc/drivers/intel-rtc:*",
     "//src/devices/spi/drivers/aml-spi:*",
-    "//src/devices/spi/drivers/intel-gspi:*",
     "//src/devices/tee/drivers/optee:*",
     "//src/devices/temperature/drivers/shtv3:*",
     "//src/devices/testing/fake-msi:*",

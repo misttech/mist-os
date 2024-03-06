@@ -149,11 +149,6 @@ board_input_bundle("x64_common") {
       driver_components = [ "meta/intel-rtc.cm" ]
     },
     {
-      package_target = "//src/devices/spi/drivers/intel-gspi"
-      package_set = "bootfs"
-      driver_components = [ "meta/intel-gspi.cm" ]
-    },
-    {
       package_target = "//src/devices/tpm/drivers/tpm:tpm-pkg"
       package_set = "bootfs"
       driver_components = [ "meta/tpm-driver.cm" ]

@@ -104,7 +104,6 @@ const std::set<std::string> kCreateThreadSymbolsDriversAllowlist = {
     "#meta/igc.cm",
     "#meta/init-test.cm",
     "#meta/integration-test.cm",
-    "#meta/intel-gspi.cm",
     "#meta/intel-hda.cm",
     "#meta/intel-i2c.cm",
     "#meta/intel-i915.cm",
