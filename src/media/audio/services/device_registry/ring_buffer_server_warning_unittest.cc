@@ -38,51 +38,41 @@ class RingBufferServerWarningTest
       .ring_buffer_min_bytes = 2000,
   }};
 
-  void EnableInputAndAddDevice(const std::unique_ptr<FakeStreamConfig>& fake_driver);
+  void EnableInputAndAddDevice(const std::unique_ptr<FakeStreamConfig>& fake_driver) {
+    adr_service_->AddDevice(Device::Create(
+        adr_service_, dispatcher(), "Test input name", fuchsia_audio_device::DeviceType::kInput,
+        DriverClient::WithStreamConfig(
+            fidl::ClientEnd<fuchsia_hardware_audio::StreamConfig>(fake_driver->Enable()))));
+    RunLoopUntilIdle();
+  }
 
   std::optional<TokenId> WaitForAddedDeviceTokenId(
-      fidl::Client<fuchsia_audio_device::Registry>& reg_client);
+      fidl::Client<fuchsia_audio_device::Registry>& reg_client) {
+    std::optional<TokenId> added_device_id;
+    reg_client->WatchDevicesAdded().Then(
+        [&added_device_id](
+            fidl::Result<fuchsia_audio_device::Registry::WatchDevicesAdded>& result) mutable {
+          ASSERT_TRUE(result.is_ok()) << result.error_value().FormatDescription();
+          ASSERT_TRUE(result->devices());
+          ASSERT_EQ(result->devices()->size(), 1u);
+          ASSERT_TRUE(result->devices()->at(0).token_id());
+          added_device_id = *result->devices()->at(0).token_id();
+        });
+    RunLoopUntilIdle();
+    return added_device_id;
+  }
 
   std::pair<fidl::Client<fuchsia_audio_device::RingBuffer>,
             fidl::ServerEnd<fuchsia_audio_device::RingBuffer>>
-  CreateRingBufferClient();
+  CreateRingBufferClient() {
+    auto [ring_buffer_client_end, ring_buffer_server_end] =
+        CreateNaturalAsyncClientOrDie<fuchsia_audio_device::RingBuffer>();
+    auto ring_buffer_client = fidl::Client<fuchsia_audio_device::RingBuffer>(
+        fidl::ClientEnd<fuchsia_audio_device::RingBuffer>(std::move(ring_buffer_client_end)),
+        dispatcher(), this);
+    return std::make_pair(std::move(ring_buffer_client), std::move(ring_buffer_server_end));
+  }
 };
-
-void RingBufferServerWarningTest::EnableInputAndAddDevice(
-    const std::unique_ptr<FakeStreamConfig>& fake_driver) {
-  adr_service_->AddDevice(Device::Create(
-      adr_service_, dispatcher(), "Test input name", fuchsia_audio_device::DeviceType::kInput,
-      DriverClient::WithStreamConfig(
-          fidl::ClientEnd<fuchsia_hardware_audio::StreamConfig>(fake_driver->Enable()))));
-  RunLoopUntilIdle();
-}
-
-std::optional<TokenId> RingBufferServerWarningTest::WaitForAddedDeviceTokenId(
-    fidl::Client<fuchsia_audio_device::Registry>& reg_client) {
-  std::optional<TokenId> added_device_id;
-  reg_client->WatchDevicesAdded().Then(
-      [&added_device_id](
-          fidl::Result<fuchsia_audio_device::Registry::WatchDevicesAdded>& result) mutable {
-        ASSERT_TRUE(result.is_ok()) << result.error_value().FormatDescription();
-        ASSERT_TRUE(result->devices());
-        ASSERT_EQ(result->devices()->size(), 1u);
-        ASSERT_TRUE(result->devices()->at(0).token_id());
-        added_device_id = *result->devices()->at(0).token_id();
-      });
-  RunLoopUntilIdle();
-  return added_device_id;
-}
-
-std::pair<fidl::Client<fuchsia_audio_device::RingBuffer>,
-          fidl::ServerEnd<fuchsia_audio_device::RingBuffer>>
-RingBufferServerWarningTest::CreateRingBufferClient() {
-  auto [ring_buffer_client_end, ring_buffer_server_end] =
-      CreateNaturalAsyncClientOrDie<fuchsia_audio_device::RingBuffer>();
-  auto ring_buffer_client = fidl::Client<fuchsia_audio_device::RingBuffer>(
-      fidl::ClientEnd<fuchsia_audio_device::RingBuffer>(std::move(ring_buffer_client_end)),
-      dispatcher(), this);
-  return std::make_pair(std::move(ring_buffer_client), std::move(ring_buffer_server_end));
-}
 
 TEST_F(RingBufferServerWarningTest, SetActiveChannelsMissingChannelBitmask) {
   auto fake_driver = CreateFakeStreamConfigInput();
