@@ -2,42 +2,55 @@
     {
         "data_source": "Inspect",
         "metadata": {
-            "component_url": "fuchsia-pkg://fuchsia.com/archivist-integration-tests#meta/test_component.cm",
+            "component_url": "puppet#meta/puppet.cm",
             "errors": [
-                "Inspect hierarchy was fully filtered by client provided selectors. No data remaining."
+                "Inspecthierarchywasfullyfilteredbyclientprovidedselectors.Nodataremaining."
             ],
             "filename": "fuchsia.inspect.Tree",
             "timestamp": 0
         },
-        "moniker": "test_component",
+        "moniker": "puppet_diagnostics_dir_methods",
         "payload": null,
         "version": 1
     },
     {
         "data_source": "Inspect",
         "metadata": {
-            "component_url": "fuchsia-pkg://fuchsia.com/archivist-integration-tests#meta/test_component.cm",
+            "component_url": "puppet#meta/puppet.cm",
             "errors": [
-                "Inspect hierarchy was fully filtered by client provided selectors. No data remaining."
+                "Inspecthierarchywasfullyfilteredbyclientprovidedselectors.Nodataremaining."
             ],
             "filename": "fuchsia.inspect.deprecated.Inspect",
             "timestamp": 0
         },
-        "moniker": "test_component",
+        "moniker": "puppet_diagnostics_dir_methods",
         "payload": null,
         "version": 1
     },
     {
         "data_source": "Inspect",
         "metadata": {
-            "component_url": "fuchsia-pkg://fuchsia.com/archivist-integration-tests#meta/test_component.cm",
+            "component_url": "puppet#meta/puppet.cm",
             "errors": [
-                "Inspect hierarchy was fully filtered by client provided selectors. No data remaining."
+                "Inspecthierarchywasfullyfilteredbyclientprovidedselectors.Nodataremaining."
             ],
             "filename": "root.inspect",
             "timestamp": 0
         },
-        "moniker": "test_component",
+        "moniker": "puppet_diagnostics_dir_methods",
+        "payload": null,
+        "version": 1
+    },
+    {
+        "data_source": "Inspect",
+        "metadata": {
+            "component_url": "puppet#meta/puppet.cm",
+            "errors": [
+                "Inspecthierarchywasfullyfilteredbyclientprovidedselectors.Nodataremaining."
+            ],
+            "timestamp": 0
+        },
+        "moniker": "puppet_inspect_sink",
         "payload": null,
         "version": 1
     }

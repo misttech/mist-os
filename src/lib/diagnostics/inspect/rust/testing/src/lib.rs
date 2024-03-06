@@ -2,26 +2,29 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{deprecated_fidl_server::*, table::*},
-    anyhow::{format_err, Error},
-    fuchsia_component::server::ServiceFs,
-    fuchsia_inspect::{self as inspect, ArithmeticArrayProperty, ArrayProperty},
-    futures::{FutureExt, StreamExt},
-    std::ops::AddAssign,
-    structopt::StructOpt,
+use crate::table::*;
+use fidl_fuchsia_inspect as finspect;
+use fidl_fuchsia_inspect_deprecated as fdeprecated;
+use fuchsia_inspect::{
+    self as inspect, ArithmeticArrayProperty, ArrayProperty, DoubleArrayProperty,
+    DoubleExponentialHistogramProperty, DoubleLinearHistogramProperty, Inspector, IntArrayProperty,
+    IntExponentialHistogramProperty, IntLinearHistogramProperty, Node, UintArrayProperty,
+    UintExponentialHistogramProperty, UintLinearHistogramProperty,
 };
+use futures::FutureExt;
+use std::ops::AddAssign;
+use structopt::StructOpt;
 
-mod deprecated_fidl_server;
-mod table;
+pub mod deprecated_fidl_server;
+pub mod table;
 
-struct PopulateParams<T> {
-    floor: T,
-    step: T,
-    count: usize,
+pub struct PopulateParams<T> {
+    pub floor: T,
+    pub step: T,
+    pub count: usize,
 }
 
-fn populated<H: inspect::HistogramProperty>(histogram: H, params: PopulateParams<H::Type>) -> H
+pub fn populated<H: inspect::HistogramProperty>(histogram: H, params: PopulateParams<H::Type>) -> H
 where
     H::Type: AddAssign + Copy,
 {
@@ -50,56 +53,132 @@ pub struct Options {
     pub extra_number: Option<i64>,
 }
 
-pub async fn emit_example_inspect_data(opts: Options) -> Result<(), Error> {
-    let inspector = inspect::Inspector::default();
-    let root = inspector.root();
-    assert!(inspector.is_valid());
+#[derive(Default)]
+pub struct ExampleInspectData {
+    int_array: IntArrayProperty,
+    uint_array: UintArrayProperty,
+    double_array: DoubleArrayProperty,
+    int_linear_hist: IntLinearHistogramProperty,
+    uint_linear_hist: UintLinearHistogramProperty,
+    double_linear_hist: DoubleLinearHistogramProperty,
+    int_exp_hist: IntExponentialHistogramProperty,
+    uint_exp_hist: UintExponentialHistogramProperty,
+    double_exp_hist: DoubleExponentialHistogramProperty,
+    table: Option<Table>,
+}
 
-    reset_unique_names();
+impl ExampleInspectData {
+    /// Allocates a collection of example inspect values for testing.
+    ///
+    /// The allocated data remains visible to other components until this object
+    /// is dropped.
+    pub fn write_to(&mut self, node: &Node) {
+        // Changing the order of the function calls below also changes the generated
+        // identifiers that are used for each piece of example inspect data.
+        reset_unique_names();
+        self.table.replace(new_example_table(node));
+        self.int_array = new_example_int_array(node);
+        self.uint_array = new_example_uint_array(node);
+        self.double_array = new_example_double_array(node);
+        self.int_linear_hist = new_example_int_linear_hist(node);
+        self.uint_linear_hist = new_example_uint_linear_hist(node);
+        self.double_linear_hist = new_example_double_linear_hist(node);
+        self.int_exp_hist = new_example_int_exp_hist(node);
+        self.uint_exp_hist = new_example_uint_exp_hist(node);
+        self.double_exp_hist = new_example_double_exp_hist(node);
+
+        // Lazy values are closures registered with the node, and don't need
+        // to be held by this struct to avoid being dropped.
+        new_example_lazy_double(node);
+        new_example_lazy_uint(node);
+    }
+
+    /// Returns an example NodeObject that can used to test fuchsia.inspect.deprecated.inspect.
+    pub fn has_node_object(&self) -> bool {
+        self.table.is_some()
+    }
+
+    pub fn get_node_object(&self) -> NodeObject {
+        self.table.as_ref().unwrap().get_node_object()
+    }
+}
+
+pub async fn serve_deprecated_inspect(stream: fdeprecated::InspectRequestStream, node: NodeObject) {
+    deprecated_fidl_server::spawn_inspect_server(stream, node);
+}
+
+pub async fn serve_inspect_tree(stream: finspect::TreeRequestStream, inspector: &Inspector) {
+    let settings = inspect_runtime::TreeServerSendPreference::default();
+    inspect_runtime::service::spawn_tree_server_with_stream(inspector.clone(), settings, stream)
+        .await;
+}
+
+pub fn new_example_table(node: &Node) -> Table {
     let table_node_name = unique_name("table");
-    let example_table =
-        Table::new(opts.rows, opts.columns, &table_node_name, root.create_child(&table_node_name));
+    Table::new(3, 3, &table_node_name, node.create_child(&table_node_name))
+}
 
-    let int_array = root.create_int_array(unique_name("array"), 3);
+pub fn new_example_int_array(node: &Node) -> IntArrayProperty {
+    let int_array = node.create_int_array(unique_name("array"), 3);
     int_array.set(0, 1);
     int_array.add(1, 10);
     int_array.subtract(2, 3);
+    int_array
+}
 
-    let uint_array = root.create_uint_array(unique_name("array"), 3);
+pub fn new_example_uint_array(node: &Node) -> UintArrayProperty {
+    let uint_array = node.create_uint_array(unique_name("array"), 3);
     uint_array.set(0, 1u64);
     uint_array.add(1, 10);
     uint_array.set(2, 3u64);
     uint_array.subtract(2, 1);
+    uint_array
+}
 
-    let double_array = root.create_double_array(unique_name("array"), 3);
+pub fn new_example_double_array(node: &Node) -> DoubleArrayProperty {
+    let double_array = node.create_double_array(unique_name("array"), 3);
     double_array.set(0, 0.25);
     double_array.add(1, 1.25);
     double_array.subtract(2, 0.75);
+    double_array
+}
 
-    let _int_linear_hist = populated(
-        root.create_int_linear_histogram(
+pub fn new_example_int_linear_hist(node: &Node) -> IntLinearHistogramProperty {
+    let hist = populated(
+        node.create_int_linear_histogram(
             unique_name("histogram"),
             inspect::LinearHistogramParams { floor: -10, step_size: 5, buckets: 3 },
         ),
         PopulateParams { floor: -20, step: 1, count: 40 },
     );
-    let _uint_linear_hist = populated(
-        root.create_uint_linear_histogram(
+    hist
+}
+
+pub fn new_example_uint_linear_hist(node: &Node) -> UintLinearHistogramProperty {
+    let hist = populated(
+        node.create_uint_linear_histogram(
             unique_name("histogram"),
             inspect::LinearHistogramParams { floor: 5, step_size: 5, buckets: 3 },
         ),
         PopulateParams { floor: 0, step: 1, count: 40 },
     );
-    let _double_linear_hist = populated(
-        root.create_double_linear_histogram(
+    hist
+}
+
+pub fn new_example_double_linear_hist(node: &Node) -> DoubleLinearHistogramProperty {
+    let hist = populated(
+        node.create_double_linear_histogram(
             unique_name("histogram"),
             inspect::LinearHistogramParams { floor: 0.0, step_size: 0.5, buckets: 3 },
         ),
         PopulateParams { floor: -1.0, step: 0.1, count: 40 },
     );
+    hist
+}
 
-    let _int_exp_hist = populated(
-        root.create_int_exponential_histogram(
+pub fn new_example_int_exp_hist(node: &Node) -> IntExponentialHistogramProperty {
+    let hist = populated(
+        node.create_int_exponential_histogram(
             unique_name("histogram"),
             inspect::ExponentialHistogramParams {
                 floor: -10,
@@ -110,8 +189,12 @@ pub async fn emit_example_inspect_data(opts: Options) -> Result<(), Error> {
         ),
         PopulateParams { floor: -20, step: 1, count: 40 },
     );
-    let _uint_exp_hist = populated(
-        root.create_uint_exponential_histogram(
+    hist
+}
+
+pub fn new_example_uint_exp_hist(node: &Node) -> UintExponentialHistogramProperty {
+    let hist = populated(
+        node.create_uint_exponential_histogram(
             unique_name("histogram"),
             inspect::ExponentialHistogramParams {
                 floor: 0,
@@ -122,8 +205,12 @@ pub async fn emit_example_inspect_data(opts: Options) -> Result<(), Error> {
         ),
         PopulateParams { floor: 0, step: 1, count: 40 },
     );
-    let _double_exp_hist = populated(
-        root.create_double_exponential_histogram(
+    hist
+}
+
+pub fn new_example_double_exp_hist(node: &Node) -> DoubleExponentialHistogramProperty {
+    let hist = populated(
+        node.create_double_exponential_histogram(
             unique_name("histogram"),
             inspect::ExponentialHistogramParams {
                 floor: 0.0,
@@ -134,8 +221,11 @@ pub async fn emit_example_inspect_data(opts: Options) -> Result<(), Error> {
         ),
         PopulateParams { floor: -1.0, step: 0.1, count: 40 },
     );
+    hist
+}
 
-    root.record_lazy_child("lazy-node", || {
+pub fn new_example_lazy_uint(node: &Node) {
+    node.record_lazy_child("lazy-node", move || {
         async move {
             let inspector = inspect::Inspector::default();
             inspector.root().record_uint("uint", 3);
@@ -143,7 +233,10 @@ pub async fn emit_example_inspect_data(opts: Options) -> Result<(), Error> {
         }
         .boxed()
     });
-    root.record_lazy_values("lazy-values", || {
+}
+
+pub fn new_example_lazy_double(node: &Node) {
+    node.record_lazy_values("lazy-values", move || {
         async move {
             let inspector = inspect::Inspector::default();
             inspector.root().record_double("lazy-double", 3.25);
@@ -151,50 +244,4 @@ pub async fn emit_example_inspect_data(opts: Options) -> Result<(), Error> {
         }
         .boxed()
     });
-
-    if let Some(extra_number) = opts.extra_number {
-        root.record_int("extra_number", extra_number);
-    }
-
-    let mut fs = ServiceFs::new();
-
-    // NOTE: this FIDL service is deprecated and the following *should not* be done.
-    // Rust doesn't have a way of writing to the deprecated FIDL service, therefore
-    // we read what we wrote to the VMO and provide it through the service for testing
-    // purposes.
-    fs.dir("diagnostics").add_fidl_service(move |stream| {
-        spawn_inspect_server(stream, example_table.get_node_object());
-    });
-
-    let inspector_clone = inspector.clone();
-    fs.dir("diagnostics").add_fidl_service(move |stream| {
-        // Purely for test purposes. Internally inspect creates a pseudo dir diagnostics and
-        // adds it as remote in ServiceFs. However, if we try to add the VMO file and the other
-        // service in the ServiceFs, an exception occurs. This is purely a workaround for
-        // ServiceFS and for the test purpose. A regular component wouldn't do this. It would
-        // just do `inspect_runtime::serve(inspector, &mut fs);`.
-        inspect_runtime::service::spawn_tree_server_with_stream(
-            inspector_clone.clone(),
-            inspect_runtime::TreeServerSendPreference::default(),
-            stream,
-        )
-        .detach();
-    });
-
-    // TODO(https://fxbug.dev/42118092): remove when all clients writing VMO files today have been migrated to write
-    // to Tree.
-    inspector
-        .duplicate_vmo()
-        .ok_or(format_err!("Failed to duplicate VMO"))
-        .and_then(|vmo| {
-            fs.dir("diagnostics").add_vmo_file_at("root.inspect", vmo);
-            Ok(())
-        })
-        .unwrap_or_else(|e| {
-            eprintln!("Failed to expose vmo. Error: {:?}", e);
-        });
-
-    fs.take_and_serve_directory_handle()?;
-
-    Ok(fs.collect().await)
 }

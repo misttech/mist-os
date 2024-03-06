@@ -57,6 +57,13 @@ fuchsia_package("realm-factory") {
   deps = [
     ":archivist-component",
     ":archivist-realm-factory-component",
-    "//src/diagnostics/archivist/testing/puppet:puppet-component",
+  ]
+  subpackages = [
+    # The puppet is subpackaged instead of included locally because the inspect
+    # data for a package-local child component contains an unstable
+    # `metadata.component_url` property that gets overwritten by realm builder,
+    # whereas the inspect data for a subpackaged component uses a stable,
+    # relative URL for this property.
+    "//src/diagnostics/archivist/testing/puppet",
   ]
 }

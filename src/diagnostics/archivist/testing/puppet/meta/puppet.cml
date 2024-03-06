@@ -13,10 +13,21 @@
     capabilities: [
         { protocol: "fuchsia.archivist.test.Puppet" },
     ],
+    use: [
+        {
+            config: "fuchsia.archivist.test.puppet.PublishInspectWithDeprecatedApis",
+            key: "publish_inspect_with_deprecated_apis",
+            type: "bool",
+        },
+    ],
     expose: [
         {
             protocol: "fuchsia.archivist.test.Puppet",
             from: "self",
         },
     ],
+    config: {
+        // Whether to use fuchsia.inspect.deprecated.inspect or fuchsia.inspect.
+        publish_inspect_with_deprecated_apis: { type: "bool" },
+    },
 }

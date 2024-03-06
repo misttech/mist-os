@@ -10,7 +10,7 @@ use diagnostics_hierarchy::{ArrayFormat, LinearHistogramParams};
 use inspect_format::constants;
 use tracing::error;
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 /// A linear histogram property for unsigned integer values.
 pub struct UintLinearHistogramProperty {
     array: UintArrayProperty,

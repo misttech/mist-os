@@ -358,6 +358,14 @@ pub struct ConfigurationCapability {
     availability: Option<fdecl::Availability>,
 }
 
+impl ConfigurationCapability {
+    /// Renames a configuration capability
+    pub fn as_(mut self, name: impl Into<String>) -> Self {
+        self.as_ = Some(name.into());
+        self
+    }
+}
+
 impl Into<ftest::Capability> for ConfigurationCapability {
     fn into(self) -> ftest::Capability {
         ftest::Capability::Config(ftest::Config {

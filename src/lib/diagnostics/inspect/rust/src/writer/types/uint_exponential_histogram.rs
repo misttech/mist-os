@@ -10,7 +10,7 @@ use diagnostics_hierarchy::{ArrayFormat, ExponentialHistogramParams};
 use inspect_format::constants;
 use tracing::error;
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 /// An exponential histogram property for uint values.
 pub struct UintExponentialHistogramProperty {
     array: UintArrayProperty,

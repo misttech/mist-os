@@ -16,7 +16,6 @@ use lazy_static::lazy_static;
 const MONIKER_KEY: &str = "moniker";
 const METADATA_KEY: &str = "metadata";
 const TIMESTAMP_KEY: &str = "timestamp";
-
 const TEST_ARCHIVIST_MONIKER: &str = "archivist";
 
 lazy_static! {
@@ -39,7 +38,7 @@ lazy_static! {
 #[fuchsia::test]
 async fn read_components_inspect() {
     let realm_proxy = test_topology::create_realm(&ftest::RealmOptions {
-        puppets: Some(vec![ftest::PuppetDecl { name: "child".to_string() }]),
+        puppets: Some(vec![test_topology::PuppetDeclBuilder::new("child").into()]),
         ..Default::default()
     })
     .await
@@ -50,7 +49,6 @@ async fn read_components_inspect() {
     child_puppet.set_health_ok().await.unwrap();
 
     let accessor = realm_proxy.connect_to_protocol::<ArchiveAccessorMarker>().await.unwrap();
-
     let data = ArchiveReader::new()
         .with_archive(accessor)
         .add_selector("child:root")
@@ -71,7 +69,7 @@ async fn read_components_inspect() {
 async fn read_component_with_hanging_lazy_node() -> Result<(), Error> {
     let realm_proxy = test_topology::create_realm(&ftest::RealmOptions {
         realm_name: Some("hanging_lazy".to_string()),
-        puppets: Some(vec![ftest::PuppetDecl { name: "hanging_data".to_string() }]),
+        puppets: Some(vec![test_topology::PuppetDeclBuilder::new("hanging_data").into()]),
         ..Default::default()
     })
     .await
@@ -106,8 +104,8 @@ async fn read_component_with_hanging_lazy_node() -> Result<(), Error> {
 async fn read_components_single_selector() -> Result<(), Error> {
     let realm_proxy = test_topology::create_realm(&ftest::RealmOptions {
         puppets: Some(vec![
-            ftest::PuppetDecl { name: "child_a".to_string() },
-            ftest::PuppetDecl { name: "child_b".to_string() },
+            test_topology::PuppetDeclBuilder::new("child_a").into(),
+            test_topology::PuppetDeclBuilder::new("child_b").into(),
         ]),
         ..Default::default()
     })
@@ -115,9 +113,9 @@ async fn read_components_single_selector() -> Result<(), Error> {
     .expect("create realm");
 
     let child_a = test_topology::connect_to_puppet(&realm_proxy, "child_a").await?;
-    child_a.set_health_ok().await?;
-
     let child_b = test_topology::connect_to_puppet(&realm_proxy, "child_b").await?;
+
+    child_a.set_health_ok().await?;
     child_b.set_health_ok().await?;
 
     let accessor = realm_proxy.connect_to_protocol::<ArchiveAccessorMarker>().await?;
@@ -128,7 +126,7 @@ async fn read_components_single_selector() -> Result<(), Error> {
         .await
         .expect("got inspect data");
 
-    // Only inspect from child_a should be reported
+    // Only inspect from child_a should be reported.
     assert_eq!(data.len(), 1);
     assert_data_tree!(data[0].payload.as_ref().unwrap(), root: {
         "fuchsia.inspect.Health": {
@@ -143,45 +141,52 @@ async fn read_components_single_selector() -> Result<(), Error> {
 
 #[fuchsia::test]
 async fn unified_reader() -> Result<(), Error> {
-    let (builder, test_realm) = test_topology::create(test_topology::Options::default())
-        .await
-        .expect("create base topology");
-    test_topology::add_eager_child(&test_realm, "test_component", IQUERY_TEST_COMPONENT_URL)
-        .await
-        .expect("add child a");
+    let realm_proxy = test_topology::create_realm(&ftest::RealmOptions {
+        puppets: Some(vec![
+            test_topology::PuppetDeclBuilder::new("puppet_inspect_sink").into(),
+            test_topology::PuppetDeclBuilder::new("puppet_diagnostics_dir_methods")
+                .publish_inspect_with_deprecated_apis(true)
+                .into(),
+        ]),
+        ..Default::default()
+    })
+    .await
+    .expect("create realm");
 
-    let instance = builder.build().await.expect("create instance");
+    let puppet1 =
+        test_topology::connect_to_puppet(&realm_proxy, "puppet_inspect_sink").await.unwrap();
+    let puppet2 = test_topology::connect_to_puppet(&realm_proxy, "puppet_diagnostics_dir_methods")
+        .await
+        .unwrap();
+
+    puppet1.emit_example_inspect_data().unwrap();
+    puppet2.emit_example_inspect_data().unwrap();
 
     // First, retrieve all of the information in our realm to make sure that everything
     // we expect is present.
-    let accessor =
-        instance.root.connect_to_protocol_at_exposed_dir::<ArchiveAccessorMarker>().unwrap();
+    let accessor = realm_proxy.connect_to_protocol::<ArchiveAccessorMarker>().await.unwrap();
     retrieve_and_validate_results(accessor, Vec::new(), &UNIFIED_ALL_GOLDEN, 4).await;
 
     // Then verify that from the expected data, we can retrieve one specific value.
-    let accessor =
-        instance.root.connect_to_protocol_at_exposed_dir::<ArchiveAccessorMarker>().unwrap();
+    let accessor = realm_proxy.connect_to_protocol::<ArchiveAccessorMarker>().await.unwrap();
     retrieve_and_validate_results(
         accessor,
-        vec!["test_component:*:lazy-*"],
+        vec!["puppet*:*:lazy-*"],
         &UNIFIED_SINGLE_VALUE_GOLDEN,
         1,
     )
     .await;
 
     // Then verify that subtree selection retrieves all trees under and including root.
-    let accessor =
-        instance.root.connect_to_protocol_at_exposed_dir::<ArchiveAccessorMarker>().unwrap();
-    retrieve_and_validate_results(accessor, vec!["test_component:root"], &UNIFIED_ALL_GOLDEN, 3)
-        .await;
+    let accessor = realm_proxy.connect_to_protocol::<ArchiveAccessorMarker>().await.unwrap();
+    retrieve_and_validate_results(accessor, vec!["puppet*:root"], &UNIFIED_ALL_GOLDEN, 3).await;
 
     // Then verify that a selector with a correct moniker, but no resolved nodes
     // produces an error schema.
-    let accessor =
-        instance.root.connect_to_protocol_at_exposed_dir::<ArchiveAccessorMarker>().unwrap();
+    let accessor = realm_proxy.connect_to_protocol::<ArchiveAccessorMarker>().await.unwrap();
     retrieve_and_validate_results(
         accessor,
-        vec!["test_component:root/non-existent-node:bloop"],
+        vec!["puppet*:root/non-existent-node:bloop"],
         &UNIFIED_FULL_FILTER_GOLDEN,
         3,
     )
@@ -381,16 +386,17 @@ async fn retrieve_and_validate_results(
     // golden file into a json struct because deserializing the golden file into a
     // struct causes serde_json to convert the u64s into exponential form which
     // causes loss of precision.
-    let mut pretty_results = serde_json::to_string_pretty(&process_results_for_comparison(results))
-        .expect("should be able to format the the results as valid json.");
+    let mut observed_string =
+        serde_json::to_string_pretty(&process_results_for_comparison(results))
+            .expect("should be able to format the the results as valid json.");
     let mut expected_string = golden.to_string();
     // Remove whitespace from both strings because text editors will do things like
     // requiring json files end in a newline, while the result string is unbounded by
     // newlines. Also, we don't want this test to fail if the only change is to json
     // format within the reader.
-    pretty_results.retain(|c| !c.is_whitespace());
+    observed_string.retain(|c| !c.is_whitespace());
     expected_string.retain(|c| !c.is_whitespace());
-    assert_diff!(&expected_string, &pretty_results, "\n", 0);
+    assert_diff!(&expected_string, &observed_string, "\n", 0);
 }
 
 fn process_results_for_comparison(results: serde_json::Value) -> serde_json::Value {

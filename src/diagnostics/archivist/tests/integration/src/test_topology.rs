@@ -36,6 +36,33 @@ pub async fn create_realm(options: &ftest::RealmOptions) -> Result<RealmProxyCli
     Ok(RealmProxyClient::from(client))
 }
 
+// Helper type for constructing `PuppetDecl`.
+pub(crate) struct PuppetDeclBuilder {
+    name: &'static str,
+    publish_inspect_with_deprecated_apis: bool,
+}
+
+impl PuppetDeclBuilder {
+    pub fn new(name: &'static str) -> Self {
+        Self { name: name, publish_inspect_with_deprecated_apis: false }
+    }
+
+    pub fn publish_inspect_with_deprecated_apis(mut self, value: bool) -> Self {
+        self.publish_inspect_with_deprecated_apis = value;
+        self
+    }
+}
+
+impl Into<ftest::PuppetDecl> for PuppetDeclBuilder {
+    fn into(self) -> ftest::PuppetDecl {
+        ftest::PuppetDecl {
+            name: Some(self.name.to_string()),
+            publish_inspect_with_deprecated_apis: Some(self.publish_inspect_with_deprecated_apis),
+            ..Default::default()
+        }
+    }
+}
+
 /// Connects to the puppet in the test realm with the given name.
 pub async fn connect_to_puppet(
     realm_proxy: &RealmProxyClient,

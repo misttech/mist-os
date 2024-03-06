@@ -14,7 +14,9 @@ use fuchsia_component_test::{
 };
 
 const ARCHIVIST_URL: &str = "#meta/archivist.cm";
-const PUPPET_URL: &str = "#meta/puppet.cm";
+const PUPPET_URL: &str = "puppet#meta/puppet.cm";
+const CONFIG_PUBLISH_INSPECT_WITH_DEPRECATED_APIS: &str =
+    "fuchsia.archivist.test.puppet.PublishInspectWithDeprecatedApis";
 
 #[derive(Default)]
 pub(crate) struct ArchivistRealmFactory;
@@ -136,13 +138,47 @@ impl ArchivistRealmFactory {
         // Add the puppet components.
         if let Some(puppet_decls) = options.puppets {
             for decl in puppet_decls {
-                let from_puppet = Route::new().capability(
-                    Capability::protocol::<PuppetMarker>().as_(decl.unique_protocol_alias()),
-                );
-                let from_test_realm = Route::new()
-                    .capability(Capability::protocol_by_name(decl.unique_protocol_alias()));
-                let puppet =
-                    test_realm.add_child(&decl.name, PUPPET_URL, ChildOptions::new()).await?;
+                let name = decl.name.clone().expect("puppet must have a name");
+                let puppet = test_realm.add_child(&name, PUPPET_URL, ChildOptions::new()).await?;
+
+                // Set the puppet's config capabilities.
+                // Multiple puppets may exist in the same relam, so alias these capabilities to
+                // prevent conflicts.
+                let use_deprecated_inspect_api_alias =
+                    format!("{CONFIG_PUBLISH_INSPECT_WITH_DEPRECATED_APIS}.{name}");
+
+                builder
+                    .add_capability(cm_rust::CapabilityDecl::Config(cm_rust::ConfigurationDecl {
+                        name: use_deprecated_inspect_api_alias.parse()?,
+                        value: cm_rust::ConfigValue::Single(cm_rust::ConfigSingleValue::Bool(
+                            decl.publish_inspect_with_deprecated_apis.unwrap_or(false),
+                        )),
+                    }))
+                    .await?;
+
+                builder
+                    .add_route(
+                        Route::new()
+                            .capability(Capability::configuration(
+                                use_deprecated_inspect_api_alias.clone(),
+                            ))
+                            .from(Ref::self_())
+                            .to(&test_realm),
+                    )
+                    .await?;
+
+                test_realm
+                    .add_route(
+                        Route::new()
+                            .capability(
+                                Capability::configuration(use_deprecated_inspect_api_alias)
+                                    .as_(CONFIG_PUBLISH_INSPECT_WITH_DEPRECATED_APIS),
+                            )
+                            .from(Ref::parent())
+                            .to(&puppet),
+                    )
+                    .await?;
+
                 test_realm
                     .add_route(
                         Route::new()
@@ -154,8 +190,27 @@ impl ArchivistRealmFactory {
                             .to(&puppet),
                     )
                     .await?;
-                test_realm.add_route(from_puppet.from(&puppet).to(Ref::parent())).await?;
-                builder.add_route(from_test_realm.from(&test_realm).to(Ref::parent())).await?;
+
+                test_realm
+                    .add_route(
+                        Route::new()
+                            .capability(
+                                Capability::protocol::<PuppetMarker>()
+                                    .as_(decl.unique_protocol_alias()),
+                            )
+                            .from(&puppet)
+                            .to(Ref::parent()),
+                    )
+                    .await?;
+
+                builder
+                    .add_route(
+                        Route::new()
+                            .capability(Capability::protocol_by_name(decl.unique_protocol_alias()))
+                            .from(&test_realm)
+                            .to(Ref::parent()),
+                    )
+                    .await?;
             }
         }
         Ok(builder.build().await?)
@@ -171,6 +226,7 @@ trait PuppetDeclExt {
 
 impl PuppetDeclExt for PuppetDecl {
     fn unique_protocol_alias(&self) -> String {
-        format!("{}.{}", PuppetMarker::PROTOCOL_NAME, self.name)
+        let name = self.name.as_ref().unwrap();
+        format!("{}.{}", PuppetMarker::PROTOCOL_NAME, name)
     }
 }
