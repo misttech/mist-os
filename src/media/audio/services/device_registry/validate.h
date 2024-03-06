@@ -21,6 +21,9 @@ const uint32_t kMinSupportedRingBufferFrameRate = 1000;
 const uint32_t kMaxSupportedRingBufferFrameRate = 192000;
 
 // Utility functions to validate direct responses from audio drivers.
+bool ClientIsValidForDeviceType(const fuchsia_audio_device::DeviceType& device_type,
+                                const fuchsia_audio_device::DriverClient& driver_client);
+
 std::vector<fuchsia_audio_device::PcmFormatSet> TranslateRingBufferFormatSets(
     std::vector<fuchsia_hardware_audio::SupportedFormats>& ring_buffer_format_sets);
 

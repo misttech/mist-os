@@ -4,10 +4,8 @@
 
 library fuchsia.audio.device;
 
-using fuchsia.hardware.audio;
-
-/// Use the `Provider` interface to manually add devices that do not use the
-/// devfs mechanism. Devices that do are automatically added, upon detection.
+/// Use the `Provider` interface to manually add devices that do not use the devfs
+/// mechanism. (Devices that use devfs are automatically added, upon detection.)
 @discoverable
 closed protocol Provider {
     strict AddDevice(resource table {
@@ -16,15 +14,18 @@ closed protocol Provider {
         /// Required.
         1: device_name string:MAX_STRING_SIZE;
 
-        /// The device's type (directionality, such as input or output).
+        /// Indicates the protocol used by the device, as well as (if StreamConfig) whether
+        /// it is an input (a source of audio) or an output (a destination for audio).
         ///
         /// Required.
         2: device_type DeviceType;
 
-        /// The `StreamConfig` channel used to configure/observe the device.
+        /// The client_end of the protocol channel (Codec, Composite, Dai or StreamConfig)
+        /// that this service will use to configure/observe the device.
+        /// For now, `AddDevice` only accepts a `stream_config_client` or `codec_client` here.
         ///
         /// Required.
-        3: stream_config client_end:fuchsia.hardware.audio.StreamConfig;
+        3: driver_client DriverClient;
     }) -> (table {}) error ProviderAddDeviceError;
 };
 
@@ -36,6 +37,9 @@ type ProviderAddDeviceError = flexible enum {
     /// The required `device_type` is missing.
     INVALID_TYPE = 2;
 
-    /// The required `stream_config` is invalid or missing.
-    INVALID_STREAM_CONFIG = 3;
+    /// The required `driver_client` is invalid or missing.
+    INVALID_DRIVER_CLIENT = 3;
+
+    /// The required `driver_client` did not contain a StreamConfig.
+    WRONG_CLIENT_TYPE = 4;
 };

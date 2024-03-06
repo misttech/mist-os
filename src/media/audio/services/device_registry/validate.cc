@@ -53,6 +53,23 @@ size_t CountUcharMatches(const std::vector<uint8_t>& uchars, size_t uchar_to_mat
 
 }  // namespace
 
+bool ClientIsValidForDeviceType(const fuchsia_audio_device::DeviceType& device_type,
+                                const fuchsia_audio_device::DriverClient& driver_client) {
+  switch (driver_client.Which()) {
+    case fuchsia_audio_device::DriverClient::Tag::kCodec:
+      return (device_type == fuchsia_audio_device::DeviceType::kCodec);
+    case fuchsia_audio_device::DriverClient::Tag::kComposite:
+      return (device_type == fuchsia_audio_device::DeviceType::kComposite);
+    case fuchsia_audio_device::DriverClient::Tag::kDai:
+      return (device_type == fuchsia_audio_device::DeviceType::kDai);
+    case fuchsia_audio_device::DriverClient::Tag::kStreamConfig:
+      return (device_type == fuchsia_audio_device::DeviceType::kInput ||
+              device_type == fuchsia_audio_device::DeviceType::kOutput);
+    default:
+      return false;
+  }
+}
+
 // Translate from fuchsia_hardware_audio::SupportedFormats to fuchsia_audio_device::PcmFormatSet.
 std::vector<fuchsia_audio_device::PcmFormatSet> TranslateRingBufferFormatSets(
     std::vector<fuchsia_hardware_audio::SupportedFormats>& ring_buffer_format_sets) {

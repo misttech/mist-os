@@ -29,6 +29,7 @@
 #include "src/media/audio/services/device_registry/ring_buffer_server.h"
 #include "src/media/audio/services/device_registry/testing/fake_codec.h"
 #include "src/media/audio/services/device_registry/testing/fake_stream_config.h"
+#include "src/media/audio/services/device_registry/validate.h"
 
 namespace media_audio {
 
@@ -58,22 +59,6 @@ class AudioDeviceRegistryServerTestBase : public gtest::TestLoopFixture {
   std::unique_ptr<FakeCodec> CreateFakeCodecOutput() { return CreateFakeCodec(false); }
   std::unique_ptr<FakeCodec> CreateFakeCodecNoDirection() { return CreateFakeCodec(std::nullopt); }
 
-  static bool ClientIsValidForDeviceType(const fuchsia_audio_device::DeviceType& device_type,
-                                         const fuchsia_audio_device::DriverClient& driver_client) {
-    switch (driver_client.Which()) {
-      case fuchsia_audio_device::DriverClient::Tag::kCodec:
-        return (device_type == fuchsia_audio_device::DeviceType::kCodec);
-      case fuchsia_audio_device::DriverClient::Tag::kComposite:
-        return (device_type == fuchsia_audio_device::DeviceType::kComposite);
-      case fuchsia_audio_device::DriverClient::Tag::kDai:
-        return (device_type == fuchsia_audio_device::DeviceType::kDai);
-      case fuchsia_audio_device::DriverClient::Tag::kStreamConfig:
-        return (device_type == fuchsia_audio_device::DeviceType::kInput ||
-                device_type == fuchsia_audio_device::DeviceType::kOutput);
-      default:
-        return false;
-    }
-  }
   // Device
   // Create a Device object (backed by a fake driver); insert it to ADR as if it had been detected.
   // Through the stream_config connection, this will communicate with the fake driver.
