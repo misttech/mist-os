@@ -34,6 +34,15 @@
                 },
                 "expected": "match",
                 "name": "MatchPCIDevice"
+            },
+            {
+                "device": {
+                    "fuchsia.BIND_PLATFORM_DEV_VID": "fuchsia.platform.BIND_PLATFORM_DEV_VID.GENERIC",
+                    "fuchsia.BIND_PLATFORM_DEV_DID": "fuchsia.platform.BIND_PLATFORM_DEV_DID.DEVICETREE",
+                    "fuchsia.devicetree.FIRST_COMPATIBLE": "\"generic-xhci\""
+                },
+                "expected": "match",
+                "name": "Match devicetree"
             }
         ]
     },

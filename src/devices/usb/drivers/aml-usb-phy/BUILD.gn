@@ -14,6 +14,7 @@ driver_bind_rules("aml_usb_phy_bind") {
   deps = [
     "//src/devices/bind/fuchsia.amlogic.platform",
     "//src/devices/bind/fuchsia.clock",
+    "//src/devices/bind/fuchsia.devicetree",
     "//src/devices/bind/fuchsia.gpio",
     "//src/devices/bind/fuchsia.platform",
     "//src/devices/bind/fuchsia.register",

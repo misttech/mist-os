@@ -8,6 +8,7 @@ using fuchsia.designware.platform;
 using fuchsia.hardware.usb.phy;
 using fuchsia.platform;
 using fuchsia.usb.phy;
+using fuchsia.devicetree;
 
 
 primary node "dwc2-phy" {
@@ -23,9 +24,16 @@ primary node "dwc2-phy" {
 }
 
 node "pdev" {
-  fuchsia.BIND_PROTOCOL == fuchsia.platform.BIND_PROTOCOL.DEVICE;
   fuchsia.BIND_PLATFORM_DEV_VID == fuchsia.platform.BIND_PLATFORM_DEV_VID.GENERIC;
-  fuchsia.BIND_PLATFORM_DEV_PID == fuchsia.platform.BIND_PLATFORM_DEV_PID.GENERIC;
-  fuchsia.BIND_PLATFORM_DEV_DID == fuchsia.platform.BIND_PLATFORM_DEV_DID.USB_DWC2;
-  fuchsia.BIND_PLATFORM_DEV_INSTANCE_ID == 0;
+  accept fuchsia.BIND_PLATFORM_DEV_DID {
+    fuchsia.platform.BIND_PLATFORM_DEV_DID.USB_DWC2,
+    fuchsia.platform.BIND_PLATFORM_DEV_DID.DEVICETREE,
+  }
+  if fuchsia.BIND_PLATFORM_DEV_DID == fuchsia.platform.BIND_PLATFORM_DEV_DID.DEVICETREE {
+    fuchsia.devicetree.FIRST_COMPATIBLE == "snps,dwc2";
+  } else {
+    fuchsia.BIND_PROTOCOL == fuchsia.platform.BIND_PROTOCOL.DEVICE;
+    fuchsia.BIND_PLATFORM_DEV_PID == fuchsia.platform.BIND_PLATFORM_DEV_PID.GENERIC;
+    fuchsia.BIND_PLATFORM_DEV_INSTANCE_ID == 0;
+  }
 }

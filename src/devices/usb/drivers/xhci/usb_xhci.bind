@@ -12,6 +12,7 @@ using fuchsia.pci.serial.usb;
 using fuchsia.platform;
 using fuchsia.sysmem;
 using fuchsia.usb.phy;
+using fuchsia.devicetree;
 
 primary node "pdev" {
   if fuchsia.BIND_FIDL_PROTOCOL == fuchsia.pci.BIND_FIDL_PROTOCOL.DEVICE {
@@ -22,21 +23,26 @@ primary node "pdev" {
   } else {
     // Platform bus support.
     fuchsia.BIND_PLATFORM_DEV_VID == fuchsia.platform.BIND_PLATFORM_DEV_VID.GENERIC;
-    fuchsia.BIND_PLATFORM_DEV_PID == fuchsia.platform.BIND_PLATFORM_DEV_PID.GENERIC;
     accept fuchsia.BIND_PLATFORM_DEV_DID {
       fuchsia.platform.BIND_PLATFORM_DEV_DID.XHCI,
       0x02,  // Only relevant to vim2, needs to be cleaned up.
+      fuchsia.platform.BIND_PLATFORM_DEV_DID.DEVICETREE,
     }
-    if fuchsia.BIND_COMPOSITE != 1 {
-      if fuchsia.BIND_FIDL_PROTOCOL == fuchsia.platform.BIND_FIDL_PROTOCOL.DEVICE {
-        true;
-      } else if fuchsia.BIND_PROTOCOL == fuchsia.platform.BIND_PROTOCOL.DEVICE {
-        true;
-      } else {
-        false;
-      }
+    if fuchsia.BIND_PLATFORM_DEV_DID == fuchsia.platform.BIND_PLATFORM_DEV_DID.DEVICETREE {
+      fuchsia.devicetree.FIRST_COMPATIBLE == "generic-xhci";
     } else {
-      true;
+      fuchsia.BIND_PLATFORM_DEV_PID == fuchsia.platform.BIND_PLATFORM_DEV_PID.GENERIC;
+      if fuchsia.BIND_COMPOSITE != 1 {
+        if fuchsia.BIND_FIDL_PROTOCOL == fuchsia.platform.BIND_FIDL_PROTOCOL.DEVICE {
+          true;
+        } else if fuchsia.BIND_PROTOCOL == fuchsia.platform.BIND_PROTOCOL.DEVICE {
+          true;
+        } else {
+          false;
+        }
+      } else {
+        true;
+      }
     }
   }
 }
