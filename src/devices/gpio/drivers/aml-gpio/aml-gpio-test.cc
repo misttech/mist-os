@@ -12,8 +12,6 @@
 
 #include <mock-mmio-reg/mock-mmio-reg.h>
 
-#include "src/devices/bus/testing/fake-pdev/fake-pdev.h"
-
 namespace {
 
 constexpr size_t kGpioRegSize = 0x100;
