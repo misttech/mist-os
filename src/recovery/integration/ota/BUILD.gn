@@ -24,6 +24,7 @@ rustc_test("test") {
     "//src/lib/fuchsia-fs",
     "//src/recovery/system:ota_lib",
     "//src/storage/lib/vfs/rust:vfs",
+    "//src/sys/pkg/lib/fuchsia-hash",
     "//src/sys/pkg/lib/fuchsia-pkg-testing",
     "//src/sys/pkg/lib/isolated-ota",
     "//src/sys/pkg/testing/blobfs-ramdisk",

@@ -118,8 +118,9 @@
             to: "#system-updater",
         },
         {
-            protocol: [ "fuchsia.pkg.PackageResolver" ],
+            protocol: "fuchsia.pkg.PackageResolver-ota",
             from: "#pkg-resolver",
+            as: "fuchsia.pkg.PackageResolver",
             to: "#system-updater",
         },
     ],

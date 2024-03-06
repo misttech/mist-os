@@ -16,7 +16,7 @@ use fuchsia_component::server::ServiceFs;
 use fuchsia_component_test::{
     Capability, ChildOptions, ChildRef, LocalComponentHandles, RealmBuilder, Ref, Route,
 };
-use fuchsia_pkg_testing::{Package, PackageBuilder};
+use fuchsia_pkg_testing::PackageBuilder;
 use futures::{channel::mpsc, FutureExt, StreamExt, TryStreamExt};
 use isolated_ota::{OmahaConfig, UpdateUrlSource};
 use isolated_ota_env::expose_mock_paver;
@@ -42,7 +42,7 @@ type ProgressRendererSender = mpsc::Sender<frui::ProgressRendererRender2Request>
 /// `paver` is expected to be populated from `TestParams`.
 struct TestResult {
     blobfs: BlobfsRamdisk,
-    packages: Vec<Package>,
+    expected_blobfs_contents: BTreeSet<fuchsia_hash::Hash>,
     pub progress_renderer_requests: Vec<frui::ProgressRendererRender2Request>,
     pub paver: Arc<MockPaverService>,
 }
@@ -51,13 +51,8 @@ impl TestResult {
     /// Asserts that all blobs in all the packages that were part of the Update
     /// have been installed into the blobfs, and that the blobfs contains no extra blobs.
     pub fn check_packages(&self) {
-        let written_blobs = self.blobfs.list_blobs().expect("Listing blobfs blobs");
-        let mut all_package_blobs = BTreeSet::new();
-        for package in self.packages.iter() {
-            all_package_blobs.append(&mut package.list_blobs());
-        }
-
-        assert_eq!(written_blobs, all_package_blobs);
+        let actual_contents = self.blobfs.list_blobs().expect("Listing blobfs blobs");
+        assert_eq!(actual_contents, self.expected_blobfs_contents);
     }
 }
 
@@ -124,7 +119,7 @@ impl TestExecutor<Result<TestResult, Error>> for OtaComponentTestExecutor {
 
         Ok(TestResult {
             blobfs,
-            packages: params.packages,
+            expected_blobfs_contents: params.expected_blobfs_contents,
             paver: params.paver,
             progress_renderer_requests,
         })

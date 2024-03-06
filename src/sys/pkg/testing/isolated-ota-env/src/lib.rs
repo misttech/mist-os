@@ -25,7 +25,12 @@ use {
         OmahaResponse, OmahaServer, OmahaServerBuilder, ResponseAndMetadata, ResponseMap,
     },
     mock_paver::{MockPaverService, MockPaverServiceBuilder},
-    std::{collections::BTreeMap, io::Write, str::FromStr, sync::Arc},
+    std::{
+        collections::{BTreeMap, BTreeSet},
+        io::Write,
+        str::FromStr,
+        sync::Arc,
+    },
     tempfile::TempDir,
 };
 
@@ -47,7 +52,7 @@ pub struct TestParams {
     pub blobfs: Option<ClientEnd<fio::DirectoryMarker>>,
     pub board: String,
     pub channel: String,
-    pub packages: Vec<Package>,
+    pub expected_blobfs_contents: BTreeSet<Hash>,
     pub paver: Arc<MockPaverService>,
     pub repo_config_dir: TempDir,
     pub ssl_certs: DirectoryProxy,
@@ -193,7 +198,9 @@ impl<R> TestEnvBuilder<R> {
 
     /// Turn this |TestEnvBuilder| into a |TestEnv|
     pub async fn build(mut self) -> Result<TestEnv<R>, Error> {
-        let (repo_config, served_repo, ssl_certs, packages, merkle) = if self.repo_config.is_none()
+        let (repo_config, served_repo, ssl_certs, expected_blobfs_contents, merkle) = if self
+            .repo_config
+            .is_none()
         {
             // If no repo config was specified, host a repo containing the provided packages,
             // and an update package containing given images + all packages in the repo.
@@ -221,11 +228,18 @@ impl<R> TestEnvBuilder<R> {
             }
             let (update, images) = update.build().await;
 
-            self.packages.push(images);
+            // Do not include the images package, system-updater triggers GC after resolving it.
+            let expected_blobfs_contents = self
+                .packages
+                .iter()
+                .chain([update.as_package()])
+                .flat_map(|p| p.list_blobs())
+                .collect();
 
             let repo = Arc::new(
                 self.packages
                     .iter()
+                    .chain([update.as_package(), &images])
                     .fold(
                         RepositoryBuilder::from_template_dir(EMPTY_REPO_PATH)
                             .add_package(update.as_package()),
@@ -254,7 +268,7 @@ impl<R> TestEnvBuilder<R> {
                     fio::OpenFlags::RIGHT_READABLE,
                 )
                 .unwrap(),
-                packages,
+                expected_blobfs_contents,
                 update_merkle,
             )
         } else {
@@ -268,7 +282,7 @@ impl<R> TestEnvBuilder<R> {
                     fio::OpenFlags::RIGHT_READABLE,
                 )
                 .unwrap(),
-                vec![],
+                BTreeSet::new(),
                 Hash::from_str("deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef")
                     .expect("make merkle"),
             )
@@ -288,7 +302,7 @@ impl<R> TestEnvBuilder<R> {
             board: self.board,
             channel: self.channel,
             omaha: self.omaha,
-            packages,
+            expected_blobfs_contents,
             paver: Arc::new(self.paver.build()),
             _repo: served_repo,
             repo_config_dir: dir,
@@ -304,7 +318,7 @@ pub struct TestEnv<R> {
     blobfs: Option<ClientEnd<fio::DirectoryMarker>>,
     channel: String,
     omaha: OmahaState,
-    packages: Vec<Package>,
+    expected_blobfs_contents: BTreeSet<Hash>,
     paver: Arc<MockPaverService>,
     _repo: Option<ServedRepository>,
     repo_config_dir: tempfile::TempDir,
@@ -372,7 +386,7 @@ impl<R> TestEnv<R> {
             blobfs: self.blobfs,
             board: self.board,
             channel: self.channel,
-            packages: self.packages,
+            expected_blobfs_contents: self.expected_blobfs_contents,
             paver: self.paver,
             repo_config_dir: self.repo_config_dir,
             ssl_certs: self.ssl_certs,

@@ -15,14 +15,6 @@ impl Resolver {
     ) -> Result<Self, Error> {
         Ok(Self { _pkg_resolver_proxy: pkg_resolver_proxy })
     }
-
-    pub fn new() -> Result<Self, Error> {
-        Ok(Self {
-            _pkg_resolver_proxy: fuchsia_component::client::connect_to_protocol::<
-                fidl_fuchsia_pkg::PackageResolverMarker,
-            >()?,
-        })
-    }
 }
 
 #[cfg(test)]
@@ -151,7 +143,7 @@ pub(crate) mod for_tests {
             realm_builder
                 .add_route(
                     Route::new()
-                        .capability(Capability::protocol_by_name("fuchsia.pkg.PackageResolver"))
+                        .capability(Capability::protocol_by_name("fuchsia.pkg.PackageResolver-ota"))
                         .from(&pkg_resolver)
                         .to(Ref::parent()),
                 )
@@ -193,7 +185,7 @@ pub(crate) mod for_tests {
 
             let resolver_proxy = realm_instance
                 .root
-                .connect_to_protocol_at_exposed_dir::<fidl_fuchsia_pkg::PackageResolverMarker>()
+                .connect_to_named_protocol_at_exposed_dir::<fidl_fuchsia_pkg::PackageResolverMarker>("fuchsia.pkg.PackageResolver-ota")
                 .expect("connect to pkg resolver");
 
             let resolver = Resolver::new_with_proxy(resolver_proxy).unwrap();

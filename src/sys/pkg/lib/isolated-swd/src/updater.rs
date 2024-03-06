@@ -136,6 +136,7 @@ pub(crate) mod for_tests {
         fuchsia_pkg_testing::serve::ServedRepository,
         fuchsia_pkg_testing::{Package, RepositoryBuilder, SystemImageBuilder},
         mock_paver::{MockPaverService, MockPaverServiceBuilder, PaverEvent},
+        std::collections::BTreeSet,
         std::sync::Arc,
     };
 
@@ -222,7 +223,7 @@ pub(crate) mod for_tests {
         /// Create an UpdateForTest from this UpdaterBuilder.
         /// This will construct an update package containing all packages and images added to the
         /// builder, create a repository containing the packages, and create a MockPaver.
-        pub async fn build(mut self) -> UpdaterForTest {
+        pub async fn build(self) -> UpdaterForTest {
             let mut update = fuchsia_pkg_testing::UpdatePackageBuilder::new(self.repo_url.clone())
                 .packages(
                     self.packages
@@ -245,11 +246,18 @@ pub(crate) mod for_tests {
             }
             let (update, images) = update.build().await;
 
-            self.packages.push(images);
+            // Do not include the images package, system-updater triggers GC after resolving it.
+            let expected_blobfs_contents = self
+                .packages
+                .iter()
+                .chain([update.as_package()])
+                .flat_map(|p| p.list_blobs())
+                .collect();
 
             let repo = Arc::new(
                 self.packages
                     .iter()
+                    .chain([update.as_package(), &images])
                     .fold(
                         RepositoryBuilder::from_template_dir(EMPTY_REPO_PATH)
                             .add_package(update.as_package()),
@@ -364,7 +372,10 @@ pub(crate) mod for_tests {
             realm_builder
                 .add_route(
                     Route::new()
-                        .capability(Capability::protocol_by_name("fuchsia.pkg.PackageResolver"))
+                        .capability(
+                            Capability::protocol_by_name("fuchsia.pkg.PackageResolver-ota")
+                                .as_("fuchsia.pkg.PackageResolver"),
+                        )
                         .from(&resolver_realm.resolver)
                         .to(&system_updater),
                 )
@@ -436,7 +447,7 @@ pub(crate) mod for_tests {
             UpdaterForTest {
                 served_repo,
                 paver: paver_clone,
-                packages: self.packages,
+                expected_blobfs_contents,
                 update_merkle_root: *update.as_package().hash(),
                 repo_url: self.repo_url,
                 updater,
@@ -456,7 +467,7 @@ pub(crate) mod for_tests {
     pub struct UpdaterForTest {
         pub served_repo: Arc<ServedRepository>,
         pub paver: Arc<MockPaverService>,
-        pub packages: Vec<Package>,
+        pub expected_blobfs_contents: BTreeSet<Hash>,
         pub update_merkle_root: Hash,
         pub repo_url: fuchsia_url::RepositoryUrl,
         pub resolver: ResolverForTest,
@@ -473,7 +484,7 @@ pub(crate) mod for_tests {
             UpdaterResult {
                 paver_events: self.paver.take_events(),
                 resolver: self.resolver,
-                packages: self.packages,
+                expected_blobfs_contents: self.expected_blobfs_contents,
                 realm_instance: self.realm_instance,
             }
         }
@@ -485,8 +496,8 @@ pub(crate) mod for_tests {
         pub paver_events: Vec<PaverEvent>,
         /// The resolver used by the updater.
         pub resolver: ResolverForTest,
-        /// All the packages that should have been resolved by the update.
-        pub packages: Vec<Package>,
+        /// All the blobs that should be in blobfs after the update.
+        pub expected_blobfs_contents: BTreeSet<Hash>,
         // The RealmInstance used to run this update, for introspection into component states.
         pub realm_instance: RealmInstance,
     }
@@ -494,22 +505,12 @@ pub(crate) mod for_tests {
     impl UpdaterResult {
         /// Verify that all packages that should have been resolved by the update
         /// were resolved.
-        pub async fn verify_packages(&self) -> Result<(), Error> {
-            let blobfs_client = self.resolver.cache.blobfs.client();
-            for package in self.packages.iter() {
-                // We deliberately avoid the package resolver here, as we want
-                // to make sure that the system-updater retrieved all the
-                // correct blobs.
-                // We also want to avoid pkg-cache, since the packages we
-                // installed are listed in the retained but not dynamic indices,
-                // and will not be returned by PackageCache.Open. So, go
-                // straight to blobfs.
-                let blobs = package.content_and_subpackage_blobs().unwrap();
-                for (merkle, _bytes) in blobs.iter() {
-                    assert!(blobfs_client.has_blob(merkle).await);
-                }
-            }
-            Ok(())
+        pub async fn verify_packages(&self) {
+            // Verify directly against blobfs to avoid any trickery pkg-resolver or pkg-cache may
+            // engage in.
+            let actual_contents =
+                self.resolver.cache.blobfs.list_blobs().expect("Listing blobfs blobs");
+            assert_eq!(actual_contents, self.expected_blobfs_contents);
         }
     }
 }
@@ -570,10 +571,6 @@ pub mod tests {
             ]
         );
 
-        result
-            .verify_packages()
-            .await
-            .context("Verifying packages were correctly installed")
-            .unwrap();
+        let () = result.verify_packages().await;
     }
 }

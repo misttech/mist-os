@@ -22,6 +22,7 @@ rustc_test("driver") {
     "//src/storage/lib/vfs/rust:vfs",
     "//src/sys/lib/fidl-fuchsia-pkg-ext",
     "//src/sys/pkg/fidl/fuchsia.update.installer:fuchsia.update.installer_rust",
+    "//src/sys/pkg/lib/fuchsia-hash",
     "//src/sys/pkg/lib/fuchsia-pkg-testing",
     "//src/sys/pkg/lib/isolated-ota",
     "//src/sys/pkg/lib/isolated-swd",

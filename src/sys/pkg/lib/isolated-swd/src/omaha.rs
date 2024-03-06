@@ -182,7 +182,7 @@ mod tests {
 
         Ok(UpdaterResult {
             paver_events: updater.paver.take_events(),
-            packages: updater.packages,
+            expected_blobfs_contents: updater.expected_blobfs_contents,
             resolver: updater.resolver,
             realm_instance: updater.realm_instance,
         })
@@ -299,7 +299,7 @@ mod tests {
         let result =
             run_omaha(updater, app_set, config, response).await.context("running omaha")?;
 
-        result.verify_packages().await.expect("Packages are all there");
+        let () = result.verify_packages().await;
         Ok(())
     }
 

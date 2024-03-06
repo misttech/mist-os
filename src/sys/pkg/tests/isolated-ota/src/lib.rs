@@ -33,7 +33,7 @@ use {
 
 struct TestResult {
     blobfs: Option<BlobfsRamdisk>,
-    packages: Vec<Package>,
+    expected_blobfs_contents: BTreeSet<fuchsia_hash::Hash>,
     pub paver_events: Vec<PaverEvent>,
     pub result: Result<(), UpdateError>,
 }
@@ -42,18 +42,13 @@ impl TestResult {
     /// Assert that all blobs in all the packages that were part of the Update
     /// have been installed into the blobfs, and that the blobfs contains no extra blobs.
     pub fn check_packages(&self) {
-        let written_blobs = self
+        let actual_contents = self
             .blobfs
             .as_ref()
             .expect("Test had no blobfs")
             .list_blobs()
             .expect("Listing blobfs blobs");
-        let mut all_package_blobs = BTreeSet::new();
-        for package in self.packages.iter() {
-            all_package_blobs.append(&mut package.list_blobs());
-        }
-
-        assert_eq!(written_blobs, all_package_blobs);
+        assert_eq!(actual_contents, self.expected_blobfs_contents);
     }
 }
 
@@ -308,7 +303,7 @@ impl TestExecutor<TestResult> for IsolatedOtaTestExecutor {
 
         TestResult {
             blobfs: blobfs_ramdisk,
-            packages: params.packages,
+            expected_blobfs_contents: params.expected_blobfs_contents,
             paver_events: params.paver.take_events(),
             result,
         }
