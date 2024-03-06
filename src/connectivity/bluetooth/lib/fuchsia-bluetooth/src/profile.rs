@@ -29,6 +29,7 @@ impl Psm {
     pub const AVDTP: Self = Self(fidl_bredr::PSM_AVDTP);
     pub const AVCTP: Self = Self(fidl_bredr::PSM_AVCTP);
     pub const AVCTP_BROWSE: Self = Self(fidl_bredr::PSM_AVCTP_BROWSE);
+    pub const DYNAMIC: Self = Self(fidl_bredr::PSM_DYNAMIC);
 
     pub fn new(value: u16) -> Self {
         Self(value)
@@ -479,6 +480,22 @@ impl ServiceDefinition {
             .collect()
     }
 
+    /// Returns the PSM in the GOEP L2CAP Attribute, if provided.
+    pub fn goep_l2cap_psm(&self) -> Option<Psm> {
+        const GOEP_L2CAP_PSM_ATTRIBUTE: u16 = 0x0200;
+        let Some(attribute) =
+            self.additional_attributes.iter().find(|attr| attr.id == GOEP_L2CAP_PSM_ATTRIBUTE)
+        else {
+            return None;
+        };
+
+        let DataElement::Uint16(psm) = attribute.element else {
+            return None;
+        };
+
+        Some(Psm::new(psm))
+    }
+
     /// Returns all the PSMs associated with this ServiceDefinition.
     ///
     /// It's possible that the definition doesn't provide any PSMs, in which
@@ -488,6 +505,10 @@ impl ServiceDefinition {
         if let Some(psm) = self.primary_psm() {
             let _ = psms.insert(psm);
         }
+        if let Some(psm) = self.goep_l2cap_psm() {
+            let _ = psms.insert(psm);
+        }
+
         psms
     }
 }
@@ -935,12 +956,9 @@ mod tests {
     }
 
     #[test]
-    fn test_get_psm_from_service_definition() {
-        let uuid = Uuid::new32(1234);
-        let psm1 = Psm(10);
-        let psm2 = Psm(12);
-        let mut def = ServiceDefinition {
-            service_class_uuids: vec![uuid],
+    fn get_psm_from_empty_service_definition() {
+        let def = ServiceDefinition {
+            service_class_uuids: vec![Uuid::new32(1234)],
             protocol_descriptor_list: vec![],
             additional_protocol_descriptor_lists: vec![],
             profile_descriptors: vec![],
@@ -951,17 +969,30 @@ mod tests {
         assert_eq!(def.primary_psm(), None);
         assert_eq!(def.additional_psms(), HashSet::new());
         assert_eq!(def.psm_set(), HashSet::new());
+    }
 
-        def.protocol_descriptor_list = vec![ProtocolDescriptor {
-            protocol: fidl_bredr::ProtocolIdentifier::L2Cap,
-            params: vec![DataElement::Uint16(psm1.into())],
-        }];
+    #[test]
+    fn test_get_psm_from_service_definition() {
+        let uuid = Uuid::new32(1234);
+        let psm1 = Psm(10);
+        let psm2 = Psm(12);
+        let psm3 = Psm(4000);
+        let mut def = ServiceDefinition {
+            service_class_uuids: vec![uuid],
+            protocol_descriptor_list: vec![ProtocolDescriptor {
+                protocol: fidl_bredr::ProtocolIdentifier::L2Cap,
+                params: vec![DataElement::Uint16(psm1.into())],
+            }],
+            additional_protocol_descriptor_lists: vec![],
+            profile_descriptors: vec![],
+            information: vec![],
+            additional_attributes: vec![],
+        };
 
-        let mut expected_psms = HashSet::new();
-        let _ = expected_psms.insert(psm1);
+        // Primary protocol contains one PSM.
         assert_eq!(def.primary_psm(), Some(psm1));
         assert_eq!(def.additional_psms(), HashSet::new());
-        assert_eq!(def.psm_set(), expected_psms);
+        assert_eq!(def.psm_set(), HashSet::from([psm1]));
 
         def.additional_protocol_descriptor_lists = vec![
             vec![ProtocolDescriptor {
@@ -974,12 +1005,18 @@ mod tests {
             }],
         ];
 
-        let mut expected_psms = HashSet::new();
-        let _ = expected_psms.insert(psm2);
+        // Additional protocol contains one PSM.
         assert_eq!(def.primary_psm(), Some(psm1));
-        assert_eq!(def.additional_psms(), expected_psms);
-        let _ = expected_psms.insert(psm1);
-        assert_eq!(def.psm_set(), expected_psms);
+        assert_eq!(def.additional_psms(), HashSet::from([psm2]));
+        assert_eq!(def.psm_set(), HashSet::from([psm1, psm2]));
+
+        // Additional attributes contain one PSM.
+        def.additional_attributes =
+            vec![Attribute { id: 0x0200, element: DataElement::Uint16(psm3.into()) }];
+        assert_eq!(def.primary_psm(), Some(psm1));
+        assert_eq!(def.additional_psms(), HashSet::from([psm2]));
+        assert_eq!(def.goep_l2cap_psm(), Some(psm3));
+        assert_eq!(def.psm_set(), HashSet::from([psm1, psm2, psm3]));
     }
 
     #[test]

@@ -109,7 +109,12 @@ impl ProfileRegistrar {
 
     /// Returns true if the requested `new_psms` do not overlap with the currently registered PSMs.
     fn is_disjoint_psms(&self, new_psms: &HashSet<Psm>) -> bool {
-        self.registered_services.psms().is_disjoint(new_psms)
+        let current = self.registered_services.psms();
+        let common: HashSet<_> = current.intersection(new_psms).collect();
+
+        // There should be no overlapping PSMs - Dynamic PSMs are exempt as they are assigned later
+        // by the downstream host stack.
+        common.is_empty() || common == HashSet::from([&Psm::DYNAMIC])
     }
 
     /// Unregisters all the active services advertised by this server.
@@ -158,12 +163,7 @@ impl ProfileRegistrar {
             psm => {
                 match self.registered_services.iter().find(|(_, client)| client.contains_psm(psm)) {
                     Some((_, client)) => client.relay_connected(peer_id.into(), channel, protocol),
-                    None => {
-                        return Err(format_err!(
-                            "Connection request for non-advertised PSM {:?}",
-                            psm
-                        ))
-                    }
+                    None => Err(format_err!("Connection request for non-advertised PSM {psm:?}")),
                 }
             }
         }
@@ -337,8 +337,6 @@ impl ProfileRegistrar {
     {
         // The requested PSMs must be disjoint from the existing set of PSMs as only one group
         // can allocate a specific PSM.
-        // TODO(b/327758656): L2CAP PSMs specified in the `attributes` section are not part of this
-        // set.
         let new_psms = psms_from_service_definitions(&services);
         if !self.is_disjoint_psms(&new_psms) {
             let _ = responder.send(Err(ErrorCode::Failed));
@@ -538,7 +536,9 @@ impl ProfileRegistrar {
 mod tests {
     use super::*;
 
-    use crate::types::tests::{other_service_definition, rfcomm_service_definition};
+    use crate::types::tests::{
+        obex_service_definition, other_service_definition, rfcomm_service_definition,
+    };
 
     use async_utils::PollExt;
     use fidl::endpoints::create_proxy_and_stream;
@@ -784,7 +784,6 @@ mod tests {
         exec.run_until_stalled(&mut adv_fut).expect_pending("should still be advertising");
 
         // Connect an l2cap channel to a peer, which should be relayed directly upstream.
-
         let expected_peer_id = PeerId(1);
         let connect_fut =
             make_l2cap_connection_request(&client, expected_peer_id, bredr::PSM_AVDTP);
@@ -997,7 +996,7 @@ mod tests {
     /// Tests that independent service advertisements from multiple clients are correctly
     /// grouped together and re-registered.
     #[fuchsia::test]
-    fn test_handle_multiple_service_advertisements() -> Result<(), Error> {
+    fn test_handle_multiple_service_advertisements() {
         let (mut exec, server, mut upstream_requests) = setup_server();
 
         let (service_sender, handler_fut) = setup_handler_fut(server);
@@ -1015,8 +1014,8 @@ mod tests {
         // Client decides to advertise.
         let psm1 = Psm::new(10);
         let services1 = vec![
-            bredr::ServiceDefinition::try_from(&other_service_definition(psm1))?,
-            bredr::ServiceDefinition::try_from(&rfcomm_service_definition(None))?,
+            bredr::ServiceDefinition::try_from(&other_service_definition(psm1)).unwrap(),
+            bredr::ServiceDefinition::try_from(&rfcomm_service_definition(None)).unwrap(),
         ];
         let n1 = services1.len();
         let (_connection_stream1, adv_fut1) = make_advertise_request(&client1, services1);
@@ -1034,19 +1033,19 @@ mod tests {
             x => panic!("Expected advertise request, got: {:?}", x),
         };
 
-        // A different client connects to bt-rfcomm. It decides to try to advertise over same PSM.
+        // A different client connects to bt-rfcomm and advertises 3 services.
         let client2 = {
             let client = new_client(&mut exec, service_sender.clone());
             let _ = exec.run_until_stalled(&mut handler_fut);
             client
         };
-        // Client 2 decides to advertise three services.
         let psm2 = Psm::new(15);
+        let psm3 = Psm::new(2000);
         let n2 = 3;
         let services2 = vec![
-            bredr::ServiceDefinition::try_from(&other_service_definition(psm2))?,
-            bredr::ServiceDefinition::try_from(&rfcomm_service_definition(None))?,
-            bredr::ServiceDefinition::try_from(&rfcomm_service_definition(None))?,
+            bredr::ServiceDefinition::try_from(&other_service_definition(psm2)).unwrap(),
+            bredr::ServiceDefinition::try_from(&obex_service_definition(psm3)).unwrap(),
+            bredr::ServiceDefinition::try_from(&rfcomm_service_definition(None)).unwrap(),
         ];
         let (_connection_stream2, adv_fut2) = make_advertise_request(&client2, services2);
         pin_mut!(adv_fut2);
@@ -1076,8 +1075,72 @@ mod tests {
         };
         exec.run_until_stalled(&mut adv_fut1).expect_pending("should still be advertising");
         exec.run_until_stalled(&mut adv_fut2).expect_pending("should still be advertising");
+    }
 
-        Ok(())
+    #[fuchsia::test]
+    fn advertise_and_connect_to_obex_service() {
+        let (mut exec, server, mut upstream_requests) = setup_server();
+
+        let (service_sender, handler_fut) = setup_handler_fut(server);
+        pin_mut!(handler_fut);
+        exec.run_until_stalled(&mut handler_fut).expect_pending("server active");
+
+        // A new client connection to bt-rfcomm and advertises an OBEX service.
+        let client = {
+            let client = new_client(&mut exec, service_sender.clone());
+            let _ = exec.run_until_stalled(&mut handler_fut);
+            client
+        };
+        let obex_psm = Psm::new(0x1003);
+        let services =
+            vec![bredr::ServiceDefinition::try_from(&obex_service_definition(obex_psm)).unwrap()];
+        let (mut connection_stream, adv_fut) = make_advertise_request(&client, services);
+        pin_mut!(adv_fut);
+        exec.run_until_stalled(&mut adv_fut).expect_pending("still advertising");
+        exec.run_until_stalled(&mut handler_fut).expect_pending("server active");
+
+        // The advertisement request should be relayed upstream.
+        let (receiver, _adv_responder) = match exec.run_until_stalled(&mut upstream_requests.next())
+        {
+            Poll::Ready(Some(Ok(bredr::ProfileRequest::Advertise {
+                responder, receiver, ..
+            }))) => {
+                let receiver = receiver.into_proxy().unwrap();
+                (receiver, responder)
+            }
+            x => panic!("Expected advertise request, got: {:?}", x),
+        };
+        exec.run_until_stalled(&mut handler_fut).expect_pending("server active");
+        exec.run_until_stalled(&mut adv_fut).expect_pending("still advertising");
+
+        // Simulate an incoming L2CAP connection over the L2CAP PSM of the OBEX service.
+        let id = PeerId(123);
+        let l2cap_protocol = [bredr::ProtocolDescriptor {
+            protocol: bredr::ProtocolIdentifier::L2Cap,
+            params: vec![bredr::DataElement::Uint16(obex_psm.into())],
+        }];
+        receiver
+            .connected(&id.into(), bredr::Channel::default(), &l2cap_protocol)
+            .expect("valid FIDL request");
+
+        // bt-rfcomm server should receive, parse, and pass to upstream FIDL client.
+        exec.run_until_stalled(&mut handler_fut).expect_pending("server active");
+
+        let connect_fut = connection_stream.next();
+        pin_mut!(connect_fut);
+        let _handle = match exec.run_until_stalled(&mut connect_fut).expect("ready result") {
+            Some(Ok(bredr::ConnectionReceiverRequest::Connected {
+                peer_id,
+                protocol,
+                control_handle,
+                ..
+            })) => {
+                assert_eq!(peer_id, id.into());
+                assert_eq!(protocol, l2cap_protocol);
+                control_handle
+            }
+            x => panic!("Expected incoming L2CAP request. got: {x:?}"),
+        };
     }
 
     /// This test validates that client Search requests are relayed directly upstream.

@@ -69,7 +69,7 @@ mod tests {
 
     use assert_matches::assert_matches;
     use fidl_fuchsia_bluetooth_bredr as bredr;
-    use fuchsia_bluetooth::profile::ProtocolDescriptor;
+    use fuchsia_bluetooth::profile::{Attribute, ProtocolDescriptor};
 
     #[test]
     fn update_empty_service_definition_is_error() {
@@ -162,5 +162,47 @@ mod tests {
             ..ServiceDefinition::default()
         };
         assert_eq!(def, expected);
+    }
+
+    #[test]
+    fn psm_from_service_definitions() {
+        // Service 1 is only L2CAP.
+        let def1 = ServiceDefinition {
+            protocol_descriptor_list: vec![ProtocolDescriptor {
+                protocol: bredr::ProtocolIdentifier::L2Cap,
+                params: vec![DataElement::Uint16(21)],
+            }],
+            additional_protocol_descriptor_lists: vec![
+                vec![ProtocolDescriptor {
+                    protocol: bredr::ProtocolIdentifier::L2Cap,
+                    params: vec![DataElement::Uint16(23)],
+                }],
+                vec![ProtocolDescriptor {
+                    protocol: bredr::ProtocolIdentifier::Avdtp,
+                    params: vec![DataElement::Uint16(0x0103)],
+                }],
+            ],
+            ..ServiceDefinition::default()
+        };
+        // Service 2 is RFCOMM + L2CAP (OBEX).
+        let def2 = ServiceDefinition {
+            protocol_descriptor_list: vec![
+                ProtocolDescriptor { protocol: bredr::ProtocolIdentifier::L2Cap, params: vec![] },
+                ProtocolDescriptor { protocol: bredr::ProtocolIdentifier::Rfcomm, params: vec![] },
+                ProtocolDescriptor { protocol: bredr::ProtocolIdentifier::Obex, params: vec![] },
+            ],
+            additional_attributes: vec![Attribute {
+                id: 0x0200,
+                element: DataElement::Uint16(2000),
+            }],
+            ..ServiceDefinition::default()
+        };
+
+        let psms = psms_from_service_definitions(&vec![def1, def2]);
+
+        // Expect to contain all of the PSMs that are specified in the record. Unallocated PSMs
+        // (e.g. RFCOMM) aren't included.
+        let expected_psms = HashSet::from([Psm::new(21), Psm::new(23), Psm::new(2000)]);
+        assert_eq!(psms, expected_psms);
     }
 }

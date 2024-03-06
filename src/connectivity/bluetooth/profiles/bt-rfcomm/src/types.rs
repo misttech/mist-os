@@ -190,7 +190,7 @@ pub(crate) mod tests {
         Channel, ProfileDescriptor, ProtocolIdentifier, ServiceClassProfileIdentifier,
     };
     use fuchsia_async as fasync;
-    use fuchsia_bluetooth::profile::{DataElement, ProtocolDescriptor};
+    use fuchsia_bluetooth::profile::{Attribute, DataElement, ProtocolDescriptor};
     use fuchsia_bluetooth::types::{PeerId, Uuid};
     use futures::{stream::StreamExt, task::Poll};
 
@@ -211,14 +211,12 @@ pub(crate) mod tests {
         ServiceDefinition {
             service_class_uuids: vec![Uuid::new16(0x1101).into()], // SPP UUID
             protocol_descriptor_list: rfcomm_protocol_descriptor_list(channel),
-            additional_protocol_descriptor_lists: vec![],
             profile_descriptors: vec![ProfileDescriptor {
                 profile_id: ServiceClassProfileIdentifier::SerialPort,
                 major_version: 1,
                 minor_version: 2,
             }],
-            information: vec![],
-            additional_attributes: vec![],
+            ..ServiceDefinition::default()
         }
     }
 
@@ -236,14 +234,28 @@ pub(crate) mod tests {
                     params: vec![DataElement::Uint16(0x0103)], // Indicate v1.3
                 },
             ],
-            additional_protocol_descriptor_lists: vec![],
             profile_descriptors: vec![ProfileDescriptor {
                 profile_id: ServiceClassProfileIdentifier::AdvancedAudioDistribution,
                 major_version: 1,
                 minor_version: 2,
             }],
-            information: vec![],
-            additional_attributes: vec![],
+            ..ServiceDefinition::default()
+        }
+    }
+
+    pub fn obex_service_definition(obex_l2cap_psm: Psm) -> ServiceDefinition {
+        ServiceDefinition {
+            service_class_uuids: vec![Uuid::new16(0x1133).into()], // MNS
+            protocol_descriptor_list: vec![
+                ProtocolDescriptor { protocol: ProtocolIdentifier::L2Cap, params: vec![] },
+                ProtocolDescriptor { protocol: ProtocolIdentifier::Rfcomm, params: vec![] },
+                ProtocolDescriptor { protocol: ProtocolIdentifier::Obex, params: vec![] },
+            ],
+            additional_attributes: vec![Attribute {
+                id: 0x0200,
+                element: DataElement::Uint16(obex_l2cap_psm.into()),
+            }],
+            ..ServiceDefinition::default()
         }
     }
 
