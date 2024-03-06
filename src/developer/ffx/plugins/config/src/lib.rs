@@ -190,9 +190,15 @@ async fn exec_env<W: Write>(
 async fn exec_analytics(analytics_cmd: &AnalyticsCommand) -> Result<()> {
     let writer = Box::new(std::io::stdout());
     match &analytics_cmd.sub {
-        AnalyticsControlCommand::Enable(_) => set_metrics_status(true).await?,
-        AnalyticsControlCommand::Disable(_) => set_metrics_status(false).await?,
-        AnalyticsControlCommand::Show(_) => show_metrics_status(writer).await?,
+        AnalyticsControlCommand::Enable(_) => {
+            set_metrics_status(true).await.with_context(|| "Failed to enable metrics")?
+        }
+        AnalyticsControlCommand::Disable(_) => {
+            set_metrics_status(false).await.with_context(|| "Failed to disable metrics")?
+        }
+        AnalyticsControlCommand::Show(_) => {
+            show_metrics_status(writer).await.with_context(|| "Failed to read metrics state")?
+        }
     }
     Ok(())
 }

@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use analytics::{add_custom_event, ga4_metrics, init_ga4_metrics_service};
-use anyhow::Result;
+use anyhow::{Context, Result};
 use fidl_fuchsia_developer_ffx::VersionInfo;
 use fuchsia_async::TimeoutExt;
 use std::{
@@ -28,7 +28,8 @@ pub async fn init_metrics_svc(
         GA4_KEY.to_string(),
         invoker,
     )
-    .await;
+    .await
+    .with_context(|| "Could not initialize metrics service");
 }
 
 pub async fn add_ffx_launch_event(
