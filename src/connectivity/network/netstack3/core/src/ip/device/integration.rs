@@ -10,6 +10,7 @@ use core::{
     marker::PhantomData,
     num::NonZeroU8,
     ops::{Deref as _, DerefMut as _},
+    sync::atomic::AtomicU16,
 };
 
 use lock_order::{
@@ -333,6 +334,10 @@ where
 impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceGmp<Ipv4>>>
     ip::IpDeviceStateContext<Ipv4, BC> for CoreCtx<'_, BC, L>
 {
+    fn with_next_packet_id<O, F: FnOnce(&AtomicU16) -> O>(&self, cb: F) -> O {
+        cb(self.unlocked_access::<crate::lock_ordering::Ipv4StateNextPacketId>())
+    }
+
     fn get_local_addr_for_remote(
         &mut self,
         device_id: &Self::DeviceId,
@@ -413,6 +418,10 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceConfigurat
 impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpState<Ipv6>>>
     ip::IpDeviceStateContext<Ipv6, BC> for CoreCtx<'_, BC, L>
 {
+    fn with_next_packet_id<O, F: FnOnce(&()) -> O>(&self, cb: F) -> O {
+        cb(&())
+    }
+
     fn get_local_addr_for_remote(
         &mut self,
         device_id: &Self::DeviceId,

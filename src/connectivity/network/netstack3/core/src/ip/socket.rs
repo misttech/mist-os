@@ -1811,7 +1811,7 @@ mod tests {
         ethernet::EthernetFrameLengthCheck,
         icmp::{IcmpIpExt, IcmpUnusedCode},
         ip::{IpExt, IpPacket, Ipv4Proto},
-        ipv4::Ipv4Packet,
+        ipv4::{Ipv4OnlyMeta, Ipv4Packet},
         testutil::{parse_ethernet_frame, parse_ip_packet_in_ethernet_frame},
     };
     use test_case::test_case;
@@ -2236,35 +2236,40 @@ mod tests {
         )
         .unwrap();
 
-        let check_frame = move |frame: &[u8]| match [local_ip.get(), remote_ip.get()].into() {
-            IpAddr::V4([local_ip, remote_ip]) => {
-                let (mut body, src_mac, dst_mac, _ethertype) =
-                    parse_ethernet_frame(frame, EthernetFrameLengthCheck::NoCheck).unwrap();
-                let packet = (&mut body).parse::<Ipv4Packet<&[u8]>>().unwrap();
-                assert_eq!(src_mac, local_mac.get());
-                assert_eq!(dst_mac, remote_mac.get());
-                assert_eq!(packet.src_ip(), local_ip);
-                assert_eq!(packet.dst_ip(), remote_ip);
-                assert_eq!(packet.proto(), Ipv4::ICMP_IP_PROTO);
-                assert_eq!(packet.ttl(), 1);
-                assert_eq!(body, [0]);
-            }
-            IpAddr::V6([local_ip, remote_ip]) => {
-                let (body, src_mac, dst_mac, src_ip, dst_ip, ip_proto, ttl) =
-                    parse_ip_packet_in_ethernet_frame::<Ipv6>(
-                        frame,
-                        EthernetFrameLengthCheck::NoCheck,
-                    )
-                    .unwrap();
-                assert_eq!(body, [0]);
-                assert_eq!(src_mac, local_mac.get());
-                assert_eq!(dst_mac, remote_mac.get());
-                assert_eq!(src_ip, local_ip);
-                assert_eq!(dst_ip, remote_ip);
-                assert_eq!(ip_proto, Ipv6::ICMP_IP_PROTO);
-                assert_eq!(ttl, 1);
-            }
-        };
+        let curr_id = crate::ip::gen_ip_packet_id::<Ipv4, _, _>(&mut core_ctx.context());
+
+        let check_frame =
+            move |frame: &[u8], packet_count| match [local_ip.get(), remote_ip.get()].into() {
+                IpAddr::V4([local_ip, remote_ip]) => {
+                    let (mut body, src_mac, dst_mac, _ethertype) =
+                        parse_ethernet_frame(frame, EthernetFrameLengthCheck::NoCheck).unwrap();
+                    let packet = (&mut body).parse::<Ipv4Packet<&[u8]>>().unwrap();
+                    assert_eq!(src_mac, local_mac.get());
+                    assert_eq!(dst_mac, remote_mac.get());
+                    assert_eq!(packet.src_ip(), local_ip);
+                    assert_eq!(packet.dst_ip(), remote_ip);
+                    assert_eq!(packet.proto(), Ipv4::ICMP_IP_PROTO);
+                    assert_eq!(packet.ttl(), 1);
+                    let Ipv4OnlyMeta { id } = packet.version_specific_meta();
+                    assert_eq!(usize::from(id), usize::from(curr_id) + packet_count);
+                    assert_eq!(body, [0]);
+                }
+                IpAddr::V6([local_ip, remote_ip]) => {
+                    let (body, src_mac, dst_mac, src_ip, dst_ip, ip_proto, ttl) =
+                        parse_ip_packet_in_ethernet_frame::<Ipv6>(
+                            frame,
+                            EthernetFrameLengthCheck::NoCheck,
+                        )
+                        .unwrap();
+                    assert_eq!(body, [0]);
+                    assert_eq!(src_mac, local_mac.get());
+                    assert_eq!(dst_mac, remote_mac.get());
+                    assert_eq!(src_ip, local_ip);
+                    assert_eq!(dst_ip, remote_ip);
+                    assert_eq!(ip_proto, Ipv6::ICMP_IP_PROTO);
+                    assert_eq!(ttl, 1);
+                }
+            };
         let mut packet_count = 0;
         assert_eq!(bindings_ctx.frames_sent().len(), packet_count);
 
@@ -2283,7 +2288,7 @@ mod tests {
             assert_eq!(bindings_ctx.frames_sent().len(), packet_count);
             let (dev, frame) = &bindings_ctx.frames_sent()[packet_count - 1];
             assert_eq!(dev, &device_ids[0]);
-            check_frame(&frame);
+            check_frame(&frame, packet_count);
         };
         check_sent_frame(&bindings_ctx);
 
