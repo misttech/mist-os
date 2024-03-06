@@ -11,7 +11,11 @@
     capabilities: [
         {
             directory: "diagnostics",
-            rights: [ "connect" ],
+            rights: [
+                "connect",
+                "enumerate",
+                "traverse",
+            ],
             path: "/diagnostics",
         },
     ],
