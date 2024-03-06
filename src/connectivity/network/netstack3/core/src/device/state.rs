@@ -8,7 +8,8 @@ use alloc::sync::Arc;
 use core::fmt::Debug;
 
 use crate::{
-    device::{socket::HeldDeviceSockets, DeviceLayerTypes, OriginTracker},
+    device::{socket::HeldDeviceSockets, DeviceCounters, DeviceLayerTypes, OriginTracker},
+    inspect::Inspectable,
     ip::{device::state::DualStackIpDeviceState, types::RawMetric},
     sync::RwLock,
     sync::WeakRc,
@@ -23,6 +24,8 @@ pub trait DeviceStateSpec: Send + Sync + 'static {
     type External<BT: DeviceLayerTypes>: Send + Sync;
     /// Properties given to device creation.
     type CreationProperties: Debug;
+    /// Device-specific counters.
+    type Counters: Inspectable;
 
     /// Creates a new link state from the given properties.
     fn new_link_state<BT: DeviceLayerTypes>(properties: Self::CreationProperties)
@@ -65,6 +68,7 @@ pub(crate) struct IpLinkDeviceStateInner<T, BT: DeviceLayerTypes> {
     pub link: T,
     pub(super) origin: OriginTracker,
     pub(super) sockets: RwLock<HeldDeviceSockets<BT>>,
+    pub(super) counters: DeviceCounters,
 }
 
 impl<T, BT: DeviceLayerTypes> IpLinkDeviceStateInner<T, BT> {
@@ -75,6 +79,7 @@ impl<T, BT: DeviceLayerTypes> IpLinkDeviceStateInner<T, BT> {
             link,
             origin,
             sockets: RwLock::new(HeldDeviceSockets::default()),
+            counters: DeviceCounters::default(),
         }
     }
 }

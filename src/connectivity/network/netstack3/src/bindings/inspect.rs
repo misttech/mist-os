@@ -180,6 +180,7 @@ pub(crate) fn devices(ctx: &mut Ctx) -> fuchsia_inspect::Inspector {
                     node.record_bool("loopback", false);
                 }
             }
+            ctx.api().device_any().inspect(&device_id, &mut BindingsInspector::new(node));
         })
     }
     inspector

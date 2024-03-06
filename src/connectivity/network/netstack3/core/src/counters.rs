@@ -59,11 +59,11 @@ where
     /// Exposes all of the stack wide counters through `inspector`.
     pub fn inspect_stack_counters<I: Inspector>(&mut self, inspector: &mut I) {
         inspector.record_child("Device", |inspector| {
-            self.core_ctx().with_counters(|device| inspect_device_counters(inspector, device));
-            inspector.record_child("Ethernet", |inspector| {
-                self.core_ctx().with_counters(|ethernet_device| {
-                    inspect_ethernet_device_counters(inspector, ethernet_device)
-                });
+            self.core_ctx().with_counters(|counters: &DeviceCounters| {
+                inspector.delegate_inspectable(counters)
+            });
+            self.core_ctx().with_counters(|counters: &EthernetDeviceCounters| {
+                inspector.delegate_inspectable(counters)
             });
         });
         inspector.record_child("Arp", |inspector| {
@@ -126,7 +126,7 @@ where
     }
 }
 
-fn inspect_device_counters(inspector: &mut impl Inspector, counters: &DeviceCounters) {
+pub(crate) fn inspect_device_counters(inspector: &mut impl Inspector, counters: &DeviceCounters) {
     let DeviceCounters {
         recv_frame,
         recv_ipv4_delivered,
@@ -157,7 +157,7 @@ fn inspect_device_counters(inspector: &mut impl Inspector, counters: &DeviceCoun
     });
 }
 
-fn inspect_ethernet_device_counters(
+pub(crate) fn inspect_ethernet_device_counters(
     inspector: &mut impl Inspector,
     counters: &EthernetDeviceCounters,
 ) {

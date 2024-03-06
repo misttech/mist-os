@@ -21,7 +21,10 @@ use packet::{BufferMut, Serializer};
 use packet_formats::ethernet::EthernetIpExt;
 
 use crate::{
-    context::{CoreCtxAndResource, CounterContext, Locked, RecvFrameContext, SendFrameContext},
+    context::{
+        CoreCtxAndResource, CounterContext, Locked, RecvFrameContext, ResourceCounterContext,
+        SendFrameContext,
+    },
     device::{
         config::DeviceConfigurationContext,
         ethernet::{
@@ -32,11 +35,11 @@ use crate::{
         queue::tx::TransmitQueueHandler,
         socket,
         state::{DeviceStateSpec, IpLinkDeviceState},
-        AnyDevice, BaseDeviceId, DeviceCollectionContext, DeviceCounters, DeviceId,
+        AnyDevice, BaseDeviceId, Device, DeviceCollectionContext, DeviceCounters, DeviceId,
         DeviceIdContext, DeviceLayerEventDispatcher, DeviceLayerState, DeviceLayerTypes, Devices,
         DevicesIter, EthernetDeviceCounters, EthernetDeviceId, EthernetPrimaryDeviceId,
         EthernetWeakDeviceId, Ipv6DeviceLinkLayerAddr, OriginTracker, OriginTrackerContext,
-        RecvIpFrameMeta, WeakDeviceId,
+        PureIpDeviceCounters, RecvIpFrameMeta, WeakDeviceId,
     },
     error::{ExistsError, NotFoundError},
     for_any_device_id,
@@ -1234,5 +1237,92 @@ impl<BC: BindingsContext> UnlockedAccess<crate::lock_ordering::EthernetDeviceCou
 impl<BC: BindingsContext, L> CounterContext<EthernetDeviceCounters> for CoreCtx<'_, BC, L> {
     fn with_counters<O, F: FnOnce(&EthernetDeviceCounters) -> O>(&self, cb: F) -> O {
         cb(self.unlocked_access::<crate::lock_ordering::EthernetDeviceCounters>())
+    }
+}
+
+impl<BC: BindingsContext> UnlockedAccess<crate::lock_ordering::PureIpDeviceCounters>
+    for StackState<BC>
+{
+    type Data = PureIpDeviceCounters;
+    type Guard<'l> = &'l PureIpDeviceCounters where Self: 'l;
+
+    fn access(&self) -> Self::Guard<'_> {
+        self.pure_ip_device_counters()
+    }
+}
+
+impl<BC: BindingsContext, L> CounterContext<PureIpDeviceCounters> for CoreCtx<'_, BC, L> {
+    fn with_counters<O, F: FnOnce(&PureIpDeviceCounters) -> O>(&self, cb: F) -> O {
+        cb(self.unlocked_access::<crate::lock_ordering::PureIpDeviceCounters>())
+    }
+}
+
+impl<'a, BC: BindingsContext, L> ResourceCounterContext<DeviceId<BC>, DeviceCounters>
+    for CoreCtx<'a, BC, L>
+{
+    fn with_per_resource_counters<O, F: FnOnce(&DeviceCounters) -> O>(
+        &mut self,
+        device_id: &DeviceId<BC>,
+        cb: F,
+    ) -> O {
+        for_any_device_id!(DeviceId, device_id, id => {
+            with_device_state(self, id, |state| cb(state.unlocked_access::<crate::lock_ordering::DeviceCounters>()))
+        })
+    }
+}
+
+impl<'a, BC: BindingsContext, D: DeviceStateSpec, L>
+    ResourceCounterContext<BaseDeviceId<D, BC>, DeviceCounters> for CoreCtx<'a, BC, L>
+{
+    fn with_per_resource_counters<O, F: FnOnce(&DeviceCounters) -> O>(
+        &mut self,
+        device_id: &BaseDeviceId<D, BC>,
+        cb: F,
+    ) -> O {
+        with_device_state(self, device_id, |state| {
+            cb(state.unlocked_access::<crate::lock_ordering::DeviceCounters>())
+        })
+    }
+}
+
+impl<'a, BC: BindingsContext, L>
+    ResourceCounterContext<EthernetDeviceId<BC>, EthernetDeviceCounters> for CoreCtx<'a, BC, L>
+{
+    fn with_per_resource_counters<O, F: FnOnce(&EthernetDeviceCounters) -> O>(
+        &mut self,
+        device_id: &EthernetDeviceId<BC>,
+        cb: F,
+    ) -> O {
+        with_device_state(self, device_id, |state| {
+            cb(state.unlocked_access::<crate::lock_ordering::EthernetDeviceCounters>())
+        })
+    }
+}
+
+impl<'a, BC: BindingsContext, L>
+    ResourceCounterContext<LoopbackDeviceId<BC>, EthernetDeviceCounters> for CoreCtx<'a, BC, L>
+{
+    fn with_per_resource_counters<O, F: FnOnce(&EthernetDeviceCounters) -> O>(
+        &mut self,
+        device_id: &LoopbackDeviceId<BC>,
+        cb: F,
+    ) -> O {
+        with_device_state(self, device_id, |state| {
+            cb(state.unlocked_access::<crate::lock_ordering::EthernetDeviceCounters>())
+        })
+    }
+}
+
+impl<'a, BC: BindingsContext, L> ResourceCounterContext<PureIpDeviceId<BC>, PureIpDeviceCounters>
+    for CoreCtx<'a, BC, L>
+{
+    fn with_per_resource_counters<O, F: FnOnce(&PureIpDeviceCounters) -> O>(
+        &mut self,
+        device_id: &PureIpDeviceId<BC>,
+        cb: F,
+    ) -> O {
+        with_device_state(self, device_id, |state| {
+            cb(state.unlocked_access::<crate::lock_ordering::PureIpDeviceCounters>())
+        })
     }
 }

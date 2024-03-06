@@ -218,6 +218,30 @@ async fn inspect_devices(name: &str) {
                             Assigned: true,
                         }
                     }
+                },
+                Counters: {
+                    Rx: {
+                        TotalFrames: 0u64,
+                        Malformed: 0u64,
+                        Ipv4Delivered: 0u64,
+                        Ipv6Delivered: 0u64,
+                    },
+                    Tx: {
+                        TotalFrames: 0u64,
+                        Sent: 0u64,
+                        SendIpv4Frame: 0u64,
+                        SendIpv6Frame: 0u64,
+                        NoQueue: 0u64,
+                        QueueFull: 0u64,
+                        SerializeError: 0u64,
+                    },
+                    Ethernet: {
+                        Rx: {
+                            NoEthertype: 0u64,
+                            NonLocalDstAddr: 0u64,
+                            UnsupportedEthertype: 0u64,
+                        },
+                    },
                 }
             },
             "2": {
@@ -249,6 +273,30 @@ async fn inspect_devices(name: &str) {
                     MacAddress: "02:00:00:00:00:01",
                     PhyUp: true,
                 },
+                Counters: {
+                    Rx: {
+                        TotalFrames: 0u64,
+                        Malformed: 0u64,
+                        Ipv4Delivered: 0u64,
+                        Ipv6Delivered: 0u64,
+                    },
+                    Tx: {
+                        TotalFrames: diagnostics_assertions::AnyUintProperty,
+                        Sent: diagnostics_assertions::AnyUintProperty,
+                        SendIpv4Frame: diagnostics_assertions::AnyUintProperty,
+                        SendIpv6Frame: diagnostics_assertions::AnyUintProperty,
+                        NoQueue: 0u64,
+                        QueueFull: 0u64,
+                        SerializeError: 0u64,
+                    },
+                    Ethernet: {
+                        Rx: {
+                            NoEthertype: 0u64,
+                            NonLocalDstAddr: 0u64,
+                            UnsupportedEthertype: 0u64,
+                        },
+                    },
+                }
             }
         }
     })

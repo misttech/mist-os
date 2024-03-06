@@ -8,7 +8,7 @@ use alloc::vec::Vec;
 use core::convert::Infallible as Never;
 
 use lock_order::{
-    lock::{LockFor, RwLockFor},
+    lock::{LockFor, RwLockFor, UnlockedAccess},
     relation::LockBefore,
     wrap::prelude::*,
 };
@@ -24,7 +24,7 @@ use packet_formats::ethernet::{
 use tracing::trace;
 
 use crate::{
-    context::{CounterContext, SendFrameContext},
+    context::{CounterContext, ResourceCounterContext, SendFrameContext},
     device::{
         self,
         id::{BaseDeviceId, BasePrimaryDeviceId, BaseWeakDeviceId},
@@ -83,11 +83,17 @@ impl DeviceStateSpec for LoopbackDevice {
     type Link<BT: DeviceLayerTypes> = LoopbackDeviceState;
     type External<BT: DeviceLayerTypes> = BT::LoopbackDeviceState;
     type CreationProperties = LoopbackCreationProperties;
+    type Counters = EthernetDeviceCounters;
 
     fn new_link_state<BT: DeviceLayerTypes>(
         LoopbackCreationProperties { mtu }: Self::CreationProperties,
     ) -> Self::Link<BT> {
-        LoopbackDeviceState { mtu, rx_queue: Default::default(), tx_queue: Default::default() }
+        LoopbackDeviceState {
+            counters: Default::default(),
+            mtu,
+            rx_queue: Default::default(),
+            tx_queue: Default::default(),
+        }
     }
 
     const IS_LOOPBACK: bool = true;
@@ -117,9 +123,22 @@ pub struct LoopbackCreationProperties {
 
 /// State for a loopback device.
 pub struct LoopbackDeviceState {
+    counters: EthernetDeviceCounters,
     mtu: Mtu,
     rx_queue: ReceiveQueue<(), Buf<Vec<u8>>>,
     tx_queue: TransmitQueue<(), Buf<Vec<u8>>, BufVecU8Allocator>,
+}
+
+impl<BC: BindingsContext> UnlockedAccess<crate::lock_ordering::EthernetDeviceCounters>
+    for IpLinkDeviceState<LoopbackDevice, BC>
+{
+    type Data = EthernetDeviceCounters;
+    type Guard<'l> = &'l EthernetDeviceCounters
+        where
+            Self: 'l ;
+    fn access(&self) -> Self::Guard<'_> {
+        &self.link.counters
+    }
 }
 
 impl<BC: BindingsContext> LockFor<crate::lock_ordering::LoopbackRxQueue>
@@ -291,7 +310,7 @@ where
     S::Buffer: BufferMut,
     BC: BindingsContext,
 {
-    core_ctx.increment(|counters: &DeviceCounters| &counters.send_total_frames);
+    core_ctx.increment(device_id, |counters: &DeviceCounters| &counters.send_total_frames);
     match TransmitQueueHandler::<LoopbackDevice, _>::queue_tx_frame(
         core_ctx,
         bindings_ctx,
@@ -300,18 +319,19 @@ where
         frame,
     ) {
         Ok(()) => {
-            core_ctx.increment(|counters: &DeviceCounters| &counters.send_frame);
+            core_ctx.increment(device_id, |counters: &DeviceCounters| &counters.send_frame);
             Ok(())
         }
         Err(TransmitQueueFrameError::NoQueue(_)) => {
             unreachable!("loopback never fails to send a frame")
         }
         Err(TransmitQueueFrameError::QueueFull(s)) => {
-            core_ctx.increment(|counters: &DeviceCounters| &counters.send_queue_full);
+            core_ctx.increment(device_id, |counters: &DeviceCounters| &counters.send_queue_full);
             Err(s)
         }
         Err(TransmitQueueFrameError::SerializeError(s)) => {
-            core_ctx.increment(|counters: &DeviceCounters| &counters.send_serialize_error);
+            core_ctx
+                .increment(device_id, |counters: &DeviceCounters| &counters.send_serialize_error);
             Err(s)
         }
     }
@@ -374,16 +394,17 @@ impl<BC: BindingsContext> ReceiveDequeFrameContext<LoopbackDevice, BC>
         (): Self::Meta,
         mut buf: Buf<Vec<u8>>,
     ) {
-        self.increment(|counters: &DeviceCounters| &counters.recv_frame);
-        let (frame, whole_body) =
-            match buf.parse_with_view::<_, EthernetFrame<_>>(EthernetFrameLengthCheck::NoCheck) {
-                Err(e) => {
-                    self.increment(|counters: &DeviceCounters| &counters.recv_parse_error);
-                    trace!("dropping invalid ethernet frame over loopback: {:?}", e);
-                    return;
-                }
-                Ok(e) => e,
-            };
+        self.increment(device_id, |counters: &DeviceCounters| &counters.recv_frame);
+        let (frame, whole_body) = match buf
+            .parse_with_view::<_, EthernetFrame<_>>(EthernetFrameLengthCheck::NoCheck)
+        {
+            Err(e) => {
+                self.increment(device_id, |counters: &DeviceCounters| &counters.recv_parse_error);
+                trace!("dropping invalid ethernet frame over loopback: {:?}", e);
+                return;
+            }
+            Ok(e) => e,
+        };
 
         let frame_dest = FrameDestination::from_dest(frame.dst_mac(), Mac::UNSPECIFIED);
         let ethertype = frame.ethertype();
@@ -399,7 +420,9 @@ impl<BC: BindingsContext> ReceiveDequeFrameContext<LoopbackDevice, BC>
         let ethertype = match ethertype {
             Some(e) => e,
             None => {
-                self.increment(|counters: &EthernetDeviceCounters| &counters.recv_no_ethertype);
+                self.increment(device_id, |counters: &EthernetDeviceCounters| {
+                    &counters.recv_no_ethertype
+                });
                 trace!("dropping ethernet frame without ethertype");
                 return;
             }
@@ -407,7 +430,9 @@ impl<BC: BindingsContext> ReceiveDequeFrameContext<LoopbackDevice, BC>
 
         match ethertype {
             EtherType::Ipv4 => {
-                self.increment(|counters: &DeviceCounters| &counters.recv_ipv4_delivered);
+                self.increment(device_id, |counters: &DeviceCounters| {
+                    &counters.recv_ipv4_delivered
+                });
                 crate::ip::receive_ipv4_packet(
                     self,
                     bindings_ctx,
@@ -417,7 +442,9 @@ impl<BC: BindingsContext> ReceiveDequeFrameContext<LoopbackDevice, BC>
                 )
             }
             EtherType::Ipv6 => {
-                self.increment(|counters: &DeviceCounters| &counters.recv_ipv6_delivered);
+                self.increment(device_id, |counters: &DeviceCounters| {
+                    &counters.recv_ipv6_delivered
+                });
                 crate::ip::receive_ipv6_packet(
                     self,
                     bindings_ctx,
@@ -427,7 +454,7 @@ impl<BC: BindingsContext> ReceiveDequeFrameContext<LoopbackDevice, BC>
                 )
             }
             ethertype @ EtherType::Arp | ethertype @ EtherType::Other(_) => {
-                self.increment(|counters: &EthernetDeviceCounters| {
+                self.increment(device_id, |counters: &EthernetDeviceCounters| {
                     &counters.recv_unsupported_ethertype
                 });
                 trace!("not handling loopback frame of type {:?}", ethertype)

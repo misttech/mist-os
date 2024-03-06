@@ -30,8 +30,9 @@ use crate::{
         loopback::{LoopbackDeviceId, LoopbackPrimaryDeviceId},
         pure_ip::{PureIpDeviceId, PureIpPrimaryDeviceId},
         socket::{self, HeldSockets},
-        state::DeviceStateSpec,
+        state::{DeviceStateSpec, IpLinkDeviceStateInner},
     },
+    inspect::Inspectable,
     ip::{
         device::{
             nud::{LinkResolutionContext, NudCounters},
@@ -42,7 +43,7 @@ use crate::{
         types::RawMetric,
     },
     sync::RwLock,
-    BindingsContext, CoreCtx, StackState,
+    BindingsContext, CoreCtx, Inspector, StackState,
 };
 
 /// A device.
@@ -266,6 +267,7 @@ pub(crate) struct DeviceLayerState<BT: DeviceLayerTypes> {
     pub(super) shared_sockets: HeldSockets<BT>,
     pub(super) counters: DeviceCounters,
     pub(super) ethernet_counters: EthernetDeviceCounters,
+    pub(super) pure_ip_counters: PureIpDeviceCounters,
     pub(super) nud_v4_counters: NudCounters<Ipv4>,
     pub(super) nud_v6_counters: NudCounters<Ipv6>,
     pub(super) arp_counters: ArpCounters,
@@ -278,6 +280,10 @@ impl<BT: DeviceLayerTypes> DeviceLayerState<BT> {
 
     pub(crate) fn ethernet_counters(&self) -> &EthernetDeviceCounters {
         &self.ethernet_counters
+    }
+
+    pub(crate) fn pure_ip_counters(&self) -> &PureIpDeviceCounters {
+        &self.pure_ip_counters
     }
 
     pub(crate) fn nud_counters<I: Ip>(&self) -> &NudCounters<I> {
@@ -299,6 +305,22 @@ pub struct EthernetDeviceCounters {
     pub recv_unsupported_ethertype: Counter,
     /// Count of incoming frames dropped due to an empty ethertype.
     pub recv_no_ethertype: Counter,
+}
+
+impl Inspectable for EthernetDeviceCounters {
+    fn record<I: Inspector>(&self, inspector: &mut I) {
+        inspector.record_child("Ethernet", |inspector| {
+            crate::counters::inspect_ethernet_device_counters(inspector, self)
+        })
+    }
+}
+
+/// Counters for pure IP devices.
+#[derive(Default)]
+pub struct PureIpDeviceCounters {}
+
+impl Inspectable for PureIpDeviceCounters {
+    fn record<I: Inspector>(&self, _inspector: &mut I) {}
 }
 
 /// Device layer counters.
@@ -329,12 +351,29 @@ pub struct DeviceCounters {
     pub send_dropped_no_queue: Counter,
 }
 
+impl Inspectable for DeviceCounters {
+    fn record<I: Inspector>(&self, inspector: &mut I) {
+        crate::counters::inspect_device_counters(inspector, self)
+    }
+}
+
 impl<BC: BindingsContext> UnlockedAccess<crate::lock_ordering::DeviceCounters> for StackState<BC> {
     type Data = DeviceCounters;
     type Guard<'l> = &'l DeviceCounters where Self: 'l;
 
     fn access(&self) -> Self::Guard<'_> {
         self.device_counters()
+    }
+}
+
+impl<T, BC: BindingsContext> UnlockedAccess<crate::lock_ordering::DeviceCounters>
+    for IpLinkDeviceStateInner<T, BC>
+{
+    type Data = DeviceCounters;
+    type Guard<'l> = &'l DeviceCounters where Self: 'l;
+
+    fn access(&self) -> Self::Guard<'_> {
+        &self.counters
     }
 }
 
@@ -420,6 +459,7 @@ impl<BC: DeviceLayerTypes + socket::DeviceSocketBindingsContext<DeviceId<BC>>>
             shared_sockets: Default::default(),
             counters: Default::default(),
             ethernet_counters: EthernetDeviceCounters::default(),
+            pure_ip_counters: PureIpDeviceCounters::default(),
             nud_v4_counters: Default::default(),
             nud_v6_counters: Default::default(),
             arp_counters: Default::default(),

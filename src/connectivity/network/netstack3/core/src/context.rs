@@ -218,6 +218,20 @@ pub trait CounterContext<T> {
     }
 }
 
+/// A context that provides access to per-resource counters for observation and
+/// debugging.
+pub trait ResourceCounterContext<R, T>: CounterContext<T> {
+    /// Call `cb` with an immutable reference to the set of counters on `resource`.
+    fn with_per_resource_counters<O, F: FnOnce(&T) -> O>(&mut self, resource: &R, cb: F) -> O;
+
+    /// Increments both the per-resource and stackwide versions of
+    /// the counter returned by the callback.
+    fn increment<F: Fn(&T) -> &Counter>(&mut self, resource: &R, cb: F) {
+        self.with_per_resource_counters(resource, |counters| cb(counters).increment());
+        self.with_counters(|counters| cb(counters).increment());
+    }
+}
+
 /// A context for emitting events.
 ///
 /// `EventContext` encodes the common pattern for emitting atomic events of type

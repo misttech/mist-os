@@ -5,14 +5,18 @@
 //! A pure IP device, capable of directly sending/receiving IPv4 & IPv6 packets.
 
 use alloc::vec::Vec;
+use lock_order::lock::UnlockedAccess;
 use net_types::ip::{IpVersion, Mtu};
 use packet::Buf;
 
-use crate::device::{
-    queue::tx::{BufVecU8Allocator, TransmitQueue},
-    state::DeviceStateSpec,
-    BaseDeviceId, BasePrimaryDeviceId, BaseWeakDeviceId, Device, DeviceLayerTypes,
-    DeviceReceiveFrameSpec,
+use crate::{
+    device::{
+        queue::tx::{BufVecU8Allocator, TransmitQueue},
+        state::{DeviceStateSpec, IpLinkDeviceState},
+        BaseDeviceId, BasePrimaryDeviceId, BaseWeakDeviceId, Device, DeviceLayerTypes,
+        DeviceReceiveFrameSpec, PureIpDeviceCounters,
+    },
+    BindingsContext,
 };
 
 mod integration;
@@ -52,6 +56,8 @@ pub struct PureIpDeviceState {
     pub(crate) mtu: Mtu,
     /// The device's transmit queue.
     tx_queue: TransmitQueue<(), Buf<Vec<u8>>, BufVecU8Allocator>,
+    /// Counters specific to pure IP devices.
+    counters: PureIpDeviceCounters,
 }
 
 impl Device for PureIpDevice {}
@@ -60,13 +66,18 @@ impl DeviceStateSpec for PureIpDevice {
     type Link<BT: DeviceLayerTypes> = PureIpDeviceState;
     type External<BT: DeviceLayerTypes> = BT::PureIpDeviceState;
     type CreationProperties = PureIpDeviceCreationProperties;
+    type Counters = PureIpDeviceCounters;
     const IS_LOOPBACK: bool = false;
     const DEBUG_TYPE: &'static str = "PureIP";
 
     fn new_link_state<BT: DeviceLayerTypes>(
         PureIpDeviceCreationProperties { mtu }: Self::CreationProperties,
     ) -> Self::Link<BT> {
-        PureIpDeviceState { mtu, tx_queue: Default::default() }
+        PureIpDeviceState {
+            mtu,
+            tx_queue: Default::default(),
+            counters: PureIpDeviceCounters::default(),
+        }
     }
 }
 
@@ -80,4 +91,16 @@ pub struct PureIpDeviceFrameMetadata<D> {
 
 impl DeviceReceiveFrameSpec for PureIpDevice {
     type FrameMetadata<D> = PureIpDeviceFrameMetadata<D>;
+}
+
+impl<BC: BindingsContext> UnlockedAccess<crate::lock_ordering::PureIpDeviceCounters>
+    for IpLinkDeviceState<PureIpDevice, BC>
+{
+    type Data = PureIpDeviceCounters;
+    type Guard<'l> = &'l PureIpDeviceCounters
+        where
+            Self: 'l ;
+    fn access(&self) -> Self::Guard<'_> {
+        &self.link.counters
+    }
 }

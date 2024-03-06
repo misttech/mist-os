@@ -11,7 +11,7 @@ use packet::BufferMut;
 use tracing::debug;
 
 use crate::{
-    context::{ContextPair, RecvFrameContext, ReferenceNotifiers},
+    context::{ContextPair, RecvFrameContext, ReferenceNotifiers, ResourceCounterContext},
     device::{
         config::{
             ArpConfiguration, ArpConfigurationUpdate, DeviceConfiguration,
@@ -22,9 +22,9 @@ use crate::{
         loopback::LoopbackDevice,
         pure_ip::PureIpDevice,
         state::{BaseDeviceState, DeviceStateSpec, IpLinkDeviceStateInner},
-        AnyDevice, BaseDeviceId, BasePrimaryDeviceId, Device, DeviceCollectionContext, DeviceId,
-        DeviceIdContext, DeviceLayerStateTypes, DeviceLayerTypes, DeviceReceiveFrameSpec,
-        OriginTrackerContext,
+        AnyDevice, BaseDeviceId, BasePrimaryDeviceId, Device, DeviceCollectionContext,
+        DeviceCounters, DeviceId, DeviceIdContext, DeviceLayerStateTypes, DeviceLayerTypes,
+        DeviceProvider, DeviceReceiveFrameSpec, OriginTrackerContext,
     },
     for_any_device_id,
     ip::{
@@ -37,6 +37,7 @@ use crate::{
         types::{RemoveResourceResult, RemoveResourceResultWithContext},
         PrimaryRc,
     },
+    Inspector,
 };
 
 /// Pending device configuration update.
@@ -268,6 +269,22 @@ where
             .map(|nud| NdpConfiguration { nud });
         DeviceConfiguration { arp, ndp }
     }
+
+    /// Exports state for `device` into `inspector`.
+    pub fn inspect<N: Inspector>(
+        &mut self,
+        device: &BaseDeviceId<D, C::BindingsContext>,
+        inspector: &mut N,
+    ) {
+        inspector.record_child("Counters", |inspector| {
+            self.core_ctx().with_per_resource_counters(device, |counters: &DeviceCounters| {
+                inspector.delegate_inspectable(counters)
+            });
+            self.core_ctx().with_per_resource_counters(device, |counters: &D::Counters| {
+                inspector.delegate_inspectable(counters)
+            });
+        });
+    }
 }
 
 /// The device API interacting with any kind of supported device.
@@ -334,6 +351,16 @@ where
         for_any_device_id!(DeviceId, device,
             device => self.device().get_configuration(device))
     }
+
+    /// Like [`DeviceApi::inspect`] but for any device type.
+    pub fn inspect<N: Inspector>(
+        &mut self,
+        device: &DeviceId<C::BindingsContext>,
+        inspector: &mut N,
+    ) {
+        for_any_device_id!(DeviceId, DeviceProvider, D, device,
+            device => self.device::<D>().inspect(device, inspector))
+    }
 }
 
 /// A marker trait for all the core context traits required to fulfill the
@@ -347,6 +374,8 @@ pub trait DeviceApiCoreContext<
     + DeviceCollectionContext<D, BC>
     + DeviceConfigurationContext<D>
     + RecvFrameContext<BC, D::FrameMetadata<BaseDeviceId<D, BC>>>
+    + ResourceCounterContext<Self::DeviceId, DeviceCounters>
+    + ResourceCounterContext<Self::DeviceId, D::Counters>
 {
 }
 
@@ -358,7 +387,9 @@ where
         + OriginTrackerContext
         + DeviceCollectionContext<D, BC>
         + DeviceConfigurationContext<D>
-        + RecvFrameContext<BC, D::FrameMetadata<BaseDeviceId<D, BC>>>,
+        + RecvFrameContext<BC, D::FrameMetadata<BaseDeviceId<D, BC>>>
+        + ResourceCounterContext<Self::DeviceId, DeviceCounters>
+        + ResourceCounterContext<Self::DeviceId, D::Counters>,
 {
 }
 

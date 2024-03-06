@@ -11,7 +11,7 @@ use crate::{
     context::{ContextProvider, CtxPair},
     device::{
         arp::ArpCounters, DeviceCounters, DeviceId, DeviceLayerState, EthernetDeviceCounters,
-        WeakDeviceId,
+        PureIpDeviceCounters, WeakDeviceId,
     },
     ip::{
         self,
@@ -125,6 +125,10 @@ impl<BT: BindingsTypes> StackState<BT> {
 
     pub(crate) fn ethernet_device_counters(&self) -> &EthernetDeviceCounters {
         &self.device.ethernet_counters()
+    }
+
+    pub(crate) fn pure_ip_device_counters(&self) -> &PureIpDeviceCounters {
+        &self.device.pure_ip_counters()
     }
 
     pub(crate) fn arp_counters(&self) -> &ArpCounters {
