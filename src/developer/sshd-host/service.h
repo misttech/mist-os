@@ -78,6 +78,7 @@ class Service {
       service_->OnStop(event.stopped_payload().status().value_or(ZX_OK), this);
     }
     void on_fidl_error(fidl::UnbindInfo error) override {
+      FX_LOGS(WARNING) << "encountered FIDL error " << error;
       service_->OnStop(error.ToError().status(), this);
     }
     void handle_unknown_event(
