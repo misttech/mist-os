@@ -13,10 +13,8 @@ test("child-driver-test") {
   ]
   deps = [
     "//examples/drivers/transport/banjo:fuchsia.examples.gizmo_banjo_cpp",
-    "//sdk/lib/async_patterns/testing/cpp",
     "//sdk/lib/driver/compat/cpp",
-    "//sdk/lib/driver/testing/cpp",
-    "//src/devices/lib/driver:driver_runtime",
+    "//sdk/lib/driver/testing/cpp:gtest_fixture",
     "//src/lib/fxl/test:gtest_main",
   ]
 }

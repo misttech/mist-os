@@ -4,18 +4,9 @@
 
 #include "examples/drivers/transport/banjo/v2/child-driver.h"
 
-#include <lib/async-loop/loop.h>
-#include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
-#include <lib/driver/component/cpp/driver_base.h>
-#include <lib/driver/testing/cpp/driver_lifecycle.h>
-#include <lib/driver/testing/cpp/driver_runtime.h>
-#include <lib/driver/testing/cpp/test_environment.h>
-#include <lib/driver/testing/cpp/test_node.h>
-#include <lib/fdf/env.h>
-#include <lib/fdf/testing.h>
+#include <lib/driver/testing/cpp/fixtures/gtest_fixture.h>
 
 #include <ddktl/device.h>
-#include <gtest/gtest.h>
 
 namespace testing {
 
@@ -49,55 +40,31 @@ class FakeParentBanjoServer : public ddk::MiscProtocol<FakeParentBanjoServer, dd
   compat::BanjoServer banjo_server_{ZX_PROTOCOL_MISC, this, &misc_protocol_ops_};
 };
 
-class TestEnvironmentWrapper {
+class BanjoTestEnvironment : public fdf_testing::Environment {
  public:
-  fdf::DriverStartArgs Init() {
-    zx::result start_args_result = node_.CreateStartArgsAndServe();
-    ZX_ASSERT(start_args_result.is_ok());
-
-    zx::result init_result =
-        test_environment_.Initialize(std::move(start_args_result->incoming_directory_server));
-    ZX_ASSERT(init_result.is_ok());
-
+  zx::result<> Serve(fdf::OutgoingDirectory& to_driver_vfs) override {
     device_server_.Init("default", "", std::nullopt, banjo_server_.GetBanjoConfig());
     ZX_ASSERT(device_server_.Serve(fdf::Dispatcher::GetCurrent()->async_dispatcher(),
-                                   &test_environment_.incoming_directory()) == ZX_OK);
-    return std::move(start_args_result->start_args);
+                                   &to_driver_vfs) == ZX_OK);
+    return zx::ok();
   }
 
  private:
-  fdf_testing::TestNode node_{"root"};
-  fdf_testing::TestEnvironment test_environment_;
-
   compat::DeviceServer device_server_;
   FakeParentBanjoServer banjo_server_;
 };
 
-class ChildBanjoTransportDriverTest : public testing::Test {
+class FixtureConfig final {
  public:
-  void SetUp() override {
-    fdf::DriverStartArgs start_args = environment_.SyncCall(&TestEnvironmentWrapper::Init);
-    zx::result driver = runtime_.RunToCompletion(driver_.Start(std::move(start_args)));
-    EXPECT_EQ(ZX_OK, driver.status_value());
-  }
+  static constexpr bool kDriverOnForeground = true;
+  static constexpr bool kAutoStartDriver = true;
+  static constexpr bool kAutoStopDriver = true;
 
-  async_dispatcher_t* env_dispatcher() { return test_env_dispatcher_->async_dispatcher(); }
-
-  async_patterns::TestDispatcherBound<TestEnvironmentWrapper>& environment() {
-    return environment_;
-  }
-
-  banjo_transport::ChildBanjoTransportDriver* driver() { return *driver_; }
-
- private:
-  fdf_testing::DriverRuntime runtime_;
-  fdf::UnownedSynchronizedDispatcher test_env_dispatcher_ = runtime_.StartBackgroundDispatcher();
-
-  async_patterns::TestDispatcherBound<TestEnvironmentWrapper> environment_{env_dispatcher(),
-                                                                           std::in_place};
-
-  fdf_testing::DriverUnderTest<banjo_transport::ChildBanjoTransportDriver> driver_;
+  using DriverType = banjo_transport::ChildBanjoTransportDriver;
+  using EnvironmentType = BanjoTestEnvironment;
 };
+
+class ChildBanjoTransportDriverTest : public fdf_testing::DriverTestFixture<FixtureConfig> {};
 
 TEST_F(ChildBanjoTransportDriverTest, VerifyQueryValues) {
   // Verify that the queried values match the fake banjo server.
