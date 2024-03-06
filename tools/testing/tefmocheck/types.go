@@ -45,4 +45,32 @@ type FailureModeCheck interface {
 	DebugText() string
 	// OutputFiles are paths associated with this check. Often empty.
 	OutputFiles() []string
+	// IsFlake is true if the check is associated with a flaked test and
+	// this check should also be reported as a flake instead of a failure.
+	IsFlake() bool
+}
+
+// baseCheck provides default implementations of the FailureModeCheck interface.
+// All types that inherit from baseCheck should override the Check() and Name() functions.
+type baseCheck struct {
+}
+
+func (c baseCheck) Check(*TestingOutputs) bool {
+	return true
+}
+
+func (c baseCheck) Name() string {
+	return ""
+}
+
+func (c baseCheck) DebugText() string {
+	return ""
+}
+
+func (c baseCheck) OutputFiles() []string {
+	return []string{}
+}
+
+func (c baseCheck) IsFlake() bool {
+	return false
 }

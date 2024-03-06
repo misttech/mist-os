@@ -9,10 +9,19 @@ import (
 	"path"
 )
 
+type taskCheck struct {
+	baseCheck
+	swarmingSummary *SwarmingTaskSummary
+}
+
+func (c *taskCheck) DebugText() string {
+	return debugTextForSwarmingSummary(c.swarmingSummary)
+}
+
 // taskStateCheck checks if the swarming task is in State.
 type taskStateCheck struct {
-	State           string
-	swarmingSummary *SwarmingTaskSummary
+	taskCheck
+	State string
 }
 
 func (c *taskStateCheck) Check(to *TestingOutputs) bool {
@@ -24,17 +33,9 @@ func (c *taskStateCheck) Name() string {
 	return path.Join("task_state", c.State)
 }
 
-func (c *taskStateCheck) DebugText() string {
-	return debugTextForSwarmingSummary(c.swarmingSummary)
-}
-
-func (c *taskStateCheck) OutputFiles() []string {
-	return []string{}
-}
-
 // taskFailureCheck checks if the swarming task failed.
 type taskFailureCheck struct {
-	swarmingSummary *SwarmingTaskSummary
+	taskCheck
 }
 
 func (c *taskFailureCheck) Check(to *TestingOutputs) bool {
@@ -46,17 +47,9 @@ func (c *taskFailureCheck) Name() string {
 	return "task_failure"
 }
 
-func (c *taskFailureCheck) DebugText() string {
-	return debugTextForSwarmingSummary(c.swarmingSummary)
-}
-
-func (c *taskFailureCheck) OutputFiles() []string {
-	return []string{}
-}
-
 // taskInternalFailureCheck checks if the swarming task internally failed.
 type taskInternalFailureCheck struct {
-	swarmingSummary *SwarmingTaskSummary
+	taskCheck
 }
 
 func (c *taskInternalFailureCheck) Check(to *TestingOutputs) bool {
@@ -66,14 +59,6 @@ func (c *taskInternalFailureCheck) Check(to *TestingOutputs) bool {
 
 func (c *taskInternalFailureCheck) Name() string {
 	return "task_internal_failure"
-}
-
-func (c *taskInternalFailureCheck) DebugText() string {
-	return debugTextForSwarmingSummary(c.swarmingSummary)
-}
-
-func (c *taskInternalFailureCheck) OutputFiles() []string {
-	return []string{}
 }
 
 func debugTextForSwarmingSummary(swarmingSummary *SwarmingTaskSummary) string {

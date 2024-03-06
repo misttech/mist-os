@@ -18,6 +18,7 @@ import (
 )
 
 type alwaysTrueCheck struct {
+	baseCheck
 	outputsDir string
 }
 
@@ -37,7 +38,7 @@ func (c alwaysTrueCheck) OutputFiles() []string {
 	return []string{filepath.Join(c.outputsDir, "true.txt")}
 }
 
-type alwaysFalseCheck struct{}
+type alwaysFalseCheck struct{ baseCheck }
 
 func (c alwaysFalseCheck) Check(*TestingOutputs) bool {
 	return false
@@ -55,7 +56,7 @@ func (c alwaysFalseCheck) OutputFiles() []string {
 	return []string{}
 }
 
-type alwaysPanicCheck struct{}
+type alwaysPanicCheck struct{ baseCheck }
 
 func (c alwaysPanicCheck) Check(*TestingOutputs) bool {
 	panic("oh dear")
@@ -73,25 +74,50 @@ func (c alwaysPanicCheck) OutputFiles() []string {
 	return []string{}
 }
 
+type alwaysFlakeCheck struct{ baseCheck }
+
+func (c alwaysFlakeCheck) Check(*TestingOutputs) bool {
+	return true
+}
+
+func (c alwaysFlakeCheck) Name() string {
+	return "always_flake"
+}
+
+func (c alwaysFlakeCheck) IsFlake() bool {
+	return true
+}
+
 func TestRunChecks(t *testing.T) {
 	falseCheck := alwaysFalseCheck{}
 	outputsDir := t.TempDir()
-	trueCheck := alwaysTrueCheck{outputsDir}
+	trueCheck := alwaysTrueCheck{outputsDir: outputsDir}
 	panicCheck := alwaysPanicCheck{}
+	flakeCheck := alwaysFlakeCheck{}
 	checks := []FailureModeCheck{
-		falseCheck, trueCheck, panicCheck,
+		flakeCheck, falseCheck, trueCheck, panicCheck,
 	}
-	debugPath := debugPathForCheck(trueCheck)
 	want := []runtests.TestDetails{
+		{
+			Name:                 path.Join(checkTestNamePrefix, flakeCheck.Name()),
+			Result:               runtests.TestFailure,
+			IsTestingFailureMode: true,
+			OutputFiles:          []string{debugPathForCheck(flakeCheck)},
+		},
+		{
+			Name:                 path.Join(checkTestNamePrefix, flakeCheck.Name()),
+			Result:               runtests.TestSuccess,
+			IsTestingFailureMode: true,
+		},
 		{
 			Name:                 path.Join(checkTestNamePrefix, trueCheck.Name()),
 			Result:               runtests.TestFailure,
 			IsTestingFailureMode: true,
-			OutputFiles:          []string{debugPath},
+			OutputFiles:          []string{debugPathForCheck(trueCheck)},
 		},
 	}
 	for _, of := range trueCheck.OutputFiles() {
-		want[0].OutputFiles = append(want[0].OutputFiles, filepath.Base(of))
+		want[2].OutputFiles = append(want[2].OutputFiles, filepath.Base(of))
 	}
 	startTime := time.Now()
 
@@ -111,7 +137,7 @@ func TestRunChecks(t *testing.T) {
 		got[i].DurationMillis = 0
 		for _, outputFile := range td.OutputFiles {
 			// RunChecks() is only responsible for writing the debug text to a file.
-			if outputFile != debugPath {
+			if outputFile != want[i].OutputFiles[0] {
 				continue
 			}
 			if _, err := os.Stat(filepath.Join(outputsDir, outputFile)); err != nil {

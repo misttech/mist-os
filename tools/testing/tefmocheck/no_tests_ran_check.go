@@ -6,7 +6,7 @@ package tefmocheck
 
 // NoTestsRanCheck checks whether the task reported running zero tests. It may
 // actually have run tests but not reported them, which is still an issue.
-type NoTestsRanCheck struct{}
+type NoTestsRanCheck struct{ baseCheck }
 
 func (c NoTestsRanCheck) Check(to *TestingOutputs) bool {
 	return len(to.TestSummary.Tests) == 0
@@ -18,8 +18,4 @@ func (c NoTestsRanCheck) Name() string {
 
 func (c NoTestsRanCheck) DebugText() string {
 	return "The task didn't run any tests, didn't produce any test results, or failed to properly clean up its test artifacts."
-}
-
-func (c NoTestsRanCheck) OutputFiles() []string {
-	return []string{}
 }

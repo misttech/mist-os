@@ -11,6 +11,8 @@ import (
 	"path/filepath"
 	"strings"
 
+	"golang.org/x/exp/slices"
+
 	"go.fuchsia.dev/fuchsia/tools/bootserver/bootserverconstants"
 	botanistconstants "go.fuchsia.dev/fuchsia/tools/botanist/constants"
 	ffxutilconstants "go.fuchsia.dev/fuchsia/tools/lib/ffxutil/constants"
@@ -43,6 +45,16 @@ type stringInLogCheck struct {
 	// SkipAllPassedTests will cause Check() to return false if all tests
 	// in the Swarming task passed.
 	SkipAllPassedTests bool
+	// SkipPassedTest will cause Check() to return true only if it finds the
+	// log in the per-test swarming output of a failed test.
+	SkipPassedTest bool
+	// IgnoreFlakes will cause Check() to behave in the following ways when
+	// combined with other options:
+	//   SkipAllPassedTests: Check() will ignore flakes when determining if all
+	//     tests passed.
+	//   SkipPassedTest: Check() will return the failure as a flake if the
+	//     associated test later passes.
+	IgnoreFlakes bool
 	// Type of log that will be checked.
 	Type logType
 	// Whether to check the per-test Swarming output for this log and emit a
@@ -52,6 +64,7 @@ type stringInLogCheck struct {
 	swarmingResult *SwarmingRpcsTaskResult
 	testName       string
 	outputFile     string
+	isFlake        bool
 }
 
 func (c *stringInLogCheck) Check(to *TestingOutputs) bool {
@@ -61,14 +74,19 @@ func (c *stringInLogCheck) Check(to *TestingOutputs) bool {
 			return false
 		}
 		if c.SkipAllPassedTests {
-			hasTestFailure := false
+			failedTests := make(map[string]struct{})
 			for _, test := range to.TestSummary.Tests {
 				if test.Result != runtests.TestSuccess {
-					hasTestFailure = true
-					break
+					failedTests[test.Name] = struct{}{}
+				} else if c.IgnoreFlakes {
+					// If a later run of a failed test passed,
+					// remove it from the list of failed tests.
+					if _, ok := failedTests[test.Name]; ok {
+						delete(failedTests, test.Name)
+					}
 				}
 			}
-			if !hasTestFailure {
+			if len(failedTests) == 0 {
 				return false
 			}
 		}
@@ -84,13 +102,66 @@ func (c *stringInLogCheck) Check(to *TestingOutputs) bool {
 		return false
 	}
 
-	if c.Type == swarmingOutputType && c.AttributeToTest {
-		for _, testLog := range to.SwarmingOutputPerTest {
-			if c.checkBytes(to.SwarmingOutput, testLog.Index, testLog.Index+len(testLog.Bytes)) {
-				c.testName = testLog.TestName
-				c.outputFile = testLog.FilePath
-				return true
+	if c.Type == swarmingOutputType && (c.AttributeToTest || c.SkipPassedTest) {
+		type testdata struct {
+			name       string
+			outputFile string
+			isFlake    bool
+			index      int
+		}
+		failedTestsMap := make(map[string]testdata)
+		for i, testLog := range to.SwarmingOutputPerTest {
+			var testResult runtests.TestResult
+			if to.TestSummary != nil {
+				testResult = to.TestSummary.Tests[i].Result
 			}
+			if c.SkipPassedTest && testResult == runtests.TestSuccess {
+				if c.IgnoreFlakes {
+					if test, ok := failedTestsMap[testLog.TestName]; ok {
+						test.isFlake = true
+						failedTestsMap[testLog.TestName] = test
+					}
+				}
+				continue
+			}
+			if c.checkBytes(to.SwarmingOutput, testLog.Index, testLog.Index+len(testLog.Bytes)) {
+				failedTestsMap[testLog.TestName] = testdata{testLog.TestName, testLog.FilePath, false, i}
+			}
+		}
+		var failedTests []testdata
+		var flakedTests []testdata
+		for _, data := range failedTestsMap {
+			if data.isFlake {
+				flakedTests = append(flakedTests, data)
+			} else {
+				failedTests = append(failedTests, data)
+			}
+		}
+		// Prioritize returning the first failure. If there are no failures,
+		// then return the first flake.
+		if len(failedTests) > 0 {
+			slices.SortFunc(failedTests, func(a, b testdata) int {
+				return a.index - b.index
+			})
+			if c.AttributeToTest {
+				c.testName = failedTests[0].name
+				c.outputFile = failedTests[0].outputFile
+			}
+			return true
+		}
+		if len(flakedTests) > 0 {
+			slices.SortFunc(flakedTests, func(a, b testdata) int {
+				return a.index - b.index
+			})
+			if c.AttributeToTest {
+				c.testName = flakedTests[0].name
+				c.outputFile = flakedTests[0].outputFile
+			}
+			c.isFlake = true
+			return true
+		}
+		if c.SkipPassedTest {
+			return false
 		}
 	}
 
@@ -194,6 +265,10 @@ func (c *stringInLogCheck) OutputFiles() []string {
 		return []string{}
 	}
 	return []string{c.outputFile}
+}
+
+func (c *stringInLogCheck) IsFlake() bool {
+	return c.isFlake
 }
 
 // StringInLogsChecks returns checks to detect bad strings in certain logs.
@@ -553,9 +628,10 @@ func infraToolLogChecks() []FailureModeCheck {
 		},
 		// For https://fxbug.dev/317290699.
 		&stringInLogCheck{
-			String:             sshutilconstants.ProcessTerminatedMsg,
-			Type:               swarmingOutputType,
-			SkipAllPassedTests: true,
+			String:         sshutilconstants.ProcessTerminatedMsg,
+			Type:           swarmingOutputType,
+			SkipPassedTest: true,
+			IgnoreFlakes:   true,
 		},
 		// This error happens when `botanist run` exceeds its timeout, e.g.
 		// because many tests are taking too long. If botanist exceeds its timeout,
@@ -566,8 +642,10 @@ func infraToolLogChecks() []FailureModeCheck {
 		},
 		// For https://fxbug.dev/42176228.
 		&stringInLogCheck{
-			String: ffxutilconstants.ClientChannelClosedMsg,
-			Type:   swarmingOutputType,
+			String:         ffxutilconstants.ClientChannelClosedMsg,
+			Type:           swarmingOutputType,
+			SkipPassedTest: true,
+			IgnoreFlakes:   true,
 		},
 		// General ffx error check.
 		&stringInLogCheck{

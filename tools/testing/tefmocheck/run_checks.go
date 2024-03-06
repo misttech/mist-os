@@ -67,6 +67,19 @@ func RunChecks(checks []FailureModeCheck, to *TestingOutputs, outputsDir string)
 			testDetails.OutputFiles = append(testDetails.OutputFiles, relPath)
 		}
 		checkTests = append(checkTests, testDetails)
+		if check.IsFlake() {
+			checkTests = append(checkTests, runtests.TestDetails{
+				Name:                 path.Join(checkTestNamePrefix, check.Name()),
+				IsTestingFailureMode: true,
+				// Specify an empty slice so it gets serialized to an empty JSON
+				// array instead of null.
+				Cases:     []runtests.TestCaseResult{},
+				Result:    runtests.TestSuccess,
+				StartTime: time.Now(), // needed by ResultDB
+			})
+			// If this check was a flake, continue to see if we get another failure.
+			continue
+		}
 		// We run more specific checks first, so it's not useful to run any checks
 		// once we have our first failure.
 		break
