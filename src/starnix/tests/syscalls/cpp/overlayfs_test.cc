@@ -646,13 +646,14 @@ TEST_F(OverlayFsTest, CanCreateExecutableFiles) {
 
   std::string file_path = overlay_ + "/executable_file_created";
 
-  test_helper::ScopedFD fd = test_helper::ScopedFD(
-      open(file_path.c_str(), O_RDWR | O_CREAT | O_EXCL, S_IRWXU | S_IRWXG | S_IRWXO));
-  EXPECT_TRUE(fd.is_valid()) << "open: " << std::strerror(errno) << std::endl;
+  {
+    test_helper::ScopedFD fd(
+        open(file_path.c_str(), O_RDWR | O_CREAT | O_EXCL, S_IRWXU | S_IRWXG | S_IRWXO));
+    EXPECT_TRUE(fd.is_valid()) << "open: " << std::strerror(errno) << std::endl;
+  }
   auto cleanup = fit::defer([file_path]() {
     EXPECT_EQ(unlink(file_path.c_str()), 0) << "unlink: " << std::strerror(errno) << std::endl;
   });
-  EXPECT_EQ(close(fd.get()), 0) << "close: " << std::strerror(errno) << std::endl;
 
   EXPECT_EQ(access(file_path.c_str(), R_OK | W_OK | X_OK), 0);
 
@@ -676,13 +677,13 @@ TEST_F(OverlayFsTest, CanChmodAsExecutable) {
 
   std::string file_path = overlay_ + "/non_executable_file_created";
 
-  test_helper::ScopedFD fd =
-      test_helper::ScopedFD(open(file_path.c_str(), O_RDWR | O_CREAT | O_EXCL, S_IRUSR | S_IWUSR));
-  EXPECT_TRUE(fd.is_valid()) << "open: " << std::strerror(errno) << std::endl;
+  {
+    test_helper::ScopedFD fd(open(file_path.c_str(), O_RDWR | O_CREAT | O_EXCL, S_IRUSR | S_IWUSR));
+    EXPECT_TRUE(fd.is_valid()) << "open: " << std::strerror(errno) << std::endl;
+  }
   auto cleanup = fit::defer([file_path]() {
     EXPECT_EQ(unlink(file_path.c_str()), 0) << "unlink: " << std::strerror(errno) << std::endl;
   });
-  EXPECT_EQ(close(fd.get()), 0) << "close: " << std::strerror(errno) << std::endl;
 
   EXPECT_EQ(access(file_path.c_str(), X_OK), -1);
 
