@@ -46,7 +46,7 @@ func (e *BridgeableEndpoint) SetBridge(b *Endpoint) {
 	e.mu.bridge = b
 }
 
-func (e *BridgeableEndpoint) DeliverNetworkPacket(protocol tcpip.NetworkProtocolNumber, pkt stack.PacketBufferPtr) {
+func (e *BridgeableEndpoint) DeliverNetworkPacket(protocol tcpip.NetworkProtocolNumber, pkt *stack.PacketBuffer) {
 	e.mu.RLock()
 	b := e.mu.bridge
 	e.mu.RUnlock()

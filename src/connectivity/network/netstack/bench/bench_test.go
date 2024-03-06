@@ -43,8 +43,8 @@ func (*nullEndpoint) Attach(dispatcher stack.NetworkDispatcher) {}
 func (*nullEndpoint) IsAttached() bool                          { return false }
 func (*nullEndpoint) Wait()                                     {}
 func (*nullEndpoint) ARPHardwareType() header.ARPHardwareType   { return header.ARPHardwareNone }
-func (*nullEndpoint) AddHeader(stack.PacketBufferPtr)           {}
-func (*nullEndpoint) ParseHeader(stack.PacketBufferPtr) bool    { return true }
+func (*nullEndpoint) AddHeader(*stack.PacketBuffer)             {}
+func (*nullEndpoint) ParseHeader(*stack.PacketBuffer) bool      { return true }
 
 type nullChecksumOffloadEndpoint struct {
 	nullEndpoint

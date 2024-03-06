@@ -45,7 +45,7 @@ const (
 
 type transportProtocolState struct {
 	proto          TransportProtocol
-	defaultHandler func(id TransportEndpointID, pkt PacketBufferPtr) bool
+	defaultHandler func(id TransportEndpointID, pkt *PacketBuffer) bool
 }
 
 // ResumableEndpoint is an endpoint that needs to be resumed after restore.
@@ -490,7 +490,7 @@ func (s *Stack) TransportProtocolOption(transport tcpip.TransportProtocolNumber,
 //
 // It must be called only during initialization of the stack. Changing it as the
 // stack is operating is not supported.
-func (s *Stack) SetTransportProtocolHandler(p tcpip.TransportProtocolNumber, h func(TransportEndpointID, PacketBufferPtr) bool) {
+func (s *Stack) SetTransportProtocolHandler(p tcpip.TransportProtocolNumber, h func(TransportEndpointID, *PacketBuffer) bool) {
 	state := s.transportProtocols[p]
 	if state != nil {
 		state.defaultHandler = h
@@ -1840,10 +1840,7 @@ func (s *Stack) RegisterPacketEndpoint(nicID tcpip.NICID, netProto tcpip.Network
 	if nicID == 0 {
 		// Register with each NIC.
 		for _, nic := range s.nics {
-			if err := nic.registerPacketEndpoint(netProto, ep); err != nil {
-				s.unregisterPacketEndpointLocked(0, netProto, ep)
-				return err
-			}
+			nic.registerPacketEndpoint(netProto, ep)
 		}
 		return nil
 	}
@@ -1853,9 +1850,7 @@ func (s *Stack) RegisterPacketEndpoint(nicID tcpip.NICID, netProto tcpip.Network
 	if !ok {
 		return &tcpip.ErrUnknownNICID{}
 	}
-	if err := nic.registerPacketEndpoint(netProto, ep); err != nil {
-		return err
-	}
+	nic.registerPacketEndpoint(netProto, ep)
 
 	return nil
 }
@@ -2141,7 +2136,7 @@ const (
 
 // ParsePacketBufferTransport parses the provided packet buffer's transport
 // header.
-func (s *Stack) ParsePacketBufferTransport(protocol tcpip.TransportProtocolNumber, pkt PacketBufferPtr) ParseResult {
+func (s *Stack) ParsePacketBufferTransport(protocol tcpip.TransportProtocolNumber, pkt *PacketBuffer) ParseResult {
 	pkt.TransportProtocolNumber = protocol
 	// Parse the transport header if present.
 	state, ok := s.transportProtocols[protocol]

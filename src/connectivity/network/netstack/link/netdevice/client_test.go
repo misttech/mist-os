@@ -40,14 +40,14 @@ import (
 
 type DeliverNetworkPacketArgs struct {
 	Protocol tcpip.NetworkProtocolNumber
-	Pkt      stack.PacketBufferPtr
+	Pkt      *stack.PacketBuffer
 }
 
 type dispatcherChan chan DeliverNetworkPacketArgs
 
 var _ stack.NetworkDispatcher = (dispatcherChan)(nil)
 
-func (ch dispatcherChan) DeliverNetworkPacket(protocol tcpip.NetworkProtocolNumber, pkt stack.PacketBufferPtr) {
+func (ch dispatcherChan) DeliverNetworkPacket(protocol tcpip.NetworkProtocolNumber, pkt *stack.PacketBuffer) {
 	pkt.IncRef()
 
 	ch <- DeliverNetworkPacketArgs{
@@ -56,7 +56,7 @@ func (ch dispatcherChan) DeliverNetworkPacket(protocol tcpip.NetworkProtocolNumb
 	}
 }
 
-func (dispatcherChan) DeliverLinkPacket(tcpip.NetworkProtocolNumber, stack.PacketBufferPtr) {
+func (dispatcherChan) DeliverLinkPacket(tcpip.NetworkProtocolNumber, *stack.PacketBuffer) {
 	panic("not implemented")
 }
 
@@ -1119,7 +1119,7 @@ func TestPairExchangePackets(t *testing.T) {
 		<-info.online
 	}
 
-	makeTestPacket := func(prefix byte, index uint16) stack.PacketBufferPtr {
+	makeTestPacket := func(prefix byte, index uint16) *stack.PacketBuffer {
 		rng := rand.New(rand.NewSource(int64(index)))
 
 		view := []byte{prefix}

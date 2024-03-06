@@ -14,12 +14,16 @@ use fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext;
 use fidl_fuchsia_net_root as fnet_root;
 use fidl_fuchsia_net_stack as fnet_stack;
 use fidl_fuchsia_net_stack_ext::FidlReturn as _;
+use fuchsia_async::{DurationExt as _, TimeoutExt as _};
 use futures::FutureExt as _;
 use net_declare::fidl_subnet;
 use netemul::{RealmTcpListener as _, RealmTcpStream as _, RealmUdpSocket as _};
 use netfilter::FidlReturn as _;
-use netstack_testing_common::ping as ping_helper;
-use netstack_testing_common::realms::{Netstack, TestSandboxExt as _};
+use netstack_testing_common::{
+    ping as ping_helper,
+    realms::{Netstack, TestSandboxExt as _},
+    ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT,
+};
 use netstack_testing_macros::netstack_test;
 use test_case::test_case;
 
@@ -911,4 +915,139 @@ async fn masquerade_nat_ping<N: Netstack>(
         .ping_pairwise(&[host2_node])
         .await
         .expect("expected to successfully ping between host1 and host2");
+}
+
+#[netstack_test]
+async fn implicit_snat_ports_locally_generated_traffic<N: Netstack>(name: &str) {
+    let sandbox = netemul::TestSandbox::new().expect("create sandbox");
+
+    // Set up two hosts and a router, and configure Masquerade NAT on the
+    // interface on which the router neighbors host2.
+    let MasqueradeNatNetwork { router_realm, net1, net2 } = setup_masquerade_nat_network::<N>(
+        &sandbox,
+        name,
+        &NatTestCase {
+            src_subnet: IPV4_SUBNET1,
+            dst_subnet: IPV4_SUBNET2,
+            nat_proto: fnetfilter::SocketProtocol::Udp,
+            nat_src_subnet: IPV4_SUBNET1,
+            nat_outgoing_nic: NatNic::RouterNic2,
+            cycle_dst_net: false,
+        },
+    )
+    .await;
+
+    let _pcap_1 = net1.net.start_capture("net1").await.expect("starting packet capture");
+    let _pcap_2 = net2.net.start_capture("net2").await.expect("starting packet capture");
+
+    let get_sock = |realm, subnet| async move {
+        let addr = subnet_to_addr(subnet);
+        let sock =
+            fuchsia_async::net::UdpSocket::bind_in_realm(realm, std::net::SocketAddr::new(addr, 0))
+                .await
+                .expect("bind socket in realm");
+        let addr = sock.local_addr().expect("get bound address");
+
+        (sock, addr)
+    };
+    let (host1_sock, host1_sockaddr) = get_sock(&net1.host_realm, net1.host_addr).await;
+    let (host2_sock, host2_sockaddr) = get_sock(&net2.host_realm, net2.host_addr).await;
+
+    // Send traffic from host1 to host2 (will be NATed by router).
+    const SEND_BUF: [u8; 4] = [1, 2, 4, 5];
+    assert_eq!(
+        host1_sock.send_to(&SEND_BUF, host2_sockaddr).await.expect("send to host2"),
+        SEND_BUF.len()
+    );
+
+    // Receive NATed traffic on host2.
+    let mut recv_buf = [0; SEND_BUF.len() + 1];
+    let (bytes, sender) = host2_sock
+        .recv_from(&mut recv_buf)
+        .on_timeout(ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT.after_now(), || {
+            panic!("timed out waiting to receive message")
+        })
+        .await
+        .expect("host2 should receive NATed traffic from host1");
+    assert_eq!(bytes, SEND_BUF.len());
+    assert_eq!(&recv_buf[..bytes], &SEND_BUF);
+    let expected_sender =
+        std::net::SocketAddr::new(subnet_to_addr(net2.router_addr), host1_sockaddr.port());
+    assert_eq!(sender, expected_sender);
+
+    // Reply and ensure the reply correctly has the source port mapping undone.
+    assert_eq!(
+        host2_sock.send_to(&SEND_BUF, sender).await.expect("reply to host1"),
+        SEND_BUF.len()
+    );
+    let (bytes, sender) = host1_sock
+        .recv_from(&mut recv_buf)
+        .on_timeout(ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT.after_now(), || {
+            panic!("timed out waiting to receive message")
+        })
+        .await
+        .expect("host1 should receive reply from host2 through router");
+    assert_eq!(bytes, SEND_BUF.len());
+    assert_eq!(&recv_buf[..bytes], &SEND_BUF);
+    assert_eq!(sender, host2_sockaddr);
+
+    // Create a socket on the router and bind to the *same* source port that was
+    // used by host1 and then allocated by the router for the above NAT binding.
+    let router_sock = fuchsia_async::net::UdpSocket::bind_in_realm(&router_realm, expected_sender)
+        .await
+        .expect("bind socket on router");
+
+    // Send a packet to the same remote (host2). The router should perform
+    // source port remapping for the locally generated traffic so that it does
+    // not conflict with any existing conntrack entry.
+    assert_eq!(
+        router_sock.send_to(&SEND_BUF, host2_sockaddr).await.expect("send to host2"),
+        SEND_BUF.len()
+    );
+    let (bytes, sender) = host2_sock
+        .recv_from(&mut recv_buf)
+        .on_timeout(ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT.after_now(), || {
+            panic!("timed out waiting to receive message")
+        })
+        .await
+        .expect("host2 should receive traffic from router");
+    assert_eq!(bytes, SEND_BUF.len());
+    assert_eq!(&recv_buf[..bytes], &SEND_BUF);
+    assert_eq!(sender.ip(), expected_sender.ip());
+    assert_ne!(sender.port(), expected_sender.port());
+
+    // Reply and ensure the reply correctly has the source port mapping undone.
+    assert_eq!(
+        host2_sock.send_to(&SEND_BUF, sender).await.expect("reply to router"),
+        SEND_BUF.len()
+    );
+    let (bytes, sender) = router_sock
+        .recv_from(&mut recv_buf)
+        .on_timeout(ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT.after_now(), || {
+            panic!("timed out waiting to receive message")
+        })
+        .await
+        .expect("router should receive reply from host2");
+    assert_eq!(bytes, SEND_BUF.len());
+    assert_eq!(&recv_buf[..bytes], &SEND_BUF);
+    assert_eq!(sender, host2_sockaddr);
+
+    // Make sure we can still send traffic from host1 to host2 through the NAT gateway.
+    assert_eq!(
+        host1_sock.send_to(&SEND_BUF, host2_sockaddr).await.expect("send to host2"),
+        SEND_BUF.len()
+    );
+    let mut recv_buf = [0; SEND_BUF.len() + 1];
+    let (bytes, sender) = host2_sock
+        .recv_from(&mut recv_buf)
+        .on_timeout(ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT.after_now(), || {
+            panic!("timed out waiting to receive message")
+        })
+        .await
+        .expect("host2 should receive traffic from host1 through router");
+    assert_eq!(bytes, SEND_BUF.len());
+    assert_eq!(&recv_buf[..bytes], &SEND_BUF);
+    let expected_sender =
+        std::net::SocketAddr::new(subnet_to_addr(net2.router_addr), host1_sockaddr.port());
+    assert_eq!(sender, expected_sender);
 }

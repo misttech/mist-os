@@ -1350,7 +1350,7 @@ func TestDeviceClassMatcher(t *testing.T) {
 				direction:   test.direction,
 			}
 			var hook stack.Hook
-			var pb stack.PacketBufferPtr
+			var pb *stack.PacketBuffer
 			matches, drop := matcher.Match(hook, pb, test.inNicName, test.outNicName)
 			if want, got := false, drop; want != got {
 				t.Errorf("got drop = %t, want %t", got, want)

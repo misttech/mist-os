@@ -98,7 +98,7 @@ func TestEndpointAttributes(t *testing.T) {
 var _ stack.NetworkDispatcher = (*testNetworkDispatcher)(nil)
 
 type testNetworkDispatcher struct {
-	pkt   stack.PacketBufferPtr
+	pkt   *stack.PacketBuffer
 	count int
 }
 
@@ -110,13 +110,13 @@ func (t *testNetworkDispatcher) release() {
 	*t = testNetworkDispatcher{}
 }
 
-func (t *testNetworkDispatcher) takePkt() stack.PacketBufferPtr {
+func (t *testNetworkDispatcher) takePkt() *stack.PacketBuffer {
 	pkt := t.pkt
 	t.pkt = nil
 	return pkt
 }
 
-func (t *testNetworkDispatcher) DeliverNetworkPacket(_ tcpip.NetworkProtocolNumber, pkt stack.PacketBufferPtr) {
+func (t *testNetworkDispatcher) DeliverNetworkPacket(_ tcpip.NetworkProtocolNumber, pkt *stack.PacketBuffer) {
 	t.count++
 
 	if pkt := t.pkt; pkt != nil {
@@ -127,7 +127,7 @@ func (t *testNetworkDispatcher) DeliverNetworkPacket(_ tcpip.NetworkProtocolNumb
 	t.pkt = pkt
 }
 
-func (*testNetworkDispatcher) DeliverLinkPacket(tcpip.NetworkProtocolNumber, stack.PacketBufferPtr) {
+func (*testNetworkDispatcher) DeliverLinkPacket(tcpip.NetworkProtocolNumber, *stack.PacketBuffer) {
 	panic("not implemented")
 }
 
@@ -137,7 +137,7 @@ var _ stack.LinkEndpoint = (*stubEndpoint)(nil)
 // that they can be retrieved and asserted upon later.
 type stubEndpoint struct {
 	linkAddr tcpip.LinkAddress
-	c        chan stack.PacketBufferPtr
+	c        chan *stack.PacketBuffer
 }
 
 func (*stubEndpoint) MTU() uint32 {
@@ -172,9 +172,9 @@ func (*stubEndpoint) ARPHardwareType() header.ARPHardwareType {
 	panic("ARPHardwareType unimplemented")
 }
 
-func (*stubEndpoint) AddHeader(stack.PacketBufferPtr) {}
+func (*stubEndpoint) AddHeader(*stack.PacketBuffer) {}
 
-func (*stubEndpoint) ParseHeader(stack.PacketBufferPtr) bool { return true }
+func (*stubEndpoint) ParseHeader(*stack.PacketBuffer) bool { return true }
 
 func (e *stubEndpoint) WritePackets(pkts stack.PacketBufferList) (int, tcpip.Error) {
 	i := 0
@@ -200,7 +200,7 @@ func (e *stubEndpoint) release() {
 	}
 }
 
-func (e *stubEndpoint) getPacket() stack.PacketBufferPtr {
+func (e *stubEndpoint) getPacket() *stack.PacketBuffer {
 	select {
 	case pkt := <-e.c:
 		return pkt
@@ -212,13 +212,13 @@ func (e *stubEndpoint) getPacket() stack.PacketBufferPtr {
 func makeStubEndpoint(linkAddr tcpip.LinkAddress, size int) stubEndpoint {
 	return stubEndpoint{
 		linkAddr: linkAddr,
-		c:        make(chan stack.PacketBufferPtr, size),
+		c:        make(chan *stack.PacketBuffer, size),
 	}
 }
 
 // Raises a failure if `pkt` is nil or does not contain an Ethernet header with
 // matching fields.
-func expectPacket(t *testing.T, name string, pkt stack.PacketBufferPtr, wantSrc, wantDst tcpip.LinkAddress, wantProto tcpip.NetworkProtocolNumber, wantData []byte, wantPktType tcpip.PacketType) {
+func expectPacket(t *testing.T, name string, pkt *stack.PacketBuffer, wantSrc, wantDst tcpip.LinkAddress, wantProto tcpip.NetworkProtocolNumber, wantData []byte, wantPktType tcpip.PacketType) {
 	t.Helper()
 	if pkt == nil {
 		t.Errorf("%s: no packet received", name)
@@ -583,7 +583,7 @@ func TestBridge(t *testing.T) {
 				"s1": s1, "s2": s2, "sb": sb,
 			}
 
-			ep2.onWritePacket = func(pkt stack.PacketBufferPtr) {
+			ep2.onWritePacket = func(pkt *stack.PacketBuffer) {
 				i := 0
 				buf := pkt.Data().ToBuffer()
 				buf.Apply(func(view *buffer.View) {
@@ -784,7 +784,7 @@ var _ stack.LinkEndpoint = (*endpoint)(nil)
 // Make endpoints using `makePipe()`, not using endpoint literals.
 type endpoint struct {
 	stack.LinkEndpoint
-	onWritePacket func(stack.PacketBufferPtr)
+	onWritePacket func(*stack.PacketBuffer)
 }
 
 func (e *endpoint) WritePackets(pkts stack.PacketBufferList) (int, tcpip.Error) {

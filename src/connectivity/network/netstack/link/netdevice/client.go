@@ -166,7 +166,7 @@ func (c *Client) write(port network.PortId, pbList stack.PacketBufferList) (int,
 	return c.processWrite(port, pbList)
 }
 
-func (c *Client) prepareTxDescriptor(descriptorIndex uint16, port network.PortId, pkt stack.PacketBufferPtr) {
+func (c *Client) prepareTxDescriptor(descriptorIndex uint16, port network.PortId, pkt *stack.PacketBuffer) {
 	descriptor := c.getDescriptor(descriptorIndex)
 	// Reset descriptor to default values before filling it.
 	c.resetTxDescriptor(descriptor)
@@ -209,7 +209,7 @@ func (p *Port) WritePackets(pkts stack.PacketBufferList) (int, tcpip.Error) {
 	return p.client.write(p.portInfo.Id, pkts)
 }
 
-func (p *Port) WriteRawPacket(pkt stack.PacketBufferPtr) tcpip.Error {
+func (p *Port) WriteRawPacket(pkt *stack.PacketBuffer) tcpip.Error {
 	var pkts stack.PacketBufferList
 	pkts.PushBack(pkt)
 	// TODO(https://fxbug.dev/42167767): Frame type detection may not work for implementing
@@ -465,9 +465,9 @@ func (*Port) ARPHardwareType() header.ARPHardwareType {
 	return header.ARPHardwareNone
 }
 
-func (*Port) AddHeader(stack.PacketBufferPtr) {}
+func (*Port) AddHeader(*stack.PacketBuffer) {}
 
-func (*Port) ParseHeader(stack.PacketBufferPtr) bool { return true }
+func (*Port) ParseHeader(*stack.PacketBuffer) bool { return true }
 
 // GSOMaxSize implements stack.GSOEndpoint.
 func (*Port) GSOMaxSize() uint32 {

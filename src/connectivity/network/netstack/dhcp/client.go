@@ -91,7 +91,7 @@ type Client struct {
 	acquire              func(context.Context, *Client, string, *Info) (Config, error)
 	now                  func() time.Time
 	contextWithTimeout   func(context.Context, time.Duration) (context.Context, context.CancelFunc)
-	createPacketEndpoint func(*stack.Stack, bool, tcpip.NetworkProtocolNumber, *waiter.Queue) (tcpip.Endpoint, tcpip.Error)
+	createPacketEndpoint func(*stack.Stack, bool, tcpip.NetworkProtocolNumber, *waiter.Queue) tcpip.Endpoint
 }
 
 type PacketDiscardStats struct {
@@ -638,10 +638,7 @@ func acquire(ctx context.Context, c *Client, nicName string, info *Info) (Config
 	//
 	// This prevents us from receiving packets that arrive on interfaces different
 	// from the interface the client is performing DHCP on.
-	ep, err := c.createPacketEndpoint(c.stack, true /* cooked */, 0 /* netProto */, &c.wq)
-	if err != nil {
-		return Config{}, fmt.Errorf("packet.NewEndpoint(_, true, 0, _): %s", err)
-	}
+	ep := c.createPacketEndpoint(c.stack, true /* cooked */, 0 /* netProto */, &c.wq)
 	defer ep.Close()
 
 	recvOn := tcpip.FullAddress{
