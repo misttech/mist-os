@@ -84,31 +84,11 @@ class MockPwmServer final : public fidl::testing::WireTestBase<fuchsia_hardware_
   bool expect_enable_ = false;
 };
 
-class FakePwmInitDevice : public PwmInitDevice {
- public:
-  static std::unique_ptr<FakePwmInitDevice> Create(
-      fidl::WireSyncClient<fuchsia_hardware_pwm::Pwm> pwm,
-      fidl::ClientEnd<fuchsia_hardware_gpio::Gpio> wifi_gpio,
-      fidl::ClientEnd<fuchsia_hardware_gpio::Gpio> bt_gpio) {
-    fbl::AllocChecker ac;
-    auto device = fbl::make_unique_checked<FakePwmInitDevice>(
-        &ac, std::move(pwm), std::move(wifi_gpio), std::move(bt_gpio));
-    if (!ac.check()) {
-      zxlogf(ERROR, "%s: device object alloc failed", __func__);
-      return nullptr;
-    }
-    EXPECT_OK(device->Init());
-
-    return device;
-  }
-
-  explicit FakePwmInitDevice(fidl::WireSyncClient<fuchsia_hardware_pwm::Pwm> pwm,
-                             fidl::ClientEnd<fuchsia_hardware_gpio::Gpio> wifi_gpio,
-                             fidl::ClientEnd<fuchsia_hardware_gpio::Gpio> bt_gpio)
-      : PwmInitDevice(nullptr, std::move(pwm), std::move(wifi_gpio), std::move(bt_gpio)) {}
-};
-
 TEST(PwmInitDeviceTest, InitTest) {
+  fdf::Logger logger{"common-test", FUCHSIA_LOG_DEBUG, zx::socket{},
+                     fidl::WireClient<fuchsia_logger::LogSink>()};
+  fdf::Logger::SetGlobalInstance(&logger);
+
   async::Loop fidl_loop{&kAsyncLoopConfigNoAttachToCurrentThread};
   async_patterns::TestDispatcherBound<MockPwmServer> pwm{fidl_loop.dispatcher(), std::in_place};
   async_patterns::TestDispatcherBound<fake_gpio::FakeGpio> wifi_gpio{fidl_loop.dispatcher(),
@@ -120,6 +100,11 @@ TEST(PwmInitDeviceTest, InitTest) {
   auto pwm_client = pwm.SyncCall(&MockPwmServer::BindServer);
   auto wifi_gpio_client = wifi_gpio.SyncCall(&fake_gpio::FakeGpio::Connect);
   auto bt_gpio_client = bt_gpio.SyncCall(&fake_gpio::FakeGpio::Connect);
+  // Create a clock connection, but don't connect it to anything.
+  zx::result clock_endpoints = fidl::CreateEndpoints<fuchsia_hardware_clock::Clock>();
+  EXPECT_TRUE(clock_endpoints.is_ok());
+  fidl::ClientEnd<fuchsia_hardware_clock::Clock> clock(std::move(clock_endpoints->client));
+  clock_endpoints->server.Close(ZX_OK);
 
   pwm.SyncCall(&MockPwmServer::ExpectEnable);
   aml_pwm::mode_config two_timer = {
@@ -140,9 +125,9 @@ TEST(PwmInitDeviceTest, InitTest) {
                                                              sizeof(two_timer))};
   pwm.SyncCall(&MockPwmServer::ExpectSetConfig, init_cfg);
 
-  std::unique_ptr<FakePwmInitDevice> dev = FakePwmInitDevice::Create(
-      std::move(pwm_client), std::move(wifi_gpio_client), std::move(bt_gpio_client));
-  ASSERT_NOT_NULL(dev);
+  PwmInitDevice dev(std::move(clock), std::move(pwm_client), std::move(wifi_gpio_client),
+                    std::move(bt_gpio_client));
+  EXPECT_OK(dev.Init());
 
   ASSERT_EQ(1, wifi_gpio.SyncCall(&fake_gpio::FakeGpio::GetAltFunction));
   std::vector states = bt_gpio.SyncCall(&fake_gpio::FakeGpio::GetStateLog);
