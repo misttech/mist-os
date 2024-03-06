@@ -320,23 +320,6 @@ void BufferCollection::V2::WaitForAllBuffersAllocated(
   parent_.MaybeCompleteWaitForBuffersAllocated();
 }
 
-void BufferCollection::V2::WaitForAllBuffersAllocatedNew(
-    WaitForAllBuffersAllocatedNewCompleter::Sync& completer) {
-  TRACE_DURATION("gfx", "BufferCollection::V2::WaitForAllBuffersAllocatedNew", "this", this,
-                 "logical_buffer_collection", &parent_.logical_buffer_collection());
-
-  trace_async_id_t current_event_id = TRACE_NONCE();
-  if (!parent_.CommonWaitForAllBuffersAllocatedStage1(true, completer, &current_event_id)) {
-    return;
-  }
-
-  parent_.pending_wait_for_buffers_allocated_v2_new_.emplace_back(
-      std::make_pair(current_event_id, completer.ToAsync()));
-  // The allocation is a one-shot (once true, remains true) and may already be done, in which case
-  // this immediately completes txn.
-  parent_.MaybeCompleteWaitForBuffersAllocated();
-}
-
 template <typename Completer>
 bool BufferCollection::CommonCheckAllBuffersAllocatedStage1(
     Completer& completer, std::optional<fuchsia_sysmem2::Error>* result) {
@@ -916,39 +899,6 @@ void BufferCollection::MaybeCompleteWaitForBuffersAllocated() {
       txn.Reply(fit::error(*logical_allocation_result_->maybe_error));
     } else {
       fuchsia_sysmem2::BufferCollectionWaitForAllBuffersAllocatedResponse response;
-      response.buffer_collection_info() = std::move(v2);
-      txn.Reply(fit::ok(std::move(response)));
-    }
-    fidl::Status reply_status = txn.result_of_reply();
-    if (!reply_status.ok()) {
-      FailAsync(FROM_HERE, Error::kUnspecified,
-                "fuchsia_sysmem2::BufferCollectionWaitForBuffersAllocated "
-                "reply failed - status: %s",
-                reply_status.FormatDescription().c_str());
-      return;
-    }
-    // ~txn
-  }
-  while (!pending_wait_for_buffers_allocated_v2_new_.empty()) {
-    auto [async_id, txn] = std::move(pending_wait_for_buffers_allocated_v2_new_.front());
-    pending_wait_for_buffers_allocated_v2_new_.pop_front();
-
-    fuchsia_sysmem2::BufferCollectionInfo v2;
-    if (!logical_allocation_result_->maybe_error.has_value()) {
-      ZX_DEBUG_ASSERT(logical_allocation_result_->buffer_collection_info);
-      auto v2_result = CloneResultForSendingV2(*logical_allocation_result_->buffer_collection_info);
-      if (!v2_result.is_ok()) {
-        // FailAsync() already called.
-        return;
-      }
-      v2 = v2_result.take_value();
-    }
-    TRACE_ASYNC_END("gfx", "BufferCollection::WaitForAllBuffersAllocatedNew async", async_id,
-                    "this", this, "logical_buffer_collection", &logical_buffer_collection());
-    if (logical_allocation_result_->maybe_error.has_value()) {
-      txn.Reply(fit::error(*logical_allocation_result_->maybe_error));
-    } else {
-      fuchsia_sysmem2::BufferCollectionWaitForAllBuffersAllocatedNewResponse response;
       response.buffer_collection_info() = std::move(v2);
       txn.Reply(fit::ok(std::move(response)));
     }

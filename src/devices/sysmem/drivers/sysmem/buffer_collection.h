@@ -156,8 +156,6 @@ class BufferCollection : public Node {
     void SetConstraints(SetConstraintsRequest& request,
                         SetConstraintsCompleter::Sync& completer) override;
     void WaitForAllBuffersAllocated(WaitForAllBuffersAllocatedCompleter::Sync& completer) override;
-    void WaitForAllBuffersAllocatedNew(
-        WaitForAllBuffersAllocatedNewCompleter::Sync& completer) override;
     void CheckAllBuffersAllocated(CheckAllBuffersAllocatedCompleter::Sync& completer) override;
     void AttachToken(AttachTokenRequest& request, AttachTokenCompleter::Sync& completer) override;
     void AttachLifetimeTracking(AttachLifetimeTrackingRequest& request,
@@ -228,8 +226,6 @@ class BufferCollection : public Node {
       pending_wait_for_buffers_allocated_v1_;
   std::list<std::pair</*async_id*/ uint64_t, V2::WaitForAllBuffersAllocatedCompleter::Async>>
       pending_wait_for_buffers_allocated_v2_;
-  std::list<std::pair</*async_id*/ uint64_t, V2::WaitForAllBuffersAllocatedNewCompleter::Async>>
-      pending_wait_for_buffers_allocated_v2_new_;
   std::optional<fidl::ServerBindingRef<fuchsia_sysmem::BufferCollection>> server_binding_v1_;
   std::optional<fidl::ServerBindingRef<fuchsia_sysmem2::BufferCollection>> server_binding_v2_;
 

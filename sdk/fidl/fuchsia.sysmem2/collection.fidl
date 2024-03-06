@@ -767,15 +767,7 @@ open protocol BufferCollection {
     ///   error code if there aren't enough buffers in the pre-existing
     ///   collection to satisfy the constraints set on the attached token and
     ///   any sub-tree of tokens derived from the attached token.
-    //
-    // TODO(b/316646315): After soft migration, we'll be left with
-    // WaitForAllBuffersAllocated that returns Error.
-    @selector("fuchsia.sysmem2/BufferCollection.WaitForAllBuffersAllocatedDeprecated")
     flexible WaitForAllBuffersAllocated() -> (resource table {
-        1: buffer_collection_info BufferCollectionInfo;
-    }) error Error;
-    @selector("fuchsia.sysmem2/BufferCollection.WaitForAllBuffersAllocated")
-    flexible WaitForAllBuffersAllocatedNew() -> (resource table {
         1: buffer_collection_info BufferCollectionInfo;
     }) error Error;
 
