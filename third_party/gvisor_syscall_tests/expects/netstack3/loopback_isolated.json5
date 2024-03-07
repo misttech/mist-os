@@ -29,21 +29,6 @@
                 "All/SocketInetLoopbackIsolatedTest.TCPLinger2TimeoutAfterClose/ListenV6Any_ConnectV4MappedLoopback",
                 "All/SocketInetLoopbackIsolatedTest.TCPLinger2TimeoutAfterClose/ListenV6Loopback_ConnectV6Any",
                 "All/SocketInetLoopbackIsolatedTest.TCPLinger2TimeoutAfterClose/ListenV6Loopback_ConnectV6Loopback",
-
-                // TODO(https://issues.fuchsia.dev/42085913): Support time wait
-                // reuse for dual stack sockets.
-                "All/SocketInetLoopbackIsolatedTest.TCPPassiveCloseNoTimeWaitReuseTest/ListenV4MappedAny_ConnectV4Any",
-                "All/SocketInetLoopbackIsolatedTest.TCPPassiveCloseNoTimeWaitReuseTest/ListenV4MappedAny_ConnectV4Loopback",
-                "All/SocketInetLoopbackIsolatedTest.TCPPassiveCloseNoTimeWaitReuseTest/ListenV4MappedAny_ConnectV4MappedAny",
-                "All/SocketInetLoopbackIsolatedTest.TCPPassiveCloseNoTimeWaitReuseTest/ListenV4MappedAny_ConnectV4MappedLoopback",
-                "All/SocketInetLoopbackIsolatedTest.TCPPassiveCloseNoTimeWaitReuseTest/ListenV4MappedLoopback_ConnectV4Any",
-                "All/SocketInetLoopbackIsolatedTest.TCPPassiveCloseNoTimeWaitReuseTest/ListenV4MappedLoopback_ConnectV4Loopback",
-                "All/SocketInetLoopbackIsolatedTest.TCPPassiveCloseNoTimeWaitReuseTest/ListenV4MappedLoopback_ConnectV4MappedAny",
-                "All/SocketInetLoopbackIsolatedTest.TCPPassiveCloseNoTimeWaitReuseTest/ListenV4MappedLoopback_ConnectV4MappedLoopback",
-                "All/SocketInetLoopbackIsolatedTest.TCPPassiveCloseNoTimeWaitReuseTest/ListenV6Any_ConnectV4Any",
-                "All/SocketInetLoopbackIsolatedTest.TCPPassiveCloseNoTimeWaitReuseTest/ListenV6Any_ConnectV4Loopback",
-                "All/SocketInetLoopbackIsolatedTest.TCPPassiveCloseNoTimeWaitReuseTest/ListenV6Any_ConnectV4MappedAny",
-                "All/SocketInetLoopbackIsolatedTest.TCPPassiveCloseNoTimeWaitReuseTest/ListenV6Any_ConnectV4MappedLoopback",
             ],
         },
         {

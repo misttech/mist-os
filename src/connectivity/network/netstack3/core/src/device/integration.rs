@@ -35,7 +35,7 @@ use crate::{
         queue::tx::TransmitQueueHandler,
         socket,
         state::{DeviceStateSpec, IpLinkDeviceState},
-        AnyDevice, BaseDeviceId, Device, DeviceCollectionContext, DeviceCounters, DeviceId,
+        AnyDevice, BaseDeviceId, DeviceCollectionContext, DeviceCounters, DeviceId,
         DeviceIdContext, DeviceLayerEventDispatcher, DeviceLayerState, DeviceLayerTypes, Devices,
         DevicesIter, EthernetDeviceCounters, EthernetDeviceId, EthernetPrimaryDeviceId,
         EthernetWeakDeviceId, Ipv6DeviceLinkLayerAddr, OriginTracker, OriginTrackerContext,

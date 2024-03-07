@@ -140,6 +140,24 @@ pub trait DualStackIpExt: crate::socket::DualStackIpExt {
     fn get_bound_info<D: device::WeakId>(
         listener_addr: &ListenerAddr<Self::ListenerIpAddr, D>,
     ) -> BoundInfo<Self::Addr, D>;
+
+    fn cancel_timer_with_demux_id<
+        BC: TcpBindingsContext<Self, D> + TcpBindingsContext<Self::OtherVersion, D>,
+        D: device::WeakId,
+    >(
+        bindings_ctx: &mut BC,
+        demux_id: &Self::DemuxSocketId<D, BC>,
+    ) -> Option<BC::Instant>;
+
+    fn destroy_socket_with_demux_id<
+        CC: TcpContext<Self, BC> + TcpContext<Self::OtherVersion, BC>,
+        BC: TcpBindingsContext<Self, CC::WeakDeviceId>
+            + TcpBindingsContext<Self::OtherVersion, CC::WeakDeviceId>,
+    >(
+        core_ctx: &mut CC,
+        bindings_ctx: &mut BC,
+        demux_id: Self::DemuxSocketId<CC::WeakDeviceId, BC>,
+    );
 }
 
 impl DualStackIpExt for Ipv4 {
@@ -193,6 +211,34 @@ impl DualStackIpExt for Ipv4 {
         listener_addr: &ListenerAddr<Self::ListenerIpAddr, D>,
     ) -> BoundInfo<Self::Addr, D> {
         listener_addr.clone().into()
+    }
+
+    fn cancel_timer_with_demux_id<
+        BC: TcpBindingsContext<Self, D> + TcpBindingsContext<Self::OtherVersion, D>,
+        D: device::WeakId,
+    >(
+        bindings_ctx: &mut BC,
+        demux_id: &Self::DemuxSocketId<D, BC>,
+    ) -> Option<BC::Instant> {
+        match demux_id {
+            EitherStack::ThisStack(id) => bindings_ctx.cancel_timer(id.downgrade()),
+            EitherStack::OtherStack(id) => bindings_ctx.cancel_timer(id.downgrade()),
+        }
+    }
+
+    fn destroy_socket_with_demux_id<
+        CC: TcpContext<Self, BC> + TcpContext<Self::OtherVersion, BC>,
+        BC: TcpBindingsContext<Self, CC::WeakDeviceId>
+            + TcpBindingsContext<Self::OtherVersion, CC::WeakDeviceId>,
+    >(
+        core_ctx: &mut CC,
+        bindings_ctx: &mut BC,
+        demux_id: Self::DemuxSocketId<CC::WeakDeviceId, BC>,
+    ) {
+        match demux_id {
+            EitherStack::ThisStack(id) => destroy_socket(core_ctx, bindings_ctx, id),
+            EitherStack::OtherStack(id) => destroy_socket(core_ctx, bindings_ctx, id),
+        }
     }
 }
 
@@ -298,6 +344,28 @@ impl DualStackIpExt for Ipv6 {
                 BoundInfo { addr: None, port: *local_port, device: device.clone() }
             }
         }
+    }
+
+    fn cancel_timer_with_demux_id<
+        BC: TcpBindingsContext<Self, D> + TcpBindingsContext<Self::OtherVersion, D>,
+        D: device::WeakId,
+    >(
+        bindings_ctx: &mut BC,
+        demux_id: &Self::DemuxSocketId<D, BC>,
+    ) -> Option<BC::Instant> {
+        bindings_ctx.cancel_timer(demux_id.downgrade())
+    }
+
+    fn destroy_socket_with_demux_id<
+        CC: TcpContext<Self, BC> + TcpContext<Self::OtherVersion, BC>,
+        BC: TcpBindingsContext<Self, CC::WeakDeviceId>
+            + TcpBindingsContext<Self::OtherVersion, CC::WeakDeviceId>,
+    >(
+        core_ctx: &mut CC,
+        bindings_ctx: &mut BC,
+        demux_id: Self::DemuxSocketId<CC::WeakDeviceId, BC>,
+    ) {
+        destroy_socket(core_ctx, bindings_ctx, demux_id)
     }
 }
 
