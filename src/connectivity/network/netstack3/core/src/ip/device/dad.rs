@@ -516,7 +516,7 @@ mod tests {
     }
 
     type FakeBindingsCtxImpl =
-        FakeBindingsCtx<DadTimerId<FakeDeviceId>, DadEvent<FakeDeviceId>, ()>;
+        FakeBindingsCtx<DadTimerId<FakeDeviceId>, DadEvent<FakeDeviceId>, (), ()>;
 
     type FakeCoreCtxImpl = FakeCoreCtx<FakeDadContext, DadMessageMeta, FakeDeviceId>;
 

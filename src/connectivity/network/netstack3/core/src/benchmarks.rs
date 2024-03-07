@@ -11,6 +11,8 @@
 #![warn(dead_code, unused_imports, unused_macros)]
 
 use alloc::vec;
+#[cfg(debug_assertions)]
+use assert_matches::assert_matches;
 
 use net_types::{ip::Ipv4, Witness as _};
 use packet::{Buf, InnerPacketBuilder, Serializer};
@@ -94,13 +96,7 @@ fn bench_forward_minimum<B: Bencher>(b: &mut B, frame_size: usize) {
         buf[ETHERNET_HDR_LEN_NO_TAG + IPV4_CHECKSUM_OFFSET + 1],
     ];
 
-    #[cfg(debug_assertions)]
-    let mut iters = 0;
     b.iter(|| {
-        #[cfg(debug_assertions)]
-        {
-            iters += 1;
-        }
         black_box(ctx.core_api().device::<EthernetLinkDevice>().receive_frame(
             black_box(RecvEthernetFrameMeta { device_id: eth_device.clone() }),
             black_box(Buf::new(&mut buf[..], range.clone())),
@@ -108,7 +104,7 @@ fn bench_forward_minimum<B: Bencher>(b: &mut B, frame_size: usize) {
 
         #[cfg(debug_assertions)]
         {
-            assert_eq!(ctx.bindings_ctx.frames_sent().len(), iters);
+            assert_matches!(&ctx.bindings_ctx.take_ethernet_frames()[..], [_frame]);
         }
 
         // Since we modified the buffer in-place, it now has the wrong source

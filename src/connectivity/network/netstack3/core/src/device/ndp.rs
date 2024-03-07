@@ -170,8 +170,9 @@ mod tests {
             SendIpPacketMeta,
         },
         testutil::{
-            assert_empty, set_logger_for_test, Ctx, FakeBindingsCtx, FakeEventDispatcherBuilder,
-            TestIpExt, DEFAULT_INTERFACE_METRIC, FAKE_CONFIG_V6, IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
+            assert_empty, set_logger_for_test, Ctx, DispatchedFrame, FakeBindingsCtx,
+            FakeEventDispatcherBuilder, TestIpExt, DEFAULT_INTERFACE_METRIC, FAKE_CONFIG_V6,
+            IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
         },
         time::TimerIdInner,
         Instant, TimerId,
@@ -261,11 +262,7 @@ mod tests {
         FakeNetwork<
             &'static str,
             crate::testutil::FakeCtx,
-            impl FakeNetworkLinks<
-                EthernetWeakDeviceId<FakeBindingsCtx>,
-                EthernetDeviceId<FakeBindingsCtx>,
-                &'static str,
-            >,
+            impl FakeNetworkLinks<DispatchedFrame, EthernetDeviceId<FakeBindingsCtx>, &'static str>,
         >,
         EthernetDeviceId<FakeBindingsCtx>,
         EthernetDeviceId<FakeBindingsCtx>,
@@ -351,7 +348,7 @@ mod tests {
                     AddrSubnet::new(remote_ip().into(), 128).unwrap(),
                 )
                 .unwrap();
-            assert_empty(ctx.bindings_ctx.frames_sent().iter());
+            assert_matches!(ctx.bindings_ctx.copy_ethernet_frames()[..], []);
         });
         net.with_context("local", |mut ctx| {
             ctx.core_api()
@@ -362,7 +359,7 @@ mod tests {
                 )
                 .unwrap();
             let Ctx { core_ctx, bindings_ctx } = &mut ctx;
-            assert_empty(bindings_ctx.frames_sent().iter());
+            assert_matches!(bindings_ctx.copy_ethernet_frames()[..], []);
 
             crate::ip::send_ip_packet_from_device::<Ipv6, _, _, _>(
                 &mut core_ctx.context(),
@@ -381,7 +378,7 @@ mod tests {
             .unwrap();
             // This should've triggered a neighbor solicitation to come out of
             // local.
-            assert_eq!(bindings_ctx.frames_sent().len(), 1);
+            assert_matches!(&bindings_ctx.copy_ethernet_frames()[..], [_frame]);
             // A timer should've been started.
             assert_eq!(bindings_ctx.timer_ctx().timers().len(), 1);
         });
@@ -392,7 +389,7 @@ mod tests {
             1,
             "remote received solicitation"
         );
-        assert_eq!(net.bindings_ctx("remote").frames_sent().len(), 1);
+        assert_matches!(&net.bindings_ctx("remote").copy_ethernet_frames()[..], [_frame]);
 
         // Forward advertisement response back to local.
         let _: StepResult = net.step();
@@ -406,7 +403,7 @@ mod tests {
         // Upon link layer resolution, the original ping request should've been
         // sent out.
         net.with_context("local", |Ctx { core_ctx: _, bindings_ctx }| {
-            assert_eq!(bindings_ctx.frames_sent().len(), 1);
+            assert_matches!(&bindings_ctx.copy_ethernet_frames()[..], [_frame]);
         });
         let _: StepResult = net.step();
         assert_eq!(
@@ -475,7 +472,7 @@ mod tests {
                 .device_ip::<Ipv6>()
                 .update_configuration(&local_device_id, update)
                 .unwrap();
-            assert_eq!(ctx.bindings_ctx.frames_sent().len(), 1);
+            assert_matches!(&ctx.bindings_ctx.copy_ethernet_frames()[..], [_frame]);
         });
         net.with_context("remote", |ctx| {
             let _: Ipv6DeviceConfigurationUpdate = ctx
@@ -483,7 +480,7 @@ mod tests {
                 .device_ip::<Ipv6>()
                 .update_configuration(&remote_device_id, update)
                 .unwrap();
-            assert_eq!(ctx.bindings_ctx.frames_sent().len(), 1);
+            assert_matches!(&ctx.bindings_ctx.copy_ethernet_frames()[..], [_frame]);
         });
 
         // Both devices should be in the solicited-node multicast group.
@@ -796,8 +793,11 @@ mod tests {
         });
         // The local host should have sent out 3 packets while the remote one
         // should only have sent out 1.
-        assert_eq!(net.bindings_ctx("local").frames_sent().len(), 3);
-        assert_eq!(net.bindings_ctx("remote").frames_sent().len(), 1);
+        assert_matches!(
+            &net.bindings_ctx("local").copy_ethernet_frames()[..],
+            [_frame1, _frame2, _frame3]
+        );
+        assert_matches!(&net.bindings_ctx("remote").copy_ethernet_frames()[..], [_frame1]);
 
         let _: StepResult = net.step();
 
@@ -869,7 +869,7 @@ mod tests {
         let dev_id = eth_dev_id.clone().into();
         crate::device::testutil::enable_device(&mut ctx, &dev_id);
 
-        assert_empty(ctx.bindings_ctx.frames_sent().iter());
+        assert_matches!(ctx.bindings_ctx.take_ethernet_frames()[..], []);
 
         let _: Ipv6DeviceConfigurationUpdate = ctx
             .core_api()
@@ -895,12 +895,12 @@ mod tests {
             .unwrap();
 
         assert_matches!(get_address_assigned(&ctx, &dev_id, local_ip()), Some(false));
-        assert_eq!(ctx.bindings_ctx.frames_sent().len(), 1);
+        assert_matches!(&ctx.bindings_ctx.take_ethernet_frames()[..], [_frame]);
 
         // Send another NS.
         let local_timer_id = dad_timer_id(eth_dev_id.clone(), local_ip());
         assert_eq!(ctx.trigger_timers_for(Duration::from_secs(1)), [local_timer_id.clone()]);
-        assert_eq!(ctx.bindings_ctx.frames_sent().len(), 2);
+        assert_matches!(&ctx.bindings_ctx.take_ethernet_frames()[..], [_frame]);
 
         // Add another IP
         ctx.core_api()
@@ -909,7 +909,7 @@ mod tests {
             .unwrap();
         assert_matches!(get_address_assigned(&ctx, &dev_id, local_ip()), Some(false));
         assert_matches!(get_address_assigned(&ctx, &dev_id, remote_ip()), Some(false));
-        assert_eq!(ctx.bindings_ctx.frames_sent().len(), 3);
+        assert_matches!(&ctx.bindings_ctx.take_ethernet_frames()[..], [_frame]);
 
         // Run to the end for DAD for local ip
         let remote_timer_id = dad_timer_id(eth_dev_id, remote_ip());
@@ -924,13 +924,13 @@ mod tests {
         );
         assert_eq!(get_address_assigned(&ctx, &dev_id, local_ip()), Some(true));
         assert_matches!(get_address_assigned(&ctx, &dev_id, remote_ip()), Some(false));
-        assert_eq!(ctx.bindings_ctx.frames_sent().len(), 6);
+        assert_matches!(&ctx.bindings_ctx.take_ethernet_frames()[..], [_frame1, _frame2, _frame3]);
 
         // Run to the end for DAD for local ip
         assert_eq!(ctx.trigger_timers_for(Duration::from_secs(1)), [remote_timer_id]);
         assert_eq!(get_address_assigned(&ctx, &dev_id, local_ip()), Some(true));
         assert_eq!(get_address_assigned(&ctx, &dev_id, remote_ip()), Some(true));
-        assert_eq!(ctx.bindings_ctx.frames_sent().len(), 6);
+        assert_matches!(ctx.bindings_ctx.take_ethernet_frames()[..], []);
 
         // No more timers.
         assert_eq!(ctx.trigger_next_timer(), None);
@@ -968,7 +968,7 @@ mod tests {
             )
             .unwrap();
 
-        assert_empty(ctx.bindings_ctx.frames_sent().iter());
+        assert_matches!(ctx.bindings_ctx.take_ethernet_frames()[..], []);
 
         // Add an IP.
         ctx.core_api()
@@ -976,12 +976,12 @@ mod tests {
             .add_ip_addr_subnet(&dev_id, AddrSubnet::new(local_ip().into(), 128).unwrap())
             .unwrap();
         assert_matches!(get_address_assigned(&ctx, &dev_id, local_ip()), Some(false));
-        assert_eq!(ctx.bindings_ctx.frames_sent().len(), 1);
+        assert_matches!(&ctx.bindings_ctx.take_ethernet_frames()[..], [_frame]);
 
         // Send another NS.
         let local_timer_id = dad_timer_id(eth_dev_id.clone(), local_ip());
         assert_eq!(ctx.trigger_timers_for(Duration::from_secs(1)), [local_timer_id.clone()]);
-        assert_eq!(ctx.bindings_ctx.frames_sent().len(), 2);
+        assert_matches!(&ctx.bindings_ctx.take_ethernet_frames()[..], [_frame]);
 
         // Add another IP
         ctx.core_api()
@@ -990,7 +990,7 @@ mod tests {
             .unwrap();
         assert_matches!(get_address_assigned(&ctx, &dev_id, local_ip()), Some(false));
         assert_matches!(get_address_assigned(&ctx, &dev_id, remote_ip()), Some(false));
-        assert_eq!(ctx.bindings_ctx.frames_sent().len(), 3);
+        assert_matches!(&ctx.bindings_ctx.take_ethernet_frames()[..], [_frame]);
 
         // Run 1s
         let remote_timer_id = dad_timer_id(eth_dev_id, remote_ip());
@@ -1000,7 +1000,7 @@ mod tests {
         );
         assert_matches!(get_address_assigned(&ctx, &dev_id, local_ip()), Some(false));
         assert_matches!(get_address_assigned(&ctx, &dev_id, remote_ip()), Some(false));
-        assert_eq!(ctx.bindings_ctx.frames_sent().len(), 5);
+        assert_matches!(&ctx.bindings_ctx.take_ethernet_frames()[..], [_frame1, _frame2]);
 
         // Remove local ip
         ctx.core_api()
@@ -1009,7 +1009,7 @@ mod tests {
             .unwrap();
         assert_eq!(get_address_assigned(&ctx, &dev_id, local_ip()), None);
         assert_matches!(get_address_assigned(&ctx, &dev_id, remote_ip()), Some(false));
-        assert_eq!(ctx.bindings_ctx.frames_sent().len(), 5);
+        assert_matches!(ctx.bindings_ctx.take_ethernet_frames()[..], []);
 
         // Run to the end for DAD for local ip
         assert_eq!(
@@ -1018,7 +1018,7 @@ mod tests {
         );
         assert_eq!(get_address_assigned(&ctx, &dev_id, local_ip()), None);
         assert_eq!(get_address_assigned(&ctx, &dev_id, remote_ip()), Some(true));
-        assert_eq!(ctx.bindings_ctx.frames_sent().len(), 6);
+        assert_matches!(&ctx.bindings_ctx.take_ethernet_frames()[..], [_frame]);
 
         // No more timers.
         assert_eq!(ctx.trigger_next_timer(), None);
@@ -1140,7 +1140,6 @@ mod tests {
             ctx: &mut crate::testutil::FakeCtx,
             device_id: &DeviceId<crate::testutil::FakeBindingsCtx>,
             hop_limit: u8,
-            frame_offset: usize,
         ) {
             let config = Ipv6::FAKE_CONFIG;
             let src_ip = config.remote_mac.to_ipv6_link_local().addr();
@@ -1184,12 +1183,10 @@ mod tests {
                 Buf::new(vec![0; 10], ..),
             )
             .unwrap();
-            let frames = bindings_ctx.frames_sent();
-            let (buf, _, _, _) = parse_ethernet_frame(
-                &frames[frame_offset].1[..],
-                EthernetFrameLengthCheck::NoCheck,
-            )
-            .unwrap();
+            let frames = bindings_ctx.take_ethernet_frames();
+            let (_dev, frame) = assert_matches!(&frames[..], [frame] => frame);
+            let (buf, _, _, _) =
+                parse_ethernet_frame(&frame[..], EthernetFrameLengthCheck::NoCheck).unwrap();
             // Packet's hop limit should be 100.
             assert_eq!(buf[7], hop_limit);
         }
@@ -1199,10 +1196,10 @@ mod tests {
         let device_id: DeviceId<_> = device_ids[0].clone().into();
 
         // Set hop limit to 100.
-        inner_test(&mut ctx, &device_id, 100, 0);
+        inner_test(&mut ctx, &device_id, 100);
 
         // Set hop limit to 30.
-        inner_test(&mut ctx, &device_id, 30, 1);
+        inner_test(&mut ctx, &device_id, 30);
     }
 
     #[test]
@@ -1335,7 +1332,7 @@ mod tests {
 
         let fake_config = Ipv6::FAKE_CONFIG;
         let mut ctx = crate::testutil::FakeCtx::default();
-        assert_empty(ctx.bindings_ctx.frames_sent().iter());
+        assert_matches!(ctx.bindings_ctx.take_ethernet_frames()[..], []);
         let eth_device_id =
             ctx.core_api().device::<EthernetLinkDevice>().add_device_with_default_state(
                 EthernetCreationProperties {
@@ -1365,17 +1362,18 @@ mod tests {
                 },
             )
             .unwrap();
-        assert_empty(ctx.bindings_ctx.frames_sent().iter());
+        assert_matches!(ctx.bindings_ctx.take_ethernet_frames()[..], []);
 
         let time = ctx.bindings_ctx.now();
         assert_eq!(ctx.trigger_next_timer().unwrap(), rs_timer_id(eth_device_id.clone()));
         // Initial router solicitation should be a random delay between 0 and
         // `MAX_RTR_SOLICITATION_DELAY`.
         assert!(ctx.bindings_ctx.now().duration_since(time) < MAX_RTR_SOLICITATION_DELAY);
-        assert_eq!(ctx.bindings_ctx.frames_sent().len(), 1);
+        let frames = ctx.bindings_ctx.take_ethernet_frames();
+        let (_dev, frame) = assert_matches!(&frames[..], [frame] => frame);
         let (src_mac, _, src_ip, _, _, message, code) =
             parse_icmp_packet_in_ip_packet_in_ethernet_frame::<Ipv6, _, RouterSolicitation, _>(
-                &ctx.bindings_ctx.frames_sent()[0].1,
+                &frame,
                 EthernetFrameLengthCheck::NoCheck,
                 |_| {},
             )
@@ -1386,9 +1384,11 @@ mod tests {
         let time = ctx.bindings_ctx.now();
         assert_eq!(ctx.trigger_next_timer().unwrap(), rs_timer_id(eth_device_id.clone()));
         assert_eq!(ctx.bindings_ctx.now().duration_since(time), RTR_SOLICITATION_INTERVAL);
+        let frames = ctx.bindings_ctx.take_ethernet_frames();
+        let (_dev, frame) = assert_matches!(&frames[..], [frame] => frame);
         let (src_mac, _, src_ip, _, _, message, code) =
             parse_icmp_packet_in_ip_packet_in_ethernet_frame::<Ipv6, _, RouterSolicitation, _>(
-                &ctx.bindings_ctx.frames_sent()[1].1,
+                &frame,
                 EthernetFrameLengthCheck::NoCheck,
                 |_| {},
             )
@@ -1409,9 +1409,11 @@ mod tests {
         let time = ctx.bindings_ctx.now();
         assert_eq!(ctx.trigger_next_timer().unwrap(), rs_timer_id(eth_device_id));
         assert_eq!(ctx.bindings_ctx.now().duration_since(time), RTR_SOLICITATION_INTERVAL);
+        let frames = ctx.bindings_ctx.take_ethernet_frames();
+        let (_dev, frame) = assert_matches!(&frames[..], [frame] => frame);
         let (src_mac, _, src_ip, _, _, message, code) =
             parse_icmp_packet_in_ip_packet_in_ethernet_frame::<Ipv6, _, RouterSolicitation, _>(
-                &ctx.bindings_ctx.frames_sent()[2].1,
+                &frame,
                 EthernetFrameLengthCheck::NoCheck,
                 |p| {
                     // We should have a source link layer option now because we
@@ -1430,10 +1432,10 @@ mod tests {
         // No more timers.
         assert_eq!(ctx.trigger_next_timer(), None);
         // Should have only sent 3 packets (Router solicitations).
-        assert_eq!(ctx.bindings_ctx.frames_sent().len(), 3);
+        assert_matches!(ctx.bindings_ctx.take_ethernet_frames()[..], []);
 
         let mut ctx = crate::testutil::FakeCtx::default();
-        assert_empty(ctx.bindings_ctx.frames_sent().iter());
+        assert_matches!(ctx.bindings_ctx.take_ethernet_frames()[..], []);
         let eth_device_id =
             ctx.core_api().device::<EthernetLinkDevice>().add_device_with_default_state(
                 EthernetCreationProperties {
@@ -1462,26 +1464,28 @@ mod tests {
                 },
             )
             .unwrap();
-        assert_empty(ctx.bindings_ctx.frames_sent().iter());
+        assert_matches!(ctx.bindings_ctx.take_ethernet_frames()[..], []);
 
         let time = ctx.bindings_ctx.now();
         assert_eq!(ctx.trigger_next_timer().unwrap(), rs_timer_id(eth_device_id.clone()));
         // Initial router solicitation should be a random delay between 0 and
         // `MAX_RTR_SOLICITATION_DELAY`.
         assert!(ctx.bindings_ctx.now().duration_since(time) < MAX_RTR_SOLICITATION_DELAY);
-        assert_eq!(ctx.bindings_ctx.frames_sent().len(), 1);
+        let frames = ctx.bindings_ctx.take_ethernet_frames();
+        let (_dev, frame1) = assert_matches!(&frames[..], [frame] => frame);
 
         // Should trigger 1 more router solicitations
         let time = ctx.bindings_ctx.now();
         assert_eq!(ctx.trigger_next_timer().unwrap(), rs_timer_id(eth_device_id));
         assert_eq!(ctx.bindings_ctx.now().duration_since(time), RTR_SOLICITATION_INTERVAL);
-        assert_eq!(ctx.bindings_ctx.frames_sent().len(), 2);
+        let frames = ctx.bindings_ctx.take_ethernet_frames();
+        let (_dev, frame2) = assert_matches!(&frames[..], [frame] => frame);
 
         // Each packet would be the same.
-        for f in ctx.bindings_ctx.frames_sent().iter() {
+        for f in [frame1, frame2] {
             let (src_mac, _, src_ip, _, _, message, code) =
                 parse_icmp_packet_in_ip_packet_in_ethernet_frame::<Ipv6, _, RouterSolicitation, _>(
-                    &f.1,
+                    &f,
                     EthernetFrameLengthCheck::NoCheck,
                     |_| {},
                 )
@@ -1508,7 +1512,7 @@ mod tests {
 
         let mut ctx = crate::testutil::FakeCtx::default();
 
-        assert_empty(ctx.bindings_ctx.frames_sent().iter());
+        assert_matches!(ctx.bindings_ctx.take_ethernet_frames()[..], []);
         assert_empty(ctx.bindings_ctx.timer_ctx().timers());
 
         let eth_device =
@@ -1541,17 +1545,18 @@ mod tests {
             rs_timer_id(device.clone().try_into().expect("expected ethernet ID"));
 
         // Send the first router solicitation.
-        assert_empty(ctx.bindings_ctx.frames_sent().iter());
+        assert_matches!(ctx.bindings_ctx.take_ethernet_frames()[..], []);
         ctx.bindings_ctx.timer_ctx().assert_timers_installed_range([(timer_id.clone(), ..)]);
 
         assert_eq!(ctx.trigger_next_timer().unwrap(), timer_id);
 
         // Should have sent a router solicitation and still have the timer
         // setup.
-        assert_eq!(ctx.bindings_ctx.frames_sent().len(), 1);
+        let frames = ctx.bindings_ctx.take_ethernet_frames();
+        let (_dev, frame) = assert_matches!(&frames[..], [frame] => frame);
         let (_, _dst_mac, _, _, _, _, _) =
             parse_icmp_packet_in_ip_packet_in_ethernet_frame::<Ipv6, _, RouterSolicitation, _>(
-                &ctx.bindings_ctx.frames_sent()[0].1,
+                &frame,
                 EthernetFrameLengthCheck::NoCheck,
                 |_| {},
             )
@@ -1564,23 +1569,24 @@ mod tests {
 
         // Should have not sent any new packets, but unset the router
         // solicitation timer.
-        assert_eq!(ctx.bindings_ctx.frames_sent().len(), 1);
+        assert_matches!(ctx.bindings_ctx.take_ethernet_frames()[..], []);
         assert_empty(ctx.bindings_ctx.timer_ctx().timers().iter().filter(|x| &x.1 == &timer_id));
 
         // Unsetting routing should succeed.
         set_forwarding_enabled::<_, Ipv6>(&mut ctx, &device, false);
         assert!(!is_forwarding_enabled::<_, Ipv6>(&mut ctx, &device));
-        assert_eq!(ctx.bindings_ctx.frames_sent().len(), 1);
+        assert_matches!(ctx.bindings_ctx.take_ethernet_frames()[..], []);
         ctx.bindings_ctx.timer_ctx().assert_timers_installed_range([(timer_id.clone(), ..)]);
 
         // Send the first router solicitation after being turned into a host.
         assert_eq!(ctx.trigger_next_timer().unwrap(), timer_id);
 
         // Should have sent a router solicitation.
-        assert_eq!(ctx.bindings_ctx.frames_sent().len(), 2);
+        let frames = ctx.bindings_ctx.take_ethernet_frames();
+        let (_dev, frame) = assert_matches!(&frames[..], [frame] => frame);
         assert_matches!(
             parse_icmp_packet_in_ip_packet_in_ethernet_frame::<Ipv6, _, RouterSolicitation, _>(
-                &ctx.bindings_ctx.frames_sent()[1].1,
+                &frame,
                 EthernetFrameLengthCheck::NoCheck,
                 |_| {},
             ),
@@ -1614,7 +1620,7 @@ mod tests {
             )
             .into();
         crate::device::testutil::enable_device(&mut ctx, &device);
-        assert_empty(ctx.bindings_ctx.frames_sent().iter());
+        assert_matches!(ctx.bindings_ctx.take_ethernet_frames()[..], []);
         assert_empty(ctx.bindings_ctx.timer_ctx().timers());
 
         // Updating the IP should resolve immediately since DAD is turned off by
@@ -1626,7 +1632,7 @@ mod tests {
 
         let device_id = device.clone().try_into().unwrap();
         assert_eq!(get_address_assigned(&ctx, &device, local_ip()), Some(true));
-        assert_empty(ctx.bindings_ctx.frames_sent().iter());
+        assert_matches!(ctx.bindings_ctx.take_ethernet_frames()[..], []);
         assert_empty(ctx.bindings_ctx.timer_ctx().timers());
 
         // Enable DAD for the device.
@@ -1654,7 +1660,7 @@ mod tests {
             .unwrap();
         assert_eq!(get_address_assigned(&ctx, &device, local_ip()), Some(true));
         assert_eq!(get_address_assigned(&ctx, &device, remote_ip()), Some(false));
-        assert_eq!(ctx.bindings_ctx.frames_sent().len(), 1);
+        assert_matches!(&ctx.bindings_ctx.take_ethernet_frames()[..], [_frame]);
         assert_eq!(ctx.bindings_ctx.timer_ctx().timers().len(), 1);
 
         // Disable DAD during DAD.
@@ -1670,11 +1676,11 @@ mod tests {
         let expected_timer_id = dad_timer_id(device_id, remote_ip());
         // Allow already started DAD to complete (2 more more NS, 3 more timers).
         assert_eq!(ctx.trigger_next_timer().unwrap(), expected_timer_id);
-        assert_eq!(ctx.bindings_ctx.frames_sent().len(), 2);
+        assert_matches!(&ctx.bindings_ctx.take_ethernet_frames()[..], [_frame]);
         assert_eq!(ctx.trigger_next_timer().unwrap(), expected_timer_id);
-        assert_eq!(ctx.bindings_ctx.frames_sent().len(), 3);
+        assert_matches!(&ctx.bindings_ctx.take_ethernet_frames()[..], [_frame]);
         assert_eq!(ctx.trigger_next_timer().unwrap(), expected_timer_id);
-        assert_eq!(ctx.bindings_ctx.frames_sent().len(), 3);
+        assert_matches!(ctx.bindings_ctx.take_ethernet_frames()[..], []);
         assert_eq!(get_address_assigned(&ctx, &device, remote_ip()), Some(true));
 
         // Updating the IP should resolve immediately since DAD has just been

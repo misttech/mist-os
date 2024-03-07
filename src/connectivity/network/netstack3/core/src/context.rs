@@ -448,9 +448,9 @@ pub(crate) mod testutil {
 
     #[cfg(test)]
     use assert_matches::assert_matches;
-    #[cfg(test)]
     use derivative::Derivative;
 
+    use net_types::ip::IpVersion;
     use packet::Buf;
     use rand_xorshift::XorShiftRng;
 
@@ -459,11 +459,13 @@ pub(crate) mod testutil {
     use crate::device::EthernetDeviceId;
     use crate::{
         data_structures::ref_counted_hash_map::{RefCountedHashSet, RemoveResult},
-        device::{link::LinkDevice, EthernetWeakDeviceId},
+        device::{
+            link::LinkDevice, pure_ip::PureIpWeakDeviceId, DeviceLayerTypes, EthernetWeakDeviceId,
+        },
         filter::FilterBindingsTypes,
         ip::device::nud::{LinkResolutionContext, LinkResolutionNotifier},
         sync::Mutex,
-        testutil::FakeCryptoRng,
+        testutil::{DispatchedFrame, FakeCryptoRng},
     };
 
     pub use netstack3_base::testutil::{FakeInstant, FakeInstantCtx};
@@ -1079,23 +1081,35 @@ pub(crate) mod testutil {
         fn duration(&self, _: &'static CStr) {}
     }
 
+    /// A tuple of device ID and IP version.
+    #[derive(Derivative)]
+    #[derivative(Debug(bound = ""))]
+    pub struct PureIpDeviceAndIpVersion<BT: DeviceLayerTypes> {
+        pub(crate) device: PureIpWeakDeviceId<BT>,
+        pub(crate) version: IpVersion,
+    }
+
     /// A test helper used to provide an implementation of a bindings context.
-    pub(crate) struct FakeBindingsCtx<TimerId, Event: Debug, State> {
+    pub(crate) struct FakeBindingsCtx<TimerId, Event: Debug, State, FrameMeta> {
         pub(crate) rng: FakeCryptoRng<XorShiftRng>,
         pub(crate) timers: FakeTimerCtx<TimerId>,
         pub(crate) events: FakeEventCtx<Event>,
-        pub(crate) frames: FakeFrameCtx<EthernetWeakDeviceId<crate::testutil::FakeBindingsCtx>>,
+        pub(crate) frames: FakeFrameCtx<FrameMeta>,
         state: State,
     }
 
-    impl<TimerId, Event: Debug, State> ContextProvider for FakeBindingsCtx<TimerId, Event, State> {
+    impl<TimerId, Event: Debug, State, FrameMeta> ContextProvider
+        for FakeBindingsCtx<TimerId, Event, State, FrameMeta>
+    {
         type Context = Self;
         fn context(&mut self) -> &mut Self::Context {
             self
         }
     }
 
-    impl<TimerId, Event: Debug, State: Default> Default for FakeBindingsCtx<TimerId, Event, State> {
+    impl<TimerId, Event: Debug, State: Default, FrameMeta> Default
+        for FakeBindingsCtx<TimerId, Event, State, FrameMeta>
+    {
         fn default() -> Self {
             Self {
                 rng: FakeCryptoRng::new_xorshift(0),
@@ -1107,7 +1121,7 @@ pub(crate) mod testutil {
         }
     }
 
-    impl<TimerId, Event: Debug, State> FakeBindingsCtx<TimerId, Event, State> {
+    impl<TimerId, Event: Debug, State, FrameMeta> FakeBindingsCtx<TimerId, Event, State, FrameMeta> {
         /// Seed the testing RNG with a specific value.
         #[cfg(test)]
         pub(crate) fn seed_rng(&mut self, seed: u128) {
@@ -1139,16 +1153,7 @@ pub(crate) mod testutil {
             self.events.take()
         }
 
-        #[cfg(test)]
-        pub(crate) fn frames(
-            &self,
-        ) -> &[(EthernetWeakDeviceId<crate::testutil::FakeBindingsCtx>, Vec<u8>)] {
-            self.frames.frames()
-        }
-
-        pub(crate) fn frame_ctx_mut(
-            &mut self,
-        ) -> &mut FakeFrameCtx<EthernetWeakDeviceId<crate::testutil::FakeBindingsCtx>> {
+        pub(crate) fn frame_ctx_mut(&mut self) -> &mut FakeFrameCtx<FrameMeta> {
             &mut self.frames
         }
 
@@ -1161,11 +1166,15 @@ pub(crate) mod testutil {
         }
     }
 
-    impl<TimerId, Event: Debug, State> FilterBindingsTypes for FakeBindingsCtx<TimerId, Event, State> {
+    impl<TimerId, Event: Debug, State, FrameMeta> FilterBindingsTypes
+        for FakeBindingsCtx<TimerId, Event, State, FrameMeta>
+    {
         type DeviceClass = ();
     }
 
-    impl<TimerId, Event: Debug, State> RngContext for FakeBindingsCtx<TimerId, Event, State> {
+    impl<TimerId, Event: Debug, State, FrameMeta> RngContext
+        for FakeBindingsCtx<TimerId, Event, State, FrameMeta>
+    {
         type Rng<'a> = FakeCryptoRng<XorShiftRng> where Self: 'a;
 
         fn rng(&mut self) -> Self::Rng<'_> {
@@ -1173,26 +1182,32 @@ pub(crate) mod testutil {
         }
     }
 
-    impl<Id, Event: Debug, State> AsRef<FakeInstantCtx> for FakeBindingsCtx<Id, Event, State> {
+    impl<Id, Event: Debug, State, FrameMeta> AsRef<FakeInstantCtx>
+        for FakeBindingsCtx<Id, Event, State, FrameMeta>
+    {
         fn as_ref(&self) -> &FakeInstantCtx {
             self.timers.as_ref()
         }
     }
 
-    impl<Id, Event: Debug, State> AsRef<FakeTimerCtx<Id>> for FakeBindingsCtx<Id, Event, State> {
+    impl<Id, Event: Debug, State, FrameMeta> AsRef<FakeTimerCtx<Id>>
+        for FakeBindingsCtx<Id, Event, State, FrameMeta>
+    {
         fn as_ref(&self) -> &FakeTimerCtx<Id> {
             &self.timers
         }
     }
 
-    impl<Id, Event: Debug, State> AsMut<FakeTimerCtx<Id>> for FakeBindingsCtx<Id, Event, State> {
+    impl<Id, Event: Debug, State, FrameMeta> AsMut<FakeTimerCtx<Id>>
+        for FakeBindingsCtx<Id, Event, State, FrameMeta>
+    {
         fn as_mut(&mut self) -> &mut FakeTimerCtx<Id> {
             &mut self.timers
         }
     }
 
-    impl<Id: Debug + PartialEq, Event: Debug, State> TimerContext<Id>
-        for FakeBindingsCtx<Id, Event, State>
+    impl<Id: Debug + PartialEq, Event: Debug, State, FrameMeta> TimerContext<Id>
+        for FakeBindingsCtx<Id, Event, State, FrameMeta>
     {
         fn schedule_timer_instant(&mut self, time: FakeInstant, id: Id) -> Option<FakeInstant> {
             self.timers.schedule_timer_instant(time, id)
@@ -1211,25 +1226,31 @@ pub(crate) mod testutil {
         }
     }
 
-    impl<Id, Event: Debug, State> EventContext<Event> for FakeBindingsCtx<Id, Event, State> {
+    impl<Id, Event: Debug, State, FrameMeta> EventContext<Event>
+        for FakeBindingsCtx<Id, Event, State, FrameMeta>
+    {
         fn on_event(&mut self, event: Event) {
             self.events.on_event(event)
         }
     }
 
-    impl<Id, Event: Debug, State> TracingContext for FakeBindingsCtx<Id, Event, State> {
+    impl<Id, Event: Debug, State, FrameMeta> TracingContext
+        for FakeBindingsCtx<Id, Event, State, FrameMeta>
+    {
         type DurationScope = ();
 
         fn duration(&self, _: &'static CStr) {}
     }
 
-    impl<D: LinkDevice, Id, Event: Debug, State> LinkResolutionContext<D>
-        for FakeBindingsCtx<Id, Event, State>
+    impl<D: LinkDevice, Id, Event: Debug, State, FrameMeta> LinkResolutionContext<D>
+        for FakeBindingsCtx<Id, Event, State, FrameMeta>
     {
         type Notifier = FakeLinkResolutionNotifier<D>;
     }
 
-    impl<Id, Event: Debug, State> crate::ReferenceNotifiers for FakeBindingsCtx<Id, Event, State> {
+    impl<Id, Event: Debug, State, FrameMeta> crate::ReferenceNotifiers
+        for FakeBindingsCtx<Id, Event, State, FrameMeta>
+    {
         type ReferenceReceiver<T: 'static> = Never;
 
         type ReferenceNotifier<T: Send + 'static> = Never;
@@ -1306,8 +1327,8 @@ pub(crate) mod testutil {
     }
 
     #[cfg(test)]
-    impl<TimerId, Event: Debug, State> WithFakeTimerContext<TimerId>
-        for FakeBindingsCtx<TimerId, Event, State>
+    impl<TimerId, Event: Debug, State, FrameMeta> WithFakeTimerContext<TimerId>
+        for FakeBindingsCtx<TimerId, Event, State, FrameMeta>
     {
         fn with_fake_timer_ctx<O, F: FnOnce(&FakeTimerCtx<TimerId>) -> O>(&self, f: F) -> O {
             f(&self.timers)
@@ -1323,7 +1344,7 @@ pub(crate) mod testutil {
 
     #[cfg(test)]
     pub(crate) type FakeCtxWithCoreCtx<CC, TimerId, Event, BindingsCtxState> =
-        crate::testutil::ContextPair<CC, FakeBindingsCtx<TimerId, Event, BindingsCtxState>>;
+        crate::testutil::ContextPair<CC, FakeBindingsCtx<TimerId, Event, BindingsCtxState, ()>>;
 
     #[cfg(test)]
     pub(crate) type FakeCtx<S, TimerId, Meta, Event, DeviceId, BindingsCtxState> =
@@ -1532,13 +1553,13 @@ pub(crate) mod testutil {
     }
 
     #[cfg(test)]
-    impl<S, Id, Meta, Event: Debug, DeviceId, BindingsCtxState>
-        SendFrameContext<FakeBindingsCtx<Id, Event, BindingsCtxState>, Meta>
+    impl<S, Id, Meta, Event: Debug, DeviceId, BindingsCtxState, FrameMeta>
+        SendFrameContext<FakeBindingsCtx<Id, Event, BindingsCtxState, FrameMeta>, Meta>
         for FakeCoreCtx<S, Meta, DeviceId>
     {
         fn send_frame<SS>(
             &mut self,
-            bindings_ctx: &mut FakeBindingsCtx<Id, Event, BindingsCtxState>,
+            bindings_ctx: &mut FakeBindingsCtx<Id, Event, BindingsCtxState, FrameMeta>,
             metadata: Meta,
             frame: SS,
         ) -> Result<(), SS>
@@ -2017,30 +2038,27 @@ pub(crate) mod testutil {
         CtxId,
         crate::testutil::FakeCtx,
         impl FakeNetworkLinks<
-            EthernetWeakDeviceId<crate::testutil::FakeBindingsCtx>,
+            DispatchedFrame,
             EthernetDeviceId<crate::testutil::FakeBindingsCtx>,
             CtxId,
         >,
     > {
         let contexts = vec![(a_id, a), (b_id, b)].into_iter();
-        FakeNetwork::new(
-            contexts,
-            move |net, _device_id: EthernetWeakDeviceId<crate::testutil::FakeBindingsCtx>| {
-                if net == a_id {
-                    b_device_id
-                        .upgrade()
-                        .map(|device_id| (b_id, device_id, None))
-                        .into_iter()
-                        .collect::<Vec<_>>()
-                } else {
-                    a_device_id
-                        .upgrade()
-                        .map(|device_id| (a_id, device_id, None))
-                        .into_iter()
-                        .collect::<Vec<_>>()
-                }
-            },
-        )
+        FakeNetwork::new(contexts, move |net, _frame: DispatchedFrame| {
+            if net == a_id {
+                b_device_id
+                    .upgrade()
+                    .map(|device_id| (b_id, device_id, None))
+                    .into_iter()
+                    .collect::<Vec<_>>()
+            } else {
+                a_device_id
+                    .upgrade()
+                    .map(|device_id| (a_id, device_id, None))
+                    .into_iter()
+                    .collect::<Vec<_>>()
+            }
+        })
     }
 
     #[cfg(test)]
@@ -2084,12 +2102,12 @@ pub(crate) mod testutil {
         fn test_fake_timer_context() {
             // An implementation of `TimerContext` that uses `usize` timer IDs
             // and stores every timer in a `Vec`.
-            impl<M, E: Debug, D, S> TimerHandler<FakeBindingsCtx<usize, E, S>, usize>
+            impl<M, E: Debug, D, S, F> TimerHandler<FakeBindingsCtx<usize, E, S, F>, usize>
                 for FakeCoreCtx<Vec<(usize, FakeInstant)>, M, D>
             {
                 fn handle_timer(
                     &mut self,
-                    bindings_ctx: &mut FakeBindingsCtx<usize, E, S>,
+                    bindings_ctx: &mut FakeBindingsCtx<usize, E, S, F>,
                     id: usize,
                 ) {
                     let now = bindings_ctx.now();

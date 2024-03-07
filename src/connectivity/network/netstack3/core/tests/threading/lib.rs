@@ -298,7 +298,7 @@ fn neighbor_resolution_and_send_queued_packets_atomic<I: Ip + TestIpExt>() {
 
         // Expect the netstack to send a neighbor probe to resolve the link
         // address of the neighbor.
-        let frames = ctx.bindings_ctx.take_frames();
+        let frames = ctx.bindings_ctx.take_ethernet_frames();
         let (sent_device, frame) = assert_matches!(&frames[..], [frame] => frame);
         assert_eq!(sent_device, &device.downgrade());
         assert_eq!(frame, &I::make_neighbor_solicitation().into_inner());
@@ -334,7 +334,9 @@ fn neighbor_resolution_and_send_queued_packets_atomic<I: Ip + TestIpExt>() {
         resolve_neighbor.join().unwrap();
         queue_packet.join().unwrap();
 
-        for (i, (sent_device, frame)) in ctx.bindings_ctx.take_frames().into_iter().enumerate() {
+        for (i, (sent_device, frame)) in
+            ctx.bindings_ctx.take_ethernet_frames().into_iter().enumerate()
+        {
             assert_eq!(device, sent_device);
 
             let (mut body, src_mac, dst_mac, src_ip, dst_ip, proto, ttl) =

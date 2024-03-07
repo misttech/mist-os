@@ -3050,6 +3050,7 @@ fn receive_icmp_echo_reply<
 #[cfg(test)]
 mod tests {
     use alloc::{vec, vec::Vec};
+    use assert_matches::assert_matches;
     use core::{
         fmt::Debug,
         ops::{Deref, DerefMut},
@@ -3179,7 +3180,7 @@ mod tests {
         Wrapped<FakeIcmpInnerCoreCtxState<I, FakeWeakDeviceId<FakeDeviceId>>, FakeBufferCoreCtx>;
 
     /// `FakeBindingsCtx` specialized for ICMP.
-    type FakeIcmpBindingsCtx<I> = FakeBindingsCtx<(), (), FakeIcmpBindingsCtxState<I>>;
+    type FakeIcmpBindingsCtx<I> = FakeBindingsCtx<(), (), FakeIcmpBindingsCtxState<I>, ()>;
 
     /// A fake ICMP bindings and core contexts.
     ///
@@ -3471,10 +3472,12 @@ mod tests {
         }
 
         if let Some((expect_message, expect_code)) = expect_message_code {
-            assert_eq!(bindings_ctx.frames_sent().len(), 1);
+            let frames = bindings_ctx.take_ethernet_frames();
+            let (_dev, frame) = assert_matches!(&frames[..], [frame] => frame);
+            assert_eq!(frames.len(), 1);
             let (src_mac, dst_mac, src_ip, dst_ip, _, message, code) =
                 parse_icmp_packet_in_ip_packet_in_ethernet_frame::<I, _, M, _>(
-                    &bindings_ctx.frames_sent()[0].1,
+                    &frame,
                     EthernetFrameLengthCheck::NoCheck,
                     f,
                 )
@@ -3487,7 +3490,7 @@ mod tests {
             assert_eq!(message, expect_message);
             assert_eq!(code, expect_code);
         } else {
-            assert_empty(bindings_ctx.frames_sent().iter());
+            assert_matches!(bindings_ctx.take_ethernet_frames()[..], []);
         }
     }
 

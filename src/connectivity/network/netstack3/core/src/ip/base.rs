@@ -3115,7 +3115,7 @@ pub(crate) mod testutil {
     #[cfg(test)]
     impl<I: packet_formats::ip::IpExt, S, Id, Event: Debug, DeviceId, BindingsCtxState>
         crate::context::SendFrameContext<
-            crate::context::testutil::FakeBindingsCtx<Id, Event, BindingsCtxState>,
+            crate::context::testutil::FakeBindingsCtx<Id, Event, BindingsCtxState, ()>,
             SendIpPacketMeta<I, DeviceId, SpecifiedAddr<I::Addr>>,
         >
         for crate::context::testutil::FakeCoreCtx<S, DualStackSendIpPacketMeta<DeviceId>, DeviceId>
@@ -3126,6 +3126,7 @@ pub(crate) mod testutil {
                 Id,
                 Event,
                 BindingsCtxState,
+                (),
             >,
             metadata: SendIpPacketMeta<I, DeviceId, SpecifiedAddr<I::Addr>>,
             frame: SS,
@@ -3245,6 +3246,7 @@ pub(crate) mod testutil {
 #[cfg(test)]
 mod tests {
     use alloc::vec;
+    use assert_matches::assert_matches;
     use core::{num::NonZeroU16, time::Duration};
 
     use ip_test_macro::ip_test;
@@ -3306,15 +3308,12 @@ mod tests {
     /// frame in `net` is an ICMP packet with code set to `code`, and pointer
     /// set to `pointer`.
     fn verify_icmp_for_unrecognized_ext_hdr_option(
-        bindings_ctx: &mut FakeBindingsCtx,
         code: Icmpv6ParameterProblemCode,
         pointer: u32,
-        offset: usize,
+        packet: &[u8],
     ) {
         // Check the ICMP that bob attempted to send to alice
-        let device_frames = bindings_ctx.frames_sent();
-        assert!(!device_frames.is_empty());
-        let mut buffer = Buf::new(device_frames[offset].1.as_slice(), ..);
+        let mut buffer = Buf::new(packet, ..);
         let _frame =
             buffer.parse_with::<_, EthernetFrame<_>>(EthernetFrameLengthCheck::Check).unwrap();
         let packet = buffer.parse::<<Ipv6 as packet_formats::ip::IpExt>::Packet<_>>().unwrap();
@@ -3559,12 +3558,12 @@ mod tests {
             Some(FrameDestination::Individual { local: true }),
             buf,
         );
-        assert_eq!(ctx.bindings_ctx.frames_sent().len(), 1);
+        let frames = ctx.bindings_ctx.take_ethernet_frames();
+        let (_dev, frame) = assert_matches!(&frames[..], [frame] => frame);
         verify_icmp_for_unrecognized_ext_hdr_option(
-            &mut ctx.bindings_ctx,
             Icmpv6ParameterProblemCode::ErroneousHeaderField,
             42,
-            0,
+            &frame[..],
         );
     }
 
@@ -3592,7 +3591,7 @@ mod tests {
             expected_icmps
         );
         assert_eq!(ctx.core_ctx.ipv6.inner.counters.dispatch_receive_ip_packet.get(), 1);
-        assert_eq!(u64::try_from(ctx.bindings_ctx.frames_sent().len()).unwrap(), expected_icmps);
+        assert_matches!(ctx.bindings_ctx.take_ethernet_frames()[..], []);
 
         // Test with unrecognized option type set with
         // action = discard.
@@ -3607,7 +3606,7 @@ mod tests {
             ctx.core_ctx.inner_icmp_state::<Ipv6>().tx_counters.parameter_problem.get(),
             expected_icmps
         );
-        assert_eq!(u64::try_from(ctx.bindings_ctx.frames_sent().len()).unwrap(), expected_icmps);
+        assert_matches!(ctx.bindings_ctx.take_ethernet_frames()[..], []);
 
         // Test with unrecognized option type set with
         // action = discard & send icmp
@@ -3624,12 +3623,12 @@ mod tests {
             ctx.core_ctx.inner_icmp_state::<Ipv6>().tx_counters.parameter_problem.get(),
             expected_icmps
         );
-        assert_eq!(u64::try_from(ctx.bindings_ctx.frames_sent().len()).unwrap(), expected_icmps);
+        let frames = ctx.bindings_ctx.take_ethernet_frames();
+        let (_dev, frame) = assert_matches!(&frames[..], [frame] => frame);
         verify_icmp_for_unrecognized_ext_hdr_option(
-            &mut ctx.bindings_ctx,
             Icmpv6ParameterProblemCode::UnrecognizedIpv6Option,
             48,
-            usize::try_from(expected_icmps).unwrap() - 1,
+            &frame[..],
         );
 
         // Test with unrecognized option type set with
@@ -3647,12 +3646,13 @@ mod tests {
             ctx.core_ctx.inner_icmp_state::<Ipv6>().tx_counters.parameter_problem.get(),
             expected_icmps
         );
-        assert_eq!(u64::try_from(ctx.bindings_ctx.frames_sent().len()).unwrap(), expected_icmps);
+
+        let frames = ctx.bindings_ctx.take_ethernet_frames();
+        let (_dev, frame) = assert_matches!(&frames[..], [frame] => frame);
         verify_icmp_for_unrecognized_ext_hdr_option(
-            &mut ctx.bindings_ctx,
             Icmpv6ParameterProblemCode::UnrecognizedIpv6Option,
             48,
-            usize::try_from(expected_icmps).unwrap() - 1,
+            &frame[..],
         );
 
         // Test with unrecognized option type set with
@@ -3670,12 +3670,13 @@ mod tests {
             ctx.core_ctx.inner_icmp_state::<Ipv6>().tx_counters.parameter_problem.get(),
             expected_icmps
         );
-        assert_eq!(u64::try_from(ctx.bindings_ctx.frames_sent().len()).unwrap(), expected_icmps);
+
+        let frames = ctx.bindings_ctx.take_ethernet_frames();
+        let (_dev, frame) = assert_matches!(&frames[..], [frame] => frame);
         verify_icmp_for_unrecognized_ext_hdr_option(
-            &mut ctx.bindings_ctx,
             Icmpv6ParameterProblemCode::UnrecognizedIpv6Option,
             48,
-            usize::try_from(expected_icmps).unwrap() - 1,
+            &frame[..],
         );
 
         // Test with unrecognized option type set with
@@ -3693,7 +3694,7 @@ mod tests {
             ctx.core_ctx.inner_icmp_state::<Ipv6>().tx_counters.parameter_problem.get(),
             expected_icmps
         );
-        assert_eq!(u64::try_from(ctx.bindings_ctx.frames_sent().len()).unwrap(), expected_icmps);
+        assert_matches!(ctx.bindings_ctx.take_ethernet_frames()[..], []);
 
         // None of our tests should have sent an icmpv4 packet, or dispatched an
         // IP packet after the first.
@@ -3977,18 +3978,17 @@ mod tests {
         assert_eq!(core_ctx.ipv6.inner.counters.dispatch_receive_ip_packet.get(), 0);
         assert_eq!(core_ctx.inner_icmp_state::<Ipv6>().tx_counters.packet_too_big.get(), 1);
 
-        // Should have sent out one frame though.
-        assert_eq!(bindings_ctx.frames_sent().len(), 1);
-
-        // Received packet should be a Packet Too Big ICMP error message.
-        let buf = &bindings_ctx.frames_sent()[0].1[..];
+        // Should have sent out one frame, and the received packet should be a
+        // Packet Too Big ICMP error message.
+        let frames = bindings_ctx.take_ethernet_frames();
+        let (_dev, frame) = assert_matches!(&frames[..], [frame] => frame);
         // The original packet's TTL gets decremented so we decrement here
         // to validate the rest of the icmp message body.
         let ipv6_packet_buf_mut: &mut [u8] = ipv6_packet_buf.as_mut();
         ipv6_packet_buf_mut[7] -= 1;
         let (_, _, _, _, _, message, code) =
             parse_icmp_packet_in_ip_packet_in_ethernet_frame::<Ipv6, _, Icmpv6PacketTooBig, _>(
-                buf,
+                &frame[..],
                 EthernetFrameLengthCheck::NoCheck,
                 move |packet| {
                     // Size of the ICMP message body should be size of the
@@ -4361,7 +4361,7 @@ mod tests {
         // unrecognized so an ICMP parameter problem response SHOULD be sent,
         // but the netstack chooses to just drop the packet since we are not
         // required to send the ICMP response.
-        assert_empty(bindings_ctx.frames_sent().iter());
+        assert_matches!(bindings_ctx.take_ethernet_frames()[..], []);
     }
 
     #[test]
@@ -4399,15 +4399,15 @@ mod tests {
         // Should have dispatched the packet but resulted in an ICMP error.
         assert_eq!(ctx.core_ctx.ipv4.inner.counters.dispatch_receive_ip_packet.get(), 1);
         assert_eq!(ctx.core_ctx.inner_icmp_state::<Ipv4>().tx_counters.dest_unreachable.get(), 1);
-        assert_eq!(ctx.bindings_ctx.frames_sent().len(), 1);
-        let buf = &ctx.bindings_ctx.frames_sent()[0].1[..];
-        let (_, _, _, _, _, _, code) = parse_icmp_packet_in_ip_packet_in_ethernet_frame::<
-            Ipv4,
-            _,
-            IcmpDestUnreachable,
-            _,
-        >(buf, EthernetFrameLengthCheck::NoCheck, |_| {})
-        .unwrap();
+        let frames = ctx.bindings_ctx.take_ethernet_frames();
+        let (_dev, frame) = assert_matches!(&frames[..], [frame] => frame);
+        let (_, _, _, _, _, _, code) =
+            parse_icmp_packet_in_ip_packet_in_ethernet_frame::<Ipv4, _, IcmpDestUnreachable, _>(
+                &frame[..],
+                EthernetFrameLengthCheck::NoCheck,
+                |_| {},
+            )
+            .unwrap();
         assert_eq!(code, Icmpv4DestUnreachableCode::DestProtocolUnreachable);
     }
 

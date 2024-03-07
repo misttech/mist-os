@@ -627,7 +627,7 @@ mod tests {
     >;
 
     type FakeBindingsCtx =
-        crate::context::testutil::FakeBindingsCtx<IgmpTimerId<FakeDeviceId>, (), ()>;
+        crate::context::testutil::FakeBindingsCtx<IgmpTimerId<FakeDeviceId>, (), (), ()>;
 
     impl IgmpStateContext<FakeBindingsCtx> for FakeCoreCtx {
         fn with_igmp_state<
@@ -1342,7 +1342,7 @@ mod tests {
                 .unwrap();
         };
         let check_sent_report = |bindings_ctx: &mut crate::testutil::FakeBindingsCtx| {
-            let frames = bindings_ctx.take_frames();
+            let frames = bindings_ctx.take_ethernet_frames();
             let (egress_device, frame) = assert_matches!(&frames[..], [x] => x);
             assert_eq!(egress_device, &eth_device_id);
             let (body, src_mac, dst_mac, src_ip, dst_ip, proto, ttl) =
@@ -1363,7 +1363,7 @@ mod tests {
             );
         };
         let check_sent_leave = |bindings_ctx: &mut crate::testutil::FakeBindingsCtx| {
-            let frames = bindings_ctx.take_frames();
+            let frames = bindings_ctx.take_ethernet_frames();
             let (egress_device, frame) = assert_matches!(&frames[..], [x] => x);
 
             assert_eq!(egress_device, &eth_device_id);
@@ -1405,14 +1405,14 @@ mod tests {
         // Should do nothing.
         set_config(&mut ctx, TestConfig { ip_enabled: false, gmp_enabled: true });
         ctx.bindings_ctx.timer_ctx().assert_no_timers_installed();
-        assert_matches!(ctx.bindings_ctx.take_frames()[..], []);
+        assert_matches!(ctx.bindings_ctx.take_ethernet_frames()[..], []);
 
         // Disable IGMP but enable IPv4.
         //
         // Should do nothing.
         set_config(&mut ctx, TestConfig { ip_enabled: true, gmp_enabled: false });
         ctx.bindings_ctx.timer_ctx().assert_no_timers_installed();
-        assert_matches!(ctx.bindings_ctx.take_frames()[..], []);
+        assert_matches!(ctx.bindings_ctx.take_ethernet_frames()[..], []);
 
         // Enable IGMP.
         set_config(&mut ctx, TestConfig { ip_enabled: true, gmp_enabled: true });

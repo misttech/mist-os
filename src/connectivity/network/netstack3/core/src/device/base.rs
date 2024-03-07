@@ -875,7 +875,7 @@ mod tests {
         _device_id: &DeviceId<crate::testutil::FakeBindingsCtx>,
         count: usize,
     ) {
-        assert_eq!(bindings_ctx.frames_sent().len(), count);
+        assert_eq!(bindings_ctx.take_ethernet_frames().len(), count);
     }
 
     fn check_transmitted_loopback(

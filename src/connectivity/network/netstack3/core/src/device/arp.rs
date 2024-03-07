@@ -713,6 +713,7 @@ mod tests {
         ArpTimerId<EthernetLinkDevice, FakeLinkDeviceId>,
         nud::Event<Mac, FakeLinkDeviceId, Ipv4, FakeInstant>,
         (),
+        (),
     >;
 
     type FakeCoreCtxImpl = FakeCoreCtx<

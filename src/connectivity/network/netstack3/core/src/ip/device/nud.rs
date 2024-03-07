@@ -2568,8 +2568,8 @@ mod tests {
         },
         routes::{AddableEntry, AddableMetric},
         testutil::{
-            self, FakeEventDispatcherConfig, TestIpExt as _, DEFAULT_INTERFACE_METRIC,
-            IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
+            self, DispatchedFrame, FakeEventDispatcherConfig, TestIpExt as _,
+            DEFAULT_INTERFACE_METRIC, IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
         },
         transport::tcp,
         UnlockedCoreCtx,
@@ -2610,6 +2610,7 @@ mod tests {
     type FakeBindingsCtxImpl<I> = FakeBindingsCtx<
         NudTimerId<I, FakeLinkDevice, FakeLinkDeviceId>,
         Event<FakeLinkAddress, FakeLinkDeviceId, I, FakeInstant>,
+        (),
         (),
     >;
 
@@ -5119,7 +5120,7 @@ mod tests {
         if let Some(NonZeroU16 { .. }) = dad_transmits {
             // Take DAD message.
             assert_matches!(
-                &ctx.bindings_ctx.take_frames()[..],
+                &ctx.bindings_ctx.take_ethernet_frames()[..],
                 [(got_device_id, got_frame)] => {
                     assert_eq!(got_device_id, &link_device_id);
 
@@ -5158,7 +5159,7 @@ mod tests {
         // new state of the neighbor table.
         let expected_neighbors = if expect_handle {
             assert_matches!(
-                &ctx.bindings_ctx.take_frames()[..],
+                &ctx.bindings_ctx.take_ethernet_frames()[..],
                 [(got_device_id, got_frame)] => {
                     assert_eq!(got_device_id, &link_device_id);
 
@@ -5192,7 +5193,7 @@ mod tests {
                 })),
             )])
         } else {
-            assert_matches!(&ctx.bindings_ctx.take_frames()[..], []);
+            assert_matches!(&ctx.bindings_ctx.take_ethernet_frames()[..], []);
             HashMap::default()
         };
 
@@ -5270,7 +5271,7 @@ mod tests {
         assert_neighbors::<Ipv6, _, _>(&mut ctx.core_ctx(), &link_device_id, Default::default());
 
         let testutil::Ctx { core_ctx, bindings_ctx } = &mut ctx;
-        assert_eq!(bindings_ctx.take_frames(), []);
+        assert_eq!(bindings_ctx.take_ethernet_frames(), []);
 
         // Trigger a neighbor solicitation to be sent.
         let body = [u8::MAX];
@@ -5286,7 +5287,7 @@ mod tests {
             Ok(())
         );
         assert_matches!(
-            &bindings_ctx.take_frames()[..],
+            &bindings_ctx.take_ethernet_frames()[..],
             [(got_device_id, got_frame)] => {
                 assert_eq!(got_device_id, &eth_device_id);
 
@@ -5351,7 +5352,7 @@ mod tests {
                 })),
             )]),
         );
-        let frames = ctx.bindings_ctx.take_frames();
+        let frames = ctx.bindings_ctx.take_ethernet_frames();
         let (got_device_id, got_frame) = assert_matches!(&frames[..], [x] => x);
         assert_eq!(got_device_id, &eth_device_id);
 
@@ -5373,7 +5374,7 @@ mod tests {
     fn new_test_net<I: Ip + testutil::TestIpExt>() -> (
         FakeNudNetwork<
             impl FakeNetworkLinks<
-                EthernetWeakDeviceId<testutil::FakeBindingsCtx>,
+                DispatchedFrame,
                 EthernetDeviceId<testutil::FakeBindingsCtx>,
                 &'static str,
             >,
@@ -5406,7 +5407,7 @@ mod tests {
     fn bind_and_connect_sockets<
         I: testutil::TestIpExt + crate::IpExt,
         L: FakeNetworkLinks<
-            EthernetWeakDeviceId<testutil::FakeBindingsCtx>,
+            DispatchedFrame,
             EthernetDeviceId<testutil::FakeBindingsCtx>,
             &'static str,
         >,

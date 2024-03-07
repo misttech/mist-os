@@ -1135,17 +1135,17 @@ pub(crate) mod testutil {
             Event: Debug,
             DeviceId: FakeStrongDeviceId,
             BindingsCtxState,
-        > IpSocketContext<I, FakeBindingsCtx<Id, Event, BindingsCtxState>>
+        > IpSocketContext<I, FakeBindingsCtx<Id, Event, BindingsCtxState, ()>>
         for FakeCoreCtx<S, Meta, DeviceId>
     where
         FakeCoreCtx<S, Meta, DeviceId>: SendFrameContext<
-            FakeBindingsCtx<Id, Event, BindingsCtxState>,
+            FakeBindingsCtx<Id, Event, BindingsCtxState, ()>,
             SendIpPacketMeta<I, Self::DeviceId, SpecifiedAddr<I::Addr>>,
         >,
     {
         fn lookup_route(
             &mut self,
-            bindings_ctx: &mut FakeBindingsCtx<Id, Event, BindingsCtxState>,
+            bindings_ctx: &mut FakeBindingsCtx<Id, Event, BindingsCtxState, ()>,
             device: Option<&Self::DeviceId>,
             local_ip: Option<IpDeviceAddr<I::Addr>>,
             addr: RoutableIpAddr<I::Addr>,
@@ -1155,7 +1155,7 @@ pub(crate) mod testutil {
 
         fn send_ip_packet<SS>(
             &mut self,
-            bindings_ctx: &mut FakeBindingsCtx<Id, Event, BindingsCtxState>,
+            bindings_ctx: &mut FakeBindingsCtx<Id, Event, BindingsCtxState, ()>,
             SendIpPacketMeta {  device, src_ip, dst_ip, next_hop, proto, ttl, mtu }: SendIpPacketMeta<I, &Self::DeviceId, SpecifiedAddr<I::Addr>>,
             body: SS,
         ) -> Result<(), SS>
@@ -1620,17 +1620,17 @@ pub(crate) mod testutil {
             Event: Debug,
             DeviceId: FakeStrongDeviceId,
             BindingsCtxState,
-        > IpSocketContext<I, FakeBindingsCtx<Id, Event, BindingsCtxState>>
+        > IpSocketContext<I, FakeBindingsCtx<Id, Event, BindingsCtxState, ()>>
         for FakeCoreCtx<FakeDualStackIpSocketCtx<DeviceId>, Meta, DeviceId>
     where
         FakeCoreCtx<FakeDualStackIpSocketCtx<DeviceId>, Meta, DeviceId>: SendFrameContext<
-            FakeBindingsCtx<Id, Event, BindingsCtxState>,
+            FakeBindingsCtx<Id, Event, BindingsCtxState, ()>,
             SendIpPacketMeta<I, Self::DeviceId, SpecifiedAddr<I::Addr>>,
         >,
     {
         fn lookup_route(
             &mut self,
-            bindings_ctx: &mut FakeBindingsCtx<Id, Event, BindingsCtxState>,
+            bindings_ctx: &mut FakeBindingsCtx<Id, Event, BindingsCtxState, ()>,
             device: Option<&Self::DeviceId>,
             local_ip: Option<IpDeviceAddr<I::Addr>>,
             addr: RoutableIpAddr<I::Addr>,
@@ -1640,7 +1640,7 @@ pub(crate) mod testutil {
 
         fn send_ip_packet<SS>(
             &mut self,
-            bindings_ctx: &mut FakeBindingsCtx<Id, Event, BindingsCtxState>,
+            bindings_ctx: &mut FakeBindingsCtx<Id, Event, BindingsCtxState, ()>,
             SendIpPacketMeta {  device, src_ip, dst_ip, next_hop, proto, ttl, mtu }: SendIpPacketMeta<I, &Self::DeviceId, SpecifiedAddr<I::Addr>>,
             body: SS,
         ) -> Result<(), SS>
@@ -2199,7 +2199,7 @@ mod tests {
 
         assert!(handle_queued_rx_packets(&mut ctx));
 
-        assert_eq!(ctx.bindings_ctx.frames_sent().len(), 0);
+        assert_matches!(ctx.bindings_ctx.take_ethernet_frames()[..], []);
 
         assert_eq!(ctx.core_ctx.ip_counters::<I>().dispatch_receive_ip_packet.get(), 1);
     }
@@ -2271,7 +2271,7 @@ mod tests {
                 }
             };
         let mut packet_count = 0;
-        assert_eq!(bindings_ctx.frames_sent().len(), packet_count);
+        assert_matches!(bindings_ctx.take_ethernet_frames()[..], []);
 
         // Send a packet on the socket and make sure that the right contents
         // are sent.
@@ -2283,14 +2283,14 @@ mod tests {
             None,
         )
         .unwrap();
-        let mut check_sent_frame = |bindings_ctx: &crate::testutil::FakeBindingsCtx| {
+        let mut check_sent_frame = |bindings_ctx: &mut crate::testutil::FakeBindingsCtx| {
             packet_count += 1;
-            assert_eq!(bindings_ctx.frames_sent().len(), packet_count);
-            let (dev, frame) = &bindings_ctx.frames_sent()[packet_count - 1];
+            let frames = bindings_ctx.take_ethernet_frames();
+            let (dev, frame) = assert_matches!(&frames[..], [frame] => frame);
             assert_eq!(dev, &device_ids[0]);
             check_frame(&frame, packet_count);
         };
-        check_sent_frame(&bindings_ctx);
+        check_sent_frame(&mut bindings_ctx);
 
         // Send a packet while imposing an MTU that is large enough to fit the
         // packet.
@@ -2304,7 +2304,7 @@ mod tests {
             Some(Ipv6::MINIMUM_LINK_MTU.into()),
         );
         assert_matches!(res, Ok(()));
-        check_sent_frame(&bindings_ctx);
+        check_sent_frame(&mut bindings_ctx);
 
         // Send a packet on the socket while imposing an MTU which will not
         // allow a packet to be sent.
@@ -2317,7 +2317,7 @@ mod tests {
         );
         assert_matches!(res, Err((_, IpSockSendError::Mtu)));
 
-        assert_eq!(bindings_ctx.frames_sent().len(), packet_count);
+        assert_matches!(bindings_ctx.take_ethernet_frames()[..], []);
         // Try sending a packet which will be larger than the device's MTU,
         // and make sure it fails.
         let res = IpSocketHandler::<I, _>::send_ip_packet(
@@ -2422,7 +2422,7 @@ mod tests {
         send_to(SocketIpAddr::try_from(remote_ip).unwrap());
         send_to(SocketIpAddr::try_from(other_remote_ip).unwrap());
 
-        let frames = bindings_ctx.frames_sent();
+        let frames = bindings_ctx.take_ethernet_frames();
         let [df_remote, df_other_remote] = assert_matches!(&frames[..], [df1, df2] => [df1, df2]);
         {
             let (_dev, frame) = df_remote;

@@ -2694,7 +2694,7 @@ mod tests {
     type FakeUdpInnerCoreCtx<D> = Wrapped<FakeBoundSockets<D>, FakeBufferCoreCtx<D>>;
 
     /// `FakeBindingsCtx` specialized for UDP.
-    type FakeUdpBindingsCtx<D> = FakeBindingsCtx<(), (), FakeBindingsCtxState<D>>;
+    type FakeUdpBindingsCtx<D> = FakeBindingsCtx<(), (), FakeBindingsCtxState<D>, ()>;
 
     /// The FakeCoreCtx held as the inner state of the [`WrappedFakeCoreCtx`] that
     /// is [`FakeUdpCoreCtx`].

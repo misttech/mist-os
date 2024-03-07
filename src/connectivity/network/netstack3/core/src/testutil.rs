@@ -61,7 +61,7 @@ use crate::{
     context::{
         testutil::{
             FakeFrameCtx, FakeInstant, FakeNetworkContext, FakeTimerCtx, FakeTimerCtxExt,
-            WithFakeFrameContext, WithFakeTimerContext,
+            PureIpDeviceAndIpVersion, WithFakeFrameContext, WithFakeTimerContext,
         },
         EventContext, InstantBindingsTypes, InstantContext, RngContext, TimerContext, TimerHandler,
         TracingContext, UnlockedCoreCtx,
@@ -580,6 +580,7 @@ pub struct FakeBindingsCtx(
                 TimerId<Self>,
                 DispatchedEvent,
                 FakeBindingsCtxState,
+                DispatchedFrame,
             >,
         >,
     >,
@@ -627,6 +628,7 @@ impl FakeBindingsCtx {
                 TimerId<Self>,
                 DispatchedEvent,
                 FakeBindingsCtxState,
+                DispatchedFrame,
             >,
         ) -> O,
         O,
@@ -645,6 +647,7 @@ impl FakeBindingsCtx {
                 TimerId<Self>,
                 DispatchedEvent,
                 FakeBindingsCtxState,
+                DispatchedFrame,
             >,
         ) -> O,
         O,
@@ -662,13 +665,6 @@ impl FakeBindingsCtx {
         Wrapper(self.0.lock(), crate::context::testutil::FakeBindingsCtx::timer_ctx, ())
     }
 
-    #[cfg(test)]
-    pub(crate) fn frames_sent(
-        &self,
-    ) -> impl Deref<Target = [(EthernetWeakDeviceId<FakeBindingsCtx>, Vec<u8>)]> + '_ {
-        Wrapper(self.0.lock(), crate::context::testutil::FakeBindingsCtx::frames, ())
-    }
-
     pub(crate) fn state_mut(&mut self) -> impl DerefMut<Target = FakeBindingsCtxState> + '_ {
         Wrapper(
             self.0.lock(),
@@ -677,9 +673,65 @@ impl FakeBindingsCtx {
         )
     }
 
-    /// Take all frames sent so far.
-    pub fn take_frames(&mut self) -> Vec<(EthernetWeakDeviceId<FakeBindingsCtx>, Vec<u8>)> {
-        self.with_inner_mut(|ctx| ctx.frame_ctx_mut().take_frames())
+    /// Copy all ethernet frames sent so far.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the there are non-Ethernet frames stored.
+    #[cfg(test)]
+    pub fn copy_ethernet_frames(
+        &mut self,
+    ) -> Vec<(EthernetWeakDeviceId<FakeBindingsCtx>, Vec<u8>)> {
+        self.with_inner_mut(|ctx| {
+            ctx.frame_ctx_mut()
+                .frames()
+                .into_iter()
+                .map(|(meta, frame)| match meta {
+                    DispatchedFrame::Ethernet(eth) => (eth.clone(), frame.clone()),
+                    DispatchedFrame::PureIp(ip) => panic!("unexpected IP packet {ip:?}: {frame:?}"),
+                })
+                .collect()
+        })
+    }
+
+    /// Take all ethernet frames sent so far.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the there are non-Ethernet frames stored.
+    pub fn take_ethernet_frames(
+        &mut self,
+    ) -> Vec<(EthernetWeakDeviceId<FakeBindingsCtx>, Vec<u8>)> {
+        self.with_inner_mut(|ctx| {
+            ctx.frame_ctx_mut()
+                .take_frames()
+                .into_iter()
+                .map(|(meta, frame)| match meta {
+                    DispatchedFrame::Ethernet(eth) => (eth, frame),
+                    DispatchedFrame::PureIp(ip) => panic!("unexpected IP packet {ip:?}: {frame:?}"),
+                })
+                .collect()
+        })
+    }
+
+    /// Take all IP frames sent so far.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the there are non-IP frames stored.
+    pub fn take_ip_frames(&mut self) -> Vec<(PureIpDeviceAndIpVersion<FakeBindingsCtx>, Vec<u8>)> {
+        self.with_inner_mut(|ctx| {
+            ctx.frame_ctx_mut()
+                .take_frames()
+                .into_iter()
+                .map(|(meta, frame)| match meta {
+                    DispatchedFrame::Ethernet(eth) => {
+                        panic!("unexpected Ethernet frame {eth:?}: {frame:?}")
+                    }
+                    DispatchedFrame::PureIp(ip) => (ip, frame),
+                })
+                .collect()
+        })
     }
 
     #[cfg(test)]
@@ -733,11 +785,8 @@ impl WithFakeTimerContext<TimerId<FakeBindingsCtx>> for FakeCtx {
     }
 }
 
-impl WithFakeFrameContext<EthernetWeakDeviceId<crate::testutil::FakeBindingsCtx>> for FakeCtx {
-    fn with_fake_frame_ctx_mut<
-        O,
-        F: FnOnce(&mut FakeFrameCtx<EthernetWeakDeviceId<crate::testutil::FakeBindingsCtx>>) -> O,
-    >(
+impl WithFakeFrameContext<DispatchedFrame> for FakeCtx {
+    fn with_fake_frame_ctx_mut<O, F: FnOnce(&mut FakeFrameCtx<DispatchedFrame>) -> O>(
         &mut self,
         f: F,
     ) -> O {
@@ -1459,7 +1508,7 @@ pub(crate) fn add_arp_or_ndp_table_entry<A: IpAddress>(
 
 impl FakeNetworkContext for FakeCtx {
     type TimerId = TimerId<FakeBindingsCtx>;
-    type SendMeta = EthernetWeakDeviceId<FakeBindingsCtx>;
+    type SendMeta = DispatchedFrame;
     type RecvMeta = EthernetDeviceId<FakeBindingsCtx>;
     fn handle_frame(&mut self, device_id: Self::RecvMeta, data: Buf<Vec<u8>>) {
         self.core_api()
@@ -1559,7 +1608,8 @@ impl DeviceLayerEventDispatcher for FakeBindingsCtx {
         device: &EthernetDeviceId<FakeBindingsCtx>,
         frame: Buf<Vec<u8>>,
     ) -> Result<(), DeviceSendFrameError<Buf<Vec<u8>>>> {
-        self.with_inner_mut(|ctx| ctx.frame_ctx_mut().push(device.downgrade(), frame.into_inner()));
+        let frame_meta = DispatchedFrame::Ethernet(device.downgrade());
+        self.with_inner_mut(|ctx| ctx.frame_ctx_mut().push(frame_meta, frame.into_inner()));
         Ok(())
     }
 }
@@ -1627,6 +1677,14 @@ impl<I: Ip> From<IpDeviceEvent<DeviceId<FakeBindingsCtx>, I, FakeInstant>>
             }
         }
     }
+}
+
+/// A frame that's been dispatched to Bindings to be sent out the device driver.
+pub enum DispatchedFrame {
+    /// A frame that's been dispatched to an Ethernet device.
+    Ethernet(EthernetWeakDeviceId<FakeBindingsCtx>),
+    /// A frame that's been dispatched to a PureIp device.
+    PureIp(PureIpDeviceAndIpVersion<FakeBindingsCtx>),
 }
 
 impl<I: Ip> From<IpDeviceEvent<DeviceId<FakeBindingsCtx>, I, FakeInstant>> for DispatchedEvent {
@@ -2084,7 +2142,7 @@ mod tests {
         let calvin_device_id = calvin_device_ids[calvin_device_idx].clone();
         let mut net = FakeNetwork::new(
             [("alice", alice_ctx), ("bob", bob_ctx), ("calvin", calvin_ctx)],
-            move |net: &'static str, _device_id: EthernetWeakDeviceId<FakeBindingsCtx>| match net {
+            move |net: &'static str, _frame: DispatchedFrame| match net {
                 "alice" => vec![
                     ("bob", bob_device_id.clone(), None),
                     ("calvin", calvin_device_id.clone(), None),
@@ -2100,9 +2158,9 @@ mod tests {
         core::mem::drop((alice_device_ids, bob_device_ids, calvin_device_ids));
 
         net.collect_frames();
-        assert_empty(net.bindings_ctx("alice").frames_sent().iter());
-        assert_empty(net.bindings_ctx("bob").frames_sent().iter());
-        assert_empty(net.bindings_ctx("calvin").frames_sent().iter());
+        assert_matches!(net.bindings_ctx("alice").copy_ethernet_frames()[..], []);
+        assert_matches!(net.bindings_ctx("bob").copy_ethernet_frames()[..], []);
+        assert_matches!(net.bindings_ctx("calvin").copy_ethernet_frames()[..], []);
         assert_empty(net.iter_pending_frames());
 
         // Bob and Calvin should get any packet sent by Alice.
@@ -2110,14 +2168,14 @@ mod tests {
         net.with_context("alice", |Ctx { core_ctx, bindings_ctx }| {
             send_packet(core_ctx, bindings_ctx, ip_a, ip_b, &alice_device_id.clone().into());
         });
-        assert_eq!(net.bindings_ctx("alice").frames_sent().len(), 1);
-        assert_empty(net.bindings_ctx("bob").frames_sent().iter());
-        assert_empty(net.bindings_ctx("calvin").frames_sent().iter());
+        assert_matches!(&net.bindings_ctx("alice").copy_ethernet_frames()[..], [_frame]);
+        assert_matches!(net.bindings_ctx("bob").copy_ethernet_frames()[..], []);
+        assert_matches!(net.bindings_ctx("calvin").copy_ethernet_frames()[..], []);
         assert_empty(net.iter_pending_frames());
         net.collect_frames();
-        assert_empty(net.bindings_ctx("alice").frames_sent().iter());
-        assert_empty(net.bindings_ctx("bob").frames_sent().iter());
-        assert_empty(net.bindings_ctx("calvin").frames_sent().iter());
+        assert_matches!(net.bindings_ctx("alice").copy_ethernet_frames()[..], []);
+        assert_matches!(net.bindings_ctx("bob").copy_ethernet_frames()[..], []);
+        assert_matches!(net.bindings_ctx("calvin").copy_ethernet_frames()[..], []);
         assert_eq!(net.iter_pending_frames().count(), 2);
         assert!(net
             .iter_pending_frames()
@@ -2133,14 +2191,14 @@ mod tests {
         net.with_context("bob", |Ctx { core_ctx, bindings_ctx }| {
             send_packet(core_ctx, bindings_ctx, ip_b, ip_a, &bob_device_id.clone().into());
         });
-        assert_empty(net.bindings_ctx("alice").frames_sent().iter());
-        assert_eq!(net.bindings_ctx("bob").frames_sent().len(), 1);
-        assert_empty(net.bindings_ctx("calvin").frames_sent().iter());
+        assert_matches!(net.bindings_ctx("alice").copy_ethernet_frames()[..], []);
+        assert_matches!(&net.bindings_ctx("bob").copy_ethernet_frames()[..], [_frame]);
+        assert_matches!(net.bindings_ctx("calvin").copy_ethernet_frames()[..], []);
         assert_empty(net.iter_pending_frames());
         net.collect_frames();
-        assert_empty(net.bindings_ctx("alice").frames_sent().iter());
-        assert_empty(net.bindings_ctx("bob").frames_sent().iter());
-        assert_empty(net.bindings_ctx("calvin").frames_sent().iter());
+        assert_matches!(net.bindings_ctx("alice").copy_ethernet_frames()[..], []);
+        assert_matches!(net.bindings_ctx("bob").copy_ethernet_frames()[..], []);
+        assert_matches!(net.bindings_ctx("calvin").copy_ethernet_frames()[..], []);
         assert_eq!(net.iter_pending_frames().count(), 1);
         assert!(net.iter_pending_frames().any(
             |InstantAndData(_, x)| (x.dst_context == "alice") && (&x.meta == &alice_device_id)
@@ -2152,14 +2210,14 @@ mod tests {
         net.with_context("calvin", |Ctx { core_ctx, bindings_ctx }| {
             send_packet(core_ctx, bindings_ctx, ip_c, ip_a, &calvin_device_id.clone().into());
         });
-        assert_empty(net.bindings_ctx("alice").frames_sent().iter());
-        assert_empty(net.bindings_ctx("bob").frames_sent().iter());
-        assert_eq!(net.bindings_ctx("calvin").frames_sent().len(), 1);
+        assert_matches!(net.bindings_ctx("alice").copy_ethernet_frames()[..], []);
+        assert_matches!(net.bindings_ctx("bob").copy_ethernet_frames()[..], []);
+        assert_matches!(&net.bindings_ctx("calvin").copy_ethernet_frames()[..], [_frame]);
         assert_empty(net.iter_pending_frames());
         net.collect_frames();
-        assert_empty(net.bindings_ctx("alice").frames_sent().iter());
-        assert_empty(net.bindings_ctx("bob").frames_sent().iter());
-        assert_empty(net.bindings_ctx("calvin").frames_sent().iter());
+        assert_matches!(net.bindings_ctx("alice").copy_ethernet_frames()[..], []);
+        assert_matches!(net.bindings_ctx("bob").copy_ethernet_frames()[..], []);
+        assert_matches!(net.bindings_ctx("calvin").copy_ethernet_frames()[..], []);
         assert_empty(net.iter_pending_frames());
     }
 }

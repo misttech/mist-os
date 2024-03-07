@@ -535,8 +535,12 @@ mod tests {
         MldFrameMetadata<FakeDeviceId>,
         FakeDeviceId,
     >;
-    type FakeBindingsCtxImpl =
-        crate::context::testutil::FakeBindingsCtx<MldDelayedReportTimerId<FakeDeviceId>, (), ()>;
+    type FakeBindingsCtxImpl = crate::context::testutil::FakeBindingsCtx<
+        MldDelayedReportTimerId<FakeDeviceId>,
+        (),
+        (),
+        (),
+    >;
 
     impl MldStateContext<FakeBindingsCtxImpl> for FakeCoreCtxImpl {
         fn with_mld_state<
@@ -1277,7 +1281,7 @@ mod tests {
         };
         let check_sent_report = |bindings_ctx: &mut crate::testutil::FakeBindingsCtx,
                                  specified_source: bool| {
-            let frames = bindings_ctx.take_frames();
+            let frames = bindings_ctx.take_ethernet_frames();
             let (egress_device, frame) = assert_matches!(&frames[..], [x] => x);
             assert_eq!(egress_device, &eth_device_id);
             let (src_mac, dst_mac, src_ip, dst_ip, ttl, _message, code) =
@@ -1305,7 +1309,7 @@ mod tests {
         };
         let check_sent_done = |bindings_ctx: &mut crate::testutil::FakeBindingsCtx,
                                specified_source: bool| {
-            let frames = bindings_ctx.take_frames();
+            let frames = bindings_ctx.take_ethernet_frames();
             let (egress_device, frame) = assert_matches!(&frames[..], [x] => x);
             assert_eq!(egress_device, &eth_device_id);
             let (src_mac, dst_mac, src_ip, dst_ip, ttl, _message, code) =
@@ -1348,14 +1352,14 @@ mod tests {
         // Should do nothing.
         set_config(&mut ctx, TestConfig { ip_enabled: false, gmp_enabled: true });
         ctx.bindings_ctx.timer_ctx().assert_no_timers_installed();
-        assert_matches!(ctx.bindings_ctx.take_frames()[..], []);
+        assert_matches!(ctx.bindings_ctx.take_ethernet_frames()[..], []);
 
         // Disable MLD but enable IPv6.
         //
         // Should do nothing.
         set_config(&mut ctx, TestConfig { ip_enabled: true, gmp_enabled: false });
         ctx.bindings_ctx.timer_ctx().assert_no_timers_installed();
-        assert_matches!(ctx.bindings_ctx.take_frames()[..], []);
+        assert_matches!(ctx.bindings_ctx.take_ethernet_frames()[..], []);
 
         // Enable MLD.
         set_config(&mut ctx, TestConfig { ip_enabled: true, gmp_enabled: true });

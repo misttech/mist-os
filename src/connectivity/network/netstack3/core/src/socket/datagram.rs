@@ -5270,7 +5270,8 @@ mod test {
     }
 
     impl<D: FakeStrongDeviceId, I: DatagramIpExt<D> + IpLayerIpExt>
-        DatagramStateContext<I, FakeBindingsCtx<(), (), ()>, FakeStateSpec> for FakeCoreCtx<I, D>
+        DatagramStateContext<I, FakeBindingsCtx<(), (), (), ()>, FakeStateSpec>
+        for FakeCoreCtx<I, D>
     {
         type SocketsStateCtx<'a> =
             Wrapped<FakeBoundSockets<Self::DeviceId>, FakeInnerCoreCtx<Self::DeviceId>>;
@@ -5334,14 +5335,14 @@ mod test {
     trait DualStackContextsIpExt<D: FakeStrongDeviceId>: Ip + DualStackIpExt {
         type DualStackContext: DualStackDatagramBoundStateContext<
             Self,
-            FakeBindingsCtx<(), (), ()>,
+            FakeBindingsCtx<(), (), (), ()>,
             FakeStateSpec,
             DeviceId = D,
             WeakDeviceId = FakeWeakDeviceId<D>,
         >;
         type NonDualStackContext: NonDualStackDatagramBoundStateContext<
             Self,
-            FakeBindingsCtx<(), (), ()>,
+            FakeBindingsCtx<(), (), (), ()>,
             FakeStateSpec,
             DeviceId = D,
             WeakDeviceId = FakeWeakDeviceId<D>,
@@ -5374,7 +5375,7 @@ mod test {
     }
 
     impl<D: FakeStrongDeviceId, I: Ip + IpExt + IpDeviceStateIpExt + DualStackContextsIpExt<D>>
-        DatagramBoundStateContext<I, FakeBindingsCtx<(), (), ()>, FakeStateSpec>
+        DatagramBoundStateContext<I, FakeBindingsCtx<(), (), (), ()>, FakeStateSpec>
         for Wrapped<FakeBoundSockets<D>, FakeInnerCoreCtx<D>>
     {
         type IpSocketsCtx<'a> = FakeInnerCoreCtx<D>;
@@ -5434,7 +5435,7 @@ mod test {
     }
 
     impl<D: FakeStrongDeviceId>
-        NonDualStackDatagramBoundStateContext<Ipv4, FakeBindingsCtx<(), (), ()>, FakeStateSpec>
+        NonDualStackDatagramBoundStateContext<Ipv4, FakeBindingsCtx<(), (), (), ()>, FakeStateSpec>
         for Wrapped<FakeBoundSockets<D>, FakeInnerCoreCtx<D>>
     {
         type Converter = ();
@@ -5444,7 +5445,7 @@ mod test {
     }
 
     impl<D: FakeStrongDeviceId>
-        DualStackDatagramBoundStateContext<Ipv6, FakeBindingsCtx<(), (), ()>, FakeStateSpec>
+        DualStackDatagramBoundStateContext<Ipv6, FakeBindingsCtx<(), (), (), ()>, FakeStateSpec>
         for Wrapped<FakeBoundSockets<D>, FakeInnerCoreCtx<D>>
     {
         type IpSocketsCtx<'a> = FakeInnerCoreCtx<D>;
@@ -5738,7 +5739,7 @@ mod test {
                 remote_ips: Default::default(),
             }),
         );
-        let mut bindings_ctx = FakeBindingsCtx::<(), (), ()>::default();
+        let mut bindings_ctx = FakeBindingsCtx::<(), (), (), ()>::default();
 
         let multicast_addr1 = I::get_multicast_addr(1);
         let mut memberships = MulticastMemberships::default();

@@ -262,7 +262,7 @@ mod tests {
     }
 
     type FakeCoreCtxImpl = FakeCoreCtx<FakeRsContext, RsMessageMeta, FakeDeviceId>;
-    type FakeBindingsCtxImpl = FakeBindingsCtx<RsTimerId<FakeDeviceId>, (), ()>;
+    type FakeBindingsCtxImpl = FakeBindingsCtx<RsTimerId<FakeDeviceId>, (), (), ()>;
 
     impl RsContext<FakeBindingsCtxImpl> for FakeCoreCtxImpl {
         type LinkLayerAddr = Vec<u8>;

@@ -1492,6 +1492,7 @@ impl DeviceStateSpec for EthernetLinkDevice {
 #[cfg(test)]
 mod tests {
     use alloc::vec;
+    use assert_matches::assert_matches;
 
     use ip_test_macro::ip_test;
     use net_declare::net_mac;
@@ -1558,6 +1559,7 @@ mod tests {
     type FakeBindingsCtx = crate::context::testutil::FakeBindingsCtx<
         EthernetTimerId<FakeDeviceId>,
         nud::Event<Mac, FakeDeviceId, Ipv4, FakeInstant>,
+        (),
         (),
     >;
 
@@ -2165,7 +2167,7 @@ mod tests {
         // Receiving a packet not destined for the node should only result in a
         // dest unreachable message if routing is enabled.
         ctx.test_api().receive_ip_packet::<I, _>(&device, Some(frame_dst), buf.clone());
-        assert_empty(ctx.bindings_ctx.frames_sent().iter());
+        assert_matches!(ctx.bindings_ctx.take_ethernet_frames()[..], []);
 
         // Set routing and expect packets to be forwarded.
         set_forwarding_enabled::<_, I>(&mut ctx, &device, true);
@@ -2177,11 +2179,11 @@ mod tests {
         // device).
         ctx.test_api().receive_ip_packet::<I, _>(&device, Some(frame_dst), buf.clone());
         {
-            assert_eq!(ctx.bindings_ctx.frames_sent().len(), 1);
-            let frames = ctx.bindings_ctx.frames_sent();
+            let frames = ctx.bindings_ctx.take_ethernet_frames();
+            let (_dev, frame) = assert_matches!(&frames[..], [frame] => frame);
             let (packet_buf, _, _, packet_src_ip, packet_dst_ip, proto, ttl) =
                 parse_ip_packet_in_ethernet_frame::<I>(
-                    &frames[0].1[..],
+                    &frame[..],
                     EthernetFrameLengthCheck::NoCheck,
                 )
                 .unwrap();
@@ -2207,8 +2209,9 @@ mod tests {
             .unwrap()
             .unwrap_b();
         ctx.test_api().receive_ip_packet::<I, _>(&device, Some(frame_dst), buf_unknown_dest);
-        assert_eq!(ctx.bindings_ctx.frames_sent().len(), 2);
-        check_icmp::<I>(&ctx.bindings_ctx.frames_sent()[1].1);
+        let frames = ctx.bindings_ctx.take_ethernet_frames();
+        let (_dev, frame) = assert_matches!(&frames[..], [frame] => frame);
+        check_icmp::<I>(&frame);
 
         // Attempt to unset router
         set_forwarding_enabled::<_, I>(&mut ctx, &device, false);
@@ -2217,7 +2220,7 @@ mod tests {
 
         // Should not route packets anymore
         ctx.test_api().receive_ip_packet::<I, _>(&device, Some(frame_dst), buf);
-        assert_eq!(ctx.bindings_ctx.frames_sent().len(), 2);
+        assert_matches!(ctx.bindings_ctx.take_ethernet_frames()[..], []);
     }
 
     #[ip_test]

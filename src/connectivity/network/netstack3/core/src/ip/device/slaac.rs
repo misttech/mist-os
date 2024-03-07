@@ -1711,7 +1711,7 @@ mod tests {
     }
 
     type FakeCoreCtxImpl = FakeCoreCtx<FakeSlaacContext, (), FakeDeviceId>;
-    type FakeBindingsCtxImpl = FakeBindingsCtx<SlaacTimerId<FakeDeviceId>, (), ()>;
+    type FakeBindingsCtxImpl = FakeBindingsCtx<SlaacTimerId<FakeDeviceId>, (), (), ()>;
 
     #[derive(Default)]
     struct FakeSlaacAddrs {

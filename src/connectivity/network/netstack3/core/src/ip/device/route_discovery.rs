@@ -367,7 +367,7 @@ mod tests {
     type FakeCoreCtxImpl = FakeCoreCtx<FakeIpv6RouteDiscoveryContext, (), FakeDeviceId>;
 
     type FakeBindingsCtxImpl =
-        FakeBindingsCtx<Ipv6DiscoveredRouteTimerId<FakeDeviceId>, DispatchedEvent, ()>;
+        FakeBindingsCtx<Ipv6DiscoveredRouteTimerId<FakeDeviceId>, DispatchedEvent, (), ()>;
 
     impl Ipv6RouteDiscoveryContext<FakeBindingsCtxImpl> for FakeCoreCtxImpl {
         type WithDiscoveredRoutesMutCtx<'a> = FakeWithDiscoveredRoutesMutCtx;

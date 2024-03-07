@@ -1038,12 +1038,14 @@ mod testutil {
 
     use super::*;
 
-    impl<TimerId, Event: Debug, State> DeviceSocketTypes for FakeBindingsCtx<TimerId, Event, State> {
+    impl<TimerId, Event: Debug, State> DeviceSocketTypes
+        for FakeBindingsCtx<TimerId, Event, State, ()>
+    {
         type SocketState = ();
     }
 
     impl<TimerId, Event: Debug, State> DeviceLayerStateTypes
-        for FakeBindingsCtx<TimerId, Event, State>
+        for FakeBindingsCtx<TimerId, Event, State, ()>
     {
         type EthernetDeviceState = ();
         type LoopbackDeviceState = ();
@@ -1052,7 +1054,7 @@ mod testutil {
     }
 
     impl<TimerId, Event: Debug, State, DeviceId> DeviceSocketBindingsContext<DeviceId>
-        for FakeBindingsCtx<TimerId, Event, State>
+        for FakeBindingsCtx<TimerId, Event, State, ()>
     {
         fn receive_frame(
             &self,
