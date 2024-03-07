@@ -79,7 +79,7 @@ void HdmiHost::ConfigurePll(const pll_param& pll_params) {
       .set_hdmi_tx_system_clock_enabled(true)
       .WriteTo(&hhi_mmio_);
 
-  ConfigureHpllClkOut(pll_params.hdmi_pll_vco_output_frequency_khz);
+  ConfigureHpllClkOut(pll_params.hdmi_pll_vco_output_frequency_hz);
 
   HhiHdmiPllCntlReg::Get()
       .ReadFrom(&hhi_mmio_)
@@ -141,8 +141,8 @@ void HdmiHost::ConfigurePll(const pll_param& pll_params) {
 
 // TODO(https://fxbug.dev/328135383): Unify the PLL configuration logic for
 // HDMI and MIPI-DSI output.
-void HdmiHost::ConfigureHpllClkOut(int64_t expected_hdmi_pll_vco_output_frequency_khz) {
-  static constexpr int64_t kExternalOscillatorFrequencyKhz = 24'000;
+void HdmiHost::ConfigureHpllClkOut(int64_t expected_hdmi_pll_vco_output_frequency_hz) {
+  static constexpr int64_t kExternalOscillatorFrequencyHz = 24'000'000;
 
   static constexpr int32_t kMinHdmiPllMultiplierInteger = 1;
   static constexpr int32_t kMaxHdmiPllMultiplierInteger = 255;
@@ -150,29 +150,29 @@ void HdmiHost::ConfigureHpllClkOut(int64_t expected_hdmi_pll_vco_output_frequenc
   // TODO(https://fxbug.dev/328177521): Instead of asserting, we should check
   // the validity of the expected VCO output frequency before configuring the
   // PLL.
-  ZX_ASSERT(expected_hdmi_pll_vco_output_frequency_khz >=
-            kExternalOscillatorFrequencyKhz * kMinHdmiPllMultiplierInteger);
-  ZX_ASSERT(expected_hdmi_pll_vco_output_frequency_khz <=
-            kExternalOscillatorFrequencyKhz * kMaxHdmiPllMultiplierInteger);
+  ZX_ASSERT(expected_hdmi_pll_vco_output_frequency_hz >=
+            kExternalOscillatorFrequencyHz * kMinHdmiPllMultiplierInteger);
+  ZX_ASSERT(expected_hdmi_pll_vco_output_frequency_hz <=
+            kExternalOscillatorFrequencyHz * kMaxHdmiPllMultiplierInteger);
 
   // The assertion above guarantees that `pll_multiplier_integer` is always
   // >= kMinHdmiPllMultiplierInteger and <= kMaxHdmiPllMultiplierInteger, so
   // it can be stored as an int32_t value.
   const int32_t pll_multiplier_integer = static_cast<int32_t>(
-      expected_hdmi_pll_vco_output_frequency_khz / kExternalOscillatorFrequencyKhz);
+      expected_hdmi_pll_vco_output_frequency_hz / kExternalOscillatorFrequencyHz);
 
   static constexpr int32_t kPllMultiplierFractionScalingRatio = 1 << 17;
   // The result is in range [0, 2^17), so it can be stored as an int32_t
   // value.
   const int32_t pll_multiplier_fraction = static_cast<int32_t>(
-      (expected_hdmi_pll_vco_output_frequency_khz % kExternalOscillatorFrequencyKhz) *
-      kPllMultiplierFractionScalingRatio / kExternalOscillatorFrequencyKhz);
+      (expected_hdmi_pll_vco_output_frequency_hz % kExternalOscillatorFrequencyHz) *
+      kPllMultiplierFractionScalingRatio / kExternalOscillatorFrequencyHz);
 
   zxlogf(DEBUG,
          "HDMI PLL VCO configured: desired multiplier = %" PRId32 " + %" PRId32 " / %" PRId32,
          pll_multiplier_integer, pll_multiplier_fraction, kPllMultiplierFractionScalingRatio);
-  zxlogf(DEBUG, "HDMI PLL VCO output frequency: %" PRId64 " kHz",
-         expected_hdmi_pll_vco_output_frequency_khz);
+  zxlogf(DEBUG, "HDMI PLL VCO output frequency: %" PRId64 " Hz",
+         expected_hdmi_pll_vco_output_frequency_hz);
 
   HhiHdmiPllCntlReg::Get()
       .FromValue(0x0b3a0400)

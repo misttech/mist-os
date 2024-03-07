@@ -28,7 +28,7 @@ struct pll_param {
   uint32_t viu_channel;
   uint32_t viu_type;
 
-  int64_t hdmi_pll_vco_output_frequency_khz;
+  int64_t hdmi_pll_vco_output_frequency_hz;
   int32_t output_divider1;
   int32_t output_divider2;
   int32_t output_divider3;
@@ -90,7 +90,7 @@ class HdmiHost {
   void ConfigEncoder(const display::DisplayTiming& timings);
   void ConfigPhy();
 
-  void ConfigureHpllClkOut(int64_t hdmi_pll_vco_output_frequency_khz);
+  void ConfigureHpllClkOut(int64_t hdmi_pll_vco_output_frequency_hz);
   // TODO(https://fxbug.dev/320616654): Support fractional divider ratios.
   void ConfigureHdmiClockTree(int divider_ratio);
   void WaitForPllLocked();

@@ -32,11 +32,11 @@ namespace {
 // Range of valid frequencies of the DCO (digitally controlled oscillator) of a
 // certain PLL (phase-locked loop).
 struct ValidDcoFrequencyRange {
-  int64_t minimum_frequency_khz;
-  int64_t maximum_frequency_khz;
+  int64_t minimum_frequency_hz;
+  int64_t maximum_frequency_hz;
 };
 
-ValidDcoFrequencyRange GetHdmiPllValidDcoFrequencyRange(int64_t pixel_clock_khz) {
+ValidDcoFrequencyRange GetHdmiPllValidDcoFrequencyRange(int64_t pixel_clock_hz) {
   // Amlogic datasheets (A311D, S905D2 and S905D3) specify that the frequency
   // of the DCO in the HDMI PLL must be between 3 GHz and 6 GHz.
   //
@@ -46,8 +46,8 @@ ValidDcoFrequencyRange GetHdmiPllValidDcoFrequencyRange(int64_t pixel_clock_khz)
   // tested and has fewer display glitches than using 5.8 GHz. So, we use
   // 2.9 GHz rather than 3 GHz as the minimum valid DCO frequency for default
   // cases.
-  static constexpr int64_t kDefaultMinimumValidHdmiPllDcoFrequencyKhz = 2'900'000;
-  static constexpr int64_t kDefaultMaximumValidHdmiPllDcoFrequencyKhz = 6'000'000;
+  static constexpr int64_t kDefaultMinimumValidHdmiPllDcoFrequencyHz = 2'900'000'000;
+  static constexpr int64_t kDefaultMaximumValidHdmiPllDcoFrequencyHz = 6'000'000'000;
 
   // For display timings with a very low pixel clock rate (for example, on
   // Surenoo SUR480480Y021A, it has a pixel clock of 16.96 MHz), in our
@@ -60,18 +60,18 @@ ValidDcoFrequencyRange GetHdmiPllValidDcoFrequencyRange(int64_t pixel_clock_khz)
   // the pixel clock is lower than 20 MHz (which is lower than the pixel clock
   // of DMT timing of 640x480p@60Hz) so that it won't affect "normal" display
   // modes.
-  static constexpr int64_t kLowPixelClockMinimumValidHdmiPllDcoFrequencyKhz = 2'700'000;
-  static constexpr int64_t kLowPixelClockThresholdKhz = 20'000;
-  if (pixel_clock_khz <= kLowPixelClockThresholdKhz) {
+  static constexpr int64_t kLowPixelClockMinimumValidHdmiPllDcoFrequencyHz = 2'700'000'000;
+  static constexpr int64_t kLowPixelClockThresholdHz = 20'000'000;
+  if (pixel_clock_hz <= kLowPixelClockThresholdHz) {
     return {
-        .minimum_frequency_khz = kLowPixelClockMinimumValidHdmiPllDcoFrequencyKhz,
-        .maximum_frequency_khz = kDefaultMaximumValidHdmiPllDcoFrequencyKhz,
+        .minimum_frequency_hz = kLowPixelClockMinimumValidHdmiPllDcoFrequencyHz,
+        .maximum_frequency_hz = kDefaultMaximumValidHdmiPllDcoFrequencyHz,
     };
   }
 
   return {
-      .minimum_frequency_khz = kDefaultMinimumValidHdmiPllDcoFrequencyKhz,
-      .maximum_frequency_khz = kDefaultMaximumValidHdmiPllDcoFrequencyKhz,
+      .minimum_frequency_hz = kDefaultMinimumValidHdmiPllDcoFrequencyHz,
+      .maximum_frequency_hz = kDefaultMaximumValidHdmiPllDcoFrequencyHz,
   };
 }
 
@@ -93,21 +93,21 @@ pll_param CalculateClockParameters(const display::DisplayTiming& timing) {
   params.output_divider2 = 1;
   params.output_divider3 = 1;
 
-  params.hdmi_pll_vco_output_frequency_khz = int64_t{timing.pixel_clock_frequency_khz} * 10;
+  const int64_t pixel_clock_frequency_hz = int64_t{timing.pixel_clock_frequency_khz} * 1'000;
+  params.hdmi_pll_vco_output_frequency_hz = pixel_clock_frequency_hz * 10;
 
   const ValidDcoFrequencyRange valid_dco_frequency_range =
-      GetHdmiPllValidDcoFrequencyRange(timing.pixel_clock_frequency_khz);
-  while (params.hdmi_pll_vco_output_frequency_khz <
-         valid_dco_frequency_range.minimum_frequency_khz) {
+      GetHdmiPllValidDcoFrequencyRange(pixel_clock_frequency_hz);
+  while (params.hdmi_pll_vco_output_frequency_hz < valid_dco_frequency_range.minimum_frequency_hz) {
     if (params.output_divider1 < 4) {
       params.output_divider1 *= 2;
-      params.hdmi_pll_vco_output_frequency_khz *= 2;
+      params.hdmi_pll_vco_output_frequency_hz *= 2;
     } else if (params.output_divider2 < 4) {
       params.output_divider2 *= 2;
-      params.hdmi_pll_vco_output_frequency_khz *= 2;
+      params.hdmi_pll_vco_output_frequency_hz *= 2;
     } else if (params.output_divider3 < 4) {
       params.output_divider3 *= 2;
-      params.hdmi_pll_vco_output_frequency_khz *= 2;
+      params.hdmi_pll_vco_output_frequency_hz *= 2;
     } else {
       ZX_DEBUG_ASSERT_MSG(false,
                           "Failed to set HDMI PLL to a valid VCO frequency range for pixel clock "
@@ -117,11 +117,10 @@ pll_param CalculateClockParameters(const display::DisplayTiming& timing) {
     }
   }
   ZX_DEBUG_ASSERT_MSG(
-      params.hdmi_pll_vco_output_frequency_khz <= valid_dco_frequency_range.maximum_frequency_khz,
-      "Calculated HDMI PLL VCO frequency (%" PRId64 " kHz) exceeds the VCO frequency limit %" PRId64
-      " kHz. This should never happen since "
-      "IsDisplayTimingSupported() returned true.",
-      params.hdmi_pll_vco_output_frequency_khz, valid_dco_frequency_range.maximum_frequency_khz);
+      params.hdmi_pll_vco_output_frequency_hz <= valid_dco_frequency_range.maximum_frequency_hz,
+      "Calculated HDMI PLL VCO frequency (%" PRId64 " Hz) exceeds the VCO frequency limit %" PRId64
+      " Hz. This should never happen since IsDisplayTimingSupported() returned true.",
+      params.hdmi_pll_vco_output_frequency_hz, valid_dco_frequency_range.maximum_frequency_hz);
   return params;
 }
 
@@ -387,10 +386,10 @@ zx_status_t HdmiHost::EdidTransfer(const i2c_impl_op_t* op_list, size_t op_count
 namespace {
 
 // Returns true iff the display PLL and clock trees can be programmed to
-// generate a pixel clock of `pixel_clock_khz` kHz.
-bool IsPixelClockSupported(int64_t pixel_clock_khz) {
+// generate a pixel clock of `pixel_clock_hz`.
+bool IsPixelClockSupported(int64_t pixel_clock_hz) {
   const ValidDcoFrequencyRange valid_dco_frequency_range =
-      GetHdmiPllValidDcoFrequencyRange(pixel_clock_khz);
+      GetHdmiPllValidDcoFrequencyRange(pixel_clock_hz);
 
   // Fixed divisor values.
   //
@@ -412,10 +411,10 @@ bool IsPixelClockSupported(int64_t pixel_clock_khz) {
   // The adjustable dividers OD1 / OD2 / OD3 cannot be calculated if the output
   // frequency using `kMinimumPllDivisionFactor` still exceeds the maximum
   // allowed value.
-  const int64_t maximum_allowed_pixel_clock_khz =
-      valid_dco_frequency_range.maximum_frequency_khz /
+  const int64_t maximum_allowed_pixel_clock_hz =
+      valid_dco_frequency_range.maximum_frequency_hz /
       (kFixedPllDivisionFactor * kMinimumPllDivisionFactor);
-  if (pixel_clock_khz > maximum_allowed_pixel_clock_khz) {
+  if (pixel_clock_hz > maximum_allowed_pixel_clock_hz) {
     return false;
   }
 
@@ -423,13 +422,13 @@ bool IsPixelClockSupported(int64_t pixel_clock_khz) {
   // frequency using `kMaximumPllDivisionFactor` is still less than the minimum
   // allowed value.
 
-  // ceil(kMinimumValidHdmiPllVcoFrequencyKhz / (kFixedPllDivisionFactor *
+  // ceil(kMinimumValidHdmiPllVcoFrequencyHz / (kFixedPllDivisionFactor *
   // kMaximumPllDivisionFactor))
-  const int64_t minimum_allowed_pixel_clock_khz =
-      (valid_dco_frequency_range.minimum_frequency_khz +
+  const int64_t minimum_allowed_pixel_clock_hz =
+      (valid_dco_frequency_range.minimum_frequency_hz +
        kFixedPllDivisionFactor * kMaximumPllDivisionFactor - 1) /
       (kFixedPllDivisionFactor * kMaximumPllDivisionFactor);
-  if (pixel_clock_khz < minimum_allowed_pixel_clock_khz) {
+  if (pixel_clock_hz < minimum_allowed_pixel_clock_hz) {
     return false;
   }
 
@@ -465,7 +464,8 @@ bool HdmiHost::IsDisplayTimingSupported(const display::DisplayTiming& timing) co
     return false;
   }
 
-  if (!IsPixelClockSupported(timing.pixel_clock_frequency_khz)) {
+  const int64_t pixel_clock_frequency_hz = int64_t{timing.pixel_clock_frequency_khz} * 1'000;
+  if (!IsPixelClockSupported(pixel_clock_frequency_hz)) {
     return false;
   }
 
