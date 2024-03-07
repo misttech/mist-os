@@ -330,7 +330,7 @@ From //boards/arm64.gni:44
 
 **Overridden from the default:** `false`
 
-From //build/images/args.gni:202
+From //build/images/args.gni:205
 
 **Current value for `target_cpu = "x64"`:** `"x64"`
 
@@ -338,15 +338,21 @@ From //boards/x64.gni:40
 
 **Overridden from the default:** `false`
 
-From //build/images/args.gni:202
+From //build/images/args.gni:205
 
 ### bazel_product_bundle_prefix
 
-bazel_product_bundle_[prefix|board] together identifies the
+**Current value (from the default):** `false`
+
+From //build/images/args.gni:204
+
+### bazel_product_bundle_root
+
+bazel_product_bundle_[root|prefix|board] together identifies the
 bazel_product_bundle target in GN target to use in Bazel assembly. The
 actual target used is:
 
-  ${bazel_product_bundle_prefix}.${bazel_product_bundle_board}
+  ${bazel_product_bundle_root}/${bazel_product_bundle_prefix}.${bazel_product_bundle_board}
 
 NOTE: bazel_product_bundle_prefix should contain the fully qualified path
 prefix to the target. Setting both arguments is a prerequisite to enable
@@ -354,16 +360,18 @@ Bazel assembly.
 
 For example, given:
 
-  bazel_product_bundle_prefix = "//build/bazel/assembly:minimal"
+  bazel_product_bundle_root = "//"
+  bazel_product_bundle_prefix = "build/bazel/assembly:minimal"
   bazel_product_bundle_board = "x64"
 
 The actual bazel_product_bundle used for Bazel assembly is:
 
   //build/bazel/assembly:minimal.x64
 
-**Current value (from the default):** `false`
 
-From //build/images/args.gni:201
+**Current value (from the default):** `"//"`
+
+From //build/images/args.gni:203
 
 ### bazel_quiet
 
@@ -3099,7 +3107,7 @@ useful for including verification and other Bazel assembly specific targets.
 
 **Current value (from the default):** `[]`
 
-From //build/images/args.gni:211
+From //build/images/args.gni:216
 
 ### extra_gn_labels_for_bazel_inputs
 
@@ -8389,16 +8397,18 @@ From //build/images/vboot/vboot.gni:12
 
 **Current value (from the default):** `false`
 
-From //build/images/args.gni:207
+From //build/images/args.gni:212
 
 ### vendor_product_dir
+
+TODO(jayzhuang): Remove once all users are using bazel_product_bundle_root.
 
 If these are defined, bazel_product_bundle path will be overwritten
 accordingly.
 
 **Current value (from the default):** `false`
 
-From //build/images/args.gni:206
+From //build/images/args.gni:211
 
 ### verbose_image_assembly
 
