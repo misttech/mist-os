@@ -70,19 +70,29 @@ zx::result<> ClockImplVisitor::Visit(fdf_devicetree::Node& node,
 
   // Parse clocks and clock-names
   if (parser_output->find(kClockReference) != parser_output->end()) {
-    if (parser_output->find(kClockNames) == parser_output->end() ||
-        (*parser_output)[kClockNames].size() != (*parser_output)[kClockReference].size()) {
-      // We need a clock names to generate bind rules.
-      FDF_LOG(ERROR, "Clock reference '%s' does not have valid clock names property.",
-              node.name().c_str());
+    if (parser_output->find(kClockNames) == parser_output->end() &&
+        (*parser_output)[kClockReference].size() != 1u) {
+      FDF_LOG(
+          ERROR,
+          "Clock reference '%s' does not have valid clock names property. Name is required to generate bind rules, especially when more than one clock is referenced.",
+          node.name().c_str());
       return zx::error(ZX_ERR_INVALID_ARGS);
     }
 
-    for (uint32_t index = 0; index < (*parser_output)[kClockReference].size(); index++) {
+    size_t count = (*parser_output)[kClockReference].size();
+    std::vector<std::optional<std::string>> clock_names(count);
+    if (parser_output->find(kClockNames) != parser_output->end()) {
+      size_t name_idx = 0;
+      for (auto& names : (*parser_output)[kClockNames]) {
+        clock_names[name_idx++] = names.AsString();
+      }
+    }
+
+    for (uint32_t index = 0; index < count; index++) {
       auto reference = (*parser_output)[kClockReference][index].AsReference();
       if (reference && is_match(reference->first.name())) {
-        auto result = ParseReferenceChild(node, reference->first, reference->second,
-                                          (*parser_output)[kClockNames][index].AsString());
+        auto result =
+            ParseReferenceChild(node, reference->first, reference->second, clock_names[index]);
         if (result.is_error()) {
           return result.take_error();
         }
@@ -139,7 +149,7 @@ zx::result<> ClockImplVisitor::Visit(fdf_devicetree::Node& node,
 }
 
 zx::result<> ClockImplVisitor::AddChildNodeSpec(fdf_devicetree::Node& child, uint32_t id,
-                                                std::string clock_name) {
+                                                std::optional<std::string_view> clock_name) {
   auto clock_node = fuchsia_driver_framework::ParentSpec{{
       .bind_rules =
           {
@@ -151,10 +161,14 @@ zx::result<> ClockImplVisitor::AddChildNodeSpec(fdf_devicetree::Node& child, uin
           {
               fdf::MakeProperty(bind_fuchsia::FIDL_PROTOCOL,
                                 bind_fuchsia_clock::BIND_FIDL_PROTOCOL_SERVICE),
-              fdf::MakeProperty(bind_fuchsia_clock::FUNCTION,
-                                "fuchsia.clock.FUNCTION." + clock_name),
           },
   }};
+
+  if (clock_name) {
+    clock_node.properties().push_back(fdf::MakeProperty(
+        bind_fuchsia_clock::FUNCTION, "fuchsia.clock.FUNCTION." + std::string(*clock_name)));
+  }
+
   child.AddNodeSpec(clock_node);
   return zx::ok();
 }
@@ -185,13 +199,6 @@ zx::result<> ClockImplVisitor::ParseReferenceChild(fdf_devicetree::Node& child,
                                                    fdf_devicetree::ReferenceNode& parent,
                                                    fdf_devicetree::PropertyCells specifiers,
                                                    std::optional<std::string_view> clock_name) {
-  if (!clock_name) {
-    FDF_LOG(ERROR, "Clock reference '%s' does not have a valid name", child.name().c_str());
-    return zx::error(ZX_ERR_INVALID_ARGS);
-  }
-
-  auto reference_name = std::string(*clock_name);
-
   auto& controller = GetController(*parent.phandle());
 
   if (specifiers.size_bytes() != 1 * sizeof(uint32_t)) {
@@ -206,13 +213,13 @@ zx::result<> ClockImplVisitor::ParseReferenceChild(fdf_devicetree::Node& child,
   id.clock_id = cells.id();
 
   FDF_LOG(DEBUG, "Clock ID added - ID 0x%x name '%s' to controller '%s'", cells.id(),
-          reference_name.c_str(), parent.name().c_str());
+          clock_name ? std::string(*clock_name).c_str() : "<anonymous>", parent.name().c_str());
 
   controller.clock_ids_metadata.insert(controller.clock_ids_metadata.end(),
                                        reinterpret_cast<const uint8_t*>(&id),
                                        reinterpret_cast<const uint8_t*>(&id) + sizeof(clock_id_t));
 
-  return AddChildNodeSpec(child, id.clock_id, reference_name);
+  return AddChildNodeSpec(child, id.clock_id, clock_name);
 }
 
 zx::result<> ClockImplVisitor::ParseInitChild(

@@ -65,9 +65,10 @@ TEST(ClockImplVisitorTest, TestClocksProperty) {
       auto metadata_start = reinterpret_cast<clock_id_t*>(metadata_blob_1.data());
       std::vector<clock_id_t> clock_ids(
           metadata_start, metadata_start + (metadata_blob_1.size() / sizeof(clock_id_t)));
-      ASSERT_EQ(clock_ids.size(), 2lu);
+      ASSERT_EQ(clock_ids.size(), 3lu);
       EXPECT_EQ(clock_ids[0].clock_id, static_cast<uint32_t>(CLK_ID1));
       EXPECT_EQ(clock_ids[1].clock_id, static_cast<uint32_t>(CLK_ID2));
+      EXPECT_EQ(clock_ids[2].clock_id, static_cast<uint32_t>(CLK_ID6));
 
       // Init steps metadata
       std::vector<uint8_t> metadata_blob_2 = std::move(*(*metadata)[1].data());
@@ -165,10 +166,23 @@ TEST(ClockImplVisitorTest, TestClocksProperty) {
       auto mgr_request = clock_tester->env().SyncCall(
           &fdf_devicetree::testing::FakeEnvWrapper::mgr_requests_at, mgr_request_idx++);
       ASSERT_TRUE(mgr_request.parents().has_value());
-      ASSERT_EQ(3lu, mgr_request.parents()->size());
+      ASSERT_EQ(4lu, mgr_request.parents()->size());
 
       // 1st parent is pdev. Skipping that.
-      for (size_t i = 1; i < 3; i++) {
+
+      // 2nd is the clock impl parent.
+      EXPECT_TRUE(fdf_devicetree::testing::CheckHasProperties(
+          {{fdf::MakeProperty(bind_fuchsia::FIDL_PROTOCOL,
+                              bind_fuchsia_clock::BIND_FIDL_PROTOCOL_SERVICE)}},
+          (*mgr_request.parents())[1].properties(), false));
+      EXPECT_TRUE(fdf_devicetree::testing::CheckHasBindRules(
+          {{fdf::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
+                                    bind_fuchsia_clock::BIND_FIDL_PROTOCOL_SERVICE),
+            fdf::MakeAcceptBindRule(bind_fuchsia::CLOCK_ID, static_cast<uint32_t>(CLK_ID6))}},
+          (*mgr_request.parents())[1].bind_rules(), false));
+
+      // The rest are init step clock parents.
+      for (size_t i = 2; i < 4; i++) {
         EXPECT_TRUE(fdf_devicetree::testing::CheckHasProperties(
             {{
                 fdf::MakeProperty(bind_fuchsia::INIT_STEP,

@@ -34,6 +34,7 @@
       assigned-clocks = <&clkA CLK_ID3 &clkB CLK_ID4>;
       assigned-clock-rates = <0 CLK_ID4_RATE>;
       assigned-clock-parents = <&clkA CLK_ID5>;
+      clocks = <&clkA CLK_ID6>;
     };
 
 };
