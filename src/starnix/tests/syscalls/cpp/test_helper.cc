@@ -290,7 +290,7 @@ void RecursiveUnmountAndRemove(const std::string &path) {
   int dir_fd = open(path.c_str(), O_DIRECTORY | O_NOFOLLOW);
   if (dir_fd >= 0) {
     DIR *dir = fdopendir(dir_fd);
-    EXPECT_NE(dir, nullptr) << "fdopendir: " << std::strerror(errno) << std::endl;
+    EXPECT_NE(dir, nullptr) << "fdopendir: " << std::strerror(errno);
     while (struct dirent *entry = readdir(dir)) {
       std::string name(entry->d_name);
       if (name == "." || name == "..")
@@ -302,7 +302,7 @@ void RecursiveUnmountAndRemove(const std::string &path) {
         EXPECT_THAT(unlink(subpath.c_str()), SyscallSucceeds()) << subpath;
       }
     }
-    EXPECT_EQ(closedir(dir), 0) << "closedir: " << std::strerror(errno) << std::endl;
+    EXPECT_EQ(closedir(dir), 0) << "closedir: " << std::strerror(errno);
   }
 
   EXPECT_THAT(rmdir(path.c_str()), SyscallSucceeds());

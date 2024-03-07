@@ -649,25 +649,21 @@ TEST_F(OverlayFsTest, CanCreateExecutableFiles) {
   {
     test_helper::ScopedFD fd(
         open(file_path.c_str(), O_RDWR | O_CREAT | O_EXCL, S_IRWXU | S_IRWXG | S_IRWXO));
-    EXPECT_TRUE(fd.is_valid()) << "open: " << std::strerror(errno) << std::endl;
+    EXPECT_TRUE(fd.is_valid()) << "open: " << std::strerror(errno);
   }
   auto cleanup = fit::defer([file_path]() {
-    EXPECT_EQ(unlink(file_path.c_str()), 0) << "unlink: " << std::strerror(errno) << std::endl;
+    EXPECT_EQ(unlink(file_path.c_str()), 0) << "unlink: " << std::strerror(errno);
   });
 
   EXPECT_EQ(access(file_path.c_str(), R_OK | W_OK | X_OK), 0);
 
   struct stat file_stat;
-  EXPECT_EQ(stat(file_path.c_str(), &file_stat), 0)
-      << "stat: " << std::strerror(errno) << std::endl;
+  EXPECT_EQ(stat(file_path.c_str(), &file_stat), 0) << "stat: " << std::strerror(errno);
 
-  EXPECT_TRUE(file_stat.st_mode & S_IFREG) << "not a regular file" << std::endl;
-  EXPECT_EQ(file_stat.st_mode & S_IRWXU, static_cast<mode_t>(S_IRWXU))
-      << "wrong user permissions" << std::endl;
-  EXPECT_EQ(file_stat.st_mode & S_IRWXG, static_cast<mode_t>(S_IRWXG))
-      << "wrong group permissions" << std::endl;
-  EXPECT_EQ(file_stat.st_mode & S_IRWXO, static_cast<mode_t>(S_IRWXO))
-      << "wrong other permissions" << std::endl;
+  EXPECT_TRUE(file_stat.st_mode & S_IFREG) << "not a regular file";
+  EXPECT_EQ(file_stat.st_mode & S_IRWXU, static_cast<mode_t>(S_IRWXU)) << "wrong user permissions";
+  EXPECT_EQ(file_stat.st_mode & S_IRWXG, static_cast<mode_t>(S_IRWXG)) << "wrong group permissions";
+  EXPECT_EQ(file_stat.st_mode & S_IRWXO, static_cast<mode_t>(S_IRWXO)) << "wrong other permissions";
 }
 
 TEST_F(OverlayFsTest, CanChmodAsExecutable) {
@@ -679,31 +675,26 @@ TEST_F(OverlayFsTest, CanChmodAsExecutable) {
 
   {
     test_helper::ScopedFD fd(open(file_path.c_str(), O_RDWR | O_CREAT | O_EXCL, S_IRUSR | S_IWUSR));
-    EXPECT_TRUE(fd.is_valid()) << "open: " << std::strerror(errno) << std::endl;
+    EXPECT_TRUE(fd.is_valid()) << "open: " << std::strerror(errno);
   }
   auto cleanup = fit::defer([file_path]() {
-    EXPECT_EQ(unlink(file_path.c_str()), 0) << "unlink: " << std::strerror(errno) << std::endl;
+    EXPECT_EQ(unlink(file_path.c_str()), 0) << "unlink: " << std::strerror(errno);
   });
 
   EXPECT_EQ(access(file_path.c_str(), X_OK), -1);
 
   const mode_t new_mode = S_IRWXU | S_IRWXG | S_IRWXO;
-  EXPECT_EQ(chmod(file_path.c_str(), new_mode), 0)
-      << "chmod: " << std::strerror(errno) << std::endl;
+  EXPECT_EQ(chmod(file_path.c_str(), new_mode), 0) << "chmod: " << std::strerror(errno);
 
   EXPECT_EQ(access(file_path.c_str(), X_OK), 0);
 
   struct stat file_stat;
-  EXPECT_EQ(stat(file_path.c_str(), &file_stat), 0)
-      << "stat: " << std::strerror(errno) << std::endl;
+  EXPECT_EQ(stat(file_path.c_str(), &file_stat), 0) << "stat: " << std::strerror(errno);
 
-  EXPECT_TRUE(file_stat.st_mode & S_IFREG) << "not a regular file" << std::endl;
-  EXPECT_EQ(file_stat.st_mode & S_IRWXU, static_cast<mode_t>(S_IRWXU))
-      << "wrong user permissions" << std::endl;
-  EXPECT_EQ(file_stat.st_mode & S_IRWXG, static_cast<mode_t>(S_IRWXG))
-      << "wrong group permissions" << std::endl;
-  EXPECT_EQ(file_stat.st_mode & S_IRWXO, static_cast<mode_t>(S_IRWXO))
-      << "wrong other permissions" << std::endl;
+  EXPECT_TRUE(file_stat.st_mode & S_IFREG) << "not a regular file";
+  EXPECT_EQ(file_stat.st_mode & S_IRWXU, static_cast<mode_t>(S_IRWXU)) << "wrong user permissions";
+  EXPECT_EQ(file_stat.st_mode & S_IRWXG, static_cast<mode_t>(S_IRWXG)) << "wrong group permissions";
+  EXPECT_EQ(file_stat.st_mode & S_IRWXO, static_cast<mode_t>(S_IRWXO)) << "wrong other permissions";
 }
 
 }  // namespace

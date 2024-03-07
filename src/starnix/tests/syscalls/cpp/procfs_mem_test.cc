@@ -30,24 +30,22 @@ TEST_P(ProcSelfMemProts, CanWriteToPrivateAnonymousMappings) {
 
   const size_t page_size = SAFE_SYSCALL(sysconf(_SC_PAGE_SIZE));
   void* mapped = mmap(nullptr, page_size, prot, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-  ASSERT_NE(mapped, MAP_FAILED) << "mmap: " << std::strerror(errno) << std::endl;
+  ASSERT_NE(mapped, MAP_FAILED) << "mmap: " << std::strerror(errno);
   auto cleanup = fit::defer([mapped, page_size]() { EXPECT_EQ(munmap(mapped, page_size), 0); });
 
   test_helper::ScopedFD fd = test_helper::ScopedFD(open("/proc/self/mem", O_RDWR));
-  ASSERT_TRUE(fd.is_valid()) << "open /proc/self/mem: " << std::strerror(errno) << std::endl;
+  ASSERT_TRUE(fd.is_valid()) << "open /proc/self/mem: " << std::strerror(errno);
 
   const off_t offset = reinterpret_cast<off_t>(mapped);
-  ASSERT_EQ(lseek(fd.get(), offset, SEEK_SET), offset)
-      << "lseek: " << std::strerror(errno) << std::endl;
+  ASSERT_EQ(lseek(fd.get(), offset, SEEK_SET), offset) << "lseek: " << std::strerror(errno);
 
   memset(buf, 'a', sizeof(buf));
 
   ssize_t n = write(fd.get(), buf, sizeof(buf));
-  EXPECT_NE(n, -1) << "write: " << std::strerror(errno) << std::endl;
+  EXPECT_NE(n, -1) << "write: " << std::strerror(errno);
   EXPECT_EQ(static_cast<size_t>(n), sizeof(buf));
 
-  ASSERT_EQ(mprotect(mapped, page_size, PROT_READ), 0)
-      << "mprotect: " << std::strerror(errno) << std::endl;
+  ASSERT_EQ(mprotect(mapped, page_size, PROT_READ), 0) << "mprotect: " << std::strerror(errno);
   EXPECT_EQ(memcmp(mapped, buf, sizeof(buf)), 0);
 }
 
