@@ -299,7 +299,7 @@ fn handle_incoming_packet<WireI, BC, CC>(
                                 let TcpSocketState { socket_state, ip_options: _ } = socket_state;
                                 match core_ctx {
                                     MaybeDualStack::NotDualStack((_core_ctx, _converter)) => {
-                                        // TODO(https://issues.fuchsia.dev/42085913):
+                                        // TODO(https://issues.fuchsia.dev/316408184):
                                         // Remove this unreachable!.
                                         unreachable!("OtherStack socket ID with non dual stack");
                                     }
