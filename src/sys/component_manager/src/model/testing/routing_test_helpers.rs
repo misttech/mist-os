@@ -87,6 +87,7 @@ pub struct RoutingTestBuilder {
     capability_policy: HashMap<CapabilityAllowlistKey, HashSet<AllowlistEntry>>,
     debug_capability_policy: HashMap<DebugCapabilityKey, HashSet<DebugCapabilityAllowlistEntry>>,
     child_policy: ChildPolicyAllowlists,
+    configs: Vec<(String, ConfigValuesData)>,
 }
 
 impl RoutingTestBuilder {
@@ -106,7 +107,16 @@ impl RoutingTestBuilder {
             capability_policy: HashMap::new(),
             debug_capability_policy: HashMap::new(),
             child_policy: ChildPolicyAllowlists::default(),
+            configs: Vec::new(),
         }
+    }
+
+    /// Add a configuration file at a given `path`.
+    /// This will be added to the resolver for the created test and given to
+    /// a component that requests this file.
+    pub fn add_config(mut self, path: &str, values: ConfigValuesData) -> Self {
+        self.configs.push((path.to_string(), values));
+        self
     }
 
     /// Expose the given `DirectoryEntry` at the given path of the `component`'s outgoing
@@ -272,6 +282,9 @@ impl RoutingTest {
         for (name, blocker) in builder.blockers {
             let (send, recv) = blocker;
             mock_resolver.add_blocker(name, send, recv);
+        }
+        for (path, values) in builder.configs {
+            mock_resolver.add_config_values(&path, values);
         }
 
         // Add the `test_runner` capability as a built-in.

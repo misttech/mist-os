@@ -375,6 +375,7 @@ pub struct CapabilityBuilder {
     backing_dir: Option<Name>,
     storage_source: Option<cm_rust::StorageDirectorySource>,
     storage_id: fdecl::StorageId,
+    value: Option<cm_rust::ConfigValue>,
 }
 
 impl CapabilityBuilder {
@@ -406,6 +407,10 @@ impl CapabilityBuilder {
         Self::new(CapabilityTypeName::Dictionary)
     }
 
+    pub fn config() -> Self {
+        Self::new(CapabilityTypeName::Config)
+    }
+
     pub fn name(mut self, name: &str) -> Self {
         self.name = Some(name.parse().unwrap());
         if self.path.is_some() {
@@ -426,8 +431,9 @@ impl CapabilityBuilder {
             }
             CapabilityTypeName::Dictionary
             | CapabilityTypeName::Storage
+            | CapabilityTypeName::Config
             | CapabilityTypeName::Directory => {}
-            CapabilityTypeName::EventStream | CapabilityTypeName::Config => unreachable!(),
+            CapabilityTypeName::EventStream => unreachable!(),
         }
         self
     }
@@ -444,6 +450,7 @@ impl CapabilityBuilder {
             backing_dir: None,
             storage_source: None,
             storage_id: fdecl::StorageId::StaticInstanceIdOrMoniker,
+            value: None,
         }
     }
 
@@ -480,6 +487,12 @@ impl CapabilityBuilder {
     pub fn backing_dir(mut self, backing_dir: &str) -> Self {
         assert_matches!(self.type_, CapabilityTypeName::Storage);
         self.backing_dir = Some(backing_dir.parse().unwrap());
+        self
+    }
+
+    pub fn value(mut self, value: cm_rust::ConfigValue) -> Self {
+        assert_matches!(self.type_, CapabilityTypeName::Config);
+        self.value = Some(value);
         self
     }
 
@@ -544,7 +557,13 @@ impl CapabilityBuilder {
                     rights: self.rights,
                 })
             }
-            CapabilityTypeName::EventStream | CapabilityTypeName::Config => unreachable!(),
+            CapabilityTypeName::Config => {
+                cm_rust::CapabilityDecl::Config(cm_rust::ConfigurationDecl {
+                    name: self.name.expect("name not set"),
+                    value: self.value.expect("value not set"),
+                })
+            }
+            CapabilityTypeName::EventStream => unreachable!(),
         }
     }
 }
