@@ -275,60 +275,67 @@ async fn get_impl(
     let needed_blobs = needed_blobs.into_stream().map_err(|_| Status::INTERNAL)?;
     let pkg: Hash = meta_far_blob.blob_id.into();
 
-    let (root_dir, package_status) =
-        match (gc_protection, get_package_status(base_packages, package_index, &pkg).await) {
-            // During OTA (which is the only client of Retained protection) do not short-circuit
-            // fetches of packages expected to be resident, so that the system can recover from
-            // unexpectedly absent blobs.
-            (fpkg::GcProtection::Retained, _)
-            | (fpkg::GcProtection::OpenPackageTracking, PackageStatus::Other) => {
-                let (root_dir, package_status) = serve_needed_blobs(
-                    needed_blobs,
-                    meta_far_blob,
-                    gc_protection,
-                    package_index,
-                    blobfs,
-                    node,
-                )
-                .await
-                .map_err(|e| {
-                    error!("error while caching package {}: {:#}", pkg, anyhow!(e));
-                    cobalt_sender.open_io_error();
-                    Status::UNAVAILABLE
-                })?;
-                (Some(root_dir), package_status)
+    let (root_dir, package_status) = match gc_protection {
+        // During OTA (which is the only client of Retained protection) do not short-circuit
+        // fetches of packages expected to be resident, so that the system can recover from
+        // unexpectedly absent blobs.
+        fpkg::GcProtection::Retained => {
+            let root_dir = serve_needed_blobs(
+                needed_blobs,
+                meta_far_blob,
+                gc_protection,
+                package_index,
+                blobfs,
+                node,
+            )
+            .await
+            .map_err(|e| {
+                error!("error while caching package {}: {:#}", pkg, anyhow!(e));
+                cobalt_sender.open_io_error();
+                Status::UNAVAILABLE
+            })?;
+            (Arc::new(root_dir), PackageStatus::Other)
+        }
+        fpkg::GcProtection::OpenPackageTracking => {
+            match get_package_status(base_packages, package_index, &pkg).await {
+                PackageStatus::Other => {
+                    let root_dir = serve_needed_blobs(
+                        needed_blobs,
+                        meta_far_blob,
+                        gc_protection,
+                        package_index,
+                        blobfs,
+                        node,
+                    )
+                    .await
+                    .map_err(|e| {
+                        error!("error while caching package {}: {:#}", pkg, anyhow!(e));
+                        cobalt_sender.open_io_error();
+                        Status::UNAVAILABLE
+                    })?;
+                    let root_dir =
+                        open_packages.get_or_insert(pkg, Some(root_dir)).await.map_err(|e| {
+                            error!("get: open_packages.get_or_insert {}: {:#}", pkg, anyhow!(e));
+                            cobalt_sender.open_io_error();
+                            Status::INTERNAL
+                        })?;
+                    (root_dir, PackageStatus::Active)
+                }
+                ps @ PackageStatus::Base | ps @ PackageStatus::Active => {
+                    let () = needed_blobs.control_handle().shutdown_with_epitaph(Status::OK);
+                    let root_dir = open_packages.get_or_insert(pkg, None).await.map_err(|e| {
+                        error!("get: open_packages.get_or_insert {}: {:#}", pkg, anyhow!(e));
+                        cobalt_sender.open_io_error();
+                        Status::INTERNAL
+                    })?;
+                    (root_dir, ps)
+                }
             }
-            (
-                fpkg::GcProtection::OpenPackageTracking,
-                ps @ PackageStatus::Base | ps @ PackageStatus::Active,
-            ) => {
-                let () = needed_blobs.control_handle().shutdown_with_epitaph(Status::OK);
-                (None, ps)
-            }
-        };
+        }
+    };
 
     let open_flags =
         make_pkgdir_flags(executability_status(executability_restrictions, &package_status));
-    let root_dir = match gc_protection {
-        fpkg::GcProtection::Retained => {
-            if let Some(root_dir) = root_dir {
-                Arc::new(root_dir)
-            } else {
-                package_directory::RootDir::new(blobfs.clone(), pkg).await.map_err(|e| {
-                    error!("get: creating RootDir {}: {:#}", pkg, anyhow!(e));
-                    cobalt_sender.open_io_error();
-                    Status::INTERNAL
-                })?
-            }
-        }
-        fpkg::GcProtection::OpenPackageTracking => {
-            open_packages.get_or_insert(pkg, root_dir).await.map_err(|e| {
-                error!("get: open_packages.get_or_insert {}: {:#}", pkg, anyhow!(e));
-                cobalt_sender.open_io_error();
-                Status::INTERNAL
-            })?
-        }
-    };
     let () = root_dir.open(scope, open_flags, vfs::path::Path::dot(), dir.into_channel().into());
 
     cobalt_sender.open_success();
@@ -445,7 +452,7 @@ async fn serve_needed_blobs(
     package_index: &async_lock::RwLock<PackageIndex>,
     blobfs: &blobfs::Client,
     node: &finspect::Node,
-) -> Result<(package_directory::RootDir<blobfs::Client>, PackageStatus), ServeNeededBlobsError> {
+) -> Result<package_directory::RootDir<blobfs::Client>, ServeNeededBlobsError> {
     let state = node.create_string("state", "need-meta-far");
     let res = async {
         // Step 1: Open and write the meta.far, or determine it is not needed.
@@ -483,20 +490,13 @@ async fn serve_needed_blobs(
     }
     .await;
 
-    let res = match res {
-        Ok(root_dir) => Ok((
-            root_dir,
-            package_index
-                .write()
-                .await
-                .complete_install(meta_far_info.blob_id.into(), gc_protection)?,
-        )),
-        Err(e) => {
-            package_index
-                .write()
-                .await
-                .cancel_install(&meta_far_info.blob_id.into(), gc_protection);
-            Err(e)
+    let () = match &res {
+        Ok(_) => package_index
+            .write()
+            .await
+            .complete_install(meta_far_info.blob_id.into(), gc_protection)?,
+        Err(_) => {
+            package_index.write().await.cancel_install(&meta_far_info.blob_id.into(), gc_protection)
         }
     };
 

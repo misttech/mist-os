@@ -133,13 +133,10 @@ impl PackageIndex {
         &mut self,
         package_hash: Hash,
         gc_protection: fpkg::GcProtection,
-    ) -> Result<crate::cache_service::PackageStatus, CompleteInstallError> {
+    ) -> Result<(), CompleteInstallError> {
         match gc_protection {
-            fpkg::GcProtection::Retained => Ok(crate::cache_service::PackageStatus::Other),
-            fpkg::GcProtection::OpenPackageTracking => self
-                .dynamic
-                .complete_install(package_hash)
-                .map(|()| crate::cache_service::PackageStatus::Active),
+            fpkg::GcProtection::Retained => Ok(()),
+            fpkg::GcProtection::OpenPackageTracking => self.dynamic.complete_install(package_hash),
         }
     }
 
@@ -303,10 +300,7 @@ mod tests {
         index
             .add_blobs(hash(0), HashSet::from([hash(1)]), fpkg::GcProtection::OpenPackageTracking)
             .unwrap();
-        assert_eq!(
-            index.complete_install(hash(0), fpkg::GcProtection::OpenPackageTracking).unwrap(),
-            PackageStatus::Active
-        );
+        let () = index.complete_install(hash(0), fpkg::GcProtection::OpenPackageTracking).unwrap();
 
         assert_eq!(
             index.retained.packages(),
@@ -370,14 +364,8 @@ mod tests {
             hash(1) => None,
         }));
 
-        assert_eq!(
-            index.complete_install(hash(0), fpkg::GcProtection::OpenPackageTracking).unwrap(),
-            PackageStatus::Active
-        );
-        assert_eq!(
-            index.complete_install(hash(1), fpkg::GcProtection::OpenPackageTracking).unwrap(),
-            PackageStatus::Active
-        );
+        let () = index.complete_install(hash(0), fpkg::GcProtection::OpenPackageTracking).unwrap();
+        let () = index.complete_install(hash(1), fpkg::GcProtection::OpenPackageTracking).unwrap();
 
         assert_eq!(
             index.retained.packages(),
@@ -467,10 +455,7 @@ mod tests {
         index
             .add_blobs(hash(2), HashSet::from([hash(10)]), fpkg::GcProtection::OpenPackageTracking)
             .unwrap();
-        assert_eq!(
-            index.complete_install(hash(2), fpkg::GcProtection::OpenPackageTracking).unwrap(),
-            PackageStatus::Active
-        );
+        let () = index.complete_install(hash(2), fpkg::GcProtection::OpenPackageTracking).unwrap();
 
         assert_eq!(
             index.retained.packages(),
@@ -661,10 +646,7 @@ mod tests {
             }
         );
 
-        assert_eq!(
-            index.complete_install(hash(2), fpkg::GcProtection::OpenPackageTracking).unwrap(),
-            PackageStatus::Active
-        );
+        let () = index.complete_install(hash(2), fpkg::GcProtection::OpenPackageTracking).unwrap();
         assert_eq!(
             index.dynamic.packages(),
             hashmap! {
@@ -795,14 +777,8 @@ mod tests {
             )
             .unwrap();
 
-        assert_eq!(
-            index.complete_install(hash(0), fpkg::GcProtection::OpenPackageTracking).unwrap(),
-            PackageStatus::Active
-        );
-        assert_eq!(
-            index.complete_install(hash(1), fpkg::GcProtection::OpenPackageTracking).unwrap(),
-            PackageStatus::Active
-        );
+        let () = index.complete_install(hash(0), fpkg::GcProtection::OpenPackageTracking).unwrap();
+        let () = index.complete_install(hash(1), fpkg::GcProtection::OpenPackageTracking).unwrap();
 
         assert_eq!(
             index.all_blobs(),
