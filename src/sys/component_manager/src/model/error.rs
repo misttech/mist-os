@@ -726,8 +726,6 @@ pub enum OpenError {
         #[source]
         err: Box<ModelError>,
     },
-    #[error("source instance not found")]
-    SourceInstanceNotFound,
     #[error("no capability provider found")]
     CapabilityProviderNotFound,
     #[error("capability provider error: {err}")]
@@ -755,7 +753,6 @@ impl OpenError {
             Self::CapabilityProviderError { err } => err.as_zx_status(),
             Self::BedrockOpen(err) => err.as_zx_status(),
             Self::CapabilityProviderNotFound => zx::Status::NOT_FOUND,
-            Self::SourceInstanceNotFound => zx::Status::NOT_FOUND,
             Self::Timeout => zx::Status::TIMED_OUT,
         }
     }

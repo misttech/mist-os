@@ -7,7 +7,7 @@ use {
         capability::{CapabilityProvider, CapabilitySource},
         model::{
             component::{ComponentInstance, ExtendedInstance, StartReason, WeakComponentInstance},
-            error::{ModelError, OpenError},
+            error::{CapabilityProviderError, ModelError, OpenError},
             routing::{
                 providers::{
                     DefaultComponentCapabilityProvider, DirectoryEntryCapabilityProvider,
@@ -117,7 +117,7 @@ impl<'a> OpenRequest<'a> {
         let OpenOptions { flags, relative_path, mut server_chan } = open_options;
 
         let source_instance =
-            source.source_instance().upgrade().map_err(|_| OpenError::SourceInstanceNotFound)?;
+            source.source_instance().upgrade().map_err(CapabilityProviderError::from)?;
         let task_group = match source_instance {
             ExtendedInstance::AboveRoot(top) => top.task_group(),
             ExtendedInstance::Component(component) => component.nonblocking_task_group(),
