@@ -17,7 +17,6 @@
                 "adjtimex01",
                 "adjtimex02",
                 "adjtimex03",
-                "aio01",
                 "bind02",
                 "bpf_prog01",
                 "bpf_prog05",
@@ -85,15 +84,10 @@
                 "getpriority02",
                 "io_cancel01",
                 "io_cancel02",
-                "io_destroy01",
-                "io_destroy02",
                 "io_getevents01",
                 "io_getevents02",
                 "io_setup01",
                 "io_setup02",
-                "io_submit01",
-                "io_submit02",
-                "io_submit03",
 
                 // Skipped with tmpfs.
                 "ioctl_loop05",
@@ -224,6 +218,7 @@
                 "fallocate05",
 
                 // These tests hang
+                "aio01",
                 "creat07",
                 "fork14",
 

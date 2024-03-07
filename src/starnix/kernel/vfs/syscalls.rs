@@ -23,6 +23,8 @@ use crate::{
     },
 };
 use fuchsia_zircon as zx;
+use linux_uapi::{IOCB_CMD_PREAD, IOCB_CMD_PWRITE};
+use smallvec::smallvec;
 use starnix_logging::{log_trace, track_stub};
 use starnix_sync::{LockBefore, Locked, Mutex, ReadOps, Unlocked};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
@@ -31,8 +33,7 @@ use starnix_uapi::{
     auth::{CAP_DAC_READ_SEARCH, CAP_SYS_ADMIN, CAP_WAKE_ALARM, PTRACE_MODE_ATTACH_REALCREDS},
     device_type::DeviceType,
     errno, error,
-    errors::EFAULT,
-    errors::{Errno, ErrnoResultExt, EINTR, ENAMETOOLONG, ETIMEDOUT},
+    errors::{Errno, ErrnoResultExt, EFAULT, EINTR, ENAMETOOLONG, ETIMEDOUT},
     f_owner_ex,
     file_mode::{Access, FileMode},
     inotify_mask::InotifyMask,
@@ -40,6 +41,7 @@ use starnix_uapi::{
     mount_flags::MountFlags,
     off_t,
     open_flags::OpenFlags,
+    ownership::OwnedRef,
     personality::PersonalityFlags,
     pid_t, pollfd, pselect6_sigmask,
     resource_limits::Resource,
@@ -69,7 +71,13 @@ use starnix_uapi::{
     XATTR_NAME_MAX, XATTR_REPLACE,
 };
 use std::{
-    cmp::Ordering, collections::VecDeque, marker::PhantomData, mem::MaybeUninit, sync::Arc, usize,
+    cmp::Ordering,
+    collections::VecDeque,
+    convert::TryInto,
+    marker::PhantomData,
+    mem::MaybeUninit,
+    sync::{mpsc::channel, Arc},
+    usize,
 };
 
 // Constants from bionic/libc/include/sys/stat.h
@@ -2707,23 +2715,139 @@ pub fn sys_readahead(
 
 pub fn sys_io_setup(
     _locked: &mut Locked<'_, Unlocked>,
-    _current_task: &CurrentTask,
-    _nr_events: u32,
-    _ctx_idp: UserRef<aio_context_t>,
+    current_task: &CurrentTask,
+    nr_events: u32,
+    ctx_idp: UserRef<aio_context_t>,
 ) -> Result<(), Errno> {
-    track_stub!(TODO("https://fxbug.dev/297433877"), "io_setup");
-    return error!(ENOSYS);
+    let mut mm_state = current_task.mm().state.write();
+    let ctx_id = mm_state.aio_contexts.setup_context(nr_events)?;
+    current_task.write_object(ctx_idp, &ctx_id)?;
+    Ok(())
 }
+
 pub fn sys_io_submit(
-    _locked: &mut Locked<'_, Unlocked>,
-    _current_task: &CurrentTask,
-    _ctx_id: aio_context_t,
-    _nr: i64,
-    _control_blocks: UserAddress,
+    locked: &mut Locked<'_, Unlocked>,
+    current_task: &CurrentTask,
+    ctx_id: aio_context_t,
+    nr: i32,
+    iocbpp: UserAddress,
 ) -> Result<i32, Errno> {
-    track_stub!(TODO("https://fxbug.dev/297433877"), "io_submit");
-    return error!(ENOSYS);
+    if nr < 0 {
+        return error!(EINVAL);
+    }
+    if nr == 0 {
+        return Ok(0);
+    }
+    {
+        let mm_state = current_task.mm().state.read();
+        let ctx = mm_state.aio_contexts.get_context(ctx_id).ok_or_else(|| errno!(EINVAL))?;
+        if !ctx.can_queue() {
+            return error!(EAGAIN);
+        }
+    }
+
+    let (iocb_sender, iocb_receiver) = channel::<(u32, FileHandle, UserBuffer, usize)>();
+    let weak_task = OwnedRef::downgrade(&current_task.task);
+    current_task.kernel().kthreads.spawn(move |inner_locked, current_task| loop {
+        let (opcode, file, buffer, offset) = match iocb_receiver.recv() {
+            Ok(r) => r,
+            Err(_) => return,
+        };
+        if let Some(task) = weak_task.upgrade() {
+            match opcode {
+                IOCB_CMD_PREAD => {
+                    let mut output_buffer =
+                        match UserBuffersOutputBuffer::vmo_new(&task, smallvec![buffer]) {
+                            Ok(b) => b,
+                            Err(_) => continue,
+                        };
+                    if offset != 0 {
+                        let _ =
+                            file.read_at(inner_locked, current_task, offset, &mut output_buffer);
+                    } else {
+                        let _ = file.read(inner_locked, current_task, &mut output_buffer);
+                    }
+                }
+                IOCB_CMD_PWRITE => {
+                    let mut input_buffer =
+                        match UserBuffersInputBuffer::vmo_new(&task, smallvec![buffer]) {
+                            Ok(b) => b,
+                            Err(_) => continue,
+                        };
+                    if offset != 0 {
+                        let _ =
+                            file.write_at(inner_locked, current_task, offset, &mut input_buffer);
+                    } else {
+                        let _ = file.write(inner_locked, current_task, &mut input_buffer);
+                    }
+                }
+                _ => {}
+            }
+        }
+    });
+
+    // `iocbpp` is an array of addresses to iocb's.
+    let mut iocb_addrs: UserRef<UserAddress> = UserRef::new(iocbpp);
+    let mut num_submitted: i32 = 0;
+    loop {
+        let iocb_addr = current_task.read_object(iocb_addrs)?;
+        let iocb_ref: UserRef<iocb> = UserRef::new(iocb_addr);
+        let control_block = current_task.read_object(iocb_ref)?;
+
+        match (num_submitted, submit_iocb(locked, current_task, control_block, iocb_sender.clone()))
+        {
+            (0, Err(e)) => return Err(e),
+            (_, Err(_)) => break,
+            (_, Ok(())) => {
+                num_submitted += 1;
+                if num_submitted == nr {
+                    break;
+                }
+            }
+        };
+
+        iocb_addrs = iocb_addrs.next();
+    }
+
+    Ok(num_submitted.into())
 }
+
+fn submit_iocb(
+    _locked: &mut Locked<'_, Unlocked>,
+    current_task: &CurrentTask,
+    control_block: iocb,
+    iocb_sender: std::sync::mpsc::Sender<(u32, FileHandle, UserBuffer, usize)>,
+) -> Result<(), Errno> {
+    let file = current_task.files.get(FdNumber::from_raw(control_block.aio_fildes as i32))?;
+    let opcode = control_block.aio_lio_opcode as u32;
+    let offset = control_block.aio_offset as usize;
+    let buffer = UserBuffer {
+        address: control_block.aio_buf.into(),
+        length: control_block.aio_nbytes as usize,
+    };
+
+    match opcode {
+        IOCB_CMD_PREAD | IOCB_CMD_PWRITE => {}
+        _ => {
+            track_stub!(TODO("https://fxbug.dev/297433877"), "io_submit opcode", opcode);
+            return error!(ENOSYS);
+        }
+    }
+
+    // Verify that the operation is permitted on the file before attempting it on a separate
+    // thread, so that an error can be returned.
+    if opcode == IOCB_CMD_PWRITE && !file.can_write() {
+        return error!(EBADF);
+    }
+    if opcode == IOCB_CMD_PREAD && !file.can_read() {
+        return error!(EBADF);
+    }
+
+    let _ = iocb_sender.send((opcode, file, buffer, offset));
+
+    Ok(())
+}
+
 pub fn sys_io_getevents(
     _locked: &mut Locked<'_, Unlocked>,
     _current_task: &CurrentTask,
@@ -2736,6 +2860,7 @@ pub fn sys_io_getevents(
     track_stub!(TODO("https://fxbug.dev/297433877"), "io_getevents");
     return error!(ENOSYS);
 }
+
 pub fn sys_io_cancel(
     _locked: &mut Locked<'_, Unlocked>,
     _current_task: &CurrentTask,
@@ -2746,13 +2871,14 @@ pub fn sys_io_cancel(
     track_stub!(TODO("https://fxbug.dev/297433877"), "io_cancel");
     return error!(ENOSYS);
 }
+
 pub fn sys_io_destroy(
     _locked: &mut Locked<'_, Unlocked>,
-    _current_task: &CurrentTask,
-    _ctx_id: aio_context_t,
+    current_task: &CurrentTask,
+    ctx_id: aio_context_t,
 ) -> Result<(), Errno> {
-    track_stub!(TODO("https://fxbug.dev/297433877"), "io_destroy");
-    return error!(ENOSYS);
+    let mut mm_state = current_task.mm().state.write();
+    mm_state.aio_contexts.destroy_context(ctx_id)
 }
 
 #[cfg(test)]

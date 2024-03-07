@@ -7,8 +7,8 @@ use crate::{
     signals::{SignalDetail, SignalInfo},
     task::{CurrentTask, ExceptionResult, PageFaultExceptionReport, Task},
     vfs::{
-        DynamicFile, DynamicFileBuf, FileWriteGuardRef, FsNodeOps, FsStr, FsString, NamespaceNode,
-        SequenceFileSource,
+        AioContexts, DynamicFile, DynamicFileBuf, FileWriteGuardRef, FsNodeOps, FsStr, FsString,
+        NamespaceNode, SequenceFileSource,
     },
 };
 use anyhow::{anyhow, Error};
@@ -461,6 +461,9 @@ pub struct MemoryManagerState {
     private_anonymous: PrivateAnonymousMemoryManager,
 
     forkable_state: MemoryManagerForkableState,
+
+    /// Asynchronous I/O contexts.
+    pub aio_contexts: AioContexts,
 }
 
 #[cfg(feature = "alternate_anon_allocs")]
@@ -2593,6 +2596,7 @@ impl MemoryManager {
                 #[cfg(feature = "alternate_anon_allocs")]
                 private_anonymous: PrivateAnonymousMemoryManager::new(backing_size),
                 forkable_state: Default::default(),
+                aio_contexts: Default::default(),
             }),
             // TODO(security): Reset to DISABLE, or the value in the fs.suid_dumpable sysctl, under
             // certain conditions as specified in the prctl(2) man page.

@@ -217,6 +217,7 @@ rustc_library("starnix_core") {
     "time/utc.rs",
     "vdso/mod.rs",
     "vdso/vdso_loader.rs",
+    "vfs/aio.rs",
     "vfs/anon_node.rs",
     "vfs/buffers/io_buffers.rs",
     "vfs/buffers/message_queue.rs",
