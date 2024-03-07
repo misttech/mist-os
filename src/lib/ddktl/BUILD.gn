@@ -159,7 +159,6 @@ source_set("ddktl") {
     "//src/devices/gpio/drivers/gpio:*",
     "//src/devices/gpio/drivers/ti-tca6408a:*",
     "//src/devices/gpio/lib/fuchsia.hardware.gpio:*",
-    "//src/devices/i2c/drivers/aml-i2c:*",
     "//src/devices/i2c/drivers/i2c:*",
     "//src/devices/lib/acpi:*",
     "//src/devices/lib/amlogic:*",

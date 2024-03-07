@@ -5,7 +5,6 @@
 #include "aml-i2c.h"
 
 #include <lib/ddk/metadata.h>
-#include <lib/device-protocol/pdev-fidl.h>
 #include <lib/driver/compat/cpp/logging.h>
 #include <lib/driver/component/cpp/driver_export.h>
 #include <lib/mmio/mmio-buffer.h>
@@ -371,28 +370,14 @@ zx::result<> AmlI2c::Start() {
     FDF_LOG(ERROR, "Failed to connect to pdev protocol: %s", pdev_result.status_string());
     return pdev_result.take_error();
   }
-  ddk::PDevFidl pdev(std::move(pdev_result.value()));
-  if (!pdev.is_valid()) {
-    FDF_LOG(ERROR, "ZX_PROTOCOL_PDEV not available");
-    return zx::error(ZX_ERR_NO_RESOURCES);
-  }
 
-  pdev_device_info_t info;
-  zx_status_t status = pdev.GetDeviceInfo(&info);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "pdev_get_device_info failed: %s", zx_status_get_string(status));
-    return zx::error(status);
-  }
+  fidl::WireSyncClient<fuchsia_hardware_platform_device::Device> pdev(
+      std::move(pdev_result.value()));
 
-  if (info.mmio_count != 1 || info.irq_count != 1) {
-    zxlogf(ERROR, "Invalid mmio_count (%u) or irq_count (%u)", info.mmio_count, info.irq_count);
-    return zx::error(ZX_ERR_INVALID_ARGS);
-  }
-
-  status = pdev.MapMmio(0, &regs_iobuff_);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "pdev_map_mmio_buffer failed: %s", zx_status_get_string(status));
-    return zx::error(status);
+  if (auto mmio = MapMmio(pdev); mmio.is_error()) {
+    return mmio.take_error();
+  } else {
+    regs_iobuff_.emplace(*std::move(mmio));
   }
 
   zx::result delay = GetDelay(compat_client);
@@ -401,16 +386,24 @@ zx::result<> AmlI2c::Start() {
     return delay.take_error();
   }
 
-  status = SetClockDelay(delay.value(), regs_iobuff());
+  zx_status_t status = SetClockDelay(delay.value(), regs_iobuff());
   if (status != ZX_OK) {
     FDF_LOG(ERROR, "Failed to set clock delay: %s", zx_status_get_string(status));
     return zx::error(status);
   }
 
-  status = pdev.GetInterrupt(0, 0, &irq_);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "pdev_get_interrupt failed: %s", zx_status_get_string(status));
-    return zx::error(status);
+  {
+    auto result = pdev->GetInterruptById(0, 0);
+    if (!result.ok()) {
+      zxlogf(ERROR, "Call to GetInterruptById failed: %s", result.FormatDescription().c_str());
+      return zx::error(result->error_value());
+    }
+    if (result->is_error()) {
+      zxlogf(ERROR, "GetInterruptById failed: %s", zx_status_get_string(result->error_value()));
+      return result->take_error();
+    }
+
+    irq_ = std::move(result->value()->irq);
   }
 
   status = zx::event::create(0, &event_);
@@ -446,6 +439,34 @@ void AmlI2c::PrepareStop(fdf::PrepareStopCompleter completer) {
   }
   completer_.emplace(std::move(completer));
   irq_dispatcher_->ShutdownAsync();
+}
+
+zx::result<fdf::MmioBuffer> AmlI2c::MapMmio(
+    const fidl::WireSyncClient<fuchsia_hardware_platform_device::Device>& pdev) {
+  auto mmio = pdev->GetMmioById(0);
+  if (!mmio.ok()) {
+    FDF_LOG(ERROR, "Call to GetMmioById failed: %s", mmio.FormatDescription().c_str());
+    return zx::error(mmio.status());
+  }
+  if (mmio->is_error()) {
+    FDF_LOG(ERROR, "GetMmioById failed: %s", zx_status_get_string(mmio->error_value()));
+    return mmio->take_error();
+  }
+
+  if (!mmio->value()->has_vmo() || !mmio->value()->has_size() || !mmio->value()->has_offset()) {
+    FDF_LOG(ERROR, "GetMmioById returned invalid MMIO");
+    return zx::error(ZX_ERR_BAD_STATE);
+  }
+
+  zx::result mmio_buffer =
+      fdf::MmioBuffer::Create(mmio->value()->offset(), mmio->value()->size(),
+                              std::move(mmio->value()->vmo()), ZX_CACHE_POLICY_UNCACHED_DEVICE);
+  if (mmio_buffer.is_error()) {
+    FDF_LOG(ERROR, "Failed to map MMIO: %s", mmio_buffer.status_string());
+    return zx::error(mmio_buffer.error_value());
+  }
+
+  return mmio_buffer.take_value();
 }
 
 zx_status_t AmlI2c::ServeI2cImpl() {

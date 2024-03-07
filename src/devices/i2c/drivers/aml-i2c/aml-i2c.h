@@ -6,6 +6,7 @@
 #define SRC_DEVICES_I2C_DRIVERS_AML_I2C_AML_I2C_H_
 
 #include <fidl/fuchsia.hardware.i2cimpl/cpp/driver/wire.h>
+#include <fidl/fuchsia.hardware.platform.device/cpp/wire.h>
 #include <lib/async/cpp/irq.h>
 #include <lib/driver/compat/cpp/compat.h>
 #include <lib/driver/component/cpp/driver_base.h>
@@ -34,6 +35,11 @@ class AmlI2c : public fdf::DriverBase, public fdf::WireServer<fuchsia_hardware_i
                              fidl::UnknownMethodCompleter::Sync& completer) override;
 
   void SetTimeout(zx::duration timeout) { timeout_ = timeout; }
+
+ protected:
+  // Visible for testing
+  virtual zx::result<fdf::MmioBuffer> MapMmio(
+      const fidl::WireSyncClient<fuchsia_hardware_platform_device::Device>& pdev);
 
  private:
   zx_status_t ServeI2cImpl();
