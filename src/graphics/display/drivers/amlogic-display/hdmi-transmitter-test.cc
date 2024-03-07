@@ -128,7 +128,7 @@ TEST_F(HdmiTransmitterTest, ModeSetTest) {
       .vertical_front_porch_lines = 0,
       .vertical_sync_width_lines = 0,
       .vertical_back_porch_lines = 0,
-      .pixel_clock_frequency_khz = 0,
+      .pixel_clock_frequency_hz = 0,
       .fields_per_frame = display::FieldsPerFrame::kProgressive,
       .hsync_polarity = display::SyncPolarity::kNegative,
       .vsync_polarity = display::SyncPolarity::kNegative,

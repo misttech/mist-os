@@ -51,7 +51,7 @@ constexpr display::DisplayTiming kBoeTv070wsmPanelTimings = {
     .vertical_back_porch_lines = 8,
     // The panel datasheet specifies a typical value of 42.4 MHz, with no
     // upper or lower bound.
-    .pixel_clock_frequency_khz = 44'226,  // refresh rate: 60 Hz
+    .pixel_clock_frequency_hz = 44'226'000,  // refresh rate: 60 Hz
     .fields_per_frame = display::FieldsPerFrame::kProgressive,
     .hsync_polarity = display::SyncPolarity::kNegative,
     .vsync_polarity = display::SyncPolarity::kNegative,
@@ -89,7 +89,7 @@ constexpr display::DisplayTiming kBoeTv101wxmPanelTimings = {
     // This value matches the typical value from the panel datasheet, while the
     // DDIC datasheets specify a typical value of 10.
     .vertical_back_porch_lines = 20,
-    .pixel_clock_frequency_khz = 70'702,  // refresh rate: 60 Hz
+    .pixel_clock_frequency_hz = 70'702'000,  // refresh rate: 60 Hz
     .fields_per_frame = display::FieldsPerFrame::kProgressive,
     .hsync_polarity = display::SyncPolarity::kNegative,
     .vsync_polarity = display::SyncPolarity::kNegative,
@@ -119,7 +119,7 @@ constexpr display::DisplayTiming kKdKd070d82PanelTimings = {
     .vertical_front_porch_lines = 20,
     .vertical_sync_width_lines = 6,
     .vertical_back_porch_lines = 20,
-    .pixel_clock_frequency_khz = 49'434,  // refresh rate: 60 Hz
+    .pixel_clock_frequency_hz = 49'434'000,  // refresh rate: 60 Hz
     .fields_per_frame = display::FieldsPerFrame::kProgressive,
     .hsync_polarity = display::SyncPolarity::kNegative,
     .vsync_polarity = display::SyncPolarity::kNegative,
@@ -217,7 +217,7 @@ constexpr PanelConfig kInnoluxP070acbFitipowerJd9364PanelConfig = {
             .vertical_front_porch_lines = 20,
             .vertical_sync_width_lines = 6,
             .vertical_back_porch_lines = 20,
-            .pixel_clock_frequency_khz = 49'434,  // refresh rate: 60 Hz
+            .pixel_clock_frequency_hz = 49'434'000,  // refresh rate: 60 Hz
             .fields_per_frame = display::FieldsPerFrame::kProgressive,
             .hsync_polarity = display::SyncPolarity::kNegative,
             .vsync_polarity = display::SyncPolarity::kNegative,
@@ -290,7 +290,7 @@ constexpr PanelConfig kInnoluxP101dezFitipowerJd9364PanelConfig = {
             .vertical_sync_width_lines = 4,
             // The DDIC datasheet specifies a typical value of 10.
             .vertical_back_porch_lines = 20,
-            .pixel_clock_frequency_khz = 70'702,  // refresh rate: 60 Hz
+            .pixel_clock_frequency_hz = 70'702'000,  // refresh rate: 60 Hz
             .fields_per_frame = display::FieldsPerFrame::kProgressive,
             .hsync_polarity = display::SyncPolarity::kNegative,
             .vsync_polarity = display::SyncPolarity::kNegative,
@@ -430,7 +430,7 @@ constexpr PanelConfig kMicrotechMtf050fhdi03NovatekNt35596PanelConfig = {
             .vertical_front_porch_lines = 2,
             .vertical_sync_width_lines = 4,
             .vertical_back_porch_lines = 7,
-            .pixel_clock_frequency_khz = 120'000,  // refresh rate: 55.428 Hz
+            .pixel_clock_frequency_hz = 120'000'000,  // refresh rate: 55.428 Hz
             .fields_per_frame = display::FieldsPerFrame::kProgressive,
             .hsync_polarity = display::SyncPolarity::kNegative,
             .vsync_polarity = display::SyncPolarity::kNegative,
@@ -475,7 +475,7 @@ display_setting_t ToDisplaySetting(const PanelConfig& config) {
   return display_setting_t{
       .lane_num = static_cast<uint32_t>(config.dphy_data_lane_count),
       .bit_rate_max = static_cast<uint32_t>(maximum_per_data_lane_megabit_per_second),
-      .lcd_clock = static_cast<uint32_t>(config.display_timing.pixel_clock_frequency_khz * 1000),
+      .lcd_clock = static_cast<uint32_t>(config.display_timing.pixel_clock_frequency_hz),
       .h_active = static_cast<uint32_t>(config.display_timing.horizontal_active_px),
       .v_active = static_cast<uint32_t>(config.display_timing.vertical_active_lines),
       .h_period = static_cast<uint32_t>(config.display_timing.horizontal_total_px()),

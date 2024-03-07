@@ -186,7 +186,7 @@ TEST(CtaTimingToDisplayTiming, InterlacedWithAlternatingVblank) {
   EXPECT_EQ(kConverted.vertical_front_porch_lines, 0x03'03);
   EXPECT_EQ(kConverted.vertical_sync_width_lines, 0x04'04);
   EXPECT_EQ(kConverted.vertical_back_porch_lines, 0x05'05);
-  EXPECT_EQ(kConverted.pixel_clock_frequency_khz, 1'000'000);
+  EXPECT_EQ(kConverted.pixel_clock_frequency_hz, 1'000'000'000);
   EXPECT_EQ(kConverted.fields_per_frame, display::FieldsPerFrame::kInterlaced);
   EXPECT_EQ(kConverted.hsync_polarity, display::SyncPolarity::kPositive);
   EXPECT_EQ(kConverted.vsync_polarity, display::SyncPolarity::kNegative);
@@ -236,7 +236,7 @@ TEST(CtaTimingToDisplayTiming, InterlacedWithConstantVblank) {
   EXPECT_EQ(kConverted.vertical_front_porch_lines, 0x03'03);
   EXPECT_EQ(kConverted.vertical_sync_width_lines, 0x04'04);
   EXPECT_EQ(kConverted.vertical_back_porch_lines, 0x05'05);
-  EXPECT_EQ(kConverted.pixel_clock_frequency_khz, 1'000'000);
+  EXPECT_EQ(kConverted.pixel_clock_frequency_hz, 1'000'000'000);
   EXPECT_EQ(kConverted.fields_per_frame, display::FieldsPerFrame::kInterlaced);
   EXPECT_EQ(kConverted.hsync_polarity, display::SyncPolarity::kPositive);
   EXPECT_EQ(kConverted.vsync_polarity, display::SyncPolarity::kNegative);
@@ -286,7 +286,7 @@ TEST(CtaTimingToDisplayTiming, Progressive) {
   EXPECT_EQ(kConverted.vertical_front_porch_lines, 0x03'03);
   EXPECT_EQ(kConverted.vertical_sync_width_lines, 0x04'04);
   EXPECT_EQ(kConverted.vertical_back_porch_lines, 0x05'05);
-  EXPECT_EQ(kConverted.pixel_clock_frequency_khz, 1'000'000);
+  EXPECT_EQ(kConverted.pixel_clock_frequency_hz, 1'000'000'000);
   EXPECT_EQ(kConverted.fields_per_frame, display::FieldsPerFrame::kProgressive);
   EXPECT_EQ(kConverted.hsync_polarity, display::SyncPolarity::kPositive);
   EXPECT_EQ(kConverted.vsync_polarity, display::SyncPolarity::kNegative);

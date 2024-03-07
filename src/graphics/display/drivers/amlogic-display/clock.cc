@@ -235,8 +235,7 @@ zx::result<> Clock::Enable(const PanelConfig& panel_config) {
   // Populate internal LCD timing structure based on predefined tables
   lcd_timing_ = CalculateLcdTiming(panel_config.display_timing);
   zx::result<HdmiPllConfigForMipiDsi> pll_result =
-      GenerateHPLL(/*pixel_clock_frequency_hz=*/
-                   int64_t{panel_config.display_timing.pixel_clock_frequency_khz} * 1'000,
+      GenerateHPLL(panel_config.display_timing.pixel_clock_frequency_hz,
                    panel_config.maximum_per_data_lane_bit_per_second());
   if (pll_result.is_error()) {
     zxlogf(ERROR, "Failed to generate HDMI PLL and Video clock tree configuration: %s",

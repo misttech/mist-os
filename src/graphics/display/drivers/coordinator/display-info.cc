@@ -49,8 +49,8 @@ edid::ddc_i2c_transact ddc_tx = [](void* ctx, edid::ddc_i2c_msg_t* msgs, uint32_
   return i2c->Transact(ops, count) == ZX_OK;
 };
 
-inline void audio_stream_format_fidl_from_banjo(const audio_types_audio_stream_format_range_t& source,
-                                         audio_stream_format_range* destination) {
+inline void audio_stream_format_fidl_from_banjo(
+    const audio_types_audio_stream_format_range_t& source, audio_stream_format_range* destination) {
   destination->sample_formats = source.sample_formats;
   destination->min_frames_per_second = source.min_frames_per_second;
   destination->max_frames_per_second = source.max_frames_per_second;
@@ -82,7 +82,7 @@ void DisplayInfo::InitializeInspect(inspect::Node* parent_node) {
     child.CreateDouble("vsync-hz",
                        static_cast<double>(t.vertical_field_refresh_rate_millihertz()) / 1000.0,
                        &properties);
-    child.CreateInt("pixel-clock-khz", t.pixel_clock_frequency_khz, &properties);
+    child.CreateInt("pixel-clock-hz", t.pixel_clock_frequency_hz, &properties);
     child.CreateInt("horizontal-pixels", t.horizontal_active_px, &properties);
     child.CreateInt("horizontal-blanking", t.horizontal_blank_px(), &properties);
     child.CreateInt("horizontal-sync-offset", t.horizontal_front_porch_px, &properties);

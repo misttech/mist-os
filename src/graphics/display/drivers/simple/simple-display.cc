@@ -98,9 +98,8 @@ void SimpleDisplay::DisplayControllerImplSetDisplayControllerInterface(
   args.panel_capabilities_source = PANEL_CAPABILITIES_SOURCE_DISPLAY_MODE;
 
   const int64_t pixel_clock_hz = int64_t{width_} * height_ * kRefreshRateHz;
-  const int64_t pixel_clock_khz = (pixel_clock_hz + 500) / 1000;
-  ZX_DEBUG_ASSERT(pixel_clock_khz >= 0);
-  ZX_DEBUG_ASSERT(pixel_clock_khz <= int64_t{std::numeric_limits<uint32_t>::max()});
+  ZX_DEBUG_ASSERT(pixel_clock_hz >= 0);
+  ZX_DEBUG_ASSERT(pixel_clock_hz <= display::kMaxPixelClockHz);
   const display::DisplayTiming timing = {
       .horizontal_active_px = static_cast<int32_t>(width_),
       .horizontal_front_porch_px = 0,
@@ -110,7 +109,7 @@ void SimpleDisplay::DisplayControllerImplSetDisplayControllerInterface(
       .vertical_front_porch_lines = 0,
       .vertical_sync_width_lines = 0,
       .vertical_back_porch_lines = 0,
-      .pixel_clock_frequency_khz = static_cast<int32_t>(pixel_clock_khz),
+      .pixel_clock_frequency_hz = pixel_clock_hz,
       .fields_per_frame = display::FieldsPerFrame::kProgressive,
       .hsync_polarity = display::SyncPolarity::kNegative,
       .vsync_polarity = display::SyncPolarity::kNegative,

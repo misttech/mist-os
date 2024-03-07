@@ -86,7 +86,7 @@ namespace {
 
 void CalculateTxParam(const display::DisplayTiming& display_timing,
                       designware_hdmi::hdmi_param_tx* p) {
-  p->is4K = display_timing.pixel_clock_frequency_khz > 500'000;
+  p->is4K = display_timing.pixel_clock_frequency_hz > 500'000'000;
 
   // The aspect ratio field in the Auxiliary Video Information (AVI) InfoFrame.
   // Values are defined in the CTA-861 standard, Section 6.4.1 "Video Format,

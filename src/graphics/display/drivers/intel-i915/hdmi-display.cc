@@ -145,8 +145,9 @@ bool HdmiDisplay::DdiModeset(const display::DisplayTiming& mode) {
   pipe()->Reset();
   controller()->ResetDdi(ddi_id(), pipe()->connected_transcoder_id());
 
+  const int64_t pixel_clock_frequency_khz = mode.pixel_clock_frequency_hz / 1'000;
   DdiPllConfig pll_config = {
-      .ddi_clock_khz = static_cast<int32_t>(mode.pixel_clock_frequency_khz) * 5,
+      .ddi_clock_khz = static_cast<int32_t>(pixel_clock_frequency_khz) * 5,
       .spread_spectrum_clocking = false,
       .admits_display_port = false,
       .admits_hdmi = true,

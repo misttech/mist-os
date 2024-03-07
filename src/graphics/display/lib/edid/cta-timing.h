@@ -134,7 +134,7 @@ constexpr display::DisplayTiming ToDisplayTiming(const CtaTiming& dmt) {
       .vertical_front_porch_lines = dmt.vertical_front_porch_lines,
       .vertical_sync_width_lines = dmt.vertical_sync_width_lines,
       .vertical_back_porch_lines = dmt.vertical_back_porch_lines,
-      .pixel_clock_frequency_khz = dmt.pixel_clock_khz,
+      .pixel_clock_frequency_hz = int64_t{dmt.pixel_clock_khz} * 1'000,
       .fields_per_frame = dmt.fields_per_frame,
       .hsync_polarity = dmt.horizontal_sync_polarity,
       .vsync_polarity = dmt.vertical_sync_polarity,

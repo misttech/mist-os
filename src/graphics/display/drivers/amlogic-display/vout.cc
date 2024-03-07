@@ -290,8 +290,8 @@ void Vout::Dump() {
              hdmi_.current_display_timing_.vertical_sync_width_lines);
       zxlogf(INFO, "vertical_back_porch_lines = %d",
              hdmi_.current_display_timing_.vertical_back_porch_lines);
-      zxlogf(INFO, "pixel_clock_frequency_khz = %d",
-             hdmi_.current_display_timing_.pixel_clock_frequency_khz);
+      zxlogf(INFO, "pixel_clock_frequency_hz = %" PRId64,
+             hdmi_.current_display_timing_.pixel_clock_frequency_hz);
       zxlogf(INFO, "fields_per_frame (enum) = %u",
              static_cast<uint32_t>(hdmi_.current_display_timing_.fields_per_frame));
       zxlogf(INFO, "hsync_polarity (enum) = %u",

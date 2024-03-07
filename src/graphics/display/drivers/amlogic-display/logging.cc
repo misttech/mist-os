@@ -29,7 +29,7 @@ void LogDisplayTiming(const display::DisplayTiming& display_timing) {
   zxlogf(INFO, "  Vertical blank (lines): %" PRId32, display_timing.vertical_blank_lines());
   zxlogf(INFO, "  Vertical total (lines): %" PRId32, display_timing.vertical_total_lines());
   zxlogf(INFO, "");
-  zxlogf(INFO, "  Pixel clock frequency (kHz): %" PRId32, display_timing.pixel_clock_frequency_khz);
+  zxlogf(INFO, "  Pixel clock frequency (Hz): %" PRId64, display_timing.pixel_clock_frequency_hz);
   zxlogf(INFO, "  Fields per frame: %s",
          display_timing.fields_per_frame == display::FieldsPerFrame::kInterlaced ? "Interlaced"
                                                                                  : "Progressive");

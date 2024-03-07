@@ -298,7 +298,7 @@ display::DisplayTiming DetailedTimingDescriptorToDisplayTiming(
       .vertical_sync_width_lines = static_cast<int32_t>(dtd.vertical_sync_pulse_width()),
       .vertical_back_porch_lines = vertical_back_porch_lines,
 
-      .pixel_clock_frequency_khz = dtd.pixel_clock_10khz * 10,
+      .pixel_clock_frequency_hz = int64_t{dtd.pixel_clock_10khz} * 10'000,
       .fields_per_frame = dtd.interlaced() ? display::FieldsPerFrame::kInterlaced
                                            : display::FieldsPerFrame::kProgressive,
       .hsync_polarity = dtd.hsync_polarity() ? display::SyncPolarity::kPositive
@@ -395,14 +395,16 @@ void timing_iterator::Advance() {
           if (rounded_refresh % 6 == 0) {
             if (modes_to_skip == 1) {
               display_timing_ = internal::kCtaDisplayTimings[idx];
-              double clock = display_timing_.pixel_clock_frequency_khz;
+              // `pixel_clock_frequency_hz` is less than 2^41, and `double` has
+              // 51 fractional bits, so `pixel_clock_frequency_hz` can be
+              // converted to a double value without losing precision.
+              double clock = static_cast<double>(display_timing_.pixel_clock_frequency_hz);
               // 240/480 height entries are already multiplied by 1000/1001
               double mult = display_timing_.vertical_active_lines == 240 ||
                                     display_timing_.vertical_active_lines == 480
                                 ? 1.001
                                 : (1000. / 1001.);
-              display_timing_.pixel_clock_frequency_khz =
-                  static_cast<uint32_t>(round(clock * mult));
+              display_timing_.pixel_clock_frequency_hz = static_cast<int64_t>(round(clock * mult));
               return;
             }
             modes_to_skip -= 2;

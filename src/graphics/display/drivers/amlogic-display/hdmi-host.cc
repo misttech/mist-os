@@ -93,11 +93,10 @@ pll_param CalculateClockParameters(const display::DisplayTiming& timing) {
   params.output_divider2 = 1;
   params.output_divider3 = 1;
 
-  const int64_t pixel_clock_frequency_hz = int64_t{timing.pixel_clock_frequency_khz} * 1'000;
-  params.hdmi_pll_vco_output_frequency_hz = pixel_clock_frequency_hz * 10;
+  params.hdmi_pll_vco_output_frequency_hz = timing.pixel_clock_frequency_hz * 10;
 
   const ValidDcoFrequencyRange valid_dco_frequency_range =
-      GetHdmiPllValidDcoFrequencyRange(pixel_clock_frequency_hz);
+      GetHdmiPllValidDcoFrequencyRange(timing.pixel_clock_frequency_hz);
   while (params.hdmi_pll_vco_output_frequency_hz < valid_dco_frequency_range.minimum_frequency_hz) {
     if (params.output_divider1 < 4) {
       params.output_divider1 *= 2;
@@ -109,11 +108,12 @@ pll_param CalculateClockParameters(const display::DisplayTiming& timing) {
       params.output_divider3 *= 2;
       params.hdmi_pll_vco_output_frequency_hz *= 2;
     } else {
-      ZX_DEBUG_ASSERT_MSG(false,
-                          "Failed to set HDMI PLL to a valid VCO frequency range for pixel clock "
-                          "%d kHz. This should never happen since IsDisplayTimingSupported() "
-                          "returned true.",
-                          timing.pixel_clock_frequency_khz);
+      ZX_DEBUG_ASSERT_MSG(
+          false,
+          "Failed to set HDMI PLL to a valid VCO frequency range for pixel clock %" PRId64
+          " Hz. This should never happen since IsDisplayTimingSupported() "
+          "returned true.",
+          timing.pixel_clock_frequency_hz);
     }
   }
   ZX_DEBUG_ASSERT_MSG(
@@ -282,11 +282,10 @@ void HdmiHost::HostOff() {
 
 zx_status_t HdmiHost::ModeSet(const display::DisplayTiming& timing) {
   if (!IsDisplayTimingSupported(timing)) {
-    zxlogf(ERROR,
-           "Display timing (%" PRIu32 " x %" PRIu32 " @ pixel rate %" PRIu32
-           " kHz) is not supported.",
-           timing.horizontal_active_px, timing.vertical_active_lines,
-           timing.pixel_clock_frequency_khz);
+    zxlogf(
+        ERROR,
+        "Display timing (%" PRIu32 " x %" PRIu32 " @ pixel rate %" PRId64 " Hz) is not supported.",
+        timing.horizontal_active_px, timing.vertical_active_lines, timing.pixel_clock_frequency_hz);
     return ZX_ERR_NOT_SUPPORTED;
   }
 
@@ -464,8 +463,7 @@ bool HdmiHost::IsDisplayTimingSupported(const display::DisplayTiming& timing) co
     return false;
   }
 
-  const int64_t pixel_clock_frequency_hz = int64_t{timing.pixel_clock_frequency_khz} * 1'000;
-  if (!IsPixelClockSupported(pixel_clock_frequency_hz)) {
+  if (!IsPixelClockSupported(timing.pixel_clock_frequency_hz)) {
     return false;
   }
 

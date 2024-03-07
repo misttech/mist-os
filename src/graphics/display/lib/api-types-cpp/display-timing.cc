@@ -44,7 +44,7 @@ constexpr void DebugAssertBanjoDisplayModeIsValid(const display_mode_t& display_
   // reason about the code without checking the types of each struct member.
 
   ZX_DEBUG_ASSERT(display_mode.pixel_clock_khz >= 0);
-  ZX_DEBUG_ASSERT(int64_t{display_mode.pixel_clock_khz} <= kMaxPixelClockKhz);
+  ZX_DEBUG_ASSERT(int64_t{display_mode.pixel_clock_khz} * 1'000 <= kMaxPixelClockHz);
 
   ZX_DEBUG_ASSERT(display_mode.h_addressable >= 0);
   ZX_DEBUG_ASSERT(display_mode.h_addressable <= kMaxTimingValue);
@@ -98,10 +98,7 @@ constexpr void DebugAssertBanjoDisplaySettingIsValid(const display_setting_t& di
   // reason about the code without checking the types of each struct member.
 
   ZX_DEBUG_ASSERT(display_setting.lcd_clock >= 0);
-  // This is a stronger constraint to guarantee that
-  // round(lcd_clock / 1000) <= kMaxPixelClockKhz, because
-  // round(lcd_clock / 1000) is always <= 1 + floor(lcd_clock / 1000).
-  ZX_DEBUG_ASSERT(1 + display_setting.lcd_clock / 1000 <= kMaxPixelClockKhz);
+  ZX_DEBUG_ASSERT(int64_t{display_setting.lcd_clock} <= kMaxPixelClockHz);
 
   ZX_DEBUG_ASSERT(display_setting.h_active >= 0);
   ZX_DEBUG_ASSERT(display_setting.h_active <= kMaxTimingValue);
@@ -180,7 +177,7 @@ DisplayTiming ToDisplayTiming(const display_mode_t& banjo_display_mode) {
       .vertical_front_porch_lines = static_cast<int32_t>(banjo_display_mode.v_front_porch),
       .vertical_sync_width_lines = static_cast<int32_t>(banjo_display_mode.v_sync_pulse),
       .vertical_back_porch_lines = vertical_back_porch_lines,
-      .pixel_clock_frequency_khz = static_cast<int32_t>(banjo_display_mode.pixel_clock_khz),
+      .pixel_clock_frequency_hz = int64_t{banjo_display_mode.pixel_clock_khz} * 1'000,
       .fields_per_frame = (banjo_display_mode.flags & MODE_FLAG_INTERLACED)
                               ? FieldsPerFrame::kInterlaced
                               : FieldsPerFrame::kProgressive,
@@ -198,7 +195,8 @@ DisplayTiming ToDisplayTiming(const display_mode_t& banjo_display_mode) {
 display_mode_t ToBanjoDisplayMode(const DisplayTiming& display_timing_params) {
   display_timing_params.DebugAssertIsValid();
   return display_mode_t{
-      .pixel_clock_khz = static_cast<uint32_t>(display_timing_params.pixel_clock_frequency_khz),
+      .pixel_clock_khz =
+          static_cast<uint32_t>(display_timing_params.pixel_clock_frequency_hz / 1'000),
       .h_addressable = static_cast<uint32_t>(display_timing_params.horizontal_active_px),
       .h_front_porch = static_cast<uint32_t>(display_timing_params.horizontal_front_porch_px),
       .h_sync_pulse = static_cast<uint32_t>(display_timing_params.horizontal_sync_width_px),
@@ -241,12 +239,6 @@ DisplayTiming ToDisplayTiming(const display_setting_t& banjo_display_setting) {
                            (banjo_display_setting.v_active + banjo_display_setting.vsync_bp +
                             banjo_display_setting.vsync_width));
 
-  // A valid display_setting_t guarantees that `lcd_clock` is <=
-  // `kMaxPixelClockKhz * 1000`, thus the `pixel_clock_khz` won't exceed
-  // `kMaxPixelClockKhz` and can be stored in an int32_t.
-  const int32_t pixel_clock_khz =
-      static_cast<int32_t>((int64_t{banjo_display_setting.lcd_clock} + 500) / 1000);
-
   return DisplayTiming{
       .horizontal_active_px = static_cast<int32_t>(banjo_display_setting.h_active),
       .horizontal_front_porch_px = static_cast<int32_t>(horizontal_front_porch_px),
@@ -256,7 +248,7 @@ DisplayTiming ToDisplayTiming(const display_setting_t& banjo_display_setting) {
       .vertical_front_porch_lines = vertical_front_porch_lines,
       .vertical_sync_width_lines = static_cast<int32_t>(banjo_display_setting.vsync_width),
       .vertical_back_porch_lines = static_cast<int32_t>(banjo_display_setting.vsync_bp),
-      .pixel_clock_frequency_khz = static_cast<int32_t>(pixel_clock_khz),
+      .pixel_clock_frequency_hz = banjo_display_setting.lcd_clock,
       .fields_per_frame = FieldsPerFrame::kProgressive,
       .hsync_polarity = (banjo_display_setting.hsync_pol == 1) ? SyncPolarity::kPositive
                                                                : SyncPolarity::kNegative,

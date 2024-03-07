@@ -98,9 +98,8 @@ void FakeDisplay::PopulateAddedDisplayArgs(added_display_args_t* args) {
   args->panel_capabilities_source = PANEL_CAPABILITIES_SOURCE_DISPLAY_MODE;
 
   const int32_t pixel_clock_hz = kWidth * kHeight * kRefreshRateFps;
-  const int32_t pixel_clock_khz = (pixel_clock_hz + 500) / 1000;
-  ZX_DEBUG_ASSERT(pixel_clock_khz >= 0);
-  ZX_DEBUG_ASSERT(pixel_clock_khz <= std::numeric_limits<uint32_t>::max());
+  ZX_DEBUG_ASSERT(pixel_clock_hz >= 0);
+  ZX_DEBUG_ASSERT(pixel_clock_hz <= display::kMaxPixelClockHz);
 
   const display::DisplayTiming timing = {
       .horizontal_active_px = static_cast<int32_t>(kWidth),
@@ -111,7 +110,7 @@ void FakeDisplay::PopulateAddedDisplayArgs(added_display_args_t* args) {
       .vertical_front_porch_lines = 0,
       .vertical_sync_width_lines = 0,
       .vertical_back_porch_lines = 0,
-      .pixel_clock_frequency_khz = static_cast<int32_t>(pixel_clock_khz),
+      .pixel_clock_frequency_hz = pixel_clock_hz,
       .fields_per_frame = display::FieldsPerFrame::kProgressive,
       .hsync_polarity = display::SyncPolarity::kNegative,
       .vsync_polarity = display::SyncPolarity::kNegative,

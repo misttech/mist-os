@@ -13,6 +13,7 @@
 #include <zircon/errors.h>
 
 #include <cfloat>
+#include <cinttypes>
 #include <cmath>
 
 #include <ddktl/fidl.h>
@@ -156,14 +157,16 @@ bool DisplayDevice::Resume() {
 
 void DisplayDevice::LoadActiveMode() {
   pipe_->LoadActiveMode(&info_);
-  info_.pixel_clock_frequency_khz = LoadPixelRateForTranscoderKhz(pipe_->connected_transcoder_id());
-  zxlogf(INFO, "Active pixel clock: %u kHz", info_.pixel_clock_frequency_khz);
+  const int32_t pixel_clock_frequency_khz =
+      LoadPixelRateForTranscoderKhz(pipe_->connected_transcoder_id());
+  info_.pixel_clock_frequency_hz = int64_t{pixel_clock_frequency_khz} * 1'000;
+  zxlogf(INFO, "Active pixel clock: %" PRId64 " Hz", info_.pixel_clock_frequency_hz);
 }
 
 bool DisplayDevice::CheckNeedsModeset(const display::DisplayTiming& mode) {
   // Check the clock and the flags later
   display::DisplayTiming mode_without_clock_or_flags = mode;
-  mode_without_clock_or_flags.pixel_clock_frequency_khz = info_.pixel_clock_frequency_khz;
+  mode_without_clock_or_flags.pixel_clock_frequency_hz = info_.pixel_clock_frequency_hz;
   mode_without_clock_or_flags.hsync_polarity = info_.hsync_polarity;
   mode_without_clock_or_flags.vsync_polarity = info_.vsync_polarity;
   mode_without_clock_or_flags.pixel_repetition = info_.pixel_repetition;
@@ -183,7 +186,7 @@ bool DisplayDevice::CheckNeedsModeset(const display::DisplayTiming& mode) {
     return true;
   }
 
-  if (mode.pixel_clock_frequency_khz == info_.pixel_clock_frequency_khz) {
+  if (mode.pixel_clock_frequency_hz == info_.pixel_clock_frequency_hz) {
     // Modeset is necessary not necessary if all display params are the same
     return false;
   }
@@ -192,7 +195,8 @@ bool DisplayDevice::CheckNeedsModeset(const display::DisplayTiming& mode) {
   // prevent unnecessary modesetting at startup. The extra work this adds to regular
   // modesetting is negligible.
   DdiPllConfig desired_pll_config =
-      ComputeDdiPllConfig(static_cast<int32_t>(info_.pixel_clock_frequency_khz));
+      ComputeDdiPllConfig(/*pixel_clock_khz=*/
+                          static_cast<int32_t>(info_.pixel_clock_frequency_hz / 1'000));
   ZX_DEBUG_ASSERT_MSG(desired_pll_config.IsEmpty(),
                       "CheckDisplayMode() should have rejected unattainable pixel rates");
   return !controller()->dpll_manager()->DdiPllMatchesConfig(ddi_id(), desired_pll_config);

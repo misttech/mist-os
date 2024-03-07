@@ -271,7 +271,7 @@ TEST(PanelConfig, ToDisplaySetting) {
               .vertical_front_porch_lines = 0x03'03,
               .vertical_sync_width_lines = 0x04'04,
               .vertical_back_porch_lines = 0x05'05,
-              .pixel_clock_frequency_khz = 0x1a'1a'1a,
+              .pixel_clock_frequency_hz = 0x1a'1a'1a'1a,
               .fields_per_frame = display::FieldsPerFrame::kProgressive,
               .hsync_polarity = display::SyncPolarity::kPositive,
               .vsync_polarity = display::SyncPolarity::kPositive,
@@ -283,7 +283,7 @@ TEST(PanelConfig, ToDisplaySetting) {
   const display_setting_t display_setting = ToDisplaySetting(config);
   EXPECT_EQ(display_setting.lane_num, 4u);
   EXPECT_EQ(display_setting.bit_rate_max, 0x26'26u);
-  EXPECT_EQ(display_setting.lcd_clock, 0x1a'1a'1a * 1000u);
+  EXPECT_EQ(display_setting.lcd_clock, 0x1a'1a'1a'1au);
   EXPECT_EQ(display_setting.h_active, 0x0f'0fu);
   EXPECT_EQ(display_setting.v_active, 0x0b'0bu);
   EXPECT_EQ(display_setting.h_period, 0x1c'1cu);
@@ -318,7 +318,7 @@ TEST(PanelConfig, ToDisplaySettingSyncPolarity) {
                 .vertical_front_porch_lines = 0x03'03,
                 .vertical_sync_width_lines = 0x04'04,
                 .vertical_back_porch_lines = 0x05'05,
-                .pixel_clock_frequency_khz = 0x1a'1a'1a,
+                .pixel_clock_frequency_hz = 0x1a'1a'1a'1a,
                 .fields_per_frame = display::FieldsPerFrame::kProgressive,
                 .hsync_polarity = display::SyncPolarity::kPositive,
                 .vsync_polarity = display::SyncPolarity::kNegative,
@@ -353,7 +353,7 @@ TEST(PanelConfig, ToDisplaySettingSyncPolarity) {
                 .vertical_front_porch_lines = 0x03'03,
                 .vertical_sync_width_lines = 0x04'04,
                 .vertical_back_porch_lines = 0x05'05,
-                .pixel_clock_frequency_khz = 0x1a'1a'1a,
+                .pixel_clock_frequency_hz = 0x1a'1a'1a'1a,
                 .fields_per_frame = display::FieldsPerFrame::kProgressive,
                 .hsync_polarity = display::SyncPolarity::kNegative,
                 .vsync_polarity = display::SyncPolarity::kPositive,

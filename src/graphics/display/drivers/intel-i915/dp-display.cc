@@ -1303,7 +1303,8 @@ bool DpDisplay::LinkTrainingSetupKabyLake() {
   //
   // Kaby Lake: IHD-OS-KBL-Vol 12-1.17 pages 187-190
   // Skylake: IHD-OS-SKL-Vol 12-05.16 pages 181-183
-  // TODO(https://fxbug.dev/42106274): Read the VBT to handle unique motherboard configs for kaby lake
+  // TODO(https://fxbug.dev/42106274): Read the VBT to handle unique motherboard configs for kaby
+  // lake
   uint8_t i_boost;
   const cpp20::span<const DdiPhyConfigEntry> entries =
       controller()->igd_opregion().IsLowVoltageEdp(ddi_id())
@@ -1962,7 +1963,7 @@ bool DpDisplay::PipeConfigPreamble(const display::DisplayTiming& mode, PipeId pi
 
   // Pixel clock rate: The rate at which pixels are sent, in pixels per
   // second, divided by 1000 (kHz).
-  int64_t pixel_clock_rate_khz = mode.pixel_clock_frequency_khz;
+  const int64_t pixel_clock_rate_khz = mode.pixel_clock_frequency_hz / 1'000;
 
   // This is the rate at which bits are sent on a single DisplayPort
   // lane, in raw bits per second, divided by 1000 (kbps).

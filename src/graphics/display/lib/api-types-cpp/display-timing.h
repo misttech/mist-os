@@ -61,8 +61,8 @@ enum class FieldsPerFrame : uint8_t {
 // Maximum value of display timing in pixels / lines.
 constexpr int32_t kMaxTimingValue = (1 << 16) - 1;
 
-// Maximum value of display pixel clock in kHz.
-constexpr int32_t kMaxPixelClockKhz = std::numeric_limits<int32_t>::max();
+// Maximum value of display pixel clock in Hz.
+constexpr int64_t kMaxPixelClockHz = int64_t{std::numeric_limits<int32_t>::max()} * 1'000;
 
 // Maximum value of display refresh rate in millihertz (0.001 Hz).
 constexpr int32_t kMaxRefreshRateMillihertz = ((1 << 16) - 1) * 1000;
@@ -169,10 +169,8 @@ struct DisplayTiming {
 
   // Frequency of pixels transmitted to the display.
   //
-  // Must be >= 0 and <= kMaxPixelClockKhz.
-  //
-  // TODO(https://fxbug.dev/322553223): Replace kHz with Hz.
-  int32_t pixel_clock_frequency_khz;
+  // Must be >= 0 and <= kMaxPixelClockHz.
+  int64_t pixel_clock_frequency_hz;
 
   FieldsPerFrame fields_per_frame = FieldsPerFrame::kProgressive;
   SyncPolarity hsync_polarity = SyncPolarity::kNegative;
@@ -303,7 +301,7 @@ constexpr bool DisplayTiming::IsValid() const {
   if (vertical_back_porch_lines < 0 || vertical_back_porch_lines > kMaxTimingValue) {
     return false;
   }
-  if (pixel_clock_frequency_khz < 0 || pixel_clock_frequency_khz > kMaxPixelClockKhz) {
+  if (pixel_clock_frequency_hz < 0 || pixel_clock_frequency_hz > kMaxPixelClockHz) {
     return false;
   }
   if (pixel_repetition < 0 || pixel_repetition > 1) {
@@ -347,8 +345,8 @@ constexpr void DisplayTiming::DebugAssertIsValid() const {
   ZX_DEBUG_ASSERT(vertical_back_porch_lines >= 0);
   ZX_DEBUG_ASSERT(vertical_back_porch_lines <= kMaxTimingValue);
 
-  ZX_DEBUG_ASSERT(pixel_clock_frequency_khz >= 0);
-  ZX_DEBUG_ASSERT(pixel_clock_frequency_khz <= kMaxPixelClockKhz);
+  ZX_DEBUG_ASSERT(pixel_clock_frequency_hz >= 0);
+  ZX_DEBUG_ASSERT(pixel_clock_frequency_hz <= kMaxPixelClockHz);
 
   ZX_DEBUG_ASSERT(pixel_repetition >= 0);
   ZX_DEBUG_ASSERT(pixel_repetition <= 1);
@@ -364,16 +362,15 @@ constexpr void DisplayTiming::DebugAssertIsValid() const {
 }
 
 constexpr int32_t DisplayTiming::vertical_field_refresh_rate_millihertz() const {
-  constexpr int kMillihertzPerKilohertz = 1'000 * 1'000;
+  constexpr int64_t kMillihertzPerHertz = 1'000;
 
   // The multiplication won't overflow, which would cause an undefined
   // behavior.
   //
-  // `pixel_clock_frequency_khz` is a signed 32-bit integer and
-  // `kMillihertzPerKilohertz` < 2^20. Thus, the multiplication result is
-  // less than 2^51, which falls within the valid range of an int64_t number.
-  const int64_t pixel_clock_millihertz =
-      int64_t{pixel_clock_frequency_khz} * kMillihertzPerKilohertz;
+  // `pixel_clock_frequency_hz` < 2^41 and `kMillihertzPerHertz` < 2^10.
+  // So, the multiplication result is less than 2^51, which falls within the
+  // valid range of an int64_t number.
+  const int64_t pixel_clock_millihertz = pixel_clock_frequency_hz * kMillihertzPerHertz;
 
   // The multiplication won't overflow, which would cause an undefined
   // behavior.
@@ -425,7 +422,7 @@ constexpr bool operator==(const DisplayTiming& lhs, const DisplayTiming& rhs) {
          lhs.vertical_front_porch_lines == rhs.vertical_front_porch_lines &&
          lhs.vertical_sync_width_lines == rhs.vertical_sync_width_lines &&
          lhs.vertical_back_porch_lines == rhs.vertical_back_porch_lines &&
-         lhs.pixel_clock_frequency_khz == rhs.pixel_clock_frequency_khz &&
+         lhs.pixel_clock_frequency_hz == rhs.pixel_clock_frequency_hz &&
          lhs.fields_per_frame == rhs.fields_per_frame && lhs.hsync_polarity == rhs.hsync_polarity &&
          lhs.vsync_polarity == rhs.vsync_polarity &&
          lhs.vblank_alternates == rhs.vblank_alternates &&
