@@ -18,6 +18,8 @@ class UsbPhy3 final : public UsbPhyBase {
 
   zx_status_t Init(fdf::MmioBuffer& usbctrl_mmio);
 
+  void dump_regs() const override;
+
  private:
   void SetModeInternal(UsbMode mode, fdf::MmioBuffer& usbctrl_mmio,
                        const std::array<uint32_t, 8>& pll_settings) override {

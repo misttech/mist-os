@@ -176,6 +176,9 @@ class Dwc2 : public Dwc2Type,
 
   inline fdf::MmioBuffer* get_mmio() { return &*mmio_; }
 
+  // Used for debugging.
+  void dump_regs();
+
   std::optional<Endpoint> endpoints_[DWC_MAX_EPS];
 
   // Used for synchronizing global state

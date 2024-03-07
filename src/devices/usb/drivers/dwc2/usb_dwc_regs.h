@@ -8,6 +8,17 @@
 #include <hwreg/bitfields.h>
 #include <usb/usb.h>
 
+#define DUMP_REG(reg, mmio) __DUMP_REG(reg, mmio, false)
+#define DUMP_REG_W_IDX(reg, idx, mmio) __DUMP_REG_W_IDX(reg, idx, mmio, false)
+#define DUMP_STARRED_REG(reg, mmio) __DUMP_REG(reg, mmio, true)
+#define DUMP_STARRED_REG_W_IDX(reg, idx, mmio) __DUMP_REG_W_IDX(reg, idx, mmio, true)
+#define __DUMP_REG(reg, mmio, starred)                        \
+  zxlogf(INFO, "%s%s      : %x", (starred) ? "*" : " ", #reg, \
+         reg::Get().ReadFrom(&mmio).reg_value());
+#define __DUMP_REG_W_IDX(reg, idx, mmio, starred)                   \
+  zxlogf(INFO, "%s%s[0x%2x]: %x", (starred) ? "*" : " ", #reg, idx, \
+         reg::Get(idx).ReadFrom(&mmio).reg_value());
+
 constexpr uint32_t MAX_EPS_CHANNELS = 16;
 constexpr uint32_t DWC_MAX_EPS = 32;
 

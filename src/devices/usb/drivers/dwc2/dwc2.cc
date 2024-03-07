@@ -28,6 +28,51 @@ namespace dwc2 {
 
 using Request = usb::BorrowedRequest<void>;
 
+void Dwc2::dump_regs() {
+  const auto& mmio = *mmio_;
+
+  DUMP_REG(GOTGCTL, mmio)
+  DUMP_REG(GOTGINT, mmio)
+  DUMP_REG(GAHBCFG, mmio)
+  DUMP_REG(GUSBCFG, mmio)
+  DUMP_REG(GRSTCTL, mmio)
+  DUMP_REG(GINTSTS, mmio)
+  DUMP_REG(GINTMSK, mmio)
+  DUMP_REG(GRXSTSP, mmio)
+  DUMP_REG(GRXFSIZ, mmio)
+  DUMP_REG(GNPTXFSIZ, mmio)
+  DUMP_REG(GNPTXSTS, mmio)
+  DUMP_REG(GSNPSID, mmio)
+  DUMP_REG(GHWCFG1, mmio)
+  DUMP_REG(GHWCFG2, mmio)
+  DUMP_REG(GHWCFG3, mmio)
+  DUMP_REG(GHWCFG4, mmio)
+  DUMP_REG(GDFIFOCFG, mmio)
+  DUMP_REG(DCFG, mmio)
+  DUMP_REG(DCTL, mmio)
+  DUMP_REG(DSTS, mmio)
+  DUMP_REG(DIEPMSK, mmio)
+  DUMP_REG(DOEPMSK, mmio)
+  DUMP_REG(DAINT, mmio)
+  DUMP_REG(DAINTMSK, mmio)
+  DUMP_REG(PCGCCTL, mmio)
+
+  for (uint32_t i = 0; i < std::size(metadata_.tx_fifo_sizes); i++) {
+    DUMP_REG_W_IDX(DTXFSIZ, i + 1, mmio)
+  }
+  for (uint32_t i = 0; i < DWC_MAX_EPS; i++) {
+    DUMP_REG_W_IDX(DEPCTL, i, mmio)
+    DUMP_REG_W_IDX(DEPTSIZ, i, mmio)
+    DUMP_REG_W_IDX(DEPDMA, i, mmio)
+  }
+  for (uint32_t i = 0; i < MAX_EPS_CHANNELS; i++) {
+    DUMP_REG_W_IDX(DIEPINT, i, mmio)
+  }
+  for (uint32_t i = 0; i < MAX_EPS_CHANNELS; i++) {
+    DUMP_REG_W_IDX(DOEPINT, i + DWC_EP_OUT_SHIFT, mmio)
+  }
+}
+
 // Handler for usbreset interrupt.
 void Dwc2::HandleReset() {
   auto* mmio = get_mmio();

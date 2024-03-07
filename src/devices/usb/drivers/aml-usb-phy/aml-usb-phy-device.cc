@@ -14,11 +14,21 @@
 #include <fbl/auto_lock.h>
 
 #include "src/devices/usb/drivers/aml-usb-phy/aml-usb-phy.h"
+#include "src/devices/usb/drivers/aml-usb-phy/power-regs.h"
 #include "src/devices/usb/drivers/aml-usb-phy/usb-phy-regs.h"
 
 namespace aml_usb_phy {
 
 namespace {
+
+[[maybe_unused]] void dump_power_regs(const fdf::MmioBuffer& mmio) {
+  DUMP_REG(A0_RTI_GEN_PWR_SLEEP0, mmio)
+  DUMP_REG(A0_RTI_GEN_PWR_ISO0, mmio)
+}
+
+[[maybe_unused]] void dump_hhi_mem_pd_regs(const fdf::MmioBuffer& mmio) {
+  DUMP_REG(HHI_MEM_PD_REG0, mmio)
+}
 
 struct PhyMetadata {
   std::array<uint32_t, 8> pll_settings;
@@ -109,7 +119,8 @@ zx::result<PhyMetadata> ParseMetadata(
 }
 
 zx_status_t PowerOn(fidl::ClientEnd<fuchsia_hardware_registers::Device>& reset_register,
-                    fdf::MmioBuffer& power_mmio, fdf::MmioBuffer& sleep_mmio) {
+                    fdf::MmioBuffer& power_mmio, fdf::MmioBuffer& sleep_mmio,
+                    bool dump_regs = false) {
   A0_RTI_GEN_PWR_SLEEP0::Get().ReadFrom(&sleep_mmio).set_usb_comb_power_off(0).WriteTo(&sleep_mmio);
   HHI_MEM_PD_REG0::Get().ReadFrom(&power_mmio).set_usb_comb_pd(0).WriteTo(&power_mmio);
   zx::nanosleep(zx::deadline_after(zx::usec(100)));
@@ -163,6 +174,11 @@ zx_status_t PowerOn(fidl::ClientEnd<fuchsia_hardware_registers::Device>& reset_r
 
   HHI_MEM_PD_REG0::Get().ReadFrom(&power_mmio).set_ge2d_pd(0xFF).WriteTo(&power_mmio);
   A0_RTI_GEN_PWR_SLEEP0::Get().ReadFrom(&sleep_mmio).set_ge2d_power_off(1).WriteTo(&sleep_mmio);
+
+  if (dump_regs) {
+    dump_power_regs(sleep_mmio);
+    dump_hhi_mem_pd_regs(power_mmio);
+  }
   return ZX_OK;
 }
 

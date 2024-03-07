@@ -9,8 +9,34 @@
 #include <soc/aml-common/aml-registers.h>
 
 #include "src/devices/usb/drivers/aml-usb-phy/usb-phy-regs.h"
+#include "src/devices/usb/drivers/aml-usb-phy/usb-phy2-regs.h"
 
 namespace aml_usb_phy {
+
+namespace {
+
+void dump_usb_regs(const fdf::MmioBuffer& mmio) {
+  DUMP_REG(USB_R0_V2, mmio)
+  DUMP_REG(USB_R1_V2, mmio)
+  DUMP_REG(USB_R2_V2, mmio)
+  DUMP_REG(USB_R3_V2, mmio)
+  DUMP_REG(USB_R4_V2, mmio)
+  DUMP_REG(USB_R5_V2, mmio)
+  DUMP_REG(USB_R6_V2, mmio)
+}
+
+}  // namespace
+
+void AmlUsbPhy::dump_regs() {
+  dump_usb_regs(usbctrl_mmio_);
+
+  for (const auto& u2 : usbphy2_) {
+    u2.dump_regs();
+  }
+  for (const auto& u3 : usbphy3_) {
+    u3.dump_regs();
+  }
+}
 
 zx_status_t AmlUsbPhy::InitPhy2() {
   auto* usbctrl_mmio = &usbctrl_mmio_;
@@ -79,7 +105,7 @@ zx_status_t AmlUsbPhy::InitPhy2() {
 
   for (auto& phy : usbphy2_) {
     auto mmio = &phy.mmio();
-    USB_PHY_REG21::Get().ReadFrom(mmio).set_usb2_otg_aca_en(0).WriteTo(mmio);
+    PHY2_R21::Get().ReadFrom(mmio).set_usb2_otg_aca_en(0).WriteTo(mmio);
 
     auto u2p_r1 = U2P_R1_V2::Get(phy.idx());
     int count = 0;
@@ -252,8 +278,8 @@ void AmlUsbPhy::ConnectStatusChanged(ConnectStatusChangedRequest& request,
     auto* mmio = &phy.mmio();
 
     if (request.connected()) {
-      PLL_REGISTER::Get(0x38).FromValue(pll_settings_[7]).WriteTo(mmio);
-      PLL_REGISTER::Get(0x34).FromValue(pll_settings_[5]).WriteTo(mmio);
+      PHY2_R14::Get().FromValue(pll_settings_[7]).WriteTo(mmio);
+      PHY2_R13::Get().FromValue(pll_settings_[5]).WriteTo(mmio);
     } else {
       phy.InitPll(type_, pll_settings_);
     }

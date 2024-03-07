@@ -57,6 +57,9 @@ class AmlUsbPhy : public fdf::Server<fuchsia_hardware_usb_phy::UsbPhy> {
   void HandleIrq(async_dispatcher_t* dispatcher, async::IrqBase* irq, zx_status_t status,
                  const zx_packet_interrupt_t* interrupt);
 
+  // Used for debugging.
+  void dump_regs();
+
   const PhyType type_;
   AmlUsbPhyDevice* controller_;
 

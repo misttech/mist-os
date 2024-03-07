@@ -22,6 +22,8 @@ class UsbPhy2 final : public UsbPhyBase {
 
   uint8_t idx() const { return idx_; }
 
+  void dump_regs() const override;
+
  private:
   void SetModeInternal(UsbMode mode, fdf::MmioBuffer& usbctrl_mmio,
                        const std::array<uint32_t, 8>& pll_settings) override;

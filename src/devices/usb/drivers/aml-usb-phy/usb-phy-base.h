@@ -19,7 +19,7 @@ enum class UsbMode {
 
 class UsbPhyBase {
  public:
-  fdf::MmioBuffer& mmio() { return mmio_; }
+  const fdf::MmioBuffer& mmio() const { return mmio_; }
   bool is_otg_capable() const { return is_otg_capable_; }
   usb_mode_t dr_mode() const { return dr_mode_; }
 
@@ -29,6 +29,9 @@ class UsbPhyBase {
     SetModeInternal(mode, usbctrl_mmio, pll_settings);
     phy_mode_ = mode;
   }
+
+  // Used for debugging.
+  virtual void dump_regs() const = 0;
 
  protected:
   UsbPhyBase(fdf::MmioBuffer mmio, bool is_otg_capable, usb_mode_t dr_mode)

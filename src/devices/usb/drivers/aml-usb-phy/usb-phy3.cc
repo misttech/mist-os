@@ -7,8 +7,25 @@
 #include <lib/driver/logging/cpp/logger.h>
 
 #include "src/devices/usb/drivers/aml-usb-phy/usb-phy-regs.h"
+#include "src/devices/usb/drivers/aml-usb-phy/usb-phy3-regs.h"
 
 namespace aml_usb_phy {
+
+namespace {
+
+void dump_phy3_regs(const fdf::MmioBuffer& mmio) {
+  DUMP_REG(PHY3_R1, mmio)
+  DUMP_REG(PHY3_R2, mmio)
+  DUMP_REG(PHY3_R4, mmio)
+  DUMP_REG(PHY3_R5, mmio)
+}
+
+}  // namespace
+
+void UsbPhy3::dump_regs() const {
+  FDF_LOG(INFO, "    UsbPhy3");
+  dump_phy3_regs(mmio());
+}
 
 zx_status_t UsbPhy3::CrBusAddr(uint32_t addr) {
   auto phy3_r4 = PHY3_R4::Get().FromValue(0).set_phy_cr_data_in(addr);
