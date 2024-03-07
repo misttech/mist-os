@@ -1256,14 +1256,16 @@ void Node::SetAndPublishInspect() {
 
 void Node::ConnectToDeviceFidl(ConnectToDeviceFidlRequestView request,
                                ConnectToDeviceFidlCompleter::Sync& completer) {
-  completer.Close(ZX_ERR_NOT_SUPPORTED);
+  zx_status_t status = ConnectDeviceInterface(std::move(request->server));
+  if (status != ZX_OK) {
+    LOGF(ERROR, "%s: Failed to connect to device fidl: ", zx_status_get_string(status));
+  }
 }
 
 void Node::ConnectToController(ConnectToControllerRequestView request,
                                ConnectToControllerCompleter::Sync& completer) {
-  dev_controller_bindings_.AddBinding(
-      dispatcher_, fidl::ServerEnd<fuchsia_device::Controller>{std::move(request->server)}, this,
-      fidl::kIgnoreBindingClosure);
+  ConnectControllerInterface(
+      fidl::ServerEnd<fuchsia_device::Controller>{std::move(request->server)});
 }
 
 void Node::Bind(BindRequestView request, BindCompleter::Sync& completer) {
@@ -1303,18 +1305,37 @@ void Node::GetTopologicalPath(GetTopologicalPathCompleter::Sync& completer) {
   completer.ReplySuccess(fidl::StringView::FromExternal(MakeTopologicalPath()));
 }
 
+void Node::ConnectControllerInterface(fidl::ServerEnd<fuchsia_device::Controller> server_end) {
+  dev_controller_bindings_.AddBinding(dispatcher_, std::move(server_end), this,
+                                      fidl::kIgnoreBindingClosure);
+}
+
+zx_status_t Node::ConnectDeviceInterface(zx::channel channel) {
+  if (!devfs_connector_.has_value()) {
+    return ZX_ERR_INTERNAL;
+  }
+  return fidl::WireCall(devfs_connector_.value())->Connect(std::move(channel)).status();
+}
+
 Devnode::Target Node::CreateDevfsPassthrough(
     std::optional<fidl::ClientEnd<fuchsia_device_fs::Connector>> connector,
     std::optional<fuchsia_device_fs::ConnectionType> connector_supports) {
-  auto supported_by_connector =
-      connector_supports.value_or(fuchsia_device_fs::ConnectionType::kDevice);
+  supported_by_connector_ = connector_supports.value_or(fuchsia_device_fs::ConnectionType::kDevice);
+  devfs_connector_ = std::move(connector);
   return Devnode::PassThrough(
       fuchsia_device_fs::ConnectionType::kDevice,
-      [connector = std::move(connector), supported_by_connector, node = weak_from_this(),
-       node_name = name_](zx::channel server_end, fuchsia_device_fs::ConnectionType type) {
+      [node = weak_from_this(), node_name = name_](zx::channel server_end,
+                                                   fuchsia_device_fs::ConnectionType type) {
+        std::shared_ptr locked_node = node.lock();
+        if (!locked_node) {
+          LOGF(ERROR, "Node was freed before it was used for %s.", node_name.c_str());
+          return ZX_ERR_BAD_STATE;
+        }
+
         // If the connector supports all of the requested types, connect with the connector.
-        if (connector.has_value() && type == (supported_by_connector & type)) {
-          return fidl::WireCall(connector.value())->Connect(std::move(server_end)).status();
+        if (locked_node->devfs_connector_.has_value() &&
+            type == (locked_node->supported_by_connector_ & type)) {
+          return locked_node->ConnectDeviceInterface(std::move(server_end));
         }
 
         if (type & fuchsia_device_fs::ConnectionType::kDevice ||
@@ -1327,16 +1348,8 @@ Devnode::Target Node::CreateDevfsPassthrough(
           return ZX_ERR_NOT_SUPPORTED;
         }
 
-        std::shared_ptr locked_node = node.lock();
-        if (!locked_node) {
-          LOGF(ERROR, "Node was freed before it was used for %s.", node_name.c_str());
-          return ZX_ERR_BAD_STATE;
-        }
-
-        locked_node->dev_controller_bindings_.AddBinding(
-            locked_node->dispatcher_,
-            fidl::ServerEnd<fuchsia_device::Controller>{std::move(server_end)}, locked_node.get(),
-            fidl::kIgnoreBindingClosure);
+        locked_node->ConnectControllerInterface(
+            fidl::ServerEnd<fuchsia_device::Controller>{std::move(server_end)});
         return ZX_OK;
       });
 }

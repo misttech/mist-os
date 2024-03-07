@@ -390,6 +390,9 @@ class Node : public fidl::WireServer<fuchsia_driver_framework::NodeController>,
       std::optional<fidl::ClientEnd<fuchsia_device_fs::Connector>> connector,
       std::optional<fuchsia_device_fs::ConnectionType> connector_supports);
 
+  void ConnectControllerInterface(fidl::ServerEnd<fuchsia_device::Controller> server_end);
+  zx_status_t ConnectDeviceInterface(zx::channel channel);
+
   std::string name_;
 
   NodeType type_;
@@ -439,6 +442,9 @@ class Node : public fidl::WireServer<fuchsia_driver_framework::NodeController>,
   // This represents the node's presence in devfs, both it's topological path and it's class path.
   DevfsDevice devfs_device_;
 
+  // Connector to service exported to devfs
+  std::optional<fidl::ClientEnd<fuchsia_device_fs::Connector>> devfs_connector_;
+  fuchsia_device_fs::ConnectionType supported_by_connector_;
   fidl::ServerBindingGroup<fuchsia_device::Controller> dev_controller_bindings_;
 };
 
