@@ -396,6 +396,15 @@ impl CurrentTask {
         } else if dir_fd == FdNumber::AT_FDCWD {
             self.fs().cwd()
         } else {
+            // O_PATH allowed for:
+            //
+            //   Passing the file descriptor as the dirfd argument of
+            //   openat() and the other "*at()" system calls.  This
+            //   includes linkat(2) with AT_EMPTY_PATH (or via procfs
+            //   using AT_SYMLINK_FOLLOW) even if the file is not a
+            //   directory.
+            //
+            // See https://man7.org/linux/man-pages/man2/open.2.html
             let file = self.files.get_allowing_opath(dir_fd)?;
             file.name.clone()
         };

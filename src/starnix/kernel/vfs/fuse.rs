@@ -125,7 +125,7 @@ pub fn new_fuse_fs(
     let default_permissions = mount_options.remove(B("default_permissions")).is_some();
     let connection = current_task
         .files
-        .get_allowing_opath(fd)?
+        .get(fd)?
         .downcast_file::<DevFuse>()
         .ok_or_else(|| errno!(EINVAL))?
         .connection

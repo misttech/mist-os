@@ -129,7 +129,7 @@ impl PerfettoConnection {
     ) -> Result<Self, anyhow::Error> {
         let conn_fd = sys_socket(locked, current_task, AF_UNIX.into(), SOCK_STREAM, 0)?;
         // TODO: There is a race condition here. The FD table might change between these two lines of code.
-        let conn_file = current_task.files.get_allowing_opath(conn_fd)?;
+        let conn_file = current_task.files.get(conn_fd)?;
         let conn_socket = conn_file.node().socket().ok_or_else(|| errno!(ENOTSOCK))?;
         let peer = SocketPeer::Handle(resolve_unix_socket_address(current_task, socket_path)?);
         conn_socket.connect(current_task, peer)?;

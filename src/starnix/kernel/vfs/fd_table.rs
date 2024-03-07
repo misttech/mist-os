@@ -429,12 +429,9 @@ mod test {
         let fd1 = add(&current_task, &files, file.clone()).unwrap();
         assert_eq!(fd1.raw(), 1);
 
-        assert!(Arc::ptr_eq(&files.get_allowing_opath(fd0).unwrap(), &file));
-        assert!(Arc::ptr_eq(&files.get_allowing_opath(fd1).unwrap(), &file));
-        assert_eq!(
-            files.get_allowing_opath(FdNumber::from_raw(fd1.raw() + 1)).map(|_| ()),
-            error!(EBADF)
-        );
+        assert!(Arc::ptr_eq(&files.get(fd0).unwrap(), &file));
+        assert!(Arc::ptr_eq(&files.get(fd1).unwrap(), &file));
+        assert_eq!(files.get(FdNumber::from_raw(fd1.raw() + 1)).map(|_| ()), error!(EBADF));
 
         files.release(());
     }
@@ -451,16 +448,10 @@ mod test {
 
         let forked = files.fork();
 
-        assert_eq!(
-            Arc::as_ptr(&files.get_allowing_opath(fd0).unwrap()),
-            Arc::as_ptr(&forked.get_allowing_opath(fd0).unwrap())
-        );
-        assert_eq!(
-            Arc::as_ptr(&files.get_allowing_opath(fd1).unwrap()),
-            Arc::as_ptr(&forked.get_allowing_opath(fd1).unwrap())
-        );
-        assert!(files.get_allowing_opath(fd2).is_err());
-        assert!(forked.get_allowing_opath(fd2).is_err());
+        assert_eq!(Arc::as_ptr(&files.get(fd0).unwrap()), Arc::as_ptr(&forked.get(fd0).unwrap()));
+        assert_eq!(Arc::as_ptr(&files.get(fd1).unwrap()), Arc::as_ptr(&forked.get(fd1).unwrap()));
+        assert!(files.get(fd2).is_err());
+        assert!(forked.get(fd2).is_err());
 
         files.set_fd_flags(fd0, FdFlags::CLOEXEC).unwrap();
         assert_eq!(FdFlags::CLOEXEC, files.get_fd_flags(fd0).unwrap());
@@ -481,13 +472,13 @@ mod test {
 
         files.set_fd_flags(fd0, FdFlags::CLOEXEC).unwrap();
 
-        assert!(files.get_allowing_opath(fd0).is_ok());
-        assert!(files.get_allowing_opath(fd1).is_ok());
+        assert!(files.get(fd0).is_ok());
+        assert!(files.get(fd1).is_ok());
 
         files.exec();
 
-        assert!(files.get_allowing_opath(fd0).is_err());
-        assert!(files.get_allowing_opath(fd1).is_ok());
+        assert!(files.get(fd0).is_err());
+        assert!(files.get(fd1).is_ok());
 
         files.release(());
     }
@@ -508,7 +499,7 @@ mod test {
         assert!(files.close(fd0).is_ok());
         assert!(files.close(fd0).is_err());
         // Now it's gone.
-        assert!(files.get_allowing_opath(fd0).is_err());
+        assert!(files.get(fd0).is_err());
 
         // The next FD we insert fills in the hole we created.
         let another_fd = add(&current_task, &files, file).unwrap();

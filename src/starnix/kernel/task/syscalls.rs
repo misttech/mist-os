@@ -238,6 +238,15 @@ pub fn sys_execveat(
             return error!(ENOENT);
         }
 
+        // O_PATH allowed for:
+        //
+        //   Passing the file descriptor as the dirfd argument of
+        //   openat() and the other "*at()" system calls.  This
+        //   includes linkat(2) with AT_EMPTY_PATH (or via procfs
+        //   using AT_SYMLINK_FOLLOW) even if the file is not a
+        //   directory.
+        //
+        // See https://man7.org/linux/man-pages/man2/open.2.html
         let file = current_task.files.get_allowing_opath(dir_fd)?;
 
         // We are forced to reopen the file with O_RDONLY to get access to the underlying VMO.
@@ -1753,6 +1762,8 @@ pub fn sys_kcmp(
     match resource_type {
         KcmpResource::FILE => {
             fn get_file(task: &Task, index: u64) -> Result<FileHandle, Errno> {
+                // TODO: Test whether O_PATH is allowed here. Conceptually, seems like
+                //       O_PATH should be allowed, but we haven't tested it yet.
                 task.files.get_allowing_opath(FdNumber::from_raw(
                     index.try_into().map_err(|_| errno!(EBADF))?,
                 ))

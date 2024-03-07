@@ -577,7 +577,7 @@ pub fn sys_pidfd_send_signal(
         return error!(EINVAL);
     }
 
-    let file = current_task.files.get_allowing_opath(pidfd)?;
+    let file = current_task.files.get(pidfd)?;
     let target = current_task.get_task(file.as_pid()?);
     let target = target.upgrade().ok_or_else(|| errno!(ESRCH))?;
 
@@ -792,7 +792,7 @@ pub fn sys_waitid(
         }),
         P_PIDFD => {
             let fd = FdNumber::from_raw(id);
-            let file = current_task.files.get_allowing_opath(fd)?;
+            let file = current_task.files.get(fd)?;
             if file.flags().contains(OpenFlags::NONBLOCK) {
                 waiting_options.block = false;
             }

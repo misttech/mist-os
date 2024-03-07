@@ -252,6 +252,13 @@ pub fn sys_fcntl(
             Ok(SUCCESS)
         }
         F_GETFL => {
+            // O_PATH allowed for:
+            //
+            //   Retrieving open file status flags using the fcntl(2)
+            //   F_GETFL operation: the returned flags will include the
+            //   bit O_PATH.
+            //
+            // See https://man7.org/linux/man-pages/man2/open.2.html
             let file = current_task.files.get_allowing_opath(fd)?;
             Ok(file.flags().into())
         }
@@ -492,6 +499,11 @@ pub fn sys_fstatfs(
     fd: FdNumber,
     user_buf: UserRef<statfs>,
 ) -> Result<(), Errno> {
+    // O_PATH allowed for:
+    //
+    //   fstatfs(2) (since Linux 3.12).
+    //
+    // See https://man7.org/linux/man-pages/man2/open.2.html
     let file = current_task.files.get_allowing_opath(fd)?;
     let stat = file.fs.statfs(current_task)?;
     current_task.write_object(user_buf, &stat)?;
@@ -797,6 +809,12 @@ pub fn sys_fchdir(
     current_task: &CurrentTask,
     fd: FdNumber,
 ) -> Result<(), Errno> {
+    // O_PATH allowed for:
+    //
+    //   fchdir(2), if the file descriptor refers to a directory
+    //   (since Linux 3.5).
+    //
+    // See https://man7.org/linux/man-pages/man2/open.2.html
     let file = current_task.files.get_allowing_opath(fd)?;
     if !file.name.entry.node.is_dir() {
         return error!(ENOTDIR);
@@ -810,6 +828,11 @@ pub fn sys_fstat(
     fd: FdNumber,
     buffer: UserRef<uapi::stat>,
 ) -> Result<(), Errno> {
+    // O_PATH allowed for:
+    //
+    //   fstat(2) (since Linux 3.6).
+    //
+    // See https://man7.org/linux/man-pages/man2/open.2.html
     let file = current_task.files.get_allowing_opath(fd)?;
     let result = file.node().stat(current_task)?;
     current_task.write_object(buffer, &result)?;
@@ -2952,10 +2975,7 @@ mod tests {
 
         assert_ne!(oldfd, newfd);
         let files = &current_task.files;
-        assert!(Arc::ptr_eq(
-            &files.get_allowing_opath(oldfd).unwrap(),
-            &files.get_allowing_opath(newfd).unwrap()
-        ));
+        assert!(Arc::ptr_eq(&files.get(oldfd).unwrap(), &files.get(newfd).unwrap()));
 
         assert_eq!(sys_dup(&mut locked, &current_task, FdNumber::from_raw(3)), error!(EBADF));
 
@@ -2973,10 +2993,7 @@ mod tests {
 
         assert_ne!(oldfd, newfd);
         let files = &current_task.files;
-        assert!(Arc::ptr_eq(
-            &files.get_allowing_opath(oldfd).unwrap(),
-            &files.get_allowing_opath(newfd).unwrap()
-        ));
+        assert!(Arc::ptr_eq(&files.get(oldfd).unwrap(), &files.get(newfd).unwrap()));
         assert_eq!(files.get_fd_flags(oldfd).unwrap(), FdFlags::empty());
         assert_eq!(files.get_fd_flags(newfd).unwrap(), FdFlags::CLOEXEC);
 
@@ -2994,15 +3011,9 @@ mod tests {
         let second_file_handle =
             current_task.open_file(&mut locked, "data/testfile.txt".into(), OpenFlags::RDONLY)?;
         let different_file_fd = current_task.add_file(second_file_handle, FdFlags::empty())?;
-        assert!(!Arc::ptr_eq(
-            &files.get_allowing_opath(oldfd).unwrap(),
-            &files.get_allowing_opath(different_file_fd).unwrap()
-        ));
+        assert!(!Arc::ptr_eq(&files.get(oldfd).unwrap(), &files.get(different_file_fd).unwrap()));
         sys_dup3(&mut locked, &current_task, oldfd, different_file_fd, O_CLOEXEC)?;
-        assert!(Arc::ptr_eq(
-            &files.get_allowing_opath(oldfd).unwrap(),
-            &files.get_allowing_opath(different_file_fd).unwrap()
-        ));
+        assert!(Arc::ptr_eq(&files.get(oldfd).unwrap(), &files.get(different_file_fd).unwrap()));
 
         Ok(())
     }

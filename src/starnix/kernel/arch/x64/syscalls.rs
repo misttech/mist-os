@@ -174,6 +174,12 @@ pub fn sys_dup2(
     newfd: FdNumber,
 ) -> Result<FdNumber, Errno> {
     if oldfd == newfd {
+        // O_PATH allowed for:
+        //
+        //  Duplicating the file descriptor (dup(2), fcntl(2)
+        //  F_DUPFD, etc.).
+        //
+        // See https://man7.org/linux/man-pages/man2/open.2.html
         current_task.files.get_allowing_opath(oldfd)?;
         return Ok(newfd);
     }
