@@ -236,6 +236,7 @@ filegroup(
             #
             # asan runtime libraries
             "//:lib/clang/%{CLANG_VERSION}/lib/%s-unknown-fuchsia/libclang_rt.asan.so" % cpu,
+            "//:lib/clang/%{CLANG_VERSION}/lib/%s-unknown-fuchsia/libclang_rt.asan_static.a" % cpu,
             "//:lib/clang/%{CLANG_VERSION}/lib/%s-unknown-fuchsia/libclang_rt.asan-preinit.a" % cpu,
 
             # hwasan runtime libraries
