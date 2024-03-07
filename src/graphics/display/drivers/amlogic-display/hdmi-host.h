@@ -27,17 +27,18 @@ struct pll_param {
   uint32_t mode;
   uint32_t viu_channel;
   uint32_t viu_type;
-  uint32_t hpll_clk_out;
-  uint32_t od1;
-  uint32_t od2;
-  uint32_t od3;
+
+  int64_t hdmi_pll_vco_output_frequency_khz;
+  int32_t output_divider1;
+  int32_t output_divider2;
+  int32_t output_divider3;
 
   // TODO(https://fxbug.dev/320616654): Support fractional divider ratios.
-  int vid_pll_divider_ratio;
-  uint32_t vid_clk_div;
-  uint32_t hdmi_tx_pixel_div;
-  uint32_t encp_div;
-  uint32_t enci_div;
+  int hdmi_clock_tree_vid_pll_divider;
+  int32_t video_clock1_divider;
+  int32_t hdmi_transmitter_pixel_clock_divider;
+  int32_t encp_clock_divider;
+  int32_t enci_clock_divider;
 };
 
 // HdmiHost has access to the amlogic/designware HDMI block and controls its
@@ -89,7 +90,7 @@ class HdmiHost {
   void ConfigEncoder(const display::DisplayTiming& timings);
   void ConfigPhy();
 
-  void ConfigureHpllClkOut(uint32_t hpll);
+  void ConfigureHpllClkOut(int64_t hdmi_pll_vco_output_frequency_khz);
   // TODO(https://fxbug.dev/320616654): Support fractional divider ratios.
   void ConfigureHdmiClockTree(int divider_ratio);
   void WaitForPllLocked();

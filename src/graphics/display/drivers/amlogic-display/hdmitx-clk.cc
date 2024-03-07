@@ -2,7 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/graphics/display/drivers/amlogic-display/amlogic-display.h"
+#include <cinttypes>
+
 #include "src/graphics/display/drivers/amlogic-display/clock-regs.h"
 #include "src/graphics/display/drivers/amlogic-display/fixed-point-util.h"
 #include "src/graphics/display/drivers/amlogic-display/hdmi-host.h"
@@ -10,14 +11,6 @@
 #include "src/graphics/display/drivers/amlogic-display/vpu-regs.h"
 
 namespace amlogic_display {
-
-// TODO(https://fxbug.dev/42148166): Reconcile with amlogic-clock
-
-namespace {
-
-const uint32_t kFracMax = 131072;
-
-}  // namespace
 
 void HdmiHost::WaitForPllLocked() {
   bool err = false;
@@ -86,16 +79,16 @@ void HdmiHost::ConfigurePll(const pll_param& pll_params) {
       .set_hdmi_tx_system_clock_enabled(true)
       .WriteTo(&hhi_mmio_);
 
-  ConfigureHpllClkOut(pll_params.hpll_clk_out);
+  ConfigureHpllClkOut(pll_params.hdmi_pll_vco_output_frequency_khz);
 
   HhiHdmiPllCntlReg::Get()
       .ReadFrom(&hhi_mmio_)
-      .set_hdmi_dpll_od1(pll_params.od1 >> 1)
-      .set_hdmi_dpll_od2(pll_params.od2 >> 1)
-      .set_hdmi_dpll_od3(pll_params.od3 >> 1)
+      .set_hdmi_dpll_od1(pll_params.output_divider1 >> 1)
+      .set_hdmi_dpll_od2(pll_params.output_divider2 >> 1)
+      .set_hdmi_dpll_od3(pll_params.output_divider3 >> 1)
       .WriteTo(&hhi_mmio_);
 
-  ConfigureHdmiClockTree(pll_params.vid_pll_divider_ratio);
+  ConfigureHdmiClockTree(pll_params.hdmi_clock_tree_vid_pll_divider);
 
   VideoClock1Control::Get()
       .ReadFrom(&hhi_mmio_)
@@ -103,7 +96,7 @@ void HdmiHost::ConfigurePll(const pll_param& pll_params) {
       .WriteTo(&hhi_mmio_);
   VideoClock1Divider::Get()
       .ReadFrom(&hhi_mmio_)
-      .SetDivider0((pll_params.vid_clk_div == 0) ? 1 : (pll_params.vid_clk_div))
+      .SetDivider0((pll_params.video_clock1_divider == 0) ? 1 : (pll_params.video_clock1_divider))
       .WriteTo(&hhi_mmio_);
   VideoClock1Control::Get()
       .ReadFrom(&hhi_mmio_)
@@ -122,7 +115,7 @@ void HdmiHost::ConfigurePll(const pll_param& pll_params) {
       .set_hdmi_tx_pixel_clock_enabled(true)
       .WriteTo(&hhi_mmio_);
 
-  if (pll_params.encp_div != (uint32_t)-1) {
+  if (pll_params.encp_clock_divider != -1) {
     VideoClock1Divider::Get()
         .ReadFrom(&hhi_mmio_)
         .set_encp_clock_selection(EncoderClockSource::kVideoClock1)
@@ -133,7 +126,7 @@ void HdmiHost::ConfigurePll(const pll_param& pll_params) {
         .WriteTo(&hhi_mmio_);
     VideoClock1Control::Get().ReadFrom(&hhi_mmio_).set_divider0_enabled(true).WriteTo(&hhi_mmio_);
   }
-  if (pll_params.enci_div != (uint32_t)-1) {
+  if (pll_params.enci_clock_divider != -1) {
     VideoClock1Divider::Get()
         .ReadFrom(&hhi_mmio_)
         .set_enci_clock_selection(EncoderClockSource::kVideoClock1)
@@ -146,17 +139,45 @@ void HdmiHost::ConfigurePll(const pll_param& pll_params) {
   }
 }
 
-void HdmiHost::ConfigureHpllClkOut(uint32_t hpll) {
-  float desired_pll = (float)hpll / (float)24000;
-  uint8_t whole;
-  uint16_t frac;
-  whole = (uint8_t)desired_pll;
-  frac = static_cast<uint16_t>(((float)desired_pll - (float)whole) * kFracMax);
+// TODO(https://fxbug.dev/328135383): Unify the PLL configuration logic for
+// HDMI and MIPI-DSI output.
+void HdmiHost::ConfigureHpllClkOut(int64_t expected_hdmi_pll_vco_output_frequency_khz) {
+  static constexpr int64_t kExternalOscillatorFrequencyKhz = 24'000;
 
-  zxlogf(ERROR, "Desired PLL = %f (frac = %d, whole = %d) (hpll = %d)", desired_pll, frac, whole,
-         hpll);
+  static constexpr int32_t kMinHdmiPllMultiplierInteger = 1;
+  static constexpr int32_t kMaxHdmiPllMultiplierInteger = 255;
 
-  HhiHdmiPllCntlReg::Get().FromValue(0x0b3a0400).set_hdmi_dpll_M(whole).WriteTo(&hhi_mmio_);
+  // TODO(https://fxbug.dev/328177521): Instead of asserting, we should check
+  // the validity of the expected VCO output frequency before configuring the
+  // PLL.
+  ZX_ASSERT(expected_hdmi_pll_vco_output_frequency_khz >=
+            kExternalOscillatorFrequencyKhz * kMinHdmiPllMultiplierInteger);
+  ZX_ASSERT(expected_hdmi_pll_vco_output_frequency_khz <=
+            kExternalOscillatorFrequencyKhz * kMaxHdmiPllMultiplierInteger);
+
+  // The assertion above guarantees that `pll_multiplier_integer` is always
+  // >= kMinHdmiPllMultiplierInteger and <= kMaxHdmiPllMultiplierInteger, so
+  // it can be stored as an int32_t value.
+  const int32_t pll_multiplier_integer = static_cast<int32_t>(
+      expected_hdmi_pll_vco_output_frequency_khz / kExternalOscillatorFrequencyKhz);
+
+  static constexpr int32_t kPllMultiplierFractionScalingRatio = 1 << 17;
+  // The result is in range [0, 2^17), so it can be stored as an int32_t
+  // value.
+  const int32_t pll_multiplier_fraction = static_cast<int32_t>(
+      (expected_hdmi_pll_vco_output_frequency_khz % kExternalOscillatorFrequencyKhz) *
+      kPllMultiplierFractionScalingRatio / kExternalOscillatorFrequencyKhz);
+
+  zxlogf(DEBUG,
+         "HDMI PLL VCO configured: desired multiplier = %" PRId32 " + %" PRId32 " / %" PRId32,
+         pll_multiplier_integer, pll_multiplier_fraction, kPllMultiplierFractionScalingRatio);
+  zxlogf(DEBUG, "HDMI PLL VCO output frequency: %" PRId64 " kHz",
+         expected_hdmi_pll_vco_output_frequency_khz);
+
+  HhiHdmiPllCntlReg::Get()
+      .FromValue(0x0b3a0400)
+      .set_hdmi_dpll_M(pll_multiplier_integer)
+      .WriteTo(&hhi_mmio_);
 
   /* Enable and reset */
   HhiHdmiPllCntlReg::Get()
@@ -165,11 +186,11 @@ void HdmiHost::ConfigureHpllClkOut(uint32_t hpll) {
       .set_hdmi_dpll_reset(1)
       .WriteTo(&hhi_mmio_);
 
-  HhiHdmiPllCntl1Reg::Get().FromValue(frac).WriteTo(&hhi_mmio_);
+  HhiHdmiPllCntl1Reg::Get().FromValue(pll_multiplier_fraction).WriteTo(&hhi_mmio_);
   HhiHdmiPllCntl2Reg::Get().FromValue(0x0).WriteTo(&hhi_mmio_);
 
   /* G12A HDMI PLL Needs specific parameters for 5.4GHz */
-  if (whole >= 0xf7) {
+  if (pll_multiplier_integer >= 0xf7) {
     HhiHdmiPllCntl3Reg::Get().FromValue(0x6a685c00).WriteTo(&hhi_mmio_);
     HhiHdmiPllCntl4Reg::Get().FromValue(0x11551293).WriteTo(&hhi_mmio_);
     HhiHdmiPllCntl5Reg::Get().FromValue(0x39272000).WriteTo(&hhi_mmio_);
