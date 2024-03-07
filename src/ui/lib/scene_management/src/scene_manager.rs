@@ -201,7 +201,7 @@ pub struct SceneManager {
 
     // Flatland instance that embeds the system shell (i.e. via the SetRootView() FIDL API).  Its
     // root view is attached to a viewport owned by the accessibility manager (via
-    // fuchsia.ui.accessibility.scene.Provider, create_view()).
+    // fuchsia.accessibility.scene.Provider/CreateView()).
     scene_flatland: FlatlandInstance,
 
     // These are the ViewRefs returned by get_pointerinjection_view_refs().  They are used to
