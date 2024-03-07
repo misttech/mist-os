@@ -6,15 +6,104 @@
 
 import abc
 
+from honeydew.typing.wlan import (
+    BssDescription,
+    ClientStatusResponse,
+    QueryIfaceResponse,
+    WlanMacRole,
+)
+
 
 class Wlan(abc.ABC):
-    """Abstract base class for Wlan affordance."""
+    """Abstract base class for Wlan driver affordance."""
 
     # List all the public methods
     @abc.abstractmethod
-    def get_phy_ids(self) -> list[int]:
-        """Get a list of identifiers for WLAN PHYs.
+    def connect(
+        self,
+        ssid: str,
+        password: str | None,
+        bss_desc: BssDescription,
+    ) -> bool:
+        """Trigger connection to a network.
+
+        Args:
+            ssid: The network to connect to.
+            password: The password for the network.
+            bss_desc: The basic service set for target network.
 
         Returns:
-            A list of PHY IDs.
+            True on success otherwise false.
+        """
+
+    @abc.abstractmethod
+    def create_iface(
+        self, phy_id: int, role: WlanMacRole, sta_addr: str | None = None
+    ) -> int:
+        """Create a new WLAN interface.
+
+        Args:
+            phy_id: The iface ID.
+            role: The role of the new iface.
+            sta_addr: MAC address for softAP iface.
+
+        Returns:
+            Iface id of newly created interface.
+        """
+
+    @abc.abstractmethod
+    def destroy_iface(self, iface_id: int) -> None:
+        """Destroy WLAN interface by ID.
+
+        Args:
+            iface_id: The interface to destroy.
+        """
+
+    @abc.abstractmethod
+    def disconnect(self) -> None:
+        """Disconnect any current wifi connections."""
+
+    @abc.abstractmethod
+    def get_iface_id_list(self) -> list[int]:
+        """Get list of wlan iface IDs on device.
+
+        Returns:
+            A list of wlan iface IDs that are present on the device.
+        """
+
+    @abc.abstractmethod
+    def get_phy_id_list(self) -> list[int]:
+        """Get list of phy ids on device.
+
+        Returns:
+            A list of phy IDs that are present on the device.
+        """
+
+    @abc.abstractmethod
+    def query_iface(self, iface_id: int) -> QueryIfaceResponse:
+        """Retrieves interface info for given wlan iface id.
+
+        Args:
+            iface_id: The wlan interface id to get info from.
+
+        Returns:
+            QueryIfaceResponseWrapper from the SL4F server.
+        """
+
+    @abc.abstractmethod
+    def scan_for_bss_info(self) -> dict[str, BssDescription]:
+        """Scans and returns BSS info.
+
+        Returns:
+            A dict mapping each seen SSID to a list of BSS Description IE
+            blocks, one for each BSS observed in the network
+        """
+
+    @abc.abstractmethod
+    def status(self) -> ClientStatusResponse:
+        """Request client state and network status.
+
+        Returns:
+            ClientStatusResponse state summary and
+            status of various networks connections.
         """
