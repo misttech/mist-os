@@ -9,7 +9,6 @@
 #include <fidl/fuchsia.hardware.gpioimpl/cpp/wire.h>
 #include <fidl/fuchsia.hardware.platform.bus/cpp/driver/fidl.h>
 #include <fidl/fuchsia.hardware.platform.bus/cpp/markers.h>
-#include <fuchsia/hardware/gpioimpl/cpp/banjo.h>
 #include <fuchsia/hardware/iommu/cpp/banjo.h>
 #include <lib/ddk/device.h>
 #include <threads.h>

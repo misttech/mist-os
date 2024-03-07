@@ -236,10 +236,6 @@ void PlatformBus::RegisterProtocol(RegisterProtocolRequestView request, fdf::Are
           ddk::ClockImplProtocolClient(reinterpret_cast<const clock_impl_protocol_t*>(protocol));
       break;
     }
-    case ZX_PROTOCOL_GPIO_IMPL: {
-      gpio_ = ddk::GpioImplProtocolClient(reinterpret_cast<const gpio_impl_protocol_t*>(protocol));
-      break;
-    }
     case ZX_PROTOCOL_IOMMU: {
       iommu_ = ddk::IommuProtocolClient(reinterpret_cast<const iommu_protocol_t*>(protocol));
       break;
@@ -550,12 +546,6 @@ zx_status_t PlatformBus::DdkGetProtocol(uint32_t proto_id, void* out) {
     case ZX_PROTOCOL_CLOCK_IMPL:
       if (clock_) {
         clock_->GetProto(static_cast<clock_impl_protocol_t*>(out));
-        return ZX_OK;
-      }
-      break;
-    case ZX_PROTOCOL_GPIO_IMPL:
-      if (gpio_) {
-        gpio_->GetProto(static_cast<gpio_impl_protocol_t*>(out));
         return ZX_OK;
       }
       break;

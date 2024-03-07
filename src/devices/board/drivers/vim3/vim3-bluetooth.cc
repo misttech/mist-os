@@ -5,7 +5,6 @@
 #include <fidl/fuchsia.hardware.platform.bus/cpp/driver/fidl.h>
 #include <fidl/fuchsia.hardware.platform.bus/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.serial/cpp/wire.h>
-#include <fuchsia/hardware/gpioimpl/c/banjo.h>
 #include <fuchsia/hardware/serial/c/banjo.h>
 #include <lib/ddk/binding.h>
 #include <lib/ddk/debug.h>

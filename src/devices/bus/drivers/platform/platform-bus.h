@@ -9,7 +9,6 @@
 #include <fidl/fuchsia.hardware.platform.bus/cpp/driver/fidl.h>
 #include <fidl/fuchsia.sysinfo/cpp/wire.h>
 #include <fuchsia/hardware/clockimpl/cpp/banjo.h>
-#include <fuchsia/hardware/gpioimpl/cpp/banjo.h>
 #include <fuchsia/hardware/iommu/cpp/banjo.h>
 #include <lib/async/cpp/task.h>
 #include <lib/ddk/device.h>
@@ -101,8 +100,6 @@ class PlatformBus : public PlatformBusType,
   zx::result<BootItemResult> GetBootItem(uint32_t type, uint32_t extra);
   zx::result<fbl::Array<uint8_t>> GetBootItemArray(uint32_t type, uint32_t extra);
 
-  inline ddk::GpioImplProtocolClient* gpio() { return &*gpio_; }
-
   fidl::WireClient<fuchsia_hardware_platform_bus::SysSuspend>& suspend_cb() { return suspend_cb_; }
 
   fuchsia_hardware_platform_bus::TemporaryBoardInfo board_info() {
@@ -149,7 +146,6 @@ class PlatformBus : public PlatformBusType,
 
   // Protocols that are optionally provided by the board driver.
   std::optional<ddk::ClockImplProtocolClient> clock_;
-  std::optional<ddk::GpioImplProtocolClient> gpio_;
   std::optional<ddk::IommuProtocolClient> iommu_;
 
   struct ProtoReadyResponse {
