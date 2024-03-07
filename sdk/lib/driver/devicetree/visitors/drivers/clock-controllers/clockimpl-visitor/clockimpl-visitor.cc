@@ -15,6 +15,7 @@
 
 #include <cstdint>
 #include <memory>
+#include <set>
 #include <utility>
 
 #include <bind/fuchsia/clock/cpp/bind.h>
@@ -133,6 +134,8 @@ zx::result<> ClockImplVisitor::Visit(fdf_devicetree::Node& node,
       }
     }
 
+    // Track the clock controllers referenced so that we can add bind rule only once per controller.
+    std::set<uint32_t> init_controllers;
     for (uint32_t index = 0; index < count; index++) {
       auto reference = (*parser_output)[kAssignedClocks][index].AsReference();
       if (reference && is_match(reference->first.name())) {
@@ -140,6 +143,14 @@ zx::result<> ClockImplVisitor::Visit(fdf_devicetree::Node& node,
                                      clock_parents[index]);
         if (result.is_error()) {
           return result.take_error();
+        }
+
+        if (init_controllers.find(reference->first.id()) == init_controllers.end()) {
+          result = AddInitChildNodeSpec(node);
+          if (result.is_error()) {
+            return result.take_error();
+          }
+          init_controllers.insert(reference->first.id());
         }
       }
     }
@@ -230,7 +241,7 @@ zx::result<> ClockImplVisitor::ParseInitChild(
   auto& controller = GetController(*parent.phandle());
   auto clock = ClockCells(specifiers);
 
-  if (clock_rate || clock_parent) {
+  if ((clock_rate && clock_rate->AsUint32().value()) || clock_parent) {
     controller.init_metadata.steps().emplace_back(clock.id(), InitCall::WithDisable({}));
   }
 
@@ -264,7 +275,7 @@ zx::result<> ClockImplVisitor::ParseInitChild(
 
   controller.init_metadata.steps().emplace_back(clock.id(), InitCall::WithEnable({}));
 
-  return AddInitChildNodeSpec(child);
+  return zx::ok();
 }
 
 zx::result<> ClockImplVisitor::FinalizeNode(fdf_devicetree::Node& node) {
