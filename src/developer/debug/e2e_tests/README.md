@@ -18,7 +18,7 @@ this directory:
     variable is optional, but expect test failures when using an unsupported build type.
   * `ZXDB_E2E_TESTS_SYMBOL_DIR`:  **Required** for all tests to find symbol data for the inferior
     programs. The symbols are hard linked to this directory from `root_out_dir` using the
-    `copy_unstripped_binaries.py` script which is executed at build time.
+    `symbols_dir_test_data` template which is executed at build time.
   * `ZXDB_E2E_TESTS_SCRIPTS_DIR`: **Required** to locate the script files under `root_out_dir`.
   * `ZXDB_E2E_TESTS_FFX_TEST_DATA`: **Required** when `ffx debug` has been compiled as an FFX
     subtool. If `ffx debug` has been compiled directly into FFX, then this is unused.
