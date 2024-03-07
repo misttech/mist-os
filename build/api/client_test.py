@@ -230,16 +230,28 @@ tests=tests.json
             expected_status=1,
         )
 
+        # Test unknown GN label
+        self.assert_output(
+            [
+                "gn_label_to_ninja_paths",
+                "--allow-unknown",
+                "unknown_path",
+                "//unknown:label",
+            ],
+            "//unknown:label\nunknown_path\n",
+        )
+
     def test_fx_build_args_to_labels(self):
         _TEST_CASES = [
-            (["//aa"], ["//aa:aa"]),
+            (["--args", "//aa"], ["//aa:aa"]),
             (
-                ["--host", "//foo/bar"],
+                ["--args", "--host", "//foo/bar"],
                 ["//foo/bar:bar(//build/toolchain:host_y64)"],
             ),
-            (["--fuchsia", "//:foo"], ["//:foo"]),
+            (["--args", "--fuchsia", "//:foo"], ["//:foo"]),
             (
                 [
+                    "--args",
                     "--host",
                     "//first",
                     "//second",
@@ -257,12 +269,19 @@ tests=tests.json
                     "//fifth:fifth(//build/fidl:fidling)",
                 ],
             ),
+            (
+                [
+                    "--allow-unknown",
+                    "--args",
+                    "first_path",
+                    "second_path",
+                ],
+                ["first_path", "second_path"],
+            ),
         ]
         for args, expected_list in _TEST_CASES:
             expected_out = "\n".join(expected_list) + "\n"
-            self.assert_output(
-                ["fx_build_args_to_labels", "--args"] + args, expected_out
-            )
+            self.assert_output(["fx_build_args_to_labels"] + args, expected_out)
 
         _WARNING_CASES = [
             (

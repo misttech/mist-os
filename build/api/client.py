@@ -251,15 +251,19 @@ def cmd_ninja_path_to_gn_label(args: argparse.Namespace) -> int:
     labels = set()
     for path in args.paths:
         label = outputs.path_to_gn_label(path)
-        if not label:
-            print(
-                f"ERROR: Unknown Ninja target path: {path}",
-                file=sys.stderr,
-            )
-            failure = True
+        if label:
+            labels.add(label)
             continue
 
-        labels.add(label)
+        if args.allow_unknown:
+            labels.add(path)
+            continue
+
+        print(
+            f"ERROR: Unknown Ninja target path: {path}",
+            file=sys.stderr,
+        )
+        failure = True
 
     if failure:
         return 1
@@ -290,11 +294,14 @@ def cmd_gn_label_to_ninja_paths(args: argparse.Namespace) -> int:
     all_paths = []
     for label in args.labels:
         paths = outputs.gn_label_to_paths(label)
-        if not paths:
-            _error(f"Unknown GN label (not in the configured graph): {label}")
-            failure = True
+        if paths:
+            all_paths.extend(paths)
             continue
-        all_paths.extend(paths)
+        if args.allow_unknown:
+            all_paths.append(label)
+            continue
+        _error(f"Unknown GN label (not in the configured graph): {label}")
+        failure = True
 
     if failure:
         return 1
@@ -325,6 +332,9 @@ def cmd_fx_build_args_to_labels(args: argparse.Namespace) -> int:
                 f"Use '{' '.join(label_args)}' instead of Ninja path '{path}'"
             )
             return label
+
+        if args.allow_unknown:
+            return path
 
         _error(f"Unknown Ninja path: {path}")
         nonlocal failure
@@ -395,6 +405,11 @@ def main(main_args: Sequence[str]) -> int:
         help="Print the GN label of a given Ninja output path.",
     )
     ninja_path_to_gn_label_parser.add_argument(
+        "--allow-unknown",
+        action="store_true",
+        help="Keep unknown input Nija paths in result.",
+    )
+    ninja_path_to_gn_label_parser.add_argument(
         "paths",
         metavar="NINJA_PATH",
         nargs="+",
@@ -406,6 +421,11 @@ def main(main_args: Sequence[str]) -> int:
         "gn_label_to_ninja_paths",
         help="Print the Ninja output paths of one or more GN labels.",
         description="Print the Ninja output paths of one or more GN labels.",
+    )
+    gn_label_to_ninja_paths_parser.add_argument(
+        "--allow-unknown",
+        action="store_true",
+        help="Keep unknown input GN labels in result.",
     )
     gn_label_to_ninja_paths_parser.add_argument(
         "labels",
@@ -421,6 +441,9 @@ def main(main_args: Sequence[str]) -> int:
         "fx_build_args_to_labels",
         help="Parse fx build arguments into qualified GN labels.",
         description="Convert a series of `fx build` arguments into a list of fully qualified GN labels.",
+    )
+    fx_build_args_to_labels_parser.add_argument(
+        "--allow-unknown", action="store_true"
     )
     fx_build_args_to_labels_parser.add_argument(
         "--args", required=True, nargs=argparse.REMAINDER
