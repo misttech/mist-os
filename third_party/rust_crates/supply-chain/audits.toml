@@ -62,6 +62,12 @@ invariants.
 [1] https://fuchsia-review.git.corp.google.com/c/fuchsia/+/711365/comment/7a8cdc16_9e9f45ca/
 """
 
+[[audits.aes]]
+who = "David Koloski <dkoloski@google.com>"
+criteria = ["safe-to-deploy", "ub-risk-1"]
+delta = "0.8.2 -> 0.8.4"
+notes = "Audited at https://fxrev.dev/987054"
+
 [[audits.aes-gcm]]
 who = "Joshua Liebow-Feeser <joshlf@google.com>"
 criteria = ["safe-to-deploy", "ub-risk-2"]
