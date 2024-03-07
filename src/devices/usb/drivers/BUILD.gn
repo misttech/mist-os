@@ -7,7 +7,6 @@ group("tests") {
 
   deps = [
     "a1-usb-phy:tests",
-    "aml-usb-crg-phy-v2:tests",
     "aml-usb-phy:tests",
     "crg-udc:tests",
     "dwc2:tests",

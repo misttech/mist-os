@@ -560,3 +560,9 @@
   available_in_git: 'a471907b40917cc1a5274530ca34b45ac1ce0a84'
   areas: ['USB']
   path: '/src/devices/usb/drivers/nelson-usb-phy'
+- short_description: 'AML USB Corigine Phy Driver'
+  deletion_reason: 'Hardware is not actively supported'
+  gerrit_change_id: '999528'
+  available_in_git: 'a471907b40917cc1a5274530ca34b45ac1ce0a84'
+  areas: ['USB']
+  path: '/src/devices/usb/drivers/aml-usb-crg-phy-v2'

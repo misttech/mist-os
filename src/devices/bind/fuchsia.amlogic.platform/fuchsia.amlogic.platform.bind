@@ -69,7 +69,7 @@ extend uint fuchsia.BIND_PLATFORM_DEV_DID {
   A5_CLK = 0x2C,
   // Deprecated: VIM3_USB_PHY was 0x2D
   RTC = 0x2E,
-  USB_CRG_PHY_V2 = 0x2F,
+  // Deprecated: USB_CRG_PHY_V2 was 0x2F
   CRG_UDC = 0x30,
   DSP = 0x31,
   A1_CLK = 0x32,

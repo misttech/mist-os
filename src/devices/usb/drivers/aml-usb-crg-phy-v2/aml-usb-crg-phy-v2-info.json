@@ -1,9 +1,0 @@
-{
-    "short_description": "AMLogic USB PHY driver",
-    "manufacturer": "AMLogic",
-    "families": [],
-    "models": [],
-    "areas": [
-        "USB"
-    ]
-}
