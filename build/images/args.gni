@@ -180,11 +180,11 @@ declare_args() {
   # exactly what you are doing.
   use_bazel_images_only = false
 
-  # bazel_product_bundle_[prefix|board] together identifies the
+  # bazel_product_bundle_[root|prefix|board] together identifies the
   # bazel_product_bundle target in GN target to use in Bazel assembly. The
   # actual target used is:
   #
-  #   ${bazel_product_bundle_prefix}.${bazel_product_bundle_board}
+  #   ${bazel_product_bundle_root}/${bazel_product_bundle_prefix}.${bazel_product_bundle_board}
   #
   # NOTE: bazel_product_bundle_prefix should contain the fully qualified path
   # prefix to the target. Setting both arguments is a prerequisite to enable
@@ -192,15 +192,20 @@ declare_args() {
   #
   # For example, given:
   #
-  #   bazel_product_bundle_prefix = "//build/bazel/assembly:minimal"
+  #   bazel_product_bundle_root = "//"
+  #   bazel_product_bundle_prefix = "build/bazel/assembly:minimal"
   #   bazel_product_bundle_board = "x64"
   #
   # The actual bazel_product_bundle used for Bazel assembly is:
   #
   #   //build/bazel/assembly:minimal.x64
+  #
+  bazel_product_bundle_root = "//"
   bazel_product_bundle_prefix = false
   bazel_product_bundle_board = false
 
+  # TODO(jayzhuang): Remove once all users are using bazel_product_bundle_root.
+  #
   # If these are defined, bazel_product_bundle path will be overwritten
   # accordingly.
   vendor_product_dir = false
@@ -249,7 +254,8 @@ if (use_bazel_images_only) {
 if (bazel_product_bundle_prefix != false &&
     bazel_product_bundle_board != false) {
   bazel_product_bundle_target =
-      bazel_product_bundle_prefix + "." + bazel_product_bundle_board
+      bazel_product_bundle_root + "/" + bazel_product_bundle_prefix + "." +
+      bazel_product_bundle_board
 } else {
   bazel_product_bundle_target = ""
 }
