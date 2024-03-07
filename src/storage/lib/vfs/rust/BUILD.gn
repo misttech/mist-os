@@ -32,10 +32,7 @@ rustc_library("vfs") {
   ]
 
   if (is_fuchsia) {
-    deps += [
-      "//src/lib/zircon/rust:fuchsia-zircon",
-      "//third_party/rust_crates:once_cell",
-    ]
+    deps += [ "//src/lib/zircon/rust:fuchsia-zircon" ]
   }
 
   if (is_host) {

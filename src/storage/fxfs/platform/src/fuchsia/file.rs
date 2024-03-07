@@ -570,6 +570,8 @@ impl PagerBacked for FxFile {
 }
 
 impl GetVmo for FxFile {
+    const PAGER_ON_FIDL_EXECUTOR: bool = true;
+
     fn get_vmo(&self) -> &zx::Vmo {
         self.vmo()
     }

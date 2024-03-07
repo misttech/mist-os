@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-//! fuchsia io conformance testing harness for the rust psuedo-fs-mt library
+//! fuchsia io conformance testing harness for the rust pseudo-fs-mt library
 
 use {
     anyhow::{anyhow, Context as _, Error},
@@ -86,7 +86,7 @@ fn add_entry(
         io_test::DirectoryEntry::File(io_test::File { name, contents, .. }) => {
             let name = name.expect("File must have name");
             let contents = contents.expect("File must have contents");
-            let new_file = vmo::read_write(contents, /*capacity*/ Some(100));
+            let new_file = vmo::read_write(contents);
             dest.add_entry(name, new_file)?;
         }
         io_test::DirectoryEntry::VmoFile(io_test::VmoFile { name, vmo, .. }) => {
@@ -122,6 +122,7 @@ async fn run(mut stream: Io1HarnessRequestStream) -> Result<(), Error> {
                     supports_unlink: Some(true),
                     supports_get_attributes: Some(true),
                     supports_open2: Some(true),
+                    supports_append: Some(true),
 
                     // Unsupported options:
                     supports_link: Some(false), // Link is not supported using a pseudo filesystem.
@@ -132,7 +133,6 @@ async fn run(mut stream: Io1HarnessRequestStream) -> Result<(), Error> {
                     // TODO(https://fxbug.dev/315357754): Pseudo-directories don't seem to generate watch
                     // events even though the machinery is available.
                     supports_directory_watchers: Some(false),
-                    supports_append: Some(false),
 
                     ..Default::default()
                 };
@@ -158,7 +158,7 @@ async fn run(mut stream: Io1HarnessRequestStream) -> Result<(), Error> {
 
         let scope = ExecutionScope::build()
             .entry_constructor(simple::tree_constructor(|_parent, _filename| {
-                Ok(vmo::read_write("", /*capacity*/ Some(100)))
+                Ok(vmo::read_write(""))
             }))
             .new();
 

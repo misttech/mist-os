@@ -99,7 +99,7 @@ mod tests {
     async fn flags_test() {
         let example_dir = pseudo_directory! {
             "read_only" => read_only("read_only"),
-            "read_write" => read_write("read_write", /*capacity*/ None),
+            "read_write" => read_write("read_write"),
         };
         let (example_dir_proxy, example_dir_service) =
             fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();

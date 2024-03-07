@@ -233,9 +233,7 @@ impl Environment {
 #[cfg(test)]
 fn init_storage_dir() -> DirectoryProxy {
     let fs_scope = ExecutionScope::build()
-        .entry_constructor(tree_constructor(move |_, _| {
-            Ok(read_write(b"", /*capacity*/ Some(100)))
-        }))
+        .entry_constructor(tree_constructor(move |_, _| Ok(read_write(b""))))
         .new();
     let (directory, server) = create_proxy::<DirectoryMarker>().unwrap();
     mut_pseudo_directory! {}.open(

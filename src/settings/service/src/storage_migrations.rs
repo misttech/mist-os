@@ -74,9 +74,7 @@ mod tests {
     ) -> (DirectoryProxy, Arc<Mutex<HashMap<String, Vmo>>>) {
         let vmo_map = Arc::new(Mutex::new(HashMap::new()));
         let fs_scope = ExecutionScope::build()
-            .entry_constructor(tree_constructor(move |_, _| {
-                Ok(read_write(b"", /*capacity*/ Some(1024)))
-            }))
+            .entry_constructor(tree_constructor(move |_, _| Ok(read_write(b""))))
             .new();
         let (client, server) = create_proxy::<DirectoryMarker>().unwrap();
         root.open(

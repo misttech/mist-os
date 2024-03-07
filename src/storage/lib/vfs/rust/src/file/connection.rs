@@ -336,13 +336,20 @@ impl<T: 'static + File + RawFileIoConnection> IoOpHandler for RawIoConnection<T>
 mod stream_io {
     use super::*;
     pub trait GetVmo {
+        /// True if the vmo is pager backed and the pager is serviced by the same executor as the
+        /// `StreamIoConnection`.
+        ///
+        /// When true, stream operations that touch the contents of the vmo will be run on a
+        /// separate thread pool to avoid deadlocks.
+        const PAGER_ON_FIDL_EXECUTOR: bool = false;
+
         /// Returns the underlying VMO for the node.
         fn get_vmo(&self) -> &zx::Vmo;
     }
 
     /// Wrapper around a file that forwards `File` requests to `file` and
     /// `FileIo` requests to `stream`.
-    pub struct StreamIoConnection<T: 'static + File> {
+    pub struct StreamIoConnection<T: 'static + File + GetVmo> {
         /// File that requests will be forwarded to.
         file: OpenNode<T>,
 
@@ -350,7 +357,7 @@ mod stream_io {
         stream: TempClonable<zx::Stream>,
     }
 
-    impl<T: 'static + File> Deref for StreamIoConnection<T> {
+    impl<T: 'static + File + GetVmo> Deref for StreamIoConnection<T> {
         type Target = OpenNode<T>;
 
         fn deref(&self) -> &Self::Target {
@@ -358,7 +365,7 @@ mod stream_io {
         }
     }
 
-    impl<T: 'static + File> DerefMut for StreamIoConnection<T> {
+    impl<T: 'static + File + GetVmo> DerefMut for StreamIoConnection<T> {
         fn deref_mut(&mut self) -> &mut Self::Target {
             &mut self.file
         }
@@ -372,11 +379,11 @@ mod stream_io {
         pub fn create(
             scope: ExecutionScope,
             file: Arc<T>,
-            protocols: impl ProtocolsExt,
+            options: impl ToFileOptions,
             object_request: ObjectRequestRef,
         ) -> Result<impl Future<Output = ()>, Status> {
             let file = OpenNode::new(file);
-            let options = protocols.to_file_options()?;
+            let options = options.to_file_options()?;
             let stream = TempClonable::new(zx::Stream::create(
                 options.to_stream_options(),
                 file.get_vmo(),
@@ -384,26 +391,51 @@ mod stream_io {
             )?);
             create_connection(scope, StreamIoConnection { file, stream }, options, object_request)
         }
+
+        /// Like create, but spawns a task to run the connection.
+        pub fn spawn(
+            scope: ExecutionScope,
+            file: Arc<T>,
+            options: FileOptions,
+            object_request: ObjectRequestRef<'_>,
+        ) -> Result<(), Status> {
+            object_request.take().spawn(&scope.clone(), move |object_request| {
+                Box::pin(async move { Ok(Self::create(scope, file, options, object_request)?) })
+            });
+            Ok(())
+        }
+
+        async fn maybe_unblock<F, R>(&self, f: F) -> R
+        where
+            F: FnOnce(&zx::Stream) -> R + Send + 'static,
+            R: Send + 'static,
+        {
+            if T::PAGER_ON_FIDL_EXECUTOR {
+                let stream = self.stream.temp_clone();
+                unblock(move || f(&*stream)).await
+            } else {
+                f(&*self.stream)
+            }
+        }
     }
 
     impl<T: 'static + File + GetVmo> IoOpHandler for StreamIoConnection<T> {
         async fn read(&mut self, count: u64) -> Result<Vec<u8>, Status> {
-            let stream = self.stream.temp_clone();
-            unblock(move || stream.read_to_vec(zx::StreamReadOptions::empty(), count as usize))
-                .await
+            self.maybe_unblock(move |stream| {
+                stream.read_to_vec(zx::StreamReadOptions::empty(), count as usize)
+            })
+            .await
         }
 
         async fn read_at(&self, offset: u64, count: u64) -> Result<Vec<u8>, Status> {
-            let stream = self.stream.temp_clone();
-            unblock(move || {
+            self.maybe_unblock(move |stream| {
                 stream.read_at_to_vec(zx::StreamReadOptions::empty(), offset, count as usize)
             })
             .await
         }
 
         async fn write(&mut self, data: Vec<u8>) -> Result<u64, Status> {
-            let stream = self.stream.temp_clone();
-            unblock(move || {
+            self.maybe_unblock(move |stream| {
                 let actual = stream.write(zx::StreamWriteOptions::empty(), &data)?;
                 Ok(actual as u64)
             })
@@ -411,8 +443,7 @@ mod stream_io {
         }
 
         async fn write_at(&self, offset: u64, data: Vec<u8>) -> Result<u64, Status> {
-            let stream = self.stream.temp_clone();
-            unblock(move || {
+            self.maybe_unblock(move |stream| {
                 let actual = stream.write_at(zx::StreamWriteOptions::empty(), offset, &data)?;
                 Ok(actual as u64)
             })

@@ -198,9 +198,7 @@ async fn test_job_sourcing() {
 fn serve_vfs_dir(root: Arc<impl Directory>) -> (DirectoryProxy, Arc<Mutex<HashMap<String, Vmo>>>) {
     let vmo_map = Arc::new(Mutex::new(HashMap::new()));
     let fs_scope = ExecutionScope::build()
-        .entry_constructor(tree_constructor(move |_, _| {
-            Ok(read_write(b"", /*capacity*/ Some(100)))
-        }))
+        .entry_constructor(tree_constructor(move |_, _| Ok(read_write(b""))))
         .new();
     let (client, server) = create_proxy::<DirectoryMarker>().unwrap();
     root.open(
@@ -217,7 +215,7 @@ async fn migration_error_does_not_cause_early_exit() {
     const UNKNOWN_ID: u64 = u64::MAX;
     let unknown_id_str = UNKNOWN_ID.to_string();
     let fs = mut_pseudo_directory! {
-        MIGRATION_FILE_NAME => read_write(unknown_id_str, /*capacity*/ None),
+        MIGRATION_FILE_NAME => read_write(unknown_id_str),
     };
     let (directory, _vmo_map) = serve_vfs_dir(fs);
     let (store_proxy, mut request_stream) =

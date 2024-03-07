@@ -441,9 +441,7 @@ mod tests {
 
     fn serve_vfs_dir(root: Arc<impl Directory>) -> DirectoryProxy {
         let fs_scope = ExecutionScope::build()
-            .entry_constructor(tree_constructor(move |_, _| {
-                Ok(read_write(b"", /*capacity*/ Some(100)))
-            }))
+            .entry_constructor(tree_constructor(move |_, _| Ok(read_write(b""))))
             .new();
         let (client, server) = create_proxy::<DirectoryMarker>().unwrap();
         root.open(
@@ -460,7 +458,7 @@ mod tests {
         let value_to_get = TestStruct { value: VALUE1 };
         let content = persist(&value_to_get.to_storable()).unwrap();
         let fs = mut_pseudo_directory! {
-            "xyz.pfidl" => read_write(content, /*capacity*/ None),
+            "xyz.pfidl" => read_write(content),
         };
         let storage_dir = serve_vfs_dir(fs);
         let (storage, sync_tasks) =
@@ -897,7 +895,7 @@ mod tests {
                     println!("Force failing attempt {}", *attempts_guard);
                     Err(fidl::Status::NO_SPACE)
                 } else {
-                    Ok(read_write("", /*capacity*/ Some(100)))
+                    Ok(read_write(""))
                 }
             }))
             .new();
