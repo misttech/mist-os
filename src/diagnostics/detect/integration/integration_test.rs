@@ -181,6 +181,7 @@ pub(crate) enum TestEvent {
     OnDiagnosticFetch,
     OnDone,
     OnCrashReport { crash_signature: String, crash_program_name: String },
+    OnCrashReportingProductRegistration { product_name: String, program_name: String },
 }
 
 impl From<ftest::TriageDetectEventsEvent> for TestEvent {
@@ -193,6 +194,10 @@ impl From<ftest::TriageDetectEventsEvent> for TestEvent {
                 crash_signature,
                 crash_program_name,
             } => TestEvent::OnCrashReport { crash_signature, crash_program_name },
+            ftest::TriageDetectEventsEvent::OnCrashReportingProductRegistration {
+                product_name,
+                program_name,
+            } => TestEvent::OnCrashReportingProductRegistration { product_name, program_name },
             _ => panic!("unknown event {:?}", event),
         }
     }

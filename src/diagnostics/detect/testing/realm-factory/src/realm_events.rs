@@ -24,6 +24,16 @@ impl TriageDetectEventSender {
         Self::log_err(self.0.send_on_crash_report(signature, program_name));
     }
 
+    pub fn send_crash_reporting_product_registration(
+        &self,
+        product_name: &str,
+        program_name: &str,
+    ) {
+        Self::log_err(
+            self.0.send_on_crash_reporting_product_registration(product_name, program_name),
+        );
+    }
+
     pub fn send_on_done(&self) {
         Self::log_err(self.0.send_on_done());
     }

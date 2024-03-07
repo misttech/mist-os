@@ -54,9 +54,15 @@ open protocol TriageDetectEvents {
     flexible -> OnDiagnosticFetch();
 
     /// Sent when a crash report is filed.
-    flexible -> OnCrashReport(resource struct {
+    flexible -> OnCrashReport(struct {
         crash_signature string:MAX_STRING_SIZE;
         crash_program_name string:MAX_STRING_SIZE;
+    });
+
+    /// Sent when a crash reporting product registers itself.
+    flexible -> OnCrashReportingProductRegistration(struct {
+        product_name string:MAX_STRING_SIZE;
+        program_name string:MAX_STRING_SIZE;
     });
 };
 

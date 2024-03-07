@@ -226,7 +226,17 @@ impl AsyncRequestHandler<fcrash::CrashReportingProductRegisterMarker> for MockCo
             fcrash::CrashReportingProductRegisterRequest::Upsert { .. } => {
                 error!("We shouldn't be calling upsert")
             }
-            fcrash::CrashReportingProductRegisterRequest::UpsertWithAck { responder, .. } => {
+            fcrash::CrashReportingProductRegisterRequest::UpsertWithAck {
+                component_url,
+                product,
+                responder,
+            } => {
+                if let Some(sender) = &self.sender {
+                    let fcrash::CrashReportingProduct { name: product_name, .. } = product;
+                    let product_name = product_name.unwrap_or_default();
+                    let program_name = component_url;
+                    sender.send_crash_reporting_product_registration(&product_name, &program_name);
+                }
                 responder.send()?;
             }
         };

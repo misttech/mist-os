@@ -56,6 +56,10 @@ pub(crate) fn test() -> TestData {
         .set_program_config("{enable_filing: true}")
         .add_triage_config(TRIAGE_CONFIG)
         .expect_events(vec![
+            TestEvent::OnCrashReportingProductRegistration {
+                product_name: "FuchsiaDetect".to_string(),
+                program_name: "triage_detect".to_string(),
+            },
             TestEvent::OnDiagnosticFetch,
             TestEvent::OnCrashReport {
                 crash_signature: "fuchsia-detect-frequently".to_string(),
