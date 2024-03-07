@@ -25,7 +25,8 @@ func TestEntries(t *testing.T) {
 
 	for _, depth := range []uint16{2, 50, maxDepth} {
 		t.Run(fmt.Sprintf("depth=%d", depth), func(t *testing.T) {
-			capacity := e.init(depth)
+			e.init(depth)
+			capacity := uint16(len(e.storage))
 
 			if ones := bits.OnesCount16(capacity); ones != 1 {
 				t.Fatalf("got len(storage)=%d (binary=%b) want power of two", capacity, capacity)
@@ -76,14 +77,14 @@ func TestEntries(t *testing.T) {
 						if got, want := e.getQueued(scratch), int(delta); got != want {
 							t.Errorf("got getQueued=%d want=%d; %#v", got, want, e)
 						}
-						if got, want := e.inFlight(), capacity-delta; got != want {
+						if got, want := e.inFlight(), capacity-delta-e.extraCapacity; got != want {
 							t.Errorf("got inFlight()=%d want=%d; %#v", got, want, e)
 						}
 					}
 
 					e.incrementSent(delta)
 
-					if got, want := e.inFlight(), capacity; got != want {
+					if got, want := e.inFlight(), capacity-e.extraCapacity; got != want {
 						t.Errorf("got inFlight()=%d want=%d; %#v", got, want, e)
 					}
 					if got, want := e.addReadied(scratch), int(capacity); got != want {

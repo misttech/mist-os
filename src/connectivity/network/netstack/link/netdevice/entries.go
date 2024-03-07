@@ -33,24 +33,28 @@ type entries struct {
 	// - queued == readied: 0 ready entries.
 	sent, queued, readied uint16
 	storage               []uint16
+	// extraCapacity keeps track of extra capacity allocated because storage is
+	// rounded up to the next power of 2 to speed up the math. This extra
+	// capacity is always notionally in the "in-flight" region of the buffer and
+	// is never used by the netdevice client to write valid descriptors into.
+	extraCapacity uint16
 }
 
-// init initializes entries with a given capacity rounded up to the next power
-// of two and limited to 2^15. Returns the adopted capacity. After Init, all the
+// init initializes entries with a given capacity. After Init, all the
 // entries are in the "in-flight" state.
-func (e *entries) init(capacity uint16) uint16 {
+func (e *entries) init(capacity uint16) {
+	originalCapacity := capacity
 	if capacity != 0 {
 		// Round up to power of 2.
 		capacity = 1 << bits.Len16(capacity-1)
 	}
 	if capacity > (math.MaxUint16>>1)+1 {
-		// Limit range to 2^15.
-		capacity >>= 1
+		panic(fmt.Sprintf("invalid capacity %d, must be smaller than 2^15", capacity))
 	}
 	*e = entries{
-		storage: make([]uint16, capacity),
+		storage:       make([]uint16, capacity),
+		extraCapacity: capacity - originalCapacity,
 	}
-	return capacity
 }
 
 // mask masks an index to the range [0, capacity).
@@ -97,11 +101,15 @@ func (e *entries) haveReadied() bool {
 // unFlight returns the number of buffers entries in flight (owned by the
 // driver).
 func (e *entries) inFlight() uint16 {
+	var inFlight uint16
 	if readied, sent := e.getInFlightRange(); readied < sent {
-		return sent - readied
+		inFlight = sent - readied
 	} else {
-		return uint16(len(e.storage)) - (readied - sent)
+		inFlight = uint16(len(e.storage)) - (readied - sent)
 	}
+	// The extra capacity is always kept in the "inFlight" state so we must
+	// subtract it out when reporting out the numbers.
+	return inFlight - e.extraCapacity
 }
 
 // getInFlightRange returns the range of indices for entries in "in-flight"

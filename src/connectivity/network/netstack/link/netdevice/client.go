@@ -11,7 +11,6 @@ import (
 	"errors"
 	"fmt"
 	"math"
-	"math/bits"
 	"syscall/zx"
 	"syscall/zx/fidl"
 	"unsafe"
@@ -837,10 +836,6 @@ func NewClient(ctx context.Context, dev *network.DeviceWithCtxInterface, session
 		return nil, fmt.Errorf("session configuration factory failed: %w", err)
 	}
 
-	// Descriptor count must be a power of 2.
-	config.TxDescriptorCount = 1 << bits.Len16(config.TxDescriptorCount-1)
-	config.RxDescriptorCount = 1 << bits.Len16(config.RxDescriptorCount-1)
-
 	totalDescriptors := uint64(config.TxDescriptorCount + config.RxDescriptorCount)
 	mappedDataVmo, dataVmo, err := fifo.NewMappedVMO(totalDescriptors*uint64(config.BufferStride), "fuchsia.hardware.network.Device/descriptors")
 	if err != nil {
@@ -888,15 +883,10 @@ func NewClient(ctx context.Context, dev *network.DeviceWithCtxInterface, session
 	}
 	c.mu.ports = make(map[basePortId]*Port)
 
-	if entries := c.rx.init(c.config.RxDescriptorCount); entries != c.config.RxDescriptorCount {
-		panic(fmt.Sprintf("bad handler rx queue size: %d, expected %d", entries, c.config.RxDescriptorCount))
-	}
-
+	c.rx.init(c.config.RxDescriptorCount)
 	c.tx.cond.L = &c.tx.mu.Mutex
 	c.tx.mu.scratch = make([]uint16, c.txDepth)
-	if entries := c.tx.mu.entries.init(c.config.TxDescriptorCount); entries != c.config.TxDescriptorCount {
-		panic(fmt.Sprintf("bad handler tx queue size: %d, expected %d", entries, c.config.RxDescriptorCount))
-	}
+	c.tx.mu.entries.init(c.config.TxDescriptorCount)
 
 	c.stats.tx.FifoStats = fifo.MakeFifoStats(uint32(c.deviceInfo.BaseInfo.TxDepth))
 	c.stats.rx.FifoStats = fifo.MakeFifoStats(uint32(c.deviceInfo.BaseInfo.RxDepth))
