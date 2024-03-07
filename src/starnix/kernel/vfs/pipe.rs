@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::{
-    mm::{read_to_vec, MemoryAccessorExt, PAGE_SIZE},
+    mm::{read_to_vec, MemoryAccessorExt, NumberOfElementsRead, PAGE_SIZE},
     signals::{send_standard_signal, SignalInfo},
     task::{CurrentTask, EventHandler, Kernel, WaitCallback, WaitCanceler, WaitQueue, Waiter},
     vfs::{
@@ -549,7 +549,9 @@ impl<'a> Buffer for SpliceOutputBuffer<'a> {
 impl<'a> OutputBuffer for SpliceOutputBuffer<'a> {
     fn write_each(&mut self, callback: &mut OutputBufferCallback<'_>) -> Result<usize, Errno> {
         // SAFETY: `callback` returns the number of bytes read on success.
-        let bytes = unsafe { read_to_vec(self.available, callback) }?;
+        let bytes = unsafe {
+            read_to_vec::<u8, _>(self.available, |buf| callback(buf).map(NumberOfElementsRead))
+        }?;
         let bytes_len = bytes.len();
         if bytes_len > 0 {
             self.pipe.messages.write_message(bytes.into());

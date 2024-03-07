@@ -1971,6 +1971,12 @@ fn slice_as_mut_bytes<T: FromBytes + Sized>(
     }
 }
 
+/// Holds the number of _elements_ read by the callback to [`read_to_vec`].
+///
+/// Used to make it clear to callers that the callback should return the number
+/// of elements read and not the number of bytes read.
+pub struct NumberOfElementsRead(pub usize);
+
 /// Performs a read into a `Vec` using the provided read function.
 ///
 /// The read function returns the number of elements of type `T` read.
@@ -1982,12 +1988,12 @@ fn slice_as_mut_bytes<T: FromBytes + Sized>(
 #[inline]
 pub unsafe fn read_to_vec<T: FromBytes, E>(
     max_len: usize,
-    read_fn: impl FnOnce(&mut [MaybeUninit<T>]) -> Result<usize, E>,
+    read_fn: impl FnOnce(&mut [MaybeUninit<T>]) -> Result<NumberOfElementsRead, E>,
 ) -> Result<Vec<T>, E> {
     let mut buffer = Vec::with_capacity(max_len);
     // We can't just pass `spare_capacity_mut` because `Vec::with_capacity`
     // returns a `Vec` with _at least_ the requested capacity.
-    let read_elements = read_fn(&mut buffer.spare_capacity_mut()[..max_len])?;
+    let NumberOfElementsRead(read_elements) = read_fn(&mut buffer.spare_capacity_mut()[..max_len])?;
     debug_assert!(read_elements <= max_len, "read_elements={read_elements}, max_len={max_len}");
     // SAFETY: The new length is equal to the number of elements successfully
     // initialized (since `read_fn` returned successfully).
@@ -2057,10 +2063,10 @@ pub trait MemoryAccessorExt: MemoryAccessor {
     fn read_memory_to_vec(&self, addr: UserAddress, len: usize) -> Result<Vec<u8>, Errno> {
         // SAFETY: `self.read_memory` only returns `Ok` if all bytes were read to.
         unsafe {
-            read_to_vec(len, |buf| {
+            read_to_vec::<u8, _>(len, |buf| {
                 self.read_memory(addr, buf).map(|bytes_read| {
                     debug_assert_eq!(bytes_read.len(), len);
-                    len
+                    NumberOfElementsRead(len)
                 })
             })
         }
@@ -2074,8 +2080,9 @@ pub trait MemoryAccessorExt: MemoryAccessor {
     ) -> Result<Vec<u8>, Errno> {
         // SAFETY: `self.read_memory_partial` returns the bytes read.
         unsafe {
-            read_to_vec(max_len, |buf| {
-                self.read_memory_partial(addr, buf).map(|bytes_read| bytes_read.len())
+            read_to_vec::<u8, _>(max_len, |buf| {
+                self.read_memory_partial(addr, buf)
+                    .map(|bytes_read| NumberOfElementsRead(bytes_read.len()))
             })
         }
     }
@@ -2172,10 +2179,10 @@ pub trait MemoryAccessorExt: MemoryAccessor {
     ) -> Result<Vec<T>, Errno> {
         // SAFETY: `self.read_objects` only returns `Ok` if all bytes were read to.
         unsafe {
-            read_to_vec(len, |buf| {
+            read_to_vec::<T, _>(len, |buf| {
                 self.read_objects(user, buf).map(|objects_read| {
                     debug_assert_eq!(objects_read.len(), len);
-                    len
+                    NumberOfElementsRead(len)
                 })
             })
         }

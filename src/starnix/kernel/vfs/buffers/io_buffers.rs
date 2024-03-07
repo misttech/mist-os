@@ -4,8 +4,8 @@
 
 use crate::{
     mm::{
-        read_to_array, read_to_object_as_bytes, read_to_vec, MemoryAccessorExt, TaskMemoryAccessor,
-        UNIFIED_ASPACES_ENABLED,
+        read_to_array, read_to_object_as_bytes, read_to_vec, MemoryAccessorExt,
+        NumberOfElementsRead, TaskMemoryAccessor, UNIFIED_ASPACES_ENABLED,
     },
     task::{CurrentTask, Task},
 };
@@ -262,7 +262,9 @@ pub trait InputBuffer: Buffer {
     /// Peek all the remaining content in this buffer and returns it as a `Vec`.
     fn peek_all(&mut self) -> Result<Vec<u8>, Errno> {
         // SAFETY: self.peek returns the number of bytes read.
-        unsafe { read_to_vec(self.available(), |buf| self.peek(buf)) }
+        unsafe {
+            read_to_vec::<u8, _>(self.available(), |buf| self.peek(buf).map(NumberOfElementsRead))
+        }
     }
 
     /// Peeks the content of this buffer into `buffer`.
@@ -313,13 +315,13 @@ pub trait InputBufferExt: InputBuffer {
     /// Returns an error if `len` is larger than the number of available bytes.
     fn read_to_vec_exact(&mut self, len: usize) -> Result<Vec<u8>, Errno> {
         // SAFETY: `data.read_exact` returns `len` bytes on success.
-        unsafe { read_to_vec(len, |buf| self.read_exact(buf)) }
+        unsafe { read_to_vec::<u8, _>(len, |buf| self.read_exact(buf).map(NumberOfElementsRead)) }
     }
 
     /// Reads up to `limit` bytes into a returned `Vec`.
     fn read_to_vec_limited(&mut self, limit: usize) -> Result<Vec<u8>, Errno> {
         // SAFETY: `data.read` returns the number of bytes read.
-        unsafe { read_to_vec(limit, |buf| self.read(buf)) }
+        unsafe { read_to_vec::<u8, _>(limit, |buf| self.read(buf).map(NumberOfElementsRead)) }
     }
 
     /// Reads bytes into the array.
@@ -467,12 +469,12 @@ impl<'a, M: TaskMemoryAccessor> OutputBuffer for UserBuffersOutputBuffer<'a, M> 
         self.write_each_inner(|buflen| {
             // SAFETY: `callback` returns the number of bytes read on success.
             unsafe {
-                read_to_vec(buflen, |buf| {
+                read_to_vec::<u8, _>(buflen, |buf| {
                     let result = callback(buf)?;
                     if result > buflen {
                         return error!(EINVAL);
                     }
-                    Ok(result)
+                    Ok(NumberOfElementsRead(result))
                 })
             }
         })

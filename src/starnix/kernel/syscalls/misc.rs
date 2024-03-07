@@ -10,7 +10,7 @@ use fuchsia_component::client::connect_to_protocol_sync;
 use starnix_sync::{Locked, Unlocked};
 
 use crate::{
-    mm::{read_to_vec, MemoryAccessor, MemoryAccessorExt},
+    mm::{read_to_vec, MemoryAccessor, MemoryAccessorExt, NumberOfElementsRead},
     task::CurrentTask,
     vfs::{FdNumber, FsString},
 };
@@ -182,7 +182,9 @@ pub fn sys_getrandom(
     }
 
     // SAFETY: The callback returns the number of bytes read.
-    let buf = unsafe { read_to_vec(size, |b| Ok(zx::cprng_draw_uninit(b).len())) }?;
+    let buf = unsafe {
+        read_to_vec::<u8, _>(size, |b| Ok(NumberOfElementsRead(zx::cprng_draw_uninit(b).len())))
+    }?;
     current_task.write_memory(buf_addr, &buf)?;
     Ok(size)
 }
