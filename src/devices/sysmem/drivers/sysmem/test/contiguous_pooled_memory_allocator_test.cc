@@ -9,6 +9,7 @@
 #include <lib/ddk/platform-defs.h>
 #include <lib/fake-bti/bti.h>
 #include <lib/inspect/cpp/reader.h>
+#include <lib/sysmem-version/sysmem-version.h>
 #include <lib/zx/clock.h>
 #include <lib/zx/vmar.h>
 #include <zircon/syscalls.h>
@@ -45,7 +46,8 @@ class FakeOwner : public MemoryAllocator::Owner {
 class ContiguousPooledSystem : public zxtest::Test {
  public:
   ContiguousPooledSystem()
-      : allocator_(&fake_owner_, kVmoName, &inspector_.GetRoot(), 0u, kVmoSize * kVmoCount,
+      : allocator_(&fake_owner_, kVmoName, &inspector_.GetRoot(),
+                   sysmem::MakeHeap("HEAP_TYPE.TEST_HEAP", 0), kVmoSize * kVmoCount,
                    true,       // is_always_cpu_accessible
                    true,       // is_ever_cpu_accessible
                    false,      // is_ready

@@ -27,6 +27,7 @@
 #include <memory>
 #include <utility>
 
+#include <bind/fuchsia/sysmem/heap/cpp/bind.h>
 #include <fbl/alloc_checker.h>
 #include <fbl/auto_lock.h>
 
@@ -384,7 +385,10 @@ zx_status_t SimpleDisplay::DisplayControllerImplSetBufferCollectionConstraints(
   buffer_constraints.secure_required(false);
   buffer_constraints.ram_domain_supported(true);
   buffer_constraints.cpu_domain_supported(true);
-  buffer_constraints.heap_permitted(std::array{fuchsia_sysmem2::wire::HeapType::kFramebuffer});
+  auto heap = fuchsia_sysmem2::wire::Heap::Builder(arena);
+  heap.heap_type(bind_fuchsia_sysmem_heap::HEAP_TYPE_FRAMEBUFFER);
+  heap.id(0);
+  buffer_constraints.permitted_heaps(std::array{heap.Build()});
   constraints.buffer_memory_constraints(buffer_constraints.Build());
   auto image_constraints = fuchsia_sysmem2::wire::ImageFormatConstraints::Builder(arena);
   image_constraints.pixel_format(format_);

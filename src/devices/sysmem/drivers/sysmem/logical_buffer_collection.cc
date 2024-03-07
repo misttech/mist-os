@@ -4,6 +4,10 @@
 
 #include "logical_buffer_collection.h"
 
+#include <bind/fuchsia/sysmem/heap/cpp/bind.h>
+// TODO(b/42113093): Remove this include of AmLogic-specific heap names in sysmem code. The include
+// is currently needed for secure heap names only, which is why an include for goldfish heap names
+// isn't here.
 #include <fidl/fuchsia.images2/cpp/fidl.h>
 #include <fidl/fuchsia.sysmem2/cpp/fidl.h>
 #include <inttypes.h>
@@ -28,6 +32,7 @@
 #include <unordered_map>
 #include <vector>
 
+#include <bind/fuchsia/amlogic/platform/sysmem/heap/cpp/bind.h>
 #include <fbl/algorithm.h>
 #include <fbl/ref_ptr.h>
 #include <fbl/string.h>
@@ -239,11 +244,11 @@ T AlignUp(T value, T divisor) {
   return (value + divisor - 1) / divisor * divisor;
 }
 
-bool IsSecureHeap(const fuchsia_sysmem2::HeapType heap_type) {
+bool IsSecureHeap(const std::string& heap_type) {
   // TODO(https://fxbug.dev/42113093): Generalize this by finding if the heap_type maps to secure
   // MemoryAllocator.
-  return heap_type == fuchsia_sysmem2::HeapType::kAmlogicSecure ||
-         heap_type == fuchsia_sysmem2::HeapType::kAmlogicSecureVdec;
+  return heap_type == bind_fuchsia_amlogic_platform_sysmem_heap::HEAP_TYPE_SECURE ||
+         heap_type == bind_fuchsia_amlogic_platform_sysmem_heap::HEAP_TYPE_SECURE_VDEC;
 }
 
 bool IsPotentiallyIncludedInInitialAllocation(const NodeProperties& node) {
@@ -1751,8 +1756,9 @@ std::optional<Error> LogicalBufferCollection::TryLateLogicalAllocation(
   if (existing.settings()->buffer_settings()->is_physically_contiguous().value()) {
     buffer_memory_constraints.physically_contiguous_required().emplace(true);
   }
-  ZX_DEBUG_ASSERT(existing.settings()->buffer_settings()->is_secure().value() ==
-                  IsSecureHeap(existing.settings()->buffer_settings()->heap().value()));
+  ZX_DEBUG_ASSERT(
+      existing.settings()->buffer_settings()->is_secure().value() ==
+      IsSecureHeap(existing.settings()->buffer_settings()->heap()->heap_type().value()));
   if (existing.settings()->buffer_settings()->is_secure().value()) {
     buffer_memory_constraints.secure_required().emplace(true);
   }
@@ -1778,8 +1784,9 @@ std::optional<Error> LogicalBufferCollection::TryLateLogicalAllocation(
     default:
       ZX_PANIC("not yet implemented (new enum value?)");
   }
-  buffer_memory_constraints.heap_permitted().emplace(1);
-  buffer_memory_constraints.heap_permitted()->at(0) =
+  buffer_memory_constraints.permitted_heaps().emplace(1);
+  // intentional copy/clone
+  buffer_memory_constraints.permitted_heaps()->at(0) =
       existing.settings()->buffer_settings()->heap().value();
   if (existing.settings()->image_format_constraints().has_value()) {
     // We can't loosen the constraints after initial allocation, nor can we tighten them.  We also
@@ -2347,12 +2354,16 @@ LogicalBufferCollection::CombineConstraints(ConstraintsList* constraints_list) {
 //
 // TODO(dustingreen): From a particular participant, be more picky about which domains are supported
 // vs. which heaps are supported.
-static bool IsHeapPermitted(const fuchsia_sysmem2::BufferMemoryConstraints& constraints,
-                            fuchsia_sysmem2::HeapType heap) {
-  if (constraints.heap_permitted()->size()) {
-    auto begin = constraints.heap_permitted().value().begin();
-    auto end = constraints.heap_permitted().value().end();
-    return std::find(begin, end, heap) != end;
+static bool IsPermittedHeap(const fuchsia_sysmem2::BufferMemoryConstraints& constraints,
+                            const fuchsia_sysmem2::Heap& heap) {
+  if (constraints.permitted_heaps()->size()) {
+    for (auto iter = constraints.permitted_heaps().value().begin();
+         iter != constraints.permitted_heaps().value().end(); ++iter) {
+      if (heap == *iter) {
+        return true;
+      }
+    }
+    return false;
   }
   // Zero heaps in heap_permitted() means any heap is ok.
   return true;
@@ -2361,9 +2372,13 @@ static bool IsHeapPermitted(const fuchsia_sysmem2::BufferMemoryConstraints& cons
 static bool IsSecurePermitted(const fuchsia_sysmem2::BufferMemoryConstraints& constraints) {
   // TODO(https://fxbug.dev/42113093): Generalize this by finding if there's a heap that maps to
   // secure MemoryAllocator in the permitted heaps.
+  const static auto kAmlogicSecureHeapSingleton =
+      sysmem::MakeHeap(bind_fuchsia_amlogic_platform_sysmem_heap::HEAP_TYPE_SECURE, 0);
+  const static auto kAmlogicSecureVdecHeapSingleton =
+      sysmem::MakeHeap(bind_fuchsia_amlogic_platform_sysmem_heap::HEAP_TYPE_SECURE_VDEC, 0);
   return constraints.inaccessible_domain_supported().value() &&
-         (IsHeapPermitted(constraints, fuchsia_sysmem2::HeapType::kAmlogicSecure) ||
-          IsHeapPermitted(constraints, fuchsia_sysmem2::HeapType::kAmlogicSecureVdec));
+         (IsPermittedHeap(constraints, kAmlogicSecureHeapSingleton) ||
+          IsPermittedHeap(constraints, kAmlogicSecureVdecHeapSingleton));
 }
 
 static bool IsCpuAccessSupported(const fuchsia_sysmem2::BufferMemoryConstraints& constraints) {
@@ -2694,7 +2709,7 @@ bool LogicalBufferCollection::CheckSanitizeBufferMemoryConstraints(
   FIELD_DEFAULT(constraints, ram_domain_supported, !*buffer_usage.cpu());
   FIELD_DEFAULT(constraints, inaccessible_domain_supported, !*buffer_usage.cpu());
   if (stage != CheckSanitizeStage::kAggregated) {
-    if (constraints.heap_permitted().has_value() && constraints.heap_permitted()->empty()) {
+    if (constraints.permitted_heaps().has_value() && constraints.permitted_heaps()->empty()) {
       LogError(FROM_HERE,
                "constraints.has_heap_permitted() && constraints.heap_permitted().empty()");
       return false;
@@ -2702,8 +2717,9 @@ bool LogicalBufferCollection::CheckSanitizeBufferMemoryConstraints(
   }
   // TODO(dustingreen): When 0 heaps specified, constrain heap list based on other constraints.
   // For now 0 heaps means any heap.
-  FIELD_DEFAULT_SET_VECTOR(constraints, heap_permitted, 0);
-  ZX_DEBUG_ASSERT(stage != CheckSanitizeStage::kInitial || constraints.heap_permitted()->empty());
+  FIELD_DEFAULT_SET_VECTOR(constraints, permitted_heaps, 0);
+  ZX_DEBUG_ASSERT(stage != CheckSanitizeStage::kInitial || constraints.permitted_heaps()->empty());
+
   if (*constraints.min_size_bytes() > *constraints.max_size_bytes()) {
     LogError(FROM_HERE, "min_size_bytes > max_size_bytes");
     return false;
@@ -3029,8 +3045,8 @@ bool LogicalBufferCollection::AccumulateConstraintBufferCollection(
   return true;
 }
 
-bool LogicalBufferCollection::AccumulateConstraintHeapPermitted(
-    std::vector<fuchsia_sysmem2::HeapType>* acc, std::vector<fuchsia_sysmem2::HeapType> c) {
+bool LogicalBufferCollection::AccumulateConstraintPermittedHeaps(
+    std::vector<fuchsia_sysmem2::Heap>* acc, std::vector<fuchsia_sysmem2::Heap> c) {
   // Remove any heap in acc that's not in c.  If zero heaps
   // remain in acc, return false.
   ZX_DEBUG_ASSERT(acc->size() > 0);
@@ -3047,9 +3063,9 @@ bool LogicalBufferCollection::AccumulateConstraintHeapPermitted(
     if (ci == c.size()) {
       // Remove from acc because not found in c.
       //
-      // Copy formerly last item on top of the item being removed, if not the same item.
+      // Move formerly last item on top of the item being removed, if not the same item.
       if (ai != acc->size() - 1) {
-        (*acc)[ai] = (*acc)[acc->size() - 1];
+        (*acc)[ai] = std::move((*acc)[acc->size() - 1]);
       }
       // remove last item
       acc->resize(acc->size() - 1);
@@ -3090,12 +3106,12 @@ bool LogicalBufferCollection::AccumulateConstraintBufferMemory(
   acc->inaccessible_domain_supported() =
       *acc->inaccessible_domain_supported() && *c.inaccessible_domain_supported();
 
-  if (acc->heap_permitted()->empty()) {
-    acc->heap_permitted().emplace(std::move(*c.heap_permitted()));
+  if (acc->permitted_heaps()->empty()) {
+    acc->permitted_heaps().emplace(std::move(*c.permitted_heaps()));
   } else {
-    if (!c.heap_permitted()->empty()) {
-      if (!AccumulateConstraintHeapPermitted(&*acc->heap_permitted(),
-                                             std::move(*c.heap_permitted()))) {
+    if (!c.permitted_heaps()->empty()) {
+      if (!AccumulateConstraintPermittedHeaps(&*acc->permitted_heaps(),
+                                              std::move(*c.permitted_heaps()))) {
         return false;
       }
     }
@@ -3360,26 +3376,32 @@ bool LogicalBufferCollection::IsColorSpaceEqual(const fuchsia_images2::ColorSpac
   return a == b;
 }
 
-static fpromise::result<fuchsia_sysmem2::HeapType, zx_status_t> GetHeap(
+static fpromise::result<fuchsia_sysmem2::Heap, zx_status_t> GetHeap(
     const fuchsia_sysmem2::BufferMemoryConstraints& constraints, Device* device) {
   if (*constraints.secure_required()) {
     // TODO(https://fxbug.dev/42113093): Generalize this.
     //
     // checked previously
     ZX_DEBUG_ASSERT(!*constraints.secure_required() || IsSecurePermitted(constraints));
-    if (IsHeapPermitted(constraints, fuchsia_sysmem2::HeapType::kAmlogicSecure)) {
-      return fpromise::ok(fuchsia_sysmem2::HeapType::kAmlogicSecure);
+    const static auto kAmlogicSecureHeapSingleton =
+        sysmem::MakeHeap(bind_fuchsia_amlogic_platform_sysmem_heap::HEAP_TYPE_SECURE, 0);
+    const static auto kAmlogicSecureVdecHeapSingleton =
+        sysmem::MakeHeap(bind_fuchsia_amlogic_platform_sysmem_heap::HEAP_TYPE_SECURE_VDEC, 0);
+    if (IsPermittedHeap(constraints, kAmlogicSecureHeapSingleton)) {
+      return fpromise::ok(kAmlogicSecureHeapSingleton);
     } else {
-      ZX_DEBUG_ASSERT(IsHeapPermitted(constraints, fuchsia_sysmem2::HeapType::kAmlogicSecureVdec));
-      return fpromise::ok(fuchsia_sysmem2::HeapType::kAmlogicSecureVdec);
+      ZX_DEBUG_ASSERT(IsPermittedHeap(constraints, kAmlogicSecureVdecHeapSingleton));
+      return fpromise::ok(kAmlogicSecureVdecHeapSingleton);
     }
   }
-  if (IsHeapPermitted(constraints, fuchsia_sysmem2::HeapType::kSystemRam)) {
-    return fpromise::ok(fuchsia_sysmem2::HeapType::kSystemRam);
+  const static auto kSystemRamHeapSingleton =
+      sysmem::MakeHeap(bind_fuchsia_sysmem_heap::HEAP_TYPE_SYSTEM_RAM, 0);
+  if (IsPermittedHeap(constraints, kSystemRamHeapSingleton)) {
+    return fpromise::ok(kSystemRamHeapSingleton);
   }
 
-  for (size_t i = 0; i < constraints.heap_permitted()->size(); ++i) {
-    auto heap = constraints.heap_permitted()->at(i);
+  for (size_t i = 0; i < constraints.permitted_heaps()->size(); ++i) {
+    auto& heap = constraints.permitted_heaps()->at(i);
     const auto* heap_properties = device->GetHeapProperties(heap);
     if (!heap_properties) {
       continue;
@@ -3753,8 +3775,8 @@ fpromise::result<fuchsia_sysmem2::BufferCollectionInfo, Error> LogicalBufferColl
 
   inspect_node_.CreateUint("allocator_id", allocator->id(), &vmo_properties_);
   inspect_node_.CreateUint("size_bytes", *buffer_settings.size_bytes(), &vmo_properties_);
-  inspect_node_.CreateUint("heap", sysmem::fidl_underlying_cast(*buffer_settings.heap()),
-                           &vmo_properties_);
+  inspect_node_.CreateString("heap_type", *buffer_settings.heap()->heap_type(), &vmo_properties_);
+  inspect_node_.CreateUint("heap_id", *buffer_settings.heap()->id(), &vmo_properties_);
   inspect_node_.CreateUint("allocation_timestamp_ns", zx::clock::get_monotonic().get(),
                            &vmo_properties_);
 
@@ -4270,16 +4292,17 @@ void LogicalBufferCollection::LogConstraints(
       LOG_BOOL_FIELD(FROM_HERE, indent, bmc, inaccessible_domain_supported);
 
       size_t heap_permitted_count =
-          bmc.heap_permitted().has_value() ? bmc.heap_permitted()->size() : 0;
-      LogInfo(FROM_HERE, "%*sheap_permitted.count() %zu", indent.num_spaces(), "",
+          bmc.permitted_heaps().has_value() ? bmc.permitted_heaps()->size() : 0;
+      LogInfo(FROM_HERE, "%*spermitted_heaps.size() %zu", indent.num_spaces(), "",
               heap_permitted_count);
       {
         // scope indent
         auto indent = indent_tracker.Nested();
         for (size_t i = 0; i < heap_permitted_count; i++) {
-          const uint64_t heap_id = safe_cast<uint64_t>(bmc.heap_permitted()->at(i));
-          LogInfo(FROM_HERE, "%*sheap_permitted[%zu] : %" PRIx64, indent.num_spaces(), "", i,
-                  heap_id);
+          LogInfo(FROM_HERE, "%*spermitted_heaps[%zu].heap_type : %s", indent.num_spaces(), "", i,
+                  bmc.permitted_heaps()->at(i).heap_type()->c_str());
+          LogInfo(FROM_HERE, "%*spermitted_heaps[%zu].id : 0x%" PRIx64, indent.num_spaces(), "", i,
+                  bmc.permitted_heaps()->at(i).id().value());
         }
       }
     }
@@ -4321,7 +4344,10 @@ void LogicalBufferCollection::LogBufferCollectionInfo(
       LOG_BOOL_FIELD(FROM_HERE, indent, bms, is_secure);
       LogInfo(FROM_HERE, "%*scoherency_domain: %u", indent.num_spaces(), "",
               *bms.coherency_domain());
-      LogInfo(FROM_HERE, "%*sheap: %" PRIx64, indent.num_spaces(), "", *bms.heap());
+      LogInfo(FROM_HERE, "%*sheap.heap_type: %s", indent.num_spaces(), "",
+              bms.heap()->heap_type().value().c_str());
+      LogInfo(FROM_HERE, "%*sheap.id: 0x%" PRIx64, indent.num_spaces(), "",
+              bms.heap()->id().value());
     }
     LogInfo(FROM_HERE, "%*simage_format_constraints:", indent.num_spaces(), "");
     {  // scope ifc, and to have indent level mirror output indent level

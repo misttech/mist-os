@@ -18,6 +18,7 @@
 #include <list>
 #include <memory>
 
+#include <bind/fuchsia/sysmem/heap/cpp/bind.h>
 #include <fake-mmio-reg/fake-mmio-reg.h>
 #include <gtest/gtest.h>
 
@@ -49,7 +50,10 @@ class FakeBufferCollection : public fidl::testing::WireTestBase<fuchsia_sysmem2:
     auto collection_info = fuchsia_sysmem2::wire::BufferCollectionInfo::Builder(arena);
     auto single_buffer_settings = fuchsia_sysmem2::wire::SingleBufferSettings::Builder(arena);
     auto buffer_memory_settings = fuchsia_sysmem2::wire::BufferMemorySettings::Builder(arena);
-    buffer_memory_settings.heap(fuchsia_sysmem2::HeapType::kFramebuffer);
+    auto heap = fuchsia_sysmem2::wire::Heap::Builder(arena);
+    heap.heap_type(arena, bind_fuchsia_sysmem_heap::HEAP_TYPE_FRAMEBUFFER);
+    // no need to set heap.id - defaults to 0 server-side
+    buffer_memory_settings.heap(heap.Build());
     single_buffer_settings.buffer_settings(buffer_memory_settings.Build());
     auto image_format_constraints = fuchsia_sysmem2::wire::ImageFormatConstraints::Builder(arena);
     image_format_constraints.pixel_format(fuchsia_images2::wire::PixelFormat::kB8G8R8A8);

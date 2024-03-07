@@ -21,6 +21,9 @@
 #include <algorithm>
 #include <random>
 
+#include <bind/fuchsia/amlogic/platform/sysmem/heap/cpp/bind.h>
+#include <bind/fuchsia/goldfish/platform/sysmem/heap/cpp/bind.h>
+#include <bind/fuchsia/sysmem/heap/cpp/bind.h>
 #include <fbl/algorithm.h>
 #include <fbl/unique_fd.h>
 #include <zxtest/zxtest.h>
@@ -351,7 +354,7 @@ void set_picky_constraints_v2(fidl::SyncClient<v2::BufferCollection>& collection
   buffer_memory.ram_domain_supported() = false;
   buffer_memory.cpu_domain_supported() = true;
   buffer_memory.inaccessible_domain_supported() = false;
-  ZX_DEBUG_ASSERT(!buffer_memory.heap_permitted().has_value());
+  ZX_DEBUG_ASSERT(!buffer_memory.permitted_heaps().has_value());
   ZX_DEBUG_ASSERT(!constraints.image_format_constraints().has_value());
   v2::BufferCollectionSetConstraintsRequest set_constraints_request;
   set_constraints_request.constraints() = std::move(constraints);
@@ -377,7 +380,7 @@ void set_specific_constraints_v2(fidl::SyncClient<v2::BufferCollection>& collect
   buffer_memory.ram_domain_supported() = false;
   buffer_memory.cpu_domain_supported() = true;
   buffer_memory.inaccessible_domain_supported() = false;
-  ZX_DEBUG_ASSERT(!buffer_memory.heap_permitted().has_value());
+  ZX_DEBUG_ASSERT(!buffer_memory.permitted_heaps().has_value());
   ZX_DEBUG_ASSERT(!constraints.image_format_constraints().has_value());
   v2::BufferCollectionSetConstraintsRequest set_constraints_request;
   set_constraints_request.constraints() = std::move(constraints);
@@ -414,7 +417,7 @@ void set_pixel_format_modifier_constraints_v2(fidl::SyncClient<v2::BufferCollect
   buffer_memory.ram_domain_supported() = false;
   buffer_memory.cpu_domain_supported() = true;
   buffer_memory.inaccessible_domain_supported() = false;
-  ZX_DEBUG_ASSERT(!buffer_memory.heap_permitted().has_value());
+  ZX_DEBUG_ASSERT(!buffer_memory.permitted_heaps().has_value());
 
   constraints.image_format_constraints().emplace(1);
   auto& image_format_constraints = constraints.image_format_constraints()->at(0);
@@ -473,7 +476,7 @@ void set_min_camping_constraints_v2(fidl::SyncClient<v2::BufferCollection>& coll
   buffer_memory.ram_domain_supported() = false;
   buffer_memory.cpu_domain_supported() = true;
   buffer_memory.inaccessible_domain_supported() = false;
-  ZX_DEBUG_ASSERT(!buffer_memory.heap_permitted().has_value());
+  ZX_DEBUG_ASSERT(!buffer_memory.permitted_heaps().has_value());
   if (max_buffer_count) {
     constraints.max_buffer_count() = max_buffer_count;
   }
@@ -484,8 +487,8 @@ void set_min_camping_constraints_v2(fidl::SyncClient<v2::BufferCollection>& coll
 }
 
 void set_heap_constraints_v2(fidl::SyncClient<v2::BufferCollection>& collection,
-                             std::vector<fuchsia_sysmem2::HeapType> heap_types,
-                             bool support_cpu_and_ram, bool support_inaccessible) {
+                             std::vector<std::string> heap_types, bool support_cpu_and_ram,
+                             bool support_inaccessible) {
   v2::BufferCollectionConstraints constraints;
   constraints.usage().emplace();
   constraints.usage()->display() = v2::kDisplayUsageLayer;
@@ -502,7 +505,11 @@ void set_heap_constraints_v2(fidl::SyncClient<v2::BufferCollection>& collection,
   buffer_memory.cpu_domain_supported() = support_cpu_and_ram;
   buffer_memory.inaccessible_domain_supported() = support_inaccessible;
   if (!heap_types.empty()) {
-    buffer_memory.heap_permitted() = std::move(heap_types);
+    buffer_memory.permitted_heaps().emplace();
+    for (auto& heap_type : heap_types) {
+      auto heap = sysmem::MakeHeap(heap_type, 0);
+      buffer_memory.permitted_heaps()->emplace_back(std::move(heap));
+    }
   }
   ZX_DEBUG_ASSERT(!constraints.image_format_constraints().has_value());
   v2::BufferCollectionSetConstraintsRequest set_constraints_request;
@@ -624,7 +631,7 @@ bool AttachTokenSucceedsV2(
   buffer_memory.ram_domain_supported() = false;
   buffer_memory.cpu_domain_supported() = true;
   buffer_memory.inaccessible_domain_supported() = false;
-  ZX_DEBUG_ASSERT(!buffer_memory.heap_permitted().has_value());
+  ZX_DEBUG_ASSERT(!buffer_memory.permitted_heaps().has_value());
   constraints_1.image_format_constraints().emplace(1);
   auto& image_constraints_1 = constraints_1.image_format_constraints()->at(0);
   image_constraints_1.pixel_format() = fuchsia_images2::PixelFormat::kNv12;
@@ -1067,7 +1074,7 @@ TEST(Sysmem, TokenOneParticipantNoImageConstraintsV2) {
   buffer_memory.ram_domain_supported() = false;
   buffer_memory.cpu_domain_supported() = true;
   buffer_memory.inaccessible_domain_supported() = false;
-  ZX_DEBUG_ASSERT(!buffer_memory.heap_permitted().has_value());
+  ZX_DEBUG_ASSERT(!buffer_memory.permitted_heaps().has_value());
   ZX_DEBUG_ASSERT(!constraints.image_format_constraints().has_value());
 
   fuchsia_sysmem2::BufferCollectionSetConstraintsRequest request;
@@ -1194,7 +1201,7 @@ TEST(Sysmem, AttachLifetimeTrackingV2) {
   buffer_memory.ram_domain_supported() = false;
   buffer_memory.cpu_domain_supported() = true;
   buffer_memory.inaccessible_domain_supported() = false;
-  ZX_DEBUG_ASSERT(!buffer_memory.heap_permitted().has_value());
+  ZX_DEBUG_ASSERT(!buffer_memory.permitted_heaps().has_value());
   ZX_DEBUG_ASSERT(!constraints.image_format_constraints().has_value());
   fuchsia_sysmem2::BufferCollectionSetConstraintsRequest request;
   request.constraints() = std::move(constraints);
@@ -1286,7 +1293,7 @@ TEST(Sysmem, AttachLifetimeTrackingV2) {
   buffer_memory_2.ram_domain_supported() = false;
   buffer_memory_2.cpu_domain_supported() = true;
   buffer_memory_2.inaccessible_domain_supported() = false;
-  ZX_DEBUG_ASSERT(!buffer_memory_2.heap_permitted().has_value());
+  ZX_DEBUG_ASSERT(!buffer_memory_2.permitted_heaps().has_value());
   ZX_DEBUG_ASSERT(!attached_constraints.image_format_constraints().has_value());
   fuchsia_sysmem2::BufferCollectionSetConstraintsRequest set_constraints_request;
   set_constraints_request.constraints() = std::move(attached_constraints);
@@ -1347,7 +1354,7 @@ TEST(Sysmem, TokenOneParticipantWithImageConstraintsV2) {
   buffer_memory.ram_domain_supported() = false;
   buffer_memory.cpu_domain_supported() = true;
   buffer_memory.inaccessible_domain_supported() = false;
-  ZX_DEBUG_ASSERT(!buffer_memory.heap_permitted().has_value());
+  ZX_DEBUG_ASSERT(!buffer_memory.permitted_heaps().has_value());
   constraints.image_format_constraints().emplace(1);
   auto& image_constraints = constraints.image_format_constraints()->at(0);
   image_constraints.pixel_format() = fuchsia_images2::PixelFormat::kNv12;
@@ -1448,7 +1455,7 @@ TEST(Sysmem, MinBufferCountV2) {
   buffer_memory.ram_domain_supported() = false;
   buffer_memory.cpu_domain_supported() = true;
   buffer_memory.inaccessible_domain_supported() = false;
-  ZX_DEBUG_ASSERT(!buffer_memory.heap_permitted().has_value());
+  ZX_DEBUG_ASSERT(!buffer_memory.permitted_heaps().has_value());
   ZX_DEBUG_ASSERT(!constraints.image_format_constraints().has_value());
 
   fuchsia_sysmem2::BufferCollectionSetConstraintsRequest request;
@@ -1494,7 +1501,7 @@ TEST(Sysmem, BufferNameV2) {
   buffer_memory.ram_domain_supported() = false;
   buffer_memory.cpu_domain_supported() = true;
   buffer_memory.inaccessible_domain_supported() = false;
-  ZX_DEBUG_ASSERT(!buffer_memory.heap_permitted().has_value());
+  ZX_DEBUG_ASSERT(!buffer_memory.permitted_heaps().has_value());
   ZX_DEBUG_ASSERT(!constraints.image_format_constraints().has_value());
 
   fuchsia_sysmem2::BufferCollectionSetConstraintsRequest set_constraints_request;
@@ -1548,7 +1555,7 @@ TEST(Sysmem, NoTokenV2) {
   buffer_memory.ram_domain_supported() = true;
   buffer_memory.cpu_domain_supported() = true;
   buffer_memory.inaccessible_domain_supported() = false;
-  ZX_DEBUG_ASSERT(!buffer_memory.heap_permitted().has_value());
+  ZX_DEBUG_ASSERT(!buffer_memory.permitted_heaps().has_value());
   ZX_DEBUG_ASSERT(!constraints.image_format_constraints().has_value());
 
   fuchsia_sysmem2::BufferCollectionSetConstraintsRequest set_constraints_request;
@@ -1754,7 +1761,7 @@ TEST(Sysmem, MultipleParticipantsV2) {
   buffer_memory.ram_domain_supported() = false;
   buffer_memory.cpu_domain_supported() = true;
   buffer_memory.inaccessible_domain_supported() = false;
-  ZX_DEBUG_ASSERT(!buffer_memory.heap_permitted().has_value());
+  ZX_DEBUG_ASSERT(!buffer_memory.permitted_heaps().has_value());
   constraints_1.image_format_constraints().emplace(1);
   auto& image_constraints_1 = constraints_1.image_format_constraints()->at(0);
   image_constraints_1.pixel_format() = fuchsia_images2::PixelFormat::kNv12;
@@ -2598,7 +2605,7 @@ TEST(Sysmem, ConstraintsRetainedBeyondReleaseV2) {
   buffer_memory.ram_domain_supported() = false;
   buffer_memory.cpu_domain_supported() = true;
   buffer_memory.inaccessible_domain_supported() = false;
-  ZX_DEBUG_ASSERT(!buffer_memory.heap_permitted().has_value());
+  ZX_DEBUG_ASSERT(!buffer_memory.permitted_heaps().has_value());
 
   // constraints_2 is just a copy of constraints_1 - since both participants
   // specify min_buffer_count_for_camping 2, the total number of allocated
@@ -2689,7 +2696,8 @@ TEST(Sysmem, HeapConstraintsV2) {
   buffer_memory.ram_domain_supported() = false;
   buffer_memory.cpu_domain_supported() = false;
   buffer_memory.inaccessible_domain_supported() = true;
-  buffer_memory.heap_permitted() = {v2::HeapType::kSystemRam};
+  buffer_memory.permitted_heaps() = {
+      sysmem::MakeHeap(bind_fuchsia_sysmem_heap::HEAP_TYPE_SYSTEM_RAM, 0)};
 
   v2::BufferCollectionSetConstraintsRequest set_constraints_request;
   set_constraints_request.constraints() = std::move(constraints);
@@ -2706,9 +2714,20 @@ TEST(Sysmem, HeapConstraintsV2) {
                 ->coherency_domain()
                 .value(),
             v2::CoherencyDomain::kInaccessible);
-  ASSERT_EQ(
-      allocate_result->buffer_collection_info()->settings()->buffer_settings()->heap().value(),
-      v2::HeapType::kSystemRam);
+  ASSERT_EQ(allocate_result->buffer_collection_info()
+                ->settings()
+                ->buffer_settings()
+                ->heap()
+                ->heap_type()
+                .value(),
+            bind_fuchsia_sysmem_heap::HEAP_TYPE_SYSTEM_RAM);
+  ASSERT_EQ(allocate_result->buffer_collection_info()
+                ->settings()
+                ->buffer_settings()
+                ->heap()
+                ->id()
+                .value(),
+            0);
   ASSERT_TRUE(allocate_result->buffer_collection_info()
                   ->settings()
                   ->buffer_settings()
@@ -2733,7 +2752,8 @@ TEST(Sysmem, CpuUsageAndInaccessibleDomainFailsV2) {
   buffer_memory.ram_domain_supported() = false;
   buffer_memory.cpu_domain_supported() = false;
   buffer_memory.inaccessible_domain_supported() = true;
-  buffer_memory.heap_permitted() = {v2::HeapType::kSystemRam};
+  buffer_memory.permitted_heaps() = {
+      sysmem::MakeHeap(bind_fuchsia_sysmem_heap::HEAP_TYPE_SYSTEM_RAM, 0)};
 
   v2::BufferCollectionSetConstraintsRequest set_constraints_request;
   set_constraints_request.constraints() = std::move(constraints);
@@ -2768,7 +2788,8 @@ TEST(Sysmem, SystemRamHeapSupportsAllDomainsV2) {
     buffer_memory.ram_domain_supported() = (domain == v2::CoherencyDomain::kRam);
     buffer_memory.cpu_domain_supported() = (domain == v2::CoherencyDomain::kCpu);
     buffer_memory.inaccessible_domain_supported() = (domain == v2::CoherencyDomain::kInaccessible);
-    buffer_memory.heap_permitted() = {v2::HeapType::kSystemRam};
+    buffer_memory.permitted_heaps() = {
+        sysmem::MakeHeap(bind_fuchsia_sysmem_heap::HEAP_TYPE_SYSTEM_RAM, 0)};
 
     v2::BufferCollectionSetConstraintsRequest set_constraints_request;
     set_constraints_request.constraints() = std::move(constraints);
@@ -2929,7 +2950,7 @@ TEST(Sysmem, CpuUsageAndNoBufferMemoryConstraintsV2) {
   buffer_memory.ram_domain_supported() = true;
   buffer_memory.cpu_domain_supported() = true;
   buffer_memory.inaccessible_domain_supported() = true;
-  ZX_DEBUG_ASSERT(!buffer_memory.heap_permitted().has_value());
+  ZX_DEBUG_ASSERT(!buffer_memory.permitted_heaps().has_value());
 
   v2::BufferCollectionSetConstraintsRequest set_constraints_request;
   set_constraints_request.constraints() = std::move(constraints_1);
@@ -2983,7 +3004,8 @@ TEST(Sysmem, ContiguousSystemRamIsCachedV2) {
   buffer_memory.cpu_domain_supported() = true;
   buffer_memory.inaccessible_domain_supported() = false;
   // Constraining this to SYSTEM_RAM is redundant for now.
-  buffer_memory.heap_permitted() = {v2::HeapType::kSystemRam};
+  buffer_memory.permitted_heaps() = {
+      sysmem::MakeHeap(bind_fuchsia_sysmem_heap::HEAP_TYPE_SYSTEM_RAM, 0)};
 
   v2::BufferCollectionSetConstraintsRequest set_constraints_request;
   set_constraints_request.constraints() = std::move(constraints);
@@ -3000,9 +3022,20 @@ TEST(Sysmem, ContiguousSystemRamIsCachedV2) {
                 ->coherency_domain()
                 .value(),
             v2::CoherencyDomain::kCpu);
-  ASSERT_EQ(
-      allocate_result->buffer_collection_info()->settings()->buffer_settings()->heap().value(),
-      v2::HeapType::kSystemRam);
+  ASSERT_EQ(allocate_result->buffer_collection_info()
+                ->settings()
+                ->buffer_settings()
+                ->heap()
+                ->heap_type()
+                .value(),
+            bind_fuchsia_sysmem_heap::HEAP_TYPE_SYSTEM_RAM);
+  ASSERT_EQ(allocate_result->buffer_collection_info()
+                ->settings()
+                ->buffer_settings()
+                ->heap()
+                ->id()
+                .value(),
+            0);
   ASSERT_TRUE(allocate_result->buffer_collection_info()
                   ->settings()
                   ->buffer_settings()
@@ -3071,7 +3104,8 @@ TEST(Sysmem, ContiguousSystemRamIsRecycledV2) {
     buffer_memory.cpu_domain_supported() = true;
     buffer_memory.inaccessible_domain_supported() = false;
     // Constraining this to SYSTEM_RAM is redundant for now.
-    buffer_memory.heap_permitted() = {v2::HeapType::kSystemRam};
+    buffer_memory.permitted_heaps() = {
+        sysmem::MakeHeap(bind_fuchsia_sysmem_heap::HEAP_TYPE_SYSTEM_RAM, 0)};
 
     v2::BufferCollectionSetConstraintsRequest set_constraints_request;
     set_constraints_request.constraints() = std::move(constraints);
@@ -3089,9 +3123,20 @@ TEST(Sysmem, ContiguousSystemRamIsRecycledV2) {
                   ->coherency_domain()
                   .value(),
               v2::CoherencyDomain::kCpu);
-    ASSERT_EQ(
-        allocate_result->buffer_collection_info()->settings()->buffer_settings()->heap().value(),
-        v2::HeapType::kSystemRam);
+    ASSERT_EQ(allocate_result->buffer_collection_info()
+                  ->settings()
+                  ->buffer_settings()
+                  ->heap()
+                  ->heap_type()
+                  .value(),
+              bind_fuchsia_sysmem_heap::HEAP_TYPE_SYSTEM_RAM);
+    ASSERT_EQ(allocate_result->buffer_collection_info()
+                  ->settings()
+                  ->buffer_settings()
+                  ->heap()
+                  ->id()
+                  .value(),
+              0);
     ASSERT_TRUE(allocate_result->buffer_collection_info()
                     ->settings()
                     ->buffer_settings()
@@ -3133,7 +3178,7 @@ TEST(Sysmem, OnlyNoneUsageFailsV2) {
   buffer_memory.ram_domain_supported() = false;
   buffer_memory.cpu_domain_supported() = true;
   buffer_memory.inaccessible_domain_supported() = false;
-  ZX_DEBUG_ASSERT(!buffer_memory.heap_permitted().has_value());
+  ZX_DEBUG_ASSERT(!buffer_memory.permitted_heaps().has_value());
   ZX_DEBUG_ASSERT(!constraints.image_format_constraints().has_value());
 
   v2::BufferCollectionSetConstraintsRequest set_constraints_request;
@@ -3180,7 +3225,7 @@ TEST(Sysmem, NoneUsageAndOtherUsageFromSingleParticipantFailsV2) {
   buffer_memory.ram_domain_supported() = false;
   buffer_memory.cpu_domain_supported() = true;
   buffer_memory.inaccessible_domain_supported() = false;
-  ZX_DEBUG_ASSERT(!buffer_memory.heap_permitted().has_value());
+  ZX_DEBUG_ASSERT(!buffer_memory.permitted_heaps().has_value());
   ZX_DEBUG_ASSERT(!constraints.image_format_constraints().has_value());
 
   v2::BufferCollectionSetConstraintsRequest set_constraints_request;
@@ -3259,7 +3304,7 @@ TEST(Sysmem, NoneUsageWithSeparateOtherUsageSucceedsV2) {
   buffer_memory.ram_domain_supported() = false;
   buffer_memory.cpu_domain_supported() = true;
   buffer_memory.inaccessible_domain_supported() = false;
-  ZX_DEBUG_ASSERT(!buffer_memory.heap_permitted().has_value());
+  ZX_DEBUG_ASSERT(!buffer_memory.permitted_heaps().has_value());
 
   // Start with constraints_2 a copy of constraints_1.  There are no handles
   // in the constraints struct so a struct copy instead of clone is fine here.
@@ -3335,7 +3380,8 @@ TEST(Sysmem, PixelFormatBgr24V2) {
   buffer_memory.ram_domain_supported() = true;
   buffer_memory.cpu_domain_supported() = true;
   buffer_memory.inaccessible_domain_supported() = false;
-  buffer_memory.heap_permitted() = {v2::HeapType::kSystemRam};
+  buffer_memory.permitted_heaps() = {
+      sysmem::MakeHeap(bind_fuchsia_sysmem_heap::HEAP_TYPE_SYSTEM_RAM, 0)};
   constraints.image_format_constraints().emplace(1);
   auto& image_constraints = constraints.image_format_constraints()->at(0);
   image_constraints.pixel_format() = fuchsia_images2::PixelFormat::kB8G8R8;
@@ -3452,7 +3498,8 @@ TEST(Sysmem, HeapAmlogicSecureV2) {
     buffer_memory.ram_domain_supported() = false;
     buffer_memory.cpu_domain_supported() = false;
     buffer_memory.inaccessible_domain_supported() = true;
-    buffer_memory.heap_permitted() = {v2::HeapType::kAmlogicSecure};
+    buffer_memory.permitted_heaps() = {
+        sysmem::MakeHeap(bind_fuchsia_amlogic_platform_sysmem_heap::HEAP_TYPE_SECURE, 0)};
     ZX_DEBUG_ASSERT(!constraints.image_format_constraints().has_value());
 
     v2::BufferCollectionSetConstraintsRequest set_constraints_request;
@@ -3472,8 +3519,9 @@ TEST(Sysmem, HeapAmlogicSecureV2) {
     EXPECT_TRUE(buffer_collection_info.settings()->buffer_settings()->is_secure().value());
     EXPECT_EQ(buffer_collection_info.settings()->buffer_settings()->coherency_domain().value(),
               v2::CoherencyDomain::kInaccessible);
-    EXPECT_EQ(buffer_collection_info.settings()->buffer_settings()->heap().value(),
-              v2::HeapType::kAmlogicSecure);
+    EXPECT_EQ(buffer_collection_info.settings()->buffer_settings()->heap()->heap_type().value(),
+              bind_fuchsia_amlogic_platform_sysmem_heap::HEAP_TYPE_SECURE);
+    EXPECT_EQ(buffer_collection_info.settings()->buffer_settings()->heap()->id().value(), 0);
     EXPECT_FALSE(buffer_collection_info.settings()->image_format_constraints().has_value());
 
     for (uint32_t i = 0; i < buffer_collection_info.buffers()->size(); ++i) {
@@ -3555,7 +3603,8 @@ TEST(Sysmem, HeapAmlogicSecureMiniStressV2) {
     buffer_memory.ram_domain_supported() = false;
     buffer_memory.cpu_domain_supported() = false;
     buffer_memory.inaccessible_domain_supported() = true;
-    buffer_memory.heap_permitted() = {v2::HeapType::kAmlogicSecure};
+    buffer_memory.permitted_heaps() = {
+        sysmem::MakeHeap(bind_fuchsia_amlogic_platform_sysmem_heap::HEAP_TYPE_SECURE, 0)};
     ZX_DEBUG_ASSERT(!constraints.image_format_constraints().has_value());
 
     v2::BufferCollectionSetConstraintsRequest set_constraints_request;
@@ -3575,8 +3624,9 @@ TEST(Sysmem, HeapAmlogicSecureMiniStressV2) {
     EXPECT_TRUE(buffer_collection_info.settings()->buffer_settings()->is_secure().value());
     EXPECT_EQ(buffer_collection_info.settings()->buffer_settings()->coherency_domain().value(),
               v2::CoherencyDomain::kInaccessible);
-    EXPECT_EQ(buffer_collection_info.settings()->buffer_settings()->heap().value(),
-              v2::HeapType::kAmlogicSecure);
+    EXPECT_EQ(buffer_collection_info.settings()->buffer_settings()->heap()->heap_type().value(),
+              bind_fuchsia_amlogic_platform_sysmem_heap::HEAP_TYPE_SECURE);
+    EXPECT_EQ(buffer_collection_info.settings()->buffer_settings()->heap()->id().value(), 0);
     EXPECT_FALSE(buffer_collection_info.settings()->image_format_constraints().has_value());
     EXPECT_EQ(buffer_collection_info.buffers()->at(0).vmo_usable_start().value(), 0);
 
@@ -3659,7 +3709,8 @@ TEST(Sysmem, HeapAmlogicSecureMiniStressV2) {
     buffer_memory.ram_domain_supported() = false;
     buffer_memory.cpu_domain_supported() = false;
     buffer_memory.inaccessible_domain_supported() = true;
-    buffer_memory.heap_permitted() = {v2::HeapType::kAmlogicSecure};
+    buffer_memory.permitted_heaps() = {
+        sysmem::MakeHeap(bind_fuchsia_amlogic_platform_sysmem_heap::HEAP_TYPE_SECURE, 0)};
     ZX_DEBUG_ASSERT(!constraints.image_format_constraints().has_value());
 
     v2::BufferCollectionSetConstraintsRequest set_constraints_request;
@@ -3679,8 +3730,9 @@ TEST(Sysmem, HeapAmlogicSecureMiniStressV2) {
     EXPECT_TRUE(buffer_collection_info.settings()->buffer_settings()->is_secure().value());
     EXPECT_EQ(buffer_collection_info.settings()->buffer_settings()->coherency_domain().value(),
               v2::CoherencyDomain::kInaccessible);
-    EXPECT_EQ(buffer_collection_info.settings()->buffer_settings()->heap().value(),
-              v2::HeapType::kAmlogicSecure);
+    EXPECT_EQ(buffer_collection_info.settings()->buffer_settings()->heap()->heap_type().value(),
+              bind_fuchsia_amlogic_platform_sysmem_heap::HEAP_TYPE_SECURE);
+    EXPECT_EQ(buffer_collection_info.settings()->buffer_settings()->heap()->id().value(), 0);
     EXPECT_FALSE(buffer_collection_info.settings()->image_format_constraints().has_value());
 
     for (uint32_t i = 0; i < buffer_collection_info.buffers()->size(); ++i) {
@@ -3729,7 +3781,11 @@ TEST(Sysmem, HeapAmlogicSecureOnlySupportsInaccessibleV2) {
     buffer_memory.ram_domain_supported() = (domain == v2::CoherencyDomain::kRam);
     buffer_memory.cpu_domain_supported() = (domain == v2::CoherencyDomain::kCpu);
     buffer_memory.inaccessible_domain_supported() = (domain == v2::CoherencyDomain::kInaccessible);
-    buffer_memory.heap_permitted() = {v2::HeapType::kAmlogicSecure};
+    fuchsia_sysmem2::Heap heap;
+    heap.heap_type() = bind_fuchsia_amlogic_platform_sysmem_heap::HEAP_TYPE_SECURE;
+    // intentionally leave id un-set for this singleton heap, to make sure id un-set works
+    ZX_ASSERT(!heap.id().has_value());
+    buffer_memory.permitted_heaps() = {std::move(heap)};
     ZX_DEBUG_ASSERT(!constraints.image_format_constraints().has_value());
 
     v2::BufferCollectionSetConstraintsRequest set_constraints_request;
@@ -3752,8 +3808,9 @@ TEST(Sysmem, HeapAmlogicSecureOnlySupportsInaccessibleV2) {
       EXPECT_TRUE(buffer_collection_info.settings()->buffer_settings()->is_secure().value());
       EXPECT_EQ(buffer_collection_info.settings()->buffer_settings()->coherency_domain().value(),
                 v2::CoherencyDomain::kInaccessible);
-      EXPECT_EQ(buffer_collection_info.settings()->buffer_settings()->heap().value(),
-                v2::HeapType::kAmlogicSecure);
+      EXPECT_EQ(buffer_collection_info.settings()->buffer_settings()->heap()->heap_type().value(),
+                bind_fuchsia_amlogic_platform_sysmem_heap::HEAP_TYPE_SECURE);
+      EXPECT_EQ(buffer_collection_info.settings()->buffer_settings()->heap()->id().value(), 0);
       EXPECT_FALSE(buffer_collection_info.settings()->image_format_constraints().has_value());
     } else {
       ASSERT_FALSE(allocate_result.is_ok(),
@@ -3787,7 +3844,12 @@ TEST(Sysmem, HeapAmlogicSecureVdecV2) {
     buffer_memory.ram_domain_supported() = false;
     buffer_memory.cpu_domain_supported() = false;
     buffer_memory.inaccessible_domain_supported() = true;
-    buffer_memory.heap_permitted() = {v2::HeapType::kAmlogicSecureVdec};
+    fuchsia_sysmem2::Heap heap;
+    heap.heap_type() = bind_fuchsia_amlogic_platform_sysmem_heap::HEAP_TYPE_SECURE_VDEC;
+    // intentionally don't set id for this singleton heap to make sure un-set id works for a
+    // singleton heap
+    ZX_DEBUG_ASSERT(!heap.id().has_value());
+    buffer_memory.permitted_heaps() = {std::move(heap)};
     ZX_DEBUG_ASSERT(!constraints.image_format_constraints().has_value());
 
     v2::BufferCollectionSetConstraintsRequest set_constraints_request;
@@ -3809,8 +3871,9 @@ TEST(Sysmem, HeapAmlogicSecureVdecV2) {
     EXPECT_EQ(buffer_collection_info.settings()->buffer_settings()->is_secure().value(), true);
     EXPECT_EQ(buffer_collection_info.settings()->buffer_settings()->coherency_domain().value(),
               v2::CoherencyDomain::kInaccessible);
-    EXPECT_EQ(buffer_collection_info.settings()->buffer_settings()->heap().value(),
-              v2::HeapType::kAmlogicSecureVdec);
+    EXPECT_EQ(buffer_collection_info.settings()->buffer_settings()->heap()->heap_type().value(),
+              bind_fuchsia_amlogic_platform_sysmem_heap::HEAP_TYPE_SECURE_VDEC);
+    EXPECT_EQ(buffer_collection_info.settings()->buffer_settings()->heap()->id().value(), 0);
     EXPECT_FALSE(buffer_collection_info.settings()->image_format_constraints().has_value());
 
     auto expected_size = fbl::round_up(kBufferSizeBytes, zx_system_get_page_size());
@@ -3849,7 +3912,7 @@ TEST(Sysmem, CpuUsageAndInaccessibleDomainSupportedSucceedsV2) {
   buffer_memory.ram_domain_supported() = false;
   buffer_memory.cpu_domain_supported() = true;
   buffer_memory.inaccessible_domain_supported() = true;
-  ZX_DEBUG_ASSERT(!buffer_memory.heap_permitted().has_value());
+  ZX_DEBUG_ASSERT(!buffer_memory.permitted_heaps().has_value());
   ZX_DEBUG_ASSERT(!constraints.image_format_constraints().has_value());
 
   v2::BufferCollectionSetConstraintsRequest set_constraints_request;
@@ -3909,7 +3972,7 @@ TEST(Sysmem, AllocatedBufferZeroInRamV2) {
     buffer_memory.ram_domain_supported() = false;
     buffer_memory.cpu_domain_supported() = true;
     buffer_memory.inaccessible_domain_supported() = false;
-    ZX_DEBUG_ASSERT(!buffer_memory.heap_permitted().has_value());
+    ZX_DEBUG_ASSERT(!buffer_memory.permitted_heaps().has_value());
     ZX_DEBUG_ASSERT(!constraints.image_format_constraints().has_value());
 
     v2::BufferCollectionSetConstraintsRequest set_constraints_request;
@@ -4104,7 +4167,7 @@ bool BasicAllocationSucceedsV2(
   buffer_memory.ram_domain_supported() = false;
   buffer_memory.cpu_domain_supported() = true;
   buffer_memory.inaccessible_domain_supported() = false;
-  ZX_DEBUG_ASSERT(!buffer_memory.heap_permitted().has_value());
+  ZX_DEBUG_ASSERT(!buffer_memory.permitted_heaps().has_value());
   constraints.image_format_constraints().emplace(1);
   auto& image_constraints = constraints.image_format_constraints()->at(0);
   image_constraints.pixel_format() = fuchsia_images2::PixelFormat::kNv12;
@@ -4479,7 +4542,7 @@ TEST(Sysmem, SetDispensableV2) {
     buffer_memory.ram_domain_supported() = false;
     buffer_memory.cpu_domain_supported() = true;
     buffer_memory.inaccessible_domain_supported() = false;
-    ZX_DEBUG_ASSERT(!buffer_memory.heap_permitted().has_value());
+    ZX_DEBUG_ASSERT(!buffer_memory.permitted_heaps().has_value());
 
     // constraints_2 is just a copy of constraints_1 - since both participants
     // specify min_buffer_count_for_camping 2, the total number of allocated
@@ -7054,13 +7117,17 @@ TEST(Sysmem, HeapConflictMovesToNextGroupChild) {
   // (after having tried child1 unsuccessfully first).
   set_heap_constraints_v2(parent_collection, {}, true, false);
   ASSERT_TRUE(group->AllChildrenPresent().is_ok());
-  set_heap_constraints_v2(child1_collection, {v2::HeapType::kGoldfishDeviceLocal}, true, true);
+  set_heap_constraints_v2(child1_collection,
+                          {bind_fuchsia_goldfish_platform_sysmem_heap::HEAP_TYPE_DEVICE_LOCAL},
+                          true, true);
   set_heap_constraints_v2(child2_collection, {}, true, false);
 
   auto wait_result = parent_collection->WaitForAllBuffersAllocated();
   ASSERT_TRUE(wait_result.is_ok());
   auto& info = wait_result->buffer_collection_info().value();
-  ASSERT_EQ(info.settings()->buffer_settings()->heap().value(), v2::HeapType::kSystemRam);
+  ASSERT_EQ(info.settings()->buffer_settings()->heap()->heap_type().value(),
+            bind_fuchsia_sysmem_heap::HEAP_TYPE_SYSTEM_RAM);
+  ASSERT_EQ(info.settings()->buffer_settings()->heap()->id().value(), 0);
 }
 
 TEST(Sysmem, RequireBytesPerRowAtPixelBoundary) {

@@ -14,6 +14,9 @@ zx_library("sysmem-version") {
   ]
   deps = [
     "//sdk/lib/fidl",
+    "//src/devices/bind/fuchsia.amlogic.platform.sysmem.heap:fuchsia.amlogic.platform.sysmem.heap_cpp",
+    "//src/devices/bind/fuchsia.goldfish.platform.sysmem.heap:fuchsia.goldfish.platform.sysmem.heap_cpp",
+    "//src/devices/bind/fuchsia.sysmem.heap:fuchsia.sysmem.heap_cpp",
     "//zircon/third_party/ulib/safemath",
   ]
 
