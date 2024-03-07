@@ -238,7 +238,7 @@ pub fn sys_execveat(
             return error!(ENOENT);
         }
 
-        let file = current_task.files.get(dir_fd)?;
+        let file = current_task.files.get_allowing_opath(dir_fd)?;
 
         // We are forced to reopen the file with O_RDONLY to get access to the underlying VMO.
         // Note that we set `check_access` to false in the arguments in case the file mode does
@@ -1557,7 +1557,7 @@ pub fn sys_setns(
     ns_fd: FdNumber,
     ns_type: c_int,
 ) -> Result<(), Errno> {
-    let file_handle = current_task.task.files.get_unless_opath(ns_fd)?;
+    let file_handle = current_task.task.files.get(ns_fd)?;
 
     // From man pages this is not quite right because some namespace types require more capabilities
     // or require this capability in multiple namespaces, but it should cover our current test
@@ -1753,7 +1753,9 @@ pub fn sys_kcmp(
     match resource_type {
         KcmpResource::FILE => {
             fn get_file(task: &Task, index: u64) -> Result<FileHandle, Errno> {
-                task.files.get(FdNumber::from_raw(index.try_into().map_err(|_| errno!(EBADF))?))
+                task.files.get_allowing_opath(FdNumber::from_raw(
+                    index.try_into().map_err(|_| errno!(EBADF))?,
+                ))
             }
             let file1 = get_file(&task1, index1)?;
             let file2 = get_file(&task2, index2)?;

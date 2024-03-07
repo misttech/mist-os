@@ -294,13 +294,13 @@ impl FsNodeOps for FdDirectory {
         let fd = FdNumber::from_fs_str(name).map_err(|_| errno!(ENOENT))?;
         let task = Task::from_weak(&self.task)?;
         // Make sure that the file descriptor exists before creating the node.
-        let _ = task.files.get(fd).map_err(|_| errno!(ENOENT))?;
+        let _ = task.files.get_allowing_opath(fd).map_err(|_| errno!(ENOENT))?;
         let task_reference = self.task.clone();
         Ok(node.fs().create_node(
             current_task,
             CallbackSymlinkNode::new(move || {
                 let task = Task::from_weak(&task_reference)?;
-                let file = task.files.get(fd).map_err(|_| errno!(ENOENT))?;
+                let file = task.files.get_allowing_opath(fd).map_err(|_| errno!(ENOENT))?;
                 Ok(SymlinkTarget::Node(file.name.clone()))
             }),
             FsNodeInfo::new_factory(mode!(IFLNK, 0o777), task.as_fscred()),
@@ -478,7 +478,7 @@ impl FsNodeOps for FdInfoDirectory {
     ) -> Result<FsNodeHandle, Errno> {
         let task = Task::from_weak(&self.task)?;
         let fd = FdNumber::from_fs_str(name).map_err(|_| errno!(ENOENT))?;
-        let file = task.files.get(fd).map_err(|_| errno!(ENOENT))?;
+        let file = task.files.get_allowing_opath(fd).map_err(|_| errno!(ENOENT))?;
         let pos = *file.offset.lock();
         let flags = file.flags();
         let data = format!("pos:\t{}flags:\t0{:o}\n", pos, flags.bits()).into_bytes();

@@ -174,7 +174,7 @@ pub fn sys_dup2(
     newfd: FdNumber,
 ) -> Result<FdNumber, Errno> {
     if oldfd == newfd {
-        current_task.files.get(oldfd)?;
+        current_task.files.get_allowing_opath(oldfd)?;
         return Ok(newfd);
     }
     sys_dup3(locked, current_task, oldfd, newfd, 0)
@@ -228,7 +228,7 @@ pub fn sys_getdents(
     user_buffer: UserAddress,
     user_capacity: usize,
 ) -> Result<usize, Errno> {
-    let file = current_task.files.get_unless_opath(fd)?;
+    let file = current_task.files.get(fd)?;
     let mut offset = file.offset.lock();
     let mut sink = DirentSink32::new(current_task, &mut offset, user_buffer, user_capacity);
     let result = file.readdir(current_task, &mut sink);

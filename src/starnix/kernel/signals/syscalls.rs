@@ -307,7 +307,7 @@ pub fn sys_signalfd4(
     let mask = current_task.read_object(mask_addr)?;
 
     if fd.raw() != -1 {
-        let file = current_task.files.get_unless_opath(fd)?;
+        let file = current_task.files.get(fd)?;
         let file = file.downcast_file::<SignalFd>().ok_or_else(|| errno!(EINVAL))?;
         file.set_mask(mask);
         Ok(fd)
@@ -577,7 +577,7 @@ pub fn sys_pidfd_send_signal(
         return error!(EINVAL);
     }
 
-    let file = current_task.files.get(pidfd)?;
+    let file = current_task.files.get_allowing_opath(pidfd)?;
     let target = current_task.get_task(file.as_pid()?);
     let target = target.upgrade().ok_or_else(|| errno!(ESRCH))?;
 
@@ -792,7 +792,7 @@ pub fn sys_waitid(
         }),
         P_PIDFD => {
             let fd = FdNumber::from_raw(id);
-            let file = current_task.files.get(fd)?;
+            let file = current_task.files.get_allowing_opath(fd)?;
             if file.flags().contains(OpenFlags::NONBLOCK) {
                 waiting_options.block = false;
             }

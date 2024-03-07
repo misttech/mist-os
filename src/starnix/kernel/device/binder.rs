@@ -2982,7 +2982,8 @@ impl ResourceAccessor for CurrentTask {
         fd: FdNumber,
     ) -> Result<(FileHandle, FdFlags), Errno> {
         log_trace!("Getting file {:?} with flags", fd);
-        self.files.get_with_flags(fd)
+        // TODO: Should we allow O_PATH here?
+        self.files.get_allowing_opath_with_flags(fd)
     }
     fn add_file_with_flags(
         &self,
@@ -3015,7 +3016,8 @@ impl ResourceAccessor for Task {
         fd: FdNumber,
     ) -> Result<(FileHandle, FdFlags), Errno> {
         log_trace!("Getting file {:?} with flags", fd);
-        self.files.get_with_flags(fd)
+        // TODO: Should we allow O_PATH here?
+        self.files.get_allowing_opath_with_flags(fd)
     }
     fn add_file_with_flags(
         &self,
@@ -6515,7 +6517,7 @@ pub mod tests {
         let (receiver_file, receiver_fd_flags) = receiver
             .task
             .files
-            .get_with_flags(FdNumber::from_raw(translated_bar.fds[0] as i32))
+            .get_allowing_opath_with_flags(FdNumber::from_raw(translated_bar.fds[0] as i32))
             .expect("FD not found in receiver");
         assert!(
             Arc::ptr_eq(&receiver_file, &files[0]),
@@ -6525,7 +6527,7 @@ pub mod tests {
         let (receiver_file, receiver_fd_flags) = receiver
             .task
             .files
-            .get_with_flags(FdNumber::from_raw(translated_bar.fds[1] as i32))
+            .get_allowing_opath_with_flags(FdNumber::from_raw(translated_bar.fds[1] as i32))
             .expect("FD not found in receiver");
         assert!(
             Arc::ptr_eq(&receiver_file, &files[1]),
@@ -6542,7 +6544,7 @@ pub mod tests {
             receiver
                 .task
                 .files
-                .get(FdNumber::from_raw(translated_bar.fds[0] as i32))
+                .get_allowing_opath(FdNumber::from_raw(translated_bar.fds[0] as i32))
                 .expect_err("file should be closed")
                 == EBADF
         );
@@ -6550,7 +6552,7 @@ pub mod tests {
             receiver
                 .task
                 .files
-                .get(FdNumber::from_raw(translated_bar.fds[1] as i32))
+                .get_allowing_opath(FdNumber::from_raw(translated_bar.fds[1] as i32))
                 .expect_err("file should be closed")
                 == EBADF
         );
@@ -6804,11 +6806,13 @@ pub mod tests {
 
         // The receiver should have the fd.
         let fd = transient_state.state.as_ref().unwrap().owned_fds[0];
-        assert!(receiver.task.files.get(fd).is_ok(), "file should be translated");
+        assert!(receiver.task.files.get_allowing_opath(fd).is_ok(), "file should be translated");
 
         // Release the result, which should close the fds in the receiver.
         transient_state.release(&sender.task);
-        assert!(receiver.task.files.get(fd).expect_err("file should be closed") == EBADF);
+        assert!(
+            receiver.task.files.get_allowing_opath(fd).expect_err("file should be closed") == EBADF
+        );
     }
 
     #[fuchsia::test]
@@ -7304,7 +7308,11 @@ pub mod tests {
         // The FD should point to the same file.
         assert!(
             Arc::ptr_eq(
-                &receiver.task.files.get(receiver_fd).expect("receiver should have FD"),
+                &receiver
+                    .task
+                    .files
+                    .get_allowing_opath(receiver_fd)
+                    .expect("receiver should have FD"),
                 &file
             ),
             "FDs from sender and receiver don't point to the same file"

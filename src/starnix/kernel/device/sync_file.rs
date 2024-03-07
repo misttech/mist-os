@@ -147,7 +147,8 @@ impl FileOps for SyncFile {
             SYNC_IOC_MERGE => {
                 let user_ref = UserRef::new(user_addr);
                 let mut merge_data: sync_merge_data = current_task.read_object(user_ref)?;
-                let file2 = current_task.files.get(FdNumber::from_raw(merge_data.fd2))?;
+                let file2 =
+                    current_task.files.get_allowing_opath(FdNumber::from_raw(merge_data.fd2))?;
 
                 let mut fence = SyncFence { sync_points: vec![] };
                 let mut set = HashSet::<zx::Koid>::new();

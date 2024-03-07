@@ -232,7 +232,7 @@ pub fn parse_numbered_handles(
     let stdio = SyslogFile::new_file(current_task);
     // If no numbered handle is provided for each stdio handle, default to syslog.
     for i in [0, 1, 2] {
-        if files.get(FdNumber::from_raw(i)).is_err() {
+        if files.get_allowing_opath(FdNumber::from_raw(i)).is_err() {
             files.insert(current_task, FdNumber::from_raw(i), stdio.clone())?;
         }
     }

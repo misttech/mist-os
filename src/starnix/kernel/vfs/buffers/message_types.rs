@@ -303,7 +303,7 @@ impl UnixControlData {
                 let files = (0..num_file_descriptors * bytes_per_file_descriptor)
                     .step_by(bytes_per_file_descriptor)
                     .map(|index| NativeEndian::read_i32(&message.data[index..]))
-                    .map(|fd| current_task.files.get(FdNumber::from_raw(fd)))
+                    .map(|fd| current_task.files.get_allowing_opath(FdNumber::from_raw(fd)))
                     .collect::<Result<Vec<FileHandle>, Errno>>()?;
 
                 Ok(UnixControlData::Rights(files))

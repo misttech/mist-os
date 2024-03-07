@@ -396,7 +396,7 @@ impl CurrentTask {
         } else if dir_fd == FdNumber::AT_FDCWD {
             self.fs().cwd()
         } else {
-            let file = self.files.get(dir_fd)?;
+            let file = self.files.get_allowing_opath(dir_fd)?;
             file.name.clone()
         };
 

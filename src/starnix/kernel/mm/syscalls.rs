@@ -150,7 +150,7 @@ pub fn do_mmap(
         trace_duration!(CATEGORY_STARNIX_MM, c"FileBackedMmap");
         profile_duration!("FileBackedMmap");
         // TODO(tbodt): maximize protection flags so that mprotect works
-        let file = current_task.files.get(fd)?;
+        let file = current_task.files.get_allowing_opath(fd)?;
         file.mmap(current_task, addr, vmo_offset, length, prot_flags, options, file.name.clone())
     }
 }
