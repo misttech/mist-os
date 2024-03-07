@@ -32,48 +32,56 @@ pub fn fletcher64(buf: &[u8], previous: Checksum) -> Checksum {
     (hi as u64) << 32 | lo as u64
 }
 
+/// A vector of fletcher64 checksums, one per block.
+/// These are stored as a flat array of bytes for efficient deserialization.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, TypeFingerprint)]
 #[cfg_attr(fuzz, derive(arbitrary::Arbitrary))]
-pub enum Checksums {
-    None,
-    /// A vector of fletcher64 checksums, one per block.
-    /// These are stored as a flat array of bytes for efficient deserialization.
-    Fletcher(Vec<u8>),
+pub struct Checksums {
+    sums: Vec<u8>,
 }
 
 impl Checksums {
     pub fn fletcher(checksums: Vec<Checksum>) -> Self {
         assert_cfg!(target_endian = "little");
         let checksums_as_u8: &[u8] = &*checksums.as_bytes();
-        Self::Fletcher(checksums_as_u8.to_owned())
+        Self { sums: checksums_as_u8.to_owned() }
     }
 
     pub fn len(&self) -> usize {
-        match self {
-            Self::None => 0,
-            Self::Fletcher(sums) => sums.len() / std::mem::size_of::<Checksum>(),
-        }
+        self.sums.len() / std::mem::size_of::<Checksum>()
     }
 
-    /// Returns a slice of the contained checksums, or None if the type is None.
-    /// May return an error if `self` is invalid (e.g. bad length).
-    pub fn maybe_as_ref(&self) -> Result<Option<&[Checksum]>, Error> {
-        match self {
-            Self::None => Ok(None),
-            Self::Fletcher(sums) => {
-                assert_cfg!(target_endian = "little");
-                let sums = Checksum::slice_from(&sums[..]).ok_or(FxfsError::Inconsistent)?;
-                Ok(Some(sums))
-            }
-        }
+    pub fn maybe_as_ref(&self) -> Result<&[Checksum], Error> {
+        assert_cfg!(target_endian = "little");
+        Checksum::slice_from(&self.sums).ok_or(FxfsError::Inconsistent.into())
     }
 
-    pub fn split_off(&mut self, at: usize) -> Self {
+    pub fn offset_by(&self, amount: usize) -> Self {
+        Checksums { sums: self.sums[amount * std::mem::size_of::<Checksum>()..].to_vec() }
+    }
+
+    pub fn shrunk(&self, len: usize) -> Self {
+        Checksums { sums: self.sums[..len * std::mem::size_of::<Checksum>()].to_vec() }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, TypeFingerprint)]
+pub enum ChecksumsV37 {
+    None,
+    Fletcher(Vec<u8>),
+}
+
+impl ChecksumsV37 {
+    pub fn fletcher(checksums: Vec<Checksum>) -> Self {
+        assert_cfg!(target_endian = "little");
+        let checksums_as_u8: &[u8] = &*checksums.as_bytes();
+        Self::Fletcher(checksums_as_u8.to_owned())
+    }
+
+    pub fn migrate(self) -> Option<Checksums> {
         match self {
-            Self::None => Self::None,
-            Self::Fletcher(sums) => {
-                Self::Fletcher(sums.split_off(at * std::mem::size_of::<Checksum>()))
-            }
+            Self::None => None,
+            Self::Fletcher(sums) => Some(Checksums { sums }),
         }
     }
 }
@@ -84,7 +92,7 @@ pub enum ChecksumsV36 {
     Fletcher(Vec<u64>),
 }
 
-impl From<ChecksumsV36> for Checksums {
+impl From<ChecksumsV36> for ChecksumsV37 {
     fn from(checksums: ChecksumsV36) -> Self {
         match checksums {
             ChecksumsV36::None => Self::None,
@@ -103,14 +111,14 @@ mod tests {
         checksums.reserve_exact(5);
 
         let encoded = Checksums::fletcher(checksums.clone());
-        let decoded = encoded.maybe_as_ref().unwrap().unwrap();
+        let decoded = encoded.maybe_as_ref().unwrap();
 
         assert_eq!(decoded, &checksums[..]);
     }
 
     #[test]
     fn deserialize_invalid_checksum() {
-        let bad = Checksums::Fletcher(vec![0, 1, 2, 3, 4, 5, 6]);
+        let bad = Checksums { sums: vec![0, 1, 2, 3, 4, 5, 6] };
         let res = bad.maybe_as_ref().expect_err("deserialization should fail");
         assert!(FxfsError::Inconsistent.matches(&res));
     }

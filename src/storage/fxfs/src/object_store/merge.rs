@@ -315,7 +315,7 @@ mod tests {
 
         tree.insert(Item::new(
             ObjectKey::extent(object_id, attr_id, 0..512),
-            ObjectValue::Extent(ExtentValue::new(0)),
+            ObjectValue::Extent(ExtentValue::new_raw(0)),
         ))
         .await
         .expect("insert error");
@@ -323,7 +323,7 @@ mod tests {
 
         tree.insert(Item::new(
             ObjectKey::extent(object_id, attr_id, 512..1024),
-            ObjectValue::Extent(ExtentValue::new(16384)),
+            ObjectValue::Extent(ExtentValue::new_raw(16384)),
         ))
         .await
         .expect("insert error");
@@ -347,7 +347,7 @@ mod tests {
 
         tree.insert(Item::new(
             ObjectKey::extent(object_id, attr_id, 0..1024),
-            ObjectValue::Extent(ExtentValue::new(0)),
+            ObjectValue::Extent(ExtentValue::new_raw(0)),
         ))
         .await
         .expect("insert error");
@@ -355,7 +355,7 @@ mod tests {
 
         tree.insert(Item::new(
             ObjectKey::extent(object_id, attr_id, 512..1024),
-            ObjectValue::Extent(ExtentValue::new(16384)),
+            ObjectValue::Extent(ExtentValue::new_raw(16384)),
         ))
         .await
         .expect("insert error");
@@ -364,10 +364,10 @@ mod tests {
         let mut merger = layer_set.merger();
         let mut iter = merger.seek(std::ops::Bound::Unbounded).await?;
         assert_eq!(iter.get().unwrap().key, &ObjectKey::extent(object_id, attr_id, 0..512));
-        assert_eq!(iter.get().unwrap().value, &ObjectValue::Extent(ExtentValue::new(0)));
+        assert_eq!(iter.get().unwrap().value, &ObjectValue::Extent(ExtentValue::new_raw(0)));
         iter.advance().await?;
         assert_eq!(iter.get().unwrap().key, &ObjectKey::extent(object_id, attr_id, 512..1024));
-        assert_eq!(iter.get().unwrap().value, &ObjectValue::Extent(ExtentValue::new(16384)));
+        assert_eq!(iter.get().unwrap().value, &ObjectValue::Extent(ExtentValue::new_raw(16384)));
         iter.advance().await?;
         assert!(iter.get().is_none());
         Ok(())
@@ -381,7 +381,7 @@ mod tests {
 
         tree.insert(Item::new(
             ObjectKey::extent(object_id, attr_id, 0..1024),
-            ObjectValue::Extent(ExtentValue::with_checksum(0, Checksums::Fletcher(vec![1, 2]))),
+            ObjectValue::Extent(ExtentValue::with_checksum(0, Checksums::fletcher(vec![1, 2]))),
         ))
         .await
         .expect("insert error");
@@ -389,7 +389,7 @@ mod tests {
 
         tree.insert(Item::new(
             ObjectKey::extent(object_id, attr_id, 0..512),
-            ObjectValue::Extent(ExtentValue::with_checksum(16384, Checksums::Fletcher(vec![3]))),
+            ObjectValue::Extent(ExtentValue::with_checksum(16384, Checksums::fletcher(vec![3]))),
         ))
         .await
         .expect("insert error");
@@ -400,13 +400,13 @@ mod tests {
         assert_eq!(iter.get().unwrap().key, &ObjectKey::extent(object_id, attr_id, 0..512));
         assert_eq!(
             iter.get().unwrap().value,
-            &ObjectValue::Extent(ExtentValue::with_checksum(16384, Checksums::Fletcher(vec![3])))
+            &ObjectValue::Extent(ExtentValue::with_checksum(16384, Checksums::fletcher(vec![3])))
         );
         iter.advance().await?;
         assert_eq!(iter.get().unwrap().key, &ObjectKey::extent(object_id, attr_id, 512..1024));
         assert_eq!(
             iter.get().unwrap().value,
-            &ObjectValue::Extent(ExtentValue::with_checksum(512, Checksums::Fletcher(vec![2])))
+            &ObjectValue::Extent(ExtentValue::with_checksum(512, Checksums::fletcher(vec![2])))
         );
         iter.advance().await?;
         assert!(iter.get().is_none());
@@ -423,7 +423,7 @@ mod tests {
             ObjectKey::extent(object_id, attr_id, 0..2048),
             ObjectValue::Extent(ExtentValue::with_checksum(
                 0,
-                Checksums::Fletcher(vec![1, 2, 3, 4]),
+                Checksums::fletcher(vec![1, 2, 3, 4]),
             )),
         ))
         .await
@@ -432,7 +432,7 @@ mod tests {
 
         tree.insert(Item::new(
             ObjectKey::extent(object_id, attr_id, 1024..1536),
-            ObjectValue::Extent(ExtentValue::with_checksum(16384, Checksums::Fletcher(vec![5]))),
+            ObjectValue::Extent(ExtentValue::with_checksum(16384, Checksums::fletcher(vec![5]))),
         ))
         .await
         .expect("insert error");
@@ -443,19 +443,19 @@ mod tests {
         assert_eq!(iter.get().unwrap().key, &ObjectKey::extent(object_id, attr_id, 0..1024));
         assert_eq!(
             iter.get().unwrap().value,
-            &ObjectValue::Extent(ExtentValue::with_checksum(0, Checksums::Fletcher(vec![1, 2])))
+            &ObjectValue::Extent(ExtentValue::with_checksum(0, Checksums::fletcher(vec![1, 2])))
         );
         iter.advance().await?;
         assert_eq!(iter.get().unwrap().key, &ObjectKey::extent(object_id, attr_id, 1024..1536));
         assert_eq!(
             iter.get().unwrap().value,
-            &ObjectValue::Extent(ExtentValue::with_checksum(16384, Checksums::Fletcher(vec![5])))
+            &ObjectValue::Extent(ExtentValue::with_checksum(16384, Checksums::fletcher(vec![5])))
         );
         iter.advance().await?;
         assert_eq!(iter.get().unwrap().key, &ObjectKey::extent(object_id, attr_id, 1536..2048));
         assert_eq!(
             iter.get().unwrap().value,
-            &ObjectValue::Extent(ExtentValue::with_checksum(1536, Checksums::Fletcher(vec![4])))
+            &ObjectValue::Extent(ExtentValue::with_checksum(1536, Checksums::fletcher(vec![4])))
         );
         iter.advance().await?;
         assert!(iter.get().is_none());
@@ -470,7 +470,7 @@ mod tests {
 
         tree.insert(Item::new(
             ObjectKey::extent(object_id, attr_id, 1024..1536),
-            ObjectValue::Extent(ExtentValue::new(0)),
+            ObjectValue::Extent(ExtentValue::new_raw(0)),
         ))
         .await
         .expect("insert error");
@@ -478,7 +478,7 @@ mod tests {
 
         tree.insert(Item::new(
             ObjectKey::extent(object_id, attr_id, 0..2048),
-            ObjectValue::Extent(ExtentValue::new(16384)),
+            ObjectValue::Extent(ExtentValue::new_raw(16384)),
         ))
         .await
         .expect("insert error");
@@ -487,7 +487,7 @@ mod tests {
         let mut merger = layer_set.merger();
         let mut iter = merger.seek(std::ops::Bound::Unbounded).await?;
         assert_eq!(iter.get().unwrap().key, &ObjectKey::extent(object_id, attr_id, 0..2048));
-        assert_eq!(iter.get().unwrap().value, &ObjectValue::Extent(ExtentValue::new(16384)));
+        assert_eq!(iter.get().unwrap().value, &ObjectValue::Extent(ExtentValue::new_raw(16384)));
         iter.advance().await?;
         assert!(iter.get().is_none());
         Ok(())
@@ -501,7 +501,7 @@ mod tests {
 
         tree.insert(Item::new(
             ObjectKey::extent(object_id, attr_id, 0..1024),
-            ObjectValue::Extent(ExtentValue::new(0)),
+            ObjectValue::Extent(ExtentValue::new_raw(0)),
         ))
         .await
         .expect("insert error");
@@ -521,7 +521,7 @@ mod tests {
         assert_eq!(iter.get().unwrap().value, &ObjectValue::deleted_extent());
         iter.advance().await?;
         assert_eq!(iter.get().unwrap().key, &ObjectKey::extent(object_id, attr_id, 512..1024));
-        assert_eq!(iter.get().unwrap().value, &ObjectValue::Extent(ExtentValue::new(512)));
+        assert_eq!(iter.get().unwrap().value, &ObjectValue::Extent(ExtentValue::new_raw(512)));
         iter.advance().await?;
         assert!(iter.get().is_none());
         Ok(())
@@ -535,7 +535,7 @@ mod tests {
 
         tree.insert(Item::new(
             ObjectKey::extent(object_id, attr_id, 0..1024),
-            ObjectValue::Extent(ExtentValue::new(0)),
+            ObjectValue::Extent(ExtentValue::new_raw(0)),
         ))
         .await
         .expect("insert error");
@@ -552,7 +552,7 @@ mod tests {
         let mut merger = layer_set.merger();
         let mut iter = merger.seek(std::ops::Bound::Unbounded).await?;
         assert_eq!(iter.get().unwrap().key, &ObjectKey::extent(object_id, attr_id, 0..512));
-        assert_eq!(iter.get().unwrap().value, &ObjectValue::Extent(ExtentValue::new(0)));
+        assert_eq!(iter.get().unwrap().value, &ObjectValue::Extent(ExtentValue::new_raw(0)));
         iter.advance().await?;
         assert_eq!(iter.get().unwrap().key, &ObjectKey::extent(object_id, attr_id, 512..1024));
         assert_eq!(iter.get().unwrap().value, &ObjectValue::deleted_extent());
@@ -569,7 +569,7 @@ mod tests {
 
         tree.insert(Item::new(
             ObjectKey::extent(object_id, attr_id, 0..2048),
-            ObjectValue::Extent(ExtentValue::new(0)),
+            ObjectValue::Extent(ExtentValue::new_raw(0)),
         ))
         .await
         .expect("insert error");
@@ -586,13 +586,13 @@ mod tests {
         let mut merger = layer_set.merger();
         let mut iter = merger.seek(std::ops::Bound::Unbounded).await?;
         assert_eq!(iter.get().unwrap().key, &ObjectKey::extent(object_id, attr_id, 0..1024));
-        assert_eq!(iter.get().unwrap().value, &ObjectValue::Extent(ExtentValue::new(0)));
+        assert_eq!(iter.get().unwrap().value, &ObjectValue::Extent(ExtentValue::new_raw(0)));
         iter.advance().await?;
         assert_eq!(iter.get().unwrap().key, &ObjectKey::extent(object_id, attr_id, 1024..1536));
         assert_eq!(iter.get().unwrap().value, &ObjectValue::deleted_extent());
         iter.advance().await?;
         assert_eq!(iter.get().unwrap().key, &ObjectKey::extent(object_id, attr_id, 1536..2048));
-        assert_eq!(iter.get().unwrap().value, &ObjectValue::Extent(ExtentValue::new(1536)));
+        assert_eq!(iter.get().unwrap().value, &ObjectValue::Extent(ExtentValue::new_raw(1536)));
         iter.advance().await?;
         assert!(iter.get().is_none());
         Ok(())
@@ -606,7 +606,7 @@ mod tests {
 
         tree.insert(Item::new(
             ObjectKey::extent(object_id, attr_id, 1024..1536),
-            ObjectValue::Extent(ExtentValue::new(0)),
+            ObjectValue::Extent(ExtentValue::new_raw(0)),
         ))
         .await
         .expect("insert error");
@@ -863,7 +863,7 @@ mod tests {
 
         tree.insert(Item::new(
             ObjectKey::extent(object_id, attr_id, 0..1024),
-            ObjectValue::Extent(ExtentValue::new(0)),
+            ObjectValue::Extent(ExtentValue::new_raw(0)),
         ))
         .await
         .expect("insert error");
@@ -883,7 +883,7 @@ mod tests {
         assert_eq!(iter.get().unwrap().value, &ObjectValue::deleted_extent());
         iter.advance().await?;
         assert_eq!(iter.get().unwrap().key, &ObjectKey::extent(object_id, attr_id, 512..1024));
-        assert_eq!(iter.get().unwrap().value, &ObjectValue::Extent(ExtentValue::new(512)));
+        assert_eq!(iter.get().unwrap().value, &ObjectValue::Extent(ExtentValue::new_raw(512)));
         iter.advance().await?;
         assert!(iter.get().is_none());
         Ok(())
@@ -901,7 +901,7 @@ mod tests {
 
         tree.insert(Item::new(
             ObjectKey::extent(object_id, attr_id, 1024..1536),
-            ObjectValue::Extent(ExtentValue::new(0)),
+            ObjectValue::Extent(ExtentValue::new_raw(0)),
         ))
         .await
         .expect("insert error");
@@ -915,7 +915,7 @@ mod tests {
         .expect("insert error");
         tree.insert(Item::new(
             ObjectKey::extent(object_id, attr_id, 512..1536),
-            ObjectValue::Extent(ExtentValue::new(0)),
+            ObjectValue::Extent(ExtentValue::new_raw(0)),
         ))
         .await
         .expect("insert error");
@@ -927,7 +927,7 @@ mod tests {
         assert_eq!(iter.get().unwrap().value, &ObjectValue::deleted_extent());
         iter.advance().await?;
         assert_eq!(iter.get().unwrap().key, &ObjectKey::extent(object_id, attr_id, 512..1536));
-        assert_eq!(iter.get().unwrap().value, &ObjectValue::Extent(ExtentValue::new(0)));
+        assert_eq!(iter.get().unwrap().value, &ObjectValue::Extent(ExtentValue::new_raw(0)));
         iter.advance().await?;
         assert!(iter.get().is_none());
         Ok(())
@@ -941,13 +941,13 @@ mod tests {
 
         tree.insert(Item::new(
             ObjectKey::extent(object_id, attr_id, 0..1024),
-            ObjectValue::Extent(ExtentValue::new(0)),
+            ObjectValue::Extent(ExtentValue::new_raw(0)),
         ))
         .await
         .expect("insert error");
         tree.insert(Item::new(
             ObjectKey::extent(object_id, attr_id, 1024..2048),
-            ObjectValue::Extent(ExtentValue::new(16384)),
+            ObjectValue::Extent(ExtentValue::new_raw(16384)),
         ))
         .await
         .expect("insert error");
@@ -962,13 +962,13 @@ mod tests {
         let mut merger = layer_set.merger();
         let mut iter = merger.seek(std::ops::Bound::Unbounded).await?;
         assert_eq!(iter.get().unwrap().key, &ObjectKey::extent(object_id, attr_id, 0..512));
-        assert_eq!(iter.get().unwrap().value, &ObjectValue::Extent(ExtentValue::new(0)));
+        assert_eq!(iter.get().unwrap().value, &ObjectValue::Extent(ExtentValue::new_raw(0)));
         iter.advance().await?;
         assert_eq!(iter.get().unwrap().key, &ObjectKey::extent(object_id, attr_id, 512..1536));
         assert_eq!(iter.get().unwrap().value, &ObjectValue::deleted_extent());
         iter.advance().await?;
         assert_eq!(iter.get().unwrap().key, &ObjectKey::extent(object_id, attr_id, 1536..2048));
-        assert_eq!(iter.get().unwrap().value, &ObjectValue::Extent(ExtentValue::new(16896)));
+        assert_eq!(iter.get().unwrap().value, &ObjectValue::Extent(ExtentValue::new_raw(16896)));
         iter.advance().await?;
         assert!(iter.get().is_none());
         Ok(())
@@ -1037,10 +1037,14 @@ mod tests {
         let tree = LSMTree::new(merge, Box::new(NullCache {}));
         test_merge(&tree, &[left.clone()], &[right.clone()], &[left, right]).await;
 
-        let left =
-            Item::new(ObjectKey::extent(1, 0, 0..100), ObjectValue::Extent(ExtentValue::new(0)));
-        let right =
-            Item::new(ObjectKey::extent(1, 1, 0..100), ObjectValue::Extent(ExtentValue::new(1)));
+        let left = Item::new(
+            ObjectKey::extent(1, 0, 0..100),
+            ObjectValue::Extent(ExtentValue::new_raw(0)),
+        );
+        let right = Item::new(
+            ObjectKey::extent(1, 1, 0..100),
+            ObjectValue::Extent(ExtentValue::new_raw(1)),
+        );
         let tree = LSMTree::new(merge, Box::new(NullCache {}));
         test_merge(&tree, &[left.clone()], &[right.clone()], &[left, right]).await;
     }
@@ -1098,7 +1102,7 @@ mod tests {
 
         tree.insert(Item {
             key: ObjectKey::extent(object_id, attr_id, 0..1024),
-            value: ObjectValue::Extent(ExtentValue::new(0u64)),
+            value: ObjectValue::Extent(ExtentValue::new_raw(0u64)),
             sequence: 1u64,
         })
         .await
@@ -1113,14 +1117,14 @@ mod tests {
         .expect("insert error");
         tree.insert(Item {
             key: ObjectKey::extent(object_id, attr_id, 1536..2048),
-            value: ObjectValue::Extent(ExtentValue::new(1536)),
+            value: ObjectValue::Extent(ExtentValue::new_raw(1536)),
             sequence: 3u64,
         })
         .await
         .expect("insert error");
         tree.insert(Item {
             key: ObjectKey::extent(object_id, attr_id, 768..1024),
-            value: ObjectValue::Extent(ExtentValue::new(12345)),
+            value: ObjectValue::Extent(ExtentValue::new_raw(12345)),
             sequence: 4u64,
         })
         .await
@@ -1134,15 +1138,15 @@ mod tests {
         assert_eq!(iter.get().unwrap().sequence, 2u64);
         iter.advance().await?;
         assert_eq!(iter.get().unwrap().key, &ObjectKey::extent(object_id, attr_id, 512..768));
-        assert_eq!(iter.get().unwrap().value, &ObjectValue::Extent(ExtentValue::new(512)));
+        assert_eq!(iter.get().unwrap().value, &ObjectValue::Extent(ExtentValue::new_raw(512)));
         assert_eq!(iter.get().unwrap().sequence, 1u64);
         iter.advance().await?;
         assert_eq!(iter.get().unwrap().key, &ObjectKey::extent(object_id, attr_id, 768..1024));
-        assert_eq!(iter.get().unwrap().value, &ObjectValue::Extent(ExtentValue::new(12345)));
+        assert_eq!(iter.get().unwrap().value, &ObjectValue::Extent(ExtentValue::new_raw(12345)));
         assert_eq!(iter.get().unwrap().sequence, 4u64);
         iter.advance().await?;
         assert_eq!(iter.get().unwrap().key, &ObjectKey::extent(object_id, attr_id, 1536..2048));
-        assert_eq!(iter.get().unwrap().value, &ObjectValue::Extent(ExtentValue::new(1536)));
+        assert_eq!(iter.get().unwrap().value, &ObjectValue::Extent(ExtentValue::new_raw(1536)));
         assert_eq!(iter.get().unwrap().sequence, 3u64);
         iter.advance().await?;
         assert!(iter.get().is_none());

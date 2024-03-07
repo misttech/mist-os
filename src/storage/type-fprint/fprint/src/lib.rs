@@ -86,7 +86,7 @@ macro_rules! impl_fprint_one_generic {
     };
 }
 
-impl_fprint_one_generic!(BTreeSet, HashSet, Range, Option, Vec);
+impl_fprint_one_generic!(BTreeSet, HashSet, Range, Option, Vec, bit_vec::BitVec);
 
 macro_rules! impl_fprint_two_generic {
     ($($($type: ident)::*),*) => {

@@ -12,13 +12,13 @@ use {
             ObjectHandle, ObjectProperties, ReadObjectHandle, WriteBytes, WriteObjectHandle,
         },
         object_store::{
-            extent_record::{ExtentKey, ExtentValue},
+            extent_record::{ExtentKey, ExtentMode, ExtentValue},
             object_manager::ObjectManager,
             object_record::{
                 AttributeKey, FsverityMetadata, ObjectAttributes, ObjectItem, ObjectKey,
                 ObjectKeyData, ObjectKind, ObjectValue, Timestamp,
             },
-            store_object_handle::NeedsTrim,
+            store_object_handle::{MaybeChecksums, NeedsTrim},
             transaction::{
                 self, lock_keys, AssocObj, AssociatedObject, LockKey, Mutation,
                 ObjectStoreMutation, Options, Transaction,
@@ -256,7 +256,7 @@ impl<S: HandleOwner> DataObjectHandle<S> {
             self.store().store_object_id,
             Mutation::merge_object(
                 ObjectKey::extent(self.object_id(), self.attribute_id(), old_end..new_size),
-                ObjectValue::Extent(ExtentValue::new(device_range.start)),
+                ObjectValue::Extent(ExtentValue::new_raw(device_range.start)),
             ),
         );
         self.update_allocated_size(transaction, device_range.end - device_range.start, 0).await
@@ -281,7 +281,7 @@ impl<S: HandleOwner> DataObjectHandle<S> {
         offset: u64,
         buf: MutableBufferRef<'_>,
         device_offset: u64,
-    ) -> Result<Checksums, Error> {
+    ) -> Result<MaybeChecksums, Error> {
         self.handle.write_at(self.attribute_id(), offset, buf, device_offset).await
     }
 
@@ -709,41 +709,36 @@ impl<S: HandleOwner> DataObjectHandle<S> {
                         match value {
                             ObjectValue::Extent(ExtentValue::Some {
                                 device_offset,
-                                checksums,
+                                mode: ExtentMode::Raw,
                                 ..
                             }) => {
-                                match checksums {
-                                    Checksums::None => {
-                                        ensure!(
-                                            range.is_aligned(block_size)
-                                                && device_offset % block_size == 0,
-                                            FxfsError::Inconsistent
-                                        );
-                                        let offset_within_extent = offset - range.start;
-                                        let remaining_length_of_extent = (range
-                                            .end
-                                            .checked_sub(offset)
-                                            .ok_or(FxfsError::Inconsistent)?)
-                                            as usize;
-                                        // Yields (device_offset, bytes_to_write, should_advance)
-                                        (
-                                            device_offset + offset_within_extent,
-                                            min(buf.len(), remaining_length_of_extent),
-                                            true,
-                                        )
-                                    }
-                                    _ => {
-                                        // TODO(https://fxbug.dev/42066056): Maybe we should create
-                                        // a new extent without checksums?
-                                        bail!(
-                                            "extent from ({},{}) which overlaps offset \
-                                                {} has checksums, overwrite is not supported",
-                                            range.start,
-                                            range.end,
-                                            offset
-                                        )
-                                    }
-                                }
+                                ensure!(
+                                    range.is_aligned(block_size) && device_offset % block_size == 0,
+                                    FxfsError::Inconsistent
+                                );
+                                let offset_within_extent = offset - range.start;
+                                let remaining_length_of_extent = (range
+                                    .end
+                                    .checked_sub(offset)
+                                    .ok_or(FxfsError::Inconsistent)?)
+                                    as usize;
+                                // Yields (device_offset, bytes_to_write, should_advance)
+                                (
+                                    device_offset + offset_within_extent,
+                                    min(buf.len(), remaining_length_of_extent),
+                                    true,
+                                )
+                            }
+                            ObjectValue::Extent(ExtentValue::Some { .. }) => {
+                                // TODO(https://fxbug.dev/42066056): Maybe we should create
+                                // a new extent without checksums?
+                                bail!(
+                                    "extent from ({},{}) which overlaps offset \
+                                        {} has the wrong extent mode",
+                                    range.start,
+                                    range.end,
+                                    offset
+                                )
                             }
                             _ => {
                                 bail!(
@@ -800,7 +795,7 @@ impl<S: HandleOwner> DataObjectHandle<S> {
                                         self.attribute_id(),
                                         offset..offset + device_range_len,
                                     ),
-                                    ObjectValue::Extent(ExtentValue::new(device_range.start)),
+                                    ObjectValue::Extent(ExtentValue::new_raw(device_range.start)),
                                 ),
                             );
 
@@ -833,7 +828,7 @@ impl<S: HandleOwner> DataObjectHandle<S> {
 
         self.store().logical_write_ops.fetch_add(1, Ordering::Relaxed);
         // The checksums are being ignored here, but we don't need to know them
-        writes.try_collect::<Vec<Checksums>>().await?;
+        writes.try_collect::<Vec<MaybeChecksums>>().await?;
 
         if let Some(mut transaction) = transaction {
             assert_eq!(allow_allocations, true);
@@ -1102,7 +1097,7 @@ impl<S: HandleOwner> DataObjectHandle<S> {
                 self.store().store_object_id,
                 Mutation::merge_object(
                     ObjectKey::extent(self.object_id(), self.attribute_id(), this_file_range),
-                    ObjectValue::Extent(ExtentValue::new(device_range.start)),
+                    ObjectValue::Extent(ExtentValue::new_raw(device_range.start)),
                 ),
             );
             ranges.push(device_range);

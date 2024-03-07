@@ -9,7 +9,10 @@ rustc_library("fprint") {
   edition = "2021"
   with_unit_tests = true
 
-  deps = [ ":macros" ]
+  deps = [
+    ":macros",
+    "//third_party/rust_crates:bit-vec",
+  ]
   source_root = "fprint/src/lib.rs"
   sources = [ "fprint/src/lib.rs" ]
   test_deps = []

@@ -166,7 +166,7 @@ impl<'a> ScannedStore<'a> {
                         ))?;
                     }
                     ObjectValue::Object {
-                        kind: ObjectKind::File { refs },
+                        kind: ObjectKind::File { refs, .. },
                         attributes: ObjectAttributes { project_id, allocated_size, .. },
                     } => {
                         if *project_id > 0 {

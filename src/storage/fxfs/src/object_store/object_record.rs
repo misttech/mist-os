@@ -9,7 +9,7 @@ use {
         lsm_tree::types::{
             Item, ItemRef, LayerKey, MergeType, OrdLowerBound, OrdUpperBound, RangeKey, SortByU64,
         },
-        object_store::extent_record::{ExtentKey, ExtentValue, ExtentValueV36},
+        object_store::extent_record::{ExtentKey, ExtentValue, ExtentValueV36, ExtentValueV37},
         serialized_types::{migrate_nodefault, migrate_to_version, Migrate, Versioned},
     },
     fprint::TypeFingerprint,
@@ -399,6 +399,9 @@ pub enum ObjectKind {
     File {
         /// The number of references to this file.
         refs: u64,
+        /// Whether this file has any overwrite-mode extents in it. This lets files which don't
+        /// have any skip looking for them during open and write.
+        has_overwrite_extents: bool,
     },
     Directory {
         /// The number of sub-directories in this directory.
@@ -415,11 +418,32 @@ pub enum ObjectKind {
 }
 
 #[derive(Debug, Deserialize, Serialize, TypeFingerprint)]
+pub enum ObjectKindV31 {
+    File { refs: u64 },
+    Directory { sub_dirs: u64 },
+    Graveyard,
+    Symlink { refs: u64, link: Vec<u8> },
+}
+
+#[derive(Debug, Deserialize, Serialize, TypeFingerprint)]
 pub enum ObjectKindV30 {
     File { refs: u64, allocated_size: u64 },
     Directory { sub_dirs: u64 },
     Graveyard,
     Symlink { refs: u64, link: Vec<u8> },
+}
+
+impl From<ObjectKindV31> for ObjectKind {
+    fn from(value: ObjectKindV31) -> Self {
+        match value {
+            // Overwrite extents are introduced in the same version as this flag, so nothing before
+            // it has these extents.
+            ObjectKindV31::File { refs } => ObjectKind::File { refs, has_overwrite_extents: false },
+            ObjectKindV31::Directory { sub_dirs } => ObjectKind::Directory { sub_dirs },
+            ObjectKindV31::Graveyard => ObjectKind::Graveyard,
+            ObjectKindV31::Symlink { refs, link } => ObjectKind::Symlink { refs, link },
+        }
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, TypeFingerprint)]
@@ -592,10 +616,26 @@ pub enum ObjectValue {
 }
 
 #[derive(Debug, Serialize, Deserialize, Migrate, TypeFingerprint, Versioned)]
+pub enum ObjectValueV37 {
+    None,
+    Some,
+    Object { kind: ObjectKindV31, attributes: ObjectAttributes },
+    Keys(EncryptionKeys),
+    Attribute { size: u64 },
+    Extent(ExtentValueV37),
+    Child(ChildValue),
+    Trim,
+    BytesAndNodes { bytes: i64, nodes: i64 },
+    ExtendedAttribute(ExtendedAttributeValue),
+    VerifiedAttribute { size: u64, fsverity_metadata: FsverityMetadata },
+}
+
+#[derive(Debug, Serialize, Deserialize, Migrate, TypeFingerprint, Versioned)]
+#[migrate_to_version(ObjectValueV37)]
 pub enum ObjectValueV36 {
     None,
     Some,
-    Object { kind: ObjectKind, attributes: ObjectAttributes },
+    Object { kind: ObjectKindV31, attributes: ObjectAttributes },
     Keys(EncryptionKeys),
     Attribute { size: u64 },
     Extent(ExtentValueV36),
@@ -611,7 +651,7 @@ pub enum ObjectValueV36 {
 pub enum ObjectValueV31 {
     None,
     Some,
-    Object { kind: ObjectKind, attributes: ObjectAttributesV31 },
+    Object { kind: ObjectKindV31, attributes: ObjectAttributesV31 },
     Keys(EncryptionKeys),
     Attribute { size: u64 },
     Extent(ExtentValueV36),
@@ -635,9 +675,8 @@ pub enum ObjectValueV30 {
     ExtendedAttribute(ExtendedAttributeValue),
 }
 
-// Manual migration from V30 -> V31 (current). If the ObjectKind is file, move the allocated_size
-// from the kind type to ObjectAttributes. For other kinds the allocated_size is initialized as
-// zero.
+// Manual migration from V30 -> V31. If the ObjectKind is file, move the allocated_size from the
+// kind type to ObjectAttributes. For other kinds the allocated_size is initialized as zero.
 impl From<ObjectValueV30> for ObjectValueV31 {
     fn from(value: ObjectValueV30) -> Self {
         match value {
@@ -654,17 +693,17 @@ impl From<ObjectValueV30> for ObjectValueV31 {
                 let (new_kind, allocated_size) = match kind {
                     // File lost the allocated_size field
                     ObjectKindV30::File { refs, allocated_size } => {
-                        (ObjectKind::File { refs }, allocated_size)
+                        (ObjectKindV31::File { refs }, allocated_size)
                     }
 
                     // The rest are 1:1 mappings, defaulting to zero allocated_size.
                     ObjectKindV30::Directory { sub_dirs } => {
-                        (ObjectKind::Directory { sub_dirs }, 0)
+                        (ObjectKindV31::Directory { sub_dirs }, 0)
                     }
                     ObjectKindV30::Symlink { refs, link } => {
-                        (ObjectKind::Symlink { refs, link }, 0)
+                        (ObjectKindV31::Symlink { refs, link }, 0)
                     }
-                    ObjectKindV30::Graveyard => (ObjectKind::Graveyard, 0),
+                    ObjectKindV30::Graveyard => (ObjectKindV31::Graveyard, 0),
                 };
 
                 ObjectValueV31::Object {
@@ -750,7 +789,7 @@ impl ObjectValue {
         posix_attributes: Option<PosixAttributes>,
     ) -> ObjectValue {
         ObjectValue::Object {
-            kind: ObjectKind::File { refs },
+            kind: ObjectKind::File { refs, has_overwrite_extents: false },
             attributes: ObjectAttributes {
                 creation_time,
                 modification_time,
@@ -775,7 +814,7 @@ impl ObjectValue {
     }
     /// Creates an ObjectValue for an insertion/replacement of an object extent.
     pub fn extent(device_offset: u64) -> ObjectValue {
-        ObjectValue::Extent(ExtentValue::with_checksum(device_offset, Checksums::None))
+        ObjectValue::Extent(ExtentValue::new_raw(device_offset))
     }
     /// Creates an ObjectValue for an insertion/replacement of an object extent.
     pub fn extent_with_checksum(device_offset: u64, checksum: Checksums) -> ObjectValue {
@@ -815,6 +854,7 @@ impl ObjectValue {
 }
 
 pub type ObjectItem = Item<ObjectKey, ObjectValue>;
+pub type ObjectItemV37 = Item<ObjectKey, ObjectValueV37>;
 pub type ObjectItemV36 = Item<ObjectKey, ObjectValueV36>;
 pub type ObjectItemV31 = Item<ObjectKey, ObjectValueV31>;
 pub type ObjectItemV30 = Item<ObjectKey, ObjectValueV30>;

@@ -412,7 +412,7 @@ async fn test_misaligned_extent_in_child_store() {
             store.store_object_id(),
             Mutation::insert_object(
                 ObjectKey::extent(555, 0, 1..fs.block_size()),
-                ObjectValue::Extent(ExtentValue::new(1)),
+                ObjectValue::Extent(ExtentValue::new_raw(1)),
             ),
         );
         transaction.commit().await.expect("commit failed");
@@ -448,7 +448,7 @@ async fn test_malformed_extent_in_child_store() {
             store.store_object_id(),
             Mutation::insert_object(
                 ObjectKey::extent(555, 0, fs.block_size()..0),
-                ObjectValue::Extent(ExtentValue::new(1)),
+                ObjectValue::Extent(ExtentValue::new_raw(1)),
             ),
         );
         transaction.commit().await.expect("commit failed");
@@ -1136,7 +1136,7 @@ async fn test_verified_file_merkle_attribute_missing() {
                 Item::new(
                     ObjectKey::object(10),
                     ObjectValue::Object {
-                        kind: ObjectKind::File { refs: 1 },
+                        kind: ObjectKind::File { refs: 1, has_overwrite_extents: false },
                         attributes: ObjectAttributes { ..Default::default() },
                     },
                 ),
@@ -1368,7 +1368,7 @@ async fn test_invalid_value_graveyard_attribute_entry() {
                 Item::new(
                     ObjectKey::object(10),
                     ObjectValue::Object {
-                        kind: ObjectKind::File { refs: 1 },
+                        kind: ObjectKind::File { refs: 1, has_overwrite_extents: false },
                         attributes: ObjectAttributes { ..Default::default() },
                     },
                 ),
@@ -1838,7 +1838,7 @@ async fn test_file_length_mismatch() {
             Mutation::replace_or_insert_object(
                 ObjectKey::object(handle.object_id()),
                 ObjectValue::Object {
-                    kind: ObjectKind::File { refs: 1 },
+                    kind: ObjectKind::File { refs: 1, has_overwrite_extents: false },
                     attributes: ObjectAttributes {
                         creation_time: Timestamp::now(),
                         modification_time: Timestamp::now(),
@@ -1883,14 +1883,14 @@ async fn test_spurious_extents() {
             store.store_object_id(),
             Mutation::insert_object(
                 ObjectKey::extent(555, 0, 0..4096),
-                ObjectValue::Extent(ExtentValue::new(SPURIOUS_OFFSET)),
+                ObjectValue::Extent(ExtentValue::new_raw(SPURIOUS_OFFSET)),
             ),
         );
         transaction.add(
             store.store_object_id(),
             Mutation::insert_object(
                 ObjectKey::extent(store.root_directory_object_id(), 0, 0..4096),
-                ObjectValue::Extent(ExtentValue::new(SPURIOUS_OFFSET)),
+                ObjectValue::Extent(ExtentValue::new_raw(SPURIOUS_OFFSET)),
             ),
         );
         transaction.commit().await.expect("commit failed");

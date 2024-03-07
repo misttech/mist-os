@@ -4,13 +4,13 @@
 
 use {
     crate::{
-        checksum::{fletcher64, Checksums},
+        checksum::{fletcher64, Checksum, Checksums},
         errors::FxfsError,
         log::*,
         lsm_tree::types::{Item, ItemRef, LayerIterator},
         object_handle::ObjectHandle,
         object_store::{
-            extent_record::{ExtentKey, ExtentValue},
+            extent_record::{ExtentKey, ExtentMode, ExtentValue},
             object_manager::ObjectManager,
             object_record::{
                 AttributeKey, EncryptionKeys, ExtendedAttributeValue, ObjectAttributes, ObjectItem,
@@ -63,6 +63,38 @@ pub const MAX_XATTR_VALUE_SIZE: usize = 64000;
 /// which isn't currently done.
 pub const EXTENDED_ATTRIBUTE_RANGE_START: u64 = 64;
 pub const EXTENDED_ATTRIBUTE_RANGE_END: u64 = 512;
+
+/// When writing, often the logic should be generic over whether or not checksums are generated.
+/// This provides that and a handy way to convert to the more general ExtentMode that eventually
+/// stores it on disk.
+#[derive(Debug, Clone, PartialEq)]
+pub enum MaybeChecksums {
+    None,
+    Fletcher(Vec<Checksum>),
+}
+
+impl MaybeChecksums {
+    pub fn maybe_as_ref(&self) -> Option<&[Checksum]> {
+        match self {
+            Self::None => None,
+            Self::Fletcher(sums) => Some(&sums),
+        }
+    }
+
+    pub fn split_off(&mut self, at: usize) -> Self {
+        match self {
+            Self::None => Self::None,
+            Self::Fletcher(sums) => Self::Fletcher(sums.split_off(at)),
+        }
+    }
+
+    pub fn to_mode(self) -> ExtentMode {
+        match self {
+            Self::None => ExtentMode::Raw,
+            Self::Fletcher(sums) => ExtentMode::Cow(Checksums::fletcher(sums)),
+        }
+    }
+}
 
 /// The mode of operation when setting extended attributes. This is the same as the fidl definition
 /// but is replicated here so we don't have fuchsia.io structures in the api, so this can be used
@@ -287,7 +319,7 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
         &self,
         buf: BufferRef<'_>,
         device_offset: u64,
-    ) -> Result<Checksums, Error> {
+    ) -> Result<MaybeChecksums, Error> {
         if self.trace() {
             info!(
                 store_id = self.store().store_object_id(),
@@ -310,9 +342,9 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
             Ok(())
         })?;
         Ok(if !self.options.skip_checksums {
-            Checksums::fletcher(checksums)
+            MaybeChecksums::Fletcher(checksums)
         } else {
-            Checksums::None
+            MaybeChecksums::None
         })
     }
 
@@ -851,7 +883,7 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
         offset: u64,
         buf: MutableBufferRef<'_>,
         device_offset: u64,
-    ) -> Result<Checksums, Error> {
+    ) -> Result<MaybeChecksums, Error> {
         let mut transfer_buf;
         let block_size = self.block_size();
         let (range, mut transfer_buf_ref) =
@@ -949,8 +981,7 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
                         }
                         let chunk_len = std::cmp::min(len, current_range.end - current_range.start);
                         let tail = checksums.split_off((chunk_len / block_size) as usize);
-                        // OK to unwrap here; we just generated checksums so they will be valid.
-                        if let Some(checksums) = checksums.maybe_as_ref().unwrap() {
+                        if let Some(checksums) = checksums.maybe_as_ref() {
                             out_checksums.push((
                                 device_offset..device_offset + chunk_len,
                                 checksums.to_owned(),
@@ -962,9 +993,9 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
                                 attribute_id,
                                 current_range.start..current_range.start + chunk_len,
                             ),
-                            ObjectValue::Extent(ExtentValue::with_checksum(
+                            ObjectValue::Extent(ExtentValue::new(
                                 device_offset,
-                                checksums,
+                                checksums.to_mode(),
                             )),
                         ));
                         checksums = tail;
