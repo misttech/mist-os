@@ -4434,9 +4434,6 @@ pub enum SetDeviceError {
     Unroutable,
     /// The socket has an address with a different zone.
     ZoneChange,
-    // TODO(https://fxbug.dev/42085913): Remove this variant.
-    /// Setting device not supported for dual stack.
-    DualStackNotSupported,
 }
 
 /// Possible errors for accept operation.
