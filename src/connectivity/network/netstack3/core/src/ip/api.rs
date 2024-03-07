@@ -19,7 +19,7 @@ use crate::{
         device::{IpDeviceBindingsContext, IpDeviceConfigurationContext, IpDeviceIpExt},
         types::{
             Destination, Entry, EntryAndGeneration, EntryEither, Metric, NextHop, OrderedEntry,
-            ResolvedRoute, RoutableIpAddr,
+            ResolvedRoute, RoutableIpAddr, WrapBroadcastMarker,
         },
         IpLayerIpExt, IpStateContext,
     },
@@ -86,6 +86,14 @@ where
                 |Destination { next_hop: found_next_hop, device: found_device }| {
                     match found_next_hop {
                         NextHop::RemoteAsNeighbor => Some(found_device),
+                        NextHop::Broadcast(marker) => {
+                            I::map_ip::<_, ()>(
+                                WrapBroadcastMarker(marker),
+                                |WrapBroadcastMarker(())| (),
+                                |WrapBroadcastMarker(never)| match never {},
+                            );
+                            Some(found_device)
+                        }
                         NextHop::Gateway(_intermediary_gateway) => None,
                     }
                 },

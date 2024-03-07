@@ -1134,7 +1134,8 @@ impl TestIpExt for Ipv6 {
 /// `FakeEventDispatcherConfig` describes a simple network with two IP hosts
 /// - one remote and one local - both on the same Ethernet network.
 #[cfg(test)]
-#[derive(Clone)]
+#[derive(Clone, net_types::ip::GenericOverIp)]
+#[generic_over_ip(A, IpAddress)]
 pub(crate) struct FakeEventDispatcherConfig<A: IpAddress> {
     /// The subnet of the local Ethernet network.
     pub(crate) subnet: Subnet<A>,
@@ -2102,6 +2103,7 @@ mod tests {
             device,
             src_ip: Some(src_ip),
             dst_ip,
+            broadcast: None,
             next_hop: dst_ip,
             proto: IpProto::Udp.into(),
             ttl: None,

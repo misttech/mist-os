@@ -5,12 +5,13 @@
 //! Common types for dealing with ip table entries.
 
 use core::{
+    convert::Infallible as Never,
     fmt::{Debug, Display, Formatter},
     hash::Hash,
 };
 
 use net_types::{
-    ip::{GenericOverIp, Ip, IpAddress, Ipv4Addr, Ipv6Addr, Subnet, SubnetEither},
+    ip::{GenericOverIp, Ip, IpAddress, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Subnet, SubnetEither},
     SpecifiedAddr,
 };
 
@@ -351,15 +352,49 @@ impl<'a, A: IpAddress, D> From<&'a EntryAndGeneration<A, D>> for OrderedEntry<'a
     }
 }
 
+/// `Ip` extension trait to assist in defining [`NextHop`].
+pub trait IpTypesIpExt: Ip {
+    /// A marker type carried by the [`NextHop::Broadcast`] variant to indicate
+    /// that it is uninhabited for IPv6.
+    type BroadcastMarker: Debug + Copy + Clone + PartialEq + Eq;
+}
+
+impl IpTypesIpExt for Ipv4 {
+    type BroadcastMarker = ();
+}
+
+impl IpTypesIpExt for Ipv6 {
+    type BroadcastMarker = Never;
+}
+
+/// Wrapper struct to provide a convenient [`GenericOverIp`] impl for use
+/// with [`IpTypesIpExt::BroadcastMarker`].
+#[derive(GenericOverIp)]
+#[generic_over_ip(I, Ip)]
+pub struct WrapBroadcastMarker<I: IpTypesIpExt>(pub I::BroadcastMarker);
+
 /// The next hop for a [`Destination`].
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
-pub enum NextHop<A> {
+pub enum NextHop<A: IpAddress>
+where
+    A::Version: IpTypesIpExt,
+{
     /// Indicates that the next-hop for a the packet is the remote since it is a
     /// neighboring node (on-link).
     RemoteAsNeighbor,
     /// Indicates that the next-hop is a gateway/router since the remote is not
     /// a neighboring node (off-link).
     Gateway(SpecifiedAddr<A>),
+    /// Indicates that the packet should be broadcast rather than sent to a
+    /// specific neighbor.
+    Broadcast(<A::Version as IpTypesIpExt>::BroadcastMarker),
+}
+
+impl<A: IpAddress, NewIp: IpTypesIpExt> GenericOverIp<NewIp> for NextHop<A>
+where
+    A::Version: IpTypesIpExt,
+{
+    type Type = NextHop<NewIp::Addr>;
 }
 
 /// An IP Address that witnesses properties needed to be routed.
@@ -368,7 +403,7 @@ pub type RoutableIpAddr<A> = SocketIpAddr<A>;
 /// The resolved route to a destination IP address.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, GenericOverIp)]
 #[generic_over_ip(I, Ip)]
-pub struct ResolvedRoute<I: Ip, D> {
+pub struct ResolvedRoute<I: IpTypesIpExt, D> {
     /// The source address to use when forwarding packets towards the
     /// destination.
     pub src_addr: RoutableIpAddr<I::Addr>,
@@ -388,7 +423,10 @@ pub struct ResolvedRoute<I: Ip, D> {
 /// Outbound IP packets are sent to a particular device (specified by the
 /// `device` field).
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
-pub(crate) struct Destination<A, D> {
+pub(crate) struct Destination<A: IpAddress, D>
+where
+    A::Version: IpTypesIpExt,
+{
     /// Indicates the next hop via which this destination can be reached.
     pub(crate) next_hop: NextHop<A>,
     /// Indicates the device over which this destination can be reached.

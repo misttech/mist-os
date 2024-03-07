@@ -8,8 +8,8 @@ use alloc::vec::Vec;
 use core::fmt::Debug;
 
 use net_types::{
-    ip::{GenericOverIp, Ip, Subnet},
-    SpecifiedAddr,
+    ip::{GenericOverIp, Ip, IpAddress as _, Ipv4, Ipv4Addr, Subnet},
+    SpecifiedAddr, Witness as _,
 };
 use thiserror::Error;
 use tracing::debug;
@@ -18,7 +18,8 @@ use crate::{
     device::{AnyDevice, DeviceIdContext},
     ip::{
         types::{
-            AddableEntry, Destination, Entry, EntryAndGeneration, NextHop, OrderedEntry, RawMetric,
+            AddableEntry, Destination, Entry, EntryAndGeneration, IpTypesIpExt, NextHop,
+            OrderedEntry, RawMetric,
         },
         IpLayerBindingsContext, IpLayerEvent, IpLayerIpExt,
     },
@@ -107,7 +108,7 @@ impl<I: Ip, D> Default for ForwardingTable<I, D> {
     }
 }
 
-impl<I: Ip, D: Clone + Debug + PartialEq> ForwardingTable<I, D> {
+impl<I: IpTypesIpExt, D: Clone + Debug + PartialEq> ForwardingTable<I, D> {
     /// Adds `entry` to the forwarding table if it does not already exist.
     ///
     /// On success, a reference to the inserted entry is returned.
@@ -210,7 +211,47 @@ impl<I: Ip, D: Clone + Debug + PartialEq> ForwardingTable<I, D> {
             }
 
             f(core_ctx, device).map(|r| {
-                let next_hop = gateway.map_or(NextHop::RemoteAsNeighbor, NextHop::Gateway);
+                let next_hop = gateway.map_or(
+                    {
+                        let next_hop = I::map_ip(
+                            (address, *subnet),
+                            |(address, subnet)| {
+                                // As per RFC 919 section 7,
+                                //      The address 255.255.255.255 denotes a broadcast on a local
+                                //      hardware network, which must not be forwarded.
+                                if address == Ipv4::LIMITED_BROADCAST_ADDRESS.get()
+                                    // Or the destination address is the highest address in the
+                                    // subnet.
+                                    // Per RFC 922,
+                                    //       Since the local network layer can always map an IP
+                                    //       address into data link layer address, the choice of an
+                                    //       IP "broadcast host number" is somewhat arbitrary.  For
+                                    //       simplicity, it should be one not likely to be assigned
+                                    //       to a real host.  The number whose bits are all ones has
+                                    //       this property; this assignment was first proposed in
+                                    //       [6].  In the few cases where a host has been assigned
+                                    //       an address with a host-number part of all ones, it does
+                                    //       not seem onerous to require renumbering.
+                                    // We require that the subnet contain more than one address
+                                    // (i.e. that the prefix length is not 32) in order to decide
+                                    // that an address is a subnet broadcast address.
+                                    || subnet.prefix() < Ipv4Addr::BYTES * 8
+                                        && subnet.broadcast() == address
+                                {
+                                    NextHop::Broadcast(())
+                                } else {
+                                    NextHop::RemoteAsNeighbor
+                                }
+                            },
+                            // IPv6 has no notion of "broadcast".
+                            |(_address, _subnet)| NextHop::RemoteAsNeighbor,
+                        );
+                        next_hop
+                    },
+                    // Notably, if the route has a gateway, then
+                    // `NextHop::Broadcast(())` is never yielded.
+                    NextHop::Gateway,
+                );
                 (Destination { next_hop, device }, r)
             })
         })
@@ -335,7 +376,10 @@ mod testutil_testonly {
     use crate::{
         context::testutil::FakeCoreCtx,
         device::StrongId,
-        ip::{testutil::FakeIpDeviceIdCtx, types::Metric},
+        ip::{
+            testutil::FakeIpDeviceIdCtx,
+            types::{IpTypesIpExt, Metric},
+        },
     };
 
     /// Adds an on-link forwarding entry for the specified address and device.
@@ -343,7 +387,9 @@ mod testutil_testonly {
         table: &mut ForwardingTable<A::Version, D>,
         ip: SpecifiedAddr<A>,
         device: D,
-    ) {
+    ) where
+        A::Version: IpTypesIpExt,
+    {
         let subnet = Subnet::new(*ip, A::BYTES * 8).unwrap();
         let entry =
             Entry { subnet, device, gateway: None, metric: Metric::ExplicitMetric(RawMetric(0)) };
@@ -351,7 +397,7 @@ mod testutil_testonly {
     }
 
     // Provide tests with access to the private `ForwardingTable.add_entry` fn.
-    pub(crate) fn add_entry<I: Ip, D: Clone + Debug + PartialEq + Ord>(
+    pub(crate) fn add_entry<I: IpTypesIpExt, D: Clone + Debug + PartialEq + Ord>(
         table: &mut ForwardingTable<I, D>,
         entry: Entry<I::Addr, D>,
     ) -> Result<&Entry<I::Addr, D>, crate::error::ExistsError> {
@@ -451,14 +497,14 @@ mod tests {
         error,
         ip::{
             forwarding::testutil::FakeIpForwardingCtx,
-            types::{AddableEntryEither, AddableMetric, Metric},
+            types::{AddableEntryEither, AddableMetric, IpTypesIpExt, Metric, RawMetric},
         },
         testutil::FakeEventDispatcherConfig,
     };
 
     type FakeCtx = FakeIpForwardingCtx<MultipleDevicesId>;
 
-    impl<I: Ip, D: Clone + Debug + PartialEq> ForwardingTable<I, D> {
+    impl<I: IpTypesIpExt, D: Clone + Debug + PartialEq> ForwardingTable<I, D> {
         /// Print the table.
         fn print_table(&self) {
             trace!("Installed Routing table:");
@@ -474,7 +520,7 @@ mod tests {
         }
     }
 
-    trait TestIpExt: crate::testutil::TestIpExt {
+    trait TestIpExt: crate::testutil::TestIpExt + IpTypesIpExt {
         fn subnet(v: u8, neg_prefix: u8) -> Subnet<Self::Addr>;
 
         fn next_hop_addr_sub(
@@ -538,7 +584,9 @@ mod tests {
         let config = I::FAKE_CONFIG;
         let subnet = config.subnet;
         let device = MultipleDevicesId::A;
-        let (next_hop, next_hop_subnet) = I::next_hop_addr_sub(1, 1);
+        // `neg_prefix` passed here must be at least 2 (as with a neg_prefix of
+        // 1 we end up constructing the broadcast address instead).
+        let (next_hop, next_hop_subnet) = I::next_hop_addr_sub(1, 2);
         let metric = Metric::ExplicitMetric(RawMetric(9999));
 
         // Should add the route successfully.
@@ -629,6 +677,50 @@ mod tests {
             Some(Destination { next_hop: NextHop::RemoteAsNeighbor, device: device.clone() })
         );
 
+        // Add a default route to facilitate testing the limited broadcast address.
+        // Without a default route being present, the all-ones broadcast address won't match any
+        // route's destination subnet, so the route lookup will fail.
+        let default_route_entry = Entry {
+            subnet: Subnet::new(I::UNSPECIFIED_ADDRESS, 0).expect("default subnet"),
+            device: device.clone(),
+            gateway: None,
+            metric,
+        };
+        assert_eq!(
+            super::testutil::add_entry(&mut table, default_route_entry.clone()),
+            Ok(&default_route_entry)
+        );
+
+        // Do lookup for broadcast addresses.
+        I::map_ip::<_, ()>(
+            (&table, &config),
+            |(table, config)| {
+                assert_eq!(
+                    table.lookup(&mut core_ctx, None, config.subnet.broadcast()),
+                    Some(Destination { next_hop: NextHop::Broadcast(()), device: device.clone() })
+                );
+
+                assert_eq!(
+                    table.lookup(&mut core_ctx, None, Ipv4::LIMITED_BROADCAST_ADDRESS.get()),
+                    Some(Destination { next_hop: NextHop::Broadcast(()), device: device.clone() })
+                );
+            },
+            |(_table, _config)| {
+                // Do nothing since IPv6 doesn't have broadcast.
+            },
+        );
+
+        // Remove the default route.
+        assert_eq!(
+            table
+                .del_entries(|Entry { subnet, device: _, gateway: _, metric: _ }| {
+                    subnet.prefix() == 0
+                })
+                .into_iter()
+                .collect::<Vec<_>>(),
+            alloc::vec![default_route_entry.clone()]
+        );
+
         // Delete routes to the subnet and make sure that we can no longer route
         // to destinations in the subnet.
         assert_eq!(
@@ -654,6 +746,19 @@ mod tests {
         );
         assert_eq!(table.lookup(&mut core_ctx, None, *config.local_ip), None);
         assert_eq!(table.lookup(&mut core_ctx, None, *config.remote_ip), None);
+        I::map_ip::<_, ()>(
+            (&table, &config),
+            |(table, config)| {
+                assert_eq!(table.lookup(&mut core_ctx, None, config.subnet.broadcast()), None);
+                assert_eq!(
+                    table.lookup(&mut core_ctx, None, Ipv4::LIMITED_BROADCAST_ADDRESS.get()),
+                    None
+                );
+            },
+            |(_table, _config)| {
+                // Do nothing since IPv6 doesn't have broadcast.
+            },
+        );
 
         // Make the subnet routable again but through a gateway.
         let gateway_entry = Entry {
@@ -677,6 +782,43 @@ mod tests {
         assert_eq!(
             table.lookup(&mut core_ctx, None, *config.remote_ip),
             Some(Destination { next_hop: NextHop::Gateway(next_hop), device: device.clone() })
+        );
+
+        // Add a default route to facilitate testing the limited broadcast address.
+        let default_route_entry = Entry {
+            subnet: Subnet::new(I::UNSPECIFIED_ADDRESS, 0).expect("default subnet"),
+            device: device.clone(),
+            gateway: Some(next_hop),
+            metric,
+        };
+        assert_eq!(
+            super::testutil::add_entry(&mut table, default_route_entry.clone()),
+            Ok(&default_route_entry)
+        );
+
+        // Do lookup for broadcast addresses.
+        I::map_ip::<_, ()>(
+            (&table, &config, next_hop),
+            |(table, config, next_hop)| {
+                assert_eq!(
+                    table.lookup(&mut core_ctx, None, config.subnet.broadcast()),
+                    Some(Destination {
+                        next_hop: NextHop::Gateway(next_hop),
+                        device: device.clone()
+                    })
+                );
+
+                assert_eq!(
+                    table.lookup(&mut core_ctx, None, Ipv4::LIMITED_BROADCAST_ADDRESS.get()),
+                    Some(Destination {
+                        next_hop: NextHop::Gateway(next_hop),
+                        device: device.clone()
+                    })
+                );
+            },
+            |(_table, _config, _next_hop)| {
+                // Do nothing since IPv6 doesn't have broadcast.
+            },
         );
     }
 
@@ -744,9 +886,11 @@ mod tests {
 
         let mut core_ctx = FakeCtx::default();
         let mut table = ForwardingTable::<I, MultipleDevicesId>::default();
-        let (remote, more_specific_sub) = I::next_hop_addr_sub(1, 1);
+        // `neg_prefix` passed here must be at least 2 (as with a neg_prefix of
+        // 1 we end up constructing the broadcast address instead).
+        let (remote, more_specific_sub) = I::next_hop_addr_sub(1, 2);
         let less_specific_sub = {
-            let (addr, sub) = I::next_hop_addr_sub(1, 2);
+            let (addr, sub) = I::next_hop_addr_sub(1, 3);
             assert_eq!(remote, addr);
             sub
         };
@@ -824,9 +968,11 @@ mod tests {
         let mut core_ctx = FakeCtx::default();
         let mut table = ForwardingTable::<I, MultipleDevicesId>::default();
 
-        let (next_hop, more_specific_sub) = I::next_hop_addr_sub(1, 1);
+        // `neg_prefix` passed here must be at least 2 (as with a neg_prefix of
+        // 1 we end up constructing the broadcast address instead).
+        let (next_hop, more_specific_sub) = I::next_hop_addr_sub(1, 2);
         let less_specific_sub = {
-            let (addr, sub) = I::next_hop_addr_sub(1, 2);
+            let (addr, sub) = I::next_hop_addr_sub(1, 3);
             assert_eq!(next_hop, addr);
             sub
         };
@@ -855,7 +1001,7 @@ mod tests {
                 super::testutil::add_entry(&mut table, less_specific_entry).expect("was added");
         }
 
-        fn lookup_with_devices<I: Ip>(
+        fn lookup_with_devices<I: IpTypesIpExt>(
             table: &ForwardingTable<I, MultipleDevicesId>,
             next_hop: SpecifiedAddr<I::Addr>,
             core_ctx: &mut FakeCtx,
@@ -916,7 +1062,9 @@ mod tests {
 
         let mut core_ctx = FakeCtx::default();
         let mut table = ForwardingTable::<I, MultipleDevicesId>::default();
-        let (remote, sub) = I::next_hop_addr_sub(1, 1);
+        // `neg_prefix` passed here must be at least 2 (as with a neg_prefix of
+        // 1 we end up constructing the broadcast address instead).
+        let (remote, sub) = I::next_hop_addr_sub(1, 2);
         let metric = Metric::ExplicitMetric(RawMetric(0));
 
         let entry1 = Entry { subnet: sub, device: DEVICE1.clone(), gateway: None, metric };
@@ -960,9 +1108,11 @@ mod tests {
 
         let mut core_ctx = FakeCtx::default();
         let mut table = ForwardingTable::<I, MultipleDevicesId>::default();
-        let (remote, more_specific_sub) = I::next_hop_addr_sub(1, 1);
+        // `neg_prefix` passed here must be at least 2 (as with a neg_prefix of
+        // 1 we end up constructing the broadcast address instead).
+        let (remote, more_specific_sub) = I::next_hop_addr_sub(1, 2);
         let less_specific_sub = {
-            let (addr, sub) = I::next_hop_addr_sub(1, 2);
+            let (addr, sub) = I::next_hop_addr_sub(1, 3);
             assert_eq!(remote, addr);
             sub
         };
@@ -1041,7 +1191,7 @@ mod tests {
     }
 
     #[ip_test]
-    fn test_add_entry_keeps_table_sorted<I: Ip>() {
+    fn test_add_entry_keeps_table_sorted<I: Ip + IpTypesIpExt>() {
         const DEVICE_A: MultipleDevicesId = MultipleDevicesId::A;
         const DEVICE_B: MultipleDevicesId = MultipleDevicesId::B;
         let (more_specific_sub, less_specific_sub) = I::map_ip(

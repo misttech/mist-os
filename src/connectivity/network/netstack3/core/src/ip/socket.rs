@@ -20,7 +20,7 @@ use crate::{
     device::{AnyDevice, DeviceIdContext},
     ip::{
         device::{state::IpDeviceStateIpExt, IpDeviceAddr},
-        types::{NextHop, ResolvedRoute, RoutableIpAddr},
+        types::{IpTypesIpExt, NextHop, ResolvedRoute, RoutableIpAddr},
         EitherDeviceId, IpCounters, IpDeviceContext, IpExt, IpLayerIpExt, ResolveRouteError,
         SendIpPacketMeta,
     },
@@ -552,9 +552,10 @@ where
     let remote_ip: SpecifiedAddr<_> = (*remote_ip).into();
     let local_ip: SpecifiedAddr<_> = (*local_ip).into();
 
-    let next_hop = match next_hop {
-        NextHop::RemoteAsNeighbor => remote_ip,
-        NextHop::Gateway(gateway) => gateway,
+    let (next_hop, broadcast) = match next_hop {
+        NextHop::RemoteAsNeighbor => (remote_ip, None),
+        NextHop::Gateway(gateway) => (gateway, None),
+        NextHop::Broadcast(marker) => (remote_ip, Some(marker)),
     };
 
     IpSocketContext::send_ip_packet(
@@ -564,6 +565,7 @@ where
             device: &device,
             src_ip: local_ip,
             dst_ip: remote_ip,
+            broadcast,
             next_hop,
             ttl: options.hop_limit(&remote_ip),
             proto: *proto,
@@ -1156,7 +1158,7 @@ pub(crate) mod testutil {
         fn send_ip_packet<SS>(
             &mut self,
             bindings_ctx: &mut FakeBindingsCtx<Id, Event, BindingsCtxState, ()>,
-            SendIpPacketMeta {  device, src_ip, dst_ip, next_hop, proto, ttl, mtu }: SendIpPacketMeta<I, &Self::DeviceId, SpecifiedAddr<I::Addr>>,
+            SendIpPacketMeta {  device, src_ip, dst_ip, broadcast, next_hop, proto, ttl, mtu }: SendIpPacketMeta<I, &Self::DeviceId, SpecifiedAddr<I::Addr>>,
             body: SS,
         ) -> Result<(), SS>
         where
@@ -1167,6 +1169,7 @@ pub(crate) mod testutil {
                 device: device.clone(),
                 src_ip,
                 dst_ip,
+                broadcast,
                 next_hop,
                 proto,
                 ttl,
@@ -1641,7 +1644,7 @@ pub(crate) mod testutil {
         fn send_ip_packet<SS>(
             &mut self,
             bindings_ctx: &mut FakeBindingsCtx<Id, Event, BindingsCtxState, ()>,
-            SendIpPacketMeta {  device, src_ip, dst_ip, next_hop, proto, ttl, mtu }: SendIpPacketMeta<I, &Self::DeviceId, SpecifiedAddr<I::Addr>>,
+            SendIpPacketMeta {  device, src_ip, dst_ip, broadcast, next_hop, proto, ttl, mtu }: SendIpPacketMeta<I, &Self::DeviceId, SpecifiedAddr<I::Addr>>,
             body: SS,
         ) -> Result<(), SS>
         where
@@ -1652,6 +1655,7 @@ pub(crate) mod testutil {
                 device: device.clone(),
                 src_ip,
                 dst_ip,
+                broadcast,
                 next_hop,
                 proto,
                 ttl,

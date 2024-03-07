@@ -29,7 +29,7 @@ use crate::{
             IpDeviceAddr, Ipv6DeviceAddr,
         },
         gmp::{igmp::IgmpGroupState, mld::MldGroupState, MulticastGroupSet},
-        types::RawMetric,
+        types::{IpTypesIpExt, RawMetric},
     },
     sync::{Mutex, PrimaryRc, RwLock, StrongRc},
     Instant,
@@ -46,7 +46,7 @@ pub(crate) const RETRANS_TIMER_DEFAULT: NonZeroDuration =
 const DEFAULT_HOP_LIMIT: NonZeroU8 = const_unwrap_option(NonZeroU8::new(64));
 
 /// An `Ip` extension trait adding IP device state properties.
-pub trait IpDeviceStateIpExt: Ip {
+pub trait IpDeviceStateIpExt: Ip + IpTypesIpExt {
     /// The information stored about an IP address assigned to an interface.
     type AssignedAddress<I: Instant>: AssignedAddress<Self::Addr> + Debug;
 

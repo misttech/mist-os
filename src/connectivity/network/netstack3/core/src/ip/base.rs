@@ -70,8 +70,10 @@ use crate::{
             FragmentCacheKey, FragmentHandler, FragmentProcessingState, IpPacketFragmentCache,
         },
         socket::{IpSocketBindingsContext, IpSocketContext, IpSocketHandler},
-        types,
-        types::{Destination, NextHop, ResolvedRoute, RoutableIpAddr},
+        types::{
+            self, Destination, IpTypesIpExt, NextHop, ResolvedRoute, RoutableIpAddr,
+            WrapBroadcastMarker,
+        },
     },
     socket::datagram,
     sync::{LockGuard, Mutex, RwLock, RwLockReadGuard, RwLockWriteGuard},
@@ -128,7 +130,7 @@ enum TransportReceiveErrorInner {
 }
 
 /// An [`Ip`] extension trait adding functionality specific to the IP layer.
-pub trait IpExt: packet_formats::ip::IpExt + IcmpIpExt {
+pub trait IpExt: packet_formats::ip::IpExt + IcmpIpExt + IpTypesIpExt {
     /// The type used to specify an IP packet's source address in a call to
     /// [`IpTransportContext::receive_ip_packet`].
     ///
@@ -353,6 +355,19 @@ impl<
                 let neighbor = match next_hop {
                     NextHop::RemoteAsNeighbor => dst,
                     NextHop::Gateway(gateway) => gateway,
+                    NextHop::Broadcast(marker) => {
+                        I::map_ip::<_, ()>(
+                            WrapBroadcastMarker(marker),
+                            |WrapBroadcastMarker(())| {
+                                tracing::debug!(
+                                    "can't confirm {dst:?}@{device:?} as reachable: \
+                                                 dst is a broadcast address"
+                                );
+                            },
+                            |WrapBroadcastMarker(never)| match never {},
+                        );
+                        return;
+                    }
                 };
                 self.confirm_reachable(bindings_ctx, &device, neighbor);
             }
@@ -2015,9 +2030,10 @@ pub(crate) fn receive_ipv4_packet<
             );
         }
         ReceivePacketAction::Forward { dst: Destination { device: dst_device, next_hop } } => {
-            let next_hop = match next_hop {
-                NextHop::RemoteAsNeighbor => dst_ip,
-                NextHop::Gateway(gateway) => gateway,
+            let (next_hop, broadcast) = match next_hop {
+                NextHop::RemoteAsNeighbor => (dst_ip, None),
+                NextHop::Gateway(gateway) => (gateway, None),
+                NextHop::Broadcast(marker) => (dst_ip, Some(marker)),
             };
             let ttl = packet.ttl();
             if ttl > 1 {
@@ -2032,6 +2048,7 @@ pub(crate) fn receive_ipv4_packet<
                     &dst_device,
                     next_hop,
                     buffer,
+                    broadcast,
                 ) {
                     Ok(()) => (),
                     Err(b) => {
@@ -2321,6 +2338,7 @@ pub(crate) fn receive_ipv6_packet<
                 let next_hop = match next_hop {
                     NextHop::RemoteAsNeighbor => dst_ip,
                     NextHop::Gateway(gateway) => gateway,
+                    NextHop::Broadcast(never) => match never {},
                 };
                 packet.set_ttl(ttl - 1);
                 let (_, _, proto, meta): (Ipv6Addr, Ipv6Addr, _, _) =
@@ -2331,6 +2349,7 @@ pub(crate) fn receive_ipv6_packet<
                     &dst_device,
                     next_hop,
                     buffer,
+                    None,
                 ) {
                     // TODO(https://fxbug.dev/42167236): Encode the MTU error more
                     // obviously in the type system.
@@ -2418,7 +2437,10 @@ pub(crate) fn receive_ipv6_packet<
 
 /// The action to take in order to process a received IP packet.
 #[cfg_attr(test, derive(Debug, PartialEq))]
-enum ReceivePacketAction<A: IpAddress, DeviceId> {
+enum ReceivePacketAction<A: IpAddress, DeviceId>
+where
+    A::Version: IpTypesIpExt,
+{
     /// Deliver the packet locally.
     Deliver,
     /// Forward the packet to the given destination.
@@ -2654,7 +2676,7 @@ fn lookup_route_table<
 
 /// The metadata associated with an outgoing IP packet.
 #[cfg_attr(test, derive(Debug))]
-pub struct SendIpPacketMeta<I: packet_formats::ip::IpExt, D, Src> {
+pub struct SendIpPacketMeta<I: packet_formats::ip::IpExt + IpTypesIpExt, D, Src> {
     /// The outgoing device.
     pub(crate) device: D,
 
@@ -2666,6 +2688,9 @@ pub struct SendIpPacketMeta<I: packet_formats::ip::IpExt, D, Src> {
 
     /// The next-hop node that the packet should be sent to.
     pub(crate) next_hop: SpecifiedAddr<I::Addr>,
+
+    /// Whether the destination is a broadcast address.
+    pub(crate) broadcast: Option<I::BroadcastMarker>,
 
     /// The upper-layer protocol held in the packet's payload.
     pub(crate) proto: I::Proto,
@@ -2681,17 +2706,27 @@ pub struct SendIpPacketMeta<I: packet_formats::ip::IpExt, D, Src> {
     pub(crate) mtu: Option<u32>,
 }
 
-impl<I: packet_formats::ip::IpExt, D> From<SendIpPacketMeta<I, D, SpecifiedAddr<I::Addr>>>
+impl<I: packet_formats::ip::IpExt + IpTypesIpExt, D>
+    From<SendIpPacketMeta<I, D, SpecifiedAddr<I::Addr>>>
     for SendIpPacketMeta<I, D, Option<SpecifiedAddr<I::Addr>>>
 {
     fn from(
-        SendIpPacketMeta { device, src_ip, dst_ip, next_hop, proto, ttl, mtu }: SendIpPacketMeta<
+        SendIpPacketMeta { device, src_ip, dst_ip, broadcast, next_hop, proto, ttl, mtu }: SendIpPacketMeta<
             I,
             D,
             SpecifiedAddr<I::Addr>,
         >,
     ) -> SendIpPacketMeta<I, D, Option<SpecifiedAddr<I::Addr>>> {
-        SendIpPacketMeta { device, src_ip: Some(src_ip), dst_ip, next_hop, proto, ttl, mtu }
+        SendIpPacketMeta {
+            device,
+            src_ip: Some(src_ip),
+            dst_ip,
+            broadcast,
+            next_hop,
+            proto,
+            ttl,
+            mtu,
+        }
     }
 }
 
@@ -2750,7 +2785,7 @@ where
     S: Serializer,
     S::Buffer: BufferMut,
 {
-    let SendIpPacketMeta { device, src_ip, dst_ip, next_hop, proto, ttl, mtu } = meta;
+    let SendIpPacketMeta { device, src_ip, dst_ip, broadcast, next_hop, proto, ttl, mtu } = meta;
     let next_packet_id = gen_ip_packet_id(core_ctx);
     let ttl = ttl.unwrap_or_else(|| core_ctx.get_hop_limit(device)).get();
     let src_ip = src_ip.map_or(I::UNSPECIFIED_ADDRESS, |a| a.get());
@@ -2782,10 +2817,12 @@ where
     if let Some(mtu) = mtu {
         let body = body.with_size_limit(mtu as usize);
         core_ctx
-            .send_ip_frame(bindings_ctx, device, next_hop, body)
+            .send_ip_frame(bindings_ctx, device, next_hop, body, broadcast)
             .map_err(|ser| ser.into_inner().into_inner())
     } else {
-        core_ctx.send_ip_frame(bindings_ctx, device, next_hop, body).map_err(|ser| ser.into_inner())
+        core_ctx
+            .send_ip_frame(bindings_ctx, device, next_hop, body, broadcast)
+            .map_err(|ser| ser.into_inner())
     }
 }
 
@@ -3093,13 +3130,13 @@ pub(crate) mod testutil {
         V6(SendIpPacketMeta<Ipv6, D, SpecifiedAddr<Ipv6Addr>>),
     }
 
-    impl<I: packet_formats::ip::IpExt, D> From<SendIpPacketMeta<I, D, SpecifiedAddr<I::Addr>>>
-        for DualStackSendIpPacketMeta<D>
+    impl<I: packet_formats::ip::IpExt + IpTypesIpExt, D>
+        From<SendIpPacketMeta<I, D, SpecifiedAddr<I::Addr>>> for DualStackSendIpPacketMeta<D>
     {
         fn from(value: SendIpPacketMeta<I, D, SpecifiedAddr<I::Addr>>) -> Self {
             #[derive(GenericOverIp)]
             #[generic_over_ip(I, Ip)]
-            struct Wrap<I: packet_formats::ip::IpExt, D>(
+            struct Wrap<I: packet_formats::ip::IpExt + IpTypesIpExt, D>(
                 SendIpPacketMeta<I, D, SpecifiedAddr<I::Addr>>,
             );
             use DualStackSendIpPacketMeta::*;
@@ -3113,7 +3150,14 @@ pub(crate) mod testutil {
     }
 
     #[cfg(test)]
-    impl<I: packet_formats::ip::IpExt, S, Id, Event: Debug, DeviceId, BindingsCtxState>
+    impl<
+            I: packet_formats::ip::IpExt + IpTypesIpExt,
+            S,
+            Id,
+            Event: Debug,
+            DeviceId,
+            BindingsCtxState,
+        >
         crate::context::SendFrameContext<
             crate::context::testutil::FakeBindingsCtx<Id, Event, BindingsCtxState, ()>,
             SendIpPacketMeta<I, DeviceId, SpecifiedAddr<I::Addr>>,
@@ -3143,12 +3187,12 @@ pub(crate) mod testutil {
     pub(crate) struct WrongIpVersion;
 
     impl<D> DualStackSendIpPacketMeta<D> {
-        pub(crate) fn try_as<I: packet_formats::ip::IpExt>(
+        pub(crate) fn try_as<I: packet_formats::ip::IpExt + IpTypesIpExt>(
             &self,
         ) -> Result<&SendIpPacketMeta<I, D, SpecifiedAddr<I::Addr>>, WrongIpVersion> {
             #[derive(GenericOverIp)]
             #[generic_over_ip(I, Ip)]
-            struct Wrap<'a, I: packet_formats::ip::IpExt, D>(
+            struct Wrap<'a, I: packet_formats::ip::IpExt + IpTypesIpExt, D>(
                 Option<&'a SendIpPacketMeta<I, D, SpecifiedAddr<I::Addr>>>,
             );
             use DualStackSendIpPacketMeta::*;

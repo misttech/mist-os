@@ -68,6 +68,7 @@ use crate::{
             mld::{MldDelayedReportTimerId, MldPacketHandler},
             GmpHandler, GmpQueryHandler, GroupJoinResult, GroupLeaveResult,
         },
+        types::IpTypesIpExt,
     },
     socket::address::SocketIpAddr,
     Instant,
@@ -1083,7 +1084,9 @@ impl<
 }
 
 /// The execution context for an IP device with a buffer.
-pub(crate) trait IpDeviceSendContext<I: Ip, BC>: DeviceIdContext<AnyDevice> {
+pub(crate) trait IpDeviceSendContext<I: IpTypesIpExt, BC>:
+    DeviceIdContext<AnyDevice>
+{
     /// Sends an IP packet through the device.
     fn send_ip_frame<S>(
         &mut self,
@@ -1091,6 +1094,7 @@ pub(crate) trait IpDeviceSendContext<I: Ip, BC>: DeviceIdContext<AnyDevice> {
         device_id: &Self::DeviceId,
         local_addr: SpecifiedAddr<I::Addr>,
         body: S,
+        broadcast: Option<I::BroadcastMarker>,
     ) -> Result<(), S>
     where
         S: Serializer,

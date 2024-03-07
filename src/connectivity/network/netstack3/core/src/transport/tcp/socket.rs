@@ -5146,7 +5146,7 @@ mod tests {
         fn send_ip_packet<SS>(
             &mut self,
             bindings_ctx: &mut BC,
-            SendIpPacketMeta {  device, src_ip, dst_ip, next_hop, proto, ttl, mtu }: SendIpPacketMeta<I, &Self::DeviceId, SpecifiedAddr<I::Addr>>,
+            SendIpPacketMeta {  device, src_ip, dst_ip, broadcast, next_hop, proto, ttl, mtu }: SendIpPacketMeta<I, &Self::DeviceId, SpecifiedAddr<I::Addr>>,
             body: SS,
         ) -> Result<(), SS>
         where
@@ -5157,6 +5157,7 @@ mod tests {
                 device: device.clone(),
                 src_ip,
                 dst_ip,
+                broadcast,
                 next_hop,
                 proto,
                 ttl,

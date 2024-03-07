@@ -17,13 +17,5 @@
                 "client_explicitly_removes_address_when_lease_expires_ns[23]",
             ],
         },
-        {
-            type: "expect_failure_with_err_logs",
-            matchers: [
-                // TODO(https://fxbug.dev/42148833): Support sending to the
-                // all-ones broadcast address in netstack3.
-                "client_rebinds_same_lease_to_other_server_ns3",
-            ],
-        },
     ],
 }

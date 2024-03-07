@@ -3313,24 +3313,30 @@ mod tests {
         .expect("send_to succeeded");
         let frames = api.core_ctx().inner.inner.frames();
         assert_eq!(frames.len(), 2);
-        let check_frame = |(meta, frame_body): &(
-            DualStackSendIpPacketMeta<FakeDeviceId>,
-            Vec<u8>,
-        )| {
-            let SendIpPacketMeta { device: _, src_ip, dst_ip, next_hop, proto, ttl: _, mtu: _ } =
-                meta.try_as::<I>().unwrap();
-            assert_eq!(next_hop, &remote_ip);
-            assert_eq!(src_ip, &local_ip);
-            assert_eq!(dst_ip, &remote_ip);
-            assert_eq!(proto, &IpProto::Udp.into());
-            let mut buf = &frame_body[..];
-            let udp_packet =
-                UdpPacket::parse(&mut buf, UdpParseArgs::new(src_ip.get(), dst_ip.get()))
-                    .expect("Parsed sent UDP packet");
-            assert_eq!(udp_packet.src_port().unwrap(), LOCAL_PORT);
-            assert_eq!(udp_packet.dst_port(), REMOTE_PORT);
-            assert_eq!(udp_packet.body(), &body[..]);
-        };
+        let check_frame =
+            |(meta, frame_body): &(DualStackSendIpPacketMeta<FakeDeviceId>, Vec<u8>)| {
+                let SendIpPacketMeta {
+                    device: _,
+                    src_ip,
+                    dst_ip,
+                    broadcast: _,
+                    next_hop,
+                    proto,
+                    ttl: _,
+                    mtu: _,
+                } = meta.try_as::<I>().unwrap();
+                assert_eq!(next_hop, &remote_ip);
+                assert_eq!(src_ip, &local_ip);
+                assert_eq!(dst_ip, &remote_ip);
+                assert_eq!(proto, &IpProto::Udp.into());
+                let mut buf = &frame_body[..];
+                let udp_packet =
+                    UdpPacket::parse(&mut buf, UdpParseArgs::new(src_ip.get(), dst_ip.get()))
+                        .expect("Parsed sent UDP packet");
+                assert_eq!(udp_packet.src_port().unwrap(), LOCAL_PORT);
+                assert_eq!(udp_packet.dst_port(), REMOTE_PORT);
+                assert_eq!(udp_packet.body(), &body[..]);
+            };
         check_frame(&frames[0]);
         check_frame(&frames[1]);
     }
@@ -3404,8 +3410,16 @@ mod tests {
         let (meta, frame_body) =
             assert_matches!(api.core_ctx().inner.inner.frames(), [frame] => frame);
         // Check first frame.
-        let SendIpPacketMeta { device: _, src_ip, dst_ip, next_hop, proto, ttl: _, mtu: _ } =
-            meta.try_as::<I>().unwrap();
+        let SendIpPacketMeta {
+            device: _,
+            src_ip,
+            dst_ip,
+            broadcast: _,
+            next_hop,
+            proto,
+            ttl: _,
+            mtu: _,
+        } = meta.try_as::<I>().unwrap();
         assert_eq!(next_hop, &remote_ip);
         assert_eq!(src_ip, &local_ip);
         assert_eq!(dst_ip, &remote_ip);
@@ -3759,8 +3773,16 @@ mod tests {
         // Check first frame.
         let (meta, frame_body) =
             assert_matches!(api.core_ctx().inner.inner.frames(), [frame] => frame);
-        let SendIpPacketMeta { device: _, src_ip, dst_ip, next_hop, proto, ttl: _, mtu: _ } =
-            meta.try_as::<I>().unwrap();
+        let SendIpPacketMeta {
+            device: _,
+            src_ip,
+            dst_ip,
+            broadcast: _,
+            next_hop,
+            proto,
+            ttl: _,
+            mtu: _,
+        } = meta.try_as::<I>().unwrap();
 
         assert_eq!(next_hop, &other_remote_ip);
         assert_eq!(src_ip, &local_ip);
@@ -4444,6 +4466,7 @@ mod tests {
                     device,
                     src_ip: _,
                     dst_ip,
+                    broadcast: _,
                     next_hop: _,
                     proto,
                     ttl: _,
@@ -5955,6 +5978,7 @@ mod tests {
                 device: _,
                 src_ip: _,
                 dst_ip,
+                broadcast: _,
                 next_hop: _,
                 proto: _,
                 ttl,

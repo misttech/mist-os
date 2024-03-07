@@ -27,7 +27,7 @@ use netstack3_core::{
     device::{DeviceId, EthernetDeviceId, EthernetLinkDevice},
     error::AddressResolutionFailed,
     neighbor::{LinkResolutionContext, LinkResolutionResult},
-    routes::{NextHop, ResolvedRoute},
+    routes::{NextHop, ResolvedRoute, WrapBroadcastMarker},
 };
 use thiserror::Error;
 use tracing::{error, info, warn};
@@ -125,6 +125,14 @@ where
         };
     let (next_hop_addr, next_hop_type) = match next_hop {
         NextHop::RemoteAsNeighbor => {
+            (SpecifiedAddr::new(destination), Either::Left(fnet_routes::Resolved::Direct))
+        }
+        NextHop::Broadcast(marker) => {
+            <A::Version as Ip>::map_ip::<_, ()>(
+                WrapBroadcastMarker(marker),
+                |WrapBroadcastMarker(())| (),
+                |WrapBroadcastMarker(never)| match never {},
+            );
             (SpecifiedAddr::new(destination), Either::Left(fnet_routes::Resolved::Direct))
         }
         NextHop::Gateway(gateway) => (Some(gateway), Either::Right(fnet_routes::Resolved::Gateway)),

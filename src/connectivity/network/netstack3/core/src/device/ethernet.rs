@@ -69,7 +69,9 @@ use crate::{
             NudHandler, NudIcmpContext, NudSenderContext, NudState, NudTimerId, NudUserConfig,
         },
         icmp::NdpCounters,
+        types::IpTypesIpExt,
     },
+    routes::WrapBroadcastMarker,
     socket::address::SocketIpAddr,
     sync::{Mutex, RwLock},
     trace_duration, BindingsContext, BindingsTypes, CoreCtx, Instant, TracingContext,
@@ -883,6 +885,7 @@ pub(super) fn send_ip_frame<BC, CC, A, S>(
     device_id: &CC::DeviceId,
     local_addr: SpecifiedAddr<A>,
     body: S,
+    broadcast: Option<<A::Version as IpTypesIpExt>::BroadcastMarker>,
 ) -> Result<(), S>
 where
     BC: EthernetIpLinkDeviceBindingsContext<CC::DeviceId>
@@ -895,7 +898,7 @@ where
     A: IpAddress,
     S: Serializer,
     S::Buffer: BufferMut,
-    A::Version: EthernetIpExt,
+    A::Version: EthernetIpExt + IpTypesIpExt,
 {
     fn increment_counter<I: Ip>(counters: &DeviceCounters) {
         let () = I::map_ip(
@@ -907,27 +910,51 @@ where
     core_ctx.with_per_resource_counters(device_id, increment_counter::<A::Version>);
     core_ctx.with_counters(increment_counter::<A::Version>);
 
-    trace!("ethernet::send_ip_frame: local_addr = {:?}; device = {:?}", local_addr, device_id);
+    trace!(
+        "ethernet::send_ip_frame: local_addr = {:?}; device = {:?}; broadcast = {:?}",
+        local_addr,
+        device_id,
+        broadcast
+    );
 
     let body = body.with_size_limit(get_mtu(core_ctx, device_id).get() as usize);
 
-    if let Some(multicast) = MulticastAddr::new(local_addr.get()) {
-        send_as_ethernet_frame_to_dst(
-            core_ctx,
-            bindings_ctx,
-            device_id,
-            Mac::from(&multicast),
-            body,
-            A::Version::ETHER_TYPE,
-        )
-    } else {
-        NudHandler::<A::Version, _, _>::send_ip_packet_to_neighbor(
-            core_ctx,
-            bindings_ctx,
-            device_id,
-            local_addr,
-            body,
-        )
+    match broadcast {
+        Some(marker) => {
+            <A::Version as Ip>::map_ip::<_, ()>(
+                WrapBroadcastMarker(marker),
+                |WrapBroadcastMarker(())| (),
+                |WrapBroadcastMarker(never)| match never {},
+            );
+            send_as_ethernet_frame_to_dst(
+                core_ctx,
+                bindings_ctx,
+                device_id,
+                Mac::BROADCAST,
+                body,
+                A::Version::ETHER_TYPE,
+            )
+        }
+        None => {
+            if let Some(multicast) = MulticastAddr::new(local_addr.get()) {
+                send_as_ethernet_frame_to_dst(
+                    core_ctx,
+                    bindings_ctx,
+                    device_id,
+                    Mac::from(&multicast),
+                    body,
+                    A::Version::ETHER_TYPE,
+                )
+            } else {
+                NudHandler::<A::Version, _, _>::send_ip_packet_to_neighbor(
+                    core_ctx,
+                    bindings_ctx,
+                    device_id,
+                    local_addr,
+                    body,
+                )
+            }
+        }
     }
     .map_err(Nested::into_inner)
 }
@@ -1503,7 +1530,8 @@ mod tests {
         ip::{IpExt, IpPacketBuilder, IpProto},
         testdata::{dns_request_v4, dns_request_v6},
         testutil::{
-            parse_icmp_packet_in_ip_packet_in_ethernet_frame, parse_ip_packet_in_ethernet_frame,
+            parse_ethernet_frame, parse_icmp_packet_in_ip_packet_in_ethernet_frame,
+            parse_ip_packet_in_ethernet_frame,
         },
     };
     use rand::Rng;
@@ -2011,6 +2039,7 @@ mod tests {
                 &FakeDeviceId,
                 FAKE_CONFIG_V4.remote_ip,
                 Buf::new(&mut vec![0; size], ..),
+                None,
             )
             .map_err(|_serializer| ());
             let sent_frames = core_ctx.inner.frames().len();
@@ -2025,6 +2054,33 @@ mod tests {
 
         test(usize::try_from(u32::from(Ipv6::MINIMUM_LINK_MTU)).unwrap(), true);
         test(usize::try_from(u32::from(Ipv6::MINIMUM_LINK_MTU)).unwrap() + 1, false);
+    }
+
+    #[test]
+    fn broadcast() {
+        let mut ctx = crate::context::testutil::FakeCtxWithCoreCtx::with_core_ctx(
+            FakeCoreCtx::with_inner_and_outer_state(
+                FakeEthernetCtx::new(FAKE_CONFIG_V4.local_mac, IPV6_MIN_IMPLIED_MAX_FRAME_SIZE),
+                ArpState::default(),
+            ),
+        );
+        let crate::testutil::ContextPair { core_ctx, bindings_ctx } = &mut ctx;
+        send_ip_frame(
+            core_ctx,
+            bindings_ctx,
+            &FakeDeviceId,
+            FAKE_CONFIG_V4.remote_ip,
+            Buf::new(&mut vec![0; 100], ..),
+            /* broadcast */ Some(()),
+        )
+        .map_err(|_serializer| ())
+        .expect("send_ip_frame should succeed");
+        let sent_frames = core_ctx.inner.frames().len();
+        assert_eq!(sent_frames, 1);
+        let (FakeDeviceId, frame) = core_ctx.inner.frames()[0].clone();
+        let (_body, _src_mac, dst_mac, _ether_type) =
+            parse_ethernet_frame(&frame, EthernetFrameLengthCheck::NoCheck).unwrap();
+        assert_eq!(dst_mac, Mac::BROADCAST);
     }
 
     #[ip_test]

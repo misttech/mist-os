@@ -1255,6 +1255,7 @@ where
             device: device_id,
             src_ip,
             dst_ip,
+            broadcast: None,
             next_hop: dst_ip,
             ttl: NonZeroU8::new(REQUIRED_NDP_IP_PACKET_HOP_LIMIT),
             proto: Ipv6Proto::Icmpv6,

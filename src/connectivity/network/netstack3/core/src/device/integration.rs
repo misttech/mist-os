@@ -5,7 +5,7 @@
 //! Implementations of device layer traits for [`CoreCtx`].
 
 use alloc::boxed::Box;
-use core::{num::NonZeroU8, ops::Deref as _};
+use core::{convert::Infallible as Never, num::NonZeroU8, ops::Deref as _};
 
 use lock_order::{
     lock::{RwLockFor, UnlockedAccess},
@@ -43,19 +43,23 @@ use crate::{
     },
     error::{ExistsError, NotFoundError},
     for_any_device_id,
-    ip::device::{
-        integration::CoreCtxWithIpDeviceConfiguration,
-        nud::{
-            ConfirmationFlags, DynamicNeighborUpdateSource, NudHandler, NudIpHandler, NudUserConfig,
+    ip::{
+        device::{
+            integration::CoreCtxWithIpDeviceConfiguration,
+            nud::{
+                ConfirmationFlags, DynamicNeighborUpdateSource, NudHandler, NudIpHandler,
+                NudUserConfig,
+            },
+            state::{
+                AssignedAddress as _, DualStackIpDeviceState, IpDeviceFlags, Ipv4AddressEntry,
+                Ipv4AddressState, Ipv4DeviceConfiguration, Ipv6AddressEntry, Ipv6AddressState,
+                Ipv6DadState, Ipv6DeviceConfiguration, Ipv6NetworkLearnedParameters,
+            },
+            IpDeviceAddressContext, IpDeviceAddressIdContext, IpDeviceConfigurationContext,
+            IpDeviceIpExt, IpDeviceSendContext, IpDeviceStateContext, Ipv6DeviceAddr,
+            Ipv6DeviceConfigurationContext, Ipv6DeviceContext,
         },
-        state::{
-            AssignedAddress as _, DualStackIpDeviceState, IpDeviceFlags, Ipv4AddressEntry,
-            Ipv4AddressState, Ipv4DeviceConfiguration, Ipv6AddressEntry, Ipv6AddressState,
-            Ipv6DadState, Ipv6DeviceConfiguration, Ipv6NetworkLearnedParameters,
-        },
-        IpDeviceAddressContext, IpDeviceAddressIdContext, IpDeviceConfigurationContext,
-        IpDeviceIpExt, IpDeviceSendContext, IpDeviceStateContext, Ipv6DeviceAddr,
-        Ipv6DeviceConfigurationContext, Ipv6DeviceContext,
+        types::IpTypesIpExt,
     },
     sync::{PrimaryRc, StrongRc},
     BindingsContext, BindingsTypes, CoreCtx, StackState,
@@ -156,21 +160,23 @@ where
     }
 }
 
-impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpState<Ipv4>>>
-    IpDeviceSendContext<Ipv4, BC> for CoreCtx<'_, BC, L>
+#[netstack3_macros::instantiate_ip_impl_block(I)]
+impl<I: IpTypesIpExt, BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpState<I>>>
+    IpDeviceSendContext<I, BC> for CoreCtx<'_, BC, L>
 {
     fn send_ip_frame<S>(
         &mut self,
         bindings_ctx: &mut BC,
         device: &DeviceId<BC>,
-        local_addr: SpecifiedAddr<Ipv4Addr>,
+        local_addr: SpecifiedAddr<<I as Ip>::Addr>,
         body: S,
+        broadcast: Option<<I as IpTypesIpExt>::BroadcastMarker>,
     ) -> Result<(), S>
     where
         S: Serializer,
         S::Buffer: BufferMut,
     {
-        send_ip_frame(self, bindings_ctx, device, local_addr, body)
+        send_ip_frame(self, bindings_ctx, device, local_addr, body, broadcast)
     }
 }
 
@@ -767,24 +773,6 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceAddresses<
     }
 }
 
-impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpState<Ipv6>>>
-    IpDeviceSendContext<Ipv6, BC> for CoreCtx<'_, BC, L>
-{
-    fn send_ip_frame<S>(
-        &mut self,
-        bindings_ctx: &mut BC,
-        device: &DeviceId<BC>,
-        local_addr: SpecifiedAddr<Ipv6Addr>,
-        body: S,
-    ) -> Result<(), S>
-    where
-        S: Serializer,
-        S::Buffer: BufferMut,
-    {
-        send_ip_frame(self, bindings_ctx, device, local_addr, body)
-    }
-}
-
 impl<BT: BindingsTypes, L> DeviceIdContext<EthernetLinkDevice> for CoreCtx<'_, BT, L> {
     type DeviceId = EthernetDeviceId<BT>;
     type WeakDeviceId = EthernetWeakDeviceId<BT>;
@@ -1084,6 +1072,7 @@ fn send_ip_frame<BC, S, A, L>(
     device: &DeviceId<BC>,
     local_addr: SpecifiedAddr<A>,
     body: S,
+    broadcast: Option<<A::Version as IpTypesIpExt>::BroadcastMarker>,
 ) -> Result<(), S>
 where
     BC: BindingsContext,
@@ -1093,15 +1082,20 @@ where
     L: LockBefore<crate::lock_ordering::IpState<A::Version>>
         + LockBefore<crate::lock_ordering::LoopbackTxQueue>
         + LockBefore<crate::lock_ordering::PureIpDeviceTxQueue>,
-    A::Version: EthernetIpExt,
+    A::Version: EthernetIpExt + IpTypesIpExt,
     for<'a> CoreCtx<'a, BC, L>: EthernetIpLinkDeviceDynamicStateContext<BC, DeviceId = EthernetDeviceId<BC>>
         + NudHandler<A::Version, EthernetLinkDevice, BC>
         + TransmitQueueHandler<EthernetLinkDevice, BC, Meta = ()>,
 {
     match device {
-        DeviceId::Ethernet(id) => {
-            ethernet::send_ip_frame::<_, _, A, _>(core_ctx, bindings_ctx, &id, local_addr, body)
-        }
+        DeviceId::Ethernet(id) => ethernet::send_ip_frame::<_, _, A, _>(
+            core_ctx,
+            bindings_ctx,
+            &id,
+            local_addr,
+            body,
+            broadcast,
+        ),
         DeviceId::Loopback(id) => {
             loopback::send_ip_frame::<_, A, _, _>(core_ctx, bindings_ctx, id, local_addr, body)
         }

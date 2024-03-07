@@ -181,7 +181,7 @@ pub mod routes {
     pub use crate::ip::forwarding::AddRouteError;
     pub use crate::ip::types::{
         AddableEntry, AddableEntryEither, AddableMetric, Entry, EntryEither, Generation, Metric,
-        NextHop, RawMetric, ResolvedRoute, RoutableIpAddr,
+        NextHop, RawMetric, ResolvedRoute, RoutableIpAddr, WrapBroadcastMarker,
     };
 }
 
