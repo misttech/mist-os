@@ -510,6 +510,43 @@ pub mod route {
         Ok(extracted_route_request)
     }
 
+    // If the metric NLA is not specified, there are default values that should
+    // be supplied to match Linux expectations.
+    //
+    // Per https://www.man7.org/linux/man-pages/man8/route.8.html,
+    //
+    //   ip route - show / manipulate the IP routing table.
+    //
+    //       metric M
+    //            set the metric field in the routing table (used by routing
+    //            daemons) to M. If this option is not specified the metric
+    //            for inet6 (IPv6) address family defaults to '1', for inet
+    //            (IPv4) it defaults to '0'. You should always specify an
+    //            explicit metric value to not rely on those defaults - they
+    //            also differ from iproute2.
+    pub(crate) fn default_metric<I: Ip>(outbound_interface: u64) -> u32 {
+        // TODO(https://fxbug.dev/291629739): Hardcoding the loopback interface
+        // ID as 1 is a hack because it's hard for us to access the interfaces
+        // state to scan for interfaces with the Loopback device class. Remove
+        // this once we've merged the routes and interfaces event loops.
+        const LOOPBACK_INTERFACE_ID: u64 = 1;
+
+        let IpInvariant(priority) = I::map_ip((), |()| IpInvariant(0), |()| IpInvariant(1));
+        priority + {
+            // Bump the default priority by 1 on loopback interfaces as a hack
+            // to avoid conflicts between routes that would otherwise be in
+            // separate tables.
+            // TODO(https://fxbug.dev/328603417): This is only necessary because
+            // we don't support tables / policy-based routing yet. Remove this
+            // hack once we do.
+            if u64::from(outbound_interface) == LOOPBACK_INTERFACE_ID {
+                1
+            } else {
+                0
+            }
+        }
+    }
+
     // Translates `RouteMessage` to `RouteRequestArgs::New`.
     //
     // `RouteRequestArgs::New` requires all fields except for next_hop, so optional
@@ -531,28 +568,6 @@ pub mod route {
             table,
         }) = extracted_request;
 
-        // If the metric NLA is not specified, there are default values that
-        // should be supplied to match Linux expectations.
-        //
-        // Per https://www.man7.org/linux/man-pages/man8/route.8.html,
-        //
-        //   ip route - show / manipulate the IP routing table.
-        //
-        //       metric M
-        //            set the metric field in the routing table (used by routing
-        //            daemons) to M. If this option is not specified the metric
-        //            for inet6 (IPv6) address family defaults to '1', for inet
-        //            (IPv4) it defaults to '0'. You should always specify an
-        //            explicit metric value to not rely on those defaults - they
-        //            also differ from iproute2.
-        let priority: u32 = match priority {
-            Some(priority) => priority.into(),
-            None => {
-                let IpInvariant(priority) = I::map_ip((), |()| IpInvariant(0), |()| IpInvariant(1));
-                priority
-            }
-        };
-
         let outbound_interface = outbound_interface.map(NonZeroU64::get).ok_or_else(|| {
             // TODO(https://issues.fuchsia.dev/292103361): Resolve destination
             // IP to find interface index if it is not provided explicitly.
@@ -563,6 +578,11 @@ pub mod route {
             );
             Errno::ENOTSUP
         })?;
+
+        let priority: u32 = match priority {
+            Some(priority) => priority.into(),
+            None => default_metric::<I>(outbound_interface),
+        };
 
         Ok(routes::RouteRequestArgs::New(routes::NewRouteArgs::Unicast(
             routes::UnicastNewRouteArgs {
@@ -3381,10 +3401,8 @@ mod test {
         });
         // `0` is the default metric value for IPv4 routes and `1` is
         // the default for Ipv6 routes when the NLA is not provided.
-        let priority_default = {
-            let IpInvariant(priority) = I::map_ip((), |()| IpInvariant(0), |()| IpInvariant(1));
-            priority
-        };
+        let priority_default =
+            route::default_metric::<I>(interface_id.map(|id| id.get()).unwrap_or(0));
 
         TestRouteCase::<I> {
             kind,
