@@ -54,7 +54,5 @@ bazel_fuchsia_test_package("example-board-test-package") {
 
 group("tests") {
   testonly = true
-  if (!is_hwasan) {
-    deps = [ ":example-board-test-package" ]
-  }
+  deps = [ ":example-board-test-package" ]
 }
