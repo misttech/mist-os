@@ -60,6 +60,10 @@ int main(int argc, char** argv) {
   }
 
   status = loop.Run();
+  if (status == ZX_ERR_CANCELED) {
+    // We intentionally quit the loop in order to exit.
+    status = ZX_OK;
+  }
   // All drivers should now be shutdown and stopped.
   // Destroy all dispatchers in case any weren't freed correctly.
   // This will block until all dispatcher callbacks complete.
