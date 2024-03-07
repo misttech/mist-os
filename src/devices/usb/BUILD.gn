@@ -5,7 +5,6 @@
 group("drivers") {
   testonly = true
   deps = [
-    "drivers/a1-usb-phy",
     "drivers/aml-usb-phy",
     "drivers/crg-udc",
     "drivers/dwc2",

@@ -76,7 +76,7 @@ extend uint fuchsia.BIND_PLATFORM_DEV_DID {
   TDM_USE_DSP = 0x33,
   PDM_USE_DSP = 0x34,
   SPI_NAND = 0x35,
-  A1_USB_PHY = 0x36,
+  // Deprecated: A1_USB_PHY was 0x36
   AUDIO_COMPOSITE = 0x37,
   ADC = 0x38,
   TEMP_SENSOR_PLL = 0x39,

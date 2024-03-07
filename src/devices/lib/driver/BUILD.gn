@@ -223,8 +223,6 @@ shared_library("driver") {
     "//src/devices/tpm/drivers/cr50-spi:*",
     "//src/devices/tpm/drivers/tpm:*",
     "//src/devices/tpm/drivers/tpm-lpc:*",
-    "//src/devices/usb/drivers/a1-usb-phy:*",
-    "//src/devices/usb/drivers/a1-usb-phy:*",
     "//src/devices/usb/drivers/aml-usb-phy:*",
     "//src/devices/usb/drivers/crg-udc:*",
     "//src/devices/usb/drivers/dwc2:*",
