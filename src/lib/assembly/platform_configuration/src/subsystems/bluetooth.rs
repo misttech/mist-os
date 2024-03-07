@@ -27,16 +27,23 @@ impl DefineSubsystemConfiguration<BluetoothConfig> for BluetoothSubsystemConfig 
             }
         }
 
-        if let BluetoothConfig::Standard { .. } = config {
-            // Core Bluetooth packages can only be added to the Standard platform service level.
-            if *context.feature_set_level == FeatureSupportLevel::Standard {
-                // TODO(b/292109810): Add rules for Bluetooth profiles once the platform
-                // configuration has been fully defined.
-                builder.platform_bundle("bluetooth_core");
-            } else {
-                return Err(format_err!("Bluetooth core forbidden on non-Minimal service levels"));
-            }
+        let BluetoothConfig::Standard { profiles, .. } = config else {
+            return Ok(());
+        };
+
+        // Bluetooth Core & Profile packages can only be added to the Standard platform
+        // service level.
+        if *context.feature_set_level != FeatureSupportLevel::Standard {
+            return Err(format_err!(
+                "Bluetooth core & profiles are forbidden on non-Standard service levels"
+            ));
         }
+        builder.platform_bundle("bluetooth_core");
+
+        // TODO(b/292109810): Add relevant AIBs when OOT product assembly has been updated.
+        if profiles.a2dp.enabled {}
+        if profiles.avrcp.enabled {}
+        if profiles.hfp.enabled {}
 
         Ok(())
     }
