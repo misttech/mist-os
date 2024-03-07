@@ -30,78 +30,39 @@ pub trait RemoteLike {
     );
 }
 
-/// The type for the callback function used to create new connections to the remote object. The
-/// arguments mirror DirectoryEntry::open.
-type RoutingFn =
-    Box<dyn Fn(ExecutionScope, fio::OpenFlags, Path, ServerEnd<fio::NodeMarker>) + Send + Sync>;
-
-/// Create a new [`Remote`] node that forwards requests to the provided [`RoutingFn`]. This routing
-/// function is called once per open request. The dirent type is set to the provided
-/// `dirent_type`, which should be one of the `DIRENT_TYPE_*` values defined in fuchsia.io.
-fn remote_boxed_with_type(open_fn: RoutingFn, dirent_type: fio::DirentType) -> Arc<Remote> {
-    Arc::new(Remote { open_fn, dirent_type })
-}
-
-/// Create a new [`Remote`] node that forwards open requests to the provided [`RoutingFn`]. This
-/// routing function is called once per open request. The dirent type is set as
-/// `DirentType::Unknown`. If the remote node is a known `DIRENT_TYPE_*` type, you may wish to use
-/// [`remote_boxed_with_type`] instead.
-fn remote_boxed(open: RoutingFn) -> Arc<Remote> {
-    remote_boxed_with_type(open, fio::DirentType::Unknown)
-}
-
 // TODO(b/325540563): consider adding `remote_lazy_dir` which takes a generic function that
 // returns the directory proxy. This will be useful, for example, in session_manager.
 
 /// Create a new [`Remote`] node that forwards open requests to the provided [`DirectoryProxy`],
 /// effectively handing off the handling of any further requests to the remote fidl server.
-pub fn remote_dir(dir: fio::DirectoryProxy) -> Arc<Remote> {
-    remote_boxed_with_type(
-        Box::new(move |_scope, flags, path, server_end| {
-            let _ = dir.open(flags, fio::ModeType::empty(), path.as_ref(), server_end);
-        }),
-        fio::DirentType::Directory,
-    )
+pub fn remote_dir(dir: fio::DirectoryProxy) -> Arc<impl DirectoryEntry + RemoteLike> {
+    Arc::new(RemoteDir { dir })
 }
 
-/// Create a new [`Remote`] node that clones the given node when connected.
-pub fn remote_node(node: fio::NodeProxy) -> Arc<Remote> {
-    remote_boxed(Box::new(move |_scope, flags, path, server_end| {
-        if !path.is_empty() {
-            let describe = flags.intersects(fio::OpenFlags::DESCRIBE);
-            send_on_open_with_error(describe, server_end, Status::NOT_DIR);
-            return;
-        }
-        let _ = node.clone(flags, server_end);
-    }))
+/// [`RemoteDir`] implements [`RemoteLike`]` which forwards open/open2 requests to a remote
+/// directory.
+pub struct RemoteDir {
+    dir: fio::DirectoryProxy,
 }
 
-/// A Remote node is a node which forwards most open requests to another entity. The forwarding is
-/// done by calling a routing function of type [`RoutingFn`] provided at the time of construction.
-/// The remote node itself doesn't do any flag validation when forwarding the open call.
-pub struct Remote {
-    open_fn: RoutingFn,
-    dirent_type: fio::DirentType,
-}
-
-impl RemoteLike for Remote {
-    fn open(
-        self: Arc<Self>,
-        scope: ExecutionScope,
-        flags: fio::OpenFlags,
-        path: Path,
-        server_end: ServerEnd<fio::NodeMarker>,
-    ) {
-        (self.open_fn)(scope, flags, path, server_end);
-    }
-}
-
-impl DirectoryEntry for Remote {
+impl DirectoryEntry for RemoteDir {
     fn entry_info(&self) -> EntryInfo {
-        EntryInfo::new(fio::INO_UNKNOWN, self.dirent_type)
+        EntryInfo::new(fio::INO_UNKNOWN, fio::DirentType::Directory)
     }
 
     fn open_entry(self: Arc<Self>, request: OpenRequest<'_>) -> Result<(), Status> {
         request.open_remote(self)
+    }
+}
+
+impl RemoteLike for RemoteDir {
+    fn open(
+        self: Arc<Self>,
+        _scope: ExecutionScope,
+        flags: fio::OpenFlags,
+        path: Path,
+        server_end: ServerEnd<fio::NodeMarker>,
+    ) {
+        let _ = self.dir.open(flags, fio::ModeType::empty(), path.as_ref(), server_end);
     }
 }

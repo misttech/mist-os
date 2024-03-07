@@ -34,7 +34,7 @@ use {
         file::vmo::VmoFile,
         name::Name,
         path::Path,
-        remote::{remote_dir, remote_node},
+        remote::remote_dir,
         service::endpoint,
     },
 };
@@ -478,21 +478,6 @@ macro_rules! add_functions {
             let name: String = name.into();
             let name: Name = name.try_into().expect("Invalid path");
             self.dir.add_entry_impl(name, remote_dir(proxy), false).expect("Unable to add entry");
-            self
-        }
-
-        /// Adds a new remote served over the given NodeProxy.  If the remote is a directory,
-        /// add_remote should be used instead.
-        ///
-        /// The name must be a valid `fuchsia.io` [`Name`].
-        pub fn add_remote_node(
-            &mut self,
-            name: impl Into<String>,
-            proxy: fio::NodeProxy,
-        ) -> &mut Self {
-            let name: String = name.into();
-            let name: Name = name.try_into().expect("Invalid path");
-            self.dir.add_entry_impl(name, remote_node(proxy), false).expect("Unable to add entry");
             self
         }
     };
