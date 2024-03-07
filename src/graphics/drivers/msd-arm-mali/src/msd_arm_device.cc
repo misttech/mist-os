@@ -272,7 +272,7 @@ bool MsdArmDevice::Init(ParentDevice* platform_device,
   device_request_semaphore_ = magma::PlatformSemaphore::Create();
   device_port_ = magma::PlatformPort::Create();
 
-  power_manager_ = std::make_unique<PowerManager>(register_io_.get());
+  power_manager_ = std::make_unique<PowerManager>(this);
   perf_counters_ = std::make_unique<PerformanceCounters>(this);
   perf_counters_->SetGpuFeatures(gpu_features_);
   scheduler_ = std::make_unique<JobScheduler>(this, 3);
@@ -368,7 +368,7 @@ void MsdArmDevice::EnableAllCores() {
 #if defined(MSD_ARM_ENABLE_ALL_CORES)
   enabled_cores = gpu_features_.shader_present;
 #endif
-  power_manager_->EnableCores(register_io_.get(), enabled_cores);
+  power_manager_->EnableCores(enabled_cores);
 }
 
 std::shared_ptr<MsdArmConnection> MsdArmDevice::OpenArmConnection(msd::msd_client_id_t client_id) {
@@ -658,7 +658,7 @@ int MsdArmDevice::GpuInterruptThreadLoop() {
     if (irq_status.power_changed_single() || irq_status.power_changed_all()) {
       irq_status.set_power_changed_single(0);
       irq_status.set_power_changed_all(0);
-      power_manager_->ReceivedPowerInterrupt(register_io_.get());
+      power_manager_->ReceivedPowerInterrupt();
       if (power_manager_->l2_ready_status() &&
           (cache_coherency_status_ == kArmMaliCacheCoherencyAce)) {
         auto enable_reg = registers::CoherencyFeatures::GetEnable().FromValue(0);
@@ -1511,8 +1511,8 @@ bool MsdArmDevice::IsProtectedModeSupported() {
   if (!mali_properties_.supports_protected_mode)
     return false;
   uint32_t gpu_product_id = gpu_features_.gpu_id.product_id();
-  // TODO(https://fxbug.dev/42081535): Support protected mode when using ACE cache coherency. Apparently
-  // the L2 needs to be powered down then switched to ACE Lite in that mode.
+  // TODO(https://fxbug.dev/42081535): Support protected mode when using ACE cache coherency.
+  // Apparently the L2 needs to be powered down then switched to ACE Lite in that mode.
   if (cache_coherency_status_ == kArmMaliCacheCoherencyAce)
     return false;
   // All Bifrost should support it. 0x6956 is Mali-t60x MP4 r0p0, so it doesn't count.
@@ -1525,8 +1525,8 @@ void MsdArmDevice::EnterProtectedMode() {
   perf_counters_->ForceDisable();
 
   if (!mali_properties_.use_protected_mode_callbacks) {
-    // TODO(https://fxbug.dev/42081535): If cache-coherency is enabled, power down L2 and wait for the
-    // completion of that.
+    // TODO(https://fxbug.dev/42081535): If cache-coherency is enabled, power down L2 and wait for
+    // the completion of that.
     register_io_->Write32(registers::GpuCommand::kCmdSetProtectedMode,
                           registers::GpuCommand::kOffset);
     return;
@@ -1561,7 +1561,7 @@ void MsdArmDevice::EnterProtectedMode() {
 
   EnableAllCores();
 
-  if (!power_manager_->WaitForShaderReady(register_io_.get())) {
+  if (!power_manager_->WaitForShaderReady()) {
     TRACE_ALERT("magma", "pmode-error");
     MAGMA_LOG(WARNING, "Waiting for shader ready failed");
     return;
@@ -1639,7 +1639,7 @@ bool MsdArmDevice::ResetDevice() {
     return false;
   }
 
-  if (!assume_reset_happened_ && !power_manager_->WaitForShaderReady(register_io_.get())) {
+  if (!assume_reset_happened_ && !power_manager_->WaitForShaderReady()) {
     MAGMA_LOG(WARNING, "Waiting for shader ready failed");
     return false;
   }
@@ -1652,13 +1652,13 @@ bool MsdArmDevice::ResetDevice() {
 }
 
 bool MsdArmDevice::PowerDownL2() {
-  power_manager_->DisableL2(register_io_.get());
-  return power_manager_->WaitForL2Disable(register_io_.get());
+  power_manager_->DisableL2();
+  return power_manager_->WaitForL2Disable();
 }
 
 bool MsdArmDevice::PowerDownShaders() {
-  power_manager_->DisableShaders(register_io_.get());
-  return power_manager_->WaitForShaderDisable(register_io_.get());
+  power_manager_->DisableShaders();
+  return power_manager_->WaitForShaderDisable();
 }
 
 bool MsdArmDevice::IsInProtectedMode() {

@@ -38,7 +38,8 @@ class MsdArmDevice : public msd::Device,
                      public JobScheduler::Owner,
                      public MsdArmConnection::Owner,
                      public AddressManager::Owner,
-                     public PerformanceCounters::Owner {
+                     public PerformanceCounters::Owner,
+                     public PowerManager::Owner {
  public:
   // Creates a device for the given |device_handle| and returns ownership.
   // If |start_device_thread| is false, then StartDeviceThread should be called

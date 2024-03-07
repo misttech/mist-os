@@ -19,13 +19,18 @@
 // This class generally lives on the device thread.
 class PowerManager {
  public:
-  PowerManager(mali::RegisterIo* io);
+  class Owner {
+   public:
+    virtual mali::RegisterIo* register_io() = 0;
+  };
+
+  explicit PowerManager(Owner* owner);
 
   // Called on the device thread or the initial driver thread.
-  void EnableCores(mali::RegisterIo* io, uint64_t shader_bitmask);
+  void EnableCores(uint64_t shader_bitmask);
 
   // Called on the GPU interrupt thread.
-  void ReceivedPowerInterrupt(mali::RegisterIo* io);
+  void ReceivedPowerInterrupt();
 
   uint64_t l2_ready_status() const {
     std::lock_guard<std::mutex> lock(ready_status_mutex_);
@@ -41,11 +46,11 @@ class PowerManager {
                         std::chrono::steady_clock::duration* active_time_out);
   bool GetTotalTime(uint32_t* buffer_out);
 
-  void DisableL2(mali::RegisterIo* io);
-  void DisableShaders(mali::RegisterIo* io);
-  bool WaitForL2Disable(mali::RegisterIo* io);
-  bool WaitForShaderDisable(mali::RegisterIo* io);
-  bool WaitForShaderReady(mali::RegisterIo* io);
+  void DisableL2();
+  void DisableShaders();
+  bool WaitForL2Disable();
+  bool WaitForShaderDisable();
+  bool WaitForShaderReady();
 
  private:
   friend class TestMsdArmDevice;
@@ -57,10 +62,13 @@ class PowerManager {
     std::chrono::steady_clock::duration active_time;
   };
 
-  void UpdateReadyStatus(mali::RegisterIo* io);
+  mali::RegisterIo* register_io() { return owner_->register_io(); }
+  void UpdateReadyStatus();
   // Called to update timekeeping and possible update the gpu activity info.
   void UpdateGpuActiveLocked(bool active) FIT_REQUIRES(active_time_mutex_);
   std::deque<TimePeriod>& time_periods() { return time_periods_; }
+
+  Owner* owner_;
 
   mutable std::mutex ready_status_mutex_;
   FIT_GUARDED(ready_status_mutex_) uint64_t tiler_ready_status_ = 0;

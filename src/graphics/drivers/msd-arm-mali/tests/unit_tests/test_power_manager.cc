@@ -13,11 +13,24 @@
 #include "src/graphics/drivers/msd-arm-mali/src/power_manager.h"
 #include "src/graphics/drivers/msd-arm-mali/src/registers.h"
 
+namespace {
+class FakePowerOwner : public PowerManager::Owner {
+ public:
+  explicit FakePowerOwner(mali::RegisterIo* register_io) : register_io_(register_io) {}
+
+  mali::RegisterIo* register_io() { return register_io_; }
+
+ private:
+  mali::RegisterIo* register_io_;
+};
+}  // namespace
+
 class TestPowerManager {
  public:
   void MockEnable() {
     auto reg_io = std::make_unique<mali::RegisterIo>(MockMmio::Create(1024 * 1024));
-    auto power_manager = std::make_unique<PowerManager>(reg_io.get());
+    FakePowerOwner power_owner{reg_io.get()};
+    auto power_manager = std::make_unique<PowerManager>(&power_owner);
 
     constexpr uint32_t kShaderOnOffset =
         static_cast<uint32_t>(registers::CoreReadyState::CoreType::kShader) +
@@ -25,7 +38,7 @@ class TestPowerManager {
     constexpr uint32_t kShaderOnHighOffset = kShaderOnOffset + 4;
     constexpr uint32_t kDummyHighValue = 1500;
     reg_io->Write32(kDummyHighValue, kShaderOnHighOffset);
-    power_manager->EnableCores(reg_io.get(), 0xf);
+    power_manager->EnableCores(0xf);
     // Higher word shouldn't be written to because none of them are being
     // enabled.
     EXPECT_EQ(kDummyHighValue, reg_io->Read32(kShaderOnHighOffset));
@@ -47,7 +60,8 @@ class TestPowerManager {
 
   void MockDisable() {
     auto reg_io = std::make_unique<mali::RegisterIo>(MockMmio::Create(1024 * 1024));
-    auto power_manager = std::make_unique<PowerManager>(reg_io.get());
+    FakePowerOwner power_owner{reg_io.get()};
+    auto power_manager = std::make_unique<PowerManager>(&power_owner);
 
     constexpr uint64_t kCoresEnabled = 2;
     constexpr uint32_t kShaderReadyOffset =
@@ -55,7 +69,7 @@ class TestPowerManager {
         static_cast<uint32_t>(registers::CoreReadyState::StatusType::kReady);
     reg_io->Write32(kCoresEnabled, kShaderReadyOffset);
 
-    power_manager->DisableShaders(reg_io.get());
+    power_manager->DisableShaders();
 
     registers::CoreReadyState::CoreType actions[] = {registers::CoreReadyState::CoreType::kShader,
                                                      registers::CoreReadyState::CoreType::kL2,
@@ -70,7 +84,7 @@ class TestPowerManager {
       else
         EXPECT_EQ(0u, reg_io->Read32(offset));
     }
-    power_manager->DisableL2(reg_io.get());
+    power_manager->DisableL2();
     for (size_t i = 0; i < std::size(actions); i++) {
       uint32_t offset =
           static_cast<uint32_t>(actions[i]) +
@@ -85,7 +99,8 @@ class TestPowerManager {
 
   void TimeCoalesce() {
     auto reg_io = std::make_unique<mali::RegisterIo>(MockMmio::Create(1024 * 1024));
-    PowerManager power_manager(reg_io.get());
+    FakePowerOwner power_owner{reg_io.get()};
+    PowerManager power_manager(&power_owner);
 
     for (int i = 0; i < 100; i++) {
       power_manager.UpdateGpuActive(true);
@@ -115,7 +130,8 @@ TEST(PowerManager, MockDisable) {
 
 TEST(PowerManager, TimeAccumulation) {
   auto reg_io = std::make_unique<mali::RegisterIo>(MockMmio::Create(1024 * 1024));
-  PowerManager power_manager(reg_io.get());
+  FakePowerOwner power_owner{reg_io.get()};
+  PowerManager power_manager(&power_owner);
   power_manager.UpdateGpuActive(true);
   usleep(150 * 1000);
 
