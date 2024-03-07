@@ -24,16 +24,13 @@ use lock_order::wrap::prelude::*;
 use net_types::{
     ethernet::Mac,
     ip::{
-        AddrSubnetEither, GenericOverIp, Ip, IpAddress, IpInvariant, Ipv4, Ipv4Addr, Ipv6,
-        Ipv6Addr, Subnet, SubnetEither,
+        AddrSubnetEither, GenericOverIp, Ip, IpAddress, IpInvariant, IpVersion, Ipv4, Ipv4Addr,
+        Ipv6, Ipv6Addr, Subnet, SubnetEither,
     },
     SpecifiedAddr, UnicastAddr, Witness as _,
 };
 #[cfg(test)]
-use net_types::{
-    ip::{IpAddr, IpVersion},
-    MulticastAddr, NonMappedAddr,
-};
+use net_types::{ip::IpAddr, MulticastAddr, NonMappedAddr};
 use packet::{Buf, BufferMut};
 #[cfg(test)]
 use packet_formats::ip::IpProto;
@@ -72,7 +69,7 @@ use crate::{
         link::LinkDevice,
         loopback::LoopbackDeviceId,
         DeviceId, DeviceLayerEventDispatcher, DeviceLayerStateTypes, DeviceSendFrameError,
-        EthernetDeviceId, EthernetWeakDeviceId, WeakDeviceId,
+        EthernetDeviceId, EthernetWeakDeviceId, PureIpDeviceId, WeakDeviceId,
     },
     filter::FilterBindingsTypes,
     ip::{
@@ -1603,13 +1600,27 @@ impl DeviceLayerEventDispatcher for FakeBindingsCtx {
         self.state_mut().tx_available.push(device.clone());
     }
 
-    fn send_frame(
+    fn send_ethernet_frame(
         &mut self,
         device: &EthernetDeviceId<FakeBindingsCtx>,
         frame: Buf<Vec<u8>>,
     ) -> Result<(), DeviceSendFrameError<Buf<Vec<u8>>>> {
         let frame_meta = DispatchedFrame::Ethernet(device.downgrade());
         self.with_inner_mut(|ctx| ctx.frame_ctx_mut().push(frame_meta, frame.into_inner()));
+        Ok(())
+    }
+
+    fn send_ip_packet(
+        &mut self,
+        device: &PureIpDeviceId<FakeBindingsCtx>,
+        packet: Buf<Vec<u8>>,
+        ip_version: IpVersion,
+    ) -> Result<(), DeviceSendFrameError<Buf<Vec<u8>>>> {
+        let frame_meta = DispatchedFrame::PureIp(PureIpDeviceAndIpVersion {
+            device: device.downgrade(),
+            version: ip_version,
+        });
+        self.with_inner_mut(|ctx| ctx.frame_ctx_mut().push(frame_meta, packet.into_inner()));
         Ok(())
     }
 }

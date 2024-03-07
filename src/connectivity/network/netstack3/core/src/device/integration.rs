@@ -31,7 +31,7 @@ use crate::{
             self, CoreCtxWithDeviceId, EthernetIpLinkDeviceDynamicStateContext, EthernetLinkDevice,
         },
         loopback::{self, LoopbackDevice, LoopbackDeviceId, LoopbackPrimaryDeviceId},
-        pure_ip::PureIpDeviceId,
+        pure_ip::{self, PureIpDeviceId},
         queue::tx::TransmitQueueHandler,
         socket,
         state::{DeviceStateSpec, IpLinkDeviceState},
@@ -1091,7 +1091,8 @@ where
     S::Buffer: BufferMut,
     A: IpAddress,
     L: LockBefore<crate::lock_ordering::IpState<A::Version>>
-        + LockBefore<crate::lock_ordering::LoopbackTxQueue>,
+        + LockBefore<crate::lock_ordering::LoopbackTxQueue>
+        + LockBefore<crate::lock_ordering::PureIpDeviceTxQueue>,
     A::Version: EthernetIpExt,
     for<'a> CoreCtx<'a, BC, L>: EthernetIpLinkDeviceDynamicStateContext<BC, DeviceId = EthernetDeviceId<BC>>
         + NudHandler<A::Version, EthernetLinkDevice, BC>
@@ -1104,8 +1105,9 @@ where
         DeviceId::Loopback(id) => {
             loopback::send_ip_frame::<_, A, _, _>(core_ctx, bindings_ctx, id, local_addr, body)
         }
-        // TODO(https://fxbug.dev/42051633): Support sending on pure IP devices.
-        DeviceId::PureIp(_id) => Ok(()),
+        DeviceId::PureIp(id) => {
+            pure_ip::send_ip_frame::<_, _, A::Version, _>(core_ctx, bindings_ctx, id, body)
+        }
     }
 }
 

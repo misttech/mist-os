@@ -19,8 +19,8 @@ use crate::{
     device::{
         config::DeviceConfigurationContext,
         pure_ip::{
-            PureIpDevice, PureIpDeviceFrameMetadata, PureIpDeviceId, PureIpPrimaryDeviceId,
-            PureIpWeakDeviceId,
+            PureIpDevice, PureIpDeviceId, PureIpDeviceReceiveFrameMetadata,
+            PureIpDeviceTxQueueFrameMetadata, PureIpPrimaryDeviceId, PureIpWeakDeviceId,
         },
         queue::{
             tx::{
@@ -93,7 +93,7 @@ where
     }
 }
 
-impl<CC, BC> RecvFrameContext<BC, PureIpDeviceFrameMetadata<CC::DeviceId>> for CC
+impl<CC, BC> RecvFrameContext<BC, PureIpDeviceReceiveFrameMetadata<CC::DeviceId>> for CC
 where
     CC: DeviceIdContext<PureIpDevice>
         + RecvFrameContext<BC, RecvIpFrameMeta<CC::DeviceId, Ipv4>>
@@ -102,12 +102,12 @@ where
     fn receive_frame<B: BufferMut>(
         &mut self,
         bindings_ctx: &mut BC,
-        metadata: PureIpDeviceFrameMetadata<CC::DeviceId>,
+        metadata: PureIpDeviceReceiveFrameMetadata<CC::DeviceId>,
         buffer: B,
     ) {
         // TODO(https://fxbug.dev/42051633): Deliver the received frame to
         // the device socket handler.
-        let PureIpDeviceFrameMetadata { device_id, ip_version } = metadata;
+        let PureIpDeviceReceiveFrameMetadata { device_id, ip_version } = metadata;
         match ip_version {
             IpVersion::V4 => self.receive_frame(
                 bindings_ctx,
@@ -132,6 +132,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::PureIpDeviceRxDequ
         metadata: RecvIpFrameMeta<PureIpDeviceId<BC>, Ipv4>,
         frame: B,
     ) {
+        // TODO(https://fxbug.dev/42051633): Update device counters.
         crate::ip::receive_ipv4_packet(
             self,
             bindings_ctx,
@@ -151,6 +152,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::PureIpDeviceRxDequ
         metadata: RecvIpFrameMeta<PureIpDeviceId<BC>, Ipv6>,
         frame: B,
     ) {
+        // TODO(https://fxbug.dev/42051633): Update device counters.
         crate::ip::receive_ipv6_packet(
             self,
             bindings_ctx,
@@ -174,7 +176,8 @@ impl<BC: BindingsContext, L> SendFrameContext<BC, DeviceSocketMetadata<PureIpDev
         S: Serializer,
         S::Buffer: BufferMut,
     {
-        // TODO(https://fxbug.dev/42051633): Handle sending IP packets.
+        // TODO(https://fxbug.dev/42051633): Handle sending IP packets from
+        // device sockets, by enqueuing the packet in the TX queue.
         Ok(())
     }
 }
@@ -182,12 +185,13 @@ impl<BC: BindingsContext, L> SendFrameContext<BC, DeviceSocketMetadata<PureIpDev
 impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::PureIpDeviceTxQueue>>
     TransmitQueueCommon<PureIpDevice, BC> for CoreCtx<'_, BC, L>
 {
-    type Meta = ();
+    type Meta = PureIpDeviceTxQueueFrameMetadata;
     type Allocator = BufVecU8Allocator;
     type Buffer = Buf<Vec<u8>>;
 
     fn parse_outgoing_frame(_buf: &[u8]) -> Result<SentFrame<&[u8]>, ParseSentFrameError> {
-        // TODO(https://fxbug.dev/42051633): Handle parsing outgoing frames
+        // TODO(https://fxbug.dev/42051633): Parse the outgoing IP packet so
+        // that it can be delivered to device sockets.
         Err(ParseSentFrameError)
     }
 }
@@ -211,13 +215,17 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::PureIpDeviceTxQueu
 
     fn send_frame(
         &mut self,
-        _bindings_ctx: &mut BC,
-        _device_id: &Self::DeviceId,
-        _meta: Self::Meta,
-        _buf: Self::Buffer,
+        bindings_ctx: &mut BC,
+        device_id: &Self::DeviceId,
+        meta: Self::Meta,
+        buf: Self::Buffer,
     ) -> Result<(), DeviceSendFrameError<(Self::Meta, Self::Buffer)>> {
-        // TODO(https://fxbug.dev/42051633): Handle sending IP packets.
-        Ok(())
+        // TODO(https://fxbug.dev/42051633): Update device counters.
+        let PureIpDeviceTxQueueFrameMetadata { ip_version } = meta;
+        DeviceLayerEventDispatcher::send_ip_packet(bindings_ctx, device_id, buf, ip_version)
+            .map_err(|DeviceSendFrameError::DeviceNotReady(buf)| {
+                DeviceSendFrameError::DeviceNotReady((meta, buf))
+            })
     }
 }
 
@@ -257,8 +265,10 @@ impl<BC: BindingsContext> TransmitQueueBindingsContext<PureIpDevice, PureIpDevic
 impl<BC: BindingsContext> LockFor<crate::lock_ordering::PureIpDeviceTxQueue>
     for IpLinkDeviceState<PureIpDevice, BC>
 {
-    type Data = TransmitQueueState<(), Buf<Vec<u8>>, BufVecU8Allocator>;
-    type Guard<'l> = crate::sync::LockGuard<'l, TransmitQueueState<(), Buf<Vec<u8>>, BufVecU8Allocator>>
+    type Data =
+        TransmitQueueState<PureIpDeviceTxQueueFrameMetadata, Buf<Vec<u8>>, BufVecU8Allocator>;
+    type Guard<'l> = crate::sync::LockGuard<
+            'l, TransmitQueueState<PureIpDeviceTxQueueFrameMetadata, Buf<Vec<u8>>, BufVecU8Allocator>>
         where
             Self: 'l;
     fn lock(&self) -> Self::Guard<'_> {
@@ -269,8 +279,9 @@ impl<BC: BindingsContext> LockFor<crate::lock_ordering::PureIpDeviceTxQueue>
 impl<BC: BindingsContext> LockFor<crate::lock_ordering::PureIpDeviceTxDequeue>
     for IpLinkDeviceState<PureIpDevice, BC>
 {
-    type Data = DequeueState<(), Buf<Vec<u8>>>;
-    type Guard<'l> = crate::sync::LockGuard<'l, DequeueState<(), Buf<Vec<u8>>>>
+    type Data = DequeueState<PureIpDeviceTxQueueFrameMetadata, Buf<Vec<u8>>>;
+    type Guard<'l> = crate::sync::LockGuard<
+            'l, DequeueState<PureIpDeviceTxQueueFrameMetadata, Buf<Vec<u8>>>>
         where
             Self: 'l;
     fn lock(&self) -> Self::Guard<'_> {
@@ -304,15 +315,32 @@ mod tests {
     use ip_test_macro::ip_test;
     use net_types::{ip::Mtu, Witness};
     use packet_formats::ip::{IpPacketBuilder, IpProto};
+    use test_case::test_case;
 
     use crate::{
-        device::{pure_ip::PureIpDeviceCreationProperties, TransmitQueueConfiguration},
+        context::testutil::PureIpDeviceAndIpVersion,
+        device::{pure_ip::PureIpDeviceCreationProperties, DeviceId, TransmitQueueConfiguration},
         sync::RemoveResourceResult,
         testutil::{TestIpExt, DEFAULT_INTERFACE_METRIC},
+        types::WorkQueueReport,
     };
 
     const MTU: Mtu = Mtu::new(1234);
     const TTL: u8 = 64;
+
+    fn default_ip_packet<I: Ip + TestIpExt>() -> Buf<Vec<u8>> {
+        Buf::new(Vec::new(), ..)
+            .encapsulate(I::PacketBuilder::new(
+                I::FAKE_CONFIG.remote_ip.get(),
+                I::FAKE_CONFIG.local_ip.get(),
+                TTL,
+                IpProto::Udp.into(),
+            ))
+            .serialize_vec_outer()
+            .ok()
+            .unwrap()
+            .unwrap_b()
+    }
 
     #[test]
     // Smoke test verifying [`PureIpDevice`] implements the traits required to
@@ -350,24 +378,68 @@ mod tests {
         );
         crate::device::testutil::enable_device(&mut ctx, &device.clone().into());
 
-        let packet = Buf::new(Vec::new(), ..)
-            .encapsulate(I::PacketBuilder::new(
-                I::FAKE_CONFIG.remote_ip.get(),
-                I::FAKE_CONFIG.local_ip.get(),
-                TTL,
-                IpProto::Udp.into(),
-            ))
-            .serialize_vec_outer()
-            .ok()
-            .unwrap()
-            .unwrap_b();
-
         // Receive a frame from the network and verify delivery to the IP layer.
         assert_eq!(ctx.core_ctx.ip_counters::<I>().receive_ip_packet.get(), 0);
         ctx.core_api().device::<PureIpDevice>().receive_frame(
-            PureIpDeviceFrameMetadata { device_id: device, ip_version: I::VERSION },
-            packet,
+            PureIpDeviceReceiveFrameMetadata { device_id: device, ip_version: I::VERSION },
+            default_ip_packet::<I>(),
         );
         assert_eq!(ctx.core_ctx.ip_counters::<I>().receive_ip_packet.get(), 1);
+    }
+
+    #[ip_test]
+    #[test_case(TransmitQueueConfiguration::None; "no queue")]
+    #[test_case(TransmitQueueConfiguration::Fifo; "fifo queue")]
+    fn send_frame<I: Ip + TestIpExt>(tx_queue_config: TransmitQueueConfiguration) {
+        let mut ctx = crate::testutil::FakeCtx::default();
+        let device = ctx.core_api().device::<PureIpDevice>().add_device_with_default_state(
+            PureIpDeviceCreationProperties { mtu: MTU },
+            DEFAULT_INTERFACE_METRIC,
+        );
+        crate::device::testutil::enable_device(&mut ctx, &device.clone().into());
+        let has_tx_queue = match tx_queue_config {
+            TransmitQueueConfiguration::None => false,
+            TransmitQueueConfiguration::Fifo => true,
+        };
+        ctx.core_api().transmit_queue::<PureIpDevice>().set_configuration(&device, tx_queue_config);
+        assert_matches!(ctx.bindings_ctx.take_ip_frames()[..], [], "unexpected sent IP frame");
+
+        {
+            let (mut core_ctx, bindings_ctx) = ctx.contexts();
+            crate::device::pure_ip::send_ip_frame::<_, _, I, _>(
+                &mut core_ctx,
+                bindings_ctx,
+                &device,
+                default_ip_packet::<I>(),
+            )
+            .expect("send should succeed");
+        }
+
+        if has_tx_queue {
+            // When a queuing configuration is set, there shouldn't be any sent
+            // frames until the queue is explicitly drained.
+            assert_matches!(ctx.bindings_ctx.take_ip_frames()[..], [], "unexpected sent IP frame");
+            let result = ctx
+                .core_api()
+                .transmit_queue::<PureIpDevice>()
+                .transmit_queued_frames(&device)
+                .expect("drain queue should succeed");
+            assert_eq!(result, WorkQueueReport::AllDone);
+            // Expect the PureIpDevice TX task to have been woken.
+            assert_eq!(
+                core::mem::take(&mut ctx.bindings_ctx.state_mut().tx_available),
+                [DeviceId::PureIp(device.clone())]
+            );
+        }
+
+        let (PureIpDeviceAndIpVersion { device: found_device, version }, packet) = {
+            let mut frames = ctx.bindings_ctx.take_ip_frames();
+            let frame = frames.pop().expect("exactly one IP frame should have been sent");
+            assert_matches!(frames[..], [], "unexpected sent IP frame");
+            frame
+        };
+        assert_eq!(found_device, device.downgrade());
+        assert_eq!(version, I::VERSION);
+        assert_eq!(packet, default_ip_packet::<I>().into_inner());
     }
 }

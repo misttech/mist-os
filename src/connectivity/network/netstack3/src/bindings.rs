@@ -63,14 +63,17 @@ use timers::TimerDispatcher;
 use net_declare::net_subnet_v4;
 use net_types::{
     ethernet::Mac,
-    ip::{AddrSubnet, AddrSubnetEither, Ip, IpAddr, IpAddress, Ipv4, Ipv4Addr, Ipv6, Mtu, Subnet},
+    ip::{
+        AddrSubnet, AddrSubnetEither, Ip, IpAddr, IpAddress, IpVersion, Ipv4, Ipv4Addr, Ipv6, Mtu,
+        Subnet,
+    },
     SpecifiedAddr,
 };
 use netstack3_core::{
     device::{
         DeviceId, DeviceLayerEventDispatcher, DeviceLayerStateTypes, DeviceSendFrameError,
         EthernetDeviceId, LoopbackCreationProperties, LoopbackDevice, LoopbackDeviceId,
-        WeakDeviceId,
+        PureIpDeviceId, WeakDeviceId,
     },
     error::NetstackError,
     filter::FilterBindingsTypes,
@@ -485,7 +488,7 @@ impl DeviceLayerEventDispatcher for BindingsCtx {
         tx_notifier.schedule()
     }
 
-    fn send_frame(
+    fn send_ethernet_frame(
         &mut self,
         device: &EthernetDeviceId<Self>,
         frame: Buf<Vec<u8>>,
@@ -512,6 +515,18 @@ impl DeviceLayerEventDispatcher for BindingsCtx {
             })
         }
 
+        Ok(())
+    }
+
+    fn send_ip_packet(
+        &mut self,
+        _device: &PureIpDeviceId<Self>,
+        _packet: Buf<Vec<u8>>,
+        _ip_version: IpVersion,
+    ) -> Result<(), DeviceSendFrameError<Buf<Vec<u8>>>> {
+        // TODO(https://fxbug.dev/42051633): Support sending IP packets to the
+        // device driver.
+        tracing::warn!("pure IP device tx is not implemented; dropping packet");
         Ok(())
     }
 }

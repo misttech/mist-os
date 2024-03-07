@@ -12,7 +12,7 @@ use derivative::Derivative;
 use lock_order::{lock::UnlockedAccess, wrap::prelude::*};
 use net_types::{
     ethernet::Mac,
-    ip::{Ip, Ipv4, Ipv6},
+    ip::{Ip, IpVersion, Ipv4, Ipv6},
     BroadcastAddr, MulticastAddr,
 };
 use packet::Buf;
@@ -524,17 +524,29 @@ pub trait DeviceLayerEventDispatcher: DeviceLayerTypes + Sized {
     /// are promptly sent.
     fn wake_tx_task(&mut self, device: &DeviceId<Self>);
 
-    /// Send a frame to a device driver.
+    /// Send a frame to an Ethernet device driver.
     ///
-    /// If there was an MTU error while attempting to serialize the frame, the
-    /// original buffer is returned in the `Err` variant. All other errors (for
-    /// example, errors in allocating a buffer) are silently ignored and
-    /// reported as success. Implementations are expected to gracefully handle
-    /// non-conformant but correctable input, e.g. by padding too-small frames.
-    fn send_frame(
+    /// See [`DeviceSendFrameError`] for the ways this call may fail; all other
+    /// errors are silently ignored and reported as success. Implementations are
+    /// expected to gracefully handle non-conformant but correctable input, e.g.
+    /// by padding too-small frames.
+    fn send_ethernet_frame(
         &mut self,
         device: &EthernetDeviceId<Self>,
         frame: Buf<Vec<u8>>,
+    ) -> Result<(), DeviceSendFrameError<Buf<Vec<u8>>>>;
+
+    /// Send an IP packet to an IP device driver.
+    ///
+    /// See [`DeviceSendFrameError`] for the ways this call may fail; all other
+    /// errors are silently ignored and reported as success. Implementations are
+    /// expected to gracefully handle non-conformant but correctable input, e.g.
+    /// by padding too-small frames.
+    fn send_ip_packet(
+        &mut self,
+        device: &PureIpDeviceId<Self>,
+        packet: Buf<Vec<u8>>,
+        ip_version: IpVersion,
     ) -> Result<(), DeviceSendFrameError<Buf<Vec<u8>>>>;
 }
 
