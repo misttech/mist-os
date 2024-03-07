@@ -871,6 +871,33 @@ class TestJobScheduler {
         "address slot -1",
         dump[found_queue_message + 1]);
   }
+
+  void TestSchedulingDisable() {
+    TestOwner owner;
+    TestConnectionOwner connection_owner;
+    std::shared_ptr<MsdArmConnection> connection = MsdArmConnection::Create(0, &connection_owner);
+    EXPECT_EQ(0u, owner.run_list().size());
+    JobScheduler scheduler(&owner, 1);
+    auto atom1 = std::make_unique<MsdArmAtom>(connection, 1u, 0, 0, magma_arm_mali_user_data(), 0);
+    MsdArmAtom* atom1_ptr = atom1.get();
+    scheduler.EnqueueAtom(std::move(atom1));
+    EXPECT_EQ(0u, owner.run_list().size());
+
+    scheduler.SetSchedulingEnabled(false);
+    scheduler.TryToSchedule();
+
+    EXPECT_EQ(0u, owner.run_list().size());
+    EXPECT_FALSE(owner.gpu_active());
+
+    scheduler.SetSchedulingEnabled(true);
+
+    EXPECT_EQ(1u, owner.run_list().size());
+    EXPECT_EQ(atom1_ptr, owner.run_list()[0]);
+    EXPECT_TRUE(owner.gpu_active());
+
+    scheduler.JobCompleted(0, kArmMaliResultSuccess, 0u);
+    EXPECT_FALSE(owner.gpu_active());
+  }
 };
 
 class JobSchedulerTest : public testing::Test {
@@ -927,3 +954,5 @@ TEST_F(JobSchedulerTest, ProtectedRunSlot1) { TestJobScheduler().TestProtectedAt
 TEST_F(JobSchedulerTest, ProtectedMode) { TestJobScheduler().TestProtectedMode(); }
 
 TEST_F(JobSchedulerTest, ProtectedPriority) { TestJobScheduler().TestProtectedPriority(); }
+
+TEST_F(JobSchedulerTest, SchedulingDisable) { TestJobScheduler().TestSchedulingDisable(); }

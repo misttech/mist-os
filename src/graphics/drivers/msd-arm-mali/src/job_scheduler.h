@@ -60,6 +60,10 @@ class JobScheduler {
   // Used to fake out time for tests.
   void set_clock_callback(const ClockCallback& clock_callback) { clock_callback_ = clock_callback; }
 
+  // Sets whether the scheduler will attempt to schedule work on the GPU. When scheduling is
+  // re-enabled, this method will attempt to schedule work on the GPU.
+  void SetSchedulingEnabled(bool enabled);
+
   std::vector<std::string> DumpStatus();
 
  private:
@@ -86,6 +90,8 @@ class JobScheduler {
   ClockCallback clock_callback_;
 
   uint32_t job_slots_;
+
+  bool scheduling_enabled_{true};
 
   // This duration determines how often to check whether this atom should be preempted by another
   // of the same priority.

@@ -65,6 +65,9 @@ class MagmaDriverBase : public fdf::DriverBase,
     if (zx::result result = CreateDevfsNode(); result.is_error()) {
       return result.take_error();
     }
+    if (zx::result result = CreateAdditionalDevNodes(); result.is_error()) {
+      return result.take_error();
+    }
     MAGMA_LOG(INFO, "MagmaDriverBase::Start completed for MSD %s", std::string(name()).c_str());
     defer_teardown.cancel();
     return zx::ok();
@@ -82,6 +85,8 @@ class MagmaDriverBase : public fdf::DriverBase,
 
   // Initialize MagmaDriver and MagmaSystemDevice.
   virtual zx::result<> MagmaStart() = 0;
+  // Called after MagmaStart to initialize devfs nodes.
+  virtual zx::result<> CreateAdditionalDevNodes() { return zx::ok(); }
 
   zx::result<zx::resource> GetInfoResource() {
     auto info_resource = incoming()->template Connect<fuchsia_kernel::InfoResource>();
@@ -99,6 +104,7 @@ class MagmaDriverBase : public fdf::DriverBase,
     return zx::ok(std::move(result->resource));
   }
 
+  fidl::WireSyncClient<fuchsia_driver_framework::Node>& node_client() { return node_client_; }
   std::mutex& magma_mutex() FIT_RETURN_CAPABILITY(magma_mutex_) { return magma_mutex_; }
 
   msd::Driver* magma_driver() FIT_REQUIRES(magma_mutex_) { return magma_driver_.get(); }

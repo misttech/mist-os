@@ -4,6 +4,7 @@
 
 #include <fidl/fuchsia.driver.framework/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.gpu.mali/cpp/driver/wire.h>
+#include <fidl/fuchsia.hardware.gpu.mali/cpp/wire.h>
 #include <fidl/fuchsia.hardware.platform.device/cpp/wire.h>
 #include <lib/driver/component/cpp/driver_base.h>
 #include <lib/driver/component/cpp/driver_export.h>
@@ -15,6 +16,7 @@
 #include <lib/magma/util/short_macros.h>
 #include <lib/magma_service/sys_driver/magma_driver_base.h>
 
+#include "msd_arm_device.h"
 #include "parent_device_dfv2.h"
 
 #if MAGMA_TEST_DRIVER
@@ -26,10 +28,12 @@ zx_status_t magma_indriver_test(ParentDevice* device);
 using MagmaDriverBaseType = msd::MagmaProductionDriverBase;
 #endif
 
-class MaliDriver : public MagmaDriverBaseType {
+class MaliDriver : public MagmaDriverBaseType,
+                   public fidl::WireServer<fuchsia_hardware_gpu_mali::MaliUtils> {
  public:
   MaliDriver(fdf::DriverStartArgs start_args, fdf::UnownedSynchronizedDispatcher driver_dispatcher)
-      : MagmaDriverBaseType("mali", std::move(start_args), std::move(driver_dispatcher)) {}
+      : MagmaDriverBaseType("mali", std::move(start_args), std::move(driver_dispatcher)),
+        mali_devfs_connector_(fit::bind_member<&MaliDriver::BindUtilsConnector>(this)) {}
 
   zx::result<> MagmaStart() override {
     zx::result info_resource = GetInfoResource();
@@ -62,6 +66,35 @@ class MaliDriver : public MagmaDriverBaseType {
       DMESSAGE("Failed to create MagmaSystemDevice");
       return zx::error(ZX_ERR_INTERNAL);
     }
+
+    return zx::ok();
+  }
+  zx::result<> CreateAdditionalDevNodes() override {
+    fidl::Arena arena;
+    zx::result connector = mali_devfs_connector_.Bind(dispatcher());
+    if (connector.is_error()) {
+      return connector.take_error();
+    }
+
+    auto devfs = fuchsia_driver_framework::wire::DevfsAddArgs::Builder(arena)
+                     .connector(std::move(connector.value()))
+                     .class_name("mali-util");
+
+    auto args = fuchsia_driver_framework::wire::NodeAddArgs::Builder(arena)
+                    .name(arena, "magma_mali")
+                    .devfs_args(devfs.Build())
+                    .Build();
+
+    zx::result controller_endpoints =
+        fidl::CreateEndpoints<fuchsia_driver_framework::NodeController>();
+    ZX_ASSERT_MSG(controller_endpoints.is_ok(), "Failed: %s", controller_endpoints.status_string());
+    zx::result node_endpoints = fidl::CreateEndpoints<fuchsia_driver_framework::Node>();
+    ZX_ASSERT_MSG(node_endpoints.is_ok(), "Failed: %s", node_endpoints.status_string());
+
+    fidl::WireResult result = node_client()->AddChild(args, std::move(controller_endpoints->server),
+                                                      std::move(node_endpoints->server));
+    mali_node_controller_.Bind(std::move(controller_endpoints->client));
+    mali_node_.Bind(std::move(node_endpoints->client));
     return zx::ok();
   }
 
@@ -70,8 +103,26 @@ class MaliDriver : public MagmaDriverBaseType {
     magma::PlatformBusMapper::SetInfoResource(zx::resource{});
   }
 
+  void BindUtilsConnector(fidl::ServerEnd<fuchsia_hardware_gpu_mali::MaliUtils> server) {
+    fidl::BindServer(dispatcher(), std::move(server), this);
+  }
+
+  void SetPowerState(fuchsia_hardware_gpu_mali::wire::MaliUtilsSetPowerStateRequest* request,
+                     SetPowerStateCompleter::Sync& completer) override {
+    std::lock_guard lock(magma_mutex());
+
+    msd::Device* dev = magma_system_device()->msd_dev();
+
+    static_cast<MsdArmDevice*>(dev)->SetPowerState(request->enabled);
+
+    completer.ReplySuccess();
+  }
+
  private:
   std::unique_ptr<ParentDeviceDFv2> parent_device_;
+  driver_devfs::Connector<fuchsia_hardware_gpu_mali::MaliUtils> mali_devfs_connector_;
+  fidl::WireSyncClient<fuchsia_driver_framework::Node> mali_node_;
+  fidl::WireSyncClient<fuchsia_driver_framework::NodeController> mali_node_controller_;
 };
 
 FUCHSIA_DRIVER_EXPORT(MaliDriver);

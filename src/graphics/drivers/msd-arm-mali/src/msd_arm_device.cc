@@ -1712,6 +1712,13 @@ magma_status_t MsdArmDevice::Query(uint64_t id, zx::vmo* result_buffer_out, uint
   return status;
 }
 
+void MsdArmDevice::SetPowerState(bool enabled) {
+  EnqueueDeviceRequest(std::make_unique<TaskRequest>([this, enabled](MsdArmDevice* device) {
+    scheduler_->SetSchedulingEnabled(enabled);
+    return MAGMA_STATUS_OK;
+  }));
+}
+
 void MsdArmDevice::DumpStatus(uint32_t dump_flags) { DumpStatusToLog(); }
 
 magma_status_t MsdArmDevice::GetIcdList(std::vector<msd::MsdIcdInfo>* icd_info_out) {

@@ -78,6 +78,9 @@ static bool HigherPriorityThan(const MsdArmAtom* a, const MsdArmAtom* b) {
 }
 
 void JobScheduler::ScheduleRunnableAtoms() {
+  if (!scheduling_enabled_) {
+    return;
+  }
   TRACE_DURATION("magma", "ScheduleRunnableAtoms");
   // First try to preempt running atoms if necessary.
   for (uint32_t slot = 0; slot < runnable_atoms_.size(); slot++) {
@@ -500,8 +503,9 @@ void JobScheduler::HandleTimedOutAtoms() {
       }
       owner_->OutputHangMessage(/*hardware_hang*/ false);
       removed_waiting_atoms = true;
-      // TODO(https://fxbug.dev/42162524): Revert https://fuchsia-review.googlesource.com/c/fuchsia/+/564008
-      // and make semaphore problems fail the atoms.
+      // TODO(https://fxbug.dev/42162524): Revert
+      // https://fuchsia-review.googlesource.com/c/fuchsia/+/564008 and make semaphore problems fail
+      // the atoms.
       owner_->AtomCompleted(atom.get(), kArmMaliResultSuccess);
       // The semaphore wait on the port will be canceled by the closing of the event handle.
       it = waiting_atoms_.erase(it);
@@ -595,6 +599,13 @@ void JobScheduler::UpdatePowerManager() {
       active = true;
   }
   owner_->UpdateGpuActive(active);
+}
+
+void JobScheduler::SetSchedulingEnabled(bool enabled) {
+  scheduling_enabled_ = enabled;
+  if (scheduling_enabled_) {
+    TryToSchedule();
+  }
 }
 
 static void AppendTo(std::vector<std::string>&& input, std::vector<std::string>* in_out) {

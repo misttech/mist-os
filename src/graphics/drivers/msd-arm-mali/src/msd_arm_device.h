@@ -129,6 +129,9 @@ class MsdArmDevice : public msd::Device,
   void DumpStatusToLog();
   magma::Status ProcessTimestampRequest(std::shared_ptr<magma::PlatformBuffer> buffer);
 
+  // Called from the device framework threadpool.
+  void SetPowerState(bool enabled);
+
   void RefCycleCounter();
   void DerefCycleCounter();
 

@@ -188,5 +188,6 @@ DDK_PROTOCOL_DEF(FAN,                     170, "fan", 0)
 DDK_PROTOCOL_DEF(AUDIO_COMPOSITE,         171, "audio-composite", 0)
 DDK_PROTOCOL_DEF(TRIP_POINT,              172, "trippoint", 0)
 DDK_PROTOCOL_DEF(SUSPEND_HAL,             173, "suspend", 0)
+DDK_PROTOCOL_DEF(MALI_UTIL,               174, "mali-util", 0)
 #undef DDK_PROTOCOL_DEF
 #endif
