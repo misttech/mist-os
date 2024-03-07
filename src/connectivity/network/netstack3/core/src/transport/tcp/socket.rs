@@ -5297,12 +5297,7 @@ mod tests {
         for TcpCoreCtx<D, BC>
     {
         type ThisStackIpTransportAndDemuxCtx<'a> = Self;
-        // TODO(https://fxbug.dev/42085913): Use `UninstantiableWrapper<Self>` as
-        // the single stack ctx once the `AsSingleStack` bound has been dropped
-        // from [`TcpContext::DualStackIpTransportAndDemuxCtx`] (It's not
-        // possible for `Self` to implement
-        // `AsSingleStack<UninstantiableWrapper<Self>>`).
-        type SingleStackIpTransportAndDemuxCtx<'a> = Self;
+        type SingleStackIpTransportAndDemuxCtx<'a> = UninstantiableWrapper<Self>;
         type SingleStackConverter = Uninstantiable;
         type DualStackIpTransportAndDemuxCtx<'a> = Self;
         type DualStackConverter = ();
