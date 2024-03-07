@@ -31,7 +31,7 @@
 
 namespace bt_hci_virtual {
 
-enum class Channel { ACL, COMMAND, SNOOP, EMULATOR };
+enum class Channel : uint8_t { ACL, COMMAND, EMULATOR, ISO, SNOOP };
 
 class EmulatorDevice : public fuchsia::bluetooth::test::HciEmulator,
                        public fidl::WireServer<fuchsia_hardware_bluetooth::Hci>,
@@ -119,16 +119,24 @@ class EmulatorDevice : public fuchsia::bluetooth::test::HciEmulator,
   // Returns false if already listening on a acl channel
   bool StartAclChannel(zx::channel chan);
 
+  // Starts listening for ISO packets on the given channel.
+  // Return false if already listenong on an ISO channel.
+  bool StartIsoChannel(zx::channel chan);
+
   void CloseCommandChannel();
   void CloseAclDataChannel();
+  void CloseIsoDataChannel();
 
   void SendEvent(pw::span<const std::byte> buffer);
   void SendAclPacket(pw::span<const std::byte> buffer);
+  void SendIsoPacket(pw::span<const std::byte> buffer);
 
   // Read and handle packets received over the channels.
   void HandleCommandPacket(async_dispatcher_t* dispatcher, async::WaitBase* wait,
                            zx_status_t wait_status, const zx_packet_signal_t* signal);
   void HandleAclPacket(async_dispatcher_t* dispatcher, async::WaitBase* wait,
+                       zx_status_t wait_status, const zx_packet_signal_t* signal);
+  void HandleIsoPacket(async_dispatcher_t* dispatcher, async::WaitBase* wait,
                        zx_status_t wait_status, const zx_packet_signal_t* signal);
 
   // Responsible for running the thread-hostile fake_device_, along with other members listed below.
@@ -174,9 +182,11 @@ class EmulatorDevice : public fuchsia::bluetooth::test::HciEmulator,
 
   zx::channel cmd_channel_;
   zx::channel acl_channel_;
+  zx::channel iso_channel_;
 
   async::WaitMethod<EmulatorDevice, &EmulatorDevice::HandleCommandPacket> cmd_channel_wait_{this};
   async::WaitMethod<EmulatorDevice, &EmulatorDevice::HandleAclPacket> acl_channel_wait_{this};
+  async::WaitMethod<EmulatorDevice, &EmulatorDevice::HandleIsoPacket> iso_channel_wait_{this};
 };
 
 }  // namespace bt_hci_virtual

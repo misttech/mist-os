@@ -105,8 +105,12 @@ void PassthroughDevice::ResetSco(ResetScoCompleter::Sync& completer) {
 
 void PassthroughDevice::OpenIsoDataChannel(OpenIsoDataChannelRequestView request,
                                            OpenIsoDataChannelCompleter::Sync& completer) {
-  // This interface is not implemented.
-  completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+  if (zx_status_t status = bt_hci_open_iso_data_channel(&this->hci, request->channel.release());
+      status != ZX_OK) {
+    completer.ReplyError(status);
+    return;
+  }
+  completer.ReplySuccess();
 }
 
 void PassthroughDevice::OpenSnoopChannel(OpenSnoopChannelRequestView request,

@@ -134,7 +134,7 @@ class FakeDevice : public ddk::BtHciProtocol<FakeDevice>, public ddk::BtVendorPr
     return ZX_OK;
   }
 
-  zx_status_t BtHciOpenIsoChannel(zx::channel in) {
+  zx_status_t BtHciOpenIsoDataChannel(zx::channel in) {
     if (!iso_supported_) {
       return ZX_ERR_NOT_SUPPORTED;
     }

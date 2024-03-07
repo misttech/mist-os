@@ -153,8 +153,11 @@ void Device::ResetSco(ResetScoCompleter::Sync& completer) {
 }
 void Device::OpenIsoDataChannel(OpenIsoDataChannelRequestView request,
                                 OpenIsoDataChannelCompleter::Sync& completer) {
-  // This interface is not implemented.
-  completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+  if (zx_status_t status = BtHciOpenIsoDataChannel(std::move(request->channel)); status != ZX_OK) {
+    completer.ReplyError(status);
+    return;
+  }
+  completer.ReplySuccess();
 }
 void Device::OpenSnoopChannel(OpenSnoopChannelRequestView request,
                               OpenSnoopChannelCompleter::Sync& completer) {
@@ -351,7 +354,9 @@ void Device::BtHciResetSco(bt_hci_reset_sco_callback callback, void* cookie) {
   hci_.ResetSco(callback, cookie);
 }
 
-zx_status_t Device::BtHciOpenIsoChannel(zx::channel in) { return ZX_ERR_NOT_SUPPORTED; }
+zx_status_t Device::BtHciOpenIsoDataChannel(zx::channel in) {
+  return hci_.OpenIsoDataChannel(std::move(in));
+}
 
 zx_status_t Device::BtHciOpenSnoopChannel(zx::channel in) {
   return hci_.OpenSnoopChannel(std::move(in));

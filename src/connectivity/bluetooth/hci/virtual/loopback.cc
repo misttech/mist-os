@@ -77,7 +77,7 @@ zx_status_t LoopbackDevice::BtHciOpenScoChannel(zx::channel in) {
   return HciOpenChannel(&sco_channel_, in.release());
 }
 
-zx_status_t LoopbackDevice::BtHciOpenIsoChannel(zx::channel in) { return ZX_ERR_NOT_SUPPORTED; }
+zx_status_t LoopbackDevice::BtHciOpenIsoDataChannel(zx::channel in) { return ZX_ERR_NOT_SUPPORTED; }
 
 void LoopbackDevice::ChannelCleanupLocked(zx::channel* channel) {
   zxlogf(TRACE, "LoopbackDevice::ChannelCleanupLocked");
@@ -512,8 +512,12 @@ void LoopbackDevice::ResetSco(ResetScoCompleter::Sync& completer) {
 
 void LoopbackDevice::OpenIsoDataChannel(OpenIsoDataChannelRequestView request,
                                         OpenIsoDataChannelCompleter::Sync& completer) {
-  // This interface is not implemented.
-  completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+  if (zx_status_t status = BtHciOpenIsoDataChannel(zx::channel(request->channel.release()));
+      status != ZX_OK) {
+    completer.ReplyError(status);
+    return;
+  }
+  completer.ReplySuccess();
 }
 
 void LoopbackDevice::OpenSnoopChannel(OpenSnoopChannelRequestView request,

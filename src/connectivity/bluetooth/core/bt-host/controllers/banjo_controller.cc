@@ -149,7 +149,7 @@ void BanjoController::Initialize(PwStatusCallback complete_callback,
     return;
   }
 
-  status = hci_proto_.OpenIsoChannel(std::move(their_iso_chan));
+  status = hci_proto_.OpenIsoDataChannel(std::move(their_iso_chan));
   if (status == ZX_OK) {
     InitializeWait(iso_wait_, iso_channel_);
   } else {

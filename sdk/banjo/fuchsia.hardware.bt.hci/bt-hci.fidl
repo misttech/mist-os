@@ -80,7 +80,7 @@ closed protocol BtHci {
     /// Returns ZX_ERR_NOT_SUPPORTED if ISO is not supported by the current vendor or transport
     /// driver.
     /// Returns ZX_ERR_ALREADY_BOUND if the channel is already open.
-    strict OpenIsoChannel(resource struct {
+    strict OpenIsoDataChannel(resource struct {
         channel zx.Handle:CHANNEL;
     }) -> (struct {
         s zx.Status;

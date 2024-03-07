@@ -125,9 +125,8 @@ constexpr bt_hci_protocol_ops_t hci_protocol_ops = {
                         void* cookie) { callback(cookie, ZX_ERR_NOT_SUPPORTED); },
     .reset_sco = [](void* ctx, bt_hci_reset_sco_callback callback,
                     void* cookie) { callback(cookie, ZX_ERR_NOT_SUPPORTED); },
-    .open_iso_channel = [](void* ctx, zx_handle_t channel) -> zx_status_t {
-      zx_handle_close(channel);
-      return ZX_ERR_NOT_SUPPORTED;
+    .open_iso_data_channel = [](void* ctx, zx_handle_t chan) -> zx_status_t {
+      return DEV(ctx)->OpenChan(Channel::ISO, chan);
     },
     .open_snoop_channel = [](void* ctx, zx_handle_t chan) -> zx_status_t {
       return DEV(ctx)->OpenChan(Channel::SNOOP, chan);
@@ -259,6 +258,9 @@ zx_status_t EmulatorDevice::OpenChan(Channel chan_type, zx_handle_t chan) {
     async::PostTask(loop_.dispatcher(), [this, in = std::move(in)]() mutable {
       StartEmulatorInterface(std::move(in));
     });
+  } else if (chan_type == Channel::ISO) {
+    async::PostTask(loop_.dispatcher(),
+                    [this, in = std::move(in)]() mutable { StartIsoChannel(std::move(in)); });
   } else {
     return ZX_ERR_NOT_SUPPORTED;
   }
@@ -552,6 +554,27 @@ bool EmulatorDevice::StartAclChannel(zx::channel chan) {
   return true;
 }
 
+bool EmulatorDevice::StartIsoChannel(zx::channel chan) {
+  if (iso_channel_.is_valid()) {
+    return false;
+  }
+
+  // Enable FakeController to send packets to bt-host.
+  fake_device_.SetReceiveIsoFunction(fit::bind_member<&EmulatorDevice::SendIsoPacket>(this));
+
+  // Enable bt-host to send packets to FakeController.
+  iso_channel_ = std::move(chan);
+  iso_channel_wait_.set_object(iso_channel_.get());
+  iso_channel_wait_.set_trigger(ZX_CHANNEL_READABLE | ZX_CHANNEL_PEER_CLOSED);
+  zx_status_t status = iso_channel_wait_.Begin(async_get_default_dispatcher());
+  if (status != ZX_OK) {
+    iso_channel_.reset();
+    logf(ERROR, "failed to start ISO channel: %s", zx_status_get_string(status));
+    return false;
+  }
+  return true;
+}
+
 void EmulatorDevice::CloseCommandChannel() {
   if (cmd_channel_.is_valid()) {
     cmd_channel_wait_.Cancel();
@@ -564,6 +587,14 @@ void EmulatorDevice::CloseAclDataChannel() {
   if (acl_channel_.is_valid()) {
     acl_channel_wait_.Cancel();
     acl_channel_.reset();
+  }
+  fake_device_.Stop();
+}
+
+void EmulatorDevice::CloseIsoDataChannel() {
+  if (iso_channel_.is_valid()) {
+    iso_channel_wait_.Cancel();
+    iso_channel_.reset();
   }
   fake_device_.Stop();
 }
@@ -581,6 +612,14 @@ void EmulatorDevice::SendAclPacket(pw::span<const std::byte> buffer) {
                                           /*handles=*/nullptr, /*num_handles=*/0);
   if (status != ZX_OK) {
     logf(WARNING, "failed to write ACL packet");
+  }
+}
+
+void EmulatorDevice::SendIsoPacket(pw::span<const std::byte> buffer) {
+  zx_status_t status = iso_channel_.write(/*flags=*/0, buffer.data(), buffer.size(),
+                                          /*handles=*/nullptr, /*num_handles=*/0);
+  if (status != ZX_OK) {
+    logf(WARNING, "failed to write ISO packet");
   }
 }
 
@@ -648,6 +687,39 @@ void EmulatorDevice::HandleAclPacket(async_dispatcher_t* dispatcher, async::Wait
   }
 }
 
+void EmulatorDevice::HandleIsoPacket(async_dispatcher_t* dispatcher, async::WaitBase* wait,
+                                     zx_status_t wait_status, const zx_packet_signal_t* signal) {
+  std::array<std::byte, bt::hci_spec::kMaxIsochronousDataPacketPayloadSize +
+                            sizeof(bt::hci_spec::ISODataHeader)>
+      buffer;
+  uint32_t read_size;
+  zx_status_t status = iso_channel_.read(0u, buffer.data(), /*handles=*/nullptr, buffer.size(), 0,
+                                         &read_size, /*actual_handles=*/nullptr);
+  ZX_DEBUG_ASSERT(status == ZX_OK || status == ZX_ERR_PEER_CLOSED);
+  if (status < 0) {
+    if (status == ZX_ERR_PEER_CLOSED) {
+      logf(INFO, "ISO channel was closed");
+    } else {
+      logf(ERROR, "failed to read on ISO channel: %s", zx_status_get_string(status));
+    }
+
+    CloseIsoDataChannel();
+    return;
+  }
+
+  if (read_size < sizeof(bt::hci_spec::ISODataHeader)) {
+    logf(ERROR, "malformed ISO packet received");
+  } else {
+    fake_device_.SendIsoData(buffer);
+  }
+
+  status = wait->Begin(dispatcher);
+  if (status != ZX_OK) {
+    logf(ERROR, "failed to wait on ISO channel: %s", zx_status_get_string(status));
+    CloseIsoDataChannel();
+  }
+}
+
 void EmulatorDevice::OpenCommandChannel(OpenCommandChannelRequestView request,
                                         OpenCommandChannelCompleter::Sync& completer) {
   if (zx_status_t status = OpenChan(Channel::COMMAND, request->channel.release());
@@ -684,8 +756,11 @@ void EmulatorDevice::ResetSco(ResetScoCompleter::Sync& completer) {
 
 void EmulatorDevice::OpenIsoDataChannel(OpenIsoDataChannelRequestView request,
                                         OpenIsoDataChannelCompleter::Sync& completer) {
-  // This interface is not implemented.
-  completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+  if (zx_status_t status = OpenChan(Channel::ISO, request->channel.release()); status != ZX_OK) {
+    completer.ReplyError(status);
+    return;
+  }
+  completer.ReplySuccess();
 }
 
 void EmulatorDevice::OpenSnoopChannel(OpenSnoopChannelRequestView request,

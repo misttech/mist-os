@@ -490,7 +490,9 @@ zx_status_t BtTransportUart::BtHciOpenScoChannel(zx::channel in) {
   return HciOpenChannel(&sco_channel_, in.release());
 }
 
-zx_status_t BtTransportUart::BtHciOpenIsoChannel(zx::channel in) { return ZX_ERR_NOT_SUPPORTED; }
+zx_status_t BtTransportUart::BtHciOpenIsoDataChannel(zx::channel in) {
+  return ZX_ERR_NOT_SUPPORTED;
+}
 
 void BtTransportUart::BtHciConfigureSco(sco_coding_format_t coding_format, sco_encoding_t encoding,
                                         sco_sample_rate_t sample_rate,

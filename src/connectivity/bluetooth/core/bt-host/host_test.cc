@@ -25,7 +25,7 @@ static bt_hci_protocol_ops_t hosttest_hci_protocol_ops = {
     .open_command_channel = hosttest_open_command_channel,
     .open_acl_data_channel = hosttest_open_acl_data_channel,
     .open_sco_channel = hosttest_open_sco_data_channel,
-    .open_iso_channel = hosttest_open_iso_data_channel,
+    .open_iso_data_channel = hosttest_open_iso_data_channel,
     .open_snoop_channel = hosttest_open_snoop_channel,
 };
 
