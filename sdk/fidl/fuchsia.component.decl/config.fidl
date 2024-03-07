@@ -29,10 +29,16 @@ type ConfigSchema = table {
     3: value_source ConfigValueSource;
 };
 
+@available(added=HEAD)
+type ConfigSourceCapabilities = table {};
+
 /// Strategies available for resolving configuration values.
 type ConfigValueSource = flexible union {
     /// (Required) The path within the component's package at which to find config value files.
     1: package_path string:MAX;
+    /// If this is set, then all of the config values are found through CML files.
+    @available(added=HEAD)
+    2: capabilities ConfigSourceCapabilities;
 };
 
 /// Declares a single config field (key + type)

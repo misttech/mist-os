@@ -385,6 +385,7 @@ impl PackageDataCollector {
                         fdecl::ConfigValueSource::PackagePath(pkg_path) => {
                             cvf_source.get(pkg_path).cloned()
                         }
+                        fdecl::ConfigValueSource::Capabilities(_) => None,
                         other => {
                             anyhow::bail!("Unsupported config value source {:?}.", other);
                         }

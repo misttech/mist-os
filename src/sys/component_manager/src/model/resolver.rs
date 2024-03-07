@@ -7,10 +7,12 @@ use {
         component::{ComponentInstance, WeakComponentInstance},
         routing::{route_and_open_capability, OpenOptions, RouteRequest},
     },
-    ::routing::component_instance::ComponentInstanceInterface,
-    ::routing::resolving::{ComponentAddress, ResolvedComponent, ResolverError},
+    ::routing::{
+        component_instance::ComponentInstanceInterface,
+        resolving::{ComponentAddress, ResolvedComponent, ResolverError},
+    },
     async_trait::async_trait,
-    cm_rust::{FidlIntoNative, RegistrationSource, ResolverRegistration},
+    cm_rust::{ConfigValueSource, FidlIntoNative, RegistrationSource, ResolverRegistration},
     fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_component_resolution as fresolution,
     fidl_fuchsia_io as fio, fidl_fuchsia_mem as fmem,
     std::{collections::HashMap, sync::Arc},
@@ -132,12 +134,14 @@ impl Resolver for RemoteResolver {
         };
         let decl_buffer: fmem::Data = component.decl.ok_or(ResolverError::RemoteInvalidData)?;
         let decl = read_and_validate_manifest(&decl_buffer)?;
-        let config_values = if decl.config.is_some() {
-            Some(read_and_validate_config_values(
-                &component.config_values.ok_or(ResolverError::RemoteInvalidData)?,
-            )?)
-        } else {
-            None
+        let config_values = match &decl.config {
+            Some(config) => match config.value_source {
+                ConfigValueSource::PackagePath(_) => Some(read_and_validate_config_values(
+                    &component.config_values.ok_or(ResolverError::RemoteInvalidData)?,
+                )?),
+                ConfigValueSource::Capabilities(_) => None,
+            },
+            None => None,
         };
         let resolved_by = format!(
             "RemoteResolver::{}{}",

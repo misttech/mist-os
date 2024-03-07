@@ -70,20 +70,21 @@ impl MockResolver {
             .components
             .get(name)
             .ok_or(ResolverError::manifest_not_found(format_err!("not in the hashmap")))?;
-        let config_values = if let Some(config_decl) = &decl.config {
-            let config_path = match &config_decl.value_source {
-                cm_rust::ConfigValueSource::PackagePath(path) => path,
-            };
-            Some(
-                self.configs
-                    .get(config_path)
-                    .ok_or_else(|| {
-                        ResolverError::manifest_invalid(format_err!("config values not provided"))
-                    })?
-                    .clone(),
-            )
-        } else {
-            None
+        let config_values = match &decl.config {
+            None => None,
+            Some(config_decl) => match &config_decl.value_source {
+                cm_rust::ConfigValueSource::Capabilities(_) => None,
+                cm_rust::ConfigValueSource::PackagePath(path) => Some(
+                    self.configs
+                        .get(path)
+                        .ok_or_else(|| {
+                            ResolverError::manifest_invalid(format_err!(
+                                "config values not provided"
+                            ))
+                        })?
+                        .clone(),
+                ),
+            },
         };
         let (client, server): (ClientEnd<fio::DirectoryMarker>, ServerEnd<fio::DirectoryMarker>) =
             create_endpoints();

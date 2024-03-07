@@ -98,16 +98,18 @@ impl V2ComponentModelDataCollector {
                         Ok(decl) => {
                             let decl = decl.fidl_into_native();
                             let config = if let Some(schema) = &decl.config {
-                                let cvf_bytes = cvf_bytes
-                                    .as_ref()
-                                    .context("getting config values to match schema")?;
-                                let values_data = unpersist::<fdecl::ConfigValuesData>(cvf_bytes)
-                                    .context("decoding config values")?
-                                    .fidl_into_native();
-                                // TODO(https://fxbug.dev/42077231) collect static parent overrides
-                                let resolved = ConfigFields::resolve(schema, values_data, None)
-                                    .context("resolving configuration")?;
-                                Some(resolved)
+                                if let Some(cvf_bytes) = cvf_bytes.as_ref() {
+                                    let values_data =
+                                        unpersist::<fdecl::ConfigValuesData>(cvf_bytes)
+                                            .context("decoding config values")?
+                                            .fidl_into_native();
+                                    // TODO(https://fxbug.dev/42077231) collect static parent overrides
+                                    let resolved = ConfigFields::resolve(schema, values_data, None)
+                                        .context("resolving configuration")?;
+                                    Some(resolved)
+                                } else {
+                                    None
+                                }
                             } else {
                                 None
                             };

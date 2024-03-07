@@ -1243,11 +1243,17 @@ pub enum ConfigChecksum {
     Sha256([u8; 32]),
 }
 
+#[derive(FidlDecl, Debug, Default, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
+#[fidl_decl(fidl_table = "fdecl::ConfigSourceCapabilities")]
+pub struct ConfigSourceCapabilities {}
+
 #[derive(FidlDecl, Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 #[fidl_decl(fidl_union = "fdecl::ConfigValueSource")]
 pub enum ConfigValueSource {
     PackagePath(String),
+    Capabilities(ConfigSourceCapabilities),
 }
 
 #[derive(FidlDecl, Debug, Clone, PartialEq, Eq)]

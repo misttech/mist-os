@@ -28,7 +28,6 @@ mod tests {
     #[fuchsia::test]
     async fn use_config_from_self() {
         let good_value = cm_rust::ConfigSingleValue::Int8(12);
-        let package_value = cm_rust::ConfigSingleValue::Int8(5);
         let components = vec![
             ("root", ComponentDeclBuilder::new().child_default("child").build()),
             (
@@ -52,22 +51,13 @@ mod tests {
                             mutability: Default::default(),
                         }],
                         checksum: cm_rust::ConfigChecksum::Sha256([0; 32]),
-                        value_source: cm_rust::ConfigValueSource::PackagePath("myfile".to_string()),
+                        value_source: cm_rust::ConfigValueSource::Capabilities(Default::default()),
                     })
                     .build(),
             ),
         ];
 
-        let test = RoutingTestBuilder::new("root", components)
-            .add_config(
-                "myfile",
-                ConfigValuesData {
-                    values: vec![cm_rust::ConfigValueSpec { value: package_value.clone().into() }],
-                    checksum: cm_rust::ConfigChecksum::Sha256([0; 32]),
-                },
-            )
-            .build()
-            .await;
+        let test = RoutingTestBuilder::new("root", components).build().await;
         let config = start_component_get_config(&test, "/child").await;
         assert_eq!(
             config.fields,
@@ -82,7 +72,6 @@ mod tests {
     #[fuchsia::test]
     async fn use_config_from_parent() {
         let good_value = cm_rust::ConfigSingleValue::Int8(12);
-        let package_value = cm_rust::ConfigSingleValue::Int8(5);
         let components = vec![
             (
                 "root",
@@ -121,22 +110,13 @@ mod tests {
                             mutability: Default::default(),
                         }],
                         checksum: cm_rust::ConfigChecksum::Sha256([0; 32]),
-                        value_source: cm_rust::ConfigValueSource::PackagePath("myfile".to_string()),
+                        value_source: cm_rust::ConfigValueSource::Capabilities(Default::default()),
                     })
                     .build(),
             ),
         ];
 
-        let test = RoutingTestBuilder::new("root", components)
-            .add_config(
-                "myfile",
-                ConfigValuesData {
-                    values: vec![cm_rust::ConfigValueSpec { value: package_value.clone().into() }],
-                    checksum: cm_rust::ConfigChecksum::Sha256([0; 32]),
-                },
-            )
-            .build()
-            .await;
+        let test = RoutingTestBuilder::new("root", components).build().await;
         let config = start_component_get_config(&test, "/child").await;
         assert_eq!(
             config.fields,

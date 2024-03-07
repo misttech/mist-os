@@ -133,18 +133,21 @@ async fn resolve_component(
         fidl::unpersist(&manifest_bytes[..]).map_err(ResolverError::ParsingManifest)?;
 
     let config_values = if let Some(config_decl) = decl.config.as_ref() {
-        // if we have a config declaration, we need to read the value file from the package dir
         let strategy =
             config_decl.value_source.as_ref().ok_or(ResolverError::MissingConfigSource)?;
-        let config_path = match strategy {
-            fdecl::ConfigValueSource::PackagePath(path) => path,
-            other => return Err(ResolverError::UnsupportedConfigStrategy(other.to_owned())),
-        };
-        Some(
-            mem_util::open_file_data(&dir, &config_path)
-                .await
-                .map_err(ResolverError::ConfigValuesNotFound)?,
-        )
+        match strategy {
+            // If we have to read the source from a package, do so.
+            fdecl::ConfigValueSource::PackagePath(path) => Some(
+                mem_util::open_file_data(&dir, path)
+                    .await
+                    .map_err(ResolverError::ConfigValuesNotFound)?,
+            ),
+            // We don't have to do anything for capability routing.
+            fdecl::ConfigValueSource::Capabilities(_) => None,
+            fdecl::ConfigValueSourceUnknown!() => {
+                return Err(ResolverError::UnsupportedConfigStrategy(strategy.to_owned()));
+            }
+        }
     } else {
         None
     };

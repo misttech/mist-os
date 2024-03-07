@@ -93,6 +93,7 @@ impl Repackager {
             .read_contents_from_far(manifest_path)
             .map_err(RepackageError::ReadManifest)?;
         let (config_bytes, path) = config_for_manifest(manifest_bytes, values)?;
+        let path = path.expect("Tried to set config for non CVF config path");
         self.builder
             .add_contents_to_far(path, config_bytes, self.outdir.as_std_path())
             .map_err(RepackageError::WriteValueFile)?;
@@ -114,21 +115,25 @@ impl Repackager {
 fn config_for_manifest(
     manifest_bytes: Vec<u8>,
     values: BTreeMap<String, serde_json::Value>,
-) -> Result<(Vec<u8>, String), RepackageError> {
+) -> Result<(Vec<u8>, Option<String>), RepackageError> {
     let manifest: cm_rust::ComponentDecl =
         read_and_validate_fidl(&manifest_bytes, cm_fidl_validator::validate)
             .map_err(RepackageError::ParseManifest)?;
 
-    if let Some(config_decl) = manifest.config {
-        // create a value file
-        let config_values =
-            config_value_file::populate_value_file(&config_decl, values)?.native_into_fidl();
-        let config_bytes = fidl::persist(&config_values).map_err(RepackageError::EncodeConfig)?;
-        let cm_rust::ConfigValueSource::PackagePath(path) = &config_decl.value_source;
-        Ok((config_bytes, path.to_string()))
-    } else {
-        Err(RepackageError::MissingConfigDecl)
-    }
+    let Some(config_decl) = manifest.config else {
+        return Err(RepackageError::MissingConfigDecl);
+    };
+
+    // create a value file
+    let config_values =
+        config_value_file::populate_value_file(&config_decl, values)?.native_into_fidl();
+
+    let config_bytes = fidl::persist(&config_values).map_err(RepackageError::EncodeConfig)?;
+    let path = match &config_decl.value_source {
+        cm_rust::ConfigValueSource::PackagePath(path) => Some(path.to_string()),
+        cm_rust::ConfigValueSource::Capabilities(_) => None,
+    };
+    Ok((config_bytes, path))
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -176,34 +181,37 @@ pub fn validate_component(
         read_and_validate_fidl(&manifest_bytes, cm_fidl_validator::validate)
             .map_err(ValidationError::ParseManifest)?;
 
-    // check for config
-    if let Some(config_decl) = manifest.config {
-        // make sure the component has a runner that will deliver config before finding values
-        let runner = manifest
-            .program
-            .as_ref()
-            .ok_or(ValidationError::ProgramMissing)?
-            .runner
-            .as_ref()
-            .ok_or(ValidationError::RunnerMissing)?
-            .as_str();
-        if !SUPPORTED_RUNNERS.contains(&runner) {
-            return Err(ValidationError::UnsupportedRunner(runner.to_owned()));
-        }
+    let Some(config_decl) = manifest.config else {
+        return Ok(());
+    };
 
-        // config is required, so find out where it's stored
-        let cm_rust::ConfigValueSource::PackagePath(path) = &config_decl.value_source;
-        let config_bytes = reader.read_file(&path).map_err(ValidationError::ConfigValuesMissing)?;
-
-        // read and validate the config values
-        let config_values: cm_rust::ConfigValuesData =
-            read_and_validate_fidl(&config_bytes, cm_fidl_validator::validate_values_data)
-                .map_err(ValidationError::ParseConfig)?;
-
-        // we have config, make sure it's compatible with the manifest which references it
-        config_encoder::ConfigFields::resolve(&config_decl, config_values, None)
-            .map_err(ValidationError::ResolveConfig)?;
+    // make sure the component has a runner that will deliver config before finding values
+    let runner = manifest
+        .program
+        .as_ref()
+        .ok_or(ValidationError::ProgramMissing)?
+        .runner
+        .as_ref()
+        .ok_or(ValidationError::RunnerMissing)?
+        .as_str();
+    if !SUPPORTED_RUNNERS.contains(&runner) {
+        return Err(ValidationError::UnsupportedRunner(runner.to_owned()));
     }
+
+    let path = match &config_decl.value_source {
+        cm_rust::ConfigValueSource::PackagePath(path) => path,
+        cm_rust::ConfigValueSource::Capabilities(_) => return Ok(()),
+    };
+    let config_bytes = reader.read_file(&path).map_err(ValidationError::ConfigValuesMissing)?;
+
+    // read and validate the config values
+    let config_values: cm_rust::ConfigValuesData =
+        read_and_validate_fidl(&config_bytes, cm_fidl_validator::validate_values_data)
+            .map_err(ValidationError::ParseConfig)?;
+
+    // we have config, make sure it's compatible with the manifest which references it
+    config_encoder::ConfigFields::resolve(&config_decl, config_values, None)
+        .map_err(ValidationError::ResolveConfig)?;
     Ok(())
 }
 

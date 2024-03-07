@@ -135,6 +135,27 @@ async fn resolve_with_context(
         .await
 }
 
+async fn load_config(
+    decl: &fcomponent_decl::Component,
+    package: &fio::DirectoryProxy,
+) -> Result<Option<fidl_fuchsia_mem::Data>, ResolverError> {
+    let Some(config_decl) = decl.config.as_ref() else {
+        return Ok(None);
+    };
+    let strategy = config_decl.value_source.as_ref().ok_or(ResolverError::InvalidConfigSource)?;
+    let config_path = match strategy {
+        fcomponent_decl::ConfigValueSource::Capabilities(_) => return Ok(None),
+        fcomponent_decl::ConfigValueSource::PackagePath(path) => path,
+        other => return Err(ResolverError::UnsupportedConfigSource(other.to_owned())),
+    };
+
+    Ok(Some(
+        mem_util::open_file_data(&package, &config_path)
+            .await
+            .map_err(ResolverError::ConfigValuesNotFound)?,
+    ))
+}
+
 async fn resolve_from_package(
     url: &fuchsia_url::ComponentUrl,
     package: fio::DirectoryProxy,
@@ -147,21 +168,7 @@ async fn resolve_from_package(
         mem_util::bytes_from_data(&data).map_err(ResolverError::ReadManifest)?.as_ref(),
     )
     .map_err(ResolverError::ParsingManifest)?;
-    let config_values = if let Some(config_decl) = decl.config.as_ref() {
-        let strategy =
-            config_decl.value_source.as_ref().ok_or(ResolverError::InvalidConfigSource)?;
-        let config_path = match strategy {
-            fcomponent_decl::ConfigValueSource::PackagePath(path) => path,
-            other => return Err(ResolverError::UnsupportedConfigSource(other.to_owned())),
-        };
-        Some(
-            mem_util::open_file_data(&package, &config_path)
-                .await
-                .map_err(ResolverError::ConfigValuesNotFound)?,
-        )
-    } else {
-        None
-    };
+    let config_values = load_config(&decl, &package).await?;
     let abi_revision =
         fidl_fuchsia_component_abi_ext::read_abi_revision_optional(&package, AbiRevision::PATH)
             .await

@@ -118,28 +118,42 @@ impl Registry {
         package_dir: Option<&fio::DirectoryProxy>,
         config_value_replacements: &HashMap<usize, cm_rust::ConfigValueSpec>,
     ) -> Result<Option<fmem::Data>, Error> {
-        if let Some(schema) = &decl.config {
-            let existing_values = match (&schema.value_source, package_dir) {
-                (Some(fcdecl::ConfigValueSource::PackagePath(path)), Some(dir)) => Some(
-                    mem_util::open_file_data(dir, path)
-                        .await
-                        .context(format!("Failed to load structured config file: {}", path))?,
-                ),
-                // fall back to using any overrides we got
-                _ => None,
-            };
+        let Some(schema) = &decl.config else {
+            return Ok(None);
+        };
+        let path = match &schema.value_source {
+            Some(fcdecl::ConfigValueSource::PackagePath(path)) => Some(path),
+            // If we are routing from capabilities we don't need to do anything else.
+            Some(fcdecl::ConfigValueSource::Capabilities(_)) => {
+                if !config_value_replacements.is_empty() {
+                    return Err(anyhow::anyhow!(
+                        "Mutability values are not supported for config capabilities"
+                    ));
+                }
+                return Ok(None);
+            }
+            // Fall back to using any overrides we have.
+            _ => None,
+        };
 
-            Ok(Some(
-                Self::verify_and_replace_config_values(
-                    schema,
-                    existing_values,
-                    config_value_replacements,
-                )
-                .await?,
-            ))
-        } else {
-            Ok(None)
-        }
+        let existing_values = match (path, package_dir) {
+            (Some(path), Some(dir)) => Some(
+                mem_util::open_file_data(dir, &path)
+                    .await
+                    .context(format!("Failed to load structured config file: {}", path))?,
+            ),
+            // Fall back to using any overrides we have.
+            _ => None,
+        };
+
+        Ok(Some(
+            Self::verify_and_replace_config_values(
+                schema,
+                existing_values,
+                config_value_replacements,
+            )
+            .await?,
+        ))
     }
 
     async fn verify_and_replace_config_values(

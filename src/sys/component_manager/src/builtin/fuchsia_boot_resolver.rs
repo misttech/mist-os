@@ -156,22 +156,23 @@ impl FuchsiaBootResolver {
             .map_err(|_| fresolution::ResolverError::InvalidManifest)?;
 
         let config_values = if let Some(config_decl) = decl.config.as_ref() {
-            // if we have a config declaration, we need to read the value file from the package dir
             let strategy = config_decl
                 .value_source
                 .as_ref()
                 .ok_or(fresolution::ResolverError::InvalidManifest)?;
-            let config_path = match strategy {
-                fdecl::ConfigValueSource::PackagePath(path) => path,
+            match strategy {
+                // If we have to read the source from a package, do so.
+                fdecl::ConfigValueSource::PackagePath(path) => Some(
+                    mem_util::open_file_data(&proxy, path)
+                        .await
+                        .map_err(|_| fresolution::ResolverError::ConfigValuesNotFound)?,
+                ),
+                // We don't have to do anything for capability routing.
+                fdecl::ConfigValueSource::Capabilities(_) => None,
                 fdecl::ConfigValueSourceUnknown!() => {
                     return Err(fresolution::ResolverError::InvalidManifest);
                 }
-            };
-            Some(
-                mem_util::open_file_data(&proxy, &config_path)
-                    .await
-                    .map_err(|_| fresolution::ResolverError::ConfigValuesNotFound)?,
-            )
+            }
         } else {
             None
         };

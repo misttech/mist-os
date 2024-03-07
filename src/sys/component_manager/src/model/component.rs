@@ -177,10 +177,18 @@ impl Component {
         config_parent_overrides: Option<&Vec<cm_rust::ConfigOverride>>,
     ) -> Result<Self, ResolveActionError> {
         let config = if let Some(config_decl) = decl.config.as_ref() {
-            let values = config_values.ok_or(StructuredConfigError::ConfigValuesMissing)?;
-            let config = ConfigFields::resolve(config_decl, values, config_parent_overrides)
-                .map_err(StructuredConfigError::ConfigResolutionFailed)?;
-            Some(config)
+            match config_decl.value_source {
+                // If the config is provided via routing then `config_values` will be empty.
+                cm_rust::ConfigValueSource::Capabilities(_) => None,
+                // If the config is provided in our package then the resolver should give use the values.
+                cm_rust::ConfigValueSource::PackagePath(_) => {
+                    let values = config_values.ok_or(StructuredConfigError::ConfigValuesMissing)?;
+                    let config =
+                        ConfigFields::resolve(config_decl, values, config_parent_overrides)
+                            .map_err(StructuredConfigError::ConfigResolutionFailed)?;
+                    Some(config)
+                }
+            }
         } else {
             None
         };

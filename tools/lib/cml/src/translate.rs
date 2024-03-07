@@ -1154,13 +1154,24 @@ fn translate_config(
         }
         use_fields.insert(key.clone(), value.clone());
     }
+
+    let source = match fields.as_ref().map_or(true, |f| f.is_empty()) {
+        // If the config block is not empty, we need a package path.
+        false => {
+            let Some(package_path) = package_path.as_ref() else {
+                return Err(Error::invalid_args(
+                    "can't translate config: no package path for value file",
+                ));
+            };
+            fdecl::ConfigValueSource::PackagePath(package_path.to_owned())
+        }
+        // If the config block is empty, we are using from capabilities.
+        true => fdecl::ConfigValueSource::Capabilities(fdecl::ConfigSourceCapabilities::default()),
+    };
     let fields = use_fields;
     if fields.is_empty() {
         return Ok(None);
     }
-    let Some(package_path) = package_path.as_ref() else {
-        return Err(Error::invalid_args("can't translate config: no package path for value file"));
-    };
 
     let mut fidl_fields = vec![];
 
@@ -1188,8 +1199,7 @@ fn translate_config(
     Ok(Some(fdecl::ConfigSchema {
         fields: Some(fidl_fields),
         checksum: Some(checksum),
-        // for now we only support ELF components that look up config by package path
-        value_source: Some(fdecl::ConfigValueSource::PackagePath(package_path.to_owned())),
+        value_source: Some(source),
         ..Default::default()
     }))
 }
@@ -5630,6 +5640,54 @@ mod tests {
             compile(&input, options),
             Err(Error::Validate { err, .. })
             if &err == "Use and config block differ on type for key 'my_config'"
+        );
+    }
+
+    #[test]
+    fn test_config_source_from_package() {
+        let input = must_parse_cml!({
+            "use": [
+                    {
+                        "config": "fuchsia.config.Config",
+                        "key" : "my_config",
+                        "type": "bool",
+                        "availability": "optional",
+                    }
+            ],
+        "config": {
+            "my_config": { "type": "bool"},
+        }
+        });
+        let features = FeatureSet::from(vec![Feature::ConfigCapabilities]);
+        let options = CompileOptions::new().config_package_path("fake.cvf").features(&features);
+        let decl = compile(&input, options).unwrap();
+        let config = decl.config.unwrap();
+        assert_eq!(
+            config.value_source,
+            Some(fdecl::ConfigValueSource::PackagePath("fake.cvf".into()))
+        );
+    }
+
+    #[test]
+    fn test_config_source_from_capabilities() {
+        let input = must_parse_cml!({
+            "use": [
+                    {
+                        "config": "fuchsia.config.Config",
+                        "key" : "my_config",
+                        "type": "bool",
+                    }
+            ],
+        });
+        let features = FeatureSet::from(vec![Feature::ConfigCapabilities]);
+        let options = CompileOptions::new().config_package_path("fake.cvf").features(&features);
+        let decl = compile(&input, options).unwrap();
+        let config = decl.config.unwrap();
+        assert_eq!(
+            config.value_source,
+            Some(
+                fdecl::ConfigValueSource::Capabilities(fdecl::ConfigSourceCapabilities::default())
+            )
         );
     }
 }
