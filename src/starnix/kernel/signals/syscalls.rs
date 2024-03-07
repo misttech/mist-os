@@ -307,7 +307,7 @@ pub fn sys_signalfd4(
     let mask = current_task.read_object(mask_addr)?;
 
     if fd.raw() != -1 {
-        let file = current_task.files.get(fd)?;
+        let file = current_task.files.get_unless_opath(fd)?;
         let file = file.downcast_file::<SignalFd>().ok_or_else(|| errno!(EINVAL))?;
         file.set_mask(mask);
         Ok(fd)

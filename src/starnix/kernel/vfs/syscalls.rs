@@ -94,7 +94,7 @@ pub fn sys_read(
     address: UserAddress,
     length: usize,
 ) -> Result<usize, Errno> {
-    let file = current_task.files.get(fd)?;
+    let file = current_task.files.get_unless_opath(fd)?;
     file.read(
         locked,
         current_task,
@@ -110,7 +110,7 @@ pub fn sys_write(
     address: UserAddress,
     length: usize,
 ) -> Result<usize, Errno> {
-    let file = current_task.files.get(fd)?;
+    let file = current_task.files.get_unless_opath(fd)?;
     file.write(
         locked,
         current_task,
@@ -162,7 +162,7 @@ pub fn sys_lseek(
     offset: off_t,
     whence: u32,
 ) -> Result<off_t, Errno> {
-    let file = current_task.files.get(fd)?;
+    let file = current_task.files.get_unless_opath(fd)?;
     file.seek(current_task, SeekTarget::from_raw(whence, offset)?)
 }
 
@@ -304,7 +304,7 @@ pub fn sys_fcntl(
             Ok(state.get_seals()?.into())
         }
         _ => {
-            let file = current_task.files.get(fd)?;
+            let file = current_task.files.get_unless_opath(fd)?;
             file.fcntl(current_task, cmd, arg)
         }
     }
@@ -318,7 +318,7 @@ pub fn sys_pread64(
     length: usize,
     offset: off_t,
 ) -> Result<usize, Errno> {
-    let file = current_task.files.get(fd)?;
+    let file = current_task.files.get_unless_opath(fd)?;
     let offset = offset.try_into().map_err(|_| errno!(EINVAL))?;
     file.read_at(
         locked,
@@ -336,7 +336,7 @@ pub fn sys_pwrite64(
     length: usize,
     offset: off_t,
 ) -> Result<usize, Errno> {
-    let file = current_task.files.get(fd)?;
+    let file = current_task.files.get_unless_opath(fd)?;
     let offset = offset.try_into().map_err(|_| errno!(EINVAL))?;
     file.write_at(
         locked,
@@ -361,7 +361,7 @@ fn do_readv(
     if flags != 0 {
         track_stub!(TODO("https://fxbug.dev/322875072"), "preadv2 flags", flags);
     }
-    let file = current_task.files.get(fd)?;
+    let file = current_task.files.get_unless_opath(fd)?;
     let iovec = current_task.read_iovec(iovec_addr, iovec_count)?;
     let mut data = UserBuffersOutputBuffer::unified_new(current_task, iovec)?;
     if let Some(offset) = offset {
@@ -427,7 +427,7 @@ fn do_writev(
         track_stub!(TODO("https://fxbug.dev/322874523"), "pwritev2 flags", flags);
     }
 
-    let file = current_task.files.get(fd)?;
+    let file = current_task.files.get_unless_opath(fd)?;
     let iovec = current_task.read_iovec(iovec_addr, iovec_count)?;
     let mut data = UserBuffersInputBuffer::unified_new(current_task, iovec)?;
     let res = if let Some(offset) = offset {
@@ -759,7 +759,7 @@ pub fn sys_getdents64(
     user_buffer: UserAddress,
     user_capacity: usize,
 ) -> Result<usize, Errno> {
-    let file = current_task.files.get(fd)?;
+    let file = current_task.files.get_unless_opath(fd)?;
     let mut offset = file.offset.lock();
     let mut sink = DirentSink64::new(current_task, &mut offset, user_buffer, user_capacity);
     let result = file.readdir(current_task, &mut sink);
@@ -1442,7 +1442,7 @@ pub fn sys_ioctl(
     request: u32,
     arg: SyscallArg,
 ) -> Result<SyscallResult, Errno> {
-    let file = current_task.files.get(fd)?;
+    let file = current_task.files.get_unless_opath(fd)?;
     file.ioctl(locked, current_task, request, arg)
 }
 
@@ -1794,13 +1794,13 @@ pub fn sys_pidfd_getfd(
         return error!(EINVAL);
     }
 
-    let file = current_task.files.get(pidfd)?;
+    let file = current_task.files.get_unless_opath(pidfd)?;
     let task = current_task.get_task(file.as_pid()?);
     let task = task.upgrade().ok_or_else(|| errno!(ESRCH))?;
 
     current_task.check_ptrace_access_mode(locked, PTRACE_MODE_ATTACH_REALCREDS, &task)?;
 
-    let target_file = task.files.get(targetfd)?;
+    let target_file = task.files.get_unless_opath(targetfd)?;
     current_task.add_file(target_file, FdFlags::CLOEXEC)
 }
 
@@ -1864,7 +1864,7 @@ pub fn sys_timerfd_gettime(
     fd: FdNumber,
     user_current_value: UserRef<itimerspec>,
 ) -> Result<(), Errno> {
-    let file = current_task.files.get(fd)?;
+    let file = current_task.files.get_unless_opath(fd)?;
     let timer_file = file.downcast_file::<TimerFile>().ok_or_else(|| errno!(EINVAL))?;
     let timer_info = timer_file.current_timer_spec();
     log_trace!("timerfd_gettime(fd={:?}, current_value={:?})", fd, timer_info);
@@ -1892,7 +1892,7 @@ pub fn sys_timerfd_settime(
         );
     }
 
-    let file = current_task.files.get(fd)?;
+    let file = current_task.files.get_unless_opath(fd)?;
     let timer_file = file.downcast_file::<TimerFile>().ok_or_else(|| errno!(EINVAL))?;
 
     let new_timer_spec = current_task.read_object(user_new_value)?;
@@ -1967,7 +1967,7 @@ fn select(
         }
         if aggregated_events != 0 {
             let fd = FdNumber::from_raw(fd as i32);
-            let file = current_task.files.get(fd)?;
+            let file = current_task.files.get_unless_opath(fd)?;
             waiter.add(
                 current_task,
                 fd,
@@ -2141,10 +2141,10 @@ pub fn sys_epoll_ctl(
         return error!(EINVAL);
     }
 
-    let file = current_task.files.get(epfd)?;
+    let file = current_task.files.get_unless_opath(epfd)?;
     let epoll_file = file.downcast_file::<EpollFileObject>().ok_or_else(|| errno!(EINVAL))?;
 
-    let ctl_file = current_task.files.get(fd)?;
+    let ctl_file = current_task.files.get_unless_opath(fd)?;
     match op {
         EPOLL_CTL_ADD => {
             let epoll_event = current_task.read_object(event)?;
@@ -2169,7 +2169,7 @@ fn do_epoll_pwait(
     deadline: zx::Time,
     user_sigmask: UserRef<SigSet>,
 ) -> Result<usize, Errno> {
-    let file = current_task.files.get(epfd)?;
+    let file = current_task.files.get_unless_opath(epfd)?;
     let epoll_file = file.downcast_file::<EpollFileObject>().ok_or_else(|| errno!(EINVAL))?;
 
     // Max_events must be greater than 0.
@@ -2322,7 +2322,7 @@ pub fn poll(
         if poll_descriptor.fd < 0 {
             continue;
         }
-        let file = current_task.files.get(FdNumber::from_raw(poll_descriptor.fd)).ok();
+        let file = current_task.files.get_unless_opath(FdNumber::from_raw(poll_descriptor.fd)).ok();
         waiter.add(
             current_task,
             index,
@@ -2420,7 +2420,7 @@ pub fn sys_flock(
     fd: FdNumber,
     operation: u32,
 ) -> Result<(), Errno> {
-    let file = current_task.files.get(fd)?;
+    let file = current_task.files.get_unless_opath(fd)?;
     let operation = FlockOperation::from_flags(operation)?;
     file.flock(current_task, operation)
 }
@@ -2448,7 +2448,7 @@ pub fn sys_fsync(
     current_task: &CurrentTask,
     fd: FdNumber,
 ) -> Result<(), Errno> {
-    let file = current_task.files.get(fd)?;
+    let file = current_task.files.get_unless_opath(fd)?;
     file.sync(current_task)
 }
 
@@ -2457,7 +2457,7 @@ pub fn sys_fdatasync(
     current_task: &CurrentTask,
     fd: FdNumber,
 ) -> Result<(), Errno> {
-    let file = current_task.files.get(fd)?;
+    let file = current_task.files.get_unless_opath(fd)?;
     file.data_sync(current_task)
 }
 
@@ -2476,7 +2476,7 @@ pub fn sys_sync_file_range(
         return error!(EINVAL);
     }
 
-    let file = current_task.files.get(fd)?;
+    let file = current_task.files.get_unless_opath(fd)?;
 
     if offset < 0 || length < 0 {
         return error!(EINVAL);
@@ -2526,7 +2526,7 @@ pub fn sys_fadvise64(
         return error!(EINVAL);
     }
 
-    let file = current_task.files.get(fd)?;
+    let file = current_task.files.get_unless_opath(fd)?;
     // fadvise does not work on pipes.
     if file.downcast_file::<PipeFileObject>().is_some() {
         return error!(ESPIPE);
@@ -2550,7 +2550,7 @@ pub fn sys_fallocate(
     offset: off_t,
     len: off_t,
 ) -> Result<(), Errno> {
-    let file = current_task.files.get(fd)?;
+    let file = current_task.files.get_unless_opath(fd)?;
 
     // Offset must not be less than 0.
     // Length must not be less than or equal to 0.
@@ -2592,7 +2592,7 @@ pub fn sys_inotify_add_watch(
         // Mask must include at least 1 event.
         return error!(EINVAL);
     }
-    let file = current_task.files.get(fd)?;
+    let file = current_task.files.get_unless_opath(fd)?;
     let inotify_file = file.downcast_file::<InotifyFileObject>().ok_or_else(|| errno!(EINVAL))?;
     let watched_node =
         lookup_at(current_task, FdNumber::AT_FDCWD, user_path, LookupFlags::default())?;
@@ -2605,7 +2605,7 @@ pub fn sys_inotify_rm_watch(
     fd: FdNumber,
     watch_id: WdNumber,
 ) -> Result<(), Errno> {
-    let file = current_task.files.get(fd)?;
+    let file = current_task.files.get_unless_opath(fd)?;
     let inotify_file = file.downcast_file::<InotifyFileObject>().ok_or_else(|| errno!(EINVAL))?;
     inotify_file.remove_watch(watch_id, &file)
 }
@@ -2709,7 +2709,7 @@ pub fn sys_readahead(
     offset: off_t,
     length: usize,
 ) -> Result<(), Errno> {
-    let file = current_task.files.get(fd)?;
+    let file = current_task.files.get_unless_opath(fd)?;
     // Allow only non-negative values of `offset`. Some versions of Linux allow it to be negative,
     // but GVisor tests require `readahead()` to fail in this case.
     let offset: usize = offset.try_into().map_err(|_| errno!(EINVAL))?;
@@ -2834,7 +2834,8 @@ fn submit_iocb(
     control_block: iocb,
     iocb_sender: std::sync::mpsc::Sender<IocbEvent>,
 ) -> Result<(), Errno> {
-    let file = current_task.files.get(FdNumber::from_raw(control_block.aio_fildes as i32))?;
+    let file =
+        current_task.files.get_unless_opath(FdNumber::from_raw(control_block.aio_fildes as i32))?;
     let opcode = control_block.aio_lio_opcode as u32;
     let offset = control_block.aio_offset as usize;
     let flags = control_block.aio_flags;
@@ -2843,7 +2844,9 @@ fn submit_iocb(
         length: control_block.aio_nbytes as usize,
     };
     let eventfd = if flags & IOCB_FLAG_RESFD == IOCB_FLAG_RESFD {
-        let eventfd = current_task.files.get(FdNumber::from_raw(control_block.aio_resfd as i32))?;
+        let eventfd = current_task
+            .files
+            .get_unless_opath(FdNumber::from_raw(control_block.aio_resfd as i32))?;
         if eventfd.downcast_file::<EventFdFileObject>().is_none() {
             return error!(EINVAL);
         }

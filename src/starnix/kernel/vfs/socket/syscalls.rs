@@ -154,7 +154,7 @@ pub fn sys_bind(
     user_socket_address: UserAddress,
     user_address_length: usize,
 ) -> Result<(), Errno> {
-    let file = current_task.files.get(fd)?;
+    let file = current_task.files.get_unless_opath(fd)?;
     let socket = file.node().socket().ok_or_else(|| errno!(ENOTSOCK))?;
     let address = parse_socket_address(current_task, user_socket_address, user_address_length)?;
     if !address.valid_for_domain(socket.domain) {
@@ -218,7 +218,7 @@ pub fn sys_listen(
     fd: FdNumber,
     backlog: i32,
 ) -> Result<(), Errno> {
-    let file = current_task.files.get(fd)?;
+    let file = current_task.files.get_unless_opath(fd)?;
     let socket = file.node().socket().ok_or_else(|| errno!(ENOTSOCK))?;
     socket.listen(backlog, current_task.as_ucred())?;
     Ok(())
@@ -242,7 +242,7 @@ pub fn sys_accept4(
     user_address_length: UserRef<socklen_t>,
     flags: u32,
 ) -> Result<FdNumber, Errno> {
-    let file = current_task.files.get(fd)?;
+    let file = current_task.files.get_unless_opath(fd)?;
     let socket = file.node().socket().ok_or_else(|| errno!(ENOTSOCK))?;
     let accepted_socket =
         file.blocking_op(current_task, FdEvents::POLLIN | FdEvents::POLLHUP, None, || {
@@ -273,7 +273,7 @@ pub fn sys_connect(
     user_socket_address: UserAddress,
     user_address_length: usize,
 ) -> Result<(), Errno> {
-    let client_file = current_task.files.get(fd)?;
+    let client_file = current_task.files.get_unless_opath(fd)?;
     let client_socket = client_file.node().socket().ok_or_else(|| errno!(ENOTSOCK))?;
     let address = parse_socket_address(current_task, user_socket_address, user_address_length)?;
     let peer = match address {
@@ -353,7 +353,7 @@ pub fn sys_getsockname(
     user_socket_address: UserAddress,
     user_address_length: UserRef<socklen_t>,
 ) -> Result<(), Errno> {
-    let file = current_task.files.get(fd)?;
+    let file = current_task.files.get_unless_opath(fd)?;
     let socket = file.node().socket().ok_or_else(|| errno!(ENOTSOCK))?;
     let address_bytes = socket.getsockname();
 
@@ -369,7 +369,7 @@ pub fn sys_getpeername(
     user_socket_address: UserAddress,
     user_address_length: UserRef<socklen_t>,
 ) -> Result<(), Errno> {
-    let file = current_task.files.get(fd)?;
+    let file = current_task.files.get_unless_opath(fd)?;
     let socket = file.node().socket().ok_or_else(|| errno!(ENOTSOCK))?;
     let address_bytes = socket.getpeername()?;
 
@@ -532,7 +532,7 @@ pub fn sys_recvmsg(
     user_message_header: UserRef<msghdr>,
     flags: u32,
 ) -> Result<usize, Errno> {
-    let file = current_task.files.get(fd)?;
+    let file = current_task.files.get_unless_opath(fd)?;
     if !file.node().is_sock() {
         return error!(ENOTSOCK);
     }
@@ -548,7 +548,7 @@ pub fn sys_recvmmsg(
     mut flags: u32,
     user_timeout: UserRef<timespec>,
 ) -> Result<usize, Errno> {
-    let file = current_task.files.get(fd)?;
+    let file = current_task.files.get_unless_opath(fd)?;
     if !file.node().is_sock() {
         return error!(ENOTSOCK);
     }
@@ -599,7 +599,7 @@ pub fn sys_recvfrom(
     user_src_address: UserAddress,
     user_src_address_length: UserRef<socklen_t>,
 ) -> Result<usize, Errno> {
-    let file = current_task.files.get(fd)?;
+    let file = current_task.files.get_unless_opath(fd)?;
     if !file.node().is_sock() {
         return error!(ENOTSOCK);
     }
@@ -701,7 +701,7 @@ pub fn sys_sendmsg(
     user_message_header: UserRef<msghdr>,
     flags: u32,
 ) -> Result<usize, Errno> {
-    let file = current_task.files.get(fd)?;
+    let file = current_task.files.get_unless_opath(fd)?;
     if !file.node().is_sock() {
         return error!(ENOTSOCK);
     }
@@ -716,7 +716,7 @@ pub fn sys_sendmmsg(
     mut vlen: u32,
     flags: u32,
 ) -> Result<usize, Errno> {
-    let file = current_task.files.get(fd)?;
+    let file = current_task.files.get_unless_opath(fd)?;
     if !file.node().is_sock() {
         return error!(ENOTSOCK);
     }
@@ -758,7 +758,7 @@ pub fn sys_sendto(
     user_dest_address: UserAddress,
     user_dest_address_length: socklen_t,
 ) -> Result<usize, Errno> {
-    let file = current_task.files.get(fd)?;
+    let file = current_task.files.get_unless_opath(fd)?;
     if !file.node().is_sock() {
         return error!(ENOTSOCK);
     }
@@ -785,7 +785,7 @@ pub fn sys_getsockopt(
     user_optval: UserAddress,
     user_optlen: UserRef<socklen_t>,
 ) -> Result<(), Errno> {
-    let file = current_task.files.get(fd)?;
+    let file = current_task.files.get_unless_opath(fd)?;
     let socket = file.node().socket().ok_or_else(|| errno!(ENOTSOCK))?;
 
     let optlen = current_task.read_object(user_optlen)?;
@@ -816,7 +816,7 @@ pub fn sys_setsockopt(
     user_optval: UserAddress,
     optlen: socklen_t,
 ) -> Result<(), Errno> {
-    let file = current_task.files.get(fd)?;
+    let file = current_task.files.get_unless_opath(fd)?;
     let socket = file.node().socket().ok_or_else(|| errno!(ENOTSOCK))?;
 
     let user_opt = UserBuffer { address: user_optval, length: optlen as usize };
@@ -838,7 +838,7 @@ pub fn sys_shutdown(
     fd: FdNumber,
     how: u32,
 ) -> Result<(), Errno> {
-    let file = current_task.files.get(fd)?;
+    let file = current_task.files.get_unless_opath(fd)?;
     let socket = file.node().socket().ok_or_else(|| errno!(ENOTSOCK))?;
     let how = match how {
         SHUT_RD => SocketShutdownFlags::READ,

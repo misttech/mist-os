@@ -1557,7 +1557,7 @@ pub fn sys_setns(
     ns_fd: FdNumber,
     ns_type: c_int,
 ) -> Result<(), Errno> {
-    let file_handle = current_task.task.files.get(ns_fd)?;
+    let file_handle = current_task.task.files.get_unless_opath(ns_fd)?;
 
     // From man pages this is not quite right because some namespace types require more capabilities
     // or require this capability in multiple namespaces, but it should cover our current test
