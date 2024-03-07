@@ -137,13 +137,19 @@ void FidlController::InitializeHci(fuchsia::hardware::bluetooth::HciHandle hci_h
   }
 
   hci_->OpenIsoDataChannel(std::move(their_iso_chan),
-                           [](fhbt::Hci_OpenIsoDataChannel_Result result) {
+                           [this](fhbt::Hci_OpenIsoDataChannel_Result result) {
                              if (result.is_err()) {
+                               // Non-fatal - may simply indicate a lack of ISO data support
+                               // in the driver.
                                bt_log(INFO, "controllers", "Failed to open ISO data channel: %s",
                                       zx_status_get_string(result.err()));
+                               iso_channel_.reset();
+                             } else {
+                               // Don't wait on channel signals until we have confirmation from
+                               // the driver that the channel has been established. b/328504823
+                               InitializeWait(iso_wait_, iso_channel_);
                              }
                            });
-  InitializeWait(iso_wait_, iso_channel_);
 
   initialize_complete_cb_(PW_STATUS_OK);
 }
