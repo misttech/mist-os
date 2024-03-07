@@ -14,6 +14,7 @@
 #include <fbl/auto_lock.h>
 
 #include "src/devices/usb/drivers/aml-usb-phy/aml-usb-phy.h"
+#include "src/devices/usb/drivers/aml-usb-phy/usb-phy-regs.h"
 
 namespace aml_usb_phy {
 
@@ -105,6 +106,64 @@ zx::result<PhyMetadata> ParseMetadata(
 
   FDF_LOG(ERROR, "Failed to parse metadata. Metadata needs to have pll_settings and phy_type.");
   return zx::error(ZX_ERR_NOT_FOUND);
+}
+
+zx_status_t PowerOn(fidl::ClientEnd<fuchsia_hardware_registers::Device>& reset_register,
+                    fdf::MmioBuffer& power_mmio, fdf::MmioBuffer& sleep_mmio) {
+  A0_RTI_GEN_PWR_SLEEP0::Get().ReadFrom(&sleep_mmio).set_usb_comb_power_off(0).WriteTo(&sleep_mmio);
+  HHI_MEM_PD_REG0::Get().ReadFrom(&power_mmio).set_usb_comb_pd(0).WriteTo(&power_mmio);
+  zx::nanosleep(zx::deadline_after(zx::usec(100)));
+
+  fidl::Arena<> arena;
+  auto register_result1 =
+      fidl::WireCall(reset_register).buffer(arena)->WriteRegister32(RESET1_LEVEL_OFFSET, 0x4, 0);
+  if ((register_result1.status() != ZX_OK) || register_result1->is_error()) {
+    FDF_LOG(ERROR, "Reset Register Write on 1 << 2 failed\n");
+    return ZX_ERR_INTERNAL;
+  }
+  zx::nanosleep(zx::deadline_after(zx::usec(100)));
+  A0_RTI_GEN_PWR_ISO0::Get()
+      .ReadFrom(&sleep_mmio)
+      .set_usb_comb_isolation_enable(0)
+      .WriteTo(&sleep_mmio);
+
+  auto register_result2 =
+      fidl::WireCall(reset_register).buffer(arena)->WriteRegister32(RESET1_LEVEL_OFFSET, 0x4, 0x4);
+  if ((register_result2.status() != ZX_OK) || register_result2->is_error()) {
+    FDF_LOG(ERROR, "Reset Register Write on 1 << 2 failed\n");
+    return ZX_ERR_INTERNAL;
+  }
+  zx::nanosleep(zx::deadline_after(zx::usec(100)));
+  A0_RTI_GEN_PWR_SLEEP0::Get().ReadFrom(&sleep_mmio).set_pci_comb_power_off(0).WriteTo(&sleep_mmio);
+
+  auto register_result3 = fidl::WireCall(reset_register)
+                              .buffer(arena)
+                              ->WriteRegister32(RESET1_LEVEL_OFFSET, 0xF << 26, 0);
+  if ((register_result3.status() != ZX_OK) || register_result3->is_error()) {
+    FDF_LOG(ERROR, "Reset Register Write on 1 << 2 failed\n");
+    return ZX_ERR_INTERNAL;
+  }
+
+  A0_RTI_GEN_PWR_ISO0::Get()
+      .ReadFrom(&sleep_mmio)
+      .set_pci_comb_isolation_enable(0)
+      .WriteTo(&sleep_mmio);
+  A0_RTI_GEN_PWR_SLEEP0::Get().ReadFrom(&sleep_mmio).set_ge2d_power_off(0).WriteTo(&sleep_mmio);
+
+  HHI_MEM_PD_REG0::Get().ReadFrom(&power_mmio).set_ge2d_pd(0).WriteTo(&power_mmio);
+
+  A0_RTI_GEN_PWR_ISO0::Get()
+      .ReadFrom(&sleep_mmio)
+      .set_ge2d_isolation_enable(0)
+      .WriteTo(&sleep_mmio);
+  A0_RTI_GEN_PWR_ISO0::Get()
+      .ReadFrom(&sleep_mmio)
+      .set_ge2d_isolation_enable(1)
+      .WriteTo(&sleep_mmio);
+
+  HHI_MEM_PD_REG0::Get().ReadFrom(&power_mmio).set_ge2d_pd(0xFF).WriteTo(&power_mmio);
+  A0_RTI_GEN_PWR_SLEEP0::Get().ReadFrom(&sleep_mmio).set_ge2d_power_off(1).WriteTo(&sleep_mmio);
+  return ZX_OK;
 }
 
 }  // namespace
@@ -208,6 +267,27 @@ zx::result<> AmlUsbPhyDevice::Start() {
     if (status != ZX_OK) {
       FDF_LOG(ERROR, "pdev.GetInterrupt(0) error %s", zx_status_get_string(status));
       return zx::error(status);
+    }
+
+    // Optional MMIOs
+    {
+      std::optional<fdf::MmioBuffer> power_mmio, sleep_mmio;
+      auto status = pdev.MapMmio(idx++, &power_mmio);
+      if (status != ZX_OK) {
+        FDF_LOG(ERROR, "pdev.MapMmio(%d) error %s", idx - 1, zx_status_get_string(status));
+      }
+      status = pdev.MapMmio(idx++, &sleep_mmio);
+      if (status != ZX_OK) {
+        FDF_LOG(ERROR, "pdev.MapMmio(%d) error %s", idx - 1, zx_status_get_string(status));
+      }
+
+      if (power_mmio.has_value() && sleep_mmio.has_value()) {
+        auto status = PowerOn(reset_register, *power_mmio, *sleep_mmio);
+        if (status != ZX_OK) {
+          FDF_LOG(ERROR, "PowerOn() error %s", zx_status_get_string(status));
+          return zx::error(status);
+        }
+      }
     }
   }
 
