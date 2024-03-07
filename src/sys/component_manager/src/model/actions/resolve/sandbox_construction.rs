@@ -21,6 +21,7 @@ use {
     cm_types::{IterablePath, Name, SeparatedPath},
     fidl_fuchsia_component_decl as fdecl,
     futures::FutureExt,
+    itertools::Itertools,
     moniker::{ChildName, ChildNameBase, MonikerBase},
     sandbox::{Capability, Dict, Unit},
     std::{collections::HashMap, iter, sync::Arc},
@@ -290,31 +291,44 @@ fn extend_dict_with_dictionary(
             .as_ref()
             .expect("source_dictionary must be set if source is set");
         let source_dict_router = match &source {
-            cm_rust::DictionarySource::Parent => {
-                match component_input.capabilities.get_router(source_path.iter_segments()) {
-                    Some(r) => r,
-                    None => return,
-                }
-            }
-            cm_rust::DictionarySource::Self_ => {
-                match program_output_dict.get_router(source_path.iter_segments()) {
-                    Some(r) => r,
-                    None => return,
-                }
-            }
+            cm_rust::DictionarySource::Parent => component_input.capabilities.get_router_or_error(
+                source_path.iter_segments(),
+                RoutingError::use_from_parent_not_found(
+                    &component.moniker,
+                    source_path.iter_segments().join("/"),
+                )
+                .into(),
+            ),
+            cm_rust::DictionarySource::Self_ => program_output_dict.get_router_or_error(
+                source_path.iter_segments(),
+                RoutingError::use_from_self_not_found(
+                    &component.moniker,
+                    source_path.iter_segments().join("/"),
+                )
+                .into(),
+            ),
             cm_rust::DictionarySource::Child(child_ref) => {
                 assert!(child_ref.collection.is_none(), "unexpected dynamic offer target");
                 let child_name =
                     ChildName::parse(child_ref.name.as_str()).expect("invalid child name");
-                let Some(child) = children.get(&child_name) else {
-                    return;
-                };
-                let child = child.as_weak();
-                new_forwarding_router_to_child(
-                    child,
-                    source_path.clone(),
-                    RoutingError::BedrockSourceDictionaryExposeNotFound,
-                )
+                match children.get(&child_name) {
+                    Some(child) => {
+                        let child = child.as_weak();
+                        new_forwarding_router_to_child(
+                            child,
+                            source_path.clone(),
+                            RoutingError::BedrockSourceDictionaryExposeNotFound,
+                        )
+                    }
+                    None => Router::new_error(
+                        RoutingError::use_from_child_instance_not_found(
+                            &child_name,
+                            &component.moniker,
+                            source_path.iter_segments().join("/"),
+                        )
+                        .into(),
+                    ),
+                }
             }
         };
         make_dict_extending_router(component.as_weak(), dict.clone(), source_dict_router)
@@ -344,13 +358,14 @@ fn build_environment(
             cm_rust::RegistrationSource::Parent => {
                 use_from_parent_router(component_input, source_path, component.as_weak())
             }
-            cm_rust::RegistrationSource::Self_ => {
-                let Some(router) = program_output_dict.get_router(source_path.iter_segments())
-                else {
-                    continue;
-                };
-                router
-            }
+            cm_rust::RegistrationSource::Self_ => program_output_dict.get_router_or_error(
+                source_path.iter_segments(),
+                RoutingError::use_from_self_not_found(
+                    &component.moniker,
+                    source_path.iter_segments().join("/"),
+                )
+                .into(),
+            ),
             cm_rust::RegistrationSource::Child(child_name) => {
                 let child_name = ChildName::parse(child_name).expect("invalid child name");
                 let Some(child) = children.get(&child_name) else { continue };
@@ -470,15 +485,18 @@ fn extend_dict_with_use(
         cm_rust::UseSource::Parent => {
             use_from_parent_router(component_input, source_path.to_owned(), component.as_weak())
         }
-        cm_rust::UseSource::Self_ => {
-            let Some(router) = program_output_dict.get_router(source_path.iter_segments()) else {
-                return;
-            };
-            router
-        }
+        cm_rust::UseSource::Self_ => program_output_dict.get_router_or_error(
+            source_path.iter_segments(),
+            RoutingError::use_from_self_not_found(
+                &component.moniker,
+                source_path.iter_segments().join("/"),
+            ),
+        ),
         cm_rust::UseSource::Child(child_name) => {
             let child_name = ChildName::parse(child_name).expect("invalid child name");
-            let Some(child) = children.get(&child_name) else { return };
+            let Some(child) = children.get(&child_name) else {
+                panic!("use declaration in manifest for component {} has a source of a nonexistent child {}, this should be prevented by manifest validation", component.moniker, child_name);
+            };
             let weak_child = WeakComponentInstance::new(child);
             new_forwarding_router_to_child(
                 weak_child,
@@ -490,14 +508,17 @@ fn extend_dict_with_use(
                 ),
             )
         }
+        cm_rust::UseSource::Framework if use_.is_from_dictionary() => Router::new_error(
+            RoutingError::capability_from_framework_not_found(
+                &component.moniker,
+                source_path.iter_segments().join("/"),
+            )
+            .into(),
+        ),
         cm_rust::UseSource::Framework => {
-            if use_.is_from_dictionary() {
-                warn!(
-                    "routing from framework with dictionary path is not supported: {source_path}"
-                );
-                return;
-            }
             let source_name = use_.source_name().clone();
+            // TODO(https://fxbug.dev/323926925): place a router here that will return an error if
+            // there's no such framework capability.
             LaunchTaskOnReceive::new_hook_launch_task(
                 component,
                 CapabilitySource::Framework {
@@ -509,6 +530,8 @@ fn extend_dict_with_use(
         }
         cm_rust::UseSource::Capability(_) => {
             let use_ = use_.clone();
+            // TODO(https://fxbug.dev/323926925): place a router here that will return an error if
+            // there's no such capability.
             LaunchTaskOnReceive::new_hook_launch_task(
                 component,
                 CapabilitySource::Capability {
@@ -519,14 +542,14 @@ fn extend_dict_with_use(
             .into_router()
         }
         cm_rust::UseSource::Debug => {
-            let Some(router) = component_input
-                .environment
-                .debug_capabilities
-                .get_router(iter::once(use_protocol.source_name.as_str()))
-            else {
-                return;
-            };
-            router
+            component_input.environment.debug_capabilities.get_router_or_error(
+                iter::once(use_protocol.source_name.as_str()),
+                RoutingError::use_from_environment_not_found(
+                    &component.moniker,
+                    "protocol",
+                    &use_protocol.source_name,
+                ),
+            )
         }
         // UseSource::Environment is not used for protocol capabilities
         cm_rust::UseSource::Environment => return,
@@ -546,9 +569,13 @@ fn use_from_parent_router(
     source_path: impl IterablePath + 'static,
     weak_component: WeakComponentInstance,
 ) -> Router {
-    let component_input_capability =
-        Router::from_capability(component_input.capabilities.clone().into())
-            .with_path(source_path.iter_segments());
+    let component_input_capability = component_input.capabilities.get_router_or_error(
+        source_path.iter_segments(),
+        RoutingError::use_from_parent_not_found(
+            &weak_component.moniker,
+            source_path.iter_segments().join("/"),
+        ),
+    );
 
     Router::new(move |request| {
         let source_path = source_path.clone();
@@ -619,7 +646,7 @@ fn extend_dict_with_offer(
     }
     let source_path = offer.source_path();
     let target_name = offer.target_name();
-    if target_dict.get_router(source_path.iter_segments()).is_some() {
+    if target_dict.get_capability(source_path.iter_segments()).is_some() {
         warn!(
             "duplicate sources for protocol {} in a dict, unable to populate dict entry",
             target_name
@@ -628,19 +655,20 @@ fn extend_dict_with_offer(
         return;
     }
     let router = match offer.source() {
-        cm_rust::OfferSource::Parent => {
-            let Some(router) = component_input.capabilities.get_router(source_path.iter_segments())
-            else {
-                return;
-            };
-            router
-        }
-        cm_rust::OfferSource::Self_ => {
-            let Some(router) = program_output_dict.get_router(source_path.iter_segments()) else {
-                return;
-            };
-            router
-        }
+        cm_rust::OfferSource::Parent => component_input.capabilities.get_router_or_error(
+            source_path.iter_segments(),
+            RoutingError::offer_from_parent_not_found(
+                &component.moniker,
+                source_path.iter_segments().join("/"),
+            ),
+        ),
+        cm_rust::OfferSource::Self_ => program_output_dict.get_router_or_error(
+            source_path.iter_segments(),
+            RoutingError::offer_from_self_not_found(
+                &component.moniker,
+                source_path.iter_segments().join("/"),
+            ),
+        ),
         cm_rust::OfferSource::Child(child_ref) => {
             let child_name: ChildName = child_ref.clone().try_into().expect("invalid child ref");
             let Some(child) = children.get(&child_name) else { return };
@@ -663,6 +691,8 @@ fn extend_dict_with_offer(
                 return;
             }
             let source_name = offer.source_name().clone();
+            // TODO(https://fxbug.dev/323926925): place a router here that will return an error if
+            // there's no such framework capability.
             LaunchTaskOnReceive::new_hook_launch_task(
                 component,
                 CapabilitySource::Framework {
@@ -674,6 +704,8 @@ fn extend_dict_with_offer(
         }
         cm_rust::OfferSource::Capability(_) => {
             let offer = offer.clone();
+            // TODO(https://fxbug.dev/323926925): place a router here that will return an error if
+            // there's no such capability.
             LaunchTaskOnReceive::new_hook_launch_task(
                 component,
                 CapabilitySource::Capability {
@@ -715,12 +747,13 @@ fn extend_dict_with_expose(
     let target_name = expose.target_name();
 
     let router = match expose.source() {
-        cm_rust::ExposeSource::Self_ => {
-            let Some(router) = program_output_dict.get_router(source_path.iter_segments()) else {
-                return;
-            };
-            router
-        }
+        cm_rust::ExposeSource::Self_ => program_output_dict.get_router_or_error(
+            source_path.iter_segments(),
+            RoutingError::expose_from_self_not_found(
+                &component.moniker,
+                source_path.iter_segments().join("/"),
+            ),
+        ),
         cm_rust::ExposeSource::Child(child_name) => {
             let child_name = ChildName::parse(child_name).expect("invalid static child name");
             if let Some(child) = children.get(&child_name) {
@@ -746,6 +779,8 @@ fn extend_dict_with_expose(
                 return;
             }
             let source_name = expose.source_name().clone();
+            // TODO(https://fxbug.dev/323926925): place a router here that will return an error if
+            // there's no such framework capability.
             LaunchTaskOnReceive::new_hook_launch_task(
                 component,
                 CapabilitySource::Framework {
@@ -757,6 +792,8 @@ fn extend_dict_with_expose(
         }
         cm_rust::ExposeSource::Capability(_) => {
             let expose = expose.clone();
+            // TODO(https://fxbug.dev/323926925): place a router here that will return an error if
+            // there's no such capability.
             LaunchTaskOnReceive::new_hook_launch_task(
                 component,
                 CapabilitySource::Capability {
@@ -810,10 +847,9 @@ async fn forward_request_to_child(
                 e,
             ))
         })?;
-        match child_state.component_output_dict.get_router(capability_path.iter_segments()) {
-            Some(router) => router,
-            None => return Err(expose_not_found_error.clone().into()),
-        }
+        child_state
+            .component_output_dict
+            .get_router_or_error(capability_path.iter_segments(), expose_not_found_error.clone())
     };
     router.route(request).await
 }

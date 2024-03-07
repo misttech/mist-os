@@ -116,6 +116,9 @@ pub enum RoutingError {
     #[error("`{}` was not offered to `{}` by parent.", capability_id, moniker)]
     UseFromParentNotFound { moniker: Moniker, capability_id: String },
 
+    #[error("`{}` was not declared as a capability by `{}`.", capability_id, moniker)]
+    UseFromSelfNotFound { moniker: Moniker, capability_id: String },
+
     #[error("`{}` does not have child `#{}`.", moniker, child_moniker)]
     UseFromChildInstanceNotFound {
         child_moniker: ChildName,
@@ -123,7 +126,12 @@ pub enum RoutingError {
         capability_id: String,
     },
 
-    #[error("`{}` was not registered in environment of `{}`.", capability_name, moniker)]
+    #[error(
+        "{} `{}` was not registered in environment of `{}`.",
+        capability_type,
+        capability_name,
+        moniker
+    )]
     UseFromEnvironmentNotFound { moniker: Moniker, capability_type: String, capability_name: Name },
 
     #[error(
@@ -174,6 +182,13 @@ pub enum RoutingError {
     OfferFromParentNotFound { moniker: Moniker, capability_id: String },
 
     #[error(
+        "Unable to offer `{}` because was not declared as a capability by `{}`. For more, run `ffx component doctor {moniker}`.",
+        capability_id,
+        moniker
+    )]
+    OfferFromSelfNotFound { moniker: Moniker, capability_id: String },
+
+    #[error(
         "`{}` was not offered to `{}` by parent. For more, run `ffx component doctor {moniker}`.",
         capability_id,
         moniker
@@ -216,6 +231,13 @@ pub enum RoutingError {
     // TODO: Could this be distinguished by use/offer/expose?
     #[error("`{}` is not a framework capability.", capability_id)]
     CapabilityFromComponentManagerNotFound { capability_id: String },
+
+    #[error(
+        "Unable to expose `{}` because it was not declared as a capability by `{}`.",
+        capability_id,
+        moniker
+    )]
+    ExposeFromSelfNotFound { moniker: Moniker, capability_id: String },
 
     #[error("`{}` does not have child `#{}`.", moniker, child_moniker)]
     ExposeFromChildInstanceNotFound {
@@ -326,12 +348,14 @@ impl RoutingError {
             | RoutingError::RegisterFromComponentManagerNotFound { .. }
             | RoutingError::OfferFromComponentManagerNotFound { .. }
             | RoutingError::UseFromParentNotFound { .. }
+            | RoutingError::UseFromSelfNotFound { .. }
             | RoutingError::UseFromChildInstanceNotFound { .. }
             | RoutingError::UseFromEnvironmentNotFound { .. }
             | RoutingError::EnvironmentFromParentNotFound { .. }
             | RoutingError::EnvironmentFromChildExposeNotFound { .. }
             | RoutingError::EnvironmentFromChildInstanceNotFound { .. }
             | RoutingError::OfferFromParentNotFound { .. }
+            | RoutingError::OfferFromSelfNotFound { .. }
             | RoutingError::StorageFromParentNotFound { .. }
             | RoutingError::OfferFromChildInstanceNotFound { .. }
             | RoutingError::OfferFromCollectionNotFound { .. }
@@ -339,6 +363,7 @@ impl RoutingError {
             | RoutingError::CapabilityFromFrameworkNotFound { .. }
             | RoutingError::CapabilityFromCapabilityNotFound { .. }
             | RoutingError::CapabilityFromComponentManagerNotFound { .. }
+            | RoutingError::ExposeFromSelfNotFound { .. }
             | RoutingError::ExposeFromChildInstanceNotFound { .. }
             | RoutingError::ExposeFromCollectionNotFound { .. }
             | RoutingError::ExposeFromChildExposeNotFound { .. }
@@ -394,6 +419,10 @@ impl RoutingError {
         }
     }
 
+    pub fn use_from_self_not_found(moniker: &Moniker, capability_id: impl Into<String>) -> Self {
+        Self::UseFromSelfNotFound { moniker: moniker.clone(), capability_id: capability_id.into() }
+    }
+
     pub fn use_from_child_instance_not_found(
         child_moniker: &ChildName,
         moniker: &Moniker,
@@ -406,11 +435,30 @@ impl RoutingError {
         }
     }
 
+    pub fn use_from_environment_not_found(
+        moniker: &Moniker,
+        capability_type: impl Into<String>,
+        capability_name: &Name,
+    ) -> Self {
+        Self::UseFromEnvironmentNotFound {
+            moniker: moniker.clone(),
+            capability_type: capability_type.into(),
+            capability_name: capability_name.clone(),
+        }
+    }
+
     pub fn offer_from_parent_not_found(
         moniker: &Moniker,
         capability_id: impl Into<String>,
     ) -> Self {
         Self::OfferFromParentNotFound {
+            moniker: moniker.clone(),
+            capability_id: capability_id.into(),
+        }
+    }
+
+    pub fn offer_from_self_not_found(moniker: &Moniker, capability_id: impl Into<String>) -> Self {
+        Self::OfferFromSelfNotFound {
             moniker: moniker.clone(),
             capability_id: capability_id.into(),
         }
@@ -457,6 +505,13 @@ impl RoutingError {
     ) -> Self {
         Self::UseFromChildExposeNotFound {
             child_moniker: child_moniker.clone(),
+            moniker: moniker.clone(),
+            capability_id: capability_id.into(),
+        }
+    }
+
+    pub fn expose_from_self_not_found(moniker: &Moniker, capability_id: impl Into<String>) -> Self {
+        Self::ExposeFromSelfNotFound {
             moniker: moniker.clone(),
             capability_id: capability_id.into(),
         }

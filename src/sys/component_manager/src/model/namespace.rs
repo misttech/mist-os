@@ -15,6 +15,7 @@ use {
                 OpenOptions,
             },
         },
+        sandbox_util::DictExt,
     },
     ::routing::{
         component_instance::ComponentInstanceInterface, mapper::NoopRouteMapper, rights::Rights,
@@ -300,6 +301,15 @@ fn service_or_protocol_use(
             availability: use_protocol_decl.availability.clone(),
             target: component.clone(),
         };
+        let Some(capability) =
+            program_input_dict.get_capability(use_protocol_decl.target_path.iter_segments())
+        else {
+            panic!("router for capability {:?} is missing from program input dictionary for component {}", use_protocol_decl.target_path, component.moniker);
+        };
+        let Capability::Router(router) = &capability else {
+            panic!("program input dictionary for component {} had an entry with an unexpected type: {:?}", component.moniker, capability);
+        };
+        let router = Router::from_any(router.clone());
         let legacy_request = RouteRequest::UseProtocol(use_protocol_decl.clone());
 
         // When there are router errors, they are sent to the error handler,
@@ -341,11 +351,7 @@ fn service_or_protocol_use(
                 }
             });
         };
-        // TODO(https://fxbug.dev/324138478): We will be able to assert that the program input dict
-        // must have the required capability if we always add a Router to the program input
-        // dict for every protocol use declaration.
-        let router = Router::from_capability(program_input_dict.clone().into())
-            .with_path(use_protocol_decl.target_path.iter_segments());
+
         let open =
             router.into_open(request, fio::DirentType::Service, blocking_task_group, errors_fn);
         return open;

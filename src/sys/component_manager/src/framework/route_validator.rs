@@ -576,8 +576,7 @@ mod tests {
     async fn validate_error() {
         let invalid_source_name_use_from_child_decl =
             UseBuilder::protocol().source(UseSource::Child("my_child".into())).name("a").build();
-        let invalid_source_use_from_child_decl =
-            UseBuilder::protocol().source(UseSource::Child("bad_child".into())).name("b").build();
+
         let invalid_source_name_expose_from_child_decl = ExposeDecl::Protocol(ExposeProtocolDecl {
             source: ExposeSource::Child("my_child".to_string()),
             source_name: "c".parse().unwrap(),
@@ -587,23 +586,12 @@ mod tests {
             availability: cm_rust::Availability::Required,
         });
 
-        let invalid_source_expose_from_child_decl = ExposeDecl::Protocol(ExposeProtocolDecl {
-            source: ExposeSource::Child("bad_child".to_string()),
-            source_name: "d".parse().unwrap(),
-            source_dictionary: None,
-            target: ExposeTarget::Parent,
-            target_name: "d".parse().unwrap(),
-            availability: cm_rust::Availability::Required,
-        });
-
         let components = vec![
             (
                 "root",
                 ComponentDeclBuilder::new()
                     .use_(invalid_source_name_use_from_child_decl)
-                    .use_(invalid_source_use_from_child_decl)
                     .expose(invalid_source_name_expose_from_child_decl)
-                    .expose(invalid_source_expose_from_child_decl)
                     .child_default("my_child")
                     .build(),
             ),
@@ -629,7 +617,7 @@ mod tests {
 
         // Validate the root
         let mut results = validator.validate(".").await.unwrap().unwrap();
-        assert_eq!(results.len(), 4);
+        assert_eq!(results.len(), 2);
 
         results.sort_by_key(|r| Key {
             capability: r.capability.clone().unwrap(),
@@ -653,35 +641,11 @@ mod tests {
             report,
             fsys::RouteReport {
                 capability: Some(s),
-                decl_type: Some(fsys::DeclType::Use),
-                source_moniker: None,
-                error: Some(_),
-                ..
-            } if s == "b"
-        );
-
-        let report = results.remove(0);
-        assert_matches!(
-            report,
-            fsys::RouteReport {
-                capability: Some(s),
                 decl_type: Some(fsys::DeclType::Expose),
                 source_moniker: None,
                 error: Some(_),
                 ..
             } if s == "c"
-        );
-
-        let report = results.remove(0);
-        assert_matches!(
-            report,
-            fsys::RouteReport {
-                capability: Some(s),
-                decl_type: Some(fsys::DeclType::Expose),
-                source_moniker: None,
-                error: Some(_),
-                ..
-            } if s == "d"
         );
 
         // This validation should have caused `my_child` to be resolved
@@ -1201,8 +1165,6 @@ mod tests {
     async fn route_error() {
         let invalid_source_name_use_from_child_decl =
             UseBuilder::protocol().source(UseSource::Child("my_child".into())).name("a").build();
-        let invalid_source_use_from_child_decl =
-            UseBuilder::protocol().source(UseSource::Child("bad_child".into())).name("b").build();
         let invalid_source_name_expose_from_child_decl = ExposeDecl::Protocol(ExposeProtocolDecl {
             source: ExposeSource::Child("my_child".to_string()),
             source_name: "c".parse().unwrap(),
@@ -1212,23 +1174,12 @@ mod tests {
             availability: cm_rust::Availability::Required,
         });
 
-        let invalid_source_expose_from_child_decl = ExposeDecl::Protocol(ExposeProtocolDecl {
-            source: ExposeSource::Child("bad_child".to_string()),
-            source_name: "d".parse().unwrap(),
-            source_dictionary: None,
-            target: ExposeTarget::Parent,
-            target_name: "d".parse().unwrap(),
-            availability: cm_rust::Availability::Required,
-        });
-
         let components = vec![
             (
                 "root",
                 ComponentDeclBuilder::new()
                     .use_(invalid_source_name_use_from_child_decl)
-                    .use_(invalid_source_use_from_child_decl)
                     .expose(invalid_source_name_expose_from_child_decl)
-                    .expose(invalid_source_expose_from_child_decl)
                     .child_default("my_child")
                     .build(),
             ),
@@ -1252,12 +1203,10 @@ mod tests {
 
         let targets = &[
             fsys::RouteTarget { name: "a".parse().unwrap(), decl_type: fsys::DeclType::Use },
-            fsys::RouteTarget { name: "b".parse().unwrap(), decl_type: fsys::DeclType::Use },
             fsys::RouteTarget { name: "c".parse().unwrap(), decl_type: fsys::DeclType::Expose },
-            fsys::RouteTarget { name: "d".parse().unwrap(), decl_type: fsys::DeclType::Expose },
         ];
         let mut results = validator.route(".", targets).await.unwrap().unwrap();
-        assert_eq!(results.len(), 4);
+        assert_eq!(results.len(), 2);
 
         let report = results.remove(0);
         assert_matches!(
@@ -1276,35 +1225,11 @@ mod tests {
             report,
             fsys::RouteReport {
                 capability: Some(s),
-                decl_type: Some(fsys::DeclType::Use),
-                source_moniker: None,
-                error: Some(_),
-                ..
-            } if s == "b"
-        );
-
-        let report = results.remove(0);
-        assert_matches!(
-            report,
-            fsys::RouteReport {
-                capability: Some(s),
                 decl_type: Some(fsys::DeclType::Expose),
                 source_moniker: None,
                 error: Some(_),
                 ..
             } if s == "c"
-        );
-
-        let report = results.remove(0);
-        assert_matches!(
-            report,
-            fsys::RouteReport {
-                capability: Some(s),
-                decl_type: Some(fsys::DeclType::Expose),
-                source_moniker: None,
-                error: Some(_),
-                ..
-            } if s == "d"
         );
     }
 }

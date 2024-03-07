@@ -10,7 +10,7 @@ use {
     crate::PathBuf,
     ::routing::{
         capability_source::CapabilitySource, component_instance::ComponentInstanceInterface,
-        policy::GlobalPolicyChecker,
+        error::RoutingError, policy::GlobalPolicyChecker,
     },
     cm_types::Name,
     cm_util::WeakTaskGroup,
@@ -92,9 +92,14 @@ pub trait DictExt {
     /// Returns the capability at the path, if it exists. Returns `None` if path is empty.
     fn get_capability<'a>(&self, path: impl Iterator<Item = &'a str>) -> Option<Capability>;
 
-    /// Returns a [Router] configured to route at `path`, if one exists at `path.first()`. /
-    /// Returns None otherwise.
-    fn get_router<'a>(&self, path: impl DoubleEndedIterator<Item = &'a str>) -> Option<Router>;
+    /// Attempts to walk `path` in `self` until a router is found. If one is, it is then downscoped
+    /// to the remaining path. If a router is not found, then a router is returned which will
+    /// unconditionally fail routing requests with `error`.
+    fn get_router_or_error<'a>(
+        &self,
+        path: impl DoubleEndedIterator<Item = &'a str>,
+        error: RoutingError,
+    ) -> Router;
 
     /// Inserts the capability at the path. Intermediary dictionaries are created as needed.
     fn insert_capability<'a>(&self, path: impl Iterator<Item = &'a str>, capability: Capability);
@@ -136,12 +141,26 @@ impl DictExt for Dict {
         }
     }
 
-    fn get_router<'a>(&self, mut path: impl DoubleEndedIterator<Item = &'a str>) -> Option<Router> {
-        let first = path.next().unwrap();
-        match self.get_capability(iter::once(first)) {
-            Some(Capability::Router(r)) => Some(Router::from_any(r).with_path(path)),
-            _ => None,
+    /// Attempts to walk `path` in `self` until a router is found. If one is, it is then downscoped
+    /// to the remaining path. If a router is not found, then a router is returned which will
+    /// unconditionally fail routing requests with `error`.
+    fn get_router_or_error<'a>(
+        &self,
+        mut path: impl DoubleEndedIterator<Item = &'a str>,
+        error: RoutingError,
+    ) -> Router {
+        let mut current = self.clone();
+        while let Some(next_element) = path.next() {
+            match current.get_capability(iter::once(next_element)) {
+                Some(Capability::Dictionary(dictionary)) => current = dictionary,
+                Some(Capability::Router(r)) => return Router::from_any(r).with_path(path),
+                Some(cap) if path.next().is_none() => {
+                    return Router::new_non_async(move |_request| Ok(cap.clone()))
+                }
+                _ => return Router::new_error(error.into()),
+            }
         }
+        Router::new_error(error.into())
     }
 
     fn insert_capability<'a>(
