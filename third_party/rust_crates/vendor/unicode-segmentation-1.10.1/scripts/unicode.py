@@ -20,9 +20,9 @@
 # Since this should not require frequent updates, we just store this
 # out-of-line and check the unicode.rs file into git.
 
-import fileinput, re, os, sys, operator
+import fileinput, re, os, sys
 
-preamble = '''// Copyright 2012-2015 The Rust Project Developers. See the COPYRIGHT
+preamble = '''// Copyright 2012-2018 The Rust Project Developers. See the COPYRIGHT
 // file at the top-level directory of this distribution and at
 // http://rust-lang.org/COPYRIGHT.
 //
@@ -43,7 +43,7 @@ expanded_categories = {
     'Lu': ['LC', 'L'], 'Ll': ['LC', 'L'], 'Lt': ['LC', 'L'],
     'Lm': ['L'], 'Lo': ['L'],
     'Mn': ['M'], 'Mc': ['M'], 'Me': ['M'],
-    'Nd': ['N'], 'Nl': ['N'], 'No': ['No'],
+    'Nd': ['N'], 'Nl': ['N'], 'No': ['N'],
     'Pc': ['P'], 'Pd': ['P'], 'Ps': ['P'], 'Pe': ['P'],
     'Pi': ['P'], 'Pf': ['P'], 'Po': ['P'],
     'Sm': ['S'], 'Sc': ['S'], 'Sk': ['S'], 'So': ['S'],
@@ -54,13 +54,21 @@ expanded_categories = {
 # these are the surrogate codepoints, which are not valid rust characters
 surrogate_codepoints = (0xd800, 0xdfff)
 
+UNICODE_VERSION = (15, 0, 0)
+
+UNICODE_VERSION_NUMBER = "%s.%s.%s" %UNICODE_VERSION
+
 def is_surrogate(n):
     return surrogate_codepoints[0] <= n <= surrogate_codepoints[1]
 
 def fetch(f):
     if not os.path.exists(os.path.basename(f)):
-        os.system("curl -O http://www.unicode.org/Public/UNIDATA/%s"
-                  % f)
+        if "emoji" in f:
+            os.system("curl -O https://www.unicode.org/Public/%s/ucd/emoji/%s"
+                      % (UNICODE_VERSION_NUMBER, f))
+        else:
+            os.system("curl -O https://www.unicode.org/Public/%s/ucd/%s"
+                      % (UNICODE_VERSION_NUMBER, f))
 
     if not os.path.exists(os.path.basename(f)):
         sys.stderr.write("cannot load %s" % f)
@@ -80,7 +88,7 @@ def load_gencats(f):
         if is_surrogate(cp):
             continue
         if range_start >= 0:
-            for i in xrange(range_start, cp):
+            for i in range(range_start, cp):
                 udict[i] = data;
             range_start = -1;
         if data[1].endswith(", First>"):
@@ -150,8 +158,8 @@ def format_table_content(f, content, indent):
 def load_properties(f, interestingprops):
     fetch(f)
     props = {}
-    re1 = re.compile("^ *([0-9A-F]+) *; *(\w+)")
-    re2 = re.compile("^ *([0-9A-F]+)\.\.([0-9A-F]+) *; *(\w+)")
+    re1 = re.compile(r"^ *([0-9A-F]+) *; *(\w+)")
+    re2 = re.compile(r"^ *([0-9A-F]+)\.\.([0-9A-F]+) *; *(\w+)")
 
     for line in fileinput.input(os.path.basename(f)):
         prop = None
@@ -221,7 +229,7 @@ pub mod util {
     #[inline]
     fn is_alphabetic(c: char) -> bool {
         match c {
-            'a' ... 'z' | 'A' ... 'Z' => true,
+            'a' ..= 'z' | 'A' ..= 'Z' => true,
             c if c > '\x7f' => super::derived_property::Alphabetic(c),
             _ => false,
         }
@@ -230,7 +238,7 @@ pub mod util {
     #[inline]
     fn is_numeric(c: char) -> bool {
         match c {
-            '0' ... '9' => true,
+            '0' ..= '9' => true,
             c if c > '\x7f' => super::general_category::N(c),
             _ => false,
         }
@@ -262,9 +270,32 @@ def emit_break_module(f, break_table, break_cats, name):
     pub use self::%sCat::*;
 
     #[allow(non_camel_case_types)]
-    #[derive(Clone, Copy, PartialEq, Eq)]
+    #[derive(Clone, Copy, PartialEq, Eq, Debug)]
     pub enum %sCat {
 """ % (name, Name, Name))
+
+    # We don't want the lookup table to be too large so choose a reasonable
+    # cutoff. 0x20000 is selected because most of the range table entries are
+    # within the interval of [0x0, 0x20000]
+    lookup_value_cutoff = 0x20000
+
+    # Length of lookup table. It has to be a divisor of `lookup_value_cutoff`.
+    lookup_table_len = 0x400
+
+    lookup_interval = round(lookup_value_cutoff / lookup_table_len)
+
+    # Lookup table is a mapping from `character code / lookup_interval` to
+    # the index in the range table that covers the `character code`.
+    lookup_table = [0] * lookup_table_len
+    j = 0
+    for i in range(0, lookup_table_len):
+      lookup_from = i * lookup_interval
+      while j < len(break_table):
+        (_, entry_to, _) = break_table[j]
+        if entry_to >= lookup_from:
+          break
+        j += 1
+      lookup_table[i] = j
 
     break_cats.append("Any")
     break_cats.sort()
@@ -272,7 +303,7 @@ def emit_break_module(f, break_table, break_cats, name):
         f.write(("        %sC_" % Name[0]) + cat + ",\n")
     f.write("""    }
 
-    fn bsearch_range_value_table(c: char, r: &'static [(char, char, %sCat)]) -> %sCat {
+    fn bsearch_range_value_table(c: char, r: &'static [(char, char, %sCat)], default_lower: u32, default_upper: u32) -> (u32, u32, %sCat) {
         use core::cmp::Ordering::{Equal, Less, Greater};
         match r.binary_search_by(|&(lo, hi, _)| {
             if lo <= c && c <= hi { Equal }
@@ -280,18 +311,53 @@ def emit_break_module(f, break_table, break_cats, name):
             else { Greater }
         }) {
             Ok(idx) => {
-                let (_, _, cat) = r[idx];
-                cat
+                let (lower, upper, cat) = r[idx];
+                (lower as u32, upper as u32, cat)
             }
-            Err(_) => %sC_Any
+            Err(idx) => {
+                (
+                    if idx > 0 { r[idx-1].1 as u32 + 1 } else { default_lower },
+                    r.get(idx).map(|c|c.0 as u32 - 1).unwrap_or(default_upper),
+                    %sC_Any,
+                )
+            }
         }
     }
 
-    pub fn %s_category(c: char) -> %sCat {
-        bsearch_range_value_table(c, %s_cat_table)
+    pub fn %s_category(c: char) -> (u32, u32, %sCat) {
+        // Perform a quick O(1) lookup in a precomputed table to determine
+        // the slice of the range table to search in.
+        let lookup_interval = 0x%x;
+        let idx = (c as u32 / lookup_interval) as usize;
+        let range = %s_cat_lookup.get(idx..(idx + 2)).map_or(
+          // If the `idx` is outside of the precomputed table - use the slice
+          // starting from the last covered index in the precomputed table and
+          // ending with the length of the range table.
+          %d..%d,
+          |r| (r[0] as usize)..((r[1] + 1) as usize)
+        );
+
+        // Compute pessimistic default lower and upper bounds on the category.
+        // If character doesn't map to any range and there is no adjacent range
+        // in the table slice - these bounds has to apply.
+        let lower = idx as u32 * lookup_interval;
+        let upper = lower + lookup_interval - 1;
+        bsearch_range_value_table(c, &%s_cat_table[range], lower, upper)
     }
 
-""" % (Name, Name, Name[0], name, Name, name))
+""" % (Name, Name, Name[0], name, Name, lookup_interval, name, j, len(break_table), name))
+
+
+    if len(break_table) <= 0xff:
+      lookup_type = "u8"
+    elif len(break_table) <= 0xffff:
+      lookup_type = "u16"
+    else:
+      lookup_type = "u32"
+
+    emit_table(f, "%s_cat_lookup" % name, lookup_table, "&'static [%s]" % lookup_type,
+        pfun=lambda x: "%d" % x,
+        is_pub=False, is_const=True)
 
     emit_table(f, "%s_cat_table" % name, break_table, "&'static [(char, char, %sCat)]" % Name,
         pfun=lambda x: "(%s,%s,%sC_%s)" % (escape_char(x[0]), escape_char(x[1]), Name[0], x[2]),
@@ -305,18 +371,13 @@ if __name__ == "__main__":
     with open(r, "w") as rf:
         # write the file's preamble
         rf.write(preamble)
-
-        # download and parse all the data
-        fetch("ReadMe.txt")
-        with open("ReadMe.txt") as readme:
-            pattern = "for Version (\d+)\.(\d+)\.(\d+) of the Unicode"
-            unicode_version = re.search(pattern, readme.read()).groups()
         rf.write("""
 /// The version of [Unicode](http://www.unicode.org/)
 /// that this version of unicode-segmentation is based on.
 pub const UNICODE_VERSION: (u64, u64, u64) = (%s, %s, %s);
-""" % unicode_version)
+""" % UNICODE_VERSION)
 
+        # download and parse all the data
         gencats = load_gencats("UnicodeData.txt")
         derived = load_properties("DerivedCoreProperties.txt", ["Alphabetic"])
 
@@ -341,8 +402,15 @@ pub const UNICODE_VERSION: (u64, u64, u64) = (%s, %s, %s);
         grapheme_table = []
         for cat in grapheme_cats:
             grapheme_table.extend([(x, y, cat) for (x, y) in grapheme_cats[cat]])
+        emoji_props = load_properties("emoji-data.txt", ["Extended_Pictographic"])
+        grapheme_table.extend([(x, y, "Extended_Pictographic") for (x, y) in emoji_props["Extended_Pictographic"]])
         grapheme_table.sort(key=lambda w: w[0])
-        emit_break_module(rf, grapheme_table, grapheme_cats.keys(), "grapheme")
+        last = -1
+        for chars in grapheme_table:
+            if chars[0] <= last:
+                raise "Grapheme tables and Extended_Pictographic values overlap; need to store these separately!"
+            last = chars[1]
+        emit_break_module(rf, grapheme_table, list(grapheme_cats.keys()) + ["Extended_Pictographic"], "grapheme")
         rf.write("\n")
 
         word_cats = load_properties("auxiliary/WordBreakProperty.txt", [])
@@ -350,4 +418,16 @@ pub const UNICODE_VERSION: (u64, u64, u64) = (%s, %s, %s);
         for cat in word_cats:
             word_table.extend([(x, y, cat) for (x, y) in word_cats[cat]])
         word_table.sort(key=lambda w: w[0])
-        emit_break_module(rf, word_table, word_cats.keys(), "word")
+        emit_break_module(rf, word_table, list(word_cats.keys()), "word")
+
+        # There are some emoji which are also ALetter, so this needs to be stored separately
+        # For efficiency, we could still merge the two tables and produce an ALetterEP state
+        emoji_table = [(x, y, "Extended_Pictographic") for (x, y) in emoji_props["Extended_Pictographic"]]
+        emit_break_module(rf, emoji_table, ["Extended_Pictographic"], "emoji")
+
+        sentence_cats = load_properties("auxiliary/SentenceBreakProperty.txt", [])
+        sentence_table = []
+        for cat in sentence_cats:
+            sentence_table.extend([(x, y, cat) for (x, y) in sentence_cats[cat]])
+        sentence_table.sort(key=lambda w: w[0])
+        emit_break_module(rf, sentence_table, list(sentence_cats.keys()), "sentence")

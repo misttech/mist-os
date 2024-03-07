@@ -1087,7 +1087,7 @@ if (current_os == "fuchsia") {
 }
 
 group("unicode-segmentation") {
-  public_deps = [ ":unicode-segmentation-v1_2_1" ]
+  public_deps = [ ":unicode-segmentation-v1_10_1" ]
 }
 
 group("unicode-width") {
@@ -6413,7 +6413,7 @@ rust_library("heck-v0_3_1") {
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":unicode-segmentation-v1_2_1" ]
+  deps += [ ":unicode-segmentation-v1_10_1" ]
 
   rustenv = []
 
@@ -12938,7 +12938,7 @@ rust_library("rustyline-v2_1_0") {
   deps += [ ":memchr-v2_4_0" ]
   deps += [ ":libc-v0_2_149" ]
   deps += [ ":log-v0_4_20" ]
-  deps += [ ":unicode-segmentation-v1_2_1" ]
+  deps += [ ":unicode-segmentation-v1_10_1" ]
   deps += [ ":unicode-width-v0_1_10" ]
   if (true && !(current_os == "fuchsia")) {
     deps += [ ":nix-v0_26_2" ]
@@ -16652,20 +16652,20 @@ rust_library("unicode-normalization-v0_1_19") {
   applicable_licenses = [ ":unicode-normalization-v0_1_19.license" ]
 }
 
-license("unicode-segmentation-v1_2_1.license") {
+license("unicode-segmentation-v1_10_1.license") {
   public_package_name = "unicode_segmentation"
   license_files = [
-    "//third_party/rust_crates/vendor/unicode-segmentation-1.2.1/COPYRIGHT",
-    "//third_party/rust_crates/vendor/unicode-segmentation-1.2.1/LICENSE-APACHE",
-    "//third_party/rust_crates/vendor/unicode-segmentation-1.2.1/LICENSE-MIT",
+    "//third_party/rust_crates/vendor/unicode-segmentation-1.10.1/COPYRIGHT",
+    "//third_party/rust_crates/vendor/unicode-segmentation-1.10.1/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/unicode-segmentation-1.10.1/LICENSE-MIT",
   ]
 }
 
-rust_library("unicode-segmentation-v1_2_1") {
+rust_library("unicode-segmentation-v1_10_1") {
   crate_name = "unicode_segmentation"
   crate_root =
-      "//third_party/rust_crates/vendor/unicode-segmentation-1.2.1/src/lib.rs"
-  output_name = "unicode_segmentation-6ac80cf67426e677"
+      "//third_party/rust_crates/vendor/unicode-segmentation-1.10.1/src/lib.rs"
+  output_name = "unicode_segmentation-ea66ef824508562"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
@@ -16674,14 +16674,14 @@ rust_library("unicode-segmentation-v1_2_1") {
 
   rustflags = [
     "--cap-lints=allow",
-    "--edition=2015",
-    "-Cmetadata=6ac80cf67426e677",
-    "-Cextra-filename=-6ac80cf67426e677",
+    "--edition=2018",
+    "-Cmetadata=ea66ef824508562",
+    "-Cextra-filename=-ea66ef824508562",
   ]
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":unicode-segmentation-v1_2_1.license" ]
+  applicable_licenses = [ ":unicode-segmentation-v1_10_1.license" ]
 }
 
 license("unicode-width-v0_1_10.license") {
