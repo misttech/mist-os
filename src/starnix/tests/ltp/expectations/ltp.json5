@@ -12,6 +12,7 @@
         {
             type: "expect_failure",
             matchers: [
+                "accept03",
                 "add_key01",
                 "add_key03",
                 "adjtimex01",
@@ -47,6 +48,7 @@
                 "cve-2018-5803",
                 "cve-2018-8897",
                 "cve-2018-9568",
+                "cve-2020-11494",
                 "cve-2021-4034",
                 "cve-2022-2590",
                 "delete_module02",
@@ -126,6 +128,9 @@
                 "munlock02",
                 "munlockall01",
                 "perf_event_open01",
+
+                // Needs /proc/sys/fs/pipe-user-pages-soft
+                "pipe15",
                 "pivot_root01",
                 "prctl01",
                 "prctl02",
@@ -133,6 +138,7 @@
                 "prctl07",
                 "prctl08",
                 "prctl10",
+                "ptrace06",
                 "ptrace10",
                 "pwritev03",
                 "pwritev03_64",
@@ -168,6 +174,7 @@
                 "setxattr03",
                 "sigtimedwait01",
                 "sigwaitinfo01",
+                "splice07",
                 "sockioctl01",
                 "statx04",
                 "statx06",
@@ -201,8 +208,20 @@
         {
             type: "skip",
             matchers: [
+                // Skip to handle transition from passing to failing.
+                "cve-2018-19854",
+
                 // https://fxbug.dev/42085930
                 "fgetxattr01",
+
+                // Skip to handle transition from passing to failing.
+                "gettimeofday01",
+
+                // Skip to handle transition from passing to failing. It fails due to: "No supported filesystems"
+                "getxattr03",
+
+                // Skip to handle transition from passing to failing.
+                "mount04",
 
                 // https://fxbug.dev/42085553
                 "open04",
