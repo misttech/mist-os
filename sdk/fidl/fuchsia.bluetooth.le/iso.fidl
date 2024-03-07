@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 library fuchsia.bluetooth.le;
 
+using fuchsia.bluetooth as bt;
 using zx;
 
 /// Parameters related to a single direction of transmission in an established CIS.
@@ -75,4 +76,30 @@ open protocol IsochronousStream {
         /// This field is always present if a stream was successfully established.
         2: established_params CisEstablishedParameters;
     });
+
+    /// Create an isochronous data path with the specified parameters. Only in-band (HCI) ISO
+    /// transport is currently supported.
+    ///
+    /// Returns ZX_ERR_ALREADY_EXISTS if a ISO stream has already been created for this
+    /// direction.
+    ///
+    /// Returns ZX_ERR_BAD_STATE if issued on a peripheral before a CIS request has been
+    /// accepted.
+    ///
+    /// Returns ZX_ERR_INVALID_ARGS if the codec arguments are invalid or outside of the
+    /// controller's supported range.
+    flexible SetupDataPath(table {
+        /// Directions in which data will flow.
+        /// Required.
+        1: data_direction bt.DataDirection;
+
+        /// Specifies the coding format used over the air.
+        /// Required.
+        2: codec_attributes bt.CodecAttributes;
+
+        /// The delay provided must be within the controller's supported range and should not
+        /// exceed 4 seconds.
+        /// Required.
+        3: controller_delay zx.Duration;
+    }) -> () error zx.Status;
 };

@@ -1,0 +1,64 @@
+// Copyright 2024 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+library fuchsia.bluetooth;
+
+/// Coding Format, as specified by the Bluetooth SIG (see Assigned Numbers document for values):
+/// https://www.bluetooth.com/specifications/assigned-numbers/
+@available(added=HEAD)
+type AssignedCodingFormat = flexible enum : uint8 {
+    U_LAW_LOG = 0;
+    A_LAW_LOG = 1;
+    CVSD = 2;
+    TRANSPARENT = 3;
+    LINEAR_PCM = 4;
+    MSBC = 5;
+    LC3 = 6;
+    G_729A = 7;
+};
+
+/// Vendor-defined coding format.
+@available(added=HEAD)
+type VendorCodingFormat = table {
+    /// Company ID, see Assigned Numbers document for values
+    /// https://www.bluetooth.com/specifications/assigned-numbers/
+    /// Required.
+    1: company_id uint16;
+
+    /// Vendor-defined codec ID.
+    /// Required.
+    2: vendor_id uint16;
+};
+
+/// Specifies a coding format.
+@available(added=HEAD)
+type CodecId = flexible union {
+    /// Coding format defined by Bluetooth SIG.
+    1: assigned_format AssignedCodingFormat;
+
+    /// Coding format defined by vendor.
+    2: vendor_format VendorCodingFormat;
+};
+
+/// Identifies a codec and its configuration that may be used with a data stream.
+@available(added=HEAD)
+type CodecAttributes = table {
+    /// Coding format.
+    /// Required.
+    1: codec_id CodecId;
+
+    /// Configuration data.
+    /// Optionally present, as determined by codec being used.
+    2: codec_configuration vector<uint8>:MAX;
+};
+
+/// Indicates direction of data in a stream. Note that these values do not correspond to constants
+/// from the Bluetooth Core specification.
+@available(added=HEAD)
+type DataDirection = strict enum : uint8 {
+    /// Host => Controller
+    INPUT = 1;
+
+    /// Controller => Host
+    OUTPUT = 2;
+};
