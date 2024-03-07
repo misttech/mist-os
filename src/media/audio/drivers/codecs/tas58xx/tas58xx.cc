@@ -291,7 +291,6 @@ Info Tas58xx::GetInfo() {
     name = "TAS5805m";
   }
   return {
-      .unique_id = {{}},
       .manufacturer = "Texas Instruments",
       .product_name = name,
   };

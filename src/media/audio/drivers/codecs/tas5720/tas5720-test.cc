@@ -158,10 +158,7 @@ TEST_F(Tas5720Test, CodecGetInfo) {
   client.SetCodec(std::move(*codec_client));
 
   auto info = client.GetInfo();
-  ASSERT_TRUE(info->unique_id.has_value());
-  for (const auto& b : *info->unique_id) {
-    ASSERT_EQ(b, 0u);
-  }
+  ASSERT_FALSE(info->unique_id.has_value());
   ASSERT_EQ(info->manufacturer.compare("Texas Instruments"), 0);
   ASSERT_EQ(info->product_name.compare("TAS5720"), 0);
 

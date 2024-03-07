@@ -282,10 +282,7 @@ TEST_F(Tas58xxTest, GetInfo5805) {
   {
     mock_i2c_.ExpectWrite({0x67}).ExpectReadStop({0x00});  // Check DIE ID.
     auto info = client_.GetInfo();
-    ASSERT_TRUE(info.value().unique_id.has_value());
-    for (const auto& b : *info.value().unique_id) {
-      EXPECT_EQ(b, 0u);
-    }
+    EXPECT_FALSE(info.value().unique_id.has_value());
     EXPECT_EQ(info.value().manufacturer.compare("Texas Instruments"), 0);
     EXPECT_EQ(info.value().product_name.compare("TAS5805m"), 0);
   }
@@ -295,10 +292,7 @@ TEST_F(Tas58xxTest, GetInfo5825) {
   {
     mock_i2c_.ExpectWrite({0x67}).ExpectReadStop({0x95});  // Check DIE ID.
     auto info = client_.GetInfo();
-    ASSERT_TRUE(info.value().unique_id.has_value());
-    for (const auto& b : *info.value().unique_id) {
-      EXPECT_EQ(b, 0u);
-    }
+    EXPECT_FALSE(info.value().unique_id.has_value());
     EXPECT_EQ(info.value().manufacturer.compare("Texas Instruments"), 0);
     EXPECT_EQ(info.value().product_name.compare("TAS5825m"), 0);
   }

@@ -180,7 +180,6 @@ zx_status_t Max98373::Create(zx_device_t* parent) {
 
 Info Max98373::GetInfo() {
   return {
-      .unique_id = {{}},
       .manufacturer = "Maxim",
       .product_name = "MAX98373",
   };

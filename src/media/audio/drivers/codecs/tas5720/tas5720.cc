@@ -235,7 +235,6 @@ zx_status_t Tas5720::Reset() {
 
 Info Tas5720::GetInfo() {
   return {
-      .unique_id = {{}},
       .manufacturer = "Texas Instruments",
       .product_name = "TAS5720",
   };
