@@ -38,8 +38,7 @@ do
   fi
   # Extract optarg from --opt=optarg
   case "$opt" in
-    *=?*) optarg=$(expr "X$opt" : '[^=]*=\(.*\)') ;;
-    *=) optarg= ;;
+    -*=*) optarg="${opt#*=}" ;;  # remove-prefix, shortest-match
   esac
   case "$opt" in
     --help|-h) usage ; exit ;;
@@ -65,10 +64,17 @@ test -n "$jq" || { echo "Error: --jq required, but missing." ; exit 1 ;}
 # in the clippy GN template.
 filtered_driver_options=()
 for opt in "${driver_options[@]}" "$@"
-do case "$opt" in
+do
+  # Extract optarg from --opt=optarg
+  case "$opt" in
+    -*=*) optarg="${opt#*=}" ;;  # remove-prefix, shortest-match
+  esac
+  case "$opt" in
+  # Same transformation done in 'build/rbe/local-only.sh'
+  --local-only=* ) filtered_driver_options+=( "$optarg" ) ;;
   --remote* ) ;;  # pseudoflag for RBE parameters, drop it
   *) filtered_driver_options+=( "$opt" )
-esac
+  esac
 done
 
 deps=( $(<"$output.deps") )
