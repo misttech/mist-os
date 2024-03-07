@@ -12,7 +12,6 @@ group("tests") {
     "crg-udc:tests",
     "dwc2:tests",
     "dwc3:tests",
-    "nelson-usb-phy:tests",
     "usb-bus:tests",
     "usb-composite:tests",
     "usb-hub:tests",

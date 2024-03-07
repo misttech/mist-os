@@ -11,7 +11,6 @@ group("drivers") {
     "drivers/crg-udc",
     "drivers/dwc2",
     "drivers/dwc3",
-    "drivers/nelson-usb-phy",
     "drivers/usb-bus",
     "drivers/usb-composite",
     "drivers/usb-hub",

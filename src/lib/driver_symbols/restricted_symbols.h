@@ -126,7 +126,6 @@ const std::set<std::string> kCreateThreadSymbolsDriversAllowlist = {
     "#meta/nand.cm",
     "#meta/nelson-brownout-protection.cm",
     "#meta/nelson-module.cm",
-    "#meta/nelson-usb-phy.cm",
     "#meta/network-device.cm",
     "#meta/nvme.cm",
     "#meta/nxpfmac_sdio.cm",

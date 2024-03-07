@@ -270,7 +270,6 @@ source_set("ddktl") {
     "//src/devices/usb/drivers/crg-udc:*",
     "//src/devices/usb/drivers/dwc2:*",
     "//src/devices/usb/drivers/dwc3:*",
-    "//src/devices/usb/drivers/nelson-usb-phy:*",
     "//src/devices/usb/drivers/usb-bus:*",
     "//src/devices/usb/drivers/usb-composite:*",
     "//src/devices/usb/drivers/usb-peripheral:*",

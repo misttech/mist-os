@@ -554,3 +554,9 @@
   available_in_git: 'b7ca12e102bef96cb1487621983b3f1e3058b148'
   areas: ['SPI']
   path: 'src/devices/spi/drivers/intel-gspi'
+- short_description: 'Nelson USB Phy Driver'
+  deletion_reason: 'Merged with aml-usb-phy (formerly vim3-usb-phy)'
+  gerrit_change_id: '997716'
+  available_in_git: 'a471907b40917cc1a5274530ca34b45ac1ce0a84'
+  areas: ['USB']
+  path: '/src/devices/usb/drivers/nelson-usb-phy'

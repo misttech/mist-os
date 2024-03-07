@@ -54,7 +54,7 @@ extend uint fuchsia.BIND_PLATFORM_DEV_DID {
   CPU = 0x1E,
   PWM_INIT = 0x1F,
   NELSON_PDM = 0x20,
-  USB_PHY = 0x21,
+  // Deprecated: USB_PHY was 0x21
   SM1_CLK = 0x22,
   VIDEO_ENC = 0x23,
   RAM_CTL = 0x24,
