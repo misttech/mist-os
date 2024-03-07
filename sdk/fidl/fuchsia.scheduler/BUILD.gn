@@ -9,6 +9,7 @@ fidl("fuchsia.scheduler") {
     "profile.fidl",
     "role.fidl",
   ]
+  sdk_category = "internal"
   public_deps = [ "//zircon/vdso/zx" ]
 
   enable_hlcpp = true

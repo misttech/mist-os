@@ -587,6 +587,7 @@ sdk_molecule("platform_fidls") {
   deps = [
     "//sdk/fidl/fuchsia.boot:fuchsia.boot_sdk($fidl_toolchain)",
     "//sdk/fidl/fuchsia.debugger:fuchsia.debugger_sdk($fidl_toolchain)",
+    "//sdk/fidl/fuchsia.device:fuchsia.device_sdk($fidl_toolchain)",
     "//sdk/fidl/fuchsia.exception:fuchsia.exception_sdk($fidl_toolchain)",
     "//sdk/fidl/fuchsia.hardware.block:fuchsia.hardware.block_sdk($fidl_toolchain)",
     "//sdk/fidl/fuchsia.hardware.clock:fuchsia.hardware.clock_sdk($fidl_toolchain)",
@@ -597,6 +598,7 @@ sdk_molecule("platform_fidls") {
     "//sdk/fidl/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_sdk($fidl_toolchain)",
     "//sdk/fidl/fuchsia.hardware.sdmmc:fuchsia.hardware.sdmmc_sdk($fidl_toolchain)",
     "//sdk/fidl/fuchsia.hardware.spi:fuchsia.hardware.spi_sdk($fidl_toolchain)",
+    "//sdk/fidl/fuchsia.scheduler:fuchsia.scheduler_sdk($fidl_toolchain)",
     "//sdk/fidl/fuchsia.sys2:fuchsia.sys2_sdk($fidl_toolchain)",
     "//sdk/fidl/fuchsia.test.manager:fuchsia.test.manager_sdk($fidl_toolchain)",
   ]
@@ -615,10 +617,12 @@ sdk_molecule("platform_libs") {
     "//sdk/lib/driver/devicetree/visitors:registration_sdk",
     "//sdk/lib/driver/devicetree/visitors/default:default_sdk",
     "//sdk/lib/driver/devicetree/visitors/drivers:devicetree-visitors",
+    "//sdk/lib/driver/promise/cpp:cpp_sdk",
     "//sdk/lib/sys/component:realm_builder_shard",
     "//src/developer/debug/ipc:ipc_sdk",
     "//src/developer/debug/shared:shared_sdk",
     "//src/devices/block/lib/sdmmc:sdmmc_sdk",
+    "//src/devices/lib/log:log_sdk",
     "//src/devices/testing/fake-bti:fake-bti_sdk",
     "//src/lib/containers/cpp:cpp_sdk",
     "//src/lib/diagnostics/accessor2logger:accessor2logger_sdk",

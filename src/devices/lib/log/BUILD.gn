@@ -3,10 +3,13 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
+import("//build/cpp/sdk_source_set.gni")
 import("//build/test.gni")
 import("//build/zircon/zx_library.gni")
 
-source_set("log") {
+sdk_source_set("log") {
+  sdk_name = "log"
+  category = "internal"
   visibility = [
     "//src/devices/bin/*",
     "//src/devices/lib/log/*",
