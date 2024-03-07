@@ -6,6 +6,9 @@ import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.settings.test") {
   sources = [ "realm_factory.test.fidl" ]
-  public_deps = [ "//sdk/fidl/fuchsia.testing.harness" ]
+  public_deps = [
+    "//sdk/fidl/fuchsia.component.sandbox",
+    "//sdk/fidl/fuchsia.testing.harness",
+  ]
   enable_hlcpp = true
 }

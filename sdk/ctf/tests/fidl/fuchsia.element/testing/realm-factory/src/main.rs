@@ -52,6 +52,7 @@ async fn serve_realm_factory(service: IncomingService) {
 
 async fn handle_request_stream(mut stream: RealmFactoryRequestStream) -> Result<()> {
     let mut task_group = fasync::TaskGroup::new();
+    let mut realms = vec![];
 
     while let Ok(Some(request)) = stream.try_next().await {
         match request {
@@ -61,6 +62,12 @@ async fn handle_request_stream(mut stream: RealmFactoryRequestStream) -> Result<
                 task_group.spawn(async move {
                     realm_proxy::service::serve(realm, request_stream).await.unwrap();
                 });
+                responder.send(Ok(()))?;
+            }
+            RealmFactoryRequest::CreateRealm2 { options, dictionary, responder } => {
+                let realm = create_realm(options).await?;
+                realm.root.controller().get_exposed_dictionary(dictionary).await?.unwrap();
+                realms.push(realm);
                 responder.send(Ok(()))?;
             }
 

@@ -11,7 +11,7 @@ rustc_binary("bin") {
   name = "settings_realm_factory"
   sources = [ "src/main.rs" ]
   deps = [
-    "//sdk/ctf/tests/fidl/fuchsia.settings/testing/fidl:fuchsia.settings.test_rust",
+    "../fidl:fuchsia.settings.test_rust",
     "//sdk/fidl/fuchsia.inspect:fuchsia.inspect_rust",
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
     "//sdk/fidl/fuchsia.settings:fuchsia.settings_rust",

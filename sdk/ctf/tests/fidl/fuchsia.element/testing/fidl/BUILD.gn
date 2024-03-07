@@ -8,5 +8,8 @@ fidl("fuchsia.element.test") {
   testonly = true
   sources = [ "realm_factory.test.fidl" ]
   enable_hlcpp = true
-  public_deps = [ "//sdk/fidl/fuchsia.testing.harness" ]
+  public_deps = [
+    "//sdk/fidl/fuchsia.component.sandbox",
+    "//sdk/fidl/fuchsia.testing.harness",
+  ]
 }

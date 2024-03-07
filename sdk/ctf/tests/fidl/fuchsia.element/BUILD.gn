@@ -11,8 +11,9 @@ executable("element-manager-test-bin") {
   sources = [ "element_manager_test.cc" ]
   deps = [
     "testing/fidl:fuchsia.element.test_hlcpp",
+    "//sdk/fidl/fuchsia.component:fuchsia.component_hlcpp",
+    "//sdk/fidl/fuchsia.component.sandbox:fuchsia.component.sandbox_hlcpp",
     "//sdk/fidl/fuchsia.element:fuchsia.element_hlcpp",
-    "//sdk/fidl/fuchsia.testing.harness:fuchsia.testing.harness_hlcpp",
     "//sdk/lib/sys/cpp",
     "//sdk/testing/fidl:fidl_test_hlcpp",
     "//zircon/system/ulib/async-loop:async-loop-cpp",

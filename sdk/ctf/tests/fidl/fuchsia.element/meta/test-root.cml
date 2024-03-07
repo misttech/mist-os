@@ -9,21 +9,26 @@
             url: "fuchsia-element-tests#meta/default.cm",
         },
         {
-            name: "test_realm_proxy",
+            name: "test_realm_factory",
             url: "fuchsia-element-test-realm-factory#meta/fuchsia-element-test-realm-factory.cm",
         },
     ],
     offer: [
         {
-            protocol: "fuchsia.testing.harness.RealmProxy",
-            from: "#test_realm_proxy",
+            protocol: [
+                "fuchsia.element.test.RealmFactory",
+
+                // Old protocol for CTF compatibility
+                "fuchsia.testing.harness.RealmProxy",
+            ],
+            from: "#test_realm_factory",
             to: "#test_suite",
         },
         {
             protocol: "fuchsia.logger.LogSink",
             from: "parent",
             to: [
-                "#test_realm_proxy",
+                "#test_realm_factory",
                 "#test_suite",
             ],
         },
