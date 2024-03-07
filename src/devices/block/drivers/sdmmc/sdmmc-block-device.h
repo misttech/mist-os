@@ -129,10 +129,6 @@ class SdmmcBlockDevice {
     return child_partition_devices_;
   }
   const std::unique_ptr<RpmbDevice>& child_rpmb_device() const { return child_rpmb_device_; }
-  bool power_suspended() TA_EXCL(power_lock_) {
-    fbl::AutoLock lock(&power_lock_);
-    return power_suspended_;
-  }
 
   fdf::Logger& logger();
 
@@ -232,6 +228,7 @@ class SdmmcBlockDevice {
     inspect::UintProperty max_packed_reads_effective_;   // Set once by the init thread.
     inspect::UintProperty max_packed_writes_effective_;  // Set once by the init thread.
     inspect::BoolProperty using_fidl_;                   // Set once by the init thread.
+    inspect::BoolProperty power_suspended_;              // Updated whenever power state changes.
   } properties_;
 
   std::optional<inspect::ComponentInspector> exposed_inspector_;

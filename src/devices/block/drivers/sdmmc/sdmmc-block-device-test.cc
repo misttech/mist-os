@@ -1930,13 +1930,42 @@ TEST_P(SdmmcBlockDeviceTest, PowerSuspendResume) {
                               });
 
   ASSERT_OK(StartDriverForMmc());
-  EXPECT_FALSE(block_device_->power_suspended());
+
+  const zx::vmo inspect_vmo = block_device_->inspector().DuplicateVmo();
+  ASSERT_TRUE(inspect_vmo.is_valid());
+
+  inspect::InspectTestHelper inspector;
+  inspector.ReadInspect(inspect_vmo);
+
+  const inspect::Hierarchy* root = inspector.hierarchy().GetByPath({"sdmmc_core"});
+  ASSERT_NOT_NULL(root);
+
+  const auto* power_suspended =
+      root->node().get_property<inspect::BoolPropertyValue>("power_suspended");
+  ASSERT_NOT_NULL(power_suspended);
+  EXPECT_FALSE(power_suspended->value());
 
   EXPECT_OK(block_device_->SuspendPower());
-  EXPECT_TRUE(block_device_->power_suspended());
+
+  inspector.ReadInspect(inspect_vmo);
+
+  root = inspector.hierarchy().GetByPath({"sdmmc_core"});
+  ASSERT_NOT_NULL(root);
+
+  power_suspended = root->node().get_property<inspect::BoolPropertyValue>("power_suspended");
+  ASSERT_NOT_NULL(power_suspended);
+  EXPECT_TRUE(power_suspended->value());
 
   EXPECT_OK(block_device_->ResumePower());
-  EXPECT_FALSE(block_device_->power_suspended());
+
+  inspector.ReadInspect(inspect_vmo);
+
+  root = inspector.hierarchy().GetByPath({"sdmmc_core"});
+  ASSERT_NOT_NULL(root);
+
+  power_suspended = root->node().get_property<inspect::BoolPropertyValue>("power_suspended");
+  ASSERT_NOT_NULL(power_suspended);
+  EXPECT_FALSE(power_suspended->value());
 }
 
 INSTANTIATE_TEST_SUITE_P(SdmmcProtocolUsingFidlTest, SdmmcBlockDeviceTest, zxtest::Bool());
