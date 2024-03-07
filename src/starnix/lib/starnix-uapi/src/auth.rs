@@ -414,12 +414,12 @@ impl Credentials {
         if self.uid == 0 && self.euid == 0 {
             self.cap_permitted = self.cap_inheritable | self.cap_bounding;
         } else {
-            // TODO(security): This should take file capabilities into account.
+            // TODO(https://fxbug.dev/328629782): This should take file capabilities into account.
             // (inheritable & file.inheritable) | (file.permitted & bounding) | ambient
             self.cap_permitted = self.cap_inheritable | self.cap_ambient;
         }
 
-        // TODO(security): This should take file capabilities into account.
+        // TODO(https://fxbug.dev/328629782): This should take file capabilities into account.
         // if file.effective { permitted | ambient } else { 0 }
         self.cap_effective = self.cap_permitted;
 
