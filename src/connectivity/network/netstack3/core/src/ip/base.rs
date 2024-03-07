@@ -486,8 +486,6 @@ impl IpLayerIpExt for Ipv4 {
         // Relaxed ordering as we only need atomicity without synchronization. See
         // https://en.cppreference.com/w/cpp/atomic/memory_order#Relaxed_ordering
         // for more details.
-        //
-        // TODO(https://fxbug.dev/42168725): Generate IPv4 IDs unpredictably
         next_packet_id.fetch_add(1, atomic::Ordering::Relaxed)
     }
 }
