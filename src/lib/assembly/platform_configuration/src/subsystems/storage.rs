@@ -145,7 +145,6 @@ impl DefineSubsystemConfiguration<StorageConfig> for StorageSubsystemConfig {
                 .package("pkg-cache")
                 .component("meta/pkg-cache.cm")?
                 .field("protect_dynamic_packages", true)?
-                .field("protect_open_packages", true)?
                 .field("use_fxblob", fxfs_blob)?
                 .field("use_system_image", true)?;
 

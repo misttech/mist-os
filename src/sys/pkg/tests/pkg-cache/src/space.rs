@@ -609,7 +609,7 @@ async fn blobs_protected_from_gc_during_get_by_dynamic_index() {
 
 #[fuchsia_async::run_singlethreaded(test)]
 async fn blobs_protected_from_gc_by_open_package_tracking() {
-    let env = TestEnv::builder().protect_open_packages(true).build().await;
+    let env = TestEnv::builder().build().await;
     let () = env.block_until_started().await;
 
     let subpkg0 = PackageBuilder::new("open-subpackage0")

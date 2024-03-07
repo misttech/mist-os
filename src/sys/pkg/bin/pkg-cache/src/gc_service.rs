@@ -25,7 +25,6 @@ pub async fn serve(
     package_index: Arc<async_lock::RwLock<PackageIndex>>,
     open_packages: package_directory::RootDirCache<blobfs::Client>,
     protect_dynamic_packages: crate::DynamicProtection,
-    protect_open_packages: crate::OpenProtection,
     commit_status_provider: CommitStatusProviderProxy,
     mut stream: SpaceManagerRequestStream,
 ) -> Result<(), anyhow::Error> {
@@ -44,7 +43,6 @@ pub async fn serve(
                 &package_index,
                 &open_packages,
                 protect_dynamic_packages,
-                protect_open_packages,
                 &event_pair,
             )
             .await,
@@ -60,7 +58,6 @@ async fn gc(
     package_index: &Arc<async_lock::RwLock<PackageIndex>>,
     open_packages: &package_directory::RootDirCache<blobfs::Client>,
     protect_dynamic_packages: crate::DynamicProtection,
-    protect_open_packages: crate::OpenProtection,
     event_pair: &zx::EventPair,
 ) -> Result<(), SpaceErrorCode> {
     info!("performing gc");
@@ -117,9 +114,7 @@ async fn gc(
             eligible_blobs.remove(blob);
         });
 
-        if matches!(protect_open_packages, crate::OpenProtection::Enabled) {
-            let () = protect_open_blobs(&mut eligible_blobs, open_packages).await;
-        }
+        let () = protect_open_blobs(&mut eligible_blobs, open_packages).await;
 
         info!("Garbage collecting {} blobs...", eligible_blobs.len());
         let mut errors = 0;
