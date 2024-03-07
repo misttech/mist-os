@@ -23,7 +23,7 @@ use crate::{
     },
 };
 use fuchsia_zircon as zx;
-use linux_uapi::{IOCB_CMD_PREAD, IOCB_CMD_PWRITE};
+use linux_uapi::{IOCB_CMD_PREAD, IOCB_CMD_PWRITE, IOCB_FLAG_RESFD};
 use smallvec::smallvec;
 use starnix_logging::{log_trace, track_stub};
 use starnix_sync::{LockBefore, Locked, Mutex, ReadOps, Unlocked};
@@ -79,6 +79,9 @@ use std::{
     sync::{mpsc::channel, Arc},
     usize,
 };
+use zerocopy::IntoBytes;
+
+use super::{eventfd::EventFdFileObject, VecInputBuffer};
 
 // Constants from bionic/libc/include/sys/stat.h
 const UTIME_NOW: i64 = 0x3fffffff;
@@ -2725,6 +2728,14 @@ pub fn sys_io_setup(
     Ok(())
 }
 
+struct IocbEvent {
+    opcode: u32,
+    file: FileHandle,
+    buffer: UserBuffer,
+    offset: usize,
+    eventfd: Option<FileHandle>,
+}
+
 pub fn sys_io_submit(
     locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
@@ -2746,10 +2757,10 @@ pub fn sys_io_submit(
         }
     }
 
-    let (iocb_sender, iocb_receiver) = channel::<(u32, FileHandle, UserBuffer, usize)>();
+    let (iocb_sender, iocb_receiver) = channel::<IocbEvent>();
     let weak_task = OwnedRef::downgrade(&current_task.task);
     current_task.kernel().kthreads.spawn(move |inner_locked, current_task| loop {
-        let (opcode, file, buffer, offset) = match iocb_receiver.recv() {
+        let IocbEvent { opcode, file, buffer, offset, eventfd } = match iocb_receiver.recv() {
             Ok(r) => r,
             Err(_) => return,
         };
@@ -2782,6 +2793,11 @@ pub fn sys_io_submit(
                     }
                 }
                 _ => {}
+            }
+
+            if let Some(eventfd) = eventfd {
+                let mut input_buffer = VecInputBuffer::new(1u64.as_bytes());
+                let _ = eventfd.write(inner_locked, current_task, &mut input_buffer);
             }
         }
     });
@@ -2816,14 +2832,24 @@ fn submit_iocb(
     _locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     control_block: iocb,
-    iocb_sender: std::sync::mpsc::Sender<(u32, FileHandle, UserBuffer, usize)>,
+    iocb_sender: std::sync::mpsc::Sender<IocbEvent>,
 ) -> Result<(), Errno> {
     let file = current_task.files.get(FdNumber::from_raw(control_block.aio_fildes as i32))?;
     let opcode = control_block.aio_lio_opcode as u32;
     let offset = control_block.aio_offset as usize;
+    let flags = control_block.aio_flags;
     let buffer = UserBuffer {
         address: control_block.aio_buf.into(),
         length: control_block.aio_nbytes as usize,
+    };
+    let eventfd = if flags & IOCB_FLAG_RESFD == IOCB_FLAG_RESFD {
+        let eventfd = current_task.files.get(FdNumber::from_raw(control_block.aio_resfd as i32))?;
+        if eventfd.downcast_file::<EventFdFileObject>().is_none() {
+            return error!(EINVAL);
+        }
+        Some(eventfd)
+    } else {
+        None
     };
 
     match opcode {
@@ -2843,7 +2869,7 @@ fn submit_iocb(
         return error!(EBADF);
     }
 
-    let _ = iocb_sender.send((opcode, file, buffer, offset));
+    let _ = iocb_sender.send(IocbEvent { opcode, file, buffer, offset, eventfd });
 
     Ok(())
 }
