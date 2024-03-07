@@ -28,9 +28,6 @@
 #include <map>
 #include <set>
 
-#include <bind/fuchsia/amlogic/platform/sysmem/heap/cpp/bind.h>
-#include <bind/fuchsia/goldfish/platform/sysmem/heap/cpp/bind.h>
-#include <bind/fuchsia/sysmem/heap/cpp/bind.h>
 #include <safemath/safe_math.h>
 
 #include "log.h"
@@ -282,29 +279,22 @@ class UnusedArena : public fidl::AnyArena {
 };
 
 template <size_t N>
-fpromise::result<std::vector<fuchsia_sysmem2::Heap>> V2CopyFromV1HeapPermittedArrayNatural(
+fpromise::result<std::vector<fuchsia_sysmem2::HeapType>> V2CopyFromV1HeapPermittedArrayNatural(
     const std::array<fuchsia_sysmem::HeapType, N>& v1a, const uint32_t v1_count) {
   ZX_DEBUG_ASSERT(v1_count);
   if (v1_count > v1a.size()) {
     LOG(ERROR, "v1_count > v1a.size() - v1_count: %u v1a.size(): %zu", v1_count, v1a.size());
     return fpromise::error();
   }
-  std::vector<fuchsia_sysmem2::Heap> v2a(v1_count);
+  std::vector<fuchsia_sysmem2::HeapType> v2a(v1_count);
   for (uint32_t i = 0; i < v1_count; i++) {
-    auto v2_heap_type_result = V2CopyFromV1HeapType(v1a[i]);
-    if (v2_heap_type_result.is_error()) {
-      // no way to correctly convert an unrecognized heap type
-      return fpromise::error();
-    }
-    auto v2_heap_type = v2_heap_type_result.value();
-    v2a[i].heap_type() = v2_heap_type;
-    v2a[i].id() = 0;
+    ASSIGN_SCALAR(v2a[i], v1a[i]);
   }
   return fpromise::ok(std::move(v2a));
 }
 
 template <size_t N>
-fpromise::result<fidl::VectorView<fuchsia_sysmem2::wire::Heap>> V2CopyFromV1HeapPermittedArray(
+fpromise::result<fidl::VectorView<fuchsia_sysmem2::wire::HeapType>> V2CopyFromV1HeapPermittedArray(
     fidl::AnyArena& allocator, const fidl::Array<fuchsia_sysmem::wire::HeapType, N>& v1a,
     const uint32_t v1_count) {
   ZX_DEBUG_ASSERT(v1_count);
@@ -312,17 +302,9 @@ fpromise::result<fidl::VectorView<fuchsia_sysmem2::wire::Heap>> V2CopyFromV1Heap
     LOG(ERROR, "v1_count > v1a.size() - v1_count: %u v1a.size(): %zu", v1_count, v1a.size());
     return fpromise::error();
   }
-  fidl::VectorView<fuchsia_sysmem2::wire::Heap> v2a(allocator, v1_count);
+  fidl::VectorView<fuchsia_sysmem2::wire::HeapType> v2a(allocator, v1_count);
   for (uint32_t i = 0; i < v1_count; i++) {
-    v2a[i].Allocate(allocator);
-    auto v2_heap_type_result = V2CopyFromV1WireHeapType(v1a[i]);
-    if (v2_heap_type_result.is_error()) {
-      // no way to correctly convert an unrecognized heap type
-      return fpromise::error();
-    }
-    auto& v2_heap_type = v2_heap_type_result.value();
-    v2a[i].set_heap_type(allocator, fidl::StringView(allocator, v2_heap_type));
-    v2a[i].set_id(allocator, 0);
+    ASSIGN_SCALAR(v2a[i], v1a[i]);
   }
   return fpromise::ok(v2a);
 }
@@ -665,7 +647,7 @@ fpromise::result<fuchsia_sysmem2::BufferMemoryConstraints> V2CopyFromV1BufferMem
     auto result =
         V2CopyFromV1HeapPermittedArrayNatural(v1.heap_permitted(), v1.heap_permitted_count());
     OK_OR_RET_ERROR(result);
-    v2b.permitted_heaps() = result.take_value();
+    v2b.heap_permitted() = result.take_value();
   }
   return fpromise::ok(std::move(v2b));
 }
@@ -685,7 +667,7 @@ V2CopyFromV1BufferMemoryConstraints(fidl::AnyArena& allocator,
     auto result =
         V2CopyFromV1HeapPermittedArray(allocator, v1.heap_permitted, v1.heap_permitted_count);
     OK_OR_RET_ERROR(result);
-    v2b.set_permitted_heaps(allocator, result.take_value());
+    v2b.set_heap_permitted(allocator, result.take_value());
   }
   return fpromise::ok(v2b);
 }
@@ -781,15 +763,7 @@ fuchsia_sysmem2::BufferMemorySettings V2CopyFromV1BufferMemorySettings(
   PROCESS_SCALAR_FIELD_V1(is_physically_contiguous);
   PROCESS_SCALAR_FIELD_V1(is_secure);
   PROCESS_SCALAR_FIELD_V1(coherency_domain);
-
-  auto heap_type_result = V2CopyFromV1HeapType(v1.heap());
-  // BufferMemorySettings are from sysmem so must be a valid fuchsia_sysmem::HeapType.
-  ZX_ASSERT(heap_type_result.is_ok());
-  v2b.heap().emplace();
-  v2b.heap()->heap_type() = heap_type_result.value();
-  // v1 HeapType can only refer to singleton heaps
-  v2b.heap()->id() = 0;
-
+  PROCESS_SCALAR_FIELD_V1(heap);
   return v2b;
 }
 
@@ -800,15 +774,7 @@ fuchsia_sysmem2::wire::BufferMemorySettings V2CopyFromV1BufferMemorySettings(
   PROCESS_WIRE_SCALAR_FIELD_V1(is_physically_contiguous);
   PROCESS_WIRE_SCALAR_FIELD_V1(is_secure);
   PROCESS_WIRE_SCALAR_FIELD_V1(coherency_domain);
-
-  auto heap_type_result = V2CopyFromV1WireHeapType(v1.heap);
-  // BufferMemorySettings are from sysmem so must be a valid fuchsia_sysmem::HeapType.
-  ZX_ASSERT(heap_type_result.is_ok());
-  fuchsia_sysmem2::wire::Heap v2_heap(allocator);
-  v2_heap.set_heap_type(allocator, fidl::StringView(allocator, heap_type_result.value()));
-  v2_heap.set_id(allocator, 0);
-  v2b.set_heap(allocator, std::move(v2_heap));
-
+  PROCESS_WIRE_SCALAR_FIELD_V1_WITH_ALLOCATOR(heap);
   return v2b;
 }
 
@@ -900,63 +866,12 @@ fpromise::result<fuchsia_sysmem2::wire::BufferCollectionInfo> V2MoveFromV1Buffer
   return fpromise::ok(v2b);
 }
 
-fpromise::result<fuchsia_sysmem::HeapType> V1CopyFromV2HeapType(const std::string& heap_type) {
-  const static std::unordered_map<std::string, fuchsia_sysmem::HeapType> kTable = {
-      {bind_fuchsia_sysmem_heap::HEAP_TYPE_SYSTEM_RAM, fuchsia_sysmem::HeapType::kSystemRam},
-      {bind_fuchsia_amlogic_platform_sysmem_heap::HEAP_TYPE_SECURE,
-       fuchsia_sysmem::HeapType::kAmlogicSecure},
-      {bind_fuchsia_amlogic_platform_sysmem_heap::HEAP_TYPE_SECURE_VDEC,
-       fuchsia_sysmem::HeapType::kAmlogicSecureVdec},
-      {bind_fuchsia_goldfish_platform_sysmem_heap::HEAP_TYPE_DEVICE_LOCAL,
-       fuchsia_sysmem::HeapType::kGoldfishDeviceLocal},
-      {bind_fuchsia_goldfish_platform_sysmem_heap::HEAP_TYPE_HOST_VISIBLE,
-       fuchsia_sysmem::HeapType::kGoldfishHostVisible},
-      {bind_fuchsia_sysmem_heap::HEAP_TYPE_FRAMEBUFFER, fuchsia_sysmem::HeapType::kFramebuffer},
-  };
-  auto iter = kTable.find(heap_type);
-  if (iter == kTable.end()) {
-    return fpromise::error();
-  }
-  return fpromise::ok(iter->second);
+fuchsia_sysmem::wire::HeapType V1CopyFromV2HeapType(fuchsia_sysmem2::wire::HeapType heap_type) {
+  return static_cast<fuchsia_sysmem::wire::HeapType>(fidl_underlying_cast(heap_type));
 }
 
-fpromise::result<fuchsia_sysmem::wire::HeapType> V1WireCopyFromV2HeapType(
-    const std::string& heap_type) {
-  auto result = V1CopyFromV2HeapType(heap_type);
-  if (result.is_error()) {
-    return result.take_error_result();
-  }
-  auto v1_wire_heap_type = static_cast<fuchsia_sysmem::wire::HeapType>(result.value());
-  return fpromise::ok(v1_wire_heap_type);
-}
-
-fpromise::result<std::string> V2CopyFromV1HeapType(fuchsia_sysmem::HeapType heap_type) {
-  const static std::unordered_map<fuchsia_sysmem::HeapType, std::string> kTable = {
-      {fuchsia_sysmem::HeapType::kSystemRam, bind_fuchsia_sysmem_heap::HEAP_TYPE_SYSTEM_RAM},
-      {fuchsia_sysmem::HeapType::kAmlogicSecure,
-       bind_fuchsia_amlogic_platform_sysmem_heap::HEAP_TYPE_SECURE},
-      {fuchsia_sysmem::HeapType::kAmlogicSecureVdec,
-       bind_fuchsia_amlogic_platform_sysmem_heap::HEAP_TYPE_SECURE_VDEC},
-      {fuchsia_sysmem::HeapType::kGoldfishDeviceLocal,
-       bind_fuchsia_goldfish_platform_sysmem_heap::HEAP_TYPE_DEVICE_LOCAL},
-      {fuchsia_sysmem::HeapType::kGoldfishHostVisible,
-       bind_fuchsia_goldfish_platform_sysmem_heap::HEAP_TYPE_HOST_VISIBLE},
-      {fuchsia_sysmem::HeapType::kFramebuffer, bind_fuchsia_sysmem_heap::HEAP_TYPE_FRAMEBUFFER},
-  };
-  auto iter = kTable.find(heap_type);
-  if (iter == kTable.end()) {
-    return fpromise::error();
-  }
-  return fpromise::ok(iter->second);
-}
-
-fpromise::result<std::string> V2CopyFromV1WireHeapType(fuchsia_sysmem::wire::HeapType heap_type) {
-  auto v1_natural_heap_type = static_cast<fuchsia_sysmem::HeapType>(heap_type);
-  auto result = V2CopyFromV1HeapType(v1_natural_heap_type);
-  if (result.is_error()) {
-    return result.take_error_result();
-  }
-  return result.take_ok_result();
+fuchsia_sysmem2::wire::HeapType V2CopyFromV1HeapType(fuchsia_sysmem::wire::HeapType heap_type) {
+  return static_cast<fuchsia_sysmem2::wire::HeapType>(fidl_underlying_cast(heap_type));
 }
 
 fpromise::result<std::optional<fuchsia_sysmem::BufferCollectionConstraints>>
@@ -1071,32 +986,15 @@ fpromise::result<fuchsia_sysmem::BufferMemoryConstraints> V1CopyFromV2BufferMemo
   PROCESS_SCALAR_FIELD_V2(cpu_domain_supported);
   PROCESS_SCALAR_FIELD_V2(inaccessible_domain_supported);
   ZX_DEBUG_ASSERT(!v1.heap_permitted_count());
-  if (v2.permitted_heaps().has_value()) {
-    if (v2.permitted_heaps()->size() >
+  if (v2.heap_permitted().has_value()) {
+    if (v2.heap_permitted()->size() >
         fuchsia_sysmem::wire::kMaxCountBufferMemoryConstraintsHeapPermitted) {
-      LOG(ERROR,
-          "v2 permitted_heaps count > v1 MAX_COUNT_BUFFER_MEMORY_CONSTRAINTS_HEAP_PERMITTED");
+      LOG(ERROR, "v2 heap_permitted count > v1 MAX_COUNT_BUFFER_MEMORY_CONSTRAINTS_HEAP_PERMITTED");
       return fpromise::error();
     }
-    v1.heap_permitted_count() = static_cast<uint32_t>(v2.permitted_heaps()->size());
-    for (uint32_t i = 0; i < v2.permitted_heaps()->size(); ++i) {
-      if (!v2.permitted_heaps()->at(i).heap_type().has_value()) {
-        LOG(ERROR, "v2 heap_type not set");
-        return fpromise::error();
-      }
-      if (v2.permitted_heaps()->at(i).id().has_value() &&
-          v2.permitted_heaps()->at(i).id().value() != 0) {
-        LOG(ERROR, "v2 heap id != 0 can't convert to v1");
-        return fpromise::error();
-      }
-      auto v1_heap_type_result =
-          V1CopyFromV2HeapType(v2.permitted_heaps()->at(i).heap_type().value());
-      if (v1_heap_type_result.is_error()) {
-        LOG(ERROR, "v2 heap_type failed conversion to v1: %s",
-            v2.permitted_heaps()->at(i).heap_type().value().c_str());
-        return fpromise::error();
-      }
-      v1.heap_permitted()[i] = v1_heap_type_result.value();
+    v1.heap_permitted_count() = static_cast<uint32_t>(v2.heap_permitted()->size());
+    for (uint32_t i = 0; i < v2.heap_permitted()->size(); ++i) {
+      ASSIGN_SCALAR(v1.heap_permitted()[i], v2.heap_permitted()->at(i));
     }
   }
   return fpromise::ok(std::move(v1));
@@ -1113,31 +1011,15 @@ fpromise::result<fuchsia_sysmem::wire::BufferMemoryConstraints> V1CopyFromV2Buff
   PROCESS_WIRE_SCALAR_FIELD_V2(cpu_domain_supported);
   PROCESS_WIRE_SCALAR_FIELD_V2(inaccessible_domain_supported);
   ZX_DEBUG_ASSERT(!v1.heap_permitted_count);
-  if (v2.has_permitted_heaps()) {
-    if (v2.permitted_heaps().count() >
+  if (v2.has_heap_permitted()) {
+    if (v2.heap_permitted().count() >
         fuchsia_sysmem::wire::kMaxCountBufferMemoryConstraintsHeapPermitted) {
-      LOG(ERROR,
-          "v2 permitted_heaps count > v1 MAX_COUNT_BUFFER_MEMORY_CONSTRAINTS_HEAP_PERMITTED");
+      LOG(ERROR, "v2 heap_permitted count > v1 MAX_COUNT_BUFFER_MEMORY_CONSTRAINTS_HEAP_PERMITTED");
       return fpromise::error();
     }
-    v1.heap_permitted_count = static_cast<uint32_t>(v2.permitted_heaps().count());
-    for (uint32_t i = 0; i < v2.permitted_heaps().count(); ++i) {
-      if (!v2.permitted_heaps().at(i).has_heap_type()) {
-        LOG(ERROR, "v2 heap_type not set");
-        return fpromise::error();
-      }
-      if (v2.permitted_heaps().at(i).has_id() && v2.permitted_heaps().at(i).id() != 0) {
-        LOG(ERROR, "v2 heap id != 0 can't convert to v1");
-        return fpromise::error();
-      }
-      auto v2_heap_type = std::string(v2.permitted_heaps().at(i).heap_type().data(),
-                                      v2.permitted_heaps().at(i).heap_type().size());
-      auto v1_heap_type_result = V1CopyFromV2HeapType(v2_heap_type);
-      if (v1_heap_type_result.is_error()) {
-        LOG(ERROR, "v2 heap_type failed conversion to v1: %s", v2_heap_type.c_str());
-        return fpromise::error();
-      }
-      v1.heap_permitted[i] = v1_heap_type_result.value();
+    v1.heap_permitted_count = static_cast<uint32_t>(v2.heap_permitted().count());
+    for (uint32_t i = 0; i < v2.heap_permitted().count(); ++i) {
+      ASSIGN_SCALAR(v1.heap_permitted[i], v2.heap_permitted()[i]);
     }
   }
   return fpromise::ok(v1);
@@ -1172,26 +1054,7 @@ fpromise::result<fuchsia_sysmem::BufferMemorySettings> V1CopyFromV2BufferMemoryS
   PROCESS_SCALAR_FIELD_V2(is_physically_contiguous);
   PROCESS_SCALAR_FIELD_V2(is_secure);
   PROCESS_SCALAR_FIELD_V2(coherency_domain);
-
-  if (!v2.heap().has_value()) {
-    return fpromise::error();
-  }
-  if (!v2.heap()->heap_type().has_value()) {
-    return fpromise::error();
-  }
-  if (!v2.heap()->id().has_value()) {
-    return fpromise::error();
-  }
-  if (*v2.heap()->id() != 0) {
-    // sysmem(1) doesn't have heap id so can't represent this
-    return fpromise::error();
-  }
-  auto heap_type_result = V1CopyFromV2HeapType(*v2.heap()->heap_type());
-  if (heap_type_result.is_error()) {
-    return heap_type_result.take_error_result();
-  }
-  v1.heap() = heap_type_result.value();
-
+  PROCESS_SCALAR_FIELD_V2(heap);
   return fpromise::ok(v1);
 }
 
@@ -1203,27 +1066,7 @@ fpromise::result<fuchsia_sysmem::wire::BufferMemorySettings> V1CopyFromV2BufferM
   PROCESS_WIRE_SCALAR_FIELD_V2(is_physically_contiguous);
   PROCESS_WIRE_SCALAR_FIELD_V2(is_secure);
   PROCESS_WIRE_SCALAR_FIELD_V2(coherency_domain);
-
-  if (!v2.has_heap()) {
-    return fpromise::error();
-  }
-  if (!v2.heap().has_heap_type()) {
-    return fpromise::error();
-  }
-  if (!v2.heap().has_id()) {
-    return fpromise::error();
-  }
-  if (v2.heap().id() != 0) {
-    // sysmem(1) doesn't have heap id so can't represent this
-    return fpromise::error();
-  }
-  auto v2_heap_type = std::string(v2.heap().heap_type().data(), v2.heap().heap_type().size());
-  auto heap_type_result = V1CopyFromV2HeapType(v2_heap_type);
-  if (heap_type_result.is_error()) {
-    return heap_type_result.take_error_result();
-  }
-  v1.heap = heap_type_result.value();
-
+  PROCESS_WIRE_SCALAR_FIELD_V2(heap);
   return fpromise::ok(v1);
 }
 
@@ -1792,13 +1635,6 @@ fuchsia_sysmem2::Error V2CopyFromV1Error(zx_status_t error) {
       // This also happens if the caller passes in ZX_OK in release.
       return fuchsia_sysmem2::Error::kInvalid;
   }
-}
-
-fuchsia_sysmem2::Heap MakeHeap(std::string heap_type, uint64_t heap_id) {
-  fuchsia_sysmem2::Heap heap;
-  heap.heap_type() = std::move(heap_type);
-  heap.id() = heap_id;
-  return heap;
 }
 
 #endif  // __Fuchsia_API_level__ >= FUCHSIA_HEAD

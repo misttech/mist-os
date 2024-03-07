@@ -84,21 +84,17 @@ bool Intersect(const ralloc_region_t& a, const ralloc_region_t& b, ralloc_region
   return true;
 }
 
-std::atomic<trace_counter_id_t> next_counter_id;
-
 }  // namespace
 
 ContiguousPooledMemoryAllocator::ContiguousPooledMemoryAllocator(
-    Owner* parent_device, const char* allocation_name, inspect::Node* parent_node,
-    fuchsia_sysmem2::Heap heap, uint64_t size, bool is_always_cpu_accessible,
-    bool is_ever_cpu_accessible, bool is_ready, bool can_be_torn_down,
-    async_dispatcher_t* dispatcher)
+    Owner* parent_device, const char* allocation_name, inspect::Node* parent_node, uint64_t pool_id,
+    uint64_t size, bool is_always_cpu_accessible, bool is_ever_cpu_accessible, bool is_ready,
+    bool can_be_torn_down, async_dispatcher_t* dispatcher)
     : MemoryAllocator(BuildHeapProperties(is_always_cpu_accessible)),
       parent_device_(parent_device),
       dispatcher_(dispatcher),
       allocation_name_(allocation_name),
-      heap_(std::move(heap)),
-      counter_id_(next_counter_id.fetch_add(1, std::memory_order_relaxed)),
+      pool_id_(pool_id),
       region_allocator_(RegionAllocator::RegionPool::Create(std::numeric_limits<size_t>::max())),
       size_(size),
       is_always_cpu_accessible_(is_always_cpu_accessible),
@@ -386,8 +382,8 @@ zx_status_t ContiguousPooledMemoryAllocator::InitCommon(zx::vmo local_contiguous
   // result from speculative prefetch from a physical page under a HW-protected range.  A non-cached
   // mapping prevents speculative prefetch.
   //
-  // TODO(https://fxbug.dev/42179016): Currently Zircon's physmap has !is_always_cpu_accessible_
-  // pages mapped cached, which we believe is likely the cause of some SError(s) related to
+  // TODO(https://fxbug.dev/42179016): Currently Zircon's physmap has !is_always_cpu_accessible_ pages mapped
+  // cached, which we believe is likely the cause of some SError(s) related to
   // protected_memory_size.  One way to fix would be to change the physmap mapping to non-cached
   // when a contiguous VMO
   //
@@ -826,14 +822,6 @@ void ContiguousPooledMemoryAllocator::StepTowardOptimalProtectedRanges(
                                                     step_toward_optimal_protected_ranges_min_time_);
 }
 
-protected_ranges::ProtectedRangesCoreControl&
-ContiguousPooledMemoryAllocator::protected_ranges_core_control(const fuchsia_sysmem2::Heap& heap) {
-  if (!protected_ranges_core_control_) {
-    protected_ranges_core_control_ = &parent_device_->protected_ranges_core_control(heap_);
-  }
-  return *protected_ranges_core_control_;
-}
-
 void ContiguousPooledMemoryAllocator::DumpRanges() const {
   if (protected_ranges_->ranges().empty()) {
     return;
@@ -1218,7 +1206,7 @@ void ContiguousPooledMemoryAllocator::TracePoolSize(bool initial_trace) {
   });
   used_size_property_.Set(used_size);
   large_contiguous_region_sum_property_.Set(CalculateLargeContiguousRegionSize());
-  TRACE_COUNTER("gfx", "Contiguous pool size", counter_id_, "size", used_size);
+  TRACE_COUNTER("gfx", "Contiguous pool size", pool_id_, "size", used_size);
   bool trace_high_water_mark = initial_trace;
   if (used_size > high_water_mark_used_size_) {
     high_water_mark_used_size_ = used_size;
@@ -1359,9 +1347,8 @@ void ContiguousPooledMemoryAllocator::OnRegionUnused(const ralloc_region_t& regi
           if (now >= next_log_time) {
             LOG(INFO,
                 "(log rate limited) ZX_VMO_OP_DECOMMIT failed on contiguous VMO - decommit_status: "
-                "%d base: 0x%" PRIx64 " size: 0x%" PRIx64 " heap_type: %s heap_id: 0x%" PRIx64,
-                decommit_status, loan_range.base, loan_range.size, heap_.heap_type()->c_str(),
-                heap_.id().value());
+                "%d base: 0x%" PRIx64 " size: 0x%" PRIx64 " pool_id_: 0x%" PRIx64,
+                decommit_status, loan_range.base, loan_range.size, pool_id_);
             next_log_time = now + zx::sec(30);
           }
           // If we can't decommit (unexpected), we try to zero before giving up.  Overall, we rely
@@ -1452,19 +1439,22 @@ uint64_t ContiguousPooledMemoryAllocator::GetLoanableBytes() {
 }
 
 bool ContiguousPooledMemoryAllocator::RangesControl::IsDynamic() {
-  return parent_->protected_ranges_core_control(parent_->heap()).IsDynamic();
+  return parent_->parent_device_->protected_ranges_core_control(parent_->heap_type()).IsDynamic();
 }
 
 uint64_t ContiguousPooledMemoryAllocator::RangesControl::MaxRangeCount() {
-  return parent_->protected_ranges_core_control(parent_->heap()).MaxRangeCount();
+  return parent_->parent_device_->protected_ranges_core_control(parent_->heap_type())
+      .MaxRangeCount();
 }
 
 uint64_t ContiguousPooledMemoryAllocator::RangesControl::GetRangeGranularity() {
-  return parent_->protected_ranges_core_control(parent_->heap()).GetRangeGranularity();
+  return parent_->parent_device_->protected_ranges_core_control(parent_->heap_type())
+      .GetRangeGranularity();
 }
 
 bool ContiguousPooledMemoryAllocator::RangesControl::HasModProtectedRange() {
-  return parent_->protected_ranges_core_control(parent_->heap()).HasModProtectedRange();
+  return parent_->parent_device_->protected_ranges_core_control(parent_->heap_type())
+      .HasModProtectedRange();
 }
 
 void ContiguousPooledMemoryAllocator::RangesControl::AddProtectedRange(
@@ -1477,8 +1467,7 @@ void ContiguousPooledMemoryAllocator::RangesControl::AddProtectedRange(
   // HW-protected pages between when sysmem hypothetically crashes and when that sysmem crash
   // triggers a hard reboot.
   //
-  // TODO(https://fxbug.dev/42178137): When possible, configure sysmem to trigger reboot on driver
-  // remove.
+  // TODO(https://fxbug.dev/42178137): When possible, configure sysmem to trigger reboot on driver remove.
   zx::pmt pmt;
   zx_paddr_t paddr;
   zx_status_t pin_result = parent_->parent_device_->bti().pin(
@@ -1496,14 +1485,16 @@ void ContiguousPooledMemoryAllocator::RangesControl::AddProtectedRange(
 
   const auto range = protected_ranges::Range::BeginLength(
       parent_->phys_start_ + zero_based_range.begin(), zero_based_range.length());
-  parent_->protected_ranges_core_control(parent_->heap()).AddProtectedRange(range);
+  parent_->parent_device_->protected_ranges_core_control(parent_->heap_type())
+      .AddProtectedRange(range);
 }
 
 void ContiguousPooledMemoryAllocator::RangesControl::DelProtectedRange(
     const protected_ranges::Range& zero_based_range) {
   const auto range = protected_ranges::Range::BeginLength(
       parent_->phys_start_ + zero_based_range.begin(), zero_based_range.length());
-  parent_->protected_ranges_core_control(parent_->heap()).DelProtectedRange(range);
+  parent_->parent_device_->protected_ranges_core_control(parent_->heap_type())
+      .DelProtectedRange(range);
 
   // The pin_count will prevent actual un-pinning for any page that's still covered by a different
   // pin.
@@ -1535,7 +1526,8 @@ void ContiguousPooledMemoryAllocator::RangesControl::ModProtectedRange(
       parent_->phys_start_ + old_zero_based_range.begin(), old_zero_based_range.length());
   const auto new_range = protected_ranges::Range::BeginLength(
       parent_->phys_start_ + new_zero_based_range.begin(), new_zero_based_range.length());
-  parent_->protected_ranges_core_control(parent_->heap()).ModProtectedRange(old_range, new_range);
+  parent_->parent_device_->protected_ranges_core_control(parent_->heap_type())
+      .ModProtectedRange(old_range, new_range);
 
   // unpin old
   //
@@ -1550,7 +1542,7 @@ void ContiguousPooledMemoryAllocator::RangesControl::ZeroProtectedSubRange(
     bool is_covering_range_explicit, const protected_ranges::Range& zero_based_range) {
   const auto range = protected_ranges::Range::BeginLength(
       parent_->phys_start_ + zero_based_range.begin(), zero_based_range.length());
-  parent_->protected_ranges_core_control(parent_->heap())
+  parent_->parent_device_->protected_ranges_core_control(parent_->heap_type())
       .ZeroProtectedSubRange(is_covering_range_explicit, range);
 }
 

@@ -245,9 +245,7 @@ static_assert(2 == fidl_underlying_cast(static_cast<fuchsia_sysmem2::HeapType>(2
 //
 // See fidl_struct.h's TakeAsLlcpp() for a way to convert from FIDL C to llcpp first.
 
-[[nodiscard]] fpromise::result<std::string> V2CopyFromV1HeapType(
-    fuchsia_sysmem::HeapType heap_type);
-[[nodiscard]] fpromise::result<std::string> V2CopyFromV1WireHeapType(
+[[nodiscard]] fuchsia_sysmem2::wire::HeapType V2CopyFromV1HeapType(
     fuchsia_sysmem::wire::HeapType heap_type);
 
 // For cases that also need to convey pixel_format_modifier, see
@@ -321,11 +319,8 @@ V2MoveFromV1BufferCollectionInfo(fidl::AnyArena& allocator,
 // V1 Copy/Move from V2
 ///////////////////////
 
-[[nodiscard]] fpromise::result<fuchsia_sysmem::HeapType> V1CopyFromV2HeapType(
-    const std::string& heap_type);
-[[nodiscard]] fpromise::result<fuchsia_sysmem::wire::HeapType> V1WireCopyFromV2HeapType(
-    const std::string& heap_type);
-
+[[nodiscard]] fuchsia_sysmem::wire::HeapType V1CopyFromV2HeapType(
+    fuchsia_sysmem2::wire::HeapType heap_type);
 [[nodiscard]] fpromise::result<std::optional<fuchsia_sysmem::BufferCollectionConstraints>>
 V1CopyFromV2BufferCollectionConstraints(const fuchsia_sysmem2::BufferCollectionConstraints& v2);
 [[nodiscard]] fpromise::result<std::optional<fuchsia_sysmem::wire::BufferCollectionConstraints>>
@@ -432,12 +427,6 @@ V2CloneBufferCollectionInfo(fidl::AnyArena& allocator,
 // Passing in ZX_OK will assert in release and debug. Passing in any unexpected
 // error value, including any positive value, will return UNSPECIFIED.
 [[nodiscard]] fuchsia_sysmem2::Error V2CopyFromV1Error(zx_status_t error);
-
-///////////
-// V2 utils
-///////////
-
-fuchsia_sysmem2::Heap MakeHeap(std::string heap_type, uint64_t heap_id);
 
 #else
 
