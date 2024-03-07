@@ -12,6 +12,7 @@ from mobly import test_runner
 
 from fuchsia_base_test import fuchsia_base_test
 from honeydew.interfaces.device_classes import fuchsia_device
+import honeydew
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
@@ -46,6 +47,44 @@ class FfxTest(fuchsia_base_test.FuchsiaBaseTest):
         got_device_name = output_json[0]["child"][0]["value"]
         # Assert FFX's target show device name matches Honeydew's.
         asserts.assert_equal(got_device_name, self.dut.device_name)
+
+    # TODO(b/328505123): reenable when `ffx daemon stop` works in builders
+    # def test_target_list_without_discovery(self) -> None:
+    #     """Test `ffx target list` output returns as expected when discovery is off."""
+    #     self.dut.ffx.run(["daemon", "stop", "-t", "1000"])
+    #     output = self.dut.ffx.run(
+    #         ["--machine", "json", "-c", "ffx.isolated=true", "target", "list"]
+    #     )
+    #     output_json = json.loads(output)
+    #     got_device_name = output_json[0]["nodename"]
+    #     # Assert FFX's target list device name matches Honeydew's.
+    #     asserts.assert_equal(got_device_name, self.dut.device_name)
+    #     # Make sure the daemon hadn't started running
+    #     with asserts.assert_raises(honeydew.errors.FfxCommandError):
+    #         self.dut.ffx.run(["-c", "daemon.autostart=false", "daemon", "echo"])
+
+    # TODO(b/328505123): reenable when `ffx daemon stop` works in builders
+    # def test_target_list_nodename_without_discovery(self) -> None:
+    #     """Test `ffx target list <nodename>` output returns as expected when discovery is off."""
+    #     self.dut.ffx.run(["daemon", "stop", "-t", "1000"], capture_output=False)
+    #     output = self.dut.ffx.run(
+    #         [
+    #             "--machine",
+    #             "json",
+    #             "-c",
+    #             "ffx.isolated=true",
+    #             "target",
+    #             "list",
+    #             self.dut.device_name,
+    #         ]
+    #     )
+    #     output_json = json.loads(output)
+    #     got_device_name = output_json[0]["nodename"]
+    #     # Assert FFX's target list device name matches Honeydew's.
+    #     asserts.assert_equal(got_device_name, self.dut.device_name)
+    #     # Make sure the daemon hadn't started running
+    #     with asserts.assert_raises(honeydew.errors.FfxCommandError):
+    #         self.dut.ffx.run(["-c", "daemon.autostart=false", "daemon", "echo"])
 
 
 if __name__ == "__main__":

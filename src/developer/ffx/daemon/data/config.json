@@ -8,7 +8,8 @@
         },
         "mdns": {
             "enabled": true
-        }
+        },
+        "timeout": 500
     },
     "fastboot": {
         "flash": {

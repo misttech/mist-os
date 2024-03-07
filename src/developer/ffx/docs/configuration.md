@@ -25,6 +25,11 @@ When updating, please add the value in alphabetical order.
 |                                         : automatically to targets           :
 |                                         : discovered through mDNS. Defaults  :
 :                                         : to `false`                         :
+| `discovery.timeout`                     | When doing _local_ discovery in    |
+:                                         : `ffx target list`, how long in     :
+                                          : milliseconds to wait before        :
+                                          : collecting responses. Defaults to  :
+                                          : `500`                              :
 | `discovery.zedboot.advert_port`         | Zedboot discovery port (must be a  |
 :                                         : nonzero u16). Default to `33331`   :
 | `discovery.zedboot.enabled`             | Determines if zedboot discovery is |

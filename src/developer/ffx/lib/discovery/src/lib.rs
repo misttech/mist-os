@@ -25,7 +25,7 @@ use usb_fastboot_discovery::{
 use fidl_fuchsia_developer_ffx as ffx;
 
 #[allow(dead_code)]
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq, Hash)]
 pub enum FastbootConnectionState {
     Usb(String),
     Tcp(TargetAddr),
@@ -44,7 +44,7 @@ impl Display for FastbootConnectionState {
 }
 
 #[allow(dead_code)]
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq, Hash)]
 pub struct FastbootTargetState {
     pub serial_number: String,
     pub connection_state: FastbootConnectionState,
@@ -56,7 +56,7 @@ impl Display for FastbootTargetState {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq, Hash)]
 pub enum TargetState {
     Unknown,
     Product(TargetAddr),
@@ -77,7 +77,7 @@ impl Display for TargetState {
 }
 
 #[allow(dead_code)]
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq, Hash)]
 pub struct TargetHandle {
     pub node_name: Option<String>,
     pub state: TargetState,
@@ -91,7 +91,7 @@ impl Display for TargetHandle {
 }
 
 /// Target discovery events. See `wait_for_devices`.
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq, Hash)]
 pub enum TargetEvent {
     /// Indicates a Target has been discovered.
     Added(TargetHandle),

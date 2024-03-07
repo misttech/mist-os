@@ -5,16 +5,22 @@
 use crate::target_formatter::{JsonTarget, JsonTargetFormatter, TargetFormatter};
 use anyhow::Result;
 use async_trait::async_trait;
+use discovery::{DiscoverySources, TargetEvent, TargetHandle};
 use errors::{ffx_bail, ffx_bail_with_code};
 use ffx_config::EnvironmentContext;
 use ffx_list_args::{AddressTypes, ListCommand};
-use fho::{daemon_protocol, FfxMain, FfxTool, ToolIO, VerifiedMachineWriter};
-use fidl_fuchsia_developer_ffx::{
-    TargetCollectionProxy, TargetCollectionReaderMarker, TargetCollectionReaderRequest, TargetQuery,
-};
-use futures::TryStreamExt;
+use fho::{daemon_protocol, deferred, Deferred, FfxMain, FfxTool, ToolIO, VerifiedMachineWriter};
+use fidl_fuchsia_developer_ffx as ffx;
+use fuchsia_async::Timer;
+use futures::{StreamExt, TryStreamExt};
+use std::collections::HashSet;
+use std::convert::TryFrom;
+use std::time::Duration;
+use timeout::timeout;
 
 mod target_formatter;
+
+const CONFIG_LOCAL_DISCOVERY_TIMEOUT: &str = "discovery.timeout";
 
 fn address_types_from_cmd(cmd: &ListCommand) -> AddressTypes {
     if cmd.no_ipv4 && cmd.no_ipv6 {
@@ -32,8 +38,8 @@ fn address_types_from_cmd(cmd: &ListCommand) -> AddressTypes {
 pub struct ListTool {
     #[command]
     cmd: ListCommand,
-    #[with(daemon_protocol())]
-    tc_proxy: TargetCollectionProxy,
+    #[with(deferred(daemon_protocol()))]
+    tc_proxy: Deferred<ffx::TargetCollectionProxy>,
     context: EnvironmentContext,
 }
 
@@ -45,36 +51,28 @@ type ListToolWriter = VerifiedMachineWriter<Vec<JsonTarget>>;
 impl FfxMain for ListTool {
     type Writer = ListToolWriter;
     async fn main(self, writer: Self::Writer) -> fho::Result<()> {
-        list_targets(self.tc_proxy, writer, self.cmd, &self.context).await?;
+        let infos = if is_discovery_enabled(&self.context).await {
+            list_targets(self.tc_proxy.await?, &self.cmd).await?
+        } else {
+            local_list_targets(&self.context, &self.cmd).await?
+        };
+        show_targets(self.cmd, infos, writer, &self.context).await?;
         Ok(())
     }
 }
 
-async fn list_targets(
-    tc_proxy: TargetCollectionProxy,
-    mut writer: ListToolWriter,
+async fn is_discovery_enabled(ctx: &EnvironmentContext) -> bool {
+    !ffx_config::is_usb_discovery_disabled(ctx).await
+        || !ffx_config::is_mdns_discovery_disabled(ctx).await
+}
+
+async fn show_targets(
     cmd: ListCommand,
+    infos: Vec<ffx::TargetInfo>,
+    mut writer: ListToolWriter,
     context: &EnvironmentContext,
 ) -> Result<()> {
-    let (reader, server) = fidl::endpoints::create_endpoints::<TargetCollectionReaderMarker>();
-
-    tc_proxy.list_targets(
-        &TargetQuery { string_matcher: cmd.nodename.clone(), ..Default::default() },
-        reader,
-    )?;
-    let mut res = Vec::new();
-    let mut stream = server.into_stream()?;
-    while let Ok(Some(TargetCollectionReaderRequest::Next { entry, responder })) =
-        stream.try_next().await
-    {
-        responder.send()?;
-        if entry.len() > 0 {
-            res.extend(entry);
-        } else {
-            break;
-        }
-    }
-    match res.len() {
+    match infos.len() {
         0 => {
             // Printed to stderr, so that if a user is parsing output, say from a formatted
             // output, that the message is not consumed. A stronger future strategy would
@@ -96,20 +94,122 @@ async fn list_targets(
                 ffx_bail!("Invalid arguments, cannot specify both --no_ipv4 and --no_ipv6")
             }
             if writer.is_machine() {
-                let res = target_formatter::filter_targets_by_address_types(res, address_types);
+                let res = target_formatter::filter_targets_by_address_types(infos, address_types);
                 let mut formatter = JsonTargetFormatter::try_from(res)?;
                 let default: Option<String> = ffx_target::get_default_target(&context).await?;
                 JsonTargetFormatter::set_default_target(&mut formatter.targets, default.as_deref());
                 writer.machine(&formatter.targets)?;
             } else {
                 let formatter =
-                    Box::<dyn TargetFormatter>::try_from((cmd.format, address_types, res))?;
+                    Box::<dyn TargetFormatter>::try_from((cmd.format, address_types, infos))?;
                 let default: Option<String> = ffx_target::get_default_target(&context).await?;
                 writer.line(formatter.lines(default.as_deref()).join("\n"))?;
             }
         }
-    };
+    }
     Ok(())
+}
+
+fn handle_to_info(handle: discovery::TargetHandle) -> ffx::TargetInfo {
+    let (target_state, addresses) = match handle.state {
+        discovery::TargetState::Unknown => (ffx::TargetState::Unknown, None),
+        discovery::TargetState::Product(target_addr) => {
+            (ffx::TargetState::Product, Some(vec![target_addr.into()]))
+        }
+        discovery::TargetState::Fastboot(_) => (ffx::TargetState::Fastboot, None),
+        discovery::TargetState::Zedboot => (ffx::TargetState::Zedboot, None),
+    };
+    ffx::TargetInfo {
+        nodename: handle.node_name,
+        addresses,
+        rcs_state: Some(ffx::RemoteControlState::Unknown),
+        target_state: Some(target_state),
+        ..Default::default()
+    }
+}
+
+async fn local_list_targets(
+    ctx: &EnvironmentContext,
+    cmd: &ListCommand,
+) -> Result<Vec<ffx::TargetInfo>> {
+    let sources = DiscoverySources::MDNS
+        | DiscoverySources::USB
+        | DiscoverySources::MANUAL
+        | DiscoverySources::EMULATOR;
+
+    let name = cmd.nodename.clone();
+    let filter = move |handle: &TargetHandle| {
+        if name.is_some() {
+            handle.node_name == name
+        } else {
+            true
+        }
+    };
+    let mut stream = discovery::wait_for_devices(filter, true, false, sources).await?;
+    let discovery_delay = ctx.get(CONFIG_LOCAL_DISCOVERY_TIMEOUT).await.unwrap_or(1000);
+    let delay = Duration::from_millis(discovery_delay);
+    let target_events: Result<Vec<TargetEvent>> = if cmd.nodename.is_some() {
+        timeout(delay, async {
+            // Get next item, if any, inside a Result
+            let r: Result<Option<_>> = stream.next().await.transpose();
+            // Convert option to vec
+            r.map(|o| o.into_iter().collect())
+        })
+        .await
+        .unwrap_or(Ok(vec![])) // Timeout case
+    } else {
+        let timer = Timer::new(delay);
+        let results: Vec<Result<_>> = stream.take_until(timer).collect().await;
+        // Fail if any results are Err
+        let r: Result<Vec<_>> = results.into_iter().collect();
+        r
+    };
+
+    // Extract handles from Added events
+    let added_handles: Vec<_> =
+        target_events?
+            .into_iter()
+            .map(|e| {
+                if let discovery::TargetEvent::Added(handle) = e {
+                    handle
+                } else {
+                    unreachable!()
+                }
+            })
+            .collect();
+
+    // Sometimes libdiscovery returns multiple Added events for the same target (I think always
+    // user emulators). The information is always the same, let's just extract the unique entries.
+    let unique_handles = added_handles.into_iter().collect::<HashSet<_>>();
+    let targets = unique_handles.into_iter().map(|t| handle_to_info(t)).collect::<Vec<_>>();
+
+    Ok(targets)
+}
+
+async fn list_targets(
+    tc_proxy: ffx::TargetCollectionProxy,
+    cmd: &ListCommand,
+) -> Result<Vec<ffx::TargetInfo>> {
+    let (reader, server) = fidl::endpoints::create_endpoints::<ffx::TargetCollectionReaderMarker>();
+
+    tc_proxy.list_targets(
+        &ffx::TargetQuery { string_matcher: cmd.nodename.clone(), ..Default::default() },
+        reader,
+    )?;
+    let mut res = Vec::new();
+    let mut stream = server.into_stream()?;
+    while let Ok(Some(ffx::TargetCollectionReaderRequest::Next { entry, responder })) =
+        stream.try_next().await
+    {
+        responder.send()?;
+        if entry.len() > 0 {
+            res.extend(entry);
+        } else {
+            break;
+        }
+    }
+
+    Ok(res)
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -122,9 +222,7 @@ mod test {
     use ffx_list_args::Format;
     use ffx_writer::{MachineWriter, TestBuffers};
     use fidl_fuchsia_developer_ffx as ffx;
-    use fidl_fuchsia_developer_ffx::{
-        RemoteControlState, TargetInfo as FidlTargetInfo, TargetState,
-    };
+    use fidl_fuchsia_developer_ffx::{TargetInfo as FidlTargetInfo, TargetState};
     use regex::Regex;
     use std::net::IpAddr;
 
@@ -142,13 +240,13 @@ mod test {
             nodename: Some(nodename),
             addresses: Some(vec![addr.into()]),
             age_ms: Some(101),
-            rcs_state: Some(RemoteControlState::Up),
+            rcs_state: Some(ffx::RemoteControlState::Up),
             target_state: Some(TargetState::Unknown),
             ..Default::default()
         }
     }
 
-    fn setup_fake_target_collection_server(num_tests: usize) -> TargetCollectionProxy {
+    fn setup_fake_target_collection_server(num_tests: usize) -> ffx::TargetCollectionProxy {
         fho::testing::fake_proxy(move |req| match req {
             ffx::TargetCollectionRequest::ListTargets { query, reader, .. } => {
                 let reader = reader.into_proxy().unwrap();
@@ -190,7 +288,8 @@ mod test {
         let proxy = setup_fake_target_collection_server(num_tests);
         let test_buffers = TestBuffers::default();
         let writer = MachineWriter::new_test(None, &test_buffers);
-        list_targets(proxy, writer, cmd, context).await?;
+        let infos = list_targets(proxy, &cmd).await?;
+        show_targets(cmd, infos, writer, context).await?;
         Ok(test_buffers.into_stdout_str())
     }
 
@@ -202,7 +301,7 @@ mod test {
         try_run_list_test(num_tests, cmd, context).await.unwrap()
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_list_with_no_devices_and_no_nodename() -> Result<()> {
         let env = ffx_config::test_init().await.unwrap();
         let output = run_list_test(0, tab_list_cmd(None), &env.context).await;
@@ -210,7 +309,7 @@ mod test {
         Ok(())
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_list_with_one_device_and_no_nodename() -> Result<()> {
         let env = ffx_config::test_init().await.unwrap();
         let output = run_list_test(1, tab_list_cmd(None), &env.context).await;
@@ -226,7 +325,7 @@ mod test {
         Ok(())
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_list_with_multiple_devices_and_no_nodename() -> Result<()> {
         let env = ffx_config::test_init().await.unwrap();
         let num_tests = 10;
@@ -245,7 +344,7 @@ mod test {
         Ok(())
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_list_with_one_device_and_matching_nodename() -> Result<()> {
         let env = ffx_config::test_init().await.unwrap();
         let output = run_list_test(1, tab_list_cmd(Some("Test 0".to_string())), &env.context).await;
@@ -261,7 +360,7 @@ mod test {
         Ok(())
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_list_with_one_device_and_not_matching_nodename() -> Result<()> {
         let env = ffx_config::test_init().await.unwrap();
         let output =
@@ -270,7 +369,7 @@ mod test {
         Ok(())
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_list_with_multiple_devices_and_not_matching_nodename() -> Result<()> {
         let env = ffx_config::test_init().await.unwrap();
         let num_tests = 25;
@@ -281,7 +380,7 @@ mod test {
         Ok(())
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_list_with_multiple_devices_and_matching_nodename() -> Result<()> {
         let env = ffx_config::test_init().await.unwrap();
         let output =
@@ -295,7 +394,7 @@ mod test {
         Ok(())
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_list_with_address_types_none() -> Result<()> {
         let env = ffx_config::test_init().await.unwrap();
         let num_tests = 25;
