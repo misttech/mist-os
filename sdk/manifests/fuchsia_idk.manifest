@@ -1,4 +1,5 @@
 bind_library://bind/fuchsia
+bind_library://bind/fuchsia.amlogic.platform
 bind_library://bind/fuchsia.arm.platform
 bind_library://bind/fuchsia.devicetree
 bind_library://bind/fuchsia.google.platform

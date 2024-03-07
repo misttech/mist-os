@@ -451,6 +451,7 @@ sdk_molecule("host_tools") {
 sdk_molecule("core_bindlib") {
   deps = [
     "//src/devices/bind/fuchsia:fuchsia_sdk",
+    "//src/devices/bind/fuchsia.amlogic.platform:fuchsia.amlogic.platform_sdk",
     "//src/devices/bind/fuchsia.arm.platform:fuchsia.arm.platform_sdk",
     "//src/devices/bind/fuchsia.devicetree:fuchsia.devicetree_sdk",
     "//src/devices/bind/fuchsia.google.platform:fuchsia.google.platform_sdk",
