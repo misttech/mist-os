@@ -28,13 +28,13 @@ type CisUnidirectionalParams = table {
 /// Established configuration for a single CIS.
 @available(added=HEAD)
 type CisEstablishedParameters = table {
-    /// Maximum time, in microseconds, for transmission of PDUs of all CISes in a CIG event.
+    /// Maximum time for transmission of PDUs of all CISes in a CIG event.
     /// In the range [234, 8388607] microseconds.
     ///
     /// This field is always present.
     1: cig_sync_delay zx.Duration;
 
-    /// The maximum time, in microseconds, for transmission of PDUs of the specified CIS in a CIG
+    /// The maximum time for transmission of PDUs of the specified CIS in a CIG
     /// event. In the range [234, 8388607] microseconds.
     ///
     /// This field is always present.
