@@ -7,7 +7,6 @@ import("//build/bind/bind.gni")
 bind_library("fuchsia.amlogic.platform.sysmem.heap") {
   source = "fuchsia.amlogic.platform.sysmem.heap.bind"
   sdk_category = "partner"
-
-  # Use of sysmem heap types is not limited to drivers.
-  sdk_area = "Driver SDK"
+  sdk_area = "Graphics"
+  sdk_area = "Media"
 }
