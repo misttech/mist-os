@@ -58,7 +58,7 @@ async fn get_single_package_with_no_content_blobs(env: TestEnv, blob_type: fpkg:
             &meta_blob_info,
             fpkg::GcProtection::OpenPackageTracking,
             needed_blobs_server_end,
-            Some(dir_server_end),
+            dir_server_end,
         )
         .map_ok(|res| res.map_err(Status::from_raw));
 
@@ -176,7 +176,7 @@ async fn get_and_hold_directory() {
             &meta_blob_info,
             fpkg::GcProtection::OpenPackageTracking,
             needed_blobs_server_end,
-            Some(dir_server_end),
+            dir_server_end,
         )
         .map_ok(|res| res.map_err(Status::from_raw));
 
@@ -211,7 +211,7 @@ async fn unavailable_when_client_drops_needed_blobs_channel() {
             &meta_blob_info,
             fpkg::GcProtection::OpenPackageTracking,
             needed_blobs_server_end,
-            Some(dir_server_end),
+            dir_server_end,
         )
         .map_ok(|res| res.map_err(Status::from_raw));
 
@@ -315,7 +315,7 @@ async fn get_package_already_present_on_fs() {
             &meta_blob_info,
             fpkg::GcProtection::OpenPackageTracking,
             needed_blobs_server_end,
-            Some(dir_server_end),
+            dir_server_end,
         )
         .map_ok(|res| res.map_err(Status::from_raw));
 
@@ -364,7 +364,7 @@ async fn get_package_already_present_on_fs_with_pre_closed_needed_blobs() {
             &meta_blob_info,
             fpkg::GcProtection::OpenPackageTracking,
             needed_blobs_server_end,
-            Some(pkgdir_server_end),
+            pkgdir_server_end,
         )
         .map_ok(|res| res.map_err(Status::from_raw));
 
@@ -602,7 +602,7 @@ async fn get_with_specific_blobfs_implementation(
             &meta_blob_info,
             fpkg::GcProtection::OpenPackageTracking,
             needed_blobs_server_end,
-            Some(dir_server_end),
+            dir_server_end,
         )
         .map_ok(|res| res.map_err(Status::from_raw));
 
@@ -695,7 +695,7 @@ async fn get_with_retained_protection_refetches_blobs() {
             &meta_blob_info,
             fpkg::GcProtection::OpenPackageTracking,
             fidl::endpoints::create_proxy::<NeededBlobsMarker>().unwrap().1,
-            Some(dir_server_end),
+            dir_server_end,
         )
         .map_ok(|res| res.map_err(Status::from_raw));
     let () = get_fut.await.unwrap().unwrap();
@@ -714,12 +714,7 @@ async fn get_with_retained_protection_refetches_blobs() {
     let get_fut = env
         .proxies
         .package_cache
-        .get(
-            &meta_blob_info,
-            fpkg::GcProtection::Retained,
-            needed_blobs_server_end,
-            Some(dir_server_end),
-        )
+        .get(&meta_blob_info, fpkg::GcProtection::Retained, needed_blobs_server_end, dir_server_end)
         .map_ok(|res| res.map_err(Status::from_raw));
     assert_matches!(
         needed_blobs.open_meta_blob(fpkg::BlobType::Delivery).await.unwrap().unwrap(),

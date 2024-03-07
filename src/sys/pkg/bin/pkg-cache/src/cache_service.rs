@@ -92,7 +92,8 @@ pub(crate) async fn serve(
                         meta_far_blob,
                         gc_protection,
                         needed_blobs,
-                        dir.map(|dir| (dir, scope.clone())),
+                        dir,
+                        scope.clone(),
                         cobalt_sender,
                         &node,
                     )
@@ -210,7 +211,8 @@ async fn get(
     meta_far_blob: BlobInfo,
     gc_protection: fpkg::GcProtection,
     needed_blobs: ServerEnd<NeededBlobsMarker>,
-    dir_and_scope: Option<(ServerEnd<fio::DirectoryMarker>, package_directory::ExecutionScope)>,
+    dir: ServerEnd<fio::DirectoryMarker>,
+    scope: package_directory::ExecutionScope,
     cobalt_sender: ProtocolSender<MetricEvent>,
     node: &finspect::Node,
 ) -> Result<(), Status> {
@@ -225,7 +227,8 @@ async fn get(
         meta_far_blob,
         gc_protection,
         needed_blobs,
-        dir_and_scope,
+        dir,
+        scope,
         cobalt_sender,
         node,
     )
@@ -259,7 +262,8 @@ async fn get_impl(
     meta_far_blob: BlobInfo,
     gc_protection: fpkg::GcProtection,
     needed_blobs: ServerEnd<NeededBlobsMarker>,
-    dir_and_scope: Option<(ServerEnd<fio::DirectoryMarker>, package_directory::ExecutionScope)>,
+    dir: ServerEnd<fio::DirectoryMarker>,
+    scope: package_directory::ExecutionScope,
     mut cobalt_sender: ProtocolSender<MetricEvent>,
     node: &finspect::Node,
 ) -> Result<(), Status> {
@@ -303,32 +307,29 @@ async fn get_impl(
             }
         };
 
-    if let Some((dir, scope)) = dir_and_scope {
-        let open_flags =
-            make_pkgdir_flags(executability_status(executability_restrictions, &package_status));
-        let root_dir = match gc_protection {
-            fpkg::GcProtection::Retained => {
-                if let Some(root_dir) = root_dir {
-                    Arc::new(root_dir)
-                } else {
-                    package_directory::RootDir::new(blobfs.clone(), pkg).await.map_err(|e| {
-                        error!("get: creating RootDir {}: {:#}", pkg, anyhow!(e));
-                        cobalt_sender.open_io_error();
-                        Status::INTERNAL
-                    })?
-                }
-            }
-            fpkg::GcProtection::OpenPackageTracking => {
-                open_packages.get_or_insert(pkg, root_dir).await.map_err(|e| {
-                    error!("get: open_packages.get_or_insert {}: {:#}", pkg, anyhow!(e));
+    let open_flags =
+        make_pkgdir_flags(executability_status(executability_restrictions, &package_status));
+    let root_dir = match gc_protection {
+        fpkg::GcProtection::Retained => {
+            if let Some(root_dir) = root_dir {
+                Arc::new(root_dir)
+            } else {
+                package_directory::RootDir::new(blobfs.clone(), pkg).await.map_err(|e| {
+                    error!("get: creating RootDir {}: {:#}", pkg, anyhow!(e));
                     cobalt_sender.open_io_error();
                     Status::INTERNAL
                 })?
             }
-        };
-        let () =
-            root_dir.open(scope, open_flags, vfs::path::Path::dot(), dir.into_channel().into());
-    }
+        }
+        fpkg::GcProtection::OpenPackageTracking => {
+            open_packages.get_or_insert(pkg, root_dir).await.map_err(|e| {
+                error!("get: open_packages.get_or_insert {}: {:#}", pkg, anyhow!(e));
+                cobalt_sender.open_io_error();
+                Status::INTERNAL
+            })?
+        }
+    };
+    let () = root_dir.open(scope, open_flags, vfs::path::Path::dot(), dir.into_channel().into());
 
     cobalt_sender.open_success();
     Ok(())
@@ -2331,7 +2332,8 @@ mod get_handler_tests {
                 meta_blob_info,
                 fpkg::GcProtection::OpenPackageTracking,
                 stream,
-                None,
+                fidl::endpoints::create_endpoints().1,
+                package_directory::ExecutionScope::new(),
                 ProtocolConnector::new_with_buffer_size(
                     CobaltConnectedService,
                     COBALT_CONNECTOR_BUFFER_SIZE,

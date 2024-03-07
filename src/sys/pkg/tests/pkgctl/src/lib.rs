@@ -475,7 +475,7 @@ impl MockPackageCacheService {
         &self,
         _meta_far: fpkg::BlobInfo,
         needed_blobs: ServerEnd<fpkg::NeededBlobsMarker>,
-        _dir: Option<ServerEnd<fio::DirectoryMarker>>,
+        _dir: ServerEnd<fio::DirectoryMarker>,
         get_responder: fpkg::PackageCacheGetResponder,
     ) {
         let behavior = *self.get_behavior.lock();

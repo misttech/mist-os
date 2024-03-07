@@ -53,7 +53,7 @@ impl Client {
             &meta_far_blob.into(),
             gc_protection,
             needed_blobs_server_end,
-            Some(pkg_dir_server_end),
+            pkg_dir_server_end,
         );
 
         Ok(Get {
@@ -773,7 +773,7 @@ mod tests {
                     assert_eq!(BlobInfo::from(meta_far_blob), blob_info);
                     assert_eq!(gc_protection, expected_gc_protection);
                     let needed_blobs = needed_blobs.into_stream().unwrap();
-                    let dir = dir.unwrap().into_stream().unwrap();
+                    let dir = dir.into_stream().unwrap();
 
                     PendingGet { stream: needed_blobs, dir, responder }
                 }

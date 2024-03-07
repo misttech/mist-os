@@ -158,7 +158,7 @@ async fn get_and_verify_package(
             &meta_blob_info,
             fpkg::GcProtection::OpenPackageTracking,
             needed_blobs_server_end,
-            Some(dir_server_end),
+            dir_server_end,
         )
         .map_ok(|res| res.map_err(zx::Status::from_raw));
 
@@ -256,7 +256,7 @@ async fn verify_package_cached(
             &meta_blob_info,
             fpkg::GcProtection::OpenPackageTracking,
             needed_blobs_server_end,
-            Some(dir_server_end),
+            dir_server_end,
         )
         .map_ok(|res| res.map_err(Status::from_raw));
 
@@ -897,7 +897,7 @@ impl<B: Blobfs> TestEnv<B> {
                 &fpkg::BlobInfo { blob_id: fpkg::BlobId { merkle_root: [0; 32] }, length: 0 },
                 fpkg::GcProtection::OpenPackageTracking,
                 needed_blobs,
-                None,
+                fidl::endpoints::create_endpoints().1,
             )
             .await
             .unwrap();

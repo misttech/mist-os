@@ -96,7 +96,7 @@ async fn packages_are_retained_gc_mid_process() {
             &meta_blob_info,
             fpkg::GcProtection::OpenPackageTracking,
             needed_blobs_server_end,
-            Some(dir_server_end),
+            dir_server_end,
         )
         .map_ok(|res| res.map_err(zx::Status::from_raw));
 

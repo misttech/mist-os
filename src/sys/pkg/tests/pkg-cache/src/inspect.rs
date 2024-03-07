@@ -209,7 +209,7 @@ async fn dynamic_index_needed_blobs() {
             &meta_blob_info,
             fpkg::GcProtection::OpenPackageTracking,
             needed_blobs_server_end,
-            Some(dir_server_end),
+            dir_server_end,
         )
         .map_ok(|res| res.map_err(Status::from_raw));
 
@@ -299,15 +299,11 @@ async fn dynamic_index_package_hash_update() {
 
     let (needed_blobs, needed_blobs_server_end) =
         fidl::endpoints::create_proxy::<NeededBlobsMarker>().unwrap();
+    let (_, dir) = fidl::endpoints::create_endpoints();
     let get_fut = env
         .proxies
         .package_cache
-        .get(
-            &meta_blob_info,
-            fpkg::GcProtection::OpenPackageTracking,
-            needed_blobs_server_end,
-            None,
-        )
+        .get(&meta_blob_info, fpkg::GcProtection::OpenPackageTracking, needed_blobs_server_end, dir)
         .map_ok(|res| res.map_err(Status::from_raw));
 
     let (meta_far, _) = pkg.contents();
@@ -444,7 +440,7 @@ async fn package_cache_get() {
             &meta_blob_info,
             fpkg::GcProtection::OpenPackageTracking,
             needed_blobs_server_end,
-            Some(dir_server_end),
+            dir_server_end,
         )
         .map_ok(|res| res.map_err(zx::Status::from_raw));
 
@@ -546,7 +542,7 @@ async fn package_cache_concurrent_gets() {
             &meta_blob_info,
             fpkg::GcProtection::OpenPackageTracking,
             needed_blobs_server_end,
-            Some(dir_server_end),
+            dir_server_end,
         )
         .map_ok(|res| res.map_err(zx::Status::from_raw));
 
@@ -568,7 +564,7 @@ async fn package_cache_concurrent_gets() {
             &meta_blob_info2,
             fpkg::GcProtection::OpenPackageTracking,
             needed_blobs_server_end2,
-            Some(dir_server_end2),
+            dir_server_end2,
         )
         .map_ok(|res| res.map_err(zx::Status::from_raw));
 
@@ -684,7 +680,7 @@ async fn retained_index_updated_and_persisted() {
             &meta_blob_info,
             fpkg::GcProtection::OpenPackageTracking,
             needed_blobs_server_end,
-            Some(dir_server_end),
+            dir_server_end,
         )
         .map_ok(|res| res.map_err(zx::Status::from_raw));
 
@@ -741,7 +737,7 @@ async fn retained_index_updated_and_persisted() {
             &meta_blob_info2,
             fpkg::GcProtection::OpenPackageTracking,
             needed_blobs_server_end2,
-            Some(dir_server_end2),
+            dir_server_end2,
         )
         .map_ok(|res| res.map_err(zx::Status::from_raw));
 
@@ -817,7 +813,7 @@ async fn index_updated_mid_package_write() {
             &meta_blob_info,
             fpkg::GcProtection::OpenPackageTracking,
             needed_blobs_server_end,
-            Some(dir_server_end),
+            dir_server_end,
         )
         .map_ok(|res| res.map_err(zx::Status::from_raw));
 

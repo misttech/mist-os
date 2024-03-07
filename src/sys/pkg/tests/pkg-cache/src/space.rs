@@ -138,7 +138,7 @@ async fn gc_dynamic_index_protected() {
             &meta_blob_info,
             fpkg::GcProtection::OpenPackageTracking,
             needed_blobs_server_end,
-            Some(dir_server_end),
+            dir_server_end,
         )
         .map_ok(|res| res.map_err(Status::from_raw));
 
@@ -292,7 +292,7 @@ async fn gc_updated_static_package() {
             &meta_blob_info,
             fpkg::GcProtection::OpenPackageTracking,
             needed_blobs_server_end,
-            Some(dir_server_end),
+            dir_server_end,
         )
         .map_ok(|res| res.map_err(Status::from_raw));
 
@@ -391,7 +391,7 @@ async fn gc_frees_space_so_write_can_succeed(blob_implementation: blobfs_ramdisk
             &meta_blob_info,
             fpkg::GcProtection::OpenPackageTracking,
             needed_blobs_server_end,
-            Some(dir_server_end),
+            dir_server_end,
         )
         .map_ok(|res| res.map_err(Status::from_raw));
 
@@ -491,7 +491,7 @@ async fn blobs_protected_from_gc_during_get(gc_protection: fpkg::GcProtection) {
     let get_fut = env
         .proxies
         .package_cache
-        .get(&meta_blob_info, gc_protection, needed_blobs_server, Some(dir_server))
+        .get(&meta_blob_info, gc_protection, needed_blobs_server, dir_server)
         .map_ok(|res| res.map_err(Status::from_raw));
 
     let blob_is_present_and_protected = |i: usize| {
@@ -670,7 +670,7 @@ async fn writing_index_protects_packages() {
             &fpkg::BlobInfo { blob_id: BlobId::from(*pkg.hash()).into(), length: 0 },
             fpkg::GcProtection::OpenPackageTracking,
             needed_blobs_server_end,
-            None,
+            fidl::endpoints::create_endpoints().1,
         )
         .map_ok(|res| res.map_err(Status::from_raw));
     let (meta_far, _) = pkg.contents();
@@ -718,7 +718,7 @@ async fn writing_index_clears_on_get_error() {
             &fpkg::BlobInfo { blob_id: BlobId::from(*pkg.hash()).into(), length: 0 },
             fpkg::GcProtection::OpenPackageTracking,
             needed_blobs_server_end,
-            None,
+            fidl::endpoints::create_endpoints().1,
         )
         .map_ok(|res| res.map_err(Status::from_raw));
     let (meta_far, content_blobs) = pkg.contents();

@@ -30,8 +30,7 @@ closed protocol PackageCache {
     /// + request `meta_far_blob` the blob info for the package's meta.far.
     /// + request `needed_blobs` an iterator over all the blobs in the package that
     ///   are not present on the system.
-    /// + request `dir` an optional request for a directory that will be resolved when the package
-    ///   has been successfully cached.
+    /// + request `dir` the channel on which the package directory will be served.
     /// * error a zx_status value indicating failure. One of the following:
     ///     * `ZX_ERR_UNAVAILABLE` if the client closed `needed_blobs` handles before
     ///       all the missing blobs were downloaded to the system.
@@ -39,7 +38,7 @@ closed protocol PackageCache {
         meta_far_blob BlobInfo;
         gc_protection GcProtection;
         needed_blobs server_end:NeededBlobs;
-        dir server_end:<fuchsia.io.Directory, optional>;
+        dir server_end:<fuchsia.io.Directory>;
     }) -> () error zx.Status;
 
     /// Gets the package directory for a subpackage.
