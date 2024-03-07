@@ -148,7 +148,6 @@ class MainUploadLogsTest(unittest.TestCase):
             return_value=self.fake_log(),
         ) as mock_convert_log:
             exit_code = upload_reproxy_logs.main_upload_logs(
-                uuid="feed-f00d-feed-f00d",
                 reproxy_logdir=Path("/tmp/reproxy.log.dir"),
                 reclient_bindir=Path("/usr/local/reclient/bin"),
                 bq_logs_table="project.dataset.reproxy_logs",
@@ -172,7 +171,6 @@ class MainUploadLogsTest(unittest.TestCase):
                 return_value=0,
             ) as mock_upload:
                 exit_code = upload_reproxy_logs.main_upload_logs(
-                    uuid="feed-f00d-feed-f00d",
                     reproxy_logdir=Path("/tmp/reproxy.log.dir"),
                     reclient_bindir=Path("/usr/local/reclient/bin"),
                     bq_logs_table="project.dataset.reproxy_logs",
@@ -197,7 +195,6 @@ class MainUploadLogsTest(unittest.TestCase):
                 return_value=1,
             ) as mock_upload:
                 exit_code = upload_reproxy_logs.main_upload_logs(
-                    uuid="feed-f00d-feed-f00d",
                     reproxy_logdir=Path("/tmp/reproxy.log.dir"),
                     reclient_bindir=Path("/usr/local/reclient/bin"),
                     bq_logs_table="project.dataset.reproxy_logs",
@@ -222,7 +219,6 @@ class MainUploadLogsTest(unittest.TestCase):
                 return_value=0,
             ) as mock_upload:
                 exit_code = upload_reproxy_logs.main_upload_logs(
-                    uuid="feed-f00d-feed-f00d",
                     reproxy_logdir=Path("/tmp/reproxy.log.dir"),
                     reclient_bindir=Path("/usr/local/reclient/bin"),
                     bq_logs_table="project.dataset.reproxy_logs",
