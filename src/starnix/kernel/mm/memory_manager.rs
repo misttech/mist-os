@@ -1977,9 +1977,8 @@ fn slice_as_mut_bytes<T: FromBytes + Sized>(
 ///
 /// # Safety
 ///
-/// The read function must only return `Ok(n)` if at least one byte was read
-/// and `n` holds the number of bytes read starting from the beginning of the
-/// slice.
+/// The read function must only return `Ok(n)` if at least one element was read and `n` holds
+/// the number of elements of type `T` read starting from the beginning of the slice.
 #[inline]
 pub unsafe fn read_to_vec<T: FromBytes, E>(
     max_len: usize,
@@ -1988,11 +1987,11 @@ pub unsafe fn read_to_vec<T: FromBytes, E>(
     let mut buffer = Vec::with_capacity(max_len);
     // We can't just pass `spare_capacity_mut` because `Vec::with_capacity`
     // returns a `Vec` with _at least_ the requested capacity.
-    let read_bytes = read_fn(&mut buffer.spare_capacity_mut()[..max_len])?;
-    debug_assert!(read_bytes <= max_len, "read_bytes={read_bytes}, max_len={max_len}");
-    // SAFETY: The new length is equal to the number of bytes successfully
+    let read_elements = read_fn(&mut buffer.spare_capacity_mut()[..max_len])?;
+    debug_assert!(read_elements <= max_len, "read_elements={read_elements}, max_len={max_len}");
+    // SAFETY: The new length is equal to the number of elements successfully
     // initialized (since `read_fn` returned successfully).
-    unsafe { buffer.set_len(read_bytes) }
+    unsafe { buffer.set_len(read_elements) }
     Ok(buffer)
 }
 
