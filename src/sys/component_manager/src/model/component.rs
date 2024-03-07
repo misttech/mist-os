@@ -3,38 +3,41 @@
 // found in the LICENSE file.
 
 use {
-    crate::bedrock::program::{self as program, ComponentStopOutcome, Program, StopRequestSuccess},
-    crate::framework::controller,
-    crate::model::{
-        actions::{
-            resolve::sandbox_construction::{
-                self, build_component_sandbox, extend_dict_with_offers, ComponentEnvironment,
-                ComponentInput,
+    crate::{
+        bedrock::program::{self as program, ComponentStopOutcome, Program, StopRequestSuccess},
+        framework::controller,
+        model::{
+            actions::{
+                resolve::sandbox_construction::{
+                    self, build_component_sandbox, extend_dict_with_offers, ComponentEnvironment,
+                    ComponentInput,
+                },
+                shutdown, start, ActionSet, DestroyAction, DiscoverAction, ResolveAction,
+                ShutdownAction, ShutdownType, StartAction, StopAction, UnresolveAction,
             },
-            shutdown, start, ActionSet, DestroyAction, DiscoverAction, ResolveAction,
-            ShutdownAction, ShutdownType, StartAction, StopAction, UnresolveAction,
+            context::ModelContext,
+            environment::Environment,
+            error::{
+                ActionError, AddChildError, AddDynamicChildError, CapabilityProviderError,
+                ComponentProviderError, CreateNamespaceError, DestroyActionError,
+                DynamicOfferError, ModelError, OpenError, OpenExposedDirError,
+                OpenOutgoingDirError, RebootError, ResolveActionError, RouteOrOpenError,
+                StartActionError, StopActionError, StructuredConfigError,
+            },
+            hooks::{CapabilityReceiver, Event, EventPayload, Hooks},
+            namespace::create_namespace,
+            routing::{
+                self,
+                router::{Request, Routable, Router},
+                service::{AnonymizedAggregateServiceDir, AnonymizedServiceRoute},
+                RoutingError,
+            },
+            routing_fns::route_fn,
+            start::Start,
+            token::{InstanceToken, InstanceTokenState},
         },
-        context::ModelContext,
-        environment::Environment,
-        error::{
-            ActionError, AddChildError, AddDynamicChildError, CapabilityProviderError,
-            ComponentProviderError, CreateNamespaceError, DestroyActionError, DynamicOfferError,
-            ModelError, OpenError, OpenExposedDirError, OpenOutgoingDirError, RebootError,
-            ResolveActionError, StartActionError, StopActionError, StructuredConfigError,
-        },
-        hooks::{CapabilityReceiver, Event, EventPayload, Hooks},
-        namespace::create_namespace,
-        routing::{
-            self,
-            router::{Request, Routable, Router},
-            service::{AnonymizedAggregateServiceDir, AnonymizedServiceRoute},
-            RoutingError,
-        },
-        routing_fns::route_fn,
-        start::Start,
-        token::{InstanceToken, InstanceTokenState},
+        sandbox_util::DictExt,
     },
-    crate::sandbox_util::DictExt,
     ::namespace::Entry as NamespaceEntry,
     ::routing::{
         capability_source::{BuiltinCapabilities, ComponentCapability, NamespaceCapabilities},
@@ -61,8 +64,7 @@ use {
         FidlIntoNative, NativeIntoFidl, OfferDeclCommon, SourceName, UseDecl,
     },
     cm_types::Name,
-    cm_util::channel,
-    cm_util::TaskGroup,
+    cm_util::{channel, TaskGroup},
     component_id_index::InstanceId,
     config_encoder::ConfigFields,
     fidl::{
@@ -74,7 +76,7 @@ use {
     fidl_fuchsia_hardware_power_statecontrol as fstatecontrol, fidl_fuchsia_io as fio,
     fidl_fuchsia_process as fprocess, fuchsia_async as fasync,
     fuchsia_component::client,
-    fuchsia_zircon::{self as zx},
+    fuchsia_zircon as zx,
     futures::{
         future::{join_all, BoxFuture, FutureExt},
         lock::{MappedMutexGuard, Mutex, MutexGuard},
@@ -1015,11 +1017,12 @@ impl ComponentInstance {
                   flags: fio::OpenFlags,
                   path: vfs::path::Path,
                   mut server_end: zx::Channel| {
-                let Ok(component) = weak_component.upgrade() else {
-                    let _ = server_end.close_with_epitaph(
-                        ComponentProviderError::SourceInstanceNotFound.as_zx_status(),
-                    );
-                    return;
+                let component = match weak_component.upgrade() {
+                    Ok(component) => component,
+                    Err(err) => {
+                        let _ = server_end.close_with_epitaph(err.as_zx_status());
+                        return;
+                    }
                 };
                 scope.spawn(async move {
                     match component.open_outgoing(flags, path.as_ref(), &mut server_end).await {
@@ -1715,51 +1718,45 @@ impl ResolvedInstanceState {
         }
         let outgoing_dict = Self::build_program_outgoing_dict(component, &decl.capabilities);
         let weak_component = WeakComponentInstance::new(component);
-        Router::new(move |request| {
-            if let Ok(component) = weak_component.upgrade() {
-                let component_clone = component.clone();
-                let outgoing_dict = outgoing_dict.clone();
-                let capability_name = capability_name.clone();
-                async move {
-                    let target_moniker = request.target.moniker.clone();
-                    // If the component is already started, this will be a no-op.
-                    match component_clone
-                        .start(
-                            &StartReason::AccessCapability {
-                                target: target_moniker,
-                                name: capability_name.clone(),
-                            },
-                            None,
-                            IncomingCapabilities::default(),
-                        )
-                        .await
-                    {
-                        Ok(_) => {
-                            let cap =
-                                outgoing_dict.get_capability(iter::once(capability_name.as_str()));
-                            match cap {
-                                Some(cap) => cap.route(request).await,
-                                None => Err(RoutingError::BedrockNotPresentInDictionary {
-                                    name: capability_name.into(),
-                                }
-                                .into()),
+        let route_fn = move |request: Request| {
+            let weak_component = weak_component.clone();
+            let outgoing_dict = outgoing_dict.clone();
+            let capability_name = capability_name.clone();
+            let target_moniker = request.target.moniker.clone();
+            async move {
+                let component = weak_component.upgrade().map_err(RoutingError::from)?;
+                // If the component is already started, this will be a no-op.
+                match component
+                    .start(
+                        &StartReason::AccessCapability {
+                            target: target_moniker,
+                            name: capability_name.clone(),
+                        },
+                        None,
+                        IncomingCapabilities::default(),
+                    )
+                    .await
+                {
+                    Ok(_) => {
+                        let cap =
+                            outgoing_dict.get_capability(iter::once(capability_name.as_str()));
+                        match cap {
+                            Some(cap) => cap.route(request).await,
+                            None => Err(RoutingError::BedrockNotPresentInDictionary {
+                                name: capability_name.into(),
                             }
+                            .into()),
                         }
-                        Err(e) => Err(OpenError::from(CapabilityProviderError::from(
-                            ComponentProviderError::from(e),
-                        ))
-                        .into()),
                     }
+                    Err(e) => Err(OpenError::from(CapabilityProviderError::from(
+                        ComponentProviderError::from(e),
+                    ))
+                    .into()),
                 }
-                .boxed()
-            } else {
-                std::future::ready(Err(OpenError::from(CapabilityProviderError::from(
-                    ComponentProviderError::SourceInstanceNotFound,
-                ))
-                .into()))
-                .boxed()
             }
-        })
+            .boxed()
+        };
+        Router::new(route_fn)
     }
 
     /// Builds the program outgoing dict such that most work is done once and cached even if
@@ -2549,41 +2546,21 @@ trait RouterExt: Routable + Clone + Send + Sync + 'static {
     fn with_capability_requested_hook(self, source: WeakComponentInstance, name: Name) -> Router {
         let name = name.to_string();
         let route_fn = move |request: Request| {
-            let source = match source.upgrade() {
-                Ok(component) => component,
-                Err(_) => {
-                    return std::future::ready(Err(OpenError::from(
-                        CapabilityProviderError::from(
-                            ComponentProviderError::SourceInstanceNotFound,
-                        ),
-                    )
-                    .into()))
-                    .boxed();
-                }
-            };
-            let target = match request.target.upgrade() {
-                Ok(component) => component,
-                Err(_) => {
-                    return std::future::ready(Err(OpenError::from(
-                        CapabilityProviderError::from(
-                            ComponentProviderError::TargetInstanceNotFound,
-                        ),
-                    )
-                    .into()))
-                    .boxed();
-                }
-            };
-            let (receiver, sender) = CapabilityReceiver::new();
-            let event = Event::new(
-                &target,
-                EventPayload::CapabilityRequested {
-                    source_moniker: source.moniker.clone(),
-                    name: name.clone(),
-                    receiver: receiver.clone(),
-                },
-            );
+            let source = source.clone();
+            let name = name.clone();
             let router = self.clone();
             async move {
+                let source = source.upgrade().map_err(RoutingError::from)?;
+                let target = request.target.upgrade().map_err(RoutingError::from)?;
+                let (receiver, sender) = CapabilityReceiver::new();
+                let event = Event::new(
+                    &target,
+                    EventPayload::CapabilityRequested {
+                        source_moniker: source.moniker.clone(),
+                        name,
+                        receiver: receiver.clone(),
+                    },
+                );
                 source.hooks.dispatch(&event).await;
                 if receiver.is_taken() {
                     Ok(sender.into())

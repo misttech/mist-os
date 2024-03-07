@@ -616,10 +616,6 @@ impl PkgDirError {
 
 #[derive(Debug, Clone, Error)]
 pub enum ComponentProviderError {
-    #[error("source instance not found")]
-    SourceInstanceNotFound,
-    #[error("target instance not found")]
-    TargetInstanceNotFound,
     #[error("failed to start source instance: {err}")]
     SourceStartError {
         #[from]
@@ -635,7 +631,6 @@ pub enum ComponentProviderError {
 impl ComponentProviderError {
     pub fn as_zx_status(&self) -> zx::Status {
         match self {
-            Self::SourceInstanceNotFound | Self::TargetInstanceNotFound => zx::Status::NOT_FOUND,
             Self::SourceStartError { err } => err.as_zx_status(),
             Self::OpenOutgoingDirError { err } => err.as_zx_status(),
         }

@@ -54,8 +54,7 @@ impl CapabilityProvider for DefaultComponentCapabilityProvider {
         server_end: &mut zx::Channel,
     ) -> Result<(), CapabilityProviderError> {
         // Start the source component, if necessary.
-        let source =
-            self.source.upgrade().map_err(|_| ComponentProviderError::SourceInstanceNotFound)?;
+        let source = self.source.upgrade()?;
         source
             .ensure_started(&StartReason::AccessCapability {
                 target: self.target.moniker.clone(),
@@ -67,7 +66,7 @@ impl CapabilityProvider for DefaultComponentCapabilityProvider {
         // Send a CapabilityRequested event.
         let (receiver, sender) = CapabilityReceiver::new();
         let event = Event::new(
-            &self.target.upgrade().map_err(|_| ComponentProviderError::TargetInstanceNotFound)?,
+            &self.target.upgrade()?,
             EventPayload::CapabilityRequested {
                 source_moniker: source.moniker.clone(),
                 name: self.name.to_string(),
