@@ -1488,28 +1488,24 @@ async fn inspect_for_sampler(name: &str) {
     let diagnostics_dir =
         realm.open_diagnostics_directory("netstack").expect("diagnostics dir exists");
 
-    // We can pass any sample rate here. It is not used at all in this test.
-    const MINIMUM_SAMPLE_RATE_SEC: i64 = 60;
-    let sampler_config = sampler_config::SamplerConfig::from_directory(
-        MINIMUM_SAMPLE_RATE_SEC,
-        "/pkg/data/sampler-config",
-    )
-    .expect("SamplerConfig::from_directory failed");
+    let sampler_config = sampler_config::SamplerConfigBuilder::default()
+        .sampler_dir("/pkg/data/sampler-config")
+        .load()
+        .expect("SamplerConfig load failed");
     let project_config = match &sampler_config.project_configs[..] {
         [project_config] => project_config,
         project_configs => panic!("expected one project_config but got {:#?}", project_configs),
     };
     for metric_config in &project_config.metrics {
-        let selector =
-            match &metric_config.selectors[..] {
-                [selector] => &selector
+        let selector = match &metric_config.selectors[..] {
+            [selector] => {
+                &selector
                     .as_ref()
-                    .expect(
-                        "SamplerConfig::from_directory() should never return None for selectors",
-                    )
-                    .selector,
-                selectors => panic!("expected one selector but got {:#?}", selectors),
-            };
+                    .expect("SamplerConfig load should never return None for selectors")
+                    .selector
+            }
+            selectors => panic!("expected one selector but got {:#?}", selectors),
+        };
         let fidl_fuchsia_diagnostics::Selector { tree_selector, .. } = selector;
         let (tree_selector, expected_key) = match tree_selector.as_ref().expect("tree_selector") {
             fidl_fuchsia_diagnostics::TreeSelector::PropertySelector(

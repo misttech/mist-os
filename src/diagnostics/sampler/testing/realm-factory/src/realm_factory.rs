@@ -30,6 +30,12 @@ const SAMPLER_BINDER_ALIAS: &str = "fuchsia.component.SamplerBinder";
 pub async fn create_realm(options: ftest::RealmOptions) -> Result<RealmInstance, Error> {
     let sampler_component_name =
         options.sampler_component_name.as_ref().map(|s| s.as_str()).unwrap_or("sampler");
+    let single_counter_name =
+        options.single_counter_name.as_ref().map(|s| s.as_str()).unwrap_or("single_counter");
+    let mock_cobalt_name =
+        options.mock_cobalt_name.as_ref().map(|s| s.as_str()).unwrap_or("mock_cobalt");
+    let test_archivist_name =
+        options.test_archivist_name.as_ref().map(|s| s.as_str()).unwrap_or("test_case_archivist");
     let builder = RealmBuilder::new().await?;
     let mocks_server = builder
         .add_local_child(
@@ -40,13 +46,14 @@ pub async fn create_realm(options: ftest::RealmOptions) -> Result<RealmInstance,
         .await?;
     let wrapper_realm = builder.add_child_realm("wrapper", ChildOptions::new()).await?;
     let mock_cobalt =
-        wrapper_realm.add_child("mock_cobalt", MOCK_COBALT_URL, ChildOptions::new()).await?;
-    let single_counter =
-        wrapper_realm.add_child("single_counter", SINGLE_COUNTER_URL, ChildOptions::new()).await?;
+        wrapper_realm.add_child(mock_cobalt_name, MOCK_COBALT_URL, ChildOptions::new()).await?;
+    let single_counter = wrapper_realm
+        .add_child(single_counter_name, SINGLE_COUNTER_URL, ChildOptions::new())
+        .await?;
     let sampler =
         wrapper_realm.add_child(sampler_component_name, SAMPLER_URL, ChildOptions::new()).await?;
     let test_case_archivist =
-        wrapper_realm.add_child("test_case_archivist", ARCHIVIST_URL, ChildOptions::new()).await?;
+        wrapper_realm.add_child(test_archivist_name, ARCHIVIST_URL, ChildOptions::new()).await?;
 
     wrapper_realm
         .add_route(

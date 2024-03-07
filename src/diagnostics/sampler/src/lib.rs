@@ -49,11 +49,13 @@ pub async fn main() -> Result<(), Error> {
     let sampler_config = format!("{}/metrics", component_config.configs_path);
     let fire_config = format!("{}/fire", component_config.configs_path);
 
-    match config::SamplerConfig::from_directories(
-        component_config.minimum_sample_rate_sec,
-        sampler_config,
-        fire_config,
-    ) {
+    match config::SamplerConfigBuilder::default()
+        .minimum_sample_rate_sec(component_config.minimum_sample_rate_sec)
+        .configure_reader_for_tests(component_config.configure_reader_for_tests)
+        .sampler_dir(sampler_config)
+        .fire_dir(fire_config)
+        .load()
+    {
         Ok(sampler_config) => {
             // Create endpoint for the reboot watcher register.
             let (reboot_watcher_client, reboot_watcher_request_stream) =

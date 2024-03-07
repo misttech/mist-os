@@ -7,15 +7,17 @@ use fidl::endpoints::create_endpoints;
 use fuchsia_component::client::connect_to_protocol;
 use realm_proxy_client::{extend_namespace, InstalledNamespace};
 
-pub(crate) async fn create_realm() -> Result<InstalledNamespace, Error> {
-    inner_create_realm(fidl_test_sampler::RealmOptions { ..Default::default() }).await
-}
+pub(crate) const SAMPLER_NAME: &str = "sampler";
+pub(crate) const COUNTER_NAME: &str = "single_counter";
+pub(crate) const COBALT_NAME: &str = "cobalt";
+pub(crate) const ARCHIVIST_NAME: &str = "test_archivist";
 
-pub(crate) async fn create_realm_with_name(
-    name: impl Into<String>,
-) -> Result<InstalledNamespace, Error> {
+pub(crate) async fn create_realm() -> Result<InstalledNamespace, Error> {
     inner_create_realm(fidl_test_sampler::RealmOptions {
-        sampler_component_name: Some(name.into()),
+        sampler_component_name: Some(SAMPLER_NAME.into()),
+        single_counter_name: Some(COUNTER_NAME.into()),
+        mock_cobalt_name: Some(COBALT_NAME.into()),
+        test_archivist_name: Some(ARCHIVIST_NAME.into()),
         ..Default::default()
     })
     .await

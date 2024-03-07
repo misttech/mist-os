@@ -22,6 +22,7 @@ pub use selector_list::{ParsedSelector, SelectorList};
 
 const MONIKER_INTERPOLATION: &str = "{MONIKER}";
 const METRICS_INSPECT_SIZE_BYTES: usize = 1024 * 1024; // 1MiB
+const DEFAULT_MIN_SAMPLE_RATE_SEC: i64 = 10;
 
 /// Configuration for a single project to map Inspect data to its Cobalt metrics.
 #[derive(Deserialize, Debug, PartialEq)]
@@ -249,15 +250,80 @@ fn load_many<T: DeserializeOwned + RemembersSource>(paths: Paths) -> Result<Vec<
 /// Container for all configurations needed to instantiate the Sampler infrastructure.
 /// Includes:
 ///      - Project configurations.
+///      - Whether to configure the ArchiveReader for tests (e.g. longer timeouts)
 ///      - Minimum sample rate.
 #[derive(Debug)]
 pub struct SamplerConfig {
     pub project_configs: Vec<Arc<ProjectConfig>>,
+    pub configure_reader_for_tests: bool,
     pub minimum_sample_rate_sec: i64,
 
     // Used to store a lazy node that publishes data to Inspect if
     // present.
     inspect_node: Mutex<Option<inspect::LazyNode>>,
+}
+
+/// Use this struct in a builder pattern to load the Sampler, and
+/// optionally FIRE, configs.
+pub struct SamplerConfigBuilder {
+    minimum_sample_rate_sec: i64,
+    configure_reader_for_tests: bool,
+    sampler_dir: Option<PathBuf>, // Not optional - load() will fail if this is not set.
+    fire_dir: Option<PathBuf>,
+}
+
+impl SamplerConfigBuilder {
+    /// Call default() to start the builder.
+    pub fn default() -> Self {
+        SamplerConfigBuilder {
+            minimum_sample_rate_sec: DEFAULT_MIN_SAMPLE_RATE_SEC,
+            configure_reader_for_tests: false,
+            sampler_dir: None,
+            fire_dir: None,
+        }
+    }
+
+    /// Optional. If not called, a default value will be used.
+    pub fn minimum_sample_rate_sec(mut self, minimum_sample_rate_sec: i64) -> Self {
+        self.minimum_sample_rate_sec = minimum_sample_rate_sec;
+        self
+    }
+
+    /// Optional. For use in tests only. Configures ArchiveReader
+    /// (and thus ArchiveAccessor) to avoid test flakes.
+    pub fn configure_reader_for_tests(mut self, configure_reader_for_tests: bool) -> Self {
+        self.configure_reader_for_tests = configure_reader_for_tests;
+        self
+    }
+
+    /// Required. The builder will fail without a Sampler config dir.
+    /// Calling multiple times will use only the last value.
+    pub fn sampler_dir(mut self, path: impl Into<PathBuf>) -> Self {
+        self.sampler_dir = Some(path.into());
+        self
+    }
+
+    /// Optional. FIRE config will be loaded if fire_dir() is called.
+    /// Calling multiple times will use only the last value.
+    pub fn fire_dir(mut self, path: impl Into<PathBuf>) -> Self {
+        self.fire_dir = Some(path.into());
+        self
+    }
+
+    /// Call load() after configuring the builder, to load and return SamplerConfig.
+    pub fn load(self) -> Result<Arc<SamplerConfig>, Error> {
+        if let Some(sampler_dir) = self.sampler_dir.as_ref() {
+            SamplerConfig::from_directories_internal(
+                self.minimum_sample_rate_sec,
+                self.configure_reader_for_tests,
+                sampler_dir,
+                self.fire_dir,
+            )
+            .map(Arc::new)
+        } else {
+            bail!("sampler_dir must be configured before loading SamplerConfig")
+        }
+    }
 }
 
 impl MetricConfig {
@@ -350,30 +416,10 @@ fn expand_fire_projects(
 
 impl SamplerConfig {
     /// Parse the ProjectConfigurations for every project from config data.
-    /// Does not load FIRE files.
-    pub fn from_directory(
-        minimum_sample_rate_sec: i64,
-        sampler_dir: impl AsRef<Path>,
-    ) -> Result<Arc<Self>, Error> {
-        Self::from_directories_internal(minimum_sample_rate_sec, sampler_dir, None::<&Path>)
-            .map(Arc::new)
-    }
-
-    /// Parse the ProjectConfigurations for every project from config data.
-    /// Load FIRE data and convert it to ProjectConfig's.
-    pub fn from_directories(
-        minimum_sample_rate_sec: i64,
-        sampler_dir: impl AsRef<Path>,
-        fire_dir: impl AsRef<Path>,
-    ) -> Result<Arc<Self>, Error> {
-        Self::from_directories_internal(minimum_sample_rate_sec, sampler_dir, Some(fire_dir))
-            .map(Arc::new)
-    }
-
-    /// Parse the ProjectConfigurations for every project from config data.
     /// If a FIRE directory is given, load FIRE data and convert it to ProjectConfig's.
     fn from_directories_internal(
         minimum_sample_rate_sec: i64,
+        configure_reader_for_tests: bool,
         sampler_dir: impl AsRef<Path>,
         fire_dir: Option<impl AsRef<Path>>,
     ) -> Result<Self, Error> {
@@ -394,7 +440,12 @@ impl SamplerConfig {
                 .append(&mut expand_fire_projects(fire_project_templates, fire_components)?);
         }
         let project_configs = project_configs.into_iter().map(Arc::new).collect();
-        Ok(Self { minimum_sample_rate_sec, project_configs, inspect_node: Mutex::new(None) })
+        Ok(Self {
+            minimum_sample_rate_sec,
+            project_configs,
+            configure_reader_for_tests,
+            inspect_node: Mutex::new(None),
+        })
     }
 
     /// Publish data about this config to Inspect under the given node.
@@ -459,7 +510,7 @@ impl SamplerConfig {
 
 #[cfg(test)]
 mod tests {
-    use super::SamplerConfig;
+    use super::SamplerConfigBuilder;
     use std::fs;
 
     #[fuchsia::test]
@@ -501,7 +552,10 @@ mod tests {
         )
         .unwrap();
 
-        let config = SamplerConfig::from_directory(10, &load_path);
+        let config = SamplerConfigBuilder::default()
+            .minimum_sample_rate_sec(10)
+            .sampler_dir(&load_path)
+            .load();
         assert!(config.is_ok());
         assert_eq!(config.unwrap().project_configs.len(), 2);
     }
@@ -538,7 +592,10 @@ mod tests {
         )
         .unwrap();
 
-        let config = SamplerConfig::from_directory(10, &load_path);
+        let config = SamplerConfigBuilder::default()
+            .minimum_sample_rate_sec(10)
+            .sampler_dir(&load_path)
+            .load();
         assert!(config.is_err());
     }
 
@@ -581,7 +638,10 @@ mod tests {
 }
 "#).unwrap();
 
-        let config = SamplerConfig::from_directory(10, &load_path);
+        let config = SamplerConfigBuilder::default()
+            .minimum_sample_rate_sec(10)
+            .sampler_dir(&load_path)
+            .load();
         assert!(config.is_ok());
         assert_eq!(config.unwrap().project_configs.len(), 2);
     }
@@ -624,7 +684,10 @@ mod tests {
         )
         .unwrap();
 
-        let config = SamplerConfig::from_directory(10, &load_path);
+        let config = SamplerConfigBuilder::default()
+            .minimum_sample_rate_sec(10)
+            .sampler_dir(&load_path)
+            .load();
         assert!(config.is_ok());
         assert_eq!(config.as_ref().unwrap().project_configs.len(), 2);
         assert_eq!(config.as_ref().unwrap().project_configs[0].customer_id(), 1);
@@ -725,7 +788,11 @@ mod tests {
         )
         .unwrap();
 
-        let config = SamplerConfig::from_directories(10, &sampler_load_path, &fire_load_path);
+        let config = SamplerConfigBuilder::default()
+            .minimum_sample_rate_sec(10)
+            .sampler_dir(&sampler_load_path)
+            .fire_dir(&fire_load_path)
+            .load();
         assert!(config.is_ok());
         let configs = &config.as_ref().unwrap().project_configs;
         // Customer ID 6 is normal Sampler config. ID 7 and 8 are FIRE configs. There must be

@@ -9,9 +9,18 @@ using fuchsia.testing.harness;
 
 /// RealmOptions tells the RealmFactory protocol how to create the test realm.
 type RealmOptions = resource table {
-    /// Optional name to give to the realm component.
+    /// Optional name to give to the Sampler realm component.
     /// Defaults to "sampler".
     1: sampler_component_name string;
+    /// Optional name to give to the "Single Counter" realm component.
+    /// Defaults to "single_counter".
+    2: single_counter_name string;
+    /// Optional name to give to the mock Cobalt realm component.
+    /// Defaults to "mock_cobalt".
+    3: mock_cobalt_name string;
+    /// Optional name to give to the Archivist realm component.
+    /// Defaults to "test_case_archivist".
+    4: test_archivist_name string;
 };
 
 @discoverable
