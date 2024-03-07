@@ -34,15 +34,6 @@ fuchsia_structured_config_cpp_elf_lib("config_lib") {
   cm_label = ":manifest"
 }
 
-fuchsia_structured_config_values("values") {
-  testonly = true
-  cm_label = ":manifest"
-  component_name = "sc_capabilities_offer_and_expose"
-  values = {
-    my_flag = false
-  }
-}
-
 fuchsia_component("child") {
   testonly = true
   manifest = "meta/child.cml"
@@ -60,6 +51,5 @@ fuchsia_test_package("tests") {
   deps = [
     ":child",
     ":sc_capabilities_offer_and_expose",
-    ":values",
   ]
 }

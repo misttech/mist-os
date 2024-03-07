@@ -27,18 +27,6 @@ fuchsia_structured_config_rust_lib("driver_index_config") {
   cm_label = ":manifest"
 }
 
-fuchsia_structured_config_values("default_config") {
-  cm_label = ":manifest"
-  values = {
-    enable_ephemeral_drivers = false
-    delay_fallback_until_base_drivers_indexed = false
-    bind_eager = []
-    enable_driver_load_fuzzer = false
-    driver_load_fuzzer_max_delay_ms = 0
-    disabled_drivers = []
-  }
-}
-
 rustc_binary("bin") {
   edition = "2021"
   output_name = "driver_index"
@@ -101,10 +89,7 @@ fuchsia_component("component") {
 
 fuchsia_package("package") {
   package_name = "driver-index"
-  deps = [
-    ":component",
-    ":default_config",
-  ]
+  deps = [ ":component" ]
 }
 
 fuchsia_driver("fake-driver") {

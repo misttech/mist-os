@@ -112,19 +112,8 @@ fuchsia_component("session_manager_comp") {
   deps = [ ":bin" ]
 }
 
-fuchsia_structured_config_values("default_config") {
-  cm_label = ":manifest"
-  values = {
-    session_url = ""
-    autolaunch = false
-  }
-}
-
 fuchsia_package("session_manager") {
-  deps = [
-    ":default_config",
-    ":session_manager_comp",
-  ]
+  deps = [ ":session_manager_comp" ]
 }
 
 fuchsia_unittest_package("session_manager_tests") {
