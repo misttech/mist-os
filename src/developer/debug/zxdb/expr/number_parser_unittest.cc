@@ -233,56 +233,80 @@ TEST(NumberParser, StringToNumber) {
 }
 
 TEST(NumberParser, GetFloatTokenLength) {
-  EXPECT_EQ(0u, GetFloatTokenLength(ExprLanguage::kC, std::string_view()));
-  EXPECT_EQ(0u, GetFloatTokenLength(ExprLanguage::kC, " 2.3"));   // Whitespace doesn't count.
-  EXPECT_EQ(0u, GetFloatTokenLength(ExprLanguage::kC, "12"));     // Integer, not a float.
-  EXPECT_EQ(0u, GetFloatTokenLength(ExprLanguage::kC, "-12.2"));  // Signs not counted.
-  EXPECT_EQ(0u, GetFloatTokenLength(ExprLanguage::kC, "12foo"));  // Not a number.
+  FloatFollowing following = FloatFollowing::kCanFollow;
+
+  EXPECT_EQ(0u, GetFloatTokenLength(ExprLanguage::kC, std::string_view(), &following));
+  EXPECT_EQ(FloatFollowing::kCanFollow, following);
+
+  // Whitespace doesn't count.
+  EXPECT_EQ(0u, GetFloatTokenLength(ExprLanguage::kC, " 2.3", &following));
+  EXPECT_EQ(FloatFollowing::kCanFollow, following);
+
+  // Integer, not a float.
+  EXPECT_EQ(0u, GetFloatTokenLength(ExprLanguage::kC, "12", &following));
+  EXPECT_EQ(FloatFollowing::kCanFollow, following);
+
+  // Signs not counted.
+  EXPECT_EQ(0u, GetFloatTokenLength(ExprLanguage::kC, "-12.2", &following));
+  EXPECT_EQ(FloatFollowing::kCanFollow, following);
+
+  // Not a number.
+  EXPECT_EQ(0u, GetFloatTokenLength(ExprLanguage::kC, "12foo", &following));
+  EXPECT_EQ(FloatFollowing::kCanFollow, following);
 
   // Simple valid cases.
-  EXPECT_EQ(3u, GetFloatTokenLength(ExprLanguage::kC, "2.3"));
-  EXPECT_EQ(3u, GetFloatTokenLength(ExprLanguage::kC, "2.3"));
-  EXPECT_EQ(2u, GetFloatTokenLength(ExprLanguage::kC, "2. foo"));
-  EXPECT_EQ(3u, GetFloatTokenLength(ExprLanguage::kC, "12.+float"));
+  EXPECT_EQ(3u, GetFloatTokenLength(ExprLanguage::kC, "2.3", &following));
+  EXPECT_EQ(FloatFollowing::kCanFollow, following);
+  EXPECT_EQ(3u, GetFloatTokenLength(ExprLanguage::kC, "2.3", &following));
+  EXPECT_EQ(2u, GetFloatTokenLength(ExprLanguage::kC, "2. foo", &following));
+  EXPECT_EQ(3u, GetFloatTokenLength(ExprLanguage::kC, "12.+float", &following));
 
   // Exponents.
-  EXPECT_EQ(0u, GetFloatTokenLength(ExprLanguage::kC, "12e"));  // Exponent needs digits.
-  EXPECT_EQ(0u, GetFloatTokenLength(ExprLanguage::kC, "12extremely"));
-  EXPECT_EQ(0u, GetFloatTokenLength(ExprLanguage::kC, "12e+"));  // Exponent needs digits.
-  EXPECT_EQ(5u, GetFloatTokenLength(ExprLanguage::kC, "12e12"));
-  EXPECT_EQ(8u, GetFloatTokenLength(ExprLanguage::kRust, "1_2.e1_2 "));
-  EXPECT_EQ(11u, GetFloatTokenLength(ExprLanguage::kC, "1'2.01'9e12+aa"));
-  EXPECT_EQ(5u, GetFloatTokenLength(ExprLanguage::kC,
-                                    "12e12.2"));  // ".2" not counted as part of the number.
-  EXPECT_EQ(0u, GetFloatTokenLength(ExprLanguage::kC, "12e+"));
-  EXPECT_EQ(6u, GetFloatTokenLength(ExprLanguage::kC, "12e+12"));
-  EXPECT_EQ(6u, GetFloatTokenLength(ExprLanguage::kC, "12E-12"));
-  EXPECT_EQ(0u, GetFloatTokenLength(ExprLanguage::kC, "12 e-12"));
-  EXPECT_EQ(0u, GetFloatTokenLength(ExprLanguage::kC, "12e- 12"));
+  EXPECT_EQ(0u,
+            GetFloatTokenLength(ExprLanguage::kC, "12e", &following));  // Exponent needs digits.
+  EXPECT_EQ(0u, GetFloatTokenLength(ExprLanguage::kC, "12extremely", &following));
+  EXPECT_EQ(0u,
+            GetFloatTokenLength(ExprLanguage::kC, "12e+", &following));  // Exponent needs digits.
+  EXPECT_EQ(5u, GetFloatTokenLength(ExprLanguage::kC, "12e12", &following));
+  EXPECT_EQ(8u, GetFloatTokenLength(ExprLanguage::kRust, "1_2.e1_2 ", &following));
+  EXPECT_EQ(11u, GetFloatTokenLength(ExprLanguage::kC, "1'2.01'9e12+aa", &following));
+  EXPECT_EQ(5u, GetFloatTokenLength(ExprLanguage::kC, "12e12.2",
+                                    &following));  // ".2" not counted as part of the number.
+  EXPECT_EQ(0u, GetFloatTokenLength(ExprLanguage::kC, "12e+", &following));
+  EXPECT_EQ(6u, GetFloatTokenLength(ExprLanguage::kC, "12e+12", &following));
+  EXPECT_EQ(6u, GetFloatTokenLength(ExprLanguage::kC, "12E-12", &following));
+  EXPECT_EQ(0u, GetFloatTokenLength(ExprLanguage::kC, "12 e-12", &following));
+  EXPECT_EQ(0u, GetFloatTokenLength(ExprLanguage::kC, "12e- 12", &following));
 
   // Suffixes. A valid number with any alphanumeric characters following is included. The suffixed
   // will be validated in the parsing phase, not this tokenizing phase.
   // TODO(bug 43220) Handle Rust-specific suffixes.
-  EXPECT_EQ(4u, GetFloatTokenLength(ExprLanguage::kC, "12.f"));
-  EXPECT_EQ(8u, GetFloatTokenLength(ExprLanguage::kC, "12.float"));
-  EXPECT_EQ(14u, GetFloatTokenLength(ExprLanguage::kC, "12e-12nonsense"));
+  EXPECT_EQ(4u, GetFloatTokenLength(ExprLanguage::kC, "12.f", &following));
+  EXPECT_EQ(FloatFollowing::kCanFollow, following);
+  EXPECT_EQ(8u, GetFloatTokenLength(ExprLanguage::kC, "12.float", &following));
+  EXPECT_EQ(FloatFollowing::kCanFollow, following);
+  EXPECT_EQ(14u, GetFloatTokenLength(ExprLanguage::kC, "12e-12nonsense", &following));
+  EXPECT_EQ(FloatFollowing::kCanFollow, following);
 
   // Rust requires a leading digit, C doesn't (as long as there's a digit following);
-  EXPECT_EQ(3u, GetFloatTokenLength(ExprLanguage::kC, ".14"));
-  EXPECT_EQ(0u, GetFloatTokenLength(ExprLanguage::kC, ".e12"));
-  EXPECT_EQ(0u, GetFloatTokenLength(ExprLanguage::kRust, ".14"));
+  EXPECT_EQ(3u, GetFloatTokenLength(ExprLanguage::kC, ".14", &following));
+  EXPECT_EQ(FloatFollowing::kCanFollow, following);
+  EXPECT_EQ(0u, GetFloatTokenLength(ExprLanguage::kC, ".e12", &following));
+  EXPECT_EQ(FloatFollowing::kCanFollow, following);
+  EXPECT_EQ(0u, GetFloatTokenLength(ExprLanguage::kRust, ".14", &following));
+  EXPECT_EQ(FloatFollowing::kCanNotFollow, following);
 
   // Separators, C and Rust use different ones. They can appear anywhere but first position.
-  EXPECT_EQ(13u, GetFloatTokenLength(ExprLanguage::kRust, "123_44_.3_76_-98"));
-  EXPECT_EQ(0u, GetFloatTokenLength(ExprLanguage::kC, "123_44_.3_76_-98"));
-  EXPECT_EQ(0u, GetFloatTokenLength(ExprLanguage::kRust, "123'44'.3'76'-98"));
-  EXPECT_EQ(13u, GetFloatTokenLength(ExprLanguage::kC, "123'44'.3'76'-98"));
+  EXPECT_EQ(13u, GetFloatTokenLength(ExprLanguage::kRust, "123_44_.3_76_-98", &following));
+  EXPECT_EQ(0u, GetFloatTokenLength(ExprLanguage::kC, "123_44_.3_76_-98", &following));
+  EXPECT_EQ(0u, GetFloatTokenLength(ExprLanguage::kRust, "123'44'.3'76'-98", &following));
+  EXPECT_EQ(13u, GetFloatTokenLength(ExprLanguage::kC, "123'44'.3'76'-98", &following));
 
   // Separators can't appear first.
-  EXPECT_EQ(0u, GetFloatTokenLength(ExprLanguage::kRust, "_123"));
-  EXPECT_EQ(0u, GetFloatTokenLength(ExprLanguage::kC, "_123"));
-  EXPECT_EQ(0u, GetFloatTokenLength(ExprLanguage::kRust, "'123"));
-  EXPECT_EQ(0u, GetFloatTokenLength(ExprLanguage::kC, "'123"));
+  EXPECT_EQ(0u, GetFloatTokenLength(ExprLanguage::kRust, "_123", &following));
+  EXPECT_EQ(0u, GetFloatTokenLength(ExprLanguage::kC, "_123", &following));
+  EXPECT_EQ(0u, GetFloatTokenLength(ExprLanguage::kRust, "'123", &following));
+  EXPECT_EQ(0u, GetFloatTokenLength(ExprLanguage::kC, "'123", &following));
 }
 
 TEST(NumberParser, StripFloatSuffix) {

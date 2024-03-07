@@ -554,7 +554,7 @@ TEST(ExprTokenizer, RustLifetime) {
   ExprTokenizer where("F: 'static + Fn(usize) -> Fut,", ExprLanguage::kRust);
   ASSERT_TRUE(where.Tokenize()) << where.err().msg();
   auto tokens = where.tokens();
-  EXPECT_EQ(11u, tokens.size());
+  ASSERT_EQ(11u, tokens.size());
 
   EXPECT_EQ(ExprTokenType::kName, tokens[0].type());
   EXPECT_EQ("F", tokens[0].value());
@@ -578,6 +578,59 @@ TEST(ExprTokenizer, RustLifetime) {
   EXPECT_EQ("Fut", tokens[9].value());
   EXPECT_EQ(ExprTokenType::kComma, tokens[10].type());
   EXPECT_EQ(",", tokens[10].value());
+}
+
+TEST(ExprTokenizer, RustTupleAccess) {
+  // In C "foo.0.1.bar" would be parsed as: Identifier(foo) Dot Float(0.1) Dot Identifier(bar)
+  // But in Rust, the leading dot puts us into "tuple accessor" mode where the following thing can
+  // NOT be a floating-point number and this is parsed as a sequence of separate tokens.
+  ExprTokenizer tuple_access("foo.0.1.bar", ExprLanguage::kRust);
+  ASSERT_TRUE(tuple_access.Tokenize()) << tuple_access.err().msg();
+  auto tokens = tuple_access.tokens();
+  ASSERT_EQ(7u, tokens.size());
+
+  EXPECT_EQ(ExprTokenType::kName, tokens[0].type());
+  EXPECT_EQ("foo", tokens[0].value());
+  EXPECT_EQ(ExprTokenType::kDot, tokens[1].type());
+  EXPECT_EQ(".", tokens[1].value());
+  EXPECT_EQ(ExprTokenType::kInteger, tokens[2].type());
+  EXPECT_EQ("0", tokens[2].value());
+  EXPECT_EQ(ExprTokenType::kDot, tokens[3].type());
+  EXPECT_EQ(".", tokens[3].value());
+  EXPECT_EQ(ExprTokenType::kInteger, tokens[4].type());
+  EXPECT_EQ("1", tokens[4].value());
+  EXPECT_EQ(ExprTokenType::kDot, tokens[5].type());
+  EXPECT_EQ(".", tokens[5].value());
+  EXPECT_EQ(ExprTokenType::kName, tokens[6].type());
+  EXPECT_EQ("bar", tokens[6].value());
+
+  // This should parse the same with spaces.
+  ExprTokenizer spaced_access("foo . 0.1 .bar", ExprLanguage::kRust);
+  ASSERT_TRUE(spaced_access.Tokenize()) << spaced_access.err().msg();
+  tokens = spaced_access.tokens();
+  ASSERT_EQ(7u, tokens.size());
+
+  EXPECT_EQ(ExprTokenType::kInteger, tokens[2].type());
+  EXPECT_EQ("0", tokens[2].value());
+  EXPECT_EQ(ExprTokenType::kDot, tokens[3].type());
+  EXPECT_EQ(".", tokens[3].value());
+  EXPECT_EQ(ExprTokenType::kInteger, tokens[4].type());
+  EXPECT_EQ("1", tokens[4].value());
+
+  // Test with a comment in the middle of the tokens.
+  ExprTokenizer commented_access("foo . /* yikes */ 0.1 .bar", ExprLanguage::kRust);
+  ASSERT_TRUE(commented_access.Tokenize()) << commented_access.err().msg();
+  tokens = commented_access.tokens();
+  ASSERT_EQ(8u, tokens.size());
+
+  EXPECT_EQ(ExprTokenType::kComment, tokens[2].type());
+  EXPECT_EQ("/* yikes */", tokens[2].value());
+  EXPECT_EQ(ExprTokenType::kInteger, tokens[3].type());
+  EXPECT_EQ("0", tokens[3].value());
+  EXPECT_EQ(ExprTokenType::kDot, tokens[4].type());
+  EXPECT_EQ(".", tokens[4].value());
+  EXPECT_EQ(ExprTokenType::kInteger, tokens[5].type());
+  EXPECT_EQ("1", tokens[5].value());
 }
 
 }  // namespace zxdb

@@ -73,8 +73,16 @@ struct IntegerSuffix {
 // invalid, return the error.
 ErrOr<IntegerSuffix> ExtractIntegerSuffix(std::string_view* s);
 
+// The tokenizer needs some context to disambiguate the Rust case where "foo.0.1" where this is
+// a sequence of accesses with integers rather than a floating point number.
+enum class FloatFollowing {
+  kCanFollow,     // Normal, if the thing after this looks like a float, it is!
+  kCanNotFollow,  // The thing following the dot can not be a float.
+};
+
 // Checks if the current input begins with a floating-point literal and returns its length if it
-// does. Returns 0 if it does not begin a floating point literal.
+// does. Returns 0 if it does not begin a floating point literal. Whether a floating point number
+// can follow the given token is placed into |*following| (see enum definition).
 //
 // Whitespace is not stripped so leading whitespace will not be considered a floating point token.
 // As in C, a leading '-' is not considered part of the token. "-23.5" is a unary '-' operator
@@ -83,7 +91,7 @@ ErrOr<IntegerSuffix> ExtractIntegerSuffix(std::string_view* s);
 // On success, the identified token may not represent a valid floating-point number. It may have
 // extra garbage in it, or may be malformed in various ways. It is just the range of text to be
 // considered a float. See ValueForFloatToken for conversion + validation.
-size_t GetFloatTokenLength(ExprLanguage lang, std::string_view input);
+size_t GetFloatTokenLength(ExprLanguage lang, std::string_view input, FloatFollowing* following);
 
 enum class FloatSuffix {
   kNone,   // No known suffix.

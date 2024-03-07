@@ -319,14 +319,23 @@ ErrOr<IntegerSuffix> ExtractIntegerSuffix(std::string_view* s) {
 //
 // TODO(bug 43220) Handle Rust-specific suffixes.
 // TODO(bug 43222) Support C++17 hex floating point literals "0x342.1a"
-size_t GetFloatTokenLength(ExprLanguage lang, std::string_view input) {
+size_t GetFloatTokenLength(ExprLanguage lang, std::string_view input, FloatFollowing* following) {
+  // Default to allowing floats to follow the current context. This will be reset in the specific
+  // Rust case where a float can not follow the current context.
+  *following = FloatFollowing::kCanFollow;
+
   std::string_view cur = input;
+
+  if (lang == ExprLanguage::kRust && !cur.empty() && cur[0] == '.') {
+    // Something starting with a dot can in Rust never be followed by a float (see function comment
+    // above).
+    *following = FloatFollowing::kCanNotFollow;
+    return 0;
+  }
 
   // Digits before the dot.
   size_t before_dot = GetDigitsLength(lang, cur);
   cur = cur.substr(before_dot);
-  if (lang == ExprLanguage::kRust & before_dot == 0)
-    return 0;
 
   // "."
   bool has_dot = false;

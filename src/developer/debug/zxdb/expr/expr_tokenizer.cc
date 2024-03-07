@@ -66,14 +66,26 @@ ExprTokenizer::ExprTokenizer(const std::string& input, ExprLanguage lang)
     : input_(input), language_(lang) {}
 
 bool ExprTokenizer::Tokenize() {
+  // Tokenizer context for Rust-specific float disambiguation.
+  FloatFollowing float_can_follow = FloatFollowing::kCanFollow;
+
   while (!done()) {
+    // Save whether the current context allows a float, and reset the context for the next time.
+    // This prevents resetting this flag for every "continue" in this loop.
+    FloatFollowing current_float_possible = float_can_follow;
+    float_can_follow = FloatFollowing::kCanFollow;
+
     AdvanceToNextToken();
     if (done())
       break;
 
     // Comments.
-    if (HandleComment())
+    if (HandleComment()) {
+      // Comment tokens should not reset whether a float can follow the current token, so put
+      // back the old value.
+      float_can_follow = current_float_possible;
       continue;
+    }
 
     // Strings and characters.
     if (auto string_info = DoesBeginStringOrCharLiteral(language_, input_, cur_)) {
@@ -120,10 +132,13 @@ bool ExprTokenizer::Tokenize() {
     }
 
     // Floats.
-    if (size_t float_len = GetFloatTokenLength(language_, input_.substr(cur_))) {
-      tokens_.emplace_back(ExprTokenType::kFloat, input_.substr(cur_, float_len), cur_);
-      cur_ += float_len;
-      continue;
+    if (current_float_possible == FloatFollowing::kCanFollow) {
+      if (size_t float_len =
+              GetFloatTokenLength(language_, input_.substr(cur_), &float_can_follow)) {
+        tokens_.emplace_back(ExprTokenType::kFloat, input_.substr(cur_, float_len), cur_);
+        cur_ += float_len;
+        continue;
+      }
     }
 
     // All other token types.

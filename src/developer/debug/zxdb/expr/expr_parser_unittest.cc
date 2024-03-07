@@ -230,6 +230,17 @@ TEST_F(ExprParserTest, DotNumber) {
       "  __0\n"
       " handle\n",
       GetParseString("channel.__0.handle", ExprLanguage::kRust));
+
+  // Test sequential dots with the numbered identifier.
+  EXPECT_EQ(
+      "ACCESSOR(.)\n"
+      " ACCESSOR(.)\n"
+      "  ACCESSOR(.)\n"
+      "   IDENTIFIER(\"channel\")\n"
+      "   0\n"
+      "  1\n"
+      " handle\n",
+      GetParseString("channel.0.1.handle", ExprLanguage::kRust));
 }
 
 TEST_F(ExprParserTest, DotNumberNoHex) {
