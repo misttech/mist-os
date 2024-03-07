@@ -893,27 +893,37 @@ void Node::RequestBind(RequestBindRequestView request, RequestBindCompleter::Syn
   if (request->has_force_rebind()) {
     force_rebind = request->force_rebind();
   }
-  if (driver_component_.has_value() && !force_rebind) {
-    completer.ReplyError(ZX_ERR_ALREADY_BOUND);
-    return;
-  }
-
-  if (pending_bind_completer_.has_value()) {
-    completer.ReplyError(ZX_ERR_ALREADY_EXISTS);
-    return;
-  }
 
   std::optional<std::string> driver_url_suffix;
   if (request->has_driver_url_suffix()) {
     driver_url_suffix = std::string(request->driver_url_suffix().get());
   }
 
-  auto completer_wrapper = [completer = completer.ToAsync()](zx::result<> result) mutable {
-    if (result.is_ok()) {
-      completer.ReplySuccess();
-    } else {
-      completer.ReplyError(result.error_value());
-    }
+  BindHelper(force_rebind, std::move(driver_url_suffix),
+             [completer = completer.ToAsync()](zx_status_t status) mutable {
+               if (status == ZX_OK) {
+                 completer.ReplySuccess();
+               } else {
+                 completer.ReplyError(status);
+               }
+             });
+}
+
+void Node::BindHelper(bool force_rebind, std::optional<std::string> driver_url_suffix,
+                      fit::callback<void(zx_status_t)> on_bind_complete) {
+  if (driver_component_.has_value() && !force_rebind) {
+    on_bind_complete(ZX_ERR_ALREADY_BOUND);
+    return;
+  }
+
+  if (pending_bind_completer_.has_value()) {
+    on_bind_complete(ZX_ERR_ALREADY_EXISTS);
+    return;
+  }
+
+  auto completer_wrapper = [on_bind_complete =
+                                std::move(on_bind_complete)](zx::result<> result) mutable {
+    on_bind_complete(result.status_value());
   };
 
   if (driver_component_.has_value()) {
@@ -1269,7 +1279,14 @@ void Node::ConnectToController(ConnectToControllerRequestView request,
 }
 
 void Node::Bind(BindRequestView request, BindCompleter::Sync& completer) {
-  completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+  BindHelper(false, {{request->driver.data(), request->driver.size()}},
+             [completer = completer.ToAsync()](zx_status_t status) mutable {
+               if (status == ZX_OK) {
+                 completer.ReplySuccess();
+               } else {
+                 completer.ReplyError(status);
+               }
+             });
 }
 
 void Node::Rebind(RebindRequestView request, RebindCompleter::Sync& completer) {

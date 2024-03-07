@@ -356,6 +356,9 @@ class Node : public fidl::WireServer<fuchsia_driver_framework::NodeController>,
     return driver_component_->driver && driver_component_->state == DriverState::kBinding;
   }
 
+  void BindHelper(bool force_rebind, std::optional<std::string> driver_url_suffix,
+                  fit::callback<void(zx_status_t)> on_bind_complete);
+
   // Shutdown helpers:
   // Remove a child from this parent
   void RemoveChild(const std::shared_ptr<Node>& child);

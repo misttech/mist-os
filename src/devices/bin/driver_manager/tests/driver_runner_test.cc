@@ -2163,6 +2163,47 @@ TEST_F(DriverRunnerTest, ConnectToControllerFidlMethod) {
   ASSERT_EQ(topological_path_1, topological_path_2);
 }
 
+// Verify that device controller's Bind FIDL method works.
+TEST_F(DriverRunnerTest, DeviceControllerBind) {
+  SetupDriverRunner();
+
+  auto root_driver = StartRootDriver();
+  ASSERT_EQ(ZX_OK, root_driver.status_value());
+
+  std::shared_ptr<CreatedChild> child = root_driver->driver->AddChild("child", false, false);
+  EXPECT_TRUE(RunLoopUntilIdle());
+
+  ASSERT_EQ(1u, driver_runner().bind_manager().NumOrphanedNodes());
+
+  driver_index().set_match_callback([](auto args) -> zx::result<FakeDriverIndex::MatchResult> {
+    EXPECT_EQ(args.driver_url_suffix().get(), second_driver_url);
+    return zx::ok(FakeDriverIndex::MatchResult{
+        .url = second_driver_url,
+    });
+  });
+
+  PrepareRealmForDriverComponentStart("dev.child", second_driver_url);
+  AssertNodeControllerBound(child);
+
+  // Bind the driver.
+  ASSERT_EQ(1u, driver_runner().bind_manager().NumOrphanedNodes());
+  auto device_controller = ConnectToDeviceController("child");
+  device_controller->Bind(fidl::StringView::FromExternal(second_driver_url))
+      .Then([](fidl::WireUnownedResult<fuchsia_device::Controller::Bind>& reply) {
+        ASSERT_EQ(reply.status(), ZX_OK);
+      });
+  ASSERT_TRUE(RunLoopUntilIdle());
+
+  // Verify the driver was bound.
+  ASSERT_EQ(0u, driver_runner().bind_manager().NumOrphanedNodes());
+  auto [driver, controller] = StartSecondDriver();
+  driver->CloseBinding();
+  driver->DropNode();
+  StopDriverComponent(std::move(root_driver->controller));
+  realm().AssertDestroyedChildren(
+      {CreateChildRef("dev", "boot-drivers"), CreateChildRef("dev.child", "boot-drivers")});
+}
+
 TEST(CompositeServiceOfferTest, WorkingOffer) {
   const std::string_view kServiceName = "fuchsia.service";
   fidl::Arena<> arena;
