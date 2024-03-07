@@ -69,8 +69,6 @@ pub const HERMETIC_RESOLVER_CAPABILITY_NAME: &'static str = "hermetic_resolver";
 /// A |RunningSuite| represents a launched test component.
 pub(crate) struct RunningSuite {
     instance: RealmInstance,
-    // Task that checks that archivist is active and responding to requests.
-    archivist_ready_task: Option<fasync::Task<()>>,
     mock_ready_task: Option<fasync::Task<()>>,
     logs_iterator_task: Option<fasync::Task<Result<(), Error>>>,
     /// A connection to the embedded archivist LogSettings protocol. This connection must be kept
@@ -156,7 +154,6 @@ impl RunningSuite {
 
         Ok(RunningSuite {
             custom_artifact_tokens: vec![],
-            archivist_ready_task: None,
             mock_ready_task: Some(fasync::Task::spawn(
                 mock_ready_event.wait_or_dropped().map(|_| ()),
             )),
@@ -248,12 +245,8 @@ impl RunningSuite {
         };
 
         match diagnostics::serve_syslog(archive_accessor, host_archive_accessor, log_iterator) {
-            Ok(diagnostics::ServeSyslogOutcome {
-                logs_iterator_task,
-                archivist_responding_task,
-            }) => {
+            Ok(diagnostics::ServeSyslogOutcome { logs_iterator_task }) => {
                 self.logs_iterator_task = logs_iterator_task;
-                self.archivist_ready_task = Some(archivist_responding_task);
             }
             Err(e) => {
                 warn!("Error spawning iterator server: {:?}", e);
@@ -437,13 +430,6 @@ impl RunningSuite {
             fasync::OnSignals::new(token, zx::Signals::EVENTPAIR_PEER_CLOSED | zx::Signals::USER_0)
                 .unwrap_or_else(|_| zx::Signals::empty())
         });
-        // Before destroying the realm, ensure archivist has responded to a query. This ensures
-        // that the server end of the log iterator served to the client will be received by
-        // archivist. TODO(https://fxbug.dev/42056523): Remove this hack once component events are ordered.
-        if let Some(archivist_ready_task) = self.archivist_ready_task {
-            info!(?diagnostics, "Wait archivist_ready_task");
-            archivist_ready_task.await;
-        }
         if let Some(mock_ready_task) = self.mock_ready_task {
             info!(?diagnostics, "Wait mock_ready_task");
             mock_ready_task.await;
