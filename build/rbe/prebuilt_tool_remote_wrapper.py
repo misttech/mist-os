@@ -153,12 +153,14 @@ class PrebuiltToolAction(object):
         self.check_preconditions()
 
     def _setup_remote_action(self) -> remote_action.RemoteAction:
+        tool_name = self.local_tool.name
         remote_options = [
             # type=tool says we are providing a custom tool, and thus,
             #   own the logic for providing explicit inputs.
             # shallow=true works around an issue where racing mode downloads
             #   incorrectly
-            "--labels=type=tool,shallow=true",
+            # toolname self-identifies the action type for metrics
+            f"--labels=type=tool,shallow=true,toolname={tool_name}",
             # --canonicalize_working_dir: coerce the output dir to a constant.
             #   This requires that the command be insensitive to output dir, and
             #   that its outputs do not leak the remote output dir.

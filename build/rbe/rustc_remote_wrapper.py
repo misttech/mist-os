@@ -697,7 +697,8 @@ class RustRemoteAction(object):
             #   thus, own the logic for providing explicit inputs.
             # shallow=true works around an issue where racing mode downloads
             #   incorrectly
-            "--labels=type=tool,shallow=true",
+            # toolname=rustc just helps classify the remote action type
+            "--labels=type=tool,shallow=true,toolname=rustc",
             # --canonicalize_working_dir: coerce the output dir to a constant.
             #   This requires that the command be insensitive to output dir, and
             #   that its outputs do not leak the remote output dir.
