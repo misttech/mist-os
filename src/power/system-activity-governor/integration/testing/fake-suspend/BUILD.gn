@@ -1,0 +1,40 @@
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/bind/bind.gni")
+import("//build/components.gni")
+import("//build/drivers.gni")
+import("//build/fidl/fidl.gni")
+import("//build/test.gni")
+
+driver_bind_rules("bind") {
+  rules = "fake-suspend.bind"
+  bind_output = "fake-suspend.bindbc"
+  deps = [ "//src/devices/bind/fuchsia.test" ]
+}
+
+fuchsia_driver("driver") {
+  output_name = "fake-suspend"
+  sources = [
+    "control_server.cc",
+    "device_server.cc",
+    "fake_suspend.cc",
+  ]
+  deps = [
+    ":bind",
+    "//sdk/fidl/fuchsia.hardware.suspend:fuchsia.hardware.suspend_cpp",
+    "//sdk/lib/driver/component/cpp:cpp",
+    "//sdk/lib/driver/devfs/cpp",
+    "//sdk/lib/fit",
+    "//src/devices/lib/driver:driver_runtime",
+    "//src/power/system-activity-governor/integration/testing/fidl:test.suspendcontrol_cpp",
+  ]
+}
+
+fuchsia_driver_component("fake-suspend") {
+  component_name = "fake-suspend"
+  manifest = "meta/fake-suspend.cml"
+  deps = [ ":driver" ]
+  info = "fake_suspend-info.json"
+}

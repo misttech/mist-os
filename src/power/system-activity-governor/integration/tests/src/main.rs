@@ -5,102 +5,48 @@
 use anyhow::Result;
 use diagnostics_assertions::tree_assertion;
 use diagnostics_reader::{ArchiveReader, Inspect};
-use fidl::endpoints::{create_endpoints, ClientEnd};
+use fidl::endpoints::create_endpoints;
 use fidl_fuchsia_hardware_suspend as fhsuspend;
 use fidl_fuchsia_power_broker::{self as fbroker, LeaseStatus};
 use fidl_fuchsia_power_suspend as fsuspend;
 use fidl_fuchsia_power_system as fsystem;
+use fidl_test_suspendcontrol as tsc;
 use fidl_test_systemactivitygovernor as ftest;
-use fuchsia_async as fasync;
 use fuchsia_component::client::connect_to_protocol;
 use fuchsia_zircon::{self as zx, HandleBased};
-use futures::StreamExt;
 use power_broker_client::PowerElementContext;
 use realm_proxy_client::RealmProxyClient;
 
 const REALM_FACTORY_CHILD_NAME: &str = "test_realm_factory";
 
-fn run_suspender(
-    get_suspend_stats_resp: Result<fhsuspend::SuspenderGetSuspendStatesResponse, i32>,
-    suspend_resp: Result<fhsuspend::SuspenderSuspendResponse, i32>,
-    expected_suspend_request: Option<fhsuspend::SuspenderSuspendRequest>,
-) -> ClientEnd<ftest::SuspenderHandlerMarker> {
-    let (client, mut handler_stream) =
-        fidl::endpoints::create_request_stream::<ftest::SuspenderHandlerMarker>().unwrap();
-
-    fasync::Task::local(async move {
-        while let Some(Ok(req)) = handler_stream.next().await {
-            if let ftest::SuspenderHandlerRequest::Handle { suspender, .. } = req {
-                let mut stream = suspender.into_stream().unwrap();
-                let get_suspend_stats_resp = get_suspend_stats_resp.clone();
-                let suspend_resp = suspend_resp.clone();
-                let expected_suspend_request = expected_suspend_request.clone();
-
-                fasync::Task::local(async move {
-                    tracing::debug!("Serving suspend HAL");
-                    while let Some(Ok(req)) = stream.next().await {
-                        tracing::debug!(?req, "New request");
-                        match req {
-                            fhsuspend::SuspenderRequest::GetSuspendStates { responder } => {
-                                responder
-                                    .send(get_suspend_stats_resp.as_ref().map_err(|e| *e))
-                                    .unwrap();
-                            }
-                            fhsuspend::SuspenderRequest::Suspend { payload, responder } => {
-                                if let Some(expected) = &expected_suspend_request {
-                                    assert_eq!(*expected, payload);
-                                }
-
-                                responder.send(suspend_resp.as_ref().map_err(|e| *e)).unwrap();
-                            }
-                            fhsuspend::SuspenderRequest::_UnknownMethod { .. } => unreachable!(),
-                        }
-                    }
-                })
-                .detach();
-            }
-        }
-    })
-    .detach();
-
-    client
-}
-
-fn run_default_suspender() -> ClientEnd<ftest::SuspenderHandlerMarker> {
-    run_suspender(
-        Ok(fhsuspend::SuspenderGetSuspendStatesResponse {
+async fn set_up_default_suspender(device: &tsc::DeviceProxy) {
+    device
+        .set_suspend_states(&tsc::DeviceSetSuspendStatesRequest {
             suspend_states: Some(vec![fhsuspend::SuspendState {
                 resume_latency: Some(0),
                 ..Default::default()
             }]),
             ..Default::default()
-        }),
-        Ok(fhsuspend::SuspenderSuspendResponse {
-            suspend_duration: Some(2),
-            suspend_overhead: Some(1),
-            ..Default::default()
-        }),
-        None,
-    )
+        })
+        .await
+        .unwrap()
+        .unwrap()
 }
 
-async fn create_realm(options: ftest::RealmOptions) -> Result<(RealmProxyClient, String)> {
+async fn create_realm() -> Result<(RealmProxyClient, String, tsc::DeviceProxy)> {
     let realm_factory = connect_to_protocol::<ftest::RealmFactoryMarker>()?;
     let (client, server) = create_endpoints();
-    let result = realm_factory
-        .create_realm(options, server)
+    let (result, suspend_control_client_end) = realm_factory
+        .create_realm(server)
         .await?
         .map_err(realm_proxy_client::Error::OperationError)?;
-    Ok((RealmProxyClient::from(client), result))
+    Ok((RealmProxyClient::from(client), result, suspend_control_client_end.into_proxy().unwrap()))
 }
 
 #[fuchsia::test]
 async fn test_stats_returns_default_values() -> Result<()> {
-    let realm_options = ftest::RealmOptions {
-        suspender_handler: Some(run_default_suspender()),
-        ..Default::default()
-    };
-    let (realm, _) = create_realm(realm_options).await?;
+    let (realm, _, suspend_device) = create_realm().await?;
+    set_up_default_suspender(&suspend_device).await;
 
     let stats = realm.connect_to_protocol::<fsuspend::StatsMarker>().await?;
     let current_stats = stats.watch().await?;
@@ -113,11 +59,8 @@ async fn test_stats_returns_default_values() -> Result<()> {
 
 #[fuchsia::test]
 async fn test_activity_governor_returns_expected_power_elements() -> Result<()> {
-    let realm_options = ftest::RealmOptions {
-        suspender_handler: Some(run_default_suspender()),
-        ..Default::default()
-    };
-    let (realm, _) = create_realm(realm_options).await?;
+    let (realm, _, suspend_device) = create_realm().await?;
+    set_up_default_suspender(&suspend_device).await;
 
     let activity_governor = realm.connect_to_protocol::<fsystem::ActivityGovernorMarker>().await?;
     let power_elements = activity_governor.get_power_elements().await?;
@@ -136,6 +79,12 @@ async fn test_activity_governor_returns_expected_power_elements() -> Result<()> 
     assert!(!wh_passive_token.is_invalid_handle());
     let wh_active_token = wh_element.active_dependency_token.unwrap();
     assert!(!wh_active_token.is_invalid_handle());
+
+    let erl_element = power_elements.execution_resume_latency.unwrap();
+    let erl_passive_token = erl_element.passive_dependency_token.unwrap();
+    assert!(!erl_passive_token.is_invalid_handle());
+    let erl_active_token = erl_element.active_dependency_token.unwrap();
+    assert!(!erl_active_token.is_invalid_handle());
 
     Ok(())
 }
@@ -261,11 +210,8 @@ macro_rules! block_until_inspect_matches {
 #[fuchsia::test]
 async fn test_activity_governor_increments_suspend_success_on_application_activity_lease_drop(
 ) -> Result<()> {
-    let realm_options = ftest::RealmOptions {
-        suspender_handler: Some(run_default_suspender()),
-        ..Default::default()
-    };
-    let (realm, activity_governor_moniker) = create_realm(realm_options).await?;
+    let (realm, activity_governor_moniker, suspend_device) = create_realm().await?;
+    set_up_default_suspender(&suspend_device).await;
     let stats = realm.connect_to_protocol::<fsuspend::StatsMarker>().await?;
 
     // First watch should return immediately with default values.
@@ -339,6 +285,16 @@ async fn test_activity_governor_increments_suspend_success_on_application_activi
     );
 
     drop(suspend_lease_control);
+    assert!(suspend_device.await_suspend().await.unwrap().unwrap().state_index.is_none());
+    suspend_device
+        .resume(&tsc::DeviceResumeRequest::Result(tsc::SuspendResult {
+            suspend_duration: Some(2i64),
+            suspend_overhead: Some(1i64),
+            ..Default::default()
+        }))
+        .await
+        .unwrap()
+        .unwrap();
 
     let current_stats = stats.watch().await?;
     assert_eq!(Some(1), current_stats.success_count);
@@ -410,6 +366,16 @@ async fn test_activity_governor_increments_suspend_success_on_application_activi
     );
 
     drop(suspend_lease_control);
+    assert!(suspend_device.await_suspend().await.unwrap().unwrap().state_index.is_none());
+    suspend_device
+        .resume(&tsc::DeviceResumeRequest::Result(tsc::SuspendResult {
+            suspend_duration: Some(2i64),
+            suspend_overhead: Some(1i64),
+            ..Default::default()
+        }))
+        .await
+        .unwrap()
+        .unwrap();
 
     let current_stats = stats.watch().await?;
     assert_eq!(Some(2), current_stats.success_count);
@@ -453,11 +419,8 @@ async fn test_activity_governor_increments_suspend_success_on_application_activi
 #[fuchsia::test]
 async fn test_activity_governor_raises_execution_state_power_level_on_wake_handling_claim(
 ) -> Result<()> {
-    let realm_options = ftest::RealmOptions {
-        suspender_handler: Some(run_default_suspender()),
-        ..Default::default()
-    };
-    let (realm, activity_governor_moniker) = create_realm(realm_options).await?;
+    let (realm, activity_governor_moniker, suspend_device) = create_realm().await?;
+    set_up_default_suspender(&suspend_device).await;
     let stats = realm.connect_to_protocol::<fsuspend::StatsMarker>().await?;
 
     // First watch should return immediately with default values.
@@ -501,6 +464,16 @@ async fn test_activity_governor_raises_execution_state_power_level_on_wake_handl
     );
 
     drop(wake_handling_lease_control);
+    assert!(suspend_device.await_suspend().await.unwrap().unwrap().state_index.is_none());
+    suspend_device
+        .resume(&tsc::DeviceResumeRequest::Result(tsc::SuspendResult {
+            suspend_duration: Some(2i64),
+            suspend_overhead: Some(1i64),
+            ..Default::default()
+        }))
+        .await
+        .unwrap()
+        .unwrap();
 
     block_until_inspect_matches!(
         activity_governor_moniker,
@@ -542,19 +515,16 @@ async fn test_activity_governor_shows_resume_latency_in_inspect() -> Result<()> 
         fhsuspend::SuspendState { resume_latency: Some(100), ..Default::default() },
         fhsuspend::SuspendState { resume_latency: Some(10), ..Default::default() },
     ];
-    let realm_options = ftest::RealmOptions {
-        suspender_handler: Some(run_suspender(
-            Ok(fhsuspend::SuspenderGetSuspendStatesResponse {
-                suspend_states: Some(suspend_states),
-                ..Default::default()
-            }),
-            Ok(Default::default()),
-            None,
-        )),
-        ..Default::default()
-    };
+    let (realm, activity_governor_moniker, suspend_device) = create_realm().await?;
+    suspend_device
+        .set_suspend_states(&tsc::DeviceSetSuspendStatesRequest {
+            suspend_states: Some(suspend_states),
+            ..Default::default()
+        })
+        .await
+        .unwrap()
+        .unwrap();
 
-    let (realm, activity_governor_moniker) = create_realm(realm_options).await?;
     let stats = realm.connect_to_protocol::<fsuspend::StatsMarker>().await?;
 
     // First watch should return immediately with default values.
@@ -613,29 +583,23 @@ async fn test_activity_governor_forwards_resume_latency_to_suspender() -> Result
         fhsuspend::SuspendState { resume_latency: Some(320), ..Default::default() },
         fhsuspend::SuspendState { resume_latency: Some(21), ..Default::default() },
     ];
-    let realm_options = ftest::RealmOptions {
-        suspender_handler: Some(run_suspender(
-            Ok(fhsuspend::SuspenderGetSuspendStatesResponse {
-                suspend_states: Some(suspend_states),
-                ..Default::default()
-            }),
-            Ok(fhsuspend::SuspenderSuspendResponse {
-                suspend_duration: Some(1000i64),
-                suspend_overhead: Some(50i64),
-                ..Default::default()
-            }),
-            Some(fhsuspend::SuspenderSuspendRequest { state_index: Some(1), ..Default::default() }),
-        )),
-        ..Default::default()
-    };
-    let (realm, activity_governor_moniker) = create_realm(realm_options).await?;
+    let (realm, activity_governor_moniker, suspend_device) = create_realm().await?;
+    suspend_device
+        .set_suspend_states(&tsc::DeviceSetSuspendStatesRequest {
+            suspend_states: Some(suspend_states),
+            ..Default::default()
+        })
+        .await
+        .unwrap()
+        .unwrap();
 
     let suspend_controller = create_suspend_topology(&realm).await?;
     let suspend_lease_control = lease(&suspend_controller, 1).await?;
 
     let expected_latencies = vec![430i64, 320i64, 21i64];
+    let expected_index = 1;
     let erl_controller = create_latency_topology(&realm, &expected_latencies).await?;
-    let _erl_lease_control = lease(&erl_controller, 1).await?;
+    let _erl_lease_control = lease(&erl_controller, expected_index).await?;
 
     block_until_inspect_matches!(
         activity_governor_moniker,
@@ -670,6 +634,19 @@ async fn test_activity_governor_forwards_resume_latency_to_suspender() -> Result
     );
 
     drop(suspend_lease_control);
+    assert_eq!(
+        expected_index as u64,
+        suspend_device.await_suspend().await.unwrap().unwrap().state_index.unwrap()
+    );
+    suspend_device
+        .resume(&tsc::DeviceResumeRequest::Result(tsc::SuspendResult {
+            suspend_duration: Some(1000i64),
+            suspend_overhead: Some(50i64),
+            ..Default::default()
+        }))
+        .await
+        .unwrap()
+        .unwrap();
 
     block_until_inspect_matches!(
         activity_governor_moniker,
@@ -713,25 +690,23 @@ async fn test_activity_governor_increments_fail_count_on_suspend_error() -> Resu
         fhsuspend::SuspendState { resume_latency: Some(320), ..Default::default() },
         fhsuspend::SuspendState { resume_latency: Some(21), ..Default::default() },
     ];
-    let realm_options = ftest::RealmOptions {
-        suspender_handler: Some(run_suspender(
-            Ok(fhsuspend::SuspenderGetSuspendStatesResponse {
-                suspend_states: Some(suspend_states),
-                ..Default::default()
-            }),
-            Err(7),
-            Some(fhsuspend::SuspenderSuspendRequest { state_index: Some(1), ..Default::default() }),
-        )),
-        ..Default::default()
-    };
-    let (realm, activity_governor_moniker) = create_realm(realm_options).await?;
+    let (realm, activity_governor_moniker, suspend_device) = create_realm().await?;
+    suspend_device
+        .set_suspend_states(&tsc::DeviceSetSuspendStatesRequest {
+            suspend_states: Some(suspend_states),
+            ..Default::default()
+        })
+        .await
+        .unwrap()
+        .unwrap();
 
     let suspend_controller = create_suspend_topology(&realm).await?;
     let suspend_lease_control = lease(&suspend_controller, 1).await?;
 
     let expected_latencies = vec![430i64, 320i64, 21i64];
+    let expected_index = 1;
     let erl_controller = create_latency_topology(&realm, &expected_latencies).await?;
-    let _erl_lease_control = lease(&erl_controller, 1).await?;
+    let _erl_lease_control = lease(&erl_controller, expected_index).await?;
 
     block_until_inspect_matches!(
         activity_governor_moniker,
@@ -766,6 +741,11 @@ async fn test_activity_governor_increments_fail_count_on_suspend_error() -> Resu
     );
 
     drop(suspend_lease_control);
+    assert_eq!(
+        expected_index as u64,
+        suspend_device.await_suspend().await.unwrap().unwrap().state_index.unwrap()
+    );
+    suspend_device.resume(&tsc::DeviceResumeRequest::Error(7)).await.unwrap().unwrap();
 
     block_until_inspect_matches!(
         activity_governor_moniker,

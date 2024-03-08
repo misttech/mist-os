@@ -1,0 +1,10 @@
+{
+    "short_description": "Fake driver for fuchsia.hardware.suspend clients",
+    "manufacturer": "",
+    "families": [],
+    "models": [],
+    "areas": [
+        "DriverFramework",
+        "Test"
+    ]
+}

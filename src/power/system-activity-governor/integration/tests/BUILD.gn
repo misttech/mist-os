@@ -18,7 +18,6 @@ rustc_test("bin") {
   sources = [ source_root ]
   name = "system_activity_governor_test"
   deps = [
-    "../testing/fidl:test.systemactivitygovernor_rust",
     "//sdk/fidl/fuchsia.hardware.suspend:fuchsia.hardware.suspend_rust",
     "//sdk/fidl/fuchsia.power.suspend:fuchsia.power.suspend_rust",
     "//sdk/fidl/fuchsia.power.system:fuchsia.power.system_rust",
@@ -26,14 +25,14 @@ rustc_test("bin") {
     "//src/lib/diagnostics/testing/diagnostics-assertions/rust:diagnostics-assertions",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",
-    "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-component",
     "//src/lib/zircon/rust:fuchsia-zircon",
     "//src/power/broker:fuchsia.power.broker_rust",
     "//src/power/broker/client",
+    "//src/power/system-activity-governor/integration/testing/fidl:test.suspendcontrol_rust",
+    "//src/power/system-activity-governor/integration/testing/fidl:test.systemactivitygovernor_rust",
     "//src/testing/realm_proxy/client",
     "//third_party/rust_crates:anyhow",
-    "//third_party/rust_crates:futures",
     "//third_party/rust_crates:tracing",
   ]
 }

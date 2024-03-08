@@ -4,16 +4,16 @@
 
 use {
     anyhow::{Error, Result},
-    fidl_fuchsia_io as fio,
+    fidl::endpoints::{ClientEnd, Proxy},
+    fidl_test_suspendcontrol as tsc,
     fidl_test_systemactivitygovernor::*,
     fuchsia_async as fasync,
     fuchsia_component::server::ServiceFs,
     fuchsia_component_test::{
-        Capability, ChildOptions, LocalComponentHandles, RealmBuilder, RealmInstance, Ref, Route,
-        DEFAULT_COLLECTION_NAME,
+        Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route, DEFAULT_COLLECTION_NAME,
     },
-    fuchsia_zircon as zx,
-    futures::{FutureExt, StreamExt, TryStreamExt},
+    fuchsia_driver_test::{DriverTestRealmBuilder, DriverTestRealmInstance},
+    futures::{StreamExt, TryStreamExt},
     tracing::*,
 };
 
@@ -38,8 +38,8 @@ async fn handle_request_stream(mut stream: RealmFactoryRequestStream) -> Result<
     let mut task_group = fasync::TaskGroup::new();
     while let Ok(Some(request)) = stream.try_next().await {
         match request {
-            RealmFactoryRequest::CreateRealm { options, realm_server, responder } => {
-                let realm = create_realm(options).await?;
+            RealmFactoryRequest::CreateRealm { realm_server, responder } => {
+                let (realm, control_client_end) = create_realm().await?;
                 let moniker = format!(
                     "{}:{}/{}",
                     DEFAULT_COLLECTION_NAME,
@@ -51,7 +51,7 @@ async fn handle_request_stream(mut stream: RealmFactoryRequestStream) -> Result<
                 task_group.spawn(async move {
                     realm_proxy::service::serve(realm, request_stream).await.unwrap();
                 });
-                responder.send(Ok(&moniker))?;
+                responder.send(Ok((&moniker, control_client_end)))?;
             }
 
             RealmFactoryRequest::_UnknownMethod { .. } => unreachable!(),
@@ -62,35 +62,11 @@ async fn handle_request_stream(mut stream: RealmFactoryRequestStream) -> Result<
     Ok(())
 }
 
-async fn serve_suspend_dir(
-    handles: LocalComponentHandles,
-    handler: SuspenderHandlerProxy,
-) -> Result<()> {
-    let mut fs = ServiceFs::new();
-    fs.dir("dev").add_service_at("000", move |channel: zx::Channel| {
-        handler.handle(channel.into()).unwrap();
-        None
-    });
-
-    fs.serve_connection(handles.outgoing_dir.into_channel().into()).unwrap();
-    fs.collect::<()>().await;
-    Ok(())
-}
-
-async fn create_realm(options: RealmOptions) -> Result<RealmInstance, Error> {
-    info!("building the realm using options {:?}", options);
+async fn create_realm() -> Result<(RealmInstance, ClientEnd<tsc::DeviceMarker>), Error> {
+    info!("building the realm");
 
     let builder = RealmBuilder::new().await?;
-    let suspender_handler = options.suspender_handler.unwrap().into_proxy().unwrap();
-
-    // TODO(mbrunson): Replace this implementation with driver-test-realm.
-    let suspend_devices = builder
-        .add_local_child(
-            "suspend-devices",
-            move |h| serve_suspend_dir(h, suspender_handler.clone()).boxed(),
-            ChildOptions::new(),
-        )
-        .await?;
+    builder.driver_test_realm_setup().await?;
 
     let component_ref = builder
         .add_child(
@@ -123,14 +99,14 @@ async fn create_realm(options: RealmOptions) -> Result<RealmInstance, Error> {
         )
         .await?;
 
-    // Expose capabilities from suspend-devices to system-activity-governor.
+    // Expose capabilities from driver-test-realm to system-activity-governor.
     builder
         .add_route(
             Route::new()
                 .capability(
-                    Capability::directory("dev-class-suspend").path("/dev").rights(fio::R_STAR_DIR),
+                    Capability::directory("dev-class").subdir("suspend").as_("dev-class-suspend"),
                 )
-                .from(&suspend_devices)
+                .from(Ref::child(fuchsia_driver_test::COMPONENT_NAME))
                 .to(&component_ref),
         )
         .await?;
@@ -147,5 +123,23 @@ async fn create_realm(options: RealmOptions) -> Result<RealmInstance, Error> {
         .await?;
 
     let realm = builder.build().await?;
-    Ok(realm)
+    realm.driver_test_realm_start(Default::default()).await?;
+    let dev = realm.driver_test_realm_connect_to_dev()?;
+
+    let dir_proxy = device_watcher::recursive_wait_and_open_directory(&dev, "class/test").await?;
+    let entry = device_watcher::wait_for_device_with(&dir_proxy, |info| {
+        info!("{:?} has topological path {:?}", info.filename, info.topological_path);
+        info.topological_path.ends_with("fake-suspend/control").then_some(info.filename.to_string())
+    })
+    .await?;
+
+    let control_client_end = device_watcher::recursive_wait_and_open::<tsc::DeviceMarker>(
+        &dev,
+        &format!("class/test/{}", entry),
+    )
+    .await?
+    .into_client_end()
+    .unwrap();
+
+    Ok((realm, control_client_end))
 }
