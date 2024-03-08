@@ -15,6 +15,7 @@
 
 #include <bind/fuchsia/clock/cpp/bind.h>
 #include <bind/fuchsia/cpp/bind.h>
+#include <bind/fuchsia/hardware/clock/cpp/bind.h>
 #include <bind/fuchsia/platform/cpp/bind.h>
 #include <ddk/metadata/clock.h>
 #include <gtest/gtest.h>
@@ -133,26 +134,26 @@ TEST(ClockImplVisitorTest, TestClocksProperty) {
 
       // 1st parent is pdev. Skipping that.
       EXPECT_TRUE(fdf_devicetree::testing::CheckHasProperties(
-          {{fdf::MakeProperty(bind_fuchsia::FIDL_PROTOCOL,
-                              bind_fuchsia_clock::BIND_FIDL_PROTOCOL_SERVICE),
+          {{fdf::MakeProperty(bind_fuchsia_hardware_clock::SERVICE,
+                              bind_fuchsia_hardware_clock::SERVICE_ZIRCONTRANSPORT),
             fdf::MakeProperty(bind_fuchsia_clock::FUNCTION,
                               "fuchsia.clock.FUNCTION." + std::string(CLK1_NAME))}},
           (*mgr_request.parents())[1].properties(), false));
       EXPECT_TRUE(fdf_devicetree::testing::CheckHasBindRules(
-          {{fdf::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
-                                    bind_fuchsia_clock::BIND_FIDL_PROTOCOL_SERVICE),
+          {{fdf::MakeAcceptBindRule(bind_fuchsia_hardware_clock::SERVICE,
+                                    bind_fuchsia_hardware_clock::SERVICE_ZIRCONTRANSPORT),
             fdf::MakeAcceptBindRule(bind_fuchsia::CLOCK_ID, static_cast<uint32_t>(CLK_ID1))}},
           (*mgr_request.parents())[1].bind_rules(), false));
 
       EXPECT_TRUE(fdf_devicetree::testing::CheckHasProperties(
-          {{fdf::MakeProperty(bind_fuchsia::FIDL_PROTOCOL,
-                              bind_fuchsia_clock::BIND_FIDL_PROTOCOL_SERVICE),
+          {{fdf::MakeProperty(bind_fuchsia_hardware_clock::SERVICE,
+                              bind_fuchsia_hardware_clock::SERVICE_ZIRCONTRANSPORT),
             fdf::MakeProperty(bind_fuchsia_clock::FUNCTION,
                               "fuchsia.clock.FUNCTION." + std::string(CLK2_NAME))}},
           (*mgr_request.parents())[2].properties(), false));
       EXPECT_TRUE(fdf_devicetree::testing::CheckHasBindRules(
-          {{fdf::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
-                                    bind_fuchsia_clock::BIND_FIDL_PROTOCOL_SERVICE),
+          {{fdf::MakeAcceptBindRule(bind_fuchsia_hardware_clock::SERVICE,
+                                    bind_fuchsia_hardware_clock::SERVICE_ZIRCONTRANSPORT),
             fdf::MakeAcceptBindRule(bind_fuchsia::CLOCK_ID, static_cast<uint32_t>(CLK_ID2))}},
           (*mgr_request.parents())[2].bind_rules(), false));
 
@@ -172,12 +173,12 @@ TEST(ClockImplVisitorTest, TestClocksProperty) {
 
       // 2nd is the clock impl parent.
       EXPECT_TRUE(fdf_devicetree::testing::CheckHasProperties(
-          {{fdf::MakeProperty(bind_fuchsia::FIDL_PROTOCOL,
-                              bind_fuchsia_clock::BIND_FIDL_PROTOCOL_SERVICE)}},
+          {{fdf::MakeProperty(bind_fuchsia_hardware_clock::SERVICE,
+                              bind_fuchsia_hardware_clock::SERVICE_ZIRCONTRANSPORT)}},
           (*mgr_request.parents())[1].properties(), false));
       EXPECT_TRUE(fdf_devicetree::testing::CheckHasBindRules(
-          {{fdf::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
-                                    bind_fuchsia_clock::BIND_FIDL_PROTOCOL_SERVICE),
+          {{fdf::MakeAcceptBindRule(bind_fuchsia_hardware_clock::SERVICE,
+                                    bind_fuchsia_hardware_clock::SERVICE_ZIRCONTRANSPORT),
             fdf::MakeAcceptBindRule(bind_fuchsia::CLOCK_ID, static_cast<uint32_t>(CLK_ID6))}},
           (*mgr_request.parents())[1].bind_rules(), false));
 

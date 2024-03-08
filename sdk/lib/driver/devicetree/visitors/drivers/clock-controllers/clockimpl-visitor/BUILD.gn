@@ -21,6 +21,7 @@ source_set("clockimpl") {
     "clockimpl-visitor.h",
   ]
   deps = [
+    "//sdk/fidl/fuchsia.hardware.clock:fuchsia.hardware.clock_bindlib_cpp",
     "//sdk/lib/driver/component/cpp:cpp",
     "//sdk/lib/driver/devicetree/manager",
     "//sdk/lib/driver/devicetree/visitors:registration",
@@ -40,6 +41,7 @@ test("clockimpl-visitor-test-bin") {
   sources = [ "test/clockimpl-visitor-test.cc" ]
   deps = [
     ":clockimpl",
+    "//sdk/fidl/fuchsia.hardware.clock:fuchsia.hardware.clock_bindlib_cpp",
     "//sdk/lib/driver/devicetree/testing:visitor-test-helper",
     "//sdk/lib/driver/devicetree/visitors:registry",
     "//sdk/lib/driver/devicetree/visitors/default/bind-property",

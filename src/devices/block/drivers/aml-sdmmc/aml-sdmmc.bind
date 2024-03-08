@@ -5,8 +5,8 @@
 composite aml_sdmmc;
 
 using fuchsia.amlogic.platform;
-using fuchsia.clock;
 using fuchsia.gpio;
+using fuchsia.hardware.clock;
 using fuchsia.platform;
 using fuchsia.pwm;
 using fuchsia.devicetree;
@@ -37,7 +37,7 @@ optional node "pwm" {
 }
 
 optional node "clock-gate" {
-  fuchsia.BIND_FIDL_PROTOCOL == fuchsia.clock.BIND_FIDL_PROTOCOL.SERVICE;
+  fuchsia.hardware.clock.Service == fuchsia.hardware.clock.Service.ZirconTransport;
 }
 
 node "gpio-init" {

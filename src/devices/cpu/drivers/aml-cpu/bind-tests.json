@@ -35,7 +35,7 @@
                 "expected": "match",
                 "device": {
                     "fuchsia.clock.FUNCTION": "fuchsia.clock.FUNCTION.SYS_PLL_DIV16",
-                    "fuchsia.BIND_FIDL_PROTOCOL": "fuchsia.clock.BIND_FIDL_PROTOCOL.SERVICE"
+                    "fuchsia.hardware.clock.Service": "fuchsia.hardware.clock.Service.ZirconTransport"
                 }
             }
         ]
@@ -47,7 +47,7 @@
                 "name": "Match",
                 "expected": "match",
                 "device": {
-                    "fuchsia.BIND_FIDL_PROTOCOL": "fuchsia.clock.BIND_FIDL_PROTOCOL.SERVICE",
+                    "fuchsia.hardware.clock.Service": "fuchsia.hardware.clock.Service.ZirconTransport",
                     "fuchsia.clock.FUNCTION": "fuchsia.clock.FUNCTION.SYS_CPU_DIV16"
                 }
             }
@@ -60,7 +60,7 @@
                 "name": "Match",
                 "expected": "match",
                 "device": {
-                    "fuchsia.BIND_FIDL_PROTOCOL": "fuchsia.clock.BIND_FIDL_PROTOCOL.SERVICE",
+                    "fuchsia.hardware.clock.Service": "fuchsia.hardware.clock.Service.ZirconTransport",
                     "fuchsia.clock.FUNCTION": "fuchsia.clock.FUNCTION.SYS_CPU_BIG_CLK"
                 }
             }
@@ -87,7 +87,7 @@
                 "expected": "match",
                 "device": {
                     "fuchsia.clock.FUNCTION": "fuchsia.clock.FUNCTION.SYS_PLLB_DIV16",
-                    "fuchsia.BIND_FIDL_PROTOCOL": "fuchsia.clock.BIND_FIDL_PROTOCOL.SERVICE"
+                    "fuchsia.hardware.clock.Service": "fuchsia.hardware.clock.Service.ZirconTransport"
                 }
             }
         ]
@@ -99,7 +99,7 @@
                 "name": "Match",
                 "expected": "match",
                 "device": {
-                    "fuchsia.BIND_FIDL_PROTOCOL": "fuchsia.clock.BIND_FIDL_PROTOCOL.SERVICE",
+                    "fuchsia.hardware.clock.Service": "fuchsia.hardware.clock.Service.ZirconTransport",
                     "fuchsia.clock.FUNCTION": "fuchsia.clock.FUNCTION.SYS_CPUB_DIV16"
                 }
             }
@@ -112,7 +112,7 @@
                 "name": "Match",
                 "expected": "match",
                 "device": {
-                    "fuchsia.BIND_FIDL_PROTOCOL": "fuchsia.clock.BIND_FIDL_PROTOCOL.SERVICE",
+                    "fuchsia.hardware.clock.Service": "fuchsia.hardware.clock.Service.ZirconTransport",
                     "fuchsia.clock.FUNCTION": "fuchsia.clock.FUNCTION.SYS_CPU_LITTLE_CLK"
                 }
             }

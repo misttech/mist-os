@@ -8,6 +8,7 @@ using fuchsia.amlogic.platform.a311d;
 using fuchsia.amlogic.platform;
 using fuchsia.gpio;
 using fuchsia.clock;
+using fuchsia.hardware.clock;
 using fuchsia.platform;
 using fuchsia.devicetree;
 
@@ -31,12 +32,12 @@ primary node "pdev" {
 
 
 optional node "clock-gate" {
-  fuchsia.BIND_FIDL_PROTOCOL == fuchsia.clock.BIND_FIDL_PROTOCOL.SERVICE;
+  fuchsia.hardware.clock.Service == fuchsia.hardware.clock.Service.ZirconTransport;
   fuchsia.clock.FUNCTION == fuchsia.clock.FUNCTION.AUDIO_GATE;
 }
 
 optional node "clock-pll" {
-  fuchsia.BIND_FIDL_PROTOCOL == fuchsia.clock.BIND_FIDL_PROTOCOL.SERVICE;
+  fuchsia.hardware.clock.Service == fuchsia.hardware.clock.Service.ZirconTransport;
   fuchsia.clock.FUNCTION == fuchsia.clock.FUNCTION.AUDIO_PLL;
 }
 

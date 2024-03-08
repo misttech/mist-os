@@ -34,7 +34,7 @@
                 "name": "Match",
                 "expected": "match",
                 "device": {
-                    "fuchsia.BIND_FIDL_PROTOCOL": "fuchsia.clock.BIND_FIDL_PROTOCOL.SERVICE",
+                    "fuchsia.hardware.clock.Service": "fuchsia.hardware.clock.Service.ZirconTransport",
                     "fuchsia.clock.FUNCTION": "fuchsia.clock.FUNCTION.AUDIO_GATE"
                 }
             }
@@ -47,7 +47,7 @@
                 "name": "Match",
                 "expected": "match",
                 "device": {
-                    "fuchsia.BIND_FIDL_PROTOCOL": "fuchsia.clock.BIND_FIDL_PROTOCOL.SERVICE",
+                    "fuchsia.hardware.clock.Service": "fuchsia.hardware.clock.Service.ZirconTransport",
                     "fuchsia.clock.FUNCTION": "fuchsia.clock.FUNCTION.AUDIO_PLL"
                 }
             }

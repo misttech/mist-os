@@ -8,6 +8,7 @@ using fuchsia.google.platform;
 using fuchsia.amlogic.platform;
 using fuchsia.clock;
 using fuchsia.gpio;
+using fuchsia.hardware.clock;
 using fuchsia.platform;
 using fuchsia.power;
 
@@ -33,17 +34,17 @@ primary node "power-01" {
 }
 
 node "clock-pll-div16-01" {
-  fuchsia.BIND_FIDL_PROTOCOL == fuchsia.clock.BIND_FIDL_PROTOCOL.SERVICE;
+  fuchsia.hardware.clock.Service == fuchsia.hardware.clock.Service.ZirconTransport;
   fuchsia.clock.FUNCTION == fuchsia.clock.FUNCTION.SYS_PLL_DIV16;
 }
 
 node "clock-cpu-div16-01" {
-  fuchsia.BIND_FIDL_PROTOCOL == fuchsia.clock.BIND_FIDL_PROTOCOL.SERVICE;
+  fuchsia.hardware.clock.Service == fuchsia.hardware.clock.Service.ZirconTransport;
   fuchsia.clock.FUNCTION == fuchsia.clock.FUNCTION.SYS_CPU_DIV16;
 }
 
 node "clock-cpu-scaler-01" {
-  fuchsia.BIND_FIDL_PROTOCOL == fuchsia.clock.BIND_FIDL_PROTOCOL.SERVICE;
+  fuchsia.hardware.clock.Service == fuchsia.hardware.clock.Service.ZirconTransport;
   fuchsia.clock.FUNCTION == fuchsia.clock.FUNCTION.SYS_CPU_BIG_CLK;
 }
 
@@ -53,17 +54,17 @@ optional node "power-02" {
 }
 
 optional node "clock-pll-div16-02" {
-  fuchsia.BIND_FIDL_PROTOCOL == fuchsia.clock.BIND_FIDL_PROTOCOL.SERVICE;
+  fuchsia.hardware.clock.Service == fuchsia.hardware.clock.Service.ZirconTransport;
   fuchsia.clock.FUNCTION == fuchsia.clock.FUNCTION.SYS_PLLB_DIV16;
 }
 
 optional node "clock-cpu-div16-02" {
-  fuchsia.BIND_FIDL_PROTOCOL == fuchsia.clock.BIND_FIDL_PROTOCOL.SERVICE;
+  fuchsia.hardware.clock.Service == fuchsia.hardware.clock.Service.ZirconTransport;
   fuchsia.clock.FUNCTION == fuchsia.clock.FUNCTION.SYS_CPUB_DIV16;
 }
 
 optional node "clock-cpu-scaler-02" {
-  fuchsia.BIND_FIDL_PROTOCOL == fuchsia.clock.BIND_FIDL_PROTOCOL.SERVICE;
+  fuchsia.hardware.clock.Service == fuchsia.hardware.clock.Service.ZirconTransport;
   fuchsia.clock.FUNCTION == fuchsia.clock.FUNCTION.SYS_CPU_LITTLE_CLK;
 }
 

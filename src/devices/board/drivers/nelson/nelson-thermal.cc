@@ -18,6 +18,7 @@
 #include <bind/fuchsia/clock/cpp/bind.h>
 #include <bind/fuchsia/cpp/bind.h>
 #include <bind/fuchsia/gpio/cpp/bind.h>
+#include <bind/fuchsia/hardware/clock/cpp/bind.h>
 #include <bind/fuchsia/pwm/cpp/bind.h>
 #include <soc/aml-common/aml-thermal.h>
 #include <soc/aml-meson/sm1-clk.h>
@@ -292,13 +293,13 @@ zx_status_t Nelson::ThermalInit() {
   parents.reserve(parents.size() + kClockFunctionMap.size());
   for (auto& [clock_id, function] : kClockFunctionMap) {
     auto rules = std::vector{
-        fdf::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
-                                bind_fuchsia_clock::BIND_FIDL_PROTOCOL_SERVICE),
+        fdf::MakeAcceptBindRule(bind_fuchsia_hardware_clock::SERVICE,
+                                bind_fuchsia_hardware_clock::SERVICE_ZIRCONTRANSPORT),
         fdf::MakeAcceptBindRule(bind_fuchsia::CLOCK_ID, clock_id),
     };
     auto properties = std::vector{
-        fdf::MakeProperty(bind_fuchsia::FIDL_PROTOCOL,
-                          bind_fuchsia_clock::BIND_FIDL_PROTOCOL_SERVICE),
+        fdf::MakeProperty(bind_fuchsia_hardware_clock::SERVICE,
+                          bind_fuchsia_hardware_clock::SERVICE_ZIRCONTRANSPORT),
         fdf::MakeProperty(bind_fuchsia_clock::FUNCTION, function),
     };
     parents.push_back(fdf::ParentSpec{{rules, properties}});

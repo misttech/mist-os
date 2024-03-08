@@ -17,6 +17,7 @@
 #include <bind/fuchsia/clock/cpp/bind.h>
 #include <bind/fuchsia/cpp/bind.h>
 #include <bind/fuchsia/hardware/amlogiccanvas/cpp/bind.h>
+#include <bind/fuchsia/hardware/clock/cpp/bind.h>
 #include <bind/fuchsia/sysmem/cpp/bind.h>
 #include <bind/fuchsia/tee/cpp/bind.h>
 #include <soc/aml-meson/g12b-clk.h>
@@ -129,16 +130,16 @@ zx_status_t Sherlock::VideoInit() {
   auto video_clock_dos_vdec = fuchsia_driver_framework::ParentSpec{{
       .bind_rules =
           {
-              fdf::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
-                                      bind_fuchsia_clock::BIND_FIDL_PROTOCOL_SERVICE),
+              fdf::MakeAcceptBindRule(bind_fuchsia_hardware_clock::SERVICE,
+                                      bind_fuchsia_hardware_clock::SERVICE_ZIRCONTRANSPORT),
               fdf::MakeAcceptBindRule(
                   bind_fuchsia::CLOCK_ID,
                   bind_fuchsia_amlogic_platform_meson::G12B_CLK_ID_CLK_DOS_GCLK_VDEC),
           },
       .properties =
           {
-              fdf::MakeProperty(bind_fuchsia::FIDL_PROTOCOL,
-                                bind_fuchsia_clock::BIND_FIDL_PROTOCOL_SERVICE),
+              fdf::MakeProperty(bind_fuchsia_hardware_clock::SERVICE,
+                                bind_fuchsia_hardware_clock::SERVICE_ZIRCONTRANSPORT),
               fdf::MakeProperty(bind_fuchsia::CLOCK_ID, bind_fuchsia_clock::FUNCTION_DOS_GCLK_VDEC),
           },
   }};
@@ -146,15 +147,15 @@ zx_status_t Sherlock::VideoInit() {
   auto video_clock_dos = fuchsia_driver_framework::ParentSpec{{
       .bind_rules =
           {
-              fdf::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
-                                      bind_fuchsia_clock::BIND_FIDL_PROTOCOL_SERVICE),
+              fdf::MakeAcceptBindRule(bind_fuchsia_hardware_clock::SERVICE,
+                                      bind_fuchsia_hardware_clock::SERVICE_ZIRCONTRANSPORT),
               fdf::MakeAcceptBindRule(bind_fuchsia::CLOCK_ID,
                                       bind_fuchsia_amlogic_platform_meson::G12B_CLK_ID_CLK_DOS),
           },
       .properties =
           {
-              fdf::MakeProperty(bind_fuchsia::FIDL_PROTOCOL,
-                                bind_fuchsia_clock::BIND_FIDL_PROTOCOL_SERVICE),
+              fdf::MakeProperty(bind_fuchsia_hardware_clock::SERVICE,
+                                bind_fuchsia_hardware_clock::SERVICE_ZIRCONTRANSPORT),
               fdf::MakeProperty(bind_fuchsia::CLOCK_ID, bind_fuchsia_clock::FUNCTION_DOS),
           },
   }};

@@ -19,9 +19,9 @@ driver_bind_rules("aml_gpu_bind") {
   bind_output = "aml-gpu.bindbc"
   tests = "bind_tests.json"
   deps = [
+    "//sdk/fidl/fuchsia.hardware.clock:fuchsia.hardware.clock_bindlib",
     "//src/devices/bind/fuchsia.amlogic.platform",
     "//src/devices/bind/fuchsia.arm.platform",
-    "//src/devices/bind/fuchsia.clock",
     "//src/devices/bind/fuchsia.devicetree",
     "//src/devices/bind/fuchsia.platform",
     "//src/devices/bind/fuchsia.register",

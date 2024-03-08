@@ -18,6 +18,7 @@
 #include <bind/fuchsia/clock/cpp/bind.h>
 #include <bind/fuchsia/cpp/bind.h>
 #include <bind/fuchsia/gpio/cpp/bind.h>
+#include <bind/fuchsia/hardware/clock/cpp/bind.h>
 #include <ddktl/metadata/audio.h>
 #include <soc/aml-a311d/a311d-gpio.h>
 #include <soc/aml-a311d/a311d-hw.h>
@@ -89,25 +90,25 @@ zx_status_t Vim3::AudioInit() {
   };
 
   const std::vector<fdf::BindRule> kClkBindRules = std::vector{
-      fdf::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
-                              bind_fuchsia_clock::BIND_FIDL_PROTOCOL_SERVICE),
+      fdf::MakeAcceptBindRule(bind_fuchsia_hardware_clock::SERVICE,
+                              bind_fuchsia_hardware_clock::SERVICE_ZIRCONTRANSPORT),
       fdf::MakeAcceptBindRule(bind_fuchsia::CLOCK_ID,
                               bind_fuchsia_amlogic_platform_meson::G12B_CLK_ID_CLK_AUDIO),
   };
   const std::vector<fdf::NodeProperty> kClkProperties = std::vector{
-      fdf::MakeProperty(bind_fuchsia::FIDL_PROTOCOL,
-                        bind_fuchsia_clock::BIND_FIDL_PROTOCOL_SERVICE),
+      fdf::MakeProperty(bind_fuchsia_hardware_clock::SERVICE,
+                        bind_fuchsia_hardware_clock::SERVICE_ZIRCONTRANSPORT),
       fdf::MakeProperty(bind_fuchsia_clock::FUNCTION, bind_fuchsia_clock::FUNCTION_AUDIO_GATE),
   };
   const std::vector<fdf::BindRule> kHifiPllBindRules = std::vector{
-      fdf::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
-                              bind_fuchsia_clock::BIND_FIDL_PROTOCOL_SERVICE),
+      fdf::MakeAcceptBindRule(bind_fuchsia_hardware_clock::SERVICE,
+                              bind_fuchsia_hardware_clock::SERVICE_ZIRCONTRANSPORT),
       fdf::MakeAcceptBindRule(bind_fuchsia::CLOCK_ID,
                               bind_fuchsia_amlogic_platform_meson::G12B_CLK_ID_CLK_HIFI_PLL),
   };
   const std::vector<fdf::NodeProperty> kHifiPllProperties = std::vector{
-      fdf::MakeProperty(bind_fuchsia::FIDL_PROTOCOL,
-                        bind_fuchsia_clock::BIND_FIDL_PROTOCOL_SERVICE),
+      fdf::MakeProperty(bind_fuchsia_hardware_clock::SERVICE,
+                        bind_fuchsia_hardware_clock::SERVICE_ZIRCONTRANSPORT),
       fdf::MakeProperty(bind_fuchsia_clock::FUNCTION, bind_fuchsia_clock::FUNCTION_AUDIO_PLL),
   };
 

@@ -75,8 +75,8 @@ const std::vector<fdf::NodeProperty> kSysmemProperties = std::vector{
 };
 
 const std::vector<fdf::BindRule> kClkDosRules = std::vector{
-    fdf::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
-                            bind_fuchsia_clock::BIND_FIDL_PROTOCOL_SERVICE),
+    fdf::MakeAcceptBindRule(bind_fuchsia_hardware_clock::SERVICE,
+                            bind_fuchsia_hardware_clock::SERVICE_ZIRCONTRANSPORT),
     fdf::MakeAcceptBindRule(bind_fuchsia::CLOCK_ID, g12b_clk::G12B_CLK_DOS),
 };
 const std::vector<fdf::NodeProperty> kClkDosProperties = std::vector{

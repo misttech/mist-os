@@ -16,6 +16,7 @@
 #include <bind/fuchsia/cpp/bind.h>
 #include <bind/fuchsia/google/platform/cpp/bind.h>
 #include <bind/fuchsia/gpio/cpp/bind.h>
+#include <bind/fuchsia/hardware/clock/cpp/bind.h>
 #include <bind/fuchsia/power/cpp/bind.h>
 #include <soc/aml-common/aml-cpu-metadata.h>
 #include <soc/aml-meson/g12a-clk.h>
@@ -134,13 +135,13 @@ zx_status_t Astro::CpuInit() {
 
   for (auto& [clock_id, function] : kClockFunctionMap) {
     auto rules = std::vector{
-        fdf::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
-                                bind_fuchsia_clock::BIND_FIDL_PROTOCOL_SERVICE),
+        fdf::MakeAcceptBindRule(bind_fuchsia_hardware_clock::SERVICE,
+                                bind_fuchsia_hardware_clock::SERVICE_ZIRCONTRANSPORT),
         fdf::MakeAcceptBindRule(bind_fuchsia::CLOCK_ID, clock_id),
     };
     auto properties = std::vector{
-        fdf::MakeProperty(bind_fuchsia::FIDL_PROTOCOL,
-                          bind_fuchsia_clock::BIND_FIDL_PROTOCOL_SERVICE),
+        fdf::MakeProperty(bind_fuchsia_hardware_clock::SERVICE,
+                          bind_fuchsia_hardware_clock::SERVICE_ZIRCONTRANSPORT),
         fdf::MakeProperty(bind_fuchsia_clock::FUNCTION, function),
     };
     parents.push_back(fdf::ParentSpec{{rules, properties}});

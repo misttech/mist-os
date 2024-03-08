@@ -16,6 +16,7 @@
 #include <bind/fuchsia/arm/platform/cpp/bind.h>
 #include <bind/fuchsia/clock/cpp/bind.h>
 #include <bind/fuchsia/cpp/bind.h>
+#include <bind/fuchsia/hardware/clock/cpp/bind.h>
 #include <bind/fuchsia/hardware/gpu/mali/cpp/bind.h>
 #include <bind/fuchsia/register/cpp/bind.h>
 #include <soc/aml-common/aml-registers.h>
@@ -116,16 +117,16 @@ zx_status_t Astro::MaliInit() {
     auto aml_gpu_clock_node = fuchsia_driver_framework::ParentSpec{{
         .bind_rules =
             {
-                fdf::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
-                                        bind_fuchsia_clock::BIND_FIDL_PROTOCOL_SERVICE),
+                fdf::MakeAcceptBindRule(bind_fuchsia_hardware_clock::SERVICE,
+                                        bind_fuchsia_hardware_clock::SERVICE_ZIRCONTRANSPORT),
                 fdf::MakeAcceptBindRule(
                     bind_fuchsia::CLOCK_ID,
                     bind_fuchsia_amlogic_platform_meson::G12A_CLK_ID_CLK_GP0_PLL),
             },
         .properties =
             {
-                fdf::MakeProperty(bind_fuchsia::FIDL_PROTOCOL,
-                                  bind_fuchsia_clock::BIND_FIDL_PROTOCOL_SERVICE),
+                fdf::MakeProperty(bind_fuchsia_hardware_clock::SERVICE,
+                                  bind_fuchsia_hardware_clock::SERVICE_ZIRCONTRANSPORT),
                 fdf::MakeProperty(bind_fuchsia_clock::FUNCTION,
                                   bind_fuchsia_clock::FUNCTION_GP0_PLL),
             },

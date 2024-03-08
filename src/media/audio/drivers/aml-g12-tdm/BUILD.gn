@@ -11,6 +11,7 @@ driver_bind_rules("aml-g12-tdm-bind") {
   bind_output = "aml-g12-tdm.bindbc"
   tests = "tests-stream.json"
   deps = [
+    "//sdk/fidl/fuchsia.hardware.clock:fuchsia.hardware.clock_bindlib",
     "//src/devices/bind/fuchsia.amlogic.platform",
     "//src/devices/bind/fuchsia.amlogic.platform.meson",
     "//src/devices/bind/fuchsia.clock",
@@ -137,6 +138,7 @@ driver_bind_rules("aml-g12-composite-bind") {
   bind_output = "aml-g12-composite.bindbc"
   tests = "tests-composite.json"
   deps = [
+    "//sdk/fidl/fuchsia.hardware.clock:fuchsia.hardware.clock_bindlib",
     "//src/devices/bind/fuchsia.amlogic.platform",
     "//src/devices/bind/fuchsia.amlogic.platform.a311d",
     "//src/devices/bind/fuchsia.clock",

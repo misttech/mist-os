@@ -17,6 +17,7 @@
 #include <bind/fuchsia/clock/cpp/bind.h>
 #include <bind/fuchsia/cpp/bind.h>
 #include <bind/fuchsia/gpio/cpp/bind.h>
+#include <bind/fuchsia/hardware/clock/cpp/bind.h>
 #include <bind/fuchsia/platform/cpp/bind.h>
 #include <soc/aml-a311d/a311d-gpio.h>
 #include <soc/aml-a311d/a311d-hw.h>
@@ -64,13 +65,14 @@ static const std::vector<fpbus::BootMetadata> emmc_boot_metadata{
 };
 
 const std::vector<fdf::BindRule> kClockGateRules = std::vector{
-    fdf::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
-                            bind_fuchsia_clock::BIND_FIDL_PROTOCOL_SERVICE),
+    fdf::MakeAcceptBindRule(bind_fuchsia_hardware_clock::SERVICE,
+                            bind_fuchsia_hardware_clock::SERVICE_ZIRCONTRANSPORT),
     fdf::MakeAcceptBindRule(bind_fuchsia::CLOCK_ID, g12b_clk::G12B_CLK_EMMC_C),
 };
 
 const std::vector<fdf::NodeProperty> kClockGateProperties = std::vector{
-    fdf::MakeProperty(bind_fuchsia::FIDL_PROTOCOL, bind_fuchsia_clock::BIND_FIDL_PROTOCOL_SERVICE),
+    fdf::MakeProperty(bind_fuchsia_hardware_clock::SERVICE,
+                      bind_fuchsia_hardware_clock::SERVICE_ZIRCONTRANSPORT),
 };
 
 const std::vector<fdf::BindRule> kGpioResetRules = std::vector{

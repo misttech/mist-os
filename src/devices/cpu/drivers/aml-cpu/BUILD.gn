@@ -12,6 +12,7 @@ driver_bind_rules("aml-cpu-bind") {
   bind_output = "aml-cpu.bindbc"
   tests = "bind-tests.json"
   deps = [
+    "//sdk/fidl/fuchsia.hardware.clock:fuchsia.hardware.clock_bindlib",
     "//src/devices/bind/fuchsia.amlogic.platform",
     "//src/devices/bind/fuchsia.clock",
     "//src/devices/bind/fuchsia.google.platform",

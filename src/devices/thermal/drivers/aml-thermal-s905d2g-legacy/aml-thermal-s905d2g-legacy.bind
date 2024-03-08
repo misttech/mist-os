@@ -7,6 +7,7 @@ composite aml_thermal_pll;
 using fuchsia.platform;
 using fuchsia.amlogic.platform;
 using fuchsia.gpio;
+using fuchsia.hardware.clock;
 using fuchsia.pwm;
 using fuchsia.clock;
 
@@ -36,21 +37,21 @@ optional node "pwm-ao-d" {
 }
 
 node "clock-1" {
-  fuchsia.BIND_FIDL_PROTOCOL == fuchsia.clock.BIND_FIDL_PROTOCOL.SERVICE;
+  fuchsia.hardware.clock.Service == fuchsia.hardware.clock.Service.ZirconTransport;
   fuchsia.clock.FUNCTION == fuchsia.clock.FUNCTION.SYS_PLL_DIV16;
 }
 
 node "clock-2" {
-  fuchsia.BIND_FIDL_PROTOCOL == fuchsia.clock.BIND_FIDL_PROTOCOL.SERVICE;
+  fuchsia.hardware.clock.Service == fuchsia.hardware.clock.Service.ZirconTransport;
   fuchsia.clock.FUNCTION == fuchsia.clock.FUNCTION.SYS_CPU_DIV16;
 }
 
 optional node "clock-3" {
-  fuchsia.BIND_FIDL_PROTOCOL == fuchsia.clock.BIND_FIDL_PROTOCOL.SERVICE;
+  fuchsia.hardware.clock.Service == fuchsia.hardware.clock.Service.ZirconTransport;
   fuchsia.clock.FUNCTION == fuchsia.clock.FUNCTION.SYS_PLLB_DIV16;
 }
 
 optional node "clock-4" {
-  fuchsia.BIND_FIDL_PROTOCOL == fuchsia.clock.BIND_FIDL_PROTOCOL.SERVICE;
+  fuchsia.hardware.clock.Service == fuchsia.hardware.clock.Service.ZirconTransport;
   fuchsia.clock.FUNCTION == fuchsia.clock.FUNCTION.SYS_CPUB_DIV16;
 }
