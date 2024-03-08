@@ -2,6 +2,14 @@
 
 This directory contains support for hosting a Trusted Execution Environment inside Fuchsia.
 
+## Structure
+
+The `ta` directory contains Trusted Application implementations for testing
+purposes.
+
+The `tee_internal_api` contains the definition of the TEE Internal Core API and
+will host an implementation.
+
 ## Glossary
 
 * TEE - Trusted Execution Environment. This is an environment suitable for

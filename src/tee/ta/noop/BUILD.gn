@@ -2,10 +2,10 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-group("tests") {
+# This is a Trusted App that does nothing.
+shared_library("ta-noop") {
   testonly = true
-  deps = [
-    "ta:tests",
-    "tee_internal_api:tests",
-  ]
+
+  sources = [ "noop.cc" ]
+  deps = [ "//src/tee/tee_internal_api" ]
 }
