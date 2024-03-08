@@ -93,10 +93,24 @@ def GetRustToolchainCommands(rust_toolchain_packages, tag):
 
 
 def main():
-    default_jiri_manifest = os.path.join(FUCHSIA_DIR, "integration", "fuchsia", "toolchain")
-    open_source_jiri_manifest = os.path.join(FUCHSIA_DIR, "integration", "toolchain")
-    if not os.path.isfile(default_jiri_manifest) and os.path.isfile(open_source_jiri_manifest):
-      default_jiri_manifest = open_source_jiri_manifest
+    possible_manifest_locations = [
+        # Open-source checkout
+        "toolchain",
+        # Internal checkout
+        os.path.join("fuchsia", "toolchain"),
+        # smart-integration checkout
+        os.path.join("platform", "fuchsia", "toolchain"),
+    ]
+
+    default_jiri_manifest = None
+    for path in possible_manifest_locations:
+        abs_path = os.path.join(FUCHSIA_DIR, "integration", path)
+        if os.path.exists(abs_path):
+            default_jiri_manifest = abs_path
+            break
+
+    assert default_jiri_manifest, "failed to locate toolchain manifest"
+
     parser = argparse.ArgumentParser(
         "fx roll-compiler",
         description="Roll a new compiler into Fuchsia",
