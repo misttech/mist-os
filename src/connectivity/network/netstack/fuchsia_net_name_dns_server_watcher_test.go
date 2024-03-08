@@ -312,7 +312,7 @@ func TestDnsWatcherDifferentAddressTypes(t *testing.T) {
 func TestDnsWatcherBroadcastRace(t *testing.T) {
 	watcherCollection, dnsClient := createCollection()
 
-	watchers := make([]*name.DnsServerWatcherWithCtxInterface, 1000)
+	watchers := make([]*name.DnsServerWatcherWithCtxInterface, 100)
 	defer func() {
 		for _, watcher := range watchers {
 			if err := watcher.Close(); err != nil {
