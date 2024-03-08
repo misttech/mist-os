@@ -1881,7 +1881,7 @@ TEST_F(DriverRunnerTest, StartAndInspectLegacyOffers) {
 
   auto hierarchy = Inspect();
   ASSERT_EQ("root", hierarchy.node().name());
-  ASSERT_EQ(3ul, hierarchy.children().size());
+  ASSERT_EQ(2ul, hierarchy.children().size());
 
   ASSERT_NO_FATAL_FAILURE(CheckNode(hierarchy, {
                                                    .node_name = {"node_topology"},
@@ -1905,10 +1905,6 @@ TEST_F(DriverRunnerTest, StartAndInspectLegacyOffers) {
 
   ASSERT_NO_FATAL_FAILURE(CheckNode(hierarchy, {
                                                    .node_name = {"orphan_nodes"},
-                                               }));
-
-  ASSERT_NO_FATAL_FAILURE(CheckNode(hierarchy, {
-                                                   .node_name = {"legacy_composites"},
                                                }));
 
   StopDriverComponent(std::move(root_driver->controller));
@@ -1960,7 +1956,7 @@ TEST_F(DriverRunnerTest, StartAndInspect) {
 
   auto hierarchy = Inspect();
   ASSERT_EQ("root", hierarchy.node().name());
-  ASSERT_EQ(3ul, hierarchy.children().size());
+  ASSERT_EQ(2ul, hierarchy.children().size());
 
   ASSERT_NO_FATAL_FAILURE(CheckNode(hierarchy, {
                                                    .node_name = {"node_topology"},
@@ -1984,10 +1980,6 @@ TEST_F(DriverRunnerTest, StartAndInspect) {
 
   ASSERT_NO_FATAL_FAILURE(CheckNode(hierarchy, {
                                                    .node_name = {"orphan_nodes"},
-                                               }));
-
-  ASSERT_NO_FATAL_FAILURE(CheckNode(hierarchy, {
-                                                   .node_name = {"legacy_composites"},
                                                }));
 
   StopDriverComponent(std::move(root_driver->controller));

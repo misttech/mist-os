@@ -234,36 +234,6 @@ void BindManagerTestBase::AddAndBindNode_EXPECT_QUEUED(
   VerifyBindManagerData(expected_data);
 }
 
-void BindManagerTestBase::AddLegacyComposite(std::string composite,
-                                             std::vector<std::string> fragment_names) {
-  fuchsia_device_manager::CompositeDeviceDescriptor descriptor;
-  for (auto& name : fragment_names) {
-    fuchsia_device_manager::DeviceFragment fragment;
-    fragment.name() = name;
-    fragment.parts().emplace_back();
-    fragment.parts()[0].match_program().emplace_back();
-    fragment.parts()[0].match_program()[0] = fuchsia_driver_legacy::BindInstruction BI_MATCH_IF(
-        EQ, BIND_PLATFORM_DEV_INSTANCE_ID, GetOrAddInstanceId(name));
-    descriptor.fragments().push_back(fragment);
-  }
-
-  descriptor.props().emplace_back();
-  descriptor.props()[0].id() = BIND_PLATFORM_DEV_INSTANCE_ID;
-  descriptor.props()[0].value() = GetOrAddInstanceId(composite);
-
-  bind_manager_->GetLegacyCompositeManager().AddCompositeDevice(composite, descriptor);
-  RunLoopUntilIdle();
-}
-
-void BindManagerTestBase::AddLegacyComposite_EXPECT_QUEUED(
-    std::string composite, std::vector<std::string> fragment_names) {
-  ASSERT_TRUE(bind_manager_->IsBindOngoing());
-  auto expected_data = CurrentBindManagerData();
-  expected_data.pending_orphan_rebind_count += 1;
-  AddLegacyComposite(composite, fragment_names);
-  VerifyBindManagerData(expected_data);
-}
-
 void BindManagerTestBase::AddCompositeNodeSpec(std::string composite,
                                                std::vector<std::string> parents) {
   std::vector<fdf::ParentSpec> parent_specs;
@@ -398,32 +368,6 @@ void BindManagerTestBase::VerifyBindOngoingWithRequests(
 
 void BindManagerTestBase::VerifyPendingBindRequestCount(size_t expected) {
   ASSERT_EQ(expected, bind_manager_->GetPendingRequests().size());
-}
-
-void BindManagerTestBase::VerifyLegacyCompositeFragmentIsBound(bool expect_bound,
-                                                               std::string composite,
-                                                               std::string fragment_name) {
-  auto& assemblers = bind_manager_->GetLegacyCompositeManager().assemblers();
-  auto composite_itr =
-      std::find_if(assemblers.begin(), assemblers.end(),
-                   [&composite](const auto& it) { return it->name() == composite; });
-  ASSERT_NE(composite_itr, assemblers.end());
-
-  auto& fragments = (*composite_itr)->fragments();
-  auto fragment_itr =
-      std::find_if(fragments.begin(), fragments.end(),
-                   [&fragment_name](const auto& it) { return it.name() == fragment_name; });
-  ASSERT_NE(fragment_itr, fragments.end());
-  EXPECT_EQ(expect_bound, fragment_itr->bound_node() != nullptr);
-}
-
-void BindManagerTestBase::VerifyLegacyCompositeBuilt(bool expect_built, std::string composite) {
-  auto& assemblers = bind_manager_->GetLegacyCompositeManager().assemblers();
-  auto composite_itr =
-      std::find_if(assemblers.begin(), assemblers.end(),
-                   [&composite](const auto& it) { return it->name() == composite; });
-  ASSERT_NE(composite_itr, assemblers.end());
-  EXPECT_EQ(expect_built, (*composite_itr)->is_assembled());
 }
 
 void BindManagerTestBase::VerifyCompositeNodeExists(bool expected, std::string spec_name) {

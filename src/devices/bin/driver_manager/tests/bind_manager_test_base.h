@@ -38,10 +38,6 @@ class TestBindManager : public driver_manager::BindManager {
   GetPendingOrphanRebindCallbacks() const {
     return pending_orphan_rebind_callbacks();
   }
-
-  driver_manager::CompositeDeviceManager& GetLegacyCompositeManager() {
-    return legacy_composite_manager();
-  }
 };
 
 class TestDriverIndex final : public fidl::WireServer<fuchsia_driver_index::DriverIndex> {
@@ -175,12 +171,6 @@ class BindManagerTestBase : public DriverManagerTestBase {
       std::string name, bool enable_multibind = false,
       std::shared_ptr<driver_manager::BindResultTracker> tracker = nullptr);
 
-  // Adds a legacy composite.
-  // If EXPECT_QUEUED, the function verifies that it queues a TryBindAllAvailable callback.
-  void AddLegacyComposite(std::string composite, std::vector<std::string> fragment_names);
-  void AddLegacyComposite_EXPECT_QUEUED(std::string composite,
-                                        std::vector<std::string> fragment_names);
-
   void AddCompositeNodeSpec(std::string composite, std::vector<std::string> parents);
   void AddCompositeNodeSpec_EXPECT_BIND_START(std::string composite,
                                               std::vector<std::string> parents);
@@ -221,10 +211,6 @@ class BindManagerTestBase : public DriverManagerTestBase {
 
   // Verify that multibind nodes set in BindManager contains |expected_nodes|.
   void VerifyMultibindNodes(std::vector<std::string> expected_nodes);
-
-  void VerifyLegacyCompositeFragmentIsBound(bool expect_bound, std::string composite,
-                                            std::string fragment_name);
-  void VerifyLegacyCompositeBuilt(bool expect_built, std::string composite);
 
   void VerifyCompositeNodeExists(bool expected, std::string spec_name);
 

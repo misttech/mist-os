@@ -11,8 +11,8 @@
 #include <unordered_map>
 
 #include "src/devices/bin/driver_manager/bind_result_tracker.h"
-#include "src/devices/bin/driver_manager/composite_assembler.h"
 #include "src/devices/bin/driver_manager/composite_node_spec/composite_node_spec_manager.h"
+#include "src/devices/bin/driver_manager/node.h"
 
 namespace driver_manager {
 
@@ -144,9 +144,6 @@ class BindManager {
   explicit BindManager(BindManagerBridge* bridge, NodeManager* node_manager,
                        async_dispatcher_t* dispatcher);
 
-  // Publish capabilities to the outgoing directory.
-  void Publish(component::OutgoingDirectory& outgoing);
-
   void Bind(Node& node, std::string_view driver_url_suffix,
             std::shared_ptr<BindResultTracker> result_tracker);
 
@@ -174,9 +171,6 @@ class BindManager {
     return pending_orphan_rebind_callbacks_;
   }
 
-  // Exposed for testing.
-  CompositeDeviceManager& legacy_composite_manager() { return legacy_composite_manager_; }
-
  private:
   using BindMatchCompleteCallback = fit::callback<void()>;
 
@@ -196,7 +190,6 @@ class BindManager {
   void OnMatchDriverCallback(
       BindRequest request,
       fidl::WireUnownedResult<fuchsia_driver_index::DriverIndex::MatchDriver>& result,
-      const std::vector<fuchsia_driver_legacy::CompositeParent>& bound_legacy_composite_info,
       BindMatchCompleteCallback match_complete_callback);
 
   // Binds |node| to |result|.
@@ -218,9 +211,6 @@ class BindManager {
   std::vector<BindRequest> pending_bind_requests_;
 
   BindNodeSet bind_node_set_;
-
-  // Manages DFv1 legacy composites.
-  CompositeDeviceManager legacy_composite_manager_;
 
   // Must outlive BindManager.
   BindManagerBridge* bridge_;

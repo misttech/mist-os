@@ -94,8 +94,6 @@ source_set("driver_runner") {
     "bind_manager.h",
     "bind_result_tracker.cc",
     "bind_result_tracker.h",
-    "composite_assembler.cc",
-    "composite_assembler.h",
     "composite_node_spec_v2.cc",
     "composite_node_spec_v2.h",
     "driver_host.cc",
@@ -235,22 +233,6 @@ fuchsia_unittest_component("bind-manager-test") {
   deps = [ ":bind_manager_test" ]
 }
 
-executable("composite_assembler_test") {
-  testonly = true
-  sources = [ "tests/composite_assembler_test.cc" ]
-
-  deps = [
-    ":driver_manager_test_base",
-    "//sdk/lib/inspect/testing/cpp",
-    "//sdk/lib/sys/cpp/testing:unit",
-    "//src/lib/ddk",
-  ]
-}
-
-fuchsia_unittest_component("composite-assembler-test") {
-  deps = [ ":composite_assembler_test" ]
-}
-
 executable("composite_node_spec_v2_test") {
   testonly = true
   sources = [ "tests/composite_node_spec_v2_test.cc" ]
@@ -315,7 +297,6 @@ fuchsia_test_package("driver-runner-tests") {
 
   test_components = [
     ":bind-manager-test",
-    ":composite-assembler-test",
     ":composite-node-spec-v2-test",
     ":driver-runner-test",
     ":node-removal-tracker-test",

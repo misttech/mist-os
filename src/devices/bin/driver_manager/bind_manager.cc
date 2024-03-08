@@ -70,13 +70,7 @@ bool BindNodeSet::MultibindContains(std::string node_moniker) const {
 
 BindManager::BindManager(BindManagerBridge* bridge, NodeManager* node_manager,
                          async_dispatcher_t* dispatcher)
-    : legacy_composite_manager_(node_manager, dispatcher,
-                                [this]() { this->TryBindAllAvailable(); }),
-      bridge_(bridge) {}
-
-void BindManager::Publish(component::OutgoingDirectory& outgoing) {
-  legacy_composite_manager_.Publish(outgoing);
-}
+    : bridge_(bridge) {}
 
 void BindManager::TryBindAllAvailable(NodeBindingInfoResultCallback result_callback) {
   // If there's an ongoing process to bind all orphans, queue up this callback. Once
@@ -173,38 +167,12 @@ void BindManager::BindInternal(BindRequest request,
     return;
   }
 
-  // Check the DFv1 composites first.
-  std::vector<fdl::CompositeParent> bound_legacy_composite_info =
-      legacy_composite_manager_.BindNode(node);
-  if (!bound_legacy_composite_info.empty()) {
-    bind_node_set_.RemoveOrphanedNode(node->MakeComponentMoniker());
-
-    // Complete bind if the node can't multibind. Otherwise, follow through to send
-    // a match request to the Driver Index for composite node specs.
-    if (!node->can_multibind_composites()) {
-      if (request.tracker) {
-        request.tracker->ReportSuccessfulBind(node->MakeComponentMoniker(),
-                                              bound_legacy_composite_info, {});
-      }
-      match_complete_callback();
-      return;
-    }
-
-    bind_node_set_.AddOrMoveMultibindNode(*node);
-
-    // If the node matched to a legacy composite, then it should only be matched to
-    // other composites.
-    request.composite_only = true;
-  }
-
   std::string driver_url_suffix = request.driver_url_suffix;
   auto match_callback =
       [this, request = std::move(request),
-       bound_legacy_composite_info = std::move(bound_legacy_composite_info),
        match_complete_callback = std::move(match_complete_callback)](
           fidl::WireUnownedResult<fdi::DriverIndex::MatchDriver>& result) mutable {
-        OnMatchDriverCallback(std::move(request), result, bound_legacy_composite_info,
-                              std::move(match_complete_callback));
+        OnMatchDriverCallback(std::move(request), result, std::move(match_complete_callback));
       };
   fidl::Arena arena;
   auto builder = fuchsia_driver_index::wire::MatchDriverArgs::Builder(arena)
@@ -218,7 +186,6 @@ void BindManager::BindInternal(BindRequest request,
 
 void BindManager::OnMatchDriverCallback(
     BindRequest request, fidl::WireUnownedResult<fdi::DriverIndex::MatchDriver>& result,
-    const std::vector<fdl::CompositeParent>& bound_legacy_composite_infos,
     BindMatchCompleteCallback match_complete_callback) {
   auto report_no_bind = fit::defer([&request, &match_complete_callback]() mutable {
     if (request.tracker) {
@@ -256,12 +223,9 @@ void BindManager::OnMatchDriverCallback(
     report_no_bind.cancel();
     if (request.tracker) {
       if (bind_result.is_driver_url()) {
-        ZX_ASSERT(bound_legacy_composite_infos.empty());
         request.tracker->ReportSuccessfulBind(node_moniker, bind_result.driver_url());
-
       } else if (bind_result.is_composite_parents()) {
-        request.tracker->ReportSuccessfulBind(node_moniker, bound_legacy_composite_infos,
-                                              bind_result.composite_parents());
+        request.tracker->ReportSuccessfulBind(node_moniker, {}, bind_result.composite_parents());
       } else {
         LOGF(ERROR, "Unknown bind result type for %s.", node_moniker.c_str());
       }
@@ -448,16 +412,12 @@ void BindManager::RecordInspect(inspect::Inspector& inspector) const {
   orphans.RecordUint("pending_bind_requests", pending_bind_requests_.size());
   orphans.RecordUint("pending_orphan_rebind_callbacks", pending_orphan_rebind_callbacks_.size());
   inspector.GetRoot().Record(std::move(orphans));
-
-  auto legacy_composites = inspector.GetRoot().CreateChild("legacy_composites");
-  legacy_composite_manager_.Inspect(legacy_composites);
-  inspector.GetRoot().Record(std::move(legacy_composites));
 }
 
 std::vector<fdd::wire::CompositeNodeInfo> BindManager::GetCompositeListInfo(
     fidl::AnyArena& arena) const {
   // TODO(https://fxbug.dev/42071016): Add composite node specs to the list.
-  return legacy_composite_manager_.GetCompositeListInfo(arena);
+  return {};
 }
 
 }  // namespace driver_manager

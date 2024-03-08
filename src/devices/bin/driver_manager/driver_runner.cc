@@ -357,8 +357,6 @@ void DriverRunner::PublishComponentRunner(component::OutgoingDirectory& outgoing
   result = outgoing.AddUnmanagedProtocol<fdf::CompositeNodeManager>(
       manager_bindings_.CreateHandler(this, dispatcher_, fidl::kIgnoreBindingClosure));
   ZX_ASSERT_MSG(result.is_ok(), "%s", result.status_string());
-
-  bind_manager_.Publish(outgoing);
 }
 
 zx::result<> DriverRunner::StartRootDriver(std::string_view url) {
@@ -637,7 +635,7 @@ zx::result<uint32_t> DriverRunner::RestartNodesColocatedWithDriverUrl(
         return false;
       }
 
-      // Legacy composites and plain nodes both use the restart with rematch flow.
+      // Non-composite nodes use the restart with rematch flow.
       current->RestartNodeWithRematch();
       return false;
     }
