@@ -14,9 +14,9 @@
 
 #include <bind/fuchsia/amlogic/platform/cpp/bind.h>
 #include <bind/fuchsia/clock/cpp/bind.h>
-#include <bind/fuchsia/codec/cpp/bind.h>
 #include <bind/fuchsia/cpp/bind.h>
 #include <bind/fuchsia/gpio/cpp/bind.h>
+#include <bind/fuchsia/hardware/audio/cpp/bind.h>
 #include <bind/fuchsia/i2c/cpp/bind.h>
 #include <bind/fuchsia/ti/platform/cpp/bind.h>
 #include <ddktl/metadata/audio.h>
@@ -98,13 +98,14 @@ const std::vector<fdf::NodeProperty> kAudioEnableGpioProps{
 };
 
 const std::vector<fdf::BindRule> kCodecRules{
-    fdf::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
-                            bind_fuchsia_codec::BIND_FIDL_PROTOCOL_SERVICE),
+    fdf::MakeAcceptBindRule(bind_fuchsia_hardware_audio::CODECSERVICE,
+                            bind_fuchsia_hardware_audio::CODECSERVICE_ZIRCONTRANSPORT),
     fdf::MakeAcceptBindRule(bind_fuchsia::PLATFORM_DEV_VID, kCodecVid),
     fdf::MakeAcceptBindRule(bind_fuchsia::PLATFORM_DEV_DID, kCodecDid),
 };
 const std::vector<fdf::NodeProperty> kCodecProps{
-    fdf::MakeProperty(bind_fuchsia::FIDL_PROTOCOL, bind_fuchsia_codec::BIND_FIDL_PROTOCOL_SERVICE),
+    fdf::MakeProperty(bind_fuchsia_hardware_audio::CODECSERVICE,
+                      bind_fuchsia_hardware_audio::CODECSERVICE_ZIRCONTRANSPORT),
     fdf::MakeProperty(bind_fuchsia::CODEC_INSTANCE, static_cast<uint32_t>(1)),
 };
 

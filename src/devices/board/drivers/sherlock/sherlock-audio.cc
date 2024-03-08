@@ -15,9 +15,9 @@
 
 #include <bind/fuchsia/amlogic/platform/cpp/bind.h>
 #include <bind/fuchsia/clock/cpp/bind.h>
-#include <bind/fuchsia/codec/cpp/bind.h>
 #include <bind/fuchsia/cpp/bind.h>
 #include <bind/fuchsia/gpio/cpp/bind.h>
+#include <bind/fuchsia/hardware/audio/cpp/bind.h>
 #include <bind/fuchsia/i2c/cpp/bind.h>
 #include <bind/fuchsia/ti/platform/cpp/bind.h>
 #include <ddktl/metadata/audio.h>
@@ -191,8 +191,8 @@ zx_status_t Sherlock::AudioInit() {
   // Add a composite for each codec instance.
   for (size_t i = 0; i < 3; i++) {
     auto codec_rules = std::vector{
-        fdf::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
-                                bind_fuchsia_codec::BIND_FIDL_PROTOCOL_SERVICE),
+        fdf::MakeAcceptBindRule(bind_fuchsia_hardware_audio::CODECSERVICE,
+                                bind_fuchsia_hardware_audio::CODECSERVICE_ZIRCONTRANSPORT),
         fdf::MakeAcceptBindRule(bind_fuchsia::PLATFORM_DEV_VID,
                                 bind_fuchsia_ti_platform::BIND_PLATFORM_DEV_VID_TI),
         fdf::MakeAcceptBindRule(bind_fuchsia::PLATFORM_DEV_DID,
@@ -200,8 +200,8 @@ zx_status_t Sherlock::AudioInit() {
         fdf::MakeAcceptBindRule(bind_fuchsia::CODEC_INSTANCE, static_cast<uint32_t>(i + 1)),
     };
     auto codec_props = std::vector{
-        fdf::MakeProperty(bind_fuchsia::FIDL_PROTOCOL,
-                          bind_fuchsia_codec::BIND_FIDL_PROTOCOL_SERVICE),
+        fdf::MakeProperty(bind_fuchsia_hardware_audio::CODECSERVICE,
+                          bind_fuchsia_hardware_audio::CODECSERVICE_ZIRCONTRANSPORT),
         fdf::MakeProperty(bind_fuchsia::CODEC_INSTANCE, static_cast<uint32_t>(i + 1)),
     };
     sherlock_tdm_i2s_parents.push_back(fdf::ParentSpec{{

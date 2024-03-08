@@ -5,9 +5,9 @@
 composite aml_tdm;
 
 using fuchsia.amlogic.platform;
-using fuchsia.codec;
 using fuchsia.gpio;
 using fuchsia.clock;
+using fuchsia.hardware.audio;
 using fuchsia.hardware.clock;
 using fuchsia.platform;
 using fuchsia.amlogic.platform.meson;
@@ -46,17 +46,17 @@ optional node "gpio-enable" {
 }
 
 optional node "codec-01" {
-  fuchsia.BIND_FIDL_PROTOCOL == fuchsia.codec.BIND_FIDL_PROTOCOL.SERVICE;
+  fuchsia.hardware.audio.CodecService == fuchsia.hardware.audio.CodecService.ZirconTransport;
   fuchsia.BIND_CODEC_INSTANCE == 1;
 }
 
 optional node "codec-02" {
-  fuchsia.BIND_FIDL_PROTOCOL == fuchsia.codec.BIND_FIDL_PROTOCOL.SERVICE;
+  fuchsia.hardware.audio.CodecService == fuchsia.hardware.audio.CodecService.ZirconTransport;
   fuchsia.BIND_CODEC_INSTANCE == 2;
 }
 
 optional node "codec-03" {
-  fuchsia.BIND_FIDL_PROTOCOL == fuchsia.codec.BIND_FIDL_PROTOCOL.SERVICE;
+  fuchsia.hardware.audio.CodecService == fuchsia.hardware.audio.CodecService.ZirconTransport;
   fuchsia.BIND_CODEC_INSTANCE == 3;
 }
 

@@ -12,10 +12,10 @@
 #include <lib/driver/component/cpp/node_add_args.h>
 
 #include <bind/fuchsia/amlogic/platform/s905d3/cpp/bind.h>
-#include <bind/fuchsia/codec/cpp/bind.h>
 #include <bind/fuchsia/cpp/bind.h>
 #include <bind/fuchsia/google/platform/cpp/bind.h>
 #include <bind/fuchsia/gpio/cpp/bind.h>
+#include <bind/fuchsia/hardware/audio/cpp/bind.h>
 #include <bind/fuchsia/i2c/cpp/bind.h>
 #include <bind/fuchsia/platform/cpp/bind.h>
 #include <bind/fuchsia/power/cpp/bind.h>
@@ -180,8 +180,8 @@ zx_status_t Nelson::PowerInit() {
                               bind_fuchsia_amlogic_platform_s905d3::GPIOZ_PIN_ID_PIN_10),
   };
   const ddk::BindRule kCodecRules[] = {
-      ddk::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
-                              bind_fuchsia_codec::BIND_FIDL_PROTOCOL_SERVICE),
+      ddk::MakeAcceptBindRule(bind_fuchsia_hardware_audio::CODECSERVICE,
+                              bind_fuchsia_hardware_audio::CODECSERVICE_ZIRCONTRANSPORT),
       ddk::MakeAcceptBindRule(bind_fuchsia::PLATFORM_DEV_VID,
                               bind_fuchsia_ti_platform::BIND_PLATFORM_DEV_VID_TI),
       ddk::MakeAcceptBindRule(bind_fuchsia::PLATFORM_DEV_DID,
@@ -197,8 +197,8 @@ zx_status_t Nelson::PowerInit() {
   };
 
   const device_bind_prop_t kCodecProperties[] = {
-      ddk::MakeProperty(bind_fuchsia::FIDL_PROTOCOL,
-                        bind_fuchsia_codec::BIND_FIDL_PROTOCOL_SERVICE),
+      ddk::MakeProperty(bind_fuchsia_hardware_audio::CODECSERVICE,
+                        bind_fuchsia_hardware_audio::CODECSERVICE_ZIRCONTRANSPORT),
   };
 
   const device_bind_prop_t kPowerSensorProperties[] = {

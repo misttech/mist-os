@@ -11,11 +11,11 @@ driver_bind_rules("aml-g12-tdm-bind") {
   bind_output = "aml-g12-tdm.bindbc"
   tests = "tests-stream.json"
   deps = [
+    "//sdk/fidl/fuchsia.hardware.audio:fuchsia.hardware.audio_bindlib",
     "//sdk/fidl/fuchsia.hardware.clock:fuchsia.hardware.clock_bindlib",
     "//src/devices/bind/fuchsia.amlogic.platform",
     "//src/devices/bind/fuchsia.amlogic.platform.meson",
     "//src/devices/bind/fuchsia.clock",
-    "//src/devices/bind/fuchsia.codec",
     "//src/devices/bind/fuchsia.gpio",
     "//src/devices/bind/fuchsia.platform",
   ]
