@@ -10,6 +10,10 @@
 #include <string_view>
 #include <type_traits>
 
+#if __cpp_impl_three_way_comparison >= 201907L
+#include <compare>
+#endif
+
 #include "abi-ptr.h"
 #include "abi-span.h"
 #include "gnu-hash.h"

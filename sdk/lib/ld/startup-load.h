@@ -111,7 +111,7 @@ inline constexpr TlsDescResolver kTlsDescResolver{};
 // allocated separately using the initial-exec allocator.
 
 using StartupLoadModuleBase = LoadModule<Elf, elfldltl::StaticVector<kMaxSegments>::Container,
-                                         LoadModuleInline::kNo, LoadModuleRelocInfo::kYes>;
+                                         AbiModuleInline::kNo, LoadModuleRelocInfo::kYes>;
 
 template <class Loader>
 struct StartupLoadModule : public StartupLoadModuleBase,
@@ -197,7 +197,7 @@ struct StartupLoadModule : public StartupLoadModuleBase,
 
     // If there was a PT_TLS, fill in tls_module() to be published later.
     if (tls_phdr) {
-      SetTls(diag, memory(), ++max_tls_modid, *tls_phdr);
+      SetTls(diag, memory(), *tls_phdr, ++max_tls_modid);
     }
 
     // A second phdr scan is needed to decode notes now that they can be

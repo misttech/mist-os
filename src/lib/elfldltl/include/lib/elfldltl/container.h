@@ -9,8 +9,8 @@
 #include <string_view>
 #include <type_traits>
 
-// This file provides some adapters for container types defined elsewhere to be
-// used with the diagnostics.h API for handling allocation failures.  These
+// This file provides some adapters for container types defined elsewhere to
+// be used with the diagnostics.h API for handling allocation failures.  These
 // represent the container API expected by other elfldltl template code.
 //
 // elfldltl template code that needs containers uses a template template
@@ -19,11 +19,12 @@
 // that the methods that can need to allocate (push_back, emplace_back,
 // emplace, and insert) take additional Diagnostics& and std::string_view
 // parameters first.  For an allocation failure, the Diagnostics object's
-// ResourceLimit<N> method will be called with the error string
-// (the std::string_view parameter).  The methods that usually return void
-// (push_back, emplace_back) instead return bool, with false indicating allocation
-// failure.  The methods that usually return an iterator (emplace, insert) instead
-// return std::optional<iterator>, with std::nullopt indicating allocation failure.
+// ResourceLimit<N> method will be called with the error string (the
+// std::string_view parameter).  The methods that usually return void
+// (push_back, emplace_back) instead return bool, with false indicating
+// allocation failure.  The methods that usually return an iterator (emplace,
+// insert) instead return std::optional<iterator>, with std::nullopt
+// indicating allocation failure.
 
 namespace elfldltl {
 
@@ -36,7 +37,14 @@ struct StdContainer {
    public:
     using Base = C<T, P...>;
 
+    static_assert(std::is_move_constructible_v<T> || std::is_copy_constructible_v<T>);
+    static_assert(std::is_move_constructible_v<Base>);
+
     using Base::Base;
+
+    constexpr Container(Container&&) noexcept = default;
+
+    constexpr Container& operator=(Container&&) noexcept = default;
 
     template <class Diagnostics, typename U>
     constexpr std::true_type push_back(Diagnostics& diagnostics, std::string_view error,

@@ -5,7 +5,6 @@
 #ifndef SRC_LIB_ELFLDLTL_INCLUDE_LIB_ELFLDLTL_LOAD_H_
 #define SRC_LIB_ELFLDLTL_INCLUDE_LIB_ELFLDLTL_LOAD_H_
 
-#include <array>
 #include <cassert>
 #include <functional>
 #include <optional>
@@ -238,6 +237,8 @@ class LoadInfo {
 
   using Segment =
       std::variant<ConstantSegment, DataSegment, DataWithZeroFillSegment, ZeroFillSegment>;
+
+  static_assert(std::is_move_constructible_v<Segment> || std::is_copy_constructible_v<Segment>);
 
   constexpr Container<Segment>& segments() { return segments_; }
   constexpr const Container<Segment>& segments() const { return segments_; }

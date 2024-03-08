@@ -28,7 +28,8 @@ namespace ld {
 // RemoteLoadModule is the LoadModule type used in the remote dynamic linker.
 using RemoteLoadModuleBase =
     LoadModule<elfldltl::Elf<>, elfldltl::StdContainer<std::vector>::Container,
-               LoadModuleInline::kYes, LoadModuleRelocInfo::kYes, elfldltl::SegmentWithVmo::NoCopy>;
+               AbiModuleInline::kYes, LoadModuleRelocInfo::kYes, elfldltl::SegmentWithVmo::NoCopy>;
+static_assert(std::is_move_constructible_v<RemoteLoadModuleBase>);
 
 template <class Elf = elfldltl::Elf<>>
 class RemoteLoadModule : public RemoteLoadModuleBase {
@@ -76,10 +77,14 @@ class RemoteLoadModule : public RemoteLoadModuleBase {
 
   RemoteLoadModule() = default;
 
-  RemoteLoadModule(RemoteLoadModule&&) = default;
+  RemoteLoadModule(const RemoteLoadModule&) = delete;
+
+  RemoteLoadModule(RemoteLoadModule&&) noexcept = default;
 
   RemoteLoadModule(const Soname& name, std::optional<uint32_t> loaded_by_modid)
       : RemoteLoadModuleBase{name}, loaded_by_modid_{loaded_by_modid} {}
+
+  RemoteLoadModule& operator=(RemoteLoadModule&& other) noexcept = default;
 
   // Return the index of other module in the list (if any) that requested this
   // one be loaded.  This means that the name() string points into that other
@@ -183,7 +188,7 @@ class RemoteLoadModule : public RemoteLoadModuleBase {
 
     // If there was a PT_TLS, fill in tls_module() to be published later.
     if (tls_phdr) {
-      SetTls(diag, memory, ++max_tls_modid, *tls_phdr);
+      SetTls(diag, memory, *tls_phdr, ++max_tls_modid);
     }
 
     auto needed = DecodeDynamic(diag, dyn_phdr);
@@ -544,6 +549,7 @@ class RemoteLoadModule : public RemoteLoadModuleBase {
   zx::vmo vmo_;
   std::optional<uint32_t> loaded_by_modid_;
 };
+static_assert(std::is_move_constructible_v<RemoteLoadModule<>>);
 
 }  // namespace ld
 

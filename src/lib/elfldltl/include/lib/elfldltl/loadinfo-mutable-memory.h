@@ -134,10 +134,12 @@ class LoadInfoMutableMemory {
       decltype(std::declval<GetMutableMemory>()(std::declval<Diagnostics&>(),
                                                 std::declval<LoadSegment&>())
                    .value())>;
+  static_assert(std::is_move_constructible_v<MutableMemory> ||
+                std::is_copy_constructible_v<MutableMemory>);
 
   class MutableSegment {
    public:
-    MutableSegment(LoadSegment& load_segment) : segment_(load_segment) {
+    explicit constexpr MutableSegment(LoadSegment& load_segment) : segment_(load_segment) {
       LoadInfo::VisitSegment(
           [this](const auto& segment) -> std::true_type {
             vaddr_ = segment.vaddr();
@@ -147,22 +149,25 @@ class LoadInfoMutableMemory {
           segment_);
     }
 
-    bool contains(size_type ptr, size_type size) const {
+    constexpr MutableSegment(const MutableSegment&) = default;
+    constexpr MutableSegment(MutableSegment&&) noexcept = default;
+
+    constexpr bool contains(size_type ptr, size_type size) const {
       return vaddr_ <= ptr && filesz_ >= size && ptr - vaddr_ < filesz_ - size;
     }
 
-    bool operator<(size_type ptr) const { return vaddr_ + filesz_ <= ptr; }
+    constexpr bool operator<(size_type ptr) const { return vaddr_ + filesz_ <= ptr; }
 
-    bool has_memory() const { return memory_.has_value(); }
+    constexpr bool has_memory() const { return memory_.has_value(); }
 
-    MutableMemory& memory() { return *memory_; }
+    constexpr MutableMemory& memory() { return *memory_; }
 
-    void set_memory(MutableMemory result) { memory_.emplace(std::move(result)); }
+    constexpr void set_memory(MutableMemory result) { memory_.emplace(std::move(result)); }
 
-    LoadSegment& segment() { return segment_; }
+    constexpr LoadSegment& segment() { return segment_; }
 
    private:
-    LoadSegment & segment_;
+    LoadSegment& segment_;
     size_type vaddr_;
     size_type filesz_;
     std::optional<MutableMemory> memory_;
