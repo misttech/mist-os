@@ -710,7 +710,7 @@ func runTestOnce(
 			}
 			return nil
 		}); err != nil {
-			logger.Errorf(ctx, "unable to record output files: %s", err)
+			logger.Debugf(ctx, "unable to record output files: %s", err)
 		}
 		if len(result.OutputFiles) > 0 {
 			result.OutputDir = outDir
