@@ -5,6 +5,7 @@
 #include "src/graphics/display/drivers/fake/fake-display.h"
 
 #include <fidl/fuchsia.sysmem/cpp/wire.h>
+#include <fuchsia/hardware/display/controller/c/banjo.h>
 #include <lib/fpromise/result.h>
 #include <lib/fzl/vmo-mapper.h>
 #include <lib/image-format/image_format.h>
@@ -387,14 +388,11 @@ TEST_F(FakeDisplayRealSysmemTest, ImportBufferCollection) {
             ZX_ERR_ALREADY_EXISTS);
 
   // Driver sets BufferCollection buffer memory constraints.
-  const image_t kDefaultConfig = {
-      .width = 1024,
-      .height = 768,
+  static constexpr image_buffer_usage_t kDisplayUsage = {
       .tiling_type = IMAGE_TILING_TYPE_LINEAR,
-      .handle = 0,
   };
   EXPECT_OK(display()->DisplayControllerImplSetBufferCollectionConstraints(
-      &kDefaultConfig, kBanjoValidBufferCollectionId));
+      &kDisplayUsage, kBanjoValidBufferCollectionId));
 
   // Set BufferCollection buffer memory constraints.
   fidl::Status set_constraints_status = collection_client->SetConstraints(
@@ -454,8 +452,11 @@ TEST_F(FakeDisplayRealSysmemTest, ImportImage) {
   };
   const uint32_t bytes_per_pixel = ImageFormatStrideBytesPerWidthPixel(kPixelFormat);
 
+  static constexpr image_buffer_usage_t kDisplayUsage = {
+      .tiling_type = IMAGE_TILING_TYPE_LINEAR,
+  };
   EXPECT_OK(display()->DisplayControllerImplSetBufferCollectionConstraints(
-      &kDefaultConfig, kBanjoBufferCollectionId));
+      &kDisplayUsage, kBanjoBufferCollectionId));
 
   // Set BufferCollection buffer memory constraints.
   fidl::Status set_constraints_status = collection_client->SetConstraints(
@@ -535,14 +536,11 @@ TEST_F(FakeDisplayRealSysmemTest, ImportImageForCapture) {
   constexpr uint32_t kDisplayWidth = 1280;
   constexpr uint32_t kDisplayHeight = 800;
 
-  const image_t kCaptureConfig = {
-      .width = kDisplayWidth,
-      .height = kDisplayHeight,
-      .tiling_type = IMAGE_TILING_TYPE_CAPTURE,
-      .handle = 0,
+  static constexpr image_buffer_usage_t kDisplayUsage = {
+      .tiling_type = IMAGE_TILING_TYPE_LINEAR,
   };
   EXPECT_OK(display()->DisplayControllerImplSetBufferCollectionConstraints(
-      &kCaptureConfig, kBanjoBufferCollectionId));
+      &kDisplayUsage, kBanjoBufferCollectionId));
   const uint32_t bytes_per_pixel = ImageFormatStrideBytesPerWidthPixel(kPixelFormat);
   const uint32_t size_bytes = kDisplayWidth * kDisplayHeight * bytes_per_pixel;
   // Set BufferCollection buffer memory constraints.
@@ -634,19 +632,19 @@ TEST_F(FakeDisplayRealSysmemTest, Capture) {
       .tiling_type = IMAGE_TILING_TYPE_LINEAR,
       .handle = 0,
   };
-  const image_t kCaptureConfig = {
-      .width = kDisplayWidth,
-      .height = kDisplayHeight,
-      .tiling_type = IMAGE_TILING_TYPE_CAPTURE,
-      .handle = 0,
-  };
 
   // Set BufferCollection buffer memory constraints from the display driver's
   // end.
+  static constexpr image_buffer_usage_t kDisplayUsage = {
+      .tiling_type = IMAGE_TILING_TYPE_LINEAR,
+  };
   EXPECT_OK(display()->DisplayControllerImplSetBufferCollectionConstraints(
-      &framebuffer_config, kBanjoFramebufferBufferCollectionId));
+      &kDisplayUsage, kBanjoFramebufferBufferCollectionId));
+  static constexpr image_buffer_usage_t kCaptureUsage = {
+      .tiling_type = IMAGE_TILING_TYPE_CAPTURE,
+  };
   EXPECT_OK(display()->DisplayControllerImplSetBufferCollectionConstraints(
-      &kCaptureConfig, kBanjoCaptureBufferCollectionId));
+      &kCaptureUsage, kBanjoCaptureBufferCollectionId));
 
   // Set BufferCollection buffer memory constraints from the test's end.
   const uint32_t bytes_per_pixel = ImageFormatStrideBytesPerWidthPixel(kPixelFormat);

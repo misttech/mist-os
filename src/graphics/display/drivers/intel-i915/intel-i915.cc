@@ -1933,7 +1933,7 @@ zx_status_t Controller::DisplayControllerImplGetSysmemConnection(zx::channel con
 }
 
 zx_status_t Controller::DisplayControllerImplSetBufferCollectionConstraints(
-    const image_t* config, uint64_t banjo_driver_buffer_collection_id) {
+    const image_buffer_usage_t* usage, uint64_t banjo_driver_buffer_collection_id) {
   display::DriverBufferCollectionId driver_buffer_collection_id =
       display::ToDriverBufferCollectionId(banjo_driver_buffer_collection_id);
   const auto it = buffer_collections_.find(driver_buffer_collection_id);
@@ -1968,7 +1968,7 @@ zx_status_t Controller::DisplayControllerImplSetBufferCollectionConstraints(
     // Skip if image type was specified and different from current type. This
     // makes it possible for a different participant to select preferred
     // modifiers.
-    if (config->tiling_type && config->tiling_type != image_tiling_type) {
+    if (usage->tiling_type != IMAGE_TILING_TYPE_LINEAR && usage->tiling_type != image_tiling_type) {
       continue;
     }
     for (fuchsia_sysmem::wire::PixelFormatType pixel_format_type : kPixelFormatTypes) {
@@ -2008,7 +2008,7 @@ zx_status_t Controller::DisplayControllerImplSetBufferCollectionConstraints(
     }
   }
   if (image_constraints_count == 0) {
-    zxlogf(ERROR, "Config has unsupported tiling type %d", config->tiling_type);
+    zxlogf(ERROR, "Config has unsupported tiling type %" PRIu32, usage->tiling_type);
     return ZX_ERR_INVALID_ARGS;
   }
   for (unsigned i = 0; i < std::size(kYuvPixelFormatTypes); ++i) {

@@ -59,7 +59,7 @@ class Driver : public ddk::Device<Driver> {
   zx_status_t ImportBufferCollection(DriverBufferCollectionId collection_id,
                                      zx::channel collection_token);
   zx_status_t ReleaseBufferCollection(DriverBufferCollectionId collection_id);
-  zx_status_t SetBufferCollectionConstraints(image_t* config,
+  zx_status_t SetBufferCollectionConstraints(const image_buffer_usage_t& usage,
                                              DriverBufferCollectionId collection_id);
 
   zx_status_t StartCapture(DriverCaptureImageId driver_capture_image_id);

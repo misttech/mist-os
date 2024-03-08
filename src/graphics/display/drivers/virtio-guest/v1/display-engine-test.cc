@@ -248,16 +248,19 @@ TEST_F(VirtioGpuTest, ImportVmo) {
   ImportBufferCollection(kBufferCollectionId);
 
   // Set buffer collection constraints.
-  const image_t kDefaultImage = {
+  static constexpr image_buffer_usage_t kDisplayUsage = {
+      .tiling_type = IMAGE_TILING_TYPE_LINEAR,
+  };
+  EXPECT_OK(proto.ops->set_buffer_collection_constraints(device_.get(), &kDisplayUsage,
+                                                         kBanjoBufferCollectionId));
+  RunLoopUntilIdle();
+
+  static constexpr image_t kDefaultImage = {
       .width = 4,
       .height = 4,
       .tiling_type = IMAGE_TILING_TYPE_LINEAR,
       .handle = 0,
   };
-  EXPECT_OK(proto.ops->set_buffer_collection_constraints(device_.get(), &kDefaultImage,
-                                                         kBanjoBufferCollectionId));
-  RunLoopUntilIdle();
-
   PerformBlockingWork([&] {
     zx::result<DisplayEngine::BufferInfo> buffer_info_result =
         device_->GetAllocatedBufferInfoForImage(kBufferCollectionId, /*index=*/0, &kDefaultImage);
@@ -285,13 +288,10 @@ TEST_F(VirtioGpuTest, SetConstraints) {
   RunLoopUntilIdle();
 
   // Set buffer collection constraints.
-  const image_t kDefaultImage = {
-      .width = 4,
-      .height = 4,
+  static constexpr image_buffer_usage_t kDisplayUsage = {
       .tiling_type = IMAGE_TILING_TYPE_LINEAR,
-      .handle = 0,
   };
-  EXPECT_OK(proto.ops->set_buffer_collection_constraints(device_.get(), &kDefaultImage,
+  EXPECT_OK(proto.ops->set_buffer_collection_constraints(device_.get(), &kDisplayUsage,
                                                          kBanjoBufferCollectionId));
   RunLoopUntilIdle();
 }
@@ -402,17 +402,20 @@ TEST_F(VirtioGpuTest, ImportImage) {
   EXPECT_TRUE(!allocator->GetActiveBufferCollectionTokenClients().empty());
 
   // Set buffer collection constraints.
-  const image_t kDefaultImage = {
+  static constexpr image_buffer_usage_t kDisplayUsage = {
+      .tiling_type = IMAGE_TILING_TYPE_LINEAR,
+  };
+  EXPECT_OK(proto.ops->set_buffer_collection_constraints(device_.get(), &kDisplayUsage,
+                                                         kBanjoBufferCollectionId));
+  RunLoopUntilIdle();
+
+  // Invalid import: bad collection id
+  static constexpr image_t kDefaultImage = {
       .width = 800,
       .height = 600,
       .tiling_type = IMAGE_TILING_TYPE_LINEAR,
       .handle = 0,
   };
-  EXPECT_OK(proto.ops->set_buffer_collection_constraints(device_.get(), &kDefaultImage,
-                                                         kBanjoBufferCollectionId));
-  RunLoopUntilIdle();
-
-  // Invalid import: bad collection id
   image_t invalid_image = kDefaultImage;
   constexpr display::DriverBufferCollectionId kInvalidCollectionId(100);
   constexpr uint64_t kBanjoInvalidCollectionId =

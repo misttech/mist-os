@@ -6,6 +6,7 @@
 
 #include <fidl/fuchsia.images2/cpp/wire.h>
 #include <fidl/fuchsia.sysmem/cpp/wire_test_base.h>
+#include <fuchsia/hardware/display/controller/c/banjo.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/async/default.h>
@@ -512,22 +513,25 @@ TEST_F(FakeSysmemTest, ImportImage) {
   EXPECT_OK(display_->DisplayControllerImplImportBufferCollection(kBanjoBufferCollectionId,
                                                                   token_client.TakeChannel()));
 
-  // Driver sets BufferCollection buffer memory constraints.
-  const image_t kDefaultConfig = {
-      .width = 1024,
-      .height = 768,
+  static constexpr image_buffer_usage_t kDisplayUsage = {
       .tiling_type = IMAGE_TILING_TYPE_LINEAR,
-      .handle = 0,
   };
   EXPECT_OK(display_->DisplayControllerImplSetBufferCollectionConstraints(
-      &kDefaultConfig, kBanjoBufferCollectionId));
+      &kDisplayUsage, kBanjoBufferCollectionId));
 
   constexpr display::DriverBufferCollectionId kInvalidBufferCollectionId(100);
   constexpr uint64_t kBanjoInvalidBufferCollectionId =
       display::ToBanjoDriverBufferCollectionId(kInvalidBufferCollectionId);
   EXPECT_EQ(display_->DisplayControllerImplSetBufferCollectionConstraints(
-                &kDefaultConfig, kBanjoInvalidBufferCollectionId),
+                &kDisplayUsage, kBanjoInvalidBufferCollectionId),
             ZX_ERR_NOT_FOUND);
+
+  static constexpr image_t kDefaultConfig = {
+      .width = 1024,
+      .height = 768,
+      .tiling_type = IMAGE_TILING_TYPE_LINEAR,
+      .handle = 0,
+  };
 
   // Invalid import: Bad image type.
   image_t invalid_config = kDefaultConfig;
@@ -582,14 +586,11 @@ TEST_F(FakeSysmemTest, ImportImageForCapture) {
                                                                   token_client.TakeChannel()));
 
   // Driver sets BufferCollection buffer memory constraints.
-  const image_t kDefaultConfig = {
-      .width = kWidth,
-      .height = kHeight,
+  static constexpr image_buffer_usage_t kCaptureUsage = {
       .tiling_type = IMAGE_TILING_TYPE_CAPTURE,
-      .handle = 0,
   };
   EXPECT_OK(display_->DisplayControllerImplSetBufferCollectionConstraints(
-      &kDefaultConfig, kBanjoBufferCollectionId));
+      &kCaptureUsage, kBanjoBufferCollectionId));
 
   // Invalid import: invalid buffer collection ID.
   uint64_t capture_handle = 0;
@@ -639,9 +640,11 @@ TEST_F(FakeSysmemTest, SysmemRequirements) {
 
   EXPECT_TRUE(PollUntil([&] { return collection != nullptr; }, zx::msec(5), 1000));
 
-  image_t image = {};
+  static constexpr image_buffer_usage_t kDisplayUsage = {
+      .tiling_type = IMAGE_TILING_TYPE_LINEAR,
+  };
   EXPECT_OK(display_->DisplayControllerImplSetBufferCollectionConstraints(
-      &image, kBanjoBufferCollectionId));
+      &kDisplayUsage, kBanjoBufferCollectionId));
 
   EXPECT_TRUE(PollUntil([&] { return collection->set_constraints_called(); }, zx::msec(5), 1000));
   EXPECT_TRUE(collection->set_name_called());
@@ -674,9 +677,11 @@ TEST_F(FakeSysmemTest, SysmemRequirements_BgraOnly) {
 
   EXPECT_TRUE(PollUntil([&] { return collection != nullptr; }, zx::msec(5), 1000));
 
-  image_t image = {};
+  static constexpr image_buffer_usage_t kDisplayUsage = {
+      .tiling_type = IMAGE_TILING_TYPE_LINEAR,
+  };
   EXPECT_OK(display_->DisplayControllerImplSetBufferCollectionConstraints(
-      &image, kBanjoBufferCollectionId));
+      &kDisplayUsage, kBanjoBufferCollectionId));
 
   EXPECT_TRUE(PollUntil([&] { return collection->set_constraints_called(); }, zx::msec(5), 1000));
   EXPECT_TRUE(collection->set_name_called());

@@ -4,6 +4,7 @@
 
 #include "src/graphics/display/drivers/coordinator/driver.h"
 
+#include <fuchsia/hardware/display/controller/c/banjo.h>
 #include <lib/zx/channel.h>
 #include <zircon/assert.h>
 #include <zircon/errors.h>
@@ -194,14 +195,14 @@ zx_status_t Driver::ReleaseBufferCollection(DriverBufferCollectionId collection_
   return dc_.ReleaseBufferCollection(ToBanjoDriverBufferCollectionId(collection_id));
 }
 
-zx_status_t Driver::SetBufferCollectionConstraints(image_t* config,
+zx_status_t Driver::SetBufferCollectionConstraints(const image_buffer_usage_t& usage,
                                                    DriverBufferCollectionId collection_id) {
   if (use_engine_) {
     return ZX_OK;
   }
 
   ZX_DEBUG_ASSERT(dc_.is_valid());
-  return dc_.SetBufferCollectionConstraints(config, ToBanjoDriverBufferCollectionId(collection_id));
+  return dc_.SetBufferCollectionConstraints(&usage, ToBanjoDriverBufferCollectionId(collection_id));
 }
 
 zx_status_t Driver::StartCapture(DriverCaptureImageId driver_capture_image_id) {

@@ -371,7 +371,10 @@ TEST(SimpleDisplay, ImportKernelFramebufferImage) {
       .tiling_type = IMAGE_TILING_TYPE_LINEAR,
       .handle = 0,
   };
-  EXPECT_OK(display.DisplayControllerImplSetBufferCollectionConstraints(&kDefaultImage,
+  static constexpr image_buffer_usage_t kDisplayUsage = {
+      .tiling_type = IMAGE_TILING_TYPE_LINEAR,
+  };
+  EXPECT_OK(display.DisplayControllerImplSetBufferCollectionConstraints(&kDisplayUsage,
                                                                         kBanjoCollectionId));
 
   zx::result heap_endpoints = fidl::CreateEndpoints<fuchsia_hardware_sysmem::Heap>();

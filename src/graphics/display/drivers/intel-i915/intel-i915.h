@@ -118,7 +118,7 @@ class Controller : public DeviceType,
                                    size_t raw_eld_count);
   zx_status_t DisplayControllerImplGetSysmemConnection(zx::channel connection);
   zx_status_t DisplayControllerImplSetBufferCollectionConstraints(
-      const image_t* config, uint64_t banjo_driver_buffer_collection_id);
+      const image_buffer_usage_t* usage, uint64_t banjo_driver_buffer_collection_id);
   zx_status_t DisplayControllerImplSetDisplayPower(uint64_t banjo_display_id, bool power_on) {
     return ZX_ERR_NOT_SUPPORTED;
   }
@@ -155,10 +155,10 @@ class Controller : public DeviceType,
   DisplayPllManager* dpll_manager() { return dpll_manager_.get(); }
 
   // Non-const getter to allow unit tests to modify the IGD.
-  // TODO(https://fxbug.dev/42164736): Consider making a fake IGD object injectable as allowing mutable access
-  // to internal state that is intended to be externally immutable can be source of bugs if used
-  // incorrectly. The various "ForTesting" methods are a typical anti-pattern that exposes internal
-  // state and makes the class state machine harder to reason about.
+  // TODO(https://fxbug.dev/42164736): Consider making a fake IGD object injectable as allowing
+  // mutable access to internal state that is intended to be externally immutable can be source of
+  // bugs if used incorrectly. The various "ForTesting" methods are a typical anti-pattern that
+  // exposes internal state and makes the class state machine harder to reason about.
   IgdOpRegion* igd_opregion_for_testing() { return &igd_opregion_; }
 
   void HandleHotplug(DdiId ddi_id, bool long_pulse);

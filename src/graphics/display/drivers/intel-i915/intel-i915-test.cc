@@ -8,6 +8,8 @@
 #include <fidl/fuchsia.hardware.sysmem/cpp/wire_test_base.h>
 #include <fidl/fuchsia.sysmem/cpp/wire.h>
 #include <fidl/fuchsia.sysmem/cpp/wire_test_base.h>
+#include <fuchsia/hardware/display/controller/c/banjo.h>
+#include <fuchsia/hardware/intelgpucore/c/banjo.h>
 #include <fuchsia/hardware/sysmem/cpp/banjo.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
@@ -442,16 +444,19 @@ TEST(IntelI915Display, ImportImage) {
   EXPECT_OK(display.DisplayControllerImplImportBufferCollection(
       kBanjoBufferCollectionId, token_endpoints->client.TakeChannel()));
 
-  const image_t kDefaultImage = {
+  static constexpr image_buffer_usage_t kDisplayUsage = {
+      .tiling_type = IMAGE_TILING_TYPE_LINEAR,
+  };
+  EXPECT_OK(display.DisplayControllerImplSetBufferCollectionConstraints(&kDisplayUsage,
+                                                                        kBanjoBufferCollectionId));
+
+  // Invalid import: bad collection id
+  static constexpr image_t kDefaultImage = {
       .width = 32,
       .height = 32,
       .tiling_type = IMAGE_TILING_TYPE_LINEAR,
       .handle = 0u,
   };
-  EXPECT_OK(display.DisplayControllerImplSetBufferCollectionConstraints(&kDefaultImage,
-                                                                        kBanjoBufferCollectionId));
-
-  // Invalid import: bad collection id
   image_t invalid_image = kDefaultImage;
   static constexpr uint64_t kBanjoInvalidCollectionId = 100;
   uint64_t image_handle = 0;
@@ -503,9 +508,10 @@ TEST_F(ControllerWithFakeSysmemTest, SysmemRequirements) {
 
   loop_.RunUntilIdle();
 
-  image_t image = {};
-
-  EXPECT_OK(display_.DisplayControllerImplSetBufferCollectionConstraints(&image,
+  static constexpr image_buffer_usage_t kDisplayUsage = {
+      .tiling_type = IMAGE_TILING_TYPE_LINEAR,
+  };
+  EXPECT_OK(display_.DisplayControllerImplSetBufferCollectionConstraints(&kDisplayUsage,
                                                                          kBanjoBufferCollectionId));
 
   loop_.RunUntilIdle();
@@ -528,11 +534,11 @@ TEST_F(ControllerWithFakeSysmemTest, SysmemInvalidType) {
 
   loop_.RunUntilIdle();
 
-  image_t image = {};
-  image.tiling_type = 1000000;
-
+  static constexpr image_buffer_usage_t kInvalidTilingUsage = {
+      .tiling_type = 1000000,
+  };
   EXPECT_EQ(ZX_ERR_INVALID_ARGS, display_.DisplayControllerImplSetBufferCollectionConstraints(
-                                     &image, kBanjoBufferCollectionId));
+                                     &kInvalidTilingUsage, kBanjoBufferCollectionId));
 
   loop_.RunUntilIdle();
 
@@ -626,11 +632,11 @@ TEST_F(IntegrationTest, SysmemImport) {
   EXPECT_OK(ctx->DisplayControllerImplImportBufferCollection(
       kBanjoBufferCollectionId, token_endpoints->client.TakeChannel()));
 
-  image_t image = {};
-  image.width = 128;
-  image.height = kImageHeight;
-  EXPECT_OK(
-      ctx->DisplayControllerImplSetBufferCollectionConstraints(&image, kBanjoBufferCollectionId));
+  static constexpr image_buffer_usage_t kDisplayUsage = {
+      .tiling_type = IMAGE_TILING_TYPE_LINEAR,
+  };
+  EXPECT_OK(ctx->DisplayControllerImplSetBufferCollectionConstraints(&kDisplayUsage,
+                                                                     kBanjoBufferCollectionId));
 
   RunLoopUntilIdle();
 
@@ -639,6 +645,9 @@ TEST_F(IntegrationTest, SysmemImport) {
   ASSERT_TRUE(collection);
   EXPECT_TRUE(collection->set_constraints_called());
 
+  image_t image = {};
+  image.width = 128;
+  image.height = kImageHeight;
   uint64_t image_handle = 0;
   PerformBlockingWork([&] {
     EXPECT_OK(ctx->DisplayControllerImplImportImage(&image, kBanjoBufferCollectionId, /*index=*/0,
@@ -683,8 +692,11 @@ TEST_F(IntegrationTest, SysmemRotated) {
   // Must match set_format_modifier above, and also be y or yf tiled so rotation is allowed.
   image.tiling_type = IMAGE_TILING_TYPE_Y_LEGACY_TILED;
 
-  EXPECT_OK(
-      ctx->DisplayControllerImplSetBufferCollectionConstraints(&image, kBanjoBufferCollectionId));
+  static constexpr image_buffer_usage_t kTiledDisplayUsage = {
+      .tiling_type = IMAGE_TILING_TYPE_Y_LEGACY_TILED,
+  };
+  EXPECT_OK(ctx->DisplayControllerImplSetBufferCollectionConstraints(&kTiledDisplayUsage,
+                                                                     kBanjoBufferCollectionId));
 
   RunLoopUntilIdle();
   EXPECT_TRUE(collection->set_constraints_called());

@@ -357,7 +357,7 @@ zx_status_t SimpleDisplay::DisplayControllerImplGetSysmemConnection(zx::channel 
 }
 
 zx_status_t SimpleDisplay::DisplayControllerImplSetBufferCollectionConstraints(
-    const image_t* config, uint64_t banjo_driver_buffer_collection_id) {
+    const image_buffer_usage_t* usage, uint64_t banjo_driver_buffer_collection_id) {
   const display::DriverBufferCollectionId driver_buffer_collection_id =
       display::ToDriverBufferCollectionId(banjo_driver_buffer_collection_id);
   const auto it = buffer_collections_.find(driver_buffer_collection_id);

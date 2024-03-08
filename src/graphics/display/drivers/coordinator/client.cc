@@ -288,15 +288,13 @@ void Client::SetBufferCollectionConstraints(
   }
   auto& collections = it->second;
 
-  image_t dc_image;
-  dc_image.height = request->config.height;
-  dc_image.width = request->config.width;
-  dc_image.tiling_type = request->config.tiling_type;
-
   zx_status_t status = ZX_ERR_INTERNAL;
 
+  const image_buffer_usage_t image_buffer_usage = {
+      .tiling_type = request->config.tiling_type,
+  };
   status = controller_->driver()->SetBufferCollectionConstraints(
-      &dc_image, collections.driver_buffer_collection_id);
+      image_buffer_usage, collections.driver_buffer_collection_id);
   if (status != ZX_OK) {
     zxlogf(WARNING,
            "Cannot set BufferCollection constraints using imported buffer collection (id=%lu) %s.",

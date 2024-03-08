@@ -31,6 +31,17 @@ type Image = struct {
     handle uint64;
 };
 
+/// The intended usage for a sysmem BufferCollection holding image buffers.
+///
+/// Each buffer in the collection will store a single image, which is intended
+/// to be used as described below.
+type ImageBufferUsage = struct {
+    /// Specifies how individual pixels are arranged in an image buffer.
+    ///
+    /// See [`fuchsia.hardware.display.types/ImageTilingTypeIdValue`].
+    tiling_type uint32;
+};
+
 const INVALID_DISPLAY_ID uint64 = 0;
 const INVALID_ID uint64 = 0;
 
@@ -490,13 +501,17 @@ closed protocol DisplayControllerImpl {
         s zx.Status;
     });
 
-    /// Set sysmem buffer collection contraints needed to ensure an image can be
-    /// imported with `config` on the imported BufferCollecition with
-    /// `collection_id`.
+    /// Conveys the display hardware's limitations on image buffers to sysmem.
+    ///
+    /// The sysmem BufferCollection imported with `collection_id` will receive
+    /// constraints representing the display hardware's limitations for image
+    /// buffers that will be used according to `usage`. Once this succeeds,
+    /// calls to ImportImage() or ImportImageForCapture() that are consistent
+    /// with `usage` will not fail.
     ///
     /// Returns ZX_ERR_NOT_FOUND if `collection_id` is not imported yet.
     strict SetBufferCollectionConstraints(struct {
-        config Image;
+        usage ImageBufferUsage;
         collection_id uint64;
     }) -> (struct {
         s zx.Status;

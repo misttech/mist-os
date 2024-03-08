@@ -659,7 +659,7 @@ zx_status_t AmlogicDisplay::DisplayControllerImplGetSysmemConnection(zx::channel
 }
 
 zx_status_t AmlogicDisplay::DisplayControllerImplSetBufferCollectionConstraints(
-    const image_t* config, uint64_t banjo_driver_buffer_collection_id) {
+    const image_buffer_usage_t* usage, uint64_t banjo_driver_buffer_collection_id) {
   const display::DriverBufferCollectionId driver_buffer_collection_id =
       display::ToDriverBufferCollectionId(banjo_driver_buffer_collection_id);
   if (buffer_collections_.find(driver_buffer_collection_id) == buffer_collections_.end()) {
@@ -673,7 +673,7 @@ zx_status_t AmlogicDisplay::DisplayControllerImplSetBufferCollectionConstraints(
       buffer_collections_.at(driver_buffer_collection_id);
   fuchsia_sysmem::wire::BufferCollectionConstraints constraints = {};
   const char* buffer_name;
-  if (config->tiling_type == IMAGE_TILING_TYPE_CAPTURE) {
+  if (usage->tiling_type == IMAGE_TILING_TYPE_CAPTURE) {
     constraints.usage.cpu =
         fuchsia_sysmem::wire::kCpuUsageReadOften | fuchsia_sysmem::wire::kCpuUsageWriteOften;
   } else {
@@ -691,7 +691,7 @@ zx_status_t AmlogicDisplay::DisplayControllerImplSetBufferCollectionConstraints(
   buffer_constraints.heap_permitted[0] = fuchsia_sysmem::wire::HeapType::kSystemRam;
   buffer_constraints.heap_permitted[1] = fuchsia_sysmem::wire::HeapType::kAmlogicSecure;
 
-  if (config->tiling_type == IMAGE_TILING_TYPE_CAPTURE) {
+  if (usage->tiling_type == IMAGE_TILING_TYPE_CAPTURE) {
     constraints.image_format_constraints_count = 1;
     fuchsia_sysmem::wire::ImageFormatConstraints& image_constraints =
         constraints.image_format_constraints[0];

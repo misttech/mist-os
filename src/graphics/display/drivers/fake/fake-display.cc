@@ -531,7 +531,7 @@ void FakeDisplay::SetLayerImageFormatConstraints(
 }
 
 zx_status_t FakeDisplay::DisplayControllerImplSetBufferCollectionConstraints(
-    const image_t* config, uint64_t banjo_driver_buffer_collection_id) {
+    const image_buffer_usage_t* usage, uint64_t banjo_driver_buffer_collection_id) {
   const display::DriverBufferCollectionId driver_buffer_collection_id =
       display::ToDriverBufferCollectionId(banjo_driver_buffer_collection_id);
   const auto it = buffer_collections_.find(driver_buffer_collection_id);
@@ -542,10 +542,11 @@ zx_status_t FakeDisplay::DisplayControllerImplSetBufferCollectionConstraints(
   }
   const fidl::SyncClient<fuchsia_sysmem::BufferCollection>& collection = it->second;
 
-  BufferCollectionUsage usage = (config->tiling_type == IMAGE_TILING_TYPE_CAPTURE)
-                                    ? BufferCollectionUsage::kCapture
-                                    : BufferCollectionUsage::kPrimaryLayer;
-  auto set_result = collection->SetConstraints({true, CreateBufferCollectionConstraints(usage)});
+  BufferCollectionUsage buffer_collection_usage = (usage->tiling_type == IMAGE_TILING_TYPE_CAPTURE)
+                                                      ? BufferCollectionUsage::kCapture
+                                                      : BufferCollectionUsage::kPrimaryLayer;
+  auto set_result = collection->SetConstraints(
+      {true, CreateBufferCollectionConstraints(buffer_collection_usage)});
   if (set_result.is_error()) {
     zxlogf(ERROR, "Failed to set constraints on a sysmem BufferCollection: %s",
            set_result.error_value().status_string());
