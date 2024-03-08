@@ -13,7 +13,6 @@
         },
         {
             protocol: [
-                "fuchsia.device.composite.DeprecatedCompositeCreator",
                 "fuchsia.device.fs.lifecycle.Lifecycle",
                 "fuchsia.device.fs.with.pkg.lifecycle.Lifecycle",
                 "fuchsia.device.manager.Administrator",
@@ -103,7 +102,6 @@
         },
         {
             protocol: [
-                "fuchsia.device.composite.DeprecatedCompositeCreator",
                 "fuchsia.device.fs.lifecycle.Lifecycle",
                 "fuchsia.device.fs.with.pkg.lifecycle.Lifecycle",
                 "fuchsia.device.manager.Administrator",

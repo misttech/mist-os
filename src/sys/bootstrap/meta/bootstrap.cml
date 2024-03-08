@@ -733,10 +733,7 @@
             ],
         },
         {
-            protocol: [
-                "fuchsia.device.composite.DeprecatedCompositeCreator",
-                "fuchsia.driver.framework.CompositeNodeManager",
-            ],
+            protocol: [ "fuchsia.driver.framework.CompositeNodeManager" ],
             from: "#driver_manager",
             to: [
                 "#boot-drivers",

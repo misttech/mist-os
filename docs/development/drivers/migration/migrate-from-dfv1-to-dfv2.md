@@ -715,7 +715,6 @@ Do the following:
              protocol: [
                  "fuchsia.boot.Arguments",
                  "fuchsia.boot.Items",
-                 "fuchsia.device.composite.DeprecatedCompositeCreator",
                  "fuchsia.device.manager.SystemStateTransition",
                  "fuchsia.driver.framework.CompositeNodeManager",
              ],

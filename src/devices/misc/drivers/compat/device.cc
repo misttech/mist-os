@@ -4,7 +4,6 @@
 
 #include "src/devices/misc/drivers/compat/device.h"
 
-#include <fidl/fuchsia.device.composite/cpp/wire.h>
 #include <fidl/fuchsia.driver.compat/cpp/wire.h>
 #include <fidl/fuchsia.driver.framework/cpp/wire_types.h>
 #include <lib/async/cpp/task.h>
