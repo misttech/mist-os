@@ -317,7 +317,7 @@ impl ProcessingTimeTracker {
             let mut key = "".to_string();
             for (k, (val, _)) in &self.longest_times_by_component {
                 if *val == self.shortest_time_ns {
-                    key = k.clone();
+                    key.clone_from(k);
                     break;
                 }
             }
