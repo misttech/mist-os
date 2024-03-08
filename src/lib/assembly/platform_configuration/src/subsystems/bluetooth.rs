@@ -40,10 +40,15 @@ impl DefineSubsystemConfiguration<BluetoothConfig> for BluetoothSubsystemConfig 
         }
         builder.platform_bundle("bluetooth_core");
 
-        // TODO(b/292109810): Add relevant AIBs when OOT product assembly has been updated.
-        if profiles.a2dp.enabled {}
-        if profiles.avrcp.enabled {}
-        if profiles.hfp.enabled {}
+        if profiles.a2dp.enabled {
+            builder.platform_bundle("bluetooth_a2dp");
+        }
+        if profiles.avrcp.enabled {
+            builder.platform_bundle("bluetooth_avrcp");
+        }
+        if profiles.hfp.enabled {
+            builder.platform_bundle("bluetooth_hfp_ag");
+        }
 
         Ok(())
     }

@@ -114,7 +114,10 @@ user_platform_aib_names =
       # Keep sorted alphabetically.
 
       # Bluetooth
+      "bluetooth_a2dp",
+      "bluetooth_avrcp",
       "bluetooth_core",
+      "bluetooth_hfp_ag",
       "bluetooth_snoop_eager",
       "bluetooth_snoop_lazy",
 

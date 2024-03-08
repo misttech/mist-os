@@ -1750,6 +1750,90 @@ assembly_input_bundle("input_group_one") {
   ]
 }
 
+assembly_input_bundle("input_group_two") {
+  kernel_cmdline = [ "kernel.render-dlog-to-crashlog=true" ]
+  base_packages = [
+    "//src/media/sounds/soundplayer",
+    "//src/session/bin/session_manager",
+  ]
+  flexible_packages = [
+    "//src/connectivity/location/emergency",
+    "//src/media/sessions:mediasession",
+  ]
+  if (current_cpu != "riscv64") {
+    flexible_packages += [ "//src/media/codec:codec_factory" ]
+  }
+  compiled_packages = [
+    {
+      name = "core"
+      component_shards = [
+        {
+          component_name = "core"
+          shards = rebase_path(
+                  [
+                    "//src/connectivity/location/emergency/meta/emergency.core_shard.cml",
+                    "//src/media/codec/factory/meta/codec_factory.core_shard.cml",
+                    "//src/media/sessions/meta/mediasession.core_shard.cml",
+                    "//src/session/bin/session_manager/meta/session.smart.from_platform.core_shard.cml",
+                  ],
+                  root_build_dir)
+        },
+      ]
+    },
+  ]
+}
+
+########
+#
+# Bluetooth Support
+
+# Bluetooth profile support: A2DP
+#
+# feature_set_levels: minimal
+# build-types: all
+#
+assembly_input_bundle("bluetooth_a2dp") {
+  flexible_packages = [ "//src/connectivity/bluetooth/profiles/bt-a2dp" ]
+  compiled_packages = [
+    {
+      name = "core"
+      component_shards = [
+        {
+          component_name = "core"
+          shards = rebase_path(
+                  [ "//src/connectivity/bluetooth/profiles/bt-a2dp/meta/bt-a2dp-eager.core_shard.cml" ],
+                  root_build_dir)
+        },
+      ]
+    },
+  ]
+}
+
+# Bluetooth profile support: AVRCP
+#
+# feature_set_levels: minimal
+# build-types: all
+#
+assembly_input_bundle("bluetooth_avrcp") {
+  flexible_packages = [
+    "//src/connectivity/bluetooth/profiles/bt-avrcp",
+    "//src/connectivity/bluetooth/profiles/bt-avrcp-target",
+  ]
+  compiled_packages = [
+    {
+      name = "core"
+      component_shards = [
+        {
+          component_name = "core"
+          shards = rebase_path(
+                  [ "//src/connectivity/bluetooth/profiles/bt-avrcp/meta/bt-avrcp.core_shard.cml" ],
+                  root_build_dir)
+        },
+      ]
+    },
+  ]
+}
+
 # Bluetooth core support
 #
 # feature_set_levels: minimal
@@ -1782,12 +1866,35 @@ assembly_input_bundle("bluetooth_core") {
   ]
 }
 
+# Bluetooth profile support: HFP - AG
+#
+# feature_set_levels: minimal
+# build-types: all
+#
+assembly_input_bundle("bluetooth_hfp_ag") {
+  flexible_packages = [ "//src/connectivity/bluetooth/profiles/bt-hfp-audio-gateway:bt-hfp-audio-gateway-default" ]
+  compiled_packages = [
+    {
+      name = "core"
+      component_shards = [
+        {
+          component_name = "core"
+          shards = rebase_path(
+                  [ "//src/connectivity/bluetooth/profiles/bt-hfp-audio-gateway/meta/bt-hfp-audio-gateway.core_shard.cml" ],
+                  root_build_dir)
+        },
+      ]
+    },
+  ]
+}
+
 # Bluetooth snoop support
 #
 # feature_set_levels: minimal
 # build-types: all
 # This AIB provides packages for the Bluetooth snoop configuration which lazily starts. It is
 # mutually exclusive with the `bluetooth_snoop_eager` AIB.
+#
 assembly_input_bundle("bluetooth_snoop_lazy") {
   base_packages = [ "//src/connectivity/bluetooth/tools/bt-snoop" ]
   compiled_packages = [
@@ -1811,6 +1918,7 @@ assembly_input_bundle("bluetooth_snoop_lazy") {
 # build-types: all
 # This AIB provides packages for the Bluetooth snoop configuration which eagerly starts at device
 # boot. It is mutually exclusive with the `bluetooth_snoop_lazy` AIB.
+#
 assembly_input_bundle("bluetooth_snoop_eager") {
   base_packages = [ "//src/connectivity/bluetooth/tools/bt-snoop" ]
   compiled_packages = [
@@ -1821,50 +1929,6 @@ assembly_input_bundle("bluetooth_snoop_eager") {
           component_name = "core"
           shards = rebase_path(
                   [ "//src/connectivity/bluetooth/tools/bt-snoop/meta/bt-snoop-eager.core_shard.cml" ],
-                  root_build_dir)
-        },
-      ]
-    },
-  ]
-}
-
-assembly_input_bundle("input_group_two") {
-  kernel_cmdline = [ "kernel.render-dlog-to-crashlog=true" ]
-  base_packages = [
-    "//src/media/sounds/soundplayer",
-    "//src/session/bin/session_manager",
-  ]
-  flexible_packages = [
-    "//src/connectivity/bluetooth/profiles/bt-a2dp",
-    "//src/connectivity/bluetooth/profiles/bt-avrcp",
-    "//src/connectivity/bluetooth/profiles/bt-avrcp-target",
-    "//src/connectivity/bluetooth/profiles/bt-hfp-audio-gateway:bt-hfp-audio-gateway-default",
-    "//src/connectivity/location/emergency",
-    "//src/media/sessions:mediasession",
-  ]
-  if (current_cpu != "riscv64") {
-    flexible_packages += [ "//src/media/codec:codec_factory" ]
-  }
-  compiled_packages = [
-    {
-      name = "core"
-      component_shards = [
-        {
-          component_name = "core"
-          shards = rebase_path(
-                  [
-                    # TODO(https://fxbug.dev/42160254): eliminate this when the core_shard above can eagerly start
-                    # A2DP when it is available at startup.
-                    # "eager_core_shard" should be used when the A2DP profile should be available from
-                    # startup.
-                    "//src/connectivity/bluetooth/profiles/bt-a2dp/meta/bt-a2dp-eager.core_shard.cml",
-                    "//src/connectivity/bluetooth/profiles/bt-avrcp/meta/bt-avrcp.core_shard.cml",
-                    "//src/connectivity/bluetooth/profiles/bt-hfp-audio-gateway/meta/bt-hfp-audio-gateway.core_shard.cml",
-                    "//src/connectivity/location/emergency/meta/emergency.core_shard.cml",
-                    "//src/media/codec/factory/meta/codec_factory.core_shard.cml",
-                    "//src/media/sessions/meta/mediasession.core_shard.cml",
-                    "//src/session/bin/session_manager/meta/session.smart.from_platform.core_shard.cml",
-                  ],
                   root_build_dir)
         },
       ]
