@@ -156,17 +156,13 @@ mod test {
     #[fuchsia_async::run_singlethreaded(test)]
     async fn run_stop_test() {
         let config_env = ffx_config::test_init().await.unwrap();
-        let tool_env = fho::testing::ToolEnv::new()
-            .try_daemon_closure(|| async { Ok(Some(setup_fake_daemon_server())) });
         let test_stdout = TestBuffer::default();
         let writer = SimpleWriter::new_buffers(test_stdout.clone(), Vec::new());
-        let tool = tool_env
-            .build_tool_from_cmd::<StopTool>(
-                StopCommand { wait: false, no_wait: true, timeout_ms: None },
-                config_env.context.clone(),
-            )
-            .await
-            .unwrap();
+        let tool = StopTool {
+            cmd: StopCommand { wait: false, no_wait: true, timeout_ms: None },
+            daemon_proxy: Some(setup_fake_daemon_server()),
+            context: config_env.context.clone(),
+        };
         let result = tool.main(writer).await;
         assert!(result.is_ok());
         let output = test_stdout.into_string();
