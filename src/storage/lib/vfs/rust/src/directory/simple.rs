@@ -118,6 +118,7 @@ where
                     path,
                 )?;
 
+                this.watchers.send_event(&mut SingleNameEventProducer::added(name));
                 let name: Name = name.to_string().try_into()?;
                 let _ = this.entries.insert(name, entry.clone());
                 Ok(entry)
@@ -164,6 +165,7 @@ where
                     return Err(Status::INVALID_ARGS);
                 };
 
+                this.watchers.send_event(&mut SingleNameEventProducer::added(name));
                 let name: Name = name.to_string().try_into()?;
                 let _ = this.entries.insert(name, entry.clone());
                 Ok(entry)
@@ -199,13 +201,15 @@ where
         name: Name,
         f: impl FnOnce() -> Arc<T>,
     ) -> Arc<dyn DirectoryEntry> {
-        self.inner
-            .lock()
-            .unwrap()
-            .entries
-            .entry(name)
-            .or_insert_with(|| f() as Arc<dyn DirectoryEntry>)
-            .clone()
+        let mut guard = self.inner.lock().unwrap();
+        let inner = &mut *guard;
+        match inner.entries.entry(name) {
+            Entry::Vacant(slot) => {
+                inner.watchers.send_event(&mut SingleNameEventProducer::added(""));
+                slot.insert(f()).clone()
+            }
+            Entry::Occupied(entry) => entry.get().clone(),
+        }
     }
 
     /// Filters and maps all directory entries.  It is similar to std::iter::Iterator::filter_map
