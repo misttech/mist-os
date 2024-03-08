@@ -149,8 +149,6 @@ zx_status_t Nelson::EmmcInit() {
       fuchsia_hardware_sdmmc::wire::SdmmcMetadata::Builder(fidl_arena)
           .max_frequency(166'666'667)
           .speed_capabilities(fuchsia_hardware_sdmmc::SdmmcHostPrefs::kDisableHs400)
-          // Maintain the current Nelson behavior until we determine that trim is needed.
-          .enable_trim(true)
           // Maintain the current Nelson behavior until we determine that cache is needed.
           .enable_cache(false)
           // Maintain the current Nelson behavior until we determine that eMMC Packed Commands are

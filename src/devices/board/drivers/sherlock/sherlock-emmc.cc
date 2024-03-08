@@ -170,7 +170,6 @@ zx_status_t Sherlock::EmmcInit() {
           .max_frequency(166'666'667)
           // As per AMlogic, on S912 chipset, HS400 mode can be operated at 125MHZ or low.
           .speed_capabilities(fuchsia_hardware_sdmmc::SdmmcHostPrefs::kDisableHs400)
-          .enable_trim(true)
           // Maintain the current Sherlock behavior until we determine that cache is needed.
           .enable_cache(false)
           // Maintain the current Sherlock behavior until we determine that eMMC Packed Commands are

@@ -261,7 +261,6 @@ class SdmmcBlockDeviceTest : public zxtest::TestWithParam<bool> {
                                                              uint64_t speed_capabilities) {
     return fuchsia_hardware_sdmmc::wire::SdmmcMetadata::Builder(arena_)
         .speed_capabilities(speed_capabilities)
-        .enable_trim(true)
         .enable_cache(true)
         .removable(removable)
         .max_command_packing(16)
