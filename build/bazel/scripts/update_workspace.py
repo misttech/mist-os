@@ -893,6 +893,20 @@ common --enable_bzlmod=false
         ),
     ]
 
+    boringssl_content_files = [
+        get_git_head_path(
+            os.path.join(fuchsia_dir, "third_party", "boringssl", "src")
+        ),
+        os.path.join(
+            fuchsia_dir,
+            "build",
+            "bazel",
+            "local_repositories",
+            "boringssl",
+            "BUILD.boringssl",
+        ),
+    ]
+
     # LINT.IfChange
     generated_repositories_inputs["fuchsia_sdk"] = all_fuchsia_sdk_metas
     # LINT.ThenChange(../templates/template.WORKSPACE.bazel)
@@ -924,6 +938,8 @@ common --enable_bzlmod=false
         "fuchsia_icu_config"
     ] = fuchsia_icu_config_files
     # LINT.ThenChange(../BUILD.gn)
+
+    generated_repositories_inputs["boringssl"] = boringssl_content_files
 
     for repo_name in sorted(generated_repositories_inputs.keys()):
         repo_inputs = generated_repositories_inputs[repo_name]

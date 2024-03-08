@@ -29,7 +29,7 @@ def main():
     args = parser.parse_args()
 
     if args.fuchsia_dir:
-        fuchsia_dir = os.path.abspath(fuchsia_dir)
+        fuchsia_dir = os.path.abspath(args.fuchsia_dir)
     else:
         fuchsia_dir = _FUCHSIA_DIR
 

@@ -181,6 +181,7 @@ local_repository(
 load(
     "//:build/bazel/repository_rules.bzl",
     "bazel_inputs_repository",
+    "boringssl_repository",
     "googletest_repository",
 )
 
@@ -195,6 +196,11 @@ googletest_repository(
     # LINT.IfChange
     content_hash_file = "generated_repository_hashes/com_google_googletest.hash",
     # LINT.ThenChange(../scripts/update-workspace.py)
+)
+
+boringssl_repository(
+    name = "boringssl",
+    content_hash_file = "generated_repository_hashes/boringssl.hash",
 )
 
 bazel_inputs_repository(
