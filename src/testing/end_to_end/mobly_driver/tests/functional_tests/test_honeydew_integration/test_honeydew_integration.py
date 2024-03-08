@@ -14,10 +14,10 @@ from mobly import test_runner
 from mobly_controller import fuchsia_device
 
 
-class MoblyDriverHoneydewIntegrationTest(base_test.BaseTestClass):
+class MoblyDriverHoneydewIntegrationTest(base_test.BaseTestClass):  # type: ignore[misc]
     """Mobly Driver Honeydew integration tests."""
 
-    def test_mobly_controller_init(self):
+    def test_mobly_controller_init(self) -> None:
         """Test case to ensure Mobly controller initializes successfully"""
         fuchsia_devices = self.register_controller(fuchsia_device)
         asserts.assert_true(

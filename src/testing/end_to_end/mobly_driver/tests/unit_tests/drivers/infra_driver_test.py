@@ -6,6 +6,7 @@
 
 import unittest
 from unittest.mock import ANY, call, mock_open, patch
+from typing import Any
 
 import common
 import infra_driver
@@ -19,8 +20,12 @@ class InfraMoblyDriverTest(unittest.TestCase):
     @patch("common.read_yaml_from_file")
     @patch("api_mobly.new_testbed_config")
     def test_generate_test_config_with_params_success(
-        self, mock_new_config, mock_read_yaml, mock_read_json, *unused_args
-    ):
+        self,
+        mock_new_config: Any,
+        mock_read_yaml: Any,
+        mock_read_json: Any,
+        *unused_args: Any,
+    ) -> None:
         """Test case for successful config generation"""
         driver = infra_driver.InfraDriver(
             tb_json_path="tb/json/path",
@@ -41,8 +46,12 @@ class InfraMoblyDriverTest(unittest.TestCase):
     @patch("common.read_yaml_from_file")
     @patch("api_mobly.new_testbed_config")
     def test_generate_test_config_without_params_success(
-        self, mock_new_config, mock_read_yaml, mock_read_json, *unused_args
-    ):
+        self,
+        mock_new_config: Any,
+        mock_read_yaml: Any,
+        mock_read_json: Any,
+        *unused_args: Any,
+    ) -> None:
         """Test case for successful config without params generation"""
         driver = infra_driver.InfraDriver(
             tb_json_path="tb/json/path",
@@ -61,8 +70,8 @@ class InfraMoblyDriverTest(unittest.TestCase):
         "common.read_json_from_file", side_effect=common.InvalidFormatException
     )
     def test_generate_test_config_invalid_json_raises_exception(
-        self, *unused_args
-    ):
+        self, *unused_args: Any
+    ) -> None:
         """Test case for exception being raised on invalid JSON content"""
         driver = infra_driver.InfraDriver(
             tb_json_path="tb/json/path",
@@ -78,8 +87,8 @@ class InfraMoblyDriverTest(unittest.TestCase):
     )
     @patch("common.read_json_from_file")
     def test_generate_test_config_invalid_yaml_raises_exception(
-        self, *unused_args
-    ):
+        self, *unused_args: Any
+    ) -> None:
         """Test case for exception being raised on invalid YAML content"""
         driver = infra_driver.InfraDriver(
             tb_json_path="tb/json/path",
@@ -93,8 +102,8 @@ class InfraMoblyDriverTest(unittest.TestCase):
 
     @patch("common.read_json_from_file", side_effect=OSError)
     def test_generate_test_config_invalid_tb_path_raises_exception(
-        self, *unused_args
-    ):
+        self, *unused_args: Any
+    ) -> None:
         """Test case for exception being raised on invalid testbed JSON path"""
         driver = infra_driver.InfraDriver(
             tb_json_path="/does/not/exist",
@@ -107,8 +116,8 @@ class InfraMoblyDriverTest(unittest.TestCase):
 
     @patch("common.read_yaml_from_file", side_effect=OSError)
     def test_generate_test_config_invalid_params_path_raises_exception(
-        self, *unused_args
-    ):
+        self, *unused_args: Any
+    ) -> None:
         """Test case for exception being raised on invalid params YAML path"""
         driver = infra_driver.InfraDriver(
             tb_json_path="/does/not/exist",
@@ -129,7 +138,9 @@ class InfraMoblyDriverTest(unittest.TestCase):
     @patch("builtins.open", new_callable=mock_open, read_data="test_result")
     @patch("os.remove")
     @patch("builtins.print")
-    def test_teardown_success(self, mock_print, mock_rm, *unused_args):
+    def test_teardown_success(
+        self, mock_print: Any, mock_rm: Any, *unused_args: Any
+    ) -> None:
         """Test case for teardown"""
         driver = infra_driver.InfraDriver(
             tb_json_path="",
@@ -154,8 +165,8 @@ class InfraMoblyDriverTest(unittest.TestCase):
     @patch("os.remove", side_effect=OSError)
     @patch("builtins.print")
     def test_teardown_success_without_test_results(
-        self, mock_print, mock_rm, *unused_args
-    ):
+        self, mock_print: Any, mock_rm: Any, *unused_args: Any
+    ) -> None:
         """Test case for teardown succeeding despite missing results"""
         driver = infra_driver.InfraDriver(
             tb_json_path="",

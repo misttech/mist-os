@@ -4,16 +4,17 @@
 # found in the LICENSE file.
 """Unit tests for Mobly driver's local_driver.py."""
 
-from ipaddress import ip_address
 import ipaddress
 import unittest
-from unittest.mock import ANY, patch
-
-from parameterized import parameterized
+from typing import Any
+from unittest.mock import patch
 
 import api_ffx
 import common
 import local_driver
+
+from ipaddress import ip_address
+from parameterized import parameterized
 
 
 class LocalDriverTest(unittest.TestCase):
@@ -24,8 +25,8 @@ class LocalDriverTest(unittest.TestCase):
     @patch("common.read_yaml_from_file")
     @patch("api_mobly.get_config_with_test_params")
     def test_generate_test_config_from_file_with_params_success(
-        self, mock_get_config, mock_read_yaml, *unused_args
-    ):
+        self, mock_get_config: Any, mock_read_yaml: Any, *unused_args: Any
+    ) -> None:
         """Test case for successful config generation from file"""
         driver = local_driver.LocalDriver(
             ffx_path="ffx/path",
@@ -45,8 +46,8 @@ class LocalDriverTest(unittest.TestCase):
     @patch("common.read_yaml_from_file")
     @patch("api_mobly.get_config_with_test_params")
     def test_generate_test_config_from_file_without_params_success(
-        self, mock_get_config, mock_read_yaml, *unused_args
-    ):
+        self, mock_get_config: Any, mock_read_yaml: Any, *unused_args: Any
+    ) -> None:
         """Test case for successful config without params generation"""
         driver = local_driver.LocalDriver(
             ffx_path="ffx/path",
@@ -65,8 +66,8 @@ class LocalDriverTest(unittest.TestCase):
         "common.read_yaml_from_file", side_effect=common.InvalidFormatException
     )
     def test_generate_test_config_from_file_invalid_yaml_content_raises_exception(
-        self, *unused_args
-    ):
+        self, *unused_args: Any
+    ) -> None:
         """Test case for exception being raised on invalid YAML content"""
         driver = local_driver.LocalDriver(
             ffx_path="ffx/path",
@@ -80,8 +81,8 @@ class LocalDriverTest(unittest.TestCase):
     @patch("builtins.print")
     @patch("common.read_yaml_from_file", side_effect=OSError)
     def test_generate_test_config_from_file_invalid_path_raises_exception(
-        self, *unused_args
-    ):
+        self, *unused_args: Any
+    ) -> None:
         """Test case for exception being raised for invalid path"""
         driver = local_driver.LocalDriver(
             ffx_path="ffx/path",
@@ -111,11 +112,11 @@ class LocalDriverTest(unittest.TestCase):
     @patch("api_mobly.new_testbed_config", autospec=True)
     def test_generate_test_config_from_env_success(
         self,
-        mock_new_tb_config,
-        mock_ffx_target_list,
-        mock_ffx_target_ssh_address,
-        *unused_args,
-    ):
+        mock_new_tb_config: Any,
+        mock_ffx_target_list: Any,
+        mock_ffx_target_ssh_address: Any,
+        *unused_args: Any,
+    ) -> None:
         """Test case for successful env config generation"""
         driver = local_driver.LocalDriver(
             ffx_path="ffx/path", transport="transport", log_path="log/path"
@@ -131,7 +132,7 @@ class LocalDriverTest(unittest.TestCase):
         mock_ffx_target_list.assert_called()
         mock_ffx_target_ssh_address.assert_called()
 
-    @parameterized.expand(
+    @parameterized.expand(  # type: ignore[misc]
         [
             (
                 "default_nodes exist, prefer all_nodes",
@@ -153,13 +154,13 @@ class LocalDriverTest(unittest.TestCase):
     @patch("api_mobly.new_testbed_config", autospec=True)
     def test_multi_device_config_generation(
         self,
-        unused_name,
-        default_nodes,
-        mock_new_tb_config,
-        mock_ffx_target_list,
-        mock_ffx_target_ssh_address,
-        *unused_args,
-    ):
+        unused_name: str,
+        default_nodes: list[str],
+        mock_new_tb_config: Any,
+        mock_ffx_target_list: Any,
+        mock_ffx_target_ssh_address: Any,
+        *unused_args: Any,
+    ) -> None:
         """Test case for multi-device config generation."""
         mock_ffx_target_list.return_value = api_ffx.TargetListResult(
             all_nodes=["dut_1", "dut_2"], default_nodes=default_nodes
@@ -181,7 +182,7 @@ class LocalDriverTest(unittest.TestCase):
         mock_ffx_target_list.assert_called()
         mock_ffx_target_ssh_address.assert_called()
 
-    @parameterized.expand(
+    @parameterized.expand(  # type: ignore[misc]
         [
             ("default_nodes exist, prefer default_nodes", ["dut_1"], ["dut_1"]),
             ("default_nodes empty, prefer all_nodes", [], ["dut_1", "dut_2"]),
@@ -200,14 +201,14 @@ class LocalDriverTest(unittest.TestCase):
     @patch("api_mobly.new_testbed_config", autospec=True)
     def test_single_device_config_generation(
         self,
-        unused_name,
-        default_nodes,
-        want_nodes,
-        mock_new_tb_config,
-        mock_ffx_target_list,
-        mock_ffx_target_ssh_address,
-        *unused_args,
-    ):
+        unused_name: str,
+        default_nodes: list[str],
+        want_nodes: list[str],
+        mock_new_tb_config: Any,
+        mock_ffx_target_list: Any,
+        mock_ffx_target_ssh_address: Any,
+        *unused_args: Any,
+    ) -> None:
         """Test case for single-device config generation."""
         mock_ffx_target_list.return_value = api_ffx.TargetListResult(
             all_nodes=["dut_1", "dut_2"], default_nodes=default_nodes
@@ -239,8 +240,8 @@ class LocalDriverTest(unittest.TestCase):
         ),
     )
     def test_config_generation_no_devices_raises_exception(
-        self, mock_check_output, *unused_args
-    ):
+        self, mock_check_output: Any, *unused_args: Any
+    ) -> None:
         """Test case for exception being raised when no devices are found"""
         driver = local_driver.LocalDriver(
             ffx_path="ffx/path",
@@ -257,8 +258,8 @@ class LocalDriverTest(unittest.TestCase):
         autospec=True,
     )
     def test_generate_test_config_from_env_discovery_failure_raises_exception(
-        self, mock_check_output, *unused_args
-    ):
+        self, mock_check_output: Any, *unused_args: Any
+    ) -> None:
         """Test case for exception being raised from discovery failure"""
         driver = local_driver.LocalDriver(
             ffx_path="ffx/path", transport="transport", log_path="log/path"
@@ -266,7 +267,7 @@ class LocalDriverTest(unittest.TestCase):
         with self.assertRaises(common.DriverException):
             ret = driver.generate_test_config()
 
-    @parameterized.expand(
+    @parameterized.expand(  # type: ignore[misc]
         [
             ("Invalid JSON str", b""),
             ("No devices JSON str", b"[]"),
@@ -276,8 +277,12 @@ class LocalDriverTest(unittest.TestCase):
     @patch("builtins.print")
     @patch("subprocess.check_output", autospec=True)
     def test_generate_test_config_from_env_discovery_output_raises_exception(
-        self, unused_name, discovery_output, mock_check_output, unused_print
-    ):
+        self,
+        unused_name: str,
+        discovery_output: bytes,
+        mock_check_output: Any,
+        unused_print: Any,
+    ) -> None:
         """Test case for exception being raised from invalid discovery output"""
         mock_check_output.return_value = discovery_output
         driver = local_driver.LocalDriver(

@@ -7,6 +7,7 @@
 import os
 import subprocess
 import unittest
+from typing import Any
 from unittest import mock
 
 from parameterized import parameterized
@@ -17,7 +18,7 @@ import mobly_driver_lib
 class MoblyDriverLibTest(unittest.TestCase):
     """Mobly Driver lib tests"""
 
-    def setUp(self):
+    def setUp(self) -> None:
         self.mock_tmp = mock.Mock()
         self.mock_process = mock.Mock()
         self.mock_driver = mock.Mock()
@@ -25,7 +26,7 @@ class MoblyDriverLibTest(unittest.TestCase):
 
     @mock.patch("builtins.print")
     @mock.patch("subprocess.Popen")
-    def test_run_success(self, mock_popen, *unused_args):
+    def test_run_success(self, mock_popen: Any, *unused_args: Any) -> None:
         """Test case to ensure run succeeds"""
         self.mock_process.wait.return_value = 0
         mock_popen.return_value.__enter__.return_value = self.mock_process
@@ -35,7 +36,7 @@ class MoblyDriverLibTest(unittest.TestCase):
         self.mock_driver.generate_test_config.assert_called()
         self.mock_driver.teardown.assert_called()
 
-    @parameterized.expand(
+    @parameterized.expand(  # type: ignore[misc]
         [
             ["invalid_driver", None, "/py/path", "/test/path", 0],
             ["invalid_python_path", mock.Mock(), "", "/test/path", 0],
@@ -44,8 +45,13 @@ class MoblyDriverLibTest(unittest.TestCase):
         ]
     )
     def test_run_invalid_argument_raises_exception(
-        self, unused_name, driver, python_path, test_path, timeout_sec
-    ):
+        self,
+        unused_name: str,
+        driver: Any,
+        python_path: str,
+        test_path: str,
+        timeout_sec: int,
+    ) -> None:
         """Test case to ensure exception raised on invalid args"""
         with self.assertRaises(ValueError):
             mobly_driver_lib.run(
@@ -55,8 +61,8 @@ class MoblyDriverLibTest(unittest.TestCase):
     @mock.patch("builtins.print")
     @mock.patch("subprocess.Popen")
     def test_run_mobly_test_failure_raises_exception(
-        self, mock_popen, *unused_args
-    ):
+        self, mock_popen: Any, *unused_args: Any
+    ) -> None:
         """Test case to ensure exception raised on test failure"""
         self.mock_process.wait.return_value = 1
         mock_popen.return_value.__enter__.return_value = self.mock_process
@@ -66,11 +72,13 @@ class MoblyDriverLibTest(unittest.TestCase):
 
     @mock.patch("builtins.print")
     @mock.patch("subprocess.Popen")
-    def test_run_mobly_test_timeout_exception(self, mock_popen, *unused_args):
+    def test_run_mobly_test_timeout_exception(
+        self, mock_popen: Any, *unused_args: Any
+    ) -> None:
         """Test case to ensure exception raised on test timeout"""
         mock_popen.return_value.__enter__.return_value = self.mock_process
         self.mock_process.wait.side_effect = [
-            subprocess.TimeoutExpired("", ""),
+            subprocess.TimeoutExpired("", 0),
             0,
         ]
 
@@ -81,8 +89,8 @@ class MoblyDriverLibTest(unittest.TestCase):
     @mock.patch("builtins.print")
     @mock.patch("subprocess.Popen")
     def test_run_teardown_runs_despite_subprocess_error(
-        self, mock_popen, *unused_args
-    ):
+        self, mock_popen: Any, *unused_args: Any
+    ) -> None:
         """Test case to ensure teardown always executes"""
         self.mock_process.wait.return_value = 1
         mock_popen.return_value.__enter__.return_value = self.mock_process
@@ -91,13 +99,17 @@ class MoblyDriverLibTest(unittest.TestCase):
             mobly_driver_lib.run(self.mock_driver, "/py/path", "/test/path")
         self.mock_driver.teardown.assert_called()
 
-    @parameterized.expand([[True], [False]])
+    @parameterized.expand([[True], [False]])  # type: ignore[misc]
     @mock.patch("builtins.print")
     @mock.patch("subprocess.Popen")
     @mock.patch("mobly_driver_lib.NamedTemporaryFile")
     def test_run_passes_params_to_popen(
-        self, verbose, mock_tempfile, mock_popen, *unused_args
-    ):
+        self,
+        verbose: bool,
+        mock_tempfile: Any,
+        mock_popen: Any,
+        *unused_args: Any,
+    ) -> None:
         """Test case to ensure correct params are passed to Popen"""
         tmp_path = "/tmp/path"
         py_path = "/py/path"
@@ -118,7 +130,9 @@ class MoblyDriverLibTest(unittest.TestCase):
 
     @mock.patch("builtins.print")
     @mock.patch("subprocess.Popen")
-    def test_run_updates_env_with_testdata_dir(self, mock_popen, *unused_args):
+    def test_run_updates_env_with_testdata_dir(
+        self, mock_popen: Any, *unused_args: Any
+    ) -> None:
         """Test case to ensure env is updated when test_data_path is provided"""
         self.mock_process.wait.return_value = 0
         mock_popen.return_value.__enter__.return_value = self.mock_process

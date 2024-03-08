@@ -21,7 +21,7 @@ import local_driver
 class DriverFactoryTest(unittest.TestCase):
     """Driver Factory tests"""
 
-    @parameterized.expand(
+    @parameterized.expand(  # type: ignore[misc]
         [
             (
                 "local_env",
@@ -41,8 +41,11 @@ class DriverFactoryTest(unittest.TestCase):
         ]
     )
     def test_get_driver_success(
-        self, unused_name, test_env, expected_driver_type
-    ):
+        self,
+        unused_name: str,
+        test_env: dict[str, str],
+        expected_driver_type: type,
+    ) -> None:
         """Test case to ensure driver resolution success"""
         factory = driver_factory.DriverFactory(
             ffx_path="ffx/path", transport="transport"
@@ -51,7 +54,7 @@ class DriverFactoryTest(unittest.TestCase):
             driver = factory.get_driver()
         self.assertEqual(type(driver), expected_driver_type)
 
-    def test_get_driver_unexpected_env_raises_exception(self):
+    def test_get_driver_unexpected_env_raises_exception(self) -> None:
         """Test case to ensure exception is raised on unexpected env"""
         factory = driver_factory.DriverFactory(
             ffx_path="ffx/path", transport="transport"

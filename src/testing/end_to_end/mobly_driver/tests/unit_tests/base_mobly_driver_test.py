@@ -6,6 +6,7 @@
 
 import os
 import unittest
+from typing import Any
 from unittest.mock import patch
 
 from parameterized import parameterized
@@ -16,7 +17,7 @@ import base_mobly_driver
 class BaseMoblyDriverTest(unittest.TestCase):
     """Base Mobly Driver tests"""
 
-    @parameterized.expand(
+    @parameterized.expand(  # type: ignore[misc]
         [
             (
                 "log_path specified",
@@ -38,20 +39,27 @@ class BaseMoblyDriverTest(unittest.TestCase):
     )
     @patch.multiple(base_mobly_driver.BaseDriver, __abstractmethods__=set())
     def test_init_success(
-        self, unused_name, log_path, test_env, expected_log_path, *unused_args
-    ):
+        self,
+        unused_name: str,
+        log_path: str,
+        test_env: dict[str, str],
+        expected_log_path: str,
+        *unused_args: Any,
+    ) -> None:
         """Test case for initialization success"""
         with patch.dict(os.environ, test_env, clear=True):
-            d = base_mobly_driver.BaseDriver(
+            d = base_mobly_driver.BaseDriver(  # type: ignore[abstract]
                 ffx_path="ffx_path", transport="transport", log_path=log_path
             )
             self.assertEqual(d._log_path, expected_log_path)
 
     @patch.multiple(base_mobly_driver.BaseDriver, __abstractmethods__=set())
-    def test_init_invalid_environment_raises_exception(self, *unused_args):
+    def test_init_invalid_environment_raises_exception(
+        self, *unused_args: Any
+    ) -> None:
         """Test case for initialization failure"""
         with patch.dict(os.environ, {}, clear=True):
             with self.assertRaises(KeyError):
-                d = base_mobly_driver.BaseDriver(
+                base_mobly_driver.BaseDriver(  # type: ignore[abstract]
                     ffx_path="ffx_path", transport="transport"
                 )

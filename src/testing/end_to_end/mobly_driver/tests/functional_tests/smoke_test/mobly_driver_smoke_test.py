@@ -25,10 +25,10 @@ from mobly import test_runner
 import fuchsia_device
 
 
-class MoblyDriverSmokeTest(base_test.BaseTestClass):
+class MoblyDriverSmokeTest(base_test.BaseTestClass):  # type: ignore[misc]
     """Mobly Driver smoke tests."""
 
-    def test_mobly_controller_init(self):
+    def test_mobly_controller_init(self) -> None:
         """Test case to ensure Mobly controller initializes successfully"""
         # Use Mobly's built-in register_controller() to parse configs and create
         # devices controllers for test usage.
@@ -37,11 +37,11 @@ class MoblyDriverSmokeTest(base_test.BaseTestClass):
             fuchsia_devices, "Expect at least 1 created controller."
         )
 
-    def test_params_exist(self):
+    def test_params_exist(self) -> None:
         """Test case to ensure test params are included in the Mobly config"""
         asserts.assert_true(self.user_params, "Test params are missing.")
 
-    def test_output_dir(self):
+    def test_output_dir(self) -> None:
         """Test case to ensure Mobly output dir can be written to"""
         test_artifact_path = os.path.join(self.log_path, "artifact.txt")
         with open(test_artifact_path, "w+", encoding="utf8") as file_handle:

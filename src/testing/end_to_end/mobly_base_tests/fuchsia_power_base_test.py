@@ -13,14 +13,16 @@ import os
 import signal
 import subprocess
 import time
+from typing import Any
 
 from fuchsia_base_test import fuchsia_base_test
+
 from mobly import test_runner
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
 
-class FuchsiaPowerBaseTest(fuchsia_base_test.FuchsiaBaseTest):
+class FuchsiaPowerBaseTest(fuchsia_base_test.FuchsiaBaseTest):  # type: ignore[misc]
     """Fuchsia power measurement base test class.
 
     Single device test with power measurement.
@@ -40,7 +42,7 @@ class FuchsiaPowerBaseTest(fuchsia_base_test.FuchsiaBaseTest):
         power_metric (str): Name of power metric being measured.
     """
 
-    def setup_class(self):
+    def setup_class(self) -> None:
         super().setup_class()
         self.metric_name = self.user_params["power_metric"]
         self.power_trace_path = os.path.join(
@@ -49,19 +51,19 @@ class FuchsiaPowerBaseTest(fuchsia_base_test.FuchsiaBaseTest):
         self.ffx_test_url = self.user_params["ffx_test_url"]
         self.ffx_test_args = self.user_params["ffx_test_args"]
         self.timeout_sec = self.user_params["timeout_sec"]
-        self.device: fuchsia_device.FuchsiaDevice = self.fuchsia_devices[0]
+        self.device: fuchsia_device.FuchsiaDevice = self.fuchsia_devices[0]  # type: ignore[name-defined]
 
-    def _find_measurepower_path(self):
+    def _find_measurepower_path(self) -> str:
         path = os.environ.get("MEASUREPOWER_PATH")
         if not path:
             raise RuntimeError("MEASUREPOWER_PATH env variable must be set")
         return path
 
-    def _wait_first_sample(self, proc):
+    def _wait_first_sample(self, proc: subprocess.Popen[Any]) -> None:
         for i in range(10):
             if proc.poll():
-                stdout = proc.stdout.read()
-                stderr = proc.stderr.read()
+                stdout = proc.stdout.read() if proc.stdout else ""
+                stderr = proc.stderr.read() if proc.stderr else ""
                 raise RuntimeError(
                     f"Measure power failed to start with status "
                     f"{proc.returncode} stdout: {stdout} "
@@ -77,7 +79,7 @@ class FuchsiaPowerBaseTest(fuchsia_base_test.FuchsiaBaseTest):
             f"Timed out while waiting to start power measurement"
         )
 
-    def _start_power_measurement(self):
+    def _start_power_measurement(self) -> subprocess.Popen[Any]:
         measurepower_path = self._find_measurepower_path()
         cmd = [
             measurepower_path,
@@ -91,13 +93,13 @@ class FuchsiaPowerBaseTest(fuchsia_base_test.FuchsiaBaseTest):
             cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE
         )
 
-    def _stop_power_measurement(self, proc: subprocess.Popen):
+    def _stop_power_measurement(self, proc: subprocess.Popen[Any]) -> None:
         _LOGGER.info(f"STOPPING POWER MEASUREMENT (process {proc.pid})")
         proc.send_signal(signal.SIGINT)
         result = proc.wait(60)
-        if result:
-            stdout = proc.stdout.read()
-            stderr = proc.stderr.read()
+        if result is not None:
+            stdout = proc.stdout.read() if proc.stdout else ""
+            stderr = proc.stderr.read() if proc.stderr else ""
             raise RuntimeError(
                 f"Measure power failed with status "
                 f"{proc.returncode} stdout: {stdout} "

@@ -7,6 +7,7 @@
 import ipaddress
 import subprocess
 import unittest
+from typing import Any
 from unittest.mock import patch
 
 from parameterized import parameterized
@@ -21,7 +22,7 @@ class FfxClientTest(unittest.TestCase):
         super().setUp()
         self.client = api_ffx.FfxClient("some_ffx_path")
 
-    @parameterized.expand(
+    @parameterized.expand(  # type: ignore[misc]
         [
             (
                 "No default nodes",
@@ -40,19 +41,19 @@ class FfxClientTest(unittest.TestCase):
     @patch("subprocess.check_output", autospec=True)
     def test_target_list_success(
         self,
-        unused_name,
-        target_list_output,
-        want_all_nodes,
-        want_default_nodes,
-        mock_check_output,
-    ):
+        unused_name: str,
+        target_list_output: bytes,
+        want_all_nodes: list[str],
+        want_default_nodes: list[str],
+        mock_check_output: Any,
+    ) -> None:
         """Test case for target_list() returning expected results"""
         mock_check_output.return_value = target_list_output
         res = self.client.target_list(isolate_dir=None)
         self.assertEqual(res.all_nodes, want_all_nodes)
         self.assertEqual(res.default_nodes, want_default_nodes)
 
-    @parameterized.expand(
+    @parameterized.expand(  # type: ignore[misc]
         [
             (
                 "timeout",
@@ -66,8 +67,8 @@ class FfxClientTest(unittest.TestCase):
     )
     @patch("subprocess.check_output", autospec=True)
     def test_target_list_command_failure_raises_exception(
-        self, unused_name, mock_exception, mock_check_output
-    ):
+        self, unused_name: str, mock_exception: Any, mock_check_output: Any
+    ) -> None:
         """Test case for exception being raised from subprocess failure"""
         mock_check_output.side_effect = mock_exception
         with self.assertRaises(api_ffx.CommandException):
@@ -78,13 +79,15 @@ class FfxClientTest(unittest.TestCase):
         autospec=True,
         return_value=b'[{"nodename": "dut", "is_default": false}]',
     )
-    def test_target_list_with_isolated_dir(self, mock_check_output):
+    def test_target_list_with_isolated_dir(
+        self, mock_check_output: Any
+    ) -> None:
         """Test case for isolated dir being included in ffx command"""
         self.client.target_list(isolate_dir="some_isolate_dir_path")
         check_output_args = mock_check_output.call_args.args[0]
         self.assertIn("some_isolate_dir_path", check_output_args)
 
-    @parameterized.expand(
+    @parameterized.expand(  # type: ignore[misc]
         [
             ("Invalid JSON str", b""),
             ("Empty device JSON str", b"[{}]"),
@@ -92,8 +95,11 @@ class FfxClientTest(unittest.TestCase):
     )
     @patch("subprocess.check_output", autospec=True)
     def test_target_list_invalid_output_raises_exception(
-        self, unused_name, target_list_output, mock_check_output
-    ):
+        self,
+        unused_name: str,
+        target_list_output: bytes,
+        mock_check_output: Any,
+    ) -> None:
         """Test case for exception being raised from invalid discovery output"""
         mock_check_output.return_value = target_list_output
         with self.assertRaises(api_ffx.OutputFormatException):
@@ -103,7 +109,7 @@ class FfxClientTest(unittest.TestCase):
         "subprocess.check_output",
         autospec=True,
     )
-    def test_get_target_ssh_address(self, mock_check_output):
+    def test_get_target_ssh_address(self, mock_check_output: Any) -> None:
         """Test case for get_target_ssh_address() returning expected results"""
         ssh_ip = "fe80::4fce:3102:ef13:888c%qemu"
         ssh_port = 8022
@@ -123,7 +129,7 @@ class FfxClientTest(unittest.TestCase):
 
         mock_check_output.assert_called()
 
-    @parameterized.expand(
+    @parameterized.expand(  # type: ignore[misc]
         [
             (
                 "timeout",
@@ -137,8 +143,8 @@ class FfxClientTest(unittest.TestCase):
     )
     @patch("subprocess.check_output", autospec=True)
     def test_get_target_ssh_address_failure_raises_exception(
-        self, unused_name, mock_exception, mock_check_output
-    ):
+        self, unused_name: str, mock_exception: Any, mock_check_output: Any
+    ) -> None:
         """Test case for get_target_ssh_address() raising exceptions for
         subprocess failure"""
         mock_check_output.side_effect = mock_exception
@@ -155,8 +161,8 @@ class FfxClientTest(unittest.TestCase):
         autospec=True,
     )
     def test_get_target_ssh_address_invalid_output_raises_exception(
-        self, mock_check_output
-    ):
+        self, mock_check_output: Any
+    ) -> None:
         """Test case for get_target_ssh_address raising exception for invalid
         output"""
         with self.assertRaises(api_ffx.OutputFormatException):
@@ -166,7 +172,7 @@ class FfxClientTest(unittest.TestCase):
             )
         mock_check_output.assert_called()
 
-    @parameterized.expand(
+    @parameterized.expand(  # type: ignore[misc]
         [
             (
                 "::1",
@@ -200,7 +206,9 @@ class FfxClientTest(unittest.TestCase):
             ),
         ]
     )
-    def test_target_ssh_address(self, ip, port, is_remote) -> None:
+    def test_target_ssh_address(
+        self, ip: str, port: int, is_remote: bool
+    ) -> None:
         """Test case for TargetSshAddress dataclass"""
         target_ssh_address = api_ffx.TargetSshAddress(
             ip=ipaddress.ip_address(ip), port=port

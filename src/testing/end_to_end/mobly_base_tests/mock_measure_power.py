@@ -6,17 +6,18 @@ import argparse
 import csv
 import signal
 import time
+from typing import Any
 
 
 class MockMeasurePower:
-    def __init__(self, csv_out):
+    def __init__(self, csv_out: str) -> None:
         self.csv_out = csv_out
         self.keep_going = True
 
-    def stop_now(self, *unused_args):
+    def stop_now(self, *unused_args: Any) -> None:
         self.keep_going = False
 
-    def start(self):
+    def start(self) -> None:
         signal.signal(signal.SIGINT, self.stop_now)
         signal.signal(signal.SIGTERM, self.stop_now)
         with open(self.csv_out, "w", newline="") as csvfile:

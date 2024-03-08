@@ -6,6 +6,7 @@
 
 import unittest
 import json
+from typing import Any
 
 from tempfile import NamedTemporaryFile
 from mobly import keys
@@ -18,43 +19,43 @@ import api_mobly
 class ApiMoblyTest(unittest.TestCase):
     """API Mobly tests"""
 
-    def test_get_latest_test_output_dir_symlink_path_success(self):
+    def test_get_latest_test_output_dir_symlink_path_success(self) -> None:
         """Test case to ensure test output symlink is returned"""
         api_mobly.get_latest_test_output_dir_symlink_path("output_path", "tb")
 
-    @parameterized.expand(
+    @parameterized.expand(  # type: ignore[misc]
         [
             ("Output path is empty", "", "tb"),
             ("Testbed name is empty", "ouput_path", ""),
         ]
     )
     def test_get_latest_test_output_dir_symlink_path_raises_exception(
-        self, unused_name, output_path, tb_name
-    ):
+        self, unused_name: str, output_path: str, tb_name: str
+    ) -> None:
         """Test case to ensure exception is raised on test output path errors"""
         with self.assertRaises(api_mobly.ApiException):
             api_mobly.get_latest_test_output_dir_symlink_path(
                 output_path, tb_name
             )
 
-    def test_get_result_path_success(self):
+    def test_get_result_path_success(self) -> None:
         """Test case to ensure test result symlink is returned"""
         api_mobly.get_result_path("output_path", "tb")
 
-    @parameterized.expand(
+    @parameterized.expand(  # type: ignore[misc]
         [
             ("Output path is empty", "", "tb"),
             ("Testbed name is empty", "ouput_path", ""),
         ]
     )
     def test_get_get_result_path_raises_exception(
-        self, unused_name, output_path, tb_name
-    ):
+        self, unused_name: str, output_path: str, tb_name: str
+    ) -> None:
         """Test case to ensure exception is raised on test result path errors"""
         with self.assertRaises(api_mobly.ApiException):
             api_mobly.get_result_path(output_path, tb_name)
 
-    @parameterized.expand(
+    @parameterized.expand(  # type: ignore[misc]
         [
             param(
                 "success_empty_controllers_empty_params",
@@ -223,25 +224,24 @@ class ApiMoblyTest(unittest.TestCase):
     )
     def test_new_testbed_config(
         self,
-        unused_name,
-        override_args,
-        expected_config_obj,
-    ):
-        default_new_testbed_config_args = {
-            "testbed_name": "tb_name",
-            "log_path": "log_path",
-            "ffx_path": "ffx_path",
-            "transport": "transport",
-            "mobly_controllers": [],
-            "test_params_dict": {},
-            "botanist_honeydew_map": {},
-            "ffx_subtools_search_path": None,
-        }
-        default_new_testbed_config_args.update(override_args)
-
+        unused_name: str,
+        override_args: dict[str, Any],
+        expected_config_obj: dict[str, Any],
+    ) -> None:
         """Test case for new testbed config generation"""
         config_obj = api_mobly.new_testbed_config(
-            **default_new_testbed_config_args
+            testbed_name=override_args.get("testbed_name", "tb_name"),
+            log_path=override_args.get("log_path", "log_path"),
+            ffx_path=override_args.get("ffx_path", "ffx_path"),
+            transport=override_args.get("transport", "transport"),
+            mobly_controllers=override_args.get("mobly_controllers", []),
+            test_params_dict=override_args.get("test_params_dict", {}),
+            botanist_honeydew_map=override_args.get(
+                "botanist_honeydew_map", {}
+            ),
+            ffx_subtools_search_path=override_args.get(
+                "ffx_subtools_search_path", None
+            ),
         )
         self.assertEqual(config_obj, expected_config_obj)
 
@@ -251,7 +251,7 @@ class ApiMoblyTest(unittest.TestCase):
             # Assert that no exceptions are raised.
             config_parser.load_test_config_file(config_fh.name)
 
-    @parameterized.expand(
+    @parameterized.expand(  # type: ignore[misc]
         [
             ("success_empty_config", {}, {}),
             (
@@ -404,14 +404,17 @@ class ApiMoblyTest(unittest.TestCase):
         ]
     )
     def test_set_transport(
-        self, unused_name, config_obj, transformed_config_obj
-    ):
+        self,
+        unused_name: str,
+        config_obj: dict[str, Any],
+        transformed_config_obj: dict[str, Any],
+    ) -> None:
         """Test case for mutating transports in config"""
         new_config_obj = config_obj.copy()
         api_mobly.set_transport(new_config_obj, "fuchsia-controller")
         self.assertDictEqual(new_config_obj, transformed_config_obj)
 
-    @parameterized.expand(
+    @parameterized.expand(  # type: ignore[misc]
         [
             ("success_empty_config", {}, {}),
             (
@@ -562,14 +565,17 @@ class ApiMoblyTest(unittest.TestCase):
         ]
     )
     def test_set_ffx_path(
-        self, unused_name, config_obj, transformed_config_obj
-    ):
+        self,
+        unused_name: str,
+        config_obj: dict[str, Any],
+        transformed_config_obj: dict[str, Any],
+    ) -> None:
         """Test case for mutating transports in config"""
         new_config_obj = config_obj.copy()
         api_mobly.set_ffx_path(new_config_obj, "ffx/path")
         self.assertDictEqual(new_config_obj, transformed_config_obj)
 
-    @parameterized.expand(
+    @parameterized.expand(  # type: ignore[misc]
         [
             ("success_empty_config", {}, {}),
             (
@@ -720,8 +726,11 @@ class ApiMoblyTest(unittest.TestCase):
         ]
     )
     def test_set_ffx_subtools_search_path(
-        self, unused_name, config_obj, transformed_config_obj
-    ):
+        self,
+        unused_name: str,
+        config_obj: dict[str, Any],
+        transformed_config_obj: dict[str, Any],
+    ) -> None:
         """Test case for mutating transports in config"""
         new_config_obj = config_obj.copy()
         api_mobly.set_ffx_subtools_search_path(
@@ -729,7 +738,7 @@ class ApiMoblyTest(unittest.TestCase):
         )
         self.assertDictEqual(new_config_obj, transformed_config_obj)
 
-    @parameterized.expand(
+    @parameterized.expand(  # type: ignore[misc]
         [
             # (name, config_dict, params_dict, expected_config_dict)
             (
@@ -768,21 +777,25 @@ class ApiMoblyTest(unittest.TestCase):
         ]
     )
     def test_get_config_with_test_params_success(
-        self, unused_name, config_dict, params_dict, expected_config_dict
-    ):
+        self,
+        unused_name: str,
+        config_dict: dict[str, Any],
+        params_dict: dict[str, Any],
+        expected_config_dict: dict[str, Any],
+    ) -> None:
         """Test case for testbed config with params"""
         ret = api_mobly.get_config_with_test_params(config_dict, params_dict)
         self.assertDictEqual(ret, expected_config_dict)
 
-    @parameterized.expand(
+    @parameterized.expand(  # type: ignore[misc]
         [
             ("Config is None", None),
             ("Config is empty", {}),
         ]
     )
     def test_get_config_with_test_params_raises_exception(
-        self, unused_name, config_dict
-    ):
+        self, unused_name: str, config_dict: dict[str, Any]
+    ) -> None:
         """Test case for exceptions in testbed config generation"""
         with self.assertRaises(api_mobly.ApiException):
-            api_mobly.get_config_with_test_params(config_dict, None)
+            api_mobly.get_config_with_test_params(config_dict, {})
