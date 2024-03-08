@@ -7,10 +7,13 @@ load(
     "PARTITION_TYPE",
     "SLOT",
     "fuchsia_assemble_package",
+    "fuchsia_board_configuration",
+    "fuchsia_board_input_bundle",
     "fuchsia_bootloader_partition",
     "fuchsia_bootstrap_partition",
     "fuchsia_partition",
     "fuchsia_partitions_configuration",
+    "fuchsia_prebuilt_board_input_bundle",
     "fuchsia_prebuilt_package",
     "fuchsia_product_configuration",
     "fuchsia_product_ota_config",
@@ -19,6 +22,8 @@ load(
     "tuf_repo",
     "tuf_repo_root",
 )
+load(":fuchsia_board_configuration_test.bzl", "fuchsia_board_configuration_test")
+load(":fuchsia_board_input_bundle_test.bzl", "fuchsia_board_input_bundle_test")
 load(":fuchsia_partitions_configuration_test.bzl", "fuchsia_partitions_configuration_test")
 load(":fuchsia_product_configuration_test.bzl", "fuchsia_product_configuration_test", "fuchsia_product_ota_config_test")
 load(":fuchsia_virtual_device_test.bzl", "fuchsia_virtual_device_test")
@@ -34,6 +39,49 @@ fuchsia_prebuilt_package(
     drivers = [
         "meta/backlight_driver.cm",
     ],
+)
+
+fuchsia_board_input_bundle(
+    name = "testing_board_input_bundle",
+    base_packages = [
+        ":prebuilt_ams_light",
+    ],
+    bootfs_driver_packages = [
+        ":prebuilt_driver",
+    ],
+    cpu_manager_config = "test_data/config_data.json",
+)
+
+fuchsia_prebuilt_board_input_bundle(
+    name = "testing_prebuilt_board_input_bundle",
+    config = "test_data/board_input_bundle.json",
+)
+
+fuchsia_board_input_bundle_test(
+    name = "board_input_bundle_golden_test",
+    board_input_bundle = ":testing_board_input_bundle",
+    golden_file = ":test_data/board_input_bundle_golden_file.json",
+    visibility = ["//visibility:public"],
+)
+
+fuchsia_board_configuration(
+    name = "testing_board_configuration",
+    board_input_bundles = [
+        ":testing_board_input_bundle",
+        ":testing_prebuilt_board_input_bundle",
+    ],
+    board_name = "x64",
+)
+
+fuchsia_board_configuration_test(
+    name = "board_configuration_golden_test",
+    board_config = ":testing_board_configuration",
+    golden_file = select({
+        "@fuchsia_sdk//fuchsia/constraints:cpu_arm64": ":test_data/board_configuration_golden_file_arm64.json",
+        "@fuchsia_sdk//fuchsia/constraints:cpu_x64": ":test_data/board_configuration_golden_file_x64.json",
+        "@fuchsia_sdk//fuchsia/constraints:cpu_riscv64": ":test_data/board_configuration_golden_file_riscv64.json",
+    }),
+    visibility = ["//visibility:public"],
 )
 
 fuchsia_assemble_package(
