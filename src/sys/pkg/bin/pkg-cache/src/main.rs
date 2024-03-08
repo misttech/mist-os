@@ -123,7 +123,7 @@ async fn main_inner() -> Result<(), Error> {
         true => DynamicProtection::Enabled,
         false => DynamicProtection::Disabled,
     };
-    let mut package_index = PackageIndex::new();
+    let mut package_index = PackageIndex::from_config(protect_dynamic_packages);
     let builder = blobfs::Client::builder().readable().writable().executable();
     let blobfs = if use_fxblob { builder.use_creator().use_reader() } else { builder }
         .build()
@@ -275,7 +275,6 @@ async fn main_inner() -> Result<(), Error> {
                         Arc::clone(&cache_packages),
                         Arc::clone(&package_index),
                         open_packages.clone(),
-                        protect_dynamic_packages,
                         commit_status_provider.clone(),
                         stream,
                     )

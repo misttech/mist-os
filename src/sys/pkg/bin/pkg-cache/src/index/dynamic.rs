@@ -19,13 +19,16 @@ const CACHE_PACKAGE_LOADING_CONCURRENCY: usize = 100;
 /// Warn if loading cache packages takes longer than this.
 const CACHE_PACKAGE_LOADING_WARN_DURATION: zx::Duration = zx::Duration::from_millis(500);
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug)]
 pub struct DynamicIndex {
     /// contains the active packages and packages still being cached that will become active when
     /// complete.
     packages: HashMap<Hash, Package>,
     /// map of package path to most recently activated package hash.
     active_packages: HashMap<PackagePath, Hash>,
+    /// If dynamic protection is disabled, all write operations on the index become no-ops.
+    /// Used while phasing out the dynamic index.
+    protect_dynamic_packages: crate::DynamicProtection,
 }
 
 #[derive(thiserror::Error, Debug)]
@@ -51,8 +54,13 @@ pub enum AddBlobsError {
 }
 
 impl DynamicIndex {
+    pub fn from_config(protect_dynamic_packages: crate::DynamicProtection) -> Self {
+        Self { packages: HashMap::new(), active_packages: HashMap::new(), protect_dynamic_packages }
+    }
+
+    #[cfg(test)]
     pub fn new() -> Self {
-        Default::default()
+        Self::from_config(crate::DynamicProtection::Enabled)
     }
 
     #[cfg(test)]
@@ -73,6 +81,9 @@ impl DynamicIndex {
 
     // Add the given package to the dynamic index.
     fn add_package(&mut self, hash: Hash, package: Package) {
+        if self.is_disabled() {
+            return;
+        }
         match &package {
             Package::Pending => {}
             Package::WithMetaFar { .. } => {}
@@ -109,6 +120,9 @@ impl DynamicIndex {
     /// Notifies dynamic index that the given package is going to be installed, to keep the meta
     /// far blob protected.
     pub fn start_install(&mut self, package_hash: Hash) {
+        if self.is_disabled() {
+            return;
+        }
         self.packages.entry(package_hash).or_insert(Package::Pending);
     }
 
@@ -120,6 +134,9 @@ impl DynamicIndex {
         hash: Hash,
         path: PackagePath,
     ) -> Result<(), FulfillNotNeededBlobError> {
+        if self.is_disabled() {
+            return Ok(());
+        }
         if let Some(wrong_state) = match &self.packages.get(&hash) {
             Some(Package::Pending) => None,
             None => Some("missing"),
@@ -140,6 +157,9 @@ impl DynamicIndex {
         package_hash: Hash,
         additional_blobs: &HashSet<Hash>,
     ) -> Result<(), AddBlobsError> {
+        if self.is_disabled() {
+            return Ok(());
+        }
         match self.packages.get_mut(&package_hash) {
             Some(Package::WithMetaFar { required_blobs, .. }) => {
                 required_blobs.extend(additional_blobs);
@@ -152,6 +172,9 @@ impl DynamicIndex {
 
     /// Notifies dynamic index that the given package has completed installation.
     pub fn complete_install(&mut self, package_hash: Hash) -> Result<(), CompleteInstallError> {
+        if self.is_disabled() {
+            return Ok(());
+        }
         match self.packages.get_mut(&package_hash) {
             Some(package @ Package::WithMetaFar { .. }) => {
                 let Package::WithMetaFar { path, required_blobs } =
@@ -171,6 +194,9 @@ impl DynamicIndex {
 
     /// Notifies dynamic index that the given package installation has been canceled.
     pub fn cancel_install(&mut self, package_hash: &Hash) {
+        if self.is_disabled() {
+            return;
+        }
         match self.packages.get(package_hash) {
             Some(Package::Pending) | Some(Package::WithMetaFar { .. }) => {
                 self.packages.remove(package_hash);
@@ -199,6 +225,10 @@ impl DynamicIndex {
                 }
             })
         }
+    }
+
+    fn is_disabled(&self) -> bool {
+        matches!(self.protect_dynamic_packages, crate::DynamicProtection::Disabled)
     }
 }
 

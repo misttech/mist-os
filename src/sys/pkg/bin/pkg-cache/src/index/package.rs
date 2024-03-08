@@ -47,6 +47,16 @@ pub enum AddBlobsError {
 
 impl PackageIndex {
     /// Creates an empty PackageIndex.
+    pub fn from_config(protect_dynamic_packages: crate::DynamicProtection) -> Self {
+        Self {
+            dynamic: DynamicIndex::from_config(protect_dynamic_packages),
+            retained: RetainedIndex::new(),
+            writing: WritingIndex::new(),
+        }
+    }
+
+    /// Creates an empty PackageIndex.
+    #[cfg(test)]
     pub fn new() -> Self {
         Self {
             dynamic: DynamicIndex::new(),
@@ -186,13 +196,6 @@ impl PackageIndex {
     pub fn all_blobs(&self) -> HashSet<Hash> {
         let mut all = self.dynamic.all_blobs();
         all.extend(self.retained.all_blobs());
-        all.extend(self.writing.all_blobs());
-        all
-    }
-
-    /// Returns all blobs protected by this index except those protected only by the dynamic index.
-    pub fn all_blobs_ignoring_dynamic_index(&self) -> HashSet<Hash> {
-        let mut all = self.retained.all_blobs();
         all.extend(self.writing.all_blobs());
         all
     }
