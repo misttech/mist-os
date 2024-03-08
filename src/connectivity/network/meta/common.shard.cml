@@ -249,6 +249,14 @@
             from: "#netstack",
             as: "fuchsia.posix.socket.packet.Provider_OnlyForStarnix",
         },
+
+        // TODO(https://fxbug.dev/328647117): This is not a long term solution and should be fixed
+        // soon.
+        {
+            protocol: [ "fuchsia.net.name.DnsServerWatcher" ],
+            from: "#netstack",
+            as: "fuchsia.net.name.DnsServerWatcher_OnlyForLowpan",
+        },
         {
             protocol: [ "fuchsia.net.name.Lookup" ],
             from: "#dns-resolver",
@@ -262,7 +270,10 @@
             from: "#reachability",
         },
         {
-            protocol: [ "fuchsia.net.masquerade.Factory" ],
+            protocol: [
+                "fuchsia.net.dhcpv6.PrefixProvider",
+                "fuchsia.net.masquerade.Factory",
+            ],
             from: "#netcfg",
         },
 
