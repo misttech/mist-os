@@ -1813,8 +1813,12 @@ Extracted items use the file names shown below:\n\
     // Zero fill to the end of the page.
     buffer.Pad(header_size - buffer.size());
 
-    // Only now do we know the total size of the image.
-    item->header_.length = data_off;
+    // Only now do we know the total uncompressed length of the image. The
+    // streaming compression logic holds as invariant that `length` defaults to
+    // the uncompressed length - to later be updated as the compressed length -
+    // so set that as well.
+    item->header_.extra = data_off;
+    item->header_.length = item->header_.extra;
 
     if (!compress) {
       // Checksum the BOOTFS image right now: header and then payload.
@@ -1953,14 +1957,13 @@ Extracted items use the file names shown below:\n\
     return ItemPtr(new Item(header, compress));
   }
 
-  void StreamRawPayload(OutputStream* out) {
-    do {
-      out->Write(payload_.front());
-      payload_.pop_front();
-    } while (!payload_.empty());
+  void StreamRawPayload(OutputStream* out) const {
+    for (const iovec& chunk : payload_) {
+      out->Write(chunk);
+    };
   }
 
-  uint32_t StreamRaw(OutputStream* out) {
+  uint32_t StreamRaw(OutputStream* out) const {
     // The header is already fully baked.
     out->Write(Iovec(&header_, sizeof(header_)));
     // The payload goes out as is.
@@ -1968,15 +1971,14 @@ Extracted items use the file names shown below:\n\
     return sizeof(header_) + header_.length;
   }
 
-  uint32_t StreamCompressed(OutputStream* out) {
+  uint32_t StreamCompressed(OutputStream* out) const {
     // Compress and checksum the payload.
     Compressor compressor(compress_);
     compressor.Init(out, header_);
-    do {
+    for (const iovec& chunk : payload_) {
       // The compressor streams the header and compressed payload out.
-      compressor.Write(out, payload_.front());
-      payload_.pop_front();
-    } while (!payload_.empty());
+      compressor.Write(out, chunk);
+    };
     // This writes the final header as well as the last of the payload.
     return compressor.Finish(out);
   }
@@ -2859,25 +2861,32 @@ int main(int argc, char** argv) {
   FileWriter writer(outfile, std::move(outdir));
 
   // TODO(phosek): document the JSON schema used for this output.
-  if (json_output) {
-    auto f = fopen(json_output, "w");
-    if (!f) {
-      perror(json_output);
-      exit(1);
+  auto output_json = [json_output, &items]() {
+    if (json_output) {
+      auto f = fopen(json_output, "w");
+      if (!f) {
+        perror(json_output);
+        exit(1);
+      }
+      char buffer[kJsonBufferSize];
+      rapidjson::FileWriteStream os(f, buffer, sizeof(buffer));
+      rapidjson::PrettyWriter<rapidjson::FileWriteStream> writer(os);
+      writer.StartArray();
+      for (auto& item : items) {
+        item->EmitJson(writer);
+      }
+      writer.EndArray();
+      fclose(f);
     }
-    char buffer[kJsonBufferSize];
-    rapidjson::FileWriteStream os(f, buffer, sizeof(buffer));
-    rapidjson::PrettyWriter<rapidjson::FileWriteStream> writer(os);
-    writer.StartArray();
-    for (auto& item : items) {
-      item->EmitJson(writer);
-    }
-    writer.EndArray();
-    fclose(f);
-  }
+  };
 
   if (outfile && !extract) {
     Item::WriteZBI(&writer, "boot.zbi", items);
+
+    // When writing an output ZBI, be sure to call output_json() after, as
+    // WriteZBI() finalizes the item header fields only known at compression
+    // time.
+    output_json();
   } else if (list_contents || verbose || extract) {
     if (list_contents || verbose) {
       if (const char* unbootable = BootableImage(items, bootable)) {
@@ -2886,6 +2895,11 @@ int main(int argc, char** argv) {
         puts("BOOTABLE: bootable image");
       }
     }
+
+    // When in 'list' mode, be sure to output the JSON first, as the listing is
+    // intended to affect the tool's return code and writing the JSON output
+    // file should not be skipped when returning one of those failures.
+    output_json();
 
     // Contents start after the ZBI_TYPE_CONTAINER header.
     uint32_t pos = sizeof(zbi_header_t);

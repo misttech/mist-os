@@ -27,7 +27,8 @@ group("tests") {
   deps = [
     ":zbi-deduplication-test",
     ":zbi-input-size-limit-test",
-    ":zbi-storage-kernel-test",
+    ":zbi-storage-kernel-test.compressed",
+    ":zbi-storage-kernel-test.uncompressed",
   ]
   if (!is_mac) {
     # TODO(https://fxbug.dev/42166036): when bug fixed, add the dep below
@@ -139,16 +140,52 @@ generated_file("bootfs-manifest") {
   deps = [ ":bootfs-entry" ]
 }
 
-input_test("zbi-storage-kernel-test") {
+input_test("zbi-storage-kernel-test.compressed") {
   sources = [ bootfs_manifest ]
-  args = [ "--files-type=kernel" ]
+  args = [
+    "--compressed=max",
+    "--files-type=kernel",
+  ]
   fields = [
     "type",
+    "uncompressed_size",
     "contents",
   ]
   expected = [
     {
       type = "KERNEL"
+      uncompressed_size = 4096
+      contents = [
+        {
+          length = 0
+          name = "DEST"
+          offset = 4096
+          size = 0
+        },
+      ]
+    },
+  ]
+
+  deps = [ ":bootfs-manifest" ]
+}
+
+input_test("zbi-storage-kernel-test.uncompressed") {
+  sources = [ bootfs_manifest ]
+  args = [
+    "--uncompressed",
+    "--files-type=kernel",
+  ]
+  fields = [
+    "type",
+    "size",
+    "uncompressed_size",
+    "contents",
+  ]
+  expected = [
+    {
+      type = "KERNEL"
+      size = 4096
+      uncompressed_size = 4096
       contents = [
         {
           length = 0
