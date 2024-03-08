@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use display_types::IMAGE_TILING_TYPE_CAPTURE;
+use display_types::IMAGE_TILING_TYPE_LINEAR;
 
 use {
     fidl::endpoints::ClientEnd,
@@ -284,7 +284,7 @@ impl Coordinator {
                 &display_types::ImageConfig {
                     width: 0,
                     height: 0,
-                    tiling_type: IMAGE_TILING_TYPE_CAPTURE,
+                    tiling_type: IMAGE_TILING_TYPE_LINEAR,
                 },
             )
             .await?
