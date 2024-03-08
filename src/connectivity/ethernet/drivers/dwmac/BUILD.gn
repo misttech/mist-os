@@ -9,6 +9,7 @@ driver_bind_rules("dwmac_bind") {
   rules = "dwmac.bind"
   tests = "bind-tests.json"
   deps = [
+    "//sdk/fidl/fuchsia.hardware.ethernet.board:fuchsia.hardware.ethernet.board_bindlib",
     "//src/devices/bind/fuchsia.designware.platform",
     "//src/devices/bind/fuchsia.ethernet",
     "//src/devices/bind/fuchsia.platform",

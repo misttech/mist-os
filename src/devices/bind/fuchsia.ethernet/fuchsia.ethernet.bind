@@ -9,10 +9,6 @@ extend uint fuchsia.BIND_PROTOCOL {
   IMPL = 0x0F,
 };
 
-extend uint fuchsia.BIND_FIDL_PROTOCOL {
-  BOARD_SERVICE = 25, // fuchsia.hardware.ethernet.board.Service
-};
-
 // The ethernet protocol is being deprecated. The LEGACY property allows
 // drivers to bind to the legacy implementation instead of the netdevice
 // migration shim.

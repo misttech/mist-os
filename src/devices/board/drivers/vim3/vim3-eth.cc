@@ -17,8 +17,8 @@
 #include <bind/fuchsia/amlogic/platform/cpp/bind.h>
 #include <bind/fuchsia/cpp/bind.h>
 #include <bind/fuchsia/designware/platform/cpp/bind.h>
-#include <bind/fuchsia/ethernet/cpp/bind.h>
 #include <bind/fuchsia/gpio/cpp/bind.h>
+#include <bind/fuchsia/hardware/ethernet/board/cpp/bind.h>
 #include <bind/fuchsia/hardware/gpio/cpp/bind.h>
 #include <fbl/algorithm.h>
 #include <soc/aml-a311d/a311d-gpio.h>
@@ -117,8 +117,8 @@ static const fpbus::Node dwmac_dev = []() {
 }();
 
 const std::vector<fdf::BindRule> kEthBoardRules = {
-    fdf::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
-                            bind_fuchsia_ethernet::BIND_FIDL_PROTOCOL_BOARD_SERVICE),
+    fdf::MakeAcceptBindRule(bind_fuchsia_hardware_ethernet_board::SERVICE,
+                            bind_fuchsia_hardware_ethernet_board::SERVICE_ZIRCONTRANSPORT),
     fdf::MakeAcceptBindRule(bind_fuchsia::PLATFORM_DEV_VID,
                             bind_fuchsia_designware_platform::BIND_PLATFORM_DEV_VID_DESIGNWARE),
     fdf::MakeAcceptBindRule(bind_fuchsia::PLATFORM_DEV_DID,
@@ -126,8 +126,8 @@ const std::vector<fdf::BindRule> kEthBoardRules = {
 };
 
 const std::vector<fdf::NodeProperty> kEthBoardProperties = {
-    fdf::MakeProperty(bind_fuchsia::FIDL_PROTOCOL,
-                      bind_fuchsia_ethernet::BIND_FIDL_PROTOCOL_BOARD_SERVICE),
+    fdf::MakeProperty(bind_fuchsia_hardware_ethernet_board::SERVICE,
+                      bind_fuchsia_hardware_ethernet_board::SERVICE_ZIRCONTRANSPORT),
 };
 
 const std::vector<fdf::ParentSpec> kEthBoardParents = {
