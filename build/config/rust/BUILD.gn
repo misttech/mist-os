@@ -70,14 +70,18 @@ config("no_features") {
 
 config("incremental") {
   if (rust_incremental != "") {
-    rustflags = [ "-Cincremental=" + rust_incremental ]
+    if (rust_rbe_enable) {
+      # Hide incremental mode from remote execution; do not attempt to
+      # use any local incremental cache state (which would surely
+      # result in a cache miss).
+      # Caveat: Local and remote outputs may no longer be bit-identical
+      # when adding such local-only options.  Use with care.
+      rustflags = [ "--local-only=-Cincremental=" + rust_incremental ]
+    } else {
+      rustflags = [ "-Cincremental=" + rust_incremental ]
+    }
   }
 }
-
-assert(
-    rust_incremental == "" || !rust_rbe_enable ||
-        rust_rbe_exec_strategy == "racing",
-    "Rust-incremental compilation is non-hermetic and is likely to cache-miss with remote execution.  However, you may race remote vs. local execution with `rust_rbe_exec_strategy = \"racing\"` (experimental).")
 
 config("one_codegen_unit") {
   # Disable codegen parallelism.
