@@ -204,13 +204,6 @@ declare_args() {
   bazel_product_bundle_prefix = false
   bazel_product_bundle_board = false
 
-  # TODO(jayzhuang): Remove once all users are using bazel_product_bundle_root.
-  #
-  # If these are defined, bazel_product_bundle path will be overwritten
-  # accordingly.
-  vendor_product_dir = false
-  vendor_board_dir = false
-
   # Extra GN targets to include when Bazel assembly is enabled. This list is
   # useful for including verification and other Bazel assembly specific targets.
   extra_bazel_assembly_targets = []
@@ -258,13 +251,4 @@ if (bazel_product_bundle_prefix != false &&
       bazel_product_bundle_board
 } else {
   bazel_product_bundle_target = ""
-}
-
-if (vendor_product_dir != false || vendor_board_dir != false) {
-  if (vendor_product_dir != false) {
-    product_bundle_dir = vendor_product_dir
-  } else {
-    product_bundle_dir = vendor_board_dir
-  }
-  bazel_product_bundle_target = "//${product_bundle_dir}/${build_info_product}:product_bundle.${build_info_board}"
 }
