@@ -13,7 +13,7 @@
         "name": "Bad protocol",
         "expected": "abort",
         "device": {
-            "fuchsia.BIND_FIDL_PROTOCOL": "fuchsia.rpmb.BIND_FIDL_PROTOCOL.DEVICE",
+            "fuchsia.hardware.rpmb.Service": "fuchsia.hardware.rpmb.Service.ZirconTransport",
             "fuchsia.BIND_PLATFORM_DEV_VID": "fuchsia.ti.platform.BIND_PLATFORM_DEV_VID.TI",
             "fuchsia.BIND_PLATFORM_DEV_DID": "0x06",
             "fuchsia.BIND_PLATFORM_DEV_PID": "0x06"

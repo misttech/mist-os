@@ -4,8 +4,8 @@
 
 composite tee;
 
+using fuchsia.hardware.rpmb;
 using fuchsia.platform;
-using fuchsia.rpmb;
 
 primary node "pdev" {
   fuchsia.BIND_PROTOCOL == fuchsia.platform.BIND_PROTOCOL.DEVICE;
@@ -16,5 +16,5 @@ primary node "pdev" {
 }
 
 optional node "rpmb" {
-  fuchsia.BIND_FIDL_PROTOCOL == fuchsia.rpmb.BIND_FIDL_PROTOCOL.DEVICE;
+  fuchsia.hardware.rpmb.Service == fuchsia.hardware.rpmb.Service.ZirconTransport;
 }
