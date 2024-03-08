@@ -10,9 +10,9 @@
 #include <bind/fuchsia/acpi/cpp/bind.h>
 #include <bind/fuchsia/cpp/bind.h>
 #include <bind/fuchsia/hardware/interrupt/cpp/bind.h>
+#include <bind/fuchsia/hardware/spi/cpp/bind.h>
 #include <bind/fuchsia/i2c/cpp/bind.h>
 #include <bind/fuchsia/pci/cpp/bind.h>
-#include <bind/fuchsia/spi/cpp/bind.h>
 #include <bind/fuchsia/sysmem/cpp/bind.h>
 #include <fbl/string_printf.h>
 
@@ -383,10 +383,10 @@ DeviceBuilder::GetFragmentBindRulesAndPropertiesForChild(size_t child_index) {
       // No Banjo protocol needed for I2C.
       break;
     case BusType::kSpi:
-      bind_rules.emplace_back(ddk::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
-                                                      bind_fuchsia_spi::BIND_FIDL_PROTOCOL_DEVICE));
-      properties.emplace_back(ddk::MakeProperty(bind_fuchsia::FIDL_PROTOCOL,
-                                                bind_fuchsia_spi::BIND_FIDL_PROTOCOL_DEVICE));
+      bind_rules.emplace_back(ddk::MakeAcceptBindRule(
+          bind_fuchsia_hardware_spi::SERVICE, bind_fuchsia_hardware_spi::SERVICE_ZIRCONTRANSPORT));
+      properties.emplace_back(ddk::MakeProperty(
+          bind_fuchsia_hardware_spi::SERVICE, bind_fuchsia_hardware_spi::SERVICE_ZIRCONTRANSPORT));
       break;
     case BusType::kUnknown:
       ZX_PANIC("Bus type is unknown");

@@ -23,7 +23,7 @@ DDK_FIDL_PROTOCOL_DEF(PCI,             4, "fuchsia.hardware.pci.Service")
 // 5 was "fuchsia.hardware.goldfish.pipe.Service"
 // 6 was "fuchsia.hardware.goldfish.AddressSpaceService"
 // 7 was "fuchsia.hardware.goldfish.SyncService"
-DDK_FIDL_PROTOCOL_DEF(SPI,             8, "fuchsia.hardware.spi.Service")
+// 8 was "fuchsia.hardware.spi.Service"
 DDK_FIDL_PROTOCOL_DEF(SYSMEM,          9, "fuchsia.hardware.sysmem.Service")
 DDK_FIDL_PROTOCOL_DEF(MAILBOX,         10, "fuchsia.hardware.mailbox.Service")
 DDK_FIDL_PROTOCOL_DEF(PLATFORM_BUS,    11, "fuchsia.hardware.platform.bus.PlatformBus")
