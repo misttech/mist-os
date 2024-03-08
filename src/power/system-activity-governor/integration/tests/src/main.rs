@@ -12,8 +12,10 @@ use fidl_fuchsia_power_suspend as fsuspend;
 use fidl_fuchsia_power_system as fsystem;
 use fidl_test_suspendcontrol as tsc;
 use fidl_test_systemactivitygovernor as ftest;
+use fuchsia_async as fasync;
 use fuchsia_component::client::connect_to_protocol;
 use fuchsia_zircon::{self as zx, HandleBased};
+use futures::{channel::mpsc, StreamExt};
 use power_broker_client::PowerElementContext;
 use realm_proxy_client::RealmProxyClient;
 
@@ -285,7 +287,7 @@ async fn test_activity_governor_increments_suspend_success_on_application_activi
     );
 
     drop(suspend_lease_control);
-    assert!(suspend_device.await_suspend().await.unwrap().unwrap().state_index.is_none());
+    assert_eq!(0, suspend_device.await_suspend().await.unwrap().unwrap().state_index.unwrap());
     suspend_device
         .resume(&tsc::DeviceResumeRequest::Result(tsc::SuspendResult {
             suspend_duration: Some(2i64),
@@ -366,7 +368,7 @@ async fn test_activity_governor_increments_suspend_success_on_application_activi
     );
 
     drop(suspend_lease_control);
-    assert!(suspend_device.await_suspend().await.unwrap().unwrap().state_index.is_none());
+    assert_eq!(0, suspend_device.await_suspend().await.unwrap().unwrap().state_index.unwrap());
     suspend_device
         .resume(&tsc::DeviceResumeRequest::Result(tsc::SuspendResult {
             suspend_duration: Some(2i64),
@@ -464,7 +466,7 @@ async fn test_activity_governor_raises_execution_state_power_level_on_wake_handl
     );
 
     drop(wake_handling_lease_control);
-    assert!(suspend_device.await_suspend().await.unwrap().unwrap().state_index.is_none());
+    assert_eq!(0, suspend_device.await_suspend().await.unwrap().unwrap().state_index.unwrap());
     suspend_device
         .resume(&tsc::DeviceResumeRequest::Result(tsc::SuspendResult {
             suspend_duration: Some(2i64),
@@ -772,6 +774,280 @@ async fn test_activity_governor_increments_fail_count_on_suspend_error() -> Resu
                 last_failed_error: 7u64,
                 last_time_in_suspend: -1i64,
                 last_time_in_suspend_operations: -1i64,
+            },
+            "fuchsia.inspect.Health": contains {
+                status: "OK",
+            },
+        }
+    );
+
+    Ok(())
+}
+
+#[fuchsia::test]
+async fn test_activity_governor_suspends_after_listener_hanging_on_resume() -> Result<()> {
+    let (realm, activity_governor_moniker, suspend_device) = create_realm().await?;
+    set_up_default_suspender(&suspend_device).await;
+
+    let stats = realm.connect_to_protocol::<fsuspend::StatsMarker>().await?;
+    let activity_governor = realm.connect_to_protocol::<fsystem::ActivityGovernorMarker>().await?;
+
+    // First watch should return immediately with default values.
+    let current_stats = stats.watch().await?;
+    assert_eq!(Some(0), current_stats.success_count);
+    assert_eq!(Some(0), current_stats.fail_count);
+    assert_eq!(None, current_stats.last_failed_error);
+    assert_eq!(None, current_stats.last_time_in_suspend);
+
+    let (listener_client_end, mut listener_stream) =
+        fidl::endpoints::create_request_stream().unwrap();
+    activity_governor
+        .register_listener(fsystem::ActivityGovernorRegisterListenerRequest {
+            listener: Some(listener_client_end),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+
+    let (on_suspend_tx, mut on_suspend_rx) = mpsc::channel(1);
+    let (on_resume_tx, mut on_resume_rx) = mpsc::channel(1);
+
+    fasync::Task::local(async move {
+        let mut on_suspend_tx = on_suspend_tx;
+        let mut on_resume_tx = on_resume_tx;
+
+        while let Some(Ok(req)) = listener_stream.next().await {
+            match req {
+                fsystem::ActivityGovernorListenerRequest::OnResume { responder } => {
+                    fasync::Timer::new(fasync::Duration::from_millis(50)).await;
+                    responder.send().unwrap();
+                    fasync::Timer::new(fasync::Duration::from_millis(50)).await;
+                    on_resume_tx.try_send(()).unwrap();
+                }
+                fsystem::ActivityGovernorListenerRequest::OnSuspend { .. } => {
+                    on_suspend_tx.try_send(()).unwrap();
+                }
+                fsystem::ActivityGovernorListenerRequest::_UnknownMethod { ordinal, .. } => {
+                    panic!("Unexpected method: {}", ordinal);
+                }
+            }
+        }
+    })
+    .detach();
+
+    let wake_controller = create_wake_topology(&realm).await?;
+
+    // Cycle execution_state power level to trigger a suspend/resume cycle.
+    let wake_lease_control = lease(&wake_controller, 1).await?;
+    drop(wake_lease_control);
+
+    // OnSuspend and OnResume should have been called once.
+    on_suspend_rx.next().await.unwrap();
+
+    assert_eq!(0, suspend_device.await_suspend().await.unwrap().unwrap().state_index.unwrap());
+    suspend_device
+        .resume(&tsc::DeviceResumeRequest::Result(tsc::SuspendResult {
+            suspend_duration: Some(2i64),
+            suspend_overhead: Some(1i64),
+            ..Default::default()
+        }))
+        .await
+        .unwrap()
+        .unwrap();
+
+    on_resume_rx.next().await.unwrap();
+
+    // Should only have been 1 suspend after all listener handling.
+    let current_stats = stats.watch().await?;
+    assert_eq!(Some(1), current_stats.success_count);
+    assert_eq!(Some(0), current_stats.fail_count);
+    assert_eq!(None, current_stats.last_failed_error);
+    assert_eq!(Some(2), current_stats.last_time_in_suspend);
+
+    // Await SAG's power elements to drop their power levels.
+    block_until_inspect_matches!(
+        activity_governor_moniker,
+        root: {
+            power_elements: {
+                execution_state: {
+                    power_level: 0u64,
+                },
+                application_activity: {
+                    power_level: 0u64,
+                },
+                wake_handling: {
+                    power_level: 0u64,
+                },
+                execution_resume_latency: contains {
+                    power_level: 0u64,
+                },
+            },
+            suspend_stats: {
+                success_count: 1u64,
+                fail_count: 0u64,
+                last_failed_error: 0u64,
+                last_time_in_suspend: 2u64,
+                last_time_in_suspend_operations: 1u64,
+            },
+            "fuchsia.inspect.Health": contains {
+                status: "OK",
+            },
+        }
+    );
+
+    Ok(())
+}
+
+#[fuchsia::test]
+async fn test_activity_governor_handles_listener_raising_power_levels() -> Result<()> {
+    let (realm, activity_governor_moniker, suspend_device) = create_realm().await?;
+    set_up_default_suspender(&suspend_device).await;
+
+    let stats = realm.connect_to_protocol::<fsuspend::StatsMarker>().await?;
+    let activity_governor = realm.connect_to_protocol::<fsystem::ActivityGovernorMarker>().await?;
+
+    // First watch should return immediately with default values.
+    let current_stats = stats.watch().await?;
+    assert_eq!(Some(0), current_stats.success_count);
+    assert_eq!(Some(0), current_stats.fail_count);
+    assert_eq!(None, current_stats.last_failed_error);
+    assert_eq!(None, current_stats.last_time_in_suspend);
+
+    let suspend_controller = create_suspend_topology(&realm).await?;
+
+    let (listener_client_end, mut listener_stream) =
+        fidl::endpoints::create_request_stream().unwrap();
+    activity_governor
+        .register_listener(fsystem::ActivityGovernorRegisterListenerRequest {
+            listener: Some(listener_client_end),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+
+    let (on_suspend_tx, mut on_suspend_rx) = mpsc::channel(1);
+    let (on_resume_tx, mut on_resume_rx) = mpsc::channel(1);
+
+    fasync::Task::local(async move {
+        let mut on_suspend_tx = on_suspend_tx;
+        let mut on_resume_tx = on_resume_tx;
+
+        while let Some(Ok(req)) = listener_stream.next().await {
+            match req {
+                fsystem::ActivityGovernorListenerRequest::OnResume { responder } => {
+                    let suspend_lease = lease(&suspend_controller, 1).await.unwrap();
+                    on_resume_tx.try_send(suspend_lease).unwrap();
+                    responder.send().unwrap();
+                }
+                fsystem::ActivityGovernorListenerRequest::OnSuspend { .. } => {
+                    on_suspend_tx.try_send(()).unwrap();
+                }
+                fsystem::ActivityGovernorListenerRequest::_UnknownMethod { ordinal, .. } => {
+                    panic!("Unexpected method: {}", ordinal);
+                }
+            }
+        }
+    })
+    .detach();
+
+    let wake_controller = create_wake_topology(&realm).await?;
+
+    // Cycle execution_state power level to trigger a suspend/resume cycle.
+    let wake_lease_control = lease(&wake_controller, 1).await?;
+    drop(wake_lease_control);
+
+    // OnSuspend should have been called.
+    on_suspend_rx.next().await.unwrap();
+
+    assert_eq!(0, suspend_device.await_suspend().await.unwrap().unwrap().state_index.unwrap());
+    suspend_device
+        .resume(&tsc::DeviceResumeRequest::Result(tsc::SuspendResult {
+            suspend_duration: Some(2i64),
+            suspend_overhead: Some(1i64),
+            ..Default::default()
+        }))
+        .await
+        .unwrap()
+        .unwrap();
+
+    let current_stats = stats.watch().await?;
+    assert_eq!(Some(1), current_stats.success_count);
+    assert_eq!(Some(0), current_stats.fail_count);
+    assert_eq!(None, current_stats.last_failed_error);
+    assert_eq!(Some(2), current_stats.last_time_in_suspend);
+
+    // At this point, the listener should have raised the execution_state power level to 2.
+    block_until_inspect_matches!(
+        activity_governor_moniker,
+        root: {
+            power_elements: {
+                execution_state: {
+                    power_level: 2u64,
+                },
+                application_activity: {
+                    power_level: 1u64,
+                },
+                wake_handling: {
+                    power_level: 0u64,
+                },
+                execution_resume_latency: contains {
+                    power_level: 0u64,
+                },
+            },
+            suspend_stats: {
+                success_count: 1u64,
+                fail_count: 0u64,
+                last_failed_error: 0u64,
+                last_time_in_suspend: 2u64,
+                last_time_in_suspend_operations: 1u64,
+            },
+            "fuchsia.inspect.Health": contains {
+                status: "OK",
+            },
+        }
+    );
+
+    // Drop the lease and wait for suspend,
+    on_resume_rx.next().await.unwrap();
+
+    // OnSuspend should be called again.
+    on_suspend_rx.next().await.unwrap();
+
+    assert_eq!(0, suspend_device.await_suspend().await.unwrap().unwrap().state_index.unwrap());
+    suspend_device
+        .resume(&tsc::DeviceResumeRequest::Result(tsc::SuspendResult {
+            suspend_duration: Some(2i64),
+            suspend_overhead: Some(1i64),
+            ..Default::default()
+        }))
+        .await
+        .unwrap()
+        .unwrap();
+
+    // At this point, the listener should have raised the execution_state power level to 2.
+    block_until_inspect_matches!(
+        activity_governor_moniker,
+        root: {
+            power_elements: {
+                execution_state: {
+                    power_level: 2u64,
+                },
+                application_activity: {
+                    power_level: 1u64,
+                },
+                wake_handling: {
+                    power_level: 0u64,
+                },
+                execution_resume_latency: contains {
+                    power_level: 0u64,
+                },
+            },
+            suspend_stats: {
+                success_count: 2u64,
+                fail_count: 0u64,
+                last_failed_error: 0u64,
+                last_time_in_suspend: 2u64,
+                last_time_in_suspend_operations: 1u64,
             },
             "fuchsia.inspect.Health": contains {
                 status: "OK",

@@ -16,9 +16,16 @@ use fuchsia_async as fasync;
 use fuchsia_component::server::ServiceFs;
 use fuchsia_inspect::{ArrayProperty, Property};
 use fuchsia_zircon as zx;
-use futures::{future::LocalBoxFuture, prelude::*};
+use futures::{
+    channel::mpsc::{self, Receiver, Sender},
+    future::LocalBoxFuture,
+    prelude::*,
+};
 use power_broker_client::PowerElementContext;
-use std::{cell::RefCell, rc::Rc};
+use std::{
+    cell::{Cell, RefCell},
+    rc::Rc,
+};
 
 type NotifyFn = Box<dyn Fn(&fsuspend::SuspendStats, fsuspend::StatsWatchResponder) -> bool>;
 type StatsHangingGet = HangingGet<fsuspend::SuspendStats, fsuspend::StatsWatchResponder, NotifyFn>;
@@ -30,13 +37,23 @@ enum IncomingRequest {
 }
 
 struct SuspendStatsManager {
+    /// The hanging get handler used to notify subscribers of changes to suspend stats.
     hanging_get: RefCell<StatsHangingGet>,
+    /// The publisher used to push changes to suspend stats.
     stats_publisher: StatsPublisher,
+    /// The inspect node for suspend stats.
     inspect_node: fuchsia_inspect::Node,
+    /// The inspect node that contains the number of successful suspend attempts.
     success_count_node: fuchsia_inspect::UintProperty,
+    /// The inspect node that contains the number of failed suspend attempts.
     fail_count_node: fuchsia_inspect::UintProperty,
+    /// The inspect node that contains the error code of the last failed suspend attempt.
     last_failed_error_node: fuchsia_inspect::IntProperty,
+    /// The inspect node that contains the duration the platform spent in suspension in the last
+    /// attempt.
     last_time_in_suspend_node: fuchsia_inspect::IntProperty,
+    /// The inspect node that contains the duration the platform spent transitioning to a suspended
+    /// state in the last attempt.
     last_time_in_suspend_operations_node: fuchsia_inspect::IntProperty,
 }
 
@@ -110,23 +127,46 @@ impl SuspendStatsManager {
                     .set(*stats.last_time_in_suspend_operations.as_ref().unwrap_or(&-1i64));
             });
 
-            tracing::debug!(?stats_opt, "suspend stats");
+            tracing::info!(?success, ?stats_opt, "Updating suspend stats");
             success
         });
     }
 }
 
-/// SystemActivityGovernor runs the server for fuchsia.power.suspend FIDL APIs.
+/// SystemActivityGovernor runs the server for fuchsia.power.suspend and fuchsia.power.system FIDL
+/// APIs.
 pub struct SystemActivityGovernor {
+    /// The root inspect node for system-activity-governor.
     inspect_root: fuchsia_inspect::Node,
+    /// The context used to manage the execution state power element.
     execution_state: PowerElementContext,
+    /// The context used to manage the application activity power element.
     application_activity: PowerElementContext,
+    /// The context used to manage the wake handling power element.
     wake_handling: PowerElementContext,
+    /// The context used to manage the execution resume latency power element.
     execution_resume_latency: PowerElementContext,
+    /// The manager used to report suspend stats to inspect and clients of
+    /// fuchsia.power.suspend.Stats.
     suspend_stats: SuspendStatsManager,
+    /// The FIDL proxy to the device used to trigger system suspend.
     suspender: fhsuspend::SuspenderProxy,
+    /// The collection of resume latencies supported by the suspender.
     resume_latencies: Vec<zx::sys::zx_duration_t>,
-    selected_suspend_state_index: RefCell<Option<u64>>,
+    /// The suspend state index that will be passed to the suspender when system suspend is
+    /// triggered.
+    selected_suspend_state_index: Cell<Option<u64>>,
+    /// The collection of ActivityGovernorListener that have registered through
+    /// fuchsia.power.system.ActivityGovernor/RegisterListener.
+    listeners: RefCell<Vec<fsystem::ActivityGovernorListenerProxy>>,
+    /// The flag used to track whether ActivityGovernorListener/OnResume notifications are still in
+    /// progress. If true, SystemActivityGovernor is currently processing on_resume notifications
+    /// and awaiting responses from listeners.
+    notify_resume_pending: Cell<bool>,
+    /// The flag used to track whether suspension is allowed based on execution_state's power level.
+    /// If true, execution_state has transitioned from a higher power state to
+    /// EXECUTION_STATE_INACTIVE and is still at the EXECUTION_STATE_INACTIVE power level.
+    suspend_allowed: Cell<bool>,
 }
 
 impl SystemActivityGovernor {
@@ -141,7 +181,8 @@ impl SystemActivityGovernor {
             &[EXECUTION_STATE_INACTIVE, EXECUTION_STATE_WAKE_HANDLING, EXECUTION_STATE_ACTIVE],
         )
         .build()
-        .await?;
+        .await
+        .expect("PowerElementContext encountered error while building execution_state");
 
         let application_activity = PowerElementContext::builder(
             topology,
@@ -155,7 +196,8 @@ impl SystemActivityGovernor {
             requires_level: EXECUTION_STATE_ACTIVE,
         }])
         .build()
-        .await?;
+        .await
+        .expect("PowerElementContext encountered error while building application_activity");
 
         let wake_handling = PowerElementContext::builder(
             topology,
@@ -169,13 +211,14 @@ impl SystemActivityGovernor {
             requires_level: EXECUTION_STATE_WAKE_HANDLING,
         }])
         .build()
-        .await?;
+        .await
+        .expect("PowerElementContext encountered error while building wake_handling");
 
         let resp = suspender
             .get_suspend_states()
             .await
-            .expect("FIDL error encountered while calling Suspend HAL")
-            .expect("Suspend HAL returned error when getting suspend states");
+            .expect("FIDL error encountered while calling Suspender")
+            .expect("Suspender returned error when getting suspend states");
         let suspend_states =
             resp.suspend_states.expect("Suspend HAL did not return any suspend states");
         tracing::info!(?suspend_states, "Got suspend states from suspend HAL");
@@ -184,7 +227,6 @@ impl SystemActivityGovernor {
             .iter()
             .map(|s| s.resume_latency.expect("resume_latency not given"))
             .collect();
-
         let latency_count = resume_latencies.len().try_into()?;
 
         let execution_resume_latency = PowerElementContext::builder(
@@ -193,7 +235,8 @@ impl SystemActivityGovernor {
             &Vec::from_iter(0..latency_count),
         )
         .build()
-        .await?;
+        .await
+        .expect("PowerElementContext encountered error while building execution_resume_latency");
 
         let suspend_stats = SuspendStatsManager::new(inspect_root.create_child("suspend_stats"));
 
@@ -206,7 +249,10 @@ impl SystemActivityGovernor {
             resume_latencies,
             suspend_stats,
             suspender,
-            selected_suspend_state_index: RefCell::new(None),
+            selected_suspend_state_index: Cell::new(None),
+            listeners: RefCell::new(Vec::new()),
+            notify_resume_pending: Cell::new(false),
+            suspend_allowed: Cell::new(false),
         }))
     }
 
@@ -215,7 +261,14 @@ impl SystemActivityGovernor {
         tracing::info!("Handling power elements");
         self.inspect_root.atomic_update(|node| {
             node.record_child("power_elements", |elements_node| {
-                self.run_execution_state(&elements_node);
+                let (es_suspend_tx, es_suspend_rx) = mpsc::channel(1);
+                let (listeners_suspend_tx, listeners_suspend_rx) = mpsc::channel(1);
+                self.run_suspend_task(
+                    es_suspend_rx,
+                    listeners_suspend_tx.clone(),
+                    listeners_suspend_rx,
+                );
+                self.run_execution_state(&elements_node, es_suspend_tx, listeners_suspend_tx);
                 self.run_application_activity(&elements_node);
                 self.run_wake_handling(&elements_node);
                 self.run_execution_resume_latency(elements_node);
@@ -226,7 +279,38 @@ impl SystemActivityGovernor {
         self.run_fidl_server().await
     }
 
-    fn run_execution_state(self: &Rc<Self>, inspect_node: &fuchsia_inspect::Node) {
+    fn run_suspend_task(
+        self: &Rc<Self>,
+        mut execution_state_suspend_signal: Receiver<()>,
+        listeners_done_signaller: Sender<()>,
+        mut listeners_done_signal: Receiver<()>,
+    ) {
+        let this = self.clone();
+        fasync::Task::local(async move {
+            loop {
+                let suspend_signal = futures::future::join(
+                    execution_state_suspend_signal.next(),
+                    listeners_done_signal.next(),
+                );
+                tracing::debug!("awaiting suspend signals");
+                suspend_signal.await;
+
+                // Check that the conditions to suspend are still satisfied.
+                if this.suspend_allowed.get() && !this.notify_resume_pending.get() {
+                    tracing::debug!("suspend signals received, triggering suspend");
+                    this.trigger_suspend(listeners_done_signaller.clone()).await;
+                }
+            }
+        })
+        .detach();
+    }
+
+    fn run_execution_state(
+        self: &Rc<Self>,
+        inspect_node: &fuchsia_inspect::Node,
+        execution_state_suspend_signaller: Sender<()>,
+        listeners_done_signaller: Sender<()>,
+    ) {
         let execution_state_node = inspect_node.create_child("execution_state");
         let this = self.clone();
 
@@ -241,50 +325,27 @@ impl SystemActivityGovernor {
                     // After other elements have been informed of new_power_level for
                     // execution_state, check whether the system should be suspended.
                     let sag = sag.clone();
+                    let mut execution_state_suspend_signaller =
+                        execution_state_suspend_signaller.clone();
+                    let listeners_done_signaller = listeners_done_signaller.clone();
+
                     async move {
                         if new_power_level == EXECUTION_STATE_INACTIVE {
-                            tracing::info!("Triggering suspend");
-                            let resp = sag
-                                .suspender
-                                .suspend(&fhsuspend::SuspenderSuspendRequest {
-                                    state_index: sag.selected_suspend_state_index.borrow().clone(),
-                                    ..Default::default()
-                                })
-                                .await;
-                            tracing::info!(?resp, "Handling suspend result");
-
-                            sag.suspend_stats.update(
-                                |stats_opt: &mut Option<fsuspend::SuspendStats>| {
-                                    let stats = stats_opt.as_mut().expect("stats is uninitialized");
-
-                                    match resp {
-                                        Ok(Ok(res)) => {
-                                            stats.last_time_in_suspend = res.suspend_duration;
-                                            stats.last_time_in_suspend_operations =
-                                                res.suspend_overhead;
-
-                                            if stats.last_time_in_suspend.is_some() {
-                                                stats.success_count =
-                                                    stats.success_count.map(|c| c + 1);
-                                            } else {
-                                                tracing::warn!("Failed to suspend");
-                                                stats.fail_count = stats.fail_count.map(|c| c + 1);
-                                            }
-                                        }
-                                        error => {
-                                            tracing::warn!(?error, "Failed to suspend");
-                                            stats.fail_count = stats.fail_count.map(|c| c + 1);
-
-                                            if let Ok(Err(error)) = error {
-                                                stats.last_failed_error = Some(error);
-                                            }
-                                        }
-                                    }
-
-                                    tracing::info!(?stats, "Updated suspend stats");
-                                    true
-                                },
-                            );
+                            tracing::debug!("beginning suspend process for execution_state");
+                            sag.suspend_allowed.set(true);
+                            if sag.notify_resume_pending.get() {
+                                tracing::debug!(
+                                    "notification in progress, sending suspend request"
+                                );
+                                let _ = execution_state_suspend_signaller.start_send(());
+                            } else {
+                                tracing::debug!(
+                                    "triggering suspend due to execution_state falling to 0",
+                                );
+                                sag.trigger_suspend(listeners_done_signaller.clone()).await;
+                            }
+                        } else {
+                            sag.suspend_allowed.set(false);
                         }
                     }
                     .boxed_local()
@@ -342,6 +403,7 @@ impl SystemActivityGovernor {
         execution_resume_latency_node.record(resume_latencies_node);
         let resume_latency_node =
             execution_resume_latency_node.create_int("resume_latency", self.resume_latencies[0]);
+        self.selected_suspend_state_index.set(Some(0));
 
         fasync::Task::local(async move {
             let sag = this.clone();
@@ -358,9 +420,7 @@ impl SystemActivityGovernor {
                     // update the value that will be sent to the suspend HAL when suspension
                     // is triggered to avoid data races.
                     if (new_power_level as usize) < sag.resume_latencies.len() {
-                        sag.selected_suspend_state_index
-                            .borrow_mut()
-                            .replace(new_power_level.into());
+                        sag.selected_suspend_state_index.set(Some(new_power_level.into()));
                     }
                     future::ready(()).boxed_local()
                 })),
@@ -438,6 +498,76 @@ impl SystemActivityGovernor {
                 }
             }
         }
+    }
+
+    async fn trigger_suspend(self: &Rc<Self>, listeners_done_signaller: Sender<()>) {
+        tracing::info!("Suspending");
+        self.notify_suspend();
+
+        let resp = self
+            .suspender
+            .suspend(&fhsuspend::SuspenderSuspendRequest {
+                state_index: self.selected_suspend_state_index.get(),
+                ..Default::default()
+            })
+            .await;
+
+        tracing::info!(?resp, "Resuming");
+
+        self.suspend_stats.update(|stats_opt: &mut Option<fsuspend::SuspendStats>| {
+            let stats = stats_opt.as_mut().expect("stats is uninitialized");
+
+            match resp {
+                Ok(Ok(res)) => {
+                    stats.last_time_in_suspend = res.suspend_duration;
+                    stats.last_time_in_suspend_operations = res.suspend_overhead;
+
+                    if stats.last_time_in_suspend.is_some() {
+                        stats.success_count = stats.success_count.map(|c| c + 1);
+                    } else {
+                        tracing::warn!("Failed to suspend in Suspender");
+                        stats.fail_count = stats.fail_count.map(|c| c + 1);
+                    }
+                }
+                error => {
+                    tracing::warn!(?error, "Failed to suspend");
+                    stats.fail_count = stats.fail_count.map(|c| c + 1);
+
+                    if let Ok(Err(error)) = error {
+                        stats.last_failed_error = Some(error);
+                    }
+                }
+            }
+            true
+        });
+
+        self.notify_resume(listeners_done_signaller);
+    }
+
+    fn notify_suspend(&self) {
+        // A client may call RegisterListener while handling on_suspend which may cause another
+        // mutable borrow of listeners. Clone the listeners to prevent this.
+        let listeners: Vec<_> = self.listeners.borrow_mut().clone();
+        for l in listeners {
+            let _ = l.on_suspend();
+        }
+    }
+
+    fn notify_resume(self: &Rc<Self>, mut listeners_done_signaller: Sender<()>) {
+        let this = self.clone();
+        self.notify_resume_pending.set(true);
+
+        fasync::Task::local(async move {
+            // A client may call RegisterListener while handling on_resume which may cause another
+            // mutable borrow of listeners. Clone the listeners to prevent this.
+            let listeners: Vec<_> = this.listeners.borrow_mut().clone();
+            for l in listeners {
+                let _ = l.on_resume().await;
+            }
+            this.notify_resume_pending.set(false);
+            let _ = listeners_done_signaller.start_send(());
+        })
+        .detach();
     }
 
     async fn run_fidl_server(self: &Rc<Self>) -> Result<()> {
@@ -522,8 +652,13 @@ impl SystemActivityGovernor {
                         );
                     }
                 }
-                fsystem::ActivityGovernorRequest::RegisterListener { responder, .. } => {
-                    // TODO(mbrunson): Implement RegisterListener.
+                fsystem::ActivityGovernorRequest::RegisterListener { responder, payload } => {
+                    match payload.listener {
+                        Some(listener) => {
+                            self.listeners.borrow_mut().push(listener.into_proxy().unwrap());
+                        }
+                        None => tracing::warn!("No listener provided in request"),
+                    }
                     let _ = responder.send();
                 }
                 fsystem::ActivityGovernorRequest::_UnknownMethod { ordinal, .. } => {
