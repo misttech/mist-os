@@ -10,10 +10,3 @@ extend uint fuchsia.BIND_PROTOCOL {
   PIPE = 0x13,
   SYNC = 0x9A,
 };
-
-// Must be kept in sync with the definition at src/lib/ddk/include/lib/ddk/fidl-protodefs.h
-extend uint fuchsia.BIND_FIDL_PROTOCOL {
-  PIPE = 0x05,
-  ADDRESS_SPACE = 0x06,
-  SYNC = 0x07,
-};

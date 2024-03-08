@@ -10,8 +10,9 @@
 #include <array>
 
 #include <bind/fuchsia/cpp/bind.h>
-#include <bind/fuchsia/goldfish/platform/cpp/bind.h>
 #include <bind/fuchsia/google/platform/cpp/bind.h>
+#include <bind/fuchsia/hardware/goldfish/cpp/bind.h>
+#include <bind/fuchsia/hardware/goldfish/pipe/cpp/bind.h>
 #include <bind/fuchsia/sysmem/cpp/bind.h>
 
 #include "src/devices/board/drivers/x86/x86.h"
@@ -22,8 +23,8 @@
 namespace x86 {
 
 const ddk::BindRule kGoldfishPipeRules[] = {
-    ddk::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
-                            bind_fuchsia_goldfish_platform::BIND_FIDL_PROTOCOL_PIPE),
+    ddk::MakeAcceptBindRule(bind_fuchsia_hardware_goldfish_pipe::SERVICE,
+                            bind_fuchsia_hardware_goldfish_pipe::SERVICE_ZIRCONTRANSPORT),
     ddk::MakeAcceptBindRule(bind_fuchsia::PLATFORM_DEV_VID,
                             bind_fuchsia_google_platform::BIND_PLATFORM_DEV_VID_GOOGLE),
     ddk::MakeAcceptBindRule(bind_fuchsia::PLATFORM_DEV_PID,
@@ -35,8 +36,8 @@ const ddk::BindRule kGoldfishPipeRules[] = {
 };
 
 const device_bind_prop_t kGoldfishPipeProperties[] = {
-    ddk::MakeProperty(bind_fuchsia::FIDL_PROTOCOL,
-                      bind_fuchsia_goldfish_platform::BIND_FIDL_PROTOCOL_PIPE),
+    ddk::MakeProperty(bind_fuchsia_hardware_goldfish_pipe::SERVICE,
+                      bind_fuchsia_hardware_goldfish_pipe::SERVICE_ZIRCONTRANSPORT),
     ddk::MakeProperty(bind_fuchsia::PLATFORM_DEV_VID,
                       bind_fuchsia_google_platform::BIND_PLATFORM_DEV_VID_GOOGLE),
     ddk::MakeProperty(bind_fuchsia::PLATFORM_DEV_PID,
@@ -46,23 +47,23 @@ const device_bind_prop_t kGoldfishPipeProperties[] = {
 };
 
 const ddk::BindRule kGoldfishAddressSpaceRules[] = {
-    ddk::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
-                            bind_fuchsia_goldfish_platform::BIND_FIDL_PROTOCOL_ADDRESS_SPACE),
+    ddk::MakeAcceptBindRule(bind_fuchsia_hardware_goldfish::ADDRESSSPACESERVICE,
+                            bind_fuchsia_hardware_goldfish::ADDRESSSPACESERVICE_ZIRCONTRANSPORT),
 };
 
 const device_bind_prop_t kGoldfishAddressSpaceProperties[] = {
-    ddk::MakeProperty(bind_fuchsia::FIDL_PROTOCOL,
-                      bind_fuchsia_goldfish_platform::BIND_FIDL_PROTOCOL_ADDRESS_SPACE),
+    ddk::MakeProperty(bind_fuchsia_hardware_goldfish::ADDRESSSPACESERVICE,
+                      bind_fuchsia_hardware_goldfish::ADDRESSSPACESERVICE_ZIRCONTRANSPORT),
 };
 
 const ddk::BindRule kGoldfishSyncRules[] = {
-    ddk::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
-                            bind_fuchsia_goldfish_platform::BIND_FIDL_PROTOCOL_SYNC),
+    ddk::MakeAcceptBindRule(bind_fuchsia_hardware_goldfish::SYNCSERVICE,
+                            bind_fuchsia_hardware_goldfish::SYNCSERVICE_ZIRCONTRANSPORT),
 };
 
 const device_bind_prop_t kGoldfishSyncProperties[] = {
-    ddk::MakeProperty(bind_fuchsia::FIDL_PROTOCOL,
-                      bind_fuchsia_goldfish_platform::BIND_FIDL_PROTOCOL_SYNC),
+    ddk::MakeProperty(bind_fuchsia_hardware_goldfish::SYNCSERVICE,
+                      bind_fuchsia_hardware_goldfish::SYNCSERVICE_ZIRCONTRANSPORT),
 };
 
 const ddk::BindRule kSysmemRules[] = {

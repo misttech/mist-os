@@ -20,9 +20,9 @@ DDK_FIDL_PROTOCOL_DEF(RPMB,            1, "fuchsia.hardware.rpmb.Service")
 DDK_FIDL_PROTOCOL_DEF(CHROMEOS_EC,     2, "fuchsia.hardware.google.ec.Service")
 DDK_FIDL_PROTOCOL_DEF(I2C,             3, "fuchsia.hardware.i2c.Service")
 DDK_FIDL_PROTOCOL_DEF(PCI,             4, "fuchsia.hardware.pci.Service")
-DDK_FIDL_PROTOCOL_DEF(GOLDFISH_PIPE,   5, "fuchsia.hardware.goldfish.pipe.Service")
-DDK_FIDL_PROTOCOL_DEF(ADDRESS_SPACE,   6, "fuchsia.hardware.goldfish.AddressSpaceService")
-DDK_FIDL_PROTOCOL_DEF(GOLDFISH_SYNC,   7, "fuchsia.hardware.goldfish.SyncService")
+// 5 was "fuchsia.hardware.goldfish.pipe.Service"
+// 6 was "fuchsia.hardware.goldfish.AddressSpaceService"
+// 7 was "fuchsia.hardware.goldfish.SyncService"
 DDK_FIDL_PROTOCOL_DEF(SPI,             8, "fuchsia.hardware.spi.Service")
 DDK_FIDL_PROTOCOL_DEF(SYSMEM,          9, "fuchsia.hardware.sysmem.Service")
 DDK_FIDL_PROTOCOL_DEF(MAILBOX,         10, "fuchsia.hardware.mailbox.Service")

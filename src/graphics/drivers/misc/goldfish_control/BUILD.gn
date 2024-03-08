@@ -11,7 +11,8 @@ driver_bind_rules("goldfish_control_composite-bind") {
   rules = "goldfish_control_composite.bind"
   tests = "bind_tests.json"
   deps = [
-    "//src/devices/bind/fuchsia.goldfish.platform",
+    "//sdk/fidl/fuchsia.hardware.goldfish:fuchsia.hardware.goldfish_bindlib",
+    "//sdk/fidl/fuchsia.hardware.goldfish.pipe:fuchsia.hardware.goldfish.pipe_bindlib",
     "//src/devices/bind/fuchsia.google.platform",
     "//src/devices/bind/fuchsia.sysmem",
   ]
