@@ -11,7 +11,6 @@ extend uint fuchsia.BIND_PROTOCOL {
 
 extend uint fuchsia.BIND_FIDL_PROTOCOL {
   DEVICE = 0x03,
-  IMPL = 0x1B,
 };
 
 extend uint fuchsia.BIND_I2C_CLASS {
