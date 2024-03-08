@@ -313,7 +313,7 @@ template("fidl_cpp_library") {
 #    - Required: The label of the target that generates the FIDL IR JSON file.
 #    - Type: label
 #
-#  * sdk_cateogry
+#  * sdk_category
 #    - Optional: See //build/fidl/fidl.gni for a description.
 #    - Type: string
 #

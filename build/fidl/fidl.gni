@@ -76,6 +76,18 @@ import("//build/testing/host_test_data.gni")
 #     Boolean flag to generate a LibFuzzer fuzz target for all protocols, used
 #     to ensure fuzzers for golden libraries compile successfully.
 #
+#   platform (optional)
+#     Name of the platform this library is versioned under. This is validated
+#     to match the library's actual platform, which is determined as follows:
+#       * If there are no @available attributes, the platform is "unversioned".
+#       * The platform can be explicit with @available(platform="PLATFORM").
+#       * Otherwise, the platform is the first component of the library name.
+#     Defaults to "fuchsia" when the library name starts with "fuchsia." and
+#     sdk_category is "cts", "partner_internal", "partner", or "public".
+#     Defaults to "unversioned" for testonly libraries. Otherwise, no default.
+#     TODO(https://fxbug.dev/325669391): Expand enforcement by ensuring that
+#     there is always a default value.
+#
 #   available (optional)
 #     A list of strings of the form PLATFORM:VERSION. This is needed when using
 #     @available annotations for platforms other than "fuchsia". For more
@@ -180,6 +192,7 @@ template("fidl") {
     "experimental_flags",
     "goldens_dir",
     "non_fidl_deps",
+    "platform",
   ]
   if (is_fidl_toolchain) {
     # Only import the fidl_library template when in the fidl toolchain

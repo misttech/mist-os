@@ -5,6 +5,8 @@
 import("//build/fidl/fidl.gni")
 
 fidl("zx") {
+  platform = "fuchsia"
+
   sources = [
     "../overview.fidl",
     "../rights.fidl",

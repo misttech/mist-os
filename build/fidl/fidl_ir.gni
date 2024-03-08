@@ -32,11 +32,12 @@ import("//build/fidl/fidlc.gni")
 #
 # Other parameters (see //build/fidl/fidl.gni for descriptions):
 #
+#   available (required)
 #   sources (required)
-#   available
 #   experimental_flags
 #   goldens_dir
 #   non_fidl_deps
+#   platform
 #   public_deps
 #   testonly
 #   visibility
@@ -51,11 +52,8 @@ template("fidl_ir") {
   assert(defined(invoker.gen_dir), "gen_dir is required")
   assert(defined(invoker.json_representation),
          "json_representation is required")
+  assert(defined(invoker.available), "available is required")
   assert(defined(invoker.sources), "sources is required")
-  if (defined(invoker.available)) {
-    assert(defined(invoker.testonly) && invoker.testonly,
-           "the `available` parameter is only allowed on testonly libraries")
-  }
 
   main_target_deps = []
 
@@ -70,9 +68,6 @@ template("fidl_ir") {
                              "target_api_level",
                            ])
     visibility = [ ":*" ]
-    if (!defined(available)) {
-      available = [ "fuchsia:" + invoker.target_api_level ]
-    }
   }
 
   main_target_deps += [ ":$fidlc_target_name" ]

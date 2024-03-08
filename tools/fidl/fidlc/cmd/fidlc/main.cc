@@ -41,6 +41,7 @@ void Usage() {
 
 Usage: fidlc [--json JSON_PATH]
              [--available PLATFORM:VERSION]
+             [--platform PLATFORM]
              [--name LIBRARY_NAME]
              [--experimental FLAG_NAME]
              [--werror]
@@ -66,12 +67,19 @@ Options:
 
  * `--available PLATFORM:VERSION`. If present, this flag instructs `fidlc` to compile
     libraries versioned under PLATFORM at VERSION, based on `@available` attributes.
-    PLATFORM corresponds to a library's `@available(platform=\"PLATFORM\")` attribute,
+    PLATFORM corresponds to a library's `@available(platform="PLATFORM")` attribute,
     or to the library name's first component if the `platform` argument is omitted.
 
+ * `--platform PLATFORM`. If present, this flag instructs `fidlc` to validate
+   that the main library being compiled is versioned under PLATFORM.
+   The library's platform is determined as follows:
+    * If there are no `@available` attributes, the platform is "unversioned".
+    * The platform can be explicit with `@available(platform="PLATFORM")`.
+    * Otherwise, the platform is the first component of the library name.
+
  * `--name LIBRARY_NAME`. If present, this flag instructs `fidlc` to validate
-   that the library being compiled has the given name. This flag is useful to
-   cross-check between the library's declaration in a build system and the
+   that the main library being compiled has the given name. This flag is useful
+   to cross-check between the library's declaration in a build system and the
    actual contents of the library.
 
  * `--experimental FLAG_NAME`. If present, this flag enables an experimental
@@ -291,7 +299,8 @@ void Write(const std::ostringstream& output_stream, const std::string& file_path
 
 }  // namespace
 
-int compile(fidlc::Reporter* reporter, const std::string& library_name,
+int compile(fidlc::Reporter* reporter, const std::optional<fidlc::Platform>& expected_platform,
+            const std::optional<std::string>& expected_library_name,
             const std::string& dep_file_path, const std::vector<std::string>& source_list,
             const std::vector<std::pair<Behavior, std::string>>& outputs,
             const std::vector<fidlc::SourceManager>& source_managers,
@@ -346,12 +355,36 @@ int compile(fidlc::Reporter* reporter, const std::string& library_name,
   }
 
   auto compilation = all_libraries.Filter(version_selection);
+  auto library_name = fidlc::NameLibrary(compilation->library_name);
 
-  // Verify that the produced library's name matches the expected name.
-  std::string produced_name = fidlc::NameLibrary(compilation->library_name);
-  if (!library_name.empty() && produced_name != library_name) {
-    Fail("Generated library '%s' did not match --name argument: %s\n", produced_name.c_str(),
-         library_name.c_str());
+  if (expected_library_name.has_value() && library_name != *expected_library_name) {
+    Fail("Found `library %s;`, but expected `library %s;` based on the --name flag\n",
+         library_name.c_str(), expected_library_name->c_str());
+  }
+
+  if (expected_platform.has_value()) {
+    auto& actual = *compilation->platform;
+    auto& expected = expected_platform.value();
+    if (actual != expected) {
+      std::stringstream hint;
+      if (expected.is_unversioned()) {
+        hint << "try removing @available attributes";
+      } else if (actual.is_unversioned()) {
+        if (compilation->library_name[0] == expected.name()) {
+          hint << "try adding `@available(added=HEAD)` on the `library` declaration";
+        } else {
+          hint << "try adding `@available(platform=\"" << expected.name()
+               << "\", added=HEAD)` on the `library` declaration";
+        }
+      } else {
+        hint << "try changing the library name to start with '" << expected.name()
+             << ".', or use `@available(platform=\"" << expected.name() << "\")`";
+      }
+      Fail(
+          "Library '%s' is versioned under platform '%s', but expected platform '%s' based on the "
+          "--platform flag; %s\n",
+          library_name.c_str(), actual.name().c_str(), expected.name().c_str(), hint.str().c_str());
+    }
   }
 
   // Write depfile, with format:
@@ -402,7 +435,8 @@ int main(int argc, char* argv[]) {
     exit(0);
   }
 
-  std::string library_name;
+  std::optional<fidlc::Platform> expected_platform;
+  std::optional<std::string> expected_library_name;
 
   std::string dep_file_path;
   std::string json_path;
@@ -459,8 +493,15 @@ int main(int argc, char* argv[]) {
             platform_str.c_str(), version_str.c_str(), platform_str.c_str());
       }
       version_selection.Insert(platform.value(), version.value());
+    } else if (behavior_argument == "--platform") {
+      const auto platform_str = args->Claim();
+      const auto platform = fidlc::Platform::Parse(platform_str);
+      if (!platform.has_value()) {
+        FailWithUsage("Invalid platform name `%s`\n", platform_str.c_str());
+      }
+      expected_platform = platform.value();
     } else if (behavior_argument == "--name") {
-      library_name = args->Claim();
+      expected_library_name = args->Claim();
     } else if (behavior_argument == "--experimental") {
       std::string string = args->Claim();
       auto it = fidlc::kAllExperimentalFlags.find(string);
@@ -503,8 +544,9 @@ int main(int argc, char* argv[]) {
   fidlc::Reporter reporter;
   fidlc::VirtualSourceFile virtual_file("generated");
   reporter.set_warnings_as_errors(warnings_as_errors);
-  auto status = compile(&reporter, library_name, dep_file_path, source_list, outputs,
-                        source_managers, &virtual_file, &version_selection, experimental_flags);
+  auto status =
+      compile(&reporter, expected_platform, expected_library_name, dep_file_path, source_list,
+              outputs, source_managers, &virtual_file, &version_selection, experimental_flags);
   if (format == "json") {
     reporter.PrintReportsJson();
   } else {

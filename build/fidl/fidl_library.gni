@@ -41,7 +41,7 @@ import("//build/testing/golden_files.gni")
 #    - Type: list(path)
 #
 #  * api, available, excluded_checks, experimental_checks, experimental_flags,
-#    goldens_dir, non_fidl_deps, sdk_category, sdk_area
+#    goldens_dir, non_fidl_deps, platform, sdk_category, sdk_area
 #    - Optional: See //build/fidl/fidl.gni for a description.
 #
 #  * testonly, visibility, public_deps, applicable_licenses
@@ -55,6 +55,10 @@ template("fidl_library") {
   assert(defined(invoker.sources), "sources is required")
   assert(defined(invoker.library_name), "library_name is required")
   assert(defined(invoker.fidl_ir_json), "fidl_ir_json is required")
+  if (defined(invoker.available)) {
+    assert(defined(invoker.testonly) && invoker.testonly,
+           "the `available` parameter is only allowed on testonly libraries")
+  }
 
   main_target_name = target_name
 
@@ -69,6 +73,9 @@ template("fidl_library") {
   requires_compatibility_tests = is_sdk_included_publishable ||
                                  (defined(invoker.sdk_category) &&
                                   invoker.sdk_category == "partner_internal")
+  in_fuchsia_namespace =
+      invoker.library_name ==
+      "fuchsia." + string_replace(invoker.library_name, "fuchsia.", "", 1)
 
   # Additional dependencies to add when this target is published in an SDK.
   sdk_atom_deps = []
@@ -82,7 +89,10 @@ template("fidl_library") {
     not_needed([ "sdk_atom_deps" ])
   }
   if (!requires_compatibility_tests) {
-    not_needed([ "goldens_dir" ])
+    not_needed([
+                 "goldens_dir",
+                 "in_fuchsia_namespace",
+               ])
   }
   if (!is_sdk_included_publishable_nontest) {
     not_needed(invoker, [ "api" ])
@@ -106,6 +116,7 @@ template("fidl_library") {
                              "available",
                              "experimental_flags",
                              "non_fidl_deps",
+                             "platform",
                              "public_deps",
                              "sources",
                              "testonly",
@@ -116,6 +127,17 @@ template("fidl_library") {
     gen_dir = target_gen_dir
     json_representation = fidl_ir_json
     target_api_level = fidl_fuchsia_api_level
+    if (!defined(available)) {
+      available = [ "fuchsia:$target_api_level" ]
+    }
+    if (!defined(platform)) {
+      # TODO(https://fxbug.dev/325669391): Always set a default `platform`.
+      if (requires_compatibility_tests && in_fuchsia_namespace) {
+        platform = "fuchsia"
+      } else if (defined(invoker.testonly) && invoker.testonly) {
+        platform = "unversioned"
+      }
+    }
   }
 
   summary_file_json = "$target_gen_dir/$target_name.api_summary.json"
@@ -227,10 +249,10 @@ template("fidl_library") {
   # Enforce compatibility checks for all FIDL libraries included in the IDK with
   # platform `fuchsia`.
   if (requires_compatibility_tests) {
-    assert(
-        !defined(invoker.available),
-        "Cannot override `available` for FIDL library " + invoker.library_name +
-            " since it is compiled at each API level for compatibility tests")
+    assert(!defined(invoker.platform) || invoker.platform == "fuchsia",
+           "Cannot override `platform` for SDK FIDL library $library_name")
+    assert(!defined(invoker.available),
+           "Cannot override `available` for SDK FIDL library $library_name")
 
     # The current level might be a supported level. Don't double count it.
     #
@@ -271,6 +293,15 @@ template("fidl_library") {
                                ])
         fidl_target_name = main_target_name
         fidl_library_name = library_name
+
+        # TODO(https://fxbug.dev/325669391): in_fuchsia_namespace should always
+        # be true here, but currently it isn't for vendor SDK libraries. Those
+        # libraries likely should be excluded in requires_compatibility_tests.
+        if (in_fuchsia_namespace) {
+          platform = "fuchsia"
+        }
+
+        available = [ "fuchsia:$level" ]
         target_api_level = level
         goldens_dir = goldens_dir
 
@@ -281,14 +312,10 @@ template("fidl_library") {
       }
       sdk_atom_deps += [ ":$fidl_ir_target_name" ]
 
-      # TODO(101964): Remove this. It's needed because we use the goldens as
-      # action.inputs so the build expects them to exist, but APIs outside the
-      # "fuchsia" namespace aren't compatibility tested and don't have goldens.
-      in_fuchsia_namespace =
-          library_name ==
-          "fuchsia." + string_replace(library_name, "fuchsia.", "", 1)
-      not_needed([ "in_fuchsia_namespace" ])
-
+      # TODO(https://fxbug.dev/42052847): Remove in_fuchsia_namespace exception.
+      # It's needed because we use the goldens as action.inputs so the build
+      # expects them to exist, but APIs outside the "fuchsia" namespace aren't
+      # compatibility tested and don't have goldens.
       if (defined(api_compatibility_testing) && api_compatibility_testing &&
           in_fuchsia_namespace) {
         test_target = "${target_name}_${level}_compatibility_test"
