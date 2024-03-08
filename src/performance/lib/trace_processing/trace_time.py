@@ -50,29 +50,29 @@ class TimeDelta:
     def to_seconds(self) -> int:
         return self._delta // (1000 * 1000 * 1000)
 
-    def to_nanoseconds_f(self) -> int:
+    def to_nanoseconds_f(self) -> float:
         return float(self._delta)
 
-    def to_microseconds_f(self) -> int:
+    def to_microseconds_f(self) -> float:
         return float(self._delta) / 1000
 
-    def to_milliseconds_f(self) -> int:
+    def to_milliseconds_f(self) -> float:
         return float(self._delta) / (1000 * 1000)
 
-    def to_seconds_f(self) -> int:
+    def to_seconds_f(self) -> float:
         return float(self._delta) / (1000 * 1000 * 1000)
 
-    def __add__(self, other: Any) -> Self:
+    def __add__(self, other: Any) -> "TimeDelta":
         if not isinstance(other, TimeDelta):
             return NotImplemented
         return TimeDelta(self._delta + other._delta)
 
-    def __sub__(self, other: Any) -> Self:
+    def __sub__(self, other: Any) -> "TimeDelta":
         if not isinstance(other, TimeDelta):
             return NotImplemented
         return TimeDelta(self._delta - other._delta)
 
-    def __mul__(self, factor: int) -> Self:
+    def __mul__(self, factor: int) -> "TimeDelta":
         return TimeDelta(self._delta * factor)
 
     def __truediv__(self, other: Any) -> float:
@@ -127,7 +127,7 @@ class TimePoint:
     def to_epoch_delta(self) -> TimeDelta:
         return TimeDelta.from_nanoseconds(self._ticks)
 
-    def __add__(self, time_delta: TimeDelta) -> Self:
+    def __add__(self, time_delta: TimeDelta) -> "TimePoint":
         return TimePoint(self._ticks + time_delta.to_nanoseconds())
 
     def __sub__(self, other: Any) -> TimeDelta:
