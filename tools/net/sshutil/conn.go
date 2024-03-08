@@ -12,6 +12,7 @@ import (
 	"net"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/pkg/sftp"
@@ -41,6 +42,10 @@ type Conn struct {
 		sync.Mutex
 		client *ssh.Client
 	}
+
+	// byteCounter keeps track of stdout/stderr bytes seen from all sessions
+	// started from this Conn. It is used to control the keepalive counter.
+	byteCounter atomic.Uint64
 
 	shuttingDown chan struct{}
 }
@@ -222,10 +227,16 @@ func (c *Conn) newSession(ctx context.Context, stdout io.Writer, stderr io.Write
 			return nil, ConnectionError{fmt.Errorf("failed to start ssh session: %w", r.err)}
 		}
 		if stdout != nil {
-			r.session.Stdout = stdout
+			r.session.Stdout = &ActivityTracker{
+				byteCounter: &c.byteCounter,
+				inner:       stdout,
+			}
 		}
 		if stderr != nil {
-			r.session.Stderr = stderr
+			r.session.Stderr = &ActivityTracker{
+				byteCounter: &c.byteCounter,
+				inner:       stderr,
+			}
 		}
 
 		return &Session{session: r.session}, nil
@@ -355,6 +366,7 @@ func (c *Conn) keepalive(ctx context.Context, session *ssh.Session, ticks <-chan
 			return nil
 		}
 	}
+	lastActivity := c.byteCounter.Load()
 	for {
 		// Sleep until the next poll cycle or until the client is closed.
 		select {
@@ -362,6 +374,13 @@ func (c *Conn) keepalive(ctx context.Context, session *ssh.Session, ticks <-chan
 		case <-c.shuttingDown:
 			return
 		}
+
+		if newActivity := c.byteCounter.Load(); newActivity != lastActivity {
+			lastActivity = newActivity
+			continue
+		}
+
+		logger.Debugf(ctx, "no activity since last tick, sending keepAlive")
 
 		// SendRequest can actually hang if the server stops responding in between
 		// receiving a keepalive and sending a response (see
@@ -474,4 +493,16 @@ func (s *Session) Run(ctx context.Context, command []string) error {
 	case <-ctx.Done():
 		return ctx.Err()
 	}
+}
+
+var _ io.Writer = (*ActivityTracker)(nil)
+
+type ActivityTracker struct {
+	byteCounter *atomic.Uint64
+	inner       io.Writer
+}
+
+func (at *ActivityTracker) Write(p []byte) (n int, err error) {
+	at.byteCounter.Add(uint64(len(p)))
+	return at.inner.Write(p)
 }
