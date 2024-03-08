@@ -51,6 +51,9 @@ def _fuchsia_package_checker_test_impl(ctx):
     # append the subpackages
     args.extend(["--subpackages={}".format(s) for s in ctx.attr.expected_subpackages])
 
+    # append the expected ABI revision
+    args.extend(["--abi-revision={}".format(ctx.attr.expected_abi_revision)])
+
     runfiles = ctx.runfiles(
         files = runfiles,
     ).merge(ctx.attr._package_checker[DefaultInfo].default_runfiles)
@@ -95,6 +98,10 @@ fuchsia_package_checker_test = rule(
         "expected_subpackages": attr.string_list(
             doc = "A list of expected subpackage names",
             mandatory = False,
+        ),
+        "expected_abi_revision": attr.string(
+            doc = "ABI revision we should find in the package, as a string-wrapped hexadecimal integer.",
+            mandatory = True,
         ),
         "_package_checker": attr.label(
             default = "//tools:package_checker",

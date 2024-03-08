@@ -261,14 +261,7 @@ def _build_fuchsia_package_impl(ctx):
     ffx_isolate_archive_dir = ctx.actions.declare_directory(pkg_dir + "_package_archive.ffx")
 
     # The Fuchsia target API level of this package
-    api_level = get_fuchsia_api_level(ctx)
-
-    # ffx package does not support stamping with HEAD so we skipping the stamp and let
-    # ffx do the right thing if we are not using a valid API level.
-    if api_level == "HEAD":
-        api_level_input = []
-    else:
-        api_level_input = ["--api-level", api_level]
+    api_level_input = ["--api-level", get_fuchsia_api_level(ctx)]
 
     # All of the resources that will go into the package
     package_resources = [

@@ -5,9 +5,10 @@
 
 import argparse
 import json
+import struct
 import subprocess
-import tempfile
 import sys
+import tempfile
 
 from typing import TypeVar, Iterable, Any, Optional
 
@@ -61,6 +62,12 @@ def parse_args() -> argparse.Namespace:
         action="append",
         default=[],
         required=False,
+    )
+    parser.add_argument(
+        "--abi-revision",
+        type=lambda x: int(x, base=16),
+        help="Expected ABI revision, in hex",
+        required=True,
     )
     return parser.parse_args()
 
@@ -160,13 +167,19 @@ def check_contents_for_bind_bytecode(
         _assert_in(bind, contents, "Failed to find bind bytecode")
 
 
-def check_for_abi_revision(contents: list[str]) -> None:
-    # TODO: we should actually check the contents of this file to see if it is valid.
-    _assert_in(
-        "meta/fuchsia.abi/abi-revision",
-        contents,
-        "Failed to find abi-revision file",
+def check_for_abi_revision(args: argparse.Namespace) -> None:
+    abi_stamp_contents = subprocess.check_output(
+        [
+            args.far,
+            "cat",
+            f"--archive={args.meta_far}",
+            "--file=meta/fuchsia.abi/abi-revision",
+        ]
     )
+
+    # Parse little-endian uint64.
+    abi_stamp = struct.unpack_from("<Q", abi_stamp_contents)[0]
+    _assert_eq(abi_stamp, args.abi_revision, "ABI revision does not match")
 
 
 def check_package_name(args: argparse.Namespace) -> None:
@@ -204,7 +217,7 @@ def main() -> None:
     check_contents_for_component_manifests(contents, args.manifests)
     check_contents_for_subpackage_names(args)
     check_contents_for_bind_bytecode(contents, args.bind_bytecode)
-    check_for_abi_revision(contents)
+    check_for_abi_revision(args)
     check_package_name(args)
     check_package_has_all_blobs(args)
 

@@ -4,7 +4,7 @@
 
 """ Defines utilities for working with fuchsia api levels. """
 
-load("//:api_version.bzl", "INTERNAL_ONLY_VALID_TARGET_APIS")
+load("//:api_version.bzl", "DEFAULT_TARGET_API", "INTERNAL_ONLY_VALID_TARGET_APIS")
 
 # We define the provider in this file because it is a private implementation
 # detail in this file. It is only made public so that it can be used in tests.
@@ -43,10 +43,22 @@ def get_fuchsia_api_levels():
     The status is not an API to be relied on but the STATUS_* constants can be
     used.
     """
+
+    # Get the ABI revision from the latest numbered API level to use for HEAD.
+    #
+    # TODO: https://fxbug.dev/324892812 - This should not reuse the most recent
+    # API level's ABI revision. Fix this once a per-release ABI revision is
+    # available.
+    most_recent_abi_revision = [
+        level.abi_revision
+        for level in INTERNAL_ONLY_VALID_TARGET_APIS
+        if int(level.api_level) == DEFAULT_TARGET_API
+    ][0]
+
     return INTERNAL_ONLY_VALID_TARGET_APIS + [
         # Add the HEAD level as an in-development level
         struct(
-            abi_revision = "",
+            abi_revision = most_recent_abi_revision,
             api_level = "HEAD",
             status = FUCHSIA_API_LEVEL_STATUS_IN_DEVELOPMENT,
         ),
