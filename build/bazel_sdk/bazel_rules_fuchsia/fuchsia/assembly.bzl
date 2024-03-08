@@ -18,11 +18,6 @@ load(
     _fuchsia_assemble_package = "fuchsia_assemble_package",
 )
 load(
-    "//fuchsia/private/assembly:fuchsia_board_input_bundle.bzl",
-    _fuchsia_board_input_bundle = "fuchsia_board_input_bundle",
-    _fuchsia_prebuilt_board_input_bundle = "fuchsia_prebuilt_board_input_bundle",
-)
-load(
     "//fuchsia/private/assembly:fuchsia_board_configuration.bzl",
     _fuchsia_board_configuration = "fuchsia_board_configuration",
     _fuchsia_prebuilt_board_configuration = "fuchsia_prebuilt_board_configuration",
@@ -127,8 +122,6 @@ fuchsia_product_configuration = _fuchsia_product_configuration
 fuchsia_product_ota_config = _fuchsia_product_ota_config
 fuchsia_virtual_device = _fuchsia_virtual_device
 fuchsia_board_configuration = _fuchsia_board_configuration
-fuchsia_board_input_bundle = _fuchsia_board_input_bundle
-fuchsia_prebuilt_board_input_bundle = _fuchsia_prebuilt_board_input_bundle
 fuchsia_prebuilt_board_configuration = _fuchsia_prebuilt_board_configuration
 fuchsia_product = _fuchsia_product
 fuchsia_product_assembly = _fuchsia_product_assembly

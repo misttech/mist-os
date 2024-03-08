@@ -31,14 +31,6 @@ FuchsiaProductConfigInfo = provider(
     },
 )
 
-FuchsiaBoardInputBundleInfo = provider(
-    doc = "A board input bundle info used to containing the board input bundle directory",
-    fields = {
-        "config": "The config file located in the root directory containing Board Input Bundle.",
-        "files": "All files belong to Board Input Bundles",
-    },
-)
-
 def _board_config_info_init(*, board_config):
     if not board_config:
         fail("board_config may not be empty")

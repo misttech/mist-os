@@ -8,7 +8,6 @@ load(
     ":providers.bzl",
     "FuchsiaBoardConfigDirectoryInfo",
     "FuchsiaBoardConfigInfo",
-    "FuchsiaBoardInputBundleInfo",
 )
 load(":util.bzl", "extract_labels", "replace_labels_with_files")
 
@@ -64,10 +63,6 @@ def _fuchsia_board_configuration_impl(ctx):
         _copy_bash(ctx, ctx.file.board_bundles_dir, board_dir)
         deps.append(board_dir)
 
-    for bib in ctx.attr.board_input_bundles:
-        board_config["input_bundles"] = board_config.get("input_bundles", []) + [bib[FuchsiaBoardInputBundleInfo].config.dirname]
-        deps.extend(bib[FuchsiaBoardInputBundleInfo].files)
-
     content = json.encode_indent(board_config, indent = "  ")
     ctx.actions.write(board_config_file, content)
 
@@ -97,11 +92,6 @@ _fuchsia_board_configuration = rule(
         "input_bundles": attr.string_list(
             doc = "Directories of precompiled board input bundles to include, relative to `board_bundles_dir`.",
         ),
-        "board_input_bundles": attr.label_list(
-            doc = "Board Input Bundles targets to be included into the board.",
-            providers = [FuchsiaBoardInputBundleInfo],
-            default = [],
-        ),
         "provided_features": attr.string_list(
             doc = "The features that this board provides to the product.",
         ),
@@ -122,7 +112,6 @@ def fuchsia_board_configuration(
         board_name,
         board_bundles_dir = None,
         input_bundles = [],
-        board_input_bundles = [],
         provided_features = [],
         filesystems = {}):
     """A board configuration that takes a dict for the filesystems config."""
@@ -133,7 +122,6 @@ def fuchsia_board_configuration(
         board_name = board_name,
         input_bundles = input_bundles,
         board_bundles_dir = board_bundles_dir,
-        board_input_bundles = board_input_bundles,
         provided_features = provided_features,
         filesystems = json.encode_indent(filesystems, indent = "    "),
         filesystems_labels = filesystem_labels,
