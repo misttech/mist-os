@@ -11,6 +11,7 @@ _tools = [
   "//src/developer/ffx/plugins/scrutiny",
   "auth",
   "echo",
+  "efi",
   "power",
   "profiler",
   "starnix",

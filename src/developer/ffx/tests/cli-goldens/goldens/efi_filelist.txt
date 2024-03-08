@@ -1,2 +1,0 @@
-ffx/efi.golden
-ffx/efi/create.golden

@@ -8,7 +8,6 @@ daemon
 debug
 doctor
 driver
-efi
 emu
 fuzz
 inspect
