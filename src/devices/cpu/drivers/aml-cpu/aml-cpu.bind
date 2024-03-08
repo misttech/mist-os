@@ -9,6 +9,7 @@ using fuchsia.amlogic.platform;
 using fuchsia.clock;
 using fuchsia.gpio;
 using fuchsia.hardware.clock;
+using fuchsia.hardware.power;
 using fuchsia.platform;
 using fuchsia.power;
 
@@ -29,7 +30,7 @@ node "pdev" {
 }
 
 primary node "power-01" {
-  fuchsia.BIND_FIDL_PROTOCOL == fuchsia.power.BIND_FIDL_PROTOCOL.DEVICE;
+  fuchsia.hardware.power.Service == fuchsia.hardware.power.Service.ZirconTransport;
   fuchsia.power.POWER_DOMAIN == fuchsia.power.POWER_DOMAIN.ARM_CORE_BIG;
 }
 
@@ -49,7 +50,7 @@ node "clock-cpu-scaler-01" {
 }
 
 optional node "power-02" {
-  fuchsia.BIND_FIDL_PROTOCOL == fuchsia.power.BIND_FIDL_PROTOCOL.DEVICE;
+  fuchsia.hardware.power.Service == fuchsia.hardware.power.Service.ZirconTransport;
   fuchsia.power.POWER_DOMAIN == fuchsia.power.POWER_DOMAIN.ARM_CORE_LITTLE;
 }
 

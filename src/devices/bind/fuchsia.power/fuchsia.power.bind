@@ -10,11 +10,6 @@ extend uint fuchsia.BIND_PROTOCOL {
   SENSOR = 0x97,
 };
 
-extend uint fuchsia.BIND_FIDL_PROTOCOL {
-  SENSOR = 0x10,  // fuchsia.hardware.power.sensor.Service
-  DEVICE = 0x15,  // fuchsia.hardware.power.Service
-};
-
 enum POWER_DOMAIN {
   ARM_CORE_BIG,
   ARM_CORE_LITTLE,

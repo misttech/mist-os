@@ -7,7 +7,7 @@
                 "expected": "match",
                 "device": {
                     "fuchsia.power.POWER_DOMAIN": "fuchsia.power.POWER_DOMAIN.ARM_CORE_BIG",
-                    "fuchsia.BIND_FIDL_PROTOCOL": "fuchsia.power.BIND_FIDL_PROTOCOL.DEVICE"
+                    "fuchsia.hardware.power.Service": "fuchsia.hardware.power.Service.ZirconTransport"
                 }
             }
         ]
@@ -74,7 +74,7 @@
                 "expected": "match",
                 "device": {
                     "fuchsia.power.POWER_DOMAIN": "fuchsia.power.POWER_DOMAIN.ARM_CORE_LITTLE",
-                    "fuchsia.BIND_FIDL_PROTOCOL": "fuchsia.power.BIND_FIDL_PROTOCOL.DEVICE"
+                    "fuchsia.hardware.power.Service": "fuchsia.hardware.power.Service.ZirconTransport"
                 }
             }
         ]

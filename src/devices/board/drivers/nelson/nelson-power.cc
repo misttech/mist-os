@@ -16,6 +16,7 @@
 #include <bind/fuchsia/google/platform/cpp/bind.h>
 #include <bind/fuchsia/gpio/cpp/bind.h>
 #include <bind/fuchsia/hardware/audio/cpp/bind.h>
+#include <bind/fuchsia/hardware/power/sensor/cpp/bind.h>
 #include <bind/fuchsia/i2c/cpp/bind.h>
 #include <bind/fuchsia/platform/cpp/bind.h>
 #include <bind/fuchsia/power/cpp/bind.h>
@@ -188,8 +189,8 @@ zx_status_t Nelson::PowerInit() {
                               bind_fuchsia_ti_platform::BIND_PLATFORM_DEV_DID_TAS58XX),
   };
   const ddk::BindRule kPowerSensorRules[] = {
-      ddk::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
-                              bind_fuchsia_power::BIND_FIDL_PROTOCOL_SENSOR),
+      ddk::MakeAcceptBindRule(bind_fuchsia_hardware_power_sensor::SERVICE,
+                              bind_fuchsia_hardware_power_sensor::SERVICE_ZIRCONTRANSPORT),
   };
   const device_bind_prop_t kGpioProperties[] = {
       ddk::MakeProperty(bind_fuchsia::FIDL_PROTOCOL, bind_fuchsia_gpio::BIND_FIDL_PROTOCOL_SERVICE),
@@ -202,7 +203,8 @@ zx_status_t Nelson::PowerInit() {
   };
 
   const device_bind_prop_t kPowerSensorProperties[] = {
-      ddk::MakeProperty(bind_fuchsia::FIDL_PROTOCOL, bind_fuchsia_power::BIND_FIDL_PROTOCOL_SENSOR),
+      ddk::MakeProperty(bind_fuchsia_hardware_power_sensor::SERVICE,
+                        bind_fuchsia_hardware_power_sensor::SERVICE_ZIRCONTRANSPORT),
       ddk::MakeProperty(bind_fuchsia::POWER_SENSOR_DOMAIN,
                         bind_fuchsia_amlogic_platform_s905d3::BIND_POWER_SENSOR_DOMAIN_AUDIO),
   };

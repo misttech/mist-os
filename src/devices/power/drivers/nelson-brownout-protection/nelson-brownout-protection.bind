@@ -8,14 +8,14 @@ using fuchsia.ti.platform;
 using fuchsia.amlogic.platform.s905d3;
 using fuchsia.gpio;
 using fuchsia.hardware.audio;
-using fuchsia.power;
+using fuchsia.hardware.power.sensor;
 
 primary node "codec" {
   fuchsia.hardware.audio.CodecService == fuchsia.hardware.audio.CodecService.ZirconTransport;
 }
 
 node "power-sensor" {
-  fuchsia.BIND_FIDL_PROTOCOL == fuchsia.power.BIND_FIDL_PROTOCOL.SENSOR;
+  fuchsia.hardware.power.sensor.Service == fuchsia.hardware.power.sensor.Service.ZirconTransport;
   fuchsia.BIND_POWER_SENSOR_DOMAIN == fuchsia.amlogic.platform.s905d3.BIND_POWER_SENSOR_DOMAIN.AUDIO;
 }
 

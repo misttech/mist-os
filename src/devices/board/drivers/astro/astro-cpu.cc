@@ -17,6 +17,7 @@
 #include <bind/fuchsia/google/platform/cpp/bind.h>
 #include <bind/fuchsia/gpio/cpp/bind.h>
 #include <bind/fuchsia/hardware/clock/cpp/bind.h>
+#include <bind/fuchsia/hardware/power/cpp/bind.h>
 #include <bind/fuchsia/power/cpp/bind.h>
 #include <soc/aml-common/aml-cpu-metadata.h>
 #include <soc/aml-meson/g12a-clk.h>
@@ -77,14 +78,15 @@ static const std::vector<fpbus::Metadata> cpu_metadata{
 };
 
 const std::vector<fdf::BindRule> kPowerRules = std::vector{
-    fdf::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
-                            bind_fuchsia_power::BIND_FIDL_PROTOCOL_DEVICE),
+    fdf::MakeAcceptBindRule(bind_fuchsia_hardware_power::SERVICE,
+                            bind_fuchsia_hardware_power::SERVICE_ZIRCONTRANSPORT),
     fdf::MakeAcceptBindRule(bind_fuchsia::POWER_DOMAIN,
                             static_cast<uint32_t>(S905d2PowerDomains::kArmCore)),
 };
 
 const std::vector<fdf::NodeProperty> kPowerProperties = std::vector{
-    fdf::MakeProperty(bind_fuchsia::FIDL_PROTOCOL, bind_fuchsia_power::BIND_FIDL_PROTOCOL_DEVICE),
+    fdf::MakeProperty(bind_fuchsia_hardware_power::SERVICE,
+                      bind_fuchsia_hardware_power::SERVICE_ZIRCONTRANSPORT),
     fdf::MakeProperty(bind_fuchsia_power::POWER_DOMAIN,
                       bind_fuchsia_power::POWER_DOMAIN_ARM_CORE_BIG),
 };

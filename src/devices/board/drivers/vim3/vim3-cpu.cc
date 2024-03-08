@@ -16,6 +16,7 @@
 #include <bind/fuchsia/clock/cpp/bind.h>
 #include <bind/fuchsia/cpp/bind.h>
 #include <bind/fuchsia/hardware/clock/cpp/bind.h>
+#include <bind/fuchsia/hardware/power/cpp/bind.h>
 #include <bind/fuchsia/power/cpp/bind.h>
 #include <soc/aml-a311d/a311d-hw.h>
 #include <soc/aml-a311d/a311d-power.h>
@@ -126,13 +127,13 @@ zx_status_t Vim3::CpuInit() {
 
   for (auto& [board, generic] : kCpuPowerDomains) {
     auto power_rules = std::vector{
-        fdf::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
-                                bind_fuchsia_power::BIND_FIDL_PROTOCOL_DEVICE),
+        fdf::MakeAcceptBindRule(bind_fuchsia_hardware_power::SERVICE,
+                                bind_fuchsia_hardware_power::SERVICE_ZIRCONTRANSPORT),
         fdf::MakeAcceptBindRule(bind_fuchsia::POWER_DOMAIN, static_cast<uint32_t>(board)),
     };
     auto power_properties = std::vector{
-        fdf::MakeProperty(bind_fuchsia::FIDL_PROTOCOL,
-                          bind_fuchsia_power::BIND_FIDL_PROTOCOL_DEVICE),
+        fdf::MakeProperty(bind_fuchsia_hardware_power::SERVICE,
+                          bind_fuchsia_hardware_power::SERVICE_ZIRCONTRANSPORT),
         fdf::MakeProperty(bind_fuchsia_power::POWER_DOMAIN, generic),
     };
     parents.push_back(fdf::ParentSpec{{power_rules, power_properties}});

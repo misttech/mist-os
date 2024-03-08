@@ -31,12 +31,12 @@ DDK_FIDL_PROTOCOL_DEF(INTERRUPT,       12, "fuchsia.hardware.interrupt.Provider"
 DDK_FIDL_PROTOCOL_DEF(PLATFORM_DEVICE, 13, "fuchsia.hardware.platform.device.Service")
 // 14 was "fuchsia.hardware.dsp.Service"
 // 15 was "fuchsia.hardware.hdmi.Service"
-DDK_FIDL_PROTOCOL_DEF(POWER_SENSOR,    16, "fuchsia.hardware.power.sensor.Service")
+// 16 was "fuchsia.hardware.power.sensor.Service"
 DDK_FIDL_PROTOCOL_DEF(VREG,            17, "fuchsia.hardware.vreg.Service")
 DDK_FIDL_PROTOCOL_DEF(REGISTERS,       18, "fuchsia.hardware.registers.Service")
 DDK_FIDL_PROTOCOL_DEF(TEE,             19, "fuchsia.hardware.tee.Service")
 // 20 was "fuchsia.hardware.amlogiccanvas.Service"
-DDK_FIDL_PROTOCOL_DEF(POWER,           21, "fuchsia.hardware.power.Service")
+// 21 was "fuchsia.hardware.power.Service"
 // 22 was "fuchsia.hardware.clock.Service"
 // 23 was "fuchsia.hardware.audio.CodecService"
 DDK_FIDL_PROTOCOL_DEF(PWM,             24, "fuchsia.hardware.pwm.Service")
