@@ -12,7 +12,6 @@
         {
             type: "expect_failure",
             matchers: [
-                "accept03",
                 "add_key01",
                 "add_key03",
                 "adjtimex01",
@@ -138,7 +137,6 @@
                 "prctl07",
                 "prctl08",
                 "prctl10",
-                "ptrace06",
                 "ptrace10",
                 "pwritev03",
                 "pwritev03_64",
