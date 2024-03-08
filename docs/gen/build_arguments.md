@@ -109,6 +109,14 @@ Build boot images that prefer Zedboot over local boot (only for EFI).
 
 From //build/images/args.gni:141
 
+### amlogic_decoder_firmware_path
+
+Path to the amlogic decoder firmware file. Overrides the default in the build.
+
+**Current value (from the default):** `""`
+
+From //src/media/drivers/amlogic_decoder/BUILD.gn:12
+
 ### api_compatibility_testing
 
 **Current value (from the default):** `true`
@@ -8725,14 +8733,6 @@ Controls which asserts are enabled.
 From //build/config/zircon/levels.gni:13
 
 ## `target_cpu = "arm64"`
-
-### amlogic_decoder_firmware_path
-
-Path to the amlogic decoder firmware file. Overrides the default in the build.
-
-**Current value (from the default):** `""`
-
-From //src/media/drivers/amlogic_decoder/BUILD.gn:12
 
 ### arm_use_neon
 
