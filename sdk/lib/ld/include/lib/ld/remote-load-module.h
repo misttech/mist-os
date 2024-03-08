@@ -26,17 +26,20 @@
 namespace ld {
 
 // RemoteLoadModule is the LoadModule type used in the remote dynamic linker.
+template <class Elf>
 using RemoteLoadModuleBase =
-    LoadModule<elfldltl::Elf<>, elfldltl::StdContainer<std::vector>::Container,
-               AbiModuleInline::kYes, LoadModuleRelocInfo::kYes, elfldltl::SegmentWithVmo::NoCopy>;
-static_assert(std::is_move_constructible_v<RemoteLoadModuleBase>);
+    LoadModule<Elf, elfldltl::StdContainer<std::vector>::Container, AbiModuleInline::kYes,
+               LoadModuleRelocInfo::kYes, elfldltl::SegmentWithVmo::NoCopy>;
 
 template <class Elf = elfldltl::Elf<>>
-class RemoteLoadModule : public RemoteLoadModuleBase {
+class RemoteLoadModule : public RemoteLoadModuleBase<Elf> {
  public:
-  using typename RemoteLoadModuleBase::Phdr;
-  using typename RemoteLoadModuleBase::size_type;
-  using typename RemoteLoadModuleBase::Soname;
+  using Base = RemoteLoadModuleBase<Elf>;
+  static_assert(std::is_move_constructible_v<Base>);
+
+  using typename Base::Phdr;
+  using typename Base::size_type;
+  using typename Base::Soname;
   using Ehdr = typename Elf::Ehdr;
   using TlsDescGot = typename Elf::TlsDescGot;
   using List = std::vector<RemoteLoadModule>;
@@ -82,7 +85,7 @@ class RemoteLoadModule : public RemoteLoadModuleBase {
   RemoteLoadModule(RemoteLoadModule&&) noexcept = default;
 
   RemoteLoadModule(const Soname& name, std::optional<uint32_t> loaded_by_modid)
-      : RemoteLoadModuleBase{name}, loaded_by_modid_{loaded_by_modid} {}
+      : Base{name}, loaded_by_modid_{loaded_by_modid} {}
 
   RemoteLoadModule& operator=(RemoteLoadModule&& other) noexcept = default;
 
@@ -108,7 +111,7 @@ class RemoteLoadModule : public RemoteLoadModuleBase {
   // vaddrs into file-relative offsets in order to read from the VMO.
   MetadataMemory metadata_memory() const {
     return MetadataMemory{
-        load_info(),
+        this->load_info(),
         // The DirectMemory API expects a mutable *this just because it's the
         // API exemplar and toolkit pieces shouldn't presume a Memory API
         // object is usable as const&.  But MappedVmoFile in fact is all const
@@ -148,7 +151,7 @@ class RemoteLoadModule : public RemoteLoadModuleBase {
     std::optional<Phdr> relro_phdr;
     std::optional<elfldltl::ElfNote> build_id;
     auto result =
-        DecodeModulePhdrs(diag, phdrs, load_info().GetPhdrObserver(Loader::page_size()),
+        DecodeModulePhdrs(diag, phdrs, this->load_info().GetPhdrObserver(Loader::page_size()),
                           elfldltl::PhdrRelroObserver<elfldltl::Elf<>>(relro_phdr),
                           elfldltl::PhdrFileNoteObserver(
                               elfldltl::Elf<>{}, mapped_vmo_, elfldltl::NoArrayFromFile<Phdr>{},
@@ -162,33 +165,33 @@ class RemoteLoadModule : public RemoteLoadModuleBase {
 
     // After successfully decoding the phdrs, we may now instantiate the module
     // and set its fields.
-    EmplaceModule(modid);
+    this->EmplaceModule(modid);
 
-    module().symbols_visible = true;
+    this->module().symbols_visible = true;
 
     if (build_id) {
-      module().build_id = build_id->desc;
+      this->module().build_id = build_id->desc;
     }
 
     // Apply RELRO protection before segments are aligned & equipped with VMOs.
-    if (!load_info().ApplyRelro(diag, relro_phdr, Loader::page_size(), false)) {
+    if (!this->load_info().ApplyRelro(diag, relro_phdr, Loader::page_size(), false)) {
       // ApplyRelro only fails if Diagnostics said to give up.
       return fit::error{false};
     }
 
     // Fix up segments to be compatible with AlignedRemoteVmarLoader.
-    if (!elfldltl::SegmentWithVmo::AlignSegments(diag, load_info(), vmo_.borrow(),
+    if (!elfldltl::SegmentWithVmo::AlignSegments(diag, this->load_info(), vmo_.borrow(),
                                                  Loader::page_size())) {
       // AlignSegments only fails if Diagnostics said to give up.
       return fit::error{false};
     }
 
     auto memory = metadata_memory();
-    SetModulePhdrs(module(), ehdr, load_info(), memory);
+    SetModulePhdrs(this->module(), ehdr, this->load_info(), memory);
 
     // If there was a PT_TLS, fill in tls_module() to be published later.
     if (tls_phdr) {
-      SetTls(diag, memory, *tls_phdr, ++max_tls_modid);
+      Base::SetTls(diag, memory, *tls_phdr, ++max_tls_modid);
     }
 
     auto needed = DecodeDynamic(diag, dyn_phdr);
@@ -220,9 +223,9 @@ class RemoteLoadModule : public RemoteLoadModuleBase {
     elfldltl::StdContainer<std::vector>::Container<size_type> needed_strtab_offsets;
 
     auto memory = metadata_memory();
-    auto result =
-        DecodeModuleDynamic(module(), diag, memory, dyn_phdr, NeededObserver(needed_strtab_offsets),
-                            elfldltl::DynamicRelocationInfoObserver(reloc_info()));
+    auto result = DecodeModuleDynamic(this->module(), diag, memory, dyn_phdr,
+                                      NeededObserver(needed_strtab_offsets),
+                                      elfldltl::DynamicRelocationInfoObserver(this->reloc_info()));
     if (result.empty()) [[unlikely]] {
       return std::nullopt;
     }
@@ -234,7 +237,7 @@ class RemoteLoadModule : public RemoteLoadModuleBase {
     needed_names.reserve(needed_strtab_offsets.size());
     std::transform(needed_strtab_offsets.begin(), needed_strtab_offsets.end(),
                    std::back_inserter(needed_names), [this, &diag, &ok](size_type offset) {
-                     std::string_view name = symbol_info().string(offset);
+                     std::string_view name = this->symbol_info().string(offset);
                      if (name.empty()) {
                        ok = diag.FormatError("Invalid offset ", offset, " in DT_NEEDED entry");
                      }
@@ -284,12 +287,12 @@ class RemoteLoadModule : public RemoteLoadModuleBase {
   // updating the module's runtime addr fields on success.
   template <class Diagnostics>
   bool Allocate(Diagnostics& diag, const zx::vmar& vmar) {
-    if (HasModule()) [[likely]] {
+    if (this->HasModule()) [[likely]] {
       loader_ = Loader{vmar};
-      if (!loader_.Allocate(diag, load_info())) {
+      if (!loader_.Allocate(diag, this->load_info())) {
         return false;
       }
-      SetModuleVaddrBounds(module(), load_info(), loader_.load_bias());
+      SetModuleVaddrBounds(this->module(), this->load_info(), loader_.load_bias());
     }
     return true;
   }
@@ -303,16 +306,17 @@ class RemoteLoadModule : public RemoteLoadModuleBase {
   template <class Diagnostics, class ModuleList, typename TlsDescResolver>
   bool Relocate(Diagnostics& diag, ModuleList& modules, const TlsDescResolver& tls_desc_resolver) {
     auto mutable_memory = elfldltl::LoadInfoMutableMemory{
-        diag, load_info(), elfldltl::SegmentWithVmo::GetMutableMemory<LoadInfo>{vmo_.borrow()}};
+        diag, this->load_info(),
+        elfldltl::SegmentWithVmo::GetMutableMemory<LoadInfo>{vmo_.borrow()}};
     if (!mutable_memory.Init()) {
       return false;
     }
-    if (!elfldltl::RelocateRelative(diag, mutable_memory, reloc_info(), load_bias())) {
+    if (!elfldltl::RelocateRelative(diag, mutable_memory, this->reloc_info(), this->load_bias())) {
       return false;
     }
     auto resolver = elfldltl::MakeSymbolResolver(*this, modules, diag, tls_desc_resolver);
-    return elfldltl::RelocateSymbolic(mutable_memory, diag, reloc_info(), symbol_info(),
-                                      load_bias(), resolver);
+    return elfldltl::RelocateSymbolic(mutable_memory, diag, this->reloc_info(), this->symbol_info(),
+                                      this->load_bias(), resolver);
   }
 
   // This returns an OK result only if all modules were fit to be relocated.
@@ -362,7 +366,7 @@ class RemoteLoadModule : public RemoteLoadModuleBase {
   // Load the module into its allocated vaddr region.
   template <class Diagnostics>
   bool Load(Diagnostics& diag) {
-    return loader_.Load(diag, load_info(), vmo_.borrow());
+    return loader_.Load(diag, this->load_info(), vmo_.borrow());
   }
 
   template <class Diagnostics>
@@ -374,7 +378,7 @@ class RemoteLoadModule : public RemoteLoadModuleBase {
   // This must be the last method called with the loader. Direct the loader to
   // preserve the load image before it is garbage collected.
   void Commit() {
-    assert(HasModule());
+    assert(this->HasModule());
     std::move(loader_).Commit();
   }
 
@@ -537,7 +541,7 @@ class RemoteLoadModule : public RemoteLoadModuleBase {
   template <class Diagnostics>
   fit::result<bool> InitMappedVmo(Diagnostics& diag, zx::vmo vmo) {
     if (auto status = mapped_vmo_.Init(vmo.borrow()); status.is_error()) {
-      return fit::error{diag.SystemError("cannot map VMO file for ", name(), " : ",
+      return fit::error{diag.SystemError("cannot map VMO file for ", this->name(), " : ",
                                          elfldltl::ZirconError{status.status_value()})};
     }
     vmo_ = std::move(vmo);
