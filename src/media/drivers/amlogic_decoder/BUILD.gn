@@ -12,6 +12,38 @@ declare_args() {
   amlogic_decoder_firmware_path = ""
 }
 
+driver_bind_rules("amlogic_video_bind") {
+  rules = "amlogic_video.bind"
+  tests = "bind_tests.json"
+  deps = [
+    "//sdk/fidl/fuchsia.hardware.amlogiccanvas:fuchsia.hardware.amlogiccanvas_bindlib",
+    "//sdk/fidl/fuchsia.hardware.clock:fuchsia.hardware.clock_bindlib",
+    "//src/devices/bind/fuchsia.amlogic.platform",
+    "//src/devices/bind/fuchsia.clock",
+    "//src/devices/bind/fuchsia.platform",
+    "//src/devices/bind/fuchsia.sysmem",
+    "//src/devices/bind/fuchsia.tee",
+  ]
+}
+
+# Note: This target uses the same source as above, the only difference is the addition of
+# `diasable_autobind = true`, and tests are omitted.
+driver_bind_rules("amlogic_video_test_bind") {
+  rules = "amlogic_video.bind"
+  disable_autobind = true
+  deps = [
+    "//sdk/fidl/fuchsia.hardware.amlogiccanvas:fuchsia.hardware.amlogiccanvas_bindlib",
+    "//sdk/fidl/fuchsia.hardware.clock:fuchsia.hardware.clock_bindlib",
+    "//src/devices/bind/fuchsia.amlogic.platform",
+    "//src/devices/bind/fuchsia.clock",
+    "//src/devices/bind/fuchsia.platform",
+    "//src/devices/bind/fuchsia.sysmem",
+    "//src/devices/bind/fuchsia.tee",
+  ]
+}
+
+test_list = [ ":amlogic_video_bind_test" ]
+
 # These targets only compile for arm64.
 if (target_cpu == "arm64") {
   # internal access is needed to get the firmware from the default path.
@@ -24,50 +56,14 @@ if (target_cpu == "arm64") {
     }
   }
 
-  group("tests") {
-    testonly = true
-
-    deps = [
-      ":amlogic_video_bind_test",
-      "tests/runner:amlogic_decoder_integration_tests",
-      "tests/unit_tests:amlogic-decoder-unittest",
-    ]
-
-    if (_has_decoder_firmware) {
-      deps += [
-        ":amlogic_decoder_firmware",
-        ":amlogic_decoder_test-package",
-      ]
-    }
-  }
-
-  driver_bind_rules("amlogic_video_bind") {
-    rules = "amlogic_video.bind"
-    tests = "bind_tests.json"
-    deps = [
-      "//sdk/fidl/fuchsia.hardware.amlogiccanvas:fuchsia.hardware.amlogiccanvas_bindlib",
-      "//sdk/fidl/fuchsia.hardware.clock:fuchsia.hardware.clock_bindlib",
-      "//src/devices/bind/fuchsia.amlogic.platform",
-      "//src/devices/bind/fuchsia.clock",
-      "//src/devices/bind/fuchsia.platform",
-      "//src/devices/bind/fuchsia.sysmem",
-      "//src/devices/bind/fuchsia.tee",
-    ]
-  }
-
-  # Note: This target uses the same source as above, the only difference is the addition of
-  # `diasable_autobind = true`, and tests are omitted.
-  driver_bind_rules("amlogic_video_test_bind") {
-    rules = "amlogic_video.bind"
-    disable_autobind = true
-    deps = [
-      "//sdk/fidl/fuchsia.hardware.amlogiccanvas:fuchsia.hardware.amlogiccanvas_bindlib",
-      "//sdk/fidl/fuchsia.hardware.clock:fuchsia.hardware.clock_bindlib",
-      "//src/devices/bind/fuchsia.amlogic.platform",
-      "//src/devices/bind/fuchsia.clock",
-      "//src/devices/bind/fuchsia.platform",
-      "//src/devices/bind/fuchsia.sysmem",
-      "//src/devices/bind/fuchsia.tee",
+  test_list += [
+    "tests/runner:amlogic_decoder_integration_tests",
+    "tests/unit_tests:amlogic-decoder-unittest",
+  ]
+  if (_has_decoder_firmware) {
+    test_list += [
+      ":amlogic_decoder_firmware",
+      ":amlogic_decoder_test-package",
     ]
   }
 
@@ -307,4 +303,10 @@ if (target_cpu == "arm64") {
     driver_components = [ ":amlogic_decoder_test-component" ]
     deps = [ ":test_files" ]
   }
+}
+
+group("tests") {
+  testonly = true
+
+  deps = test_list
 }
