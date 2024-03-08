@@ -766,7 +766,15 @@ impl OpenRequest<'_> {
                 remote.open(scope, flags, path, object_request.take().into_server_end());
                 Ok(())
             }
-            _ => Err(Status::NOT_SUPPORTED),
+            OpenRequest {
+                scope,
+                flags_or_protocols: FlagsOrProtocols::Protocols(protocols),
+                path,
+                object_request,
+            } => {
+                // We should fix the copy of protocols here.
+                remote.open2(scope, path, protocols.clone(), object_request)
+            }
         }
     }
 }

@@ -14,6 +14,7 @@ use crate::{
         test_utils::{run_client, DirentsSameInodeBuilder},
     },
     execution_scope::ExecutionScope,
+    object_request::ToObjectRequest as _,
     path::Path,
     test_utils::test_file::TestFile,
 };
@@ -49,7 +50,6 @@ async fn test_set_up_remote() {
 
 // Tests for opening a remote node with the NODE_REFERENCE flag. The remote node uses the existing
 // Service connection type after construction, which is tested in service/tests/node_reference.rs.
-
 #[test]
 fn remote_dir_construction_open_node_ref() {
     let exec = fasync::TestExecutor::new();
@@ -59,9 +59,23 @@ fn remote_dir_construction_open_node_ref() {
     let server = remote_dir(remote_proxy);
 
     run_client(exec, || async move {
-        let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+        // Test open1.
+        let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::NodeMarker>().unwrap();
         let flags = fio::OpenFlags::NODE_REFERENCE;
-        server.open(scope, flags, Path::dot(), server_end.into_channel().into());
+        server.clone().open(scope.clone(), flags, Path::dot(), server_end.into_channel().into());
+        assert_close!(proxy);
+
+        // Test open2.
+        let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::NodeMarker>().unwrap();
+        let protocols = fio::ConnectionProtocols::Node(fio::NodeOptions {
+            protocols: Some(fio::NodeProtocols {
+                node: Some(Default::default()),
+                ..Default::default()
+            }),
+            ..Default::default()
+        });
+        let object_request = protocols.to_object_request(server_end);
+        object_request.handle(|request| server.open2(scope, Path::dot(), protocols, request));
         assert_close!(proxy);
     })
 }
@@ -74,21 +88,31 @@ fn remote_dir_node_ref_with_path() {
     let remote_proxy = set_up_remote(scope.clone());
     let server = remote_dir(remote_proxy);
 
+    let path = Path::validate_and_split("dir/b").unwrap();
+
     run_client(exec, || async move {
-        let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+        // Test open1.
+        let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::NodeMarker>().unwrap();
         let flags = fio::OpenFlags::NODE_REFERENCE;
-        server.open(
-            scope,
-            flags,
-            Path::validate_and_split("dir/b").unwrap(),
-            server_end.into_channel().into(),
-        );
+        server.clone().open(scope.clone(), flags, path.clone(), server_end.into_channel().into());
+        assert_close!(proxy);
+
+        // Test open2.
+        let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::NodeMarker>().unwrap();
+        let protocols = fio::ConnectionProtocols::Node(fio::NodeOptions {
+            protocols: Some(fio::NodeProtocols {
+                node: Some(Default::default()),
+                ..Default::default()
+            }),
+            ..Default::default()
+        });
+        let object_request = protocols.to_object_request(server_end);
+        object_request.handle(|request| server.open2(scope, path, protocols, request));
         assert_close!(proxy);
     })
 }
 
 // Tests for opening a remote node where we actually want the open request to be forwarded.
-
 #[test]
 fn remote_dir_direct_connection() {
     let exec = fasync::TestExecutor::new();
@@ -98,10 +122,10 @@ fn remote_dir_direct_connection() {
     let server = remote_dir(remote_proxy);
 
     run_client(exec, || async move {
+        // Test open1.
         let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
         let flags = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DIRECTORY;
-        server.open(scope, flags, Path::dot(), server_end.into_channel().into());
-
+        server.clone().open(scope.clone(), flags, Path::dot(), server_end.into_channel().into());
         let mut expected = DirentsSameInodeBuilder::new(fio::INO_UNKNOWN);
         expected
             // (10 + 1) = 11
@@ -109,7 +133,26 @@ fn remote_dir_direct_connection() {
             // 11 + (10 + 1) = 22
             .add(fio::DirentType::File, b"a");
         assert_read_dirents!(proxy, 22, expected.into_vec());
+        assert_close!(proxy);
 
+        // Test open2.
+        let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+        let protocols = fio::ConnectionProtocols::Node(fio::NodeOptions {
+            protocols: Some(fio::NodeProtocols {
+                directory: Some(Default::default()),
+                ..Default::default()
+            }),
+            ..Default::default()
+        });
+        let object_request = protocols.to_object_request(server_end);
+        object_request.handle(|request| server.open2(scope, Path::dot(), protocols, request));
+        let mut expected = DirentsSameInodeBuilder::new(fio::INO_UNKNOWN);
+        expected
+            // (10 + 1) = 11
+            .add(fio::DirentType::Directory, b".")
+            // 11 + (10 + 1) = 22
+            .add(fio::DirentType::File, b"a");
+        assert_read_dirents!(proxy, 22, expected.into_vec());
         assert_close!(proxy);
     })
 }
@@ -123,11 +166,26 @@ fn remote_dir_direct_connection_dir_contents() {
     let server = remote_dir(remote_proxy);
 
     run_client(exec, || async move {
+        // Test open1.
         let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::FileMarker>().unwrap();
         let flags = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::NOT_DIRECTORY;
         let path = Path::validate_and_split("a").unwrap();
-        server.open(scope, flags, path, server_end.into_channel().into());
+        server.clone().open(scope.clone(), flags, path.clone(), server_end.into_channel().into());
+        assert_read!(proxy, "a content");
+        assert_close!(proxy);
 
+        // Test open2.
+        let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::FileMarker>().unwrap();
+        let protocols = fio::ConnectionProtocols::Node(fio::NodeOptions {
+            protocols: Some(fio::NodeProtocols {
+                file: Some(Default::default()),
+                ..Default::default()
+            }),
+            rights: Some(fio::Operations::READ_BYTES),
+            ..Default::default()
+        });
+        let object_request = protocols.to_object_request(server_end);
+        object_request.handle(|request| server.open2(scope, path, protocols, request));
         assert_read!(proxy, "a content");
         assert_close!(proxy);
     })
