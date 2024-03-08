@@ -30,7 +30,7 @@ bool ParseInt(std::string_view string, int_t &i, int base = 10) {
   if (string.empty())
     return false;
 
-  const char *begin = string.begin();
+  const char *begin = string.data();
   const char *end = begin + string.size();
   if (string.size() > 2 && string[0] == '0' && string[1] == 'x') {
     base = 16;
