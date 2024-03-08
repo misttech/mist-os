@@ -496,6 +496,10 @@ impl Usercopy {
     /// Copies data from the restricted address `source_addr` to `dest`.
     ///
     /// Returns the read and unread bytes.
+    ///
+    /// The returned slices will always reference `dest`. Because of this, it is
+    /// guaranteed that that `dest` and the returned initialized slice will have
+    /// the same address.
     pub fn copyin<'a>(
         &self,
         source_addr: usize,
@@ -504,23 +508,24 @@ impl Usercopy {
         // Assumption: The address 0 is invalid and cannot be mapped.  The error encoding scheme has
         // a collision on the value 0 - it could mean that there was a fault at the address 0 or
         // that there was no fault. We want to treat an attempt to copy from 0 as a fault always.
-        if source_addr == 0 || !self.restricted_address_range.contains(&source_addr) {
-            return (&mut [], dest);
-        }
+        let read_count =
+            if source_addr == 0 || !self.restricted_address_range.contains(&source_addr) {
+                0
+            } else {
+                // SAFETY: `dest` is a valid Starnix-owned buffer and `source_addr` is the user-mode
+                // buffer.
+                unsafe {
+                    do_hermetic_copy(
+                        self.hermetic_copy_fn,
+                        dest.as_ptr() as usize,
+                        source_addr,
+                        dest.len(),
+                        false,
+                    )
+                }
+            };
 
-        // SAFETY: `dest` is a valid Starnix-owned buffer and `source_addr` is the user-mode
-        // buffer.
-        let read_count = unsafe {
-            do_hermetic_copy(
-                self.hermetic_copy_fn,
-                dest.as_ptr() as usize,
-                source_addr,
-                dest.len(),
-                false,
-            )
-        };
-
-        // SAFETY: `dest`'s first `read_count` bytes are initialized
+        // SAFETY: `dest`'s first `read_count` bytes are initialized.
         unsafe { assume_initialized_until(dest, read_count) }
     }
 
@@ -529,6 +534,10 @@ impl Usercopy {
     ///
     /// Returns the read and unread bytes. The read bytes includes the null byte
     /// if present.
+    ///
+    /// The returned slices will always reference `dest`. Because of this, it is
+    /// guaranteed that that `dest` and the returned initialized slice will have
+    /// the same address.
     pub fn copyin_until_null_byte<'a>(
         &self,
         source_addr: usize,
@@ -537,21 +546,22 @@ impl Usercopy {
         // Assumption: The address 0 is invalid and cannot be mapped.  The error encoding scheme has
         // a collision on the value 0 - it could mean that there was a fault at the address 0 or
         // that there was no fault. We want to treat an attempt to copy from 0 as a fault always.
-        if source_addr == 0 || !self.restricted_address_range.contains(&source_addr) {
-            return (&mut [], dest);
-        }
-
-        // SAFETY: `dest` is a valid Starnix-owned buffer and `source_addr` is the user-mode
-        // buffer.
-        let read_count = unsafe {
-            do_hermetic_copy(
-                self.hermetic_copy_until_null_byte_fn,
-                dest.as_ptr() as usize,
-                source_addr,
-                dest.len(),
-                false,
-            )
-        };
+        let read_count =
+            if source_addr == 0 || !self.restricted_address_range.contains(&source_addr) {
+                0
+            } else {
+                // SAFETY: `dest` is a valid Starnix-owned buffer and `source_addr` is the user-mode
+                // buffer.
+                unsafe {
+                    do_hermetic_copy(
+                        self.hermetic_copy_until_null_byte_fn,
+                        dest.as_ptr() as usize,
+                        source_addr,
+                        dest.len(),
+                        false,
+                    )
+                }
+            };
 
         // SAFETY: `dest`'s first `read_count` bytes are initialized
         unsafe { assume_initialized_until(dest, read_count) }
@@ -854,10 +864,12 @@ mod test {
         unsafe { std::slice::from_raw_parts_mut(mapped_addr as *mut u8, buf_len) }.fill('a' as u8);
 
         let usercopy = Usercopy::new_for_test(mapped_addr..mapped_addr + page_size);
+        let dest_as_mut_ptr = dest.as_mut_ptr();
         let (read_bytes, unread_bytes) = usercopy.copyin(mapped_addr, dest.spare_capacity_mut());
         let expected = vec!['a' as u8; buf_len];
         assert_eq!(read_bytes, &expected);
         assert_eq!(unread_bytes.len(), 0);
+        assert_eq!(read_bytes.as_mut_ptr(), dest_as_mut_ptr);
 
         // SAFETY: OK because the copyin was successful.
         unsafe { dest.set_len(buf_len) }
@@ -942,11 +954,13 @@ mod test {
 
         let usercopy = Usercopy::new_for_test(mapped_addr..mapped_addr + page_size);
 
+        let dest_as_mut_ptr = dest.as_mut_ptr();
         let (read_bytes, unread_bytes) =
             usercopy.copyin_until_null_byte(mapped_addr, dest.spare_capacity_mut());
         let expected = vec!['a' as u8; buf_len];
         assert_eq!(read_bytes, &expected);
         assert_eq!(unread_bytes.len(), 0);
+        assert_eq!(read_bytes.as_mut_ptr(), dest_as_mut_ptr);
 
         // SAFETY: OK because the copyin_until_null_byte was successful.
         unsafe { dest.set_len(dest.capacity()) }
