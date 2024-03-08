@@ -6,12 +6,12 @@ point in time and export them in a
 
 ## How to use
 
-* Pass `--with src/performance/memory/heapdump/collector` to the `fx set`
-  invocation.
 * Add `//src/performance/memory/heapdump/instrumentation` to the `deps` of the
   `executable` target that you want to profile.
 * Add `//src/performance/memory/heapdump/instrumentation/collector.shard.cml`
   to the `include` list in your component's manifest.
+* Add `//src/performance/memory/heapdump/collector` to the `subpackages` of
+  your package.
 * Add `#include <heapdump/bind.h>` and call `heapdump_bind_with_fdio()` at the
   beginning of `main` in your program.
 * Run your program as usual.
@@ -29,11 +29,21 @@ ffx profile heapdump snapshot --by-name example.cm --output-file my_snapshot.pb
 fx pprof -http=":" my_snapshot.pb
 ```
 
+Note: in alternative, when the component being profiled does not have access to
+the package resolver (e.g. bootstrap components) or if subpackages cannot be
+used, it is possible to add the collector package directly to the image (e.g.
+`--with-base //src/performance/memory/heapdump/collector`) and, instead of
+including the predefined shard, instantiate it somewhere else in component
+hierarchy that has access to the resolver (the URL to be instantiated will be
+`fuchsia-pkg://fuchsia.com/heapdump-collector#meta/heapdump-collector.cm`).
+With this approach, the `fuchsia.memory.heapdump.process.Registry` capability
+must then be manually routed to the component being profiled.
+
 ## Quickstart: Running the example
 
 ```
-# Include heapdump's collector and the example component in the build.
-fx set ... --with src/performance/memory/heapdump/collector --with src/performance/memory/heapdump/example
+# Include heapdump's example component in the build.
+fx set ... --with src/performance/memory/heapdump/example
 
 # Build and run Fuchsia as usual, then start the example component.
 ffx component run /core/ffx-laboratory:example fuchsia-pkg://fuchsia.com/heapdump-example#meta/heapdump-example.cm

@@ -5,7 +5,7 @@
     children: [
         {
             name: "heapdump-collector",
-            url: "fuchsia-pkg://fuchsia.com/heapdump-collector#meta/heapdump-collector.cm",
+            url: "heapdump-collector#meta/heapdump-collector.cm",
         },
     ],
     use: [

@@ -14,4 +14,5 @@ fuchsia_package_with_single_component("example") {
   package_name = "heapdump-example"
   manifest = "meta/example.cml"
   deps = [ ":bin" ]
+  subpackages = [ "//src/performance/memory/heapdump/collector" ]
 }

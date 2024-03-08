@@ -52,9 +52,6 @@ if (is_host) {
 if (is_fuchsia) {
   group("package_deps_for_host_tests") {
     testonly = true
-    deps = [
-      "//src/performance/memory/heapdump/collector",
-      "//src/performance/memory/heapdump/example",
-    ]
+    deps = [ "//src/performance/memory/heapdump/example" ]
   }
 }
