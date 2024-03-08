@@ -1436,6 +1436,8 @@ zx_status_t AmlSdmmc::SdmmcUnregisterVmo(uint32_t vmo_id, uint8_t client_id, zx:
 
 void AmlSdmmc::Request(RequestRequestView request, fdf::Arena& arena,
                        RequestCompleter::Sync& completer) {
+  fbl::AutoLock lock(&lock_);
+
   fidl::Array<uint32_t, 4> response;
   for (const auto& req : request->reqs) {
     std::vector<sdmmc_buffer_region_t> buffer_regions;
@@ -1475,7 +1477,11 @@ void AmlSdmmc::Request(RequestRequestView request, fdf::Arena& arena,
         .buffers_list = buffer_regions.data(),
         .buffers_count = buffer_regions.size(),
     };
-    zx_status_t status = SdmmcRequest(&sdmmc_req, response.data());
+    if (sdmmc_req.client_id > SDMMC_MAX_CLIENT_ID) {
+      completer.buffer(arena).ReplyError(ZX_ERR_OUT_OF_RANGE);
+      return;
+    }
+    zx_status_t status = SdmmcRequestLocked(&sdmmc_req, response.data());
     if (status != ZX_OK) {
       completer.buffer(arena).ReplyError(status);
       return;
