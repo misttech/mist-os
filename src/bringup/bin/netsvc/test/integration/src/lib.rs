@@ -2,8 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#![allow(clippy::large_futures)]
-
 use fidl::prelude::*;
 use fidl_fuchsia_hardware_network as fhardware_network;
 use fidl_fuchsia_net_tun as fnet_tun;
@@ -264,7 +262,10 @@ where
             let read_result = proxy.read_data().await.expect("calling read data");
             Some((read_result, proxy))
         });
-        let mut payload = [0u8; PAVE_IMAGE_LEN_USIZE];
+        // Box this in order to avoid needing to keep a huge Future on the
+        // stack, which risks overflows.
+        // See https://rust-lang.github.io/rust-clippy/stable/index.html#/large_futures.
+        let mut payload = Box::new([0u8; PAVE_IMAGE_LEN_USIZE]);
         let payload = async_utils::fold::fold_while(
             stream,
             (0, &mut payload[..], vmo),
