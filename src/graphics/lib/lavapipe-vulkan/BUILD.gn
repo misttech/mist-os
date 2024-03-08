@@ -9,12 +9,31 @@ group("lavapipe-vulkan") {
   public_deps = [ ":lavapipe_pkg" ]
 }
 
-shared_library("libvulkan_lavapipe") {
+shared_library("libvulkan_lavapipe_fake") {
   sources = [ "lavapipe_icd_fake.cc" ]
   deps = [
     "//sdk/lib/fdio",
     "//src/lib/vulkan",
     "//zircon/system/ulib/zx",
+  ]
+}
+
+shared_library("libvulkan_lavapipe") {
+  deps = [
+    "//sdk/lib/fdio",
+    "//src/lib/llvm:LLVMBitWriter",
+    "//src/lib/llvm:LLVMCodeGenTypes",
+    "//src/lib/llvm:LLVMCore",
+    "//src/lib/llvm:LLVMIRPrinter",
+    "//src/lib/llvm:LLVMMCDisassembler",
+    "//src/lib/llvm:LLVMMCJIT",
+    "//src/lib/llvm:LLVMPasses",
+    "//src/lib/llvm:LLVMTarget",
+    "//src/lib/llvm:LLVMX86CodeGen",
+    "//src/lib/llvm:LLVMX86Disassembler",
+    "//src/lib/llvm:LLVMX86Info",
+    "//third_party/mesa/src/gallium/drivers/llvmpipe",
+    "//third_party/mesa/src/gallium/frontends/lavapipe",
   ]
 }
 
