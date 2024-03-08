@@ -130,14 +130,15 @@
     // see:  https://github.com/rust-lang/rust-analyzer/issues/12572
     // see:  https://github.com/microsoft/vscode/issues/153154
     "rust-analyzer.files.watcher": "server",
-    "rust-analyzer.server.path": "${workspaceFolder}/prebuilt/third_party/rust/linux-x64/bin/rust-analyzer",
+    "rust-analyzer.server.path": "${workspaceFolder}/prebuilt/third_party/rust-analyzer/rust-analyzer",
 
     // Use clippy.
     "rust-analyzer.check.overrideCommand": [
       "${workspaceFolder}/scripts/fx",
       "clippy",
       "--raw",
-      "--all"
+      "-f",
+      "$saved_file"
     ],
 
     // Remap the diagnostics results from RA to handle the change in working dir
