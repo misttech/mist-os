@@ -282,6 +282,8 @@ class PrettyRecursiveVariant : public PrettyType {
 // Currently this is formatted like "typename(value)". For some types it might be nice to format
 // them just as the value, but the confusing part is that it won't behave exactly like the value in
 // expressions.
+//
+// This adds the ability to dereference with |*foo|.
 class PrettyWrappedValue : public PrettyType {
  public:
   PrettyWrappedValue(const std::string& name, const std::string& open_bracket,
@@ -293,6 +295,7 @@ class PrettyWrappedValue : public PrettyType {
 
   void Format(FormatNode* node, const FormatOptions& options,
               const fxl::RefPtr<EvalContext>& context, fit::deferred_callback cb) override;
+  EvalFunction GetDereferencer() const override;
 
  private:
   const std::string name_;

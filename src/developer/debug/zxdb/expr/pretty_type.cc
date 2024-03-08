@@ -677,6 +677,13 @@ void PrettyWrappedValue::Format(FormatNode* node, const FormatOptions& options,
                 });
 }
 
+PrettyWrappedValue::EvalFunction PrettyWrappedValue::GetDereferencer() const {
+  return [expr = expression_](const fxl::RefPtr<EvalContext>& context, const ExprValue& val,
+                              EvalCallback cb) {
+    EvalExpressionOn(context, val, expr, std::move(cb));
+  };
+}
+
 PrettyZxStatusT::PrettyZxStatusT() : PrettyType({}) {}
 
 void PrettyZxStatusT::Format(FormatNode* node, const FormatOptions& options,
