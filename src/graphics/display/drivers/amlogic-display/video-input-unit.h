@@ -67,7 +67,7 @@ class VideoInputUnit {
 
   // Schedules the given |config| to be applied by the RDMA engine when the next VSYNC interrupt
   // occurs.
-  void FlipOnVsync(uint8_t idx, const display_config_t* config, display::ConfigStamp config_stamp);
+  void FlipOnVsync(const display_config_t* config, display::ConfigStamp config_stamp);
 
   // Returns the image handle that was most recently processed by the RDMA engine. If RDMA is
   // determined to be in progress and incomplete, then the previously applied image is returned. If

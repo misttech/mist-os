@@ -288,7 +288,7 @@ void VideoInputUnit::SetColorCorrection(uint32_t rdma_table_idx, const display_c
          coef02_10, coef11_12, coef20_21, coef22);
 }
 
-void VideoInputUnit::FlipOnVsync(uint8_t idx, const display_config_t* config,
+void VideoInputUnit::FlipOnVsync(const display_config_t* config,
                                  display::ConfigStamp config_stamp) {
   auto info = reinterpret_cast<ImageInfo*>(config[0].layer_list[0]->cfg.primary.image.handle);
   const int next_table_idx = rdma_->GetNextAvailableRdmaTableIndex();
@@ -321,8 +321,9 @@ void VideoInputUnit::FlipOnVsync(uint8_t idx, const display_config_t* config,
     // AFBC: Enable sourcing from mali + configure as big endian
     cfg_w0.set_mali_src_en(1).set_little_endian(0);
   } else {
+    uint8_t canvas_index = info->canvas_idx;
     // Update CFG_W0 with correct Canvas Index
-    cfg_w0.set_mali_src_en(0).set_little_endian(1).set_tbl_addr(idx);
+    cfg_w0.set_mali_src_en(0).set_little_endian(1).set_tbl_addr(canvas_index);
   }
   cfg_w0.set_blk_mode(OsdBlk0CfgW0Reg::kBlockMode32Bit);
 

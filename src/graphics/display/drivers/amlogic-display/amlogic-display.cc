@@ -547,9 +547,7 @@ void AmlogicDisplay::DisplayControllerImplApplyConfiguration(
 
     // Since Amlogic does not support plug'n play (fixed display), there is no way
     // a checked configuration could be invalid at this point.
-    auto info =
-        reinterpret_cast<ImageInfo*>(display_configs[0]->layer_list[0]->cfg.primary.image.handle);
-    video_input_unit_->FlipOnVsync(info->canvas_idx, display_configs[0], config_stamp);
+    video_input_unit_->FlipOnVsync(display_configs[0], config_stamp);
   } else {
     if (fully_initialized()) {
       {
