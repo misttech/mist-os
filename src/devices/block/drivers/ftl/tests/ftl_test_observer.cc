@@ -19,13 +19,6 @@ void FtlTestObserver::OnProgramStart() {
     printf("Unable to wait for block device. Error: %s\n", zx_status_get_string(status));
     return;
   }
-
-  fbl::unique_fd fd;
-  if (zx_status_t status = fdio_open_fd(kTestDevice, 0, fd.reset_and_get_address());
-      status != ZX_OK) {
-    printf("Unable to open remapped device. Error: %s\n", zx_status_get_string(status));
-    return;
-  }
   ok_ = true;
 }
 
