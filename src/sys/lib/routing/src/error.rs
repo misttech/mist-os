@@ -631,3 +631,10 @@ pub enum AvailabilityRoutingError {
     #[error("Expose uses void source, but target requires the capability")]
     ExposeFromVoidToRequiredTarget,
 }
+
+impl From<availability::TargetHasStrongerAvailability> for AvailabilityRoutingError {
+    fn from(value: availability::TargetHasStrongerAvailability) -> Self {
+        let availability::TargetHasStrongerAvailability = value;
+        AvailabilityRoutingError::TargetHasStrongerAvailability
+    }
+}

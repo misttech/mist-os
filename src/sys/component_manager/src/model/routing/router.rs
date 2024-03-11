@@ -176,10 +176,9 @@ impl Router {
             async move {
                 // The availability of the request must be compatible with the
                 // availability of this step of the route.
-                let mut state = ::routing::availability::AvailabilityState(request.availability);
-                match state.advance(&availability) {
-                    Ok(()) => {
-                        request.availability = state.0;
+                match ::routing::availability::advance(request.availability, availability) {
+                    Ok(updated) => {
+                        request.availability = updated;
                         // Everything checks out, forward the request.
                         let res = router.route(request).await;
                         res

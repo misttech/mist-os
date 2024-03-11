@@ -20,7 +20,6 @@ pub mod walk_state;
 use fuchsia_zircon_status as zx;
 use {
     crate::{
-        availability::{AvailabilityState, AvailabilityVisitor},
         capability_source::{CapabilitySource, ComponentCapability, InternalCapability},
         component_instance::{
             ComponentInstanceInterface, ExtendedInstanceInterface, TopInstanceInterface,
@@ -393,7 +392,7 @@ async fn route_protocol_from_offer<C>(
 where
     C: ComponentInstanceInterface + 'static,
 {
-    let mut availability_visitor = AvailabilityVisitor::new(offer_decl.availability);
+    let mut availability_visitor = offer_decl.availability;
     let allowed_sources = AllowedSourcesBuilder::new(CapabilityTypeName::Protocol)
         .framework(InternalCapability::Protocol)
         .builtin()
@@ -453,8 +452,7 @@ where
     // TODO(https://fxbug.dev/42124541): Figure out how to set the availability when `offer_bundle` contains
     // multiple routes with different availabilities. It's possible that manifest validation should
     // disallow this. For now, just pick the first.
-    let mut availability_visitor =
-        AvailabilityVisitor::new(offer_bundle.iter().next().unwrap().availability);
+    let mut availability_visitor = offer_bundle.iter().next().unwrap().availability;
     let allowed_sources =
         AllowedSourcesBuilder::new(CapabilityTypeName::Service).component().collection();
     let source = legacy_router::route_from_offer(
@@ -479,7 +477,7 @@ where
 {
     let allowed_sources = AllowedSourcesBuilder::new(CapabilityTypeName::EventStream).builtin();
 
-    let mut availability_visitor = AvailabilityVisitor::new(offer_decl.availability);
+    let mut availability_visitor = offer_decl.availability;
     let source = legacy_router::route_from_offer(
         RouteBundle::from_offer(offer_decl.into()),
         target.clone(),
@@ -499,7 +497,7 @@ async fn route_storage_from_offer<C>(
 where
     C: ComponentInstanceInterface + 'static,
 {
-    let mut availability_visitor = AvailabilityVisitor::new(offer_decl.availability);
+    let mut availability_visitor = offer_decl.availability;
     let allowed_sources = AllowedSourcesBuilder::new(CapabilityTypeName::Storage).component();
     let source = legacy_router::route_from_offer(
         RouteBundle::from_offer(offer_decl.into()),
@@ -624,7 +622,7 @@ where
                 }
             };
 
-            let mut availability_visitor = AvailabilityVisitor::new(use_decl.availability);
+            let mut availability_visitor = use_decl.availability;
             let source = legacy_router::route_from_registration(
                 registration_decl,
                 env_component_instance.clone(),
@@ -641,7 +639,7 @@ where
             return Ok(RouteSource::new(source));
         }
         UseSource::Self_ => {
-            let mut availability_visitor = AvailabilityVisitor::new(use_decl.availability);
+            let mut availability_visitor = use_decl.availability;
             let allowed_sources =
                 AllowedSourcesBuilder::new(CapabilityTypeName::Protocol).component();
             let source = legacy_router::route_from_self(
@@ -655,7 +653,7 @@ where
             Ok(RouteSource::new(source))
         }
         _ => {
-            let mut availability_visitor = AvailabilityVisitor::new(use_decl.availability);
+            let mut availability_visitor = use_decl.availability;
             let source = legacy_router::route_from_use(
                 use_decl.into(),
                 target.clone(),
@@ -680,7 +678,7 @@ async fn route_protocol_from_expose<C>(
 where
     C: ComponentInstanceInterface + 'static,
 {
-    let mut availability_visitor = AvailabilityVisitor::new(expose_decl.availability);
+    let mut availability_visitor = expose_decl.availability;
     let allowed_sources = AllowedSourcesBuilder::new(CapabilityTypeName::Protocol)
         .framework(InternalCapability::Protocol)
         .builtin()
@@ -787,7 +785,7 @@ where
 {
     match use_decl.source {
         UseSource::Self_ => {
-            let mut availability_visitor = AvailabilityVisitor::new(use_decl.availability);
+            let mut availability_visitor = use_decl.availability;
             let allowed_sources =
                 AllowedSourcesBuilder::new(CapabilityTypeName::Service).component();
             let source = legacy_router::route_from_self(
@@ -801,7 +799,7 @@ where
             Ok(RouteSource::new(source))
         }
         _ => {
-            let mut availability_visitor = AvailabilityVisitor::new(use_decl.availability);
+            let mut availability_visitor = use_decl.availability;
             let allowed_sources =
                 AllowedSourcesBuilder::new(CapabilityTypeName::Service).component().collection();
             let source = legacy_router::route_from_use(
@@ -827,7 +825,7 @@ async fn route_service_from_expose<C>(
 where
     C: ComponentInstanceInterface + 'static,
 {
-    let mut availability_visitor = AvailabilityVisitor::new(expose_bundle.availability().clone());
+    let mut availability_visitor = expose_bundle.availability().clone();
     let allowed_sources =
         AllowedSourcesBuilder::new(CapabilityTypeName::Service).component().collection();
     let source = legacy_router::route_from_expose(
@@ -848,7 +846,7 @@ where
 pub struct DirectoryState {
     rights: WalkState<Rights>,
     pub subdir: PathBuf,
-    availability_state: AvailabilityState,
+    availability_state: Availability,
 }
 
 impl DirectoryState {
@@ -860,17 +858,18 @@ impl DirectoryState {
         DirectoryState {
             rights: WalkState::at(operations.into()),
             subdir: subdir.unwrap_or_else(PathBuf::new),
-            availability_state: availability.clone().into(),
+            availability_state: availability.clone(),
         }
     }
 
     fn advance_with_offer(&mut self, offer: &OfferDirectoryDecl) -> Result<(), RoutingError> {
-        self.availability_state.advance_with_offer(offer)?;
+        self.availability_state = availability::advance_with_offer(self.availability_state, offer)?;
         self.advance(offer.rights.clone(), offer.subdir.clone())
     }
 
     fn advance_with_expose(&mut self, expose: &ExposeDirectoryDecl) -> Result<(), RoutingError> {
-        self.availability_state.advance_with_expose(expose)?;
+        self.availability_state =
+            availability::advance_with_expose(self.availability_state, expose)?;
         self.advance(expose.rights.clone(), expose.subdir.clone())
     }
 
@@ -943,7 +942,7 @@ where
 {
     match use_decl.source {
         UseSource::Self_ => {
-            let mut availability_visitor = AvailabilityVisitor::new(use_decl.availability);
+            let mut availability_visitor = use_decl.availability;
             let allowed_sources =
                 AllowedSourcesBuilder::new(CapabilityTypeName::Dictionary).component();
             let source = legacy_router::route_from_self(
@@ -1057,7 +1056,7 @@ pub async fn route_to_storage_decl<C>(
 where
     C: ComponentInstanceInterface + 'static,
 {
-    let mut availability_visitor = AvailabilityVisitor::new(use_decl.availability);
+    let mut availability_visitor = use_decl.availability;
     let allowed_sources = AllowedSourcesBuilder::new(CapabilityTypeName::Storage).component();
     let source = legacy_router::route_from_use(
         use_decl.into(),
@@ -1185,8 +1184,7 @@ where
                 .builtin()
                 .capability()
                 .component();
-            let mut availability_visitor =
-                AvailabilityVisitor::new(use_decl.availability().clone());
+            let mut availability_visitor = use_decl.availability().clone();
             let source = legacy_router::route_from_use(
                 use_decl.into(),
                 target.clone(),
@@ -1213,7 +1211,7 @@ where
 {
     let allowed_sources =
         AllowedSourcesBuilder::new(CapabilityTypeName::Config).component().capability();
-    let mut availability_visitor = AvailabilityVisitor::new(use_decl.availability().clone());
+    let mut availability_visitor = use_decl.availability().clone();
     let source = legacy_router::route_from_use(
         use_decl.clone().into(),
         target.clone(),
@@ -1281,7 +1279,7 @@ where
     C: ComponentInstanceInterface + 'static,
 {
     let allowed_sources = AllowedSourcesBuilder::new(CapabilityTypeName::EventStream).builtin();
-    let mut availability_visitor = AvailabilityVisitor::new(use_decl.availability);
+    let mut availability_visitor = use_decl.availability;
     let source = legacy_router::route_from_use(
         use_decl.into(),
         target.clone(),

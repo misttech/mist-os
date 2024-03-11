@@ -8,84 +8,58 @@ use {
     cm_rust::{Availability, ExposeDeclCommon, ExposeSource, OfferDeclCommon, OfferSource},
 };
 
-/// Opaque availability type to define new traits like PartialOrd on.
-#[derive(Debug, PartialEq, Eq, Clone)]
-pub struct AvailabilityState(pub Availability);
-
-/// Allows creating the availability walker from Availability
-impl From<Availability> for AvailabilityState {
-    fn from(availability: Availability) -> Self {
-        AvailabilityState(availability)
+pub fn advance_with_offer(
+    current: Availability,
+    offer: &impl OfferDeclCommon,
+) -> Result<Availability, AvailabilityRoutingError> {
+    let result = advance(current, *offer.availability());
+    if offer.source() == &OfferSource::Void
+        && result == Err(AvailabilityRoutingError::TargetHasStrongerAvailability)
+    {
+        return Err(AvailabilityRoutingError::OfferFromVoidToRequiredTarget);
     }
+    result
 }
 
-impl AvailabilityState {
-    pub fn advance_with_offer(
-        &mut self,
-        offer: &dyn OfferDeclCommon,
-    ) -> Result<(), AvailabilityRoutingError> {
-        let result = self.advance(offer.availability());
-        if offer.source() == &OfferSource::Void
-            && result == Err(AvailabilityRoutingError::TargetHasStrongerAvailability)
-        {
-            return Err(AvailabilityRoutingError::OfferFromVoidToRequiredTarget);
-        }
-        result
+pub fn advance_with_expose(
+    current: Availability,
+    expose: &impl ExposeDeclCommon,
+) -> Result<Availability, AvailabilityRoutingError> {
+    let result = advance(current, *expose.availability());
+    if expose.source() == &ExposeSource::Void
+        && result == Err(AvailabilityRoutingError::TargetHasStrongerAvailability)
+    {
+        return Err(AvailabilityRoutingError::ExposeFromVoidToRequiredTarget);
     }
+    result
+}
 
-    pub fn advance_with_expose(
-        &mut self,
-        expose: &dyn ExposeDeclCommon,
-    ) -> Result<(), AvailabilityRoutingError> {
-        let result = self.advance(expose.availability());
-        if expose.source() == &ExposeSource::Void
-            && result == Err(AvailabilityRoutingError::TargetHasStrongerAvailability)
-        {
-            return Err(AvailabilityRoutingError::ExposeFromVoidToRequiredTarget);
-        }
-        result
-    }
-
-    pub fn advance(
-        &mut self,
-        next_availability: &Availability,
-    ) -> Result<(), AvailabilityRoutingError> {
-        self.0 = availability::advance(self.0, *next_availability).map_err(
-            |_: TargetHasStrongerAvailability| {
-                AvailabilityRoutingError::TargetHasStrongerAvailability
-            },
-        )?;
+impl crate::legacy_router::OfferVisitor for Availability {
+    fn visit(&mut self, offer: &cm_rust::OfferDecl) -> Result<(), crate::RoutingError> {
+        *self = advance_with_offer(*self, offer)?;
         Ok(())
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Clone)]
-pub struct AvailabilityVisitor {
-    pub state: AvailabilityState,
-}
-
-impl AvailabilityVisitor {
-    pub fn new(availability: Availability) -> AvailabilityVisitor {
-        AvailabilityVisitor { state: AvailabilityState(availability) }
-    }
-}
-
-impl crate::legacy_router::OfferVisitor for AvailabilityVisitor {
-    fn visit(&mut self, offer: &cm_rust::OfferDecl) -> Result<(), crate::RoutingError> {
-        self.state.advance_with_offer(offer).map_err(Into::into)
-    }
-}
-
-impl crate::legacy_router::ExposeVisitor for AvailabilityVisitor {
+impl crate::legacy_router::ExposeVisitor for Availability {
     fn visit(&mut self, expose: &cm_rust::ExposeDecl) -> Result<(), crate::RoutingError> {
-        self.state.advance_with_expose(expose).map_err(Into::into)
+        *self = advance_with_expose(*self, expose)?;
+        Ok(())
     }
 }
 
-impl crate::legacy_router::CapabilityVisitor for AvailabilityVisitor {
+impl crate::legacy_router::CapabilityVisitor for Availability {
     fn visit(&mut self, _: &cm_rust::CapabilityDecl) -> Result<(), crate::RoutingError> {
         Ok(())
     }
+}
+
+pub fn advance(
+    current: Availability,
+    next_availability: Availability,
+) -> Result<Availability, AvailabilityRoutingError> {
+    let next = availability::advance(current, next_availability)?;
+    Ok(next)
 }
 
 #[cfg(test)]
@@ -159,8 +133,7 @@ mod tests {
         offer: OfferDecl,
         expected: Result<(), AvailabilityRoutingError>,
     ) {
-        let mut current_state: AvailabilityState = availability.into();
-        let actual = current_state.advance_with_offer(&offer);
+        let actual = advance_with_offer(availability, &offer).map(|_| ());
         assert_eq!(actual, expected);
     }
 
@@ -230,8 +203,7 @@ mod tests {
         expose: ExposeDecl,
         expected: Result<(), AvailabilityRoutingError>,
     ) {
-        let mut current_state: AvailabilityState = availability.into();
-        let actual = current_state.advance_with_expose(&expose);
+        let actual = advance_with_expose(availability, &expose).map(|_| ());
         assert_eq!(actual, expected);
     }
 }
