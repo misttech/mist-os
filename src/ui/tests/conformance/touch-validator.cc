@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <fuchsia/input/report/cpp/fidl.h>
 #include <fuchsia/ui/composition/cpp/fidl.h>
 #include <fuchsia/ui/display/singleton/cpp/fidl.h>
 #include <fuchsia/ui/input3/cpp/fidl.h>
@@ -17,8 +18,10 @@
 #include <zircon/errors.h>
 
 #include <algorithm>
+#include <cstdint>
 #include <memory>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include <gtest/gtest.h>
@@ -26,6 +29,9 @@
 #include "src/ui/tests/conformance/conformance-test-base.h"
 
 namespace ui_conformance_testing {
+
+namespace futi = fuchsia::ui::test::input;
+namespace fir = fuchsia::input::report;
 
 const std::string PUPPET_UNDER_TEST_FACTORY_SERVICE = "puppet-under-test-factory-service";
 const std::string AUXILIARY_PUPPET_FACTORY_SERVICE = "auxiliary-puppet-factory-service";
@@ -38,11 +44,11 @@ constexpr double kEpsilon = 0.0001f;
 
 // TODO(https://fxbug.dev/42076606): Two coordinates (x/y) systems can differ in scale (size of
 // pixels).
-void ExpectLocationAndPhase(
-    const std::string& scoped_message,
-    const fuchsia::ui::test::input::TouchInputListenerReportTouchInputRequest& e,
-    float expected_pixel_ratio, double expected_x, double expected_y,
-    fuchsia::ui::pointer::EventPhase expected_phase, const uint32_t expected_pointer_id) {
+void ExpectLocationAndPhase(const std::string& scoped_message,
+                            const futi::TouchInputListenerReportTouchInputRequest& e,
+                            float expected_pixel_ratio, double expected_x, double expected_y,
+                            fuchsia::ui::pointer::EventPhase expected_phase,
+                            const uint32_t expected_pointer_id) {
   SCOPED_TRACE(scoped_message);
   auto pixel_scale = e.has_device_pixel_ratio() ? e.device_pixel_ratio() : 1;
   EXPECT_NEAR(static_cast<double>(expected_pixel_ratio), pixel_scale, kEpsilon);
@@ -58,7 +64,7 @@ void ExpectLocationAndPhase(
 // So tests sort the request vector by pointer id and keep the order of
 // event time.
 void SortTouchInputRequestByTimeAndTimestampAndPointerId(
-    std::vector<fuchsia::ui::test::input::TouchInputListenerReportTouchInputRequest>& requests) {
+    std::vector<futi::TouchInputListenerReportTouchInputRequest>& requests) {
   std::sort(requests.begin(), requests.end(), [](const auto& a, const auto& b) {
     if (a.time_received() != b.time_received()) {
       return a.time_received() < b.time_received();
@@ -67,37 +73,34 @@ void SortTouchInputRequestByTimeAndTimestampAndPointerId(
   });
 }
 
-class TouchListener : public fuchsia::ui::test::input::TouchInputListener {
+class TouchListener : public futi::TouchInputListener {
  public:
   TouchListener() : binding_(this) {}
 
-  // |fuchsia::ui::test::input::TouchInputListener|
-  void ReportTouchInput(
-      fuchsia::ui::test::input::TouchInputListenerReportTouchInputRequest request) override {
+  // |futi::TouchInputListener|
+  void ReportTouchInput(futi::TouchInputListenerReportTouchInputRequest request) override {
     events_received_.push_back(std::move(request));
   }
 
   // Returns a client end bound to this object.
-  fidl::InterfaceHandle<fuchsia::ui::test::input::TouchInputListener> NewBinding() {
-    return binding_.NewBinding();
-  }
+  fidl::InterfaceHandle<futi::TouchInputListener> NewBinding() { return binding_.NewBinding(); }
 
-  const std::vector<fuchsia::ui::test::input::TouchInputListenerReportTouchInputRequest>&
-  events_received() {
+  const std::vector<futi::TouchInputListenerReportTouchInputRequest>& events_received() {
     return events_received_;
   }
 
-  std::vector<fuchsia::ui::test::input::TouchInputListenerReportTouchInputRequest>
-  cloned_events_received() {
-    auto res = std::vector<fuchsia::ui::test::input::TouchInputListenerReportTouchInputRequest>();
+  std::vector<futi::TouchInputListenerReportTouchInputRequest> cloned_events_received() {
+    auto res = std::vector<futi::TouchInputListenerReportTouchInputRequest>();
     for (auto& req : events_received_) {
-      fuchsia::ui::test::input::TouchInputListenerReportTouchInputRequest clone;
+      futi::TouchInputListenerReportTouchInputRequest clone;
       req.Clone(&clone);
       res.push_back(std::move(clone));
     }
 
     return res;
   }
+
+  void clear_events() { events_received_.clear(); }
 
   bool LastEventReceivedMatchesPhase(fuchsia::ui::pointer::EventPhase phase) {
     if (events_received_.empty()) {
@@ -114,8 +117,8 @@ class TouchListener : public fuchsia::ui::test::input::TouchInputListener {
   }
 
  private:
-  fidl::Binding<fuchsia::ui::test::input::TouchInputListener> binding_;
-  std::vector<fuchsia::ui::test::input::TouchInputListenerReportTouchInputRequest> events_received_;
+  fidl::Binding<futi::TouchInputListener> binding_;
+  std::vector<futi::TouchInputListenerReportTouchInputRequest> events_received_;
 };
 
 // Holds resources associated with a single puppet instance.
@@ -139,12 +142,12 @@ class TouchConformanceTest : public ui_conformance_test_base::ConformanceTest,
     // Register fake touch screen.
     {
       FX_LOGS(INFO) << "Connecting to input registry";
-      auto input_registry = ConnectSyncIntoRealm<fuchsia::ui::test::input::Registry>();
+      auto input_registry = ConnectSyncIntoRealm<futi::Registry>();
 
       FX_LOGS(INFO) << "Registering fake touch screen";
-      fuchsia::ui::test::input::RegistryRegisterTouchScreenRequest request;
+      futi::RegistryRegisterTouchScreenRequest request;
       request.set_device(fake_touch_screen_.NewRequest());
-      request.set_coordinate_unit(fuchsia::ui::test::input::CoordinateUnit::PHYSICAL_PIXELS);
+      request.set_coordinate_unit(futi::CoordinateUnit::PHYSICAL_PIXELS);
       ASSERT_EQ(input_registry->RegisterTouchScreen(std::move(request)), ZX_OK);
     }
 
@@ -168,7 +171,7 @@ class TouchConformanceTest : public ui_conformance_test_base::ConformanceTest,
   int32_t display_width_as_int() const { return static_cast<int32_t>(display_width_); }
   int32_t display_height_as_int() const { return static_cast<int32_t>(display_height_); }
 
-  fuchsia::ui::test::input::TouchScreenSyncPtr fake_touch_screen_;
+  futi::TouchScreenSyncPtr fake_touch_screen_;
   uint32_t display_width_ = 0;
   uint32_t display_height_ = 0;
 };
@@ -234,7 +237,7 @@ TEST_P(SingleViewTouchConformanceTest, SimpleTap) {
   const auto kTapY = display_height_as_int() / 4;
 
   // Inject tap in the middle of the top-right quadrant.
-  fuchsia::ui::test::input::TouchScreenSimulateTapRequest tap_request;
+  futi::TouchScreenSimulateTapRequest tap_request;
   tap_request.mutable_tap_location()->x = kTapX;
   tap_request.mutable_tap_location()->y = kTapY;
   FX_LOGS(INFO) << "Injecting tap at (" << kTapX << ", " << kTapY << ")";
@@ -267,7 +270,7 @@ TEST_P(SingleViewTouchConformanceTest, MultiTap) {
   const int kTap0X = kTap1X - 5;
   const int kTap2X = kTap1X + 5;
 
-  fuchsia::ui::test::input::TouchScreenSimulateMultiTapRequest multi_tap_req;
+  futi::TouchScreenSimulateMultiTapRequest multi_tap_req;
   multi_tap_req.mutable_tap_locations()->push_back({.x = kTap0X, .y = kTapY});
   multi_tap_req.mutable_tap_locations()->push_back({.x = kTap1X, .y = kTapY});
   multi_tap_req.mutable_tap_locations()->push_back({.x = kTap2X, .y = kTapY});
@@ -310,7 +313,7 @@ TEST_P(SingleViewTouchConformanceTest, Pinch) {
   const int kTapX = 3 * display_width_as_int() / 4;
   const int kTapY = display_height_as_int() / 4;
 
-  fuchsia::ui::test::input::TouchScreenSimulateMultiFingerGestureRequest pinch_req;
+  futi::TouchScreenSimulateMultiFingerGestureRequest pinch_req;
   pinch_req.set_start_locations({fuchsia::math::Vec{.x = kTapX - 5, .y = kTapY},
                                  fuchsia::math::Vec{.x = kTapX + 5, .y = kTapY}});
   pinch_req.set_end_locations({fuchsia::math::Vec{.x = kTapX - 20, .y = kTapY},
@@ -358,6 +361,166 @@ TEST_P(SingleViewTouchConformanceTest, Pinch) {
                          fuchsia::ui::pointer::EventPhase::REMOVE, 0);
   ExpectLocationAndPhase("remove [2]", events_received[7], DevicePixelRatio(), kTapX + 15, kTapY,
                          fuchsia::ui::pointer::EventPhase::REMOVE, 1);
+}
+
+TEST_P(SingleViewTouchConformanceTest, TouchEventFields) {
+  const uint32_t kID = 1u;
+  const int kX = 3 * display_width_as_int() / 4;
+  const int kY = display_height_as_int() / 4;
+  const int64_t kHeight = 10;
+  const int64_t kWidth = 15;
+  const int64_t kPressure = 20;
+
+  fir::ContactInputReport contact;
+  contact.set_contact_id(kID);
+  contact.set_position_x(kX);
+  contact.set_position_y(kY);
+
+  // following fields are not passing to UI client yet.
+  contact.set_contact_height(kHeight);
+  contact.set_contact_width(kWidth);
+  contact.set_confidence(true);
+  contact.set_pressure(kPressure);
+
+  fir::TouchInputReport report;
+  report.mutable_contacts()->push_back(std::move(contact));
+
+  fake_touch_screen_->SimulateTouchEvent(std::move(report));
+
+  RunLoopUntil([this]() { return this->puppet_->touch_listener.events_received().size() >= 1; });
+
+  auto events_received = this->puppet_->touch_listener.cloned_events_received();
+  ASSERT_EQ(events_received.size(), 1u);
+
+  ExpectLocationAndPhase("add [1]", events_received[0], DevicePixelRatio(), kX, kY,
+                         fuchsia::ui::pointer::EventPhase::ADD, kID);
+
+  puppet_->touch_listener.clear_events();
+}
+
+// The test wants to ensure UI client will receive events in order:
+// finger 1 down:
+// 1. finger 1 add
+//
+// finger 2 down:
+// 1. finger 1 change
+// 2. finger 2 add
+//
+// keep 2 fingers down:
+// finger 1/2 change <- in any order
+//
+// finger 2 up:
+// 1. finger 1 update
+// 2. finger 2 remove
+//
+// finger 1 up：
+// 1. finger 1 remove
+TEST_P(SingleViewTouchConformanceTest, OneFingerDownThenAnotherThenLift) {
+  const int kFinger1X = 3 * display_width_as_int() / 4;
+  const int kY = display_height_as_int() / 4;
+  const int kFinger2X = kFinger1X + 5;
+
+  auto build_contact = [](uint32_t id, int64_t x, int64_t y) {
+    fir::ContactInputReport contact;
+    contact.set_contact_id(id);
+    contact.set_position_x(x);
+    contact.set_position_y(y);
+    return contact;
+  };
+
+  {
+    fir::TouchInputReport finger1_down;
+    finger1_down.mutable_contacts()->push_back(build_contact(1u, kFinger1X, kY));
+
+    fake_touch_screen_->SimulateTouchEvent(std::move(finger1_down));
+
+    RunLoopUntil([this]() { return this->puppet_->touch_listener.events_received().size() >= 1; });
+
+    auto events_received = this->puppet_->touch_listener.cloned_events_received();
+    ASSERT_EQ(events_received.size(), 1u);
+
+    ExpectLocationAndPhase("add [1]", events_received[0], DevicePixelRatio(), kFinger1X, kY,
+                           fuchsia::ui::pointer::EventPhase::ADD, 1);
+
+    puppet_->touch_listener.clear_events();
+  }
+
+  {
+    fir::TouchInputReport finger_1_2_down;
+    finger_1_2_down.mutable_contacts()->push_back(build_contact(1u, kFinger1X, kY));
+    finger_1_2_down.mutable_contacts()->push_back(build_contact(2u, kFinger2X, kY));
+
+    fake_touch_screen_->SimulateTouchEvent(std::move(finger_1_2_down));
+
+    RunLoopUntil([this]() { return this->puppet_->touch_listener.events_received().size() >= 2; });
+
+    auto events_received = this->puppet_->touch_listener.cloned_events_received();
+    ASSERT_EQ(events_received.size(), 2u);
+
+    ExpectLocationAndPhase("change [1]", events_received[0], DevicePixelRatio(), kFinger1X, kY,
+                           fuchsia::ui::pointer::EventPhase::CHANGE, 1);
+    ExpectLocationAndPhase("add [2]", events_received[1], DevicePixelRatio(), kFinger2X, kY,
+                           fuchsia::ui::pointer::EventPhase::ADD, 2);
+
+    puppet_->touch_listener.clear_events();
+  }
+
+  {
+    fir::TouchInputReport keep_finger_1_2_down;
+    keep_finger_1_2_down.mutable_contacts()->push_back(build_contact(2u, kFinger2X, kY));
+    keep_finger_1_2_down.mutable_contacts()->push_back(build_contact(1u, kFinger1X, kY));
+
+    fake_touch_screen_->SimulateTouchEvent(std::move(keep_finger_1_2_down));
+
+    RunLoopUntil([this]() { return this->puppet_->touch_listener.events_received().size() >= 2; });
+
+    auto events_received = this->puppet_->touch_listener.cloned_events_received();
+    ASSERT_EQ(events_received.size(), 2u);
+
+    std::sort(events_received.begin(), events_received.end(),
+              [](const auto& a, const auto& b) { return a.pointer_id() < b.pointer_id(); });
+    ExpectLocationAndPhase("change [1]", events_received[0], DevicePixelRatio(), kFinger1X, kY,
+                           fuchsia::ui::pointer::EventPhase::CHANGE, 1);
+    ExpectLocationAndPhase("change [2]", events_received[1], DevicePixelRatio(), kFinger2X, kY,
+                           fuchsia::ui::pointer::EventPhase::CHANGE, 2);
+
+    puppet_->touch_listener.clear_events();
+  }
+
+  {
+    fir::TouchInputReport finger_2_lift;
+    finger_2_lift.mutable_contacts()->push_back(build_contact(1u, kFinger1X, kY));
+
+    fake_touch_screen_->SimulateTouchEvent(std::move(finger_2_lift));
+
+    RunLoopUntil([this]() { return this->puppet_->touch_listener.events_received().size() >= 2; });
+
+    auto events_received = this->puppet_->touch_listener.cloned_events_received();
+    ASSERT_EQ(events_received.size(), 2u);
+
+    ExpectLocationAndPhase("change [1]", events_received[0], DevicePixelRatio(), kFinger1X, kY,
+                           fuchsia::ui::pointer::EventPhase::CHANGE, 1);
+    ExpectLocationAndPhase("remove [2]", events_received[1], DevicePixelRatio(), kFinger2X, kY,
+                           fuchsia::ui::pointer::EventPhase::REMOVE, 2);
+
+    puppet_->touch_listener.clear_events();
+  }
+
+  {
+    fir::TouchInputReport finger_1_lift;
+
+    fake_touch_screen_->SimulateTouchEvent(std::move(finger_1_lift));
+
+    RunLoopUntil([this]() { return this->puppet_->touch_listener.events_received().size() >= 1; });
+
+    auto events_received = this->puppet_->touch_listener.cloned_events_received();
+    ASSERT_EQ(events_received.size(), 1u);
+
+    ExpectLocationAndPhase("remove [1]", events_received[0], DevicePixelRatio(), kFinger1X, kY,
+                           fuchsia::ui::pointer::EventPhase::REMOVE, 1);
+
+    puppet_->touch_listener.clear_events();
+  }
 }
 
 class EmbeddedViewTouchConformanceTest : public TouchConformanceTest {
@@ -475,7 +638,7 @@ TEST_P(EmbeddedViewTouchConformanceTest, EmbeddedViewTap) {
   const auto kTapY = 3 * display_height_as_int() / 4;
 
   // Inject tap in the middle of the bottom-right quadrant.
-  fuchsia::ui::test::input::TouchScreenSimulateTapRequest tap_request;
+  futi::TouchScreenSimulateTapRequest tap_request;
   tap_request.mutable_tap_location()->x = kTapX;
   tap_request.mutable_tap_location()->y = kTapY;
   FX_LOGS(INFO) << "Injecting tap at (" << kTapX << ", " << kTapY << ")";
@@ -514,7 +677,7 @@ TEST_P(EmbeddedViewTouchConformanceTest, EmbeddedViewMultiTap) {
   const int kTap0X = kTap1X - 5;
   const int kTap2X = kTap1X + 5;
 
-  fuchsia::ui::test::input::TouchScreenSimulateMultiTapRequest multi_tap_req;
+  futi::TouchScreenSimulateMultiTapRequest multi_tap_req;
   multi_tap_req.mutable_tap_locations()->push_back({.x = kTap0X, .y = kTapY});
   multi_tap_req.mutable_tap_locations()->push_back({.x = kTap1X, .y = kTapY});
   multi_tap_req.mutable_tap_locations()->push_back({.x = kTap2X, .y = kTapY});
@@ -565,7 +728,7 @@ TEST_P(EmbeddedViewTouchConformanceTest, Pinch) {
   const int kTapX = 3 * display_width_as_int() / 4;
   const int kTapY = 3 * display_height_as_int() / 4;
 
-  fuchsia::ui::test::input::TouchScreenSimulateMultiFingerGestureRequest pinch_req;
+  futi::TouchScreenSimulateMultiFingerGestureRequest pinch_req;
   pinch_req.set_start_locations({fuchsia::math::Vec{.x = kTapX - 5, .y = kTapY},
                                  fuchsia::math::Vec{.x = kTapX + 5, .y = kTapY}});
   pinch_req.set_end_locations({fuchsia::math::Vec{.x = kTapX - 20, .y = kTapY},
