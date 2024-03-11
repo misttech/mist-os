@@ -217,10 +217,7 @@ struct RelocationTraits<ElfMachine::kRiscv> {
   // as kAbsolute anyway.
   static constexpr std::optional<uint32_t> kGot = std::nullopt;
 
-  // RISCV is unfortunately missing TLSDESC.
-  // https://github.com/riscv-non-isa/riscv-elf-psabi-doc/issues/94 tracks
-  // getting it specified.
-  static constexpr std::optional<uint32_t> kTlsDesc = std::nullopt;
+  static constexpr std::optional<uint32_t> kTlsDesc = 12;  // R_RISCV_TLSDESC
 };
 
 // This is specialized to give the machine-specific details on dynamic
