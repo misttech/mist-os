@@ -257,9 +257,15 @@ elif is_feature_enabled "incremental_legacy"; then
 fi
 
 if is_feature_enabled "foreground_repo_server" && [[ "$(ffx-repository-server-state)" != "disabled" ]]; then
-  fx-warn "The 'foreground_repo_server' feature is enabled. An already running"
-  fx-warn "foreground server may not be detected correctly yet. Please consider"
-  fx-warn "running the following commands:"
+  fx-warn "The 'foreground_repo_server' feature is now enabled by default."
+  fx-wann "If you prefer the previous behavior for now, you can set this"
+  fx-warn "environment variable in (sh-type) shells where you use fx / ffx:"
+  fx-warn ""
+  fx-warn "$ export FUCHSIA_DISABLED_foreground_repo_server=1"
+  fx-warn ""
+  fx-warn "Please note that an already running foreground server"
+  fx-warn "may not always be detected correctly. Please consider"
+  fx-warn "running the following commands in case of problems:"
   fx-warn ""
   fx-warn "$ ffx config set repository.server.listen \"\""
   fx-warn "$ ffx doctor --restart-daemon"
