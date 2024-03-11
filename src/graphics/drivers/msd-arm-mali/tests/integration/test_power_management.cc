@@ -86,4 +86,37 @@ TEST(PowerManagement, SuspendResume) {
   submit_returned = true;
   enable_thread.join();
 }
+
+// Repeatedly attempt to suspend/resume to GPU to attempt to trigger a soft stop.
+TEST(PowerManagement, RepeatedSuspendResume) {
+  std::string gpu_device_value;
+  for (auto& p : std::filesystem::directory_iterator("/dev/class/mali-util")) {
+    gpu_device_value = p.path();
+  }
+
+  ASSERT_FALSE(gpu_device_value.empty());
+  zx::result client_end =
+      component::Connect<fuchsia_hardware_gpu_mali::MaliUtils>(gpu_device_value);
+  ASSERT_FALSE(client_end.is_error()) << client_end.status_string();
+
+  auto client = fidl::WireSyncClient(std::move(*client_end));
+
+  std::unique_ptr<TestConnection> test;
+  test.reset(new TestConnection());
+  std::atomic_bool finished_test{false};
+  std::thread enable_thread([&] {
+    for (uint32_t i = 0; i < 20; i++) {
+      constexpr uint32_t kMaxTimeToDelayMs = 10;
+      zx::nanosleep(zx::deadline_after(zx::msec(rand() % kMaxTimeToDelayMs)));
+      EXPECT_TRUE(client->SetPowerState(false).ok());
+      zx::nanosleep(zx::deadline_after(zx::msec(1)));
+      EXPECT_TRUE(client->SetPowerState(true).ok());
+    }
+    finished_test = true;
+  });
+  while (!finished_test) {
+    test->SubmitCommandBuffer(mali_utils::AtomHelper::NORMAL, 1, 0, false);
+  }
+  enable_thread.join();
+}
 }  // namespace

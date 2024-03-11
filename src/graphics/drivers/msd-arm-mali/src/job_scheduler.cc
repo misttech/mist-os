@@ -12,6 +12,25 @@
 #include "src/graphics/drivers/msd-arm-mali/src/msd_arm_connection.h"
 #include "string_printf.h"
 
+namespace {
+bool AtomCanBeSoftStopped(const MsdArmAtom& atom) {
+  if (atom.is_protected()) {
+    // We can't soft-stop protected-mode atoms because they can't
+    // write out their progress to memory to be restarted.
+    return false;
+  }
+  if (atom.soft_stopped()) {
+    // No point trying to soft-stop an atom that's already stopping.
+    return false;
+  }
+  if (atom.hard_stopped()) {
+    // Hardware is already trying to change the atom state.
+    return false;
+  }
+  return true;
+}
+}  // namespace
+
 JobScheduler::JobScheduler(Owner* owner, uint32_t job_slots)
     : owner_(owner),
       clock_callback_([]() { return Clock::now(); }),
@@ -88,13 +107,7 @@ void JobScheduler::ScheduleRunnableAtoms() {
       continue;
     }
     std::shared_ptr<MsdArmAtom> atom = executing_atoms_[slot];
-    if (atom->is_protected()) {
-      // We can't soft-stop protected-mode atoms because they can't
-      // write out their progress to memory to be restarted.
-      continue;
-    }
-    if (atom->soft_stopped()) {
-      // No point trying to soft-stop an atom that's already stopping.
+    if (!AtomCanBeSoftStopped(*atom)) {
       continue;
     }
     auto& runnable = runnable_atoms_[slot];
@@ -389,7 +402,7 @@ JobScheduler::Clock::duration JobScheduler::GetCurrentTimeoutDuration() {
       timeout_time = atom_timeout_time;
 
     bool may_want_to_preempt =
-        !atom->is_protected() && !atom->soft_stopped() && !runnable_atoms_[atom->slot()].empty();
+        AtomCanBeSoftStopped(*atom) && !runnable_atoms_[atom->slot()].empty();
 
     if (may_want_to_preempt) {
       auto tick_timeout =
@@ -456,7 +469,7 @@ void JobScheduler::HandleTimedOutAtoms() {
       // Reset tick time so we won't spin trying to stop this atom.
       atom->set_tick_start_time(clock_callback_());
 
-      if (atom->soft_stopped() || atom->is_protected())
+      if (!AtomCanBeSoftStopped(*atom))
         continue;
       DASSERT(!atom->preempted());
       bool want_to_preempt = false;
@@ -602,6 +615,20 @@ void JobScheduler::UpdatePowerManager() {
 }
 
 void JobScheduler::SetSchedulingEnabled(bool enabled) {
+  if (scheduling_enabled_ && !enabled) {
+    // Soft stop all possible executing atoms.
+    for (uint32_t slot = 0; slot < runnable_atoms_.size(); slot++) {
+      if (!executing_atoms_[slot]) {
+        continue;
+      }
+      std::shared_ptr<MsdArmAtom> atom = executing_atoms_[slot];
+      if (!AtomCanBeSoftStopped(*atom)) {
+        continue;
+      }
+      atom->set_soft_stopped(true);
+      owner_->SoftStopAtom(atom.get());
+    }
+  }
   scheduling_enabled_ = enabled;
   if (scheduling_enabled_) {
     TryToSchedule();
