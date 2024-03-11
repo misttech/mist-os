@@ -110,8 +110,8 @@ inline constexpr TlsDescResolver kTlsDescResolver{};
 // Its LoadInfo uses fixed storage bounded by kMaxSegments.  The Module is
 // allocated separately using the initial-exec allocator.
 
-using StartupLoadModuleBase = LoadModule<Elf, elfldltl::StaticVector<kMaxSegments>::Container,
-                                         AbiModuleInline::kNo, LoadModuleRelocInfo::kYes>;
+using StartupLoadModuleBase = LoadModule<
+    DecodedModule<Elf, elfldltl::StaticVector<kMaxSegments>::Container, AbiModuleInline::kNo>>;
 
 template <class Loader>
 struct StartupLoadModule : public StartupLoadModuleBase,
@@ -163,9 +163,9 @@ struct StartupLoadModule : public StartupLoadModuleBase,
 
     // Decode phdrs to fill LoadInfo and other things.
     std::optional<Phdr> relro_phdr;
-    auto result =
-        DecodeModulePhdrs(diag, phdrs, this->load_info().GetPhdrObserver(loader_.page_size()),
-                          elfldltl::PhdrRelroObserver<elfldltl::Elf<>>(relro_phdr));
+    auto result = DecodeModulePhdrs(
+        diag, phdrs, this->decoded().load_info().GetPhdrObserver(loader_.page_size()),
+        elfldltl::PhdrRelroObserver<elfldltl::Elf<>>(relro_phdr));
     if (!result) {
       return {};
     }
@@ -187,17 +187,17 @@ struct StartupLoadModule : public StartupLoadModuleBase,
 
     // All modules allocated by StartupModule are part of the initial exec set
     // and their symbols are inherently visible.
-    this->module().symbols_visible = true;
+    this->decoded().module().symbols_visible = true;
 
     // This fills in the vaddr bounds and phdrs fields.  Note that module.phdrs
     // might remain empty if the phdrs aren't in the load image, so keep using
     // the stack copy read from the file instead.
-    SetModuleVaddrBounds(this->module(), this->load_info(), loader_.load_bias());
-    SetModulePhdrs(this->module(), ehdr, this->load_info(), memory());
+    SetModuleVaddrBounds(this->decoded().module(), this->load_info(), loader_.load_bias());
+    SetModulePhdrs(this->decoded().module(), ehdr, this->load_info(), memory());
 
     // If there was a PT_TLS, fill in tls_module() to be published later.
     if (tls_phdr) {
-      SetTls(diag, memory(), *tls_phdr, ++max_tls_modid);
+      decoded().SetTls(diag, memory(), *tls_phdr, ++max_tls_modid);
     }
 
     // A second phdr scan is needed to decode notes now that they can be
@@ -207,7 +207,7 @@ struct StartupLoadModule : public StartupLoadModuleBase,
                           elfldltl::PhdrMemoryNoteObserver(elfldltl::Elf<>{}, memory(),
                                                            elfldltl::ObserveBuildIdNote(build_id)));
     if (build_id) {
-      this->module().build_id = build_id->desc;
+      this->decoded().module().build_id = build_id->desc;
     }
 
     // Now that there is a Memory object to use, decode the dynamic section.
@@ -245,8 +245,9 @@ struct StartupLoadModule : public StartupLoadModuleBase,
     using NeededObserver = elfldltl::DynamicTagCountObserver<Elf, elfldltl::ElfDynTag::kNeeded>;
     size_t count = 0;
     // Save the span of Dyn entries for LoadDeps to scan later.
-    dynamic_ = DecodeModuleDynamic(module(), diag, memory(), dyn_phdr, NeededObserver(count),
-                                   elfldltl::DynamicRelocationInfoObserver(reloc_info()));
+    dynamic_ =
+        DecodeModuleDynamic(decoded().module(), diag, memory(), dyn_phdr, NeededObserver(count),
+                            elfldltl::DynamicRelocationInfoObserver(decoded().reloc_info()));
     return count;
   }
 
@@ -270,12 +271,12 @@ struct StartupLoadModule : public StartupLoadModuleBase,
                           GetDepFile&& get_dep_file,
                           std::initializer_list<BootstrapModule> preloaded_module_list,
                           size_t executable_needed_count, LoaderArgs&&... loader_args) {
-    main_executable->module().symbols_visible = true;
+    main_executable->decoded().module().symbols_visible = true;
 
     // The main executable implicitly can use static TLS and doesn't have to
     // have DF_STATIC_TLS set at link time.
-    main_executable->module().symbols.set_flags(main_executable->module().symbols.flags() |
-                                                elfldltl::ElfDynFlags::kStaticTls);
+    main_executable->decoded().module().symbols.set_flags(
+        main_executable->module().symbols.flags() | elfldltl::ElfDynFlags::kStaticTls);
 
     List modules = main_executable->MakeList();
     List preloaded_modules =
@@ -302,16 +303,16 @@ struct StartupLoadModule : public StartupLoadModuleBase,
 
  private:
   void Preload(Diagnostics& diag, Module& module, cpp20::span<const Dyn> dynamic) {
-    set_module(module);
+    decoded().set_module(module);
     dynamic_ = dynamic;
 
     // Scan the phdrs to populate the LoadInfo just so it can be used for
     // things like symbolizer markup.
     elfldltl::DecodePhdrs(diag, module.phdrs.get(),
-                          load_info().GetPhdrObserver(loader_.page_size()));
+                          decoded().load_info().GetPhdrObserver(loader_.page_size()));
   }
 
-  bool IsLoaded() const { return HasModule(); }
+  bool IsLoaded() const { return decoded().HasModule(); }
 
   template <typename Allocator, typename... LoaderArgs>
   static List MakePreloadedList(Diagnostics& diag, Allocator& allocator,
@@ -327,9 +328,9 @@ struct StartupLoadModule : public StartupLoadModuleBase,
   }
 
   void AddToPassiveAbi(typename List::iterator it, bool symbols_visible) {
-    module().symbols_visible = symbols_visible;
-    auto& ins_link_map = it->module().link_map;
-    auto& this_link_map = module().link_map;
+    decoded().module().symbols_visible = symbols_visible;
+    auto& ins_link_map = it->decoded().module().link_map;
+    auto& this_link_map = decoded().module().link_map;
     ins_link_map.next = &this_link_map;
     this_link_map.prev = &ins_link_map;
   }
@@ -384,7 +385,7 @@ struct StartupLoadModule : public StartupLoadModuleBase,
     for (auto it = modules.begin(); it != modules.end(); it++) {
       const bool was_already_loaded = it->IsLoaded();
       if (was_already_loaded) {
-        it->module().symbolizer_modid = symbolizer_modid++;
+        it->decoded().module().symbolizer_modid = symbolizer_modid++;
       } else if (auto file = get_dep_file(it->name())) {
         needed_count =
             it->Load(diag, initial_exec, *file, symbolizer_modid++, max_tls_modid).needed_count;
@@ -443,7 +444,7 @@ struct StartupLoadModule : public StartupLoadModuleBase,
       // Assign increasing symbolizer module IDs to the preloaded module now,
       // so the ID order matches the list order.  Its module() is still mutable
       // since it's in .bss rather than coming from the InitialExecAllocator.
-      next->module().symbolizer_modid = last->module().symbolizer_modid + 1;
+      next->decoded().module().symbolizer_modid = last->module().symbolizer_modid + 1;
       next->AddToPassiveAbi(last, false);
     }
 

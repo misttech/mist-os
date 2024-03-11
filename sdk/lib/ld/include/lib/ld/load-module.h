@@ -25,21 +25,21 @@
 namespace ld {
 
 // The ld::DecodedModule template class provides a base class for a dynamic
-// linker's internal data structure describing a module.  This holds the
-// ld::abi::Abi<...>::Module object that describes the module in the passive
-// ABI, but also other information the only the dynamic linker itself needs.
-// It's parameterized by a container template to use in elfldltl::LoadInfo (see
-// <lib/elfldltl/load.h> and <lib/elfldltl/container.h>).  This base class
-// intentionally describes only information that is extracted directly from the
-// ELF file's contents; it does not include things like a runtime load address,
-// TLS module ID assignment, or even the name by which the file was loaded
-// (only any DT_SONAME that might be embedded in the ELF metadata itself).
-// This can be appropriate to use as the base class for objects describing a
-// cached ELF file.
+// linker's internal data structure describing a module's ELF metadata.  This
+// holds the ld::abi::Abi<...>::Module object that describes the module in the
+// passive ABI, but also other information the only the dynamic linker itself
+// needs.  It's parameterized by a container template for elfldltl::LoadInfo
+// (see <lib/elfldltl/load.h> and <lib/elfldltl/container.h>).
 //
-// The ld::LoadModule template class is derived from ld::DecodedModule and adds
-// information about a given ELF file's use in a particular dynamic linking
-// scenario.  This includes things like its name and runtime load address.
+// This base class intentionally describes only information that is extracted
+// directly from the ELF file's contents; it does not include things like a
+// runtime load address, TLS module ID assignment, or even the name by which
+// the file was loaded (only any DT_SONAME that might be embedded in the ELF
+// metadata itself).  This can be appropriate to use as the base class for
+// objects describing a cached ELF file.
+//
+// See ld::LoadModule (below) for how DecodedModule can be used in a particular
+// dynamic linking session.
 
 // This template parameter indicates whether the ld::abi::Abi<...>::Module is
 // stored directly (inline) in the ld::DecodedModule or is allocated
@@ -54,17 +54,16 @@ enum class AbiModuleInline : bool { kNo, kYes };
 // object is ephemeral and discarded shortly after relocation is finished.
 // For a zygote model, the LoadModule might be kept indefinitely after
 // relocation to be used for repeated loading or symbol resolution.
-enum class LoadModuleRelocInfo : bool { kNo, kYes };
+enum class DecodedModuleRelocInfo : bool { kNo, kYes };
 
-// Forward declaration for a helper class defined below.
-// See the name_ref() and soname_ref() methods in ld::LoadModule, below.
-template <class LoadModule>
-class LoadModuleRef;
+// This is used as a base class for all DecodedModule<...> instantiations just
+// as a marker so they can be detected using std::is_base_of.
+struct DecodedModuleBase {};
 
 template <class ElfLayout, template <typename> class SegmentContainer, AbiModuleInline InlineModule,
-          LoadModuleRelocInfo WithRelocInfo,
+          DecodedModuleRelocInfo WithRelocInfo = DecodedModuleRelocInfo::kYes,
           template <class SegmentType> class SegmentWrapper = elfldltl::NoSegmentWrapper>
-class DecodedModule {
+class DecodedModule : public DecodedModuleBase {
  public:
   using Elf = ElfLayout;
   using Addr = typename Elf::Addr;
@@ -79,6 +78,9 @@ class DecodedModule {
   using Sym = typename Elf::Sym;
 
   static_assert(std::is_move_constructible_v<LoadInfo> || std::is_copy_constructible_v<LoadInfo>);
+
+  static constexpr bool kModuleInline = InlineModule == AbiModuleInline::kYes;
+  static constexpr bool kRelocInfo = WithRelocInfo == DecodedModuleRelocInfo::kYes;
 
   // Derived types might or might not be default-constructed.
   constexpr DecodedModule() = default;
@@ -123,20 +125,20 @@ class DecodedModule {
   // to convert memory addresses to file offsets.  The SegmentWrapper template
   // class may extend the load_info().segments() element types with holders of
   // segment data mapped or copied from the file (and maybe further prepared).
-  LoadInfo& load_info() { return load_info_; }
-  const LoadInfo& load_info() const { return load_info_; }
+  constexpr LoadInfo& load_info() { return load_info_; }
+  constexpr const LoadInfo& load_info() const { return load_info_; }
 
   // See <lib/elfldtl/relocation.h> for details; the RelocationInfo provides
   // information need by the <lib/elfldtl/link.h> layer to drive dynamic
   // linking of this module.  It doesn't need to be stored at all if a module
   // is being cached after relocation without concern for a separate dynamic
   // linking session reusing the same data.
-  template <auto R = WithRelocInfo, typename = std::enable_if_t<R == LoadModuleRelocInfo::kYes>>
-  RelocationInfo& reloc_info() {
+  template <auto R = WithRelocInfo, typename = std::enable_if_t<R == DecodedModuleRelocInfo::kYes>>
+  constexpr RelocationInfo& reloc_info() {
     return reloc_info_;
   }
-  template <auto R = WithRelocInfo, typename = std::enable_if_t<R == LoadModuleRelocInfo::kYes>>
-  const RelocationInfo& reloc_info() const {
+  template <auto R = WithRelocInfo, typename = std::enable_if_t<R == DecodedModuleRelocInfo::kYes>>
+  constexpr const RelocationInfo& reloc_info() const {
     return reloc_info_;
   }
 
@@ -192,19 +194,6 @@ class DecodedModule {
     return tls_module_;
   }
 
-  // The following methods satisfy the Module template API for use with
-  // elfldltl::ResolverDefinition (see <lib/elfldltl/resolve.h>).
-
-  constexpr const auto& symbol_info() const { return module().symbols; }
-
-  constexpr size_type load_bias() const { return module().link_map.addr; }
-
-  constexpr bool uses_static_tls() const {
-    return (module().symbols.flags() & elfldltl::ElfDynFlags::kStaticTls) ||
-           (module().symbols.flags1() & elfldltl::ElfDynFlags1::kPie);
-  }
-
- protected:
   template <bool Inline = InlineModule == AbiModuleInline::kYes,
             typename = std::enable_if_t<!Inline>>
   constexpr void set_module(Module& module) {
@@ -257,7 +246,7 @@ class DecodedModule {
   struct Empty {};
 
   using RelocInfoStorage =
-      std::conditional_t<WithRelocInfo == LoadModuleRelocInfo::kYes, RelocationInfo, Empty>;
+      std::conditional_t<WithRelocInfo == DecodedModuleRelocInfo::kYes, RelocationInfo, Empty>;
 
   ModuleStorage module_{};
   LoadInfo load_info_;
@@ -265,23 +254,73 @@ class DecodedModule {
   TlsModule tls_module_;
 };
 
-template <class ElfLayout, template <typename> class SegmentContainer, AbiModuleInline InlineModule,
-          LoadModuleRelocInfo WithRelocInfo,
-          template <class SegmentType> class SegmentWrapper = elfldltl::NoSegmentWrapper>
-class LoadModule : public DecodedModule<ElfLayout, SegmentContainer, InlineModule, WithRelocInfo,
-                                        SegmentWrapper> {
+// Forward declaration for a helper class defined below.
+// See the name_ref() and soname_ref() methods in ld::LoadModule, below.
+template <class LoadModule>
+class LoadModuleRef;
+
+// The ld::LoadModule template class provides a base class for a
+// information about a given ELF file's use in a particular dynamic linking
+// scenario.  This includes things like its name and runtime load bias.
+//
+// The template parameter can either be a ld::DecodedModule<...> instantiation
+// or subclass of one, or it can be some pointer-like type that can be
+// dereferenced with `*` to get to one.  That can be a plain pointer, a pointer
+// to `const`, a smart pointer type of some kind, or even something like
+// `std::optional`.
+//
+// This provides proxy methods for read-only access to the object derived from
+// ld::DecodedModule.  The ld::LoadModule object itself holds little more than
+// the module name.  A mutable decoded module object can be modified via the
+// `decoded()` accessor.
+//
+// TODO(https://fxbug.dev/326524302): Flesh out the indirect case with a
+// read-only decoded().
+template <typename DecodedStorage>
+class LoadModule {
+ private:
+  // Determine whether the template parameter is derived from an instantiation
+  // of ld::DecodedModule<...>.  If not, it must be some pointer-like type.
+  static constexpr bool kDecodedDirect = []() -> bool {
+    if constexpr (std::is_class_v<DecodedStorage>) {
+      return std::is_base_of_v<DecodedModuleBase, DecodedStorage>;
+    }
+    return false;
+  }();
+
+  // This is a static method so it can easily be called from both const and
+  // non-const overloads of decoded(), below, where Storage will be const
+  // DecodedStorage or DecodedStorage respectively.  It's also used to deduce
+  // the underlying Decoded type, whether direct or pointed-to.
+  template <class Storage>
+  static constexpr auto& GetDecodedRef(Storage& storage) {
+    if constexpr (kDecodedDirect) {
+      return storage;
+    } else {
+      return *storage;
+    }
+  }
+
  public:
-  using Base =
-      DecodedModule<ElfLayout, SegmentContainer, InlineModule, WithRelocInfo, SegmentWrapper>;
-  using typename Base::Elf;
-  using typename Base::LoadInfo;
-  using typename Base::size_type;
-  using typename Base::Soname;
+  // In the simple case, this will be the same as the template parameter.  But
+  // if the template parameter is pointer-like, this is the pointed-to type,
+  // which might be const.
+  using Decoded = std::remove_reference_t<decltype(GetDecodedRef(std::declval<DecodedStorage&>()))>;
 
+  // For convenience alias all the interesting types from Decoded.
+  using Elf = typename Decoded::Elf;
+  using Addr = typename Decoded::Addr;
+  using size_type = typename Decoded::size_type;
+  using Phdr = typename Decoded::Phdr;
+  using Sym = typename Decoded::Sym;
+  using Module = typename Decoded::Module;
+  using TlsModule = typename Decoded::TlsModule;
+  using LoadInfo = typename Decoded::LoadInfo;
+  using RelocationInfo = typename Decoded::RelocationInfo;
+  using Soname = typename Decoded::Soname;
+
+  // This is returned by the name_ref() and soname_ref() methods.
   using Ref = LoadModuleRef<LoadModule>;
-
-  static_assert(std::is_move_constructible_v<LoadInfo>);
-  static_assert(std::is_move_constructible_v<Base>);
 
   constexpr LoadModule() = default;
 
@@ -314,7 +353,7 @@ class LoadModule : public DecodedModule<ElfLayout, SegmentContainer, InlineModul
   // name checks both name fields.  An unloaded module only has a load name.
   // A loaded module may also have a SONAME.
   constexpr bool operator==(const Soname& name) const {
-    return name == name_ || (this->HasModule() && name == this->module().soname);
+    return name == name_ || (HasModule() && name == this->module().soname);
   }
 
   // This returns an object that can be used like a LoadModule* pointing at
@@ -327,25 +366,9 @@ class LoadModule : public DecodedModule<ElfLayout, SegmentContainer, InlineModul
   // fbl::HashTable keyed by soname().
   Ref soname_ref() const { return {this, &LoadModule::soname}; }
 
-  // In an instantiation with InlineModule=kYes, EmplaceModule(..) just
-  // constructs Module{...}).
-  template <typename... Args, bool Inline = InlineModule == AbiModuleInline::kYes,
-            typename = std::enable_if_t<Inline>>
-  constexpr void EmplaceModule(uint32_t modid, Args&&... args) {
-    Base::EmplaceModule(modid, std::forward<Args>(args)...);
-    SetAbiName();
-  }
-
-  // In an instantiation with InlineModule=false, NewModule(a..., c...) does
-  // new (a...) Module{c...}.  The last argument in a... must be a
-  // fbl::AllocChecker that indicates whether `new` succeeded.
-  template <typename... Args, bool Inline = InlineModule == AbiModuleInline::kYes,
-            typename = std::enable_if_t<!Inline>>
-  constexpr void NewModule(uint32_t modid, Args&&... args) {
-    Base::NewModule(modid, std::forward<Args>(args)...);
-    SetAbiName();
-  }
-
+  // This returns the offset from the thread pointer to this module's static
+  // TLS block if it has one.  The value is assigned by AssignStaticTls, below.
+  // This method should not be called unless AssignStaticTls has been called.
   constexpr size_t static_tls_bias() const { return static_tls_bias_; }
 
   // Use ths TlsLayout object to assign a static TLS offset for this module's
@@ -355,7 +378,7 @@ class LoadModule : public DecodedModule<ElfLayout, SegmentContainer, InlineModul
   // .tls_module() and .static_tls_bias().
   template <elfldltl::ElfMachine Machine = elfldltl::ElfMachine::kNative, size_type RedZone = 0>
   constexpr std::optional<size_type> AssignStaticTls(elfldltl::TlsLayout<Elf>& tls_layout) {
-    if (!this->HasModule()) [[unlikely]] {
+    if (!HasModule()) [[unlikely]] {
       return std::nullopt;
     }
 
@@ -373,9 +396,96 @@ class LoadModule : public DecodedModule<ElfLayout, SegmentContainer, InlineModul
     return this->tls_module_id() - 1;
   }
 
- private:
-  constexpr void SetAbiName() { Base::SetAbiName(name_); }
+  // This returns true if it's safe to call the decoded() method.  This is
+  // always true if the template parameter is a DecodedModule type itself.
+  // If it's instead some pointer-like type, then this can return false
+  // before the pointer has been installed.
+  // TODO(https://fxbug.dev/326524302): There is not yet any way to install it!
+  constexpr bool HasDecoded() const {
+    if constexpr (kDecodedDirect) {
+      return true;
+    } else {
+      return static_cast<bool>(decoded_);
+    }
+  }
 
+  // Access the underlying DecodedModule object.  This must not be called if
+  // HasDecoded() returns false.  There are both const and mutable overloads
+  // for this.  But note that Decoded might be a const type itself when the
+  // template parameter is a pointer-like type, in which case decoded() always
+  // returns a const reference even when called on a mutable LoadModule.
+  constexpr Decoded& decoded() { return GetDecodedRef(decoded_); }
+  constexpr const Decoded& decoded() const { return GetDecodedRef(decoded_); }
+
+  // When Decoded is mutable and uses AbiModuleInline::kYes, EmplaceModule(..)
+  // just constructs Module{...}).
+  template <typename... Args, bool CanEmplace = Decoded::kModuleInline && !std::is_const_v<Decoded>,
+            typename = std::enable_if_t<CanEmplace>>
+  constexpr void EmplaceModule(uint32_t modid, Args&&... args) {
+    decoded().EmplaceModule(modid, std::forward<Args>(args)...);
+    SetAbiName();
+  }
+
+  // When Decoded is mutable and uses AbiModuleInline::kNo, then calling
+  // NewModule(a..., c...)  does new (a...) Module{c...}.  The last argument in
+  // a... must be a fbl::AllocChecker that indicates whether `new` succeeded.
+  template <typename... Args, bool CanNew = !Decoded::kModuleInline && !std::is_const_v<Decoded>,
+            typename = std::enable_if_t<CanNew>>
+  constexpr void NewModule(uint32_t modid, Args&&... args) {
+    decoded().NewModule(modid, std::forward<Args>(args)...);
+    SetAbiName();
+  }
+
+  // The following methods are simple proxies for the same method on decoded().
+  // Note only const overloads are provided here, for reading information from
+  // the DecodedModule to use in loading and dynamic linking.  For filling in
+  // the information from the file in the first place, use decoded() for the
+  // mutable reference.
+
+  constexpr bool HasModule() const { return HasDecoded() && decoded().HasModule(); }
+
+  constexpr const Module& module() const { return decoded().module(); }
+
+  constexpr const Soname& soname() const { return decoded().soname(); }
+
+  constexpr const LoadInfo& load_info() const { return decoded().load_info(); }
+
+  template <bool RI = Decoded::kRelocInfo, typename = std::enable_if_t<RI>>
+  constexpr const RelocationInfo& reloc_info() const {
+    return decoded().reloc_info();
+  }
+
+  constexpr size_type tls_module_id() const { return module().tls_modid; }
+
+  constexpr const TlsModule& tls_module() const { return decoded().tls_module(); }
+
+  // The following methods satisfy the Module template API for use with
+  // elfldltl::ResolverDefinition (see <lib/elfldltl/resolve.h>).
+
+  constexpr const auto& symbol_info() const { return module().symbols; }
+
+  // This is only provided when Decoded is mutable.  In that case, after
+  // decoding and choosing load address, module() will be updated via
+  // ld::SetModuleVaddrBounds.  In other cases, a derived class must implement
+  // load_bias() itself.
+  template <bool Mutable = !std::is_const_v<Decoded>, typename = std::enable_if_t<Mutable>>
+  constexpr size_type load_bias() const {
+    return module().link_map.addr;
+  }
+
+  constexpr bool uses_static_tls() const {
+    return (module().symbols.flags() & elfldltl::ElfDynFlags::kStaticTls) ||
+           (module().symbols.flags1() & elfldltl::ElfDynFlags1::kPie);
+  }
+
+ private:
+  constexpr void SetAbiName() {
+    if constexpr (!std::is_const_v<Decoded>) {
+      decoded().SetAbiName(name_);
+    }
+  }
+
+  DecodedStorage decoded_{};
   Soname name_;
   size_type static_tls_bias_ = 0;
 };

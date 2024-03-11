@@ -231,9 +231,11 @@ class RemoteAbiHeap {
       std::ignore = stub_data_size;  // For NDEBUG, capture optimized out.
       return ReplaceSegment(diagnostics, std::move(old_segment), file_vmo, memsz);
     };
-    if (auto new_segment = std::visit(replace, stub_module.load_info().RemoveLastSegment());
+    if (auto new_segment =
+            std::visit(replace, stub_module.decoded().load_info().RemoveLastSegment());
         new_segment.is_ok()) {
-      if (!stub_module.load_info().AddSegment(diagnostics, *std::move(new_segment), false)) {
+      if (!stub_module.decoded().load_info().AddSegment(diagnostics, *std::move(new_segment),
+                                                        false)) {
         return zx::error{ZX_ERR_NO_MEMORY};
       }
     } else {

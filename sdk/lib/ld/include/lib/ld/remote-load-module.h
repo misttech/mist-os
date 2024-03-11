@@ -27,9 +27,9 @@ namespace ld {
 
 // RemoteLoadModule is the LoadModule type used in the remote dynamic linker.
 template <class Elf>
-using RemoteLoadModuleBase =
-    LoadModule<Elf, elfldltl::StdContainer<std::vector>::Container, AbiModuleInline::kYes,
-               LoadModuleRelocInfo::kYes, elfldltl::SegmentWithVmo::NoCopy>;
+using RemoteLoadModuleBase = LoadModule<
+    DecodedModule<Elf, elfldltl::StdContainer<std::vector>::Container, AbiModuleInline::kYes,
+                  DecodedModuleRelocInfo::kYes, elfldltl::SegmentWithVmo::NoCopy>>;
 
 template <class Elf = elfldltl::Elf<>>
 class RemoteLoadModule : public RemoteLoadModuleBase<Elf> {
@@ -150,12 +150,12 @@ class RemoteLoadModule : public RemoteLoadModuleBase<Elf> {
     const cpp20::span<const Phdr> phdrs = phdrs_owner;
     std::optional<Phdr> relro_phdr;
     std::optional<elfldltl::ElfNote> build_id;
-    auto result =
-        DecodeModulePhdrs(diag, phdrs, this->load_info().GetPhdrObserver(Loader::page_size()),
-                          elfldltl::PhdrRelroObserver<elfldltl::Elf<>>(relro_phdr),
-                          elfldltl::PhdrFileNoteObserver(
-                              elfldltl::Elf<>{}, mapped_vmo_, elfldltl::NoArrayFromFile<Phdr>{},
-                              elfldltl::ObserveBuildIdNote(build_id, true)));
+    auto result = DecodeModulePhdrs(
+        diag, phdrs, this->decoded().load_info().GetPhdrObserver(Loader::page_size()),
+        elfldltl::PhdrRelroObserver<elfldltl::Elf<>>(relro_phdr),
+        elfldltl::PhdrFileNoteObserver(elfldltl::Elf<>{}, mapped_vmo_,
+                                       elfldltl::NoArrayFromFile<Phdr>{},
+                                       elfldltl::ObserveBuildIdNote(build_id, true)));
     if (!result) [[unlikely]] {
       // DecodeModulePhdrs only fails if Diagnostics said to give up.
       return fit::error{false};
@@ -167,31 +167,31 @@ class RemoteLoadModule : public RemoteLoadModuleBase<Elf> {
     // and set its fields.
     this->EmplaceModule(modid);
 
-    this->module().symbols_visible = true;
+    this->decoded().module().symbols_visible = true;
 
     if (build_id) {
-      this->module().build_id = build_id->desc;
+      this->decoded().module().build_id = build_id->desc;
     }
 
     // Apply RELRO protection before segments are aligned & equipped with VMOs.
-    if (!this->load_info().ApplyRelro(diag, relro_phdr, Loader::page_size(), false)) {
+    if (!this->decoded().load_info().ApplyRelro(diag, relro_phdr, Loader::page_size(), false)) {
       // ApplyRelro only fails if Diagnostics said to give up.
       return fit::error{false};
     }
 
     // Fix up segments to be compatible with AlignedRemoteVmarLoader.
-    if (!elfldltl::SegmentWithVmo::AlignSegments(diag, this->load_info(), vmo_.borrow(),
+    if (!elfldltl::SegmentWithVmo::AlignSegments(diag, this->decoded().load_info(), vmo_.borrow(),
                                                  Loader::page_size())) {
       // AlignSegments only fails if Diagnostics said to give up.
       return fit::error{false};
     }
 
     auto memory = metadata_memory();
-    SetModulePhdrs(this->module(), ehdr, this->load_info(), memory);
+    SetModulePhdrs(this->decoded().module(), ehdr, this->load_info(), memory);
 
     // If there was a PT_TLS, fill in tls_module() to be published later.
     if (tls_phdr) {
-      Base::SetTls(diag, memory, *tls_phdr, ++max_tls_modid);
+      this->decoded().SetTls(diag, memory, *tls_phdr, ++max_tls_modid);
     }
 
     auto needed = DecodeDynamic(diag, dyn_phdr);
@@ -223,9 +223,9 @@ class RemoteLoadModule : public RemoteLoadModuleBase<Elf> {
     elfldltl::StdContainer<std::vector>::Container<size_type> needed_strtab_offsets;
 
     auto memory = metadata_memory();
-    auto result = DecodeModuleDynamic(this->module(), diag, memory, dyn_phdr,
-                                      NeededObserver(needed_strtab_offsets),
-                                      elfldltl::DynamicRelocationInfoObserver(this->reloc_info()));
+    auto result = DecodeModuleDynamic(
+        this->decoded().module(), diag, memory, dyn_phdr, NeededObserver(needed_strtab_offsets),
+        elfldltl::DynamicRelocationInfoObserver(this->decoded().reloc_info()));
     if (result.empty()) [[unlikely]] {
       return std::nullopt;
     }
@@ -292,7 +292,7 @@ class RemoteLoadModule : public RemoteLoadModuleBase<Elf> {
       if (!loader_.Allocate(diag, this->load_info())) {
         return false;
       }
-      SetModuleVaddrBounds(this->module(), this->load_info(), loader_.load_bias());
+      SetModuleVaddrBounds(this->decoded().module(), this->load_info(), loader_.load_bias());
     }
     return true;
   }
@@ -306,7 +306,7 @@ class RemoteLoadModule : public RemoteLoadModuleBase<Elf> {
   template <class Diagnostics, class ModuleList, typename TlsDescResolver>
   bool Relocate(Diagnostics& diag, ModuleList& modules, const TlsDescResolver& tls_desc_resolver) {
     auto mutable_memory = elfldltl::LoadInfoMutableMemory{
-        diag, this->load_info(),
+        diag, this->decoded().load_info(),
         elfldltl::SegmentWithVmo::GetMutableMemory<LoadInfo>{vmo_.borrow()}};
     if (!mutable_memory.Init()) {
       return false;
@@ -444,7 +444,7 @@ class RemoteLoadModule : public RemoteLoadModuleBase<Elf> {
             // Record the first module to request this dependency.
             mod.set_loaded_by_modid(loaded_by_modid);
             // Mark that the module is in the symbolic resolution set.
-            mod.module().symbols_visible = true;
+            mod.decoded().module().symbols_visible = true;
 
             // Use the exact pointer that's the dependent module's DT_NEEDED
             // string for the name field, so remoting can transcribe it.
@@ -452,7 +452,7 @@ class RemoteLoadModule : public RemoteLoadModuleBase<Elf> {
             mod.set_loaded_by_modid(loaded_by_modid);
 
             // Assign the module ID that matches the position in the list.
-            mod.module().symbolizer_modid = static_cast<uint32_t>(pos);
+            mod.decoded().module().symbolizer_modid = static_cast<uint32_t>(pos);
             return true;
           }
         }
@@ -529,9 +529,9 @@ class RemoteLoadModule : public RemoteLoadModuleBase<Elf> {
       if (pos == kNpos) {
         pos = modules.size();
         RemoteLoadModule& mod = modules.emplace_back(std::move(module));
-        mod.module().symbols_visible = false;
+        mod.decoded().module().symbols_visible = false;
         mod.set_name(mod.module().symbols.soname());
-        mod.module().symbolizer_modid = static_cast<uint32_t>(pos);
+        mod.decoded().module().symbolizer_modid = static_cast<uint32_t>(pos);
       }
     }
 

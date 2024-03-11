@@ -170,7 +170,9 @@ class RemoteAbi {
   using AbiTranscriber = RemoteAbiTranscriber<Abi>;
   using ModuleTranscriber = RemoteAbiTranscriber<AbiModule>;
 
-  static constexpr LocalLinkMap& LocalMap(RemoteModule& module) { return module.module().link_map; }
+  static constexpr LocalLinkMap& LocalMap(RemoteModule& module) {
+    return module.decoded().module().link_map;
+  }
 
   // The link_map linked-list pointers are to the LocalLinkMap type.  But
   // actually that's always the LocalAbiModule::link_map member, which is

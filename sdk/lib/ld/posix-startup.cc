@@ -87,7 +87,7 @@ std::pair<StartupModule*, size_t> LoadExecutable(Diagnostics& diag, StartupData&
   fbl::AllocChecker ac;
   main_executable->NewModule(0, initial_exec, ac);
   CheckAlloc(diag, ac, "passive ABI module");
-  Module& module = main_executable->module();
+  Module& module = main_executable->decoded().module();
 
   // We already have the direct pointer to the phdrs in the load image, from
   // PT_PHDR even though we never see the Ehdr::phoff value.
@@ -100,7 +100,7 @@ std::pair<StartupModule*, size_t> LoadExecutable(Diagnostics& diag, StartupData&
       elfldltl::PhdrSingletonObserver<elfldltl::Elf<>, elfldltl::ElfPhdrType::kPhdr>;
   std::optional<Phdr> phdr_phdr, relro_phdr;
   auto phdr_info = DecodeModulePhdrs(
-      diag, phdrs, main_executable->load_info().GetPhdrObserver(startup.page_size),
+      diag, phdrs, main_executable->decoded().load_info().GetPhdrObserver(startup.page_size),
       PhdrPhdrObserver{phdr_phdr}, elfldltl::PhdrRelroObserver<elfldltl::Elf<>>(relro_phdr));
   if (!phdr_info) {
     return {};
@@ -139,7 +139,7 @@ std::pair<StartupModule*, size_t> LoadExecutable(Diagnostics& diag, StartupData&
   }
 
   if (phdr_info->tls_phdr) {
-    main_executable->SetTls(diag, main_executable->memory(), *phdr_info->tls_phdr, 1);
+    main_executable->decoded().SetTls(diag, main_executable->memory(), *phdr_info->tls_phdr, 1);
   }
 
   size_t needed_count = main_executable->DecodeDynamic(diag, phdr_info->dyn_phdr);
