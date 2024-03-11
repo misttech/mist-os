@@ -10,7 +10,6 @@ source_set("fake-pdev") {
     "//src/devices/bus/lib/device-protocol-pdev",
     "//src/devices/lib/mmio",
     "//zircon/system/ulib/async-default",
-    "//zircon/system/ulib/fbl",
   ]
   deps = [
     "//src/devices/testing/fake-bti",

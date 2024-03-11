@@ -13,9 +13,6 @@
 #include <map>
 #include <optional>
 
-#include <fbl/auto_lock.h>
-#include <fbl/mutex.h>
-
 namespace fake_pdev {
 
 struct MmioInfo {
