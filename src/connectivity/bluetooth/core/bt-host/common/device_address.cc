@@ -87,6 +87,21 @@ DeviceAddress::DeviceAddress(Type type,
                              std::array<uint8_t, kDeviceAddressSize> bytes)
     : DeviceAddress(type, DeviceAddressBytes(bytes)) {}
 
+pw::bluetooth::emboss::LEAddressType DeviceAddress::DeviceAddrToLeAddr(
+    DeviceAddress::Type type) {
+  switch (type) {
+    case DeviceAddress::Type::kLEPublic: {
+      return pw::bluetooth::emboss::LEAddressType::PUBLIC;
+    }
+    case DeviceAddress::Type::kLERandom: {
+      return pw::bluetooth::emboss::LEAddressType::RANDOM;
+    }
+    default: {
+      BT_PANIC("invalid DeviceAddressType");
+    }
+  }
+}
+
 pw::bluetooth::emboss::LEPeerAddressType DeviceAddress::DeviceAddrToLePeerAddr(
     Type type) {
   switch (type) {
@@ -191,22 +206,7 @@ DeviceAddress::Type DeviceAddress::LeAddrToDeviceAddr(
       return DeviceAddress::Type::kLERandom;
     }
     default: {
-      BT_PANIC("invalid LEPeerAddressNoAnonType");
-    }
-  }
-}
-
-pw::bluetooth::emboss::LEAddressType DeviceAddress::DeviceAddrToLeAddr(
-    DeviceAddress::Type type) {
-  switch (type) {
-    case DeviceAddress::Type::kLEPublic: {
-      return pw::bluetooth::emboss::LEAddressType::PUBLIC;
-    }
-    case DeviceAddress::Type::kLERandom: {
-      return pw::bluetooth::emboss::LEAddressType::RANDOM;
-    }
-    default: {
-      BT_PANIC("invalid DeviceAddressType");
+      BT_PANIC("invalid LEPeerAddressTypeNoAnon");
     }
   }
 }
