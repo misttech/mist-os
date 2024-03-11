@@ -6,6 +6,7 @@
 #define SRC_CONNECTIVITY_BLUETOOTH_CORE_BT_HOST_HOST_COMPONENT_H_
 
 #include <lib/async/dispatcher.h>
+#include <lib/inspect/component/cpp/component.h>
 
 #include <pw_async_fuchsia/dispatcher.h>
 
@@ -75,7 +76,7 @@ class BtHostComponent {
   std::unique_ptr<HostServer> host_server_;
 
   // Inspector for component inspect tree. This object is thread-safe.
-  inspect::Inspector inspect_;
+  inspect::ComponentInspector inspector_;
 
   WeakSelf<BtHostComponent> weak_self_{this};
 

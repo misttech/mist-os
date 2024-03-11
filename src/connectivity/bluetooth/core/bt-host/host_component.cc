@@ -6,6 +6,7 @@
 
 #include <fidl/fuchsia.hardware.bluetooth/cpp/wire.h>
 #include <lib/fdio/directory.h>
+#include <lib/inspect/component/cpp/component.h>
 
 #include "fidl/host_server.h"
 #include "fuchsia/hardware/bluetooth/cpp/fidl.h"
@@ -20,11 +21,14 @@ namespace bthost {
 
 BtHostComponent::BtHostComponent(async_dispatcher_t* dispatcher, const std::string& device_path,
                                  bool initialize_rng)
-    : pw_dispatcher_(dispatcher), device_path_(device_path), initialize_rng_(initialize_rng) {
+    : pw_dispatcher_(dispatcher),
+      device_path_(device_path),
+      initialize_rng_(initialize_rng),
+      inspector_(inspect::ComponentInspector(dispatcher, {})) {
   if (initialize_rng) {
     set_random_generator(&random_generator_);
   }
-  inspect_.GetRoot().CreateString("name", device_path_, &inspect_);
+  inspector_.root().RecordString("name", device_path_);
 }
 
 BtHostComponent::~BtHostComponent() {
@@ -66,7 +70,7 @@ bool BtHostComponent::Initialize(fuchsia::hardware::bluetooth::VendorHandle vend
     bt_log(WARN, "bt-host", "GAP could not be created");
     return false;
   }
-  gap_->AttachInspect(inspect_.GetRoot(), "adapter");
+  gap_->AttachInspect(inspector_.root(), "adapter");
 
   // Called when the GAP layer is ready. We initialize the GATT profile after
   // initial setup in GAP. The data domain will be initialized by GAP because it

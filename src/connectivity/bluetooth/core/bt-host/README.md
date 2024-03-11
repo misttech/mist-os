@@ -30,23 +30,78 @@ to the Fuchsia system.
 
 ### Usage
 
-To query the current state of the `bt-host` Inspect hierarchy through `ffx` tooling, run
+To query the current state of the `bt-host` ***driver*** Inspect hierarchy through `ffx` tooling, run:
 
 `ffx inspect show bootstrap/driver_manager --file class/bt-host/000.inspect`
 
+To query the current state of the `bt-host` ***component*** Inspect hierarchy, run:
+
+1. `ffx inspect list | grep bt-host` to find the component's `<moniker>`
+2. `ffx inspect show "<moniker>"`
+   - Note that the full moniker from step 2 should be in quotations
+     - e.g., `ffx inspect show "core/bluetooth-core/bt-host-collection\:bt-host_000"`
+   - Wildcards can be passed into the selector as needed
+     - e.g., `ffx inspect show "core/bluetooth-core/bt-host-collection*"`
+
 ### Hierarchy
+
 ```
 adapter:
     adapter_id
-    hci_version
     bredr_max_num_packets
     bredr_max_data_length
-    le_max_num_packets
-    le_max_data_length
-    sco_max_num_packets
-    sco_max_data_length
-    lmp_features
+    hci_version
     le_features
+    le_max_data_length
+    le_max_num_packets
+    lmp_features
+    sco_max_data_length
+    sco_max_num_packets
+    bredr_connection_manager:
+        disconnect_acl_link_error_count
+        disconnect_interrogation_failed_count
+        disconnect_local_api_request_count
+        disconnect_pairing_failed_count
+        disconnect_peer_disconnection_count
+        interrogation_complete_count
+        security_mode
+        connection_requests:
+            request_0x0:
+               peer_id
+               has_incoming
+               callbacks
+        connections:
+            connection_0x0:
+                peer_id
+                pairing_state:
+                    encryption_status
+                    security_properties:
+                        encrypted
+                        secure_connections
+                        authenticated
+                        level
+                        key_type
+        incoming:
+            connection_attempts
+            failed_connections
+            successful_connections
+        last_disconnected:
+            0:
+                peer_id
+                duration_s
+                @time
+        outgoing:
+            connection_attempts
+            failed_connections
+            successful_connections
+    bredr_discovery_manager:
+        discoverable_sessions
+        discoverable_sessions_count
+        discovery_sessions
+        inquiry_sessions_count
+        last_discoverable_length_sec
+        last_inquiry_length_sec
+        pending_discoverable
     hci:
         command_channel:
             allowed_command_packets
@@ -70,20 +125,50 @@ adapter:
                     10th_percentile_bytes
                     50th_percentile_bytes
                     90th_percentile_bytes
+    l2cap:
+        logical_links:
+          logical_link_0x0:
+            handle
+            link_type
+            flush_timeout_ms
+            channels:
+              channel_0x0:
+                local_id
+                remote_id
+                psm
+        services:
+          service_0x0:
+            psm
+    low_energy_connection_manager:
+        disconnect_explicit_disconnect_count
+        disconnect_link_error_count
+        disconnect_remote_disconnection_count
+        disconnect_zero_ref_count
+        incoming_connection_failure_count
+        incoming_connection_success_count
+        outgoing_connection_failure_count
+        outgoing_connection_success_count
+        recent_connection_failures
+        pending_requests:
+            pending_request_0x0:
+                peer_id
+                callbacks
+        outbound_connector:
+            peer_id
+            is_outbound
+            connection_attempt
+            state
+        connections:
+            connection_0x0:
+                peer_id
+                peer_address
+                ref_count
     low_energy_discovery_manager:
-        state
-        paused
         failed_count
+        paused
         scan_interval_ms
         scan_window_ms
-    bredr_discovery_manager:
-        discoverable_sessions
-        pending_discoverable
-        discoverable_sessions_count
-        last_discoverable_length_sec
-        discovery_sessions
-        inquiry_sessions_count
-        last_inquiry_length_sec
+        state
     metrics:
         bredr:
             open_l2cap_channel_requests
@@ -99,20 +184,6 @@ adapter:
             start_advertising_events
             start_discovery_events
             stop_advertising_events
-    l2cap:
-        logical_links:
-          logical_link_0x0:
-            handle
-            link_type
-            flush_timeout_ms
-            channels:
-              channel_0x0:
-                local_id
-                remote_id
-                psm
-        services:
-          service_0x0:
-            psm
     peer_cache:
         metrics:
             bredr:
@@ -161,65 +232,4 @@ adapter:
             record
             registered_psms:
                 (none)
-    low_energy_connection_manager:
-        disconnect_explicit_disconnect_count
-        disconnect_link_error_count
-        disconnect_remote_disconnection_count
-        disconnect_zero_ref_count
-        incoming_connection_failure_count
-        incoming_connection_success_count
-        outgoing_connection_failure_count
-        outgoing_connection_success_count
-        recent_connection_failures
-        pending_requests:
-            pending_request_0x0:
-                peer_id
-                callbacks
-        outbound_connector:
-            peer_id
-            is_outbound
-            connection_attempt
-            state
-        connections:
-            connection_0x0:
-                peer_id
-                peer_address
-                ref_count
-    bredr_connection_manager:
-        security_mode
-        disconnect_acl_link_error_count
-        disconnect_interrogation_failed_count
-        disconnect_local_api_request_count
-        disconnect_pairing_failed_count
-        disconnect_peer_disconnection_count
-        interrogation_complete_count
-        incoming:
-            connection_attempts
-            failed_connections
-            successful_connections
-        outgoing:
-            connection_attempts
-            failed_connections
-            successful_connections
-        connection_requests:
-            request_0x0:
-                peer_id
-                has_incoming
-                callbacks
-        connections:
-            connection_0x0:
-                peer_id
-                pairing_state:
-                    encryption_status
-                    security_properties:
-                        encrypted
-                        secure_connections
-                        authenticated
-                        level
-                        key_type
-        last_disconnected:
-            0:
-                peer_id
-                duration_s
-                @time
 ```
