@@ -536,6 +536,8 @@ struct InfoHandle {
 };
 
 // Filters -----------------------------------------------------------------------------------------
+constexpr uint32_t kInvalidFilterId = static_cast<uint32_t>(-1);
+
 struct Filter {
   enum class Type : uint32_t {
     kUnset,
@@ -553,7 +555,34 @@ struct Filter {
   std::string pattern;
   uint64_t job_koid = 0;  // must be 0 when type is kComponent*.
 
-  void Serialize(Serializer& ser, uint32_t ver) { ser | type | pattern | job_koid; }
+  // Set by the frontend. Different from the console's id for "active" filters in the ui.
+  uint32_t id = kInvalidFilterId;
+
+  // Whether or not this is a weak filter. The backend needs to know this so when newly spawned
+  // processes that match a filter hit the loader breakpoint can know whether or not to eagerly send
+  // modules to the front end.
+  bool weak = false;
+
+  void Serialize(Serializer& ser, uint32_t ver) {
+    ser | type | pattern | job_koid;
+    if (ver >= 61) {
+      ser | id | weak;
+    }
+  }
+};
+
+// Reply indicating that a filter matched one or more processes.
+struct FilterMatch {
+  FilterMatch() = default;
+  FilterMatch(uint32_t id, std::vector<uint64_t> pids) : id(id), matched_pids(std::move(pids)) {}
+
+  // The frontend id of the filter that matched, -1 if invalid or unknown.
+  uint32_t id = kInvalidFilterId;
+
+  // All of the pids that matched this filter.
+  std::vector<uint64_t> matched_pids;
+
+  void Serialize(Serializer& ser, uint32_t ver) { ser | id | matched_pids; }
 };
 
 #pragma pack(pop)

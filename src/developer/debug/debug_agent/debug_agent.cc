@@ -529,7 +529,10 @@ void DebugAgent::OnUpdateFilter(const debug_ipc::UpdateFilterRequest& request,
   filters_.reserve(request.filters.size());
   for (const auto& filter : request.filters) {
     filters_.emplace_back(filter);
-    reply->matched_processes = filters_.back().ApplyToJob(*root_job_, *system_interface_);
+    auto matched_processes = filters_.back().ApplyToJob(*root_job_, *system_interface_);
+    if (!matched_processes.empty()) {
+      reply->matched_processes_for_filter.emplace_back(filter.id, std::move(matched_processes));
+    }
   }
 }
 
@@ -802,12 +805,17 @@ void DebugAgent::OnProcessStart(std::unique_ptr<ProcessHandle> process_handle) {
   debug_ipc::NotifyProcessStarting::Type type = debug_ipc::NotifyProcessStarting::Type::kLast;
   StdioHandles stdio;  // Will be filled in only for components.
   std::string process_name_override;
+  const debug_ipc::Filter* matched_filter = nullptr;
 
   if (system_interface_->GetComponentManager().OnProcessStart(*process_handle, &stdio,
                                                               &process_name_override)) {
     type = debug_ipc::NotifyProcessStarting::Type::kLaunch;
   } else if (std::any_of(filters_.begin(), filters_.end(), [&](const Filter& filter) {
-               return filter.MatchesProcess(*process_handle, *system_interface_);
+               if (filter.MatchesProcess(*process_handle, *system_interface_)) {
+                 matched_filter = &filter.filter();
+                 return true;
+               }
+               return false;
              })) {
     type = debug_ipc::NotifyProcessStarting::Type::kAttach;
   } else {
@@ -830,6 +838,7 @@ void DebugAgent::OnProcessStart(std::unique_ptr<ProcessHandle> process_handle) {
   notify.name = process_name_override.empty() ? process_handle->GetName() : process_name_override;
   notify.timestamp = GetNowTimestamp();
   notify.components = system_interface_->GetComponentManager().FindComponentInfo(*process_handle);
+  notify.filter_id = matched_filter ? matched_filter->id : debug_ipc::kInvalidFilterId;
 
   DebuggedProcessCreateInfo create_info(std::move(process_handle));
   create_info.stdio = std::move(stdio);

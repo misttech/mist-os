@@ -708,34 +708,37 @@ void System::SyncFilters() {
     }
     weak_this->session()->remote_api()->UpdateFilter(
         request, [weak_this](const Err& err, debug_ipc::UpdateFilterReply reply) {
-          if (weak_this && !reply.matched_processes.empty()) {
-            weak_this->OnFilterMatches(reply.matched_processes);
+          if (weak_this && !reply.matched_processes_for_filter.empty()) {
+            weak_this->OnFilterMatches(reply.matched_processes_for_filter);
           }
         });
   });
 }
 
-void System::OnFilterMatches(const std::vector<uint64_t>& matched_pids) {
-  // Check that we don't accidentally attach to too many processes.
-  if (matched_pids.size() > 50) {
-    LOGS(Error) << "Filter matches too many (" << matched_pids.size() << ") processes. "
-                << "No attach is performed.";
-    return;
-  }
-  // Go over the targets and see if we find a valid one for each pid.
-  for (uint64_t matched_pid : matched_pids) {
-    // If we found an already attached process, we don't care about this match.
-    if (ProcessFromKoid(matched_pid)) {
-      continue;
+void System::OnFilterMatches(const std::vector<debug_ipc::FilterMatch>& matches) {
+  for (const auto& match : matches) {
+    // Check that we don't accidentally attach to too many processes.
+    if (match.matched_pids.size() > 50) {
+      LOGS(Error) << "Filter matches too many (" << match.matched_pids.size() << ") processes. "
+                  << "No attach is performed.";
+      return;
     }
 
-    AttachToProcess(matched_pid, [matched_pid](fxl::WeakPtr<Target> target, const Err& err,
-                                               uint64_t timestamp) {
-      if (err.has_error()) {
-        LOGS(Error) << "Could not attach to process " << matched_pid << ": " << err.msg();
-        return;
+    // Go over the targets and see if we find a valid one for each pid.
+    for (uint64_t matched_pid : match.matched_pids) {
+      // If we found an already attached process, we don't care about this match.
+      if (ProcessFromKoid(matched_pid)) {
+        continue;
       }
-    });
+
+      AttachToProcess(matched_pid, [matched_pid](fxl::WeakPtr<Target> target, const Err& err,
+                                                 uint64_t timestamp) {
+        if (err.has_error()) {
+          LOGS(Error) << "Could not attach to process " << matched_pid << ": " << err.msg();
+          return;
+        }
+      });
+    }
   }
 }
 

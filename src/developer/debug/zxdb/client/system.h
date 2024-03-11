@@ -174,7 +174,7 @@ class System : public ClientObject, public SessionObserver, public SettingStoreO
   void SyncFilters();
 
   // Will attach to any process we are not already attached to.
-  void OnFilterMatches(const std::vector<uint64_t>& matched_pids);
+  void OnFilterMatches(const std::vector<debug_ipc::FilterMatch>& matches);
 
   // Searches through for an open slot (Target without an attached process) or creates another one
   // if none is found. Calls attach on that target, passing |callback| into it.

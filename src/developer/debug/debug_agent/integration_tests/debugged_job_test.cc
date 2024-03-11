@@ -230,7 +230,7 @@ TEST(DebuggedJobIntegrationTest, DISABLED_RepresentativeScenario) {
       debug_ipc::Filter{.type = debug_ipc::Filter::Type::kProcessNameSubstr, .pattern = "false"}};
   UpdateFilterReply filter_reply;
   remote_api->OnUpdateFilter(filter_request, &filter_reply);
-  ASSERT_TRUE(filter_reply.matched_processes.empty());
+  ASSERT_TRUE(filter_reply.matched_processes_for_filter.empty());
 
   FX_LOGS(DEBUG) << "Launching jobs.";
 
@@ -299,7 +299,7 @@ TEST(DebuggedJobIntegrationTest, DISABLED_RepresentativeScenario) {
   filter_request.filters = {debug_ipc::Filter{.type = debug_ipc::Filter::Type::kProcessNameSubstr,
                                               .pattern = "breakpoint"}};
   remote_api->OnUpdateFilter(filter_request, &filter_reply);
-  ASSERT_TRUE(filter_reply.matched_processes.empty());
+  ASSERT_TRUE(filter_reply.matched_processes_for_filter.empty());
 
   FX_LOGS(DEBUG) << "Launching new processes.";
 

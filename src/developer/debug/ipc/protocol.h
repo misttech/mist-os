@@ -5,6 +5,8 @@
 #ifndef SRC_DEVELOPER_DEBUG_IPC_PROTOCOL_H_
 #define SRC_DEVELOPER_DEBUG_IPC_PROTOCOL_H_
 
+#include <set>
+
 #include "lib/syslog/cpp/macros.h"
 #include "src/developer/debug/ipc/records.h"
 #include "src/developer/debug/shared/arch.h"
@@ -36,7 +38,7 @@ namespace debug_ipc {
 // CURRENT_SUPPORTED_API_LEVEL is equal to FUCHSIA_API_LEVEL specified in version_history.json.
 // If not, continue reading the comments below.
 
-constexpr uint32_t kCurrentProtocolVersion = 60;
+constexpr uint32_t kCurrentProtocolVersion = 61;
 
 // How to decide kMinimumProtocolVersion
 // -------------------------------------
@@ -288,7 +290,16 @@ struct KillReply {
 struct AttachRequest {
   uint64_t koid = 0;
 
-  void Serialize(Serializer& ser, uint32_t ver) { ser | koid; }
+  // Attaching weakly means that the backend will only be listening for exceptions on the process,
+  // the frontend must explicitly request and load the modules to do anything with symbols.
+  bool weak = false;
+
+  void Serialize(Serializer& ser, uint32_t ver) {
+    ser | koid;
+    if (ver >= 61) {
+      ser | weak;
+    }
+  }
 };
 
 struct AttachReply {
@@ -517,11 +528,39 @@ struct UpdateFilterRequest {
 };
 
 struct UpdateFilterReply {
-  // List of koids for currently running processes that match any of the filters.
-  // Guaranteed that each koid is unique.
-  std::vector<uint64_t> matched_processes;
+  // Each matched process will be paired with the frontend id of the filter that matched it.
+  // Several filters could have matched the same pids, which can be observed in the respective
+  // filter's list of matches.
+  std::vector<FilterMatch> matched_processes_for_filter;
 
-  void Serialize(Serializer& ser, uint32_t ver) { ser | matched_processes; }
+  void Serialize(Serializer& ser, uint32_t ver) {
+    if (ver < 61) {
+      // List of koids for currently running processes that match any of the filters.
+      // Guaranteed that each koid is unique.
+      std::vector<uint64_t> matched_processes;
+
+      // This set will filter out duplicate koids.
+      std::set<uint64_t> pids;
+
+      for (auto& match : matched_processes_for_filter) {
+        pids.insert(match.matched_pids.begin(), match.matched_pids.end());
+      }
+
+      matched_processes.reserve(pids.size());
+      matched_processes.insert(matched_processes.end(), pids.begin(), pids.end());
+
+      pids.clear();
+      matched_processes_for_filter.clear();
+
+      ser | matched_processes;
+
+      // There's no way for us to reconstruct the filter id to pid mapping, so we map all of the
+      // matches to the reserved invalid filter id.
+      matched_processes_for_filter.emplace_back(kInvalidFilterId, std::move(matched_processes));
+    } else {
+      ser | matched_processes_for_filter;
+    }
+  }
 };
 
 struct WriteMemoryRequest {
@@ -695,6 +734,9 @@ struct NotifyProcessStarting {
   // the process. Order of components is not guaranteed.
   std::vector<ComponentInfo> components;
 
+  // The client filter id that matched this process.
+  uint32_t filter_id = kInvalidFilterId;
+
   void Serialize(Serializer& ser, uint32_t ver) {
     ser | timestamp | type | koid | name;
     if (ver < 57) {
@@ -712,6 +754,10 @@ struct NotifyProcessStarting {
       }
     } else {
       ser | components;
+    }
+
+    if (ver >= 61) {
+      ser | filter_id;
     }
   }
 };

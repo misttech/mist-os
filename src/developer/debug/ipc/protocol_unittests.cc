@@ -715,9 +715,11 @@ TEST(Protocol, AspaceReply) {
 
 TEST(Protocol, UpdateFilterRequest) {
   UpdateFilterRequest initial;
-  initial.filters.push_back({Filter::Type::kProcessNameSubstr, "Clock"});
-  initial.filters.push_back({Filter::Type::kProcessName, "Time"});
-  initial.filters.push_back({Filter::Type::kComponentName, "Network"});
+  initial.filters.push_back({Filter::Type::kProcessNameSubstr, "Clock", 1234, 1, false});
+  initial.filters.push_back({Filter::Type::kProcessName, "Time", 2345, 2, true});
+  initial.filters.push_back({Filter::Type::kComponentName, "Network", 0, 3, false});
+  initial.filters.push_back(
+      {Filter::Type::kComponentUrl, "fuchsia-pkg://test.com/test#meta/test.cm", 0, 4, true});
 
   UpdateFilterRequest second;
   ASSERT_TRUE(SerializeDeserialize(initial, &second));
@@ -726,18 +728,33 @@ TEST(Protocol, UpdateFilterRequest) {
     EXPECT_EQ(initial.filters[i].type, second.filters[i].type);
     EXPECT_EQ(initial.filters[i].pattern, second.filters[i].pattern);
     EXPECT_EQ(initial.filters[i].job_koid, second.filters[i].job_koid);
+    EXPECT_EQ(initial.filters[i].id, second.filters[i].id);
+    EXPECT_EQ(initial.filters[i].weak, second.filters[i].weak);
   }
 }
 
 TEST(Protocol, UpdateFilterReply) {
   UpdateFilterReply initial;
-  initial.matched_processes = {1234, 5678};
+  initial.matched_processes_for_filter.emplace_back(FilterMatch(1, {1234}));
+  initial.matched_processes_for_filter.emplace_back(FilterMatch(2, {5678}));
+  initial.matched_processes_for_filter.emplace_back(FilterMatch(3, {4321, 2345}));
+  initial.matched_processes_for_filter.emplace_back(
+      FilterMatch(debug_ipc::kInvalidFilterId, {9876}));
 
   UpdateFilterReply second;
   ASSERT_TRUE(SerializeDeserialize(initial, &second));
-  ASSERT_EQ(second.matched_processes.size(), 2u);
-  EXPECT_EQ(second.matched_processes[0], initial.matched_processes[0]);
-  EXPECT_EQ(second.matched_processes[1], initial.matched_processes[1]);
+  ASSERT_EQ(second.matched_processes_for_filter.size(), 4u);
+  for (size_t i = 0; i < initial.matched_processes_for_filter.size(); i++) {
+    EXPECT_EQ(initial.matched_processes_for_filter[i].id,
+              second.matched_processes_for_filter[i].id);
+    EXPECT_EQ(initial.matched_processes_for_filter[i].matched_pids.size(),
+              second.matched_processes_for_filter[i].matched_pids.size());
+
+    for (size_t j = 0; j < initial.matched_processes_for_filter[i].matched_pids.size(); j++) {
+      EXPECT_EQ(initial.matched_processes_for_filter[i].matched_pids[j],
+                second.matched_processes_for_filter[i].matched_pids[j]);
+    }
+  }
 }
 
 // WriteMemory -------------------------------------------------------------------------------------
@@ -1062,6 +1079,7 @@ TEST(Protocol, NotifyProcessStarting) {
   initial.name = "some_process";
   initial.timestamp = kTestTimestampDefault;
   initial.components = {ComponentInfo{.moniker = "moniker", .url = "url"}};
+  initial.filter_id = 1;
 
   NotifyProcessStarting second;
   ASSERT_TRUE(SerializeDeserialize(initial, &second));
@@ -1070,6 +1088,7 @@ TEST(Protocol, NotifyProcessStarting) {
   EXPECT_EQ(initial.koid, second.koid);
   EXPECT_EQ(initial.name, second.name);
   EXPECT_EQ(initial.timestamp, second.timestamp);
+  EXPECT_EQ(initial.filter_id, second.filter_id);
   ASSERT_FALSE(second.components.empty());
   auto initial_component = initial.components[0];
   auto component = second.components[0];

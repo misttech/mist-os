@@ -5,6 +5,7 @@
 #include "src/developer/debug/debug_agent/mock_debug_agent_harness.h"
 
 #include "src/developer/debug/debug_agent/mock_process.h"
+#include "src/developer/debug/ipc/protocol.h"
 
 namespace debug_agent {
 
@@ -13,6 +14,13 @@ MockDebugAgentHarness::MockDebugAgentHarness(std::unique_ptr<MockSystemInterface
   auto stream_backend = std::make_unique<MockStreamBackend>();
   stream_backend_ = stream_backend.get();
   agent_.Connect(std::move(stream_backend));
+
+  // Make sure DebugAgent is initialized with the current protocol version.
+  debug_ipc::HelloRequest request;
+  request.version = debug_ipc::kCurrentProtocolVersion;
+
+  debug_ipc::HelloReply reply;
+  agent_.OnHello(request, &reply);
 }
 
 MockProcess* MockDebugAgentHarness::AddProcess(zx_koid_t process_koid) {
