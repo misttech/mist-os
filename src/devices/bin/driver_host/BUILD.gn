@@ -177,7 +177,16 @@ fuchsia_component("component") {
   deps = [ ":bin" ]
 }
 
+fuchsia_component("next_component") {
+  component_name = "driver_host_next"
+  manifest = "meta/driver_host_next.cml"
+  deps = [ ":bin" ]
+}
+
 fuchsia_package("package") {
   package_name = "driver_host"
-  deps = [ ":component" ]
+  deps = [
+    ":component",
+    ":next_component",
+  ]
 }

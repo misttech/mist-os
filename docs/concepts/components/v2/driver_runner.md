@@ -103,6 +103,27 @@ node, the non-fallback driver will bind to the node instead.
 If the `fallback` field is not specified, its value defaults to the string
 `false`.
 
+### Next vDSO
+
+If the `use_next_vdso` field is set to the string `true`, the driver will be put in
+a [driver host][driver-host] with the next vdso dynamic linked in. The driver must
+also have `colocate` set to `true` or this field is ignored.
+
+```json5 {:.devsite-disable-click-to-copy}
+{
+    program: {
+        runner: "driver",
+        binary: "driver/example.so",
+        bind: "meta/bind/example.bindbc",
+        colocate: "true"
+        {{ '<strong>' }}use_next_vdso: "true"{{ '</strong>' }}
+    }
+}
+```
+
+If the `use_next_vdso` field is not specified, its value defaults to the string
+`false`.
+
 ### Device categories
 
 The `device_categories` field provides metadata indicating the device categories

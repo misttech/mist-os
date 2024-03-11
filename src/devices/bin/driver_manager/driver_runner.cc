@@ -450,7 +450,7 @@ void DriverRunner::DestroyDriverComponent(driver_manager::Node& node,
   runner_.realm()->DestroyChild(child_ref).Then(std::move(callback));
 }
 
-zx::result<DriverHost*> DriverRunner::CreateDriverHost() {
+zx::result<DriverHost*> DriverRunner::CreateDriverHost(bool use_next_vdso) {
   zx::result endpoints = fidl::CreateEndpoints<fio::Directory>();
   if (endpoints.is_error()) {
     return endpoints.take_error();
@@ -458,7 +458,8 @@ zx::result<DriverHost*> DriverRunner::CreateDriverHost() {
   std::string name = "driver-host-" + std::to_string(next_driver_host_id_++);
 
   std::shared_ptr<bool> connected = std::make_shared<bool>(false);
-  auto create = CreateDriverHostComponent(name, std::move(endpoints->server), connected);
+  auto create =
+      CreateDriverHostComponent(name, std::move(endpoints->server), connected, use_next_vdso);
   if (create.is_error()) {
     return create.take_error();
   }
@@ -556,11 +557,14 @@ void DriverRunner::RequestRebindFromDriverIndex(std::string spec,
 
 zx::result<> DriverRunner::CreateDriverHostComponent(
     std::string moniker, fidl::ServerEnd<fuchsia_io::Directory> exposed_dir,
-    std::shared_ptr<bool> exposed_dir_connected) {
+    std::shared_ptr<bool> exposed_dir_connected, bool use_next_vdso) {
   constexpr std::string_view kUrl = "fuchsia-boot:///driver_host#meta/driver_host.cm";
+  constexpr std::string_view kNextUrl = "fuchsia-boot:///driver_host#meta/driver_host_next.cm";
   fidl::Arena arena;
-  auto child_decl_builder = fdecl::wire::Child::Builder(arena).name(moniker).url(kUrl).startup(
-      fdecl::wire::StartupMode::kLazy);
+  auto child_decl_builder = fdecl::wire::Child::Builder(arena)
+                                .name(moniker)
+                                .url(use_next_vdso ? kNextUrl : kUrl)
+                                .startup(fdecl::wire::StartupMode::kLazy);
   auto child_args_builder = fcomponent::wire::CreateChildArgs::Builder(arena);
   auto open_callback =
       [moniker](fidl::WireUnownedResult<fcomponent::Realm::OpenExposedDir>& result) {

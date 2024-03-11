@@ -996,6 +996,8 @@ void Node::StartDriver(fuchsia_component_runner::wire::ComponentStartInfo start_
   bool host_restart_on_crash =
       fdf_internal::ProgramValue(start_info.program(), "host_restart_on_crash").value_or("") ==
       "true";
+  bool use_next_vdso =
+      fdf_internal::ProgramValue(start_info.program(), "use_next_vdso").value_or("") == "true";
 
   if (host_restart_on_crash && colocate) {
     LOGF(ERROR,
@@ -1023,7 +1025,7 @@ void Node::StartDriver(fuchsia_component_runner::wire::ComponentStartInfo start_
 
   // Launch a driver host if we are not colocated.
   if (!colocate) {
-    auto result = (*node_manager_)->CreateDriverHost();
+    auto result = (*node_manager_)->CreateDriverHost(use_next_vdso);
     if (result.is_error()) {
       cb(result.take_error());
       return;

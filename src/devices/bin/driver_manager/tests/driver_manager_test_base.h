@@ -18,7 +18,7 @@ class TestNodeManagerBase : public driver_manager::NodeManager {
       fit::callback<void(fidl::WireUnownedResult<fuchsia_component::Realm::DestroyChild>& result)>
           callback) override {}
 
-  zx::result<driver_manager::DriverHost*> CreateDriverHost() override {
+  zx::result<driver_manager::DriverHost*> CreateDriverHost(bool use_next_vdso) override {
     return zx::error(ZX_ERR_NOT_SUPPORTED);
   }
 };

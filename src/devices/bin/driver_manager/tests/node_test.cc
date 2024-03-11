@@ -69,7 +69,7 @@ class FakeNodeManager : public TestNodeManagerBase {
  public:
   FakeNodeManager(fidl::WireClient<fuchsia_component::Realm> realm) : realm_(std::move(realm)) {}
 
-  zx::result<driver_manager::DriverHost*> CreateDriverHost() override {
+  zx::result<driver_manager::DriverHost*> CreateDriverHost(bool use_next_vdso) override {
     return zx::ok(&driver_host_);
   }
 

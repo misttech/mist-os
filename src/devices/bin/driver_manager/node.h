@@ -57,7 +57,7 @@ class NodeManager {
     return zx::error(ZX_ERR_NOT_SUPPORTED);
   }
 
-  virtual zx::result<DriverHost*> CreateDriverHost() = 0;
+  virtual zx::result<DriverHost*> CreateDriverHost(bool use_next_vdso) = 0;
 
   // DriverHost lifetimes are managed through a linked list, and they will delete themselves
   // when the FIDL connection is closed. Currently in the Node class we store a raw pointer to the

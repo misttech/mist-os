@@ -380,6 +380,7 @@ struct Driver {
   bool colocate = false;
   bool close = false;
   bool host_restart_on_crash = false;
+  bool use_next_vdso = false;
 };
 
 class DriverRunnerTest : public gtest::TestLoopFixture {
@@ -508,14 +509,19 @@ class DriverRunnerTest : public gtest::TestLoopFixture {
     PrepareRealmForDriverComponentStart("dev.second", second_driver_url);
   }
 
-  void PrepareRealmForStartDriverHost() {
+  void PrepareRealmForStartDriverHost(bool use_next_vdso) {
     constexpr std::string_view kDriverHostName = "driver-host-";
     std::string coll = "driver-hosts";
     realm().SetCreateChildHandler(
-        [coll, kDriverHostName](fdecl::CollectionRef collection, fdecl::Child decl, auto offers) {
+        [coll, kDriverHostName, use_next_vdso](fdecl::CollectionRef collection, fdecl::Child decl,
+                                               auto offers) {
           EXPECT_EQ(coll, collection.name());
           EXPECT_EQ(kDriverHostName, decl.name().value().substr(0, kDriverHostName.size()));
-          EXPECT_EQ("fuchsia-boot:///driver_host#meta/driver_host.cm", decl.url());
+          if (use_next_vdso) {
+            EXPECT_EQ("fuchsia-boot:///driver_host#meta/driver_host_next.cm", decl.url());
+          } else {
+            EXPECT_EQ("fuchsia-boot:///driver_host#meta/driver_host.cm", decl.url());
+          }
         });
     realm().SetOpenExposedDirHandler(
         [this, coll, kDriverHostName](fdecl::ChildRef child, auto exposed_dir) {
@@ -560,12 +566,12 @@ class DriverRunnerTest : public gtest::TestLoopFixture {
         });
 
     if (!driver.colocate) {
-      PrepareRealmForStartDriverHost();
+      PrepareRealmForStartDriverHost(driver.use_next_vdso);
     }
 
     fidl::Arena arena;
 
-    fidl::VectorView<fdata::wire::DictionaryEntry> program_entries(arena, 3);
+    fidl::VectorView<fdata::wire::DictionaryEntry> program_entries(arena, 4);
     program_entries[0].key.Set(arena, "binary");
     program_entries[0].value = fdata::wire::DictionaryValue::WithStr(arena, driver.binary);
 
@@ -576,6 +582,10 @@ class DriverRunnerTest : public gtest::TestLoopFixture {
     program_entries[2].key.Set(arena, "host_restart_on_crash");
     program_entries[2].value = fdata::wire::DictionaryValue::WithStr(
         arena, driver.host_restart_on_crash ? "true" : "false");
+
+    program_entries[3].key.Set(arena, "use_next_vdso");
+    program_entries[3].value =
+        fdata::wire::DictionaryValue::WithStr(arena, driver.use_next_vdso ? "true" : "false");
 
     auto program_builder = fdata::wire::Dictionary::Builder(arena);
     program_builder.entries(program_entries);
@@ -618,7 +628,7 @@ class DriverRunnerTest : public gtest::TestLoopFixture {
     EXPECT_TRUE(RunLoopUntilIdle());
 
     StartDriverHandler start_handler = [](TestDriver* driver, fdfw::DriverStartArgs start_args) {
-      ValidateProgram(start_args.program(), root_driver_binary, "false", "false");
+      ValidateProgram(start_args.program(), root_driver_binary, "false", "false", "false");
     };
     return zx::ok(StartDriver(
         {
@@ -628,15 +638,16 @@ class DriverRunnerTest : public gtest::TestLoopFixture {
         std::move(start_handler)));
   }
 
-  StartDriverResult StartSecondDriver(bool colocate = false, bool host_restart_on_crash = false) {
-    StartDriverHandler start_handler = [colocate, host_restart_on_crash](
+  StartDriverResult StartSecondDriver(bool colocate = false, bool host_restart_on_crash = false,
+                                      bool use_next_vdso = false) {
+    StartDriverHandler start_handler = [colocate, host_restart_on_crash, use_next_vdso](
                                            TestDriver* driver, fdfw::DriverStartArgs start_args) {
       if (!colocate) {
         EXPECT_FALSE(start_args.symbols().has_value());
       }
 
       ValidateProgram(start_args.program(), second_driver_binary, colocate ? "true" : "false",
-                      host_restart_on_crash ? "true" : "false");
+                      host_restart_on_crash ? "true" : "false", use_next_vdso ? "true" : "false");
     };
     return StartDriver(
         {
@@ -644,6 +655,7 @@ class DriverRunnerTest : public gtest::TestLoopFixture {
             .binary = second_driver_binary,
             .colocate = colocate,
             .host_restart_on_crash = host_restart_on_crash,
+            .use_next_vdso = use_next_vdso,
         },
         std::move(start_handler));
   }
@@ -657,18 +669,21 @@ class DriverRunnerTest : public gtest::TestLoopFixture {
 
   static void ValidateProgram(std::optional<::fuchsia_data::Dictionary>& program,
                               std::string_view binary, std::string_view colocate,
-                              std::string_view host_restart_on_crash) {
+                              std::string_view host_restart_on_crash,
+                              std::string_view use_next_vdso) {
     ZX_ASSERT(program.has_value());
     auto& entries_opt = program.value().entries();
     ZX_ASSERT(entries_opt.has_value());
     auto& entries = entries_opt.value();
-    EXPECT_EQ(3u, entries.size());
+    EXPECT_EQ(4u, entries.size());
     EXPECT_EQ("binary", entries[0].key());
     EXPECT_EQ(std::string(binary), entries[0].value()->str().value());
     EXPECT_EQ("colocate", entries[1].key());
     EXPECT_EQ(std::string(colocate), entries[1].value()->str().value());
     EXPECT_EQ("host_restart_on_crash", entries[2].key());
     EXPECT_EQ(std::string(host_restart_on_crash), entries[2].value()->str().value());
+    EXPECT_EQ("use_next_vdso", entries[3].key());
+    EXPECT_EQ(std::string(use_next_vdso), entries[3].value()->str().value());
   }
 
   static void AssertNodeBound(const std::shared_ptr<CreatedChild>& child) {
@@ -1072,7 +1087,7 @@ TEST_F(DriverRunnerTest, StartSecondDriver_SameDriverHost) {
     EXPECT_EQ(1u, symbols.size());
     EXPECT_EQ("sym", symbols[0].name().value());
     EXPECT_EQ(0xfeedu, symbols[0].address());
-    ValidateProgram(start_args.program(), second_driver_binary, "true", "false");
+    ValidateProgram(start_args.program(), second_driver_binary, "true", "false", "false");
   };
   auto [driver, controller] = StartDriver(
       {
@@ -1294,6 +1309,26 @@ TEST_F(DriverRunnerTest, StartSecondDriverHostRestartOnCrash) {
        CreateChildRef("dev.second", "boot-drivers")});
 }
 
+// Start the second driver with use_next_vdso enabled,
+TEST_F(DriverRunnerTest, StartSecondDriver_UseNextVdso) {
+  SetupDriverRunner();
+
+  auto root_driver = StartRootDriver();
+  ASSERT_EQ(ZX_OK, root_driver.status_value());
+
+  PrepareRealmForSecondDriverComponentStart();
+  std::shared_ptr<CreatedChild> child = root_driver->driver->AddChild("second", false, false);
+  EXPECT_TRUE(RunLoopUntilIdle());
+
+  auto [driver_1, controller_1] = StartSecondDriver(true, false, true);
+
+  EXPECT_EQ(0u, driver_runner().bind_manager().NumOrphanedNodes());
+
+  StopDriverComponent(std::move(root_driver->controller));
+  realm().AssertDestroyedChildren(
+      {CreateChildRef("dev", "boot-drivers"), CreateChildRef("dev.second", "boot-drivers")});
+}
+
 // The root driver adds a node that only binds after a RequestBind() call.
 TEST_F(DriverRunnerTest, BindThroughRequest) {
   SetupDriverRunner();
@@ -1396,7 +1431,7 @@ TEST_F(DriverRunnerTest, BindAndRestartThroughRequest) {
   // Get the third-driver running.
   StartDriverHandler start_handler = [&](TestDriver* driver, fdfw::DriverStartArgs start_args) {
     EXPECT_FALSE(start_args.symbols().has_value());
-    ValidateProgram(start_args.program(), "driver/third-driver.so", "false", "false");
+    ValidateProgram(start_args.program(), "driver/third-driver.so", "false", "false", "false");
   };
   auto third_driver = StartDriver(
       {
@@ -1575,7 +1610,7 @@ TEST_F(DriverRunnerTest, StartDriverChain_UnbindSecondNode) {
 
     StartDriverHandler start_handler = [](TestDriver* driver, fdfw::DriverStartArgs start_args) {
       EXPECT_FALSE(start_args.symbols().has_value());
-      ValidateProgram(start_args.program(), "driver/driver.so", "false", "false");
+      ValidateProgram(start_args.program(), "driver/driver.so", "false", "false", "false");
     };
     drivers.emplace_back(StartDriver(
         {
@@ -1796,7 +1831,7 @@ TEST_F(DriverRunnerTest, CreateAndBindCompositeNodeSpec) {
   ASSERT_TRUE(driver_runner().composite_node_spec_manager().specs().at(name)->parent_specs().at(1));
 
   StartDriverHandler start_handler = [](TestDriver* driver, fdfw::DriverStartArgs start_args) {
-    ValidateProgram(start_args.program(), "driver/composite-driver.so", "true", "false");
+    ValidateProgram(start_args.program(), "driver/composite-driver.so", "true", "false", "false");
   };
   auto composite_driver = StartDriver(
       {
