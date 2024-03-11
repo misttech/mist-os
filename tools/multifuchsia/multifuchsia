@@ -5,6 +5,12 @@
 
 set -euE -o pipefail
 
+# If true, `./multifuchsia enter` will create a new namespace and mount the
+# checkout with the $MOUNTPOINT path. This has the advantage of making all
+# checkouts have the same path, but may prevent the ability to use tools like
+# RBE that will error out if run in a sub-namespace.
+ENTER_ISOLATED_NAMESPACE="false"
+
 function swap() {
   local -r file1=$1
   local -r file2=$2
@@ -33,7 +39,23 @@ function cmd_sync_and_build() {
     return 1
   fi
 
-  unshare --user --mount --map-current-user --keep-caps "${multifuchsia_srcdir}/update_and_build_inner.sh" "$MOUNTPOINT" "${multifuchsia_workdir}"
+  local args=(
+    "${multifuchsia_srcdir}/update_and_build_inner.sh"
+    --workspace "${multifuchsia_workdir}"
+  )
+
+  if [ ${ENTER_ISOLATED_NAMESPACE} == "true" ]; then
+    unshare \
+      --user \
+      --mount \
+      --map-current-user \
+      --keep-caps \
+      "${args[@]}" \
+      --mount "${MOUNTPOINT}"
+  else
+    bash -- \
+      "${args[@]}"
+  fi
 }
 
 # For calling from systemd units/anywhere where it's easier to manipulate the
@@ -448,7 +470,16 @@ function cmd_enter() {
   local -r tmp_multifuchsia=$(mktemp "$WORKDIR/.multifuchsia_enter_helper.XXXXXX")
   cp -p --reflink=auto "$WORKDIR/multifuchsia" "$tmp_multifuchsia"
   local -r multifuchsia_src="$(dirname "$(realpath "$WORKDIR/multifuchsia")")"
-  exec unshare --user --mount --map-current-user --keep-caps "$tmp_multifuchsia" enter_helper "$multifuchsia_src" "$checkout" "$@"
+
+  local args=()
+
+  if [ ${ENTER_ISOLATED_NAMESPACE} == "true" ]; then
+    args+=( exec unshare --user --mount --map-current-user --keep-caps )
+  fi
+
+  args+=( "$tmp_multifuchsia" enter_helper "$multifuchsia_src" "$checkout" "$@" )
+
+  "${args[@]}"
 }
 
 function bind_mount() {
@@ -485,14 +516,23 @@ function cmd_enter_helper() {
     return 1
   fi
 
-  bind_mount "$checkout"
-  cd "$MOUNTPOINT"
-  export PATH="$MOUNTPOINT/.jiri_root/bin:$PATH"
+  # Optionally set up an isolated namespace.
+  if [ $ENTER_ISOLATED_NAMESPACE == "true" ]; then
+    bind_mount "$checkout"
+    cd "$MOUNTPOINT"
+    export PATH="$MOUNTPOINT/.jiri_root/bin:$PATH"
+
+    readonly goma_tmp_dir="$(./prebuilt/third_party/goma/linux-x64/gomacc tmp_dir)"
+    mount -t tmpfs isolated_goma "$goma_tmp_dir"
+    # goma complains about excessive permissions on this dir
+    chmod go-rwx "$goma_tmp_dir"
+  else
+    cd "$checkout"
+    export PATH="$checkout/.jiri_root/bin:$PATH"
+    export FUCHSIA_DIR="$checkout"
+  fi
+
   export MULTIFUCHSIA_ENTER_ENV="$(basename "$checkout")"
-  readonly goma_tmp_dir="$(./prebuilt/third_party/goma/linux-x64/gomacc tmp_dir)"
-  mount -t tmpfs isolated_goma "$goma_tmp_dir"
-  # goma complains about excessive permissions on this dir
-  chmod go-rwx "$goma_tmp_dir"
   # pick alternate ports so we don't interfere with the outside goma
   # default ports: 8089 19080
   # cron job ports: 8088 19081
@@ -538,7 +578,11 @@ function cmd_enter_helper() {
         ;;
     esac
   fi
-  ./scripts/fx goma_ctl ensure_stop
+
+  if grep -q "^ *use_goma = true" "$(./scripts/fx get-build-dir)/args.gn"; then
+    ./scripts/fx goma_ctl ensure_stop
+  fi
+
   return "$retcode"
 }
 
