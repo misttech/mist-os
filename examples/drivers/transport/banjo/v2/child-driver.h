@@ -6,7 +6,6 @@
 #define EXAMPLES_DRIVERS_TRANSPORT_BANJO_V2_CHILD_DRIVER_H_
 
 #include <fuchsia/examples/gizmo/cpp/banjo.h>
-#include <lib/driver/compat/cpp/compat.h>
 #include <lib/driver/component/cpp/driver_base.h>
 
 namespace banjo_transport {

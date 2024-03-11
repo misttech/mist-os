@@ -4,6 +4,7 @@
 
 #include "examples/drivers/transport/banjo/v2/child-driver.h"
 
+#include <lib/driver/compat/cpp/compat.h>
 #include <lib/driver/component/cpp/driver_export.h>
 #include <lib/driver/logging/cpp/structured_logger.h>
 

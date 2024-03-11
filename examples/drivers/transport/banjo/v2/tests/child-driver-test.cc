@@ -4,6 +4,7 @@
 
 #include "examples/drivers/transport/banjo/v2/child-driver.h"
 
+#include <lib/driver/compat/cpp/compat.h>
 #include <lib/driver/testing/cpp/fixtures/gtest_fixture.h>
 
 #include <ddktl/device.h>

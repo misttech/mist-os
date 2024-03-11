@@ -7,7 +7,6 @@
 
 #include <fuchsia/examples/gizmo/cpp/banjo.h>
 #include <lib/driver/compat/cpp/compat.h>
-#include <lib/driver/compat/cpp/symbols.h>
 #include <lib/driver/component/cpp/driver_base.h>
 
 #include <bind/fuchsia/platform/cpp/bind.h>

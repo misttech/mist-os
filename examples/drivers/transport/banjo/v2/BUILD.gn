@@ -19,10 +19,7 @@ fuchsia_driver("parent_driver") {
   deps = [
     "//examples/drivers/bind/bindlib:gizmo.example_cpp",
     "//examples/drivers/transport/banjo:fuchsia.examples.gizmo_banjo_cpp",
-    "//sdk/fidl/fuchsia.driver.compat:fuchsia.driver.compat_cpp",
-    "//sdk/fidl/fuchsia.driver.framework:fuchsia.driver.framework_cpp",
     "//sdk/lib/driver/compat/cpp",
-    "//sdk/lib/driver/compat/cpp:symbols",
     "//sdk/lib/driver/component/cpp:cpp",
     "//src/devices/bind/fuchsia.platform:fuchsia.platform_cpp",
     "//src/devices/lib/driver:driver_runtime",
@@ -54,7 +51,6 @@ fuchsia_driver("child_driver") {
   deps = [
     "//examples/drivers/transport/banjo:fuchsia.examples.gizmo_banjo_cpp",
     "//sdk/lib/driver/compat/cpp",
-    "//sdk/lib/driver/compat/cpp:symbols",
     "//sdk/lib/driver/component/cpp:cpp",
     "//src/devices/lib/driver:driver_runtime",
   ]
