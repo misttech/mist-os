@@ -21,6 +21,7 @@ pub mod loop_device;
 pub mod mem;
 pub mod misc;
 pub mod perfetto_consumer;
+pub mod sync_fence_registry;
 pub mod sync_file;
 pub mod terminal;
 pub mod uinput;

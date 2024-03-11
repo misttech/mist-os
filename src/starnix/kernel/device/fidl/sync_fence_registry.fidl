@@ -1,0 +1,51 @@
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+library fuchsia.starnix.device;
+
+using zx;
+
+/// Represent a SyncFence.
+type SyncFenceKey = resource struct {
+    value zx.Handle:EVENTPAIR;
+};
+
+const MAX_CREATE_FENCE_COUNT int32 = 64;
+
+/// This protocol is used to create Linux compatible fences for Fuchsia.
+///
+/// This protocol is "closed", but for this protocol we don't require
+/// cross-version source or ABI compatibility.
+///
+/// The registry service guarantees that the timestamp of event signal
+/// operations are accurately recorded. The timestamps are only available
+/// inside Starnix.
+///
+/// Any errors in methods result in channel closure.
+@discoverable
+closed protocol SyncFenceRegistry {
+    /// Batch create SyncFences. There is one-to-one correspondance between
+    /// `sync_fence_keys` and `events`. Each event is treated as the first
+    /// synchronization object that is backing a SyncFence. There may be
+    /// other events added later through SYNC_IOC_MERGE ioctl.
+    ///
+    /// Lifetime of SyncFence is defined by how long the client holds
+    /// SyncFenceKey.
+    strict CreateSyncFences(struct {
+        num_fences uint32;
+    }) -> (resource struct {
+        sync_fence_keys vector<SyncFenceKey>:MAX_CREATE_FENCE_COUNT;
+        events vector<zx.Handle:EVENT>:MAX_CREATE_FENCE_COUNT;
+    });
+
+    /// Registers an `event` for this SyncFenceKey. This event is expected to
+    /// be signaled iff all the underlying events associated with this
+    /// SyncFence are signaled.
+    ///
+    /// If `fence_key` is not found in the registry of created SyncFenceKeys or
+    /// dropped, `event` is signaled immediately.
+    strict RegisterSignaledEvent(resource struct {
+        fence_key SyncFenceKey;
+        event zx.Handle:EVENT;
+    });
+};

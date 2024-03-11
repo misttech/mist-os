@@ -8,6 +8,7 @@ use fidl_fuchsia_component_runner as frunner;
 use fidl_fuchsia_element as felement;
 use fidl_fuchsia_io as fio;
 use fidl_fuchsia_starnix_container as fstarcontainer;
+use fidl_fuchsia_starnix_device as fstardevice;
 use fuchsia_async::{
     DurationExt, {self as fasync},
 };
@@ -273,4 +274,42 @@ pub async fn serve_graphical_presenter(
         })
         .await
         .map_err(Error::from)
+}
+
+pub async fn serve_sync_fence_registry(
+    request_stream: fstardevice::SyncFenceRegistryRequestStream,
+    kernel: &Kernel,
+) -> Result<(), Error> {
+    let sync_fence_registry = kernel.sync_fence_registry.clone();
+    kernel.kthreads.spawner().spawn(|_, _| {
+        let mut executor = fasync::LocalExecutor::new();
+        let _ = executor.run_singlethreaded(async move {
+            request_stream
+                .try_for_each_concurrent(None, |event| async {
+                    match event {
+                        fstardevice::SyncFenceRegistryRequest::CreateSyncFences {
+                            num_fences,
+                            responder,
+                        } => {
+                            let (fence_keys, events) =
+                                sync_fence_registry.create_sync_fences(num_fences);
+                            let _ = responder.send(fence_keys, events);
+                        }
+
+                        fstardevice::SyncFenceRegistryRequest::RegisterSignaledEvent {
+                            fence_key,
+                            event,
+                            ..
+                        } => {
+                            sync_fence_registry.register_signaled_event(fence_key, event);
+                        }
+                    }
+                    Ok(())
+                })
+                .await
+                .map_err(Error::from)
+        });
+    });
+
+    Ok(())
 }

@@ -7,6 +7,7 @@ use crate::{
         framebuffer::{AspectRatio, Framebuffer},
         input::InputDevice,
         loop_device::LoopDeviceRegistry,
+        sync_fence_registry::SyncFenceRegistry,
         BinderDevice, DeviceMode, DeviceRegistry,
     },
     fs::proc::SystemLimits,
@@ -135,6 +136,10 @@ pub struct Kernel {
     /// When a component is run in that container and also specifies the `framebuffer` feature, the
     /// framebuffer will be served as the view of the component.
     pub framebuffer: Arc<Framebuffer>,
+
+    /// Implementation of fuchsia.starnix.device.SyncFenceRegistry. It is used to hold Linux
+    /// compatible fences for Fuchsia.
+    pub sync_fence_registry: Arc<SyncFenceRegistry>,
 
     /// An `InputDevice` that can be opened to read input events from Fuchsia.
     ///
@@ -321,6 +326,7 @@ impl Kernel {
             container_data_dir,
             loop_device_registry: Default::default(),
             framebuffer,
+            sync_fence_registry: SyncFenceRegistry::new(),
             input_device,
             binders: Default::default(),
             iptables: OrderedRwLock::new(IpTables::new()),

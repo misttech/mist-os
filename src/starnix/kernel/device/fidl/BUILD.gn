@@ -1,0 +1,15 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/fidl/fidl.gni")
+
+fidl("fuchsia.starnix.device") {
+  sdk_category = "excluded"
+  sources = [ "sync_fence_registry.fidl" ]
+  public_deps = [ "//zircon/vdso/zx" ]
+  enable_cpp = true
+  enable_hlcpp = true
+  enable_rust = true
+  visibility = [ "*" ]
+}
