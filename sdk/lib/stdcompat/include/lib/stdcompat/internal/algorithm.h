@@ -89,8 +89,8 @@ constexpr void sort(RandomIterator first, RandomIterator end, Comparator compari
   const auto reverse_comp = [&comparison](const auto& a, const auto& b) {
     return !comparison(a, b);
   };
-  make_heap(first, end, reverse_comp);
-  sort_heap(first, end, reverse_comp);
+  ::cpp20::internal::make_heap(first, end, reverse_comp);
+  ::cpp20::internal::sort_heap(first, end, reverse_comp);
 }
 
 template <typename ForwardIt, typename Comparator>
