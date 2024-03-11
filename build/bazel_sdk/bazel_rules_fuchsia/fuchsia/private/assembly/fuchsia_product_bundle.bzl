@@ -25,7 +25,9 @@ def fuchsia_product_bundle(
         *,
         name,
         board_name = None,
+        # Deprecated. Use product_bundle_name.
         product_name = None,
+        product_bundle_name = None,
         partitions_config = None,
         # Deprecated. Use main.
         product_image = None,
@@ -59,7 +61,7 @@ def fuchsia_product_bundle(
         board_name = board_name,
         partitions_config = partitions_config,
         product_image = main or product_image,
-        product_name = product_name,
+        product_name = product_bundle_name or product_name,
         **kwargs
     )
 
