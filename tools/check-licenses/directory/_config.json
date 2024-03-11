@@ -383,7 +383,6 @@
             {
                 "paths": [
                     "src/devices/tools/fidlgen_banjo/src/backends/templates",
-                    "tools/femu-control/femu-grpc/proto",
                     "src/devices/tools/fidlgen_banjo/src/backends/templates"
                 ],
                 "notes": [
