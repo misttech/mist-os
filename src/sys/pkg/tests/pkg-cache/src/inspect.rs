@@ -169,6 +169,7 @@ async fn dynamic_index_with_cache_packages() {
     let env = TestEnv::builder()
         .blobfs_from_system_image_and_extra_packages(&system_image_package, &[&cache_package])
         .await
+        .protect_dynamic_packages(true)
         .build()
         .await;
     env.block_until_started().await;
@@ -194,7 +195,7 @@ async fn dynamic_index_with_cache_packages() {
 
 #[fuchsia::test]
 async fn dynamic_index_needed_blobs() {
-    let env = TestEnv::builder().build().await;
+    let env = TestEnv::builder().protect_dynamic_packages(true).build().await;
     let pkg = PackageBuilder::new("single-blob").build().await.unwrap();
 
     let meta_blob_info = BlobInfo { blob_id: BlobId::from(*pkg.hash()).into(), length: 0 };
@@ -292,7 +293,7 @@ async fn dynamic_index_needed_blobs() {
 
 #[fuchsia::test]
 async fn dynamic_index_package_hash_update() {
-    let env = TestEnv::builder().build().await;
+    let env = TestEnv::builder().protect_dynamic_packages(true).build().await;
     let pkg = PackageBuilder::new("single-blob").build().await.unwrap();
 
     let meta_blob_info = BlobInfo { blob_id: BlobId::from(*pkg.hash()).into(), length: 0 };
@@ -793,7 +794,7 @@ async fn retained_index_updated_and_persisted() {
 
 #[fuchsia::test]
 async fn index_updated_mid_package_write() {
-    let env = TestEnv::builder().build().await;
+    let env = TestEnv::builder().protect_dynamic_packages(true).build().await;
     let package = PackageBuilder::new("multi-pkg-a")
         .add_resource_at("bin/foo", "a-bin-foo".as_bytes())
         .add_resource_at("data/content", "a-data-content".as_bytes())
