@@ -1,0 +1,21 @@
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+# inspect testing library
+
+package(default_visibility = ["//visibility:public"])
+
+cc_library(
+    name = "cpp",
+    srcs = [
+        "inspect.cc",
+    ],
+    hdrs = [
+        "inspect.h",
+    ],
+    deps = [
+        "@com_google_googletest//:gtest_main",
+        "@fuchsia_sdk//pkg/inspect",
+    ],
+)

@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <sdk/lib/inspect/testing/cpp/inspect.h>
+#include "inspect.h"
 
 using inspect::NodeValue;
 using inspect::PropertyValue;
@@ -155,7 +155,7 @@ void internal::PropertyListMatcher::DescribeNegationTo(::std::ostream* os) const
 }
 
 ::testing::Matcher<const PropertyValue&> BoolIs(const std::string& name,
-                                               ::testing::Matcher<bool> matcher) {
+                                                ::testing::Matcher<bool> matcher) {
   return ::testing::AllOf(
       ::testing::Property(&PropertyValue::name, ::testing::StrEq(name)),
       ::testing::Property(&PropertyValue::format, PropertyFormat::kBool),
