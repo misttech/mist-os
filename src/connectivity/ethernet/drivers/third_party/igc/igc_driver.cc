@@ -14,13 +14,25 @@
 #include "igc_driver.h"
 
 #include <fidl/fuchsia.hardware.network/cpp/wire.h>
-#include <lib/ddk/binding_driver.h>
+#include <fidl/fuchsia.hardware.pci/cpp/fidl.h>
+#include <lib/driver/component/cpp/driver_export.h>
+#include <lib/driver/component/cpp/node_add_args.h>
 #include <zircon/status.h>
 
 #include <fbl/auto_lock.h>
 
+// The io-buffer lib uses DFv1 logging which needs this symbol to link.
+__EXPORT
+__WEAK zx_driver_rec __zircon_driver_rec__ = {
+    .ops = {},
+    .driver = {},
+};
+
 namespace ethernet {
 namespace igc {
+
+namespace netdev = fuchsia_hardware_network;
+namespace netdriver = fuchsia_hardware_network_driver;
 
 constexpr char kNetDevDriverName[] = "igc-netdev";
 
@@ -42,50 +54,113 @@ constexpr static uint8_t kIgcRxPthresh = 8;
 constexpr static uint8_t kIgcRxHthresh = 8;
 constexpr static uint8_t kIgcRxWthresh = 4;
 
-IgcDriver::IgcDriver(zx_device_t* parent)
-    : parent_(parent),
-      netdev_impl_proto_{&this->network_device_impl_protocol_ops_, this},
-      mac_addr_proto_{&this->mac_addr_protocol_ops_, this} {
-  zx_status_t status = ZX_OK;
-  adapter_ = std::make_shared<struct adapter>();
+IgcDriver::IgcDriver(fdf::DriverStartArgs start_args,
+                     fdf::UnownedSynchronizedDispatcher driver_dispatcher)
+    : DriverBase("igc", std::move(start_args), std::move(driver_dispatcher)) {
+  for (auto& buffer : adapter_->buffers) {
+    buffer = {
+        .meta{
+            .port = kPortId,
+            .info = netdriver::wire::FrameInfo::WithNoInfo({}),
+            .frame_type = netdev::wire::FrameType::kEthernet,
+        },
+        .data{adapter_->rx_buffer_arena, 1u},
+    };
+  }
+}
 
-  // Set up PCI.
-  adapter_->osdep.pci = ddk::Pci(parent, "pci");
+IgcDriver::~IgcDriver() { Shutdown(); }
+
+void IgcDriver::Shutdown() {
+  State expected = State::Running;
+  if (!state_.compare_exchange_strong(expected, State::ShuttingDown)) {
+    // Already shutting down or shut down.
+    return;
+  }
+  // The driver release the control to firmware.
+  uint32_t ctrl_ext = IGC_READ_REG(&adapter_->hw, IGC_CTRL_EXT);
+  IGC_WRITE_REG(&adapter_->hw, IGC_CTRL_EXT, ctrl_ext & ~IGC_CTRL_EXT_DRV_LOAD);
+
+  igc_reset_hw(&adapter_->hw);
+  adapter_->osdep.pci.SetBusMastering(false);
+  io_buffer_release(&adapter_->desc_buffer);
+
+  irq_handler_.Cancel();
+
+  zx_handle_close(adapter_->btih);
+  zx_handle_close(adapter_->irqh);
+
+  state_ = State::ShutDown;
+}
+
+zx_status_t IgcDriver::ConfigurePci() {
+  zx::result pci_client_end = incoming()->Connect<fuchsia_hardware_pci::Service::Device>();
+  if (pci_client_end.is_error()) {
+    FDF_LOG(ERROR, "Failed to connect to PCI device: %s", pci_client_end.status_string());
+    return pci_client_end.status_value();
+  }
+
+  adapter_->osdep.pci = ddk::Pci(std::move(pci_client_end.value()));
   auto& pci = adapter_->osdep.pci;
 
   if (!pci.is_valid()) {
-    zxlogf(ERROR, "Failed to connect pci protocol.");
-    return;
+    FDF_LOG(ERROR, "Failed to connect pci protocol.");
+    return ZX_ERR_CONNECTION_REFUSED;
   }
 
-  status = pci.SetBusMastering(true);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "cannot enable bus master %d", status);
-    return;
+  if (zx_status_t status = pci.SetBusMastering(true); status != ZX_OK) {
+    FDF_LOG(ERROR, "cannot enable bus master %d", status);
+    return status;
   }
 
   zx::bti bti;
-  status = pci.GetBti(0, &bti);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "failed to get BTI");
-    return;
+  if (zx_status_t status = pci.GetBti(0, &bti); status != ZX_OK) {
+    FDF_LOG(ERROR, "failed to get BTI");
+    return status;
   }
   adapter_->btih = bti.release();
 
   // Request 1 interrupt of any mode.
-  status = pci.ConfigureInterruptMode(1, &adapter_->irq_mode);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "failed to configure irqs");
-    return;
+  if (zx_status_t status = pci.ConfigureInterruptMode(1, &adapter_->irq_mode); status != ZX_OK) {
+    FDF_LOG(ERROR, "failed to configure irqs");
+    return status;
   }
 
   zx::interrupt interrupt;
-  status = pci.MapInterrupt(0, &interrupt);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "failed to map irq");
-    return;
+  if (zx_status_t status = pci.MapInterrupt(0, &interrupt); status != ZX_OK) {
+    FDF_LOG(ERROR, "failed to map irq");
+    return status;
   }
   adapter_->irqh = interrupt.release();
+
+  return ZX_OK;
+}
+
+zx::result<> IgcDriver::Start() {
+  auto netdev_dispatcher =
+      fdf::UnsynchronizedDispatcher::Create({}, "igc-netdev", [](fdf_dispatcher_t*) {});
+  if (netdev_dispatcher.is_error()) {
+    FDF_LOG(ERROR, "Failed to create netdev dispatcher");
+    return netdev_dispatcher.take_error();
+  }
+  netdev_dispatcher_ = std::move(netdev_dispatcher.value());
+
+  return zx::make_result(Initialize());
+}
+
+void IgcDriver::PrepareStop(fdf::PrepareStopCompleter completer) {
+  Shutdown();
+  completer(zx::ok());
+}
+
+zx_status_t IgcDriver::Initialize() {
+  zx_status_t status = ZX_OK;
+
+  // Set up PCI.
+  if (status = ConfigurePci(); status != ZX_OK) {
+    FDF_LOG(ERROR, "failed to configure PCI: %s", zx_status_get_string(status));
+    return status;
+  }
 
   vmo_store::Options options = {
       .map =
@@ -101,36 +176,23 @@ IgcDriver::IgcDriver(zx_device_t* parent)
           },
   };
 
-  // Initialize VmoStore.
-  vmo_store_ = std::make_unique<VmoStore>(options);
+  {
+    // Initialize VmoStore.
+    fbl::AutoLock vmo_lock(&vmo_lock_);
+    vmo_store_ = std::make_unique<VmoStore>(options);
 
-  if (status = vmo_store_->Reserve(MAX_VMOS); status != ZX_OK) {
-    zxlogf(ERROR, "failed to reserve the capacity of VmoStore to MAX_VMOS: %s",
-           zx_status_get_string(status));
-    return;
+    if (status = vmo_store_->Reserve(netdriver::wire::kMaxVmos); status != ZX_OK) {
+      FDF_LOG(ERROR, "failed to reserve the capacity of VmoStore to max VMOs (%u): %s",
+              netdriver::wire::kMaxVmos, zx_status_get_string(status));
+      return status;
+    }
   }
 
-  // Explicitly initialize rx/tx info buffers with 0s.
-  memset(rx_buffers_, 0, sizeof(rx_buffers_));
-  memset(tx_buffers_, 0, sizeof(tx_buffers_));
-}
-
-IgcDriver::~IgcDriver() {
-  // The driver release the control to firmware.
-  uint32_t ctrl_ext = IGC_READ_REG(&adapter_->hw, IGC_CTRL_EXT);
-  IGC_WRITE_REG(&adapter_->hw, IGC_CTRL_EXT, ctrl_ext & ~IGC_CTRL_EXT_DRV_LOAD);
-
-  igc_reset_hw(&adapter_->hw);
-  adapter_->osdep.pci.SetBusMastering(false);
-  io_buffer_release(&adapter_->desc_buffer);
-  zx_handle_close(adapter_->btih);
-  zx_handle_close(adapter_->irqh);
-}
-
-void IgcDriver::Release() { delete this; }
-
-zx_status_t IgcDriver::Init() {
-  zx_status_t status = ZX_OK;
+  if (zx::result result = compat_server_.Initialize(incoming(), outgoing(), node_name(), name());
+      result.is_error()) {
+    FDF_LOG(ERROR, "Failed to initialize compatibility server: %s", result.status_string());
+    return result.error_value();
+  }
 
   // Get and store hardware infomation.
   IdentifyHardware();
@@ -160,9 +222,9 @@ zx_status_t IgcDriver::Init() {
 
   /* Check SOL/IDER usage */
   if (igc_check_reset_block(hw))
-    zxlogf(ERROR,
-           "PHY reset is blocked"
-           " due to SOL/IDER session.\n");
+    FDF_LOG(ERROR,
+            "PHY reset is blocked"
+            " due to SOL/IDER session.\n");
 
   /*
   ** Start from a known state, this is
@@ -180,7 +242,7 @@ zx_status_t IgcDriver::Init() {
     ** if it fails a second time its a real issue.
     */
     if (igc_validate_nvm_checksum(hw) < 0) {
-      zxlogf(ERROR, "The EEPROM Checksum Is Not Valid\n");
+      FDF_LOG(ERROR, "The EEPROM Checksum Is Not Valid\n");
       // TODO: Clean up states at these places.
       return ZX_ERR_INTERNAL;
     }
@@ -188,14 +250,14 @@ zx_status_t IgcDriver::Init() {
 
   /* Copy the permanent MAC address out of the EEPROM */
   if (igc_read_mac_addr(hw) < 0) {
-    zxlogf(ERROR,
-           "EEPROM read error while reading MAC"
-           " address\n");
+    FDF_LOG(ERROR,
+            "EEPROM read error while reading MAC"
+            " address\n");
     return ZX_ERR_INTERNAL;
   }
 
   if (!IsValidEthernetAddr(hw->mac.addr)) {
-    zxlogf(ERROR, "Invalid MAC address\n");
+    FDF_LOG(ERROR, "Invalid MAC address\n");
     return ZX_ERR_INTERNAL;
   }
 
@@ -203,7 +265,7 @@ zx_status_t IgcDriver::Init() {
   if ((status = io_buffer_init(&adapter_->desc_buffer, adapter_->btih,
                                kEthTxDescBufTotalSize + kEthRxDescBufTotalSize,
                                IO_BUFFER_RW | IO_BUFFER_CONTIG)) != ZX_OK) {
-    zxlogf(ERROR, "Failed initializing io_buffer: %s", zx_status_get_string(status));
+    FDF_LOG(ERROR, "Failed initializing io_buffer: %s", zx_status_get_string(status));
     return status;
   }
 
@@ -238,33 +300,58 @@ zx_status_t IgcDriver::Init() {
   uint32_t ctrl_ext = IGC_READ_REG(hw, IGC_CTRL_EXT);
   IGC_WRITE_REG(hw, IGC_CTRL_EXT, ctrl_ext | IGC_CTRL_EXT_DRV_LOAD);
 
-  thrd_create_with_name(&adapter_->thread, IgcDriver::IgcIrqThreadFunc, this, "igc_irq_thread");
-  thrd_detach(adapter_->thread);
-
-  // Enable interrupts.
-  u32 ims_mask = IMS_ENABLE_MASK;
-  IGC_WRITE_REG(hw, IGC_IMS, ims_mask);
+  irq_handler_.set_object(adapter_->irqh);
+  if (status = irq_handler_.Begin(dispatcher()); status != ZX_OK) {
+    FDF_LOG(ERROR, "Failed to begin IRQ handling: %s", zx_status_get_string(status));
+    return status;
+  }
 
   OnlineStatusUpdate();
 
-  // Add network device.
-  static zx_protocol_device_t network_device_ops = {
-      .version = DEVICE_OPS_VERSION,
-      .release = [](void* ctx) { static_cast<IgcDriver*>(ctx)->Release(); },
-  };
-
-  device_add_args_t netDevArgs = {};
-  netDevArgs.version = DEVICE_ADD_ARGS_VERSION;
-  netDevArgs.name = kNetDevDriverName;
-  netDevArgs.ctx = this;
-  netDevArgs.ops = &network_device_ops;
-  netDevArgs.proto_id = ZX_PROTOCOL_NETWORK_DEVICE_IMPL;
-  netDevArgs.proto_ops = netdev_impl_proto_.ops;
-
-  if ((status = device_add(parent_, &netDevArgs, &device_)) != ZX_OK) {
-    zxlogf(ERROR, "Failed adding network device: %s", zx_status_get_string(status));
+  if (status = AddNetworkDevice(); status != ZX_OK) {
+    FDF_LOG(ERROR, "Failed to add network device: %s", zx_status_get_string(status));
     return status;
   }
+
+  return ZX_OK;
+}
+
+zx_status_t IgcDriver::AddNetworkDevice() {
+  netdriver::Service::InstanceHandler handler(
+      {.network_device_impl = [this](fdf::ServerEnd<netdriver::NetworkDeviceImpl> server_end) {
+        netdev_binding_ = fdf::BindServer(netdev_dispatcher_.get(), std::move(server_end), this);
+      }});
+
+  if (zx::result result = outgoing()->AddService<netdriver::Service>(std::move(handler));
+      result.is_error()) {
+    FDF_LOG(ERROR, "Failed to add network device service to outgoing directory: %s",
+            result.status_string());
+    return result.error_value();
+  }
+
+  fidl::Arena arena;
+  std::vector<fuchsia_driver_framework::wire::Offer> offers = compat_server_.CreateOffers2(arena);
+  offers.push_back(fdf::MakeOffer2<netdriver::Service>(arena, component::kDefaultInstance));
+
+  auto args = fuchsia_driver_framework::wire::NodeAddArgs::Builder(arena)
+                  .name(kNetDevDriverName)
+                  .offers2(arena, std::move(offers))
+                  .Build();
+
+  auto endpoints = fidl::CreateEndpoints<fuchsia_driver_framework::NodeController>();
+  if (endpoints.is_error()) {
+    FDF_LOG(ERROR, "Failed to create node controller endpoints: %s", endpoints.status_string());
+    return endpoints.error_value();
+  }
+
+  if (fidl::WireResult result =
+          fidl::WireCall(node())->AddChild(args, std::move(endpoints->server), {});
+      !result.ok()) {
+    FDF_LOG(ERROR, "Failed to add network device child: %s", result.FormatDescription().c_str());
+    return result.status();
+  }
+
+  controller_.Bind(std::move(endpoints->client), dispatcher());
 
   return ZX_OK;
 }
@@ -279,7 +366,7 @@ void IgcDriver::IdentifyHardware() {
   fuchsia_hardware_pci::wire::DeviceInfo pci_info;
   zx_status_t status = pci.GetDeviceInfo(&pci_info);
   if (status != ZX_OK) {
-    zxlogf(ERROR, "pci_get_device_info failure");
+    FDF_LOG(ERROR, "pci_get_device_info failure");
     return;
   }
 
@@ -291,7 +378,7 @@ void IgcDriver::IdentifyHardware() {
 
   // Do shared code init and setup.
   if (igc_set_mac_type(hw)) {
-    zxlogf(ERROR, "igc_set_mac_type init failure");
+    FDF_LOG(ERROR, "igc_set_mac_type init failure");
     return;
   }
 }
@@ -303,7 +390,7 @@ zx_status_t IgcDriver::AllocatePCIResources() {
   zx_status_t status =
       pci.MapMmio(0u, ZX_CACHE_POLICY_UNCACHED_DEVICE, &adapter_->osdep.mmio_buffer);
   if (status != ZX_OK) {
-    zxlogf(ERROR, "PCI cannot map io %d", status);
+    FDF_LOG(ERROR, "PCI cannot map io %d", status);
     return status;
   }
 
@@ -463,11 +550,22 @@ bool IgcDriver::IsValidEthernetAddr(uint8_t* addr) {
 
 void IgcDriver::ReapTxBuffers() {
   std::lock_guard lock(adapter_->tx_lock);
-  // Allocate the result array with max tx buffer pool size which is 256.
-  tx_result_t results[kEthTxBufCount];
-  uint32_t& n = adapter_->txh_ind;
-  size_t reap_count = 0;
+  // Assume TX depth here to simplify this and avoid having to deal with batching.
+  static_assert(kEthTxBufCount < netdriver::wire::kMaxTxResults,
+                "TX depth exceeds maximum TX results that can be completed");
 
+  // Allocate the result array with max tx buffer pool size. Indicate a size for the arena so that
+  // data is located on the stack whenever possible to avoid memory allocation.
+  constexpr size_t kArenaSize =
+      fidl::MaxSizeInChannel<netdriver::wire::NetworkDeviceIfcCompleteTxRequest,
+                             fidl::MessageDirection::kSending>();
+  fidl::Arena<kArenaSize> arena;
+
+  fidl::VectorView<netdriver::wire::TxResult> results(arena, kEthTxBufCount);
+
+  uint32_t& n = adapter_->txh_ind;
+
+  size_t reap_count = 0;
   while (adapter_->txdr[n].upper.fields.status & IGC_TXD_STAT_DD) {
     adapter_->txdr[n].upper.fields.status = 0;
     results[reap_count].id = tx_buffers_[n].buffer_id;
@@ -480,69 +578,84 @@ void IgcDriver::ReapTxBuffers() {
     reap_count++;
     n = (n + 1) & (kEthTxDescRingCount - 1);
   }
-  adapter_->netdev_ifc.CompleteTx(results, reap_count);
+  if (reap_count > 0) {
+    results.set_count(reap_count);
+    fdf::Arena fdf_arena(0u);
+    if (fidl::OneWayStatus status = adapter_->netdev_ifc.buffer(fdf_arena)->CompleteTx(results);
+        !status.ok()) {
+      FDF_LOG(ERROR, "Failed to complete TX: %s", status.FormatDescription().c_str());
+      return;
+    }
+  }
 }
 
 bool IgcDriver::OnlineStatusUpdate() {
-  std::lock_guard lock(online_mutex_);
   bool new_status = IGC_READ_REG(&adapter_->hw, IGC_STATUS) & IGC_STATUS_LU;
-  if (new_status == online_) {
-    return false;
-  }
-  online_ = new_status;
-  return true;
+  bool old_status = online_.exchange(new_status);
+  return new_status != old_status;
 }
 
 // NetworkDevice::Callbacks implementations
-void IgcDriver::NetworkDeviceImplInit(const network_device_ifc_protocol_t* iface,
-                                      network_device_impl_init_callback callback, void* cookie) {
-  adapter_->netdev_ifc = ::ddk::NetworkDeviceIfcProtocolClient(iface);
+void IgcDriver::Init(netdriver::wire::NetworkDeviceImplInitRequest* request, fdf::Arena& arena,
+                     InitCompleter::Sync& completer) {
+  adapter_->netdev_ifc.Bind(std::move(request->iface), driver_dispatcher()->get());
 
-  using Context = std::tuple<network_device_impl_init_callback, void*>;
-  std::unique_ptr context = std::make_unique<Context>(callback, cookie);
-
-  adapter_->netdev_ifc.AddPort(
-      kPortId, this, &network_port_protocol_ops_,
-      [](void* ctx, zx_status_t status) {
-        std::unique_ptr<Context> context(static_cast<Context*>(ctx));
-        auto [callback, cookie] = *context;
-        if (status != ZX_OK) {
-          zxlogf(ERROR, "Failed to add port: %s", zx_status_get_string(status));
+  auto endpoints = fdf::CreateEndpoints<netdriver::NetworkPort>();
+  if (endpoints.is_error()) {
+    FDF_LOG(ERROR, "Failed to create network port endpoints: %s", endpoints.status_string());
+    completer.buffer(arena).Reply(endpoints.status_value());
+    return;
+  }
+  port_binding_ = fdf::BindServer(netdev_dispatcher_.get(), std::move(endpoints->server), this);
+  adapter_->netdev_ifc.buffer(arena)
+      ->AddPort(kPortId, std::move(endpoints->client))
+      .Then([this, completer = completer.ToAsync()](
+                fdf::WireUnownedResult<netdriver::NetworkDeviceIfc::AddPort>& result) mutable {
+        fdf::Arena arena(0u);
+        if (!result.ok()) {
+          FDF_LOG(ERROR, "Failed to add port: %s", result.FormatDescription().c_str());
         }
-        callback(cookie, status);
-      },
-      context.release());
+        completer.buffer(arena).Reply(result.status());
+        // Enable the interrupt now that the data path is set up. It's not safe to enable
+        // it before netdev_ifc is bound because the interrupt handler uses it.
+        EnableInterrupt();
+      });
 }
 
-void IgcDriver::NetworkDeviceImplStart(network_device_impl_start_callback callback, void* cookie) {
-  std::lock_guard lock(started_mutex_);
+void IgcDriver::Start(fdf::Arena& arena, StartCompleter::Sync& completer) {
   started_ = true;
-  callback(cookie, ZX_OK);
+  completer.buffer(arena).Reply(ZX_OK);
 }
 
-void IgcDriver::NetworkDeviceImplStop(network_device_impl_stop_callback callback, void* cookie) {
-  std::lock_guard lock(started_mutex_);
+void IgcDriver::Stop(fdf::Arena& arena, StopCompleter::Sync& completer) {
   started_ = false;
   {
     // Reclaim all the buffers queued in rx descriptor ring.
     std::lock_guard lock(adapter_->rx_lock);
-    rx_buffer_t buffers[kEthRxBufCount];
-    rx_buffer_part_t buffer_parts[std::size(buffers)];
-    size_t buf_idx = 0;
+    // Assume RX depth here to simplify this and avoid having to deal with batching.
+    static_assert(kEthRxBufCount < netdriver::wire::kMaxRxBuffers,
+                  "RX depth exceeds maximum RX buffers that can be completed.");
+    // Just use the provided arena here, no need to try to optimize this by trying to get everything
+    // allocated on the stack. This is not part of the critical path.
+    fidl::VectorView<netdriver::wire::RxBuffer> buffers(arena, kEthRxBufCount);
 
+    size_t buf_idx = 0;
     uint32_t& rxh = adapter_->rxh_ind;
     const uint32_t& rxt = adapter_->rxt_ind;
 
     while (rxh != rxt) {
       // Populate empty buffers.
+      fidl::VectorView<netdriver::wire::RxBufferPart> parts(arena, 1);
+      parts[0] = {.id = rx_buffers_[rxh].buffer_id, .offset = 0, .length = 0};
+
       buffers[buf_idx] = {
-          .meta{.port = kPortId,
-                .frame_type =
-                    static_cast<uint8_t>(::fuchsia_hardware_network::wire::FrameType::kEthernet)},
-          .data_list = &buffer_parts[buf_idx],
-          .data_count = 1,
+          .meta{
+              .port = kPortId,
+              .info = netdriver::wire::FrameInfo::WithNoInfo({}),
+              .frame_type = netdev::wire::FrameType::kEthernet,
+          },
+          .data = parts,
       };
-      buffer_parts[buf_idx] = {.id = rx_buffers_[rxh].buffer_id, .offset = 0, .length = 0};
 
       rx_buffers_[rxh].available = false;
       // Clean up the status flag in rx descriptor.
@@ -551,12 +664,26 @@ void IgcDriver::NetworkDeviceImplStop(network_device_impl_stop_callback callback
       buf_idx++;
       ZX_ASSERT_MSG(buf_idx <= kEthRxBufCount, "buf_idx: %zu", buf_idx);
     }
-    adapter_->netdev_ifc.CompleteRx(buffers, buf_idx);
+    if (buf_idx > 0) {
+      buffers.set_count(buf_idx);
+      if (fidl::OneWayStatus status = adapter_->netdev_ifc.buffer(arena)->CompleteRx(buffers);
+          !status.ok()) {
+        FDF_LOG(ERROR, "Failed to complete RX buffers during stop: %s",
+                status.FormatDescription().c_str());
+        // Attempt to complete the rest of the stop operation. We can't indicate an error anyway.
+      }
+    }
   }
 
   // Reclaim all tx buffers. Tx data path is protected by start lock.
+  // Assume TX depth here to simplify this and avoid having to deal with batching.
+  static_assert(kEthTxBufCount < netdriver::wire::kMaxTxResults,
+                "TX depth exceeds maximum TX results that can be completed");
+  // Just use the provided arena here, no need to try to optimize this by trying to get everything
+  // allocated on the stack. This is not part of the critical path.
+  fidl::VectorView<netdriver::wire::TxResult> results(arena, kEthTxBufCount);
+
   size_t res_idx = 0;
-  tx_result_t results[kEthTxBufCount];
   uint32_t& txh = adapter_->txh_ind;
   const uint32_t& txt = adapter_->txt_ind;
   while (txh != txt) {
@@ -566,49 +693,64 @@ void IgcDriver::NetworkDeviceImplStop(network_device_impl_stop_callback callback
     res_idx++;
     txh = (txh + 1) & (kEthTxDescRingCount - 1);
   }
-  adapter_->netdev_ifc.CompleteTx(results, res_idx);
-
-  callback(cookie);
+  if (res_idx > 0) {
+    results.set_count(res_idx);
+    if (fidl::OneWayStatus status = adapter_->netdev_ifc.buffer(arena)->CompleteTx(results);
+        !status.ok()) {
+      FDF_LOG(ERROR, "Failed to complete TX during stop: %s", status.FormatDescription().c_str());
+    }
+  }
+  completer.buffer(arena).Reply();
 }
 
-void IgcDriver::NetworkDeviceImplGetInfo(device_impl_info_t* out_info) {
-  memset(out_info, 0, sizeof(*out_info));
-  out_info->tx_depth = kEthTxBufCount;
-  out_info->rx_depth = kEthRxBufCount;
-  out_info->rx_threshold = out_info->rx_depth / 2;
-  out_info->max_buffer_parts = 1;
-  out_info->max_buffer_length = ZX_PAGE_SIZE / 2;
-  out_info->buffer_alignment = ZX_PAGE_SIZE / 2;
-  out_info->min_rx_buffer_length = 2048;
-  out_info->min_tx_buffer_length = 60;
+void IgcDriver::GetInfo(
+    fdf::Arena& arena,
+    fdf::WireServer<netdriver::NetworkDeviceImpl>::GetInfoCompleter::Sync& completer) {
+  fidl::WireTableBuilder builder = netdriver::wire::DeviceImplInfo::Builder(arena);
+  builder.tx_depth(kEthTxBufCount)
+      .rx_depth(kEthRxBufCount)
+      .rx_threshold(kEthRxBufCount / 2)
+      .max_buffer_parts(1)
+      .max_buffer_length(ZX_PAGE_SIZE / 2)
+      .buffer_alignment(ZX_PAGE_SIZE / 2)
+      .min_rx_buffer_length(2048)
+      .min_tx_buffer_length(60)
+      .tx_head_length(0)
+      .tx_tail_length(0);
 
-  out_info->tx_head_length = 0;
-  out_info->tx_tail_length = 0;
-  // No hardware acceleration supported yet.
-  out_info->rx_accel_count = 0;
-  out_info->tx_accel_count = 0;
+  completer.buffer(arena).Reply(builder.Build());
 }
 
-void IgcDriver::NetworkDeviceImplQueueTx(const tx_buffer_t* buffers_list, size_t buffers_count) {
+void IgcDriver::QueueTx(netdriver::wire::NetworkDeviceImplQueueTxRequest* request,
+                        fdf::Arena& arena, QueueTxCompleter::Sync& completer) {
   network::SharedAutoLock autp_lock(&vmo_lock_);
   std::lock_guard tx_lock(adapter_->tx_lock);
-  std::lock_guard start_lock(started_mutex_);
-  if (!started_) {
-    std::vector<tx_result_t> results(buffers_count);
-    for (size_t i = 0; i < buffers_count; ++i) {
-      results[i].id = buffers_list[i].id;
+  if (!started_.load(std::memory_order_relaxed)) {
+    if (request->buffers.empty()) {
+      return;
+    }
+
+    // Assume TX depth here to simplify this and avoid having to deal with batching.
+    static_assert(kEthTxBufCount < netdriver::wire::kMaxTxResults,
+                  "TX depth exceeds maximum TX results that can be completed");
+    fidl::VectorView<netdriver::wire::TxResult> results(arena, request->buffers.count());
+
+    for (size_t i = 0; i < request->buffers.count(); ++i) {
+      results[i].id = request->buffers[i].id;
       results[i].status = ZX_ERR_UNAVAILABLE;
     }
-    adapter_->netdev_ifc.CompleteTx(results.data(), results.size());
+    if (fidl::OneWayStatus status = adapter_->netdev_ifc.buffer(arena)->CompleteTx(results);
+        !status.ok()) {
+      FDF_LOG(ERROR, "Failed to complete TX: %s", status.FormatDescription().c_str());
+    }
     return;
   }
 
   uint32_t& n = adapter_->txt_ind;
-  for (size_t i = 0; i < buffers_count; i++) {
-    const tx_buffer_t& buffer = buffers_list[i];
-    ZX_ASSERT_MSG(buffer.data_count == 1,
+  for (const auto& buffer : request->buffers) {
+    ZX_ASSERT_MSG(buffer.data.count() == 1,
                   "Tx buffer contains multiple regions, which does not fit the configuration.");
-    const buffer_region_t& region = buffer.data_list[0];
+    const netdriver::wire::BufferRegion& region = buffer.data[0];
     // Get physical address of buffers from region data.
     VmoStore::StoredVmo* stored_vmo = vmo_store_->GetVmo(region.vmo);
     ZX_ASSERT_MSG(stored_vmo != nullptr, "invalid VMO id %d", region.vmo);
@@ -635,16 +777,14 @@ void IgcDriver::NetworkDeviceImplQueueTx(const tx_buffer_t* buffers_list, size_t
   IGC_WRITE_REG(&adapter_->hw, IGC_TDT(0), n);
 }
 
-void IgcDriver::NetworkDeviceImplQueueRxSpace(const rx_space_buffer_t* buffers_list,
-                                              size_t buffers_count) {
+void IgcDriver::QueueRxSpace(netdriver::wire::NetworkDeviceImplQueueRxSpaceRequest* request,
+                             fdf::Arena& arena, QueueRxSpaceCompleter::Sync& completer) {
   network::SharedAutoLock autp_lock(&vmo_lock_);
   std::lock_guard lock(adapter_->rx_lock);
-
   // Get current rx descriptor ring tail index.
   uint32_t& rxdr_tail = adapter_->rxt_ind;
-  for (size_t i = 0; i < buffers_count; i++) {
-    const rx_space_buffer_t& buffer = buffers_list[i];
-    const buffer_region_t& vmo_region = buffer.region;
+  for (const auto& buffer : request->buffers) {
+    const netdriver::wire::BufferRegion& vmo_region = buffer.region;
 
     // Store the buffer id info into internal buffer info array. It will be used by the interrupt
     // thread for reporting received buffers.
@@ -672,7 +812,7 @@ void IgcDriver::NetworkDeviceImplQueueRxSpace(const rx_space_buffer_t* buffers_l
     cur_desc->wb.upper.status_error = 0;
 
     // Increase the tail index of rx descriptor ring, note that after this loop ends, rxdr_tail
-    // should points to the desciptor right after the last ready-to-write buffer's descriptor.
+    // should points to the descriptor right after the last ready-to-write buffer's descriptor.
     rxdr_tail = (rxdr_tail + 1) & (kEthRxBufCount - 1);
   }
 
@@ -681,209 +821,188 @@ void IgcDriver::NetworkDeviceImplQueueRxSpace(const rx_space_buffer_t* buffers_l
   IGC_WRITE_REG(&adapter_->hw, IGC_RDT(0), rxdr_tail - 1);
 }
 
-void IgcDriver::NetworkDeviceImplPrepareVmo(uint8_t id, zx::vmo vmo,
-                                            network_device_impl_prepare_vmo_callback callback,
-                                            void* cookie) {
+void IgcDriver::PrepareVmo(netdriver::wire::NetworkDeviceImplPrepareVmoRequest* request,
+                           fdf::Arena& arena, PrepareVmoCompleter::Sync& completer) {
   size_t size;
-  vmo.get_size(&size);
+  request->vmo.get_size(&size);
   fbl::AutoLock vmo_lock(&vmo_lock_);
-
-  zx_status_t status = vmo_store_->RegisterWithKey(id, std::move(vmo));
+  zx_status_t status = vmo_store_->RegisterWithKey(request->id, std::move(request->vmo));
   if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to store VMO(with mapping and pinning): %s",
-           zx_status_get_string(status));
-    callback(cookie, status);
+    FDF_LOG(ERROR, "Failed to store VMO(with mapping and pinning): %s",
+            zx_status_get_string(status));
+    completer.buffer(arena).Reply(status);
     return;
   }
-  callback(cookie, ZX_OK);
+  completer.buffer(arena).Reply(ZX_OK);
 }
 
-void IgcDriver::NetworkDeviceImplReleaseVmo(uint8_t vmo_id) {
+void IgcDriver::ReleaseVmo(netdriver::wire::NetworkDeviceImplReleaseVmoRequest* request,
+                           fdf::Arena& arena, ReleaseVmoCompleter::Sync& completer) {
   fbl::AutoLock vmo_lock(&vmo_lock_);
-  zx::result<zx::vmo> status = vmo_store_->Unregister(vmo_id);
+  zx::result<zx::vmo> status = vmo_store_->Unregister(request->id);
   if (status.status_value() != ZX_OK) {
-    zxlogf(ERROR, "Failed to release VMO: %s", status.status_string());
+    FDF_LOG(ERROR, "Failed to release VMO: %s", status.status_string());
   }
+  completer.buffer(arena).Reply();
 }
 
-void IgcDriver::NetworkDeviceImplSetSnoop(bool snoop) {}
+void IgcDriver::SetSnoop(netdriver::wire::NetworkDeviceImplSetSnoopRequest* request,
+                         fdf::Arena& arena, SetSnoopCompleter::Sync& completer) {}
 
-constexpr uint8_t kRxTypesList[] = {
-    static_cast<uint8_t>(fuchsia_hardware_network::wire::FrameType::kEthernet)};
-constexpr frame_type_support_t kTxTypesList[] = {{
-    .type = static_cast<uint8_t>(fuchsia_hardware_network::wire::FrameType::kEthernet),
-    .features = fuchsia_hardware_network::wire::kFrameFeaturesRaw,
-    .supported_flags = 0,
+constexpr netdev::wire::FrameType kRxTypes[] = {netdev::wire::FrameType::kEthernet};
+constexpr netdev::wire::FrameTypeSupport kTxTypes[] = {{
+    .type = netdev::wire::FrameType::kEthernet,
+    .features = netdev::wire::kFrameFeaturesRaw,
+    .supported_flags = netdev::wire::TxFlags{},
 }};
 
 // NetworkPort protocol implementations.
-void IgcDriver::NetworkPortGetInfo(port_base_info_t* out_info) {
-  *out_info = {
-      .port_class = static_cast<uint32_t>(fuchsia_hardware_network::wire::DeviceClass::kEthernet),
-      .rx_types_list = kRxTypesList,
-      .rx_types_count = std::size(kRxTypesList),
-      .tx_types_list = kTxTypesList,
-      .tx_types_count = std::size(kTxTypesList),
-  };
+void IgcDriver::GetInfo(
+    fdf::Arena& arena, fdf::WireServer<netdriver::NetworkPort>::GetInfoCompleter::Sync& completer) {
+  fidl::WireTableBuilder builder = netdev::wire::PortBaseInfo::Builder(arena);
+  builder.port_class(netdev::wire::DeviceClass::kEthernet).tx_types(kTxTypes).rx_types(kRxTypes);
+
+  completer.buffer(arena).Reply(builder.Build());
 }
 
-void IgcDriver::NetworkPortGetStatus(port_status_t* out_status) {
+void IgcDriver::GetStatus(fdf::Arena& arena, GetStatusCompleter::Sync& completer) {
   OnlineStatusUpdate();
-  *out_status = {
-      .flags =
-          online_ ? static_cast<uint32_t>(fuchsia_hardware_network::wire::StatusFlags::kOnline) : 0,
-      .mtu = kEtherMtu,
-  };
+
+  auto builder = netdev::wire::PortStatus::Builder(arena);
+  builder.mtu(kEtherMtu).flags(online_ ? netdev::wire::StatusFlags::kOnline
+                                       : netdev::wire::StatusFlags{});
+
+  completer.buffer(arena).Reply(builder.Build());
 }
 
-void IgcDriver::NetworkPortSetActive(bool active) { /* Do nothing here.*/
-}
+void IgcDriver::SetActive(netdriver::wire::NetworkPortSetActiveRequest* request, fdf::Arena& arena,
+                          SetActiveCompleter::Sync& completer) { /* Do nothing here.*/ }
 
-void IgcDriver::NetworkPortGetMac(mac_addr_protocol_t** out_mac_ifc) {
-  if (out_mac_ifc) {
-    *out_mac_ifc = &mac_addr_proto_;
+void IgcDriver::GetMac(fdf::Arena& arena, GetMacCompleter::Sync& completer) {
+  zx::result endpoints = fdf::CreateEndpoints<netdriver::MacAddr>();
+  if (endpoints.is_error()) {
+    FDF_LOG(ERROR, "Failed to create MacAddr endpoints: %s", endpoints.status_string());
+    completer.Close(endpoints.error_value());
+    return;
   }
+  mac_binding_ = fdf::BindServer(netdev_dispatcher_.get(), std::move(endpoints->server), this);
+  completer.buffer(arena).Reply(std::move(endpoints->client));
 }
 
-void IgcDriver::NetworkPortRemoved() { /* Do nothing here, we don't remove port in this driver.*/
+void IgcDriver::Removed(
+    fdf::Arena& arena,
+    RemovedCompleter::Sync& completer) { /* Do nothing here, we don't remove port in this driver.*/
 }
 
-void IgcDriver::MacAddrGetAddress(mac_address_t* out_mac) {
-  memcpy(out_mac->octets, adapter_->hw.mac.addr, kEtherAddrLen);
+void IgcDriver::GetAddress(fdf::Arena& arena, GetAddressCompleter::Sync& completer) {
+  fuchsia_net::wire::MacAddress mac;
+  memcpy(mac.octets.data(), adapter_->hw.mac.addr, kEtherAddrLen);
+  completer.buffer(arena).Reply(mac);
 }
 
-void IgcDriver::MacAddrGetFeatures(features_t* out_features) {
-  *out_features = {
-      .multicast_filter_count = 0,
-      .supported_modes = SUPPORTED_MAC_FILTER_MODE_PROMISCUOUS,
-  };
+void IgcDriver::GetFeatures(fdf::Arena& arena, GetFeaturesCompleter::Sync& completer) {
+  fidl::WireTableBuilder builder = netdriver::wire::Features::Builder(arena);
+
+  builder.multicast_filter_count(0).supported_modes(
+      netdriver::wire::SupportedMacFilterMode::kPromiscuous);
+
+  completer.buffer(arena).Reply(builder.Build());
 }
 
-void IgcDriver::MacAddrSetMode(mac_filter_mode_t mode, const mac_address_t* multicast_macs_list,
-                               size_t multicast_macs_count) {
+void IgcDriver::SetMode(netdriver::wire::MacAddrSetModeRequest* request, fdf::Arena& arena,
+                        SetModeCompleter::Sync& completer) {
   /* Do nothing here.*/
+  completer.buffer(arena).Reply();
 }
 
-int IgcDriver::IgcIrqThreadFunc(void* arg) {
-  auto drv = static_cast<IgcDriver*>(arg);
-  std::shared_ptr<ethernet::igc::IgcDriver::adapter> adapter = drv->Adapter();
-  struct igc_hw* hw = &adapter->hw;
+void IgcDriver::EnableInterrupt() { IGC_WRITE_REG(&adapter_->hw, IGC_IMS, IMS_ENABLE_MASK); }
 
-  // Allocate a buffer array at half of the rx buffer ring size, and this limits the maximum number
-  // of packets that the driver passes up in one batch.
-  constexpr size_t kRxBuffersPerBatch = kEthRxBufCount / 2;
-  rx_buffer_t buffers[kRxBuffersPerBatch];
-  rx_buffer_part_t buffer_parts[std::size(buffers)];
+void IgcDriver::HandleIrq(async_dispatcher_t* dispatcher, async::IrqBase* irq_base,
+                          zx_status_t status, const zx_packet_interrupt_t* interrupt) {
+  if (status != ZX_OK) {
+    if (status != ZX_ERR_CANCELED || state_ != State::ShuttingDown) {
+      // Don't report ZX_ERR_CANCELED during shutdown, it's expected to happen.
+      FDF_LOG(ERROR, "IRQ handler failed: %s", zx_status_get_string(status));
+    }
+    return;
+  }
 
-  // Clean up all the buffers and buffer_parts.
-  memset(buffers, 0, kRxBuffersPerBatch * sizeof(buffers[0]));
-  memset(buffer_parts, 0, kRxBuffersPerBatch * sizeof(buffer_parts[0]));
+  auto ack_interrupt = fit::defer([&] {
+    zx_interrupt_ack(adapter_->irqh);
+    if (adapter_->irq_mode == fuchsia_hardware_pci::InterruptMode::kLegacy) {
+      adapter_->osdep.pci.AckInterrupt();
+    }
+  });
 
-  IgcDriver::buffer_info* rx_buffer_info = drv->RxBuffer();
-
-  for (;;) {
-    zx_status_t r;
-    r = zx_interrupt_wait(adapter->irqh, NULL);
-    if (r != ZX_OK) {
-      DEBUGOUT("irq wait failed? %d", r);
-      break;
+  const unsigned irq = IGC_READ_REG(&adapter_->hw, IGC_ICR);
+  if (irq & IGC_ICR_RXT0) {
+    if (!started_.load(std::memory_order_relaxed)) {
+      // skip the excessive rx interrupts if driver is stopped. The rx descriptor ring has been
+      // cleaned up.
+      return;
     }
 
-    unsigned irq = 0;
-    irq = IGC_READ_REG(hw, IGC_ICR);
-    if (irq & IGC_ICR_RXT0) {
-      {
-        std::lock_guard lock(drv->started_mutex_);
-        if (drv->started_ == false) {
-          // skip the excessive rx interrupts if driver is stopped. The rx descriptor ring has been
-          // cleaned up.
-          continue;
+    fdf::Arena arena('IGCD');
+
+    std::lock_guard lock(adapter_->rx_lock);
+    // The index for accessing "buffers" on a per interrupt basis.
+    size_t buf_idx = 0;
+    fidl::VectorView<netdriver::wire::RxBuffer>& buffers = adapter_->buffers;
+    while ((adapter_->rxdr[adapter_->rxh_ind].wb.upper.status_error & IGC_RXD_STAT_DD)) {
+      // Call complete_rx to pass the packet up to network device.
+      buffers[buf_idx].data[0].id = rx_buffers_[adapter_->rxh_ind].buffer_id;
+      buffers[buf_idx].data[0].length = adapter_->rxdr[adapter_->rxh_ind].wb.upper.length;
+      buffers[buf_idx].data[0].offset = 0;
+
+      // Release the buffer in internal buffer info array.
+      rx_buffers_[adapter_->rxh_ind].available = false;
+
+      // Update the head index of rx descriptor ring.
+      adapter_->rxh_ind = (adapter_->rxh_ind + 1) & (kEthRxBufCount - 1);
+
+      // Update buffer index and check whether the local buffer array is full.
+      buf_idx++;
+      if (buf_idx == adapter::kRxBuffersPerBatch) {  // Local buffer array is full.
+        // Pass up a full batch of packets and reset buffer index.
+        buffers.set_count(buf_idx);
+        if (fidl::OneWayStatus status = adapter_->netdev_ifc.buffer(arena)->CompleteRx(buffers);
+            !status.ok()) {
+          FDF_LOG(ERROR, "Failed to complete RX: %s", status.FormatDescription().c_str());
+          return;
         }
-      }
-
-      {
-        std::lock_guard lock(adapter->rx_lock);
-        // The index for accessing "buffers" on a per interrupt basis.
-        size_t buf_idx = 0;
-        while ((adapter->rxdr[adapter->rxh_ind].wb.upper.status_error & IGC_RXD_STAT_DD)) {
-          // Call complete_rx to pass the packet up to network device.
-          buffers[buf_idx].data_count = 1;
-          buffers[buf_idx].meta.port = kPortId;
-          buffers[buf_idx].data_list = &buffer_parts[buf_idx];
-          buffers[buf_idx].meta.frame_type =
-              static_cast<uint8_t>(::fuchsia_hardware_network::wire::FrameType::kEthernet);
-          buffer_parts[buf_idx].id = rx_buffer_info[adapter->rxh_ind].buffer_id;
-          buffer_parts[buf_idx].length = adapter->rxdr[adapter->rxh_ind].wb.upper.length;
-          buffer_parts[buf_idx].offset = 0;
-
-          // Release the buffer in internal buffer info array.
-          rx_buffer_info[adapter->rxh_ind].available = false;
-
-          // Update the head index of rx descriptor ring.
-          adapter->rxh_ind = (adapter->rxh_ind + 1) & (kEthRxBufCount - 1);
-
-          // Update buffer index and check whether the local buffer array is full.
-          buf_idx++;
-          if (buf_idx == kRxBuffersPerBatch) {  // Local buffer array is full.
-            // Pass up a full batch of packets and reset buffer index.
-            adapter->netdev_ifc.CompleteRx(buffers, kRxBuffersPerBatch);
-            buf_idx = 0;
-
-            // Clean up used buffers.
-            memset(buffers, 0, kRxBuffersPerBatch * sizeof(buffers[0]));
-            memset(buffer_parts, 0, kRxBuffersPerBatch * sizeof(buffer_parts[0]));
-          }
-        }
-        if (buf_idx != 0) {
-          adapter->netdev_ifc.CompleteRx(buffers, buf_idx);
-          // Clean up used buffers.
-          memset(buffers, 0, buf_idx * sizeof(buffers[0]));
-          memset(buffer_parts, 0, buf_idx * sizeof(buffer_parts[0]));
-        }
+        buf_idx = 0;
       }
     }
-    if (irq & IGC_ICR_TXDW) {
-      // Reap the tx buffers as much as possible when there is a tx write back interrupt.
-      drv->ReapTxBuffers();
-    }
-    if (irq & IGC_ICR_LSC) {
-      if (drv->OnlineStatusUpdate()) {
-        port_status_t status = {
-            .flags = drv->online_ ? static_cast<uint32_t>(
-                                        fuchsia_hardware_network::wire::StatusFlags::kOnline)
-                                  : 0,
-            .mtu = kEtherMtu,
-        };
-        adapter->netdev_ifc.PortStatusChanged(kPortId, &status);
+    if (buf_idx != 0) {
+      buffers.set_count(buf_idx);
+      if (fidl::OneWayStatus status = adapter_->netdev_ifc.buffer(arena)->CompleteRx(buffers);
+          !status.ok()) {
+        FDF_LOG(ERROR, "Failed to complete RX: %s", status.FormatDescription().c_str());
+        return;
       }
-    }
-    if (adapter->irq_mode == fuchsia_hardware_pci::InterruptMode::kLegacy) {
-      adapter->osdep.pci.AckInterrupt();
     }
   }
-  return 0;
+  if (irq & IGC_ICR_TXDW) {
+    // Reap the tx buffers as much as possible when there is a tx write back interrupt.
+    ReapTxBuffers();
+  }
+  if (irq & IGC_ICR_LSC) {
+    if (OnlineStatusUpdate()) {
+      fdf::Arena arena('IGCD');
+      auto builder = netdev::wire::PortStatus::Builder(arena);
+      builder.mtu(kEtherMtu).flags(online_ ? netdev::wire::StatusFlags::kOnline
+                                           : netdev::wire::StatusFlags{});
+      if (fidl::OneWayStatus status =
+              adapter_->netdev_ifc.buffer(arena)->PortStatusChanged(kPortId, builder.Build());
+          !status.ok()) {
+        FDF_LOG(ERROR, "Failed to update port status: %s", status.FormatDescription().c_str());
+        return;
+      }
+    }
+  }
 }
 
 }  // namespace igc
 }  // namespace ethernet
 
-static zx_status_t igc_bind(void* ctx, zx_device_t* device) {
-  std::printf("%s\n", __func__);
-  zx_status_t status = ZX_OK;
-
-  auto igc = std::make_unique<ethernet::igc::IgcDriver>(device);
-  if ((status = igc->Init()) != ZX_OK) {
-    return status;
-  }
-
-  // devhost is now responsible for the memory allocated for object igc.
-  igc.release();
-  return ZX_OK;
-}
-
-static zx_driver_ops_t igc_driver_ops = {
-    .version = DRIVER_OPS_VERSION,
-    .bind = igc_bind,
-};
-
-ZIRCON_DRIVER(igc, igc_driver_ops, "zircon", "0.1");
+FUCHSIA_DRIVER_EXPORT(::ethernet::igc::IgcDriver);

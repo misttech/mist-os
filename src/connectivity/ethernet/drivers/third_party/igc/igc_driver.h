@@ -14,12 +14,13 @@
 #ifndef SRC_CONNECTIVITY_ETHERNET_DRIVERS_THIRD_PARTY_IGC_IGC_DRIVER_H_
 #define SRC_CONNECTIVITY_ETHERNET_DRIVERS_THIRD_PARTY_IGC_IGC_DRIVER_H_
 
-#include <fuchsia/hardware/network/driver/cpp/banjo.h>
+#include <fidl/fuchsia.hardware.network.driver/cpp/driver/fidl.h>
+#include <lib/async/cpp/irq.h>
+#include <lib/driver/compat/cpp/device_server.h>
+#include <lib/driver/component/cpp/driver_base.h>
 #include <zircon/types.h>
 
 #include <mutex>
-
-#include <ddktl/device.h>
 
 #include "igc_api.h"
 #include "src/connectivity/network/drivers/network-device/device/public/locks.h"
@@ -50,54 +51,73 @@ constexpr static uint8_t kPortId = 1;
 constexpr static size_t kEtherMtu = 1500;
 constexpr static size_t kEtherAddrLen = 6;
 
-class IgcDriver : public ::ddk::NetworkDeviceImplProtocol<IgcDriver>,
-                  public ::ddk::NetworkPortProtocol<IgcDriver>,
-                  public ::ddk::MacAddrProtocol<IgcDriver> {
+#define USE_NETDEV_DISPATCHER
+
+class IgcDriver final : public fdf::DriverBase,
+                        public fdf::WireServer<fuchsia_hardware_network_driver::NetworkDeviceImpl>,
+                        public fdf::WireServer<fuchsia_hardware_network_driver::NetworkPort>,
+                        public fdf::WireServer<fuchsia_hardware_network_driver::MacAddr> {
  public:
   struct buffer_info;
   struct adapter;
 
-  explicit IgcDriver(zx_device_t* parent);
+  explicit IgcDriver(fdf::DriverStartArgs start_args,
+                     fdf::UnownedSynchronizedDispatcher driver_dispatcher);
   ~IgcDriver();
 
-  // Called by DDK.
-  void Release();
-
-  zx_status_t Init();
+  // DriverBase implementation.
+  // Because there are Start methods in both NetworkDeviceImpl and DriverBase we need to override
+  // all of them to prevent error messages about hiding overloads. Make the asynchronous Start
+  // method behave just like the DriverBase implementation.
+  zx::result<> Start() override;
+  void Start(fdf::StartCompleter completer) override { DriverBase::Start(std::move(completer)); }
+  void PrepareStop(fdf::PrepareStopCompleter completer) override;
+  // Stop also exists in NetworkDeviceImpl and DriverBase, override it to avoid errors.
+  void Stop() override { DriverBase::Stop(); }
 
   // NetworkDeviceImpl implementation
-  void NetworkDeviceImplInit(const network_device_ifc_protocol_t* iface,
-                             network_device_impl_init_callback callback, void* cookie);
-  void NetworkDeviceImplStart(network_device_impl_start_callback callback, void* cookie)
-      __TA_EXCLUDES(started_mutex_);
-  void NetworkDeviceImplStop(network_device_impl_stop_callback callback, void* cookie)
-      __TA_EXCLUDES(started_mutex_);
-  void NetworkDeviceImplGetInfo(device_impl_info_t* out_info);
-  void NetworkDeviceImplQueueTx(const tx_buffer_t* buffers_list, size_t buffers_count)
-      __TA_EXCLUDES(started_mutex_);
-  void NetworkDeviceImplQueueRxSpace(const rx_space_buffer_t* buffers_list, size_t buffers_count);
-  void NetworkDeviceImplPrepareVmo(uint8_t id, zx::vmo vmo,
-                                   network_device_impl_prepare_vmo_callback callback, void* cookie);
-  void NetworkDeviceImplReleaseVmo(uint8_t id);
-  void NetworkDeviceImplSetSnoop(bool snoop);
+  void Init(fuchsia_hardware_network_driver::wire::NetworkDeviceImplInitRequest* request,
+            fdf::Arena& arena, InitCompleter::Sync& completer) override;
+  void Start(fdf::Arena& arena, StartCompleter::Sync& completer) override;
+  void Stop(fdf::Arena& arena, StopCompleter::Sync& completer) override;
+  void GetInfo(
+      fdf::Arena& arena,
+      fdf::WireServer<fuchsia_hardware_network_driver::NetworkDeviceImpl>::GetInfoCompleter::Sync&
+          completer) override;
+  void QueueTx(fuchsia_hardware_network_driver::wire::NetworkDeviceImplQueueTxRequest* request,
+               fdf::Arena& arena, QueueTxCompleter::Sync& completer) override;
+  void QueueRxSpace(
+      fuchsia_hardware_network_driver::wire::NetworkDeviceImplQueueRxSpaceRequest* request,
+      fdf::Arena& arena, QueueRxSpaceCompleter::Sync& completer) override;
+  void PrepareVmo(
+      fuchsia_hardware_network_driver::wire::NetworkDeviceImplPrepareVmoRequest* request,
+      fdf::Arena& arena, PrepareVmoCompleter::Sync& completer) override;
+  void ReleaseVmo(
+      fuchsia_hardware_network_driver::wire::NetworkDeviceImplReleaseVmoRequest* request,
+      fdf::Arena& arena, ReleaseVmoCompleter::Sync& completer) override;
+  void SetSnoop(fuchsia_hardware_network_driver::wire::NetworkDeviceImplSetSnoopRequest* request,
+                fdf::Arena& arena, SetSnoopCompleter::Sync& completer) override;
 
   // NetworkPort protocol implementation.
-  void NetworkPortGetInfo(port_base_info_t* out_info);
-  void NetworkPortGetStatus(port_status_t* out_status);
-  void NetworkPortSetActive(bool active);
-  void NetworkPortGetMac(mac_addr_protocol_t** out_mac_ifc);
-  void NetworkPortRemoved();
+  void GetInfo(
+      fdf::Arena& arena,
+      fdf::WireServer<fuchsia_hardware_network_driver::NetworkPort>::GetInfoCompleter::Sync&
+          completer) override;
+  void GetStatus(fdf::Arena& arena, GetStatusCompleter::Sync& completer) override;
+  void SetActive(fuchsia_hardware_network_driver::wire::NetworkPortSetActiveRequest* request,
+                 fdf::Arena& arena, SetActiveCompleter::Sync& completer) override;
+  void GetMac(fdf::Arena& arena, GetMacCompleter::Sync& completer) override;
+  void Removed(fdf::Arena& arena, RemovedCompleter::Sync& completer) override;
 
   // MacAddr protocol:
-  void MacAddrGetAddress(mac_address_t* out_mac);
-  void MacAddrGetFeatures(features_t* out_features);
-  void MacAddrSetMode(mac_filter_mode_t mode, const mac_address_t* multicast_macs_list,
-                      size_t multicast_macs_count);
+  void GetAddress(fdf::Arena& arena, GetAddressCompleter::Sync& completer) override;
+  void GetFeatures(fdf::Arena& arena, GetFeaturesCompleter::Sync& completer) override;
+  void SetMode(fuchsia_hardware_network_driver::wire::MacAddrSetModeRequest* request,
+               fdf::Arena& arena, SetModeCompleter::Sync& completer) override;
 
   buffer_info* RxBuffer() { return rx_buffers_; }
   buffer_info* TxBuffer() { return tx_buffers_; }
   std::shared_ptr<adapter> Adapter() { return adapter_; }
-  static int IgcIrqThreadFunc(void* arg);
 
   // The return value indicates whether the online status has been changed.
   bool OnlineStatusUpdate();
@@ -106,8 +126,6 @@ class IgcDriver : public ::ddk::NetworkDeviceImplProtocol<IgcDriver>,
     struct igc_hw hw;
     struct igc_osdep osdep;
     mtx_t lock;
-    zx_device_t* zxdev;
-    thrd_t thread;
     zx_handle_t irqh;
     zx_handle_t btih;
 
@@ -124,19 +142,30 @@ class IgcDriver : public ::ddk::NetworkDeviceImplProtocol<IgcDriver>,
     uint64_t rxd_phys;
 
     // callback interface to attached ethernet layer
-    ::ddk::NetworkDeviceIfcProtocolClient netdev_ifc;
+    fdf::WireSharedClient<fuchsia_hardware_network_driver::NetworkDeviceIfc> netdev_ifc;
 
     uint32_t txh_ind;  // Index of the head of awaiting(for the adapter to pick up) buffers in txdr.
     uint32_t txt_ind;  // Index of the tail of awaiting(for the adapter to pick up) buffers in txdr.
     uint32_t rxh_ind;  // Index of the head of available buffers in rxdr.
     uint32_t rxt_ind;  // Index of the tail of available buffers in rxdr.
-
     // Protect the rx data path between the two operations: QueueRxSpace and IgcIrqThreadFunc.
     std::mutex rx_lock;
     // Protect the tx data path between the two operations: QueueTx and ReapTxBuffers.
     std::mutex tx_lock;
-
     fuchsia_hardware_pci::InterruptMode irq_mode;
+
+    // Indicate a size for the arena so that we avoid re-allocation as much as possible. Don't use
+    // this arena for anything other than these RX buffers.
+    static constexpr size_t kArenaSize = fidl::MaxSizeInChannel<
+        fuchsia_hardware_network_driver::wire::NetworkDeviceIfcCompleteRxRequest,
+        fidl::MessageDirection::kSending>();
+    fidl::Arena<kArenaSize> rx_buffer_arena;
+
+    // Allocate a buffer array at half of the rx buffer ring size, and this limits the maximum
+    // number of packets that the driver passes up in one batch.
+    static constexpr size_t kRxBuffersPerBatch = kEthRxBufCount / 2;
+    fidl::VectorView<fuchsia_hardware_network_driver::wire::RxBuffer> buffers{rx_buffer_arena,
+                                                                              kRxBuffersPerBatch};
   };
 
   // We store the buffer information for each rx_space_buffer in this struct, so that we can do
@@ -147,10 +176,11 @@ class IgcDriver : public ::ddk::NetworkDeviceImplProtocol<IgcDriver>,
                      // RxSpace.
   };
 
-  // Status of hw.
-  bool online_ = false;
-
  private:
+  void Shutdown();
+  zx_status_t ConfigurePci();
+  zx_status_t Initialize();
+  zx_status_t AddNetworkDevice();
   bool IsValidEthernetAddr(uint8_t* addr);
   void IdentifyHardware();
   zx_status_t AllocatePCIResources();
@@ -160,17 +190,19 @@ class IgcDriver : public ::ddk::NetworkDeviceImplProtocol<IgcDriver>,
   void IfSetPromisc(uint32_t flags);
   void ReapTxBuffers();
 
-  zx_device_t* parent_ = nullptr;
-  zx_device_t* device_ = nullptr;
+  void EnableInterrupt();
+  void HandleIrq(async_dispatcher_t* dispatcher, async::IrqBase* irq_base, zx_status_t status,
+                 const zx_packet_interrupt_t* interrupt);
 
-  std::shared_ptr<struct adapter> adapter_;
+  std::shared_ptr<struct adapter> adapter_{std::make_shared<struct adapter>()};
+  async::IrqMethod<IgcDriver, &IgcDriver::HandleIrq> irq_handler_{this};
 
-  std::mutex started_mutex_;
-  std::mutex online_mutex_;
-  bool started_ __TA_GUARDED(started_mutex_) = false;
+  enum class State { Running, ShuttingDown, ShutDown };
 
-  network_device_impl_protocol_t netdev_impl_proto_;
-  mac_addr_protocol_t mac_addr_proto_;
+  std::atomic<State> state_ = State::Running;
+
+  std::atomic<bool> started_ = false;
+  std::atomic<bool> online_ = false;
 
   // Lock for VMO changes.
   network::SharedLock vmo_lock_;
@@ -180,10 +212,20 @@ class IgcDriver : public ::ddk::NetworkDeviceImplProtocol<IgcDriver>,
   std::unique_ptr<VmoStore> vmo_store_ __TA_GUARDED(vmo_lock_);
 
   // An extension for rx decriptor.
-  buffer_info rx_buffers_[kEthRxBufCount];
+  buffer_info rx_buffers_[kEthRxBufCount]{};
 
   // An extension for tx decriptor.
-  buffer_info tx_buffers_[kEthTxDescRingCount];
+  buffer_info tx_buffers_[kEthTxDescRingCount]{};
+
+  fdf::UnsynchronizedDispatcher netdev_dispatcher_;
+
+  // Because NetworkDevice is currently DFv1 we need to have a compatibility server in place.
+  compat::SyncInitializedDeviceServer compat_server_;
+  fidl::WireClient<fuchsia_driver_framework::NodeController> controller_;
+  std::optional<fdf::ServerBindingRef<fuchsia_hardware_network_driver::NetworkDeviceImpl>>
+      netdev_binding_;
+  std::optional<fdf::ServerBindingRef<fuchsia_hardware_network_driver::NetworkPort>> port_binding_;
+  std::optional<fdf::ServerBindingRef<fuchsia_hardware_network_driver::MacAddr>> mac_binding_;
 };
 
 }  // namespace igc

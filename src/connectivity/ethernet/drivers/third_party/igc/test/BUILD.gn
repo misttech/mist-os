@@ -16,12 +16,14 @@ executable("igc_interface_tests") {
   defines = [ "IGC_TEST" ]
 
   deps = [
+    "//sdk/lib/async_patterns/testing/cpp:cpp",
     "//sdk/lib/component/outgoing/cpp",
+    "//sdk/lib/driver/testing/cpp:gtest_fixture",
     "//src/connectivity/ethernet/drivers/third_party/igc:igc_core",
     "//src/devices/pci/testing:pci-protocol-fake",
-    "//src/devices/testing/mock-ddk",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/loop_fixture",
+    "//src/lib/testing/predicates",
   ]
 }
 

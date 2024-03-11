@@ -12,12 +12,10 @@
 
 #include <assert.h>
 #include <inttypes.h>
-#include <lib/ddk/debug.h>
-#include <lib/ddk/device.h>
-#include <lib/ddk/driver.h>
 #include <lib/ddk/io-buffer.h>
 #include <lib/device-protocol/pci.h>
 #include <lib/mmio/mmio-buffer.h>
+#include <sdk/lib/driver/logging/cpp/logger.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -35,7 +33,7 @@
 #define msec_delay(x) nsec_delay(ZX_MSEC(x))
 #define msec_delay_irq(x) nsec_delay(ZX_MSEC(x))
 
-#define DEBUGOUT(format, ...) zxlogf(DEBUG, "%s %d: " format, __FUNCTION__, __LINE__, ##__VA_ARGS__)
+#define DEBUGOUT(format, ...) FDF_LOG(DEBUG, "%s %d: " format, __FUNCTION__, __LINE__, ##__VA_ARGS__)
 #define DEBUGOUT1(...) DEBUGOUT(__VA_ARGS__)
 #define DEBUGOUT2(...) DEBUGOUT(__VA_ARGS__)
 #define DEBUGOUT3(...) DEBUGOUT(__VA_ARGS__)
