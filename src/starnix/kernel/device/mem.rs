@@ -61,7 +61,9 @@ impl FileOps for DevNull {
         let log_buffer = data.read_to_vec_limited(bytes_to_log);
         let bytes_logged = match log_buffer {
             Ok(bytes) => {
-                log_info!("write to devnull: {:?}", String::from_utf8_lossy(&bytes));
+                if cfg!(feature = "starnix_log_dev_null_writes_at_info") {
+                    log_info!("write to devnull: {:?}", String::from_utf8_lossy(&bytes));
+                }
                 bytes.len()
             }
             Err(_) => 0,

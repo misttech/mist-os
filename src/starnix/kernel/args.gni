@@ -25,4 +25,7 @@ declare_args() {
 
   # Whether to use an alternate strategy for anonymous memory allocations.
   starnix_enable_alternate_anon_allocs = false
+
+  # Whether to log writes to `/dev/null` at the INFO level.
+  starnix_log_dev_null_writes_at_info = false
 }
