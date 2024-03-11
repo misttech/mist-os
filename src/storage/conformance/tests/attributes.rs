@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use {
+    assert_matches::assert_matches,
     fidl_fuchsia_io as fio, fuchsia_zircon as zx,
     io_conformance_util::{test_harness::TestHarness, *},
 };
@@ -186,28 +187,40 @@ async fn get_attributes_return_some_value() {
     if !harness.config.supports_get_attributes.unwrap_or_default() {
         return;
     }
+    const TEST_FILE_CONTENTS: &'static [u8] = b"test-file-contents";
 
-    let root = root_directory(vec![file(TEST_FILE, vec![])]);
+    let root = root_directory(vec![file(TEST_FILE, TEST_FILE_CONTENTS.to_owned())]);
     let test_dir = harness.get_directory(root, harness.dir_rights.all());
     let file_proxy =
         open_file_with_flags(&test_dir, fio::OpenFlags::RIGHT_READABLE, TEST_FILE).await;
 
     // fuchsia.io/Node.GetAttributes
-    // Requested node attributes should return some value
+    // All of the attributes are requested. Filesystems are allowed to return None for attributes
+    // they don't support.
     let (mutable_attributes, immutable_attributes) = file_proxy
         .get_attributes(fio::NodeAttributesQuery::all())
         .await
         .unwrap()
         .expect("get_attributes failed");
-    assert!(mutable_attributes.creation_time.is_some());
-    assert!(mutable_attributes.modification_time.is_some());
-    assert_eq!(mutable_attributes.mode.unwrap(), 0);
-    assert_eq!(mutable_attributes.uid.unwrap(), 0);
-    assert_eq!(mutable_attributes.gid.unwrap(), 0);
-    assert_eq!(mutable_attributes.rdev.unwrap(), 0);
-    assert_eq!(immutable_attributes.protocols.unwrap(), fio::NodeProtocolKinds::FILE);
-    assert!(immutable_attributes.abilities.is_some());
-    assert!(immutable_attributes.content_size.is_some());
+
+    // If ctime and mtime are supported then they shouldn't be 0.
+    assert_matches!(mutable_attributes.creation_time, None | Some(1..));
+    assert_matches!(mutable_attributes.modification_time, None | Some(1..));
+    // The posix attributes weren't set so if the filesystem supports them then they should be 0.
+    assert_matches!(mutable_attributes.mode, None | Some(0));
+    assert_matches!(mutable_attributes.uid, None | Some(0));
+    assert_matches!(mutable_attributes.gid, None | Some(0));
+    assert_matches!(mutable_attributes.rdev, None | Some(0));
+
+    assert_matches!(immutable_attributes.protocols, Some(fio::NodeProtocolKinds::FILE));
+    assert_matches!(
+        immutable_attributes.abilities,
+        Some(x) if x.contains(fio::Operations::READ_BYTES | fio::Operations::GET_ATTRIBUTES)
+    );
+    assert_matches!(
+        immutable_attributes.content_size,
+        Some(x) if x == TEST_FILE_CONTENTS.len() as u64
+    );
     assert!(immutable_attributes.storage_size.is_some());
     assert!(immutable_attributes.link_count.is_some());
     assert!(immutable_attributes.id.is_some());
