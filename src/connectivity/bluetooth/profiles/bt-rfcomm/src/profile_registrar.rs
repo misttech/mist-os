@@ -266,6 +266,7 @@ impl ProfileRegistrar {
         mut connect_requests: bredr::ConnectionReceiverRequestStream,
         mut sender: mpsc::Sender<ConnectionEvent>,
     ) {
+        trace!("Starting connection request relay");
         while let Some(connect_request) = connect_requests.next().await {
             match connect_request {
                 Ok(request) => {
@@ -274,8 +275,9 @@ impl ProfileRegistrar {
                 Err(e) => info!("Connection request error: {e:?}"),
             }
         }
-        // The upstream server has dropped the ConnectionReceiver. Let the
-        // receiver know that the advertisement has been canceled.
+        // The upstream server has dropped the `ConnectionReceiver`. Notify the server main loop
+        // that the advertisement has been canceled.
+        trace!("`ConnectionReceiver` stream terminated. Notifying cancellation.");
         let _ = sender.send(ConnectionEvent::AdvertisementCanceled).await;
     }
 
@@ -288,6 +290,7 @@ impl ProfileRegistrar {
                 // If we are currently advertising, drop the stream processing task to unregister
                 // the services. Wait for the advertisement to resolve before attempting to
                 // re-advertise.
+                trace!("Unregistering existing advertisement");
                 drop(relay_task);
                 let _ = adv_task.await;
                 trace!("Finished waiting for unregistration");
@@ -302,7 +305,7 @@ impl ProfileRegistrar {
             trace!("Advertising from registered services: {:?}", params);
             let (connect_client, connect_requests) =
                 create_request_stream::<bredr::ConnectionReceiverMarker>().unwrap();
-            // Spawn a task to advertise `params`.
+            // Advertise the `params` set of services.
             let adv_fut =
                 ProfileRegistrar::advertise(self.profile_upstream.clone(), params, connect_client);
             let adv_task = adv_fut.boxed();
@@ -338,6 +341,7 @@ impl ProfileRegistrar {
         // The requested PSMs must be disjoint from the existing set of PSMs as only one group
         // can allocate a specific PSM.
         let new_psms = psms_from_service_definitions(&services);
+        trace!("Adding managed advertisement with PSMs: {new_psms:?}");
         if !self.is_disjoint_psms(&new_psms) {
             let _ = responder.send(Err(ErrorCode::Failed));
             return Err(format_err!("New advertisement requests allocated PSMs"));

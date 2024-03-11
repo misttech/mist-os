@@ -101,6 +101,7 @@ impl Clients {
         server_channel: ServerChannel,
         channel: Channel,
     ) -> Result<(), Error> {
+        trace!(%peer_id, "Delivering RFCOMM channel (# = {:?}) to client", server_channel);
         let inner = self.inner.lock().await;
         let client = inner
             .channel_receivers
