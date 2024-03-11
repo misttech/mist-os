@@ -30,6 +30,8 @@ const TEST_DEPRECATED_ALLOWED_PACKAGES_FACET_KEY: &'static str =
     "fuchsia.test.deprecated-allowed-packages";
 const HERMETIC_TEST_REALM: &'static str = "hermetic";
 
+const SUITE_PROTOCOL: &'static str = "fuchsia.test.Suite";
+
 mod error;
 mod opts;
 mod test_config;
@@ -301,18 +303,6 @@ fn read_test_components_json(file: &Utf8PathBuf) -> Result<Vec<TestComponentsJso
     Ok(t)
 }
 
-fn update_tags_from_manifest(
-    test_tags: &mut FuchsiaTestTags,
-    package_url: String,
-    meta_far_path: &Utf8PathBuf,
-) -> Result<(), Error> {
-    let pkg_url = AbsoluteComponentUrl::parse(&package_url)?;
-    let cm_path = pkg_url.resource();
-    let decl = cm_decl_from_meta_far(&meta_far_path, cm_path)?;
-    update_tags_from_facets(test_tags, &decl.facets.unwrap_or(fdata::Dictionary::default()))?;
-    Ok(())
-}
-
 fn write_depfile(
     depfile: &Utf8PathBuf,
     output: &Utf8PathBuf,
@@ -331,6 +321,37 @@ fn write_depfile(
     Ok(())
 }
 
+fn validate_test_decl(decl: &Component) -> Result<(), Error> {
+    if let Some(exposes) = &decl.exposes {
+        if exposes.iter().any(|e| match e {
+            fidl_fuchsia_component_decl::Expose::Protocol(ep) => {
+                ep.target_name.eq(&Some(SUITE_PROTOCOL.to_string()))
+            }
+            _ => false,
+        }) {
+            return Ok(());
+        }
+    }
+    Err(format_err!("Does not expose {} protocol.
+Refer to https://fuchsia.dev/fuchsia-src/development/testing/components/test_runner_framework?hl=en#troubleshoot-test-root", SUITE_PROTOCOL))
+}
+
+fn validate_and_get_test_cml(
+    package_url: String,
+    meta_far_path: &Utf8PathBuf,
+) -> Result<Component, Error> {
+    let pkg_url = AbsoluteComponentUrl::parse(&package_url)?;
+    let cm_path = pkg_url.resource();
+    let decl = match cm_decl_from_meta_far(&meta_far_path, cm_path) {
+        Ok(decl) => decl,
+        Err(e) => return Err(format_err!("Error retrieving manifest for {}: {}", pkg_url, e)),
+    };
+    if let Err(e) = validate_test_decl(&decl) {
+        return Err(format_err!("Error validating manifest for {}: {}", pkg_url, e));
+    }
+    Ok(decl)
+}
+
 fn run_tool() -> Result<(), Error> {
     let opt = opts::Opt::from_args();
     opt.validate()?;
@@ -340,10 +361,7 @@ fn run_tool() -> Result<(), Error> {
     let test_components_map = TestComponentsJsonEntry::convert_to_map(test_components_json)?;
 
     use rayon::prelude::*;
-    let (data, inputs): (
-        Vec<(Option<TestListEntry>, Option<test_config::TestConfig>)>,
-        Vec<Vec<Utf8PathBuf>>,
-    ) = tests_json
+    let (successes, errors): (Vec<_>, Vec<_>) = tests_json
         .par_iter()
         .map(|entry| {
             let realm = match &entry.test.component_label {
@@ -367,22 +385,27 @@ fn run_tool() -> Result<(), Error> {
 
                 let res = find_meta_far(&opt.build_dir, pkg_manifest.clone());
                 if res.is_err() {
-                    println!(
+                    return Err(format_err!(
                         "error finding meta.far file in package manifest {}: {:?}",
                         &pkg_manifest,
                         res.unwrap_err()
-                    );
-                    return ((None, None), inputs);
+                    ));
                 }
                 let meta_far_path = res.unwrap();
                 inputs.push(meta_far_path.clone());
 
+                let decl = validate_and_get_test_cml(pkg_url.clone(), &meta_far_path)?;
+
                 // Find additional tags. Note that this can override existing tags (e.g. to set the test type based on realm)
-                match update_tags_from_manifest(&mut test_tags, pkg_url.clone(), &meta_far_path) {
-                    Err(e) => {
-                        println!("error processing manifest for package URL {}: {:?}", &pkg_url, e)
-                    }
-                    _ => {}
+                if let Err(e) = update_tags_from_facets(
+                    &mut test_tags,
+                    &decl.facets.unwrap_or(fdata::Dictionary::default()),
+                ) {
+                    return Err(format_err!(
+                        "error processing manifest for package URL {}: {:?}",
+                        &pkg_url,
+                        e
+                    ));
                 }
             }
 
@@ -401,9 +424,24 @@ fn run_tool() -> Result<(), Error> {
                 }
             }
 
-            ((Some(test_list_entry), config), inputs)
+            Ok(((Some(test_list_entry), config), inputs))
         })
-        .unzip();
+        .partition(Result::is_ok);
+
+    if !errors.is_empty() {
+        let error_message: String = errors
+            .into_iter()
+            .map(Result::unwrap_err)
+            .map(|err| err.to_string())
+            .collect::<Vec<String>>()
+            .join("; ");
+        return Err(format_err!("{}", error_message));
+    }
+
+    let (data, inputs): (
+        Vec<(Option<TestListEntry>, Option<test_config::TestConfig>)>,
+        Vec<Vec<Utf8PathBuf>>,
+    ) = successes.into_iter().map(Result::unwrap).unzip();
 
     let (test_list_entries, test_configs): (
         Vec<Option<TestListEntry>>,
@@ -430,7 +468,7 @@ fn run_tool() -> Result<(), Error> {
 
 #[cfg(test)]
 mod tests {
-    use {super::*, tempfile::tempdir};
+    use {super::*, fidl_fuchsia_component_decl as fdecl, tempfile::tempdir};
 
     #[test]
     fn test_find_meta_far() {
@@ -1168,5 +1206,46 @@ mod tests {
         let entries = vec![entry1, entry2, entry3];
         let _ = TestComponentsJsonEntry::convert_to_map(entries)
             .expect_err("This should error out due to conflicting entries");
+    }
+
+    #[test]
+    fn test_validate_test_decl_exposes_suite_protocol() {
+        let mut component = Component::default();
+        let mut expose_protocol = fdecl::ExposeProtocol::default();
+        expose_protocol.target_name = Some(SUITE_PROTOCOL.to_string());
+        let mut random_expose_protocol = fdecl::ExposeProtocol::default();
+        random_expose_protocol.target_name = Some("random".to_string());
+        component.exposes = Some(vec![
+            fdecl::Expose::Protocol(expose_protocol),
+            fdecl::Expose::Protocol(random_expose_protocol),
+        ]);
+
+        let result = validate_test_decl(&component);
+
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_validate_test_decl_does_not_expose_suite_protocol() {
+        let mut component = Component::default();
+
+        let err = validate_test_decl(&component).unwrap_err();
+
+        assert!(
+            err.to_string().contains(&format!("Does not expose {} protocol", SUITE_PROTOCOL)),
+            "{:?}",
+            err
+        );
+
+        let mut expose_protocol = fdecl::ExposeProtocol::default();
+        expose_protocol.target_name = Some("random".to_string());
+        component.exposes = Some(vec![fdecl::Expose::Protocol(expose_protocol)]);
+        let err = validate_test_decl(&component).unwrap_err();
+
+        assert!(
+            err.to_string().contains(&format!("Does not expose {} protocol", SUITE_PROTOCOL)),
+            "{:?}",
+            err
+        );
     }
 }
