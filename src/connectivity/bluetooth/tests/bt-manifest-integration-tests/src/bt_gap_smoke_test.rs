@@ -75,7 +75,6 @@ impl From<SecureStoreMarker> for Event {
     }
 }
 
-// TODO(b/42085239): Remove when all bt vendor drivers support FIDL
 /// An empty dev/bt-host pseudo-directory.
 pub fn dev_bt_host() -> Arc<dyn Directory> {
     pseudo_directory! {

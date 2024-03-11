@@ -22,18 +22,15 @@ source_set("common") {
 
   public_deps = [
     ":bt_transport_uart_bind",
+    "//sdk/banjo/fuchsia.hardware.bt.hci:fuchsia.hardware.bt.hci_banjo_cpp",
+    "//sdk/banjo/fuchsia.hardware.serial:fuchsia.hardware.serial_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.serialimpl.async:fuchsia.hardware.serialimpl.async_banjo_cpp",
-    "//sdk/fidl/fuchsia.hardware.bluetooth:fuchsia.hardware.bluetooth_cpp",
     "//sdk/fidl/fuchsia.hardware.serial:fuchsia.hardware.serial_cpp",
-    "//sdk/lib/driver/outgoing/cpp:cpp",
     "//src/devices/lib/driver",
-    "//src/devices/lib/driver:driver_runtime",
     "//src/lib/ddk",
-    "//zircon/system/ulib/async-default",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/sync",
-    "//zircon/system/ulib/sync:sync-cpp",
   ]
 
   # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings

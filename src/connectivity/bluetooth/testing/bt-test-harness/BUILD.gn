@@ -42,12 +42,13 @@ rustc_library("bt-test-harness") {
     "//third_party/rust_crates:tracing",
   ]
 
-  # Components included in `deps` because they're used by CoreRealm and/or HostRealm
+  # Components included in `deps` because they're used by core_realm and/or host_driver_realm
   deps += [
     ":test-bt-init",
     ":test-bt-init-config",
     "//sdk/lib/driver_test_realm/realm_builder/rust",
     "//src/connectivity/bluetooth/core/bt-gap:test-stash-secure",
+    "//src/connectivity/bluetooth/core/bt-host:driver",
     "//src/connectivity/bluetooth/hci/virtual:driver",
     "//src/devices/bus/drivers/platform",
     "//src/devices/misc/drivers/test",
@@ -71,6 +72,9 @@ rustc_library("bt-test-harness") {
     "src/core_realm.rs",
     "src/emulator.rs",
     "src/host.rs",
+    "src/host_driver/mod.rs",
+    "src/host_driver/realm.rs",
+    "src/host_driver/v2.rs",
     "src/host_realm.rs",
     "src/host_watcher.rs",
     "src/inspect.rs",

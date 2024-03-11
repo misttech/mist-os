@@ -6,6 +6,8 @@
 #define SRC_CONNECTIVITY_BLUETOOTH_HCI_VENDOR_BROADCOM_BT_HCI_BROADCOM_H_
 
 #include <fidl/fuchsia.hardware.bluetooth/cpp/wire.h>
+#include <fuchsia/hardware/bt/hci/c/banjo.h>
+#include <fuchsia/hardware/bt/vendor/cpp/banjo.h>
 #include <fuchsia/hardware/serialimpl/async/c/banjo.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async/cpp/executor.h>
@@ -19,10 +21,12 @@ namespace bt_hci_broadcom {
 
 class BtHciBroadcom;
 
-using BtHciBroadcomType = ddk::Device<BtHciBroadcom, ddk::Initializable, ddk::Unbindable,
-                                      ddk::Messageable<fuchsia_hardware_bluetooth::Vendor>::Mixin>;
+using BtHciBroadcomType =
+    ddk::Device<BtHciBroadcom, ddk::GetProtocolable, ddk::Initializable, ddk::Unbindable,
+                ddk::Messageable<fuchsia_hardware_bluetooth::Vendor>::Mixin>;
 
 class BtHciBroadcom : public BtHciBroadcomType,
+                      public ddk::BtVendorProtocol<BtHciBroadcom>,
                       public fidl::WireServer<fuchsia_hardware_bluetooth::Hci> {
  public:
   // |dispatcher| will be used for the initialization thread if non-null.
@@ -40,13 +44,19 @@ class BtHciBroadcom : public BtHciBroadcomType,
   void DdkInit(ddk::InitTxn txn);
   void DdkUnbind(ddk::UnbindTxn txn);
   void DdkRelease();
+  zx_status_t DdkGetProtocol(uint32_t proto_id, void* out_proto);
+
+  // ddk::BtVendorProtocol implementations:
+  bt_vendor_features_t BtVendorGetFeatures();
+  zx_status_t BtVendorEncodeCommand(bt_vendor_command_t command, const bt_vendor_params_t* params,
+                                    uint8_t* out_encoded_buffer, size_t encoded_size,
+                                    size_t* out_encoded_actual);
 
  private:
   static constexpr size_t kMacAddrLen = 6;
 
   static const std::unordered_map<uint16_t, std::string> kFirmwareMap;
 
-  // fuchsia_hardware_bluetooth::Vendor protocol interface implementations.
   void GetFeatures(GetFeaturesCompleter::Sync& completer) override;
   void EncodeCommand(EncodeCommandRequestView request,
                      EncodeCommandCompleter::Sync& completer) override;
@@ -56,7 +66,7 @@ class BtHciBroadcom : public BtHciBroadcomType,
       fidl::UnknownMethodMetadata<fuchsia_hardware_bluetooth::Vendor> metadata,
       fidl::UnknownMethodCompleter::Sync& completer) override;
 
-  // fuchsia_hardware_bluetooth::Hci protocol interface implementations.
+  // ddk::Messageable mixins:
   void OpenCommandChannel(OpenCommandChannelRequestView request,
                           OpenCommandChannelCompleter::Sync& completer) override;
   void OpenAclDataChannel(OpenAclDataChannelRequestView request,
@@ -75,7 +85,10 @@ class BtHciBroadcom : public BtHciBroadcomType,
                              fidl::UnknownMethodCompleter::Sync& completer) override;
 
   // Truly private, internal helper methods:
-  zx_status_t ConnectToHciFidlProtocol();
+
+  static zx_status_t EncodeSetAclPriorityCommand(bt_vendor_set_acl_priority_params_t params,
+                                                 void* out_buffer, size_t buffer_size,
+                                                 size_t* actual_size);
 
   static void EncodeSetAclPriorityCommand(
       fuchsia_hardware_bluetooth::wire::BtVendorSetAclPriorityParams params, void* out_buffer);
@@ -104,6 +117,7 @@ class BtHciBroadcom : public BtHciBroadcomType,
 
   zx_status_t Bind();
 
+  bt_hci_protocol_t hci_;
   serial_impl_async_protocol_t serial_;
   uint16_t serial_pid_;
   zx::channel command_channel_;
@@ -117,8 +131,6 @@ class BtHciBroadcom : public BtHciBroadcomType,
   async_dispatcher_t* dispatcher_;
   // The executor for |dispatcher_|, created during initialization.
   std::optional<async::Executor> executor_;
-
-  fidl::WireClient<fuchsia_hardware_bluetooth::Hci> hci_client_;
 };
 
 }  // namespace bt_hci_broadcom

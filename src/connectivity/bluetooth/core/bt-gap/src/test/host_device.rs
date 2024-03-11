@@ -46,12 +46,12 @@ impl HostListener for () {
 async fn host_device_set_local_name() -> Result<(), Error> {
     let (client, server) = fidl::endpoints::create_proxy_and_stream::<HostMarker>()?;
     let address = Address::Public([0, 0, 0, 0, 0, 0]);
-    let host = HostDevice::mock(HostId(1), address, "/dev/class/bt-hci/test".to_string(), client);
+    let host = HostDevice::mock(HostId(1), address, "/dev/class/bt-host/test".to_string(), client);
     let expected_name = "EXPECTED_NAME".to_string();
     let info = Arc::new(RwLock::new(host.info()));
     let server = Arc::new(RwLock::new(server));
 
-    // Assign a name and verify that that it gets written to the bt-host device over FIDL.
+    // Assign a name and verify that that it gets written to the bt-host over FIDL.
     let set_name = host.set_name(expected_name.clone());
     let expect_fidl = expect_call(server.clone(), |_, e| match e {
         HostRequest::SetLocalName { local_name, responder } => {
@@ -78,7 +78,7 @@ async fn test_discovery_session() -> Result<(), Error> {
     let (client, server) = fidl::endpoints::create_proxy_and_stream::<HostMarker>()?;
 
     let address = Address::Public([0, 0, 0, 0, 0, 0]);
-    let host = HostDevice::mock(HostId(1), address, "/dev/class/bt-hci/test".to_string(), client);
+    let host = HostDevice::mock(HostId(1), address, "/dev/class/bt-host/test".to_string(), client);
     let info = Arc::new(RwLock::new(host.info()));
     let server = Arc::new(RwLock::new(server));
 
@@ -127,7 +127,7 @@ async fn test_discovery_session() -> Result<(), Error> {
 async fn host_device_restore_bonds() -> Result<(), Error> {
     let (client, server) = fidl::endpoints::create_proxy_and_stream::<HostMarker>()?;
     let address = Address::Public([0, 0, 0, 0, 0, 0]);
-    let host = HostDevice::mock(HostId(1), address, "/dev/class/bt-hci/test".to_string(), client);
+    let host = HostDevice::mock(HostId(1), address, "/dev/class/bt-host/test".to_string(), client);
 
     // TODO(https://fxbug.dev/42160922): Assume that 256 bonds is enough to cause HostDevice to use multiple
     // FIDL calls to transmit all of the bonds (at this time, the maximum message size is 64 KiB

@@ -14,7 +14,6 @@
 
 #include <ddktl/device.h>
 
-#include "fidl/fuchsia.hardware.bluetooth/cpp/markers.h"
 #include "vendor_hci.h"
 
 namespace btintel {
@@ -22,15 +21,13 @@ namespace btintel {
 class Device;
 
 using DeviceType = ddk::Device<Device, ddk::Initializable, ddk::GetProtocolable, ddk::Unbindable,
-                               ddk::Messageable<fuchsia_hardware_bluetooth::Vendor>::Mixin>;
+                               ddk::Messageable<fuchsia_hardware_bluetooth::Hci>::Mixin>;
 
-class Device : public DeviceType,
-               public ddk::BtHciProtocol<Device, ddk::base_protocol>,
-               public fidl::WireServer<fuchsia_hardware_bluetooth::Hci> {
+class Device : public DeviceType, public ddk::BtHciProtocol<Device, ddk::base_protocol> {
  public:
   Device(zx_device_t* device, bt_hci_protocol_t* hci, bool secure, bool legacy_firmware_loading);
 
-  static zx_status_t bt_intel_bind(void* ctx, zx_device_t* device);
+  ~Device() = default;
 
   // Bind the device, invisibly.
   zx_status_t Bind();
@@ -59,7 +56,6 @@ class Device : public DeviceType,
   zx_status_t BtHciOpenSnoopChannel(zx::channel in);
 
  private:
-  // fuchsia_hardware_bluetooth::Hci protocol interface implementations
   void OpenCommandChannel(OpenCommandChannelRequestView request,
                           OpenCommandChannelCompleter::Sync& completer) override;
   void OpenAclDataChannel(OpenAclDataChannelRequestView request,
@@ -75,15 +71,6 @@ class Device : public DeviceType,
                         OpenSnoopChannelCompleter::Sync& completer) override;
   void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_hardware_bluetooth::Hci> metadata,
                              fidl::UnknownMethodCompleter::Sync& completer) override;
-
-  // fuchsia_hardware_bluetooth::Vendor protocol interface implementations
-  void GetFeatures(GetFeaturesCompleter::Sync& completer) override;
-  void EncodeCommand(EncodeCommandRequestView request,
-                     EncodeCommandCompleter::Sync& completer) override;
-  void OpenHci(OpenHciCompleter::Sync& completer) override;
-  void handle_unknown_method(
-      fidl::UnknownMethodMetadata<fuchsia_hardware_bluetooth::Vendor> metadata,
-      fidl::UnknownMethodCompleter::Sync& completer) override;
 
   zx_status_t LoadSecureFirmware(zx::channel* cmd, zx::channel* acl);
   zx_status_t LoadLegacyFirmware(zx::channel* cmd, zx::channel* acl);
@@ -101,8 +88,6 @@ class Device : public DeviceType,
   // receives a pointer to the memory.
   // |fw_size| receives the size of the firmware if valid.
   zx_handle_t MapFirmware(const char* name, uintptr_t* fw_addr, size_t* fw_size);
-
-  fidl::ServerBindingGroup<fuchsia_hardware_bluetooth::Hci> hci_binding_group_;
 
   ddk::BtHciProtocolClient hci_;
   bool secure_;

@@ -1,11 +1,11 @@
-# Copyright 2020 The Fuchsia Authors. All rights reserved.
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
 import("//build/components.gni")
 import("//build/rust/rustc_test.gni")
 
-rustc_test("bt_host_integration_tests") {
+rustc_test("bt_host_component_integration_tests") {
   edition = "2021"
   source_root = "src/lib.rs"
   deps = [
@@ -28,13 +28,21 @@ rustc_test("bt_host_integration_tests") {
   configs -= [ "//build/config/rust/lints:allow_unused_results" ]
 }
 
-fuchsia_test_component("bt-host-integration-tests-component") {
-  manifest = "meta/bt-host-integration-tests.cml"
-  deps = [ ":bt_host_integration_tests" ]
+fuchsia_test_component("bt-host-component-integration-tests-component") {
+  manifest = "meta/bt-host-component-integration-tests.cml"
+  deps = [ ":bt_host_component_integration_tests" ]
 }
 
 # Note: The integration tests include the bt-host and bt-hci-emulator driver
 # components in this package via the dep on the bt-test-harness crate.
-fuchsia_test_package("bt-host-integration-tests") {
-  test_components = [ ":bt-host-integration-tests-component" ]
+fuchsia_test_package("bt-host-component-integration-tests") {
+  # b/317259066 causes driver_manager ERRORs. Ignore until fixed.
+  test_specs = {
+    log_settings = {
+      max_severity = "ERROR"
+    }
+  }
+  test_components = [ ":bt-host-component-integration-tests-component" ]
+  subpackages =
+      [ "//src/connectivity/bluetooth/core/bt-host:bt-host-component" ]
 }

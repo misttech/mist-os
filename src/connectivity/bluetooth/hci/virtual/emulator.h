@@ -67,10 +67,7 @@ class EmulatorDevice : public fuchsia::bluetooth::test::HciEmulator,
   // fuchsia_hardware_bluetooth::Emulator overrides:
   void Open(OpenRequestView request, OpenCompleter::Sync& completer) override;
 
-  void ClearHciDev() {
-    std::lock_guard<std::mutex> lock(hci_dev_lock_);
-    hci_dev_ = nullptr;
-  }
+  void ClearHciDev() { hci_dev_ = nullptr; }
 
  private:
   void StartEmulatorInterface(zx::channel chan);
@@ -153,7 +150,6 @@ class EmulatorDevice : public fuchsia::bluetooth::test::HciEmulator,
 
   zx_device_t* const parent_;
 
-  std::mutex hci_dev_lock_;
   // The device that implements the bt-hci protocol. |hci_dev_| will only be accessed on |loop_|,
   // and only in the following conditions:
   //   1. Initialized during Publish().
@@ -162,7 +158,7 @@ class EmulatorDevice : public fuchsia::bluetooth::test::HciEmulator,
   //   3. Unpublished in the DDK Unbind() call. While the Unbind method itself runs on a devhost
   //      thread, the Unpublish call is posted to |loop_| and joined upon during unbind, ensuring
   //      that |hci_dev_| is never accessed across threads.
-  zx_device_t* hci_dev_ __TA_GUARDED(hci_dev_lock_);
+  zx_device_t* hci_dev_;
 
   // The device that implements the bt-emulator protocol.
   zx_device_t* emulator_dev_;

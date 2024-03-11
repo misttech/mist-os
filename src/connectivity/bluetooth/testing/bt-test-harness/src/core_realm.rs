@@ -163,7 +163,6 @@ impl CoreRealm {
             .await?;
 
         // Add directory routing between components within CoreRealm
-        // TODO(b/42085239): Remove when all bt vendor drivers support FIDL
         builder
             .add_route(
                 Route::new()

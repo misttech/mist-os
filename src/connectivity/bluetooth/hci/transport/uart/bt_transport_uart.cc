@@ -6,7 +6,8 @@
 
 #include <assert.h>
 #include <fidl/fuchsia.hardware.serial/cpp/wire.h>
-#include <lib/async/default.h>
+#include <fuchsia/hardware/bt/hci/c/banjo.h>
+#include <fuchsia/hardware/serialimpl/async/c/banjo.h>
 #include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
@@ -23,13 +24,15 @@
 
 namespace bt_transport_uart {
 
-BtTransportUart::BtTransportUart(zx_device_t* parent)
-    : BtTransportUartType(parent),
-      dispatcher_(fdf::Dispatcher::GetCurrent()->async_dispatcher()),
-      outgoing_dir_(fdf::OutgoingDirectory::Create(fdf::Dispatcher::GetCurrent()->get())) {}
+BtTransportUart::BtTransportUart(zx_device_t* parent, async_dispatcher_t* dispatcher)
+    : BtTransportUartType(parent), dispatcher_(dispatcher) {}
 
 zx_status_t BtTransportUart::Create(void* /*ctx*/, zx_device_t* parent) {
-  std::unique_ptr<BtTransportUart> dev = std::make_unique<BtTransportUart>(parent);
+  return Create(parent, /*dispatcher=*/nullptr);
+}
+
+zx_status_t BtTransportUart::Create(zx_device_t* parent, async_dispatcher_t* dispatcher) {
+  std::unique_ptr<BtTransportUart> dev = std::make_unique<BtTransportUart>(parent, dispatcher);
 
   zx_status_t bind_status = dev->Bind();
   if (bind_status != ZX_OK) {
@@ -471,65 +474,36 @@ void BtTransportUart::DdkRelease() {
   delete this;
 }
 
-void BtTransportUart::OpenCommandChannel(OpenCommandChannelRequestView request,
-                                         OpenCommandChannelCompleter::Sync& completer) {
-  if (zx_status_t status = HciOpenChannel(&cmd_channel_, std::move(request->channel.release()));
-      status != ZX_OK) {
-    zxlogf(ERROR, "Failed to open command channel: %s", zx_status_get_string(status));
-    completer.ReplyError(status);
-    return;
-  }
-  completer.ReplySuccess();
-}
-void BtTransportUart::OpenAclDataChannel(OpenAclDataChannelRequestView request,
-                                         OpenAclDataChannelCompleter::Sync& completer) {
-  if (zx_status_t status = HciOpenChannel(&acl_channel_, std::move(request->channel.release()));
-      status != ZX_OK) {
-    zxlogf(ERROR, "Failed to open acl channel: %s", zx_status_get_string(status));
-    completer.ReplyError(status);
-    return;
-  }
-  completer.ReplySuccess();
-}
-void BtTransportUart::OpenSnoopChannel(OpenSnoopChannelRequestView request,
-                                       OpenSnoopChannelCompleter::Sync& completer) {
-  if (zx_status_t status = HciOpenChannel(&snoop_channel_, std::move(request->channel.release()));
-      status != ZX_OK) {
-    zxlogf(ERROR, "Failed to open snoop channel: %s", zx_status_get_string(status));
-    completer.ReplyError(status);
-    return;
-  }
-  completer.ReplySuccess();
-}
-void BtTransportUart::OpenScoDataChannel(OpenScoDataChannelRequestView request,
-                                         OpenScoDataChannelCompleter::Sync& completer) {
-  if (zx_status_t status = HciOpenChannel(&sco_channel_, std::move(request->channel.release()));
-      status != ZX_OK) {
-    zxlogf(ERROR, "Failed to open sco channel: %s", zx_status_get_string(status));
-    completer.ReplyError(status);
-    return;
-  }
-  completer.ReplySuccess();
-}
-void BtTransportUart::OpenIsoDataChannel(OpenIsoDataChannelRequestView request,
-                                         OpenIsoDataChannelCompleter::Sync& completer) {
-  completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
-}
-void BtTransportUart::ConfigureSco(ConfigureScoRequestView request,
-                                   ConfigureScoCompleter::Sync& completer) {
-  // UART doesn't require any SCO configuration.
-  completer.ReplySuccess();
-}
-void BtTransportUart::ResetSco(ResetScoCompleter::Sync& completer) {
-  // UART doesn't require any SCO configuration, so there's nothing to do.
-  completer.ReplySuccess();
+zx_status_t BtTransportUart::BtHciOpenCommandChannel(zx::channel in) {
+  return HciOpenChannel(&cmd_channel_, in.release());
 }
 
-void BtTransportUart::handle_unknown_method(
-    fidl::UnknownMethodMetadata<fuchsia_hardware_bluetooth::Hci> metadata,
-    fidl::UnknownMethodCompleter::Sync& completer) {
-  zxlogf(ERROR, "Unknown method in Hci protocol, closing with ZX_ERR_NOT_SUPPORTED");
-  completer.Close(ZX_ERR_NOT_SUPPORTED);
+zx_status_t BtTransportUart::BtHciOpenAclDataChannel(zx::channel in) {
+  return HciOpenChannel(&acl_channel_, in.release());
+}
+
+zx_status_t BtTransportUart::BtHciOpenSnoopChannel(zx::channel in) {
+  return HciOpenChannel(&snoop_channel_, in.release());
+}
+
+zx_status_t BtTransportUart::BtHciOpenScoChannel(zx::channel in) {
+  return HciOpenChannel(&sco_channel_, in.release());
+}
+
+zx_status_t BtTransportUart::BtHciOpenIsoDataChannel(zx::channel in) {
+  return ZX_ERR_NOT_SUPPORTED;
+}
+
+void BtTransportUart::BtHciConfigureSco(sco_coding_format_t coding_format, sco_encoding_t encoding,
+                                        sco_sample_rate_t sample_rate,
+                                        bt_hci_configure_sco_callback callback, void* cookie) {
+  // UART doesn't require any SCO configuration.
+  callback(cookie, ZX_OK);
+}
+
+void BtTransportUart::BtHciResetSco(bt_hci_reset_sco_callback callback, void* cookie) {
+  // UART doesn't require any SCO configuration, so there's nothing to do.
+  callback(cookie, ZX_OK);
 }
 
 zx_status_t BtTransportUart::DdkGetProtocol(uint32_t proto_id, void* out_proto) {
@@ -538,6 +512,9 @@ zx_status_t BtTransportUart::DdkGetProtocol(uint32_t proto_id, void* out_proto) 
     return device_get_protocol(parent(), proto_id, out_proto);
   }
 
+  bt_hci_protocol_t* hci_proto = static_cast<bt_hci_protocol*>(out_proto);
+  hci_proto->ops = &bt_hci_protocol_ops_;
+  hci_proto->ctx = this;
   return ZX_OK;
 }
 
@@ -547,26 +524,6 @@ void BtTransportUart::QueueUartRead() {
     static_cast<BtTransportUart*>(ctx)->HciReadComplete(status, buffer, length);
   };
   serial_impl_async_read_async(&serial_, read_cb, this);
-}
-
-zx_status_t BtTransportUart::ServeHciProtocol(fidl::ServerEnd<fuchsia_io::Directory> server_end) {
-  auto protocol = [this](fidl::ServerEnd<fuchsia_hardware_bluetooth::Hci> server_end) mutable {
-    fidl::BindServer(dispatcher_, std::move(server_end), this);
-  };
-  fuchsia_hardware_bluetooth::HciService::InstanceHandler handler({.hci = std::move(protocol)});
-  auto status =
-      outgoing_dir_.AddService<fuchsia_hardware_bluetooth::HciService>(std::move(handler));
-  if (status.is_error()) {
-    zxlogf(ERROR, "Failed to add service to outgoing directory: %s\n", status.status_string());
-    return status.error_value();
-  }
-  auto result = outgoing_dir_.Serve(std::move(server_end));
-  if (result.is_error()) {
-    zxlogf(ERROR, "Failed to serve outgoing directory: %s\n", result.status_string());
-    return result.error_value();
-  }
-
-  return ZX_OK;
 }
 
 zx_status_t BtTransportUart::Bind() {
@@ -625,18 +582,6 @@ zx_status_t BtTransportUart::Bind() {
 
   zxlogf(DEBUG, "Bind complete, adding device");
 
-  auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-  if (endpoints.is_error()) {
-    zxlogf(ERROR, "failed to create endpoints: %s\n", endpoints.status_string());
-    return endpoints.status_value();
-  }
-
-  status = ServeHciProtocol(std::move(endpoints->server));
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to serve Hci protocol: %s", zx_status_get_string(status));
-    return status;
-  }
-
   ddk::DeviceAddArgs args("bt-transport-uart");
   // Copy the PID and VID from the platform device info so it can be filtered on
   // for HCI drivers
@@ -645,17 +590,9 @@ zx_status_t BtTransportUart::Bind() {
       {.id = BIND_SERIAL_VID, .reserved = 0, .value = info.serial_vid},
       {.id = BIND_SERIAL_PID, .reserved = 0, .value = info.serial_pid},
   };
-
-  std::array offers = {
-      fuchsia_hardware_bluetooth::HciService::Name,
-  };
-
   args.set_props(props);
   args.set_proto_id(ZX_PROTOCOL_BT_TRANSPORT);
   args.forward_metadata(parent(), DEVICE_METADATA_MAC_ADDRESS);
-  args.set_fidl_service_offers(offers);
-  args.set_outgoing_dir(endpoints->client.TakeChannel());
-
   status = DdkAdd(args);
   if (status != ZX_OK) {
     zxlogf(ERROR, "Failed to add bt-transport-uart device: %s\n", zx_status_get_string(status));

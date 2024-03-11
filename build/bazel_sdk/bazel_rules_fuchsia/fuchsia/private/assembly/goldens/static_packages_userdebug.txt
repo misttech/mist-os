@@ -9,7 +9,7 @@
 ?bt-avrcp-target
 ?bt-gap
 ?bt-hfp-audio-gateway-default
-?bt-host-component
+?bt-host
 ?bt-init
 ?bt-rfcomm
 ?bt-snoop

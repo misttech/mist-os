@@ -26,6 +26,9 @@ const BT_GAP_CHILD_NAME: &str = "bt-gap";
 const BT_RFCOMM_CHILD_NAME: &str = "bt-rfcomm";
 const BT_FASTPAIR_PROVIDER_CHILD_NAME: &str = "bt-fastpair-provider";
 
+// TODO(https://fxbug.dev/42085245): Remove flag once bt-host is successfully migrated to component
+const IS_BT_HOST_COMPONENT: bool = false;
+
 #[async_trait]
 trait ComponentClientAdapter {
     async fn open_childs_exposed_directory(
@@ -185,10 +188,18 @@ fn main() -> Result<(), Error> {
         }
     }
 
-    // Watch for vendor device drivers and spawn bt-host component if any are found
-    let _task = fasync::Task::spawn(async move {
-        run_device_watcher().await.unwrap_or_else(|e| error!("Error watching devices: {:?}", e))
-    });
+    let mut device_watcher_task: Option<fuchsia_async::Task<()>> = None;
+    if IS_BT_HOST_COMPONENT {
+        // Watch for vendor device drivers and spawn bt-host component if any are found
+        let task = fuchsia_async::Task::spawn(async move {
+            run_device_watcher().await.unwrap_or_else(|e| error!("Error watching devices: {:?}", e))
+        });
+        device_watcher_task = Some(task);
+    };
+    info!(
+        "Device watcher task was{} spawned",
+        if device_watcher_task.is_some() { "" } else { "not" }
+    );
 
     let run_bluetooth = async move {
         // Get the backing service directory of the `bt-rfcomm` and `bt-fastpair-provider` child
