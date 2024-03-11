@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use bedrock_error::Explain;
 use cm_types::Availability;
 use fuchsia_zircon_status as zx;
 use thiserror::Error;
@@ -54,8 +55,8 @@ pub fn advance(
 )]
 pub struct TargetHasStrongerAvailability;
 
-impl TargetHasStrongerAvailability {
-    pub fn as_zx_status(&self) -> zx::Status {
+impl Explain for TargetHasStrongerAvailability {
+    fn as_zx_status(&self) -> zx::Status {
         zx::Status::NOT_FOUND
     }
 }
