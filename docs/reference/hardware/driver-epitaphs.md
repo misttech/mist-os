@@ -11,8 +11,11 @@ Since this page is generated from on a template, the full page is best viewed at
 http://www.fuchsia.dev/fuchsia-src/reference/hardware/driver-epitaphs
 {% endcomment %}
 
-This page lists drivers that are deprecated in the Fuchsia source tree, For the
-drivers in the Fuchsia source tree, see [Fuchsia hardware drivers](drivers.md).
+This page lists drivers that are deprecated. In order to deprecate a driver, it must be
+deleted from the Fuchsia source tree according to the instructions at
+[Deleting Drivers](/docs/development/drivers/best_practices/deleting.md).
+
+For the drivers in the Fuchsia source tree, see [Fuchsia hardware drivers](drivers.md).
 
 <a name="deprecated-drivers"><h2>Deprecated drivers</h2></a>
   <div class="form-checkbox">
