@@ -48,7 +48,8 @@ def GetSplitRustToolchainPaths(packages, host_platforms, target_platforms=None):
         # "wasm32-unknown-unknown",
         "x86_64-unknown-linux-gnu",
     ] + ([
-        "x86_64-apple-darwin"
+        "x86_64-apple-darwin",
+        "aarch64-apple-darwin",
     ] if any("mac-" in plat for plat in host_platforms) else [])
     rust_toolchain_packages = []
     if "rust" not in packages:
