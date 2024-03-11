@@ -3,7 +3,17 @@
 // found in the LICENSE file.
 
 use anyhow::Error;
-use std::{borrow::Cow, fmt::Display, mem::swap, ops::Deref};
+use futures::Stream;
+use pin_project::pin_project;
+use std::{
+    borrow::Cow,
+    fmt::Display,
+    mem::swap,
+    ops::Deref,
+    pin::Pin,
+    task::{ready, Context, Poll},
+};
+use tokio::io::{AsyncBufReadExt, AsyncRead, BufReader, Lines};
 
 /// Start of transaction message
 const TRANSACTION_BEGIN_STR: &'static str = "TXN";
@@ -155,8 +165,11 @@ pub enum ReadError {
     MismatchedTransaction,
     #[error(transparent)]
     UnknownError(#[from] anyhow::Error),
+    #[error(transparent)]
+    IoError(#[from] std::io::Error),
 }
 
+#[derive(Debug)]
 enum TransactionState<'a> {
     /// Initial state
     Start,
@@ -172,7 +185,7 @@ impl<'a> Default for TransactionState<'a> {
 
 /// Transaction reader, which accepts input strings and outputs
 /// transaction data.
-#[derive(Default)]
+#[derive(Default, Debug)]
 struct TransactionReader<'a> {
     state: TransactionState<'a>,
 }
@@ -230,10 +243,61 @@ impl<'a> TransactionReader<'a> {
     }
 }
 
+/// Asynchronous version of TransactionReader,
+/// which can read from a symbolizer's stdout
+/// and return transactions as they complete.
+#[pin_project]
+struct AsyncTransactionReader<T> {
+    reader: TransactionReader<'static>,
+    #[pin]
+    lines: Lines<BufReader<T>>,
+}
+
+impl<T> AsyncTransactionReader<T>
+where
+    T: AsyncRead + Unpin,
+{
+    /// Creates a new async transaction reader in the reading state.
+    fn new(stream: T) -> Self {
+        let lines = BufReader::new(stream).lines();
+        Self { reader: Default::default(), lines }
+    }
+}
+
+impl<T> Stream for AsyncTransactionReader<T>
+where
+    T: AsyncRead + Unpin,
+{
+    type Item = Result<(u64, String), ReadError>;
+
+    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        let this = self.project();
+        match ready!(this.lines.poll_next_line(cx)) {
+            Ok(Some(line)) => {
+                // Tokio's poll works different than futures::Stream.
+                // It expects poll to be called continuously until it returns
+                // Pending, rather than itself signalling the waker if more space
+                // is available in the buffer.
+                // If it returns a line, it's necessary to schedule another wakeup
+                // so that additional lines are returned if they are available in the buffer.
+                cx.waker().wake_by_ref();
+                match this.reader.push_line(Cow::from(line).into()) {
+                    Ok(Some(value)) => Poll::Ready(Some(Ok(value))),
+                    Ok(None) => Poll::Pending,
+                    Err(e) => Poll::Ready(Some(Err(e))),
+                }
+            }
+            Err(err) => Poll::Ready(Some(Err(err.into()))),
+            Ok(None) => Poll::Ready(None),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use assert_matches::assert_matches;
+    use futures::StreamExt;
     use std::fmt::Write;
 
     #[fuchsia::test]
@@ -249,6 +313,19 @@ mod tests {
         // No-op
         assert_eq!(UnescapedMessage::from("nop").sanitize(), "nop");
         assert_eq!(UnescapedMessage::from("nop").sanitize(), "nop");
+    }
+
+    #[fuchsia::test]
+    async fn async_read_transacted_test() {
+        let input = BufReader::new("TXN:0:start\nHello world!\n\n\nTest line 2\nRTXN:0:escaped message\nTXN-COMMIT:0:COMMIT\nTXN:1:second\nsecond transaction\nTXN-COMMIT:1:end\nTXN:1:start".as_bytes());
+        let mut reader = AsyncTransactionReader::new(input);
+        let (txn, msg) = assert_matches!(reader.next().await, Some(Ok(value)) => value);
+        assert_eq!(msg, "Hello world!\n\n\nTest line 2\nTXN:0:escaped message");
+        assert_eq!(txn, 0);
+        let (txn, msg) = assert_matches!(reader.next().await, Some(Ok(value)) => value);
+        assert_eq!(msg, "second transaction");
+        assert_eq!(txn, 1);
+        assert_matches!(reader.next().await, None);
     }
 
     #[fuchsia::test]
