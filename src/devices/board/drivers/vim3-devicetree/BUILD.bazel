@@ -1,0 +1,140 @@
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+load(
+    "@fuchsia_sdk//fuchsia:defs.bzl",
+    "fuchsia_cc_driver",
+    "fuchsia_cc_test",
+    "fuchsia_component_manifest",
+    "fuchsia_driver_bind_bytecode",
+    "fuchsia_driver_component",
+    "fuchsia_package",
+    "fuchsia_package_resource",
+    "fuchsia_test_component",
+    "fuchsia_test_package",
+)
+
+fuchsia_driver_bind_bytecode(
+    name = "vim3-devicetree-bind",
+    output = "vim3-devicetree-bind.bindbc",
+    rules = "vim3-devicetree.bind",
+    deps = [
+        "@fuchsia_sdk//bind/fuchsia.devicetree",
+        "@fuchsia_sdk//bind/fuchsia.khadas.platform",
+        "@fuchsia_sdk//bind/fuchsia.platform",
+    ],
+)
+
+fuchsia_cc_driver(
+    name = "vim3-devicetree-driver",
+    srcs = [
+        "vim3-devicetree.cc",
+        "vim3-devicetree.h",
+    ],
+    linkshared = True,
+    output_name = "vim3-devicetree",
+    deps = [
+        "@fuchsia_sdk//fidl/fuchsia.driver.framework:fuchsia.driver.framework_cpp",
+        "@fuchsia_sdk//pkg/driver_component_cpp",
+        "@fuchsia_sdk//pkg/driver_runtime",
+        "@fuchsia_sdk//pkg/driver_runtime_cpp",
+        "@internal_sdk//fidl/fuchsia.hardware.platform.bus:fuchsia.hardware.platform.bus_cpp",
+        "@internal_sdk//pkg/devicetree-load-visitors",
+        "@internal_sdk//pkg/devicetree-manager",
+    ],
+)
+
+fuchsia_component_manifest(
+    name = "manifest",
+    src = "meta/vim3-devicetree.cml",
+)
+
+fuchsia_driver_component(
+    name = "component",
+    bind_bytecode = ":vim3-devicetree-bind",
+    driver_lib = ":vim3-devicetree-driver",
+    manifest = ":manifest",
+)
+
+fuchsia_package(
+    name = "vim3-devicetree",
+    package_name = "vim3-devicetree",
+    components = [":component"],
+    fuchsia_api_level = "HEAD",
+    package_repository_name = "fuchsia.com",
+    resources = [
+        "@internal_sdk//pkg/devicetree-arm-gicv2",
+        "@internal_sdk//pkg/devicetree-clockimpl-visitor",
+        "@internal_sdk//pkg/devicetree-gpioimpl-visitor",
+        "@internal_sdk//pkg/devicetree-mali-gpu-visitor",
+        "@internal_sdk//pkg/devicetree-registers-visitor",
+        "@internal_sdk//pkg/devicetree-sysmem-visitor",
+    ],
+    visibility = ["//visibility:public"],
+)
+
+# For testing
+fuchsia_package_resource(
+    name = "vim3-dtb",
+    src = "@legacy_ninja_build_outputs//:vim3-dtb",
+    dest = "test-data/khadas-vim3.dtb",
+)
+
+fuchsia_cc_test(
+    name = "vim3-devicetree-test-bin",
+    size = "small",
+    srcs = [
+        "vim3-devicetree-test.cc",
+    ],
+    copts = [
+        "-Wno-vla-cxx-extension",
+    ],
+    deps = [
+        "@fuchsia_sdk//pkg/async-loop-cpp",
+        "@fuchsia_sdk//pkg/async-loop-default",
+        "@internal_sdk//pkg/board-test-helper",
+        "@internal_sdk//pkg/ddk-platform-defs",
+        "@internal_sdk//pkg/zxtest",
+    ],
+)
+
+fuchsia_component_manifest(
+    name = "test-manifest",
+    src = "meta/vim3-devicetree-test.cml",
+    includes = [
+        "@internal_sdk//pkg/sys/component:realm_builder",
+    ],
+)
+
+fuchsia_test_component(
+    name = "vim3-devicetree-test-component",
+    manifest = ":test-manifest",
+    deps = [":vim3-devicetree-test-bin"],
+)
+
+fuchsia_test_package(
+    name = "vim3-devicetree-test-package",
+    package_name = "vim3-devicetree-test",
+    components = [
+        ":component",
+    ],
+    fuchsia_api_level = "HEAD",
+    resources = [
+        ":vim3-dtb",
+        "@internal_sdk//pkg/devicetree-arm-gicv2",
+        "@internal_sdk//pkg/devicetree-clockimpl-visitor",
+        "@internal_sdk//pkg/devicetree-gpioimpl-visitor",
+        "@internal_sdk//pkg/devicetree-mali-gpu-visitor",
+        "@internal_sdk//pkg/devicetree-registers-visitor",
+        "@internal_sdk//pkg/devicetree-sysmem-visitor",
+    ],
+    subpackages_to_flatten = [
+        "//sdk/lib/driver/devicetree/testing:platform-bus-driver",
+        "//sdk/lib/driver/devicetree/testing:driver_test_realm",
+    ],
+    test_components = [
+        ":vim3-devicetree-test-component",
+    ],
+    visibility = ["//visibility:public"],
+)

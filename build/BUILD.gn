@@ -133,7 +133,8 @@ group("non_hermetic_deps") {
     "//build/bazel/examples/*",
     "//build/bazel/tests/*",
     "//sdk/lib/driver/devicetree/*",
-    "//src/devices/gpio/drivers/aml-gpio/*",
+    "//src/devices/board/drivers/vim3-devicetree:*",
+    "//src/devices/gpio/drivers/aml-gpio:*",
   ]
 
   # Products which use Bazel-based assembly have non-hermetic outputs

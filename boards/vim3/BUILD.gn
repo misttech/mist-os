@@ -334,7 +334,8 @@ board_input_bundle("board_driver") {
 board_input_bundle("devicetree_board_driver") {
   drivers = [
     {
-      package_target = "//src/devices/board/drivers/vim3-devicetree:package"
+      package_target =
+          "//src/devices/board/drivers/vim3-devicetree:bazel_package"
       package_set = "bootfs"
       driver_components = [ "meta/vim3-devicetree.cm" ]
     },

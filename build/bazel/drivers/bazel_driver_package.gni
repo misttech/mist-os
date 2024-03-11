@@ -75,6 +75,7 @@ template("bazel_driver_package") {
         ninja = "${bazel_build_target}_build_id_dir"
       },
     ]
+
     metadata = {
       # Used by the check_included_drivers template.
       fuchsia_driver_labels =
@@ -120,6 +121,7 @@ template("bazel_driver_package") {
     if (verify_against_gn) {
       deps += [ ":$verify_target_name" ]
     }
+
     metadata = {
       # Used by the assert_driver_components template.
       driver_component_barrier = []

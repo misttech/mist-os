@@ -17,7 +17,7 @@ group("drivers") {
     "drivers/sherlock:sherlock-factory",
     "drivers/sherlock/post-init",
     "drivers/vim3",
-    "drivers/vim3-devicetree",
+    "drivers/vim3-devicetree:bazel_package",
   ]
 
   if (current_cpu == "x64") {

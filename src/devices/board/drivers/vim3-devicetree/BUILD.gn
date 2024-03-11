@@ -1,12 +1,11 @@
 # Copyright 2023 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
-
+import("//build/bazel/bazel_inputs.gni")
+import("//build/bazel/drivers/bazel_driver_package.gni")
+import("//build/bazel/wrappers.gni")
 import("//build/bind/bind.gni")
-import("//build/components.gni")
 import("//build/devicetree/devicetree.gni")
-import("//build/drivers.gni")
-import("//build/test.gni")
 import("//build/zbi/zbi_input.gni")
 
 group("tests") {
@@ -60,59 +59,27 @@ driver_bind_rules("vim3-devicetree-bind") {
   ]
 }
 
-fuchsia_driver("vim3-devicetree-driver") {
-  output_name = "vim3-devicetree"
-  sources = [ "vim3-devicetree.cc" ]
-  deps = [
-    ":vim3-devicetree-bind",
-    "//sdk/fidl/fuchsia.boot:fuchsia.boot_cpp",
-    "//sdk/fidl/fuchsia.hardware.platform.bus:fuchsia.hardware.platform.bus_cpp",
-    "//sdk/lib/driver/component/cpp:cpp",
-    "//sdk/lib/driver/devicetree/manager",
-    "//sdk/lib/driver/devicetree/visitors:load-visitors",
-    "//sdk/lib/driver/runtime:driver_runtime_cpp",
-    "//src/devices/bin/driver_runtime",
-  ]
-}
-
-fuchsia_driver_component("vim3-devicetree") {
-  deps = [
-    ":vim3",
-    ":vim3-devicetree-driver",
-    ":vim3.visitors",
-  ]
-  info = "vim3-devicetree-info.json"
-  manifest = "meta/vim3-devicetree.cml"
-  is_v1_driver = false
-}
-
-fuchsia_driver_package("package") {
+bazel_driver_package("bazel_package") {
+  bazel_target = "//src/devices/board/drivers/vim3-devicetree:vim3-devicetree"
   package_name = "vim3-devicetree"
-  driver_components = [ ":vim3-devicetree" ]
 }
 
-test("vim3-devicetree-test") {
-  sources = [ "vim3-devicetree-test.cc" ]
-  deps = [
-    "//sdk/lib/driver/devicetree/testing:board-test-helper",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
-    "//zircon/system/ulib/ddk-platform-defs",
-    "//zircon/system/ulib/zxtest",
+bazel_fuchsia_test_package("vim3-devicetree-test-package") {
+  test_package_name = "vim3-devicetree-test"
+  test_component_names = [ "vim3-devicetree-test" ]
+
+  # Integration test for the board driver requires these prebuilt artifacts:
+  #   - devicetree blob (.dtb)
+  #   - Platform bus driver (.far)
+  #   - driver-test-realm package (.far)
+  bazel_inputs = [
+    ":vim3",
+    "//sdk/lib/driver/devicetree/testing:devicetree-test-bazel-inputs",
   ]
 }
 
-resource("test-dtb") {
-  sources = get_target_outputs(":vim3.dtb")
-  outputs = [ "test-data/{{source_file_part}}" ]
+bazel_input_resource("vim3-dtb") {
+  sources = [ "$target_out_dir/khadas-vim3.dtb" ]
+  outputs = [ "{{source_file_part}}" ]
   deps = [ ":vim3" ]
-}
-
-fuchsia_unittest_package("vim3-devicetree-test-package") {
-  package_name = "vim3-devicetree-test"
-  deps = [
-    ":test-dtb",
-    ":vim3-devicetree",
-    ":vim3-devicetree-test",
-  ]
 }

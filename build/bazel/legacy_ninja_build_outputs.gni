@@ -46,6 +46,7 @@ gn_labels_for_bazel_inputs = [
                                "//src/fonts/asset_providers:bazel_inputs",
                                "//sdk:core",
                                "//sdk/lib/driver/devicetree/examples/example-board:test-dtb",
+                               "//src/devices/board/drivers/vim3-devicetree:vim3-dtb",
                                "//sdk/lib/driver/devicetree/testing:devicetree-test-bazel-inputs",
                              ] + eng_platform_aib_labels
 
