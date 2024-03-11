@@ -13,7 +13,7 @@ use assembly_config_schema::{
 use assembly_file_relative_path::SupportsFileRelativePaths;
 use assembly_images_config::ImagesConfig;
 use assembly_tool::SdkToolProvider;
-use assembly_util as util;
+use assembly_util::{read_config, BlobfsCompiledPackageDestination, CompiledPackageDestination};
 use camino::Utf8PathBuf;
 use ffx_assembly_args::{PackageMode, PackageValidationHandling, ProductArgs};
 use std::collections::BTreeMap;
@@ -38,11 +38,10 @@ pub fn assemble(args: ProductArgs) -> Result<()> {
     info!("Reading configuration files.");
     info!("  product: {}", product);
 
-    let config: AssemblyConfig =
-        util::read_config(&product).context("Reading product configuration")?;
+    let config: AssemblyConfig = read_config(&product).context("Reading product configuration")?;
 
     let board_info_path = board_info;
-    let board_info = util::read_config::<BoardInformation>(&board_info_path)
+    let board_info = read_config::<BoardInformation>(&board_info_path)
         .context("Reading board information")?
         // and then resolve the file-relative paths to be relative to the cwd instead.
         .resolve_paths_from_file(&board_info_path)
@@ -53,7 +52,7 @@ pub fn assemble(args: ProductArgs) -> Result<()> {
     let mut board_input_bundles = Vec::new();
     for bundle_path in &board_info.input_bundles {
         let bundle_path = bundle_path.as_utf8_pathbuf().join("board_input_bundle.json");
-        let bundle = util::read_config::<BoardInputBundle>(&bundle_path)
+        let bundle = read_config::<BoardInputBundle>(&bundle_path)
             .with_context(|| format!("Reading board input bundle: {bundle_path}"))?;
         let bundle = bundle
             .resolve_paths_from_file(&bundle_path)
@@ -153,7 +152,7 @@ pub fn assemble(args: ProductArgs) -> Result<()> {
     if !configuration.core_shards.is_empty() {
         let compiled_package_def =
             CompiledPackageDefinition::Additional(AdditionalPackageContents {
-                name: util::CompiledPackageDestination::Core,
+                name: CompiledPackageDestination::Blob(BlobfsCompiledPackageDestination::Core),
                 component_shards: BTreeMap::from([(
                     "core".to_string(),
                     configuration.core_shards.clone(),
@@ -187,7 +186,7 @@ pub fn assemble(args: ProductArgs) -> Result<()> {
 
     if let Some(package_config_path) = additional_packages_path {
         let additional_packages =
-            util::read_config(package_config_path).context("Reading additional package config")?;
+            read_config(package_config_path).context("Reading additional package config")?;
         builder.add_product_packages(additional_packages).context("Adding additional packages")?;
     }
 

@@ -5,7 +5,8 @@
 use argh::FromArgs;
 use assembly_config_schema::BuildType;
 use assembly_util::{
-    BootfsDestination, BootfsPackageDestination, CompiledPackageDestination, PackageDestination,
+    BlobfsCompiledPackageDestination, BootfsDestination, BootfsPackageDestination,
+    PackageDestination,
 };
 use camino::Utf8PathBuf;
 use strum::IntoEnumIterator;
@@ -48,19 +49,11 @@ fn main() {
             (a @ _, _) => Some(a.to_string()),
         })
         .collect();
-    let mut compiled_packages: Vec<String> = CompiledPackageDestination::iter()
+    let mut compiled_packages: Vec<String> = BlobfsCompiledPackageDestination::iter()
         .filter_map(|v| match (v, args.build_type) {
-            (
-                // We ignore fshost here, because it is repackaged into bootfs,
-                // not blobfs, and we collect those bootfs files below.
-                CompiledPackageDestination::Fshost
-                | CompiledPackageDestination::ForTest
-                | CompiledPackageDestination::ForTest2,
-                _,
-            ) => None,
             // Toolbox should not be included on user.
-            (CompiledPackageDestination::Toolbox, BuildType::User) => None,
-            (a @ CompiledPackageDestination::Toolbox, _) => Some(a.to_string()),
+            (BlobfsCompiledPackageDestination::Toolbox, BuildType::User) => None,
+            (a @ BlobfsCompiledPackageDestination::Toolbox, _) => Some(a.to_string()),
             (a @ _, _) => Some(a.to_string()),
         })
         .collect();

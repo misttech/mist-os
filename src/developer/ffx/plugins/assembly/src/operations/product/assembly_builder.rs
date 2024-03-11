@@ -941,7 +941,7 @@ mod tests {
     use assembly_test_util::generate_test_manifest;
     use assembly_tool::testing::FakeToolProvider;
     use assembly_tool::ToolCommandLog;
-    use assembly_util::CompiledPackageDestination;
+    use assembly_util::{CompiledPackageDestination, TestCompiledPackageDestination::ForTest};
     use fuchsia_pkg::{BlobInfo, MetaPackage, PackageBuilder, PackageManifestBuilder};
     use serde_json::json;
     use std::fs::File;
@@ -1694,7 +1694,7 @@ mod tests {
         let mut bundle1 = make_test_assembly_bundle(&vars.outdir, &vars.bundle_path);
         bundle1.packages_to_compile.push(CompiledPackageDefinition::MainDefinition(
             MainPackageDefinition {
-                name: CompiledPackageDestination::ForTest,
+                name: CompiledPackageDestination::Test(ForTest),
                 components: BTreeMap::from([
                     ("component1".into(), "cml1".into()),
                     ("component2".into(), "cml2".into()),
@@ -1707,7 +1707,7 @@ mod tests {
         let bundle2 = AssemblyInputBundle {
             packages_to_compile: vec![CompiledPackageDefinition::Additional(
                 AdditionalPackageContents {
-                    name: CompiledPackageDestination::ForTest,
+                    name: CompiledPackageDestination::Test(ForTest),
                     component_shards: BTreeMap::from([(
                         "component2".into(),
                         vec!["shard1".into()],

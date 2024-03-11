@@ -184,21 +184,45 @@ impl std::fmt::Display for PackageSetDestination {
 /// A package that assembly is allowed to compile then include.
 /// Deserialize is implemented so that AIBs can continue to list the package
 /// name as a string, and we can convert it into this enum.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Deserialize, Serialize)]
+#[serde(untagged)]
+pub enum CompiledPackageDestination {
+    /// A blobfs compiled package.
+    Blob(BlobfsCompiledPackageDestination),
+    /// A bootfs compiled package.
+    Boot(BootfsCompiledPackageDestination),
+    /// Test variants.
+    Test(TestCompiledPackageDestination),
+}
+
+/// A blobfs package that assembly is allowed to compiled then include.
 #[derive(Debug, Clone, EnumIter, PartialEq, Eq, PartialOrd, Ord, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case")]
-pub enum CompiledPackageDestination {
+pub enum BlobfsCompiledPackageDestination {
     /// The compiled core package.
     Core,
     /// The compiled diagnostics package.
     Diagnostics,
-    /// The compiled fshost package.
-    Fshost,
     /// The compiled network package.
     Network,
     /// The compiled system update realm package.
     SystemUpdateRealm,
     /// The compiled toolbox package.
     Toolbox,
+}
+
+/// A blobfs package that assembly is allowed to compiled then include.
+#[derive(Debug, Clone, EnumIter, PartialEq, Eq, PartialOrd, Ord, Deserialize, Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum BootfsCompiledPackageDestination {
+    /// The compiled fshost package.
+    Fshost,
+}
+
+/// Test variants.
+#[derive(Debug, Clone, EnumIter, PartialEq, Eq, PartialOrd, Ord, Deserialize, Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum TestCompiledPackageDestination {
     /// Variant specifically for making tests easier.
     ForTest,
     /// Variant specifically for making tests easier.
@@ -313,6 +337,20 @@ impl std::fmt::Display for CompiledPackageDestination {
     }
 }
 
+impl std::fmt::Display for BlobfsCompiledPackageDestination {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let value = serde_json::to_value(self).expect("serialize enum");
+        write!(f, "{}", value.as_str().expect("enum is str"))
+    }
+}
+
+impl std::fmt::Display for BootfsCompiledPackageDestination {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let value = serde_json::to_value(self).expect("serialize enum");
+        write!(f, "{}", value.as_str().expect("enum is str"))
+    }
+}
+
 impl std::fmt::Display for BootfsComponentForRepackage {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let value = serde_json::to_value(self).expect("serialize enum");
@@ -324,14 +362,16 @@ impl Key for BootfsDestination {}
 impl Key for PackageDestination {}
 impl Key for BootfsPackageDestination {}
 impl Key for PackageSetDestination {}
-impl Key for CompiledPackageDestination {}
+impl Key for BlobfsCompiledPackageDestination {}
+impl Key for BootfsCompiledPackageDestination {}
 impl Key for BootfsComponentForRepackage {}
 impl Destination for String {}
 impl Destination for BootfsDestination {}
 impl Destination for PackageDestination {}
 impl Destination for BootfsPackageDestination {}
 impl Destination for PackageSetDestination {}
-impl Destination for CompiledPackageDestination {}
+impl Destination for BlobfsCompiledPackageDestination {}
+impl Destination for BootfsCompiledPackageDestination {}
 
 #[cfg(test)]
 mod tests {
@@ -371,8 +411,6 @@ mod tests {
             "core",
             "diagnostics",
             "for-test",
-            "for-test",
-            "for-test2",
             "fshost",
             "netcfg-config",
             "network",
@@ -387,7 +425,10 @@ mod tests {
         .collect();
 
         let mut packages: Vec<String> = PackageDestination::iter().map(|p| p.to_string()).collect();
-        packages.append(&mut CompiledPackageDestination::iter().map(|p| p.to_string()).collect());
+        packages
+            .append(&mut BlobfsCompiledPackageDestination::iter().map(|p| p.to_string()).collect());
+        packages
+            .append(&mut BootfsCompiledPackageDestination::iter().map(|p| p.to_string()).collect());
         packages.sort();
         assert_eq!(packages_expected, packages);
 

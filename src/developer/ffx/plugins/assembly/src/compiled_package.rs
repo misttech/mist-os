@@ -249,7 +249,7 @@ mod tests {
     use assembly_config_schema::assembly_config::AdditionalPackageContents;
     use assembly_tool::testing::FakeToolProvider;
     use assembly_tool::ToolProvider;
-    use assembly_util::CompiledPackageDestination;
+    use assembly_util::{CompiledPackageDestination, TestCompiledPackageDestination::ForTest};
     use fuchsia_archive::Utf8Reader;
     use fuchsia_pkg::PackageManifest;
     use std::fs::File;
@@ -265,7 +265,7 @@ mod tests {
         compiled_package_builder
             .add_package_def(
                 &CompiledPackageDefinition::MainDefinition(MainPackageDefinition {
-                    name: CompiledPackageDestination::ForTest,
+                    name: CompiledPackageDestination::Test(ForTest),
                     components: BTreeMap::from([
                         ("component1".into(), "cml1".into()),
                         ("component2".into(), "cml2".into()),
@@ -282,7 +282,7 @@ mod tests {
             .unwrap()
             .add_package_def(
                 &CompiledPackageDefinition::Additional(AdditionalPackageContents {
-                    name: CompiledPackageDestination::ForTest,
+                    name: CompiledPackageDestination::Test(ForTest),
                     component_shards: BTreeMap::from([(
                         "component2".into(),
                         vec!["shard1".into()],
@@ -303,7 +303,7 @@ mod tests {
                 )]),
                 main_bundle_dir: outdir.into(),
                 main_definition: Some(MainPackageDefinition {
-                    name: CompiledPackageDestination::ForTest,
+                    name: CompiledPackageDestination::Test(ForTest),
                     components: BTreeMap::from([
                         ("component1".into(), "cml1".into()),
                         ("component2".into(), "cml2".into()),
@@ -331,7 +331,7 @@ mod tests {
         compiled_package_builder
             .add_package_def(
                 &CompiledPackageDefinition::MainDefinition(MainPackageDefinition {
-                    name: CompiledPackageDestination::ForTest,
+                    name: CompiledPackageDestination::Test(ForTest),
                     components: BTreeMap::from([
                         ("component1".into(), "cml1".into()),
                         ("component2".into(), "cml2".into()),
@@ -348,7 +348,7 @@ mod tests {
             .unwrap()
             .add_package_def(
                 &CompiledPackageDefinition::Additional(AdditionalPackageContents {
-                    name: CompiledPackageDestination::ForTest,
+                    name: CompiledPackageDestination::Test(ForTest),
                     component_shards: BTreeMap::from([(
                         "component2".into(),
                         vec!["shard1".into()],
@@ -381,7 +381,7 @@ mod tests {
 
         let result = compiled_package_builder.add_package_def(
             &CompiledPackageDefinition::MainDefinition(MainPackageDefinition {
-                name: CompiledPackageDestination::ForTest,
+                name: CompiledPackageDestination::Test(ForTest),
                 components: BTreeMap::new(),
                 contents: Vec::default(),
                 includes: Vec::default(),
@@ -399,7 +399,7 @@ mod tests {
 
         let result = compiled_package_builder.add_package_def(
             &CompiledPackageDefinition::MainDefinition(MainPackageDefinition {
-                name: CompiledPackageDestination::ForTest,
+                name: CompiledPackageDestination::Test(ForTest),
                 components: BTreeMap::new(),
                 contents: vec![FileEntry { source: "file1".into(), destination: "file1".into() }],
                 includes: Vec::default(),
@@ -417,7 +417,7 @@ mod tests {
         compiled_package_builder
             .add_package_def(
                 &CompiledPackageDefinition::Additional(AdditionalPackageContents {
-                    name: CompiledPackageDestination::ForTest,
+                    name: CompiledPackageDestination::Test(ForTest),
                     component_shards: BTreeMap::from([(
                         "component2".into(),
                         vec!["shard1".into()],
@@ -438,7 +438,7 @@ mod tests {
         compiled_package_builder
             .add_package_def(
                 &CompiledPackageDefinition::MainDefinition(MainPackageDefinition {
-                    name: CompiledPackageDestination::ForTest,
+                    name: CompiledPackageDestination::Test(ForTest),
                     components: BTreeMap::default(),
                     contents: Vec::default(),
                     includes: Vec::default(),
@@ -450,7 +450,7 @@ mod tests {
 
         let result = compiled_package_builder.add_package_def(
             &CompiledPackageDefinition::MainDefinition(MainPackageDefinition {
-                name: CompiledPackageDestination::ForTest,
+                name: CompiledPackageDestination::Test(ForTest),
                 components: BTreeMap::default(),
                 contents: Vec::default(),
                 includes: Vec::default(),
