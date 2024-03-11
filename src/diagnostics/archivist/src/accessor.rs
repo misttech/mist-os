@@ -43,6 +43,28 @@ use {
     tracing::warn,
 };
 
+#[derive(Debug, Copy, Clone)]
+pub struct BatchRetrievalTimeout(i64);
+
+impl BatchRetrievalTimeout {
+    pub fn from_seconds(s: i64) -> Self {
+        Self(s)
+    }
+
+    #[cfg(test)]
+    pub fn max() -> Self {
+        Self::from_seconds(-1)
+    }
+
+    pub fn seconds(&self) -> i64 {
+        if self.0 > 0 {
+            self.0
+        } else {
+            i64::MAX
+        }
+    }
+}
+
 /// ArchiveAccessorServer represents an incoming connection from a client to an Archivist
 /// instance, through which the client may make Reader requests to the various data
 /// sources the Archivist offers.
@@ -52,6 +74,7 @@ pub struct ArchiveAccessorServer {
     maximum_concurrent_snapshots_per_reader: u64,
     server_task_sender: Arc<Mutex<mpsc::UnboundedSender<fasync::Task<()>>>>,
     server_task_drainer: Mutex<Option<fasync::Task<()>>>,
+    default_batch_timeout_seconds: BatchRetrievalTimeout,
 }
 
 fn validate_and_parse_selectors(
@@ -116,6 +139,7 @@ impl ArchiveAccessorServer {
         inspect_repository: Arc<InspectRepository>,
         logs_repository: Arc<LogsRepository>,
         maximum_concurrent_snapshots_per_reader: u64,
+        default_batch_timeout_seconds: BatchRetrievalTimeout,
     ) -> Self {
         let (snd, rcv) = mpsc::unbounded();
         ArchiveAccessorServer {
@@ -126,6 +150,7 @@ impl ArchiveAccessorServer {
             server_task_drainer: Mutex::new(Some(fasync::Task::spawn(async move {
                 rcv.for_each_concurrent(None, |rx| rx).await
             }))),
+            default_batch_timeout_seconds,
         }
     }
 
@@ -149,6 +174,7 @@ impl ArchiveAccessorServer {
         requests: R,
         params: StreamParameters,
         maximum_concurrent_snapshots_per_reader: u64,
+        default_batch_timeout_seconds: BatchRetrievalTimeout,
     ) -> Result<(), AccessorError> {
         let format = params.format.ok_or(AccessorError::MissingFormat)?;
         if !matches!(format, Format::Json | Format::Cbor) {
@@ -156,8 +182,11 @@ impl ArchiveAccessorServer {
         }
         let mode = params.stream_mode.ok_or(AccessorError::MissingMode)?;
 
-        let performance_config: PerformanceConfig =
-            PerformanceConfig::new(&params, maximum_concurrent_snapshots_per_reader)?;
+        let performance_config: PerformanceConfig = PerformanceConfig::new(
+            &params,
+            maximum_concurrent_snapshots_per_reader,
+            default_batch_timeout_seconds,
+        )?;
 
         let trace_id = ftrace::Id::random();
         match params.data_type.ok_or(AccessorError::MissingDataType)? {
@@ -260,6 +289,7 @@ impl ArchiveAccessorServer {
         let log_repo = Arc::clone(&self.logs_repository);
         let inspect_repo = Arc::clone(&self.inspect_repository);
         let maximum_concurrent_snapshots_per_reader = self.maximum_concurrent_snapshots_per_reader;
+        let default_batch_timeout_seconds = self.default_batch_timeout_seconds;
         self.server_task_sender
             .lock()
             .unbounded_send(fasync::Task::spawn(async move {
@@ -285,6 +315,7 @@ impl ArchiveAccessorServer {
                                 request.iterator,
                                 request.parameters,
                                 maximum_concurrent_snapshots_per_reader,
+                                default_batch_timeout_seconds,
                             )
                             .await
                             {
@@ -728,8 +759,9 @@ impl PerformanceConfig {
     fn new(
         params: &StreamParameters,
         maximum_concurrent_snapshots_per_reader: u64,
+        default_batch_timeout_seconds: BatchRetrievalTimeout,
     ) -> Result<PerformanceConfig, AccessorError> {
-        let batch_timeout_sec_opt = match params {
+        let batch_timeout = match params {
             // If only nested batch retrieval timeout is definitely not set,
             // use the optional outer field.
             StreamParameters {
@@ -753,7 +785,9 @@ impl PerformanceConfig {
             } => batch_retrieval_timeout_seconds,
             // Both the inner and outer fields are set, which is an error.
             _ => return Err(AccessorError::DuplicateBatchTimeout),
-        };
+        }
+        .map(BatchRetrievalTimeout::from_seconds)
+        .unwrap_or(default_batch_timeout_seconds);
 
         let aggregated_content_limit_bytes = match params {
             StreamParameters {
@@ -765,8 +799,7 @@ impl PerformanceConfig {
         };
 
         Ok(PerformanceConfig {
-            batch_timeout_sec: batch_timeout_sec_opt
-                .unwrap_or(constants::PER_COMPONENT_ASYNC_TIMEOUT_SECONDS),
+            batch_timeout_sec: batch_timeout.seconds(),
             aggregated_content_limit_bytes,
             maximum_concurrent_snapshots_per_reader,
         })
@@ -791,7 +824,8 @@ mod tests {
         let inspector = Inspector::default();
         let log_repo = LogsRepository::new(1_000_000, inspector.root());
         let inspect_repo = Arc::new(InspectRepository::new(vec![Arc::downgrade(&pipeline)]));
-        let server = ArchiveAccessorServer::new(inspect_repo, log_repo, 4);
+        let server =
+            ArchiveAccessorServer::new(inspect_repo, log_repo, 4, BatchRetrievalTimeout::max());
         server.spawn_server(pipeline, stream);
 
         // A selector of the form `component:node/path:property` is rejected.
@@ -845,7 +879,12 @@ mod tests {
         let inspector = Inspector::default();
         let log_repo = LogsRepository::new(1_000_000, inspector.root());
         let inspect_repo = Arc::new(InspectRepository::new(vec![Arc::downgrade(&pipeline)]));
-        let server = Arc::new(ArchiveAccessorServer::new(inspect_repo, log_repo, 4));
+        let server = Arc::new(ArchiveAccessorServer::new(
+            inspect_repo,
+            log_repo,
+            4,
+            BatchRetrievalTimeout::max(),
+        ));
         server.spawn_server(pipeline, stream);
 
         // A selector of the form `component:node/path:property` is rejected.
@@ -985,7 +1024,8 @@ mod tests {
         let inspector = Inspector::default();
         let log_repo = LogsRepository::new(1_000_000, inspector.root());
         let inspect_repo = Arc::new(InspectRepository::new(vec![Arc::downgrade(&pipeline)]));
-        let server = ArchiveAccessorServer::new(inspect_repo, log_repo, 4);
+        let server =
+            ArchiveAccessorServer::new(inspect_repo, log_repo, 4, BatchRetrievalTimeout::max());
         server.spawn_server(pipeline, stream);
 
         // A selector of the form `component:node/path:property` is rejected.

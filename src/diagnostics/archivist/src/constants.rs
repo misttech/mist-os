@@ -2,10 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-// Number of seconds to wait for a single component to have its diagnostics data "pumped".
-// This involves diagnostics directory traversal, contents extraction, and snapshotting.
-pub const PER_COMPONENT_ASYNC_TIMEOUT_SECONDS: i64 = 10;
-
 // Divide total batch timeout duration by this value to get the duration that should be allowed
 // on individual lazy nodes/values.
 pub const LAZY_NODE_TIMEOUT_PROPORTION: i64 = 2;

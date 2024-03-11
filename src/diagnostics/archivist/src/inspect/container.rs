@@ -324,7 +324,7 @@ enum Status {
 struct State {
     status: Status,
     unpopulated: Arc<UnpopulatedInspectDataContainer>,
-    batch_timeout: Option<zx::Duration>,
+    batch_timeout: zx::Duration,
     elapsed_time: zx::Duration,
     global_stats: Arc<GlobalConnectionStats>,
     trace_guard: Arc<Option<ftrace::AsyncScope>>,
@@ -376,9 +376,7 @@ impl State {
                         let snapshot = SnapshotData::new(
                             name,
                             data,
-                            self.batch_timeout.unwrap_or(zx::Duration::from_seconds(
-                                constants::PER_COMPONENT_ASYNC_TIMEOUT_SECONDS,
-                            )) / constants::LAZY_NODE_TIMEOUT_PROPORTION,
+                            self.batch_timeout / constants::LAZY_NODE_TIMEOUT_PROPORTION,
                             &self.unpopulated.identity,
                             self.trace_id,
                         )
@@ -435,7 +433,7 @@ impl UnpopulatedInspectDataContainer {
         let state = State {
             status: Status::Begin,
             unpopulated: this,
-            batch_timeout: Some(zx::Duration::from_seconds(timeout)),
+            batch_timeout: zx::Duration::from_seconds(timeout),
             global_stats,
             elapsed_time: zx::Duration::from_nanos(0),
             trace_guard: Arc::new(trace_guard),
@@ -451,38 +449,34 @@ impl UnpopulatedInspectDataContainer {
             let trace_guard = Arc::clone(&state.trace_guard);
             let trace_id = state.trace_id;
 
-            let fut = state.iterate(start_time);
-            match timeout {
-                None => fut.boxed(),
-                Some(timeout) => fut
-                    .on_timeout((timeout - elapsed_time).after_now(), move || {
-                        warn!(identity = ?unpopulated_for_timeout.identity.moniker,
+            state
+                .iterate(start_time)
+                .on_timeout((timeout - elapsed_time).after_now(), move || {
+                    warn!(identity = ?unpopulated_for_timeout.identity.moniker,
                             "{}", &*TIMEOUT_MESSAGE);
-                        global_stats.add_timeout();
-                        let result = PopulatedInspectDataContainer {
-                            identity: Arc::clone(&unpopulated_for_timeout.identity),
-                            inspect_matcher: unpopulated_for_timeout.inspect_matcher.clone(),
-                            snapshot: SnapshotData::failed(
-                                schema::InspectError { message: TIMEOUT_MESSAGE.to_string() },
-                                None,
-                            ),
-                        };
-                        Some((
-                            result,
-                            State {
-                                status: Status::Pending(VecDeque::new()),
-                                unpopulated: unpopulated_for_timeout,
-                                batch_timeout: None,
-                                global_stats,
-                                elapsed_time: elapsed_time
-                                    + (zx::Time::get_monotonic() - start_time),
-                                trace_guard,
-                                trace_id,
-                            },
-                        ))
-                    })
-                    .boxed(),
-            }
+                    global_stats.add_timeout();
+                    let result = PopulatedInspectDataContainer {
+                        identity: Arc::clone(&unpopulated_for_timeout.identity),
+                        inspect_matcher: unpopulated_for_timeout.inspect_matcher.clone(),
+                        snapshot: SnapshotData::failed(
+                            schema::InspectError { message: TIMEOUT_MESSAGE.to_string() },
+                            None,
+                        ),
+                    };
+                    Some((
+                        result,
+                        State {
+                            status: Status::Pending(VecDeque::new()),
+                            unpopulated: unpopulated_for_timeout,
+                            batch_timeout: timeout,
+                            global_stats,
+                            elapsed_time: elapsed_time + (zx::Time::get_monotonic() - start_time),
+                            trace_guard,
+                            trace_id,
+                        },
+                    ))
+                })
+                .boxed()
         })
     }
 }

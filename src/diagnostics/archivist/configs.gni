@@ -22,6 +22,7 @@ default_config = {
   pipelines_path = "/config/data"
   allow_serial_logs = []
   deny_serial_log_tags = []
+  per_component_batch_timeout_seconds = 10
 }
 
 # LINT.ThenChange(/src/lib/assembly/platform_configuration/src/subsystems/diagnostics.rs)
@@ -33,4 +34,5 @@ embedded_config = {
   enable_klog = false
   log_to_debuglog = false
   num_threads = 1
+  per_component_batch_timeout_seconds = -1
 }

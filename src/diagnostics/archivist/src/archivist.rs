@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::{
-    accessor::ArchiveAccessorServer,
+    accessor::{ArchiveAccessorServer, BatchRetrievalTimeout},
     component_lifecycle,
     error::Error,
     events::{
@@ -113,6 +113,7 @@ impl Archivist {
             Arc::clone(&inspect_repo),
             Arc::clone(&logs_repo),
             config.maximum_concurrent_snapshots_per_reader,
+            BatchRetrievalTimeout::from_seconds(config.per_component_batch_timeout_seconds),
         ));
 
         let log_server = Arc::new(LogServer::new(Arc::clone(&logs_repo)));
@@ -422,6 +423,7 @@ mod tests {
             bind_services: vec![],
             allow_serial_logs: vec![],
             deny_serial_log_tags: vec![],
+            per_component_batch_timeout_seconds: -1,
         };
 
         let mut archivist = Archivist::new(config).await;

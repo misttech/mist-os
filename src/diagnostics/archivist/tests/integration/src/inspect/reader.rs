@@ -87,6 +87,7 @@ async fn read_component_with_hanging_lazy_node() -> Result<(), Error> {
     let accessor = realm_proxy.connect_to_protocol::<ArchiveAccessorMarker>().await?;
     let data = ArchiveReader::new()
         .with_archive(accessor)
+        .with_batch_retrieval_timeout_seconds(10)
         .add_selector("hanging_data:*")
         .snapshot::<Inspect>()
         .await
