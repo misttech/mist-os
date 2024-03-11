@@ -55,6 +55,7 @@ pub(crate) async fn serve(
     cobalt_sender: ProtocolSender<MetricEvent>,
     serve_id: Arc<AtomicU32>,
     get_node: Arc<finspect::Node>,
+    protect_dynamic_packages: crate::DynamicProtection,
 ) -> Result<(), Error> {
     stream
         .map_err(anyhow::Error::new)
@@ -86,6 +87,7 @@ pub(crate) async fn serve(
                     let response = get(
                         package_index.as_ref(),
                         base_packages.as_ref(),
+                        cache_packages.as_ref(),
                         executability_restrictions,
                         &blobfs,
                         &open_packages,
@@ -96,6 +98,7 @@ pub(crate) async fn serve(
                         scope.clone(),
                         cobalt_sender,
                         &node,
+                        protect_dynamic_packages,
                     )
                     .await;
                     guard.map(|o| {
@@ -111,7 +114,6 @@ pub(crate) async fn serve(
                     let fpkg::PackageUrl { url } = subpackage;
                     let () = responder.send(
                         get_subpackage(
-                            package_index.as_ref(),
                             base_packages.as_ref(),
                             executability_restrictions,
                             &open_packages,
@@ -152,8 +154,35 @@ pub(crate) async fn serve(
         .await
 }
 
+#[derive(Debug)]
+enum PackageAvailability {
+    Always,
+    Open(Arc<package_directory::RootDir<blobfs::Client>>),
+    Unknown,
+}
+
+impl PackageAvailability {
+    fn get(
+        base_packages: &BasePackages,
+        cache_packages: &CachePackages,
+        open_packages: &package_directory::RootDirCache<blobfs::Client>,
+        package: &fuchsia_hash::Hash,
+    ) -> Self {
+        if base_packages.is_package(*package) {
+            return Self::Always;
+        }
+        if cache_packages.is_package(*package) {
+            return Self::Always;
+        }
+        match open_packages.get(package) {
+            Some(root_dir) => Self::Open(root_dir),
+            None => Self::Unknown,
+        }
+    }
+}
+
 #[derive(PartialEq, Eq, Debug)]
-pub(crate) enum PackageStatus {
+enum PackageStatus {
     Base,
     Active,
     Other,
@@ -181,13 +210,15 @@ enum ExecutabilityStatus {
 
 fn executability_status(
     executability_restrictions: system_image::ExecutabilityRestrictions,
-    package_status: &PackageStatus,
+    base_packages: &BasePackages,
+    package: fuchsia_hash::Hash,
 ) -> ExecutabilityStatus {
-    use {system_image::ExecutabilityRestrictions::*, ExecutabilityStatus::*, PackageStatus::*};
-    match (executability_restrictions, package_status) {
-        (Enforce, Base) => Allowed,
-        (Enforce, _) => Forbidden,
-        (DoNotEnforce, _) => Allowed,
+    use {system_image::ExecutabilityRestrictions::*, ExecutabilityStatus::*};
+    let is_base = base_packages.is_package(package);
+    match (is_base, executability_restrictions) {
+        (true, _) => Allowed,
+        (false, Enforce) => Forbidden,
+        (false, DoNotEnforce) => Allowed,
     }
 }
 
@@ -205,6 +236,7 @@ fn make_pkgdir_flags(executability_status: ExecutabilityStatus) -> fio::OpenFlag
 async fn get(
     package_index: &async_lock::RwLock<PackageIndex>,
     base_packages: &BasePackages,
+    cache_packages: &CachePackages,
     executability_restrictions: system_image::ExecutabilityRestrictions,
     blobfs: &blobfs::Client,
     open_packages: &package_directory::RootDirCache<blobfs::Client>,
@@ -215,12 +247,14 @@ async fn get(
     scope: package_directory::ExecutionScope,
     cobalt_sender: ProtocolSender<MetricEvent>,
     node: &finspect::Node,
+    protect_dynamic_packages: crate::DynamicProtection,
 ) -> Result<(), Status> {
     let guard =
         package_index.write().await.start_writing(meta_far_blob.blob_id.into(), gc_protection);
     let get_ret = get_impl(
         package_index,
         base_packages,
+        cache_packages,
         executability_restrictions,
         blobfs,
         open_packages,
@@ -231,6 +265,7 @@ async fn get(
         scope,
         cobalt_sender,
         node,
+        protect_dynamic_packages,
     )
     .await;
     let stop_ret = package_index.write().await.stop_writing(guard);
@@ -256,6 +291,7 @@ async fn get(
 async fn get_impl(
     package_index: &async_lock::RwLock<PackageIndex>,
     base_packages: &BasePackages,
+    cache_packages: &CachePackages,
     executability_restrictions: system_image::ExecutabilityRestrictions,
     blobfs: &blobfs::Client,
     open_packages: &package_directory::RootDirCache<blobfs::Client>,
@@ -266,6 +302,7 @@ async fn get_impl(
     scope: package_directory::ExecutionScope,
     mut cobalt_sender: ProtocolSender<MetricEvent>,
     node: &finspect::Node,
+    protect_dynamic_packages: crate::DynamicProtection,
 ) -> Result<(), Status> {
     let () = node.record_int("started-time", zx::Time::get_monotonic().into_nanos());
     let () = node.record_string("meta-far-id", meta_far_blob.blob_id.to_string());
@@ -275,7 +312,7 @@ async fn get_impl(
     let needed_blobs = needed_blobs.into_stream().map_err(|_| Status::INTERNAL)?;
     let pkg: Hash = meta_far_blob.blob_id.into();
 
-    let (root_dir, package_status) = match gc_protection {
+    let root_dir = match gc_protection {
         // During OTA (which is the only client of Retained protection) do not short-circuit
         // fetches of packages expected to be resident, so that the system can recover from
         // unexpectedly absent blobs.
@@ -294,48 +331,112 @@ async fn get_impl(
                 cobalt_sender.open_io_error();
                 Status::UNAVAILABLE
             })?;
-            (Arc::new(root_dir), PackageStatus::Other)
+            Arc::new(root_dir)
         }
         fpkg::GcProtection::OpenPackageTracking => {
-            match get_package_status(base_packages, package_index, &pkg).await {
-                PackageStatus::Other => {
-                    let root_dir = serve_needed_blobs(
-                        needed_blobs,
-                        meta_far_blob,
-                        gc_protection,
-                        package_index,
-                        blobfs,
-                        node,
-                    )
-                    .await
-                    .map_err(|e| {
-                        error!("error while caching package {}: {:#}", pkg, anyhow!(e));
-                        cobalt_sender.open_io_error();
-                        Status::UNAVAILABLE
-                    })?;
-                    let root_dir =
-                        open_packages.get_or_insert(pkg, Some(root_dir)).await.map_err(|e| {
-                            error!("get: open_packages.get_or_insert {}: {:#}", pkg, anyhow!(e));
-                            cobalt_sender.open_io_error();
-                            Status::INTERNAL
-                        })?;
-                    (root_dir, PackageStatus::Active)
+            // If the dynamic index is active, use it to short-ciruit resolves. Otherwise, use the
+            // open package cache.
+            match protect_dynamic_packages {
+                crate::DynamicProtection::Enabled => {
+                    match get_package_status(base_packages, package_index, &pkg).await {
+                        PackageStatus::Other => {
+                            let root_dir = serve_needed_blobs(
+                                needed_blobs,
+                                meta_far_blob,
+                                gc_protection,
+                                package_index,
+                                blobfs,
+                                node,
+                            )
+                            .await
+                            .map_err(|e| {
+                                error!("error while caching package {}: {:#}", pkg, anyhow!(e));
+                                cobalt_sender.open_io_error();
+                                Status::UNAVAILABLE
+                            })?;
+                            open_packages.get_or_insert(pkg, Some(root_dir)).await.map_err(|e| {
+                                error!(
+                                    "get: open_packages.get_or_insert {}: {:#}",
+                                    pkg,
+                                    anyhow!(e)
+                                );
+                                cobalt_sender.open_io_error();
+                                Status::INTERNAL
+                            })?
+                        }
+                        PackageStatus::Base | PackageStatus::Active => {
+                            let () =
+                                needed_blobs.control_handle().shutdown_with_epitaph(Status::OK);
+                            open_packages.get_or_insert(pkg, None).await.map_err(|e| {
+                                error!(
+                                    "get: open_packages.get_or_insert {}: {:#}",
+                                    pkg,
+                                    anyhow!(e)
+                                );
+                                cobalt_sender.open_io_error();
+                                Status::INTERNAL
+                            })?
+                        }
+                    }
                 }
-                ps @ PackageStatus::Base | ps @ PackageStatus::Active => {
-                    let () = needed_blobs.control_handle().shutdown_with_epitaph(Status::OK);
-                    let root_dir = open_packages.get_or_insert(pkg, None).await.map_err(|e| {
-                        error!("get: open_packages.get_or_insert {}: {:#}", pkg, anyhow!(e));
-                        cobalt_sender.open_io_error();
-                        Status::INTERNAL
-                    })?;
-                    (root_dir, ps)
+                crate::DynamicProtection::Disabled => {
+                    match PackageAvailability::get(
+                        base_packages,
+                        cache_packages,
+                        open_packages,
+                        &pkg,
+                    ) {
+                        PackageAvailability::Unknown => {
+                            let root_dir = serve_needed_blobs(
+                                needed_blobs,
+                                meta_far_blob,
+                                gc_protection,
+                                package_index,
+                                blobfs,
+                                node,
+                            )
+                            .await
+                            .map_err(|e| {
+                                error!("error while caching package {}: {:#}", pkg, anyhow!(e));
+                                cobalt_sender.open_io_error();
+                                Status::UNAVAILABLE
+                            })?;
+                            open_packages.get_or_insert(pkg, Some(root_dir)).await.map_err(|e| {
+                                error!(
+                                    "get: open_packages.get_or_insert {}: {:#}",
+                                    pkg,
+                                    anyhow!(e)
+                                );
+                                cobalt_sender.open_io_error();
+                                Status::INTERNAL
+                            })?
+                        }
+                        PackageAvailability::Open(root_dir) => {
+                            let () =
+                                needed_blobs.control_handle().shutdown_with_epitaph(Status::OK);
+                            root_dir
+                        }
+                        PackageAvailability::Always => {
+                            let () =
+                                needed_blobs.control_handle().shutdown_with_epitaph(Status::OK);
+                            open_packages.get_or_insert(pkg, None).await.map_err(|e| {
+                                error!(
+                                    "get: open_packages.get_or_insert {}: {:#}",
+                                    pkg,
+                                    anyhow!(e)
+                                );
+                                cobalt_sender.open_io_error();
+                                Status::INTERNAL
+                            })?
+                        }
+                    }
                 }
             }
         }
     };
 
     let open_flags =
-        make_pkgdir_flags(executability_status(executability_restrictions, &package_status));
+        make_pkgdir_flags(executability_status(executability_restrictions, base_packages, pkg));
     let () = root_dir.open(scope, open_flags, vfs::path::Path::dot(), dir.into_channel().into());
 
     cobalt_sender.open_success();
@@ -780,7 +881,6 @@ async fn serve_package_index(
 }
 
 async fn get_subpackage(
-    package_index: &async_lock::RwLock<PackageIndex>,
     base_packages: &BasePackages,
     executability_restrictions: system_image::ExecutabilityRestrictions,
     open_packages: &package_directory::RootDirCache<blobfs::Client>,
@@ -831,7 +931,8 @@ async fn get_subpackage(
             scope,
             make_pkgdir_flags(executability_status(
                 executability_restrictions,
-                &get_package_status(base_packages, package_index, &hash).await,
+                base_packages,
+                *hash,
             )),
             vfs::path::Path::dot(),
             dir.into_channel().into(),
@@ -2326,6 +2427,7 @@ mod get_handler_tests {
             get(
                 &package_index,
                 &BasePackages::new_test_only(HashSet::new(), vec![]),
+                &CachePackages::new_test_only(HashSet::new(), vec![]),
                 system_image::ExecutabilityRestrictions::DoNotEnforce,
                 &blobfs,
                 &open_packages,
@@ -2341,6 +2443,7 @@ mod get_handler_tests {
                 .serve_and_log_errors()
                 .0,
                 &inspector.root().create_child("get"),
+                crate::DynamicProtection::Enabled,
             )
             .await,
             Err(Status::UNAVAILABLE)

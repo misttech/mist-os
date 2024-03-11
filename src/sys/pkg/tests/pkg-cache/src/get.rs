@@ -765,3 +765,70 @@ async fn get_subpackage_fails_if_superpackage_closed() {
         Ok(Err(fpkg::GetSubpackageError::SuperpackageClosed))
     );
 }
+
+#[fuchsia_async::run_singlethreaded(test)]
+async fn get_uses_open_packages_to_short_circuit() {
+    let env = TestEnv::builder().protect_dynamic_packages(false).build().await;
+    let blob_content = &b"some-content"[..];
+    let pkg = PackageBuilder::new("ephemeral")
+        .add_resource_at("content-blob", blob_content)
+        .build()
+        .await
+        .unwrap();
+
+    // Add the package to the open package cache.
+    let dir = crate::get_and_verify_package(&env.proxies.package_cache, &pkg).await;
+
+    // Delete its content blob.
+    let content_hash = MerkleTree::from_reader(blob_content).unwrap().root();
+    let () = env.blobfs.client().delete_blob(&content_hash).await.unwrap();
+
+    {
+        // A second Get while the package is still open will not require writing any blobs, even
+        // though the content blob is missing, because of the short-circuit.
+        let (needed_blobs, needed_blobs_server_end) =
+            fidl::endpoints::create_proxy::<NeededBlobsMarker>().unwrap();
+        let _get_fut = env
+            .proxies
+            .package_cache
+            .get(
+                &fpkg::BlobInfo { blob_id: BlobId::from(*pkg.hash()).into(), length: 0 },
+                fpkg::GcProtection::OpenPackageTracking,
+                needed_blobs_server_end,
+                fidl::endpoints::create_endpoints().1,
+            )
+            .map_ok(|res| res.map_err(Status::from_raw));
+        // NeededBlobs closed with OK because no blobs are needed.
+        assert_matches!(
+            needed_blobs.open_meta_blob(fpkg::BlobType::Delivery).await,
+            Err(fidl::Error::ClientChannelClosed{status, ..})
+                if status == Status::OK
+        );
+    }
+
+    // Close the package, wait for it to leave the open package cache.
+    drop(dir);
+    let () = env.wait_for_package_to_close(pkg.hash()).await;
+
+    // With the package out of the open package cache, the short-circuit logic should no longer
+    // trigger and pkg-cache should ask for the content blob we deleted.
+    let (needed_blobs, needed_blobs_server_end) =
+        fidl::endpoints::create_proxy::<NeededBlobsMarker>().unwrap();
+    let _get_fut = env
+        .proxies
+        .package_cache
+        .get(
+            &fpkg::BlobInfo { blob_id: BlobId::from(*pkg.hash()).into(), length: 0 },
+            fpkg::GcProtection::OpenPackageTracking,
+            needed_blobs_server_end,
+            fidl::endpoints::create_endpoints().1,
+        )
+        .map_ok(|res| res.map_err(Status::from_raw));
+    // meta.far not needed because we didn't delete it.
+    assert_matches!(needed_blobs.open_meta_blob(fpkg::BlobType::Delivery).await, Ok(Ok(None)));
+    // pkg-cache is now requesting the deleted content blob.
+    assert_eq!(
+        get_missing_blobs(&needed_blobs).await,
+        vec![fpkg::BlobInfo { blob_id: BlobId::from(content_hash).into(), length: 0 }]
+    );
+}

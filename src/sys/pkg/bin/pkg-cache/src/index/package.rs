@@ -271,10 +271,7 @@ pub async fn set_retained_index(
 mod tests {
     use {
         super::*,
-        crate::{
-            cache_service::PackageStatus, index::dynamic::Package,
-            test_utils::add_meta_far_to_blobfs,
-        },
+        crate::{index::dynamic::Package, test_utils::add_meta_far_to_blobfs},
         assert_matches::assert_matches,
         maplit::hashmap,
     };

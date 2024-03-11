@@ -221,6 +221,7 @@ async fn main_inner() -> Result<(), Error> {
                         cobalt_sender.clone(),
                         Arc::clone(&cache_inspect_id),
                         Arc::clone(&cache_get_node),
+                        protect_dynamic_packages,
                     )
                     .unwrap_or_else(|e| {
                         error!(
