@@ -200,6 +200,7 @@ def _boringssl_repository_impl(repo_ctx):
         [
             repo_ctx.path("src/util/generate_build_files.py"),
             "bazel",
+            "--embed_test_data=false",
         ],
         quiet = False,  # False for debugging.
     )
