@@ -518,6 +518,8 @@ struct Inner {
     trim_listener: Option<EventListener>,
     /// This controls how we allocate our free space to manage fragmentation.
     strategy: Box<dyn strategy::AllocatorStrategy>,
+    /// Tracks the number of allocations of size 1,2,...63,>=64.
+    histogram: [u64; 64],
 }
 
 impl Inner {
@@ -685,6 +687,7 @@ impl Allocator {
                 trim_reserved_bytes: 0,
                 trim_listener: None,
                 strategy,
+                histogram: [0; 64],
             }),
             allocation_mutex: futures::lock::Mutex::new(()),
             counters: Mutex::new(AllocatorCounters::default()),
@@ -716,6 +719,13 @@ impl Allocator {
             .keys()
             .cloned()
             .collect::<Vec<_>>()
+    }
+
+    /// A histogram of allocation request sizes.
+    /// The index into the array is 'number of blocks'.
+    /// The last bucket is a catch-all for larger allocation requests.
+    pub fn histogram(&self) -> [u64; 64] {
+        self.inner.lock().unwrap().histogram
     }
 
     /// Creates a new (empty) allocator.
@@ -1009,6 +1019,14 @@ impl Allocator {
                         sizes.set(i, counters.persistent_layer_file_sizes[i]);
                     }
                     root.record(sizes);
+
+                    let allocator_data = this.histogram();
+                    let alloc_sizes =
+                        root.create_uint_array("allocation_size_histogram", allocator_data.len());
+                    for (i, count) in allocator_data.iter().enumerate() {
+                        alloc_sizes.set(i, *count);
+                    }
+                    root.record(alloc_sizes);
                 }
                 Ok(inspector)
             }
@@ -1131,6 +1149,8 @@ impl Allocator {
         let mut trim_listener = None;
         {
             let mut inner = self.inner.lock().unwrap();
+            inner.histogram[std::cmp::min(63, len / self.block_size) as usize] += 1;
+
             // If trimming would be the reason that this allocation gets cut short, wait for
             // trimming to complete before proceeding.
             let avail = self
