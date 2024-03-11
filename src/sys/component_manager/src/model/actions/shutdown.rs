@@ -3375,14 +3375,7 @@ mod tests {
                 "d",
                 ComponentDeclBuilder::new()
                     .protocol_default("serviceD")
-                    .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
-                        source: ExposeSource::Self_,
-                        source_name: "serviceD".parse().unwrap(),
-                        source_dictionary: None,
-                        target_name: "serviceD".parse().unwrap(),
-                        target: ExposeTarget::Parent,
-                        availability: cm_rust::Availability::Required,
-                    }))
+                    .expose(ExposeBuilder::protocol().name("serviceD").source(ExposeSource::Self_))
                     .build(),
             ),
             (
@@ -3525,14 +3518,7 @@ mod tests {
                 "d",
                 ComponentDeclBuilder::new()
                     .protocol_default("serviceD")
-                    .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
-                        source: ExposeSource::Self_,
-                        source_name: "serviceD".parse().unwrap(),
-                        source_dictionary: None,
-                        target_name: "serviceD".parse().unwrap(),
-                        target: ExposeTarget::Parent,
-                        availability: cm_rust::Availability::Required,
-                    }))
+                    .expose(ExposeBuilder::protocol().name("serviceD").source(ExposeSource::Self_))
                     .build(),
             ),
             (
@@ -3540,14 +3526,7 @@ mod tests {
                 ComponentDeclBuilder::new()
                     .protocol_default("serviceE")
                     .use_(UseBuilder::protocol().name("serviceD"))
-                    .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
-                        source: ExposeSource::Self_,
-                        source_name: "serviceE".parse().unwrap(),
-                        source_dictionary: None,
-                        target_name: "serviceE".parse().unwrap(),
-                        target: ExposeTarget::Parent,
-                        availability: cm_rust::Availability::Required,
-                    }))
+                    .expose(ExposeBuilder::protocol().name("serviceE").source(ExposeSource::Self_))
                     .build(),
             ),
             (
@@ -3728,14 +3707,7 @@ mod tests {
                 "d",
                 ComponentDeclBuilder::new()
                     .protocol_default("serviceD")
-                    .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
-                        source: ExposeSource::Self_,
-                        source_name: "serviceD".parse().unwrap(),
-                        source_dictionary: None,
-                        target_name: "serviceD".parse().unwrap(),
-                        target: ExposeTarget::Parent,
-                        availability: cm_rust::Availability::Required,
-                    }))
+                    .expose(ExposeBuilder::protocol().name("serviceD").source(ExposeSource::Self_))
                     .build(),
             ),
             (
@@ -3743,14 +3715,7 @@ mod tests {
                 ComponentDeclBuilder::new()
                     .protocol_default("serviceE")
                     .use_(UseBuilder::protocol().name("serviceE"))
-                    .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
-                        source: ExposeSource::Self_,
-                        source_name: "serviceE".parse().unwrap(),
-                        source_dictionary: None,
-                        target_name: "serviceE".parse().unwrap(),
-                        target: ExposeTarget::Parent,
-                        availability: cm_rust::Availability::Required,
-                    }))
+                    .expose(ExposeBuilder::protocol().name("serviceE").source(ExposeSource::Self_))
                     .build(),
             ),
             (
@@ -3893,14 +3858,7 @@ mod tests {
                 "c",
                 ComponentDeclBuilder::new()
                     .protocol_default("serviceC")
-                    .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
-                        source: ExposeSource::Self_,
-                        source_name: "serviceC".parse().unwrap(),
-                        source_dictionary: None,
-                        target_name: "serviceC".parse().unwrap(),
-                        target: ExposeTarget::Parent,
-                        availability: cm_rust::Availability::Required,
-                    }))
+                    .expose(ExposeBuilder::protocol().name("serviceC").source(ExposeSource::Self_))
                     .build(),
             ),
             (
@@ -3983,14 +3941,7 @@ mod tests {
                 "b",
                 ComponentDeclBuilder::new()
                     .protocol_default("serviceC")
-                    .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
-                        source: ExposeSource::Self_,
-                        source_name: "serviceC".parse().unwrap(),
-                        source_dictionary: None,
-                        target_name: "serviceC".parse().unwrap(),
-                        target: ExposeTarget::Parent,
-                        availability: cm_rust::Availability::Required,
-                    }))
+                    .expose(ExposeBuilder::protocol().name("serviceC").source(ExposeSource::Self_))
                     .build(),
             ),
             ("c", ComponentDeclBuilder::new().build()),
@@ -4065,13 +4016,7 @@ mod tests {
             (
                 "b",
                 ComponentDeclBuilder::new()
-                    .expose(ExposeDecl::Runner(ExposeRunnerDecl {
-                        source: ExposeSource::Self_,
-                        source_name: "test.runner".parse().unwrap(),
-                        source_dictionary: None,
-                        target_name: "test.runner".parse().unwrap(),
-                        target: ExposeTarget::Parent,
-                    }))
+                    .expose(ExposeBuilder::runner().name("test.runner").source(ExposeSource::Self_))
                     .build(),
             ),
             ("c", ComponentDeclBuilder::new().build()),
@@ -4156,14 +4101,7 @@ mod tests {
                 "b",
                 ComponentDeclBuilder::new()
                     .protocol_default("serviceB")
-                    .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
-                        source: ExposeSource::Self_,
-                        source_name: "serviceB".parse().unwrap(),
-                        source_dictionary: None,
-                        target_name: "serviceB".parse().unwrap(),
-                        target: ExposeTarget::Parent,
-                        availability: cm_rust::Availability::Required,
-                    }))
+                    .expose(ExposeBuilder::protocol().name("serviceB").source(ExposeSource::Self_))
                     .use_(UseBuilder::protocol().name("serviceC"))
                     .build(),
             ),
@@ -4171,14 +4109,7 @@ mod tests {
                 "c",
                 ComponentDeclBuilder::new()
                     .protocol_default("serviceC")
-                    .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
-                        source: ExposeSource::Self_,
-                        source_name: "serviceC".parse().unwrap(),
-                        source_dictionary: None,
-                        target_name: "serviceC".parse().unwrap(),
-                        target: ExposeTarget::Parent,
-                        availability: cm_rust::Availability::Required,
-                    }))
+                    .expose(ExposeBuilder::protocol().name("serviceC").source(ExposeSource::Self_))
                     .build(),
             ),
         ];
@@ -4254,14 +4185,7 @@ mod tests {
                 "b",
                 ComponentDeclBuilder::new()
                     .protocol_default("serviceC")
-                    .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
-                        source: ExposeSource::Self_,
-                        source_name: "serviceC".parse().unwrap(),
-                        source_dictionary: None,
-                        target_name: "serviceC".parse().unwrap(),
-                        target: ExposeTarget::Parent,
-                        availability: cm_rust::Availability::Required,
-                    }))
+                    .expose(ExposeBuilder::protocol().name("serviceC").source(ExposeSource::Self_))
                     .build(),
             ),
             ("c", ComponentDeclBuilder::new().build()),

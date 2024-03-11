@@ -2856,14 +2856,8 @@ pub mod tests {
             availability: Availability::Required,
         });
         let example_capability = CapabilityBuilder::protocol().name("bar").build();
-        let example_expose = ExposeDecl::Protocol(ExposeProtocolDecl {
-            source: ExposeSource::Self_,
-            target: ExposeTarget::Parent,
-            source_name: "bar".parse().unwrap(),
-            source_dictionary: None,
-            target_name: "bar".parse().unwrap(),
-            availability: cm_rust::Availability::Required,
-        });
+        let example_expose =
+            ExposeBuilder::protocol().name("bar").source(ExposeSource::Self_).build();
         let example_use = UseBuilder::protocol().name("baz").build();
         let env_a = EnvironmentBuilder::new().name("env_a").build();
         let env_b = EnvironmentBuilder::new().name("env_b").build();

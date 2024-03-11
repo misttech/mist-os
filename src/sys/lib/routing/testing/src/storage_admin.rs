@@ -231,14 +231,11 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
                         target_name: "data".parse().unwrap(),
                         availability: Availability::Required,
                     }))
-                    .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
-                        source: ExposeSource::Capability("data".parse().unwrap()),
-                        source_name: "fuchsia.sys2.StorageAdmin".parse().unwrap(),
-                        source_dictionary: None,
-                        target_name: "fuchsia.sys2.StorageAdmin".parse().unwrap(),
-                        target: ExposeTarget::Parent,
-                        availability: cm_rust::Availability::Required,
-                    }))
+                    .expose(
+                        ExposeBuilder::protocol()
+                            .name("fuchsia.sys2.StorageAdmin")
+                            .source(ExposeSource::Capability("data".parse().unwrap())),
+                    )
                     .child_default("d")
                     .build(),
             ),
@@ -511,14 +508,11 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
                         target_name: "data".parse().unwrap(),
                         availability: Availability::Required,
                     }))
-                    .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
-                        source: ExposeSource::Capability("unrelated.protocol".parse().unwrap()),
-                        source_name: "fuchsia.sys2.StorageAdmin".parse().unwrap(),
-                        source_dictionary: None,
-                        target_name: "fuchsia.sys2.StorageAdmin".parse().unwrap(),
-                        target: ExposeTarget::Parent,
-                        availability: cm_rust::Availability::Required,
-                    }))
+                    .expose(
+                        ExposeBuilder::protocol().name("fuchsia.sys2.StorageAdmin").source(
+                            ExposeSource::Capability("unrelated.protocol".parse().unwrap()),
+                        ),
+                    )
                     .child_default("d")
                     .build(),
             ),
@@ -723,14 +717,12 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
                         target_name: "data".parse().unwrap(),
                         availability: Availability::Required,
                     }))
-                    .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
-                        source: ExposeSource::Capability("data".parse().unwrap()),
-                        source_name: "unrelated.protocol".parse().unwrap(),
-                        source_dictionary: None,
-                        target_name: "fuchsia.sys2.StorageAdmin".parse().unwrap(),
-                        target: ExposeTarget::Parent,
-                        availability: cm_rust::Availability::Required,
-                    }))
+                    .expose(
+                        ExposeBuilder::protocol()
+                            .name("unrelated.protocol")
+                            .target_name("fuchsia.sys2.StorageAdmin")
+                            .source(ExposeSource::Capability("data".parse().unwrap())),
+                    )
                     .child_default("d")
                     .build(),
             ),

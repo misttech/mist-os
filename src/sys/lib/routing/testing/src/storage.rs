@@ -608,16 +608,13 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                             .path("/data")
                             .rights(fio::RW_STAR_DIR),
                     )
-                    .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
-                        source_name: "data".parse().unwrap(),
-                        source: ExposeSource::Self_,
-                        source_dictionary: None,
-                        target_name: "minfs".parse().unwrap(),
-                        target: ExposeTarget::Parent,
-                        rights: Some(fio::RW_STAR_DIR),
-                        subdir: None,
-                        availability: cm_rust::Availability::Required,
-                    }))
+                    .expose(
+                        ExposeBuilder::directory()
+                            .name("data")
+                            .source(ExposeSource::Self_)
+                            .target_name("minfs")
+                            .rights(fio::RW_STAR_DIR),
+                    )
                     .build(),
             ),
             (
@@ -683,16 +680,14 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                             .path("/data")
                             .rights(fio::RW_STAR_DIR),
                     )
-                    .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
-                        source_name: "data".parse().unwrap(),
-                        source: ExposeSource::Self_,
-                        source_dictionary: None,
-                        target_name: "minfs".parse().unwrap(),
-                        target: ExposeTarget::Parent,
-                        rights: Some(fio::RW_STAR_DIR),
-                        subdir: Some("subdir_1".parse().unwrap()),
-                        availability: cm_rust::Availability::Required,
-                    }))
+                    .expose(
+                        ExposeBuilder::directory()
+                            .name("data")
+                            .source(ExposeSource::Self_)
+                            .target_name("minfs")
+                            .rights(fio::RW_STAR_DIR)
+                            .subdir("subdir_1"),
+                    )
                     .build(),
             ),
             (
@@ -781,16 +776,13 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                             .path("/data")
                             .rights(fio::RW_STAR_DIR),
                     )
-                    .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
-                        source_name: "data".parse().unwrap(),
-                        source: ExposeSource::Self_,
-                        source_dictionary: None,
-                        target_name: "minfs".parse().unwrap(),
-                        target: ExposeTarget::Parent,
-                        rights: Some(fio::RW_STAR_DIR),
-                        subdir: None,
-                        availability: cm_rust::Availability::Required,
-                    }))
+                    .expose(
+                        ExposeBuilder::directory()
+                            .name("data")
+                            .source(ExposeSource::Self_)
+                            .target_name("minfs")
+                            .rights(fio::RW_STAR_DIR),
+                    )
                     .build(),
             ),
             (

@@ -639,14 +639,7 @@ mod tests {
                 "b",
                 ComponentDeclBuilder::new()
                     .service_default("foo")
-                    .expose(ExposeDecl::Service(ExposeServiceDecl {
-                        source: ExposeSource::Self_,
-                        source_name: "foo".parse().unwrap(),
-                        source_dictionary: None,
-                        target_name: "foo".parse().unwrap(),
-                        target: ExposeTarget::Parent,
-                        availability: cm_rust::Availability::Required,
-                    }))
+                    .expose(ExposeBuilder::service().name("foo").source(ExposeSource::Self_))
                     .build(),
             ),
         ];
@@ -696,14 +689,7 @@ mod tests {
             (
                 "c",
                 ComponentDeclBuilder::new()
-                    .expose(ExposeDecl::Service(ExposeServiceDecl {
-                        source: ExposeSource::Self_,
-                        source_name: "foo".parse().unwrap(),
-                        source_dictionary: None,
-                        target_name: "foo".parse().unwrap(),
-                        target: ExposeTarget::Parent,
-                        availability: cm_rust::Availability::Required,
-                    }))
+                    .expose(ExposeBuilder::service().name("foo").source(ExposeSource::Self_))
                     .service_default("foo")
                     .build(),
             ),
@@ -1189,14 +1175,11 @@ mod tests {
             .source(UseSource::Child("b".into()))
             .path("/svc/hippo")
             .build();
-        let expose_decl = ExposeDecl::Protocol(ExposeProtocolDecl {
-            source: ExposeSource::Self_,
-            source_name: "foo".parse().unwrap(),
-            source_dictionary: None,
-            target_name: "bar".parse().unwrap(),
-            target: ExposeTarget::Parent,
-            availability: cm_rust::Availability::Required,
-        });
+        let expose_decl = ExposeBuilder::protocol()
+            .name("foo")
+            .target_name("bar")
+            .source(ExposeSource::Self_)
+            .build();
         let protocol_decl = CapabilityBuilder::protocol().name("foo").build();
         let components = vec![
             ("a", ComponentDeclBuilder::new().use_(use_decl.clone()).child_default("b").build()),
@@ -1285,26 +1268,18 @@ mod tests {
             dependency_type: DependencyType::Strong,
             availability: Availability::Required,
         });
-        let b_expose_decl = ExposeDecl::Directory(ExposeDirectoryDecl {
-            source: ExposeSource::Child("d".to_string()),
-            source_name: "bar_data".parse().unwrap(),
-            source_dictionary: None,
-            target_name: "baz_data".parse().unwrap(),
-            target: ExposeTarget::Parent,
-            rights: Some(fio::R_STAR_DIR),
-            subdir: None,
-            availability: cm_rust::Availability::Required,
-        });
-        let d_expose_decl = ExposeDecl::Directory(ExposeDirectoryDecl {
-            source: ExposeSource::Self_,
-            source_name: "foo_data".parse().unwrap(),
-            source_dictionary: None,
-            target_name: "bar_data".parse().unwrap(),
-            target: ExposeTarget::Parent,
-            rights: Some(fio::R_STAR_DIR),
-            subdir: None,
-            availability: cm_rust::Availability::Required,
-        });
+        let b_expose_decl = ExposeBuilder::directory()
+            .name("bar_data")
+            .target_name("baz_data")
+            .source(ExposeSource::Child("d".to_string()))
+            .rights(fio::R_STAR_DIR)
+            .build();
+        let d_expose_decl = ExposeBuilder::directory()
+            .name("foo_data")
+            .target_name("bar_data")
+            .source(ExposeSource::Self_)
+            .rights(fio::R_STAR_DIR)
+            .build();
         let directory_decl =
             CapabilityBuilder::directory().name("foo_data").path("/foo/data").build();
 
@@ -1640,13 +1615,8 @@ mod tests {
             source: RegistrationSource::Child("c".to_string()),
             scheme: "base".into(),
         };
-        let expose_decl = ExposeDecl::Resolver(ExposeResolverDecl {
-            source: ExposeSource::Self_,
-            source_name: "base".parse().unwrap(),
-            source_dictionary: None,
-            target: ExposeTarget::Parent,
-            target_name: "base".parse().unwrap(),
-        });
+        let expose_decl =
+            ExposeBuilder::resolver().name("base").source(ExposeSource::Self_).build();
         let resolver_decl = CapabilityBuilder::resolver().name("base").build();
 
         let components = vec![
@@ -1945,14 +1915,10 @@ mod tests {
         });
         let directory_decl =
             CapabilityBuilder::directory().name("foo_data").path("/foo/data").build();
-        let expose_protocol_decl = ExposeDecl::Protocol(ExposeProtocolDecl {
-            source: ExposeSource::Child("c".to_string()),
-            source_name: "bad_protocol".parse().unwrap(),
-            source_dictionary: None,
-            target_name: "bad_protocol".parse().unwrap(),
-            target: ExposeTarget::Parent,
-            availability: cm_rust::Availability::Required,
-        });
+        let expose_protocol_decl = ExposeBuilder::protocol()
+            .name("bad_protocol")
+            .source(ExposeSource::Child("c".to_string()))
+            .build();
         let use_event_decl =
             UseBuilder::event_stream().name("started_on_a").path("/started").build();
 

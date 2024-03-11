@@ -152,38 +152,23 @@ impl<T: RoutingTestModelBuilder> CommonAvailabilityTest<T> {
                                 .name("fuchsia.examples.EchoService")
                                 .path("/svc/foo.service"),
                         )
-                        .expose(ExposeDecl::Service(ExposeServiceDecl {
-                            source: ExposeSource::Self_,
-                            source_name: "fuchsia.examples.EchoService".parse().unwrap(),
-                            source_dictionary: None,
-                            target_name: "fuchsia.examples.EchoService".parse().unwrap(),
-                            target: ExposeTarget::Parent,
-                            availability: cm_rust::Availability::Required,
-                        }))
+                        .expose(
+                            ExposeBuilder::service()
+                                .name("fuchsia.examples.EchoService")
+                                .source(ExposeSource::Self_),
+                        )
                         .capability(
                             CapabilityBuilder::protocol()
                                 .name("fuchsia.examples.Echo")
                                 .path("/svc/foo"),
                         )
-                        .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
-                            source: ExposeSource::Self_,
-                            source_name: "fuchsia.examples.Echo".parse().unwrap(),
-                            source_dictionary: None,
-                            target_name: "fuchsia.examples.Echo".parse().unwrap(),
-                            target: ExposeTarget::Parent,
-                            availability: cm_rust::Availability::Required,
-                        }))
+                        .expose(
+                            ExposeBuilder::protocol()
+                                .name("fuchsia.examples.Echo")
+                                .source(ExposeSource::Self_),
+                        )
                         .capability(CapabilityBuilder::directory().name("dir").path("/data/dir"))
-                        .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
-                            source: ExposeSource::Self_,
-                            source_name: "dir".parse().unwrap(),
-                            source_dictionary: None,
-                            target_name: "dir".parse().unwrap(),
-                            target: ExposeTarget::Parent,
-                            rights: None,
-                            subdir: None,
-                            availability: cm_rust::Availability::Required,
-                        }))
+                        .expose(ExposeBuilder::directory().name("dir").source(ExposeSource::Self_))
                         .build(),
                 ),
                 (
@@ -366,43 +351,28 @@ impl<T: RoutingTestModelBuilder> CommonAvailabilityTest<T> {
                                 .name("fuchsia.examples.EchoService")
                                 .path("/svc/foo.service"),
                         )
-                        .expose(ExposeDecl::Service(ExposeServiceDecl {
-                            source: ExposeSource::Self_,
-                            source_name: "fuchsia.examples.EchoService".parse().unwrap(),
-                            source_dictionary: None,
-                            target_name: "fuchsia.examples.EchoService".parse().unwrap(),
-                            target: ExposeTarget::Parent,
-                            availability: cm_rust::Availability::Required,
-                        }))
+                        .expose(
+                            ExposeBuilder::service()
+                                .name("fuchsia.examples.EchoService")
+                                .source(ExposeSource::Self_),
+                        )
                         .capability(
                             CapabilityBuilder::protocol()
                                 .name("fuchsia.examples.Echo")
                                 .path("/svc/foo"),
                         )
-                        .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
-                            source: ExposeSource::Self_,
-                            source_name: "fuchsia.examples.Echo".parse().unwrap(),
-                            source_dictionary: None,
-                            target_name: "fuchsia.examples.Echo".parse().unwrap(),
-                            target: ExposeTarget::Parent,
-                            availability: cm_rust::Availability::Required,
-                        }))
+                        .expose(
+                            ExposeBuilder::protocol()
+                                .name("fuchsia.examples.Echo")
+                                .source(ExposeSource::Self_),
+                        )
                         .capability(
                             CapabilityBuilder::directory()
                                 .name("dir")
                                 .path("/dir")
                                 .rights(fio::Operations::CONNECT),
                         )
-                        .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
-                            source: ExposeSource::Self_,
-                            source_name: "dir".parse().unwrap(),
-                            source_dictionary: None,
-                            target_name: "dir".parse().unwrap(),
-                            target: ExposeTarget::Parent,
-                            rights: None,
-                            subdir: None,
-                            availability: cm_rust::Availability::Required,
-                        }))
+                        .expose(ExposeBuilder::directory().name("dir").source(ExposeSource::Self_))
                         .build(),
                 ),
                 (
@@ -513,38 +483,30 @@ impl<T: RoutingTestModelBuilder> CommonAvailabilityTest<T> {
                                 .name("fuchsia.examples.EchoService")
                                 .path("/svc/foo.service"),
                         )
-                        .expose(ExposeDecl::Service(ExposeServiceDecl {
-                            source: ExposeSource::Self_,
-                            source_name: "fuchsia.examples.EchoService".parse().unwrap(),
-                            source_dictionary: None,
-                            target_name: "fuchsia.examples.EchoService".parse().unwrap(),
-                            target: ExposeTarget::Parent,
-                            availability: test_case.provider_availability,
-                        }))
+                        .expose(
+                            ExposeBuilder::service()
+                                .name("fuchsia.examples.EchoService")
+                                .source(ExposeSource::Self_)
+                                .availability(test_case.provider_availability),
+                        )
                         .capability(
                             CapabilityBuilder::protocol()
                                 .name("fuchsia.examples.Echo")
                                 .path("/svc/foo"),
                         )
-                        .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
-                            source: ExposeSource::Self_,
-                            source_name: "fuchsia.examples.Echo".parse().unwrap(),
-                            source_dictionary: None,
-                            target_name: "fuchsia.examples.Echo".parse().unwrap(),
-                            target: ExposeTarget::Parent,
-                            availability: test_case.provider_availability,
-                        }))
+                        .expose(
+                            ExposeBuilder::protocol()
+                                .name("fuchsia.examples.Echo")
+                                .source(ExposeSource::Self_)
+                                .availability(test_case.provider_availability),
+                        )
                         .capability(CapabilityBuilder::directory().name("dir").path("/data/dir"))
-                        .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
-                            source: ExposeSource::Self_,
-                            source_name: "dir".parse().unwrap(),
-                            source_dictionary: None,
-                            target_name: "dir".parse().unwrap(),
-                            target: ExposeTarget::Parent,
-                            rights: None,
-                            subdir: None,
-                            availability: test_case.provider_availability,
-                        }))
+                        .expose(
+                            ExposeBuilder::directory()
+                                .name("dir")
+                                .source(ExposeSource::Self_)
+                                .availability(test_case.provider_availability),
+                        )
                         .build(),
                 ),
             ];
@@ -677,38 +639,30 @@ impl<T: RoutingTestModelBuilder> CommonAvailabilityTest<T> {
                                 .name("fuchsia.examples.EchoService")
                                 .path("/svc/foo.service"),
                         )
-                        .expose(ExposeDecl::Service(ExposeServiceDecl {
-                            source: test_case.source.clone(),
-                            source_name: "fuchsia.examples.EchoService".parse().unwrap(),
-                            source_dictionary: None,
-                            target_name: "fuchsia.examples.EchoService".parse().unwrap(),
-                            target: ExposeTarget::Parent,
-                            availability: test_case.expose_availability,
-                        }))
+                        .expose(
+                            ExposeBuilder::service()
+                                .name("fuchsia.examples.EchoService")
+                                .source(test_case.source.clone())
+                                .availability(test_case.expose_availability),
+                        )
                         .capability(
                             CapabilityBuilder::protocol()
                                 .name("fuchsia.examples.Echo")
                                 .path("/svc/foo"),
                         )
-                        .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
-                            source: test_case.source.clone(),
-                            source_name: "fuchsia.examples.Echo".parse().unwrap(),
-                            source_dictionary: None,
-                            target_name: "fuchsia.examples.Echo".parse().unwrap(),
-                            target: ExposeTarget::Parent,
-                            availability: test_case.expose_availability,
-                        }))
+                        .expose(
+                            ExposeBuilder::protocol()
+                                .name("fuchsia.examples.Echo")
+                                .source(test_case.source.clone())
+                                .availability(test_case.expose_availability),
+                        )
                         .capability(CapabilityBuilder::directory().name("dir").path("/data/dir"))
-                        .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
-                            source: test_case.source.clone(),
-                            source_name: "dir".parse().unwrap(),
-                            source_dictionary: None,
-                            target_name: "dir".parse().unwrap(),
-                            target: ExposeTarget::Parent,
-                            rights: None,
-                            subdir: None,
-                            availability: test_case.expose_availability,
-                        }))
+                        .expose(
+                            ExposeBuilder::directory()
+                                .name("dir")
+                                .source(test_case.source.clone())
+                                .availability(test_case.expose_availability),
+                        )
                         .build(),
                 ),
             ];

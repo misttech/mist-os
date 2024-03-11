@@ -745,14 +745,7 @@ mod tests {
 
     fn create_test_component_decls() -> Vec<(&'static str, ComponentDecl)> {
         let leaf_component_decl = ComponentDeclBuilder::new()
-            .expose(ExposeDecl::Service(ExposeServiceDecl {
-                source: ExposeSource::Self_,
-                source_name: "my.service.Service".parse().unwrap(),
-                source_dictionary: None,
-                target_name: "my.service.Service".parse().unwrap(),
-                target: ExposeTarget::Parent,
-                availability: cm_rust::Availability::Required,
-            }))
+            .expose(ExposeBuilder::service().name("my.service.Service").source(ExposeSource::Self_))
             .service_default("my.service.Service")
             .build();
         vec![
@@ -764,38 +757,26 @@ mod tests {
                             .source(UseSource::Framework)
                             .name("fuchsia.component.Realm"),
                     )
-                    .expose(ExposeDecl::Service(ExposeServiceDecl {
-                        source: ExposeSource::Collection("coll1".parse().unwrap()),
-                        source_name: "my.service.Service".parse().unwrap(),
-                        source_dictionary: None,
-                        target_name: "my.service.Service".parse().unwrap(),
-                        target: ExposeTarget::Parent,
-                        availability: cm_rust::Availability::Required,
-                    }))
-                    .expose(ExposeDecl::Service(ExposeServiceDecl {
-                        source: ExposeSource::Collection("coll2".parse().unwrap()),
-                        source_name: "my.service.Service".parse().unwrap(),
-                        source_dictionary: None,
-                        target_name: "my.service.Service".parse().unwrap(),
-                        target: ExposeTarget::Parent,
-                        availability: cm_rust::Availability::Required,
-                    }))
-                    .expose(ExposeDecl::Service(ExposeServiceDecl {
-                        source: ExposeSource::Child("static_a".into()),
-                        source_name: "my.service.Service".parse().unwrap(),
-                        source_dictionary: None,
-                        target_name: "my.service.Service".parse().unwrap(),
-                        target: ExposeTarget::Parent,
-                        availability: cm_rust::Availability::Required,
-                    }))
-                    .expose(ExposeDecl::Service(ExposeServiceDecl {
-                        source: ExposeSource::Child("static_b".into()),
-                        source_name: "my.service.Service".parse().unwrap(),
-                        source_dictionary: None,
-                        target_name: "my.service.Service".parse().unwrap(),
-                        target: ExposeTarget::Parent,
-                        availability: cm_rust::Availability::Required,
-                    }))
+                    .expose(
+                        ExposeBuilder::service()
+                            .name("my.service.Service")
+                            .source(ExposeSource::Collection("coll1".parse().unwrap())),
+                    )
+                    .expose(
+                        ExposeBuilder::service()
+                            .name("my.service.Service")
+                            .source(ExposeSource::Collection("coll2".parse().unwrap())),
+                    )
+                    .expose(
+                        ExposeBuilder::service()
+                            .name("my.service.Service")
+                            .source(ExposeSource::Child("static_a".into())),
+                    )
+                    .expose(
+                        ExposeBuilder::service()
+                            .name("my.service.Service")
+                            .source(ExposeSource::Child("static_b".into())),
+                    )
                     .collection(CollectionBuilder::new().name("coll1"))
                     .collection(CollectionBuilder::new().name("coll2"))
                     .child_default("static_a")
@@ -1022,14 +1003,7 @@ mod tests {
     #[fuchsia::test]
     async fn test_anonymized_service_directory_with_parent_and_self() {
         let leaf_component_decl = ComponentDeclBuilder::new()
-            .expose(ExposeDecl::Service(ExposeServiceDecl {
-                source: ExposeSource::Self_,
-                source_name: "my.service.Service".parse().unwrap(),
-                source_dictionary: None,
-                target_name: "my.service.Service".parse().unwrap(),
-                target: ExposeTarget::Parent,
-                availability: cm_rust::Availability::Required,
-            }))
+            .expose(ExposeBuilder::service().name("my.service.Service").source(ExposeSource::Self_))
             .service_default("my.service.Service")
             .build();
         let components = vec![

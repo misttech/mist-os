@@ -1160,14 +1160,12 @@ mod tests {
                     "system",
                     ComponentDeclBuilder::new()
                         .protocol_default("foo")
-                        .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
-                            source: ExposeSource::Self_,
-                            source_name: "foo".parse().unwrap(),
-                            source_dictionary: None,
-                            target_name: "hippo".parse().unwrap(),
-                            target: ExposeTarget::Parent,
-                            availability: cm_rust::Availability::Required,
-                        }))
+                        .expose(
+                            ExposeBuilder::protocol()
+                                .name("foo")
+                                .target_name("hippo")
+                                .source(ExposeSource::Self_),
+                        )
                         .build(),
                 ),
             ],
@@ -1226,14 +1224,12 @@ mod tests {
                     "system",
                     ComponentDeclBuilder::new()
                         .protocol_default("foo")
-                        .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
-                            source: ExposeSource::Self_,
-                            source_name: "foo".parse().unwrap(),
-                            source_dictionary: None,
-                            target_name: "hippo".parse().unwrap(),
-                            target: ExposeTarget::Parent,
-                            availability: cm_rust::Availability::Required,
-                        }))
+                        .expose(
+                            ExposeBuilder::protocol()
+                                .name("foo")
+                                .target_name("hippo")
+                                .source(ExposeSource::Self_),
+                        )
                         .build(),
                 ),
             ],

@@ -9,7 +9,7 @@ mod tests {
             Availability, ExposeDecl, ExposeDirectoryDecl, ExposeProtocolDecl, ExposeServiceDecl,
             ExposeSource, ExposeTarget,
         },
-        cm_rust_testing::ComponentDeclBuilder,
+        cm_rust_testing::*,
         moniker::{Moniker, MonikerBase},
         routing_test_helpers::{
             availability::CommonAvailabilityTest, CheckUse, ExpectedResult, RoutingTestModel,
@@ -79,64 +79,48 @@ mod tests {
                 (
                     "a",
                     ComponentDeclBuilder::new()
-                        .expose(ExposeDecl::Service(ExposeServiceDecl {
-                            source: ExposeSource::Child("b".to_owned()),
-                            source_name: "fuchsia.examples.EchoService".parse().unwrap(),
-                            source_dictionary: None,
-                            target_name: "fuchsia.examples.EchoService".parse().unwrap(),
-                            target: ExposeTarget::Parent,
-                            availability: test_case.expose_availability,
-                        }))
-                        .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
-                            source: ExposeSource::Child("b".to_owned()),
-                            source_name: "fuchsia.examples.Echo".parse().unwrap(),
-                            source_dictionary: None,
-                            target_name: "fuchsia.examples.Echo".parse().unwrap(),
-                            target: ExposeTarget::Parent,
-                            availability: test_case.expose_availability,
-                        }))
-                        .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
-                            source: ExposeSource::Child("b".to_owned()),
-                            source_name: "dir".parse().unwrap(),
-                            source_dictionary: None,
-                            target_name: "dir".parse().unwrap(),
-                            target: ExposeTarget::Parent,
-                            rights: None,
-                            subdir: None,
-                            availability: test_case.expose_availability,
-                        }))
+                        .expose(
+                            ExposeBuilder::service()
+                                .name("fuchsia.examples.EchoService")
+                                .source(ExposeSource::Child("b".to_owned()))
+                                .availability(test_case.expose_availability),
+                        )
+                        .expose(
+                            ExposeBuilder::protocol()
+                                .name("fuchsia.examples.Echo")
+                                .source(ExposeSource::Child("b".to_owned()))
+                                .availability(test_case.expose_availability),
+                        )
+                        .expose(
+                            ExposeBuilder::directory()
+                                .name("dir")
+                                .source(ExposeSource::Child("b".to_owned()))
+                                .availability(test_case.expose_availability),
+                        )
                         .child_default("b")
                         .build(),
                 ),
                 (
                     "b",
                     ComponentDeclBuilder::new()
-                        .expose(ExposeDecl::Service(ExposeServiceDecl {
-                            source: ExposeSource::Void,
-                            source_name: "fuchsia.examples.EchoService".parse().unwrap(),
-                            source_dictionary: None,
-                            target_name: "fuchsia.examples.EchoService".parse().unwrap(),
-                            target: ExposeTarget::Parent,
-                            availability: Availability::Optional,
-                        }))
-                        .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
-                            source: ExposeSource::Void,
-                            source_name: "fuchsia.examples.Echo".parse().unwrap(),
-                            source_dictionary: None,
-                            target_name: "fuchsia.examples.Echo".parse().unwrap(),
-                            target: ExposeTarget::Parent,
-                            availability: Availability::Optional,
-                        }))
-                        .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
-                            source: ExposeSource::Void,
-                            source_name: "dir".parse().unwrap(),
-                            source_dictionary: None,
-                            target_name: "dir".parse().unwrap(),
-                            target: ExposeTarget::Parent,
-                            rights: None,
-                            subdir: None,
-                            availability: Availability::Optional,
-                        }))
+                        .expose(
+                            ExposeBuilder::service()
+                                .name("fuchsia.examples.EchoService")
+                                .source(ExposeSource::Void)
+                                .availability(Availability::Optional),
+                        )
+                        .expose(
+                            ExposeBuilder::protocol()
+                                .name("fuchsia.examples.Echo")
+                                .source(ExposeSource::Void)
+                                .availability(Availability::Optional),
+                        )
+                        .expose(
+                            ExposeBuilder::directory()
+                                .name("dir")
+                                .source(ExposeSource::Void)
+                                .availability(Availability::Optional),
+                        )
                         .build(),
                 ),
             ];

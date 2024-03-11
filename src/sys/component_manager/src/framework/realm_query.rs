@@ -828,14 +828,8 @@ mod tests {
                 .name(&use_name)
                 .path(&capability_path)
                 .build();
-            let expose_decl = ExposeDecl::Protocol(ExposeProtocolDecl {
-                source: ExposeSource::Self_,
-                source_name: expose_name.parse().unwrap(),
-                source_dictionary: None,
-                target: ExposeTarget::Parent,
-                target_name: expose_name.parse().unwrap(),
-                availability: Availability::Required,
-            });
+            let expose_decl =
+                ExposeBuilder::protocol().source(ExposeSource::Self_).name(&expose_name).build();
 
             manifest = manifest.use_(use_decl).expose(expose_decl);
         }
@@ -956,14 +950,7 @@ mod tests {
     #[fuchsia::test]
     async fn open_test() {
         let use_decl = UseBuilder::protocol().source(UseSource::Framework).name("foo").build();
-        let expose_decl = ExposeDecl::Protocol(ExposeProtocolDecl {
-            source: ExposeSource::Self_,
-            source_name: "bar".parse().unwrap(),
-            source_dictionary: None,
-            target: ExposeTarget::Parent,
-            target_name: "bar".parse().unwrap(),
-            availability: cm_rust::Availability::Required,
-        });
+        let expose_decl = ExposeBuilder::protocol().source(ExposeSource::Self_).name("bar").build();
 
         let components = vec![(
             "root",
@@ -1185,16 +1172,7 @@ mod tests {
                             .path("/fs/data")
                             .rights(fio::Operations::all()),
                     )
-                    .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
-                        source_name: "fs".parse().unwrap(),
-                        target_name: "fs".parse().unwrap(),
-                        subdir: None,
-                        source: ExposeSource::Self_,
-                        source_dictionary: None,
-                        target: ExposeTarget::Parent,
-                        rights: None,
-                        availability: cm_rust::Availability::Required,
-                    }))
+                    .expose(ExposeBuilder::directory().name("fs").source(ExposeSource::Self_))
                     .build(),
             ),
         ];

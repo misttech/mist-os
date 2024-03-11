@@ -399,15 +399,11 @@ mod tests {
     }
 
     fn expose_diagnostics_decl() -> ExposeDecl {
-        ExposeDecl::Directory(ExposeDirectoryDecl {
-            source: ExposeSource::Self_,
-            source_name: "diagnostics".parse().unwrap(),
-            source_dictionary: None,
-            target_name: "diagnostics".parse().unwrap(),
-            target: ExposeTarget::Framework,
-            rights: Some(fio::Operations::CONNECT),
-            subdir: None,
-            availability: cm_rust::Availability::Required,
-        })
+        ExposeBuilder::directory()
+            .name("diagnostics")
+            .source(ExposeSource::Self_)
+            .target(ExposeTarget::Framework)
+            .rights(fio::Operations::CONNECT)
+            .build()
     }
 }

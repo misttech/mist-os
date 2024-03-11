@@ -560,16 +560,12 @@ mod tests {
                             .path("/data")
                             .rights(fio::RW_STAR_DIR),
                     )
-                    .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
-                        source_name: "data".parse().unwrap(),
-                        source: ExposeSource::Self_,
-                        source_dictionary: None,
-                        target_name: "data".parse().unwrap(),
-                        target: ExposeTarget::Parent,
-                        rights: Some(fio::Operations::CONNECT),
-                        subdir: None,
-                        availability: cm_rust::Availability::Required,
-                    }))
+                    .expose(
+                        ExposeBuilder::directory()
+                            .name("data")
+                            .source(ExposeSource::Self_)
+                            .rights(fio::Operations::CONNECT),
+                    )
                     .build(),
             ),
         ];
@@ -653,16 +649,12 @@ mod tests {
                             .path("/data")
                             .rights(fio::RW_STAR_DIR),
                     )
-                    .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
-                        source_name: "data".parse().unwrap(),
-                        source: ExposeSource::Self_,
-                        source_dictionary: None,
-                        target_name: "data".parse().unwrap(),
-                        target: ExposeTarget::Parent,
-                        rights: Some(fio::Operations::CONNECT),
-                        subdir: None,
-                        availability: cm_rust::Availability::Required,
-                    }))
+                    .expose(
+                        ExposeBuilder::directory()
+                            .name("data")
+                            .source(ExposeSource::Self_)
+                            .rights(fio::Operations::CONNECT),
+                    )
                     .build(),
             ),
         ];
@@ -777,16 +769,12 @@ mod tests {
                             .path("/data")
                             .rights(fio::RW_STAR_DIR),
                     )
-                    .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
-                        source_name: "data".parse().unwrap(),
-                        source: ExposeSource::Self_,
-                        source_dictionary: None,
-                        target_name: "data".parse().unwrap(),
-                        target: ExposeTarget::Parent,
-                        rights: Some(fio::Operations::CONNECT),
-                        subdir: None,
-                        availability: cm_rust::Availability::Required,
-                    }))
+                    .expose(
+                        ExposeBuilder::directory()
+                            .name("data")
+                            .source(ExposeSource::Self_)
+                            .rights(fio::Operations::CONNECT),
+                    )
                     .build(),
             ),
         ];
@@ -915,16 +903,12 @@ mod tests {
                             .path("/data")
                             .rights(fio::RW_STAR_DIR),
                     )
-                    .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
-                        source_name: "data".parse().unwrap(),
-                        source: ExposeSource::Self_,
-                        source_dictionary: None,
-                        target_name: "data".parse().unwrap(),
-                        target: ExposeTarget::Parent,
-                        rights: Some(fio::Operations::CONNECT),
-                        subdir: None,
-                        availability: cm_rust::Availability::Required,
-                    }))
+                    .expose(
+                        ExposeBuilder::directory()
+                            .name("data")
+                            .source(ExposeSource::Self_)
+                            .rights(fio::Operations::CONNECT),
+                    )
                     .build(),
             ),
         ];

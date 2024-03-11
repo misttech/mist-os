@@ -78,14 +78,10 @@ pub fn component_decl_with_exposed_binder() -> ComponentDecl {
             runner: Some(TEST_RUNNER_NAME.parse().unwrap()),
             info: fdata::Dictionary { entries: Some(vec![]), ..Default::default() },
         }),
-        exposes: vec![ExposeDecl::Protocol(ExposeProtocolDecl {
-            source: ExposeSource::Framework,
-            source_name: fcomponent::BinderMarker::DEBUG_NAME.parse().unwrap(),
-            source_dictionary: None,
-            target: ExposeTarget::Parent,
-            target_name: fcomponent::BinderMarker::DEBUG_NAME.parse().unwrap(),
-            availability: cm_rust::Availability::Required,
-        })],
+        exposes: vec![ExposeBuilder::protocol()
+            .source(ExposeSource::Framework)
+            .name(fcomponent::BinderMarker::DEBUG_NAME)
+            .build()],
         ..Default::default()
     }
 }
@@ -489,24 +485,19 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 ComponentDeclBuilder::new()
                     .capability(CapabilityBuilder::directory().name("foo_data").path("/data/foo"))
                     .protocol_default("foo")
-                    .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
-                        source: ExposeSource::Self_,
-                        source_name: "foo_data".parse().unwrap(),
-                        source_dictionary: None,
-                        target_name: "bar_data".parse().unwrap(),
-                        target: ExposeTarget::Parent,
-                        rights: Some(fio::R_STAR_DIR),
-                        subdir: None,
-                        availability: cm_rust::Availability::Required,
-                    }))
-                    .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
-                        source: ExposeSource::Self_,
-                        source_name: "foo".parse().unwrap(),
-                        source_dictionary: None,
-                        target_name: "bar".parse().unwrap(),
-                        target: ExposeTarget::Parent,
-                        availability: cm_rust::Availability::Required,
-                    }))
+                    .expose(
+                        ExposeBuilder::directory()
+                            .name("foo_data")
+                            .source(ExposeSource::Self_)
+                            .target_name("bar_data")
+                            .rights(fio::R_STAR_DIR),
+                    )
+                    .expose(
+                        ExposeBuilder::protocol()
+                            .name("foo")
+                            .target_name("bar")
+                            .source(ExposeSource::Self_),
+                    )
                     .build(),
             ),
         ];
@@ -579,24 +570,19 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             (
                 "b",
                 ComponentDeclBuilder::new()
-                    .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
-                        source: ExposeSource::Child("c".to_string()),
-                        source_name: "bar_data".parse().unwrap(),
-                        source_dictionary: None,
-                        target_name: "baz_data".parse().unwrap(),
-                        target: ExposeTarget::Parent,
-                        rights: Some(fio::R_STAR_DIR),
-                        subdir: None,
-                        availability: cm_rust::Availability::Required,
-                    }))
-                    .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
-                        source: ExposeSource::Child("c".to_string()),
-                        source_name: "bar".parse().unwrap(),
-                        source_dictionary: None,
-                        target_name: "baz".parse().unwrap(),
-                        target: ExposeTarget::Parent,
-                        availability: cm_rust::Availability::Required,
-                    }))
+                    .expose(
+                        ExposeBuilder::directory()
+                            .name("bar_data")
+                            .source(ExposeSource::Child("c".to_string()))
+                            .target_name("baz_data")
+                            .rights(fio::R_STAR_DIR),
+                    )
+                    .expose(
+                        ExposeBuilder::protocol()
+                            .name("bar")
+                            .target_name("baz")
+                            .source(ExposeSource::Child("c".to_string())),
+                    )
                     .child_default("c")
                     .build(),
             ),
@@ -605,24 +591,19 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 ComponentDeclBuilder::new()
                     .capability(CapabilityBuilder::directory().name("foo_data").path("/data/foo"))
                     .protocol_default("foo")
-                    .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
-                        source: ExposeSource::Self_,
-                        source_name: "foo_data".parse().unwrap(),
-                        source_dictionary: None,
-                        target_name: "bar_data".parse().unwrap(),
-                        target: ExposeTarget::Parent,
-                        rights: Some(fio::R_STAR_DIR),
-                        subdir: None,
-                        availability: cm_rust::Availability::Required,
-                    }))
-                    .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
-                        source: ExposeSource::Self_,
-                        source_name: "foo".parse().unwrap(),
-                        source_dictionary: None,
-                        target_name: "bar".parse().unwrap(),
-                        target: ExposeTarget::Parent,
-                        availability: cm_rust::Availability::Required,
-                    }))
+                    .expose(
+                        ExposeBuilder::directory()
+                            .name("foo_data")
+                            .source(ExposeSource::Self_)
+                            .target_name("bar_data")
+                            .rights(fio::R_STAR_DIR),
+                    )
+                    .expose(
+                        ExposeBuilder::protocol()
+                            .name("foo")
+                            .target_name("bar")
+                            .source(ExposeSource::Self_),
+                    )
                     .build(),
             ),
         ];
@@ -851,24 +832,19 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 ComponentDeclBuilder::new()
                     .capability(CapabilityBuilder::directory().name("foo_data").path("/data/foo"))
                     .protocol_default("foo")
-                    .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
-                        source: ExposeSource::Self_,
-                        source_name: "foo_data".parse().unwrap(),
-                        source_dictionary: None,
-                        target_name: "bar_data".parse().unwrap(),
-                        target: ExposeTarget::Parent,
-                        rights: Some(fio::R_STAR_DIR),
-                        subdir: None,
-                        availability: cm_rust::Availability::Required,
-                    }))
-                    .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
-                        source: ExposeSource::Self_,
-                        source_name: "foo".parse().unwrap(),
-                        source_dictionary: None,
-                        target_name: "bar".parse().unwrap(),
-                        target: ExposeTarget::Parent,
-                        availability: cm_rust::Availability::Required,
-                    }))
+                    .expose(
+                        ExposeBuilder::directory()
+                            .name("foo_data")
+                            .source(ExposeSource::Self_)
+                            .target_name("bar_data")
+                            .rights(fio::R_STAR_DIR),
+                    )
+                    .expose(
+                        ExposeBuilder::protocol()
+                            .name("foo")
+                            .target_name("bar")
+                            .source(ExposeSource::Self_),
+                    )
                     .build(),
             ),
         ];
@@ -931,24 +907,19 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 ComponentDeclBuilder::new()
                     .capability(CapabilityBuilder::directory().name("foo_data").path("/data/foo"))
                     .protocol_default("foo")
-                    .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
-                        source: ExposeSource::Self_,
-                        source_name: "foo_data".parse().unwrap(),
-                        source_dictionary: None,
-                        target_name: "bar_data".parse().unwrap(),
-                        target: ExposeTarget::Parent,
-                        rights: Some(fio::R_STAR_DIR),
-                        subdir: None,
-                        availability: cm_rust::Availability::Required,
-                    }))
-                    .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
-                        source: ExposeSource::Self_,
-                        source_name: "foo".parse().unwrap(),
-                        source_dictionary: None,
-                        target_name: "bar".parse().unwrap(),
-                        target: ExposeTarget::Parent,
-                        availability: cm_rust::Availability::Required,
-                    }))
+                    .expose(
+                        ExposeBuilder::directory()
+                            .name("foo_data")
+                            .source(ExposeSource::Self_)
+                            .target_name("bar_data")
+                            .rights(fio::R_STAR_DIR),
+                    )
+                    .expose(
+                        ExposeBuilder::protocol()
+                            .name("foo")
+                            .target_name("bar")
+                            .source(ExposeSource::Self_),
+                    )
                     .build(),
             ),
             (
@@ -1019,24 +990,19 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             (
                 "b",
                 ComponentDeclBuilder::new()
-                    .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
-                        source: ExposeSource::Child("d".to_string()),
-                        source_name: "bar_data".parse().unwrap(),
-                        source_dictionary: None,
-                        target_name: "baz_data".parse().unwrap(),
-                        target: ExposeTarget::Parent,
-                        rights: Some(fio::R_STAR_DIR),
-                        subdir: None,
-                        availability: cm_rust::Availability::Required,
-                    }))
-                    .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
-                        source: ExposeSource::Child("d".to_string()),
-                        source_name: "bar".parse().unwrap(),
-                        source_dictionary: None,
-                        target_name: "baz".parse().unwrap(),
-                        target: ExposeTarget::Parent,
-                        availability: cm_rust::Availability::Required,
-                    }))
+                    .expose(
+                        ExposeBuilder::directory()
+                            .name("bar_data")
+                            .source(ExposeSource::Child("d".to_string()))
+                            .target_name("baz_data")
+                            .rights(fio::R_STAR_DIR),
+                    )
+                    .expose(
+                        ExposeBuilder::protocol()
+                            .name("bar")
+                            .target_name("baz")
+                            .source(ExposeSource::Child("d".to_string())),
+                    )
                     .child_default("d")
                     .build(),
             ),
@@ -1052,24 +1018,19 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 ComponentDeclBuilder::new()
                     .capability(CapabilityBuilder::directory().name("foo_data").path("/data/foo"))
                     .protocol_default("foo")
-                    .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
-                        source: ExposeSource::Self_,
-                        source_name: "foo_data".parse().unwrap(),
-                        source_dictionary: None,
-                        target_name: "bar_data".parse().unwrap(),
-                        target: ExposeTarget::Parent,
-                        rights: Some(fio::R_STAR_DIR),
-                        subdir: None,
-                        availability: cm_rust::Availability::Required,
-                    }))
-                    .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
-                        source: ExposeSource::Self_,
-                        source_name: "foo".parse().unwrap(),
-                        source_dictionary: None,
-                        target_name: "bar".parse().unwrap(),
-                        target: ExposeTarget::Parent,
-                        availability: cm_rust::Availability::Required,
-                    }))
+                    .expose(
+                        ExposeBuilder::directory()
+                            .name("foo_data")
+                            .source(ExposeSource::Self_)
+                            .target_name("bar_data")
+                            .rights(fio::R_STAR_DIR),
+                    )
+                    .expose(
+                        ExposeBuilder::protocol()
+                            .name("foo")
+                            .target_name("bar")
+                            .source(ExposeSource::Self_),
+                    )
                     .build(),
             ),
         ];
@@ -1156,16 +1117,12 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
                     }))
-                    .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
-                        source: ExposeSource::Child("d".to_string()),
-                        source_name: "foo_from_d_data".parse().unwrap(),
-                        source_dictionary: None,
-                        target_name: "foo_from_d_data".parse().unwrap(),
-                        target: ExposeTarget::Parent,
-                        rights: Some(fio::R_STAR_DIR),
-                        subdir: None,
-                        availability: cm_rust::Availability::Required,
-                    }))
+                    .expose(
+                        ExposeBuilder::directory()
+                            .name("foo_from_d_data")
+                            .source(ExposeSource::Child("d".to_string()))
+                            .rights(fio::R_STAR_DIR),
+                    )
                     .child_default("d")
                     .child_default("e")
                     .build(),
@@ -1201,16 +1158,13 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 "d",
                 ComponentDeclBuilder::new()
                     .capability(CapabilityBuilder::directory().name("foo_data").path("/data/foo"))
-                    .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
-                        source: ExposeSource::Self_,
-                        source_name: "foo_data".parse().unwrap(),
-                        source_dictionary: None,
-                        target_name: "foo_from_d_data".parse().unwrap(),
-                        target: ExposeTarget::Parent,
-                        rights: Some(fio::R_STAR_DIR),
-                        subdir: None,
-                        availability: cm_rust::Availability::Required,
-                    }))
+                    .expose(
+                        ExposeBuilder::directory()
+                            .name("foo_data")
+                            .source(ExposeSource::Self_)
+                            .target_name("foo_from_d_data")
+                            .rights(fio::R_STAR_DIR),
+                    )
                     .build(),
             ),
             (
@@ -1230,14 +1184,11 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             (
                 "g",
                 ComponentDeclBuilder::new_empty_component()
-                    .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
-                        source: ExposeSource::Child("h".to_string()),
-                        source_name: "foo_from_h_svc".parse().unwrap(),
-                        source_dictionary: None,
-                        target_name: "foo_from_h_svc".parse().unwrap(),
-                        target: ExposeTarget::Parent,
-                        availability: cm_rust::Availability::Required,
-                    }))
+                    .expose(
+                        ExposeBuilder::protocol()
+                            .name("foo_from_h_svc")
+                            .source(ExposeSource::Child("h".to_string())),
+                    )
                     .child_default("h")
                     .build(),
             ),
@@ -1245,14 +1196,12 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 "h",
                 ComponentDeclBuilder::new()
                     .protocol_default("foo")
-                    .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
-                        source: ExposeSource::Self_,
-                        source_name: "foo".parse().unwrap(),
-                        source_dictionary: None,
-                        target_name: "foo_from_h_svc".parse().unwrap(),
-                        target: ExposeTarget::Parent,
-                        availability: cm_rust::Availability::Required,
-                    }))
+                    .expose(
+                        ExposeBuilder::protocol()
+                            .name("foo")
+                            .target_name("foo_from_h_svc")
+                            .source(ExposeSource::Self_),
+                    )
                     .build(),
             ),
         ];
@@ -1596,24 +1545,13 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 ComponentDeclBuilder::new()
                     .capability(CapabilityBuilder::directory().name("hippo_data").path("/data/foo"))
                     .protocol_default("hippo")
-                    .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
-                        source_name: "hippo_data".parse().unwrap(),
-                        source: ExposeSource::Self_,
-                        source_dictionary: None,
-                        target_name: "hippo_data".parse().unwrap(),
-                        target: ExposeTarget::Parent,
-                        rights: Some(fio::R_STAR_DIR),
-                        subdir: None,
-                        availability: cm_rust::Availability::Required,
-                    }))
-                    .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
-                        source_name: "hippo".parse().unwrap(),
-                        source: ExposeSource::Self_,
-                        source_dictionary: None,
-                        target_name: "hippo".parse().unwrap(),
-                        target: ExposeTarget::Parent,
-                        availability: cm_rust::Availability::Required,
-                    }))
+                    .expose(
+                        ExposeBuilder::directory()
+                            .name("hippo_data")
+                            .source(ExposeSource::Self_)
+                            .rights(fio::R_STAR_DIR),
+                    )
+                    .expose(ExposeBuilder::protocol().name("hippo").source(ExposeSource::Self_))
                     .build(),
             ),
         ];
@@ -1642,39 +1580,22 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
     /// a: exposes "foo" to parent from child
     /// b: exposes "foo" to parent from self
     pub async fn test_route_protocol_from_expose(&self) {
-        let expose_decl = ExposeProtocolDecl {
-            source: ExposeSource::Child("b".parse().unwrap()),
-            source_name: "foo".parse().unwrap(),
-            source_dictionary: None,
-            target_name: "foo".parse().unwrap(),
-            target: ExposeTarget::Parent,
-            availability: cm_rust::Availability::Required,
-        };
-        let expected_protocol_decl = ProtocolDecl {
-            name: "foo".parse().unwrap(),
-            source_path: Some("/svc/foo".parse().unwrap()),
-        };
+        let expose_decl = ExposeBuilder::protocol()
+            .name("foo")
+            .source(ExposeSource::Child("b".parse().unwrap()))
+            .build();
+        let expected_protocol_decl = CapabilityBuilder::protocol().name("foo").build();
 
         let components = vec![
             (
                 "a",
-                ComponentDeclBuilder::new()
-                    .expose(ExposeDecl::Protocol(expose_decl.clone()))
-                    .child_default("b")
-                    .build(),
+                ComponentDeclBuilder::new().expose(expose_decl.clone()).child_default("b").build(),
             ),
             (
                 "b",
                 ComponentDeclBuilder::new()
-                    .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
-                        source: ExposeSource::Self_,
-                        source_name: "foo".parse().unwrap(),
-                        source_dictionary: None,
-                        target_name: "foo".parse().unwrap(),
-                        target: ExposeTarget::Parent,
-                        availability: cm_rust::Availability::Required,
-                    }))
-                    .capability(CapabilityDecl::Protocol(expected_protocol_decl.clone()))
+                    .expose(ExposeBuilder::protocol().name("foo").source(ExposeSource::Self_))
+                    .capability(expected_protocol_decl.clone())
                     .build(),
             ),
         ];
@@ -1682,17 +1603,23 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         let root_instance = model.look_up_instance(&Moniker::root()).await.expect("root instance");
         let expected_source_moniker = Moniker::parse_str("/b").unwrap();
 
+        let CapabilityDecl::Protocol(expected_protocol_decl) = expected_protocol_decl else {
+            unreachable!();
+        };
+        let ExposeDecl::Protocol(expose_decl) = expose_decl else {
+            unreachable!();
+        };
         assert_matches!(
         route_capability(RouteRequest::ExposeProtocol(expose_decl), &root_instance, &mut NoopRouteMapper).await,
             Ok(RouteSource {
                 source: CapabilitySource::<
                     <<T as RoutingTestModelBuilder>::Model as RoutingTestModel>::C
                     >::Component {
-                        capability: ComponentCapability::Protocol(protocol_decl),
+                        capability: ComponentCapability::Protocol(capability_decl),
                         component,
                     },
                 relative_path,
-            }) if protocol_decl == expected_protocol_decl && component.moniker == expected_source_moniker && relative_path == PathBuf::new()
+            }) if capability_decl == expected_protocol_decl && component.moniker == expected_source_moniker && relative_path == PathBuf::new()
         );
     }
 
@@ -1737,24 +1664,21 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 ComponentDeclBuilder::new()
                     .capability(CapabilityBuilder::directory().name("foo_data").path("/data/foo"))
                     .protocol_default("foo")
-                    .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
-                        source: ExposeSource::Self_,
-                        source_name: "foo_data".parse().unwrap(),
-                        source_dictionary: None,
-                        target_name: "bar_data".parse().unwrap(),
-                        target: ExposeTarget::Framework,
-                        rights: Some(fio::R_STAR_DIR),
-                        subdir: None,
-                        availability: cm_rust::Availability::Required,
-                    }))
-                    .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
-                        source: ExposeSource::Self_,
-                        source_name: "foo".parse().unwrap(),
-                        source_dictionary: None,
-                        target_name: "bar".parse().unwrap(),
-                        target: ExposeTarget::Framework,
-                        availability: cm_rust::Availability::Required,
-                    }))
+                    .expose(
+                        ExposeBuilder::directory()
+                            .name("foo_data")
+                            .source(ExposeSource::Self_)
+                            .target_name("bar_data")
+                            .target(ExposeTarget::Framework)
+                            .rights(fio::R_STAR_DIR),
+                    )
+                    .expose(
+                        ExposeBuilder::protocol()
+                            .name("foo")
+                            .target_name("bar")
+                            .source(ExposeSource::Self_)
+                            .target(ExposeTarget::Framework),
+                    )
                     .build(),
             ),
             (
@@ -1896,28 +1820,14 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             (
                 "b",
                 ComponentDeclBuilder::new()
-                    .expose(ExposeDecl::Service(ExposeServiceDecl {
-                        source: ExposeSource::Self_,
-                        source_name: "foo".parse().unwrap(),
-                        source_dictionary: None,
-                        target_name: "foo".parse().unwrap(),
-                        target: ExposeTarget::Parent,
-                        availability: cm_rust::Availability::Required,
-                    }))
+                    .expose(ExposeBuilder::service().name("foo").source(ExposeSource::Self_))
                     .capability(expected_service_decl.clone())
                     .build(),
             ),
             (
                 "c",
                 ComponentDeclBuilder::new()
-                    .expose(ExposeDecl::Service(ExposeServiceDecl {
-                        source: ExposeSource::Self_,
-                        source_name: "foo".parse().unwrap(),
-                        source_dictionary: None,
-                        target_name: "foo".parse().unwrap(),
-                        target: ExposeTarget::Parent,
-                        availability: cm_rust::Availability::Required,
-                    }))
+                    .expose(ExposeBuilder::service().name("foo").source(ExposeSource::Self_))
                     .capability(expected_service_decl.clone())
                     .build(),
             ),
@@ -2031,14 +1941,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             (
                 "c",
                 ComponentDeclBuilder::new()
-                    .expose(ExposeDecl::Service(ExposeServiceDecl {
-                        source: ExposeSource::Self_,
-                        source_name: "foo".parse().unwrap(),
-                        source_dictionary: None,
-                        target_name: "foo".parse().unwrap(),
-                        target: ExposeTarget::Parent,
-                        availability: cm_rust::Availability::Required,
-                    }))
+                    .expose(ExposeBuilder::service().name("foo").source(ExposeSource::Self_))
                     .capability(expected_service_decl.clone())
                     .build(),
             ),
@@ -2133,28 +2036,14 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             (
                 "b",
                 ComponentDeclBuilder::new()
-                    .expose(ExposeDecl::Service(ExposeServiceDecl {
-                        source: ExposeSource::Self_,
-                        source_name: "foo".parse().unwrap(),
-                        source_dictionary: None,
-                        target_name: "foo".parse().unwrap(),
-                        target: ExposeTarget::Parent,
-                        availability: cm_rust::Availability::Required,
-                    }))
+                    .expose(ExposeBuilder::service().name("foo").source(ExposeSource::Self_))
                     .capability(expected_service_decl.clone())
                     .build(),
             ),
             (
                 "c",
                 ComponentDeclBuilder::new()
-                    .expose(ExposeDecl::Service(ExposeServiceDecl {
-                        source: ExposeSource::Self_,
-                        source_name: "foo".parse().unwrap(),
-                        source_dictionary: None,
-                        target_name: "foo".parse().unwrap(),
-                        target: ExposeTarget::Parent,
-                        availability: cm_rust::Availability::Required,
-                    }))
+                    .expose(ExposeBuilder::service().name("foo").source(ExposeSource::Self_))
                     .capability(expected_service_decl.clone())
                     .build(),
             ),
@@ -2285,16 +2174,13 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 "b",
                 ComponentDeclBuilder::new()
                     .capability(CapabilityBuilder::directory().name("foo_data").path("/data/foo"))
-                    .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
-                        source: ExposeSource::Self_,
-                        source_name: "foo_data".parse().unwrap(),
-                        source_dictionary: None,
-                        target: ExposeTarget::Parent,
-                        target_name: "foo_data".parse().unwrap(),
-                        rights: Some(fio::R_STAR_DIR),
-                        subdir: Some(PathBuf::from("s1/s2")),
-                        availability: cm_rust::Availability::Required,
-                    }))
+                    .expose(
+                        ExposeBuilder::directory()
+                            .name("foo_data")
+                            .source(ExposeSource::Self_)
+                            .rights(fio::R_STAR_DIR)
+                            .subdir("s1/s2"),
+                    )
                     .build(),
             ),
             (
@@ -2336,32 +2222,25 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             (
                 "a",
                 ComponentDeclBuilder::new()
-                    .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
-                        source: ExposeSource::Child("b".to_string()),
-                        source_name: "foo_data".parse().unwrap(),
-                        source_dictionary: None,
-                        target_name: "hippo_data".parse().unwrap(),
-                        target: ExposeTarget::Parent,
-                        rights: None,
-                        subdir: Some(PathBuf::from("s3")),
-                        availability: cm_rust::Availability::Required,
-                    }))
+                    .expose(
+                        ExposeBuilder::directory()
+                            .name("foo_data")
+                            .source(ExposeSource::Child("b".to_string()))
+                            .target_name("hippo_data")
+                            .subdir("s3"),
+                    )
                     .child_default("b")
                     .build(),
             ),
             (
                 "b",
                 ComponentDeclBuilder::new()
-                    .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
-                        source: ExposeSource::Child("c".to_string()),
-                        source_name: "foo_data".parse().unwrap(),
-                        source_dictionary: None,
-                        target_name: "foo_data".parse().unwrap(),
-                        target: ExposeTarget::Parent,
-                        rights: None,
-                        subdir: Some(PathBuf::from("s1/s2")),
-                        availability: cm_rust::Availability::Required,
-                    }))
+                    .expose(
+                        ExposeBuilder::directory()
+                            .name("foo_data")
+                            .source(ExposeSource::Child("c".to_string()))
+                            .subdir("s1/s2"),
+                    )
                     .child_default("c")
                     .build(),
             ),
@@ -2369,16 +2248,12 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 "c",
                 ComponentDeclBuilder::new()
                     .capability(CapabilityBuilder::directory().name("foo_data").path("/data/foo"))
-                    .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
-                        source: ExposeSource::Self_,
-                        source_name: "foo_data".parse().unwrap(),
-                        source_dictionary: None,
-                        target_name: "foo_data".parse().unwrap(),
-                        target: ExposeTarget::Parent,
-                        rights: Some(fio::R_STAR_DIR),
-                        subdir: None,
-                        availability: cm_rust::Availability::Required,
-                    }))
+                    .expose(
+                        ExposeBuilder::directory()
+                            .name("foo_data")
+                            .source(ExposeSource::Self_)
+                            .rights(fio::R_STAR_DIR),
+                    )
                     .build(),
             ),
         ];
@@ -2405,24 +2280,19 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             (
                 "b",
                 ComponentDeclBuilder::new()
-                    .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
-                        source: ExposeSource::Child("c".to_string()),
-                        source_name: "hippo_data".parse().unwrap(),
-                        source_dictionary: None,
-                        target_name: "hippo_bar_data".parse().unwrap(),
-                        target: ExposeTarget::Parent,
-                        rights: Some(fio::R_STAR_DIR),
-                        subdir: None,
-                        availability: cm_rust::Availability::Required,
-                    }))
-                    .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
-                        source: ExposeSource::Child("c".to_string()),
-                        source_name: "hippo".parse().unwrap(),
-                        source_dictionary: None,
-                        target_name: "hippo_bar".parse().unwrap(),
-                        target: ExposeTarget::Parent,
-                        availability: cm_rust::Availability::Required,
-                    }))
+                    .expose(
+                        ExposeBuilder::directory()
+                            .name("hippo_data")
+                            .source(ExposeSource::Child("c".to_string()))
+                            .target_name("hippo_bar_data")
+                            .rights(fio::R_STAR_DIR),
+                    )
+                    .expose(
+                        ExposeBuilder::protocol()
+                            .name("hippo")
+                            .target_name("hippo_bar")
+                            .source(ExposeSource::Child("c".to_string())),
+                    )
                     .child_default("c")
                     .build(),
             ),
@@ -2431,24 +2301,19 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 ComponentDeclBuilder::new()
                     .capability(CapabilityBuilder::directory().name("foo_data").path("/data/foo"))
                     .protocol_default("foo")
-                    .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
-                        source: ExposeSource::Self_,
-                        source_name: "foo_data".parse().unwrap(),
-                        source_dictionary: None,
-                        target_name: "hippo_data".parse().unwrap(),
-                        target: ExposeTarget::Parent,
-                        rights: Some(fio::R_STAR_DIR),
-                        subdir: None,
-                        availability: cm_rust::Availability::Required,
-                    }))
-                    .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
-                        source: ExposeSource::Self_,
-                        source_name: "foo".parse().unwrap(),
-                        source_dictionary: None,
-                        target_name: "hippo".parse().unwrap(),
-                        target: ExposeTarget::Parent,
-                        availability: cm_rust::Availability::Required,
-                    }))
+                    .expose(
+                        ExposeBuilder::directory()
+                            .name("foo_data")
+                            .source(ExposeSource::Self_)
+                            .target_name("hippo_data")
+                            .rights(fio::R_STAR_DIR),
+                    )
+                    .expose(
+                        ExposeBuilder::protocol()
+                            .name("foo")
+                            .target_name("hippo")
+                            .source(ExposeSource::Self_),
+                    )
                     .build(),
             ),
         ];
@@ -2502,24 +2367,19 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 ComponentDeclBuilder::new()
                     .capability(CapabilityBuilder::directory().name("foo_data").path("/data/foo"))
                     .protocol_default("foo")
-                    .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
-                        source: ExposeSource::Self_,
-                        source_name: "foo_data".parse().unwrap(),
-                        source_dictionary: None,
-                        target_name: "hippo_data".parse().unwrap(),
-                        target: ExposeTarget::Parent,
-                        rights: Some(fio::R_STAR_DIR),
-                        subdir: None,
-                        availability: cm_rust::Availability::Required,
-                    }))
-                    .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
-                        source: ExposeSource::Self_,
-                        source_name: "foo".parse().unwrap(),
-                        source_dictionary: None,
-                        target_name: "hippo".parse().unwrap(),
-                        target: ExposeTarget::Parent,
-                        availability: cm_rust::Availability::Required,
-                    }))
+                    .expose(
+                        ExposeBuilder::directory()
+                            .name("foo_data")
+                            .source(ExposeSource::Self_)
+                            .target_name("hippo_data")
+                            .rights(fio::R_STAR_DIR),
+                    )
+                    .expose(
+                        ExposeBuilder::protocol()
+                            .name("foo")
+                            .target_name("hippo")
+                            .source(ExposeSource::Self_),
+                    )
                     .build(),
             ),
         ];
@@ -3455,14 +3315,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 "b",
                 ComponentDeclBuilder::new()
                     .service_default("foo")
-                    .expose(ExposeDecl::Service(ExposeServiceDecl {
-                        source: ExposeSource::Self_,
-                        source_name: "foo".parse().unwrap(),
-                        source_dictionary: None,
-                        target_name: "foo".parse().unwrap(),
-                        target: ExposeTarget::Parent,
-                        availability: cm_rust::Availability::Required,
-                    }))
+                    .expose(ExposeBuilder::service().name("foo").source(ExposeSource::Self_))
                     .build(),
             ),
         ];
@@ -3531,14 +3384,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             (
                 "c",
                 ComponentDeclBuilder::new()
-                    .expose(ExposeDecl::Service(ExposeServiceDecl {
-                        source: ExposeSource::Self_,
-                        source_name: "foo".parse().unwrap(),
-                        source_dictionary: None,
-                        target_name: "foo".parse().unwrap(),
-                        target: ExposeTarget::Parent,
-                        availability: cm_rust::Availability::Required,
-                    }))
+                    .expose(ExposeBuilder::service().name("foo").source(ExposeSource::Self_))
                     .service_default("foo")
                     .build(),
             ),
@@ -3613,14 +3459,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             (
                 "c",
                 ComponentDeclBuilder::new()
-                    .expose(ExposeDecl::Service(ExposeServiceDecl {
-                        source: ExposeSource::Self_,
-                        source_name: "foo".parse().unwrap(),
-                        source_dictionary: None,
-                        target_name: "foo".parse().unwrap(),
-                        target: ExposeTarget::Parent,
-                        availability: cm_rust::Availability::Required,
-                    }))
+                    .expose(ExposeBuilder::service().name("foo").source(ExposeSource::Self_))
                     .service_default("foo")
                     .build(),
             ),
@@ -3718,14 +3557,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             (
                 "c",
                 ComponentDeclBuilder::new()
-                    .expose(ExposeDecl::Service(ExposeServiceDecl {
-                        source: ExposeSource::Self_,
-                        source_name: "foo".parse().unwrap(),
-                        source_dictionary: None,
-                        target_name: "foo".parse().unwrap(),
-                        target: ExposeTarget::Parent,
-                        availability: cm_rust::Availability::Required,
-                    }))
+                    .expose(ExposeBuilder::service().name("foo").source(ExposeSource::Self_))
                     .service_default("foo")
                     .build(),
             ),
@@ -3952,13 +3784,12 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             (
                 "b",
                 ComponentDeclBuilder::new()
-                    .expose(ExposeDecl::Runner(ExposeRunnerDecl {
-                        source: ExposeSource::Self_,
-                        source_name: "elf".parse().unwrap(),
-                        source_dictionary: None,
-                        target: ExposeTarget::Parent,
-                        target_name: "dwarf".parse().unwrap(),
-                    }))
+                    .expose(
+                        ExposeBuilder::runner()
+                            .name("elf")
+                            .target_name("dwarf")
+                            .source(ExposeSource::Self_),
+                    )
                     .runner_default("elf")
                     .build(),
             ),
@@ -4350,13 +4181,12 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             (
                 "b",
                 ComponentDeclBuilder::new()
-                    .expose(ExposeDecl::Runner(ExposeRunnerDecl {
-                        source: ExposeSource::Self_,
-                        source_name: "elf".parse().unwrap(),
-                        source_dictionary: None,
-                        target: ExposeTarget::Parent,
-                        target_name: "dwarf".parse().unwrap(),
-                    }))
+                    .expose(
+                        ExposeBuilder::runner()
+                            .name("elf")
+                            .target_name("dwarf")
+                            .source(ExposeSource::Self_),
+                    )
                     .runner_default("elf")
                     .build(),
             ),

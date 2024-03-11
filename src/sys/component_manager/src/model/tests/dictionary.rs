@@ -82,14 +82,7 @@ async fn use_protocol_from_dictionary() {
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
                 }))
-                .expose(ExposeDecl::Dictionary(ExposeDictionaryDecl {
-                    source: ExposeSource::Self_,
-                    source_name: "child_dict".parse().unwrap(),
-                    source_dictionary: None,
-                    target_name: "child_dict".parse().unwrap(),
-                    target: ExposeTarget::Parent,
-                    availability: Availability::Required,
-                }))
+                .expose(ExposeBuilder::dictionary().name("child_dict").source(ExposeSource::Self_))
                 .build(),
         ),
     ];
@@ -223,26 +216,18 @@ async fn expose_directory_from_dictionary_not_supported() {
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
                 }))
-                .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
-                    source: ExposeSource::Self_,
-                    source_name: "A".parse().unwrap(),
-                    source_dictionary: Some("self_dict".parse().unwrap()),
-                    target_name: "A".parse().unwrap(),
-                    rights: None,
-                    subdir: None,
-                    target: ExposeTarget::Parent,
-                    availability: Availability::Required,
-                }))
-                .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
-                    source: ExposeSource::Child("leaf".into()),
-                    source_name: "B".parse().unwrap(),
-                    source_dictionary: Some("child_dict".parse().unwrap()),
-                    target_name: "B".parse().unwrap(),
-                    rights: None,
-                    subdir: None,
-                    target: ExposeTarget::Parent,
-                    availability: Availability::Required,
-                }))
+                .expose(
+                    ExposeBuilder::directory()
+                        .name("A")
+                        .source(ExposeSource::Self_)
+                        .from_dictionary("self_dict"),
+                )
+                .expose(
+                    ExposeBuilder::directory()
+                        .name("B")
+                        .source(ExposeSource::Child("leaf".into()))
+                        .from_dictionary("child_dict"),
+                )
                 .child_default("leaf")
                 .build(),
         ),
@@ -251,14 +236,12 @@ async fn expose_directory_from_dictionary_not_supported() {
             ComponentDeclBuilder::new()
                 .capability(CapabilityBuilder::directory().name("bar_data").path("/data/bar"))
                 .dictionary_default("child_dict")
-                .expose(ExposeDecl::Dictionary(ExposeDictionaryDecl {
-                    source: ExposeSource::Self_,
-                    source_name: "child_dict".parse().unwrap(),
-                    source_dictionary: None,
-                    target: ExposeTarget::Parent,
-                    target_name: "child_dict".parse().unwrap(),
-                    availability: Availability::Required,
-                }))
+                .expose(
+                    ExposeBuilder::dictionary()
+                        .name("child_dict")
+                        .source(ExposeSource::Self_)
+                        .availability(Availability::Required),
+                )
                 .offer(OfferDecl::Directory(OfferDirectoryDecl {
                     source: OfferSource::Self_,
                     source_name: "bar_data".parse().unwrap(),
@@ -400,14 +383,7 @@ async fn use_protocol_from_nested_dictionary() {
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
                 }))
-                .expose(ExposeDecl::Dictionary(ExposeDictionaryDecl {
-                    source: ExposeSource::Self_,
-                    source_name: "child_dict".parse().unwrap(),
-                    source_dictionary: None,
-                    target_name: "child_dict".parse().unwrap(),
-                    target: ExposeTarget::Parent,
-                    availability: Availability::Required,
-                }))
+                .expose(ExposeBuilder::dictionary().name("child_dict").source(ExposeSource::Self_))
                 .build(),
         ),
     ];
@@ -511,14 +487,7 @@ async fn offer_protocol_from_dictionary() {
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
                 }))
-                .expose(ExposeDecl::Dictionary(ExposeDictionaryDecl {
-                    source: ExposeSource::Self_,
-                    source_name: "child_dict".parse().unwrap(),
-                    source_dictionary: None,
-                    target_name: "child_dict".parse().unwrap(),
-                    target: ExposeTarget::Parent,
-                    availability: Availability::Required,
-                }))
+                .expose(ExposeBuilder::dictionary().name("child_dict").source(ExposeSource::Self_))
                 .build(),
         ),
         (
@@ -661,14 +630,7 @@ async fn offer_protocol_from_nested_dictionary() {
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
                 }))
-                .expose(ExposeDecl::Dictionary(ExposeDictionaryDecl {
-                    source: ExposeSource::Self_,
-                    source_name: "child_dict".parse().unwrap(),
-                    source_dictionary: None,
-                    target_name: "child_dict".parse().unwrap(),
-                    target: ExposeTarget::Parent,
-                    availability: Availability::Required,
-                }))
+                .expose(ExposeBuilder::dictionary().name("child_dict").source(ExposeSource::Self_))
                 .build(),
         ),
         (
@@ -718,22 +680,20 @@ async fn expose_protocol_from_dictionary() {
             ComponentDeclBuilder::new()
                 .protocol_default("foo")
                 .dictionary_default("self_dict")
-                .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
-                    source: ExposeSource::Self_,
-                    source_name: "A".parse().unwrap(),
-                    source_dictionary: Some("self_dict".parse().unwrap()),
-                    target_name: "A_svc".parse().unwrap(),
-                    target: ExposeTarget::Parent,
-                    availability: Availability::Required,
-                }))
-                .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
-                    source: ExposeSource::Child("leaf".into()),
-                    source_name: "B".parse().unwrap(),
-                    source_dictionary: Some("child_dict".parse().unwrap()),
-                    target_name: "B_svc".parse().unwrap(),
-                    target: ExposeTarget::Parent,
-                    availability: Availability::Required,
-                }))
+                .expose(
+                    ExposeBuilder::protocol()
+                        .name("A")
+                        .target_name("A_svc")
+                        .from_dictionary("self_dict")
+                        .source(ExposeSource::Self_),
+                )
+                .expose(
+                    ExposeBuilder::protocol()
+                        .name("B")
+                        .target_name("B_svc")
+                        .from_dictionary("child_dict")
+                        .source(ExposeSource::Child("leaf".into())),
+                )
                 .offer(OfferDecl::Protocol(OfferProtocolDecl {
                     source: OfferSource::Self_,
                     source_name: "foo".parse().unwrap(),
@@ -760,14 +720,7 @@ async fn expose_protocol_from_dictionary() {
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
                 }))
-                .expose(ExposeDecl::Dictionary(ExposeDictionaryDecl {
-                    source: ExposeSource::Self_,
-                    source_name: "child_dict".parse().unwrap(),
-                    source_dictionary: None,
-                    target_name: "child_dict".parse().unwrap(),
-                    target: ExposeTarget::Parent,
-                    availability: Availability::Required,
-                }))
+                .expose(ExposeBuilder::dictionary().name("child_dict").source(ExposeSource::Self_))
                 .build(),
         ),
     ];
@@ -811,22 +764,20 @@ async fn expose_protocol_from_nested_dictionary() {
                 .protocol_default("foo")
                 .dictionary_default("self_dict")
                 .dictionary_default("nested")
-                .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
-                    source: ExposeSource::Self_,
-                    source_name: "A".parse().unwrap(),
-                    source_dictionary: Some("self_dict/nested".parse().unwrap()),
-                    target_name: "A_svc".parse().unwrap(),
-                    target: ExposeTarget::Parent,
-                    availability: Availability::Required,
-                }))
-                .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
-                    source: ExposeSource::Child("leaf".into()),
-                    source_name: "B".parse().unwrap(),
-                    source_dictionary: Some("child_dict/nested".parse().unwrap()),
-                    target_name: "B_svc".parse().unwrap(),
-                    target: ExposeTarget::Parent,
-                    availability: Availability::Required,
-                }))
+                .expose(
+                    ExposeBuilder::protocol()
+                        .name("A")
+                        .target_name("A_svc")
+                        .from_dictionary("self_dict/nested")
+                        .source(ExposeSource::Self_),
+                )
+                .expose(
+                    ExposeBuilder::protocol()
+                        .name("B")
+                        .target_name("B_svc")
+                        .from_dictionary("child_dict/nested")
+                        .source(ExposeSource::Child("leaf".into())),
+                )
                 .offer(OfferDecl::Protocol(OfferProtocolDecl {
                     source: OfferSource::Self_,
                     source_name: "foo".parse().unwrap(),
@@ -872,14 +823,7 @@ async fn expose_protocol_from_nested_dictionary() {
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
                 }))
-                .expose(ExposeDecl::Dictionary(ExposeDictionaryDecl {
-                    source: ExposeSource::Self_,
-                    source_name: "child_dict".parse().unwrap(),
-                    source_dictionary: None,
-                    target_name: "child_dict".parse().unwrap(),
-                    target: ExposeTarget::Parent,
-                    availability: Availability::Required,
-                }))
+                .expose(ExposeBuilder::dictionary().name("child_dict").source(ExposeSource::Self_))
                 .build(),
         ),
     ];
@@ -903,22 +847,12 @@ async fn dictionary_in_exposed_dir() {
             ComponentDeclBuilder::new()
                 .protocol_default("foo")
                 .dictionary_default("self_dict")
-                .expose(ExposeDecl::Dictionary(ExposeDictionaryDecl {
-                    source: ExposeSource::Self_,
-                    source_name: "self_dict".parse().unwrap(),
-                    source_dictionary: None,
-                    target_name: "self_dict".parse().unwrap(),
-                    target: ExposeTarget::Parent,
-                    availability: Availability::Required,
-                }))
-                .expose(ExposeDecl::Dictionary(ExposeDictionaryDecl {
-                    source: ExposeSource::Child("leaf".into()),
-                    source_name: "child_dict".parse().unwrap(),
-                    source_dictionary: None,
-                    target_name: "child_dict".parse().unwrap(),
-                    target: ExposeTarget::Parent,
-                    availability: Availability::Required,
-                }))
+                .expose(ExposeBuilder::dictionary().name("self_dict").source(ExposeSource::Self_))
+                .expose(
+                    ExposeBuilder::dictionary()
+                        .name("child_dict")
+                        .source(ExposeSource::Child("leaf".into())),
+                )
                 .offer(OfferDecl::Protocol(OfferProtocolDecl {
                     source: OfferSource::Self_,
                     source_name: "foo".parse().unwrap(),
@@ -955,14 +889,7 @@ async fn dictionary_in_exposed_dir() {
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
                 }))
-                .expose(ExposeDecl::Dictionary(ExposeDictionaryDecl {
-                    source: ExposeSource::Self_,
-                    source_name: "child_dict".parse().unwrap(),
-                    source_dictionary: None,
-                    target_name: "child_dict".parse().unwrap(),
-                    target: ExposeTarget::Parent,
-                    availability: Availability::Required,
-                }))
+                .expose(ExposeBuilder::dictionary().name("child_dict").source(ExposeSource::Self_))
                 .build(),
         ),
     ];
@@ -1085,14 +1012,7 @@ async fn offer_dictionary_to_dictionary() {
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
                 }))
-                .expose(ExposeDecl::Dictionary(ExposeDictionaryDecl {
-                    source: ExposeSource::Self_,
-                    source_name: "child_dict".parse().unwrap(),
-                    source_dictionary: None,
-                    target_name: "child_dict".parse().unwrap(),
-                    target: ExposeTarget::Parent,
-                    availability: Availability::Required,
-                }))
+                .expose(ExposeBuilder::dictionary().name("child_dict").source(ExposeSource::Self_))
                 .build(),
         ),
     ];
@@ -1327,14 +1247,7 @@ async fn extend_from_child() {
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
                 }))
-                .expose(ExposeDecl::Dictionary(ExposeDictionaryDecl {
-                    source: ExposeSource::Self_,
-                    source_name: "origin_dict".parse().unwrap(),
-                    source_dictionary: None,
-                    target_name: "origin_dict".parse().unwrap(),
-                    target: ExposeTarget::Parent,
-                    availability: Availability::Required,
-                }))
+                .expose(ExposeBuilder::dictionary().name("origin_dict").source(ExposeSource::Self_))
                 .build(),
         ),
     ];
@@ -1857,22 +1770,20 @@ async fn expose_from_dictionary_availability_attenuated() {
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
                 }))
-                .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
-                    source: ExposeSource::Self_,
-                    source_name: "A".parse().unwrap(),
-                    source_dictionary: Some("dict".parse().unwrap()),
-                    target_name: "A".parse().unwrap(),
-                    target: ExposeTarget::Parent,
-                    availability: Availability::Required,
-                }))
-                .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
-                    source: ExposeSource::Self_,
-                    source_name: "B".parse().unwrap(),
-                    source_dictionary: Some("dict/nested".parse().unwrap()),
-                    target_name: "B".parse().unwrap(),
-                    target: ExposeTarget::Parent,
-                    availability: Availability::Required,
-                }))
+                .expose(
+                    ExposeBuilder::protocol()
+                        .name("A")
+                        .from_dictionary("dict")
+                        .source(ExposeSource::Self_)
+                        .availability(Availability::Required),
+                )
+                .expose(
+                    ExposeBuilder::protocol()
+                        .name("B")
+                        .from_dictionary("dict/nested")
+                        .source(ExposeSource::Self_)
+                        .availability(Availability::Required),
+                )
                 .build(),
         ),
     ];
@@ -1909,30 +1820,27 @@ async fn expose_from_dictionary_availability_invalid() {
         (
             "mid",
             ComponentDeclBuilder::new()
-                .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
-                    source: ExposeSource::Child("leaf".into()),
-                    source_name: "A".parse().unwrap(),
-                    source_dictionary: Some("required_dict".parse().unwrap()),
-                    target_name: "A".parse().unwrap(),
-                    target: ExposeTarget::Parent,
-                    availability: Availability::Required,
-                }))
-                .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
-                    source: ExposeSource::Child("leaf".into()),
-                    source_name: "B".parse().unwrap(),
-                    source_dictionary: Some("optional_dict".parse().unwrap()),
-                    target_name: "B".parse().unwrap(),
-                    target: ExposeTarget::Parent,
-                    availability: Availability::Required,
-                }))
-                .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
-                    source: ExposeSource::Child("leaf".into()),
-                    source_name: "C".parse().unwrap(),
-                    source_dictionary: Some("dict_with_optional_nested/nested".parse().unwrap()),
-                    target_name: "C".parse().unwrap(),
-                    target: ExposeTarget::Parent,
-                    availability: Availability::Required,
-                }))
+                .expose(
+                    ExposeBuilder::protocol()
+                        .name("A")
+                        .from_dictionary("required_dict")
+                        .source(ExposeSource::Child("leaf".into()))
+                        .availability(Availability::Required),
+                )
+                .expose(
+                    ExposeBuilder::protocol()
+                        .name("B")
+                        .from_dictionary("optional_dict")
+                        .source(ExposeSource::Child("leaf".into()))
+                        .availability(Availability::Required),
+                )
+                .expose(
+                    ExposeBuilder::protocol()
+                        .name("C")
+                        .from_dictionary("dict_with_optional_nested/nested")
+                        .source(ExposeSource::Child("leaf".into()))
+                        .availability(Availability::Required),
+                )
                 .child_default("leaf")
                 .build(),
         ),
@@ -1982,30 +1890,24 @@ async fn expose_from_dictionary_availability_invalid() {
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Optional,
                 }))
-                .expose(ExposeDecl::Dictionary(ExposeDictionaryDecl {
-                    source: ExposeSource::Self_,
-                    source_name: "required_dict".parse().unwrap(),
-                    source_dictionary: None,
-                    target_name: "required_dict".parse().unwrap(),
-                    target: ExposeTarget::Parent,
-                    availability: Availability::Required,
-                }))
-                .expose(ExposeDecl::Dictionary(ExposeDictionaryDecl {
-                    source: ExposeSource::Self_,
-                    source_name: "optional_dict".parse().unwrap(),
-                    source_dictionary: None,
-                    target_name: "optional_dict".parse().unwrap(),
-                    target: ExposeTarget::Parent,
-                    availability: Availability::Optional,
-                }))
-                .expose(ExposeDecl::Dictionary(ExposeDictionaryDecl {
-                    source: ExposeSource::Self_,
-                    source_name: "dict_with_optional_nested".parse().unwrap(),
-                    source_dictionary: None,
-                    target_name: "dict_with_optional_nested".parse().unwrap(),
-                    target: ExposeTarget::Parent,
-                    availability: Availability::Required,
-                }))
+                .expose(
+                    ExposeBuilder::dictionary()
+                        .name("required_dict")
+                        .source(ExposeSource::Self_)
+                        .availability(Availability::Required),
+                )
+                .expose(
+                    ExposeBuilder::dictionary()
+                        .name("optional_dict")
+                        .source(ExposeSource::Self_)
+                        .availability(Availability::Optional),
+                )
+                .expose(
+                    ExposeBuilder::dictionary()
+                        .name("dict_with_optional_nested")
+                        .source(ExposeSource::Self_)
+                        .availability(Availability::Required),
+                )
                 .build(),
         ),
     ];

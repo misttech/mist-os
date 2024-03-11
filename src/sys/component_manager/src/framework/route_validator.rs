@@ -452,23 +452,12 @@ mod tests {
             .source(UseSource::Child("my_child".into()))
             .name("foo.bar")
             .build();
-        let expose_from_child_decl = ExposeDecl::Protocol(ExposeProtocolDecl {
-            source: ExposeSource::Child("my_child".to_string()),
-            source_name: "foo.bar".parse().unwrap(),
-            source_dictionary: None,
-            target: ExposeTarget::Parent,
-            target_name: "foo.bar".parse().unwrap(),
-            availability: cm_rust::Availability::Required,
-        });
-
-        let expose_from_self_decl = ExposeDecl::Protocol(ExposeProtocolDecl {
-            source: ExposeSource::Self_,
-            source_name: "foo.bar".parse().unwrap(),
-            source_dictionary: None,
-            target: ExposeTarget::Parent,
-            target_name: "foo.bar".parse().unwrap(),
-            availability: cm_rust::Availability::Required,
-        });
+        let expose_from_child_decl = ExposeBuilder::protocol()
+            .name("foo.bar")
+            .source(ExposeSource::Child("my_child".to_string()))
+            .build();
+        let expose_from_self_decl =
+            ExposeBuilder::protocol().name("foo.bar").source(ExposeSource::Self_).build();
 
         let components = vec![
             (
@@ -576,15 +565,10 @@ mod tests {
     async fn validate_error() {
         let invalid_source_name_use_from_child_decl =
             UseBuilder::protocol().source(UseSource::Child("my_child".into())).name("a").build();
-
-        let invalid_source_name_expose_from_child_decl = ExposeDecl::Protocol(ExposeProtocolDecl {
-            source: ExposeSource::Child("my_child".to_string()),
-            source_name: "c".parse().unwrap(),
-            source_dictionary: None,
-            target: ExposeTarget::Parent,
-            target_name: "c".parse().unwrap(),
-            availability: cm_rust::Availability::Required,
-        });
+        let invalid_source_name_expose_from_child_decl = ExposeBuilder::protocol()
+            .name("c")
+            .source(ExposeSource::Child("my_child".to_string()))
+            .build();
 
         let components = vec![
             (
@@ -664,22 +648,13 @@ mod tests {
             .name("biz.buz")
             .path("/svc/foo.bar")
             .build();
-        let expose_from_child_decl = ExposeDecl::Protocol(ExposeProtocolDecl {
-            source: ExposeSource::Child("my_child".into()),
-            source_name: "biz.buz".parse().unwrap(),
-            source_dictionary: None,
-            target: ExposeTarget::Parent,
-            target_name: "foo.bar".parse().unwrap(),
-            availability: cm_rust::Availability::Required,
-        });
-        let expose_from_self_decl = ExposeDecl::Protocol(ExposeProtocolDecl {
-            source: ExposeSource::Self_,
-            source_name: "biz.buz".parse().unwrap(),
-            source_dictionary: None,
-            target: ExposeTarget::Parent,
-            target_name: "biz.buz".parse().unwrap(),
-            availability: cm_rust::Availability::Required,
-        });
+        let expose_from_child_decl = ExposeBuilder::protocol()
+            .name("biz.buz")
+            .target_name("foo.bar")
+            .source(ExposeSource::Child("my_child".into()))
+            .build();
+        let expose_from_self_decl =
+            ExposeBuilder::protocol().name("biz.buz").source(ExposeSource::Self_).build();
 
         let components = vec![
             (
@@ -791,20 +766,13 @@ mod tests {
     async fn route_all() {
         let use_from_framework_decl =
             UseBuilder::protocol().source(UseSource::Framework).name("foo.bar").build();
-        let expose_from_child_decl = ExposeDecl::Resolver(ExposeResolverDecl {
-            source: ExposeSource::Child("my_child".into()),
-            source_name: "qax.qux".parse().unwrap(),
-            source_dictionary: None,
-            target: ExposeTarget::Parent,
-            target_name: "foo.buz".parse().unwrap(),
-        });
-        let expose_from_self_decl = ExposeDecl::Resolver(ExposeResolverDecl {
-            source: ExposeSource::Self_,
-            source_name: "qax.qux".parse().unwrap(),
-            source_dictionary: None,
-            target: ExposeTarget::Parent,
-            target_name: "qax.qux".parse().unwrap(),
-        });
+        let expose_from_child_decl = ExposeBuilder::resolver()
+            .name("qax.qux")
+            .target_name("foo.buz")
+            .source(ExposeSource::Child("my_child".into()))
+            .build();
+        let expose_from_self_decl =
+            ExposeBuilder::resolver().name("qax.qux").source(ExposeSource::Self_).build();
         let capability_decl =
             CapabilityBuilder::resolver().name("qax.qux").path("/svc/qax.qux").build();
 
@@ -875,39 +843,20 @@ mod tests {
             UseBuilder::protocol().source(UseSource::Framework).name("foo.buz").build();
         let use_from_framework_decl3 =
             UseBuilder::protocol().source(UseSource::Framework).name("no.match").build();
-        let expose_from_child_decl = ExposeDecl::Protocol(ExposeProtocolDecl {
-            source: ExposeSource::Child("my_child".into()),
-            source_name: "qax.qux".parse().unwrap(),
-            source_dictionary: None,
-            target: ExposeTarget::Parent,
-            target_name: "foo.buz".parse().unwrap(),
-            availability: cm_rust::Availability::Required,
-        });
-        let expose_from_child_decl2 = ExposeDecl::Protocol(ExposeProtocolDecl {
-            source: ExposeSource::Child("my_child".into()),
-            source_name: "qax.qux".parse().unwrap(),
-            source_dictionary: None,
-            target: ExposeTarget::Parent,
-            target_name: "foo.biz".parse().unwrap(),
-            availability: cm_rust::Availability::Required,
-        });
-        let expose_from_child_decl3 = ExposeDecl::Protocol(ExposeProtocolDecl {
-            source: ExposeSource::Framework,
-            source_name: "no.match".parse().unwrap(),
-            source_dictionary: None,
-            target: ExposeTarget::Parent,
-            target_name: "no.match".parse().unwrap(),
-            availability: cm_rust::Availability::Required,
-        });
-
-        let expose_from_self_decl = ExposeDecl::Protocol(ExposeProtocolDecl {
-            source: ExposeSource::Self_,
-            source_name: "qax.qux".parse().unwrap(),
-            source_dictionary: None,
-            target: ExposeTarget::Parent,
-            target_name: "qax.qux".parse().unwrap(),
-            availability: cm_rust::Availability::Required,
-        });
+        let expose_from_child_decl = ExposeBuilder::protocol()
+            .name("qax.qux")
+            .target_name("foo.buz")
+            .source(ExposeSource::Child("my_child".into()))
+            .build();
+        let expose_from_child_decl2 = ExposeBuilder::protocol()
+            .name("qax.qux")
+            .target_name("foo.biz")
+            .source(ExposeSource::Child("my_child".into()))
+            .build();
+        let expose_from_child_decl3 =
+            ExposeBuilder::protocol().name("no.match").source(ExposeSource::Framework).build();
+        let expose_from_self_decl =
+            ExposeBuilder::protocol().name("qax.qux").source(ExposeSource::Self_).build();
 
         let components = vec![
             (
@@ -1010,14 +959,8 @@ mod tests {
             source_instance_filter: None,
             renamed_instances: None,
         });
-        let expose_from_self_decl = ExposeDecl::Service(ExposeServiceDecl {
-            source: ExposeSource::Self_,
-            source_name: "my_service".parse().unwrap(),
-            source_dictionary: None,
-            target: ExposeTarget::Parent,
-            target_name: "my_service".parse().unwrap(),
-            availability: cm_rust::Availability::Required,
-        });
+        let expose_from_self_decl =
+            ExposeBuilder::service().name("my_service").source(ExposeSource::Self_).build();
         let use_decl = UseBuilder::service().name("my_service").path("/svc/foo.bar").build();
         let capability_decl =
             CapabilityBuilder::service().name("my_service").path("/svc/foo.bar").build();
@@ -1165,14 +1108,10 @@ mod tests {
     async fn route_error() {
         let invalid_source_name_use_from_child_decl =
             UseBuilder::protocol().source(UseSource::Child("my_child".into())).name("a").build();
-        let invalid_source_name_expose_from_child_decl = ExposeDecl::Protocol(ExposeProtocolDecl {
-            source: ExposeSource::Child("my_child".to_string()),
-            source_name: "c".parse().unwrap(),
-            source_dictionary: None,
-            target: ExposeTarget::Parent,
-            target_name: "c".parse().unwrap(),
-            availability: cm_rust::Availability::Required,
-        });
+        let invalid_source_name_expose_from_child_decl = ExposeBuilder::protocol()
+            .name("c")
+            .source(ExposeSource::Child("my_child".to_string()))
+            .build();
 
         let components = vec![
             (

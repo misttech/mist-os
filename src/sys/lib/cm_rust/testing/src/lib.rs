@@ -76,19 +76,19 @@ impl ComponentDeclBuilder {
         self
     }
 
-    /// Add a custom offer.
+    /// Add an offer decl.
     pub fn offer(mut self, offer: cm_rust::OfferDecl) -> Self {
         self.result.offers.push(offer);
         self
     }
 
-    /// Add a custom expose.
-    pub fn expose(mut self, expose: cm_rust::ExposeDecl) -> Self {
-        self.result.exposes.push(expose);
+    /// Add an expose decl.
+    pub fn expose(mut self, expose: impl Into<cm_rust::ExposeDecl>) -> Self {
+        self.result.exposes.push(expose.into());
         self
     }
 
-    /// Add a custom use decl.
+    /// Add a use decl.
     pub fn use_(mut self, use_: impl Into<cm_rust::UseDecl>) -> Self {
         self.result.uses.push(use_.into());
         self
@@ -577,7 +577,7 @@ impl From<CapabilityBuilder> for cm_rust::CapabilityDecl {
 /// A convenience builder for constructing [UseDecl]s.
 ///
 /// To use, call the constructor matching their capability type ([UseBuilder::protocol],
-/// [UseBuilder::directory], etc., and then call methods to set properties. When done,
+/// [UseBuilder::directory], etc.), and then call methods to set properties. When done,
 /// call [UseBuilder::build] (or [Into::into]) to generate the [UseDecl].
 #[derive(Debug)]
 pub struct UseBuilder {
@@ -819,6 +819,210 @@ impl UseBuilder {
 
 impl From<UseBuilder> for cm_rust::UseDecl {
     fn from(builder: UseBuilder) -> Self {
+        builder.build()
+    }
+}
+
+/// A convenience builder for constructing [ExposeDecl]s.
+///
+/// To use, call the constructor matching their capability type ([ExposeBuilder::protocol],
+/// [ExposeBuilder::directory], etc.), and then call methods to set properties. When done,
+/// call [ExposeBuilder::build] (or [Into::into]) to generate the [ExposeDecl].
+#[derive(Debug)]
+pub struct ExposeBuilder {
+    source_name: Option<Name>,
+    type_: CapabilityTypeName,
+    source_dictionary: Option<RelativePath>,
+    source: Option<cm_rust::ExposeSource>,
+    target: cm_rust::ExposeTarget,
+    target_name: Option<Name>,
+    availability: cm_rust::Availability,
+    rights: Option<fio::Operations>,
+    subdir: Option<PathBuf>,
+}
+
+impl ExposeBuilder {
+    pub fn protocol() -> Self {
+        Self::new(CapabilityTypeName::Protocol)
+    }
+
+    pub fn service() -> Self {
+        Self::new(CapabilityTypeName::Service)
+    }
+
+    pub fn directory() -> Self {
+        Self::new(CapabilityTypeName::Directory)
+    }
+
+    pub fn runner() -> Self {
+        Self::new(CapabilityTypeName::Runner)
+    }
+
+    pub fn resolver() -> Self {
+        Self::new(CapabilityTypeName::Resolver)
+    }
+
+    pub fn dictionary() -> Self {
+        Self::new(CapabilityTypeName::Dictionary)
+    }
+
+    pub fn config() -> Self {
+        Self::new(CapabilityTypeName::Config)
+    }
+
+    fn new(type_: CapabilityTypeName) -> Self {
+        Self {
+            type_,
+            source: None,
+            target: cm_rust::ExposeTarget::Parent,
+            source_name: None,
+            target_name: None,
+            source_dictionary: None,
+            rights: None,
+            subdir: None,
+            availability: cm_rust::Availability::Required,
+        }
+    }
+
+    pub fn name(mut self, name: &str) -> Self {
+        self.source_name = Some(name.parse().unwrap());
+        if self.target_name.is_some() {
+            return self;
+        }
+        self.target_name = self.source_name.clone();
+        self
+    }
+
+    pub fn target_name(mut self, name: &str) -> Self {
+        self.target_name = Some(name.parse().unwrap());
+        self
+    }
+
+    pub fn from_dictionary(mut self, dictionary: &str) -> Self {
+        assert_matches!(
+            self.type_,
+            CapabilityTypeName::Service
+                | CapabilityTypeName::Protocol
+                | CapabilityTypeName::Directory
+                | CapabilityTypeName::Dictionary
+                | CapabilityTypeName::Runner
+                | CapabilityTypeName::Resolver
+        );
+        self.source_dictionary = Some(dictionary.parse().unwrap());
+        self
+    }
+
+    pub fn source(mut self, source: cm_rust::ExposeSource) -> Self {
+        self.source = Some(source);
+        self
+    }
+
+    pub fn target(mut self, target: cm_rust::ExposeTarget) -> Self {
+        self.target = target;
+        self
+    }
+
+    pub fn availability(mut self, availability: cm_rust::Availability) -> Self {
+        assert_matches!(
+            self.type_,
+            CapabilityTypeName::Protocol
+                | CapabilityTypeName::Service
+                | CapabilityTypeName::Directory
+                | CapabilityTypeName::Config
+                | CapabilityTypeName::Dictionary
+        );
+        self.availability = availability;
+        self
+    }
+
+    pub fn rights(mut self, rights: fio::Operations) -> Self {
+        assert_matches!(self.type_, CapabilityTypeName::Directory);
+        self.rights = Some(rights);
+        self
+    }
+
+    pub fn subdir(mut self, subdir: &str) -> Self {
+        assert_matches!(self.type_, CapabilityTypeName::Directory);
+        self.subdir = Some(subdir.parse().unwrap());
+        self
+    }
+
+    pub fn build(self) -> cm_rust::ExposeDecl {
+        match self.type_ {
+            CapabilityTypeName::Protocol => {
+                cm_rust::ExposeDecl::Protocol(cm_rust::ExposeProtocolDecl {
+                    source: self.source.expect("source not set"),
+                    source_name: self.source_name.expect("name not set"),
+                    source_dictionary: self.source_dictionary,
+                    target: self.target,
+                    target_name: self.target_name.expect("name not set"),
+                    availability: self.availability,
+                })
+            }
+            CapabilityTypeName::Service => {
+                cm_rust::ExposeDecl::Service(cm_rust::ExposeServiceDecl {
+                    source: self.source.expect("source not set"),
+                    source_name: self.source_name.expect("name not set"),
+                    source_dictionary: self.source_dictionary,
+                    target: self.target,
+                    target_name: self.target_name.expect("name not set"),
+                    availability: self.availability,
+                })
+            }
+            CapabilityTypeName::Directory => {
+                cm_rust::ExposeDecl::Directory(cm_rust::ExposeDirectoryDecl {
+                    source: self.source.expect("source not set"),
+                    source_name: self.source_name.expect("name not set"),
+                    source_dictionary: self.source_dictionary,
+                    target: self.target,
+                    target_name: self.target_name.expect("name not set"),
+                    rights: self.rights,
+                    subdir: self.subdir,
+                    availability: self.availability,
+                })
+            }
+            CapabilityTypeName::Runner => cm_rust::ExposeDecl::Runner(cm_rust::ExposeRunnerDecl {
+                source: self.source.expect("source not set"),
+                source_name: self.source_name.expect("name not set"),
+                source_dictionary: self.source_dictionary,
+                target: self.target,
+                target_name: self.target_name.expect("name not set"),
+            }),
+            CapabilityTypeName::Resolver => {
+                cm_rust::ExposeDecl::Resolver(cm_rust::ExposeResolverDecl {
+                    source: self.source.expect("source not set"),
+                    source_name: self.source_name.expect("name not set"),
+                    source_dictionary: self.source_dictionary,
+                    target: self.target,
+                    target_name: self.target_name.expect("name not set"),
+                })
+            }
+            CapabilityTypeName::Config => {
+                cm_rust::ExposeDecl::Config(cm_rust::ExposeConfigurationDecl {
+                    source: self.source.expect("source not set"),
+                    source_name: self.source_name.expect("name not set"),
+                    target: self.target,
+                    target_name: self.target_name.expect("name not set"),
+                    availability: self.availability,
+                })
+            }
+            CapabilityTypeName::Dictionary => {
+                cm_rust::ExposeDecl::Dictionary(cm_rust::ExposeDictionaryDecl {
+                    source: self.source.expect("source not set"),
+                    source_name: self.source_name.expect("name not set"),
+                    source_dictionary: self.source_dictionary,
+                    target: self.target,
+                    target_name: self.target_name.expect("name not set"),
+                    availability: self.availability,
+                })
+            }
+            CapabilityTypeName::EventStream | CapabilityTypeName::Storage => unreachable!(),
+        }
+    }
+}
+
+impl From<ExposeBuilder> for cm_rust::ExposeDecl {
+    fn from(builder: ExposeBuilder) -> Self {
         builder.build()
     }
 }

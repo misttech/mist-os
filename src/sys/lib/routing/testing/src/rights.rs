@@ -48,16 +48,13 @@ impl<T: RoutingTestModelBuilder> CommonRightsTest<T> {
                             .path("/data/foo")
                             .rights(fio::RW_STAR_DIR),
                     )
-                    .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
-                        source: ExposeSource::Self_,
-                        source_name: "foo_data".parse().unwrap(),
-                        source_dictionary: None,
-                        target_name: "bar_data".parse().unwrap(),
-                        target: ExposeTarget::Parent,
-                        rights: Some(fio::RW_STAR_DIR),
-                        subdir: None,
-                        availability: cm_rust::Availability::Required,
-                    }))
+                    .expose(
+                        ExposeBuilder::directory()
+                            .name("foo_data")
+                            .source(ExposeSource::Self_)
+                            .target_name("bar_data")
+                            .rights(fio::RW_STAR_DIR),
+                    )
                     .build(),
             ),
             (
@@ -105,16 +102,13 @@ impl<T: RoutingTestModelBuilder> CommonRightsTest<T> {
                             .path("/data/foo")
                             .rights(fio::RW_STAR_DIR),
                     )
-                    .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
-                        source: ExposeSource::Self_,
-                        source_name: "foo_data".parse().unwrap(),
-                        source_dictionary: None,
-                        target_name: "bar_data".parse().unwrap(),
-                        target: ExposeTarget::Parent,
-                        rights: Some(fio::RW_STAR_DIR),
-                        subdir: None,
-                        availability: cm_rust::Availability::Required,
-                    }))
+                    .expose(
+                        ExposeBuilder::directory()
+                            .name("foo_data")
+                            .source(ExposeSource::Self_)
+                            .target_name("bar_data")
+                            .rights(fio::RW_STAR_DIR),
+                    )
                     .build(),
             ),
             (
@@ -162,16 +156,13 @@ impl<T: RoutingTestModelBuilder> CommonRightsTest<T> {
                             .path("/data/foo")
                             .rights(fio::RW_STAR_DIR),
                     )
-                    .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
-                        source: ExposeSource::Self_,
-                        source_name: "foo_data".parse().unwrap(),
-                        source_dictionary: None,
-                        target_name: "bar_data".parse().unwrap(),
-                        target: ExposeTarget::Parent,
-                        rights: Some(fio::RW_STAR_DIR),
-                        subdir: None,
-                        availability: cm_rust::Availability::Required,
-                    }))
+                    .expose(
+                        ExposeBuilder::directory()
+                            .name("foo_data")
+                            .source(ExposeSource::Self_)
+                            .target_name("bar_data")
+                            .rights(fio::RW_STAR_DIR),
+                    )
                     .build(),
             ),
             (
@@ -219,16 +210,13 @@ impl<T: RoutingTestModelBuilder> CommonRightsTest<T> {
                             .path("/data/foo")
                             .rights(fio::RW_STAR_DIR),
                     )
-                    .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
-                        source: ExposeSource::Self_,
-                        source_name: "foo_data".parse().unwrap(),
-                        source_dictionary: None,
-                        target_name: "bar_data".parse().unwrap(),
-                        target: ExposeTarget::Parent,
-                        rights: Some(fio::W_STAR_DIR),
-                        subdir: None,
-                        availability: cm_rust::Availability::Required,
-                    }))
+                    .expose(
+                        ExposeBuilder::directory()
+                            .name("foo_data")
+                            .source(ExposeSource::Self_)
+                            .target_name("bar_data")
+                            .rights(fio::W_STAR_DIR),
+                    )
                     .build(),
             ),
             (
@@ -276,16 +264,13 @@ impl<T: RoutingTestModelBuilder> CommonRightsTest<T> {
                             .path("/data/foo")
                             .rights(fio::RW_STAR_DIR),
                     )
-                    .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
-                        source: ExposeSource::Self_,
-                        source_name: "foo_data".parse().unwrap(),
-                        source_dictionary: None,
-                        target_name: "bar_data".parse().unwrap(),
-                        target: ExposeTarget::Parent,
-                        rights: Some(fio::R_STAR_DIR),
-                        subdir: None,
-                        availability: cm_rust::Availability::Required,
-                    }))
+                    .expose(
+                        ExposeBuilder::directory()
+                            .name("foo_data")
+                            .source(ExposeSource::Self_)
+                            .target_name("bar_data")
+                            .rights(fio::R_STAR_DIR),
+                    )
                     .build(),
             ),
             (
@@ -333,16 +318,13 @@ impl<T: RoutingTestModelBuilder> CommonRightsTest<T> {
                             .path("/data/foo")
                             .rights(fio::W_STAR_DIR),
                     )
-                    .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
-                        source: ExposeSource::Self_,
-                        source_name: "foo_data".parse().unwrap(),
-                        source_dictionary: None,
-                        target_name: "bar_data".parse().unwrap(),
-                        target: ExposeTarget::Parent,
-                        rights: Some(fio::RW_STAR_DIR),
-                        subdir: None,
-                        availability: cm_rust::Availability::Required,
-                    }))
+                    .expose(
+                        ExposeBuilder::directory()
+                            .name("foo_data")
+                            .source(ExposeSource::Self_)
+                            .target_name("bar_data")
+                            .rights(fio::RW_STAR_DIR),
+                    )
                     .build(),
             ),
             (

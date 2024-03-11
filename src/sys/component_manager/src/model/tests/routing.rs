@@ -484,14 +484,7 @@ async fn dynamic_offer_siblings_same_collection() {
             "b",
             ComponentDeclBuilder::new()
                 .protocol_default("hippo")
-                .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
-                    source_name: "hippo".parse().unwrap(),
-                    source: ExposeSource::Self_,
-                    source_dictionary: None,
-                    target_name: "hippo".parse().unwrap(),
-                    target: ExposeTarget::Parent,
-                    availability: cm_rust::Availability::Required,
-                }))
+                .expose(ExposeBuilder::protocol().name("hippo").source(ExposeSource::Self_))
                 .build(),
         ),
         ("c", ComponentDeclBuilder::new().use_(UseBuilder::protocol().name("hippo")).build()),
@@ -573,14 +566,7 @@ async fn dynamic_offer_siblings_cross_collection() {
             "b",
             ComponentDeclBuilder::new()
                 .protocol_default("hippo")
-                .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
-                    source_name: "hippo".parse().unwrap(),
-                    source: ExposeSource::Self_,
-                    source_dictionary: None,
-                    target_name: "hippo".parse().unwrap(),
-                    target: ExposeTarget::Parent,
-                    availability: cm_rust::Availability::Required,
-                }))
+                .expose(ExposeBuilder::protocol().name("hippo").source(ExposeSource::Self_))
                 .build(),
         ),
         ("c", ComponentDeclBuilder::new().use_(UseBuilder::protocol().name("hippo")).build()),
@@ -661,14 +647,7 @@ async fn dynamic_offer_destroyed_on_source_destruction() {
             "b",
             ComponentDeclBuilder::new()
                 .protocol_default("hippo")
-                .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
-                    source_name: "hippo".parse().unwrap(),
-                    source: ExposeSource::Self_,
-                    source_dictionary: None,
-                    target_name: "hippo".parse().unwrap(),
-                    target: ExposeTarget::Parent,
-                    availability: cm_rust::Availability::Required,
-                }))
+                .expose(ExposeBuilder::protocol().name("hippo").source(ExposeSource::Self_))
                 .build(),
         ),
         ("c", ComponentDeclBuilder::new().use_(UseBuilder::protocol().name("hippo")).build()),
@@ -773,16 +752,12 @@ async fn dynamic_offer_destroyed_on_target_destruction() {
             "b",
             ComponentDeclBuilder::new()
                 .capability(CapabilityBuilder::directory().name("hippo_data").path("/data/foo"))
-                .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
-                    source_name: "hippo_data".parse().unwrap(),
-                    source: ExposeSource::Self_,
-                    source_dictionary: None,
-                    target_name: "hippo_data".parse().unwrap(),
-                    target: ExposeTarget::Parent,
-                    rights: Some(fio::R_STAR_DIR),
-                    subdir: None,
-                    availability: cm_rust::Availability::Required,
-                }))
+                .expose(
+                    ExposeBuilder::directory()
+                        .name("hippo_data")
+                        .source(ExposeSource::Self_)
+                        .rights(fio::R_STAR_DIR),
+                )
                 .build(),
         ),
         (
@@ -893,14 +868,7 @@ async fn dynamic_offer_to_static_offer() {
             "b",
             ComponentDeclBuilder::new()
                 .protocol_default("hippo")
-                .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
-                    source_name: "hippo".parse().unwrap(),
-                    source: ExposeSource::Self_,
-                    source_dictionary: None,
-                    target_name: "hippo".parse().unwrap(),
-                    target: ExposeTarget::Parent,
-                    availability: cm_rust::Availability::Required,
-                }))
+                .expose(ExposeBuilder::protocol().name("hippo").source(ExposeSource::Self_))
                 .build(),
         ),
         (
@@ -1113,24 +1081,13 @@ async fn destroying_instance_blocks_on_routing() {
             ComponentDeclBuilder::new()
                 .protocol_default("foo")
                 .capability(CapabilityBuilder::directory().name("foo_data").path("/data/foo"))
-                .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
-                    source: ExposeSource::Self_,
-                    source_name: "foo".parse().unwrap(),
-                    source_dictionary: None,
-                    target_name: "foo".parse().unwrap(),
-                    target: ExposeTarget::Parent,
-                    availability: cm_rust::Availability::Required,
-                }))
-                .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
-                    source: ExposeSource::Self_,
-                    source_name: "foo_data".parse().unwrap(),
-                    source_dictionary: None,
-                    target_name: "foo_data".parse().unwrap(),
-                    target: ExposeTarget::Parent,
-                    rights: Some(fio::R_STAR_DIR),
-                    subdir: None,
-                    availability: cm_rust::Availability::Required,
-                }))
+                .expose(ExposeBuilder::protocol().name("foo").source(ExposeSource::Self_))
+                .expose(
+                    ExposeBuilder::directory()
+                        .name("foo_data")
+                        .source(ExposeSource::Self_)
+                        .rights(fio::R_STAR_DIR),
+                )
                 .build(),
         ),
     ];
@@ -1414,13 +1371,12 @@ async fn use_runner_from_sibling_environment() {
         (
             "b",
             ComponentDeclBuilder::new()
-                .expose(ExposeDecl::Runner(ExposeRunnerDecl {
-                    source: ExposeSource::Self_,
-                    source_name: "elf".parse().unwrap(),
-                    source_dictionary: None,
-                    target: ExposeTarget::Parent,
-                    target_name: "dwarf".parse().unwrap(),
-                }))
+                .expose(
+                    ExposeBuilder::runner()
+                        .name("elf")
+                        .target_name("dwarf")
+                        .source(ExposeSource::Self_),
+                )
                 .runner_default("elf")
                 .build(),
         ),
@@ -1798,14 +1754,12 @@ async fn use_from_destroyed_but_not_removed() {
             ComponentDeclBuilder::new()
                 .capability(CapabilityBuilder::directory().name("foo_data").path("/data/foo"))
                 .protocol_default("foo")
-                .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
-                    source: ExposeSource::Self_,
-                    source_name: "foo".parse().unwrap(),
-                    source_dictionary: None,
-                    target_name: "bar".parse().unwrap(),
-                    target: ExposeTarget::Parent,
-                    availability: cm_rust::Availability::Required,
-                }))
+                .expose(
+                    ExposeBuilder::protocol()
+                        .name("foo")
+                        .target_name("bar")
+                        .source(ExposeSource::Self_),
+                )
                 .build(),
         ),
         (
@@ -1865,13 +1819,7 @@ async fn use_resolver_from_parent_environment() {
         (
             "c",
             ComponentDeclBuilder::new()
-                .expose(ExposeDecl::Resolver(ExposeResolverDecl {
-                    source: ExposeSource::Self_,
-                    source_name: "base".parse().unwrap(),
-                    source_dictionary: None,
-                    target: ExposeTarget::Parent,
-                    target_name: "base".parse().unwrap(),
-                }))
+                .expose(ExposeBuilder::resolver().name("base").source(ExposeSource::Self_))
                 .resolver_default("base")
                 .build(),
         ),
@@ -2374,14 +2322,7 @@ async fn offer_service_from_collection() {
         (
             ch,
             ComponentDeclBuilder::new()
-                .expose(ExposeDecl::Service(ExposeServiceDecl {
-                    source: ExposeSource::Self_,
-                    source_name: "foo".parse().unwrap(),
-                    source_dictionary: None,
-                    target_name: "foo".parse().unwrap(),
-                    target: ExposeTarget::Parent,
-                    availability: cm_rust::Availability::Required,
-                }))
+                .expose(ExposeBuilder::service().name("foo").source(ExposeSource::Self_))
                 .capability(CapabilityBuilder::service().name("foo").path("/svc/foo.service"))
                 .build(),
         )
@@ -2443,14 +2384,7 @@ async fn offer_service_from_collections() {
         (
             ch,
             ComponentDeclBuilder::new()
-                .expose(ExposeDecl::Service(ExposeServiceDecl {
-                    source: ExposeSource::Self_,
-                    source_name: "foo".parse().unwrap(),
-                    source_dictionary: None,
-                    target_name: "foo".parse().unwrap(),
-                    target: ExposeTarget::Parent,
-                    availability: cm_rust::Availability::Required,
-                }))
+                .expose(ExposeBuilder::service().name("foo").source(ExposeSource::Self_))
                 .capability(CapabilityBuilder::service().name("foo").path("/svc/foo.service"))
                 .build(),
         )
@@ -2530,14 +2464,7 @@ async fn offer_service_from_collections_multilevel() {
         (
             ch,
             ComponentDeclBuilder::new()
-                .expose(ExposeDecl::Service(ExposeServiceDecl {
-                    source: ExposeSource::Self_,
-                    source_name: "foo".parse().unwrap(),
-                    source_dictionary: None,
-                    target_name: "foo".parse().unwrap(),
-                    target: ExposeTarget::Parent,
-                    availability: cm_rust::Availability::Required,
-                }))
+                .expose(ExposeBuilder::service().name("foo").source(ExposeSource::Self_))
                 .capability(CapabilityBuilder::service().name("foo").path("/svc/foo.service"))
                 .build(),
         )
@@ -2572,14 +2499,12 @@ async fn expose_service_from_collection() {
             "b",
             ComponentDeclBuilder::new()
                 .use_realm()
-                .expose(ExposeDecl::Service(ExposeServiceDecl {
-                    source: ExposeSource::Collection("coll".parse().unwrap()),
-                    source_name: "foo".parse().unwrap(),
-                    source_dictionary: None,
-                    target: ExposeTarget::Parent,
-                    target_name: "foo".parse().unwrap(),
-                    availability: Availability::Required,
-                }))
+                .expose(
+                    ExposeBuilder::service()
+                        .name("foo")
+                        .source(ExposeSource::Collection("coll".parse().unwrap()))
+                        .availability(Availability::Required),
+                )
                 .collection_default("coll")
                 .build(),
         ),
@@ -2588,14 +2513,7 @@ async fn expose_service_from_collection() {
         (
             ch,
             ComponentDeclBuilder::new()
-                .expose(ExposeDecl::Service(ExposeServiceDecl {
-                    source: ExposeSource::Self_,
-                    source_name: "foo".parse().unwrap(),
-                    source_dictionary: None,
-                    target_name: "foo".parse().unwrap(),
-                    target: ExposeTarget::Parent,
-                    availability: cm_rust::Availability::Required,
-                }))
+                .expose(ExposeBuilder::service().name("foo").source(ExposeSource::Self_))
                 .capability(CapabilityBuilder::service().name("foo").path("/svc/foo.service"))
                 .build(),
         )
@@ -2627,14 +2545,10 @@ async fn expose_service_from_collections() {
     let mut exposes: Vec<_> = ["coll1", "coll2", "coll3"]
         .into_iter()
         .map(|coll| {
-            ExposeDecl::Service(ExposeServiceDecl {
-                source: ExposeSource::Collection(coll.parse().unwrap()),
-                source_name: "foo".parse().unwrap(),
-                source_dictionary: None,
-                target: ExposeTarget::Parent,
-                target_name: "foo".parse().unwrap(),
-                availability: Availability::Required,
-            })
+            ExposeBuilder::service()
+                .name("foo")
+                .source(ExposeSource::Collection(coll.parse().unwrap()))
+                .build()
         })
         .collect();
     let mut components = vec![
@@ -2656,14 +2570,7 @@ async fn expose_service_from_collections() {
         (
             ch,
             ComponentDeclBuilder::new()
-                .expose(ExposeDecl::Service(ExposeServiceDecl {
-                    source: ExposeSource::Self_,
-                    source_name: "foo".parse().unwrap(),
-                    source_dictionary: None,
-                    target_name: "foo".parse().unwrap(),
-                    target: ExposeTarget::Parent,
-                    availability: cm_rust::Availability::Required,
-                }))
+                .expose(ExposeBuilder::service().name("foo").source(ExposeSource::Self_))
                 .capability(CapabilityBuilder::service().name("foo").path("/svc/foo.service"))
                 .build(),
         )
@@ -2697,14 +2604,9 @@ async fn expose_service_from_collections_multilevel() {
     let mut exposes: Vec<_> = ["coll1", "coll2", "coll3"]
         .into_iter()
         .map(|coll| {
-            ExposeDecl::Service(ExposeServiceDecl {
-                source: ExposeSource::Collection(coll.parse().unwrap()),
-                source_name: "foo".parse().unwrap(),
-                source_dictionary: None,
-                target: ExposeTarget::Parent,
-                target_name: "foo".parse().unwrap(),
-                availability: Availability::Required,
-            })
+            ExposeBuilder::service()
+                .name("foo")
+                .source(ExposeSource::Collection(coll.parse().unwrap()))
         })
         .collect();
     let mut components = vec![
@@ -2712,14 +2614,9 @@ async fn expose_service_from_collections_multilevel() {
         (
             "m",
             ComponentDeclBuilder::new()
-                .expose(ExposeDecl::Service(ExposeServiceDecl {
-                    source: ExposeSource::Child("b".into()),
-                    source_name: "foo".parse().unwrap(),
-                    source_dictionary: None,
-                    target_name: "foo".parse().unwrap(),
-                    target: ExposeTarget::Parent,
-                    availability: cm_rust::Availability::Required,
-                }))
+                .expose(
+                    ExposeBuilder::service().name("foo").source(ExposeSource::Child("b".into())),
+                )
                 .child_default("b")
                 .build(),
         ),
@@ -2740,14 +2637,7 @@ async fn expose_service_from_collections_multilevel() {
         (
             ch,
             ComponentDeclBuilder::new()
-                .expose(ExposeDecl::Service(ExposeServiceDecl {
-                    source: ExposeSource::Self_,
-                    source_name: "foo".parse().unwrap(),
-                    source_dictionary: None,
-                    target_name: "foo".parse().unwrap(),
-                    target: ExposeTarget::Parent,
-                    availability: cm_rust::Availability::Required,
-                }))
+                .expose(ExposeBuilder::service().name("foo").source(ExposeSource::Self_))
                 .capability(CapabilityBuilder::service().name("foo").path("/svc/foo.service"))
                 .build(),
         )
@@ -2805,28 +2695,14 @@ async fn list_service_instances_from_collections() {
         (
             "service_child_a",
             ComponentDeclBuilder::new()
-                .expose(ExposeDecl::Service(ExposeServiceDecl {
-                    source: ExposeSource::Self_,
-                    source_name: "foo".parse().unwrap(),
-                    source_dictionary: None,
-                    target: ExposeTarget::Parent,
-                    target_name: "foo".parse().unwrap(),
-                    availability: cm_rust::Availability::Required,
-                }))
+                .expose(ExposeBuilder::service().name("foo").source(ExposeSource::Self_))
                 .capability(CapabilityBuilder::service().name("foo").path("/svc/foo.service"))
                 .build(),
         ),
         (
             "service_child_b",
             ComponentDeclBuilder::new()
-                .expose(ExposeDecl::Service(ExposeServiceDecl {
-                    source: ExposeSource::Self_,
-                    source_name: "foo".parse().unwrap(),
-                    source_dictionary: None,
-                    target: ExposeTarget::Parent,
-                    target_name: "foo".parse().unwrap(),
-                    availability: cm_rust::Availability::Required,
-                }))
+                .expose(ExposeBuilder::service().name("foo").source(ExposeSource::Self_))
                 .capability(CapabilityBuilder::service().name("foo").path("/svc/foo.service"))
                 .build(),
         ),
@@ -2954,42 +2830,29 @@ async fn use_service_from_sibling_collection() {
                         .source(UseSource::Framework)
                         .name("fuchsia.component.Realm"),
                 )
-                .expose(ExposeDecl::Service(ExposeServiceDecl {
-                    source: ExposeSource::Collection("coll".parse().unwrap()),
-                    source_name: "my.service.Service".parse().unwrap(),
-                    source_dictionary: None,
-                    target_name: "my.service.Service".parse().unwrap(),
-                    target: ExposeTarget::Parent,
-                    availability: cm_rust::Availability::Required,
-                }))
+                .expose(
+                    ExposeBuilder::service()
+                        .name("my.service.Service")
+                        .source(ExposeSource::Collection("coll".parse().unwrap())),
+                )
                 .collection_default("coll")
                 .build(),
         ),
         (
             "foo",
             ComponentDeclBuilder::new()
-                .expose(ExposeDecl::Service(ExposeServiceDecl {
-                    source: ExposeSource::Self_,
-                    source_name: "my.service.Service".parse().unwrap(),
-                    source_dictionary: None,
-                    target_name: "my.service.Service".parse().unwrap(),
-                    target: ExposeTarget::Parent,
-                    availability: cm_rust::Availability::Required,
-                }))
+                .expose(
+                    ExposeBuilder::service().name("my.service.Service").source(ExposeSource::Self_),
+                )
                 .service_default("my.service.Service")
                 .build(),
         ),
         (
             "bar",
             ComponentDeclBuilder::new()
-                .expose(ExposeDecl::Service(ExposeServiceDecl {
-                    source: ExposeSource::Self_,
-                    source_name: "my.service.Service".parse().unwrap(),
-                    source_dictionary: None,
-                    target_name: "my.service.Service".parse().unwrap(),
-                    target: ExposeTarget::Parent,
-                    availability: cm_rust::Availability::Required,
-                }))
+                .expose(
+                    ExposeBuilder::service().name("my.service.Service").source(ExposeSource::Self_),
+                )
                 .service_default("my.service.Service")
                 .build(),
         ),
@@ -3104,14 +2967,9 @@ async fn use_filtered_service_from_sibling() {
         (
             "b",
             ComponentDeclBuilder::new()
-                .expose(ExposeDecl::Service(ExposeServiceDecl {
-                    source: ExposeSource::Self_,
-                    source_name: "my.service.Service".parse().unwrap(),
-                    source_dictionary: None,
-                    target_name: "my.service.Service".parse().unwrap(),
-                    target: ExposeTarget::Parent,
-                    availability: cm_rust::Availability::Required,
-                }))
+                .expose(
+                    ExposeBuilder::service().name("my.service.Service").source(ExposeSource::Self_),
+                )
                 .service_default("my.service.Service")
                 .build(),
         ),
@@ -3250,14 +3108,9 @@ async fn use_filtered_aggregate_service_from_sibling() {
         (
             "b",
             ComponentDeclBuilder::new()
-                .expose(ExposeDecl::Service(ExposeServiceDecl {
-                    source: ExposeSource::Self_,
-                    source_name: "my.service.Service".parse().unwrap(),
-                    source_dictionary: None,
-                    target_name: "my.service.Service".parse().unwrap(),
-                    target: ExposeTarget::Parent,
-                    availability: cm_rust::Availability::Required,
-                }))
+                .expose(
+                    ExposeBuilder::service().name("my.service.Service").source(ExposeSource::Self_),
+                )
                 .service_default("my.service.Service")
                 .build(),
         ),
@@ -3338,14 +3191,7 @@ async fn use_filtered_aggregate_service_from_sibling() {
 #[fuchsia::test]
 async fn use_anonymized_aggregate_service() {
     let expose_service_decl = ComponentDeclBuilder::new()
-        .expose(ExposeDecl::Service(ExposeServiceDecl {
-            source: ExposeSource::Self_,
-            source_name: "my.service.Service".parse().unwrap(),
-            source_dictionary: None,
-            target_name: "my.service.Service".parse().unwrap(),
-            target: ExposeTarget::Parent,
-            availability: cm_rust::Availability::Required,
-        }))
+        .expose(ExposeBuilder::service().name("my.service.Service").source(ExposeSource::Self_))
         .service_default("my.service.Service")
         .build();
     let components = vec![
