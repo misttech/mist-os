@@ -1,0 +1,66 @@
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/components.gni")
+import("//build/devicetree/devicetree.gni")
+import("//build/test.gni")
+
+group("tests") {
+  deps = [ ":usb-phy-visitor-test" ]
+  testonly = true
+}
+
+devicetree_visitor("usb-phy-visitor") {
+  deps = [ ":usb-phy-visitor-impl" ]
+}
+
+source_set("usb-phy-visitor-impl") {
+  sources = [
+    "usb-phy-visitor.cc",
+    "usb-phy-visitor.h",
+  ]
+  deps = [
+    "//sdk/fidl/fuchsia.hardware.usb.phy:fuchsia.hardware.usb.phy_bindlib_cpp",
+    "//sdk/lib/driver/component/cpp",
+    "//sdk/lib/driver/devicetree/manager",
+    "//sdk/lib/driver/devicetree/visitors:registration",
+    "//sdk/lib/driver/logging/cpp",
+    "//src/devices/bind/fuchsia:fuchsia_cpp",
+    "//src/devices/bind/fuchsia.platform:fuchsia.platform_cpp",
+  ]
+  public_deps = [ "//sdk/lib/driver/devicetree/visitors:property-parser" ]
+}
+
+test("usb-phy-visitor-test-bin") {
+  sources = [ "test/usb-phy-visitor-test.cc" ]
+  deps = [
+    ":usb-phy-visitor-impl",
+    "//sdk/fidl/fuchsia.hardware.usb.phy:fuchsia.hardware.usb.phy_bindlib_cpp",
+    "//sdk/lib/driver/component/cpp",
+    "//sdk/lib/driver/devicetree/testing:visitor-test-helper",
+    "//sdk/lib/driver/devicetree/visitors:registry",
+    "//sdk/lib/driver/devicetree/visitors/default/bind-property",
+    "//src/devices/bind/fuchsia:fuchsia_cpp",
+    "//src/devices/bind/fuchsia.platform:fuchsia.platform_cpp",
+    "//src/lib/fxl/test:gtest_main",
+  ]
+}
+
+dtb("usb-phy-visitor-dtb") {
+  sources = [ "test/dts/usb-phy.dts.S" ]
+}
+
+resource("usb-phy-visitor-dtb-file") {
+  sources = get_target_outputs(":usb-phy-visitor-dtb")
+  outputs = [ "test-data/usb-phy.dtb" ]
+  deps = [ ":usb-phy-visitor-dtb" ]
+}
+
+fuchsia_unittest_package("usb-phy-visitor-test") {
+  component_name = "usb-phy-visitor-test"
+  deps = [
+    ":usb-phy-visitor-dtb-file",
+    ":usb-phy-visitor-test-bin",
+  ]
+}
