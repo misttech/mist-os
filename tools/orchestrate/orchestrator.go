@@ -389,23 +389,26 @@ func (r *TestOrchestrator) test(testCmd []string, in *RunInput) error {
 		}
 	}()
 
-	cmd := exec.Command(testCmd[0], testCmd[1:]...)
-
-	// Prepare the `cmd` env for target tests:
+	// Prepare the env for target tests:
 	//  1. Applies default ffx cmd environment variables
 	//     (eg: isolation, disabling analytics).
 	//  2. Adds ffx so that downstream can call "ffx" without having to leak its
 	//     full path.
 	//  3. Add openssh to PATH.
+	env := os.Environ()
 	if in.IsTarget() {
-		r.ffx.ApplyEnv(cmd)
+		env = r.ffx.ApplyEnv(env)
 		ffxDir := filepath.Dir(filepath.Join(wd, in.Target().FfxPath))
 		if err := os.Setenv("PATH", fmt.Sprintf("%s:%s", ffxDir, os.Getenv("PATH"))); err != nil {
 			return fmt.Errorf("os.Setenv: %w", err)
 		}
 		sshDir := filepath.Join(wd, "openssh-portable", "bin")
-		cmd.Env = appendPath(cmd.Env, sshDir, ffxDir)
+		env = appendPath(env, sshDir, ffxDir)
 	}
+
+	// Create cmd AFTER setting the PATH so that it will correctly resolve testCmd[0]
+	cmd := exec.Command(testCmd[0], testCmd[1:]...)
+	cmd.Env = env
 
 	// Setup pipes to forward subcmd stdout and stderr to logFile and os.Stdout.
 	pipeOut := io.MultiWriter(logFile, os.Stdout)

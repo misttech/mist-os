@@ -145,24 +145,24 @@ func (f *Ffx) setupDefaultConfig(configPath string, opt Option) error {
 // Cmd returns a generic exec.Cmd configured to execute ffx.
 func (f *Ffx) Cmd(args ...string) *exec.Cmd {
 	cmd := exec.Command(f.bin, args...)
-	f.ApplyEnv(cmd)
+	cmd.Env = f.ApplyEnv(cmd.Environ())
 	return cmd
 }
 
-// ApplyEnv applies the relevant ffx environment variables onto an `exec.Cmd`,
-// needed for the safe execution of ffx.
-func (f *Ffx) ApplyEnv(cmd *exec.Cmd) {
-	cmd.Env = append(os.Environ(), "FFX_ISOLATE_DIR="+f.Dir, "FUCHSIA_ANALYTICS_DISABLED=1")
+// ApplyEnv adds the environment variables needed for safe execution of ffx.
+func (f *Ffx) ApplyEnv(env []string) []string {
+	env = append(env, "FFX_ISOLATE_DIR="+f.Dir, "FUCHSIA_ANALYTICS_DISABLED=1")
 	if f.sslCertPath != "" {
-		cmd.Env = append(cmd.Env, "SSL_CERT_FILE="+f.sslCertPath)
+		env = append(env, "SSL_CERT_FILE="+f.sslCertPath)
 	}
 	// Override HOME and other HOME-related environment variables, since ffx and
 	// tests shouldn't assume anything about those.
 	// This prevents ffx from creating and using default ssh keys from the real
 	// home directory.
 	for _, xdg_env_var := range XDG_ENV_VARS {
-		cmd.Env = append(cmd.Env, xdg_env_var+"="+f.Dir)
+		env = append(env, xdg_env_var+"="+f.Dir)
 	}
+	return env
 }
 
 // RunCmdSync starts a command and waits for the command to complete.
