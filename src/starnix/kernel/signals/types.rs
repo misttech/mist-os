@@ -6,8 +6,8 @@ use crate::task::{IntervalTimerHandle, ThreadGroupReadGuard, WaitQueue, WaiterRe
 use starnix_sync::InterruptibleEvent;
 use starnix_sync::RwLock;
 use starnix_uapi::{
-    __sifields__bindgen_ty_2, __sifields__bindgen_ty_4, __sifields__bindgen_ty_7, c_int, c_uint,
-    error,
+    __sifields__bindgen_ty_1, __sifields__bindgen_ty_2, __sifields__bindgen_ty_4,
+    __sifields__bindgen_ty_7, c_int, c_uint, error,
     errors::Errno,
     pid_t, sigaction, sigaltstack, sigevent, siginfo_t,
     signals::{SigSet, Signal, UncheckedSignal, UNBLOCKABLE_SIGNALS},
@@ -299,6 +299,9 @@ impl SignalInfo {
 
         match self.detail {
             SignalDetail::None => make_siginfo!(self),
+            SignalDetail::Kill { pid, uid } => {
+                make_siginfo!(self, _kill, __sifields__bindgen_ty_1 { _pid: pid, _uid: uid })
+            }
             SignalDetail::SIGCHLD { pid, uid, status } => make_siginfo!(
                 self,
                 _sigchld,
@@ -358,6 +361,10 @@ impl SignalInfo {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum SignalDetail {
     None,
+    Kill {
+        pid: pid_t,
+        uid: uid_t,
+    },
     SIGCHLD {
         pid: pid_t,
         uid: uid_t,

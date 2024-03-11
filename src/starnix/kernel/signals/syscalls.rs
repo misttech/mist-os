@@ -337,7 +337,17 @@ fn send_unchecked_signal(
     let signal = Signal::try_from(unchecked_signal)?;
     selinux_hooks::check_signal_access(current_task, &target, signal)?;
 
-    send_signal(target, SignalInfo { code: si_code, ..SignalInfo::default(signal) })
+    send_signal(
+        target,
+        SignalInfo {
+            code: si_code,
+            detail: SignalDetail::Kill {
+                pid: current_task.thread_group.leader,
+                uid: current_task.creds().uid,
+            },
+            ..SignalInfo::default(signal)
+        },
+    )
 }
 
 fn send_unchecked_signal_info(

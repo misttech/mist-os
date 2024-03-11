@@ -170,8 +170,6 @@
                 "settimeofday01",
                 "settimeofday02",
                 "setxattr03",
-                "sigtimedwait01",
-                "sigwaitinfo01",
                 "splice07",
                 "sockioctl01",
                 "statx04",
