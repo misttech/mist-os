@@ -9182,6 +9182,34 @@ extern "C" {
         aRawPowerSettingLength: *mut u16,
     ) -> otError;
 }
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct otPlatDnsUpstreamQuery {
+    _unused: [u8; 0],
+}
+extern "C" {
+    #[doc = " Starts an upstream query transaction.\n\n - In success case (and errors represented by DNS protocol messages), the platform is expected to call\n   `otPlatDnsUpstreamQueryDone`.\n - The OpenThread core may cancel a (possibly timeout) query transaction by calling\n   `otPlatDnsCancelUpstreamQuery`, the platform must not call `otPlatDnsUpstreamQueryDone` on a\n   cancelled transaction.\n\n @param[in] aInstance  The OpenThread instance structure.\n @param[in] aTxn       A pointer to the opaque DNS query transaction object.\n @param[in] aQuery     A message buffer of the DNS payload that should be sent to upstream DNS server.\n"]
+    pub fn otPlatDnsStartUpstreamQuery(
+        aInstance: *mut otInstance,
+        aTxn: *mut otPlatDnsUpstreamQuery,
+        aQuery: *const otMessage,
+    );
+}
+extern "C" {
+    #[doc = " Cancels a transaction of upstream query.\n\n The platform must call `otPlatDnsUpstreamQueryDone` to release the resources.\n\n @param[in] aInstance  The OpenThread instance structure.\n @param[in] aTxn       A pointer to the opaque DNS query transaction object.\n"]
+    pub fn otPlatDnsCancelUpstreamQuery(
+        aInstance: *mut otInstance,
+        aTxn: *mut otPlatDnsUpstreamQuery,
+    );
+}
+extern "C" {
+    #[doc = " The platform calls this function to finish DNS query.\n\n The transaction will be released, so the platform must not call on the same transaction twice. This function passes\n the ownership of `aResponse` to OpenThread stack.\n\n Platform can pass a nullptr to close a transaction without a response.\n\n @param[in] aInstance  The OpenThread instance structure.\n @param[in] aTxn       A pointer to the opaque DNS query transaction object.\n @param[in] aResponse  A message buffer of the DNS response payload or `nullptr` to close a transaction without a\n                       response.\n"]
+    pub fn otPlatDnsUpstreamQueryDone(
+        aInstance: *mut otInstance,
+        aTxn: *mut otPlatDnsUpstreamQuery,
+        aResponse: *mut otMessage,
+    );
+}
 extern "C" {
     #[doc = " Fill buffer with entropy.\n\n MUST be implemented using a true random number generator (TRNG).\n\n @param[out]  aOutput              A pointer to where the true random values are placed.  Must not be NULL.\n @param[in]   aOutputLength        Size of @p aBuffer.\n\n @retval OT_ERROR_NONE          Successfully filled @p aBuffer with true random values.\n @retval OT_ERROR_FAILED        Failed to fill @p aBuffer with true random values.\n @retval OT_ERROR_INVALID_ARGS  @p aBuffer was set to NULL.\n"]
     pub fn otPlatEntropyGet(aOutput: *mut u8, aOutputLength: u16) -> otError;

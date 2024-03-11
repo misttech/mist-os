@@ -22,6 +22,7 @@ mod infra_if;
 mod nat64;
 mod radio;
 mod reset;
+mod resolver;
 mod trel;
 mod udp;
 
