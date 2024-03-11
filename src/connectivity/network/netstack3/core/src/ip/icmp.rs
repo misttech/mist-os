@@ -3193,7 +3193,7 @@ mod tests {
         bound_socket_map_and_allocator: BoundSockets<I, D, FakeIcmpBindingsCtx<I>>,
         error_send_bucket: TokenBucket<FakeInstant>,
         receive_icmp_error: Vec<I::ErrorCode>,
-        pmtu_state: FakePmtuState<I::Addr>,
+        pmtu_state: FakePmtuState,
     }
 
     impl<I: socket::IpExt, D: device::WeakId> FakeIcmpInnerCoreCtxState<I, D> {
@@ -4044,8 +4044,8 @@ mod tests {
             false
         }
     }
-    impl<I: datagram::IpExt> AsMut<FakePmtuState<I::Addr>> for FakeIcmpInnerCoreCtx<I> {
-        fn as_mut(&mut self) -> &mut FakePmtuState<I::Addr> {
+    impl<I: datagram::IpExt> AsMut<FakePmtuState> for FakeIcmpInnerCoreCtx<I> {
+        fn as_mut(&mut self) -> &mut FakePmtuState {
             &mut self.outer.pmtu_state
         }
     }

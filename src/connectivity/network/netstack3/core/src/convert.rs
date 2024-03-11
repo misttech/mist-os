@@ -12,7 +12,6 @@
 ///
 /// This trait is blanket-implemented for `T` as a pass-through and for `&T`
 /// where `T: Clone` by cloning `self`.
-#[allow(dead_code)]
 pub(crate) trait OwnedOrCloned<T> {
     fn into_owned(self) -> T;
 }

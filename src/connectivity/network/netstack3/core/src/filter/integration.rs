@@ -18,7 +18,6 @@ pub(crate) trait FilterHandlerProvider<I: IpExt, BC: FilterBindingsTypes> {
     where
         Self: 'a;
 
-    #[allow(dead_code)]
     fn filter_handler(&mut self) -> Self::Handler<'_>;
 }
 

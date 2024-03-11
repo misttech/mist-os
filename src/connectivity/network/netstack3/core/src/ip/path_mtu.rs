@@ -371,75 +371,30 @@ pub(crate) mod testutil {
 
     use super::*;
 
-    // TODO(rheacock): remove `#[allow(dead_code)]` when the impl_pmtu_handler
-    // macro is used.
-    #[allow(dead_code)]
-    pub(crate) struct UpdatePmtuIfLessArgs<A: IpAddress> {
-        pub(crate) src_ip: A,
-        pub(crate) dst_ip: A,
-        pub(crate) new_mtu: Mtu,
-    }
-
-    // TODO(rheacock): remove `#[allow(dead_code)]` when the impl_pmtu_handler
-    // macro is used.
-    #[allow(dead_code)]
-    pub(crate) struct UpdatePmtuNextLowerArgs<A: IpAddress> {
-        pub(crate) src_ip: A,
-        pub(crate) dst_ip: A,
-        pub(crate) from: Mtu,
-    }
-
     #[derive(Default)]
-    pub(crate) struct FakePmtuState<A: IpAddress> {
-        /// Each time `PmtuHandler::update_pmtu_if_less` is called, a new entry
-        /// is pushed onto this vector.
-        pub(crate) update_pmtu_if_less: Vec<UpdatePmtuIfLessArgs<A>>,
-        /// Each time `PmtuHandler::update_pmtu_next_lower` is called, a new
-        /// entry is pushed onto this vector.
-        pub(crate) update_pmtu_next_lower: Vec<UpdatePmtuNextLowerArgs<A>>,
-    }
+    pub(crate) struct FakePmtuState;
 
     /// Implement the `PmtuHandler<$ip_version>` trait for a particular type
-    /// which implements `AsMut<FakePmtuState<$ip_version::Addr>>`.
+    /// which implements `AsMut<FakePmtuState>`.
     macro_rules! impl_pmtu_handler {
         ($ty:ty, $ctx:ty, $ip_version:ident) => {
             impl PmtuHandler<net_types::ip::$ip_version, $ctx> for $ty {
                 fn update_pmtu_if_less(
                     &mut self,
                     _ctx: &mut $ctx,
-                    src_ip: <net_types::ip::$ip_version as net_types::ip::Ip>::Addr,
-                    dst_ip: <net_types::ip::$ip_version as net_types::ip::Ip>::Addr,
-                    new_mtu: Mtu,
+                    _src_ip: <net_types::ip::$ip_version as net_types::ip::Ip>::Addr,
+                    _dst_ip: <net_types::ip::$ip_version as net_types::ip::Ip>::Addr,
+                    _new_mtu: Mtu,
                 ) {
-                    let state: &mut FakePmtuState<
-                        <net_types::ip::$ip_version as net_types::ip::Ip>::Addr,
-                    > = self.as_mut();
-                    state.update_pmtu_if_less.push(
-                        crate::ip::path_mtu::testutil::UpdatePmtuIfLessArgs {
-                            src_ip,
-                            dst_ip,
-                            new_mtu,
-                        },
-                    );
                 }
 
                 fn update_pmtu_next_lower(
                     &mut self,
                     _ctx: &mut $ctx,
-                    src_ip: <net_types::ip::$ip_version as net_types::ip::Ip>::Addr,
-                    dst_ip: <net_types::ip::$ip_version as net_types::ip::Ip>::Addr,
-                    from: Mtu,
+                    _src_ip: <net_types::ip::$ip_version as net_types::ip::Ip>::Addr,
+                    _dst_ip: <net_types::ip::$ip_version as net_types::ip::Ip>::Addr,
+                    _from: Mtu,
                 ) {
-                    let state: &mut FakePmtuState<
-                        <net_types::ip::$ip_version as net_types::ip::Ip>::Addr,
-                    > = self.as_mut();
-                    state.update_pmtu_next_lower.push(
-                        crate::ip::path_mtu::testutil::UpdatePmtuNextLowerArgs {
-                            src_ip,
-                            dst_ip,
-                            from,
-                        },
-                    );
                 }
             }
         };

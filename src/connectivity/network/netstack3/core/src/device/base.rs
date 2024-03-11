@@ -602,7 +602,6 @@ pub(crate) mod testutil {
         }
     }
 
-    #[allow(dead_code)]
     pub trait FakeStrongDeviceId: StrongId<Weak = FakeWeakDeviceId<Self>> + 'static + Ord {}
 
     impl<D: StrongId<Weak = FakeWeakDeviceId<Self>> + 'static + Ord> FakeStrongDeviceId for D {}
