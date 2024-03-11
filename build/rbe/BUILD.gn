@@ -10,6 +10,7 @@ group("tests") {
 
   deps = [
     ":bbtool_test($host_toolchain)",
+    ":build_summary($host_toolchain)",
     ":cl_utils_test($host_toolchain)",
     ":cxx_link_remote_wrapper_test($host_toolchain)",
     ":cxx_remote_wrapper_test($host_toolchain)",
@@ -25,6 +26,7 @@ group("tests") {
     ":remotetool_test($host_toolchain)",
     ":rustc_remote_wrapper_test($host_toolchain)",
     ":rustc_test($host_toolchain)",
+    ":tablefmt($host_toolchain)",
     ":textpb_test($host_toolchain)",
   ]
 }
@@ -40,9 +42,12 @@ if (is_host) {
   _output_leak_scanner_sources =
       [ "output_leak_scanner.py" ] + _fuchsia_sources + _cl_utils_sources
   _linker_sources = [ "linker.py" ] + _cl_utils_sources + _depfile_sources
+  _tablefmt_sources = [ "tablefmt.py" ]
   _textpb_sources = [ "textpb.py" ]
 
   _bbtool_sources = [ "bbtool.py" ] + _fuchsia_sources + _cl_utils_sources
+  _build_summary_sources =
+      [ "build_summary.py" ] + _tablefmt_sources + _textpb_sources
   _remotetool_sources =
       [ "remotetool.py" ] + _fuchsia_sources + _cl_utils_sources
   _remote_action_sources =
@@ -71,6 +76,14 @@ if (is_host) {
   python_host_test("bbtool_test") {
     main_source = "bbtool_test.py"
     sources = _bbtool_sources
+  }
+
+  python_library("build_summary") {
+    sources = _build_summary_sources
+  }
+  python_host_test("build_summary_test") {
+    main_source = "build_summary_test.py"
+    sources = _build_summary_sources
   }
 
   python_library("cl_utils") {
@@ -191,6 +204,14 @@ if (is_host) {
   python_host_test("rustc_remote_wrapper_test") {
     main_source = "rustc_remote_wrapper_test.py"
     sources = _rustc_remote_wrapper_sources
+  }
+
+  python_library("tablefmt") {
+    sources = _tablefmt_sources
+  }
+  python_host_test("tablefmt_test") {
+    main_source = "tablefmt_test.py"
+    sources = _tablefmt_sources
   }
 
   python_library("textpb") {
