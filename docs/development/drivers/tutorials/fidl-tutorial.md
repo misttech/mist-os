@@ -204,13 +204,13 @@ Here is an example of one where the FIDL library contains a single discoverable 
 #### protocol.fidl {:#protocol-fidl}
 
 ```fidl {:.devsite-disable-click-to-copy}
-{% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/drivers/fidl_bindlib_codegen/protocol.fidl" region_tag="fidl" %}
+{% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/drivers/bind/fidl_bindlib_codegen/protocol.fidl" region_tag="fidl" %}
 ```
 
 #### Generated lib {:#generated-lib}
 
 ```none {:.devsite-disable-click-to-copy}
-{% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/drivers/fidl_bindlib_codegen/generated_lib.bind.golden" %}
+{% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/drivers/bind/fidl_bindlib_codegen/generated_lib.bind.golden" %}
 ```
 
 ### The build target
@@ -242,7 +242,7 @@ Lets take the FIDL library shown [above](#protocol-fidl) and use it in an exampl
 #### FIDL (BUILD.gn)
 
 ```gn {:.devsite-disable-click-to-copy}
-{% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/drivers/fidl_bindlib_codegen/BUILD.gn" region_tag="fidl" %}
+{% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/drivers/bind/fidl_bindlib_codegen/BUILD.gn" region_tag="fidl" %}
 ```
 
 This now gives us the generated bind library with the target name of `:my_fidl_target_bindlib`
@@ -252,13 +252,13 @@ and library name of `fuchsia.gizmo.protocol`. The generated source for the bind 
 #### Child bind rules (BUILD.gn)
 
 ```gn {:.devsite-disable-click-to-copy}
-{% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/drivers/fidl_bindlib_codegen/BUILD.gn" region_tag="child_bind_rules" %}
+{% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/drivers/bind/fidl_bindlib_codegen/BUILD.gn" region_tag="child_bind_rules" %}
 ```
 
 #### child-driver.bind
 
 ```none {:.devsite-disable-click-to-copy}
-{% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/drivers/fidl_bindlib_codegen/child_driver.bind" exclude_regexp="// Copyright.*|// Use of.*|// found in.*" %}
+{% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/drivers/bind/fidl_bindlib_codegen/child_driver.bind" exclude_regexp="// Copyright.*|// Use of.*|// found in.*" %}
 ```
 
 When a driver is creating children nodes, they are automatically assigned a property for each of
@@ -284,13 +284,13 @@ the composite node spec creation code.
 * {C++}
 
   ```gn {:.devsite-disable-click-to-copy}
-  {% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/drivers/fidl_bindlib_codegen/BUILD.gn" region_tag="example_cpp_target" %}
+  {% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/drivers/bind/fidl_bindlib_codegen/BUILD.gn" region_tag="example_cpp_target" %}
   ```
 
 * {Rust}
 
   ```gn {:.devsite-disable-click-to-copy}
-  {% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/drivers/fidl_bindlib_codegen/BUILD.gn" region_tag="example_rust_target" %}
+  {% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/drivers/bind/fidl_bindlib_codegen/BUILD.gn" region_tag="example_rust_target" %}
   ```
 
 
@@ -300,11 +300,11 @@ the composite node spec creation code.
 * {C++}
 
   ```cpp {:.devsite-disable-click-to-copy}
-  {% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/drivers/fidl_bindlib_codegen/bindlib_usage.cc" region_tag="code" %}
+  {% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/drivers/bind/fidl_bindlib_codegen/bindlib_usage.cc" region_tag="code" %}
   ```
 
 * {Rust}
 
   ```rust {:.devsite-disable-click-to-copy}
-  {% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/drivers/fidl_bindlib_codegen/bindlib_usage.rs" region_tag="code" %}
+  {% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/drivers/bind/fidl_bindlib_codegen/bindlib_usage.rs" region_tag="code" %}
   ```

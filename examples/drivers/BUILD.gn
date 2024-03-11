@@ -4,10 +4,10 @@
 
 group("drivers") {
   deps = [
-    "bindlib_codegen",
+    "bind/bindlib_codegen",
+    "bind/fidl_bindlib_codegen",
     "demo-number:component",
     "driver_test_realm/sample-driver",
-    "fidl_bindlib_codegen",
     "simple/dfv1:pkg",
     "simple/dfv2:pkg",
     "skeleton:pkg",

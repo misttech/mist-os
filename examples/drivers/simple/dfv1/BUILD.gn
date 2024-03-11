@@ -9,7 +9,7 @@ import("//build/drivers.gni")
 driver_bind_rules("bind") {
   rules = "simple_driver.bind"
   bind_output = "simple_driver.bindbc"
-  deps = [ "//examples/drivers/bind_library:gizmo.example" ]
+  deps = [ "//examples/drivers/bind/bindlib:gizmo.example" ]
 }
 
 fuchsia_driver("driver") {

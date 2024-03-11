@@ -8,7 +8,7 @@ driver_bind_rules("parent_bind") {
   rules = "bind/parent-driver.bind"
   bind_output = "parent-driver.bindbc"
   deps = [
-    "//examples/drivers/bind_library:gizmo.example",
+    "//examples/drivers/bind/bindlib:gizmo.example",
     "//src/devices/bind/fuchsia.test",
   ]
 }
@@ -17,7 +17,7 @@ fuchsia_driver("parent_driver") {
   output_name = "banjo_transport_parent"
   sources = [ "parent-driver.cc" ]
   deps = [
-    "//examples/drivers/bind_library:gizmo.example_cpp",
+    "//examples/drivers/bind/bindlib:gizmo.example_cpp",
     "//examples/drivers/transport/banjo:fuchsia.examples.gizmo_banjo_cpp",
     "//sdk/fidl/fuchsia.driver.compat:fuchsia.driver.compat_cpp",
     "//sdk/fidl/fuchsia.driver.framework:fuchsia.driver.framework_cpp",
@@ -43,7 +43,7 @@ driver_bind_rules("child_bind") {
   rules = "bind/child-driver.bind"
   bind_output = "child-driver.bindbc"
   deps = [
-    "//examples/drivers/bind_library:gizmo.example",
+    "//examples/drivers/bind/bindlib:gizmo.example",
     "//src/devices/bind/fuchsia.platform",
   ]
 }

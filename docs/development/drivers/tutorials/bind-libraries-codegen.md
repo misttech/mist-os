@@ -17,7 +17,7 @@ depend on another existing bind library. This is optional but for completeness w
 ### BUILD.gn
 
 ```gn {:.devsite-disable-click-to-copy}
-{% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/drivers/bindlib_codegen/BUILD.gn" region_tag="example_bind_lib_target" %}
+{% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/drivers/bind/bindlib_codegen/BUILD.gn" region_tag="example_bind_lib_target" %}
 ```
 
 Most of the time the build target name and the library name are the same (it's
@@ -27,7 +27,7 @@ But here we define them separately to help distinguish where each one is used la
 ### mybindlib.bind
 
 ```none {:.devsite-disable-click-to-copy}
-{% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/drivers/bindlib_codegen/mybindlib.bind" %}
+{% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/drivers/bind/bindlib_codegen/mybindlib.bind" %}
 ```
 
 ## Auto-generated libraries
@@ -84,13 +84,13 @@ But here we define them separately to help distinguish where each one is used la
 * {C++}
 
   ```cpp {:.devsite-disable-click-to-copy}
-  {% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/drivers/bindlib_codegen/cpp_codegen.h.golden" exclude_regexp="// Copyright.*|// Use of.*|// found in.*" %}
+  {% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/drivers/bind/bindlib_codegen/cpp_codegen.h.golden" exclude_regexp="// Copyright.*|// Use of.*|// found in.*" %}
   ```
 
 * {Rust}
 
   ```rust {:.devsite-disable-click-to-copy}
-  {% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/drivers/bindlib_codegen/rust_codegen.rs.golden" exclude_regexp="// Copyright.*|// Use of.*|// found in.*" %}
+  {% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/drivers/bind/bindlib_codegen/rust_codegen.rs.golden" exclude_regexp="// Copyright.*|// Use of.*|// found in.*" %}
   ```
 
 ### The generated constants
@@ -177,13 +177,13 @@ all separated by `.`s.
 * {C++}
 
   ```gn {:.devsite-disable-click-to-copy}
-  {% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/drivers/bindlib_codegen/BUILD.gn" region_tag="example_cpp_target" %}
+  {% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/drivers/bind/bindlib_codegen/BUILD.gn" region_tag="example_cpp_target" %}
   ```
 
 * {Rust}
 
   ```gn {:.devsite-disable-click-to-copy}
-  {% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/drivers/bindlib_codegen/BUILD.gn" region_tag="example_rust_target" %}
+  {% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/drivers/bind/bindlib_codegen/BUILD.gn" region_tag="example_rust_target" %}
   ```
 
 #### composite-node-specification creator
@@ -191,13 +191,13 @@ all separated by `.`s.
 * {C++}
 
   ```cpp {:.devsite-disable-click-to-copy}
-  {% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/drivers/bindlib_codegen/parent-driver.cc" region_tag="code" %}
+  {% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/drivers/bind/bindlib_codegen/parent-driver.cc" region_tag="code" %}
   ```
 
 * {Rust}
 
   ```rust {:.devsite-disable-click-to-copy}
-  {% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/drivers/bindlib_codegen/parent-driver.rs" region_tag="code" %}
+  {% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/drivers/bind/bindlib_codegen/parent-driver.rs" region_tag="code" %}
   ```
 
 ## Auto-generated libraries in the SDK
