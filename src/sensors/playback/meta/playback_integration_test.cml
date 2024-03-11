@@ -1,0 +1,45 @@
+// Copyright 2024 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    include: [
+        "//src/sys/test_runners/gtest/default.shard.cml",
+        "syslog/client.shard.cml",
+    ],
+
+    // Information about the program to run.
+    program: {
+        // The binary to run for this component.
+        binary: "bin/playback_integration_test_bin",
+    },
+    children: [
+        {
+            name: "sensors_playback",
+            url: "#meta/sensors_playback.cm",
+        },
+    ],
+
+    // Capabilities used by this component.
+    use: [
+        {
+            protocol: [ "fuchsia.hardware.sensors.Driver" ],
+            from: "#sensors_playback",
+        },
+        {
+            protocol: [ "fuchsia.hardware.sensors.Playback" ],
+            from: "#sensors_playback",
+        },
+    ],
+
+    // Capabilities required by components under test.
+    offer: [
+        {
+            protocol: [
+                "fuchsia.inspect.InspectSink",
+                "fuchsia.logger.LogSink",
+            ],
+            from: "parent",
+            to: "#sensors_playback",
+        },
+    ],
+}
