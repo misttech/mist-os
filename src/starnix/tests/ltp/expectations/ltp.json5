@@ -224,9 +224,10 @@
                 // https://fxbug.dev/42085553
                 "open04",
 
-                // Flaky test.
+                // Flaky tests.
                 "cve-2017-17052",
                 "io_pgetevents01",
+                "ptrace06",
                 "recvmsg01",
                 "rename14",
                 "select03",
