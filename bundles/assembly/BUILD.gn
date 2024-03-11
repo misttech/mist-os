@@ -104,8 +104,6 @@ assembly_input_bundle("bootstrap") {
     "//src/bringup/bin/debuglog:bootfs",
     "//src/bringup/bin/dlog:bootfs",
     "//src/bringup/bin/waitfor:bootfs",
-
-    "//src/devices/usb/bin/usbctl",
   ]
   bootfs_packages = [
     "//src/bringup/bin/svchost:pkg",
@@ -314,6 +312,7 @@ assembly_input_bundle("bootstrap_userdebug") {
     "//src/devices/block/bin/fvm-check:bootfs",
     "//src/devices/nand/bin/nand-loader:bootfs",
     "//src/devices/nand/bin/nand-util:bootfs",
+    "//src/devices/usb/bin/usbctl",
     "//src/storage/bin/dd:bootfs",
     "//src/storage/bin/df:bootfs",
     "//src/storage/bin/storage-metrics:bootfs",

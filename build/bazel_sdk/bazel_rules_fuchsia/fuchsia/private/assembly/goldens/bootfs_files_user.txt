@@ -9,7 +9,6 @@ bin/dlog
 ?bin/fxfs_crypt
 ?bin/memfs
 ?bin/minfs
-bin/usbctl
 bin/waitfor
 ?config/additional_boot_args
 config/build_info/minimum_utc_stamp
@@ -27,7 +26,7 @@ config/profiles/bringup.profiles
 ?data/boot-animation.riv
 ?data/bootfs_packages
 lib/ld.so.1
-lib/libasync-default.so
+?lib/libasync-default.so
 ?lib/libbackend_fuchsia_globals.so
 lib/libc++.so.2
 lib/libc++abi.so.1
@@ -40,9 +39,8 @@ lib/libfdio.so
 ?lib/libssl.so
 ?lib/libsvc.so
 ?lib/libtee-client-api.so
-lib/libtrace-engine.so
+?lib/libtrace-engine.so
 lib/libunwind.so.1
-lib/libusb-peripheral-utils.so
 ?lib/libvfs_internal.so
 ?meta/blobfs.cm
 ?meta/blobfs.cvf
