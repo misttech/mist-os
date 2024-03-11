@@ -24,6 +24,7 @@
 #include <fbl/alloc_checker.h>
 #include <fbl/auto_lock.h>
 
+#include "src/graphics/display/drivers/aml-canvas/board-resources.h"
 #include "src/graphics/display/drivers/aml-canvas/dmc-regs.h"
 
 namespace aml_canvas {
@@ -186,32 +187,30 @@ void AmlCanvas::DdkRelease() {
 
 // static
 zx_status_t AmlCanvas::Create(zx_device_t* parent) {
-  zx::result<ddk::PDevFidl> pdev_result = ddk::PDevFidl::Create(parent);
+  zx::result pdev_result =
+      ddk::Device<void>::DdkConnectFidlProtocol<fuchsia_hardware_platform_device::Service::Device>(
+          parent);
   if (pdev_result.is_error()) {
     zxlogf(ERROR, "Failed to get parent protocol: %s", pdev_result.status_string());
     return pdev_result.error_value();
   }
+  fidl::ClientEnd<fuchsia_hardware_platform_device::Device> pdev = std::move(pdev_result).value();
 
-  ddk::PDevFidl pdev = std::move(pdev_result).value();
-
-  zx::bti bti;
-  zx_status_t status = pdev.GetBti(/*index=*/0, &bti);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to get BTI handle: %s", zx_status_get_string(status));
-    return status;
+  zx::result<zx::bti> bti_result = GetBti(BtiResourceIndex::kCanvas, pdev);
+  if (bti_result.is_error()) {
+    zxlogf(ERROR, "Failed to get BTI handle: %s", bti_result.status_string());
+    return bti_result.status_value();
   }
 
-  std::optional<fdf::MmioBuffer> mmio;
-  status = pdev.MapMmio(0, &mmio);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to map DMC registers: %s", zx_status_get_string(status));
-    return status;
+  zx::result<fdf::MmioBuffer> mmio_result = MapMmio(MmioResourceIndex::kDmc, pdev);
+  if (mmio_result.is_error()) {
+    zxlogf(ERROR, "Failed to map DMC registers: %s", mmio_result.status_string());
+    return mmio_result.status_value();
   }
-  ZX_ASSERT_MSG(mmio.has_value(), "PDevFidl::MapMmio() succeeded but didn't populate out-param");
 
   fbl::AllocChecker alloc_checker;
   auto canvas = fbl::make_unique_checked<aml_canvas::AmlCanvas>(
-      &alloc_checker, parent, std::move(mmio).value(), std::move(bti));
+      &alloc_checker, parent, std::move(mmio_result).value(), std::move(bti_result).value());
   if (!alloc_checker.check()) {
     return ZX_ERR_NO_MEMORY;
   }
@@ -223,7 +222,7 @@ zx_status_t AmlCanvas::Create(zx_device_t* parent) {
     return endpoints.status_value();
   }
 
-  status = canvas->ServeOutgoing(std::move(endpoints->server));
+  zx_status_t status = canvas->ServeOutgoing(std::move(endpoints->server));
   if (status != ZX_OK) {
     zxlogf(ERROR, "Could not serve outgoing directory %s.", zx_status_get_string(status));
     return status;

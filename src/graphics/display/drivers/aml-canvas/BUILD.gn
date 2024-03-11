@@ -26,6 +26,8 @@ source_set("common_srcs") {
   sources = [
     "aml-canvas.cc",
     "aml-canvas.h",
+    "board-resources.cc",
+    "board-resources.h",
     "dmc-regs.h",
   ]
   public_deps = [
@@ -62,12 +64,17 @@ fuchsia_driver_package("package") {
   driver_components = [ ":aml-canvas" ]
 }
 
-test("aml-canvas-test") {
-  sources = [ "aml-canvas-test.cc" ]
+test("aml-canvas-tests") {
+  sources = [
+    "aml-canvas-test.cc",
+    "board-resources-test.cc",
+  ]
   deps = [
     ":common_srcs",
+    "//sdk/lib/async-loop-testing/cpp",
     "//sdk/lib/driver/runtime/testing/cpp",
     "//sdk/lib/driver/testing/cpp",
+    "//src/devices/bus/testing/fake-pdev",
     "//src/devices/testing/fake-bti",
     "//src/devices/testing/mock-ddk",
     "//src/devices/testing/mock-mmio-range",
@@ -81,14 +88,14 @@ test("aml-canvas-test") {
 group("tests") {
   testonly = true
   deps = [
-    ":aml-canvas-test-package",
+    ":aml-canvas-tests-package",
     ":aml_canvas_bind_test",
   ]
 }
 
-fuchsia_unittest_package("aml-canvas-test-package") {
-  package_name = "aml-canvas-test"
-  deps = [ ":aml-canvas-test" ]
+fuchsia_unittest_package("aml-canvas-tests-package") {
+  package_name = "aml-canvas-tests"
+  deps = [ ":aml-canvas-tests" ]
   test_specs = {
     log_settings = {
       max_severity = "ERROR"
