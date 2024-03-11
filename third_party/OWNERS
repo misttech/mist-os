@@ -3,7 +3,6 @@
 # TODO(b/253329946): Remove OWNERS file once submodules are the source of truth in fuchsia.git.
 global-integration-roller@fuchsia-infra.iam.gserviceaccount.com #{LAST_RESORT_SUGGESTION}
 releases-prod-builder@fuchsia-infra.iam.gserviceaccount.com #{LAST_RESORT_SUGGESTION}
-# Include users to debug submodules.
-zarvox@google.com #{LAST_RESORT_SUGGESTION}
+# Include users to debug submodules below.
 
 per-file owners.toml = file: /third_party/rust_crates/OWNERS
