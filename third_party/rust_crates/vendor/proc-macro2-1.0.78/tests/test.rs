@@ -7,7 +7,6 @@
 
 use proc_macro2::{Ident, Literal, Punct, Spacing, Span, TokenStream, TokenTree};
 use std::iter;
-use std::panic;
 use std::str::{self, FromStr};
 
 #[test]
@@ -90,24 +89,9 @@ fn lifetime_number() {
 }
 
 #[test]
+#[should_panic(expected = r#""'a#" is not a valid Ident"#)]
 fn lifetime_invalid() {
-    let result = panic::catch_unwind(|| Ident::new("'a#", Span::call_site()));
-    match result {
-        Err(box_any) => {
-            let message = box_any.downcast_ref::<String>().unwrap();
-            let expected1 = r#""\'a#" is not a valid Ident"#; // 1.31.0 .. 1.53.0
-            let expected2 = r#""'a#" is not a valid Ident"#; // 1.53.0 ..
-            assert!(
-                message == expected1 || message == expected2,
-                "panic message does not match expected string\n\
-                 \x20   panic message: `{:?}`\n\
-                 \x20expected message: `{:?}`",
-                message,
-                expected2,
-            );
-        }
-        Ok(_) => panic!("test did not panic as expected"),
-    }
+    Ident::new("'a#", Span::call_site());
 }
 
 #[test]
@@ -339,6 +323,24 @@ fn literal_span() {
     }
 
     assert!(positive.subspan(1..4).is_none());
+}
+
+#[cfg(span_locations)]
+#[test]
+fn source_text() {
+    let input = "    𓀕 a z    ";
+    let mut tokens = input
+        .parse::<proc_macro2::TokenStream>()
+        .unwrap()
+        .into_iter();
+
+    let first = tokens.next().unwrap();
+    assert_eq!("𓀕", first.span().source_text().unwrap());
+
+    let second = tokens.next().unwrap();
+    let third = tokens.next().unwrap();
+    assert_eq!("z", third.span().source_text().unwrap());
+    assert_eq!("a", second.span().source_text().unwrap());
 }
 
 #[test]
@@ -680,8 +682,8 @@ fn non_ascii_tokens() {
     check_spans("/*** ábc */ x", &[(1, 12, 1, 13)]);
     check_spans(r#""abc""#, &[(1, 0, 1, 5)]);
     check_spans(r#""ábc""#, &[(1, 0, 1, 5)]);
-    check_spans(r###"r#"abc"#"###, &[(1, 0, 1, 8)]);
-    check_spans(r###"r#"ábc"#"###, &[(1, 0, 1, 8)]);
+    check_spans(r##"r#"abc"#"##, &[(1, 0, 1, 8)]);
+    check_spans(r##"r#"ábc"#"##, &[(1, 0, 1, 8)]);
     check_spans("r#\"a\nc\"#", &[(1, 0, 2, 3)]);
     check_spans("r#\"á\nc\"#", &[(1, 0, 2, 3)]);
     check_spans("'a'", &[(1, 0, 1, 3)]);
@@ -739,8 +741,8 @@ fn whitespace() {
     let tokens = various_spaces.parse::<TokenStream>().unwrap();
     assert_eq!(tokens.into_iter().count(), 0);
 
-    let lone_carriage_return = " \r ";
-    lone_carriage_return.parse::<TokenStream>().unwrap_err();
+    let lone_carriage_returns = " \r \r\r\n ";
+    lone_carriage_returns.parse::<TokenStream>().unwrap();
 }
 
 #[test]
@@ -754,4 +756,40 @@ fn byte_order_mark() {
 
     let string = "foo\u{feff}";
     string.parse::<TokenStream>().unwrap_err();
+}
+
+#[cfg(span_locations)]
+fn create_span() -> proc_macro2::Span {
+    let tts: TokenStream = "1".parse().unwrap();
+    match tts.into_iter().next().unwrap() {
+        TokenTree::Literal(literal) => literal.span(),
+        _ => unreachable!(),
+    }
+}
+
+#[cfg(span_locations)]
+#[test]
+fn test_invalidate_current_thread_spans() {
+    let actual = format!("{:#?}", create_span());
+    assert_eq!(actual, "bytes(1..2)");
+    let actual = format!("{:#?}", create_span());
+    assert_eq!(actual, "bytes(3..4)");
+
+    proc_macro2::extra::invalidate_current_thread_spans();
+
+    let actual = format!("{:#?}", create_span());
+    // Test that span offsets have been reset after the call
+    // to invalidate_current_thread_spans()
+    assert_eq!(actual, "bytes(1..2)");
+}
+
+#[cfg(span_locations)]
+#[test]
+#[should_panic(expected = "Invalid span with no related FileInfo!")]
+fn test_use_span_after_invalidation() {
+    let span = create_span();
+
+    proc_macro2::extra::invalidate_current_thread_spans();
+
+    span.source_text();
 }

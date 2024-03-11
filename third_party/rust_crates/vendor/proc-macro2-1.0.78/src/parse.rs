@@ -1,5 +1,5 @@
 use crate::fallback::{
-    is_ident_continue, is_ident_start, Group, LexError, Literal, Span, TokenStream,
+    self, is_ident_continue, is_ident_start, Group, LexError, Literal, Span, TokenStream,
     TokenStreamBuilder,
 };
 use crate::{Delimiter, Punct, Spacing, TokenTree};
@@ -104,15 +104,11 @@ fn skip_whitespace(input: Cursor) -> Cursor {
             }
         }
         match byte {
-            b' ' | 0x09..=0x0c => {
+            b' ' | 0x09..=0x0d => {
                 s = s.advance(1);
                 continue;
             }
-            b'\r' if s.as_bytes().get(1) == Some(&b'\n') => {
-                s = s.advance(2);
-                continue;
-            }
-            b if b <= 0x7f => {}
+            b if b.is_ascii() => {}
             _ => {
                 let ch = s.chars().next().unwrap();
                 if is_whitespace(ch) {
@@ -165,6 +161,10 @@ fn word_break(input: Cursor) -> Result<Cursor, Reject> {
     }
 }
 
+// Rustc's representation of a macro expansion error in expression position or
+// type position.
+const ERROR: &str = "(/*ERROR*/)";
+
 pub(crate) fn token_stream(mut input: Cursor) -> Result<TokenStream, LexError> {
     let mut trees = TokenStreamBuilder::new();
     let mut stack = Vec::new();
@@ -196,7 +196,7 @@ pub(crate) fn token_stream(mut input: Cursor) -> Result<TokenStream, LexError> {
         };
 
         if let Some(open_delimiter) = match first {
-            b'(' => Some(Delimiter::Parenthesis),
+            b'(' if !input.starts_with(ERROR) => Some(Delimiter::Parenthesis),
             b'[' => Some(Delimiter::Bracket),
             b'{' => Some(Delimiter::Brace),
             _ => None,
@@ -271,6 +271,10 @@ fn leaf_token(input: Cursor) -> PResult<TokenTree> {
         Ok((input, TokenTree::Punct(p)))
     } else if let Ok((input, i)) = ident(input) {
         Ok((input, TokenTree::Ident(i)))
+    } else if input.starts_with(ERROR) {
+        let rest = input.advance(ERROR.len());
+        let repr = crate::Literal::_new_fallback(Literal::_new(ERROR.to_owned()));
+        Ok((rest, TokenTree::Literal(repr)))
     } else {
         Err(Reject)
     }
@@ -296,7 +300,10 @@ fn ident_any(input: Cursor) -> PResult<crate::Ident> {
     let (rest, sym) = ident_not_raw(rest)?;
 
     if !raw {
-        let ident = crate::Ident::new(sym, crate::Span::call_site());
+        let ident = crate::Ident::_new(crate::imp::Ident::new_unchecked(
+            sym,
+            fallback::Span::call_site(),
+        ));
         return Ok((rest, ident));
     }
 
@@ -305,7 +312,10 @@ fn ident_any(input: Cursor) -> PResult<crate::Ident> {
         _ => {}
     }
 
-    let ident = crate::Ident::_new_raw(sym, crate::Span::call_site());
+    let ident = crate::Ident::_new(crate::imp::Ident::new_raw_unchecked(
+        sym,
+        fallback::Span::call_site(),
+    ));
     Ok((rest, ident))
 }
 
@@ -388,12 +398,11 @@ fn cooked_string(mut input: Cursor) -> Result<Cursor, Reject> {
                 Some((_, 'x')) => {
                     backslash_x_char(&mut chars)?;
                 }
-                Some((_, 'n')) | Some((_, 'r')) | Some((_, 't')) | Some((_, '\\'))
-                | Some((_, '\'')) | Some((_, '"')) | Some((_, '0')) => {}
+                Some((_, 'n' | 'r' | 't' | '\\' | '\'' | '"' | '0')) => {}
                 Some((_, 'u')) => {
                     backslash_u(&mut chars)?;
                 }
-                Some((newline, ch @ '\n')) | Some((newline, ch @ '\r')) => {
+                Some((newline, ch @ ('\n' | '\r'))) => {
                     input = input.advance(newline + 1);
                     trailing_backslash(&mut input, ch as u8)?;
                     chars = input.char_indices();
@@ -451,16 +460,15 @@ fn cooked_byte_string(mut input: Cursor) -> Result<Cursor, Reject> {
                 Some((_, b'x')) => {
                     backslash_x_byte(&mut bytes)?;
                 }
-                Some((_, b'n')) | Some((_, b'r')) | Some((_, b't')) | Some((_, b'\\'))
-                | Some((_, b'0')) | Some((_, b'\'')) | Some((_, b'"')) => {}
-                Some((newline, b @ b'\n')) | Some((newline, b @ b'\r')) => {
+                Some((_, b'n' | b'r' | b't' | b'\\' | b'0' | b'\'' | b'"')) => {}
+                Some((newline, b @ (b'\n' | b'\r'))) => {
                     input = input.advance(newline + 1);
                     trailing_backslash(&mut input, b)?;
                     bytes = input.bytes().enumerate();
                 }
                 _ => break,
             },
-            b if b < 0x80 => {}
+            b if b.is_ascii() => {}
             _ => break,
         }
     }
@@ -554,14 +562,13 @@ fn cooked_c_string(mut input: Cursor) -> Result<Cursor, Reject> {
                 Some((_, 'x')) => {
                     backslash_x_nonzero(&mut chars)?;
                 }
-                Some((_, 'n')) | Some((_, 'r')) | Some((_, 't')) | Some((_, '\\'))
-                | Some((_, '\'')) | Some((_, '"')) => {}
+                Some((_, 'n' | 'r' | 't' | '\\' | '\'' | '"')) => {}
                 Some((_, 'u')) => {
                     if backslash_u(&mut chars)? == '\0' {
                         break;
                     }
                 }
-                Some((newline, ch @ '\n')) | Some((newline, ch @ '\r')) => {
+                Some((newline, ch @ ('\n' | '\r'))) => {
                     input = input.advance(newline + 1);
                     trailing_backslash(&mut input, ch as u8)?;
                     chars = input.char_indices();
@@ -581,8 +588,7 @@ fn byte(input: Cursor) -> Result<Cursor, Reject> {
     let ok = match bytes.next().map(|(_, b)| b) {
         Some(b'\\') => match bytes.next().map(|(_, b)| b) {
             Some(b'x') => backslash_x_byte(&mut bytes).is_ok(),
-            Some(b'n') | Some(b'r') | Some(b't') | Some(b'\\') | Some(b'0') | Some(b'\'')
-            | Some(b'"') => true,
+            Some(b'n' | b'r' | b't' | b'\\' | b'0' | b'\'' | b'"') => true,
             _ => false,
         },
         b => b.is_some(),
@@ -605,9 +611,7 @@ fn character(input: Cursor) -> Result<Cursor, Reject> {
         Some('\\') => match chars.next().map(|(_, ch)| ch) {
             Some('x') => backslash_x_char(&mut chars).is_ok(),
             Some('u') => backslash_u(&mut chars).is_ok(),
-            Some('n') | Some('r') | Some('t') | Some('\\') | Some('0') | Some('\'') | Some('"') => {
-                true
-            }
+            Some('n' | 'r' | 't' | '\\' | '0' | '\'' | '"') => true,
             _ => false,
         },
         ch => ch.is_some(),
@@ -621,10 +625,10 @@ fn character(input: Cursor) -> Result<Cursor, Reject> {
 }
 
 macro_rules! next_ch {
-    ($chars:ident @ $pat:pat $(| $rest:pat)*) => {
+    ($chars:ident @ $pat:pat) => {
         match $chars.next() {
             Some((_, ch)) => match ch {
-                $pat $(| $rest)* => ch,
+                $pat => ch,
                 _ => return Err(Reject),
             },
             None => return Err(Reject),
@@ -696,8 +700,7 @@ fn trailing_backslash(input: &mut Cursor, mut last: u8) -> Result<(), Reject> {
             return Err(Reject);
         }
         match whitespace.next() {
-            Some((_, b @ b' ')) | Some((_, b @ b'\t')) | Some((_, b @ b'\n'))
-            | Some((_, b @ b'\r')) => {
+            Some((_, b @ (b' ' | b'\t' | b'\n' | b'\r'))) => {
                 last = b;
             }
             Some((offset, _)) => {
@@ -722,7 +725,7 @@ fn float(input: Cursor) -> Result<Cursor, Reject> {
 fn float_digits(input: Cursor) -> Result<Cursor, Reject> {
     let mut chars = input.chars().peekable();
     match chars.next() {
-        Some(ch) if ch >= '0' && ch <= '9' => {}
+        Some(ch) if '0' <= ch && ch <= '9' => {}
         _ => return Err(Reject),
     }
 
@@ -911,12 +914,13 @@ fn doc_comment<'a>(input: Cursor<'a>, trees: &mut TokenStreamBuilder) -> PResult
     #[cfg(span_locations)]
     let lo = input.off;
     let (rest, (comment, inner)) = doc_comment_contents(input)?;
-    let span = crate::Span::_new_fallback(Span {
+    let fallback_span = Span {
         #[cfg(span_locations)]
         lo,
         #[cfg(span_locations)]
         hi: rest.off,
-    });
+    };
+    let span = crate::Span::_new_fallback(fallback_span);
 
     let mut scan_for_bare_cr = comment;
     while let Some(cr) = scan_for_bare_cr.find('\r') {
@@ -937,7 +941,7 @@ fn doc_comment<'a>(input: Cursor<'a>, trees: &mut TokenStreamBuilder) -> PResult
         trees.push_token_from_parser(TokenTree::Punct(bang));
     }
 
-    let doc_ident = crate::Ident::new("doc", span);
+    let doc_ident = crate::Ident::_new(crate::imp::Ident::new_unchecked("doc", fallback_span));
     let mut equal = Punct::new('=', Spacing::Alone);
     equal.set_span(span);
     let mut literal = crate::Literal::string(comment);
