@@ -12,7 +12,10 @@ use fidl_fuchsia_net_stack as fnet_stack;
 use futures_util::{AsyncReadExt as _, AsyncWriteExt as _};
 use net_declare::{fidl_ip, fidl_subnet, std_ip};
 use netemul::{RealmTcpListener as _, RealmTcpStream as _};
-use netstack_testing_common::realms::{Netstack, TestSandboxExt as _};
+use netstack_testing_common::{
+    interfaces::TestInterfaceExt,
+    realms::{Netstack, TestSandboxExt as _},
+};
 use netstack_testing_macros::netstack_test;
 use test_case::test_case;
 
@@ -101,11 +104,13 @@ async fn forwarding<N: Netstack>(name: &str, setup: Setup) {
         .await
         .expect("install interface in client netstack");
     client_iface.add_address_and_subnet_route(client_subnet).await.expect("configure address");
+    client_iface.apply_nud_flake_workaround().await.expect("nud flake workaround");
     let server_iface = server
         .join_network(&server_net, "server-ep")
         .await
         .expect("install interface in server netstack");
     server_iface.add_address_and_subnet_route(server_subnet).await.expect("configure address");
+    server_iface.apply_nud_flake_workaround().await.expect("nud flake workaround");
     let router_client_iface = router
         .join_network(&client_net, "router-client-ep")
         .await
@@ -114,6 +119,7 @@ async fn forwarding<N: Netstack>(name: &str, setup: Setup) {
         .add_address_and_subnet_route(router_client_ip)
         .await
         .expect("configure address");
+    router_client_iface.apply_nud_flake_workaround().await.expect("nud flake workaround");
     let router_server_iface = router
         .join_network(&server_net, "router-server-ep")
         .await
@@ -122,6 +128,7 @@ async fn forwarding<N: Netstack>(name: &str, setup: Setup) {
         .add_address_and_subnet_route(router_server_ip)
         .await
         .expect("configure address");
+    router_server_iface.apply_nud_flake_workaround().await.expect("nud flake workaround");
 
     async fn add_default_gateway(
         realm: &netemul::TestRealm<'_>,
