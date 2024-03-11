@@ -414,11 +414,13 @@ fn translate_use(
                 Some(t) => t.clone(),
             };
             let availability = extract_use_availability(use_)?;
+            let type_ = validate::use_config_to_value_type(use_)?;
             out_uses.push(fdecl::Use::Config(fdecl::UseConfiguration {
                 source: Some(source),
                 source_name: Some(n.clone().into()),
                 target_name: Some(target.into()),
                 availability: Some(availability),
+                type_: Some(translate_value_type(&type_).0),
                 ..Default::default()
             }));
         } else {
@@ -5593,6 +5595,11 @@ mod tests {
         let features = FeatureSet::from(vec![Feature::ConfigCapabilities]);
         let options = CompileOptions::new().config_package_path("fake.cvf").features(&features);
         let actual = compile(&input, options).unwrap();
+        let type_ = fdecl::ConfigType {
+            layout: fdecl::ConfigTypeLayout::Bool,
+            parameters: Some(vec![]),
+            constraints: vec![],
+        };
         assert_eq!(
             actual.uses.unwrap(),
             vec![fdecl::Use::Config(fdecl::UseConfiguration {
@@ -5600,6 +5607,7 @@ mod tests {
                 source: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
                 target_name: Some("my_config".to_string()),
                 availability: Some(fdecl::Availability::Required),
+                type_: Some(type_.clone()),
                 ..Default::default()
             })]
         );
@@ -5607,11 +5615,7 @@ mod tests {
             actual.config.unwrap().fields.unwrap(),
             [fdecl::ConfigField {
                 key: Some("my_config".to_string()),
-                type_: Some(fdecl::ConfigType {
-                    layout: fdecl::ConfigTypeLayout::Bool,
-                    parameters: Some(vec![]),
-                    constraints: vec![],
-                }),
+                type_: Some(type_),
                 mutability: Some(fdecl::ConfigMutability::default()),
                 ..Default::default()
             }]

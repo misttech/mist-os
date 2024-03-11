@@ -423,6 +423,7 @@ pub struct UseConfigurationDecl {
     pub target_name: Name,
     #[fidl_decl(default)]
     pub availability: Availability,
+    pub type_: ConfigValueType,
 }
 
 #[cfg(feature = "target_api_level_head")]
@@ -2859,6 +2860,11 @@ mod tests {
                         source_name: Some("fuchsia.config.MyConfig".to_string()),
                         target_name: Some("my_config".to_string()),
                         availability: Some(fdecl::Availability::Required),
+                        type_: Some(fdecl::ConfigType{
+                            layout: fdecl::ConfigTypeLayout::Bool,
+                            parameters: Some(Vec::new()),
+                            constraints: Vec::new(),
+                        }),
                         ..Default::default()
                     }),
                 ]),
@@ -3332,6 +3338,7 @@ mod tests {
                             source_name: "fuchsia.config.MyConfig".parse().unwrap(),
                             target_name: "my_config".parse().unwrap(),
                             availability: Availability::Required,
+                            type_: ConfigValueType::Bool,
                         }),
                     ],
                     exposes: vec![

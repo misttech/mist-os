@@ -42,7 +42,8 @@ mod tests {
                         UseBuilder::config()
                             .source(cm_rust::UseSource::Self_)
                             .name("fuchsia.MyConfig")
-                            .target_name("my_config"),
+                            .target_name("my_config")
+                            .config_type(cm_rust::ConfigValueType::Int8),
                     )
                     .config(cm_rust::ConfigDecl {
                         fields: vec![cm_rust::ConfigField {
@@ -101,7 +102,8 @@ mod tests {
                         UseBuilder::config()
                             .source(cm_rust::UseSource::Parent)
                             .name("fuchsia.MyConfig")
-                            .target_name("my_config"),
+                            .target_name("my_config")
+                            .config_type(cm_rust::ConfigValueType::Int8),
                     )
                     .config(cm_rust::ConfigDecl {
                         fields: vec![cm_rust::ConfigField {
@@ -146,7 +148,8 @@ mod tests {
                         UseBuilder::config()
                             .source(cm_rust::UseSource::Self_)
                             .name("fuchsia.MyConfig")
-                            .target_name("my_config"),
+                            .target_name("my_config")
+                            .config_type(cm_rust::ConfigValueType::Int8),
                     )
                     .config(cm_rust::ConfigDecl {
                         fields: vec![cm_rust::ConfigField {
@@ -242,7 +245,8 @@ mod tests {
                         UseBuilder::config()
                             .source(cm_rust::UseSource::Self_)
                             .name("fuchsia.MyConfig")
-                            .target_name("from_cap"),
+                            .target_name("from_cap")
+                            .config_type(cm_rust::ConfigValueType::Int8),
                     )
                     .config(cm_rust::ConfigDecl {
                         fields: vec![

@@ -299,4 +299,8 @@ type UseConfiguration = table {
     /// capability is not provided. If set to `optional`, the component can
     /// handle the capability's absence.
     4: availability Availability;
+
+    /// (Required) The type of this config value. If `target_name` matches a
+    /// key in the `config` schema, then this type must match that type.
+    5: type ConfigType;
 };

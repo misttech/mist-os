@@ -593,6 +593,7 @@ pub struct UseBuilder {
     subdir: Option<PathBuf>,
     scope: Option<Vec<cm_rust::EventScope>>,
     filter: Option<BTreeMap<String, cm_rust::DictionaryValue>>,
+    config_type: Option<cm_rust::ConfigValueType>,
 }
 
 impl UseBuilder {
@@ -638,7 +639,13 @@ impl UseBuilder {
             availability: cm_rust::Availability::Required,
             scope: None,
             filter: None,
+            config_type: None,
         }
+    }
+
+    pub fn config_type(mut self, type_: cm_rust::ConfigValueType) -> Self {
+        self.config_type = Some(type_);
+        self
     }
 
     pub fn name(mut self, name: &str) -> Self {
@@ -803,6 +810,7 @@ impl UseBuilder {
                 source_name: self.source_name.expect("name not set"),
                 target_name: self.target_name.expect("target name not set"),
                 availability: self.availability,
+                type_: self.config_type.expect("config_type not set"),
             }),
             CapabilityTypeName::Resolver | CapabilityTypeName::Dictionary => unreachable!(),
         }
