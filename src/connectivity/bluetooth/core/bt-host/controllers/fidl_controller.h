@@ -28,6 +28,8 @@ class FidlController final : public pw::bluetooth::Controller {
 
   void SetReceiveAclFunction(DataFunction func) override { acl_cb_ = std::move(func); }
 
+  void SetReceiveScoFunction(DataFunction func) override { sco_cb_ = std::move(func); }
+
   void SetReceiveIsoFunction(DataFunction func) override { iso_cb_ = std::move(func); }
 
   void Initialize(PwStatusCallback complete_callback, PwStatusCallback error_callback) override;
@@ -38,13 +40,15 @@ class FidlController final : public pw::bluetooth::Controller {
 
   void SendAclData(pw::span<const std::byte> data) override;
 
+  void SendScoData(pw::span<const std::byte> data) override;
+
   void SendIsoData(pw::span<const std::byte> data) override;
 
-  void SetReceiveScoFunction(DataFunction func) override {}
-  void SendScoData(pw::span<const std::byte> data) override {}
   void ConfigureSco(ScoCodingFormat coding_format, ScoEncoding encoding, ScoSampleRate sample_rate,
-                    pw::Callback<void(pw::Status)> callback) override {}
-  void ResetSco(pw::Callback<void(pw::Status)> callback) override {}
+                    pw::Callback<void(pw::Status)> callback) override;
+
+  void ResetSco(pw::Callback<void(pw::Status)> callback) override;
+
   void GetFeatures(pw::Callback<void(FeaturesBits)> callback) override;
   void EncodeVendorCommand(
       pw::bluetooth::VendorCommandParameters parameters,
@@ -67,6 +71,9 @@ class FidlController final : public pw::bluetooth::Controller {
   void OnCommandSignal(async_dispatcher_t* dispatcher, async::WaitBase* wait, zx_status_t status,
                        const zx_packet_signal_t* signal);
 
+  void OnScoSignal(async_dispatcher_t* dispatcher, async::WaitBase* wait, zx_status_t status,
+                   const zx_packet_signal_t* signal);
+
   void OnIsoSignal(async_dispatcher_t* dispatcher, async::WaitBase* wait, zx_status_t status,
                    const zx_packet_signal_t* signal);
 
@@ -85,16 +92,19 @@ class FidlController final : public pw::bluetooth::Controller {
 
   zx::channel acl_channel_;
   zx::channel command_channel_;
+  zx::channel sco_channel_;
   zx::channel iso_channel_;
 
   DataFunction event_cb_;
   DataFunction acl_cb_;
+  DataFunction sco_cb_;
   DataFunction iso_cb_;
   PwStatusCallback initialize_complete_cb_;
   PwStatusCallback error_cb_;
 
   async::WaitMethod<FidlController, &FidlController::OnAclSignal> acl_wait_{this};
   async::WaitMethod<FidlController, &FidlController::OnCommandSignal> command_wait_{this};
+  async::WaitMethod<FidlController, &FidlController::OnScoSignal> sco_wait_{this};
   async::WaitMethod<FidlController, &FidlController::OnIsoSignal> iso_wait_{this};
 };
 

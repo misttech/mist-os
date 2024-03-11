@@ -20,10 +20,11 @@
 
 namespace bt::fidl::testing {
 
-class FakeHciServer final : public fuchsia::hardware::bluetooth::testing::Hci_TestBase {
+namespace fhbt = fuchsia::hardware::bluetooth;
+
+class FakeHciServer final : public fhbt::testing::Hci_TestBase {
  public:
-  FakeHciServer(::fidl::InterfaceRequest<fuchsia::hardware::bluetooth::Hci> request,
-                async_dispatcher_t* dispatcher)
+  FakeHciServer(::fidl::InterfaceRequest<fhbt::Hci> request, async_dispatcher_t* dispatcher)
       : dispatcher_(dispatcher) {
     binding_.Bind(std::move(request));
   }
@@ -38,6 +39,10 @@ class FakeHciServer final : public fuchsia::hardware::bluetooth::testing::Hci_Te
     return acl_channel_.write(/*flags=*/0, buffer.data(), static_cast<uint32_t>(buffer.size()),
                               /*handles=*/nullptr, /*num_handles=*/0);
   }
+  zx_status_t SendSco(const BufferView& buffer) {
+    return sco_channel_.write(/*flags=*/0, buffer.data(), static_cast<uint32_t>(buffer.size()),
+                              /*handles=*/nullptr, /*num_handles=*/0);
+  }
   zx_status_t SendIso(const BufferView& buffer) {
     return iso_channel_.write(/*flags=*/0, buffer.data(), static_cast<uint32_t>(buffer.size()),
                               /*handles=*/nullptr, /*num_handles=*/0);
@@ -46,6 +51,9 @@ class FakeHciServer final : public fuchsia::hardware::bluetooth::testing::Hci_Te
   const std::vector<bt::DynamicByteBuffer>& commands_received() const { return commands_received_; }
   const std::vector<bt::DynamicByteBuffer>& acl_packets_received() const {
     return acl_packets_received_;
+  }
+  const std::vector<bt::DynamicByteBuffer>& sco_packets_received() const {
+    return sco_packets_received_;
   }
   const std::vector<bt::DynamicByteBuffer>& iso_packets_received() const {
     return iso_packets_received_;
@@ -57,8 +65,22 @@ class FakeHciServer final : public fuchsia::hardware::bluetooth::testing::Hci_Te
     return was_valid;
   }
 
+  // Use custom |ConfigureScoTestCallback| to manually verify configuration fields from tests
+  using ConfigureScoTestCallback =
+      fit::function<void(fhbt::ScoCodingFormat, fhbt::ScoEncoding, fhbt::ScoSampleRate)>;
+  void set_check_configure_sco(ConfigureScoTestCallback callback) {
+    check_configure_sco_ = std::move(callback);
+  }
+
+  // Uee custom |ResetScoTestCallback| to manually perform reset actions from tests
+  using ResetScoTestCallback = fit::function<void()>;
+  void set_reset_sco_callback(ResetScoTestCallback callback) {
+    reset_sco_cb_ = std::move(callback);
+  }
+
   bool acl_channel_valid() const { return acl_channel_.is_valid(); }
   bool command_channel_valid() const { return command_channel_.is_valid(); }
+  bool sco_channel_valid() const { return sco_channel_.is_valid(); }
   bool iso_channel_valid() const { return iso_channel_.is_valid(); }
 
  private:
@@ -74,9 +96,30 @@ class FakeHciServer final : public fuchsia::hardware::bluetooth::testing::Hci_Te
     callback(fpromise::ok());
   }
 
+  void OpenScoDataChannel(zx::channel channel, OpenScoDataChannelCallback callback) override {
+    sco_channel_ = std::move(channel);
+    InitializeWait(sco_wait_, sco_channel_);
+    callback(fpromise::ok());
+  }
+
   void OpenIsoDataChannel(zx::channel channel, OpenIsoDataChannelCallback callback) override {
     iso_channel_ = std::move(channel);
     InitializeWait(iso_wait_, iso_channel_);
+    callback(fpromise::ok());
+  }
+
+  void ConfigureSco(fhbt::ScoCodingFormat coding_format, fhbt::ScoEncoding encoding,
+                    fhbt::ScoSampleRate sample_rate, ConfigureScoCallback callback) override {
+    if (check_configure_sco_) {
+      check_configure_sco_(coding_format, encoding, sample_rate);
+    }
+    callback(fpromise::ok());
+  }
+
+  void ResetSco(ResetScoCallback callback) override {
+    if (reset_sco_cb_) {
+      reset_sco_cb_();
+    }
     callback(fpromise::ok());
   }
 
@@ -129,6 +172,25 @@ class FakeHciServer final : public fuchsia::hardware::bluetooth::testing::Hci_Te
     command_wait_.Begin(dispatcher_);
   }
 
+  void OnScoSignal(async_dispatcher_t* dispatcher, async::WaitBase* wait, zx_status_t status,
+                   const zx_packet_signal_t* signal) {
+    ASSERT_TRUE(status == ZX_OK);
+    if (signal->observed & ZX_CHANNEL_PEER_CLOSED) {
+      sco_channel_.reset();
+      return;
+    }
+    ASSERT_TRUE(signal->observed & ZX_CHANNEL_READABLE);
+
+    bt::StaticByteBuffer<hci::allocators::kMaxScoDataPacketSize> buffer;
+    uint32_t read_size = 0;
+    zx_status_t read_status = sco_channel_.read(0u, buffer.mutable_data(), /*handles=*/nullptr,
+                                                static_cast<uint32_t>(buffer.size()), 0, &read_size,
+                                                /*actual_handles=*/nullptr);
+    ASSERT_TRUE(read_status == ZX_OK);
+    sco_packets_received_.emplace_back(bt::BufferView(buffer, read_size));
+    sco_wait_.Begin(dispatcher_);
+  }
+
   void OnIsoSignal(async_dispatcher_t* dispatcher, async::WaitBase* wait, zx_status_t status,
                    const zx_packet_signal_t* signal) {
     ASSERT_TRUE(status == ZX_OK);
@@ -148,7 +210,7 @@ class FakeHciServer final : public fuchsia::hardware::bluetooth::testing::Hci_Te
     iso_wait_.Begin(dispatcher_);
   }
 
-  ::fidl::Binding<fuchsia::hardware::bluetooth::Hci> binding_{this};
+  ::fidl::Binding<fhbt::Hci> binding_{this};
 
   zx::channel command_channel_;
   std::vector<bt::DynamicByteBuffer> commands_received_;
@@ -156,11 +218,17 @@ class FakeHciServer final : public fuchsia::hardware::bluetooth::testing::Hci_Te
   zx::channel acl_channel_;
   std::vector<bt::DynamicByteBuffer> acl_packets_received_;
 
+  zx::channel sco_channel_;
+  std::vector<bt::DynamicByteBuffer> sco_packets_received_;
+  ConfigureScoTestCallback check_configure_sco_;
+  ResetScoTestCallback reset_sco_cb_;
+
   zx::channel iso_channel_;
   std::vector<bt::DynamicByteBuffer> iso_packets_received_;
 
   async::WaitMethod<FakeHciServer, &FakeHciServer::OnAclSignal> acl_wait_{this};
   async::WaitMethod<FakeHciServer, &FakeHciServer::OnCommandSignal> command_wait_{this};
+  async::WaitMethod<FakeHciServer, &FakeHciServer::OnScoSignal> sco_wait_{this};
   async::WaitMethod<FakeHciServer, &FakeHciServer::OnIsoSignal> iso_wait_{this};
 
   async_dispatcher_t* dispatcher_;

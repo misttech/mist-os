@@ -50,6 +50,41 @@ fhbt::BtVendorAclDirection AclPriorityToFidlAclDirection(pw::bluetooth::AclPrior
       return fhbt::BtVendorAclDirection::SINK;
   }
 }
+
+fhbt::ScoCodingFormat ScoCodingFormatToFidl(
+    pw::bluetooth::Controller::ScoCodingFormat coding_format) {
+  switch (coding_format) {
+    case pw::bluetooth::Controller::ScoCodingFormat::kCvsd:
+      return fhbt::ScoCodingFormat::CVSD;
+    case pw::bluetooth::Controller::ScoCodingFormat::kMsbc:
+      return fhbt::ScoCodingFormat::MSBC;
+    default:
+      BT_PANIC("invalid SCO coding format");
+  }
+}
+
+fhbt::ScoEncoding ScoEncodingToFidl(pw::bluetooth::Controller::ScoEncoding encoding) {
+  switch (encoding) {
+    case pw::bluetooth::Controller::ScoEncoding::k8Bits:
+      return fhbt::ScoEncoding::BITS_8;
+    case pw::bluetooth::Controller::ScoEncoding::k16Bits:
+      return fhbt::ScoEncoding::BITS_16;
+    default:
+      BT_PANIC("invalid SCO encoding");
+  }
+}
+
+fhbt::ScoSampleRate ScoSampleRateToFidl(pw::bluetooth::Controller::ScoSampleRate sample_rate) {
+  switch (sample_rate) {
+    case pw::bluetooth::Controller::ScoSampleRate::k8Khz:
+      return fhbt::ScoSampleRate::KHZ_8;
+    case pw::bluetooth::Controller::ScoSampleRate::k16Khz:
+      return fhbt::ScoSampleRate::KHZ_16;
+    default:
+      BT_PANIC("invalid SCO sample rate");
+  }
+}
+
 }  // namespace
 
 FidlController::FidlController(fhbt::VendorHandle vendor, async_dispatcher_t* dispatcher)
@@ -101,7 +136,6 @@ void FidlController::InitializeHci(fuchsia::hardware::bluetooth::HciHandle hci_h
     OnError(status);
     return;
   }
-
   hci_->OpenCommandChannel(std::move(their_command_chan),
                            [](fhbt::Hci_OpenCommandChannel_Result result) {
                              if (result.is_err()) {
@@ -118,7 +152,6 @@ void FidlController::InitializeHci(fuchsia::hardware::bluetooth::HciHandle hci_h
     OnError(status);
     return;
   }
-
   hci_->OpenAclDataChannel(std::move(their_acl_chan),
                            [](fhbt::Hci_OpenAclDataChannel_Result result) {
                              if (result.is_err()) {
@@ -128,6 +161,26 @@ void FidlController::InitializeHci(fuchsia::hardware::bluetooth::HciHandle hci_h
                            });
   InitializeWait(acl_wait_, acl_channel_);
 
+  zx::channel their_sco_chan;
+  status = zx::channel::create(0, &sco_channel_, &their_sco_chan);
+  if (status != ZX_OK) {
+    bt_log(ERROR, "controllers", "Failed to create SCO channel");
+    OnError(status);
+    return;
+  }
+  hci_->OpenScoDataChannel(std::move(their_sco_chan),
+                           [this](fhbt::Hci_OpenScoDataChannel_Result result) {
+                             if (result.is_err()) {
+                               // Non-fatal - may simply indicate a lack of SCO data support
+                               // in the driver.
+                               bt_log(INFO, "controllers", "Failed to open SCO data channel: %s",
+                                      zx_status_get_string(result.err()));
+                               sco_channel_.reset();
+                             } else {
+                               InitializeWait(sco_wait_, sco_channel_);
+                             }
+                           });
+
   zx::channel their_iso_chan;
   status = zx::channel::create(0, &iso_channel_, &their_iso_chan);
   if (status != ZX_OK) {
@@ -135,7 +188,6 @@ void FidlController::InitializeHci(fuchsia::hardware::bluetooth::HciHandle hci_h
     OnError(status);
     return;
   }
-
   hci_->OpenIsoDataChannel(std::move(their_iso_chan),
                            [this](fhbt::Hci_OpenIsoDataChannel_Result result) {
                              if (result.is_err()) {
@@ -182,6 +234,18 @@ void FidlController::SendAclData(pw::span<const std::byte> data) {
   }
 }
 
+void FidlController::SendScoData(pw::span<const std::byte> data) {
+  zx_status_t status =
+      sco_channel_.write(/*flags=*/0, data.data(), static_cast<uint32_t>(data.size()),
+                         /*handles=*/nullptr, /*num_handles=*/0);
+
+  if (status != ZX_OK) {
+    bt_log(ERROR, "controllers", "failed to write SCO channel: %s", zx_status_get_string(status));
+    OnError(status);
+    return;
+  }
+}
+
 void FidlController::SendIsoData(pw::span<const std::byte> data) {
   zx_status_t status =
       iso_channel_.write(/*flags=*/0, data.data(), static_cast<uint32_t>(data.size()),
@@ -192,6 +256,34 @@ void FidlController::SendIsoData(pw::span<const std::byte> data) {
     OnError(status);
     return;
   }
+}
+
+void FidlController::ConfigureSco(ScoCodingFormat coding_format, ScoEncoding encoding,
+                                  ScoSampleRate sample_rate, PwStatusCallback callback) {
+  hci_->ConfigureSco(ScoCodingFormatToFidl(coding_format), ScoEncodingToFidl(encoding),
+                     ScoSampleRateToFidl(sample_rate),
+                     [cb = std::move(callback)](
+                         fuchsia::hardware::bluetooth::Hci_ConfigureSco_Result result) mutable {
+                       if (result.is_err()) {
+                         bt_log(ERROR, "controllers", "Failed to configure SCO: %s",
+                                zx_status_get_string(result.err()));
+                         cb(ZxStatusToPwStatus(result.err()));
+                         return;
+                       }
+                       cb(ZxStatusToPwStatus(ZX_OK));
+                     });
+}
+
+void FidlController::ResetSco(pw::Callback<void(pw::Status)> callback) {
+  hci_->ResetSco([cb = std::move(callback)](
+                     fuchsia::hardware::bluetooth::Hci_ResetSco_Result result) mutable {
+    if (result.is_err()) {
+      bt_log(ERROR, "controllers", "Failed to reset SCO: %s", zx_status_get_string(result.err()));
+      cb(ZxStatusToPwStatus(result.err()));
+      return;
+    }
+    cb(ZxStatusToPwStatus(ZX_OK));
+  });
 }
 
 void FidlController::GetFeatures(pw::Callback<void(FidlController::FeaturesBits)> callback) {
@@ -263,10 +355,12 @@ void FidlController::OnError(zx_status_t status) {
 void FidlController::CleanUp() {
   // Waits need to be canceled before the underlying channels are destroyed.
   acl_wait_.Cancel();
+  sco_wait_.Cancel();
   iso_wait_.Cancel();
   command_wait_.Cancel();
 
   acl_channel_.reset();
+  sco_channel_.reset();
   iso_channel_.reset();
   command_channel_.reset();
 }
@@ -360,6 +454,32 @@ void FidlController::OnCommandSignal(async_dispatcher_t* /*dispatcher*/, async::
       hci_spec::kMaxEventPacketPayloadSize + sizeof(hci_spec::EventHeader);
   std::byte packet[kMaxEventPacketSize];
   OnChannelSignal(kChannelName, wait, packet, command_channel_, event_cb_);
+}
+
+void FidlController::OnScoSignal(async_dispatcher_t* /*dispatcher*/, async::WaitBase* wait,
+                                 zx_status_t status, const zx_packet_signal_t* signal) {
+  const char* kChannelName = "SCO";
+  TRACE_DURATION("bluetooth", "FidlController::OnScoSignal");
+
+  if (status != ZX_OK) {
+    bt_log(ERROR, "controllers", "%s channel error: %s", kChannelName,
+           zx_status_get_string(status));
+    OnError(status);
+    return;
+  }
+  if (signal->observed & ZX_CHANNEL_PEER_CLOSED) {
+    bt_log(ERROR, "controllers", "%s channel closed", kChannelName);
+    OnError(ZX_ERR_PEER_CLOSED);
+    return;
+  }
+  BT_ASSERT(signal->observed & ZX_CHANNEL_READABLE);
+
+  // Allocate a buffer for the packet. Since we don't know the size beforehand we allocate the
+  // largest possible buffer.
+  constexpr uint32_t kMaxScoPacketSize =
+      hci_spec::kMaxSynchronousDataPacketPayloadSize + sizeof(hci_spec::SynchronousDataHeader);
+  std::byte packet[kMaxScoPacketSize];
+  OnChannelSignal(kChannelName, wait, packet, sco_channel_, sco_cb_);
 }
 
 void FidlController::OnIsoSignal(async_dispatcher_t* /*dispatcher*/, async::WaitBase* wait,

@@ -144,6 +144,44 @@ TEST_F(FidlControllerTest, SendCommandsAndReceiveEvents) {
   EXPECT_EQ(close_status.value(), PW_STATUS_OK);
 }
 
+TEST_F(FidlControllerTest, SendAndReceiveSco) {
+  RETURN_IF_FATAL(InitializeController());
+  RunLoopUntilIdle();
+  ASSERT_THAT(complete_status(), ::testing::Optional(PW_STATUS_OK));
+
+  const StaticByteBuffer packet_0(0x00, 0x01, 0x02, 0x03);
+  controller()->SendScoData(packet_0.subspan());
+  RunLoopUntilIdle();
+  ASSERT_EQ(hci_server()->sco_packets_received().size(), 1u);
+  EXPECT_THAT(hci_server()->sco_packets_received()[0], BufferEq(packet_0));
+
+  const StaticByteBuffer packet_1(0x04, 0x05, 0x06, 0x07);
+  controller()->SendScoData(packet_1.subspan());
+  RunLoopUntilIdle();
+  ASSERT_EQ(hci_server()->sco_packets_received().size(), 2u);
+  EXPECT_THAT(hci_server()->sco_packets_received()[1], BufferEq(packet_1));
+
+  std::vector<DynamicByteBuffer> received_sco;
+  controller()->SetReceiveScoFunction([&](pw::span<const std::byte> buffer) {
+    received_sco.emplace_back(BufferView(buffer.data(), buffer.size()));
+  });
+
+  hci_server()->SendSco(packet_1.view());
+  RunLoopUntilIdle();
+  ASSERT_EQ(received_sco.size(), 1u);
+  EXPECT_THAT(received_sco[0], BufferEq(packet_1));
+
+  hci_server()->SendSco(packet_1.view());
+  RunLoopUntilIdle();
+  ASSERT_EQ(received_sco.size(), 2u);
+  EXPECT_THAT(received_sco[1], BufferEq(packet_1));
+
+  std::optional<pw::Status> close_status;
+  controller()->Close([&](pw::Status status) { close_status = status; });
+  ASSERT_TRUE(close_status.has_value());
+  EXPECT_EQ(close_status.value(), PW_STATUS_OK);
+}
+
 TEST_F(FidlControllerTest, SendAndReceiveIso) {
   RETURN_IF_FATAL(InitializeController());
   RunLoopUntilIdle();
@@ -182,6 +220,130 @@ TEST_F(FidlControllerTest, SendAndReceiveIso) {
   EXPECT_EQ(close_status.value(), PW_STATUS_OK);
 }
 
+TEST_F(FidlControllerTest, ConfigureScoWithFormatCvsdEncoding8BitsSampleRate8Khz) {
+  RETURN_IF_FATAL(InitializeController());
+  RunLoopUntilIdle();
+  ASSERT_THAT(complete_status(), ::testing::Optional(PW_STATUS_OK));
+
+  int device_cb_count = 0;
+  hci_server()->set_check_configure_sco([&device_cb_count](fhbt::ScoCodingFormat format,
+                                                           fhbt::ScoEncoding encoding,
+                                                           fhbt::ScoSampleRate rate) mutable {
+    device_cb_count++;
+    EXPECT_EQ(format, fhbt::ScoCodingFormat::CVSD);
+    EXPECT_EQ(encoding, fhbt::ScoEncoding::BITS_8);
+    EXPECT_EQ(rate, fhbt::ScoSampleRate::KHZ_8);
+  });
+
+  int controller_cb_count = 0;
+  controller()->ConfigureSco(pw::bluetooth::Controller::ScoCodingFormat::kCvsd,
+                             pw::bluetooth::Controller::ScoEncoding::k8Bits,
+                             pw::bluetooth::Controller::ScoSampleRate::k8Khz,
+                             [&controller_cb_count](pw::Status status) {
+                               controller_cb_count++;
+                               EXPECT_EQ(status, PW_STATUS_OK);
+                             });
+
+  EXPECT_EQ(device_cb_count, 0);
+  EXPECT_EQ(controller_cb_count, 0);
+  RunLoopUntilIdle();
+  EXPECT_EQ(controller_cb_count, 1);
+  EXPECT_EQ(device_cb_count, 1);
+}
+
+TEST_F(FidlControllerTest, ConfigureScoWithFormatCvsdEncoding16BitsSampleRate8Khz) {
+  RETURN_IF_FATAL(InitializeController());
+  RunLoopUntilIdle();
+  ASSERT_THAT(complete_status(), ::testing::Optional(PW_STATUS_OK));
+
+  hci_server()->set_check_configure_sco(
+      [](fhbt::ScoCodingFormat format, fhbt::ScoEncoding encoding, fhbt::ScoSampleRate rate) {
+        EXPECT_EQ(format, fhbt::ScoCodingFormat::CVSD);
+        EXPECT_EQ(encoding, fhbt::ScoEncoding::BITS_16);
+        EXPECT_EQ(rate, fhbt::ScoSampleRate::KHZ_8);
+      });
+
+  int config_cb_count = 0;
+  controller()->ConfigureSco(pw::bluetooth::Controller::ScoCodingFormat::kCvsd,
+                             pw::bluetooth::Controller::ScoEncoding::k16Bits,
+                             pw::bluetooth::Controller::ScoSampleRate::k8Khz,
+                             [&](pw::Status status) {
+                               config_cb_count++;
+                               EXPECT_EQ(status, PW_STATUS_OK);
+                             });
+  RunLoopUntilIdle();
+  EXPECT_EQ(config_cb_count, 1);
+}
+
+TEST_F(FidlControllerTest, ConfigureScoWithFormatCvsdEncoding16BitsSampleRate16Khz) {
+  RETURN_IF_FATAL(InitializeController());
+  RunLoopUntilIdle();
+  ASSERT_THAT(complete_status(), ::testing::Optional(PW_STATUS_OK));
+
+  hci_server()->set_check_configure_sco(
+      [](fhbt::ScoCodingFormat format, fhbt::ScoEncoding encoding, fhbt::ScoSampleRate rate) {
+        EXPECT_EQ(format, fhbt::ScoCodingFormat::CVSD);
+        EXPECT_EQ(encoding, fhbt::ScoEncoding::BITS_16);
+        EXPECT_EQ(rate, fhbt::ScoSampleRate::KHZ_16);
+      });
+
+  int config_cb_count = 0;
+  controller()->ConfigureSco(pw::bluetooth::Controller::ScoCodingFormat::kCvsd,
+                             pw::bluetooth::Controller::ScoEncoding::k16Bits,
+                             pw::bluetooth::Controller::ScoSampleRate::k16Khz,
+                             [&](pw::Status status) {
+                               config_cb_count++;
+                               EXPECT_EQ(status, PW_STATUS_OK);
+                             });
+  RunLoopUntilIdle();
+  EXPECT_EQ(config_cb_count, 1);
+}
+
+TEST_F(FidlControllerTest, ConfigureScoWithFormatMsbcEncoding16BitsSampleRate16Khz) {
+  RETURN_IF_FATAL(InitializeController());
+  RunLoopUntilIdle();
+  ASSERT_THAT(complete_status(), ::testing::Optional(PW_STATUS_OK));
+
+  hci_server()->set_check_configure_sco(
+      [](fhbt::ScoCodingFormat format, fhbt::ScoEncoding encoding, fhbt::ScoSampleRate rate) {
+        EXPECT_EQ(format, fhbt::ScoCodingFormat::MSBC);
+        EXPECT_EQ(encoding, fhbt::ScoEncoding::BITS_16);
+        EXPECT_EQ(rate, fhbt::ScoSampleRate::KHZ_16);
+      });
+
+  int config_cb_count = 0;
+  controller()->ConfigureSco(pw::bluetooth::Controller::ScoCodingFormat::kMsbc,
+                             pw::bluetooth::Controller::ScoEncoding::k16Bits,
+                             pw::bluetooth::Controller::ScoSampleRate::k16Khz,
+                             [&](pw::Status status) {
+                               config_cb_count++;
+                               EXPECT_EQ(status, PW_STATUS_OK);
+                             });
+  RunLoopUntilIdle();
+  EXPECT_EQ(config_cb_count, 1);
+}
+
+TEST_F(FidlControllerTest, ResetSco) {
+  RETURN_IF_FATAL(InitializeController());
+  RunLoopUntilIdle();
+  ASSERT_THAT(complete_status(), ::testing::Optional(PW_STATUS_OK));
+
+  int device_cb_count = 0;
+  hci_server()->set_reset_sco_callback([&device_cb_count]() { device_cb_count++; });
+
+  int controller_cb_count = 0;
+  controller()->ResetSco([&](pw::Status status) {
+    controller_cb_count++;
+    EXPECT_EQ(status, PW_STATUS_OK);
+  });
+
+  EXPECT_EQ(device_cb_count, 0);
+  EXPECT_EQ(controller_cb_count, 0);
+  RunLoopUntilIdle();
+  EXPECT_EQ(device_cb_count, 1);
+  EXPECT_EQ(controller_cb_count, 1);
+}
+
 TEST_F(FidlControllerTest, CloseClosesChannels) {
   RETURN_IF_FATAL(InitializeController());
   RunLoopUntilIdle();
@@ -194,6 +356,7 @@ TEST_F(FidlControllerTest, CloseClosesChannels) {
   EXPECT_EQ(close_status.value(), PW_STATUS_OK);
   EXPECT_FALSE(hci_server()->acl_channel_valid());
   EXPECT_FALSE(hci_server()->command_channel_valid());
+  EXPECT_FALSE(hci_server()->sco_channel_valid());
   EXPECT_FALSE(hci_server()->iso_channel_valid());
 }
 
