@@ -75,6 +75,14 @@ def _get_ninja_output_dir(repo_ctx):
 
     return result
 
+def _cfg_values_to_dict(values_text):
+    """Parse comma-separated key=value pairs into a dictionary."""
+    values = {}
+    for var in values_text.split(","):
+        k, _, v = var.partition("=")
+        values[k] = v
+    return values
+
 def _get_rbe_config(repo_ctx):
     """Compute RBE-related configuration.
 
@@ -94,21 +102,19 @@ def _get_rbe_config(repo_ctx):
     )
 
     instance_prefix = "instance="
+    platform_prefix = "platform="
 
-    # Note: platform value is a comma-separated list of key=values.
-    # This extraction assumes that "container-image" is the only key-value.
-    # If ever there are multiple key-values, this extraction will require
-    # a little more parsing to be more robust.
-    container_image_prefix = "platform=container-image="
-
-    instance_name = None
-    container_image = None
-
+    platform_values = {}
     for line in repo_ctx.read(rewrapper_config_path).splitlines():
         line = line.strip()
-        if line.startswith(container_image_prefix):
-            container_image = line[len(container_image_prefix):]
+        if line.startswith(platform_prefix):
+            # After "platform=", expect comma-separated key=value pairs.
+            platform_values = _cfg_values_to_dict(line.removeprefix(platform_prefix))
 
+    container_image = platform_values.get("container-image")
+    gce_machine_type = platform_values.get("gceMachineType")
+
+    instance_name = None
     for line in repo_ctx.read(reproxy_config_path).splitlines():
         line = line.strip()
         if line.startswith(instance_prefix):
@@ -123,9 +129,10 @@ def _get_rbe_config(repo_ctx):
     return struct(
         instance_name = instance_name,
         container_image = container_image,
+        gce_machine_type = gce_machine_type,
     )
 
-def _get_formatted_starlak_dict(dict_value, margin):
+def _get_formatted_starlark_dict(dict_value, margin):
     """Convert dictionary into formatted Starlak expression.
 
     Args:
@@ -221,10 +228,13 @@ build_config = struct(
         exec_properties = {
             "container-image": rbe_config.container_image,
             "OSFamily": "Linux",
+            "gceMachineType": rbe_config.gce_machine_type,
         }
     else:
         exec_properties = {}
 
+    # TODO: invoke `create_rbe_exec_properties_dict` to validate keys
+    # https://github.com/bazelbuild/bazel-toolchains/blob/master/rules/exec_properties/README.md
     build_bazel_content = '''# Auto-generated DO NOT EDIT
 
 """A host platform() with optional support for remote builds."""
@@ -240,7 +250,7 @@ platform(
 '''.format(
         host_os_constraint = host_os_constraint,
         host_cpu_constraint = host_cpu_constraint,
-        exec_properties_str = _get_formatted_starlak_dict(exec_properties, "    "),
+        exec_properties_str = _get_formatted_starlark_dict(exec_properties, "    "),
     )
     repo_ctx.file("BUILD.bazel", build_bazel_content)
 

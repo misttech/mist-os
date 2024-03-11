@@ -191,6 +191,15 @@ def get_fx_build_dir(fuchsia_dir):
         return os.path.join(fuchsia_dir, build_dir)
 
 
+def _cfg_values_to_dict(values_text):
+    """Parse comma-separated key=value pairs into a dictionary."""
+    values = {}
+    for var in values_text.split(","):
+        k, _, v = var.partition("=")
+        values[k] = v
+    return values
+
+
 def get_reclient_config(fuchsia_dir):
     """Return reclient configuration."""
     rewrapper_config_path = os.path.join(
@@ -201,21 +210,23 @@ def get_reclient_config(fuchsia_dir):
     )
 
     instance_prefix = "instance="
-    # Note: platform value is a comma-separated list of key=values.
-    # This extraction assumes that "container-image" is the only key-value.
-    # If ever there are multiple key-values, this extraction will require
-    # a little more parsing to be more robust.
-    container_image_prefix = "platform=container-image="
+    platform_prefix = "platform="
 
-    instance_name = None
-    container_image = None
-
+    platform_values = {}
     with open(rewrapper_config_path) as f:
         for line in f:
             line = line.strip()
-            if line.startswith(container_image_prefix):
-                container_image = line[len(container_image_prefix) :]
+            values = {}
+            if line.startswith(platform_prefix):
+                # After "platform=", expect comma-separated key=value pairs.
+                platform_values = _cfg_values_to_dict(
+                    line.removeprefix(platform_prefix)
+                )
 
+    container_image = platform_values.get("container-image")
+    gce_machine_type = platform_values.get("gceMachineType")
+
+    instance_name = None
     with open(reproxy_config_path) as f:
         for line in f:
             line = line.strip()
@@ -239,6 +250,7 @@ def get_reclient_config(fuchsia_dir):
     return {
         "instance_name": instance_name,
         "container_image": container_image,
+        "gce_machine_type": gce_machine_type,
     }
 
 
@@ -257,6 +269,7 @@ def generate_fuchsia_build_config(fuchsia_dir) -> Dict[str, str]:
         "host_tag": host_tag,
         "rbe_instance_name": rbe_instance_name,
         "rbe_container_image": rbe_config.get("container_image", ""),
+        "rbe_gce_machine_type": rbe_config.get("gce_machine_type", ""),
         "rbe_project": rbe_project,
     }
 
@@ -764,6 +777,7 @@ block *
         remote_instance_name=build_config["rbe_instance_name"],
         rbe_project=build_config["rbe_project"],
     )
+    # TODO(b/327500655): figure out where build_config["rbe_gce_machine_type"] goes
     if args.use_bzlmod:
         bazelrc_content += """
 # Enable BlzMod, i.e. support for MODULE.bazel files.
