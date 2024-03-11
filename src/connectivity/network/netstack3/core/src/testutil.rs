@@ -1628,6 +1628,7 @@ impl DeviceLayerEventDispatcher for FakeBindingsCtx {
 
 /// Handles any pending frames and returns true if any frames that were in the
 /// RX queue were processed.
+#[allow(dead_code)]
 pub(crate) fn handle_queued_rx_packets(ctx: &mut FakeCtx) -> bool {
     let mut handled = false;
     loop {

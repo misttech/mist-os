@@ -370,6 +370,7 @@ impl<C: TryIntoFidl<F, Error = Never>, F> IntoFidl<F> for C {
 /// [`C: TryIntoFidl<F>`].
 ///
 /// [`C: TryIntoFidl<F>`]: TryIntoFidl
+#[allow(dead_code)]
 pub(crate) trait TryFromCore<C>: Sized {
     /// The error type on conversion failure.
     type Error;
@@ -825,6 +826,7 @@ pub(crate) trait TryIntoFidlWithContext<F>: Sized {
 /// [`C: TryIntoFidlWithContext<F>`].
 ///
 /// [`C: TryIntoFidlWithContext<F>`]: TryIntoFidlWithContext
+#[allow(dead_code)]
 pub(crate) trait TryFromCoreWithContext<C>: Sized {
     /// The type of error returned from [`try_from_core_with_ctx`].
     ///

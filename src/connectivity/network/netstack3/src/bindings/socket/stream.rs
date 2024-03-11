@@ -59,8 +59,9 @@ const MAX_TCP_KEEPCNT: u8 = 127;
 
 type TcpSocketId<I> = tcp::TcpSocketId<I, WeakDeviceId<BindingsCtx>, BindingsCtx>;
 
+#[allow(dead_code)] // TODO(https://fxbug.dev/318827209)
 #[derive(Debug)]
-pub(crate) struct ListenerState;
+pub(crate) struct ListenerState(zx::Socket);
 
 /// Local end of a zircon socket pair which will be later provided to state
 /// machine inside Core.

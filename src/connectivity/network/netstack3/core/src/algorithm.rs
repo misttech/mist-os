@@ -167,7 +167,9 @@ where
 /// See the function documentation for more info.
 #[derive(Copy, Clone, Debug)]
 pub(crate) enum OpaqueIidNonce {
-    #[cfg(test)]
+    // TODO(https://fxbug.dev/42148800) Remove allow(dead_code) when this is used
+    // to generate static opaque identifiers.
+    #[cfg_attr(not(test), allow(dead_code))]
     DadCounter(u8),
     Random(u64),
 }
@@ -175,7 +177,6 @@ pub(crate) enum OpaqueIidNonce {
 impl From<OpaqueIidNonce> for u64 {
     fn from(nonce: OpaqueIidNonce) -> Self {
         match nonce {
-            #[cfg(test)]
             OpaqueIidNonce::DadCounter(count) => count.into(),
             OpaqueIidNonce::Random(random) => random,
         }

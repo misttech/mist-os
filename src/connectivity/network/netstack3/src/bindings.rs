@@ -116,12 +116,10 @@ mod ctx {
         core_ctx: Arc<StackState<BindingsCtx>>,
     }
 
+    #[allow(dead_code)] // TODO(https://fxbug.dev/318827209)
     #[derive(Debug)]
-    /// Error observed while attempting to destroy the last remaining clone of `Ctx`.
-    pub enum DestructionError {
-        /// Another clone of `BindingsCtx` still exists.
+    pub(crate) enum DestructionError {
         BindingsCtxStillCloned(usize),
-        /// Another clone of `CoreCtx` still exists.
         CoreCtxStillCloned(usize),
     }
 
