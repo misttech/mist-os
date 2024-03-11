@@ -54,7 +54,7 @@ executable("camera_device_watcher_bin") {
 
 fidl("fuchsia.camera.test") {
   sdk_category = "internal"
-  sources = [ "device_watcher_tester.test.fidl" ]
+  sources = [ "device_watcher_tester.fidl" ]
   public_deps = [ "//sdk/fidl/fuchsia.hardware.camera" ]
   excluded_checks = [ "string-bounds-not-specified" ]
   enable_hlcpp = true

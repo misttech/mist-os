@@ -6,7 +6,7 @@ import("//build/components.gni")
 import("//build/fidl/fidl.gni")
 
 fidl("test.virtualkeyboard") {
-  sdk_category = "internal"
+  testonly = true
   sources = [ "input_position_listener.test.fidl" ]
   public_deps = [ "//zircon/vdso/zx" ]
   enable_hlcpp = true

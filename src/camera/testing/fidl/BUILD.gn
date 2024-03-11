@@ -11,7 +11,7 @@ group("fidl") {
 }
 
 fidl("fuchsia.camera.debug") {
-  sdk_category = "internal"
+  testonly = true
   sources = [ "debug.test.fidl" ]
   public_deps = [ "//zircon/vdso/zx" ]
 }

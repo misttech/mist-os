@@ -4,11 +4,7 @@
 
 // TODO(b/317255344): Remove the deprecated types/fields in this file once no
 // CTF tests depend on the deprecated API.
-
-
-// TODO(b/317219542): Add concrete version numbers to this API when
-// fuchsia.testing.harness is versioned.
-@available(platform = "fuchsia", added=HEAD)
+// TODO(b/317219542): Rename to start with "fuchsia." and use versioning.
 library test.wlan.realm;
 
 using fuchsia.testing.harness;
@@ -16,7 +12,7 @@ using fuchsia.io;
 using fuchsia.driver.test;
 
 /// Defines the configuration of the WLAN components under test.
-@available(added=HEAD, deprecated=HEAD)
+@deprecated
 type WlanConfig = resource table {
     /// If true, WEP and WPA1 are supported.
     /// If not present, defaults to false.
@@ -35,14 +31,14 @@ type WlanConfig = resource table {
 
 /// Options for configuring the Driver Test Realm in the constructed test realm.
 type DriverConfig = resource table {
-  /// These will be opened in the test realm's devfs. The test suite holds the client end that
-  /// can be used to connect to FIDL protocols exposed by drivers over dev_topological or dev_class.
-  1: dev_topological server_end:fuchsia.io.Directory;
-  2: dev_class server_end:fuchsia.io.Directory;
+    /// These will be opened in the test realm's devfs. The test suite holds the client end that
+    /// can be used to connect to FIDL protocols exposed by drivers over dev_topological or dev_class.
+    1: dev_topological server_end:fuchsia.io.Directory;
+    2: dev_class server_end:fuchsia.io.Directory;
 
-  /// Any topology that requires drivers will want the Driver Test Realm to be started.
-  /// For convenience, the realm factory starts the Driver Test Realm with these args.
-  3: driver_test_realm_start_args fuchsia.driver.test.RealmArgs;
+    /// Any topology that requires drivers will want the Driver Test Realm to be started.
+    /// For convenience, the realm factory starts the Driver Test Realm with these args.
+    3: driver_test_realm_start_args fuchsia.driver.test.RealmArgs;
 };
 
 /// Each variant specifies which WLAN components are included in the constructed
@@ -60,10 +56,10 @@ type Topology = resource union {
 
 /// RealmOptions tells the RealmFactory protocol how to create the test realm.
 type RealmOptions = resource table {
-    @available(added=HEAD, deprecated=HEAD)
+    @deprecated
     1: devfs_server_end server_end:fuchsia.io.Directory;
 
-    @available(added=HEAD, deprecated=HEAD)
+    @deprecated
     2: wlan_config WlanConfig;
 
     /// Specifies the components included in the test realm, the client

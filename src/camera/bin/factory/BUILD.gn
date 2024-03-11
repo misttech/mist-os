@@ -62,7 +62,7 @@ fidl("fuchsia.factory.camera") {
     "invalid-case-for-decl-name",
   ]
 
-  sources = [ "factory.test.fidl" ]
+  sources = [ "factory.fidl" ]
 
   public_deps = [ "//sdk/fidl/fuchsia.images" ]
 

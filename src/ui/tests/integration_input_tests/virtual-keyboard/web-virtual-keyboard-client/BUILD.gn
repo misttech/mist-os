@@ -10,6 +10,7 @@ group("web-virtual-keyboard-client") {
 }
 
 executable("bin") {
+  testonly = true
   output_name = "web-virtual-keyboard-client"
   sources = [ "web-virtual-keyboard-client.cc" ]
   deps = [
