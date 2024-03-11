@@ -43,8 +43,8 @@ constexpr void DebugAssertBanjoDisplayModeIsValid(const display_mode_t& display_
   // definitions in `DisplayTiming` and they make it easier for readers to
   // reason about the code without checking the types of each struct member.
 
-  ZX_DEBUG_ASSERT(display_mode.pixel_clock_khz >= 0);
-  ZX_DEBUG_ASSERT(int64_t{display_mode.pixel_clock_khz} * 1'000 <= kMaxPixelClockHz);
+  ZX_DEBUG_ASSERT(display_mode.pixel_clock_hz >= 0);
+  ZX_DEBUG_ASSERT(display_mode.pixel_clock_hz <= kMaxPixelClockHz);
 
   ZX_DEBUG_ASSERT(display_mode.h_addressable >= 0);
   ZX_DEBUG_ASSERT(display_mode.h_addressable <= kMaxTimingValue);
@@ -177,7 +177,7 @@ DisplayTiming ToDisplayTiming(const display_mode_t& banjo_display_mode) {
       .vertical_front_porch_lines = static_cast<int32_t>(banjo_display_mode.v_front_porch),
       .vertical_sync_width_lines = static_cast<int32_t>(banjo_display_mode.v_sync_pulse),
       .vertical_back_porch_lines = vertical_back_porch_lines,
-      .pixel_clock_frequency_hz = int64_t{banjo_display_mode.pixel_clock_khz} * 1'000,
+      .pixel_clock_frequency_hz = banjo_display_mode.pixel_clock_hz,
       .fields_per_frame = (banjo_display_mode.flags & MODE_FLAG_INTERLACED)
                               ? FieldsPerFrame::kInterlaced
                               : FieldsPerFrame::kProgressive,
@@ -195,8 +195,7 @@ DisplayTiming ToDisplayTiming(const display_mode_t& banjo_display_mode) {
 display_mode_t ToBanjoDisplayMode(const DisplayTiming& display_timing_params) {
   display_timing_params.DebugAssertIsValid();
   return display_mode_t{
-      .pixel_clock_khz =
-          static_cast<uint32_t>(display_timing_params.pixel_clock_frequency_hz / 1'000),
+      .pixel_clock_hz = display_timing_params.pixel_clock_frequency_hz,
       .h_addressable = static_cast<uint32_t>(display_timing_params.horizontal_active_px),
       .h_front_porch = static_cast<uint32_t>(display_timing_params.horizontal_front_porch_px),
       .h_sync_pulse = static_cast<uint32_t>(display_timing_params.horizontal_sync_width_px),

@@ -226,7 +226,7 @@ TEST(DisplayTiming, FromBanjo) {
         .vertical_front_porch_lines = 0x03'03,
         .vertical_sync_width_lines = 0x04'04,
         .vertical_back_porch_lines = 0x05'05,
-        .pixel_clock_frequency_hz = int64_t{0x1f'1f'1f'1f} * 1'000,
+        .pixel_clock_frequency_hz = 0x1f'1f'1f'1f'1f,
         .fields_per_frame = FieldsPerFrame::kInterlaced,
         .hsync_polarity = SyncPolarity::kPositive,
         .vsync_polarity = SyncPolarity::kPositive,
@@ -234,7 +234,7 @@ TEST(DisplayTiming, FromBanjo) {
         .pixel_repetition = 0,
     };
     constexpr display_mode_t kBanjoDisplayMode = {
-        .pixel_clock_khz = 0x1f'1f'1f'1f,
+        .pixel_clock_hz = 0x1f'1f'1f'1f'1f,
         .h_addressable = 0x0f'0f,
         .h_front_porch = 0x0a'0a,
         .h_sync_pulse = 0x01'01,
@@ -260,7 +260,7 @@ TEST(DisplayTiming, FromBanjo) {
         .vertical_front_porch_lines = 0x03'03,
         .vertical_sync_width_lines = 0x04'04,
         .vertical_back_porch_lines = 0x05'05,
-        .pixel_clock_frequency_hz = int64_t{0x1f'1f'1f'1f} * 1'000,
+        .pixel_clock_frequency_hz = 0x1f'1f'1f'1f'1f,
         .fields_per_frame = FieldsPerFrame::kInterlaced,
         .hsync_polarity = SyncPolarity::kPositive,
         .vsync_polarity = SyncPolarity::kNegative,
@@ -268,7 +268,7 @@ TEST(DisplayTiming, FromBanjo) {
         .pixel_repetition = 0,
     };
     constexpr display_mode_t kBanjoDisplayMode = {
-        .pixel_clock_khz = 0x1f'1f'1f'1f,
+        .pixel_clock_hz = 0x1f'1f'1f'1f'1f,
         .h_addressable = 0x0f'0f,
         .h_front_porch = 0x0a'0a,
         .h_sync_pulse = 0x01'01,
@@ -291,7 +291,7 @@ TEST(DisplayTiming, FromBanjo) {
         .vertical_front_porch_lines = 0x03'03,
         .vertical_sync_width_lines = 0x04'04,
         .vertical_back_porch_lines = 0x05'05,
-        .pixel_clock_frequency_hz = int64_t{0x1f'1f'1f'1f} * 1'000,
+        .pixel_clock_frequency_hz = 0x1f'1f'1f'1f'1f,
         .fields_per_frame = FieldsPerFrame::kInterlaced,
         .hsync_polarity = SyncPolarity::kNegative,
         .vsync_polarity = SyncPolarity::kPositive,
@@ -299,7 +299,7 @@ TEST(DisplayTiming, FromBanjo) {
         .pixel_repetition = 0,
     };
     constexpr display_mode_t kBanjoDisplayMode = {
-        .pixel_clock_khz = 0x1f'1f'1f'1f,
+        .pixel_clock_hz = 0x1f'1f'1f'1f'1f,
         .h_addressable = 0x0f'0f,
         .h_front_porch = 0x0a'0a,
         .h_sync_pulse = 0x01'01,
@@ -325,7 +325,7 @@ TEST(DisplayTiming, ToBanjo) {
         .vertical_front_porch_lines = 0x03'03,
         .vertical_sync_width_lines = 0x04'04,
         .vertical_back_porch_lines = 0x05'05,
-        .pixel_clock_frequency_hz = int64_t{0x1f'1f'1f'1f} * 1'000,
+        .pixel_clock_frequency_hz = 0x1f'1f'1f'1f'1f,
         .fields_per_frame = FieldsPerFrame::kInterlaced,
         .hsync_polarity = SyncPolarity::kPositive,
         .vsync_polarity = SyncPolarity::kPositive,
@@ -333,7 +333,7 @@ TEST(DisplayTiming, ToBanjo) {
         .pixel_repetition = 0,
     };
     const display_mode_t kBanjoDisplayMode = ToBanjoDisplayMode(kDisplayTiming);
-    EXPECT_EQ(kBanjoDisplayMode.pixel_clock_khz, 0x1f'1f'1f'1fu);
+    EXPECT_EQ(kBanjoDisplayMode.pixel_clock_hz, 0x1f'1f'1f'1f'1f);
     EXPECT_EQ(kBanjoDisplayMode.h_addressable, 0x0f'0fu);
     EXPECT_EQ(kBanjoDisplayMode.h_front_porch, 0x0a'0au);
     EXPECT_EQ(kBanjoDisplayMode.h_sync_pulse, 0x01'01u);
@@ -357,7 +357,7 @@ TEST(DisplayTiming, ToBanjo) {
         .vertical_front_porch_lines = 0x03'03,
         .vertical_sync_width_lines = 0x04'04,
         .vertical_back_porch_lines = 0x05'05,
-        .pixel_clock_frequency_hz = int64_t{0x1f'1f'1f'1f} * 1'000,
+        .pixel_clock_frequency_hz = 0x1f'1f'1f'1f'1f,
         .fields_per_frame = FieldsPerFrame::kInterlaced,
         .hsync_polarity = SyncPolarity::kPositive,
         .vsync_polarity = SyncPolarity::kNegative,
@@ -378,7 +378,7 @@ TEST(DisplayTiming, ToBanjo) {
         .vertical_front_porch_lines = 0x03'03,
         .vertical_sync_width_lines = 0x04'04,
         .vertical_back_porch_lines = 0x05'05,
-        .pixel_clock_frequency_hz = int64_t{0x1f'1f'1f'1f} * 1'000,
+        .pixel_clock_frequency_hz = 0x1f'1f'1f'1f'1f,
         .fields_per_frame = FieldsPerFrame::kInterlaced,
         .hsync_polarity = SyncPolarity::kNegative,
         .vsync_polarity = SyncPolarity::kPositive,
@@ -401,7 +401,7 @@ TEST(DisplayTiming, BanjoRoundTrip) {
       .vertical_front_porch_lines = 0x03'03,
       .vertical_sync_width_lines = 0x04'04,
       .vertical_back_porch_lines = 0x05'05,
-      .pixel_clock_frequency_hz = int64_t{0x1f'1f'1f'1f} * 1'000,
+      .pixel_clock_frequency_hz = 0x1f'1f'1f'1f'1f,
       .fields_per_frame = FieldsPerFrame::kInterlaced,
       .hsync_polarity = SyncPolarity::kPositive,
       .vsync_polarity = SyncPolarity::kPositive,
