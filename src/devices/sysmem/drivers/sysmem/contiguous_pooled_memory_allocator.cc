@@ -382,8 +382,8 @@ zx_status_t ContiguousPooledMemoryAllocator::InitCommon(zx::vmo local_contiguous
   // result from speculative prefetch from a physical page under a HW-protected range.  A non-cached
   // mapping prevents speculative prefetch.
   //
-  // TODO(https://fxbug.dev/42179016): Currently Zircon's physmap has !is_always_cpu_accessible_ pages mapped
-  // cached, which we believe is likely the cause of some SError(s) related to
+  // TODO(https://fxbug.dev/42179016): Currently Zircon's physmap has !is_always_cpu_accessible_
+  // pages mapped cached, which we believe is likely the cause of some SError(s) related to
   // protected_memory_size.  One way to fix would be to change the physmap mapping to non-cached
   // when a contiguous VMO
   //
@@ -1467,7 +1467,8 @@ void ContiguousPooledMemoryAllocator::RangesControl::AddProtectedRange(
   // HW-protected pages between when sysmem hypothetically crashes and when that sysmem crash
   // triggers a hard reboot.
   //
-  // TODO(https://fxbug.dev/42178137): When possible, configure sysmem to trigger reboot on driver remove.
+  // TODO(https://fxbug.dev/42178137): When possible, configure sysmem to trigger reboot on driver
+  // remove.
   zx::pmt pmt;
   zx_paddr_t paddr;
   zx_status_t pin_result = parent_->parent_device_->bti().pin(

@@ -15,9 +15,9 @@ zx_library("mmio-ptr") {
 zx_library("mmio-ptr-fake") {
   sources = []
   deps = [ ":mmio-ptr" ]
-  testonly = true
 
   sdk = "source"
+  sdk_publishable = "internal"
   sdk_headers = [ "lib/mmio-ptr/fake.h" ]
 }
 

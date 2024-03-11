@@ -118,7 +118,7 @@ board_input_bundle("main_bundle") {
       driver_components = [ "meta/aml-cpu.cm" ]
     },
     {
-      package_target = "//src/devices/gpio/drivers/aml-gpio:package"
+      package_target = "//src/devices/gpio/drivers/aml-gpio:bazel_package"
       package_set = "bootfs"
       driver_components = [ "meta/aml-gpio.cm" ]
     },

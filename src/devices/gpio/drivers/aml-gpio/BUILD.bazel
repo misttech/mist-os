@@ -1,0 +1,127 @@
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+load(
+    "@fuchsia_sdk//fuchsia:defs.bzl",
+    "fuchsia_cc_driver",
+    "fuchsia_cc_test",
+    "fuchsia_component_manifest",
+    "fuchsia_driver_bind_bytecode",
+    "fuchsia_driver_component",
+    "fuchsia_package",
+    "fuchsia_unittest_package",
+)
+
+fuchsia_driver_bind_bytecode(
+    name = "aml-gpio-bind",
+    output = "aml-gpio.bindbc",
+    rules = "aml-gpio.bind",
+    deps = [
+        "@fuchsia_sdk//bind/fuchsia.amlogic.platform",
+        "@fuchsia_sdk//bind/fuchsia.devicetree",
+        "@fuchsia_sdk//bind/fuchsia.platform",
+    ],
+)
+
+fuchsia_cc_driver(
+    name = "aml-gpio-driver",
+    srcs = [
+        "a1-blocks.h",
+        "a113-blocks.h",
+        "a5-blocks.h",
+        "aml-gpio.cc",
+        "aml-gpio.h",
+        "s905d2-blocks.h",
+    ],
+    defines = [
+        "ZX_ASSERT_LEVEL=2",
+        "_ALL_SOURCE",
+    ],
+    output_name = "aml-gpio",
+    deps = [
+        "//src/devices/lib/amlogic",
+        "@fuchsia_sdk//fidl/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_cpp",
+        "@fuchsia_sdk//pkg/async",
+        "@fuchsia_sdk//pkg/ddk",
+        "@fuchsia_sdk//pkg/driver_component_cpp",
+        "@fuchsia_sdk//pkg/driver_runtime_cpp",
+        "@fuchsia_sdk//pkg/fit-promise",
+        "@fuchsia_sdk//pkg/mmio",
+        "@fuchsia_sdk//pkg/zx",
+        "@internal_sdk//fidl/fuchsia.hardware.gpioimpl:fuchsia.hardware.gpioimpl_bindlib_cc",
+        "@internal_sdk//fidl/fuchsia.hardware.gpioimpl:fuchsia.hardware.gpioimpl_cpp",
+        "@internal_sdk//fidl/fuchsia.logger:fuchsia.logger_cpp",
+        "@internal_sdk//pkg/ddk-platform-defs",
+        "@internal_sdk//pkg/driver_compat",
+    ],
+)
+
+fuchsia_component_manifest(
+    name = "manifest",
+    src = "meta/aml-gpio.cml",
+)
+
+fuchsia_driver_component(
+    name = "component",
+    bind_bytecode = ":aml-gpio-bind",
+    driver_lib = ":aml-gpio-driver",
+    manifest = ":manifest",
+)
+
+fuchsia_package(
+    name = "aml-gpio",
+    package_name = "aml-gpio",
+    components = [":component"],
+    fuchsia_api_level = "HEAD",
+    package_repository_name = "fuchsia.com",
+    visibility = ["//visibility:public"],
+)
+
+# Tests
+fuchsia_cc_test(
+    name = "aml-gpio-test-bin",
+    size = "small",
+    srcs = [
+        "a1-blocks.h",
+        "a113-blocks.h",
+        "a5-blocks.h",
+        "aml-gpio.cc",
+        "aml-gpio.h",
+        "aml-gpio-test.cc",
+        "s905d2-blocks.h",
+    ],
+    # TODO(b/322398374) Remove this copts
+    copts = [
+        "-Wno-vla-cxx-extension",
+    ],
+    deps = [
+        "//src/devices/lib/amlogic",
+        "@fuchsia_sdk//fidl/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_cpp",
+        "@fuchsia_sdk//pkg/async",
+        "@fuchsia_sdk//pkg/ddk",
+        "@fuchsia_sdk//pkg/driver_component_cpp",
+        "@fuchsia_sdk//pkg/driver_runtime_cpp",
+        "@fuchsia_sdk//pkg/driver_testing_cpp",
+        "@fuchsia_sdk//pkg/fit-promise",
+        "@fuchsia_sdk//pkg/mmio",
+        "@fuchsia_sdk//pkg/zx",
+        "@internal_sdk//fidl/fuchsia.hardware.gpioimpl:fuchsia.hardware.gpioimpl_bindlib_cc",
+        "@internal_sdk//fidl/fuchsia.hardware.gpioimpl:fuchsia.hardware.gpioimpl_cpp",
+        "@internal_sdk//fidl/fuchsia.logger:fuchsia.logger_cpp",
+        "@internal_sdk//pkg/ddk-platform-defs",
+        "@internal_sdk//pkg/driver_compat",
+        "@internal_sdk//pkg/fbl",
+        "@internal_sdk//pkg/fzl",
+        "@internal_sdk//pkg/mock-mmio-reg",
+        "@internal_sdk//pkg/zxtest",
+    ],
+)
+
+fuchsia_unittest_package(
+    name = "aml-gpio-test-package",
+    package_name = "aml-gpio-test",
+    fuchsia_api_level = "HEAD",
+    unit_tests = [":aml-gpio-test-bin"],
+    visibility = ["//visibility:public"],
+)

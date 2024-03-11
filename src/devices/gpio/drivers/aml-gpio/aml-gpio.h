@@ -8,6 +8,7 @@
 #include <fidl/fuchsia.hardware.gpioimpl/cpp/driver/fidl.h>
 #include <fidl/fuchsia.hardware.platform.device/cpp/fidl.h>
 #include <lib/async/cpp/executor.h>
+#include <lib/driver/compat/cpp/device_server.h>
 #include <lib/driver/component/cpp/driver_base.h>
 #include <lib/fpromise/promise.h>
 #include <lib/mmio/mmio.h>
@@ -17,8 +18,6 @@
 #include <cstdint>
 
 #include <fbl/array.h>
-
-#include "sdk/lib/driver/compat/cpp/device_server.h"
 
 namespace gpio {
 

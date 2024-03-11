@@ -1,7 +1,6 @@
 # Copyright 2023 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
-
 import("//build/bazel/bazel_action.gni")
 import("//build/bazel/drivers/verify_driver_package.gni")
 import("//build/packages/prebuilt_package.gni")
@@ -46,7 +45,6 @@ template("bazel_driver_package") {
   assert(defined(invoker.package_name), "package_name must be defined")
   bazel_target = invoker.bazel_target
   package_name = invoker.package_name
-
   bazel_build_target = "$target_name.bazel_build"
   bazel_action(bazel_build_target) {
     forward_variables_from(invoker,
@@ -71,15 +69,18 @@ template("bazel_driver_package") {
         ninja = "$package_name.far"
       },
     ]
-
     build_id_directories = [
       {
         bazel = "{{BAZEL_TARGET_OUT_DIR}}/{{BAZEL_TARGET_NAME}}_build_id_dir"
         ninja = "${bazel_build_target}_build_id_dir"
       },
     ]
+    metadata = {
+      # Used by the check_included_drivers template.
+      fuchsia_driver_labels =
+          [ get_label_info(":$target_name", "label_no_toolchain") ]
+    }
   }
-
   if (defined(invoker.gn_driver_package_for_verification)) {
     verify_against_gn = true
 
@@ -115,11 +116,13 @@ template("bazel_driver_package") {
     if (!defined(deps)) {
       deps = []
     }
-
     deps += [ ":$bazel_build_target" ]
-
     if (verify_against_gn) {
       deps += [ ":$verify_target_name" ]
+    }
+    metadata = {
+      # Used by the assert_driver_components template.
+      driver_component_barrier = []
     }
   }
 }

@@ -11,8 +11,12 @@ group("tests") {
 
 zx_library("mock-mmio-reg") {
   sdk = "source"
+  sdk_publishable = "internal"
+  sdk_name = "mock-mmio-reg"
   sdk_headers = [ "mock-mmio-reg/mock-mmio-reg.h" ]
-  testonly = true
-  deps = [ "//src/devices/lib/mmio:test_helper" ]
+  deps = [
+    "//src/devices/lib/mmio:test_helper",
+    "//zircon/system/ulib/mmio-ptr:mmio-ptr-fake",
+  ]
   sources = []
 }
