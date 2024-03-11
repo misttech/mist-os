@@ -83,11 +83,14 @@ fn send_signal_prio(
             return error!(EAGAIN);
         }
     }
-    // Enqueue any signal that is blocked by the current mask or blocked by the original mask,
-    // since it can be unmasked later.
-    // But don't enqueue an ignored signal. See SigtimedwaitTest.IgnoredUnmaskedSignal gvisor test.
-    // In either case, if it is ptraced, enqueue it, so it can do the signal-delivery-stop.
-    if is_masked || was_masked || action != DeliveryAction::Ignore || task_state.is_ptraced() {
+
+    // If the signal is ignored then it doesn't need to be queued, except the following 2 cases:
+    //  1. The signal is blocked by the current or the original mask. The signal may be unmasked
+    //     later, see `SigtimedwaitTest.IgnoredUnmaskedSignal` gvisor test.
+    //  2. The task is ptraced. In this case we want to queue the signal for signal-delivery-stop.
+    let is_queued =
+        action != DeliveryAction::Ignore || is_masked || was_masked || task_state.is_ptraced();
+    if is_queued {
         if prio == SignalPriority::First {
             task_state.signals.jump_queue(siginfo.clone());
         } else {
@@ -98,7 +101,7 @@ fn send_signal_prio(
 
     drop(task_state);
 
-    if !is_masked && action.must_interrupt(sigaction) {
+    if is_queued && !is_masked && action.must_interrupt(sigaction) {
         // Wake the task. Note that any potential signal handler will be executed before
         // the task returns from the suspend (from the perspective of user space).
         task.interrupt();
