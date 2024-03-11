@@ -123,6 +123,31 @@ driver-inspect-test (90.96% similar)
 
 You can then add the necessary packages to your build.
 
+### Basic test output
+
+`fx test` stores its output in log files for later analysis. You
+can view a summary of this log file in text form using the
+`--print-logs` argument:
+
+```bash {:.devsite-disable-click-to-copy}
+$ fx test --print-logs
+previous-log-file.json.gz:
+
+4 tests were run
+
+[START first_test]
+...
+[END first_test]
+```
+
+By default this command prints the most recent log stored in your Fuchsia
+output directory, but you may pass `--logpath` to choose a specific
+log.
+
+This command is resilient to corrupt or incomplete log files,
+so it should still work even if you terminate the `fx test` command
+running the tests.
+
 ## Configuration options
 
 `fx test` is highly configurable, and a full list of options is
@@ -169,6 +194,11 @@ tests, this command lists all test *cases* within each test suite.
 It outputs the appropriate command line to run each individual case.
 Note that this does require access to a Fuchsia device or emulator
 because cases are enumerated by Test Manager on device.
+
+**`--print-logs`** will provide a human-readable summary of a log
+file. Rather than executing tests, this command prints the command
+line and output for each test recorded in a log file. It also
+respects `--logpath` to specify a log file location.
 
 ### Build options
 
