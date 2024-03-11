@@ -12,6 +12,10 @@
 #include "src/developer/debug/zxdb/client/setting_schema.h"
 #include "src/developer/debug/zxdb/client/setting_schema_definition.h"
 
+namespace {
+uint32_t next_filter_id = 1;
+}  // namespace
+
 namespace zxdb {
 
 const char* ClientSettings::Filter::kType = "type";
@@ -28,6 +32,13 @@ const char* ClientSettings::Filter::kJobDescription =
     R"(  The scope of the filter. Only valid when the type is "process name substr" or
   "process name".)";
 
+const char* ClientSettings::Filter::kWeak = "weak";
+const char* ClientSettings::Filter::kWeakDescription =
+    R"(  Whether or not this is a weak filter. When matched, a weak filter will
+  configure the corresponding target to attach but defer loading symbols for
+  the matched process only when an exception or breakpoint is raised for that
+  process in the backend.)";
+
 namespace {
 
 fxl::RefPtr<SettingSchema> CreateSchema() {
@@ -43,6 +54,7 @@ fxl::RefPtr<SettingSchema> CreateSchema() {
        debug_ipc::Filter::TypeToString(debug_ipc::Filter::Type::kComponentMonikerSuffix)});
   schema->AddString(ClientSettings::Filter::kPattern, ClientSettings::Filter::kPatternDescription);
   schema->AddInt(ClientSettings::Filter::kJob, ClientSettings::Filter::kJobDescription);
+  schema->AddBool(ClientSettings::Filter::kWeak, ClientSettings::Filter::kWeakDescription);
   return schema;
 }
 
@@ -68,6 +80,8 @@ SettingValue Filter::Settings::GetStorageValue(const std::string& key) const {
     return SettingValue(filter_->filter_.pattern);
   if (key == ClientSettings::Filter::kJob)
     return SettingValue(static_cast<int64_t>(filter_->filter_.job_koid));
+  if (key == ClientSettings::Filter::kWeak)
+    return SettingValue(filter_->filter_.weak);
   return SettingValue();
 }
 
@@ -83,11 +97,15 @@ Err Filter::Settings::SetStorageValue(const std::string& key, SettingValue value
       return Err("This filter type cannot be associated with a job.");
     }
     filter_->SetJobKoid(value.get_int());
+  } else if (key == ClientSettings::Filter::kWeak) {
+    filter_->SetWeak(value.get_bool());
   }
   return Err();
 }
 
-Filter::Filter(Session* session) : ClientObject(session), settings_(this) {}
+Filter::Filter(Session* session) : ClientObject(session), settings_(this) {
+  filter_.id = next_filter_id++;
+}
 
 void Filter::SetType(debug_ipc::Filter::Type type) {
   filter_.type = type;
@@ -101,6 +119,11 @@ void Filter::SetPattern(const std::string& pattern) {
 
 void Filter::SetJobKoid(zx_koid_t job_koid) {
   filter_.job_koid = job_koid;
+  Sync();
+}
+
+void Filter::SetWeak(bool weak) {
+  filter_.weak = weak;
   Sync();
 }
 

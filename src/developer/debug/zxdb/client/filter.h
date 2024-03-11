@@ -37,6 +37,9 @@ class Filter : public ClientObject {
   void SetJobKoid(zx_koid_t job_koid);
   zx_koid_t job_koid() const { return filter_.job_koid; }
 
+  void SetWeak(bool weak);
+  bool weak() const { return filter_.weak; }
+
   // Accessing the underlying filter storage.
   const debug_ipc::Filter& filter() const { return filter_; }
   SettingStore& settings() { return settings_; }

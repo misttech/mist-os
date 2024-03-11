@@ -136,6 +136,9 @@ struct ClientSettings {
 
     static const char* kJob;
     static const char* kJobDescription;
+
+    static const char* kWeak;
+    static const char* kWeakDescription;
   };
 };
 

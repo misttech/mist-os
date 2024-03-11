@@ -33,6 +33,11 @@ OutputBuffer FormatFilter(const ConsoleContext* context, const Filter* filter) {
     out.Append("=" + std::to_string(filter->job_koid()) + " ");
   }
 
+  if (filter->weak()) {
+    out.Append(Syntax::kVariable, "weak");
+    out.Append("=true ");
+  }
+
   if (!filter->is_valid()) {
     out.Append(Syntax::kComment, "(invalid) ");
   }

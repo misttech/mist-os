@@ -87,6 +87,11 @@ class System : public ClientObject, public SessionObserver, public SettingStoreO
   // System object and should not be cached once you return to the message loop.
   std::vector<Filter*> GetFilters() const;
 
+  // Returns the filter matching the given id or nullptr if not found. Similarly to |GetFilters|
+  // only weak pointers should be cached from the returned pointer and checked for validity before
+  // use.
+  Filter* GetFilterForId(uint32_t id) const;
+
   // Returns all symbol servers registered with this symbol instance. The returned pointers are
   // managed by the System object and should not be cached once you return to the message loop.
   std::vector<SymbolServer*> GetSymbolServers() const;

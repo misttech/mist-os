@@ -38,6 +38,13 @@ TEST_F(FormatFilterTest, FormatFilter) {
   f->SetJobKoid(1234);
   EXPECT_EQ("Filter 1 type=\"process name substr\" job=1234 ",
             FormatFilter(&context, f).AsString());
+
+  f->SetType(debug_ipc::Filter::Type::kComponentName);
+  f->SetPattern("component.cm");
+  f->SetJobKoid(0);  // Must be 0 when type is kComponent*.
+  f->SetWeak(true);
+  EXPECT_EQ("Filter 1 type=\"component name\" pattern=component.cm weak=true ",
+            FormatFilter(&context, f).AsString());
 }
 
 TEST_F(FormatFilterTest, FormatFilterList) {

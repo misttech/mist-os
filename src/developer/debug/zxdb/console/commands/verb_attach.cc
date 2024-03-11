@@ -20,6 +20,7 @@ namespace {
 
 constexpr int kSwitchJob = 1;
 constexpr int kSwitchExact = 2;
+constexpr int kSwitchWeak = 3;
 
 const char kAttachShortHelp[] = "attach: Attach to processes.";
 const char kAttachHelp[] =
@@ -41,6 +42,15 @@ Arguments
         interpreted as a filter that requires an exact match against the process
         name. This bypasses any heuristics below and is useful if the process
         name looks like a pid/koid, a URL, or a moniker.
+
+    --weak
+        Tells the backend to attach to any matching processes, but the front end
+        will not request modules or load symbols until an exception is raised in
+        the process. This significantly speeds up start up time with an initial
+        filter, but requires an external event to stop the process. This is
+        typically used by orchestration tools, rather than from the command
+        line. This option can be specified in combination with any type of
+        filter and all other flags to attach.
 
 Attaching to a process by a process id
 
@@ -202,6 +212,10 @@ void RunVerbAttach(const Command& cmd, fxl::RefPtr<CommandContext> cmd_context) 
   // Now all the checks are performed. Create a filter.
   Filter* filter = console_context->session()->system().CreateNewFilter();
 
+  if (cmd.HasSwitch(kSwitchWeak)) {
+    filter->SetWeak(true);
+  }
+
   std::string pattern;
   if (!cmd.args().empty())
     pattern = cmd.args()[0];
@@ -254,6 +268,7 @@ VerbRecord GetAttachVerbRecord() {
                     CommandGroup::kProcess);
   attach.switches.emplace_back(kSwitchJob, true, "job", 'j');
   attach.switches.emplace_back(kSwitchExact, false, "exact");
+  attach.switches.emplace_back(kSwitchWeak, false, "weak");
   return attach;
 }
 

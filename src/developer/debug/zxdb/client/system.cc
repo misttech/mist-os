@@ -6,6 +6,7 @@
 
 #include <lib/syslog/cpp/log_settings.h>
 
+#include <algorithm>
 #include <filesystem>
 #include <set>
 
@@ -716,6 +717,11 @@ void System::SyncFilters() {
 }
 
 void System::OnFilterMatches(const std::vector<debug_ipc::FilterMatch>& matches) {
+  // A collection of pids that we are going to attach to. The corresponding bool is whether or not
+  // it should be performed as a weak attach. If a pid is matched by multiple filters, they must
+  // ALL be configured as weak filters for a weak attach to occur.
+  std::map<uint64_t, bool> pids_to_attach;
+
   for (const auto& match : matches) {
     // Check that we don't accidentally attach to too many processes.
     if (match.matched_pids.size() > 50) {
@@ -724,6 +730,8 @@ void System::OnFilterMatches(const std::vector<debug_ipc::FilterMatch>& matches)
       return;
     }
 
+    Filter* matched_filter = GetFilterForId(match.id);
+
     // Go over the targets and see if we find a valid one for each pid.
     for (uint64_t matched_pid : match.matched_pids) {
       // If we found an already attached process, we don't care about this match.
@@ -731,15 +739,45 @@ void System::OnFilterMatches(const std::vector<debug_ipc::FilterMatch>& matches)
         continue;
       }
 
-      AttachToProcess(matched_pid, [matched_pid](fxl::WeakPtr<Target> target, const Err& err,
-                                                 uint64_t timestamp) {
-        if (err.has_error()) {
-          LOGS(Error) << "Could not attach to process " << matched_pid << ": " << err.msg();
-          return;
-        }
-      });
+      bool weak_attach = false;
+      if (matched_filter) {
+        weak_attach = matched_filter->weak();
+      }
+
+      auto inserted = pids_to_attach.insert(std::make_pair(matched_pid, weak_attach));
+
+      // Make sure we double check weak_attach after the insertion. If the pid had already been
+      // added to the map by a weak filter and this is a strong filter that also matched, then we
+      // should strongly attach. Conversely, a strong filter should never be overruled by a weak
+      // filter. If the filter id for this match is invalid or isn't found, perform a strong
+      // attach.
+      if (!weak_attach)
+        inserted.second = weak_attach;
     }
   }
+
+  // Now we can attach to all of the matched pids.
+  for (const auto& [pid, weak] : pids_to_attach) {
+    // The pid = pid assignment capture is because capturing from a structured binding is a C++20
+    // extension and causes a compilation error.
+    AttachToProcess(pid,
+                    [pid = pid](fxl::WeakPtr<Target> target, const Err& err, uint64_t timestamp) {
+                      if (err.has_error()) {
+                        LOGS(Error) << "Could not attach to process " << pid << ": " << err.msg();
+                        return;
+                      }
+                    });
+  }
+}
+
+Filter* System::GetFilterForId(uint32_t id) const {
+  if (filters_.empty())
+    return nullptr;
+
+  const auto& filter = std::find_if(
+      filters_.begin(), filters_.end(),
+      [id](const std::unique_ptr<Filter>& filter) { return id == filter->filter().id; });
+  return filter != filters_.end() ? filter->get() : nullptr;
 }
 
 Target* System::GetNextTarget() {
