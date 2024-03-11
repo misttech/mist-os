@@ -79,7 +79,7 @@ impl InterfaceFactoryBase<TcpNetworkInterface> for TcpFactory {
 
         rediscover_helper(&self.target_name, filter, &mut |connection_state| {
             match connection_state {
-                FastbootConnectionState::Tcp(addr) => self.addr = addr.into(),
+                FastbootConnectionState::Tcp(addrs) => self.addr = addrs.first().unwrap().into(),
                 _ => bail!(
                     "When rediscovering target: {}, expected target to reconnect in TCP mode",
                     self.target_name

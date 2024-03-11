@@ -113,9 +113,10 @@ async fn show_targets(
 fn handle_to_info(handle: discovery::TargetHandle) -> ffx::TargetInfo {
     let (target_state, addresses) = match handle.state {
         discovery::TargetState::Unknown => (ffx::TargetState::Unknown, None),
-        discovery::TargetState::Product(target_addr) => {
-            (ffx::TargetState::Product, Some(vec![target_addr.into()]))
-        }
+        discovery::TargetState::Product(target_addrs) => (
+            ffx::TargetState::Product,
+            Some(target_addrs.into_iter().map(|x| x.into()).collect::<Vec<ffx::TargetAddrInfo>>()),
+        ),
         discovery::TargetState::Fastboot(_) => (ffx::TargetState::Fastboot, None),
         discovery::TargetState::Zedboot => (ffx::TargetState::Zedboot, None),
     };

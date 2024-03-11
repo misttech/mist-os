@@ -242,8 +242,7 @@ where
                                     );
                                 }
                                 FastbootConnectionState::Udp(udp_state) => {
-                                    tracing::warn!("Discovered Target at address: {} in Fastboot Over UDP mode. It cannot be used with `funnel`. Skipping", udp_state);
-                                    tracing::warn!("Discovered Target at address: {} in Fastboot Over UDP mode, which funnel does not support.", udp_state);
+                                    tracing::warn!("Discovered Target at address: {:?} in Fastboot Over UDP mode, which funnel does not support.", udp_state);
                                 }
                             }
                         }
@@ -275,9 +274,9 @@ where
     }
     let res = targets
         .iter()
-        .map(|(nodename, address)| TargetInfo {
+        .map(|(nodename, addresses)| TargetInfo {
             nodename: nodename.to_string(),
-            addresses: vec![*address],
+            addresses: addresses.clone(),
         })
         .collect();
     Ok(res)

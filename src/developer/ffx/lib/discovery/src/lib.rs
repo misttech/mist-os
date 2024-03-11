@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use addr::TargetAddr;
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, bail, Result};
 use bitflags::bitflags;
 use fuchsia_async::Task;
 use futures::channel::mpsc::{unbounded, UnboundedReceiver, UnboundedSender};
@@ -28,16 +28,16 @@ use fidl_fuchsia_developer_ffx as ffx;
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub enum FastbootConnectionState {
     Usb(String),
-    Tcp(TargetAddr),
-    Udp(TargetAddr),
+    Tcp(Vec<TargetAddr>),
+    Udp(Vec<TargetAddr>),
 }
 
 impl Display for FastbootConnectionState {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let res = match self {
             Self::Usb(s) => format!("Usb({})", s),
-            Self::Tcp(addr) => format!("Tcp({})", addr),
-            Self::Udp(addr) => format!("Udp({})", addr),
+            Self::Tcp(addr) => format!("Tcp({:?})", addr),
+            Self::Udp(addr) => format!("Udp({:?})", addr),
         };
         write!(f, "{}", res)
     }
@@ -59,7 +59,7 @@ impl Display for FastbootTargetState {
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub enum TargetState {
     Unknown,
-    Product(TargetAddr),
+    Product(Vec<TargetAddr>),
     Fastboot(FastbootTargetState),
     Zedboot,
 }
@@ -68,8 +68,8 @@ impl Display for TargetState {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let res = match self {
             TargetState::Unknown => "Unknown".to_string(),
-            TargetState::Product(addr) => format!("Product({})", addr),
-            TargetState::Fastboot(state) => format!("Fastboot({})", state),
+            TargetState::Product(addr) => format!("Product({:?})", addr),
+            TargetState::Fastboot(state) => format!("Fastboot({:?})", state),
             TargetState::Zedboot => "Zedboot".to_string(),
         };
         write!(f, "{}", res)
@@ -327,18 +327,25 @@ impl TryFrom<ffx::TargetInfo> for TargetHandle {
 
     fn try_from(info: ffx::TargetInfo) -> Result<Self, Self::Error> {
         let addresses = info.addresses.ok_or(anyhow!("Addresses are populated"))?;
-        let addr = addresses.first().ok_or(anyhow!("There must be at least one address"))?;
+        // Get the TargetAddrs
+        let mut addrs: Vec<_> = addresses.into_iter().map(TargetAddr::from).collect();
+        // Sorting them this way put ipv6 above ipv4
+        addrs.sort_by(|a, b| b.cmp(a));
+
+        if addrs.is_empty() {
+            bail!("There must be at least one target address")
+        }
 
         let state = match info.fastboot_interface {
-            None => TargetState::Product(addr.into()),
+            None => TargetState::Product(addrs),
             Some(iface) => {
                 let serial_number = info.serial_number.unwrap_or("".to_string());
                 let connection_state = match iface {
                     ffx::FastbootInterface::Usb => {
                         FastbootConnectionState::Usb(serial_number.clone())
                     }
-                    ffx::FastbootInterface::Udp => FastbootConnectionState::Udp(addr.into()),
-                    ffx::FastbootInterface::Tcp => FastbootConnectionState::Tcp(addr.into()),
+                    ffx::FastbootInterface::Udp => FastbootConnectionState::Udp(addrs),
+                    ffx::FastbootInterface::Tcp => FastbootConnectionState::Tcp(addrs),
                 };
                 TargetState::Fastboot(FastbootTargetState { serial_number, connection_state })
             }
@@ -380,10 +387,14 @@ impl From<ManualTargetEvent> for TargetEvent {
             ManualTargetEvent::Discovered(manual_target, manual_state) => {
                 let state = match manual_state {
                     ManualTargetState::Disconnected => TargetState::Unknown,
-                    ManualTargetState::Product => TargetState::Product(manual_target.addr().into()),
+                    ManualTargetState::Product => {
+                        TargetState::Product(vec![manual_target.addr().into()])
+                    }
                     ManualTargetState::Fastboot => TargetState::Fastboot(FastbootTargetState {
                         serial_number: "".to_string(),
-                        connection_state: FastbootConnectionState::Tcp(manual_target.addr().into()),
+                        connection_state: FastbootConnectionState::Tcp(vec![manual_target
+                            .addr()
+                            .into()]),
                     }),
                 };
 
@@ -522,7 +533,7 @@ mod test {
                 TargetHandle::try_from(info)?,
                 TargetHandle {
                     node_name: Some("foo".to_string()),
-                    state: TargetState::Product(addr)
+                    state: TargetState::Product(vec![addr])
                 }
             );
         }
@@ -542,7 +553,7 @@ mod test {
                     node_name: Some("foo".to_string()),
                     state: TargetState::Fastboot(FastbootTargetState {
                         serial_number: "".to_string(),
-                        connection_state: FastbootConnectionState::Udp(addr)
+                        connection_state: FastbootConnectionState::Udp(vec![addr])
                     })
                 }
             );
@@ -563,7 +574,7 @@ mod test {
                     node_name: Some("foo".to_string()),
                     state: TargetState::Fastboot(FastbootTargetState {
                         serial_number: "".to_string(),
-                        connection_state: FastbootConnectionState::Tcp(addr)
+                        connection_state: FastbootConnectionState::Tcp(vec![addr])
                     })
                 }
             );
@@ -613,7 +624,7 @@ mod test {
                 TargetEvent::try_from(mdns_event)?,
                 TargetEvent::Added(TargetHandle {
                     node_name: Some("foo".to_string()),
-                    state: TargetState::Product(addr)
+                    state: TargetState::Product(vec![addr])
                 })
             );
         }
@@ -631,7 +642,7 @@ mod test {
                 TargetEvent::try_from(mdns_event)?,
                 TargetEvent::Added(TargetHandle {
                     node_name: Some("foo".to_string()),
-                    state: TargetState::Product(addr)
+                    state: TargetState::Product(vec![addr])
                 })
             );
         }
@@ -649,7 +660,7 @@ mod test {
                 TargetEvent::try_from(mdns_event)?,
                 TargetEvent::Removed(TargetHandle {
                     node_name: Some("foo".to_string()),
-                    state: TargetState::Product(addr)
+                    state: TargetState::Product(vec![addr])
                 })
             );
         }
@@ -671,7 +682,7 @@ mod test {
                 TargetEvent::try_from(emulator_event)?,
                 TargetEvent::Added(TargetHandle {
                     node_name: Some("foo".to_string()),
-                    state: TargetState::Product(addr)
+                    state: TargetState::Product(vec![addr])
                 })
             );
         }
@@ -687,7 +698,7 @@ mod test {
                 TargetEvent::try_from(emulator_event)?,
                 TargetEvent::Removed(TargetHandle {
                     node_name: Some("foo".to_string()),
-                    state: TargetState::Product(addr)
+                    state: TargetState::Product(vec![addr])
                 })
             );
         }
@@ -707,7 +718,7 @@ mod test {
                 TargetEvent::from(manual_target_event),
                 TargetEvent::Added(TargetHandle {
                     node_name: Some("127.0.0.1:8080".to_string()),
-                    state: TargetState::Product(addr.into()),
+                    state: TargetState::Product(vec![addr.into()]),
                 })
             );
         }
@@ -727,7 +738,7 @@ mod test {
                 TargetEvent::from(manual_target_event),
                 TargetEvent::Added(TargetHandle {
                     node_name: Some("[::1]:8023".to_string()),
-                    state: TargetState::Product(addr.into()),
+                    state: TargetState::Product(vec![addr.into()]),
                 })
             );
         }
@@ -744,7 +755,7 @@ mod test {
                     node_name: Some("127.0.0.1:8080".to_string()),
                     state: TargetState::Fastboot(FastbootTargetState {
                         serial_number: "".to_string(),
-                        connection_state: FastbootConnectionState::Tcp(addr.into())
+                        connection_state: FastbootConnectionState::Tcp(vec![addr.into()])
                     }),
                 })
             );
@@ -915,7 +926,7 @@ mod test {
         // This should not come into the queue since the target is not in zedboot
         sender.unbounded_send(Ok(TargetEvent::Added(TargetHandle {
             node_name: Some("Kelsier".to_string()),
-            state: TargetState::Product(addr),
+            state: TargetState::Product(vec![addr]),
         })))?;
 
         sender.unbounded_send(Ok(TargetEvent::Added(TargetHandle {
@@ -1007,7 +1018,7 @@ mod test {
                 // Name must correspond to "runtime:name" value in config
                 node_name: Some("emu-data-instance".to_string()),
                 // Addr must correspond to "host:port_map:sh:host" value in config
-                state: TargetState::Product(TargetAddr::from_str("127.0.0.1:3322")?),
+                state: TargetState::Product(vec![TargetAddr::from_str("127.0.0.1:3322")?]),
             })
         );
 
@@ -1028,7 +1039,7 @@ mod test {
                 // Name must correspond to "runtime:name" value in config
                 node_name: Some("emu-data-instance2".to_string()),
                 // Addr must correspond to "host:port_map:sh:host" value in config
-                state: TargetState::Product(TargetAddr::from_str("127.0.0.1:3322")?),
+                state: TargetState::Product(vec![TargetAddr::from_str("127.0.0.1:3322")?]),
             })
         );
 

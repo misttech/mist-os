@@ -81,7 +81,7 @@ impl InterfaceFactoryBase<UdpNetworkInterface> for UdpFactory {
 
         rediscover_helper(&self.target_name, filter, &mut |connection_state| {
             match connection_state {
-                FastbootConnectionState::Udp(addr) => self.addr = addr.into(),
+                FastbootConnectionState::Udp(addrs) => self.addr = addrs.first().unwrap().into(),
                 _ => bail!(
                     "When rediscovering target: {}, expected target to reconnect in UDP mode",
                     self.target_name

@@ -18,8 +18,8 @@ const CLEANUP_COMMAND: &'static str = include_str!("cleanup_command");
 
 #[derive(Debug, Error)]
 pub enum TunnelError {
-    #[error("Target {target} did not have any valid Ip Addresses associated with it.")]
-    NoAdressesError { target: String },
+    #[error("Target {target} did not have any valid IpV6 Addresses associated with it.")]
+    NoAddressesError { target: String },
     #[error("There may be a tunnel already running to {remote_host}. Try running `funnel cleanup-remote-host {remote_host}` to clean it up before retrying")]
     TunnelAlreadyRunning { remote_host: String },
     #[error("Ssh was terminated by a signal")]
@@ -98,13 +98,23 @@ fn build_ssh_args(
     additional_port_forwards: Vec<u32>,
 ) -> Result<Vec<String>, TunnelError> {
     let mut addrs: Vec<TargetAddr> = target.addresses.into_iter().collect::<Vec<TargetAddr>>();
-
+    tracing::debug!("Discovered addresses for target: {:?}", addrs);
     // Flip the sorting so that Ipv6 comes before Ipv4 as we will take the first
     // address, and (generally) Ipv4 addresses from the Target are ephemeral
     addrs.sort_by(|a, b| b.cmp(a));
 
     let target_ip =
-        addrs.first().ok_or(TunnelError::NoAdressesError { target: target.nodename })?;
+        addrs.first().ok_or(TunnelError::NoAddressesError { target: target.nodename.clone() })?;
+
+    if addrs.len() > 1 {
+        tracing::warn!(
+            "Target: {} has {} addresses associated with it: {:?}. Choosing the first one: {}",
+            target.nodename.clone(),
+            addrs.len(),
+            addrs,
+            target_ip
+        );
+    }
 
     let mut res: Vec<String> = vec![
         // We want ipv6 binds for the port forwards
