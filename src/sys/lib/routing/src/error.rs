@@ -4,6 +4,7 @@
 
 use {
     crate::{policy::PolicyError, rights::Rights},
+    availability::TargetHasStrongerAvailability,
     clonable_error::ClonableError,
     cm_rust::CapabilityTypeName,
     cm_types::Name,
@@ -618,7 +619,10 @@ impl RightsRoutingError {
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize), serde(rename_all = "snake_case"))]
 #[derive(Debug, Error, Clone, PartialEq)]
 pub enum AvailabilityRoutingError {
-    #[error("Availability of target has stronger guarantees than what is being offered.")]
+    #[error(
+        "Availability requested by the target has stronger guarantees than what \
+    is being provided at the source."
+    )]
     TargetHasStrongerAvailability,
 
     #[error("Offer uses void source, but target requires the capability")]

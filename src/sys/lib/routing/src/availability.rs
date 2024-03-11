@@ -4,6 +4,7 @@
 
 use {
     crate::error::AvailabilityRoutingError,
+    availability::TargetHasStrongerAvailability,
     cm_rust::{Availability, ExposeDeclCommon, ExposeSource, OfferDeclCommon, OfferSource},
 };
 
@@ -49,38 +50,11 @@ impl AvailabilityState {
         &mut self,
         next_availability: &Availability,
     ) -> Result<(), AvailabilityRoutingError> {
-        match (&self.0, &next_availability) {
-            // `self` will be `SameAsTarget` when routing starts from an `Offer` or `Expose`. This
-            // is to verify as much as possible the correctness of routes involving `Offer` and
-            // `Expose` without full knowledge of the `use -> offer -> expose` chain.
-            //
-            // For the purpose of availability checking, we will skip any checks until we encounter
-            // a route declaration that has a known availability.
-            (Availability::SameAsTarget, _) => self.0 = *next_availability,
-
-            // If our availability doesn't change, there's nothing to do.
-            (Availability::Required, Availability::Required)
-            | (Availability::Optional, Availability::Optional)
-            | (Availability::Transitional, Availability::Transitional)
-
-            // If the next availability is explicitly a pass-through, there's nothing to do.
-            | (Availability::Required, Availability::SameAsTarget)
-            | (Availability::Optional, Availability::SameAsTarget)
-            | (Availability::Transitional, Availability::SameAsTarget) => (),
-
-            // Increasing the strength of availability as we travel toward the source is allowed.
-            (Availability::Optional, Availability::Required)
-            | (Availability::Transitional, Availability::Required)
-            | (Availability::Transitional, Availability::Optional) =>
-                self.0 = *next_availability,
-
-            // Decreasing the strength of availability is not allowed, as that could lead to
-            // unsanctioned broken routes.
-            (Availability::Optional, Availability::Transitional)
-            | (Availability::Required, Availability::Transitional)
-            | (Availability::Required, Availability::Optional) =>
-                return Err(AvailabilityRoutingError::TargetHasStrongerAvailability),
-        }
+        self.0 = availability::advance(self.0, *next_availability).map_err(
+            |_: TargetHasStrongerAvailability| {
+                AvailabilityRoutingError::TargetHasStrongerAvailability
+            },
+        )?;
         Ok(())
     }
 }

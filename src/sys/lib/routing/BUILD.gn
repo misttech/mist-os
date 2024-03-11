@@ -41,6 +41,7 @@ rustc_library("routing") {
     "//src/sys/lib/cm_types",
     "//src/sys/lib/component_id_index",
     "//src/sys/lib/moniker",
+    "//src/sys/lib/routing/availability",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:derivative",
@@ -102,6 +103,6 @@ group("tests") {
   testonly = true
   deps = [
     ":fuchsia-routing-tests",
-    ":host-routing-tests",
+    "availability:tests",
   ]
 }
