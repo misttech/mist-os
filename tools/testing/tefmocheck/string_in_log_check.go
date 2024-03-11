@@ -626,6 +626,21 @@ func infraToolLogChecks() []FailureModeCheck {
 			String: "Timed out waiting for the ffx daemon on the Overnet mesh over socket",
 			Type:   swarmingOutputType,
 		},
+		// These errors happen when the ssh keepalive fails, which in turns closes the SSH
+		// connection. It should come before the ProcessTerminatedMsg to distinguish when the
+		// SSH connection terminates due to the keepalive or something else.
+		&stringInLogCheck{
+			String:         "botanist DEBUG: error sending keepalive",
+			Type:           swarmingOutputType,
+			SkipPassedTest: true,
+			IgnoreFlakes:   true,
+		},
+		&stringInLogCheck{
+			String:         "botanist DEBUG: ssh keepalive timed out",
+			Type:           swarmingOutputType,
+			SkipPassedTest: true,
+			IgnoreFlakes:   true,
+		},
 		// For https://fxbug.dev/317290699.
 		&stringInLogCheck{
 			String:         sshutilconstants.ProcessTerminatedMsg,
