@@ -234,7 +234,6 @@ zx::result<> AmlUsbPhyDevice::Start() {
   std::vector<UsbPhy2> usbphy2;
   std::vector<UsbPhy3> usbphy3;
   zx::interrupt irq;
-  bool has_otg = false;
   {
     zx::result result =
         incoming()->Connect<fuchsia_hardware_platform_device::Service::Device>("pdev");
@@ -274,9 +273,6 @@ zx::result<> AmlUsbPhyDevice::Start() {
           break;
       }
       idx++;
-      if (phy_mode.dr_mode == USB_MODE_OTG) {
-        has_otg = true;
-      }
     }
 
     status = pdev.GetInterrupt(0, &irq);
@@ -290,11 +286,11 @@ zx::result<> AmlUsbPhyDevice::Start() {
       std::optional<fdf::MmioBuffer> power_mmio, sleep_mmio;
       auto status = pdev.MapMmio(idx++, &power_mmio);
       if (status != ZX_OK) {
-        FDF_LOG(ERROR, "pdev.MapMmio(%d) error %s", idx - 1, zx_status_get_string(status));
+        FDF_LOG(INFO, "Power mmio not found %s", zx_status_get_string(status));
       }
       status = pdev.MapMmio(idx++, &sleep_mmio);
       if (status != ZX_OK) {
-        FDF_LOG(ERROR, "pdev.MapMmio(%d) error %s", idx - 1, zx_status_get_string(status));
+        FDF_LOG(INFO, "Sleep mmio not found %s", zx_status_get_string(status));
       }
 
       if (power_mmio.has_value() && sleep_mmio.has_value()) {
@@ -335,7 +331,7 @@ zx::result<> AmlUsbPhyDevice::Start() {
 
   // Initialize device. Must come after CreateNode() because Init() will create xHCI and DWC2
   // nodes on top of node_.
-  auto status = device_->Init(has_otg);
+  auto status = device_->Init();
   if (status != ZX_OK) {
     FDF_LOG(ERROR, "Init() error %s", zx_status_get_string(status));
     return zx::error(status);

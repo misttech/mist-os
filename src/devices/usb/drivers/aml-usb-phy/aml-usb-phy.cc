@@ -212,7 +212,8 @@ void AmlUsbPhy::HandleIrq(async_dispatcher_t* dispatcher, async::IrqBase* irq, z
   irq_.ack();
 }
 
-zx_status_t AmlUsbPhy::Init(bool has_otg) {
+zx_status_t AmlUsbPhy::Init() {
+  bool has_otg = false;
   auto status = InitPhy2();
   if (status != ZX_OK) {
     FDF_LOG(ERROR, "InitPhy2() error %s", zx_status_get_string(status));

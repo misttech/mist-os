@@ -35,7 +35,7 @@ class AmlUsbPhy : public fdf::Server<fuchsia_hardware_usb_phy::UsbPhy> {
     irq_.destroy();
   }
 
-  zx_status_t Init(bool has_otg);
+  zx_status_t Init();
 
   // fuchsia_hardware_usb_phy::UsbPhy required methods
   void ConnectStatusChanged(ConnectStatusChangedRequest& request,

@@ -14,7 +14,10 @@ using fuchsia.devicetree;
 primary node "pdev" {
   if fuchsia.BIND_PLATFORM_DEV_VID == fuchsia.platform.BIND_PLATFORM_DEV_VID.GENERIC {
     fuchsia.BIND_PLATFORM_DEV_DID == fuchsia.platform.BIND_PLATFORM_DEV_DID.DEVICETREE;
-    fuchsia.devicetree.FIRST_COMPATIBLE == "amlogic,g12a-usb-phy";
+    accept fuchsia.devicetree.FIRST_COMPATIBLE {
+      "amlogic,g12a-usb-phy",
+      "amlogic,g12b-usb-phy",
+    }
   } else {
     fuchsia.BIND_PROTOCOL == fuchsia.platform.BIND_PROTOCOL.DEVICE;
     fuchsia.BIND_PLATFORM_DEV_VID == fuchsia.amlogic.platform.BIND_PLATFORM_DEV_VID.AMLOGIC;
