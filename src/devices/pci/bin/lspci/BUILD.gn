@@ -48,6 +48,7 @@ rustc_binary("lspci") {
     "//third_party/rust_crates:argh",
   ]
   sources = [ "src/main.rs" ]
+  configs += [ "//build/config/rust:bootfs" ]
 }
 
 resource("database") {
