@@ -47,7 +47,7 @@ impl MutableConnection {
         scope: ExecutionScope,
         directory: Arc<impl MutableDirectory>,
         protocols: impl ProtocolsExt,
-        object_request: ObjectRequestRef,
+        object_request: ObjectRequestRef<'_>,
     ) -> Result<impl Future<Output = ()>, Status> {
         // Ensure we close the directory if we fail to prepare the connection.
         let directory = OpenNode::new(directory as Arc<dyn MutableDirectory>);

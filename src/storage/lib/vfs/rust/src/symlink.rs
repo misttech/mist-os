@@ -88,7 +88,7 @@ impl<T: Symlink> Connection<T> {
         scope: ExecutionScope,
         symlink: Arc<T>,
         protocols: impl ProtocolsExt,
-        object_request: ObjectRequestRef,
+        object_request: ObjectRequestRef<'_>,
     ) -> Result<impl Future<Output = ()>, Status> {
         let _options = protocols.to_symlink_options()?;
         Ok(Connection::new(scope, symlink).run(object_request.take()))

@@ -93,7 +93,7 @@ impl ServiceLike for Service {
         &self,
         scope: ExecutionScope,
         _options: ServiceOptions,
-        object_request: ObjectRequestRef,
+        object_request: ObjectRequestRef<'_>,
     ) -> Result<(), Status> {
         if object_request.what_to_send() == ObjectRequestSend::OnOpen {
             if let Ok(channel) = object_request

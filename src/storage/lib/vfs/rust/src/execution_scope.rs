@@ -295,7 +295,7 @@ struct TaskRunner<F> {
 impl<F: 'static + Future<Output = ()> + Send> Future for TaskRunner<F> {
     type Output = ();
 
-    fn poll(self: Pin<&mut Self>, cx: &mut Context) -> Poll<Self::Output> {
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let this = self.project();
         if this
             .task_state
@@ -620,7 +620,7 @@ mod tests {
         impl Future for ImmediateTask {
             type Output = ();
 
-            fn poll(mut self: Pin<&mut Self>, _cx: &mut Context) -> Poll<Self::Output> {
+            fn poll(mut self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Self::Output> {
                 self.poll_call_count.fetch_add(1, Ordering::Relaxed);
 
                 if let Some(sender) = self.done_sender.take() {
@@ -672,7 +672,7 @@ mod tests {
         impl Future for ControlledTask {
             type Output = ();
 
-            fn poll(mut self: Pin<&mut Self>, cx: &mut Context) -> Poll<Self::Output> {
+            fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
                 self.poll_call_count.fetch_add(1, Ordering::Relaxed);
                 self.future.as_mut().poll(cx)
             }

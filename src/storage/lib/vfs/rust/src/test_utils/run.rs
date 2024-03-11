@@ -175,7 +175,7 @@ where
     get_client: Box<
         dyn FnOnce(Marker::Proxy) -> Pin<Box<dyn Future<Output = ()> + 'test_refs>> + 'test_refs,
     >,
-    coordinator: Option<Box<dyn FnOnce(TestController) + 'test_refs>>,
+    coordinator: Option<Box<dyn FnOnce(TestController<'_>) + 'test_refs>>,
     entry_constructor: Option<Arc<dyn EntryConstructor + Send + Sync>>,
 }
 
@@ -184,7 +184,7 @@ where
 pub struct AsyncClientTestParams<'test_refs> {
     exec: Option<TestExecutor>,
     get_client: Box<dyn FnOnce() -> Pin<Box<dyn Future<Output = ()> + 'test_refs>> + 'test_refs>,
-    coordinator: Option<Box<dyn FnOnce(TestController) + 'test_refs>>,
+    coordinator: Option<Box<dyn FnOnce(TestController<'_>) + 'test_refs>>,
 }
 
 macro_rules! field_setter {
@@ -205,7 +205,7 @@ where
 
     pub fn coordinator(
         mut self,
-        get_coordinator: impl FnOnce(TestController) + 'test_refs,
+        get_coordinator: impl FnOnce(TestController<'_>) + 'test_refs,
     ) -> Self {
         assert!(self.coordinator.is_none(), "`coordinator` is already set");
         self.coordinator = Some(Box::new(get_coordinator));
@@ -252,7 +252,7 @@ impl<'test_refs> AsyncClientTestParams<'test_refs> {
 
     pub fn coordinator(
         mut self,
-        get_coordinator: impl FnOnce(TestController) + 'test_refs,
+        get_coordinator: impl FnOnce(TestController<'_>) + 'test_refs,
     ) -> Self {
         assert!(self.coordinator.is_none(), "`coordinator` is already set");
         self.coordinator = Some(Box::new(get_coordinator));

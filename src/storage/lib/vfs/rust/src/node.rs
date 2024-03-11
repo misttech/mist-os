@@ -89,7 +89,7 @@ pub trait Node: IsDirectory + IntoAny + Send + Sync + 'static {
         self: Arc<Self>,
         scope: ExecutionScope,
         options: NodeOptions,
-        object_request: ObjectRequestRef,
+        object_request: ObjectRequestRef<'_>,
     ) -> Result<(), Status> {
         self.will_open_as_node()?;
         scope.spawn(node::Connection::create(scope.clone(), self, options, object_request)?);
@@ -125,7 +125,7 @@ impl<N: Node + ?Sized> Connection<N> {
         scope: ExecutionScope,
         node: Arc<N>,
         options: impl ToNodeOptions,
-        object_request: ObjectRequestRef,
+        object_request: ObjectRequestRef<'_>,
     ) -> Result<impl Future<Output = ()>, Status> {
         let node = OpenNode::new(node);
         let options = options.to_node_options(node.is_directory())?;

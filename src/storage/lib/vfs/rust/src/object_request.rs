@@ -129,7 +129,7 @@ impl ObjectRequest {
     }
 
     /// Calls `f` and sends an error on the object request channel upon failure.
-    pub fn handle<T>(self, f: impl FnOnce(ObjectRequestRef) -> Result<T, Status>) -> Option<T> {
+    pub fn handle<T>(self, f: impl FnOnce(ObjectRequestRef<'_>) -> Result<T, Status>) -> Option<T> {
         let mut request = Some(self);
         match f(ObjectRequestRef(&mut request)) {
             Ok(o) => Some(o),

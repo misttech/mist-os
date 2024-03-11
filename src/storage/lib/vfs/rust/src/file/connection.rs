@@ -47,7 +47,7 @@ fn create_connection<T: 'static + File, U: Deref<Target = OpenNode<T>> + DerefMu
     scope: ExecutionScope,
     file: U,
     options: FileOptions,
-    object_request: ObjectRequestRef,
+    object_request: ObjectRequestRef<'_>,
 ) -> Result<impl Future<Output = ()>, Status> {
     new_connection_validate_options(&options, file.readable(), file.writable(), file.executable())?;
 
@@ -162,7 +162,7 @@ impl<T: 'static + File + FileIo> FidlIoConnection<T> {
         scope: ExecutionScope,
         file: Arc<T>,
         options: impl ToFileOptions,
-        object_request: ObjectRequestRef,
+        object_request: ObjectRequestRef<'_>,
     ) -> Result<impl Future<Output = ()>, Status> {
         let file = OpenNode::new(file);
         let options = options.to_file_options()?;
@@ -270,7 +270,7 @@ impl<T: 'static + File + RawFileIoConnection> RawIoConnection<T> {
         scope: ExecutionScope,
         file: Arc<T>,
         protocols: impl ProtocolsExt,
-        object_request: ObjectRequestRef,
+        object_request: ObjectRequestRef<'_>,
     ) -> Result<impl Future<Output = ()>, Status> {
         let file = OpenNode::new(file);
         create_connection(
@@ -380,7 +380,7 @@ mod stream_io {
             scope: ExecutionScope,
             file: Arc<T>,
             options: impl ToFileOptions,
-            object_request: ObjectRequestRef,
+            object_request: ObjectRequestRef<'_>,
         ) -> Result<impl Future<Output = ()>, Status> {
             let file = OpenNode::new(file);
             let options = options.to_file_options()?;

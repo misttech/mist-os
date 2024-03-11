@@ -6,8 +6,6 @@
 //! callbacks.  Examples are: component configuration, debug information or statistics.
 
 #![recursion_limit = "1024"]
-// This crate doesn't comply with all 2018 idioms
-#![allow(rust_2018_idioms)]
 
 pub mod test_utils;
 
@@ -120,4 +118,5 @@ pub use protocols::ProtocolsExt;
 // This allows the pseudo_directory! macro to use absolute paths within this crate to refer to the
 // helper functions. External crates that use pseudo_directory! will rely on the pseudo_directory
 // export above.
+#[cfg(test)]
 extern crate self as vfs;

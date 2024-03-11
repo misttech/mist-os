@@ -40,7 +40,7 @@ impl ImmutableConnection {
         scope: ExecutionScope,
         directory: Arc<impl entry_container::Directory>,
         protocols: impl ProtocolsExt,
-        object_request: ObjectRequestRef,
+        object_request: ObjectRequestRef<'_>,
     ) -> Result<impl Future<Output = ()>, Status> {
         // Ensure we close the directory if we fail to create the connection.
         let directory = OpenNode::new(directory as Arc<dyn entry_container::Directory>);
