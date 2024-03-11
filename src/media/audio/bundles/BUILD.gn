@@ -2,20 +2,6 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-group("tools") {
-  testonly = true
-  deps = [
-    "//src/media/audio/audio_core/shared/mixer/tools:audio_mixer_profiler",
-    "//src/media/audio/audio_core/tools",
-    "//src/media/audio/tools/audio_listener",
-    "//src/media/audio/tools/signal_generator",
-    "//src/media/audio/tools/virtual_audio_util",
-    "//src/media/audio/tools/vol",
-    "//src/media/audio/tools/wav_player",
-    "//src/media/audio/tools/wav_recorder",
-  ]
-}
-
 group("examples") {
   testonly = true
   deps = [

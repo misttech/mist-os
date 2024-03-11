@@ -245,10 +245,20 @@ size_checker_input = {
     {
       component = "Development Support - Audio"
       pkgs = [
+        "audio-capture-timestamp-validator",
         "audio_ffx_daemon",
         "virtual_audio",
+        "audio-codec-ctl",
+        "audio-effects-ctl",
+        "audio_listener",
+        "dsputil",
+        "signal_generator",
+        "virtual_audio_util",
+        "vol",
+        "wav_player",
+        "wav_recorder",
       ]
-      limit = 2621440  # 2.5 MiB
+      limit = 3670016  # 3.5 MiB
       creep_limit = 24576  # 24.0 KiB
     },
     {
