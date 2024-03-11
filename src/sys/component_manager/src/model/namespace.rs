@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use {
-    super::error::BedrockErrorIsAuthoritative,
     crate::{
         constants::PKG_PATH,
         model::{
@@ -320,35 +319,14 @@ fn service_or_protocol_use(
                 return;
             };
             target.blocking_task_group().spawn(async move {
-                let (error, mut open_request) = err.manually_handle();
-                let open_options = OpenOptions {
-                    flags: open_request.flags,
-                    relative_path: open_request.relative_path.into_string(),
-                    server_chan: &mut open_request.server_end,
-                };
-                if error.is_bedrock_error_authoritative() {
-                    return routing::report_routing_failure(
-                        &legacy_request,
-                        &target,
-                        error.clone().into(),
-                        open_request.server_end,
-                    )
-                    .await;
-                }
-
-                // TODO(https://fxbug.dev/319546081): We can remove the fallback once bedrock
-                // properly communicates routing errors with fidelity on par with legacy routing.
-                if let Err(error) =
-                    routing::route_and_open_capability(&legacy_request, &target, open_options).await
-                {
-                    routing::report_routing_failure(
-                        &legacy_request,
-                        &target,
-                        error.into(),
-                        open_request.server_end,
-                    )
-                    .await;
-                }
+                let (error, open_request) = err.manually_handle();
+                routing::report_routing_failure(
+                    &legacy_request,
+                    &target,
+                    error.clone().into(),
+                    open_request.server_end,
+                )
+                .await
             });
         };
 

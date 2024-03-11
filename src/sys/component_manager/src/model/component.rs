@@ -621,11 +621,11 @@ impl ComponentInstance {
             dynamic_capabilities
         };
 
-        let child_dict = state
-            .collection_dicts
+        let child_input = state
+            .collection_inputs
             .get(&Name::new(&collection_name).unwrap())
             .expect("dict missing for declared collection")
-            .copy();
+            .shallow_copy();
 
         // Merge `ChildArgs.dictionary` entries into the child sandbox.
         if let Some(dictionary_client_end) = child_args.dictionary {
@@ -640,7 +640,7 @@ impl ComponentInstance {
                 let mut entries = dict.lock_entries();
                 std::mem::replace(&mut *entries, std::collections::BTreeMap::new())
             };
-            let mut child_dict_entries = child_dict.lock_entries();
+            let mut child_dict_entries = child_input.capabilities.lock_entries();
             for (key, value) in dict_entries.into_iter() {
                 // The child/collection Dict normally contains Routers created by component manager.
                 // ChildArgs.dict may contain capabilities created by an external client.
@@ -663,13 +663,6 @@ impl ComponentInstance {
                 }
             }
         }
-
-        let child_input = ComponentInput::new(
-            child_dict,
-            state.component_input.environment(),
-            &state.bedrock_environments,
-            child_decl.environment.as_ref().map(|n| Name::new(n.clone()).unwrap()),
-        );
 
         let (child, discover_fut) = state
             .add_child(
@@ -1629,7 +1622,7 @@ pub struct ResolvedInstanceState {
     /// Dicts containing the capabilities we want to provide to each collection. Each new
     /// dynamic child gets a clone of one of these inputs (which is potentially extended by
     /// dynamic offers).
-    collection_dicts: HashMap<Name, Dict>,
+    collection_inputs: HashMap<Name, ComponentInput>,
 
     /// The environments declared by this component.
     bedrock_environments: HashMap<Name, ComponentEnvironment>,
@@ -1689,12 +1682,13 @@ impl ResolvedInstanceState {
             program_input_dict: Dict::new(),
             program_output_dict: Dict::new(),
             program_input_dict_additions: None,
-            collection_dicts: HashMap::new(),
+            collection_inputs: HashMap::new(),
             bedrock_environments: HashMap::new(),
         };
         state.add_static_children(component).await?;
 
-        let component_sandbox = build_component_sandbox(
+        let mut child_inputs = HashMap::new();
+        build_component_sandbox(
             component,
             &state.children,
             &decl,
@@ -1702,10 +1696,11 @@ impl ResolvedInstanceState {
             &state.component_output_dict,
             &state.program_input_dict,
             &state.program_output_dict,
-            &mut state.collection_dicts,
+            &mut child_inputs,
+            &mut state.collection_inputs,
             &mut state.bedrock_environments,
         );
-        state.discover_static_children(component_sandbox.child_inputs).await;
+        state.discover_static_children(child_inputs).await;
         Ok(state)
     }
 

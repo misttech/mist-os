@@ -1536,15 +1536,12 @@ async fn use_from_dictionary_availability_invalid() {
         ),
     ];
 
-    // TODO(https://fxbug.dev/319546081): This returns NOT_SUPPORTED due to the fallback to legacy
-    // routing. It should return NOT_FOUND. For this to happen, bedrock routing needs to return the
-    // error instead of falling back.
     let test = RoutingTestBuilder::new("root", components).build().await;
     test.check_use(
         "leaf".try_into().unwrap(),
         CheckUse::Protocol {
             path: "/svc/A".parse().unwrap(),
-            expected_res: ExpectedResult::Err(zx::Status::NOT_SUPPORTED),
+            expected_res: ExpectedResult::Err(zx::Status::NOT_FOUND),
         },
     )
     .await;
@@ -1552,7 +1549,7 @@ async fn use_from_dictionary_availability_invalid() {
         "leaf".try_into().unwrap(),
         CheckUse::Protocol {
             path: "/svc/B".parse().unwrap(),
-            expected_res: ExpectedResult::Err(zx::Status::NOT_SUPPORTED),
+            expected_res: ExpectedResult::Err(zx::Status::NOT_FOUND),
         },
     )
     .await;
@@ -1560,7 +1557,7 @@ async fn use_from_dictionary_availability_invalid() {
         "leaf".try_into().unwrap(),
         CheckUse::Protocol {
             path: "/svc/C".parse().unwrap(),
-            expected_res: ExpectedResult::Err(zx::Status::NOT_SUPPORTED),
+            expected_res: ExpectedResult::Err(zx::Status::NOT_FOUND),
         },
     )
     .await;
@@ -1775,15 +1772,12 @@ async fn offer_from_dictionary_availability_invalid() {
         ),
     ];
 
-    // TODO(https://fxbug.dev/319546081): This returns NOT_SUPPORTED due to the fallback to legacy
-    // routing. It should return NOT_FOUND. For this to happen, bedrock routing needs to return the
-    // error instead of falling back.
     let test = RoutingTestBuilder::new("root", components).build().await;
     test.check_use(
         "mid/leaf".try_into().unwrap(),
         CheckUse::Protocol {
             path: "/svc/A".parse().unwrap(),
-            expected_res: ExpectedResult::Err(zx::Status::NOT_SUPPORTED),
+            expected_res: ExpectedResult::Err(zx::Status::NOT_FOUND),
         },
     )
     .await;
@@ -1791,7 +1785,7 @@ async fn offer_from_dictionary_availability_invalid() {
         "mid/leaf".try_into().unwrap(),
         CheckUse::Protocol {
             path: "/svc/B".parse().unwrap(),
-            expected_res: ExpectedResult::Err(zx::Status::NOT_SUPPORTED),
+            expected_res: ExpectedResult::Err(zx::Status::NOT_FOUND),
         },
     )
     .await;
@@ -1799,7 +1793,7 @@ async fn offer_from_dictionary_availability_invalid() {
         "mid/leaf".try_into().unwrap(),
         CheckUse::Protocol {
             path: "/svc/C".parse().unwrap(),
-            expected_res: ExpectedResult::Err(zx::Status::NOT_SUPPORTED),
+            expected_res: ExpectedResult::Err(zx::Status::NOT_FOUND),
         },
     )
     .await;
@@ -2016,15 +2010,12 @@ async fn expose_from_dictionary_availability_invalid() {
         ),
     ];
 
-    // TODO(https://fxbug.dev/319546081): This returns NOT_SUPPORTED due to the fallback to legacy
-    // routing. It should return NOT_FOUND. For this to happen, bedrock routing needs to return the
-    // error instead of falling back.
     let test = RoutingTestBuilder::new("root", components).build().await;
     test.check_use(
         ".".try_into().unwrap(),
         CheckUse::Protocol {
             path: "/svc/A".parse().unwrap(),
-            expected_res: ExpectedResult::Err(zx::Status::NOT_SUPPORTED),
+            expected_res: ExpectedResult::Err(zx::Status::NOT_FOUND),
         },
     )
     .await;
@@ -2032,7 +2023,7 @@ async fn expose_from_dictionary_availability_invalid() {
         ".".try_into().unwrap(),
         CheckUse::Protocol {
             path: "/svc/B".parse().unwrap(),
-            expected_res: ExpectedResult::Err(zx::Status::NOT_SUPPORTED),
+            expected_res: ExpectedResult::Err(zx::Status::NOT_FOUND),
         },
     )
     .await;
@@ -2040,7 +2031,7 @@ async fn expose_from_dictionary_availability_invalid() {
         ".".try_into().unwrap(),
         CheckUse::Protocol {
             path: "/svc/C".parse().unwrap(),
-            expected_res: ExpectedResult::Err(zx::Status::NOT_SUPPORTED),
+            expected_res: ExpectedResult::Err(zx::Status::NOT_FOUND),
         },
     )
     .await;

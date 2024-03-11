@@ -32,10 +32,10 @@ use {
 #[derive(Default, Clone)]
 pub struct ComponentInput {
     /// Capabilities offered to a component by its parent.
-    capabilities: Dict,
+    pub capabilities: Dict,
 
     /// Capabilities available to a component through its environment.
-    environment: ComponentEnvironment,
+    pub environment: ComponentEnvironment,
 }
 
 impl ComponentInput {
@@ -101,13 +101,6 @@ impl ComponentEnvironment {
     }
 }
 
-/// The dicts a component holds once it has been resolved.
-#[derive(Default)]
-pub struct ComponentSandbox {
-    /// Initial dicts for children and collections
-    pub child_inputs: HashMap<Name, ComponentInput>,
-}
-
 /// Once a component has been resolved and its manifest becomes known, this function produces the
 /// various dicts the component needs based on the contents of its manifest.
 pub fn build_component_sandbox(
@@ -118,10 +111,10 @@ pub fn build_component_sandbox(
     component_output_dict: &Dict,
     program_input_dict: &Dict,
     program_output_dict: &Dict,
-    collection_dicts: &mut HashMap<Name, Dict>,
+    child_inputs: &mut HashMap<Name, ComponentInput>,
+    collection_inputs: &mut HashMap<Name, ComponentInput>,
     environments: &mut HashMap<Name, ComponentEnvironment>,
-) -> ComponentSandbox {
-    let mut output = ComponentSandbox::default();
+) {
     let declared_dictionaries = Dict::new();
 
     for environment_decl in &decl.environments {
@@ -138,18 +131,36 @@ pub fn build_component_sandbox(
     }
 
     for child in &decl.children {
-        let mut child_input = ComponentInput::empty();
+        let mut input = ComponentInput::empty();
         if let Some(environment_name) = &child.environment {
-            child_input.environment = environments.get(&Name::new(environment_name.clone()).unwrap()).expect("child references nonexistent environment, this should be prevented in manifest validation").clone();
+            input.environment = environments
+                .get(&Name::new(environment_name.clone()).unwrap())
+                .expect(
+                    "child references nonexistent environment, \
+                    this should be prevented in manifest validation",
+                )
+                .clone();
         } else {
-            child_input.environment = component_input.environment.clone();
+            input.environment = component_input.environment.clone();
         }
         let child_name = Name::new(&child.name).unwrap();
-        output.child_inputs.insert(child_name, child_input);
+        child_inputs.insert(child_name, input);
     }
 
     for collection in &decl.collections {
-        collection_dicts.insert(collection.name.clone(), Dict::new());
+        let mut input = ComponentInput::empty();
+        if let Some(environment_name) = &collection.environment {
+            input.environment = environments
+                .get(&Name::new(environment_name.clone()).unwrap())
+                .expect(
+                    "collection references nonexistent environment, \
+                    this should be prevented in manifest validation",
+                )
+                .clone();
+        } else {
+            input.environment = component_input.environment.clone();
+        }
+        collection_inputs.insert(collection.name.clone(), input);
     }
 
     for capability in &decl.capabilities {
@@ -185,14 +196,13 @@ pub fn build_component_sandbox(
             cm_rust::OfferTarget::Child(child_ref) => {
                 assert!(child_ref.collection.is_none(), "unexpected dynamic offer target");
                 let child_name = Name::new(&child_ref.name).unwrap();
-                &mut output
-                    .child_inputs
-                    .entry(child_name)
-                    .or_insert(ComponentInput::empty())
-                    .capabilities
+                &mut child_inputs.entry(child_name).or_insert(ComponentInput::empty()).capabilities
             }
             cm_rust::OfferTarget::Collection(name) => {
-                collection_dicts.entry(name.clone()).or_insert(Dict::new())
+                &mut collection_inputs
+                    .entry(name.clone())
+                    .or_insert(ComponentInput::empty())
+                    .capabilities
             }
             cm_rust::OfferTarget::Capability(name) => {
                 let mut entries = declared_dictionaries.lock_entries();
@@ -228,8 +238,6 @@ pub fn build_component_sandbox(
             component_output_dict,
         );
     }
-
-    output
 }
 
 /// Adds `capability` to the program output dict given the resolved `decl`. The program output dict

@@ -681,23 +681,6 @@ impl CapabilityProviderError {
     }
 }
 
-pub trait BedrockErrorIsAuthoritative {
-    /// When bedrock routing returns an error, check if the error has enough
-    /// information such that legacy routing does not need to be run again to
-    /// obtain a better error.
-    ///
-    /// As more error cases are implemented in bedrock, more error members should
-    /// return true for this method.
-    fn is_bedrock_error_authoritative(&self) -> bool;
-}
-
-impl BedrockErrorIsAuthoritative for RoutingError {
-    fn is_bedrock_error_authoritative(&self) -> bool {
-        // TODO(https://fxbug.dev/319546081): Support all routing errors in bedrock.
-        false
-    }
-}
-
 #[derive(Debug, Error, Clone)]
 pub enum BedrockOpenError {
     #[error("The capability failed to convert to Open: {0}")]
@@ -709,12 +692,6 @@ impl BedrockOpenError {
         match self {
             Self::Conversion(_) => zx::Status::NOT_SUPPORTED,
         }
-    }
-}
-
-impl BedrockErrorIsAuthoritative for BedrockOpenError {
-    fn is_bedrock_error_authoritative(&self) -> bool {
-        true
     }
 }
 
@@ -758,12 +735,6 @@ impl OpenError {
     }
 }
 
-impl BedrockErrorIsAuthoritative for OpenError {
-    fn is_bedrock_error_authoritative(&self) -> bool {
-        true
-    }
-}
-
 /// Describes all errors encountered when routing and opening a namespace capability.
 #[derive(Debug, Clone, Error)]
 pub enum RouteOrOpenError {
@@ -778,15 +749,6 @@ impl RouteOrOpenError {
         match self {
             Self::RoutingError(err) => err.as_zx_status(),
             Self::OpenError(err) => err.as_zx_status(),
-        }
-    }
-}
-
-impl BedrockErrorIsAuthoritative for RouteOrOpenError {
-    fn is_bedrock_error_authoritative(&self) -> bool {
-        match self {
-            RouteOrOpenError::RoutingError(err) => err.is_bedrock_error_authoritative(),
-            RouteOrOpenError::OpenError(err) => err.is_bedrock_error_authoritative(),
         }
     }
 }

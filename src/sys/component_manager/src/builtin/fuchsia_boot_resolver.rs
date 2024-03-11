@@ -192,7 +192,7 @@ impl FuchsiaBootResolver {
         })
     }
 
-    pub async fn resolve_async(
+    async fn resolve_async(
         &self,
         component_url: &str,
     ) -> Result<fresolution::Component, fresolution::ResolverError> {
@@ -213,7 +213,7 @@ impl FuchsiaBootResolver {
         }
     }
 
-    async fn serve(
+    pub async fn serve(
         self: Arc<Self>,
         mut stream: fresolution::ResolverRequestStream,
     ) -> Result<(), Error> {
@@ -254,9 +254,6 @@ impl FuchsiaBootResolverBuiltinCapability {
 impl BuiltinCapability for FuchsiaBootResolverBuiltinCapability {
     fn matches(&self, capability: &InternalCapability) -> bool {
         matches!(capability, InternalCapability::Resolver(n) if n.as_str() == "boot_resolver")
-            || matches!(capability,
-                InternalCapability::Protocol(n) if n.as_str() == "fuchsia.component.resolution.Resolver"
-            )
     }
 
     fn new_provider(&self, _target: WeakComponentInstance) -> Box<dyn CapabilityProvider> {
