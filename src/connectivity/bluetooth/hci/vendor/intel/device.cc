@@ -4,6 +4,11 @@
 
 #include "device.h"
 
+#include <fuchsia/hardware/bt/hci/c/banjo.h>
+#include <fuchsia/hardware/usb/c/banjo.h>
+#include <lib/ddk/binding_driver.h>
+#include <lib/ddk/device.h>
+#include <lib/ddk/driver.h>
 #include <lib/zx/vmo.h>
 #include <zircon/process.h>
 #include <zircon/status.h>
@@ -18,6 +23,23 @@
 
 namespace btintel {
 
+// USB Product IDs that use the "secure" firmware method.
+static constexpr uint16_t sfi_product_ids[] = {
+    0x0025,  // Thunder Peak (9160/9260)
+    0x0a2b,  // Snowfield Peak (8260)
+    0x0aaa,  // Jefferson Peak (9460/9560)
+    0x0026,  // Harrison Peak (AX201)
+    0x0032,  // Sun Peak (AX210)
+};
+
+// USB Product IDs that use the "legacy" firmware loading method.
+static constexpr uint16_t legacy_firmware_loading_ids[] = {
+    0x0025,  // Thunder Peak (9160/9260)
+    0x0a2b,  // Snowfield Peak (8260)
+    0x0aaa,  // Jefferson Peak (9460/9560)
+    0x0026,  // Harrison Peak (AX201)
+};
+
 Device::Device(zx_device_t* device, bt_hci_protocol_t* hci, bool secure,
                bool legacy_firmware_loading)
     : DeviceType(device),
@@ -26,7 +48,61 @@ Device::Device(zx_device_t* device, bt_hci_protocol_t* hci, bool secure,
       firmware_loaded_(false),
       legacy_firmware_loading_(legacy_firmware_loading) {}
 
-zx_status_t Device::Bind() { return DdkAdd("bt_hci_intel"); }
+zx_status_t Device::bt_intel_bind(void* ctx, zx_device_t* device) {
+  tracef("bind\n");
+
+  usb_protocol_t usb;
+  zx_status_t result = device_get_protocol(device, ZX_PROTOCOL_USB, &usb);
+  if (result != ZX_OK) {
+    errorf("couldn't get USB protocol: %s\n", zx_status_get_string(result));
+    return result;
+  }
+
+  usb_device_descriptor_t dev_desc;
+  usb_get_device_descriptor(&usb, &dev_desc);
+
+  // Whether this device uses the "secure" firmware method.
+  bool secure = false;
+  for (uint16_t id : sfi_product_ids) {
+    if (dev_desc.id_product == id) {
+      secure = true;
+      break;
+    }
+  }
+
+  // Whether this device uses the "legacy" firmware loading method.
+  bool legacy_firmware_loading = false;
+  for (uint16_t id : legacy_firmware_loading_ids) {
+    if (dev_desc.id_product == id) {
+      legacy_firmware_loading = true;
+      break;
+    }
+  }
+
+  bt_hci_protocol_t hci;
+  result = device_get_protocol(device, ZX_PROTOCOL_BT_HCI, &hci);
+  if (result != ZX_OK) {
+    errorf("couldn't get BT_HCI protocol: %s\n", zx_status_get_string(result));
+    return result;
+  }
+
+  auto btdev = new btintel::Device(device, &hci, secure, legacy_firmware_loading);
+  result = btdev->Bind();
+  if (result != ZX_OK) {
+    errorf("failed binding device: %s\n", zx_status_get_string(result));
+    delete btdev;
+    return result;
+  }
+  // Bind succeeded and devmgr is now responsible for releasing |btdev|
+  // The device's init hook will load the firmware.
+  return ZX_OK;
+}
+
+zx_status_t Device::Bind() {
+  ddk::DeviceAddArgs args("bt-hci-intel");
+  args.set_flags(DEVICE_ADD_NON_BINDABLE);
+  return DdkAdd(args);
+}
 
 void Device::DdkInit(ddk::InitTxn init_txn) {
   init_thread_ = std::thread(
@@ -153,11 +229,8 @@ void Device::ResetSco(ResetScoCompleter::Sync& completer) {
 }
 void Device::OpenIsoDataChannel(OpenIsoDataChannelRequestView request,
                                 OpenIsoDataChannelCompleter::Sync& completer) {
-  if (zx_status_t status = BtHciOpenIsoDataChannel(std::move(request->channel)); status != ZX_OK) {
-    completer.ReplyError(status);
-    return;
-  }
-  completer.ReplySuccess();
+  // This interface is not implemented.
+  completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
 }
 void Device::OpenSnoopChannel(OpenSnoopChannelRequestView request,
                               OpenSnoopChannelCompleter::Sync& completer) {
@@ -169,7 +242,33 @@ void Device::OpenSnoopChannel(OpenSnoopChannelRequestView request,
 void Device::handle_unknown_method(
     fidl::UnknownMethodMetadata<fuchsia_hardware_bluetooth::Hci> metadata,
     fidl::UnknownMethodCompleter::Sync& completer) {
-  zxlogf(WARNING, "Unknown method in Hci request, closing with ZX_ERR_NOT_SUPPORTED");
+  zxlogf(ERROR, "Unknown method in Hci request, closing with ZX_ERR_NOT_SUPPORTED");
+  completer.Close(ZX_ERR_NOT_SUPPORTED);
+}
+
+void Device::GetFeatures(GetFeaturesCompleter::Sync& completer) {
+  completer.Reply(fuchsia_hardware_bluetooth::BtVendorFeatures::kSetAclPriorityCommand);
+}
+void Device::EncodeCommand(EncodeCommandRequestView request,
+                           EncodeCommandCompleter::Sync& completer) {
+  completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+}
+void Device::OpenHci(OpenHciCompleter::Sync& completer) {
+  auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_bluetooth::Hci>();
+  if (endpoints.is_error()) {
+    zxlogf(ERROR, "Failed to create endpoints: %s", zx_status_get_string(endpoints.error_value()));
+    completer.ReplyError(endpoints.error_value());
+    return;
+  }
+  hci_binding_group_.AddBinding(fdf::Dispatcher::GetCurrent()->async_dispatcher(),
+                                std::move(endpoints->server), this, fidl::kIgnoreBindingClosure);
+
+  completer.ReplySuccess(std::move(endpoints->client));
+}
+void Device::handle_unknown_method(
+    fidl::UnknownMethodMetadata<fuchsia_hardware_bluetooth::Vendor> metadata,
+    fidl::UnknownMethodCompleter::Sync& completer) {
+  zxlogf(ERROR, "Unknown method in Vendor request, closing with ZX_ERR_NOT_SUPPORTED");
   completer.Close(ZX_ERR_NOT_SUPPORTED);
 }
 
@@ -354,12 +453,19 @@ void Device::BtHciResetSco(bt_hci_reset_sco_callback callback, void* cookie) {
   hci_.ResetSco(callback, cookie);
 }
 
-zx_status_t Device::BtHciOpenIsoDataChannel(zx::channel in) {
-  return hci_.OpenIsoDataChannel(std::move(in));
-}
+zx_status_t Device::BtHciOpenIsoDataChannel(zx::channel in) { return ZX_ERR_NOT_SUPPORTED; }
 
 zx_status_t Device::BtHciOpenSnoopChannel(zx::channel in) {
   return hci_.OpenSnoopChannel(std::move(in));
 }
 
+static constexpr zx_driver_ops_t btintel_driver_ops = []() {
+  zx_driver_ops_t ops = {};
+  ops.version = DRIVER_OPS_VERSION;
+  ops.bind = btintel::Device::bt_intel_bind;
+  return ops;
+}();
+
 }  // namespace btintel
+
+ZIRCON_DRIVER(bt_hci_intel, btintel::btintel_driver_ops, "fuchsia", "0.1");

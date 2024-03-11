@@ -33,8 +33,10 @@ fuchsia_test_component("bt-host-integration-tests-component") {
   deps = [ ":bt_host_integration_tests" ]
 }
 
-# Note: The integration tests include the bt-host and bt-hci-emulator driver
-# components in this package via the dep on the bt-test-harness crate.
+# Note: The integration tests includes the bt-hci-emulator driver
+# component in this package via the dep on the bt-test-harness crate.
 fuchsia_test_package("bt-host-integration-tests") {
   test_components = [ ":bt-host-integration-tests-component" ]
+  subpackages =
+      [ "//src/connectivity/bluetooth/core/bt-host:bt-host-component" ]
 }

@@ -1,14 +1,26 @@
-// Copyright 2021 The Fuchsia Authors. All rights reserved.
+// Copyright 2020 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 {
     include: [
         "//sdk/lib/driver_test_realm/meta/realm_builder.shard.cml",
         "//src/sys/test_runners/rust/default.shard.cml",
-        "inspect/client.shard.cml",
         "sys/component/realm_builder.shard.cml",
     ],
     program: {
         binary: "bin/bt_host_integration_tests",
     },
+    children: [
+        {
+            name: "bt_host_component",
+            url: "bt-host-component#meta/bt-host.cm",
+        },
+    ],
+    offer: [
+        {
+            storage: "tmp",
+            from: "parent",
+            to: [ "#realm_builder" ],
+        },
+    ],
 }

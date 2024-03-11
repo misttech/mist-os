@@ -289,6 +289,7 @@ void EmulatorDevice::Publish(ftest::EmulatorSettings in_settings, PublishCallbac
   logf(TRACE, "HciEmulator.Publish\n");
 
   ftest::HciEmulator_Publish_Result result;
+  std::lock_guard<std::mutex> lock(hci_dev_lock_);
   // Between Device::Unbind & Device::Release, this->hci_dev_ == nullptr, but this->fake_device_
   // != nullptr. This seems like it might cause issues for this logic; however, because binding_ is
   // unbound during Device::Unbind, it is impossible for further messages, including Publish, to be
@@ -491,6 +492,7 @@ void EmulatorDevice::OnLegacyAdvertisingStateChanged() {
 }
 
 void EmulatorDevice::UnpublishHci() {
+  std::lock_guard<std::mutex> lock(hci_dev_lock_);
   if (hci_dev_) {
     device_async_remove(hci_dev_);
     hci_dev_ = nullptr;
@@ -690,7 +692,7 @@ void EmulatorDevice::HandleAclPacket(async_dispatcher_t* dispatcher, async::Wait
 void EmulatorDevice::HandleIsoPacket(async_dispatcher_t* dispatcher, async::WaitBase* wait,
                                      zx_status_t wait_status, const zx_packet_signal_t* signal) {
   std::array<std::byte, bt::hci_spec::kMaxIsochronousDataPacketPayloadSize +
-                            sizeof(bt::hci_spec::ISODataHeader)>
+                            sizeof(bt::hci_spec::IsoDataHeader)>
       buffer;
   uint32_t read_size;
   zx_status_t status = iso_channel_.read(0u, buffer.data(), /*handles=*/nullptr, buffer.size(), 0,
@@ -707,7 +709,7 @@ void EmulatorDevice::HandleIsoPacket(async_dispatcher_t* dispatcher, async::Wait
     return;
   }
 
-  if (read_size < sizeof(bt::hci_spec::ISODataHeader)) {
+  if (read_size < sizeof(bt::hci_spec::IsoDataHeader)) {
     logf(ERROR, "malformed ISO packet received");
   } else {
     fake_device_.SendIsoData(buffer);

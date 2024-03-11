@@ -28,6 +28,7 @@
         },
     ],
     use: [
+        // TODO(b/42085239): Remove when all bt vendor drivers support FIDL
         {
             directory: "dev-bt-host",
             rights: [ "r*" ],

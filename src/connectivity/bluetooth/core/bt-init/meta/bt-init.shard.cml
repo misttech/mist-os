@@ -68,6 +68,8 @@
             from: "parent",
             to: [ "#bt-host-collection" ],
         },
+
+        // TODO(b/42085239): Remove when all bt vendor drivers support FIDL
         {
             directory: "dev-bt-host",
             from: "parent",
