@@ -17,16 +17,15 @@ driver_bind_rules("ahci_bind") {
     "//src/devices/bind/fuchsia.sysmem",
   ]
 }
+
 fuchsia_driver("ahci-driver") {
   output_name = "ahci"
   configs += [
     "//build/config:all_source",
     "//build/config/fuchsia:enable_zircon_asserts",
   ]
-  deps = [
-    ":shared",
-    "//src/devices/lib/driver",
-  ]
+  sources = [ "export.cc" ]
+  deps = [ ":shared" ]
 }
 
 fuchsia_driver_component("ahci") {
@@ -59,12 +58,11 @@ test("ahci-unittest-bin") {
   deps = [
     ":shared",
     "//sdk/fidl/fuchsia.hardware.block.driver:fuchsia.hardware.block.driver_banjo_cpp",
+    "//sdk/lib/async_patterns/testing/cpp",
+    "//sdk/lib/driver/testing/cpp:cpp",
     "//sdk/lib/inspect/testing/cpp:zxtest",
     "//src/devices/lib/mmio",
     "//src/devices/testing/fake-bti",
-    "//src/devices/testing/mock-ddk",
-    "//src/lib/ddk",
-    "//src/lib/ddktl",
     "//zircon/system/ulib/sync",
     "//zircon/system/ulib/zxtest",
   ]
@@ -92,18 +90,20 @@ source_set("shared") {
   ]
   deps = [
     ":ahci_bind",
-    "//sdk/fidl/fuchsia.hardware.block.driver:fuchsia.hardware.block.driver_banjo_cpp",
-    "//src/devices/block/lib/common:common-dfv1",
-    "//src/devices/lib/mmio",
-    "//src/devices/pci/lib/device-protocol-pci",
-    "//src/devices/pci/lib/pci",
-    "//src/lib/ddk",
-    "//zircon/system/ulib/fbl",
+    "//sdk/fidl/fuchsia.hardware.pci:fuchsia.hardware.pci_cpp",
+    "//src/devices/bin/driver_runtime",
+    "//src/devices/block/lib/common:common",
     "//zircon/system/ulib/sync",
     "//zircon/system/ulib/zx",
   ]
   public_deps = [
+    "//sdk/fidl/fuchsia.hardware.block.driver:fuchsia.hardware.block.driver_banjo_cpp",
+    "//sdk/lib/driver/compat/cpp",
+    "//sdk/lib/driver/runtime:driver_runtime_cpp",
+    "//sdk/lib/inspect/component/cpp",
     "//src/devices/lib/dma-buffer",
+    "//src/devices/lib/mmio",
+    "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/inspect",
   ]
 }

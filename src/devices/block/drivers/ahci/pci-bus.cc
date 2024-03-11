@@ -5,8 +5,7 @@
 #include "pci-bus.h"
 
 #include <endian.h>
-#include <lib/ddk/debug.h>
-#include <lib/device-protocol/pci.h>
+#include <lib/driver/component/cpp/driver_base.h>
 
 namespace ahci {
 
@@ -22,60 +21,124 @@ zx_status_t PciBus::RegWrite(size_t offset, uint32_t val) {
   return ZX_OK;
 }
 
-zx_status_t PciBus::Configure(zx_device_t* parent) {
-  zx_status_t status = ZX_ERR_NOT_SUPPORTED;
+zx_status_t PciBus::Configure() {
   if (!pci_.is_valid()) {
-    zxlogf(ERROR, "ahci: error getting pci config information");
-    return status;
+    FDF_LOG(ERROR, "Invalid client to PCI device service.");
+    return ZX_ERR_NOT_SUPPORTED;
   }
 
   // Map register window.
-  status = pci_.MapMmio(5u, ZX_CACHE_POLICY_UNCACHED_DEVICE, &mmio_);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "ahci: error %d mapping pci register window", status);
-    return status;
+  {
+    const auto result = pci_->GetBar(5);
+    if (!result.ok()) {
+      FDF_LOG(ERROR, "Call to GetBar failed: %s", result.status_string());
+      return result.status();
+    }
+    if (result->is_error()) {
+      FDF_LOG(ERROR, "GetBar failed: %s", zx_status_get_string(result->error_value()));
+      return result->error_value();
+    }
+
+    if (!result->value()->result.result.is_vmo()) {
+      FDF_LOG(ERROR, "PCI BAR is not an MMIO BAR.");
+      return ZX_ERR_WRONG_TYPE;
+    }
+    auto mmio = fdf::MmioBuffer::Create(0, result->value()->result.size,
+                                        std::move(result->value()->result.result.vmo()),
+                                        ZX_CACHE_POLICY_UNCACHED_DEVICE);
+    if (mmio.is_error()) {
+      FDF_LOG(ERROR, "Failed to map PCI register window: %s", mmio.status_string());
+      return mmio.status_value();
+    }
+    mmio_ = *std::move(mmio);
   }
 
   fuchsia_hardware_pci::wire::DeviceInfo config;
-  status = pci_.GetDeviceInfo(&config);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "ahci: error getting pci config information");
-    return status;
+  {
+    const auto result = pci_->GetDeviceInfo();
+    if (!result.ok()) {
+      FDF_LOG(ERROR, "Call to GetDeviceInfo failed: %s", result.status_string());
+      return result.status();
+    }
+    config = result->info;
   }
 
   // TODO: move this to SATA.
   if (config.sub_class != 0x06 && config.base_class == 0x01) {  // SATA
-    zxlogf(ERROR, "ahci: device class 0x%x unsupported", config.sub_class);
+    FDF_LOG(ERROR, "Device class 0x%x unsupported", config.sub_class);
     return ZX_ERR_NOT_SUPPORTED;
   }
 
   // FIXME intel devices need to set SATA port enable at config + 0x92
   // ahci controller is bus master
-  status = pci_.SetBusMastering(true);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "ahci: error %d enabling bus master", status);
-    return status;
+  {
+    const auto result = pci_->SetBusMastering(true);
+    if (!result.ok()) {
+      FDF_LOG(ERROR, "Call to SetBusMastering failed: %s", result.status_string());
+      return result.status();
+    }
+    if (result->is_error()) {
+      FDF_LOG(ERROR, "SetBusMastering failed: %s", zx_status_get_string(result->error_value()));
+      return result->error_value();
+    }
   }
 
   // Request 1 interrupt of any mode.
-  status = pci_.ConfigureInterruptMode(1, &irq_mode_);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "ahci: no interrupts available %d", status);
-    return ZX_ERR_NO_RESOURCES;
+  {
+    const auto result = pci_->GetInterruptModes();
+    if (!result.ok()) {
+      FDF_LOG(ERROR, "Call to GetInterruptModes failed: %s", result.status_string());
+      return result.status();
+    }
+    if (result->modes.msix_count > 0) {
+      irq_mode_ = fuchsia_hardware_pci::InterruptMode::kMsiX;
+    } else if (result->modes.msi_count > 0) {
+      irq_mode_ = fuchsia_hardware_pci::InterruptMode::kMsi;
+    } else if (result->modes.has_legacy) {
+      irq_mode_ = fuchsia_hardware_pci::InterruptMode::kLegacy;
+    } else {
+      FDF_LOG(ERROR, "No interrupt modes are supported.");
+      return ZX_ERR_NOT_SUPPORTED;
+    }
+  }
+  {
+    const auto result = pci_->SetInterruptMode(irq_mode_, 1);
+    if (!result.ok()) {
+      FDF_LOG(ERROR, "Call to SetInterruptMode failed: %s", result.status_string());
+      return result.status();
+    }
+    if (result->is_error()) {
+      FDF_LOG(ERROR, "SetInterruptMode failed: %s", zx_status_get_string(result->error_value()));
+      return result->error_value();
+    }
   }
 
   // Get bti handle.
-  status = pci_.GetBti(0, &bti_);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "ahci: error %d getting bti handle", status);
-    return status;
+  {
+    const auto result = pci_->GetBti(0);
+    if (!result.ok()) {
+      FDF_LOG(ERROR, "Call to GetBti failed: %s", result.status_string());
+      return result.status();
+    }
+    if (result->is_error()) {
+      FDF_LOG(ERROR, "GetBti failed: %s", zx_status_get_string(result->error_value()));
+      return result->error_value();
+    }
+    bti_ = std::move(result->value()->bti);
   }
 
   // Get irq handle.
-  status = pci_.MapInterrupt(0, &irq_);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "ahci: error %d getting irq handle", status);
-    return status;
+  {
+    const auto result = pci_->MapInterrupt(0);
+    if (!result.ok()) {
+      FDF_LOG(ERROR, "Call to MapInterrupt failed: %s", result.status_string());
+      return result.status();
+    }
+    if (result->is_error()) {
+      FDF_LOG(ERROR, "MapInterrupt failed: %s", zx_status_get_string(result->error_value()));
+      return result->error_value();
+    }
+    irq_ = std::move(result->value()->interrupt);
   }
   return ZX_OK;
 }
@@ -107,7 +170,15 @@ zx_status_t PciBus::BtiPin(uint32_t options, const zx::unowned_vmo& vmo, uint64_
 
 zx_status_t PciBus::InterruptWait() {
   if (irq_mode_ == fuchsia_hardware_pci::InterruptMode::kLegacy) {
-    pci_.AckInterrupt();
+    const auto result = pci_->AckInterrupt();
+    if (!result.ok()) {
+      FDF_LOG(ERROR, "Call to AckInterrupt failed: %s", result.status_string());
+      return result.status();
+    }
+    if (result->is_error()) {
+      FDF_LOG(ERROR, "AckInterrupt failed: %s", zx_status_get_string(result->error_value()));
+      return result->error_value();
+    }
   }
 
   return irq_.wait(nullptr);

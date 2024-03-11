@@ -37,9 +37,11 @@ struct FakePort {
 
 class FakeBus : public Bus {
  public:
+  static constexpr uint32_t kTestPortNumber = 0;
+
   explicit FakeBus(bool support_ncq = true);
   ~FakeBus() override;
-  zx_status_t Configure(zx_device_t* parent) override;
+  zx_status_t Configure() override;
   zx_status_t DmaBufferInit(std::unique_ptr<dma_buffer::ContiguousBuffer>* buffer_out, size_t size,
                             zx_paddr_t* phys_out, void** virt_out) override;
   zx_status_t BtiPin(uint32_t options, const zx::unowned_vmo& vmo, uint64_t offset, uint64_t size,
@@ -76,7 +78,7 @@ class FakeBus : public Bus {
   bool fail_configure_ = false;
 
   uint32_t slots_ = 32;
-  uint32_t num_ports_ = 4;
+  uint32_t num_ports_ = 1;
 
   // Fake host bus adapter registers.
   uint32_t ghc_ = 0;

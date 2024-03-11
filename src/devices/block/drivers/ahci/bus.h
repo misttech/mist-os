@@ -5,7 +5,6 @@
 #ifndef SRC_DEVICES_BLOCK_DRIVERS_AHCI_BUS_H_
 #define SRC_DEVICES_BLOCK_DRIVERS_AHCI_BUS_H_
 
-#include <lib/ddk/device.h>
 #include <lib/dma-buffer/buffer.h>
 #include <lib/zx/pmt.h>
 #include <lib/zx/vmo.h>
@@ -22,7 +21,7 @@ class Bus {
   DISALLOW_COPY_AND_ASSIGN_ALLOW_MOVE(Bus);
 
   // Configure the bus for use. Registers should be accessible after this call.
-  virtual zx_status_t Configure(zx_device_t* parent) = 0;
+  virtual zx_status_t Configure() = 0;
 
   // Initialize dma buffer, returning the mapped physical and virtual addresses
   // in |phys_out| and |virt_out|.

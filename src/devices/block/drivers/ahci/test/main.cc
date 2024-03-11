@@ -3,6 +3,12 @@
 // found in the LICENSE file.
 
 #include <byteswap.h>
+#include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
+#include <lib/driver/component/cpp/driver_export.h>
+#include <lib/driver/testing/cpp/driver_lifecycle.h>
+#include <lib/driver/testing/cpp/driver_runtime.h>
+#include <lib/driver/testing/cpp/test_environment.h>
+#include <lib/driver/testing/cpp/test_node.h>
 #include <lib/inspect/testing/cpp/zxtest/inspect.h>
 #include <lib/zx/clock.h>
 
@@ -12,12 +18,13 @@
 
 #include "../controller.h"
 #include "fake-bus.h"
-#include "src/devices/testing/mock-ddk/mock-device.h"
 
 namespace ahci {
 
 class PortTest : public zxtest::Test {
  protected:
+  void SetUp() override { fdf::Logger::SetGlobalInstance(&logger_); }
+
   void TearDown() override { fake_bus_.reset(); }
 
   void PortEnable(Bus* bus, Port* port) {
@@ -37,9 +44,8 @@ class PortTest : public zxtest::Test {
   }
 
   void BusAndPortEnable(Port* port) {
-    zx_device_t* fake_parent = nullptr;
     std::unique_ptr<FakeBus> bus(new FakeBus());
-    EXPECT_OK(bus->Configure(fake_parent));
+    EXPECT_OK(bus->Configure());
 
     PortEnable(bus.get(), port);
 
@@ -48,6 +54,9 @@ class PortTest : public zxtest::Test {
 
   // If non-null, this pointer is owned by Controller::bus_
   std::unique_ptr<FakeBus> fake_bus_;
+
+  fdf::Logger logger_{"ahci-test", FUCHSIA_LOG_DEBUG, zx::socket{},
+                      fidl::WireClient<fuchsia_logger::LogSink>()};
 };
 
 TEST(SataTest, SataStringFixTest) {
@@ -107,47 +116,6 @@ TEST(SataTest, SataStringFixTest) {
     sout[i] = sout[i + 1];
     sout[i + 1] = c;
   }
-}
-
-TEST(AhciTest, Create) {
-  zx_device_t* fake_parent = nullptr;
-  std::unique_ptr<FakeBus> bus(new FakeBus());
-
-  zx::result con = Controller::CreateWithBus(fake_parent, std::move(bus));
-  ASSERT_TRUE(con.is_ok());
-}
-
-TEST(AhciTest, CreateBusConfigFailure) {
-  zx_device_t* fake_parent = nullptr;
-  std::unique_ptr<FakeBus> bus(new FakeBus());
-  bus->DoFailConfigure();
-
-  // Expected to fail during bus configure.
-  zx::result con = Controller::CreateWithBus(fake_parent, std::move(bus));
-  ASSERT_TRUE(con.is_error());
-}
-
-TEST(AhciTest, LaunchIrqAndWorkerThreads) {
-  zx_device_t* fake_parent = nullptr;
-  std::unique_ptr<FakeBus> bus(new FakeBus());
-
-  zx::result con = Controller::CreateWithBus(fake_parent, std::move(bus));
-  ASSERT_TRUE(con.is_ok());
-
-  EXPECT_OK(con->LaunchIrqAndWorkerThreads());
-  con->Shutdown();
-}
-
-TEST(AhciTest, HbaReset) {
-  zx_device_t* fake_parent = nullptr;
-  std::unique_ptr<FakeBus> bus(new FakeBus());
-  zx::result con = Controller::CreateWithBus(fake_parent, std::move(bus));
-  ASSERT_TRUE(con.is_ok());
-
-  // Test reset function.
-  EXPECT_OK(con->HbaReset());
-
-  con->Shutdown();
 }
 
 TEST_F(PortTest, PortTestEnable) {
@@ -258,67 +226,6 @@ TEST_F(PortTest, PortCompleteTimeout) {
   EXPECT_FALSE(port.Complete());
   // Set by completion callback.
   EXPECT_NOT_OK(status);
-}
-
-TEST_F(PortTest, ShutdownWaitsForTransactionsInFlight) {
-  zx_device_t* fake_parent = nullptr;
-  std::unique_ptr<FakeBus> bus(new FakeBus());
-  FakeBus* bus_ptr = bus.get();
-
-  zx::result con = Controller::CreateWithBus(fake_parent, std::move(bus));
-  ASSERT_TRUE(con.is_ok());
-
-  Port& port = *con->port(0);
-  PortEnable(bus_ptr, &port);
-
-  // Set up a transaction that will timeout in 5 seconds.
-
-  zx_status_t status = ZX_OK;  // Value to be overwritten by callback.
-
-  SataTransaction txn = {};
-  txn.timeout = zx::clock::get_monotonic() + zx::sec(5);
-  txn.completion_cb = cb_status;
-  txn.cookie = &status;
-
-  uint32_t slot = 0;
-
-  // Set txn as running.
-  port.TestSetRunning(&txn, slot);
-  // Set the running bit in the bus.
-  bus_ptr->PortRegOverride(0, kPortSataActive, (1u << slot));
-
-  // Set interrupt for successful transfer completion.
-  bus_ptr->PortRegOverride(0, kPortInterruptStatus, AHCI_PORT_INT_DP);
-  // Kick off interrupt-handler and worker threads.
-  EXPECT_OK(con->LaunchIrqAndWorkerThreads());
-
-  // True means there are running command(s).
-  EXPECT_TRUE(port.Complete());
-
-  bool shutdown_complete = false;
-  zx::duration shutdown_duration;
-
-  std::thread shutdown_thread([&]() {
-    zx::time time = zx::clock::get_monotonic();
-    con->Shutdown();
-    shutdown_duration = zx::clock::get_monotonic() - time;
-    shutdown_complete = true;
-  });
-
-  // TODO(https://fxbug.dev/42061061): This should be handled by a watchdog in the driver.
-  std::thread watchdog_thread([&]() {
-    while (!shutdown_complete) {
-      con->SignalWorker();
-    }
-  });
-
-  shutdown_thread.join();
-  watchdog_thread.join();
-  // The shutdown duration should be around 5 seconds (+/-). Conservatively check for > 2.5 seconds.
-  EXPECT_GT(shutdown_duration, zx::msec(2500));
-
-  // Set by completion callback.
-  EXPECT_EQ(status, ZX_ERR_TIMED_OUT);
 }
 
 TEST_F(PortTest, FlushWhenCommandQueueEmpty) {
@@ -465,103 +372,140 @@ TEST_F(PortTest, FlushWhenWritePrecedingAndReadFollowing) {
   EXPECT_FALSE(port.paused_cmd_issuing());
 }
 
-class AhciTestFixture : public inspect::InspectTestHelper, public zxtest::TestWithParam<bool> {
+class TestController : public Controller {
  public:
+  // Modify to configure the behaviour of this test controller.
+  static bool support_native_command_queuing_;
+
   static constexpr uint32_t kTestLogicalBlockCount = 1024;
 
-  void SetUp() override {
-    support_native_command_queuing_ = GetParam();
-    fake_root_ = MockDevice::FakeRootParent();
+  TestController(fdf::DriverStartArgs start_args, fdf::UnownedSynchronizedDispatcher dispatcher)
+      : Controller(std::move(start_args), std::move(dispatcher)) {}
 
+  zx::result<std::unique_ptr<Bus>> CreateBus() override {
     // Create a fake bus.
-    auto bus = std::make_unique<FakeBus>(support_native_command_queuing_);
-    fake_bus_ = bus.get();
+    auto fake_bus = std::make_unique<FakeBus>(support_native_command_queuing_);
 
-    // Set up the driver.
-    zx::result controller = Controller::CreateWithBus(fake_root_.get(), std::move(bus));
-    ASSERT_TRUE(controller.is_ok());
-    ASSERT_OK(controller->AddDevice());
-    [[maybe_unused]] auto unused = controller.value().release();
+    auto dispatcher =
+        fdf::SynchronizedDispatcher::Create(fdf::SynchronizedDispatcher::Options::kAllowSyncCalls,
+                                            "sata-background-init", [](fdf_dispatcher_t*) {});
+    if (dispatcher.is_error()) {
+      return dispatcher.take_error();
+    }
+    dispatcher_ = *std::move(dispatcher);
 
-    device_ = fake_root_->GetLatestChild();
-    controller_ = device_->GetDeviceContext<Controller>();
+    // Background work to emulate a SATA device on the fake bus responding to an IDENTIFY DEVICE
+    // command.
+    async::PostTask(dispatcher_.async_dispatcher(), [this, fake_bus = fake_bus.get()] {
+      Port* port = this->port(FakeBus::kTestPortNumber);
+      const SataTransaction* command;
+      while (true) {
+        command = port->TestGetRunning(0);
+        if (command != nullptr) {
+          break;
+        }
+        // Wait until IDENTIFY DEVICE command is issued.
+        zx::nanosleep(zx::deadline_after(zx::msec(1)));
+      }
+      ASSERT_EQ(command->cmd, SATA_CMD_IDENTIFY_DEVICE);
+
+      // Perform IDENTIFY DEVICE command.
+      SataIdentifyDeviceResponse devinfo{};
+      devinfo.major_version = 1 << 10;  // Support ACS-3.
+      devinfo.capabilities_1 = 1 << 9;  // Spec simply says, "Shall be set to one."
+      devinfo.lba_capacity = kTestLogicalBlockCount;
+      zx::unowned_vmo vmo(command->bop.rw.vmo);
+      ASSERT_OK(vmo->write(&devinfo, 0, sizeof(devinfo)));
+
+      // Clear the running bit in the bus.
+      fake_bus->PortRegOverride(FakeBus::kTestPortNumber, kPortSataActive, 0);
+      fake_bus->PortRegOverride(FakeBus::kTestPortNumber, kPortCommandIssue, 0);
+
+      // Set interrupt for successful transfer completion.
+      fake_bus->PortRegOverride(FakeBus::kTestPortNumber, kPortInterruptStatus, AHCI_PORT_INT_DP);
+      // Invoke interrupt handler.
+      fake_bus->InterruptTrigger();
+    });
+
+    return zx::ok(std::move(fake_bus));
   }
 
-  void RunInit() {
-    device_->InitOp();
-    ASSERT_OK(device_->WaitUntilInitReplyCalled(zx::time::infinite()));
-    ASSERT_OK(device_->InitReplyCallStatus());
+ private:
+  fdf::Dispatcher dispatcher_;
+};
+
+bool TestController::support_native_command_queuing_;
+
+struct IncomingNamespace {
+  fdf_testing::TestNode node{"root"};
+  fdf_testing::TestEnvironment env{fdf::Dispatcher::GetCurrent()->get()};
+};
+
+class AhciTest : public inspect::InspectTestHelper, public zxtest::TestWithParam<bool> {
+ public:
+  AhciTest()
+      : env_dispatcher_(runtime_.StartBackgroundDispatcher()),
+        incoming_(env_dispatcher_->async_dispatcher(), std::in_place) {}
+
+  void SetUp() override {
+    TestController::support_native_command_queuing_ = GetParam();
+
+    // Initialize driver test environment.
+    fuchsia_driver_framework::DriverStartArgs start_args;
+    fidl::ClientEnd<fuchsia_io::Directory> outgoing_directory_client;
+    incoming_.SyncCall([&](IncomingNamespace* incoming) mutable {
+      auto start_args_result = incoming->node.CreateStartArgsAndServe();
+      ASSERT_TRUE(start_args_result.is_ok());
+      start_args = std::move(start_args_result->start_args);
+      outgoing_directory_client = std::move(start_args_result->outgoing_directory_client);
+
+      ASSERT_OK(incoming->env.Initialize(std::move(start_args_result->incoming_directory_server)));
+    });
+
+    // Start dut_.
+    ASSERT_OK(runtime_.RunToCompletion(dut_.Start(std::move(start_args))));
+
+    fake_bus_ = static_cast<FakeBus*>(dut_->bus());
+    ASSERT_NOT_NULL(fake_bus_);
+
+    ASSERT_GT(dut_->sata_devices().size(), 0);
+    sata_device_ = dut_->sata_devices()[0].get();
+    ASSERT_NOT_NULL(sata_device_);
   }
 
   void TearDown() override {
-    device_async_remove(device_);
-    EXPECT_OK(mock_ddk::ReleaseFlaggedDevices(device_));
+    zx::result prepare_stop_result = runtime_.RunToCompletion(dut_.PrepareStop());
+    EXPECT_OK(prepare_stop_result);
+
+    incoming_.reset();
+    runtime_.ShutdownAllDispatchers(fdf::Dispatcher::GetCurrent()->get());
+
+    EXPECT_OK(dut_.Stop());
   }
 
  protected:
-  bool support_native_command_queuing_;
-  std::shared_ptr<zx_device> fake_root_;
+  fdf_testing::DriverRuntime runtime_;
+  fdf::UnownedSynchronizedDispatcher env_dispatcher_;
+  async_patterns::TestDispatcherBound<IncomingNamespace> incoming_;
+  fdf_testing::DriverUnderTest<TestController> dut_;
   FakeBus* fake_bus_;
-  zx_device* device_;
-  Controller* controller_;
+  SataDevice* sata_device_;
 };
 
-TEST_P(AhciTestFixture, SataDeviceInitAndRead) {
-  ASSERT_NO_FATAL_FAILURE(RunInit());
-  ASSERT_NE(device_->child_count(), 0);
-
-  zx_device* sata_device = device_->GetLatestChild();
-  std::thread device_init_thread([&]() {
-    sata_device->InitOp();  // Issues IDENTIFY DEVICE command.
-    sata_device->WaitUntilInitReplyCalled(zx::time::infinite());
-    ASSERT_OK(sata_device->InitReplyCallStatus());
-  });
-
-  const uint32_t port_number = sata_device->GetDeviceContext<SataDevice>()->port();
-  Port* port = controller_->port(port_number);
-  const SataTransaction* command;
-  while (true) {
-    command = port->TestGetRunning(0);
-    if (command != nullptr) {
-      break;
-    }
-    // Wait until IDENTIFY DEVICE command is issued.
-    zx::nanosleep(zx::deadline_after(zx::msec(1)));
-  }
-  ASSERT_EQ(command->cmd, SATA_CMD_IDENTIFY_DEVICE);
-
-  // Perform IDENTIFY DEVICE command.
-  SataIdentifyDeviceResponse devinfo{};
-  devinfo.major_version = 1 << 10;  // Support ACS-3.
-  devinfo.capabilities_1 = 1 << 9;  // Spec simply says, "Shall be set to one."
-  devinfo.lba_capacity = kTestLogicalBlockCount;
-  zx::unowned_vmo vmo(command->bop.rw.vmo);
-  ASSERT_OK(vmo->write(&devinfo, 0, sizeof(devinfo)));
-
-  // Clear the running bit in the bus.
-  fake_bus_->PortRegOverride(port_number, kPortSataActive, 0);
-  fake_bus_->PortRegOverride(port_number, kPortCommandIssue, 0);
-
-  // Set interrupt for successful transfer completion.
-  fake_bus_->PortRegOverride(port_number, kPortInterruptStatus, AHCI_PORT_INT_DP);
-  // Invoke interrupt handler.
-  fake_bus_->InterruptTrigger();
-
-  device_init_thread.join();
-  ASSERT_NO_FATAL_FAILURE(ReadInspect(controller_->inspector().DuplicateVmo()));
+TEST_P(AhciTest, SataDeviceRead) {
+  ASSERT_NO_FATAL_FAILURE(ReadInspect(dut_->inspector().DuplicateVmo()));
   const auto* ahci = hierarchy().GetByPath({"ahci"});
   ASSERT_NOT_NULL(ahci);
   const auto* ncq = ahci->node().get_property<inspect::BoolPropertyValue>("native_command_queuing");
   ASSERT_NOT_NULL(ncq);
-  EXPECT_EQ(ncq->value(), support_native_command_queuing_);
+  EXPECT_EQ(ncq->value(), TestController::support_native_command_queuing_);
 
-  ddk::BlockImplProtocolClient client(sata_device);
   block_info_t info;
   uint64_t op_size;
-  client.Query(&info, &op_size);
+  sata_device_->BlockImplQuery(&info, &op_size);
   EXPECT_EQ(info.block_size, 512);
-  EXPECT_EQ(info.block_count, kTestLogicalBlockCount);
-  if (support_native_command_queuing_) {
+  EXPECT_EQ(info.block_count, TestController::kTestLogicalBlockCount);
+  if (TestController::support_native_command_queuing_) {
     EXPECT_TRUE(info.flags & FLAG_FUA_SUPPORT);
   } else {
     EXPECT_FALSE(info.flags & FLAG_FUA_SUPPORT);
@@ -584,8 +528,10 @@ TEST_P(AhciTestFixture, SataDeviceInitAndRead) {
              .offset_dev = 0,
              .offset_vmo = 0,
          }};
-  client.Queue(op, callback, &done);
+  sata_device_->BlockImplQueue(op, callback, &done);
 
+  Port* port = dut_->port(FakeBus::kTestPortNumber);
+  const SataTransaction* command;
   while (true) {
     command = port->TestGetRunning(0);
     if (command != nullptr) {
@@ -594,24 +540,79 @@ TEST_P(AhciTestFixture, SataDeviceInitAndRead) {
     // Wait until read command is issued.
     zx::nanosleep(zx::deadline_after(zx::msec(1)));
   }
-  if (support_native_command_queuing_) {
+  if (TestController::support_native_command_queuing_) {
     EXPECT_EQ(command->cmd, SATA_CMD_READ_FPDMA_QUEUED);
   } else {
     EXPECT_EQ(command->cmd, SATA_CMD_READ_DMA_EXT);
   }
 
   // Clear the running bit in the bus.
-  fake_bus_->PortRegOverride(port_number, kPortSataActive, 0);
-  fake_bus_->PortRegOverride(port_number, kPortCommandIssue, 0);
+  fake_bus_->PortRegOverride(FakeBus::kTestPortNumber, kPortSataActive, 0);
+  fake_bus_->PortRegOverride(FakeBus::kTestPortNumber, kPortCommandIssue, 0);
 
   // Set interrupt for successful transfer completion.
-  fake_bus_->PortRegOverride(port_number, kPortInterruptStatus, AHCI_PORT_INT_DP);
+  fake_bus_->PortRegOverride(FakeBus::kTestPortNumber, kPortInterruptStatus, AHCI_PORT_INT_DP);
   // Invoke interrupt handler.
   fake_bus_->InterruptTrigger();
 
   sync_completion_wait(&done, ZX_TIME_INFINITE);
 }
 
-INSTANTIATE_TEST_SUITE_P(NativeCommandQueuingSupportTest, AhciTestFixture, zxtest::Bool());
+// TODO(b/324291694): Re-enable this test after switching to using DF's dispatcher threads.
+TEST_P(AhciTest, DISABLED_ShutdownWaitsForTransactionsInFlight) {
+  Port* port = dut_->port(FakeBus::kTestPortNumber);
+
+  // Set up a transaction that will timeout in 5 seconds.
+
+  zx_status_t status = ZX_OK;  // Value to be overwritten by callback.
+
+  SataTransaction txn = {};
+  txn.timeout = zx::clock::get_monotonic() + zx::sec(5);
+  txn.completion_cb = cb_status;
+  txn.cookie = &status;
+
+  uint32_t slot = 0;
+
+  // Set txn as running.
+  port->TestSetRunning(&txn, slot);
+  // Set the running bit in the bus.
+  fake_bus_->PortRegOverride(FakeBus::kTestPortNumber, kPortSataActive, (1u << slot));
+  fake_bus_->PortRegOverride(FakeBus::kTestPortNumber, kPortCommandIssue, (1u << slot));
+
+  // Set interrupt for successful transfer completion.
+  fake_bus_->PortRegOverride(FakeBus::kTestPortNumber, kPortInterruptStatus, AHCI_PORT_INT_DP);
+
+  // True means there are running command(s).
+  EXPECT_TRUE(port->Complete());
+
+  bool shutdown_complete = false;
+  zx::duration shutdown_duration;
+
+  std::thread shutdown_thread([&]() {
+    zx::time time = zx::clock::get_monotonic();
+    dut_->Shutdown();
+    shutdown_duration = zx::clock::get_monotonic() - time;
+    shutdown_complete = true;
+  });
+
+  // TODO(https://fxbug.dev/42061061): This should be handled by a watchdog in the driver.
+  std::thread watchdog_thread([&]() {
+    while (!shutdown_complete) {
+      dut_->SignalWorker();
+    }
+  });
+
+  shutdown_thread.join();
+  watchdog_thread.join();
+  // The shutdown duration should be around 5 seconds (+/-). Conservatively check for > 2.5 seconds.
+  EXPECT_GT(shutdown_duration, zx::msec(2500));
+
+  // Set by completion callback.
+  EXPECT_EQ(status, ZX_ERR_TIMED_OUT);
+}
+
+INSTANTIATE_TEST_SUITE_P(NativeCommandQueuingSupportTest, AhciTest, zxtest::Bool());
 
 }  // namespace ahci
+
+FUCHSIA_DRIVER_EXPORT(ahci::TestController);

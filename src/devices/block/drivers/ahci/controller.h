@@ -5,6 +5,8 @@
 #ifndef SRC_DEVICES_BLOCK_DRIVERS_AHCI_CONTROLLER_H_
 #define SRC_DEVICES_BLOCK_DRIVERS_AHCI_CONTROLLER_H_
 
+#include <lib/driver/component/cpp/driver_base.h>
+#include <lib/inspect/component/cpp/component.h>
 #include <lib/inspect/cpp/inspect.h>
 #include <lib/sync/completion.h>
 #include <lib/zx/time.h>
@@ -44,27 +46,22 @@ struct ThreadWrapper {
   }
 };
 
-class Controller;
-using ControllerDeviceType = ddk::Device<Controller, ddk::Initializable>;
-class Controller : public ControllerDeviceType {
+class Controller : public fdf::DriverBase {
  public:
   static constexpr char kDriverName[] = "ahci";
 
-  // Test function: Create a new AHCI Controller with a caller-provided host bus interface.
-  static zx::result<std::unique_ptr<Controller>> CreateWithBus(zx_device_t* parent,
-                                                               std::unique_ptr<Bus> bus);
+  Controller(fdf::DriverStartArgs start_args, fdf::UnownedSynchronizedDispatcher dispatcher)
+      : fdf::DriverBase(kDriverName, std::move(start_args), std::move(dispatcher)) {}
 
-  explicit Controller(zx_device_t* parent) : ControllerDeviceType(parent) {}
   ~Controller() = default;
 
   DISALLOW_COPY_ASSIGN_AND_MOVE(Controller);
 
-  static zx_status_t Bind(void* ctx, zx_device_t* parent);
-  // Invokes DdkAdd().
-  zx_status_t AddDevice();
+  zx::result<> Start() override;
 
-  void DdkInit(ddk::InitTxn txn);
-  void DdkRelease();
+  void PrepareStop(fdf::PrepareStopCompleter completer) __TA_EXCLUDES(lock_) override;
+
+  virtual zx::result<std::unique_ptr<Bus>> CreateBus();
 
   // Read or write a 32-bit AHCI controller reg. Endinaness is corrected.
   uint32_t RegRead(size_t offset);
@@ -74,7 +71,6 @@ class Controller : public ControllerDeviceType {
   zx_status_t LaunchIrqAndWorkerThreads();
 
   // Release all resources.
-  // Not used in DDK lifecycle where Release() is called.
   void Shutdown() __TA_EXCLUDES(lock_);
 
   zx_status_t HbaReset();
@@ -90,6 +86,15 @@ class Controller : public ControllerDeviceType {
 
   Bus* bus() { return bus_.get(); }
   Port* port(uint32_t portnr) { return &ports_[portnr]; }
+  std::vector<std::unique_ptr<SataDevice>>& sata_devices() { return sata_devices_; }
+
+  // Called by children device of this controller for invoking AddChild() or instantiating
+  // compat::DeviceServer.
+  fidl::WireSyncClient<fuchsia_driver_framework::Node>& root_node() { return root_node_; }
+  std::string_view driver_name() const { return name(); }
+  const std::shared_ptr<fdf::Namespace>& driver_incoming() const { return incoming(); }
+  std::shared_ptr<fdf::OutgoingDirectory>& driver_outgoing() { return outgoing(); }
+  const std::optional<std::string>& driver_node_name() const { return node_name(); }
 
  private:
   static int WorkerThread(void* arg) { return static_cast<Controller*>(arg)->WorkerLoop(); }
@@ -105,6 +110,8 @@ class Controller : public ControllerDeviceType {
   inspect::Inspector inspector_;
   inspect::Node inspect_node_;
 
+  std::optional<inspect::ComponentInspector> exposed_inspector_;
+
   fbl::Mutex lock_;
   bool threads_should_exit_ __TA_GUARDED(lock_) = false;
 
@@ -115,6 +122,11 @@ class Controller : public ControllerDeviceType {
 
   std::unique_ptr<Bus> bus_;
   Port ports_[AHCI_MAX_PORTS];
+  std::vector<std::unique_ptr<SataDevice>> sata_devices_;
+
+  fidl::WireSyncClient<fuchsia_driver_framework::Node> parent_node_;
+  fidl::WireSyncClient<fuchsia_driver_framework::Node> root_node_;
+  fidl::WireSyncClient<fuchsia_driver_framework::NodeController> node_controller_;
 };
 
 }  // namespace ahci

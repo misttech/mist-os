@@ -5,12 +5,6 @@
 #include "controller.h"
 
 #include <inttypes.h>
-#include <lib/ddk/binding_driver.h>
-#include <lib/ddk/debug.h>
-#include <lib/ddk/device.h>
-#include <lib/ddk/driver.h>
-#include <lib/ddk/phys-iter.h>
-#include <lib/device-protocol/pci.h>
 #include <lib/zx/clock.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -69,7 +63,7 @@ zx_status_t Controller::HbaReset() {
   // reset should complete within 1 second
   zx_status_t status = bus_->WaitForClear(kHbaGlobalHostControl, AHCI_GHC_HR, zx::sec(1));
   if (status) {
-    zxlogf(ERROR, "ahci: hba reset timed out");
+    FDF_LOG(ERROR, "HBA reset timed out");
   }
   return status;
 }
@@ -87,20 +81,20 @@ void Controller::Queue(uint32_t portnr, SataTransaction* txn) {
   Port* port = &ports_[portnr];
   zx_status_t status = port->Queue(txn);
   if (status == ZX_OK) {
-    zxlogf(TRACE, "ahci.%u: Queue txn %p offset_dev 0x%" PRIx64 " length 0x%x", port->num(), txn,
-           txn->bop.rw.offset_dev, txn->bop.rw.length);
+    FDF_LOG(TRACE, "ahci.%u: Queue txn %p offset_dev 0x%" PRIx64 " length 0x%x", port->num(), txn,
+            txn->bop.rw.offset_dev, txn->bop.rw.length);
     // hit the worker thread
     sync_completion_signal(&worker_completion_);
   } else {
-    zxlogf(INFO, "ahci.%u: Failed to queue txn %p: %s", port->num(), txn,
-           zx_status_get_string(status));
+    FDF_LOG(INFO, "ahci.%u: Failed to queue txn %p: %s", port->num(), txn,
+            zx_status_get_string(status));
     // TODO: close transaction.
   }
 }
 
-void Controller::DdkRelease() {
+void Controller::PrepareStop(fdf::PrepareStopCompleter completer) {
   Shutdown();
-  delete this;
+  completer(zx::ok());
 }
 
 bool Controller::ShouldExit() {
@@ -143,7 +137,7 @@ int Controller::IrqLoop() {
     zx_status_t status = bus_->InterruptWait();
     if (status != ZX_OK) {
       if (!ShouldExit()) {
-        zxlogf(ERROR, "ahci: Error waiting for interrupt: %s", zx_status_get_string(status));
+        FDF_LOG(ERROR, "Error waiting for interrupt: %s", zx_status_get_string(status));
       }
       return 0;
     }
@@ -173,21 +167,11 @@ int Controller::IrqLoop() {
 
 // implement device protocol:
 
-void Controller::DdkInit(ddk::InitTxn txn) {
-  // The drive initialization has numerous error conditions. Wrap the initialization here to ensure
-  // we always call txn.Reply() in any outcome.
-  zx_status_t status = Init();
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "ahci: Driver initialization failed: %s", zx_status_get_string(status));
-  }
-  txn.Reply(status);
-}
-
 zx_status_t Controller::Init() {
   zx_status_t status;
   if ((status = LaunchIrqAndWorkerThreads()) != ZX_OK) {
-    zxlogf(ERROR, "ahci: Failed to start controller irq and worker threads: %s",
-           zx_status_get_string(status));
+    FDF_LOG(ERROR, "Failed to start controller irq and worker threads: %s",
+            zx_status_get_string(status));
     return status;
   }
 
@@ -213,7 +197,7 @@ zx_status_t Controller::Init() {
       continue;  // port not implemented
     status = ports_[i].Configure(i, bus_.get(), kHbaPorts, max_command_tag);
     if (status != ZX_OK) {
-      zxlogf(ERROR, "ahci: Failed to configure port %u: %s", i, zx_status_get_string(status));
+      FDF_LOG(ERROR, "Failed to configure port %u: %s", i, zx_status_get_string(status));
       return status;
     }
   }
@@ -245,12 +229,14 @@ zx_status_t Controller::Init() {
     if (port->RegRead(kPortSataStatus) & AHCI_PORT_SSTS_DET_PRESENT) {
       port->set_device_present(true);
       if (port->RegRead(kPortSignature) == AHCI_PORT_SIG_SATA) {
-        zx_status_t status = SataDevice::Bind(this, port->num(), use_command_queue);
-        if (status != ZX_OK) {
-          zxlogf(ERROR, "ahci: Failed to add SATA device at port %u: %s", port->num(),
-                 zx_status_get_string(status));
-          return status;
+        zx::result<std::unique_ptr<SataDevice>> device =
+            SataDevice::Bind(this, port->num(), use_command_queue);
+        if (device.is_error()) {
+          FDF_LOG(ERROR, "Failed to add SATA device at port %u: %s", port->num(),
+                  device.status_string());
+          return device.status_value();
         }
+        sata_devices_.push_back(*std::move(device));
       }
     }
   }
@@ -258,32 +244,16 @@ zx_status_t Controller::Init() {
   return ZX_OK;
 }
 
-zx::result<std::unique_ptr<Controller>> Controller::CreateWithBus(zx_device_t* parent,
-                                                                  std::unique_ptr<Bus> bus) {
-  fbl::AllocChecker ac;
-  std::unique_ptr<Controller> controller(new (&ac) Controller(parent));
-  if (!ac.check()) {
-    zxlogf(ERROR, "ahci: out of memory");
-    return zx::error(ZX_ERR_NO_MEMORY);
-  }
-  zx_status_t status = bus->Configure(parent);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "ahci: failed to configure host bus");
-    return zx::error(status);
-  }
-  controller->bus_ = std::move(bus);
-  return zx::ok(std::move(controller));
-}
-
+// TODO(b/324291694): Switch to using DF's dispatcher threads.
 zx_status_t Controller::LaunchIrqAndWorkerThreads() {
   zx_status_t status = irq_thread_.CreateWithName(IrqThread, this, "ahci-irq");
   if (status != ZX_OK) {
-    zxlogf(ERROR, "ahci: Error creating irq thread: %s", zx_status_get_string(status));
+    FDF_LOG(ERROR, "Error creating irq thread: %s", zx_status_get_string(status));
     return status;
   }
   status = worker_thread_.CreateWithName(WorkerThread, this, "ahci-worker");
   if (status != ZX_OK) {
-    zxlogf(ERROR, "ahci: Error creating worker thread: %s", zx_status_get_string(status));
+    FDF_LOG(ERROR, "Error creating worker thread: %s", zx_status_get_string(status));
     return status;
   }
   return ZX_OK;
@@ -304,60 +274,87 @@ void Controller::Shutdown() {
   irq_thread_.Join();
 }
 
-// implement driver object:
+zx::result<std::unique_ptr<Bus>> Controller::CreateBus() {
+  auto pci_client_end = incoming()->Connect<fuchsia_hardware_pci::Service::Device>("pci");
+  if (!pci_client_end.is_ok()) {
+    FDF_LOG(ERROR, "Failed to connect to PCI device service: %s", pci_client_end.status_string());
+    return pci_client_end.take_error();
+  }
+  auto pci = fidl::WireSyncClient(*std::move(pci_client_end));
 
-zx_status_t Controller::Bind(void* ctx, zx_device_t* parent) {
+  fbl::AllocChecker ac;
+  auto bus = fbl::make_unique_checked<PciBus>(&ac, std::move(pci));
+  if (!ac.check()) {
+    FDF_LOG(ERROR, "Failed to allocate memory for bus.");
+    return zx::error(ZX_ERR_NO_MEMORY);
+  }
+  return zx::ok(std::move(bus));
+}
+
+zx::result<> Controller::Start() {
+  parent_node_.Bind(std::move(node()));
+
   if (AHCI_PAGE_SIZE != zx_system_get_page_size()) {
-    zxlogf(ERROR, "ahci: System page size of %u does not match expected page size of %u\n",
-           zx_system_get_page_size(), AHCI_PAGE_SIZE);
-    return ZX_ERR_INTERNAL;
+    FDF_LOG(ERROR, "System page size of %u does not match expected page size of %u\n",
+            zx_system_get_page_size(), AHCI_PAGE_SIZE);
+    return zx::error(ZX_ERR_INTERNAL);
   }
 
-  std::unique_ptr<Controller> controller;
-  {
-    fbl::AllocChecker ac;
-    std::unique_ptr<Bus> bus(new (&ac) PciBus(parent));
-    if (!ac.check()) {
-      zxlogf(ERROR, "ahci: Failed to allocate memory for PciBus.");
-      return ZX_ERR_NO_MEMORY;
-    }
-
-    zx::result result = Controller::CreateWithBus(parent, std::move(bus));
-    if (result.is_error()) {
-      zxlogf(ERROR, "ahci: Failed to create AHCI controller: %s",
-             zx_status_get_string(result.status_value()));
-      return result.status_value();
-    }
-    controller = std::move(result.value());
+  zx::result<std::unique_ptr<Bus>> bus = CreateBus();
+  if (bus.is_error()) {
+    return bus.take_error();
   }
+  bus_ = *std::move(bus);
 
-  zx_status_t status = controller->AddDevice();
+  zx_status_t status = bus_->Configure();
   if (status != ZX_OK) {
-    return status;
+    FDF_LOG(ERROR, "Failed to configure host bus");
+    return zx::error(status);
   }
 
-  // The DriverFramework now owns driver.
-  controller.release();
-  return ZX_OK;
-}
+  auto inspect_sink = incoming()->Connect<fuchsia_inspect::InspectSink>();
+  if (inspect_sink.is_error() || !inspect_sink->is_valid()) {
+    FDF_LOG(ERROR, "Failed to connect to inspect sink: %s", inspect_sink.status_string());
+    return inspect_sink.take_error();
+  }
+  exposed_inspector_.emplace(inspect::ComponentInspector(
+      dispatcher(), {.inspector = inspector(), .client_end = std::move(inspect_sink.value())}));
 
-zx_status_t Controller::AddDevice() {
-  zx_status_t status = DdkAdd(ddk::DeviceAddArgs(kDriverName)
-                                  .set_flags(DEVICE_ADD_NON_BINDABLE)
-                                  .set_inspect_vmo(inspector_.DuplicateVmo()));
+  zx::result controller_endpoints =
+      fidl::CreateEndpoints<fuchsia_driver_framework::NodeController>();
+  if (!controller_endpoints.is_ok()) {
+    FDF_LOG(ERROR, "Failed to create controller endpoints: %s",
+            controller_endpoints.status_string());
+    return controller_endpoints.take_error();
+  }
+
+  zx::result node_endpoints = fidl::CreateEndpoints<fuchsia_driver_framework::Node>();
+  if (!node_endpoints.is_ok()) {
+    FDF_LOG(ERROR, "Failed to create node endpoints: %s", node_endpoints.status_string());
+    return node_endpoints.take_error();
+  }
+
+  node_controller_.Bind(std::move(controller_endpoints->client));
+  root_node_.Bind(std::move(node_endpoints->client));
+
+  fidl::Arena arena;
+
+  const auto args =
+      fuchsia_driver_framework::wire::NodeAddArgs::Builder(arena).name(arena, name()).Build();
+
+  auto result = parent_node_->AddChild(args, std::move(controller_endpoints->server),
+                                       std::move(node_endpoints->server));
+  if (!result.ok()) {
+    FDF_LOG(ERROR, "Failed to add child: %s", result.status_string());
+    return zx::error(result.status());
+  }
+
+  status = Init();
   if (status != ZX_OK) {
-    zxlogf(ERROR, "ahci: Error in DdkAdd: %s", zx_status_get_string(status));
+    FDF_LOG(ERROR, "Driver initialization failed: %s", zx_status_get_string(status));
+    return zx::error(status);
   }
-  return status;
+  return zx::ok();
 }
-
-constexpr zx_driver_ops_t ahci_driver_ops = []() {
-  zx_driver_ops_t driver = {};
-  driver.version = DRIVER_OPS_VERSION;
-  driver.bind = Controller::Bind;
-  return driver;
-}();
 
 }  // namespace ahci
-
-ZIRCON_DRIVER(ahci, ahci::ahci_driver_ops, "zircon", "0.1");

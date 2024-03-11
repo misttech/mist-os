@@ -7,11 +7,11 @@
 
 #include <byteswap.h>
 #include <fuchsia/hardware/block/driver/cpp/banjo.h>
-#include <lib/ddk/device.h>
+#include <lib/driver/compat/cpp/compat.h>
+#include <lib/driver/component/cpp/driver_base.h>
 #include <lib/zx/time.h>
 #include <zircon/listnode.h>
 
-#include <ddktl/device.h>
 #include <fbl/string_printf.h>
 
 #include "ahci.h"
@@ -176,23 +176,15 @@ inline void SataStringFix(uint16_t* buf, size_t size) {
 
 class Controller;
 
-class SataDevice;
-using SataDeviceType = ddk::Device<SataDevice, ddk::Initializable>;
-class SataDevice : public SataDeviceType,
-                   public ddk::BlockImplProtocol<SataDevice, ddk::base_protocol> {
+class SataDevice : public ddk::BlockImplProtocol<SataDevice> {
  public:
-  SataDevice(zx_device_t* parent, Controller* controller, uint32_t port, bool use_command_queue)
-      : SataDeviceType(parent),
-        controller_(controller),
-        port_(port),
-        use_command_queue_(use_command_queue) {}
+  SataDevice(Controller* controller, uint32_t port, bool use_command_queue)
+      : controller_(controller), port_(port), use_command_queue_(use_command_queue) {}
 
   // Create a SATA device on |controller| at |port|.
-  static zx_status_t Bind(Controller* controller, uint32_t port, bool use_command_queue);
+  static zx::result<std::unique_ptr<SataDevice>> Bind(Controller* controller, uint32_t port,
+                                                      bool use_command_queue);
   fbl::String DriverName() const { return fbl::StringPrintf("sata%u", port_); }
-
-  void DdkInit(ddk::InitTxn txn);
-  void DdkRelease();
 
   // ddk::BlockImplProtocol implementations.
   void BlockImplQuery(block_info_t* out_info, uint64_t* out_block_op_size);
@@ -201,11 +193,13 @@ class SataDevice : public SataDeviceType,
   uint32_t port() const { return port_; }
 
  private:
-  // Invokes DdkAdd().
+  // Invokes AddChild().
   zx_status_t AddDevice();
 
   // Main driver initialization.
   zx_status_t Init();
+
+  fdf::Logger& logger();
 
   Controller* const controller_;
   const uint32_t port_;
@@ -213,6 +207,11 @@ class SataDevice : public SataDeviceType,
   const bool use_command_queue_;
 
   block_info_t info_{};
+
+  fidl::WireSyncClient<fuchsia_driver_framework::NodeController> node_controller_;
+
+  compat::BanjoServer block_impl_server_{ZX_PROTOCOL_BLOCK_IMPL, this, &block_impl_protocol_ops_};
+  compat::SyncInitializedDeviceServer compat_server_;
 };
 
 }  // namespace ahci

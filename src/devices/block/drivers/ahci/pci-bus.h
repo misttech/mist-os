@@ -5,7 +5,7 @@
 #ifndef SRC_DEVICES_BLOCK_DRIVERS_AHCI_PCI_BUS_H_
 #define SRC_DEVICES_BLOCK_DRIVERS_AHCI_PCI_BUS_H_
 
-#include <lib/device-protocol/pci.h>
+#include <fidl/fuchsia.hardware.pci/cpp/wire.h>
 #include <lib/mmio/mmio.h>
 #include <lib/zx/bti.h>
 #include <lib/zx/interrupt.h>
@@ -17,9 +17,9 @@ namespace ahci {
 
 class PciBus : public Bus {
  public:
-  explicit PciBus(zx_device_t* parent) : pci_(parent, ddk::Pci::kFragmentName) {}
+  explicit PciBus(fidl::WireSyncClient<fuchsia_hardware_pci::Device> pci) : pci_(std::move(pci)) {}
   ~PciBus() override;
-  zx_status_t Configure(zx_device_t* parent) override;
+  zx_status_t Configure() override;
   zx_status_t DmaBufferInit(std::unique_ptr<dma_buffer::ContiguousBuffer>* buffer_out, size_t size,
                             zx_paddr_t* phys_out, void** virt_out) override;
   zx_status_t BtiPin(uint32_t options, const zx::unowned_vmo& vmo, uint64_t offset, uint64_t size,
@@ -32,7 +32,7 @@ class PciBus : public Bus {
   void InterruptCancel() override;
 
  private:
-  ddk::Pci pci_;
+  fidl::WireSyncClient<fuchsia_hardware_pci::Device> pci_;
   fuchsia_hardware_pci::InterruptMode irq_mode_;
   std::optional<fdf::MmioBuffer> mmio_;
   zx::bti bti_;

@@ -20,7 +20,7 @@ FakeBus::FakeBus(bool support_ncq) : support_ncq_(support_ncq) {
 
 FakeBus::~FakeBus() { iobufs_.clear(); }
 
-zx_status_t FakeBus::Configure(zx_device_t* parent) {
+zx_status_t FakeBus::Configure() {
   if (fail_configure_)
     return ZX_ERR_IO;
   return ZX_OK;

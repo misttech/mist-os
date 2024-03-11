@@ -5,9 +5,7 @@
 #include "sata.h"
 
 #include <inttypes.h>
-#include <lib/ddk/debug.h>
-#include <lib/ddk/device.h>
-#include <lib/ddk/driver.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/sync/completion.h>
 #include <lib/zx/vmo.h>
 #include <limits.h>
@@ -20,7 +18,7 @@
 #include <fbl/alloc_checker.h>
 
 #include "controller.h"
-#include "src/devices/block/lib/common/include/common-dfv1.h"
+#include "src/devices/block/lib/common/include/common.h"
 
 namespace ahci {
 
@@ -38,16 +36,6 @@ static bool IsModelIdQemu(char* model_id) {
   return !memcmp(model_id, kQemuModelId, sizeof(kQemuModelId) - 1);
 }
 
-void SataDevice::DdkInit(ddk::InitTxn txn) {
-  // The driver initialization has numerous error conditions. Wrap the initialization here to ensure
-  // we always call txn.Reply() in any outcome.
-  zx_status_t status = Init();
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "sata: Driver initialization failed: %s", zx_status_get_string(status));
-  }
-  txn.Reply(status);
-}
-
 zx_status_t SataDevice::Init() {
   // Set default devinfo
   SataDeviceInfo di;
@@ -59,7 +47,7 @@ zx_status_t SataDevice::Init() {
   zx::vmo vmo;
   zx_status_t status = zx::vmo::create(512, 0, &vmo);
   if (status != ZX_OK) {
-    zxlogf(ERROR, "sata: Failed to allocate vmo: %s", zx_status_get_string(status));
+    FDF_LOG(ERROR, "Failed to allocate vmo: %s", zx_status_get_string(status));
     return status;
   }
 
@@ -80,8 +68,8 @@ zx_status_t SataDevice::Init() {
 
   status = txn.bop.command.flags;
   if (status != ZX_OK) {
-    zxlogf(ERROR, "%s: Failed IDENTIFY_DEVICE: %s", DriverName().c_str(),
-           zx_status_get_string(status));
+    FDF_LOG(ERROR, "%s: Failed IDENTIFY_DEVICE: %s", DriverName().c_str(),
+            zx_status_get_string(status));
     return status;
   }
 
@@ -89,7 +77,7 @@ zx_status_t SataDevice::Init() {
   SataIdentifyDeviceResponse devinfo;
   status = vmo.read(&devinfo, 0, sizeof(devinfo));
   if (status != ZX_OK) {
-    zxlogf(ERROR, "sata: Failed vmo_read: %s", zx_status_get_string(status));
+    FDF_LOG(ERROR, "Failed vmo_read: %s", zx_status_get_string(status));
     return ZX_ERR_INTERNAL;
   }
   vmo.reset();
@@ -108,9 +96,9 @@ zx_status_t SataDevice::Init() {
   model_number = std::string(model_number.c_str());
   serial_number = std::string(serial_number.c_str());
   firmware_rev = std::string(firmware_rev.c_str());
-  zxlogf(INFO, "Model number:  '%s'", model_number.c_str());
-  zxlogf(INFO, "Serial number: '%s'", serial_number.c_str());
-  zxlogf(INFO, "Firmware rev.: '%s'", firmware_rev.c_str());
+  FDF_LOG(INFO, "Model number:  '%s'", model_number.c_str());
+  FDF_LOG(INFO, "Serial number: '%s'", serial_number.c_str());
+  FDF_LOG(INFO, "Firmware rev.: '%s'", firmware_rev.c_str());
 
   auto inspect_device = controller_->inspect_node().CreateChild(DriverName());
   inspect_device.RecordString("model_number", model_number);
@@ -201,8 +189,6 @@ zx_status_t SataDevice::Init() {
 
 // implement device protocol:
 
-void SataDevice::DdkRelease() { delete this; }
-
 void SataDevice::BlockImplQuery(block_info_t* info_out, uint64_t* block_op_size_out) {
   *info_out = info_;
   *block_op_size_out = sizeof(SataTransaction);
@@ -217,7 +203,8 @@ void SataDevice::BlockImplQueue(block_op_t* bop, block_impl_queue_callback compl
   switch (bop->command.opcode) {
     case BLOCK_OPCODE_READ:
     case BLOCK_OPCODE_WRITE: {
-      if (zx_status_t status = block::CheckIoRange(bop->rw, info_.block_count); status != ZX_OK) {
+      if (zx_status_t status = block::CheckIoRange(bop->rw, info_.block_count, logger());
+          status != ZX_OK) {
         txn->Complete(status);
         return;
       }
@@ -238,13 +225,13 @@ void SataDevice::BlockImplQueue(block_op_t* bop, block_impl_queue_callback compl
         txn->cmd = is_read ? SATA_CMD_READ_DMA_EXT : SATA_CMD_WRITE_DMA_EXT;
       }
 
-      zxlogf(DEBUG, "sata: queue op 0x%x txn %p", bop->command.opcode, txn);
+      FDF_LOG(DEBUG, "Queue op 0x%x txn %p", bop->command.opcode, txn);
       break;
     }
     case BLOCK_OPCODE_FLUSH:
       txn->cmd = SATA_CMD_FLUSH_EXT;
       txn->device = 0x00;
-      zxlogf(DEBUG, "sata: queue FLUSH txn %p", txn);
+      FDF_LOG(DEBUG, "Queue FLUSH txn %p", txn);
       break;
     default:
       txn->Complete(ZX_ERR_NOT_SUPPORTED);
@@ -254,26 +241,75 @@ void SataDevice::BlockImplQueue(block_op_t* bop, block_impl_queue_callback compl
   controller_->Queue(port_, txn);
 }
 
-zx_status_t SataDevice::Bind(Controller* controller, uint32_t port, bool use_command_queue) {
+zx::result<std::unique_ptr<SataDevice>> SataDevice::Bind(Controller* controller, uint32_t port,
+                                                         bool use_command_queue) {
   // initialize the device
   fbl::AllocChecker ac;
-  auto device = fbl::make_unique_checked<SataDevice>(&ac, controller->zxdev(), controller, port,
-                                                     use_command_queue);
+  auto device = fbl::make_unique_checked<SataDevice>(&ac, controller, port, use_command_queue);
   if (!ac.check()) {
-    zxlogf(ERROR, "sata: Failed to allocate memory for SATA device at port %u.", port);
-    return ZX_ERR_NO_MEMORY;
+    FDF_LOG(ERROR, "Failed to allocate memory for SATA device at port %u.", port);
+    return zx::error(ZX_ERR_NO_MEMORY);
   }
 
   zx_status_t status = device->AddDevice();
   if (status != ZX_OK) {
+    return zx::error(status);
+  }
+  return zx::ok(std::move(device));
+}
+
+zx_status_t SataDevice::AddDevice() {
+  {
+    const std::string path_from_parent = std::string(controller_->driver_name()) + "/";
+    compat::DeviceServer::BanjoConfig banjo_config;
+    banjo_config.callbacks[ZX_PROTOCOL_BLOCK_IMPL] = block_impl_server_.callback();
+
+    auto result = compat_server_.Initialize(
+        controller_->driver_incoming(), controller_->driver_outgoing(),
+        controller_->driver_node_name(), DriverName(), compat::ForwardMetadata::None(),
+        std::move(banjo_config), path_from_parent);
+    if (result.is_error()) {
+      return result.status_value();
+    }
+  }
+
+  zx_status_t status = Init();
+  if (status != ZX_OK) {
     return status;
   }
 
-  // The DriverFramework now owns driver.
-  device.release();
+  zx::result controller_endpoints =
+      fidl::CreateEndpoints<fuchsia_driver_framework::NodeController>();
+  if (!controller_endpoints.is_ok()) {
+    FDF_LOG(ERROR, "Failed to create controller endpoints: %s",
+            controller_endpoints.status_string());
+    return controller_endpoints.status_value();
+  }
+
+  node_controller_.Bind(std::move(controller_endpoints->client));
+
+  fidl::Arena arena;
+
+  fidl::VectorView<fuchsia_driver_framework::wire::NodeProperty> properties(arena, 1);
+  properties[0] = fdf::MakeProperty(arena, BIND_PROTOCOL, ZX_PROTOCOL_BLOCK_IMPL);
+
+  std::vector<fuchsia_driver_framework::wire::Offer> offers = compat_server_.CreateOffers2(arena);
+
+  const auto args = fuchsia_driver_framework::wire::NodeAddArgs::Builder(arena)
+                        .name(arena, DriverName())
+                        .offers2(arena, std::move(offers))
+                        .properties(properties)
+                        .Build();
+
+  auto result =
+      controller_->root_node()->AddChild(args, std::move(controller_endpoints->server), {});
+  if (!result.ok()) {
+    FDF_LOG(ERROR, "Failed to add child SATA device: %s", result.status_string());
+    return result.status();
+  }
   return ZX_OK;
 }
 
-zx_status_t SataDevice::AddDevice() { return DdkAdd(DriverName().c_str()); }
+fdf::Logger& SataDevice::logger() { return controller_->logger(); }
 
 }  // namespace ahci

@@ -5,8 +5,8 @@
 #include "port.h"
 
 #include <inttypes.h>
-#include <lib/ddk/debug.h>
 #include <lib/ddk/phys-iter.h>
+#include <lib/driver/component/cpp/driver_base.h>
 #include <lib/zx/clock.h>
 #include <unistd.h>
 
@@ -65,7 +65,7 @@ zx_status_t Port::Configure(uint32_t num, Bus* bus, size_t reg_base, uint32_t ma
   paused_cmd_issuing_ = false;
   uint32_t cmd = RegRead(kPortCommand);
   if (cmd & (AHCI_PORT_CMD_ST | AHCI_PORT_CMD_FRE | AHCI_PORT_CMD_CR | AHCI_PORT_CMD_FR)) {
-    zxlogf(ERROR, "ahci.%u: port busy", num_);
+    FDF_LOG(ERROR, "port %u: port busy", num_);
     return ZX_ERR_UNAVAILABLE;
   }
 
@@ -75,7 +75,7 @@ zx_status_t Port::Configure(uint32_t num, Bus* bus, size_t reg_base, uint32_t ma
   zx_status_t status =
       bus_->DmaBufferInit(&buffer_, sizeof(ahci_port_mem_t), &phys_base, &virt_base);
   if (status != ZX_OK) {
-    zxlogf(ERROR, "ahci.%u: error allocating dma memory: %s", num_, zx_status_get_string(status));
+    FDF_LOG(ERROR, "port %u: error allocating dma memory: %s", num_, zx_status_get_string(status));
     return status;
   }
   mem_ = static_cast<ahci_port_mem_t*>(virt_base);
@@ -130,13 +130,13 @@ zx_status_t Port::Enable() {
   if (cmd & AHCI_PORT_CMD_ST)
     return ZX_OK;
   if (!(cmd & AHCI_PORT_CMD_FRE)) {
-    zxlogf(ERROR, "ahci.%u: cannot enable port without FRE enabled", num_);
+    FDF_LOG(ERROR, "port %u: cannot enable port without FRE enabled", num_);
     return ZX_ERR_BAD_STATE;
   }
   zx_status_t status =
       bus_->WaitForClear(reg_base_ + kPortCommand, AHCI_PORT_CMD_CR, zx::msec(500));
   if (status) {
-    zxlogf(ERROR, "ahci.%u: dma engine still running when enabling port", num_);
+    FDF_LOG(ERROR, "port %u: dma engine still running when enabling port", num_);
     return ZX_ERR_BAD_STATE;
   }
   cmd |= AHCI_PORT_CMD_ST;
@@ -153,7 +153,7 @@ void Port::Disable() {
   zx_status_t status =
       bus_->WaitForClear(reg_base_ + kPortCommand, AHCI_PORT_CMD_CR, zx::msec(500));
   if (status) {
-    zxlogf(ERROR, "ahci.%u: port disable timed out", num_);
+    FDF_LOG(ERROR, "port %u: port disable timed out", num_);
   }
 }
 
@@ -169,7 +169,7 @@ void Port::Reset() {
       reg_base_ + kPortTaskFileData, AHCI_PORT_TFD_BUSY | AHCI_PORT_TFD_DATA_REQUEST, zx::sec(1));
   if (status != ZX_OK) {
     // if busy is not cleared, do a full comreset
-    zxlogf(TRACE, "ahci.%u: timed out waiting for port idle, resetting", num_);
+    FDF_LOG(TRACE, "port %u: timed out waiting for port idle, resetting", num_);
     // v1.3.1, 10.4.2 port reset
     uint32_t sctl =
         AHCI_PORT_SCTL_IPM_ACTIVE | AHCI_PORT_SCTL_IPM_PARTIAL | AHCI_PORT_SCTL_DET_INIT;
@@ -186,7 +186,7 @@ void Port::Reset() {
   // wait for device detect
   status = bus_->WaitForSet(reg_base_ + kPortSataStatus, AHCI_PORT_SSTS_DET_PRESENT, zx::sec(1));
   if (status < 0) {
-    zxlogf(TRACE, "ahci.%u: no device detected", num_);
+    FDF_LOG(TRACE, "port %u: no device detected", num_);
   }
 
   // clear error
@@ -238,7 +238,7 @@ bool Port::Complete() {
       }
       // Timed out.
       zx::duration delta = now - txn->timeout;
-      zxlogf(ERROR, "ahci: txn time out on port %d txn %p (%ld ms)", num_, txn, delta.to_msecs());
+      FDF_LOG(ERROR, "port %u: timed out txn %p (%ld ms)", num_, txn, delta.to_msecs());
       txn->timeout = zx::time::infinite_past();  // Signal that timeout occurred.
     }
     // Completed or timed out.
@@ -261,7 +261,7 @@ bool Port::Complete() {
     if (txn->timeout == zx::time::infinite_past()) {
       txn->Complete(ZX_ERR_TIMED_OUT);
     } else {
-      zxlogf(TRACE, "ahci.%u: complete txn %p", num_, txn);
+      FDF_LOG(TRACE, "port %u: complete txn %p", num_, txn);
       txn->Complete(ZX_OK);
     }
   }
@@ -357,7 +357,7 @@ zx_status_t Port::TxnBeginLocked(uint32_t slot, SataTransaction* txn) {
       ((offset_vmo & (AHCI_PAGE_SIZE - 1)) + bytes + (AHCI_PAGE_SIZE - 1)) / AHCI_PAGE_SIZE;
   zx_paddr_t pages[AHCI_MAX_PAGES];
   if (pagecount > AHCI_MAX_PAGES) {
-    zxlogf(TRACE, "ahci.%u: txn %p too many pages (%zu)", num_, txn, pagecount);
+    FDF_LOG(TRACE, "port %u: txn %p too many pages (%zu)", num_, txn, pagecount);
     return ZX_ERR_INVALID_ARGS;
   }
 
@@ -370,7 +370,7 @@ zx_status_t Port::TxnBeginLocked(uint32_t slot, SataTransaction* txn) {
     zx_status_t st = bus_->BtiPin(options, vmo, offset_vmo & ~AHCI_PAGE_MASK,
                                   pagecount * AHCI_PAGE_SIZE, pages, pagecount, &pmt);
     if (st != ZX_OK) {
-      zxlogf(TRACE, "ahci.%u: failed to pin pages, err = %d", num_, st);
+      FDF_LOG(TRACE, "port %u: failed to pin pages, err = %d", num_, st);
       return st;
     }
     txn->pmt = pmt.release();
@@ -436,10 +436,10 @@ zx_status_t Port::TxnBeginLocked(uint32_t slot, SataTransaction* txn) {
     if (length == 0) {
       break;
     } else if (length > AHCI_PRD_MAX_SIZE) {
-      zxlogf(ERROR, "ahci.%u: chunk size > %zu is unsupported", num_, length);
+      FDF_LOG(ERROR, "port %u: chunk size > %zu is unsupported", num_, length);
       return ZX_ERR_NOT_SUPPORTED;
     } else if (cl->prdtl == AHCI_MAX_PRDS) {
-      zxlogf(ERROR, "ahci.%u: txn with more than %d chunks is unsupported", num_, cl->prdtl);
+      FDF_LOG(ERROR, "port %u: txn with more than %d chunks is unsupported", num_, cl->prdtl);
       return ZX_ERR_NOT_SUPPORTED;
     }
 
@@ -450,13 +450,14 @@ zx_status_t Port::TxnBeginLocked(uint32_t slot, SataTransaction* txn) {
     cl->prdtl++;
   }
 
-  zxlogf(TRACE,
-         "ahci.%u: do_txn txn %p (%c) offset 0x%" PRIx64 " length 0x%" PRIx64 " slot %d prdtl %u\n",
-         num_, txn, cl->w ? 'w' : 'r', lba, count, slot, cl->prdtl);
-  if (zxlog_level_enabled(TRACE)) {
+  FDF_LOG(TRACE,
+          "port %u: do_txn txn %p (%c) offset 0x%" PRIx64 " length 0x%" PRIx64
+          " slot %d prdtl %u\n",
+          num_, txn, cl->w ? 'w' : 'r', lba, count, slot, cl->prdtl);
+  if (fdf::Logger::GlobalInstance()->GetSeverity() <= FUCHSIA_LOG_TRACE) {
     for (uint32_t i = 0; i < cl->prdtl; i++) {
       ahci_prd_t* prd = &mem_->tab[slot].prd[i];
-      zxlogf(TRACE, "%04u: dbau=0x%08x dba=0x%08x dbc=0x%x", i, prd->dbau, prd->dba, prd->dbc);
+      FDF_LOG(TRACE, "%04u: dbau=0x%08x dba=0x%08x dbc=0x%x", i, prd->dbau, prd->dba, prd->dbc);
     }
   }
 
@@ -483,7 +484,7 @@ bool Port::HandleIrq() {
     RegWrite(kPortSataError, serr & ~0x1);
   }
   if (int_status & AHCI_PORT_INT_ERROR) {  // error
-    zxlogf(ERROR, "ahci.%u: error is=0x%08x", num_, int_status);
+    FDF_LOG(ERROR, "port %u: error is=0x%08x", num_, int_status);
     TxnComplete(ZX_ERR_INTERNAL);
     return true;
   } else if (int_status) {
