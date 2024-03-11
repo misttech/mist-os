@@ -262,6 +262,14 @@ impl MockRunner {
         }
     }
 
+    /// If the runner has ran a component with this URL, forget this fact.
+    /// This is useful when `wait_for_url` is to be used repeatedly to run a
+    /// component with the same URL.
+    pub fn reset_wait_for_url(&self, expected_url: &str) {
+        let mut inner = self.inner.lock().unwrap();
+        inner.urls_run.retain(|url| url != expected_url);
+    }
+
     pub fn abort_controller(&self, koid: &Koid) {
         let state = self.inner.lock().unwrap();
         let controller = state.controllers.get(koid).expect("koid was not available");

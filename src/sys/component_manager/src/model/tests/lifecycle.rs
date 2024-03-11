@@ -584,7 +584,7 @@ async fn on_terminate_exit_triggers_reboot() {
 
     // Start the critical component and cause it to 'exit' by making the runner close its end
     // of the controller channel. This should cause the Admin protocol to receive a reboot request.
-    root.start_instance(&vec!["system"].try_into().unwrap(), &StartReason::Debug).await.unwrap();
+    test.start_instance_and_wait_start(&vec!["system"].try_into().unwrap()).await.unwrap();
     let component = root.find_and_maybe_resolve(&vec!["system"].try_into().unwrap()).await.unwrap();
     let info = ComponentInfo::new(component.clone()).await;
     test.mock_runner.wait_for_url("test:///system_resolved").await;
@@ -665,7 +665,7 @@ async fn on_terminate_with_missing_reboot_protocol_panics() {
     // the controller channel. component_manager should attempt to send a reboot request, which
     // should fail because the reboot protocol isn't exposed to it -- expect component_manager to
     // respond by crashing.
-    root.start_instance(&vec!["system"].try_into().unwrap(), &StartReason::Debug).await.unwrap();
+    test.start_instance_and_wait_start(&vec!["system"].try_into().unwrap()).await.unwrap();
     let component = root.find_and_maybe_resolve(&vec!["system"].try_into().unwrap()).await.unwrap();
     let info = ComponentInfo::new(component.clone()).await;
     test.mock_runner.wait_for_url("test:///system_resolved").await;
@@ -716,7 +716,7 @@ async fn on_terminate_with_failed_reboot_panics() {
     // Start the critical component and cause it to 'exit' by making the runner close its end
     // of the controller channel. Admin protocol should receive a reboot request -- make it fail
     // and expect component_manager to respond by crashing.
-    root.start_instance(&vec!["system"].try_into().unwrap(), &StartReason::Debug).await.unwrap();
+    test.start_instance_and_wait_start(&vec!["system"].try_into().unwrap()).await.unwrap();
     let component = root.find_and_maybe_resolve(&vec!["system"].try_into().unwrap()).await.unwrap();
     let info = ComponentInfo::new(component.clone()).await;
     test.mock_runner.wait_for_url("test:///system_resolved").await;

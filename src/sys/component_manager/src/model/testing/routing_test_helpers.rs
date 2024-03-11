@@ -595,31 +595,31 @@ impl RoutingTest {
         reason: StartReason,
         wait_for_start: bool,
     ) -> Result<String, ModelError> {
-        self.model.root().start_instance(moniker, &reason).await?;
-        let component_name = match moniker.path().last() {
-            Some(part) => part.name().to_string(),
-            None => self.root_component_name.to_string(),
-        };
-        if wait_for_start {
-            let resolved_url = Self::resolved_url(&component_name);
-            self.mock_runner.wait_for_url(&resolved_url).await;
-        }
-        Ok(component_name)
+        self.start_and_get_instance(moniker, reason, wait_for_start).await.map(|v| v.1)
     }
 
-    pub async fn start_and_get_instance<'a>(
+    pub async fn start_and_get_instance(
         &self,
         moniker: &Moniker,
         reason: StartReason,
         wait_for_start: bool,
     ) -> Result<(Arc<ComponentInstance>, String), ModelError> {
-        let instance = self.model.root().start_instance(moniker, &reason).await?;
         let component_name = match moniker.path().last() {
             Some(part) => part.name().to_string(),
             None => self.root_component_name.to_string(),
         };
+        let resolved_url = Self::resolved_url(&component_name);
         if wait_for_start {
-            let resolved_url = Self::resolved_url(&component_name);
+            let is_started = {
+                let component = self.model.root().find_and_maybe_resolve(moniker).await?;
+                component.is_started().await
+            };
+            if !is_started {
+                self.mock_runner.reset_wait_for_url(&resolved_url);
+            }
+        }
+        let instance = self.model.root().start_instance(moniker, &reason).await?;
+        if wait_for_start {
             self.mock_runner.wait_for_url(&resolved_url).await;
         }
 
