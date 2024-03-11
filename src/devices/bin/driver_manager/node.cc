@@ -398,7 +398,9 @@ Node::~Node() {
   }
 
   if (composite_rebind_completer_.has_value() && composite_rebind_completer_.value()) {
-    composite_rebind_completer_.value()(zx::ok());
+    LOGF(WARNING, "Unable to rebind node %s since it deallocated before completing shutdown",
+         MakeComponentMoniker().c_str());
+    composite_rebind_completer_.value()(zx::error(ZX_ERR_CANCELED));
     composite_rebind_completer_.reset();
   }
 }

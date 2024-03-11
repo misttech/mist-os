@@ -290,10 +290,10 @@ TEST_F(Dfv2NodeTest, RemoveCompositeNodeForRebind_Dealloc) {
   ASSERT_EQ(1u, parent_node_1->children().size());
   ASSERT_EQ(1u, parent_node_2->children().size());
 
-  auto remove_callback_succeeded = false;
-  composite->RemoveCompositeNodeForRebind([&remove_callback_succeeded](zx::result<> result) {
-    if (result.is_ok()) {
-      remove_callback_succeeded = true;
+  bool is_cancelled = false;
+  composite->RemoveCompositeNodeForRebind([&is_cancelled](zx::result<> result) {
+    if (result.is_error()) {
+      is_cancelled = result.error_value() == ZX_ERR_CANCELED;
     }
   });
   RunLoopUntilIdle();
@@ -304,7 +304,7 @@ TEST_F(Dfv2NodeTest, RemoveCompositeNodeForRebind_Dealloc) {
   parent_node_2.reset();
   composite.reset();
   RunLoopUntilIdle();
-  ASSERT_TRUE(remove_callback_succeeded);
+  ASSERT_TRUE(is_cancelled);
 }
 
 TEST_F(Dfv2NodeTest, RestartOnCrashComposite) {
