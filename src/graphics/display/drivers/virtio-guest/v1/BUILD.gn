@@ -25,6 +25,20 @@ group("tests") {
   ]
 }
 
+source_set("gpu_control_server") {
+  sources = [
+    "gpu-control-server.cc",
+    "gpu-control-server.h",
+  ]
+  public_deps = [
+    "//sdk/fidl/fuchsia.gpu.virtio:fuchsia.gpu.virtio_cpp",
+    "//sdk/lib/component/outgoing/cpp",
+    "//sdk/lib/driver/runtime:driver_runtime_cpp",
+    "//src/devices/bin/driver_runtime",
+    "//src/lib/ddk",
+  ]
+}
+
 source_set("common_srcs") {
   configs += [ "//build/config:all_source" ]
   sources = [
@@ -40,6 +54,7 @@ source_set("common_srcs") {
     "virtio-pci-device.h",
   ]
   public_deps = [
+    ":gpu_control_server",
     "//sdk/banjo/fuchsia.hardware.display.controller:fuchsia.hardware.display.controller_banjo_cpp",
     "//sdk/fidl/fuchsia.hardware.sysmem:fuchsia.hardware.sysmem_cpp",
     "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_cpp",
