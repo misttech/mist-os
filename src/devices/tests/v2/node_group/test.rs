@@ -12,7 +12,7 @@ use {
     fuchsia_zircon as zx,
     futures::prelude::*,
     futures::{channel::mpsc, StreamExt, TryStreamExt},
-    realm_proxy_client::RealmProxyClient,
+    realm_proxy_client::{extend_namespace, InstalledNamespace},
     tracing::info,
 };
 
@@ -39,14 +39,15 @@ async fn run_offers_server(
     Ok(fs.collect::<()>().await)
 }
 
-async fn create_realm(options: ftest::RealmOptions) -> Result<RealmProxyClient> {
+async fn create_realm(options: ftest::RealmOptions) -> Result<InstalledNamespace> {
     let realm_factory = connect_to_protocol::<ftest::RealmFactoryMarker>()?;
-    let (client, server) = create_endpoints();
+    let (dict_client, dict_server) = create_endpoints();
     realm_factory
-        .create_realm(options, server)
+        .create_realm2(options, dict_server)
         .await?
         .map_err(realm_proxy_client::Error::OperationError)?;
-    Ok(RealmProxyClient::from(client))
+    let ns = extend_namespace(realm_factory, dict_client).await?;
+    Ok(ns)
 }
 
 #[fuchsia::test]
@@ -78,7 +79,7 @@ async fn test_nodegroup() -> Result<()> {
         ..Default::default()
     };
 
-    let _realm = create_realm(realm_options).await?;
+    let _test_ns = create_realm(realm_options).await?;
     info!("connected to the test realm!");
 
     let (sender, mut receiver) = mpsc::channel(1);

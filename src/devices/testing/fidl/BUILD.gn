@@ -7,6 +7,7 @@ import("//build/fidl/fidl.gni")
 fidl("fuchsia.driver.testing") {
   sources = [ "realm_factory.test.fidl" ]
   public_deps = [
+    "//sdk/fidl/fuchsia.component.sandbox",
     "//sdk/fidl/fuchsia.driver.test",
     "//sdk/fidl/fuchsia.io",
     "//sdk/fidl/fuchsia.testing.harness",

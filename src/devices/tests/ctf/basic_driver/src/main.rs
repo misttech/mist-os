@@ -5,18 +5,18 @@
 use std::collections::HashSet;
 
 use anyhow::{anyhow, Error, Result};
-use fidl::endpoints::{create_endpoints, DiscoverableProtocolMarker, ServiceMarker};
+use fidl::endpoints::{create_endpoints, create_proxy, DiscoverableProtocolMarker, ServiceMarker};
 use fidl_fuchsia_basicdriver_ctftest as ctf;
 use fidl_fuchsia_driver_test as fdt;
 use fidl_fuchsia_driver_testing as ftest;
 use fidl_fuchsia_io as fio;
 use fuchsia_async as fasync;
-use fuchsia_component::client::connect_to_protocol;
+use fuchsia_component::client::{connect_to_protocol, connect_to_service_instance_at};
 use fuchsia_component::server::ServiceFs;
 use fuchsia_fs::directory::WatchEvent;
 use futures::channel::mpsc;
 use futures::prelude::*;
-use realm_proxy_client::RealmProxyClient;
+use realm_proxy_client::{extend_namespace, InstalledNamespace};
 use tracing::info;
 
 async fn run_waiter_server(mut stream: ctf::WaiterRequestStream, mut sender: mpsc::Sender<()>) {
@@ -40,14 +40,15 @@ async fn run_offers_server(
     Ok(fs.collect::<()>().await)
 }
 
-async fn create_realm(options: ftest::RealmOptions) -> Result<RealmProxyClient> {
+async fn create_realm(options: ftest::RealmOptions) -> Result<InstalledNamespace> {
     let realm_factory = connect_to_protocol::<ftest::RealmFactoryMarker>()?;
-    let (client, server) = create_endpoints();
+    let (dict_client, dict_server) = create_endpoints();
     realm_factory
-        .create_realm(options, server)
+        .create_realm2(options, dict_server)
         .await?
         .map_err(realm_proxy_client::Error::OperationError)?;
-    Ok(RealmProxyClient::from(client))
+    let ns = extend_namespace(realm_factory, dict_client).await?;
+    Ok(ns)
 }
 
 #[fuchsia::test]
@@ -82,7 +83,7 @@ async fn test_basic_driver() -> Result<()> {
         dev_topological: Some(devfs_server),
         ..Default::default()
     };
-    let realm = create_realm(realm_options).await?;
+    let test_ns = create_realm(realm_options).await?;
     info!("connected to the test realm!");
 
     // Setup our offers to provide the Waiter, and wait to receive the waiter ack event.
@@ -102,7 +103,13 @@ async fn test_basic_driver() -> Result<()> {
     // Connect to the device. We have already received an ack from the driver, but sometimes
     // seeing the item in the service directory doesn't happen immediately. So we wait for a
     // corresponding directory watcher event.
-    let service = realm.open_service::<ctf::ServiceMarker>().await?;
+    let (service, server) = create_proxy::<fio::DirectoryMarker>().unwrap();
+    fdio::open(
+        &format!("{}/{}", test_ns.prefix(), ctf::ServiceMarker::SERVICE_NAME),
+        fio::OpenFlags::RIGHT_READABLE,
+        server.into_channel(),
+    )
+    .unwrap();
     let mut watcher = fuchsia_fs::directory::Watcher::new(&service).await?;
     let mut instances: HashSet<String> = Default::default();
     let mut event = None;
@@ -127,9 +134,10 @@ async fn test_basic_driver() -> Result<()> {
         ));
     }
 
-    let service_instance = realm
-        .connect_to_service_instance::<ctf::ServiceMarker>(instances.iter().next().unwrap())
-        .await?;
+    let service_instance = connect_to_service_instance_at::<ctf::ServiceMarker>(
+        test_ns.prefix(),
+        instances.iter().next().unwrap(),
+    )?;
     let device = service_instance.connect_to_device()?;
 
     // Talk to the device!
