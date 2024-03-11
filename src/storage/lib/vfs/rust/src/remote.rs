@@ -9,7 +9,6 @@ mod tests;
 
 use {
     crate::{
-        common::send_on_open_with_error,
         directory::entry::{DirectoryEntry, EntryInfo, OpenRequest},
         execution_scope::ExecutionScope,
         path::Path,

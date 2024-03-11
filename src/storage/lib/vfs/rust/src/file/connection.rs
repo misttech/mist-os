@@ -519,7 +519,7 @@ struct FileConnection<U> {
 impl<T: 'static + File, U: Deref<Target = OpenNode<T>> + DerefMut + IoOpHandler> FileConnection<U> {
     async fn handle_requests(mut self, mut requests: fio::FileRequestStream) {
         while let Some(request) = requests.next().await {
-            let Some(_guard) = self.scope.try_active_guard() else { break };
+            let _guard = self.scope.active_guard();
 
             let state = match request {
                 Err(_) => {

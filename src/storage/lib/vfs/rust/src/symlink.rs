@@ -99,7 +99,7 @@ impl<T: Symlink> Connection<T> {
     pub async fn run(mut self, object_request: ObjectRequest) {
         if let Ok(mut requests) = object_request.into_request_stream(&self).await {
             while let Some(Ok(request)) = requests.next().await {
-                let Some(_guard) = self.scope.try_active_guard() else { break };
+                let _guard = self.scope.active_guard();
                 if self.handle_request(request).await.unwrap_or(true) {
                     break;
                 }

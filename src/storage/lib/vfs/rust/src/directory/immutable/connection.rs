@@ -29,7 +29,7 @@ pub struct ImmutableConnection {
 impl ImmutableConnection {
     async fn handle_requests(mut self, mut requests: fio::DirectoryRequestStream) {
         while let Ok(Some(request)) = requests.try_next().await {
-            let Some(_guard) = self.base.scope.try_active_guard() else { break };
+            let _guard = self.base.scope.active_guard();
             if !matches!(self.base.handle_request(request).await, Ok(ConnectionState::Alive)) {
                 break;
             }

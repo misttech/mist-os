@@ -34,6 +34,9 @@ use {
     },
 };
 
+#[cfg(target_os = "fuchsia")]
+use {fuchsia_async::EHandle, std::sync::OnceLock};
+
 pub type SpawnError = task::SpawnError;
 
 /// An execution scope that is hosting tasks for a group of connections.  See the module level
@@ -46,15 +49,17 @@ pub type SpawnError = task::SpawnError;
 ///
 /// Use [`ExecutionScope::new()`] or [`ExecutionScope::build()`] to construct new
 /// `ExecutionScope`es.
+#[derive(Clone)]
 pub struct ExecutionScope {
     executor: Arc<Executor>,
-
     entry_constructor: Option<Arc<dyn EntryConstructor + Send + Sync>>,
 }
 
 struct Executor {
     inner: Mutex<Inner>,
     token_registry: TokenRegistry,
+    #[cfg(target_os = "fuchsia")]
+    async_executor: OnceLock<EHandle>,
 }
 
 struct Inner {
@@ -103,12 +108,8 @@ impl Inner {
     }
 
     // Registers a task. If task_id == usize, it means this is the first time the task has been
-    // registered. Returns true if the executor has been shut down and this task should terminate
-    // (which is the case if the active count is zero).
-    fn register_task(&mut self, task_id: &mut usize, waker: std::task::Waker) -> bool {
-        if self.is_shutdown && self.active_count == 0 {
-            return true;
-        }
+    // registered.
+    fn register_task(&mut self, task_id: &mut usize, waker: std::task::Waker) {
         if *task_id == usize::MAX {
             // Balance the increment to `active_count` in `spawn`.
             self.active_count -= 1;
@@ -117,7 +118,6 @@ impl Inner {
         } else {
             *self.registered.get_mut(*task_id).unwrap() = waker;
         }
-        false
     }
 }
 
@@ -132,7 +132,7 @@ impl ExecutionScope {
     /// accepting additional parameters.  Run [`ExecutionScopeParams::new()`] to get an actual
     /// [`ExecutionScope`] object.
     pub fn build() -> ExecutionScopeParams {
-        ExecutionScopeParams { entry_constructor: None }
+        ExecutionScopeParams::default()
     }
 
     /// Sends a `task` to be executed in this execution scope.  This is very similar to
@@ -155,7 +155,7 @@ impl ExecutionScope {
         // TODO(https://fxbug.dev/42182949): Make fasync implement a single API that can handle
         // both of these cases.
         #[cfg(target_os = "fuchsia")]
-        fuchsia_async::EHandle::local().spawn_detached(TaskRunner {
+        self.executor.async_executor().spawn_detached(TaskRunner {
             task,
             task_state: TaskState { executor: self.executor.clone(), task_id: usize::MAX },
         });
@@ -215,15 +215,6 @@ impl ExecutionScope {
     }
 }
 
-impl Clone for ExecutionScope {
-    fn clone(&self) -> Self {
-        ExecutionScope {
-            executor: self.executor.clone(),
-            entry_constructor: self.entry_constructor.as_ref().map(Arc::clone),
-        }
-    }
-}
-
 impl PartialEq for ExecutionScope {
     fn eq(&self, other: &Self) -> bool {
         Arc::as_ptr(&self.executor) == Arc::as_ptr(&other.executor)
@@ -238,14 +229,24 @@ impl std::fmt::Debug for ExecutionScope {
     }
 }
 
+#[derive(Default)]
 pub struct ExecutionScopeParams {
     entry_constructor: Option<Arc<dyn EntryConstructor + Send + Sync>>,
+    #[cfg(target_os = "fuchsia")]
+    async_executor: Option<EHandle>,
 }
 
 impl ExecutionScopeParams {
     pub fn entry_constructor(mut self, value: Arc<dyn EntryConstructor + Send + Sync>) -> Self {
         assert!(self.entry_constructor.is_none(), "`entry_constructor` is already set");
         self.entry_constructor = Some(value);
+        self
+    }
+
+    #[cfg(target_os = "fuchsia")]
+    pub fn executor(mut self, value: EHandle) -> Self {
+        assert!(self.async_executor.is_none(), "`executor` is already set");
+        self.async_executor = Some(value);
         self
     }
 
@@ -259,6 +260,8 @@ impl ExecutionScopeParams {
                     is_shutdown: false,
                     active_count: 0,
                 }),
+                #[cfg(target_os = "fuchsia")]
+                async_executor: self.async_executor.map_or_else(|| OnceLock::new(), |e| e.into()),
             }),
             entry_constructor: self.entry_constructor,
         }
@@ -297,21 +300,34 @@ impl<F: 'static + Future<Output = ()> + Send> Future for TaskRunner<F> {
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let this = self.project();
-        if this
-            .task_state
-            .executor
-            .inner
-            .lock()
-            .unwrap()
-            .register_task(&mut this.task_state.task_id, cx.waker().clone())
-        {
-            return Poll::Ready(());
+        let shutting_down = {
+            let mut executor = this.task_state.executor.inner.lock().unwrap();
+            executor.register_task(&mut this.task_state.task_id, cx.waker().clone());
+            executor.is_shutdown
+        };
+        match this.task.poll(cx) {
+            Poll::Ready(()) => Poll::Ready(()),
+            Poll::Pending => {
+                if shutting_down && this.task_state.executor.inner.lock().unwrap().active_count == 0
+                {
+                    Poll::Ready(())
+                } else {
+                    Poll::Pending
+                }
+            }
         }
-        this.task.poll(cx)
     }
 }
 
 impl Executor {
+    #[cfg(target_os = "fuchsia")]
+    fn async_executor(&self) -> &EHandle {
+        // We lazily initialize the executor rather than at construction time as there are currently
+        // a few tests that create the ExecutionScope before the async executor has been initialized
+        // (which means we cannot call EHandle::local()).
+        self.async_executor.get_or_init(|| EHandle::local())
+    }
+
     fn shutdown(&self) {
         let mut inner = self.inner.lock().unwrap();
         inner.is_shutdown = true;
@@ -548,6 +564,34 @@ mod tests {
             "`scope` returned `Arc` to an entry constructor is different from the one initially \
              set."
         );
+    }
+
+    #[cfg(target_os = "fuchsia")]
+    #[fuchsia::test]
+    async fn test_shutdown_waits_for_channels() {
+        use {fuchsia_async as fasync, fuchsia_zircon as zx};
+
+        let scope = ExecutionScope::new();
+        let (rx, tx) = zx::Channel::create();
+        let received_msg = Arc::new(AtomicBool::new(false));
+        let (sender, receiver) = futures::channel::oneshot::channel();
+        {
+            let received_msg = received_msg.clone();
+            scope.spawn(async move {
+                let mut msg_buf = zx::MessageBuf::new();
+                msg_buf.ensure_capacity_bytes(64);
+                let _ = sender.send(());
+                let _ = fasync::Channel::from_channel(rx).recv_msg(&mut msg_buf).await;
+                received_msg.store(true, Ordering::Relaxed);
+            });
+        }
+        // Wait until the spawned future has been polled once.
+        let _ = receiver.await;
+
+        tx.write(b"hello", &mut []).expect("write failed");
+        scope.shutdown();
+        scope.wait().await;
+        assert!(received_msg.load(Ordering::Relaxed));
     }
 
     mod mocks {

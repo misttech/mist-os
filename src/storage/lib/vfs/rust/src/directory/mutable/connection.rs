@@ -315,7 +315,7 @@ impl MutableConnection {
         let this = Tokenizable::new(self);
         pin_mut!(this);
         while let Ok(Some(request)) = requests.try_next().await {
-            let Some(_guard) = this.base.scope.try_active_guard() else { break };
+            let _guard = this.base.scope.active_guard();
             if !matches!(
                 Self::handle_request(Pin::as_mut(&mut this), request).await,
                 Ok(ConnectionState::Alive)
