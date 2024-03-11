@@ -5,6 +5,7 @@
 use crate::{
     device::DeviceMode,
     mm::PAGE_SIZE,
+    selinux::hooks::current_task_hooks::post_setxattr,
     signals::{send_standard_signal, SignalInfo},
     task::{CurrentTask, Kernel, WaitQueue, Waiter},
     time::utc,
@@ -1809,7 +1810,9 @@ impl FsNode {
     ) -> Result<(), Errno> {
         self.check_access(current_task, mount, Access::WRITE)?;
         self.check_trusted_attribute_access(current_task, name, || errno!(EPERM))?;
-        self.ops().set_xattr(self, current_task, name, value, op)
+        self.ops().set_xattr(self, current_task, name, value, op)?;
+        post_setxattr(current_task, self, name, value);
+        Ok(())
     }
 
     pub fn remove_xattr(
@@ -1978,6 +1981,17 @@ impl Releasable for FsNode {
 mod tests {
     use super::*;
     use crate::{testing::*, vfs::buffers::VecOutputBuffer};
+    use selinux::security_server::{Mode as SecurityServerMode, SecurityServer};
+
+    const VALID_SECURITY_CONTEXT: &'static str = "system_u:object_r:unconfined_t:s0";
+
+    fn create_test_file(current_task: &AutoReleasableTask) -> NamespaceNode {
+        current_task
+            .fs()
+            .root()
+            .create_node(&current_task, "file".into(), FileMode::IFREG, DeviceType::NONE)
+            .expect("create_node(file)")
+    }
 
     #[::fuchsia::test]
     async fn open_device_file() {
@@ -2131,5 +2145,25 @@ mod tests {
         assert_eq!(check_access(0, 3, 0o070, Access::EXEC), Ok(()));
         assert_eq!(check_access(0, 3, 0o070, Access::READ), Ok(()));
         assert_eq!(check_access(0, 3, 0o070, Access::WRITE), Ok(()));
+    }
+
+    #[::fuchsia::test]
+    async fn setxattr_set_sid() {
+        let security_server = SecurityServer::new(SecurityServerMode::Enable);
+        security_server.set_enforcing(true);
+        let (_kernel, current_task) = create_kernel_and_task_with_selinux(security_server);
+        let node = &create_test_file(&current_task).entry.node;
+        assert_eq!(None, node.info().sid);
+
+        node.set_xattr(
+            current_task.as_ref(),
+            &current_task.fs().root().mount,
+            "security.selinux".into(),
+            VALID_SECURITY_CONTEXT.into(),
+            XattrOp::Set,
+        )
+        .expect("setxattr");
+
+        assert!(node.info().sid.is_some());
     }
 }

@@ -5,7 +5,10 @@
 use std::sync::Arc;
 
 use super::thread_group_hooks::{self, SeLinuxResolvedElfState};
-use crate::task::{CurrentTask, Task, ThreadGroup};
+use crate::{
+    task::{CurrentTask, Task, ThreadGroup},
+    vfs::{FsNode, FsStr},
+};
 
 use selinux::security_server::{SecurityServer, SecurityServerStatus};
 use starnix_uapi::{errors::Errno, signals::Signal};
@@ -175,17 +178,50 @@ pub fn check_ptrace_attach_access(
     })
 }
 
+/// Attempts to update the security ID (SID) associated with `fs_node` when
+/// `name="security.selinux"` and `value` is a valid security context according to the current
+/// policy.
+pub fn post_setxattr(current_task: &CurrentTask, fs_node: &FsNode, name: &FsStr, value: &FsStr) {
+    let security_selinux_name: &FsStr = "security.selinux".into();
+    if name != security_selinux_name {
+        return;
+    }
+
+    // This hook is not fallible; no need to handle `Result` from `maybe_call_closure`.
+    let _ = maybe_call_closure(current_task, |security_server| {
+        match security_server.security_context_to_sid(value) {
+            // Update node SID value if a SID is found to be associated with new security context
+            // string.
+            Ok(sid) => {
+                fs_node.update_info(|info| info.sid = Some(sid));
+            }
+            // Clear any existing node SID if none is associated with new security context string.
+            Err(_) => {
+                fs_node.update_info(|info| info.sid = None);
+            }
+        }
+
+        Ok(())
+    });
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::testing::{
-        create_kernel_and_task, create_kernel_and_task_with_selinux,
-        create_kernel_task_and_unlocked, create_kernel_task_and_unlocked_with_selinux, create_task,
-        AutoReleasableTask,
+    use crate::{
+        testing::{
+            create_kernel_and_task, create_kernel_and_task_with_selinux,
+            create_kernel_task_and_unlocked, create_kernel_task_and_unlocked_with_selinux,
+            create_task, AutoReleasableTask,
+        },
+        vfs::NamespaceNode,
     };
     use selinux::security_server::Mode;
-    use starnix_uapi::signals::SIGTERM;
+    use starnix_uapi::{device_type::DeviceType, file_mode::FileMode, signals::SIGTERM};
     use tests::thread_group_hooks::SeLinuxThreadGroupState;
+
+    const VALID_SECURITY_CONTEXT: &'static str = "system_u:object_r:unconfined_t:s0";
+    const DIFFERENT_VALID_SECURITY_CONTEXT: &'static str = "system_u:object_r:unconfined_t:s1";
 
     fn create_task_pair_with_selinux_disabled() -> (AutoReleasableTask, AutoReleasableTask) {
         let (kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
@@ -209,6 +245,14 @@ mod tests {
             create_kernel_task_and_unlocked_with_selinux(security_server);
         let another_task = create_task(&mut locked, &kernel, "another-task");
         (current_task, another_task)
+    }
+
+    fn create_test_file(current_task: &AutoReleasableTask) -> NamespaceNode {
+        current_task
+            .fs()
+            .root()
+            .create_node(&current_task, "file".into(), FileMode::IFREG, DeviceType::NONE)
+            .expect("create_node(file)")
     }
 
     #[fuchsia::test]
@@ -441,5 +485,148 @@ mod tests {
     async fn ptrace_attach_access_allowed_for_permissive_mode() {
         let (tracer_task, tracee_task) = create_task_pair_with_permissive_selinux();
         assert_eq!(check_ptrace_attach_access(&tracer_task, &tracee_task), Ok(()));
+    }
+
+    #[fuchsia::test]
+    async fn post_setxattr_noop_selinux_disabled() {
+        let (_kernel, current_task) = create_kernel_and_task();
+        let node = &create_test_file(&current_task).entry.node;
+        assert_eq!(None, node.info().sid);
+
+        post_setxattr(
+            current_task.as_ref(),
+            node.as_ref(),
+            "security.selinux".into(),
+            VALID_SECURITY_CONTEXT.into(),
+        );
+
+        assert_eq!(None, node.info().sid);
+    }
+
+    #[fuchsia::test]
+    async fn post_setxattr_noop_selinux_fake() {
+        let security_server = SecurityServer::new(Mode::Fake);
+        let (_kernel, current_task) = create_kernel_and_task_with_selinux(security_server);
+        let node = &create_test_file(&current_task).entry.node;
+        assert_eq!(None, node.info().sid);
+
+        post_setxattr(
+            current_task.as_ref(),
+            node.as_ref(),
+            "security.selinux".into(),
+            VALID_SECURITY_CONTEXT.into(),
+        );
+
+        assert_eq!(None, node.info().sid);
+    }
+
+    #[fuchsia::test]
+    async fn post_setxattr_noop_selinux_permissive() {
+        let security_server = SecurityServer::new(Mode::Enable);
+        security_server.set_enforcing(false);
+        let (_kernel, current_task) = create_kernel_and_task_with_selinux(security_server);
+        let node = &create_test_file(&current_task).entry.node;
+        assert_eq!(None, node.info().sid);
+
+        post_setxattr(
+            current_task.as_ref(),
+            node.as_ref(),
+            "security.selinux".into(),
+            VALID_SECURITY_CONTEXT.into(),
+        );
+
+        assert_eq!(None, node.info().sid);
+    }
+
+    #[fuchsia::test]
+    async fn post_setxattr_noop_different_name() {
+        let security_server = SecurityServer::new(Mode::Enable);
+        security_server.set_enforcing(true);
+        let (_kernel, current_task) = create_kernel_and_task_with_selinux(security_server);
+        let node = &create_test_file(&current_task).entry.node;
+        assert_eq!(None, node.info().sid);
+
+        post_setxattr(
+            current_task.as_ref(),
+            node.as_ref(),
+            "security.selinu!".into(), // Note: name != "security.selinux".
+            VALID_SECURITY_CONTEXT.into(),
+        );
+
+        assert_eq!(None, node.info().sid);
+    }
+
+    #[fuchsia::test]
+    async fn post_setxattr_clear_invalid_security_context() {
+        let security_server = SecurityServer::new(Mode::Enable);
+        security_server.set_enforcing(true);
+        let (_kernel, current_task) = create_kernel_and_task_with_selinux(security_server);
+        let node = &create_test_file(&current_task).entry.node;
+        post_setxattr(
+            current_task.as_ref(),
+            node.as_ref(),
+            "security.selinux".into(),
+            VALID_SECURITY_CONTEXT.into(),
+        );
+        assert_ne!(None, node.info().sid);
+
+        post_setxattr(
+            current_task.as_ref(),
+            node.as_ref(),
+            "security.selinux".into(),
+            "!".into(), // Note: Not a valid security context.
+        );
+
+        assert_eq!(None, node.info().sid);
+    }
+
+    #[fuchsia::test]
+    async fn post_setxattr_set_sid_selinux_enforcing() {
+        let security_server = SecurityServer::new(Mode::Enable);
+        security_server.set_enforcing(true);
+        let (_kernel, current_task) = create_kernel_and_task_with_selinux(security_server);
+        let node = &create_test_file(&current_task).entry.node;
+        assert_eq!(None, node.info().sid);
+
+        post_setxattr(
+            current_task.as_ref(),
+            node.as_ref(),
+            "security.selinux".into(),
+            VALID_SECURITY_CONTEXT.into(),
+        );
+
+        assert!(node.info().sid.is_some());
+    }
+
+    #[fuchsia::test]
+    async fn post_setxattr_different_sid_for_different_context() {
+        let security_server = SecurityServer::new(Mode::Enable);
+        security_server.set_enforcing(true);
+        let (_kernel, current_task) = create_kernel_and_task_with_selinux(security_server);
+        let node = &create_test_file(&current_task).entry.node;
+        assert_eq!(None, node.info().sid);
+
+        post_setxattr(
+            current_task.as_ref(),
+            node.as_ref(),
+            "security.selinux".into(),
+            VALID_SECURITY_CONTEXT.into(),
+        );
+
+        assert!(node.info().sid.is_some());
+
+        let first_sid = node.info().sid.clone().unwrap();
+        post_setxattr(
+            current_task.as_ref(),
+            node.as_ref(),
+            "security.selinux".into(),
+            DIFFERENT_VALID_SECURITY_CONTEXT.into(),
+        );
+
+        assert!(node.info().sid.is_some());
+
+        let second_sid = node.info().sid.clone().unwrap();
+
+        assert_ne!(first_sid, second_sid);
     }
 }
