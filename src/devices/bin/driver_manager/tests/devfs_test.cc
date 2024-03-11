@@ -188,15 +188,13 @@ TEST(Devfs, PassthroughTarget) {
   Devfs devfs(root_slot);
   ASSERT_TRUE(root_slot.has_value());
   fuchsia_device_fs::ConnectionType connection_type;
-  Devnode::PassThrough passthrough(
-      fuchsia_device_fs::ConnectionType::kDevice,
-      {
-          [&loop, &connection_type](zx::channel server, fuchsia_device_fs::ConnectionType type) {
-            connection_type = type;
-            loop.Quit();
-            return ZX_OK;
-          },
-      });
+  Devnode::PassThrough passthrough({
+      [&loop, &connection_type](zx::channel server, fuchsia_device_fs::ConnectionType type) {
+        connection_type = type;
+        loop.Quit();
+        return ZX_OK;
+      },
+  });
 
   DevfsDevice device;
   ASSERT_OK(root_slot.value().add_child("test", std::nullopt, passthrough.Clone(), device));
@@ -214,69 +212,6 @@ TEST(Devfs, PassthroughTarget) {
       {
           .file_name = "test",
           .expected = fuchsia_device_fs::ConnectionType::kDevice,
-      },
-      {
-          .file_name = "test/device_controller",
-          .expected = fuchsia_device_fs::ConnectionType::kController,
-      },
-      {
-          .file_name = "test/device_protocol",
-          .expected = fuchsia_device_fs::ConnectionType::kDevice,
-      },
-  };
-
-  for (const TestRun& test : tests) {
-    SCOPED_TRACE(test.file_name);
-    zx::result file_endpoints = fidl::CreateEndpoints<fuchsia_io::Node>();
-    ASSERT_OK(file_endpoints);
-
-    ASSERT_OK(fidl::WireCall(devfs_client.value())
-                  ->Open(fuchsia_io::wire::OpenFlags(), fuchsia_io::wire::ModeType(),
-                         fidl::StringView::FromExternal(test.file_name),
-                         std::move(file_endpoints->server))
-                  .status());
-    loop.Run();
-    loop.ResetQuit();
-
-    ASSERT_EQ(connection_type, test.expected);
-  }
-}
-
-TEST(Devfs, PassthroughTargetWithDefaultNode) {
-  async::Loop loop(&kAsyncLoopConfigNoAttachToCurrentThread);
-  fs::SynchronousVfs vfs(loop.dispatcher());
-
-  std::optional<Devnode> root_slot;
-  Devfs devfs(root_slot);
-  ASSERT_TRUE(root_slot.has_value());
-  fuchsia_device_fs::ConnectionType connection_type;
-  Devnode::PassThrough passthrough(
-      fuchsia_device_fs::ConnectionType::kDevice | fuchsia_device_fs::ConnectionType::kNode,
-      {
-          [&loop, &connection_type](zx::channel server, fuchsia_device_fs::ConnectionType type) {
-            connection_type = type;
-            loop.Quit();
-            return ZX_OK;
-          },
-      });
-
-  DevfsDevice device;
-  ASSERT_OK(root_slot.value().add_child("test", std::nullopt, passthrough.Clone(), device));
-  device.publish();
-
-  zx::result devfs_client = devfs.Connect(vfs);
-  ASSERT_OK(devfs_client);
-
-  struct TestRun {
-    const char* file_name;
-    fuchsia_device_fs::ConnectionType expected;
-  };
-
-  const TestRun tests[] = {
-      {
-          .file_name = "test",
-          .expected =
-              fuchsia_device_fs::ConnectionType::kDevice | fuchsia_device_fs::ConnectionType::kNode,
       },
       {
           .file_name = "test/device_controller",

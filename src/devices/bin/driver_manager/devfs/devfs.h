@@ -38,14 +38,11 @@ class Devnode {
     // Create a Passthrough class. The client must make sure that any captures in the callback
     // live as long as the passthrough class (for this reason it's strongly recommended to use
     // owned captures).
-    explicit PassThrough(fuchsia_device_fs::ConnectionType default_connection_type,
-                         ConnectCallback callback)
-        : default_connection_type(default_connection_type),
-          connect(std::make_shared<ConnectCallback>(std::move(callback))) {}
+    explicit PassThrough(ConnectCallback callback)
+        : connect(std::make_shared<ConnectCallback>(std::move(callback))) {}
 
     PassThrough Clone() { return *this; }
 
-    fuchsia_device_fs::ConnectionType default_connection_type;
     std::shared_ptr<ConnectCallback> connect;
   };
 

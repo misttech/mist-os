@@ -24,7 +24,6 @@
 
 #include <fbl/ref_ptr.h>
 
-#include "src/devices/bin/driver_manager/devfs/allowlist.h"
 #include "src/devices/bin/driver_manager/devfs/builtin_devices.h"
 #include "src/devices/lib/log/log.h"
 #include "src/lib/fxl/strings/split_string.h"
@@ -114,7 +113,7 @@ zx_status_t Devnode::VnodeImpl::ConnectService(zx::channel channel) {
   if (!target_.has_value()) {
     return ZX_ERR_NOT_SUPPORTED;
   }
-  return (*target_->connect.get())(std::move(channel), target_->default_connection_type);
+  return (*target_->connect.get())(std::move(channel), fuchsia_device_fs::ConnectionType::kDevice);
 }
 
 zx_status_t Devnode::VnodeImpl::GetAttributes(fs::VnodeAttributes* a) {
@@ -309,19 +308,6 @@ zx_status_t Devnode::add_child(std::string_view name, std::optional<std::string_
     LOGF(WARNING, "rejecting duplicate device name '%.*s'", static_cast<int>(name.size()),
          name.data());
     return ZX_ERR_ALREADY_EXISTS;
-  }
-
-  // Set the FIDL multiplexing of the node based on the class name.
-  if (target.has_value()) {
-    if (class_name.has_value()) {
-      if (AllowMultiplexingNode(class_name.value())) {
-        target->default_connection_type |= fuchsia_device_fs::ConnectionType::kNode;
-      } else {
-        target->default_connection_type -= fuchsia_device_fs::ConnectionType::kNode;
-      }
-
-      target->default_connection_type -= fuchsia_device_fs::ConnectionType::kController;
-    }
   }
 
   // Export the device to its class directory.

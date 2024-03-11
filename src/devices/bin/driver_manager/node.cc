@@ -1341,36 +1341,34 @@ Devnode::Target Node::CreateDevfsPassthrough(
     std::optional<fuchsia_device_fs::ConnectionType> connector_supports) {
   supported_by_connector_ = connector_supports.value_or(fuchsia_device_fs::ConnectionType::kDevice);
   devfs_connector_ = std::move(connector);
-  return Devnode::PassThrough(
-      fuchsia_device_fs::ConnectionType::kDevice,
-      [node = weak_from_this(), node_name = name_](zx::channel server_end,
-                                                   fuchsia_device_fs::ConnectionType type) {
-        std::shared_ptr locked_node = node.lock();
-        if (!locked_node) {
-          LOGF(ERROR, "Node was freed before it was used for %s.", node_name.c_str());
-          return ZX_ERR_BAD_STATE;
-        }
+  return Devnode::PassThrough([node = weak_from_this(), node_name = name_](
+                                  zx::channel server_end, fuchsia_device_fs::ConnectionType type) {
+    std::shared_ptr locked_node = node.lock();
+    if (!locked_node) {
+      LOGF(ERROR, "Node was freed before it was used for %s.", node_name.c_str());
+      return ZX_ERR_BAD_STATE;
+    }
 
-        // If the connector supports all of the requested types, connect with the connector.
-        if (locked_node->devfs_connector_.has_value() &&
-            type == (locked_node->supported_by_connector_ & type)) {
-          return locked_node->ConnectDeviceInterface(std::move(server_end));
-        }
+    // If the connector supports all of the requested types, connect with the connector.
+    if (locked_node->devfs_connector_.has_value() &&
+        type == (locked_node->supported_by_connector_ & type)) {
+      return locked_node->ConnectDeviceInterface(std::move(server_end));
+    }
 
-        if (type & fuchsia_device_fs::ConnectionType::kDevice ||
-            type & fuchsia_device_fs::ConnectionType::kNode) {
-          LOGF(WARNING, "Cannot include device or node for %s.", node_name.c_str());
-        }
+    if (type & fuchsia_device_fs::ConnectionType::kDevice ||
+        type & fuchsia_device_fs::ConnectionType::kNode) {
+      LOGF(WARNING, "Cannot include device or node for %s.", node_name.c_str());
+    }
 
-        if (!(type & fuchsia_device_fs::ConnectionType::kController)) {
-          LOGF(WARNING, "Controller not requested for %s.", node_name.c_str());
-          return ZX_ERR_NOT_SUPPORTED;
-        }
+    if (!(type & fuchsia_device_fs::ConnectionType::kController)) {
+      LOGF(WARNING, "Controller not requested for %s.", node_name.c_str());
+      return ZX_ERR_NOT_SUPPORTED;
+    }
 
-        locked_node->ConnectControllerInterface(
-            fidl::ServerEnd<fuchsia_device::Controller>{std::move(server_end)});
-        return ZX_OK;
-      });
+    locked_node->ConnectControllerInterface(
+        fidl::ServerEnd<fuchsia_device::Controller>{std::move(server_end)});
+    return ZX_OK;
+  });
 }
 
 }  // namespace driver_manager

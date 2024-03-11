@@ -1,5 +1,7 @@
 # Driver FIDL multiplexing deprecation
 
+Note: this project has been completed!
+
 ## Goal & motivation
 
 The Driver Framework manages the connection between a hardware device and a
@@ -40,8 +42,7 @@ Contributors do not need to be familiar with drivers or the driver framework.
 
 ### Picking a task
 
-Each line in this
-[allowlist](/src/devices/bin/driver_manager/devfs/allowlist.cc) represents one
+Each line in the allowlist represents one
 task. These tasks can be picked at will.
 
 There is one allowlist for `fuchsia.io/Node` and one allowlist for
