@@ -6,7 +6,10 @@ use crate::{
     task::{CurrentTask, EventHandler, Kernel, Waiter},
     vfs::{
         buffers::{VecInputBuffer, VecOutputBuffer},
-        socket::{resolve_unix_socket_address, syscalls::sys_socket, SocketPeer},
+        socket::{
+            new_socket_file, resolve_unix_socket_address, SocketDomain, SocketPeer, SocketProtocol,
+            SocketType,
+        },
         FileHandle, FsStr, FsString,
     },
 };
@@ -20,7 +23,7 @@ use perfetto_consumer_proto::perfetto::protos::{
 use prost::Message;
 use starnix_logging::{log_error, CATEGORY_ATRACE, NAME_PERFETTO_BLOB};
 use starnix_sync::{LockBefore, Locked, ReadOps, Unlocked, WriteOps};
-use starnix_uapi::{errno, errors::Errno, vfs::FdEvents, AF_UNIX, SOCK_STREAM};
+use starnix_uapi::{errno, errors::Errno, open_flags::OpenFlags, vfs::FdEvents};
 use std::{
     collections::VecDeque,
     sync::{
@@ -120,16 +123,20 @@ struct PerfettoConnection {
 }
 
 impl PerfettoConnection {
-    /// Opens a socket sonnection to the specified socket path and initializes the requisite
+    /// Opens a socket connection to the specified socket path and initializes the requisite
     /// bookkeeping information.
     fn new(
         locked: &mut Locked<'_, Unlocked>,
         current_task: &CurrentTask,
         socket_path: &FsStr,
     ) -> Result<Self, anyhow::Error> {
-        let conn_fd = sys_socket(locked, current_task, AF_UNIX.into(), SOCK_STREAM, 0)?;
-        // TODO: There is a race condition here. The FD table might change between these two lines of code.
-        let conn_file = current_task.files.get(conn_fd)?;
+        let conn_file = new_socket_file(
+            current_task,
+            SocketDomain::Unix,
+            SocketType::Stream,
+            OpenFlags::RDWR,
+            SocketProtocol::from_raw(0),
+        )?;
         let conn_socket = conn_file.node().socket().ok_or_else(|| errno!(ENOTSOCK))?;
         let peer = SocketPeer::Handle(resolve_unix_socket_address(current_task, socket_path)?);
         conn_socket.connect(current_task, peer)?;
