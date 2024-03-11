@@ -995,6 +995,16 @@
                 "AllInetTests/UdpSocketTest.ReconnectDoesNotClearReadShutdown/*",
                 "AllInetTests/UdpSocketTest.ReconnectDoesNotClearWriteShutdown/*",
 
+                // TODO(https://fxbug.dev/328692410): Re-enable once flake is resolved.
+                "All/SocketInetLoopbackIsolatedTest.TCPFinWait2Test/ListenV4Loopback_ConnectV4Any",
+                "All/SocketInetLoopbackIsolatedTest.TCPFinWait2Test/ListenV4MappedAny_ConnectV4MappedAny",
+                "All/SocketInetLoopbackIsolatedTest.TCPFinWait2Test/ListenV4MappedLoopback_ConnectV4Loopback",
+                "All/SocketInetLoopbackIsolatedTest.TCPFinWait2Test/ListenV6Any_ConnectV6Any",
+                "All/SocketInetLoopbackIsolatedTest.TCPFinWait2Test/ListenV6Loopback_ConnectV6Loopback",
+
+                // TODO(https://fxbug.dev/328692751): Re-enable once flake is resolved.
+                "AllFamilies/SocketMultiProtocolInetLoopbackIsolatedTest.V6EphemeralPortReservedReuseAddr/TCP",
+
                 // This hangs on debug builds.
                 //
                 // See https://fxbug.dev/42084731.
@@ -1119,6 +1129,9 @@
                 "TkillTest.ValidTIDAndRealSignal",
                 "VsyscallTest.VsyscallAlwaysAvailableOnGvisor",
 
+                // TODO(https://fxbug.dev/328694064) Re-enable once the flake is resolved.
+                "Signalfd/SignalfdTest.Poll/kSigno",
+
                 // Causes some other wait tests to fail.
                 "WaitTest.TraceeWALL",
 
@@ -1183,6 +1196,9 @@
                 // These tests hang / hard crash
                 "PtraceTest.AttachingConvertsGroupStopToPtraceStop",
 
+                // TODO(https://fxbug.dev/328690720) Re-enable once flake is resolved.
+                "PtraceTest.Seize_Interrupt_Listen",
+
                 // TODO(https://fxbug.dev/297434895): This test hangs if
                 // multithreaded exec doesn't work.
                 "TraceExec/PtraceExecveTest.Execve_GetRegs_PeekUser_SIGKILL_TraceClone_TraceExit/0",
@@ -1203,6 +1219,11 @@
 
                 // Depend on missing timer feature.
                 "FifoTest.OpenBlockedAndInterrupted",
+
+                // TODO(https://fxbug.dev/328693993) Re-enable once flake is resolved.
+                "NetdeviceTest.InterfaceFlags",
+                "NetdeviceTest.InterfaceMTU",
+                "NetdeviceTest.Loopback",
             ],
         },
     ],

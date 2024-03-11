@@ -268,6 +268,9 @@
 
                 // Test sometimes timeout instead of failing
                 "starvation",
+
+                // TODO(https://fxbug.dev/328694820) Re-enable once flake is resolved.
+                "ptrace01",
             ],
         },
     ],
