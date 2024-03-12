@@ -258,7 +258,7 @@ fi
 
 if is_feature_enabled "foreground_repo_server" && [[ "$(ffx-repository-server-state)" != "disabled" ]]; then
   fx-warn "The 'foreground_repo_server' feature is now enabled by default."
-  fx-wann "If you prefer the previous behavior for now, you can set this"
+  fx-warn "If you prefer the previous behavior for now, you can set this"
   fx-warn "environment variable in (sh-type) shells where you use fx / ffx:"
   fx-warn ""
   fx-warn "$ export FUCHSIA_DISABLED_foreground_repo_server=1"
