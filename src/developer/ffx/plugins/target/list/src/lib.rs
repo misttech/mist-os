@@ -14,7 +14,6 @@ use fidl_fuchsia_developer_ffx as ffx;
 use fuchsia_async::Timer;
 use futures::{StreamExt, TryStreamExt};
 use std::collections::HashSet;
-use std::convert::TryFrom;
 use std::time::Duration;
 use timeout::timeout;
 

@@ -8,6 +8,7 @@ rustc_test("fuchsia_ui_composition_flatland_test_bin") {
   edition = "2021"
   source_root = "src/fuchsia_ui_composition_flatland_test.rs"
   sources = [ "src/fuchsia_ui_composition_flatland_test.rs" ]
+  configs += [ "//build/config/rust/lints:allow_unused_imports" ]
   deps = [
     "//sdk/fidl/fuchsia.testing.harness:fuchsia.testing.harness_rust",
     "//sdk/fidl/fuchsia.ui.composition:fuchsia.ui.composition_rust",

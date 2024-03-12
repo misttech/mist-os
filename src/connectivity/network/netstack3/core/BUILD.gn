@@ -16,6 +16,7 @@ rustc_library_with_features("netstack3-core") {
     configs += [ "//src/connectivity/network/netstack3:netstack3_configs" ]
   }
   configs -= [ "//build/config/rust/lints:allow_unused_results" ]
+  configs += [ "//build/config/rust/lints:allow_unused_imports" ]
   sources = [
     "src/algorithm.rs",
     "src/algorithm/port_alloc.rs",

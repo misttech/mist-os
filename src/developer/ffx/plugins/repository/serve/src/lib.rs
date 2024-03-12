@@ -34,7 +34,6 @@ use {
     pkg::repo::register_target_with_fidl_proxies,
     std::{fs, io::Write, path::Path, sync::Arc, time::Duration},
     timeout::timeout,
-    tracing,
 };
 
 const TIMEOUT: std::time::Duration = std::time::Duration::from_secs(15);

@@ -41,6 +41,8 @@ rustc_library("lib") {
     "//src/session/tools/*",
   ]
 
+  configs += [ "//build/config/rust/lints:allow_unused_imports" ]
+
   deps = [
     ":session_framework_metrics_registry_rustlib",
     "//sdk/fidl/fuchsia.component:fuchsia.component_rust",

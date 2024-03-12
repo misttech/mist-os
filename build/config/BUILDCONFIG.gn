@@ -605,6 +605,7 @@ default_rust_configs = [
   "//build/config/rust/lints:deny_unused_crate_dependencies",
   "//build/config/rust/lints:deny_unused_results",
   "//build/config/rust/lints:allow_unused_results",
+  "//build/config/rust/lints:deny_unused_imports",
 ]
 
 set_defaults("rustc_binary") {

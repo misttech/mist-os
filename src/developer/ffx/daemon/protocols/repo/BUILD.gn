@@ -37,6 +37,8 @@ if (is_host) {
     edition = "2021"
     with_unit_tests = true
 
+    configs += [ "//build/config/rust/lints:allow_unused_imports" ]
+
     deps = [
       ":measure_fuchsia_developer_ffx",
       "//sdk/fidl/fuchsia.pkg:fuchsia.pkg_rust",

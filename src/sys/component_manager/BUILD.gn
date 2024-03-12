@@ -286,6 +286,8 @@ rustc_binary("bin") {
     # "//third_party/rust_crates:serde_json",
     "//third_party/rust_crates:serde_json5",
   ]
+
+  configs += [ "//build/config/rust/lints:allow_unused_imports" ]
 }
 
 # This v2 component bundles component manager with a config suitable for running

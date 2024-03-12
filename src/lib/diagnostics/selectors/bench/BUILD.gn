@@ -10,6 +10,8 @@ rustc_binary("bin") {
   output_name = "selectors_benchmarks"
   edition = "2018"
 
+  configs += [ "//build/config/rust/lints:allow_unused_imports" ]
+
   deps = [
     "//src/developer/fuchsia-criterion",
     "//src/lib/diagnostics/selectors",

@@ -125,10 +125,43 @@ config("allow_unused_imports") {
   # The visibility list below enforces the list on certain areas of the tree while
   # we evaluate wider adoption.
   #
-  # To update this list run:
+  # To update this list run and insert wildcards as appropriate:
   # $ scripts/gn/gen_visibility_globs.py \
   #    --all=//build/config/rust/lints:deny_unused_imports \
   #    --allow=//build/config/rust/lints:allow_unused_imports \
   #    --ignore-suffix=_rust  # FIDL bindings use the _rust suffix
-  visibility = [ "//*" ]
+  visibility = [
+    "//sdk/ctf/tests/fidl/fuchsia.ui.composition:*",
+    "//src/connectivity/bluetooth/tools/bt-rootcanal:*",
+    "//src/connectivity/lowpan/drivers/lowpan-ot-driver:*",
+    "//src/connectivity/network/netstack3/core:*",
+    "//src/connectivity/network/tests/integration/common:*",
+    "//src/connectivity/wlan/*",
+    "//src/developer/ffx/daemon/protocols/repo:*",
+    "//src/developer/ffx/plugins/repository/serve:*",
+    "//src/developer/ffx/plugins/target:*",
+    "//src/diagnostics/archivist:*",
+    "//src/diagnostics/lib/log-command:*",
+    "//src/lib/assembly/*",
+    "//src/lib/diagnostics/selectors/bench:*",
+    "//src/lib/fuchsia-async:*",
+    "//src/lib/ui/wayland/*",
+    "//src/lib/versioning/version-history/rust/shared/*",
+    "//src/security/lib/scrutiny/*",
+    "//src/session/bin/element_launcher:*",
+    "//src/session/bin/element_manager:*",
+    "//src/session/bin/session_manager:*",
+    "//src/starnix/kernel:*",
+    "//src/storage/benchmarks/fuchsia:*",
+    "//src/storage/benchmarks/host:*",
+    "//src/storage/fxfs:*",
+    "//src/storage/lib/vfs/rust:*",
+    "//src/sys/component_manager/*",
+    "//src/sys/lib/routing:*",
+    "//src/sys/pkg/bin/pkg-cache:*",
+    "//src/sys/time/*",
+    "//src/ui/*",
+    "//tools/lib/cm_fidl_analyzer/tests:*",
+    "//vendor/*",
+  ]
 }

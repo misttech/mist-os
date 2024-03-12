@@ -12,6 +12,8 @@ rustc_binary("element_manager_bin") {
   with_unit_tests = true
   edition = "2021"
 
+  configs += [ "//build/config/rust/lints:allow_unused_imports" ]
+
   deps = [
     ":element_config",
     "//sdk/fidl/fuchsia.component:fuchsia.component_rust",

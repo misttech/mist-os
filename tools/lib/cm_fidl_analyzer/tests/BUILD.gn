@@ -10,6 +10,8 @@ rustc_test("tests") {
   edition = "2021"
   testonly = true
 
+  configs += [ "//build/config/rust/lints:allow_unused_imports" ]
+
   deps = [
     "//sdk/fidl/fuchsia.component.decl:fuchsia.component.decl_rust",
     "//sdk/fidl/fuchsia.component.internal:fuchsia.component.internal_rust",

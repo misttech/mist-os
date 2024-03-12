@@ -140,6 +140,7 @@ if (is_host) {
     ]
 
     configs += [ ":test_config" ]
+    configs += [ "//build/config/rust/lints:allow_unused_imports" ]
 
     deps = [
       "//sdk/fidl/fuchsia.component.decl:fuchsia.component.decl_rust",

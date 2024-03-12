@@ -88,6 +88,8 @@ rustc_library("starnix_core") {
     "hwasan",
   ]
 
+  configs += [ "//build/config/rust/lints:allow_unused_imports" ]
+
   sources = [
     "arch/${current_cpu}/execution.rs",
     "arch/${current_cpu}/loader.rs",

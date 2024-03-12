@@ -209,11 +209,11 @@ impl QemuBasedEngine for FemuEngine {
     }
 }
 
+#[cfg(test)]
 mod tests {
     use super::*;
-    use crate::EngineBuilder;
     use emulator_instance::NetworkingMode;
-    use std::{ffi::OsStr, fs, path::PathBuf};
+    use std::ffi::OsStr;
 
     #[test]
     fn test_build_emulator_cmd() {

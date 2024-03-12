@@ -59,6 +59,9 @@ rustc_binary("fuchsia-storage-benchmarks") {
   edition = "2021"
   testonly = true
   name = "fuchsia_storage_benchmarks"
+
+  configs += [ "//build/config/rust/lints:allow_unused_imports" ]
+
   sources = [
     "src/blob_benchmarks.rs",
     "src/blob_loader.rs",
