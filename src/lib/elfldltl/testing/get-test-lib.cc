@@ -8,6 +8,7 @@
 #include <lib/zx/channel.h>
 #include <zircon/dlfcn.h>
 #include <zircon/status.h>
+#include <zircon/types.h>
 
 #include <cerrno>
 
@@ -17,9 +18,10 @@ namespace elfldltl::testing {
 
 // The fdio open doesn't support getting an fd that will allow PROT_EXEC mmap
 // usage, i.e. yield a VMO with ZX_RIGHT_EXECUTE.  Instead, use the loader
-// service to look up the file in /pkg/lib. Note this uses gtest assertions for all
-// failures and so must be used inside a gtest TEST(...) function.
-zx::vmo GetTestLibVmo(std::string_view libname) {
+// service to look up the file in /pkg/lib. It is permissible for the VMO to not
+// be found, but otherwise gtest assertions are used for all other failures.
+// This should only be used inside a gtest Test(...) function.
+zx::vmo TryGetTestLibVmo(std::string_view libname) {
   constexpr auto init_ldsvc = []() {
     // The dl_set_loader_service API replaces the handle used by `dlopen` et al
     // and returns the old one, so initialize by borrowing that handle while
@@ -34,15 +36,22 @@ zx::vmo GetTestLibVmo(std::string_view libname) {
 
   fidl::Arena arena;
   fidl::WireResult result = fidl::WireCall(ldsvc_endpoint)->LoadObject({arena, libname});
+  // Expect the FIDL call to succeed.
   EXPECT_TRUE(result.ok()) << libname << ": " << zx_status_get_string(result.status());
-  if (!result.ok()) {
-    return {};
+  // If the VMO was not found, return an empty object.
+  if (result->rv == ZX_ERR_NOT_FOUND) {
+    return zx::vmo(ZX_HANDLE_INVALID);
   }
   EXPECT_EQ(result->rv, ZX_OK) << libname << ": " << zx_status_get_string(result->rv);
-  if (result->rv != ZX_OK) {
-    return {};
-  }
   return std::move(result->object);
+}
+
+// Note this uses gtest assertions for all failures and so must be used inside
+// a gtest TEST(...) function.
+zx::vmo GetTestLibVmo(std::string_view libname) {
+  auto vmo = TryGetTestLibVmo(libname);
+  EXPECT_TRUE(vmo) << libname << ": not found";
+  return vmo;
 }
 
 // Fuchsia-specific implementation of GetTestLib; a custom implementation is needed

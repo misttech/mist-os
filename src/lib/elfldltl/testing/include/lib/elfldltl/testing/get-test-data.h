@@ -23,6 +23,10 @@ std::filesystem::path GetTestDataPath(std::string_view filename);
 fbl::unique_fd GetTestLib(std::string_view libname);
 
 #ifdef __Fuchsia__
+
+// Get the vmo backing an arbitrary test data file, if it exists.
+zx::vmo TryGetTestLibVmo(std::string_view libname);
+
 // Get the vmo backing an arbitrary test data file.
 zx::vmo GetTestLibVmo(std::string_view libname);
 #endif
