@@ -16,14 +16,18 @@ use {
     crate::{
         capability::CapabilitySource,
         model::{
-            actions::{ActionSet, DestroyAction, ShutdownAction, ShutdownType},
+            actions::{ActionSet, DestroyAction, ShutdownAction, ShutdownType, StopAction},
             component::StartReason,
             error::{
                 ActionError, ModelError, ResolveActionError, RouteOrOpenError, StartActionError,
             },
-            routing::{Route, RouteRequest, RouteSource, RoutingError},
-            testing::{echo_service::EchoProtocol, routing_test_helpers::*, test_helpers::*},
+            routing::{router::Routable, Route, RouteRequest, RouteSource, RoutingError},
+            testing::{
+                echo_service::EchoProtocol, mocks::ControllerActionResponse, out_dir::OutDir,
+                routing_test_helpers::*, test_helpers::*,
+            },
         },
+        sandbox_util::DictExt,
     },
     ::routing::{
         capability_source::{
@@ -35,21 +39,28 @@ use {
     assert_matches::assert_matches,
     cm_rust::*,
     cm_rust_testing::*,
+    fasync::TestExecutor,
     fidl::endpoints::{ClientEnd, ProtocolMarker, ServerEnd},
-    fidl_fidl_examples_routing_echo::{self as echo},
-    fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
-    fidl_fuchsia_component_resolution as fresolution, fidl_fuchsia_component_runner as fcrunner,
-    fidl_fuchsia_component_sandbox as fsandbox, fidl_fuchsia_io as fio, fidl_fuchsia_mem as fmem,
-    fuchsia_async as fasync, fuchsia_zircon as zx,
-    futures::{channel::oneshot, join, StreamExt},
+    fidl_fidl_examples_routing_echo as echo, fidl_fuchsia_component as fcomponent,
+    fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_component_resolution as fresolution,
+    fidl_fuchsia_component_runner as fcrunner, fidl_fuchsia_component_sandbox as fsandbox,
+    fidl_fuchsia_io as fio, fidl_fuchsia_mem as fmem, fuchsia_async as fasync,
+    fuchsia_zircon as zx,
+    fuchsia_zircon::AsHandleRef,
+    futures::{
+        channel::{mpsc, oneshot},
+        join, StreamExt,
+    },
     maplit::btreemap,
     moniker::{ChildName, ChildNameBase, Moniker, MonikerBase},
+    routing::component_instance::ComponentInstanceInterface,
     routing_test_helpers::{
         default_service_capability, instantiate_common_routing_tests, RoutingTestModel,
     },
-    std::{collections::HashSet, sync::Arc},
+    sandbox::Open,
+    std::{collections::HashSet, iter, sync::Arc, task::Poll},
     tracing::warn,
-    vfs::{pseudo_directory, service},
+    vfs::{execution_scope::ExecutionScope, pseudo_directory, service},
 };
 
 instantiate_common_routing_tests! { RoutingTestBuilder }
@@ -3314,4 +3325,96 @@ async fn use_anonymized_aggregate_service() {
         },
     )
     .await;
+}
+
+/// While the provider component is stopping (waiting on stop timeout), a routing request should
+/// still be handled.
+#[fuchsia::test(allow_stalls = false)]
+async fn route_from_while_component_is_stopping() {
+    // Use mock time in this test.
+    let initial = fasync::Time::from_nanos(0);
+    TestExecutor::advance_to(initial).await;
+
+    let components = vec![(
+        "root",
+        ComponentDeclBuilder::new()
+            .capability(CapabilityBuilder::protocol().name("foo").path("/svc/foo").build())
+            .expose(ExposeBuilder::protocol().name("foo").source(ExposeSource::Self_))
+            .build(),
+    )];
+    let test_topology = ActionsTest::new(components[0].0, components, None).await;
+    let (open_request_tx, mut open_request_rx) = mpsc::unbounded();
+
+    let mut root_out_dir = OutDir::new();
+    root_out_dir.add_entry(
+        "/svc/foo".parse().unwrap(),
+        vfs::service::endpoint(move |_scope, channel| {
+            open_request_tx.unbounded_send(channel).unwrap();
+        }),
+    );
+    test_topology.runner.add_host_fn("test:///root_resolved", root_out_dir.host_fn());
+
+    // Configure the component runner to take 3 seconds to stop the component.
+    let response_delay = zx::Duration::from_seconds(3);
+    test_topology.runner.add_controller_response(
+        "test:///root_resolved",
+        Box::new(move || ControllerActionResponse {
+            close_channel: true,
+            delay: Some(response_delay),
+        }),
+    );
+
+    let root = test_topology.look_up(Moniker::default()).await;
+    assert!(!root.is_started().await);
+
+    // Start the component.
+    let root = root
+        .start_instance(&Moniker::root(), &StartReason::Root)
+        .await
+        .expect("failed to start root");
+    test_topology.runner.wait_for_urls(&["test:///root_resolved"]).await;
+    assert!(root.is_started().await);
+
+    // Start to stop the component. This will stall because the framework will be
+    // waiting the controller to respond.
+    let stop_fut = ActionSet::register(root.clone(), StopAction::new(false));
+    futures::pin_mut!(stop_fut);
+    assert_matches!(TestExecutor::poll_until_stalled(&mut stop_fut).await, Poll::Pending);
+
+    // Start to request a capability from the component.
+    let (client_end, server_end) = zx::Channel::create();
+    let output = root.lock_resolved_state().await.unwrap().component_output_dict.clone();
+    let route_and_open_fut = async {
+        // Route the capability.
+        let open: Open = output
+            .get_capability(iter::once("foo"))
+            .unwrap()
+            .route(crate::model::routing::router::Request {
+                availability: Availability::Required,
+                target: root.as_weak().into(),
+            })
+            .await
+            .unwrap()
+            .try_into_open()
+            .unwrap();
+
+        // Connect to the capability.
+        open.open(ExecutionScope::new(), fio::OpenFlags::empty(), ".", server_end);
+    };
+
+    // Both should complete after the response delay has passed.
+    let ((), stop_result, ()) = futures::join!(
+        route_and_open_fut,
+        stop_fut,
+        TestExecutor::advance_to(initial + response_delay)
+    );
+    assert_matches!(stop_result, Ok(()));
+
+    // The request should hit the outgoing directory of the component.
+    let server_end = open_request_rx.next().await.unwrap();
+    assert_eq!(
+        client_end.basic_info().unwrap().related_koid,
+        server_end.basic_info().unwrap().koid
+    );
+    assert!(root.is_started().await);
 }
