@@ -76,17 +76,6 @@ def spawn(
         fifo,
     ]
 
-    # TODO(https://fxbug.dev/322225894): This shouldn't be needed, but rust tests install a
-    # non-abort panic hook, which doesn't raise an exception that the debugger can catch. This
-    # breakpoint will ensure that the test stops if the panic hook is run. Regular rust binaries
-    # do not have this issue, so this typically isn't needed when debugging non-tests. For C++
-    # tests this will appear as a breakpoint that never resolves to any symbol.
-    if break_on_failure:
-        zxdb_args += [
-            "--execute",
-            "break std::panicking::default_hook",
-        ]
-
     # Add the requested breakpoints.
     for bp in breakpoints:
         zxdb_args += ["--execute", f"break {bp}"]

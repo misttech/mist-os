@@ -7,6 +7,7 @@ import json
 import math
 import sys
 import typing
+import zlib
 
 import event
 
@@ -99,7 +100,7 @@ def pretty_print(in_stream: typing.TextIO) -> None:
             f"Found invalid JSON data, skipping the rest and proceeding. ({e})",
             file=sys.stderr,
         )
-    except EOFError as e:
+    except (EOFError, zlib.error) as e:
         print(
             f"File may be corrupt, skipping the rest and proceeding. ({e})",
             file=sys.stderr,
