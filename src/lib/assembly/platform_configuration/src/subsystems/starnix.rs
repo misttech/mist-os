@@ -28,9 +28,6 @@ impl DefineSubsystemConfiguration<PlatformStarnixConfig> for StarnixSubsystem {
                 }
 
                 builder.platform_bundle("sensors_framework");
-                if *context.build_type == BuildType::Eng {
-                    builder.platform_bundle("sensors_playback");
-                }
 
                 builder
                     .package("starnix")
