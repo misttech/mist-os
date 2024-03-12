@@ -5,6 +5,7 @@
 #include "src/graphics/display/drivers/aml-canvas/aml-canvas.h"
 
 #include <lib/async-loop/cpp/loop.h>
+#include <lib/driver/logging/cpp/logger.h>
 #include <lib/driver/testing/cpp/driver_runtime.h>
 #include <lib/fake-bti/bti.h>
 
@@ -13,7 +14,6 @@
 #include <gtest/gtest.h>
 #include <mock-mmio-range/mock-mmio-range.h>
 
-#include "src/devices/testing/mock-ddk/mock-device.h"
 #include "src/graphics/display/drivers/aml-canvas/dmc-regs.h"
 #include "src/lib/testing/predicates/status.h"
 
@@ -44,6 +44,10 @@ constexpr int kCanvasLutAddressOffset = 0x0014 * 4;
 class AmlCanvasTest : public testing::Test {
  public:
   void SetUp() override {
+    logger_ = std::make_unique<fdf::Logger>("aml-canvas-test", FUCHSIA_LOG_INFO, zx::socket{},
+                                            fidl::WireClient<fuchsia_logger::LogSink>{});
+    fdf::Logger::SetGlobalInstance(logger_.get());
+
     zx::bti bti;
     EXPECT_OK(fake_bti_create(bti.reset_and_get_address()));
 
@@ -52,14 +56,16 @@ class AmlCanvasTest : public testing::Test {
     ASSERT_EQ(ZX_OK, endpoints.status_value());
 
     // TODO(136015): This test should invoke ::Create(), which requires a FakePDevFidl.
-    canvas_ =
-        std::make_unique<AmlCanvas>(fake_root_.get(), mmio_range_.GetMmioBuffer(), std::move(bti));
+    canvas_ = std::make_unique<AmlCanvas>(mmio_range_.GetMmioBuffer(), std::move(bti),
+                                          inspect::Inspector{});
 
     binding_.emplace(fdf::Dispatcher::GetCurrent()->async_dispatcher(),
                      std::move(endpoints->server), canvas_.get(), fidl::kIgnoreBindingClosure);
 
     canvas_client_.Bind(std::move(endpoints->client));
   }
+
+  void TearDown() override { mmio_range_.CheckAllAccessesReplayed(); }
 
   // Because this test is using a fidl::WireSyncClient, we need to run any ops on the client on
   // their own thread because the testing thread is shared with the client end.
@@ -68,12 +74,6 @@ class AmlCanvasTest : public testing::Test {
     loop.StartThread();
     zx::result result = fdf::RunOnDispatcherSync(loop.dispatcher(), std::move(task));
     ASSERT_EQ(ZX_OK, result.status_value());
-  }
-
-  void TestLifecycle() {
-    EXPECT_OK(canvas_->DdkAdd("aml-canvas"));
-    EXPECT_EQ(static_cast<const unsigned long>(1), fake_root_->child_count());  // Because gtest.
-    canvas_.release();                                                          // Now DDK-managed.
   }
 
   zx_status_t CreateNewCanvas() {
@@ -206,9 +206,9 @@ class AmlCanvasTest : public testing::Test {
     return lut_addr.reg_value();
   }
 
-  fdf_testing::DriverRuntime* runtime() { return fdf_testing::DriverRuntime::GetInstance(); }
+  fdf_testing::DriverRuntime runtime_;
+  std::unique_ptr<fdf::Logger> logger_;
 
-  std::shared_ptr<MockDevice> fake_root_{MockDevice::FakeRootParent()};
   std::vector<uint8_t> canvas_indices_;
 
   constexpr static int kMmioRangeSize = 0x100;
@@ -220,8 +220,6 @@ class AmlCanvasTest : public testing::Test {
   std::optional<fidl::ServerBinding<fuchsia_hardware_amlogiccanvas::Device>> binding_;
   fidl::WireSyncClient<fuchsia_hardware_amlogiccanvas::Device> canvas_client_;
 };
-
-TEST_F(AmlCanvasTest, DdkLifecyle) { TestLifecycle(); }
 
 TEST_F(AmlCanvasTest, CanvasConfigFreeSingle) {
   SetRegisterExpectations();

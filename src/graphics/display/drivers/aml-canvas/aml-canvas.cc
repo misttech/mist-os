@@ -4,16 +4,15 @@
 
 #include "src/graphics/display/drivers/aml-canvas/aml-canvas.h"
 
-#include <lib/ddk/binding_driver.h>
-#include <lib/ddk/debug.h>
-#include <lib/ddk/device.h>
-#include <lib/ddk/driver.h>
-#include <lib/device-protocol/pdev-fidl.h>
+#include <lib/driver/compat/cpp/logging.h>
+#include <lib/driver/outgoing/cpp/outgoing_directory.h>
+#include <lib/inspect/cpp/inspector.h>
+#include <lib/mmio/mmio-buffer.h>
 #include <lib/stdcompat/bit.h>
+#include <lib/zx/bti.h>
 #include <zircon/assert.h>
 #include <zircon/status.h>
 #include <zircon/syscalls.h>
-#include <zircon/types.h>
 
 #include <cstdint>
 #include <string>
@@ -21,13 +20,13 @@
 #include <utility>
 
 #include <fbl/algorithm.h>
-#include <fbl/alloc_checker.h>
 #include <fbl/auto_lock.h>
 
-#include "src/graphics/display/drivers/aml-canvas/board-resources.h"
 #include "src/graphics/display/drivers/aml-canvas/dmc-regs.h"
 
 namespace aml_canvas {
+
+namespace {
 
 template <typename T, typename _ = std::enable_if<std::is_unsigned_v<T>>>
 constexpr bool IsAligned(T address_or_size, T alignment) {
@@ -35,6 +34,20 @@ constexpr bool IsAligned(T address_or_size, T alignment) {
 
   const T alignment_mask = alignment - 1;
   return (address_or_size & alignment_mask) == 0;
+}
+
+}  // namespace
+
+AmlCanvas::AmlCanvas(fdf::MmioBuffer mmio, zx::bti bti, inspect::Inspector inspector)
+    : inspector_(std::move(inspector)), dmc_regs_(std::move(mmio)), bti_(std::move(bti)) {
+  inspect_root_ = inspector_.GetRoot().CreateChild("aml-canvas");
+}
+
+AmlCanvas::~AmlCanvas() {
+  fbl::AutoLock lock(&lock_);
+  for (uint32_t index = 0; index < kNumCanvasEntries; index++) {
+    entries_[index] = CanvasEntry();
+  }
 }
 
 void AmlCanvas::Config(ConfigRequestView request, ConfigCompleter::Sync& completer) {
@@ -156,111 +169,16 @@ void AmlCanvas::Free(FreeRequestView request, FreeCompleter::Sync& completer) {
   completer.ReplySuccess();
 }
 
-zx_status_t AmlCanvas::ServeOutgoing(fidl::ServerEnd<fuchsia_io::Directory> server_end) {
+zx_status_t AmlCanvas::ServeOutgoing(std::shared_ptr<fdf::OutgoingDirectory>& outgoing) {
   fuchsia_hardware_amlogiccanvas::Service::InstanceHandler handler({
       .device = bindings_.CreateHandler(this, dispatcher_, fidl::kIgnoreBindingClosure),
   });
-  auto result = outgoing_.AddService<fuchsia_hardware_amlogiccanvas::Service>(std::move(handler));
+  auto result = outgoing->AddService<fuchsia_hardware_amlogiccanvas::Service>(std::move(handler));
   if (result.is_error()) {
     zxlogf(ERROR, "Failed to add amlogiccanvas service to the outgoing directory.");
     return result.status_value();
   }
-
-  result = outgoing_.Serve(std::move(server_end));
-  if (result.is_error()) {
-    zxlogf(ERROR, "Failed to serve the outgoing directory.");
-    return result.status_value();
-  }
-
   return ZX_OK;
 }
-
-void AmlCanvas::DdkRelease() {
-  {
-    fbl::AutoLock lock(&lock_);
-    for (uint32_t index = 0; index < kNumCanvasEntries; index++) {
-      entries_[index] = CanvasEntry();
-    }
-  }
-  delete this;
-}
-
-// static
-zx_status_t AmlCanvas::Create(zx_device_t* parent) {
-  zx::result pdev_result =
-      ddk::Device<void>::DdkConnectFidlProtocol<fuchsia_hardware_platform_device::Service::Device>(
-          parent);
-  if (pdev_result.is_error()) {
-    zxlogf(ERROR, "Failed to get parent protocol: %s", pdev_result.status_string());
-    return pdev_result.error_value();
-  }
-  fidl::ClientEnd<fuchsia_hardware_platform_device::Device> pdev = std::move(pdev_result).value();
-
-  zx::result<zx::bti> bti_result = GetBti(BtiResourceIndex::kCanvas, pdev);
-  if (bti_result.is_error()) {
-    zxlogf(ERROR, "Failed to get BTI handle: %s", bti_result.status_string());
-    return bti_result.status_value();
-  }
-
-  zx::result<fdf::MmioBuffer> mmio_result = MapMmio(MmioResourceIndex::kDmc, pdev);
-  if (mmio_result.is_error()) {
-    zxlogf(ERROR, "Failed to map DMC registers: %s", mmio_result.status_string());
-    return mmio_result.status_value();
-  }
-
-  fbl::AllocChecker alloc_checker;
-  auto canvas = fbl::make_unique_checked<aml_canvas::AmlCanvas>(
-      &alloc_checker, parent, std::move(mmio_result).value(), std::move(bti_result).value());
-  if (!alloc_checker.check()) {
-    return ZX_ERR_NO_MEMORY;
-  }
-
-  canvas->inspect_root_ = canvas->inspector_.GetRoot().CreateChild("aml-canvas");
-
-  auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-  if (endpoints.is_error()) {
-    return endpoints.status_value();
-  }
-
-  zx_status_t status = canvas->ServeOutgoing(std::move(endpoints->server));
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Could not serve outgoing directory %s.", zx_status_get_string(status));
-    return status;
-  }
-
-  std::array offers = {
-      fuchsia_hardware_amlogiccanvas::Service::Name,
-  };
-
-  status = canvas->DdkAdd(ddk::DeviceAddArgs("aml-canvas")
-                              .set_flags(DEVICE_ADD_ALLOW_MULTI_COMPOSITE)
-                              .set_fidl_service_offers(offers)
-                              .set_outgoing_dir(endpoints->client.TakeChannel())
-                              .set_inspect_vmo(canvas->inspector_.DuplicateVmo()));
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to add aml-canvas device: %s", zx_status_get_string(status));
-    return status;
-  }
-
-  // devmgr now owns the memory for `canvas`.
-  [[maybe_unused]] auto ptr = canvas.release();
-  return ZX_OK;
-}
-
-AmlCanvas::AmlCanvas(zx_device_t* parent, fdf::MmioBuffer mmio, zx::bti bti)
-    : DeviceType(parent), dmc_regs_(std::move(mmio)), bti_(std::move(bti)) {}
-
-AmlCanvas::~AmlCanvas() = default;
-
-namespace {
-
-constexpr zx_driver_ops_t kDriverOps = {
-    .version = DRIVER_OPS_VERSION,
-    .bind = [](void* ctx, zx_device_t* parent) { return AmlCanvas::Create(parent); }};
-
-}  // namespace
 
 }  // namespace aml_canvas
-
-// clang-format off
-ZIRCON_DRIVER(aml_canvas, aml_canvas::kDriverOps, "zircon", "0.1");

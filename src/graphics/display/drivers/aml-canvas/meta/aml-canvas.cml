@@ -3,15 +3,15 @@
 // found in the LICENSE file.
 {
     include: [
-        "//sdk/lib/driver/compat/compat.shard.cml",
+        "driver_component/driver.shard.cml",
         "inspect/client.shard.cml",
         "syslog/client.shard.cml",
     ],
     program: {
         runner: "driver",
+        binary: "driver/aml-canvas.so",
         bind: "meta/bind/aml-canvas.bindbc",
         colocate: "false",
-        compat: "driver/aml-canvas.so",
         default_dispatcher_opts: [ "allow_sync_calls" ],
         default_dispatcher_scheduler_role: "fuchsia.graphics.display.drivers.aml-canvas.device",
         fallback: "false",

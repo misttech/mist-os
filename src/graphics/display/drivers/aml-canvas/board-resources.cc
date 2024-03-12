@@ -5,7 +5,7 @@
 #include "src/graphics/display/drivers/aml-canvas/board-resources.h"
 
 #include <fidl/fuchsia.hardware.platform.device/cpp/wire.h>
-#include <lib/ddk/debug.h>
+#include <lib/driver/compat/cpp/logging.h>
 #include <lib/mmio/mmio-buffer.h>
 #include <lib/zx/bti.h>
 #include <lib/zx/result.h>
