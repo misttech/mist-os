@@ -6,8 +6,15 @@ import("//build/cpp/library_headers.gni")
 
 source_set("runtime") {
   public = [ "runtime-dynamic-linker.h" ]
-  public_deps = [ "//sdk/lib/fit" ]
-  sources = [ "runtime-dynamic-linker.cc" ]
+  public_deps = [
+    "//sdk/lib/fit",
+    "//src/lib/elfldltl",
+    "//zircon/system/ulib/fbl",
+  ]
+  sources = [
+    "module.h",
+    "runtime-dynamic-linker.cc",
+  ]
 }
 
 group("tests") {

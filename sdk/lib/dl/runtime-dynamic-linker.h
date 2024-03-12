@@ -6,9 +6,12 @@
 #define LIB_DL_RUNTIME_DYNAMIC_LINKER_H_
 
 #include <dlfcn.h>  // for RTLD_* macros
+#include <lib/elfldltl/soname.h>
 #include <lib/fit/result.h>
 
-#include <string>
+#include <fbl/intrusive_double_list.h>
+
+#include "module.h"
 
 namespace dl {
 
@@ -41,13 +44,22 @@ class RuntimeDynamicLinker {
   // TODO(https://fxbug.dev/325494781): Use an allocated buffer to store string
   // contents that is associated with dlerror.
   using Error = std::string;
+  using Soname = elfldltl::Soname<>;
 
   // Not copyable, not movable
   RuntimeDynamicLinker() = default;
   RuntimeDynamicLinker(const RuntimeDynamicLinker&) = delete;
   RuntimeDynamicLinker(RuntimeDynamicLinker&&) = delete;
 
-  fit::result<Error, void*> Open(std::string name, int mode);
+  fit::result<Error, void*> Open(const char* file, int mode);
+
+ private:
+  Module* FindModule(const Soname& name);
+
+  // The RuntimeDynamicLinker owns the list of all 'live' modules that have been
+  // loaded into the system image.
+  // TODO(https://fxbug.dev/324136831): support startup modules
+  fbl::DoublyLinkedList<std::unique_ptr<Module>> loaded_modules_;
 };
 
 }  // namespace dl

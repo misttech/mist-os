@@ -4,9 +4,9 @@
 
 #include "dl-impl-tests.h"
 
-#include "../runtime-dynamic-linker.h"
-
 #include <filesystem>
+
+#include "../runtime-dynamic-linker.h"
 
 namespace dl::testing {
 
@@ -16,7 +16,7 @@ constexpr std::string_view kLibprefix = LD_TEST_LIBPREFIX;
 
 fit::result<Error, void*> DlImplTests::DlOpen(const char* name, int mode) {
   std::string path = std::filesystem::path("test") / "lib" / kLibprefix / name;
-  return dynamic_linker_.Open(path, mode);
+  return dynamic_linker_.Open(path.c_str(), mode);
 }
 
 }  // namespace dl::testing
