@@ -18,8 +18,8 @@
 #include <bind/fuchsia/cpp/bind.h>
 #include <bind/fuchsia/hardware/amlogiccanvas/cpp/bind.h>
 #include <bind/fuchsia/hardware/clock/cpp/bind.h>
+#include <bind/fuchsia/hardware/tee/cpp/bind.h>
 #include <bind/fuchsia/sysmem/cpp/bind.h>
-#include <bind/fuchsia/tee/cpp/bind.h>
 #include <soc/aml-meson/g12a-clk.h>
 #include <soc/aml-s905d2/s905d2-hw.h>
 
@@ -168,13 +168,13 @@ zx_status_t Astro::VideoInit() {
   auto video_tee = fuchsia_driver_framework::ParentSpec{{
       .bind_rules =
           {
-              fdf::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
-                                      bind_fuchsia_tee::BIND_FIDL_PROTOCOL_DEVICE),
+              fdf::MakeAcceptBindRule(bind_fuchsia_hardware_tee::SERVICE,
+                                      bind_fuchsia_hardware_tee::SERVICE_ZIRCONTRANSPORT),
           },
       .properties =
           {
-              fdf::MakeProperty(bind_fuchsia::FIDL_PROTOCOL,
-                                bind_fuchsia_tee::BIND_FIDL_PROTOCOL_DEVICE),
+              fdf::MakeProperty(bind_fuchsia_hardware_tee::SERVICE,
+                                bind_fuchsia_hardware_tee::SERVICE_ZIRCONTRANSPORT),
           },
   }};
 

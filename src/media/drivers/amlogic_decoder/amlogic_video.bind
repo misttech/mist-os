@@ -8,9 +8,9 @@ using fuchsia.amlogic.platform;
 using fuchsia.clock;
 using fuchsia.hardware.amlogiccanvas;
 using fuchsia.hardware.clock;
+using fuchsia.hardware.tee;
 using fuchsia.platform;
 using fuchsia.sysmem;
-using fuchsia.tee;
 
 primary node "pdev" {
     fuchsia.BIND_PROTOCOL == fuchsia.platform.BIND_PROTOCOL.DEVICE;
@@ -43,5 +43,5 @@ node "clock-dos" {
 }
 
 optional node "tee" {
-  fuchsia.BIND_FIDL_PROTOCOL == fuchsia.tee.BIND_FIDL_PROTOCOL.DEVICE;
+  fuchsia.hardware.tee.Service == fuchsia.hardware.tee.Service.ZirconTransport;
 }

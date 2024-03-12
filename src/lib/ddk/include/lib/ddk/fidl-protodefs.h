@@ -34,7 +34,7 @@ DDK_FIDL_PROTOCOL_DEF(INTERRUPT,       12, "fuchsia.hardware.interrupt.Provider"
 // 16 was "fuchsia.hardware.power.sensor.Service"
 DDK_FIDL_PROTOCOL_DEF(VREG,            17, "fuchsia.hardware.vreg.Service")
 // 18 was "fuchsia.hardware.registers.Service"
-DDK_FIDL_PROTOCOL_DEF(TEE,             19, "fuchsia.hardware.tee.Service")
+// 19 was "fuchsia.hardware.tee.Service"
 // 20 was "fuchsia.hardware.amlogiccanvas.Service"
 // 21 was "fuchsia.hardware.power.Service"
 // 22 was "fuchsia.hardware.clock.Service"
