@@ -201,7 +201,11 @@ Device::Device(device_t device, const zx_protocol_device_t* ops, Driver* driver,
                std::optional<Device*> parent, std::shared_ptr<fdf::Logger> logger,
                async_dispatcher_t* dispatcher)
     : devfs_connector_([this](fidl::ServerEnd<fuchsia_device::Controller> controller) {
-        devfs_server_.ServeMultiplexed(controller.TakeChannel(), true);
+        devfs_server_.ServeMultiplexed(controller.TakeChannel(), false);
+      }),
+      devfs_controller_connector_([this](fidl::ServerEnd<fuchsia_device::Controller> server_end) {
+        dev_controller_bindings_.AddBinding(dispatcher_, std::move(server_end), this,
+                                            fidl::kIgnoreBindingClosure);
       }),
       devfs_server_(*this, dispatcher),
       name_(device.name),
@@ -309,7 +313,7 @@ void Device::CompleteUnbind() {
                   .and_then([this]() mutable {
                     // Remove ourself from devfs.
                     devfs_connector_.reset();
-
+                    dev_controller_bindings_.CloseAll(ZX_OK);
                     // Our unbind is finished, so close all outstanding connections to devfs
                     // clients.
                     devfs_server_.CloseAllConnections([this]() {
@@ -557,7 +561,7 @@ zx_status_t Device::CreateNode() {
 
   // Set up devfs information.
   {
-    if (!devfs_connector_.has_value()) {
+    if (!devfs_connector_.has_value() || !devfs_controller_connector_.has_value()) {
       FDF_LOGL(ERROR, *logger_, "Device %s failed to add to devfs: no devfs_connector",
                topological_path_.c_str());
       return ZX_ERR_INTERNAL;
@@ -567,6 +571,10 @@ zx_status_t Device::CreateNode() {
       devfs_connector_->binding().reset();
     }
 
+    if (devfs_controller_connector_->binding().has_value()) {
+      devfs_controller_connector_->binding().reset();
+    }
+
     zx::result connector = devfs_connector_.value().Bind(dispatcher());
     if (connector.is_error()) {
       FDF_LOGL(ERROR, *logger_, "Device %s failed to create devfs connector: %s",
@@ -574,11 +582,15 @@ zx_status_t Device::CreateNode() {
       return connector.error_value();
     }
 
+    zx::result controller_connector = devfs_controller_connector_.value().Bind(dispatcher());
+    if (controller_connector.is_error()) {
+      FDF_LOGL(ERROR, *logger_, "Device %s failed to create devfs controller_connector: %s",
+               topological_path_.c_str(), controller_connector.status_string());
+      return controller_connector.error_value();
+    }
     auto devfs_args = fdf::wire::DevfsAddArgs::Builder(arena)
                           .connector(std::move(connector.value()))
-                          .connector_supports(fuchsia_device_fs::ConnectionType::kDevice |
-                                              fuchsia_device_fs::ConnectionType::kNode |
-                                              fuchsia_device_fs::ConnectionType::kController);
+                          .controller_connector(std::move(controller_connector.value()));
     fidl::StringView class_name = ProtocolIdToClassName(device_server_.proto_id());
     if (!class_name.empty()) {
       devfs_args.class_name(class_name);
@@ -1055,7 +1067,8 @@ void Device::ConnectToDeviceFidl(ConnectToDeviceFidlRequestView request,
 
 void Device::ConnectToController(ConnectToControllerRequestView request,
                                  ConnectToControllerCompleter::Sync& completer) {
-  devfs_server_.ConnectToController(std::move(request->server));
+  dev_controller_bindings_.AddBinding(dispatcher_, std::move(request->server), this,
+                                      fidl::kIgnoreBindingClosure);
 }
 
 void Device::Bind(BindRequestView request, BindCompleter::Sync& completer) {

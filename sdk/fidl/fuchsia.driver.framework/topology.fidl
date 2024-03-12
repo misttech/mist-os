@@ -91,6 +91,14 @@ type DevfsAddArgs = resource table {
     /// If not provided, only the device type is assumed as supported by the connector.
     @available(added=16)
     4: connector_supports fuchsia.device.fs.ConnectionType;
+
+    /// This is the controller connector to be installed in devfs.
+    /// `Connect()` will be called when a client connects to the device_controller connection
+    /// for this node in the filesystem.
+    /// Optional: If this is not provided then the Node will handle the connection natively.
+    /// This option should only be used by the compat shim or in tests
+    @available(added=HEAD)
+    5: controller_connector client_end:fuchsia.device.fs.Connector;
 };
 
 /// Arguments for adding a node.

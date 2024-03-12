@@ -376,7 +376,7 @@ zx::result<std::shared_ptr<Node>> Node::CreateCompositeNode(
                 composite->MakeTopologicalPath().c_str());
 
   primary->devfs_device_.topological_node().value().add_child(
-      composite->name_, std::nullopt, composite->CreateDevfsPassthrough(std::nullopt, false),
+      composite->name_, std::nullopt, composite->CreateDevfsPassthrough(std::nullopt, std::nullopt),
       composite->devfs_device_);
   composite->devfs_device_.publish();
   return zx::ok(std::move(composite));
@@ -803,15 +803,11 @@ fit::result<fuchsia_driver_framework::wire::NodeError, std::shared_ptr<Node>> No
     if (devfs_args->class_name().has_value()) {
       devfs_class_path = devfs_args->class_name();
     }
-    // This is an unfortunate but temporary hack to deal with the fact
-    // that the compat shim routes everything through the device connection.
-    bool controller_through_device = (devfs_args->connector_supports().has_value() &&
-                                      (devfs_args->connector_supports().value() &
-                                       fuchsia_device_fs::ConnectionType::kController));
+
     devfs_target = child->CreateDevfsPassthrough(std::move(devfs_args->connector()),
-                                                 controller_through_device);
+                                                 std::move(devfs_args->controller_connector()));
   } else {
-    devfs_target = child->CreateDevfsPassthrough(std::nullopt, false);
+    devfs_target = child->CreateDevfsPassthrough(std::nullopt, std::nullopt);
   }
   ZX_ASSERT(devfs_device_.topological_node().has_value());
   zx_status_t status = devfs_device_.topological_node()->add_child(
@@ -1333,8 +1329,10 @@ void Node::GetTopologicalPath(GetTopologicalPathCompleter::Sync& completer) {
 
 zx_status_t Node::ConnectControllerInterface(
     fidl::ServerEnd<fuchsia_device::Controller> server_end) {
-  if (controller_through_device_ && devfs_connector_.has_value()) {
-    return fidl::WireCall(devfs_connector_.value())->Connect(server_end.TakeChannel()).status();
+  if (devfs_controller_connector_.has_value()) {
+    return fidl::WireCall(devfs_controller_connector_.value())
+        ->Connect(server_end.TakeChannel())
+        .status();
   }
   dev_controller_bindings_.AddBinding(dispatcher_, std::move(server_end), this,
                                       fidl::kIgnoreBindingClosure);
@@ -1350,9 +1348,9 @@ zx_status_t Node::ConnectDeviceInterface(zx::channel channel) {
 
 Devnode::Target Node::CreateDevfsPassthrough(
     std::optional<fidl::ClientEnd<fuchsia_device_fs::Connector>> connector,
-    bool controller_through_device) {
+    std::optional<fidl::ClientEnd<fuchsia_device_fs::Connector>> controller_connector) {
   devfs_connector_ = std::move(connector);
-  controller_through_device_ = controller_through_device;
+  devfs_controller_connector_ = std::move(controller_connector);
   return Devnode::PassThrough(
       [node = weak_from_this(), node_name = name_](zx::channel server_end) {
         std::shared_ptr locked_node = node.lock();

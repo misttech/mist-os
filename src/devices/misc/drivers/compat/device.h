@@ -191,6 +191,9 @@ class Device : public std::enable_shared_from_this<Device>, public devfs_fidl::D
   std::vector<fuchsia_driver_framework::wire::NodeProperty> properties_;
 
   std::optional<driver_devfs::Connector<fuchsia_device::Controller>> devfs_connector_;
+  std::optional<driver_devfs::Connector<fuchsia_device::Controller>> devfs_controller_connector_;
+
+  fidl::ServerBindingGroup<fuchsia_device::Controller> dev_controller_bindings_;
 
   devfs_fidl::DeviceServer devfs_server_;
 
