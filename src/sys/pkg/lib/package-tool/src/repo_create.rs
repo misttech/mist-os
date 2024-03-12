@@ -46,6 +46,7 @@ mod tests {
             package_archives: vec![],
             package_manifests: vec![],
             package_list_manifests: vec![],
+            product_bundle: vec![],
             metadata_current_time: Utc::now(),
             time_versioning: false,
             refresh_root: false,

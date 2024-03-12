@@ -84,6 +84,18 @@
       "hidden": false
     },
     {
+      "kind": {
+        "Option": {
+          "arg_name": "product-bundle"
+        }
+      },
+      "optionality": "repeating",
+      "long": "--product-bundle",
+      "short": null,
+      "description": "path to a product bundle",
+      "hidden": false
+    },
+    {
       "kind": "Switch",
       "optionality": "optional",
       "long": "--time-versioning",

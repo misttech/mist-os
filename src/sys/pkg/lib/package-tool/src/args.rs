@@ -182,6 +182,10 @@ pub struct RepoPublishCommand {
     #[argh(option, long = "package-archive")]
     pub package_archives: Vec<Utf8PathBuf>,
 
+    /// path to a product bundle
+    #[argh(option)]
+    pub product_bundle: Vec<Utf8PathBuf>,
+
     /// set repository version based on time rather than monotonically increasing version
     #[argh(switch)]
     pub time_versioning: bool,

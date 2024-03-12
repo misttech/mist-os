@@ -7,7 +7,7 @@ use {
         args::{RepoPMListCommand, RepoPublishCommand},
         write_depfile,
     },
-    anyhow::{format_err, Context, Result},
+    anyhow::{anyhow, format_err, Context, Result},
     camino::{Utf8Path, Utf8PathBuf},
     chrono::{TimeZone, Utc},
     fuchsia_async as fasync,
@@ -27,6 +27,7 @@ use {
         fs::{create_dir_all, File},
         io::{BufReader, BufWriter},
     },
+    tempfile::TempDir,
     tracing::{error, info, warn},
     tuf::{
         metadata::{MetadataPath, MetadataVersion, RawSignedMetadata, RootMetadata},
@@ -101,7 +102,8 @@ pub async fn cmd_repo_package_manifest_list(cmd: RepoPMListCommand) -> Result<()
         .src_trusted_root_path
         .unwrap_or(cmd.src_repo_path.join("repository").join("1.root.json"));
 
-    repo_package_manifest_list(cmd.src_repo_path, src_trusted_root_path, cmd.manifest_dir).await
+    repo_package_manifest_list(cmd.src_repo_path, Some(src_trusted_root_path), cmd.manifest_dir)
+        .await
 }
 
 async fn lock_repository(dir: &Utf8Path) -> Result<Lockfile> {
@@ -143,7 +145,7 @@ async fn repo_publish(cmd: &RepoPublishCommand) -> Result<()> {
 
 pub async fn repo_package_manifest_list(
     src_repo_path: Utf8PathBuf,
-    src_trusted_root_path: Utf8PathBuf,
+    src_trusted_root_path: Option<Utf8PathBuf>,
     manifests_dir: Utf8PathBuf,
 ) -> Result<()> {
     let package_manifest_list_path = manifests_dir.join("package_manifests.list");
@@ -154,15 +156,21 @@ pub async fn repo_package_manifest_list(
     let src_repos = get_repositories(src_repo_path)?;
     for src_repo in src_repos {
         let blobs_dir = src_repo.blob_repo_path();
-        let buf = async_fs::read(&src_trusted_root_path)
-            .await
-            .with_context(|| format!("reading trusted root {src_trusted_root_path}"))?;
+        let mut client = if let Some(ref trusted_root_path) = src_trusted_root_path {
+            let buf = async_fs::read(&trusted_root_path)
+                .await
+                .with_context(|| format!("reading trusted root {trusted_root_path}"))?;
 
-        let trusted_root = RawSignedMetadata::new(buf);
+            let trusted_root = RawSignedMetadata::new(buf);
 
-        let mut client = RepoClient::from_trusted_root(&trusted_root, &src_repo)
-            .await
-            .context("creating the src repo client")?;
+            RepoClient::from_trusted_root(&trusted_root, &src_repo)
+                .await
+                .context("creating the src repo client")?
+        } else {
+            RepoClient::from_trusted_remote(&src_repo)
+                .await
+                .with_context(|| format!("creating RepoClient from trusted remote"))?
+        };
 
         client.update().await.context("updating the src repo metadata")?;
 
@@ -261,17 +269,38 @@ async fn repo_publish_oneshot(cmd: &RepoPublishCommand) -> Result<()> {
         repo_builder.refresh_non_root_metadata(true)
     };
 
-    // Publish all the packages.
-
-    let (repo_deps, staged_blobs) = repo_builder
+    repo_builder = repo_builder
         .add_packages(cmd.package_manifests.iter().cloned())
         .await?
         .add_package_lists(cmd.package_list_manifests.iter().cloned())
         .await?
         .add_package_archives(cmd.package_archives.iter().cloned())
-        .await?
-        .commit()
         .await?;
+
+    // Add product bundle packages if requested
+
+    // Extract the product bundles into a temp dir which needs to be
+    // kept around until the manifests are committed to the repository.
+    let product_bundle_dirs = TempDir::new()?;
+
+    for (i, pb) in cmd.product_bundle.iter().enumerate() {
+        let wrkdir = product_bundle_dirs.path().join(i.to_string());
+        create_dir_all(wrkdir.clone())?;
+        let manifests_dir = Utf8PathBuf::from_path_buf(wrkdir)
+            .map_err(|e| anyhow!("error converting path into UTF-8: {:?}", e))?;
+
+        // Extract product bundle
+        repo_package_manifest_list(pb.clone(), None, manifests_dir.clone()).await?;
+
+        // Stage product bundle manifest
+        let package_manifest_list_path = manifests_dir.join("package_manifests.list");
+        repo_package_manifest_list(pb.clone(), None, manifests_dir).await?;
+        repo_builder = repo_builder.add_package_list(package_manifest_list_path).await?;
+    }
+
+    // Publish all the packages.
+
+    let (repo_deps, staged_blobs) = repo_builder.commit().await?;
     deps.extend(repo_deps);
 
     if cmd.watch {
@@ -404,7 +433,6 @@ mod tests {
         pretty_assertions::assert_eq,
         sdk_metadata::{ProductBundle, ProductBundleV2, Repository},
         std::io::Write,
-        tempfile::TempDir,
         tuf::metadata::Metadata as _,
     };
 
@@ -518,6 +546,7 @@ mod tests {
             package_archives: vec![],
             package_manifests: vec![],
             package_list_manifests: vec![],
+            product_bundle: vec![],
             metadata_current_time: Utc::now(),
             time_versioning: false,
             refresh_root: false,
@@ -866,6 +895,7 @@ mod tests {
         );
         env.validate_manifest_blobs(expected_deps);
     }
+
     #[fuchsia::test]
     async fn test_publish_packages_with_ignored_missing_packages() {
         let mut env = TestEnv::new();
@@ -1297,5 +1327,83 @@ mod tests {
                 manifest_dir.join("e2333edbf2e36a0881384cce4b77debcb629aa4535f8b7b922bba4aba85e50d9_package_manifest.json"),
             ].into(),
         );
+    }
+
+    #[fuchsia::test]
+    async fn test_publish_packages_from_optional_product_bundle() {
+        let tempdir = TempDir::new().unwrap();
+        let wrkdir = Utf8Path::from_path(tempdir.path()).unwrap();
+
+        // Make an empty repo in a subdir of wrkdir
+        let repo_dir = wrkdir.join("repo_dir");
+        let mut repo_client =
+            test_utils::make_writable_empty_repository(repo_dir.clone().into()).await.unwrap();
+        let pkg_list = repo_client.list_packages().await.unwrap();
+
+        assert_eq!(pkg_list, vec![]);
+
+        // Populate a repo with packages in a product bundle
+        let pb_dir = wrkdir.join("pb_dir");
+        let pb_metadata_dir = pb_dir.join("repository");
+        let pb_blobs_dir = pb_dir.join("repository").join("blobs");
+        test_utils::make_repo_dir(pb_metadata_dir.as_std_path(), pb_blobs_dir.as_std_path()).await;
+        let pb_client =
+            test_utils::make_file_system_repository(&pb_metadata_dir, &pb_blobs_dir).await;
+
+        let pb = ProductBundle::V2(ProductBundleV2 {
+            product_name: "".to_string(),
+            product_version: "".to_string(),
+            partitions: PartitionsConfig::default(),
+            sdk_version: "".to_string(),
+            system_a: None,
+            system_b: None,
+            system_r: None,
+            repositories: vec![Repository {
+                name: "fuchsia.com".into(),
+                metadata_path: pb_metadata_dir,
+                blobs_path: pb_blobs_dir.clone(),
+                delivery_blob_type: None,
+                root_private_key_path: None,
+                targets_private_key_path: None,
+                snapshot_private_key_path: None,
+                timestamp_private_key_path: None,
+            }],
+            update_package_hash: None,
+            virtual_devices_path: None,
+        });
+        pb.write(&pb_dir).unwrap();
+
+        let pkg_list = pb_client.list_packages().await.unwrap();
+
+        // test_utils::make_repo_dir should have created two test packages
+        // in the product bundle directory tree
+        assert_eq!(pkg_list.len(), 2);
+
+        let cmd = RepoPublishCommand {
+            package_manifests: vec![],
+            repo_path: repo_dir.to_path_buf(),
+            product_bundle: vec![pb_dir.to_path_buf()],
+            clean: true,
+            ..default_command_for_test()
+        };
+        assert_matches!(cmd_repo_publish(cmd).await, Ok(()));
+
+        repo_client.update().await.unwrap();
+
+        assert_eq!(
+            repo_client.list_packages().await.unwrap().sort(),
+            pb_client.list_packages().await.unwrap().sort(),
+        );
+
+        for entry in std::fs::read_dir(&pb_blobs_dir).unwrap() {
+            let entry = entry.unwrap();
+            let blob = entry.file_name().into_string().unwrap();
+            let repo_blob_path = repo_dir.join("repository").join("blobs").join(blob);
+
+            assert_eq!(
+                std::fs::read(entry.path()).unwrap(),
+                std::fs::read(repo_blob_path).unwrap()
+            );
+        }
     }
 }
