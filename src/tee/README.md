@@ -7,8 +7,8 @@ This directory contains support for hosting a Trusted Execution Environment insi
 The `ta` directory contains Trusted Application implementations for testing
 purposes.
 
-The `tee_internal_api` contains the definition of the TEE Internal Core API and
-will host an implementation.
+The `tee_internal_api` contains the definition and implementation of the TEE
+Internal Core API.
 
 ## Glossary
 

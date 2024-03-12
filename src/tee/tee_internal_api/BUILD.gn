@@ -13,14 +13,36 @@ config("config") {
   include_dirs = [ "include" ]
 }
 
-source_set("headers") {
+rustc_cdylib("impl") {
+  edition = "2021"
+  output_name = "tee_internal"
   public = [
     "include/lib/tee_internal_api/tee_internal_api.h",
     "include/lib/tee_internal_api/tee_internal_api_types.h",
   ]
-  public_configs = [ ":config" ]
+
+  sources = [
+    "src/binding.rs",
+    "src/binding_stubs.rs",
+    "src/lib.rs",
+    "src/tee_impl.rs",
+  ]
+
+  configs -= [ "//build/config/fuchsia:dynamic_rust_standard_library" ]
+  configs += [ "//build/config/fuchsia:static_rust_standard_library" ]
+  deps = [
+    # When statically linking the Rust standard library there's an unspecified dependency on fdio.
+    # Add the dep so our library can link.
+    "//sdk/lib/fdio",
+  ]
+
+  # TODO: Write tests.
+  # with_unit_tests = true
+
+  configs -= [ "//build/config/rust/lints:allow_unused_results" ]
 }
 
 group("tee_internal_api") {
-  public_deps = [ ":headers" ]
+  public_configs = [ ":config" ]
+  public_deps = [ ":impl" ]
 }
