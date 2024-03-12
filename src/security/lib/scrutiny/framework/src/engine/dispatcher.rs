@@ -129,10 +129,7 @@ impl ControllerDispatcher {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*, crate::model::controller::DataController,
-        scrutiny_testing::fake::fake_model_config, serde_json::json,
-    };
+    use {super::*, scrutiny_testing::fake::fake_model_config, serde_json::json};
 
     struct FakeController {
         pub result: String,

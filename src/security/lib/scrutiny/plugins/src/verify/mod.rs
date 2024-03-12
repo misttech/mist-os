@@ -206,12 +206,12 @@ mod tests {
         fidl_fuchsia_component_decl as fdecl,
         fidl_fuchsia_component_internal as component_internal, fidl_fuchsia_io as fio,
         maplit::hashset,
-        moniker::{Moniker, MonikerBase},
+        moniker::MonikerBase,
         routing::{component_instance::ComponentInstanceInterface, environment::RunnerRegistry},
         scrutiny_testing::fake::*,
         scrutiny_utils::bootfs::{BootfsFileIndex, BootfsPackageIndex},
         serde_json::json,
-        std::{collections::HashMap, convert::TryFrom},
+        std::collections::HashMap,
         url::Url,
     };
 

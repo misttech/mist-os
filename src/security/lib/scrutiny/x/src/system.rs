@@ -171,7 +171,6 @@ struct SystemData {
 #[cfg(test)]
 mod tests {
     use super::super::product_bundle::test::*;
-    use super::super::product_bundle::ProductBundle;
     use super::super::update_package::test::FAKE_UPDATE_PACKAGE;
     use super::api::System as _;
     use super::*;

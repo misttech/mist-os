@@ -132,7 +132,6 @@ config("allow_unused_imports") {
   #    --ignore-suffix=_rust  # FIDL bindings use the _rust suffix
   visibility = [
     "//src/lib/assembly/*",
-    "//src/security/lib/scrutiny/*",
     "//src/ui/*",
     "//tools/lib/cm_fidl_analyzer/tests:*",
     "//vendor/*",

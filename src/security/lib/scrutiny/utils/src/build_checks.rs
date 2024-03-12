@@ -884,16 +884,15 @@ impl FileValidator for PackageFileValidator {
 mod tests {
     use {
         super::*,
-        crate::{artifact::ArtifactReader, io::ReadSeek, package::META_CONTENTS_PATH},
-        anyhow::{anyhow, Result},
+        crate::package::META_CONTENTS_PATH,
+        anyhow::anyhow,
         fuchsia_archive::write as far_write,
         maplit::hashmap,
         serde_json::json,
         std::{
-            collections::{BTreeMap, HashMap, HashSet},
+            collections::BTreeMap,
             io::{BufWriter, Cursor, Read, Write},
-            path::{Path, PathBuf},
-            str::FromStr,
+            path::PathBuf,
         },
         tempfile::NamedTempFile,
     };

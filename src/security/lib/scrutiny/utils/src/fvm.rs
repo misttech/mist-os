@@ -290,7 +290,7 @@ impl FvmReader {
 
 #[cfg(test)]
 mod tests {
-    use {super::*, std::convert::TryFrom};
+    use super::*;
 
     #[test]
     fn test_fvm_magic_invalid() {

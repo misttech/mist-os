@@ -152,7 +152,7 @@ impl DataController for ZbiExtractBootfsPackageIndex {
 
 #[cfg(test)]
 mod tests {
-    use {super::*, maplit::hashmap, serde_json};
+    use {super::*, maplit::hashmap};
 
     #[fuchsia::test]
     fn test_bootfs_package_serde() {

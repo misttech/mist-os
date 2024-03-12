@@ -107,7 +107,7 @@ pub fn chunked_decompress(src: &[u8], dst_capacity: u32) -> Vec<u8> {
 
 #[cfg(test)]
 mod tests {
-    use {super::*, hex};
+    use super::*;
 
     #[test]
     fn test_compress_decompress() {

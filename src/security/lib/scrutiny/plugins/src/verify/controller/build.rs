@@ -51,7 +51,6 @@ impl DataController for VerifyBuildController {
 mod tests {
     use {
         super::*,
-        crate::zbi::Zbi,
         scrutiny_testing::fake::*,
         scrutiny_utils::bootfs::{BootfsFileIndex, BootfsPackageIndex},
         scrutiny_utils::zbi::ZbiSection,

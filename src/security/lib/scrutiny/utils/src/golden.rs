@@ -196,11 +196,7 @@ impl GoldenFile {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        std::{fs::File, io::Write},
-        tempfile::tempdir,
-    };
+    use {super::*, std::io::Write, tempfile::tempdir};
 
     #[test]
     fn test_required_golden_files() {

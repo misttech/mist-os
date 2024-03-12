@@ -315,7 +315,7 @@ pub mod test {
 
 #[cfg(test)]
 mod tests {
-    use {super::test::*, super::*, crate::bootfs::test::*, std::convert::TryInto};
+    use {super::test::*, super::*, crate::bootfs::test::*};
 
     #[test]
     fn test_zbi_empty_container() {
