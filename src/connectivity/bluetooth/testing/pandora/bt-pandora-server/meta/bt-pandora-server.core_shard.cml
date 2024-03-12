@@ -1,0 +1,29 @@
+// Copyright 2024 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    children: [
+        {
+            name: "bt-pandora-server",
+            url: "fuchsia-pkg://fuchsia.com/bt-pandora-server#meta/bt-pandora-server.cm",
+            environment: "#core-env",
+        },
+    ],
+    offer: [
+        {
+            protocol: "fuchsia.posix.socket.Provider",
+            from: "#network",
+            to: "#bt-pandora-server",
+        },
+        {
+            protocol: [
+                "fuchsia.bluetooth.sys.Access",
+                "fuchsia.bluetooth.sys.HostWatcher",
+                "fuchsia.bluetooth.sys.Pairing",
+            ],
+            from: "#bluetooth-core",
+            to: "#bt-pandora-server",
+            source_availability: "unknown",
+        },
+    ],
+}

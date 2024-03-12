@@ -1,0 +1,88 @@
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/components.gni")
+import("//third_party/protobuf/proto_library.gni")
+
+config("include_bindings") {
+  include_dirs =
+      [ root_gen_dir + "/third_party/github.com/google/bt-test-interfaces/src" ]
+}
+
+proto_library("bt-test-interfaces") {
+  visibility = [ ":*" ]
+
+  sources = [
+    "//third_party/github.com/google/bt-test-interfaces/src/pandora/a2dp.proto",
+    "//third_party/github.com/google/bt-test-interfaces/src/pandora/host.proto",
+    "//third_party/github.com/google/bt-test-interfaces/src/pandora/security.proto",
+  ]
+
+  proto_in_dir = "//third_party/github.com/google/bt-test-interfaces/src"
+  extra_configs = [ ":include_bindings" ]
+
+  generate_python = false
+  generator_plugin_suffix = ".grpc.pb"
+  generator_plugin_label = "//third_party/grpc:grpc_cpp_plugin"
+  import_protobuf_full = true
+
+  deps = [
+    "//third_party/grpc:grpc++",
+    "//third_party/protobuf:protobuf_full",
+  ]
+}
+
+source_set("grpc_services") {
+  public = [
+    "src/grpc_services/a2dp.h",
+    "src/grpc_services/host.h",
+  ]
+  sources = [
+    "src/grpc_services/a2dp.cc",
+    "src/grpc_services/host.cc",
+  ]
+  public_deps = [
+    "//sdk/fidl/fuchsia.bluetooth.sys:fuchsia.bluetooth.sys_cpp",
+    "//third_party/protobuf:protobuf_full",
+  ]
+  configs += [ ":include_bindings" ]
+  deps = [
+    ":bt-test-interfaces",
+    "//sdk/lib/component/incoming/cpp",
+    "//sdk/lib/syslog/cpp",
+    "//third_party/grpc:grpc++",
+  ]
+}
+
+executable("bin") {
+  output_name = "bt-pandora-server"
+
+  sources = [
+    "src/main.cc",
+    "src/pandora_fidl_server.cc",
+    "src/pandora_fidl_server.h",
+    "src/pandora_grpc_server.cc",
+    "src/pandora_grpc_server.h",
+  ]
+  configs += [ ":include_bindings" ]
+
+  deps = [
+    ":grpc_services",
+    "//sdk/fidl/fuchsia.bluetooth.pandora:fuchsia.bluetooth.pandora_cpp",
+    "//sdk/lib/component/outgoing/cpp",
+    "//sdk/lib/syslog/cpp",
+    "//third_party/grpc:grpc++",
+    "//zircon/system/ulib/async-loop:async-loop-cpp",
+  ]
+}
+
+fuchsia_component("component") {
+  component_name = "bt-pandora-server"
+  manifest = "meta/bt-pandora-server.cml"
+  deps = [ ":bin" ]
+}
+
+fuchsia_package("bt-pandora-server") {
+  deps = [ ":component" ]
+}
