@@ -3,16 +3,19 @@
 # found in the LICENSE file.
 """Logic to deserialize a trace Model from JSON."""
 
-from collections import defaultdict
 import json
 import logging
+import math
 import os
+import pathlib
 import subprocess
-from typing import Any, Dict, List, Optional, Self, TextIO, Tuple, Union
+import types
+from collections import defaultdict
+from typing import Any, Dict, List, Optional, Self, TextIO, Tuple
 
-from perf_test_utils import utils
 import trace_processing.trace_model as trace_model
 import trace_processing.trace_time as trace_time
+from perf_test_utils import utils
 
 _LOGGER: logging.Logger = logging.getLogger("Performance")
 
@@ -21,28 +24,28 @@ class _FlowKey:
     """A helper struct to group flow events."""
 
     def __init__(
-        self, category: Optional[str], name: Optional[str], pid: int, id: int
+        self, category: Optional[str], name: Optional[str], pid: int, id: str
     ) -> None:
         self.category: Optional[str] = category
         self.name: Optional[str] = name
         self.pid: int = pid  # Only used for 'local' flow ids.
-        self.id: int = id
+        self.id: str = id
 
     @classmethod
-    def from_trace_event(cls, trace_event: trace_model.Event) -> Self:
+    def from_trace_event(cls, trace_event: Dict[str, Any]) -> Self:
         category: Optional[str] = trace_event.get("cat")
         name: Optional[str] = trace_event.get("name")
         # _FlowKey is globally scoped unless specifically local.
         pid: int = 0
 
         # Helper to convert an object into a string.
-        def as_string_id(obj: object):
+        def as_string_id(obj: object) -> str:
             if isinstance(obj, str):
                 return obj
             elif isinstance(obj, int):
                 return str(obj)
             elif isinstance(obj, float):
-                if obj.isNaN():
+                if math.isnan(obj):
                     raise TypeError("Got NaN double for id field value")
                 elif obj % 1.0 != 0.0:
                     raise TypeError(
@@ -104,14 +107,14 @@ class _AsyncKey:
         self.id: int = id
 
     @classmethod
-    def from_trace_event(cls, trace_event) -> Self:
+    def from_trace_event(cls, trace_event: Dict[str, Any]) -> Self:
         category: Optional[str] = trace_event.get("cat", None)
         name: Optional[str] = trace_event.get("name", None)
         pid: int = trace_event["pid"]
 
         # Helper to parse an object into an int, returning None if the object is
         # not parseable.
-        def try_parse_int(s: object):
+        def try_parse_int(s: str) -> Optional[int]:
             try:
                 return int(s, 0)  # 0 base allows guessing hex, binary, etc
             except (TypeError, ValueError):
@@ -142,7 +145,7 @@ class _AsyncKey:
 
         return cls(category, name, pid, id)
 
-    def __eq__(self, other) -> bool:
+    def __eq__(self, other: object) -> bool:
         if not isinstance(other, _AsyncKey):
             return False
 
@@ -163,10 +166,10 @@ class _AsyncKey:
 
 
 def convert_trace_file_to_json(
-    trace_path: Union[str, os.PathLike],
+    trace_path: str | os.PathLike[Any],
     compressed_input: bool = False,
     compressed_output: bool = False,
-    trace2json_path: Union[str, os.PathLike] | None = None,
+    trace2json_path: str | os.PathLike[Any] | None = None,
 ) -> str:
     """Converts the specified trace file to JSON.
 
@@ -185,6 +188,7 @@ def convert_trace_file_to_json(
     """
     _LOGGER.info(f"Converting {trace_path} to json")
 
+    trace_path = pathlib.Path(trace_path)
     compressed_ext: str = ".gz"
     output_extension: str = ".json" + (
         compressed_ext if compressed_output else ""
@@ -197,19 +201,17 @@ def convert_trace_file_to_json(
     if trace2json_path is None:
         # Locate trace2json via runtime_deps. The python_perf_test template will
         # ensure that trace2json is available via the runtime_deps directory.
-        runtime_deps_dir: os.PathLike = utils.get_associated_runtime_deps_dir(
-            __file__
+        runtime_deps_dir: pathlib.Path = pathlib.Path(
+            utils.get_associated_runtime_deps_dir(__file__)
         )
-        trace2json_path: os.PathLike = os.path.join(
-            runtime_deps_dir, "trace2json"
-        )
+        trace2json_path = runtime_deps_dir / "trace2json"
 
     args: List[str] = [
         str(trace2json_path),
         f"--input-file={trace_path}",
         f"--output-file={output_path}",
     ]
-    if compressed_input or trace_path.endswith(compressed_ext):
+    if compressed_input or trace_path.suffix == compressed_ext:
         args.append("--compressed-input")
 
     _LOGGER.info(f"Running {args}")
@@ -222,7 +224,7 @@ def convert_trace_file_to_json(
 
 
 def create_model_from_file_path(
-    path: Union[str, os.PathLike]
+    path: str | os.PathLike[Any],
 ) -> trace_model.Model:
     """Create a Model from a file path.
 
@@ -233,7 +235,7 @@ def create_model_from_file_path(
         A Model object.
     """
 
-    with open(str(path), "r") as file:
+    with open(path, "r") as file:
         return create_model_from_file(file)
 
 
@@ -274,7 +276,9 @@ def create_model_from_json(root_object: Dict[str, Any]) -> trace_model.Model:
         A Model object.
     """
 
-    def validate_field_type(d: Dict[str, Any], field: str, ty):
+    def validate_field_type(
+        d: Dict[str, Any], field: str, ty: type | types.UnionType
+    ) -> None:
         """
         Check that a given field exists in the dictionary and has the expected type
         """
@@ -287,7 +291,7 @@ def create_model_from_json(root_object: Dict[str, Any]) -> trace_model.Model:
     # present and are of the correct type.  If any of these fields are missing
     # or is of a different type than what is asserted here, then the JSON trace
     # event is considered to be malformed.
-    def check_trace_event(json_trace_event: Dict[str, Any]):
+    def check_trace_event(json_trace_event: Dict[str, Any]) -> None:
         if not (
             "ph" in json_trace_event and isinstance(json_trace_event["ph"], str)
         ):
@@ -344,7 +348,7 @@ def create_model_from_json(root_object: Dict[str, Any]) -> trace_model.Model:
     def add_to_duration_stack(
         duration_event: trace_model.DurationEvent,
         duration_stack: List[trace_model.DurationEvent],
-    ):
+    ) -> None:
         duration_stack.append(duration_event)
         if len(duration_stack) > 1:
             top = duration_stack[-1]
@@ -427,48 +431,51 @@ def create_model_from_json(root_object: Dict[str, Any]) -> trace_model.Model:
                 trace_model.DurationEvent.from_dict(trace_event)
             )
             if track_key in unbound_flow_events:
-                for flow_event in unbound_flow_events[track_key]:
-                    flow_event.enclosing_duration = duration_event
+                for unbound_flow_event in unbound_flow_events[track_key]:
+                    unbound_flow_event.enclosing_duration = duration_event
                 unbound_flow_events[track_key].clear()
             add_to_duration_stack(duration_event, duration_stack)
             if phase == "X":
                 result_events.append(duration_event)
         elif phase == "E":
             if duration_stack:
-                popped: trace_model.DurationEvent = duration_stack.pop()
+                popped_begin: trace_model.DurationEvent = duration_stack.pop()
                 # It's we drop the "Begin" or "End" part of a begin-end duration pair, or we get
                 # mismatched Begin-End pairs in general. We should attempt some form of error
                 # recovery. It's likely this is a local error due to either dropped events. The rest
                 # of the trace is likely still good.
-                if popped.duration != None:
+                if popped_begin.duration != None:
                     # We know that since we artificially insert the matching pairs for complete
                     # duration events (ph == X), those must be correct and we can attempt to recover
                     # using them. If we're attempting to match with a duration complete event (i.e.
                     # it has a duration set already), drop this end event instead
-                    duration_stack.append(popped)
+                    duration_stack.append(popped_begin)
                     continue
-                popped.duration = (
+                popped_begin.duration = (
                     trace_time.TimePoint.from_epoch_delta(
                         trace_time.TimeDelta.from_microseconds(
                             trace_event["ts"]
                         )
                     )
-                    - popped.start
+                    - popped_begin.start
                 )
                 if "args" in trace_event:
-                    popped.args = {**popped.args, **trace_event["args"]}
-                result_events.append(popped)
+                    popped_begin.args = {
+                        **popped_begin.args,
+                        **trace_event["args"],
+                    }
+                result_events.append(popped_begin)
         elif phase == "fuchsia_synthetic_end":
             assert duration_stack
-            popped: trace_model.DurationEvent = duration_stack.pop()
+            popped_complete: trace_model.DurationEvent = duration_stack.pop()
             # We know that since we artificially insert the matching pairs for complete duration
             # there must be a matching event. If we popped a non duration complete begin event (i.e.
             # it has no duration set yet), we must have dropped a matching end somewhere.
             #
             # We'll attempt to recover by popping events until we find a duration complete begin
             # event.
-            while popped.duration == None:
-                popped = duration_stack.pop()
+            while popped_complete.duration == None:
+                popped_complete = duration_stack.pop()
         elif phase == "b":
             async_key: _AsyncKey = _AsyncKey.from_trace_event(trace_event)
             async_event: trace_model.AsyncEvent = (
@@ -476,28 +483,28 @@ def create_model_from_json(root_object: Dict[str, Any]) -> trace_model.Model:
             )
             live_async_events[async_key] = async_event
         elif phase == "e":
-            async_key: _AsyncKey = _AsyncKey.from_trace_event(trace_event)
-            async_event: Optional[
+            async_key = _AsyncKey.from_trace_event(trace_event)
+            begin_async_event: Optional[
                 trace_model.AsyncEvent
             ] = live_async_events.pop(async_key, None)
-            if async_event is not None:
-                async_event.duration = (
+            if begin_async_event is not None:
+                begin_async_event.duration = (
                     trace_time.TimePoint.from_epoch_delta(
                         trace_time.TimeDelta.from_microseconds(
                             trace_event["ts"]
                         )
                     )
-                    - async_event.start
+                    - begin_async_event.start
                 )
                 if "args" in trace_event:
-                    async_event.args = {
-                        **async_event.args,
+                    begin_async_event.args = {
+                        **begin_async_event.args,
                         **trace_event["args"],
                     }
             else:
                 dropped_async_event_counter += 1
                 continue
-            result_events.append(async_event)
+            result_events.append(begin_async_event)
         elif phase == "i" or phase == "I":
             instant_event: trace_model.InstantEvent = (
                 trace_model.InstantEvent.from_dict(trace_event)
@@ -539,7 +546,7 @@ def create_model_from_json(root_object: Dict[str, Any]) -> trace_model.Model:
             flow_event: trace_model.FlowEvent = trace_model.FlowEvent.from_dict(
                 flow_key.id, enclosing_duration, trace_event
             )
-            if binding_point == "enclosing":
+            if enclosing_duration:
                 enclosing_duration.child_flows.append(flow_event)
             else:
                 unbound_flow_events[track_key].append(flow_event)
@@ -685,8 +692,8 @@ def create_model_from_json(root_object: Dict[str, Any]) -> trace_model.Model:
                     f"String"
                 )
 
-            phase: str = system_trace_event["ph"]
-            if phase == "p":
+            system_event_type: str = system_trace_event["ph"]
+            if system_event_type == "p":
                 if not (
                     "pid" in system_trace_event
                     and isinstance(system_trace_event["pid"], int)
@@ -707,7 +714,7 @@ def create_model_from_json(root_object: Dict[str, Any]) -> trace_model.Model:
                 pid = system_trace_event["pid"]
                 name = system_trace_event["name"]
                 pid_to_name[pid] = name
-            elif phase == "t":
+            elif system_event_type == "t":
                 if not (
                     "pid" in system_trace_event
                     and isinstance(system_trace_event["pid"], int)
@@ -736,13 +743,13 @@ def create_model_from_json(root_object: Dict[str, Any]) -> trace_model.Model:
                 tid = int(system_trace_event["tid"])
                 name = system_trace_event["name"]
                 tid_to_name[tid] = name
-            elif phase == "k":
+            elif system_event_type == "k":
                 # Context Switch Records
                 #
                 # Contains data about when a thread was scheduled on a cpu.
                 # The incoming or outgoing thread may be the idle thread, which is indicated by a
                 # priority of -0x80000000.
-                validate_field_type(system_trace_event, "ts", (float, int))
+                validate_field_type(system_trace_event, "ts", float | int)
                 validate_field_type(system_trace_event, "cpu", int)
                 validate_field_type(system_trace_event, "out", dict)
                 validate_field_type(system_trace_event["out"], "tid", int)
@@ -789,12 +796,12 @@ def create_model_from_json(root_object: Dict[str, Any]) -> trace_model.Model:
                     )
                 )
 
-            elif phase == "w":
+            elif system_event_type == "w":
                 # Waking Record
                 #
                 # Indicates that thread has woken up and is waiting to run on a given cpu. Frequent
                 # and lengthy waking records can indicate high cpu contention or starving threads.
-                validate_field_type(system_trace_event, "ts", (float, int))
+                validate_field_type(system_trace_event, "ts", float | int)
                 validate_field_type(system_trace_event, "cpu", int)
                 validate_field_type(system_trace_event, "tid", int)
 
