@@ -136,7 +136,6 @@ config("allow_unused_imports") {
     "//src/connectivity/lowpan/drivers/lowpan-ot-driver:*",
     "//src/lib/assembly/*",
     "//src/lib/fuchsia-async:*",
-    "//src/lib/versioning/version-history/rust/shared/*",
     "//src/security/lib/scrutiny/*",
     "//src/session/bin/element_launcher:*",
     "//src/session/bin/element_manager:*",
