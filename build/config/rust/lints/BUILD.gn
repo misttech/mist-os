@@ -136,7 +136,6 @@ config("allow_unused_imports") {
     "//src/connectivity/lowpan/drivers/lowpan-ot-driver:*",
     "//src/lib/assembly/*",
     "//src/security/lib/scrutiny/*",
-    "//src/sys/lib/routing:*",
     "//src/ui/*",
     "//tools/lib/cm_fidl_analyzer/tests:*",
     "//vendor/*",

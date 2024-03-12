@@ -4,7 +4,6 @@
 
 use {
     crate::{policy::PolicyError, rights::Rights},
-    availability::TargetHasStrongerAvailability,
     clonable_error::ClonableError,
     cm_rust::CapabilityTypeName,
     cm_types::Name,

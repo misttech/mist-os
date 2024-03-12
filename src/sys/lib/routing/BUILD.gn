@@ -11,8 +11,6 @@ rustc_library("routing") {
   with_unit_tests = true
   edition = "2021"
 
-  configs += [ "//build/config/rust/lints:allow_unused_imports" ]
-
   visibility = [
     "//src/lib/assembly/component_id_index/*",
     "//src/security/lib/scrutiny/plugins/*",

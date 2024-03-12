@@ -4,7 +4,6 @@
 
 use {
     crate::error::AvailabilityRoutingError,
-    availability::TargetHasStrongerAvailability,
     cm_rust::{Availability, ExposeDeclCommon, ExposeSource, OfferDeclCommon, OfferSource},
 };
 
