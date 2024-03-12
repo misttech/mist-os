@@ -163,6 +163,9 @@ def main(argv: Sequence[str]) -> int:
     with open(rbe_metrics_txt) as f:
         data = textpb.parse(f)
 
+    if "stats" not in data:
+        return 0
+
     stats = {_get_stat_name(stat): stat for stat in data["stats"]}
 
     # Construct a table by action type

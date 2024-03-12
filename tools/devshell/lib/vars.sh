@@ -1012,8 +1012,7 @@ function fx-run-ninja {
     )
   fi
 
-  full_cmdline=(
-    env -i
+  envs=(
     "FX_BUILD_UUID=$build_uuid"
     "${user_rbe_env[@]}"
     "TERM=${TERM}"
@@ -1024,11 +1023,17 @@ function fx-run-ninja {
     "NINJA_STATUS_MAX_COMMANDS=${NINJA_STATUS_MAX_COMMANDS:-4}"
     "NINJA_STATUS_REFRESH_MILLIS=${NINJA_STATUS_REFRESH_MILLIS:-100}"
     "NINJA_PERSISTENT_MODE=${NINJA_PERSISTENT_MODE:-0}"
+    # Forward the following only if the environment already sets them:
     ${NINJA_PERSISTENT_TIMEOUT_SECONDS+"NINJA_PERSISTENT_TIMEOUT_SECONDS=$NINJA_PERSISTENT_TIMEOUT_SECONDS"}
     ${NINJA_PERSISTENT_LOG_FILE+"NINJA_PERSISTENT_LOG_FILE=$NINJA_PERSISTENT_LOG_FILE"}
     ${GOMA_DISABLED+"GOMA_DISABLED=$GOMA_DISABLED"}
     ${TMPDIR+"TMPDIR=$TMPDIR"}
     ${CLICOLOR_FORCE+"CLICOLOR_FORCE=$CLICOLOR_FORCE"}
+    ${FX_BUILD_RBE_STATS+"FX_BUILD_RBE_STATS=$FX_BUILD_RBE_STATS"}
+  )
+
+  full_cmdline=(
+    env -i "${envs[@]}"
     "${rbe_wrapper[@]}"
     "$cmd"
     "${args[@]}"
