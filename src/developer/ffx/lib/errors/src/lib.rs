@@ -61,9 +61,6 @@ pub enum FfxError {
     })]
     TunnelError { err: TunnelError, target: Option<String>, is_default_target: bool },
 
-    #[error("{}", format!("No target with matcher {} was found.\n\n* Use `ffx target list` to verify the state of connected devices.\n* Use the SERIAL matcher with the --target (-t) parameter to explicity match a device.", target_string(.target, .is_default_target)))]
-    FastbootError { target: Option<String>, is_default_target: bool },
-
     #[cfg(not(target_os = "fuchsia"))]
     #[error("{}", match .err {
         TargetConnectionError::PermissionDenied => format!("Could not establish SSH connection to the target {}: Permission denied.", target_string(.target, .is_default_target)),
@@ -205,7 +202,79 @@ impl IntoExitCode for FfxError {
     fn exit_code(&self) -> i32 {
         match self {
             FfxError::Error(_, code) => *code,
-            _ => 1,
+            FfxError::TestingError => 254,
+            #[cfg(not(target_os = "fuchsia"))]
+            FfxError::DaemonError { err, target: _, is_default_target: _ } => err.exit_code(),
+            #[cfg(not(target_os = "fuchsia"))]
+            FfxError::OpenTargetError { err, target: _, is_default_target: _ } => err.exit_code(),
+            #[cfg(not(target_os = "fuchsia"))]
+            FfxError::TunnelError { err, target: _, is_default_target: _ } => err.exit_code(),
+            #[cfg(not(target_os = "fuchsia"))]
+            FfxError::TargetConnectionError { err, target: _, is_default_target: _, logs: _ } => {
+                err.exit_code()
+            }
+        }
+    }
+}
+
+#[cfg(not(target_os = "fuchsia"))]
+impl IntoExitCode for DaemonError {
+    fn exit_code(&self) -> i32 {
+        match self {
+            DaemonError::TargetCacheError => 11,
+            DaemonError::TargetStateError => 12,
+            DaemonError::RcsConnectionError => 13,
+            DaemonError::Timeout => 14,
+            DaemonError::TargetCacheEmpty => 15,
+            DaemonError::TargetAmbiguous => 16,
+            DaemonError::TargetNotFound => 17,
+            DaemonError::TargetInFastboot => 18,
+            DaemonError::NonFastbootDevice => 19,
+            DaemonError::ProtocolNotFound => 20,
+            DaemonError::ProtocolOpenError => 21,
+            DaemonError::BadProtocolRegisterState => 22,
+            DaemonError::TargetInZedboot => 23,
+        }
+    }
+}
+
+#[cfg(not(target_os = "fuchsia"))]
+impl IntoExitCode for OpenTargetError {
+    fn exit_code(&self) -> i32 {
+        match self {
+            OpenTargetError::TargetNotFound => 26,
+            OpenTargetError::QueryAmbiguous => 27,
+        }
+    }
+}
+
+#[cfg(not(target_os = "fuchsia"))]
+impl IntoExitCode for TunnelError {
+    fn exit_code(&self) -> i32 {
+        match self {
+            TunnelError::CouldNotListen => 31,
+            TunnelError::TargetConnectFailed => 32,
+        }
+    }
+}
+
+#[cfg(not(target_os = "fuchsia"))]
+impl IntoExitCode for TargetConnectionError {
+    fn exit_code(&self) -> i32 {
+        match self {
+            TargetConnectionError::PermissionDenied => 41,
+            TargetConnectionError::ConnectionRefused => 42,
+            TargetConnectionError::UnknownNameOrService => 43,
+            TargetConnectionError::Timeout => 44,
+            TargetConnectionError::KeyVerificationFailure => 45,
+            TargetConnectionError::NoRouteToHost => 46,
+            TargetConnectionError::NetworkUnreachable => 47,
+            TargetConnectionError::InvalidArgument => 48,
+            TargetConnectionError::UnknownError => 49,
+            TargetConnectionError::FidlCommunicationError => 50,
+            TargetConnectionError::RcsConnectionError => 51,
+            TargetConnectionError::FailedToKnockService => 52,
+            TargetConnectionError::TargetIncompatible => 53,
         }
     }
 }
