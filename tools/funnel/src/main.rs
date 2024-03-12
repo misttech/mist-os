@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use crate::errors::{FunnelError, IntoExitCode};
+use crate::metrics::MetricsService;
 use crate::ssh::do_ssh;
 use crate::target::choose_target;
 use anyhow::anyhow;
@@ -25,6 +26,7 @@ use tracing_subscriber::filter::LevelFilter;
 
 mod errors;
 mod logging;
+mod metrics;
 mod ssh;
 mod target;
 mod update;
@@ -55,6 +57,18 @@ enum FunnelSubcommands {
     Update(SubCommandUpdate),
     Cleanup(SubCommandCleanupRemote),
     CloseLocalTunnel(SubCommandCloseLocalTunnel),
+}
+
+impl FunnelSubcommands {
+    fn command_name(&self) -> String {
+        match self {
+            Self::Host(_) => "host",
+            Self::Update(_) => "update",
+            Self::Cleanup(_) => "cleanup",
+            Self::CloseLocalTunnel(_) => "close-local-tunnel",
+        }
+        .to_string()
+    }
 }
 
 #[derive(FromArgs, PartialEq, Debug)]
@@ -122,6 +136,9 @@ async fn main() -> Result<()> {
 
     logging::init(args.log_level)?;
 
+    let command_name = args.nested.command_name();
+    let metrics_service = metrics::GaMetricsService::new("0.1".to_string()).await?;
+
     let res = match args.nested {
         FunnelSubcommands::Host(host_command) => funnel_main(host_command).await,
         FunnelSubcommands::Update(update_command) => update_main(update_command).await,
@@ -130,6 +147,17 @@ async fn main() -> Result<()> {
             close_existing_tunnel_main(close_existing_tunnel).await
         }
     };
+
+    let (exit_code, error_message) = match res {
+        Ok(_) => (0, None),
+        Err(ref e) => (e.exit_code(), Some(format!("{}", e))),
+    };
+
+    if let Err(record_res) =
+        metrics_service.record_invocation(command_name, exit_code, error_message).await
+    {
+        tracing::warn!("Error recording metrics: {}", record_res);
+    }
 
     match res {
         Ok(_) => Ok(()),
