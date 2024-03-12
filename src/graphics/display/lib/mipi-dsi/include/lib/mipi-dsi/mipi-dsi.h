@@ -10,9 +10,15 @@
 
 // Some of the constants here are from the MIPI Alliance Specification for
 // Display Serial Interface (DSI), which can be obtained from
-// https://www.mipi.org/specifications/dsi
+// https://www.mipi.org/specifications/dsi-2
 //
-// mipi_dsi1 is Version 1.3.2, adopted on 23 September 2021.
+// mipi_dsi2 is Version 2.1, adopted on 24 May 2023.
+//
+// The DSI standard references some concepts from the MIPI Alliance Standard for
+// Display Pixel Interface (DPI), which can be obtained from
+// https://www.mipi.org/current-specifications
+//
+// mipi_dpi2 is Version 2.00, approved on 23 January 2006.
 
 // TODO(https://fxbug.dev/328078798): Move all the constants below to the
 // `mipi_dsi` namespace.
@@ -24,7 +30,7 @@ constexpr uint8_t kMipiDsiVirtualChanId = 0;
 
 // Data types for DSI Processor-to-Peripheral packets.
 //
-// mipi_dsi1 8.7.1 "Processor-sourced Data Type Summary" Table 16 "Data Types
+// mipi_dsi2 8.7.1 "Processor-sourced Data Type Summary" Table 16 "Data Types
 // for Processor-Sourced Packets"
 
 constexpr uint8_t kMipiDsiDtVsyncStart = 0x01;
@@ -64,8 +70,8 @@ constexpr uint8_t kMipiDsiDtUnknown = 0xFF;
 
 // Data types for DSI Peripheral-to-Processor (response) packets.
 //
-// mipi_dsi1 8.10 "Peripheral-to-Processor Transactions – Detailed Format
-// Description" Table 22 "Data Types for Peripheral-Sourced Packets"
+// mipi_dsi2 8.10 "Peripheral-to-Processor Transactions – Detailed Format
+// Description" Table 23 "Data Types for Peripheral-Sourced Packets"
 
 constexpr uint8_t kMipiDsiRspGenShort1 = 0x11;
 constexpr uint8_t kMipiDsiRspGenShort2 = 0x12;
@@ -76,92 +82,136 @@ constexpr uint8_t kMipiDsiRspDcsShort2 = 0x22;
 
 namespace mipi_dsi {
 
-// mipi_dsi1 4.2 "Command And Video Modes", page 12.
+// mipi_dsi2 4.2 "Command And Video Modes", pages 14-15.
 enum class DsiOperationMode : uint8_t {
   kVideo = 0,
   kCommand = 1,
 };
 
-// Packet sequences for Video Mode data transmission.
+// The sequence of packets used to convey pixel and timing data in Video Mode.
 //
-// mipi_dsi1 8.11.1 "Transmission Packet Sequences", pages 76-77.
-enum class DsiVideoModePacketSequence : uint8_t {
-  // The transmission rate of pixel packets over the DSI serial link matches
-  // the DPI pixel transmission rate.
+// The MIPI DSI standard defines multiple methods for transmitting video data
+// (pixel data and synchronization pulses). The methods differ in complexity
+// required in the receiver and performance characteristics, such as DSI link
+// power consumption.
+//
+// The DSI standard calls these methods "packet sequences", because they differ
+// in the packet data types that are used.
+//
+// mipi_dsi2 8.11.1 "Transmission Packet Sequences", pages 120-121
+enum class DsiVideoModePacketSequencing : uint8_t {
+  // Packets explicitly mark the start and end of each synchronization pulse.
   //
-  // Synchronization pulses (vertical syncs and horizontal syncs) are defined
-  // using packets transmitting both start and end of sync pulses.
+  // Synchronization pulses (Horizontal and Vertical) are marked with both Start
+  // and End packets. This minimizes the complexity of recovering video timing
+  // in the receiver, at the expense of sending more data across the DSI link.
   //
-  // mipi_dsi1 8.11.2 "Non-Burst Mode with Sync Pulses", pages 77-78.
-  kNonBurstModeWithSyncPulses = 0,
+  // Each line of pixel data is transmitted at the equivalent DPI transmission
+  // rate, possibly by splitting the line into multiple pixel stream packets and
+  // null packets.
+  //
+  // mipi_dsi2 8.11.2 "Non-Burst Mode with Sync Pulses", page 122
+  kSyncPulsesNoBurst = 0,
 
-  // The transmission rate of pixel packets over the DSI serial link matches
-  // the DPI pixel transmission rate.
+  // Only the start of each synchronization pulse is marked by a packet.
   //
-  // Synchronization pulses (vertical syncs and horizontal syncs) are defined
-  // using only the "start" packets.
+  // Synchronization pulses (Horizontal and Vertical) are conveyed by Start
+  // packets. This reduces DSI link usage, at the expense of having the receiver
+  // be responsible for inferring the end of synchronization pulses.
   //
-  // mipi_dsi1 8.11.3 "Non-Burst Mode with Sync Events", pages 78-79.
-  kNonBurstModeWithSyncEvents = 1,
+  // Each line of pixel data is transmitted at the equivalent DPI transmission
+  // rate, possibly by splitting the line into multiple pixel stream packets and
+  // null packets.
+  //
+  // mipi_dsi2 8.11.3 "Non-Burst Mode with Sync Events", page 123
+  kSyncEventsNoBurst = 1,
 
-  // Pixel packets are transferred in "bursts" using a time-compressed format
-  // for each line, so its transmission rate may be higher than the DPI pixel
-  // transmission rate.
+  // Each line of pixel data is transmitted as quickly as possible.
   //
-  // Synchronization pulses (vertical syncs and horizontal syncs) are defined
-  // using only the "start" packets.
+  // Synchronization pulses (Horizontal and Vertical) are conveyed by Start
+  // packets. This reduces DSI link usage, at the expense of having the receiver
+  // be responsible for inferring the end of synchronization pulses.
   //
-  // mipi_dsi1 8.11.4 "Burst Mode", pages 79-80.
-  kBurstMode = 2,
+  // Each line of pixel data is transmitted in a single packet, saturating the
+  // DSI link bandwidth. The DSI link may be driven to a LP (Low Power) mode
+  // between the end of the pixel stream packet and the next synchronization
+  // packet. This reduces the power usage of the DSI link, but places increased
+  // demands on receiver logic such as line buffers.
+  //
+  // mipi_dsi2 8.11.4 "Burst Mode", page 124
+  kBurst = 2,
 };
 
-// Layout and pixel format of a DSI pixel stream packet.
+// Describes the pixel data format and layout in a DSI pixel stream packet.
 //
-// The enum value is the Data Type field (bits 5-0) in the Data Identifier byte
-// of the DSI packet.
-enum class DsiPacketPixelFormat : uint8_t {
-  // mipi_dsi1 8.8.14 "Loosely Packed Pixel Stream, 20-bit YCbCr 4:2:2 Format,
-  // Data Type = 00 1100 (0x0C)", pages 55-56.
+// MIPI DSI specifies pixel stream packets as a subset of the Processor-Sourced
+// (Processor-to-Peripheral Direction) packets. Each pixel stream packet format
+// has its own Packet Data Type value (bits 0-5 in the Data Identifier). So, the
+// Data Type values for pixel stream packets are a subset of the values defined
+// in mipi_dsi2 8.7.1 "Processor-sourced Data Type Summary".
+//
+// Each enum member's value is the Packet Data Type value. This makes it
+// convenient to use the enum members with display engine hardware that relies
+// on the DSI pixel stream packet Data Type values.
+//
+// Most layouts described by the DSI standard are "packed", meaning that every
+// bit of the packet is meaningful. By contrast, "loosely packed" formats leave
+// some bits unused, which enables some optimizations in the receiver's decoding
+// logic. This enum's naming scheme only calls out loosely packed formats.
+enum class DsiPixelStreamPacketFormat : uint8_t {
+  // mipi_dsi2 8.8.14 "Loosely Packed Pixel Stream, 20-bit YCbCr 4:2:2 Format,
+  // Data Type = 00 1100 (0x0C)", page 93
   k20BitYcbcr422LooselyPacked = 0x0c,
 
-  // mipi_dsi1 8.8.15 "Packed Pixel Stream, 24-bit YCbCr 4:2:2 Format, Data
-  // Type = 01 1100 (0x1C)", pages 56-57.
-  k24BitYcbcr422Packed = 0x1c,
+  // mipi_dsi2 8.8.15 "Packed Pixel Stream, 24-bit YCbCr 4:2:2 Format, Data
+  // Type = 01 1100 (0x1C)", page 94
+  k24BitYcbcr422 = 0x1c,
 
-  // mipi_dsi1 8.8.16 "Packed Pixel Stream, 16-bit YCbCr 4:2:2 Format, Data
-  // Type = 10 1100 (0x2C)", pages 57-58.
-  k16BitYcbcr422Packed = 0x2c,
+  // mipi_dsi2 8.8.16 "Packed Pixel Stream, 16-bit YCbCr 4:2:2 Format, Data
+  // Type = 10 1100 (0x2C)", page 95
+  k16BitYcbcr422 = 0x2c,
 
-  // mipi_dsi1 8.8.17 "Packed Pixel Stream, 30-bit Format, Long Packet, Data
-  // Type = 00 1101 (0x0D)", pages 58-59.
-  k30BitR10G10B10Packed = 0x0d,
+  // The MIPI DSI 1 standard does not include the 20-bit YCbCr 4:2:2 format.
+  //
+  // mipi_dsi2 8.8.17 "Packed Pixel Stream, 20-bit YCbCr 4:2:2 Format, Data
+  // Type = 11 1100 (0x3C)", page 96
+  k20BitYcbcr422 = 0x3c,
 
-  // mipi_dsi1 8.8.18 "Packed Pixel Stream, 36-bit Format, Long Packet, Data
-  // Type = 01 1101 (0x1D)", pages 59-60.
-  k36BitR12G12B12Packed = 0x1d,
+  // mipi_dsi2 8.8.18 "Packed Pixel Stream, 30-bit Format, Long Packet, Data
+  // Type = 00 1101 (0x0D)", page 97
+  k30BitR10G10B10 = 0x0d,
 
-  // mipi_dsi1 8.8.19 "Packed Pixel Stream, 12-bit YCbCr 4:2:0 Format, Data
-  // Type = 11 1101 (0x3D)", pages 60-61.
-  k12BitYcbcr420Packed = 0x3d,
+  // mipi_dsi2 8.8.19 "Packed Pixel Stream, 36-bit Format, Long Packet, Data
+  // Type = 01 1101 (0x1D)", page 98
+  k36BitR12G12B12 = 0x1d,
 
-  // mipi_dsi1 8.8.20 "Packed Pixel Stream, 16-bit Format, Long Packet, Data
-  // Type 00 1110 (0x0E)", pages 61-62.
-  k16BitR5G6B5Packed = 0x0e,
+  // mipi_dsi2 8.8.20 "Packed Pixel Stream, 12-bit YCbCr 4:2:0 Format, Data
+  // Type = 11 1101 (0x3D)", page 99
+  k12BitYcbcr420 = 0x3d,
 
-  // mipi_dsi1 8.8.21 "Packed Pixel Stream, 18-bit Format, Long Packet, Data
-  // Type = 01 1110 (0x1E)", pages 62-63.
-  k18BitR6G6B6Packed = 0x1e,
+  // mipi_dsi2 8.8.21 "Packed Pixel Stream, 16-bit Format, Long Packet, Data
+  // Type 00 1110 (0x0E)", page 100
+  k16BitR5G6B5 = 0x0e,
 
-  // mipi_dsi1 8.8.22 "Pixel Stream, 18-bit Format in Three Bytes, Long Packet,
-  // Data Type = 10 1110 (0x2E)", pages 63-64.
+  // mipi_dsi2 8.8.22 "Packed Pixel Stream, 18-bit Format, Long Packet, Data
+  // Type = 01 1110 (0x1E)", page 101
+  k18BitR6G6B6 = 0x1e,
+
+  // mipi_dsi2 8.8.23 "Pixel Stream, 18-bit Format in Three Bytes, Long Packet,
+  // Data Type = 10 1110 (0x2E)", page 102
   k18BitR6G6B6LooselyPacked = 0x2e,
 
-  // mipi_dsi1 8.8.23 "Packed Pixel Stream, 24-bit Format, Long Packet, Data
-  // Type = 11 1110 (0x3E)", pages 64-65.
-  k24BitR8G8B8Packed = 0x3e,
+  // mipi_dsi2 8.8.24 "Packed Pixel Stream, 24-bit Format, Long Packet, Data
+  // Type = 11 1110 (0x3E)", page 103
+  k24BitR8G8B8 = 0x3e,
 
-  // mipi_dsi1 8.8.24 "Compressed Pixel Stream, Long Packet, Data Type =
-  // 00 1011 (0x0B)", pages 65-66.
+  // Compressed pixel data without any particular format designation.
+  //
+  // The compression format can be negotiated using Compression Mode Command
+  // packets and/or Picture Parameter Set packets.
+  //
+  // mipi_dsi1 8.8.25 "Compressed Pixel Stream, Long Packet, Data Type =
+  // 00 1011 (0x0B)", pages 104-105
   kCompressed = 0x0b,
 };
 
