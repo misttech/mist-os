@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use anyhow::Error;
-use fidl;
 use fidl_fuchsia_testing_harness as harness;
 use fidl_fuchsia_ui_composition as flatland;
 use fidl_fuchsia_ui_test_context as ui_test_context;
