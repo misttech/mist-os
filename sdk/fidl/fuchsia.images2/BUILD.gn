@@ -19,5 +19,7 @@ fidl("fuchsia.images2") {
 
   public_deps = [ "//sdk/fidl/fuchsia.math" ]
 
+  enable_cpp = true
   enable_hlcpp = true
+  enable_rust = true
 }
