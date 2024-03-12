@@ -678,9 +678,14 @@ async fn ping_once<Ip: ping::FuchsiaIpExt>(
     // The body of the packet is filled with `payload_length` 0 bytes.
     let payload: Vec<u8> = std::iter::repeat(0).take(payload_length).collect();
 
-    let (mut sink, mut stream) = ping::new_unicast_sink_and_stream::<Ip, _, { u16::MAX as usize }>(
+    let (mut sink, stream) = ping::new_unicast_sink_and_stream::<Ip, _, { u16::MAX as usize }>(
         &socket, &address, &payload,
     );
+
+    // Address clippy::large_futures lint by boxing the `PingStream`, which
+    // takes up around `u16::MAX` bytes on the stack.
+    // See https://rust-lang.github.io/rust-clippy/stable/index.html#/large_futures.
+    let mut stream = Box::pin(stream);
 
     const SEQ: u16 = 1;
     sink.send(SEQ).await.map_err(|e| {
@@ -870,7 +875,6 @@ impl Controller {
                 timeout,
                 responder,
             } => {
-                #[allow(clippy::large_futures)]
                 let result = self
                     .ping(target, payload_length, interface_name, zx::Duration::from_nanos(timeout))
                     .await;
@@ -1287,9 +1291,7 @@ impl Controller {
         let fnet_ext::IpAddress(target) = target.into();
         const UNSPECIFIED_PORT: u16 = 0;
         match target {
-            std::net::IpAddr::V4(addr) =>
-            {
-                #[allow(clippy::large_futures)]
+            std::net::IpAddr::V4(addr) => {
                 ping_once::<Ipv4>(
                     std::net::SocketAddrV4::new(addr, UNSPECIFIED_PORT),
                     payload_length.into(),
@@ -1304,7 +1306,6 @@ impl Controller {
                 let scope_id =
                     get_interface_scope_id(&interface_name, &addr, hermetic_network_connector)
                         .await?;
-                #[allow(clippy::large_futures)]
                 ping_once::<Ipv6>(
                     std::net::SocketAddrV6::new(
                         addr,
@@ -1473,7 +1474,6 @@ async fn main() -> Result<(), Error> {
         match event {
             Event::ControllerRequest(controller_request) => {
                 let controller_request = controller_request.expect("stopped serving requests");
-                #[allow(clippy::large_futures)]
                 match futures::future::ready(controller_request)
                     .and_then(|req| controller.handle_request(req))
                     .await
