@@ -880,7 +880,6 @@ mod tests {
         super::*,
         crate::{test_utils::*, MlmeStream, Station},
         fidl_fuchsia_wlan_mlme as fidl_mlme,
-        ieee80211::MacAddr,
         lazy_static::lazy_static,
         test_case::test_case,
         wlan_common::{

@@ -136,7 +136,6 @@ config("allow_unused_imports") {
     "//src/connectivity/lowpan/drivers/lowpan-ot-driver:*",
     "//src/connectivity/network/netstack3/core:*",
     "//src/connectivity/network/tests/integration/common:*",
-    "//src/connectivity/wlan/*",
     "//src/developer/ffx/daemon/protocols/repo:*",
     "//src/developer/ffx/plugins/repository/serve:*",
     "//src/developer/ffx/plugins/target:*",
