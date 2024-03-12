@@ -3,10 +3,12 @@
 // found in the LICENSE file.
 
 use crate::helpers::rediscover_helper;
-use anyhow::{anyhow, bail, Context as _, Result};
+use anyhow::{Context as _, Result};
 use async_trait::async_trait;
 use discovery::{FastbootConnectionState, TargetFilter, TargetHandle, TargetState};
-use ffx_fastboot_interface::interface_factory::{InterfaceFactory, InterfaceFactoryBase};
+use ffx_fastboot_interface::interface_factory::{
+    InterfaceFactory, InterfaceFactoryBase, InterfaceFactoryError,
+};
 use ffx_fastboot_transport_interface::udp::{open, UdpNetworkInterface};
 use fuchsia_async::Timer;
 use std::net::SocketAddr;
@@ -45,7 +47,7 @@ impl Drop for UdpFactory {
 
 #[async_trait(?Send)]
 impl InterfaceFactoryBase<UdpNetworkInterface> for UdpFactory {
-    async fn open(&mut self) -> Result<UdpNetworkInterface> {
+    async fn open(&mut self) -> Result<UdpNetworkInterface, InterfaceFactoryError> {
         let wait_duration = Duration::from_secs(self.retry_wait_seconds);
         for i in 1..self.open_retries {
             match open(self.addr)
@@ -65,27 +67,26 @@ impl InterfaceFactoryBase<UdpNetworkInterface> for UdpFactory {
                 }
             }
         }
-        Err(anyhow!(
-            "Could not connect via UDP to fastboot address: {} after {} tries",
-            self.addr,
-            self.open_retries
-        ))
+        Err(InterfaceFactoryError::ConnectionError("UDP".to_string(), self.addr, self.open_retries))
     }
 
     async fn close(&self) {
         tracing::debug!("Closing Fastboot UDP Factory for: {}", self.addr);
     }
 
-    async fn rediscover(&mut self) -> Result<()> {
+    async fn rediscover(&mut self) -> Result<(), InterfaceFactoryError> {
         let filter = UdpTargetFilter { node_name: self.target_name.clone() };
 
         rediscover_helper(&self.target_name, filter, &mut |connection_state| {
             match connection_state {
                 FastbootConnectionState::Udp(addrs) => self.addr = addrs.first().unwrap().into(),
-                _ => bail!(
-                    "When rediscovering target: {}, expected target to reconnect in UDP mode",
-                    self.target_name
-                ),
+                s @ _ => {
+                    return Err(InterfaceFactoryError::RediscoverTargetNotInCorrectTransport(
+                        self.target_name.clone(),
+                        "UDP".to_string(),
+                        s.to_string(),
+                    ))
+                }
             }
             Ok(())
         })

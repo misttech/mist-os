@@ -4,7 +4,9 @@
 
 use anyhow::{Context, Result};
 use async_trait::async_trait;
-use ffx_fastboot_interface::interface_factory::{InterfaceFactory, InterfaceFactoryBase};
+use ffx_fastboot_interface::interface_factory::{
+    InterfaceFactory, InterfaceFactoryBase, InterfaceFactoryError,
+};
 use fuchsia_async::Duration;
 use futures::channel::oneshot::{channel, Sender};
 use usb_bulk::AsyncInterface;
@@ -85,7 +87,7 @@ impl FastbootUsbLiveTester for StrictGetVarFastbootUsbLiveTester {
 
 #[async_trait(?Send)]
 impl InterfaceFactoryBase<AsyncInterface> for UsbFactory {
-    async fn open(&mut self) -> Result<AsyncInterface> {
+    async fn open(&mut self) -> Result<AsyncInterface, InterfaceFactoryError> {
         let interface = open_interface_with_serial(&self.serial).await.with_context(|| {
             format!("Failed to open target usb interface by serial {}", self.serial)
         })?;
@@ -97,7 +99,7 @@ impl InterfaceFactoryBase<AsyncInterface> for UsbFactory {
         tracing::debug!("dropping UsbFactory for serial: {}", self.serial);
     }
 
-    async fn rediscover(&mut self) -> Result<()> {
+    async fn rediscover(&mut self) -> Result<(), InterfaceFactoryError> {
         tracing::debug!("Rediscovering devices");
 
         let (tx, rx) = channel::<()>();
@@ -118,7 +120,9 @@ impl InterfaceFactoryBase<AsyncInterface> for UsbFactory {
             Duration::from_secs(1),
         );
 
-        rx.await?;
+        rx.await.map_err(|e| {
+            anyhow::anyhow!("error awaiting oneshot channel rediscovering target: {}", e)
+        })?;
 
         drop(watcher);
         Ok(())

@@ -3,10 +3,12 @@
 // found in the LICENSE file.
 
 use crate::helpers::rediscover_helper;
-use anyhow::{anyhow, bail, Context as _, Result};
+use anyhow::{Context as _, Result};
 use async_trait::async_trait;
 use discovery::{FastbootConnectionState, TargetFilter, TargetHandle, TargetState};
-use ffx_fastboot_interface::interface_factory::{InterfaceFactory, InterfaceFactoryBase};
+use ffx_fastboot_interface::interface_factory::{
+    InterfaceFactory, InterfaceFactoryBase, InterfaceFactoryError,
+};
 use ffx_fastboot_transport_interface::tcp::{open_once, TcpNetworkInterface};
 use fuchsia_async::Timer;
 use std::net::SocketAddr;
@@ -45,7 +47,7 @@ impl Drop for TcpFactory {
 
 #[async_trait(?Send)]
 impl InterfaceFactoryBase<TcpNetworkInterface> for TcpFactory {
-    async fn open(&mut self) -> Result<TcpNetworkInterface> {
+    async fn open(&mut self) -> Result<TcpNetworkInterface, InterfaceFactoryError> {
         let wait_duration = Duration::from_secs(self.retry_wait_seconds);
         for i in 1..self.open_retries {
             match open_once(&self.addr, Duration::from_secs(1)).await.with_context(|| {
@@ -63,27 +65,26 @@ impl InterfaceFactoryBase<TcpNetworkInterface> for TcpFactory {
                 Ok(interface) => return Ok(interface),
             }
         }
-        Err(anyhow!(
-            "Could not connect via TCP to fastboot address: {} after {} tries",
-            self.addr,
-            self.open_retries
-        ))
+        Err(InterfaceFactoryError::ConnectionError("TCP".to_string(), self.addr, self.open_retries))
     }
 
     async fn close(&self) {
         tracing::debug!("Closing Fastboot TCP Factory for: {}", self.addr);
     }
 
-    async fn rediscover(&mut self) -> Result<()> {
+    async fn rediscover(&mut self) -> Result<(), InterfaceFactoryError> {
         let filter = TcpTargetFilter { node_name: self.target_name.clone() };
 
         rediscover_helper(&self.target_name, filter, &mut |connection_state| {
             match connection_state {
                 FastbootConnectionState::Tcp(addrs) => self.addr = addrs.first().unwrap().into(),
-                _ => bail!(
-                    "When rediscovering target: {}, expected target to reconnect in TCP mode",
-                    self.target_name
-                ),
+                s @ _ => {
+                    return Err(InterfaceFactoryError::RediscoverTargetNotInCorrectTransport(
+                        self.target_name.clone(),
+                        "TCP".to_string(),
+                        s.to_string(),
+                    ))
+                }
             }
             Ok(())
         })

@@ -9,7 +9,9 @@ use anyhow::{anyhow, Context as _, Result};
 use async_trait::async_trait;
 use ffx_fastboot_interface::fastboot_interface::Fastboot;
 use ffx_fastboot_interface::fastboot_proxy::FastbootProxy;
-use ffx_fastboot_interface::interface_factory::{InterfaceFactory, InterfaceFactoryBase};
+use ffx_fastboot_interface::interface_factory::{
+    InterfaceFactory, InterfaceFactoryBase, InterfaceFactoryError,
+};
 use ffx_fastboot_transport_interface::tcp::{open_once, TcpNetworkInterface};
 use fuchsia_async::{Task, Timer};
 use std::collections::BTreeSet;
@@ -279,7 +281,7 @@ impl OneshotTcpFactory {
 
 #[async_trait(?Send)]
 impl InterfaceFactoryBase<TcpNetworkInterface> for OneshotTcpFactory {
-    async fn open(&mut self) -> Result<TcpNetworkInterface> {
+    async fn open(&mut self) -> Result<TcpNetworkInterface, InterfaceFactoryError> {
         let interface = open_once(&self.addr, Duration::from_secs(1))
             .await
             .with_context(|| format!("connecting via TCP to Fastboot address: {}", self.addr))?;
@@ -290,8 +292,9 @@ impl InterfaceFactoryBase<TcpNetworkInterface> for OneshotTcpFactory {
         tracing::debug!("Closing Oneshot Fastboot TCP Factory for: {}", self.addr);
     }
 
-    async fn rediscover(&mut self) -> Result<()> {
-        Err(anyhow!("OneshotTcpFactory does not support the rediscover function. It is oneshot..."))
+    async fn rediscover(&mut self) -> Result<(), InterfaceFactoryError> {
+        Err(anyhow!("OneshotTcpFactory does not support the rediscover function. It is oneshot...")
+            .into())
     }
 }
 
