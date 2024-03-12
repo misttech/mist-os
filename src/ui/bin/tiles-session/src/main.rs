@@ -13,7 +13,6 @@ use {
     fuchsia_zircon as zx,
     futures::{channel::mpsc::UnboundedSender, StreamExt, TryStreamExt},
     std::collections::HashMap,
-    tiles_config,
     tracing::{error, info, warn},
 };
 
