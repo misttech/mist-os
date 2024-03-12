@@ -43,20 +43,20 @@ class FuchsiaDevice(abc.ABC):
     # List all the persistent properties
     @properties.PersistentProperty
     @abc.abstractmethod
+    def board(self) -> str:
+        """Returns the board value of the device.
+
+        Returns:
+            board value of the device.
+        """
+
+    @properties.PersistentProperty
+    @abc.abstractmethod
     def device_name(self) -> str:
         """Returns the name of the device.
 
         Returns:
             Name of the device.
-        """
-
-    @properties.PersistentProperty
-    @abc.abstractmethod
-    def device_type(self) -> str:
-        """Returns the type of the device.
-
-        Returns:
-            Type of the device.
         """
 
     @properties.PersistentProperty
@@ -75,6 +75,15 @@ class FuchsiaDevice(abc.ABC):
 
         Returns:
             Model of the device.
+        """
+
+    @properties.PersistentProperty
+    @abc.abstractmethod
+    def product(self) -> str:
+        """Returns the product value of the device.
+
+        Returns:
+            product value of the device.
         """
 
     @properties.PersistentProperty

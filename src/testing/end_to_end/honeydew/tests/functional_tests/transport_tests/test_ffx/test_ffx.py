@@ -55,20 +55,35 @@ class FFXTransportTests(fuchsia_base_test.FuchsiaBaseTest):
             custom_types.TargetSshAddress,
         )
 
-    def test_get_target_type(self) -> None:
-        """Test case for FFX.get_target_type()."""
-        target_type: str = self.device.ffx.get_target_type()
-        # Note - If "target_type" is specified in "expected_values" in
+    def test_get_target_board(self) -> None:
+        """Test case for FFX.get_target_board()."""
+        board: str = self.device.ffx.get_target_board()
+        # Note - If "board" is specified in "expected_values" in
         # params.yml then compare with it.
         if self.user_params["expected_values"] and self.user_params[
             "expected_values"
-        ].get("target_type"):
+        ].get("board"):
             asserts.assert_equal(
-                target_type, self.user_params["expected_values"]["target_type"]
+                board, self.user_params["expected_values"]["board"]
             )
         else:
-            asserts.assert_is_not_none(target_type)
-            asserts.assert_is_instance(target_type, str)
+            asserts.assert_is_not_none(board)
+            asserts.assert_is_instance(board, str)
+
+    def test_get_target_product(self) -> None:
+        """Test case for FFX.get_target_product()."""
+        product: str = self.device.ffx.get_target_product()
+        # Note - If "product" is specified in "expected_values" in
+        # params.yml then compare with it.
+        if self.user_params["expected_values"] and self.user_params[
+            "expected_values"
+        ].get("product"):
+            asserts.assert_equal(
+                product, self.user_params["expected_values"]["product"]
+            )
+        else:
+            asserts.assert_is_not_none(product)
+            asserts.assert_is_instance(product, str)
 
     def test_ffx_run(self) -> None:
         """Test case for FFX.run()."""

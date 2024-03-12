@@ -479,21 +479,21 @@ class FFX(ffx_interface.FFX):
                 f"Failed to get the SSH address of {self._target_name}"
             ) from err
 
-    def get_target_type(
+    def get_target_board(
         self, timeout: float = ffx_interface.TIMEOUTS["FFX_CLI"]
     ) -> str:
-        """Returns the target type.
+        """Returns the target's board.
 
         Args:
             timeout: Timeout to wait for the ffx command to return.
 
         Returns:
-            Target type.
+            Target's board.
 
         Raises:
             errors.FfxCommandError: In case of failure.
         """
-        # Sample ffx_target_show_info containing product type (board):
+        # Sample ffx_target_show_info containing the target's board:
         # [
         #     {
         #         'title': 'Build',
@@ -537,6 +537,65 @@ class FFX(ffx_interface.FFX):
             build_entry["child"], label_value="board"
         )
         return str(board_entry["value"])
+
+    def get_target_product(
+        self, timeout: float = ffx_interface.TIMEOUTS["FFX_CLI"]
+    ) -> str:
+        """Returns the target's product.
+
+        Args:
+            timeout: Timeout to wait for the ffx command to return.
+
+        Returns:
+            Target's product.
+
+        Raises:
+            errors.FfxCommandError: In case of failure.
+        """
+        # Sample ffx_target_show_info containing the target's product:
+        # [
+        #     {
+        #         'title': 'Build',
+        #         'label': 'build',
+        #         'description': '',
+        #         'child': [
+        #             {
+        #                 'title': 'Version',
+        #                 'label': 'version',
+        #                 'description': 'Build version.',
+        #                 'value': '2023-02-01T17:26:40+00:00'
+        #             },
+        #             {
+        #                 'title': 'Product',
+        #                 'label': 'product',
+        #                 'description': 'Product config.',
+        #                 'value': 'workstation_eng'
+        #             },
+        #             {
+        #                 'title': 'Board',
+        #                 'label': 'board',
+        #                 'description': 'Board config.',
+        #                 'value': 'qemu-x64'
+        #             },
+        #             {
+        #                 'title': 'Commit',
+        #                 'label': 'commit',
+        #                 'description': 'Integration Commit Date',
+        #                 'value': '2023-02-01T17:26:40+00:00'
+        #             }
+        #         ]
+        #     },
+        # ]
+        target_show_info: list[dict[str, Any]] = self.get_target_information(
+            timeout=timeout
+        )
+        build_entry: dict[str, Any] = self._get_label_entry(
+            target_show_info, label_value="build"
+        )
+        product_entry: dict[str, Any] = self._get_label_entry(
+            build_entry["child"], label_value="product"
+        )
+        return str(product_entry["value"])
 
     # pylint: disable=missing-raises-doc
     # To handle below pylint warning:

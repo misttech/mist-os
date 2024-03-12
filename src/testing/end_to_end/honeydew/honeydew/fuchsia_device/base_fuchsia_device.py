@@ -81,6 +81,18 @@ class BaseFuchsiaDevice(
 
     # List all the persistent properties
     @properties.PersistentProperty
+    def board(self) -> str:
+        """Returns the board value of the device.
+
+        Returns:
+            board value of the device.
+
+        Raises:
+            errors.FfxCommandError: On failure.
+        """
+        return self.ffx.get_target_board()
+
+    @properties.PersistentProperty
     def device_name(self) -> str:
         """Returns the name of the device.
 
@@ -88,18 +100,6 @@ class BaseFuchsiaDevice(
             Name of the device.
         """
         return self._name
-
-    @properties.PersistentProperty
-    def device_type(self) -> str:
-        """Returns the type of the device.
-
-        Returns:
-            Type of the device.
-
-        Raises:
-            errors.FfxCommandError: On failure.
-        """
-        return self.ffx.get_target_type()
 
     @properties.PersistentProperty
     def manufacturer(self) -> str:
@@ -124,6 +124,18 @@ class BaseFuchsiaDevice(
             errors.FuchsiaDeviceError: On failure.
         """
         return self._product_info["model"]
+
+    @properties.PersistentProperty
+    def product(self) -> str:
+        """Returns the product value of the device.
+
+        Returns:
+            product value of the device.
+
+        Raises:
+            errors.FfxCommandError: On failure.
+        """
+        return self.ffx.get_target_product()
 
     @properties.PersistentProperty
     def product_name(self) -> str:

@@ -537,10 +537,26 @@ class FfxTests(unittest.TestCase):
         return_value=_MOCK_ARGS["ffx_target_show_json"],
         autospec=True,
     )
-    def test_get_target_type(self, mock_get_target_information) -> None:
-        """Verify ffx.get_target_type returns target type of fuchsia device."""
-        result: str = self.ffx_obj_with_ip.get_target_type()
+    def test_get_target_board(self, mock_get_target_information) -> None:
+        """Verify ffx.get_target_board returns board value of fuchsia device."""
+        result: str = self.ffx_obj_with_ip.get_target_board()
         expected: str = _FFX_TARGET_SHOW_JSON[1]["child"][2]["value"]
+
+        self.assertEqual(result, expected)
+
+        mock_get_target_information.assert_called()
+
+    @mock.patch.object(
+        ffx.FFX,
+        "get_target_information",
+        return_value=_MOCK_ARGS["ffx_target_show_json"],
+        autospec=True,
+    )
+    def test_get_target_product(self, mock_get_target_information) -> None:
+        """Verify ffx.get_target_product returns product value of fuchsia
+        device."""
+        result: str = self.ffx_obj_with_ip.get_target_product()
+        expected: str = _FFX_TARGET_SHOW_JSON[1]["child"][1]["value"]
 
         self.assertEqual(result, expected)
 

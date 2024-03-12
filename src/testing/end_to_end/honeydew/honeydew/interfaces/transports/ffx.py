@@ -125,14 +125,28 @@ class FFX(abc.ABC):
         """
 
     @abc.abstractmethod
-    def get_target_type(self, timeout: float = TIMEOUTS["FFX_CLI"]) -> str:
-        """Returns the target type.
+    def get_target_board(self, timeout: float = TIMEOUTS["FFX_CLI"]) -> str:
+        """Returns the target's board.
 
         Args:
             timeout: Timeout to wait for the ffx command to return.
 
         Returns:
-            Target type.
+            Target's board.
+
+        Raises:
+            errors.FfxCommandError: In case of failure.
+        """
+
+    @abc.abstractmethod
+    def get_target_product(self, timeout: float = TIMEOUTS["FFX_CLI"]) -> str:
+        """Returns the target's product.
+
+        Args:
+            timeout: Timeout to wait for the ffx command to return.
+
+        Returns:
+            Target's product.
 
         Raises:
             errors.FfxCommandError: In case of failure.

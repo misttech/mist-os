@@ -35,9 +35,7 @@ _INPUT_ARGS: dict[str, Any] = {
     ),
 }
 
-_MOCK_ARGS: dict[str, str] = {
-    "device_type": "qemu-x64",
-}
+_MOCK_ARGS: dict[str, str] = {"board": "x64", "product": "core"}
 
 _BASE64_ENCODED_BYTES: bytes = base64.b64decode("some base64 encoded string==")
 
@@ -216,14 +214,14 @@ class BaseFuchsiaDeviceTests(unittest.TestCase):
     # List all the tests related to static properties
     @mock.patch.object(
         base_fuchsia_device.ffx_transport.FFX,
-        "get_target_type",
-        return_value=_MOCK_ARGS["device_type"],
+        "get_target_board",
+        return_value=_MOCK_ARGS["board"],
         autospec=True,
     )
-    def test_device_type(self, mock_ffx_get_target_type) -> None:
-        """Testcase for BaseFuchsiaDevice.device_type property"""
-        self.assertEqual(self.fd_obj.device_type, _MOCK_ARGS["device_type"])
-        mock_ffx_get_target_type.assert_called()
+    def test_board(self, mock_ffx_get_target_board) -> None:
+        """Testcase for BaseFuchsiaDevice.board property"""
+        self.assertEqual(self.fd_obj.board, _MOCK_ARGS["board"])
+        mock_ffx_get_target_board.assert_called()
 
     @mock.patch.object(
         base_fuchsia_device.BaseFuchsiaDevice,
@@ -252,6 +250,17 @@ class BaseFuchsiaDeviceTests(unittest.TestCase):
     def test_model(self, *unused_args) -> None:
         """Testcase for BaseFuchsiaDevice.model property"""
         self.assertEqual(self.fd_obj.model, "default-model")
+
+    @mock.patch.object(
+        base_fuchsia_device.ffx_transport.FFX,
+        "get_target_product",
+        return_value=_MOCK_ARGS["product"],
+        autospec=True,
+    )
+    def test_product(self, mock_ffx_get_target_product) -> None:
+        """Testcase for BaseFuchsiaDevice.product property"""
+        self.assertEqual(self.fd_obj.product, _MOCK_ARGS["product"])
+        mock_ffx_get_target_product.assert_called()
 
     @mock.patch.object(
         base_fuchsia_device.BaseFuchsiaDevice,

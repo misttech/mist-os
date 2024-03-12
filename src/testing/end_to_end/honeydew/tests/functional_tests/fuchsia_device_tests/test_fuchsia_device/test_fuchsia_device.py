@@ -83,12 +83,20 @@ class FuchsiaDeviceTests(fuchsia_base_test.FuchsiaBaseTest):
                 self.device, sl4f_fuchsia_device.FuchsiaDevice
             )
 
-    def test_device_type(self) -> None:
-        """Test case for device_type"""
-        asserts.assert_equal(
-            self.device.device_type,
-            self.user_params["expected_values"]["device_type"],
-        )
+    def test_board(self) -> None:
+        """Test case for board"""
+        board: str = self.device.board
+        # Note - If "board" is specified in "expected_values" in
+        # params.yml then compare with it.
+        if self.user_params["expected_values"] and self.user_params[
+            "expected_values"
+        ].get("board"):
+            asserts.assert_equal(
+                board, self.user_params["expected_values"]["board"]
+            )
+        else:
+            asserts.assert_is_not_none(board)
+            asserts.assert_is_instance(board, str)
 
     def test_manufacturer(self) -> None:
         """Test case for manufacturer"""
@@ -102,6 +110,12 @@ class FuchsiaDeviceTests(fuchsia_base_test.FuchsiaBaseTest):
         asserts.assert_equal(
             self.device.model, self.user_params["expected_values"]["model"]
         )
+
+    def test_product(self) -> None:
+        """Test case for product"""
+        product: str = self.device.product
+        asserts.assert_is_not_none(product)
+        asserts.assert_is_instance(product, str)
 
     def test_product_name(self) -> None:
         """Test case for product_name"""
