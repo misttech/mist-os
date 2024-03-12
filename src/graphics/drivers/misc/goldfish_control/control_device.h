@@ -106,7 +106,7 @@ class Control : public ControlType,
   // Create a pair of channel and register a sysmem Heap of |heap_type| using
   // the channel pair. The client-side channel is sent to sysmem, and the
   // server-side channel is bound to |heap|.
-  zx_status_t RegisterAndBindHeap(fuchsia_sysmem2::wire::HeapType heap_type, Heap* heap);
+  zx_status_t RegisterAndBindHeap(fuchsia_sysmem::wire::HeapType heap_type, Heap* heap);
 
   // TODO(https://fxbug.dev/42161642): Remove these pipe IO functions and use
   // //src/devices/lib/goldfish/pipe_io instead.

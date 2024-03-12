@@ -479,7 +479,7 @@ zx_status_t SimpleDisplay::Bind(const char* name, std::unique_ptr<SimpleDisplay>
   }
 
   auto result = hardware_sysmem_->RegisterHeap(
-      static_cast<uint64_t>(fuchsia_sysmem2::wire::HeapType::kFramebuffer),
+      static_cast<uint64_t>(fuchsia_sysmem::wire::HeapType::kFramebuffer),
       fidl::ClientEnd<fuchsia_hardware_sysmem::Heap>(std::move(heap_connection)));
   if (!result.ok()) {
     printf("%s: failed to register sysmem heap: %s\n", name, result.status_string());

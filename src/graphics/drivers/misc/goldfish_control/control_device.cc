@@ -267,7 +267,7 @@ zx_status_t Control::InitSyncDeviceLocked() {
   return ZX_OK;
 }
 
-zx_status_t Control::RegisterAndBindHeap(fuchsia_sysmem2::wire::HeapType heap_type, Heap* heap) {
+zx_status_t Control::RegisterAndBindHeap(fuchsia_sysmem::wire::HeapType heap_type, Heap* heap) {
   zx::channel heap_request, heap_connection;
   zx_status_t status = zx::channel::create(0, &heap_request, &heap_connection);
   if (status != ZX_OK) {
@@ -309,13 +309,13 @@ zx_status_t Control::Bind() {
   std::unique_ptr<DeviceLocalHeap> device_local_heap = DeviceLocalHeap::Create(this);
   DeviceLocalHeap* device_local_heap_ptr = device_local_heap.get();
   heaps_.push_back(std::move(device_local_heap));
-  RegisterAndBindHeap(fuchsia_sysmem2::wire::HeapType::kGoldfishDeviceLocal, device_local_heap_ptr);
+  RegisterAndBindHeap(fuchsia_sysmem::wire::HeapType::kGoldfishDeviceLocal, device_local_heap_ptr);
 
   // Serve goldfish host-visible heap allocations.
   std::unique_ptr<HostVisibleHeap> host_visible_heap = HostVisibleHeap::Create(this);
   HostVisibleHeap* host_visible_heap_ptr = host_visible_heap.get();
   heaps_.push_back(std::move(host_visible_heap));
-  RegisterAndBindHeap(fuchsia_sysmem2::wire::HeapType::kGoldfishHostVisible, host_visible_heap_ptr);
+  RegisterAndBindHeap(fuchsia_sysmem::wire::HeapType::kGoldfishHostVisible, host_visible_heap_ptr);
 
   status =
       DdkAdd(ddk::DeviceAddArgs("goldfish-control").set_proto_id(ZX_PROTOCOL_GOLDFISH_CONTROL));

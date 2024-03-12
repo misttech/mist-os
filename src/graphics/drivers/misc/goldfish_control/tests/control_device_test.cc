@@ -503,18 +503,18 @@ TEST_F(ControlDeviceTest, Bind) {
   const auto& heaps = pipe_.heap_info();
   ASSERT_EQ(heaps.size(), 2u);
   ASSERT_TRUE(heaps.find(static_cast<uint64_t>(
-                  fuchsia_sysmem2::wire::HeapType::kGoldfishDeviceLocal)) != heaps.end());
+                  fuchsia_sysmem::wire::HeapType::kGoldfishDeviceLocal)) != heaps.end());
   ASSERT_TRUE(heaps.find(static_cast<uint64_t>(
-                  fuchsia_sysmem2::wire::HeapType::kGoldfishHostVisible)) != heaps.end());
+                  fuchsia_sysmem::wire::HeapType::kGoldfishHostVisible)) != heaps.end());
 
   const auto& device_local_heap_info =
-      heaps.at(static_cast<uint64_t>(fuchsia_sysmem2::wire::HeapType::kGoldfishDeviceLocal));
+      heaps.at(static_cast<uint64_t>(fuchsia_sysmem::wire::HeapType::kGoldfishDeviceLocal));
   EXPECT_TRUE(device_local_heap_info.heap_client_end.is_valid());
   EXPECT_TRUE(device_local_heap_info.is_registered);
   EXPECT_TRUE(device_local_heap_info.inaccessible_supported);
 
   const auto& host_visible_heap_info =
-      heaps.at(static_cast<uint64_t>(fuchsia_sysmem2::wire::HeapType::kGoldfishHostVisible));
+      heaps.at(static_cast<uint64_t>(fuchsia_sysmem::wire::HeapType::kGoldfishHostVisible));
   EXPECT_TRUE(host_visible_heap_info.heap_client_end.is_valid());
   EXPECT_TRUE(host_visible_heap_info.is_registered);
   EXPECT_TRUE(host_visible_heap_info.cpu_supported);

@@ -8,11 +8,12 @@ using fuchsia.math;
 
 /// The maximum size of
 /// [`fuchsia.sysmem2/BufferCollectionConstraints.image_format_constraints`].
+@available(added=19)
 const MAX_COUNT_BUFFER_COLLECTION_CONSTRAINTS_IMAGE_FORMAT_CONSTRAINTS uint32 = 64;
 
 /// The maximum size of
 /// [`fuchsia.sysmem2/BufferMemoryConstraints.permitted_heaps`].
-@available(added=HEAD)
+@available(added=19)
 const MAX_COUNT_BUFFER_MEMORY_CONSTRAINTS_PERMITTED_HEAPS uint32 = 64;
 
 /// The maximum size of [`fuchsia.sysmem2/ImageFormatConstraints.color_spaces`].
@@ -159,33 +160,6 @@ type BufferCollectionConstraints = table {
     /// specify any `image_format_constraints` entries.
     8: image_format_constraints
             vector<ImageFormatConstraints>:MAX_COUNT_BUFFER_COLLECTION_CONSTRAINTS_IMAGE_FORMAT_CONSTRAINTS;
-};
-
-/// Known heap types.
-///
-/// Vendor or device specific types should have bit 60 set. Top order bit is
-/// reserved and should not be set.
-@available(added=HEAD)
-type HeapType = flexible enum : uint64 {
-    SYSTEM_RAM = 0x0000000000000000;
-
-    /// Heap used for amlogic protected memory.
-    AMLOGIC_SECURE = 0x1000000000010000;
-
-    /// Heap used for amlogic protected memory between decrypt and video decode.
-    AMLOGIC_SECURE_VDEC = 0x1000000000010001;
-
-    /// Heap used by goldfish vulkan for device-local memory.
-    GOLDFISH_DEVICE_LOCAL = 0x1000000000020000;
-
-    /// Heap used by goldfish vulkan for host-visible memory.
-    GOLDFISH_HOST_VISIBLE = 0x1000000000020001;
-
-    /// Heap used for display framebuffer. This is used by display drivers
-    /// limited to a single framebuffer located at a specific physical address.
-    /// The framebuffer heap makes it possible to create buffer collections
-    /// for the framebuffer and enables sysmem support in these drivers.
-    FRAMEBUFFER = 0x1000000000030001;
 };
 
 /// A reference to a heap instance.

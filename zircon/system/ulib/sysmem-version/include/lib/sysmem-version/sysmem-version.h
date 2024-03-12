@@ -141,9 +141,6 @@ struct HasOperatorUInt32<
 static_assert(!HasOperatorUInt32<fuchsia_sysmem::PixelFormatType>::value);
 static_assert(HasOperatorUInt32<fuchsia_images2::PixelFormat>::value);
 static_assert(!HasOperatorUInt32<fuchsia_sysmem::HeapType>::value);
-#if __Fuchsia_API_level__ >= FUCHSIA_HEAD
-static_assert(!HasOperatorUInt32<fuchsia_sysmem2::HeapType>::value);
-#endif  // __Fuchsia_API_level__ >= FUCHSIA_HEAD
 
 template <typename T, typename Enable = void>
 struct HasOperatorUInt64 : std::false_type {};
@@ -156,9 +153,6 @@ struct HasOperatorUInt64<
 static_assert(!HasOperatorUInt64<fuchsia_sysmem::PixelFormatType>::value);
 static_assert(!HasOperatorUInt64<fuchsia_images2::PixelFormat>::value);
 static_assert(!HasOperatorUInt64<fuchsia_sysmem::HeapType>::value);
-#if __Fuchsia_API_level__ >= FUCHSIA_HEAD
-static_assert(HasOperatorUInt64<fuchsia_sysmem2::HeapType>::value);
-#endif  // __Fuchsia_API_level__ >= FUCHSIA_HEAD
 
 // The meaning of "fidl enum" here includes flexible enums, which are actually just final classes
 // with a single private scalar field after codegen, but the have an operator uint32_t() or
@@ -212,10 +206,6 @@ static_assert(
     std::is_same<uint64_t, FidlUnderlyingTypeOrType<fuchsia_sysmem::HeapType>::type>::value);
 static_assert(
     std::is_same<uint32_t, FidlUnderlyingTypeOrType<fuchsia_images2::PixelFormat>::type>::value);
-#if __Fuchsia_API_level__ >= FUCHSIA_HEAD
-static_assert(
-    std::is_same<uint64_t, FidlUnderlyingTypeOrType<fuchsia_sysmem2::HeapType>::type>::value);
-#endif  // __Fuchsia_API_level__ >= FUCHSIA_HEAD
 
 }  // namespace internal
 
@@ -231,8 +221,6 @@ constexpr FidlUnderlyingTypeOrType_t<T> fidl_underlying_cast(const T& value) {
 }
 
 #if __Fuchsia_API_level__ >= FUCHSIA_HEAD
-
-static_assert(2 == fidl_underlying_cast(static_cast<fuchsia_sysmem2::HeapType>(2)));
 
 ///////////////////////
 // V2 Copy/Move from V1
