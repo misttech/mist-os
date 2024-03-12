@@ -97,7 +97,7 @@ class FuchsiaPowerBaseTest(fuchsia_base_test.FuchsiaBaseTest):  # type: ignore[m
         _LOGGER.info(f"STOPPING POWER MEASUREMENT (process {proc.pid})")
         proc.send_signal(signal.SIGINT)
         result = proc.wait(60)
-        if result is not None:
+        if result != 0:
             stdout = proc.stdout.read() if proc.stdout else ""
             stderr = proc.stderr.read() if proc.stderr else ""
             raise RuntimeError(
