@@ -73,7 +73,6 @@ use starnix_uapi::{
 use std::{
     cmp::Ordering,
     collections::VecDeque,
-    convert::TryInto,
     marker::PhantomData,
     mem::MaybeUninit,
     sync::{mpsc::channel, Arc},
