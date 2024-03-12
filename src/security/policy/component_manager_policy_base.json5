@@ -40,6 +40,7 @@
                 capability: "protocol",
                 target_monikers: [
                     "/bootstrap",
+                    "/bootstrap/boot-drivers:**",
                     "/bootstrap/power_manager",
                     "/bootstrap/cpu_manager",
                 ],

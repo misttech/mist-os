@@ -27,6 +27,7 @@ fuchsia_driver("aml-suspend-driver") {
     "//sdk/fidl/fuchsia.hardware.platform.bus:fuchsia.hardware.platform.bus_cpp",
     "//sdk/fidl/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_cpp",
     "//sdk/fidl/fuchsia.hardware.suspend:fuchsia.hardware.suspend_cpp",
+    "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_cpp",
     "//sdk/lib/driver/compat/cpp",
     "//sdk/lib/driver/component/cpp:cpp",
     "//sdk/lib/driver/logging/cpp:cpp",

@@ -4,19 +4,45 @@
 
 #include "aml-suspend.h"
 
+#include <fidl/fuchsia.kernel/cpp/wire.h>
 #include <lib/driver/component/cpp/driver_export.h>
+#include <zircon/errors.h>
+#include <zircon/syscalls-next.h>
 
 #include "fidl/fuchsia.hardware.suspend/cpp/markers.h"
 #include "fidl/fuchsia.hardware.suspend/cpp/wire_types.h"
+#include "fidl/fuchsia.kernel/cpp/markers.h"
 #include "lib/driver/component/cpp/prepare_stop_completer.h"
+#include "lib/driver/incoming/cpp/namespace.h"
 #include "lib/fidl/cpp/wire/arena.h"
 #include "lib/fidl/cpp/wire/channel.h"
 #include "lib/fidl/cpp/wire/vector_view.h"
+#include "lib/fidl/cpp/wire/wire_messaging_declarations.h"
 #include "lib/zx/time.h"
+#include "zircon/status.h"
 
 namespace suspend {
 
-static constexpr char kDeviceName[] = "aml-suspend-device";
+namespace {
+
+constexpr char kDeviceName[] = "aml-suspend-device";
+constexpr zx::duration kDebugSuspendDuration = zx::sec(10);
+
+}  // namespace
+
+zx::result<zx::resource> AmlSuspend::GetCpuResource() {
+  zx::result resource = incoming()->Connect<fuchsia_kernel::CpuResource>();
+  if (resource.is_error()) {
+    return resource.take_error();
+  }
+
+  fidl::WireResult result = fidl::WireCall(resource.value())->Get();
+  if (!result.ok()) {
+    return zx::error(result.status());
+  }
+
+  return zx::ok(std::move(result.value().resource));
+}
 
 zx::result<> AmlSuspend::CreateDevfsNode() {
   fidl::Arena arena;
@@ -64,6 +90,14 @@ zx::result<> AmlSuspend::Start() {
     return result.take_error();
   }
 
+  zx::result resource = GetCpuResource();
+  if (!resource.is_ok()) {
+    FDF_LOG(ERROR, "Failed to get CPU Resource: %s", resource.status_string());
+    return resource.take_error();
+  }
+
+  cpu_resource_ = std::move(resource.value());
+
   zx::result create_devfs_node_result = CreateDevfsNode();
   if (create_devfs_node_result.is_error()) {
     FDF_LOG(ERROR, "Failed to export to devfs %s", create_devfs_node_result.status_string());
@@ -95,10 +129,28 @@ void AmlSuspend::GetSuspendStates(GetSuspendStatesCompleter::Sync& completer) {
 }
 
 void AmlSuspend::Suspend(SuspendRequestView request, SuspendCompleter::Sync& completer) {
-  fuchsia_hardware_suspend::wire::SuspenderSuspendResponse resp;
-  resp.suspend_duration() = 0;
-  resp.suspend_overhead() = 0;
-  completer.ReplySuccess(resp);
+  fidl::Arena arena;
+
+  auto resp = fuchsia_hardware_suspend::wire::SuspenderSuspendResponse::Builder(arena)
+      .suspend_duration(0)
+      .suspend_overhead(0).Build();
+
+  if (!request->has_state_index() || request->state_index() != 0) {
+    // This driver only supports one suspend state for now.
+    FDF_LOG(ERROR, "Invalid argument to suspend");
+    completer.ReplyError(ZX_ERR_INVALID_ARGS);
+    return;
+  }
+
+  zx_status_t result =
+      zx_system_suspend_enter(cpu_resource_.get(), zx::deadline_after(kDebugSuspendDuration).get());
+
+  if (result != ZX_OK) {
+    FDF_LOG(ERROR, "zx_system_suspend_enter failed: %s", zx_status_get_string(result));
+    completer.ReplyError(result);
+  } else {
+    completer.ReplySuccess(resp);
+  }
 }
 
 void AmlSuspend::Serve(fidl::ServerEnd<fuchsia_hardware_suspend::Suspender> request) {

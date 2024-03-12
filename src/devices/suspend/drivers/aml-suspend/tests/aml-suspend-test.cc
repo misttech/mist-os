@@ -4,6 +4,7 @@
 
 #include "../aml-suspend.h"
 
+#include <fidl/fuchsia.kernel/cpp/wire.h>
 #include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
 #include <lib/driver/compat/cpp/device_server.h>
 #include <lib/driver/testing/cpp/driver_lifecycle.h>
@@ -15,8 +16,44 @@
 #include <src/devices/bus/testing/fake-pdev/fake-pdev.h>
 
 #include "fidl/fuchsia.hardware.suspend/cpp/markers.h"
+#include "lib/zx/handle.h"
+#include "lib/zx/resource.h"
+#include "lib/zx/vmo.h"
 
 namespace suspend {
+
+class AmlSuspendTest : public AmlSuspend {
+ public:
+  AmlSuspendTest(fdf::DriverStartArgs start_args, fdf::UnownedSynchronizedDispatcher dispatcher)
+      : AmlSuspend(std::move(start_args), std::move(dispatcher)) {
+    zx_status_t result = zx::vmo::create(1, 0, &fake_resource_);
+    ZX_ASSERT(result == ZX_OK);
+  }
+
+  zx::result<zx::resource> GetCpuResource() override {
+    zx::vmo dupe;
+    zx_status_t st = fake_resource_.duplicate(ZX_RIGHT_SAME_RIGHTS, &dupe);
+    if (st != ZX_OK) {
+      return zx::error(st);
+    }
+
+    // Client is now the owner.
+    zx::handle result(dupe.release());
+
+    return zx::ok(std::move(result));
+  }
+
+  static DriverRegistration GetDriverRegistration() {
+    // Use a custom DriverRegistration to create the DUT. Without this, the non-test implementation
+    // will be used by default.
+    return FUCHSIA_DRIVER_REGISTRATION_V1(fdf_internal::DriverServer<AmlSuspendTest>::initialize,
+                                          fdf_internal::DriverServer<AmlSuspendTest>::destroy);
+  }
+
+ private:
+  // We just need any kernel handle here.
+  zx::vmo fake_resource_;
+};
 
 class TestEnvironmentWrapper {
  public:
@@ -58,7 +95,8 @@ class AmlSuspendTestFixture : public testing::Test {
   AmlSuspendTestFixture()
       : env_dispatcher_(runtime_.StartBackgroundDispatcher()),
         driver_dispatcher_(runtime_.StartBackgroundDispatcher()),
-        dut_(driver_dispatcher_->async_dispatcher(), std::in_place),
+        dut_(driver_dispatcher_->async_dispatcher(), std::in_place,
+             AmlSuspendTest::GetDriverRegistration()),
         test_environment_(env_dispatcher_->async_dispatcher(), std::in_place) {}
 
  protected:
@@ -67,7 +105,7 @@ class AmlSuspendTestFixture : public testing::Test {
     fdf::DriverStartArgs start_args =
         test_environment_.SyncCall(&TestEnvironmentWrapper::Setup, std::move(config));
     zx::result start_result = runtime_.RunToCompletion(
-        dut_.SyncCall(&fdf_testing::DriverUnderTest<AmlSuspend>::Start, std::move(start_args)));
+        dut_.SyncCall(&fdf_testing::DriverUnderTest<AmlSuspendTest>::Start, std::move(start_args)));
     ASSERT_EQ(start_result.status_value(), ZX_OK);
 
     test_environment_.SyncCall([this](TestEnvironmentWrapper* env_wrapper) {
@@ -81,7 +119,7 @@ class AmlSuspendTestFixture : public testing::Test {
 
   void TearDown() override {
     zx::result run_result = runtime_.RunToCompletion(
-        dut_.SyncCall(&fdf_testing::DriverUnderTest<AmlSuspend>::PrepareStop));
+        dut_.SyncCall(&fdf_testing::DriverUnderTest<AmlSuspendTest>::PrepareStop));
     ZX_ASSERT(run_result.is_ok());
   }
 
@@ -91,7 +129,7 @@ class AmlSuspendTestFixture : public testing::Test {
   fdf_testing::DriverRuntime runtime_;
   fdf::UnownedSynchronizedDispatcher env_dispatcher_;
   fdf::UnownedSynchronizedDispatcher driver_dispatcher_;
-  async_patterns::TestDispatcherBound<fdf_testing::DriverUnderTest<AmlSuspend>> dut_;
+  async_patterns::TestDispatcherBound<fdf_testing::DriverUnderTest<AmlSuspendTest>> dut_;
   async_patterns::TestDispatcherBound<TestEnvironmentWrapper> test_environment_;
 };
 

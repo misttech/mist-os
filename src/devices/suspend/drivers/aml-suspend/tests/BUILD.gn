@@ -19,6 +19,7 @@ executable("aml-suspend-test-bin") {
     "//sdk/fidl/fuchsia.hardware.platform.bus:fuchsia.hardware.platform.bus_cpp",
     "//sdk/fidl/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_cpp",
     "//sdk/fidl/fuchsia.hardware.suspend:fuchsia.hardware.suspend_cpp",
+    "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_cpp",
     "//sdk/lib/async_patterns/testing/cpp",
     "//sdk/lib/component/outgoing/cpp",
     "//sdk/lib/driver/compat/cpp",

@@ -11,11 +11,13 @@
         runner: "driver",
         binary: "driver/aml-suspend.so",
         bind: "meta/bind/aml-suspend.bindbc",
+        use_next_vdso: "true",
         default_dispatcher_opts: [ "allow_sync_calls" ],
-        colocate: "true",
+        colocate: "false",
     },
     use: [
         { service: "fuchsia.hardware.platform.bus.Service" },
         { service: "fuchsia.hardware.platform.device.Service" },
+        { protocol: "fuchsia.kernel.CpuResource" },
     ],
 }

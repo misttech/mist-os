@@ -13,8 +13,8 @@
 
 namespace suspend {
 
-class AmlSuspend final : public fdf::DriverBase,
-                         public fidl::WireServer<fuchsia_hardware_suspend::Suspender> {
+class AmlSuspend : public fdf::DriverBase,
+                   public fidl::WireServer<fuchsia_hardware_suspend::Suspender> {
  public:
   AmlSuspend(fdf::DriverStartArgs start_args, fdf::UnownedSynchronizedDispatcher dispatcher)
       : fdf::DriverBase("aml-suspend", std::move(start_args), std::move(dispatcher)),
@@ -33,6 +33,9 @@ class AmlSuspend final : public fdf::DriverBase,
   void GetSuspendStates(GetSuspendStatesCompleter::Sync& completer) override;
   void Suspend(SuspendRequestView request, SuspendCompleter::Sync& completer) override;
 
+ protected:
+  virtual zx::result<zx::resource> GetCpuResource();
+
  private:
   void Serve(fidl::ServerEnd<fuchsia_hardware_suspend::Suspender> request);
   zx::result<> CreateDevfsNode();
@@ -41,6 +44,8 @@ class AmlSuspend final : public fdf::DriverBase,
   fidl::WireSyncClient<fuchsia_driver_framework::Node> parent_;
   fidl::WireSyncClient<fuchsia_driver_framework::NodeController> controller_;
   driver_devfs::Connector<fuchsia_hardware_suspend::Suspender> devfs_connector_;
+
+  zx::resource cpu_resource_;
 };
 
 }  // namespace suspend
