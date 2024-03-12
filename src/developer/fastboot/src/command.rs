@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use std::fmt;
 use thiserror::Error;
 
 #[derive(PartialEq, Debug)]
@@ -167,6 +168,59 @@ impl TryFrom<&Command> for Vec<u8> {
             Command::SetActive(s) => concat_message(b"set_active:", s),
             Command::Oem(s) => concat_message(b"oem ", s),
         }
+    }
+}
+
+fn write_command(reply: &Command, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    match reply {
+        Command::GetVar(v) => write!(f, "GET_VAR: {}", v),
+        Command::Download(s) => write!(f, "DOWNLOAD: {}", s),
+        Command::Upload => write!(f, "UPLOAD"),
+        Command::Flash(s) => write!(f, "FLASH: {}", s),
+        Command::Erase(s) => write!(f, "ERASE: {}", s),
+        Command::Boot => write!(f, "BOOT"),
+        Command::Continue => write!(f, "CONTINUE"),
+        Command::Reboot => write!(f, "REBOOT"),
+        Command::RebootBootLoader => write!(f, "REBOOT_BOOTLOADER"),
+        Command::UpdateSuper(partition_name, arg) => {
+            write!(f, "UPDATE_SUPER: {}:{}", partition_name, arg)
+        }
+        Command::CreateLogicalPartition(partition_name, size) => {
+            write!(f, "CREATE_LOGICAL_PARTITION: {}:{}", partition_name, size)
+        }
+        Command::DeleteLogicalPartition(s) => write!(f, "DELETE-LOGICAL-PARTITION: {}", s),
+        Command::ResizeLogicalPartition(partition_name, size) => {
+            write!(f, "RESIZE-LOGICAL-PARTITION: {}:{}", partition_name, size)
+        }
+        Command::IsLogical(s) => write!(f, "IS_LOGICAL: {}", s),
+        Command::SetActive(s) => write!(f, "SET_ACTIVE: {}", s),
+        Command::Oem(s) => write!(f, "OEM {}", s),
+    }
+}
+
+impl fmt::Display for Command {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write_command(self, f)
+    }
+}
+
+fn write_client_variable(variable: &ClientVariable, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    match variable {
+        ClientVariable::All => write!(f, "ALL"),
+        ClientVariable::Version => write!(f, "VERSION"),
+        ClientVariable::VersionBootLoader => write!(f, "VERSION_BOOTLOADER"),
+        ClientVariable::VersionBaseBand => write!(f, "VERSION_BASEBAND"),
+        ClientVariable::Product => write!(f, "PRODUCT"),
+        ClientVariable::SerialNumber => write!(f, "SERIAL_NUMBER"),
+        ClientVariable::Secure => write!(f, "SECURE"),
+        ClientVariable::IsUserSpace => write!(f, "IS_USERSPACE"),
+        ClientVariable::Oem(s) => write!(f, "OEM: {}", s),
+    }
+}
+
+impl fmt::Display for ClientVariable {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write_client_variable(self, f)
     }
 }
 
