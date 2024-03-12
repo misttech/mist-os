@@ -5,6 +5,7 @@
 use crate::subsystems::prelude::*;
 use crate::util;
 use anyhow::bail;
+use assembly_config_capabilities::{Config, ConfigValueType};
 use assembly_config_schema::platform_config::connectivity_config::{
     NetstackVersion, NetworkingConfig, PlatformConnectivityConfig, WlanPolicyLayer,
     WlanRecoveryProfile,
@@ -182,14 +183,20 @@ impl DefineSubsystemConfiguration<PlatformConnectivityConfig> for ConnectivitySu
                                 String::from("thresholded_recovery")
                             }
                         };
-                        builder
-                            .package("wlancfg") // Added by platform_bundle("wlan_policy")
-                            .component("meta/wlancfg.cm")?
-                            .field("recovery_profile", recovery_profile)?
-                            .field(
-                                "recovery_enabled",
-                                connectivity_config.wlan.recovery_enabled.clone(),
-                            )?;
+                        builder.set_config_capability(
+                            "fuchsia.wlan.RecoveryEnabled",
+                            Config::new(
+                                ConfigValueType::Bool,
+                                connectivity_config.wlan.recovery_enabled.clone().into(),
+                            ),
+                        )?;
+                        builder.set_config_capability(
+                            "fuchsia.wlan.RecoveryProfile",
+                            Config::new(
+                                ConfigValueType::String { max_size: 512 },
+                                recovery_profile.into(),
+                            ),
+                        )?;
                     }
                 }
 

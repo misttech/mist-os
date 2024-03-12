@@ -200,7 +200,6 @@ group("for_transition") {
 
 fuchsia_package("wlancfg") {
   deps = [ ":service" ]
-  validate_structured_config = false
 }
 
 fuchsia_component("wlancfg_lib_test") {

@@ -172,8 +172,27 @@ async fn create_wlan_components(builder: &RealmBuilder, config: WlanConfig) -> R
         .await?;
 
     builder.init_mutable_config_to_empty(&wlancfg).await?;
-    builder.set_config_value(&wlancfg, "recovery_profile", String::from("").into()).await?;
-    builder.set_config_value(&wlancfg, "recovery_enabled", false.into()).await?;
+    builder
+        .add_capability(cm_rust::CapabilityDecl::Config(cm_rust::ConfigurationDecl {
+            name: "fuchsia.wlan.RecoveryProfile".parse()?,
+            value: cm_rust::ConfigValue::Single(cm_rust::ConfigSingleValue::String("".into())),
+        }))
+        .await?;
+    builder
+        .add_capability(cm_rust::CapabilityDecl::Config(cm_rust::ConfigurationDecl {
+            name: "fuchsia.wlan.RecoveryEnabled".parse()?,
+            value: cm_rust::ConfigValue::Single(cm_rust::ConfigSingleValue::Bool(false)),
+        }))
+        .await?;
+    builder
+        .add_route(
+            Route::new()
+                .capability(Capability::configuration("fuchsia.wlan.RecoveryProfile"))
+                .capability(Capability::configuration("fuchsia.wlan.RecoveryEnabled"))
+                .from(Ref::self_())
+                .to(&wlancfg),
+        )
+        .await?;
 
     builder
         .add_route(

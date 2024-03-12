@@ -65,6 +65,8 @@
                 "fuchsia.memory.WarningCaptureDelay",
                 "fuchsia.session.AutoLaunch",
                 "fuchsia.session.SessionUrl",
+                "fuchsia.wlan.RecoveryEnabled",
+                "fuchsia.wlan.RecoveryProfile",
             ],
             availability: "same_as_target",
         },

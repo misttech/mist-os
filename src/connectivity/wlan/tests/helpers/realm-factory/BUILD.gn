@@ -22,6 +22,7 @@ rustc_binary("bin") {
     "//src/lib/fuchsia-component",
     "//src/lib/fuchsia-component-test",
     "//src/lib/zircon/rust:fuchsia-zircon-status",
+    "//src/sys/lib/cm_rust",
     "//src/testing/realm_proxy",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:futures",

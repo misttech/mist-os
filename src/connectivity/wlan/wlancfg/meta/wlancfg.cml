@@ -24,6 +24,17 @@
     ],
     use: [
         {
+            config: "fuchsia.wlan.RecoveryProfile",
+            key: "recovery_profile",
+            type: "string",
+            max_size: 512,
+        },
+        {
+            config: "fuchsia.wlan.RecoveryEnabled",
+            key: "recovery_enabled",
+            type: "bool",
+        },
+        {
             protocol: [
                 "fuchsia.diagnostics.persist.DataPersistence-wlan",
                 "fuchsia.location.namedplace.RegulatoryRegionWatcher",
@@ -63,15 +74,4 @@
             from: "self",
         },
     ],
-    config: {
-        recovery_profile: {
-            type: "string",
-            max_size: 512,
-            mutability: [ "parent" ],
-        },
-        recovery_enabled: {
-            type: "bool",
-            mutability: [ "parent" ],
-        },
-    },
 }

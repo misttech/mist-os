@@ -12,6 +12,14 @@
     ],
     offer: [
         {
+            from: "parent",
+            to: "#wlancfg",
+            config: [
+                "fuchsia.wlan.RecoveryEnabled",
+                "fuchsia.wlan.RecoveryProfile",
+            ],
+        },
+        {
             protocol: "fuchsia.stash.SecureStore",
             from: "#stash_secure",
             to: "#wlancfg",
