@@ -312,7 +312,7 @@ zx::result<GptDevicePartitioner::InitializeGptResult> GptDevicePartitioner::Init
   zx::result gpt_devices = FindGptDevices(devfs_root);
   if (gpt_devices.is_error()) {
     ERROR("Failed to find GPT: %s\n", gpt_devices.status_string());
-    gpt_devices.take_error();
+    return gpt_devices.take_error();
   }
 
   std::vector<fidl::ClientEnd<fuchsia_device::Controller>> non_removable_gpt_devices;
