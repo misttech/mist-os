@@ -40,7 +40,21 @@ if (override_target_api_level == -1) {
   # target it. It's a higher level than the "HEAD" API level, in other words,
   # "HEAD" is a subset of "LEGACY".
   fidl_fuchsia_api_level = "LEGACY"
+
+  # Directory name to use for target API level.
+  target_cpu_dir_name_for_target_api_level = target_cpu
+
+  # Base path for library binaries in SDKs.
+  sdk_prebuilt_base_for_target_api_level =
+      "arch/${target_cpu_dir_name_for_target_api_level}"
 } else {
   clang_fuchsia_api_level = override_target_api_level
   fidl_fuchsia_api_level = "$override_target_api_level"
+
+  # If support for named API levels is added and `override_target_api_level` becomes a string,
+  # we will need to ensure the strings are normalized.
+  target_cpu_dir_name_for_target_api_level =
+      "${target_cpu}-api-${override_target_api_level}"
+  sdk_prebuilt_base_for_target_api_level =
+      "obj/${target_cpu_dir_name_for_target_api_level}"
 }

@@ -179,13 +179,6 @@ template("sdk_static_library") {
     }
   }
 
-  # Base path for binaries of this library in SDKs.
-  if (override_target_api_level == -1) {
-    prebuilt_base = "arch/$target_cpu"
-  } else {
-    prebuilt_base = "obj/${target_cpu}-api-${override_target_api_level}"
-  }
-
   # Identify dependencies and their metadata files.
   sdk_deps = []
   sdk_metas = []
@@ -291,7 +284,7 @@ template("sdk_static_library") {
       "###${output_name}") {
     lib_name = "${output_name}.a"
   }
-  link_lib = "${prebuilt_base}/lib/${lib_name}"
+  link_lib = "${sdk_prebuilt_base_for_target_api_level}/lib/${lib_name}"
   sdk_files = sdk_header_files + [
                 {
                   source = "${target_out_dir}/${lib_name}"
