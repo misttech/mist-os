@@ -213,20 +213,12 @@ pub fn sys_rt_sigsuspend(
     let mask = current_task.read_object(user_mask)?;
 
     let waiter = Waiter::new();
-    if let Err(e) =
-        current_task.wait_with_temporary_mask(mask, |current_task| waiter.wait(current_task))
-    {
-        // ERESTARTNOHAND indicates that the error should be EINTR if
-        // interrupted by a signal delivered to a user handler, and the syscall
-        // should be restarted otherwise.
-        if e == starnix_uapi::errors::EINTR {
-            return error!(ERESTARTNOHAND);
-        } else {
-            return Err(e);
-        }
-    }
-
-    Ok(())
+    // ERESTARTNOHAND indicates that the error should be EINTR if
+    // interrupted by a signal delivered to a user handler, and the syscall
+    // should be restarted otherwise.
+    current_task
+        .wait_with_temporary_mask(mask, |current_task| waiter.wait(current_task))
+        .map_eintr(errno!(ERESTARTNOHAND))
 }
 
 pub fn sys_rt_sigtimedwait(

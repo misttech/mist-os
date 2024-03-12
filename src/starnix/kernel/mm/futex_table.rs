@@ -437,6 +437,8 @@ pub trait FutexKey: Sized + Ord + Hash + Clone {
         addr: UserAddress,
         perms: ProtectionFlags,
     ) -> Result<(FutexOperand, Self), Errno>;
+
+    fn get_table_from_task(task: &Task) -> &FutexTable<Self>;
 }
 
 #[derive(Debug, Clone, Eq, Hash, PartialEq, Ord, PartialOrd)]
@@ -460,6 +462,10 @@ impl FutexKey for PrivateFutexKey {
         let (vmo, offset) = task.mm().get_mapping_vmo(addr, perms)?;
         let key = PrivateFutexKey { addr };
         Ok((FutexOperand { vmo, offset }, key))
+    }
+
+    fn get_table_from_task(task: &Task) -> &FutexTable<Self> {
+        &task.mm().futex
     }
 }
 
@@ -487,6 +493,10 @@ impl FutexKey for SharedFutexKey {
         let (vmo, offset) = task.mm().get_mapping_vmo(addr, perms)?;
         let key = SharedFutexKey::new(&vmo, offset)?;
         Ok((FutexOperand { vmo, offset }, key))
+    }
+
+    fn get_table_from_task(task: &Task) -> &FutexTable<Self> {
+        &task.kernel().shared_futexes
     }
 }
 

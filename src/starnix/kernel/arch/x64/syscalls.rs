@@ -26,7 +26,7 @@ use starnix_uapi::{
     __kernel_time_t, clone_args,
     device_type::DeviceType,
     errno, error,
-    errors::Errno,
+    errors::{Errno, ErrnoResultExt},
     file_mode::FileMode,
     gid_t, itimerval,
     open_flags::OpenFlags,
@@ -343,16 +343,7 @@ pub fn sys_pause(
             Ok(()) => Ok(()),
         }
     });
-    match result {
-        Err(ref errno) => {
-            if errno.code == starnix_uapi::errors::EINTR {
-                error!(ERESTARTNOHAND)
-            } else {
-                result
-            }
-        }
-        _ => result,
-    }
+    result.map_eintr(errno!(ERESTARTNOHAND))
 }
 
 pub fn sys_pipe(

@@ -3,12 +3,14 @@
 // found in the LICENSE file.
 
 #include <fcntl.h>
+#include <signal.h>
 #include <stdint.h>
 #include <sys/mman.h>
 #include <sys/syscall.h>
 #include <unistd.h>
 
 #include <atomic>
+#include <ctime>
 #include <latch>
 #include <new>
 #include <string>
@@ -344,6 +346,30 @@ TEST(FutexTest, FutexWaitOnRemappedMemory) {
     EXPECT_EQ(0, munmap(addr, page_size));
   });
   EXPECT_EQ(true, helper.WaitForChildren());
+}
+
+// Test that FUTEX_WAIT can be restarted after being interrupted by a signal.
+TEST(FutexTest, WaitRestartableOnSignal) {
+  // The child process will do a FUTEX_WAIT with a timeout. The parent will send SIGSTOP + SIGCONT
+  // during the timeout.
+  test_helper::ForkHelper helper;
+  pid_t child_pid = helper.RunInForkedProcess([] {
+    uint32_t word = 0;
+    struct timespec timeout = {.tv_sec = 1};
+    // Should fail with ETIMEDOUT and *not* EINTR.
+    ASSERT_THAT(syscall(SYS_futex, &word, FUTEX_WAIT_PRIVATE, 0, &timeout),
+                SyscallFailsWithErrno(ETIMEDOUT));
+  });
+
+  // Wait for child to go to sleep.
+  std::cerr << "wait for block" << std::endl;
+  test_helper::WaitUntilBlocked(child_pid, true);
+  std::cerr << "waited for block" << std::endl;
+  usleep(100000);
+
+  ASSERT_THAT(kill(child_pid, SIGSTOP), SyscallSucceeds());
+  ASSERT_THAT(kill(child_pid, SIGCONT), SyscallSucceeds());
+  EXPECT_TRUE(helper.WaitForChildren());
 }
 
 }  // anonymous namespace

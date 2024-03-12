@@ -252,32 +252,6 @@ exit_loop:
   EXPECT_EQ(ptrace(PTRACE_CONT, child_pid, 0, 0), 0);
 }
 
-namespace {
-
-// Loop until the target process indicates a sleeping state in /proc/pid/stat.
-std::optional<std::string> WaitUntilBlocked(pid_t target, bool ignore_tracer) {
-  for (int i = 0; i < 100000; i++) {
-    // Loop until the target task is paused.
-    std::string fname = "/proc/" + std::to_string(target) + "/stat";
-    std::ifstream t(fname);
-    if (!t.is_open()) {
-      return std::optional<std::string>("File " + fname + " not found");
-    }
-    std::stringstream buffer;
-    buffer << t.rdbuf();
-    if (buffer.str().find("S") != std::string::npos ||
-        (!ignore_tracer && buffer.str().find("t") != std::string::npos)) {
-      break;
-    }
-    // Give up if we don't seem to be getting to sleep.
-    if (i == 99999)
-      return std::optional<std::string>(buffer.str());
-  }
-  return std::nullopt;
-}
-
-}  // namespace
-
 #ifdef __x86_64__
 
 static constexpr int kUnmaskedSignal = SIGUSR1;
@@ -332,8 +306,7 @@ void TraceSyscallWithRestartWithCall(int call, long arg0, long arg1, long arg2, 
 
   // Resume the child with PTRACE_SYSCALL and expect it to block in the syscall.
   EXPECT_EQ(ptrace(PTRACE_SYSCALL, child_pid, 0, 0), 0);
-  std::optional<std::string> proc_status = WaitUntilBlocked(child_pid, true);
-  EXPECT_EQ(proc_status, std::nullopt) << "Blocking failed with status " << *proc_status;
+  test_helper::WaitUntilBlocked(child_pid, true);
   ASSERT_EQ(waitpid(child_pid, &status, WNOHANG), 0);
 
   // Send the child kUnmaskedSignal, causing it to return the given errno and enter
@@ -918,7 +891,7 @@ TEST(PtraceTest, GrandchildWithSigsuspend) {
     EXPECT_EQ(0, sigprocmask(SIG_BLOCK, &child_mask, &old_mask));
     pid_t gc_pid = fork();
     if (gc_pid == 0) {
-      WaitUntilBlocked(my_pid, false);
+      test_helper::WaitUntilBlocked(my_pid, false);
       exit(0);
     }
     EXPECT_EQ(-1, sigsuspend(&old_mask));

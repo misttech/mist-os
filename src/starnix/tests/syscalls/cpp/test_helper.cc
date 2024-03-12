@@ -20,6 +20,7 @@
 #include <sys/wait.h>
 #include <time.h>
 #include <unistd.h>
+#include <fstream>
 
 #include <gtest/gtest.h>
 #include <linux/capability.h>
@@ -328,6 +329,28 @@ bool TryWrite(uintptr_t addr) {
   EXPECT_TRUE(zero_fd.is_valid());
 
   return read(zero_fd.get(), reinterpret_cast<void *>(addr), 1) == 1;
+}
+
+// Loop until the target process indicates a sleeping state in /proc/pid/stat.
+void WaitUntilBlocked(pid_t target, bool ignore_tracer) {
+  for (int i = 0; i < 100000; i++) {
+    // Loop until the target task is paused.
+    std::string fname = "/proc/" + std::to_string(target) + "/stat";
+    std::ifstream t(fname);
+    if (!t.is_open()) {
+      FAIL() << "File " << fname << " not found";
+    }
+    std::stringstream buffer;
+    buffer << t.rdbuf();
+    if (buffer.str().find("S") != std::string::npos ||
+        (!ignore_tracer && buffer.str().find("t") != std::string::npos)) {
+      break;
+    }
+    // Give up if we don't seem to be getting to sleep.
+    if (i == 99999)
+      FAIL() << "Failed to wait for pid " << target
+             << " to block. resulting status: " << buffer.str();
+  }
 }
 
 }  // namespace test_helper

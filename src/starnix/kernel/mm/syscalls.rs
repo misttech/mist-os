@@ -8,8 +8,8 @@ use starnix_sync::{Locked, Unlocked};
 use crate::{
     execution::notify_debugger_of_module_list,
     mm::{
-        DesiredAddress, FutexKey, FutexTable, MappingName, MappingOptions, MemoryAccessorExt,
-        MremapFlags, ProtectionFlags, PAGE_SIZE,
+        DesiredAddress, FutexKey, MappingName, MappingOptions, MemoryAccessorExt, MremapFlags,
+        PrivateFutexKey, ProtectionFlags, SharedFutexKey, PAGE_SIZE,
     },
     task::{CurrentTask, Task},
     vfs::{
@@ -24,6 +24,7 @@ use starnix_uapi::{
     auth::{CAP_SYS_PTRACE, PTRACE_MODE_ATTACH_REALCREDS},
     errno, error,
     errors::Errno,
+    errors::EINTR,
     pid_t, robust_list_head,
     time::{duration_from_timespec, time_from_timespec},
     timespec, uapi,
@@ -355,9 +356,9 @@ pub fn sys_membarrier(
     }
 }
 
-fn do_futex<Key: FutexKey>(
-    current_task: &CurrentTask,
-    futexes: &FutexTable<Key>,
+pub fn sys_futex(
+    _locked: &mut Locked<'_, Unlocked>,
+    current_task: &mut CurrentTask,
     addr: UserAddress,
     op: u32,
     value: u32,
@@ -365,6 +366,24 @@ fn do_futex<Key: FutexKey>(
     addr2: UserAddress,
     value3: u32,
 ) -> Result<usize, Errno> {
+    if op & FUTEX_PRIVATE_FLAG != 0 {
+        do_futex::<PrivateFutexKey>(current_task, addr, op, value, timeout_or_value2, addr2, value3)
+    } else {
+        do_futex::<SharedFutexKey>(current_task, addr, op, value, timeout_or_value2, addr2, value3)
+    }
+}
+
+fn do_futex<Key: FutexKey>(
+    current_task: &mut CurrentTask,
+    addr: UserAddress,
+    op: u32,
+    value: u32,
+    timeout_or_value2: SyscallArg,
+    addr2: UserAddress,
+    value3: u32,
+) -> Result<usize, Errno> {
+    let futexes = Key::get_table_from_task(current_task);
+
     let is_realtime = op & FUTEX_CLOCK_REALTIME != 0;
     let cmd = op & (FUTEX_CMD_MASK as u32);
 
@@ -383,7 +402,8 @@ fn do_futex<Key: FutexKey>(
     match cmd {
         FUTEX_WAIT => {
             let deadline = read_deadline(current_task)?;
-            futexes.wait(current_task, addr, value, FUTEX_BITSET_MATCH_ANY, deadline)?;
+            let bitset = FUTEX_BITSET_MATCH_ANY;
+            do_futex_wait_with_restart::<Key>(current_task, addr, value, bitset, deadline)?;
             Ok(0)
         }
         FUTEX_WAKE => futexes.wake(current_task, addr, value as usize, FUTEX_BITSET_MATCH_ANY),
@@ -405,7 +425,7 @@ fn do_futex<Key: FutexKey>(
                 let deadline = current_task.read_object(utime)?;
                 time_from_timespec(deadline)?
             };
-            futexes.wait(current_task, addr, value, value3, deadline)?;
+            do_futex_wait_with_restart::<Key>(current_task, addr, value, value3, deadline)?;
             Ok(0)
         }
         FUTEX_WAKE_BITSET => {
@@ -439,38 +459,23 @@ fn do_futex<Key: FutexKey>(
     }
 }
 
-pub fn sys_futex(
-    _locked: &mut Locked<'_, Unlocked>,
-    current_task: &CurrentTask,
+fn do_futex_wait_with_restart<Key: FutexKey>(
+    current_task: &mut CurrentTask,
     addr: UserAddress,
-    op: u32,
     value: u32,
-    timeout_or_value2: SyscallArg,
-    addr2: UserAddress,
-    value3: u32,
-) -> Result<usize, Errno> {
-    if op & FUTEX_PRIVATE_FLAG != 0 {
-        do_futex(
-            current_task,
-            &current_task.mm().futex,
-            addr,
-            op,
-            value,
-            timeout_or_value2,
-            addr2,
-            value3,
-        )
-    } else {
-        do_futex(
-            current_task,
-            &current_task.kernel().shared_futexes,
-            addr,
-            op,
-            value,
-            timeout_or_value2,
-            addr2,
-            value3,
-        )
+    mask: u32,
+    deadline: zx::Time,
+) -> Result<(), Errno> {
+    let futexes = Key::get_table_from_task(current_task);
+    let result = futexes.wait(current_task, addr, value, mask, deadline);
+    match result {
+        Err(err) if err == EINTR => {
+            current_task.set_syscall_restart_func(move |current_task| {
+                do_futex_wait_with_restart::<Key>(current_task, addr, value, mask, deadline)
+            });
+            error!(ERESTART_RESTARTBLOCK)
+        }
+        result => result,
     }
 }
 

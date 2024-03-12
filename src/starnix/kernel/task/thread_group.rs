@@ -1595,6 +1595,14 @@ impl ThreadGroupMutableState<Base = ThreadGroup, BaseType = Arc<ThreadGroup>> {
             return stopped;
         }
 
+        // Thread groups don't transition to group stop if they are waking, because waking
+        // means something told it to wake up (like a SIGCONT) but hasn't finished yet.
+        if self.base.load_stopped() == StopState::Waking
+            && (new_stopped == StopState::GroupStopping || new_stopped == StopState::GroupStopped)
+        {
+            return self.base.load_stopped();
+        }
+
         // TODO(https://g-issues.fuchsia.dev/issues/306438676): When thread
         // group can be stopped inside user code, tasks/thread groups will
         // need to be either restarted or stopped here.

@@ -251,7 +251,10 @@ impl StopState {
         *self == StopState::ForceAwake
             || (*self == StopState::ForceWaking && new_state != StopState::ForceAwake)
             || new_state == *self
-            || self.is_downgrade(&new_state)
+            // Downgrades are generally a sign that something is screwed up, but
+            // a SIGCONT can result in a downgrade from Awake to Waking, so we
+            // allowlist it.
+            || (self.is_downgrade(&new_state) && *self != StopState::Awake)
     }
 
     pub fn is_force(&self) -> bool {

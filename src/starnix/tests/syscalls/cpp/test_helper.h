@@ -234,6 +234,8 @@ bool TryWrite(uintptr_t addr);
 // Wrapper for the memfd_create system call.
 int MemFdCreate(const char *name, unsigned int flags);
 
+void WaitUntilBlocked(pid_t target, bool ignore_tracer);
+
 }  // namespace test_helper
 
 #endif  // SRC_STARNIX_TESTS_SYSCALLS_CPP_TEST_HELPER_H_
