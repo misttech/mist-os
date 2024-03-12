@@ -9,7 +9,9 @@ use packet_encoding::{Decodable, Encodable};
 use tracing::{info, trace, warn};
 
 use crate::error::{Error, PacketError};
-use crate::header::{Header, HeaderIdentifier, HeaderSet, SingleResponseMode};
+use crate::header::{
+    ConnectionIdentifier, Header, HeaderIdentifier, HeaderSet, SingleResponseMode,
+};
 use crate::operation::{OpCode, RequestPacket, ResponseCode, ResponsePacket, SetPathFlags};
 use crate::transport::max_packet_size_from_transport;
 pub use crate::transport::TransportType;
@@ -127,15 +129,26 @@ pub trait ServerOperation {
     ) -> Result<Vec<ResponsePacket>, Error>;
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
 enum ConnectionStatus {
     /// The transport is created but the CONNECT operation has not been completed.
+    #[default]
     Initialized,
     /// The transport is connected and the CONNECT operation has been completed.
-    Connected,
+    /// `id` contains the optional identifier for this connection. It is typically set when the
+    /// OBEX client requests a directed OBEX connection to a specific Service by including the
+    /// `Target` header in the CONNECT request.
+    Connected { id: Option<ConnectionIdentifier> },
     /// The transport is connected but a DISCONNECT request has been received. The `ObexServer`
     /// will no longer process requests from the remote peer.
     DisconnectReceived,
+}
+
+impl ConnectionStatus {
+    #[cfg(test)]
+    fn connected_no_id() -> Self {
+        Self::Connected { id: None }
+    }
 }
 
 /// Implements the Server role for the OBEX protocol.
@@ -164,6 +177,13 @@ pub struct ObexServer {
 }
 
 impl ObexServer {
+    /// The default Connection Identifier used for directed OBEX connections.
+    /// Because a single `ObexServer` services a single transport (L2CAP or RFCOMM), this
+    /// identifier does not multiplex anything and is only sent in the CONNECT response.
+    /// This value is arbitrarily chosen and will be included in all subsequent requests made by
+    /// the remote OBEX Client.
+    const DIRECTED_CONNECTION_ID: ConnectionIdentifier = ConnectionIdentifier(1);
+
     pub fn new(
         channel: Channel,
         type_: TransportType,
@@ -171,7 +191,7 @@ impl ObexServer {
     ) -> Self {
         let max_packet_size = max_packet_size_from_transport(channel.max_tx_size());
         Self {
-            connected: ConnectionStatus::Initialized,
+            connected: ConnectionStatus::default(),
             max_packet_size,
             active_operation: None,
             channel,
@@ -182,10 +202,10 @@ impl ObexServer {
 
     /// Returns `true` if the OBEX connection is currently active (e.g. CONNECT operation done).
     fn is_connected(&self) -> bool {
-        matches!(self.connected, ConnectionStatus::Connected)
+        matches!(self.connected, ConnectionStatus::Connected { .. })
     }
 
-    fn set_connected(&mut self, status: ConnectionStatus) {
+    fn set_connection_status(&mut self, status: ConnectionStatus) {
         self.connected = status;
     }
 
@@ -215,12 +235,19 @@ impl ObexServer {
         self.set_max_packet_size(peer_max_packet_size);
 
         let headers = HeaderSet::from(request);
-        // TODO(https://fxbug.dev/42080293): Check `headers` for Target header. If present, generate a
-        // ConnectionId for a directed OBEX connection.
+
+        // The connection can optionally be considered "directed" if the Client provides a Target
+        // UUID identifying the service.
+        let id = if headers.contains_header(&HeaderIdentifier::Target) {
+            Some(Self::DIRECTED_CONNECTION_ID)
+        } else {
+            None
+        };
         let (code, response_headers) = match self.handler.connect(headers).await {
-            Ok(headers) => {
+            Ok(mut headers) => {
                 trace!("Application accepted CONNECT request");
-                self.set_connected(ConnectionStatus::Connected);
+                let _ = headers.try_add_connection_id(&id);
+                self.set_connection_status(ConnectionStatus::Connected { id });
                 (ResponseCode::Ok, headers)
             }
             Err(reject_parameters) => {
@@ -242,7 +269,7 @@ impl ObexServer {
         let headers = HeaderSet::from(request);
         let response_headers = self.handler.disconnect(headers).await;
         let response_packet = ResponsePacket::new_disconnect(response_headers);
-        self.set_connected(ConnectionStatus::DisconnectReceived);
+        self.set_connection_status(ConnectionStatus::DisconnectReceived);
         Ok(response_packet)
     }
 
@@ -438,8 +465,36 @@ mod tests {
         pin_mut!(server_fut);
         let _ = exec.run_until_stalled(&mut server_fut).expect_pending("server active");
 
-        let headers = HeaderSet::from_header(Header::Target(vec![5, 6]));
-        let connect_request = RequestPacket::new_connect(500, headers);
+        let connect_request = RequestPacket::new_connect(500, HeaderSet::new());
+        send_packet(&mut remote, connect_request);
+
+        // Expect the ObexServer to receive the request, parse it, ask the application, and reply.
+        // Simulate application accepting the request.
+        let headers = HeaderSet::from_header(Header::Description("foo".into()));
+        test_app.set_response(Ok(headers));
+        let _ = exec.run_until_stalled(&mut server_fut).expect_pending("server active");
+
+        // Expect the remote peer to receive our CONNECT response. Our response shouldn't contain
+        // a `ConnectionIdentifier` since the request didn't contain a `Target` header.
+        let expectation = |response: ResponsePacket| {
+            assert_eq!(*response.code(), ResponseCode::Ok);
+            assert_eq!(response.data(), &[0x10, 0, 0x01, 0xf4]);
+            assert!(response.headers().contains_header(&HeaderIdentifier::Description));
+            assert!(!response.headers().contains_header(&HeaderIdentifier::ConnectionId));
+        };
+        expect_response(&mut exec, &mut remote, expectation, OpCode::Connect);
+    }
+
+    #[fuchsia::test]
+    fn directed_connect_accepted_by_app_success() {
+        let mut exec = fasync::TestExecutor::new();
+        let (obex_server, test_app, mut remote) = new_obex_server(/*srm=*/ false);
+        let server_fut = obex_server.run();
+        pin_mut!(server_fut);
+        let _ = exec.run_until_stalled(&mut server_fut).expect_pending("server active");
+
+        let request_headers = HeaderSet::from_header(Header::Target(vec![5, 6]));
+        let connect_request = RequestPacket::new_connect(500, request_headers);
         send_packet(&mut remote, connect_request);
 
         // Expect the ObexServer to receive the request, parse it, ask the application, and reply.
@@ -448,12 +503,13 @@ mod tests {
         test_app.set_response(Ok(headers));
         let _ = exec.run_until_stalled(&mut server_fut).expect_pending("server active");
 
-        // Expect the remote peer to receive our CONNECT response.
+        // Expect the remote peer to receive our CONNECT response. Our response should contain a
+        // connection identifier because the `request_headers` contains a `Target` header.
         let expectation = |response: ResponsePacket| {
             assert_eq!(*response.code(), ResponseCode::Ok);
             assert_eq!(response.data(), &[0x10, 0, 0x01, 0xf4]);
-            let headers = HeaderSet::from(response);
-            assert!(headers.contains_header(&HeaderIdentifier::Name));
+            assert!(response.headers().contains_header(&HeaderIdentifier::Name));
+            assert!(response.headers().contains_header(&HeaderIdentifier::ConnectionId));
         };
         expect_response(&mut exec, &mut remote, expectation, OpCode::Connect);
     }
@@ -534,7 +590,7 @@ mod tests {
         let mut exec = fasync::TestExecutor::new();
         let (mut obex_server, test_app, mut remote) = new_obex_server(/*srm=*/ false);
         // Set to the Connected state to bypass CONNECT operation.
-        obex_server.set_connected(ConnectionStatus::Connected);
+        obex_server.set_connection_status(ConnectionStatus::connected_no_id());
         let server_fut = obex_server.run();
         pin_mut!(server_fut);
         let _ = exec.run_until_stalled(&mut server_fut).expect_pending("server active");
@@ -562,7 +618,7 @@ mod tests {
         let mut exec = fasync::TestExecutor::new();
         let (mut obex_server, test_app, mut remote) = new_obex_server(/*srm=*/ false);
         // Set to the Connected state to bypass CONNECT operation.
-        obex_server.set_connected(ConnectionStatus::Connected);
+        obex_server.set_connection_status(ConnectionStatus::connected_no_id());
         let server_fut = obex_server.run();
         pin_mut!(server_fut);
         let _ = exec.run_until_stalled(&mut server_fut).expect_pending("server active");
@@ -606,7 +662,7 @@ mod tests {
         let mut exec = fasync::TestExecutor::new();
         let (mut obex_server, test_app, mut remote) = new_obex_server(/*srm=*/ false);
         // Set to the Connected state to bypass CONNECT operation.
-        obex_server.set_connected(ConnectionStatus::Connected);
+        obex_server.set_connection_status(ConnectionStatus::connected_no_id());
         let server_fut = obex_server.run();
         pin_mut!(server_fut);
         let _ = exec.run_until_stalled(&mut server_fut).expect_pending("server active");
@@ -652,7 +708,7 @@ mod tests {
     fn get_request_rejected_by_app_success() {
         let mut exec = fasync::TestExecutor::new();
         let (mut obex_server, _test_app, mut remote) = new_obex_server(/*srm=*/ false);
-        obex_server.set_connected(ConnectionStatus::Connected);
+        obex_server.set_connection_status(ConnectionStatus::connected_no_id());
         let server_fut = obex_server.run();
         pin_mut!(server_fut);
         let _ = exec.run_until_stalled(&mut server_fut).expect_pending("server active");
@@ -677,7 +733,7 @@ mod tests {
     fn get_request_with_srm_enabled_success() {
         let mut exec = fasync::TestExecutor::new();
         let (mut obex_server, test_app, mut remote) = new_obex_server(/*srm=*/ true);
-        obex_server.set_connected(ConnectionStatus::Connected);
+        obex_server.set_connection_status(ConnectionStatus::connected_no_id());
         obex_server.set_max_packet_size(20); // Set max to something small.
         let server_fut = obex_server.run();
         pin_mut!(server_fut);
@@ -745,7 +801,7 @@ mod tests {
         let mut exec = fasync::TestExecutor::new();
         let (mut obex_server, test_app, mut remote) = new_obex_server(/*srm=*/ false);
         // Set to the Connected state to bypass CONNECT operation.
-        obex_server.set_connected(ConnectionStatus::Connected);
+        obex_server.set_connection_status(ConnectionStatus::connected_no_id());
         let server_fut = obex_server.run();
         pin_mut!(server_fut);
         let _ = exec.run_until_stalled(&mut server_fut).expect_pending("server active");
@@ -777,7 +833,7 @@ mod tests {
     fn put_request_with_srm_enabled_success() {
         let mut exec = fasync::TestExecutor::new();
         let (mut obex_server, test_app, mut remote) = new_obex_server(/*srm=*/ true);
-        obex_server.set_connected(ConnectionStatus::Connected);
+        obex_server.set_connection_status(ConnectionStatus::connected_no_id());
         let server_fut = obex_server.run();
         pin_mut!(server_fut);
         let _ = exec.run_until_stalled(&mut server_fut).expect_pending("server active");
@@ -835,7 +891,7 @@ mod tests {
     fn delete_request_accepted_by_app_success() {
         let mut exec = fasync::TestExecutor::new();
         let (mut obex_server, test_app, mut remote) = new_obex_server(/*srm=*/ false);
-        obex_server.set_connected(ConnectionStatus::Connected);
+        obex_server.set_connection_status(ConnectionStatus::connected_no_id());
         let server_fut = obex_server.run();
         pin_mut!(server_fut);
         let _ = exec.run_until_stalled(&mut server_fut).expect_pending("server active");

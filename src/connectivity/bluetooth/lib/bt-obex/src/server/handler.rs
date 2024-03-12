@@ -19,6 +19,11 @@ pub type ObexResult<T> = Result<T, ObexOperationError>;
 pub trait ObexServerHandler {
     /// A request to initiate the CONNECT operation.
     /// `headers` are the informational headers provided by the remote OBEX client.
+    ///
+    /// Directed OBEX connections are automatically supported by the `ObexServer` and needn't be
+    /// handled in this response. Specifically, the `ConnectionIdentifier` is automatically
+    /// added and shouldn't be included here.
+    ///
     /// Returns `Ok` with any response headers if the CONNECT request is accepted.
     /// Returns `Err` with a rejection code and headers if the CONNECT request is rejected.
     async fn connect(&mut self, headers: HeaderSet) -> ObexResult<HeaderSet>;
@@ -71,8 +76,6 @@ pub trait ObexServerHandler {
     /// Returns `Ok` if accepted.
     /// Returns `Err` with a rejection code and optional headers if rejected.
     async fn delete(&mut self, headers: HeaderSet) -> ObexResult<()>;
-
-    // TODO(https://fxbug.dev/42076096): Add other operation types.
 }
 
 #[cfg(test)]
