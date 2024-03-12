@@ -52,6 +52,21 @@ impl From<fidl_fuchsia_net::Ipv6Address> for Ip6NetworkPrefix {
     }
 }
 
+impl From<fidl_fuchsia_net::Ipv6AddressWithPrefix> for Ip6Prefix {
+    fn from(x: fidl_fuchsia_net::Ipv6AddressWithPrefix) -> Self {
+        Ip6Prefix::new(Ip6Address::from(x.addr.addr), x.prefix_len)
+    }
+}
+
+impl From<Ip6Prefix> for fidl_fuchsia_net::Ipv6AddressWithPrefix {
+    fn from(x: Ip6Prefix) -> Self {
+        fidl_fuchsia_net::Ipv6AddressWithPrefix {
+            addr: fidl_fuchsia_net::Ipv6Address { addr: x.addr().octets() },
+            prefix_len: x.0.mLength,
+        }
+    }
+}
+
 impl From<fidl_fuchsia_net::Ipv6SocketAddress> for SockAddr {
     fn from(x: fidl_fuchsia_net::Ipv6SocketAddress) -> Self {
         SockAddr::new(Ip6Address::from(x.address.addr), x.port)

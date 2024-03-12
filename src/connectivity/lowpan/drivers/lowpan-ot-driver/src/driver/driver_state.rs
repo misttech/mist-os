@@ -13,9 +13,6 @@ pub struct DriverState<OT> {
 
     pub connectivity_state: ConnectivityState,
 
-    /// The current set of addresses configured for this interface.
-    pub(super) address_table: AddressTable,
-
     pub srp_discovery_proxy: Option<DiscoveryProxy>,
 
     pub srp_advertising_proxy: Option<AdvertisingProxy>,
@@ -25,6 +22,8 @@ pub struct DriverState<OT> {
     pub detailed_logging: detailed_logging::DetailedLogging,
 
     pub nat64: nat64::Nat64,
+
+    pub dhcp_v6_pd: dhcpv6pd::DhcpV6Pd,
 }
 
 impl<OT: AsRef<ot::Instance>> AsRef<ot::Instance> for DriverState<OT> {
@@ -42,6 +41,12 @@ impl<OT> AsRef<Option<DiscoveryProxy>> for DriverState<OT> {
 impl<OT> AsRef<Option<AdvertisingProxy>> for DriverState<OT> {
     fn as_ref(&self) -> &Option<AdvertisingProxy> {
         &self.srp_advertising_proxy
+    }
+}
+
+impl<OT> AsRef<dhcpv6pd::DhcpV6Pd> for DriverState<OT> {
+    fn as_ref(&self) -> &dhcpv6pd::DhcpV6Pd {
+        &self.dhcp_v6_pd
     }
 }
 
@@ -105,27 +110,22 @@ impl<OT: openthread::ot::BorderRouter> DriverState<OT> {
     }
 
     pub fn set_dhcpv6_pd_enabled(&mut self, enabled: bool) {
-        if enabled
-            != (self.ot_instance.border_routing_dhcp6_pd_get_state()
-                != ot::BorderRoutingDhcp6PdState::Disabled)
-        {
-            self.ot_instance.border_routing_dhcp6_pd_set_enabled(enabled);
-        }
-
         // SAFETY: This is safe for the reasons explained
         //         in the comment above `dhcpv6_pd_enable_ref()`.
         unsafe {
             *Self::dhcpv6_pd_enabled_ref() = enabled;
         }
+
+        info!(
+            "DHCPv6-PD has been {}.",
+            if self.is_dhcpv6_pd_enabled() { "ENABLED" } else { "DISABLED" }
+        );
+
+        self.check_dhcpv6_pd();
     }
 
     pub fn check_dhcpv6_pd(&self) {
-        if !self.is_dhcpv6_pd_enabled()
-            && (self.ot_instance.border_routing_dhcp6_pd_get_state()
-                != ot::BorderRoutingDhcp6PdState::Disabled)
-        {
-            self.ot_instance.border_routing_dhcp6_pd_set_enabled(false);
-        }
+        self.ot_instance.border_routing_dhcp6_pd_set_enabled(self.is_dhcpv6_pd_enabled());
     }
 }
 
@@ -166,12 +166,12 @@ impl<OT> DriverState<OT> {
         DriverState {
             ot_instance,
             connectivity_state: ConnectivityState::Inactive,
-            address_table: Default::default(),
             srp_discovery_proxy: None,
             srp_advertising_proxy: None,
             ot_ctl: ot_ctl::OtCtl::new(),
             detailed_logging: detailed_logging::DetailedLogging::new(),
             nat64: nat64::Nat64::new(),
+            dhcp_v6_pd: dhcpv6pd::DhcpV6Pd::default(),
         }
     }
 }

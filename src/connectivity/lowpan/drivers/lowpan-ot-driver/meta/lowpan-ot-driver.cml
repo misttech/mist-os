@@ -22,6 +22,7 @@
                 "fuchsia.lowpan.driver.Register",
                 "fuchsia.lowpan.experimental.DeviceRouteConnector",
                 "fuchsia.lowpan.experimental.DeviceRouteExtraConnector",
+                "fuchsia.net.dhcpv6.PrefixProvider",
                 "fuchsia.net.interfaces.admin.Installer",
                 "fuchsia.net.interfaces.State",
                 "fuchsia.net.masquerade.Factory",

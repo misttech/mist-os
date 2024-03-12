@@ -33,6 +33,26 @@ impl From<Icmp6EchoMode> for otIcmp6EchoMode {
     }
 }
 
+/// Iterates over the [`NetifAddress`] structs from [`Ip6::ip6_get_unicast_addresses()`].
+#[derive(Default, Debug, Clone)]
+pub struct NetifAddressIterator<'a>(Option<&'a NetifAddress>);
+
+impl<'a> Iterator for NetifAddressIterator<'a> {
+    type Item = &'a NetifAddress;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if let Some(addr_ref) = self.0 {
+            // SAFETY: The `otNetifAddress` pointer used here comes
+            //         from `otIp6GetUnicastAddresses`, which is guaranteed
+            //         to have valid values for `mNext`.
+            self.0 = unsafe { NetifAddress::ref_from_ot_ptr(addr_ref.0.mNext) };
+            Some(addr_ref)
+        } else {
+            None
+        }
+    }
+}
+
 /// Methods from the [OpenThread "IPv6" Module](https://openthread.io/reference/group/api-ip6).
 pub trait Ip6 {
     /// Functional equivalent of [`otsys::otIp6Send`](crate::otsys::otIp6Send).
@@ -116,6 +136,10 @@ pub trait Ip6 {
     /// Functional equivalent of
     /// [`otsys::otIp6GetBorderRoutingCounters`](crate::otsys::otIp6GetBorderRoutingCounters).
     fn ip6_get_border_routing_counters(&self) -> &BorderRoutingCounters;
+
+    /// Functional equivalent of
+    /// [`otsys::otIp6GetUnicastAddresses`](crate::otsys::otIp6GetUnicastAddresses).
+    fn ip6_get_unicast_addresses(&self) -> NetifAddressIterator<'_>;
 }
 
 impl<T: Ip6 + ot::Boxable> Ip6 for ot::Box<T> {
@@ -195,6 +219,10 @@ impl<T: Ip6 + ot::Boxable> Ip6 for ot::Box<T> {
 
     fn ip6_get_border_routing_counters(&self) -> &BorderRoutingCounters {
         self.as_ref().ip6_get_border_routing_counters()
+    }
+
+    fn ip6_get_unicast_addresses(&self) -> NetifAddressIterator<'_> {
+        self.as_ref().ip6_get_unicast_addresses()
     }
 }
 
@@ -376,5 +404,11 @@ impl Ip6 for Instance {
             BorderRoutingCounters::ref_from_ot_ptr(otIp6GetBorderRoutingCounters(self.as_ot_ptr()))
                 .unwrap()
         }
+    }
+
+    fn ip6_get_unicast_addresses(&self) -> NetifAddressIterator<'_> {
+        NetifAddressIterator(unsafe {
+            NetifAddress::ref_from_ot_ptr(otIp6GetUnicastAddresses(self.as_ot_ptr()))
+        })
     }
 }

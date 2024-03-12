@@ -281,7 +281,7 @@ impl Debug for AddressOrigin {
 /// Functional equivalent of [`otsys::otNetifAddress`](crate::otsys::otNetifAddress).
 #[derive(Default, Clone, Copy)]
 #[repr(transparent)]
-pub struct NetifAddress(otNetifAddress);
+pub struct NetifAddress(pub(crate) otNetifAddress);
 
 impl_ot_castable!(NetifAddress, otNetifAddress);
 
@@ -612,9 +612,12 @@ impl BorderRoutingPrefixTableEntry {
 }
 
 /// This enumeration represents the state of DHCPv6 Prefix Delegation State.
-#[derive(Debug, Copy, Clone, Eq, Ord, PartialOrd, PartialEq, num_derive::FromPrimitive)]
+#[derive(
+    Debug, Default, Copy, Clone, Eq, Ord, PartialOrd, PartialEq, num_derive::FromPrimitive,
+)]
 #[allow(missing_docs)]
 pub enum BorderRoutingDhcp6PdState {
+    #[default]
     Disabled = OT_BORDER_ROUTING_DHCP6_PD_STATE_DISABLED as isize,
     Stopped = OT_BORDER_ROUTING_DHCP6_PD_STATE_STOPPED as isize,
     Running = OT_BORDER_ROUTING_DHCP6_PD_STATE_RUNNING as isize,

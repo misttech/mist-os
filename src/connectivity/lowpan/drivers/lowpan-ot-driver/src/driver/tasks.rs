@@ -126,6 +126,12 @@ where
         let discovery_proxy_stream =
             self.driver_state.discovery_proxy_future().into_stream().map(|_: Never| unreachable!());
 
+        let dhcp_v6_pd_stream = self
+            .driver_state
+            .dhcp_v6_pd_future()
+            .into_stream()
+            .map_err(|x| x.context("single_main_loop"));
+
         // Openthread CLI inbound task
         let (cli_input_sender_local, mut cli_input_receiver) = futures::channel::mpsc::unbounded();
         let openthread_cli_inbound_loop = async move {
@@ -201,6 +207,7 @@ where
             backbone_if_event_stream.boxed(),
             state_machine_stream.boxed(),
             discovery_proxy_stream.boxed(),
+            dhcp_v6_pd_stream.boxed(),
             scan_watchdog.into_stream().boxed(),
             openthread_cli_inbound_loop.into_stream().boxed(),
         ]))

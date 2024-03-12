@@ -54,6 +54,18 @@ where
         debug!("OpenThread State Change: {:?}", flags);
         self.update_connectivity_state();
 
+        {
+            // Check to make sure if we need to handle
+            // any state changes from DHCPv6-PD in OpenThread.
+            let driver_state = self.driver_state.lock();
+            match driver_state.dhcp_v6_pd.check_last_state(&driver_state.ot_instance) {
+                Ok(()) => {}
+                Err(err) => {
+                    error!("Call to driver_state.dhcp_v6_pd.check_last_state failed: {:?}", err);
+                }
+            }
+        }
+
         // TODO(rquattle): Consider make this a little more selective, this async-condition
         //                 is a bit of a big hammer.
         if flags.intersects(
@@ -108,6 +120,7 @@ where
             }
         } else if is_added {
             debug!("OpenThread ADDED address: {:?}", info);
+
             // TODO(b/235498515): If it looks like an RLOC, don't add it for the time being.
             if subnet.addr.segments()[4..7] == [0x0, 0xff, 0xfe00] {
                 info!(

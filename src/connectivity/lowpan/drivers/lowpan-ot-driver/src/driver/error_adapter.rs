@@ -82,6 +82,7 @@ pub trait ErrorResultExt {
     type Error;
     fn ignore_already_exists(self) -> Result<(), Self::Error>;
     fn ignore_not_found(self) -> Result<(), Self::Error>;
+    fn ignore_rejected(self) -> Result<(), Self::Error>;
 }
 
 impl ErrorResultExt for Result<(), anyhow::Error> {
@@ -116,6 +117,17 @@ impl ErrorResultExt for Result<(), anyhow::Error> {
             }
         })
     }
+
+    fn ignore_rejected(self) -> Result<(), Self::Error> {
+        #[allow(clippy::if_same_then_else)] // TODO(https://fxbug.dev/42177056)
+        self.or_else(|err| {
+            if err.get_ot_error() == Some(ot::Error::Rejected) {
+                Ok(())
+            } else {
+                Err(err)
+            }
+        })
+    }
 }
 
 impl ErrorResultExt for Result<(), ot::Error> {
@@ -130,6 +142,13 @@ impl ErrorResultExt for Result<(), ot::Error> {
     fn ignore_not_found(self) -> Result<(), Self::Error> {
         self.or_else(|err| match err {
             Error::NotFound => Ok(()),
+            err => Err(err),
+        })
+    }
+
+    fn ignore_rejected(self) -> Result<(), Self::Error> {
+        self.or_else(|err| match err {
+            Error::Rejected => Ok(()),
             err => Err(err),
         })
     }

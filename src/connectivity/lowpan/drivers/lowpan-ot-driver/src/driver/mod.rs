@@ -13,6 +13,7 @@ mod border_agent;
 mod connectivity_state;
 mod convert;
 mod detailed_logging;
+mod dhcpv6pd;
 mod driver_state;
 mod error_adapter;
 mod host_to_thread;
@@ -29,6 +30,7 @@ mod tests;
 
 pub use connectivity_state::*;
 pub use convert::*;
+pub use dhcpv6pd::*;
 use driver_state::*;
 pub use error_adapter::*;
 use lowpan_driver_common::net::{BackboneInterface, NetworkInterface};

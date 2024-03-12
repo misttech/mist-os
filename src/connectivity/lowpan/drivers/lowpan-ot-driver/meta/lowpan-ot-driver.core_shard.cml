@@ -55,6 +55,7 @@
         },
         {
             protocol: [
+                "fuchsia.net.dhcpv6.PrefixProvider",
                 "fuchsia.net.interfaces.admin.Installer",
                 "fuchsia.net.interfaces.State",
                 "fuchsia.net.multicast.admin.Ipv6RoutingTableController",

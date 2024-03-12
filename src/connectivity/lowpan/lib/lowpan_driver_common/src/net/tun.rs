@@ -304,7 +304,7 @@ impl NetworkInterface for TunNetworkInterface {
             addr: fnetext::IpAddress(addr.addr.into()).into(),
             prefix_len: addr.prefix_len,
         };
-        self.add_address(device_addr)
+        self.remove_address(device_addr)
     }
 
     fn remove_address(&self, addr: fidl_fuchsia_net::Subnet) -> Result<(), Error> {
