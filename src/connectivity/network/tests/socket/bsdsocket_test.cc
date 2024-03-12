@@ -1449,7 +1449,7 @@ TEST_P(ReadAfterShutdownTest, Success) {
         .fd = local.get(),
         .events = POLLIN,
     };
-    int n = poll(&pfd, 1, std::chrono::milliseconds(kTimeout).count());
+    int n = poll(&pfd, 1, std::chrono::milliseconds(kDeprecatedTimeout).count());
     ASSERT_GE(n, 0) << strerror(errno);
     ASSERT_EQ(n, 1);
     EXPECT_EQ(pfd.revents, POLLIN);
@@ -1473,7 +1473,7 @@ TEST_P(ReadAfterShutdownTest, Success) {
         .fd = local.get(),
         .events = POLLRDHUP,
     };
-    int n = poll(&pfd, 1, std::chrono::milliseconds(kTimeout).count());
+    int n = poll(&pfd, 1, std::chrono::milliseconds(kDeprecatedTimeout).count());
     ASSERT_GE(n, 0) << strerror(errno);
     ASSERT_EQ(n, 1);
     EXPECT_EQ(pfd.revents, POLLRDHUP);
@@ -1624,7 +1624,7 @@ TEST_P(NetSocketTest, SocketPeekTest) {
   auto start = std::chrono::steady_clock::now();
   // First peek on first byte.
   EXPECT_EQ(asyncSocketRead(recvfd.get(), sendfd.get(), recvbuf, 1, MSG_PEEK, socket_type,
-                            SocketDomain::IPv4(), kTimeout),
+                            SocketDomain::IPv4(), kDeprecatedTimeout),
             1);
   auto success_rcv_duration = std::chrono::steady_clock::now() - start;
   EXPECT_EQ(recvbuf[0], sendbuf[0]);
@@ -1639,7 +1639,7 @@ TEST_P(NetSocketTest, SocketPeekTest) {
     // TODO(https://fxbug.dev/42154343) : Use SO_RCVLOWAT instead of retry.
     do {
       readLen = asyncSocketRead(recvfd.get(), sendfd.get(), recvbuf, sizeof(recvbuf), flags,
-                                socket_type, SocketDomain::IPv4(), kTimeout);
+                                socket_type, SocketDomain::IPv4(), kDeprecatedTimeout);
       if (HasFailure()) {
         break;
       }
@@ -1731,7 +1731,7 @@ TEST_P(SocketKindTest, IoctlFIONREAD) {
       .fd = recvfd.get(),
       .events = POLLIN,
   };
-  int n = poll(&pfd, 1, std::chrono::milliseconds(kTimeout).count());
+  int n = poll(&pfd, 1, std::chrono::milliseconds(kDeprecatedTimeout).count());
   ASSERT_GE(n, 0) << strerror(errno);
   ASSERT_EQ(n, 1);
 

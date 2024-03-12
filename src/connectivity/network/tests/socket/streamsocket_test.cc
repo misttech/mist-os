@@ -181,7 +181,7 @@ TEST_F(NetStreamSocketsTest, PeerClosedPOLLOUT) {
       .fd = server().get(),
       .events = POLLOUT,
   };
-  int n = poll(&pfd, 1, std::chrono::milliseconds(kTimeout).count());
+  int n = poll(&pfd, 1, std::chrono::milliseconds(kDeprecatedTimeout).count());
   EXPECT_GE(n, 0) << strerror(errno);
   EXPECT_EQ(n, 1);
   EXPECT_EQ(pfd.revents, POLLOUT | POLLERR | POLLHUP);
@@ -262,7 +262,7 @@ TEST_F(NetStreamSocketsTest, Shutdown) {
       .fd = client().get(),
       .events = POLLRDHUP,
   };
-  int n = poll(&pfd, 1, std::chrono::milliseconds(kTimeout).count());
+  int n = poll(&pfd, 1, std::chrono::milliseconds(kDeprecatedTimeout).count());
   EXPECT_GE(n, 0) << strerror(errno);
   EXPECT_EQ(n, 1);
   EXPECT_EQ(pfd.revents, POLLRDHUP);
@@ -288,7 +288,7 @@ TEST_F(NetStreamSocketsTest, ResetOnFullReceiveBufferShutdown) {
   pollfd pfd = {
       .fd = client().get(),
   };
-  int n = poll(&pfd, 1, std::chrono::milliseconds(kTimeout).count());
+  int n = poll(&pfd, 1, std::chrono::milliseconds(kDeprecatedTimeout).count());
   ASSERT_GE(n, 0) << strerror(errno);
   ASSERT_EQ(n, 1);
   EXPECT_EQ(pfd.revents, POLLHUP | POLLERR);
@@ -335,7 +335,7 @@ TEST_F(NetStreamSocketsTest, ShutdownReset) {
         .fd = client().get(),
         .events = POLLRDHUP,
     };
-    int n = poll(&pfd, 1, std::chrono::milliseconds(kTimeout).count());
+    int n = poll(&pfd, 1, std::chrono::milliseconds(kDeprecatedTimeout).count());
     ASSERT_GE(n, 0) << strerror(errno);
     ASSERT_EQ(n, 1);
     EXPECT_EQ(pfd.revents, POLLRDHUP);
@@ -350,7 +350,7 @@ TEST_F(NetStreamSocketsTest, ShutdownReset) {
   pollfd pfd = {
       .fd = client().get(),
   };
-  int n = poll(&pfd, 1, std::chrono::milliseconds(kTimeout).count());
+  int n = poll(&pfd, 1, std::chrono::milliseconds(kDeprecatedTimeout).count());
   ASSERT_GE(n, 0) << strerror(errno);
   ASSERT_EQ(n, 1);
   EXPECT_EQ(pfd.revents, POLLHUP | POLLERR);
@@ -370,7 +370,7 @@ TEST_F(NetStreamSocketsTest, ShutdownPendingWrite) {
   // All client reads are expected to return here, including the last
   // read on receiving a FIN. Keeping a timeout for unexpected failures.
   timeval tv = {
-      .tv_sec = std::chrono::seconds(kTimeout).count(),
+      .tv_sec = std::chrono::seconds(kDeprecatedTimeout).count(),
   };
   EXPECT_EQ(setsockopt(client().get(), SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv)), 0)
       << strerror(errno);
@@ -445,7 +445,7 @@ void TestListenWhileConnect(const IOMethod& io_method, void (*stopListen)(fbl::u
         .fd = listener.get(),
         .events = POLLIN,
     };
-    int n = poll(&pfd, 1, std::chrono::milliseconds(kTimeout).count());
+    int n = poll(&pfd, 1, std::chrono::milliseconds(kDeprecatedTimeout).count());
     ASSERT_GE(n, 0) << strerror(errno);
     ASSERT_EQ(n, 1);
     ASSERT_EQ(pfd.revents, POLLIN);
@@ -566,7 +566,7 @@ TEST_P(ConnectingIOTest, BlockedIO) {
         .fd = listener.get(),
         .events = POLLIN,
     };
-    int n = poll(&pfd, 1, std::chrono::milliseconds(kTimeout).count());
+    int n = poll(&pfd, 1, std::chrono::milliseconds(kDeprecatedTimeout).count());
     ASSERT_GE(n, 0) << strerror(errno);
     ASSERT_EQ(n, 1);
     ASSERT_EQ(pfd.revents, POLLIN);
@@ -660,7 +660,7 @@ TEST_P(ConnectingIOTest, BlockedIO) {
             .fd = test_accept.get(),
             .events = POLLIN,
         };
-        int n = poll(&pfd, 1, std::chrono::milliseconds(kTimeout).count());
+        int n = poll(&pfd, 1, std::chrono::milliseconds(kDeprecatedTimeout).count());
         ASSERT_GE(n, 0) << strerror(errno);
         ASSERT_EQ(n, 1);
         ASSERT_EQ(pfd.revents, POLLIN);
@@ -678,7 +678,7 @@ TEST_P(ConnectingIOTest, BlockedIO) {
     }
   }
 
-  EXPECT_EQ(fut.wait_for(kTimeout), std::future_status::ready);
+  EXPECT_EQ(fut.wait_for(kDeprecatedTimeout), std::future_status::ready);
 }
 
 std::string ConnectingIOParamsToString(const testing::TestParamInfo<ConnectingIOParams> info) {
@@ -883,7 +883,7 @@ TEST(NetStreamTest, NonBlockingAcceptWrite) {
       .fd = acptfd.get(),
       .events = POLLIN,
   };
-  int n = poll(&pfd, 1, std::chrono::milliseconds(kTimeout).count());
+  int n = poll(&pfd, 1, std::chrono::milliseconds(kDeprecatedTimeout).count());
   ASSERT_GE(n, 0) << strerror(errno);
   ASSERT_EQ(n, 1);
 
@@ -925,7 +925,7 @@ TEST(NetStreamTest, NonBlockingAcceptDupWrite) {
       .fd = acptfd.get(),
       .events = POLLIN,
   };
-  int n = poll(&pfd, 1, std::chrono::milliseconds(kTimeout).count());
+  int n = poll(&pfd, 1, std::chrono::milliseconds(kDeprecatedTimeout).count());
   ASSERT_GE(n, 0) << strerror(errno);
   ASSERT_EQ(n, 1);
 
@@ -975,7 +975,7 @@ TEST(NetStreamTest, NonBlockingConnectWrite) {
         .fd = connfd.get(),
         .events = POLLOUT,
     };
-    int n = poll(&pfd, 1, std::chrono::milliseconds(kTimeout).count());
+    int n = poll(&pfd, 1, std::chrono::milliseconds(kDeprecatedTimeout).count());
     ASSERT_GE(n, 0) << strerror(errno);
     ASSERT_EQ(n, 1);
 
@@ -1038,7 +1038,7 @@ TEST(NetStreamTest, NonBlockingConnectRead) {
         .fd = connfd.get(),
         .events = POLLIN,
     };
-    int n = poll(&pfd, 1, std::chrono::milliseconds(kTimeout).count());
+    int n = poll(&pfd, 1, std::chrono::milliseconds(kDeprecatedTimeout).count());
     ASSERT_GE(n, 0) << strerror(errno);
     ASSERT_EQ(n, 1);
 
@@ -1084,7 +1084,7 @@ TEST(NetStreamTest, NonBlockingConnectRefused) {
         .fd = connfd.get(),
         .events = POLLOUT,
     };
-    int n = poll(&pfd, 1, std::chrono::milliseconds(kTimeout).count());
+    int n = poll(&pfd, 1, std::chrono::milliseconds(kDeprecatedTimeout).count());
     ASSERT_GE(n, 0) << strerror(errno);
     ASSERT_EQ(n, 1);
 
@@ -1330,7 +1330,7 @@ TEST_P(BlockedIOTest, CloseWhileBlocked) {
       break;
     }
   }
-  ASSERT_EQ(fut.wait_for(kTimeout), std::future_status::ready);
+  ASSERT_EQ(fut.wait_for(kDeprecatedTimeout), std::future_status::ready);
 
   auto undo = DisableSigPipe(is_write);
 
@@ -1558,7 +1558,7 @@ TEST(NetStreamTest, UnconnectPoll) {
                          .fd = bound.get(),
                          .events = events,
                      }};
-    int n = poll(pfds, std::size(pfds), std::chrono::milliseconds(kTimeout).count());
+    int n = poll(pfds, std::size(pfds), std::chrono::milliseconds(kDeprecatedTimeout).count());
     EXPECT_GE(n, 0) << strerror(errno);
     EXPECT_EQ(n, static_cast<int>(std::size(pfds))) << " events = " << std::hex << events;
 
@@ -1707,7 +1707,7 @@ TEST_P(HangupTest, DuringConnect) {
         .fd = listener.get(),
         .events = POLLIN,
     };
-    int n = poll(&pfd, 1, std::chrono::milliseconds(kTimeout).count());
+    int n = poll(&pfd, 1, std::chrono::milliseconds(kDeprecatedTimeout).count());
     ASSERT_GE(n, 0) << strerror(errno);
     ASSERT_EQ(n, 1);
     ASSERT_EQ(pfd.revents, POLLIN);
@@ -1762,7 +1762,7 @@ TEST_P(HangupTest, DuringConnect) {
               // be ready before the other expected events are asserted.
               pfd.events ^= (POLLIN | POLLRDHUP);
               // TODO(https://fxbug.dev/42166160): Remove the poll timeout.
-              int n = poll(&pfd, 1, std::chrono::milliseconds(kTimeout).count());
+              int n = poll(&pfd, 1, std::chrono::milliseconds(kDeprecatedTimeout).count());
               EXPECT_GE(n, 0) << strerror(errno);
               EXPECT_EQ(n, 1);
               // TODO(https://fxbug.dev/42152810): Add POLLWRNORM to the expectations.
@@ -1787,7 +1787,7 @@ TEST_P(HangupTest, DuringConnect) {
                 .fd = established_client.get(),
                 .events = POLLIN,
             };
-            int n = poll(&pfd, 1, std::chrono::milliseconds(kTimeout).count());
+            int n = poll(&pfd, 1, std::chrono::milliseconds(kDeprecatedTimeout).count());
             EXPECT_GE(n, 0) << strerror(errno);
             EXPECT_EQ(n, 1);
             EXPECT_EQ(pfd.revents, POLLIN);
@@ -1823,7 +1823,7 @@ TEST_P(HangupTest, DuringConnect) {
             // be ready before the other expected events are asserted.
             pfd.events ^= (POLLIN | POLLRDHUP);
             // TODO(https://fxbug.dev/42166160): Remove the poll timeout.
-            int n = poll(&pfd, 1, std::chrono::milliseconds(kTimeout).count());
+            int n = poll(&pfd, 1, std::chrono::milliseconds(kDeprecatedTimeout).count());
             EXPECT_GE(n, 0) << strerror(errno);
             EXPECT_EQ(n, 1);
             // TODO(https://fxbug.dev/42166165): Remove POLLERR from the expectations.
@@ -1953,7 +1953,7 @@ TEST(LocalhostTest, AcceptAfterReset) {
         .fd = server.get(),
         .events = POLLIN,
     };
-    int n = poll(&pfd, 1, std::chrono::milliseconds(kTimeout).count());
+    int n = poll(&pfd, 1, std::chrono::milliseconds(kDeprecatedTimeout).count());
     ASSERT_GE(n, 0) << strerror(errno);
     ASSERT_EQ(n, 1);
     EXPECT_EQ(pfd.revents, POLLIN);
@@ -1980,7 +1980,7 @@ TEST(LocalhostTest, AcceptAfterReset) {
         .fd = conn.get(),
     };
 
-    int n = poll(&pfd, 1, std::chrono::milliseconds(kTimeout).count());
+    int n = poll(&pfd, 1, std::chrono::milliseconds(kDeprecatedTimeout).count());
     ASSERT_GE(n, 0) << strerror(errno);
     ASSERT_EQ(n, 1);
     EXPECT_EQ(pfd.revents, POLLERR | POLLHUP);
@@ -2172,7 +2172,7 @@ TEST_P(IOMethodTest, NullptrFaultSTREAM) {
         .fd = client.get(),
         .events = POLLOUT,
     };
-    int n = poll(&pfd, 1, std::chrono::milliseconds(kTimeout).count());
+    int n = poll(&pfd, 1, std::chrono::milliseconds(kDeprecatedTimeout).count());
     ASSERT_GE(n, 0) << strerror(errno);
     ASSERT_EQ(n, 1);
   }

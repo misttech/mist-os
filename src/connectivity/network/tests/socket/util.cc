@@ -417,7 +417,7 @@ void DoNullPtrIO(const fbl::unique_fd& fd, const fbl::unique_fd& other, IOMethod
         .events = POLLIN,
     };
 
-    int n = poll(&pfd, 1, std::chrono::milliseconds(kTimeout).count());
+    int n = poll(&pfd, 1, std::chrono::milliseconds(kDeprecatedTimeout).count());
     ASSERT_GE(n, 0) << strerror(errno);
     ASSERT_EQ(n, 1);
     EXPECT_EQ(pfd.revents, POLLIN);
@@ -442,7 +442,7 @@ void DoNullPtrIO(const fbl::unique_fd& fd, const fbl::unique_fd& other, IOMethod
               .fd = other.get(),
               .events = POLLIN,
           };
-          int n = poll(&pfd, 1, std::chrono::milliseconds(kTimeout).count());
+          int n = poll(&pfd, 1, std::chrono::milliseconds(kDeprecatedTimeout).count());
           ASSERT_GE(n, 0) << strerror(errno);
           ASSERT_EQ(n, 1);
           EXPECT_EQ(pfd.revents, POLLIN);
@@ -602,7 +602,7 @@ ssize_t asyncSocketRead(int recvfd, int sendfd, char* buf, ssize_t len, int flag
       EXPECT_EQ(shutdown(recvfd, SHUT_RD), 0) << strerror(errno);
       // We do not use 'timeout' because that maybe short here. We expect to succeed and hence use
       // a known large timeout to ensure the test does not hang in case underlying code is broken.
-      EXPECT_EQ(recv.wait_for(kTimeout), std::future_status::ready);
+      EXPECT_EQ(recv.wait_for(kDeprecatedTimeout), std::future_status::ready);
       EXPECT_EQ(recv.get(), 0);
       return 0;
     }
@@ -633,7 +633,7 @@ ssize_t asyncSocketRead(int recvfd, int sendfd, char* buf, ssize_t len, int flag
       EXPECT_EQ(sendto(sendfd, nullptr, 0, 0, reinterpret_cast<sockaddr*>(&addr), addrlen), 0)
           << strerror(errno);
       // We use a known large timeout for the same reason as for the above case.
-      EXPECT_EQ(recv.wait_for(kTimeout), std::future_status::ready);
+      EXPECT_EQ(recv.wait_for(kDeprecatedTimeout), std::future_status::ready);
       EXPECT_EQ(recv.get(), 0);
       return 0;
     }

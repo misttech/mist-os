@@ -408,7 +408,7 @@ TEST_P(IOReadingMethodTest, DatagramSocketErrorWhileBlocked) {
   // Send a UDP packet to trigger a port unreachable response.
   ASSERT_EQ(send(fd.get(), bytes, sizeof(bytes), 0), ssize_t(sizeof(bytes))) << strerror(errno);
   // The blocking recv call should terminate with an error.
-  ASSERT_EQ(fut.wait_for(kTimeout), std::future_status::ready);
+  ASSERT_EQ(fut.wait_for(kDeprecatedTimeout), std::future_status::ready);
 
   {
     // Postcondition sanity check: no pending events on the socket, the POLLERR should've been
@@ -468,7 +468,7 @@ class DatagramSocketErrBase {
     pollfd pfd = {
         .fd = fd.get(),
     };
-    const int n = poll(&pfd, 1, std::chrono::milliseconds(kTimeout).count());
+    const int n = poll(&pfd, 1, std::chrono::milliseconds(kDeprecatedTimeout).count());
     ASSERT_GE(n, 0) << strerror(errno);
     EXPECT_EQ(n, 1);
     EXPECT_EQ(pfd.revents & POLLERR, POLLERR);
@@ -668,7 +668,8 @@ TEST_F(IcmpErrorTest, ErrNotObservableOnUnconnectedSocket) {
   ASSERT_NO_FATAL_FAILURE(SendToUnreachableAddr(fd(), /*connect=*/false));
 
   // Ensure that there is no error observable on the socket.
-  ASSERT_NO_FATAL_FAILURE(CheckNoPendingEvents(fd(), std::chrono::milliseconds(kTimeout)));
+  ASSERT_NO_FATAL_FAILURE(
+      CheckNoPendingEvents(fd(), std::chrono::milliseconds(kDeprecatedTimeout)));
 }
 
 TEST_F(IcmpErrorTest, ErrNotObservableWhenConnectedSocketSendsToUnconnectedAddr) {
@@ -681,7 +682,8 @@ TEST_F(IcmpErrorTest, ErrNotObservableWhenConnectedSocketSendsToUnconnectedAddr)
   ASSERT_NO_FATAL_FAILURE(SendToUnreachableAddr(fd(), /*connect=*/false));
 
   // Ensure that there is no error observable on the socket.
-  ASSERT_NO_FATAL_FAILURE(CheckNoPendingEvents(fd(), std::chrono::milliseconds(kTimeout)));
+  ASSERT_NO_FATAL_FAILURE(
+      CheckNoPendingEvents(fd(), std::chrono::milliseconds(kDeprecatedTimeout)));
   EXPECT_EQ(close(other_fd.release()), 0) << strerror(errno);
 }
 
@@ -816,7 +818,7 @@ class DatagramSocketErrWithIOMethodAndReceivedDatagramBase
         .fd = fd.get(),
         .events = POLLIN,
     };
-    const int n = poll(&pfd, 1, std::chrono::milliseconds(kTimeout).count());
+    const int n = poll(&pfd, 1, std::chrono::milliseconds(kDeprecatedTimeout).count());
     ASSERT_GE(n, 0) << strerror(errno);
     EXPECT_EQ(n, 1);
     ASSERT_EQ(pfd.revents & POLLIN, POLLIN)
@@ -1066,7 +1068,7 @@ TEST_P(DatagramSendTest, DatagramSend) {
   }
   auto start = std::chrono::steady_clock::now();
   EXPECT_EQ(asyncSocketRead(recvfd.get(), sendfd.get(), recvbuf, sizeof(recvbuf), 0,
-                            SocketType::Dgram(), SocketDomain::IPv4(), kTimeout),
+                            SocketType::Dgram(), SocketDomain::IPv4(), kDeprecatedTimeout),
             ssize_t(msg.size()));
   auto success_rcv_duration = std::chrono::steady_clock::now() - start;
   EXPECT_EQ(std::string_view(recvbuf, msg.size()), msg);
@@ -1095,7 +1097,7 @@ TEST_P(DatagramSendTest, DatagramSend) {
     }
   }
   EXPECT_EQ(asyncSocketRead(recvfd.get(), sendfd.get(), recvbuf, sizeof(recvbuf), 0,
-                            SocketType::Dgram(), SocketDomain::IPv4(), kTimeout),
+                            SocketType::Dgram(), SocketDomain::IPv4(), kDeprecatedTimeout),
             ssize_t(msg.size()));
   EXPECT_EQ(std::string_view(recvbuf, msg.size()), msg);
 
@@ -1178,7 +1180,7 @@ TEST(NetDatagramTest, DatagramConnectWrite) {
       .fd = recvfd.get(),
       .events = POLLIN,
   };
-  int n = poll(&pfd, 1, std::chrono::milliseconds(kTimeout).count());
+  int n = poll(&pfd, 1, std::chrono::milliseconds(kDeprecatedTimeout).count());
   ASSERT_GE(n, 0) << strerror(errno);
   ASSERT_EQ(n, 1);
   char buf[sizeof(msg) + 1] = {};
@@ -1258,7 +1260,7 @@ TEST(NetDatagramTest, POLLOUT) {
       .fd = fd.get(),
       .events = POLLOUT,
   };
-  int n = poll(&pfd, 1, std::chrono::milliseconds(kTimeout).count());
+  int n = poll(&pfd, 1, std::chrono::milliseconds(kDeprecatedTimeout).count());
   ASSERT_GE(n, 0) << strerror(errno);
   ASSERT_EQ(n, 1);
 
@@ -1629,7 +1631,7 @@ TEST(NetDatagramTest, PingIpv4LoopbackAddresses) {
             .fd = recvfd.get(),
             .events = POLLIN,
         };
-        int n = poll(&pfd, 1, std::chrono::milliseconds(kTimeout).count());
+        int n = poll(&pfd, 1, std::chrono::milliseconds(kDeprecatedTimeout).count());
         ASSERT_GE(n, 0) << strerror(errno);
         ASSERT_EQ(n, 1);
         char buf[sizeof(msg) + 1] = {};
@@ -1699,7 +1701,7 @@ TEST_P(IOSendingMethodTest, CloseTerminatesWithRxZirconSocketRemainder) {
 
   // Expect that both calls to `close()` return without blocking indefinitely.
   const auto close_both = std::async(std::launch::async, [&done]() { done.wait(); });
-  ASSERT_EQ(close_both.wait_for(kTimeout), std::future_status::ready);
+  ASSERT_EQ(close_both.wait_for(kDeprecatedTimeout), std::future_status::ready);
 
   for (close_task& task : close_tasks) {
     ASSERT_TRUE(task.result.has_value()) << " close(" << task.name << ") failed to terminate";
@@ -3729,7 +3731,7 @@ class DatagramSendSemanticsTestInstance : public NetDatagramSocketsTestBase {
         .events = POLLIN,
     };
 
-    const int n = poll(&pfd, 1, std::chrono::milliseconds(kTimeout).count());
+    const int n = poll(&pfd, 1, std::chrono::milliseconds(kDeprecatedTimeout).count());
     EXPECT_GE(n, 0) << strerror(errno);
     EXPECT_EQ(n, 1);
     ASSERT_EQ(read(fd, recvbuf_.data(), recvbuf_.size()), ssize_t(kBuf.size())) << strerror(errno);

@@ -18,7 +18,22 @@
 
 #include <fbl/unique_fd.h>
 
-constexpr std::chrono::duration kTimeout = std::chrono::seconds(2);
+// Timeout when waiting for something that's expected to occur.
+//
+// The larger this is, the less likely flakes are to occur. Assuming there
+// aren't any bugs, the timeout should never be reached.
+inline constexpr std::chrono::duration kPositiveCheckTimeout = std::chrono::seconds(120);
+
+// Timeout when waiting for something that's expected to time out.
+//
+// Making this small saves time in tests that are expected to fail, but also
+// make "false passes" (tests that would have failed, but spuriously passed due
+// to hitting the timeout) somewhat more likely.  We think this is a reasonable
+// trade-off, given that flakes of this kind are rare.
+inline constexpr std::chrono::duration kNegativeCheckTimeout = std::chrono::seconds(2);
+
+// TODO(https://fxbug.dev/328778498): Remove and use the positive and negative variants.
+inline constexpr std::chrono::duration kDeprecatedTimeout = std::chrono::seconds(2);
 
 constexpr char kFastUdpEnvVar[] = "FAST_UDP";
 
