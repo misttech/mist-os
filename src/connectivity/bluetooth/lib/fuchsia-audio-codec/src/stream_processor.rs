@@ -1121,7 +1121,7 @@ mod tests {
         // allocation process.
         let (written_res, mut decoded_fut) =
             run_while(&mut exec, decoded_fut, decoder.write(next_frame));
-        assert_eq!(written_res.expect("failed write"), next_frame.len());
+        assert_eq!(written_res.expect("initial write should succeed"), next_frame.len());
 
         // Write to the encoder until we cannot write anymore, because there are no input buffers
         // available.  This should happen when all the input buffers are full and and the input
@@ -1129,12 +1129,18 @@ mod tests {
         let (waker, write_fut_wake_count) = new_count_waker();
         let mut counting_ctx = Context::from_waker(&waker);
 
+        let mut wake_count_before_stall = 0;
         for frame in chunks {
+            wake_count_before_stall = write_fut_wake_count.get();
             let mut written_fut = decoder.write(&frame);
             if written_fut.poll_unpin(&mut counting_ctx).is_pending() {
+                // The poll_unpin can wake the input waker if an event arrived for it, meaning we should
+                // continue filling.
+                if write_fut_wake_count.get() != wake_count_before_stall {
+                    continue;
+                }
                 // We should have never been woken until now, because we always were ready before,
-                // and the output waker is processing codec events.
-                assert_eq!(0, write_fut_wake_count.get());
+                // and the output waker is not registered (so can't progress)
                 break;
             }
             // Flush the packet, to make input buffers get spent faster.
@@ -1150,8 +1156,14 @@ mod tests {
         // Fill the input buffer again so the input waker is registered.
         let chunks = sbc_data.as_slice().chunks(SBC_FRAME_SIZE);
         for frame in chunks {
+            wake_count_before_stall = write_fut_wake_count.get();
             let mut written_fut = decoder.write(&frame);
             if written_fut.poll_unpin(&mut counting_ctx).is_pending() {
+                // The poll_unpin can wake the input waker if an event arrived for it, meaning we should
+                // continue filling.
+                if write_fut_wake_count.get() != wake_count_before_stall {
+                    continue;
+                }
                 break;
             }
             // Flush the packet, to make input buffers get spent faster.
@@ -1160,11 +1172,11 @@ mod tests {
             exec.run_singlethreaded(&mut flush_fut).expect("to flush the decoder");
         }
 
-        // The input waker should be the one waiting on events from the codec (and woken up)
+        // The input waker should be the one waiting on events from the codec and get woken up,
+        // even if an output event happens.
         // At some point, we will get an event from the encoder, with no output waker set, and this
         // should wake the input waker, which is waiting to be woken up.
-        let woken_count = write_fut_wake_count.get();
-        while write_fut_wake_count.get() == woken_count {
+        while write_fut_wake_count.get() == wake_count_before_stall {
             let _ = exec.run_until_stalled(&mut futures::future::pending::<()>());
         }
 
