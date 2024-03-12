@@ -90,7 +90,7 @@ It will be set below and passed to other toolchains through toolchain_args
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:2099
+From //build/config/BUILDCONFIG.gn:2101
 
 ### allowed_test_device_types
 
@@ -3115,7 +3115,7 @@ useful for including verification and other Bazel assembly specific targets.
 
 **Current value (from the default):** `[]`
 
-From //build/images/args.gni:216
+From //build/images/args.gni:209
 
 ### extra_gn_labels_for_bazel_inputs
 
@@ -3168,7 +3168,7 @@ vendor/acme/proprietary:build_installer with Ninja:
 
 **Current value (from the default):** `[]`
 
-From //build/bazel/legacy_ninja_build_outputs.gni:123
+From //build/bazel/legacy_ninja_build_outputs.gni:124
 
 ### extra_package_labels
 
@@ -3183,7 +3183,7 @@ This is just added to [`known_variants`](#known_variants).
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:1834
+From //build/config/BUILDCONFIG.gn:1836
 
 ### extra_vbmeta_descriptors
 
@@ -3788,6 +3788,14 @@ Fuchsia. This flag allows us to define the flag ahead of time in
 
 From //build/icu.gni:38
 
+### icu_fuchsia_extra_configs
+
+Similar to above, except it allows adding an entire `config` target.
+
+**Current value (from the default):** `[]`
+
+From //build/icu.gni:41
+
 ### icu_fuchsia_override_data_dir
 
 If set to nonempty, this is the label of the directory to be used to pull
@@ -3797,6 +3805,15 @@ inside the Fuchsia source tree.
 **Current value (from the default):** `""`
 
 From //build/icu.gni:24
+
+### icu_fuchsia_remove_configs
+
+Similar to above, except it allows removing an entire `config` target, if
+it exists.
+
+**Current value (from the default):** `[]`
+
+From //build/icu.gni:45
 
 ### icu_major_version_number
 
@@ -4324,7 +4341,7 @@ Each element of the list is one variant, which is a scope defining:
 }]
 ```
 
-From //build/config/BUILDCONFIG.gn:1635
+From //build/config/BUILDCONFIG.gn:1637
 
 ### legacy_base_package_labels
 
@@ -7211,7 +7228,7 @@ toolchain, so that recompilations with the new compiler can be triggered.
 When using the prebuilt, this is ignored and the CIPD instance ID of the
 prebuilt is used.
 
-**Current value (from the default):** `"UTqyxcD4n3nCoqodkYrlANhYywikk4TKAhxkbPhQTYIC"`
+**Current value (from the default):** `"LrAgVBhitDoJMgg_VNfKJKddhX01eaSobswKGc6X-x8C"`
 
 From //build/rust/config.gni:38
 
@@ -7473,7 +7490,7 @@ is satisfied if any of the strings matches against the candidate string.
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:2089
+From //build/config/BUILDCONFIG.gn:2091
 
 ### select_variant_canonical
 
@@ -7483,7 +7500,7 @@ See //build/toolchain/clang_toolchain.gni for details.
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:2094
+From //build/config/BUILDCONFIG.gn:2096
 
 ### select_variant_shortcuts
 
@@ -7541,7 +7558,7 @@ a list that can be spliced into [`select_variant`](#select_variant).
 }]
 ```
 
-From //build/config/BUILDCONFIG.gn:1880
+From //build/config/BUILDCONFIG.gn:1882
 
 ### size_checker_input
 
@@ -8015,7 +8032,7 @@ From //build/config/sanitizers/sanitizer_default_options.gni:47
 }]
 ```
 
-From //build/config/BUILDCONFIG.gn:1864
+From //build/config/BUILDCONFIG.gn:1866
 
 ### universe_package_labels
 
@@ -8400,23 +8417,6 @@ If true, vboot() image builds print out the exact "futility" command line.
 **Current value (from the default):** `false`
 
 From //build/images/vboot/vboot.gni:12
-
-### vendor_board_dir
-
-**Current value (from the default):** `false`
-
-From //build/images/args.gni:212
-
-### vendor_product_dir
-
-TODO(jayzhuang): Remove once all users are using bazel_product_bundle_root.
-
-If these are defined, bazel_product_bundle path will be overwritten
-accordingly.
-
-**Current value (from the default):** `false`
-
-From //build/images/args.gni:211
 
 ### verbose_image_assembly
 
