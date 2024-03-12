@@ -5,7 +5,7 @@
 //! Implementations of device layer traits for [`CoreCtx`].
 
 use alloc::boxed::Box;
-use core::{convert::Infallible as Never, num::NonZeroU8, ops::Deref as _};
+use core::{num::NonZeroU8, ops::Deref as _};
 
 use lock_order::{
     lock::{RwLockFor, UnlockedAccess},

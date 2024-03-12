@@ -2557,7 +2557,7 @@ mod tests {
             loopback::{LoopbackCreationProperties, LoopbackDevice},
             ndp::testutil::{neighbor_advertisement_ip_packet, neighbor_solicitation_ip_packet},
             testutil::FakeWeakDeviceId,
-            EthernetDeviceId, EthernetWeakDeviceId, FrameDestination, WeakDeviceId,
+            EthernetDeviceId, FrameDestination, WeakDeviceId,
         },
         ip::{
             device::{

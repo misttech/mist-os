@@ -369,17 +369,14 @@ mod testutil_testonly {
     use alloc::collections::HashSet;
 
     use derivative::Derivative;
-    use net_types::ip::{IpAddress, IpInvariant, Ipv4, Ipv6};
+    use net_types::ip::{IpAddress, IpInvariant, Ipv6};
 
     use super::*;
 
     use crate::{
         context::testutil::FakeCoreCtx,
         device::StrongId,
-        ip::{
-            testutil::FakeIpDeviceIdCtx,
-            types::{IpTypesIpExt, Metric},
-        },
+        ip::{testutil::FakeIpDeviceIdCtx, types::Metric},
     };
 
     /// Adds an on-link forwarding entry for the specified address and device.
@@ -483,7 +480,7 @@ mod tests {
     use ip_test_macro::ip_test;
     use itertools::Itertools;
     use net_declare::{net_ip_v4, net_ip_v6, net_subnet_v4, net_subnet_v6};
-    use net_types::ip::{IpAddress as _, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr};
+    use net_types::ip::{IpAddress as _, Ipv6, Ipv6Addr};
     use test_case::test_case;
     use tracing::trace;
 
@@ -497,7 +494,7 @@ mod tests {
         error,
         ip::{
             forwarding::testutil::FakeIpForwardingCtx,
-            types::{AddableEntryEither, AddableMetric, IpTypesIpExt, Metric, RawMetric},
+            types::{AddableEntryEither, AddableMetric, Metric},
         },
         testutil::FakeEventDispatcherConfig,
     };

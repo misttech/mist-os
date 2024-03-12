@@ -20,7 +20,7 @@ use crate::{
     device::{AnyDevice, DeviceIdContext},
     ip::{
         device::{state::IpDeviceStateIpExt, IpDeviceAddr},
-        types::{IpTypesIpExt, NextHop, ResolvedRoute, RoutableIpAddr},
+        types::{NextHop, ResolvedRoute, RoutableIpAddr},
         EitherDeviceId, IpCounters, IpDeviceContext, IpExt, IpLayerIpExt, ResolveRouteError,
         SendIpPacketMeta,
     },

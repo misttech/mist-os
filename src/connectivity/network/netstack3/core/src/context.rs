@@ -455,17 +455,18 @@ pub(crate) mod testutil {
     use rand_xorshift::XorShiftRng;
 
     use super::*;
-    #[cfg(test)]
-    use crate::device::EthernetDeviceId;
     use crate::{
         data_structures::ref_counted_hash_map::{RefCountedHashSet, RemoveResult},
-        device::{
-            link::LinkDevice, pure_ip::PureIpWeakDeviceId, DeviceLayerTypes, EthernetWeakDeviceId,
-        },
+        device::{link::LinkDevice, pure_ip::PureIpWeakDeviceId, DeviceLayerTypes},
         filter::FilterBindingsTypes,
         ip::device::nud::{LinkResolutionContext, LinkResolutionNotifier},
         sync::Mutex,
-        testutil::{DispatchedFrame, FakeCryptoRng},
+        testutil::FakeCryptoRng,
+    };
+    #[cfg(test)]
+    use crate::{
+        device::{EthernetDeviceId, EthernetWeakDeviceId},
+        testutil::DispatchedFrame,
     };
 
     pub use netstack3_base::testutil::{FakeInstant, FakeInstantCtx};

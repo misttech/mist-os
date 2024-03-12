@@ -3336,7 +3336,7 @@ mod tests {
             types::{AddableEntryEither, AddableMetric, RawMetric},
         },
         testutil::{
-            assert_empty, new_rng, set_logger_for_test, Ctx, FakeBindingsCtx, FakeCtx,
+            new_rng, set_logger_for_test, Ctx, FakeBindingsCtx, FakeCtx,
             FakeEventDispatcherBuilder, TestIpExt, DEFAULT_INTERFACE_METRIC, FAKE_CONFIG_V4,
             FAKE_CONFIG_V6, IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
         },

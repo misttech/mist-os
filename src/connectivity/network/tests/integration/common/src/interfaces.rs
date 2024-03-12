@@ -10,7 +10,6 @@
 use super::Result;
 
 use anyhow::Context as _;
-use fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin;
 use fuchsia_async::{DurationExt as _, TimeoutExt as _};
 use fuchsia_zircon as zx;
 use futures::future::{FusedFuture, Future, FutureExt as _, TryFutureExt as _};

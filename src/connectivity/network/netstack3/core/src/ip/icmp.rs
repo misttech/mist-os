@@ -3090,7 +3090,7 @@ mod tests {
             IpCounters, IpLayerIpExt,
         },
         state::StackStateBuilder,
-        testutil::{assert_empty, Ctx, TestIpExt, FAKE_CONFIG_V4, FAKE_CONFIG_V6},
+        testutil::{Ctx, TestIpExt, FAKE_CONFIG_V4, FAKE_CONFIG_V6},
         transport::udp::UdpStateBuilder,
         uninstantiable::UninstantiableWrapper,
     };

@@ -148,7 +148,7 @@ mod tests {
             ethernet::{EthernetCreationProperties, EthernetLinkDevice, MaxEthernetFrameSize},
             link::LinkAddress,
             testutil::{is_forwarding_enabled, set_forwarding_enabled},
-            DeviceId, EthernetDeviceId, EthernetWeakDeviceId, FrameDestination,
+            DeviceId, EthernetDeviceId, FrameDestination,
         },
         ip::{
             device::{
