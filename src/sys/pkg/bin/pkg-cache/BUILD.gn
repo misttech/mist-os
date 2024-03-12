@@ -109,7 +109,6 @@ rustc_binary("bin") {
   ]
 
   configs += [
-    "//build/config/rust/lints:allow_unused_imports",
     "//build/config/rust/lints:clippy_warn_all",
     "//build/config/rust:bootfs",
   ]

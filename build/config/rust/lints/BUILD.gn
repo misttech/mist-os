@@ -150,7 +150,6 @@ config("allow_unused_imports") {
     "//src/session/bin/session_manager:*",
     "//src/starnix/kernel:*",
     "//src/sys/lib/routing:*",
-    "//src/sys/pkg/bin/pkg-cache:*",
     "//src/ui/*",
     "//tools/lib/cm_fidl_analyzer/tests:*",
     "//vendor/*",
