@@ -36,7 +36,7 @@ use pkg::repo::{
 };
 use protocols::prelude::*;
 use shared_child::SharedChild;
-use std::{convert::TryFrom, net::SocketAddr, rc::Rc, sync::Arc, time::Duration};
+use std::{net::SocketAddr, rc::Rc, sync::Arc, time::Duration};
 
 const PKG_RESOLVER_MONIKER: &str = "/core/pkg-resolver";
 
@@ -1299,7 +1299,7 @@ mod tests {
     use addr::TargetAddr;
     use assert_matches::assert_matches;
     use ffx_config::ConfigLevel;
-    use fidl::{self, endpoints::Request};
+    use fidl::endpoints::Request;
     use fidl_fuchsia_developer_ffx as ffx;
     use fidl_fuchsia_developer_ffx_ext::RepositoryStorageType;
     use fidl_fuchsia_developer_remotecontrol as rcs;
@@ -1319,13 +1319,11 @@ mod tests {
     use std::{
         cell::RefCell,
         collections::BTreeSet,
-        convert::TryInto,
         fs,
         future::Future,
-        net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr},
-        rc::Rc,
+        net::{IpAddr, Ipv4Addr, Ipv6Addr},
         str::FromStr,
-        sync::{Arc, Mutex},
+        sync::Mutex,
     };
 
     const REPO_NAME: &str = "some-repo";
