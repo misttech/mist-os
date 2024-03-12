@@ -85,6 +85,11 @@ class Device : public std::enable_shared_from_this<Device> {
       fit::callback<void(std::vector<fuchsia_hardware_audio::DaiSupportedFormats>)>
           dai_format_sets_callback);
 
+  bool CodecSetDaiFormat(const fuchsia_hardware_audio::DaiFormat& dai_format);
+  bool CodecReset();
+  bool CodecStart();
+  bool CodecStop();
+
   struct RingBufferInfo {
     fuchsia_audio::RingBuffer ring_buffer;
     fuchsia_audio_device::RingBufferProperties properties;
@@ -108,6 +113,8 @@ class Device : public std::enable_shared_from_this<Device> {
   const std::vector<fuchsia_hardware_audio::DaiSupportedFormats>& dai_format_sets() const {
     return *dai_format_sets_;
   }
+
+  fuchsia_audio_device::DeviceType device_type() const { return device_type_; }
 
   // Static object counts, for debugging purposes.
   static inline uint64_t count() { return count_; }
@@ -250,6 +257,18 @@ class Device : public std::enable_shared_from_this<Device> {
 
   std::optional<fuchsia_hardware_audio::CodecProperties> codec_properties_;
   std::optional<std::vector<fuchsia_hardware_audio::DaiSupportedFormats>> dai_format_sets_;
+
+  struct CodecFormat {
+    fuchsia_hardware_audio::DaiFormat dai_format;
+    fuchsia_hardware_audio::CodecFormatInfo codec_format_info;
+  };
+  std::optional<CodecFormat> codec_format_;
+
+  struct CodecStartState {
+    bool started = false;
+    zx::time start_stop_time = zx::time::infinite_past();
+  };
+  CodecStartState codec_start_state_;
 
   State state_{State::DeviceInitializing};
 

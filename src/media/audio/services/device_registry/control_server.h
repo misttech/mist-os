@@ -43,10 +43,20 @@ class ControlServer
   void GainStateChanged(const fuchsia_audio_device::GainState&) final;
   void PlugStateChanged(const fuchsia_audio_device::PlugState& new_plug_state,
                         zx::time plug_change_time) final;
+
   // ControlNotify
   //
   void DeviceDroppedRingBuffer() final;
   void DelayInfoChanged(const fuchsia_audio_device::DelayInfo&) final;
+  void DaiFormatChanged(
+      const std::optional<fuchsia_hardware_audio::DaiFormat>& dai_format,
+      const std::optional<fuchsia_hardware_audio::CodecFormatInfo>& codec_format_info) final;
+  void DaiFormatNotSet(const fuchsia_hardware_audio::DaiFormat& dai_format,
+                       zx_status_t driver_error) final;
+  void CodecStarted(const zx::time& start_time) final;
+  void CodecNotStarted() final;
+  void CodecStopped(const zx::time& stop_time) final;
+  void CodecNotStopped() final;
 
   // fuchsia.audio.device.Control
   //

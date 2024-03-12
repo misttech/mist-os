@@ -146,7 +146,8 @@ void Device::FidlErrorHandler<T>::on_fidl_error(fidl::UnbindInfo info) {
     ADR_WARN_METHOD() << name_ << " disconnected: " << info;
     device_->OnError(info.status());
   } else {
-    ADR_LOG_METHOD(kLogStreamConfigFidlResponses || kLogDeviceState || kLogObjectLifetimes)
+    ADR_LOG_METHOD(kLogCodecFidlResponses || kLogStreamConfigFidlResponses || kLogDeviceState ||
+                   kLogObjectLifetimes)
         << name_ << " disconnected: " << info;
   }
   device_->OnRemoval();
@@ -299,6 +300,19 @@ bool Device::SetControl(std::shared_ptr<ControlNotify> control_notify) {
   control_notify_ = control_notify;
   AddObserver(std::move(control_notify));
 
+  if (device_type_ == fuchsia_audio_device::DeviceType::kCodec) {
+    if (auto notify = GetControlNotify(); notify) {
+      if (codec_format_) {
+        notify->DaiFormatChanged(codec_format_->dai_format, codec_format_->codec_format_info);
+      } else {
+        notify->DaiFormatChanged(std::nullopt, std::nullopt);
+      }
+
+      codec_start_state_.started ? notify->CodecStarted(codec_start_state_.start_stop_time)
+                                 : notify->CodecStopped(codec_start_state_.start_stop_time);
+    }
+  }
+
   LogObjectCounts();
   return true;
 }
@@ -446,11 +460,11 @@ bool Device::LogResultError(const ResultT& result, const char* debug_context) {
     ADR_WARN_METHOD() << debug_context << ": device already has an error";
     return true;
   }
-  if (!result.is_ok()) {
+  if (result.is_error()) {
     if (result.error_value().is_framework_error()) {
       if (result.error_value().framework_error().is_canceled() ||
           result.error_value().framework_error().is_peer_closed()) {
-        ADR_LOG_METHOD(kLogStreamConfigFidlResponses)
+        ADR_LOG_METHOD(kLogCodecFidlResponses || kLogStreamConfigFidlResponses)
             << debug_context << ": will take no action on "
             << result.error_value().FormatDescription();
       } else {
@@ -461,9 +475,8 @@ bool Device::LogResultError(const ResultT& result, const char* debug_context) {
     } else {
       OnError(ZX_ERR_INTERNAL);
     }
-    return true;
   }
-  return false;
+  return result.is_error();
 }
 
 // This method also sets OnError, so it is not just for logging.
@@ -474,18 +487,18 @@ bool Device::LogResultFrameworkError(const ResultT& result, const char* debug_co
     ADR_WARN_METHOD() << "device already has an error; ignoring this";
     return true;
   }
-  if (!result.is_ok()) {
+  if (result.is_error()) {
     if (result.error_value().is_canceled() || result.error_value().is_peer_closed()) {
-      ADR_LOG_METHOD(kLogStreamConfigFidlResponses) << debug_context << ": will take no action on "
-                                                    << result.error_value().FormatDescription();
+      ADR_LOG_METHOD(kLogCodecFidlResponses || kLogStreamConfigFidlResponses)
+          << debug_context << ": will take no action on "
+          << result.error_value().FormatDescription();
     } else {
       FX_LOGS(ERROR) << debug_context << " failed: " << result.error_value().status() << " ("
                      << result.error_value().FormatDescription() << ")";
       OnError(result.error_value().status());
     }
-    return true;
   }
-  return false;
+  return result.is_error();
 }
 
 void Device::RetrieveStreamProperties() {
@@ -1143,6 +1156,251 @@ std::shared_ptr<ControlNotify> Device::GetControlNotify() {
   }
 
   return sh_ptr_control;
+}
+
+bool Device::CodecSetDaiFormat(const fuchsia_hardware_audio::DaiFormat& dai_format) {
+  if (device_type_ != fuchsia_audio_device::DeviceType::kCodec) {
+    ADR_WARN_METHOD() << "Incorrect device_type " << device_type_ << " cannot SetDaiFormat";
+    return false;
+  }
+
+  ADR_LOG_METHOD(kLogCodecFidlCalls);
+  FX_CHECK(state_ != State::DeviceInitializing);
+
+  if (state_ == State::Error) {
+    ADR_WARN_METHOD() << "Codec has previous error; cannot SetDaiFormat";
+    return false;
+  }
+  if (!GetControlNotify()) {
+    ADR_WARN_METHOD() << "Codec must be controlled before SetDaiFormat can be called";
+    return false;
+  }
+  if (ValidateDaiFormat(dai_format) != ZX_OK) {
+    ADR_WARN_METHOD() << "Invalid dai_format -- cannot SetDaiFormat";
+    return false;
+  }
+
+  auto new_dai_format = dai_format;
+  (*codec_client_)
+      ->SetDaiFormat(dai_format)
+      .Then([this, dai_format = std::move(new_dai_format)](
+                fidl::Result<fuchsia_hardware_audio::Codec::SetDaiFormat>& result) {
+        if (state_ == State::Error) {
+          ADR_WARN_OBJECT() << "Codec/SetDaiFormat response: device already has an error";
+          if (auto notify = GetControlNotify(); notify) {
+            notify->DaiFormatNotSet(dai_format, ZX_ERR_INTERNAL);
+          }
+          return;
+        }
+
+        if (!result.is_ok()) {
+          // These types of errors don't lead us to mark the device as in Error state.
+          if (result.error_value().is_domain_error() &&
+              (result.error_value().domain_error() == ZX_ERR_INVALID_ARGS ||
+               result.error_value().domain_error() == ZX_ERR_NOT_SUPPORTED)) {
+            ADR_WARN_OBJECT()
+                << "Codec/SetDaiFormat response: ZX_ERR_INVALID_ARGS or ZX_ERR_NOT_SUPPORTED";
+          } else {
+            LogResultError(result, "SetDaiFormat response");
+          }
+          if (auto notify = GetControlNotify(); notify) {
+            notify->DaiFormatNotSet(dai_format,
+                                    result.error_value().is_domain_error()
+                                        ? result.error_value().domain_error()
+                                        : result.error_value().framework_error().status());
+          }
+
+          return;
+        }
+
+        ADR_LOG_OBJECT(kLogCodecFidlResponses) << "Codec/SetDaiFormat: success";
+        zx_status_t status = ValidateCodecFormatInfo(result->state());
+        if (status != ZX_OK) {
+          FX_LOGS(ERROR) << "Codec/SetDaiFormat error: "
+                         << result.error_value().FormatDescription();
+          OnError(status);
+          if (auto notify = GetControlNotify(); notify) {
+            notify->DaiFormatNotSet(dai_format, status);
+          }
+          return;
+        }
+
+        if (codec_format_ && codec_format_->dai_format == dai_format &&
+            codec_format_->codec_format_info == result->state()) {
+          // No change
+          return;
+        }
+
+        // Reset Start state and DaiFormat (if this is a change) and notify our controlling entity.
+        bool was_started = codec_start_state_.started;
+        if (was_started) {
+          codec_start_state_.started = false;
+          codec_start_state_ = CodecStartState{false, zx::clock::get_monotonic()};
+        }
+        codec_format_ = CodecFormat{dai_format, result->state()};
+        if (auto notify = GetControlNotify(); notify) {
+          if (was_started) {
+            notify->CodecStopped(codec_start_state_.start_stop_time);
+          }
+          notify->DaiFormatChanged(codec_format_->dai_format, codec_format_->codec_format_info);
+        }
+      });
+
+  return true;
+}
+
+bool Device::CodecReset() {
+  if (device_type_ != fuchsia_audio_device::DeviceType::kCodec) {
+    ADR_WARN_METHOD() << "Incorrect device_type " << device_type_ << " cannot Reset";
+    return false;
+  }
+
+  ADR_LOG_METHOD(kLogCodecFidlCalls);
+  FX_CHECK(state_ != State::DeviceInitializing);
+
+  if (state_ == State::Error) {
+    ADR_WARN_METHOD() << "Codec has previous error; cannot Reset";
+    return false;
+  }
+  if (!GetControlNotify()) {
+    ADR_WARN_METHOD() << "Codec must be controlled before Reset can be called";
+    return false;
+  }
+
+  (*codec_client_)
+      ->Reset()
+      .Then([this](fidl::Result<fuchsia_hardware_audio::Codec::Reset>& result) {
+        if (LogResultFrameworkError(result, "Reset response")) {
+          return;
+        }
+        ADR_LOG_OBJECT(kLogCodecFidlResponses) << "Codec/Reset: success";
+
+        // Reset to Stopped (if Started), even if no ControlNotify is listening for notifications.
+        if (codec_start_state_.started) {
+          codec_start_state_.started = false;
+          codec_start_state_.start_stop_time = zx::clock::get_monotonic();
+          if (auto notify = GetControlNotify(); notify) {
+            notify->CodecStopped(codec_start_state_.start_stop_time);
+          }
+        }
+
+        // Reset our DaiFormat (if set), even if no ControlNotify is listening for notifications.
+        if (codec_format_) {
+          codec_format_.reset();
+          if (auto notify = GetControlNotify(); notify) {
+            notify->DaiFormatChanged(std::nullopt, std::nullopt);
+          }
+        }
+
+        // TODO(https://fxbug.dev/323270827): implement signalprocessing for Codec (topology, gain).
+        // When implemented, reset the signalprocessing topology and all elements, here.
+      });
+
+  return true;
+}
+
+bool Device::CodecStart() {
+  if (device_type_ != fuchsia_audio_device::DeviceType::kCodec) {
+    ADR_WARN_METHOD() << "Incorrect device_type " << device_type_ << " cannot Start";
+    return false;
+  }
+
+  ADR_LOG_METHOD(kLogCodecFidlCalls);
+  FX_CHECK(state_ != State::DeviceInitializing);
+
+  if (state_ == State::Error) {
+    ADR_WARN_METHOD() << "Codec has previous error; cannot Start";
+    return false;
+  }
+  if (!GetControlNotify()) {
+    ADR_WARN_METHOD() << "Codec must be controlled before Start can be called";
+    return false;
+  }
+  if (!codec_format_) {
+    ADR_WARN_METHOD() << "Format must be set before Start can be called";
+    return false;
+  }
+
+  if (codec_start_state_.started) {
+    ADR_LOG_METHOD(kLogCodecFidlCalls) << "Codec is already started; ignoring CodecStart command";
+    return true;
+  }
+
+  (*codec_client_)
+      ->Start()
+      .Then([this](fidl::Result<fuchsia_hardware_audio::Codec::Start>& result) {
+        if (LogResultFrameworkError(result, "Start response")) {
+          if (auto notify = GetControlNotify(); notify) {
+            notify->CodecNotStarted();
+          }
+          return;
+        }
+
+        ADR_LOG_OBJECT(kLogCodecFidlResponses) << "Codec/Start: success";
+
+        // Notify our controlling entity, if this was a change.
+        if (!codec_start_state_.started ||
+            codec_start_state_.start_stop_time.get() <= result->start_time()) {
+          codec_start_state_.started = true;
+          codec_start_state_.start_stop_time = zx::time(result->start_time());
+          if (auto notify = GetControlNotify(); notify) {
+            notify->CodecStarted(codec_start_state_.start_stop_time);
+          }
+        }
+      });
+
+  return true;
+}
+
+bool Device::CodecStop() {
+  if (device_type_ != fuchsia_audio_device::DeviceType::kCodec) {
+    ADR_WARN_METHOD() << "Incorrect device_type " << device_type_ << " cannot Stop";
+    return false;
+  }
+
+  ADR_LOG_METHOD(kLogCodecFidlCalls);
+  FX_CHECK(state_ != State::DeviceInitializing);
+
+  if (state_ == State::Error) {
+    ADR_WARN_METHOD() << "Codec has previous error; cannot Stop";
+    return false;
+  }
+  if (!GetControlNotify()) {
+    ADR_WARN_METHOD() << "Codec must be controlled before Stop can be called";
+    return false;
+  }
+  if (!codec_format_) {
+    ADR_WARN_METHOD() << "Format must be set before Stop can be called";
+    return false;
+  }
+
+  if (!codec_start_state_.started) {
+    ADR_LOG_METHOD(kLogCodecFidlCalls) << "Codec is already stopped; ignoring CodecStop command";
+    return true;
+  }
+
+  (*codec_client_)->Stop().Then([this](fidl::Result<fuchsia_hardware_audio::Codec::Stop>& result) {
+    if (LogResultFrameworkError(result, "Stop response")) {
+      if (auto notify = GetControlNotify(); notify) {
+        notify->CodecNotStopped();
+      }
+      return;
+    }
+
+    ADR_LOG_OBJECT(kLogCodecFidlResponses) << "Codec/Stop: success";
+
+    // Notify our controlling entity, if this was a change.
+    if (codec_start_state_.started ||
+        codec_start_state_.start_stop_time.get() <= result->stop_time()) {
+      codec_start_state_.started = false;
+      codec_start_state_.start_stop_time = zx::time(result->stop_time());
+      if (auto notify = GetControlNotify(); notify) {
+        notify->CodecStopped(codec_start_state_.start_stop_time);
+      }
+    }
+  });
+
+  return true;
 }
 
 bool Device::CreateRingBuffer(const fuchsia_hardware_audio::Format& format,

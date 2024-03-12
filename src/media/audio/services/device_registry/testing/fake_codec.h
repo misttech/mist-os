@@ -29,6 +29,8 @@
 
 namespace media_audio {
 
+inline constexpr bool kLogFakeCodec = false;
+
 // This driver implements the audio driver interface and is configurable to simulate audio hardware.
 using fuchsia_hardware_audio::Codec;
 using fuchsia_hardware_audio::CodecConnector;
@@ -36,14 +38,13 @@ using fuchsia_hardware_audio_signalprocessing::SignalProcessing;
 class FakeCodec : public fidl::testing::TestBase<CodecConnector>,
                   public fidl::testing::TestBase<Codec>,
                   public fidl::testing::TestBase<SignalProcessing> {
-  static constexpr bool kLogFakeCodec = true;
-
  public:
   static constexpr char kDefaultManufacturer[] = "fake_codec device manufacturer";
   static constexpr char kDefaultProduct[] = "fake_codec device product";
   static constexpr UniqueId kDefaultUniqueInstanceId{
-      0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef,  //
-      0xfe, 0xdc, 0xba, 0x98, 0x76, 0x54, 0x32, 0x10};
+      0xFE, 0xDC, 0xBA, 0x98, 0x76, 0x54, 0x32, 0x10,
+      0x01, 0x23, 0x45, 0x67, 0x89, 0xAB, 0xCD, 0xEF,
+  };
   static constexpr bool kDefaultIsInput = false;
 
   static constexpr uint32_t kDefaultNumberOfChannels = 2;

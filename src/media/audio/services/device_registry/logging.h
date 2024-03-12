@@ -50,7 +50,7 @@ inline constexpr bool kLogStreamConfigFidlResponseValues = false;
 
 inline constexpr bool kLogCodecFidlCalls = false;
 inline constexpr bool kLogCodecFidlResponses = false;
-inline constexpr bool kLogCodecFidlResponseValues = false;
+inline constexpr bool kLogCodecFidlResponseValues = true;
 
 inline constexpr bool kLogRingBufferMethods = false;
 inline constexpr bool kLogRingBufferFidlCalls = false;

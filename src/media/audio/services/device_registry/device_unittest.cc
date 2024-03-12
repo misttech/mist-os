@@ -46,7 +46,8 @@ class StreamConfigTest : public DeviceTest {};
 
 // Validate that a fake codec with default values is initialized successfully.
 TEST_F(CodecTest, Initialization) {
-  auto device = InitializeDeviceForFakeCodec(MakeFakeCodecOutput());
+  auto fake_driver = MakeFakeCodecOutput();
+  auto device = InitializeDeviceForFakeCodec(fake_driver);
   EXPECT_TRUE(InInitializedState(device));
 
   EXPECT_EQ(fake_device_presence_watcher_->ready_devices().size(), 1u);
@@ -56,6 +57,7 @@ TEST_F(CodecTest, Initialization) {
   EXPECT_EQ(fake_device_presence_watcher_->on_error_count(), 0u);
   EXPECT_EQ(fake_device_presence_watcher_->on_removal_count(), 0u);
 
+  EXPECT_EQ(device->device_type(), fuchsia_audio_device::DeviceType::kCodec);
   EXPECT_TRUE(device->ring_buffer_format_sets().empty());
   EXPECT_EQ(device->dai_format_sets(), FakeCodec::kDefaultDaiFormatSets);
 
@@ -86,7 +88,8 @@ TEST_F(CodecTest, InitializationNoDirection) {
 
 // Validate that a fake codec with default values is initialized successfully.
 TEST_F(CodecTest, DeviceInfoValues) {
-  auto device = InitializeDeviceForFakeCodec(MakeFakeCodecOutput());
+  auto fake_driver = MakeFakeCodecOutput();
+  auto device = InitializeDeviceForFakeCodec(fake_driver);
   ASSERT_TRUE(InInitializedState(device));
 
   ASSERT_EQ(fake_device_presence_watcher_->ready_devices().size(), 1u);
@@ -215,6 +218,319 @@ TEST_F(CodecTest, GetDaiFormats) {
   RunLoopUntilIdle();
   ASSERT_TRUE(received_get_dai_formats_callback);
   EXPECT_EQ(ValidateDaiFormatSets(dai_formats), ZX_OK);
+}
+
+// SetDaiFormat is tested (here and in CodecWarningTest) against all states and error cases:
+// States: First set, format-change, no-change. ControlNotify::DaiFormatChanged received.
+// SetDaiFormat stops Codec; ControlNotify::CodecStopped received if was started.
+// Errors: StreamConfig type; Device has error, not controlled; invalid format; unsupported format.
+//
+// SetDaiFormat - use the first supported format
+TEST_F(CodecTest, SetDaiFormat) {
+  auto fake_codec = MakeFakeCodecNoDirection();
+  auto device = InitializeDeviceForFakeCodec(fake_codec);
+  ASSERT_TRUE(InInitializedState(device));
+
+  ASSERT_TRUE(SetControl(device));
+  ASSERT_TRUE(IsControlled(device));
+
+  bool received_get_dai_formats_callback = false;
+  std::vector<fuchsia_hardware_audio::DaiSupportedFormats> dai_formats;
+  device->RetrieveDaiFormatSets(
+      [&received_get_dai_formats_callback,
+       &dai_formats](const std::vector<fuchsia_hardware_audio::DaiSupportedFormats>& formats) {
+        received_get_dai_formats_callback = true;
+        for (auto& dai_format_set : formats) {
+          dai_formats.push_back(dai_format_set);
+        }
+      });
+  RunLoopUntilIdle();
+  ASSERT_TRUE(received_get_dai_formats_callback);
+  ASSERT_FALSE(notify_->dai_format());
+
+  ASSERT_TRUE(device->CodecSetDaiFormat(SafeDaiFormatFromDaiSupportedFormats(dai_formats)));
+
+  // check that notify received dai_format and codec_format_info
+  RunLoopUntilIdle();
+  EXPECT_TRUE(notify_->dai_format());
+  EXPECT_EQ(ValidateDaiFormat(*notify_->dai_format()), ZX_OK);
+  EXPECT_TRUE(notify_->codec_format_info());
+  EXPECT_EQ(ValidateCodecFormatInfo(*notify_->codec_format_info()), ZX_OK);
+}
+
+// Start and Stop
+TEST_F(CodecTest, InitialStop) {
+  auto fake_codec = MakeFakeCodecOutput();
+  auto device = InitializeDeviceForFakeCodec(fake_codec);
+  ASSERT_TRUE(InInitializedState(device));
+
+  ASSERT_TRUE(SetControl(device));
+  ASSERT_TRUE(IsControlled(device));
+
+  bool received_get_dai_formats_callback = false;
+  std::vector<fuchsia_hardware_audio::DaiSupportedFormats> dai_formats;
+  device->RetrieveDaiFormatSets(
+      [&received_get_dai_formats_callback,
+       &dai_formats](const std::vector<fuchsia_hardware_audio::DaiSupportedFormats>& formats) {
+        received_get_dai_formats_callback = true;
+        for (auto& dai_format_set : formats) {
+          dai_formats.push_back(dai_format_set);
+        }
+      });
+
+  RunLoopUntilIdle();
+  ASSERT_TRUE(received_get_dai_formats_callback);
+  ASSERT_TRUE(device->CodecSetDaiFormat(SafeDaiFormatFromDaiSupportedFormats(dai_formats)));
+
+  RunLoopUntilIdle();
+  ASSERT_TRUE(notify_->dai_format());
+  ASSERT_TRUE(notify_->codec_is_stopped());
+
+  // This should do nothing since we are already stopped.
+  EXPECT_TRUE(device->CodecStop());
+
+  RunLoopUntilIdle();
+  EXPECT_TRUE(notify_->codec_is_stopped());
+  // This demonstrates that there was no change as a result of the Stop call.
+  EXPECT_EQ(notify_->codec_stop_time()->get(), zx::time::infinite_past().get());
+}
+
+TEST_F(CodecTest, Start) {
+  auto fake_codec = MakeFakeCodecInput();
+  auto device = InitializeDeviceForFakeCodec(fake_codec);
+  ASSERT_TRUE(InInitializedState(device));
+  ASSERT_TRUE(SetControl(device));
+  std::vector<fuchsia_hardware_audio::DaiSupportedFormats> dai_formats;
+  device->RetrieveDaiFormatSets(
+      [&dai_formats](std::vector<fuchsia_hardware_audio::DaiSupportedFormats> formats) {
+        dai_formats.push_back(formats[0]);
+      });
+
+  RunLoopUntilIdle();
+  ASSERT_TRUE(device->CodecSetDaiFormat(SafeDaiFormatFromDaiSupportedFormats(dai_formats)));
+
+  RunLoopUntilIdle();
+  ASSERT_TRUE(notify_->dai_format());
+  ASSERT_TRUE(notify_->codec_is_stopped());
+  auto time_before_start = zx::clock::get_monotonic();
+
+  EXPECT_TRUE(device->CodecStart());
+
+  RunLoopUntilIdle();
+  EXPECT_TRUE(notify_->codec_is_started());
+  EXPECT_GT(notify_->codec_start_time()->get(), time_before_start.get());
+}
+
+TEST_F(CodecTest, SetDaiFormatChange) {
+  auto fake_codec = MakeFakeCodecNoDirection();
+  auto device = InitializeDeviceForFakeCodec(fake_codec);
+  ASSERT_TRUE(InInitializedState(device));
+  ASSERT_TRUE(SetControl(device));
+  std::vector<fuchsia_hardware_audio::DaiSupportedFormats> dai_formats;
+  device->RetrieveDaiFormatSets(
+      [&dai_formats](std::vector<fuchsia_hardware_audio::DaiSupportedFormats> formats) {
+        dai_formats.push_back(formats[0]);
+      });
+
+  RunLoopUntilIdle();
+  ASSERT_TRUE(device->CodecSetDaiFormat(SafeDaiFormatFromDaiSupportedFormats(dai_formats)));
+
+  RunLoopUntilIdle();
+  ASSERT_TRUE(notify_->dai_format());
+  ASSERT_TRUE(device->CodecStart());
+
+  RunLoopUntilIdle();
+  ASSERT_TRUE(notify_->codec_is_started());
+  auto dai_format2 = SecondDaiFormatFromDaiSupportedFormats(dai_formats);
+  auto time_before_format_change = zx::clock::get_monotonic();
+
+  // Change the DaiFormat
+  EXPECT_TRUE(device->CodecSetDaiFormat(dai_format2));
+
+  // Expect codec to be stopped, and format to be changed.
+  RunLoopUntilIdle();
+  EXPECT_TRUE(notify_->codec_is_stopped());
+  EXPECT_GT(notify_->codec_stop_time()->get(), time_before_format_change.get());
+  EXPECT_TRUE(notify_->dai_format());
+  EXPECT_EQ(*notify_->dai_format(), dai_format2);
+  EXPECT_TRUE(notify_->codec_format_info());
+}
+
+TEST_F(CodecTest, SetDaiFormatNoChange) {
+  auto fake_codec = MakeFakeCodecNoDirection();
+  auto device = InitializeDeviceForFakeCodec(fake_codec);
+  ASSERT_TRUE(InInitializedState(device));
+  ASSERT_TRUE(SetControl(device));
+  std::vector<fuchsia_hardware_audio::DaiSupportedFormats> dai_formats;
+  device->RetrieveDaiFormatSets(
+      [&dai_formats](std::vector<fuchsia_hardware_audio::DaiSupportedFormats> formats) {
+        dai_formats.push_back(formats[0]);
+      });
+
+  RunLoopUntilIdle();
+  auto safe_format = SafeDaiFormatFromDaiSupportedFormats(dai_formats);
+  ASSERT_TRUE(device->CodecSetDaiFormat(safe_format));
+
+  RunLoopUntilIdle();
+  ASSERT_TRUE(notify_->dai_format());
+  ASSERT_TRUE(device->CodecStart());
+
+  RunLoopUntilIdle();
+  ASSERT_TRUE(notify_->codec_is_started());
+  auto time_after_started = zx::clock::get_monotonic();
+  // Clear out our notify's DaiFormat so we can detect a new notification of the same DaiFormat.
+  notify_->clear_dai_format();
+
+  EXPECT_TRUE(device->CodecSetDaiFormat(safe_format));
+
+  RunLoopUntilIdle();
+  // We do not expect this to reset our Start state.
+  EXPECT_TRUE(notify_->codec_is_started());
+  EXPECT_LT(notify_->codec_start_time()->get(), time_after_started.get());
+  // We do not expect to be notified of a format change -- even a "change" to the same format.
+  EXPECT_FALSE(notify_->dai_format());
+}
+
+TEST_F(CodecTest, StartStop) {
+  auto fake_codec = MakeFakeCodecNoDirection();
+  auto device = InitializeDeviceForFakeCodec(fake_codec);
+  ASSERT_TRUE(InInitializedState(device));
+  ASSERT_TRUE(SetControl(device));
+  std::vector<fuchsia_hardware_audio::DaiSupportedFormats> dai_formats;
+  device->RetrieveDaiFormatSets(
+      [&dai_formats](std::vector<fuchsia_hardware_audio::DaiSupportedFormats> formats) {
+        dai_formats.push_back(formats[0]);
+      });
+
+  RunLoopUntilIdle();
+  ASSERT_TRUE(device->CodecSetDaiFormat(SafeDaiFormatFromDaiSupportedFormats(dai_formats)));
+
+  RunLoopUntilIdle();
+  ASSERT_TRUE(notify_->dai_format());
+  ASSERT_TRUE(notify_->codec_is_stopped());
+  ASSERT_TRUE(device->CodecStart());
+
+  RunLoopUntilIdle();
+  auto time_before_stop = zx::clock::get_monotonic();
+  ASSERT_TRUE(notify_->codec_is_started());
+  ASSERT_TRUE(device->CodecStop());
+
+  RunLoopUntilIdle();
+  EXPECT_TRUE(notify_->codec_is_stopped());
+  EXPECT_GT(notify_->codec_stop_time()->get(), time_before_stop.get());
+}
+
+// Start when already started: no notification; old start_time.
+TEST_F(CodecTest, StartStart) {
+  auto fake_codec = MakeFakeCodecOutput();
+  auto device = InitializeDeviceForFakeCodec(fake_codec);
+  ASSERT_TRUE(InInitializedState(device));
+  ASSERT_TRUE(SetControl(device));
+  std::vector<fuchsia_hardware_audio::DaiSupportedFormats> dai_formats;
+  device->RetrieveDaiFormatSets(
+      [&dai_formats](std::vector<fuchsia_hardware_audio::DaiSupportedFormats> formats) {
+        dai_formats.push_back(formats[0]);
+      });
+
+  RunLoopUntilIdle();
+  ASSERT_TRUE(device->CodecSetDaiFormat(SafeDaiFormatFromDaiSupportedFormats(dai_formats)));
+
+  RunLoopUntilIdle();
+  ASSERT_TRUE(notify_->dai_format());
+  ASSERT_TRUE(notify_->codec_is_stopped());
+  ASSERT_TRUE(device->CodecStart());
+
+  RunLoopUntilIdle();
+  ASSERT_TRUE(notify_->codec_is_started());
+  auto previous_start_time = *notify_->codec_start_time();
+  ASSERT_TRUE(device->CodecStart());
+
+  // Should not get a new notification here.
+  RunLoopUntilIdle();
+  EXPECT_TRUE(notify_->codec_is_started());
+  EXPECT_EQ(notify_->codec_start_time()->get(), previous_start_time.get());
+}
+
+// Stop when already stopped: no notification; old stop_time.
+TEST_F(CodecTest, StopStop) {
+  auto fake_codec = MakeFakeCodecInput();
+  auto device = InitializeDeviceForFakeCodec(fake_codec);
+  ASSERT_TRUE(InInitializedState(device));
+  ASSERT_TRUE(SetControl(device));
+  std::vector<fuchsia_hardware_audio::DaiSupportedFormats> dai_formats;
+  device->RetrieveDaiFormatSets(
+      [&dai_formats](std::vector<fuchsia_hardware_audio::DaiSupportedFormats> formats) {
+        dai_formats.push_back(formats[0]);
+      });
+
+  RunLoopUntilIdle();
+  ASSERT_TRUE(device->CodecSetDaiFormat(SafeDaiFormatFromDaiSupportedFormats(dai_formats)));
+
+  RunLoopUntilIdle();
+  ASSERT_TRUE(notify_->dai_format());
+  ASSERT_TRUE(notify_->codec_is_stopped());
+  // First Start the Codec so we can explicitly transition into the Stop state.
+  ASSERT_TRUE(device->CodecStart());
+
+  RunLoopUntilIdle();
+  ASSERT_TRUE(notify_->codec_is_started());
+  ASSERT_TRUE(device->CodecStop());
+
+  RunLoopUntilIdle();
+  ASSERT_TRUE(notify_->codec_is_stopped());
+  auto previous_stop_time = *notify_->codec_stop_time();
+
+  // Since we are already stopped, this should have no effect.
+  EXPECT_TRUE(device->CodecStop());
+
+  RunLoopUntilIdle();
+  EXPECT_TRUE(notify_->codec_is_stopped());
+  // This demonstrates that there was no change as a result of the Stop call.
+  EXPECT_EQ(notify_->codec_stop_time()->get(), previous_stop_time.get());
+}
+
+// Reset stops the Codec and resets DaiFormat, Elements and Topology
+TEST_F(CodecTest, Reset) {
+  auto fake_codec = MakeFakeCodecNoDirection();
+  auto device = InitializeDeviceForFakeCodec(fake_codec);
+  ASSERT_TRUE(InInitializedState(device));
+  ASSERT_TRUE(SetControl(device));
+  std::vector<fuchsia_hardware_audio::DaiSupportedFormats> dai_formats;
+  device->RetrieveDaiFormatSets(
+      [&dai_formats](std::vector<fuchsia_hardware_audio::DaiSupportedFormats> formats) {
+        dai_formats.push_back(formats[0]);
+      });
+
+  RunLoopUntilIdle();
+  ASSERT_TRUE(device->CodecSetDaiFormat(SafeDaiFormatFromDaiSupportedFormats(dai_formats)));
+
+  RunLoopUntilIdle();
+  ASSERT_TRUE(notify_->dai_format());
+  ASSERT_TRUE(notify_->codec_format_info());
+  ASSERT_TRUE(notify_->codec_is_stopped());
+  ASSERT_TRUE(device->CodecStart());
+
+  // TODO(https://fxbug.dev/323270827): implement signalprocessing for Codec (topology, gain).
+  // When implemented in FakeCodec, set a signalprocessing Topology, and change a signalprocessing
+  // Element, and observe that both of these changes are reverted by the call to Reset.
+
+  RunLoopUntilIdle();
+  EXPECT_TRUE(notify_->codec_is_started());
+  // Verify that the signalprocessing Topology has in fact changed.
+  // Verify that the signalprocessing Element has in fact changed.
+  auto time_before_reset = zx::clock::get_monotonic();
+
+  EXPECT_TRUE(device->CodecReset());
+
+  RunLoopUntilIdle();
+  EXPECT_TRUE(notify_->codec_is_stopped());
+  // We were notified that the Codec stopped.
+  EXPECT_GT(notify_->codec_stop_time()->get(), time_before_reset.get());
+  // We were notified that the Codec reset its DaiFormat (none is now set).
+  EXPECT_FALSE(notify_->dai_format());
+  EXPECT_FALSE(notify_->codec_format_info());
+  // Observe the signalprocessing Elements - were they reset?
+  // Observe the signalprocessing Topology - was it reset?
 }
 
 // This tests the driver's ability to inform its ObserverNotify of initial plug state.
@@ -540,8 +856,6 @@ TEST_F(StreamConfigTest, DynamicPlugUpdate) {
   EXPECT_EQ(notify_->plug_state()->first, fuchsia_audio_device::PlugState::kUnplugged);
   EXPECT_EQ(notify_->plug_state()->second.get(), unplug_time.get());
 }
-
-// TODO(https://fxbug.dev/42069012): unittest RetrieveCurrentlyPermittedFormats
 
 // Validate that Device can open the driver's RingBuffer FIDL channel.
 TEST_F(StreamConfigTest, CreateRingBuffer) {

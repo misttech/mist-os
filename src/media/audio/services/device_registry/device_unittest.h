@@ -11,7 +11,9 @@
 #include <lib/fidl/cpp/client.h>
 #include <lib/fidl/cpp/unified_messaging_declarations.h>
 #include <lib/fidl/cpp/wire/status.h>
+#include <zircon/compiler.h>
 #include <zircon/errors.h>
+#include <zircon/types.h>
 
 #include <memory>
 #include <sstream>
@@ -22,6 +24,7 @@
 #include "src/media/audio/lib/clock/clock.h"
 #include "src/media/audio/services/device_registry/control_notify.h"
 #include "src/media/audio/services/device_registry/device.h"
+#include "src/media/audio/services/device_registry/logging.h"
 #include "src/media/audio/services/device_registry/observer_notify.h"
 #include "src/media/audio/services/device_registry/testing/fake_codec.h"
 #include "src/media/audio/services/device_registry/testing/fake_device_presence_watcher.h"
@@ -128,12 +131,75 @@ class DeviceTestBase : public gtest::TestLoopFixture {
                           zx::time plug_change_time) final {
       plug_state_ = std::make_pair(new_plug_state, plug_change_time);
     }
+
     // ControlNotify
     //
     void DeviceDroppedRingBuffer() final { FX_LOGS(INFO) << __func__; }
     void DelayInfoChanged(const fuchsia_audio_device::DelayInfo& new_delay_info) final {
       FX_LOGS(INFO) << __func__;
       delay_info_ = new_delay_info;
+    }
+    void DaiFormatChanged(
+        const std::optional<fuchsia_hardware_audio::DaiFormat>& dai_format,
+        const std::optional<fuchsia_hardware_audio::CodecFormatInfo>& codec_format_info) final {
+      dai_format_error_.reset();
+
+      if (!dai_format.has_value()) {
+        FX_LOGS(INFO) << "DaiFormat was cleared";
+        dai_format_.reset();
+        codec_format_info_.reset();
+      } else {
+        FX_LOGS(INFO) << __func__;
+        LogDaiFormat(dai_format);
+        LogCodecFormatInfo(codec_format_info);
+        FX_DCHECK(codec_format_info.has_value());
+        dai_format_ = *dai_format;
+        codec_format_info_ = codec_format_info;
+      }
+    }
+    void DaiFormatNotSet(const fuchsia_hardware_audio::DaiFormat& dai_format,
+                         zx_status_t driver_error) final {
+      FX_LOGS(INFO) << __func__ << "(error " << std::hex << driver_error << ")";
+      dai_format_error_ = driver_error;
+    }
+
+    void CodecStarted(const zx::time& start_time) final {
+      FX_LOGS(INFO) << __func__ << "(" << start_time.get() << ")";
+      codec_start_failed_ = false;
+      codec_start_time_ = start_time;
+      codec_stop_time_.reset();
+    }
+    void CodecNotStarted() final {
+      FX_LOGS(INFO) << __func__;
+      codec_start_failed_ = true;
+    }
+    void CodecStopped(const zx::time& stop_time) final {
+      FX_LOGS(INFO) << __func__ << "(" << stop_time.get() << ")";
+      codec_stop_failed_ = false;
+      codec_stop_time_ = stop_time;
+      codec_start_time_.reset();
+    }
+    void CodecNotStopped() final { codec_stop_failed_ = true; }
+
+    bool codec_is_started() {
+      FX_CHECK(codec_start_time_.has_value() != codec_stop_time_.has_value());
+      return codec_start_time_.has_value();
+    }
+    bool codec_is_stopped() {
+      FX_CHECK(codec_start_time_.has_value() != codec_stop_time_.has_value());
+      return codec_stop_time_.has_value();
+    }
+    // For testing purposes, reset internal state so we detect new Notify calls (including errors).
+    void clear_dai_format() {
+      dai_format_.reset();
+      codec_format_info_.reset();
+      dai_format_error_.reset();
+    }
+    void clear_codec_start_stop() {
+      codec_start_time_.reset();
+      codec_stop_time_ = zx::time::infinite_past();
+      codec_start_failed_ = false;
+      codec_stop_failed_ = false;
     }
 
     const std::optional<fuchsia_audio_device::GainState>& gain_state() const { return gain_state_; }
@@ -148,11 +214,15 @@ class DeviceTestBase : public gtest::TestLoopFixture {
     std::optional<fuchsia_audio_device::DelayInfo>& delay_info() { return delay_info_; }
 
     std::optional<fuchsia_hardware_audio::DaiFormat>& dai_format() { return dai_format_; }
+    std::optional<zx_status_t> dai_format_error() const { return dai_format_error_; }
+
     std::optional<fuchsia_hardware_audio::CodecFormatInfo>& codec_format_info() {
       return codec_format_info_;
     }
     std::optional<zx::time>& codec_start_time() { return codec_start_time_; }
+    bool codec_start_failed() const { return codec_start_failed_; }
     std::optional<zx::time>& codec_stop_time() { return codec_stop_time_; }
+    bool codec_stop_failed() const { return codec_stop_failed_; }
 
    private:
     [[maybe_unused]] DeviceTestBase& parent_;
@@ -163,7 +233,11 @@ class DeviceTestBase : public gtest::TestLoopFixture {
     std::optional<fuchsia_hardware_audio::DaiFormat> dai_format_;
     std::optional<fuchsia_hardware_audio::CodecFormatInfo> codec_format_info_;
     std::optional<zx::time> codec_start_time_;
-    std::optional<zx::time> codec_stop_time_;
+    std::optional<zx::time> codec_stop_time_{zx::time::infinite_past()};
+
+    std::optional<zx_status_t> dai_format_error_;
+    bool codec_start_failed_ = false;
+    bool codec_stop_failed_ = false;
   };
 
   static uint8_t ExpectFormatMatch(std::shared_ptr<Device> device,
@@ -317,34 +391,113 @@ class DeviceTestBase : public gtest::TestLoopFixture {
   ////////////////////////
   // Codec-related methods
   static fuchsia_hardware_audio::DaiFormat SafeDaiFormatFromDaiSupportedFormats(
-      const std::vector<fuchsia_hardware_audio::DaiSupportedFormats>& dai_formats) {
-    if (dai_formats.empty()) {
-      ADD_FAILURE() << "empty DaiSupportedFormats";
-      return fuchsia_hardware_audio::DaiFormat{{}};
-    }
-    if (dai_formats[0].number_of_channels().empty() || dai_formats[0].sample_formats().empty() ||
-        dai_formats[0].frame_formats().empty() || dai_formats[0].frame_rates().empty() ||
-        dai_formats[0].bits_per_slot().empty() || dai_formats[0].bits_per_sample().empty()) {
-      ADD_FAILURE() << "empty sub-vector in DaiSupportedFormats";
-      return fuchsia_hardware_audio::DaiFormat{{}};
-    }
+      const std::vector<fuchsia_hardware_audio::DaiSupportedFormats>& dai_format_sets) {
+    FX_CHECK(!dai_format_sets.empty()) << "empty DaiSupportedFormats";
+
+    FX_CHECK(!dai_format_sets[0].number_of_channels().empty() &&
+             !dai_format_sets[0].sample_formats().empty() &&
+             !dai_format_sets[0].frame_formats().empty() &&
+             !dai_format_sets[0].frame_rates().empty() &&
+             !dai_format_sets[0].bits_per_slot().empty() &&
+             !dai_format_sets[0].bits_per_sample().empty())
+        << "empty sub-vector in DaiSupportedFormats";
 
     fuchsia_hardware_audio::DaiFormat dai_format{{
-        .number_of_channels = dai_formats[0].number_of_channels()[0],
-        .channels_to_use_bitmask = (dai_formats[0].number_of_channels()[0] < 64
-                                        ? (1ull << dai_formats[0].number_of_channels()[0]) - 1ull
-                                        : 0xFFFFFFFFFFFFFFFFull),
-        .sample_format = dai_formats[0].sample_formats()[0],
-        .frame_format = dai_formats[0].frame_formats()[0],
-        .frame_rate = dai_formats[0].frame_rates()[0],
-        .bits_per_slot = dai_formats[0].bits_per_slot()[0],
-        .bits_per_sample = dai_formats[0].bits_per_sample()[0],
+        .number_of_channels = dai_format_sets[0].number_of_channels()[0],
+        .channels_to_use_bitmask =
+            (dai_format_sets[0].number_of_channels()[0] < 64
+                 ? (1ull << dai_format_sets[0].number_of_channels()[0]) - 1ull
+                 : 0xFFFFFFFFFFFFFFFFull),
+        .sample_format = dai_format_sets[0].sample_formats()[0],
+        .frame_format = dai_format_sets[0].frame_formats()[0],
+        .frame_rate = dai_format_sets[0].frame_rates()[0],
+        .bits_per_slot = dai_format_sets[0].bits_per_slot()[0],
+        .bits_per_sample = dai_format_sets[0].bits_per_sample()[0],
     }};
-    if (ValidateDaiFormat(dai_format) != ZX_OK) {
-      ADD_FAILURE() << "first entries did not create a valid DaiFormat";
-      return fuchsia_hardware_audio::DaiFormat{{}};
-    }
+    FX_CHECK(ValidateDaiFormat(dai_format) == ZX_OK)
+        << "first entries did not create a valid DaiFormat";
+
     return dai_format;
+  }
+
+  static fuchsia_hardware_audio::DaiFormat SecondDaiFormatFromDaiSupportedFormats(
+      const std::vector<fuchsia_hardware_audio::DaiSupportedFormats>& dai_format_sets) {
+    auto safe_format_2 = SafeDaiFormatFromDaiSupportedFormats(dai_format_sets);
+
+    if (safe_format_2.channels_to_use_bitmask() > 1) {
+      safe_format_2.channels_to_use_bitmask() -= 1;
+    } else if (dai_format_sets[0].number_of_channels().size() > 1) {
+      safe_format_2.number_of_channels() = dai_format_sets[0].number_of_channels()[1];
+    } else if (dai_format_sets[0].sample_formats().size() > 1) {
+      safe_format_2.sample_format() = dai_format_sets[0].sample_formats()[1];
+    } else if (dai_format_sets[0].frame_formats().size() > 1) {
+      safe_format_2.frame_format() = dai_format_sets[0].frame_formats()[1];
+    } else if (dai_format_sets[0].frame_rates().size() > 1) {
+      safe_format_2.frame_rate() = dai_format_sets[0].frame_rates()[1];
+    } else if (dai_format_sets[0].bits_per_slot().size() > 1) {
+      safe_format_2.bits_per_slot() = dai_format_sets[0].bits_per_slot()[1];
+    } else if (dai_format_sets[0].bits_per_sample().size() > 1) {
+      safe_format_2.bits_per_sample() = dai_format_sets[0].bits_per_sample()[1];
+    } else if (dai_format_sets.size() > 1) {
+      return fuchsia_hardware_audio::DaiFormat{{
+          .number_of_channels = dai_format_sets[1].number_of_channels()[0],
+          .channels_to_use_bitmask =
+              (dai_format_sets[1].number_of_channels()[0] < 64
+                   ? (1ull << dai_format_sets[1].number_of_channels()[0]) - 1ull
+                   : 0xFFFFFFFFFFFFFFFFull),
+          .sample_format = dai_format_sets[1].sample_formats()[0],
+          .frame_format = dai_format_sets[1].frame_formats()[0],
+          .frame_rate = dai_format_sets[1].frame_rates()[0],
+          .bits_per_slot = dai_format_sets[1].bits_per_slot()[0],
+          .bits_per_sample = dai_format_sets[1].bits_per_sample()[0],
+      }};
+
+    } else {
+      FX_CHECK(false) << "Dai format set has only one possible valid format";
+    }
+    return safe_format_2;
+  }
+
+  static fuchsia_hardware_audio::DaiFormat UnsupportedDaiFormatFromDaiFormatSets(
+      const std::vector<fuchsia_hardware_audio::DaiSupportedFormats>& dai_format_sets) {
+    FX_CHECK(!dai_format_sets.empty()) << "empty DaiSupportedFormats";
+
+    std::optional<fuchsia_hardware_audio::DaiFormat> dai_format;
+    for (const auto& format_set : dai_format_sets) {
+      FX_CHECK(!format_set.number_of_channels().empty() && !format_set.sample_formats().empty() &&
+               !format_set.frame_formats().empty() && !format_set.frame_rates().empty() &&
+               !format_set.bits_per_slot().empty() && !format_set.bits_per_sample().empty())
+          << "empty sub-vector in DaiSupportedFormats";
+      dai_format = SafeDaiFormatFromDaiSupportedFormats({{format_set}});
+      if (dai_format->number_of_channels() > 1) {
+        dai_format->number_of_channels() -= 1;
+        dai_format->channels_to_use_bitmask() = (1ull << dai_format->number_of_channels()) - 1ull;
+        FX_LOGS(INFO) << "Returning this invalid format: ";
+        LogDaiFormat(dai_format);
+        return *dai_format;
+      }
+      if (dai_format->frame_rate() > kMinSupportedDaiFrameRate) {
+        dai_format->frame_rate() -= 1;
+        FX_LOGS(INFO) << "Returning this invalid format: ";
+        LogDaiFormat(dai_format);
+        return *dai_format;
+      }
+      if (dai_format->bits_per_slot() > 1) {
+        dai_format->bits_per_slot() -= 1;
+        FX_LOGS(INFO) << "Returning this invalid format: ";
+        LogDaiFormat(dai_format);
+        return *dai_format;
+      }
+      if (dai_format->bits_per_sample() > 1) {
+        dai_format->bits_per_sample() -= 1;
+        FX_LOGS(INFO) << "Returning this invalid format: ";
+        LogDaiFormat(dai_format);
+        return *dai_format;
+      }
+    }
+
+    FX_CHECK(false) << "No invalid DaiFormat found for these format_sets";
+    __UNREACHABLE;
   }
 
   /////////////////////////////

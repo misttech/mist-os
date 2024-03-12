@@ -257,21 +257,63 @@ void ControlServer::CreateRingBuffer(CreateRingBufferRequest& request,
   ring_buffer_server_ = ring_buffer_server;
 }
 
-void ControlServer::GainStateChanged(const fuchsia_audio_device::GainState&) {}
+// This is only here because ControlNotify includes the methods from ObserverNotify. It might be
+// helpful for ControlServer to know when its SetGain call took effect, but this isn't needed.
+// ControlServer also has no gain-related hanging-get to complete.
+void ControlServer::GainStateChanged(const fuchsia_audio_device::GainState&) {
+  ADR_LOG_OBJECT(kLogNotifyMethods);
+}
 
+// This is only here because ControlNotify includes the methods from ObserverNotify. ControlServer
+// doesn't have a role to play in plug state changes, nor a client hanging-get to complete.
 void ControlServer::PlugStateChanged(const fuchsia_audio_device::PlugState& new_plug_state,
-                                     zx::time plug_change_time) {}
+                                     zx::time plug_change_time) {
+  ADR_LOG_OBJECT(kLogNotifyMethods);
+}
 
 // We receive delay values for the first time during the configuration process. Once we have these
 // values, we can calculate the required ring-buffer size and request the VMO.
 void ControlServer::DelayInfoChanged(const fuchsia_audio_device::DelayInfo& delay_info) {
   ADR_LOG_METHOD(kLogControlServerResponses || kLogNotifyMethods);
 
-  // Initialization is complete, so this represents a delay update. Eventually, notify watchers.
+  // Initialization is complete, so this represents a delay update.
+  // If this is eventually exposed to Observers or any other watcher, notify them.
   if (auto ring_buffer_server = GetRingBufferServer(); ring_buffer_server) {
     ring_buffer_server->DelayInfoChanged(delay_info);
   }
   delay_info_ = delay_info;
 }
+
+// For now don't do anything on receiving this. Eventually we'll complete a pending `SetDaiFormat`.
+void ControlServer::DaiFormatChanged(
+    const std::optional<fuchsia_hardware_audio::DaiFormat>& dai_format,
+    const std::optional<fuchsia_hardware_audio::CodecFormatInfo>& codec_format_info) {
+  ADR_LOG_OBJECT(kLogNotifyMethods);
+  LogDaiFormat(dai_format);
+  LogCodecFormatInfo(codec_format_info);
+}
+
+// For now don't do anything on receiving this. Eventually we'll fail a pending `SetDaiFormat`.
+void ControlServer::DaiFormatNotSet(const fuchsia_hardware_audio::DaiFormat& dai_format,
+                                    zx_status_t driver_error) {
+  ADR_WARN_METHOD() << "(err " << driver_error << ")";
+  LogDaiFormat(dai_format);
+}
+
+// For now don't do anything on receiving this. Eventually we'll complete a pending `Start`.
+void ControlServer::CodecStarted(const zx::time& start_time) {
+  ADR_LOG_OBJECT(kLogNotifyMethods) << "(" << start_time.get() << ")";
+}
+
+// For now don't do anything on receiving this. Eventually we'll fail a pending `Start`.
+void ControlServer::CodecNotStarted() { ADR_WARN_METHOD(); }
+
+// For now don't do anything on receiving this. Eventually we'll complete a pending `Stop`.
+void ControlServer::CodecStopped(const zx::time& stop_time) {
+  ADR_LOG_OBJECT(kLogNotifyMethods) << "(" << stop_time.get() << ")";
+}
+
+// For now don't do anything on receiving this. Eventually we'll fail a pending `Stop`.
+void ControlServer::CodecNotStopped() { ADR_WARN_METHOD(); }
 
 }  // namespace media_audio

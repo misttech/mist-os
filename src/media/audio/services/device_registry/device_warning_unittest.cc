@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <fidl/fuchsia.hardware.audio/cpp/natural_types.h>
+
 #include <gtest/gtest.h>
 
 #include "src/media/audio/services/device_registry/device.h"
@@ -75,9 +77,9 @@ TEST_F(CodecWarningTest, UnhealthyFailsAddObserver) {
 
 // TODO(https://fxbug.dev/42068381): If Health can change post-initialization, test:
 //    * device becomes unhealthy before any Device method. Expect method-specific failure +
-//      State::Error notif.
+//      State::Error notif. Would include Reset, SetDaiFormat, Start, Stop.
 //    * device becomes unhealthy after being Observed / Controlled. Expect both to drop.
-//      for this reason, the only "UnhealthyCodec" tests needed are SetControl/AddObserver.
+// For this reason, the only "UnhealthyCodec" tests needed at this time are SetControl/AddObserver.
 
 TEST_F(CodecWarningTest, AlreadyControlledFailsSetControl) {
   auto fake_codec = MakeFakeCodecInput();
@@ -151,7 +153,119 @@ TEST_F(CodecWarningTest, CannotDropCodecControlTwice) {
 }
 
 // GetDaiFormats for FakeCodec that fails the GetDaiFormats call
+
 // GetDaiFormats for FakeCodec that returns bad dai_format_sets
+
+TEST_F(CodecWarningTest, WithoutControlFailsCodecCalls) {
+  auto fake_codec = MakeFakeCodecInput();
+  auto device = InitializeDeviceForFakeCodec(fake_codec);
+  ASSERT_TRUE(InInitializedState(device));
+  ASSERT_FALSE(notify_->dai_format());
+  ASSERT_FALSE(notify_->codec_is_started());
+  std::vector<fuchsia_hardware_audio::DaiSupportedFormats> dai_formats;
+  device->RetrieveDaiFormatSets(
+      [&dai_formats](std::vector<fuchsia_hardware_audio::DaiSupportedFormats> formats) {
+        dai_formats.push_back(formats[0]);
+      });
+
+  RunLoopUntilIdle();
+  EXPECT_FALSE(device->CodecReset());
+  EXPECT_FALSE(device->CodecStop());
+  EXPECT_FALSE(device->CodecSetDaiFormat(SafeDaiFormatFromDaiSupportedFormats(dai_formats)));
+  EXPECT_FALSE(device->CodecStart());
+
+  RunLoopUntilIdle();
+  EXPECT_FALSE(notify_->dai_format());
+  EXPECT_FALSE(notify_->codec_is_started());
+}
+
+// SetDaiFormat with invalid formats: expect a warning.
+TEST_F(CodecWarningTest, SetInvalidDaiFormat) {
+  auto fake_codec = MakeFakeCodecNoDirection();
+  auto device = InitializeDeviceForFakeCodec(fake_codec);
+  ASSERT_EQ(fake_device_presence_watcher_->ready_devices().size(), 1u);
+  ASSERT_EQ(fake_device_presence_watcher_->error_devices().size(), 0u);
+  ASSERT_TRUE(InInitializedState(device));
+  ASSERT_TRUE(SetControl(device));
+  std::vector<fuchsia_hardware_audio::DaiSupportedFormats> dai_formats;
+  device->RetrieveDaiFormatSets(
+      [&dai_formats](std::vector<fuchsia_hardware_audio::DaiSupportedFormats> formats) {
+        dai_formats.push_back(formats[0]);
+      });
+
+  RunLoopUntilIdle();
+  auto invalid_dai_format = SafeDaiFormatFromDaiSupportedFormats(dai_formats);
+  invalid_dai_format.bits_per_sample() = invalid_dai_format.bits_per_slot() + 1;
+
+  EXPECT_FALSE(device->CodecSetDaiFormat(invalid_dai_format));
+
+  RunLoopUntilIdle();
+  EXPECT_FALSE(notify_->dai_format());
+  EXPECT_EQ(fake_device_presence_watcher_->ready_devices().size(), 1u);
+  EXPECT_EQ(fake_device_presence_watcher_->error_devices().size(), 0u);
+}
+
+TEST_F(CodecWarningTest, SetUnsupportedDaiFormat) {
+  auto fake_codec = MakeFakeCodecNoDirection();
+  auto device = InitializeDeviceForFakeCodec(fake_codec);
+  ASSERT_EQ(fake_device_presence_watcher_->ready_devices().size(), 1u);
+  ASSERT_EQ(fake_device_presence_watcher_->error_devices().size(), 0u);
+  ASSERT_TRUE(InInitializedState(device));
+  ASSERT_TRUE(SetControl(device));
+  std::vector<fuchsia_hardware_audio::DaiSupportedFormats> dai_formats;
+  device->RetrieveDaiFormatSets(
+      [&dai_formats](std::vector<fuchsia_hardware_audio::DaiSupportedFormats> format_sets) {
+        for (const auto &format_set : format_sets) {
+          dai_formats.push_back(format_set);
+        }
+      });
+
+  RunLoopUntilIdle();
+
+  // For this valid, but unsupported format, we expect the call to pass but no notification of a
+  // DaiFormat change. The device should remain healthy.
+  EXPECT_TRUE(device->CodecSetDaiFormat(UnsupportedDaiFormatFromDaiFormatSets(dai_formats)));
+
+  RunLoopUntilIdle();
+  EXPECT_FALSE(notify_->dai_format());
+  EXPECT_EQ(fake_device_presence_watcher_->ready_devices().size(), 1u);
+  EXPECT_EQ(fake_device_presence_watcher_->error_devices().size(), 0u);
+}
+
+TEST_F(CodecWarningTest, StartBeforeSetDaiFormat) {
+  auto fake_codec = MakeFakeCodecNoDirection();
+  auto device = InitializeDeviceForFakeCodec(fake_codec);
+  ASSERT_EQ(fake_device_presence_watcher_->ready_devices().size(), 1u);
+  ASSERT_EQ(fake_device_presence_watcher_->error_devices().size(), 0u);
+  ASSERT_TRUE(InInitializedState(device));
+  ASSERT_TRUE(SetControl(device));
+
+  // We expect this to fail, because the DaiFormat has not yet been set.
+  EXPECT_FALSE(device->CodecStart());
+
+  RunLoopUntilIdle();
+  EXPECT_FALSE(notify_->codec_is_started());
+  // We do expect the device to remain healthy and usable.
+  EXPECT_EQ(fake_device_presence_watcher_->ready_devices().size(), 1u);
+  EXPECT_EQ(fake_device_presence_watcher_->error_devices().size(), 0u);
+}
+
+TEST_F(CodecWarningTest, StopBeforeSetDaiFormat) {
+  auto fake_codec = MakeFakeCodecNoDirection();
+  auto device = InitializeDeviceForFakeCodec(fake_codec);
+  ASSERT_EQ(fake_device_presence_watcher_->ready_devices().size(), 1u);
+  ASSERT_EQ(fake_device_presence_watcher_->error_devices().size(), 0u);
+  ASSERT_TRUE(InInitializedState(device));
+  ASSERT_TRUE(SetControl(device));
+
+  // We expect this to fail, because the DaiFormat has not yet been set.
+  EXPECT_FALSE(device->CodecStop());
+
+  RunLoopUntilIdle();
+  // We do expect the device to remain healthy and usable.
+  EXPECT_EQ(fake_device_presence_watcher_->ready_devices().size(), 1u);
+  EXPECT_EQ(fake_device_presence_watcher_->error_devices().size(), 0u);
+}
 
 ////////////////////
 // StreamConfig tests
@@ -241,7 +355,7 @@ TEST_F(StreamConfigWarningTest, CannotAddSameObserverTwice) {
   EXPECT_FALSE(AddObserver(device));
 }
 
-TEST_F(StreamConfigWarningTest, UnhealthyAddObserverFails) {
+TEST_F(StreamConfigWarningTest, UnhealthyFailsAddObserver) {
   auto fake_stream_config = MakeFakeStreamConfigOutput();
   fake_stream_config->set_health_state(false);
   auto device = InitializeDeviceForFakeStreamConfig(fake_stream_config);
@@ -294,6 +408,18 @@ TEST_F(StreamConfigWarningTest, WithoutControlFailsSetGain) {
   EXPECT_EQ(*gain_state.gain_db(), 0.0f);
   EXPECT_FALSE(*gain_state.muted());
   EXPECT_FALSE(*gain_state.agc_enabled());
+}
+
+TEST_F(StreamConfigWarningTest, CodecDeviceCallsFail) {
+  auto fake_stream_config = MakeFakeStreamConfigOutput();
+  auto device = InitializeDeviceForFakeStreamConfig(fake_stream_config);
+
+  ASSERT_TRUE(InInitializedState(device));
+
+  EXPECT_FALSE(device->CodecReset());
+  EXPECT_FALSE(device->CodecSetDaiFormat(fuchsia_hardware_audio::DaiFormat{{}}));
+  EXPECT_FALSE(device->CodecStart());
+  EXPECT_FALSE(device->CodecStop());
 }
 
 // TODO(https://fxbug.dev/42069012): CreateRingBuffer with bad format.

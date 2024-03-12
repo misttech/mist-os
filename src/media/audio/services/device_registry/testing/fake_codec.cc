@@ -56,7 +56,7 @@ FakeCodec::~FakeCodec() { ADR_LOG_METHOD(kLogFakeCodec || kLogObjectLifetimes); 
 
 void on_unbind(FakeCodec* fake_codec, fidl::UnbindInfo info,
                fidl::ServerEnd<fuchsia_hardware_audio::Codec> server_end) {
-  FX_LOGS(INFO) << "FakeCodec disconnected";
+  ADR_LOG(kLogFakeCodec || kLogObjectLifetimes) << "FakeCodec disconnected";
 }
 
 zx::channel FakeCodec::Enable() {
@@ -119,7 +119,8 @@ void FakeCodec::GetProperties(GetPropertiesCompleter::Sync& completer) {
     codec_properties.product(*product_);
   }
   if (uid_) {
-    codec_properties.unique_id() = *uid_;
+    // codec_properties.unique_id() = *uid_;
+    codec_properties.unique_id(*uid_);
   }
   if (plug_detect_capabilities_) {
     codec_properties.plug_detect_capabilities(*plug_detect_capabilities_);
@@ -164,7 +165,7 @@ void FakeCodec::SetDaiFormat(SetDaiFormatRequest& request, SetDaiFormatCompleter
   ADR_LOG_METHOD(kLogFakeCodec);
 
   if (!CheckDaiFormatSupported(request.format())) {
-    completer.Reply(fit::error(ZX_ERR_INVALID_ARGS));
+    completer.Reply(fit::error(ZX_ERR_NOT_SUPPORTED));
     return;
   }
 
