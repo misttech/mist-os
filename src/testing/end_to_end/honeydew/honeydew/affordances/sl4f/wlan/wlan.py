@@ -68,9 +68,9 @@ class Wlan(wlan.Wlan):
         """Trigger connection to a network.
 
         Args:
-            target_ssid: The network to connect to.
-            target_pwd: The password for the network.
-            target_bss_desc: The basic service set for target network.
+            ssid: The network to connect to.
+            password: The password for the network.
+            bss_desc: The basic service set for target network.
 
         Returns:
             True on success otherwise false.
