@@ -26,6 +26,8 @@ if (is_host) {
     ]
     transport = "sl4f"
     environments = [ vim3_env ]
+    test_data_deps =
+        [ "//src/developer/ffx/plugins/driver:ffx_driver_tool_test_data" ]
   }
 
   # Group containing all of the WLAN affordance functional test cases.
