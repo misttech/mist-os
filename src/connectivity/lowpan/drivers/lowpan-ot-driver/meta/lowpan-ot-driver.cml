@@ -34,6 +34,7 @@
                 "fuchsia.net.mdns.ServiceInstancePublisher",
                 "fuchsia.net.mdns.ServiceSubscriber2",
                 "fuchsia.net.multicast.admin.Ipv6RoutingTableController",
+                "fuchsia.net.name.DnsServerWatcher",
                 "fuchsia.net.name.Lookup",
                 "fuchsia.net.stack.Stack",
                 "fuchsia.net.tun.Control",

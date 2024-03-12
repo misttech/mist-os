@@ -51,6 +51,7 @@
 #include <openthread/platform/border_routing.h>
 #include <openthread/platform/debug_uart.h>
 #include <openthread/platform/diag.h>
+#include <openthread/platform/dns.h>
 #include <openthread/platform/entropy.h>
 #include <openthread/platform/flash.h>
 #include <openthread/platform/infra_if.h>

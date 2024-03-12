@@ -68,6 +68,12 @@
             to: [ "#lowpan-ot-driver" ],
         },
         {
+            protocol: [ "fuchsia.net.name.DnsServerWatcher_OnlyForLowpan" ],
+            from: "#network",
+            as: "fuchsia.net.name.DnsServerWatcher",
+            to: [ "#lowpan-ot-driver" ],
+        },
+        {
             protocol: [
                 "fuchsia.net.mdns.HostNameResolver",
                 "fuchsia.net.mdns.HostNameSubscriber",

@@ -187,6 +187,7 @@ impl Platform {
                 infra_if: InfraIfInstance::new(builder.backbone_netif_index.unwrap_or(0)),
                 is_platform_reset_requested: AtomicBool::new(false),
                 nat64: Nat64Instance::new(nat64_prefix_req_sender),
+                resolver: Resolver::new(),
             });
 
             // Initialize the lower-level platform implementation
@@ -227,6 +228,7 @@ impl ot::Platform for Platform {
         self.process_poll_infra_if(instance, cx);
         self.process_poll_nat64(instance, cx);
         self.process_poll_tasks(cx);
+        PlatformBacking::as_ref().resolver.process_poll_resolver(instance, cx);
         if PlatformBacking::as_ref().is_platform_reset_requested.load(Ordering::SeqCst) {
             return Err(PlatformResetRequested {}.into());
         }

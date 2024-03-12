@@ -31,6 +31,7 @@ pub(crate) use infra_if::InfraIfInstance;
 pub(crate) use nat64::{Nat64Instance, Nat64PlatformInstance};
 use openthread::ot::NetifIdentifier;
 pub(crate) use reset::PlatformResetRequested;
+pub(crate) use resolver::*;
 pub(crate) use udp::*;
 
 pub(super) struct PlatformBacking {
@@ -43,6 +44,7 @@ pub(super) struct PlatformBacking {
     pub(super) infra_if: Option<InfraIfInstance>,
     pub(super) is_platform_reset_requested: AtomicBool,
     pub(super) nat64: Nat64Instance,
+    pub(super) resolver: Resolver,
 }
 
 impl PlatformBacking {

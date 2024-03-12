@@ -145,6 +145,9 @@ pub use net_data::*;
 mod nat64;
 pub use nat64::*;
 
+mod dns_upstream;
+pub use dns_upstream::*;
+
 /// Trait implemented by all OpenThread instances.
 pub trait InstanceInterface:
     Ip6
@@ -168,6 +171,7 @@ pub trait InstanceInterface:
     + BorderAgent
     + NetData
     + Nat64
+    + DnsUpstream
 {
 }
 
