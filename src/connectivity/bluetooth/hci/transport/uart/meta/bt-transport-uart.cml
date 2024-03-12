@@ -17,11 +17,16 @@
     },
     capabilities: [
         { service: "fuchsia.hardware.bluetooth.HciService" },
+        { service: "fuchsia.hardware.serialimpl.Service" },
     ],
     use: [],
     expose: [
         {
             service: "fuchsia.hardware.bluetooth.HciService",
+            from: "self",
+        },
+        {
+            service: "fuchsia.hardware.serialimpl.Service",
             from: "self",
         },
     ],

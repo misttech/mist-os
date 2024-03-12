@@ -6,6 +6,7 @@
 #define SRC_CONNECTIVITY_BLUETOOTH_HCI_TRANSPORT_UART_BT_TRANSPORT_UART_H_
 
 #include <fidl/fuchsia.hardware.bluetooth/cpp/wire.h>
+#include <fidl/fuchsia.hardware.serialimpl/cpp/driver/fidl.h>
 #include <fuchsia/hardware/serialimpl/async/c/banjo.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
@@ -22,14 +23,14 @@
 
 #include <ddktl/device.h>
 #include <ddktl/fidl.h>
-
 namespace bt_transport_uart {
 
 class BtTransportUart;
-using BtTransportUartType = ddk::Device<BtTransportUart, ddk::GetProtocolable, ddk::Unbindable>;
+using BtTransportUartType = ddk::Device<BtTransportUart, ddk::Unbindable>;
 
 class BtTransportUart : public BtTransportUartType,
-                        public fidl::WireServer<fuchsia_hardware_bluetooth::Hci> {
+                        public fidl::WireServer<fuchsia_hardware_bluetooth::Hci>,
+                        public fdf::WireServer<fuchsia_hardware_serialimpl::Device> {
  public:
   // If |dispatcher| is non-null, it will be used instead of a new work thread.
   // tests.
@@ -42,7 +43,6 @@ class BtTransportUart : public BtTransportUartType,
   // DDK mixins:
   void DdkUnbind(ddk::UnbindTxn txn);
   void DdkRelease();
-  zx_status_t DdkGetProtocol(uint32_t proto_id, void* out_proto);
 
   // Request handlers for Hci protocol.
   void OpenCommandChannel(OpenCommandChannelRequestView request,
@@ -61,6 +61,20 @@ class BtTransportUart : public BtTransportUartType,
 
   void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_hardware_bluetooth::Hci> metadata,
                              fidl::UnknownMethodCompleter::Sync& completer) override;
+
+  // fuchsia_hardware_serialimpl::Device FIDL request handler implementation.
+  void GetInfo(fdf::Arena& arena, GetInfoCompleter::Sync& completer) override;
+  void Config(ConfigRequestView request, fdf::Arena& arena,
+              ConfigCompleter::Sync& completer) override;
+  void Enable(EnableRequestView request, fdf::Arena& arena,
+              EnableCompleter::Sync& completer) override;
+  void Read(fdf::Arena& arena, ReadCompleter::Sync& completer) override;
+  void Write(WriteRequestView request, fdf::Arena& arena, WriteCompleter::Sync& completer) override;
+  void CancelAll(fdf::Arena& arena, CancelAllCompleter::Sync& completer) override;
+
+  void handle_unknown_method(
+      fidl::UnknownMethodMetadata<fuchsia_hardware_serialimpl::Device> metadata,
+      fidl::UnknownMethodCompleter::Sync& completer) override;
 
  private:
   // HCI UART packet indicators
@@ -138,7 +152,7 @@ class BtTransportUart : public BtTransportUartType,
 
   zx_status_t HciOpenChannel(zx::channel* in_channel, zx_handle_t in) __TA_EXCLUDES(mutex_);
 
-  zx_status_t ServeHciProtocol(fidl::ServerEnd<fuchsia_io::Directory> server_end);
+  zx_status_t ServeProtocols(fidl::ServerEnd<fuchsia_io::Directory> server_end);
 
   // Adds the device.
   zx_status_t Bind() __TA_EXCLUDES(mutex_);
@@ -209,6 +223,9 @@ class BtTransportUart : public BtTransportUartType,
   // for sending outbound packets to the UART
   // kAclMaxFrameSize is the largest frame size sent.
   uint8_t write_buffer_[kAclMaxFrameSize] __TA_GUARDED(mutex_);
+
+  // Save the serial device pid for vendor drivers to fetch.
+  uint32_t serial_pid_ = 0;
 
   std::mutex mutex_;
 

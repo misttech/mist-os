@@ -6,7 +6,7 @@
 #define SRC_CONNECTIVITY_BLUETOOTH_HCI_VENDOR_BROADCOM_BT_HCI_BROADCOM_H_
 
 #include <fidl/fuchsia.hardware.bluetooth/cpp/wire.h>
-#include <fuchsia/hardware/serialimpl/async/c/banjo.h>
+#include <fidl/fuchsia.hardware.serialimpl/cpp/driver/fidl.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async/cpp/executor.h>
 #include <lib/async/cpp/wait.h>
@@ -76,6 +76,7 @@ class BtHciBroadcom : public BtHciBroadcomType,
 
   // Truly private, internal helper methods:
   zx_status_t ConnectToHciFidlProtocol();
+  zx_status_t ConnectToSerialFidlProtocol();
 
   static void EncodeSetAclPriorityCommand(
       fuchsia_hardware_bluetooth::wire::BtVendorSetAclPriorityParams params, void* out_buffer);
@@ -104,8 +105,7 @@ class BtHciBroadcom : public BtHciBroadcomType,
 
   zx_status_t Bind();
 
-  serial_impl_async_protocol_t serial_;
-  uint16_t serial_pid_;
+  uint32_t serial_pid_;
   zx::channel command_channel_;
   // true if underlying transport is UART
   bool is_uart_;
@@ -119,6 +119,7 @@ class BtHciBroadcom : public BtHciBroadcomType,
   std::optional<async::Executor> executor_;
 
   fidl::WireClient<fuchsia_hardware_bluetooth::Hci> hci_client_;
+  fdf::WireSyncClient<fuchsia_hardware_serialimpl::Device> serial_client_;
 };
 
 }  // namespace bt_hci_broadcom

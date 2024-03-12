@@ -24,7 +24,7 @@ source_set("common") {
     ":bt_transport_uart_bind",
     "//sdk/banjo/fuchsia.hardware.serialimpl.async:fuchsia.hardware.serialimpl.async_banjo_cpp",
     "//sdk/fidl/fuchsia.hardware.bluetooth:fuchsia.hardware.bluetooth_cpp",
-    "//sdk/fidl/fuchsia.hardware.serial:fuchsia.hardware.serial_cpp",
+    "//sdk/fidl/fuchsia.hardware.serialimpl:fuchsia.hardware.serialimpl_cpp",
     "//sdk/lib/driver/outgoing/cpp:cpp",
     "//src/devices/lib/driver",
     "//src/devices/lib/driver:driver_runtime",

@@ -532,13 +532,46 @@ void BtTransportUart::handle_unknown_method(
   completer.Close(ZX_ERR_NOT_SUPPORTED);
 }
 
-zx_status_t BtTransportUart::DdkGetProtocol(uint32_t proto_id, void* out_proto) {
-  if (proto_id != ZX_PROTOCOL_BT_HCI) {
-    // Pass this on for drivers to load firmware / initialize
-    return device_get_protocol(parent(), proto_id, out_proto);
+void BtTransportUart::GetInfo(fdf::Arena& arena, GetInfoCompleter::Sync& completer) {
+  fuchsia_hardware_serial::wire::SerialPortInfo info{
+      .serial_class = fuchsia_hardware_serial::wire::Class::kBluetoothHci,
+      .serial_pid = serial_pid_,
+  };
+  completer.buffer(arena).ReplySuccess(info);
+}
+void BtTransportUart::Config(ConfigRequestView request, fdf::Arena& arena,
+                             ConfigCompleter::Sync& completer) {
+  zx_status_t status =
+      serial_impl_async_config(&serial_, request->baud_rate, SERIAL_SET_BAUD_RATE_ONLY);
+  if (status == ZX_OK) {
+    completer.buffer(arena).ReplySuccess();
+  } else {
+    completer.buffer(arena).ReplyError(status);
   }
+}
 
-  return ZX_OK;
+void BtTransportUart::Enable(EnableRequestView request, fdf::Arena& arena,
+                             EnableCompleter::Sync& completer) {
+  completer.buffer(arena).ReplyError(ZX_ERR_NOT_SUPPORTED);
+}
+
+void BtTransportUart::Read(fdf::Arena& arena, ReadCompleter::Sync& completer) {
+  completer.buffer(arena).ReplyError(ZX_ERR_NOT_SUPPORTED);
+}
+
+void BtTransportUart::Write(WriteRequestView request, fdf::Arena& arena,
+                            WriteCompleter::Sync& completer) {
+  completer.buffer(arena).ReplyError(ZX_ERR_NOT_SUPPORTED);
+}
+
+void BtTransportUart::CancelAll(fdf::Arena& arena, CancelAllCompleter::Sync& completer) {
+  completer.buffer(arena).Reply();
+}
+
+void BtTransportUart::handle_unknown_method(
+    fidl::UnknownMethodMetadata<fuchsia_hardware_serialimpl::Device> metadata,
+    fidl::UnknownMethodCompleter::Sync& completer) {
+  ZX_PANIC("Unknown method in fuchsia_hardware_serialimpl::Device request");
 }
 
 void BtTransportUart::QueueUartRead() {
@@ -549,17 +582,35 @@ void BtTransportUart::QueueUartRead() {
   serial_impl_async_read_async(&serial_, read_cb, this);
 }
 
-zx_status_t BtTransportUart::ServeHciProtocol(fidl::ServerEnd<fuchsia_io::Directory> server_end) {
-  auto protocol = [this](fidl::ServerEnd<fuchsia_hardware_bluetooth::Hci> server_end) mutable {
+zx_status_t BtTransportUart::ServeProtocols(fidl::ServerEnd<fuchsia_io::Directory> server_end) {
+  // Add HCI service to the outgoing directory.
+  auto hci_protocol = [this](fidl::ServerEnd<fuchsia_hardware_bluetooth::Hci> server_end) mutable {
     fidl::BindServer(dispatcher_, std::move(server_end), this);
   };
-  fuchsia_hardware_bluetooth::HciService::InstanceHandler handler({.hci = std::move(protocol)});
+  fuchsia_hardware_bluetooth::HciService::InstanceHandler hci_handler(
+      {.hci = std::move(hci_protocol)});
   auto status =
-      outgoing_dir_.AddService<fuchsia_hardware_bluetooth::HciService>(std::move(handler));
+      outgoing_dir_.AddService<fuchsia_hardware_bluetooth::HciService>(std::move(hci_handler));
   if (status.is_error()) {
-    zxlogf(ERROR, "Failed to add service to outgoing directory: %s\n", status.status_string());
+    zxlogf(ERROR, "Failed to add HCI service to outgoing directory: %s\n", status.status_string());
     return status.error_value();
   }
+
+  // Add Serial service to the outgoing directory.
+  auto serial_protocol =
+      [this](fdf::ServerEnd<fuchsia_hardware_serialimpl::Device> server_end) mutable {
+        fdf::BindServer(fdf::Dispatcher::GetCurrent()->get(), std::move(server_end), this);
+      };
+  fuchsia_hardware_serialimpl::Service::InstanceHandler serial_handler(
+      {.device = std::move(serial_protocol)});
+  status =
+      outgoing_dir_.AddService<fuchsia_hardware_serialimpl::Service>(std::move(serial_handler));
+  if (status.is_error()) {
+    zxlogf(ERROR, "Failed to add Serial service to outgoing directory: %s\n",
+           status.status_string());
+    return status.error_value();
+  }
+
   auto result = outgoing_dir_.Serve(std::move(server_end));
   if (result.is_error()) {
     zxlogf(ERROR, "Failed to serve outgoing directory: %s\n", result.status_string());
@@ -607,6 +658,8 @@ zx_status_t BtTransportUart::Bind() {
     return ZX_ERR_INTERNAL;
   }
 
+  serial_pid_ = info.serial_pid;
+
   // Spawn a new thread in production. In tests, use the test dispatcher provided in the
   // constructor.
   if (!dispatcher_) {
@@ -631,9 +684,9 @@ zx_status_t BtTransportUart::Bind() {
     return endpoints.status_value();
   }
 
-  status = ServeHciProtocol(std::move(endpoints->server));
+  status = ServeProtocols(std::move(endpoints->server));
   if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to serve Hci protocol: %s", zx_status_get_string(status));
+    zxlogf(ERROR, "Failed to serve protocols: %s", zx_status_get_string(status));
     return status;
   }
 
@@ -648,6 +701,7 @@ zx_status_t BtTransportUart::Bind() {
 
   std::array offers = {
       fuchsia_hardware_bluetooth::HciService::Name,
+      fuchsia_hardware_serialimpl::Service::Name,
   };
 
   args.set_props(props);

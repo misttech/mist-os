@@ -246,6 +246,18 @@ zx_status_t BtHciBroadcom::ConnectToHciFidlProtocol() {
   return ZX_OK;
 }
 
+zx_status_t BtHciBroadcom::ConnectToSerialFidlProtocol() {
+  zx::result<fdf::ClientEnd<fuchsia_hardware_serialimpl::Device>> client_end =
+      DdkConnectRuntimeProtocol<fuchsia_hardware_serialimpl::Service::Device>();
+  if (client_end.is_error()) {
+    zxlogf(ERROR, "Connect to Serial FIDL protocol failed: %s", client_end.status_string());
+    return client_end.status_value();
+  }
+
+  serial_client_ = fdf::WireSyncClient(*std::move(client_end));
+  return ZX_OK;
+}
+
 void BtHciBroadcom::EncodeSetAclPriorityCommand(
     fuchsia_hardware_bluetooth::wire::BtVendorSetAclPriorityParams params, void* out_buffer) {
   BcmSetAclPriorityCmd command = {
@@ -333,11 +345,14 @@ fpromise::promise<void, zx_status_t> BtHciBroadcom::SetBaudRate(uint32_t baud_ra
   return SendCommand(&command, sizeof(command))
       .and_then(
           [this, baud_rate](const std::vector<uint8_t>&) -> fpromise::result<void, zx_status_t> {
-            zx_status_t status =
-                serial_impl_async_config(&serial_, baud_rate, SERIAL_SET_BAUD_RATE_ONLY);
-
-            if (status != ZX_OK) {
-              return fpromise::error(status);
+            fdf::Arena arena('CONF');
+            auto result = serial_client_.buffer(arena)->Config(
+                baud_rate, fuchsia_hardware_serialimpl::wire::kSerialSetBaudRateOnly);
+            if (!result.ok()) {
+              return fpromise::error(result.status());
+            }
+            if (result->is_error()) {
+              return fpromise::error(result->error_value());
             }
             return fpromise::ok();
           });
@@ -431,10 +446,14 @@ fpromise::promise<void, zx_status_t> BtHciBroadcom::LoadFirmware() {
       .and_then([this]() -> fpromise::promise<void, zx_status_t> {
         if (is_uart_) {
           // firmware switched us back to 115200. switch back to kTargetBaudRate.
-          zx_status_t status =
-              serial_impl_async_config(&serial_, kDefaultBaudRate, SERIAL_SET_BAUD_RATE_ONLY);
-          if (status != ZX_OK) {
-            return fpromise::make_result_promise(fpromise::error(status));
+          fdf::Arena arena('CONF');
+          auto result = serial_client_.buffer(arena)->Config(
+              kDefaultBaudRate, fuchsia_hardware_serialimpl::wire::kSerialSetBaudRateOnly);
+          if (!result.ok()) {
+            return fpromise::make_result_promise(fpromise::error(result.status()));
+          }
+          if (result->is_error()) {
+            return fpromise::make_result_promise(fpromise::error(result->error_value()));
           }
 
           return executor_->MakeDelayedPromise(kBaudRateSwitchDelay)
@@ -581,19 +600,24 @@ zx_status_t BtHciBroadcom::Bind() {
     return status;
   }
 
-  status = device_get_protocol(parent(), ZX_PROTOCOL_SERIAL_IMPL_ASYNC, &serial_);
-  if (status == ZX_OK) {
+  status = ConnectToSerialFidlProtocol();
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "ConnectToSerialFidlProtocol failed: %s", zx_status_get_string(status));
+  } else {
     is_uart_ = true;
   }
-
-  serial_port_info_t info;
-  status = serial_impl_async_get_info(&serial_, &info);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "serial_get_info failed: %s", zx_status_get_string(status));
-    return status;
+  fdf::Arena arena('INFO');
+  auto result = serial_client_.buffer(arena)->GetInfo();
+  if (!result.ok()) {
+    zxlogf(ERROR, "GetInfo failed FIDL error: %s", result.status_string());
+    return result.status();
+  }
+  if (result->is_error()) {
+    zxlogf(ERROR, "GetInfo failed : %s", zx_status_get_string(result->error_value()));
+    return result->error_value();
   }
 
-  serial_pid_ = info.serial_pid;
+  serial_pid_ = result.value()->info.serial_pid;
 
   ddk::DeviceAddArgs args("bt-hci-broadcom");
   args.set_proto_id(ZX_PROTOCOL_BT_HCI);

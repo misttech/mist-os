@@ -17,5 +17,6 @@
     },
     use: [
         { service: "fuchsia.hardware.bluetooth.HciService" },
+        { service: "fuchsia.hardware.serialimpl.Service" },
     ],
 }

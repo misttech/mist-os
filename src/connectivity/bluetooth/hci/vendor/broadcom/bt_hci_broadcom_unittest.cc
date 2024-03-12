@@ -5,7 +5,6 @@
 #include "bt_hci_broadcom.h"
 
 #include <fidl/fuchsia.hardware.bluetooth/cpp/wire.h>
-#include <fuchsia/hardware/serialimpl/async/cpp/banjo.h>
 #include <lib/async/cpp/task.h>
 #include <lib/async/cpp/wait.h>
 #include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
@@ -44,15 +43,9 @@ const std::array<uint8_t, 6> kCommandCompleteEvent = {
 };
 
 class FakeTransportDevice : public fidl::WireServer<fuchsia_hardware_bluetooth::Hci>,
-                            public ddk::SerialImplAsyncProtocol<FakeTransportDevice> {
+                            public fdf::WireServer<fuchsia_hardware_serialimpl::Device> {
  public:
   explicit FakeTransportDevice(fdf_dispatcher_t* dispatcher) : dispatcher_(dispatcher) {}
-  serial_impl_async_protocol_t serial_proto() const {
-    serial_impl_async_protocol_t proto;
-    proto.ctx = const_cast<FakeTransportDevice*>(this);
-    proto.ops = const_cast<serial_impl_async_protocol_ops_t*>(&serial_impl_async_protocol_ops_);
-    return proto;
-  }
 
   // Set a custom handler for commands. If null, command complete events will be automatically sent.
   void SetCommandHandler(fit::function<void(std::vector<uint8_t>)> command_callback) {
@@ -97,18 +90,38 @@ class FakeTransportDevice : public fidl::WireServer<fuchsia_hardware_bluetooth::
     ZX_PANIC("Unknown method in HCI requests");
   }
 
-  // ddk::SerialImplAsyncProtocol mixins:
-  zx_status_t SerialImplAsyncGetInfo(serial_port_info_t* out_info) {
-    // Use this PID to match kFirmwarePath defined in the test.
-    out_info->serial_pid = PDEV_PID_BCM43458;
-    return ZX_OK;
+  // fuchsia_hardware_serialimpl::Device FIDL request handler implementation.
+  void GetInfo(fdf::Arena& arena, GetInfoCompleter::Sync& completer) override {
+    fuchsia_hardware_serial::wire::SerialPortInfo info = {
+        .serial_class = fuchsia_hardware_serial::Class::kBluetoothHci,
+        .serial_pid = PDEV_PID_BCM43458,
+    };
+
+    completer.buffer(arena).ReplySuccess(info);
   }
-  zx_status_t SerialImplAsyncConfig(uint32_t baud_rate, uint32_t flags) { return ZX_OK; }
-  zx_status_t SerialImplAsyncEnable(bool enable) { return ZX_ERR_NOT_SUPPORTED; }
-  void SerialImplAsyncReadAsync(serial_impl_async_read_async_callback callback, void* cookie) {}
-  void SerialImplAsyncWriteAsync(const uint8_t* buf_buffer, size_t buf_size,
-                                 serial_impl_async_write_async_callback callback, void* cookie) {}
-  void SerialImplAsyncCancelAll() {}
+  void Config(ConfigRequestView request, fdf::Arena& arena,
+              ConfigCompleter::Sync& completer) override {
+    completer.buffer(arena).ReplySuccess();
+  }
+  void Enable(EnableRequestView request, fdf::Arena& arena,
+              EnableCompleter::Sync& completer) override {
+    completer.buffer(arena).ReplySuccess();
+  }
+  void Read(fdf::Arena& arena, ReadCompleter::Sync& completer) override {
+    fidl::VectorView<uint8_t> data;
+    completer.buffer(arena).ReplySuccess(data);
+  }
+  void Write(WriteRequestView request, fdf::Arena& arena,
+             WriteCompleter::Sync& completer) override {
+    completer.buffer(arena).ReplySuccess();
+  }
+  void CancelAll(fdf::Arena& arena, CancelAllCompleter::Sync& completer) override {}
+
+  void handle_unknown_method(
+      fidl::UnknownMethodMetadata<fuchsia_hardware_serialimpl::Device> metadata,
+      fidl::UnknownMethodCompleter::Sync& completer) override {
+    ZX_PANIC("Unknown method in Serial requests");
+  }
 
   void ServeHci(fidl::ServerEnd<fuchsia_io::Directory> server_end) {
     auto hci_handler = [&](fidl::ServerEnd<fuchsia_hardware_bluetooth::Hci> request) {
@@ -118,6 +131,21 @@ class FakeTransportDevice : public fidl::WireServer<fuchsia_hardware_bluetooth::
         {.hci = std::move(hci_handler)});
     auto service_result = fdf_outgoing_.SyncCall([&](fdf::OutgoingDirectory* outgoing) {
       return outgoing->AddService<fuchsia_hardware_bluetooth::HciService>(std::move(handler));
+    });
+    ASSERT_EQ(ZX_OK, service_result.status_value());
+
+    ASSERT_EQ(ZX_OK, fdf_outgoing_.SyncCall(&fdf::OutgoingDirectory::Serve, std::move(server_end))
+                         .status_value());
+  }
+
+  void ServeSerial(fidl::ServerEnd<fuchsia_io::Directory> server_end) {
+    auto serial_handler = [&](fdf::ServerEnd<fuchsia_hardware_serialimpl::Device> request) {
+      fdf::BindServer(dispatcher_, std::move(request), this);
+    };
+    fuchsia_hardware_serialimpl::Service::InstanceHandler handler(
+        {.device = std::move(serial_handler)});
+    auto service_result = fdf_outgoing_.SyncCall([&](fdf::OutgoingDirectory* outgoing) {
+      return outgoing->AddService<fuchsia_hardware_serialimpl::Service>(std::move(handler));
     });
     ASSERT_EQ(ZX_OK, service_result.status_value());
 
@@ -167,7 +195,6 @@ class FakeTransportDevice : public fidl::WireServer<fuchsia_hardware_bluetooth::
   async::WaitMethod<FakeTransportDevice, &FakeTransportDevice::OnCommandChannelSignal>
       cmd_chan_wait_{this};
   fdf_dispatcher_t* dispatcher_;
-
   async_patterns::TestDispatcherBound<fdf::OutgoingDirectory> fdf_outgoing_{
       fdf_dispatcher_get_async_dispatcher(dispatcher_), std::in_place};
 };
@@ -187,10 +214,15 @@ class BtHciBroadcomTest : public ::testing::Test {
                                    std::move(endpoints->client));
     }
 
-    // Add serial impl banjo protocol to the root device
-    root_device_->AddProtocol(ZX_PROTOCOL_SERIAL_IMPL_ASYNC,
-                              fake_transport_device_.serial_proto().ops,
-                              fake_transport_device_.serial_proto().ctx);
+    {
+      // Serve fuchsia_hardware_serialimpl::Device FIDL protocol from fake_transport_device_, and
+      // add the protocol to the root device.
+      auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+      ASSERT_FALSE(endpoints.is_error());
+      fake_transport_device_.ServeSerial(std::move(endpoints->server));
+      root_device_->AddFidlService(fuchsia_hardware_serialimpl::Service::Name,
+                                   std::move(endpoints->client));
+    }
 
     ASSERT_EQ(BtHciBroadcom::Create(/*ctx=*/nullptr, root_device_.get(),
                                     fdf::Dispatcher::GetCurrent()->async_dispatcher()),
@@ -235,8 +267,6 @@ class BtHciBroadcomTest : public ::testing::Test {
   FakeTransportDevice* transport() { return &fake_transport_device_; }
 
   fidl::WireSyncClient<fuchsia_hardware_bluetooth::Vendor> vendor_client_;
-
-  fidl::Arena<> test_arena_;
 
  private:
   std::shared_ptr<MockDevice> root_device_ = MockDevice::FakeRootParent();
