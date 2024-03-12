@@ -135,10 +135,8 @@ zx::result<std::unique_ptr<AmlPwmRegulator>> AmlPwmRegulator::Create(
   auto offers = device->compat_server_.CreateOffers2(arena);
   offers.push_back(fdf::MakeOffer2<fuchsia_hardware_vreg::Service>(arena, device->name_));
 
-  fidl::VectorView<fuchsia_driver_framework::wire::NodeProperty> properties(arena, 2);
-  properties[0] =
-      fdf::MakeProperty(arena, 0x0004 /* BIND_FIDL_PROTOCOL */, 17u /* ZX_FIDL_PROTOCOL_VREG */);
-  properties[1] = fdf::MakeProperty(arena, 0x0A50 /* BIND_PWM_ID */, idx);
+  fidl::VectorView<fuchsia_driver_framework::wire::NodeProperty> properties(arena, 1);
+  properties[0] = fdf::MakeProperty(arena, 0x0A50 /* BIND_PWM_ID */, idx);
 
   const auto args = fuchsia_driver_framework::wire::NodeAddArgs::Builder(arena)
                         .name(arena, name)

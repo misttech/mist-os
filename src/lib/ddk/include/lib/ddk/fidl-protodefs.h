@@ -17,7 +17,7 @@
 #error Internal use only. Do not include.
 #else
 // 1 was "fuchsia.hardware.rpmb.Service"
-DDK_FIDL_PROTOCOL_DEF(CHROMEOS_EC,     2, "fuchsia.hardware.google.ec.Service")
+// 2 was "fuchsia.hardware.google.ec.Service"
 DDK_FIDL_PROTOCOL_DEF(I2C,             3, "fuchsia.hardware.i2c.Service")
 DDK_FIDL_PROTOCOL_DEF(PCI,             4, "fuchsia.hardware.pci.Service")
 // 5 was "fuchsia.hardware.goldfish.pipe.Service"
@@ -25,14 +25,14 @@ DDK_FIDL_PROTOCOL_DEF(PCI,             4, "fuchsia.hardware.pci.Service")
 // 7 was "fuchsia.hardware.goldfish.SyncService"
 // 8 was "fuchsia.hardware.spi.Service"
 DDK_FIDL_PROTOCOL_DEF(SYSMEM,          9, "fuchsia.hardware.sysmem.Service")
-DDK_FIDL_PROTOCOL_DEF(MAILBOX,         10, "fuchsia.hardware.mailbox.Service")
+// 10 was "fuchsia.hardware.mailbox.Service"
 DDK_FIDL_PROTOCOL_DEF(PLATFORM_BUS,    11, "fuchsia.hardware.platform.bus.PlatformBus")
-DDK_FIDL_PROTOCOL_DEF(INTERRUPT,       12, "fuchsia.hardware.interrupt.Provider")
+// 12 was "fuchsia.hardware.interrupt.Provider"
 // 13 was "fuchsia.hardware.platform.device.Service"
 // 14 was "fuchsia.hardware.dsp.Service"
 // 15 was "fuchsia.hardware.hdmi.Service"
 // 16 was "fuchsia.hardware.power.sensor.Service"
-DDK_FIDL_PROTOCOL_DEF(VREG,            17, "fuchsia.hardware.vreg.Service")
+// 17 was "fuchsia.hardware.vreg.Service"
 // 18 was "fuchsia.hardware.registers.Service"
 // 19 was "fuchsia.hardware.tee.Service"
 // 20 was "fuchsia.hardware.amlogiccanvas.Service"

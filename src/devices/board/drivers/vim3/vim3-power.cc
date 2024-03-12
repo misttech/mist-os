@@ -58,8 +58,8 @@ enum VregIdx {
 };
 
 const std::vector<fuchsia_driver_framework::BindRule> kVregPwmAoDRules = {
-    fdf::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
-                            static_cast<uint32_t>(ZX_FIDL_PROTOCOL_VREG)),
+    fdf::MakeAcceptBindRule(bind_fuchsia_hardware_vreg::SERVICE,
+                            bind_fuchsia_hardware_vreg::SERVICE_ZIRCONTRANSPORT),
     fdf::MakeAcceptBindRule(bind_fuchsia::PWM_ID, static_cast<uint32_t>(A311D_PWM_AO_D))};
 const std::vector<fuchsia_driver_framework::NodeProperty> kVregPwmAoDProperties = {
     fdf::MakeProperty(bind_fuchsia_hardware_vreg::SERVICE,
@@ -68,8 +68,8 @@ const std::vector<fuchsia_driver_framework::NodeProperty> kVregPwmAoDProperties 
                       bind_fuchsia_amlogic_platform::PWM_ID_AO_D)};
 
 const std::vector<fuchsia_driver_framework::BindRule> kVregPwmARules = {
-    fdf::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
-                            static_cast<uint32_t>(ZX_FIDL_PROTOCOL_VREG)),
+    fdf::MakeAcceptBindRule(bind_fuchsia_hardware_vreg::SERVICE,
+                            bind_fuchsia_hardware_vreg::SERVICE_ZIRCONTRANSPORT),
     fdf::MakeAcceptBindRule(bind_fuchsia::PWM_ID, static_cast<uint32_t>(A311D_PWM_A))};
 const std::vector<fuchsia_driver_framework::NodeProperty> kVregPwmAProperties = {
     fdf::MakeProperty(bind_fuchsia_hardware_vreg::SERVICE,

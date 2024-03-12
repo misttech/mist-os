@@ -114,7 +114,6 @@ template("sherlock_driver") {
       "//src/devices/bind/fuchsia.platform:fuchsia.platform_cpp",
       "//src/devices/bind/fuchsia.pwm:fuchsia.pwm_cpp",
       "//src/devices/bind/fuchsia.register:fuchsia.register_cpp",
-      "//src/devices/bind/fuchsia.rpmb:fuchsia.rpmb_cpp",
       "//src/devices/bind/fuchsia.sdio:fuchsia.sdio_cpp",
       "//src/devices/bind/fuchsia.sony.platform:fuchsia.sony.platform_cpp",
       "//src/devices/bind/fuchsia.spi:fuchsia.spi_cpp",
