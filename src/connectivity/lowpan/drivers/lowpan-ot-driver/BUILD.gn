@@ -11,7 +11,6 @@ rustc_binary("bin") {
   output_name = "lowpan_ot_driver"
   with_unit_tests = true
   edition = "2021"
-  configs += [ "//build/config/rust/lints:allow_unused_imports" ]
   deps = [
     "//sdk/fidl/fuchsia.factory.lowpan:fuchsia.factory.lowpan_rust",
     "//sdk/fidl/fuchsia.hardware.network:fuchsia.hardware.network_rust",

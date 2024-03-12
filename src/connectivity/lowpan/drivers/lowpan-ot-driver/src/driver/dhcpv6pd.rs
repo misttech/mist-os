@@ -60,8 +60,6 @@ fn make_fake_ra_prefix_packet(prefix: ot::Ip6Prefix, valid: u32, preferred: u32)
     use packet_formats::icmp::ndp::RouterAdvertisement;
     use packet_formats::icmp::IcmpPacketBuilder;
     use packet_formats::icmp::IcmpUnusedCode;
-    use packet_formats::ip::Ipv6Proto;
-    use packet_formats::ipv6::Ipv6PacketBuilder;
 
     let src_addr = Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 1); // Local host address
     let dst_addr = Ipv6Addr::new(0xFF02, 0, 0, 0, 0, 0, 0, 2); // All routers multicast

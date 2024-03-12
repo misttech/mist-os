@@ -131,8 +131,6 @@ config("allow_unused_imports") {
   #    --allow=//build/config/rust/lints:allow_unused_imports \
   #    --ignore-suffix=_rust  # FIDL bindings use the _rust suffix
   visibility = [
-    "//src/connectivity/bluetooth/tools/bt-rootcanal:*",
-    "//src/connectivity/lowpan/drivers/lowpan-ot-driver:*",
     "//src/lib/assembly/*",
     "//src/security/lib/scrutiny/*",
     "//src/ui/*",

@@ -5,7 +5,6 @@
 use super::*;
 
 use lowpan_driver_common::lowpan_fidl::*;
-use lowpan_driver_common::spinel::AddressTable;
 
 #[derive(Debug)]
 pub struct DriverState<OT> {

@@ -14,7 +14,7 @@ use {
     fuchsia_sync::Mutex,
     fuchsia_zircon::{self as zx},
     futures::{
-        self, future::Either, io::ReadHalf, io::WriteHalf, AsyncRead, AsyncReadExt, AsyncWrite,
+        future::Either, io::ReadHalf, io::WriteHalf, AsyncRead, AsyncReadExt, AsyncWrite,
         AsyncWriteExt, StreamExt, TryFutureExt,
     },
     std::net::{IpAddr, SocketAddr},
