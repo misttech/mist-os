@@ -103,9 +103,10 @@ followed by zero or more alphanumeric characters, or the `-` character.",
     $ fx create component --path <project-path> --lang rust
 
 Supports the following project types:
-    create component        # CML-based component launched by Component Manager
-    create component test   # Integration test component
-    create driver           # Driver launched in a devhost"
+    create component          # CML-based component launched by Component Manager
+    create component test     # Integration test component
+    create driver             # Driver launched in a devhost
+    create devicetree visitor # Visitor for devicetree parsing"
 )]
 struct CreateArgs {
     /// type of the newly created project.

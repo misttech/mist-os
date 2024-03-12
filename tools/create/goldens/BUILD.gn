@@ -13,6 +13,7 @@ group("goldens") {
     "my-component-test-rust:tests",
     "my-component-v2-cpp",
     "my-component-v2-rust",
+    "my-devicetree-visitor:tests",
     "my-driver-cpp",
   ]
 }
@@ -24,6 +25,7 @@ group("tests") {
     ":my-component-test-rust($host_toolchain)",
     ":my-component-v2-cpp($host_toolchain)",
     ":my-component-v2-rust($host_toolchain)",
+    ":my-devicetree-visitor($host_toolchain)",
     ":my-driver-cpp($host_toolchain)",
   ]
   if (is_fuchsia) {
@@ -32,6 +34,7 @@ group("tests") {
       "my-component-test-rust:tests",
       "my-component-v2-cpp:tests",
       "my-component-v2-rust:tests",
+      "my-devicetree-visitor:tests",
       "my-driver-cpp:tests",
     ]
   }
@@ -108,6 +111,22 @@ if (is_host) {
       "my-driver-cpp/my_driver_cpp.cc",
       "my-driver-cpp/my_driver_cpp-info.json",
       "my-driver-cpp/unit-tests.cc",
+    ]
+  }
+
+  # Create a C++ driver project named `my-devicetree-visitor` and
+  # compare its file contents to the golden project of the same name.
+  golden_test("my-devicetree-visitor") {
+    project_type = "devicetree"
+    project_subtype = "visitor"
+    language = "cpp"
+    golden_files = [
+      "my-devicetree-visitor/BUILD.gn",
+      "my-devicetree-visitor/my-devicetree-visitor.cc",
+      "my-devicetree-visitor/my-devicetree-visitor.h",
+      "my-devicetree-visitor/my-devicetree-visitor.yaml",
+      "my-devicetree-visitor/test/my-devicetree-visitor-test.cc",
+      "my-devicetree-visitor/test/dts/my-devicetree-visitor.dts",
     ]
   }
 }
