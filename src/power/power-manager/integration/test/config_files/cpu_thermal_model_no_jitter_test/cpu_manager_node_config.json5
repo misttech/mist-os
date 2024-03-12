@@ -4,7 +4,7 @@
         name: "cpu_stats",
     },
     {
-        type: "DeviceControlHandler",
+        type: "CpuDeviceHandler",
         name: "cpu_dev",
         config: {
             driver_path: "/dev/class/cpu-ctrl/000",

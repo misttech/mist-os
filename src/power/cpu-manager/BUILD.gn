@@ -46,7 +46,6 @@ cpu_manager_sources = [
   "src/cpu_manager.rs",
   "src/cpu_manager_main.rs",
   "src/cpu_stats_handler.rs",
-  "src/dev_control_handler.rs",
   "src/error.rs",
   "src/main.rs",
   "src/message.rs",

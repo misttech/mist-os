@@ -1,17 +1,18 @@
 // Copyright 2021 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-use crate::dev_control_handler::{self, DeviceControlHandler, DeviceControlHandlerBuilder};
+use crate::common_utils::result_debug_panic::ResultDebugPanic;
 use crate::error::CpuManagerError;
+use crate::log_if_err;
 use crate::message::{Message, MessageReturn};
 use crate::node::Node;
 use crate::types::{Hertz, PState, Volts};
-use anyhow::{Context as _, Error};
+use anyhow::{format_err, Context as _, Error};
 use async_trait::async_trait;
 use async_utils::event::Event as AsyncEvent;
 use fidl_fuchsia_hardware_cpu_ctrl as fcpu_ctrl;
 use fidl_fuchsia_io as fio;
-use fuchsia_inspect as inspect;
+use fuchsia_inspect::{self as inspect, NumericProperty, Property};
 use serde_derive::Deserialize;
 use serde_json as json;
 use std::cell::RefCell;
@@ -20,9 +21,8 @@ use std::rc::Rc;
 
 /// Node: CpuDeviceHandler
 ///
-/// Summary: Provides an interface to interact with a CPU driver, both as a generic driver via
-///          fuchsia.device.Controller and specifically as a CPU driver via
-///          fuchsia.hardware.cpu_ctrl.Device. Light wrapper around DeviceControlHandler.
+/// Summary: Provides an interface to interact with a CPU driver via
+///          fuchsia.hardware.cpu_ctrl.Device.
 ///          Similar to CpuControlHandler in its logical management of a single CPU device, but is
 ///          more narrowly-scoped, as it does not administer thermal policy.
 ///
@@ -31,28 +31,23 @@ use std::rc::Rc;
 ///     - SetPerformanceState
 ///     - GetCpuPerformanceStates
 ///
-/// Sends Messages (via proxy to owned DeviceControlHandler):
-///     - GetPerformanceState
-///     - SetPerformanceState
-///
 /// FIDL dependencies:
 ///     - fuchsia.hardware.cpu_ctrl.Device: used to query descriptions of CPU performance states
 //
 // TODO(https://fxbug.dev/42164952): Update summary when CpuControlHandler is removed.
 
+pub const MAX_PERF_STATES: u32 = fcpu_ctrl::MAX_DEVICE_PERFORMANCE_STATES;
+
 /// Builder struct for CpuDeviceHandler.
-pub struct CpuDeviceHandlerBuilder<'a, 'b> {
+pub struct CpuDeviceHandlerBuilder<'a> {
     /// Path to the CPU driver
     driver_path: String,
-
-    /// Builder for the DeviceControlHandler that CpuDeviceHandler will own
-    dev_handler_builder: DeviceControlHandlerBuilder<'b>,
 
     cpu_ctrl_proxy: Option<fcpu_ctrl::DeviceProxy>,
     inspect_root: Option<&'a inspect::Node>,
 }
 
-impl<'a, 'b> CpuDeviceHandlerBuilder<'a, 'b> {
+impl<'a> CpuDeviceHandlerBuilder<'a> {
     pub fn new_from_json(json_data: json::Value, _nodes: &HashMap<String, Rc<dyn Node>>) -> Self {
         #[derive(Deserialize)]
         struct Config {
@@ -70,31 +65,13 @@ impl<'a, 'b> CpuDeviceHandlerBuilder<'a, 'b> {
 
     /// Constructs a CpuDeviceHandlerBuilder from the provided CPU driver path
     pub fn new_with_driver_path(driver_path: String) -> Self {
-        Self {
-            driver_path: driver_path.clone(),
-            dev_handler_builder: DeviceControlHandlerBuilder::new().driver_path(&driver_path),
-            cpu_ctrl_proxy: None,
-            inspect_root: None,
-        }
+        Self { driver_path: driver_path.clone(), cpu_ctrl_proxy: None, inspect_root: None }
     }
 
     /// Test-only interface to construct a builder with fake proxies
-    /// TODO(b/308880233): Merge DeviceControlHandler with CpuDeviceHandler.
     #[cfg(test)]
-    fn new_with_proxies(
-        driver_path: String,
-        cpu_device_proxy: fcpu_ctrl::DeviceProxy,
-        cpu_ctrl_proxy: fcpu_ctrl::DeviceProxy,
-    ) -> Self {
-        let dev_handler_builder = DeviceControlHandlerBuilder::new()
-            .driver_path(&driver_path)
-            .driver_proxy(cpu_device_proxy);
-        Self {
-            driver_path,
-            dev_handler_builder,
-            cpu_ctrl_proxy: Some(cpu_ctrl_proxy),
-            inspect_root: None,
-        }
+    fn new_with_proxies(driver_path: String, cpu_ctrl_proxy: fcpu_ctrl::DeviceProxy) -> Self {
+        Self { driver_path, cpu_ctrl_proxy: Some(cpu_ctrl_proxy), inspect_root: None }
     }
 
     /// Test-only interface to override the Inspect root
@@ -110,17 +87,12 @@ impl<'a, 'b> CpuDeviceHandlerBuilder<'a, 'b> {
         let inspect =
             InspectData::new(inspect_root, format!("CpuDeviceHandler ({})", self.driver_path));
 
-        // Build the DeviceControlHandler
-        let dev_handler_builder = self.dev_handler_builder.inspect_root(&inspect.root_node);
-        let dev_control_handler = dev_handler_builder.build()?;
-
         let mutable_inner =
             MutableInner { cpu_ctrl_proxy: self.cpu_ctrl_proxy, pstates: Vec::new() };
 
         Ok(Rc::new(CpuDeviceHandler {
             init_done: AsyncEvent::new(),
             driver_path: self.driver_path,
-            dev_control_handler,
             inspect,
             mutable_inner: RefCell::new(mutable_inner),
         }))
@@ -142,9 +114,6 @@ pub struct CpuDeviceHandler {
     /// Path to the underlying CPU driver
     driver_path: String,
 
-    /// Child node to handle GetPerformanceState and SetPerformanceState
-    dev_control_handler: Rc<DeviceControlHandler>,
-
     /// A struct for managing Component Inspection data
     inspect: InspectData,
 
@@ -163,6 +132,100 @@ impl CpuDeviceHandler {
         self.init_done.wait().await;
 
         Ok(MessageReturn::GetCpuPerformanceStates(self.mutable_inner.borrow().pstates.clone()))
+    }
+
+    async fn handle_get_performance_state(&self) -> Result<MessageReturn, CpuManagerError> {
+        fuchsia_trace::duration!(
+            c"cpu_manager",
+            c"CpuDeviceHandler::handle_get_performance_state",
+            "driver" => self.driver_path.as_str()
+        );
+
+        self.init_done.wait().await;
+
+        let result = self.get_performance_state().await;
+        log_if_err!(result, "Failed to get performance state");
+        fuchsia_trace::instant!(
+            c"cpu_manager",
+            c"CpuDeviceHandler::get_performance_state_result",
+            fuchsia_trace::Scope::Thread,
+            "driver" => self.driver_path.as_str(),
+            "result" => format!("{:?}", result).as_str()
+        );
+
+        match result {
+            Ok(state) => Ok(MessageReturn::GetPerformanceState(state)),
+            Err(e) => {
+                self.inspect.get_performance_state_errors.add(1);
+                Err(CpuManagerError::GenericError(e))
+            }
+        }
+    }
+
+    async fn get_performance_state(&self) -> Result<u32, Error> {
+        let proxy = &self.mutable_inner.borrow().cpu_ctrl_proxy;
+
+        proxy
+            .as_ref()
+            .ok_or(format_err!("Missing driver_proxy"))
+            .or_debug_panic()?
+            .get_current_performance_state()
+            .await
+            .map_err(|e| format_err!("{}: get_performance_state IPC failed: {}", self.name(), e))
+    }
+
+    async fn handle_set_performance_state(
+        &self,
+        in_state: u32,
+    ) -> Result<MessageReturn, CpuManagerError> {
+        fuchsia_trace::duration!(
+            c"cpu_manager",
+            c"CpuDeviceHandler::handle_set_performance_state",
+            "driver" => self.driver_path.as_str(),
+            "state" => in_state
+        );
+
+        self.init_done.wait().await;
+
+        let result = self.set_performance_state(in_state).await;
+        log_if_err!(result, "Failed to set performance state");
+        fuchsia_trace::instant!(
+            c"cpu_manager",
+            c"CpuDeviceHandler::set_performance_state_result",
+            fuchsia_trace::Scope::Thread,
+            "driver" => self.driver_path.as_str(),
+            "result" => format!("{:?}", result).as_str()
+        );
+
+        match result {
+            Ok(_) => {
+                self.inspect.perf_state.set(in_state.into());
+                Ok(MessageReturn::SetPerformanceState)
+            }
+            Err(e) => {
+                self.inspect.set_performance_state_errors.add(1);
+                self.inspect.last_set_performance_state_error.set(format!("{}", e).as_str());
+                Err(CpuManagerError::GenericError(e))
+            }
+        }
+    }
+
+    async fn set_performance_state(&self, in_state: u32) -> Result<(), Error> {
+        let proxy = &self.mutable_inner.borrow().cpu_ctrl_proxy;
+
+        // Make the FIDL call
+        let _out_state = proxy
+            .as_ref()
+            .ok_or(format_err!("Missing driver_proxy"))
+            .or_debug_panic()?
+            .set_performance_state(in_state)
+            .await
+            .map_err(|e| format_err!("{}: set_performance_state IPC failed: {}", self.name(), e))?
+            .map_err(|e| {
+                format_err!("{}: set_performance_state driver returned error: {}", self.name(), e)
+            })?;
+
+        Ok(())
     }
 }
 
@@ -184,8 +247,6 @@ impl Node for CpuDeviceHandler {
     /// Connects to the cpu-ctrl driver unless a proxy was already provided (in a test).
     async fn init(&self) -> Result<(), Error> {
         fuchsia_trace::duration!(c"cpu_manager", c"CpuDeviceHandler::init");
-
-        self.dev_control_handler.init().await.context("Failed to init dev_control_handler")?;
 
         // Connect to the cpu-ctrl driver. Typically this is None, but it may be set by tests.
         let cpu_ctrl_proxy = match &self.mutable_inner.borrow().cpu_ctrl_proxy {
@@ -234,9 +295,8 @@ impl Node for CpuDeviceHandler {
 
     async fn handle_message(&self, msg: &Message) -> Result<MessageReturn, CpuManagerError> {
         match msg {
-            &Message::GetPerformanceState | Message::SetPerformanceState(_) => {
-                self.dev_control_handler.handle_message(msg).await
-            }
+            Message::GetPerformanceState => self.handle_get_performance_state().await,
+            Message::SetPerformanceState(state) => self.handle_set_performance_state(*state).await,
             Message::GetCpuPerformanceStates => self.handle_get_cpu_performance_states().await,
             _ => Err(CpuManagerError::Unsupported),
         }
@@ -258,7 +318,7 @@ async fn get_pstates(
     // accompanying P-state metadata.
     let mut pstates = Vec::new();
 
-    for i in 0..dev_control_handler::MAX_PERF_STATES {
+    for i in 0..MAX_PERF_STATES {
         if let Ok(info) = cpu_ctrl_proxy.get_performance_state_info(i).await? {
             pstates.push(PState {
                 frequency: Hertz(info.frequency_hz as f64),
@@ -299,13 +359,35 @@ fn validate_pstates(pstates: &Vec<PState>) -> Result<(), Error> {
 struct InspectData {
     // Nodes
     root_node: inspect::Node,
+
+    perf_state: inspect::UintProperty,
+    get_performance_state_errors: inspect::UintProperty,
+    set_performance_state_errors: inspect::UintProperty,
+    last_set_performance_state_error: inspect::StringProperty,
 }
 
 impl InspectData {
     fn new(parent: &inspect::Node, node_name: String) -> Self {
         // Create a local root node and properties
         let root_node = parent.create_child(node_name);
-        InspectData { root_node }
+
+        let current_perf_state = root_node.create_child("current_perf_state");
+        let perf_state = current_perf_state.create_uint("perf_state", 0);
+        let get_performance_state_errors =
+            current_perf_state.create_uint("get_performance_state_errors", 0);
+        let set_performance_state_errors =
+            current_perf_state.create_uint("set_performance_state_errors", 0);
+        let last_set_performance_state_error =
+            current_perf_state.create_string("last_set_performance_state_error", "");
+        root_node.record(current_perf_state);
+
+        InspectData {
+            root_node,
+            perf_state,
+            get_performance_state_errors,
+            set_performance_state_errors,
+            last_set_performance_state_error,
+        }
     }
 
     fn record_pstates(&self, pstates: &Vec<PState>) {
@@ -331,8 +413,8 @@ mod tests {
     use futures::TryStreamExt;
     use std::cell::Cell;
 
-    // Creates a fake fuchsia.device.Controller proxy
-    fn setup_fake_cpu_driver_proxy() -> fcpu_ctrl::DeviceProxy {
+    /// Creates a fake fuchsia.hardware.cpu_ctrl.Device proxy
+    fn setup_fake_cpu_ctrl_proxy(pstates: Vec<PState>) -> fcpu_ctrl::DeviceProxy {
         let perf_state = Rc::new(Cell::new(0));
         let perf_state_clone_1 = perf_state.clone();
         let perf_state_clone_2 = perf_state.clone();
@@ -340,14 +422,7 @@ mod tests {
         let set_performance_state = move |state| {
             perf_state_clone_2.set(state);
         };
-        dev_control_handler::tests::fake_dev_ctrl_driver(
-            get_performance_state,
-            set_performance_state,
-        )
-    }
 
-    /// Creates a fake fuchsia.hardware.cpu_ctrl.Device proxy
-    fn setup_fake_cpu_ctrl_proxy(pstates: Vec<PState>) -> fcpu_ctrl::DeviceProxy {
         let (proxy, mut stream) =
             fidl::endpoints::create_proxy_and_stream::<fcpu_ctrl::DeviceMarker>().unwrap();
 
@@ -369,6 +444,16 @@ mod tests {
                         };
                         let _ = responder.send(result.as_ref().map_err(|e| *e));
                     }
+                    Some(fcpu_ctrl::DeviceRequest::GetCurrentPerformanceState { responder }) => {
+                        let _ = responder.send(get_performance_state());
+                    }
+                    Some(fcpu_ctrl::DeviceRequest::SetPerformanceState {
+                        requested_state,
+                        responder,
+                    }) => {
+                        set_performance_state(requested_state as u32);
+                        let _ = responder.send(Ok(requested_state));
+                    }
                     Some(other) => panic!("Unexpected request: {:?}", other),
                     None => break, // Stream terminates when client is dropped
                 }
@@ -382,7 +467,6 @@ mod tests {
     async fn setup_simple_test_node(pstates: Vec<PState>) -> Rc<CpuDeviceHandler> {
         let builder = CpuDeviceHandlerBuilder::new_with_proxies(
             "fake_path".to_string(),
-            setup_fake_cpu_driver_proxy(),
             setup_fake_cpu_ctrl_proxy(pstates),
         );
         builder.build_and_init().await
@@ -400,7 +484,7 @@ mod tests {
     }
 
     /// Tests that the Get/SetPerformanceState messages cause the node to call the appropriate
-    /// device controller FIDL APIs via DeviceControllerHandler.
+    /// device controller FIDL APIs.
     #[fasync::run_singlethreaded(test)]
     async fn test_performance_state() {
         let pstates = vec![PState { frequency: Hertz(1e9), voltage: Volts(1.0) }];
@@ -474,7 +558,6 @@ mod tests {
         ];
         let builder = CpuDeviceHandlerBuilder::new_with_proxies(
             "fake_path".to_string(),
-            setup_fake_cpu_driver_proxy(),
             setup_fake_cpu_ctrl_proxy(pstates),
         );
         assert!(builder.build().unwrap().init().await.is_err());
@@ -486,7 +569,6 @@ mod tests {
         ];
         let builder = CpuDeviceHandlerBuilder::new_with_proxies(
             "fake_path".to_string(),
-            setup_fake_cpu_driver_proxy(),
             setup_fake_cpu_ctrl_proxy(pstates),
         );
         assert!(builder.build().unwrap().init().await.is_err());
@@ -498,7 +580,6 @@ mod tests {
         ];
         let builder = CpuDeviceHandlerBuilder::new_with_proxies(
             "fake_path".to_string(),
-            setup_fake_cpu_driver_proxy(),
             setup_fake_cpu_ctrl_proxy(pstates),
         );
         assert!(builder.build().unwrap().init().await.is_err());
@@ -515,7 +596,6 @@ mod tests {
         let inspector = inspect::Inspector::default();
         let builder = CpuDeviceHandlerBuilder::new_with_proxies(
             "fake_path".to_string(),
-            setup_fake_cpu_driver_proxy(),
             setup_fake_cpu_ctrl_proxy(pstates.clone()),
         )
         .with_inspect_root(inspector.root());
@@ -536,9 +616,7 @@ mod tests {
                             "voltage (V)": pstates[1].voltage.0,
                         },
                     },
-                    "DeviceControlHandler (fake_path)": contains {
-                        performance_state: 0u64,
-                    }
+                    "current_perf_state": contains {}
                 }
             }
         );

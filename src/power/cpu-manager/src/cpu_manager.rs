@@ -18,8 +18,8 @@ use tracing::*;
 
 // nodes
 use crate::{
-    cpu_control_handler, cpu_device_handler, cpu_manager_main, cpu_stats_handler,
-    dev_control_handler, syscall_handler, thermal_watcher,
+    cpu_control_handler, cpu_device_handler, cpu_manager_main, cpu_stats_handler, syscall_handler,
+    thermal_watcher,
 };
 
 pub struct CpuManager {
@@ -138,13 +138,6 @@ impl CpuManager {
                 cpu_stats_handler::CpuStatsHandlerBuilder::new_from_json(json_data, &self.nodes)
                     .build()
                     .await?
-            }
-            "DeviceControlHandler" => {
-                dev_control_handler::DeviceControlHandlerBuilder::new_from_json(
-                    json_data,
-                    &self.nodes,
-                )
-                .build()?
             }
 
             // TODO(fxbug.dev/42062455): Remove async node creation

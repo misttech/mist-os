@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::dev_control_handler;
+use crate::cpu_device_handler;
 use crate::error::CpuManagerError;
 use crate::message::{Message, MessageReturn};
 use crate::node::Node;
@@ -681,7 +681,7 @@ async fn get_p_states(
     // accompanying P-state metadata.
     let mut p_states = Vec::new();
     let mut skipped_p_states = Vec::new();
-    for i in 0..dev_control_handler::MAX_PERF_STATES {
+    for i in 0..cpu_device_handler::MAX_PERF_STATES {
         if let Ok(info) = cpu_ctrl_proxy.get_performance_state_info(i).await? {
             let frequency = Hertz(info.frequency_hz as f64);
             let voltage = Volts(info.voltage_uv as f64 / 1e6);
