@@ -116,18 +116,20 @@ Use the following approach in deciding whether to run the test case in CQ/CI/FYI
 
 Based on this we have created the following:
 * Test case build groups:
-  * Test group naming scheme: `<STABILITY>_<BOARD>[ |_sl4f]_tests`
+  * Test group naming scheme: `<PRODUCT>_<BOARD>_<STABILITY>[ |_sl4f]_tests`
+    * `<PRODUCT>` - The product that the tests require to run on - e.g. "core",
+        "workbench".
+    * `<BOARD>` - The board that the tests require to run on - e.g. "emulator",
+        "nuc", "vim3".
     * `<STABILITY>` - Whether tests are stable or flaky - "stable" or "unstable".
         All newly added tests must be added to the "unstable" groups until 200
         passing runs in infra FYI builder have been observed, after which they
         may be promoted to "stable" groups.
-    * `<BOARD>` - The board that the tests require to run on - e.g. "emulator",
-        "nuc", "vim3".
     * `[ |_sl4f]` - If tests require SL4F server then include "_sl4f".
         Otherwise, leave it empty.
     * Examples:
-      * `stable_emulator_tests`
-      * `unstable_emulator_sl4f_tests`
+      * `core_emulator_stable_tests`
+      * `workbench_vim3_unstable_tests`
   * This naming scheme is chosen to facilitate infra builder configuration.
     * `<STABILITY>` informs whether a group is potential to run in CI/CQ
         (as it depends on `<BOARD>` also).

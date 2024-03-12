@@ -2,14 +2,315 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-# Target-side packages needed by functional tests.
+######### STEPS FOR ADDING HONEYDEW FUNCTIONAL TEST TO INFRA - START ###########
+# 1. Identify which all <PRODUCT>.<BOARD> you like to run this test on
+# 2. For each of the <PRODUCT>.<BOARD> there is a Test group and Package group
+#    defined below. Accordingly update each of <PRODUCT>.<BOARD> Infra Test and
+#    Package group where you like to run the test
+########## STEPS FOR ADDING HONEYDEW FUNCTIONAL TEST TO INFRA - END ############
+
+# Infra Test and Package groups:
+# For every <PRODUCT>.<BOARD> that we plans to run the tests on, below test
+# and package groups are created:
+#     Test groups
+#         <PRODUCT>.<BOARD>
+#             Stable (Tests that passed for at least 200+ consecutive runs)
+#                 Tests that require SL4F transport, if any
+#                 Tests that does not require SL4F transport
+#             Unstable (Tests that are yet to pass 200 consecutive runs)
+#                 Tests that require SL4F transport, if any
+#                 Tests that does not require SL4F transport
+#     Package groups
+#         <PRODUCT>.<BOARD>
+#             Stable (Packages needed for Stable test groups)
+#                 Packages needed for SL4F test groups, if any
+#                 Packages needed for non-SL4F test groups
+#             Unstable (Packages needed for Stable test groups)
+#                 Packages needed for SL4F test groups, if any
+#                 Packages needed for non-SL4F test groups
+# Exception: Instead of `x64` board, we will use `nuc` and `emulator`.
+
+# See https://fuchsia.googlesource.com/fuchsia/+/refs/heads/main/src/testing/end_to_end/honeydew/tests/functional_tests/#cq-vs-ci-vs-fyi
+# for test distribution rules.
+
+# Note - Please refrain from referencing one group in another one (such as
+# including `core_emulator_stable_tests` in `workbench_emulator_stable_tests`)
+# as it is not guaranteed that every single test case supported by
+# <product-#1>.<board-#1> is supported by other <product-#2>.<board-#2>
+
+template("group_with_no_dir_target_deps") {
+  group(target_name) {
+    forward_variables_from(invoker, "*")
+    assert_no_deps = [ ":*" ]
+    if (defined(invoker.assert_no_deps)) {
+      assert_no_deps += invoker.assert_no_deps
+    }
+  }
+}
+
+############################# Test groups - Start ##############################
+if (is_host) {
+  # core.emulator
+  group_with_no_dir_target_deps("core_emulator_stable_sl4f_tests") {
+    testonly = true
+    public_deps = [
+      "affordance_tests/test_tracing:tracing_test_sl4f($host_toolchain)",
+      "fuchsia_device_tests/test_fuchsia_device:x64_emu_test_fc_preferred($host_toolchain)",
+      "fuchsia_device_tests/test_fuchsia_device:x64_emu_test_sl4f($host_toolchain)",
+    ]
+  }
+
+  group_with_no_dir_target_deps("core_emulator_stable_tests") {
+    testonly = true
+    public_deps = [
+      "affordance_tests/test_session:session_test_fc($host_toolchain)",
+      "affordance_tests/test_tracing:tracing_test_fc($host_toolchain)",
+      "affordance_tests/test_ui:screenshot_test_ffx($host_toolchain)",
+      "fuchsia_device_tests/test_fuchsia_device:x64_emu_test_fc($host_toolchain)",
+      "transport_tests/test_ffx:ffx_test_fc($host_toolchain)",
+      "transport_tests/test_ffx:ffx_wait_for_rcs_disconnection_test_fc($host_toolchain)",
+    ]
+  }
+
+  group_with_no_dir_target_deps("core_emulator_unstable_sl4f_tests") {
+    testonly = true
+    public_deps = []
+  }
+
+  group_with_no_dir_target_deps("core_emulator_unstable_tests") {
+    testonly = true
+    public_deps = []
+  }
+
+  # workbench_eng.emulator
+  # Note - workbench does not support SL4F
+  group_with_no_dir_target_deps("workbench_emulator_stable_tests") {
+    testonly = true
+    public_deps = [
+      "affordance_tests/test_session:session_test_fc($host_toolchain)",
+      "affordance_tests/test_tracing:tracing_test_fc($host_toolchain)",
+      "affordance_tests/test_ui:screenshot_test_ffx($host_toolchain)",
+      "fuchsia_device_tests/test_fuchsia_device:x64_emu_test_fc($host_toolchain)",
+      "transport_tests/test_ffx:ffx_test_fc($host_toolchain)",
+      "transport_tests/test_ffx:ffx_wait_for_rcs_disconnection_test_fc($host_toolchain)",
+    ]
+  }
+
+  group_with_no_dir_target_deps("workbench_emulator_unstable_tests") {
+    testonly = true
+    public_deps = []
+  }
+
+  # core.vim3
+  group_with_no_dir_target_deps("core_vim3_stable_sl4f_tests") {
+    testonly = true
+    public_deps = [
+      "affordance_tests/test_wlan:wlan_policy_test_sl4f($host_toolchain)",
+      "affordance_tests/test_wlan:wlan_test_sl4f($host_toolchain)",
+      "fuchsia_device_tests/test_fuchsia_device:vim3_test_fc_preferred($host_toolchain)",
+      "fuchsia_device_tests/test_fuchsia_device:vim3_test_sl4f($host_toolchain)",
+    ]
+  }
+
+  group_with_no_dir_target_deps("core_vim3_stable_tests") {
+    testonly = true
+    public_deps = [
+      "fuchsia_device_tests/test_fuchsia_device:vim3_test_fc($host_toolchain)",
+    ]
+  }
+
+  group_with_no_dir_target_deps("core_vim3_unstable_sl4f_tests") {
+    testonly = true
+    public_deps = []
+  }
+
+  group_with_no_dir_target_deps("core_vim3_unstable_tests") {
+    testonly = true
+    public_deps = [ "auxiliary_device_tests/test_power_switch_dmc:power_switch_dmc_test_fc($host_toolchain)" ]
+  }
+
+  # workbench_eng.vim3
+  # Note - workbench does not support SL4F
+  group_with_no_dir_target_deps("workbench_vim3_stable_tests") {
+    testonly = true
+    public_deps = [
+      "fuchsia_device_tests/test_fuchsia_device:vim3_test_fc($host_toolchain)",
+    ]
+  }
+
+  group_with_no_dir_target_deps("workbench_vim3_unstable_tests") {
+    testonly = true
+    public_deps = [ "auxiliary_device_tests/test_power_switch_dmc:power_switch_dmc_test_fc($host_toolchain)" ]
+  }
+
+  # core.nuc
+  group_with_no_dir_target_deps("core_nuc_stable_sl4f_tests") {
+    testonly = true
+    public_deps = [
+      "fuchsia_device_tests/test_fuchsia_device:x64_nuc_test_fc_preferred($host_toolchain)",
+      "fuchsia_device_tests/test_fuchsia_device:x64_nuc_test_sl4f($host_toolchain)",
+    ]
+  }
+
+  group_with_no_dir_target_deps("core_nuc_stable_tests") {
+    testonly = true
+    public_deps = [ "fuchsia_device_tests/test_fuchsia_device:x64_nuc_test_fc($host_toolchain)" ]
+  }
+
+  group_with_no_dir_target_deps("core_nuc_unstable_sl4f_tests") {
+    testonly = true
+    public_deps = []
+  }
+
+  group_with_no_dir_target_deps("core_nuc_unstable_tests") {
+    testonly = true
+    public_deps = []
+  }
+
+  # workbench.nuc
+  # Note - workbench does not support SL4F
+  group_with_no_dir_target_deps("workbench_nuc_stable_tests") {
+    testonly = true
+    public_deps = [ "fuchsia_device_tests/test_fuchsia_device:x64_nuc_test_fc($host_toolchain)" ]
+  }
+
+  group_with_no_dir_target_deps("workbench_nuc_unstable_tests") {
+    testonly = true
+    public_deps = []
+  }
+}
+
+############################## Test groups - End ###############################
+
+############################ Package groups - Start ############################
+# core.emulator
+group_with_no_dir_target_deps("core_emulator_stable_sl4f_packages") {
+  testonly = true
+  public_deps = [ "../..:sl4f_packages" ]
+}
+
+group_with_no_dir_target_deps("core_emulator_stable_packages") {
+  testonly = true
+  public_deps = [
+    "affordance_tests/test_session:packages",
+    "transport_tests/test_ffx:packages",
+  ]
+}
+
+group_with_no_dir_target_deps("core_emulator_unstable_sl4f_packages") {
+  testonly = true
+  public_deps = [ "../..:sl4f_packages" ]
+}
+
+group_with_no_dir_target_deps("core_emulator_unstable_packages") {
+  testonly = true
+  public_deps = []
+}
+
+# workbench.emulator
+# Note - workbench does not support SL4F
+group_with_no_dir_target_deps("workbench_emulator_stable_packages") {
+  testonly = true
+  public_deps = [
+    "affordance_tests/test_session:packages",
+    "transport_tests/test_ffx:packages",
+  ]
+}
+
+group_with_no_dir_target_deps("workbench_emulator_unstable_packages") {
+  testonly = true
+  public_deps = []
+}
+
+# core.vim3
+group_with_no_dir_target_deps("core_vim3_stable_sl4f_packages") {
+  testonly = true
+  public_deps = [ "../..:sl4f_packages" ]
+}
+
+group_with_no_dir_target_deps("core_vim3_stable_packages") {
+  testonly = true
+  public_deps = []
+}
+
+group_with_no_dir_target_deps("core_vim3_unstable_sl4f_packages") {
+  testonly = true
+  public_deps = [ "../..:sl4f_packages" ]
+}
+
+group_with_no_dir_target_deps("core_vim3_unstable_packages") {
+  testonly = true
+  public_deps = []
+}
+
+# workbench.vim3
+# Note - workbench does not support SL4F
+group_with_no_dir_target_deps("workbench_vim3_stable_packages") {
+  testonly = true
+  public_deps = []
+}
+
+group_with_no_dir_target_deps("workbench_vim3_unstable_packages") {
+  testonly = true
+  public_deps = []
+}
+
+# core.nuc
+group_with_no_dir_target_deps("core_nuc_stable_sl4f_packages") {
+  testonly = true
+  public_deps = [ "../..:sl4f_packages" ]
+}
+
+group_with_no_dir_target_deps("core_nuc_stable_packages") {
+  testonly = true
+  public_deps = []
+}
+
+group_with_no_dir_target_deps("core_nuc_unstable_sl4f_packages") {
+  testonly = true
+  public_deps = [ "../..:sl4f_packages" ]
+}
+
+group_with_no_dir_target_deps("core_nuc_unstable_packages") {
+  testonly = true
+  public_deps = []
+}
+
+# workbench.nuc
+# Note - workbench does not support SL4F
+group_with_no_dir_target_deps("workbench_nuc_stable_packages") {
+  testonly = true
+  public_deps = []
+}
+
+group_with_no_dir_target_deps("workbench_nuc_unstable_packages") {
+  testonly = true
+  public_deps = []
+}
+
+############################ Package groups - End ##############################
+
+# All of the target-side packages needed by functional tests.
 group("packages") {
   testonly = true
   public_deps = [
-    "../../..:sl4f_packages",
+    "../..:sl4f_packages",
     "affordance_tests:packages",
     "transport_tests:packages",
   ]
+}
+
+# All of the Honeydew functional tests
+if (is_host) {
+  group("tests") {
+    testonly = true
+    public_deps = [
+      "affordance_tests:tests",
+      "auxiliary_device_tests:tests",
+      "fuchsia_device_tests:tests",
+      "transport_tests:tests",
+    ]
+  }
 }
 
 # All of the Honeydew functional tests and their dependencies.
@@ -21,17 +322,8 @@ group("functional_tests") {
   ]
 }
 
+# TODO(b/328778702): Everything below this line will be deleted
 if (is_host) {
-  # All of the Honeydew functional tests
-  group("tests") {
-    testonly = true
-    public_deps = [
-      "affordance_tests:tests",
-      "fuchsia_device_tests:tests",
-      "transport_tests:tests",
-    ]
-  }
-
   # Infra test groups:
   #     Stable (Tests that passed for at least 200+ consecutive runs)
   #         Emulator
@@ -139,7 +431,7 @@ if (is_host) {
 
 group("stable_emulator_sl4f_packages") {
   testonly = true
-  public_deps = [ "../../..:sl4f_packages" ]
+  public_deps = [ "../..:sl4f_packages" ]
 }
 
 group("stable_emulator_packages") {
@@ -152,7 +444,7 @@ group("stable_emulator_packages") {
 
 group("stable_vim3_sl4f_packages") {
   testonly = true
-  public_deps = [ "../../..:sl4f_packages" ]
+  public_deps = [ "../..:sl4f_packages" ]
 }
 
 group("stable_vim3_packages") {
@@ -162,7 +454,7 @@ group("stable_vim3_packages") {
 
 group("stable_nuc_sl4f_packages") {
   testonly = true
-  public_deps = [ "../../..:sl4f_packages" ]
+  public_deps = [ "../..:sl4f_packages" ]
 }
 
 group("stable_nuc_packages") {
@@ -172,7 +464,7 @@ group("stable_nuc_packages") {
 
 group("unstable_emulator_sl4f_packages") {
   testonly = true
-  public_deps = [ "../../..:sl4f_packages" ]
+  public_deps = [ "../..:sl4f_packages" ]
 }
 
 group("unstable_emulator_packages") {
@@ -182,7 +474,7 @@ group("unstable_emulator_packages") {
 
 group("unstable_vim3_sl4f_packages") {
   testonly = true
-  public_deps = [ "../../..:sl4f_packages" ]
+  public_deps = [ "../..:sl4f_packages" ]
 }
 
 group("unstable_vim3_packages") {
@@ -192,7 +484,7 @@ group("unstable_vim3_packages") {
 
 group("unstable_nuc_sl4f_packages") {
   testonly = true
-  public_deps = [ "../../..:sl4f_packages" ]
+  public_deps = [ "../..:sl4f_packages" ]
 }
 
 group("unstable_nuc_packages") {
