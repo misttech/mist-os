@@ -4,56 +4,31 @@
 
 use {
     anyhow::{anyhow, Context, Error},
-    argh::FromArgs,
+    fidl_fuchsia_bluetooth_pandora::{
+        RootcanalClientControllerRequest, RootcanalClientControllerRequestStream, ServiceError,
+    },
     fidl_fuchsia_hardware_bluetooth::VirtualControllerMarker,
     fuchsia_async::{self as fasync, net::TcpStream, pin_mut},
+    fuchsia_component::server::ServiceFs,
     fuchsia_fs::OpenFlags,
+    fuchsia_sync::Mutex,
     fuchsia_zircon::{self as zx},
     futures::{
-        future::Either, io::ReadHalf, io::WriteHalf, AsyncRead, AsyncReadExt, AsyncWrite,
-        AsyncWriteExt, FutureExt,
+        self, future::Either, io::ReadHalf, io::WriteHalf, AsyncRead, AsyncReadExt, AsyncWrite,
+        AsyncWriteExt, StreamExt, TryFutureExt,
     },
     std::net::{IpAddr, SocketAddr},
     std::str::FromStr,
+    std::sync::Arc,
 };
 
 // Across all three link types, ACL has the largest frame at 1028. Add a byte of UART header.
 const UART_MAX_FRAME_BUFFER_SIZE: usize = 1029;
 
-// Default rootcanal TCP port.
-const fn default_port() -> u16 {
-    6402
-}
-
 // Default control device.
 fn default_control_device() -> String {
     // TODO(303503457): Access virtual device via "/dev/class/bt-hci-virtual".
     "sys/platform/00:00:30/bt_hci_virtual".to_string()
-}
-
-/// Define the command line arguments that the tool accepts.
-#[derive(FromArgs)]
-#[argh(description = "Bluetooth Root Canal Proxy")]
-struct Options {
-    /// Control Device
-    #[argh(
-        option,
-        short = 'c',
-        description = "control device path",
-        default = "default_control_device()"
-    )]
-    control_device: String,
-    /// Host Port (default 6402)
-    #[argh(
-        option,
-        short = 'p',
-        description = "host port number (default 6402)",
-        default = "default_port()"
-    )]
-    port: u16,
-    /// Host IP address
-    #[argh(positional, description = "host IP address")]
-    host: String,
 }
 
 /// Reads the TCP stream from the host from the `read_stream` and writes all data to the loopback
@@ -97,25 +72,6 @@ async fn channel_reader(
     }
 }
 
-// Runs reader futures on both ends.
-async fn run_rootcanal(
-    stream: impl AsyncRead + AsyncWrite + Sized,
-    channel: fasync::Channel,
-) -> Result<(), Error> {
-    let (read_stream, write_stream) = stream.split();
-
-    let chan_fut = channel_reader(write_stream, &channel).fuse();
-    pin_mut!(chan_fut);
-
-    let stream_fut = stream_reader(read_stream, &channel).fuse();
-    pin_mut!(stream_fut);
-
-    match futures::future::select(chan_fut, stream_fut).await {
-        Either::Left((res, _)) => res,
-        Either::Right((res, _)) => res,
-    }
-}
-
 /// Opens the virtual loopback device, creates a channel to pass to it and returns that channel.
 async fn open_virtual_device(control_device: &str) -> Result<fasync::Channel, Error> {
     let dev_directory = fuchsia_fs::directory::open_in_namespace("/dev", OpenFlags::RIGHT_READABLE)
@@ -133,19 +89,139 @@ async fn open_virtual_device(control_device: &str) -> Result<fasync::Channel, Er
     Ok(fasync::Channel::from_channel(local_channel))
 }
 
-/// Connects to the socket addr and loopack device and runs the loop proxing data between both.
-#[fuchsia::main(logging_tags = ["rootcanal"])]
+enum ClientTask {
+    None,
+    Starting,
+    Running { _task: fasync::Task<Result<(), Error>> },
+}
+
+impl ClientTask {
+    // Set state to Starting if it is previously None. Return Err otherwise.
+    fn set_starting(&mut self) -> Result<(), (ServiceError, Error)> {
+        if matches!(self, Self::None) {
+            *self = Self::Starting;
+            return Ok(());
+        }
+        return Err((ServiceError::AlreadyRunning, anyhow!("Rootcanal task already running")));
+    }
+
+    // Set state to None if it is previously Running, clearing the contained Task.
+    fn stop(&mut self) {
+        *self = Self::None;
+    }
+}
+
+/// Abstracts a connection to a Rootcanal server.
+struct RootcanalClient {
+    task: Mutex<ClientTask>,
+}
+
+impl RootcanalClient {
+    pub fn new() -> Self {
+        RootcanalClient { task: Mutex::new(ClientTask::None) }
+    }
+
+    /// Connect to Rootcanal server at `socket_addr` & loopback device and begin proxying data between them.
+    async fn connect(&self, socket_addr: SocketAddr) -> Result<(), (ServiceError, Error)> {
+        self.task.lock().set_starting()?;
+
+        tracing::debug!("Opening host {}", socket_addr);
+        let connector_res = TcpStream::connect(socket_addr);
+        let Ok(tcp_connector) = connector_res else {
+            return Err((ServiceError::ConnectionFailed, connector_res.unwrap_err().into()));
+        };
+        let stream_res = tcp_connector.await;
+        let Ok(tcp_stream) = stream_res else {
+            return Err((ServiceError::ConnectionFailed, stream_res.unwrap_err().into()));
+        };
+        tracing::debug!("Connected");
+
+        let channel_res = open_virtual_device(&default_control_device()).await;
+        let Ok(channel) = channel_res else {
+            return Err((ServiceError::Failed, channel_res.unwrap_err().into()));
+        };
+
+        *self.task.lock() = ClientTask::Running {
+            _task: fuchsia_async::Task::spawn(Self::run(tcp_stream, channel)),
+        };
+
+        Ok(())
+    }
+
+    /// Disconnect this client from the server if connected.
+    async fn disconnect(&self) {
+        self.task.lock().stop();
+    }
+
+    /// Run reader futures on both ends.
+    async fn run(
+        stream: impl AsyncRead + AsyncWrite + Sized,
+        channel: fasync::Channel,
+    ) -> Result<(), Error> {
+        let (read_stream, write_stream) = stream.split();
+
+        let chan_fut = channel_reader(write_stream, &channel);
+        pin_mut!(chan_fut);
+
+        let stream_fut = stream_reader(read_stream, &channel);
+        pin_mut!(stream_fut);
+
+        match futures::future::select(chan_fut, stream_fut).await {
+            Either::Left((res, _)) => res,
+            Either::Right((res, _)) => res,
+        }
+    }
+}
+
+async fn run_fidl_server(
+    mut stream: RootcanalClientControllerRequestStream,
+    rootcanal_client: Arc<RootcanalClient>,
+) -> Result<(), Error> {
+    while let Ok(request) = stream.next().await.context("failed FIDL request")? {
+        match request {
+            // ffx bluetooth pandora start --rootcanal-ip |ip| --rootcanal-port |port|
+            RootcanalClientControllerRequest::Start { payload, responder, .. } => {
+                let ip_res = IpAddr::from_str(&payload.ip.unwrap());
+                let Ok(ip) = ip_res else {
+                    let _ = responder.send(Err(ServiceError::InvalidIp));
+                    return Err(ip_res.unwrap_err().into());
+                };
+                let socket_addr: SocketAddr = (ip, payload.port.unwrap()).into();
+
+                if let Err(err) = rootcanal_client.connect(socket_addr).await {
+                    let _ = responder.send(Err(err.0));
+                    return Err(err.1);
+                }
+                let _ = responder.send(Ok(()));
+            }
+
+            // ffx bluetooth pandora stop
+            RootcanalClientControllerRequest::Stop { responder } => {
+                rootcanal_client.disconnect().await;
+                let _ = responder.send();
+            }
+
+            _ => return Err(anyhow!("unknown FIDL request")),
+        }
+    }
+    Ok(())
+}
+
+#[fuchsia::main(logging_tags = ["bt-rootcanal"])]
 async fn main() -> Result<(), Error> {
-    let opt: Options = argh::from_env();
+    let mut fs = ServiceFs::new_local();
+    let _ = fs.dir("svc").add_fidl_service(|s: RootcanalClientControllerRequestStream| s);
+    let _ = fs.take_and_serve_directory_handle()?;
 
-    let channel = open_virtual_device(&opt.control_device).await?;
-    let socket_addr: SocketAddr = (IpAddr::from_str(&opt.host)?, opt.port).into();
+    tracing::debug!("Listening for incoming Rootcanal FIDL connections...");
+    let rootcanal_client = Arc::new(RootcanalClient::new());
+    fs.for_each(|stream| {
+        run_fidl_server(stream, Arc::clone(&rootcanal_client))
+            .unwrap_or_else(|e| tracing::info!("FIDL server encountered an error: {:?}", e))
+    })
+    .await;
 
-    eprintln!("Opening host {}", socket_addr);
-    let stream = TcpStream::connect(socket_addr)?.await.expect("unable to connect to host");
-    eprintln!("Connected");
-
-    run_rootcanal(stream, channel).await
+    Ok(())
 }
 
 #[cfg(test)]
@@ -164,7 +240,7 @@ mod tests {
         let (txs, rxs) = zx::Socket::create_stream();
         let async_socket = fasync::Socket::from_socket(rxs);
 
-        let fut = Box::pin(super::run_rootcanal(async_socket, async_channel).fuse());
+        let fut = Box::pin(RootcanalClient::run(async_socket, async_channel));
         pin_mut!(fut);
 
         // Run with nothing to read yet. Futures should be waiting on both streams.

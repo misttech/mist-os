@@ -295,6 +295,9 @@ eng_only_platform_aib_names =
 
       # Suspend/resume Support
       "power_framework",
+
+      # Bluetooth testing support
+      "bluetooth_pandora",
     ]
 eng_platform_aib_names =
     userdebug_platform_aib_names + eng_only_platform_aib_names

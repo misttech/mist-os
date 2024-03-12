@@ -701,6 +701,7 @@
                     "/bootstrap/sysinfo",
                     "/bootstrap/vboot-fwparam",
                     "/core/audio_recording",
+                    "/core/bt-rootcanal",
                     "/core/driver_playground",
                     "/core/factory",
                     "/core/factory_env",

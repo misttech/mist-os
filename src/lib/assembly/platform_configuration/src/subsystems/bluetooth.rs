@@ -50,6 +50,12 @@ impl DefineSubsystemConfiguration<BluetoothConfig> for BluetoothSubsystemConfig 
             builder.platform_bundle("bluetooth_hfp_ag");
         }
 
+        if *context.feature_set_level == FeatureSupportLevel::Standard
+            && *context.build_type == BuildType::Eng
+        {
+            builder.platform_bundle("bluetooth_pandora");
+        }
+
         Ok(())
     }
 }
