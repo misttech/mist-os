@@ -93,10 +93,10 @@ class LdRemoteProcessTests : public ::testing::Test, public LdLoadZirconProcessT
       // Set a temporary name until we decode the DT_SONAME.
       module.set_name(what);
       RemoteModule::size_type tls_id = 0;
-      auto result = module.Decode(diag, std::move(vmo), -1, tls_id);
+      ASSERT_TRUE(module.Decode(diag, std::move(vmo), -1, tls_id));
       EXPECT_EQ(tls_id, 0u);
-      ASSERT_TRUE(result.is_ok());
-      EXPECT_THAT(result->needed, ::testing::IsEmpty()) << what << " cannot have DT_NEEDED";
+      EXPECT_THAT(module.decoded().needed(), ::testing::IsEmpty())
+          << what << " cannot have DT_NEEDED";
       EXPECT_THAT(module.reloc_info().rel_relative(), ::testing::IsEmpty())
           << what << " cannot have RELATIVE relocations";
       EXPECT_THAT(module.reloc_info().rel_symbolic(), ::testing::IsEmpty())
@@ -163,13 +163,14 @@ class LdRemoteProcessTests : public ::testing::Test, public LdLoadZirconProcessT
     auto decode_result = RemoteModule::DecodeModules(diag, std::move(vmo), get_dep_vmo,
                                                      std::move(predecoded_modules));
     ASSERT_TRUE(decode_result);
-    const RemoteModule::ExecInfo& exec_info = decode_result->main_exec;
-
     auto& modules = decode_result->modules;
+    ASSERT_FALSE(modules.empty());
+
     RemoteModule& loaded_exec = modules.front();
+    const RemoteModule::ExecInfo& exec_info = loaded_exec.decoded().exec_info();
+
     RemoteModule& loaded_stub = modules[decode_result->predecoded_positions[kStub]];
     RemoteModule& loaded_vdso = modules[decode_result->predecoded_positions[kStub]];
-    ASSERT_FALSE(modules.empty());
 
     // Check the loaded-by pointers.
     EXPECT_FALSE(modules.front().loaded_by_modid())
@@ -276,7 +277,7 @@ class LdRemoteProcessTests : public ::testing::Test, public LdLoadZirconProcessT
     EXPECT_TRUE(RemoteModule::LoadModules(diag, modules));
 
     // Use the executable's entry point at its loaded address.
-    set_entry(decode_result->main_exec.relative_entry + loaded_exec.load_bias());
+    set_entry(exec_info.relative_entry + loaded_exec.load_bias());
 
     // Locate the loaded vDSO to pass its base pointer to the test process.
     set_vdso_base(loaded_vdso.module().vaddr_start());

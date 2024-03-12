@@ -197,7 +197,7 @@ class RemoteAbiStub {
                               " missing PT_GNU_EH_FRAME program header"sv);
     }
 
-    auto memory = ld_stub.metadata_memory();
+    auto memory = ld_stub.decoded().metadata_memory();
     if (memory.base() != 0) [[unlikely]] {
       return diag.FormatError("stub "sv, LocalAbi::kSoname.str(), " has base address ",
                               memory.base());

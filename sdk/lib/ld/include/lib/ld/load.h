@@ -8,6 +8,7 @@
 #include <lib/elfldltl/dynamic.h>
 #include <lib/elfldltl/note.h>
 #include <lib/elfldltl/phdr.h>
+#include <lib/fit/result.h>
 
 #include <tuple>
 
@@ -94,33 +95,37 @@ constexpr std::optional<ModulePhdrInfo<Elf>> DecodeModulePhdrs(
 // dynamic section observers can be passed to include in the same scan.
 template <class Elf = elfldltl::Elf<>, class Diagnostics, class Memory,
           typename... DynamicObservers>
-constexpr cpp20::span<const typename Elf::Dyn> DecodeModuleDynamic(
+constexpr fit::result<bool, cpp20::span<const typename Elf::Dyn>> DecodeModuleDynamic(
     AbiModule<Elf>& module, Diagnostics& diag, Memory& memory,
     const std::optional<typename Elf::Phdr>& dyn_phdr, DynamicObservers&&... dynamic_observers) {
   using Dyn = const typename Elf::Dyn;
 
   if (!dyn_phdr) [[unlikely]] {
-    diag.FormatError("no PT_DYNAMIC program header found");
-    return {};
+    return fit::error{diag.FormatError("no PT_DYNAMIC program header found")};
   }
 
   const size_t count = dyn_phdr->filesz / sizeof(Dyn);
   auto read_dyn = memory.template ReadArray<Dyn>(dyn_phdr->vaddr, count);
   if (!read_dyn) [[unlikely]] {
-    diag.FormatError("cannot read", count, "entries from PT_DYNAMIC",
-                     elfldltl::FileAddress{dyn_phdr->vaddr});
-    return {};
+    return fit::error{
+        diag.FormatError("cannot read", count, "entries from PT_DYNAMIC",
+                         elfldltl::FileAddress{dyn_phdr->vaddr}),
+    };
   }
   cpp20::span<const Dyn> dyn = *read_dyn;
 
   module.link_map.ld = dyn.data();
 
-  elfldltl::DecodeDynamic(diag, memory, dyn, elfldltl::DynamicSymbolInfoObserver(module.symbols),
-                          elfldltl::DynamicInitObserver(module.init),
-                          elfldltl::DynamicFiniObserver(module.fini),
-                          std::forward<DynamicObservers>(dynamic_observers)...);
+  if (!elfldltl::DecodeDynamic(
+          diag, memory, dyn, elfldltl::DynamicSymbolInfoObserver(module.symbols),
+          elfldltl::DynamicInitObserver(module.init), elfldltl::DynamicFiniObserver(module.fini),
+          std::forward<DynamicObservers>(dynamic_observers)...)) [[unlikely]] {
+    return fit::error{false};
+  }
+
   module.soname = module.symbols.soname();
-  return dyn;
+
+  return fit::ok(dyn);
 }
 
 // Return an observer object to be passed to elfldltl::*NoteObserver.  When

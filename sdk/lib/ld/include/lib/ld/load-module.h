@@ -112,6 +112,8 @@ class DecodedModule : public DecodedModuleBase {
   // **NOTE:** Most methods below use module() and cannot be called unless
   // HasModule() returns true, i.e. after EmplaceModule / NewModule.
 
+  constexpr const auto& symbol_info() const { return module().symbols; }
+
   // This is the DT_SONAME in the file or empty if there was none (or if
   // decoding was incomplete).  This often matches the name by which the
   // module is known, but need not.  There may be no SONAME at all (normal for
@@ -279,6 +281,8 @@ class LoadModuleRef;
 template <typename DecodedStorage>
 class LoadModule {
  private:
+  static_assert(!std::is_const_v<DecodedStorage>);
+
   // Determine whether the template parameter is derived from an instantiation
   // of ld::DecodedModule<...>.  If not, it must be some pointer-like type.
   static constexpr bool kDecodedDirect = []() -> bool {
@@ -348,6 +352,10 @@ class LoadModule {
     name_ = name;
     SetAbiName();
   }
+
+  // If the template parameter is pointer-like, then HasDecoded() is initially
+  // false and this must be used to install a pointer.
+  constexpr void set_decoded(DecodedStorage decoded) { decoded_ = std::move(decoded); }
 
   // For convenient container searches, equality comparison against a (hashed)
   // name checks both name fields.  An unloaded module only has a load name.
@@ -478,13 +486,16 @@ class LoadModule {
            (module().symbols.flags1() & elfldltl::ElfDynFlags1::kPie);
   }
 
- private:
+ protected:
   constexpr void SetAbiName() {
     if constexpr (!std::is_const_v<Decoded>) {
-      decoded().SetAbiName(name_);
+      if (HasDecoded()) {
+        decoded().SetAbiName(name_);
+      }
     }
   }
 
+ private:
   DecodedStorage decoded_{};
   Soname name_;
   size_type static_tls_bias_ = 0;

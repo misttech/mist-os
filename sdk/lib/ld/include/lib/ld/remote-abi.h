@@ -182,9 +182,9 @@ class RemoteAbi {
     return reinterpret_cast<const LocalAbiModule&>(in);
   }
 
-  // This maps an offset into the RemoteModule::mapped_vmo() image to the
-  // corresponding absolute vaddr in the remote address space where that part
-  // of the module's file is mapped.
+  // This maps an offset into the RemoteDecodedModule::mapped_vmo() image to
+  // the corresponding absolute vaddr in the remote address space where that
+  // part of the module's file is mapped.
   class ModuleVaddrMap {
    public:
     // Make it move-only so the set doesn't get copied.
@@ -208,11 +208,11 @@ class RemoteAbi {
 
     const RemoteModule& module() const { return module_; }
 
-    // Given a pointer into this module's mapped_vmo() image image, yield the
+    // Given a pointer into this module's mapped_vmo() image, yield the
     // absolute vaddr if it lies in any of this module's segments.
     template <class Diagnostics, typename T>
     std::optional<size_type> GetVaddr(Diagnostics& diag, const T& ptr) const {
-      std::optional<size_type> offset = module_.mapped_vmo().GetVaddr(&ptr);
+      std::optional<size_type> offset = module_.decoded().mapped_vmo().GetVaddr(&ptr);
       if (!offset) [[unlikely]] {
         diag.FormatError("remote ABI transcription bug:",
                          " pointer not within mapped file for module ", DiagnosticsModuleName());

@@ -226,7 +226,7 @@ class RemoteAbiHeap {
 
     const size_type memsz = layout.size_;
     auto replace = [stub_data_size, memsz, &diagnostics,
-                    &file_vmo = stub_module.vmo()](auto old_segment) {
+                    &file_vmo = stub_module.decoded().vmo()](auto old_segment) {
       assert(old_segment.memsz() >= stub_data_size);
       std::ignore = stub_data_size;  // For NDEBUG, capture optimized out.
       return ReplaceSegment(diagnostics, std::move(old_segment), file_vmo, memsz);

@@ -18,9 +18,10 @@ using std::ranges::filter_view;
 
 #else
 
-// only std::ranges::find_if will use std::invoke, so we just write this ourselves.
+// Only std::ranges::find_if will use std::invoke, so we just write this
+// ourselves.
 template <class It, typename Pred>
-It find_if(It begin, It end, Pred&& pred) {
+It FindIf(It begin, It end, Pred&& pred) {
   while (begin != end && !std::invoke(pred, *begin)) {
     ++begin;
   }
@@ -42,9 +43,9 @@ class filter_view {
   using iterator = filter_iterator<decltype(std::begin(std::declval<Range>()))>;
   using const_iterator = filter_iterator<decltype(std::cbegin(std::declval<Range>()))>;
 
-  iterator begin() { return {*this, find_if(std::begin(range_), std::end(range_), filter_)}; }
+  iterator begin() { return {*this, FindIf(std::begin(range_), std::end(range_), filter_)}; }
   const_iterator begin() const {
-    return {*this, find_if(std::cbegin(range_), std::cend(range_), filter_)};
+    return {*this, FindIf(std::cbegin(range_), std::cend(range_), filter_)};
   }
 
   iterator end() { return {*this, std::end(range_)}; }
@@ -69,7 +70,7 @@ class filter_view {
     constexpr filter_iterator(const filter_iterator&) = default;
 
     constexpr filter_iterator& operator++() {
-      iter_ = find_if(++iter_, end(), parent_->filter_);
+      iter_ = FindIf(++iter_, end(), parent_->filter_);
       return *this;
     }
 

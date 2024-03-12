@@ -246,8 +246,8 @@ struct StartupLoadModule : public StartupLoadModuleBase,
     size_t count = 0;
     // Save the span of Dyn entries for LoadDeps to scan later.
     dynamic_ =
-        DecodeModuleDynamic(decoded().module(), diag, memory(), dyn_phdr, NeededObserver(count),
-                            elfldltl::DynamicRelocationInfoObserver(decoded().reloc_info()));
+        *DecodeModuleDynamic(decoded().module(), diag, memory(), dyn_phdr, NeededObserver(count),
+                             elfldltl::DynamicRelocationInfoObserver(decoded().reloc_info()));
     return count;
   }
 
