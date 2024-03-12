@@ -1,7 +1,6 @@
 ?bin/blobfs
 bin/component_manager
 ?bin/decompressor
-bin/dlog
 ?bin/f2fs
 ?bin/fshost
 ?bin/fxfs
