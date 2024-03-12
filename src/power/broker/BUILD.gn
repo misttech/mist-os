@@ -18,6 +18,8 @@ fidl("fuchsia.power.broker") {
   # This is still experimental, so restricting visibility for now.
   visibility = [
     "//sdk/fidl/fuchsia.power.system/*:*",
+    "//sdk/lib/driver/power/cpp/*:*",
+    "//src/devices/bus/drivers/platform/test/*:*",
     "//src/power/broker/*:*",
     "//src/power/system-activity-governor/*:*",
     "//src/sys/time/timekeeper/*:*",
