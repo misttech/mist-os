@@ -4,6 +4,8 @@
 
 library fuchsia.images2;
 
+// TODO(b/329151498): Remove this file when build-time support for level 17 and
+// lower is removed.
 
 //
 /// An integral, rectangular, axis-aligned region in a 2D cartesian
@@ -16,9 +18,10 @@ library fuchsia.images2;
 // Some non-protocol types in this library are used by libmagma, which ships in
 // the IDK and must be built at all API levels supported by the IDK. See
 // https://fxbug.dev/42085119. ImageFormat is one of those types and relies on
-// fuchsia.math.RectU which is only available at HEAD. For other API levels,
-// use the definition of RectU that existed before https://fxrev.dev/796842.
-@available(removed=18)
+// fuchsia.math.RectU which is only available at 18. For earlier API levels,
+// use this definition (same as the RectU that existed before
+// https://fxrev.dev/796842).
+@available(added=12, removed=18)
 type RectU = struct {
     /// The location of the origin of the rectangle in the x-axis.
     x uint32;

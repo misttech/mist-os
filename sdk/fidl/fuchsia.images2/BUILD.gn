@@ -14,6 +14,9 @@ fidl("fuchsia.images2") {
   sources = [
     "format_modifier.fidl",
     "image_format.fidl",
+
+    # TODO(b/329151498): Remove when build-time support for level 17 and lower
+    # is removed.
     "math.fidl",
   ]
 
