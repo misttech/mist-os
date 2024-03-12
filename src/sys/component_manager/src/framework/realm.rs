@@ -323,7 +323,7 @@ mod tests {
             },
         },
         assert_matches::assert_matches,
-        cm_rust::{ComponentDecl, ExposeDecl, ExposeProtocolDecl, ExposeSource, ExposeTarget},
+        cm_rust::{ComponentDecl, ExposeSource},
         cm_rust_testing::*,
         fidl::endpoints,
         fidl_fidl_examples_routing_echo as echo, fidl_fuchsia_component as fcomponent,

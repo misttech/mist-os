@@ -623,13 +623,10 @@ impl<T: Send + Sync + 'static> DirectoryEntry for ServiceInstanceDirectoryEntry<
 mod tests {
     use {
         super::*,
-        crate::{
-            capability::CapabilitySource,
-            model::{
-                component::StartReason,
-                start::Start,
-                testing::routing_test_helpers::{RoutingTest, RoutingTestBuilder},
-            },
+        crate::model::{
+            component::StartReason,
+            start::Start,
+            testing::routing_test_helpers::{RoutingTest, RoutingTestBuilder},
         },
         ::routing::{
             capability_source::{ComponentCapability, FilteredAggregateCapabilityRouteData},

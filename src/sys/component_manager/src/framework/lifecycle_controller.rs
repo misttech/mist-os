@@ -22,10 +22,7 @@ use {
     futures::prelude::*,
     lazy_static::lazy_static,
     moniker::{ChildName, Moniker, MonikerBase, MonikerError},
-    std::{
-        convert::TryFrom,
-        sync::{Arc, Weak},
-    },
+    std::sync::{Arc, Weak},
     tracing::warn,
 };
 

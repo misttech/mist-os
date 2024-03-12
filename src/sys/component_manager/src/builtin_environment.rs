@@ -7,7 +7,6 @@ use crate::builtin::smc_resource::SmcResource;
 
 #[cfg(target_arch = "x86_64")]
 use crate::builtin::ioport_resource::IoportResource;
-use crate::model::routing::router::Router;
 
 use {
     crate::{
@@ -76,7 +75,6 @@ use {
             hooks::EventType,
             model::{Model, ModelParams},
             resolver::{box_arc_resolver, ResolverRegistry},
-            routing::router,
             storage::admin_protocol::StorageAdminDerivedCapability,
             token::InstanceRegistry,
         },
@@ -87,24 +85,18 @@ use {
         capability_source::{ComponentCapability, InternalCapability},
         component_instance::TopInstanceInterface,
         environment::{DebugRegistry, RunnerRegistry},
-        error::RoutingError,
-        path::PathBufExt,
         policy::GlobalPolicyChecker,
     },
     anyhow::{format_err, Context as _, Error},
     cm_config::{RuntimeConfig, VmexSource},
     cm_rust::{Availability, RunnerRegistration, UseEventStreamDecl, UseSource},
     cm_types::Name,
-    cm_util::channel,
     elf_runner::{
         crash_info::CrashRecords,
         process_launcher::ProcessLauncher,
         vdso_vmo::{get_next_vdso_vmo, get_stable_vdso_vmo, get_vdso_vmo},
     },
-    fidl::{
-        endpoints::{DiscoverableProtocolMarker, ProtocolMarker, RequestStream, ServerEnd},
-        epitaph::ChannelEpitaphExt,
-    },
+    fidl::endpoints::{DiscoverableProtocolMarker, ProtocolMarker, RequestStream, ServerEnd},
     fidl_fuchsia_boot as fboot,
     fidl_fuchsia_component_internal::BuiltinBootResolver,
     fidl_fuchsia_component_resolution as fresolution,
@@ -120,7 +112,6 @@ use {
     moniker::{Moniker, MonikerBase},
     std::{iter, sync::Arc},
     tracing::{info, warn},
-    vfs::execution_scope::ExecutionScope,
 };
 
 #[cfg(test)]

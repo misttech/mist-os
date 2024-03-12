@@ -881,7 +881,7 @@ mod tests {
         },
         cm_rust::{
             Availability, ChildDecl, ComponentDecl, DependencyType, ExposeProtocolDecl,
-            ExposeRunnerDecl, ExposeSource, ExposeTarget, StorageDecl,
+            ExposeSource, ExposeTarget, StorageDecl,
         },
         cm_rust_testing::*,
         cm_types::AllowedOffers,

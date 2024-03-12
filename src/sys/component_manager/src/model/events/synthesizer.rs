@@ -270,7 +270,7 @@ mod tests {
             hooks::EventPayload,
             testing::routing_test_helpers::*,
         },
-        cm_rust::{CapabilityDecl, ExposeDecl, ExposeDirectoryDecl, ExposeSource, ExposeTarget},
+        cm_rust::{CapabilityDecl, ExposeDecl, ExposeSource, ExposeTarget},
         cm_rust_testing::*,
         fidl_fuchsia_io as fio,
         routing::component_instance::ComponentInstanceInterface,

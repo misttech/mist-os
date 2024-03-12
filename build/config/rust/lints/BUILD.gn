@@ -156,7 +156,6 @@ config("allow_unused_imports") {
     "//src/storage/benchmarks/host:*",
     "//src/storage/fxfs:*",
     "//src/storage/lib/vfs/rust:*",
-    "//src/sys/component_manager/*",
     "//src/sys/lib/routing:*",
     "//src/sys/pkg/bin/pkg-cache:*",
     "//src/ui/*",

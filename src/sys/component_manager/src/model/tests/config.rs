@@ -8,11 +8,7 @@ mod tests {
     use crate::model::component::StartReason;
     use moniker::Moniker;
     use moniker::MonikerBase;
-    use {
-        crate::model::testing::routing_test_helpers::*, cm_rust::*, cm_rust_testing::*,
-        fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_io as fio, fuchsia_zircon as zx,
-        routing_test_helpers::RoutingTestModel, std::path::PathBuf,
-    };
+    use {crate::model::testing::routing_test_helpers::*, cm_rust::*, cm_rust_testing::*};
 
     async fn start_component_get_config(
         test: &RoutingTest,
