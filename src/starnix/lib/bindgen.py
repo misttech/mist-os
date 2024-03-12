@@ -29,6 +29,12 @@ GENERATED_FILE_HEADER = (
     % datetime.datetime.now().year
 )
 
+# Replacements to add to these defined by the user.
+BASE_REPLACEMENTS = [
+    # Remove alignment field that use u8
+    (re.compile(r"pub _bitfield_align_[0-9]*: \[u8; 0\],\n"), ""),
+]
+
 
 class Bindgen:
     def __init__(self):
@@ -38,7 +44,7 @@ class Bindgen:
         self.opaque_types = []
         self.include_dirs = []
         self.auto_derive_traits = []
-        self.replacements = []
+        self.replacements = BASE_REPLACEMENTS
         self.ignore_functions = False
         self.function_allowlist = []
         self.var_allowlist = []
@@ -50,7 +56,9 @@ class Bindgen:
         self.auto_derive_traits = [(re.compile(x[0]), x[1]) for x in traits_map]
 
     def set_replacements(self, replacements):
-        self.replacements = [(re.compile(x[0]), x[1]) for x in replacements]
+        self.replacements = [
+            (re.compile(x[0]), x[1]) for x in replacements
+        ] + BASE_REPLACEMENTS
 
     def run_bindgen(self, input_file, output_file):
         # Bindgen arguments.

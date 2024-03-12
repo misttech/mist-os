@@ -6384,7 +6384,6 @@ pub type _bindgen_ty_5 = crate::types::c_uint;
 #[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
 pub struct bpf_insn {
     pub code: __u8,
-    pub _bitfield_align_1: [u8; 0],
     pub _bitfield_1: __BindgenBitfieldUnit<[u8; 1usize]>,
     pub off: __s16,
     pub imm: __s32,
@@ -7498,7 +7497,6 @@ pub struct __sk_buff {
     pub __bindgen_anon_2: __sk_buff__bindgen_ty_2,
     pub gso_size: __u32,
     pub tstamp_type: __u8,
-    pub _bitfield_align_1: [u8; 0],
     pub _bitfield_1: __BindgenBitfieldUnit<[u8; 3usize]>,
     pub hwtstamp: __u64,
 }
@@ -7506,7 +7504,6 @@ pub struct __sk_buff {
 #[derive(Copy, Clone)]
 pub union __sk_buff__bindgen_ty_1 {
     pub flow_keys: uref<bpf_flow_keys>,
-    pub _bitfield_align_1: [u8; 0],
     pub _bitfield_1: __BindgenBitfieldUnit<[u8; 8usize]>,
 }
 impl Default for __sk_buff__bindgen_ty_1 {
@@ -7529,7 +7526,6 @@ impl __sk_buff__bindgen_ty_1 {
 #[derive(Copy, Clone)]
 pub union __sk_buff__bindgen_ty_2 {
     pub sk: uref<bpf_sock>,
-    pub _bitfield_align_1: [u8; 0],
     pub _bitfield_1: __BindgenBitfieldUnit<[u8; 8usize]>,
 }
 impl Default for __sk_buff__bindgen_ty_2 {
@@ -7681,7 +7677,6 @@ pub struct bpf_sock {
     pub src_ip6: [__u32; 4usize],
     pub src_port: __u32,
     pub dst_port: __be16,
-    pub _bitfield_align_1: [u8; 0],
     pub _bitfield_1: __BindgenBitfieldUnit<[u8; 2usize]>,
     pub dst_ip4: __u32,
     pub dst_ip6: [__u32; 4usize],
@@ -7873,7 +7868,6 @@ pub struct sk_msg_md {
 #[derive(Copy, Clone)]
 pub union sk_msg_md__bindgen_ty_1 {
     pub data: uaddr,
-    pub _bitfield_align_1: [u8; 0],
     pub _bitfield_1: __BindgenBitfieldUnit<[u8; 8usize]>,
 }
 impl Default for sk_msg_md__bindgen_ty_1 {
@@ -7896,7 +7890,6 @@ impl sk_msg_md__bindgen_ty_1 {
 #[derive(Copy, Clone)]
 pub union sk_msg_md__bindgen_ty_2 {
     pub data_end: uaddr,
-    pub _bitfield_align_1: [u8; 0],
     pub _bitfield_1: __BindgenBitfieldUnit<[u8; 8usize]>,
 }
 impl Default for sk_msg_md__bindgen_ty_2 {
@@ -7919,7 +7912,6 @@ impl sk_msg_md__bindgen_ty_2 {
 #[derive(Copy, Clone)]
 pub union sk_msg_md__bindgen_ty_3 {
     pub sk: uref<bpf_sock>,
-    pub _bitfield_align_1: [u8; 0],
     pub _bitfield_1: __BindgenBitfieldUnit<[u8; 8usize]>,
 }
 impl Default for sk_msg_md__bindgen_ty_3 {
@@ -7965,7 +7957,6 @@ pub struct sk_reuseport_md {
 #[derive(Copy, Clone)]
 pub union sk_reuseport_md__bindgen_ty_1 {
     pub data: uaddr,
-    pub _bitfield_align_1: [u8; 0],
     pub _bitfield_1: __BindgenBitfieldUnit<[u8; 8usize]>,
 }
 impl Default for sk_reuseport_md__bindgen_ty_1 {
@@ -7988,7 +7979,6 @@ impl sk_reuseport_md__bindgen_ty_1 {
 #[derive(Copy, Clone)]
 pub union sk_reuseport_md__bindgen_ty_2 {
     pub data_end: uaddr,
-    pub _bitfield_align_1: [u8; 0],
     pub _bitfield_1: __BindgenBitfieldUnit<[u8; 8usize]>,
 }
 impl Default for sk_reuseport_md__bindgen_ty_2 {
@@ -8011,7 +8001,6 @@ impl sk_reuseport_md__bindgen_ty_2 {
 #[derive(Copy, Clone)]
 pub union sk_reuseport_md__bindgen_ty_3 {
     pub sk: uref<bpf_sock>,
-    pub _bitfield_align_1: [u8; 0],
     pub _bitfield_1: __BindgenBitfieldUnit<[u8; 8usize]>,
 }
 impl Default for sk_reuseport_md__bindgen_ty_3 {
@@ -8034,7 +8023,6 @@ impl sk_reuseport_md__bindgen_ty_3 {
 #[derive(Copy, Clone)]
 pub union sk_reuseport_md__bindgen_ty_4 {
     pub migrating_sk: uref<bpf_sock>,
-    pub _bitfield_align_1: [u8; 0],
     pub _bitfield_1: __BindgenBitfieldUnit<[u8; 8usize]>,
 }
 impl Default for sk_reuseport_md__bindgen_ty_4 {
@@ -8078,7 +8066,6 @@ pub struct bpf_prog_info {
     pub map_ids: __u64,
     pub name: [crate::types::c_char; 16usize],
     pub ifindex: __u32,
-    pub _bitfield_align_1: [u8; 0],
     pub _bitfield_1: __BindgenBitfieldUnit<[u8; 4usize]>,
     pub netns_dev: __u64,
     pub netns_ino: __u64,
@@ -8145,7 +8132,6 @@ pub struct bpf_map_info {
     pub btf_id: __u32,
     pub btf_key_type_id: __u32,
     pub btf_value_type_id: __u32,
-    pub _bitfield_align_1: [u8; 0],
     pub _bitfield_1: __BindgenBitfieldUnit<[u8; 4usize]>,
     pub map_extra: __u64,
 }
@@ -8333,7 +8319,6 @@ pub struct bpf_sock_addr {
 #[derive(Copy, Clone)]
 pub union bpf_sock_addr__bindgen_ty_1 {
     pub sk: uref<bpf_sock>,
-    pub _bitfield_align_1: [u8; 0],
     pub _bitfield_1: __BindgenBitfieldUnit<[u8; 8usize]>,
 }
 impl Default for bpf_sock_addr__bindgen_ty_1 {
@@ -8426,7 +8411,6 @@ impl Default for bpf_sock_ops__bindgen_ty_1 {
 #[derive(Copy, Clone)]
 pub union bpf_sock_ops__bindgen_ty_2 {
     pub sk: uref<bpf_sock>,
-    pub _bitfield_align_1: [u8; 0],
     pub _bitfield_1: __BindgenBitfieldUnit<[u8; 8usize]>,
 }
 impl Default for bpf_sock_ops__bindgen_ty_2 {
@@ -8449,7 +8433,6 @@ impl bpf_sock_ops__bindgen_ty_2 {
 #[derive(Copy, Clone)]
 pub union bpf_sock_ops__bindgen_ty_3 {
     pub skb_data: uaddr,
-    pub _bitfield_align_1: [u8; 0],
     pub _bitfield_1: __BindgenBitfieldUnit<[u8; 8usize]>,
 }
 impl Default for bpf_sock_ops__bindgen_ty_3 {
@@ -8472,7 +8455,6 @@ impl bpf_sock_ops__bindgen_ty_3 {
 #[derive(Copy, Clone)]
 pub union bpf_sock_ops__bindgen_ty_4 {
     pub skb_data_end: uaddr,
-    pub _bitfield_align_1: [u8; 0],
     pub _bitfield_1: __BindgenBitfieldUnit<[u8; 8usize]>,
 }
 impl Default for bpf_sock_ops__bindgen_ty_4 {
@@ -8824,7 +8806,6 @@ pub struct bpf_spin_lock {
 #[repr(align(8))]
 #[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
 pub struct bpf_timer {
-    pub _bitfield_align_1: [u8; 0],
     pub _bitfield_1: __BindgenBitfieldUnit<[u8; 16usize]>,
 }
 impl bpf_timer {
@@ -8838,7 +8819,6 @@ impl bpf_timer {
 #[repr(align(8))]
 #[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
 pub struct bpf_dynptr {
-    pub _bitfield_align_1: [u8; 0],
     pub _bitfield_1: __BindgenBitfieldUnit<[u8; 16usize]>,
 }
 impl bpf_dynptr {
@@ -8852,7 +8832,6 @@ impl bpf_dynptr {
 #[repr(align(8))]
 #[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
 pub struct bpf_list_head {
-    pub _bitfield_align_1: [u8; 0],
     pub _bitfield_1: __BindgenBitfieldUnit<[u8; 16usize]>,
 }
 impl bpf_list_head {
@@ -8866,7 +8845,6 @@ impl bpf_list_head {
 #[repr(align(8))]
 #[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
 pub struct bpf_list_node {
-    pub _bitfield_align_1: [u8; 0],
     pub _bitfield_1: __BindgenBitfieldUnit<[u8; 16usize]>,
 }
 impl bpf_list_node {
@@ -8880,7 +8858,6 @@ impl bpf_list_node {
 #[repr(align(8))]
 #[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
 pub struct bpf_rb_root {
-    pub _bitfield_align_1: [u8; 0],
     pub _bitfield_1: __BindgenBitfieldUnit<[u8; 16usize]>,
 }
 impl bpf_rb_root {
@@ -8894,7 +8871,6 @@ impl bpf_rb_root {
 #[repr(align(8))]
 #[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
 pub struct bpf_rb_node {
-    pub _bitfield_align_1: [u8; 0],
     pub _bitfield_1: __BindgenBitfieldUnit<[u8; 24usize]>,
 }
 impl bpf_rb_node {
@@ -8908,7 +8884,6 @@ impl bpf_rb_node {
 #[repr(align(4))]
 #[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
 pub struct bpf_refcount {
-    pub _bitfield_align_1: [u8; 0],
     pub _bitfield_1: __BindgenBitfieldUnit<[u8; 4usize]>,
 }
 impl bpf_refcount {
@@ -8939,7 +8914,6 @@ pub struct bpf_sockopt {
 #[derive(Copy, Clone)]
 pub union bpf_sockopt__bindgen_ty_1 {
     pub sk: uref<bpf_sock>,
-    pub _bitfield_align_1: [u8; 0],
     pub _bitfield_1: __BindgenBitfieldUnit<[u8; 8usize]>,
 }
 impl Default for bpf_sockopt__bindgen_ty_1 {
@@ -8962,7 +8936,6 @@ impl bpf_sockopt__bindgen_ty_1 {
 #[derive(Copy, Clone)]
 pub union bpf_sockopt__bindgen_ty_2 {
     pub optval: uaddr,
-    pub _bitfield_align_1: [u8; 0],
     pub _bitfield_1: __BindgenBitfieldUnit<[u8; 8usize]>,
 }
 impl Default for bpf_sockopt__bindgen_ty_2 {
@@ -8985,7 +8958,6 @@ impl bpf_sockopt__bindgen_ty_2 {
 #[derive(Copy, Clone)]
 pub union bpf_sockopt__bindgen_ty_3 {
     pub optval_end: uaddr,
-    pub _bitfield_align_1: [u8; 0],
     pub _bitfield_1: __BindgenBitfieldUnit<[u8; 8usize]>,
 }
 impl Default for bpf_sockopt__bindgen_ty_3 {
@@ -9028,7 +9000,6 @@ pub struct bpf_sk_lookup {
     pub remote_ip4: __u32,
     pub remote_ip6: [__u32; 4usize],
     pub remote_port: __be16,
-    pub _bitfield_align_1: [u8; 0],
     pub _bitfield_1: __BindgenBitfieldUnit<[u8; 2usize]>,
     pub local_ip4: __u32,
     pub local_ip6: [__u32; 4usize],
@@ -9046,7 +9017,6 @@ pub union bpf_sk_lookup__bindgen_ty_1 {
 #[derive(Copy, Clone)]
 pub union bpf_sk_lookup__bindgen_ty_1__bindgen_ty_1 {
     pub sk: uref<bpf_sock>,
-    pub _bitfield_align_1: [u8; 0],
     pub _bitfield_1: __BindgenBitfieldUnit<[u8; 8usize]>,
 }
 impl Default for bpf_sk_lookup__bindgen_ty_1__bindgen_ty_1 {
@@ -10675,7 +10645,6 @@ impl Default for ff_effect {
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub struct iphdr {
-    pub _bitfield_align_1: [u8; 0],
     pub _bitfield_1: __BindgenBitfieldUnit<[u8; 1usize]>,
     pub tos: __u8,
     pub tot_len: __be16,
@@ -11020,7 +10989,6 @@ impl Default for ipv6_destopt_hao {
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub struct ipv6hdr {
-    pub _bitfield_align_1: [u8; 0],
     pub _bitfield_1: __BindgenBitfieldUnit<[u8; 1usize]>,
     pub flow_lbl: [__u8; 3usize],
     pub payload_len: __be16,
