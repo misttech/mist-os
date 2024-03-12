@@ -9,23 +9,18 @@ load(
     _fuchsia_prebuilt_package = "fuchsia_prebuilt_package",
 )
 load(
-    "//fuchsia/private/assembly:fuchsia_platform_artifacts.bzl",
-    _fuchsia_legacy_bundle = "fuchsia_legacy_bundle",
-    _fuchsia_platform_artifacts = "fuchsia_platform_artifacts",
-)
-load(
     "//fuchsia/private/assembly:fuchsia_assemble_package.bzl",
     _fuchsia_assemble_package = "fuchsia_assemble_package",
-)
-load(
-    "//fuchsia/private/assembly:fuchsia_board_input_bundle.bzl",
-    _fuchsia_board_input_bundle = "fuchsia_board_input_bundle",
-    _fuchsia_prebuilt_board_input_bundle = "fuchsia_prebuilt_board_input_bundle",
 )
 load(
     "//fuchsia/private/assembly:fuchsia_board_configuration.bzl",
     _fuchsia_board_configuration = "fuchsia_board_configuration",
     _fuchsia_prebuilt_board_configuration = "fuchsia_prebuilt_board_configuration",
+)
+load(
+    "//fuchsia/private/assembly:fuchsia_board_input_bundle.bzl",
+    _fuchsia_board_input_bundle = "fuchsia_board_input_bundle",
+    _fuchsia_prebuilt_board_input_bundle = "fuchsia_prebuilt_board_input_bundle",
 )
 load(
     "//fuchsia/private/assembly:fuchsia_bootloader_partition.bzl",
@@ -56,6 +51,11 @@ load(
 load(
     "//fuchsia/private/assembly:fuchsia_partitions_configuration.bzl",
     _fuchsia_partitions_configuration = "fuchsia_partitions_configuration",
+)
+load(
+    "//fuchsia/private/assembly:fuchsia_platform_artifacts.bzl",
+    _fuchsia_legacy_bundle = "fuchsia_legacy_bundle",
+    _fuchsia_platform_artifacts = "fuchsia_platform_artifacts",
 )
 load(
     "//fuchsia/private/assembly:fuchsia_product_bundle.bzl",
