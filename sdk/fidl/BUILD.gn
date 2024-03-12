@@ -229,9 +229,10 @@ group("sdk_partner_libs") {
 # this group is used to ensure that we run the FIDL API compatibility tests on
 # these libraries.
 _sdk_partner_internal_fidl_libraries = [
+  # keep-sorted: begin
   "fuchsia.audio.controller",
-  "fuchsia.dash",
   "fuchsia.bluetooth.pandora",
+  "fuchsia.dash",
   "fuchsia.debugdata",
   "fuchsia.debugger",
   "fuchsia.developer.ffxdaemonlifecycle",
@@ -239,19 +240,21 @@ _sdk_partner_internal_fidl_libraries = [
   "fuchsia.diagnostics.host",
   "fuchsia.fs",
   "fuchsia.hardware.pty",
-  "fuchsia.net.name",
   "fuchsia.memory.debug",
   "fuchsia.memory.heapdump.client",
   "fuchsia.memory.inspection",
+  "fuchsia.net.name",
   "fuchsia.overnet.protocol",
+  "fuchsia.posix",
+  "fuchsia.posix.socket",
   "fuchsia.posix.socket.packet",
   "fuchsia.posix.socket.raw",
-  "fuchsia.posix.socket",
-  "fuchsia.posix",
+  "fuchsia.power.metrics",
   "fuchsia.starnix.container",
   "fuchsia.sys2",
   "fuchsia.vulkan.loader",
-  "fuchsia.power.metrics",
+
+  # keep-sorted: end
 ]
 
 group("sdk_partner_internal_libs") {
