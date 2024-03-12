@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use {
-    element_launcher_config, fidl_fuchsia_element as element,
+    fidl_fuchsia_element as element,
     fuchsia_component::client::connect_to_protocol,
     tracing::{info, warn},
 };
@@ -37,4 +37,9 @@ async fn main() {
         .await
         .expect("Failed to call ProposeElement.")
         .expect("Failed to propose element.");
+}
+
+#[cfg(test)]
+mod tests {
+    // TODO(https://fxbug.dev/329232994): Add unit tests
 }

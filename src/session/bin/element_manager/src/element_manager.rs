@@ -22,7 +22,6 @@ use {
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_element as felement, fidl_fuchsia_io as fio,
     fidl_fuchsia_ui_app as fuiapp,
     fuchsia_async::{self as fasync, DurationExt},
-    fuchsia_component,
     fuchsia_fs::directory as ffs_dir,
     fuchsia_scenic as scenic, fuchsia_zircon as zx,
     futures::{lock::Mutex, select, FutureExt, StreamExt, TryStreamExt},

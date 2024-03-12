@@ -13,11 +13,6 @@ use {
     futures::{StreamExt, TryFutureExt, TryStreamExt},
     std::sync::{Arc, Mutex},
     tracing::{error, warn},
-    vfs::{
-        directory::{entry::EntryInfo, simple::OpenRequest},
-        execution_scope::ExecutionScope,
-        remote::RemoteLike,
-    },
 };
 
 /// Maximum number of concurrent connections to the protocols served by SessionManager.
@@ -432,9 +427,7 @@ mod tests {
         futures::prelude::*,
         lazy_static::lazy_static,
         session_testing::{spawn_directory_server, spawn_noop_directory_server, spawn_server},
-        std::sync::Arc,
         test_util::Counter,
-        vfs::{execution_scope::ExecutionScope, remote::RemoteLike},
     };
 
     fn serve_launcher(session_manager: SessionManager) -> fsession::LauncherProxy {
