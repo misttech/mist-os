@@ -39,6 +39,7 @@ type fakeSSHClient struct {
 	runErrs        []error
 	runCalls       int
 	lastCmd        []string
+	shuttingDown   chan struct{}
 }
 
 func (c *fakeSSHClient) Run(_ context.Context, command []string, _, _ io.Writer) error {
@@ -52,7 +53,18 @@ func (c *fakeSSHClient) Run(_ context.Context, command []string, _, _ io.Writer)
 	return err
 }
 
-func (c *fakeSSHClient) Close() {}
+func (c *fakeSSHClient) Close() {
+	if c.shuttingDown != nil {
+		close(c.shuttingDown)
+	}
+}
+
+func (c *fakeSSHClient) DisconnectionListener() <-chan struct{} {
+	if c.shuttingDown == nil {
+		c.shuttingDown = make(chan struct{})
+	}
+	return c.shuttingDown
+}
 
 func (c *fakeSSHClient) ReconnectWithBackoff(_ context.Context, _ retry.Backoff) error {
 	c.reconnectCalls++

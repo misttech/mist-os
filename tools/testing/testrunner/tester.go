@@ -110,6 +110,7 @@ var newTempDir = func(dir, pattern string) (string, error) {
 // For testability
 type sshClient interface {
 	Close()
+	DisconnectionListener() <-chan struct{}
 	ReconnectWithBackoff(ctx context.Context, backoff retry.Backoff) error
 	Run(ctx context.Context, command []string, stdout, stderr io.Writer) error
 }
@@ -1109,6 +1110,14 @@ func (t *FuchsiaSSHTester) isTimeoutError(test testsharder.Test, err error) bool
 }
 
 func (t *FuchsiaSSHTester) runSSHCommand(ctx context.Context, command []string, stdout, stderr io.Writer) error {
+	select {
+	case <-t.client.DisconnectionListener():
+		if err := t.Reconnect(ctx); err != nil {
+			return err
+		}
+	default:
+		// The client is still connected, so continue to run the command.
+	}
 	cmdErr := t.client.Run(ctx, command, stdout, stderr)
 	if sshutil.IsConnectionError(cmdErr) {
 		return connectionError{cmdErr}
