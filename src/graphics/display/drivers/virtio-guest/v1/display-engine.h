@@ -121,6 +121,10 @@ class DisplayEngine : public ddk::DisplayControllerImplProtocol<DisplayEngine, d
 
   bool DisplayControllerImplIsCaptureCompleted() { return false; }
 
+  zx_status_t DisplayControllerImplSetMinimumRgb(uint8_t minimum_rgb) {
+    return ZX_ERR_NOT_SUPPORTED;
+  }
+
   VirtioPciDevice& pci_device() { return gpu_device_->pci_device(); }
 
  private:

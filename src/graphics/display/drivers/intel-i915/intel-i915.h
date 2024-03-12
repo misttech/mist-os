@@ -129,6 +129,9 @@ class Controller : public DeviceType,
     return ZX_ERR_NOT_SUPPORTED;
   }
   bool DisplayControllerImplIsCaptureCompleted() { return false; }
+  zx_status_t DisplayControllerImplSetMinimumRgb(uint8_t minimum_rgb) {
+    return ZX_ERR_NOT_SUPPORTED;
+  }
 
   // gpu core ops
   zx_status_t IntelGpuCoreReadPciConfig16(uint16_t addr, uint16_t* value_out);

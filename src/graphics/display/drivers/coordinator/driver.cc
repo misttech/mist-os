@@ -49,17 +49,13 @@ zx_status_t Driver::Bind() {
 
   // Fallback to Banjo protocol.
   dc_ = ddk::DisplayControllerImplProtocolClient(parent_);
-  if (dc_.is_valid()) {
-    zxlogf(INFO, "Using Banjo display controller protocol");
-
-    // optional display controller clamp rgb protocol client
-    dc_clamp_rgb_ = ddk::DisplayClampRgbImplProtocolClient(parent_);
-
-    return ZX_OK;
+  if (!dc_.is_valid()) {
+    zxlogf(ERROR, "Failed to get Banjo or FIDL display controller protocol");
+    return ZX_ERR_NOT_SUPPORTED;
   }
 
-  zxlogf(ERROR, "Failed to get Banjo or FIDL display controller protocol");
-  return ZX_ERR_NOT_SUPPORTED;
+  zxlogf(INFO, "Using Banjo display controller protocol");
+  return ZX_OK;
 }
 
 void Driver::ReleaseImage(image_t* image) {
@@ -228,11 +224,8 @@ zx_status_t Driver::SetMinimumRgb(uint8_t minimum_rgb) {
     return ZX_OK;
   }
 
-  if (dc_clamp_rgb_.is_valid()) {
-    return dc_clamp_rgb_.SetMinimumRgb(minimum_rgb);
-  }
-
-  return ZX_ERR_NOT_SUPPORTED;
+  ZX_DEBUG_ASSERT(dc_.is_valid());
+  return dc_.SetMinimumRgb(minimum_rgb);
 }
 
 zx_status_t Driver::GetSysmemConnection(zx::channel sysmem_handle) {

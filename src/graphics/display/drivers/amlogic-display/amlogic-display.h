@@ -9,7 +9,6 @@
 #include <fidl/fuchsia.hardware.sysmem/cpp/wire.h>
 #include <fidl/fuchsia.images2/cpp/wire.h>
 #include <fidl/fuchsia.sysmem/cpp/wire.h>
-#include <fuchsia/hardware/display/clamprgb/cpp/banjo.h>
 #include <fuchsia/hardware/display/controller/cpp/banjo.h>
 #include <fuchsia/hardware/platform/device/cpp/banjo.h>
 #include <lib/ddk/debug.h>
@@ -72,15 +71,13 @@ struct ImageInfo : public fbl::DoublyLinkedListable<std::unique_ptr<ImageInfo>> 
 };
 
 class AmlogicDisplay;
-class ClampRgb;
 
 // AmlogicDisplay will implement only a few subset of Device.
 using DeviceType = ddk::Device<AmlogicDisplay, ddk::GetProtocolable, ddk::Suspendable,
                                ddk::Resumable, ddk::ChildPreReleaseable>;
 class AmlogicDisplay
     : public DeviceType,
-      public ddk::DisplayControllerImplProtocol<AmlogicDisplay, ddk::base_protocol>,
-      public ddk::DisplayClampRgbImplProtocol<AmlogicDisplay> {
+      public ddk::DisplayControllerImplProtocol<AmlogicDisplay, ddk::base_protocol> {
  public:
   // Factory method used by the device manager glue code.
   static zx_status_t Create(zx_device_t* parent);
@@ -135,7 +132,7 @@ class AmlogicDisplay
   zx_status_t DisplayControllerImplReleaseCapture(uint64_t capture_handle);
   bool DisplayControllerImplIsCaptureCompleted() __TA_EXCLUDES(capture_mutex_);
 
-  zx_status_t DisplayClampRgbImplSetMinimumRgb(uint8_t minimum_rgb);
+  zx_status_t DisplayControllerImplSetMinimumRgb(uint8_t minimum_rgb);
 
   // Required functions for DeviceType
   void DdkSuspend(ddk::SuspendTxn txn);

@@ -97,6 +97,9 @@ class SimpleDisplay : public DeviceType,
     return ZX_ERR_NOT_SUPPORTED;
   }
   bool DisplayControllerImplIsCaptureCompleted() { return false; }
+  zx_status_t DisplayControllerImplSetMinimumRgb(uint8_t minimum_rgb) {
+    return ZX_ERR_NOT_SUPPORTED;
+  }
 
   const std::unordered_map<display::DriverBufferCollectionId,
                            fidl::WireSyncClient<fuchsia_sysmem2::BufferCollection>>&

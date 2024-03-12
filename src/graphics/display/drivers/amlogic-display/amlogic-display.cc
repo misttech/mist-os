@@ -7,7 +7,6 @@
 #include <fidl/fuchsia.hardware.amlogiccanvas/cpp/wire.h>
 #include <fidl/fuchsia.hardware.gpio/cpp/wire.h>
 #include <fidl/fuchsia.sysmem/cpp/wire.h>
-#include <fuchsia/hardware/display/clamprgb/cpp/banjo.h>
 #include <fuchsia/hardware/display/controller/cpp/banjo.h>
 #include <fuchsia/hardware/dsiimpl/cpp/banjo.h>
 #include <lib/ddk/binding_driver.h>
@@ -163,7 +162,7 @@ bool AmlogicDisplay::IsNewDisplayTiming(const display::DisplayTiming& timing) {
   return current_display_timing_ != timing;
 }
 
-zx_status_t AmlogicDisplay::DisplayClampRgbImplSetMinimumRgb(uint8_t minimum_rgb) {
+zx_status_t AmlogicDisplay::DisplayControllerImplSetMinimumRgb(uint8_t minimum_rgb) {
   if (fully_initialized()) {
     video_input_unit_->SetMinimumRgb(minimum_rgb);
     return ZX_OK;
@@ -637,9 +636,6 @@ zx_status_t AmlogicDisplay::DdkGetProtocol(uint32_t proto_id, void* out_protocol
   switch (proto_id) {
     case ZX_PROTOCOL_DISPLAY_CONTROLLER_IMPL:
       proto->ops = &display_controller_impl_protocol_ops_;
-      return ZX_OK;
-    case ZX_PROTOCOL_DISPLAY_CLAMP_RGB_IMPL:
-      proto->ops = &display_clamp_rgb_impl_protocol_ops_;
       return ZX_OK;
     default:
       return ZX_ERR_NOT_SUPPORTED;

@@ -6,7 +6,6 @@
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_FAKE_FAKE_DISPLAY_H_
 
 #include <fidl/fuchsia.sysmem/cpp/fidl.h>
-#include <fuchsia/hardware/display/clamprgb/cpp/banjo.h>
 #include <fuchsia/hardware/display/controller/cpp/banjo.h>
 #include <fuchsia/hardware/sysmem/cpp/banjo.h>
 #include <lib/ddk/driver.h>
@@ -61,8 +60,7 @@ struct FakeDisplayDeviceConfig {
 };
 
 class FakeDisplay : public DeviceType,
-                    public ddk::DisplayControllerImplProtocol<FakeDisplay, ddk::base_protocol>,
-                    public ddk::DisplayClampRgbImplProtocol<FakeDisplay> {
+                    public ddk::DisplayControllerImplProtocol<FakeDisplay, ddk::base_protocol> {
  public:
   explicit FakeDisplay(zx_device_t* parent, FakeDisplayDeviceConfig device_config,
                        inspect::Inspector inspector);
@@ -111,7 +109,7 @@ class FakeDisplay : public DeviceType,
       __TA_EXCLUDES(capture_mutex_);
   bool DisplayControllerImplIsCaptureCompleted() __TA_EXCLUDES(capture_mutex_);
 
-  zx_status_t DisplayClampRgbImplSetMinimumRgb(uint8_t minimum_rgb);
+  zx_status_t DisplayControllerImplSetMinimumRgb(uint8_t minimum_rgb);
 
   // Required functions for DeviceType
   void DdkRelease();
@@ -123,9 +121,6 @@ class FakeDisplay : public DeviceType,
 
   const display_controller_impl_protocol_t* display_controller_impl_banjo_protocol() const {
     return &display_controller_impl_banjo_protocol_;
-  }
-  const display_clamp_rgb_impl_protocol_t* display_clamp_rgb_impl_banjo_protocol() const {
-    return &display_clamp_rgb_impl_banjo_protocol_;
   }
 
   void SendVsync();
@@ -181,9 +176,6 @@ class FakeDisplay : public DeviceType,
 
   // Banjo vtable for fuchsia.hardware.display.controller.DisplayControllerImpl.
   const display_controller_impl_protocol_t display_controller_impl_banjo_protocol_;
-
-  // Banjo vtable for fuchsia.hardware.display.clamprgb.DisplayClampRgbImpl.
-  const display_clamp_rgb_impl_protocol_t display_clamp_rgb_impl_banjo_protocol_;
 
   FakeDisplayDeviceConfig device_config_;
 
@@ -255,7 +247,7 @@ class FakeDisplay : public DeviceType,
   // for signal capture complete
   uint64_t capture_complete_signal_count_ TA_GUARDED(capture_mutex_) = 0;
 
-  // Minimum value of RGB channels, via the DisplayClampRgbImpl protocol.
+  // Minimum value of RGB channels, via the SetMinimumRgb() method.
   //
   // This is associated with the display capture lock so we have the option to
   // reflect the clamping when we simulate display capture.

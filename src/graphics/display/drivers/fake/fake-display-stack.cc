@@ -69,9 +69,6 @@ FakeDisplayStack::FakeDisplayStack(std::shared_ptr<zx_device> mock_root,
   mock_display->AddProtocol(ZX_PROTOCOL_DISPLAY_CONTROLLER_IMPL,
                             display_->display_controller_impl_banjo_protocol()->ops,
                             display_->display_controller_impl_banjo_protocol()->ctx);
-  mock_display->AddProtocol(ZX_PROTOCOL_DISPLAY_CLAMP_RGB_IMPL,
-                            display_->display_clamp_rgb_impl_banjo_protocol()->ops,
-                            display_->display_clamp_rgb_impl_banjo_protocol()->ctx);
 
   std::unique_ptr<display::Controller> c(new Controller(mock_display));
   // Save a copy for test cases.

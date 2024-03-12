@@ -78,7 +78,6 @@ FakeDisplay::FakeDisplay(zx_device_t* parent, FakeDisplayDeviceConfig device_con
                          inspect::Inspector inspector)
     : DeviceType(parent),
       display_controller_impl_banjo_protocol_({&display_controller_impl_protocol_ops_, this}),
-      display_clamp_rgb_impl_banjo_protocol_({&display_clamp_rgb_impl_protocol_ops_, this}),
       device_config_(device_config),
       inspector_(std::move(inspector)) {
   ZX_DEBUG_ASSERT(parent);
@@ -86,7 +85,7 @@ FakeDisplay::FakeDisplay(zx_device_t* parent, FakeDisplayDeviceConfig device_con
 
 FakeDisplay::~FakeDisplay() = default;
 
-zx_status_t FakeDisplay::DisplayClampRgbImplSetMinimumRgb(uint8_t minimum_rgb) {
+zx_status_t FakeDisplay::DisplayControllerImplSetMinimumRgb(uint8_t minimum_rgb) {
   fbl::AutoLock lock(&capture_mutex_);
 
   clamp_rgb_value_ = minimum_rgb;
@@ -712,9 +711,6 @@ zx_status_t FakeDisplay::DdkGetProtocol(uint32_t proto_id, void* out_protocol) {
   switch (proto_id) {
     case ZX_PROTOCOL_DISPLAY_CONTROLLER_IMPL:
       proto->ops = &display_controller_impl_protocol_ops_;
-      return ZX_OK;
-    case ZX_PROTOCOL_DISPLAY_CLAMP_RGB_IMPL:
-      proto->ops = &display_clamp_rgb_impl_protocol_ops_;
       return ZX_OK;
     default:
       return ZX_ERR_NOT_SUPPORTED;

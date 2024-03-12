@@ -100,6 +100,9 @@ class Display : public DisplayType,
     return ZX_ERR_NOT_SUPPORTED;
   }
   bool DisplayControllerImplIsCaptureCompleted() { return false; }
+  zx_status_t DisplayControllerImplSetMinimumRgb(uint8_t minimum_rgb) {
+    return ZX_ERR_NOT_SUPPORTED;
+  }
 
   void SetSysmemAllocatorForTesting(
       fidl::WireSyncClient<fuchsia_sysmem::Allocator> sysmem_allocator_client) {

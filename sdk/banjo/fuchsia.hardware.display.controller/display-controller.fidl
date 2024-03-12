@@ -562,4 +562,19 @@ closed protocol DisplayControllerImpl {
     strict IsCaptureCompleted() -> (struct {
         is_capture_completed bool;
     });
+
+    /// Set the minimum value of RGB channels.
+    ///
+    /// Returns ZX_ERR_NOT_SUPPORTED if RGB clamping is not supported.
+    //
+    // TODO(https://fxbug.dev/328903017): This is a provisional method meant
+    // to address a hardware issue where RGB channels need to get clamped in
+    // order to reduce backlight bleeding. Revise this API when migrating this
+    // protocol to FIDL.
+    strict SetMinimumRgb(struct {
+        /// Must be >= 0 and <= 255.
+        minimum_rgb uint8;
+    }) -> (struct {
+        s zx.Status;
+    });
 };

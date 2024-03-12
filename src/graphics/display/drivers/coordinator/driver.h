@@ -6,7 +6,6 @@
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_COORDINATOR_DRIVER_H_
 
 #include <fidl/fuchsia.hardware.display.engine/cpp/driver/wire.h>
-#include <fuchsia/hardware/display/clamprgb/cpp/banjo.h>
 #include <fuchsia/hardware/display/controller/cpp/banjo.h>
 
 #include <ddktl/device.h>
@@ -85,7 +84,6 @@ class Driver : public ddk::Device<Driver> {
 
   // Banjo Client
   ddk::DisplayControllerImplProtocolClient dc_;
-  ddk::DisplayClampRgbImplProtocolClient dc_clamp_rgb_;
 };
 
 }  // namespace display

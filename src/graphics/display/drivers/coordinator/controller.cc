@@ -5,7 +5,6 @@
 #include "src/graphics/display/drivers/coordinator/controller.h"
 
 #include <fuchsia/hardware/audiotypes/c/banjo.h>
-#include <fuchsia/hardware/display/clamprgb/cpp/banjo.h>
 #include <fuchsia/hardware/display/controller/cpp/banjo.h>
 #include <lib/async-loop/default.h>
 #include <lib/async/cpp/task.h>
