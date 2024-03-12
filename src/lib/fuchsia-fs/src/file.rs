@@ -23,8 +23,8 @@ pub use buffered_async_read_at::BufferedAsyncReadAt;
 
 #[cfg(target_os = "fuchsia")]
 use {
-    fuchsia_async::{DurationExt, TimeoutExt},
-    fuchsia_zircon::Duration,
+    crate::node::{take_on_open_event, Kind},
+    fuchsia_zircon::{self as zx},
 };
 
 /// An error encountered while reading a file
@@ -42,9 +42,6 @@ pub enum ReadError {
 
     #[error("file was not a utf-8 encoded string: {0}")]
     InvalidUtf8(#[from] std::string::FromUtf8Error),
-
-    #[error("read timed out")]
-    Timeout,
 }
 
 /// An error encountered while reading a named file
@@ -273,8 +270,13 @@ pub async fn read_num_bytes(file: &fio::FileProxy, num_bytes: u64) -> Result<Vec
 #[cfg(target_os = "fuchsia")]
 pub async fn read_in_namespace(path: &str) -> Result<Vec<u8>, ReadNamedError> {
     async {
-        let file = open_in_namespace(path, fio::OpenFlags::RIGHT_READABLE)?;
-        read(&file).await
+        let file = open_in_namespace(
+            path,
+            fio::OpenFlags::DESCRIBE
+                | fio::OpenFlags::RIGHT_READABLE
+                | fio::OpenFlags::NOT_DIRECTORY,
+        )?;
+        read_file_with_on_open_event(file).await
     }
     .await
     .map_err(|source| ReadNamedError { path: path.to_owned(), source })
@@ -295,20 +297,6 @@ pub async fn read_in_namespace_to_string(path: &str) -> Result<String, ReadNamed
     let string = String::from_utf8(bytes)
         .map_err(|source| ReadNamedError { path: path.to_owned(), source: source.into() })?;
     Ok(string)
-}
-
-/// Reads a utf-8 encoded string from the file at `path` in the current namespace. The path must be
-/// an absolute path. Times out if the read takes longer than the given `timeout` duration.
-#[cfg(target_os = "fuchsia")]
-pub async fn read_in_namespace_to_string_with_timeout(
-    path: &str,
-    timeout: Duration,
-) -> Result<String, ReadNamedError> {
-    read_in_namespace_to_string(&path)
-        .on_timeout(timeout.after_now(), || {
-            Err(ReadNamedError { path: path.to_owned(), source: ReadError::Timeout })
-        })
-        .await
 }
 
 /// Read the given FIDL message from binary form from a file open for reading.
@@ -332,17 +320,96 @@ pub async fn read_in_namespace_to_fidl<T: Persistable>(path: &str) -> Result<T, 
         .map_err(|source| ReadNamedError { path: path.to_owned(), source: source.into() })
 }
 
+/// Extracts the stream from an OnOpen or OnRepresentation FileEvent.
+#[cfg(target_os = "fuchsia")]
+fn extract_stream_from_on_open_event(
+    event: fio::FileEvent,
+) -> Result<Option<zx::Stream>, OpenError> {
+    match event {
+        fio::FileEvent::OnOpen_ { s: status, info } => {
+            zx::Status::ok(status).map_err(OpenError::OpenError)?;
+            let node_info = info.ok_or(OpenError::MissingOnOpenInfo)?;
+            match *node_info {
+                fio::NodeInfoDeprecated::File(file_info) => Ok(file_info.stream),
+                node_info @ _ => Err(OpenError::UnexpectedNodeKind {
+                    expected: Kind::File,
+                    actual: Kind::kind_of(&node_info),
+                }),
+            }
+        }
+        fio::FileEvent::OnRepresentation { payload } => match payload {
+            fio::Representation::File(file_info) => Ok(file_info.stream),
+            representation @ _ => Err(OpenError::UnexpectedNodeKind {
+                expected: Kind::File,
+                actual: Kind::kind_of2(&representation),
+            }),
+        },
+    }
+}
+
+/// Reads the contents of a stream into a Vec.
+#[cfg(target_os = "fuchsia")]
+fn read_contents_of_stream(stream: zx::Stream) -> Result<Vec<u8>, ReadError> {
+    // TODO(https://fxbug.dev/324239375): Get the file size from the OnRepresentation event.
+    let file_size = stream.seek(std::io::SeekFrom::End(0)).map_err(ReadError::ReadError)? as usize;
+    let mut data = Vec::with_capacity(file_size);
+    let mut remaining = file_size;
+    while remaining > 0 {
+        // read_at is used instead of read because the seek offset was moved to the end of the file
+        // to determine the file size. Moving the seek offset back to the start of the file would
+        // require another syscall.
+        let actual = stream
+            .read_at_uninit(
+                zx::StreamReadOptions::empty(),
+                data.len() as u64,
+                &mut data.spare_capacity_mut()[0..remaining],
+            )
+            .map_err(ReadError::ReadError)?;
+        // A read of 0 bytes indicates the end of the file was reached. The file may have changed
+        // size since the seek.
+        if actual == 0 {
+            break;
+        }
+        // SAFETY: read_at_uninit returns the number of bytes that were read and initialized.
+        unsafe { data.set_len(data.len() + actual) };
+        remaining -= actual;
+    }
+    Ok(data)
+}
+
+/// Reads the contents of `file` into a Vec. `file` must have been opened with either `DESCRIBE` or
+/// `GET_REPRESENTATION` and the event must not have been read yet.
+#[cfg(target_os = "fuchsia")]
+pub(crate) async fn read_file_with_on_open_event(
+    file: fio::FileProxy,
+) -> Result<Vec<u8>, ReadError> {
+    let event = take_on_open_event(&file).await.map_err(ReadError::Open)?;
+    let stream = extract_stream_from_on_open_event(event).map_err(ReadError::Open)?;
+
+    if let Some(stream) = stream {
+        read_contents_of_stream(stream)
+    } else {
+        // Fall back to FIDL reads if the file doesn't support streams.
+        read(&file).await
+    }
+}
+
 #[cfg(test)]
 mod tests {
-
     use {
         super::*,
         crate::{directory, OpenFlags},
         assert_matches::assert_matches,
         fidl_fidl_test_schema::{DataTable1, DataTable2},
         fuchsia_async as fasync,
-        std::path::Path,
+        fuchsia_zircon::{self as zx, HandleBased as _},
+        std::{path::Path, sync::Arc},
         tempfile::TempDir,
+        vfs::{
+            execution_scope::ExecutionScope,
+            file::vmo::{read_only, VmoFile},
+            ToObjectRequest,
+        },
     };
 
     const DATA_FILE_CONTENTS: &str = "Hello World!\n";
@@ -581,5 +648,136 @@ mod tests {
             ..Default::default()
         };
         assert_eq!(&contents, &data);
+    }
+
+    #[test]
+    fn extract_stream_from_on_open_event_with_stream() {
+        let vmo = zx::Vmo::create(0).unwrap();
+        let stream = zx::Stream::create(zx::StreamOptions::empty(), &vmo, 0).unwrap();
+        let event = fio::FileEvent::OnOpen_ {
+            s: 0,
+            info: Some(Box::new(fio::NodeInfoDeprecated::File(fio::FileObject {
+                stream: Some(stream),
+                event: None,
+            }))),
+        };
+        let stream = extract_stream_from_on_open_event(event)
+            .expect("Not a file")
+            .expect("Stream not present");
+        assert!(!stream.is_invalid_handle());
+    }
+
+    #[test]
+    fn extract_stream_from_on_open_event_without_stream() {
+        let event = fio::FileEvent::OnOpen_ {
+            s: 0,
+            info: Some(Box::new(fio::NodeInfoDeprecated::File(fio::FileObject {
+                stream: None,
+                event: None,
+            }))),
+        };
+        let stream = extract_stream_from_on_open_event(event).expect("Not a file");
+        assert!(stream.is_none());
+    }
+
+    #[test]
+    fn extract_stream_from_on_open_event_with_open_error() {
+        let event = fio::FileEvent::OnOpen_ { s: zx::Status::NOT_FOUND.into_raw(), info: None };
+        let result = extract_stream_from_on_open_event(event);
+        assert_matches!(result, Err(OpenError::OpenError(zx::Status::NOT_FOUND)));
+    }
+
+    #[test]
+    fn extract_stream_from_on_open_event_not_a_file() {
+        let event = fio::FileEvent::OnOpen_ {
+            s: 0,
+            info: Some(Box::new(fio::NodeInfoDeprecated::Service(fio::Service))),
+        };
+        let result = extract_stream_from_on_open_event(event);
+        assert_matches!(
+            result,
+            Err(OpenError::UnexpectedNodeKind { expected: Kind::File, actual: Kind::Service })
+        );
+    }
+
+    #[test]
+    fn extract_stream_from_on_representation_event_with_stream() {
+        let vmo = zx::Vmo::create(0).unwrap();
+        let stream = zx::Stream::create(zx::StreamOptions::empty(), &vmo, 0).unwrap();
+        let event = fio::FileEvent::OnRepresentation {
+            payload: fio::Representation::File(fio::FileInfo {
+                stream: Some(stream),
+                ..Default::default()
+            }),
+        };
+        let stream = extract_stream_from_on_open_event(event)
+            .expect("Not a file")
+            .expect("Stream not present");
+        assert!(!stream.is_invalid_handle());
+    }
+
+    #[test]
+    fn extract_stream_from_on_representation_event_without_stream() {
+        let event = fio::FileEvent::OnRepresentation {
+            payload: fio::Representation::File(fio::FileInfo::default()),
+        };
+        let stream = extract_stream_from_on_open_event(event).expect("Not a file");
+        assert!(stream.is_none());
+    }
+
+    #[test]
+    fn extract_stream_from_on_representation_event_not_a_file() {
+        let event = fio::FileEvent::OnRepresentation {
+            payload: fio::Representation::Connector(fio::ConnectorInfo::default()),
+        };
+        let result = extract_stream_from_on_open_event(event);
+        assert_matches!(
+            result,
+            Err(OpenError::UnexpectedNodeKind { expected: Kind::File, actual: Kind::Service })
+        );
+    }
+
+    #[test]
+    fn read_contents_of_stream_with_contents() {
+        let data = b"file-contents".repeat(1000);
+        let vmo = zx::Vmo::create(data.len() as u64).unwrap();
+        vmo.write(&data, 0).unwrap();
+        let stream = zx::Stream::create(zx::StreamOptions::MODE_READ, &vmo, 0).unwrap();
+        let contents = read_contents_of_stream(stream).unwrap();
+        assert_eq!(contents, data);
+    }
+
+    #[test]
+    fn read_contents_of_stream_with_empty_stream() {
+        let vmo = zx::Vmo::create(0).unwrap();
+        let stream = zx::Stream::create(zx::StreamOptions::MODE_READ, &vmo, 0).unwrap();
+        let contents = read_contents_of_stream(stream).unwrap();
+        assert!(contents.is_empty());
+    }
+
+    fn serve_file(file: Arc<VmoFile>, flags: fio::OpenFlags) -> fio::FileProxy {
+        let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::FileMarker>().unwrap();
+        flags.to_object_request(server_end).handle(|object_request| {
+            vfs::file::serve(file, ExecutionScope::new(), &flags, object_request)
+        });
+        proxy
+    }
+
+    #[fasync::run_singlethreaded(test)]
+    async fn read_file_with_on_open_event_with_stream() {
+        let data = b"file-contents".repeat(1000);
+        let vmo_file = read_only(&data);
+        let flags = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DESCRIBE;
+
+        {
+            // Ensure that the file supports streams.
+            let file = serve_file(vmo_file.clone(), flags);
+            let event = take_on_open_event(&file).await.unwrap();
+            extract_stream_from_on_open_event(event).unwrap().expect("Stream not present");
+        }
+
+        let file = serve_file(vmo_file.clone(), flags);
+        let contents = read_file_with_on_open_event(file).await.unwrap();
+        assert_eq!(contents, data);
     }
 }

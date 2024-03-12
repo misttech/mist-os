@@ -95,7 +95,7 @@ pub enum Kind {
 }
 
 impl Kind {
-    fn kind_of(info: &fio::NodeInfoDeprecated) -> Kind {
+    pub(crate) fn kind_of(info: &fio::NodeInfoDeprecated) -> Kind {
         match info {
             fio::NodeInfoDeprecated::Service(_) => Kind::Service,
             fio::NodeInfoDeprecated::File(_) => Kind::File,
@@ -118,11 +118,12 @@ impl Kind {
         }
     }
 
-    fn kind_of2(representation: &fio::Representation) -> Kind {
+    pub(crate) fn kind_of2(representation: &fio::Representation) -> Kind {
         match representation {
             fio::Representation::Connector(_) => Kind::Service,
             fio::Representation::Directory(_) => Kind::Directory,
             fio::Representation::File(_) => Kind::File,
+            fio::Representation::Symlink(_) => Kind::Symlink,
             _ => Kind::Unknown,
         }
     }
@@ -190,13 +191,7 @@ pub async fn close(node: fio::NodeProxy) -> Result<(), CloseError> {
 pub(crate) async fn verify_node_describe_event(
     node: fio::NodeProxy,
 ) -> Result<fio::NodeProxy, OpenError> {
-    let mut events = node.take_event_stream();
-    match events
-        .next()
-        .await
-        .ok_or(OpenError::OnOpenEventStreamClosed)?
-        .map_err(OpenError::OnOpenDecode)?
-    {
+    match take_on_open_event(&node).await? {
         fio::NodeEvent::OnOpen_ { s: status, info } => {
             let () = zx_status::Status::ok(status).map_err(OpenError::OpenError)?;
             info.ok_or(OpenError::MissingOnOpenInfo)?;
@@ -212,13 +207,7 @@ pub(crate) async fn verify_node_describe_event(
 pub(crate) async fn verify_directory_describe_event(
     node: fio::DirectoryProxy,
 ) -> Result<fio::DirectoryProxy, OpenError> {
-    let mut events = node.take_event_stream();
-    match events
-        .next()
-        .await
-        .ok_or(OpenError::OnOpenEventStreamClosed)?
-        .map_err(OpenError::OnOpenDecode)?
-    {
+    match take_on_open_event(&node).await? {
         fio::DirectoryEvent::OnOpen_ { s: status, info } => {
             let () = zx_status::Status::ok(status).map_err(OpenError::OpenError)?;
             let info = info.ok_or(OpenError::MissingOnOpenInfo)?;
@@ -241,14 +230,7 @@ pub(crate) async fn verify_directory_describe_event(
 pub(crate) async fn verify_file_describe_event(
     node: fio::FileProxy,
 ) -> Result<fio::FileProxy, OpenError> {
-    let mut events = node.take_event_stream();
-
-    match events
-        .next()
-        .await
-        .ok_or(OpenError::OnOpenEventStreamClosed)?
-        .map_err(OpenError::OnOpenDecode)?
-    {
+    match take_on_open_event(&node).await? {
         fio::FileEvent::OnOpen_ { s: status, info } => {
             let () = zx_status::Status::ok(status).map_err(OpenError::OpenError)?;
             let info = info.ok_or(OpenError::MissingOnOpenInfo)?;
@@ -262,6 +244,39 @@ pub(crate) async fn verify_file_describe_event(
     }
 
     Ok(node)
+}
+
+pub(crate) trait OnOpenEventProducer {
+    type Event;
+    type Stream: futures::Stream<Item = Result<Self::Event, fidl::Error>> + Unpin;
+    fn take_event_stream(&self) -> Self::Stream;
+}
+
+macro_rules! impl_on_open_event_producer {
+    ($proxy:ty, $event:ty, $stream:ty) => {
+        impl OnOpenEventProducer for $proxy {
+            type Event = $event;
+            type Stream = $stream;
+            fn take_event_stream(&self) -> Self::Stream {
+                self.take_event_stream()
+            }
+        }
+    };
+}
+
+impl_on_open_event_producer!(fio::NodeProxy, fio::NodeEvent, fio::NodeEventStream);
+impl_on_open_event_producer!(fio::FileProxy, fio::FileEvent, fio::FileEventStream);
+impl_on_open_event_producer!(fio::DirectoryProxy, fio::DirectoryEvent, fio::DirectoryEventStream);
+
+pub(crate) async fn take_on_open_event<T>(node: &T) -> Result<T::Event, OpenError>
+where
+    T: OnOpenEventProducer,
+{
+    node.take_event_stream()
+        .next()
+        .await
+        .ok_or(OpenError::OnOpenEventStreamClosed)?
+        .map_err(OpenError::OnOpenDecode)
 }
 
 #[cfg(test)]

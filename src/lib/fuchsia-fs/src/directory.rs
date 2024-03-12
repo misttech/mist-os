@@ -5,7 +5,10 @@
 //! Utility functions for fuchsia.io directories.
 
 use {
-    crate::node::{self, CloneError, CloseError, OpenError, RenameError},
+    crate::{
+        file::ReadError,
+        node::{self, CloneError, CloseError, OpenError, RenameError},
+    },
     fidl::endpoints::{ClientEnd, ServerEnd},
     fidl_fuchsia_io as fio,
     fuchsia_async::{Duration, DurationExt, TimeoutExt},
@@ -748,6 +751,32 @@ fn remove_dir_contents(dir: fio::DirectoryProxy) -> BoxFuture<'static, Result<()
     };
     Box::pin(fut)
 }
+
+/// Opens `path` from the `parent` directory as a file and reads the file contents into a Vec.
+#[cfg(target_os = "fuchsia")]
+pub async fn read_file(parent: &fio::DirectoryProxy, path: &str) -> Result<Vec<u8>, ReadError> {
+    let flags = fio::OpenFlags::DESCRIBE | fio::OpenFlags::RIGHT_READABLE;
+    let file = open_file_no_describe(parent, path, flags).map_err(ReadError::Open)?;
+    crate::file::read_file_with_on_open_event(file).await
+}
+
+/// Opens `path` from the `parent` directory as a file and reads the file contents into a Vec.
+#[cfg(not(target_os = "fuchsia"))]
+pub async fn read_file(parent: &fio::DirectoryProxy, path: &str) -> Result<Vec<u8>, ReadError> {
+    let file = open_file_no_describe(parent, path, fio::OpenFlags::RIGHT_READABLE)?;
+    crate::file::read(&file).await
+}
+
+/// Opens `path` from the `parent` directory as a file and reads the file contents as a utf-8
+/// encoded string.
+pub async fn read_file_to_string(
+    parent: &fio::DirectoryProxy,
+    path: &str,
+) -> Result<String, ReadError> {
+    let contents = read_file(parent, path).await?;
+    Ok(String::from_utf8(contents)?)
+}
+
 #[cfg(test)]
 mod tests {
     use {
@@ -1680,5 +1709,17 @@ mod tests {
         let chained2 = parent.chain(&child2);
         assert_eq!(&chained2.name, "foo/baz");
         assert_eq!(chained2.kind, DirentKind::File);
+    }
+
+    #[fasync::run_singlethreaded(test)]
+    async fn teat_read_file() {
+        let contents = read_file(&open_pkg(), "/data/file").await.unwrap();
+        assert_eq!(&contents, DATA_FILE_CONTENTS.as_bytes());
+    }
+
+    #[fasync::run_singlethreaded(test)]
+    async fn teat_read_file_to_string() {
+        let contents = read_file_to_string(&open_pkg(), "/data/file").await.unwrap();
+        assert_eq!(contents, DATA_FILE_CONTENTS);
     }
 }
