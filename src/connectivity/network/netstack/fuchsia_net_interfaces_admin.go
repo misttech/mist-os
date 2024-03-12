@@ -240,18 +240,13 @@ func (ci *adminControlImpl) isLoopback() bool {
 }
 
 func (ci *adminControlImpl) Remove(fidl.Context) (admin.ControlRemoveResult, error) {
-	_ = syslog.DebugTf(controlName, "Remove() called on %d from %p", ci.nicid, ci)
-
 	if ci.isLoopback() {
-		_ = syslog.DebugTf(controlName, "Loopback return from Remove() on %d from %p", ci.nicid, ci)
-
 		return admin.ControlRemoveResultWithErr(admin.ControlRemoveErrorNotAllowed), nil
 	}
 
 	ci.syncRemoval = true
 	ci.cancelServe()
 
-	_ = syslog.DebugTf(controlName, "Successful return from Remove() on %d from %p", ci.nicid, ci)
 	return admin.ControlRemoveResultWithResponse(admin.ControlRemoveResponse{}), nil
 }
 
@@ -927,10 +922,7 @@ func (c *adminControlCollection) stopServing() []zx.Channel {
 	c.mu.tearingDown = true
 	c.mu.Unlock()
 
-	_ = syslog.DebugTf("adminControlCollection", "stopServing called on %p", c)
-
 	for control := range controls {
-		_ = syslog.DebugTf("adminControlCollection", "cancelServe called on %p from %p", control, c)
 		control.cancelServe()
 	}
 
@@ -947,15 +939,6 @@ func (c *adminControlCollection) stopServing() []zx.Channel {
 
 func sendControlTerminationReason(pending []zx.Channel, reason admin.InterfaceRemovedReason) {
 	for _, c := range pending {
-		info, err := c.Handle().GetInfoHandleBasic()
-		var koid uint64
-		if err != nil {
-			koid = 0
-		} else {
-			koid = info.Koid
-		}
-		_ = syslog.DebugTf(controlName, "Sending reason %s on channel %d", reason, koid)
-
 		eventProxy := admin.ControlEventProxy{Channel: c}
 		if err := eventProxy.OnInterfaceRemoved(reason); err != nil {
 			_ = syslog.WarnTf(controlName, "failed to send interface close reason %s: %s", reason, err)
@@ -1011,15 +994,6 @@ func (ifs *ifState) addAdminConnection(request admin.ControlWithCtxInterfaceRequ
 		defer close(impl.doneChannel)
 		requestChannel := request.Channel
 
-		info, err := requestChannel.Handle().GetInfoHandleBasic()
-		var koid uint64
-		if err != nil {
-			koid = 0
-		} else {
-			koid = info.Koid
-		}
-		_ = syslog.DebugTf(controlName, "Serving %p for NIC %d on channel %d", impl, impl.nicid, koid)
-
 		component.Serve(ctx, &admin.ControlWithCtxStub{Impl: impl}, requestChannel, component.ServeOptions{
 			Concurrent:       false,
 			KeepChannelAlive: true,
@@ -1027,8 +1001,6 @@ func (ifs *ifState) addAdminConnection(request admin.ControlWithCtxInterfaceRequ
 				_ = syslog.WarnTf(controlName, "%s", err)
 			},
 		})
-
-		_ = syslog.DebugTf(controlName, "component.Serve completed for NIC %d from %p", impl.nicid, impl)
 
 		// NB: anonymous function is used to restrict section where the lock is
 		// held.
@@ -1071,7 +1043,6 @@ func (ifs *ifState) addAdminConnection(request admin.ControlWithCtxInterfaceRequ
 
 				return false
 			}(); keepInterface {
-				_ = syslog.DebugTf(controlName, "keepInterface=true, wasCanceled=%t for NIC %d from %p", wasCanceled, impl.nicid, impl)
 				if wasCanceled {
 					// If we were canceled, pass the request channel along so
 					// it'll receive the epitaph later.
@@ -1105,7 +1076,6 @@ func (ifs *ifState) addAdminConnection(request admin.ControlWithCtxInterfaceRequ
 		}()
 
 		if ifStateToRemove != nil {
-			_ = syslog.DebugTf(controlName, "Calling RemoveByUser for NIC %d from %p", impl.nicid, impl)
 			ifStateToRemove.RemoveByUser()
 		}
 
