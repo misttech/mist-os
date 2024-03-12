@@ -56,10 +56,6 @@ bool FuchsiaPkgUrl::operator==(const FuchsiaPkgUrl& rhs) const {
           this->hash() == rhs.hash());
 }
 
-std::string FuchsiaPkgUrl::pkgfs_dir_path() const {
-  return fxl::Substitute("/pkgfs/packages/$0/$1", package_name_, variant_);
-}
-
 std::string FuchsiaPkgUrl::package_path() const {
   std::string query = "";
   if (!hash_.empty()) {

@@ -13,7 +13,6 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
   component::FuchsiaPkgUrl::IsFuchsiaPkgScheme(str);
   component::FuchsiaPkgUrl url;
   url.Parse(str);
-  url.pkgfs_dir_path();
   url.package_path();
 
   return 0;
