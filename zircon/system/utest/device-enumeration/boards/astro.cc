@@ -83,9 +83,6 @@ TEST_F(DeviceEnumerationTest, AstroTest) {
       // Registers Device.
       "sys/platform/00:00:29",
 #ifdef include_packaged_drivers
-      // BT
-      "sys/platform/05:00:3/bluetooth-composite-spec/aml-uart/bt-transport-uart/bt-hci-broadcom/bt_host",
-
       "sys/platform/05:03:e/aml_video",
 
       // WLAN

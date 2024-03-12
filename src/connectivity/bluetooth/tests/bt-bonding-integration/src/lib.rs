@@ -4,7 +4,7 @@
 
 use {
     anyhow::Error,
-    bt_test_harness::host_driver::v2::{self as host_driver, HostDriverHarness},
+    bt_test_harness::host::{self as host, HostHarness},
     fidl_fuchsia_bluetooth_sys as sys,
     fuchsia_bluetooth::{
         expectation::{self, asynchronous::ExpectableExt},
@@ -49,7 +49,7 @@ fn new_le_bond_data(id: &PeerId, address: &Address, name: &str, has_ltk: bool) -
 }
 
 async fn restore_bonds(
-    state: &HostDriverHarness,
+    state: &HostHarness,
     bonds: Vec<BondingData>,
 ) -> Result<Vec<BondingData>, Error> {
     let bonds: Vec<_> = bonds.into_iter().map(sys::BondingData::from).collect();
@@ -66,14 +66,14 @@ const TEST_NAME1: &str = "Name1";
 const TEST_NAME2: &str = "Name2";
 
 #[test_harness::run_singlethreaded_test]
-async fn test_restore_no_bonds_succeeds(harness: HostDriverHarness) {
+async fn test_restore_no_bonds_succeeds(harness: HostHarness) {
     let errors = restore_bonds(&harness, vec![]).await.unwrap();
     assert_eq!(errors, vec![]);
 }
 
 // Tests initializing bonded LE devices.
 #[test_harness::run_singlethreaded_test]
-async fn test_restore_bonded_devices_success(harness: HostDriverHarness) {
+async fn test_restore_bonded_devices_success(harness: HostHarness) {
     // Peers should be initially empty.
     assert_eq!(harness.write_state().peers().len(), 0);
 
@@ -93,12 +93,12 @@ async fn test_restore_bonded_devices_success(harness: HostDriverHarness) {
         .and(expectation::peer::name(TEST_NAME2))
         .and(expectation::peer::bonded(true));
 
-    let _ = host_driver::expectation::peer(&harness, expected1).await.unwrap();
-    let _ = host_driver::expectation::peer(&harness, expected2).await.unwrap();
+    let _ = host::expectation::peer(&harness, expected1).await.unwrap();
+    let _ = host::expectation::peer(&harness, expected2).await.unwrap();
 }
 
 #[test_harness::run_singlethreaded_test]
-async fn test_restore_bonded_devices_no_ltk_fails(harness: HostDriverHarness) {
+async fn test_restore_bonded_devices_no_ltk_fails(harness: HostHarness) {
     // Peers should be initially empty.
     assert_eq!(harness.write_state().peers().len(), 0);
 
@@ -110,7 +110,7 @@ async fn test_restore_bonded_devices_no_ltk_fails(harness: HostDriverHarness) {
 }
 
 #[test_harness::run_singlethreaded_test]
-async fn test_restore_bonded_devices_duplicate_entry(harness: HostDriverHarness) {
+async fn test_restore_bonded_devices_duplicate_entry(harness: HostHarness) {
     // Peers should be initially empty.
     assert_eq!(harness.write_state().peers().len(), 0);
 
@@ -123,7 +123,7 @@ async fn test_restore_bonded_devices_duplicate_entry(harness: HostDriverHarness)
     let expected = expectation::peer::address(TEST_ADDR1)
         .and(expectation::peer::technology(fidl_fuchsia_bluetooth_sys::TechnologyType::LowEnergy))
         .and(expectation::peer::bonded(true));
-    let _ = host_driver::expectation::peer(&harness, expected.clone()).await.unwrap();
+    let _ = host::expectation::peer(&harness, expected.clone()).await.unwrap();
 
     // Adding an entry with the existing id should fail.
     let bond_data = new_le_bond_data(&TEST_ID1, &TEST_ADDR2, TEST_NAME2, true /* with LTK */);
@@ -139,7 +139,7 @@ async fn test_restore_bonded_devices_duplicate_entry(harness: HostDriverHarness)
 // Tests that adding a list of bonding data with malformed content succeeds for the valid entries
 // but reports an error.
 #[test_harness::run_singlethreaded_test]
-async fn test_restore_bonded_devices_invalid_entry(harness: HostDriverHarness) {
+async fn test_restore_bonded_devices_invalid_entry(harness: HostHarness) {
     // Peers should be initially empty.
     assert_eq!(harness.write_state().peers().len(), 0);
 
@@ -153,5 +153,5 @@ async fn test_restore_bonded_devices_invalid_entry(harness: HostDriverHarness) {
     let expected = expectation::peer::address(TEST_ADDR2)
         .and(expectation::peer::technology(fidl_fuchsia_bluetooth_sys::TechnologyType::LowEnergy))
         .and(expectation::peer::bonded(true));
-    let _ = host_driver::expectation::peer(&harness, expected.clone()).await.unwrap();
+    let _ = host::expectation::peer(&harness, expected.clone()).await.unwrap();
 }

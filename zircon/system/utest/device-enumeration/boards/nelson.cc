@@ -102,9 +102,7 @@ TEST_F(DeviceEnumerationTest, NelsonTest) {
       "sys/platform/05:05:1:2/aml-gpio/gpio/gpio-50/spi_0/aml-spi-0/spi/spi-0-0",
 
 #ifdef include_packaged_drivers
-      // BT
-      "sys/platform/05:00:3/bluetooth-composite-spec/aml-uart/bt-transport-uart/bt-hci-broadcom/bt_host",
-
+      // OpenThread
       "sys/platform/05:05:1:2/aml-gpio/gpio/gpio-50/spi_0/aml-spi-0/spi/spi-0-0/nrf52811_radio/ot-radio",
 
       // WLAN
