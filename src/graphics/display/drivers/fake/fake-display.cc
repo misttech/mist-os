@@ -236,8 +236,8 @@ zx_status_t FakeDisplay::DisplayControllerImplReleaseBufferCollection(
 }
 
 zx_status_t FakeDisplay::DisplayControllerImplImportImage(
-    const image_t* image, uint64_t banjo_driver_buffer_collection_id, uint32_t index,
-    uint64_t* out_image_handle) {
+    const image_metadata_t* image_metadata, uint64_t banjo_driver_buffer_collection_id,
+    uint32_t index, uint64_t* out_image_handle) {
   const display::DriverBufferCollectionId driver_buffer_collection_id =
       display::ToDriverBufferCollectionId(banjo_driver_buffer_collection_id);
   const auto it = buffer_collections_.find(driver_buffer_collection_id);
@@ -249,9 +249,9 @@ zx_status_t FakeDisplay::DisplayControllerImplImportImage(
   const fidl::SyncClient<fuchsia_sysmem::BufferCollection>& collection = it->second;
 
   fbl::AutoLock lock(&image_mutex_);
-  if (!IsAcceptableImageTilingType(image->tiling_type)) {
+  if (!IsAcceptableImageTilingType(image_metadata->tiling_type)) {
     zxlogf(INFO, "ImportImage() will fail due to invalid Image tiling type %" PRIu32,
-           image->tiling_type);
+           image_metadata->tiling_type);
     return ZX_ERR_INVALID_ARGS;
   }
 

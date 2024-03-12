@@ -182,8 +182,8 @@ zx_status_t SimpleDisplay::DisplayControllerImplReleaseBufferCollection(
 }
 
 zx_status_t SimpleDisplay::DisplayControllerImplImportImage(
-    const image_t* image, uint64_t banjo_driver_buffer_collection_id, uint32_t index,
-    uint64_t* out_image_handle) {
+    const image_metadata_t* image_metadata, uint64_t banjo_driver_buffer_collection_id,
+    uint32_t index, uint64_t* out_image_handle) {
   const display::DriverBufferCollectionId driver_buffer_collection_id =
       display::ToDriverBufferCollectionId(banjo_driver_buffer_collection_id);
   const auto it = buffer_collections_.find(driver_buffer_collection_id);
@@ -273,7 +273,7 @@ zx_status_t SimpleDisplay::DisplayControllerImplImportImage(
     return ZX_ERR_INVALID_ARGS;
   }
 
-  if (image->width != width_ || image->height != height_) {
+  if (image_metadata->width != width_ || image_metadata->height != height_) {
     return ZX_ERR_INVALID_ARGS;
   }
 

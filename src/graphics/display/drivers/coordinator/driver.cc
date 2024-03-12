@@ -141,9 +141,14 @@ zx_status_t Driver::ImportImage(image_t* image, DriverBufferCollectionId collect
   }
 
   ZX_DEBUG_ASSERT(dc_.is_valid());
+  const image_metadata_t image_metadata = {
+      .width = image->width,
+      .height = image->height,
+      .tiling_type = image->tiling_type,
+  };
   uint64_t image_handle = 0;
-  zx_status_t status =
-      dc_.ImportImage(image, ToBanjoDriverBufferCollectionId(collection_id), index, &image_handle);
+  zx_status_t status = dc_.ImportImage(
+      &image_metadata, ToBanjoDriverBufferCollectionId(collection_id), index, &image_handle);
   image->handle = image_handle;
   return status;
 }

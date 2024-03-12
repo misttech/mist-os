@@ -255,15 +255,15 @@ TEST_F(VirtioGpuTest, ImportVmo) {
                                                          kBanjoBufferCollectionId));
   RunLoopUntilIdle();
 
-  static constexpr image_t kDefaultImage = {
+  static constexpr image_metadata_t kDefaultImageMetadata = {
       .width = 4,
       .height = 4,
       .tiling_type = IMAGE_TILING_TYPE_LINEAR,
-      .handle = 0,
   };
   PerformBlockingWork([&] {
     zx::result<DisplayEngine::BufferInfo> buffer_info_result =
-        device_->GetAllocatedBufferInfoForImage(kBufferCollectionId, /*index=*/0, &kDefaultImage);
+        device_->GetAllocatedBufferInfoForImage(kBufferCollectionId, /*index=*/0,
+                                                kDefaultImageMetadata);
     ASSERT_OK(buffer_info_result.status_value());
 
     const auto& buffer_info = buffer_info_result.value();
@@ -410,29 +410,27 @@ TEST_F(VirtioGpuTest, ImportImage) {
   RunLoopUntilIdle();
 
   // Invalid import: bad collection id
-  static constexpr image_t kDefaultImage = {
+  static constexpr image_metadata_t kDefaultImageMetadata = {
       .width = 800,
       .height = 600,
       .tiling_type = IMAGE_TILING_TYPE_LINEAR,
-      .handle = 0,
   };
-  image_t invalid_image = kDefaultImage;
   constexpr display::DriverBufferCollectionId kInvalidCollectionId(100);
   constexpr uint64_t kBanjoInvalidCollectionId =
       display::ToBanjoDriverBufferCollectionId(kInvalidCollectionId);
   uint64_t image_handle = 0;
   PerformBlockingWork([&] {
-    EXPECT_EQ(proto.ops->import_image(device_.get(), &invalid_image, kBanjoInvalidCollectionId,
-                                      /*index=*/0, &image_handle),
-              ZX_ERR_NOT_FOUND);
+    EXPECT_EQ(
+        proto.ops->import_image(device_.get(), &kDefaultImageMetadata, kBanjoInvalidCollectionId,
+                                /*index=*/0, &image_handle),
+        ZX_ERR_NOT_FOUND);
   });
 
   // Invalid import: bad index
-  invalid_image = kDefaultImage;
   uint32_t kInvalidIndex = 100;
   PerformBlockingWork([&] {
-    EXPECT_EQ(proto.ops->import_image(device_.get(), &invalid_image, kBanjoBufferCollectionId,
-                                      kInvalidIndex, &image_handle),
+    EXPECT_EQ(proto.ops->import_image(device_.get(), &kDefaultImageMetadata,
+                                      kBanjoBufferCollectionId, kInvalidIndex, &image_handle),
               ZX_ERR_OUT_OF_RANGE);
   });
 

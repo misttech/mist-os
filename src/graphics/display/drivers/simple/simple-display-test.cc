@@ -369,12 +369,6 @@ TEST(SimpleDisplay, ImportKernelFramebufferImage) {
       kBanjoCollectionId, token_endpoints->client.TakeChannel()));
 
   // Set Buffer collection constraints.
-  const image_t kDefaultImage = {
-      .width = kWidth,
-      .height = kHeight,
-      .tiling_type = IMAGE_TILING_TYPE_LINEAR,
-      .handle = 0,
-  };
   static constexpr image_buffer_usage_t kDisplayUsage = {
       .tiling_type = IMAGE_TILING_TYPE_LINEAR,
   };
@@ -399,42 +393,52 @@ TEST(SimpleDisplay, ImportKernelFramebufferImage) {
   fake_sysmem.SetupFakeVmoInfo(kBanjoCollectionId, 0);
 
   // Invalid import: bad collection id
-  image_t invalid_image = kDefaultImage;
+  static constexpr image_metadata_t kDisplayImageMetadata = {
+      .width = kWidth,
+      .height = kHeight,
+      .tiling_type = IMAGE_TILING_TYPE_LINEAR,
+  };
   uint64_t kBanjoInvalidCollectionId = 100;
   uint64_t image_handle = 0;
-  EXPECT_EQ(display.DisplayControllerImplImportImage(&invalid_image, kBanjoInvalidCollectionId, 0,
-                                                     &image_handle),
+  EXPECT_EQ(display.DisplayControllerImplImportImage(&kDisplayImageMetadata,
+                                                     kBanjoInvalidCollectionId, 0, &image_handle),
             ZX_ERR_NOT_FOUND);
 
   // Invalid import: bad index
-  invalid_image = kDefaultImage;
   uint32_t kInvalidIndex = 100;
   image_handle = 0;
-  EXPECT_EQ(display.DisplayControllerImplImportImage(&invalid_image, kBanjoCollectionId,
+  EXPECT_EQ(display.DisplayControllerImplImportImage(&kDisplayImageMetadata, kBanjoCollectionId,
                                                      kInvalidIndex, &image_handle),
             ZX_ERR_OUT_OF_RANGE);
 
   // Invalid import: bad width
-  invalid_image = kDefaultImage;
-  invalid_image.width = invalid_image.width * 2;
+  static constexpr image_metadata_t kImageMetadataWithIncorrectWidth = {
+      .width = kWidth * 2,
+      .height = kHeight,
+      .tiling_type = IMAGE_TILING_TYPE_LINEAR,
+  };
   image_handle = 0;
-  EXPECT_EQ(display.DisplayControllerImplImportImage(&invalid_image, kBanjoCollectionId,
+  EXPECT_EQ(display.DisplayControllerImplImportImage(&kImageMetadataWithIncorrectWidth,
+                                                     kBanjoCollectionId,
                                                      /*index=*/0, &image_handle),
             ZX_ERR_INVALID_ARGS);
 
   // Invalid import: bad height
-  invalid_image = kDefaultImage;
-  invalid_image.height = invalid_image.height * 2;
+  static constexpr image_metadata_t kImageMetadataWithIncorrectHeight = {
+      .width = kWidth,
+      .height = kHeight * 2,
+      .tiling_type = IMAGE_TILING_TYPE_LINEAR,
+  };
   image_handle = 0;
-  EXPECT_EQ(display.DisplayControllerImplImportImage(&invalid_image, kBanjoCollectionId,
+  EXPECT_EQ(display.DisplayControllerImplImportImage(&kImageMetadataWithIncorrectHeight,
+                                                     kBanjoCollectionId,
                                                      /*index=*/0, &image_handle),
             ZX_ERR_INVALID_ARGS);
 
   // Valid import
-  image_t valid_image = kDefaultImage;
   image_handle = 0;
-  EXPECT_OK(display.DisplayControllerImplImportImage(&valid_image, kBanjoCollectionId, /*index=*/0,
-                                                     &image_handle));
+  EXPECT_OK(display.DisplayControllerImplImportImage(&kDisplayImageMetadata, kBanjoCollectionId,
+                                                     /*index=*/0, &image_handle));
   EXPECT_NE(image_handle, 0u);
 
   // Release buffer collection.

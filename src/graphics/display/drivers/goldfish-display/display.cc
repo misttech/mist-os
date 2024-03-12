@@ -341,16 +341,16 @@ uint32_t GetColorBufferFormatFromSysmemPixelFormat(
 }  // namespace
 
 zx::result<display::DriverImageId> Display::ImportVmoImage(
-    const image_t* image, const fuchsia_sysmem::PixelFormat& pixel_format, zx::vmo vmo,
-    size_t offset) {
+    const image_metadata_t& image_metadata, const fuchsia_sysmem::PixelFormat& pixel_format,
+    zx::vmo vmo, size_t offset) {
   auto color_buffer = std::make_unique<ColorBuffer>();
-  color_buffer->is_linear_format = image->tiling_type == IMAGE_TILING_TYPE_LINEAR;
+  color_buffer->is_linear_format = image_metadata.tiling_type == IMAGE_TILING_TYPE_LINEAR;
   const uint32_t color_buffer_format = GetColorBufferFormatFromSysmemPixelFormat(pixel_format);
 
   fidl::Arena unused_arena;
   const uint32_t bytes_per_pixel =
       ImageFormatStrideBytesPerWidthPixel(fidl::ToWire(unused_arena, pixel_format));
-  color_buffer->size = fbl::round_up(image->width * image->height * bytes_per_pixel,
+  color_buffer->size = fbl::round_up(image_metadata.width * image_metadata.height * bytes_per_pixel,
                                      static_cast<uint32_t>(PAGE_SIZE));
 
   // Linear images must be pinned.
@@ -358,12 +358,12 @@ zx::result<display::DriverImageId> Display::ImportVmoImage(
       rc_->pipe_io()->PinVmo(vmo, ZX_BTI_PERM_READ | ZX_BTI_CONTIGUOUS, offset, color_buffer->size);
 
   color_buffer->vmo = std::move(vmo);
-  color_buffer->width = image->width;
-  color_buffer->height = image->height;
+  color_buffer->width = image_metadata.width;
+  color_buffer->height = image_metadata.height;
   color_buffer->format = color_buffer_format;
 
   zx::result<HostColorBufferId> create_result =
-      rc_->CreateColorBuffer(image->width, image->height, color_buffer_format);
+      rc_->CreateColorBuffer(image_metadata.width, image_metadata.height, color_buffer_format);
   if (create_result.is_error()) {
     zxlogf(ERROR, "%s: failed to create color buffer: %s", kTag, create_result.status_string());
     return create_result.take_error();
@@ -419,7 +419,7 @@ zx_status_t Display::DisplayControllerImplReleaseBufferCollection(
   return ZX_OK;
 }
 
-zx_status_t Display::DisplayControllerImplImportImage(const image_t* image,
+zx_status_t Display::DisplayControllerImplImportImage(const image_metadata_t* image_metadata,
                                                       uint64_t banjo_driver_buffer_collection_id,
                                                       uint32_t index, uint64_t* out_image_handle) {
   const display::DriverBufferCollectionId driver_buffer_collection_id =
@@ -481,7 +481,7 @@ zx_status_t Display::DisplayControllerImplImportImage(const image_t* image,
       fuchsia_sysmem::HeapType::kGoldfishDeviceLocal) {
     const auto& pixel_format = collection_info.settings().image_format_constraints().pixel_format();
     zx::result<display::DriverImageId> import_vmo_result =
-        ImportVmoImage(image, pixel_format, std::move(vmo), offset);
+        ImportVmoImage(*image_metadata, pixel_format, std::move(vmo), offset);
     if (import_vmo_result.is_ok()) {
       *out_image_handle = display::ToBanjoDriverImageId(import_vmo_result.value());
       return ZX_OK;
@@ -495,7 +495,7 @@ zx_status_t Display::DisplayControllerImplImportImage(const image_t* image,
   }
 
   auto color_buffer = std::make_unique<ColorBuffer>();
-  color_buffer->is_linear_format = image->tiling_type == IMAGE_TILING_TYPE_LINEAR;
+  color_buffer->is_linear_format = image_metadata->tiling_type == IMAGE_TILING_TYPE_LINEAR;
   color_buffer->vmo = std::move(vmo);
   const display::DriverImageId image_id(reinterpret_cast<uint64_t>(color_buffer.release()));
   *out_image_handle = display::ToBanjoDriverImageId(image_id);

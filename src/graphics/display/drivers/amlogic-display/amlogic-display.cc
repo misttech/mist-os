@@ -261,8 +261,8 @@ zx_status_t AmlogicDisplay::DisplayControllerImplReleaseBufferCollection(
 }
 
 zx_status_t AmlogicDisplay::DisplayControllerImplImportImage(
-    const image_t* image, uint64_t banjo_driver_buffer_collection_id, uint32_t index,
-    uint64_t* out_image_handle) {
+    const image_metadata_t* image_metadata, uint64_t banjo_driver_buffer_collection_id,
+    uint32_t index, uint64_t* out_image_handle) {
   const display::DriverBufferCollectionId driver_buffer_collection_id =
       display::ToDriverBufferCollectionId(banjo_driver_buffer_collection_id);
   if (buffer_collections_.find(driver_buffer_collection_id) == buffer_collections_.end()) {
@@ -277,7 +277,7 @@ zx_status_t AmlogicDisplay::DisplayControllerImplImportImage(
     return ZX_ERR_NO_MEMORY;
   }
 
-  if (image->tiling_type != IMAGE_TILING_TYPE_LINEAR) {
+  if (image_metadata->tiling_type != IMAGE_TILING_TYPE_LINEAR) {
     status = ZX_ERR_INVALID_ARGS;
     return status;
   }
@@ -343,7 +343,7 @@ zx_status_t AmlogicDisplay::DisplayControllerImplImportImage(
       size_t size =
           ZX_ROUNDUP(ImageFormatImageSize(
                          ImageConstraintsToFormat(collection_info.settings.image_format_constraints,
-                                                  image->width, image->height)
+                                                  image_metadata->width, image_metadata->height)
                              .value()),
                      PAGE_SIZE);
       zx_paddr_t paddr;
@@ -355,21 +355,21 @@ zx_status_t AmlogicDisplay::DisplayControllerImplImportImage(
         return status;
       }
       import_info->paddr = paddr;
-      import_info->image_height = image->height;
-      import_info->image_width = image->width;
+      import_info->image_height = image_metadata->height;
+      import_info->image_width = image_metadata->width;
       import_info->is_afbc = true;
     } break;
     case fuchsia_sysmem::wire::kFormatModifierLinear:
     case fuchsia_sysmem::wire::kFormatModifierArmLinearTe: {
       uint32_t minimum_row_bytes;
       if (!ImageFormatMinimumRowBytes(collection_info.settings.image_format_constraints,
-                                      image->width, &minimum_row_bytes)) {
-        zxlogf(ERROR, "Invalid image width %d for collection", image->width);
+                                      image_metadata->width, &minimum_row_bytes)) {
+        zxlogf(ERROR, "Invalid image width %d for collection", image_metadata->width);
         return ZX_ERR_INVALID_ARGS;
       }
 
       fuchsia_hardware_amlogiccanvas::wire::CanvasInfo canvas_info;
-      canvas_info.height = image->height;
+      canvas_info.height = image_metadata->height;
       canvas_info.stride_bytes = minimum_row_bytes;
       canvas_info.blkmode = fuchsia_hardware_amlogiccanvas::CanvasBlockMode::kLinear;
       canvas_info.endianness = fuchsia_hardware_amlogiccanvas::CanvasEndianness();
@@ -392,8 +392,8 @@ zx_status_t AmlogicDisplay::DisplayControllerImplImportImage(
 
       import_info->canvas = canvas_.client_end();
       import_info->canvas_idx = result->value()->canvas_idx;
-      import_info->image_height = image->height;
-      import_info->image_width = image->width;
+      import_info->image_height = image_metadata->height;
+      import_info->image_width = image_metadata->width;
       import_info->is_afbc = false;
     } break;
     default:

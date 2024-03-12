@@ -118,7 +118,7 @@ void DisplayEngine::DisplayControllerImplSetDisplayControllerInterface(
 
 zx::result<DisplayEngine::BufferInfo> DisplayEngine::GetAllocatedBufferInfoForImage(
     display::DriverBufferCollectionId driver_buffer_collection_id, uint32_t index,
-    const image_t* image) const {
+    const image_metadata_t& image_metadata) const {
   const fidl::WireSyncClient<fuchsia_sysmem::BufferCollection>& client =
       buffer_collections_.at(driver_buffer_collection_id);
   fidl::WireResult check_result = client->CheckBuffersAllocated();
@@ -175,8 +175,8 @@ zx::result<DisplayEngine::BufferInfo> DisplayEngine::GetAllocatedBufferInfoForIm
 
   const auto& format_constraints = collection_info.settings.image_format_constraints;
   uint32_t minimum_row_bytes;
-  if (!ImageFormatMinimumRowBytes(format_constraints, image->width, &minimum_row_bytes)) {
-    zxlogf(ERROR, "Invalid image width %" PRIu32 " for collection", image->width);
+  if (!ImageFormatMinimumRowBytes(format_constraints, image_metadata.width, &minimum_row_bytes)) {
+    zxlogf(ERROR, "Invalid image width %" PRIu32 " for collection", image_metadata.width);
     return zx::error(ZX_ERR_INVALID_ARGS);
   }
 
@@ -235,8 +235,8 @@ zx_status_t DisplayEngine::DisplayControllerImplReleaseBufferCollection(
 }
 
 zx_status_t DisplayEngine::DisplayControllerImplImportImage(
-    const image_t* image, uint64_t banjo_driver_buffer_collection_id, uint32_t index,
-    uint64_t* out_image_handle) {
+    const image_metadata_t* image_metadata, uint64_t banjo_driver_buffer_collection_id,
+    uint32_t index, uint64_t* out_image_handle) {
   const display::DriverBufferCollectionId driver_buffer_collection_id =
       display::ToDriverBufferCollectionId(banjo_driver_buffer_collection_id);
   const auto it = buffer_collections_.find(driver_buffer_collection_id);
@@ -247,14 +247,14 @@ zx_status_t DisplayEngine::DisplayControllerImplImportImage(
   }
 
   zx::result<BufferInfo> buffer_info_result =
-      GetAllocatedBufferInfoForImage(driver_buffer_collection_id, index, image);
+      GetAllocatedBufferInfoForImage(driver_buffer_collection_id, index, *image_metadata);
   if (!buffer_info_result.is_ok()) {
     return buffer_info_result.error_value();
   }
   BufferInfo& buffer_info = buffer_info_result.value();
   zx::result<display::DriverImageId> import_result =
-      Import(std::move(buffer_info.vmo), image, buffer_info.offset, buffer_info.bytes_per_pixel,
-             buffer_info.bytes_per_row, buffer_info.pixel_format);
+      Import(std::move(buffer_info.vmo), *image_metadata, buffer_info.offset,
+             buffer_info.bytes_per_pixel, buffer_info.bytes_per_row, buffer_info.pixel_format);
   if (import_result.is_ok()) {
     *out_image_handle = display::ToBanjoDriverImageId(import_result.value());
     return ZX_OK;
@@ -263,9 +263,9 @@ zx_status_t DisplayEngine::DisplayControllerImplImportImage(
 }
 
 zx::result<display::DriverImageId> DisplayEngine::Import(
-    zx::vmo vmo, const image_t* image, size_t offset, uint32_t pixel_size, uint32_t row_bytes,
-    fuchsia_images2::wire::PixelFormat pixel_format) {
-  if (image->tiling_type != IMAGE_TILING_TYPE_LINEAR) {
+    zx::vmo vmo, const image_metadata_t& image_metadata, size_t offset, uint32_t pixel_size,
+    uint32_t row_bytes, fuchsia_images2::wire::PixelFormat pixel_format) {
+  if (image_metadata.tiling_type != IMAGE_TILING_TYPE_LINEAR) {
     return zx::error(ZX_ERR_INVALID_ARGS);
   }
 
@@ -275,7 +275,7 @@ zx::result<display::DriverImageId> DisplayEngine::Import(
     return zx::error(ZX_ERR_NO_MEMORY);
   }
 
-  unsigned size = ZX_ROUNDUP(row_bytes * image->height, zx_system_get_page_size());
+  unsigned size = ZX_ROUNDUP(row_bytes * image_metadata.height, zx_system_get_page_size());
   zx_paddr_t paddr;
   zx_status_t status = gpu_device_->bti().pin(ZX_BTI_PERM_READ | ZX_BTI_CONTIGUOUS, vmo, offset,
                                               size, &paddr, 1, &import_data->pmt);
@@ -285,7 +285,7 @@ zx::result<display::DriverImageId> DisplayEngine::Import(
   }
 
   zx::result<uint32_t> create_resource_result =
-      gpu_device_->Create2DResource(row_bytes / pixel_size, image->height, pixel_format);
+      gpu_device_->Create2DResource(row_bytes / pixel_size, image_metadata.height, pixel_format);
   if (create_resource_result.is_error()) {
     zxlogf(ERROR, "Failed to allocate 2D resource: %s", create_resource_result.status_string());
     return create_resource_result.take_error();

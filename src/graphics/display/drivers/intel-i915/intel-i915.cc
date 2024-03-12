@@ -912,7 +912,7 @@ zx_status_t Controller::DisplayControllerImplReleaseBufferCollection(
   return ZX_OK;
 }
 
-zx_status_t Controller::DisplayControllerImplImportImage(const image_t* image,
+zx_status_t Controller::DisplayControllerImplImportImage(const image_metadata_t* image_metadata,
                                                          uint64_t banjo_driver_buffer_collection_id,
                                                          uint32_t index,
                                                          uint64_t* out_image_handle) {
@@ -926,10 +926,10 @@ zx_status_t Controller::DisplayControllerImplImportImage(const image_t* image,
   }
   const fidl::WireSyncClient<fuchsia_sysmem::BufferCollection>& collection = it->second;
 
-  if (!(image->tiling_type == IMAGE_TILING_TYPE_LINEAR ||
-        image->tiling_type == IMAGE_TILING_TYPE_X_TILED ||
-        image->tiling_type == IMAGE_TILING_TYPE_Y_LEGACY_TILED ||
-        image->tiling_type == IMAGE_TILING_TYPE_YF_TILED)) {
+  if (!(image_metadata->tiling_type == IMAGE_TILING_TYPE_LINEAR ||
+        image_metadata->tiling_type == IMAGE_TILING_TYPE_X_TILED ||
+        image_metadata->tiling_type == IMAGE_TILING_TYPE_Y_LEGACY_TILED ||
+        image_metadata->tiling_type == IMAGE_TILING_TYPE_YF_TILED)) {
     return ZX_ERR_INVALID_ARGS;
   }
 
@@ -994,9 +994,9 @@ zx_status_t Controller::DisplayControllerImplImportImage(const image_t* image,
     zxlogf(ERROR, "Invalid pixel format modifier");
     return ZX_ERR_INVALID_ARGS;
   }
-  if (image->tiling_type != image_tiling_type) {
-    zxlogf(ERROR, "Incompatible image type from image %d and sysmem %d", image->tiling_type,
-           image_tiling_type);
+  if (image_metadata->tiling_type != image_tiling_type) {
+    zxlogf(ERROR, "Incompatible image type from image %d and sysmem %d",
+           image_metadata->tiling_type, image_tiling_type);
     return ZX_ERR_INVALID_ARGS;
   }
 
@@ -1008,7 +1008,7 @@ zx_status_t Controller::DisplayControllerImplImportImage(const image_t* image,
   }
 
   auto format = ImageConstraintsToFormat(collection_info.settings.image_format_constraints,
-                                         image->width, image->height);
+                                         image_metadata->width, image_metadata->height);
   if (!format.is_ok()) {
     zxlogf(ERROR, "Failed to get format from constraints");
     return ZX_ERR_INVALID_ARGS;
@@ -1023,14 +1023,16 @@ zx_status_t Controller::DisplayControllerImplImportImage(const image_t* image,
 
   const uint32_t bytes_per_pixel = ImageFormatStrideBytesPerWidthPixel(format.value().pixel_format);
 
-  ZX_DEBUG_ASSERT(length >= width_in_tiles(image->tiling_type, image->width, bytes_per_pixel) *
-                                height_in_tiles(image->tiling_type, image->height) *
-                                get_tile_byte_size(image->tiling_type));
+  ZX_DEBUG_ASSERT(
+      length >=
+      width_in_tiles(image_metadata->tiling_type, image_metadata->width, bytes_per_pixel) *
+          height_in_tiles(image_metadata->tiling_type, image_metadata->height) *
+          get_tile_byte_size(image_metadata->tiling_type));
 
   uint32_t align;
-  if (image->tiling_type == IMAGE_TILING_TYPE_LINEAR) {
+  if (image_metadata->tiling_type == IMAGE_TILING_TYPE_LINEAR) {
     align = registers::PlaneSurface::kLinearAlignment;
-  } else if (image->tiling_type == IMAGE_TILING_TYPE_X_TILED) {
+  } else if (image_metadata->tiling_type == IMAGE_TILING_TYPE_X_TILED) {
     align = registers::PlaneSurface::kXTilingAlignment;
   } else {
     align = registers::PlaneSurface::kYTilingAlignment;

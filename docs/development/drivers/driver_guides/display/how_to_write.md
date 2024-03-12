@@ -175,8 +175,9 @@ class Device : public DeviceType {
     return ZX_ERR_NOT_SUPPORTED;
   }
 
-  zx_status_t DisplayControllerImplImportImage(
-      image_t* image, uint64_t collection_id, uint32_t index) {
+  zx_status_t DisplayControllerImplImportImage(const image_metadata_t* image_metadata,
+                                               uint64_t collection_id, uint32_t index,
+                                               uint64_t* out_image_handle) {
     return ZX_ERR_NOT_SUPPORTED;
   }
 

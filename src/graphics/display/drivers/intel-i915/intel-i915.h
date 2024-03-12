@@ -98,7 +98,7 @@ class Controller : public DeviceType,
       uint64_t banjo_driver_buffer_collection_id, zx::channel collection_token);
   zx_status_t DisplayControllerImplReleaseBufferCollection(
       uint64_t banjo_driver_buffer_collection_id);
-  zx_status_t DisplayControllerImplImportImage(const image_t* image,
+  zx_status_t DisplayControllerImplImportImage(const image_metadata_t* image_metadata,
                                                uint64_t banjo_driver_buffer_collection_id,
                                                uint32_t index, uint64_t* out_image_handle);
   zx_status_t DisplayControllerImplImportImageForCapture(uint64_t banjo_driver_buffer_collection_id,

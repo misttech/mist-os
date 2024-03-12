@@ -42,6 +42,24 @@ type ImageBufferUsage = struct {
     tiling_type uint32;
 };
 
+/// Describes how an image is stored in a buffer of a sysmem BufferCollection.
+///
+/// The buffer is dedicated to storing a single image. The properties below are
+/// needed for decoding the image from the buffer.
+// TODO(https://fxbug.dev/329163718): sysmem already has some of the information
+// here. Prune this structure, replacing members with querying properties on the
+// associated sysmem BufferCollection.
+type ImageMetadata = struct {
+    /// The width and height of the image in pixels.
+    width uint32;
+    height uint32;
+
+    /// Specifies how individual pixels are arranged in an image buffer.
+    ///
+    /// See [`fuchsia.hardware.display.types/ImageTilingTypeIdValue`].
+    tiling_type uint32;
+};
+
 const INVALID_DISPLAY_ID uint64 = 0;
 const INVALID_ID uint64 = 0;
 
@@ -378,7 +396,10 @@ closed protocol DisplayControllerImpl {
     /// Returns ZX_ERR_SHOULD_WAIT if the buffer collection is not already
     /// allocated.
     strict ImportImage(struct {
-        image Image;
+        // TODO(https://fxbug.dev/329163718): Some of the information in
+        // `image_metadata` was negotiated by sysmem. The display coordinator or
+        // engine drivers should read that information directly from sysmem.
+        image_metadata ImageMetadata;
         collection_id uint64;
         index uint32;
     }) -> (struct {

@@ -69,7 +69,7 @@ class Display : public DisplayType,
       uint64_t banjo_driver_buffer_collection_id, zx::channel collection_token);
   zx_status_t DisplayControllerImplReleaseBufferCollection(
       uint64_t banjo_driver_buffer_collection_id);
-  zx_status_t DisplayControllerImplImportImage(const image_t* image,
+  zx_status_t DisplayControllerImplImportImage(const image_metadata_t* image_metadata,
                                                uint64_t banjo_driver_buffer_collection_id,
                                                uint32_t index, uint64_t* out_image_handle);
   zx_status_t DisplayControllerImplImportImageForCapture(uint64_t banjo_driver_buffer_collection_id,
@@ -197,7 +197,7 @@ class Display : public DisplayType,
   // until the device is released.
   zx_status_t InitSysmemAllocatorClientLocked() TA_REQ(lock_);
 
-  zx::result<display::DriverImageId> ImportVmoImage(const image_t* image,
+  zx::result<display::DriverImageId> ImportVmoImage(const image_metadata_t& image_metadata,
                                                     const fuchsia_sysmem::PixelFormat& pixel_format,
                                                     zx::vmo vmo, size_t offset);
   zx_status_t PresentDisplayConfig(display::DisplayId display_id,

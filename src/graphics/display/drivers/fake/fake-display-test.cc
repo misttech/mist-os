@@ -436,22 +436,6 @@ TEST_F(FakeDisplayRealSysmemTest, ImportImage) {
                                                                    token.TakeChannel()));
 
   // Driver sets BufferCollection buffer memory constraints.
-  const image_t kDefaultConfig = {
-      .width = 1024,
-      .height = 768,
-      .tiling_type = IMAGE_TILING_TYPE_LINEAR,
-      .handle = 0,
-  };
-  const auto kPixelFormat = fuchsia_sysmem::wire::PixelFormat{
-      .type = fuchsia_sysmem::PixelFormatType::kBgra32,
-      .has_format_modifier = true,
-      .format_modifier =
-          {
-              .value = fuchsia_sysmem::wire::kFormatModifierLinear,
-          },
-  };
-  const uint32_t bytes_per_pixel = ImageFormatStrideBytesPerWidthPixel(kPixelFormat);
-
   static constexpr image_buffer_usage_t kDisplayUsage = {
       .tiling_type = IMAGE_TILING_TYPE_LINEAR,
   };
@@ -459,11 +443,26 @@ TEST_F(FakeDisplayRealSysmemTest, ImportImage) {
       &kDisplayUsage, kBanjoBufferCollectionId));
 
   // Set BufferCollection buffer memory constraints.
+  static constexpr const image_metadata_t kDisplayImageMetadata = {
+      .width = 1024,
+      .height = 768,
+      .tiling_type = IMAGE_TILING_TYPE_LINEAR,
+  };
+  static constexpr fuchsia_sysmem::wire::PixelFormat kPixelFormat = {
+      .type = fuchsia_sysmem::PixelFormatType::kBgra32,
+      .has_format_modifier = true,
+      .format_modifier =
+          {
+              .value = fuchsia_sysmem::wire::kFormatModifierLinear,
+          },
+  };
+
+  const uint32_t bytes_per_pixel = ImageFormatStrideBytesPerWidthPixel(kPixelFormat);
   fidl::Status set_constraints_status = collection_client->SetConstraints(
-      /* has_constraints= */ true,
-      CreateImageConstraints(
-          /*min_size_bytes=*/kDefaultConfig.width * kDefaultConfig.height * bytes_per_pixel,
-          kPixelFormat));
+      /* has_constraints= */ true, CreateImageConstraints(
+                                       /*min_size_bytes=*/kDisplayImageMetadata.width *
+                                           kDisplayImageMetadata.height * bytes_per_pixel,
+                                       kPixelFormat));
   EXPECT_TRUE(set_constraints_status.ok());
 
   // Both the test-side client and the driver have set the constraints.
@@ -473,37 +472,39 @@ TEST_F(FakeDisplayRealSysmemTest, ImportImage) {
   // TODO(https://fxbug.dev/42079037): Split all valid / invalid imports into separate
   // test cases.
   // Invalid import: Bad image type.
-  image_t invalid_config = kDefaultConfig;
-  invalid_config.tiling_type = IMAGE_TILING_TYPE_CAPTURE;
+  static constexpr const image_metadata_t kInvalidTilingTypeMetadata = {
+      .width = 1024,
+      .height = 768,
+      .tiling_type = IMAGE_TILING_TYPE_CAPTURE,
+  };
   uint64_t image_handle = 0;
-  EXPECT_EQ(display()->DisplayControllerImplImportImage(&invalid_config, kBanjoBufferCollectionId,
+  EXPECT_EQ(display()->DisplayControllerImplImportImage(&kInvalidTilingTypeMetadata,
+                                                        kBanjoBufferCollectionId,
                                                         /*index=*/0, &image_handle),
             ZX_ERR_INVALID_ARGS);
 
   // Invalid import: Invalid collection ID.
-  invalid_config = kDefaultConfig;
   constexpr display::DriverBufferCollectionId kInvalidBufferCollectionId(100);
   constexpr uint64_t kBanjoInvalidBufferCollectionId =
       display::ToBanjoDriverBufferCollectionId(kInvalidBufferCollectionId);
   image_handle = 0;
-  EXPECT_EQ(
-      display()->DisplayControllerImplImportImage(&invalid_config, kBanjoInvalidBufferCollectionId,
-                                                  /*index=*/0, &image_handle),
-      ZX_ERR_NOT_FOUND);
+  EXPECT_EQ(display()->DisplayControllerImplImportImage(&kDisplayImageMetadata,
+                                                        kBanjoInvalidBufferCollectionId,
+                                                        /*index=*/0, &image_handle),
+            ZX_ERR_NOT_FOUND);
 
   // Invalid import: Invalid buffer collection index.
-  invalid_config = kDefaultConfig;
   constexpr uint64_t kInvalidBufferCollectionIndex = 100u;
   image_handle = 0;
   EXPECT_EQ(
-      display()->DisplayControllerImplImportImage(&invalid_config, kBanjoBufferCollectionId,
+      display()->DisplayControllerImplImportImage(&kDisplayImageMetadata, kBanjoBufferCollectionId,
                                                   kInvalidBufferCollectionIndex, &image_handle),
       ZX_ERR_OUT_OF_RANGE);
 
   // Valid import.
-  image_t valid_config = kDefaultConfig;
   image_handle = 0;
-  EXPECT_OK(display()->DisplayControllerImplImportImage(&valid_config, kBanjoBufferCollectionId,
+  EXPECT_OK(display()->DisplayControllerImplImportImage(&kDisplayImageMetadata,
+                                                        kBanjoBufferCollectionId,
                                                         /*index=*/0, &image_handle));
   EXPECT_NE(image_handle, 0u);
 
@@ -626,13 +627,6 @@ TEST_F(FakeDisplayRealSysmemTest, Capture) {
   constexpr int kDisplayWidth = 1280;
   constexpr int kDisplayHeight = 800;
 
-  image_t framebuffer_config = {
-      .width = kDisplayWidth,
-      .height = kDisplayHeight,
-      .tiling_type = IMAGE_TILING_TYPE_LINEAR,
-      .handle = 0,
-  };
-
   // Set BufferCollection buffer memory constraints from the display driver's
   // end.
   static constexpr image_buffer_usage_t kDisplayUsage = {
@@ -681,15 +675,26 @@ TEST_F(FakeDisplayRealSysmemTest, Capture) {
   EXPECT_NE(capture_handle, INVALID_ID);
 
   // Import framebuffer image.
+  static constexpr image_metadata_t kFramebufferImageMetadata = {
+      .width = kDisplayWidth,
+      .height = kDisplayHeight,
+      .tiling_type = IMAGE_TILING_TYPE_LINEAR,
+  };
+
   uint64_t framebuffer_image_handle = 0;
-  EXPECT_OK(display()->DisplayControllerImplImportImage(&framebuffer_config,
+  EXPECT_OK(display()->DisplayControllerImplImportImage(&kFramebufferImageMetadata,
                                                         kBanjoFramebufferBufferCollectionId,
                                                         /*index=*/0, &framebuffer_image_handle));
   EXPECT_NE(framebuffer_image_handle, INVALID_ID);
-  framebuffer_config.handle = framebuffer_image_handle;
 
   // Create display configuration.
-  layer_t layer = CreatePrimaryLayerConfig(framebuffer_config);
+  const image_t framebuffer_image_config = {
+      .width = kDisplayWidth,
+      .height = kDisplayHeight,
+      .tiling_type = IMAGE_TILING_TYPE_LINEAR,
+      .handle = framebuffer_image_handle,
+  };
+  layer_t layer = CreatePrimaryLayerConfig(framebuffer_image_config);
 
   constexpr size_t kNumLayers = 1;
   std::array<const layer_t*, kNumLayers> layers = {&layer};

@@ -451,39 +451,39 @@ TEST(IntelI915Display, ImportImage) {
                                                                         kBanjoBufferCollectionId));
 
   // Invalid import: bad collection id
-  static constexpr image_t kDefaultImage = {
+  static constexpr image_metadata_t kDisplayImageMetadata = {
       .width = 32,
       .height = 32,
       .tiling_type = IMAGE_TILING_TYPE_LINEAR,
-      .handle = 0u,
   };
-  image_t invalid_image = kDefaultImage;
   static constexpr uint64_t kBanjoInvalidCollectionId = 100;
   uint64_t image_handle = 0;
-  EXPECT_EQ(display.DisplayControllerImplImportImage(&invalid_image, kBanjoInvalidCollectionId, 0,
-                                                     &image_handle),
+  EXPECT_EQ(display.DisplayControllerImplImportImage(&kDisplayImageMetadata,
+                                                     kBanjoInvalidCollectionId, 0, &image_handle),
             ZX_ERR_NOT_FOUND);
 
   // Invalid import: bad index
-  invalid_image = kDefaultImage;
   static constexpr uint32_t kInvalidIndex = 100;
   image_handle = 0;
-  EXPECT_EQ(display.DisplayControllerImplImportImage(&invalid_image, kBanjoBufferCollectionId,
-                                                     kInvalidIndex, &image_handle),
+  EXPECT_EQ(display.DisplayControllerImplImportImage(
+                &kDisplayImageMetadata, kBanjoBufferCollectionId, kInvalidIndex, &image_handle),
             ZX_ERR_OUT_OF_RANGE);
 
   // Invalid import: bad type
-  invalid_image = kDefaultImage;
-  invalid_image.tiling_type = IMAGE_TILING_TYPE_CAPTURE;
-  EXPECT_EQ(display.DisplayControllerImplImportImage(&invalid_image, kBanjoBufferCollectionId,
+  static constexpr image_metadata_t kInvalidTilingTypeMetadata = {
+      .width = 32,
+      .height = 32,
+      .tiling_type = IMAGE_TILING_TYPE_CAPTURE,
+  };
+  EXPECT_EQ(display.DisplayControllerImplImportImage(&kInvalidTilingTypeMetadata,
+                                                     kBanjoBufferCollectionId,
                                                      /*index=*/0, &image_handle),
             ZX_ERR_INVALID_ARGS);
 
   // Valid import
-  const image_t valid_image = kDefaultImage;
   image_handle = 0;
-  EXPECT_OK(display.DisplayControllerImplImportImage(&valid_image, kBanjoBufferCollectionId, 0,
-                                                     &image_handle));
+  EXPECT_OK(display.DisplayControllerImplImportImage(&kDisplayImageMetadata,
+                                                     kBanjoBufferCollectionId, 0, &image_handle));
   EXPECT_NE(image_handle, 0u);
 
   display.DisplayControllerImplReleaseImage(image_handle);
@@ -645,16 +645,23 @@ TEST_F(IntegrationTest, SysmemImport) {
   ASSERT_TRUE(collection);
   EXPECT_TRUE(collection->set_constraints_called());
 
-  image_t image = {};
-  image.width = 128;
-  image.height = kImageHeight;
+  static constexpr image_metadata_t kDisplayImageMetadata = {
+      .width = 128,
+      .height = kImageHeight,
+      .tiling_type = IMAGE_TILING_TYPE_LINEAR,
+  };
   uint64_t image_handle = 0;
   PerformBlockingWork([&] {
-    EXPECT_OK(ctx->DisplayControllerImplImportImage(&image, kBanjoBufferCollectionId, /*index=*/0,
-                                                    &image_handle));
+    EXPECT_OK(ctx->DisplayControllerImplImportImage(
+        &kDisplayImageMetadata, kBanjoBufferCollectionId, /*index=*/0, &image_handle));
   });
-  image.handle = image_handle;
 
+  const image_t image = {
+      .width = 128,
+      .height = kImageHeight,
+      .tiling_type = IMAGE_TILING_TYPE_LINEAR,
+      .handle = image_handle,
+  };
   const GttRegion& region = ctx->SetupGttImage(&image, FRAME_TRANSFORM_IDENTITY);
   EXPECT_LT(image.width * 4, kBytesPerRowDivisor);
   EXPECT_EQ(kBytesPerRowDivisor, region.bytes_per_row());
@@ -686,13 +693,8 @@ TEST_F(IntegrationTest, SysmemRotated) {
   ASSERT_TRUE(collection);
   collection->set_format_modifier(fuchsia_sysmem::wire::kFormatModifierIntelI915YTiled);
 
-  image_t image = {};
-  image.width = 128;
-  image.height = kImageHeight;
-  // Must match set_format_modifier above, and also be y or yf tiled so rotation is allowed.
-  image.tiling_type = IMAGE_TILING_TYPE_Y_LEGACY_TILED;
-
   static constexpr image_buffer_usage_t kTiledDisplayUsage = {
+      // Must be y or yf tiled so rotation is allowed.
       .tiling_type = IMAGE_TILING_TYPE_Y_LEGACY_TILED,
   };
   EXPECT_OK(ctx->DisplayControllerImplSetBufferCollectionConstraints(&kTiledDisplayUsage,
@@ -701,15 +703,24 @@ TEST_F(IntegrationTest, SysmemRotated) {
   RunLoopUntilIdle();
   EXPECT_TRUE(collection->set_constraints_called());
 
-  image.tiling_type = IMAGE_TILING_TYPE_Y_LEGACY_TILED;
+  static constexpr image_metadata_t kTiledImageMetadata = {
+      .width = 128,
+      .height = kImageHeight,
+      .tiling_type = IMAGE_TILING_TYPE_Y_LEGACY_TILED,
+  };
   uint64_t image_handle = 0;
   PerformBlockingWork([&]() mutable {
-    EXPECT_OK(ctx->DisplayControllerImplImportImage(&image, kBanjoBufferCollectionId, /*index=*/0,
-                                                    &image_handle));
+    EXPECT_OK(ctx->DisplayControllerImplImportImage(&kTiledImageMetadata, kBanjoBufferCollectionId,
+                                                    /*index=*/0, &image_handle));
   });
-  image.handle = image_handle;
 
   // Check that rotating the image doesn't hang.
+  const image_t image = {
+      .width = 128,
+      .height = kImageHeight,
+      .tiling_type = IMAGE_TILING_TYPE_Y_LEGACY_TILED,
+      .handle = image_handle,
+  };
   const GttRegion& region = ctx->SetupGttImage(&image, FRAME_TRANSFORM_ROT_90);
   EXPECT_LT(image.width * 4, kBytesPerRowDivisor);
   EXPECT_EQ(kBytesPerRowDivisor, region.bytes_per_row());

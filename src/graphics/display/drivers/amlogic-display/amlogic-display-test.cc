@@ -526,41 +526,40 @@ TEST_F(FakeSysmemTest, ImportImage) {
                 &kDisplayUsage, kBanjoInvalidBufferCollectionId),
             ZX_ERR_NOT_FOUND);
 
-  static constexpr image_t kDefaultConfig = {
+  // Invalid import: Bad image type.
+  static constexpr image_metadata_t kInvalidTilingMetadata = {
+      .width = 1024,
+      .height = 768,
+      .tiling_type = IMAGE_TILING_TYPE_CAPTURE,
+  };
+  uint64_t image_handle = 0;
+  EXPECT_EQ(
+      display_->DisplayControllerImplImportImage(&kInvalidTilingMetadata, kBanjoBufferCollectionId,
+                                                 /*index=*/0, &image_handle),
+      ZX_ERR_INVALID_ARGS);
+
+  // Invalid import: Invalid collection ID.
+  static constexpr image_metadata_t kDisplayImageMetadata = {
       .width = 1024,
       .height = 768,
       .tiling_type = IMAGE_TILING_TYPE_LINEAR,
-      .handle = 0,
   };
-
-  // Invalid import: Bad image type.
-  image_t invalid_config = kDefaultConfig;
-  invalid_config.tiling_type = IMAGE_TILING_TYPE_CAPTURE;
-  uint64_t image_handle = 0;
-  EXPECT_EQ(display_->DisplayControllerImplImportImage(&invalid_config, kBanjoBufferCollectionId,
+  EXPECT_EQ(display_->DisplayControllerImplImportImage(&kDisplayImageMetadata,
+                                                       kBanjoInvalidBufferCollectionId,
                                                        /*index=*/0, &image_handle),
-            ZX_ERR_INVALID_ARGS);
-
-  // Invalid import: Invalid collection ID.
-  invalid_config = kDefaultConfig;
-  EXPECT_EQ(
-      display_->DisplayControllerImplImportImage(&invalid_config, kBanjoInvalidBufferCollectionId,
-                                                 /*index=*/0, &image_handle),
-      ZX_ERR_NOT_FOUND);
+            ZX_ERR_NOT_FOUND);
 
   // Invalid import: Invalid buffer collection index.
-  invalid_config = kDefaultConfig;
   constexpr uint64_t kInvalidBufferCollectionIndex = 100u;
   image_handle = 0;
   EXPECT_EQ(
-      display_->DisplayControllerImplImportImage(&invalid_config, kBanjoBufferCollectionId,
+      display_->DisplayControllerImplImportImage(&kDisplayImageMetadata, kBanjoBufferCollectionId,
                                                  kInvalidBufferCollectionIndex, &image_handle),
       ZX_ERR_OUT_OF_RANGE);
 
   // Valid import.
-  image_t valid_config = kDefaultConfig;
-  image_handle = 0;
-  EXPECT_OK(display_->DisplayControllerImplImportImage(&valid_config, kBanjoBufferCollectionId,
+  EXPECT_OK(display_->DisplayControllerImplImportImage(&kDisplayImageMetadata,
+                                                       kBanjoBufferCollectionId,
                                                        /*index=*/0, &image_handle));
   EXPECT_NE(image_handle, 0u);
 

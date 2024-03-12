@@ -67,7 +67,7 @@ class DisplayEngine : public ddk::DisplayControllerImplProtocol<DisplayEngine, d
 
   zx::result<BufferInfo> GetAllocatedBufferInfoForImage(
       display::DriverBufferCollectionId driver_buffer_collection_id, uint32_t index,
-      const image_t* image) const;
+      const image_metadata_t& image_metadata) const;
 
   void DisplayControllerImplSetDisplayControllerInterface(
       const display_controller_interface_protocol_t* intf);
@@ -82,7 +82,7 @@ class DisplayEngine : public ddk::DisplayControllerImplProtocol<DisplayEngine, d
   zx_status_t DisplayControllerImplReleaseBufferCollection(
       uint64_t banjo_driver_buffer_collection_id);
 
-  zx_status_t DisplayControllerImplImportImage(const image_t* image,
+  zx_status_t DisplayControllerImplImportImage(const image_metadata_t* image_metadata,
                                                uint64_t banjo_driver_buffer_collection_id,
                                                uint32_t index, uint64_t* out_image_handle);
 
@@ -134,8 +134,8 @@ class DisplayEngine : public ddk::DisplayControllerImplProtocol<DisplayEngine, d
           fuchsia_images2::wire::PixelFormat::kB8G8R8A8),
   };
 
-  zx::result<display::DriverImageId> Import(zx::vmo vmo, const image_t* image, size_t offset,
-                                            uint32_t pixel_size, uint32_t row_bytes,
+  zx::result<display::DriverImageId> Import(zx::vmo vmo, const image_metadata& image_metadata,
+                                            size_t offset, uint32_t pixel_size, uint32_t row_bytes,
                                             fuchsia_images2::wire::PixelFormat pixel_format);
 
   // Initializes the sysmem Allocator client used to import incoming buffer
