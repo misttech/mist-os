@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/ui/tests/conformance/conformance-test-base.h"
+#include "src/ui/tests/conformance_input_tests/conformance-test-base.h"
 
 #include <fuchsia/ui/test/context/cpp/fidl.h>
 

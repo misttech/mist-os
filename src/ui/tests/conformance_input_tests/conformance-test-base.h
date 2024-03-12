@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_UI_TESTS_CONFORMANCE_CONFORMANCE_TEST_BASE_H_
-#define SRC_UI_TESTS_CONFORMANCE_CONFORMANCE_TEST_BASE_H_
+#ifndef SRC_UI_TESTS_CONFORMANCE_INPUT_TESTS_CONFORMANCE_TEST_BASE_H_
+#define SRC_UI_TESTS_CONFORMANCE_INPUT_TESTS_CONFORMANCE_TEST_BASE_H_
 
 #include <fuchsia/testing/harness/cpp/fidl.h>
 #include <lib/fidl/cpp/interface_handle.h>
@@ -63,4 +63,4 @@ class ConformanceTest : public gtest::RealLoopFixture {
 
 }  // namespace ui_conformance_test_base
 
-#endif  // SRC_UI_TESTS_CONFORMANCE_CONFORMANCE_TEST_BASE_H_
+#endif  // SRC_UI_TESTS_CONFORMANCE_INPUT_TESTS_CONFORMANCE_TEST_BASE_H_

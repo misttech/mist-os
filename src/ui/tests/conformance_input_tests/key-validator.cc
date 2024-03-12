@@ -22,7 +22,7 @@
 #include <gtest/gtest.h>
 
 #include "src/lib/fsl/handles/object_info.h"
-#include "src/ui/tests/conformance/conformance-test-base.h"
+#include "src/ui/tests/conformance_input_tests/conformance-test-base.h"
 
 namespace ui_conformance_testing {
 

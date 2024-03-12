@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 {
     include: [
-        "//src/ui/tests/conformance/meta/conformance-test-base.shard.cml",
+        "//src/ui/tests/conformance_input_tests/meta/conformance-test-base.shard.cml",
         "inspect/offer.shard.cml",
     ],
     children: [

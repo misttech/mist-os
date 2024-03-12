@@ -25,7 +25,7 @@
 #include <gtest/gtest.h>
 #include <src/lib/fostr/fidl/fuchsia/ui/input/formatting.h>
 
-#include "src/ui/tests/conformance/conformance-test-base.h"
+#include "src/ui/tests/conformance_input_tests/conformance-test-base.h"
 
 namespace ui_conformance_testing {
 

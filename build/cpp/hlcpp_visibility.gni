@@ -341,7 +341,7 @@ hlcpp_visibility = [
   "//src/ui/scenic/lib/view_tree:*",
   "//src/ui/scenic/tests:*",
   "//src/ui/testing/*",
-  "//src/ui/tests/conformance:*",
+  "//src/ui/tests/conformance_input_tests:*",
   "//src/ui/tests/integration_flutter_tests/embedder:*",
   "//src/ui/tests/integration_graphics_tests/carnelian-pixel-tests:*",
   "//src/ui/tests/integration_graphics_tests/display-pixel-ratio:*",
