@@ -25,9 +25,9 @@ namespace sysmem_driver {
 class ContiguousPooledMemoryAllocator : public MemoryAllocator {
  public:
   ContiguousPooledMemoryAllocator(Owner* parent_device, const char* allocation_name,
-                                  inspect::Node* parent_node, uint64_t pool_id, uint64_t size,
-                                  bool is_always_cpu_accessible, bool is_ever_cpu_accessible,
-                                  bool is_ready, bool can_be_torn_down,
+                                  inspect::Node* parent_node, fuchsia_sysmem2::Heap heap,
+                                  uint64_t size, bool is_always_cpu_accessible,
+                                  bool is_ever_cpu_accessible, bool is_ready, bool can_be_torn_down,
                                   async_dispatcher_t* dispatcher);
 
   ~ContiguousPooledMemoryAllocator();
@@ -92,7 +92,7 @@ class ContiguousPooledMemoryAllocator : public MemoryAllocator {
   }
   bool is_bti_fake() { return is_bti_fake_; }
 
-  fuchsia_sysmem2::HeapType heap_type() { return safe_cast<fuchsia_sysmem2::HeapType>(pool_id_); }
+  const fuchsia_sysmem2::Heap& heap() { return heap_; }
 
   // loanable pages / un-used pages
   //
@@ -228,12 +228,16 @@ class ContiguousPooledMemoryAllocator : public MemoryAllocator {
   void StepTowardOptimalProtectedRanges(async_dispatcher_t* dispatcher, async::TaskBase* task,
                                         zx_status_t status);
 
+  protected_ranges::ProtectedRangesCoreControl& protected_ranges_core_control(
+      const fuchsia_sysmem2::Heap& heap);
+
   void DumpRanges() const;
 
   Owner* const parent_device_{};
   async_dispatcher_t* dispatcher_{};
   const char* const allocation_name_{};
-  const uint64_t pool_id_{};
+  const fuchsia_sysmem2::Heap heap_{};
+  const uint64_t counter_id_{};
   char child_name_[ZX_MAX_NAME_LEN] = {};
 
   uint64_t guard_region_size_ = 0;
@@ -387,6 +391,8 @@ class ContiguousPooledMemoryAllocator : public MemoryAllocator {
   uint64_t zero_page_vmo_size_ = fbl::round_up(64ull * 1024, zx_system_get_page_size());
   zx::vmo zero_page_vmo_;
   uint8_t* zero_page_vmo_base_ = nullptr;
+
+  protected_ranges::ProtectedRangesCoreControl* protected_ranges_core_control_ = nullptr;
 };
 
 }  // namespace sysmem_driver

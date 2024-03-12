@@ -90,7 +90,7 @@ class Device final : public DdkDeviceType,
   [[nodiscard]] zx_status_t CommonSysmemConnectV1(zx::channel allocator_request);
   [[nodiscard]] zx_status_t CommonSysmemConnectV2(zx::channel allocator_request);
   [[nodiscard]] zx_status_t CommonSysmemRegisterHeap(
-      uint64_t heap, fidl::ClientEnd<fuchsia_hardware_sysmem::Heap> heap_connection);
+      fuchsia_sysmem2::Heap heap, fidl::ClientEnd<fuchsia_hardware_sysmem::Heap> heap_connection);
   [[nodiscard]] zx_status_t CommonSysmemRegisterSecureMem(
       fidl::ClientEnd<fuchsia_sysmem::SecureMem> secure_mem_connection);
   [[nodiscard]] zx_status_t CommonSysmemUnregisterSecureMem();
@@ -120,7 +120,7 @@ class Device final : public DdkDeviceType,
   void CheckForUnbind() override;
   SysmemMetrics& metrics() override;
   protected_ranges::ProtectedRangesCoreControl& protected_ranges_core_control(
-      fuchsia_sysmem2::HeapType heap_type) override;
+      const fuchsia_sysmem2::Heap& heap) override;
 
   inspect::Node* heap_node() override { return &heaps_; }
 
@@ -161,7 +161,7 @@ class Device final : public DdkDeviceType,
   //
   // If the heap is not valid or not registered to sysmem driver, nullptr is returned.
   [[nodiscard]] const fuchsia_hardware_sysmem::HeapProperties* GetHeapProperties(
-      fuchsia_sysmem2::HeapType heap) const;
+      const fuchsia_sysmem2::Heap& heap) const;
 
   [[nodiscard]] const sysmem_protocol_t* proto() const { return &in_proc_sysmem_protocol_; }
   [[nodiscard]] const zx_device_t* device() const { return zxdev_; }
@@ -304,14 +304,28 @@ class Device final : public DdkDeviceType,
 
   std::deque<zx_koid_t> unfound_token_koids_ __TA_GUARDED(*loop_checker_);
 
+  struct HashHeap {
+    size_t operator()(const fuchsia_sysmem2::Heap& heap) const {
+      const static auto hash_heap_type = std::hash<std::string>{};
+      const static auto hash_id = std::hash<uint64_t>{};
+      size_t hash = 0;
+      if (heap.heap_type().has_value()) {
+        hash = hash ^ hash_heap_type(heap.heap_type().value());
+      }
+      if (heap.id().has_value()) {
+        hash = hash ^ hash_id(heap.id().value());
+      }
+      return hash;
+    }
+  };
   // This map contains all registered memory allocators.
-  std::map<fuchsia_sysmem2::HeapType, std::shared_ptr<MemoryAllocator>> allocators_
+  std::unordered_map<fuchsia_sysmem2::Heap, std::shared_ptr<MemoryAllocator>, HashHeap> allocators_
       __TA_GUARDED(*loop_checker_);
 
   // This map contains only the secure allocators, if any.  The pointers are owned by allocators_.
   //
   // TODO(dustingreen): Consider unordered_map for this and some of above.
-  std::map<fuchsia_sysmem2::HeapType, MemoryAllocator*> secure_allocators_
+  std::unordered_map<fuchsia_sysmem2::Heap, MemoryAllocator*, HashHeap> secure_allocators_
       __TA_GUARDED(*loop_checker_);
 
   struct SecureMemControl : public protected_ranges::ProtectedRangesCoreControl {
@@ -337,15 +351,16 @@ class Device final : public DdkDeviceType,
     void ZeroProtectedSubRange(bool is_covering_range_explicit,
                                const protected_ranges::Range& range) override;
 
-    fuchsia_sysmem2::HeapType heap_type;
+    fuchsia_sysmem2::Heap heap{};
+    fuchsia_sysmem::HeapType v1_heap_type{};
     Device* parent{};
     bool is_dynamic{};
     uint64_t range_granularity{};
     uint64_t max_range_count{};
     bool has_mod_protected_range{};
   };
-  // This map has the secure_mem_ properties for each HeapType in secure_allocators_.
-  std::map<fuchsia_sysmem2::HeapType, SecureMemControl> secure_mem_controls_
+  // This map has the secure_mem_ properties for each fuchsia_sysmem2::Heap in secure_allocators_.
+  std::unordered_map<fuchsia_sysmem2::Heap, SecureMemControl, HashHeap> secure_mem_controls_
       __TA_GUARDED(*loop_checker_);
 
   // This flag is used to determine if the closing of the current secure mem

@@ -34,7 +34,7 @@ class MemoryAllocator {
     virtual void CheckForUnbind() {}
     virtual SysmemMetrics& metrics() = 0;
     virtual protected_ranges::ProtectedRangesCoreControl& protected_ranges_core_control(
-        fuchsia_sysmem2::HeapType heap_type) {
+        const fuchsia_sysmem2::Heap& heap) {
       // Avoid requiring unrelated tests to implement.
       ZX_PANIC("protected_ranges_core_control() not implemented by subclass");
     }

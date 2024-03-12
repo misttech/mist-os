@@ -9,11 +9,15 @@ using fuchsia.math;
 /// The maximum size of
 /// [`fuchsia.sysmem2/BufferCollectionConstraints.image_format_constraints`].
 const MAX_COUNT_BUFFER_COLLECTION_CONSTRAINTS_IMAGE_FORMAT_CONSTRAINTS uint32 = 64;
+
 /// The maximum size of
-/// [`fuchsia.sysmem2/BufferMemoryConstraints.heap_permitted`].
-const MAX_COUNT_BUFFER_MEMORY_CONSTRAINTS_HEAP_PERMITTED uint32 = 64;
+/// [`fuchsia.sysmem2/BufferMemoryConstraints.permitted_heaps`].
+@available(added=HEAD)
+const MAX_COUNT_BUFFER_MEMORY_CONSTRAINTS_PERMITTED_HEAPS uint32 = 64;
+
 /// The maximum size of [`fuchsia.sysmem2/ImageFormatConstraints.color_spaces`].
 const MAX_COUNT_IMAGE_FORMAT_CONSTRAINTS_COLOR_SPACES uint32 = 32;
+
 /// The maximum size of
 /// [`fuchsia.sysmem2/ImageFormatConstraints.pixel_format_and_modifiers`].
 const MAX_COUNT_PIXEL_FORMAT_AND_MODIFIERS uint32 = 64;
@@ -184,6 +188,44 @@ type HeapType = flexible enum : uint64 {
     FRAMEBUFFER = 0x1000000000030001;
 };
 
+/// A reference to a heap instance.
+///
+/// A given heap instance can have more than one `Heap` which can be used to
+/// refer to the heap instance. Comparing `Heap` tables without knowledge of
+/// these `Heap` aliases is not a reliable way to determine if two `Heap` tables
+/// refer to the same heap (matching means yes, but not matching means maybe).
+/// Allowing heap aliases makes renaming `Heap.type`(s) easier.
+@available(added=HEAD)
+type Heap = table {
+    /// The type of the heap, specified using a bind string defined per the
+    /// schema and mechanism described in comments in the
+    /// fuchsia.sysmem.heap.bind file.
+    ///
+    /// Examples:
+    /// * "fuchsia.sysmem.heap.HEAP_TYPE.SYSTEM_RAM"
+    /// * "fuchsia.goldfish.platform.sysmem.heap.HEAP_TYPE.HOST_VISIBLE"
+    //
+    // The word "heap" is repeated here because "type" is a keyword or reserved
+    // keyword in at least one relevant language (rust), and this naming also
+    // lines up with the bind enum(s) named `HEAP_TYPE` which provide the known
+    // meaningful/valid strings for this field.
+    1: heap_type string:128;
+
+    /// The uint64 id of the heap. This is only required to be unique per (type,
+    /// boot) tuple. In other words, a given heap id is only meaningful within
+    /// the current boot of the machine (not across boots), and only within the
+    /// `Heap.type`.
+    ///
+    /// For `Heap.type`(s) that refer to a singleton heap, a participant
+    /// specifying the singleton heap in
+    /// [`fuchsia.sysmem2.BufferMemoryConstraints.permitted_heaps`] can leave
+    /// this field un-set, or set it to zero. Sysmem will always fill out this
+    /// field for the heap indicated in
+    /// [`fuchsia.sysmem2.BufferMemmorySettings.heap`] (for a singleton heap the
+    /// `id` field will be set to 0 by sysmem).
+    2: id uint64;
+};
+
 @available(added=HEAD)
 type BufferMemoryConstraints = table {
     /// un-set is treated as 1
@@ -238,7 +280,7 @@ type BufferMemoryConstraints = table {
     /// secure heap is only selected if all participants explicitly indicate
     /// that the secure heap is acceptable via `heap_permitted`, or specify
     /// `NONE_USAGE`.
-    8: heap_permitted vector<HeapType>:MAX_COUNT_BUFFER_MEMORY_CONSTRAINTS_HEAP_PERMITTED;
+    8: permitted_heaps vector<Heap>:MAX_COUNT_BUFFER_MEMORY_CONSTRAINTS_PERMITTED_HEAPS;
 };
 
 /// `INACCESSIBLE` is only for cases where there is no CPU access to the

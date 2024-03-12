@@ -471,6 +471,8 @@ class LogicalBufferCollection : public fbl::RefCounted<LogicalBufferCollection> 
   bool CheckSanitizeBufferUsage(CheckSanitizeStage stage,
                                 fuchsia_sysmem2::BufferUsage& buffer_usage);
 
+  bool CheckSanitizeHeap(CheckSanitizeStage stage, fuchsia_sysmem2::Heap& heap);
+
   bool CheckSanitizeBufferMemoryConstraints(CheckSanitizeStage stage,
                                             const fuchsia_sysmem2::BufferUsage& buffer_usage,
                                             fuchsia_sysmem2::BufferMemoryConstraints& constraints);
@@ -485,8 +487,8 @@ class LogicalBufferCollection : public fbl::RefCounted<LogicalBufferCollection> 
   bool AccumulateConstraintsBufferUsage(fuchsia_sysmem2::BufferUsage* acc,
                                         fuchsia_sysmem2::BufferUsage c);
 
-  bool AccumulateConstraintHeapPermitted(std::vector<fuchsia_sysmem2::HeapType>* acc,
-                                         std::vector<fuchsia_sysmem2::HeapType> c);
+  bool AccumulateConstraintPermittedHeaps(std::vector<fuchsia_sysmem2::Heap>* acc,
+                                          std::vector<fuchsia_sysmem2::Heap> c);
 
   bool AccumulateConstraintBufferMemory(fuchsia_sysmem2::BufferMemoryConstraints* acc,
                                         fuchsia_sysmem2::BufferMemoryConstraints c);
@@ -703,6 +705,17 @@ class LogicalBufferCollection : public fbl::RefCounted<LogicalBufferCollection> 
       }
     }
   };
+  template <>
+  struct DiffPrinter<std::string, void> {
+    static void PrintDiff(const LogicalBufferCollection& buffer_collection,
+                          const std::string& field_name, const std::string& o,
+                          const std::string& n) {
+      if (o != n) {
+        buffer_collection.LogError(FROM_HERE, "o%s: %s n%s: %s", field_name.c_str(), o.c_str(),
+                                   field_name.c_str(), n.c_str());
+      }
+    }
+  };
 
   template <typename Table>
   void LogTableDiffs(const std::string& field_name, const Table& o, const Table& n) const;
@@ -761,6 +774,14 @@ class LogicalBufferCollection : public fbl::RefCounted<LogicalBufferCollection> 
       const fuchsia_sysmem2::BufferCollectionInfo& n) const {
     PRINT_DIFF(settings);
     PRINT_DIFF(buffers);
+  }
+
+  template <>
+  void LogTableDiffs<fuchsia_sysmem2::Heap>(const std::string& field_name,
+                                            const fuchsia_sysmem2::Heap& o,
+                                            const fuchsia_sysmem2::Heap& n) const {
+    PRINT_DIFF(heap_type);
+    PRINT_DIFF(id);
   }
 #undef PRINT_DIFF
 

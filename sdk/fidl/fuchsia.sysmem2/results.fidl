@@ -119,8 +119,7 @@ type BufferMemorySettings = table {
     /// This field will always be set by sysmem.
     4: coherency_domain CoherencyDomain;
     /// The specific heap from which buffers are allocated.
-    /// See above in this file for heap identifier values.
     ///
     /// This field will always be set by sysmem.
-    5: heap HeapType;
+    5: heap Heap;
 };
