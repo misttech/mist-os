@@ -325,8 +325,8 @@ impl SecurityServer {
             (state.sid_to_security_context(&source_sid), state.sid_to_security_context(&target_sid))
         {
             // Take copies of the the type fields before dropping the state lock.
-            let source_type = source_security_context.type_().to_string();
-            let target_type = target_security_context.type_().to_string();
+            let source_type = source_security_context.type_().clone();
+            let target_type = target_security_context.type_().clone();
             drop(state);
 
             match target_class {

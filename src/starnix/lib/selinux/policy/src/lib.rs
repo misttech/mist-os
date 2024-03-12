@@ -33,6 +33,26 @@ use {
 /// Maximum SELinux policy version supported by this implementation.
 pub const SUPPORTED_POLICY_VERSION: u32 = 33;
 
+/// Identifies a user within a policy.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct UserId(String);
+
+/// Identifies a role within a policy.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct RoleId(String);
+
+/// Identifies a type within a policy.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct TypeId(String);
+
+/// Identifies a sensitivity level within a policy.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SensitivityId(String);
+
+/// Identifies a security category within a policy.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct CategoryId(String);
+
 /// The set of permissions that may be granted to sources accessing targets of a particular class,
 /// as defined in an SELinux policy.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -165,17 +185,17 @@ impl<PS: ParseStrategy> Policy<PS> {
         let high_level = context.high_level().as_ref().map(|x| self.security_level(x));
 
         security_context::SecurityContext::new(
-            String::from_utf8(user.name_bytes().to_vec()).unwrap(),
-            String::from_utf8(role.name_bytes().to_vec()).unwrap(),
-            String::from_utf8(type_.name_bytes().to_vec()).unwrap(),
+            UserId(String::from_utf8(user.name_bytes().to_vec()).unwrap()),
+            RoleId(String::from_utf8(role.name_bytes().to_vec()).unwrap()),
+            TypeId(String::from_utf8(type_.name_bytes().to_vec()).unwrap()),
             low_level,
             high_level,
         )
     }
 
     /// Helper used by `security_level()` to create a `Sensitivity` instance from policy fields.
-    fn sensitivity(&self, sensitivity: le::U32) -> security_context::Sensitivity {
-        security_context::Sensitivity::new(
+    fn sensitivity(&self, sensitivity: le::U32) -> SensitivityId {
+        SensitivityId(
             String::from_utf8(
                 self.0.parsed_policy().sensitivity(sensitivity).name_bytes().to_vec(),
             )
@@ -184,8 +204,10 @@ impl<PS: ParseStrategy> Policy<PS> {
     }
 
     /// Helper used by `category()` to create a category name from policy fields.
-    fn category_id(&self, id: le::U32) -> String {
-        String::from_utf8(self.0.parsed_policy().category(id).name_bytes().to_vec()).unwrap()
+    fn category_id(&self, id: le::U32) -> CategoryId {
+        CategoryId(
+            String::from_utf8(self.0.parsed_policy().category(id).name_bytes().to_vec()).unwrap(),
+        )
     }
 
     /// Helper used by `security_level()` to create a `Category` instance from policy fields.
@@ -200,6 +222,7 @@ impl<PS: ParseStrategy> Policy<PS> {
             }
         }
     }
+
     /// Helper used by `initial_context()` to create a `SecurityLevel` instance from
     /// the policy fields.
     fn security_level(&self, level: &MlsLevel<PS>) -> security_context::SecurityLevel {
@@ -208,6 +231,7 @@ impl<PS: ParseStrategy> Policy<PS> {
             level.categories().spans().map(|span| self.category(span)).collect(),
         )
     }
+
     /// Returns the security context that should be applied to a newly created file-like SELinux
     /// object according to `source` and `target` security contexts, as well as the new object's
     /// `class`. Returns an error if the security context for such an object is not well-defined
@@ -222,19 +246,23 @@ impl<PS: ParseStrategy> Policy<PS> {
     }
 
     /// Returns whether the input types are explicitly granted `permission` via an `allow [...];`
-    /// policy statement, or an error if looking up the input types fails.
+    /// policy statement.
+    ///
+    /// # Panics
+    /// If supplied with type Ids not previously obtained from the `Policy` itself; validation
+    /// ensures that all such Ids have corresponding definitions.
     pub fn is_explicitly_allowed(
         &self,
-        source_type_name: &str,
-        target_type_name: &str,
+        source_type: &TypeId,
+        target_type: &TypeId,
         permission: sc::Permission,
     ) -> Result<bool, QueryError> {
         let object_class = permission.class();
         let target_class = self.0.class(&object_class);
         let permission = self.0.permission(&permission);
         self.0.parsed_policy().class_permission_is_explicitly_allowed(
-            source_type_name,
-            target_type_name,
+            source_type,
+            target_type,
             target_class,
             permission,
         )
@@ -244,16 +272,20 @@ impl<PS: ParseStrategy> Policy<PS> {
     /// `permission_name` via an `allow [...];` policy statement, or an error if looking up the
     /// input types fails. This is the "custom" form of this API because `permission_name` is
     /// associated with a [`selinux_common::AbstractPermission::Custom::permission`] value.
+    ///
+    /// # Panics
+    /// If supplied with type Ids not previously obtained from the `Policy` itself; validation
+    /// ensures that all such Ids have corresponding definitions.
     pub fn is_explicitly_allowed_custom(
         &self,
-        source_type_name: &str,
-        target_type_name: &str,
+        source_type: &TypeId,
+        target_type: &TypeId,
         target_class_name: &str,
         permission_name: &str,
     ) -> Result<bool, QueryError> {
         self.0.parsed_policy().is_explicitly_allowed_custom(
-            source_type_name,
-            target_type_name,
+            source_type,
+            target_type,
             target_class_name,
             permission_name,
         )
@@ -264,16 +296,12 @@ impl<PS: ParseStrategy> Policy<PS> {
     /// if no such statement exists.
     pub fn compute_explicitly_allowed(
         &self,
-        source_type_name: &str,
-        target_type_name: &str,
+        source_type: &TypeId,
+        target_type: &TypeId,
         object_class: sc::ObjectClass,
     ) -> Result<AccessVector, QueryError> {
         let target_class = self.0.class(&object_class);
-        self.0.parsed_policy().compute_explicitly_allowed(
-            source_type_name,
-            target_type_name,
-            target_class,
-        )
+        self.0.parsed_policy().compute_explicitly_allowed(source_type, target_type, target_class)
     }
 
     /// Computes the access vector that associates type `source_type_name` and `target_type_name`
@@ -283,8 +311,8 @@ impl<PS: ParseStrategy> Policy<PS> {
     /// value.
     pub fn compute_explicitly_allowed_custom(
         &self,
-        source_type_name: &str,
-        target_type_name: &str,
+        source_type_name: &TypeId,
+        target_type_name: &TypeId,
         target_class_name: &str,
     ) -> Result<AccessVector, QueryError> {
         self.0.parsed_policy().compute_explicitly_allowed_custom(
@@ -306,6 +334,12 @@ impl<PS: ParseStrategy> Policy<PS> {
                 );
             }
         }
+    }
+
+    /// Used by tests to resolve a type, alias or attribute name to a `TypeId`.
+    #[cfg(feature = "selinux_policy_test_api")]
+    pub fn type_by_name(&self, name: &str) -> TypeId {
+        self.0.parsed_policy().type_by_name(name)
     }
 }
 

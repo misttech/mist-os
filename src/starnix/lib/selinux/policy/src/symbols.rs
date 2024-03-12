@@ -1078,9 +1078,6 @@ impl Validate for RoleStaticMetadata {
 
 /// Returns a type or type alias or attribute named `name`, if one exists in the collection,
 /// `types`.
-///
-/// TODO: Eliminate `dead_code` guard.
-#[allow(dead_code)]
 pub(crate) fn find_type_alias_or_attribute_by_name<'a, PS: ParseStrategy>(
     types: &'a Types<PS>,
     name: &str,

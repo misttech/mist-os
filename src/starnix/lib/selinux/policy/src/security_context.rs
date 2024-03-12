@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::{CategoryId, RoleId, SensitivityId, TypeId, UserId};
 use std::{fmt, str};
 
 /// The security context, a variable-length string associated with each SELinux object in the
@@ -13,11 +14,11 @@ use std::{fmt, str};
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SecurityContext {
     /// The user component of the security context.
-    user: String,
+    user: UserId,
     /// The role component of the security context.
-    role: String,
+    role: RoleId,
     /// The type component of the security context.
-    type_: String,
+    type_: TypeId,
     /// The [lowest] security level of the context.
     low_level: SecurityLevel,
     /// The highest security level, if it allows a range.
@@ -30,9 +31,9 @@ impl SecurityContext {
     /// typically validated against the loaded policy by the Security Server,
     /// e.g. when exchanging them for a Security Id.
     pub fn new(
-        user: String,
-        role: String,
-        type_: String,
+        user: UserId,
+        role: RoleId,
+        type_: TypeId,
         low_level: SecurityLevel,
         high_level: Option<SecurityLevel>,
     ) -> Self {
@@ -40,17 +41,17 @@ impl SecurityContext {
     }
 
     /// Returns the user component of the security context.
-    pub fn user(&self) -> &str {
+    pub fn user(&self) -> &UserId {
         &self.user
     }
 
     /// Returns the role component of the security context.
-    pub fn role(&self) -> &str {
+    pub fn role(&self) -> &RoleId {
         &self.role
     }
 
     /// Returns the type component of the security context.
-    pub fn type_(&self) -> &str {
+    pub fn type_(&self) -> &TypeId {
         &self.type_
     }
 
@@ -69,14 +70,14 @@ impl SecurityContext {
 /// of associated categories.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SecurityLevel {
-    sensitivity: Sensitivity,
+    sensitivity: SensitivityId,
     categories: Vec<Category>,
 }
 
 impl SecurityLevel {
     /// Returns a new instance with the specified contents.
     /// No validation of the supplied values is performed.
-    pub fn new(sensitivity: Sensitivity, categories: Vec<Category>) -> Self {
+    pub fn new(sensitivity: SensitivityId, categories: Vec<Category>) -> Self {
         Self { sensitivity, categories }
     }
 }
@@ -89,14 +90,17 @@ impl TryFrom<&str> for SecurityLevel {
             return Err(Self::Error::Invalid);
         }
         let mut items = level.split(":");
-        let sensitivity = Sensitivity(items.next().ok_or(Self::Error::Invalid)?.to_string());
+        let sensitivity = SensitivityId(items.next().ok_or(Self::Error::Invalid)?.to_string());
         let categories = items.next().map_or_else(Vec::new, |s| {
             s.split(",")
                 .map(|entry| {
                     if let Some((low, high)) = entry.split_once(".") {
-                        Category::Range { low: low.to_string(), high: high.to_string() }
+                        Category::Range {
+                            low: CategoryId(low.to_string()),
+                            high: CategoryId(high.to_string()),
+                        }
                     } else {
-                        Category::Single(entry.to_string())
+                        Category::Single(CategoryId(entry.to_string()))
                     }
                 })
                 .collect()
@@ -109,24 +113,12 @@ impl TryFrom<&str> for SecurityLevel {
     }
 }
 
-/// Typed container for a policy-defined sensitivity.
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct Sensitivity(String);
-
-impl Sensitivity {
-    /// Returns a new instance with the specified contents.
-    /// No validation of the supplied value is performed.
-    pub fn new(name: String) -> Self {
-        Self(name)
-    }
-}
-
 /// Describes an entry in a category specification, which may be an
 /// individual category, or a range.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Category {
-    Single(String),
-    Range { low: String, high: String },
+    Single(CategoryId),
+    Range { low: CategoryId, high: CategoryId },
 }
 
 /// Errors that may be returned when attempting to parse a security context.
@@ -170,9 +162,9 @@ impl TryFrom<&str> for SecurityContext {
     /// Security Context string.
     fn try_from(security_context: &str) -> Result<Self, Self::Error> {
         let mut items = security_context.splitn(4, ":");
-        let user = items.next().ok_or(Self::Error::Invalid)?.to_string();
-        let role = items.next().ok_or(Self::Error::Invalid)?.to_string();
-        let type_ = items.next().ok_or(Self::Error::Invalid)?.to_string();
+        let user = UserId(items.next().ok_or(Self::Error::Invalid)?.to_string());
+        let role = RoleId(items.next().ok_or(Self::Error::Invalid)?.to_string());
+        let type_ = TypeId(items.next().ok_or(Self::Error::Invalid)?.to_string());
 
         // `next()` holds the remainder of the string, if any.
         let mut levels = items.next().ok_or(Self::Error::Invalid)?.splitn(2, "-");
@@ -205,7 +197,7 @@ impl fmt::Display for SecurityContext {
         } else {
             self.low_level.to_string()
         };
-        write!(f, "{}:{}:{}:{}", self.user, self.role, self.type_, level_fmt)
+        write!(f, "{}:{}:{}:{}", self.user.0, self.role.0, self.type_.0, level_fmt)
     }
 }
 
@@ -224,10 +216,10 @@ impl fmt::Display for Category {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Category::Single(category) => {
-                write!(f, "{}", category.to_string())
+                write!(f, "{}", category.0)
             }
             Category::Range { low, high } => {
-                write!(f, "{}.{}", low.to_string(), high.to_string())
+                write!(f, "{}.{}", low.0, high.0)
             }
         }
     }
@@ -241,10 +233,10 @@ mod tests {
     fn parse_security_context_single_sensitivity() {
         let security_context = SecurityContext::try_from("u:unconfined_r:unconfined_t:s0")
             .expect("creating security context should succeed");
-        assert_eq!(security_context.user, "u");
-        assert_eq!(security_context.role, "unconfined_r");
-        assert_eq!(security_context.type_, "unconfined_t");
-        assert_eq!(security_context.low_level.sensitivity, Sensitivity("s0".to_string()));
+        assert_eq!(security_context.user.0, "u");
+        assert_eq!(security_context.role.0, "unconfined_r");
+        assert_eq!(security_context.type_.0, "unconfined_t");
+        assert_eq!(security_context.low_level.sensitivity, SensitivityId("s0".to_string()));
         assert_eq!(security_context.high_level, None);
     }
 
@@ -252,9 +244,9 @@ mod tests {
     fn parse_security_context_with_sensitivity_range() {
         let security_context = SecurityContext::try_from("u:unconfined_r:unconfined_t:s0-s1")
             .expect("creating security context should succeed");
-        assert_eq!(security_context.user, "u");
-        assert_eq!(security_context.role, "unconfined_r");
-        assert_eq!(security_context.type_, "unconfined_t");
+        assert_eq!(security_context.user.0, "u");
+        assert_eq!(security_context.role.0, "unconfined_r");
+        assert_eq!(security_context.type_.0, "unconfined_t");
         assert_eq!(security_context.low_level.sensitivity.0, "s0");
         assert!(security_context.low_level.categories.is_empty());
         let high_level = security_context.high_level.as_ref().unwrap();
@@ -266,13 +258,16 @@ mod tests {
     fn parse_security_context_with_single_sensitivity_and_categories_interval() {
         let security_context = SecurityContext::try_from("u:unconfined_r:unconfined_t:s0:c0.c255")
             .expect("creating security context should succeed");
-        assert_eq!(security_context.user, "u");
-        assert_eq!(security_context.role, "unconfined_r");
-        assert_eq!(security_context.type_, "unconfined_t");
+        assert_eq!(security_context.user.0, "u");
+        assert_eq!(security_context.role.0, "unconfined_r");
+        assert_eq!(security_context.type_.0, "unconfined_t");
         assert_eq!(security_context.low_level.sensitivity.0, "s0");
         assert_eq!(
             security_context.low_level.categories,
-            [Category::Range { low: "c0".to_string(), high: "c255".to_string() }]
+            [Category::Range {
+                low: CategoryId("c0".to_string()),
+                high: CategoryId("c255".to_string())
+            }]
         );
     }
 
@@ -281,16 +276,19 @@ mod tests {
         let security_context =
             SecurityContext::try_from("u:unconfined_r:unconfined_t:s0-s0:c0.c1023")
                 .expect("creating security context should succeed");
-        assert_eq!(security_context.user, "u");
-        assert_eq!(security_context.role, "unconfined_r");
-        assert_eq!(security_context.type_, "unconfined_t");
+        assert_eq!(security_context.user.0, "u");
+        assert_eq!(security_context.role.0, "unconfined_r");
+        assert_eq!(security_context.type_.0, "unconfined_t");
         assert_eq!(security_context.low_level.sensitivity.0, "s0");
         assert!(security_context.low_level.categories.is_empty());
         let high_level = security_context.high_level.as_ref().unwrap();
         assert_eq!(high_level.sensitivity.0, "s0");
         assert_eq!(
             high_level.categories,
-            [Category::Range { low: "c0".to_string(), high: "c1023".to_string() }]
+            [Category::Range {
+                low: CategoryId("c0".to_string()),
+                high: CategoryId("c1023".to_string())
+            }]
         );
     }
 
@@ -299,19 +297,25 @@ mod tests {
         let security_context =
             SecurityContext::try_from("u:unconfined_r:unconfined_t:s0:c0.c255-s0:c0.c1023")
                 .expect("creating security context should succeed");
-        assert_eq!(security_context.user, "u");
-        assert_eq!(security_context.role, "unconfined_r");
-        assert_eq!(security_context.type_, "unconfined_t");
+        assert_eq!(security_context.user.0, "u");
+        assert_eq!(security_context.role.0, "unconfined_r");
+        assert_eq!(security_context.type_.0, "unconfined_t");
         assert_eq!(security_context.low_level.sensitivity.0, "s0");
         assert_eq!(
             security_context.low_level.categories,
-            [Category::Range { low: "c0".to_string(), high: "c255".to_string() }]
+            [Category::Range {
+                low: CategoryId("c0".to_string()),
+                high: CategoryId("c255".to_string())
+            }]
         );
         let high_level = security_context.high_level.as_ref().unwrap();
         assert_eq!(high_level.sensitivity.0, "s0");
         assert_eq!(
             high_level.categories,
-            [Category::Range { low: "c0".to_string(), high: "c1023".to_string() }]
+            [Category::Range {
+                low: CategoryId("c0".to_string()),
+                high: CategoryId("c1023".to_string())
+            }]
         );
     }
 
@@ -319,13 +323,16 @@ mod tests {
     fn parse_security_context_with_single_sensitivity_and_category_list() {
         let security_context = SecurityContext::try_from("u:unconfined_r:unconfined_t:s0:c0,c255")
             .expect("creating security context should succeed");
-        assert_eq!(security_context.user, "u");
-        assert_eq!(security_context.role, "unconfined_r");
-        assert_eq!(security_context.type_, "unconfined_t");
+        assert_eq!(security_context.user.0, "u");
+        assert_eq!(security_context.role.0, "unconfined_r");
+        assert_eq!(security_context.type_.0, "unconfined_t");
         assert_eq!(security_context.low_level.sensitivity.0, "s0");
         assert_eq!(
             security_context.low_level.categories,
-            [Category::Single("c0".to_string()), Category::Single("c255".to_string())]
+            [
+                Category::Single(CategoryId("c0".to_string())),
+                Category::Single(CategoryId("c255".to_string()))
+            ]
         );
     }
 
@@ -334,15 +341,18 @@ mod tests {
         let security_context =
             SecurityContext::try_from("u:unconfined_r:unconfined_t:s0:c0,c200.c255")
                 .expect("creating security context should succeed");
-        assert_eq!(security_context.user, "u");
-        assert_eq!(security_context.role, "unconfined_r");
-        assert_eq!(security_context.type_, "unconfined_t");
+        assert_eq!(security_context.user.0, "u");
+        assert_eq!(security_context.role.0, "unconfined_r");
+        assert_eq!(security_context.type_.0, "unconfined_t");
         assert_eq!(security_context.low_level.sensitivity.0, "s0");
         assert_eq!(
             security_context.low_level.categories,
             [
-                Category::Single("c0".to_string()),
-                Category::Range { low: "c200".to_string(), high: "c255".to_string() }
+                Category::Single(CategoryId("c0".to_string())),
+                Category::Range {
+                    low: CategoryId("c200".to_string()),
+                    high: CategoryId("c255".to_string())
+                }
             ]
         );
     }

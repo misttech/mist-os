@@ -8,10 +8,9 @@ use super::{
     symbols::{
         Class, ClassDefault, ClassDefaultRange, Classes, CommonSymbol, CommonSymbols, Permission,
     },
-    ParsedPolicy,
+    ParsedPolicy, RoleId, SecurityContext,
 };
 
-use super::SecurityContext;
 use selinux_common::{self as sc, ClassPermission as _};
 use std::collections::HashMap;
 
@@ -144,9 +143,9 @@ impl<PS: ParseStrategy> PolicyIndex<PS> {
         // role_transition and version 27 allows a default_role of source or target to be defined
         // for each object class).
         let role = match class_defaults.role() {
-            ClassDefault::Source => source.role(),
-            ClassDefault::Target => target.role(),
-            _ => "object_r",
+            ClassDefault::Source => source.role().clone(),
+            ClassDefault::Target => target.role().clone(),
+            _ => RoleId("object_r".to_string()),
         };
 
         // The SELinux notebook states:
@@ -190,13 +189,7 @@ impl<PS: ParseStrategy> PolicyIndex<PS> {
         // TODO(b/322353836): Implement transitions for `*_transition` rules based on initial
         // `user`, `role`, `type_`, `range` values.
         // TODO(b/319232900): Ensure that the generated Context has e.g. valid security range.
-        Ok(SecurityContext::new(
-            user.to_string(),
-            role.to_string(),
-            type_.to_string(),
-            low_level,
-            high_level,
-        ))
+        Ok(SecurityContext::new(user.clone(), role, type_.clone(), low_level, high_level))
     }
 
     pub(crate) fn parsed_policy(&self) -> &ParsedPolicy<PS> {

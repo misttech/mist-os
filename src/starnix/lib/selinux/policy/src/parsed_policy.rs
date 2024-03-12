@@ -19,7 +19,7 @@ use super::{
         Category, Class, Classes, CommonSymbol, CommonSymbols, ConditionalBoolean, Permission,
         Role, Sensitivity, SymbolList, Type, User,
     },
-    AccessVector, Parse, Validate,
+    AccessVector, Parse, TypeId, Validate,
 };
 
 use anyhow::Context as _;
@@ -97,8 +97,8 @@ impl<PS: ParseStrategy> ParsedPolicy<PS> {
     /// associated with a [`selinux_common::AbstractPermission::Custom::permission`] value.
     pub fn is_explicitly_allowed_custom(
         &self,
-        source_type_name: &str,
-        target_type_name: &str,
+        source_type: &TypeId,
+        target_type: &TypeId,
         target_class_name: &str,
         permission_name: &str,
     ) -> Result<bool, QueryError> {
@@ -111,8 +111,8 @@ impl<PS: ParseStrategy> ParsedPolicy<PS> {
                     permission_name: permission_name.to_owned(),
                 })?;
         self.class_permission_is_explicitly_allowed(
-            source_type_name,
-            target_type_name,
+            source_type,
+            target_type,
             target_class,
             permission,
         )
@@ -123,24 +123,17 @@ impl<PS: ParseStrategy> ParsedPolicy<PS> {
     /// statement, or an error if lookups for input values fail.
     pub(crate) fn class_permission_is_explicitly_allowed(
         &self,
-        source_type_name: &str,
-        target_type_name: &str,
+        source_type: &TypeId,
+        target_type: &TypeId,
         target_class: &Class<PS>,
         permission: &Permission<PS>,
     ) -> Result<bool, QueryError> {
-        let source_type = find_type_alias_or_attribute_by_name(&self.types.data, source_type_name)
-            .ok_or_else(|| QueryError::UnknownSourceType {
-                source_type_name: source_type_name.to_owned(),
-            })?;
-        let target_type = find_type_alias_or_attribute_by_name(&self.types.data, target_type_name)
-            .ok_or_else(|| QueryError::UnknownTargetType {
-                target_type_name: target_type_name.to_owned(),
-            })?;
+        let source_type_id = self.find_type_alias_or_attribute(source_type).id();
+        let target_type_id = self.find_type_alias_or_attribute(target_type).id();
+
         let permission_id = permission.id();
         let permission_bit = (1 as u32) << (permission_id - 1);
 
-        let source_type_id = source_type.id();
-        let target_type_id = target_type.id();
         let target_class_id = target_class.id();
 
         for access_vector in self.access_vectors.data.iter() {
@@ -204,8 +197,8 @@ impl<PS: ParseStrategy> ParsedPolicy<PS> {
     /// value.
     pub fn compute_explicitly_allowed_custom(
         &self,
-        source_type_name: &str,
-        target_type_name: &str,
+        source_type_name: &TypeId,
+        target_type_name: &TypeId,
         target_class_name: &str,
     ) -> Result<AccessVector, QueryError> {
         let target_class = find_class_by_name(self.classes(), target_class_name)
@@ -218,21 +211,12 @@ impl<PS: ParseStrategy> ParsedPolicy<PS> {
     /// if no such statement exists.
     pub(crate) fn compute_explicitly_allowed(
         &self,
-        source_type_name: &str,
-        target_type_name: &str,
+        source_type: &TypeId,
+        target_type: &TypeId,
         target_class: &Class<PS>,
     ) -> Result<AccessVector, QueryError> {
-        let source_type = find_type_alias_or_attribute_by_name(&self.types.data, source_type_name)
-            .ok_or_else(|| QueryError::UnknownSourceType {
-                source_type_name: source_type_name.to_owned(),
-            })?;
-        let target_type = find_type_alias_or_attribute_by_name(&self.types.data, target_type_name)
-            .ok_or_else(|| QueryError::UnknownTargetType {
-                target_type_name: target_type_name.to_owned(),
-            })?;
-
-        let source_type_id = source_type.id();
-        let target_type_id = target_type.id();
+        let source_type_id = self.find_type_alias_or_attribute(source_type).id();
+        let target_type_id = self.find_type_alias_or_attribute(target_type).id();
         let target_class_id = target_class.id();
 
         let mut computed_access_vector = AccessVector::NONE;
@@ -331,6 +315,16 @@ impl<PS: ParseStrategy> ParsedPolicy<PS> {
     #[cfg(feature = "selinux_policy_test_api")]
     pub fn validate(&self) -> Result<(), anyhow::Error> {
         Validate::validate(self)
+    }
+
+    #[cfg(feature = "selinux_policy_test_api")]
+    pub fn type_by_name(&self, name: &str) -> TypeId {
+        TypeId(name.to_string())
+    }
+
+    /// Returns the type, alias, or attribute for an Id obtained from this policy.
+    fn find_type_alias_or_attribute(&self, type_: &TypeId) -> &Type<PS> {
+        find_type_alias_or_attribute_by_name(&self.types.data, type_.0.as_str()).unwrap()
     }
 }
 
