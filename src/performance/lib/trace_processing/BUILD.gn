@@ -14,7 +14,6 @@ python_library("trace_processing") {
     "metrics/fps.py",
     "metrics/scenic.py",
     "trace_importing.py",
-    "trace_metrics.py",
     "trace_utils.py",
   ]
   library_deps = [
@@ -29,6 +28,7 @@ python_library("trace_processing_type_checked") {
   enable_pytype = true
   library_name = "trace_processing"
   sources = [
+    "trace_metrics.py",
     "trace_model.py",
     "trace_time.py",
   ]

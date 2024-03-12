@@ -73,7 +73,7 @@ class TestCaseResult:
     def write_fuchsiaperf_json(
         results: list["TestCaseResult"],
         test_suite: str,
-        output_path: Union[str, os.PathLike],
+        output_path: pathlib.Path,
     ) -> None:
         """Writes the given TestCaseResults into a fuchsiaperf json file.
 
@@ -83,8 +83,6 @@ class TestCaseResult:
                 E.g. "fuchsia.uiperf.my_metric".
             output_path: Output file path, must end with ".fuchsiaperf.json".
         """
-        if isinstance(output_path, str):
-            output_path = pathlib.Path(output_path)
         assert output_path.name.endswith(
             ".fuchsiaperf.json"
         ), f"Expecting path that ends with '.fuchsiaperf.json' but got {output_path}"
@@ -135,7 +133,7 @@ class MetricsProcessor(abc.ABC):
         self,
         model: trace_model.Model,
         test_suite: str,
-        output_path: Union[str, os.PathLike],
+        output_path: pathlib.Path,
     ) -> None:
         """Convenience method for processing a model and saving the output into a fuchsiaperf.json file.
 
