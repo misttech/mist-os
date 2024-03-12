@@ -63,6 +63,20 @@ type CisEstablishedParameters = table {
     6: peripheral_to_central_params CisUnidirectionalParams;
 };
 
+/// Flags indicating validity of data received from an isochronous channel.
+@available(added=HEAD)
+type IsoPacketStatusFlag = strict enum : uint8 {
+    /// Valid data. The complete SDU was received correctly.
+    VALID_DATA = 0;
+
+    /// Possibly invalid data. One ore more of the fragments received may contain errors or part of
+    /// the packet may be missing.
+    DATA_WITH_POSSIBLE_ERRORS = 1;
+
+    /// Parts of the packet were not received correctly.
+    LOST_DATA = 2;
+};
+
 @available(added=HEAD)
 open protocol IsochronousStream {
     /// Provide notification when a CIS is established, as initiated by a Central
@@ -125,4 +139,27 @@ open protocol IsochronousStream {
         /// Required.
         3: controller_delay zx.Duration;
     }) -> () error zx.Status;
+
+    /// Receive data from an output (controller => host) ISO stream that has been established and
+    /// set up. Designed to be used with a hanging get pattern.
+    ///
+    /// Can be invoked before the ISO data stream has been established and set up, but will not
+    /// return until after it has been set up and data has been received.
+    flexible Read() -> (table {
+        /// The data frame itself.
+        /// Required.
+        1: data vector<uint8>:MAX;
+
+        /// The sequence number associated with the frame.
+        /// Required.
+        2: sequence_number uint16;
+
+        /// Status flags of packet, as reported by the controller.
+        /// Required.
+        3: status_flag IsoPacketStatusFlag;
+
+        /// Reception timestamp, as reported by the controller.
+        /// Optional.
+        4: timestamp zx.Duration;
+    });
 };
