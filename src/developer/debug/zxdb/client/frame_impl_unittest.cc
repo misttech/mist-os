@@ -151,7 +151,7 @@ TEST_F(FrameImplTest, AsyncBasePointer) {
 TEST_F(FrameImplRegisterTest, UpdateRegister) {
   // Make a process for notifying about.
   constexpr uint64_t kProcessKoid = 1234;
-  InjectProcess(kProcessKoid);
+  InjectProcessWithModule(kProcessKoid);
   constexpr uint64_t kThreadKoid = 5678;
   Thread* thread = InjectThread(kProcessKoid, kThreadKoid);
 
@@ -199,7 +199,7 @@ TEST_F(FrameImplRegisterTest, UpdateRegister) {
 TEST_F(FrameImplRegisterTest, AlwaysRequest) {
   // Make a process for notifying about.
   constexpr uint64_t kProcessKoid = 1234;
-  InjectProcess(kProcessKoid);
+  InjectProcessWithModule(kProcessKoid);
   constexpr uint64_t kThreadKoid = 5678;
   Thread* thread = InjectThread(kProcessKoid, kThreadKoid);
 

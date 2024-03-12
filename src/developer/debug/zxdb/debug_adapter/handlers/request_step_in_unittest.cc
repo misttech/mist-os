@@ -18,7 +18,7 @@ using RequestStepInTest = DebugAdapterContextTest;
 TEST_F(RequestStepInTest, StepInSuccess) {
   InitializeDebugging();
 
-  InjectProcess(kProcessKoid);
+  InjectProcessWithModule(kProcessKoid);
   // Run client to receive process started event.
   RunClient();
   InjectThread(kProcessKoid, kThreadKoid);

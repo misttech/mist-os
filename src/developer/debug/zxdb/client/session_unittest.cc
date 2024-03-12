@@ -213,7 +213,7 @@ void SessionSink::Status(const debug_ipc::StatusRequest& request,
 // same address and reports them hit with various combinations of responses from each breakpoint.
 TEST_F(SessionTest, MultiBreakpointStop) {
   constexpr uint64_t kProcessKoid = 1234;
-  Process* process = InjectProcess(kProcessKoid);
+  auto process = InjectProcessWithModule(kProcessKoid);
   ASSERT_TRUE(process);
 
   // Thread with observer.
@@ -252,6 +252,8 @@ TEST_F(SessionTest, MultiBreakpointStop) {
   sink()->PopulateNotificationWithBreakpoints(&notify);
   InjectException(notify);
 
+  loop().RunUntilNoTasks();
+
   // The thread observer should be triggered since there is a regular user breakpoint responsible
   // for this address. It should be the only one in the notification (internal ones don't get listed
   // as a stop reason).
@@ -272,7 +274,7 @@ TEST_F(SessionTest, MultiBreakpointStop) {
 TEST_F(SessionTest, OneShotBreakpointDelete) {
   // Make a process and thread for notifying about.
   constexpr uint64_t kProcessKoid = 1234;
-  InjectProcess(kProcessKoid);
+  InjectProcessWithModule(kProcessKoid);
   constexpr uint64_t kThreadKoid = 5678;
   InjectThread(kProcessKoid, kThreadKoid);
 
@@ -310,11 +312,12 @@ TEST_F(SessionTest, OneShotBreakpointDelete) {
 TEST_F(SessionTest, BreakpointStopNone) {
   // Make a process and thread for notifying about.
   constexpr uint64_t kProcessKoid = 1234;
-  InjectProcess(kProcessKoid);
+  InjectProcessWithModule(kProcessKoid);
   constexpr uint64_t kThreadKoid = 5678;
   InjectThread(kProcessKoid, kThreadKoid);
   SessionThreadObserver thread_observer;
   session().thread_observers().AddObserver(&thread_observer);
+  sink()->ResetResumeState();
 
   // Create a breakpoint.
   Breakpoint* bp = session().system().CreateNewBreakpoint();

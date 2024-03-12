@@ -13,6 +13,12 @@ MockProcess::MockProcess(DebugAgent* debug_agent, zx_koid_t koid, std::string na
   auto status = Init(DebuggedProcessCreateInfo{std::make_unique<MockProcessHandle>(koid, name)});
   FX_CHECK(status.ok());
 }
+
+MockProcess::MockProcess(DebugAgent* debug_agent, DebuggedProcessCreateInfo info)
+    : DebuggedProcess(debug_agent) {
+  FX_CHECK(Init(std::move(info)).ok());
+}
+
 MockProcess::~MockProcess() = default;
 
 MockThread* MockProcess::AddThread(zx_koid_t thread_koid) {

@@ -18,7 +18,8 @@ using RequestStepOutTest = DebugAdapterContextTest;
 TEST_F(RequestStepOutTest, StepOutSuccess) {
   InitializeDebugging();
 
-  InjectProcess(kProcessKoid);
+  InjectProcessWithModule(kProcessKoid);
+
   // Run client to receive process started event.
   RunClient();
   InjectThread(kProcessKoid, kThreadKoid);

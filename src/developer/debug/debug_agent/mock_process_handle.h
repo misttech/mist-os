@@ -18,6 +18,8 @@ namespace debug_agent {
 
 class MockProcessHandle final : public ProcessHandle {
  public:
+  static constexpr uint64_t kLoaderBreakpointAddress = 0x8000'0000;
+
   struct MemoryWrite {
     MemoryWrite(uint64_t a, std::vector<uint8_t> d) : address(a), data(std::move(d)) {}
 

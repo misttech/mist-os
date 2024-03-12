@@ -98,7 +98,7 @@ class FutureThreadController : public ThreadController {
 TEST_F(ThreadImplTest, Frames) {
   // Make a process and thread for notifying about.
   constexpr uint64_t kProcessKoid = 1234;
-  InjectProcess(kProcessKoid);
+  InjectProcessWithModule(kProcessKoid);
   constexpr uint64_t kThreadKoid = 5678;
   Thread* thread = InjectThread(kProcessKoid, kThreadKoid);
 
@@ -166,7 +166,7 @@ TEST_F(ThreadImplTest, Frames) {
 // For this exception case, the thread should always stop, even if the controllers say "continue."
 TEST_F(ThreadImplTest, ControllersWithGeneralException) {
   constexpr uint64_t kProcessKoid = 1234;
-  InjectProcess(kProcessKoid);
+  InjectProcessWithModule(kProcessKoid);
   constexpr uint64_t kThreadKoid = 5678;
   Thread* thread = InjectThread(kProcessKoid, kThreadKoid);
 
@@ -202,7 +202,7 @@ TEST_F(ThreadImplTest, ControllersWithGeneralException) {
 // Tests conditions where thread controllers report unexpected stop types.
 TEST_F(ThreadImplTest, ControllersUnexpected) {
   constexpr uint64_t kProcessKoid = 1234;
-  InjectProcess(kProcessKoid);
+  InjectProcessWithModule(kProcessKoid);
   constexpr uint64_t kThreadKoid = 5678;
   Thread* thread = InjectThread(kProcessKoid, kThreadKoid);
 
@@ -245,8 +245,8 @@ TEST_F(ThreadImplTest, ControllersUnexpected) {
 // Sends an exception with no stack. Any thread controllers should get deleted.
 TEST_F(ThreadImplTest, StopNoStack) {
   constexpr uint64_t kProcessKoid = 1234;
-  InjectProcess(kProcessKoid);
   constexpr uint64_t kThreadKoid = 5678;
+  InjectProcessWithModule(kProcessKoid);
   Thread* thread = InjectThread(kProcessKoid, kThreadKoid);
 
   TestThreadObserver thread_observer(thread);
@@ -325,7 +325,7 @@ TEST_F(ThreadImplTest, JumpTo) {
 
 TEST_F(ThreadImplTest, FutureThreadController) {
   constexpr uint64_t kProcessKoid = 1234;
-  InjectProcess(kProcessKoid);
+  InjectProcessWithModule(kProcessKoid);
   constexpr uint64_t kThreadKoid = 5678;
   Thread* thread = InjectThread(kProcessKoid, kThreadKoid);
 

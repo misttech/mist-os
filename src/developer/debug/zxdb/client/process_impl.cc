@@ -64,6 +64,8 @@ ThreadImpl* ProcessImpl::GetThreadImplFromKoid(uint64_t koid) {
   return found->second.get();
 }
 
+bool ProcessImpl::HasLoadedSymbols() const { return !symbols_.GetStatus().empty(); }
+
 void ProcessImpl::GetModules(
     bool force_reload_symbols,
     fit::callback<void(const Err&, std::vector<debug_ipc::Module>)> callback) {
@@ -76,6 +78,7 @@ void ProcessImpl::GetModules(
         if (process) {
           process->FixupEmptyModuleNames(reply.modules);
           process->symbols_.SetModules(reply.modules, force_reload_symbols);
+          process->SyncThreads({});
         }
         if (callback)
           callback(err, std::move(reply.modules));

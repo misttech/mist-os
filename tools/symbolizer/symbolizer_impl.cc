@@ -27,6 +27,7 @@
 #include "src/developer/debug/zxdb/client/symbol_server.h"
 #include "src/developer/debug/zxdb/client/system.h"
 #include "src/developer/debug/zxdb/client/target.h"
+#include "src/developer/debug/zxdb/client/target_impl.h"
 #include "src/developer/debug/zxdb/client/thread.h"
 #include "src/developer/debug/zxdb/common/file_util.h"
 #include "src/developer/debug/zxdb/console/format_name.h"
@@ -514,7 +515,19 @@ void SymbolizerImpl::InitProcess() {
 
   analytics_builder_.TotalTimerStart();
 
-  session_.DispatchNotifyProcessStarting({});
+  // Manually create our own target and process. The normal notification machinery expects a backend
+  // to be connected and a filter to cause a notification, but there is no actual process to connect
+  // to, which makes those notifications inappropriate to use here. Since we provide all of the
+  // module information ourselves we need to manually set up the client objects to operate on.
+  zxdb::TargetImpl* target_impl = session_.system().CreateNewTargetImpl(nullptr);
+  target_impl->CreateProcess(zxdb::Process::StartType::kAttach, 0, "", 0, {});
+  target_ = static_cast<zxdb::Target*>(target_impl);
+
+  // This will match against process koid 0 we gave to the CreateProcess call above. We don't need
+  // to do this manually since the thread state is being reconstructed from the symbolizer markup,
+  // and all we're inspecting are the frames. Since we don't need any of the additional complicated
+  // machinery that are involved with the client thread objects, we can simply have a default
+  // constructed thread injected into the process we created above.
   session_.DispatchNotifyThreadStarting({});
 
   std::vector<debug_ipc::Module> modules;

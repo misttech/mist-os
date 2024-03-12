@@ -55,7 +55,7 @@ class TargetImpl : public Target {
   void SetArgs(std::vector<std::string> args) override;
   void Launch(CallbackWithTimestamp callback) override;
   void Kill(Callback callback) override;
-  void Attach(uint64_t koid, CallbackWithTimestamp callback) override;
+  void Attach(uint64_t koid, AttachMode mode, CallbackWithTimestamp callback) override;
   void Detach(Callback callback) override;
   void OnProcessExiting(int return_code, uint64_t timestamp) override;
   void AssignPreviousConnectedProcess(const debug_ipc::ProcessRecord& record) override;

@@ -36,6 +36,7 @@ class MockProcess : public Process {
     return kComponentInfo;
   }
   ProcessSymbols* GetSymbols() override { return symbols_; }
+  bool HasLoadedSymbols() const override { return false; }
   void GetModules(bool force_reload_symbols,
                   fit::callback<void(const Err&, std::vector<debug_ipc::Module>)>) override;
   void GetAspace(

@@ -19,11 +19,27 @@ namespace zxdb {
 
 namespace {
 
-class VerbSymStat : public ConsoleTest {};
+class VerbSymStat : public ConsoleTest {
+ public:
+  // Skip the default process setup done by ConsoleTest so we can configure our own process with no
+  // symbols.
+  void SetUp() override {
+    RemoteAPITest::SetUp();
+    console_ = std::make_unique<MockConsole>(&session());
+    console_->EnableOutput();
+  }
+};
 
 }  // namespace
 
 TEST_F(VerbSymStat, SymStat) {
+  // Make our own process since the default one set up by ConsoleTest::SetUp already has symbols
+  // loaded by default.
+  constexpr uint64_t kProcessKoid = 0x1234;
+  InjectProcess(kProcessKoid);
+  // Eat the output event.
+  console().FlushOutputEvents();
+
   auto server = std::make_unique<MockSymbolServer>(&session(), "gs://fake-bucket");
   server->InitForTest();
   session().system().InjectSymbolServerForTesting(std::move(server));

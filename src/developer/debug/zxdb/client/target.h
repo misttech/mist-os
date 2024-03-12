@@ -62,6 +62,16 @@ class Target : public ClientObject {
     kRunning
   };
 
+  enum class AttachMode {
+    // Attach strongly. Symbols will be loaded eagerly upon attaching. Most of the time, this is the
+    // one to use.
+    kStrong,
+    // Attach weakly. This defers symbol loading until an exception for this process is received,
+    // but breakpoints cannot be installed and many other typical commands will not function until
+    // symbols are explicitly requested.
+    kWeak,
+  };
+
   ~Target() override;
 
   fxl::WeakPtr<Target> GetWeakPtr();
@@ -90,7 +100,7 @@ class Target : public ClientObject {
 
   // Attaches to the process with the given koid. The callback will be executed when the attach is
   // complete (or fails).
-  virtual void Attach(uint64_t koid, CallbackWithTimestamp callback) = 0;
+  virtual void Attach(uint64_t koid, AttachMode mode, CallbackWithTimestamp callback) = 0;
 
   // Detaches from the process with the given koid. The callback will be executed when the detach is
   // complete (or fails).

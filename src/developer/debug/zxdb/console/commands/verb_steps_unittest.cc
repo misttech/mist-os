@@ -27,6 +27,7 @@ TEST_F(VerbSteps, Test) {
       &session(), thread(), Location(Location::State::kSymbolized, kLineBegin), 0x2000));
   InjectExceptionWithStack(ConsoleTest::kProcessKoid, ConsoleTest::kThreadKoid,
                            debug_ipc::ExceptionType::kSingleStep, std::move(frames), true);
+  mock_remote_api()->GetAndResetResumeCount();
 
   // Don't care about the stop notification.
   loop().RunUntilNoTasks();

@@ -76,6 +76,9 @@ class Process : public ClientObject {
   // Returns the interface for querying symbols for this process.
   virtual ProcessSymbols* GetSymbols() = 0;
 
+  // Returns true if this process has loaded at least one module, false otherwise.
+  virtual bool HasLoadedSymbols() const = 0;
+
   // Queries the process for the currently-loaded modules (this always recomputes the list). The
   // force_reload_symbols flag will force-reload all symbol information for all modules, regardless
   // of whether it may already have symbols.

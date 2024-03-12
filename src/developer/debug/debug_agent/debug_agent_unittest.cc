@@ -519,4 +519,31 @@ TEST_F(DebugAgentTests, OnUpdateGlobalSettings) {
             harness.debug_agent()->GetExceptionStrategy(debug_ipc::ExceptionType::kPageFault));
 }
 
+TEST_F(DebugAgentTests, WeakFilterMatchDoesNotSendModules) {
+  MockDebugAgentHarness harness;
+  RemoteAPI* remote_api = harness.debug_agent();
+
+  constexpr char kProcessName[] = "process-1";
+  constexpr uint64_t kProcessKoid = 0x12345;
+
+  debug_ipc::UpdateFilterRequest request;
+  auto& filter = request.filters.emplace_back();
+  filter.type = debug_ipc::Filter::Type::kProcessName;
+  filter.pattern = kProcessName;
+  filter.id = 1;
+  filter.weak = true;
+
+  debug_ipc::UpdateFilterReply reply;
+  remote_api->OnUpdateFilter(request, &reply);
+
+  EXPECT_TRUE(reply.matched_processes_for_filter.empty());
+
+  harness.debug_agent()->OnProcessStart(
+      std::make_unique<MockProcessHandle>(kProcessKoid, kProcessName));
+
+  // We should have sent a process starting notification, but no modules.
+  EXPECT_FALSE(harness.stream_backend()->process_starts().empty());
+  EXPECT_TRUE(harness.stream_backend()->modules().empty());
+}
+
 }  // namespace debug_agent

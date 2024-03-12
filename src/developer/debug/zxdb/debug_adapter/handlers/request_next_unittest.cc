@@ -20,7 +20,8 @@ using RequestNextTest = DebugAdapterContextTest;
 TEST_F(RequestNextTest, NextStatement) {
   InitializeDebugging();
 
-  InjectProcess(kProcessKoid);
+  InjectProcessWithModule(kProcessKoid);
+
   // Run client to receive process started event.
   RunClient();
   InjectThread(kProcessKoid, kThreadKoid);

@@ -671,7 +671,7 @@ void DebugAgent::OnAttach(const debug_ipc::AttachRequest& request, debug_ipc::At
   }
 
   // Attempt to attach to an existing process. Sends the appropriate replies/notifications.
-  reply->status = AttachToExistingProcess(request.koid, reply);
+  reply->status = AttachToExistingProcess(request.koid, request.weak, reply);
   if (reply->status.ok())
     return;
 
@@ -735,16 +735,16 @@ debug::Status DebugAgent::AttachToLimboProcess(zx_koid_t process_koid,
   return debug::Status();
 }
 
-debug::Status DebugAgent::AttachToExistingProcess(zx_koid_t process_koid,
+debug::Status DebugAgent::AttachToExistingProcess(zx_koid_t process_koid, bool weak,
                                                   debug_ipc::AttachReply* reply) {
   std::unique_ptr<ProcessHandle> process_handle = system_interface_->GetProcess(process_koid);
   if (!process_handle)
     return debug::Status("Can't find process " + std::to_string(process_koid) + " to attach to.");
 
   DebuggedProcess* process = nullptr;
-  if (auto status =
-          AddDebuggedProcess(DebuggedProcessCreateInfo(std::move(process_handle)), &process);
-      status.has_error())
+  DebuggedProcessCreateInfo create_info(std::move(process_handle));
+  create_info.weak = weak;
+  if (auto status = AddDebuggedProcess(std::move(create_info), &process); status.has_error())
     return status;
 
   reply->koid = process->koid();
@@ -754,12 +754,13 @@ debug::Status DebugAgent::AttachToExistingProcess(zx_koid_t process_koid,
 
   // Send the reply first, then the notifications about the process and threads.
   debug::MessageLoop::Current()->PostTask(
-      FROM_HERE, [weak_this = GetWeakPtr(), koid = reply->koid]() mutable {
+      FROM_HERE, [weak_this = GetWeakPtr(), koid = reply->koid, weak]() mutable {
         if (!weak_this)
           return;
         if (DebuggedProcess* process = weak_this->GetDebuggedProcess(koid)) {
           process->PopulateCurrentThreads();
-          process->SuspendAndSendModules();
+          if (!weak)
+            process->SuspendAndSendModules();
         }
       });
 
@@ -840,8 +841,11 @@ void DebugAgent::OnProcessStart(std::unique_ptr<ProcessHandle> process_handle) {
   notify.components = system_interface_->GetComponentManager().FindComponentInfo(*process_handle);
   notify.filter_id = matched_filter ? matched_filter->id : debug_ipc::kInvalidFilterId;
 
+  bool weak = matched_filter ? matched_filter->weak : false;
+
   DebuggedProcessCreateInfo create_info(std::move(process_handle));
   create_info.stdio = std::move(stdio);
+  create_info.weak = weak;
 
   DebuggedProcess* new_process = nullptr;
   debug::Status status = AddDebuggedProcess(std::move(create_info), &new_process);
@@ -853,7 +857,14 @@ void DebugAgent::OnProcessStart(std::unique_ptr<ProcessHandle> process_handle) {
 
   SendNotification(notify);
 
-  new_process->SuspendAndSendModules();
+  // If this wasn't a weak attach, we need to send modules here. We cannot wait for the client to
+  // request all the modules later because we won't be able to load symbols early enough to set
+  // breakpoints on things like _dl_start, which will resolve from the first modules being sent
+  // now. The rest of the modules will be sent later on when the client requests them or we hit the
+  // loader breakpoint.
+  if (!weak) {
+    new_process->SuspendAndSendModules();
+  }
 }
 
 void DebugAgent::OnComponentStarted(const std::string& moniker, const std::string& url) {

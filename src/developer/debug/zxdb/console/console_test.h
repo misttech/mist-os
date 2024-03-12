@@ -54,9 +54,10 @@ class ConsoleTest : public RemoteAPITest {
   void SetUp() override;
   void TearDown() override;
 
- private:
+ protected:
   std::unique_ptr<MockConsole> console_;
 
+ private:
   // The injected process/thread.
   Process* process_ = nullptr;
   Thread* thread_ = nullptr;

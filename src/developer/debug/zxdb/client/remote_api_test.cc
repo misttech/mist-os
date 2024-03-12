@@ -76,6 +76,18 @@ Process* RemoteAPITest::InjectProcess(uint64_t process_koid) {
   return target->GetProcess();
 }
 
+Process* RemoteAPITest::InjectProcessWithModule(uint64_t process_koid, uint64_t load_address) {
+  auto process = InjectProcess(process_koid);
+  InjectMockModule(process, load_address);
+
+  // This is a conditional in case a derived class has overridden GetRemoteAPIImpl to provide a
+  // different implementation.
+  if (mock_remote_api_)
+    mock_remote_api_->GetAndResetResumeCount();
+
+  return process;
+}
+
 Thread* RemoteAPITest::InjectThread(uint64_t process_koid, uint64_t thread_koid) {
   debug_ipc::NotifyThreadStarting notify;
   notify.record.id = {.process = process_koid, .thread = thread_koid};

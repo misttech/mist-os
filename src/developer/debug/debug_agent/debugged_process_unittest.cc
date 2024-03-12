@@ -7,6 +7,8 @@
 
 #include "src/developer/debug/debug_agent/arch.h"
 #include "src/developer/debug/debug_agent/breakpoint.h"
+#include "src/developer/debug/debug_agent/debug_agent.h"
+#include "src/developer/debug/debug_agent/mock_debug_agent_harness.h"
 #include "src/developer/debug/debug_agent/mock_process.h"
 #include "src/developer/debug/debug_agent/mock_thread.h"
 #include "src/developer/debug/debug_agent/test_utils.h"
@@ -254,6 +256,21 @@ TEST(DebuggedProcess, DetachFromProcess) {
   ASSERT_FALSE(thread->running());
   process.DetachFromProcess();
   ASSERT_TRUE(thread->running());
+}
+
+TEST(DebuggedProcess, WeakAttachSkipsLoaderBreakpoint) {
+  MockDebugAgentHarness harness;
+  DebuggedProcessCreateInfo info(std::make_unique<MockProcessHandle>(kProcessKoid, kProcessName));
+  info.weak = true;
+  auto unique_process = std::make_unique<MockProcess>(harness.debug_agent(), std::move(info));
+  DebuggedProcess* process = unique_process.get();
+
+  harness.debug_agent()->InjectProcessForTest(std::move(unique_process));
+
+  process->HandleLoaderBreakpoint(MockProcessHandle::kLoaderBreakpointAddress);
+
+  // Should not have sent modules.
+  EXPECT_TRUE(harness.stream_backend()->modules().empty());
 }
 
 }  // namespace

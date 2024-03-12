@@ -128,6 +128,7 @@ debug::Status DebuggedProcess::Init(DebuggedProcessCreateInfo create_info) {
 
   process_handle_ = std::move(create_info.handle);
   from_limbo_ = create_info.from_limbo;
+  is_weakly_attached_ = create_info.weak;
 
   if (create_info.stdio.out.is_valid())
     SetStdout(std::move(create_info.stdio.out));
@@ -270,8 +271,10 @@ bool DebuggedProcess::HandleLoaderBreakpoint(uint64_t address) {
     return false;
 
   if (module_list_.Update(process_handle())) {
-    DEBUG_LOG(Process) << "Got loader breakpoint with new module, suspending and sending list.";
-    SuspendAndSendModules();
+    if (!is_weakly_attached_) {
+      DEBUG_LOG(Process) << "Got loader breakpoint with new module, suspending and sending list.";
+      SuspendAndSendModules();
+    }
   } else {
     DEBUG_LOG(Process) << "Got loader breakpoint but no module list change, continuing.";
   }
@@ -571,6 +574,9 @@ void DebuggedProcess::OnAddressSpace(const debug_ipc::AddressSpaceRequest& reque
 }
 
 void DebuggedProcess::OnModules(debug_ipc::ModulesReply* reply) {
+  // When the client explicitly requests modules, we are no longer weakly attached.
+  is_weakly_attached_ = false;
+
   // Since the client requested the modules explicitly, force update our cache in case something
   // changed unexpectedly.
   module_list_.Update(process_handle());
@@ -614,7 +620,7 @@ void DebuggedProcess::InjectThreadForTest(std::unique_ptr<DebuggedThread> thread
 
 std::vector<debug_ipc::ProcessThreadId> DebuggedProcess::ClientSuspendAllThreads(
     zx_koid_t except_thread) {
-  DEBUG_LOG(Process) << "DebuggedProcess::ClientSuspendAllThreads";
+  DEBUG_LOG(Process) << LogPreamble(this) << "DebuggedProcess::ClientSuspendAllThreads";
   // Also suspend new threads.
   suspend_new_threads_ = true;
 

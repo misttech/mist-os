@@ -44,6 +44,13 @@ struct DebuggedProcessCreateInfo {
   // have the ZX_RIGHT_DESTROY right. The way to "kill" them is to re send them to the limbo and
   // then release it from it.
   bool from_limbo = false;
+
+  // Whether the client requested a "weak" attach. If this is set, we ignore the loader breakpoint
+  // and never proactively send module updates. The client will explicitly request modules when it
+  // is ready to do more work. This is useful when the client is orchestrating with other tools, and
+  // may be hidden for some time. "Weak" attaches allow the client to defer loading modules (and not
+  // blocking the console) until something interesting happened.
+  bool weak = false;
 };
 
 class DebuggedProcess : public ProcessHandleObserver {
@@ -246,6 +253,13 @@ class DebuggedProcess : public ProcessHandleObserver {
   // when it tries to kill this process in order to determine whether the ZX_ERR_BAD_ACCESS is
   // expected (limbo handles do not have ZX_RIGHT_DESTROY right) or it is an actual error.
   bool from_limbo_ = false;
+
+  // Whether or not we are currently "weakly" attached to this process. The process will become
+  // "strongly" attached when there is a non-loader breakpoint or an exception. Note the client we
+  // are talking to will never be able to install its own breakpoints until symbols are loaded, so
+  // if no external event (i.e. an exception from the kernel or a manually installed breakpoint)
+  // occurs then the process will exit normally.
+  bool is_weakly_attached_ = false;
 
 #if defined(__linux__)
   // On Linux we need to manually set a breakpoint in the loader to observe module loads (Fuchsia

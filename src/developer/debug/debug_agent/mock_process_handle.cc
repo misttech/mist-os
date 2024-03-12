@@ -40,7 +40,7 @@ void MockProcessHandle::Detach() { is_attached_ = false; }
 
 uint64_t MockProcessHandle::GetLoaderBreakpointAddress() {
   // Not currently implemented in this mock.
-  return 0;
+  return kLoaderBreakpointAddress;
 }
 
 std::vector<debug_ipc::AddressRegion> MockProcessHandle::GetAddressSpace(uint64_t address) const {

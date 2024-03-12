@@ -180,6 +180,9 @@ class Session : public SettingStoreObserver {
   void DispatchNotifyComponentExiting(const debug_ipc::NotifyComponentExiting& notify);
   void DispatchNotifyTestExited(const debug_ipc::NotifyTestExited& notify);
 
+  void HandleException(ThreadImpl* thread, const debug_ipc::NotifyException& notify,
+                       bool set_metadata = true);
+
   // SettingStoreObserver
   void OnSettingChanged(const SettingStore&, const std::string& setting_name) override;
 

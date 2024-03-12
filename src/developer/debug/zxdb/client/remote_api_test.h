@@ -63,6 +63,12 @@ class RemoteAPITest : public TestWithLoop {
   // deterministic name, "process-" followed by the given koid in hex.
   Process* InjectProcess(uint64_t process_koid);
 
+  // Calls |InjectProcess| with the given koid and then injects a mock module with
+  // |InjectMockModule|. This is a convenience method for tests that don't inject their own modules,
+  // but still need some module to be loaded to properly test notification and event paths. The
+  // resume count in |mock_remote_api| is reset at the end of this method.
+  Process* InjectProcessWithModule(uint64_t process_koid, uint64_t load_address = 0);
+
   // Sends a "thread created" notifications to the client for the given fake KOID. The thread will
   // be reported as running.
   Thread* InjectThread(uint64_t process_koid, uint64_t thread_koid);

@@ -300,21 +300,22 @@ void InterceptionWorkflow::Attach(const std::vector<zx_koid_t>& process_koids) {
     }
 
     // The debugger is not yet attached to the process.  Attach to it.
-    target->Attach(
-        process_koid, [this, target, process_koid](fxl::WeakPtr<zxdb::Target> /*target*/,
-                                                   const zxdb::Err& err, uint64_t timestamp) {
-          if (!err.ok()) {
-            Process* process = syscall_decoder_dispatcher()->SearchProcess(process_koid);
-            if (process == nullptr) {
-              process = syscall_decoder_dispatcher()->CreateProcess("", process_koid, nullptr);
-            }
-            syscall_decoder_dispatcher()->AddProcessMonitoredEvent(
-                std::make_shared<ProcessMonitoredEvent>(timestamp, process, err.msg()));
-            return;
-          }
+    target->Attach(process_koid, zxdb::Target::AttachMode::kStrong,
+                   [this, target, process_koid](fxl::WeakPtr<zxdb::Target> /*target*/,
+                                                const zxdb::Err& err, uint64_t timestamp) {
+                     if (!err.ok()) {
+                       Process* process = syscall_decoder_dispatcher()->SearchProcess(process_koid);
+                       if (process == nullptr) {
+                         process =
+                             syscall_decoder_dispatcher()->CreateProcess("", process_koid, nullptr);
+                       }
+                       syscall_decoder_dispatcher()->AddProcessMonitoredEvent(
+                           std::make_shared<ProcessMonitoredEvent>(timestamp, process, err.msg()));
+                       return;
+                     }
 
-          SetBreakpoints(target->GetProcess(), timestamp);
-        });
+                     SetBreakpoints(target->GetProcess(), timestamp);
+                   });
   }
 }
 

@@ -499,7 +499,8 @@ void Session::OpenMinidump(const std::string& path, fit::callback<void(const Err
   SendLocalHello(std::move(callback));
 
   system().GetTargets()[0]->Attach(
-      minidump->ProcessID(), [](fxl::WeakPtr<Target> target, const Err&, uint64_t timestamp) {});
+      minidump->ProcessID(), Target::AttachMode::kStrong,
+      [](fxl::WeakPtr<Target> target, const Err&, uint64_t timestamp) {});
 }
 
 Err Session::Disconnect() {
@@ -566,11 +567,11 @@ void Session::DispatchNotifyThreadExiting(const debug_ipc::NotifyThreadExiting& 
   process->OnThreadExiting(notify.record);
 }
 
-// This is the main entrypoint for all thread stops notifications in the client.
-void Session::DispatchNotifyException(const debug_ipc::NotifyException& notify, bool set_metadata) {
-  ThreadImpl* thread = ThreadImplFromKoid(notify.thread.id);
+void Session::HandleException(ThreadImpl* thread, const debug_ipc::NotifyException& notify,
+                              bool set_metadata) {
   if (!thread) {
-    LOGS(Warn) << "Received thread exception for an unknown thread.";
+    LOGS(Warn) << "Received thread exception for an unknown thread: pr:" << notify.thread.id.process
+               << " thread: " << notify.thread.id.thread;
     return;
   }
 
@@ -627,6 +628,36 @@ void Session::DispatchNotifyException(const debug_ipc::NotifyException& notify, 
   }
 }
 
+// This is the main entrypoint for all thread stops notifications in the client.
+void Session::DispatchNotifyException(const debug_ipc::NotifyException& notify, bool set_metadata) {
+  ThreadImpl* thread = ThreadImplFromKoid(notify.thread.id);
+  FX_DCHECK(thread->process());
+
+  if (thread->process()->HasLoadedSymbols()) {
+    // Normal case, just handle the exception.
+    HandleException(thread, notify, set_metadata);
+    return;
+  }
+
+  // If we were weakly attached, we may not have symbols yet. Check now if we need to load them,
+  // then dispatch the exception to be handled.
+  thread->process()->GetModules(true, [weak_this = GetWeakPtr(), notify, set_metadata, thread](
+                                          const Err& err, const std::vector<debug_ipc::Module>&) {
+    if (err.has_error())
+      LOGS(Warn) << err.msg();
+
+    thread->process()->SyncThreads([weak_this, notify, set_metadata, thread]() {
+      if (weak_this && thread) {
+        thread->GetStack().SyncFrames(
+            true, [weak_this, notify, set_metadata, thread](const Err& err) mutable {
+              if (weak_this && thread)
+                weak_this->HandleException(thread, notify, set_metadata);
+            });
+      }
+    });
+  });
+}
+
 void Session::DispatchNotifyModules(const debug_ipc::NotifyModules& notify) {
   ProcessImpl* process = system_.ProcessImplFromKoid(notify.process_koid);
   if (process) {
@@ -667,8 +698,18 @@ void Session::DispatchNotifyProcessStarting(const debug_ipc::NotifyProcessStarti
   auto start_type = notify.type == debug_ipc::NotifyProcessStarting::Type::kAttach
                         ? Process::StartType::kAttach
                         : Process::StartType::kLaunch;
+
   found_target->CreateProcess(start_type, notify.koid, notify.name, notify.timestamp,
                               notify.components);
+
+  auto matched_filter = system().GetFilterForId(notify.filter_id);
+
+  // If the notification is coming from a weak filter, defer fetching modules until later.
+  if (matched_filter && matched_filter->weak()) {
+    return;
+  }
+
+  found_target->process()->GetModules(true, [](const Err&, std::vector<debug_ipc::Module>) {});
 }
 
 void Session::DispatchNotifyProcessExiting(const debug_ipc::NotifyProcessExiting& notify) {
@@ -844,6 +885,7 @@ void Session::SyncAgentStatus() {
             client_filter->SetType(remote_filter.type);
             client_filter->SetPattern(remote_filter.pattern);
             client_filter->SetJobKoid(remote_filter.job_koid);
+            client_filter->SetWeak(remote_filter.weak);
           }
         }
 
@@ -906,7 +948,7 @@ void Session::ListenForSystemSettings() {
 
 void Session::AttachToLimboProcessAndNotify(uint64_t koid, const std::string& process_name) {
   if (koid_seen_in_limbo_.insert(koid).second) {
-    system().AttachToProcess(koid,
+    system().AttachToProcess(koid, Target::AttachMode::kStrong,
                              [](fxl::WeakPtr<Target> target, const Err&, uint64_t timestamp) {});
 
   } else {

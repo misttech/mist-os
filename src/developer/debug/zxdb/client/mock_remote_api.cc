@@ -142,4 +142,10 @@ void MockRemoteAPI::Kill(const debug_ipc::KillRequest& request,
   debug::MessageLoop::Current()->PostTask(
       FROM_HERE, [cb = std::move(cb)]() mutable { cb(Err(), debug_ipc::KillReply()); });
 }
+
+void MockRemoteAPI::Modules(const debug_ipc::ModulesRequest& request,
+                            fit::callback<void(const Err&, debug_ipc::ModulesReply)> cb) {
+  debug::MessageLoop::Current()->PostTask(
+      FROM_HERE, [cb = std::move(cb)]() mutable { cb(Err(), debug_ipc::ModulesReply()); });
+}
 }  // namespace zxdb

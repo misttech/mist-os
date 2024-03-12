@@ -140,7 +140,7 @@ void TargetImpl::Kill(Callback callback) {
       });
 }
 
-void TargetImpl::Attach(uint64_t koid, CallbackWithTimestamp callback) {
+void TargetImpl::Attach(uint64_t koid, AttachMode mode, CallbackWithTimestamp callback) {
   if (state_ != State::kNone) {
     // Avoid reentering caller to dispatch the error.
     debug::MessageLoop::Current()->PostTask(
@@ -155,6 +155,7 @@ void TargetImpl::Attach(uint64_t koid, CallbackWithTimestamp callback) {
 
   debug_ipc::AttachRequest request;
   request.koid = koid;
+  request.weak = mode == AttachMode::kWeak;
   session()->remote_api()->Attach(request, [koid, callback = std::move(callback),
                                             weak_target = impl_weak_factory_.GetWeakPtr()](
                                                const Err& err,
@@ -237,7 +238,8 @@ void TargetImpl::OnLaunchOrAttachReply(
   if (err.has_error()) {
     if (err.type() == ErrType::kAlreadyExists) {
       FX_DCHECK(system_->ProcessFromKoid(koid));
-      callback(GetWeakPtr(), Err("Process " + std::to_string(koid) + " is already being debugged."),
+      callback(GetWeakPtr(),
+               Err(err.type(), "Process " + std::to_string(koid) + " is already being debugged."),
                timestamp);
       return;
     }

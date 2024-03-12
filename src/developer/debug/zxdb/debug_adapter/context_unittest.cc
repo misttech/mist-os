@@ -115,7 +115,7 @@ TEST_F(DebugAdapterContextTest, StoppedEvent) {
 
   InitializeDebugging();
 
-  InjectProcess(kProcessKoid);
+  InjectProcessWithModule(kProcessKoid);
   // Receive process started event in client.
   RunClient();
 

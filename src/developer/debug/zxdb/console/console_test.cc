@@ -4,6 +4,8 @@
 
 #include "src/developer/debug/zxdb/console/console_test.h"
 
+#include "src/developer/debug/zxdb/symbols/mock_module_symbols.h"
+
 namespace zxdb {
 
 constexpr uint64_t ConsoleTest::kProcessKoid;
@@ -14,7 +16,7 @@ void ConsoleTest::SetUp() {
   console_ = std::make_unique<MockConsole>(&session());
   console_->EnableOutput();
 
-  process_ = InjectProcess(kProcessKoid);
+  process_ = InjectProcessWithModule(kProcessKoid);
   thread_ = InjectThread(kProcessKoid, kThreadKoid);
 
   // Eat the output from process attaching (this is asynchronously appended).
