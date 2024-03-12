@@ -264,6 +264,22 @@ open protocol Engine {
         power_on bool;
     }) -> () error zx.Status;
 
+    /// Set the minimum value of RGB channels.
+    ///
+    /// Returns ZX_ERR_NOT_SUPPORTED if RGB clamping is not supported.
+    ///
+    /// This method is provisional and is only for some display engines.
+    /// Most display drivers willreturn ZX_ERR_NOT_SUPPORTED.
+    //
+    // TODO(https://fxbug.dev/328903017): This is a provisional method meant
+    // to address a hardware issue where RGB channels need to get clamped in
+    // order to reduce backlight bleeding. Revise this method when stabilizing
+    // the Engine protocol API.
+    flexible SetMinimumRgb(struct {
+        /// Must be >= 0 and <= 255.
+        minimum_rgb uint8;
+    }) -> () error zx.Status;
+
     /// Starts capture into the resource mapped by `capture_image_id `(non-blocking)
     /// Only one active capture is allowed at a time.
     /// A valid image must be displayed during capture. Otherwise unexpected
