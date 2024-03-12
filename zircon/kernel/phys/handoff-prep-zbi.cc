@@ -21,6 +21,7 @@
 #include <zircon/limits.h>
 
 #include <efi/types.h>
+#include <fbl/algorithm.h>
 #include <ktl/algorithm.h>
 #include <ktl/byte.h>
 #include <ktl/span.h>
@@ -151,9 +152,52 @@ void HandoffPrep::SummarizeMiscZbiItems(ktl::span<ktl::byte> zbi) {
         ZX_ASSERT_MSG(ac.check(), "cannot allocate %zu bytes for memory handoff",
                       mem_config.size_bytes());
 
-        ktl::copy(mem_config.begin(), mem_config.end(), handoff_mem_config.begin());
+        // Align memory to page boundaries.
+        size_t current = 0;
+        for (auto mem_range : mem_config) {
+          switch (mem_range.type) {
+              // It is only safe to trim non aligned bytes from these ranges, since
+              // in platforms relying on boot shims handing out the memory ranges in the zbi format,
+              // the reserved ranges are gone. This means that we may expand a free ram range into
+              // touching a reserved region, which the kernel will be unaware of.
+              //
+              // The unfortunate side-effect of doing is, is that possibly contigous ranges that
+              // could have been represented a single free ram range, with a shared page, will no
+              // longer be contiguous.
+            case ZBI_MEM_TYPE_RAM: {
+              // It is possible to generate a 0 sized range here.
+              uintptr_t aligned_start = fbl::round_up(mem_range.paddr, ZX_PAGE_SIZE);
+              mem_range.length =
+                  fbl::round_down(mem_range.paddr + mem_range.length, ZX_PAGE_SIZE) - aligned_start;
+              mem_range.paddr = aligned_start;
+              break;
+            }
 
-        ktl::span extra_ranges = handoff_mem_config.subspan(mem_config.size());
+            // For periphral regions we cannot compact to aligned addresses within the range, since
+            // it may leave out registers that are required for operation. This is harmless,
+            // since the page will just be mapped uncached.
+            case ZBI_MEM_TYPE_PERIPHERAL: {
+              uintptr_t aligned_start = fbl::round_down(mem_range.paddr, ZX_PAGE_SIZE);
+              mem_range.length =
+                  fbl::round_up(mem_range.paddr + mem_range.length, ZX_PAGE_SIZE) - aligned_start;
+              mem_range.paddr = aligned_start;
+              break;
+            }
+
+              // `ZBI_MEM_TYPE_RESERVED` is left untouched.
+            case ZBI_MEM_TYPE_RESERVED:
+            default:
+              break;
+          }
+
+          if (mem_range.length == 0) {
+            continue;
+          }
+
+          handoff_mem_config[current++] = mem_range;
+        }
+
+        ktl::span extra_ranges = handoff_mem_config.subspan(current);
         size_t current_range = 0;
 
         if (uart_periph_range) {
@@ -166,7 +210,9 @@ void HandoffPrep::SummarizeMiscZbiItems(ktl::span<ktl::byte> zbi) {
           // fixed shortly when mexec handoff is handled directly here instead.
           extra_ranges[current_range++] = *test_ram_reserve;
         }
-        // ZX_DEBUG_ASSERT(current_range == extra_mem_config_ranges);
+
+        // Adjust the size of valid ranges.
+        handoff_->mem_config.size_ = current + current_range;
         break;
       }
 
