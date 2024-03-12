@@ -4,7 +4,6 @@
 
 use {
     crate::{
-        checksum::Checksums,
         errors::FxfsError,
         log::*,
         lsm_tree::types::{ItemRef, LayerIterator},

@@ -113,8 +113,6 @@ rustc_library("vfs") {
     "//third_party/rust_crates:assert_matches",
     "//third_party/rust_crates:test-case",
   ]
-
-  configs += [ "//build/config/rust/lints:allow_unused_imports" ]
 }
 
 fuchsia_unittest_package("vfs-tests") {

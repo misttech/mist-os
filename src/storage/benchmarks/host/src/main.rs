@@ -4,7 +4,7 @@
 
 use {
     regex::{Regex, RegexSetBuilder},
-    std::{fs::File, path::PathBuf, vec::Vec},
+    std::{fs::File, path::PathBuf},
     storage_benchmarks::{
         add_benchmarks,
         block_device::PanickingBlockDeviceFactory,

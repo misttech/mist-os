@@ -9,7 +9,6 @@ rustc_binary("host-storage-benchmarks") {
   edition = "2021"
   testonly = true
   name = "storage-benchmarks"
-  configs += [ "//build/config/rust/lints:allow_unused_imports" ]
   sources = [ "src/main.rs" ]
   deps = [
     "//src/lib/fuchsia",

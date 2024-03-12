@@ -16,7 +16,7 @@ use {
         Rng, SeedableRng,
     },
     rand_xorshift::XorShiftRng,
-    std::{iter::StepBy, ops::Range, vec::Vec},
+    std::{iter::StepBy, ops::Range},
     storage_benchmarks::{
         Benchmark, CacheClearableFilesystem as _, OperationDuration, OperationTimer,
     },

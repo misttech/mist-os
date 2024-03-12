@@ -148,8 +148,6 @@ rustc_library("lib") {
   deps = fxfs_deps
   sources = fxfs_sources
   test_deps = fxfs_test_deps
-
-  configs += [ "//build/config/rust/lints:allow_unused_imports" ]
 }
 
 fuchsia_unittest_component("fxfs-test") {
@@ -343,7 +341,6 @@ foreach(fuzzer, _fuzzers) {
              "//third_party/rust_crates:futures",
            ]
     sources = fxfs_sources
-    configs += [ "//build/config/rust/lints:allow_unused_imports" ]
   }
 
   fuchsia_fuzzer_component("${fuzzer}_component") {
