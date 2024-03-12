@@ -20,6 +20,7 @@ use fho::{bug, return_bug, Result};
 use fidl_fuchsia_developer_ffx as ffx;
 use serde::{Deserialize, Serialize};
 use std::{
+    env,
     path::{Path, PathBuf},
     process::Command,
 };
@@ -144,8 +145,14 @@ impl EmulatorEngine for QemuEngine {
         if extra_args.len() > 0 {
             cmd.args(["-append", &extra_args]);
         }
-        if emulator_configuration.flags.envs.len() > 0 {
-            cmd.envs(&emulator_configuration.flags.envs);
+        if self.data.get_emulator_configuration().flags.envs.len() > 0 {
+            // Add environment variables if not already present.
+            // This does not overwrite any existing values.
+            let unset_envs =
+                emulator_configuration.flags.envs.iter().filter(|(k, _)| env::var(k).is_err());
+            if unset_envs.clone().count() > 0 {
+                cmd.envs(unset_envs);
+            }
         }
         cmd
     }
@@ -222,5 +229,46 @@ impl QemuBasedEngine for QemuEngine {
 
     fn get_engine_state(&self) -> EngineState {
         self.data.get_engine_state()
+    }
+}
+
+mod tests {
+    use super::*;
+    use crate::EngineBuilder;
+    use emulator_instance::NetworkingMode;
+    use std::{ffi::OsStr, fs, path::PathBuf};
+
+    #[test]
+    fn test_build_emulator_cmd() {
+        let program_name = "/test_femu_bin";
+        let mut cfg = EmulatorConfiguration::default();
+        cfg.host.networking = NetworkingMode::User;
+        cfg.flags.envs.insert("FLAG_NAME_THAT_DOES_NOT_EXIST".into(), "1".into());
+
+        let mut emu_data = EmulatorInstanceData::new(cfg, EngineType::Qemu, EngineState::New);
+        emu_data.set_emulator_binary(program_name.into());
+        let test_engine = QemuEngine::new(emu_data);
+        let cmd = test_engine.build_emulator_cmd();
+        assert_eq!(cmd.get_program(), program_name);
+        assert_eq!(
+            cmd.get_envs().collect::<Vec<_>>(),
+            [(OsStr::new("FLAG_NAME_THAT_DOES_NOT_EXIST"), Some(OsStr::new("1")))]
+        );
+    }
+
+    #[test]
+    fn test_build_emulator_cmd_existing_env() {
+        env::set_var("FLAG_NAME_THAT_DOES_EXIST", "preset_value");
+        let program_name = "/test_femu_bin";
+        let mut cfg = EmulatorConfiguration::default();
+        cfg.host.networking = NetworkingMode::User;
+        cfg.flags.envs.insert("FLAG_NAME_THAT_DOES_EXIST".into(), "1".into());
+
+        let mut emu_data = EmulatorInstanceData::new(cfg, EngineType::Qemu, EngineState::New);
+        emu_data.set_emulator_binary(program_name.into());
+        let test_engine: QemuEngine = QemuEngine::new(emu_data);
+        let cmd = test_engine.build_emulator_cmd();
+        assert_eq!(cmd.get_program(), program_name);
+        assert_eq!(cmd.get_envs().collect::<Vec<_>>(), []);
     }
 }
