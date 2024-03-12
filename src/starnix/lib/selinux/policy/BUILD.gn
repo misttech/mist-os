@@ -56,7 +56,6 @@ if (is_host) {
 
   testdata_policies = [
     "emulator",
-    "minimal",
     "selinux_testsuite",
   ]
 

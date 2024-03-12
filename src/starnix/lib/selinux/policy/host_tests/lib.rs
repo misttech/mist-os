@@ -67,13 +67,6 @@ fn known_policies() {
         let (policy, returned_policy_bytes) =
             parse_policy_by_value(policy_bytes.clone()).expect("parse policy");
 
-        // "minimal" policy is syntactically valid but does not contain all "well-known" elements
-        // that are validated by `Policy::validate()`.
-        if policy_path.file_name().expect("policy file name") == "minimal" {
-            policy.parsed_policy().validate().expect("validate policy");
-            continue;
-        }
-
         let policy = policy
             .validate()
             .with_context(|| format!("policy path: {:?}", policy_path))
