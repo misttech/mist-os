@@ -87,8 +87,6 @@ rustc_binary("bin") {
     "//src/lib/test_util",
     "//third_party/rust_crates:test-case",
   ]
-
-  configs += [ "//build/config/rust/lints:allow_unused_imports" ]
 }
 
 rustc_binary("bin_with_fake_time") {
@@ -102,8 +100,6 @@ rustc_binary("bin_with_fake_time") {
   sources = timekeeper_sources
 
   non_rust_deps = [ "//src/lib/fake-clock/lib" ]
-
-  configs += [ "//build/config/rust/lints:allow_unused_imports" ]
 }
 
 fuchsia_component_manifest("manifest") {

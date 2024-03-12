@@ -159,7 +159,6 @@ config("allow_unused_imports") {
     "//src/sys/component_manager/*",
     "//src/sys/lib/routing:*",
     "//src/sys/pkg/bin/pkg-cache:*",
-    "//src/sys/time/*",
     "//src/ui/*",
     "//tools/lib/cm_fidl_analyzer/tests:*",
     "//vendor/*",

@@ -8,12 +8,10 @@ use fidl_fuchsia_power_broker as fpb;
 use fidl_fuchsia_power_system as fps;
 use fuchsia_async as fasync;
 use fuchsia_component::client;
-use fuchsia_zircon as zx;
 use futures::channel::mpsc;
 use futures::future;
 use futures::{Future, SinkExt, StreamExt};
 use tracing::{debug, error};
-use zx::HandleBased;
 
 const ELEMENT_NAME: &str = "timekeeper-pe";
 
