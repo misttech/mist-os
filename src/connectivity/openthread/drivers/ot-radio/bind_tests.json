@@ -20,7 +20,7 @@
                 "name": "Match",
                 "expected": "match",
                 "device": {
-                    "fuchsia.BIND_FIDL_PROTOCOL": "fuchsia.gpio.BIND_FIDL_PROTOCOL.SERVICE",
+                    "fuchsia.hardware.gpio.Service": "fuchsia.hardware.gpio.Service.ZirconTransport",
                     "fuchsia.gpio.FUNCTION": "fuchsia.gpio.FUNCTION.OT_RADIO_INTERRUPT"
                 }
             }
@@ -33,7 +33,7 @@
                 "name": "Match",
                 "expected": "match",
                 "device": {
-                    "fuchsia.BIND_FIDL_PROTOCOL": "fuchsia.gpio.BIND_FIDL_PROTOCOL.SERVICE",
+                    "fuchsia.hardware.gpio.Service": "fuchsia.hardware.gpio.Service.ZirconTransport",
                     "fuchsia.gpio.FUNCTION": "fuchsia.gpio.FUNCTION.OT_RADIO_RESET"
                 }
             }
@@ -46,7 +46,7 @@
                 "name": "Match",
                 "expected": "match",
                 "device": {
-                    "fuchsia.BIND_FIDL_PROTOCOL": "fuchsia.gpio.BIND_FIDL_PROTOCOL.SERVICE",
+                    "fuchsia.hardware.gpio.Service": "fuchsia.hardware.gpio.Service.ZirconTransport",
                     "fuchsia.gpio.FUNCTION": "fuchsia.gpio.FUNCTION.OT_RADIO_BOOTLOADER"
                 }
             }

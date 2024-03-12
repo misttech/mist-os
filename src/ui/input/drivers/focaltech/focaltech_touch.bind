@@ -5,6 +5,7 @@
 composite focaltech_touch;
 
 using fuchsia.gpio;
+using fuchsia.hardware.gpio;
 using fuchsia.i2c;
 using fuchsia.focaltech.platform;
 using fuchsia.platform;
@@ -15,12 +16,12 @@ primary node "i2c" {
 }
 
 node "gpio-int" {
-  fuchsia.BIND_FIDL_PROTOCOL == fuchsia.gpio.BIND_FIDL_PROTOCOL.SERVICE;
+  fuchsia.hardware.gpio.Service == fuchsia.hardware.gpio.Service.ZirconTransport;
   fuchsia.gpio.FUNCTION == fuchsia.gpio.FUNCTION.TOUCH_INTERRUPT;
 }
 
 node "gpio-reset" {
-  fuchsia.BIND_FIDL_PROTOCOL == fuchsia.gpio.BIND_FIDL_PROTOCOL.SERVICE;
+  fuchsia.hardware.gpio.Service == fuchsia.hardware.gpio.Service.ZirconTransport;
   fuchsia.gpio.FUNCTION == fuchsia.gpio.FUNCTION.TOUCH_RESET;
 }
 

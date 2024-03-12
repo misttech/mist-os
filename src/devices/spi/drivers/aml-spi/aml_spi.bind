@@ -6,11 +6,12 @@ composite spi_0;
 
 using fuchsia.amlogic.platform;
 using fuchsia.gpio;
+using fuchsia.hardware.gpio;
 using fuchsia.hardware.registers;
 using fuchsia.platform;
 
 primary node "gpio-cs-0" {
-  fuchsia.BIND_FIDL_PROTOCOL == fuchsia.gpio.BIND_FIDL_PROTOCOL.SERVICE;
+  fuchsia.hardware.gpio.Service == fuchsia.hardware.gpio.Service.ZirconTransport;
   accept fuchsia.gpio.FUNCTION {
     fuchsia.gpio.FUNCTION.SPICC0_SS0,
     fuchsia.gpio.FUNCTION.SPICC1_SS0

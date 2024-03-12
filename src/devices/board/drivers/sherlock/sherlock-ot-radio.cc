@@ -18,6 +18,7 @@
 #include <bind/fuchsia/cpp/bind.h>
 #include <bind/fuchsia/google/platform/cpp/bind.h>
 #include <bind/fuchsia/gpio/cpp/bind.h>
+#include <bind/fuchsia/hardware/gpio/cpp/bind.h>
 #include <bind/fuchsia/nordic/platform/cpp/bind.h>
 #include <bind/fuchsia/platform/cpp/bind.h>
 #include <bind/fuchsia/spi/cpp/bind.h>
@@ -84,13 +85,13 @@ zx_status_t Sherlock::OtRadioInit() {
 
   for (auto& [gpio_pin, function] : kGpioPinFunctionMap) {
     auto rules = std::vector{
-        fdf::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
-                                bind_fuchsia_gpio::BIND_FIDL_PROTOCOL_SERVICE),
+        fdf::MakeAcceptBindRule(bind_fuchsia_hardware_gpio::SERVICE,
+                                bind_fuchsia_hardware_gpio::SERVICE_ZIRCONTRANSPORT),
         fdf::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN, gpio_pin),
     };
     auto properties = std::vector{
-        fdf::MakeProperty(bind_fuchsia::FIDL_PROTOCOL,
-                          bind_fuchsia_gpio::BIND_FIDL_PROTOCOL_SERVICE),
+        fdf::MakeProperty(bind_fuchsia_hardware_gpio::SERVICE,
+                          bind_fuchsia_hardware_gpio::SERVICE_ZIRCONTRANSPORT),
         fdf::MakeProperty(bind_fuchsia_gpio::FUNCTION, function),
     };
     parents.push_back(fdf::ParentSpec{{rules, properties}});

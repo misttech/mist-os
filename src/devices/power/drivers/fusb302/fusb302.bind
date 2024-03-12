@@ -6,9 +6,10 @@ composite fusb302;
 
 using fuchsia.i2c;
 using fuchsia.gpio;
+using fuchsia.hardware.gpio;
 
 primary node "gpio" {
-  fuchsia.BIND_FIDL_PROTOCOL == fuchsia.gpio.BIND_FIDL_PROTOCOL.SERVICE;
+  fuchsia.hardware.gpio.Service == fuchsia.hardware.gpio.Service.ZirconTransport;
   fuchsia.gpio.FUNCTION == fuchsia.gpio.FUNCTION.USB_POWER_DELIVERY;
 }
 

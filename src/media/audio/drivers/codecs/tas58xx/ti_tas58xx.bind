@@ -5,6 +5,7 @@
 composite tas58xx;
 
 using fuchsia.gpio;
+using fuchsia.hardware.gpio;
 using fuchsia.i2c;
 using fuchsia.ti.platform;
 using fuchsia.platform;
@@ -16,7 +17,7 @@ primary node "i2c" {
 }
 
 node "gpio-fault" {
-  fuchsia.BIND_FIDL_PROTOCOL == fuchsia.gpio.BIND_FIDL_PROTOCOL.SERVICE;
+  fuchsia.hardware.gpio.Service == fuchsia.hardware.gpio.Service.ZirconTransport;
   fuchsia.gpio.FUNCTION == fuchsia.gpio.FUNCTION.SOC_AUDIO_FAULT;
 }
 

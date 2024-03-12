@@ -19,6 +19,7 @@ driver_bind_rules("imx227_bind") {
   tests = "bind_tests.json"
   deps = [
     "//sdk/fidl/fuchsia.hardware.clock:fuchsia.hardware.clock_bindlib",
+    "//sdk/fidl/fuchsia.hardware.gpio:fuchsia.hardware.gpio_bindlib",
     "//src/devices/bind/fuchsia.camera",
     "//src/devices/bind/fuchsia.clock",
     "//src/devices/bind/fuchsia.gpio",

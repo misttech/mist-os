@@ -12,6 +12,7 @@ driver_bind_rules("tcs3400_light_bind") {
   bind_output = "ams-light.bindbc"
   tests = "bind_tests.json"
   deps = [
+    "//sdk/fidl/fuchsia.hardware.gpio:fuchsia.hardware.gpio_bindlib",
     "//src/devices/bind/fuchsia.gpio",
     "//src/devices/bind/fuchsia.i2c",
     "//src/devices/bind/fuchsia.platform",

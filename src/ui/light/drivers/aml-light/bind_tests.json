@@ -22,7 +22,7 @@
                 "expected": "match",
                 "device": {
                     "fuchsia.gpio.FUNCTION": "fuchsia.gpio.FUNCTION.GPIO_AMBER_LED",
-                    "fuchsia.BIND_FIDL_PROTOCOL": "fuchsia.gpio.BIND_FIDL_PROTOCOL.SERVICE"
+                    "fuchsia.hardware.gpio.Service": "fuchsia.hardware.gpio.Service.ZirconTransport"
                 }
             }
         ]
@@ -48,7 +48,7 @@
                 "expected": "match",
                 "device": {
                     "fuchsia.gpio.FUNCTION": "fuchsia.gpio.FUNCTION.GPIO_GREEN_LED",
-                    "fuchsia.BIND_FIDL_PROTOCOL": "fuchsia.gpio.BIND_FIDL_PROTOCOL.SERVICE"
+                    "fuchsia.hardware.gpio.Service": "fuchsia.hardware.gpio.Service.ZirconTransport"
                 }
             }
         ]

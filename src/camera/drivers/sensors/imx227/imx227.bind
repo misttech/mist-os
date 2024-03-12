@@ -7,6 +7,7 @@ composite imx227_sensor;
 using fuchsia.clock;
 using fuchsia.gpio;
 using fuchsia.hardware.clock;
+using fuchsia.hardware.gpio;
 using fuchsia.i2c;
 using fuchsia.camera;
 using fuchsia.platform;
@@ -28,17 +29,17 @@ node "i2c" {
 }
 
 node "gpio-reset" {
-  fuchsia.BIND_FIDL_PROTOCOL == fuchsia.gpio.BIND_FIDL_PROTOCOL.SERVICE;
+  fuchsia.hardware.gpio.Service == fuchsia.hardware.gpio.Service.ZirconTransport;
   fuchsia.gpio.FUNCTION == fuchsia.gpio.FUNCTION.CAM_RESET;
 }
 
 node "gpio-vana" {
-  fuchsia.BIND_FIDL_PROTOCOL == fuchsia.gpio.BIND_FIDL_PROTOCOL.SERVICE;
+  fuchsia.hardware.gpio.Service == fuchsia.hardware.gpio.Service.ZirconTransport;
   fuchsia.gpio.FUNCTION == fuchsia.gpio.FUNCTION.VANA_ENABLE;
 }
 
 node "gpio-vdig" {
-  fuchsia.BIND_FIDL_PROTOCOL == fuchsia.gpio.BIND_FIDL_PROTOCOL.SERVICE;
+  fuchsia.hardware.gpio.Service == fuchsia.hardware.gpio.Service.ZirconTransport;
   fuchsia.gpio.FUNCTION == fuchsia.gpio.FUNCTION.VDIG_ENABLE;
 }
 

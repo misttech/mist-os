@@ -41,7 +41,7 @@ DDK_FIDL_PROTOCOL_DEF(PLATFORM_BUS,    11, "fuchsia.hardware.platform.bus.Platfo
 // 23 was "fuchsia.hardware.audio.CodecService"
 DDK_FIDL_PROTOCOL_DEF(PWM,             24, "fuchsia.hardware.pwm.Service")
 // 25 was "fuchsia.hardware.ethernet.board.Service"
-DDK_FIDL_PROTOCOL_DEF(GPIO,            26, "fuchsia.hardware.gpio.Service")
+// 26 was "fuchsia.hardware.gpio.Service"
 // 27 was "fuchsia.hardware.i2cimpl.Service"
 #undef DDK_FIDL_PROTOCOL_DEF
 #endif

@@ -4,6 +4,7 @@
 
 composite backlight;
 
+using fuchsia.hardware.gpio;
 using fuchsia.pwm;
 using fuchsia.gpio;
 
@@ -13,6 +14,6 @@ primary node "pwm" {
 }
 
 node "gpio-lcd-backlight-enable" {
-  fuchsia.BIND_FIDL_PROTOCOL == fuchsia.gpio.BIND_FIDL_PROTOCOL.SERVICE;
+  fuchsia.hardware.gpio.Service == fuchsia.hardware.gpio.Service.ZirconTransport;
   fuchsia.gpio.FUNCTION == fuchsia.gpio.FUNCTION.LCD_BACKLIGHT_ENABLE;
 }

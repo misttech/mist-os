@@ -11,6 +11,7 @@ driver_bind_rules("fusb302-bind") {
   rules = "fusb302.bind"
   tests = "bind-tests.json"
   deps = [
+    "//sdk/fidl/fuchsia.hardware.gpio:fuchsia.hardware.gpio_bindlib",
     "//src/devices/bind/fuchsia.gpio",
     "//src/devices/bind/fuchsia.i2c",
   ]

@@ -16,6 +16,7 @@
 #include <bind/fuchsia/cpp/bind.h>
 #include <bind/fuchsia/gpio/cpp/bind.h>
 #include <bind/fuchsia/hardware/adc/cpp/bind.h>
+#include <bind/fuchsia/hardware/gpio/cpp/bind.h>
 #include <ddk/metadata/buttons.h>
 #include <soc/aml-a311d/a311d-hw.h>
 
@@ -54,12 +55,13 @@ zx::result<> Vim3::ButtonsInit() {
                                 reinterpret_cast<const uint8_t*>(&gpios),
                                 reinterpret_cast<const uint8_t*>(&gpios) + sizeof(gpios))}}}}};
   const std::vector<fuchsia_driver_framework::BindRule> kPowerButtonRules = {
-      fdf::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
-                              bind_fuchsia_gpio::BIND_FIDL_PROTOCOL_SERVICE),
+      fdf::MakeAcceptBindRule(bind_fuchsia_hardware_gpio::SERVICE,
+                              bind_fuchsia_hardware_gpio::SERVICE_ZIRCONTRANSPORT),
       fdf::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN,
                               bind_fuchsia_amlogic_platform_a311d::GPIOAO_PIN_ID_PIN_7)};
   const std::vector<fuchsia_driver_framework::NodeProperty> kPowerButtonProps = {
-      fdf::MakeProperty(bind_fuchsia::FIDL_PROTOCOL, bind_fuchsia_gpio::BIND_FIDL_PROTOCOL_SERVICE),
+      fdf::MakeProperty(bind_fuchsia_hardware_gpio::SERVICE,
+                        bind_fuchsia_hardware_gpio::SERVICE_ZIRCONTRANSPORT),
       fdf::MakeProperty(bind_fuchsia_gpio::FUNCTION, bind_fuchsia_gpio::FUNCTION_POWER),
   };
   std::vector<fuchsia_driver_framework::ParentSpec> parents = {

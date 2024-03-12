@@ -8,6 +8,7 @@ using fuchsia.ti.platform;
 using fuchsia.amlogic.platform.s905d3;
 using fuchsia.gpio;
 using fuchsia.hardware.audio;
+using fuchsia.hardware.gpio;
 using fuchsia.hardware.power.sensor;
 
 primary node "codec" {
@@ -20,6 +21,6 @@ node "power-sensor" {
 }
 
 node "alert-gpio" {
-  fuchsia.BIND_FIDL_PROTOCOL == fuchsia.gpio.BIND_FIDL_PROTOCOL.SERVICE;
+  fuchsia.hardware.gpio.Service == fuchsia.hardware.gpio.Service.ZirconTransport;
   fuchsia.gpio.FUNCTION == fuchsia.gpio.FUNCTION.GPIO_ALERT_PWR_L;
 }

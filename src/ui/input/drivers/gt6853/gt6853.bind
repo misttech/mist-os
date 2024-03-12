@@ -7,6 +7,7 @@ composite gt6853_touch;
 using fuchsia.i2c;
 using fuchsia.goodix.platform;
 using fuchsia.gpio;
+using fuchsia.hardware.gpio;
 using fuchsia.amlogic.platform.s905d3;
 using fuchsia.platform;
 
@@ -22,11 +23,11 @@ node "i2c" {
 }
 
 node "gpio-int" {
-  fuchsia.BIND_FIDL_PROTOCOL == fuchsia.gpio.BIND_FIDL_PROTOCOL.SERVICE;
+  fuchsia.hardware.gpio.Service == fuchsia.hardware.gpio.Service.ZirconTransport;
   fuchsia.gpio.FUNCTION == fuchsia.gpio.FUNCTION.TOUCH_INTERRUPT;
 }
 
 node "gpio-reset" {
-  fuchsia.BIND_FIDL_PROTOCOL == fuchsia.gpio.BIND_FIDL_PROTOCOL.SERVICE;
+  fuchsia.hardware.gpio.Service == fuchsia.hardware.gpio.Service.ZirconTransport;
   fuchsia.gpio.FUNCTION == fuchsia.gpio.FUNCTION.TOUCH_RESET;
 }
