@@ -102,7 +102,6 @@ assembly_input_bundle("bootstrap") {
 
     # tools
     "//src/bringup/bin/dlog:bootfs",
-    "//src/bringup/bin/waitfor:bootfs",
   ]
   bootfs_packages = [
     "//src/bringup/bin/svchost:pkg",
@@ -306,6 +305,7 @@ assembly_input_bundle("bootstrap_userdebug") {
   bootfs_files_labels = [
     # tools
     "//src/bringup/bin/debuglog:bootfs",
+    "//src/bringup/bin/waitfor:bootfs",
     "//src/connectivity/network/bin/ping:bootfs",
     "//src/developer/forensics/crasher/cpp:bootfs",
     "//src/devices/block/bin/disk-inspect:bootfs",

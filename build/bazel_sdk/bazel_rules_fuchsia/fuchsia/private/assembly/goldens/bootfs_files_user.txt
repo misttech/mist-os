@@ -8,7 +8,6 @@ bin/dlog
 ?bin/fxfs_crypt
 ?bin/memfs
 ?bin/minfs
-bin/waitfor
 ?config/additional_boot_args
 config/build_info/minimum_utc_stamp
 ?config/component_id_index
