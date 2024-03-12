@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::TargetInfo;
+use crate::{errors::IntoExitCode, TargetInfo};
 use addr::TargetAddr;
 use anyhow::Result;
 use camino::{Utf8Path, Utf8PathBuf};
@@ -18,7 +18,7 @@ const CLEANUP_COMMAND: &'static str = include_str!("cleanup_command");
 
 #[derive(Debug, Error)]
 pub enum TunnelError {
-    #[error("Target {target} did not have any valid IpV6 Addresses associated with it.")]
+    #[error("Target {target} did not have any valid Ip Addresses associated with it.")]
     NoAddressesError { target: String },
     #[error("There may be a tunnel already running to {remote_host}. Try running `funnel cleanup-remote-host {remote_host}` to clean it up before retrying")]
     TunnelAlreadyRunning { remote_host: String },
@@ -36,6 +36,24 @@ pub enum TunnelError {
     SshDidNotStart(#[from] std::io::Error),
     #[error("unknown error code during ssh: {0}")]
     SshError(i32),
+}
+
+impl IntoExitCode for TunnelError {
+    fn exit_code(&self) -> i32 {
+        match self {
+            Self::NoAddressesError { target: _ } => 31,
+            Self::TunnelAlreadyRunning { remote_host: _ } => 32,
+            Self::SshTerminatedFromSignal => 128,
+            Self::InvalidHomeDir { home_dir: _ } => 33,
+            Self::NoHomeDir => 34,
+            Self::ControlMasterPathCannotBeAtRoot => 35,
+            Self::CannotCreateControlMasterPath { source } => {
+                source.raw_os_error().unwrap_or_else(|| 36)
+            }
+            Self::SshDidNotStart(e) => e.raw_os_error().unwrap_or_else(|| 37),
+            Self::SshError(i) => *i,
+        }
+    }
 }
 
 fn get_control_path() -> Result<Utf8PathBuf, TunnelError> {
@@ -163,7 +181,27 @@ pub(crate) async fn cleanup_remote_sshd(host: String) -> Result<()> {
     Ok(())
 }
 
-pub(crate) fn close_existing_tunnel(host: String) -> Result<()> {
+#[derive(Debug, Error)]
+pub enum CloseExistingTunnelError {
+    #[error("{}", .0)]
+    Error(#[from] anyhow::Error),
+    #[error("{}", .0)]
+    TunnelError(#[from] TunnelError),
+    #[error("{}", .0)]
+    SshError(#[from] std::io::Error),
+}
+
+impl IntoExitCode for CloseExistingTunnelError {
+    fn exit_code(&self) -> i32 {
+        match self {
+            Self::Error(_) => 1,
+            Self::TunnelError(e) => e.exit_code(),
+            Self::SshError(e) => e.raw_os_error().unwrap_or_else(|| 1),
+        }
+    }
+}
+
+pub(crate) fn close_existing_tunnel(host: String) -> Result<(), CloseExistingTunnelError> {
     let funnel_control_path = get_control_path()?;
     let args = vec![
         "-o".to_string(),

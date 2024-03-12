@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::errors::{FunnelError, IntoExitCode};
 use crate::ssh::do_ssh;
 use crate::target::choose_target;
 use anyhow::anyhow;
@@ -22,6 +23,7 @@ use target::TargetInfo;
 use timeout::timeout;
 use tracing_subscriber::filter::LevelFilter;
 
+mod errors;
 mod logging;
 mod ssh;
 mod target;
@@ -120,32 +122,40 @@ async fn main() -> Result<()> {
 
     logging::init(args.log_level)?;
 
-    match args.nested {
+    let res = match args.nested {
         FunnelSubcommands::Host(host_command) => funnel_main(host_command).await,
         FunnelSubcommands::Update(update_command) => update_main(update_command).await,
         FunnelSubcommands::Cleanup(cleanup_command) => cleanup_main(cleanup_command).await,
         FunnelSubcommands::CloseLocalTunnel(close_existing_tunnel) => {
             close_existing_tunnel_main(close_existing_tunnel).await
         }
+    };
+
+    match res {
+        Ok(_) => Ok(()),
+        Err(e) => {
+            eprintln!("{}", e);
+            std::process::exit(e.exit_code())
+        }
     }
 }
 
-async fn close_existing_tunnel_main(args: SubCommandCloseLocalTunnel) -> Result<()> {
-    ssh::close_existing_tunnel(args.host)
+async fn close_existing_tunnel_main(args: SubCommandCloseLocalTunnel) -> Result<(), FunnelError> {
+    ssh::close_existing_tunnel(args.host).map_err(FunnelError::from)
 }
 
-async fn cleanup_main(args: SubCommandCleanupRemote) -> Result<()> {
-    ssh::cleanup_remote_sshd(args.host).await
+async fn cleanup_main(args: SubCommandCleanupRemote) -> Result<(), FunnelError> {
+    ssh::cleanup_remote_sshd(args.host).await.map_err(FunnelError::from)
 }
 
-async fn update_main(_args: SubCommandUpdate) -> Result<()> {
+async fn update_main(_args: SubCommandUpdate) -> Result<(), FunnelError> {
     let current_exe_path = std::env::current_exe()?;
     let exe_path_buf = Utf8PathBuf::from_path_buf(current_exe_path)
         .map_err(|p| anyhow!("Non-Utf8 Path passed: {}", p.display()))?;
-    update::self_update(exe_path_buf).await.map_err(|e| anyhow!(e))
+    update::self_update(exe_path_buf).await.map_err(FunnelError::from)
 }
 
-async fn funnel_main(args: SubCommandHost) -> Result<()> {
+async fn funnel_main(args: SubCommandHost) -> Result<(), FunnelError> {
     tracing::trace!("Discoving targets...");
     let wait_duration = Duration::from_secs(args.wait_for_target_time);
 

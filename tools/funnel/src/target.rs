@@ -3,8 +3,11 @@
 // found in the LICENSE file.
 
 use addr::TargetAddr;
-use anyhow::{anyhow, bail, Result};
+use anyhow::Result;
 use std::io::{BufRead, Write};
+use thiserror::Error;
+
+use crate::errors::IntoExitCode;
 
 #[derive(Debug, Clone, PartialEq, Default)]
 pub(crate) struct TargetInfo {
@@ -12,12 +15,52 @@ pub(crate) struct TargetInfo {
     pub(crate) addresses: Vec<TargetAddr>,
 }
 
+#[derive(Debug, Error)]
+pub enum ChooseTargetError {
+    #[error(
+        "No valid targets discovered.\nEnsure your Target is in Product mode or Fastboot Over TCP"
+    )]
+    NoValidTargets,
+
+    #[error("Internal error: list of targets was length 1, but the `first` one was None.")]
+    InvalidState,
+
+    #[error("Specified target ({}) does not exist", .0    )]
+    DoesNotExist(String),
+
+    #[error("Invalid choice: {}", .0)]
+    OutOfRangeChoice(usize),
+
+    #[error("Choice {} was not an unsigned integer", .0)]
+    InvalidChoice(String),
+
+    #[error("Could not get target {} from collection", .0)]
+    CollectionError(usize),
+
+    #[error("{}", .0)]
+    IoError(#[from] std::io::Error),
+}
+
+impl IntoExitCode for ChooseTargetError {
+    fn exit_code(&self) -> i32 {
+        match self {
+            Self::NoValidTargets => 80,
+            Self::InvalidState => 81,
+            Self::DoesNotExist(_) => 82,
+            Self::OutOfRangeChoice(_) => 83,
+            Self::InvalidChoice(_) => 84,
+            Self::CollectionError(_) => 85,
+            Self::IoError(e) => e.raw_os_error().unwrap_or_else(|| 86),
+        }
+    }
+}
+
 pub async fn choose_target<R, W>(
     input: &mut R,
     output: &mut W,
     targets: Vec<TargetInfo>,
     def: Option<String>,
-) -> Result<TargetInfo>
+) -> Result<TargetInfo, ChooseTargetError>
 where
     R: BufRead,
     W: Write,
@@ -28,22 +71,18 @@ where
             targets.iter().filter(|x| x.nodename == t).cloned().collect::<Vec<TargetInfo>>();
         let found_target = filtered_targets.first();
         if found_target.is_none() {
-            anyhow::bail!("Specified target does not exist")
+            return Err(ChooseTargetError::DoesNotExist(t));
         }
         return Ok(found_target.cloned().unwrap());
     }
 
     match targets.len() {
-        0 => {
-            bail!("No valid targets discovered.\nEnsure your Target is in Product mode or Fastboot Over TCP")
-        }
+        0 => return Err(ChooseTargetError::NoValidTargets),
         1 => {
             let first = targets.first();
             match first {
                 Some(f) => Ok(f.clone()),
-                None => bail!(
-                    "Internal error: list of targets was length 1, but the `first` one was None."
-                ),
+                None => Err(ChooseTargetError::InvalidState),
             }
         }
         _ => {
@@ -58,7 +97,7 @@ async fn prompt_for_target<R, W>(
     mut input: R,
     mut output: W,
     targets: Vec<TargetInfo>,
-) -> Result<TargetInfo>
+) -> Result<TargetInfo, ChooseTargetError>
 where
     R: BufRead,
     W: Write,
@@ -73,18 +112,12 @@ where
 
     let mut choice = String::new();
     input.read_line(&mut choice)?;
-    let idx: usize = choice
-        .trim()
-        .parse()
-        .map_err(|_| anyhow!("Choice: {} was not an unsigned integer", choice))?;
+    let idx: usize = choice.trim().parse().map_err(|_| ChooseTargetError::InvalidChoice(choice))?;
     if idx == 0 || idx > targets.len() {
-        bail!("Invalid choice: {}", idx);
+        return Err(ChooseTargetError::OutOfRangeChoice(idx));
     }
 
-    targets
-        .get(idx - 1)
-        .ok_or_else(|| anyhow!("Could not get target {} from collection", (idx - 1)))
-        .cloned()
+    targets.get(idx - 1).ok_or_else(|| ChooseTargetError::CollectionError(idx - 1)).cloned()
 }
 
 #[cfg(test)]

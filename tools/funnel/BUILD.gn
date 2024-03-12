@@ -10,6 +10,7 @@ rustc_binary("funnel_bin") {
   output_name = "funnel"
   edition = "2021"
   sources = [
+    "src/errors.rs",
     "src/logging.rs",
     "src/main.rs",
     "src/ssh.rs",

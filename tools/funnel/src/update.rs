@@ -7,6 +7,8 @@ use std::io;
 use std::process::Command;
 use thiserror::Error;
 
+use crate::errors::IntoExitCode;
+
 #[derive(Debug, Error)]
 pub enum UpdateError {
     #[error("invalid parent directory for funnel located at: {funnel_path}")]
@@ -27,6 +29,22 @@ pub enum UpdateError {
     },
     #[error("unknown error updating: {0}")]
     Unknown(#[source] io::Error),
+}
+
+impl IntoExitCode for UpdateError {
+    fn exit_code(&self) -> i32 {
+        match self {
+            Self::InvalidParentPath { funnel_path: _ } => 20,
+            Self::CipdNotFound => 21,
+            Self::NoCipdEnsureFile { expected_path: _ } => 22,
+            Self::CipdEnsureError { code } => *code,
+            Self::CipdEnsureTerminated => 23,
+            Self::CouldNotCanonicalizePath { given_path: _, source } => {
+                source.raw_os_error().unwrap_or_else(|| 24)
+            }
+            Self::Unknown(_) => 1,
+        }
+    }
 }
 
 const CIPD_MANIFEST_NAME: &str = "funnel-cipd-manifest";
