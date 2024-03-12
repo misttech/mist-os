@@ -22,14 +22,12 @@ rustc_library("lib") {
     "//src/developer/ffx/lib/fho/metadata:lib",
     "//src/developer/ffx/lib/rcs:lib",
     "//src/developer/ffx/lib/target:lib",
-    "//src/developer/ffx/lib/validation:lib",
     "//src/developer/ffx/lib/writer:lib",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia-async",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:argh",
     "//third_party/rust_crates:async-trait",
-    "//third_party/rust_crates:bumpalo",
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:serde",
     "//third_party/rust_crates:serde_json",
@@ -47,7 +45,6 @@ rustc_library("lib") {
     "src/from_env/helpers.rs",
     "src/lib.rs",
     "src/subtool.rs",
-    "src/subtool/schema.rs",
     "src/testing.rs",
   ]
 }

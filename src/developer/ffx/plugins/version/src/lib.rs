@@ -5,7 +5,7 @@
 use async_trait::async_trait;
 use chrono::Local;
 use ffx_version_args::VersionCommand;
-use ffx_writer::{ToolIO, VerifiedMachineWriter};
+use ffx_writer::{MachineWriter, ToolIO};
 use fho::FfxContext;
 use fho::{Deferred, FfxMain, FfxTool, Result};
 use fidl_fuchsia_developer_ffx::{self as ffx};
@@ -30,7 +30,7 @@ fho::embedded_plugin!(VersionTool);
 
 #[async_trait(?Send)]
 impl FfxMain for VersionTool {
-    type Writer = VerifiedMachineWriter<Versions>;
+    type Writer = MachineWriter<Versions>;
     async fn main(self, mut writer: Self::Writer) -> Result<()> {
         let tool_version = self.build_info.into();
         let daemon_version = if self.cmd.verbose {

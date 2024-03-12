@@ -7,11 +7,11 @@ use std::io::{stderr, stdout, Write};
 use std::ops::DerefMut;
 use std::sync::{Arc, Mutex, MutexGuard};
 
-use crate::{format_output, Format, NoSchema};
+use crate::{format_output, Format};
 
 /// This is the legacy writer that doesn't impose any particular type of the
 /// machine output. It should not be used in new code.
-// TODO(mgnb): Remove after all uses have been removed.
+// TODO(b/328290060): Remove after all uses have been removed.
 #[derive(Debug, Clone, Default)]
 pub struct Writer {
     format: Option<Format>,
@@ -53,7 +53,7 @@ impl Writer {
     /// This is a no-op if `is_machine` returns false.
     pub fn machine<T: serde::Serialize>(&self, output: &T) -> Result<()> {
         if let Some(format) = self.format {
-            format_output::<_, _, NoSchema>(format, &mut self.inner(), output)?;
+            format_output(format, &mut self.inner(), output)?;
         }
         Ok(())
     }

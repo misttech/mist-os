@@ -25,7 +25,6 @@ pub use ffx_writer::{MachineWriter, SimpleWriter, ToolIO, VerifiedMachineWriter}
 
 #[doc(hidden)]
 pub mod macro_deps {
-    pub use crate::subtool::schema::print_schema;
     pub use anyhow;
     pub use argh;
     pub use async_trait::async_trait;

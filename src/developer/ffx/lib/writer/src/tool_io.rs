@@ -5,25 +5,32 @@
 use std::fmt::Display;
 use std::io::Write;
 
-use crate::Result;
+use crate::{Error, Result};
 
 /// ToolIO defines the necessary functions to perform output from a tool,
 /// potentially including type-safe machine output if required.
 ///
-/// There are two provided implementations, [`crate::MachineWriter`] and
-/// [`crate::SimpleWriter`], which provide either type-safe or string-only
-/// output respectively.
+/// There are three provided implementations:
+// [`crate::MachineWriter`] and [`crate::VerifiedMachineWriter`],
+/// and [`crate::SimpleWriter`]. These provide either type-safe,
+/// type-safe with schema, or string-only output respectively.
 pub trait ToolIO: Write + Sized {
     /// The type of object that is expected for the [`Self::item`] call (or
     /// any machine output writing functions that may be added by an
     /// implementation)
     type OutputItem;
 
-    /// The schema the output item is expected to follow.
-    const OUTPUT_SCHEMA: Option<ffx_validation::schema::StaticType> = None;
-
     /// Whether this can theoretically support machine output given the right configuration.
     fn is_machine_supported() -> bool;
+
+    /// Is a schema of the output type available.
+    fn has_schema() -> bool {
+        false
+    }
+
+    fn try_print_schema(&mut self) -> Result<()> {
+        Err(Error::SchemaFailure)
+    }
 
     /// Returns true if the receiver was configured to output for machines.
     fn is_machine(&self) -> bool;

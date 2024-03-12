@@ -21,13 +21,6 @@ macro_rules! embedded_plugin {
             // As a result global command line arguments cannot be defined in tests, preventing this
             // from being _fully_ testable.
             let ffx = FfxCommandLine::from_env()?;
-
-            if ffx.global.schema {
-                return $crate::macro_deps::print_schema::<<$tool as $crate::FfxMain>::Writer>(
-                    ffx.global.machine,
-                );
-            }
-
             let context = if let Some(gc) = global_env_context() {
                 gc
             } else {

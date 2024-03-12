@@ -7,12 +7,14 @@ mod machine_writer;
 mod simple_writer;
 mod test_buffer;
 mod tool_io;
+mod verified_machine_writer;
 
 pub use dynamic_writer::*;
 pub use machine_writer::*;
 pub use simple_writer::*;
 pub use test_buffer::*;
 pub use tool_io::*;
+pub use verified_machine_writer::*;
 
 #[derive(thiserror::Error, Debug)]
 #[error("Error while presenting output")]
