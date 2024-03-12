@@ -1,0 +1,52 @@
+// Copyright 2024 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    children: [
+        {
+            name: "bt-hfp-hands-free",
+            url: "fuchsia-pkg://fuchsia.com/bt-hfp-hands-free#meta/bt-hfp-hands-free.cm",
+            environment: "#core-env",
+        },
+    ],
+    offer: [
+        {
+            protocol: [ "fuchsia.logger.LogSink" ],
+            from: "parent",
+            to: [ "#bt-hfp-hands-free" ],
+        },
+        {
+            directory: "dev-class",
+            from: "parent",
+            as: "dev-dai",
+            to: [ "#bt-hfp-hands-free" ],
+            subdir: "dai",
+        },
+        {
+            protocol: [ "fuchsia.media.AudioDeviceEnumerator" ],
+            from: "#audio_core",
+            to: [ "#bt-hfp-hands-free" ],
+        },
+        {
+            protocol: "fuchsia.sysmem.Allocator",
+            from: "#sysmem_connector",
+            to: "#bt-hfp-hands-free",
+        },
+        {
+            protocol: "fuchsia.mediacodec.CodecFactory",
+            from: "#codec_factory",
+            to: "#bt-hfp-hands-free",
+        },
+        {
+            protocol: [ "fuchsia.bluetooth.bredr.Profile" ],
+            from: "#bluetooth-core",
+            to: [ "#bt-hfp-hands-free" ],
+        },
+        {
+            protocol: [ "fuchsia.bluetooth.internal.a2dp.Controller" ],
+            from: "#bt-a2dp",
+            to: [ "#bt-hfp-hands-free" ],
+            source_availability: "unknown",
+        },
+    ],
+}
