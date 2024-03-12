@@ -1,6 +1,5 @@
 ?bin/blobfs
 bin/component_manager
-bin/debuglog
 ?bin/decompressor
 bin/dlog
 ?bin/f2fs
