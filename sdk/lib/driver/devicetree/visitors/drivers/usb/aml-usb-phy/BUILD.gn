@@ -1,0 +1,66 @@
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/components.gni")
+import("//build/devicetree/devicetree.gni")
+import("//build/test.gni")
+
+group("tests") {
+  deps = [ ":aml-usb-phy-visitor-test" ]
+  testonly = true
+}
+
+devicetree_visitor("aml-usb-phy-visitor") {
+  deps = [ ":aml-usb-phy-visitor-impl" ]
+}
+
+source_set("aml-usb-phy-visitor-impl") {
+  sources = [
+    "aml-usb-phy-visitor.cc",
+    "aml-usb-phy-visitor.h",
+  ]
+  deps = [
+    "//sdk/lib/driver/devicetree/manager",
+    "//sdk/lib/driver/devicetree/visitors:registration",
+    "//sdk/lib/driver/logging/cpp",
+    "//src/devices/lib/amlogic",
+    "//src/devices/usb/lib/usb:usb-header",
+    "//src/lib/ddk:ddk_metadata",
+  ]
+  public_deps = [
+    "//sdk/lib/driver/devicetree/visitors:driver-visitor",
+    "//sdk/lib/driver/devicetree/visitors:property-parser",
+  ]
+}
+
+test("aml-usb-phy-visitor-test-bin") {
+  sources = [ "test/aml-usb-phy-visitor-test.cc" ]
+  deps = [
+    ":aml-usb-phy-visitor-impl",
+    "//sdk/lib/driver/devicetree/testing:visitor-test-helper",
+    "//sdk/lib/driver/devicetree/visitors:registry",
+    "//sdk/lib/driver/devicetree/visitors/default/bind-property",
+    "//src/devices/lib/amlogic",
+    "//src/devices/usb/lib/usb:usb-header",
+    "//src/lib/fxl/test:gtest_main",
+  ]
+}
+
+dtb("aml-usb-phy-visitor-dtb") {
+  sources = [ "test/dts/aml-usb-phy.dts.S" ]
+}
+
+resource("aml-usb-phy-visitor-dtb-file") {
+  sources = get_target_outputs(":aml-usb-phy-visitor-dtb")
+  outputs = [ "test-data/aml-usb-phy.dtb" ]
+  deps = [ ":aml-usb-phy-visitor-dtb" ]
+}
+
+fuchsia_unittest_package("aml-usb-phy-visitor-test") {
+  component_name = "aml-usb-phy-visitor-test"
+  deps = [
+    ":aml-usb-phy-visitor-dtb-file",
+    ":aml-usb-phy-visitor-test-bin",
+  ]
+}

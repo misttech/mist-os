@@ -3,6 +3,9 @@
 # found in the LICENSE file.
 
 group("tests") {
-  deps = [ "usb-phy:tests" ]
+  deps = [
+    "aml-usb-phy:tests",
+    "usb-phy:tests",
+  ]
   testonly = true
 }

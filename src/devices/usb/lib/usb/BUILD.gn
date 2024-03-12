@@ -63,6 +63,16 @@ source_set("usb-fidl") {
   public_configs = [ ":includes" ]
 }
 
+source_set("usb-header") {
+  public = [ "include/usb/usb.h" ]
+  public_configs = [ ":includes" ]
+  public_deps = [
+    "//sdk/banjo/fuchsia.hardware.usb:fuchsia.hardware.usb_banjo_c",
+    "//sdk/banjo/fuchsia.hardware.usb:fuchsia.hardware.usb_banjo_cpp",
+    "//sdk/banjo/fuchsia.hardware.usb.composite:fuchsia.hardware.usb.composite_banjo_c",
+  ]
+}
+
 source_set("audio") {
   public = [ "include/usb/audio.h" ]
   public_configs = [ ":includes" ]

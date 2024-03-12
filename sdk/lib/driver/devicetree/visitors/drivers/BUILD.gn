@@ -11,6 +11,7 @@ group("tests") {
     "interrupt-controllers:tests",
     "mali-gpu:tests",
     "registers:tests",
+    "usb:tests",
   ]
   testonly = true
 }
