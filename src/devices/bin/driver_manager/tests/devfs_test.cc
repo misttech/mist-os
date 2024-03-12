@@ -188,13 +188,21 @@ TEST(Devfs, PassthroughTarget) {
   Devfs devfs(root_slot);
   ASSERT_TRUE(root_slot.has_value());
   fuchsia_device_fs::ConnectionType connection_type;
-  Devnode::PassThrough passthrough({
-      [&loop, &connection_type](zx::channel server, fuchsia_device_fs::ConnectionType type) {
-        connection_type = type;
-        loop.Quit();
-        return ZX_OK;
+  Devnode::PassThrough passthrough(
+      {
+          [&loop, &connection_type](zx::channel server) {
+            connection_type = fuchsia_device_fs::ConnectionType::kDevice;
+            loop.Quit();
+            return ZX_OK;
+          },
       },
-  });
+      {
+          [&loop, &connection_type](fidl::ServerEnd<fuchsia_device::Controller> server_end) {
+            connection_type = fuchsia_device_fs::ConnectionType::kController;
+            loop.Quit();
+            return ZX_OK;
+          },
+      });
 
   DevfsDevice device;
   ASSERT_OK(root_slot.value().add_child("test", std::nullopt, passthrough.Clone(), device));

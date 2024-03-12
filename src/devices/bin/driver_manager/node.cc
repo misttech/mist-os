@@ -8,6 +8,7 @@
 #include <lib/driver/component/cpp/node_add_args.h>
 
 #include <deque>
+#include <optional>
 #include <unordered_set>
 #include <utility>
 
@@ -375,7 +376,7 @@ zx::result<std::shared_ptr<Node>> Node::CreateCompositeNode(
                 composite->MakeTopologicalPath().c_str());
 
   primary->devfs_device_.topological_node().value().add_child(
-      composite->name_, std::nullopt, composite->CreateDevfsPassthrough(std::nullopt, std::nullopt),
+      composite->name_, std::nullopt, composite->CreateDevfsPassthrough(std::nullopt, false),
       composite->devfs_device_);
   composite->devfs_device_.publish();
   return zx::ok(std::move(composite));
@@ -802,11 +803,15 @@ fit::result<fuchsia_driver_framework::wire::NodeError, std::shared_ptr<Node>> No
     if (devfs_args->class_name().has_value()) {
       devfs_class_path = devfs_args->class_name();
     }
-
+    // This is an unfortunate but temporary hack to deal with the fact
+    // that the compat shim routes everything through the device connection.
+    bool controller_through_device = (devfs_args->connector_supports().has_value() &&
+                                      (devfs_args->connector_supports().value() &
+                                       fuchsia_device_fs::ConnectionType::kController));
     devfs_target = child->CreateDevfsPassthrough(std::move(devfs_args->connector()),
-                                                 devfs_args->connector_supports());
+                                                 controller_through_device);
   } else {
-    devfs_target = child->CreateDevfsPassthrough(std::nullopt, std::nullopt);
+    devfs_target = child->CreateDevfsPassthrough(std::nullopt, false);
   }
   ZX_ASSERT(devfs_device_.topological_node().has_value());
   zx_status_t status = devfs_device_.topological_node()->add_child(
@@ -1326,9 +1331,14 @@ void Node::GetTopologicalPath(GetTopologicalPathCompleter::Sync& completer) {
   completer.ReplySuccess(fidl::StringView::FromExternal(MakeTopologicalPath()));
 }
 
-void Node::ConnectControllerInterface(fidl::ServerEnd<fuchsia_device::Controller> server_end) {
+zx_status_t Node::ConnectControllerInterface(
+    fidl::ServerEnd<fuchsia_device::Controller> server_end) {
+  if (controller_through_device_ && devfs_connector_.has_value()) {
+    return fidl::WireCall(devfs_connector_.value())->Connect(server_end.TakeChannel()).status();
+  }
   dev_controller_bindings_.AddBinding(dispatcher_, std::move(server_end), this,
                                       fidl::kIgnoreBindingClosure);
+  return ZX_OK;
 }
 
 zx_status_t Node::ConnectDeviceInterface(zx::channel channel) {
@@ -1340,37 +1350,27 @@ zx_status_t Node::ConnectDeviceInterface(zx::channel channel) {
 
 Devnode::Target Node::CreateDevfsPassthrough(
     std::optional<fidl::ClientEnd<fuchsia_device_fs::Connector>> connector,
-    std::optional<fuchsia_device_fs::ConnectionType> connector_supports) {
-  supported_by_connector_ = connector_supports.value_or(fuchsia_device_fs::ConnectionType::kDevice);
+    bool controller_through_device) {
   devfs_connector_ = std::move(connector);
-  return Devnode::PassThrough([node = weak_from_this(), node_name = name_](
-                                  zx::channel server_end, fuchsia_device_fs::ConnectionType type) {
-    std::shared_ptr locked_node = node.lock();
-    if (!locked_node) {
-      LOGF(ERROR, "Node was freed before it was used for %s.", node_name.c_str());
-      return ZX_ERR_BAD_STATE;
-    }
-
-    // If the connector supports all of the requested types, connect with the connector.
-    if (locked_node->devfs_connector_.has_value() &&
-        type == (locked_node->supported_by_connector_ & type)) {
-      return locked_node->ConnectDeviceInterface(std::move(server_end));
-    }
-
-    if (type & fuchsia_device_fs::ConnectionType::kDevice ||
-        type & fuchsia_device_fs::ConnectionType::kNode) {
-      LOGF(WARNING, "Cannot include device or node for %s.", node_name.c_str());
-    }
-
-    if (!(type & fuchsia_device_fs::ConnectionType::kController)) {
-      LOGF(WARNING, "Controller not requested for %s.", node_name.c_str());
-      return ZX_ERR_NOT_SUPPORTED;
-    }
-
-    locked_node->ConnectControllerInterface(
-        fidl::ServerEnd<fuchsia_device::Controller>{std::move(server_end)});
-    return ZX_OK;
-  });
+  controller_through_device_ = controller_through_device;
+  return Devnode::PassThrough(
+      [node = weak_from_this(), node_name = name_](zx::channel server_end) {
+        std::shared_ptr locked_node = node.lock();
+        if (!locked_node) {
+          LOGF(ERROR, "Node was freed before it was used for %s.", node_name.c_str());
+          return ZX_ERR_BAD_STATE;
+        }
+        return locked_node->ConnectDeviceInterface(std::move(server_end));
+      },
+      [node = weak_from_this(),
+       node_name = name_](fidl::ServerEnd<fuchsia_device::Controller> server_end) {
+        std::shared_ptr locked_node = node.lock();
+        if (!locked_node) {
+          LOGF(ERROR, "Node was freed before it was used for %s.", node_name.c_str());
+          return ZX_ERR_BAD_STATE;
+        }
+        return locked_node->ConnectControllerInterface(std::move(server_end));
+      });
 }
 
 }  // namespace driver_manager

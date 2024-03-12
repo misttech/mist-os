@@ -113,7 +113,7 @@ zx_status_t Devnode::VnodeImpl::ConnectService(zx::channel channel) {
   if (!target_.has_value()) {
     return ZX_ERR_NOT_SUPPORTED;
   }
-  return (*target_->connect.get())(std::move(channel), fuchsia_device_fs::ConnectionType::kDevice);
+  return (*target_->device_connect.get())(std::move(channel));
 }
 
 zx_status_t Devnode::VnodeImpl::GetAttributes(fs::VnodeAttributes* a) {
@@ -162,14 +162,13 @@ Devnode::Devnode(Devfs& devfs, PseudoDir& parent, Target target, fbl::String nam
     children().AddEntry(
         fuchsia_device_fs::wire::kDeviceControllerName,
         fbl::MakeRefCounted<fs::Service>([passthrough = target->Clone()](zx::channel channel) {
-          return (*passthrough.connect.get())(std::move(channel),
-                                              fuchsia_device_fs::ConnectionType::kController);
+          return (*passthrough.controller_connect.get())(
+              fidl::ServerEnd<fuchsia_device::Controller>(std::move(channel)));
         }));
     children().AddEntry(
         fuchsia_device_fs::wire::kDeviceProtocolName,
         fbl::MakeRefCounted<fs::Service>([passthrough = target->Clone()](zx::channel channel) {
-          return (*passthrough.connect.get())(std::move(channel),
-                                              fuchsia_device_fs::ConnectionType::kDevice);
+          return (*passthrough.device_connect.get())(std::move(channel));
         }));
   }
 }
