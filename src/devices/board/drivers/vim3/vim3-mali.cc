@@ -14,6 +14,7 @@
 #include <bind/fuchsia/arm/platform/cpp/bind.h>
 #include <bind/fuchsia/cpp/bind.h>
 #include <bind/fuchsia/hardware/gpu/mali/cpp/bind.h>
+#include <bind/fuchsia/hardware/registers/cpp/bind.h>
 #include <bind/fuchsia/register/cpp/bind.h>
 #include <soc/aml-a311d/a311d-hw.h>
 #include <soc/aml-common/aml-registers.h>
@@ -77,15 +78,15 @@ zx_status_t Vim3::MaliInit() {
     auto aml_gpu_register_reset_node = fuchsia_driver_framework::ParentSpec{{
         .bind_rules =
             {
-                fdf::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
-                                        bind_fuchsia_register::BIND_FIDL_PROTOCOL_DEVICE),
+                fdf::MakeAcceptBindRule(bind_fuchsia_hardware_registers::SERVICE,
+                                        bind_fuchsia_hardware_registers::SERVICE_ZIRCONTRANSPORT),
                 fdf::MakeAcceptBindRule(bind_fuchsia_register::NAME,
                                         aml_registers::REGISTER_MALI_RESET),
             },
         .properties =
             {
-                fdf::MakeProperty(bind_fuchsia::FIDL_PROTOCOL,
-                                  bind_fuchsia_register::BIND_FIDL_PROTOCOL_DEVICE),
+                fdf::MakeProperty(bind_fuchsia_hardware_registers::SERVICE,
+                                  bind_fuchsia_hardware_registers::SERVICE_ZIRCONTRANSPORT),
                 fdf::MakeProperty(bind_fuchsia_register::NAME, aml_registers::REGISTER_MALI_RESET),
             },
     }};

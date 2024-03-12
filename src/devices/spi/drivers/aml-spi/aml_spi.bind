@@ -6,8 +6,8 @@ composite spi_0;
 
 using fuchsia.amlogic.platform;
 using fuchsia.gpio;
+using fuchsia.hardware.registers;
 using fuchsia.platform;
-using fuchsia.register;
 
 primary node "gpio-cs-0" {
   fuchsia.BIND_FIDL_PROTOCOL == fuchsia.gpio.BIND_FIDL_PROTOCOL.SERVICE;
@@ -25,7 +25,7 @@ node "pdev" {
 }
 
 node "reset" {
-  fuchsia.BIND_FIDL_PROTOCOL == fuchsia.register.BIND_FIDL_PROTOCOL.DEVICE;
+  fuchsia.hardware.registers.Service == fuchsia.hardware.registers.Service.ZirconTransport;
 }
 
 node "gpio-init" {

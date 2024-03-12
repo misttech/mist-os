@@ -6,9 +6,9 @@ composite aml_gpu;
 
 using fuchsia.amlogic.platform;
 using fuchsia.hardware.clock;
-using fuchsia.register;
 using fuchsia.platform;
 using fuchsia.devicetree;
+using fuchsia.hardware.registers;
 
 primary node "pdev" {
   if fuchsia.BIND_PLATFORM_DEV_DID == fuchsia.platform.BIND_PLATFORM_DEV_DID.DEVICETREE {
@@ -28,7 +28,7 @@ primary node "pdev" {
 }
 
 node "register-reset" {
-  fuchsia.BIND_FIDL_PROTOCOL == fuchsia.register.BIND_FIDL_PROTOCOL.DEVICE;
+  fuchsia.hardware.registers.Service == fuchsia.hardware.registers.Service.ZirconTransport;
 }
 
 optional node "clock-gp0-pll" {

@@ -11,6 +11,7 @@
 #include <lib/driver/devicetree/visitors/registry.h>
 
 #include <bind/fuchsia/cpp/bind.h>
+#include <bind/fuchsia/hardware/registers/cpp/bind.h>
 #include <bind/fuchsia/register/cpp/bind.h>
 #include <gtest/gtest.h>
 
@@ -129,14 +130,14 @@ TEST(RegistersVisitorTest, TestRegistersProperty) {
           &fdf_devicetree::testing::FakeEnvWrapper::mgr_requests_at, mgr_request_idx);
       mgr_request_idx++;
       EXPECT_TRUE(fdf_devicetree::testing::CheckHasBindRules(
-          {{fdf::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
-                                    bind_fuchsia_register::BIND_FIDL_PROTOCOL_DEVICE),
+          {{fdf::MakeAcceptBindRule(bind_fuchsia_hardware_registers::SERVICE,
+                                    bind_fuchsia_hardware_registers::SERVICE_ZIRCONTRANSPORT),
             fdf::MakeAcceptBindRule(bind_fuchsia_register::NAME, node.name()->c_str())}},
           (*mgr_request.parents())[1].bind_rules(), false));
       EXPECT_TRUE(fdf_devicetree::testing::CheckHasProperties(
           {{
-              fdf::MakeProperty(bind_fuchsia::FIDL_PROTOCOL,
-                                bind_fuchsia_register::BIND_FIDL_PROTOCOL_DEVICE),
+              fdf::MakeProperty(bind_fuchsia_hardware_registers::SERVICE,
+                                bind_fuchsia_hardware_registers::SERVICE_ZIRCONTRANSPORT),
           }},
           (*mgr_request.parents())[1].properties(), false));
 
@@ -146,26 +147,26 @@ TEST(RegistersVisitorTest, TestRegistersProperty) {
           &fdf_devicetree::testing::FakeEnvWrapper::mgr_requests_at, mgr_request_idx);
       mgr_request_idx++;
       EXPECT_TRUE(fdf_devicetree::testing::CheckHasBindRules(
-          {{fdf::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
-                                    bind_fuchsia_register::BIND_FIDL_PROTOCOL_DEVICE),
+          {{fdf::MakeAcceptBindRule(bind_fuchsia_hardware_registers::SERVICE,
+                                    bind_fuchsia_hardware_registers::SERVICE_ZIRCONTRANSPORT),
             fdf::MakeAcceptBindRule(bind_fuchsia_register::NAME, REGISTER_NAME3)}},
 
           (*mgr_request.parents())[1].bind_rules(), false));
       EXPECT_TRUE(fdf_devicetree::testing::CheckHasProperties(
-          {{fdf::MakeProperty(bind_fuchsia::FIDL_PROTOCOL,
-                              bind_fuchsia_register::BIND_FIDL_PROTOCOL_DEVICE),
+          {{fdf::MakeProperty(bind_fuchsia_hardware_registers::SERVICE,
+                              bind_fuchsia_hardware_registers::SERVICE_ZIRCONTRANSPORT),
             fdf::MakeProperty(bind_fuchsia_register::NAME, REGISTER_NAME3)}},
           (*mgr_request.parents())[1].properties(), false));
 
       EXPECT_TRUE(fdf_devicetree::testing::CheckHasBindRules(
-          {{fdf::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
-                                    bind_fuchsia_register::BIND_FIDL_PROTOCOL_DEVICE),
+          {{fdf::MakeAcceptBindRule(bind_fuchsia_hardware_registers::SERVICE,
+                                    bind_fuchsia_hardware_registers::SERVICE_ZIRCONTRANSPORT),
             fdf::MakeAcceptBindRule(bind_fuchsia_register::NAME, REGISTER_NAME4)}},
 
           (*mgr_request.parents())[2].bind_rules(), false));
       EXPECT_TRUE(fdf_devicetree::testing::CheckHasProperties(
-          {{fdf::MakeProperty(bind_fuchsia::FIDL_PROTOCOL,
-                              bind_fuchsia_register::BIND_FIDL_PROTOCOL_DEVICE),
+          {{fdf::MakeProperty(bind_fuchsia_hardware_registers::SERVICE,
+                              bind_fuchsia_hardware_registers::SERVICE_ZIRCONTRANSPORT),
             fdf::MakeProperty(bind_fuchsia_register::NAME, REGISTER_NAME4)}},
           (*mgr_request.parents())[2].properties(), false));
     }

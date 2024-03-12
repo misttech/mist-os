@@ -10,7 +10,3 @@ string NAME;
 extend uint fuchsia.BIND_PROTOCOL {
   DEVICE = 0x98,
 };
-
-extend uint fuchsia.BIND_FIDL_PROTOCOL {
-  DEVICE = 0x12,
-};

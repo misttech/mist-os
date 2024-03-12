@@ -33,7 +33,7 @@ DDK_FIDL_PROTOCOL_DEF(INTERRUPT,       12, "fuchsia.hardware.interrupt.Provider"
 // 15 was "fuchsia.hardware.hdmi.Service"
 // 16 was "fuchsia.hardware.power.sensor.Service"
 DDK_FIDL_PROTOCOL_DEF(VREG,            17, "fuchsia.hardware.vreg.Service")
-DDK_FIDL_PROTOCOL_DEF(REGISTERS,       18, "fuchsia.hardware.registers.Service")
+// 18 was "fuchsia.hardware.registers.Service"
 DDK_FIDL_PROTOCOL_DEF(TEE,             19, "fuchsia.hardware.tee.Service")
 // 20 was "fuchsia.hardware.amlogiccanvas.Service"
 // 21 was "fuchsia.hardware.power.Service"

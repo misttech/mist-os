@@ -13,10 +13,10 @@ driver_bind_rules("aml_spi_bind") {
   tests = "bind_tests.json"
 
   deps = [
+    "//sdk/fidl/fuchsia.hardware.registers:fuchsia.hardware.registers_bindlib",
     "//src/devices/bind/fuchsia.amlogic.platform",
     "//src/devices/bind/fuchsia.gpio",
     "//src/devices/bind/fuchsia.platform",
-    "//src/devices/bind/fuchsia.register",
   ]
 }
 

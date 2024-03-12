@@ -59,7 +59,7 @@
                 "name": "Match",
                 "expected": "match",
                 "device": {
-                    "fuchsia.BIND_FIDL_PROTOCOL": "fuchsia.register.BIND_FIDL_PROTOCOL.DEVICE"
+                    "fuchsia.hardware.registers.Service": "fuchsia.hardware.registers.Service.ZirconTransport"
                 }
             }
         ]

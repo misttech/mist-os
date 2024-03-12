@@ -20,6 +20,7 @@
 #include <bind/fuchsia/gpio/cpp/bind.h>
 #include <bind/fuchsia/hardware/amlogiccanvas/cpp/bind.h>
 #include <bind/fuchsia/hardware/clock/cpp/bind.h>
+#include <bind/fuchsia/hardware/registers/cpp/bind.h>
 #include <bind/fuchsia/i2c/cpp/bind.h>
 #include <bind/fuchsia/isp/cpp/bind.h>
 #include <bind/fuchsia/register/cpp/bind.h>
@@ -470,15 +471,15 @@ zx_status_t Sherlock::CameraInit() {
   auto isp_reset_node = fuchsia_driver_framework::ParentSpec{{
       .bind_rules =
           {
-              fdf::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
-                                      bind_fuchsia_register::BIND_FIDL_PROTOCOL_DEVICE),
+              fdf::MakeAcceptBindRule(bind_fuchsia_hardware_registers::SERVICE,
+                                      bind_fuchsia_hardware_registers::SERVICE_ZIRCONTRANSPORT),
               fdf::MakeAcceptBindRule(bind_fuchsia_register::NAME,
                                       aml_registers::REGISTER_ISP_RESET),
           },
       .properties =
           {
-              fdf::MakeProperty(bind_fuchsia::FIDL_PROTOCOL,
-                                bind_fuchsia_register::BIND_FIDL_PROTOCOL_DEVICE),
+              fdf::MakeProperty(bind_fuchsia_hardware_registers::SERVICE,
+                                bind_fuchsia_hardware_registers::SERVICE_ZIRCONTRANSPORT),
               fdf::MakeProperty(bind_fuchsia_register::NAME, aml_registers::REGISTER_ISP_RESET),
           },
   }};

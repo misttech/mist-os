@@ -19,6 +19,7 @@
 #include <bind/fuchsia/clock/cpp/bind.h>
 #include <bind/fuchsia/cpp/bind.h>
 #include <bind/fuchsia/gpio/cpp/bind.h>
+#include <bind/fuchsia/hardware/registers/cpp/bind.h>
 #include <bind/fuchsia/hardware/usb/phy/cpp/bind.h>
 #include <bind/fuchsia/platform/cpp/bind.h>
 #include <bind/fuchsia/register/cpp/bind.h>
@@ -130,13 +131,13 @@ static const fpbus::Node usb_phy_dev = []() {
 }();
 
 const std::vector<fuchsia_driver_framework::BindRule> kResetRegisterRules = {
-    fdf::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
-                            bind_fuchsia_register::BIND_FIDL_PROTOCOL_DEVICE),
+    fdf::MakeAcceptBindRule(bind_fuchsia_hardware_registers::SERVICE,
+                            bind_fuchsia_hardware_registers::SERVICE_ZIRCONTRANSPORT),
     fdf::MakeAcceptBindRule(bind_fuchsia_register::NAME, aml_registers::REGISTER_USB_PHY_V2_RESET)};
 
 const std::vector<fuchsia_driver_framework::NodeProperty> kResetRegisterProperties = {
-    fdf::MakeProperty(bind_fuchsia::FIDL_PROTOCOL,
-                      bind_fuchsia_register::BIND_FIDL_PROTOCOL_DEVICE),
+    fdf::MakeProperty(bind_fuchsia_hardware_registers::SERVICE,
+                      bind_fuchsia_hardware_registers::SERVICE_ZIRCONTRANSPORT),
     fdf::MakeProperty(bind_fuchsia_register::NAME, aml_registers::REGISTER_USB_PHY_V2_RESET)};
 
 const std::vector<fdf::BindRule> kGpioInitRules = std::vector{

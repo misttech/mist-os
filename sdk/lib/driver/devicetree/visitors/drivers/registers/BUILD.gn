@@ -21,6 +21,7 @@ source_set("registers") {
     "registers-visitor.h",
   ]
   deps = [
+    "//sdk/fidl/fuchsia.hardware.registers:fuchsia.hardware.registers_bindlib_cpp",
     "//sdk/lib/driver/component/cpp:cpp",
     "//sdk/lib/driver/devicetree/manager",
     "//sdk/lib/driver/devicetree/visitors:common-types",
@@ -41,6 +42,7 @@ test("registers-visitor-test-bin") {
   sources = [ "test/registers-visitor-test.cc" ]
   deps = [
     ":registers",
+    "//sdk/fidl/fuchsia.hardware.registers:fuchsia.hardware.registers_bindlib_cpp",
     "//sdk/lib/driver/devicetree/testing:visitor-test-helper",
     "//sdk/lib/driver/devicetree/visitors:registry",
     "//sdk/lib/driver/devicetree/visitors/default/bind-property",
