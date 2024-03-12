@@ -135,7 +135,6 @@ config("allow_unused_imports") {
     "//src/connectivity/bluetooth/tools/bt-rootcanal:*",
     "//src/connectivity/lowpan/drivers/lowpan-ot-driver:*",
     "//src/lib/assembly/*",
-    "//src/lib/fuchsia-async:*",
     "//src/security/lib/scrutiny/*",
     "//src/starnix/kernel:*",
     "//src/sys/lib/routing:*",

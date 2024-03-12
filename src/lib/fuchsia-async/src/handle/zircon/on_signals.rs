@@ -215,7 +215,7 @@ mod test {
         future::{pending, FutureExt},
         task::{waker, ArcWake},
     };
-    use std::{pin::pin, sync::Arc};
+    use std::pin::pin;
 
     #[test]
     fn wait_for_event() -> Result<(), zx::Status> {

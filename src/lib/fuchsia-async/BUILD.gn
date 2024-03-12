@@ -21,8 +21,6 @@ rustc_library("fuchsia-async") {
   version = "0.1.0"
   with_unit_tests = true
 
-  configs += [ "//build/config/rust/lints:allow_unused_imports" ]
-
   # TODO(https://fxbug.dev/42179953) Remove --nocapture when this flake is found and fixed.
   if (is_host) {
     args = [ "--nocapture" ]
@@ -109,7 +107,6 @@ rustc_library("fuchsia-async") {
 
 rustc_staticlib("fuchsia-async-staticlib") {
   edition = "2021"
-  configs += [ "//build/config/rust/lints:allow_unused_imports" ]
   deps = [
     ":fuchsia-async",
     "//src/lib/fuchsia-sync",
