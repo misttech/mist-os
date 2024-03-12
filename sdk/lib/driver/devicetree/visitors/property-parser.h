@@ -52,7 +52,8 @@ class PropertyParser {
 // Eg: Uint32ArrayProperty, StringListProperty, ReferenceProperty etc.
 class Property {
  public:
-  explicit Property(PropertyName name) : name_(std::move(name)) {}
+  explicit Property(PropertyName name, bool required = false)
+      : name_(std::move(name)), required_(required) {}
 
   virtual ~Property() = default;
 
@@ -61,24 +62,35 @@ class Property {
 
   PropertyName name() const { return name_; }
 
+  bool required() const { return required_; }
+
  private:
   PropertyName name_;
+  bool required_;
 };
 
 class BoolProperty : public Property {
  public:
-  explicit BoolProperty(PropertyName name) : Property(std::move(name)) {}
+  explicit BoolProperty(PropertyName name, bool required = false) : Property(std::move(name)) {}
 };
 
 class Uint32Property : public Property {
  public:
-  explicit Uint32Property(PropertyName name) : Property(std::move(name)) {}
+  explicit Uint32Property(PropertyName name, bool required = false)
+      : Property(std::move(name), required) {}
+};
+
+class StringProperty : public Property {
+ public:
+  explicit StringProperty(PropertyName name, bool required = false)
+      : Property(std::move(name), required) {}
 };
 
 // Property of uint32 array type.
 class Uint32ArrayProperty : public Property {
  public:
-  explicit Uint32ArrayProperty(PropertyName name) : Property(std::move(name)) {}
+  explicit Uint32ArrayProperty(PropertyName name, bool required = false)
+      : Property(std::move(name), required) {}
 
   zx::result<std::vector<PropertyValue>> Parse(Node& node,
                                                devicetree::ByteView bytes) const override;
@@ -87,7 +99,8 @@ class Uint32ArrayProperty : public Property {
 // Property of string list type.
 class StringListProperty : public Property {
  public:
-  explicit StringListProperty(PropertyName name) : Property(std::move(name)) {}
+  explicit StringListProperty(PropertyName name, bool required = false)
+      : Property(std::move(name), required) {}
 
   zx::result<std::vector<PropertyValue>> Parse(Node& node,
                                                devicetree::ByteView bytes) const override;
@@ -95,8 +108,9 @@ class StringListProperty : public Property {
 
 class ReferenceProperty : public Property {
  public:
-  explicit ReferenceProperty(PropertyName name, std::variant<PropertyName, uint32_t> cell_specifier)
-      : Property(std::move(name)), cell_specifier_(std::move(cell_specifier)) {}
+  explicit ReferenceProperty(PropertyName name, std::variant<PropertyName, uint32_t> cell_specifier,
+                             bool required = false)
+      : Property(std::move(name), required), cell_specifier_(std::move(cell_specifier)) {}
 
   zx::result<std::vector<PropertyValue>> Parse(Node& node,
                                                devicetree::ByteView bytes) const override;

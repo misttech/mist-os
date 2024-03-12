@@ -26,8 +26,11 @@ zx::result<PropertyValues> PropertyParser::Parse(Node& node) {
       }
       all_values[property->name()] = std::move(*property_values);
     } else {
-      FDF_LOG(DEBUG, "Node '%s' does not have property '%s'", node.name().c_str(),
-              property->name().c_str());
+      if (property->required()) {
+        FDF_LOG(ERROR, "Node '%s' does not include the required property '%s'",
+                node.name().c_str(), property->name().c_str());
+        return zx::error(ZX_ERR_NOT_FOUND);
+      }
     }
   }
   return zx::ok(std::move(all_values));
