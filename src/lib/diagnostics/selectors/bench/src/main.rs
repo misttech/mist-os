@@ -7,7 +7,7 @@ use fuchsia_criterion::{
     FuchsiaCriterion,
 };
 
-use selectors::{self, FastError};
+use selectors::FastError;
 use std::mem;
 use std::time::Duration;
 

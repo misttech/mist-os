@@ -492,7 +492,7 @@ pub trait LogFormatter {
 mod test {
     use crate::parse_time;
     use assert_matches::assert_matches;
-    use diagnostics_data::{Data, Logs, LogsDataBuilder, Severity};
+    use diagnostics_data::{LogsDataBuilder, Severity};
     use ffx_writer::{Format, MachineWriter, TestBuffers};
     use std::cell::Cell;
 

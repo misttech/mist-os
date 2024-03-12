@@ -4,7 +4,7 @@
 
 use {
     crate::{
-        constants::{self, FORMATTED_CONTENT_CHUNK_SIZE_TARGET},
+        constants::FORMATTED_CONTENT_CHUNK_SIZE_TARGET,
         diagnostics::BatchIteratorConnectionStats,
         error::AccessorError,
         formatter::{new_batcher, FormattedStream, JsonPacketSerializer, SerializedVmo},
