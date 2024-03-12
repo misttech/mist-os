@@ -6,7 +6,6 @@
 
 use {
     argh::FromArgs,
-    libc,
     std::{
         io::{Error, ErrorKind},
         mem, thread,

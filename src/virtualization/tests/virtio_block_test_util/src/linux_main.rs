@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 #![deny(warnings)]
 
-use libc;
 use std::fs::{File, OpenOptions};
 use std::io::{Error, ErrorKind, Read, Seek, SeekFrom, Write};
 use std::os::unix::io::AsRawFd;

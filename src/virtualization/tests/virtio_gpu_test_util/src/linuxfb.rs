@@ -5,7 +5,6 @@
 use {
     crate::framebuffer::{DetectResult, DisplayInfo, Framebuffer},
     anyhow::Error,
-    libc,
     serde::Serialize,
     serde_json::json,
     std::fs::File,
