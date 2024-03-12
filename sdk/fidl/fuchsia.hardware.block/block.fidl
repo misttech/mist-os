@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 library fuchsia.hardware.block;
 
-using fuchsia.storage.metrics as storage_metrics;
 using fuchsia.unknown;
 using zx;
 
@@ -85,32 +84,6 @@ closed protocol Block {
         // TODO(https://fxbug.dev/42054535): consider removing the outer struct when the issue is
         // resolved.
         info BlockInfo;
-    }) error zx.Status;
-
-    /// Returns stats about the block device on the provided buffer and optionally
-    /// clears the counters.
-    ///
-    /// storage_metrics.CallStat.bytes_transferred is number of bytes requested
-    /// to be transferred.
-    @available(replaced=15)
-    strict GetStats(struct {
-        clear bool;
-    }) -> (struct {
-        // TODO(https://fxbug.dev/42054535): consider removing the outer struct when the issue is
-        // resolved.
-        stats @generated_name("BlockStats") struct {
-            /// The stats about read from the device.
-            read storage_metrics.CallStat;
-
-            /// The stats about write to the device.
-            write storage_metrics.CallStat;
-
-            /// The stats about trim commands.
-            trim storage_metrics.CallStat;
-
-            /// The stats about flush commands.
-            flush storage_metrics.CallStat;
-        };
     }) error zx.Status;
 
     /// Returns stats about block device operations. Setting `clear` will reset stats counters.
