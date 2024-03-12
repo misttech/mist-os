@@ -22,17 +22,6 @@ using DriverClient = fuchsia_audio_device::DriverClient;
 class ObserverServerWarningTest : public AudioDeviceRegistryServerTestBase,
                                   public fidl::AsyncEventHandler<fuchsia_audio_device::Observer> {
  protected:
-  std::unique_ptr<FakeStreamConfig> CreateAndEnableDriverWithDefaults() {
-    auto fake_driver = CreateFakeStreamConfigOutput();
-
-    adr_service_->AddDevice(Device::Create(
-        adr_service_, dispatcher(), "Test output name", fuchsia_audio_device::DeviceType::kOutput,
-        DriverClient::WithStreamConfig(
-            fidl::ClientEnd<fuchsia_hardware_audio::StreamConfig>(fake_driver->Enable()))));
-    RunLoopUntilIdle();
-    return fake_driver;
-  }
-
   std::optional<TokenId> WaitForAddedDeviceTokenId(
       fidl::Client<fuchsia_audio_device::Registry>& registry_client) {
     std::optional<TokenId> added_device_id;
@@ -50,8 +39,25 @@ class ObserverServerWarningTest : public AudioDeviceRegistryServerTestBase,
   }
 };
 
+class ObserverServerStreamConfigWarningTest : public ObserverServerWarningTest {
+ protected:
+  std::unique_ptr<FakeStreamConfig> CreateAndEnableDriverWithDefaults() {
+    auto fake_driver = CreateFakeStreamConfigOutput();
+
+    adr_service_->AddDevice(Device::Create(
+        adr_service_, dispatcher(), "Test output name", fuchsia_audio_device::DeviceType::kOutput,
+        DriverClient::WithStreamConfig(
+            fidl::ClientEnd<fuchsia_hardware_audio::StreamConfig>(fake_driver->Enable()))));
+    RunLoopUntilIdle();
+    return fake_driver;
+  }
+};
+
+/////////////////////
+// StreamConfig tests
+
 // A subsequent call to WatchGainState before the previous one completes should fail.
-TEST_F(ObserverServerWarningTest, WatchGainStateWhilePending) {
+TEST_F(ObserverServerStreamConfigWarningTest, WatchGainStateWhilePending) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
   ASSERT_EQ(adr_service_->devices().size(), 1u);
   ASSERT_EQ(adr_service_->unhealthy_devices().size(), 0u);
@@ -102,7 +108,7 @@ TEST_F(ObserverServerWarningTest, WatchGainStateWhilePending) {
   EXPECT_EQ(observer_fidl_error_status_.value_or(ZX_OK), ZX_OK);
 }
 
-TEST_F(ObserverServerWarningTest, WatchPlugStateWhilePending) {
+TEST_F(ObserverServerStreamConfigWarningTest, WatchPlugStateWhilePending) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
   ASSERT_EQ(adr_service_->devices().size(), 1u);
   ASSERT_EQ(adr_service_->unhealthy_devices().size(), 0u);

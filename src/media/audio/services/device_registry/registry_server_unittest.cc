@@ -22,7 +22,12 @@ using Registry = fuchsia_audio_device::Registry;
 using DriverClient = fuchsia_audio_device::DriverClient;
 
 class RegistryServerTest : public AudioDeviceRegistryServerTestBase {};
+class RegistryServerStreamConfigTest : public RegistryServerTest {};
 
+/////////////////////
+// Device-less tests
+//
+// A client can drop their Registry connection without hang, and without WARNING being logged.
 TEST_F(RegistryServerTest, CleanClientDrop) {
   auto registry = CreateTestRegistryServer();
   EXPECT_EQ(RegistryServer::count(), 1u);
@@ -30,6 +35,7 @@ TEST_F(RegistryServerTest, CleanClientDrop) {
   registry->client() = fidl::Client<fuchsia_audio_device::Registry>();
 }
 
+// Server can cleanly shutdown without hang, and without WARNING being logged.
 TEST_F(RegistryServerTest, CleanServerShutdown) {
   auto registry = CreateTestRegistryServer();
   EXPECT_EQ(RegistryServer::count(), 1u);
@@ -37,190 +43,222 @@ TEST_F(RegistryServerTest, CleanServerShutdown) {
   registry->server().Shutdown(ZX_ERR_PEER_CLOSED);
 }
 
+/////////////////////
+// StreamConfig tests
 // Device already exists before the Registry connection is created.
-TEST_F(RegistryServerTest, DeviceAddThenRegistryCreate) {
+TEST_F(RegistryServerStreamConfigTest, DeviceAddThenRegistryCreate) {
   auto fake_driver = CreateFakeStreamConfigOutput();
   adr_service_->AddDevice(Device::Create(
       adr_service_, dispatcher(), "Test output name", fuchsia_audio_device::DeviceType::kOutput,
       DriverClient::WithStreamConfig(
           fidl::ClientEnd<fuchsia_hardware_audio::StreamConfig>(fake_driver->Enable()))));
+
   RunLoopUntilIdle();
-  EXPECT_EQ(adr_service_->devices().size(), 1u);
-  EXPECT_EQ(adr_service_->unhealthy_devices().size(), 0u);
-
+  ASSERT_EQ(adr_service_->devices().size(), 1u);
+  ASSERT_EQ(adr_service_->unhealthy_devices().size(), 0u);
   auto registry = CreateTestRegistryServer();
-  EXPECT_EQ(RegistryServer::count(), 1u);
+  ASSERT_EQ(RegistryServer::count(), 1u);
+  auto received_callback = false;
 
-  std::optional<TokenId> added_device;
   registry->client()->WatchDevicesAdded().Then(
-      [&added_device](fidl::Result<Registry::WatchDevicesAdded>& result) mutable {
-        ASSERT_TRUE(result.is_ok()) << result.error_value().FormatDescription();
+      [&received_callback](fidl::Result<Registry::WatchDevicesAdded>& result) mutable {
+        received_callback = true;
+        ASSERT_TRUE(result.is_ok()) << result.error_value();
         ASSERT_TRUE(result->devices());
         ASSERT_EQ(result->devices()->size(), 1u);
-        ASSERT_TRUE(result->devices()->at(0).token_id());
-        added_device = *result->devices()->at(0).token_id();
+        EXPECT_EQ(result->devices()->at(0).device_type(),
+                  fuchsia_audio_device::DeviceType::kOutput);
       });
+
   RunLoopUntilIdle();
-  EXPECT_TRUE(added_device);
+  EXPECT_TRUE(received_callback);
 }
 
-// WatchDevicesAdded, then add device.
-TEST_F(RegistryServerTest, WatchAddsThenDeviceAdd) {
+// Client calls WatchDevicesAdded, then add device and client is notified.
+TEST_F(RegistryServerStreamConfigTest, WatchAddsThenDeviceAdd) {
   auto registry = CreateTestRegistryServer();
-  EXPECT_EQ(RegistryServer::count(), 1u);
-  EXPECT_EQ(adr_service_->devices().size(), 0u);
-  EXPECT_EQ(adr_service_->unhealthy_devices().size(), 0u);
+  ASSERT_EQ(RegistryServer::count(), 1u);
+  ASSERT_EQ(adr_service_->devices().size(), 0u);
+  ASSERT_EQ(adr_service_->unhealthy_devices().size(), 0u);
+  auto received_callback = false;
 
-  std::optional<TokenId> added_device;
   registry->client()->WatchDevicesAdded().Then(
-      [&added_device](fidl::Result<Registry::WatchDevicesAdded>& result) mutable {
-        ASSERT_TRUE(result.is_ok()) << result.error_value().FormatDescription();
+      [&received_callback](fidl::Result<Registry::WatchDevicesAdded>& result) mutable {
+        received_callback = true;
+        ASSERT_TRUE(result.is_ok()) << result.error_value();
         ASSERT_TRUE(result->devices());
         ASSERT_EQ(result->devices()->size(), 1u);
-        ASSERT_TRUE(result->devices()->at(0).token_id());
-        added_device = *result->devices()->at(0).token_id();
+        EXPECT_EQ(result->devices()->at(0).device_type(), fuchsia_audio_device::DeviceType::kInput);
       });
+
   RunLoopUntilIdle();
-  EXPECT_FALSE(added_device);
+  EXPECT_FALSE(received_callback);
+  EXPECT_EQ(adr_service_->devices().size(), 0u);
 
   auto fake_driver = CreateFakeStreamConfigInput();
   adr_service_->AddDevice(Device::Create(
       adr_service_, dispatcher(), "Test input name", fuchsia_audio_device::DeviceType::kInput,
       DriverClient::WithStreamConfig(
           fidl::ClientEnd<fuchsia_hardware_audio::StreamConfig>(fake_driver->Enable()))));
+
   RunLoopUntilIdle();
+  EXPECT_TRUE(received_callback);
   EXPECT_EQ(adr_service_->devices().size(), 1u);
-  EXPECT_TRUE(added_device);
 }
 
-// Add device then WatchDevicesAdded.
-TEST_F(RegistryServerTest, DeviceAddThenWatchAdds) {
+// Add device, see it added, then client calls WatchDevicesAdded and is notified.
+TEST_F(RegistryServerStreamConfigTest, DeviceAddThenWatchAdds) {
   auto registry = CreateTestRegistryServer();
-  EXPECT_EQ(RegistryServer::count(), 1u);
-  EXPECT_EQ(adr_service_->devices().size(), 0u);
-
+  ASSERT_EQ(RegistryServer::count(), 1u);
+  ASSERT_EQ(adr_service_->devices().size(), 0u);
   auto fake_driver = CreateFakeStreamConfigOutput();
   adr_service_->AddDevice(Device::Create(
       adr_service_, dispatcher(), "Test output name", fuchsia_audio_device::DeviceType::kOutput,
       DriverClient::WithStreamConfig(
           fidl::ClientEnd<fuchsia_hardware_audio::StreamConfig>(fake_driver->Enable()))));
+
   RunLoopUntilIdle();
   EXPECT_EQ(adr_service_->devices().size(), 1u);
+  auto received_callback = false;
 
-  std::optional<TokenId> added_device;
   registry->client()->WatchDevicesAdded().Then(
-      [&added_device](fidl::Result<Registry::WatchDevicesAdded>& result) mutable {
-        ASSERT_TRUE(result.is_ok()) << result.error_value().FormatDescription();
+      [&received_callback](fidl::Result<Registry::WatchDevicesAdded>& result) mutable {
+        received_callback = true;
+        ASSERT_TRUE(result.is_ok()) << result.error_value();
         ASSERT_TRUE(result->devices());
         ASSERT_EQ(result->devices()->size(), 1u);
-        ASSERT_TRUE(result->devices()->at(0).token_id());
-        added_device = *result->devices()->at(0).token_id();
+        EXPECT_EQ(result->devices()->at(0).device_type(),
+                  fuchsia_audio_device::DeviceType::kOutput);
       });
+
   RunLoopUntilIdle();
-  EXPECT_TRUE(added_device);
+  EXPECT_TRUE(received_callback);
 }
 
-// WatchDeviceRemoved, then remove device.
-TEST_F(RegistryServerTest, WatchRemovesThenDeviceRemove) {
+// Client calls WatchDeviceRemoved, then remove device, then client is notified.
+TEST_F(RegistryServerStreamConfigTest, WatchRemovesThenDeviceRemove) {
   auto fake_driver = CreateFakeStreamConfigInput();
   adr_service_->AddDevice(Device::Create(
       adr_service_, dispatcher(), "Test input name", fuchsia_audio_device::DeviceType::kInput,
       DriverClient::WithStreamConfig(
           fidl::ClientEnd<fuchsia_hardware_audio::StreamConfig>(fake_driver->Enable()))));
-  RunLoopUntilIdle();
-  EXPECT_EQ(adr_service_->devices().size(), 1u);
 
+  RunLoopUntilIdle();
+  ASSERT_EQ(adr_service_->devices().size(), 1u);
   auto registry = CreateTestRegistryServer();
-  EXPECT_EQ(RegistryServer::count(), 1u);
+  ASSERT_EQ(RegistryServer::count(), 1u);
+  auto received_callback = false;
+  std::optional<TokenId> added_device_id;
 
-  std::optional<TokenId> added_device;
   registry->client()->WatchDevicesAdded().Then(
-      [&added_device](fidl::Result<Registry::WatchDevicesAdded>& result) mutable {
-        ASSERT_TRUE(result.is_ok()) << result.error_value().FormatDescription();
-        ASSERT_TRUE(result->devices());
-        ASSERT_EQ(result->devices()->size(), 1u);
-        ASSERT_TRUE(result->devices()->at(0).token_id());
-        added_device = *result->devices()->at(0).token_id();
+      [&received_callback,
+       &added_device_id](fidl::Result<Registry::WatchDevicesAdded>& result) mutable {
+        received_callback = true;
+        ASSERT_TRUE(result.is_ok() && result->devices() && result->devices()->size() == 1);
+        ASSERT_TRUE(result->devices()->at(0).device_type() ==
+                        fuchsia_audio_device::DeviceType::kInput &&
+                    result->devices()->at(0).token_id().has_value());
+        added_device_id = *result->devices()->at(0).token_id();
       });
-  RunLoopUntilIdle();
-  ASSERT_TRUE(added_device);
 
-  std::optional<uint64_t> removed_device;
+  RunLoopUntilIdle();
+  ASSERT_TRUE(received_callback);
+  ASSERT_TRUE(added_device_id);
+  received_callback = false;
+  std::optional<TokenId> removed_device_id;
+
   registry->client()->WatchDeviceRemoved().Then(
-      [&removed_device](fidl::Result<Registry::WatchDeviceRemoved>& result) mutable {
+      [&received_callback,
+       &removed_device_id](fidl::Result<Registry::WatchDeviceRemoved>& result) mutable {
+        received_callback = true;
         ASSERT_TRUE(result.is_ok()) << result.error_value().FormatDescription();
         ASSERT_TRUE(result->token_id());
-        removed_device = *result->token_id();
+        removed_device_id = *result->token_id();
       });
-  RunLoopUntilIdle();
-  EXPECT_FALSE(removed_device);
 
-  fake_driver->DropStreamConfig();
   RunLoopUntilIdle();
+  EXPECT_FALSE(received_callback);
+  EXPECT_FALSE(removed_device_id.has_value());
+  fake_driver->DropStreamConfig();
+
+  RunLoopUntilIdle();
+  EXPECT_TRUE(received_callback);
+  ASSERT_TRUE(removed_device_id.has_value());
+  EXPECT_EQ(*added_device_id, *removed_device_id);
   EXPECT_EQ(adr_service_->devices().size(), 0u);
-  ASSERT_TRUE(removed_device);
-  EXPECT_EQ(*added_device, *removed_device);
 }
 
-// Remove device, then WatchDeviceRemoved.
-TEST_F(RegistryServerTest, DeviceRemoveThenWatchRemoves) {
+// Remove device, see ADR remove it, then client calls WatchDeviceRemoved and is notified.
+TEST_F(RegistryServerStreamConfigTest, DeviceRemoveThenWatchRemoves) {
   auto fake_driver = CreateFakeStreamConfigOutput();
   adr_service_->AddDevice(Device::Create(
       adr_service_, dispatcher(), "Test output name", fuchsia_audio_device::DeviceType::kOutput,
       DriverClient::WithStreamConfig(
           fidl::ClientEnd<fuchsia_hardware_audio::StreamConfig>(fake_driver->Enable()))));
-  RunLoopUntilIdle();
-  EXPECT_EQ(adr_service_->devices().size(), 1u);
 
+  RunLoopUntilIdle();
+  ASSERT_EQ(adr_service_->devices().size(), 1u);
   auto registry = CreateTestRegistryServer();
-  EXPECT_EQ(RegistryServer::count(), 1u);
+  ASSERT_EQ(RegistryServer::count(), 1u);
+  auto received_callback = false;
+  std::optional<TokenId> added_device_id;
 
-  std::optional<TokenId> added_device;
   registry->client()->WatchDevicesAdded().Then(
-      [&added_device](fidl::Result<Registry::WatchDevicesAdded>& result) mutable {
-        ASSERT_TRUE(result.is_ok()) << result.error_value().FormatDescription();
-        ASSERT_TRUE(result->devices());
-        ASSERT_EQ(result->devices()->size(), 1u);
-        ASSERT_TRUE(result->devices()->at(0).token_id());
-        added_device = *result->devices()->at(0).token_id();
+      [&received_callback,
+       &added_device_id](fidl::Result<Registry::WatchDevicesAdded>& result) mutable {
+        received_callback = true;
+        ASSERT_TRUE(result.is_ok() && result->devices() && result->devices()->size() == 1);
+        ASSERT_TRUE(result->devices()->at(0).device_type() ==
+                        fuchsia_audio_device::DeviceType::kOutput &&
+                    result->devices()->at(0).token_id().has_value());
+        added_device_id = *result->devices()->at(0).token_id();
       });
-  RunLoopUntilIdle();
-  ASSERT_TRUE(added_device);
 
+  RunLoopUntilIdle();
+  ASSERT_TRUE(received_callback);
+  ASSERT_TRUE(added_device_id);
   fake_driver->DropStreamConfig();
-  RunLoopUntilIdle();
-  EXPECT_EQ(adr_service_->devices().size(), 0u);
 
-  std::optional<uint64_t> removed_device;
+  RunLoopUntilIdle();
+  ASSERT_EQ(adr_service_->devices().size(), 0u);
+  received_callback = false;
+  std::optional<TokenId> removed_device_id;
+
   registry->client()->WatchDeviceRemoved().Then(
-      [&removed_device](fidl::Result<Registry::WatchDeviceRemoved>& result) mutable {
+      [&received_callback,
+       &removed_device_id](fidl::Result<Registry::WatchDeviceRemoved>& result) mutable {
+        received_callback = true;
         ASSERT_TRUE(result.is_ok()) << result.error_value().FormatDescription();
         ASSERT_TRUE(result->token_id());
-        removed_device = *result->token_id();
+        removed_device_id = *result->token_id();
       });
+
   RunLoopUntilIdle();
-  ASSERT_TRUE(removed_device);
-  EXPECT_EQ(*added_device, *removed_device);
+  EXPECT_TRUE(received_callback);
+  ASSERT_TRUE(removed_device_id.has_value());
+  EXPECT_EQ(*added_device_id, *removed_device_id);
+  EXPECT_EQ(adr_service_->devices().size(), 0u);
 }
 
-// Add device, remove device, then WatchDevicesAdded/WatchDeviceRemoved (should not notify).
-TEST_F(RegistryServerTest, DeviceAddRemoveThenWatches) {
+// Create a Registry connection then add and remove device (see ADR count go up and down).
+// Then when client calls WatchDevicesAdded and WatchDeviceRemoved, no notifications should occur.
+TEST_F(RegistryServerStreamConfigTest, DeviceAddRemoveThenWatches) {
   auto registry = CreateTestRegistryServer();
-  EXPECT_EQ(RegistryServer::count(), 1u);
-
+  ASSERT_EQ(RegistryServer::count(), 1u);
   auto fake_driver = CreateFakeStreamConfigInput();
   adr_service_->AddDevice(Device::Create(
       adr_service_, dispatcher(), "Test input name", fuchsia_audio_device::DeviceType::kInput,
       DriverClient::WithStreamConfig(
           fidl::ClientEnd<fuchsia_hardware_audio::StreamConfig>(fake_driver->Enable()))));
-  RunLoopUntilIdle();
-  EXPECT_EQ(adr_service_->devices().size(), 1u);
 
+  RunLoopUntilIdle();
+  ASSERT_EQ(adr_service_->devices().size(), 1u);
   fake_driver->DropStreamConfig();
-  RunLoopUntilIdle();
-  EXPECT_EQ(adr_service_->devices().size(), 0u);
 
+  RunLoopUntilIdle();
+  ASSERT_EQ(adr_service_->devices().size(), 0u);
   bool received_add_response = false, received_remove_response = false;
+
   registry->client()->WatchDevicesAdded().Then(
       [&received_add_response](fidl::Result<Registry::WatchDevicesAdded>& result) mutable {
         received_add_response = true;
@@ -231,116 +269,141 @@ TEST_F(RegistryServerTest, DeviceAddRemoveThenWatches) {
         received_remove_response = true;
         FAIL() << "Unexpected WatchDeviceRemoved response";
       });
+
   RunLoopUntilIdle();
   EXPECT_FALSE(received_add_response);
   EXPECT_FALSE(received_remove_response);
 }
 
 // Remove device, add device, WatchDevicesAdded/WatchDeviceRemoved (id's differ: should notify).
-TEST_F(RegistryServerTest, DeviceRemoveAddThenWatches) {
+TEST_F(RegistryServerStreamConfigTest, DeviceRemoveAddThenWatches) {
   auto registry = CreateTestRegistryServer();
-  EXPECT_EQ(RegistryServer::count(), 1u);
-
+  ASSERT_EQ(RegistryServer::count(), 1u);
   auto fake_driver = CreateFakeStreamConfigOutput();
   adr_service_->AddDevice(Device::Create(
       adr_service_, dispatcher(), "Test output name", fuchsia_audio_device::DeviceType::kOutput,
       DriverClient::WithStreamConfig(
           fidl::ClientEnd<fuchsia_hardware_audio::StreamConfig>(fake_driver->Enable()))));
-  RunLoopUntilIdle();
-  EXPECT_EQ(adr_service_->devices().size(), 1u);
 
-  std::optional<TokenId> first_id;
+  RunLoopUntilIdle();
+  ASSERT_EQ(adr_service_->devices().size(), 1u);
+  bool received_callback = false;
+  std::optional<TokenId> first_added_id;
+
   registry->client()->WatchDevicesAdded().Then(
-      [&first_id](fidl::Result<Registry::WatchDevicesAdded>& result) mutable {
-        ASSERT_TRUE(result.is_ok()) << result.error_value().FormatDescription();
-        ASSERT_TRUE(result->devices());
-        ASSERT_EQ(result->devices()->size(), 1u);
-        ASSERT_TRUE(result->devices()->at(0).token_id());
-        first_id = *result->devices()->at(0).token_id();
+      [&received_callback,
+       &first_added_id](fidl::Result<Registry::WatchDevicesAdded>& result) mutable {
+        received_callback = true;
+        ASSERT_TRUE(result.is_ok() && result->devices() && result->devices()->size() == 1);
+        ASSERT_TRUE(result->devices()->at(0).device_type() ==
+                        fuchsia_audio_device::DeviceType::kOutput &&
+                    result->devices()->at(0).token_id().has_value());
+        first_added_id = *result->devices()->at(0).token_id();
       });
-  RunLoopUntilIdle();
-  ASSERT_TRUE(first_id);
 
+  RunLoopUntilIdle();
+  ASSERT_TRUE(received_callback);
+  ASSERT_TRUE(first_added_id);
   fake_driver->DropStreamConfig();
-  RunLoopUntilIdle();
-  EXPECT_EQ(adr_service_->devices().size(), 0u);
 
+  RunLoopUntilIdle();
+  ASSERT_EQ(adr_service_->devices().size(), 0u);
   fake_driver = CreateFakeStreamConfigInput();
   adr_service_->AddDevice(Device::Create(
       adr_service_, dispatcher(), "Test input name", fuchsia_audio_device::DeviceType::kInput,
       DriverClient::WithStreamConfig(
           fidl::ClientEnd<fuchsia_hardware_audio::StreamConfig>(fake_driver->Enable()))));
-  RunLoopUntilIdle();
-  EXPECT_EQ(adr_service_->devices().size(), 1u);
 
-  std::optional<uint64_t> removed_device;
+  RunLoopUntilIdle();
+  ASSERT_EQ(adr_service_->devices().size(), 1u);
+  received_callback = false;
+  std::optional<uint64_t> removed_device_id;
+
   registry->client()->WatchDeviceRemoved().Then(
-      [&removed_device](fidl::Result<Registry::WatchDeviceRemoved>& result) mutable {
+      [&received_callback,
+       &removed_device_id](fidl::Result<Registry::WatchDeviceRemoved>& result) mutable {
+        received_callback = true;
         ASSERT_TRUE(result.is_ok()) << result.error_value().FormatDescription();
         ASSERT_TRUE(result->token_id());
-        removed_device = *result->token_id();
+        removed_device_id = *result->token_id();
       });
-  RunLoopUntilIdle();
-  ASSERT_TRUE(removed_device);
-  EXPECT_EQ(*first_id, *removed_device);
 
-  std::optional<TokenId> second_id;
-  registry->client()->WatchDevicesAdded().Then(
-      [&second_id](fidl::Result<Registry::WatchDevicesAdded>& result) mutable {
-        ASSERT_TRUE(result.is_ok()) << result.error_value().FormatDescription();
-        ASSERT_TRUE(result->devices());
-        ASSERT_EQ(result->devices()->size(), 1u);
-        ASSERT_TRUE(result->devices()->at(0).token_id());
-        second_id = *result->devices()->at(0).token_id();
-      });
   RunLoopUntilIdle();
-  ASSERT_TRUE(second_id);
-  EXPECT_NE(*first_id, *second_id);
+  ASSERT_TRUE(received_callback);
+  ASSERT_TRUE(removed_device_id);
+  EXPECT_EQ(*first_added_id, *removed_device_id);
+  received_callback = false;
+  std::optional<TokenId> second_added_id;
+
+  registry->client()->WatchDevicesAdded().Then(
+      [&received_callback,
+       &second_added_id](fidl::Result<Registry::WatchDevicesAdded>& result) mutable {
+        received_callback = true;
+        ASSERT_TRUE(result.is_ok() && result->devices() && result->devices()->size() == 1);
+        ASSERT_TRUE(result->devices()->at(0).device_type() ==
+                        fuchsia_audio_device::DeviceType::kInput &&
+                    result->devices()->at(0).token_id().has_value());
+        second_added_id = *result->devices()->at(0).token_id();
+      });
+
+  RunLoopUntilIdle();
+  EXPECT_TRUE(received_callback);
+  ASSERT_TRUE(second_added_id);
+  EXPECT_NE(*first_added_id, *second_added_id);
 }
 
-TEST_F(RegistryServerTest, CreateObserver) {
+// Add cases for info.signalprocessing_topologies and signalprocessing_elements (once implemented).
+//
+// TODO(https://fxbug.dev/323270827): implement signalprocessing for Codec (topology, gain).
+
+// Client can open an Observer connection on an added Codec device.
+TEST_F(RegistryServerStreamConfigTest, CreateObserver) {
   auto fake_driver = CreateFakeStreamConfigOutput();
   adr_service_->AddDevice(Device::Create(
       adr_service_, dispatcher(), "Test output name", fuchsia_audio_device::DeviceType::kOutput,
       DriverClient::WithStreamConfig(
           fidl::ClientEnd<fuchsia_hardware_audio::StreamConfig>(fake_driver->Enable()))));
-  RunLoopUntilIdle();
-  EXPECT_EQ(adr_service_->devices().size(), 1u);
 
+  RunLoopUntilIdle();
+  ASSERT_EQ(adr_service_->devices().size(), 1u);
   auto registry = CreateTestRegistryServer();
-  EXPECT_EQ(RegistryServer::count(), 1u);
+  ASSERT_EQ(RegistryServer::count(), 1u);
+  auto received_callback = true;
+  std::optional<TokenId> added_id;
 
-  std::optional<TokenId> id;
   registry->client()->WatchDevicesAdded().Then(
-      [&id](fidl::Result<Registry::WatchDevicesAdded>& result) mutable {
-        ASSERT_TRUE(result.is_ok()) << result.error_value().FormatDescription();
-        ASSERT_TRUE(result->devices());
-        ASSERT_EQ(result->devices()->size(), 1u);
-        ASSERT_TRUE(result->devices()->at(0).token_id());
-        id = *result->devices()->at(0).token_id();
+      [&received_callback, &added_id](fidl::Result<Registry::WatchDevicesAdded>& result) mutable {
+        received_callback = true;
+        ASSERT_TRUE(result.is_ok() && result->devices() && result->devices()->size() == 1);
+        ASSERT_TRUE(result->devices()->at(0).device_type() ==
+                        fuchsia_audio_device::DeviceType::kOutput &&
+                    result->devices()->at(0).token_id().has_value());
+        added_id = *result->devices()->at(0).token_id();
       });
-  RunLoopUntilIdle();
-  ASSERT_TRUE(id);
 
+  RunLoopUntilIdle();
+  ASSERT_TRUE(received_callback);
+  ASSERT_TRUE(added_id);
   auto [observer_client_end, observer_server_end] =
       CreateNaturalAsyncClientOrDie<fuchsia_audio_device::Observer>();
   auto observer_client = fidl::Client<fuchsia_audio_device::Observer>(
       fidl::ClientEnd<fuchsia_audio_device::Observer>(std::move(observer_client_end)), dispatcher(),
       observer_fidl_handler_.get());
-  bool received_callback = false;
+  received_callback = false;
+
   registry->client()
       ->CreateObserver({{
-          .token_id = *id,
+          .token_id = *added_id,
           .observer_server =
               fidl::ServerEnd<fuchsia_audio_device::Observer>(std::move(observer_server_end)),
       }})
       .Then([&received_callback](fidl::Result<Registry::CreateObserver>& result) {
-        EXPECT_TRUE(result.is_ok()) << result.error_value().FormatDescription();
         received_callback = true;
+        EXPECT_TRUE(result.is_ok()) << result.error_value().FormatDescription();
       });
+
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback);
-  observer_client = fidl::Client<fuchsia_audio_device::Observer>();
 }
 
 }  // namespace

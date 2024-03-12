@@ -4,8 +4,9 @@
 
 #include "src/media/audio/services/device_registry/control_server.h"
 
-#include <fidl/fuchsia.audio.device/cpp/natural_types.h>
+#include <fidl/fuchsia.audio.device/cpp/fidl.h>
 #include <fidl/fuchsia.audio/cpp/common_types.h>
+#include <fidl/fuchsia.hardware.audio.signalprocessing/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.audio/cpp/fidl.h>
 #include <fidl/fuchsia.mem/cpp/natural_types.h>
 #include <lib/fidl/cpp/wire/status.h>
@@ -261,14 +262,14 @@ void ControlServer::CreateRingBuffer(CreateRingBufferRequest& request,
 // helpful for ControlServer to know when its SetGain call took effect, but this isn't needed.
 // ControlServer also has no gain-related hanging-get to complete.
 void ControlServer::GainStateChanged(const fuchsia_audio_device::GainState&) {
-  ADR_LOG_OBJECT(kLogNotifyMethods);
+  ADR_LOG_METHOD(kLogNotifyMethods);
 }
 
 // This is only here because ControlNotify includes the methods from ObserverNotify. ControlServer
 // doesn't have a role to play in plug state changes, nor a client hanging-get to complete.
 void ControlServer::PlugStateChanged(const fuchsia_audio_device::PlugState& new_plug_state,
                                      zx::time plug_change_time) {
-  ADR_LOG_OBJECT(kLogNotifyMethods);
+  ADR_LOG_METHOD(kLogNotifyMethods);
 }
 
 // We receive delay values for the first time during the configuration process. Once we have these
@@ -288,7 +289,7 @@ void ControlServer::DelayInfoChanged(const fuchsia_audio_device::DelayInfo& dela
 void ControlServer::DaiFormatChanged(
     const std::optional<fuchsia_hardware_audio::DaiFormat>& dai_format,
     const std::optional<fuchsia_hardware_audio::CodecFormatInfo>& codec_format_info) {
-  ADR_LOG_OBJECT(kLogNotifyMethods);
+  ADR_LOG_METHOD(kLogNotifyMethods);
   LogDaiFormat(dai_format);
   LogCodecFormatInfo(codec_format_info);
 }
@@ -302,7 +303,7 @@ void ControlServer::DaiFormatNotSet(const fuchsia_hardware_audio::DaiFormat& dai
 
 // For now don't do anything on receiving this. Eventually we'll complete a pending `Start`.
 void ControlServer::CodecStarted(const zx::time& start_time) {
-  ADR_LOG_OBJECT(kLogNotifyMethods) << "(" << start_time.get() << ")";
+  ADR_LOG_METHOD(kLogNotifyMethods) << "(" << start_time.get() << ")";
 }
 
 // For now don't do anything on receiving this. Eventually we'll fail a pending `Start`.
@@ -310,10 +311,51 @@ void ControlServer::CodecNotStarted() { ADR_WARN_METHOD(); }
 
 // For now don't do anything on receiving this. Eventually we'll complete a pending `Stop`.
 void ControlServer::CodecStopped(const zx::time& stop_time) {
-  ADR_LOG_OBJECT(kLogNotifyMethods) << "(" << stop_time.get() << ")";
+  ADR_LOG_METHOD(kLogNotifyMethods) << "(" << stop_time.get() << ")";
 }
 
 // For now don't do anything on receiving this. Eventually we'll fail a pending `Stop`.
 void ControlServer::CodecNotStopped() { ADR_WARN_METHOD(); }
+
+// fuchsia.hardware.audio.signalprocessing support
+//
+void ControlServer::GetTopologies(GetTopologiesCompleter::Sync& completer) {
+  ADR_WARN_METHOD() << kClassName << "(" << this << ")::" << __func__
+                    << ": signalprocessing not supported";
+  completer.Reply(fit::error(ZX_ERR_NOT_SUPPORTED));
+}
+
+void ControlServer::GetElements(GetElementsCompleter::Sync& completer) {
+  ADR_WARN_METHOD() << kClassName << "(" << this << ")::" << __func__
+                    << ": signalprocessing not supported";
+  completer.Reply(fit::error(ZX_ERR_NOT_SUPPORTED));
+}
+
+void ControlServer::WatchTopology(WatchTopologyCompleter::Sync& completer) {
+  ADR_WARN_METHOD() << kClassName << "(" << this << ")::" << __func__
+                    << ": signalprocessing not supported";
+  completer.Close(ZX_ERR_NOT_SUPPORTED);
+}
+
+void ControlServer::WatchElementState(WatchElementStateRequest& request,
+                                      WatchElementStateCompleter::Sync& completer) {
+  ADR_WARN_METHOD() << kClassName << "(" << this << ")::" << __func__
+                    << ": signalprocessing not supported";
+  completer.Close(ZX_ERR_NOT_SUPPORTED);
+}
+
+void ControlServer::SetTopology(SetTopologyRequest& request,
+                                SetTopologyCompleter::Sync& completer) {
+  ADR_WARN_METHOD() << kClassName << "(" << this << ")::" << __func__
+                    << ": signalprocessing not supported";
+  completer.Reply(fit::error(ZX_ERR_NOT_SUPPORTED));
+}
+
+void ControlServer::SetElementState(SetElementStateRequest& request,
+                                    SetElementStateCompleter::Sync& completer) {
+  ADR_WARN_METHOD() << kClassName << "(" << this << ")::" << __func__
+                    << ": signalprocessing not supported";
+  completer.Reply(fit::error(ZX_ERR_NOT_SUPPORTED));
+}
 
 }  // namespace media_audio

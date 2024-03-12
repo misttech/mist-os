@@ -119,7 +119,6 @@ void FakeCodec::GetProperties(GetPropertiesCompleter::Sync& completer) {
     codec_properties.product(*product_);
   }
   if (uid_) {
-    // codec_properties.unique_id() = *uid_;
     codec_properties.unique_id(*uid_);
   }
   if (plug_detect_capabilities_) {

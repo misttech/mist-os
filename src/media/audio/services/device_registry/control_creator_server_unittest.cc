@@ -15,7 +15,11 @@ namespace media_audio {
 namespace {
 
 class ControlCreatorServerTest : public AudioDeviceRegistryServerTestBase {};
+class ControlCreatorServerStreamConfigTest : public ControlCreatorServerTest {};
 
+/////////////////////
+// Device-less tests
+//
 // Validate that the ControlCreator client can be dropped cleanly without generating a WARNING.
 TEST_F(ControlCreatorServerTest, CleanClientDrop) {
   auto control_creator = CreateTestControlCreatorServer();
@@ -32,26 +36,28 @@ TEST_F(ControlCreatorServerTest, CleanServerShutdown) {
   control_creator->server().Shutdown(ZX_ERR_PEER_CLOSED);
 }
 
-// Validate the ControlCreator/CreateControl method.
-TEST_F(ControlCreatorServerTest, CreateControl) {
+/////////////////////
+// StreamConfig tests
+//
+// Validate the ControlCreator/CreateControl method for StreamConfig devices.
+TEST_F(ControlCreatorServerStreamConfigTest, CreateControl) {
   auto control_creator = CreateTestControlCreatorServer();
   ASSERT_EQ(ControlCreatorServer::count(), 1u);
-
   auto fake_driver = CreateFakeStreamConfigOutput();
   adr_service_->AddDevice(Device::Create(
       adr_service_, dispatcher(), "Test output name", fuchsia_audio_device::DeviceType::kOutput,
       fuchsia_audio_device::DriverClient::WithStreamConfig(
           fidl::ClientEnd<fuchsia_hardware_audio::StreamConfig>(fake_driver->Enable()))));
+
   RunLoopUntilIdle();
   ASSERT_EQ(adr_service_->devices().size(), 1u);
   ASSERT_EQ(adr_service_->unhealthy_devices().size(), 0u);
-
   zx::channel server_end, client_end;
   ASSERT_EQ(ZX_OK, zx::channel::create(0, &server_end, &client_end));
-
   auto control_client = fidl::Client<fuchsia_audio_device::Control>(
       fidl::ClientEnd<fuchsia_audio_device::Control>(std::move(client_end)), dispatcher());
   auto received_callback = false;
+
   control_creator->client()
       ->Create({{
           .token_id = (*adr_service_->devices().begin())->token_id(),
@@ -59,8 +65,8 @@ TEST_F(ControlCreatorServerTest, CreateControl) {
       }})
       .Then([&received_callback](
                 fidl::Result<fuchsia_audio_device::ControlCreator::Create>& result) mutable {
-        EXPECT_TRUE(result.is_ok()) << result.error_value().FormatDescription();
         received_callback = true;
+        EXPECT_TRUE(result.is_ok()) << result.error_value();
       });
 
   RunLoopUntilIdle();

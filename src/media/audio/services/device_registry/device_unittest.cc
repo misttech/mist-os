@@ -6,7 +6,6 @@
 
 #include <fidl/fuchsia.audio/cpp/common_types.h>
 #include <fidl/fuchsia.hardware.audio/cpp/fidl.h>
-#include <fuchsia/hardware/audio/cpp/fidl.h>
 #include <lib/zx/clock.h>
 #include <zircon/errors.h>
 
@@ -15,6 +14,7 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
+#include "src/media/audio/services/device_registry/common_unittest.h"
 #include "src/media/audio/services/device_registry/device_unittest.h"
 #include "src/media/audio/services/device_registry/testing/fake_codec.h"
 #include "src/media/audio/services/device_registry/testing/fake_stream_config.h"
@@ -24,38 +24,18 @@ namespace media_audio {
 
 using ::testing::Optional;
 
-class DeviceTest : public DeviceTestBase {
- protected:
-  static inline const fuchsia_hardware_audio::Format kDefaultRingBufferFormat{{
-      .pcm_format = fuchsia_hardware_audio::PcmFormat{{
-          .number_of_channels = 2,
-          .sample_format = fuchsia_hardware_audio::SampleFormat::kPcmSigned,
-          .bytes_per_sample = 2,
-          .valid_bits_per_sample = static_cast<uint8_t>(16),
-          .frame_rate = 48000,
-      }},
-  }};
-  // Accessor for a Device private member.
-  static const std::optional<fuchsia_hardware_audio::DelayInfo>& DeviceDelayInfo(
-      const std::shared_ptr<Device>& device) {
-    return device->delay_info_;
-  }
-};
-class CodecTest : public DeviceTestBase {};
-class StreamConfigTest : public DeviceTest {};
-
 // Validate that a fake codec with default values is initialized successfully.
 TEST_F(CodecTest, Initialization) {
   auto fake_driver = MakeFakeCodecOutput();
   auto device = InitializeDeviceForFakeCodec(fake_driver);
   EXPECT_TRUE(InInitializedState(device));
 
-  EXPECT_EQ(fake_device_presence_watcher_->ready_devices().size(), 1u);
-  EXPECT_EQ(fake_device_presence_watcher_->error_devices().size(), 0u);
+  EXPECT_EQ(device_presence_watcher()->ready_devices().size(), 1u);
+  EXPECT_EQ(device_presence_watcher()->error_devices().size(), 0u);
 
-  EXPECT_EQ(fake_device_presence_watcher_->on_ready_count(), 1u);
-  EXPECT_EQ(fake_device_presence_watcher_->on_error_count(), 0u);
-  EXPECT_EQ(fake_device_presence_watcher_->on_removal_count(), 0u);
+  EXPECT_EQ(device_presence_watcher()->on_ready_count(), 1u);
+  EXPECT_EQ(device_presence_watcher()->on_error_count(), 0u);
+  EXPECT_EQ(device_presence_watcher()->on_removal_count(), 0u);
 
   EXPECT_EQ(device->device_type(), fuchsia_audio_device::DeviceType::kCodec);
   EXPECT_TRUE(device->ring_buffer_format_sets().empty());
@@ -65,7 +45,7 @@ TEST_F(CodecTest, Initialization) {
   EXPECT_TRUE(device->info()->is_input().has_value());
   EXPECT_FALSE(*device->info()->is_input());
 
-  fake_device_presence_watcher_.reset();
+  device_presence_watcher().reset();
 }
 
 TEST_F(CodecTest, InitializationNoDirection) {
@@ -73,17 +53,17 @@ TEST_F(CodecTest, InitializationNoDirection) {
   auto device = InitializeDeviceForFakeCodec(fake_driver);
   EXPECT_TRUE(InInitializedState(device));
 
-  EXPECT_EQ(fake_device_presence_watcher_->ready_devices().size(), 1u);
-  EXPECT_EQ(fake_device_presence_watcher_->error_devices().size(), 0u);
+  EXPECT_EQ(device_presence_watcher()->ready_devices().size(), 1u);
+  EXPECT_EQ(device_presence_watcher()->error_devices().size(), 0u);
 
-  EXPECT_EQ(fake_device_presence_watcher_->on_ready_count(), 1u);
-  EXPECT_EQ(fake_device_presence_watcher_->on_error_count(), 0u);
-  EXPECT_EQ(fake_device_presence_watcher_->on_removal_count(), 0u);
+  EXPECT_EQ(device_presence_watcher()->on_ready_count(), 1u);
+  EXPECT_EQ(device_presence_watcher()->on_error_count(), 0u);
+  EXPECT_EQ(device_presence_watcher()->on_removal_count(), 0u);
 
   ASSERT_TRUE(device->info().has_value());
   EXPECT_FALSE(device->info()->is_input().has_value());
 
-  fake_device_presence_watcher_.reset();
+  device_presence_watcher().reset();
 }
 
 // Validate that a fake codec with default values is initialized successfully.
@@ -92,8 +72,8 @@ TEST_F(CodecTest, DeviceInfoValues) {
   auto device = InitializeDeviceForFakeCodec(fake_driver);
   ASSERT_TRUE(InInitializedState(device));
 
-  ASSERT_EQ(fake_device_presence_watcher_->ready_devices().size(), 1u);
-  ASSERT_EQ(fake_device_presence_watcher_->on_ready_count(), 1u);
+  ASSERT_EQ(device_presence_watcher()->ready_devices().size(), 1u);
+  ASSERT_EQ(device_presence_watcher()->on_ready_count(), 1u);
 
   ASSERT_TRUE(device->info().has_value());
   auto info = *device->info();
@@ -121,7 +101,7 @@ TEST_F(CodecTest, DeviceInfoValues) {
   EXPECT_EQ(*info.dai_format_sets(), FakeCodec::kDefaultDaiFormatSets);
   EXPECT_EQ(*info.plug_detect_caps(), FakeCodec::kDefaultPlugCaps);
 
-  fake_device_presence_watcher_.reset();
+  device_presence_watcher().reset();
 }
 
 // Validate that a driver's dropping the Codec causes a DeviceIsRemoved notification.
@@ -129,23 +109,23 @@ TEST_F(CodecTest, Disconnect) {
   auto fake_codec = MakeFakeCodecNoDirection();
   auto device = InitializeDeviceForFakeCodec(fake_codec);
   ASSERT_TRUE(InInitializedState(device));
-  ASSERT_EQ(fake_device_presence_watcher_->ready_devices().size(), 1u);
-  ASSERT_EQ(fake_device_presence_watcher_->error_devices().size(), 0u);
+  ASSERT_EQ(device_presence_watcher()->ready_devices().size(), 1u);
+  ASSERT_EQ(device_presence_watcher()->error_devices().size(), 0u);
 
-  ASSERT_EQ(fake_device_presence_watcher_->on_ready_count(), 1u);
-  ASSERT_EQ(fake_device_presence_watcher_->on_error_count(), 0u);
-  ASSERT_EQ(fake_device_presence_watcher_->on_removal_count(), 0u);
+  ASSERT_EQ(device_presence_watcher()->on_ready_count(), 1u);
+  ASSERT_EQ(device_presence_watcher()->on_error_count(), 0u);
+  ASSERT_EQ(device_presence_watcher()->on_removal_count(), 0u);
 
   fake_codec->DropCodec();
   RunLoopUntilIdle();
 
-  EXPECT_EQ(fake_device_presence_watcher_->ready_devices().size(), 0u);
-  EXPECT_EQ(fake_device_presence_watcher_->error_devices().size(), 0u);
+  EXPECT_EQ(device_presence_watcher()->ready_devices().size(), 0u);
+  EXPECT_EQ(device_presence_watcher()->error_devices().size(), 0u);
 
-  EXPECT_EQ(fake_device_presence_watcher_->on_ready_count(), 1u);
-  EXPECT_EQ(fake_device_presence_watcher_->on_error_count(), 0u);
-  EXPECT_EQ(fake_device_presence_watcher_->on_removal_count(), 1u);
-  EXPECT_EQ(fake_device_presence_watcher_->on_removal_from_ready_count(), 1u);
+  EXPECT_EQ(device_presence_watcher()->on_ready_count(), 1u);
+  EXPECT_EQ(device_presence_watcher()->on_error_count(), 0u);
+  EXPECT_EQ(device_presence_watcher()->on_removal_count(), 1u);
+  EXPECT_EQ(device_presence_watcher()->on_removal_from_ready_count(), 1u);
 }
 
 // Validate that a GetHealthState response of an empty struct is considered "healthy".
@@ -155,8 +135,8 @@ TEST_F(CodecTest, EmptyHealthResponse) {
   auto device = InitializeDeviceForFakeCodec(fake_codec);
   EXPECT_TRUE(InInitializedState(device));
 
-  EXPECT_EQ(fake_device_presence_watcher_->ready_devices().size(), 1u);
-  EXPECT_EQ(fake_device_presence_watcher_->error_devices().size(), 0u);
+  EXPECT_EQ(device_presence_watcher()->ready_devices().size(), 1u);
+  EXPECT_EQ(device_presence_watcher()->error_devices().size(), 0u);
 }
 
 TEST_F(CodecTest, DeviceInfo) {
@@ -246,16 +226,16 @@ TEST_F(CodecTest, SetDaiFormat) {
       });
   RunLoopUntilIdle();
   ASSERT_TRUE(received_get_dai_formats_callback);
-  ASSERT_FALSE(notify_->dai_format());
+  ASSERT_FALSE(notify()->dai_format());
 
   ASSERT_TRUE(device->CodecSetDaiFormat(SafeDaiFormatFromDaiSupportedFormats(dai_formats)));
 
   // check that notify received dai_format and codec_format_info
   RunLoopUntilIdle();
-  EXPECT_TRUE(notify_->dai_format());
-  EXPECT_EQ(ValidateDaiFormat(*notify_->dai_format()), ZX_OK);
-  EXPECT_TRUE(notify_->codec_format_info());
-  EXPECT_EQ(ValidateCodecFormatInfo(*notify_->codec_format_info()), ZX_OK);
+  EXPECT_TRUE(notify()->dai_format());
+  EXPECT_EQ(ValidateDaiFormat(*notify()->dai_format()), ZX_OK);
+  EXPECT_TRUE(notify()->codec_format_info());
+  EXPECT_EQ(ValidateCodecFormatInfo(*notify()->codec_format_info()), ZX_OK);
 }
 
 // Start and Stop
@@ -283,16 +263,16 @@ TEST_F(CodecTest, InitialStop) {
   ASSERT_TRUE(device->CodecSetDaiFormat(SafeDaiFormatFromDaiSupportedFormats(dai_formats)));
 
   RunLoopUntilIdle();
-  ASSERT_TRUE(notify_->dai_format());
-  ASSERT_TRUE(notify_->codec_is_stopped());
+  ASSERT_TRUE(notify()->dai_format());
+  ASSERT_TRUE(notify()->codec_is_stopped());
 
   // This should do nothing since we are already stopped.
   EXPECT_TRUE(device->CodecStop());
 
   RunLoopUntilIdle();
-  EXPECT_TRUE(notify_->codec_is_stopped());
+  EXPECT_TRUE(notify()->codec_is_stopped());
   // This demonstrates that there was no change as a result of the Stop call.
-  EXPECT_EQ(notify_->codec_stop_time()->get(), zx::time::infinite_past().get());
+  EXPECT_EQ(notify()->codec_stop_time()->get(), zx::time::infinite_past().get());
 }
 
 TEST_F(CodecTest, Start) {
@@ -310,15 +290,15 @@ TEST_F(CodecTest, Start) {
   ASSERT_TRUE(device->CodecSetDaiFormat(SafeDaiFormatFromDaiSupportedFormats(dai_formats)));
 
   RunLoopUntilIdle();
-  ASSERT_TRUE(notify_->dai_format());
-  ASSERT_TRUE(notify_->codec_is_stopped());
+  ASSERT_TRUE(notify()->dai_format());
+  ASSERT_TRUE(notify()->codec_is_stopped());
   auto time_before_start = zx::clock::get_monotonic();
 
   EXPECT_TRUE(device->CodecStart());
 
   RunLoopUntilIdle();
-  EXPECT_TRUE(notify_->codec_is_started());
-  EXPECT_GT(notify_->codec_start_time()->get(), time_before_start.get());
+  EXPECT_TRUE(notify()->codec_is_started());
+  EXPECT_GT(notify()->codec_start_time()->get(), time_before_start.get());
 }
 
 TEST_F(CodecTest, SetDaiFormatChange) {
@@ -336,11 +316,11 @@ TEST_F(CodecTest, SetDaiFormatChange) {
   ASSERT_TRUE(device->CodecSetDaiFormat(SafeDaiFormatFromDaiSupportedFormats(dai_formats)));
 
   RunLoopUntilIdle();
-  ASSERT_TRUE(notify_->dai_format());
+  ASSERT_TRUE(notify()->dai_format());
   ASSERT_TRUE(device->CodecStart());
 
   RunLoopUntilIdle();
-  ASSERT_TRUE(notify_->codec_is_started());
+  ASSERT_TRUE(notify()->codec_is_started());
   auto dai_format2 = SecondDaiFormatFromDaiSupportedFormats(dai_formats);
   auto time_before_format_change = zx::clock::get_monotonic();
 
@@ -349,11 +329,11 @@ TEST_F(CodecTest, SetDaiFormatChange) {
 
   // Expect codec to be stopped, and format to be changed.
   RunLoopUntilIdle();
-  EXPECT_TRUE(notify_->codec_is_stopped());
-  EXPECT_GT(notify_->codec_stop_time()->get(), time_before_format_change.get());
-  EXPECT_TRUE(notify_->dai_format());
-  EXPECT_EQ(*notify_->dai_format(), dai_format2);
-  EXPECT_TRUE(notify_->codec_format_info());
+  EXPECT_TRUE(notify()->codec_is_stopped());
+  EXPECT_GT(notify()->codec_stop_time()->get(), time_before_format_change.get());
+  EXPECT_TRUE(notify()->dai_format());
+  EXPECT_EQ(*notify()->dai_format(), dai_format2);
+  EXPECT_TRUE(notify()->codec_format_info());
 }
 
 TEST_F(CodecTest, SetDaiFormatNoChange) {
@@ -372,23 +352,23 @@ TEST_F(CodecTest, SetDaiFormatNoChange) {
   ASSERT_TRUE(device->CodecSetDaiFormat(safe_format));
 
   RunLoopUntilIdle();
-  ASSERT_TRUE(notify_->dai_format());
+  ASSERT_TRUE(notify()->dai_format());
   ASSERT_TRUE(device->CodecStart());
 
   RunLoopUntilIdle();
-  ASSERT_TRUE(notify_->codec_is_started());
+  ASSERT_TRUE(notify()->codec_is_started());
   auto time_after_started = zx::clock::get_monotonic();
   // Clear out our notify's DaiFormat so we can detect a new notification of the same DaiFormat.
-  notify_->clear_dai_format();
+  notify()->clear_dai_format();
 
   EXPECT_TRUE(device->CodecSetDaiFormat(safe_format));
 
   RunLoopUntilIdle();
   // We do not expect this to reset our Start state.
-  EXPECT_TRUE(notify_->codec_is_started());
-  EXPECT_LT(notify_->codec_start_time()->get(), time_after_started.get());
+  EXPECT_TRUE(notify()->codec_is_started());
+  EXPECT_LT(notify()->codec_start_time()->get(), time_after_started.get());
   // We do not expect to be notified of a format change -- even a "change" to the same format.
-  EXPECT_FALSE(notify_->dai_format());
+  EXPECT_FALSE(notify()->dai_format());
 }
 
 TEST_F(CodecTest, StartStop) {
@@ -406,18 +386,18 @@ TEST_F(CodecTest, StartStop) {
   ASSERT_TRUE(device->CodecSetDaiFormat(SafeDaiFormatFromDaiSupportedFormats(dai_formats)));
 
   RunLoopUntilIdle();
-  ASSERT_TRUE(notify_->dai_format());
-  ASSERT_TRUE(notify_->codec_is_stopped());
+  ASSERT_TRUE(notify()->dai_format());
+  ASSERT_TRUE(notify()->codec_is_stopped());
   ASSERT_TRUE(device->CodecStart());
 
   RunLoopUntilIdle();
   auto time_before_stop = zx::clock::get_monotonic();
-  ASSERT_TRUE(notify_->codec_is_started());
+  ASSERT_TRUE(notify()->codec_is_started());
   ASSERT_TRUE(device->CodecStop());
 
   RunLoopUntilIdle();
-  EXPECT_TRUE(notify_->codec_is_stopped());
-  EXPECT_GT(notify_->codec_stop_time()->get(), time_before_stop.get());
+  EXPECT_TRUE(notify()->codec_is_stopped());
+  EXPECT_GT(notify()->codec_stop_time()->get(), time_before_stop.get());
 }
 
 // Start when already started: no notification; old start_time.
@@ -436,19 +416,19 @@ TEST_F(CodecTest, StartStart) {
   ASSERT_TRUE(device->CodecSetDaiFormat(SafeDaiFormatFromDaiSupportedFormats(dai_formats)));
 
   RunLoopUntilIdle();
-  ASSERT_TRUE(notify_->dai_format());
-  ASSERT_TRUE(notify_->codec_is_stopped());
+  ASSERT_TRUE(notify()->dai_format());
+  ASSERT_TRUE(notify()->codec_is_stopped());
   ASSERT_TRUE(device->CodecStart());
 
   RunLoopUntilIdle();
-  ASSERT_TRUE(notify_->codec_is_started());
-  auto previous_start_time = *notify_->codec_start_time();
+  ASSERT_TRUE(notify()->codec_is_started());
+  auto previous_start_time = *notify()->codec_start_time();
   ASSERT_TRUE(device->CodecStart());
 
   // Should not get a new notification here.
   RunLoopUntilIdle();
-  EXPECT_TRUE(notify_->codec_is_started());
-  EXPECT_EQ(notify_->codec_start_time()->get(), previous_start_time.get());
+  EXPECT_TRUE(notify()->codec_is_started());
+  EXPECT_EQ(notify()->codec_start_time()->get(), previous_start_time.get());
 }
 
 // Stop when already stopped: no notification; old stop_time.
@@ -467,26 +447,26 @@ TEST_F(CodecTest, StopStop) {
   ASSERT_TRUE(device->CodecSetDaiFormat(SafeDaiFormatFromDaiSupportedFormats(dai_formats)));
 
   RunLoopUntilIdle();
-  ASSERT_TRUE(notify_->dai_format());
-  ASSERT_TRUE(notify_->codec_is_stopped());
+  ASSERT_TRUE(notify()->dai_format());
+  ASSERT_TRUE(notify()->codec_is_stopped());
   // First Start the Codec so we can explicitly transition into the Stop state.
   ASSERT_TRUE(device->CodecStart());
 
   RunLoopUntilIdle();
-  ASSERT_TRUE(notify_->codec_is_started());
+  ASSERT_TRUE(notify()->codec_is_started());
   ASSERT_TRUE(device->CodecStop());
 
   RunLoopUntilIdle();
-  ASSERT_TRUE(notify_->codec_is_stopped());
-  auto previous_stop_time = *notify_->codec_stop_time();
+  ASSERT_TRUE(notify()->codec_is_stopped());
+  auto previous_stop_time = *notify()->codec_stop_time();
 
   // Since we are already stopped, this should have no effect.
   EXPECT_TRUE(device->CodecStop());
 
   RunLoopUntilIdle();
-  EXPECT_TRUE(notify_->codec_is_stopped());
+  EXPECT_TRUE(notify()->codec_is_stopped());
   // This demonstrates that there was no change as a result of the Stop call.
-  EXPECT_EQ(notify_->codec_stop_time()->get(), previous_stop_time.get());
+  EXPECT_EQ(notify()->codec_stop_time()->get(), previous_stop_time.get());
 }
 
 // Reset stops the Codec and resets DaiFormat, Elements and Topology
@@ -505,9 +485,9 @@ TEST_F(CodecTest, Reset) {
   ASSERT_TRUE(device->CodecSetDaiFormat(SafeDaiFormatFromDaiSupportedFormats(dai_formats)));
 
   RunLoopUntilIdle();
-  ASSERT_TRUE(notify_->dai_format());
-  ASSERT_TRUE(notify_->codec_format_info());
-  ASSERT_TRUE(notify_->codec_is_stopped());
+  ASSERT_TRUE(notify()->dai_format());
+  ASSERT_TRUE(notify()->codec_format_info());
+  ASSERT_TRUE(notify()->codec_is_stopped());
   ASSERT_TRUE(device->CodecStart());
 
   // TODO(https://fxbug.dev/323270827): implement signalprocessing for Codec (topology, gain).
@@ -515,7 +495,7 @@ TEST_F(CodecTest, Reset) {
   // Element, and observe that both of these changes are reverted by the call to Reset.
 
   RunLoopUntilIdle();
-  EXPECT_TRUE(notify_->codec_is_started());
+  EXPECT_TRUE(notify()->codec_is_started());
   // Verify that the signalprocessing Topology has in fact changed.
   // Verify that the signalprocessing Element has in fact changed.
   auto time_before_reset = zx::clock::get_monotonic();
@@ -523,12 +503,12 @@ TEST_F(CodecTest, Reset) {
   EXPECT_TRUE(device->CodecReset());
 
   RunLoopUntilIdle();
-  EXPECT_TRUE(notify_->codec_is_stopped());
+  EXPECT_TRUE(notify()->codec_is_stopped());
   // We were notified that the Codec stopped.
-  EXPECT_GT(notify_->codec_stop_time()->get(), time_before_reset.get());
+  EXPECT_GT(notify()->codec_stop_time()->get(), time_before_reset.get());
   // We were notified that the Codec reset its DaiFormat (none is now set).
-  EXPECT_FALSE(notify_->dai_format());
-  EXPECT_FALSE(notify_->codec_format_info());
+  EXPECT_FALSE(notify()->dai_format());
+  EXPECT_FALSE(notify()->codec_format_info());
   // Observe the signalprocessing Elements - were they reset?
   // Observe the signalprocessing Topology - was it reset?
 }
@@ -541,10 +521,10 @@ TEST_F(CodecTest, InitialPlugState) {
   ASSERT_TRUE(AddObserver(device));
 
   RunLoopUntilIdle();
-  EXPECT_TRUE(DevicePluggedState(device));
-  ASSERT_TRUE(notify_->plug_state());
-  EXPECT_EQ(notify_->plug_state()->first, fuchsia_audio_device::PlugState::kPlugged);
-  EXPECT_EQ(notify_->plug_state()->second.get(), zx::time::infinite_past().get());
+  EXPECT_TRUE(device_plugged_state(device));
+  ASSERT_TRUE(notify()->plug_state());
+  EXPECT_EQ(notify()->plug_state()->first, fuchsia_audio_device::PlugState::kPlugged);
+  EXPECT_EQ(notify()->plug_state()->second.get(), zx::time::infinite_past().get());
 }
 
 // This tests the driver's ability to originate plug changes, such as from jack detection. It also
@@ -556,19 +536,19 @@ TEST_F(CodecTest, DynamicPlugUpdate) {
   ASSERT_TRUE(SetControl(device));
 
   RunLoopUntilIdle();
-  EXPECT_TRUE(DevicePluggedState(device));
-  ASSERT_TRUE(notify_->plug_state());
-  EXPECT_EQ(notify_->plug_state()->first, fuchsia_audio_device::PlugState::kPlugged);
-  EXPECT_EQ(notify_->plug_state()->second.get(), zx::time::infinite_past().get());
-  notify_->plug_state().reset();
+  EXPECT_TRUE(device_plugged_state(device));
+  ASSERT_TRUE(notify()->plug_state());
+  EXPECT_EQ(notify()->plug_state()->first, fuchsia_audio_device::PlugState::kPlugged);
+  EXPECT_EQ(notify()->plug_state()->second.get(), zx::time::infinite_past().get());
+  notify()->plug_state().reset();
 
   auto unplug_time = zx::clock::get_monotonic();
   fake_codec->InjectUnpluggedAt(unplug_time);
   RunLoopUntilIdle();
-  EXPECT_FALSE(DevicePluggedState(device));
-  ASSERT_TRUE(notify_->plug_state());
-  EXPECT_EQ(notify_->plug_state()->first, fuchsia_audio_device::PlugState::kUnplugged);
-  EXPECT_EQ(notify_->plug_state()->second.get(), unplug_time.get());
+  EXPECT_FALSE(device_plugged_state(device));
+  ASSERT_TRUE(notify()->plug_state());
+  EXPECT_EQ(notify()->plug_state()->first, fuchsia_audio_device::PlugState::kUnplugged);
+  EXPECT_EQ(notify()->plug_state()->second.get(), unplug_time.get());
 }
 
 // Validate that a fake stream_config with default values is initialized successfully.
@@ -576,14 +556,14 @@ TEST_F(StreamConfigTest, Initialization) {
   auto device = InitializeDeviceForFakeStreamConfig(MakeFakeStreamConfigOutput());
   EXPECT_TRUE(InInitializedState(device));
 
-  EXPECT_EQ(fake_device_presence_watcher_->ready_devices().size(), 1u);
-  EXPECT_EQ(fake_device_presence_watcher_->error_devices().size(), 0u);
+  EXPECT_EQ(device_presence_watcher()->ready_devices().size(), 1u);
+  EXPECT_EQ(device_presence_watcher()->error_devices().size(), 0u);
 
-  EXPECT_EQ(fake_device_presence_watcher_->on_ready_count(), 1u);
-  EXPECT_EQ(fake_device_presence_watcher_->on_error_count(), 0u);
-  EXPECT_EQ(fake_device_presence_watcher_->on_removal_count(), 0u);
+  EXPECT_EQ(device_presence_watcher()->on_ready_count(), 1u);
+  EXPECT_EQ(device_presence_watcher()->on_error_count(), 0u);
+  EXPECT_EQ(device_presence_watcher()->on_removal_count(), 0u);
 
-  fake_device_presence_watcher_.reset();
+  device_presence_watcher().reset();
 }
 
 // Validate that a driver's dropping the StreamConfig causes a DeviceIsRemoved notification.
@@ -591,23 +571,23 @@ TEST_F(StreamConfigTest, Disconnect) {
   auto fake_stream_config = MakeFakeStreamConfigOutput();
   auto device = InitializeDeviceForFakeStreamConfig(fake_stream_config);
   ASSERT_TRUE(InInitializedState(device));
-  ASSERT_EQ(fake_device_presence_watcher_->ready_devices().size(), 1u);
-  ASSERT_EQ(fake_device_presence_watcher_->error_devices().size(), 0u);
+  ASSERT_EQ(device_presence_watcher()->ready_devices().size(), 1u);
+  ASSERT_EQ(device_presence_watcher()->error_devices().size(), 0u);
 
-  ASSERT_EQ(fake_device_presence_watcher_->on_ready_count(), 1u);
-  ASSERT_EQ(fake_device_presence_watcher_->on_error_count(), 0u);
-  ASSERT_EQ(fake_device_presence_watcher_->on_removal_count(), 0u);
+  ASSERT_EQ(device_presence_watcher()->on_ready_count(), 1u);
+  ASSERT_EQ(device_presence_watcher()->on_error_count(), 0u);
+  ASSERT_EQ(device_presence_watcher()->on_removal_count(), 0u);
 
   fake_stream_config->DropStreamConfig();
   RunLoopUntilIdle();
 
-  EXPECT_EQ(fake_device_presence_watcher_->ready_devices().size(), 0u);
-  EXPECT_EQ(fake_device_presence_watcher_->error_devices().size(), 0u);
+  EXPECT_EQ(device_presence_watcher()->ready_devices().size(), 0u);
+  EXPECT_EQ(device_presence_watcher()->error_devices().size(), 0u);
 
-  EXPECT_EQ(fake_device_presence_watcher_->on_ready_count(), 1u);
-  EXPECT_EQ(fake_device_presence_watcher_->on_error_count(), 0u);
-  EXPECT_EQ(fake_device_presence_watcher_->on_removal_count(), 1u);
-  EXPECT_EQ(fake_device_presence_watcher_->on_removal_from_ready_count(), 1u);
+  EXPECT_EQ(device_presence_watcher()->on_ready_count(), 1u);
+  EXPECT_EQ(device_presence_watcher()->on_error_count(), 0u);
+  EXPECT_EQ(device_presence_watcher()->on_removal_count(), 1u);
+  EXPECT_EQ(device_presence_watcher()->on_removal_from_ready_count(), 1u);
 }
 
 // Validate that a GetHealthState response of an empty struct is considered "healthy".
@@ -617,11 +597,11 @@ TEST_F(StreamConfigTest, EmptyHealthResponse) {
   auto device = InitializeDeviceForFakeStreamConfig(fake_stream_config);
   EXPECT_TRUE(InInitializedState(device));
 
-  EXPECT_EQ(fake_device_presence_watcher_->ready_devices().size(), 1u);
-  EXPECT_EQ(fake_device_presence_watcher_->error_devices().size(), 0u);
+  EXPECT_EQ(device_presence_watcher()->ready_devices().size(), 1u);
+  EXPECT_EQ(device_presence_watcher()->error_devices().size(), 0u);
 }
 
-TEST_F(DeviceTest, DistinctTokenIds) {
+TEST_F(StreamConfigTest, DistinctTokenIds) {
   auto fake_stream_config = MakeFakeStreamConfigOutput();
   auto device = InitializeDeviceForFakeStreamConfig(fake_stream_config);
   ASSERT_TRUE(InInitializedState(device));
@@ -639,8 +619,8 @@ TEST_F(DeviceTest, DistinctTokenIds) {
 
   EXPECT_NE(device->token_id(), device2->token_id());
 
-  EXPECT_EQ(fake_device_presence_watcher_->ready_devices().size(), 2u);
-  EXPECT_EQ(fake_device_presence_watcher_->error_devices().size(), 0u);
+  EXPECT_EQ(device_presence_watcher()->ready_devices().size(), 2u);
+  EXPECT_EQ(device_presence_watcher()->error_devices().size(), 0u);
 }
 
 TEST_F(StreamConfigTest, DefaultClock) {
@@ -652,8 +632,8 @@ TEST_F(StreamConfigTest, DefaultClock) {
   EXPECT_TRUE(device_clock(device)->IdenticalToMonotonicClock());
   EXPECT_FALSE(device_clock(device)->adjustable());
 
-  EXPECT_EQ(fake_device_presence_watcher_->ready_devices().size(), 1u);
-  EXPECT_EQ(fake_device_presence_watcher_->error_devices().size(), 0u);
+  EXPECT_EQ(device_presence_watcher()->ready_devices().size(), 1u);
+  EXPECT_EQ(device_presence_watcher()->error_devices().size(), 0u);
 }
 
 TEST_F(StreamConfigTest, ClockInOtherDomain) {
@@ -667,8 +647,8 @@ TEST_F(StreamConfigTest, ClockInOtherDomain) {
   EXPECT_TRUE(device_clock(device)->IdenticalToMonotonicClock());
   EXPECT_TRUE(device_clock(device)->adjustable());
 
-  EXPECT_EQ(fake_device_presence_watcher_->ready_devices().size(), 1u);
-  EXPECT_EQ(fake_device_presence_watcher_->error_devices().size(), 0u);
+  EXPECT_EQ(device_presence_watcher()->ready_devices().size(), 1u);
+  EXPECT_EQ(device_presence_watcher()->error_devices().size(), 0u);
 }
 
 TEST_F(StreamConfigTest, DeviceInfo) {
@@ -732,15 +712,15 @@ TEST_F(StreamConfigTest, InitialGainState) {
   ASSERT_TRUE(AddObserver(device));
 
   RunLoopUntilIdle();
-  auto gain_state = DeviceGainState(device);
+  auto gain_state = device_gain_state(device);
   EXPECT_EQ(*gain_state.gain_db(), 0.0f);
   EXPECT_FALSE(*gain_state.muted());
   EXPECT_FALSE(*gain_state.agc_enabled());
-  ASSERT_TRUE(notify_->gain_state()) << "ObserverNotify was not notified of initial gain state";
-  ASSERT_TRUE(notify_->gain_state()->gain_db());
-  EXPECT_EQ(*notify_->gain_state()->gain_db(), 0.0f);
-  EXPECT_FALSE(notify_->gain_state()->muted().value_or(false));
-  EXPECT_FALSE(notify_->gain_state()->agc_enabled().value_or(false));
+  ASSERT_TRUE(notify()->gain_state()) << "ObserverNotify was not notified of initial gain state";
+  ASSERT_TRUE(notify()->gain_state()->gain_db());
+  EXPECT_EQ(*notify()->gain_state()->gain_db(), 0.0f);
+  EXPECT_FALSE(notify()->gain_state()->muted().value_or(false));
+  EXPECT_FALSE(notify()->gain_state()->agc_enabled().value_or(false));
 }
 
 // This tests the driver's ability to originate gain changes, such as from hardware buttons. It also
@@ -752,14 +732,14 @@ TEST_F(StreamConfigTest, DynamicGainUpdate) {
   ASSERT_TRUE(SetControl(device));
 
   RunLoopUntilIdle();
-  auto gain_state = DeviceGainState(device);
+  auto gain_state = device_gain_state(device);
   EXPECT_EQ(*gain_state.gain_db(), 0.0f);
   EXPECT_FALSE(*gain_state.muted());
   EXPECT_FALSE(*gain_state.agc_enabled());
-  EXPECT_EQ(*notify_->gain_state()->gain_db(), 0.0f);
-  EXPECT_FALSE(notify_->gain_state()->muted().value_or(false));
-  EXPECT_FALSE(notify_->gain_state()->agc_enabled().value_or(false));
-  notify_->gain_state().reset();
+  EXPECT_EQ(*notify()->gain_state()->gain_db(), 0.0f);
+  EXPECT_FALSE(notify()->gain_state()->muted().value_or(false));
+  EXPECT_FALSE(notify()->gain_state()->agc_enabled().value_or(false));
+  notify()->gain_state().reset();
 
   constexpr float kNewGainDb = -2.0f;
   fake_stream_config->InjectGainChange({{
@@ -769,18 +749,18 @@ TEST_F(StreamConfigTest, DynamicGainUpdate) {
   }});
 
   RunLoopUntilIdle();
-  gain_state = DeviceGainState(device);
+  gain_state = device_gain_state(device);
   EXPECT_EQ(*gain_state.gain_db(), kNewGainDb);
   EXPECT_TRUE(*gain_state.muted());
   EXPECT_TRUE(*gain_state.agc_enabled());
 
-  ASSERT_TRUE(notify_->gain_state());
-  ASSERT_TRUE(notify_->gain_state()->gain_db());
-  ASSERT_TRUE(notify_->gain_state()->muted());
-  ASSERT_TRUE(notify_->gain_state()->agc_enabled());
-  EXPECT_EQ(*notify_->gain_state()->gain_db(), kNewGainDb);
-  EXPECT_TRUE(*notify_->gain_state()->muted());
-  EXPECT_TRUE(*notify_->gain_state()->agc_enabled());
+  ASSERT_TRUE(notify()->gain_state());
+  ASSERT_TRUE(notify()->gain_state()->gain_db());
+  ASSERT_TRUE(notify()->gain_state()->muted());
+  ASSERT_TRUE(notify()->gain_state()->agc_enabled());
+  EXPECT_EQ(*notify()->gain_state()->gain_db(), kNewGainDb);
+  EXPECT_TRUE(*notify()->gain_state()->muted());
+  EXPECT_TRUE(*notify()->gain_state()->agc_enabled());
 }
 
 // This tests the ability to set gain to the driver, such as from GUI volume controls.
@@ -791,15 +771,15 @@ TEST_F(StreamConfigTest, SetGain) {
   ASSERT_TRUE(SetControl(device));
 
   RunLoopUntilIdle();
-  auto gain_state = DeviceGainState(device);
+  auto gain_state = device_gain_state(device);
   EXPECT_EQ(*gain_state.gain_db(), 0.0f);
   EXPECT_FALSE(*gain_state.muted());
   EXPECT_FALSE(*gain_state.agc_enabled());
-  ASSERT_TRUE(notify_->gain_state()) << "ObserverNotify was not notified of initial gain state";
-  EXPECT_EQ(*notify_->gain_state()->gain_db(), 0.0f);
-  EXPECT_FALSE(notify_->gain_state()->muted().value_or(false));
-  EXPECT_FALSE(notify_->gain_state()->agc_enabled().value_or(false));
-  notify_->gain_state().reset();
+  ASSERT_TRUE(notify()->gain_state()) << "ObserverNotify was not notified of initial gain state";
+  EXPECT_EQ(*notify()->gain_state()->gain_db(), 0.0f);
+  EXPECT_FALSE(notify()->gain_state()->muted().value_or(false));
+  EXPECT_FALSE(notify()->gain_state()->agc_enabled().value_or(false));
+  notify()->gain_state().reset();
 
   constexpr float kNewGainDb = -2.0f;
   EXPECT_TRUE(SetDeviceGain(device, {{
@@ -809,16 +789,16 @@ TEST_F(StreamConfigTest, SetGain) {
                                     }}));
 
   RunLoopUntilIdle();
-  gain_state = DeviceGainState(device);
+  gain_state = device_gain_state(device);
   EXPECT_EQ(*gain_state.gain_db(), kNewGainDb);
   EXPECT_TRUE(*gain_state.muted());
   EXPECT_TRUE(*gain_state.agc_enabled());
 
-  ASSERT_TRUE(notify_->gain_state() && notify_->gain_state()->gain_db() &&
-              notify_->gain_state()->muted() && notify_->gain_state()->agc_enabled());
-  EXPECT_EQ(*notify_->gain_state()->gain_db(), kNewGainDb);
-  EXPECT_TRUE(notify_->gain_state()->muted().value_or(false));        // Must be present and true.
-  EXPECT_TRUE(notify_->gain_state()->agc_enabled().value_or(false));  // Must be present and true.
+  ASSERT_TRUE(notify()->gain_state() && notify()->gain_state()->gain_db() &&
+              notify()->gain_state()->muted() && notify()->gain_state()->agc_enabled());
+  EXPECT_EQ(*notify()->gain_state()->gain_db(), kNewGainDb);
+  EXPECT_TRUE(notify()->gain_state()->muted().value_or(false));        // Must be present and true.
+  EXPECT_TRUE(notify()->gain_state()->agc_enabled().value_or(false));  // Must be present and true.
 }
 
 // This tests the driver's ability to inform its ObserverNotify of initial plug state.
@@ -829,10 +809,10 @@ TEST_F(StreamConfigTest, InitialPlugState) {
   ASSERT_TRUE(AddObserver(device));
 
   RunLoopUntilIdle();
-  EXPECT_TRUE(DevicePluggedState(device));
-  ASSERT_TRUE(notify_->plug_state());
-  EXPECT_EQ(notify_->plug_state()->first, fuchsia_audio_device::PlugState::kPlugged);
-  EXPECT_EQ(notify_->plug_state()->second.get(), zx::time(0).get());
+  EXPECT_TRUE(device_plugged_state(device));
+  ASSERT_TRUE(notify()->plug_state());
+  EXPECT_EQ(notify()->plug_state()->first, fuchsia_audio_device::PlugState::kPlugged);
+  EXPECT_EQ(notify()->plug_state()->second.get(), zx::time(0).get());
 }
 
 TEST_F(StreamConfigTest, DynamicPlugUpdate) {
@@ -842,19 +822,19 @@ TEST_F(StreamConfigTest, DynamicPlugUpdate) {
   ASSERT_TRUE(SetControl(device));
 
   RunLoopUntilIdle();
-  EXPECT_TRUE(DevicePluggedState(device));
-  ASSERT_TRUE(notify_->plug_state());
-  EXPECT_EQ(notify_->plug_state()->first, fuchsia_audio_device::PlugState::kPlugged);
-  EXPECT_EQ(notify_->plug_state()->second.get(), zx::time(0).get());
-  notify_->plug_state().reset();
+  EXPECT_TRUE(device_plugged_state(device));
+  ASSERT_TRUE(notify()->plug_state());
+  EXPECT_EQ(notify()->plug_state()->first, fuchsia_audio_device::PlugState::kPlugged);
+  EXPECT_EQ(notify()->plug_state()->second.get(), zx::time(0).get());
+  notify()->plug_state().reset();
 
   auto unplug_time = zx::clock::get_monotonic();
   fake_stream_config->InjectUnpluggedAt(unplug_time);
   RunLoopUntilIdle();
-  EXPECT_FALSE(DevicePluggedState(device));
-  ASSERT_TRUE(notify_->plug_state());
-  EXPECT_EQ(notify_->plug_state()->first, fuchsia_audio_device::PlugState::kUnplugged);
-  EXPECT_EQ(notify_->plug_state()->second.get(), unplug_time.get());
+  EXPECT_FALSE(device_plugged_state(device));
+  ASSERT_TRUE(notify()->plug_state());
+  EXPECT_EQ(notify()->plug_state()->first, fuchsia_audio_device::PlugState::kUnplugged);
+  EXPECT_EQ(notify()->plug_state()->second.get(), unplug_time.get());
 }
 
 // Validate that Device can open the driver's RingBuffer FIDL channel.
@@ -948,10 +928,10 @@ TEST_F(StreamConfigTest, InitialDelay) {
   EXPECT_EQ(*DeviceDelayInfo(device)->internal_delay(), 0);
 
   // Validate that the ControlNotify was sent the expected values.
-  ASSERT_TRUE(notify_->delay_info()) << "ControlNotify was not notified of initial delay info";
-  ASSERT_TRUE(notify_->delay_info()->internal_delay());
-  EXPECT_FALSE(notify_->delay_info()->external_delay());
-  EXPECT_EQ(*notify_->delay_info()->internal_delay(), 0);
+  ASSERT_TRUE(notify()->delay_info()) << "ControlNotify was not notified of initial delay info";
+  ASSERT_TRUE(notify()->delay_info()->internal_delay());
+  EXPECT_FALSE(notify()->delay_info()->external_delay());
+  EXPECT_EQ(*notify()->delay_info()->internal_delay(), 0);
 }
 
 TEST_F(StreamConfigTest, DynamicDelay) {
@@ -968,14 +948,14 @@ TEST_F(StreamConfigTest, DynamicDelay) {
   RunLoopUntilIdle();
 
   EXPECT_TRUE(created_ring_buffer);
-  ASSERT_TRUE(notify_->delay_info()) << "ControlNotify was not notified of initial delay info";
-  ASSERT_TRUE(notify_->delay_info()->internal_delay());
-  EXPECT_FALSE(notify_->delay_info()->external_delay());
-  EXPECT_EQ(*notify_->delay_info()->internal_delay(), 0);
-  notify_->delay_info().reset();
+  ASSERT_TRUE(notify()->delay_info()) << "ControlNotify was not notified of initial delay info";
+  ASSERT_TRUE(notify()->delay_info()->internal_delay());
+  EXPECT_FALSE(notify()->delay_info()->external_delay());
+  EXPECT_EQ(*notify()->delay_info()->internal_delay(), 0);
+  notify()->delay_info().reset();
 
   RunLoopUntilIdle();
-  EXPECT_FALSE(notify_->delay_info());
+  EXPECT_FALSE(notify()->delay_info());
 
   fake_stream_config->InjectDelayUpdate(zx::nsec(123'456), zx::nsec(654'321));
   RunLoopUntilIdle();
@@ -985,11 +965,11 @@ TEST_F(StreamConfigTest, DynamicDelay) {
   EXPECT_EQ(*DeviceDelayInfo(device)->internal_delay(), 123'456);
   EXPECT_EQ(*DeviceDelayInfo(device)->external_delay(), 654'321);
 
-  ASSERT_TRUE(notify_->delay_info()) << "ControlNotify was not notified with updated delay info";
-  ASSERT_TRUE(notify_->delay_info()->internal_delay());
-  ASSERT_TRUE(notify_->delay_info()->external_delay());
-  EXPECT_EQ(*notify_->delay_info()->internal_delay(), 123'456);
-  EXPECT_EQ(*notify_->delay_info()->external_delay(), 654'321);
+  ASSERT_TRUE(notify()->delay_info()) << "ControlNotify was not notified with updated delay info";
+  ASSERT_TRUE(notify()->delay_info()->internal_delay());
+  ASSERT_TRUE(notify()->delay_info()->external_delay());
+  EXPECT_EQ(*notify()->delay_info()->internal_delay(), 123'456);
+  EXPECT_EQ(*notify()->delay_info()->external_delay(), 654'321);
 }
 
 TEST_F(StreamConfigTest, ReportsThatItSupportsSetActiveChannels) {

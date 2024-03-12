@@ -124,6 +124,8 @@ class Device : public std::enable_shared_from_this<Device> {
  private:
   friend class DeviceTestBase;
   friend class DeviceTest;
+  friend class CodecTest;
+  friend class StreamConfigTest;
   friend class DeviceWarningTest;
   friend class AudioDeviceRegistryServerTestBase;
 

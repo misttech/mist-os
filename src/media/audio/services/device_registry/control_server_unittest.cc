@@ -4,15 +4,16 @@
 
 #include "src/media/audio/services/device_registry/control_server.h"
 
-#include <fidl/fuchsia.audio.device/cpp/markers.h>
-#include <fidl/fuchsia.audio.device/cpp/natural_types.h>
+#include <fidl/fuchsia.audio.device/cpp/fidl.h>
 #include <fidl/fuchsia.audio/cpp/common_types.h>
+#include <fidl/fuchsia.hardware.audio/cpp/natural_types.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/zx/time.h>
 
 #include <gtest/gtest.h>
 
 #include "src/media/audio/services/device_registry/adr_server_unittest_base.h"
+#include "src/media/audio/services/device_registry/common_unittest.h"
 #include "src/media/audio/services/device_registry/testing/fake_stream_config.h"
 
 namespace media_audio {
@@ -23,17 +24,6 @@ using DriverClient = fuchsia_audio_device::DriverClient;
 
 class ControlServerTest : public AudioDeviceRegistryServerTestBase {
  protected:
-  std::unique_ptr<FakeStreamConfig> CreateAndEnableDriverWithDefaults() {
-    auto fake_driver = CreateFakeStreamConfigOutput();
-
-    adr_service_->AddDevice(Device::Create(
-        adr_service_, dispatcher(), "Test output name", fuchsia_audio_device::DeviceType::kOutput,
-        DriverClient::WithStreamConfig(
-            fidl::ClientEnd<fuchsia_hardware_audio::StreamConfig>(fake_driver->Enable()))));
-    RunLoopUntilIdle();
-    return fake_driver;
-  }
-
   std::optional<TokenId> WaitForAddedDeviceTokenId(
       fidl::Client<fuchsia_audio_device::Registry>& registry_client) {
     std::optional<TokenId> added_device_id;
@@ -78,7 +68,23 @@ class ControlServerTest : public AudioDeviceRegistryServerTestBase {
   }
 };
 
-TEST_F(ControlServerTest, CleanClientDrop) {
+class ControlServerStreamConfigTest : public ControlServerTest {
+ protected:
+  std::unique_ptr<FakeStreamConfig> CreateAndEnableDriverWithDefaults() {
+    auto fake_driver = CreateFakeStreamConfigOutput();
+
+    adr_service_->AddDevice(Device::Create(
+        adr_service_, dispatcher(), "Test output name", fuchsia_audio_device::DeviceType::kOutput,
+        DriverClient::WithStreamConfig(
+            fidl::ClientEnd<fuchsia_hardware_audio::StreamConfig>(fake_driver->Enable()))));
+    RunLoopUntilIdle();
+    return fake_driver;
+  }
+};
+
+/////////////////////
+// StreamConfig tests
+TEST_F(ControlServerStreamConfigTest, CleanClientDrop) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
   auto control = CreateTestControlServer(*adr_service_->devices().begin());
   RunLoopUntilIdle();
@@ -89,7 +95,7 @@ TEST_F(ControlServerTest, CleanClientDrop) {
   // If Control client doesn't drop cleanly, ControlServer will emit a WARNING, causing a failure.
 }
 
-TEST_F(ControlServerTest, CleanServerShutdown) {
+TEST_F(ControlServerStreamConfigTest, CleanServerShutdown) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
   auto control = CreateTestControlServer(*adr_service_->devices().begin());
   RunLoopUntilIdle();
@@ -102,7 +108,7 @@ TEST_F(ControlServerTest, CleanServerShutdown) {
 
 // Same as "CleanClientDrop" test case, but the Control is created "properly" through a
 // ControlCreator rather than directly via AudioDeviceRegistry::CreateControlServer.
-TEST_F(ControlServerTest, BasicClose) {
+TEST_F(ControlServerStreamConfigTest, BasicClose) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
   auto registry = CreateTestRegistryServer();
   auto added_id = WaitForAddedDeviceTokenId(registry->client());
@@ -119,7 +125,7 @@ TEST_F(ControlServerTest, BasicClose) {
   control_client = fidl::Client<fuchsia_audio_device::Control>();
 }
 
-TEST_F(ControlServerTest, ControlCreatorServerShutdownDoesNotAffectControl) {
+TEST_F(ControlServerStreamConfigTest, ControlCreatorServerShutdownDoesNotAffectControl) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
   auto registry = CreateTestRegistryServer();
   auto added_id = WaitForAddedDeviceTokenId(registry->client());
@@ -140,7 +146,7 @@ TEST_F(ControlServerTest, ControlCreatorServerShutdownDoesNotAffectControl) {
   control_client = fidl::Client<fuchsia_audio_device::Control>();
 }
 
-TEST_F(ControlServerTest, SetGain) {
+TEST_F(ControlServerStreamConfigTest, SetGain) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
   fake_driver->AllocateRingBuffer(8192);
   auto registry = CreateTestRegistryServer();
@@ -169,7 +175,7 @@ TEST_F(ControlServerTest, SetGain) {
 }
 
 // Validate that the Control lives, even if the client drops its child RingBuffer.
-TEST_F(ControlServerTest, ClientRingBufferDropDoesNotAffectControl) {
+TEST_F(ControlServerStreamConfigTest, ClientRingBufferDropDoesNotAffectControl) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
   fake_driver->AllocateRingBuffer(8192);
   auto registry = CreateTestRegistryServer();
@@ -227,7 +233,7 @@ TEST_F(ControlServerTest, ClientRingBufferDropDoesNotAffectControl) {
 }
 
 // Validate that the Control lives, even if the driver drops its RingBuffer connection.
-TEST_F(ControlServerTest, DriverRingBufferDropDoesNotAffectControl) {
+TEST_F(ControlServerStreamConfigTest, DriverRingBufferDropDoesNotAffectControl) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
   fake_driver->AllocateRingBuffer(8192);
   auto registry = CreateTestRegistryServer();
@@ -281,7 +287,7 @@ TEST_F(ControlServerTest, DriverRingBufferDropDoesNotAffectControl) {
 }
 
 // Validate that the ControlServer shuts down cleanly if the driver drops its StreamConfig.
-TEST_F(ControlServerTest, StreamConfigDropCausesCleanControlServerShutdown) {
+TEST_F(ControlServerStreamConfigTest, StreamConfigDropCausesCleanControlServerShutdown) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
   fake_driver->AllocateRingBuffer(8192);
   auto registry = CreateTestRegistryServer();

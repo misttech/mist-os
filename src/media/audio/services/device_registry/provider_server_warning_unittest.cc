@@ -16,23 +16,26 @@ namespace {
 using Provider = fuchsia_audio_device::Provider;
 
 // These tests rely upon a single, already-created Provider.
-class ProviderServerWarningTest : public AudioDeviceRegistryServerTestBase {};
+class ProviderServerCodecWarningTest : public AudioDeviceRegistryServerTestBase {};
+class ProviderServerCompositeWarningTest : public AudioDeviceRegistryServerTestBase {};
+class ProviderServerDaiWarningTest : public AudioDeviceRegistryServerTestBase {};
+class ProviderServerStreamConfigWarningTest : public AudioDeviceRegistryServerTestBase {};
 
-///////////////////////////////////
-// Validate AddDevice(Codec)
+/////////////////////
+// Codec tests
 //
-TEST_F(ProviderServerWarningTest, MissingDeviceNameForCodec) {
+TEST_F(ProviderServerCodecWarningTest, MissingDeviceName) {
   auto provider = CreateTestProviderServer();
-  EXPECT_EQ(ProviderServer::count(), 1u);
-
+  ASSERT_EQ(ProviderServer::count(), 1u);
   auto fake_driver = CreateFakeCodecOutput();
-
   auto received_callback = false;
+
   fuchsia_audio_device::ProviderAddDeviceRequest request;
   // missing .device_name
   request.device_type(fuchsia_audio_device::DeviceType::kCodec);
   request.driver_client(fuchsia_audio_device::DriverClient::WithCodec(
       fidl::ClientEnd<fuchsia_hardware_audio::Codec>(fake_driver->Enable())));
+
   provider->client()
       ->AddDevice(std::move(request))
       .Then([&received_callback](fidl::Result<Provider::AddDevice>& result) {
@@ -51,17 +54,15 @@ TEST_F(ProviderServerWarningTest, MissingDeviceNameForCodec) {
   EXPECT_EQ(adr_service_->unhealthy_devices().size(), 0u);
 }
 
-TEST_F(ProviderServerWarningTest, EmptyDeviceNameForCodec) {
+TEST_F(ProviderServerCodecWarningTest, EmptyDeviceName) {
   auto provider = CreateTestProviderServer();
-  EXPECT_EQ(ProviderServer::count(), 1u);
-
+  ASSERT_EQ(ProviderServer::count(), 1u);
   auto fake_driver = CreateFakeCodecInput();
-  fake_driver->set_is_input(true);
-
   auto received_callback = false;
+
   provider->client()
       ->AddDevice({{
-          .device_name = "",
+          .device_name = "",  // empty .device_name
           .device_type = fuchsia_audio_device::DeviceType::kCodec,
           .driver_client = fuchsia_audio_device::DriverClient::WithCodec(
               fidl::ClientEnd<fuchsia_hardware_audio::Codec>(fake_driver->Enable())),
@@ -82,17 +83,15 @@ TEST_F(ProviderServerWarningTest, EmptyDeviceNameForCodec) {
   EXPECT_EQ(adr_service_->unhealthy_devices().size(), 0u);
 }
 
-TEST_F(ProviderServerWarningTest, MissingDeviceTypeForCodec) {
+TEST_F(ProviderServerCodecWarningTest, MissingDeviceType) {
   auto provider = CreateTestProviderServer();
-  EXPECT_EQ(ProviderServer::count(), 1u);
-
+  ASSERT_EQ(ProviderServer::count(), 1u);
   auto fake_driver = CreateFakeCodecNoDirection();
-  fake_driver->set_is_input(std::nullopt);
-
   auto received_callback = false;
+
   provider->client()
       ->AddDevice({{
-          .device_name = "Test codec",
+          .device_name = "Test device name",
           // missing .device_type
           .driver_client = fuchsia_audio_device::DriverClient::WithCodec(
               fidl::ClientEnd<fuchsia_hardware_audio::Codec>(fake_driver->Enable())),
@@ -113,16 +112,16 @@ TEST_F(ProviderServerWarningTest, MissingDeviceTypeForCodec) {
   EXPECT_EQ(adr_service_->unhealthy_devices().size(), 0u);
 }
 
-TEST_F(ProviderServerWarningTest, MissingDriverClientForCodec) {
+TEST_F(ProviderServerCodecWarningTest, MissingDriverClient) {
   auto provider = CreateTestProviderServer();
-  EXPECT_EQ(ProviderServer::count(), 1u);
-
+  ASSERT_EQ(ProviderServer::count(), 1u);
   auto received_callback = false;
+
   provider->client()
       ->AddDevice({{
-          .device_name = "Test codec",                              //
-          .device_type = fuchsia_audio_device::DeviceType::kCodec,  //
-                                                                    // missing .driver_client
+          .device_name = "Test device name",
+          .device_type = fuchsia_audio_device::DeviceType::kCodec,
+          // missing .driver_client
       }})
       .Then([&received_callback](fidl::Result<Provider::AddDevice>& result) {
         received_callback = true;
@@ -140,11 +139,11 @@ TEST_F(ProviderServerWarningTest, MissingDriverClientForCodec) {
   EXPECT_EQ(adr_service_->unhealthy_devices().size(), 0u);
 }
 
-TEST_F(ProviderServerWarningTest, InvalidDriverClientForCodec) {
+TEST_F(ProviderServerCodecWarningTest, InvalidDriverClient) {
   auto provider = CreateTestProviderServer();
-  EXPECT_EQ(ProviderServer::count(), 1u);
-
+  ASSERT_EQ(ProviderServer::count(), 1u);
   auto received_callback = false;
+
   provider->client()
       ->AddDevice({{
           .device_name = "Test device name",
@@ -167,16 +166,15 @@ TEST_F(ProviderServerWarningTest, InvalidDriverClientForCodec) {
   EXPECT_EQ(adr_service_->unhealthy_devices().size(), 0u);
 }
 
-TEST_F(ProviderServerWarningTest, WrongDriverClientForCodec) {
+TEST_F(ProviderServerCodecWarningTest, WrongDriverClient) {
   auto provider = CreateTestProviderServer();
-  EXPECT_EQ(ProviderServer::count(), 1u);
-
+  ASSERT_EQ(ProviderServer::count(), 1u);
   auto fake_driver = CreateFakeCodecOutput();
-
   auto received_callback = false;
+
   provider->client()
       ->AddDevice({{
-          .device_name = "Test codec",
+          .device_name = "Test device name",
           .device_type = fuchsia_audio_device::DeviceType::kCodec,
           // StreamConfig driver_client doesn't match kCodec.
           .driver_client = fuchsia_audio_device::DriverClient::WithStreamConfig(
@@ -198,17 +196,16 @@ TEST_F(ProviderServerWarningTest, WrongDriverClientForCodec) {
   EXPECT_EQ(adr_service_->unhealthy_devices().size(), 0u);
 }
 
-///////////////////////////////////
-// Validate AddDevice(Composite)
+/////////////////////
+// Composite tests
 //
 // Remove this test, once Provider/AddDevice supports the Composite driver type.
-TEST_F(ProviderServerWarningTest, UnsupportedCompositeType) {
+TEST_F(ProviderServerCompositeWarningTest, Unsupported) {
   auto provider = CreateTestProviderServer();
-  EXPECT_EQ(ProviderServer::count(), 1u);
-
+  ASSERT_EQ(ProviderServer::count(), 1u);
   auto fake_driver = CreateFakeStreamConfigOutput();
-
   auto received_callback = false;
+
   provider->client()
       ->AddDevice({{
           .device_name = "Test device name",
@@ -233,24 +230,17 @@ TEST_F(ProviderServerWarningTest, UnsupportedCompositeType) {
   EXPECT_EQ(adr_service_->devices().size(), 0u);
   EXPECT_EQ(adr_service_->unhealthy_devices().size(), 0u);
 }
-// TEST_F(ProviderServerWarningTest, MissingDeviceNameForComposite) {}
-// TEST_F(ProviderServerWarningTest, EmptyDeviceNameForComposite) {}
-// TEST_F(ProviderServerWarningTest, MissingDeviceTypeForComposite) {}
-// TEST_F(ProviderServerWarningTest, MissingDriverClientForComposite) {}
-// TEST_F(ProviderServerWarningTest, InvalidDriverClientForComposite) {}
-// TEST_F(ProviderServerWarningTest, WrongDriverClientForComposite) {}
 
-///////////////////////////////////
-// Validate AddDevice(Dai)
+/////////////////////
+// Dai tests
 //
 // Remove this test, once Provider/AddDevice supports the Dai driver type.
-TEST_F(ProviderServerWarningTest, UnsupportedDaiType) {
+TEST_F(ProviderServerDaiWarningTest, Unsupported) {
   auto provider = CreateTestProviderServer();
-  EXPECT_EQ(ProviderServer::count(), 1u);
-
+  ASSERT_EQ(ProviderServer::count(), 1u);
   auto fake_driver = CreateFakeStreamConfigInput();
-
   auto received_callback = false;
+
   provider->client()
       ->AddDevice({{
           .device_name = "Test device name",
@@ -275,23 +265,16 @@ TEST_F(ProviderServerWarningTest, UnsupportedDaiType) {
   EXPECT_EQ(adr_service_->devices().size(), 0u);
   EXPECT_EQ(adr_service_->unhealthy_devices().size(), 0u);
 }
-// TEST_F(ProviderServerWarningTest, MissingDeviceNameForDai) {}
-// TEST_F(ProviderServerWarningTest, EmptyDeviceNameForDai) {}
-// TEST_F(ProviderServerWarningTest, MissingDeviceTypeForDai) {}
-// TEST_F(ProviderServerWarningTest, MissingDriverClientForDai) {}
-// TEST_F(ProviderServerWarningTest, InvalidDriverClientForDai) {}
-// TEST_F(ProviderServerWarningTest, WrongDriverClientForDai) {}
 
-///////////////////////////////////
-// Validate AddDevice(StreamConfig)
+/////////////////////
+// StreamConfig tests
 //
-TEST_F(ProviderServerWarningTest, MissingDeviceNameForStreamConfig) {
+TEST_F(ProviderServerStreamConfigWarningTest, MissingDeviceName) {
   auto provider = CreateTestProviderServer();
-  EXPECT_EQ(ProviderServer::count(), 1u);
-
+  ASSERT_EQ(ProviderServer::count(), 1u);
   auto fake_driver = CreateFakeStreamConfigOutput();
-
   auto received_callback = false;
+
   provider->client()
       ->AddDevice({{
           // missing .device_name
@@ -315,16 +298,15 @@ TEST_F(ProviderServerWarningTest, MissingDeviceNameForStreamConfig) {
   EXPECT_EQ(adr_service_->unhealthy_devices().size(), 0u);
 }
 
-TEST_F(ProviderServerWarningTest, EmptyDeviceNameForStreamConfig) {
+TEST_F(ProviderServerStreamConfigWarningTest, EmptyDeviceName) {
   auto provider = CreateTestProviderServer();
-  EXPECT_EQ(ProviderServer::count(), 1u);
-
+  ASSERT_EQ(ProviderServer::count(), 1u);
   auto fake_driver = CreateFakeStreamConfigInput();
-
   auto received_callback = false;
+
   provider->client()
       ->AddDevice({{
-          .device_name = "",
+          .device_name = "",  // empty .device_name
           .device_type = fuchsia_audio_device::DeviceType::kInput,
           .driver_client = fuchsia_audio_device::DriverClient::WithStreamConfig(
               fidl::ClientEnd<fuchsia_hardware_audio::StreamConfig>(fake_driver->Enable())),
@@ -345,13 +327,12 @@ TEST_F(ProviderServerWarningTest, EmptyDeviceNameForStreamConfig) {
   EXPECT_EQ(adr_service_->unhealthy_devices().size(), 0u);
 }
 
-TEST_F(ProviderServerWarningTest, MissingDeviceTypeForStreamConfig) {
+TEST_F(ProviderServerStreamConfigWarningTest, MissingDeviceType) {
   auto provider = CreateTestProviderServer();
-  EXPECT_EQ(ProviderServer::count(), 1u);
-
+  ASSERT_EQ(ProviderServer::count(), 1u);
   auto fake_driver = CreateFakeStreamConfigOutput();
-
   auto received_callback = false;
+
   provider->client()
       ->AddDevice({{
           .device_name = "Test device name",
@@ -375,14 +356,15 @@ TEST_F(ProviderServerWarningTest, MissingDeviceTypeForStreamConfig) {
   EXPECT_EQ(adr_service_->unhealthy_devices().size(), 0u);
 }
 
-TEST_F(ProviderServerWarningTest, MissingDriverClientForStreamConfig) {
+TEST_F(ProviderServerStreamConfigWarningTest, MissingDriverClient) {
   auto provider = CreateTestProviderServer();
-  EXPECT_EQ(ProviderServer::count(), 1u);
-
+  ASSERT_EQ(ProviderServer::count(), 1u);
   auto received_callback = false;
+
   provider->client()
       ->AddDevice({{
-          .device_name = "Test output", .device_type = fuchsia_audio_device::DeviceType::kOutput,
+          .device_name = "Test device name",
+          .device_type = fuchsia_audio_device::DeviceType::kOutput,
           // missing .driver_client
       }})
       .Then([&received_callback](fidl::Result<Provider::AddDevice>& result) {
@@ -401,11 +383,11 @@ TEST_F(ProviderServerWarningTest, MissingDriverClientForStreamConfig) {
   EXPECT_EQ(adr_service_->unhealthy_devices().size(), 0u);
 }
 
-TEST_F(ProviderServerWarningTest, InvalidDriverClientForStreamConfig) {
+TEST_F(ProviderServerStreamConfigWarningTest, InvalidDriverClient) {
   auto provider = CreateTestProviderServer();
-  EXPECT_EQ(ProviderServer::count(), 1u);
-
+  ASSERT_EQ(ProviderServer::count(), 1u);
   auto received_callback = false;
+
   provider->client()
       ->AddDevice({{
           .device_name = "Test device name",
@@ -428,16 +410,15 @@ TEST_F(ProviderServerWarningTest, InvalidDriverClientForStreamConfig) {
   EXPECT_EQ(adr_service_->unhealthy_devices().size(), 0u);
 }
 
-TEST_F(ProviderServerWarningTest, WrongDriverClientForStreamConfig) {
+TEST_F(ProviderServerStreamConfigWarningTest, WrongDriverClient) {
   auto provider = CreateTestProviderServer();
-  EXPECT_EQ(ProviderServer::count(), 1u);
-
+  ASSERT_EQ(ProviderServer::count(), 1u);
   auto fake_driver = CreateFakeCodecOutput();
-
   auto received_callback = false;
+
   provider->client()
       ->AddDevice({{
-          .device_name = "Test output",
+          .device_name = "Test device name",
           .device_type = fuchsia_audio_device::DeviceType::kOutput,
           // Codec driver_client doesn't match kOutput.
           .driver_client = fuchsia_audio_device::DriverClient::WithCodec(

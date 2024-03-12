@@ -6,6 +6,7 @@
 
 #include <gtest/gtest.h>
 
+#include "src/media/audio/services/device_registry/common_unittest.h"
 #include "src/media/audio/services/device_registry/device.h"
 #include "src/media/audio/services/device_registry/device_unittest.h"
 #include "src/media/audio/services/device_registry/testing/fake_codec.h"
@@ -13,8 +14,8 @@
 
 namespace media_audio {
 
-class CodecWarningTest : public DeviceTestBase {};
-class StreamConfigWarningTest : public DeviceTestBase {};
+class CodecWarningTest : public CodecTest {};
+class StreamConfigWarningTest : public StreamConfigTest {};
 
 // TODO(https://fxbug.dev/42069012): test non-compliant driver behavior (e.g. min_gain>max_gain).
 
@@ -24,12 +25,12 @@ TEST_F(CodecWarningTest, UnhealthyIsError) {
   auto device = InitializeDeviceForFakeCodec(fake_codec);
 
   EXPECT_TRUE(HasError(device));
-  EXPECT_EQ(fake_device_presence_watcher_->ready_devices().size(), 0u);
-  EXPECT_EQ(fake_device_presence_watcher_->error_devices().size(), 1u);
+  EXPECT_EQ(device_presence_watcher()->ready_devices().size(), 0u);
+  EXPECT_EQ(device_presence_watcher()->error_devices().size(), 1u);
 
-  EXPECT_EQ(fake_device_presence_watcher_->on_ready_count(), 0u);
-  EXPECT_EQ(fake_device_presence_watcher_->on_error_count(), 1u);
-  EXPECT_EQ(fake_device_presence_watcher_->on_removal_count(), 0u);
+  EXPECT_EQ(device_presence_watcher()->on_ready_count(), 0u);
+  EXPECT_EQ(device_presence_watcher()->on_error_count(), 1u);
+  EXPECT_EQ(device_presence_watcher()->on_removal_count(), 0u);
 }
 
 TEST_F(CodecWarningTest, UnhealthyCanBeRemoved) {
@@ -38,23 +39,23 @@ TEST_F(CodecWarningTest, UnhealthyCanBeRemoved) {
   auto device = InitializeDeviceForFakeCodec(fake_codec);
 
   ASSERT_TRUE(HasError(device));
-  ASSERT_EQ(fake_device_presence_watcher_->ready_devices().size(), 0u);
-  ASSERT_EQ(fake_device_presence_watcher_->error_devices().size(), 1u);
+  ASSERT_EQ(device_presence_watcher()->ready_devices().size(), 0u);
+  ASSERT_EQ(device_presence_watcher()->error_devices().size(), 1u);
 
-  ASSERT_EQ(fake_device_presence_watcher_->on_ready_count(), 0u);
-  ASSERT_EQ(fake_device_presence_watcher_->on_error_count(), 1u);
-  ASSERT_EQ(fake_device_presence_watcher_->on_removal_count(), 0u);
+  ASSERT_EQ(device_presence_watcher()->on_ready_count(), 0u);
+  ASSERT_EQ(device_presence_watcher()->on_error_count(), 1u);
+  ASSERT_EQ(device_presence_watcher()->on_removal_count(), 0u);
 
   fake_codec->DropCodec();
   RunLoopUntilIdle();
 
-  EXPECT_EQ(fake_device_presence_watcher_->ready_devices().size(), 0u);
-  EXPECT_EQ(fake_device_presence_watcher_->error_devices().size(), 0u);
+  EXPECT_EQ(device_presence_watcher()->ready_devices().size(), 0u);
+  EXPECT_EQ(device_presence_watcher()->error_devices().size(), 0u);
 
-  EXPECT_EQ(fake_device_presence_watcher_->on_ready_count(), 0u);
-  EXPECT_EQ(fake_device_presence_watcher_->on_error_count(), 1u);
-  EXPECT_EQ(fake_device_presence_watcher_->on_removal_count(), 1u);
-  EXPECT_EQ(fake_device_presence_watcher_->on_removal_from_error_count(), 1u);
+  EXPECT_EQ(device_presence_watcher()->on_ready_count(), 0u);
+  EXPECT_EQ(device_presence_watcher()->on_error_count(), 1u);
+  EXPECT_EQ(device_presence_watcher()->on_removal_count(), 1u);
+  EXPECT_EQ(device_presence_watcher()->on_removal_from_error_count(), 1u);
 }
 
 TEST_F(CodecWarningTest, UnhealthyFailsSetControl) {
@@ -92,12 +93,12 @@ TEST_F(CodecWarningTest, AlreadyControlledFailsSetControl) {
   EXPECT_TRUE(IsControlled(device));
 
   // Even though SetControl failed, the device should still be healthy and configurable.
-  EXPECT_EQ(fake_device_presence_watcher_->ready_devices().size(), 1u);
-  EXPECT_EQ(fake_device_presence_watcher_->error_devices().size(), 0u);
+  EXPECT_EQ(device_presence_watcher()->ready_devices().size(), 1u);
+  EXPECT_EQ(device_presence_watcher()->error_devices().size(), 0u);
 
-  EXPECT_EQ(fake_device_presence_watcher_->on_ready_count(), 1u);
-  EXPECT_EQ(fake_device_presence_watcher_->on_error_count(), 0u);
-  EXPECT_EQ(fake_device_presence_watcher_->on_removal_count(), 0u);
+  EXPECT_EQ(device_presence_watcher()->on_ready_count(), 1u);
+  EXPECT_EQ(device_presence_watcher()->on_error_count(), 0u);
+  EXPECT_EQ(device_presence_watcher()->on_removal_count(), 0u);
 }
 
 TEST_F(CodecWarningTest, AlreadyObservedFailsAddObserver) {
@@ -109,12 +110,12 @@ TEST_F(CodecWarningTest, AlreadyObservedFailsAddObserver) {
   EXPECT_FALSE(AddObserver(device));
 
   // Even though AddObserver failed, the device should still be healthy and configurable.
-  EXPECT_EQ(fake_device_presence_watcher_->ready_devices().size(), 1u);
-  EXPECT_EQ(fake_device_presence_watcher_->error_devices().size(), 0u);
+  EXPECT_EQ(device_presence_watcher()->ready_devices().size(), 1u);
+  EXPECT_EQ(device_presence_watcher()->error_devices().size(), 0u);
 
-  EXPECT_EQ(fake_device_presence_watcher_->on_ready_count(), 1u);
-  EXPECT_EQ(fake_device_presence_watcher_->on_error_count(), 0u);
-  EXPECT_EQ(fake_device_presence_watcher_->on_removal_count(), 0u);
+  EXPECT_EQ(device_presence_watcher()->on_ready_count(), 1u);
+  EXPECT_EQ(device_presence_watcher()->on_error_count(), 0u);
+  EXPECT_EQ(device_presence_watcher()->on_removal_count(), 0u);
 }
 
 TEST_F(CodecWarningTest, CannotDropUnknownCodecControl) {
@@ -125,12 +126,12 @@ TEST_F(CodecWarningTest, CannotDropUnknownCodecControl) {
   EXPECT_FALSE(DropControl(device));
 
   // Even though DropControl failed, the device should still be healthy and configurable.
-  EXPECT_EQ(fake_device_presence_watcher_->ready_devices().size(), 1u);
-  EXPECT_EQ(fake_device_presence_watcher_->error_devices().size(), 0u);
+  EXPECT_EQ(device_presence_watcher()->ready_devices().size(), 1u);
+  EXPECT_EQ(device_presence_watcher()->error_devices().size(), 0u);
 
-  EXPECT_EQ(fake_device_presence_watcher_->on_ready_count(), 1u);
-  EXPECT_EQ(fake_device_presence_watcher_->on_error_count(), 0u);
-  EXPECT_EQ(fake_device_presence_watcher_->on_removal_count(), 0u);
+  EXPECT_EQ(device_presence_watcher()->on_ready_count(), 1u);
+  EXPECT_EQ(device_presence_watcher()->on_error_count(), 0u);
+  EXPECT_EQ(device_presence_watcher()->on_removal_count(), 0u);
 }
 
 TEST_F(CodecWarningTest, CannotDropCodecControlTwice) {
@@ -144,12 +145,12 @@ TEST_F(CodecWarningTest, CannotDropCodecControlTwice) {
   EXPECT_FALSE(DropControl(device));
 
   // Even though DropControl failed, the device should still be healthy and configurable.
-  EXPECT_EQ(fake_device_presence_watcher_->ready_devices().size(), 1u);
-  EXPECT_EQ(fake_device_presence_watcher_->error_devices().size(), 0u);
+  EXPECT_EQ(device_presence_watcher()->ready_devices().size(), 1u);
+  EXPECT_EQ(device_presence_watcher()->error_devices().size(), 0u);
 
-  EXPECT_EQ(fake_device_presence_watcher_->on_ready_count(), 1u);
-  EXPECT_EQ(fake_device_presence_watcher_->on_error_count(), 0u);
-  EXPECT_EQ(fake_device_presence_watcher_->on_removal_count(), 0u);
+  EXPECT_EQ(device_presence_watcher()->on_ready_count(), 1u);
+  EXPECT_EQ(device_presence_watcher()->on_error_count(), 0u);
+  EXPECT_EQ(device_presence_watcher()->on_removal_count(), 0u);
 }
 
 // GetDaiFormats for FakeCodec that fails the GetDaiFormats call
@@ -160,8 +161,8 @@ TEST_F(CodecWarningTest, WithoutControlFailsCodecCalls) {
   auto fake_codec = MakeFakeCodecInput();
   auto device = InitializeDeviceForFakeCodec(fake_codec);
   ASSERT_TRUE(InInitializedState(device));
-  ASSERT_FALSE(notify_->dai_format());
-  ASSERT_FALSE(notify_->codec_is_started());
+  ASSERT_FALSE(notify()->dai_format());
+  ASSERT_FALSE(notify()->codec_is_started());
   std::vector<fuchsia_hardware_audio::DaiSupportedFormats> dai_formats;
   device->RetrieveDaiFormatSets(
       [&dai_formats](std::vector<fuchsia_hardware_audio::DaiSupportedFormats> formats) {
@@ -175,16 +176,16 @@ TEST_F(CodecWarningTest, WithoutControlFailsCodecCalls) {
   EXPECT_FALSE(device->CodecStart());
 
   RunLoopUntilIdle();
-  EXPECT_FALSE(notify_->dai_format());
-  EXPECT_FALSE(notify_->codec_is_started());
+  EXPECT_FALSE(notify()->dai_format());
+  EXPECT_FALSE(notify()->codec_is_started());
 }
 
 // SetDaiFormat with invalid formats: expect a warning.
 TEST_F(CodecWarningTest, SetInvalidDaiFormat) {
   auto fake_codec = MakeFakeCodecNoDirection();
   auto device = InitializeDeviceForFakeCodec(fake_codec);
-  ASSERT_EQ(fake_device_presence_watcher_->ready_devices().size(), 1u);
-  ASSERT_EQ(fake_device_presence_watcher_->error_devices().size(), 0u);
+  ASSERT_EQ(device_presence_watcher()->ready_devices().size(), 1u);
+  ASSERT_EQ(device_presence_watcher()->error_devices().size(), 0u);
   ASSERT_TRUE(InInitializedState(device));
   ASSERT_TRUE(SetControl(device));
   std::vector<fuchsia_hardware_audio::DaiSupportedFormats> dai_formats;
@@ -200,16 +201,16 @@ TEST_F(CodecWarningTest, SetInvalidDaiFormat) {
   EXPECT_FALSE(device->CodecSetDaiFormat(invalid_dai_format));
 
   RunLoopUntilIdle();
-  EXPECT_FALSE(notify_->dai_format());
-  EXPECT_EQ(fake_device_presence_watcher_->ready_devices().size(), 1u);
-  EXPECT_EQ(fake_device_presence_watcher_->error_devices().size(), 0u);
+  EXPECT_FALSE(notify()->dai_format());
+  EXPECT_EQ(device_presence_watcher()->ready_devices().size(), 1u);
+  EXPECT_EQ(device_presence_watcher()->error_devices().size(), 0u);
 }
 
 TEST_F(CodecWarningTest, SetUnsupportedDaiFormat) {
   auto fake_codec = MakeFakeCodecNoDirection();
   auto device = InitializeDeviceForFakeCodec(fake_codec);
-  ASSERT_EQ(fake_device_presence_watcher_->ready_devices().size(), 1u);
-  ASSERT_EQ(fake_device_presence_watcher_->error_devices().size(), 0u);
+  ASSERT_EQ(device_presence_watcher()->ready_devices().size(), 1u);
+  ASSERT_EQ(device_presence_watcher()->error_devices().size(), 0u);
   ASSERT_TRUE(InInitializedState(device));
   ASSERT_TRUE(SetControl(device));
   std::vector<fuchsia_hardware_audio::DaiSupportedFormats> dai_formats;
@@ -227,16 +228,16 @@ TEST_F(CodecWarningTest, SetUnsupportedDaiFormat) {
   EXPECT_TRUE(device->CodecSetDaiFormat(UnsupportedDaiFormatFromDaiFormatSets(dai_formats)));
 
   RunLoopUntilIdle();
-  EXPECT_FALSE(notify_->dai_format());
-  EXPECT_EQ(fake_device_presence_watcher_->ready_devices().size(), 1u);
-  EXPECT_EQ(fake_device_presence_watcher_->error_devices().size(), 0u);
+  EXPECT_FALSE(notify()->dai_format());
+  EXPECT_EQ(device_presence_watcher()->ready_devices().size(), 1u);
+  EXPECT_EQ(device_presence_watcher()->error_devices().size(), 0u);
 }
 
 TEST_F(CodecWarningTest, StartBeforeSetDaiFormat) {
   auto fake_codec = MakeFakeCodecNoDirection();
   auto device = InitializeDeviceForFakeCodec(fake_codec);
-  ASSERT_EQ(fake_device_presence_watcher_->ready_devices().size(), 1u);
-  ASSERT_EQ(fake_device_presence_watcher_->error_devices().size(), 0u);
+  ASSERT_EQ(device_presence_watcher()->ready_devices().size(), 1u);
+  ASSERT_EQ(device_presence_watcher()->error_devices().size(), 0u);
   ASSERT_TRUE(InInitializedState(device));
   ASSERT_TRUE(SetControl(device));
 
@@ -244,17 +245,17 @@ TEST_F(CodecWarningTest, StartBeforeSetDaiFormat) {
   EXPECT_FALSE(device->CodecStart());
 
   RunLoopUntilIdle();
-  EXPECT_FALSE(notify_->codec_is_started());
+  EXPECT_FALSE(notify()->codec_is_started());
   // We do expect the device to remain healthy and usable.
-  EXPECT_EQ(fake_device_presence_watcher_->ready_devices().size(), 1u);
-  EXPECT_EQ(fake_device_presence_watcher_->error_devices().size(), 0u);
+  EXPECT_EQ(device_presence_watcher()->ready_devices().size(), 1u);
+  EXPECT_EQ(device_presence_watcher()->error_devices().size(), 0u);
 }
 
 TEST_F(CodecWarningTest, StopBeforeSetDaiFormat) {
   auto fake_codec = MakeFakeCodecNoDirection();
   auto device = InitializeDeviceForFakeCodec(fake_codec);
-  ASSERT_EQ(fake_device_presence_watcher_->ready_devices().size(), 1u);
-  ASSERT_EQ(fake_device_presence_watcher_->error_devices().size(), 0u);
+  ASSERT_EQ(device_presence_watcher()->ready_devices().size(), 1u);
+  ASSERT_EQ(device_presence_watcher()->error_devices().size(), 0u);
   ASSERT_TRUE(InInitializedState(device));
   ASSERT_TRUE(SetControl(device));
 
@@ -263,8 +264,8 @@ TEST_F(CodecWarningTest, StopBeforeSetDaiFormat) {
 
   RunLoopUntilIdle();
   // We do expect the device to remain healthy and usable.
-  EXPECT_EQ(fake_device_presence_watcher_->ready_devices().size(), 1u);
-  EXPECT_EQ(fake_device_presence_watcher_->error_devices().size(), 0u);
+  EXPECT_EQ(device_presence_watcher()->ready_devices().size(), 1u);
+  EXPECT_EQ(device_presence_watcher()->error_devices().size(), 0u);
 }
 
 ////////////////////
@@ -276,12 +277,12 @@ TEST_F(StreamConfigWarningTest, UnhealthyIsError) {
   auto device = InitializeDeviceForFakeStreamConfig(fake_stream_config);
 
   EXPECT_TRUE(HasError(device));
-  EXPECT_EQ(fake_device_presence_watcher_->ready_devices().size(), 0u);
-  EXPECT_EQ(fake_device_presence_watcher_->error_devices().size(), 1u);
+  EXPECT_EQ(device_presence_watcher()->ready_devices().size(), 0u);
+  EXPECT_EQ(device_presence_watcher()->error_devices().size(), 1u);
 
-  EXPECT_EQ(fake_device_presence_watcher_->on_ready_count(), 0u);
-  EXPECT_EQ(fake_device_presence_watcher_->on_error_count(), 1u);
-  EXPECT_EQ(fake_device_presence_watcher_->on_removal_count(), 0u);
+  EXPECT_EQ(device_presence_watcher()->on_ready_count(), 0u);
+  EXPECT_EQ(device_presence_watcher()->on_error_count(), 1u);
+  EXPECT_EQ(device_presence_watcher()->on_removal_count(), 0u);
 }
 
 TEST_F(StreamConfigWarningTest, UnhealthyCanBeRemoved) {
@@ -290,23 +291,23 @@ TEST_F(StreamConfigWarningTest, UnhealthyCanBeRemoved) {
   auto device = InitializeDeviceForFakeStreamConfig(fake_stream_config);
 
   ASSERT_TRUE(HasError(device));
-  ASSERT_EQ(fake_device_presence_watcher_->ready_devices().size(), 0u);
-  ASSERT_EQ(fake_device_presence_watcher_->error_devices().size(), 1u);
+  ASSERT_EQ(device_presence_watcher()->ready_devices().size(), 0u);
+  ASSERT_EQ(device_presence_watcher()->error_devices().size(), 1u);
 
-  ASSERT_EQ(fake_device_presence_watcher_->on_ready_count(), 0u);
-  ASSERT_EQ(fake_device_presence_watcher_->on_error_count(), 1u);
-  ASSERT_EQ(fake_device_presence_watcher_->on_removal_count(), 0u);
+  ASSERT_EQ(device_presence_watcher()->on_ready_count(), 0u);
+  ASSERT_EQ(device_presence_watcher()->on_error_count(), 1u);
+  ASSERT_EQ(device_presence_watcher()->on_removal_count(), 0u);
 
   fake_stream_config->DropStreamConfig();
   RunLoopUntilIdle();
 
-  EXPECT_EQ(fake_device_presence_watcher_->ready_devices().size(), 0u);
-  EXPECT_EQ(fake_device_presence_watcher_->error_devices().size(), 0u);
+  EXPECT_EQ(device_presence_watcher()->ready_devices().size(), 0u);
+  EXPECT_EQ(device_presence_watcher()->error_devices().size(), 0u);
 
-  EXPECT_EQ(fake_device_presence_watcher_->on_ready_count(), 0u);
-  EXPECT_EQ(fake_device_presence_watcher_->on_error_count(), 1u);
-  EXPECT_EQ(fake_device_presence_watcher_->on_removal_count(), 1u);
-  EXPECT_EQ(fake_device_presence_watcher_->on_removal_from_error_count(), 1u);
+  EXPECT_EQ(device_presence_watcher()->on_ready_count(), 0u);
+  EXPECT_EQ(device_presence_watcher()->on_error_count(), 1u);
+  EXPECT_EQ(device_presence_watcher()->on_removal_count(), 1u);
+  EXPECT_EQ(device_presence_watcher()->on_removal_from_error_count(), 1u);
 }
 
 TEST_F(StreamConfigWarningTest, AlreadyControlledFailsSetControl) {
@@ -391,7 +392,7 @@ TEST_F(StreamConfigWarningTest, WithoutControlFailsSetGain) {
   ASSERT_TRUE(InInitializedState(device));
 
   RunLoopUntilIdle();
-  auto gain_state = DeviceGainState(device);
+  auto gain_state = device_gain_state(device);
   EXPECT_EQ(*gain_state.gain_db(), 0.0f);
   EXPECT_FALSE(*gain_state.muted());
   EXPECT_FALSE(*gain_state.agc_enabled());
@@ -404,7 +405,7 @@ TEST_F(StreamConfigWarningTest, WithoutControlFailsSetGain) {
                                      }}));
 
   RunLoopUntilIdle();
-  gain_state = DeviceGainState(device);
+  gain_state = device_gain_state(device);
   EXPECT_EQ(*gain_state.gain_db(), 0.0f);
   EXPECT_FALSE(*gain_state.muted());
   EXPECT_FALSE(*gain_state.agc_enabled());

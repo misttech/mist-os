@@ -5,6 +5,8 @@
 #include <fidl/fuchsia.audio.device/cpp/common_types.h>
 #include <fidl/fuchsia.audio.device/cpp/natural_types.h>
 #include <fidl/fuchsia.audio/cpp/common_types.h>
+#include <fidl/fuchsia.hardware.audio/cpp/common_types.h>
+#include <fidl/fuchsia.hardware.audio/cpp/natural_types.h>
 #include <lib/fidl/cpp/enum.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/zx/time.h>
@@ -16,6 +18,7 @@
 
 #include "src/media/audio/services/common/testing/test_server_and_async_client.h"
 #include "src/media/audio/services/device_registry/adr_server_unittest_base.h"
+#include "src/media/audio/services/device_registry/common_unittest.h"
 #include "src/media/audio/services/device_registry/control_server.h"
 #include "src/media/audio/services/device_registry/testing/fake_stream_config.h"
 
@@ -29,17 +32,6 @@ class ControlServerWarningTest : public AudioDeviceRegistryServerTestBase,
                                  public fidl::AsyncEventHandler<fuchsia_audio_device::Control>,
                                  public fidl::AsyncEventHandler<fuchsia_audio_device::RingBuffer> {
  protected:
-  std::unique_ptr<FakeStreamConfig> CreateAndEnableDriverWithDefaults() {
-    auto fake_driver = CreateFakeStreamConfigOutput();
-
-    adr_service_->AddDevice(Device::Create(
-        adr_service_, dispatcher(), "Test output name", fuchsia_audio_device::DeviceType::kOutput,
-        DriverClient::WithStreamConfig(
-            fidl::ClientEnd<fuchsia_hardware_audio::StreamConfig>(fake_driver->Enable()))));
-    RunLoopUntilIdle();
-    return fake_driver;
-  }
-
   std::optional<TokenId> WaitForAddedDeviceTokenId(
       fidl::Client<fuchsia_audio_device::Registry>& registry_client) {
     std::optional<TokenId> added_device_id;
@@ -82,74 +74,124 @@ class ControlServerWarningTest : public AudioDeviceRegistryServerTestBase,
     EXPECT_TRUE(control_client.is_valid());
     return control_client;
   }
-
-  void TestSetGainBadState(const std::optional<fuchsia_audio_device::GainState>& bad_state,
-                           fuchsia_audio_device::ControlSetGainError expected_error);
-  void TestCreateRingBufferBadOptions(
-      const std::optional<fuchsia_audio_device::RingBufferOptions>& bad_options,
-      fuchsia_audio_device::ControlCreateRingBufferError expected_error);
 };
 
-// Device error causes ControlNotify->DeviceHasError
-// Driver drops StreamConfig causes ControlNotify->DeviceIsRemoved
-// Client closes RingBuffer does NOT cause ControlNotify->DeviceIsRemoved or DeviceHasError
-// Driver drops RingBuffer does NOT cause ControlNotify->DeviceIsRemoved or DeviceHasError
-void ControlServerWarningTest::TestSetGainBadState(
-    const std::optional<fuchsia_audio_device::GainState>& bad_state,
-    fuchsia_audio_device::ControlSetGainError expected_error) {
-  auto fake_driver = CreateFakeStreamConfigOutput();
+class ControlServerStreamConfigWarningTest : public ControlServerWarningTest {
+ protected:
+  std::unique_ptr<FakeStreamConfig> CreateAndEnableDriverWithDefaults() {
+    auto fake_driver = CreateFakeStreamConfigOutput();
 
-  fake_driver->set_can_mute(false);
-  fake_driver->set_can_agc(false);
-  fake_driver->AllocateRingBuffer(8192);
-  adr_service_->AddDevice(Device::Create(
-      adr_service_, dispatcher(), "Test output name", fuchsia_audio_device::DeviceType::kOutput,
-      DriverClient::WithStreamConfig(
-          fidl::ClientEnd<fuchsia_hardware_audio::StreamConfig>(fake_driver->Enable()))));
-  RunLoopUntilIdle();
+    adr_service_->AddDevice(Device::Create(
+        adr_service_, dispatcher(), "Test output name", fuchsia_audio_device::DeviceType::kOutput,
+        DriverClient::WithStreamConfig(
+            fidl::ClientEnd<fuchsia_hardware_audio::StreamConfig>(fake_driver->Enable()))));
+    RunLoopUntilIdle();
+    return fake_driver;
+  }
 
-  auto registry = CreateTestRegistryServer();
-  auto added_id = WaitForAddedDeviceTokenId(registry->client());
-  auto control_creator = CreateTestControlCreatorServer();
-  auto control_client = ConnectToControl(control_creator->client(), *added_id);
-  RunLoopUntilIdle();
+  // Device error causes ControlNotify->DeviceHasError
+  // Driver drops StreamConfig causes ControlNotify->DeviceIsRemoved
+  // Client closes RingBuffer does NOT cause ControlNotify->DeviceIsRemoved or DeviceHasError
+  // Driver drops RingBuffer does NOT cause ControlNotify->DeviceIsRemoved or DeviceHasError
 
-  ASSERT_EQ(ControlServer::count(), 1u);
-  auto [ring_buffer_client_end, ring_buffer_server_end] =
-      CreateNaturalAsyncClientOrDie<fuchsia_audio_device::RingBuffer>();
-  auto ring_buffer_client = fidl::Client<fuchsia_audio_device::RingBuffer>(
-      fidl::ClientEnd<fuchsia_audio_device::RingBuffer>(std::move(ring_buffer_client_end)),
-      dispatcher(), ring_buffer_fidl_handler_.get());
-  bool received_callback = false;
+  void TestSetGainBadState(const std::optional<fuchsia_audio_device::GainState>& bad_state,
+                           fuchsia_audio_device::ControlSetGainError expected_error) {
+    auto fake_driver = CreateFakeStreamConfigOutput();
 
-  control_client
-      ->SetGain({{
-          .target_state = bad_state,
-      }})
-      .Then([&received_callback, expected_error](fidl::Result<Control::SetGain>& result) {
-        ASSERT_TRUE(result.is_error());
-        ASSERT_TRUE(result.error_value().is_domain_error())
-            << result.error_value().FormatDescription();
-        EXPECT_EQ(result.error_value().domain_error(), expected_error)
-            << result.error_value().FormatDescription();
-        received_callback = true;
-      });
+    fake_driver->set_can_mute(false);
+    fake_driver->set_can_agc(false);
+    fake_driver->AllocateRingBuffer(8192);
+    adr_service_->AddDevice(Device::Create(
+        adr_service_, dispatcher(), "Test output name", fuchsia_audio_device::DeviceType::kOutput,
+        DriverClient::WithStreamConfig(
+            fidl::ClientEnd<fuchsia_hardware_audio::StreamConfig>(fake_driver->Enable()))));
+    RunLoopUntilIdle();
 
-  RunLoopUntilIdle();
-  EXPECT_TRUE(received_callback);
-  EXPECT_EQ(ControlServer::count(), 1u);
-}
+    auto registry = CreateTestRegistryServer();
+    auto added_id = WaitForAddedDeviceTokenId(registry->client());
+    auto control_creator = CreateTestControlCreatorServer();
+    auto control_client = ConnectToControl(control_creator->client(), *added_id);
+    RunLoopUntilIdle();
 
-TEST_F(ControlServerWarningTest, SetGainMissingState) {
+    ASSERT_EQ(ControlServer::count(), 1u);
+    auto [ring_buffer_client_end, ring_buffer_server_end] =
+        CreateNaturalAsyncClientOrDie<fuchsia_audio_device::RingBuffer>();
+    auto ring_buffer_client = fidl::Client<fuchsia_audio_device::RingBuffer>(
+        fidl::ClientEnd<fuchsia_audio_device::RingBuffer>(std::move(ring_buffer_client_end)),
+        dispatcher(), ring_buffer_fidl_handler_.get());
+    bool received_callback = false;
+
+    control_client
+        ->SetGain({{
+            .target_state = bad_state,
+        }})
+        .Then([&received_callback, expected_error](fidl::Result<Control::SetGain>& result) {
+          ASSERT_TRUE(result.is_error());
+          ASSERT_TRUE(result.error_value().is_domain_error())
+              << result.error_value().FormatDescription();
+          EXPECT_EQ(result.error_value().domain_error(), expected_error)
+              << result.error_value().FormatDescription();
+          received_callback = true;
+        });
+
+    RunLoopUntilIdle();
+    EXPECT_TRUE(received_callback);
+    EXPECT_EQ(ControlServer::count(), 1u);
+  }
+
+  void TestCreateRingBufferBadOptions(
+      const std::optional<fuchsia_audio_device::RingBufferOptions>& bad_options,
+      fuchsia_audio_device::ControlCreateRingBufferError expected_error) {
+    auto fake_driver = CreateAndEnableDriverWithDefaults();
+    fake_driver->AllocateRingBuffer(8192);
+    auto registry = CreateTestRegistryServer();
+    auto added_id = WaitForAddedDeviceTokenId(registry->client());
+    auto control_creator = CreateTestControlCreatorServer();
+    auto control_client = ConnectToControl(control_creator->client(), *added_id);
+    RunLoopUntilIdle();
+
+    ASSERT_EQ(ControlServer::count(), 1u);
+    auto [ring_buffer_client_end, ring_buffer_server_end] =
+        CreateNaturalAsyncClientOrDie<fuchsia_audio_device::RingBuffer>();
+    auto ring_buffer_client = fidl::Client<fuchsia_audio_device::RingBuffer>(
+        fidl::ClientEnd<fuchsia_audio_device::RingBuffer>(std::move(ring_buffer_client_end)),
+        dispatcher(), ring_buffer_fidl_handler_.get());
+    bool received_callback = false;
+
+    control_client
+        ->CreateRingBuffer({{
+            .options = bad_options,
+            .ring_buffer_server = fidl::ServerEnd<fuchsia_audio_device::RingBuffer>(
+                std::move(ring_buffer_server_end)),
+        }})
+        .Then(
+            [&received_callback, expected_error](fidl::Result<Control::CreateRingBuffer>& result) {
+              ASSERT_TRUE(result.is_error());
+              ASSERT_TRUE(result.error_value().is_domain_error())
+                  << result.error_value().FormatDescription();
+              EXPECT_EQ(result.error_value().domain_error(), expected_error)
+                  << result.error_value().FormatDescription();
+              received_callback = true;
+            });
+
+    RunLoopUntilIdle();
+    EXPECT_TRUE(received_callback);
+    EXPECT_EQ(ControlServer::count(), 1u);
+  }
+};
+
+/////////////////////
+// StreamConfig tests
+TEST_F(ControlServerStreamConfigWarningTest, SetGainMissingState) {
   TestSetGainBadState(std::nullopt, fuchsia_audio_device::ControlSetGainError::kInvalidGainState);
 }
 
-TEST_F(ControlServerWarningTest, SetGainEmptyState) {
+TEST_F(ControlServerStreamConfigWarningTest, SetGainEmptyState) {
   TestSetGainBadState(fuchsia_audio_device::GainState(),
                       fuchsia_audio_device::ControlSetGainError::kInvalidGainDb);
 }
 
-TEST_F(ControlServerWarningTest, SetGainMissingGainDb) {
+TEST_F(ControlServerStreamConfigWarningTest, SetGainMissingGainDb) {
   TestSetGainBadState(fuchsia_audio_device::GainState{{
                           .muted = false,
                           .agc_enabled = false,
@@ -157,7 +199,7 @@ TEST_F(ControlServerWarningTest, SetGainMissingGainDb) {
                       fuchsia_audio_device::ControlSetGainError::kInvalidGainDb);
 }
 
-TEST_F(ControlServerWarningTest, SetGainTooHigh) {
+TEST_F(ControlServerStreamConfigWarningTest, SetGainTooHigh) {
   TestSetGainBadState(fuchsia_audio_device::GainState{{
                           .gain_db = +200.0f,
                           .muted = false,
@@ -166,7 +208,7 @@ TEST_F(ControlServerWarningTest, SetGainTooHigh) {
                       fuchsia_audio_device::ControlSetGainError::kGainOutOfRange);
 }
 
-TEST_F(ControlServerWarningTest, SetGainTooLow) {
+TEST_F(ControlServerStreamConfigWarningTest, SetGainTooLow) {
   TestSetGainBadState(fuchsia_audio_device::GainState{{
                           .gain_db = -200.0f,
                           .muted = false,
@@ -175,7 +217,7 @@ TEST_F(ControlServerWarningTest, SetGainTooLow) {
                       fuchsia_audio_device::ControlSetGainError::kGainOutOfRange);
 }
 
-TEST_F(ControlServerWarningTest, SetGainBadMute) {
+TEST_F(ControlServerStreamConfigWarningTest, SetGainBadMute) {
   TestSetGainBadState(fuchsia_audio_device::GainState{{
                           .gain_db = 0.0f,
                           .muted = true,
@@ -184,7 +226,7 @@ TEST_F(ControlServerWarningTest, SetGainBadMute) {
                       fuchsia_audio_device::ControlSetGainError::kMuteUnavailable);
 }
 
-TEST_F(ControlServerWarningTest, SetGainBadAgc) {
+TEST_F(ControlServerStreamConfigWarningTest, SetGainBadAgc) {
   TestSetGainBadState(fuchsia_audio_device::GainState{{
                           .gain_db = 0.0f,
                           .muted = false,
@@ -193,57 +235,18 @@ TEST_F(ControlServerWarningTest, SetGainBadAgc) {
                       fuchsia_audio_device::ControlSetGainError::kAgcUnavailable);
 }
 
-void ControlServerWarningTest::TestCreateRingBufferBadOptions(
-    const std::optional<fuchsia_audio_device::RingBufferOptions>& bad_options,
-    fuchsia_audio_device::ControlCreateRingBufferError expected_error) {
-  auto fake_driver = CreateAndEnableDriverWithDefaults();
-  fake_driver->AllocateRingBuffer(8192);
-  auto registry = CreateTestRegistryServer();
-  auto added_id = WaitForAddedDeviceTokenId(registry->client());
-  auto control_creator = CreateTestControlCreatorServer();
-  auto control_client = ConnectToControl(control_creator->client(), *added_id);
-  RunLoopUntilIdle();
-
-  ASSERT_EQ(ControlServer::count(), 1u);
-  auto [ring_buffer_client_end, ring_buffer_server_end] =
-      CreateNaturalAsyncClientOrDie<fuchsia_audio_device::RingBuffer>();
-  auto ring_buffer_client = fidl::Client<fuchsia_audio_device::RingBuffer>(
-      fidl::ClientEnd<fuchsia_audio_device::RingBuffer>(std::move(ring_buffer_client_end)),
-      dispatcher(), ring_buffer_fidl_handler_.get());
-  bool received_callback = false;
-
-  control_client
-      ->CreateRingBuffer({{
-          .options = bad_options,
-          .ring_buffer_server =
-              fidl::ServerEnd<fuchsia_audio_device::RingBuffer>(std::move(ring_buffer_server_end)),
-      }})
-      .Then([&received_callback, expected_error](fidl::Result<Control::CreateRingBuffer>& result) {
-        ASSERT_TRUE(result.is_error());
-        ASSERT_TRUE(result.error_value().is_domain_error())
-            << result.error_value().FormatDescription();
-        EXPECT_EQ(result.error_value().domain_error(), expected_error)
-            << result.error_value().FormatDescription();
-        received_callback = true;
-      });
-
-  RunLoopUntilIdle();
-  EXPECT_TRUE(received_callback);
-  EXPECT_EQ(ControlServer::count(), 1u);
-}
-
-TEST_F(ControlServerWarningTest, CreateRingBufferMissingOptions) {
+TEST_F(ControlServerStreamConfigWarningTest, CreateRingBufferMissingOptions) {
   TestCreateRingBufferBadOptions(
       std::nullopt, fuchsia_audio_device::ControlCreateRingBufferError::kInvalidOptions);
 }
 
-TEST_F(ControlServerWarningTest, CreateRingBufferEmptyOptions) {
+TEST_F(ControlServerStreamConfigWarningTest, CreateRingBufferEmptyOptions) {
   TestCreateRingBufferBadOptions(
       fuchsia_audio_device::RingBufferOptions(),
       fuchsia_audio_device::ControlCreateRingBufferError::kInvalidFormat);
 }
 
-TEST_F(ControlServerWarningTest, CreateRingBufferMissingFormat) {
+TEST_F(ControlServerStreamConfigWarningTest, CreateRingBufferMissingFormat) {
   TestCreateRingBufferBadOptions(
       fuchsia_audio_device::RingBufferOptions{{
           .format = std::nullopt,
@@ -252,7 +255,7 @@ TEST_F(ControlServerWarningTest, CreateRingBufferMissingFormat) {
       fuchsia_audio_device::ControlCreateRingBufferError::kInvalidFormat);
 }
 
-TEST_F(ControlServerWarningTest, CreateRingBufferEmptyFormat) {
+TEST_F(ControlServerStreamConfigWarningTest, CreateRingBufferEmptyFormat) {
   TestCreateRingBufferBadOptions(
       fuchsia_audio_device::RingBufferOptions{{
           .format = fuchsia_audio::Format(),
@@ -261,7 +264,7 @@ TEST_F(ControlServerWarningTest, CreateRingBufferEmptyFormat) {
       fuchsia_audio_device::ControlCreateRingBufferError::kInvalidFormat);
 }
 
-TEST_F(ControlServerWarningTest, CreateRingBufferMissingSampleType) {
+TEST_F(ControlServerStreamConfigWarningTest, CreateRingBufferMissingSampleType) {
   TestCreateRingBufferBadOptions(
       fuchsia_audio_device::RingBufferOptions{{
           .format = fuchsia_audio::Format{{
@@ -273,7 +276,7 @@ TEST_F(ControlServerWarningTest, CreateRingBufferMissingSampleType) {
       fuchsia_audio_device::ControlCreateRingBufferError::kInvalidFormat);
 }
 
-TEST_F(ControlServerWarningTest, CreateRingBufferBadSampleType) {
+TEST_F(ControlServerStreamConfigWarningTest, CreateRingBufferBadSampleType) {
   TestCreateRingBufferBadOptions(
       fuchsia_audio_device::RingBufferOptions{{
           .format = fuchsia_audio::Format{{
@@ -286,7 +289,7 @@ TEST_F(ControlServerWarningTest, CreateRingBufferBadSampleType) {
       fuchsia_audio_device::ControlCreateRingBufferError::kFormatMismatch);
 }
 
-TEST_F(ControlServerWarningTest, CreateRingBufferMissingChannelCount) {
+TEST_F(ControlServerStreamConfigWarningTest, CreateRingBufferMissingChannelCount) {
   TestCreateRingBufferBadOptions(
       fuchsia_audio_device::RingBufferOptions{{
           .format = fuchsia_audio::Format{{
@@ -298,7 +301,7 @@ TEST_F(ControlServerWarningTest, CreateRingBufferMissingChannelCount) {
       fuchsia_audio_device::ControlCreateRingBufferError::kInvalidFormat);
 }
 
-TEST_F(ControlServerWarningTest, CreateRingBufferBadChannelCount) {
+TEST_F(ControlServerStreamConfigWarningTest, CreateRingBufferBadChannelCount) {
   TestCreateRingBufferBadOptions(
       fuchsia_audio_device::RingBufferOptions{{
           .format = fuchsia_audio::Format{{
@@ -311,7 +314,7 @@ TEST_F(ControlServerWarningTest, CreateRingBufferBadChannelCount) {
       fuchsia_audio_device::ControlCreateRingBufferError::kFormatMismatch);
 }
 
-TEST_F(ControlServerWarningTest, CreateRingBufferMissingFramesPerSecond) {
+TEST_F(ControlServerStreamConfigWarningTest, CreateRingBufferMissingFramesPerSecond) {
   TestCreateRingBufferBadOptions(
       fuchsia_audio_device::RingBufferOptions{{
           .format = fuchsia_audio::Format{{
@@ -323,7 +326,7 @@ TEST_F(ControlServerWarningTest, CreateRingBufferMissingFramesPerSecond) {
       fuchsia_audio_device::ControlCreateRingBufferError::kInvalidFormat);
 }
 
-TEST_F(ControlServerWarningTest, CreateRingBufferBadFramesPerSecond) {
+TEST_F(ControlServerStreamConfigWarningTest, CreateRingBufferBadFramesPerSecond) {
   TestCreateRingBufferBadOptions(
       fuchsia_audio_device::RingBufferOptions{{
           .format = fuchsia_audio::Format{{
@@ -336,7 +339,7 @@ TEST_F(ControlServerWarningTest, CreateRingBufferBadFramesPerSecond) {
       fuchsia_audio_device::ControlCreateRingBufferError::kFormatMismatch);
 }
 
-TEST_F(ControlServerWarningTest, CreateRingBufferMissingRingBufferMinBytes) {
+TEST_F(ControlServerStreamConfigWarningTest, CreateRingBufferMissingRingBufferMinBytes) {
   TestCreateRingBufferBadOptions(
       fuchsia_audio_device::RingBufferOptions{{
           .format = fuchsia_audio::Format{{
@@ -348,7 +351,7 @@ TEST_F(ControlServerWarningTest, CreateRingBufferMissingRingBufferMinBytes) {
       fuchsia_audio_device::ControlCreateRingBufferError::kInvalidMinBytes);
 }
 
-TEST_F(ControlServerWarningTest, CreateRingBufferWhilePending) {
+TEST_F(ControlServerStreamConfigWarningTest, CreateRingBufferWhilePending) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
   fake_driver->AllocateRingBuffer(8192);
   auto registry = CreateTestRegistryServer();
@@ -404,10 +407,11 @@ TEST_F(ControlServerWarningTest, CreateRingBufferWhilePending) {
   EXPECT_TRUE(control_client.is_valid());
 }
 
-// TODO(https://fxbug.dev/42069012): Enable this unittest to test the upper limit of VMO size (4Gb).
+// TODO(https://fxbug.dev/42069012): Enable this unittest to test the upper limit of VMO size
+// (4Gb).
 //   This is not high-priority since even at the service's highest supported bitrate (192kHz,
 //   8-channel, float64), a 4Gb ring-buffer would be 5.8 minutes long!
-TEST_F(ControlServerWarningTest, DISABLED_CreateRingBufferHugeRingBufferMinBytes) {
+TEST_F(ControlServerStreamConfigWarningTest, DISABLED_CreateRingBufferHugeRingBufferMinBytes) {
   auto fake_driver = CreateFakeStreamConfigOutput();
 
   fake_driver->clear_formats();
@@ -506,7 +510,7 @@ TEST_F(ControlServerWarningTest, DISABLED_CreateRingBufferHugeRingBufferMinBytes
   EXPECT_EQ(ControlServer::count(), 1u);
 }
 
-TEST_F(ControlServerWarningTest, CreateRingBufferMissingRingBufferServerEnd) {
+TEST_F(ControlServerStreamConfigWarningTest, CreateRingBufferMissingRingBufferServerEnd) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
   fake_driver->AllocateRingBuffer(8192);
   auto registry = CreateTestRegistryServer();
@@ -544,7 +548,7 @@ TEST_F(ControlServerWarningTest, CreateRingBufferMissingRingBufferServerEnd) {
   EXPECT_EQ(ControlServer::count(), 1u);
 }
 
-TEST_F(ControlServerWarningTest, CreateRingBufferBadRingBufferServerEnd) {
+TEST_F(ControlServerStreamConfigWarningTest, CreateRingBufferBadRingBufferServerEnd) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
   fake_driver->AllocateRingBuffer(8192);
   auto registry = CreateTestRegistryServer();

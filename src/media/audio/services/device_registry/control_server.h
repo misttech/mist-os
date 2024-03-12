@@ -66,14 +66,14 @@ class ControlServer
 
   // fuchsia.hardware.audio.signalprocessing support
   //
-  void GetElements(GetElementsCompleter::Sync& completer) final {}
+  void GetTopologies(GetTopologiesCompleter::Sync& completer) final;
+  void GetElements(GetElementsCompleter::Sync& completer) final;
+  void WatchTopology(WatchTopologyCompleter::Sync& completer) final;
   void WatchElementState(WatchElementStateRequest& request,
-                         WatchElementStateCompleter::Sync& completer) final {}
-  void GetTopologies(GetTopologiesCompleter::Sync& completer) final {}
-  void WatchTopology(WatchTopologyCompleter::Sync& completer) final {}
+                         WatchElementStateCompleter::Sync& completer) final;
+  void SetTopology(SetTopologyRequest& request, SetTopologyCompleter::Sync& completer) final;
   void SetElementState(SetElementStateRequest& request,
-                       SetElementStateCompleter::Sync& completer) final {}
-  void SetTopology(SetTopologyRequest& request, SetTopologyCompleter::Sync& completer) final {}
+                       SetElementStateCompleter::Sync& completer) final;
 
   // Static object count, for debugging purposes.
   static inline uint64_t count() { return count_; }

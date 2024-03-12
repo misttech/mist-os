@@ -47,41 +47,6 @@ TEST_F(AudioDeviceRegistryServerWarningTest, UnhealthyDevices) {
 }
 
 /////////////////////
-// StreamConfig cases
-TEST_F(AudioDeviceRegistryServerWarningTest, FindStreamConfigByTokenIdError) {
-  auto fake_driver = CreateFakeStreamConfigInput();
-  fake_driver->set_health_state(false);
-  auto client = fidl::ClientEnd<fuchsia_hardware_audio::StreamConfig>(fake_driver->Enable());
-  AddDeviceForDetection("test input", fuchsia_audio_device::DeviceType::kInput,
-                        fuchsia_audio_device::DriverClient::WithStreamConfig(std::move(client)));
-
-  RunLoopUntilIdle();
-  EXPECT_EQ(adr_service_->devices().size(), 0u);
-  EXPECT_EQ(adr_service_->unhealthy_devices().size(), 1u);
-  auto token_id = adr_service_->unhealthy_devices().begin()->get()->token_id();
-
-  EXPECT_EQ(adr_service_->FindDeviceByTokenId(token_id).first,
-            AudioDeviceRegistry::DevicePresence::Error);
-}
-
-TEST_F(AudioDeviceRegistryServerWarningTest, FindStreamConfigByTokenIdRemoved) {
-  auto fake_driver = CreateFakeStreamConfigOutput();
-  auto client = fidl::ClientEnd<fuchsia_hardware_audio::StreamConfig>(fake_driver->Enable());
-  AddDeviceForDetection("test output", fuchsia_audio_device::DeviceType::kOutput,
-                        fuchsia_audio_device::DriverClient::WithStreamConfig(std::move(client)));
-
-  RunLoopUntilIdle();
-  EXPECT_EQ(adr_service_->devices().size(), 1u);
-  auto token_id = adr_service_->devices().begin()->get()->token_id();
-
-  fake_driver->DropStreamConfig();
-  RunLoopUntilIdle();
-
-  EXPECT_EQ(adr_service_->FindDeviceByTokenId(token_id).first,
-            AudioDeviceRegistry::DevicePresence::Unknown);
-}
-
-/////////////////////
 // Codec cases
 TEST_F(AudioDeviceRegistryServerWarningTest, FindCodecByTokenIdError) {
   auto fake_driver = CreateFakeCodecInput();
@@ -110,6 +75,41 @@ TEST_F(AudioDeviceRegistryServerWarningTest, FindCodecByTokenIdRemoved) {
   auto token_id = adr_service_->devices().begin()->get()->token_id();
 
   fake_driver->DropCodec();
+  RunLoopUntilIdle();
+
+  EXPECT_EQ(adr_service_->FindDeviceByTokenId(token_id).first,
+            AudioDeviceRegistry::DevicePresence::Unknown);
+}
+
+/////////////////////
+// StreamConfig cases
+TEST_F(AudioDeviceRegistryServerWarningTest, FindStreamConfigByTokenIdError) {
+  auto fake_driver = CreateFakeStreamConfigInput();
+  fake_driver->set_health_state(false);
+  auto client = fidl::ClientEnd<fuchsia_hardware_audio::StreamConfig>(fake_driver->Enable());
+  AddDeviceForDetection("test input", fuchsia_audio_device::DeviceType::kInput,
+                        fuchsia_audio_device::DriverClient::WithStreamConfig(std::move(client)));
+
+  RunLoopUntilIdle();
+  EXPECT_EQ(adr_service_->devices().size(), 0u);
+  EXPECT_EQ(adr_service_->unhealthy_devices().size(), 1u);
+  auto token_id = adr_service_->unhealthy_devices().begin()->get()->token_id();
+
+  EXPECT_EQ(adr_service_->FindDeviceByTokenId(token_id).first,
+            AudioDeviceRegistry::DevicePresence::Error);
+}
+
+TEST_F(AudioDeviceRegistryServerWarningTest, FindStreamConfigByTokenIdRemoved) {
+  auto fake_driver = CreateFakeStreamConfigOutput();
+  auto client = fidl::ClientEnd<fuchsia_hardware_audio::StreamConfig>(fake_driver->Enable());
+  AddDeviceForDetection("test output", fuchsia_audio_device::DeviceType::kOutput,
+                        fuchsia_audio_device::DriverClient::WithStreamConfig(std::move(client)));
+
+  RunLoopUntilIdle();
+  EXPECT_EQ(adr_service_->devices().size(), 1u);
+  auto token_id = adr_service_->devices().begin()->get()->token_id();
+
+  fake_driver->DropStreamConfig();
   RunLoopUntilIdle();
 
   EXPECT_EQ(adr_service_->FindDeviceByTokenId(token_id).first,
