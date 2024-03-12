@@ -33,58 +33,61 @@ uint32_t arm64_zva_size = 32;
 uint32_t arm64_icache_size = 32;
 uint32_t arm64_dcache_size = 32;
 
-static void parse_ccsid(arm64_cache_desc_t* desc, uint64_t ccsid) {
-  desc->write_through = BIT(ccsid, 31) > 0;
-  desc->write_back = BIT(ccsid, 30) > 0;
-  desc->read_alloc = BIT(ccsid, 29) > 0;
-  desc->write_alloc = BIT(ccsid, 28) > 0;
-  desc->num_sets = (uint32_t)BITS_SHIFT(ccsid, 27, 13) + 1;
-  desc->associativity = (uint32_t)BITS_SHIFT(ccsid, 12, 3) + 1;
-  desc->line_size = 1u << (BITS(ccsid, 2, 0) + 4);
-}
-
 void arm64_get_cache_info(arm64_cache_info_t* info) {
-  uint64_t temp = 0;
+  *info = {};
 
   uint64_t clidr = __arm_rsr64("clidr_el1");
-  info->inner_boundary = (uint8_t)BITS_SHIFT(clidr, 32, 30);
-  info->lou_u = (uint8_t)BITS_SHIFT(clidr, 29, 27);
-  info->loc = (uint8_t)BITS_SHIFT(clidr, 26, 24);
-  info->lou_is = (uint8_t)BITS_SHIFT(clidr, 23, 21);
+  info->inner_boundary = static_cast<uint8_t>(BITS_SHIFT(clidr, 32, 30));
+  info->lou_u = static_cast<uint8_t>(BITS_SHIFT(clidr, 29, 27));
+  info->loc = static_cast<uint8_t>(BITS_SHIFT(clidr, 26, 24));
+  info->lou_is = static_cast<uint8_t>(BITS_SHIFT(clidr, 23, 21));
 
   uint64_t ctr = __arm_rsr64("ctr_el0");
-  info->imin_line = (uint8_t)BITS(ctr, 3, 0);
-  info->dmin_line = (uint8_t)BITS_SHIFT(ctr, 19, 16);
-  info->l1_instruction_cache_policy = (uint8_t)BITS_SHIFT(ctr, 15, 14);
-  info->cache_writeback_granule = (uint8_t)BITS_SHIFT(ctr, 27, 24);
-  info->idc = BIT(ctr, 28) == 0;  // inverted logic
-  info->dic = BIT(ctr, 29) == 0;  // inverted logic
+  info->imin_line = static_cast<uint8_t>(BITS(ctr, 3, 0));
+  info->dmin_line = static_cast<uint8_t>(BITS_SHIFT(ctr, 19, 16));
+  info->l1_instruction_cache_policy = static_cast<uint8_t>(BITS_SHIFT(ctr, 15, 14));
+  info->cache_writeback_granule = static_cast<uint8_t>(BITS_SHIFT(ctr, 27, 24));
+  info->idc = BIT(ctr, 28);
+  info->dic = BIT(ctr, 29);
 
-  for (int i = 0; i < 7; i++) {
+  auto process_ccsid = [info](size_t level, uint8_t ctype) {
+    const bool instruction = ctype & 0x1;
+
+    __arm_wsr64("csselr_el1", (level << 1) | (instruction ? 1 : 0));  // Select cache level
+    __isb(ARM_MB_SY);
+
+    arm64_cache_desc_t* desc =
+        instruction ? &info->level_inst_type[level] : &info->level_data_type[level];
+    desc->ctype = ctype;
+
+    const uint64_t ccsid = __arm_rsr64("ccsidr_el1");
+    if (arm64_mmu_features.ccsidx) {
+      // Parse the newer extended ccsid format
+      desc->num_sets = static_cast<uint32_t>(BITS_SHIFT(ccsid, 55, 32) + 1);
+      desc->associativity = static_cast<uint32_t>(BITS_SHIFT(ccsid, 23, 3) + 1);
+      desc->line_size = 1u << (BITS(ccsid, 2, 0) + 4);
+    } else {
+      desc->num_sets = static_cast<uint32_t>(BITS_SHIFT(ccsid, 27, 13) + 1);
+      desc->associativity = static_cast<uint32_t>(BITS_SHIFT(ccsid, 12, 3) + 1);
+      desc->line_size = 1u << (BITS(ccsid, 2, 0) + 4);
+    }
+  };
+
+  for (size_t i = 0; i < 7; i++) {
     uint8_t ctype = (clidr >> (3 * i)) & 0x07;
     if (ctype == 0) {
-      info->level_data_type[i].ctype = 0;
-      info->level_inst_type[i].ctype = 0;
-    } else if (ctype == 4) {                         // Unified
-      __arm_wsr64("csselr_el1", (int64_t)(i << 1));  // Select cache level
-      __isb(ARM_MB_SY);
-      temp = __arm_rsr64("ccsidr_el1");
-      info->level_data_type[i].ctype = 4;
-      parse_ccsid(&(info->level_data_type[i]), temp);
+      // No more valid ctypes after this
+      break;
+    }
+
+    if (ctype == 4) {  // Unified
+      process_ccsid(i, ctype);
     } else {
-      if (ctype & 0x02) {
-        __arm_wsr64("csselr_el1", (int64_t)(i << 1));
-        __isb(ARM_MB_SY);
-        temp = __arm_rsr64("ccsidr_el1");
-        info->level_data_type[i].ctype = 2;
-        parse_ccsid(&(info->level_data_type[i]), temp);
+      if (ctype & 0x2) {  // Data cache
+        process_ccsid(i, ctype & 0x2);
       }
-      if (ctype & 0x01) {
-        __arm_wsr64("csselr_el1", (int64_t)(i << 1) | 0x01);
-        __isb(ARM_MB_SY);
-        temp = __arm_rsr64("ccsidr_el1");
-        info->level_inst_type[i].ctype = 1;
-        parse_ccsid(&(info->level_inst_type[i]), temp);
+      if (ctype & 0x1) {  // Instruction cache
+        process_ccsid(i, ctype & 0x1);
       }
     }
   }
@@ -100,6 +103,9 @@ void arm64_dump_cache_info(cpu_num_t cpu) {
   printf("Instruction/Data cache minimum line = %u/%u\n", (1U << info->imin_line) * 4,
          (1U << info->dmin_line) * 4);
   printf("Cache Writeback Granule = %u\n", (1U << info->cache_writeback_granule) * 4);
+  if (arm64_mmu_features.ccsidx) {
+    dprintf(INFO, "Extended CCSIDR format\n");
+  }
   const char* icp = "";
   switch (info->l1_instruction_cache_policy) {
     case 0:
@@ -536,6 +542,9 @@ void arm64_feature_init() {
     // Check for User Access Override
     if (mmfr2.uao() != 0) {
       arm64_mmu_features.uao = true;
+    }
+    if (mmfr2.ccidx() != 0) {
+      arm64_mmu_features.ccsidx = true;
     }
 
     // Check if FEAT_PMUv3 is enabled.

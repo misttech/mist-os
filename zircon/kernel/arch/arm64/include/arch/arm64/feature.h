@@ -88,6 +88,9 @@ struct arm64_mmu_features {
   // accessed and dirty bits
   bool accessed_bit;
   bool dirty_bit;
+
+  // extended CCSIDR register format
+  bool ccsidx;
 };
 
 // the global feature structure for mmu features

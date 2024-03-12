@@ -22,10 +22,6 @@ struct iframe_t;
 
 typedef struct {
   uint8_t ctype;
-  bool write_through;
-  bool write_back;
-  bool read_alloc;
-  bool write_alloc;
   uint32_t num_sets;
   uint32_t associativity;
   uint32_t line_size;
