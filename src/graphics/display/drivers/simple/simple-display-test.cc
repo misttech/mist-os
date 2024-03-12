@@ -57,7 +57,8 @@ class FakeBufferCollection : public fidl::testing::WireTestBase<fuchsia_sysmem2:
     single_buffer_settings.buffer_settings(buffer_memory_settings.Build());
     auto image_format_constraints = fuchsia_sysmem2::wire::ImageFormatConstraints::Builder(arena);
     image_format_constraints.pixel_format(fuchsia_images2::wire::PixelFormat::kB8G8R8A8);
-    image_format_constraints.pixel_format_modifier(fuchsia_images2::wire::kFormatModifierLinear);
+    image_format_constraints.pixel_format_modifier(
+        fuchsia_images2::wire::PixelFormatModifier::kLinear);
     single_buffer_settings.image_format_constraints(image_format_constraints.Build());
     collection_info.settings(single_buffer_settings.Build());
     auto vmo_buffer = fuchsia_sysmem2::wire::VmoBuffer::Builder(arena);

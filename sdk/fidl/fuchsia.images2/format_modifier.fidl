@@ -41,30 +41,7 @@ library fuchsia.images2;
 /// `pixel_format_modifier`, and that `pixel_format` value can also contribute
 /// to the overall meaning of the `ImageFormat`. In other words, the "modifier"
 /// part of the name is more accurate than "override" would be.
-@available(added=19)
 type PixelFormatModifier = flexible enum : uint64 {
-    // FORMAT_MODIFIER_VENDOR_NONE = 0x0000000000000000;
-    // FORMAT_MODIFIER_VENDOR_INTEL = 0x0100000000000000;
-    // FORMAT_MODIFIER_VENDOR_AMD = 0x0200000000000000;
-    // FORMAT_MODIFIER_VENDOR_NVIDIA = 0x0300000000000000;
-    // FORMAT_MODIFIER_VENDOR_SAMSUNG = 0x0400000000000000;
-    // FORMAT_MODIFIER_VENDOR_QCOM = 0x0500000000000000;
-    // FORMAT_MODIFIER_VENDOR_VIVANTE = 0x0600000000000000;
-    // FORMAT_MODIFIER_VENDOR_BROADCOM = 0x0700000000000000;
-    // FORMAT_MODIFIER_VENDOR_ARM = 0x0800000000000000;
-    // FORMAT_MODIFIER_VENDOR_ALLWINNER = 0x0900000000000000;
-    // FORMAT_MODIFIER_VENDOR_AMLOGIC = 0x0a00000000000000;
-
-    // Prefer to avoid unilaterally allocating vendor numbers from 0x0b onwards,
-    // to hopefully avoid collisions with vendor numbers allocated elsewhere and
-    // to allow for "compatible" values (see below), at least for now.
-    //
-    // The 0x67 is 'g'. The intent of this vendor number is to avoid collision
-    // with sequentially-allocated vendor numbers allocated elsewhere and listed
-    // above, at least for now.
-    //
-    // FORMAT_MODIFIER_VENDOR_GOOGLE = 0x6700000000000000;
-
     DO_NOT_CARE = 0x00FFFFFFFFFFFFFE;
 
     INVALID = 0x00FFFFFFFFFFFFFF;
@@ -77,8 +54,6 @@ type PixelFormatModifier = flexible enum : uint64 {
 
     // Intel format modifier values
 
-    // Format has a color control surface after the tile data
-    // FORMAT_MODIFIER_INTEL_CCS_BIT = 0x1000000;
     INTEL_I915_X_TILED = 0x0100000000000001;
     INTEL_I915_Y_TILED = 0x0100000000000002;
     INTEL_I915_YF_TILED = 0x0100000000000003;
@@ -100,24 +75,6 @@ type PixelFormatModifier = flexible enum : uint64 {
 
     // ARM format modifier values
 
-    // bit 0x10 is for using the YUV transform.
-    // FORMAT_MODIFIER_ARM_YUV_BIT = 0x10;
-
-    // bit 0x20 is for split-block formats.
-    // FORMAT_MODIFIER_ARM_SPLIT_BLOCK_BIT = 0x20;
-
-    // bit 0x40 is for sparse formats.
-    // FORMAT_MODIFIER_ARM_SPARSE_BIT = 0x40;
-
-    // bit 0x800 is for variants with buffer content hints.
-    // FORMAT_MODIFIER_ARM_BCH_BIT = 0x800;
-
-    // bit 0x1000 is for variants with a transaction elimination buffer allocated.
-    // FORMAT_MODIFIER_ARM_TE_BIT = 0x1000;
-
-    // bit 0x2000 is for variants with tiled headers.
-    // FORMAT_MODIFIER_ARM_TILED_HEADER_BIT = 0x2000;
-
     // Not all values are equally useful, so we only have format modifiers for some particularly interesting ones.
 
     // To make the variants with bits set more consistent 0x0800000000000000 is reserved for linear.
@@ -136,7 +93,6 @@ type PixelFormatModifier = flexible enum : uint64 {
     ARM_AFBC_16X16_SPLIT_BLOCK_SPARSE_YUV_TILED_HEADER = 0x0800000000002071;
     ARM_AFBC_16X16_SPLIT_BLOCK_SPARSE_YUV_TE_TILED_HEADER = 0x0800000000003071;
 
-    // GOOGLE format modifier values
     GOOGLE_GOLDFISH_OPTIMAL = 0x6700000000000001;
 };
 
@@ -146,8 +102,6 @@ type PixelFormatModifier = flexible enum : uint64 {
 // bitfield values (in contrast to complete values) will remain below here after
 // deprecation / removal of complete values below here is done.
 //
-@available(added=12, deprecated=19)
-const FORMAT_MODIFIER_NONE uint64 = 0x0000000000000000;
 
 // Per-vendor upper byte vendor-codes.
 @available(added=HEAD)
@@ -180,29 +134,28 @@ const FORMAT_MODIFIER_VENDOR_AMLOGIC uint64 = 0x0a00000000000000;
 @available(added=HEAD)
 const FORMAT_MODIFIER_VENDOR_GOOGLE uint64 = 0x6700000000000000;
 
-@available(added=12, deprecated=19)
-const FORMAT_MODIFIER_LINEAR uint64 = 0x0000000000000000;
-
 //
-// Fill in (compatible) values below as needed.
+// Within/under a particular FORMAT_MODIFIER_VENDOR_* byte, the remaining bits
+// of the format modifier value can include some bitfields that have consistent
+// meaning within/under that specific vendor byte.
+//
+// Fill in (compatible) bitfield/mask values below as needed. These bitfield
+// values/masks can be used to build or interpret a complete format modifier.
+// These values aren't complete format modifiers on their own. Complete format
+// modifiers go in the PixelFormatModifier enum above (but only those which are
+// actually used / actually useful, not just every possible combination of
+// semantically valid bitfield values).
+//
+// We define bitfield/mask values here to make it easier for code to check the
+// relevant bitfield(s), easier to mask away a feature bit, and similar. These
+// are generally defined only within/under the relevant FORMAT_MODIFIER_VENDOR_*
+// byte, so each should contain the relevant vendor name.
 //
 
 // Intel format modifier bitfield values / masks
 
 /// Format has a color control surface after the tile data
-@available(added=12, deprecated=19)
 const FORMAT_MODIFIER_INTEL_CCS_BIT uint64 = 0x1000000;
-@available(added=12, deprecated=19)
-const FORMAT_MODIFIER_INTEL_I915_X_TILED uint64 = 0x0100000000000001;
-@available(added=12, deprecated=19)
-const FORMAT_MODIFIER_INTEL_I915_Y_TILED uint64 = 0x0100000000000002;
-@available(added=12, deprecated=19)
-const FORMAT_MODIFIER_INTEL_I915_YF_TILED uint64 = 0x0100000000000003;
-
-@available(added=12, deprecated=19)
-const FORMAT_MODIFIER_INTEL_I915_Y_TILED_CCS uint64 = 0x0100000001000002;
-@available(added=12, deprecated=19)
-const FORMAT_MODIFIER_INTEL_I915_YF_TILED_CCS uint64 = 0x0100000001000003;
 
 // AMD format modifier bitfield values / masks
 
@@ -218,35 +171,14 @@ const FORMAT_MODIFIER_INTEL_I915_YF_TILED_CCS uint64 = 0x0100000001000003;
 
 // ARM format modifier bitfield values / masks
 // bit 0x10 is for using the YUV transform.
-@available(added=12, deprecated=19)
 const FORMAT_MODIFIER_ARM_YUV_BIT uint64 = 0x10;
 // bit 0x20 is for split-block formats.
-@available(added=12, deprecated=19)
 const FORMAT_MODIFIER_ARM_SPLIT_BLOCK_BIT uint64 = 0x20;
 // bit 0x40 is for sparse formats.
-@available(added=12, deprecated=19)
 const FORMAT_MODIFIER_ARM_SPARSE_BIT uint64 = 0x40;
 // bit 0x800 is for variants with buffer content hints.
-@available(added=12, deprecated=19)
 const FORMAT_MODIFIER_ARM_BCH_BIT uint64 = 0x800;
 // bit 0x1000 is for variants with a transaction elimination buffer allocated.
-@available(added=12, deprecated=19)
 const FORMAT_MODIFIER_ARM_TE_BIT uint64 = 0x1000;
 // bit 0x2000 is for variants with tiled headers.
-@available(added=12, deprecated=19)
 const FORMAT_MODIFIER_ARM_TILED_HEADER_BIT uint64 = 0x2000;
-// Not all values are equally useful, so we only have format modifiers for some particularly interesting ones.
-
-// To make the variants with bits set more consistent 0x0800000000000000 is reserved for linear.
-@available(added=12, deprecated=19)
-const FORMAT_MODIFIER_ARM_AFBC_16X16 uint64 = 0x0800000000000001;
-@available(added=12, deprecated=19)
-const FORMAT_MODIFIER_ARM_AFBC_32X8 uint64 = 0x0800000000000002;
-
-// Variations with transaction elimination support 0x1000 should be set for these formats.
-@available(added=12, deprecated=19)
-const FORMAT_MODIFIER_ARM_LINEAR_TE uint64 = 0x0800000000001000;
-
-// GOOGLE format modifier bitfield values / masks
-@available(added=12, deprecated=19)
-const FORMAT_MODIFIER_GOOGLE_GOLDFISH_OPTIMAL uint64 = 0x6700000000000001;

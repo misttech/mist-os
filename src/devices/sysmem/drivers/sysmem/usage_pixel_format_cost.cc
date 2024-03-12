@@ -160,7 +160,8 @@ const std::list<const UsagePixelFormatCostEntry> kArm_Mali_Cost_Entries = [] {
 
     constexpr uint64_t kAfbcTypeMask = 0xf;
     if ((modifier_as_bits & kAfbcTypeMask) !=
-        (fuchsia_images2::kFormatModifierArmAfbc16X16 & kAfbcTypeMask))
+        (static_cast<uint64_t>(fuchsia_images2::PixelFormatModifier::kArmAfbc16X16) &
+         kAfbcTypeMask))
       cost += kNon16X16Cost;
     AddRgbaPixelFormat(allocator, modifier, cost, result);
   }

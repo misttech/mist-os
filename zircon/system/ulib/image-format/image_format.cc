@@ -44,16 +44,6 @@ using safemath::CheckSub;
 uint32_t ImageFormatStrideBytesPerWidthPixel(const PixelFormatAndModifier& pixel_format);
 #endif
 
-#if __Fuchsia_API_level__ >= 19
-#define FORMAT_MODIFIER_TYPE fuchsia_images2::PixelFormatModifier
-#define FORMAT_MODIFIER(x) (fuchsia_images2::PixelFormatModifier::k##x)
-#define FORMAT_MODIFIER_TO_UNDERLYING(x) fidl::ToUnderlying((x))
-#else
-#define FORMAT_MODIFIER_TYPE uint64_t
-#define FORMAT_MODIFIER(x) (fuchsia_images2::kFormatModifier##x)
-#define FORMAT_MODIFIER_TO_UNDERLYING(x) (x)
-#endif
-
 namespace {
 
 using ColorSpace = fuchsia_images2::ColorSpace;
@@ -171,12 +161,12 @@ class IntelTiledFormats : public ImageFormatSet {
       return false;
     }
     switch (pixel_format.pixel_format_modifier) {
-      case FORMAT_MODIFIER(IntelI915XTiled):
-      case FORMAT_MODIFIER(IntelI915YTiled):
-      case FORMAT_MODIFIER(IntelI915YfTiled):
+      case fuchsia_images2::PixelFormatModifier::kIntelI915XTiled:
+      case fuchsia_images2::PixelFormatModifier::kIntelI915YTiled:
+      case fuchsia_images2::PixelFormatModifier::kIntelI915YfTiled:
       // X-Tiled CCS is not supported.
-      case FORMAT_MODIFIER(IntelI915YTiledCcs):
-      case FORMAT_MODIFIER(IntelI915YfTiledCcs):
+      case fuchsia_images2::PixelFormatModifier::kIntelI915YTiledCcs:
+      case fuchsia_images2::PixelFormatModifier::kIntelI915YfTiledCcs:
         return true;
       default:
         return false;
@@ -348,15 +338,17 @@ class IntelTiledFormats : public ImageFormatSet {
   static constexpr uint32_t kCcsTileHeightRatio = 16;
 
   static TilingType GetTilingTypeForPixelFormat(const PixelFormatAndModifier& pixel_format) {
-    switch (FORMAT_MODIFIER_TO_UNDERLYING(pixel_format.pixel_format_modifier) &
-            ~fuchsia_images2::kFormatModifierIntelCcsBit) {
-      case fuchsia_images2::kFormatModifierIntelI915XTiled:
+    auto modifier_without_ccs_bit = static_cast<fuchsia_images2::PixelFormatModifier>(
+        fidl::ToUnderlying(pixel_format.pixel_format_modifier) &
+        ~fuchsia_images2::kFormatModifierIntelCcsBit);
+    switch (modifier_without_ccs_bit) {
+      case fuchsia_images2::PixelFormatModifier::kIntelI915XTiled:
         return TilingType::kX;
 
-      case fuchsia_images2::kFormatModifierIntelI915YTiled:
+      case fuchsia_images2::PixelFormatModifier::kIntelI915YTiled:
         return TilingType::kY;
 
-      case fuchsia_images2::kFormatModifierIntelI915YfTiled:
+      case fuchsia_images2::PixelFormatModifier::kIntelI915YfTiled:
         return TilingType::kYf;
       default:
         ZX_DEBUG_ASSERT(false);
@@ -422,7 +414,7 @@ class IntelTiledFormats : public ImageFormatSet {
   }
 
   static bool FormatHasCcs(const PixelFormatAndModifier& pixel_format) {
-    return FORMAT_MODIFIER_TO_UNDERLYING(pixel_format.pixel_format_modifier) &
+    return fidl::ToUnderlying(pixel_format.pixel_format_modifier) &
            fuchsia_images2::kFormatModifierIntelCcsBit;
   }
 
@@ -464,10 +456,11 @@ class AfbcFormats : public ImageFormatSet {
         pixel_format.pixel_format != PixelFormatWire::kB8G8R8A8) {
       return false;
     }
-    switch (FORMAT_MODIFIER_TO_UNDERLYING(pixel_format.pixel_format_modifier) &
-            ~kAfbcModifierMask) {
-      case fuchsia_images2::kFormatModifierArmAfbc16X16:
-      case fuchsia_images2::kFormatModifierArmAfbc32X8:
+    auto modifier_without_afbc = static_cast<fuchsia_images2::PixelFormatModifier>(
+        fidl::ToUnderlying(pixel_format.pixel_format_modifier) & ~kAfbcModifierMask);
+    switch (modifier_without_afbc) {
+      case fuchsia_images2::PixelFormatModifier::kArmAfbc16X16:
+      case fuchsia_images2::PixelFormatModifier::kArmAfbc32X8:
         return true;
       default:
         return false;
@@ -489,13 +482,13 @@ class AfbcFormats : public ImageFormatSet {
     uint32_t block_height;
     uint32_t width_alignment;
     uint32_t height_alignment;
-    bool tiled_header =
-        FORMAT_MODIFIER_TO_UNDERLYING(image_format.pixel_format_modifier().value()) &
-        fuchsia_images2::kFormatModifierArmTiledHeaderBit;
+    bool tiled_header = fidl::ToUnderlying(image_format.pixel_format_modifier().value()) &
+                        fuchsia_images2::kFormatModifierArmTiledHeaderBit;
 
-    switch (FORMAT_MODIFIER_TO_UNDERLYING(image_format.pixel_format_modifier().value()) &
-            ~kAfbcModifierMask) {
-      case fuchsia_images2::kFormatModifierArmAfbc16X16:
+    auto modifier_without_afbc = static_cast<fuchsia_images2::PixelFormatModifier>(
+        fidl::ToUnderlying(image_format.pixel_format_modifier().value()) & ~kAfbcModifierMask);
+    switch (modifier_without_afbc) {
+      case fuchsia_images2::PixelFormatModifier::kArmAfbc16X16:
         block_width = 16;
         block_height = 16;
         if (!tiled_header) {
@@ -507,7 +500,7 @@ class AfbcFormats : public ImageFormatSet {
         }
         break;
 
-      case fuchsia_images2::kFormatModifierArmAfbc32X8:
+      case fuchsia_images2::PixelFormatModifier::kArmAfbc32X8:
         block_width = 32;
         block_height = 8;
         if (!tiled_header) {
@@ -540,7 +533,7 @@ class AfbcFormats : public ImageFormatSet {
 
   uint64_t ImageFormatImageSize(const ImageFormat& image_format) const override {
     uint64_t size = NonTESize(image_format);
-    if (FORMAT_MODIFIER_TO_UNDERLYING(image_format.pixel_format_modifier().value()) &
+    if (fidl::ToUnderlying(image_format.pixel_format_modifier().value()) &
         fuchsia_images2::kFormatModifierArmTeBit) {
       size += arm_transaction_elimination_buffer_size(size, image_format.size()->width(),
                                                       image_format.size()->height());
@@ -589,12 +582,13 @@ class AfbcFormats : public ImageFormatSet {
 
     uint32_t block_width;
     uint32_t width_alignment;
-    bool tiled_header = FORMAT_MODIFIER_TO_UNDERLYING(constraints.pixel_format_modifier().value()) &
+    bool tiled_header = fidl::ToUnderlying(constraints.pixel_format_modifier().value()) &
                         fuchsia_images2::kFormatModifierArmTiledHeaderBit;
 
-    switch (FORMAT_MODIFIER_TO_UNDERLYING(constraints.pixel_format_modifier().value()) &
-            ~kAfbcModifierMask) {
-      case fuchsia_images2::kFormatModifierArmAfbc16X16:
+    auto modifier_without_afbc = static_cast<fuchsia_images2::PixelFormatModifier>(
+        fidl::ToUnderlying(constraints.pixel_format_modifier().value()) & ~kAfbcModifierMask);
+    switch (modifier_without_afbc) {
+      case fuchsia_images2::PixelFormatModifier::kArmAfbc16X16:
         block_width = 16;
         if (!tiled_header) {
           width_alignment = block_width;
@@ -603,7 +597,7 @@ class AfbcFormats : public ImageFormatSet {
         }
         break;
 
-      case fuchsia_images2::kFormatModifierArmAfbc32X8:
+      case fuchsia_images2::PixelFormatModifier::kArmAfbc32X8:
         block_width = 32;
         if (!tiled_header) {
           width_alignment = block_width;
@@ -704,7 +698,7 @@ class LinearFormats : public ImageFormatSet {
   const char* Name() const override { return "LinearFormats"; }
 
   bool IsSupported(const PixelFormatAndModifier& pixel_format) const override {
-    if (pixel_format.pixel_format_modifier != FORMAT_MODIFIER(Linear)) {
+    if (pixel_format.pixel_format_modifier != fuchsia_images2::PixelFormatModifier::kLinear) {
       return false;
     }
     switch (pixel_format.pixel_format) {
@@ -838,7 +832,7 @@ class GoldfishFormats : public ImageFormatSet {
 
   bool IsSupported(const PixelFormatAndModifier& pixel_format) const override {
     switch (pixel_format.pixel_format_modifier) {
-      case FORMAT_MODIFIER(GoogleGoldfishOptimal):
+      case fuchsia_images2::PixelFormatModifier::kGoogleGoldfishOptimal:
         return true;
       default:
         return false;
@@ -884,7 +878,7 @@ class ArmTELinearFormats : public ImageFormatSet {
   const char* Name() const override { return "ArmTELinearFormats"; }
 
   bool IsSupported(const PixelFormatAndModifier& pixel_format) const override {
-    if (pixel_format.pixel_format_modifier != FORMAT_MODIFIER(ArmLinearTe))
+    if (pixel_format.pixel_format_modifier != fuchsia_images2::PixelFormatModifier::kArmLinearTe)
       return false;
     switch (pixel_format.pixel_format) {
       case PixelFormat::kInvalid:
@@ -1582,8 +1576,8 @@ bool ImageFormatCompatibleWithProtectedMemory(const PixelFormatAndModifier& pixe
   switch (fidl::ToUnderlying(pixel_format.pixel_format_modifier) &
           ~AfbcFormats::kAfbcModifierMask) {
     case kArmLinearFormat:
-    case fuchsia_images2::kFormatModifierArmAfbc16X16:
-    case fuchsia_images2::kFormatModifierArmAfbc32X8:
+    case fidl::ToUnderlying(fuchsia_images2::PixelFormatModifier::kArmAfbc16X16):
+    case fidl::ToUnderlying(fuchsia_images2::PixelFormatModifier::kArmAfbc32X8):
       // TE formats occasionally need CPU writes to the TE buffer.
       return !(fidl::ToUnderlying(pixel_format.pixel_format_modifier) &
                fuchsia_images2::kFormatModifierArmTeBit);

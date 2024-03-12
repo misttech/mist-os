@@ -116,7 +116,8 @@ TEST(ImageFormat, LinearRowBytes_V2_wire) {
   fidl::Arena allocator;
   sysmem_v2::wire::ImageFormatConstraints constraints(allocator);
   constraints.set_pixel_format(fuchsia_images2::wire::PixelFormat::kB8G8R8A8);
-  constraints.set_pixel_format_modifier(allocator, fuchsia_images2::wire::kFormatModifierLinear);
+  constraints.set_pixel_format_modifier(allocator,
+                                        fuchsia_images2::wire::PixelFormatModifier::kLinear);
   constraints.set_min_size(allocator, fuchsia_math::wire::SizeU{12u, 1u});
   constraints.set_max_size(allocator, fuchsia_math::wire::SizeU{100u, 0xFFFFFFFF});
   constraints.set_bytes_per_row_divisor(4u * 8u);
@@ -343,7 +344,8 @@ TEST(ImageFormat, PlaneByteOffset_V2_wire) {
   fidl::Arena allocator;
   sysmem_v2::wire::ImageFormatConstraints constraints(allocator);
   constraints.set_pixel_format(fuchsia_images2::wire::PixelFormat::kB8G8R8A8);
-  constraints.set_pixel_format_modifier(allocator, fuchsia_images2::wire::kFormatModifierLinear);
+  constraints.set_pixel_format_modifier(allocator,
+                                        fuchsia_images2::wire::PixelFormatModifier::kLinear);
   constraints.set_min_size(allocator, fuchsia_math::wire::SizeU{12u, 12u});
   constraints.set_max_size(allocator, fuchsia_math::wire::SizeU{100u, 100u});
   constraints.set_bytes_per_row_divisor(4u * 8u);
@@ -839,7 +841,7 @@ TEST(ImageFormat, GoldfishOptimal_V2_wire) {
   goldfish_optimal_image_format_bgra32.set_pixel_format(
       fuchsia_images2::wire::PixelFormat::kB8G8R8A8);
   goldfish_optimal_image_format_bgra32.set_pixel_format_modifier(
-      allocator, fuchsia_images2::wire::kFormatModifierGoogleGoldfishOptimal);
+      allocator, fuchsia_images2::wire::PixelFormatModifier::kGoogleGoldfishOptimal);
   goldfish_optimal_image_format_bgra32.set_size(allocator,
                                                 fuchsia_math::wire::SizeU{kWidth, kHeight});
   goldfish_optimal_image_format_bgra32.set_bytes_per_row(kStride);
@@ -865,7 +867,7 @@ TEST(ImageFormat, CorrectModifiers) {
                 sysmem_v1::kFormatModifierArmTiledHeaderBit);
   // V2 changes the value to be less likely to collide.
   EXPECT_NE(sysmem_v1::kFormatModifierGoogleGoldfishOptimal,
-            fuchsia_images2::kFormatModifierGoogleGoldfishOptimal);
+            fidl::ToUnderlying(fuchsia_images2::PixelFormatModifier::kGoogleGoldfishOptimal));
 }
 
 TEST(ImageFormat, CorrectModifiers_wire) {
@@ -877,7 +879,7 @@ TEST(ImageFormat, CorrectModifiers_wire) {
                 sysmem_v1::wire::kFormatModifierArmTiledHeaderBit);
   // V2 changes the value to be less likely to collide.
   EXPECT_NE(sysmem_v1::wire::kFormatModifierGoogleGoldfishOptimal,
-            fuchsia_images2::wire::kFormatModifierGoogleGoldfishOptimal);
+            fidl::ToUnderlying(fuchsia_images2::wire::PixelFormatModifier::kGoogleGoldfishOptimal));
 }
 
 TEST(ImageFormat, RoundUpWidthForCallers) {
