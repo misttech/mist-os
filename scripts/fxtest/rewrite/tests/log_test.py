@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 import asyncio
+import contextlib
 import io
 import json
 import unittest
@@ -12,8 +13,12 @@ import log
 
 
 class TestLogOutput(unittest.IsolatedAsyncioTestCase):
-    async def test_logs_json(self) -> None:
-        """Test that logs are properly serialized to JSON."""
+    async def _write_test_logs(self) -> io.StringIO:
+        """Write out test logs
+
+        Returns:
+            io.StringIO: A buffer containing test logs.
+        """
         recorder = event.EventRecorder()
         output = io.StringIO()
         log_task = asyncio.create_task(log.writer(recorder, output))
@@ -24,6 +29,12 @@ class TestLogOutput(unittest.IsolatedAsyncioTestCase):
         recorder.emit_end()
 
         await log_task
+
+        return output
+
+    async def test_logs_json(self) -> None:
+        """Test that logs are properly serialized to JSON."""
+        output = await self._write_test_logs()
 
         events: list[event.Event] = [
             event.Event.from_dict(json.loads(line))  # type:ignore
@@ -39,3 +50,10 @@ class TestLogOutput(unittest.IsolatedAsyncioTestCase):
             payloads[2].user_message,
             event.Message("Done testing", event.MessageLevel.INFO),
         )
+
+    async def test_pretty_print(self) -> None:
+        output = await self._write_test_logs()
+        stdout = io.StringIO()
+        with contextlib.redirect_stdout(stdout):
+            log.pretty_print(output)
+        self.assertEqual(stdout.getvalue(), "0 tests were run\n")

@@ -21,6 +21,7 @@ class Flags:
 
     dry: bool
     list: bool
+    print_logs: bool
 
     build: bool
     updateifinbase: bool
@@ -164,6 +165,12 @@ def parse_args(
         "--list",
         action="store_true",
         help="Do not actually run tests. Instead print out the list of test cases each test contains.",
+    )
+    utility.add_argument(
+        "--print-logs",
+        action="store_true",
+        default=False,
+        help="If set, pretty print the contents of the log file. If no --logpath is set, the default log output location is checked and the most recent log is used.",
     )
 
     build = parser.add_argument_group("Build Options")

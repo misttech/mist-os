@@ -2,8 +2,12 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import contextlib
+import gzip
+import io
 import json
 import os
+import re
 import shutil
 import tempfile
 import typing
@@ -613,3 +617,160 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
             command_mock.call_args_list
         )
         self.assertIsSubset({("fx", "ota", "--no-build")}, call_prefixes)
+
+    async def test_print_logs_success(self) -> None:
+        """Test that --print-logs searches for logs, can be given a log,
+        and handles invalid data
+        """
+        env = environment.ExecutionEnvironment.initialize_from_args(
+            args.parse_args([])
+        )
+        assert env.log_file
+        # Create a sample log with 3 tests running
+        recorder = event.EventRecorder()
+        recorder.emit_init()
+
+        # Simulate one test suite
+        test_id = recorder.emit_test_suite_started("foo", hermetic=False)
+        program_id = recorder.emit_program_start(
+            "bar", ["abcd"], parent=test_id
+        )
+        recorder.emit_program_output(
+            program_id, "Data", event.ProgramOutputStream.STDOUT
+        )
+        recorder.emit_program_termination(program_id, 0)
+        recorder.emit_test_suite_ended(
+            test_id,
+            event.TestSuiteStatus.PASSED,
+            message=None,
+        )
+
+        test_2 = recorder.emit_test_suite_started(
+            "//other:test2", hermetic=True
+        )
+        test_3 = recorder.emit_test_suite_started(
+            "//other:test3", hermetic=True
+        )
+        program_2 = recorder.emit_program_start(
+            "test", ["arg", "1"], parent=test_2
+        )
+        program_3 = recorder.emit_program_start(
+            "test", ["arg", "2"], parent=test_3
+        )
+        recorder.emit_program_output(
+            program_3,
+            "line for test 3",
+            stream=event.ProgramOutputStream.STDOUT,
+        )
+        recorder.emit_program_output(
+            program_2,
+            "line for test 2",
+            stream=event.ProgramOutputStream.STDOUT,
+        )
+        recorder.emit_program_termination(program_2, 0)
+        recorder.emit_program_termination(program_3, 0)
+        recorder.emit_test_suite_ended(
+            test_2, event.TestSuiteStatus.FAILED, message=None
+        )
+        recorder.emit_test_suite_ended(
+            test_3, event.TestSuiteStatus.PASSED, message=None
+        )
+        recorder.emit_end()
+
+        with gzip.open(env.log_file, "wt") as out_file:
+            async for e in recorder.iter():
+                json.dump(e.to_dict(), out_file)  # type:ignore[attr-defined]
+                print("", file=out_file)
+
+        def assert_print_logs_output(return_code: int, output: str) -> None:
+            self.assertEqual(return_code, 0, f"Content was:\n{output}")
+            self.assertIsNotNone(
+                re.search(r"3 tests were run", output, re.MULTILINE),
+                f"Did not find substring, content was:\n{output}",
+            )
+
+        # Test finding most recent log file.
+        output = io.StringIO()
+        with contextlib.redirect_stdout(output):
+            return_code = main.do_print_logs(args.parse_args([]))
+            assert_print_logs_output(return_code, output.getvalue())
+
+        # Test finding specific log file.
+        output = io.StringIO()
+        new_file_path = os.path.join(env.out_dir, "other-file.json.gz")
+        shutil.move(env.log_file, new_file_path)
+
+        with contextlib.redirect_stdout(output):
+            return_code = main.do_print_logs(
+                args.parse_args(["--logpath", new_file_path])
+            )
+            self.assertEqual(
+                return_code, 0, f"Content was:\n{output.getvalue()}"
+            )
+            self.assertIsNotNone(
+                re.search(r"3 tests were run", output.getvalue(), re.MULTILINE),
+                f"Did not find substring, content was:\n{output.getvalue()}",
+            )
+
+        # Corrupt the data a bit, the output should still work.
+        with open(new_file_path, "r+b") as f:
+            # Overwrite last 20 bytes of the file with 0
+            f.seek(-20, 2)
+            f.write(b"\0" * 80)
+        output = io.StringIO()
+        with contextlib.redirect_stdout(output):
+            return_code = main.do_print_logs(
+                args.parse_args(["--logpath", new_file_path])
+            )
+            self.assertEqual(
+                return_code, 0, f"Content was:\n{output.getvalue()}"
+            )
+            self.assertIsNotNone(
+                re.search(r"3 tests were run", output.getvalue(), re.MULTILINE),
+                f"Did not find substring, content was:\n{output.getvalue()}",
+            )
+
+    async def test_print_logs_failure(self) -> None:
+        """Test that --print-logs prints an error and exits if the log cannot be found"""
+
+        # Default search location
+        output = io.StringIO()
+        with contextlib.redirect_stderr(output):
+            self.assertEqual(main.do_print_logs(args.parse_args([])), 1)
+            self.assertIsNotNone(
+                re.search(r"No log files found", output.getvalue()),
+                f"Did not find substring, output was:\n{output.getvalue()}",
+            )
+
+        # Specific missing file
+        output = io.StringIO()
+        with contextlib.redirect_stderr(output):
+            with tempfile.TemporaryDirectory() as td:
+                path = os.path.join(td, "does-not-exist")
+                self.assertEqual(
+                    main.do_print_logs(args.parse_args(["--logpath", path])),
+                    1,
+                )
+                self.assertIsNotNone(
+                    re.search(r"No log files found", output.getvalue()),
+                    f"Did not find substring, output was:\n{output.getvalue()}",
+                )
+
+        # Specific file is not a gzip file
+        output = io.StringIO()
+        with contextlib.redirect_stderr(output):
+            with tempfile.TemporaryDirectory() as td:
+                path = os.path.join(td, "does-not-exist")
+                with open(path, "w") as f:
+                    f.writelines(["hello world"])
+                self.assertEqual(
+                    main.do_print_logs(args.parse_args(["--logpath", path])),
+                    1,
+                )
+                self.assertIsNotNone(
+                    re.search(
+                        r"File does not appear to be a gzip file",
+                        output.getvalue(),
+                    ),
+                    f"Did not find substring, output was:\n{output.getvalue()}",
+                )

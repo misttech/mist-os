@@ -51,6 +51,12 @@ def main() -> None:
     except argparse.ArgumentError as e:
         print(f"Failed to parse command line: {e.message}")
         sys.exit(1)
+
+    # Special utility mode handling
+    if real_flags.print_logs:
+        sys.exit(do_print_logs(real_flags))
+
+    # No special modes, proceed with async execution.
     fut = asyncio.ensure_future(
         async_main_wrapper(real_flags, config_file=config_file)
     )
@@ -99,6 +105,25 @@ async def async_main_wrapper(
             file=sys.stderr,
         )
     return ret
+
+
+def do_print_logs(flags: args.Flags) -> int:
+    env = environment.ExecutionEnvironment.initialize_from_args(
+        flags, create_log_file=False
+    )
+    try:
+        log_path = env.get_most_recent_log()
+        with gzip.open(log_path, "rt") as f:
+            print(f"{log_path}:\n")
+            log.pretty_print(f)
+    except environment.EnvironmentError as e:
+        print(f"Failed to read log: {e}", file=sys.stderr)
+        return 1
+    except gzip.BadGzipFile as e:
+        print(f"File does not appear to be a gzip file. ({e})", file=sys.stderr)
+        return 1
+
+    return 0
 
 
 async def async_main(

@@ -42,12 +42,16 @@ class ExecutionEnvironment:
 
     @classmethod
     def initialize_from_args(
-        cls: typing.Type[typing.Self], flags: args.Flags
+        cls: typing.Type[typing.Self],
+        flags: args.Flags,
+        create_log_file: bool = True,
     ) -> typing.Self:
         """Initialize an execution environment from the given flags.
 
         Args:
             flags (args.Flags): Parsed command line flags.
+            create_log_file (bool): If not set, do not log if
+                the log file does not already exist.
 
         Raises:
             EnvironmentError: If the environment is not valid for some reason.
@@ -92,6 +96,8 @@ class ExecutionEnvironment:
                 )
             )
         )
+        if not create_log_file and log_file and not os.path.isfile(log_file):
+            log_file = None
 
         # Get the input files from their expected locations directly
         # under the output directory.
@@ -133,6 +139,33 @@ class ExecutionEnvironment:
                 same destination.
         """
         return os.path.relpath(path, self.fuchsia_dir)
+
+    def get_most_recent_log(self) -> str:
+        """Get the most recent log file for this environment.
+
+        If this environment specifies a log file, return that one, otherwise
+        search the output directory for log files and return the most recent
+        one by name.
+
+        Raises:
+            EnvironmentError: If no log file could be found.
+
+        Returns:
+            str: Path to the most recent log file.
+        """
+        if self.log_file:
+            return self.log_file
+
+        matching = [
+            name
+            for name in os.listdir(self.out_dir)
+            if name.startswith("fxtest-") and name.endswith(".json.gz")
+        ]
+
+        matching.sort()
+        if not matching:
+            raise EnvironmentError(f"No log files found in {self.out_dir}")
+        return os.path.join(self.out_dir, matching[-1])
 
     def __hash__(self) -> int:
         return hash(self.fuchsia_dir)
