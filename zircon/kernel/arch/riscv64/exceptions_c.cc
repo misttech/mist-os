@@ -182,6 +182,7 @@ void riscv64_page_fault_handler(int64_t cause, uint64_t tval, struct iframe_t* f
   }
 
   // Reenable interrupts and call the upper VM layers to handle the fault.
+  DEBUG_ASSERT(arch_num_spinlocks_held() == 0);
   arch_enable_ints();
   CPU_STATS_INC(page_faults);
   zx_status_t pf_status = vmm_page_fault_handler(tval, pf_flags);

@@ -278,6 +278,7 @@ static void arm64_instruction_abort_handler(iframe_t* iframe, uint exception_fla
   LTRACEF("instruction abort: PC at %#" PRIx64 ", is_user %d, FAR %" PRIx64 ", esr %#x, iss %#x\n",
           iframe->elr, is_user, far, esr, iss);
 
+  DEBUG_ASSERT(arch_num_spinlocks_held() == 0);
   arch_enable_ints();
   zx_status_t err;
   DEBUG_ASSERT(far == arch_detag_ptr(far) &&
@@ -343,6 +344,7 @@ static void arm64_data_abort_handler(iframe_t* iframe, uint exception_flags, uin
   // resolve such faults prior to potentially invoking the data fault resume handler.
   // 0b0010XX is access faults
   if ((dfsc & 0b111100) == 0b001000) {
+    DEBUG_ASSERT(arch_num_spinlocks_held() == 0);
     arch_enable_ints();
     exceptions_access.Add(1);
     zx_status_t err = vmm_accessed_fault_handler(arch_detag_ptr(far));
@@ -374,6 +376,7 @@ static void arm64_data_abort_handler(iframe_t* iframe, uint exception_flags, uin
   // 0b0011XX is permission faults
   zx_status_t err = ZX_OK;
   if (likely((dfsc & 0b001100) != 0 && (dfsc & 0b110000) == 0)) {
+    DEBUG_ASSERT(arch_num_spinlocks_held() == 0);
     arch_enable_ints();
     kcounter_add(exceptions_page, 1);
     err = vmm_page_fault_handler(arch_detag_ptr(far), pf_flags);

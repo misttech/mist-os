@@ -304,6 +304,7 @@ static zx_status_t x86_pfe_handler(iframe_t* frame) {
 
   /* reenable interrupts */
   PreemptionState& preemption_state = Thread::Current::preemption_state();
+  DEBUG_ASSERT(arch_num_spinlocks_held() == 0);
   arch_set_blocking_disallowed(false);
   arch_enable_ints();
   preemption_state.PreemptReenable();
