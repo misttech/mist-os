@@ -11,8 +11,6 @@ use std::str::FromStr;
 static CC_ELF_SOURCE_TEMPLATE: &str = include_str!("../templates/cpp_elf.cc.hbs");
 static H_ELF_SOURCE_TEMPLATE: &str = include_str!("../templates/cpp_elf.h.hbs");
 
-static CC_ELF_HLCPP_SOURCE_TEMPLATE: &str = include_str!("../templates/cpp_elf_hlcpp.cc.hbs");
-
 static HELPERS_SOURCE_TEMPLATE: &str = include_str!("../templates/helpers.cc.hbs");
 static TYPEDEF_SOURCE_TEMPLATE: &str = include_str!("../templates/typedef.h.hbs");
 static VMO_PARSE_SOURCE_TEMPLATE: &str = include_str!("../templates/vmo_parse.cc.hbs");
@@ -27,8 +25,6 @@ pub struct CppSource {
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub enum Flavor {
     ElfProcess,
-    // TODO(https://fxbug.dev/42060287) delete once unified FIDL available OOT
-    ElfHlcpp,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -45,7 +41,6 @@ impl FromStr for Flavor {
 
         match string.as_str() {
             "elf" => Ok(Flavor::ElfProcess),
-            "elf-hlcpp" => Ok(Flavor::ElfHlcpp),
             _ => Err(FlavorParseError::UnknownFlavor(string)),
         }
     }
@@ -59,7 +54,6 @@ pub fn create_cpp_wrapper(
 ) -> Result<CppSource, SourceGenError> {
     let (cc_source_template, h_source_template) = match flavor {
         Flavor::ElfProcess => (CC_ELF_SOURCE_TEMPLATE, H_ELF_SOURCE_TEMPLATE),
-        Flavor::ElfHlcpp => (CC_ELF_HLCPP_SOURCE_TEMPLATE, H_ELF_SOURCE_TEMPLATE),
     };
 
     let vars = TemplateVars::from_decl(config_decl, cpp_namespace, fidl_library_name, flavor);
@@ -109,14 +103,11 @@ impl TemplateVars {
     ) -> Self {
         let cpp_namespace = cpp_namespace.replace('.', "_").replace('-', "_").to_ascii_lowercase();
         let header_guard = fidl_library_name.replace('.', "_").to_ascii_uppercase();
-        let (fidl_cpp_namespace, fidl_cpp_header_prefix) = if let Flavor::ElfHlcpp = flavor {
-            (
-                fidl_library_name.replace('.', "::").to_ascii_lowercase(),
-                fidl_library_name.replace('.', "/").to_ascii_lowercase(),
-            )
-        } else {
-            let ns = fidl_library_name.replace('.', "_").to_ascii_lowercase();
-            (ns.clone(), ns)
+        let (fidl_cpp_namespace, fidl_cpp_header_prefix) = match flavor {
+            Flavor::ElfProcess => {
+                let ns = fidl_library_name.replace('.', "_").to_ascii_lowercase();
+                (ns.clone(), ns)
+            }
         };
         let ConfigChecksum::Sha256(expected_checksum) = &config_decl.checksum;
         let expected_checksum = expected_checksum.to_vec();

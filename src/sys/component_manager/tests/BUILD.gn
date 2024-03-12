@@ -50,7 +50,6 @@ group("hermetic_tests") {
     "storage:storage_integration_test",
     "structured_config/client_integration/cpp_driver:cpp_driver",
     "structured_config/client_integration/cpp_elf:cpp_elf",
-    "structured_config/client_integration/cpp_elf_hlcpp:cpp_elf_hlcpp",
     "structured_config/client_integration/rust:rust",
     "structured_config/different_values:different_values_false",
     "structured_config/different_values:different_values_true",

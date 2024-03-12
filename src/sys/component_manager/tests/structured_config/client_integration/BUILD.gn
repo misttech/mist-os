@@ -25,7 +25,6 @@ group("client_integration") {
   deps = [
     "cpp_driver",
     "cpp_elf",
-    "cpp_elf_hlcpp",
     "rust",
   ]
 }

@@ -281,7 +281,6 @@ hlcpp_visibility = [
   "//src/storage/testing:*",
   "//src/sys/activity:*",
   "//src/sys/component_manager/tests/services/src/fidl:*",
-  "//src/sys/component_manager/tests/structured_config/client_integration/cpp_elf_hlcpp:*",
   "//src/sys/component_manager/tests/structured_config/client_integration/cpp_elf:*",
   "//src/sys/component_manager/tests/structured_config/fidl:*",
   "//src/sys/fuzzing/common/*",
