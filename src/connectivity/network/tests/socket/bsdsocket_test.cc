@@ -1449,7 +1449,7 @@ TEST_P(ReadAfterShutdownTest, Success) {
         .fd = local.get(),
         .events = POLLIN,
     };
-    int n = poll(&pfd, 1, std::chrono::milliseconds(kDeprecatedTimeout).count());
+    int n = poll(&pfd, 1, std::chrono::milliseconds(kPositiveCheckTimeout).count());
     ASSERT_GE(n, 0) << strerror(errno);
     ASSERT_EQ(n, 1);
     EXPECT_EQ(pfd.revents, POLLIN);
@@ -1473,7 +1473,7 @@ TEST_P(ReadAfterShutdownTest, Success) {
         .fd = local.get(),
         .events = POLLRDHUP,
     };
-    int n = poll(&pfd, 1, std::chrono::milliseconds(kDeprecatedTimeout).count());
+    int n = poll(&pfd, 1, std::chrono::milliseconds(kPositiveCheckTimeout).count());
     ASSERT_GE(n, 0) << strerror(errno);
     ASSERT_EQ(n, 1);
     EXPECT_EQ(pfd.revents, POLLRDHUP);
