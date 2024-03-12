@@ -118,7 +118,6 @@ shared_library("driver") {
     "//src/devices/cpu/drivers/aml-cpu-legacy:*",
     "//src/devices/gpio/drivers/gpio:*",
     "//src/devices/gpio/drivers/ti-tca6408a:*",
-    "//src/devices/i2c/drivers/aml-i2c:*",
     "//src/devices/i2c/drivers/i2c:*",
     "//src/devices/i2c/drivers/intel-i2c:*",
     "//src/devices/lib:*",

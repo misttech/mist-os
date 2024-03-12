@@ -595,6 +595,8 @@ sdk_molecule("platform_fidls") {
     "//sdk/fidl/fuchsia.hardware.clockimpl:fuchsia.hardware.clockimpl_sdk($fidl_toolchain)",
     "//sdk/fidl/fuchsia.hardware.gpio:fuchsia.hardware.gpio_sdk($fidl_toolchain)",
     "//sdk/fidl/fuchsia.hardware.gpioimpl:fuchsia.hardware.gpioimpl_sdk($fidl_toolchain)",
+    "//sdk/fidl/fuchsia.hardware.i2c.businfo:fuchsia.hardware.i2c.businfo_sdk($fidl_toolchain)",
+    "//sdk/fidl/fuchsia.hardware.i2cimpl:fuchsia.hardware.i2cimpl_sdk($fidl_toolchain)",
     "//sdk/fidl/fuchsia.hardware.platform.bus:fuchsia.hardware.platform.bus_sdk($fidl_toolchain)",
     "//sdk/fidl/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_sdk($fidl_toolchain)",
     "//sdk/fidl/fuchsia.hardware.sdmmc:fuchsia.hardware.sdmmc_sdk($fidl_toolchain)",
