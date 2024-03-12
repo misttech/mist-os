@@ -415,14 +415,10 @@ void FormatActiveTasksHashMapTuple(
         auto out = fxl::MakeRefCounted<AsyncOutputBuffer>();
         out->Append("Task(id = " + std::to_string(task_id) + ")\n", TextForegroundColor::kGreen);
         out->Append(kAwaiteeMarker);
-        ErrOrValue some = ResolveNonstaticMember(context, arc_inner.value(),
-                                                 {"data", "future", "future", "value"});
-        if (some.has_error())
-          return cb(task_id, FormatError("Invalid HashMap tuple (4)", some.err()));
-        some = ResolveSingleVariantValue(context, some.value());
-        if (some.has_error() || some.value().type()->GetAssignedName() != "Some")
-          return cb(task_id, FormatError("Invalid HashMap tuple (5)", some.err()));
-        ErrOrValue future = ResolveNonstaticMember(context, some.value(), {"__0", "__0", "future"});
+        // Arc -> Task -> AtomicFuture -> UnsafeCell -> ManuallyDrop -> FutureObj -> LocalFutureObj
+        ErrOrValue future =
+            ResolveNonstaticMember(context, arc_inner.value(),
+                                   {"data", "future", "future", "value", "value", "__0", "future"});
         if (future.has_error())
           return cb(task_id, FormatError("Invalid HashMap tuple (6)", future.err()));
 

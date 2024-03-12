@@ -139,7 +139,12 @@ impl Inner {
                     return PollReadyTasksResult::NoneReady;
                 };
                 let complete = task.try_poll();
-                local_collector.task_polled(task.id, task.source, complete, self.ready_tasks.len());
+                local_collector.task_polled(
+                    task.id,
+                    task.source(),
+                    complete,
+                    self.ready_tasks.len(),
+                );
                 if complete {
                     self.active_tasks.lock().remove(&task.id);
                     if task.id == MAIN_TASK_ID {
@@ -177,7 +182,7 @@ impl Inner {
         }
         let next_id = self.task_count.fetch_add(1, Ordering::Relaxed);
         let task = Task::new(next_id, future, self.clone());
-        self.collector.task_created(next_id, task.source);
+        self.collector.task_created(next_id, task.source());
         self.active_tasks.lock().insert(next_id, task.clone());
         task.wake();
     }
@@ -202,7 +207,7 @@ impl Inner {
     /// Spawns the main future.
     pub fn spawn_main(self: &Arc<Self>, future: FutureObj<'static, ()>) {
         let task = Task::new(MAIN_TASK_ID, future, self.clone());
-        self.collector.task_created(MAIN_TASK_ID, task.source);
+        self.collector.task_created(MAIN_TASK_ID, task.source());
         assert!(
             self.active_tasks.lock().insert(MAIN_TASK_ID, task.clone()).is_none(),
             "Existing main task"
@@ -639,24 +644,19 @@ pub(super) struct Task {
     id: usize,
     future: AtomicFuture,
     executor: Arc<Inner>,
-    notifier: Notifier,
-    source: Option<&'static Location<'static>>,
+    #[cfg(trace_level_logging)]
+    source: &'static Location<'static>,
 }
 
 impl Task {
     #[cfg_attr(trace_level_logging, track_caller)]
     fn new(id: usize, future: FutureObj<'static, ()>, executor: Arc<Inner>) -> Arc<Self> {
-        #[cfg(trace_level_logging)]
-        let source = Some(Location::caller());
-        #[cfg(not(trace_level_logging))]
-        let source = None;
-
         let this = Arc::new(Self {
             id,
             future: AtomicFuture::new(future),
             executor,
-            notifier: Notifier::default(),
-            source,
+            #[cfg(trace_level_logging)]
+            source: Location::caller(),
         });
 
         // Take a weak reference now to be used as a waker.
@@ -666,7 +666,7 @@ impl Task {
     }
 
     fn wake(self: &Arc<Self>) {
-        if self.notifier.prepare_notify() {
+        if self.future.mark_ready() {
             self.executor.ready_tasks.push(self.clone());
             self.executor.notify_task_ready();
         }
@@ -677,8 +677,20 @@ impl Task {
         let task_waker = unsafe {
             Waker::from_raw(RawWaker::new(Arc::as_ptr(self) as *const (), &BORROWED_VTABLE))
         };
-        self.notifier.reset();
-        self.future.try_poll(&mut Context::from_waker(&task_waker)) == AttemptPollResult::IFinished
+        let result = self.future.try_poll(&mut Context::from_waker(&task_waker));
+        if result == AttemptPollResult::Yield {
+            self.executor.ready_tasks.push(self.clone());
+        }
+        result == AttemptPollResult::IFinished
+    }
+
+    fn source(&self) -> Option<&'static Location<'static>> {
+        #[cfg(trace_level_logging)]
+        {
+            Some(self.source)
+        }
+        #[cfg(not(trace_level_logging))]
+        None
     }
 }
 
@@ -729,27 +741,5 @@ fn waker_drop(weak_raw: *const ()) {
     // SAFETY: `weak_raw` comes from a previous call to `into_raw`.
     unsafe {
         Weak::from_raw(weak_raw as *const Task);
-    }
-}
-
-/// Notifier is a helper which de-duplicates task wakeups. When embedded in a task, it keeps
-/// track of whether the task has been notified or not. This optimization is possible due
-/// to the futures contract which specifies that poll can occur any number of times, and as
-/// such the poll count must not be relied upon.
-#[derive(Default)]
-pub(crate) struct Notifier {
-    notified: AtomicBool,
-}
-
-impl Notifier {
-    /// Prepare for notification and enqueuing the task. If true, the caller should proceed with
-    /// scheduling the task. If false, another worker will ensure that this happens.
-    pub fn prepare_notify(&self) -> bool {
-        self.notified.compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire).is_ok()
-    }
-
-    /// Reset the notification. Should be called prior to polling the task again.
-    pub fn reset(&self) {
-        self.notified.store(false, Ordering::Release);
     }
 }
