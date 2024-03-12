@@ -2686,7 +2686,7 @@ TEST(Sysmem, HeapConstraintsV2) {
 
     v2::BufferCollectionConstraints constraints;
     constraints.usage().emplace();
-    constraints.usage()->vulkan() = v2::kVulkanUsageTransferDst;
+    constraints.usage()->vulkan() = v2::kVulkanImageUsageTransferDst;
     constraints.min_buffer_count_for_camping() = 1;
     constraints.buffer_memory_constraints().emplace();
     auto& buffer_memory = constraints.buffer_memory_constraints().value();
@@ -2999,7 +2999,7 @@ TEST(Sysmem, ContiguousSystemRamIsCachedV2) {
 
   v2::BufferCollectionConstraints constraints;
   constraints.usage().emplace();
-  constraints.usage()->vulkan() = v2::kVulkanUsageTransferDst;
+  constraints.usage()->vulkan() = v2::kVulkanImageUsageTransferDst;
   constraints.min_buffer_count_for_camping() = 1;
   constraints.buffer_memory_constraints().emplace();
   auto& buffer_memory = constraints.buffer_memory_constraints().value();
@@ -3099,7 +3099,7 @@ TEST(Sysmem, ContiguousSystemRamIsRecycledV2) {
 
     v2::BufferCollectionConstraints constraints;
     constraints.usage().emplace();
-    constraints.usage()->vulkan() = v2::kVulkanUsageTransferDst;
+    constraints.usage()->vulkan() = v2::kVulkanImageUsageTransferDst;
     constraints.min_buffer_count_for_camping() = 1;
     constraints.buffer_memory_constraints().emplace();
     auto& buffer_memory = constraints.buffer_memory_constraints().value();
@@ -3318,7 +3318,7 @@ TEST(Sysmem, NoneUsageWithSeparateOtherUsageSucceedsV2) {
   v2::BufferCollectionConstraints constraints_2(constraints_1);
   // Modify constraints_2 to set non-"none" usage.
   constraints_2.usage()->none().reset();
-  constraints_2.usage()->vulkan() = v2::kVulkanUsageTransferDst;
+  constraints_2.usage()->vulkan() = v2::kVulkanImageUsageTransferDst;
 
   v2::BufferCollectionSetConstraintsRequest set_constraints_request;
   set_constraints_request.constraints() = std::move(constraints_1);

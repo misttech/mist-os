@@ -63,24 +63,6 @@ const VULKAN_IMAGE_USAGE_TRANSIENT_ATTACHMENT uint32 = 0X0040;
 @available(added=HEAD)
 const VULKAN_IMAGE_USAGE_INPUT_ATTACHMENT uint32 = 0X0080;
 
-// Deprecated. Use |VULKAN_IMAGE_USAGE_*| instead.
-@available(added=HEAD)
-const VULKAN_USAGE_TRANSFER_SRC uint32 = 0x0001;
-@available(added=HEAD)
-const VULKAN_USAGE_TRANSFER_DST uint32 = 0x0002;
-@available(added=HEAD)
-const VULKAN_USAGE_SAMPLED uint32 = 0x0004;
-@available(added=HEAD)
-const VULKAN_USAGE_STORAGE uint32 = 0x0008;
-@available(added=HEAD)
-const VULKAN_USAGE_COLOR_ATTACHMENT uint32 = 0x0010;
-@available(added=HEAD)
-const VULKAN_USAGE_STENCIL_ATTACHMENT uint32 = 0x0020;
-@available(added=HEAD)
-const VULKAN_USAGE_TRANSIENT_ATTACHMENT uint32 = 0x0040;
-@available(added=HEAD)
-const VULKAN_USAGE_INPUT_ATTACHMENT uint32 = 0x0080;
-
 // Vulkan buffer usage flags.
 // Based on https://www.khronos.org/registry/vulkan/specs/1.2-extensions/man/html/VkBufferUsageFlagBits.html
 @available(added=HEAD)

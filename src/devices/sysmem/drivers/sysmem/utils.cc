@@ -10,8 +10,10 @@ bool IsWriteUsage(const fuchsia_sysmem2::BufferUsage& buffer_usage) {
   const uint32_t kCpuWriteBits =
       fuchsia_sysmem2::kCpuUsageWriteOften | fuchsia_sysmem2::kCpuUsageWrite;
   // This list may not be complete.
-  const uint32_t kVulkanWriteBits =
-      fuchsia_sysmem2::kVulkanUsageTransferDst | fuchsia_sysmem2::kVulkanUsageStorage;
+  const uint32_t kVulkanWriteBits = fuchsia_sysmem2::kVulkanImageUsageTransferDst |
+                                    fuchsia_sysmem2::kVulkanImageUsageStorage |
+                                    fuchsia_sysmem2::kVulkanBufferUsageTransferDst |
+                                    fuchsia_sysmem2::kVulkanBufferUsageStorageBuffer;
   // Display usages don't include any writing.
   const uint32_t kDisplayWriteBits = 0;
   const uint32_t kVideoWriteBits =
