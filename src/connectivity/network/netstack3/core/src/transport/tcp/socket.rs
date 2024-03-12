@@ -37,7 +37,7 @@ use net_types::{
         GenericOverIp, Ip, IpAddr, IpAddress, IpInvariant, IpVersion, IpVersionMarker, Ipv4,
         Ipv4Addr, Ipv6, Ipv6Addr,
     },
-    AddrAndZone, SpecifiedAddr, ZonedAddr,
+    AddrAndPortFormatter, AddrAndZone, SpecifiedAddr, ZonedAddr,
 };
 use packet_formats::ip::IpProto;
 use smallvec::{smallvec, SmallVec};
@@ -854,15 +854,11 @@ impl<A: IpAddress, D> SocketAddr<A, D> {
 impl<A: IpAddress, D: fmt::Display> fmt::Display for SocketAddr<A, D> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
         let Self { ip, port } = self;
-        let IpInvariant(result) = A::Version::map_ip(
-            (ip, IpInvariant((f, port))),
-            |(ip, IpInvariant((f, port)))| IpInvariant(write!(f, "{}:{}", ip.addr(), port)),
-            |(ip, IpInvariant((f, port)))| match *ip {
-                ZonedAddr::Unzoned(a) => IpInvariant(write!(f, "[{}]:{}", a, port)),
-                ZonedAddr::Zoned(ref az) => IpInvariant(write!(f, "[{}]:{}", az, port)),
-            },
+        let formatter = AddrAndPortFormatter::<_, _, A::Version>::new(
+            ip.as_ref().map_addr(core::convert::AsRef::<A>::as_ref),
+            port,
         );
-        result
+        formatter.fmt(f)
     }
 }
 
@@ -4010,9 +4006,11 @@ where
                     addr,
                 ))) => {
                     let BoundInfo { addr, port, device } = I::get_bound_info(addr);
-                    let local =
-                        addr.map(|addr| SocketAddr { ip: maybe_zoned(addr.addr(), &device), port });
-                    (local, None)
+                    let local = addr.map_or_else(
+                        || ZonedAddr::Unzoned(I::UNSPECIFIED_ADDRESS),
+                        |addr| maybe_zoned(addr.addr(), &device).into(),
+                    );
+                    (Some((local, port)), None)
                 }
                 TcpSocketStateInner::Bound(BoundSocketState::Connected((
                     conn_and_addr,
@@ -4021,9 +4019,12 @@ where
                     if I::get_defunct(conn_and_addr) {
                         return;
                     }
-                    let ConnectionInfo { local_addr, remote_addr, device: _ } =
-                        I::get_conn_info(conn_and_addr);
-                    (Some(local_addr), Some(remote_addr))
+                    let ConnectionInfo {
+                        local_addr: SocketAddr { ip, port },
+                        remote_addr,
+                        device: _,
+                    } = I::get_conn_info(conn_and_addr);
+                    (Some((ip.into(), port)), Some(remote_addr))
                 }
             };
             inspector.record_unnamed_child(|node| {
@@ -4037,9 +4038,12 @@ where
                 );
                 match local {
                     None => node.record_str("LocalAddress", "[NOT BOUND]"),
-                    Some(addr) => node.record_display(
+                    Some((addr, port)) => node.record_display(
                         "LocalAddress",
-                        addr.map_zone(|device| N::device_identifier_as_address_zone(device)),
+                        AddrAndPortFormatter::<_, _, I>::new(
+                            addr.map_zone(|device| N::device_identifier_as_address_zone(device)),
+                            port,
+                        ),
                     ),
                 };
                 match remote {

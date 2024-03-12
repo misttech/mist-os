@@ -79,7 +79,7 @@ use core::{
     ops::Deref,
 };
 
-use crate::ip::{GenericOverIp, Ip, IpAddress};
+use crate::ip::{GenericOverIp, Ip, IpAddress, IpInvariant, IpVersionMarker};
 
 mod sealed {
     // Used to ensure that certain traits cannot be implemented by anyone
@@ -1015,6 +1015,20 @@ impl<A: ScopeableAddress, Z> AddrAndZone<A, Z> {
             None
         }
     }
+}
+
+impl<A, Z> AddrAndZone<A, Z> {
+    /// Constructs a new `AddrAndZone` without checking to see if `addr`'s scope
+    /// can have a zone.
+    ///
+    /// # Safety
+    ///
+    /// It is up to the caller to make sure that `addr`'s scope can have a zone
+    /// to avoid breaking the guarantees of `AddrAndZone`.
+    #[inline]
+    pub const unsafe fn new_unchecked(addr: A, zone: Z) -> Self {
+        Self(addr, zone)
+    }
 
     /// Consumes this `AddrAndZone`, returning the address and zone separately.
     pub fn into_addr_scope_id(self) -> (A, Z) {
@@ -1026,6 +1040,12 @@ impl<A: ScopeableAddress, Z> AddrAndZone<A, Z> {
     pub fn map_zone<Y>(self, f: impl FnOnce(Z) -> Y) -> AddrAndZone<A, Y> {
         let AddrAndZone(addr, zone) = self;
         AddrAndZone(addr, f(zone))
+    }
+
+    /// Translates the address using `f`.
+    pub fn map_addr<B>(self, f: impl FnOnce(A) -> B) -> AddrAndZone<B, Z> {
+        let Self(addr, zone) = self;
+        AddrAndZone(f(addr), zone)
     }
 
     /// Attempts to translate the zone identifier using the provided function.
@@ -1045,23 +1065,15 @@ impl<A: ScopeableAddress, Z> AddrAndZone<A, Z> {
         let AddrAndZone(addr, _zone) = self;
         *addr
     }
-}
 
-impl<A, Z> AddrAndZone<A, Z> {
-    /// Constructs a new `AddrAndZone` without checking to see if `addr`'s scope
-    /// can have a zone.
-    ///
-    /// # Safety
-    ///
-    /// It is up to the caller to make sure that `addr`'s scope can have a zone
-    /// to avoid breaking the guarantees of `AddrAndZone`.
-    #[inline]
-    pub const unsafe fn new_unchecked(addr: A, zone: Z) -> Self {
-        Self(addr, zone)
+    /// Converts from `AddrAndZone<A, Z>` to `AddrAndZone<&A, &Z>`.
+    pub fn as_ref(&self) -> AddrAndZone<&A, &Z> {
+        let Self(addr, zone) = self;
+        AddrAndZone(addr, zone)
     }
 }
 
-impl<A: ScopeableAddress + Display, Z: Display> Display for AddrAndZone<A, Z> {
+impl<A: Display, Z: Display> Display for AddrAndZone<A, Z> {
     #[inline]
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(f, "{}%{}", self.0, self.1)
@@ -1069,6 +1081,12 @@ impl<A: ScopeableAddress + Display, Z: Display> Display for AddrAndZone<A, Z> {
 }
 
 impl<A, Z> sealed::Sealed for AddrAndZone<A, Z> {}
+
+impl<A: SpecifiedAddress, Z> From<AddrAndZone<SpecifiedAddr<A>, Z>> for AddrAndZone<A, Z> {
+    fn from(AddrAndZone(addr, zone): AddrAndZone<SpecifiedAddr<A>, Z>) -> Self {
+        Self(addr.into_addr(), zone)
+    }
+}
 
 /// An address that may have an associated scope zone.
 #[allow(missing_docs)]
@@ -1078,19 +1096,17 @@ pub enum ZonedAddr<A, Z> {
     Zoned(AddrAndZone<A, Z>),
 }
 
-impl<A: ScopeableAddress, Z> ZonedAddr<A, Z> {
-    /// Creates a new `ZonedAddr` with the provided optional scope zone.
-    ///
-    /// If `zone` is `None`, [`ZonedAddr::Unzoned`] is returned. Otherwise, a
-    /// [`ZonedAddr::Zoned`] is returned only if the provided `addr`'s scope can
-    /// have a zone (`addr.scope().can_have_zone()`).
-    pub fn new(addr: A, zone: Option<Z>) -> Option<Self> {
-        match zone {
-            Some(zone) => AddrAndZone::new(addr, zone).map(ZonedAddr::Zoned),
-            None => Some(ZonedAddr::Unzoned(addr)),
+impl<A: Display, Z: Display> Display for ZonedAddr<A, Z> {
+    #[inline]
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Unzoned(addr) => write!(f, "{addr}"),
+            Self::Zoned(addr_and_zone) => write!(f, "{addr_and_zone}"),
         }
     }
+}
 
+impl<A, Z> ZonedAddr<A, Z> {
     /// Decomposes this `ZonedAddr` into an addr and an optional scope zone.
     pub fn into_addr_zone(self) -> (A, Option<Z>) {
         match self {
@@ -1120,6 +1136,36 @@ impl<A: ScopeableAddress, Z> ZonedAddr<A, Z> {
             ZonedAddr::Zoned(z) => ZonedAddr::Zoned(z.map_zone(f)),
         }
     }
+
+    /// Translates the address using `f`.
+    pub fn map_addr<B>(self, f: impl FnOnce(A) -> B) -> ZonedAddr<B, Z> {
+        match self {
+            Self::Unzoned(u) => ZonedAddr::Unzoned(f(u)),
+            Self::Zoned(z) => ZonedAddr::Zoned(z.map_addr(f)),
+        }
+    }
+
+    /// Converts from `&ZonedAddr<A, Z>` to `ZonedAddr<&A, &Z>`.
+    pub fn as_ref(&self) -> ZonedAddr<&A, &Z> {
+        match self {
+            Self::Unzoned(u) => ZonedAddr::Unzoned(u),
+            Self::Zoned(z) => ZonedAddr::Zoned(z.as_ref()),
+        }
+    }
+}
+
+impl<A: ScopeableAddress, Z> ZonedAddr<A, Z> {
+    /// Creates a new `ZonedAddr` with the provided optional scope zone.
+    ///
+    /// If `zone` is `None`, [`ZonedAddr::Unzoned`] is returned. Otherwise, a
+    /// [`ZonedAddr::Zoned`] is returned only if the provided `addr`'s scope can
+    /// have a zone (`addr.scope().can_have_zone()`).
+    pub fn new(addr: A, zone: Option<Z>) -> Option<Self> {
+        match zone {
+            Some(zone) => AddrAndZone::new(addr, zone).map(ZonedAddr::Zoned),
+            None => Some(ZonedAddr::Unzoned(addr)),
+        }
+    }
 }
 
 impl<A: ScopeableAddress<Scope = ()>, Z> ZonedAddr<A, Z> {
@@ -1141,6 +1187,15 @@ impl<A, Z> From<AddrAndZone<A, Z>> for ZonedAddr<A, Z> {
     }
 }
 
+impl<A: SpecifiedAddress, Z> From<ZonedAddr<SpecifiedAddr<A>, Z>> for ZonedAddr<A, Z> {
+    fn from(zoned_addr: ZonedAddr<SpecifiedAddr<A>, Z>) -> Self {
+        match zoned_addr {
+            ZonedAddr::Unzoned(a) => Self::Unzoned(a.into_addr()),
+            ZonedAddr::Zoned(z) => Self::Zoned(z.into()),
+        }
+    }
+}
+
 impl<A, I: Ip> GenericOverIp<I> for SpecifiedAddr<A> {
     type Type = SpecifiedAddr<I::Addr>;
 }
@@ -1155,6 +1210,33 @@ impl<A: GenericOverIp<I>, I: Ip, Z> GenericOverIp<I> for ZonedAddr<A, Z> {
 
 impl<A: GenericOverIp<I>, I: Ip, Z> GenericOverIp<I> for AddrAndZone<A, Z> {
     type Type = AddrAndZone<A::Type, Z>;
+}
+
+/// Provides a `Display` implementation for printing an address and a port.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct AddrAndPortFormatter<A, P, I: Ip> {
+    addr: A,
+    port: P,
+    _marker: IpVersionMarker<I>,
+}
+
+impl<A, P, I: Ip> AddrAndPortFormatter<A, P, I> {
+    /// Construct a new `AddrAndPortFormatter`.
+    pub fn new(addr: A, port: P) -> Self {
+        Self { addr, port, _marker: IpVersionMarker::new() }
+    }
+}
+
+impl<A: Display, P: Display, I: Ip> Display for AddrAndPortFormatter<A, P, I> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
+        let Self { addr, port, _marker } = self;
+        let IpInvariant(result) = I::map_ip(
+            IpInvariant((addr, port, f)),
+            |IpInvariant((addr, port, f))| IpInvariant(write!(f, "{}:{}", addr, port)),
+            |IpInvariant((addr, port, f))| IpInvariant(write!(f, "[{}]:{}", addr, port)),
+        );
+        result
+    }
 }
 
 #[cfg(test)]

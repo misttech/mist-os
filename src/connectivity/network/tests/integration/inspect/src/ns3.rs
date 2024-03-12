@@ -10,7 +10,7 @@ use std::{collections::HashMap, convert::TryFrom as _};
 
 use fidl_fuchsia_posix_socket as fposix_socket;
 
-use net_declare::{fidl_mac, fidl_subnet};
+use net_declare::{fidl_mac, fidl_subnet, std_ip_v4};
 use netstack_testing_common::{constants, get_inspect_data, realms::TestSandboxExt as _};
 use netstack_testing_macros::netstack_test;
 use packet_formats::ethernet::testutil::ETHERNET_HDR_LEN_NO_TAG;
@@ -32,16 +32,19 @@ async fn inspect_sockets(name: &str) {
             .expect("wait for v6 link local");
 
     // Ensure ns3 has started and that there is a Socket to collect inspect data about.
-    let _tcp_socket = realm
+    let tcp_socket = realm
         .stream_socket(fposix_socket::Domain::Ipv4, fposix_socket::StreamSocketProtocol::Tcp)
         .await
         .expect("create TCP socket");
+    const PORT: u16 = 8080;
+    tcp_socket
+        .bind(&std::net::SocketAddr::from((std_ip_v4!("0.0.0.0"), PORT)).into())
+        .expect("bind to 0.0.0.0");
 
     let tcp_socket = realm
         .stream_socket(fposix_socket::Domain::Ipv6, fposix_socket::StreamSocketProtocol::Tcp)
         .await
         .expect("create TCP socket");
-    const PORT: u16 = 8080;
 
     let scope = dev.id().try_into().unwrap();
     let sockaddr = std::net::SocketAddrV6::new(link_local.into(), PORT, 0, scope);
@@ -57,7 +60,7 @@ async fn inspect_sockets(name: &str) {
     diagnostics_assertions::assert_data_tree!(data, "root": contains {
         "Sockets": {
             "0": {
-                LocalAddress: "[NOT BOUND]",
+                LocalAddress: format!("0.0.0.0:{PORT}"),
                 RemoteAddress: "[NOT CONNECTED]",
                 TransportProtocol: "TCP",
                 NetworkProtocol: "IPv4"
