@@ -142,7 +142,6 @@ config("allow_unused_imports") {
     "//src/lib/assembly/*",
     "//src/lib/diagnostics/selectors/bench:*",
     "//src/lib/fuchsia-async:*",
-    "//src/lib/ui/wayland/*",
     "//src/lib/versioning/version-history/rust/shared/*",
     "//src/security/lib/scrutiny/*",
     "//src/session/bin/element_launcher:*",

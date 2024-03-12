@@ -74,9 +74,6 @@ template("wayland_protocol") {
         "//third_party/rust_crates:anyhow",
         "//third_party/rust_crates:bitflags",
       ]
-
-      configs += [ "//build/config/rust/lints:allow_unused_imports" ]
-
       if (defined(invoker.need_fuchsia_zircon) && invoker.need_fuchsia_zircon) {
         deps += [ "//src/lib/zircon/rust:fuchsia-zircon" ]
       }

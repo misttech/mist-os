@@ -77,16 +77,20 @@ impl<W: io::Write> Codegen<W> {
             "
 #![allow(warnings)]
 #![allow(clippy::all)]
-use bitflags::*;
 use anyhow;
-use fuchsia_trace;
-use fuchsia_wayland_core::{{ArgKind, Arg, Array, Enum, Fixed, FromArgs, IntoMessage, Message,
+#[allow(unused_imports)]
+use fuchsia_wayland_core::{{Array, Enum, Fixed, NewId, NewObject}};
+use fuchsia_wayland_core::{{ArgKind, Arg, FromArgs, IntoMessage, Message,
                             MessageGroupSpec, MessageHeader, MessageSpec, MessageType,
-                            NewId, NewObject, ObjectId, EncodeError, DecodeError,
-                            Interface }};",
+                            ObjectId, EncodeError, DecodeError, Interface}};",
         )?;
         for dep in dependencies.iter() {
-            writeln!(self.w, "use {}::*;", dep)?;
+            writeln!(
+                self.w,
+                "
+#[allow(unused_imports)]
+use {dep}::*;",
+            )?;
         }
 
         for interface in protocol.interfaces.into_iter() {
