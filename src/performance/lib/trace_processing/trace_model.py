@@ -5,10 +5,9 @@
 
 import copy
 import enum
-from typing import Any, Dict, Iterator, List, Optional, Self
+from typing import Any, Dict, Iterator, List, Optional, Self, TypeVar
 
 import trace_processing.trace_time as trace_time
-
 
 INT32_MIN = -0x80000000
 
@@ -51,8 +50,9 @@ class Event:
         # Any extra arguments that the event contains.
         self.args: Dict[str, Any] = args.copy()
 
-    @classmethod
-    def from_dict(cls, event_dict: Dict[str, Any]) -> Self:
+    @staticmethod
+    # from_dict should not be called on an instance
+    def from_dict(event_dict: Dict[str, Any]) -> "Event":
         category: str = event_dict["cat"]
         name: str = event_dict["name"]
         start: trace_time.TimePoint = trace_time.TimePoint.from_epoch_delta(
@@ -62,7 +62,7 @@ class Event:
         tid: int = event_dict["tid"]
         args: Dict[str, Any] = event_dict.get("args", {})
 
-        return cls(category, name, start, pid, tid, args)
+        return Event(category, name, start, pid, tid, args)
 
 
 class InstantEvent(Event):
@@ -80,8 +80,8 @@ class InstantEvent(Event):
         )
         self.scope: InstantEventScope = scope
 
-    @classmethod
-    def from_dict(cls, event_dict: Dict[str, Any]) -> Self:
+    @staticmethod
+    def from_dict(event_dict: Dict[str, Any]) -> "InstantEvent":
         scope_key: str = "s"
         if scope_key not in event_dict:
             raise TypeError(
@@ -94,14 +94,16 @@ class InstantEvent(Event):
                 f"str: {event_dict}"
             )
         scope_str: str = event_dict[scope_key]
-        if scope_str not in cls.INSTANT_EVENT_SCOPE_MAP:
+        if scope_str not in InstantEvent.INSTANT_EVENT_SCOPE_MAP:
             raise TypeError(
                 f"Expected '{scope_key}' (scope field) of dict to be one of "
-                f"{list(cls.INSTANT_EVENT_SCOPE_MAP)}: {event_dict}"
+                f"{list(InstantEvent.INSTANT_EVENT_SCOPE_MAP)}: {event_dict}"
             )
-        scope: InstantEventScope = cls.INSTANT_EVENT_SCOPE_MAP[scope_str]
+        scope: InstantEventScope = InstantEvent.INSTANT_EVENT_SCOPE_MAP[
+            scope_str
+        ]
 
-        return cls(scope, base=Event.from_dict(event_dict))
+        return InstantEvent(scope, base=Event.from_dict(event_dict))
 
 
 class CounterEvent(Event):
@@ -113,8 +115,8 @@ class CounterEvent(Event):
         )
         self.id: Optional[int] = id
 
-    @classmethod
-    def from_dict(cls, event_dict: Dict[str, Any]) -> Self:
+    @staticmethod
+    def from_dict(event_dict: Dict[str, Any]) -> "CounterEvent":
         id_key: str = "id"
         id: Optional[int] = None
         if id_key in event_dict:
@@ -126,7 +128,7 @@ class CounterEvent(Event):
                     f"parses as int: {event_dict}"
                 ) from t
 
-        return cls(id, base=Event.from_dict(event_dict))
+        return CounterEvent(id, base=Event.from_dict(event_dict))
 
 
 class DurationEvent(Event):
@@ -150,13 +152,13 @@ class DurationEvent(Event):
         super().__init__(
             base.category, base.name, base.start, base.pid, base.tid, base.args
         )
-        self.duration: Optional[int] = duration
+        self.duration: Optional[trace_time.TimeDelta] = duration
         self.parent: Optional[Self] = parent
         self.child_durations: List[Self] = child_durations
         self.child_flows: List["FlowEvent"] = child_flows
 
-    @classmethod
-    def from_dict(cls, event_dict: Dict[str, Any]) -> Self:
+    @staticmethod
+    def from_dict(event_dict: Dict[str, Any]) -> "DurationEvent":
         duration_key: str = "dur"
         duration: Optional[trace_time.TimeDelta] = None
         microseconds: Optional[float | int] = event_dict.get(duration_key, None)
@@ -170,7 +172,7 @@ class DurationEvent(Event):
                 float(microseconds)
             )
 
-        return cls(
+        return DurationEvent(
             duration=duration,
             parent=None,
             child_durations=[],
@@ -195,9 +197,11 @@ class AsyncEvent(Event):
         self.id: int = id
         self.duration: Optional[trace_time.TimeDelta] = duration
 
-    @classmethod
-    def from_dict(cls, id: int, event_dict: Dict[str, Any]) -> Self:
-        return cls(id, duration=None, base=Event.from_dict(event_dict))
+    @staticmethod
+    # from_dict should not be called on an instance
+    # type: ignore[override]
+    def from_dict(id: int, event_dict: Dict[str, Any]) -> "AsyncEvent":
+        return AsyncEvent(id, duration=None, base=Event.from_dict(event_dict))
 
 
 class FlowEvent(Event):
@@ -235,13 +239,14 @@ class FlowEvent(Event):
         self.previous_flow: Optional[Self] = previous_flow
         self.next_flow: Optional[Self] = next_flow
 
-    @classmethod
+    @staticmethod
+    # from_dict should not be called on an instance
+    # type: ignore[override]
     def from_dict(
-        cls,
         id: str,
         enclosing_duration: Optional[DurationEvent],
         event_dict: Dict[str, Any],
-    ) -> Self:
+    ) -> "FlowEvent":
         phase_key: str = "ph"
         if phase_key not in event_dict:
             raise TypeError(
@@ -254,14 +259,14 @@ class FlowEvent(Event):
                 f"str: {event_dict}"
             )
         phase_str: str = event_dict[phase_key]
-        if phase_str not in cls.FLOW_EVENT_PHASE_MAP:
+        if phase_str not in FlowEvent.FLOW_EVENT_PHASE_MAP:
             raise TypeError(
                 f"Expected '{phase_key}' (phase field) of dict to be one of "
-                f"{list(cls.FLOW_EVENT_PHASE_MAP)}: {event_dict}"
+                f"{list(FlowEvent.FLOW_EVENT_PHASE_MAP)}: {event_dict}"
             )
-        phase: FlowEventPhase = cls.FLOW_EVENT_PHASE_MAP[phase_str]
+        phase: FlowEventPhase = FlowEvent.FLOW_EVENT_PHASE_MAP[phase_str]
 
-        return cls(
+        return FlowEvent(
             id,
             phase,
             enclosing_duration,
@@ -384,7 +389,7 @@ class Model:
 
     def __init__(self) -> None:
         self.processes: List[Process] = []
-        self.scheduling_records: Dict[int, List[CpuUsage]] = {}
+        self.scheduling_records: Dict[int, List[SchedulingRecord]] = {}
 
     def all_events(self) -> Iterator[Event]:
         for process in self.processes:
@@ -396,7 +401,7 @@ class Model:
         self,
         start: Optional[trace_time.TimePoint] = None,
         end: Optional[trace_time.TimePoint] = None,
-    ) -> Self:
+    ) -> "Model":
         """Extract a sub-Model defined by a time interval.
 
         Args:
@@ -413,7 +418,16 @@ class Model:
         # need to update so that all the relations in the new model stay within
         # the new model. This dict tracks for each event of the old model, which
         # event in the new model it corresponds to.
-        new_event_map = {}
+        new_event_map: Dict[Any, Event] = {}
+
+        T = TypeVar("T")
+
+        def get_new_event(old_event: T) -> T | None:
+            new_event: Event | None = new_event_map.get(old_event)
+            if not new_event:
+                return None
+            assert isinstance(new_event, type(old_event))
+            return new_event
 
         # Step 1: Populate the model with new event objects. These events will
         # have references into the old model.
@@ -451,25 +465,28 @@ class Model:
             for thread in process.threads:
                 for event in thread.events:
                     if isinstance(event, DurationEvent):
-                        event.parent = new_event_map.get(event.parent, None)
+                        if event.parent:
+                            event.parent = get_new_event(event.parent)
                         event.child_durations = [
-                            new_event_map[e] for e in event.child_durations
+                            child
+                            for e in event.child_durations
+                            for child in [get_new_event(e)]
+                            if child is not None
                         ]
                         event.child_flows = [
-                            new_event_map[e] for e in event.child_flows
+                            child
+                            for e in event.child_flows
+                            for child in [get_new_event(e)]
+                            if child is not None
                         ]
                     elif isinstance(event, FlowEvent):
-                        event.enclosing_duration = new_event_map.get(
-                            event.enclosing_duration, None
+                        event.enclosing_duration = get_new_event(
+                            event.enclosing_duration
                         )
-                        event.previous_flow = new_event_map.get(
-                            event.previous_flow, None
-                        )
-                        event.next_flow = new_event_map.get(
-                            event.next_flow, None
-                        )
+                        event.previous_flow = get_new_event(event.previous_flow)
+                        event.next_flow = get_new_event(event.next_flow)
 
-        def slice_scheduling_records(record):
+        def slice_scheduling_records(record: SchedulingRecord) -> bool:
             return (start is None or record.start >= start) and (
                 end is None or record.start <= end
             )
