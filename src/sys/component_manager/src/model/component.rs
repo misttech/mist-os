@@ -758,12 +758,15 @@ impl ComponentInstance {
         self: &Arc<Self>,
         shut_down: bool,
     ) -> Result<(), StopActionError> {
-        let stop_result = {
+        let mut runtime = {
             let mut execution = self.lock_execution().await;
             let shut_down = execution.shut_down | shut_down;
             execution.shut_down = shut_down;
+            execution.runtime.take()
+        };
 
-            if let Some(ref mut runtime) = execution.runtime.take() {
+        let stop_result = {
+            if let Some(ref mut runtime) = runtime {
                 let stop_timer = Box::pin(async move {
                     let timer = fasync::Timer::new(fasync::Time::after(zx::Duration::from(
                         self.environment.stop_timeout(),
@@ -2588,6 +2591,7 @@ pub mod tests {
             events::{registry::EventSubscription, stream::EventStream},
             hooks::EventType,
             testing::{
+                mocks::ControllerActionResponse,
                 out_dir::OutDir,
                 routing_test_helpers::{RoutingTest, RoutingTestBuilder},
                 test_helpers::{component_decl_with_test_runner, ActionsTest, ComponentInfo},
@@ -2600,11 +2604,12 @@ pub mod tests {
             OfferSource, OfferTarget, UseEventStreamDecl, UseSource,
         },
         cm_rust_testing::*,
+        fasync::TestExecutor,
         fidl::endpoints::DiscoverableProtocolMarker,
         fidl_fuchsia_logger as flogger, fuchsia_async as fasync, fuchsia_zircon as zx,
         futures::{channel::mpsc, StreamExt, TryStreamExt},
         routing_test_helpers::component_id_index::make_index_file,
-        std::panic,
+        std::{panic, task::Poll},
         tracing::info,
         vfs::service::host,
     };
@@ -3824,5 +3829,66 @@ pub mod tests {
         assert_matches!(root.find_resolved(&vec!["a", "b"].try_into().unwrap()).await, None);
         assert_matches!(root.find_resolved(&vec!["a", "b", "c"].try_into().unwrap()).await, None);
         assert_matches!(root.find_resolved(&vec!["a", "b", "d"].try_into().unwrap()).await, None);
+    }
+
+    /// While the provider component is stopping, opening its outgoing directory should not block.
+    /// This is important to not cause deadlocks if we are draining the provider component's
+    /// namespace.
+    #[fuchsia::test(allow_stalls = false)]
+    async fn open_outgoing_while_component_is_stopping() {
+        // Use mock time in this test.
+        let initial = fasync::Time::from_nanos(0);
+        TestExecutor::advance_to(initial).await;
+
+        let components = vec![("root", ComponentDeclBuilder::new().build())];
+        let test_topology = ActionsTest::new(components[0].0, components, None).await;
+
+        let root_out_dir = OutDir::new();
+        test_topology.runner.add_host_fn("test:///root_resolved", root_out_dir.host_fn());
+
+        // Configure the component runner to take 3 seconds to stop the component.
+        let response_delay = zx::Duration::from_seconds(3);
+        test_topology.runner.add_controller_response(
+            "test:///root_resolved",
+            Box::new(move || ControllerActionResponse {
+                close_channel: true,
+                delay: Some(response_delay),
+            }),
+        );
+
+        let root = test_topology.look_up(Moniker::default()).await;
+        assert!(!root.is_started().await);
+
+        // Start the component.
+        let root = root
+            .start_instance(&Moniker::root(), &StartReason::Root)
+            .await
+            .expect("failed to start root");
+        test_topology.runner.wait_for_urls(&["test:///root_resolved"]).await;
+
+        // Start to stop the component. This will stall because the framework will be
+        // waiting the controller to respond.
+        let stop_fut = ActionSet::register(root.clone(), StopAction::new(false));
+        futures::pin_mut!(stop_fut);
+        assert_matches!(TestExecutor::poll_until_stalled(&mut stop_fut).await, Poll::Pending);
+
+        // Open the outgoing directory. This should not block.
+        let (_, mut server_end) = zx::Channel::create();
+        let open_fut = root.open_outgoing(fio::OpenFlags::empty(), ".", &mut server_end);
+        futures::pin_mut!(open_fut);
+        // Note: if the behavior of `open_outgoing` changes to start the component, we can simply
+        // update the `Err` here accordingly.
+        assert_matches!(
+            TestExecutor::poll_until_stalled(open_fut).await,
+            Poll::Ready(Err(OpenOutgoingDirError::InstanceNotRunning))
+        );
+
+        // Let the timer advance. The component should be stopped now.
+        TestExecutor::advance_to(initial + response_delay).await;
+        assert_matches!(stop_fut.await, Ok(()));
+
+        // Open the outgoing directory. This should still not block.
+        let (_, mut server_end) = zx::Channel::create();
+        let _ = root.open_outgoing(fio::OpenFlags::empty(), ".", &mut server_end).await;
     }
 }

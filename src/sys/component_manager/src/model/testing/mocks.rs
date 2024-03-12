@@ -157,6 +157,8 @@ impl Resolver for MockResolver {
 
 pub type HostFn = Box<dyn Fn(ServerEnd<fio::DirectoryMarker>) + Send + Sync>;
 
+pub type ControllerResponseFn = Box<dyn Fn() -> ControllerActionResponse + Send + Sync>;
+
 pub type ManagedNamespace = Mutex<Namespace>;
 
 struct MockRunnerInner {
@@ -177,6 +179,10 @@ struct MockRunnerInner {
 
     /// Set of URLs that the MockRunner will fail the `start` call for.
     failing_urls: HashSet<String>,
+
+    /// Functions for setting the controller's response to stop and kill
+    /// requests. If not found, the controller will reply with success.
+    controller_response_fns: HashMap<String, Arc<ControllerResponseFn>>,
 
     /// Map from the `Koid` of `Channel` owned by a `ComponentController` to
     /// the messages received by that controller.
@@ -210,6 +216,7 @@ impl MockRunner {
                 runner_requests: Arc::new(Mutex::new(HashMap::new())),
                 controllers: HashMap::new(),
                 last_checker: None,
+                controller_response_fns: HashMap::new(),
             }),
         }
     }
@@ -224,9 +231,18 @@ impl MockRunner {
         self.add_failing_url(&format!("test:///{}_resolved", name))
     }
 
-    /// Register `function` to serve the outgoing directory of component `name`
-    pub fn add_host_fn(&self, name: &str, function: HostFn) {
-        self.inner.lock().unwrap().outgoing_host_fns.insert(name.to_string(), Arc::new(function));
+    /// Register `function` to serve the outgoing directory of component with `url`.
+    pub fn add_host_fn(&self, url: &str, function: HostFn) {
+        self.inner.lock().unwrap().outgoing_host_fns.insert(url.to_string(), Arc::new(function));
+    }
+
+    /// Register `function` to override the controller response for the component with URL `url`.
+    pub fn add_controller_response(&self, url: &str, function: ControllerResponseFn) {
+        self.inner
+            .lock()
+            .unwrap()
+            .controller_response_fns
+            .insert(url.to_string(), Arc::new(function));
     }
 
     /// Get the input namespace for component `name`.
@@ -318,8 +334,17 @@ impl MockRunner {
                 Arc::new(Mutex::new(start_info.ns.unwrap().try_into().unwrap())),
             );
 
-            let abort_handle =
-                MockController::new(server_end, runner_requests, channel_koid).serve();
+            let controller = match state.controller_response_fns.get(&resolved_url).map(|f| f()) {
+                Some(response) => MockController::new_with_responses(
+                    server_end,
+                    runner_requests,
+                    channel_koid,
+                    response.clone(),
+                    response,
+                ),
+                None => MockController::new(server_end, runner_requests, channel_koid),
+            };
+            let abort_handle = controller.serve();
             state.controllers.insert(channel_koid, abort_handle);
 
             // Start serving the outgoing/runtime directories.
