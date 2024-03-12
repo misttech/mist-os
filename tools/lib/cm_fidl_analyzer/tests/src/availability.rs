@@ -5,10 +5,7 @@
 mod tests {
     use {
         crate::routing::RoutingTestBuilderForAnalyzer,
-        cm_rust::{
-            Availability, ExposeDecl, ExposeDirectoryDecl, ExposeProtocolDecl, ExposeServiceDecl,
-            ExposeSource, ExposeTarget,
-        },
+        cm_rust::{Availability, ExposeSource},
         cm_rust_testing::*,
         moniker::{Moniker, MonikerBase},
         routing_test_helpers::{
