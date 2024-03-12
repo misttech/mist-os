@@ -10,8 +10,8 @@ use {
     fuchsia_component::server::{ServiceFs, ServiceObjLocal},
     fuchsia_inspect_contrib::nodes::BoundedListNode,
     fuchsia_zircon as zx,
-    futures::{lock::Mutex, StreamExt, TryFutureExt, TryStreamExt},
-    std::sync::Arc,
+    futures::{StreamExt, TryFutureExt, TryStreamExt},
+    std::sync::{Arc, Mutex},
     tracing::{error, warn},
     vfs::{
         directory::{entry::EntryInfo, simple::OpenRequest},
@@ -55,14 +55,6 @@ impl Diagnostics {
 
 /// State for a session that will be started in the future.
 struct PendingSession {
-    /// A proxy to the session's exposed directory.
-    ///
-    /// This proxy is not connected in the `Pending` state, and used to pipeline connections
-    /// to session protocols (svc_from_session) before the session is started.
-    ///
-    /// This is the other end of `exposed_dir_server_end`.
-    pub exposed_dir: fio::DirectoryProxy,
-
     /// The server end on which the session's exposed directory will be served.
     ///
     /// This is the other end of `exposed_dir`.
@@ -70,9 +62,9 @@ struct PendingSession {
 }
 
 impl PendingSession {
-    fn new() -> Self {
+    fn new() -> (fio::DirectoryProxy, Self) {
         let (exposed_dir, exposed_dir_server_end) = create_proxy::<fio::DirectoryMarker>().unwrap();
-        Self { exposed_dir, exposed_dir_server_end }
+        (exposed_dir, Self { exposed_dir_server_end })
     }
 }
 
@@ -83,9 +75,6 @@ impl PendingSession {
 struct StartedSession {
     /// The component URL of the session.
     url: String,
-
-    /// A proxy to the session's exposed directory.
-    exposed_dir: fio::DirectoryProxy,
 }
 
 enum Session {
@@ -94,8 +83,9 @@ enum Session {
 }
 
 impl Session {
-    fn new_pending() -> Self {
-        Self::Pending(PendingSession::new())
+    fn new_pending() -> (fio::DirectoryProxy, Self) {
+        let (proxy, pending_session) = PendingSession::new();
+        (proxy, Self::Pending(pending_session))
     }
 }
 
@@ -104,13 +94,21 @@ struct SessionManagerState {
     default_session_url: Option<String>,
 
     /// State of the session.
-    session: Session,
+    session: futures::lock::Mutex<Session>,
 
     /// The realm in which session components will be created.
     realm: fcomponent::RealmProxy,
 
+    /// Other mutable state.
+    inner: Mutex<Inner>,
+}
+
+struct Inner {
     /// Collection of diagnostics nodes.
     diagnostics: Diagnostics,
+
+    /// The current directory proxy we should use.  When pending, requests are queued.
+    exposed_dir: fio::DirectoryProxy,
 }
 
 impl SessionManagerState {
@@ -119,7 +117,7 @@ impl SessionManagerState {
     /// # Errors
     ///
     /// Returns an error if the is no default session URL or the session could not be launched.
-    async fn start_default(&mut self) -> Result<(), Error> {
+    async fn start_default(&self) -> Result<(), Error> {
         let session_url = self
             .default_session_url
             .as_ref()
@@ -130,67 +128,70 @@ impl SessionManagerState {
     }
 
     /// Start a session, replacing any already session.
-    async fn start(&mut self, url: String) -> Result<(), startup::StartupError> {
-        let session = std::mem::replace(&mut self.session, Session::new_pending());
-        let pending = match session {
+    async fn start(&self, url: String) -> Result<(), startup::StartupError> {
+        self.start_impl(&mut *self.session.lock().await, url).await
+    }
+
+    async fn start_impl(
+        &self,
+        session: &mut Session,
+        url: String,
+    ) -> Result<(), startup::StartupError> {
+        let (proxy_on_failure, new_pending) = Session::new_pending();
+        let pending_session = std::mem::replace(session, new_pending);
+        let pending = match pending_session {
             Session::Pending(pending) => pending,
-            Session::Started(_) => PendingSession::new(),
+            Session::Started(_) => {
+                let (proxy, pending) = PendingSession::new();
+                self.inner.lock().unwrap().exposed_dir = proxy;
+                pending
+            }
         };
-        let _controller =
-            startup::launch_session(&url, pending.exposed_dir_server_end, &self.realm).await?;
-        self.session = Session::Started(StartedSession { url, exposed_dir: pending.exposed_dir });
-        self.diagnostics.record_session_start();
+        if let Err(e) =
+            startup::launch_session(&url, pending.exposed_dir_server_end, &self.realm).await
+        {
+            self.inner.lock().unwrap().exposed_dir = proxy_on_failure;
+            return Err(e);
+        }
+        *session = Session::Started(StartedSession { url });
+        self.inner.lock().unwrap().diagnostics.record_session_start();
         Ok(())
     }
 
     /// Stops the session, if any.
-    async fn stop(&mut self) -> Result<(), startup::StartupError> {
-        let session = std::mem::replace(&mut self.session, Session::new_pending());
-        if let Session::Started(_) = session {
+    async fn stop(&self) -> Result<(), startup::StartupError> {
+        let mut session = self.session.lock().await;
+        if let Session::Started(_) = &*session {
+            let (proxy, new_pending) = Session::new_pending();
+            *session = new_pending;
+            self.inner.lock().unwrap().exposed_dir = proxy;
             startup::stop_session(&self.realm).await?;
         }
         Ok(())
     }
-}
 
-struct SessionExposedDir {
-    state: Arc<Mutex<SessionManagerState>>,
-}
-
-impl vfs::directory::entry::DirectoryEntry for SessionExposedDir {
-    fn entry_info(&self) -> EntryInfo {
-        EntryInfo::new(fio::INO_UNKNOWN, fio::DirentType::Directory)
-    }
-
-    fn open_entry(self: Arc<Self>, request: OpenRequest<'_>) -> Result<(), zx::Status> {
-        request.open_remote(self)
+    /// Restarts a session.
+    async fn restart(&self) -> Result<(), startup::StartupError> {
+        let mut session = self.session.lock().await;
+        let Session::Started(StartedSession { url }) = &*session else {
+            return Err(startup::StartupError::NotRunning);
+        };
+        let url = url.clone();
+        self.start_impl(&mut *session, url).await?;
+        Ok(())
     }
 }
 
-impl RemoteLike for SessionExposedDir {
-    fn open(
-        self: Arc<Self>,
-        scope: ExecutionScope,
-        flags: fio::OpenFlags,
-        path: vfs::path::Path,
-        server_end: ServerEnd<fio::NodeMarker>,
-    ) {
-        let state = self.state.clone();
-        scope.spawn(async move {
-            let state = state.lock().await;
-            let exposed_dir = match &state.session {
-                Session::Pending(pending) => &pending.exposed_dir,
-                Session::Started(started) => &started.exposed_dir,
-            };
-            let _ = exposed_dir.open(flags, fio::ModeType::empty(), path.as_ref(), server_end);
-        });
+impl vfs::remote::GetRemoteDir for SessionManagerState {
+    fn get_remote_dir(&self) -> fio::DirectoryProxy {
+        Clone::clone(&self.inner.lock().unwrap().exposed_dir)
     }
 }
 
 /// Manages the session lifecycle and provides services to control the session.
 #[derive(Clone)]
 pub struct SessionManager {
-    state: Arc<Mutex<SessionManagerState>>,
+    state: Arc<SessionManagerState>,
 }
 
 impl SessionManager {
@@ -208,13 +209,14 @@ impl SessionManager {
             DIANGNOSTICS_SESSION_STARTED_AT_SIZE,
         );
         let diagnostics = Diagnostics { session_started_at };
+        let (proxy, new_pending) = Session::new_pending();
         let state = SessionManagerState {
             default_session_url,
-            session: Session::new_pending(),
+            session: futures::lock::Mutex::new(new_pending),
             realm,
-            diagnostics,
+            inner: Mutex::new(Inner { exposed_dir: proxy, diagnostics }),
         };
-        SessionManager { state: Arc::new(Mutex::new(state)) }
+        SessionManager { state: Arc::new(state) }
     }
 
     /// Starts the session with the default session component URL, if any.
@@ -223,8 +225,7 @@ impl SessionManager {
     ///
     /// Returns an error if the is no default session URL or the session could not be launched.
     pub async fn start_default_session(&mut self) -> Result<(), Error> {
-        let mut state = self.state.lock().await;
-        state.start_default().await?;
+        self.state.start_default().await?;
         Ok(())
     }
 
@@ -244,11 +245,7 @@ impl SessionManager {
             .add_fidl_service(IncomingRequest::Lifecycle);
 
         // Requests to /svc_from_session are forwarded to the session's exposed dir.
-        let session_manager = self.clone();
-        fs.add_entry_at(
-            "svc_from_session",
-            Arc::new(SessionExposedDir { state: session_manager.state }),
-        );
+        fs.add_entry_at("svc_from_session", self.state.clone());
 
         fs.take_and_serve_directory_handle()?;
 
@@ -386,20 +383,12 @@ impl SessionManager {
         configuration: fsession::LaunchConfiguration,
     ) -> Result<(), fsession::LaunchError> {
         let session_url = configuration.session_url.ok_or(fsession::LaunchError::InvalidArgs)?;
-        let mut state = self.state.lock().await;
-        state.start(session_url).await.map_err(Into::into)
+        self.state.start(session_url).await.map_err(Into::into)
     }
 
     /// Handles a Restarter.Restart() request.
     async fn handle_restart_request(&mut self) -> Result<(), fsession::RestartError> {
-        let mut state = self.state.lock().await;
-        let session_url = match &state.session {
-            Session::Started(started) => Some(&started.url),
-            Session::Pending(_) => None,
-        }
-        .ok_or(fsession::RestartError::NotRunning)?
-        .clone();
-        state.start(session_url).await.map_err(Into::into)
+        self.state.restart().await.map_err(Into::into)
     }
 
     /// Handles a `Lifecycle.Start()` request.
@@ -410,38 +399,29 @@ impl SessionManager {
         &mut self,
         session_url: Option<String>,
     ) -> Result<(), fsession::LifecycleError> {
-        let mut state = self.state.lock().await;
         let session_url = session_url
             .as_ref()
-            .or(state.default_session_url.as_ref())
+            .or(self.state.default_session_url.as_ref())
             .ok_or(fsession::LifecycleError::NotFound)?
             .to_owned();
-        state.start(session_url).await.map_err(Into::into)
+        self.state.start(session_url).await.map_err(Into::into)
     }
 
     /// Handles a `Lifecycle.Stop()` request.
     async fn handle_lifecycle_stop_request(&mut self) -> Result<(), fsession::LifecycleError> {
-        let mut state = self.state.lock().await;
-        state.stop().await.map_err(Into::into)
+        self.state.stop().await.map_err(Into::into)
     }
 
     /// Handles a `Lifecycle.Restart()` request.
     async fn handle_lifecycle_restart_request(&mut self) -> Result<(), fsession::LifecycleError> {
-        let mut state = self.state.lock().await;
-        let session_url = match &state.session {
-            Session::Started(started) => Some(&started.url),
-            Session::Pending(_) => None,
-        }
-        .ok_or(fsession::LifecycleError::NotFound)?
-        .to_owned();
-        state.start(session_url).await.map_err(Into::into)
+        self.state.restart().await.map_err(Into::into)
     }
 }
 
 #[cfg(test)]
 mod tests {
     use {
-        super::{SessionExposedDir, SessionManager},
+        super::SessionManager,
         anyhow::{anyhow, Error},
         diagnostics_assertions::assert_data_tree,
         diagnostics_assertions::AnyProperty,
@@ -522,13 +502,18 @@ mod tests {
 
     fn open_session_exposed_dir(
         session_manager: SessionManager,
-        scope: ExecutionScope,
         flags: fio::OpenFlags,
-        path: vfs::path::Path,
+        path: &str,
         server_end: ServerEnd<fio::NodeMarker>,
     ) {
-        let exposed_directory = Arc::new(SessionExposedDir { state: session_manager.state });
-        exposed_directory.open(scope, flags, path, server_end);
+        session_manager
+            .state
+            .inner
+            .lock()
+            .unwrap()
+            .exposed_dir
+            .open(flags, fio::ModeType::empty(), path, server_end)
+            .unwrap();
     }
 
     /// Verifies that Launcher.Launch creates a new session.
@@ -885,14 +870,7 @@ mod tests {
         // The actual protocol does not matter because it's not being served.
         let (_client_end, server_end) = fidl::endpoints::create_proxy::<fio::NodeMarker>().unwrap();
 
-        let scope = ExecutionScope::new();
-        open_session_exposed_dir(
-            session_manager,
-            scope,
-            fio::OpenFlags::empty(),
-            vfs::path::Path::validate_and_split(svc_path)?,
-            server_end,
-        );
+        open_session_exposed_dir(session_manager, fio::OpenFlags::empty(), svc_path, server_end);
         // Start the session.
         lifecycle
             .start(&fsession::LifecycleStartRequest {
@@ -961,14 +939,7 @@ mod tests {
         // The actual protocol does not matter because it's not being served.
         let (_client_end, server_end) = fidl::endpoints::create_proxy::<fio::NodeMarker>().unwrap();
 
-        let scope = ExecutionScope::new();
-        open_session_exposed_dir(
-            session_manager,
-            scope,
-            fio::OpenFlags::empty(),
-            vfs::path::Path::validate_and_split(svc_path)?,
-            server_end,
-        );
+        open_session_exposed_dir(session_manager, fio::OpenFlags::empty(), svc_path, server_end);
 
         assert_eq!(path_receiver.next().await.unwrap(), svc_path);
 

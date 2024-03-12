@@ -40,9 +40,6 @@ pub trait RemoteLike {
     }
 }
 
-// TODO(https://fxbug.dev/293947862): consider adding `remote_lazy_dir` which takes a generic
-// function that returns the directory proxy. This will be useful, for example, in session_manager.
-
 /// Create a new [`Remote`] node that forwards open requests to the provided [`DirectoryProxy`],
 /// effectively handing off the handling of any further requests to the remote fidl server.
 pub fn remote_dir(dir: fio::DirectoryProxy) -> Arc<impl DirectoryEntry + RemoteLike> {
@@ -51,11 +48,23 @@ pub fn remote_dir(dir: fio::DirectoryProxy) -> Arc<impl DirectoryEntry + RemoteL
 
 /// [`RemoteDir`] implements [`RemoteLike`]` which forwards open/open2 requests to a remote
 /// directory.
-pub struct RemoteDir {
+struct RemoteDir {
     dir: fio::DirectoryProxy,
 }
 
-impl DirectoryEntry for RemoteDir {
+impl GetRemoteDir for RemoteDir {
+    fn get_remote_dir(&self) -> fio::DirectoryProxy {
+        Clone::clone(&self.dir)
+    }
+}
+
+/// A trait that can be implemented to return a directory proxy that should be used as a remote
+/// directory.
+pub trait GetRemoteDir {
+    fn get_remote_dir(&self) -> fio::DirectoryProxy;
+}
+
+impl<T: GetRemoteDir + Send + Sync + 'static> DirectoryEntry for T {
     fn entry_info(&self) -> EntryInfo {
         EntryInfo::new(fio::INO_UNKNOWN, fio::DirentType::Directory)
     }
@@ -65,7 +74,7 @@ impl DirectoryEntry for RemoteDir {
     }
 }
 
-impl RemoteLike for RemoteDir {
+impl<T: GetRemoteDir> RemoteLike for T {
     fn open(
         self: Arc<Self>,
         _scope: ExecutionScope,
@@ -73,7 +82,8 @@ impl RemoteLike for RemoteDir {
         path: Path,
         server_end: ServerEnd<fio::NodeMarker>,
     ) {
-        let _ = self.dir.open(flags, fio::ModeType::empty(), path.as_ref(), server_end);
+        let _ =
+            self.get_remote_dir().open(flags, fio::ModeType::empty(), path.as_ref(), server_end);
     }
 
     // TODO(https://fxbug.dev/293947862): The Open2 method implies that `object_request` should be
@@ -93,7 +103,11 @@ impl RemoteLike for RemoteDir {
     ) -> Result<(), Status> {
         // There is nowhere to propagate any errors since we take the `object_request`. This is okay
         // as the channel will be dropped and closed if the wire call fails.
-        let _ = self.dir.open2(path.as_ref(), &protocols, object_request.take().into_channel());
+        let _ = self.get_remote_dir().open2(
+            path.as_ref(),
+            &protocols,
+            object_request.take().into_channel(),
+        );
         Ok(())
     }
 }

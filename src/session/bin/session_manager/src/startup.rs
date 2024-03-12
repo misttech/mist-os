@@ -31,6 +31,9 @@ pub enum StartupError {
 
     #[error("Session {} not launched at \"{}/{}\": {:?}", url, collection, name, err)]
     NotLaunched { name: String, collection: String, url: String, err: fcomponent::Error },
+
+    #[error("Attempt to restart a not running session")]
+    NotRunning,
 }
 
 impl Into<fsession::LaunchError> for StartupError {
@@ -45,6 +48,7 @@ impl Into<fsession::LaunchError> for StartupError {
                 fsession::LaunchError::CreateComponentFailed
             }
             StartupError::NotLaunched { .. } => fsession::LaunchError::CreateComponentFailed,
+            StartupError::NotRunning => fsession::LaunchError::NotFound,
         }
     }
 }
@@ -61,6 +65,7 @@ impl Into<fsession::RestartError> for StartupError {
                 fsession::RestartError::CreateComponentFailed
             }
             StartupError::NotLaunched { .. } => fsession::RestartError::CreateComponentFailed,
+            StartupError::NotRunning => fsession::RestartError::NotRunning,
         }
     }
 }
@@ -79,6 +84,7 @@ impl Into<fsession::LifecycleError> for StartupError {
                 fsession::LifecycleError::CreateComponentFailed
             }
             StartupError::NotLaunched { .. } => fsession::LifecycleError::CreateComponentFailed,
+            StartupError::NotRunning => fsession::LifecycleError::NotFound,
         }
     }
 }
