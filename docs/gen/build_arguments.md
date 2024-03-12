@@ -90,7 +90,7 @@ It will be set below and passed to other toolchains through toolchain_args
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:2101
+From //build/config/BUILDCONFIG.gn:2100
 
 ### allowed_test_device_types
 
@@ -3183,7 +3183,7 @@ This is just added to [`known_variants`](#known_variants).
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:1836
+From //build/config/BUILDCONFIG.gn:1835
 
 ### extra_vbmeta_descriptors
 
@@ -4341,7 +4341,7 @@ Each element of the list is one variant, which is a scope defining:
 }]
 ```
 
-From //build/config/BUILDCONFIG.gn:1637
+From //build/config/BUILDCONFIG.gn:1636
 
 ### legacy_base_package_labels
 
@@ -7228,7 +7228,7 @@ toolchain, so that recompilations with the new compiler can be triggered.
 When using the prebuilt, this is ignored and the CIPD instance ID of the
 prebuilt is used.
 
-**Current value (from the default):** `"LrAgVBhitDoJMgg_VNfKJKddhX01eaSobswKGc6X-x8C"`
+**Current value (from the default):** `"--02xf3_pbelV5FNeOt_DUOzgKrFOoyCEqZN-znayEEC"`
 
 From //build/rust/config.gni:38
 
@@ -7490,7 +7490,7 @@ is satisfied if any of the strings matches against the candidate string.
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:2091
+From //build/config/BUILDCONFIG.gn:2090
 
 ### select_variant_canonical
 
@@ -7500,7 +7500,7 @@ See //build/toolchain/clang_toolchain.gni for details.
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:2096
+From //build/config/BUILDCONFIG.gn:2095
 
 ### select_variant_shortcuts
 
@@ -7558,7 +7558,7 @@ a list that can be spliced into [`select_variant`](#select_variant).
 }]
 ```
 
-From //build/config/BUILDCONFIG.gn:1882
+From //build/config/BUILDCONFIG.gn:1881
 
 ### size_checker_input
 
@@ -7725,6 +7725,14 @@ Whether or not high-throughput tracing (e.g. per-syscall) is enabled globally.
 **Current value (from the default):** `false`
 
 From //src/starnix/kernel/args.gni:13
+
+### starnix_log_dev_null_writes_at_info
+
+Whether to log writes to `/dev/null` at the INFO level.
+
+**Current value (from the default):** `false`
+
+From //src/starnix/kernel/args.gni:30
 
 ### starnix_syscall_stats
 
@@ -8032,7 +8040,7 @@ From //build/config/sanitizers/sanitizer_default_options.gni:47
 }]
 ```
 
-From //build/config/BUILDCONFIG.gn:1866
+From //build/config/BUILDCONFIG.gn:1865
 
 ### universe_package_labels
 
