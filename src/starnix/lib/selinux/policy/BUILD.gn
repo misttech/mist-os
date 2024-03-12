@@ -14,7 +14,6 @@ policy = {
     "//src/starnix/lib/selinux/common",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:bstr",
-    "//third_party/rust_crates:once_cell",
     "//third_party/rust_crates:thiserror",
     "//third_party/rust_crates:zerocopy",
   ]
@@ -82,6 +81,7 @@ if (is_host) {
     "allow_a_t_b_attr_class0_perm0",
     "allow_a_t_b_t_class0_perm0",
     "minimal",
+    "multiple_levels_and_categories",
     "no_allow_a_attr_b_attr_class0_perm0",
     "no_allow_a_t_b_attr_class0_perm0",
     "no_allow_a_t_b_t_class0_perm0",

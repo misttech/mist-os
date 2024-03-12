@@ -196,7 +196,7 @@ pub(crate) struct CommonSymbolStaticMetadata {
     length: le::U32,
     /// An integer that identifies this this common symbol, unique to this common symbol relative
     /// to all common symbols and classes in this policy.
-    value: le::U32,
+    id: le::U32,
     /// The number of primary names referred to by the associated [`CommonSymbol`].
     primary_names_count: le::U32,
     /// The number of items stored in the [`Permissions`] in the associated [`CommonSymbol`].
@@ -244,8 +244,8 @@ impl<PS: ParseStrategy> Permission<PS> {
         PS::deref_slice(&self.data)
     }
 
-    pub fn value(&self) -> u32 {
-        PS::deref(&self.metadata).value.get()
+    pub fn id(&self) -> u32 {
+        PS::deref(&self.metadata).id.get()
     }
 }
 
@@ -266,7 +266,7 @@ impl<PS: ParseStrategy> ValidateArray<PermissionMetadata, u8> for Permission<PS>
 pub(crate) struct PermissionMetadata {
     /// The length of the `[u8]` in the associated [`Permission`].
     length: le::U32,
-    value: le::U32,
+    id: le::U32,
 }
 
 impl Counted for PermissionMetadata {
@@ -619,13 +619,13 @@ impl<PS: ParseStrategy> Class<PS> {
         PS::deref_slice(&class_key.data)
     }
 
-    /// Returns the value associated with this class. The value is used to index into collections
-    /// and bitmaps associated with this class. The value is 1-indexed, whereas most collections and
-    /// bitmaps are 0-indexed, so clients of this API will usually use `value - 1`.
-    pub fn value(&self) -> u32 {
+    /// Returns the id associated with this class. The id is used to index into collections
+    /// and bitmaps associated with this class. The id is 1-indexed, whereas most collections and
+    /// bitmaps are 0-indexed, so clients of this API will usually use `id - 1`.
+    pub fn id(&self) -> u32 {
         let class_metadata: &ClassMetadata =
             &PS::deref(&self.constraints.metadata.metadata.metadata.metadata);
-        class_metadata.value.get()
+        class_metadata.id.get()
     }
 
     /// Returns whether this class inherits from a named `common` policy statement. For example,
@@ -963,7 +963,7 @@ where
 pub(crate) struct ClassMetadata {
     key_length: le::U32,
     common_key_length: le::U32,
-    value: le::U32,
+    id: le::U32,
     primary_names_count: le::U32,
     elements_count: le::U32,
     constraint_count: le::U32,
@@ -998,6 +998,16 @@ pub(crate) struct Role<PS: ParseStrategy> {
     metadata: RoleMetadata<PS>,
     role_dominates: ExtensibleBitmap<PS>,
     role_types: ExtensibleBitmap<PS>,
+}
+
+impl<PS: ParseStrategy> Role<PS> {
+    pub(crate) fn id(&self) -> le::U32 {
+        PS::deref(&self.metadata.metadata).id
+    }
+
+    pub(crate) fn name_bytes(&self) -> &[u8] {
+        PS::deref_slice(&self.metadata.data)
+    }
 }
 
 impl<PS: ParseStrategy> Parse<PS> for Role<PS>
@@ -1046,7 +1056,7 @@ impl<PS: ParseStrategy> ValidateArray<RoleStaticMetadata, u8> for RoleMetadata<P
 #[repr(C, packed)]
 pub(crate) struct RoleStaticMetadata {
     length: le::U32,
-    value: le::U32,
+    id: le::U32,
     bounds: le::U32,
 }
 
@@ -1097,10 +1107,10 @@ pub(crate) fn type_has_attribute<'a, PS: ParseStrategy>(
     attr: &'a Type<PS>,
     attribute_maps: &Vec<ExtensibleBitmap<PS>>,
 ) -> bool {
-    let type_id = PS::deref(&ty.metadata).value.get();
+    let type_id = PS::deref(&ty.metadata).id.get();
     let type_index = type_id - 1;
 
-    let attribute_id = PS::deref(&attr.metadata).value.get();
+    let attribute_id = PS::deref(&attr.metadata).id.get();
     let attribute_index = attribute_id - 1;
 
     attribute_maps[type_index as usize].is_set(attribute_index)
@@ -1127,11 +1137,11 @@ impl<PS: ParseStrategy> Type<PS> {
         PS::deref_slice(&self.data)
     }
 
-    /// Returns the value associated with this type. The value is used to index into collections and
-    /// bitmaps associated with this type. The value is 1-indexed, whereas most collections and
-    /// bitmaps are 0-indexed, so clients of this API will usually use `value - 1`.
-    pub fn value(&self) -> u32 {
-        PS::deref(&self.metadata).value.get()
+    /// Returns the id associated with this type. The id is used to index into collections and
+    /// bitmaps associated with this type. The id is 1-indexed, whereas most collections and
+    /// bitmaps are 0-indexed, so clients of this API will usually use `id - 1`.
+    pub fn id(&self) -> u32 {
+        PS::deref(&self.metadata).id.get()
     }
 
     /// Returns whether this type is from a `type [name];` policy statement.
@@ -1139,7 +1149,7 @@ impl<PS: ParseStrategy> Type<PS> {
     /// TODO: Eliminate `dead_code` guard.
     #[allow(dead_code)]
     pub fn is_type(&self) -> bool {
-        PS::deref(&self.metadata).value.get() == TYPE_PROPERTIES_TYPE
+        PS::deref(&self.metadata).properties.get() == TYPE_PROPERTIES_TYPE
     }
 
     /// Returns whether this type is from a `typealias [typename] alias [aliasname];` policy
@@ -1148,7 +1158,7 @@ impl<PS: ParseStrategy> Type<PS> {
     /// TODO: Eliminate `dead_code` guard.
     #[allow(dead_code)]
     pub fn is_alias(&self) -> bool {
-        PS::deref(&self.metadata).value.get() == TYPE_PROPERTIES_ALIAS
+        PS::deref(&self.metadata).properties.get() == TYPE_PROPERTIES_ALIAS
     }
 
     /// Returns whether this type is from an `attribute [name];` policy statement.
@@ -1156,7 +1166,7 @@ impl<PS: ParseStrategy> Type<PS> {
     /// TODO: Eliminate `dead_code` guard.
     #[allow(dead_code)]
     pub fn is_attribute(&self) -> bool {
-        PS::deref(&self.metadata).value.get() == TYPE_PROPERTIES_ATTRIBUTE
+        PS::deref(&self.metadata).properties.get() == TYPE_PROPERTIES_ATTRIBUTE
     }
 }
 
@@ -1173,7 +1183,7 @@ impl<PS: ParseStrategy> ValidateArray<TypeMetadata, u8> for Type<PS> {
 #[repr(C, packed)]
 pub(crate) struct TypeMetadata {
     length: le::U32,
-    value: le::U32,
+    id: le::U32,
     properties: le::U32,
     bounds: le::U32,
 }
@@ -1208,6 +1218,16 @@ pub(crate) struct User<PS: ParseStrategy> {
     roles: ExtensibleBitmap<PS>,
     expanded_range: MlsRange<PS>,
     default_level: MLSLevel<PS>,
+}
+
+impl<PS: ParseStrategy> User<PS> {
+    pub(crate) fn id(&self) -> le::U32 {
+        PS::deref(&self.user_data.metadata).id
+    }
+
+    pub(crate) fn name_bytes(&self) -> &[u8] {
+        PS::deref_slice(&self.user_data.data)
+    }
 }
 
 impl<PS: ParseStrategy> Parse<PS> for User<PS>
@@ -1254,7 +1274,7 @@ impl<PS: ParseStrategy> ValidateArray<UserMetadata, u8> for UserData<PS> {
 #[repr(C, packed)]
 pub(crate) struct UserMetadata {
     length: le::U32,
-    value: le::U32,
+    id: le::U32,
     bounds: le::U32,
 }
 
@@ -1274,12 +1294,35 @@ impl Validate for UserMetadata {
 }
 
 #[derive(Debug, PartialEq)]
+pub(crate) struct MlsLevel<PS: ParseStrategy> {
+    sensitivity: PS::Output<le::U32>,
+    categories: ExtensibleBitmap<PS>,
+}
+
+impl<PS: ParseStrategy> MlsLevel<PS> {
+    pub fn sensitivity(&self) -> le::U32 {
+        *PS::deref(&self.sensitivity)
+    }
+    pub fn categories(&self) -> &ExtensibleBitmap<PS> {
+        &self.categories
+    }
+}
+
+#[derive(Debug, PartialEq)]
 pub(crate) struct MlsRange<PS: ParseStrategy> {
     count: PS::Output<le::U32>,
-    sensitivity_low: PS::Output<le::U32>,
-    sensitivity_high: Option<PS::Output<le::U32>>,
-    low_categories: ExtensibleBitmap<PS>,
-    high_categories: Option<ExtensibleBitmap<PS>>,
+    low: MlsLevel<PS>,
+    high: Option<MlsLevel<PS>>,
+}
+
+impl<PS: ParseStrategy> MlsRange<PS> {
+    pub fn low(&self) -> &MlsLevel<PS> {
+        &self.low
+    }
+
+    pub fn high(&self) -> &Option<MlsLevel<PS>> {
+        &self.high
+    }
 }
 
 impl<PS: ParseStrategy> Parse<PS> for MlsRange<PS>
@@ -1306,33 +1349,40 @@ where
                 num_bytes,
             })?;
 
-        let (sensitivity_high, low_categories, high_categories, tail) =
-            if PS::deref(&count).get() > 1 {
-                let num_bytes = tail.len();
-                let (sensitivity_high, tail) =
-                    PS::parse::<le::U32>(tail).ok_or(ParseError::MissingData {
-                        type_name: "MLSRangeSensitivityHigh",
-                        type_size: std::mem::size_of::<le::U32>(),
-                        num_bytes,
-                    })?;
-                let (low_categories, tail) = ExtensibleBitmap::parse(tail)
-                    .map_err(Into::<anyhow::Error>::into)
-                    .context("parsing mls range low categories")?;
-                let (high_categories, tail) = ExtensibleBitmap::parse(tail)
-                    .map_err(Into::<anyhow::Error>::into)
-                    .context("parsing mls range high categories")?;
+        let (low_categories, high_level, tail) = if PS::deref(&count).get() > 1 {
+            let num_bytes = tail.len();
+            let (sensitivity_high, tail) =
+                PS::parse::<le::U32>(tail).ok_or(ParseError::MissingData {
+                    type_name: "MLSRangeSensitivityHigh",
+                    type_size: std::mem::size_of::<le::U32>(),
+                    num_bytes,
+                })?;
+            let (low_categories, tail) = ExtensibleBitmap::parse(tail)
+                .map_err(Into::<anyhow::Error>::into)
+                .context("parsing mls range low categories")?;
+            let (high_categories, tail) = ExtensibleBitmap::parse(tail)
+                .map_err(Into::<anyhow::Error>::into)
+                .context("parsing mls range high categories")?;
 
-                (Some(sensitivity_high), low_categories, Some(high_categories), tail)
-            } else {
-                let (low_categories, tail) = ExtensibleBitmap::parse(tail)
-                    .map_err(Into::<anyhow::Error>::into)
-                    .context("parsing mls range low categories")?;
+            (
+                low_categories,
+                Some(MlsLevel { sensitivity: sensitivity_high, categories: high_categories }),
+                tail,
+            )
+        } else {
+            let (low_categories, tail) = ExtensibleBitmap::parse(tail)
+                .map_err(Into::<anyhow::Error>::into)
+                .context("parsing mls range low categories")?;
 
-                (None, low_categories, None, tail)
-            };
+            (low_categories, None, tail)
+        };
 
         Ok((
-            Self { count, sensitivity_low, sensitivity_high, low_categories, high_categories },
+            Self {
+                count,
+                low: MlsLevel { sensitivity: sensitivity_low, categories: low_categories },
+                high: high_level,
+            },
             tail,
         ))
     }
@@ -1413,7 +1463,7 @@ impl<PS: ParseStrategy> ValidateArray<ConditionalBooleanMetadata, u8> for Condit
 #[derive(Clone, Debug, FromZeroes, FromBytes, NoCell, PartialEq, Unaligned)]
 #[repr(C, packed)]
 pub(crate) struct ConditionalBooleanMetadata {
-    value: le::U32,
+    id: le::U32,
     /// Current active value of this conditional boolean.
     active: le::U32,
     length: le::U32,
@@ -1456,6 +1506,16 @@ impl<PS: ParseStrategy> Validate for [Sensitivity<PS>] {
 pub(crate) struct Sensitivity<PS: ParseStrategy> {
     metadata: SensitivityMetadata<PS>,
     level: MLSLevel<PS>,
+}
+
+impl<PS: ParseStrategy> Sensitivity<PS> {
+    pub fn id(&self) -> le::U32 {
+        *PS::deref(&self.level.sensitivity)
+    }
+
+    pub fn name_bytes(&self) -> &[u8] {
+        PS::deref_slice(&self.metadata.data)
+    }
 }
 
 impl<PS: ParseStrategy> Parse<PS> for Sensitivity<PS>
@@ -1542,6 +1602,16 @@ array_type!(Category, PS, PS::Output<CategoryMetadata>, PS::Slice<u8>);
 
 array_type_validate_deref_both!(Category);
 
+impl<PS: ParseStrategy> Category<PS> {
+    pub fn id(&self) -> le::U32 {
+        PS::deref(&self.metadata).id
+    }
+
+    pub fn name_bytes(&self) -> &[u8] {
+        PS::deref_slice(&self.data)
+    }
+}
+
 impl<PS: ParseStrategy> ValidateArray<CategoryMetadata, u8> for Category<PS> {
     type Error = anyhow::Error;
 
@@ -1558,7 +1628,7 @@ impl<PS: ParseStrategy> ValidateArray<CategoryMetadata, u8> for Category<PS> {
 #[repr(C, packed)]
 pub(crate) struct CategoryMetadata {
     length: le::U32,
-    value: le::U32,
+    id: le::U32,
     is_alias: le::U32,
 }
 

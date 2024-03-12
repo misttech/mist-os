@@ -474,6 +474,18 @@ mod tests {
         thread::spawn,
     };
 
+    /// SID to use where any value will do.
+    const A_TEST_SID: SecurityId = SecurityId(1000);
+
+    /// Default fixed cache size to use in tests.
+    const CACHE_ENTRIES: usize = 10;
+
+    /// Returns a vector of unique `SecurityIds` with values not including `A_TEST_SID`.
+    fn unique_sids(count: usize) -> Vec<SecurityId> {
+        static NEXT_ID: AtomicU64 = AtomicU64::new(1001);
+        (0..count).map(|_| SecurityId(NEXT_ID.fetch_add(1, Ordering::AcqRel))).collect()
+    }
+
     #[derive(Default)]
     struct Counter<D = DenyAll> {
         query_count: AtomicUsize,
@@ -514,16 +526,25 @@ mod tests {
     #[fuchsia::test]
     fn empty_access_vector_cache_default_deny_all() {
         let mut avc = Empty::<DenyAll>::default();
-        assert_eq!(AccessVector::NONE, avc.query(0.into(), 0.into(), ObjectClass::Process.into()));
+        assert_eq!(
+            AccessVector::NONE,
+            avc.query(A_TEST_SID, A_TEST_SID, ObjectClass::Process.into())
+        );
     }
 
     #[fuchsia::test]
     fn fixed_access_vector_cache_add_entry() {
-        let mut avc = Fixed::<_, 10>::new(Counter::<DenyAll>::default());
+        let mut avc = Fixed::<_, CACHE_ENTRIES>::new(Counter::<DenyAll>::default());
         assert_eq!(0, avc.delegate.query_count());
-        assert_eq!(AccessVector::NONE, avc.query(0.into(), 0.into(), ObjectClass::Process.into()));
+        assert_eq!(
+            AccessVector::NONE,
+            avc.query(A_TEST_SID, A_TEST_SID, ObjectClass::Process.into())
+        );
         assert_eq!(1, avc.delegate.query_count());
-        assert_eq!(AccessVector::NONE, avc.query(0.into(), 0.into(), ObjectClass::Process.into()));
+        assert_eq!(
+            AccessVector::NONE,
+            avc.query(A_TEST_SID, A_TEST_SID, ObjectClass::Process.into())
+        );
         assert_eq!(1, avc.delegate.query_count());
         assert_eq!(1, avc.next_index);
         assert_eq!(false, avc.is_full);
@@ -531,14 +552,17 @@ mod tests {
 
     #[fuchsia::test]
     fn fixed_access_vector_cache_reset() {
-        let mut avc = Fixed::<_, 10>::new(Counter::<DenyAll>::default());
+        let mut avc = Fixed::<_, CACHE_ENTRIES>::new(Counter::<DenyAll>::default());
 
         avc.reset();
         assert_eq!(0, avc.next_index);
         assert_eq!(false, avc.is_full);
 
         assert_eq!(0, avc.delegate.query_count());
-        assert_eq!(AccessVector::NONE, avc.query(0.into(), 0.into(), ObjectClass::Process.into()));
+        assert_eq!(
+            AccessVector::NONE,
+            avc.query(A_TEST_SID, A_TEST_SID, ObjectClass::Process.into())
+        );
         assert_eq!(1, avc.delegate.query_count());
         assert_eq!(1, avc.next_index);
         assert_eq!(false, avc.is_full);
@@ -550,10 +574,10 @@ mod tests {
 
     #[fuchsia::test]
     fn fixed_access_vector_cache_fill() {
-        let mut avc = Fixed::<_, 10>::new(Counter::<DenyAll>::default());
+        let mut avc = Fixed::<_, CACHE_ENTRIES>::new(Counter::<DenyAll>::default());
 
-        for i in 0..10 {
-            avc.query(i.into(), 0.into(), ObjectClass::Process.into());
+        for sid in unique_sids(CACHE_ENTRIES) {
+            avc.query(sid, A_TEST_SID, ObjectClass::Process.into());
         }
         assert_eq!(0, avc.next_index);
         assert_eq!(true, avc.is_full);
@@ -562,8 +586,8 @@ mod tests {
         assert_eq!(0, avc.next_index);
         assert_eq!(false, avc.is_full);
 
-        for i in 0..10 {
-            avc.query(0.into(), i.into(), ObjectClass::Process.into());
+        for sid in unique_sids(CACHE_ENTRIES) {
+            avc.query(A_TEST_SID, sid, ObjectClass::Process.into());
         }
         assert_eq!(0, avc.next_index);
         assert_eq!(true, avc.is_full);
@@ -575,35 +599,35 @@ mod tests {
 
     #[fuchsia::test]
     fn fixed_access_vector_cache_full_miss() {
-        let mut avc = Fixed::<_, 10>::new(Counter::<DenyAll>::default());
+        let mut avc = Fixed::<_, CACHE_ENTRIES>::new(Counter::<DenyAll>::default());
 
-        // Fill with (i, 0, 0 => 0), then overwrite (0, 0, 0 => 0) with (10, 0, 0 => 0).
-        for i in 0..11 {
-            avc.query(i.into(), 0.into(), ObjectClass::Process.into());
-        }
-        assert_eq!(1, avc.next_index);
-        assert_eq!(true, avc.is_full);
-
-        // Query (0, 0, 0) should miss, then overwrite (1, 0, 0 => 0) with (0, 0, 0 => 0).
+        // Make the test query, which will trivially miss.
         let delegate_query_count = avc.delegate.query_count();
-        avc.query(0.into(), 0.into(), ObjectClass::Process.into());
+        avc.query(A_TEST_SID, A_TEST_SID, ObjectClass::Process.into());
+        assert_eq!(delegate_query_count + 1, avc.delegate.query_count());
+        assert!(!avc.is_full);
+
+        // Fill the cache with new queries, which should evict the test query.
+        for sid in unique_sids(CACHE_ENTRIES) {
+            avc.query(sid, A_TEST_SID, ObjectClass::Process.into());
+        }
+        assert!(avc.is_full);
+
+        // Making the test query should result in another miss.
+        let delegate_query_count = avc.delegate.query_count();
+        avc.query(A_TEST_SID, A_TEST_SID, ObjectClass::Process.into());
         assert_eq!(delegate_query_count + 1, avc.delegate.query_count());
 
-        // Query (2, 0, 0) should still hit.
-        let delegate_query_count = avc.delegate.query_count();
-        avc.query(2.into(), 0.into(), ObjectClass::Process.into());
-        assert_eq!(delegate_query_count, avc.delegate.query_count());
-
-        // Cache is not LRU: Querying (0, 0, 0), then (i + 100, 0, 0) repeatedly will evict
-        // (0, 0, 0 => ...) from the cache after filling the cache with (i + 100, 0, 0 => ...)
-        // entries.
-        for i in 0..10 {
-            avc.query(0.into(), 0.into(), ObjectClass::Process.into());
-            avc.query((i + 100).into(), 0.into(), ObjectClass::Process.into());
+        // Because the cache is not LRU, making `CACHE_ENTRIES` unique queries, each preceded by
+        // the test query, will still result in the test query result being evicted.
+        for sid in unique_sids(CACHE_ENTRIES) {
+            avc.query(A_TEST_SID, A_TEST_SID, ObjectClass::Process.into());
+            avc.query(sid, A_TEST_SID, ObjectClass::Process.into());
         }
-        // Query (0, 0, 0) should now miss.
+
+        // The test query should now miss.
         let delegate_query_count = avc.delegate.query_count();
-        avc.query(0.into(), 0.into(), ObjectClass::Process.into());
+        avc.query(A_TEST_SID, A_TEST_SID, ObjectClass::Process.into());
         assert_eq!(delegate_query_count + 1, avc.delegate.query_count());
     }
 
@@ -616,7 +640,7 @@ mod tests {
         assert_eq!(0, avc.delegate.reset_count());
         cache_version.reset();
         assert_eq!(0, avc.delegate.reset_count());
-        avc.query(0.into(), 0.into(), ObjectClass::Process.into());
+        avc.query(A_TEST_SID, A_TEST_SID, ObjectClass::Process.into());
         assert_eq!(1, avc.delegate.reset_count());
     }
 
@@ -668,7 +692,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn thread_local_query_access_vector_cache_coherence() {
-        for _ in 0..10 {
+        for _ in 0..CACHE_ENTRIES {
             test_thread_local_query_access_vector_cache_coherence().await
         }
     }
@@ -680,7 +704,7 @@ mod tests {
             Arc::new(PolicyServer { policy: active_policy.clone() });
         let cache_version = Arc::new(AtomicVersion::default());
 
-        let fixed_avc = Fixed::<_, 10>::new(policy_server.clone());
+        let fixed_avc = Fixed::<_, CACHE_ENTRIES>::new(policy_server.clone());
         let cache_version_for_avc = cache_version.clone();
         let mut query_avc = ThreadLocalQuery::new(cache_version_for_avc, fixed_avc);
 
@@ -690,7 +714,7 @@ mod tests {
             let mut trace = vec![];
 
             for _ in 0..2000 {
-                trace.push(query_avc.query(0.into(), 0.into(), ObjectClass::Process.into()))
+                trace.push(query_avc.query(A_TEST_SID, A_TEST_SID, ObjectClass::Process.into()))
             }
 
             tx.send(trace).expect("send trace");
@@ -744,7 +768,7 @@ mod tests {
 
         let active_policy: Arc<AtomicU32> = Arc::new(Default::default());
         let policy_server = Arc::new(PolicyServer { policy: active_policy.clone() });
-        let fixed_avc = Fixed::<_, 10>::new(policy_server.clone());
+        let fixed_avc = Fixed::<_, CACHE_ENTRIES>::new(policy_server.clone());
         let avc = Locked::new(fixed_avc);
 
         // Ensure the initial policy is `NO_RIGHTS`.
@@ -774,7 +798,7 @@ mod tests {
             for sid in thread_rng().sample_iter(&Uniform::new(0, 20)).take(2000) {
                 trace.push((
                     sid,
-                    avc_for_query_1.query(sid.into(), 0.into(), ObjectClass::Process.into()),
+                    avc_for_query_1.query(SecurityId(sid), A_TEST_SID, ObjectClass::Process.into()),
                 ))
             }
 
@@ -783,7 +807,7 @@ mod tests {
             for sid in thread_rng().sample_iter(&Uniform::new(0, 20)).take(10) {
                 trace.push((
                     sid,
-                    avc_for_query_1.query(sid.into(), 0.into(), ObjectClass::Process.into()),
+                    avc_for_query_1.query(SecurityId(sid), A_TEST_SID, ObjectClass::Process.into()),
                 ))
             }
 
@@ -807,7 +831,7 @@ mod tests {
             for sid in thread_rng().sample_iter(&Uniform::new(10, 30)).take(2000) {
                 trace.push((
                     sid,
-                    avc_for_query_2.query(sid.into(), 0.into(), ObjectClass::Process.into()),
+                    avc_for_query_2.query(SecurityId(sid), A_TEST_SID, ObjectClass::Process.into()),
                 ))
             }
 
@@ -816,7 +840,7 @@ mod tests {
             for sid in thread_rng().sample_iter(&Uniform::new(10, 30)).take(10) {
                 trace.push((
                     sid,
-                    avc_for_query_2.query(sid.into(), 0.into(), ObjectClass::Process.into()),
+                    avc_for_query_2.query(SecurityId(sid), A_TEST_SID, ObjectClass::Process.into()),
                 ))
             }
 
@@ -1014,7 +1038,7 @@ mod tests {
             for sid in thread_rng().sample_iter(&Uniform::new(0, 20)).take(2000) {
                 trace.push((
                     sid,
-                    avc_for_query_1.query(sid.into(), 0.into(), ObjectClass::Process.into()),
+                    avc_for_query_1.query(SecurityId(sid), A_TEST_SID, ObjectClass::Process.into()),
                 ))
             }
 
@@ -1023,7 +1047,7 @@ mod tests {
             for sid in thread_rng().sample_iter(&Uniform::new(0, 20)).take(10) {
                 trace.push((
                     sid,
-                    avc_for_query_1.query(sid.into(), 0.into(), ObjectClass::Process.into()),
+                    avc_for_query_1.query(SecurityId(sid), A_TEST_SID, ObjectClass::Process.into()),
                 ))
             }
 
@@ -1047,7 +1071,7 @@ mod tests {
             for sid in thread_rng().sample_iter(&Uniform::new(10, 30)).take(2000) {
                 trace.push((
                     sid,
-                    avc_for_query_2.query(sid.into(), 0.into(), ObjectClass::Process.into()),
+                    avc_for_query_2.query(SecurityId(sid), A_TEST_SID, ObjectClass::Process.into()),
                 ))
             }
 
@@ -1056,7 +1080,7 @@ mod tests {
             for sid in thread_rng().sample_iter(&Uniform::new(10, 30)).take(10) {
                 trace.push((
                     sid,
-                    avc_for_query_2.query(sid.into(), 0.into(), ObjectClass::Process.into()),
+                    avc_for_query_2.query(SecurityId(sid), A_TEST_SID, ObjectClass::Process.into()),
                 ))
             }
 

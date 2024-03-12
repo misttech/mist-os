@@ -6,12 +6,16 @@
 //! appear in binary SELinux policies.
 
 use super::{
-    array_type, array_type_validate_deref_both, error::ParseError,
-    extensible_bitmap::ExtensibleBitmap, parser::ParseStrategy, symbols::MlsRange, Array, Counted,
-    Parse, Validate, ValidateArray,
+    array_type, array_type_validate_deref_both,
+    error::{ParseError, ValidateError},
+    extensible_bitmap::ExtensibleBitmap,
+    parser::ParseStrategy,
+    symbols::{MlsLevel, MlsRange},
+    Array, Counted, Parse, Validate, ValidateArray,
 };
 
 use anyhow::Context as _;
+use selinux_common as sc;
 use std::fmt::Debug;
 use zerocopy::{little_endian as le, FromBytes, FromZeroes, NoCell, Unaligned};
 
@@ -171,27 +175,27 @@ impl<PS: ParseStrategy> AccessVector<PS> {
         PS::deref(&self.metadata).is_allow()
     }
 
-    /// Returns the source type value in this access vector. This value corresponds to the
-    /// [`super::symbols::Type`] `value()` of some type or attribute in the same policy.
+    /// Returns the source type id in this access vector. This id corresponds to the
+    /// [`super::symbols::Type`] `id()` of some type or attribute in the same policy.
     pub fn source_type(&self) -> u16 {
         PS::deref(&self.metadata).source_type.get()
     }
 
-    /// Returns the target type value in this access vector. This value corresponds to the
-    /// [`super::symbols::Type`] `value()` of some type or attribute in the same policy.
+    /// Returns the target type id in this access vector. This id corresponds to the
+    /// [`super::symbols::Type`] `id()` of some type or attribute in the same policy.
     pub fn target_type(&self) -> u16 {
         PS::deref(&self.metadata).target_type.get()
     }
 
-    /// Returns the target class value in this access vector. This value corresponds to the
-    /// [`super::symbols::Class`] `value()` of some class in the same policy.
+    /// Returns the target class id in this access vector. This id corresponds to the
+    /// [`super::symbols::Class`] `id()` of some class in the same policy.
     pub fn target_class(&self) -> u16 {
         PS::deref(&self.metadata).class.get()
     }
 
     /// A bit mask that corresponds to the permissions in this access vector. Permission bits are
-    /// specified using a [`super::symbols::Permission`] `value()` as follows:
-    /// `1 << (Permission::value() - 1)`.
+    /// specified using a [`super::symbols::Permission`] `id()` as follows:
+    /// `1 << (Permission::id() - 1)`.
     pub fn permission_mask(&self) -> Option<u32> {
         match &self.extended_permissions {
             ExtendedPermissions::PermissionMask(mask) => Some(PS::deref(mask).get()),
@@ -509,14 +513,29 @@ impl<PS: ParseStrategy> Validate for InitialSids<PS> {
 
     /// TODO: Validate consistency of sequence of [`InitialSid`] objects.
     fn validate(&self) -> Result<(), Self::Error> {
+        for initial_sid in sc::InitialSid::all_variants() {
+            self.iter()
+                .find(|initial| initial.id().get() == initial_sid as u32)
+                .ok_or(ValidateError::MissingInitialSid { initial_sid })?;
+        }
         Ok(())
     }
 }
 
 #[derive(Debug, PartialEq)]
 pub(crate) struct InitialSid<PS: ParseStrategy> {
-    sid: PS::Output<le::U32>,
+    id: PS::Output<le::U32>,
     context: Context<PS>,
+}
+
+impl<PS: ParseStrategy> InitialSid<PS> {
+    pub(crate) fn id(&self) -> le::U32 {
+        *PS::deref(&self.id)
+    }
+
+    pub(crate) fn context(&self) -> &Context<PS> {
+        &self.context
+    }
 }
 
 impl<PS: ParseStrategy> Parse<PS> for InitialSid<PS>
@@ -529,7 +548,7 @@ where
         let tail = bytes;
 
         let num_bytes = tail.len();
-        let (sid, tail) = PS::parse::<le::U32>(tail).ok_or(ParseError::MissingData {
+        let (id, tail) = PS::parse::<le::U32>(tail).ok_or(ParseError::MissingData {
             type_name: "InitialSid::sid",
             type_size: std::mem::size_of::<le::U32>(),
             num_bytes,
@@ -539,7 +558,7 @@ where
             .map_err(Into::<anyhow::Error>::into)
             .context("parsing context for initial sid")?;
 
-        Ok((Self { sid, context }, tail))
+        Ok((Self { id, context }, tail))
     }
 }
 
@@ -547,6 +566,24 @@ where
 pub(crate) struct Context<PS: ParseStrategy> {
     metadata: PS::Output<ContextMetadata>,
     mls_range: MlsRange<PS>,
+}
+
+impl<PS: ParseStrategy> Context<PS> {
+    pub(crate) fn user_id(&self) -> le::U32 {
+        PS::deref(&self.metadata).user
+    }
+    pub(crate) fn role_id(&self) -> le::U32 {
+        PS::deref(&self.metadata).role
+    }
+    pub(crate) fn type_id(&self) -> le::U32 {
+        PS::deref(&self.metadata).context_type
+    }
+    pub(crate) fn low_level(&self) -> &MlsLevel<PS> {
+        self.mls_range.low()
+    }
+    pub(crate) fn high_level(&self) -> &Option<MlsLevel<PS>> {
+        self.mls_range.high()
+    }
 }
 
 impl<PS: ParseStrategy> Parse<PS> for Context<PS>

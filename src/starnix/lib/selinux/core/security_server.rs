@@ -11,7 +11,9 @@ use crate::{
 
 use anyhow::Context as _;
 use fuchsia_zircon::{self as zx};
-use selinux_common::{AbstractObjectClass, ClassPermission, FileClass, Permission};
+use selinux_common::{
+    AbstractObjectClass, ClassPermission, FileClass, InitialSid, Permission, FIRST_UNUSED_SID,
+};
 use selinux_policy::{
     metadata::HandleUnknown, parse_policy_by_value, parser::ByValue, AccessVector,
     AccessVectorComputer, Policy, SecurityContext, SecurityContextParseError,
@@ -117,7 +119,7 @@ impl SecurityServerState {
             Some((sid, _)) => sid.clone(),
             None => {
                 // Create and insert a new SID for `security_context`.
-                let sid = SecurityId::from(self.next_sid);
+                let sid = SecurityId(self.next_sid);
                 self.next_sid += 1;
                 assert!(
                     self.sids.insert(sid.clone(), security_context).is_none(),
@@ -159,7 +161,7 @@ impl SecurityServer {
         let status = SeLinuxStatus::new_default().expect("Failed to create SeLinuxStatus");
         let state = Mutex::new(SecurityServerState {
             sids: HashMap::new(),
-            next_sid: 1,
+            next_sid: FIRST_UNUSED_SID,
             policy: None,
             booleans: SeLinuxBooleans::default(),
             status,
@@ -214,8 +216,19 @@ impl SecurityServer {
         // parsed policy is not valid.
         let policy = Arc::new(LoadedPolicy { parsed, binary });
 
+        // Fetch the initial Security Contexts used by this implementation from
+        // the new policy, ready to swap into the SID table.
+        let mut initial_contexts = HashMap::<SecurityId, SecurityContext>::new();
+        for id in InitialSid::all_variants() {
+            let security_context = policy.parsed.initial_context(id);
+            initial_contexts.insert(SecurityId::initial(id), security_context);
+        }
+
         // Replace any existing policy and update the [`SeLinuxStatus`].
         self.with_state_and_update_status(|state| {
+            // Replace the Contexts associated with initial SIDs used by this implementation.
+            state.sids.extend(initial_contexts.drain());
+
             // TODO(b/324265752): Determine whether SELinux booleans need to be retained across
             // policy (re)loads.
             state.booleans.reset(
@@ -525,10 +538,25 @@ mod tests {
     fn sids_for_same_security_context_are_equal() {
         let security_context = b"u:unconfined_r:unconfined_t:s0";
         let security_server = SecurityServer::new(Mode::Enable);
-        let sid1 = security_server.security_context_to_sid(security_context);
-        let sid2 = security_server.security_context_to_sid(security_context);
+        let sid1 = security_server
+            .security_context_to_sid(security_context)
+            .expect("creating SID from security context should succeed");
+        let sid2 = security_server
+            .security_context_to_sid(security_context)
+            .expect("creating SID from security context should succeed");
         assert_eq!(sid1, sid2);
         assert_eq!(security_server.state.lock().sids.len(), 1);
+    }
+
+    #[fuchsia::test]
+    fn sids_allocated_outside_initial_range() {
+        let security_context = b"u:unconfined_r:unconfined_t:s0";
+        let security_server = SecurityServer::new(Mode::Enable);
+        let sid = security_server
+            .security_context_to_sid(security_context)
+            .expect("creating SID from security context should succeed");
+        assert_eq!(security_server.state.lock().sids.len(), 1);
+        assert!(sid.0 >= FIRST_UNUSED_SID);
     }
 
     #[fuchsia::test]

@@ -16,19 +16,19 @@ mod symbols;
 pub use security_context::{SecurityContext, SecurityContextParseError};
 
 use {
+    anyhow::Context as _,
     error::{NewSecurityContextError, ParseError, QueryError},
+    extensible_bitmap::ExtensibleBitmapSpan,
     index::PolicyIndex,
     metadata::HandleUnknown,
     parsed_policy::ParsedPolicy,
+    parser::ByValue,
     parser::{ByRef, ParseStrategy},
+    selinux_common::{self as sc, ClassPermission as _, FileClass},
+    std::{fmt::Debug, marker::PhantomData, ops::Deref},
+    symbols::MlsLevel,
+    zerocopy::{little_endian as le, ByteSlice, FromBytes, NoCell, Ref, Unaligned},
 };
-
-use anyhow::Context as _;
-use once_cell::sync::Lazy;
-use parser::ByValue;
-use selinux_common::{self as sc, ClassPermission as _, FileClass};
-use std::{collections::BTreeMap, fmt::Debug, marker::PhantomData, ops::Deref};
-use zerocopy::{little_endian as le, ByteSlice, FromBytes, NoCell, Ref, Unaligned};
 
 /// Maximum SELinux policy version supported by this implementation.
 pub const SUPPORTED_POLICY_VERSION: u32 = 33;
@@ -73,43 +73,6 @@ impl std::ops::BitOrAssign for AccessVector {
         self.0 |= rhs.0
     }
 }
-
-/// Binary policy SIDs that may be referenced in the policy without be explicitly introduced in the
-/// policy because they are hard-coded in the Linux kernel.
-///
-/// TODO: Eliminate `dead_code` guard.
-#[allow(dead_code)]
-pub(crate) static INITIAL_SIDS_IDENTIFIERS: Lazy<BTreeMap<u32, &'static [u8]>> = Lazy::new(|| {
-    BTreeMap::<u32, &'static [u8]>::from([
-        (1, b"kernel".as_slice()),
-        (2, b"security".as_slice()),
-        (3, b"unlabeled".as_slice()),
-        (4, b"fs".as_slice()),
-        (5, b"file".as_slice()),
-        (6, b"file_labels".as_slice()),
-        (7, b"init".as_slice()),
-        (8, b"any_socket".as_slice()),
-        (9, b"port".as_slice()),
-        (10, b"netif".as_slice()),
-        (11, b"netmsg".as_slice()),
-        (12, b"node".as_slice()),
-        (13, b"igmp_packet".as_slice()),
-        (14, b"icmp_socket".as_slice()),
-        (15, b"tcp_socket".as_slice()),
-        (16, b"sysctl_modprobe".as_slice()),
-        (17, b"sysctl".as_slice()),
-        (18, b"sysctl_fs".as_slice()),
-        (19, b"sysctl_kernel".as_slice()),
-        (20, b"sysctl_net".as_slice()),
-        (21, b"sysctl_net_unix".as_slice()),
-        (22, b"sysctl_vm".as_slice()),
-        (23, b"sysctl_dev".as_slice()),
-        (24, b"kmod".as_slice()),
-        (25, b"policy".as_slice()),
-        (26, b"scmp_packet".as_slice()),
-        (27, b"devnull".as_slice()),
-    ])
-});
 
 /// Parses `binary_policy` by value; that is, copies underlying binary data out in addition to
 /// building up parser output structures. This function returns
@@ -183,6 +146,68 @@ impl<PS: ParseStrategy> Policy<PS> {
             .collect()
     }
 
+    /// Returns the [`SecurityContext`] defined by this policy for the specified
+    /// well-known (or "initial") Id.
+    ///
+    /// # Panics
+    ///
+    /// If the policy is not internally consistent, such that e.g. the Context refers to
+    /// user, role, etc Ids that the policy does not define. This indicates that there is
+    /// some missing validation of policy fields.
+    pub fn initial_context(&self, id: sc::InitialSid) -> security_context::SecurityContext {
+        let id = le::U32::from(id as u32);
+
+        let context = self.0.parsed_policy().initial_context(id).unwrap();
+        let user = self.0.parsed_policy().user(context.user_id());
+        let role = self.0.parsed_policy().role(context.role_id());
+        let type_ = self.0.parsed_policy().type_(context.type_id());
+        let low_level = self.security_level(context.low_level());
+        let high_level = context.high_level().as_ref().map(|x| self.security_level(x));
+
+        security_context::SecurityContext::new(
+            String::from_utf8(user.name_bytes().to_vec()).unwrap(),
+            String::from_utf8(role.name_bytes().to_vec()).unwrap(),
+            String::from_utf8(type_.name_bytes().to_vec()).unwrap(),
+            low_level,
+            high_level,
+        )
+    }
+
+    /// Helper used by `security_level()` to create a `Sensitivity` instance from policy fields.
+    fn sensitivity(&self, sensitivity: le::U32) -> security_context::Sensitivity {
+        security_context::Sensitivity::new(
+            String::from_utf8(
+                self.0.parsed_policy().sensitivity(sensitivity).name_bytes().to_vec(),
+            )
+            .unwrap(),
+        )
+    }
+
+    /// Helper used by `category()` to create a category name from policy fields.
+    fn category_id(&self, id: le::U32) -> String {
+        String::from_utf8(self.0.parsed_policy().category(id).name_bytes().to_vec()).unwrap()
+    }
+
+    /// Helper used by `security_level()` to create a `Category` instance from policy fields.
+    fn category(&self, span: ExtensibleBitmapSpan) -> security_context::Category {
+        // Spans describe zero-based bit indexes, corresponding to 1-based category Ids.
+        if span.low == span.high {
+            security_context::Category::Single(self.category_id(le::U32::new(span.low + 1)))
+        } else {
+            security_context::Category::Range {
+                low: self.category_id(le::U32::new(span.low + 1)),
+                high: self.category_id(le::U32::new(span.high + 1)),
+            }
+        }
+    }
+    /// Helper used by `initial_context()` to create a `SecurityLevel` instance from
+    /// the policy fields.
+    fn security_level(&self, level: &MlsLevel<PS>) -> security_context::SecurityLevel {
+        security_context::SecurityLevel::new(
+            self.sensitivity(level.sensitivity()),
+            level.categories().spans().map(|span| self.category(span)).collect(),
+        )
+    }
     /// Returns the security context that should be applied to a newly created file-like SELinux
     /// object according to `source` and `target` security contexts, as well as the new object's
     /// `class`. Returns an error if the security context for such an object is not well-defined
@@ -292,11 +317,11 @@ impl<PS: ParseStrategy> AccessVectorComputer for Policy<PS> {
         let permission = self.0.permission(&permission.into());
 
         // Compute bit flag associated with permission.
-        // Use `permission.value() - 1` below because values start at `1` to refer to the
+        // Use `permission.id() - 1` below because ids start at `1` to refer to the
         // "shift `1` by 0 bits".
         //
-        // value=1 => bits:0...001, value=2 => bits:0...010, etc.
-        AccessVector(1 << (permission.value() - 1))
+        // id=1 => bits:0...001, id=2 => bits:0...010, etc.
+        AccessVector(1 << (permission.id() - 1))
     }
 
     fn access_vector_from_permissions<

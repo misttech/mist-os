@@ -5,7 +5,7 @@
 use selinux_policy::{metadata::HandleUnknown, parse_policy_by_reference, parse_policy_by_value};
 
 use anyhow::Context as _;
-use selinux_common::{Permission, ProcessPermission};
+use selinux_common::{InitialSid, Permission, ProcessPermission};
 use serde::Deserialize;
 use std::io::Read as _;
 
@@ -105,6 +105,22 @@ fn policy_lookup() {
             Permission::Process(ProcessPermission::Fork),
         )
         .expect("check for `allow unconfined_t unconfined_t:process fork;` in policy");
+}
+
+#[test]
+fn initial_contexts() {
+    let policy_path = format!(
+        "{}/{}/multiple_levels_and_categories_policy.pp",
+        TESTDATA_DIR, MICRO_POLICIES_SUBDIR
+    );
+    let mut policy_file = std::fs::File::open(&policy_path).expect("open policy file");
+    let mut policy_bytes = vec![];
+    policy_file.read_to_end(&mut policy_bytes).expect("read policy file");
+    let (policy, _) = parse_policy_by_value(policy_bytes.clone()).expect("parse policy");
+    let policy = policy.validate().expect("validate policy");
+
+    let kernel_context = policy.initial_context(InitialSid::Kernel);
+    assert_eq!(kernel_context.to_string(), "user0:object_r:type0:s0:c0-s1:c0.c2,c4")
 }
 
 #[cfg(feature = "selinux_policy_test_api")]

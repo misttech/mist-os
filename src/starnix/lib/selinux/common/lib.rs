@@ -283,6 +283,84 @@ impl FilePermission {
     }
 }
 
+/// Initial Security Identifier (SID) values defined by the SELinux Reference Policy.
+/// The presence and ordering of all values, including ones unused by the implementation,
+/// ensures that the numeric values match those output by userspace policy tooling.
+#[repr(u64)]
+enum ReferenceInitialSid {
+    Kernel = 1,
+    _Security,
+    Unlabeled,
+    _Fs,
+    _File,
+    _FileLabels,
+    _Init,
+    _AnySocket,
+    _Port,
+    _Netif,
+    _Netmsg,
+    _Node,
+    _IgmpPacket,
+    _IcmpSocket,
+    _TcpSocket,
+    _SysctlModprobe,
+    _Sysctl,
+    _SysctlFs,
+    _SysctlKernel,
+    _SysctlNet,
+    _SysctlNetUnix,
+    _SysctlVm,
+    _SysctlDev,
+    _Kmod,
+    _Policy,
+    _ScmpPacket,
+    _Devnull,
+
+    FirstUnused,
+}
+
+/// Lowest Security Identifier value guaranteed not to be used by this
+/// implementation to refer to an initial Security Context.
+pub const FIRST_UNUSED_SID: u64 = ReferenceInitialSid::FirstUnused as u64;
+
+macro_rules! initial_sid_enum {
+    ($(#[$meta:meta])* $name:ident {
+        $($(#[$variant_meta:meta])* $variant:ident),*,
+    }) => {
+        $(#[$meta])*
+        pub enum $name {
+            $($(#[$variant_meta])* $variant = ReferenceInitialSid::$variant as isize),*
+        }
+
+        impl $name {
+            pub fn all_variants() -> Vec<Self> {
+                vec![
+                    $($name::$variant),*
+                ]
+            }
+        }
+    }
+}
+
+initial_sid_enum! {
+/// Initial Security Identifier (SID) values actually used by this implementation.
+/// These must be present in the policy, for it to be valid.
+#[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
+    InitialSid {
+        Kernel,
+        Unlabeled,
+    }
+}
+
+impl InitialSid {
+    pub fn name(&self) -> &'static str {
+        match self {
+            Self::Kernel => "kernel",
+            Self::Unlabeled => "unlabeled",
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -15,7 +15,10 @@ use crate::{
     },
 };
 
-use selinux::security_server::{SecurityServer, SecurityServerStatus as _};
+use selinux::{
+    security_server::{SecurityServer, SecurityServerStatus as _},
+    InitialSid, SecurityId,
+};
 use selinux_policy::SUPPORTED_POLICY_VERSION;
 use starnix_logging::{log_error, log_info, track_stub};
 use starnix_sync::{Locked, Mutex, ReadOps, WriteOps};
@@ -81,12 +84,14 @@ impl SeLinuxFs {
             mode!(IFREG, 0o444),
         );
         dir.subdir(current_task, "initial_contexts", 0o555, |dir| {
-            dir.entry(
-                current_task,
-                "kernel",
-                BytesFile::new_node(b"system_u:system_r:kernel_t:s0".to_vec()),
-                mode!(IFREG, 0o444),
-            );
+            for initial_sid in InitialSid::all_variants().into_iter() {
+                dir.entry(
+                    current_task,
+                    initial_sid.name(),
+                    SeInitialContext::new_node(security_server.clone(), initial_sid),
+                    mode!(IFREG, 0o444),
+                );
+            }
         });
         dir.entry(current_task, "mls", BytesFile::new_node(b"1".to_vec()), mode!(IFREG, 0o444));
         dir.entry(
@@ -303,6 +308,31 @@ impl BytesFileOps for SeContext {
             .security_context_to_sid(data.as_slice())
             .map_err(|_| errno!(EINVAL))?;
         Ok(())
+    }
+}
+
+struct SeInitialContext {
+    security_server: Arc<SecurityServer>,
+    initial_sid: InitialSid,
+}
+
+impl SeInitialContext {
+    fn new_node(security_server: Arc<SecurityServer>, initial_sid: InitialSid) -> impl FsNodeOps {
+        BytesFile::new_node(Self { security_server, initial_sid })
+    }
+}
+
+impl BytesFileOps for SeInitialContext {
+    fn read(&self, _current_task: &CurrentTask) -> Result<Cow<'_, [u8]>, Errno> {
+        let sid = SecurityId::initial(self.initial_sid);
+        if let Some(context) = self.security_server.sid_to_security_context(&sid) {
+            Ok(context.into())
+        } else {
+            // Looking up an initial SID can only fail if no policy is loaded, in
+            // which case the file contains the name of the initial SID, rather
+            // than a Security Context value.
+            Ok(self.initial_sid.name().as_bytes().into())
+        }
     }
 }
 

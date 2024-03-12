@@ -12,6 +12,7 @@ use super::{
 };
 
 use super::{SecurityContext, SecurityContextParseError};
+use selinux_common as sc;
 use thiserror::Error;
 
 /// Structured errors that may be encountered parsing a binary policy.
@@ -82,6 +83,8 @@ pub enum ValidateError {
         ClassDefaultRange::DEFAULT_UNKNOWN_USED_VALUE]
     )]
     InvalidClassDefaultRange { value: u32 },
+    #[error("missing initial SID {initial_sid:?}")]
+    MissingInitialSid { initial_sid: sc::InitialSid },
     #[error("required validation routine not implemented")]
     NotImplemented,
 }

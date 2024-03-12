@@ -4,10 +4,10 @@
 
 use super::{
     arrays::{
-        AccessVectors, ConditionalNodes, DeprecatedFilenameTransitions, FilenameTransitionList,
-        FilenameTransitions, FsUses, GenericFsContexts, IPv6Nodes, InfinitiBandEndPorts,
-        InfinitiBandPartitionKeys, InitialSids, NamedContextPairs, Nodes, Ports, RangeTranslations,
-        RoleAllows, RoleTransitions, SimpleArray,
+        AccessVectors, ConditionalNodes, Context, DeprecatedFilenameTransitions,
+        FilenameTransitionList, FilenameTransitions, FsUses, GenericFsContexts, IPv6Nodes,
+        InfinitiBandEndPorts, InfinitiBandPartitionKeys, InitialSids, NamedContextPairs, Nodes,
+        Ports, RangeTranslations, RoleAllows, RoleTransitions, SimpleArray,
         MIN_POLICY_VERSION_FOR_INFINITIBAND_PARTITION_KEY,
     },
     error::{ParseError, QueryError},
@@ -24,6 +24,7 @@ use super::{
 
 use anyhow::Context as _;
 use std::fmt::Debug;
+use zerocopy::little_endian as le;
 
 /// A parsed binary policy.
 #[derive(Debug)]
@@ -135,12 +136,12 @@ impl<PS: ParseStrategy> ParsedPolicy<PS> {
             .ok_or_else(|| QueryError::UnknownTargetType {
                 target_type_name: target_type_name.to_owned(),
             })?;
-        let permission_value = permission.value();
-        let permission_bit = (1 as u32) << (permission_value - 1);
+        let permission_id = permission.id();
+        let permission_bit = (1 as u32) << (permission_id - 1);
 
-        let source_type_value = source_type.value();
-        let target_type_value = target_type.value();
-        let target_class_value = target_class.value();
+        let source_type_id = source_type.id();
+        let target_type_id = target_type.id();
+        let target_class_id = target_class.id();
 
         for access_vector in self.access_vectors.data.iter() {
             // Concern ourselves only with explicit `allow [...];` policy statements.
@@ -149,8 +150,8 @@ impl<PS: ParseStrategy> ParsedPolicy<PS> {
             }
 
             // Concern ourselves only with `allow [source-type] [target-type]:[class] [...];`
-            // policy statements where `[class]` matches `target_class_value`.
-            if access_vector.target_class() != target_class_value as u16 {
+            // policy statements where `[class]` matches `target_class_id`.
+            if access_vector.target_class() != target_class_id as u16 {
                 continue;
             }
 
@@ -168,21 +169,21 @@ impl<PS: ParseStrategy> ParsedPolicy<PS> {
 
             // Note: Perform bitmap lookups last: they are the most expensive comparison operation.
 
-            // Note: Type values start at 1, but are 0-indexed in bitmaps: hence the `type - 1` bitmap
+            // Note: Type ids start at 1, but are 0-indexed in bitmaps: hence the `type - 1` bitmap
             // lookups below.
 
             // Concern ourselves only with `allow [source-type] [...];` policy statements where
-            // `[source-type]` is associated with `source_type_value`.
+            // `[source-type]` is associated with `source_type_id`.
             let source_attribute_bitmap: &ExtensibleBitmap<PS> =
-                &self.attribute_maps[(source_type_value - 1) as usize];
+                &self.attribute_maps[(source_type_id - 1) as usize];
             if !source_attribute_bitmap.is_set((access_vector.source_type() - 1) as u32) {
                 continue;
             }
 
             // Concern ourselves only with `allow [source-type] [target-type][...];` policy
-            // statements where `[target-type]` is associated with `target_type_value`.
+            // statements where `[target-type]` is associated with `target_type_id`.
             let target_attribute_bitmap: &ExtensibleBitmap<PS> =
-                &self.attribute_maps[(target_type_value - 1) as usize];
+                &self.attribute_maps[(target_type_id - 1) as usize];
             if !target_attribute_bitmap.is_set((access_vector.target_type() - 1) as u32) {
                 continue;
             }
@@ -230,9 +231,9 @@ impl<PS: ParseStrategy> ParsedPolicy<PS> {
                 target_type_name: target_type_name.to_owned(),
             })?;
 
-        let source_type_value = source_type.value();
-        let target_type_value = target_type.value();
-        let target_class_value = target_class.value();
+        let source_type_id = source_type.id();
+        let target_type_id = target_type.id();
+        let target_class_id = target_class.id();
 
         let mut computed_access_vector = AccessVector::NONE;
         for access_vector in self.access_vectors.data.iter() {
@@ -242,28 +243,28 @@ impl<PS: ParseStrategy> ParsedPolicy<PS> {
             }
 
             // Concern ourselves only with `allow [source-type] [target-type]:[class] [...];`
-            // policy statements where `[class]` matches `target_class_value`.
-            if access_vector.target_class() != target_class_value as u16 {
+            // policy statements where `[class]` matches `target_class_id`.
+            if access_vector.target_class() != target_class_id as u16 {
                 continue;
             }
 
             // Note: Perform bitmap lookups last: they are the most expensive comparison operation.
 
-            // Note: Type values start at 1, but are 0-indexed in bitmaps: hence the `type - 1` bitmap
+            // Note: Type ids start at 1, but are 0-indexed in bitmaps: hence the `type - 1` bitmap
             // lookups below.
 
             // Concern ourselves only with `allow [source-type] [...];` policy statements where
-            // `[source-type]` is associated with `source_type_value`.
+            // `[source-type]` is associated with `source_type_id`.
             let source_attribute_bitmap: &ExtensibleBitmap<PS> =
-                &self.attribute_maps[(source_type_value - 1) as usize];
+                &self.attribute_maps[(source_type_id - 1) as usize];
             if !source_attribute_bitmap.is_set((access_vector.source_type() - 1) as u32) {
                 continue;
             }
 
             // Concern ourselves only with `allow [source-type] [target-type][...];` policy
-            // statements where `[target-type]` is associated with `target_type_value`.
+            // statements where `[target-type]` is associated with `target_type_id`.
             let target_attribute_bitmap: &ExtensibleBitmap<PS> =
-                &self.attribute_maps[(target_type_value - 1) as usize];
+                &self.attribute_maps[(target_type_id - 1) as usize];
             if !target_attribute_bitmap.is_set((access_vector.target_type() - 1) as u32) {
                 continue;
             }
@@ -277,6 +278,42 @@ impl<PS: ParseStrategy> ParsedPolicy<PS> {
 
         // Failed to find any explicit-allow access vector for this source, target, class query.
         Ok(computed_access_vector)
+    }
+
+    /// Returns the policy entry for the specified initial Security Context.
+    /// `id` must correspond to one of the `InitialSid` ids.
+    pub(crate) fn initial_context(&self, id: le::U32) -> Option<&Context<PS>> {
+        Some(&self.initial_sids.data.iter().find(|initial| initial.id() == id)?.context())
+    }
+
+    /// Returns the `User` structure for the requested Id. Valid policies include definitions
+    /// for all the Ids they refer to internally; supply some other Id will trigger a panic.
+    pub(crate) fn user(&self, id: le::U32) -> &User<PS> {
+        &self.users.data.iter().find(|x| x.id() == id).unwrap()
+    }
+
+    /// Returns the `Role` structure for the requested Id. Valid policies include definitions
+    /// for all the Ids they refer to internally; supply some other Id will trigger a panic.
+    pub(crate) fn role(&self, id: le::U32) -> &Role<PS> {
+        &self.roles.data.iter().find(|x| x.id() == id).unwrap()
+    }
+
+    /// Returns the `Type` structure for the requested Id. Valid policies include definitions
+    /// for all the Ids they refer to internally; supply some other Id will trigger a panic.
+    pub(crate) fn type_(&self, id: le::U32) -> &Type<PS> {
+        &self.types.data.iter().find(|x| x.id() == id.get()).unwrap()
+    }
+
+    /// Returns the `Sensitivity` structure for the requested Id. Valid policies include definitions
+    /// for all the Ids they refer to internally; supply some other Id will trigger a panic.
+    pub(crate) fn sensitivity(&self, id: le::U32) -> &Sensitivity<PS> {
+        &self.sensitivities.data.iter().find(|x| x.id() == id).unwrap()
+    }
+
+    /// Returns the `Category` structure for the requested Id. Valid policies include definitions
+    /// for all the Ids they refer to internally; supply some other Id will trigger a panic.
+    pub(crate) fn category(&self, id: le::U32) -> &Category<PS> {
+        self.categories.data.iter().find(|y| y.id() == id).unwrap()
     }
 
     pub(crate) fn classes(&self) -> &Classes<PS> {

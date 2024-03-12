@@ -180,6 +180,9 @@ mod tests {
     use selinux_policy::testing::{ACCESS_VECTOR_0001, ACCESS_VECTOR_0010};
     use std::any::Any;
 
+    /// SID to use where any value will do.
+    const A_TEST_SID: SecurityId = SecurityId(1000);
+
     fn access_vector_from_permission<P: ClassPermission + Into<Permission> + 'static>(
         permission: P,
     ) -> AccessVector {
@@ -291,28 +294,38 @@ mod tests {
             // DenyAllPermissions denies.
             assert_eq!(
                 false,
-                PermissionCheck::has_permission(&deny_all, 0.into(), 0.into(), permission.clone())
+                PermissionCheck::has_permission(
+                    &deny_all,
+                    A_TEST_SID,
+                    A_TEST_SID,
+                    permission.clone()
+                )
             );
             assert_eq!(
                 false,
                 PermissionCheckMut::has_permission(
                     &mut deny_all,
-                    0.into(),
-                    0.into(),
+                    A_TEST_SID,
+                    A_TEST_SID,
                     permission.clone()
                 )
             );
             // AllowAllPermissions allows.
             assert_eq!(
                 true,
-                PermissionCheck::has_permission(&allow_all, 0.into(), 0.into(), permission.clone())
+                PermissionCheck::has_permission(
+                    &allow_all,
+                    A_TEST_SID,
+                    A_TEST_SID,
+                    permission.clone()
+                )
             );
             assert_eq!(
                 true,
                 PermissionCheckMut::has_permission(
                     &mut allow_all,
-                    0.into(),
-                    0.into(),
+                    A_TEST_SID,
+                    A_TEST_SID,
                     permission.clone()
                 )
             );
@@ -321,14 +334,19 @@ mod tests {
         // DenyAllPermissions denies.
         assert_eq!(
             false,
-            PermissionCheck::has_permissions(&deny_all, 0.into(), 0.into(), permissions.clone())
+            PermissionCheck::has_permissions(
+                &deny_all,
+                A_TEST_SID,
+                A_TEST_SID,
+                permissions.clone()
+            )
         );
         assert_eq!(
             false,
             PermissionCheckMut::has_permissions(
                 &mut deny_all,
-                0.into(),
-                0.into(),
+                A_TEST_SID,
+                A_TEST_SID,
                 permissions.clone()
             )
         );
@@ -336,11 +354,21 @@ mod tests {
         // AllowAllPermissions allows.
         assert_eq!(
             true,
-            PermissionCheck::has_permissions(&allow_all, 0.into(), 0.into(), permissions.clone())
+            PermissionCheck::has_permissions(
+                &allow_all,
+                A_TEST_SID,
+                A_TEST_SID,
+                permissions.clone()
+            )
         );
         assert_eq!(
             true,
-            PermissionCheckMut::has_permissions(&mut allow_all, 0.into(), 0.into(), permissions)
+            PermissionCheckMut::has_permissions(
+                &mut allow_all,
+                A_TEST_SID,
+                A_TEST_SID,
+                permissions
+            )
         );
 
         // DenyAllPermissions and AllowAllPermissions vacuously accept empty permissions collection.
@@ -349,8 +377,8 @@ mod tests {
             true,
             PermissionCheck::has_permissions(
                 &deny_all,
-                0.into(),
-                0.into(),
+                A_TEST_SID,
+                A_TEST_SID,
                 empty_permissions.clone()
             )
         );
@@ -358,8 +386,8 @@ mod tests {
             true,
             PermissionCheckMut::has_permissions(
                 &mut deny_all,
-                0.into(),
-                0.into(),
+                A_TEST_SID,
+                A_TEST_SID,
                 empty_permissions.clone()
             )
         );
@@ -367,8 +395,8 @@ mod tests {
             true,
             PermissionCheck::has_permissions(
                 &allow_all,
-                0.into(),
-                0.into(),
+                A_TEST_SID,
+                A_TEST_SID,
                 empty_permissions.clone()
             )
         );
@@ -376,8 +404,8 @@ mod tests {
             true,
             PermissionCheckMut::has_permissions(
                 &mut allow_all,
-                0.into(),
-                0.into(),
+                A_TEST_SID,
+                A_TEST_SID,
                 empty_permissions
             )
         );

@@ -7,12 +7,17 @@ pub mod permission_check;
 pub mod security_server;
 pub mod seq_lock;
 
+pub use selinux_common::InitialSid;
+
 /// The Security ID (SID) used internally to refer to a security context.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct SecurityId(u64);
 
-impl From<u64> for SecurityId {
-    fn from(sid: u64) -> Self {
-        Self(sid)
+impl SecurityId {
+    /// Returns a `SecurityId` encoding the specified initial Security Context.
+    /// These are used when labeling kernel resources created before policy
+    /// load, allowing the policy to determine the Security Context to use.
+    pub fn initial(initial_sid: InitialSid) -> Self {
+        Self(initial_sid as u64)
     }
 }

@@ -49,6 +49,12 @@ impl<PS: ParseStrategy> ExtensibleBitmap<PS> {
         false
     }
 
+    /// Returns an iterator that returns a set of spans of continuous set bits.
+    /// Each span consists of inclusive low and high bit indexes (i.e. zero-based).
+    pub fn spans<'a>(&'a self) -> ExtensibleBitmapSpansIterator<'a, PS> {
+        ExtensibleBitmapSpansIterator::<'a, PS> { bitmap: self, map_item: 0, next_bit: 0 }
+    }
+
     /// Returns the next bit after the bits in this [`ExtensibleBitmap`]. That is, the bits in this
     /// [`ExtensibleBitmap`] may be indexed by the range `[0, Self::high_bit())`.
     fn high_bit(&self) -> u32 {
@@ -71,6 +77,73 @@ impl<PS: ParseStrategy> ExtensibleBitmap<PS> {
         } else {
             Ordering::Equal
         }
+    }
+}
+
+/// Describes the indexes of a span of "true" bits in an `ExtensibleBitmap`.
+/// Low and high values are inclusive, such that when `low==high`, the span consists
+/// of a single bit.
+#[derive(Debug, PartialEq)]
+pub(crate) struct ExtensibleBitmapSpan {
+    pub low: u32,
+    pub high: u32,
+}
+
+/// Iterator returned by `ExtensibleBitmap::spans()`.
+pub(crate) struct ExtensibleBitmapSpansIterator<'a, PS: ParseStrategy> {
+    bitmap: &'a ExtensibleBitmap<PS>,
+    map_item: usize, // Zero-based `Vec<MapItem>` index.
+    next_bit: u32,   // Zero-based bit index within the bitmap.
+}
+
+impl<PS: ParseStrategy> ExtensibleBitmapSpansIterator<'_, PS> {
+    /// Returns the zero-based index of the next bit with the specified value, if any.
+    fn next_bit_with_value(&mut self, is_set: bool) -> Option<u32> {
+        let map_item_size_bits = PS::deref(&self.bitmap.metadata).map_item_size_bits.get();
+        let num_elements = self.bitmap.num_elements();
+
+        while self.next_bit < num_elements {
+            let (start_bit, map) = PS::deref_slice(&self.bitmap.data)
+                .get(self.map_item)
+                .map_or((num_elements, 0), |item| (item.start_bit.get(), item.map.get()));
+
+            if start_bit > self.next_bit {
+                if is_set {
+                    // Skip the implicit "false" bits, to the next `MapItem`.
+                    self.next_bit = start_bit
+                } else {
+                    return Some(self.next_bit);
+                }
+            } else {
+                // Scan the `MapItem` for the next matching bit.
+                let next_map_item_bit = self.next_bit - start_bit;
+                for map_bit in next_map_item_bit..map_item_size_bits {
+                    if ((map & (1 << map_bit)) != 0) == is_set {
+                        self.next_bit = start_bit + map_bit;
+                        return Some(self.next_bit);
+                    }
+                }
+
+                // Move on to the next `MapItem`, which may not be contiguous with
+                // this one.
+                self.next_bit = start_bit + map_item_size_bits;
+                self.map_item += 1;
+            }
+        }
+
+        None
+    }
+}
+
+impl<PS: ParseStrategy> Iterator for ExtensibleBitmapSpansIterator<'_, PS> {
+    type Item = ExtensibleBitmapSpan;
+
+    /// Returns the next span of at least one bit set in the bitmap.
+    fn next(&mut self) -> Option<Self::Item> {
+        let low = self.next_bit_with_value(true)?;
+        // End the span at the bit preceding either the next false bit, or the end of the bitmap.
+        let high = self.next_bit_with_value(false).unwrap_or(self.bitmap.num_elements()) - 1;
+        Some(Self::Item { low, high })
     }
 }
 
@@ -545,6 +618,134 @@ mod tests {
                     }
                 };
                 None::<(ExtensibleBitmap<ByValue<Vec<u8>>>, ByValue<Vec<u8>>)>
+            }
+        );
+    }
+
+    #[test]
+    fn extensible_bitmap_spans_iterator() {
+        type Span = ExtensibleBitmapSpan;
+
+        // Single- and multi-bit spans.
+        parse_test!(
+            ExtensibleBitmap,
+            [
+                MAP_NODE_BITS.to_le_bytes().as_slice(), // bits per node
+                ((MAP_NODE_BITS * 10) as u32).to_le_bytes().as_slice(), // high bit for bitmap
+                (2 as u32).to_le_bytes().as_slice(),    // count of `MapItem` entries in bitmap
+                ((MAP_NODE_BITS * 2) as u32).to_le_bytes().as_slice(), // start bit for `MapItem` 0
+                ((1 << 2) as u64).to_le_bytes().as_slice(), // bit values for `MapItem` 0
+                ((MAP_NODE_BITS * 7) as u32).to_le_bytes().as_slice(), // start bit for `MapItem` 1
+                ((1 << 7) | (1 << 8) as u64).to_le_bytes().as_slice(), // bit values for `MapItem` 1
+            ]
+            .concat(),
+            result,
+            {
+                let (extensible_bitmap, tail) = result.expect("parse");
+                assert_eq!(0, tail.len());
+
+                let mut iterator = extensible_bitmap.spans();
+                assert_eq!(
+                    iterator.next(),
+                    Some(Span { low: (MAP_NODE_BITS * 2) + 2, high: (MAP_NODE_BITS * 2) + 2 })
+                );
+                assert_eq!(
+                    iterator.next(),
+                    Some(Span { low: (MAP_NODE_BITS * 7) + 7, high: (MAP_NODE_BITS * 7) + 8 })
+                );
+                assert_eq!(iterator.next(), None);
+
+                Some((extensible_bitmap, tail))
+            }
+        );
+
+        // Multi-bit span that straddles two `MapItem`s.
+        parse_test!(
+            ExtensibleBitmap,
+            [
+                MAP_NODE_BITS.to_le_bytes().as_slice(), // bits per node
+                ((MAP_NODE_BITS * 10) as u32).to_le_bytes().as_slice(), // high bit for bitmap
+                (2 as u32).to_le_bytes().as_slice(),    // count of `MapItem` entries in bitmap
+                ((MAP_NODE_BITS * 6) as u32).to_le_bytes().as_slice(), // start bit for `MapItem` 0
+                ((1 as u64) << 63).to_le_bytes().as_slice(), // bit values for `MapItem` 0
+                ((MAP_NODE_BITS * 7) as u32).to_le_bytes().as_slice(), // start bit for `MapItem` 1
+                ((1 << 0) | (1 << 1) as u64).to_le_bytes().as_slice(), // bit values for `MapItem` 1
+            ]
+            .concat(),
+            result,
+            {
+                let (extensible_bitmap, tail) = result.expect("parse");
+                assert_eq!(0, tail.len());
+
+                let mut iterator = extensible_bitmap.spans();
+                assert_eq!(
+                    iterator.next(),
+                    Some(Span { low: (MAP_NODE_BITS * 6) + 63, high: (MAP_NODE_BITS * 7) + 1 })
+                );
+                assert_eq!(iterator.next(), None);
+
+                Some((extensible_bitmap, tail))
+            }
+        );
+
+        // Multi-bit spans of full `MapItem`s, separated by an implicit span of false bits,
+        // and with further implicit spans of false bits at the end.
+        parse_test!(
+            ExtensibleBitmap,
+            [
+                MAP_NODE_BITS.to_le_bytes().as_slice(), // bits per node
+                ((MAP_NODE_BITS * 10) as u32).to_le_bytes().as_slice(), // high bit for bitmap
+                (2 as u32).to_le_bytes().as_slice(),    // count of `MapItem` entries in bitmap
+                ((MAP_NODE_BITS * 5) as u32).to_le_bytes().as_slice(), // start bit for `MapItem` 0
+                (u64::MAX).to_le_bytes().as_slice(),    // bit values for `MapItem` 0
+                ((MAP_NODE_BITS * 7) as u32).to_le_bytes().as_slice(), // start bit for `MapItem` 1
+                (u64::MAX).to_le_bytes().as_slice(),    // bit values for `MapItem` 1
+            ]
+            .concat(),
+            result,
+            {
+                let (extensible_bitmap, tail) = result.expect("parse");
+                assert_eq!(0, tail.len());
+
+                let mut iterator = extensible_bitmap.spans();
+                assert_eq!(
+                    iterator.next(),
+                    Some(Span { low: (MAP_NODE_BITS * 5), high: (MAP_NODE_BITS * 6) - 1 })
+                );
+                assert_eq!(
+                    iterator.next(),
+                    Some(Span { low: (MAP_NODE_BITS * 7), high: (MAP_NODE_BITS * 8) - 1 })
+                );
+                assert_eq!(iterator.next(), None);
+
+                Some((extensible_bitmap, tail))
+            }
+        );
+
+        // Span reaching the end of the bitmap is handled correctly.
+        parse_test!(
+            ExtensibleBitmap,
+            [
+                MAP_NODE_BITS.to_le_bytes().as_slice(), // bits per node
+                ((MAP_NODE_BITS * 10) as u32).to_le_bytes().as_slice(), // high bit for bitmap
+                (1 as u32).to_le_bytes().as_slice(),    // count of `MapItem` entries  in bitmap
+                ((MAP_NODE_BITS * 9) as u32).to_le_bytes().as_slice(), // start bit for `MapItem` 0
+                (u64::MAX).to_le_bytes().as_slice(),    // bit values for `MapItem` 0
+            ]
+            .concat(),
+            result,
+            {
+                let (extensible_bitmap, tail) = result.expect("parse");
+                assert_eq!(0, tail.len());
+
+                let mut iterator = extensible_bitmap.spans();
+                assert_eq!(
+                    iterator.next(),
+                    Some(Span { low: (MAP_NODE_BITS * 9), high: (MAP_NODE_BITS * 10) - 1 })
+                );
+                assert_eq!(iterator.next(), None);
+
+                Some((extensible_bitmap, tail))
             }
         );
     }
