@@ -273,7 +273,7 @@ pub enum EventPayload {
 /// Information about a component's runtime provided to `Started`.
 #[derive(Clone)]
 pub struct RuntimeInfo {
-    pub outgoing_dir: Option<fio::OpenableProxy>,
+    pub outgoing_dir: Option<fio::DirectoryProxy>,
     pub diagnostics_receiver:
         Arc<Mutex<Option<oneshot::Receiver<fdiagnostics::ComponentDiagnostics>>>>,
     pub start_time: zx::Time,

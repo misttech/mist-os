@@ -44,7 +44,7 @@ impl DirectoryReadyNotifier {
     async fn on_component_started(
         self: &Arc<Self>,
         target_moniker: &Moniker,
-        outgoing_dir: &fio::OpenableProxy,
+        outgoing_dir: &fio::DirectoryProxy,
         decl: ComponentDecl,
     ) -> Result<(), ModelError> {
         // Don't block the handling on the event on the exposed capabilities being ready
@@ -79,7 +79,7 @@ impl DirectoryReadyNotifier {
     /// inside it that were exposed to the framework by the component.
     async fn dispatch_capabilities_ready(
         &self,
-        outgoing_dir: fio::OpenableProxy,
+        outgoing_dir: fio::DirectoryProxy,
         decl: &ComponentDecl,
         matching_exposes: Vec<&ExposeDecl>,
         target: &Arc<ComponentInstance>,
@@ -93,7 +93,7 @@ impl DirectoryReadyNotifier {
 
     async fn create_events(
         &self,
-        outgoing_dir: Option<fio::OpenableProxy>,
+        outgoing_dir: Option<fio::DirectoryProxy>,
         decl: &ComponentDecl,
         matching_exposes: Vec<&ExposeDecl>,
         target: &Arc<ComponentInstance>,
