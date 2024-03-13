@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef THIRD_PARTY_GVISOR_SYSCALL_TESTS_GVISOR_TEST_UTIL_FS_UTIL_H_
-#define THIRD_PARTY_GVISOR_SYSCALL_TESTS_GVISOR_TEST_UTIL_FS_UTIL_H_
+#ifndef GVISOR_TEST_UTIL_FS_UTIL_H_
+#define GVISOR_TEST_UTIL_FS_UTIL_H_
 
 #include <dirent.h>
 #include <sys/stat.h>
@@ -21,8 +21,8 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-#include "absl/strings/string_view.h"
 #include "gtest/gtest.h"
+#include "absl/strings/string_view.h"
 #include "test/util/file_descriptor.h"
 #include "test/util/posix_error.h"
 
@@ -68,11 +68,13 @@ PosixError Delete(absl::string_view path);
 PosixError Chmod(absl::string_view path, int mode);
 
 // Create a special or ordinary file.
-PosixError MknodAt(const FileDescriptor& dfd, absl::string_view path, int mode, dev_t dev);
+PosixError MknodAt(const FileDescriptor& dfd, absl::string_view path, int mode,
+                   dev_t dev);
 
 // Unlink the file.
 PosixError Unlink(absl::string_view path);
-PosixError UnlinkAt(const FileDescriptor& dfd, absl::string_view path, int flags);
+PosixError UnlinkAt(const FileDescriptor& dfd, absl::string_view path,
+                    int flags);
 
 // Truncates a file to the given length or returns an error.
 PosixError Truncate(absl::string_view path, int length);
@@ -91,7 +93,8 @@ PosixError Rmdir(absl::string_view path);
 PosixError SetContents(absl::string_view path, absl::string_view contents);
 
 // Creates a file with the given contents and mode or returns an error.
-PosixError CreateWithContents(absl::string_view path, absl::string_view contents, int mode = 0666);
+PosixError CreateWithContents(absl::string_view path,
+                              absl::string_view contents, int mode = 0666);
 
 // Attempts to read the entire contents of the file into the provided string
 // buffer or returns an error.
@@ -117,42 +120,49 @@ PosixErrorOr<std::string> ReadLink(absl::string_view path);
 //
 // This method will return an error when it's unable to access the provided
 // path, or when the path is not a directory.
-PosixError WalkTree(absl::string_view path, bool recursive,
-                    const std::function<void(absl::string_view, const struct stat&)>& cb);
+PosixError WalkTree(
+    absl::string_view path, bool recursive,
+    const std::function<void(absl::string_view, const struct stat&)>& cb);
 
 // Returns the base filenames for all files under a given absolute path. If
 // skipdots is true the returned vector will not contain "." or "..". This
 // method does not walk the tree recursively it only returns the elements
 // in that directory.
-PosixErrorOr<std::vector<std::string>> ListDir(absl::string_view abspath, bool skipdots);
+PosixErrorOr<std::vector<std::string>> ListDir(absl::string_view abspath,
+                                               bool skipdots);
 
 // Check that a directory contains children nodes named in expect, and does not
 // contain any children nodes named in exclude.
-PosixError DirContains(absl::string_view path, const std::vector<std::string>& expect,
+PosixError DirContains(absl::string_view path,
+                       const std::vector<std::string>& expect,
                        const std::vector<std::string>& exclude);
 
 // Same as DirContains, but adds a retry. Suitable for checking a directory
 // being modified asynchronously.
-PosixError EventuallyDirContains(absl::string_view path, const std::vector<std::string>& expect,
+PosixError EventuallyDirContains(absl::string_view path,
+                                 const std::vector<std::string>& expect,
                                  const std::vector<std::string>& exclude);
 
 // Attempt to recursively delete a directory or file. Returns an error and
 // the number of undeleted directories and files. If either
 // undeleted_dirs or undeleted_files is nullptr then it will not be used.
-PosixError RecursivelyDelete(absl::string_view path, int* undeleted_dirs, int* undeleted_files);
+PosixError RecursivelyDelete(absl::string_view path, int* undeleted_dirs,
+                             int* undeleted_files);
 
 // Recursively create the directory provided or return an error.
 PosixError RecursivelyCreateDir(absl::string_view path);
 
 // Makes a path absolute with respect to an optional base. If no base is
 // provided it will use the current working directory.
-PosixErrorOr<std::string> MakeAbsolute(absl::string_view filename, absl::string_view base);
+PosixErrorOr<std::string> MakeAbsolute(absl::string_view filename,
+                                       absl::string_view base);
 
 // Generates a relative path from the source directory to the destination
 // (dest) file or directory.  This uses ../ when necessary for destinations
 // which are not nested within the source.  Both source and dest are required
 // to be absolute paths, and an empty string will be returned if they are not.
-PosixErrorOr<std::string> GetRelativePath(absl::string_view source, absl::string_view dest);
+PosixErrorOr<std::string> GetRelativePath(absl::string_view source,
+                                          absl::string_view dest);
 
 // Returns the part of the path before the final "/", EXCEPT:
 // * If there is a single leading "/" in the path, the result will be the
@@ -165,7 +175,8 @@ absl::string_view Dirname(absl::string_view path);
 // "/" in the path, the first part of the output is empty and the second
 // is the input. If the only "/" in the path is the first character, it is
 // the first part of the output.
-std::pair<absl::string_view, absl::string_view> SplitPath(absl::string_view path);
+std::pair<absl::string_view, absl::string_view> SplitPath(
+    absl::string_view path);
 
 // Returns the part of the path after the final "/". If there is no
 // "/" in the path, the result is the same as the input.
@@ -230,7 +241,9 @@ class ModePermissionMatcher : public ::testing::MatcherInterface<mode_t> {
  public:
   explicit ModePermissionMatcher(mode_t want) : want_(want) {}
 
-  bool MatchAndExplain(mode_t got, ::testing::MatchResultListener* const listener) const override {
+  bool MatchAndExplain(
+      mode_t got,
+      ::testing::MatchResultListener* const listener) const override {
     const mode_t masked = got & (S_IRWXU | S_IRWXG | S_IRWXO);
     if (masked == want_) {
       return true;
@@ -255,4 +268,4 @@ class ModePermissionMatcher : public ::testing::MatcherInterface<mode_t> {
 
 }  // namespace testing
 }  // namespace gvisor
-#endif  // THIRD_PARTY_GVISOR_SYSCALL_TESTS_GVISOR_TEST_UTIL_FS_UTIL_H_
+#endif  // GVISOR_TEST_UTIL_FS_UTIL_H_
