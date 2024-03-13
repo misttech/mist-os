@@ -98,6 +98,105 @@ async fn use_protocol_from_dictionary() {
 }
 
 #[fuchsia::test]
+async fn use_protocol_from_dictionary_not_found() {
+    // Test extracting a protocol from a dictionary, but the protocol is missing from the
+    // dictionary.
+    let components = vec![
+        (
+            "root",
+            ComponentDeclBuilder::new()
+                .protocol_default("foo")
+                .dictionary_default("dict")
+                .offer(OfferDecl::Protocol(OfferProtocolDecl {
+                    source: OfferSource::Self_,
+                    source_name: "foo".parse().unwrap(),
+                    source_dictionary: None,
+                    target_name: "B".parse().unwrap(),
+                    target: OfferTarget::Capability("dict".parse().unwrap()),
+                    dependency_type: DependencyType::Strong,
+                    availability: Availability::Required,
+                }))
+                .offer(OfferDecl::Dictionary(OfferDictionaryDecl {
+                    source: OfferSource::Self_,
+                    source_name: "dict".parse().unwrap(),
+                    source_dictionary: None,
+                    target_name: "dict".parse().unwrap(),
+                    target: OfferTarget::static_child("leaf".into()),
+                    dependency_type: DependencyType::Strong,
+                    availability: Availability::Required,
+                }))
+                .child_default("leaf")
+                .build(),
+        ),
+        (
+            "leaf",
+            ComponentDeclBuilder::new()
+                .use_(UseBuilder::protocol().name("A").from_dictionary("dict"))
+                .child_default("leaf")
+                .build(),
+        ),
+    ];
+
+    let test = RoutingTestBuilder::new("root", components).build().await;
+    test.check_use(
+        "leaf".try_into().unwrap(),
+        CheckUse::Protocol {
+            path: "/svc/A".parse().unwrap(),
+            expected_res: ExpectedResult::Err(zx::Status::NOT_FOUND),
+        },
+    )
+    .await;
+
+    // Test extracting a protocol from a dictionary, but the dictionary is not routed to the
+    // target.
+    let components = vec![
+        (
+            "root",
+            ComponentDeclBuilder::new()
+                .protocol_default("foo")
+                .dictionary_default("dict")
+                .offer(OfferDecl::Protocol(OfferProtocolDecl {
+                    source: OfferSource::Self_,
+                    source_name: "foo".parse().unwrap(),
+                    source_dictionary: None,
+                    target_name: "A".parse().unwrap(),
+                    target: OfferTarget::Capability("dict".parse().unwrap()),
+                    dependency_type: DependencyType::Strong,
+                    availability: Availability::Required,
+                }))
+                .offer(OfferDecl::Dictionary(OfferDictionaryDecl {
+                    source: OfferSource::Self_,
+                    source_name: "dict".parse().unwrap(),
+                    source_dictionary: None,
+                    target_name: "other_dict".parse().unwrap(),
+                    target: OfferTarget::static_child("leaf".into()),
+                    dependency_type: DependencyType::Strong,
+                    availability: Availability::Required,
+                }))
+                .child_default("leaf")
+                .build(),
+        ),
+        (
+            "leaf",
+            ComponentDeclBuilder::new()
+                .use_(UseBuilder::protocol().name("A").from_dictionary("dict"))
+                .child_default("leaf")
+                .build(),
+        ),
+    ];
+
+    let test = RoutingTestBuilder::new("root", components).build().await;
+    test.check_use(
+        "leaf".try_into().unwrap(),
+        CheckUse::Protocol {
+            path: "/svc/A".parse().unwrap(),
+            expected_res: ExpectedResult::Err(zx::Status::NOT_FOUND),
+        },
+    )
+    .await;
+}
+
+#[fuchsia::test]
 async fn use_directory_from_dictionary_not_supported() {
     // Routing a directory into a dictionary isn't supported yet, it should fail.
     let components = vec![
@@ -511,6 +610,71 @@ async fn offer_protocol_from_dictionary() {
 }
 
 #[fuchsia::test]
+async fn offer_protocol_from_dictionary_not_found() {
+    // Test extracting a protocol from a dictionary, but the protocol is missing from the
+    // dictionary.
+    let components = vec![
+        (
+            "root",
+            ComponentDeclBuilder::new()
+                .protocol_default("foo")
+                .dictionary_default("dict")
+                .offer(OfferDecl::Protocol(OfferProtocolDecl {
+                    source: OfferSource::Self_,
+                    source_name: "foo".parse().unwrap(),
+                    source_dictionary: None,
+                    target_name: "B".parse().unwrap(),
+                    target: OfferTarget::Capability("dict".parse().unwrap()),
+                    dependency_type: DependencyType::Strong,
+                    availability: Availability::Required,
+                }))
+                .offer(OfferDecl::Dictionary(OfferDictionaryDecl {
+                    source: OfferSource::Self_,
+                    source_name: "dict".parse().unwrap(),
+                    source_dictionary: None,
+                    target_name: "dict".parse().unwrap(),
+                    target: OfferTarget::static_child("mid".into()),
+                    dependency_type: DependencyType::Strong,
+                    availability: Availability::Required,
+                }))
+                .child_default("mid")
+                .build(),
+        ),
+        (
+            "mid",
+            ComponentDeclBuilder::new()
+                .offer(OfferDecl::Protocol(OfferProtocolDecl {
+                    source: OfferSource::Parent,
+                    source_name: "A".parse().unwrap(),
+                    source_dictionary: Some("dict".parse().unwrap()),
+                    target_name: "A_svc".parse().unwrap(),
+                    target: OfferTarget::static_child("leaf".into()),
+                    dependency_type: DependencyType::Strong,
+                    availability: Availability::Required,
+                }))
+                .child_default("leaf")
+                .build(),
+        ),
+        (
+            "leaf",
+            ComponentDeclBuilder::new()
+                .use_(UseBuilder::protocol().name("A_svc").path("/svc/A"))
+                .build(),
+        ),
+    ];
+
+    let test = RoutingTestBuilder::new("root", components).build().await;
+    test.check_use(
+        "mid/leaf".try_into().unwrap(),
+        CheckUse::Protocol {
+            path: "/svc/A".parse().unwrap(),
+            expected_res: ExpectedResult::Err(zx::Status::NOT_FOUND),
+        },
+    )
+    .await;
+}
+
+#[fuchsia::test]
 async fn offer_protocol_from_nested_dictionary() {
     // Test extracting a protocol from a dictionary nested in another dictionary with source
     // parent, self, and child.
@@ -733,6 +897,66 @@ async fn expose_protocol_from_dictionary() {
         )
         .await;
     }
+}
+
+#[fuchsia::test]
+async fn expose_protocol_from_dictionary_not_found() {
+    // Test extracting a protocol from a dictionary, but the protocol is missing.
+    let components = vec![
+        (
+            "root",
+            ComponentDeclBuilder::new()
+                .use_(
+                    UseBuilder::protocol()
+                        .source(UseSource::Child("mid".into()))
+                        .name("A_svc")
+                        .path("/svc/A"),
+                )
+                .child_default("mid")
+                .build(),
+        ),
+        (
+            "mid",
+            ComponentDeclBuilder::new()
+                .expose(
+                    ExposeBuilder::protocol()
+                        .name("A")
+                        .target_name("A_svc")
+                        .source(ExposeSource::Self_)
+                        .from_dictionary("dict")
+                        .build(),
+                )
+                .child_default("leaf")
+                .build(),
+        ),
+        (
+            "leaf",
+            ComponentDeclBuilder::new()
+                .protocol_default("foo")
+                .dictionary_default("dict")
+                .offer(OfferDecl::Protocol(OfferProtocolDecl {
+                    source: OfferSource::Self_,
+                    source_name: "foo".parse().unwrap(),
+                    source_dictionary: None,
+                    target_name: "B".parse().unwrap(),
+                    target: OfferTarget::Capability("dict".parse().unwrap()),
+                    dependency_type: DependencyType::Strong,
+                    availability: Availability::Required,
+                }))
+                .expose(ExposeBuilder::dictionary().name("dict").source(ExposeSource::Self_))
+                .build(),
+        ),
+    ];
+
+    let test = RoutingTestBuilder::new("root", components).build().await;
+    test.check_use(
+        ".".try_into().unwrap(),
+        CheckUse::Protocol {
+            path: "/svc/A".parse().unwrap(),
+            expected_res: ExpectedResult::Err(zx::Status::NOT_FOUND),
+        },
+    )
+    .await;
 }
 
 #[fuchsia::test]
