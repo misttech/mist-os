@@ -302,20 +302,6 @@ static zx_status_t x86_pfe_handler(iframe_t* frame) {
     }
   }
 
-  /* reenable interrupts */
-  PreemptionState& preemption_state = Thread::Current::preemption_state();
-  DEBUG_ASSERT(arch_num_spinlocks_held() == 0);
-  arch_set_blocking_disallowed(false);
-  arch_enable_ints();
-  preemption_state.PreemptReenable();
-
-  /* make sure we put interrupts back as we exit */
-  auto cleanup = fit::defer([&preemption_state]() {
-    preemption_state.PreemptDisable();
-    arch_disable_ints();
-    arch_set_blocking_disallowed(true);
-  });
-
   /* check for flags we're not prepared to handle */
   if (unlikely(error_code & ~(PFEX_I | PFEX_U | PFEX_W | PFEX_P))) {
     printf("x86_pfe_handler: unhandled error code bits set, error code %#" PRIx64 "\n", error_code);
@@ -341,6 +327,22 @@ static zx_status_t x86_pfe_handler(iframe_t* frame) {
     frame->rcx = flags;
     return ZX_OK;
   }
+
+  // Now that we've checked whether we're capturing faults (we're not), we must
+  // therefore be in a context where it's safe for the thread to block so we can
+  // re-enable preemption and interrupts at this point.
+  PreemptionState& preemption_state = Thread::Current::preemption_state();
+  DEBUG_ASSERT(arch_num_spinlocks_held() == 0);
+  arch_set_blocking_disallowed(false);
+  arch_enable_ints();
+  preemption_state.PreemptReenable();
+
+  // Make sure we put interrupts back as we exit.
+  auto cleanup = fit::defer([&preemption_state]() {
+    preemption_state.PreemptDisable();
+    arch_disable_ints();
+    arch_set_blocking_disallowed(true);
+  });
 
   /* call the high level page fault handler */
   zx_status_t pf_err = vmm_page_fault_handler(va, flags);
