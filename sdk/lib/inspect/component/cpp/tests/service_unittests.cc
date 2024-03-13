@@ -490,7 +490,8 @@ TEST_F(InspectServiceTest, ListChildNamesFromVmoIsEmpty) {
 
 TEST_F(InspectServiceTest, ReadFromComponentInspector) {
   auto svc = component::OpenServiceRoot();
-  auto client_end = component::ConnectAt<fuchsia_component::Binder>(*svc);
+  auto client_end =
+      component::ConnectAt<fuchsia_component::Binder>(*svc, "InspectorPublisherBinder");
   ASSERT_TRUE(client_end.is_ok());
 
   fidl::WireSyncClient(std::move(*client_end));
@@ -501,46 +502,65 @@ TEST_F(InspectServiceTest, ReadFromComponentInspector) {
 
   diagnostics::reader::ArchiveReader reader(std::move(accessor), {});
 
-  auto result = RunPromise(reader.SnapshotInspectUntilPresent({"inspect_writer_app"}));
+  auto result = RunPromise(reader.SnapshotInspectUntilPresent({"inspector_publisher"}));
 
   auto data = result.take_value();
-  uint64_t component_inspector_index;
-  uint64_t vmo_index;
-  bool found_ci = false;
-  bool found_vmo = false;
+  uint64_t app_index;
+  bool found = false;
   for (uint64_t i = 0; i < data.size(); i++) {
-    if (data.at(i).moniker() == "inspect_writer_app") {
-      if (data.at(i).metadata().name == "ComponentInspector") {
-        component_inspector_index = i;
-        found_ci = true;
-      } else if (data.at(i).metadata().name == "VmoServer") {
-        vmo_index = i;
-        found_vmo = true;
-      }
-
-      if (found_ci && found_vmo) {
-        break;
-      }
+    if (data.at(i).moniker() == "inspector_publisher") {
+      app_index = i;
+      found = true;
+      break;
     }
   }
 
-  ASSERT_TRUE(found_ci && found_vmo);
+  ASSERT_TRUE(found);
 
-  auto& ci_data = data.at(component_inspector_index);
+  auto& app_data = data.at(app_index);
 
-  ASSERT_EQ(ci_data.metadata().name, "ComponentInspector");
-  ASSERT_EQ(ci_data.metadata().filename, std::nullopt);
+  ASSERT_EQ(app_data.metadata().name, "ComponentInspector");
+  ASSERT_EQ(app_data.metadata().filename, std::nullopt);
 
-  ASSERT_EQ(1, ci_data.GetByPath({"root", "val1"}).GetInt());
-  ASSERT_EQ(2, ci_data.GetByPath({"root", "val2"}).GetInt());
-  ASSERT_EQ(3, ci_data.GetByPath({"root", "val3"}).GetInt());
-  ASSERT_EQ(4, ci_data.GetByPath({"root", "val4"}).GetInt());
-  ASSERT_EQ(0, ci_data.GetByPath({"root", "child", "val"}).GetInt());
+  ASSERT_EQ(1, app_data.GetByPath({"root", "val1"}).GetInt());
+  ASSERT_EQ(2, app_data.GetByPath({"root", "val2"}).GetInt());
+  ASSERT_EQ(3, app_data.GetByPath({"root", "val3"}).GetInt());
+  ASSERT_EQ(4, app_data.GetByPath({"root", "val4"}).GetInt());
+  ASSERT_EQ(0, app_data.GetByPath({"root", "child", "val"}).GetInt());
   ASSERT_EQ(
       std::string("OK"),
-      std::string(ci_data.GetByPath({"root", "fuchsia.inspect.Health", "status"}).GetString()));
+      std::string(app_data.GetByPath({"root", "fuchsia.inspect.Health", "status"}).GetString()));
+}
 
-  auto& vmo_data = data.at(vmo_index);
+TEST_F(InspectServiceTest, ReadFromPublishedVmo) {
+  auto svc = component::OpenServiceRoot();
+  auto client_end = component::ConnectAt<fuchsia_component::Binder>(*svc, "VmoPublisherBinder");
+  ASSERT_TRUE(client_end.is_ok());
+
+  fidl::WireSyncClient(std::move(*client_end));
+
+  auto context = sys::ComponentContext::Create();
+  fuchsia::diagnostics::ArchiveAccessorPtr accessor;
+  ASSERT_EQ(ZX_OK, context->svc()->Connect(accessor.NewRequest(dispatcher())));
+
+  diagnostics::reader::ArchiveReader reader(std::move(accessor), {});
+
+  auto result = RunPromise(reader.SnapshotInspectUntilPresent({"vmo_publisher"}));
+
+  auto data = result.take_value();
+  uint64_t app_index;
+  bool found = false;
+  for (uint64_t i = 0; i < data.size(); i++) {
+    if (data.at(i).moniker() == "vmo_publisher") {
+      app_index = i;
+      found = true;
+      break;
+    }
+  }
+
+  ASSERT_TRUE(found);
+
+  auto& vmo_data = data.at(app_index);
 
   ASSERT_EQ(vmo_data.metadata().name, "VmoServer");
   ASSERT_EQ(vmo_data.metadata().filename, std::nullopt);

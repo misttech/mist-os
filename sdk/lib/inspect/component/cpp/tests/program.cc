@@ -6,37 +6,47 @@
 #include <lib/async-loop/default.h>
 #include <lib/inspect/component/cpp/component.h>
 
+#include "sdk/lib/inspect/component/cpp/tests/config.h"
+
 using inspect::ComponentInspector;
 using inspect::Inspector;
 using inspect::PublishVmo;
 
 int main() {
+  const auto conf = config::Config::TakeFromStartupHandle();
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
   auto* dispatcher = loop.dispatcher();
 
-  auto ci = ComponentInspector(dispatcher, {.tree_name = "ComponentInspector"});
+  std::optional<ComponentInspector> ci = std::nullopt;
+  std::optional<Inspector> inspector = std::nullopt;
 
-  ci.root().RecordInt("val1", 1);
-  ci.root().RecordInt("val2", 2);
-  ci.root().RecordInt("val3", 3);
-  ci.root().RecordLazyNode("child", [] {
-    inspect::Inspector insp;
-    insp.GetRoot().RecordInt("val", 0);
-    return fpromise::make_ok_promise(std::move(insp));
-  });
-  ci.root().RecordLazyValues("values", [] {
-    inspect::Inspector insp;
-    insp.GetRoot().RecordInt("val4", 4);
-    return fpromise::make_ok_promise(std::move(insp));
-  });
+  if (conf.publish_inspector()) {
+    ci = ComponentInspector(dispatcher, {.tree_name = "ComponentInspector"});
 
-  Inspector insp;
-  PublishVmo(dispatcher, insp.DuplicateVmo(), {.tree_name = "VmoServer"});
+    ci->root().RecordInt("val1", 1);
+    ci->root().RecordInt("val2", 2);
+    ci->root().RecordInt("val3", 3);
+    ci->root().RecordLazyNode("child", [] {
+      inspect::Inspector insp;
+      insp.GetRoot().RecordInt("val", 0);
+      return fpromise::make_ok_promise(std::move(insp));
+    });
+    ci->root().RecordLazyValues("values", [] {
+      inspect::Inspector insp;
+      insp.GetRoot().RecordInt("val4", 4);
+      return fpromise::make_ok_promise(std::move(insp));
+    });
+    ci->Health().Ok();
+  }
 
-  insp.GetRoot().RecordString("value1", "only in VMO");
-  insp.GetRoot().RecordInt("value2", 10);
+  if (conf.publish_vmo()) {
+    inspector = inspect::Inspector{};
+    PublishVmo(dispatcher, inspector->DuplicateVmo(), {.tree_name = "VmoServer"});
 
-  ci.Health().Ok();
+    inspector->GetRoot().RecordString("value1", "only in VMO");
+    inspector->GetRoot().RecordInt("value2", 10);
+  }
+
   loop.Run();
 
   return 0;

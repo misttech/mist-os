@@ -13,14 +13,24 @@
     },
     children: [
         {
-            name: "inspect_writer_app",
-            url: "#meta/program_writing_inspect.cm",
+            name: "inspector_publisher",
+            url: "publish_inspector_only#meta/program.cm",
+        },
+        {
+            name: "vmo_publisher",
+            url: "publish_vmo_only#meta/program.cm",
         },
     ],
     use: [
         {
             protocol: "fuchsia.component.Binder",
-            from: "#inspect_writer_app",
+            from: "#inspector_publisher",
+            path: "/svc/InspectorPublisherBinder",
+        },
+        {
+            protocol: "fuchsia.component.Binder",
+            from: "#vmo_publisher",
+            path: "/svc/VmoPublisherBinder",
         },
         { protocol: "fuchsia.diagnostics.ArchiveAccessor" },
     ],

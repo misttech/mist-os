@@ -17,4 +17,8 @@
             from: "framework",
         },
     ],
+    config: {
+        publish_inspector: { type: "bool" },
+        publish_vmo: { type: "bool" },
+    },
 }
