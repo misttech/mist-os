@@ -1,32 +1,9 @@
 # Writers
 
-The `ffx` subtool interface has the concept of a `Writer` that manages IO between
-the tool and the user. This interface distinguishes between human and
-machine users so that we can use our tools in other tooling more effectively.
-
-We currently implement two kinds of writers:
-
-* `SimpleWriter`: Errors if the program is run with `--machine json` and can
-only output strings.
-* `MachineWriter`: adapts it output to match whether the `--machine json`
-argument is passed, outputting only JSON on stdout if it is and outputting
-user-readable strings if not.
-
-## How to specify your `Writer` type
-
-In the legacy plugin interface you could add a `writer` argument to your plugin
-definition using an `#[ffx(writer = OutputType)]` attribute on the writer
-argument, and that would cause some generation of schema information from
-the type you specified.
-
-In this subtool interface, you specify this as an associated type on
-the `FfxMain` trait for your tool, and the machine type is a generic
-argument to the `MachineWriter` type. If your tool doesn't implement machine
-output, it should use `SimpleWriter` instead of something like
-`MachineWriter<String>` to avoid having people depend on your unstructured
-output.
-
-### Using the `Writer`
+The `ffx` subtool interface has the concept of a `Writer` that manages output
+from the tool and the user. The different types of Writer are used to
+distinguish between output intended to be read by interactive users and
+structured output intended for use by other programs and scripts.
 
 For the most part, you can use the writer as you would any implementation of
 `std::io::Write`, and it's fine to just use `writeln!()` or similar built-in
@@ -40,12 +17,72 @@ All writers also implement `item`, which will either print the object
 given in machine mode, or use its `Display` implementation to output it in
 non-machine mode as text.
 
-If you're using a machine writer, you also get a few more methods to help
-with outputting structured output:
+The different implementations implement the [ToolIO][toolio] trait.
+Depending on the how the subtool will be used, subtool authors should
+use the appropriate implementation.
+
+## SimpleWriter
+
+The [SimpleWriter][simplewriter] struct is the most basic of the Writers.
+It should be used when there is no need to support structured output and has
+no restrictions or guidelines on how to use it. The advantage of a SimpleWriter
+versus directly using stdio is that the SimpleWriter can be instantiated using
+buffers which allows easier testing of output. To create the buffer backed
+SimpleWriter see [new_with_buffers()][simple-new-with-buffers].
+
+## MachineWriter
+
+The [MachineWriter][machinewriter] struct builds on the SimpleWriter by
+adding the implementations of methods to support structured output:
 
 * `machine`: Only print the given object in machine mode.
 * `machine_many`: Print the given objects in machine mode.
-* `machine_or`: If in machine mode, print the object. Otherwise print the textual
-information in the other argument (implementing `Display`).
+* `machine_or`: If in machine mode, print the object. Otherwise print the
+   textual information in the other argument (implementing `Display`).
 * `machine_or_else`: If in machine mode, print the object. Otherwise print the
 textual information resulting from the function in the other argument.
+
+The format of the output of `MachineWriter` is controlled by the top level
+command line argument to ffx, `--machine`.
+
+MachineWriter should be used when there is need to support programmatic
+processing of the output. Since the `machine()` method is used to produce the
+output, the subtool should use machine() for all possible output, including
+errors when possible. This way the caller of the subtool can handle and present
+errors that are encountered in a structured way, rather than falling back to
+unstructured data on stderr.
+
+To use MachineWriter, the declaration of the Writer attribute in FfxMain
+requires an object type that implements the [serde::Serialize][serialize] trait.
+
+## VerifiedMachineWriter
+
+The [VerifiedMachineWriter][verifiedwriter] struct builds on the MachineWriter
+behavior and adds JSON schema support. This schema is intended to describe the
+structure of the output so it can be deserialized. The schema is also used to
+detect changes over time to promote backwards compatibility with integrations
+with other tools and scripts so eventually, there are no breakages due to
+updating the ffx tools, or at least they are known and can be accommodated.
+
+To use VerifiedMachineWriter, the declaration of the Writer attribute
+in FfxMain requiresan object type that implements the
+[serde::Serialize][serialize] trait and [schemars::JsonSchema][jsonschema].
+
+
+## How to specify your `Writer` type
+
+In this subtool interface, you specify this as an associated type on
+the `FfxMain` trait for your tool, and the machine type is a generic
+argument to the `MachineWriter` type. If your tool doesn't implement machine
+output, it should use `SimpleWriter` instead of something like
+`MachineWriter<String>` to avoid having people depend on your unstructured
+output.
+
+<!-- refs -->
+[simplewriter]: https://fuchsia-docs.firebaseapp.com/rust/ffx_writer/struct.SimpleWriter.html
+[simple-new-with-buffers]: https://fuchsia-docs.firebaseapp.com/rust/ffx_writer/struct.SimpleWriter.html#method.new_buffers
+[machinewriter]: https://fuchsia-docs.firebaseapp.com/rust/ffx_writer/struct.MachineWriter.html
+[verifiedwriter]: https://fuchsia-docs.firebaseapp.com/rust/ffx_writer/struct.VerifiedMachineWriter.html
+[toolio]: https://fuchsia-docs.firebaseapp.com/rust/ffx_writer/trait.ToolIO.html
+[serialize]: https://docs.rs/serde/latest/serde/trait.Serialize.html
+[jsonschema]: https://graham.cool/schemars/
