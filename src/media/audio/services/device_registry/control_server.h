@@ -11,7 +11,6 @@
 
 #include <cstdint>
 #include <optional>
-#include <unordered_set>
 
 #include "src/media/audio/services/common/base_fidl_server.h"
 #include "src/media/audio/services/device_registry/audio_device_registry.h"
@@ -48,14 +47,19 @@ class ControlServer
   //
   void DeviceDroppedRingBuffer() final;
   void DelayInfoChanged(const fuchsia_audio_device::DelayInfo&) final;
+  // If `dai_format` contains no value, no DaiFormat is set. The Device might be newly-initialized,
+  // or `CodecReset` may have been called. `SetDaiFormat` must be called.
   void DaiFormatChanged(
       const std::optional<fuchsia_hardware_audio::DaiFormat>& dai_format,
       const std::optional<fuchsia_hardware_audio::CodecFormatInfo>& codec_format_info) final;
+  // `SetDaiFormat` did not change the format. The previously-set DaiFormat is still be in effect.
   void DaiFormatNotSet(const fuchsia_hardware_audio::DaiFormat& dai_format,
                        zx_status_t driver_error) final;
   void CodecStarted(const zx::time& start_time) final;
+  // A call to `CodecStart` did not succeed.
   void CodecNotStarted() final;
   void CodecStopped(const zx::time& stop_time) final;
+  // A call to `CodecStop` did not succeed.
   void CodecNotStopped() final;
 
   // fuchsia.audio.device.Control
@@ -63,6 +67,10 @@ class ControlServer
   void SetGain(SetGainRequest& request, SetGainCompleter::Sync& completer) final;
   void CreateRingBuffer(CreateRingBufferRequest& request,
                         CreateRingBufferCompleter::Sync& completer) final;
+  void SetDaiFormat(SetDaiFormatRequest& request, SetDaiFormatCompleter::Sync& completer) final;
+  void CodecReset(CodecResetCompleter::Sync& completer) final;
+  void CodecStart(CodecStartCompleter::Sync& completer) final;
+  void CodecStop(CodecStopCompleter::Sync& completer) final;
 
   // fuchsia.hardware.audio.signalprocessing support
   //
@@ -93,6 +101,9 @@ class ControlServer
   std::shared_ptr<Device> device_;
 
   std::optional<CreateRingBufferCompleter::Async> create_ring_buffer_completer_;
+  std::optional<SetDaiFormatCompleter::Async> set_dai_format_completer_;
+  std::optional<CodecStartCompleter::Async> codec_start_completer_;
+  std::optional<CodecStopCompleter::Async> codec_stop_completer_;
 
   // Locks weak_ptr ring_buffer_server_ to shared_ptr and returns it.
   // If it cannot, returns nullptr and resets the optional.

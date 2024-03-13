@@ -166,7 +166,7 @@ class AudioDeviceRegistryServerTestBase : public gtest::TestLoopFixture {
                               public FidlHandler {
    public:
     explicit ObserverFidlHandler(AudioDeviceRegistryServerTestBase* parent) : FidlHandler(parent) {}
-    // Invoked when the underlying driver disconnects its StreamConfig.
+    // Invoked when the underlying driver disconnects its Codec/StreamConfig.
     void on_fidl_error(fidl::UnbindInfo error) override {
       LogFidlClientError(error, "Observer");
       parent()->observer_fidl_error_status_ = error.status();

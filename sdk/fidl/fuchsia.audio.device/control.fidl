@@ -5,6 +5,7 @@
 library fuchsia.audio.device;
 
 using fuchsia.audio;
+using fuchsia.hardware.audio;
 using fuchsia.hardware.audio.signalprocessing;
 using zx;
 
@@ -111,6 +112,8 @@ closed protocol Control {
     compose fuchsia.hardware.audio.signalprocessing.SignalProcessing;
 
     /// Change the device's overall gain state.
+    ///
+    /// Should only be called for StreamConfig devices.
     //
     // TODO(https://fxbug.dev/42052918): Remove legacy gain aspects once driver API does.
     // Going forward, gain will be handled by `SignalProcessing`.
@@ -122,6 +125,8 @@ closed protocol Control {
     }) -> (table {}) error ControlSetGainError;
 
     /// Create the ring buffer used to pass audio to/from this device.
+    ///
+    /// Should only be called for StreamConfig devices.
     strict CreateRingBuffer(resource table {
         /// Additional requirements about the actual ring buffer being created.
         ///
@@ -141,6 +146,42 @@ closed protocol Control {
         /// each read, and cache-flushed after each write.
         2: ring_buffer fuchsia.audio.RingBuffer;
     }) error ControlCreateRingBufferError;
+
+    /// Set the wire format for the digital interconnect connected to this Codec endpoint.
+    /// This method returns information related to the format that was set, including delay values.
+    ///
+    /// Should only be called for Codec devices.
+    strict SetDaiFormat(table {
+        1: dai_format fuchsia.hardware.audio.DaiFormat;
+    }) -> (table {
+        1: state fuchsia.hardware.audio.CodecFormatInfo;
+    }) error ControlSetDaiFormatError;
+
+    /// Start the Codec hardware. If successful, this returns after the Codec was started and
+    /// `start_time` indicates the time when the hardware started. Note that the Codec's DaiFormat
+    /// must be set (by a successful `SetDaiFormat` call) before calling this method.
+    ///
+    /// Should only be called for Codec devices.
+    strict CodecStart() -> (table {
+        1: start_time zx.Time;
+    }) error ControlCodecStartError;
+
+    /// Stop the Codec hardware. If successful, this returns after the Codec was stopped and
+    /// `stop_time` indicates the time when the hardware stopped. Note that the Codec's DaiFormat
+    /// must be set (by a successful `SetDaiFormat` call) before calling this method.
+    ///
+    /// Should only be called for Codec devices.
+    strict CodecStop() -> (table {
+        1: stop_time zx.Time;
+    }) error ControlCodecStopError;
+
+    /// Reset the Codec hardware -- stopping the hardware and clearing any DaiFormat that was set.
+    /// This method returns when the hardware reset is complete. After calling this method,
+    /// `SetDaiFormat` and `CodecStart` must be called (in that order) -- as well as `SetTopology`
+    /// and `SetElementState` if applicable -- to return the Codec to the active operational mode.
+    ///
+    /// Should only be called for Codec devices.
+    strict CodecReset() -> (table {}) error ControlCodecResetError;
 };
 
 /// Errors returned by `Control/SetGain`.
@@ -148,20 +189,23 @@ type ControlSetGainError = flexible enum {
     /// This device has encountered an error and can no longer be controlled.
     DEVICE_ERROR = 1;
 
+    /// This device type does not support the method that was called.
+    WRONG_DEVICE_TYPE = 2;
+
     /// The required `target_state` is missing.
-    INVALID_GAIN_STATE = 2;
+    INVALID_GAIN_STATE = 3;
 
     /// The required `target_state.gain_db` is missing.
-    INVALID_GAIN_DB = 3;
+    INVALID_GAIN_DB = 4;
 
     /// The specified gain is outside the device's allowed range.
-    GAIN_OUT_OF_RANGE = 4;
+    GAIN_OUT_OF_RANGE = 5;
 
     /// MUTE is requested, but the device has no MUTE control.
-    MUTE_UNAVAILABLE = 5;
+    MUTE_UNAVAILABLE = 6;
 
     /// Enabling AGC is requested, but the device has no AGC.
-    AGC_UNAVAILABLE = 6;
+    AGC_UNAVAILABLE = 7;
 };
 
 /// Errors returned by `Control/CreateRingBuffer`.
@@ -169,29 +213,104 @@ type ControlCreateRingBufferError = flexible enum {
     /// This device has encountered an error and can no longer be controlled.
     DEVICE_ERROR = 1;
 
+    /// This device type does not support the method that was called.
+    WRONG_DEVICE_TYPE = 2;
+
     /// The previous `CreateRingBuffer` call has not yet completed.
-    ALREADY_PENDING = 2;
+    ALREADY_PENDING = 3;
 
     /// The required `options` is missing.
-    INVALID_OPTIONS = 3;
+    INVALID_OPTIONS = 4;
 
     /// The required `options.format` is missing.
-    INVALID_FORMAT = 4;
+    INVALID_FORMAT = 5;
 
     /// The required `options.ring_buffer_min_bytes` is missing.
-    INVALID_MIN_BYTES = 5;
+    INVALID_MIN_BYTES = 6;
 
     /// The required `ring_buffer_server` is missing.
-    INVALID_RING_BUFFER = 6;
+    INVALID_RING_BUFFER = 7;
 
     /// An active `RingBuffer` instance already exists for this `Control`.
-    ALREADY_ALLOCATED = 7;
+    ALREADY_ALLOCATED = 8;
 
     /// The device does not support the specified format.
-    FORMAT_MISMATCH = 8;
+    FORMAT_MISMATCH = 9;
 
     /// The device cannot create a ring buffer with the specified options.
-    BAD_RING_BUFFER_OPTION = 9;
+    BAD_RING_BUFFER_OPTION = 10;
+};
+
+/// Errors returned by `Control/SetDaiFormat`.
+type ControlSetDaiFormatError = flexible enum {
+    /// This device has encountered an error and can no longer be controlled.
+    DEVICE_ERROR = 1;
+
+    /// This device type does not support the method that was called.
+    WRONG_DEVICE_TYPE = 2;
+
+    /// The previous `SetDaiFormat` call has not yet completed.
+    ALREADY_PENDING = 3;
+
+    /// The required `dai_format` is missing or invalid.
+    INVALID_DAI_FORMAT = 4;
+
+    /// The device does not support the specified dai_format.
+    FORMAT_MISMATCH = 5;
+
+    /// The driver returned some other error. This call may be retried.
+    OTHER = 6;
+};
+
+/// Errors returned by `Control/CodecStart`.
+type ControlCodecStartError = flexible enum {
+    /// This device has encountered an error and can no longer be controlled.
+    DEVICE_ERROR = 1;
+
+    /// This device type does not support the method that was called.
+    WRONG_DEVICE_TYPE = 2;
+
+    /// The previous `CodecStart` call has not yet completed.
+    ALREADY_PENDING = 3;
+
+    /// `SetDaiFormat` was not called before making this call.
+    DAI_FORMAT_NOT_SET = 4;
+
+    /// The device was already started when this call was made.
+    ALREADY_STARTED = 5;
+
+    /// The driver returned some other error. This call may be retried.
+    OTHER = 6;
+};
+
+/// Errors returned by `Control/CodecStop`.
+type ControlCodecStopError = flexible enum {
+    /// This device has encountered an error and can no longer be controlled.
+    DEVICE_ERROR = 1;
+
+    /// This device type does not support the method that was called.
+    WRONG_DEVICE_TYPE = 2;
+
+    /// The previous `CodecStop` call has not yet completed.
+    ALREADY_PENDING = 3;
+
+    /// `SetDaiFormat` was not called before making this call.
+    DAI_FORMAT_NOT_SET = 4;
+
+    /// The device was already stopped when this call was made.
+    ALREADY_STOPPED = 5;
+
+    /// The driver returned some other error. This call may be retried.
+    OTHER = 6;
+};
+
+/// Errors returned by `Control/CodecReset`.
+type ControlCodecResetError = flexible enum {
+    /// This device has encountered an error and can no longer be controlled.
+    DEVICE_ERROR = 1;
+
+    /// This device type does not support the method that was called.
+    WRONG_DEVICE_TYPE = 2;
 };
 
 /// A `RingBuffer` instance controls data flow for the associated audio stream.

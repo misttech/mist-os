@@ -8,6 +8,7 @@
 
 #include <gtest/gtest.h>
 
+#include "lib/fidl/cpp/wire/channel.h"
 #include "src/media/audio/services/common/testing/test_server_and_async_client.h"
 #include "src/media/audio/services/device_registry/adr_server_unittest_base.h"
 
@@ -15,6 +16,7 @@ namespace media_audio {
 namespace {
 
 class ControlCreatorServerTest : public AudioDeviceRegistryServerTestBase {};
+class ControlCreatorServerCodecTest : public ControlCreatorServerTest {};
 class ControlCreatorServerStreamConfigTest : public ControlCreatorServerTest {};
 
 /////////////////////
@@ -37,6 +39,46 @@ TEST_F(ControlCreatorServerTest, CleanServerShutdown) {
 }
 
 /////////////////////
+// Codec tests
+//
+// Validate the ControlCreator/CreateControl method for Codec devices.
+TEST_F(ControlCreatorServerCodecTest, CreateControl) {
+  auto control_creator = CreateTestControlCreatorServer();
+  ASSERT_EQ(ControlCreatorServer::count(), 1u);
+  auto fake_driver = CreateFakeCodecOutput();
+  adr_service_->AddDevice(Device::Create(
+      adr_service_, dispatcher(), "Test codec name", fuchsia_audio_device::DeviceType::kCodec,
+      fuchsia_audio_device::DriverClient::WithCodec(
+          fidl::ClientEnd<fuchsia_hardware_audio::Codec>(fake_driver->Enable()))));
+
+  RunLoopUntilIdle();
+  ASSERT_EQ(adr_service_->devices().size(), 1u);
+  ASSERT_EQ(adr_service_->unhealthy_devices().size(), 0u);
+  auto control_endpoints = fidl::CreateEndpoints<fuchsia_audio_device::Control>();
+  ASSERT_TRUE(control_endpoints.is_ok());
+  auto control_client = fidl::Client<fuchsia_audio_device::Control>(
+      fidl::ClientEnd<fuchsia_audio_device::Control>(std::move(control_endpoints->client)),
+      dispatcher());
+  auto received_callback = false;
+
+  control_creator->client()
+      ->Create({{
+          .token_id = (*adr_service_->devices().begin())->token_id(),
+          .control_server =
+              fidl::ServerEnd<fuchsia_audio_device::Control>(std::move(control_endpoints->server)),
+      }})
+      .Then([&received_callback](
+                fidl::Result<fuchsia_audio_device::ControlCreator::Create>& result) mutable {
+        received_callback = true;
+        EXPECT_TRUE(result.is_ok()) << result.error_value();
+      });
+
+  RunLoopUntilIdle();
+  EXPECT_TRUE(received_callback);
+  EXPECT_EQ(ControlServer::count(), 1u);
+}
+
+/////////////////////
 // StreamConfig tests
 //
 // Validate the ControlCreator/CreateControl method for StreamConfig devices.
@@ -52,16 +94,18 @@ TEST_F(ControlCreatorServerStreamConfigTest, CreateControl) {
   RunLoopUntilIdle();
   ASSERT_EQ(adr_service_->devices().size(), 1u);
   ASSERT_EQ(adr_service_->unhealthy_devices().size(), 0u);
-  zx::channel server_end, client_end;
-  ASSERT_EQ(ZX_OK, zx::channel::create(0, &server_end, &client_end));
+  auto control_endpoints = fidl::CreateEndpoints<fuchsia_audio_device::Control>();
+  ASSERT_TRUE(control_endpoints.is_ok());
   auto control_client = fidl::Client<fuchsia_audio_device::Control>(
-      fidl::ClientEnd<fuchsia_audio_device::Control>(std::move(client_end)), dispatcher());
+      fidl::ClientEnd<fuchsia_audio_device::Control>(std::move(control_endpoints->client)),
+      dispatcher());
   auto received_callback = false;
 
   control_creator->client()
       ->Create({{
           .token_id = (*adr_service_->devices().begin())->token_id(),
-          .control_server = fidl::ServerEnd<fuchsia_audio_device::Control>(std::move(server_end)),
+          .control_server =
+              fidl::ServerEnd<fuchsia_audio_device::Control>(std::move(control_endpoints->server)),
       }})
       .Then([&received_callback](
                 fidl::Result<fuchsia_audio_device::ControlCreator::Create>& result) mutable {

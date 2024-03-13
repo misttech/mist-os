@@ -14,6 +14,7 @@
 #include <gtest/gtest.h>
 
 #include "src/media/audio/services/device_registry/adr_server_unittest_base.h"
+#include "src/media/audio/services/device_registry/testing/fake_codec.h"
 #include "src/media/audio/services/device_registry/testing/fake_stream_config.h"
 
 namespace media_audio {
@@ -82,6 +83,25 @@ class ObserverServerTest : public AudioDeviceRegistryServerTestBase,
   }
 };
 
+class ObserverServerCodecTest : public ObserverServerTest {
+ protected:
+  std::unique_ptr<FakeCodec> CreateAndEnableDriverWithDefaults() {
+    EXPECT_EQ(dispatcher(), test_loop().dispatcher());
+    zx::channel server_end, client_end;
+    EXPECT_EQ(ZX_OK, zx::channel::create(0, &server_end, &client_end));
+    auto fake_driver =
+        std::make_unique<FakeCodec>(std::move(server_end), std::move(client_end), dispatcher());
+
+    adr_service_->AddDevice(Device::Create(
+        adr_service_, dispatcher(), "Test codec name", fuchsia_audio_device::DeviceType::kCodec,
+        fuchsia_audio_device::DriverClient::WithCodec(
+            fidl::ClientEnd<fuchsia_hardware_audio::Codec>(fake_driver->Enable()))));
+
+    RunLoopUntilIdle();
+    return fake_driver;
+  }
+};
+
 class ObserverServerStreamConfigTest : public ObserverServerTest {
  protected:
   static inline const fuchsia_audio::Format kDefaultRingBufferFormat{{
@@ -113,6 +133,231 @@ class ObserverServerStreamConfigTest : public ObserverServerTest {
     return std::make_pair(std::move(ring_buffer_client), std::move(ring_buffer_server_end));
   }
 };
+
+/////////////////////
+// Codec tests
+//
+// Validate that an Observer client can drop cleanly (without generating a WARNING or ERROR).
+TEST_F(ObserverServerCodecTest, CleanClientDrop) {
+  auto fake_driver = CreateAndEnableDriverWithDefaults();
+  auto observer = CreateTestObserverServer(*adr_service_->devices().begin());
+  ASSERT_EQ(ObserverServer::count(), 1u);
+
+  observer->client() = fidl::Client<fuchsia_audio_device::Observer>();
+
+  RunLoopUntilIdle();
+  EXPECT_FALSE(observer_fidl_error_status_.has_value());
+
+  // No WARNING logging should occur during test case shutdown.
+}
+
+// Validate that an Observer server can shutdown cleanly (without generating a WARNING or ERROR).
+TEST_F(ObserverServerCodecTest, CleanServerShutdown) {
+  auto fake_driver = CreateAndEnableDriverWithDefaults();
+  auto observer = CreateTestObserverServer(*adr_service_->devices().begin());
+  ASSERT_EQ(ObserverServer::count(), 1u);
+
+  observer->server().Shutdown(ZX_ERR_PEER_CLOSED);
+
+  RunLoopUntilIdle();
+  EXPECT_TRUE(observer_fidl_error_status_.has_value());
+  EXPECT_EQ(*observer_fidl_error_status_, ZX_ERR_PEER_CLOSED);
+
+  // No WARNING logging should occur during test case shutdown.
+}
+
+// Validate creation of an Observer via the Registry/CreateObserver method. Most other test cases
+// directly create an Observer server and client synthetically via CreateTestObserverServer.
+TEST_F(ObserverServerCodecTest, Creation) {
+  auto fake_driver = CreateAndEnableDriverWithDefaults();
+  ASSERT_EQ(adr_service_->devices().size(), 1u);
+  ASSERT_EQ(adr_service_->unhealthy_devices().size(), 0u);
+  auto registry = CreateTestRegistryServer();
+  ASSERT_EQ(RegistryServer::count(), 1u);
+
+  auto added_device_id = WaitForAddedDeviceTokenId(registry->client());
+  ASSERT_TRUE(added_device_id);
+  auto [observer_client_end, observer_server_end] =
+      CreateNaturalAsyncClientOrDie<fuchsia_audio_device::Observer>();
+  auto observer_client = fidl::Client<fuchsia_audio_device::Observer>(
+      fidl::ClientEnd<fuchsia_audio_device::Observer>(std::move(observer_client_end)), dispatcher(),
+      observer_fidl_handler_.get());
+  bool received_callback = false;
+
+  registry->client()
+      ->CreateObserver({{
+          .token_id = *added_device_id,
+          .observer_server =
+              fidl::ServerEnd<fuchsia_audio_device::Observer>(std::move(observer_server_end)),
+      }})
+      .Then([&received_callback](fidl::Result<Registry::CreateObserver>& result) {
+        received_callback = true;
+        EXPECT_TRUE(result.is_ok()) << result.error_value();
+      });
+
+  RunLoopUntilIdle();
+  EXPECT_TRUE(received_callback);
+  EXPECT_TRUE(observer_client.is_valid());
+  EXPECT_FALSE(observer_fidl_error_status_.has_value());
+}
+
+// Validate that when an observed device is removed, the Observer is dropped.
+TEST_F(ObserverServerCodecTest, ObservedDeviceRemoved) {
+  auto fake_driver = CreateAndEnableDriverWithDefaults();
+  ASSERT_EQ(adr_service_->devices().size(), 1u);
+  ASSERT_EQ(adr_service_->unhealthy_devices().size(), 0u);
+  auto registry = CreateTestRegistryServer();
+  ASSERT_EQ(RegistryServer::count(), 1u);
+
+  auto added_device_id = WaitForAddedDeviceTokenId(registry->client());
+  ASSERT_TRUE(added_device_id);
+  auto [status, added_device] = adr_service_->FindDeviceByTokenId(*added_device_id);
+  ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
+  auto observer = CreateTestObserverServer(added_device);
+
+  fake_driver->DropCodec();
+
+  // RunLoopUntilIdle();
+  auto removed_device_id = WaitForRemovedDeviceTokenId(registry->client());
+  ASSERT_TRUE(removed_device_id);
+  EXPECT_EQ(*added_device_id, *removed_device_id);
+
+  RunLoopUntilIdle();
+  EXPECT_TRUE(observer_fidl_error_status_.has_value());
+  EXPECT_EQ(*observer_fidl_error_status_, ZX_ERR_PEER_CLOSED);
+}
+
+// Validate that the Observer receives the initial plug state of the observed device.
+// To ensure we correctly receive this, change the default state we we are initially kUnplugged.
+TEST_F(ObserverServerCodecTest, InitialPlugState) {
+  auto fake_driver = CreateFakeCodecOutput();
+  auto initial_plug_time = zx::clock::get_monotonic();
+  fake_driver->InjectUnpluggedAt(initial_plug_time);
+
+  RunLoopUntilIdle();
+  adr_service_->AddDevice(Device::Create(
+      adr_service_, dispatcher(), "Test codec name", fuchsia_audio_device::DeviceType::kCodec,
+      DriverClient::WithCodec(
+          fidl::ClientEnd<fuchsia_hardware_audio::Codec>(fake_driver->Enable()))));
+
+  RunLoopUntilIdle();
+  ASSERT_EQ(adr_service_->devices().size(), 1u);
+  ASSERT_EQ(adr_service_->unhealthy_devices().size(), 0u);
+  auto registry = CreateTestRegistryServer();
+  ASSERT_EQ(RegistryServer::count(), 1u);
+
+  auto added_device_id = WaitForAddedDeviceTokenId(registry->client());
+  ASSERT_TRUE(added_device_id);
+  auto [status, added_device] = adr_service_->FindDeviceByTokenId(*added_device_id);
+  ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
+  auto observer = CreateTestObserverServer(added_device);
+  bool received_callback = false;
+  zx::time reported_plug_time = zx::time::infinite_past();
+
+  observer->client()->WatchPlugState().Then(
+      [&received_callback, &reported_plug_time](
+          fidl::Result<fuchsia_audio_device::Observer::WatchPlugState>& result) mutable {
+        received_callback = true;
+        ASSERT_TRUE(result.is_ok()) << result.error_value();
+        ASSERT_TRUE(result->state());
+        EXPECT_EQ(*result->state(), fuchsia_audio_device::PlugState::kUnplugged);
+        ASSERT_TRUE(result->plug_time());
+        reported_plug_time = zx::time(*result->plug_time());
+      });
+
+  RunLoopUntilIdle();
+  EXPECT_TRUE(received_callback);
+  EXPECT_EQ(initial_plug_time.get(), reported_plug_time.get());
+  EXPECT_EQ(ObserverServer::count(), 1u);
+  EXPECT_FALSE(observer_fidl_error_status_.has_value());
+}
+
+// Validate that the Observer receives changes in the plug state of the observed device.
+TEST_F(ObserverServerCodecTest, PlugChange) {
+  auto fake_driver = CreateAndEnableDriverWithDefaults();
+  ASSERT_EQ(adr_service_->devices().size(), 1u);
+  ASSERT_EQ(adr_service_->unhealthy_devices().size(), 0u);
+  auto registry = CreateTestRegistryServer();
+  ASSERT_EQ(RegistryServer::count(), 1u);
+
+  auto added_device_id = WaitForAddedDeviceTokenId(registry->client());
+  ASSERT_TRUE(added_device_id);
+  auto [status, added_device] = adr_service_->FindDeviceByTokenId(*added_device_id);
+  ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
+  auto observer = CreateTestObserverServer(added_device);
+  auto time_after_device_added = zx::clock::get_monotonic();
+  zx::time received_plug_time;
+  bool received_callback = false;
+
+  observer->client()->WatchPlugState().Then(
+      [&received_callback, &received_plug_time](fidl::Result<Observer::WatchPlugState>& result) {
+        received_callback = true;
+        ASSERT_TRUE(result.is_ok()) << result.error_value();
+        ASSERT_TRUE(result->state());
+        EXPECT_EQ(*result->state(), fuchsia_audio_device::PlugState::kPlugged);  // default state
+        ASSERT_TRUE(result->plug_time());
+        received_plug_time = zx::time(*result->plug_time());
+      });
+
+  RunLoopUntilIdle();
+  EXPECT_TRUE(received_callback);
+  EXPECT_LT(received_plug_time.get(), time_after_device_added.get());
+  auto time_of_plug_change = zx::clock::get_monotonic();
+  received_callback = false;
+
+  observer->client()->WatchPlugState().Then(
+      [&received_callback, &received_plug_time](fidl::Result<Observer::WatchPlugState>& result) {
+        received_callback = true;
+        ASSERT_TRUE(result.is_ok()) << result.error_value();
+        ASSERT_TRUE(result->state());
+        EXPECT_EQ(*result->state(), fuchsia_audio_device::PlugState::kUnplugged);  // new state
+        ASSERT_TRUE(result->plug_time());
+        received_plug_time = zx::time(*result->plug_time());
+      });
+
+  RunLoopUntilIdle();
+  EXPECT_FALSE(received_callback);
+  fake_driver->InjectUnpluggedAt(time_of_plug_change);
+
+  RunLoopUntilIdle();
+  EXPECT_TRUE(received_callback);
+  EXPECT_EQ(received_plug_time.get(), time_of_plug_change.get());
+  EXPECT_FALSE(observer_fidl_error_status_.has_value());
+}
+
+// Validate that an Observer does not drop, if the observed device's Control client is dropped.
+TEST_F(ObserverServerCodecTest, ObserverDoesNotDropIfClientControlDrops) {
+  auto fake_driver = CreateAndEnableDriverWithDefaults();
+  auto registry = CreateTestRegistryServer();
+
+  auto added_device_id = WaitForAddedDeviceTokenId(registry->client());
+  ASSERT_TRUE(added_device_id);
+  auto [status, added_device] = adr_service_->FindDeviceByTokenId(*added_device_id);
+  ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
+  auto observer = CreateTestObserverServer(added_device);
+
+  {
+    auto received_callback = false;
+    auto control = CreateTestControlServer(added_device);
+    control->client()->CodecReset().Then(
+        [&received_callback](fidl::Result<Control::CodecReset>& result) {
+          received_callback = true;
+          EXPECT_TRUE(result.is_ok()) << result.error_value();
+        });
+
+    RunLoopUntilIdle();
+    EXPECT_TRUE(received_callback);
+  }
+
+  RunLoopUntilIdle();
+  EXPECT_EQ(ObserverServer::count(), 1u);
+  EXPECT_TRUE(observer->client().is_valid());
+  EXPECT_FALSE(observer_fidl_error_status_.has_value());
+}
+
+// Add test cases for WatchTopology and WatchElementState (once implemented)
+//
+// TODO(https://fxbug.dev/323270827): implement signalprocessing for Codec (topology, gain).
 
 /////////////////////
 // StreamConfig tests

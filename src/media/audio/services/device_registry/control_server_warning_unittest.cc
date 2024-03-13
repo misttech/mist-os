@@ -20,6 +20,7 @@
 #include "src/media/audio/services/device_registry/adr_server_unittest_base.h"
 #include "src/media/audio/services/device_registry/common_unittest.h"
 #include "src/media/audio/services/device_registry/control_server.h"
+#include "src/media/audio/services/device_registry/testing/fake_codec.h"
 #include "src/media/audio/services/device_registry/testing/fake_stream_config.h"
 
 namespace media_audio {
@@ -73,6 +74,20 @@ class ControlServerWarningTest : public AudioDeviceRegistryServerTestBase,
     EXPECT_TRUE(received_callback);
     EXPECT_TRUE(control_client.is_valid());
     return control_client;
+  }
+};
+
+class ControlServerCodecWarningTest : public ControlServerWarningTest {
+ protected:
+  std::unique_ptr<FakeCodec> CreateAndEnableDriverWithDefaults() {
+    auto fake_driver = CreateFakeCodecInput();
+
+    adr_service_->AddDevice(Device::Create(
+        adr_service_, dispatcher(), "Test codec name", fuchsia_audio_device::DeviceType::kCodec,
+        DriverClient::WithCodec(
+            fidl::ClientEnd<fuchsia_hardware_audio::Codec>(fake_driver->Enable()))));
+    RunLoopUntilIdle();
+    return fake_driver;
   }
 };
 
@@ -175,6 +190,435 @@ class ControlServerStreamConfigWarningTest : public ControlServerWarningTest {
     EXPECT_EQ(ControlServer::count(), 1u);
   }
 };
+
+/////////////////////
+// Codec tests
+
+// SetDaiFormat when already pending
+TEST_F(ControlServerCodecWarningTest, SetDaiFormatWhenAlreadyPending) {
+  auto fake_driver = CreateAndEnableDriverWithDefaults();
+  auto registry = CreateTestRegistryServer();
+  (void)WaitForAddedDeviceTokenId(registry->client());
+  auto device = *adr_service_->devices().begin();
+  auto control = CreateTestControlServer(device);
+
+  RunLoopUntilIdle();
+  ASSERT_EQ(RegistryServer::count(), 1u);
+  ASSERT_EQ(ControlServer::count(), 1u);
+  auto dai_format = SafeDaiFormatFromDaiSupportedFormats(device->dai_format_sets());
+  auto dai_format2 = SecondDaiFormatFromDaiSupportedFormats(device->dai_format_sets());
+  auto received_callback = false;
+  auto received_callback2 = false;
+
+  control->client()
+      ->SetDaiFormat({{.dai_format = dai_format}})
+      .Then([&received_callback](fidl::Result<Control::SetDaiFormat>& result) {
+        received_callback = true;
+        EXPECT_TRUE(result.is_ok()) << result.error_value().FormatDescription();
+      });
+  control->client()
+      ->SetDaiFormat({{.dai_format = dai_format}})
+      .Then([&received_callback2](fidl::Result<Control::SetDaiFormat>& result) {
+        received_callback2 = true;
+        ASSERT_TRUE(result.is_error());
+        ASSERT_TRUE(result.error_value().is_domain_error()) << result.error_value();
+        EXPECT_EQ(result.error_value().domain_error(),
+                  fuchsia_audio_device::ControlSetDaiFormatError::kAlreadyPending)
+            << result.error_value();
+      });
+
+  RunLoopUntilIdle();
+  EXPECT_TRUE(received_callback && received_callback2);
+  EXPECT_EQ(ControlServer::count(), 1u);
+}
+
+// SetDaiFormat invalid
+TEST_F(ControlServerCodecWarningTest, SetDaiFormatInvalidFormat) {
+  auto fake_driver = CreateAndEnableDriverWithDefaults();
+  auto registry = CreateTestRegistryServer();
+  (void)WaitForAddedDeviceTokenId(registry->client());
+  auto device = *adr_service_->devices().begin();
+  auto control = CreateTestControlServer(device);
+
+  RunLoopUntilIdle();
+  ASSERT_EQ(RegistryServer::count(), 1u);
+  ASSERT_EQ(ControlServer::count(), 1u);
+  auto invalid_dai_format = SafeDaiFormatFromDaiSupportedFormats(device->dai_format_sets());
+  invalid_dai_format.bits_per_sample() = invalid_dai_format.bits_per_slot() + 1;
+  auto received_callback = false;
+
+  control->client()
+      ->SetDaiFormat({{.dai_format = invalid_dai_format}})
+      .Then([&received_callback](fidl::Result<Control::SetDaiFormat>& result) {
+        received_callback = true;
+        ASSERT_TRUE(result.is_error());
+        ASSERT_TRUE(result.error_value().is_domain_error()) << result.error_value();
+        EXPECT_EQ(result.error_value().domain_error(),
+                  fuchsia_audio_device::ControlSetDaiFormatError::kInvalidDaiFormat)
+            << result.error_value();
+      });
+
+  RunLoopUntilIdle();
+  EXPECT_TRUE(received_callback);
+  EXPECT_EQ(ControlServer::count(), 1u);
+}
+
+// SetDaiFormat unsupported
+TEST_F(ControlServerCodecWarningTest, SetDaiFormatUnsupportedFormat) {
+  auto fake_driver = CreateAndEnableDriverWithDefaults();
+  auto registry = CreateTestRegistryServer();
+  (void)WaitForAddedDeviceTokenId(registry->client());
+  auto device = *adr_service_->devices().begin();
+  auto control = CreateTestControlServer(device);
+
+  RunLoopUntilIdle();
+  ASSERT_EQ(RegistryServer::count(), 1u);
+  ASSERT_EQ(ControlServer::count(), 1u);
+  auto unsupported_dai_format = UnsupportedDaiFormatFromDaiFormatSets(device->dai_format_sets());
+  auto received_callback = false;
+
+  control->client()
+      ->SetDaiFormat({{.dai_format = unsupported_dai_format}})
+      .Then([&received_callback](fidl::Result<Control::SetDaiFormat>& result) {
+        received_callback = true;
+        ASSERT_TRUE(result.is_error());
+        ASSERT_TRUE(result.error_value().is_domain_error()) << result.error_value();
+        EXPECT_EQ(result.error_value().domain_error(),
+                  fuchsia_audio_device::ControlSetDaiFormatError::kFormatMismatch)
+            << result.error_value();
+      });
+
+  RunLoopUntilIdle();
+  EXPECT_TRUE(received_callback);
+  EXPECT_EQ(ControlServer::count(), 1u);
+}
+
+// Start when already pending
+TEST_F(ControlServerCodecWarningTest, CodecStartWhenAlreadyPending) {
+  auto fake_driver = CreateAndEnableDriverWithDefaults();
+  auto registry = CreateTestRegistryServer();
+  (void)WaitForAddedDeviceTokenId(registry->client());
+  auto device = *adr_service_->devices().begin();
+  auto control = CreateTestControlServer(device);
+
+  RunLoopUntilIdle();
+  ASSERT_EQ(RegistryServer::count(), 1u);
+  ASSERT_EQ(ControlServer::count(), 1u);
+  auto dai_format = SafeDaiFormatFromDaiSupportedFormats(device->dai_format_sets());
+  auto received_callback = false;
+  control->client()
+      ->SetDaiFormat({{.dai_format = dai_format}})
+      .Then([&received_callback](fidl::Result<Control::SetDaiFormat>& result) {
+        received_callback = true;
+        EXPECT_TRUE(result.is_ok()) << result.error_value().FormatDescription();
+      });
+
+  RunLoopUntilIdle();
+  ASSERT_TRUE(received_callback);
+  received_callback = false;
+  auto received_callback2 = false;
+
+  control->client()->CodecStart().Then(
+      [&received_callback](fidl::Result<Control::CodecStart>& result) {
+        received_callback = true;
+        EXPECT_TRUE(result.is_ok()) << result.error_value().FormatDescription();
+      });
+  control->client()->CodecStart().Then(
+      [&received_callback2](fidl::Result<Control::CodecStart>& result) {
+        received_callback2 = true;
+        ASSERT_TRUE(result.is_error());
+        ASSERT_TRUE(result.error_value().is_domain_error()) << result.error_value();
+        EXPECT_EQ(result.error_value().domain_error(),
+                  fuchsia_audio_device::ControlCodecStartError::kAlreadyPending)
+            << result.error_value();
+      });
+
+  RunLoopUntilIdle();
+  EXPECT_TRUE(received_callback && received_callback2);
+  EXPECT_EQ(ControlServer::count(), 1u);
+}
+
+// Start before SetDaiFormat
+TEST_F(ControlServerCodecWarningTest, CodecStartBeforeSetDaiFormat) {
+  auto fake_driver = CreateAndEnableDriverWithDefaults();
+  auto registry = CreateTestRegistryServer();
+  (void)WaitForAddedDeviceTokenId(registry->client());
+  auto device = *adr_service_->devices().begin();
+  auto control = CreateTestControlServer(device);
+
+  RunLoopUntilIdle();
+  ASSERT_EQ(RegistryServer::count(), 1u);
+  ASSERT_EQ(ControlServer::count(), 1u);
+  auto received_callback = false;
+
+  control->client()->CodecStart().Then(
+      [&received_callback](fidl::Result<Control::CodecStart>& result) {
+        received_callback = true;
+        ASSERT_TRUE(result.is_error());
+        ASSERT_TRUE(result.error_value().is_domain_error()) << result.error_value();
+        EXPECT_EQ(result.error_value().domain_error(),
+                  fuchsia_audio_device::ControlCodecStartError::kDaiFormatNotSet)
+            << result.error_value();
+      });
+
+  RunLoopUntilIdle();
+  EXPECT_TRUE(received_callback);
+  EXPECT_EQ(ControlServer::count(), 1u);
+}
+
+// Start when Started
+TEST_F(ControlServerCodecWarningTest, CodecStartWhenStarted) {
+  auto fake_driver = CreateAndEnableDriverWithDefaults();
+  auto registry = CreateTestRegistryServer();
+  (void)WaitForAddedDeviceTokenId(registry->client());
+  auto device = *adr_service_->devices().begin();
+  auto control = CreateTestControlServer(device);
+
+  RunLoopUntilIdle();
+  ASSERT_EQ(RegistryServer::count(), 1u);
+  ASSERT_EQ(ControlServer::count(), 1u);
+  auto dai_format = SafeDaiFormatFromDaiSupportedFormats(device->dai_format_sets());
+  auto received_callback = false;
+  control->client()
+      ->SetDaiFormat({{.dai_format = dai_format}})
+      .Then([&received_callback](fidl::Result<Control::SetDaiFormat>& result) {
+        received_callback = true;
+        EXPECT_TRUE(result.is_ok()) << result.error_value().FormatDescription();
+      });
+
+  RunLoopUntilIdle();
+  ASSERT_TRUE(received_callback);
+  received_callback = false;
+  control->client()->CodecStart().Then(
+      [&received_callback](fidl::Result<Control::CodecStart>& result) {
+        received_callback = true;
+        EXPECT_TRUE(result.is_ok()) << result.error_value().FormatDescription();
+      });
+
+  RunLoopUntilIdle();
+  ASSERT_TRUE(received_callback);
+  received_callback = false;
+
+  control->client()->CodecStart().Then(
+      [&received_callback](fidl::Result<Control::CodecStart>& result) {
+        received_callback = true;
+        ASSERT_TRUE(result.is_error());
+        ASSERT_TRUE(result.error_value().is_domain_error()) << result.error_value();
+        EXPECT_EQ(result.error_value().domain_error(),
+                  fuchsia_audio_device::ControlCodecStartError::kAlreadyStarted)
+            << result.error_value();
+      });
+
+  RunLoopUntilIdle();
+  EXPECT_TRUE(received_callback);
+  EXPECT_EQ(ControlServer::count(), 1u);
+}
+
+// Stop when already pending
+TEST_F(ControlServerCodecWarningTest, CodecStopWhenAlreadyPending) {
+  auto fake_driver = CreateAndEnableDriverWithDefaults();
+  auto registry = CreateTestRegistryServer();
+  (void)WaitForAddedDeviceTokenId(registry->client());
+  auto device = *adr_service_->devices().begin();
+  auto control = CreateTestControlServer(device);
+
+  RunLoopUntilIdle();
+  ASSERT_EQ(RegistryServer::count(), 1u);
+  ASSERT_EQ(ControlServer::count(), 1u);
+  auto dai_format = SafeDaiFormatFromDaiSupportedFormats(device->dai_format_sets());
+  auto received_callback = false;
+  control->client()
+      ->SetDaiFormat({{.dai_format = dai_format}})
+      .Then([&received_callback](fidl::Result<Control::SetDaiFormat>& result) {
+        received_callback = true;
+        EXPECT_TRUE(result.is_ok()) << result.error_value().FormatDescription();
+      });
+
+  RunLoopUntilIdle();
+  ASSERT_TRUE(received_callback);
+  received_callback = false;
+  control->client()->CodecStart().Then(
+      [&received_callback](fidl::Result<Control::CodecStart>& result) {
+        received_callback = true;
+        EXPECT_TRUE(result.is_ok()) << result.error_value().FormatDescription();
+      });
+
+  RunLoopUntilIdle();
+  ASSERT_TRUE(received_callback);
+  received_callback = false;
+  auto received_callback2 = false;
+
+  control->client()->CodecStop().Then(
+      [&received_callback](fidl::Result<Control::CodecStop>& result) {
+        received_callback = true;
+        EXPECT_TRUE(result.is_ok()) << result.error_value().FormatDescription();
+      });
+  control->client()->CodecStop().Then(
+      [&received_callback2](fidl::Result<Control::CodecStop>& result) {
+        received_callback2 = true;
+        ASSERT_TRUE(result.is_error());
+        ASSERT_TRUE(result.error_value().is_domain_error()) << result.error_value();
+        EXPECT_EQ(result.error_value().domain_error(),
+                  fuchsia_audio_device::ControlCodecStopError::kAlreadyPending)
+            << result.error_value();
+      });
+
+  RunLoopUntilIdle();
+  EXPECT_TRUE(received_callback && received_callback2);
+  EXPECT_EQ(ControlServer::count(), 1u);
+}
+
+// Stop before SetDaiFormat
+TEST_F(ControlServerCodecWarningTest, CodecStopBeforeSetDaiFormat) {
+  auto fake_driver = CreateAndEnableDriverWithDefaults();
+  auto registry = CreateTestRegistryServer();
+  (void)WaitForAddedDeviceTokenId(registry->client());
+  auto device = *adr_service_->devices().begin();
+  auto control = CreateTestControlServer(device);
+
+  RunLoopUntilIdle();
+  ASSERT_EQ(RegistryServer::count(), 1u);
+  ASSERT_EQ(ControlServer::count(), 1u);
+  auto received_callback = false;
+
+  control->client()->CodecStop().Then(
+      [&received_callback](fidl::Result<Control::CodecStop>& result) {
+        received_callback = true;
+        ASSERT_TRUE(result.is_error());
+        ASSERT_TRUE(result.error_value().is_domain_error()) << result.error_value();
+        EXPECT_EQ(result.error_value().domain_error(),
+                  fuchsia_audio_device::ControlCodecStopError::kDaiFormatNotSet)
+            << result.error_value();
+      });
+
+  RunLoopUntilIdle();
+  EXPECT_TRUE(received_callback);
+  EXPECT_EQ(ControlServer::count(), 1u);
+}
+
+// Stop when Stopped
+TEST_F(ControlServerCodecWarningTest, CodecStopWhenStopped) {
+  auto fake_driver = CreateAndEnableDriverWithDefaults();
+  auto registry = CreateTestRegistryServer();
+  (void)WaitForAddedDeviceTokenId(registry->client());
+  auto device = *adr_service_->devices().begin();
+  auto control = CreateTestControlServer(device);
+
+  RunLoopUntilIdle();
+  ASSERT_EQ(RegistryServer::count(), 1u);
+  ASSERT_EQ(ControlServer::count(), 1u);
+  auto dai_format = SafeDaiFormatFromDaiSupportedFormats(device->dai_format_sets());
+  auto received_callback = false;
+  control->client()
+      ->SetDaiFormat({{.dai_format = dai_format}})
+      .Then([&received_callback](fidl::Result<Control::SetDaiFormat>& result) {
+        received_callback = true;
+        EXPECT_TRUE(result.is_ok()) << result.error_value().FormatDescription();
+      });
+
+  RunLoopUntilIdle();
+  ASSERT_TRUE(received_callback);
+  received_callback = false;
+
+  control->client()->CodecStop().Then(
+      [&received_callback](fidl::Result<Control::CodecStop>& result) {
+        received_callback = true;
+        ASSERT_TRUE(result.is_error());
+        ASSERT_TRUE(result.error_value().is_domain_error()) << result.error_value();
+        EXPECT_EQ(result.error_value().domain_error(),
+                  fuchsia_audio_device::ControlCodecStopError::kAlreadyStopped)
+            << result.error_value();
+      });
+
+  RunLoopUntilIdle();
+  EXPECT_TRUE(received_callback);
+  EXPECT_EQ(ControlServer::count(), 1u);
+}
+
+// SetGain WRONG_DEVICE_TYPE
+TEST_F(ControlServerCodecWarningTest, SetGainFails) {
+  auto fake_driver = CreateAndEnableDriverWithDefaults();
+  auto registry = CreateTestRegistryServer();
+  (void)WaitForAddedDeviceTokenId(registry->client());
+  auto device = *adr_service_->devices().begin();
+  auto control = CreateTestControlServer(device);
+
+  RunLoopUntilIdle();
+  ASSERT_EQ(RegistryServer::count(), 1u);
+  ASSERT_EQ(ControlServer::count(), 1u);
+  auto received_callback = false;
+
+  control->client()
+      ->SetGain({{
+          .target_state = fuchsia_audio_device::GainState{{
+              .gain_db = 0.0f,
+              .muted = false,
+              .agc_enabled = false,
+          }},
+      }})
+      .Then([&received_callback](fidl::Result<Control::SetGain>& result) {
+        received_callback = true;
+        ASSERT_TRUE(result.is_error());
+        ASSERT_TRUE(result.error_value().is_domain_error()) << result.error_value();
+        EXPECT_EQ(result.error_value().domain_error(),
+                  fuchsia_audio_device::ControlSetGainError::kWrongDeviceType)
+            << result.error_value();
+      });
+
+  RunLoopUntilIdle();
+  EXPECT_TRUE(received_callback);
+  EXPECT_EQ(ControlServer::count(), 1u);
+}
+
+// CreateRingBuffer WRONG_DEVICE_TYPE
+TEST_F(ControlServerCodecWarningTest, CreateRingBufferFails) {
+  auto fake_driver = CreateAndEnableDriverWithDefaults();
+  auto registry = CreateTestRegistryServer();
+  (void)WaitForAddedDeviceTokenId(registry->client());
+  auto device = *adr_service_->devices().begin();
+  auto control = CreateTestControlServer(device);
+
+  RunLoopUntilIdle();
+  ASSERT_EQ(RegistryServer::count(), 1u);
+  ASSERT_EQ(ControlServer::count(), 1u);
+  auto received_callback = false;
+
+  auto [ring_buffer_client_end, ring_buffer_server_end] =
+      CreateNaturalAsyncClientOrDie<fuchsia_audio_device::RingBuffer>();
+
+  auto ring_buffer_client = fidl::Client<fuchsia_audio_device::RingBuffer>(
+      std::move(ring_buffer_client_end), dispatcher(), ring_buffer_fidl_handler_.get());
+
+  control->client()
+      ->CreateRingBuffer({{
+          .options = fuchsia_audio_device::RingBufferOptions{{
+              .format = fuchsia_audio::Format{{
+                  .sample_type = fuchsia_audio::SampleType::kInt16,
+                  .channel_count = 2,
+                  .frames_per_second = 48000,
+              }},
+              .ring_buffer_min_bytes = 2000,
+          }},
+          .ring_buffer_server =
+              fidl::ServerEnd<fuchsia_audio_device::RingBuffer>(std::move(ring_buffer_server_end)),
+      }})
+      .Then([&received_callback](fidl::Result<Control::CreateRingBuffer>& result) {
+        received_callback = true;
+        ASSERT_TRUE(result.is_error());
+        ASSERT_TRUE(result.error_value().is_domain_error()) << result.error_value();
+        EXPECT_EQ(result.error_value().domain_error(),
+                  fuchsia_audio_device::ControlCreateRingBufferError::kWrongDeviceType)
+            << result.error_value();
+      });
+
+  RunLoopUntilIdle();
+  EXPECT_TRUE(received_callback);
+  EXPECT_EQ(ControlServer::count(), 1u);
+}
+
+// Add negative test cases for SetTopology and SetElementState (once implemented)
+//
+// TODO(https://fxbug.dev/323270827): implement signalprocessing for Codec (topology, gain).
 
 /////////////////////
 // StreamConfig tests
@@ -583,6 +1027,123 @@ TEST_F(ControlServerStreamConfigWarningTest, CreateRingBufferBadRingBufferServer
 
 // TODO(https://fxbug.dev/42068381): If Health can change post-initialization, test: device becomes
 //   unhealthy before CreateRingBuffer. Expect Obs/Ctl to drop, Reg/WatchRemoved.
+
+TEST_F(ControlServerStreamConfigWarningTest, SetDaiFormatFails) {
+  auto fake_driver = CreateAndEnableDriverWithDefaults();
+  auto registry = CreateTestRegistryServer();
+  (void)WaitForAddedDeviceTokenId(registry->client());
+  auto control = CreateTestControlServer(*adr_service_->devices().begin());
+
+  RunLoopUntilIdle();
+  ASSERT_EQ(RegistryServer::count(), 1u);
+  ASSERT_EQ(ControlServer::count(), 1u);
+  auto received_callback = false;
+
+  fuchsia_hardware_audio::DaiFormat dai_format{{
+      .number_of_channels = 1,
+      .channels_to_use_bitmask = 1,
+      .sample_format = fuchsia_hardware_audio::DaiSampleFormat::kPcmSigned,
+      .frame_format = fuchsia_hardware_audio::DaiFrameFormat::WithFrameFormatStandard(
+          fuchsia_hardware_audio::DaiFrameFormatStandard::kNone),
+      .frame_rate = 48000,
+      .bits_per_slot = 16,
+      .bits_per_sample = 16,
+  }};
+
+  control->client()
+      ->SetDaiFormat({{.dai_format = dai_format}})
+      .Then([&received_callback](fidl::Result<Control::SetDaiFormat>& result) {
+        received_callback = true;
+        ASSERT_TRUE(result.is_error());
+        ASSERT_TRUE(result.error_value().is_domain_error())
+            << result.error_value().framework_error();
+        EXPECT_EQ(result.error_value().domain_error(),
+                  fuchsia_audio_device::ControlSetDaiFormatError::kWrongDeviceType)
+            << result.error_value();
+      });
+  RunLoopUntilIdle();
+
+  EXPECT_TRUE(received_callback);
+  EXPECT_EQ(ControlServer::count(), 1u);
+}
+
+TEST_F(ControlServerStreamConfigWarningTest, CodecStartFails) {
+  auto fake_driver = CreateAndEnableDriverWithDefaults();
+  auto registry = CreateTestRegistryServer();
+  (void)WaitForAddedDeviceTokenId(registry->client());
+  auto control = CreateTestControlServer(*adr_service_->devices().begin());
+
+  RunLoopUntilIdle();
+  ASSERT_EQ(RegistryServer::count(), 1u);
+  ASSERT_EQ(ControlServer::count(), 1u);
+  auto received_callback = false;
+
+  control->client()->CodecStart().Then([&received_callback](
+                                           fidl::Result<Control::CodecStart>& result) {
+    received_callback = true;
+    ASSERT_TRUE(result.is_error());
+    ASSERT_TRUE(result.error_value().is_domain_error()) << result.error_value().framework_error();
+    EXPECT_EQ(result.error_value().domain_error(),
+              fuchsia_audio_device::ControlCodecStartError::kWrongDeviceType)
+        << result.error_value();
+  });
+  RunLoopUntilIdle();
+
+  EXPECT_TRUE(received_callback);
+  EXPECT_EQ(ControlServer::count(), 1u);
+}
+
+TEST_F(ControlServerStreamConfigWarningTest, CodecStopFails) {
+  auto fake_driver = CreateAndEnableDriverWithDefaults();
+  auto registry = CreateTestRegistryServer();
+  (void)WaitForAddedDeviceTokenId(registry->client());
+  auto control = CreateTestControlServer(*adr_service_->devices().begin());
+
+  RunLoopUntilIdle();
+  ASSERT_EQ(RegistryServer::count(), 1u);
+  ASSERT_EQ(ControlServer::count(), 1u);
+  auto received_callback = false;
+
+  control->client()->CodecStop().Then([&received_callback](
+                                          fidl::Result<Control::CodecStop>& result) {
+    received_callback = true;
+    ASSERT_TRUE(result.is_error());
+    ASSERT_TRUE(result.error_value().is_domain_error()) << result.error_value().framework_error();
+    EXPECT_EQ(result.error_value().domain_error(),
+              fuchsia_audio_device::ControlCodecStopError::kWrongDeviceType)
+        << result.error_value();
+  });
+  RunLoopUntilIdle();
+
+  EXPECT_TRUE(received_callback);
+  EXPECT_EQ(ControlServer::count(), 1u);
+}
+
+TEST_F(ControlServerStreamConfigWarningTest, CodecResetFails) {
+  auto fake_driver = CreateAndEnableDriverWithDefaults();
+  auto registry = CreateTestRegistryServer();
+  (void)WaitForAddedDeviceTokenId(registry->client());
+  auto control = CreateTestControlServer(*adr_service_->devices().begin());
+
+  RunLoopUntilIdle();
+  ASSERT_EQ(RegistryServer::count(), 1u);
+  ASSERT_EQ(ControlServer::count(), 1u);
+  auto received_callback = false;
+
+  control->client()->CodecReset().Then([&received_callback](
+                                           fidl::Result<Control::CodecReset>& result) {
+    received_callback = true;
+    ASSERT_TRUE(result.is_error());
+    ASSERT_TRUE(result.error_value().is_domain_error()) << result.error_value().framework_error();
+    EXPECT_EQ(result.error_value().domain_error(),
+              fuchsia_audio_device::ControlCodecResetError::kWrongDeviceType)
+        << result.error_value();
+  });
+  RunLoopUntilIdle();
+
+  EXPECT_TRUE(received_callback);
+  EXPECT_EQ(ControlServer::count(), 1u);
+}
 
 }  // namespace
 }  // namespace media_audio

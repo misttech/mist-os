@@ -15,14 +15,13 @@
 #include <zircon/compiler.h>
 #include <zircon/errors.h>
 
-#include <iomanip>
-#include <limits>
 #include <optional>
 
 #include "src/media/audio/services/device_registry/device.h"
 #include "src/media/audio/services/device_registry/device_presence_watcher.h"
 #include "src/media/audio/services/device_registry/logging.h"
 #include "src/media/audio/services/device_registry/ring_buffer_server.h"
+#include "src/media/audio/services/device_registry/validate.h"
 
 namespace media_audio {
 
@@ -116,6 +115,13 @@ void ControlServer::SetGain(SetGainRequest& request, SetGainCompleter::Sync& com
     return;
   }
 
+  if (device_->device_type() != fuchsia_audio_device::DeviceType::kInput &&
+      device_->device_type() != fuchsia_audio_device::DeviceType::kOutput) {
+    ADR_WARN_METHOD() << "Unsupported method for device_type " << device_->device_type();
+    completer.Reply(fit::error(fuchsia_audio_device::ControlSetGainError::kWrongDeviceType));
+    return;
+  }
+
   if (!request.target_state()) {
     ADR_WARN_METHOD() << "required field 'target_state' is missing";
     completer.Reply(fit::error(fuchsia_audio_device::ControlSetGainError::kInvalidGainState));
@@ -172,7 +178,15 @@ void ControlServer::CreateRingBuffer(CreateRingBufferRequest& request,
     return;
   }
 
-  if (create_ring_buffer_completer_) {
+  if (device_->device_type() != fuchsia_audio_device::DeviceType::kInput &&
+      device_->device_type() != fuchsia_audio_device::DeviceType::kOutput) {
+    ADR_WARN_METHOD() << "Unsupported method for device_type " << device_->device_type();
+    completer.Reply(
+        fit::error(fuchsia_audio_device::ControlCreateRingBufferError::kWrongDeviceType));
+    return;
+  }
+
+  if (create_ring_buffer_completer_.has_value()) {
     ADR_WARN_METHOD() << "previous `CreateRingBuffer` request has not yet completed";
     completer.Reply(
         fit::error(fuchsia_audio_device::ControlCreateRingBufferError::kAlreadyPending));
@@ -226,7 +240,7 @@ void ControlServer::CreateRingBuffer(CreateRingBufferRequest& request,
       *driver_format, *request.options()->ring_buffer_min_bytes(),
       [this](Device::RingBufferInfo info) {
         // If we have no async completer, maybe we're shutting down. Just exit.
-        if (!create_ring_buffer_completer_) {
+        if (!create_ring_buffer_completer_.has_value()) {
           ADR_WARN_METHOD()
               << "create_ring_buffer_completer_ gone by the time the CreateRingBuffer callback ran";
           if (auto ring_buffer_server = GetRingBufferServer(); ring_buffer_server) {
@@ -247,9 +261,10 @@ void ControlServer::CreateRingBuffer(CreateRingBufferRequest& request,
   if (!created) {
     ADR_WARN_METHOD() << "device cannot create a ring buffer with the specified options";
     ring_buffer_server_.reset();
-    create_ring_buffer_completer_->Reply(
-        fidl::Response<fuchsia_audio_device::Control::CreateRingBuffer>(
-            fit::error(fuchsia_audio_device::ControlCreateRingBufferError::kBadRingBufferOption)));
+    auto completer = std::move(*create_ring_buffer_completer_);
+    create_ring_buffer_completer_.reset();
+    completer.Reply(fidl::Response<fuchsia_audio_device::Control::CreateRingBuffer>(
+        fit::error(fuchsia_audio_device::ControlCreateRingBufferError::kBadRingBufferOption)));
     return;
   }
   auto ring_buffer_server = RingBufferServer::Create(
@@ -285,37 +300,271 @@ void ControlServer::DelayInfoChanged(const fuchsia_audio_device::DelayInfo& dela
   delay_info_ = delay_info;
 }
 
-// For now don't do anything on receiving this. Eventually we'll complete a pending `SetDaiFormat`.
+void ControlServer::SetDaiFormat(SetDaiFormatRequest& request,
+                                 SetDaiFormatCompleter::Sync& completer) {
+  if (device_has_error_) {
+    ADR_WARN_METHOD() << "device has an error";
+    completer.Reply(fit::error(fuchsia_audio_device::ControlSetDaiFormatError::kDeviceError));
+    return;
+  }
+
+  if (device_->device_type() != fuchsia_audio_device::DeviceType::kCodec) {
+    ADR_WARN_METHOD() << "Unsupported method for device_type " << device_->device_type();
+    completer.Reply(fit::error(fuchsia_audio_device::ControlSetDaiFormatError::kWrongDeviceType));
+    return;
+  }
+
+  if (set_dai_format_completer_.has_value()) {
+    ADR_WARN_METHOD() << "previous `SetDaiFormat` request has not yet completed";
+    completer.Reply(fit::error(fuchsia_audio_device::ControlSetDaiFormatError::kAlreadyPending));
+    return;
+  }
+
+  if (!request.dai_format().has_value() || ValidateDaiFormat(*request.dai_format()) != ZX_OK) {
+    ADR_WARN_METHOD() << "required field 'dai_format' is missing or invalid";
+    completer.Reply(fit::error(fuchsia_audio_device::ControlSetDaiFormatError::kInvalidDaiFormat));
+    return;
+  }
+
+  set_dai_format_completer_ = completer.ToAsync();
+
+  if (!device_->CodecSetDaiFormat(*request.dai_format())) {
+    auto set_fmt_completer = std::move(*set_dai_format_completer_);
+    set_dai_format_completer_.reset();
+    set_fmt_completer.Reply(fit::error(fuchsia_audio_device::ControlSetDaiFormatError::kOther));
+  }
+
+  // We need the CodecFormatInfo to complete this, so we wait for the Device to notify us. Besides,
+  // it's also possible that the underlying driver will reject the request (e.g. format mismatch).
+}
+
+// The Device's DaiFormat has changed. If `dai_format` is set, this resulted from `SetDaiFormat`
+// being called. Otherwise, the Device is newly-initialized or `CodecReset` was called, so
+// SetDaiFormat must be called again.
 void ControlServer::DaiFormatChanged(
     const std::optional<fuchsia_hardware_audio::DaiFormat>& dai_format,
     const std::optional<fuchsia_hardware_audio::CodecFormatInfo>& codec_format_info) {
   ADR_LOG_METHOD(kLogNotifyMethods);
+
+  if (!dai_format.has_value()) {
+    FX_DCHECK(!codec_format_info.has_value());
+    set_dai_format_completer_.reset();
+    return;
+  }
+
   LogDaiFormat(dai_format);
   LogCodecFormatInfo(codec_format_info);
+
+  if (!set_dai_format_completer_.has_value()) {
+    ADR_WARN_METHOD() << "received Device notification, but completer is gone.";
+    return;
+  }
+
+  auto completer = std::move(*set_dai_format_completer_);
+  set_dai_format_completer_.reset();
+  completer.Reply(fit::success(
+      fuchsia_audio_device::ControlSetDaiFormatResponse{{.state = device_->codec_format_info()}}));
 }
 
-// For now don't do anything on receiving this. Eventually we'll fail a pending `SetDaiFormat`.
+// If `driver_error` is ZX_OK, a `SetDaiFormat` call was not an error but resulted in no change.
 void ControlServer::DaiFormatNotSet(const fuchsia_hardware_audio::DaiFormat& dai_format,
                                     zx_status_t driver_error) {
-  ADR_WARN_METHOD() << "(err " << driver_error << ")";
+  ADR_LOG_METHOD(kLogNotifyMethods);
   LogDaiFormat(dai_format);
+
+  if (!set_dai_format_completer_.has_value()) {
+    ADR_WARN_METHOD()
+        << "received Device notification (SetDaiFormat rejected), but completer is gone.";
+    return;
+  }
+
+  auto completer = std::move(*set_dai_format_completer_);
+  set_dai_format_completer_.reset();
+  if (driver_error == ZX_OK) {
+    completer.Reply(fit::success(fuchsia_audio_device::ControlSetDaiFormatResponse{
+        {.state = device_->codec_format_info()}}));
+    return;
+  }
+
+  if (driver_error == ZX_ERR_NOT_SUPPORTED) {
+    completer.Reply(fit::error(fuchsia_audio_device::ControlSetDaiFormatError::kFormatMismatch));
+  } else if (driver_error == ZX_ERR_INVALID_ARGS) {
+    completer.Reply(fit::error(fuchsia_audio_device::ControlSetDaiFormatError::kInvalidDaiFormat));
+  } else {
+    completer.Reply(fit::error(fuchsia_audio_device::ControlSetDaiFormatError::kOther));
+  }
 }
 
-// For now don't do anything on receiving this. Eventually we'll complete a pending `Start`.
+void ControlServer::CodecStart(CodecStartCompleter::Sync& completer) {
+  if (device_has_error_) {
+    ADR_WARN_METHOD() << "device has an error";
+    completer.Reply(fit::error(fuchsia_audio_device::ControlCodecStartError::kDeviceError));
+    return;
+  }
+
+  if (device_->device_type() != fuchsia_audio_device::DeviceType::kCodec) {
+    ADR_WARN_METHOD() << "Unsupported method for device_type " << device_->device_type();
+    completer.Reply(fit::error(fuchsia_audio_device::ControlCodecStartError::kWrongDeviceType));
+    return;
+  }
+
+  // Check for already pending
+  if (codec_start_completer_.has_value()) {
+    ADR_WARN_METHOD() << "previous `CodecStart` request has not yet completed";
+    completer.Reply(fit::error(fuchsia_audio_device::ControlCodecStartError::kAlreadyPending));
+    return;
+  }
+
+  if (!device_->dai_format_is_set()) {
+    ADR_WARN_METHOD() << "CodecStart called before DaiFormat was set";
+    completer.Reply(fit::error(fuchsia_audio_device::ControlCodecStartError::kDaiFormatNotSet));
+    return;
+  }
+
+  // Check for already started
+  if (device_->codec_is_started()) {
+    ADR_WARN_METHOD() << "Codec is already started";
+    completer.Reply(fit::error(fuchsia_audio_device::ControlCodecStartError::kAlreadyStarted));
+    return;
+  }
+
+  codec_start_completer_ = completer.ToAsync();
+
+  // Call into the Device to Start.
+  if (!device_->CodecStart()) {
+    auto start_completer = std::move(*codec_start_completer_);
+    codec_start_completer_.reset();
+    start_completer.Reply(fit::error(fuchsia_audio_device::ControlCodecStartError::kDeviceError));
+  }
+
+  // We need `start_time` to complete this, so we wait for the Device to notify us. Besides,
+  // it's also possible that the underlying driver will reject the request.
+}
+
 void ControlServer::CodecStarted(const zx::time& start_time) {
   ADR_LOG_METHOD(kLogNotifyMethods) << "(" << start_time.get() << ")";
+
+  if (!codec_start_completer_.has_value()) {
+    ADR_WARN_METHOD() << "received notification from Device, but completer is gone";
+    return;
+  }
+
+  auto completer = std::move(*codec_start_completer_);
+  codec_start_completer_.reset();
+  completer.Reply(fit::success(
+      fuchsia_audio_device::ControlCodecStartResponse{{.start_time = start_time.get()}}));
 }
 
-// For now don't do anything on receiving this. Eventually we'll fail a pending `Start`.
-void ControlServer::CodecNotStarted() { ADR_WARN_METHOD(); }
+void ControlServer::CodecNotStarted() {
+  ADR_LOG_METHOD(kLogNotifyMethods);
 
-// For now don't do anything on receiving this. Eventually we'll complete a pending `Stop`.
+  if (!codec_start_completer_.has_value()) {
+    ADR_WARN_METHOD()
+        << "received Device notification (CodecStart rejected), but completer is gone.";
+    return;
+  }
+
+  auto completer = std::move(*codec_start_completer_);
+  codec_start_completer_.reset();
+  completer.Reply(fit::error(fuchsia_audio_device::ControlCodecStartError::kOther));
+}
+
+void ControlServer::CodecStop(CodecStopCompleter::Sync& completer) {
+  if (device_has_error_) {
+    ADR_WARN_METHOD() << "device has an error";
+    completer.Reply(fit::error(fuchsia_audio_device::ControlCodecStopError::kDeviceError));
+    return;
+  }
+
+  if (device_->device_type() != fuchsia_audio_device::DeviceType::kCodec) {
+    ADR_WARN_METHOD() << "Unsupported method for device_type " << device_->device_type();
+    completer.Reply(fit::error(fuchsia_audio_device::ControlCodecStopError::kWrongDeviceType));
+    return;
+  }
+
+  // Check for already pending
+  if (codec_stop_completer_.has_value()) {
+    ADR_WARN_METHOD() << "previous `CodecStop` request has not yet completed";
+    completer.Reply(fit::error(fuchsia_audio_device::ControlCodecStopError::kAlreadyPending));
+    return;
+  }
+
+  if (!device_->dai_format_is_set()) {
+    ADR_WARN_METHOD() << "CodecStop called before DaiFormat was set";
+    completer.Reply(fit::error(fuchsia_audio_device::ControlCodecStopError::kDaiFormatNotSet));
+    return;
+  }
+
+  // Check for already stopped
+  if (!device_->codec_is_started()) {
+    ADR_WARN_METHOD() << "Codec is already stopped";
+    completer.Reply(fit::error(fuchsia_audio_device::ControlCodecStopError::kAlreadyStopped));
+    return;
+  }
+
+  codec_stop_completer_ = completer.ToAsync();
+
+  // Call into the Device to Stop.
+  if (!device_->CodecStop()) {
+    auto stop_completer = std::move(*codec_stop_completer_);
+    codec_stop_completer_.reset();
+    stop_completer.Reply(fit::error(fuchsia_audio_device::ControlCodecStopError::kDeviceError));
+  }
+
+  // We need `stop_time` to complete this, so we wait for the Device to notify us. Besides,
+  // it's also possible that the underlying driver will reject the request.
+}
+
 void ControlServer::CodecStopped(const zx::time& stop_time) {
   ADR_LOG_METHOD(kLogNotifyMethods) << "(" << stop_time.get() << ")";
+
+  if (!codec_stop_completer_.has_value()) {
+    ADR_LOG_METHOD(kLogNotifyMethods)
+        << "received Device notification, but completer is gone. Reset occurred?";
+    return;
+  }
+
+  auto completer = std::move(*codec_stop_completer_);
+  codec_stop_completer_.reset();
+  completer.Reply(
+      fit::success(fuchsia_audio_device::ControlCodecStopResponse{{.stop_time = stop_time.get()}}));
 }
 
-// For now don't do anything on receiving this. Eventually we'll fail a pending `Stop`.
-void ControlServer::CodecNotStopped() { ADR_WARN_METHOD(); }
+void ControlServer::CodecNotStopped() {
+  ADR_LOG_METHOD(kLogNotifyMethods);
+
+  if (!codec_stop_completer_.has_value()) {
+    ADR_WARN_METHOD()
+        << "received Device notification (CodecStop rejected), but completer is gone.";
+    return;
+  }
+
+  auto completer = std::move(*codec_stop_completer_);
+  codec_stop_completer_.reset();
+  completer.Reply(fit::error(fuchsia_audio_device::ControlCodecStopError::kOther));
+}
+
+void ControlServer::CodecReset(CodecResetCompleter::Sync& completer) {
+  if (device_has_error_) {
+    ADR_WARN_METHOD() << "device has an error";
+    completer.Reply(fit::error(fuchsia_audio_device::ControlCodecResetError::kDeviceError));
+    return;
+  }
+
+  if (device_->device_type() != fuchsia_audio_device::DeviceType::kCodec) {
+    ADR_WARN_METHOD() << "Unsupported method for device_type " << device_->device_type();
+    completer.Reply(fit::error(fuchsia_audio_device::ControlCodecResetError::kWrongDeviceType));
+    return;
+  }
+
+  if (!device_->CodecReset()) {
+    ADR_WARN_METHOD() << "device had an error during Device::CodecReset";
+    completer.Reply(fit::error(fuchsia_audio_device::ControlCodecResetError::kDeviceError));
+    return;
+  }
+
+  completer.Reply(fit::success(fuchsia_audio_device::ControlCodecResetResponse{}));
+}
 
 // fuchsia.hardware.audio.signalprocessing support
 //

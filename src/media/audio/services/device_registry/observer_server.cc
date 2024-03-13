@@ -66,6 +66,14 @@ void ObserverServer::WatchGainState(WatchGainStateCompleter::Sync& completer) {
     return;
   }
 
+  FX_CHECK(device_);
+  if (device_->device_type() != fuchsia_audio_device::DeviceType::kInput &&
+      device_->device_type() != fuchsia_audio_device::DeviceType::kOutput) {
+    completer.Reply(fit::error<fuchsia_audio_device::ObserverWatchGainStateError>(
+        fuchsia_audio_device::ObserverWatchGainStateError::kWrongDeviceType));
+    return;
+  }
+
   if (watch_gain_state_completer_) {
     ADR_WARN_METHOD() << "previous `WatchGainState` request has not yet completed";
     completer.Reply(fit::error<fuchsia_audio_device::ObserverWatchGainStateError>(
@@ -86,6 +94,9 @@ void ObserverServer::WatchGainState(WatchGainStateCompleter::Sync& completer) {
 
 void ObserverServer::GainStateChanged(const fuchsia_audio_device::GainState& new_gain_state) {
   ADR_LOG_METHOD(kLogObserverServerMethods || kLogNotifyMethods);
+
+  FX_DCHECK(device_->device_type() == fuchsia_audio_device::DeviceType::kInput ||
+            device_->device_type() == fuchsia_audio_device::DeviceType::kOutput);
 
   if (watch_gain_state_completer_) {
     new_gain_state_to_notify_.reset();
@@ -108,6 +119,7 @@ void ObserverServer::WatchPlugState(WatchPlugStateCompleter::Sync& completer) {
         fuchsia_audio_device::ObserverWatchPlugStateError::kDeviceError));
     return;
   }
+
   if (watch_plug_state_completer_) {
     ADR_WARN_METHOD() << "previous `WatchPlugState` request has not yet completed";
     completer.Reply(fit::error<fuchsia_audio_device::ObserverWatchPlugStateError>(
@@ -139,8 +151,7 @@ void ObserverServer::PlugStateChanged(const fuchsia_audio_device::PlugState& new
     auto completer = std::move(*watch_plug_state_completer_);
     watch_plug_state_completer_.reset();
 
-    fuchsia_audio_device::ObserverWatchPlugStateResponse response =
-        std::move(*new_plug_state_to_notify_);
+    auto response = std::move(*new_plug_state_to_notify_);
     new_plug_state_to_notify_.reset();
     completer.Reply(fit::success(response));
   }
@@ -156,6 +167,13 @@ void ObserverServer::GetReferenceClock(GetReferenceClockCompleter::Sync& complet
   }
 
   FX_CHECK(device_);
+  if (device_->device_type() != fuchsia_audio_device::DeviceType::kInput &&
+      device_->device_type() != fuchsia_audio_device::DeviceType::kOutput) {
+    completer.Reply(fit::error<fuchsia_audio_device::ObserverGetReferenceClockError>(
+        fuchsia_audio_device::ObserverGetReferenceClockError::kWrongDeviceType));
+    return;
+  }
+
   auto clock_result = device_->GetReadOnlyClock();
   if (clock_result.is_error()) {
     completer.Reply(fit::error<fuchsia_audio_device::ObserverGetReferenceClockError>(

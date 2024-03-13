@@ -14,6 +14,7 @@
 
 #include "src/media/audio/services/device_registry/adr_server_unittest_base.h"
 #include "src/media/audio/services/device_registry/common_unittest.h"
+#include "src/media/audio/services/device_registry/testing/fake_codec.h"
 #include "src/media/audio/services/device_registry/testing/fake_stream_config.h"
 
 namespace media_audio {
@@ -68,6 +69,20 @@ class ControlServerTest : public AudioDeviceRegistryServerTestBase {
   }
 };
 
+class ControlServerCodecTest : public ControlServerTest {
+ protected:
+  std::unique_ptr<FakeCodec> CreateAndEnableDriverWithDefaults() {
+    auto fake_driver = CreateFakeCodecOutput();
+
+    adr_service_->AddDevice(Device::Create(
+        adr_service_, dispatcher(), "Test codec name", fuchsia_audio_device::DeviceType::kCodec,
+        DriverClient::WithCodec(
+            fidl::ClientEnd<fuchsia_hardware_audio::Codec>(fake_driver->Enable()))));
+    RunLoopUntilIdle();
+    return fake_driver;
+  }
+};
+
 class ControlServerStreamConfigTest : public ControlServerTest {
  protected:
   std::unique_ptr<FakeStreamConfig> CreateAndEnableDriverWithDefaults() {
@@ -81,6 +96,288 @@ class ControlServerStreamConfigTest : public ControlServerTest {
     return fake_driver;
   }
 };
+
+/////////////////////
+// Codec tests
+//
+// When client drops their Control, the server should cleanly unwind without hang or WARNING.
+TEST_F(ControlServerCodecTest, CleanClientDrop) {
+  auto fake_driver = CreateAndEnableDriverWithDefaults();
+  auto control = CreateTestControlServer(*adr_service_->devices().begin());
+  RunLoopUntilIdle();
+  ASSERT_EQ(ControlServer::count(), 1u);
+
+  control->client() = fidl::Client<fuchsia_audio_device::Control>();
+
+  // If Control client doesn't drop cleanly, ControlServer will emit a WARNING, causing a failure.
+}
+
+// When server closes a client connection, the shutdown should be orderly without hang or WARNING.
+TEST_F(ControlServerCodecTest, CleanServerShutdown) {
+  auto fake_driver = CreateAndEnableDriverWithDefaults();
+  auto control = CreateTestControlServer(*adr_service_->devices().begin());
+  RunLoopUntilIdle();
+  ASSERT_EQ(ControlServer::count(), 1u);
+
+  control->server().Shutdown(ZX_ERR_PEER_CLOSED);
+
+  // If ControlServer doesn't shutdown cleanly, it emits a WARNING, which will cause a failure.
+}
+
+// When client drops their Control, the server should cleanly unwind without hang or WARNING.
+//
+// (Same as "CleanClientDrop" test case, but the Control is created "properly" through a
+// ControlCreator rather than directly via AudioDeviceRegistry::CreateControlServer.)
+TEST_F(ControlServerCodecTest, BasicClose) {
+  auto fake_driver = CreateAndEnableDriverWithDefaults();
+  auto registry = CreateTestRegistryServer();
+  auto added_id = WaitForAddedDeviceTokenId(registry->client());
+  auto control_creator = CreateTestControlCreatorServer();
+  auto control_client = ConnectToControl(control_creator->client(), *added_id);
+  RunLoopUntilIdle();
+
+  ASSERT_EQ(RegistryServer::count(), 1u);
+  ASSERT_EQ(ControlCreatorServer::count(), 1u);
+  ASSERT_EQ(ControlServer::count(), 1u);
+
+  RunLoopUntilIdle();
+  EXPECT_TRUE(control_client.is_valid());
+  control_client = fidl::Client<fuchsia_audio_device::Control>();
+}
+
+// A ControlCreator can be closed without affecting the Controls that it created.
+TEST_F(ControlServerCodecTest, ControlCreatorServerShutdownDoesNotAffectControl) {
+  auto fake_driver = CreateAndEnableDriverWithDefaults();
+  auto registry = CreateTestRegistryServer();
+  auto added_id = WaitForAddedDeviceTokenId(registry->client());
+  auto control_creator = CreateTestControlCreatorServer();
+  auto control_client = ConnectToControl(control_creator->client(), *added_id);
+  RunLoopUntilIdle();
+
+  ASSERT_EQ(RegistryServer::count(), 1u);
+  ASSERT_EQ(ControlCreatorServer::count(), 1u);
+  ASSERT_EQ(ControlServer::count(), 1u);
+
+  control_creator->server().Shutdown(ZX_ERR_PEER_CLOSED);
+  RunLoopUntilIdle();
+  EXPECT_TRUE(control_creator->server().WaitForShutdown(zx::sec(1)));
+
+  EXPECT_TRUE(control_client.is_valid());
+  EXPECT_EQ(ControlServer::count(), 1u);
+  control_client = fidl::Client<fuchsia_audio_device::Control>();
+}
+
+// Validate that the ControlServer shuts down cleanly if the driver drops its Codec.
+TEST_F(ControlServerCodecTest, CodecDropCausesCleanControlServerShutdown) {
+  auto fake_driver = CreateAndEnableDriverWithDefaults();
+  auto registry = CreateTestRegistryServer();
+  WaitForAddedDeviceTokenId(registry->client());
+  auto control = CreateTestControlServer(*adr_service_->devices().begin());
+
+  RunLoopUntilIdle();
+  ASSERT_EQ(RegistryServer::count(), 1u);
+  ASSERT_EQ(ControlServer::count(), 1u);
+
+  // Drop the driver StreamConfig connection.
+  fake_driver->DropCodec();
+
+  RunLoopUntilIdle();
+  EXPECT_TRUE(control->server().WaitForShutdown(zx::sec(5)));
+}
+
+// Validate basic SetDaiFormat functionality, including valid CodecFormatInfo returned.
+TEST_F(ControlServerCodecTest, SetDaiFormat) {
+  auto fake_driver = CreateAndEnableDriverWithDefaults();
+  auto registry = CreateTestRegistryServer();
+  (void)WaitForAddedDeviceTokenId(registry->client());
+  auto device = *adr_service_->devices().begin();
+  auto control = CreateTestControlServer(device);
+
+  RunLoopUntilIdle();
+  ASSERT_EQ(RegistryServer::count(), 1u);
+  ASSERT_EQ(ControlServer::count(), 1u);
+  auto received_callback = false;
+
+  // Determine a safe DaiFormat to set
+  auto dai_format = SafeDaiFormatFromDaiSupportedFormats(device->dai_format_sets());
+  control->client()
+      ->SetDaiFormat({{.dai_format = dai_format}})
+      .Then([&received_callback](fidl::Result<Control::SetDaiFormat>& result) {
+        received_callback = true;
+        ASSERT_TRUE(result.is_ok()) << result.error_value();
+        ASSERT_TRUE(result->state());
+        EXPECT_EQ(ValidateCodecFormatInfo(*result->state()), ZX_OK);
+      });
+
+  RunLoopUntilIdle();
+  EXPECT_TRUE(received_callback);
+  EXPECT_EQ(ControlServer::count(), 1u);
+}
+
+// Validate basic CodecStart functionality including a current start_time.
+TEST_F(ControlServerCodecTest, CodecStart) {
+  auto fake_driver = CreateAndEnableDriverWithDefaults();
+  auto registry = CreateTestRegistryServer();
+  (void)WaitForAddedDeviceTokenId(registry->client());
+  auto device = *adr_service_->devices().begin();
+  auto control = CreateTestControlServer(device);
+
+  RunLoopUntilIdle();
+  ASSERT_EQ(RegistryServer::count(), 1u);
+  ASSERT_EQ(ControlServer::count(), 1u);
+  auto received_callback = false;
+  auto dai_format = SafeDaiFormatFromDaiSupportedFormats(device->dai_format_sets());
+  control->client()
+      ->SetDaiFormat({{.dai_format = dai_format}})
+      .Then([&received_callback](fidl::Result<Control::SetDaiFormat>& result) {
+        received_callback = true;
+        EXPECT_TRUE(result.is_ok()) << result.error_value();
+      });
+
+  RunLoopUntilIdle();
+  ASSERT_TRUE(received_callback);
+  received_callback = false;
+  auto start_time = zx::time::infinite_past();
+  auto time_before_start = zx::clock::get_monotonic();
+
+  control->client()->CodecStart().Then(
+      [&received_callback, &start_time](fidl::Result<Control::CodecStart>& result) {
+        received_callback = true;
+        ASSERT_TRUE(result.is_ok()) << result.error_value();
+        ASSERT_TRUE(result->start_time().has_value());
+        start_time = zx::time(*result->start_time());
+      });
+
+  RunLoopUntilIdle();
+  EXPECT_TRUE(received_callback);
+  EXPECT_GT(start_time.get(), time_before_start.get());
+  EXPECT_EQ(ControlServer::count(), 1u);
+}
+
+// Validate basic CodecStop functionality including a current stop_time.
+TEST_F(ControlServerCodecTest, CodecStop) {
+  auto fake_driver = CreateAndEnableDriverWithDefaults();
+  auto registry = CreateTestRegistryServer();
+  (void)WaitForAddedDeviceTokenId(registry->client());
+  auto device = *adr_service_->devices().begin();
+  auto control = CreateTestControlServer(device);
+
+  RunLoopUntilIdle();
+  ASSERT_EQ(RegistryServer::count(), 1u);
+  ASSERT_EQ(ControlServer::count(), 1u);
+  auto dai_format = SafeDaiFormatFromDaiSupportedFormats(device->dai_format_sets());
+  auto received_callback = false;
+  control->client()
+      ->SetDaiFormat({{.dai_format = dai_format}})
+      .Then([&received_callback](fidl::Result<Control::SetDaiFormat>& result) {
+        received_callback = true;
+        EXPECT_TRUE(result.is_ok()) << result.error_value();
+      });
+
+  RunLoopUntilIdle();
+  ASSERT_TRUE(received_callback);
+  received_callback = false;
+  control->client()->CodecStart().Then(
+      [&received_callback](fidl::Result<Control::CodecStart>& result) {
+        received_callback = true;
+        EXPECT_TRUE(result.is_ok()) << result.error_value();
+      });
+
+  RunLoopUntilIdle();
+  ASSERT_TRUE(received_callback);
+  auto stop_time = zx::time::infinite_past();
+  auto time_before_stop = zx::clock::get_monotonic();
+  received_callback = false;
+
+  control->client()->CodecStop().Then(
+      [&received_callback, &stop_time](fidl::Result<Control::CodecStop>& result) {
+        received_callback = true;
+        ASSERT_TRUE(result.is_ok()) << result.error_value();
+        ASSERT_TRUE(result->stop_time().has_value());
+        stop_time = zx::time(*result->stop_time());
+      });
+
+  RunLoopUntilIdle();
+  EXPECT_TRUE(received_callback);
+  EXPECT_GT(stop_time.get(), time_before_stop.get());
+  EXPECT_EQ(ControlServer::count(), 1u);
+}
+
+// CodecReset - validate that the DaiFormat and the Start state are reset.
+TEST_F(ControlServerCodecTest, CodecReset) {
+  auto fake_driver = CreateAndEnableDriverWithDefaults();
+  auto registry = CreateTestRegistryServer();
+  (void)WaitForAddedDeviceTokenId(registry->client());
+  auto device = *adr_service_->devices().begin();
+  auto control = CreateTestControlServer(device);
+
+  RunLoopUntilIdle();
+  ASSERT_EQ(RegistryServer::count(), 1u);
+  ASSERT_EQ(ControlServer::count(), 1u);
+  auto dai_format = SafeDaiFormatFromDaiSupportedFormats(device->dai_format_sets());
+  auto received_callback = false;
+  control->client()
+      ->SetDaiFormat({{.dai_format = dai_format}})
+      .Then([&received_callback](fidl::Result<Control::SetDaiFormat>& result) {
+        received_callback = true;
+        EXPECT_TRUE(result.is_ok()) << result.error_value();
+      });
+
+  RunLoopUntilIdle();
+  ASSERT_TRUE(received_callback);
+  received_callback = false;
+  zx::time first_start_time;
+  control->client()->CodecStart().Then(
+      [&received_callback, &first_start_time](fidl::Result<Control::CodecStart>& result) {
+        received_callback = true;
+        ASSERT_TRUE(result.is_ok()) << result.error_value();
+        ASSERT_TRUE(result->start_time());
+        first_start_time = zx::time(*result->start_time());
+      });
+
+  RunLoopUntilIdle();
+  ASSERT_TRUE(received_callback);
+  received_callback = false;
+
+  control->client()->CodecReset().Then(
+      [&received_callback](fidl::Result<Control::CodecReset>& result) {
+        received_callback = true;
+        EXPECT_TRUE(result.is_ok()) << result.error_value();
+      });
+
+  // Only way to verify that DaiFormat is reset: set the same format again.
+  RunLoopUntilIdle();
+  EXPECT_TRUE(received_callback);
+  received_callback = false;
+  control->client()
+      ->SetDaiFormat({{.dai_format = dai_format}})
+      .Then([&received_callback](fidl::Result<Control::SetDaiFormat>& result) {
+        received_callback = true;
+        EXPECT_TRUE(result.is_ok()) << result.error_value();
+      });
+
+  // Only way to verify that Start state is reset: call CodecStart again.
+  RunLoopUntilIdle();
+  EXPECT_TRUE(received_callback);
+  received_callback = false;
+  zx::time second_start_time;
+  control->client()->CodecStart().Then(
+      [&received_callback, &second_start_time](fidl::Result<Control::CodecStart>& result) {
+        received_callback = true;
+        ASSERT_TRUE(result.is_ok()) << result.error_value();
+        ASSERT_TRUE(result->start_time());
+        second_start_time = zx::time(*result->start_time());
+      });
+
+  RunLoopUntilIdle();
+  EXPECT_TRUE(received_callback);
+  EXPECT_GT(second_start_time.get(), first_start_time.get());
+  EXPECT_EQ(ControlServer::count(), 1u);
+}
+
+// Add test cases for SetTopology and SetElementState (once implemented)
+//
+// TODO(https://fxbug.dev/323270827): implement signalprocessing for Codec (topology, gain).
 
 /////////////////////
 // StreamConfig tests

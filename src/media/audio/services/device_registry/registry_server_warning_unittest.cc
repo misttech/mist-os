@@ -18,6 +18,7 @@ namespace {
 using DriverClient = fuchsia_audio_device::DriverClient;
 
 class RegistryServerWarningTest : public AudioDeviceRegistryServerTestBase {};
+class RegistryServerCodecWarningTest : public RegistryServerWarningTest {};
 class RegistryServerStreamConfigWarningTest : public RegistryServerWarningTest {};
 
 /////////////////////
@@ -155,6 +156,114 @@ TEST_F(RegistryServerWarningTest, CreateObserverBadToken) {
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback);
 }
+
+/////////////////////
+// Codec tests
+//
+// If required 'observer_server' is not set, CreateObserver should fail with kInvalidObserver.
+TEST_F(RegistryServerCodecWarningTest, CreateObserverMissingObserver) {
+  auto fake_driver = CreateFakeCodecOutput();
+  adr_service_->AddDevice(Device::Create(
+      adr_service_, dispatcher(), "Test codec name", fuchsia_audio_device::DeviceType::kCodec,
+      DriverClient::WithCodec(
+          fidl::ClientEnd<fuchsia_hardware_audio::Codec>(fake_driver->Enable()))));
+
+  RunLoopUntilIdle();
+  ASSERT_EQ(adr_service_->devices().size(), 1u);
+  auto registry = CreateTestRegistryServer();
+  ASSERT_EQ(RegistryServer::count(), 1u);
+  auto received_callback = false;
+  std::optional<TokenId> added_id;
+  registry->client()->WatchDevicesAdded().Then(
+      [&received_callback,
+       &added_id](fidl::Result<fuchsia_audio_device::Registry::WatchDevicesAdded>& result) mutable {
+        received_callback = true;
+        ASSERT_TRUE(result.is_ok() && result->devices() && result->devices()->size() == 1u);
+        ASSERT_TRUE(result->devices()->at(0).token_id());
+        added_id = *result->devices()->at(0).token_id();
+      });
+
+  RunLoopUntilIdle();
+  ASSERT_TRUE(received_callback);
+  ASSERT_TRUE(added_id);
+  auto [observer_client_end, observer_server_end] =
+      CreateNaturalAsyncClientOrDie<fuchsia_audio_device::Observer>();
+  auto observer_client = fidl::Client<fuchsia_audio_device::Observer>(
+      fidl::ClientEnd<fuchsia_audio_device::Observer>(std::move(observer_client_end)), dispatcher(),
+      observer_fidl_handler_.get());
+  received_callback = false;
+
+  registry->client()
+      ->CreateObserver({{
+          .token_id = *added_id,
+      }})
+      .Then([&received_callback](
+                fidl::Result<fuchsia_audio_device::Registry::CreateObserver>& result) {
+        received_callback = true;
+        ASSERT_TRUE(result.is_error());
+        ASSERT_TRUE(result.error_value().is_domain_error()) << result.error_value();
+        EXPECT_EQ(result.error_value().domain_error(),
+                  fuchsia_audio_device::RegistryCreateObserverError::kInvalidObserver)
+            << result.error_value();
+      });
+
+  RunLoopUntilIdle();
+  EXPECT_TRUE(received_callback);
+}
+
+// If 'observer_server' is not set to a valid handle, we should fail with ZX_ERR_INVALID_ARGS.
+TEST_F(RegistryServerCodecWarningTest, CreateObserverBadObserver) {
+  auto fake_driver = CreateFakeCodecInput();
+  adr_service_->AddDevice(Device::Create(
+      adr_service_, dispatcher(), "Test codec name", fuchsia_audio_device::DeviceType::kCodec,
+      DriverClient::WithCodec(
+          fidl::ClientEnd<fuchsia_hardware_audio::Codec>(fake_driver->Enable()))));
+
+  RunLoopUntilIdle();
+  ASSERT_EQ(adr_service_->devices().size(), 1u);
+  auto registry = CreateTestRegistryServer();
+  ASSERT_EQ(RegistryServer::count(), 1u);
+  auto received_callback = false;
+  std::optional<TokenId> added_id;
+  registry->client()->WatchDevicesAdded().Then(
+      [&received_callback,
+       &added_id](fidl::Result<fuchsia_audio_device::Registry::WatchDevicesAdded>& result) mutable {
+        received_callback = true;
+        ASSERT_TRUE(result.is_ok() && result->devices() && result->devices()->size() == 1u);
+        ASSERT_TRUE(result->devices()->at(0).token_id());
+        added_id = *result->devices()->at(0).token_id();
+      });
+
+  RunLoopUntilIdle();
+  ASSERT_TRUE(received_callback);
+  ASSERT_TRUE(added_id);
+  auto [observer_client_end, observer_server_end] =
+      CreateNaturalAsyncClientOrDie<fuchsia_audio_device::Observer>();
+  auto observer_client = fidl::Client<fuchsia_audio_device::Observer>(
+      fidl::ClientEnd<fuchsia_audio_device::Observer>(std::move(observer_client_end)), dispatcher(),
+      observer_fidl_handler_.get());
+  received_callback = false;
+
+  registry->client()
+      ->CreateObserver({{
+          .token_id = *added_id,
+          .observer_server = fidl::ServerEnd<fuchsia_audio_device::Observer>(zx::channel()),
+      }})
+      .Then([&received_callback](
+                fidl::Result<fuchsia_audio_device::Registry::CreateObserver>& result) {
+        received_callback = true;
+        ASSERT_TRUE(result.is_error());
+        ASSERT_TRUE(result.error_value().is_framework_error()) << result.error_value();
+        EXPECT_EQ(result.error_value().framework_error().status(), ZX_ERR_INVALID_ARGS)
+            << result.error_value();
+      });
+
+  RunLoopUntilIdle();
+  EXPECT_TRUE(received_callback);
+}
+
+// TODO(https://fxbug.dev/42068381): If Health can change post-initialization, add a test case for:
+//   CreateObserver with token of Codec that was ready & Added, but then became unhealthy.
 
 /////////////////////
 // StreamConfig tests

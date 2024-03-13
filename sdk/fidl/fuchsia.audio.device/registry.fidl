@@ -21,36 +21,35 @@ type Info = table {
     /// A device identifier that is guaranteed unique for this boot session, but
     /// may change across reboots.
     ///
-    /// Required.
+    /// Required for all device types.
     1: token_id TokenId;
 
-    /// Whether the device is an input (a source of audio) or an output
-    /// (a destination for audio).
+    /// The protocol used by the driver, and (if StreamConfig) its directionality.
     ///
-    /// Required.
+    /// Required for all device types.
     2: device_type DeviceType;
 
     /// The device's high-level name, as received from devfs or the
     /// `Provider/AddDevice` caller.
     ///
-    /// Required.
+    /// Required for all device types.
     3: device_name string:MAX_STRING_SIZE;
 
     /// The name of the device's manufacturer.
     ///
-    /// Optional.
+    /// Optional for all device types.
     4: manufacturer string:MAX_STRING_SIZE;
 
     /// The device's high-level product name.
     ///
-    /// Optional.
+    /// Optional for all device types.
     5: product string:MAX_STRING_SIZE;
 
     /// A 16-character ID provided by the driver that (if present) can be used
     /// to differentiate instances of the same device. This value should not
     /// change across system reboots.
     ///
-    /// Optional.
+    /// Optional for all device types.
     6: unique_instance_id array<uint8, UNIQUE_INSTANCE_ID_SIZE>;
 
     /// Whether the device is a source (is_input TRUE) or destination (is_input FALSE) of audio.
@@ -243,6 +242,8 @@ closed protocol Observer {
     /// device's`Info` table (`GainCapabilities` specifically). Use
     /// `WatchElementState` for gain processing exposed as `SignalProcessing`
     /// (`GetTopologies`, `GetElements`).
+    ///
+    /// Should only be called for StreamConfig devices.
     //
     // TODO(https://fxbug.dev/42052918): Remove legacy gain aspects once driver API does.
     // Going forward, gain will be handled by `SignalProcessing`.
@@ -264,6 +265,8 @@ closed protocol Observer {
     /// Retrieve the device's reference clock.
     ///
     /// This clock will be in the domain specified in the device's `Info` table.
+    ///
+    /// Should only be called for StreamConfig devices.
     strict GetReferenceClock() -> (resource table {
         /// The device's reference clock.
         1: reference_clock zx.Handle:CLOCK;
@@ -275,8 +278,11 @@ type ObserverWatchGainStateError = flexible enum {
     /// This device has encountered an error and can no longer be observed.
     DEVICE_ERROR = 1;
 
+    /// This device type does not support the method that was called.
+    WRONG_DEVICE_TYPE = 2;
+
     /// The previous `WatchGainState` call has not yet completed.
-    ALREADY_PENDING = 2;
+    ALREADY_PENDING = 3;
 };
 
 /// Errors returned by `Observer/WatchPlugState`.
@@ -284,8 +290,13 @@ type ObserverWatchPlugStateError = flexible enum {
     /// This device has encountered an error and can no longer be observed.
     DEVICE_ERROR = 1;
 
+    /// This device type does not support the method that was called.
+    //
+    // Although added prematurely, this will be used in subsequent CL when adding Composite or Dai.
+    WRONG_DEVICE_TYPE = 2;
+
     /// The previous `WatchPlugState` call has not yet completed.
-    ALREADY_PENDING = 2;
+    ALREADY_PENDING = 3;
 };
 
 /// Errors returned by `Observer/GetReferenceClock`.
@@ -293,6 +304,9 @@ type ObserverGetReferenceClockError = flexible enum {
     /// This device has encountered an error and can no longer be observed.
     DEVICE_ERROR = 1;
 
+    /// This device type does not support the method that was called.
+    WRONG_DEVICE_TYPE = 2;
+
     /// The device's reference clock could not be returned.
-    DEVICE_CLOCK_UNAVAILABLE = 2;
+    DEVICE_CLOCK_UNAVAILABLE = 3;
 };
