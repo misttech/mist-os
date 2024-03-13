@@ -380,13 +380,16 @@ async fn main() -> Result<(), anyhow::Error> {
 
     let boot = fuchsia_fs::directory::open_in_namespace("/boot", fio::OpenFlags::RIGHT_READABLE)
         .context("Failed to open /boot")?;
+    let config_dir =
+        fuchsia_fs::directory::open_in_namespace("/config", fio::OpenFlags::RIGHT_READABLE)
+            .context("Failed to open /config")?;
     let boot_resolver = client::connect_to_protocol_at_path::<fresolution::ResolverMarker>(
         "/svc/fuchsia.component.resolution.Resolver-boot",
     )
     .context("Failed to connect to boot resolver")?;
 
     let packaged_boot_drivers =
-        load_boot_drivers(&boot, &boot_resolver, &eager_drivers, &disabled_drivers)
+        load_boot_drivers(&config_dir, &boot_resolver, &eager_drivers, &disabled_drivers)
             .await
             .context("Failed to load boot drivers")
             .map_err(log_error)?;
@@ -422,7 +425,7 @@ async fn main() -> Result<(), anyhow::Error> {
                     .context("Failed to connect to base component resolver")?;
                 load_base_drivers(
                     index.clone(),
-                    &boot,
+                    &config_dir,
                     &base_resolver,
                     &eager_drivers,
                     &disabled_drivers,
@@ -635,12 +638,13 @@ mod tests {
         let eager_drivers = HashSet::new();
         let disabled_drivers = HashSet::new();
 
-        let boot = fuchsia_fs::directory::open_in_namespace("/pkg", fio::OpenFlags::RIGHT_READABLE)
-            .unwrap();
+        let config =
+            fuchsia_fs::directory::open_in_namespace("/pkg/config", fio::OpenFlags::RIGHT_READABLE)
+                .unwrap();
 
         // Run two tasks: the fake resolver and the task that loads the base drivers.
         let load_base_drivers_task =
-            load_base_drivers(index.clone(), &boot, &resolver, &eager_drivers, &disabled_drivers)
+            load_base_drivers(index.clone(), &config, &resolver, &eager_drivers, &disabled_drivers)
                 .fuse();
         let resolver_task = run_resolver_server(resolver_stream).fuse();
         futures::pin_mut!(load_base_drivers_task, resolver_task);
@@ -1390,14 +1394,17 @@ mod tests {
     async fn test_load_packaged_boot_drivers() {
         let (resolver, resolver_stream) =
             fidl::endpoints::create_proxy_and_stream::<fresolution::ResolverMarker>().unwrap();
-        let boot = fuchsia_fs::directory::open_in_namespace("/pkg", fio::OpenFlags::RIGHT_READABLE)
-            .unwrap();
+        let config = fuchsia_fs::directory::open_in_namespace(
+            "/pkg/config/",
+            fio::OpenFlags::RIGHT_READABLE,
+        )
+        .unwrap();
 
         let eager_drivers = HashSet::new();
         let disabled_drivers = HashSet::new();
 
         let load_boot_drivers_task =
-            load_boot_drivers(&boot, &resolver, &eager_drivers, &disabled_drivers).fuse();
+            load_boot_drivers(&config, &resolver, &eager_drivers, &disabled_drivers).fuse();
 
         let resolver_task = run_resolver_server(resolver_stream).fuse();
         futures::pin_mut!(load_boot_drivers_task, resolver_task);
@@ -1428,11 +1435,14 @@ mod tests {
         let eager_drivers = HashSet::from([eager_driver_component_url.clone()]);
         let disabled_drivers = HashSet::new();
 
-        let boot = fuchsia_fs::directory::open_in_namespace("/pkg", fio::OpenFlags::RIGHT_READABLE)
-            .unwrap();
+        let config = fuchsia_fs::directory::open_in_namespace(
+            "/pkg/config/",
+            fio::OpenFlags::RIGHT_READABLE,
+        )
+        .unwrap();
 
         let load_boot_drivers_task =
-            load_boot_drivers(&boot, &resolver, &eager_drivers, &disabled_drivers).fuse();
+            load_boot_drivers(&config, &resolver, &eager_drivers, &disabled_drivers).fuse();
 
         let resolver_task = run_resolver_server(resolver_stream).fuse();
         futures::pin_mut!(load_boot_drivers_task, resolver_task);
@@ -1468,12 +1478,13 @@ mod tests {
         let eager_drivers = HashSet::from([eager_driver_component_url.clone()]);
         let disabled_drivers = HashSet::new();
 
-        let boot = fuchsia_fs::directory::open_in_namespace("/pkg", fio::OpenFlags::RIGHT_READABLE)
-            .unwrap();
+        let config =
+            fuchsia_fs::directory::open_in_namespace("/pkg/config", fio::OpenFlags::RIGHT_READABLE)
+                .unwrap();
 
         let load_base_drivers_task = load_base_drivers(
             Rc::clone(&index),
-            &boot,
+            &config,
             &resolver,
             &eager_drivers,
             &disabled_drivers,
@@ -1539,11 +1550,12 @@ mod tests {
         let eager_drivers = HashSet::new();
         let disabled_drivers = HashSet::from([disabled_driver_component_url.clone()]);
 
-        let boot = fuchsia_fs::directory::open_in_namespace("/pkg", fio::OpenFlags::RIGHT_READABLE)
-            .unwrap();
+        let config =
+            fuchsia_fs::directory::open_in_namespace("/pkg/config", fio::OpenFlags::RIGHT_READABLE)
+                .unwrap();
 
         let load_boot_drivers_task =
-            load_boot_drivers(&boot, &resolver, &eager_drivers, &disabled_drivers).fuse();
+            load_boot_drivers(&config, &resolver, &eager_drivers, &disabled_drivers).fuse();
 
         let resolver_task = run_resolver_server(resolver_stream).fuse();
         futures::pin_mut!(load_boot_drivers_task, resolver_task);
@@ -1576,12 +1588,13 @@ mod tests {
         let eager_drivers = HashSet::new();
         let disabled_drivers = HashSet::from([disabled_driver_component_url.clone()]);
 
-        let boot = fuchsia_fs::directory::open_in_namespace("/pkg", fio::OpenFlags::RIGHT_READABLE)
-            .unwrap();
+        let config =
+            fuchsia_fs::directory::open_in_namespace("/pkg/config", fio::OpenFlags::RIGHT_READABLE)
+                .unwrap();
 
         let load_base_drivers_task = load_base_drivers(
             Rc::clone(&index),
-            &boot,
+            &config,
             &resolver,
             &eager_drivers,
             &disabled_drivers,

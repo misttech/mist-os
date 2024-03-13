@@ -72,6 +72,11 @@
             path: "/boot",
         },
         {
+            directory: "config",
+            rights: [ "r*" ],
+            path: "/config",
+        },
+        {
             protocol: [
                 "fuchsia.component.resolution.Resolver-base",
                 "fuchsia.component.resolution.Resolver-boot",

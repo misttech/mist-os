@@ -22,14 +22,14 @@ fn log_error(err: anyhow::Error) -> anyhow::Error {
 }
 
 pub async fn load_boot_drivers(
-    boot: &fio::DirectoryProxy,
+    config: &fio::DirectoryProxy,
     resolver: &fresolution::ResolverProxy,
     eager_drivers: &HashSet<url::Url>,
     disabled_drivers: &HashSet<url::Url>,
 ) -> Result<Vec<ResolvedDriver>, anyhow::Error> {
     let manifest = fuchsia_fs::directory::open_file_no_describe(
-        &boot,
-        "config/driver_index/boot_driver_manifest",
+        &config,
+        "boot_driver_manifest",
         fio::OpenFlags::RIGHT_READABLE,
     )
     .context("boot: Failed to open driver_manifest")?;
@@ -48,14 +48,14 @@ pub async fn load_boot_drivers(
 
 pub async fn load_base_drivers(
     indexer: Rc<Indexer>,
-    boot: &fio::DirectoryProxy,
+    config: &fio::DirectoryProxy,
     resolver: &fresolution::ResolverProxy,
     eager_drivers: &HashSet<url::Url>,
     disabled_drivers: &HashSet<url::Url>,
 ) -> Result<(), anyhow::Error> {
     let manifest = fuchsia_fs::directory::open_file_no_describe(
-        &boot,
-        "config/driver_index/base_driver_manifest",
+        &config,
+        "base_driver_manifest",
         fio::OpenFlags::RIGHT_READABLE,
     )
     .context("boot: Failed to open driver_manifest")?;

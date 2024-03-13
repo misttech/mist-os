@@ -213,6 +213,12 @@
             rights: [ "rx*" ],
         },
         {
+            directory: "config",
+            from: "parent",
+            to: "#driver-index",
+            rights: [ "r*" ],
+        },
+        {
             directory: "pkg_drivers",
             from: "parent",
             to: [

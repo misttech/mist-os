@@ -413,6 +413,14 @@
         {
             directory: "boot",
             from: "parent",
+            as: "config",
+            to: "#driver_index",
+            rights: [ "r*" ],
+            subdir: "config/driver_index",
+        },
+        {
+            directory: "boot",
+            from: "parent",
             as: "config-profiles",
             to: "#svchost",
             rights: [ "r*" ],

@@ -221,6 +221,22 @@ zx::result<fidl::ClientEnd<fio::Directory>> OpenPkgDir() {
   return zx::ok(std::move(endpoints->client));
 }
 
+zx::result<fidl::ClientEnd<fio::Directory>> OpenConfigDir() {
+  auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+  if (endpoints.is_error()) {
+    return zx::error(ZX_ERR_INTERNAL);
+  }
+  zx_status_t status =
+      fdio_open("/pkg/config",
+                static_cast<uint32_t>(fuchsia_io::wire::OpenFlags::kDirectory |
+                                      fuchsia_io::wire::OpenFlags::kRightReadable),
+                endpoints->server.TakeChannel().release());
+  if (status != ZX_OK) {
+    return zx::error(ZX_ERR_INTERNAL);
+  }
+  return zx::ok(std::move(endpoints->client));
+}
+
 class DriverTestRealm final : public fidl::Server<fuchsia_driver_test::Realm> {
  public:
   DriverTestRealm(component::OutgoingDirectory* outgoing, async_dispatcher_t* dispatcher,
@@ -352,6 +368,17 @@ class DriverTestRealm final : public fidl::Server<fuchsia_driver_test::Realm> {
     }
 
     result = outgoing_->AddDirectory(std::move(boot_dir), "boot");
+    if (result.is_error()) {
+      completer.Reply(result.take_error());
+      return;
+    }
+
+    zx::result config_dir = OpenConfigDir();
+    if (config_dir.is_error()) {
+      completer.Reply(config_dir.take_error());
+      return;
+    }
+    result = outgoing_->AddDirectory(std::move(*config_dir), "config");
     if (result.is_error()) {
       completer.Reply(result.take_error());
       return;

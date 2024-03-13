@@ -142,7 +142,7 @@ fuchsia_driver_component("test-fallback-component") {
 }
 
 driver_manifest("base-driver-manifest") {
-  manifest_name = "driver_index/base_driver_manifest"
+  manifest_name = "base_driver_manifest"
   install_as_config_resource = true
   package_url = "fuchsia-pkg://fuchsia.com/driver-index-unittests"
   deps = [
@@ -153,7 +153,7 @@ driver_manifest("base-driver-manifest") {
 }
 
 driver_manifest("boot-driver-manifest") {
-  manifest_name = "driver_index/boot_driver_manifest"
+  manifest_name = "boot_driver_manifest"
   install_as_config_resource = true
   package_url = "fuchsia-boot:///driver-index-unittests"
   deps = [
