@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use {
+    crate::emulator::EMULATOR_ROOT_DRIVER_URL,
     anyhow::{format_err, Error},
     fidl_fuchsia_bluetooth as fbt, fidl_fuchsia_bluetooth_bredr as fbredr,
     fidl_fuchsia_bluetooth_gatt as fbgatt, fidl_fuchsia_bluetooth_le as fble,
@@ -19,8 +20,6 @@ use {
     futures::FutureExt,
     realmbuilder_mock_helpers::stateless_mock_responder,
 };
-
-use crate::emulator::EMULATOR_ROOT_DRIVER_URL;
 
 pub const SHARED_STATE_INDEX: &str = "BT-CORE-REALM";
 pub const DEFAULT_TEST_DEVICE_NAME: &str = "fuchsia-bt-integration-test";
@@ -163,17 +162,6 @@ impl CoreRealm {
             .await?;
 
         // Add directory routing between components within CoreRealm
-        // TODO(b/42085239): Remove when all bt vendor drivers support FIDL
-        builder
-            .add_route(
-                Route::new()
-                    .capability(
-                        Capability::directory("dev-class").subdir("bt-host").as_("dev-bt-host"),
-                    )
-                    .from(Ref::child(fuchsia_driver_test::COMPONENT_NAME))
-                    .to(&bt_init),
-            )
-            .await?;
         builder
             .add_route(
                 Route::new()
@@ -193,6 +181,7 @@ impl CoreRealm {
             ..Default::default()
         };
         instance.driver_test_realm_start(args).await?;
+
         Ok(Self { realm: instance })
     }
 

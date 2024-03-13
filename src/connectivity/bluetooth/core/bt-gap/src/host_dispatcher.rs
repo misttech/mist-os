@@ -11,13 +11,11 @@ use fidl_fuchsia_bluetooth_gatt::Server_Marker;
 use fidl_fuchsia_bluetooth_gatt2::{
     LocalServiceRequest, Server_Marker as Server_Marker2, Server_Proxy,
 };
-use fidl_fuchsia_bluetooth_host::{HostMarker, HostProxy};
+use fidl_fuchsia_bluetooth_host::HostProxy;
 use fidl_fuchsia_bluetooth_le::{CentralMarker, PeripheralMarker};
 use fidl_fuchsia_bluetooth_sys::{
     self as sys, InputCapability, OutputCapability, PairingDelegateProxy,
 };
-use fidl_fuchsia_hardware_bluetooth::HostMarker as HardwareHostMarker;
-use fidl_fuchsia_io::DirectoryProxy;
 use fuchsia_async::{self as fasync, DurationExt, TimeoutExt};
 use fuchsia_bluetooth::inspect::{DebugExt, Inspectable, ToProperty};
 use fuchsia_bluetooth::types::pairing_options::PairingOptions;
@@ -46,7 +44,7 @@ use crate::{
     watch_peers::PeerWatcher,
 };
 
-pub use fidl_fuchsia_device::{ControllerMarker, DEFAULT_DEVICE_NAME};
+pub use fidl_fuchsia_device::DEFAULT_DEVICE_NAME;
 
 /// Policies for HostDispatcher::set_name
 #[derive(Copy, Clone, PartialEq, Debug)]
@@ -813,46 +811,6 @@ impl HostDispatcher {
         self.handle_pairing_requests(host_device.clone());
 
         self.state.write().add_host(host_device.id(), host_device.clone());
-
-        Ok(())
-    }
-
-    /// Adds a bt-host device to the host dispatcher. Called by the watch_hosts device watcher
-    pub async fn add_host_by_path(
-        &self,
-        dir: &DirectoryProxy,
-        host_path: &str,
-    ) -> Result<(), Error> {
-        let node = self.state.read().inspect.hosts().create_child(unique_name("device_"));
-        let controller_path = host_path.to_owned() + "/device_controller";
-        let host_dev = fuchsia_component::client::connect_to_named_protocol_at_dir_root::<
-            ControllerMarker,
-        >(dir, &controller_path)
-        .with_context(|| format!("failed to open {host_path}"))?;
-        let device_topo = host_dev.get_topological_path().await?.map_err(zx::Status::from_raw)?;
-        info!("Adding Adapter: {:?} (topology: {:?})", host_path, device_topo);
-
-        // Connect to the host device.
-        let hardware = fuchsia_component::client::connect_to_named_protocol_at_dir_root::<
-            HardwareHostMarker,
-        >(dir, host_path)
-        .context("failed to open bt-host device")?;
-        let (host, server_end) = fidl::endpoints::create_proxy::<HostMarker>()?;
-        hardware.open(server_end)?;
-
-        let host_device = init_host(host_path, node, host).await?;
-        self.add_host_device(&host_device).await?;
-
-        // Start listening to Host interface events.
-        fasync::Task::spawn(host_device.watch_events(self.clone()).map(|r| {
-            r.unwrap_or_else(|err| {
-                warn!("Error handling host event: {:?}", err);
-                // TODO(https://fxbug.dev/42120566): This should probably remove the bt-host since
-                // termination of the `watch_events` task indicates that it no longer functions
-                // properly.
-            })
-        }))
-        .detach();
 
         Ok(())
     }

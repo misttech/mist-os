@@ -5,7 +5,6 @@
 group("core") {
   deps = [
     "bt-gap",
-    "bt-host",
     "bt-host:bt-host-component",  # TODO(https://fxbug.dev/42085245): Rename to
                                   # bt-host
     "bt-init",

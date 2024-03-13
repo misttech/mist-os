@@ -29,15 +29,6 @@
             to: [ "#bluetooth-core" ],
             source_availability: "unknown",
         },
-
-        // TODO(b/42085239): Remove when all bt vendor drivers support FIDL
-        {
-            directory: "dev-class",
-            from: "parent",
-            as: "dev-bt-host",
-            to: "#bluetooth-core",
-            subdir: "bt-host",
-        },
         {
             directory: "dev-class",
             from: "parent",

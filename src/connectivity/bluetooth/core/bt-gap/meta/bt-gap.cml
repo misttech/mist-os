@@ -28,12 +28,6 @@
         },
     ],
     use: [
-        // TODO(b/42085239): Remove when all bt vendor drivers support FIDL
-        {
-            directory: "dev-bt-host",
-            rights: [ "r*" ],
-            path: "/dev/class/bt-host",
-        },
         {
             protocol: [
                 "fuchsia.device.NameProvider",

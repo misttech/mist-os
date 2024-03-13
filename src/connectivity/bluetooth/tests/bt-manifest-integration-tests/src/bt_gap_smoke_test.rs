@@ -13,17 +13,14 @@ use {
         ConfigurationProxy, HostWatcherMarker, HostWatcherProxy, PairingMarker, PairingProxy,
     },
     fidl_fuchsia_device::{NameProviderMarker, NameProviderRequestStream},
-    fidl_fuchsia_io as fio,
     fidl_fuchsia_stash::SecureStoreMarker,
     fuchsia_component::server::ServiceFs,
     fuchsia_component_test::{
         Capability, ChildOptions, LocalComponentHandles, RealmBuilder, Ref, Route,
     },
     futures::{channel::mpsc, pending, SinkExt, StreamExt},
-    realmbuilder_mock_helpers::{mock_dev, provide_bt_gap_uses},
-    std::sync::Arc,
+    realmbuilder_mock_helpers::provide_bt_gap_uses,
     tracing::info,
-    vfs::{directory::entry_container::Directory, pseudo_directory},
 };
 
 const BT_GAP_URL: &str = "fuchsia-pkg://fuchsia.com/bt-gap-smoke-test#meta/bt-gap.cm";
@@ -34,7 +31,6 @@ const SECURE_STORE_URL: &str = "fuchsia-pkg://fuchsia.com/bt-gap-smoke-test#meta
 const BT_GAP_MONIKER: &str = "bt-gap";
 const MOCK_PROVIDER_MONIKER: &str = "mock-provider";
 const MOCK_CLIENT_MONIKER: &str = "mock-client";
-const MOCK_DEV_MONIKER: &str = "mock-dev";
 const SECURE_STORE_MONIKER: &str = "fake-secure-store";
 
 #[allow(dead_code)] // TODO(https://fxbug.dev/318827209)
@@ -72,16 +68,6 @@ impl From<NameProviderRequestStream> for Event {
 impl From<SecureStoreMarker> for Event {
     fn from(_src: SecureStoreMarker) -> Self {
         Self::SecureStore
-    }
-}
-
-// TODO(b/42085239): Remove when all bt vendor drivers support FIDL
-/// An empty dev/bt-host pseudo-directory.
-pub fn dev_bt_host() -> Arc<dyn Directory> {
-    pseudo_directory! {
-        "class" => pseudo_directory! {
-            "bt-host" => pseudo_directory! {}
-        }
     }
 }
 
@@ -203,16 +189,6 @@ async fn bt_gap_component_topology() {
         .await
         .expect("Failed adding mock provider to topology");
 
-    // Provides a stub `/dev/bt-host` so bt-gap initialization doesn't fail.
-    let mock_dev_child = builder
-        .add_local_child(
-            MOCK_DEV_MONIKER,
-            move |handles: LocalComponentHandles| Box::pin(mock_dev(handles, dev_bt_host())),
-            ChildOptions::new(),
-        )
-        .await
-        .expect("Failed adding mock /dev provider to topology");
-
     // Mock bt-gap client that will request all the services exposed by bt-gap.
     let mock_client_child = builder
         .add_local_child(
@@ -260,19 +236,6 @@ async fn bt_gap_component_topology() {
         )
         .await
         .expect("Failed adding Secure Store and Name Provider route between mock and bt-gap");
-    builder
-        .add_route(
-            Route::new()
-                .capability(
-                    Capability::directory("dev-bt-host")
-                        .path("/dev/class/bt-host")
-                        .rights(fio::R_STAR_DIR),
-                )
-                .from(&mock_dev_child)
-                .to(&bt_gap),
-        )
-        .await
-        .expect("Failed adding route for bt-host device directory");
     // Proxy LogSink to children
     builder
         .add_route(

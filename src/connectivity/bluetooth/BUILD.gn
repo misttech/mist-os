@@ -23,8 +23,6 @@ group("bluetooth") {
 group("drivers") {
   testonly = true
   deps = [
-    "core/bt-host:driver",  # TODO(https://fxbug.dev/42085239): Remove bt-host
-                            # driver code
     "hci/passthrough:driver",
     "hci/transport/uart:bt-transport-uart",
     "hci/transport/usb:bt-transport-usb",
@@ -36,7 +34,6 @@ group("drivers") {
 
 # Core is the group that is required for any Bluetooth functionality
 # This group includes all of the non-driver components.
-# Driver packages are defined in "core-drivers"
 group("core") {
   deps = [
     "core/bt-gap",
@@ -55,11 +52,6 @@ group("core-testonly") {
     "profiles/bt-rfcomm:bt-rfcomm-testonly",
     "tools/bt-snoop",
   ]
-}
-
-# This is the part of core group that are drivers packages.
-group("core-drivers") {
-  deps = [ "core/bt-host" ]
 }
 
 # TODO(https://fxbug.dev/42148904): Remove core-system once it is not longer referenced.
@@ -92,14 +84,9 @@ kernel_cmdline("driver-debug-logging") {
     "driver.bt_hci_virtual.log=debug",
     "driver.bt_hci_intel.log=debug",
     "driver.bt_hci_passthrough.log=debug",
-    "driver.bt_host.log=debug",
     "driver.bt_intel.log=debug",
     "driver.bt_transport_uart.log=debug",
     "driver.bt_transport_usb.log=debug",
     "driver.tracing.enable=1",
   ]
-}
-
-kernel_cmdline("disable-bt-host") {
-  args = [ "driver.bt_host.disable=true" ]
 }

@@ -68,14 +68,6 @@
             from: "parent",
             to: [ "#bt-host-collection" ],
         },
-
-        // TODO(b/42085239): Remove when all bt vendor drivers support FIDL
-        {
-            directory: "dev-bt-host",
-            from: "parent",
-            to: [ "#bt-gap" ],
-            rights: [ "r*" ],
-        },
         {
             protocol: [ "fuchsia.bluetooth.host.Receiver" ],
             from: "#bt-gap",

@@ -15,8 +15,5 @@ group("tests") {
     "bt-le-integration:bt-le-integration-tests",
     "bt-manifest-integration-tests:tests",
     "bt-profile-integration:bt-profile-integration-tests",
-
-    # TODO(b/42085239): Remove when all bt vendor drivers support FIDL
-    "//src/connectivity/bluetooth/core/bt-host:bt_host_bind_test",
   ]
 }

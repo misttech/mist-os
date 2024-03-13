@@ -23,7 +23,6 @@
 //src/camera/drivers/hw_accel/ge2d:ge2d-driver-driver
 //src/camera/drivers/sensors/imx227:fuchsia_driver
 //src/camera/drivers/usb_video:fuchsia_driver
-//src/connectivity/bluetooth/core/bt-host:fuchsia_driver
 //src/connectivity/bluetooth/hci/passthrough:fuchsia_driver
 //src/connectivity/bluetooth/hci/transport/uart:bt-transport-uart-driver
 //src/connectivity/bluetooth/hci/transport/usb:bt-transport-usb-driver
