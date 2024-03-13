@@ -42,14 +42,6 @@ class Device : public std::enable_shared_from_this<Device> {
                                         fuchsia_audio_device::DriverClient driver_client);
   ~Device();
 
-  // This is the const subset available to device observers.
-  //
-  // Assigned by this service, guaranteed unique for this boot session, but not across reboots.
-  TokenId token_id() const { return token_id_; }
-  // `info` is only populated once the device is initialized.
-  const std::optional<fuchsia_audio_device::Info>& info() const { return device_info_; }
-  zx::result<zx::clock> GetReadOnlyClock() const;
-
   bool AddObserver(std::shared_ptr<ObserverNotify> observer_to_add);
 
   void Initialize();
@@ -60,15 +52,6 @@ class Device : public std::enable_shared_from_this<Device> {
   bool SetControl(std::shared_ptr<ControlNotify> control_notify);
   bool DropControl();
   void DropRingBuffer();
-
-  // TODO(https://fxbug.dev/42069015): Consider using media_audio::Format internally.
-  const fuchsia_audio::Format& ring_buffer_format() { return vmo_format_; }
-  std::optional<int16_t> valid_bits_per_sample() const {
-    if (!driver_format_ || !driver_format_->pcm_format()) {
-      return std::nullopt;
-    }
-    return driver_format_->pcm_format()->valid_bits_per_sample();
-  }
 
   // Translate from the specified client format to the fuchsia_hardware_audio format that the driver
   // can support, including valid_bits_per_sample (which clients don't specify). If the driver
@@ -98,7 +81,6 @@ class Device : public std::enable_shared_from_this<Device> {
                         uint32_t requested_ring_buffer_bytes,
                         fit::callback<void(RingBufferInfo)> create_ring_buffer_callback);
 
-  std::optional<bool> supports_set_active_channels() const { return supports_set_active_channels_; }
   // Change the channels that are currently active (powered-up).
   void SetActiveChannels(uint64_t channel_bitmask,
                          fit::callback<void(zx::result<zx::time>)> set_active_channels_callback);
@@ -107,14 +89,36 @@ class Device : public std::enable_shared_from_this<Device> {
   // Stop the device ring buffer now (including device clock recovery).
   void StopRingBuffer(fit::callback<void(zx_status_t)> stop_callback);
 
+  // Simple accessors
+  // This is the const subset available to device observers.
+  //
+  fuchsia_audio_device::DeviceType device_type() const { return device_type_; }
+  // Assigned by this service, guaranteed unique for this boot session, but not across reboots.
+  TokenId token_id() const { return token_id_; }
+  // `info` is only populated once the device is initialized.
+  const std::optional<fuchsia_audio_device::Info>& info() const { return device_info_; }
+  zx::result<zx::clock> GetReadOnlyClock() const;
   const std::vector<fuchsia_audio_device::PcmFormatSet>& ring_buffer_format_sets() const {
     return translated_ring_buffer_format_sets_;
   }
+  // TODO(https://fxbug.dev/42069015): Consider using media_audio::Format internally.
+  const fuchsia_audio::Format& ring_buffer_format() { return vmo_format_; }
+  std::optional<int16_t> valid_bits_per_sample() const {
+    if (!driver_format_ || !driver_format_->pcm_format()) {
+      return std::nullopt;
+    }
+    return driver_format_->pcm_format()->valid_bits_per_sample();
+  }
+  std::optional<bool> supports_set_active_channels() const { return supports_set_active_channels_; }
+
   const std::vector<fuchsia_hardware_audio::DaiSupportedFormats>& dai_format_sets() const {
     return *dai_format_sets_;
   }
-
-  fuchsia_audio_device::DeviceType device_type() const { return device_type_; }
+  bool dai_format_is_set() const { return codec_format_.has_value(); }
+  const fuchsia_hardware_audio::CodecFormatInfo& codec_format_info() const {
+    return codec_format_->codec_format_info;
+  }
+  bool codec_is_started() const { return codec_start_state_.started; }
 
   // Static object counts, for debugging purposes.
   static inline uint64_t count() { return count_; }

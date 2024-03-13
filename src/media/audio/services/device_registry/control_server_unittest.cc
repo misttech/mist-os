@@ -30,7 +30,7 @@ class ControlServerTest : public AudioDeviceRegistryServerTestBase {
     registry_client->WatchDevicesAdded().Then(
         [&added_device_id](
             fidl::Result<fuchsia_audio_device::Registry::WatchDevicesAdded>& result) mutable {
-          ASSERT_TRUE(result.is_ok()) << result.error_value().FormatDescription();
+          ASSERT_TRUE(result.is_ok()) << result.error_value();
           ASSERT_TRUE(result->devices());
           ASSERT_EQ(result->devices()->size(), 1u);
           ASSERT_TRUE(result->devices()->at(0).token_id());
@@ -58,7 +58,7 @@ class ControlServerTest : public AudioDeviceRegistryServerTestBase {
         }})
         .Then([&received_callback](
                   fidl::Result<fuchsia_audio_device::ControlCreator::Create>& result) {
-          ASSERT_TRUE(result.is_ok()) << result.error_value().FormatDescription();
+          ASSERT_TRUE(result.is_ok()) << result.error_value();
           received_callback = true;
         });
     RunLoopUntilIdle();
@@ -84,6 +84,8 @@ class ControlServerStreamConfigTest : public ControlServerTest {
 
 /////////////////////
 // StreamConfig tests
+//
+// When client drops their Control, the server should cleanly unwind without hang or WARNING.
 TEST_F(ControlServerStreamConfigTest, CleanClientDrop) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
   auto control = CreateTestControlServer(*adr_service_->devices().begin());
@@ -95,6 +97,7 @@ TEST_F(ControlServerStreamConfigTest, CleanClientDrop) {
   // If Control client doesn't drop cleanly, ControlServer will emit a WARNING, causing a failure.
 }
 
+// When server closes a client connection, the shutdown should be orderly without hang or WARNING.
 TEST_F(ControlServerStreamConfigTest, CleanServerShutdown) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
   auto control = CreateTestControlServer(*adr_service_->devices().begin());
@@ -106,8 +109,10 @@ TEST_F(ControlServerStreamConfigTest, CleanServerShutdown) {
   // If ControlServer doesn't shutdown cleanly, it emits a WARNING, which will cause a failure.
 }
 
-// Same as "CleanClientDrop" test case, but the Control is created "properly" through a
-// ControlCreator rather than directly via AudioDeviceRegistry::CreateControlServer.
+// When client drops their Control, the server should cleanly unwind without hang or WARNING.
+//
+// (Same as "CleanClientDrop" test case, but the Control is created "properly" through a
+// ControlCreator rather than directly via AudioDeviceRegistry::CreateControlServer.)
 TEST_F(ControlServerStreamConfigTest, BasicClose) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
   auto registry = CreateTestRegistryServer();
@@ -125,6 +130,7 @@ TEST_F(ControlServerStreamConfigTest, BasicClose) {
   control_client = fidl::Client<fuchsia_audio_device::Control>();
 }
 
+// A ControlCreator can be closed without affecting the Controls that it created.
 TEST_F(ControlServerStreamConfigTest, ControlCreatorServerShutdownDoesNotAffectControl) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
   auto registry = CreateTestRegistryServer();
@@ -146,6 +152,7 @@ TEST_F(ControlServerStreamConfigTest, ControlCreatorServerShutdownDoesNotAffectC
   control_client = fidl::Client<fuchsia_audio_device::Control>();
 }
 
+// Validate that the ControlServer shuts down cleanly if the driver drops its Codec.
 TEST_F(ControlServerStreamConfigTest, SetGain) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
   fake_driver->AllocateRingBuffer(8192);
@@ -165,7 +172,7 @@ TEST_F(ControlServerStreamConfigTest, SetGain) {
           .target_state = fuchsia_audio_device::GainState{{.gain_db = -1.0f}},
       }})
       .Then([&received_callback](fidl::Result<Control::SetGain>& result) {
-        EXPECT_TRUE(result.is_ok()) << result.error_value().FormatDescription();
+        EXPECT_TRUE(result.is_ok()) << result.error_value();
         received_callback = true;
       });
   RunLoopUntilIdle();
@@ -211,7 +218,7 @@ TEST_F(ControlServerStreamConfigTest, ClientRingBufferDropDoesNotAffectControl) 
                 std::move(ring_buffer_server_end)),
         }})
         .Then([&received_callback](fidl::Result<Control::CreateRingBuffer>& result) {
-          ASSERT_TRUE(result.is_ok()) << result.error_value().FormatDescription();
+          ASSERT_TRUE(result.is_ok()) << result.error_value();
           received_callback = true;
         });
     RunLoopUntilIdle();
@@ -265,7 +272,7 @@ TEST_F(ControlServerStreamConfigTest, DriverRingBufferDropDoesNotAffectControl) 
               fidl::ServerEnd<fuchsia_audio_device::RingBuffer>(std::move(ring_buffer_server_end)),
       }})
       .Then([&received_callback](fidl::Result<Control::CreateRingBuffer>& result) {
-        ASSERT_TRUE(result.is_ok()) << result.error_value().FormatDescription();
+        ASSERT_TRUE(result.is_ok()) << result.error_value();
         received_callback = true;
       });
   RunLoopUntilIdle();
@@ -319,7 +326,7 @@ TEST_F(ControlServerStreamConfigTest, StreamConfigDropCausesCleanControlServerSh
               fidl::ServerEnd<fuchsia_audio_device::RingBuffer>(std::move(ring_buffer_server_end)),
       }})
       .Then([&received_callback](fidl::Result<Control::CreateRingBuffer>& result) {
-        ASSERT_TRUE(result.is_ok()) << result.error_value().FormatDescription();
+        ASSERT_TRUE(result.is_ok()) << result.error_value();
         received_callback = true;
       });
   RunLoopUntilIdle();

@@ -63,7 +63,7 @@ TEST_F(ProviderServerCodecTest, AddedDeviceThatOutlivesProvider) {
       }})
       .Then([&received_callback](fidl::Result<Provider::AddDevice>& result) {
         received_callback = true;
-        EXPECT_TRUE(result.is_ok()) << result.error_value().FormatDescription();
+        EXPECT_TRUE(result.is_ok()) << result.error_value();
       });
 
   RunLoopUntilIdle();
@@ -95,7 +95,7 @@ TEST_F(ProviderServerCodecTest, ProviderCanOutliveAddedDevice) {
       }})
       .Then([&received_callback](fidl::Result<Provider::AddDevice>& result) {
         received_callback = true;
-        EXPECT_TRUE(result.is_ok()) << result.error_value().FormatDescription();
+        EXPECT_TRUE(result.is_ok()) << result.error_value();
       });
 
   RunLoopUntilIdle();
@@ -129,7 +129,7 @@ TEST_F(ProviderServerCodecTest, AddThenWatch) {
       }})
       .Then([&received_callback](fidl::Result<Provider::AddDevice>& result) {
         received_callback = true;
-        EXPECT_TRUE(result.is_ok()) << result.error_value().FormatDescription();
+        EXPECT_TRUE(result.is_ok()) << result.error_value();
       });
 
   RunLoopUntilIdle();
@@ -141,7 +141,7 @@ TEST_F(ProviderServerCodecTest, AddThenWatch) {
   registry_wrapper->client()->WatchDevicesAdded().Then(
       [&received_callback](fidl::Result<Registry::WatchDevicesAdded>& result) mutable {
         received_callback = true;
-        ASSERT_TRUE(result.is_ok()) << result.error_value().FormatDescription();
+        ASSERT_TRUE(result.is_ok()) << result.error_value();
         ASSERT_TRUE(result->devices());
         ASSERT_EQ(result->devices()->size(), 1u);
       });
@@ -158,7 +158,7 @@ TEST_F(ProviderServerCodecTest, WatchThenAdd) {
   registry_wrapper->client()->WatchDevicesAdded().Then(
       [&received_callback1](fidl::Result<Registry::WatchDevicesAdded>& result) mutable {
         received_callback1 = true;
-        ASSERT_TRUE(result.is_ok()) << result.error_value().FormatDescription();
+        ASSERT_TRUE(result.is_ok()) << result.error_value();
         ASSERT_TRUE(result->devices());
         ASSERT_EQ(result->devices()->size(), 1u);
       });
@@ -178,7 +178,7 @@ TEST_F(ProviderServerCodecTest, WatchThenAdd) {
       }})
       .Then([&received_callback2](fidl::Result<Provider::AddDevice>& result) {
         received_callback2 = true;
-        EXPECT_TRUE(result.is_ok()) << result.error_value().FormatDescription();
+        EXPECT_TRUE(result.is_ok()) << result.error_value();
       });
 
   RunLoopUntilIdle();
@@ -207,7 +207,7 @@ TEST_F(ProviderServerStreamConfigTest, AddedDeviceThatOutlivesProvider) {
       }})
       .Then([&received_callback](fidl::Result<Provider::AddDevice>& result) {
         received_callback = true;
-        EXPECT_TRUE(result.is_ok()) << result.error_value().FormatDescription();
+        EXPECT_TRUE(result.is_ok()) << result.error_value();
       });
 
   RunLoopUntilIdle();
@@ -239,7 +239,7 @@ TEST_F(ProviderServerStreamConfigTest, ProviderCanOutliveAddedDevice) {
       }})
       .Then([&received_callback](fidl::Result<Provider::AddDevice>& result) {
         received_callback = true;
-        EXPECT_TRUE(result.is_ok()) << result.error_value().FormatDescription();
+        EXPECT_TRUE(result.is_ok()) << result.error_value();
       });
 
   RunLoopUntilIdle();
@@ -273,7 +273,7 @@ TEST_F(ProviderServerStreamConfigTest, AddThenWatch) {
       }})
       .Then([&received_callback](fidl::Result<Provider::AddDevice>& result) {
         received_callback = true;
-        EXPECT_TRUE(result.is_ok()) << result.error_value().FormatDescription();
+        EXPECT_TRUE(result.is_ok()) << result.error_value();
       });
 
   RunLoopUntilIdle();
@@ -285,7 +285,7 @@ TEST_F(ProviderServerStreamConfigTest, AddThenWatch) {
   registry_wrapper->client()->WatchDevicesAdded().Then(
       [&received_callback](fidl::Result<Registry::WatchDevicesAdded>& result) mutable {
         received_callback = true;
-        ASSERT_TRUE(result.is_ok()) << result.error_value().FormatDescription();
+        ASSERT_TRUE(result.is_ok()) << result.error_value();
         ASSERT_TRUE(result->devices());
         ASSERT_EQ(result->devices()->size(), 1u);
       });
@@ -302,7 +302,7 @@ TEST_F(ProviderServerStreamConfigTest, WatchThenAdd) {
   registry_wrapper->client()->WatchDevicesAdded().Then(
       [&received_callback1](fidl::Result<Registry::WatchDevicesAdded>& result) mutable {
         received_callback1 = true;
-        ASSERT_TRUE(result.is_ok()) << result.error_value().FormatDescription();
+        ASSERT_TRUE(result.is_ok()) << result.error_value();
         ASSERT_TRUE(result->devices());
         ASSERT_EQ(result->devices()->size(), 1u);
       });
@@ -322,7 +322,7 @@ TEST_F(ProviderServerStreamConfigTest, WatchThenAdd) {
       }})
       .Then([&received_callback2](fidl::Result<Provider::AddDevice>& result) {
         received_callback2 = true;
-        EXPECT_TRUE(result.is_ok()) << result.error_value().FormatDescription();
+        EXPECT_TRUE(result.is_ok()) << result.error_value();
       });
 
   RunLoopUntilIdle();

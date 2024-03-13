@@ -38,7 +38,7 @@ class ControlServerWarningTest : public AudioDeviceRegistryServerTestBase,
     registry_client->WatchDevicesAdded().Then(
         [&added_device_id](
             fidl::Result<fuchsia_audio_device::Registry::WatchDevicesAdded>& result) mutable {
-          ASSERT_TRUE(result.is_ok()) << result.error_value().FormatDescription();
+          ASSERT_TRUE(result.is_ok()) << result.error_value();
           ASSERT_TRUE(result->devices());
           ASSERT_EQ(result->devices()->size(), 1u);
           ASSERT_TRUE(result->devices()->at(0).token_id());
@@ -66,7 +66,7 @@ class ControlServerWarningTest : public AudioDeviceRegistryServerTestBase,
         }})
         .Then([&received_callback](
                   fidl::Result<fuchsia_audio_device::ControlCreator::Create>& result) {
-          ASSERT_TRUE(result.is_ok()) << result.error_value().FormatDescription();
+          ASSERT_TRUE(result.is_ok()) << result.error_value();
           received_callback = true;
         });
     RunLoopUntilIdle();
@@ -127,10 +127,8 @@ class ControlServerStreamConfigWarningTest : public ControlServerWarningTest {
         }})
         .Then([&received_callback, expected_error](fidl::Result<Control::SetGain>& result) {
           ASSERT_TRUE(result.is_error());
-          ASSERT_TRUE(result.error_value().is_domain_error())
-              << result.error_value().FormatDescription();
-          EXPECT_EQ(result.error_value().domain_error(), expected_error)
-              << result.error_value().FormatDescription();
+          ASSERT_TRUE(result.error_value().is_domain_error()) << result.error_value();
+          EXPECT_EQ(result.error_value().domain_error(), expected_error) << result.error_value();
           received_callback = true;
         });
 
@@ -164,15 +162,13 @@ class ControlServerStreamConfigWarningTest : public ControlServerWarningTest {
             .ring_buffer_server = fidl::ServerEnd<fuchsia_audio_device::RingBuffer>(
                 std::move(ring_buffer_server_end)),
         }})
-        .Then(
-            [&received_callback, expected_error](fidl::Result<Control::CreateRingBuffer>& result) {
-              ASSERT_TRUE(result.is_error());
-              ASSERT_TRUE(result.error_value().is_domain_error())
-                  << result.error_value().FormatDescription();
-              EXPECT_EQ(result.error_value().domain_error(), expected_error)
-                  << result.error_value().FormatDescription();
-              received_callback = true;
-            });
+        .Then([&received_callback,
+               expected_error](fidl::Result<Control::CreateRingBuffer>& result) {
+          ASSERT_TRUE(result.is_error());
+          ASSERT_TRUE(result.error_value().is_domain_error()) << result.error_value();
+          EXPECT_EQ(result.error_value().domain_error(), expected_error) << result.error_value();
+          received_callback = true;
+        });
 
     RunLoopUntilIdle();
     EXPECT_TRUE(received_callback);
@@ -382,7 +378,7 @@ TEST_F(ControlServerStreamConfigWarningTest, CreateRingBufferWhilePending) {
               fidl::ServerEnd<fuchsia_audio_device::RingBuffer>(std::move(ring_buffer_server_end1)),
       }})
       .Then([&received_callback_1](fidl::Result<Control::CreateRingBuffer>& result) {
-        ASSERT_TRUE(result.is_ok()) << result.error_value().FormatDescription();
+        ASSERT_TRUE(result.is_ok()) << result.error_value();
         received_callback_1 = true;
       });
   control_client
@@ -393,11 +389,10 @@ TEST_F(ControlServerStreamConfigWarningTest, CreateRingBufferWhilePending) {
       }})
       .Then([&received_callback_2](fidl::Result<Control::CreateRingBuffer>& result) {
         ASSERT_TRUE(result.is_error());
-        ASSERT_TRUE(result.error_value().is_domain_error())
-            << result.error_value().FormatDescription();
+        ASSERT_TRUE(result.error_value().is_domain_error()) << result.error_value();
         EXPECT_EQ(result.error_value().domain_error(),
                   fuchsia_audio_device::ControlCreateRingBufferError::kAlreadyPending)
-            << result.error_value().FormatDescription();
+            << result.error_value();
         received_callback_2 = true;
       });
 
@@ -496,11 +491,10 @@ TEST_F(ControlServerStreamConfigWarningTest, DISABLED_CreateRingBufferHugeRingBu
                                  : "NONE");
         }
         ASSERT_TRUE(result.is_error());
-        ASSERT_TRUE(result.error_value().is_domain_error())
-            << result.error_value().FormatDescription();
+        ASSERT_TRUE(result.error_value().is_domain_error()) << result.error_value();
         EXPECT_EQ(result.error_value().domain_error(),
                   fuchsia_audio_device::ControlCreateRingBufferError::kBadRingBufferOption)
-            << result.error_value().FormatDescription();
+            << result.error_value();
 
         received_callback = true;
       });
@@ -535,11 +529,10 @@ TEST_F(ControlServerStreamConfigWarningTest, CreateRingBufferMissingRingBufferSe
       }})
       .Then([&received_callback](fidl::Result<Control::CreateRingBuffer>& result) {
         ASSERT_TRUE(result.is_error());
-        ASSERT_TRUE(result.error_value().is_domain_error())
-            << result.error_value().FormatDescription();
+        ASSERT_TRUE(result.error_value().is_domain_error()) << result.error_value();
         EXPECT_EQ(result.error_value().domain_error(),
                   fuchsia_audio_device::ControlCreateRingBufferError::kInvalidRingBuffer)
-            << result.error_value().FormatDescription();
+            << result.error_value();
         received_callback = true;
       });
 
@@ -574,10 +567,9 @@ TEST_F(ControlServerStreamConfigWarningTest, CreateRingBufferBadRingBufferServer
       }})
       .Then([&received_callback](fidl::Result<Control::CreateRingBuffer>& result) {
         ASSERT_TRUE(result.is_error());
-        ASSERT_TRUE(result.error_value().is_framework_error())
-            << result.error_value().FormatDescription();
+        ASSERT_TRUE(result.error_value().is_framework_error()) << result.error_value();
         EXPECT_EQ(result.error_value().framework_error().status(), ZX_ERR_INVALID_ARGS)
-            << result.error_value().FormatDescription();
+            << result.error_value();
         received_callback = true;
       });
 

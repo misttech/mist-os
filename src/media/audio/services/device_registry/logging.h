@@ -39,7 +39,7 @@ inline constexpr bool kLogMain = true;
 inline constexpr bool kLogDeviceDetection = false;
 inline constexpr bool kLogDeviceInitializationProgress = false;
 inline constexpr bool kLogAudioDeviceRegistryMethods = false;
-inline constexpr bool kLogSummaryFinalDeviceInfo = true;
+inline constexpr bool kLogSummaryFinalDeviceInfo = false;
 inline constexpr bool kLogDetailedFinalDeviceInfo = true;
 
 inline constexpr bool kLogDeviceMethods = false;
@@ -50,7 +50,7 @@ inline constexpr bool kLogStreamConfigFidlResponseValues = false;
 
 inline constexpr bool kLogCodecFidlCalls = false;
 inline constexpr bool kLogCodecFidlResponses = false;
-inline constexpr bool kLogCodecFidlResponseValues = true;
+inline constexpr bool kLogCodecFidlResponseValues = false;
 
 inline constexpr bool kLogRingBufferMethods = false;
 inline constexpr bool kLogRingBufferFidlCalls = false;

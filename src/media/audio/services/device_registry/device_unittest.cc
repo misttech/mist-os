@@ -24,6 +24,9 @@ namespace media_audio {
 
 using ::testing::Optional;
 
+/////////////////////
+// Codec tests
+//
 // Validate that a fake codec with default values is initialized successfully.
 TEST_F(CodecTest, Initialization) {
   auto fake_driver = MakeFakeCodecOutput();
@@ -566,6 +569,9 @@ TEST_F(StreamConfigTest, Initialization) {
   device_presence_watcher().reset();
 }
 
+/////////////////////
+// StreamConfig tests
+//
 // Validate that a driver's dropping the StreamConfig causes a DeviceIsRemoved notification.
 TEST_F(StreamConfigTest, Disconnect) {
   auto fake_stream_config = MakeFakeStreamConfigOutput();

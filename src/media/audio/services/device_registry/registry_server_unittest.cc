@@ -171,7 +171,7 @@ TEST_F(RegistryServerStreamConfigTest, WatchRemovesThenDeviceRemove) {
       [&received_callback,
        &removed_device_id](fidl::Result<Registry::WatchDeviceRemoved>& result) mutable {
         received_callback = true;
-        ASSERT_TRUE(result.is_ok()) << result.error_value().FormatDescription();
+        ASSERT_TRUE(result.is_ok()) << result.error_value();
         ASSERT_TRUE(result->token_id());
         removed_device_id = *result->token_id();
       });
@@ -228,7 +228,7 @@ TEST_F(RegistryServerStreamConfigTest, DeviceRemoveThenWatchRemoves) {
       [&received_callback,
        &removed_device_id](fidl::Result<Registry::WatchDeviceRemoved>& result) mutable {
         received_callback = true;
-        ASSERT_TRUE(result.is_ok()) << result.error_value().FormatDescription();
+        ASSERT_TRUE(result.is_ok()) << result.error_value();
         ASSERT_TRUE(result->token_id());
         removed_device_id = *result->token_id();
       });
@@ -323,7 +323,7 @@ TEST_F(RegistryServerStreamConfigTest, DeviceRemoveAddThenWatches) {
       [&received_callback,
        &removed_device_id](fidl::Result<Registry::WatchDeviceRemoved>& result) mutable {
         received_callback = true;
-        ASSERT_TRUE(result.is_ok()) << result.error_value().FormatDescription();
+        ASSERT_TRUE(result.is_ok()) << result.error_value();
         ASSERT_TRUE(result->token_id());
         removed_device_id = *result->token_id();
       });
@@ -399,7 +399,7 @@ TEST_F(RegistryServerStreamConfigTest, CreateObserver) {
       }})
       .Then([&received_callback](fidl::Result<Registry::CreateObserver>& result) {
         received_callback = true;
-        EXPECT_TRUE(result.is_ok()) << result.error_value().FormatDescription();
+        EXPECT_TRUE(result.is_ok()) << result.error_value();
       });
 
   RunLoopUntilIdle();
