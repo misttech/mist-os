@@ -24,6 +24,7 @@ source_set("client") {
     "//src/lib/files",
     "//zircon/system/ulib/async-default",
     "//zircon/system/ulib/trace",
+    "//zircon/system/ulib/zx",
   ]
 }
 

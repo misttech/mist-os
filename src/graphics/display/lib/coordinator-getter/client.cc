@@ -13,6 +13,7 @@
 #include <lib/fpromise/promise.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/trace/event.h>
+#include <lib/zx/result.h>
 #include <zircon/status.h>
 
 #include <memory>
@@ -23,121 +24,22 @@ namespace {
 
 using ProviderClientEnd = fidl::ClientEnd<fuchsia_hardware_display::Provider>;
 
-class IoNodeEventHandler : public fidl::AsyncEventHandler<fuchsia_io::Node> {
- public:
-  using OnOpenCallback = fit::function<void(fidl::Event<fuchsia_io::Node::OnOpen>& event)>;
-  using OnFidlErrorCallback = fit::function<void(fidl::UnbindInfo error)>;
-
-  IoNodeEventHandler() = default;
-  void OnOpen(fidl::Event<fuchsia_io::Node::OnOpen>& event) override { on_open_(event); }
-  void on_fidl_error(fidl::UnbindInfo error) override { on_fidl_error_(error); }
-
-  // Sets the OnOpen() callback to `on_open` and returns the old callback.
-  OnOpenCallback SetOnOpen(OnOpenCallback on_open) {
-    on_open_.swap(on_open);
-    return on_open;
-  }
-
-  // Sets the OnFidlError() callback to `on_fidl_error` and returns the old
-  // callback.
-  OnFidlErrorCallback SetOnFidlError(OnFidlErrorCallback on_fidl_error) {
-    on_fidl_error_.swap(on_fidl_error);
-    return on_fidl_error;
-  }
-
-  // Clears event handler callbacks and returns the old callbacks.
-  std::pair<OnOpenCallback, OnFidlErrorCallback> TakeCallbacksAndReset() {
-    auto on_open = SetOnOpen({});
-    auto on_fidl_error = SetOnFidlError({});
-    return std::make_pair(std::move(on_open), std::move(on_fidl_error));
-  }
-
- private:
-  OnOpenCallback on_open_;
-  OnFidlErrorCallback on_fidl_error_;
-};
-
-// Connects to the dispatcher
-fpromise::promise<ProviderClientEnd, zx_status_t> GetProvider(async_dispatcher_t* dispatcher) {
-  zx::result<fidl::Endpoints<fuchsia_io::Node>> endpoints =
-      fidl::CreateEndpoints<fuchsia_io::Node>();
+zx::result<ProviderClientEnd> GetProvider() {
+  zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_display::Provider>();
   if (endpoints.is_error()) {
     FX_PLOGS(ERROR, endpoints.status_value()) << "Failed to create fuchsia.io.Node endpoints: ";
-    return fpromise::make_result_promise<ProviderClientEnd, zx_status_t>(
-        fpromise::error(endpoints.error_value()));
+    return endpoints.take_error();
   }
-  auto& [node_client, node_server] = endpoints.value();
+  auto& [client, server] = endpoints.value();
 
   constexpr const char* kServicePath =
       fidl::DiscoverableProtocolDefaultPath<fuchsia_hardware_display::Provider>;
-  zx_status_t status =
-      fdio_open(kServicePath, static_cast<uint32_t>(fuchsia_io::wire::OpenFlags::kDescribe),
-                node_server.TakeChannel().release());
+  zx_status_t status = fdio_service_connect(kServicePath, server.TakeChannel().release());
   if (status != ZX_OK) {
-    FX_PLOGS(ERROR, status) << "failed to connect to " << kServicePath;
-    return fpromise::make_result_promise<ProviderClientEnd, zx_status_t>(fpromise::error(status));
+    FX_PLOGS(ERROR, status) << "Failed to connect to " << kServicePath << ": ";
+    return zx::error(status);
   }
-
-  fpromise::bridge<ProviderClientEnd, zx_status_t> bridge;
-  std::shared_ptr completer =
-      std::make_shared<decltype(bridge.completer)>(std::move(bridge.completer));
-
-  std::unique_ptr event_handler = std::make_unique<IoNodeEventHandler>();
-
-  // fidl::Client is required since we need to get the io.Node client endpoint
-  // (and repurpose it as a display.Provider client) after the endpoint gets
-  // unbound from the Client. This adds thread safety requirements for methods
-  // of `client`.
-  std::unique_ptr client = std::make_unique<fidl::Client<fuchsia_io::Node>>();
-
-  IoNodeEventHandler* event_handler_raw = event_handler.get();
-  fidl::Client<fuchsia_io::Node>* client_raw = client.get();
-
-  // The FIDL async client (with its client bindings) and the event handler
-  // bound to the client are moved to the `OnOpen()` callback closure.
-  //
-  // Closures are removed from the event handler only on success open (OnOpen
-  // event) or FIDL errors, so the FIDL connection will be valid until then.
-  event_handler_raw->SetOnOpen([completer, client = std::move(client),
-                                event_handler = std::move(event_handler)](auto&) mutable {
-    auto unbind_result = client->UnbindMaybeGetEndpoint();
-    if (unbind_result.is_error()) {
-      zx_status_t status = unbind_result.error_value().status();
-      FX_PLOGS(ERROR, status) << "Failed to unbind the channel from async Node client.";
-      completer->complete_error(status);
-    } else {
-      // When a Node is opened using `kDescribe` mode, once the the open is
-      // successful, the target protocol (here it's fuchsia.hardware.display.
-      // Provider) can be used exclusively on the channel.
-      completer->complete_ok(ProviderClientEnd(unbind_result.value().TakeChannel()));
-    }
-    // Move the callbacks to this closure so that they'll be destroyed when
-    // this callback finishes. Destroyal will always occur on `dispatcher`
-    // thread.
-    auto callbacks = event_handler->TakeCallbacksAndReset();
-  });
-  event_handler_raw->SetOnFidlError([completer, event_handler_raw](fidl::UnbindInfo error) {
-    FX_PLOGS(ERROR, error.status()) << "FIDL client unbound:";
-    completer->complete_error(error.status());
-    // Move the callbacks to this closure so that they'll be destroyed when
-    // this callback finishes. Destroyal will always occur on `dispatcher`
-    // thread.
-    auto callbacks = event_handler_raw->TakeCallbacksAndReset();
-  });
-
-  // The FIDL client and event handler have been moved to the OnOpen() callback
-  // which will be only modified after the FIDL client is bound to a channel.
-  // So it is safe to use the raw pointers to fidl::Client and
-  // IoNodeEventHandler here to bind the channel to the client.
-  //
-  // fidl::Client requires that it must be bound on the dispatcher thread.
-  // So this has to be dispatched as an async task running on `dispatcher`.
-  async::PostTask(dispatcher, [client_raw, event_handler_raw, dispatcher,
-                               node_client = std::move(node_client)]() mutable {
-    client_raw->Bind(std::move(node_client), dispatcher, event_handler_raw);
-  });
-
-  return bridge.consumer.promise();
+  return zx::ok(std::move(client));
 }
 
 fpromise::promise<CoordinatorClientEnd, zx_status_t> GetCoordinatorFromProvider(
@@ -195,9 +97,12 @@ fpromise::promise<CoordinatorClientEnd, zx_status_t> GetCoordinatorFromProvider(
 fpromise::promise<CoordinatorClientEnd, zx_status_t> GetCoordinator(
     async_dispatcher_t* dispatcher) {
   TRACE_DURATION("gfx", "GetCoordinator");
-  return GetProvider(dispatcher).and_then([dispatcher](ProviderClientEnd& client_end) {
-    return GetCoordinatorFromProvider(dispatcher, client_end);
-  });
+  zx::result client_end = GetProvider();
+  if (client_end.is_error()) {
+    return fpromise::make_result_promise<CoordinatorClientEnd, zx_status_t>(
+        fpromise::error(client_end.error_value()));
+  }
+  return GetCoordinatorFromProvider(dispatcher, *client_end);
 }
 
 fpromise::promise<CoordinatorClientEnd, zx_status_t> GetCoordinator() {
