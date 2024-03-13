@@ -1,0 +1,32 @@
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+package(default_visibility = ["//visibility:public"])
+
+cc_library(
+    name = "pw_log",
+    hdrs = [
+        "public/pw_log_fuchsia/log_fuchsia.h",
+        "public_overrides/pw_log_backend/log_backend.h",
+    ],
+    srcs = [
+        "log_fuchsia.cc",
+    ],
+    includes = [
+        "public",
+        "public_overrides",
+    ],
+    deps = [
+        "@pigweed//pw_log:facade",
+        "@pigweed//pw_preprocessor",
+        "@pigweed//pw_string:builder",
+    ],
+)
+
+# pw_log backends must provide their own "impl" target that collects their
+# actual dependencies. The backend "impl" target may be empty if everything can
+# go directly in the backend target without causing circular dependencies.
+cc_library(
+    name = "impl",
+)

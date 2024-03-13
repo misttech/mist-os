@@ -350,6 +350,7 @@ def fuchsia_wrap_cc_test(
         test_binary_name = name,
         deps = exact_cc_test_deps,
         googletest = "%s//:BUILD.bazel" % googletest_root_label,
+        testonly = True,
         **kwargs
     )
 
@@ -358,6 +359,7 @@ def fuchsia_wrap_cc_test(
         name = "%s_autogen_manifest" % name,
         component_name = name,
         src = ":%s_autogen_cml" % name,
+        testonly = True,
         **kwargs
     )
 
@@ -366,6 +368,7 @@ def fuchsia_wrap_cc_test(
         name = "%s_manifest_resource" % name,
         src = ":%s_autogen_manifest" % name,
         dest = "meta/%s.cm" % name,
+        testonly = True,
     )
 
     # Generate the default component.

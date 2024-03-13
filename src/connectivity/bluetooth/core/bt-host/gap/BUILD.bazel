@@ -1,0 +1,61 @@
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+package(default_visibility = ["//visibility:public"])
+
+cc_library(
+    name = "definitions",
+    srcs = [
+        "gap.cc",
+    ],
+    deps = [
+        "//src/connectivity/bluetooth/core/bt-host:public",
+        "//src/connectivity/bluetooth/core/bt-host/common",
+    ],
+)
+
+cc_library(
+    name = "gap",
+    srcs = [
+        "adapter.cc",
+        "android_vendor_capabilities.cc",
+        "bredr_connection.cc",
+        "bredr_connection_manager.cc",
+        "bredr_connection_request.cc",
+        "bredr_discovery_manager.cc",
+        "bredr_interrogator.cc",
+        "discovery_filter.cc",
+        "generic_access_client.cc",
+        "identity_resolving_list.cc",
+        "low_energy_address_manager.cc",
+        "low_energy_advertising_manager.cc",
+        "low_energy_connection.cc",
+        "low_energy_connection_handle.cc",
+        "low_energy_connection_manager.cc",
+        "low_energy_connection_request.cc",
+        "low_energy_connector.cc",
+        "low_energy_discovery_manager.cc",
+        "low_energy_interrogator.cc",
+        "pairing_state.cc",
+        "peer.cc",
+        "peer_cache.cc",
+        "peer_metrics.cc",
+        "types.cc",
+    ],
+    deps = [
+        ":definitions",
+        "//src/connectivity/bluetooth/core/bt-host:public",
+        "//src/connectivity/bluetooth/core/bt-host/common",
+        "//src/connectivity/bluetooth/core/bt-host/gatt",
+        "//src/connectivity/bluetooth/core/bt-host/hci",
+        "//src/connectivity/bluetooth/core/bt-host/iso",
+        "//src/connectivity/bluetooth/core/bt-host/l2cap",
+        "//src/connectivity/bluetooth/core/bt-host/sco",
+        "//src/connectivity/bluetooth/core/bt-host/sdp",
+        "//src/connectivity/bluetooth/core/bt-host/sm",
+        "@pigweed//pw_async:heap_dispatcher",
+        "@pigweed//pw_bluetooth",
+        "@pigweed//third_party/fuchsia:fit",
+    ],
+)

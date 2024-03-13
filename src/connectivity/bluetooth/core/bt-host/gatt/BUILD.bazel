@@ -1,0 +1,38 @@
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+package(default_visibility = ["//visibility:public"])
+
+cc_library(
+    name = "definitions",
+    srcs = [
+        "gatt_defs.cc",
+    ],
+    deps = [
+        "//src/connectivity/bluetooth/core/bt-host:public",
+        "//src/connectivity/bluetooth/core/bt-host/att:definitions",
+    ],
+)
+
+cc_library(
+    name = "gatt",
+    srcs = [
+        "client.cc",
+        "connection.cc",
+        "gatt.cc",
+        "generic_attribute_service.cc",
+        "local_service_manager.cc",
+        "remote_characteristic.cc",
+        "remote_service.cc",
+        "remote_service_manager.cc",
+        "server.cc",
+        "types.cc",
+    ],
+    deps = [
+        ":definitions",
+        "//src/connectivity/bluetooth/core/bt-host:public",
+        "//src/connectivity/bluetooth/core/bt-host/att",
+        "@pigweed//third_party/fuchsia:fit",
+    ],
+)

@@ -1,0 +1,34 @@
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+package(default_visibility = ["//visibility:public"])
+
+cc_library(
+    name = "definitions",
+    srcs = [
+        "data_element.cc",
+        "error.cc",
+        "service_record.cc",
+    ],
+    deps = [
+        "//src/connectivity/bluetooth/core/bt-host:public",
+        "//src/connectivity/bluetooth/core/bt-host/common",
+    ],
+)
+
+cc_library(
+    name = "sdp",
+    srcs = [
+        "client.cc",
+        "pdu.cc",
+        "server.cc",
+        "service_discoverer.cc",
+    ],
+    deps = [
+        ":definitions",
+        "//src/connectivity/bluetooth/core/bt-host:public",
+        "//src/connectivity/bluetooth/core/bt-host/l2cap",
+        "@pigweed//third_party/fuchsia:stdcompat",
+    ],
+)

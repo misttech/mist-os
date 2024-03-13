@@ -379,3 +379,8 @@ group("tests") {
     "socket:bt-host-socket-tests",
   ]
 }
+
+group("bazel_tests") {
+  testonly = true
+  deps = [ "hci-spec:test_pkg" ]
+}

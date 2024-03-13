@@ -1,0 +1,106 @@
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+package(default_visibility = ["//visibility:public"])
+
+cc_library(
+    name = "testing",
+    testonly = True,
+    srcs = [
+        "inspect_util.cc",
+        "parse_args.cc",
+        "test_packets.cc",
+    ],
+    deps = [
+        ":fake_controller",
+        ":mock_controller",
+        ":test_helpers",
+        "//sdk/lib/inspect/testing/cpp",
+        "//src/connectivity/bluetooth/core/bt-host:config",
+        "//src/connectivity/bluetooth/core/bt-host:public",
+        "//src/connectivity/bluetooth/core/bt-host/transport",
+        "//src/connectivity/bluetooth/core/bt-host/transport:testing",
+        "@com_google_googletest//:gtest",
+    ],
+)
+
+cc_library(
+    name = "test_helpers",
+    testonly = True,
+    # test_helpers.h is currently in bt-host:public, but its deps are here.
+    deps = [
+        "//src/connectivity/bluetooth/core/bt-host:public",
+        "//src/connectivity/bluetooth/core/bt-host/common",
+        "//src/connectivity/bluetooth/lib/cpp-string",
+        "@com_google_googletest//:gtest",
+    ],
+)
+
+cc_library(
+    name = "controller_test_double_base",
+    testonly = True,
+    srcs = ["controller_test_double_base.cc"],
+    deps = [
+        "//src/connectivity/bluetooth/core/bt-host:public",
+        "//src/connectivity/bluetooth/core/bt-host/common",
+        "//src/connectivity/bluetooth/core/bt-host/hci",
+        "@pigweed//pw_async:heap_dispatcher",
+        "@pigweed//pw_bluetooth",
+        "@pigweed//third_party/fuchsia:fit",
+    ],
+)
+
+cc_library(
+    name = "mock_controller",
+    testonly = True,
+    srcs = ["mock_controller.cc"],
+    deps = [
+        ":controller_test_double_base",
+        ":test_helpers",
+        "//src/connectivity/bluetooth/core/bt-host:public",
+        "//src/connectivity/bluetooth/core/bt-host/transport",
+        "//src/connectivity/bluetooth/core/bt-host/transport:testing",
+        "@com_google_googletest//:gtest",
+        "@pigweed//pw_async:heap_dispatcher",
+    ],
+)
+
+cc_library(
+    name = "fake_controller",
+    testonly = True,
+    srcs = [
+        "fake_controller.cc",
+        "fake_dynamic_channel.cc",
+        "fake_gatt_server.cc",
+        "fake_l2cap.cc",
+        "fake_peer.cc",
+        "fake_sdp_server.cc",
+        "fake_signaling_server.cc",
+    ],
+    deps = [
+        ":controller_test_double_base",
+        ":test_helpers",
+        "//src/connectivity/bluetooth/core/bt-host:public",
+        "//src/connectivity/bluetooth/core/bt-host/att:definitions",
+        "//src/connectivity/bluetooth/core/bt-host/common",
+        "//src/connectivity/bluetooth/core/bt-host/gap",
+        "//src/connectivity/bluetooth/core/bt-host/gatt:definitions",
+        "//src/connectivity/bluetooth/core/bt-host/hci",
+        "//src/connectivity/bluetooth/core/bt-host/l2cap:definitions",
+        "//src/connectivity/bluetooth/core/bt-host/l2cap:testing",
+        "//src/connectivity/bluetooth/core/bt-host/sdp",
+        "@pigweed//pw_bluetooth:emboss_hci",
+        "@pigweed//third_party/fuchsia:fit",
+    ],
+)
+
+cc_library(
+    name = "gtest_main",
+    testonly = True,
+    srcs = ["run_all_unittests.cc"],
+    deps = [
+        ":testing",
+        "//src/connectivity/bluetooth/core/bt-host/common",
+    ],
+)

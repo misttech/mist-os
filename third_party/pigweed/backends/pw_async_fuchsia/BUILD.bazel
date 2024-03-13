@@ -1,0 +1,38 @@
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+package(default_visibility = ["//visibility:public"])
+
+# Backend for pw_async:task
+cc_library(
+    name = "task",
+    includes = [
+        "public",
+        "public_overrides",
+    ],
+    deps = [
+        "@pigweed//pw_async:task_facade",
+        "@fuchsia_sdk//pkg/zx",
+        "@fuchsia_sdk//pkg/async-loop-default",
+    ],
+    srcs = [
+        "task.cc",
+    ],
+)
+
+# Backend for pw_async:fake_dispatcher
+cc_library(
+    name = "fake_dispatcher",
+    includes = [
+        "public",
+        "public_overrides",
+    ],
+    srcs = [
+        "fake_dispatcher.cc",
+    ],
+    deps = [
+        ":task",
+        "@pigweed//pw_async:fake_dispatcher_facade",
+    ],
+)

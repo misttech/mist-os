@@ -138,6 +138,14 @@ group("non_hermetic_deps") {
     "//src/devices/i2c/drivers/aml-i2c:*",
   ]
 
+  # Bluetooth Bazel test packages are wrapped in the bazel_fuchsia_test_package
+  # GN rule, which has unspecified outputs.
+  # bt-host tests will be migrated out-of-tree.
+  visibility += [
+    "//src/connectivity/bluetooth/core/bt-host/hci-spec:test_pkg",
+    "//src/connectivity/bluetooth/core/bt-host/hci-spec:test_pkg.bazel_build",
+  ]
+
   # Products which use Bazel-based assembly have non-hermetic outputs
   visibility += [
     "//products/minimal:*",

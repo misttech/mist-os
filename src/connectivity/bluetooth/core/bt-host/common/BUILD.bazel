@@ -1,0 +1,50 @@
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+load(
+    "@fuchsia_sdk//fuchsia:defs.bzl",
+    "if_fuchsia",
+)
+
+package(default_visibility = ["//visibility:public"])
+
+cc_library(
+    name = "common",
+    srcs = [
+        "advertising_data.cc",
+        "bounded_inspect_list_node.cc",
+        "byte_buffer.cc",
+        "device_address.cc",
+        "device_class.cc",
+        "host_error.cc",
+        "identifier.cc",
+        "log.cc",
+        "manufacturer_names.cc",
+        "metrics.cc",
+        "random.cc",
+        "retire_log.cc",
+        "slab_allocator.cc",
+        "supplement_data.cc",
+        "uuid.cc",
+    ],
+    deps = [
+        "//src/connectivity/bluetooth/core/bt-host:config",
+        "//src/connectivity/bluetooth/core/bt-host:public",
+        "//src/connectivity/bluetooth/lib/cpp-string",
+        "//src/connectivity/bluetooth/lib/cpp-type",
+        "@pigweed//pw_assert",
+        "@pigweed//pw_async:dispatcher",
+        "@pigweed//pw_async:task",
+        "@pigweed//pw_bluetooth:emboss_hci",
+        "@pigweed//pw_intrusive_ptr",
+        "@pigweed//pw_log",
+        "@pigweed//pw_random",
+        "@pigweed//pw_span",
+        "@pigweed//pw_string",
+        "@pigweed//third_party/fuchsia:fit",
+    ] + if_fuchsia([
+        "@fuchsia_sdk//pkg/inspect_component_cpp",
+        "@fuchsia_sdk//pkg/trace",
+    ]),
+)

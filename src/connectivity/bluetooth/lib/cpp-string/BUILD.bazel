@@ -2,21 +2,17 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-# inspect testing library
-
 package(default_visibility = ["//visibility:public"])
 
 cc_library(
-    name = "cpp",
+    name = "cpp-string",
     srcs = [
-        "inspect.cc",
+        "string_printf.cc",
+        "string_printf.h",
+        "utf_codecs.cc",
+        "utf_codecs.h",
     ],
-    hdrs = [
-        "inspect.h",
-    ],
-    include_prefix = "lib/inspect/testing/cpp",
     deps = [
-        "@com_google_googletest//:gtest_main",
-        "@fuchsia_sdk//pkg/inspect",
+        "//src/connectivity/bluetooth/lib/third_party/icu",
     ],
 )

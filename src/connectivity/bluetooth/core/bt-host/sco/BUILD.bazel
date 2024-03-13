@@ -1,0 +1,20 @@
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+package(default_visibility = ["//visibility:public"])
+
+cc_library(
+    name = "sco",
+    srcs = [
+        "sco_connection.cc",
+        "sco_connection_manager.cc",
+    ],
+    deps = [
+        "//src/connectivity/bluetooth/core/bt-host:public",
+        "//src/connectivity/bluetooth/core/bt-host/common",
+        "//src/connectivity/bluetooth/core/bt-host/hci",
+        "//src/connectivity/bluetooth/core/bt-host/transport",
+        "@pigweed//third_party/fuchsia:fit",
+    ],
+)

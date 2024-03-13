@@ -1,0 +1,52 @@
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+load(
+    "@fuchsia_sdk//fuchsia:defs.bzl",
+    "fuchsia_cc_test",
+    "fuchsia_unittest_package",
+)
+
+package(default_visibility = ["//visibility:public"])
+
+cc_library(
+    name = "hci-spec",
+    srcs = [
+        "le_connection_parameters.cc",
+        "link_key.cc",
+        "util.cc",
+    ],
+    deps = [
+        "//src/connectivity/bluetooth/core/bt-host:config",
+        "//src/connectivity/bluetooth/core/bt-host:public",
+        "//src/connectivity/bluetooth/core/bt-host/common",
+        "@pigweed//pw_bluetooth:emboss_hci",
+        "@pigweed//pw_chrono:system_clock",
+    ],
+)
+
+fuchsia_cc_test(
+    name = "hci_spec_test",
+    size = "small",
+    testonly = True,
+    srcs = [
+        "util_test.cc",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":hci-spec",
+        "//src/connectivity/bluetooth/core/bt-host/testing:gtest_main",
+    ],
+)
+
+fuchsia_unittest_package(
+    name = "test_pkg",
+    package_name = "hci_spec_tests",
+    testonly = True,
+    fuchsia_api_level = "HEAD",
+    unit_tests = [
+        ":hci_spec_test",
+    ],
+    visibility = ["//visibility:public"],
+)

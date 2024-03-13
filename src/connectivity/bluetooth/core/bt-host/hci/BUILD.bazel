@@ -1,0 +1,36 @@
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+package(default_visibility = ["//visibility:public"])
+
+cc_library(
+    name = "hci",
+    srcs = [
+        "acl_connection.cc",
+        "advertising_handle_map.cc",
+        "advertising_report_parser.cc",
+        "android_extended_low_energy_advertiser.cc",
+        "bredr_connection.cc",
+        "bredr_connection_request.cc",
+        "connection.cc",
+        "extended_low_energy_advertiser.cc",
+        "extended_low_energy_scanner.cc",
+        "legacy_low_energy_advertiser.cc",
+        "legacy_low_energy_scanner.cc",
+        "low_energy_advertiser.cc",
+        "low_energy_connection.cc",
+        "low_energy_connector.cc",
+        "low_energy_scanner.cc",
+        "sco_connection.cc",
+        "sequential_command_runner.cc",
+        "util.cc",
+    ],
+    deps = [
+        "//src/connectivity/bluetooth/core/bt-host:public",
+        "//src/connectivity/bluetooth/core/bt-host/transport",
+        "@pigweed//pw_async:heap_dispatcher",
+        "@pigweed//pw_bluetooth:emboss_hci",
+        "@pigweed//third_party/fuchsia:fit",
+    ],
+)

@@ -2,21 +2,21 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-# inspect testing library
-
 package(default_visibility = ["//visibility:public"])
 
 cc_library(
-    name = "cpp",
+    name = "pw_assert",
     srcs = [
-        "inspect.cc",
+        "assert.cc",
     ],
     hdrs = [
-        "inspect.h",
+        "public_overrides/pw_assert_backend/assert_backend.h",
+        "public_overrides/pw_assert_backend/check_backend.h",
     ],
-    include_prefix = "lib/inspect/testing/cpp",
+    includes = [
+        "public_overrides",
+    ],
     deps = [
-        "@com_google_googletest//:gtest_main",
-        "@fuchsia_sdk//pkg/inspect",
+        "@pigweed//pw_assert:facade",
     ],
 )

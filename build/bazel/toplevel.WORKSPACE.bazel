@@ -24,6 +24,13 @@ local_repository(
     path = "build/bazel/local_repositories/rules_java",
 )
 
+load(
+    "//:third_party/pigweed/repositories.bzl",
+    "setup_pigweed_repository_dependencies",
+)
+
+setup_pigweed_repository_dependencies()
+
 local_repository(
     name = "remote_coverage_tools",
     path = "build/bazel/local_repositories/remote_coverage_tools",
@@ -70,6 +77,17 @@ local_repository(
 local_repository(
     name = "rules_proto",
     path = "third_party/bazel_rules_proto",
+)
+
+local_repository(
+    name = "pigweed",
+    path = "third_party/pigweed/src",
+)
+
+# This is a @pigweed dependency.
+local_repository(
+    name = "com_google_emboss",
+    path = "third_party/github.com/google/emboss/src",
 )
 
 # The repository containing common definitions for the Fuchsia platform build
