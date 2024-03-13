@@ -11,10 +11,7 @@ use {
     crate::{
         client,
         telemetry::{inspect_time_series::TimeSeriesStats, windowed_stats::WindowedStats},
-        util::{
-            historical_list::{HistoricalList, Timestamped},
-            pseudo_energy::PseudoDecibel,
-        },
+        util::historical_list::{HistoricalList, Timestamped},
     },
     anyhow::{format_err, Context, Error},
     cobalt_client::traits::AsEventCode,
@@ -274,7 +271,7 @@ pub enum TelemetryEvent {
     },
     OnSignalReport {
         ind: fidl_internal::SignalReportIndication,
-        rssi_velocity: PseudoDecibel,
+        rssi_velocity: f64,
     },
     OnChannelSwitched {
         info: fidl_internal::ChannelSwitchInfo,
@@ -2942,11 +2939,7 @@ impl StatsLogger {
         );
     }
 
-    async fn log_signal_report_metrics(
-        &mut self,
-        rssi: PseudoDecibel,
-        rssi_velocity: PseudoDecibel,
-    ) {
+    async fn log_signal_report_metrics(&mut self, rssi: i8, rssi_velocity: f64) {
         // The range of the RSSI histogram is -128 to 0 with bucket size 1. The buckets are:
         //     bucket 0: reserved for underflow, although not possible with i8
         //     bucket 1: -128
@@ -2964,9 +2957,9 @@ impl StatsLogger {
         // Add the count to the RSSI velocity histogram, which will be periodically logged.
         // The histogram range is -10 to 10, and index 0 is reserved for values below -10. For
         // example, RSSI velocity -10 should map to index 1 and velocity 0 should map to index 11.
-        const RSSI_VELOCITY_MIN_IDX: i8 = 0;
-        const RSSI_VELOCITY_MAX_IDX: i8 = 22;
-        const RSSI_VELOCITY_HIST_OFFSET: i8 = 11;
+        const RSSI_VELOCITY_MIN_IDX: f64 = 0.0;
+        const RSSI_VELOCITY_MAX_IDX: f64 = 22.0;
+        const RSSI_VELOCITY_HIST_OFFSET: f64 = 11.0;
         let index = (rssi_velocity + RSSI_VELOCITY_HIST_OFFSET)
             .clamp(RSSI_VELOCITY_MIN_IDX, RSSI_VELOCITY_MAX_IDX) as u32;
         let entry = self
@@ -3964,7 +3957,9 @@ mod tests {
 
         // Send a signal, which resets timing information for determining driver unresponsiveness
         let ind = fidl_internal::SignalReportIndication { rssi_dbm: -40, snr_db: 30 };
-        test_helper.telemetry_sender.send(TelemetryEvent::OnSignalReport { ind, rssi_velocity: 1 });
+        test_helper
+            .telemetry_sender
+            .send(TelemetryEvent::OnSignalReport { ind, rssi_velocity: 1.0 });
 
         test_helper.advance_by(UNRESPONSIVE_FLAG_MIN_DURATION, test_fut.as_mut());
         assert_data_tree_with_respond_blocking_req!(test_helper, test_fut, root: contains {
@@ -5626,8 +5621,8 @@ mod tests {
         test_helper.send_connected_event(random_bss_description!(Wpa2));
 
         // Send some RSSI velocities
-        let rssi_velocity_1 = -2;
-        let rssi_velocity_2 = 2;
+        let rssi_velocity_1 = -2.0;
+        let rssi_velocity_2 = 2.0;
         let ind_1 = fidl_internal::SignalReportIndication { rssi_dbm: -50, snr_db: 30 };
         let ind_2 = fidl_internal::SignalReportIndication { rssi_dbm: -61, snr_db: 40 };
         test_helper
@@ -5663,7 +5658,7 @@ mod tests {
         test_helper.clear_cobalt_events();
 
         // Send another different RSSI velocity
-        let rssi_velocity_3 = 3;
+        let rssi_velocity_3 = 3.0;
         let ind_3 = fidl_internal::SignalReportIndication { rssi_dbm: -75, snr_db: 30 };
         test_helper
             .telemetry_sender
@@ -5710,22 +5705,22 @@ mod tests {
         // Send the telemetry events. -10 is the min velocity bucket and 10 is the max.
         test_helper
             .telemetry_sender
-            .send(TelemetryEvent::OnSignalReport { ind: ind_min, rssi_velocity: -11 });
+            .send(TelemetryEvent::OnSignalReport { ind: ind_min, rssi_velocity: -11.0 });
         test_helper
             .telemetry_sender
-            .send(TelemetryEvent::OnSignalReport { ind: ind_min, rssi_velocity: -15 });
+            .send(TelemetryEvent::OnSignalReport { ind: ind_min, rssi_velocity: -15.0 });
         test_helper
             .telemetry_sender
-            .send(TelemetryEvent::OnSignalReport { ind: ind_min, rssi_velocity: 11 });
+            .send(TelemetryEvent::OnSignalReport { ind: ind_min, rssi_velocity: 11.0 });
         test_helper
             .telemetry_sender
-            .send(TelemetryEvent::OnSignalReport { ind: ind_max, rssi_velocity: 20 });
+            .send(TelemetryEvent::OnSignalReport { ind: ind_max, rssi_velocity: 20.0 });
         test_helper
             .telemetry_sender
-            .send(TelemetryEvent::OnSignalReport { ind: ind_overflow_1, rssi_velocity: -10 });
+            .send(TelemetryEvent::OnSignalReport { ind: ind_overflow_1, rssi_velocity: -10.0 });
         test_helper
             .telemetry_sender
-            .send(TelemetryEvent::OnSignalReport { ind: ind_overflow_2, rssi_velocity: 10 });
+            .send(TelemetryEvent::OnSignalReport { ind: ind_overflow_2, rssi_velocity: 10.0 });
         test_helper.advance_by(1.hour(), test_fut.as_mut());
 
         // Check that the min, max, underflow, and overflow buckets are used correctly.

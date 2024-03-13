@@ -7,9 +7,6 @@ use {
     tracing::error,
 };
 
-/// Unified type for dB, dBm, and dB/s for Policy consumption.
-pub type PseudoDecibel = i8;
-
 /// Update a weighted average with a new measurement
 fn calculate_ewma_update(current: f64, next: f64, weighting_factor: f64) -> f64 {
     let weight = 2.0 / (1.0 + weighting_factor);
@@ -18,11 +15,6 @@ fn calculate_ewma_update(current: f64, next: f64, weighting_factor: f64) -> f64 
 
 /// Struct for maintaining a dB or dBm exponentially weighted moving average. Differs from
 /// SignalStrengthAverage, which is not exponentially weighted.
-///
-/// dB and dBm are represented throughout the WLAN stack as an i8. However, due to integer rounding,
-/// small updates to the average may never move an i8 value (e.g. avg(-50, -51) rounds to -50, so
-/// updates of -51 will never result in an average of -51). This struct maintains the average signal
-/// strength as an f64, so even small changes will affect the average.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct EwmaPseudoDecibel {
     current: f64,
@@ -30,8 +22,8 @@ pub struct EwmaPseudoDecibel {
 }
 
 impl EwmaPseudoDecibel {
-    pub fn new(n: usize, initial_signal: PseudoDecibel) -> Self {
-        Self { current: initial_signal as f64, weighting_factor: n as f64 }
+    pub fn new(n: usize, initial_signal: impl Into<f64>) -> Self {
+        Self { current: initial_signal.into(), weighting_factor: n as f64 }
     }
 
     /// Returns the current EWMA value
@@ -46,7 +38,7 @@ impl EwmaPseudoDecibel {
 
 /// Calculates the rate of change across a vector of dB measurements by determining
 /// the slope of the line of best fit using least squares regression. Return is technically
-/// dB(i8)/t where t is the unit of time used in the vector. Returns error if integer overflows.
+/// dB(f64)/t where t is the unit of time used in the vector. Returns error if integer overflows.
 ///
 /// Note: This is the linear velocity (not the logarithmic velocity), but it is a useful
 /// abstraction for monitoring real-world signal changes.
@@ -100,18 +92,18 @@ pub struct SignalData {
 
 impl SignalData {
     pub fn new(
-        initial_rssi: PseudoDecibel,
-        initial_snr: PseudoDecibel,
+        initial_rssi: impl Into<f64>,
+        initial_snr: impl Into<f64>,
         ewma_weight: usize,
         ewma_velocity_weight: usize,
     ) -> Self {
         Self {
             ewma_rssi: EwmaPseudoDecibel::new(ewma_weight, initial_rssi),
             ewma_snr: EwmaPseudoDecibel::new(ewma_weight, initial_snr),
-            ewma_rssi_velocity: EwmaPseudoDecibel::new(ewma_velocity_weight, 0),
+            ewma_rssi_velocity: EwmaPseudoDecibel::new(ewma_velocity_weight, 0.0),
         }
     }
-    pub fn update_with_new_measurement(&mut self, rssi: PseudoDecibel, snr: PseudoDecibel) {
+    pub fn update_with_new_measurement(&mut self, rssi: impl Into<f64>, snr: impl Into<f64>) {
         let prev_rssi = self.ewma_rssi.get();
         self.ewma_rssi.update_average(rssi);
         self.ewma_snr.update_average(snr);

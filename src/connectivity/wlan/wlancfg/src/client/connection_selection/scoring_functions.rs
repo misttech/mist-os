@@ -377,10 +377,10 @@ mod test {
     fn positive_velocity_scores_higher_than_negative_velocity() {
         let mut improving_signal = SignalData::new(-50, 35, 10, EWMA_VELOCITY_SMOOTHING_FACTOR);
         improving_signal.ewma_rssi_velocity =
-            EwmaPseudoDecibel::new(EWMA_VELOCITY_SMOOTHING_FACTOR, 3);
+            EwmaPseudoDecibel::new(EWMA_VELOCITY_SMOOTHING_FACTOR, 3.0);
         let mut degrading_signal = SignalData::new(-50, 35, 10, EWMA_VELOCITY_SMOOTHING_FACTOR);
         degrading_signal.ewma_rssi_velocity =
-            EwmaPseudoDecibel::new(EWMA_VELOCITY_SMOOTHING_FACTOR, -3);
+            EwmaPseudoDecibel::new(EWMA_VELOCITY_SMOOTHING_FACTOR, -3.0);
         assert_gt!(
             score_current_connection_signal_data(improving_signal),
             score_current_connection_signal_data(degrading_signal)
@@ -392,7 +392,7 @@ mod test {
         let strong_stable_signal = SignalData::new(-50, 35, 10, EWMA_VELOCITY_SMOOTHING_FACTOR);
         let mut strong_improving_signal = strong_stable_signal;
         strong_improving_signal.ewma_rssi_velocity =
-            EwmaPseudoDecibel::new(EWMA_VELOCITY_SMOOTHING_FACTOR, 3);
+            EwmaPseudoDecibel::new(EWMA_VELOCITY_SMOOTHING_FACTOR, 3.0);
 
         assert_gt!(
             score_current_connection_signal_data(strong_stable_signal),
@@ -401,7 +401,7 @@ mod test {
 
         let mut strong_degrading_signal = strong_stable_signal;
         strong_degrading_signal.ewma_rssi_velocity =
-            EwmaPseudoDecibel::new(EWMA_VELOCITY_SMOOTHING_FACTOR, -3);
+            EwmaPseudoDecibel::new(EWMA_VELOCITY_SMOOTHING_FACTOR, -3.0);
 
         assert_gt!(
             score_current_connection_signal_data(strong_stable_signal),
@@ -414,7 +414,7 @@ mod test {
         let mut weak_improving_signal =
             SignalData::new(-85, 10, 10, EWMA_VELOCITY_SMOOTHING_FACTOR);
         weak_improving_signal.ewma_rssi_velocity =
-            EwmaPseudoDecibel::new(EWMA_VELOCITY_SMOOTHING_FACTOR, 3);
+            EwmaPseudoDecibel::new(EWMA_VELOCITY_SMOOTHING_FACTOR, 3.0);
         let weak_stable_signal = SignalData::new(-85, 10, 10, EWMA_VELOCITY_SMOOTHING_FACTOR);
 
         assert_gt!(

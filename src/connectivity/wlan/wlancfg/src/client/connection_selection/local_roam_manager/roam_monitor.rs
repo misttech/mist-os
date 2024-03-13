@@ -67,13 +67,7 @@ impl RoamMonitorApi for RoamMonitor {
         // Send RSSI and RSSI velocity metrics
         self.telemetry_sender.send(TelemetryEvent::OnSignalReport {
             ind: stats,
-            rssi_velocity: self
-                .connection_data
-                .quality_data
-                .signal_data
-                .ewma_rssi_velocity
-                .get()
-                .round() as i8,
+            rssi_velocity: self.connection_data.quality_data.signal_data.ewma_rssi_velocity.get(),
         });
 
         // Evaluate current BSS, and determine if roaming future should be triggered.
@@ -223,7 +217,7 @@ mod test {
         assert_variant!(test_values.telemetry_receiver.try_next(), Ok(Some(TelemetryEvent::OnSignalReport {ind, rssi_velocity})) => {
             assert_eq!(ind, signal_report);
             // verify that RSSI velocity is negative since the signal report RSSI is lower.
-            assert_lt!(rssi_velocity, 0);
+            assert_lt!(rssi_velocity, 0.0);
         });
     }
 
@@ -275,7 +269,7 @@ mod test {
         assert_variant!(test_values.telemetry_receiver.try_next(), Ok(Some(TelemetryEvent::OnSignalReport {ind, rssi_velocity})) => {
             assert_eq!(ind, signal_report_1);
             // verify that RSSI velocity is negative since the signal report RSSI is lower.
-            assert_lt!(rssi_velocity, 0);
+            assert_lt!(rssi_velocity, 0.0);
         });
 
         // Send some stats with RSSI and SNR getting getting better and check that RSSI velocity
@@ -291,7 +285,7 @@ mod test {
         assert_variant!(test_values.telemetry_receiver.try_next(), Ok(Some(TelemetryEvent::OnSignalReport {ind, rssi_velocity})) => {
             assert_eq!(ind, signal_report_2);
             // verify that RSSI velocity is negative since the signal report RSSI is lower.
-            assert_gt!(rssi_velocity, 0);
+            assert_gt!(rssi_velocity, 0.0);
         });
     }
 
