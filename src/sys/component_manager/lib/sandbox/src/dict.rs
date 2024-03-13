@@ -205,13 +205,11 @@ impl Dict {
     /// Serves the `fuchsia.sandbox.Dictionary` protocol for this Open and moves it into the registry.
     pub fn serve_and_register(self, stream: fsandbox::DictionaryRequestStream, koid: zx::Koid) {
         let mut dict = self.clone();
-        let fut = async move {
-            dict.serve_dict(stream).await.expect("failed to serve Dict");
-        };
 
         // Move this capability into the registry.
-        let task = fasync::Task::spawn(registry::remove_when_done(koid, fasync::Task::spawn(fut)));
-        registry::insert_with_task(self.into(), koid, task);
+        registry::spawn_task(self.into(), koid, async move {
+            dict.serve_dict(stream).await.expect("failed to serve Dict");
+        });
     }
 
     /// Sets this Dict's client end to the provided one.

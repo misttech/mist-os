@@ -5,7 +5,6 @@
 use fidl::endpoints::{create_request_stream, ClientEnd, ServerEnd};
 use fidl_fuchsia_component_sandbox as fsandbox;
 use fidl_fuchsia_io as fio;
-use fuchsia_async as fasync;
 use fuchsia_zircon::{self as zx, AsHandleRef};
 use futures::TryStreamExt;
 use std::sync::{Arc, Mutex};
@@ -60,16 +59,14 @@ impl OneShotHandle {
     /// and moves it into the registry.
     fn serve_and_register(self, stream: fsandbox::HandleCapabilityRequestStream, koid: zx::Koid) {
         let one_shot = self.clone();
-        let fut = async move {
+
+        // Move this capability into the registry.
+        registry::spawn_task(self.into(), koid, async move {
             one_shot
                 .serve_handle_capability(stream)
                 .await
                 .expect("failed to serve HandleCapability");
-        };
-
-        // Move this capability into the registry.
-        let task = fasync::Task::spawn(registry::remove_when_done(koid, fasync::Task::spawn(fut)));
-        registry::insert_with_task(self.into(), koid, task);
+        });
     }
 }
 

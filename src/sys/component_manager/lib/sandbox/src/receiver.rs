@@ -5,7 +5,6 @@ use crate::{registry, CapabilityTrait, Message, Sender};
 use derivative::Derivative;
 use fidl::endpoints::{create_proxy, Proxy, ServerEnd};
 use fidl_fuchsia_component_sandbox as fsandbox;
-use fuchsia_async as fasync;
 use fuchsia_zircon::{self as zx, AsHandleRef};
 use futures::{
     channel::mpsc::{self, UnboundedReceiver},
@@ -76,13 +75,11 @@ impl Receiver {
     /// and moves it into the registry.
     fn handle_and_register(self, proxy: fsandbox::ReceiverProxy, koid: zx::Koid) {
         let receiver = self.clone();
-        let fut = async move {
-            receiver.handle_receiver(proxy).await;
-        };
 
         // Move this capability into the registry.
-        let task = fasync::Task::spawn(registry::remove_when_done(koid, fasync::Task::spawn(fut)));
-        registry::insert_with_task(self.into(), koid, task);
+        registry::spawn_task(self.into(), koid, async move {
+            receiver.handle_receiver(proxy).await;
+        });
     }
 
     /// Sets this Receiver's server end to the provided one.
@@ -116,6 +113,7 @@ impl From<Receiver> for fsandbox::Capability {
 mod tests {
     use assert_matches::assert_matches;
     use fidl_fuchsia_io as fio;
+    use fuchsia_async as fasync;
     use zx::Peered;
 
     use super::*;

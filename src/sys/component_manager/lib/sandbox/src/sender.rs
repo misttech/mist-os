@@ -6,7 +6,6 @@ use fidl::endpoints::{create_request_stream, ClientEnd, ControlHandle, RequestSt
 use fidl::epitaph::ChannelEpitaphExt;
 use fidl_fuchsia_component_sandbox as fsandbox;
 use fidl_fuchsia_io as fio;
-use fuchsia_async as fasync;
 use fuchsia_zircon::{self as zx, AsHandleRef};
 use futures::{channel::mpsc, TryStreamExt};
 use std::fmt::Debug;
@@ -81,11 +80,9 @@ impl Sender {
     /// Serves the `fuchsia.sandbox.Sender` protocol for this Sender and moves it into the registry.
     pub fn serve_and_register(self, stream: fsandbox::SenderRequestStream, koid: zx::Koid) {
         let sender = self.clone();
-        let fut = sender.serve_sender(stream);
 
         // Move this capability into the registry.
-        let task = fasync::Task::spawn(registry::remove_when_done(koid, fasync::Task::spawn(fut)));
-        registry::insert_with_task(self.into(), koid, task);
+        registry::spawn_task(self.into(), koid, sender.serve_sender(stream));
     }
 
     /// Sets this Sender's client end to the provided one.

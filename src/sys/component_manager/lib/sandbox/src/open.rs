@@ -5,9 +5,8 @@ use core::fmt;
 use fidl::endpoints::{create_request_stream, ClientEnd, ServerEnd};
 use fidl_fuchsia_component_sandbox as fsandbox;
 use fidl_fuchsia_io as fio;
-use fuchsia_async as fasync;
 use fuchsia_zircon::{self as zx, AsHandleRef};
-use futures::{FutureExt, TryStreamExt};
+use futures::TryStreamExt;
 use std::collections::VecDeque;
 use std::fmt::Debug;
 use std::sync::Arc;
@@ -167,31 +166,20 @@ impl Open {
 
     /// Serves the `fuchsia.io.Openable` protocol for this Open and moves it into the registry.
     pub fn serve_and_register(self, mut stream: fio::OpenableRequestStream, koid: zx::Koid) {
-        let scope = ExecutionScope::new();
-        // If this future is dropped, stop serving the connection.
-        let guard = scopeguard::guard(scope.clone(), move |scope| {
-            scope.shutdown();
-        });
-
         let open = self.clone();
-        let fut = {
-            async move {
-                let _guard = guard;
-                while let Ok(Some(request)) = stream.try_next().await {
-                    match request {
-                        fio::OpenableRequest::Open { flags, mode: _, path, object, .. } => {
-                            open.open(scope.clone(), flags, path, object.into_channel())
-                        }
-                    }
-                }
-                scope.wait().await;
-            }
-            .boxed()
-        };
 
         // Move this capability into the registry.
-        let task = fasync::Task::spawn(registry::remove_when_done(koid, fasync::Task::spawn(fut)));
-        registry::insert_with_task(self.into(), koid, task);
+        registry::spawn_task(self.into(), koid, async move {
+            let scope = ExecutionScope::new();
+            while let Ok(Some(request)) = stream.try_next().await {
+                match request {
+                    fio::OpenableRequest::Open { flags, mode: _, path, object, .. } => {
+                        open.open(scope.clone(), flags, path, object.into_channel())
+                    }
+                }
+            }
+            scope.wait().await;
+        });
     }
 }
 

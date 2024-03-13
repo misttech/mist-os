@@ -5,6 +5,7 @@ use fuchsia_async as fasync;
 use fuchsia_zircon as zx;
 use lazy_static::lazy_static;
 use std::collections::HashMap;
+use std::future::Future;
 use std::sync::Mutex;
 
 use crate::Capability;
@@ -20,12 +21,19 @@ pub(crate) fn insert(capability: Capability, koid: zx::Koid) {
     assert!(existing.is_none());
 }
 
-/// Inserts a capability with an associated task into the global registry.
-///
-/// The capability is *not* automatically removed when the task completes.
-/// Wrap the task with [remove_when_done] to do so.
-pub(crate) fn insert_with_task(capability: Capability, koid: zx::Koid, task: fasync::Task<()>) {
+/// Registers a capability with a task.
+pub(crate) fn spawn_task(
+    capability: Capability,
+    koid: zx::Koid,
+    fut: impl Future<Output = ()> + Send + 'static,
+) {
     let mut registry = REGISTRY.lock().unwrap();
+    let task = fasync::Task::spawn(async move {
+        scopeguard::defer! {
+            REGISTRY.lock().unwrap().remove(koid);
+        }
+        fut.await;
+    });
     let existing = registry.insert(koid, Entry { capability, task: Some(task) });
     assert!(existing.is_none());
 }
@@ -36,13 +44,6 @@ pub(crate) fn insert_with_task(capability: Capability, koid: zx::Koid, task: fas
 pub(crate) fn remove(koid: zx::Koid) -> Option<Capability> {
     let mut registry = REGISTRY.lock().unwrap();
     registry.remove(koid).map(|entry| entry.capability)
-}
-
-/// Removes the entry with the koid when the task completes, if the entry exists.
-pub(crate) async fn remove_when_done(koid: zx::Koid, task: fasync::Task<()>) {
-    task.await;
-    let mut registry = REGISTRY.lock().unwrap();
-    registry.remove(koid);
 }
 
 pub struct Entry {
@@ -82,7 +83,6 @@ mod tests {
     use crate::Unit;
     use assert_matches::assert_matches;
     use futures::channel::oneshot;
-    use futures::FutureExt;
 
     /// Tests that a capability can be inserted and retrieved from a Registry.
     #[test]
@@ -102,7 +102,7 @@ mod tests {
 
     /// Tests that a capability added with a [remove_when_done] task is removed
     /// when the wrapped task completes.
-    #[fuchsia::test]
+    #[fuchsia::test(allow_stalls = false)]
     async fn insert_with_task_remove_when_done() {
         let (sender, receiver) = oneshot::channel::<()>();
         // This task completes when the sender is dropped.
@@ -113,17 +113,13 @@ mod tests {
         let koid = zx::Koid::from_raw(123);
         let unit = Unit::default();
 
-        let remove_when_done_fut = remove_when_done(koid, task).shared();
-        let remove_when_done_task = fasync::Task::spawn(remove_when_done_fut.clone());
-
-        // Insert into the global registry used by [remove_when_done].
-        insert_with_task(unit.into(), koid, remove_when_done_task);
+        spawn_task(unit.into(), koid, task);
 
         // Drop the sender so `task` completes and `remove_when_done_task` removes the entry.
         drop(sender);
 
-        // Ensure `remove_when_done_task` finishes.
-        remove_when_done_fut.await;
+        // Allow the spawned future to complete.
+        let _ = fasync::TestExecutor::poll_until_stalled(std::future::pending::<()>()).await;
 
         // Remove a capability with the same koid. It should not exist.
         assert!(remove(koid).is_none());
