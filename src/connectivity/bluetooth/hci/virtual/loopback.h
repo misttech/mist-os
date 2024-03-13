@@ -27,9 +27,11 @@ namespace bt_hci_virtual {
 // doesn't bind to service device but to a zx::channel as a virtual loopback UART device.
 class LoopbackDevice;
 using LoopbackDeviceType = ddk::Device<LoopbackDevice, ddk::GetProtocolable, ddk::Unbindable,
-                                       ddk::Messageable<fuchsia_hardware_bluetooth::Hci>::Mixin>;
+                                       ddk::Messageable<fuchsia_hardware_bluetooth::Vendor>::Mixin>;
 
-class LoopbackDevice : public LoopbackDeviceType, public ddk::BtHciProtocol<LoopbackDevice> {
+class LoopbackDevice : public LoopbackDeviceType,
+                       public ddk::BtHciProtocol<LoopbackDevice>,
+                       public fidl::WireServer<fuchsia_hardware_bluetooth::Hci> {
  public:
   explicit LoopbackDevice(zx_device_t* parent, async_dispatcher_t* dispatcher);
 
@@ -44,7 +46,17 @@ class LoopbackDevice : public LoopbackDeviceType, public ddk::BtHciProtocol<Loop
   zx_status_t BtHciOpenIsoDataChannel(zx::channel channel);
   zx_status_t BtHciOpenSnoopChannel(zx::channel channel);
 
-  // ddk::Messageable mixins:
+  // fuchsia_hardware_bluetooth::Vendor protocol interface implementations.
+  void GetFeatures(GetFeaturesCompleter::Sync& completer) override;
+  void EncodeCommand(EncodeCommandRequestView request,
+                     EncodeCommandCompleter::Sync& completer) override;
+  void OpenHci(OpenHciCompleter::Sync& completer) override;
+
+  void handle_unknown_method(
+      fidl::UnknownMethodMetadata<fuchsia_hardware_bluetooth::Vendor> metadata,
+      fidl::UnknownMethodCompleter::Sync& completer) override;
+
+  // fuchsia_hardware_bluetooth::Hci protocol interface implementations.
   void OpenCommandChannel(OpenCommandChannelRequestView request,
                           OpenCommandChannelCompleter::Sync& completer) override;
   void OpenAclDataChannel(OpenAclDataChannelRequestView request,
@@ -86,8 +98,9 @@ class LoopbackDevice : public LoopbackDeviceType, public ddk::BtHciProtocol<Loop
     uint8_t* buffer;
   };
 
-  // This wrapper around async_wait enables us to get a LoopbackDevice* in the handler.
-  // We use this instead of async::WaitMethod because async::WaitBase isn't thread safe.
+  // This wrapper around async_wait enables us to get a LoopbackDevice* in
+  // the handler. We use this instead of async::WaitMethod because
+  // async::WaitBase isn't thread safe.
   struct Wait : public async_wait {
     explicit Wait(LoopbackDevice* uart, zx::channel* channel);
     static void Handler(async_dispatcher_t* dispatcher, async_wait_t* async_wait,
@@ -123,9 +136,9 @@ class LoopbackDevice : public LoopbackDeviceType, public ddk::BtHciProtocol<Loop
 
   void HciHandleUartReadEvents(const uint8_t* buf, size_t length) __TA_EXCLUDES(mutex_);
 
-  // Reads the next packet chunk from |uart_src| into |buffer| and increments |buffer_offset| and
-  // |uart_src| by the number of bytes read. If a complete packet is read, it will be written to
-  // |channel|.
+  // Reads the next packet chunk from |uart_src| into |buffer| and
+  // increments |buffer_offset| and |uart_src| by the number of bytes read.
+  // If a complete packet is read, it will be written to |channel|.
   using PacketLengthFunction = size_t (LoopbackDevice::*)();
   void ProcessNextUartPacketFromReadBuffer(uint8_t* buffer, size_t buffer_size,
                                            size_t* buffer_offset, const uint8_t** uart_src,
@@ -147,9 +160,9 @@ class LoopbackDevice : public LoopbackDeviceType, public ddk::BtHciProtocol<Loop
   // 1 byte packet indicator + 3 byte header + payload
   static constexpr uint32_t kCmdBufSize = 255 + 4;
 
-  // The number of currently supported HCI channel endpoints. We currently have
-  // one channel for command/event flow and one for ACL data flow. The sniff channel is managed
-  // separately.
+  // The number of currently supported HCI channel endpoints. We currently
+  // have one channel for command/event flow and one for ACL data flow. The
+  // sniff channel is managed separately.
   static constexpr uint8_t kNumChannels = 2;
 
   // add one for the wakeup event
@@ -160,7 +173,8 @@ class LoopbackDevice : public LoopbackDeviceType, public ddk::BtHciProtocol<Loop
   static constexpr uint32_t kAclMaxFrameSize = 1029;
 
   // The maximum HCI SCO frame size used for data transactions.
-  // (255 byte payload + 3 bytes for the SCO header + 1 byte packet indicator)
+  // (255 byte payload + 3 bytes for the SCO header + 1 byte packet
+  // indicator)
   static constexpr uint32_t kScoMaxFrameSize = 259;
 
   // 1 byte packet indicator + 2 byte header + payload
@@ -213,7 +227,8 @@ class LoopbackDevice : public LoopbackDeviceType, public ddk::BtHciProtocol<Loop
   std::mutex mutex_;
 
   std::optional<async::Loop> loop_;
-  // In production, this is loop_.dispatcher(). In tests, this is the test dispatcher.
+  // In production, this is loop_.dispatcher(). In tests, this is the test
+  // dispatcher.
   async_dispatcher_t* dispatcher_ = nullptr;
 };
 

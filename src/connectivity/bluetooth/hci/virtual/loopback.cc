@@ -475,6 +475,35 @@ void LoopbackDevice::DdkRelease() {
   delete this;
 }
 
+void LoopbackDevice::GetFeatures(GetFeaturesCompleter::Sync& completer) {
+  completer.Reply(fuchsia_hardware_bluetooth::BtVendorFeatures{});
+}
+
+void LoopbackDevice::EncodeCommand(EncodeCommandRequestView request,
+                                   EncodeCommandCompleter::Sync& completer) {
+  // This interface is not implemented.
+  completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+}
+
+void LoopbackDevice::OpenHci(OpenHciCompleter::Sync& completer) {
+  auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_bluetooth::Hci>();
+  if (endpoints.is_error()) {
+    zxlogf(ERROR, "Failed to create endpoints: %s", zx_status_get_string(endpoints.error_value()));
+    completer.ReplyError(endpoints.error_value());
+    return;
+  }
+  fidl::BindServer(fdf::Dispatcher::GetCurrent()->async_dispatcher(), std::move(endpoints->server),
+                   this);
+  completer.ReplySuccess(std::move(endpoints->client));
+}
+
+void LoopbackDevice::handle_unknown_method(
+    fidl::UnknownMethodMetadata<fuchsia_hardware_bluetooth::Vendor> metadata,
+    fidl::UnknownMethodCompleter::Sync& completer) {
+  zxlogf(ERROR, "Unknown method in Vendor request, closing with ZX_ERR_NOT_SUPPORTED");
+  completer.Close(ZX_ERR_NOT_SUPPORTED);
+}
+
 void LoopbackDevice::OpenCommandChannel(OpenCommandChannelRequestView request,
                                         OpenCommandChannelCompleter::Sync& completer) {
   if (zx_status_t status = BtHciOpenCommandChannel(zx::channel(request->channel.release()));

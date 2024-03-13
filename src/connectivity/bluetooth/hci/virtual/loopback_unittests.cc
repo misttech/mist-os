@@ -52,8 +52,9 @@ class LoopbackTest : public ::gtest::TestLoopFixture {
     ASSERT_EQ(1u, root_dev()->child_count());
     ASSERT_TRUE(dut());
 
-    // TODO(https://fxbug.dev/42173055): Due to Mock DDK limitations, we need to add the BT_HCI protocol to the
-    // BtTransportUart MockDevice so that BtHciProtocolClient (and device_get_protocol) work.
+    // TODO(https://fxbug.dev/42173055): Due to Mock DDK limitations, we need to add the BT_HCI
+    // protocol to the BtTransportUart MockDevice so that BtHciProtocolClient (and
+    // device_get_protocol) work.
     bt_hci_protocol_t proto;
     dut()->GetDeviceContext<bt_hci_virtual::LoopbackDevice>()->DdkGetProtocol(ZX_PROTOCOL_BT_HCI,
                                                                               &proto);
@@ -265,8 +266,25 @@ class LoopbackHciProtocolTest : public LoopbackTest {
   std::vector<std::vector<uint8_t>> sco_chan_received_packets_;
 };
 
-// Sanity check
 TEST_F(LoopbackTest, Lifecycle) {}
+
+TEST_F(LoopbackTest, VendorProtocolSmokeTest) {
+  auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_bluetooth::Vendor>();
+  ASSERT_FALSE(endpoints.is_error());
+
+  // Bind client end
+  fidl::WireSyncClient vendor_client(std::move(endpoints->client));
+
+  // Bind server end
+  auto server_dispatcher = mock_ddk::GetDriverRuntime()->StartBackgroundDispatcher();
+  fidl::BindServer(server_dispatcher->async_dispatcher(), std::move(endpoints->server),
+                   dut()->GetDeviceContext<bt_hci_virtual::LoopbackDevice>());
+
+  auto result = vendor_client->GetFeatures();
+  ASSERT_TRUE(result.ok());
+
+  EXPECT_EQ(result->features, fuchsia_hardware_bluetooth::BtVendorFeatures{});
+}
 
 TEST_F(LoopbackHciProtocolTest, SendAclPackets) {
   const uint8_t kNumPackets = 25;
