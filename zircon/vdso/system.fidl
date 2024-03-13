@@ -3,6 +3,36 @@
 // found in the LICENSE file.
 library zx;
 
+const MAX_POWER_LEVELS usize64 = 256;
+const MAX_POWER_LEVEL_TRANSITIONS usize64 = 65536; // MAX_POWER_LEVELS^2
+
+type CpuSet = struct {
+    // Sadly we can't do math in FIDL with constants to compute the array size.
+    mask array<uint64, 8>;
+};
+
+type ProcessorPowerLevelOptions = flexible bits : uint64 {};
+
+type ProcessorPowerControl = flexible enum : uint64 {};
+
+type ProcessorPowerLevel = struct {
+    options ProcessorPowerLevelOptions;
+    processing_rate uint64;
+    power_coefficient_nw uint64;
+    control_interface ProcessorPowerControl;
+    control_argument uint64;
+    diagnostic_name string_array<MAX_NAME_LEN>;
+    reserved array<uint8, 32>;
+};
+
+type ProcessorPowerLevelTransition = struct {
+    latency Duration;
+    energy_nj uint64;
+    from uint8;
+    to uint8;
+    reserved array<uint8, 6>;
+};
+
 type SystemPowerctlArg = struct {
         // TODO(scottmg): More unnamed unions.
         //union {
@@ -909,5 +939,66 @@ closed protocol System {
     strict SuspendEnter(resource struct {
         resource Handle:RESOURCE;
         resume_deadline Time;
+    }) -> () error Status;
+
+    /// ## Summary
+    ///
+    /// Informs the kernel of the processor power levels within a given power
+    /// domain for energy-aware scheduling.
+    ///
+    /// ## Declaration
+    ///
+    /// ```c
+    /// #include <zircon/syscalls-next.h>
+    ///
+    /// zx_status_t zx_system_set_processor_power_level_domain(
+    ///     zx_handle_t resource,
+    ///     uint64_t options,
+    ///     const zx_cpu_set_t* cpus,
+    ///     const zx_processor_power_level_t* power_levels,
+    ///     size_t num_power_levels,
+    ///     const zx_processor_power_level_transition_t* transitions,
+    ///     size_t num_transitions);
+    /// ```
+    ///
+    /// ## Description
+    ///
+    /// Enables energy-aware scheduling for a given processor power domain.
+    ///
+    /// Power levels are implicitly enumerated as the indices of `power_levels`.
+    ///
+    /// There are no ordering restrictions on `transformations` and the power
+    /// levels they encode correspond to those defined by `power_levels`. An
+    /// absent transformation between levels is assumed to indicate that there
+    /// is no energy cost borne by perfoming it.
+    ///
+    /// ## Rights
+    ///
+    /// `resource` must be of `ZX_RSRC_KIND_SYSTEM` kind and
+    /// `ZX_RSRC_SYSTEM_CPU_BASE` base.
+    ///
+    /// ## Return value
+    ///
+    /// `ZX_OK` is returned if and only if the processor power level domain
+    /// was successfully registered.
+    ///
+    /// ## Errors
+    ///
+    /// `ZX_ERR_ACCESS_DENIED` if `resource` is not a valid handle.
+    ///
+    /// `ZX_ERR_WRONG_TYPE` if `resource` is not a valid resource handle of
+    /// SYSTEM kind and CPU base.
+    ///
+    /// `ZX_ERR_OUT_OF_RANGE` if `num_power_levels` exceeds
+    /// `ZX_MAX_POWER_LEVELS` or `num_transitions` exceeds
+    /// `ZX_MAX_POWER_LEVEL_TRANSITIONS`.
+    ///
+    @next
+    strict SetProcessorPowerLevelDomain(resource struct {
+        resource Handle:RESOURCE;
+        options uint64;
+        cpus CpuSet;
+        power_levels vector<ProcessorPowerLevel>:MAX_POWER_LEVELS;
+        transitions vector<ProcessorPowerLevelTransition>:MAX_POWER_LEVEL_TRANSITIONS;
     }) -> () error Status;
 };

@@ -128,7 +128,59 @@ typedef struct zx_sampler_config {
   size_t buffer_size;
   uint64_t iobuffer_discipline;
 } zx_sampler_config_t;
+
 // ====== End of Software Sampling support ====== //
+
+// ====== Runtime processor power management support ====== //
+
+typedef uint64_t zx_processor_power_level_options_t;
+
+#define ZX_MAX_POWER_LEVELS ((uint64_t)(256))
+#define ZX_MAX_POWER_LEVEL_TRANSFORMATIONS (ZX_MAX_POWER_LEVELS * ZX_MAX_POWER_LEVELS)
+
+#define ZX_PROCESSOR_POWER_LEVEL_OPTIONS_DOMAIN_INDEPENDENT \
+  ((zx_processor_power_level_options_t)(1u << 0))
+
+// Specifies a processor power control interface.
+typedef uint64_t zx_processor_power_control_t;
+
+#define ZX_PROCESSOR_POWER_CONTROL_CPU_DRIVER ((zx_processor_power_control_t)(0u))
+#define ZX_PROCESSOR_POWER_CONTROL_ARM_PSCI ((zx_processor_power_control_t)(1u))
+#define ZX_PROCESSOR_POWER_CONTROL_ARM_WFI ((zx_processor_power_control_t)(2u))
+#define ZX_PROCESSOR_POWER_CONTROL_RISCV_SBI ((zx_processor_power_control_t)(3u))
+#define ZX_PROCESSOR_POWER_CONTROL_RISCV_WFI ((zx_processor_power_control_t)(4u))
+
+// Represents a processor power level.
+typedef struct {
+  zx_processor_power_level_options_t options;
+  uint64_t processing_rate;
+  uint64_t power_coefficient_nw;
+  zx_processor_power_control_t control_interface;
+  uint64_t control_argument;
+  char diagnostic_name[ZX_MAX_NAME_LEN];
+  uint8_t reserved[32];
+} zx_processor_power_level_t;
+
+// Represents a transition between processor power levels.
+typedef struct {
+  // The expected latency of the transition.
+  zx_duration_t latency;
+
+  // The expected energy expended by the transition in nanojoules.
+  uint64_t energy_nj;
+
+  // The level being transitioned from, represented as an index into an
+  // associated array of zx_processor_power_level_t.
+  uint8_t from;
+
+  // The level being transitioned to, represented as an index into an
+  // associated array of zx_processor_power_level_t.
+  uint8_t to;
+
+  uint8_t reserved[6];
+} zx_processor_power_level_transition_t;
+
+// ====== End of runtime processor power management support ====== //
 
 #ifndef _KERNEL
 

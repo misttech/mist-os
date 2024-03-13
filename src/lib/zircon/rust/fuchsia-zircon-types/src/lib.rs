@@ -41,6 +41,8 @@ pub type zx_vm_option_t = u32;
 pub type zx_thread_state_topic_t = u32;
 pub type zx_vcpu_state_topic_t = u32;
 pub type zx_restricted_reason_t = u64;
+pub type zx_processor_power_level_options_t = u64;
+pub type zx_processor_power_control_t = u64;
 
 // TODO: magically coerce this to &`static str somehow?
 #[repr(C)]
@@ -2113,6 +2115,39 @@ pub struct zx_sampler_config_t {
     pub period: zx_duration_t,
     pub buffer_size: usize,
     pub iobuffer_discipline: u64,
+}
+
+multiconst!(zx_processor_power_level_options_t, [
+    ZX_PROCESSOR_POWER_LEVEL_OPTIONS_DOMAIN_INDEPENDENT = 1 << 0;
+]);
+
+multiconst!(zx_processor_power_control_t, [
+    ZX_PROCESSOR_POWER_CONTROL_CPU_DRIVER = 0;
+    ZX_PROCESSOR_POWER_CONTROL_ARM_PSCI = 1;
+    ZX_PROCESSOR_POWER_CONTROL_ARM_WFI = 2;
+    ZX_PROCESSOR_POWER_CONTROL_RISCV_SBI = 3;
+    ZX_PROCESSOR_POWER_CONTROL_RISCV_WFI = 4;
+]);
+
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, Eq, PartialEq)]
+pub struct zx_processor_power_level_t {
+    pub options: zx_processor_power_level_options_t,
+    pub procesing_rate: u64,
+    pub power_coefficient_nw: u64,
+    pub control_interface: zx_processor_power_control_t,
+    pub control_argument: u64,
+    pub diagnostic_name: [u8; ZX_MAX_NAME_LEN],
+    pub padding: [u8; 32],
+}
+
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, Eq, PartialEq)]
+pub struct zx_processor_power_level_transition_t {
+    pub from: u32,
+    pub to: u32,
+    pub latency: zx_duration_t,
+    pub energy: u64,
 }
 
 #[cfg(test)]

@@ -671,3 +671,21 @@ zx_status_t sys_system_suspend_enter(zx_handle_t resource, zx_time_t resume_dead
 
   return IdlePowerThread::TransitionAllActiveToSuspend(resume_deadline);
 }
+
+zx_status_t sys_system_set_processor_power_level_domain(
+    zx_handle_t resource, uint64_t options, user_in_ptr<const zx_cpu_set_t> cpus,
+    user_in_ptr<const zx_processor_power_level_t> power_levels, size_t num_power_levels,
+    user_in_ptr<const zx_processor_power_level_transition_t> transitions, size_t num_transitions) {
+  zx_status_t status =
+      validate_ranged_resource(resource, ZX_RSRC_KIND_SYSTEM, ZX_RSRC_SYSTEM_CPU_BASE, 1);
+  if (status != ZX_OK) {
+    return status;
+  }
+
+  if (num_power_levels > ZX_MAX_POWER_LEVELS ||
+      num_transitions > ZX_MAX_POWER_LEVEL_TRANSFORMATIONS) {
+    return ZX_ERR_OUT_OF_RANGE;
+  }
+
+  return ZX_ERR_NOT_SUPPORTED;
+}
