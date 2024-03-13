@@ -8,11 +8,11 @@ use super::{read_only, read_write, VmoFile};
 
 // Macros are exported into the root of the crate.
 use crate::{
-    assert_close, assert_event, assert_get_attr, assert_get_buffer, assert_get_buffer_err,
-    assert_read, assert_read_at, assert_read_at_err, assert_read_err, assert_read_fidl_err_closed,
-    assert_seek, assert_truncate, assert_truncate_err, assert_vmo_content, assert_write,
-    assert_write_at, assert_write_at_err, assert_write_err, assert_write_fidl_err_closed,
-    clone_as_file_assert_err, clone_get_proxy_assert, clone_get_vmo_file_proxy_assert_err,
+    assert_close, assert_event, assert_get_attr, assert_get_vmo, assert_read, assert_read_at,
+    assert_read_at_err, assert_read_err, assert_read_fidl_err_closed, assert_seek, assert_truncate,
+    assert_truncate_err, assert_vmo_content, assert_write, assert_write_at, assert_write_at_err,
+    assert_write_err, assert_write_fidl_err_closed, clone_as_file_assert_err,
+    clone_get_proxy_assert, clone_get_vmo_file_proxy_assert_err,
     clone_get_vmo_file_proxy_assert_ok,
 };
 
@@ -807,32 +807,26 @@ fn mock_directory_with_one_file_and_two_connections() {
 }
 
 #[test]
-fn get_buffer_read_only() {
+fn get_vmo_read_only() {
     run_server_client(
         fio::OpenFlags::RIGHT_READABLE,
         read_only(b"Read only test"),
         |proxy| async move {
             {
-                let buffer = assert_get_buffer!(proxy, fio::VmoFlags::READ);
-
-                assert_eq!(buffer.size, 14);
-                assert_vmo_content!(&buffer.vmo, b"Read only test");
+                let vmo = assert_get_vmo!(proxy, fio::VmoFlags::READ);
+                assert_vmo_content!(&vmo, b"Read only test");
             }
 
             {
-                let buffer =
-                    assert_get_buffer!(proxy, fio::VmoFlags::READ | fio::VmoFlags::SHARED_BUFFER);
-
-                assert_eq!(buffer.size, 14);
-                assert_vmo_content!(&buffer.vmo, b"Read only test");
+                let vmo =
+                    assert_get_vmo!(proxy, fio::VmoFlags::READ | fio::VmoFlags::SHARED_BUFFER);
+                assert_vmo_content!(&vmo, b"Read only test");
             }
 
             {
-                let buffer =
-                    assert_get_buffer!(proxy, fio::VmoFlags::READ | fio::VmoFlags::PRIVATE_CLONE);
-
-                assert_eq!(buffer.size, 14);
-                assert_vmo_content!(&buffer.vmo, b"Read only test");
+                let vmo =
+                    assert_get_vmo!(proxy, fio::VmoFlags::READ | fio::VmoFlags::PRIVATE_CLONE);
+                assert_vmo_content!(&vmo, b"Read only test");
             }
 
             assert_read!(proxy, "Read only test");
@@ -842,49 +836,48 @@ fn get_buffer_read_only() {
 }
 
 #[test]
-fn get_buffer_read_write() {
+fn get_vmo_private_read_write() {
     run_server_client(
         fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
         read_write(b"Initial"),
         |proxy| {
             async move {
                 {
-                    let buffer = assert_get_buffer!(
+                    let vmo = assert_get_vmo!(
                         proxy,
                         fio::VmoFlags::READ | fio::VmoFlags::WRITE | fio::VmoFlags::PRIVATE_CLONE
                     );
 
-                    assert_eq!(buffer.size, 7);
-                    assert_vmo_content!(&buffer.vmo, b"Initial");
+                    assert_vmo_content!(&vmo, b"Initial");
 
                     // VMO can be updated only via the file interface.  There is no writable sharing
                     // via VMOs.
                     assert_write!(proxy, "No shared");
 
-                    assert_vmo_content!(&buffer.vmo, b"Initial");
+                    assert_vmo_content!(&vmo, b"Initial");
+
+                    // Private clones can change properties and the VMO size.
+                    vmo.set_content_size(&3).unwrap();
+                    assert_vmo_content!(&vmo, b"Ini");
+                    vmo.set_size(2).unwrap();
+                    assert_vmo_content!(&vmo, b"In");
+                    // The file is unaffected by these changes.
+                    assert_seek!(proxy, 0, End, Ok(9));
                 }
-
-                assert_get_buffer_err!(
-                    proxy,
-                    fio::VmoFlags::WRITE | fio::VmoFlags::SHARED_BUFFER,
-                    Status::NOT_SUPPORTED
-                );
-
                 {
-                    let buffer = assert_get_buffer!(
+                    let vmo = assert_get_vmo!(
                         proxy,
                         fio::VmoFlags::READ | fio::VmoFlags::WRITE | fio::VmoFlags::PRIVATE_CLONE
                     );
 
-                    assert_eq!(buffer.size, 9);
-                    assert_vmo_content!(&buffer.vmo, b"No shared");
-                    buffer.vmo.write(b"-Private-", 0).unwrap();
+                    assert_vmo_content!(&vmo, b"No shared");
+                    vmo.write(b"-Private-", 0).unwrap();
 
                     // VMO can be updated only via the file interface.  There is no writable sharing
                     // via VMOs.
                     assert_write!(proxy, " writable VMOs");
 
-                    assert_vmo_content!(&buffer.vmo, b"-Private-");
+                    assert_vmo_content!(&vmo, b"-Private-");
                 }
 
                 assert_close!(proxy);
@@ -894,27 +887,65 @@ fn get_buffer_read_write() {
 }
 
 #[test]
-fn get_buffer_two_vmos() {
+fn get_vmo_shared_read_write() {
+    use crate::test_utils::assertions::reexport::Status;
+    run_server_client(
+        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
+        read_write(b"Initial"),
+        |proxy| async move {
+            let vmo1 = assert_get_vmo!(
+                proxy,
+                fio::VmoFlags::READ | fio::VmoFlags::WRITE | fio::VmoFlags::SHARED_BUFFER
+            );
+            let vmo2 = assert_get_vmo!(
+                proxy,
+                fio::VmoFlags::READ | fio::VmoFlags::WRITE | fio::VmoFlags::SHARED_BUFFER
+            );
+
+            assert_vmo_content!(&vmo1, b"Initial");
+            assert_vmo_content!(&vmo2, b"Initial");
+
+            // Writes to one VMO can be observed in the file and in other shared VMOs.
+            vmo1.write(b"Changed", 0).unwrap();
+            assert_vmo_content!(&vmo1, b"Changed");
+            assert_vmo_content!(&vmo2, b"Changed");
+            assert_read!(proxy, "Changed");
+            assert_seek!(proxy, 0, End, Ok(7));
+
+            // Writing beyond the VMO's content size doesn't change the content size.
+            vmo1.write(b"Beyond-content-size", 0).unwrap();
+            assert_vmo_content!(&vmo1, b"Beyond-");
+            assert_vmo_content!(&vmo2, b"Beyond-");
+            assert_seek!(proxy, 0, End, Ok(7));
+
+            // Doesn't have permission to change properties.
+            assert_matches::assert_matches!(vmo1.set_content_size(&10), Err(Status::ACCESS_DENIED));
+            // Doesn't have permission to change the vmo size.
+            assert_matches::assert_matches!(vmo1.set_size(10), Err(Status::ACCESS_DENIED));
+
+            assert_close!(proxy);
+        },
+    );
+}
+
+#[test]
+fn get_vmo_two_vmos() {
     run_server_client(
         fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
         read_write(b"Initial"),
         //                  0           0         1
         //                  0123456     012345678901234
         |proxy| async move {
-            let buffer1 =
-                assert_get_buffer!(proxy, fio::VmoFlags::READ | fio::VmoFlags::SHARED_BUFFER);
+            let vmo1 = assert_get_vmo!(proxy, fio::VmoFlags::READ | fio::VmoFlags::SHARED_BUFFER);
 
-            assert_eq!(buffer1.size, 7);
-            assert_vmo_content!(&buffer1.vmo, b"Initial");
+            assert_vmo_content!(&vmo1, b"Initial");
 
             assert_write!(proxy, "Updated content");
 
-            let buffer2 =
-                assert_get_buffer!(proxy, fio::VmoFlags::READ | fio::VmoFlags::SHARED_BUFFER);
+            let vmo2 = assert_get_vmo!(proxy, fio::VmoFlags::READ | fio::VmoFlags::SHARED_BUFFER);
 
-            assert_eq!(buffer2.size, 15);
-            assert_vmo_content!(&buffer2.vmo, b"Updated content");
-            assert_vmo_content!(&buffer1.vmo, b"Updated content");
+            assert_vmo_content!(&vmo2, b"Updated content");
+            assert_vmo_content!(&vmo1, b"Updated content");
 
             assert_close!(proxy);
         },

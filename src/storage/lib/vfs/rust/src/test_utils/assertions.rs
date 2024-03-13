@@ -657,23 +657,20 @@ macro_rules! assert_channel_closed {
 }
 
 #[macro_export]
-macro_rules! assert_get_buffer {
+macro_rules! assert_get_vmo {
     ($proxy:expr, $flags:expr) => {{
-        use $crate::test_utils::assertions::reexport::{Buffer, Status};
-
-        let vmo = $proxy
+        use $crate::test_utils::assertions::reexport::Status;
+        $proxy
             .get_backing_memory($flags)
             .await
             .expect("`get_backing_memory()` failed")
             .map_err(Status::from_raw)
-            .expect("`get_backing_memory` error");
-        let size = vmo.get_content_size().expect("`get_content_size` failed");
-        Buffer { vmo, size }
+            .expect("`get_backing_memory` error")
     }};
 }
 
 #[macro_export]
-macro_rules! assert_get_buffer_err {
+macro_rules! assert_get_vmo_err {
     ($proxy:expr, $flags:expr, $expected_status:expr) => {{
         use $crate::test_utils::assertions::reexport::Status;
 

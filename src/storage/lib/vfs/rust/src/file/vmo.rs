@@ -22,7 +22,7 @@ use crate::{
 use {
     async_trait::async_trait,
     fidl_fuchsia_io as fio,
-    fuchsia_zircon::{self as zx, AsHandleRef as _, HandleBased as _, Status, Vmo},
+    fuchsia_zircon::{self as zx, HandleBased as _, Status, Vmo},
     std::sync::Arc,
 };
 
@@ -225,14 +225,8 @@ impl File for VmoFile {
     }
 
     async fn get_backing_memory(&self, flags: fio::VmoFlags) -> Result<zx::Vmo, Status> {
-        // The only sharing mode we support that disallows the VMO size to change currently
-        // is PRIVATE_CLONE (`get_as_private`), so we require that to be set explicitly.
-        if flags.contains(fio::VmoFlags::WRITE) && !flags.contains(fio::VmoFlags::PRIVATE_CLONE) {
-            return Err(zx::Status::NOT_SUPPORTED);
-        }
-
         // Disallow opening as both writable and executable. In addition to improving W^X
-        // enforcement, this also eliminates any inconstiencies related to clones that use
+        // enforcement, this also eliminates any inconsistencies related to clones that use
         // SNAPSHOT_AT_LEAST_ON_WRITE since in that case, we cannot satisfy both requirements.
         if flags.contains(fio::VmoFlags::EXECUTE) && flags.contains(fio::VmoFlags::WRITE) {
             return Err(zx::Status::NOT_SUPPORTED);
@@ -241,14 +235,16 @@ impl File for VmoFile {
         // Logic here matches fuchsia.io requirements and matches what works for memfs.
         // Shared requests are satisfied by duplicating an handle, and private shares are
         // child VMOs.
-        let vmo_rights = vmo_flags_to_rights(flags);
+        let vmo_rights = vmo_flags_to_rights(flags)
+            | zx::Rights::BASIC
+            | zx::Rights::MAP
+            | zx::Rights::GET_PROPERTY;
         // Unless private sharing mode is specified, we always default to shared.
-        let new_vmo = if flags.contains(fio::VmoFlags::PRIVATE_CLONE) {
-            get_as_private(&self.vmo, vmo_rights)?
+        if flags.contains(fio::VmoFlags::PRIVATE_CLONE) {
+            get_as_private(&self.vmo, vmo_rights)
         } else {
-            get_as_shared(&self.vmo, vmo_rights)?
-        };
-        Ok(new_vmo)
+            self.vmo.duplicate_handle(vmo_rights)
+        }
     }
 
     async fn get_size(&self) -> Result<u64, Status> {
@@ -277,30 +273,24 @@ impl File for VmoFile {
     }
 }
 
-fn get_as_shared(vmo: &zx::Vmo, mut rights: zx::Rights) -> Result<zx::Vmo, zx::Status> {
-    // Add set of basic rights to include in shared mode before duplicating the VMO handle.
-    rights |= zx::Rights::BASIC | zx::Rights::MAP | zx::Rights::GET_PROPERTY;
-    vmo.as_handle_ref().duplicate(rights).map(Into::into)
-}
-
 fn get_as_private(vmo: &zx::Vmo, mut rights: zx::Rights) -> Result<zx::Vmo, zx::Status> {
-    // Add set of basic rights to include in private mode, ensuring we provide SET_PROPERTY.
-    rights |=
-        zx::Rights::BASIC | zx::Rights::MAP | zx::Rights::GET_PROPERTY | zx::Rights::SET_PROPERTY;
+    // Allow for the child VMO's content size and name to be changed.
+    rights |= zx::Rights::SET_PROPERTY;
 
-    // Ensure we give out a copy-on-write clone.
+    // Ensure we give out a copy-on-write child.
     let mut child_options = zx::VmoChildOptions::SNAPSHOT_AT_LEAST_ON_WRITE;
-    // If we don't need a writable clone, we need to add CHILD_NO_WRITE since
-    // SNAPSHOT_AT_LEAST_ON_WRITE removes ZX_RIGHT_EXECUTE even if the parent VMO has it, but
-    // adding CHILD_NO_WRITE will ensure EXECUTE is maintained.
     if !rights.contains(zx::Rights::WRITE) {
+        // If we don't need a writable clone, we need to add CHILD_NO_WRITE since
+        // SNAPSHOT_AT_LEAST_ON_WRITE removes ZX_RIGHT_EXECUTE even if the parent VMO has it, but
+        // adding CHILD_NO_WRITE will ensure EXECUTE is maintained.
         child_options |= zx::VmoChildOptions::NO_WRITE;
     } else {
-        // If we need a writable clone, ensure it can be resized.
+        // If we need a writable child, ensure it can be resized.
         child_options |= zx::VmoChildOptions::RESIZABLE;
+        rights |= zx::Rights::RESIZE;
     }
 
     let size = vmo.get_content_size()?;
     let new_vmo = vmo.create_child(child_options, 0, size)?;
-    new_vmo.into_handle().replace_handle(rights).map(Into::into)
+    new_vmo.replace_handle(rights)
 }

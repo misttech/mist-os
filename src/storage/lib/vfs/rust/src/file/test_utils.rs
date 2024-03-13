@@ -42,6 +42,8 @@ where
 
 /// Possible errors for the [`assert_vmo_content()`] function.
 pub enum AssertVmoContentError {
+    /// Failure returned from the `vmo.get_content_size()` call.
+    GetContentSizeFailed(Status),
     /// Failure returned from the `vmo.read()` call.
     VmoReadFailed(Status),
     /// Expected content and the actual VMO content did not match.
@@ -51,8 +53,10 @@ pub enum AssertVmoContentError {
 /// Reads the VMO content and matches it against the expectation.
 #[cfg(target_os = "fuchsia")]
 pub fn assert_vmo_content(vmo: &fidl::Vmo, expected: &[u8]) -> Result<(), AssertVmoContentError> {
-    let mut buffer = Vec::with_capacity(expected.len());
-    buffer.resize(expected.len(), 0);
+    let size =
+        vmo.get_content_size().map_err(AssertVmoContentError::GetContentSizeFailed)? as usize;
+    let mut buffer = Vec::with_capacity(size);
+    buffer.resize(size, 0);
     vmo.read(&mut buffer, 0).map_err(AssertVmoContentError::VmoReadFailed)?;
     if buffer != expected {
         Err(AssertVmoContentError::UnexpectedContent(buffer))
@@ -71,6 +75,9 @@ macro_rules! assert_vmo_content {
         let expected = $expected;
         match assert_vmo_content($vmo, expected) {
             Ok(()) => (),
+            Err(AssertVmoContentError::GetContentSizeFailed(status)) => {
+                panic!("`vmo.get_content_size()` failed: {}", status)
+            }
             Err(AssertVmoContentError::VmoReadFailed(status)) => {
                 panic!("`vmo.read(&mut buffer, 0)` failed: {}", status)
             }
