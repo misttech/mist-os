@@ -20,9 +20,9 @@ use {
 };
 
 #[cfg(feature = "serde")]
-use serde::Serialize;
+use {schemars::JsonSchema, serde::Serialize};
 
-#[cfg_attr(feature = "serde", derive(Serialize))]
+#[cfg_attr(feature = "serde", derive(Serialize, JsonSchema))]
 pub struct ShowCmdInstance {
     pub moniker: Moniker,
     pub url: String,
@@ -31,7 +31,7 @@ pub struct ShowCmdInstance {
     pub resolved: Option<ShowCmdResolvedInfo>,
 }
 
-#[cfg_attr(feature = "serde", derive(Serialize))]
+#[cfg_attr(feature = "serde", derive(Serialize, JsonSchema))]
 pub struct ShowCmdResolvedInfo {
     pub resolved_url: String,
     pub merkle_root: Option<String>,
@@ -42,7 +42,7 @@ pub struct ShowCmdResolvedInfo {
     pub collections: Vec<String>,
 }
 
-#[cfg_attr(feature = "serde", derive(Serialize))]
+#[cfg_attr(feature = "serde", derive(Serialize, JsonSchema))]
 pub struct ShowCmdExecutionInfo {
     pub runtime: Runtime,
     pub outgoing_capabilities: Vec<String>,

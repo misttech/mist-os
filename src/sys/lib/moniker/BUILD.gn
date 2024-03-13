@@ -61,7 +61,10 @@ rustc_library("moniker") {
   features = []
   if (is_host) {
     features += [ "serde" ]
-    deps += [ "//third_party/rust_crates:serde" ]
+    deps += [
+      "//third_party/rust_crates:schemars",
+      "//third_party/rust_crates:serde",
+    ]
     sources += [ "src/serde_ext.rs" ]
   }
 }

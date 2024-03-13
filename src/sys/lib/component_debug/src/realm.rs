@@ -25,7 +25,7 @@ use {
 static DIR_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(1);
 
 #[cfg(feature = "serde")]
-use serde::Serialize;
+use {schemars::JsonSchema, serde::Serialize};
 
 #[derive(Debug, Error)]
 pub enum ParseError {
@@ -249,7 +249,7 @@ impl TryFrom<fsys::ExecutionInfo> for ExecutionInfo {
 }
 
 /// A single structured configuration key-value pair.
-#[cfg_attr(feature = "serde", derive(Serialize))]
+#[cfg_attr(feature = "serde", derive(Serialize, JsonSchema))]
 #[derive(Debug, PartialEq)]
 pub struct ConfigField {
     pub key: String,
@@ -273,7 +273,7 @@ impl TryFrom<fcdecl::ResolvedConfigField> for ConfigField {
     }
 }
 
-#[cfg_attr(feature = "serde", derive(Serialize))]
+#[cfg_attr(feature = "serde", derive(Serialize, JsonSchema))]
 #[derive(Debug)]
 pub enum Runtime {
     Elf {

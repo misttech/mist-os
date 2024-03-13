@@ -7,7 +7,7 @@ use component_debug::cli::{show::ShowCmdInstance, show_cmd_print, show_cmd_seria
 use errors::FfxError;
 use ffx_component::rcs::connect_to_realm_query;
 use ffx_component_show_args::ComponentShowCommand;
-use fho::{FfxMain, FfxTool, MachineWriter, ToolIO};
+use fho::{FfxMain, FfxTool, ToolIO, VerifiedMachineWriter};
 use fidl_fuchsia_developer_remotecontrol as rc;
 
 #[derive(FfxTool)]
@@ -21,7 +21,7 @@ fho::embedded_plugin!(ShowTool);
 
 #[async_trait(?Send)]
 impl FfxMain for ShowTool {
-    type Writer = MachineWriter<ShowCmdInstance>;
+    type Writer = VerifiedMachineWriter<ShowCmdInstance>;
 
     async fn main(self, mut writer: Self::Writer) -> fho::Result<()> {
         let realm_query = connect_to_realm_query(&self.rcs).await?;

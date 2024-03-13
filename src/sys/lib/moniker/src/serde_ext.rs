@@ -7,6 +7,7 @@ use {
         child_name::{ChildName, ChildNameBase},
         moniker::{Moniker, MonikerBase},
     },
+    schemars::{gen::SchemaGenerator, schema::Schema, schema_for, JsonSchema},
     serde::{
         de::{self, Deserializer, Visitor},
         Deserialize, Serialize, Serializer,
@@ -87,5 +88,14 @@ impl<'de> Deserialize<'de> for Moniker {
         D: Deserializer<'de>,
     {
         deserializer.deserialize_str(MonikerVisitor)
+    }
+}
+
+impl JsonSchema for Moniker {
+    fn schema_name() -> String {
+        "Moniker".to_owned()
+    }
+    fn json_schema(_gen: &mut SchemaGenerator) -> Schema {
+        Schema::Object(schema_for!(String).schema)
     }
 }
