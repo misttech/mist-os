@@ -180,7 +180,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn multi_packet_put_operation() {
+    fn multi_packet_put() {
         let mut operation = PutOperation::new(/*srm_supported=*/ false);
         assert!(!operation.is_complete());
 
@@ -227,7 +227,44 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn multi_packet_put_operation_srm_enabled() {
+    fn multi_packet_put_with_duplicate_headers_is_ok() {
+        let mut operation = PutOperation::new(/*srm_supported=*/ false);
+
+        // Peer's first request provides informational headers about the payload.
+        let type_header = Header::Type("foo".into());
+        let headers1 =
+            HeaderSet::from_headers(vec![Header::name("random file".into()), type_header.clone()])
+                .unwrap();
+        let request1 = RequestPacket::new_put(headers1);
+        let response1 = operation.handle_peer_request(request1).expect("valid request");
+        let response_packet1 = expect_single_packet(response1);
+        assert_eq!(*response_packet1.code(), ResponseCode::Continue);
+        assert!(!operation.is_complete());
+
+        // Peer's second and final request contains a duplicate informational header & payload.
+        let body = (0..10).collect::<Vec<u8>>();
+        let headers2 =
+            HeaderSet::from_headers(vec![type_header, Header::EndOfBody(body.clone())]).unwrap();
+        let request2 = RequestPacket::new_put_final(headers2);
+        let response2 = operation.handle_peer_request(request2).expect("valid request");
+        assert_matches!(response2,
+            OperationRequest::PutApplicationData(data, headers)
+            if headers.contains_header(&HeaderIdentifier::Name) && headers.contains_header(&HeaderIdentifier::Type)
+            && data == body
+        );
+        assert!(!operation.is_complete());
+
+        // Simulate application accepting - expect a single outgoing packet acknowledging the PUT.
+        let responses3 = operation
+            .handle_application_response(ApplicationResponse::accept_put())
+            .expect("valid response");
+        assert_eq!(responses3.len(), 1);
+        assert_eq!(*responses3[0].code(), ResponseCode::Ok);
+        assert!(operation.is_complete());
+    }
+
+    #[fuchsia::test]
+    fn multi_packet_put_srm_enabled() {
         let mut operation = PutOperation::new(/*srm_supported=*/ true);
         assert!(!operation.is_complete());
         assert_eq!(operation.srm_status(), SingleResponseMode::Disable);

@@ -64,10 +64,18 @@ impl HeaderSet {
         self.ids.get(id)
     }
 
+    /// Attempts to add the `header` to the HeaderSet.
+    /// Returns `Ok` if the header was successfully added, Error if the header is incompatible with
+    /// the existing headers in the set or if a different value already exists for the requested
+    /// `header`.
     pub fn add(&mut self, header: Header) -> Result<(), Error> {
         let id = header.identifier();
-        if self.contains_header(&id) {
-            return Err(Error::Duplicate(id));
+        // Cannot add the same header to the collection. If the underlying value is the same then
+        // `add` is a no-op.
+        match self.get(&id) {
+            Some(h) if *h == header => return Ok(()),
+            Some(_h) => return Err(Error::AlreadyExists(id)),
+            None => {}
         }
 
         // Check for any incompatibilities.
@@ -255,11 +263,26 @@ mod tests {
     use assert_matches::assert_matches;
 
     #[fuchsia::test]
-    fn add_duplicate_header_is_error() {
+    fn add_duplicate_header_is_ok() {
         let mut headers = HeaderSet::new();
-        headers.add(Header::Count(123)).expect("can add header");
-        assert!(headers.contains_header(&HeaderIdentifier::Count));
-        assert_matches!(headers.add(Header::Count(100)), Err(Error::Duplicate(_)));
+        let header = Header::ConnectionId(ConnectionIdentifier(1));
+        headers.add(header.clone()).expect("can add header");
+        assert!(headers.contains_header(&HeaderIdentifier::ConnectionId));
+        // Adding the same exact header (ID & Value) is OK. It's a no-op.
+        assert_matches!(headers.add(header), Ok(_));
+        assert!(headers.contains_header(&HeaderIdentifier::ConnectionId));
+    }
+
+    #[fuchsia::test]
+    fn add_existing_header_is_error() {
+        let mut headers = HeaderSet::new();
+        headers.add(Header::ConnectionId(ConnectionIdentifier(2))).expect("can add header");
+        assert!(headers.contains_header(&HeaderIdentifier::ConnectionId));
+        // Adding the same header but with a different value is an error.
+        assert_matches!(
+            headers.add(Header::ConnectionId(ConnectionIdentifier(3))),
+            Err(Error::AlreadyExists(HeaderIdentifier::ConnectionId))
+        );
     }
 
     #[fuchsia::test]
@@ -275,7 +298,7 @@ mod tests {
     fn try_append_error() {
         let mut headers1 = HeaderSet::from_header(Header::name("foo"));
         let headers2 = HeaderSet::from_header(Header::name("bar"));
-        assert_matches!(headers1.try_append(headers2), Err(Error::Duplicate(_)));
+        assert_matches!(headers1.try_append(headers2), Err(Error::AlreadyExists(_)));
     }
 
     #[fuchsia::test]
@@ -416,7 +439,7 @@ mod tests {
         let mut headers = HeaderSet::from_header(Header::ConnectionId(ConnectionIdentifier(10)));
         assert_matches!(
             headers.try_add_connection_id(&Some(ConnectionIdentifier(11))),
-            Err(Error::Duplicate(_))
+            Err(Error::AlreadyExists(_))
         );
 
         // Trying to add the ID to a set with a Target header is an error.

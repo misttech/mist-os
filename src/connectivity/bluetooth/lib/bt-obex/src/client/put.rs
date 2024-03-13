@@ -562,6 +562,6 @@ mod tests {
         let write_fut = operation.write(&[1, 2, 3], write_headers);
         pin_mut!(write_fut);
         let result = exec.run_until_stalled(&mut write_fut).expect("finished with error");
-        assert_matches!(result, Err(Error::Duplicate(_)));
+        assert_matches!(result, Err(Error::AlreadyExists(_)));
     }
 }

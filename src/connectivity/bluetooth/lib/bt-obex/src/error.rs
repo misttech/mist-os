@@ -14,8 +14,8 @@ use crate::operation::{OpCode, ResponseCode};
 pub enum Error {
     #[error("Error parsing packet: {:?}", .0)]
     Packet(#[from] PacketError),
-    #[error("Duplicate add of {:?} to HeaderSet", .0)]
-    Duplicate(HeaderIdentifier),
+    #[error("Header {:?} already exists in HeaderSet", .0)]
+    AlreadyExists(HeaderIdentifier),
     #[error("{:?} cannot be added with {:?}", .0, .1)]
     IncompatibleHeaders(HeaderIdentifier, HeaderIdentifier),
     #[error("Encountered an IO Error: {}", .0)]
