@@ -114,22 +114,13 @@ impl LogsRepository {
         parent_trace_id: ftrace::Id,
     ) -> impl Stream<Item = Arc<LogsData>> + Send + 'static {
         let mut repo = self.mutable_state.write();
-        let (mut merged, mpx_handle) = Multiplexer::new(parent_trace_id);
-        if let Some(selectors) = selectors {
-            merged.set_selectors(selectors);
-        }
-        repo.logs_data_store
-            .iter()
-            .map(|(identity, c)| {
-                let cursor = c.cursor(mode, parent_trace_id);
-                (Arc::clone(identity), cursor)
-            })
-            .for_each(|(n, c)| {
-                mpx_handle.send(n, c);
-            });
+        let substreams = repo.logs_data_store.iter().map(|(identity, c)| {
+            let cursor = c.cursor(mode, parent_trace_id);
+            (Arc::clone(identity), cursor)
+        });
+        let (mut merged, mpx_handle) = Multiplexer::new(parent_trace_id, selectors, substreams);
         repo.logs_multiplexers.add(mode, mpx_handle);
         merged.set_on_drop_id_sender(repo.logs_multiplexers.cleanup_sender());
-
         merged
     }
 
