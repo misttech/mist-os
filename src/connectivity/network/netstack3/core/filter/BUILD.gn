@@ -25,8 +25,10 @@ rustc_library_with_features("netstack3-filter") {
     "//src/connectivity/lib/packet-formats",
     "//src/connectivity/network/netstack3/core/base:netstack3-base",
     "//src/lib/fakealloc",
+    "//src/lib/network/packet",
     "//third_party/rust_crates:derivative",
     "//third_party/rust_crates:once_cell",
+    "//third_party/rust_crates:zerocopy",
   ]
   test_deps = [
     "//src/connectivity/lib/ip-test-macro",

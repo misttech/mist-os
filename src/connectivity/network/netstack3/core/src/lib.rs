@@ -66,7 +66,10 @@ pub mod device {
     pub(crate) use id::*;
 
     // Re-exported types.
-    pub use base::{DeviceLayerEventDispatcher, DeviceLayerStateTypes, DeviceSendFrameError};
+    pub use base::{
+        DeviceClassMatcher, DeviceIdAndNameMatcher, DeviceLayerEventDispatcher,
+        DeviceLayerStateTypes, DeviceSendFrameError,
+    };
     pub use config::{
         ArpConfiguration, ArpConfigurationUpdate, DeviceConfiguration, DeviceConfigurationUpdate,
         DeviceConfigurationUpdateError, NdpConfiguration, NdpConfigurationUpdate,
@@ -101,6 +104,7 @@ pub mod error;
 pub mod filter {
     pub(crate) mod integration;
 
+    pub(crate) use integration::FilterHandlerProvider;
     pub use netstack3_filter::{
         Action, AddressMatcher, AddressMatcherType, FilterApi, FilterBindingsTypes, Hook,
         InterfaceMatcher, InterfaceProperties, IpRoutines, NatRoutines, PacketMatcher, PortMatcher,
@@ -108,7 +112,7 @@ pub mod filter {
         ValidationInfo,
     };
     pub(crate) use netstack3_filter::{
-        FilterContext, FilterHandler, FilterImpl, FilterIpContext, ValidState,
+        FilterContext, FilterHandler, FilterImpl, FilterIpContext, ValidState, Verdict,
     };
 }
 

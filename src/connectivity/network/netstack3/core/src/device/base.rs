@@ -6,6 +6,7 @@ use alloc::{collections::HashMap, vec::Vec};
 use core::{
     fmt::{Debug, Display},
     marker::PhantomData,
+    num::NonZeroU64,
 };
 
 use derivative::Derivative;
@@ -32,6 +33,7 @@ use crate::{
         socket::{self, HeldSockets},
         state::{DeviceStateSpec, IpLinkDeviceStateInner},
     },
+    filter::FilterBindingsTypes,
     inspect::Inspectable,
     ip::{
         device::{
@@ -468,19 +470,37 @@ impl<BC: DeviceLayerTypes + socket::DeviceSocketBindingsContext<DeviceId<BC>>>
 }
 
 /// Provides associated types used in the device layer.
-pub trait DeviceLayerStateTypes: InstantContext {
+pub trait DeviceLayerStateTypes: InstantContext + FilterBindingsTypes {
     /// The state associated with loopback devices.
-    type LoopbackDeviceState: Send + Sync;
+    type LoopbackDeviceState: Send + Sync + DeviceClassMatcher<Self::DeviceClass>;
 
     /// The state associated with ethernet devices.
-    type EthernetDeviceState: Send + Sync;
+    type EthernetDeviceState: Send + Sync + DeviceClassMatcher<Self::DeviceClass>;
 
     /// The state associated with pure IP devices.
-    type PureIpDeviceState: Send + Sync;
+    type PureIpDeviceState: Send + Sync + DeviceClassMatcher<Self::DeviceClass>;
 
     /// An opaque identifier that is available from both strong and weak device
     /// references.
-    type DeviceIdentifier: Send + Sync + Debug + Display;
+    type DeviceIdentifier: Send + Sync + Debug + Display + DeviceIdAndNameMatcher;
+}
+
+/// Provides matching functionality for the device class of a device installed
+/// in the netstack.
+pub trait DeviceClassMatcher<DeviceClass> {
+    /// Returns whether the provided device class matches the class of the
+    /// device.
+    fn device_class_matches(&self, device_class: &DeviceClass) -> bool;
+}
+
+/// Provides matching functionality for the ID and name of a device installed in
+/// the netstack.
+pub trait DeviceIdAndNameMatcher {
+    /// Returns whether the provided ID matches the ID of the device.
+    fn id_matches(&self, id: &NonZeroU64) -> bool;
+
+    /// Returns whether the provided name matches the name of the device.
+    fn name_matches(&self, name: &str) -> bool;
 }
 
 /// Provides associated types used in the device layer.

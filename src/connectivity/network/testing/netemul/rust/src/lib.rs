@@ -1132,30 +1132,23 @@ impl<'a> TestInterface<'a> {
         &self,
         included_addresses: fnet_interfaces_ext::IncludedAddresses,
     ) -> Result<Vec<fnet_interfaces_ext::Address>> {
-        let fnet_interfaces_ext::Properties {
-            addresses,
-            id: _,
-            name: _,
-            device_class: _,
-            online: _,
-            has_default_ipv4_route: _,
-            has_default_ipv6_route: _,
-        } = self.get_properties(included_addresses).await?;
+        let fnet_interfaces_ext::Properties { addresses, .. } =
+            self.get_properties(included_addresses).await?;
         Ok(addresses)
     }
 
     /// Gets the interface's device name.
     pub async fn get_interface_name(&self) -> Result<String> {
-        let fnet_interfaces_ext::Properties {
-            name,
-            addresses: _,
-            id: _,
-            device_class: _,
-            online: _,
-            has_default_ipv4_route: _,
-            has_default_ipv6_route: _,
-        } = self.get_properties(fnet_interfaces_ext::IncludedAddresses::OnlyAssigned).await?;
+        let fnet_interfaces_ext::Properties { name, .. } =
+            self.get_properties(fnet_interfaces_ext::IncludedAddresses::OnlyAssigned).await?;
         Ok(name)
+    }
+
+    /// Gets the interface's device class.
+    pub async fn get_device_class(&self) -> Result<fnet_interfaces::DeviceClass> {
+        let fnet_interfaces_ext::Properties { device_class, .. } =
+            self.get_properties(fnet_interfaces_ext::IncludedAddresses::OnlyAssigned).await?;
+        Ok(device_class)
     }
 
     /// Gets the interface's MAC address.

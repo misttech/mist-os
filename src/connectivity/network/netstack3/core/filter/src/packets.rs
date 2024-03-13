@@ -2,7 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use packet_formats::ip::IpExt;
+use net_types::ip::{IpAddress, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr};
+use packet::ParseBuffer;
+use packet_formats::{
+    icmp::{IcmpParseArgs, Icmpv4Packet, Icmpv6Packet},
+    ip::{IpExt, IpPacket as _, IpProto, Ipv4Proto, Ipv6Proto},
+    ipv4::Ipv4Packet,
+    ipv6::Ipv6Packet,
+    tcp::{TcpParseArgs, TcpSegment},
+    udp::{UdpPacket, UdpParseArgs},
+};
+use zerocopy::ByteSliceMut;
 
 /// An IP packet that provides header inspection.
 //
@@ -49,11 +59,165 @@ pub trait TransportPacket {
     fn dst_port(&self) -> u16;
 }
 
+impl<B: ByteSliceMut + ParseBuffer> IpPacket<B, Ipv4> for Ipv4Packet<B> {
+    type TransportPacket<'a> = ParsedTransportHeader where Self: 'a;
+
+    fn src_addr(&self) -> Ipv4Addr {
+        self.src_ip()
+    }
+
+    fn dst_addr(&self) -> Ipv4Addr {
+        self.dst_ip()
+    }
+
+    fn protocol(&self) -> Ipv4Proto {
+        self.proto()
+    }
+
+    fn transport_packet(&self) -> Option<Self::TransportPacket<'_>> {
+        parse_transport_header_in_ipv4_packet(
+            self.src_ip(),
+            self.dst_ip(),
+            self.proto(),
+            self.body(),
+        )
+    }
+}
+
+impl<B: ByteSliceMut + ParseBuffer> IpPacket<B, Ipv6> for Ipv6Packet<B> {
+    type TransportPacket<'a> = ParsedTransportHeader where Self: 'a;
+
+    fn src_addr(&self) -> Ipv6Addr {
+        self.src_ip()
+    }
+
+    fn dst_addr(&self) -> Ipv6Addr {
+        self.dst_ip()
+    }
+
+    fn protocol(&self) -> Ipv6Proto {
+        self.proto()
+    }
+
+    fn transport_packet(&self) -> Option<Self::TransportPacket<'_>> {
+        parse_transport_header_in_ipv6_packet(
+            self.src_ip(),
+            self.dst_ip(),
+            self.proto(),
+            self.body(),
+        )
+    }
+}
+
+pub struct ParsedTransportHeader {
+    src_port: u16,
+    dst_port: u16,
+}
+
+impl TransportPacket for ParsedTransportHeader {
+    fn src_port(&self) -> u16 {
+        self.src_port
+    }
+
+    fn dst_port(&self) -> u16 {
+        self.dst_port
+    }
+}
+
+fn parse_transport_header_in_ipv4_packet<B: ParseBuffer>(
+    src_ip: Ipv4Addr,
+    dst_ip: Ipv4Addr,
+    proto: Ipv4Proto,
+    body: B,
+) -> Option<ParsedTransportHeader> {
+    match proto {
+        Ipv4Proto::Proto(IpProto::Udp) => parse_udp_header(body, UdpParseArgs::new(src_ip, dst_ip)),
+        Ipv4Proto::Proto(IpProto::Tcp) => parse_tcp_header(body, TcpParseArgs::new(src_ip, dst_ip)),
+        Ipv4Proto::Icmp => parse_icmpv4_header(body, IcmpParseArgs::new(src_ip, dst_ip)),
+        Ipv4Proto::Igmp | Ipv4Proto::Other(_) => None,
+    }
+}
+
+fn parse_transport_header_in_ipv6_packet<B: ParseBuffer>(
+    src_ip: Ipv6Addr,
+    dst_ip: Ipv6Addr,
+    proto: Ipv6Proto,
+    body: B,
+) -> Option<ParsedTransportHeader> {
+    match proto {
+        Ipv6Proto::Proto(IpProto::Udp) => parse_udp_header(body, UdpParseArgs::new(src_ip, dst_ip)),
+        Ipv6Proto::Proto(IpProto::Tcp) => parse_tcp_header(body, TcpParseArgs::new(src_ip, dst_ip)),
+        Ipv6Proto::Icmpv6 => parse_icmpv6_header(body, IcmpParseArgs::new(src_ip, dst_ip)),
+        Ipv6Proto::NoNextHeader | Ipv6Proto::Other(_) => None,
+    }
+}
+
+fn parse_udp_header<B: ParseBuffer, A: IpAddress>(
+    mut body: B,
+    args: UdpParseArgs<A>,
+) -> Option<ParsedTransportHeader> {
+    let packet = body.parse_with::<_, UdpPacket<_>>(args).ok()?;
+    Some(ParsedTransportHeader {
+        src_port: packet.src_port().map(|port| port.get()).unwrap_or(0),
+        dst_port: packet.dst_port().get(),
+    })
+}
+
+fn parse_tcp_header<B: ParseBuffer, A: IpAddress>(
+    mut body: B,
+    args: TcpParseArgs<A>,
+) -> Option<ParsedTransportHeader> {
+    let packet = body.parse_with::<_, TcpSegment<_>>(args).ok()?;
+    Some(ParsedTransportHeader {
+        src_port: packet.src_port().get(),
+        dst_port: packet.dst_port().get(),
+    })
+}
+
+fn parse_icmpv4_header<B: ParseBuffer>(
+    mut body: B,
+    args: IcmpParseArgs<Ipv4Addr>,
+) -> Option<ParsedTransportHeader> {
+    let packet = body.parse_with::<_, Icmpv4Packet<_>>(args).ok()?;
+    let (src_port, dst_port) = match packet {
+        Icmpv4Packet::EchoRequest(packet) => Some((packet.message().id(), 0)),
+        Icmpv4Packet::EchoReply(packet) => Some((0, packet.message().id())),
+        // TODO(https://fxbug.dev/328057704): parse packet contained in ICMP error
+        // message payload so NAT can be applied to it.
+        Icmpv4Packet::DestUnreachable(_)
+        | Icmpv4Packet::Redirect(_)
+        | Icmpv4Packet::TimeExceeded(_)
+        | Icmpv4Packet::ParameterProblem(_)
+        | Icmpv4Packet::TimestampRequest(_)
+        | Icmpv4Packet::TimestampReply(_) => None,
+    }?;
+    Some(ParsedTransportHeader { src_port, dst_port })
+}
+
+fn parse_icmpv6_header<B: ParseBuffer>(
+    mut body: B,
+    args: IcmpParseArgs<Ipv6Addr>,
+) -> Option<ParsedTransportHeader> {
+    let packet = body.parse_with::<_, Icmpv6Packet<_>>(args).ok()?;
+    let (src_port, dst_port) = match packet {
+        Icmpv6Packet::EchoRequest(packet) => Some((packet.message().id(), 0)),
+        Icmpv6Packet::EchoReply(packet) => Some((0, packet.message().id())),
+        // TODO(https://fxbug.dev/328057704): parse packet contained in ICMP error
+        // message payload so NAT can be applied to it.
+        Icmpv6Packet::DestUnreachable(_)
+        | Icmpv6Packet::PacketTooBig(_)
+        | Icmpv6Packet::TimeExceeded(_)
+        | Icmpv6Packet::ParameterProblem(_)
+        | Icmpv6Packet::Ndp(_)
+        | Icmpv6Packet::Mld(_) => None,
+    }?;
+    Some(ParsedTransportHeader { src_port, dst_port })
+}
+
 #[cfg(test)]
 pub(crate) mod testutil {
     use net_declare::{net_ip_v4, net_ip_v6, net_subnet_v4, net_subnet_v6};
-    use net_types::ip::{IpInvariant, Ipv4, Ipv6, Subnet};
-    use packet_formats::ip::{IpProto, Ipv4Proto, Ipv6Proto};
+    use net_types::ip::{IpInvariant, Subnet};
 
     use super::*;
 

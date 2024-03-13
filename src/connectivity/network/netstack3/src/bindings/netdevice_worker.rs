@@ -652,6 +652,10 @@ pub(crate) enum SendError {
 }
 
 impl PortHandler {
+    pub(crate) fn device_class(&self) -> fhardware_network::DeviceClass {
+        self.device_class
+    }
+
     pub(crate) async fn attach(&self) -> Result<(), netdevice_client::Error> {
         let Self { port_id, inner: Inner { session, .. }, .. } = self;
         session.attach(*port_id, &[fhardware_network::FrameType::Ethernet]).await

@@ -19,7 +19,10 @@ use net_types::{
     SpecifiedAddr, UnicastAddr,
 };
 use netstack3_core::{
-    device::{DeviceId, DeviceProvider, DeviceSendFrameError, LoopbackDeviceId},
+    device::{
+        DeviceClassMatcher, DeviceId, DeviceIdAndNameMatcher, DeviceProvider, DeviceSendFrameError,
+        LoopbackDeviceId,
+    },
     sync::{Mutex as CoreMutex, RwLock as CoreRwLock},
     types::WorkQueueReport,
 };
@@ -267,6 +270,20 @@ impl LoopbackInfo {
     }
 }
 
+impl DeviceClassMatcher<fidl_fuchsia_net_filter::DeviceClass> for LoopbackInfo {
+    fn device_class_matches(&self, device_class: &fidl_fuchsia_net_filter::DeviceClass) -> bool {
+        match device_class {
+            fidl_fuchsia_net_filter::DeviceClass::Loopback(fidl_fuchsia_net_filter::Empty {}) => {
+                true
+            }
+            fidl_fuchsia_net_filter::DeviceClass::Device(_) => false,
+            fidl_fuchsia_net_filter::DeviceClass::__SourceBreaking { unknown_ordinal } => {
+                panic!("unknown device class ordinal {unknown_ordinal:?}")
+            }
+        }
+    }
+}
+
 /// Information associated with FIDL Protocol workers.
 #[derive(Debug)]
 pub(crate) struct FidlWorkerInfo<R> {
@@ -312,6 +329,22 @@ impl NetdeviceInfo {
     }
 }
 
+impl DeviceClassMatcher<fidl_fuchsia_net_filter::DeviceClass> for NetdeviceInfo {
+    fn device_class_matches(&self, device_class: &fidl_fuchsia_net_filter::DeviceClass) -> bool {
+        match device_class {
+            fidl_fuchsia_net_filter::DeviceClass::Loopback(fidl_fuchsia_net_filter::Empty {}) => {
+                false
+            }
+            fidl_fuchsia_net_filter::DeviceClass::Device(class) => {
+                *class == self.handler.device_class()
+            }
+            fidl_fuchsia_net_filter::DeviceClass::__SourceBreaking { unknown_ordinal } => {
+                panic!("unknown device class ordinal {unknown_ordinal:?}")
+            }
+        }
+    }
+}
+
 #[derive(Debug)]
 pub(crate) struct PureIpDeviceInfo {
     pub(crate) static_common_info: StaticCommonInfo,
@@ -331,6 +364,14 @@ impl PureIpDeviceInfo {
     }
 }
 
+impl DeviceClassMatcher<fidl_fuchsia_net_filter::DeviceClass> for PureIpDeviceInfo {
+    fn device_class_matches(&self, _device_class: &fidl_fuchsia_net_filter::DeviceClass) -> bool {
+        // TODO(https://fxbug.dev/42051633): when IP-layer netdevice-backed devices are
+        // supported, match against the port's device class.
+        false
+    }
+}
+
 pub(crate) struct DeviceIdAndName {
     pub(crate) id: BindingId,
     pub(crate) name: String,
@@ -346,5 +387,15 @@ impl Debug for DeviceIdAndName {
 impl Display for DeviceIdAndName {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         Debug::fmt(self, f)
+    }
+}
+
+impl DeviceIdAndNameMatcher for DeviceIdAndName {
+    fn id_matches(&self, id: &NonZeroU64) -> bool {
+        self.id == *id
+    }
+
+    fn name_matches(&self, name: &str) -> bool {
+        self.name == name
     }
 }

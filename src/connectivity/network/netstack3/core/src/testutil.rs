@@ -15,6 +15,7 @@ use core::{
     ffi::CStr,
     fmt::{self, Debug, Display},
     hash::Hash,
+    num::NonZeroU64,
     ops::{Deref, DerefMut},
     sync::atomic::AtomicUsize,
     time::Duration,
@@ -68,8 +69,9 @@ use crate::{
         ethernet::{EthernetCreationProperties, EthernetLinkDevice},
         link::LinkDevice,
         loopback::LoopbackDeviceId,
-        DeviceId, DeviceLayerEventDispatcher, DeviceLayerStateTypes, DeviceSendFrameError,
-        EthernetDeviceId, EthernetWeakDeviceId, PureIpDeviceId, WeakDeviceId,
+        DeviceClassMatcher, DeviceId, DeviceIdAndNameMatcher, DeviceLayerEventDispatcher,
+        DeviceLayerStateTypes, DeviceSendFrameError, EthernetDeviceId, EthernetWeakDeviceId,
+        PureIpDeviceId, WeakDeviceId,
     },
     filter::FilterBindingsTypes,
     ip::{
@@ -762,6 +764,12 @@ impl FakeBindingsCtx {
 
 impl FilterBindingsTypes for FakeBindingsCtx {
     type DeviceClass = ();
+}
+
+impl DeviceClassMatcher<()> for () {
+    fn device_class_matches(&self, (): &()) -> bool {
+        unimplemented!()
+    }
 }
 
 impl WithFakeTimerContext<TimerId<FakeBindingsCtx>> for FakeCtx {
@@ -1805,6 +1813,16 @@ impl MonotonicIdentifier {
 impl Default for MonotonicIdentifier {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+impl DeviceIdAndNameMatcher for MonotonicIdentifier {
+    fn id_matches(&self, _id: &NonZeroU64) -> bool {
+        unimplemented!()
+    }
+
+    fn name_matches(&self, _name: &str) -> bool {
+        unimplemented!()
     }
 }
 

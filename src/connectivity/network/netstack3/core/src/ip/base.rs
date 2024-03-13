@@ -47,7 +47,7 @@ use crate::{
     counters::Counter,
     data_structures::token_bucket::TokenBucket,
     device::{AnyDevice, DeviceId, DeviceIdContext, FrameDestination, Id, StrongId, WeakDeviceId},
-    filter::FilterBindingsTypes,
+    filter::{FilterBindingsTypes, FilterHandler as _, FilterHandlerProvider},
     inspect::{Inspectable, Inspector},
     ip::{
         device::{
@@ -623,13 +623,16 @@ pub enum IpLayerEvent<DeviceId, I: Ip> {
 
 /// The bindings execution context for the IP layer.
 pub trait IpLayerBindingsContext<I: Ip, DeviceId>:
-    InstantContext + EventContext<IpLayerEvent<DeviceId, I>> + TracingContext
+    InstantContext + EventContext<IpLayerEvent<DeviceId, I>> + TracingContext + FilterBindingsTypes
 {
 }
 impl<
         I: Ip,
         DeviceId,
-        BC: InstantContext + EventContext<IpLayerEvent<DeviceId, I>> + TracingContext,
+        BC: InstantContext
+            + EventContext<IpLayerEvent<DeviceId, I>>
+            + TracingContext
+            + FilterBindingsTypes,
     > IpLayerBindingsContext<I, DeviceId> for BC
 {
 }
@@ -990,13 +993,21 @@ pub(crate) trait IpLayerIngressContext<
     I: IpLayerIpExt + IcmpHandlerIpExt,
     BC: IpLayerBindingsContext<I, Self::DeviceId>,
 >:
-    IpTransportDispatchContext<I, BC>
+    IpTransportDispatchContext<I, BC, DeviceId = Self::DeviceId_>
     + IpDeviceStateContext<I, BC>
     + IpDeviceSendContext<I, BC>
     + IcmpErrorHandler<I, BC>
     + IpLayerContext<I, BC>
     + FragmentHandler<I, BC>
+    + FilterHandlerProvider<I, BC>
 {
+    // This is working around the fact that currently, where clauses are only
+    // elaborated for supertraits, and not, for example, bounds on associated types
+    // as we have here.
+    //
+    // See https://github.com/rust-lang/rust/issues/20671#issuecomment-1905186183
+    // for more discussion.
+    type DeviceId_: crate::filter::InterfaceProperties<BC::DeviceClass> + Debug;
 }
 
 impl<
@@ -1007,9 +1018,13 @@ impl<
             + IpDeviceSendContext<I, BC>
             + IcmpErrorHandler<I, BC>
             + IpLayerContext<I, BC>
-            + FragmentHandler<I, BC>,
+            + FragmentHandler<I, BC>
+            + FilterHandlerProvider<I, BC>,
     > IpLayerIngressContext<I, BC> for CC
+where
+    Self::DeviceId: crate::filter::InterfaceProperties<BC::DeviceClass>,
 {
+    type DeviceId_ = Self::DeviceId;
 }
 
 impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IcmpAllSocketsSet<Ipv4>>>
@@ -1998,6 +2013,11 @@ pub(crate) fn receive_ipv4_packet<
 
     // TODO(ghanan): Act upon options.
 
+    match core_ctx.filter_handler().ingress_hook(&mut packet, device) {
+        crate::filter::Verdict::Drop => return,
+        crate::filter::Verdict::Accept => {}
+    }
+
     match receive_ipv4_packet_action(core_ctx, bindings_ctx, device, dst_ip) {
         ReceivePacketAction::Deliver => {
             trace!("receive_ipv4_packet: delivering locally");
@@ -2230,6 +2250,11 @@ pub(crate) fn receive_ipv6_packet<
             return;
         }
     };
+
+    match core_ctx.filter_handler().ingress_hook(&mut packet, device) {
+        crate::filter::Verdict::Drop => return,
+        crate::filter::Verdict::Accept => {}
+    }
 
     match receive_ipv6_packet_action(core_ctx, bindings_ctx, device, dst_ip) {
         ReceivePacketAction::Deliver => {

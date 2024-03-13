@@ -7,6 +7,7 @@
 use alloc::sync::Arc;
 use core::fmt::{self, Debug};
 use core::hash::Hash;
+use core::num::NonZeroU64;
 
 use derivative::Derivative;
 
@@ -16,7 +17,7 @@ use crate::{
         loopback::{LoopbackDevice, LoopbackDeviceId, LoopbackWeakDeviceId},
         pure_ip::{PureIpDevice, PureIpDeviceId, PureIpWeakDeviceId},
         state::{BaseDeviceState, DeviceStateSpec, IpLinkDeviceState, WeakCookie},
-        Device, DeviceLayerTypes,
+        Device, DeviceClassMatcher as _, DeviceIdAndNameMatcher as _, DeviceLayerTypes,
     },
     sync::{PrimaryRc, StrongRc},
 };
@@ -367,6 +368,24 @@ impl<BT: DeviceLayerTypes> StrongId for DeviceId<BT> {
 impl<BT: DeviceLayerTypes> Debug for DeviceId<BT> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         for_any_device_id!(DeviceId, self, id => Debug::fmt(id, f))
+    }
+}
+
+impl<BT: DeviceLayerTypes> crate::filter::InterfaceProperties<BT::DeviceClass> for DeviceId<BT> {
+    fn id_matches(&self, id: &NonZeroU64) -> bool {
+        self.bindings_id().id_matches(id)
+    }
+
+    fn name_matches(&self, name: &str) -> bool {
+        self.bindings_id().name_matches(name)
+    }
+
+    fn device_class_matches(&self, device_class: &BT::DeviceClass) -> bool {
+        for_any_device_id!(
+            DeviceId,
+            self,
+            id => id.external_state().device_class_matches(device_class)
+        )
     }
 }
 

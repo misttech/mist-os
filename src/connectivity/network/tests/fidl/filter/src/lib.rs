@@ -4,6 +4,8 @@
 
 #![cfg(test)]
 
+mod ingress;
+
 use assert_matches::assert_matches;
 use fidl::endpoints::Proxy as _;
 use fidl_fuchsia_hardware_network as fhardware_network;

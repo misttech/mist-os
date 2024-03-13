@@ -137,6 +137,7 @@ pub trait IpExt: Ip + Unpin {
     type SockAddr: Into<socket2::SockAddr>
         + TryFromSockAddr
         + Clone
+        + Copy
         + Unpin
         + PartialEq
         + std::fmt::Debug
