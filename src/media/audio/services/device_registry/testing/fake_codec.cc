@@ -59,7 +59,7 @@ void on_unbind(FakeCodec* fake_codec, fidl::UnbindInfo info,
   ADR_LOG(kLogFakeCodec || kLogObjectLifetimes) << "FakeCodec disconnected";
 }
 
-zx::channel FakeCodec::Enable() {
+fidl::ClientEnd<fuchsia_hardware_audio::Codec> FakeCodec::Enable() {
   ADR_LOG_METHOD(kLogFakeCodec);
   EXPECT_TRUE(server_end_.is_valid());
   EXPECT_TRUE(client_end_.is_valid());
@@ -69,7 +69,7 @@ zx::channel FakeCodec::Enable() {
   binding_ = fidl::BindServer(dispatcher_, std::move(server_end_), this);
   EXPECT_FALSE(server_end_.is_valid());
 
-  return client_end_.TakeChannel();
+  return std::move(client_end_);
 }
 
 void FakeCodec::DropCodec() {

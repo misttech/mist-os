@@ -37,14 +37,15 @@ FakeStreamConfig::~FakeStreamConfig() {
   ADR_LOG_METHOD(kLogFakeStreamConfig || kLogObjectLifetimes);
 }
 
-zx::channel FakeStreamConfig::Enable() {
+fidl::ClientEnd<fuchsia_hardware_audio::StreamConfig> FakeStreamConfig::Enable() {
   ADR_LOG_METHOD(kLogFakeStreamConfig);
 
   EXPECT_FALSE(stream_config_binding_);
   stream_config_binding_.emplace(this, std::move(stream_config_server_end_), dispatcher_);
   EXPECT_TRUE(stream_config_binding_->is_bound());
 
-  return std::move(stream_config_client_end_);
+  return fidl::ClientEnd<fuchsia_hardware_audio::StreamConfig>(
+      std::move(stream_config_client_end_));
 }
 
 void FakeStreamConfig::DropStreamConfig() {

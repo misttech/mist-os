@@ -31,9 +31,8 @@ TEST_F(AudioDeviceRegistryServerWarningTest, UnhealthyDevices) {
   fake_stream_config->set_health_state(false);
   fake_codec->set_health_state(false);
 
-  auto stream_config_client =
-      fidl::ClientEnd<fuchsia_hardware_audio::StreamConfig>(fake_stream_config->Enable());
-  auto codec_client = fidl::ClientEnd<fuchsia_hardware_audio::Codec>(fake_codec->Enable());
+  auto stream_config_client = fake_stream_config->Enable();
+  auto codec_client = fake_codec->Enable();
 
   AddDeviceForDetection(
       "test output", fuchsia_audio_device::DeviceType::kOutput,
@@ -51,7 +50,7 @@ TEST_F(AudioDeviceRegistryServerWarningTest, UnhealthyDevices) {
 TEST_F(AudioDeviceRegistryServerWarningTest, FindCodecByTokenIdError) {
   auto fake_driver = CreateFakeCodecInput();
   fake_driver->set_health_state(false);
-  auto client = fidl::ClientEnd<fuchsia_hardware_audio::Codec>(fake_driver->Enable());
+  auto client = fake_driver->Enable();
   AddDeviceForDetection("test codec", fuchsia_audio_device::DeviceType::kCodec,
                         fuchsia_audio_device::DriverClient::WithCodec(std::move(client)));
 
@@ -66,7 +65,7 @@ TEST_F(AudioDeviceRegistryServerWarningTest, FindCodecByTokenIdError) {
 
 TEST_F(AudioDeviceRegistryServerWarningTest, FindCodecByTokenIdRemoved) {
   auto fake_driver = CreateFakeCodecNoDirection();
-  auto client = fidl::ClientEnd<fuchsia_hardware_audio::Codec>(fake_driver->Enable());
+  auto client = fake_driver->Enable();
   AddDeviceForDetection("test codec", fuchsia_audio_device::DeviceType::kCodec,
                         fuchsia_audio_device::DriverClient::WithCodec(std::move(client)));
 
@@ -86,7 +85,7 @@ TEST_F(AudioDeviceRegistryServerWarningTest, FindCodecByTokenIdRemoved) {
 TEST_F(AudioDeviceRegistryServerWarningTest, FindStreamConfigByTokenIdError) {
   auto fake_driver = CreateFakeStreamConfigInput();
   fake_driver->set_health_state(false);
-  auto client = fidl::ClientEnd<fuchsia_hardware_audio::StreamConfig>(fake_driver->Enable());
+  auto client = fake_driver->Enable();
   AddDeviceForDetection("test input", fuchsia_audio_device::DeviceType::kInput,
                         fuchsia_audio_device::DriverClient::WithStreamConfig(std::move(client)));
 
@@ -101,7 +100,7 @@ TEST_F(AudioDeviceRegistryServerWarningTest, FindStreamConfigByTokenIdError) {
 
 TEST_F(AudioDeviceRegistryServerWarningTest, FindStreamConfigByTokenIdRemoved) {
   auto fake_driver = CreateFakeStreamConfigOutput();
-  auto client = fidl::ClientEnd<fuchsia_hardware_audio::StreamConfig>(fake_driver->Enable());
+  auto client = fake_driver->Enable();
   AddDeviceForDetection("test output", fuchsia_audio_device::DeviceType::kOutput,
                         fuchsia_audio_device::DriverClient::WithStreamConfig(std::move(client)));
 

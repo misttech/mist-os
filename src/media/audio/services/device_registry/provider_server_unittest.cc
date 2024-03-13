@@ -58,8 +58,7 @@ TEST_F(ProviderServerCodecTest, AddedDeviceThatOutlivesProvider) {
       ->AddDevice({{
           .device_name = "Test codec",
           .device_type = fuchsia_audio_device::DeviceType::kCodec,
-          .driver_client = fuchsia_audio_device::DriverClient::WithCodec(
-              fidl::ClientEnd<fuchsia_hardware_audio::Codec>(fake_driver->Enable())),
+          .driver_client = fuchsia_audio_device::DriverClient::WithCodec(fake_driver->Enable()),
       }})
       .Then([&received_callback](fidl::Result<Provider::AddDevice>& result) {
         received_callback = true;
@@ -90,8 +89,7 @@ TEST_F(ProviderServerCodecTest, ProviderCanOutliveAddedDevice) {
       ->AddDevice({{
           .device_name = "Test codec",
           .device_type = fuchsia_audio_device::DeviceType::kCodec,
-          .driver_client = fuchsia_audio_device::DriverClient::WithCodec(
-              fidl::ClientEnd<fuchsia_hardware_audio::Codec>(fake_driver->Enable())),
+          .driver_client = fuchsia_audio_device::DriverClient::WithCodec(fake_driver->Enable()),
       }})
       .Then([&received_callback](fidl::Result<Provider::AddDevice>& result) {
         received_callback = true;
@@ -124,8 +122,7 @@ TEST_F(ProviderServerCodecTest, AddThenWatch) {
       ->AddDevice({{
           .device_name = "Test codec",
           .device_type = fuchsia_audio_device::DeviceType::kCodec,
-          .driver_client = fuchsia_audio_device::DriverClient::WithCodec(
-              fidl::ClientEnd<fuchsia_hardware_audio::Codec>(fake_driver->Enable())),
+          .driver_client = fuchsia_audio_device::DriverClient::WithCodec(fake_driver->Enable()),
       }})
       .Then([&received_callback](fidl::Result<Provider::AddDevice>& result) {
         received_callback = true;
@@ -173,8 +170,7 @@ TEST_F(ProviderServerCodecTest, WatchThenAdd) {
       ->AddDevice({{
           .device_name = "Test codec",
           .device_type = fuchsia_audio_device::DeviceType::kCodec,
-          .driver_client = fuchsia_audio_device::DriverClient::WithCodec(
-              fidl::ClientEnd<fuchsia_hardware_audio::Codec>(fake_driver->Enable())),
+          .driver_client = fuchsia_audio_device::DriverClient::WithCodec(fake_driver->Enable()),
       }})
       .Then([&received_callback2](fidl::Result<Provider::AddDevice>& result) {
         received_callback2 = true;
@@ -202,8 +198,8 @@ TEST_F(ProviderServerStreamConfigTest, AddedDeviceThatOutlivesProvider) {
       ->AddDevice({{
           .device_name = "Test output",
           .device_type = fuchsia_audio_device::DeviceType::kOutput,
-          .driver_client = fuchsia_audio_device::DriverClient::WithStreamConfig(
-              fidl::ClientEnd<fuchsia_hardware_audio::StreamConfig>(fake_driver->Enable())),
+          .driver_client =
+              fuchsia_audio_device::DriverClient::WithStreamConfig(fake_driver->Enable()),
       }})
       .Then([&received_callback](fidl::Result<Provider::AddDevice>& result) {
         received_callback = true;
@@ -234,8 +230,8 @@ TEST_F(ProviderServerStreamConfigTest, ProviderCanOutliveAddedDevice) {
       ->AddDevice({{
           .device_name = "Test input",
           .device_type = fuchsia_audio_device::DeviceType::kInput,
-          .driver_client = fuchsia_audio_device::DriverClient::WithStreamConfig(
-              fidl::ClientEnd<fuchsia_hardware_audio::StreamConfig>(fake_driver->Enable())),
+          .driver_client =
+              fuchsia_audio_device::DriverClient::WithStreamConfig(fake_driver->Enable()),
       }})
       .Then([&received_callback](fidl::Result<Provider::AddDevice>& result) {
         received_callback = true;
@@ -268,8 +264,8 @@ TEST_F(ProviderServerStreamConfigTest, AddThenWatch) {
       ->AddDevice({{
           .device_name = "Test output",
           .device_type = fuchsia_audio_device::DeviceType::kOutput,
-          .driver_client = fuchsia_audio_device::DriverClient::WithStreamConfig(
-              fidl::ClientEnd<fuchsia_hardware_audio::StreamConfig>(fake_driver->Enable())),
+          .driver_client =
+              fuchsia_audio_device::DriverClient::WithStreamConfig(fake_driver->Enable()),
       }})
       .Then([&received_callback](fidl::Result<Provider::AddDevice>& result) {
         received_callback = true;
@@ -317,8 +313,8 @@ TEST_F(ProviderServerStreamConfigTest, WatchThenAdd) {
       ->AddDevice({{
           .device_name = "Test output",
           .device_type = fuchsia_audio_device::DeviceType::kOutput,
-          .driver_client = fuchsia_audio_device::DriverClient::WithStreamConfig(
-              fidl::ClientEnd<fuchsia_hardware_audio::StreamConfig>(fake_driver->Enable())),
+          .driver_client =
+              fuchsia_audio_device::DriverClient::WithStreamConfig(fake_driver->Enable()),
       }})
       .Then([&received_callback2](fidl::Result<Provider::AddDevice>& result) {
         received_callback2 = true;

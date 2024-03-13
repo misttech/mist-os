@@ -103,8 +103,7 @@ TEST_F(RegistryServerWarningTest, CreateObserverMissingToken) {
   auto [observer_client_end, observer_server_end] =
       CreateNaturalAsyncClientOrDie<fuchsia_audio_device::Observer>();
   auto observer_client = fidl::Client<fuchsia_audio_device::Observer>(
-      fidl::ClientEnd<fuchsia_audio_device::Observer>(std::move(observer_client_end)), dispatcher(),
-      observer_fidl_handler_.get());
+      std::move(observer_client_end), dispatcher(), observer_fidl_handler_.get());
   bool received_callback = false;
 
   registry->client()
@@ -133,8 +132,7 @@ TEST_F(RegistryServerWarningTest, CreateObserverBadToken) {
   auto [observer_client_end, observer_server_end] =
       CreateNaturalAsyncClientOrDie<fuchsia_audio_device::Observer>();
   auto observer_client = fidl::Client<fuchsia_audio_device::Observer>(
-      fidl::ClientEnd<fuchsia_audio_device::Observer>(std::move(observer_client_end)), dispatcher(),
-      observer_fidl_handler_.get());
+      std::move(observer_client_end), dispatcher(), observer_fidl_handler_.get());
   bool received_callback = false;
 
   registry->client()
@@ -163,10 +161,9 @@ TEST_F(RegistryServerWarningTest, CreateObserverBadToken) {
 // If required 'observer_server' is not set, CreateObserver should fail with kInvalidObserver.
 TEST_F(RegistryServerCodecWarningTest, CreateObserverMissingObserver) {
   auto fake_driver = CreateFakeCodecOutput();
-  adr_service_->AddDevice(Device::Create(
-      adr_service_, dispatcher(), "Test codec name", fuchsia_audio_device::DeviceType::kCodec,
-      DriverClient::WithCodec(
-          fidl::ClientEnd<fuchsia_hardware_audio::Codec>(fake_driver->Enable()))));
+  adr_service_->AddDevice(Device::Create(adr_service_, dispatcher(), "Test codec name",
+                                         fuchsia_audio_device::DeviceType::kCodec,
+                                         DriverClient::WithCodec(fake_driver->Enable())));
 
   RunLoopUntilIdle();
   ASSERT_EQ(adr_service_->devices().size(), 1u);
@@ -189,8 +186,7 @@ TEST_F(RegistryServerCodecWarningTest, CreateObserverMissingObserver) {
   auto [observer_client_end, observer_server_end] =
       CreateNaturalAsyncClientOrDie<fuchsia_audio_device::Observer>();
   auto observer_client = fidl::Client<fuchsia_audio_device::Observer>(
-      fidl::ClientEnd<fuchsia_audio_device::Observer>(std::move(observer_client_end)), dispatcher(),
-      observer_fidl_handler_.get());
+      std::move(observer_client_end), dispatcher(), observer_fidl_handler_.get());
   received_callback = false;
 
   registry->client()
@@ -214,10 +210,9 @@ TEST_F(RegistryServerCodecWarningTest, CreateObserverMissingObserver) {
 // If 'observer_server' is not set to a valid handle, we should fail with ZX_ERR_INVALID_ARGS.
 TEST_F(RegistryServerCodecWarningTest, CreateObserverBadObserver) {
   auto fake_driver = CreateFakeCodecInput();
-  adr_service_->AddDevice(Device::Create(
-      adr_service_, dispatcher(), "Test codec name", fuchsia_audio_device::DeviceType::kCodec,
-      DriverClient::WithCodec(
-          fidl::ClientEnd<fuchsia_hardware_audio::Codec>(fake_driver->Enable()))));
+  adr_service_->AddDevice(Device::Create(adr_service_, dispatcher(), "Test codec name",
+                                         fuchsia_audio_device::DeviceType::kCodec,
+                                         DriverClient::WithCodec(fake_driver->Enable())));
 
   RunLoopUntilIdle();
   ASSERT_EQ(adr_service_->devices().size(), 1u);
@@ -240,8 +235,7 @@ TEST_F(RegistryServerCodecWarningTest, CreateObserverBadObserver) {
   auto [observer_client_end, observer_server_end] =
       CreateNaturalAsyncClientOrDie<fuchsia_audio_device::Observer>();
   auto observer_client = fidl::Client<fuchsia_audio_device::Observer>(
-      fidl::ClientEnd<fuchsia_audio_device::Observer>(std::move(observer_client_end)), dispatcher(),
-      observer_fidl_handler_.get());
+      std::move(observer_client_end), dispatcher(), observer_fidl_handler_.get());
   received_callback = false;
 
   registry->client()
@@ -271,10 +265,9 @@ TEST_F(RegistryServerCodecWarningTest, CreateObserverBadObserver) {
 // If the required 'observer_server' field is not set, we should fail.
 TEST_F(RegistryServerStreamConfigWarningTest, CreateObserverMissingObserver) {
   auto fake_driver = CreateFakeStreamConfigOutput();
-  adr_service_->AddDevice(Device::Create(
-      adr_service_, dispatcher(), "Test output name", fuchsia_audio_device::DeviceType::kOutput,
-      DriverClient::WithStreamConfig(
-          fidl::ClientEnd<fuchsia_hardware_audio::StreamConfig>(fake_driver->Enable()))));
+  adr_service_->AddDevice(Device::Create(adr_service_, dispatcher(), "Test output name",
+                                         fuchsia_audio_device::DeviceType::kOutput,
+                                         DriverClient::WithStreamConfig(fake_driver->Enable())));
 
   RunLoopUntilIdle();
   ASSERT_EQ(adr_service_->devices().size(), 1u);
@@ -297,8 +290,7 @@ TEST_F(RegistryServerStreamConfigWarningTest, CreateObserverMissingObserver) {
   auto [observer_client_end, observer_server_end] =
       CreateNaturalAsyncClientOrDie<fuchsia_audio_device::Observer>();
   auto observer_client = fidl::Client<fuchsia_audio_device::Observer>(
-      fidl::ClientEnd<fuchsia_audio_device::Observer>(std::move(observer_client_end)), dispatcher(),
-      observer_fidl_handler_.get());
+      std::move(observer_client_end), dispatcher(), observer_fidl_handler_.get());
   received_callback = false;
 
   registry->client()
@@ -322,10 +314,9 @@ TEST_F(RegistryServerStreamConfigWarningTest, CreateObserverMissingObserver) {
 // If 'observer_server' is not set to a valid handle, we should fail.
 TEST_F(RegistryServerStreamConfigWarningTest, CreateObserverBadObserver) {
   auto fake_driver = CreateFakeStreamConfigInput();
-  adr_service_->AddDevice(Device::Create(
-      adr_service_, dispatcher(), "Test input name", fuchsia_audio_device::DeviceType::kInput,
-      DriverClient::WithStreamConfig(
-          fidl::ClientEnd<fuchsia_hardware_audio::StreamConfig>(fake_driver->Enable()))));
+  adr_service_->AddDevice(Device::Create(adr_service_, dispatcher(), "Test input name",
+                                         fuchsia_audio_device::DeviceType::kInput,
+                                         DriverClient::WithStreamConfig(fake_driver->Enable())));
 
   RunLoopUntilIdle();
   ASSERT_EQ(adr_service_->devices().size(), 1u);
@@ -348,8 +339,7 @@ TEST_F(RegistryServerStreamConfigWarningTest, CreateObserverBadObserver) {
   auto [observer_client_end, observer_server_end] =
       CreateNaturalAsyncClientOrDie<fuchsia_audio_device::Observer>();
   auto observer_client = fidl::Client<fuchsia_audio_device::Observer>(
-      fidl::ClientEnd<fuchsia_audio_device::Observer>(std::move(observer_client_end)), dispatcher(),
-      observer_fidl_handler_.get());
+      std::move(observer_client_end), dispatcher(), observer_fidl_handler_.get());
   received_callback = false;
 
   registry->client()

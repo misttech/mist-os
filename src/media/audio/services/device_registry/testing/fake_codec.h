@@ -79,7 +79,7 @@ class FakeCodec : public fidl::testing::TestBase<CodecConnector>,
 
   // This returns a fidl::client_end<Codec>. The driver will not start serving requests until
   // Enable is called, which is why the construction/Enable separation exists.
-  zx::channel Enable();
+  fidl::ClientEnd<fuchsia_hardware_audio::Codec> Enable();
   void DropCodec();
 
   async_dispatcher_t* dispatcher() { return dispatcher_; }

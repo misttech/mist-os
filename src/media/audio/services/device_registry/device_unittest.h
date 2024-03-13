@@ -253,11 +253,10 @@ class CodecTest : public DeviceTestBase {
   std::shared_ptr<Device> InitializeDeviceForFakeCodec(const std::unique_ptr<FakeCodec>& driver) {
     auto codec_client_end = driver->Enable();
     EXPECT_TRUE(codec_client_end.is_valid());
-    auto device = Device::Create(
-        std::weak_ptr<FakeDevicePresenceWatcher>(device_presence_watcher()), dispatcher(),
-        "Device name", fuchsia_audio_device::DeviceType::kCodec,
-        fuchsia_audio_device::DriverClient::WithCodec(
-            fidl::ClientEnd<fuchsia_hardware_audio::Codec>(std::move(codec_client_end))));
+    auto device =
+        Device::Create(std::weak_ptr<FakeDevicePresenceWatcher>(device_presence_watcher()),
+                       dispatcher(), "Device name", fuchsia_audio_device::DeviceType::kCodec,
+                       fuchsia_audio_device::DriverClient::WithCodec(std::move(codec_client_end)));
 
     RunLoopUntilIdle();
     EXPECT_FALSE(device->state_ == Device::State::DeviceInitializing) << "Device is initializing";
@@ -267,10 +266,10 @@ class CodecTest : public DeviceTestBase {
 
  private:
   std::unique_ptr<FakeCodec> MakeFakeCodec(std::optional<bool> is_input = false) {
-    zx::channel server_end, client_end;
-    EXPECT_EQ(ZX_OK, zx::channel::create(0, &server_end, &client_end));
-    auto fake_codec =
-        std::make_unique<FakeCodec>(std::move(server_end), std::move(client_end), dispatcher());
+    auto codec_endpoints = fidl::CreateEndpoints<fuchsia_hardware_audio::Codec>();
+    EXPECT_TRUE(codec_endpoints.is_ok());
+    auto fake_codec = std::make_unique<FakeCodec>(
+        codec_endpoints->server.TakeChannel(), codec_endpoints->client.TakeChannel(), dispatcher());
     fake_codec->set_is_input(is_input);
     return fake_codec;
   }
@@ -300,12 +299,10 @@ class StreamConfigTest : public DeviceTestBase {
     auto device_type = *driver->is_input() ? fuchsia_audio_device::DeviceType::kInput
                                            : fuchsia_audio_device::DeviceType::kOutput;
     auto stream_config_client_end = driver->Enable();
-    auto device =
-        Device::Create(std::weak_ptr<FakeDevicePresenceWatcher>(device_presence_watcher()),
-                       dispatcher(), "Device name", device_type,
-                       fuchsia_audio_device::DriverClient::WithStreamConfig(
-                           fidl::ClientEnd<fuchsia_hardware_audio::StreamConfig>(
-                               std::move(stream_config_client_end))));
+    auto device = Device::Create(
+        std::weak_ptr<FakeDevicePresenceWatcher>(device_presence_watcher()), dispatcher(),
+        "Device name", device_type,
+        fuchsia_audio_device::DriverClient::WithStreamConfig(std::move(stream_config_client_end)));
 
     RunLoopUntilIdle();
     EXPECT_FALSE(device->state_ == Device::State::DeviceInitializing);
@@ -435,10 +432,11 @@ class StreamConfigTest : public DeviceTestBase {
 
  private:
   std::unique_ptr<FakeStreamConfig> MakeFakeStreamConfig(bool is_input = false) {
-    zx::channel server_end, client_end;
-    EXPECT_EQ(ZX_OK, zx::channel::create(0, &server_end, &client_end));
-    auto fake_stream = std::make_unique<FakeStreamConfig>(std::move(server_end),
-                                                          std::move(client_end), dispatcher());
+    auto stream_config_endpoints = fidl::CreateEndpoints<fuchsia_hardware_audio::StreamConfig>();
+    EXPECT_TRUE(stream_config_endpoints.is_ok());
+    auto fake_stream = std::make_unique<FakeStreamConfig>(
+        stream_config_endpoints->server.TakeChannel(),
+        stream_config_endpoints->client.TakeChannel(), dispatcher());
     fake_stream->set_is_input(is_input);
     return fake_stream;
   }

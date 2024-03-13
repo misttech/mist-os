@@ -38,7 +38,7 @@ class FakeStreamConfig : public fuchsia::hardware::audio::StreamConfig,
 
   // This returns a fidl::client_end<StreamConfig). The driver will not start serving requests until
   // Enable is called, which is why the construction/Enable separation exists.
-  zx::channel Enable();
+  fidl::ClientEnd<fuchsia_hardware_audio::StreamConfig> Enable();
   fzl::VmoMapper AllocateRingBuffer(size_t size);
   void DropStreamConfig();
   void DropRingBuffer();

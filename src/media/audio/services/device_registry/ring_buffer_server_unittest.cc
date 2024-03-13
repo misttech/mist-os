@@ -52,10 +52,9 @@ class RingBufferServerTest : public AudioDeviceRegistryServerTestBase,
 
 void RingBufferServerTest::EnableDriverAndAddDevice(
     const std::unique_ptr<FakeStreamConfig>& fake_driver) {
-  adr_service_->AddDevice(Device::Create(
-      adr_service_, dispatcher(), "Test output name", fuchsia_audio_device::DeviceType::kOutput,
-      DriverClient::WithStreamConfig(
-          fidl::ClientEnd<fuchsia_hardware_audio::StreamConfig>(fake_driver->Enable()))));
+  adr_service_->AddDevice(Device::Create(adr_service_, dispatcher(), "Test output name",
+                                         fuchsia_audio_device::DeviceType::kOutput,
+                                         DriverClient::WithStreamConfig(fake_driver->Enable())));
   RunLoopUntilIdle();
 }
 
@@ -81,8 +80,7 @@ RingBufferServerTest::CreateRingBufferClient() {
   auto [ring_buffer_client_end, ring_buffer_server_end] =
       CreateNaturalAsyncClientOrDie<fuchsia_audio_device::RingBuffer>();
   auto ring_buffer_client = fidl::Client<fuchsia_audio_device::RingBuffer>(
-      fidl::ClientEnd<fuchsia_audio_device::RingBuffer>(std::move(ring_buffer_client_end)),
-      dispatcher(), this);
+      std::move(ring_buffer_client_end), dispatcher(), this);
   return std::make_pair(std::move(ring_buffer_client), std::move(ring_buffer_server_end));
 }
 

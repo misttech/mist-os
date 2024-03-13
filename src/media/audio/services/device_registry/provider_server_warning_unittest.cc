@@ -33,8 +33,7 @@ TEST_F(ProviderServerCodecWarningTest, MissingDeviceName) {
   fuchsia_audio_device::ProviderAddDeviceRequest request;
   // missing .device_name
   request.device_type(fuchsia_audio_device::DeviceType::kCodec);
-  request.driver_client(fuchsia_audio_device::DriverClient::WithCodec(
-      fidl::ClientEnd<fuchsia_hardware_audio::Codec>(fake_driver->Enable())));
+  request.driver_client(fuchsia_audio_device::DriverClient::WithCodec(fake_driver->Enable()));
 
   provider->client()
       ->AddDevice(std::move(request))
@@ -63,8 +62,7 @@ TEST_F(ProviderServerCodecWarningTest, EmptyDeviceName) {
       ->AddDevice({{
           .device_name = "",  // empty .device_name
           .device_type = fuchsia_audio_device::DeviceType::kCodec,
-          .driver_client = fuchsia_audio_device::DriverClient::WithCodec(
-              fidl::ClientEnd<fuchsia_hardware_audio::Codec>(fake_driver->Enable())),
+          .driver_client = fuchsia_audio_device::DriverClient::WithCodec(fake_driver->Enable()),
       }})
       .Then([&received_callback](fidl::Result<Provider::AddDevice>& result) {
         received_callback = true;
@@ -91,8 +89,7 @@ TEST_F(ProviderServerCodecWarningTest, MissingDeviceType) {
       ->AddDevice({{
           .device_name = "Test device name",
           // missing .device_type
-          .driver_client = fuchsia_audio_device::DriverClient::WithCodec(
-              fidl::ClientEnd<fuchsia_hardware_audio::Codec>(fake_driver->Enable())),
+          .driver_client = fuchsia_audio_device::DriverClient::WithCodec(fake_driver->Enable()),
       }})
       .Then([&received_callback](fidl::Result<Provider::AddDevice>& result) {
         received_callback = true;
@@ -164,7 +161,7 @@ TEST_F(ProviderServerCodecWarningTest, InvalidDriverClient) {
 TEST_F(ProviderServerCodecWarningTest, WrongDriverClient) {
   auto provider = CreateTestProviderServer();
   ASSERT_EQ(ProviderServer::count(), 1u);
-  auto fake_driver = CreateFakeCodecOutput();
+  auto fake_driver = CreateFakeStreamConfigOutput();
   auto received_callback = false;
 
   provider->client()
@@ -172,8 +169,8 @@ TEST_F(ProviderServerCodecWarningTest, WrongDriverClient) {
           .device_name = "Test device name",
           .device_type = fuchsia_audio_device::DeviceType::kCodec,
           // StreamConfig driver_client doesn't match kCodec.
-          .driver_client = fuchsia_audio_device::DriverClient::WithStreamConfig(
-              fidl::ClientEnd<fuchsia_hardware_audio::StreamConfig>(fake_driver->Enable())),
+          .driver_client =
+              fuchsia_audio_device::DriverClient::WithStreamConfig(fake_driver->Enable()),
       }})
       .Then([&received_callback](fidl::Result<Provider::AddDevice>& result) {
         received_callback = true;
@@ -207,7 +204,8 @@ TEST_F(ProviderServerCompositeWarningTest, Unsupported) {
           // Set a Composite device_type and driver_client -- which ADR doesn't yet support.
           .driver_client = fuchsia_audio_device::DriverClient::WithComposite(
               // (as elsewhere, the zx::channel is from FakeStreamConfig, but that's irrelevant)
-              fidl::ClientEnd<fuchsia_hardware_audio::Composite>(fake_driver->Enable())),
+              fidl::ClientEnd<fuchsia_hardware_audio::Composite>(
+                  fake_driver->Enable().TakeChannel())),
       }})
       .Then([&received_callback](fidl::Result<Provider::AddDevice>& result) {
         received_callback = true;
@@ -241,7 +239,7 @@ TEST_F(ProviderServerDaiWarningTest, Unsupported) {
           // Set a Dai device_type and driver_client -- which ADR doesn't yet support.
           .driver_client = fuchsia_audio_device::DriverClient::WithDai(
               // (as elsewhere, the zx::channel is from FakeStreamConfig, but that's irrelevant)
-              fidl::ClientEnd<fuchsia_hardware_audio::Dai>(fake_driver->Enable())),
+              fidl::ClientEnd<fuchsia_hardware_audio::Dai>(fake_driver->Enable().TakeChannel())),
       }})
       .Then([&received_callback](fidl::Result<Provider::AddDevice>& result) {
         received_callback = true;
@@ -271,8 +269,8 @@ TEST_F(ProviderServerStreamConfigWarningTest, MissingDeviceName) {
       ->AddDevice({{
           // missing .device_name
           .device_type = fuchsia_audio_device::DeviceType::kOutput,
-          .driver_client = fuchsia_audio_device::DriverClient::WithStreamConfig(
-              fidl::ClientEnd<fuchsia_hardware_audio::StreamConfig>(fake_driver->Enable())),
+          .driver_client =
+              fuchsia_audio_device::DriverClient::WithStreamConfig(fake_driver->Enable()),
       }})
       .Then([&received_callback](fidl::Result<Provider::AddDevice>& result) {
         received_callback = true;
@@ -299,8 +297,8 @@ TEST_F(ProviderServerStreamConfigWarningTest, EmptyDeviceName) {
       ->AddDevice({{
           .device_name = "",  // empty .device_name
           .device_type = fuchsia_audio_device::DeviceType::kInput,
-          .driver_client = fuchsia_audio_device::DriverClient::WithStreamConfig(
-              fidl::ClientEnd<fuchsia_hardware_audio::StreamConfig>(fake_driver->Enable())),
+          .driver_client =
+              fuchsia_audio_device::DriverClient::WithStreamConfig(fake_driver->Enable()),
       }})
       .Then([&received_callback](fidl::Result<Provider::AddDevice>& result) {
         received_callback = true;
@@ -327,8 +325,8 @@ TEST_F(ProviderServerStreamConfigWarningTest, MissingDeviceType) {
       ->AddDevice({{
           .device_name = "Test device name",
           // missing .device_type
-          .driver_client = fuchsia_audio_device::DriverClient::WithStreamConfig(
-              fidl::ClientEnd<fuchsia_hardware_audio::StreamConfig>(fake_driver->Enable())),
+          .driver_client =
+              fuchsia_audio_device::DriverClient::WithStreamConfig(fake_driver->Enable()),
       }})
       .Then([&received_callback](fidl::Result<Provider::AddDevice>& result) {
         received_callback = true;
@@ -408,8 +406,7 @@ TEST_F(ProviderServerStreamConfigWarningTest, WrongDriverClient) {
           .device_name = "Test device name",
           .device_type = fuchsia_audio_device::DeviceType::kOutput,
           // Codec driver_client doesn't match kOutput.
-          .driver_client = fuchsia_audio_device::DriverClient::WithCodec(
-              fidl::ClientEnd<fuchsia_hardware_audio::Codec>(fake_driver->Enable())),
+          .driver_client = fuchsia_audio_device::DriverClient::WithCodec(fake_driver->Enable()),
       }})
       .Then([&received_callback](fidl::Result<Provider::AddDevice>& result) {
         received_callback = true;

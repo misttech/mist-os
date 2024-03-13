@@ -51,10 +51,9 @@ TEST_F(RegistryServerTest, CleanServerShutdown) {
 // Client calls WatchDevicesAdded and is notified.
 TEST_F(RegistryServerCodecTest, DeviceAddThenRegistryCreate) {
   auto fake_driver = CreateFakeCodecOutput();
-  adr_service_->AddDevice(Device::Create(
-      adr_service_, dispatcher(), "Test codec name", fuchsia_audio_device::DeviceType::kCodec,
-      DriverClient::WithCodec(
-          fidl::ClientEnd<fuchsia_hardware_audio::Codec>(fake_driver->Enable()))));
+  adr_service_->AddDevice(Device::Create(adr_service_, dispatcher(), "Test codec name",
+                                         fuchsia_audio_device::DeviceType::kCodec,
+                                         DriverClient::WithCodec(fake_driver->Enable())));
 
   RunLoopUntilIdle();
   ASSERT_EQ(adr_service_->devices().size(), 1u);
@@ -98,10 +97,9 @@ TEST_F(RegistryServerCodecTest, WatchAddsThenDeviceAdd) {
   EXPECT_EQ(adr_service_->devices().size(), 0u);
 
   auto fake_driver = CreateFakeCodecInput();
-  adr_service_->AddDevice(Device::Create(
-      adr_service_, dispatcher(), "Test codec name", fuchsia_audio_device::DeviceType::kCodec,
-      DriverClient::WithCodec(
-          fidl::ClientEnd<fuchsia_hardware_audio::Codec>(fake_driver->Enable()))));
+  adr_service_->AddDevice(Device::Create(adr_service_, dispatcher(), "Test codec name",
+                                         fuchsia_audio_device::DeviceType::kCodec,
+                                         DriverClient::WithCodec(fake_driver->Enable())));
 
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback);
@@ -114,10 +112,9 @@ TEST_F(RegistryServerCodecTest, DeviceAddThenWatchAdds) {
   ASSERT_EQ(RegistryServer::count(), 1u);
   ASSERT_EQ(adr_service_->devices().size(), 0u);
   auto fake_driver = CreateFakeCodecOutput();
-  adr_service_->AddDevice(Device::Create(
-      adr_service_, dispatcher(), "Test codec name", fuchsia_audio_device::DeviceType::kCodec,
-      DriverClient::WithCodec(
-          fidl::ClientEnd<fuchsia_hardware_audio::Codec>(fake_driver->Enable()))));
+  adr_service_->AddDevice(Device::Create(adr_service_, dispatcher(), "Test codec name",
+                                         fuchsia_audio_device::DeviceType::kCodec,
+                                         DriverClient::WithCodec(fake_driver->Enable())));
 
   RunLoopUntilIdle();
   EXPECT_EQ(adr_service_->devices().size(), 1u);
@@ -139,10 +136,9 @@ TEST_F(RegistryServerCodecTest, DeviceAddThenWatchAdds) {
 // Client calls WatchDeviceRemoved, then remove device, then client is notified.
 TEST_F(RegistryServerCodecTest, WatchRemovesThenDeviceRemove) {
   auto fake_driver = CreateFakeCodecInput();
-  adr_service_->AddDevice(Device::Create(
-      adr_service_, dispatcher(), "Test codec name", fuchsia_audio_device::DeviceType::kCodec,
-      DriverClient::WithCodec(
-          fidl::ClientEnd<fuchsia_hardware_audio::Codec>(fake_driver->Enable()))));
+  adr_service_->AddDevice(Device::Create(adr_service_, dispatcher(), "Test codec name",
+                                         fuchsia_audio_device::DeviceType::kCodec,
+                                         DriverClient::WithCodec(fake_driver->Enable())));
 
   RunLoopUntilIdle();
   ASSERT_EQ(adr_service_->devices().size(), 1u);
@@ -192,10 +188,9 @@ TEST_F(RegistryServerCodecTest, WatchRemovesThenDeviceRemove) {
 // Remove device, see ADR remove it, then client calls WatchDeviceRemoved and is notified.
 TEST_F(RegistryServerCodecTest, DeviceRemoveThenWatchRemoves) {
   auto fake_driver = CreateFakeCodecOutput();
-  adr_service_->AddDevice(Device::Create(
-      adr_service_, dispatcher(), "Test codec name", fuchsia_audio_device::DeviceType::kCodec,
-      DriverClient::WithCodec(
-          fidl::ClientEnd<fuchsia_hardware_audio::Codec>(fake_driver->Enable()))));
+  adr_service_->AddDevice(Device::Create(adr_service_, dispatcher(), "Test codec name",
+                                         fuchsia_audio_device::DeviceType::kCodec,
+                                         DriverClient::WithCodec(fake_driver->Enable())));
 
   RunLoopUntilIdle();
   ASSERT_EQ(adr_service_->devices().size(), 1u);
@@ -247,10 +242,9 @@ TEST_F(RegistryServerCodecTest, DeviceAddRemoveThenWatches) {
   auto registry = CreateTestRegistryServer();
   ASSERT_EQ(RegistryServer::count(), 1u);
   auto fake_driver = CreateFakeCodecInput();
-  adr_service_->AddDevice(Device::Create(
-      adr_service_, dispatcher(), "Test codec name", fuchsia_audio_device::DeviceType::kCodec,
-      DriverClient::WithCodec(
-          fidl::ClientEnd<fuchsia_hardware_audio::Codec>(fake_driver->Enable()))));
+  adr_service_->AddDevice(Device::Create(adr_service_, dispatcher(), "Test codec name",
+                                         fuchsia_audio_device::DeviceType::kCodec,
+                                         DriverClient::WithCodec(fake_driver->Enable())));
 
   RunLoopUntilIdle();
   ASSERT_EQ(adr_service_->devices().size(), 1u);
@@ -281,10 +275,9 @@ TEST_F(RegistryServerCodecTest, DeviceRemoveAddThenWatches) {
   auto registry = CreateTestRegistryServer();
   ASSERT_EQ(RegistryServer::count(), 1u);
   auto fake_driver = CreateFakeCodecNoDirection();
-  adr_service_->AddDevice(Device::Create(
-      adr_service_, dispatcher(), "Test codec name", fuchsia_audio_device::DeviceType::kCodec,
-      DriverClient::WithCodec(
-          fidl::ClientEnd<fuchsia_hardware_audio::Codec>(fake_driver->Enable()))));
+  adr_service_->AddDevice(Device::Create(adr_service_, dispatcher(), "Test codec name",
+                                         fuchsia_audio_device::DeviceType::kCodec,
+                                         DriverClient::WithCodec(fake_driver->Enable())));
 
   RunLoopUntilIdle();
   ASSERT_EQ(adr_service_->devices().size(), 1u);
@@ -310,10 +303,9 @@ TEST_F(RegistryServerCodecTest, DeviceRemoveAddThenWatches) {
   RunLoopUntilIdle();
   ASSERT_EQ(adr_service_->devices().size(), 0u);
   fake_driver = CreateFakeCodecNoDirection();
-  adr_service_->AddDevice(Device::Create(
-      adr_service_, dispatcher(), "Test codec name", fuchsia_audio_device::DeviceType::kCodec,
-      DriverClient::WithCodec(
-          fidl::ClientEnd<fuchsia_hardware_audio::Codec>(fake_driver->Enable()))));
+  adr_service_->AddDevice(Device::Create(adr_service_, dispatcher(), "Test codec name",
+                                         fuchsia_audio_device::DeviceType::kCodec,
+                                         DriverClient::WithCodec(fake_driver->Enable())));
 
   RunLoopUntilIdle();
   ASSERT_EQ(adr_service_->devices().size(), 1u);
@@ -360,10 +352,9 @@ TEST_F(RegistryServerCodecTest, DeviceRemoveAddThenWatches) {
 // Client can open an Observer connection on an added Codec device.
 TEST_F(RegistryServerCodecTest, CreateObserver) {
   auto fake_driver = CreateFakeCodecOutput();
-  adr_service_->AddDevice(Device::Create(
-      adr_service_, dispatcher(), "Test codec name", fuchsia_audio_device::DeviceType::kCodec,
-      DriverClient::WithCodec(
-          fidl::ClientEnd<fuchsia_hardware_audio::Codec>(fake_driver->Enable()))));
+  adr_service_->AddDevice(Device::Create(adr_service_, dispatcher(), "Test codec name",
+                                         fuchsia_audio_device::DeviceType::kCodec,
+                                         DriverClient::WithCodec(fake_driver->Enable())));
 
   RunLoopUntilIdle();
   ASSERT_EQ(adr_service_->devices().size(), 1u);
@@ -388,8 +379,7 @@ TEST_F(RegistryServerCodecTest, CreateObserver) {
   auto [observer_client_end, observer_server_end] =
       CreateNaturalAsyncClientOrDie<fuchsia_audio_device::Observer>();
   auto observer_client = fidl::Client<fuchsia_audio_device::Observer>(
-      fidl::ClientEnd<fuchsia_audio_device::Observer>(std::move(observer_client_end)), dispatcher(),
-      observer_fidl_handler_.get());
+      std::move(observer_client_end), dispatcher(), observer_fidl_handler_.get());
   received_callback = false;
 
   registry->client()
@@ -412,10 +402,9 @@ TEST_F(RegistryServerCodecTest, CreateObserver) {
 // Device already exists before the Registry connection is created.
 TEST_F(RegistryServerStreamConfigTest, DeviceAddThenRegistryCreate) {
   auto fake_driver = CreateFakeStreamConfigOutput();
-  adr_service_->AddDevice(Device::Create(
-      adr_service_, dispatcher(), "Test output name", fuchsia_audio_device::DeviceType::kOutput,
-      DriverClient::WithStreamConfig(
-          fidl::ClientEnd<fuchsia_hardware_audio::StreamConfig>(fake_driver->Enable()))));
+  adr_service_->AddDevice(Device::Create(adr_service_, dispatcher(), "Test output name",
+                                         fuchsia_audio_device::DeviceType::kOutput,
+                                         DriverClient::WithStreamConfig(fake_driver->Enable())));
 
   RunLoopUntilIdle();
   ASSERT_EQ(adr_service_->devices().size(), 1u);
@@ -460,10 +449,9 @@ TEST_F(RegistryServerStreamConfigTest, WatchAddsThenDeviceAdd) {
   EXPECT_EQ(adr_service_->devices().size(), 0u);
 
   auto fake_driver = CreateFakeStreamConfigInput();
-  adr_service_->AddDevice(Device::Create(
-      adr_service_, dispatcher(), "Test input name", fuchsia_audio_device::DeviceType::kInput,
-      DriverClient::WithStreamConfig(
-          fidl::ClientEnd<fuchsia_hardware_audio::StreamConfig>(fake_driver->Enable()))));
+  adr_service_->AddDevice(Device::Create(adr_service_, dispatcher(), "Test input name",
+                                         fuchsia_audio_device::DeviceType::kInput,
+                                         DriverClient::WithStreamConfig(fake_driver->Enable())));
 
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback);
@@ -476,10 +464,9 @@ TEST_F(RegistryServerStreamConfigTest, DeviceAddThenWatchAdds) {
   ASSERT_EQ(RegistryServer::count(), 1u);
   ASSERT_EQ(adr_service_->devices().size(), 0u);
   auto fake_driver = CreateFakeStreamConfigOutput();
-  adr_service_->AddDevice(Device::Create(
-      adr_service_, dispatcher(), "Test output name", fuchsia_audio_device::DeviceType::kOutput,
-      DriverClient::WithStreamConfig(
-          fidl::ClientEnd<fuchsia_hardware_audio::StreamConfig>(fake_driver->Enable()))));
+  adr_service_->AddDevice(Device::Create(adr_service_, dispatcher(), "Test output name",
+                                         fuchsia_audio_device::DeviceType::kOutput,
+                                         DriverClient::WithStreamConfig(fake_driver->Enable())));
 
   RunLoopUntilIdle();
   EXPECT_EQ(adr_service_->devices().size(), 1u);
@@ -502,10 +489,9 @@ TEST_F(RegistryServerStreamConfigTest, DeviceAddThenWatchAdds) {
 // Client calls WatchDeviceRemoved, then remove device, then client is notified.
 TEST_F(RegistryServerStreamConfigTest, WatchRemovesThenDeviceRemove) {
   auto fake_driver = CreateFakeStreamConfigInput();
-  adr_service_->AddDevice(Device::Create(
-      adr_service_, dispatcher(), "Test input name", fuchsia_audio_device::DeviceType::kInput,
-      DriverClient::WithStreamConfig(
-          fidl::ClientEnd<fuchsia_hardware_audio::StreamConfig>(fake_driver->Enable()))));
+  adr_service_->AddDevice(Device::Create(adr_service_, dispatcher(), "Test input name",
+                                         fuchsia_audio_device::DeviceType::kInput,
+                                         DriverClient::WithStreamConfig(fake_driver->Enable())));
 
   RunLoopUntilIdle();
   ASSERT_EQ(adr_service_->devices().size(), 1u);
@@ -555,10 +541,9 @@ TEST_F(RegistryServerStreamConfigTest, WatchRemovesThenDeviceRemove) {
 // Remove device, see ADR remove it, then client calls WatchDeviceRemoved and is notified.
 TEST_F(RegistryServerStreamConfigTest, DeviceRemoveThenWatchRemoves) {
   auto fake_driver = CreateFakeStreamConfigOutput();
-  adr_service_->AddDevice(Device::Create(
-      adr_service_, dispatcher(), "Test output name", fuchsia_audio_device::DeviceType::kOutput,
-      DriverClient::WithStreamConfig(
-          fidl::ClientEnd<fuchsia_hardware_audio::StreamConfig>(fake_driver->Enable()))));
+  adr_service_->AddDevice(Device::Create(adr_service_, dispatcher(), "Test output name",
+                                         fuchsia_audio_device::DeviceType::kOutput,
+                                         DriverClient::WithStreamConfig(fake_driver->Enable())));
 
   RunLoopUntilIdle();
   ASSERT_EQ(adr_service_->devices().size(), 1u);
@@ -610,10 +595,9 @@ TEST_F(RegistryServerStreamConfigTest, DeviceAddRemoveThenWatches) {
   auto registry = CreateTestRegistryServer();
   ASSERT_EQ(RegistryServer::count(), 1u);
   auto fake_driver = CreateFakeStreamConfigInput();
-  adr_service_->AddDevice(Device::Create(
-      adr_service_, dispatcher(), "Test input name", fuchsia_audio_device::DeviceType::kInput,
-      DriverClient::WithStreamConfig(
-          fidl::ClientEnd<fuchsia_hardware_audio::StreamConfig>(fake_driver->Enable()))));
+  adr_service_->AddDevice(Device::Create(adr_service_, dispatcher(), "Test input name",
+                                         fuchsia_audio_device::DeviceType::kInput,
+                                         DriverClient::WithStreamConfig(fake_driver->Enable())));
 
   RunLoopUntilIdle();
   ASSERT_EQ(adr_service_->devices().size(), 1u);
@@ -644,10 +628,9 @@ TEST_F(RegistryServerStreamConfigTest, DeviceRemoveAddThenWatches) {
   auto registry = CreateTestRegistryServer();
   ASSERT_EQ(RegistryServer::count(), 1u);
   auto fake_driver = CreateFakeStreamConfigOutput();
-  adr_service_->AddDevice(Device::Create(
-      adr_service_, dispatcher(), "Test output name", fuchsia_audio_device::DeviceType::kOutput,
-      DriverClient::WithStreamConfig(
-          fidl::ClientEnd<fuchsia_hardware_audio::StreamConfig>(fake_driver->Enable()))));
+  adr_service_->AddDevice(Device::Create(adr_service_, dispatcher(), "Test output name",
+                                         fuchsia_audio_device::DeviceType::kOutput,
+                                         DriverClient::WithStreamConfig(fake_driver->Enable())));
 
   RunLoopUntilIdle();
   ASSERT_EQ(adr_service_->devices().size(), 1u);
@@ -673,10 +656,9 @@ TEST_F(RegistryServerStreamConfigTest, DeviceRemoveAddThenWatches) {
   RunLoopUntilIdle();
   ASSERT_EQ(adr_service_->devices().size(), 0u);
   fake_driver = CreateFakeStreamConfigInput();
-  adr_service_->AddDevice(Device::Create(
-      adr_service_, dispatcher(), "Test input name", fuchsia_audio_device::DeviceType::kInput,
-      DriverClient::WithStreamConfig(
-          fidl::ClientEnd<fuchsia_hardware_audio::StreamConfig>(fake_driver->Enable()))));
+  adr_service_->AddDevice(Device::Create(adr_service_, dispatcher(), "Test input name",
+                                         fuchsia_audio_device::DeviceType::kInput,
+                                         DriverClient::WithStreamConfig(fake_driver->Enable())));
 
   RunLoopUntilIdle();
   ASSERT_EQ(adr_service_->devices().size(), 1u);
@@ -723,10 +705,9 @@ TEST_F(RegistryServerStreamConfigTest, DeviceRemoveAddThenWatches) {
 // Client can open an Observer connection on an added Codec device.
 TEST_F(RegistryServerStreamConfigTest, CreateObserver) {
   auto fake_driver = CreateFakeStreamConfigOutput();
-  adr_service_->AddDevice(Device::Create(
-      adr_service_, dispatcher(), "Test output name", fuchsia_audio_device::DeviceType::kOutput,
-      DriverClient::WithStreamConfig(
-          fidl::ClientEnd<fuchsia_hardware_audio::StreamConfig>(fake_driver->Enable()))));
+  adr_service_->AddDevice(Device::Create(adr_service_, dispatcher(), "Test output name",
+                                         fuchsia_audio_device::DeviceType::kOutput,
+                                         DriverClient::WithStreamConfig(fake_driver->Enable())));
 
   RunLoopUntilIdle();
   ASSERT_EQ(adr_service_->devices().size(), 1u);
@@ -751,8 +732,7 @@ TEST_F(RegistryServerStreamConfigTest, CreateObserver) {
   auto [observer_client_end, observer_server_end] =
       CreateNaturalAsyncClientOrDie<fuchsia_audio_device::Observer>();
   auto observer_client = fidl::Client<fuchsia_audio_device::Observer>(
-      fidl::ClientEnd<fuchsia_audio_device::Observer>(std::move(observer_client_end)), dispatcher(),
-      observer_fidl_handler_.get());
+      std::move(observer_client_end), dispatcher(), observer_fidl_handler_.get());
   received_callback = false;
 
   registry->client()

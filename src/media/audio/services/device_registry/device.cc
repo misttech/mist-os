@@ -80,16 +80,13 @@ Device::Device(std::weak_ptr<DevicePresenceWatcher> presence_watcher,
   switch (device_type_) {
     case fuchsia_audio_device::DeviceType::kCodec:
       codec_handler_ = {this, "Codec"};
-      codec_client_ = fidl::Client(
-          fidl::ClientEnd<fuchsia_hardware_audio::Codec>{driver_client_.codec()->TakeChannel()},
-          dispatcher, &codec_handler_);
+      codec_client_ = {driver_client_.codec().take().value(), dispatcher, &codec_handler_};
       break;
     case fuchsia_audio_device::DeviceType::kInput:
     case fuchsia_audio_device::DeviceType::kOutput:
       stream_config_handler_ = {this, "StreamConfig"};
-      stream_config_client_ = {fidl::ClientEnd<fuchsia_hardware_audio::StreamConfig>{
-                                   driver_client_.stream_config()->TakeChannel()},
-                               dispatcher, &stream_config_handler_};
+      stream_config_client_ = {driver_client_.stream_config().take().value(), dispatcher,
+                               &stream_config_handler_};
       ring_buffer_handler_ = {this, "RingBuffer"};
       break;
     case fuchsia_audio_device::DeviceType::kComposite:
@@ -143,14 +140,12 @@ void Device::FidlErrorHandler<fuchsia_hardware_audio::RingBuffer>::on_fidl_error
 template <typename T>
 void Device::FidlErrorHandler<T>::on_fidl_error(fidl::UnbindInfo info) {
   if (!info.is_peer_closed() && !info.is_user_initiated() && !info.is_dispatcher_shutdown()) {
-    ADR_WARN_METHOD() << name_ << " disconnected: " << info.FormatDescription();
-    ;
+    ADR_WARN_METHOD() << name_ << " disconnected: " << info;
     device_->OnError(info.status());
   } else {
     ADR_LOG_METHOD(kLogCodecFidlResponses || kLogStreamConfigFidlResponses || kLogDeviceState ||
                    kLogObjectLifetimes)
-        << name_ << " disconnected: " << info.FormatDescription();
-    ;
+        << name_ << " disconnected: " << info;
   }
   device_->OnRemoval();
 }
@@ -467,9 +462,11 @@ bool Device::LogResultError(const ResultT& result, const char* debug_context) {
       if (result.error_value().framework_error().is_canceled() ||
           result.error_value().framework_error().is_peer_closed()) {
         ADR_LOG_METHOD(kLogCodecFidlResponses || kLogStreamConfigFidlResponses)
-            << debug_context << ": will take no action on " << result.error_value();
+            << debug_context << ": will take no action on "
+            << result.error_value().FormatDescription();
       } else {
-        FX_LOGS(ERROR) << debug_context << " failed: " << result.error_value() << ")";
+        FX_LOGS(ERROR) << debug_context << " failed: " << result.error_value().FormatDescription()
+                       << ")";
         OnError(result.error_value().framework_error().status());
       }
     } else {
@@ -490,7 +487,8 @@ bool Device::LogResultFrameworkError(const ResultT& result, const char* debug_co
   if (result.is_error()) {
     if (result.error_value().is_canceled() || result.error_value().is_peer_closed()) {
       ADR_LOG_METHOD(kLogCodecFidlResponses || kLogStreamConfigFidlResponses)
-          << debug_context << ": will take no action on " << result.error_value();
+          << debug_context << ": will take no action on "
+          << result.error_value().FormatDescription();
     } else {
       FX_LOGS(ERROR) << debug_context << " failed: " << result.error_value().status() << " ("
                      << result.error_value().FormatDescription() << ")";
@@ -1123,7 +1121,8 @@ bool Device::SetGain(fuchsia_hardware_audio::GainState& gain_state) {
     if (status.error_value().is_canceled()) {
       // These indicate that we are already shutting down, so they aren't error conditions.
       ADR_LOG_METHOD(kLogStreamConfigFidlResponses)
-          << "SetGain response will take no action on error " << status.error_value();
+          << "SetGain response will take no action on error "
+          << status.error_value().FormatDescription();
 
       return false;
     }
@@ -1214,7 +1213,8 @@ bool Device::CodecSetDaiFormat(const fuchsia_hardware_audio::DaiFormat& dai_form
         ADR_LOG_OBJECT(kLogCodecFidlResponses) << "Codec/SetDaiFormat: success";
         zx_status_t status = ValidateCodecFormatInfo(result->state());
         if (status != ZX_OK) {
-          FX_LOGS(ERROR) << "Codec/SetDaiFormat error: " << result.error_value();
+          FX_LOGS(ERROR) << "Codec/SetDaiFormat error: "
+                         << result.error_value().FormatDescription();
           OnError(status);
           if (auto notify = GetControlNotify(); notify) {
             notify->DaiFormatNotSet(dai_format, status);
@@ -1450,9 +1450,7 @@ bool Device::ConnectRingBufferFidl(fuchsia_hardware_audio::Format driver_format)
     return false;
   }
 
-  ring_buffer_client_.Bind(
-      fidl::ClientEnd<fuchsia_hardware_audio::RingBuffer>(std::move(endpoints->client)),
-      dispatcher_, &ring_buffer_handler_);
+  ring_buffer_client_.Bind(std::move(endpoints->client), dispatcher_, &ring_buffer_handler_);
 
   std::optional<fuchsia_audio::SampleType> sample_type;
   if (bytes_per_sample == 1 &&
@@ -1513,7 +1511,8 @@ void Device::RetrieveRingBufferProperties() {
         ADR_LOG_OBJECT(kLogRingBufferFidlResponses) << "RingBuffer/GetProperties: success";
         auto status = ValidateRingBufferProperties(result->properties());
         if (status != ZX_OK) {
-          FX_LOGS(ERROR) << "RingBuffer/GetProperties error: " << result.error_value();
+          FX_LOGS(ERROR) << "RingBuffer/GetProperties error: "
+                         << result.error_value().FormatDescription();
           OnError(status);
           return;
         }

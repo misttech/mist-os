@@ -21,9 +21,8 @@ TEST_F(AudioDeviceRegistryServerTest, DeviceInitialization) {
   auto fake_stream_config = CreateFakeStreamConfigOutput();
   auto fake_codec = CreateFakeCodecOutput();
 
-  auto stream_config_client =
-      fidl::ClientEnd<fuchsia_hardware_audio::StreamConfig>(fake_stream_config->Enable());
-  auto codec_client = fidl::ClientEnd<fuchsia_hardware_audio::Codec>(fake_codec->Enable());
+  auto stream_config_client = fake_stream_config->Enable();
+  auto codec_client = fake_codec->Enable();
 
   AddDeviceForDetection(
       "test output", fuchsia_audio_device::DeviceType::kOutput,
@@ -40,9 +39,8 @@ TEST_F(AudioDeviceRegistryServerTest, DeviceRemoval) {
   auto fake_input = CreateFakeStreamConfigInput();
   auto fake_codec = CreateFakeCodecInput();
 
-  auto stream_config_client =
-      fidl::ClientEnd<fuchsia_hardware_audio::StreamConfig>(fake_input->Enable());
-  auto codec_client = fidl::ClientEnd<fuchsia_hardware_audio::Codec>(fake_codec->Enable());
+  auto stream_config_client = fake_input->Enable();
+  auto codec_client = fake_codec->Enable();
 
   AddDeviceForDetection(
       "test input", fuchsia_audio_device::DeviceType::kInput,
@@ -67,7 +65,7 @@ TEST_F(AudioDeviceRegistryServerTest, DeviceRemoval) {
 TEST_F(AudioDeviceRegistryServerTest, FindCodecByTokenId) {
   auto fake_driver = CreateFakeCodecNoDirection();
 
-  auto client = fidl::ClientEnd<fuchsia_hardware_audio::Codec>(fake_driver->Enable());
+  auto client = fake_driver->Enable();
   AddDeviceForDetection("test codec", fuchsia_audio_device::DeviceType::kCodec,
                         fuchsia_audio_device::DriverClient::WithCodec(std::move(client)));
 
@@ -84,7 +82,7 @@ TEST_F(AudioDeviceRegistryServerTest, FindCodecByTokenId) {
 TEST_F(AudioDeviceRegistryServerTest, FindStreamConfigByTokenId) {
   auto fake_driver = CreateFakeStreamConfigInput();
 
-  auto client = fidl::ClientEnd<fuchsia_hardware_audio::StreamConfig>(fake_driver->Enable());
+  auto client = fake_driver->Enable();
   AddDeviceForDetection("test input", fuchsia_audio_device::DeviceType::kInput,
                         fuchsia_audio_device::DriverClient::WithStreamConfig(std::move(client)));
 

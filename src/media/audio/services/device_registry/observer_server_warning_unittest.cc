@@ -46,10 +46,9 @@ class ObserverServerCodecWarningTest : public ObserverServerWarningTest {
   std::unique_ptr<FakeCodec> CreateAndEnableDriverWithDefaults() {
     auto fake_driver = CreateFakeCodecNoDirection();
 
-    adr_service_->AddDevice(Device::Create(
-        adr_service_, dispatcher(), "Test codec name", fuchsia_audio_device::DeviceType::kCodec,
-        DriverClient::WithCodec(
-            fidl::ClientEnd<fuchsia_hardware_audio::Codec>(fake_driver->Enable()))));
+    adr_service_->AddDevice(Device::Create(adr_service_, dispatcher(), "Test codec name",
+                                           fuchsia_audio_device::DeviceType::kCodec,
+                                           DriverClient::WithCodec(fake_driver->Enable())));
     RunLoopUntilIdle();
     return fake_driver;
   }
@@ -60,10 +59,9 @@ class ObserverServerStreamConfigWarningTest : public ObserverServerWarningTest {
   std::unique_ptr<FakeStreamConfig> CreateAndEnableDriverWithDefaults() {
     auto fake_driver = CreateFakeStreamConfigOutput();
 
-    adr_service_->AddDevice(Device::Create(
-        adr_service_, dispatcher(), "Test output name", fuchsia_audio_device::DeviceType::kOutput,
-        DriverClient::WithStreamConfig(
-            fidl::ClientEnd<fuchsia_hardware_audio::StreamConfig>(fake_driver->Enable()))));
+    adr_service_->AddDevice(Device::Create(adr_service_, dispatcher(), "Test output name",
+                                           fuchsia_audio_device::DeviceType::kOutput,
+                                           DriverClient::WithStreamConfig(fake_driver->Enable())));
     RunLoopUntilIdle();
     return fake_driver;
   }

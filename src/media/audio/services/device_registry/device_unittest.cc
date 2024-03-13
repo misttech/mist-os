@@ -613,11 +613,12 @@ TEST_F(StreamConfigTest, DistinctTokenIds) {
   ASSERT_TRUE(InInitializedState(device));
 
   // Set up a second, entirely distinct fake device.
-  zx::channel server_end, client_end;
-  ASSERT_EQ(ZX_OK, zx::channel::create(0, &server_end, &client_end));
+  auto stream_config_endpoints = fidl::CreateEndpoints<fuchsia_hardware_audio::StreamConfig>();
+  ASSERT_TRUE(stream_config_endpoints.is_ok());
 
-  auto fake_driver2 = std::make_unique<FakeStreamConfig>(std::move(server_end),
-                                                         std::move(client_end), dispatcher());
+  auto fake_driver2 = std::make_unique<FakeStreamConfig>(
+      stream_config_endpoints->server.TakeChannel(), stream_config_endpoints->client.TakeChannel(),
+      dispatcher());
   fake_driver2->set_is_input(true);
 
   auto device2 = InitializeDeviceForFakeStreamConfig(fake_driver2);

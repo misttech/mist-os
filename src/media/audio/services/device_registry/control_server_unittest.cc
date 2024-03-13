@@ -48,8 +48,7 @@ class ControlServerTest : public AudioDeviceRegistryServerTestBase {
     auto [control_client_end, control_server_end] =
         CreateNaturalAsyncClientOrDie<fuchsia_audio_device::Control>();
     auto control_client = fidl::Client<fuchsia_audio_device::Control>(
-        fidl::ClientEnd<fuchsia_audio_device::Control>(std::move(control_client_end)), dispatcher(),
-        control_fidl_handler_.get());
+        std::move(control_client_end), dispatcher(), control_fidl_handler_.get());
     bool received_callback = false;
     control_creator_client
         ->Create({{
@@ -74,10 +73,9 @@ class ControlServerCodecTest : public ControlServerTest {
   std::unique_ptr<FakeCodec> CreateAndEnableDriverWithDefaults() {
     auto fake_driver = CreateFakeCodecOutput();
 
-    adr_service_->AddDevice(Device::Create(
-        adr_service_, dispatcher(), "Test codec name", fuchsia_audio_device::DeviceType::kCodec,
-        DriverClient::WithCodec(
-            fidl::ClientEnd<fuchsia_hardware_audio::Codec>(fake_driver->Enable()))));
+    adr_service_->AddDevice(Device::Create(adr_service_, dispatcher(), "Test codec name",
+                                           fuchsia_audio_device::DeviceType::kCodec,
+                                           DriverClient::WithCodec(fake_driver->Enable())));
     RunLoopUntilIdle();
     return fake_driver;
   }
@@ -88,10 +86,9 @@ class ControlServerStreamConfigTest : public ControlServerTest {
   std::unique_ptr<FakeStreamConfig> CreateAndEnableDriverWithDefaults() {
     auto fake_driver = CreateFakeStreamConfigOutput();
 
-    adr_service_->AddDevice(Device::Create(
-        adr_service_, dispatcher(), "Test output name", fuchsia_audio_device::DeviceType::kOutput,
-        DriverClient::WithStreamConfig(
-            fidl::ClientEnd<fuchsia_hardware_audio::StreamConfig>(fake_driver->Enable()))));
+    adr_service_->AddDevice(Device::Create(adr_service_, dispatcher(), "Test output name",
+                                           fuchsia_audio_device::DeviceType::kOutput,
+                                           DriverClient::WithStreamConfig(fake_driver->Enable())));
     RunLoopUntilIdle();
     return fake_driver;
   }
