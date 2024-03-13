@@ -16,18 +16,19 @@
 #include <ddktl/device.h>
 #include <ddktl/fidl.h>
 #include <fake-mmio-reg/fake-mmio-reg.h>
-#include <sdk/lib/inspect/testing/cpp/zxtest/inspect.h>
-#include <zxtest/zxtest.h>
+#include <gtest/gtest.h>
+#include <sdk/lib/inspect/testing/cpp/inspect.h>
 
+#include "lib/inspect/cpp/reader.h"
 #include "src/devices/bus/testing/fake-pdev/fake-pdev.h"
 #include "src/devices/cpu/drivers/aml-cpu/aml-cpu-v1.h"
 #include "src/devices/testing/mock-ddk/mock-device.h"
+#include "src/lib/testing/predicates/status.h"
 
 namespace amlogic_cpu {
 
 using fuchsia_hardware_cpu_ctrl::wire::kMaxDevicePerformanceStates;
 using CpuCtrlClient = fidl::WireSyncClient<fuchsia_hardware_cpu_ctrl::Device>;
-using inspect::InspectTestHelper;
 
 #define MHZ(x) ((x) * 1000000)
 
@@ -115,7 +116,7 @@ class TestClockDevice : public fidl::testing::WireTestBase<fuchsia_hardware_cloc
 
   fidl::ClientEnd<fuchsia_hardware_clock::Clock> Connect() {
     zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_clock::Clock>();
-    EXPECT_OK(endpoints);
+    EXPECT_OK(endpoints.status_value());
     binding_group_.AddBinding(async_get_default_dispatcher(), std::move(endpoints->server), this,
                               fidl::kIgnoreBindingClosure);
     return std::move(endpoints->client);
@@ -146,7 +147,7 @@ class TestPowerDevice : public fidl::WireServer<fuchsia_hardware_power::Device> 
 
   fidl::ClientEnd<fuchsia_hardware_power::Device> Connect() {
     auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_power::Device>();
-    EXPECT_OK(endpoints);
+    EXPECT_OK(endpoints.status_value());
     ConnectRequest(std::move(endpoints->server));
     return std::move(endpoints->client);
   }
@@ -221,23 +222,23 @@ struct IncomingNamespace {
   component::OutgoingDirectory clock_cpu_scaler_outgoing{async_get_default_dispatcher()};
 };
 
-class AmlCpuBindingTest : public zxtest::Test {
+class AmlCpuBindingTest : public testing::Test {
  public:
-  AmlCpuBindingTest() {
+  void SetUp() override {
     ASSERT_OK(incoming_loop_.StartThread("incoming-ns-thread"));
     std::map<uint32_t, fake_pdev::Mmio> mmios;
     mmios[0] = mmio_.mmio();
 
     zx::result pdev_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-    ASSERT_OK(pdev_endpoints);
+    ASSERT_OK(pdev_endpoints.status_value());
     zx::result power_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-    ASSERT_OK(power_endpoints);
+    ASSERT_OK(power_endpoints.status_value());
     zx::result clock_pll_div16_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-    ASSERT_OK(clock_pll_div16_endpoints);
+    ASSERT_OK(clock_pll_div16_endpoints.status_value());
     zx::result clock_cpu_div16_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-    ASSERT_OK(clock_cpu_div16_endpoints);
+    ASSERT_OK(clock_cpu_div16_endpoints.status_value());
     zx::result clock_cpu_scaler_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-    ASSERT_OK(clock_cpu_scaler_endpoints);
+    ASSERT_OK(clock_cpu_scaler_endpoints.status_value());
     incoming_.SyncCall([mmios = std::move(mmios), pdev_server = std::move(pdev_endpoints->server),
                         power_server = std::move(power_endpoints->server),
                         clock_pll_div16_server = std::move(clock_pll_div16_endpoints->server),
@@ -251,27 +252,40 @@ class AmlCpuBindingTest : public zxtest::Test {
                   .pid = PDEV_PID_ASTRO,
               },
       });
-      ASSERT_OK(infra->pdev_outgoing.AddService<fuchsia_hardware_platform_device::Service>(
-          infra->pdev_server.GetInstanceHandler()));
-      ASSERT_OK(infra->pdev_outgoing.Serve(std::move(pdev_server)));
+      ASSERT_OK(infra->pdev_outgoing
+                    .AddService<fuchsia_hardware_platform_device::Service>(
+                        infra->pdev_server.GetInstanceHandler())
+                    .status_value());
+      ASSERT_OK(infra->pdev_outgoing.Serve(std::move(pdev_server)).status_value());
 
       infra->power_server.SetVoltage(0);
       infra->power_server.SetSupportedVoltageRange(0, 0);
-      ASSERT_OK(infra->power_outgoing.AddService<fuchsia_hardware_power::Service>(
-          infra->power_server.GetInstanceHandler()));
-      ASSERT_OK(infra->power_outgoing.Serve(std::move(power_server)));
+      ASSERT_OK(
+          infra->power_outgoing
+              .AddService<fuchsia_hardware_power::Service>(infra->power_server.GetInstanceHandler())
+              .status_value());
+      ASSERT_OK(infra->power_outgoing.Serve(std::move(power_server)).status_value());
 
-      ASSERT_OK(infra->clock_pll_div16_outgoing.AddService<fuchsia_hardware_clock::Service>(
-          infra->clock_pll_div16_server.GetInstanceHandler()));
-      ASSERT_OK(infra->clock_pll_div16_outgoing.Serve(std::move(clock_pll_div16_server)));
+      ASSERT_OK(infra->clock_pll_div16_outgoing
+                    .AddService<fuchsia_hardware_clock::Service>(
+                        infra->clock_pll_div16_server.GetInstanceHandler())
+                    .status_value());
+      ASSERT_OK(
+          infra->clock_pll_div16_outgoing.Serve(std::move(clock_pll_div16_server)).status_value());
 
-      ASSERT_OK(infra->clock_cpu_div16_outgoing.AddService<fuchsia_hardware_clock::Service>(
-          infra->clock_cpu_div16_server.GetInstanceHandler()));
-      ASSERT_OK(infra->clock_cpu_div16_outgoing.Serve(std::move(clock_cpu_div16_server)));
+      ASSERT_OK(infra->clock_cpu_div16_outgoing
+                    .AddService<fuchsia_hardware_clock::Service>(
+                        infra->clock_cpu_div16_server.GetInstanceHandler())
+                    .status_value());
+      ASSERT_OK(
+          infra->clock_cpu_div16_outgoing.Serve(std::move(clock_cpu_div16_server)).status_value());
 
-      ASSERT_OK(infra->clock_cpu_scaler_outgoing.AddService<fuchsia_hardware_clock::Service>(
-          infra->clock_cpu_scaler_server.GetInstanceHandler()));
-      ASSERT_OK(infra->clock_cpu_scaler_outgoing.Serve(std::move(clock_cpu_scaler_server)));
+      ASSERT_OK(infra->clock_cpu_scaler_outgoing
+                    .AddService<fuchsia_hardware_clock::Service>(
+                        infra->clock_cpu_scaler_server.GetInstanceHandler())
+                    .status_value());
+      ASSERT_OK(infra->clock_cpu_scaler_outgoing.Serve(std::move(clock_cpu_scaler_server))
+                    .status_value());
     });
 
     ASSERT_NO_FATAL_FAILURE();
@@ -308,7 +322,7 @@ TEST_F(AmlCpuBindingTest, TrivialBinding) {
                      sizeof(kOperatingPointsMetadata));
 
   ASSERT_OK(CreateV1Domains(nullptr, root_.get()));
-  ASSERT_EQ(root_->child_count(), 1);
+  ASSERT_EQ(root_->child_count(), 1ul);
 }
 
 TEST_F(AmlCpuBindingTest, UnorderedOperatingPoints) {
@@ -325,18 +339,18 @@ TEST_F(AmlCpuBindingTest, UnorderedOperatingPoints) {
                      sizeof(kOperatingPointsMetadata));
 
   ASSERT_OK(CreateV1Domains(nullptr, root_.get()));
-  ASSERT_EQ(root_->child_count(), 1);
+  ASSERT_EQ(root_->child_count(), 1ul);
 
   MockDevice* child = root_->GetLatestChild();
   AmlCpuV1* dev = child->GetDeviceContext<AmlCpuV1>();
 
   uint32_t out_state;
   EXPECT_OK(dev->aml_cpu_for_testing().SetPerformanceStateInternal(0, &out_state));
-  EXPECT_EQ(out_state, 0);
+  EXPECT_EQ(out_state, 0ul);
 
   incoming_.SyncCall([](IncomingNamespace* infra) {
     uint32_t voltage = infra->power_server.voltage();
-    EXPECT_EQ(voltage, 300'000);
+    EXPECT_EQ(voltage, 300'000u);
   });
 }
 
@@ -398,7 +412,7 @@ class AmlCpuTest : public AmlCpuV1 {
   zx::vmo inspect_vmo() { return aml_cpu_for_testing().inspector_.DuplicateVmo(); }
 };
 
-class AmlCpuTestFixture : public InspectTestHelper, public zxtest::Test {
+class AmlCpuTestFixture : public testing::Test {
  public:
   AmlCpuTestFixture()
       : dut_(kTestOperatingPoints, kTestCoreCount),
@@ -531,21 +545,19 @@ TEST_F(AmlCpuTestFixture, TestSetPerformanceState) {
 }
 
 TEST_F(AmlCpuTestFixture, TestSetCpuInfo) {
+  using namespace inspect::testing;
+
   uint32_t test_cpu_version = 0x28200b02;
   dut_.aml_cpu_for_testing().SetCpuInfo(test_cpu_version);
-  ASSERT_NO_FATAL_FAILURE(ReadInspect(dut_.inspect_vmo()));
-  auto* cpu_info = hierarchy().GetByPath({"cpu_info_service"});
+  auto hierarchy = inspect::ReadFromVmo(dut_.inspect_vmo());
+  ASSERT_TRUE(hierarchy.is_ok());
+  auto* cpu_info = hierarchy.value().GetByPath({"cpu_info_service"});
   ASSERT_TRUE(cpu_info);
 
   // cpu_major_revision : 40
-  ASSERT_NO_FATAL_FAILURE(
-      CheckProperty(cpu_info->node(), "cpu_major_revision", inspect::UintPropertyValue(40)));
-  // cpu_minor_revision : 11
-  ASSERT_NO_FATAL_FAILURE(
-      CheckProperty(cpu_info->node(), "cpu_minor_revision", inspect::UintPropertyValue(11)));
-  // cpu_package_id : 2
-  ASSERT_NO_FATAL_FAILURE(
-      CheckProperty(cpu_info->node(), "cpu_package_id", inspect::UintPropertyValue(2)));
+  EXPECT_THAT(*cpu_info, NodeMatches(AllOf(PropertyList(::testing::UnorderedElementsAre(
+                             UintIs("cpu_major_revision", 40), UintIs("cpu_minor_revision", 11),
+                             UintIs("cpu_package_id", 2))))));
 }
 
 TEST_F(AmlCpuTestFixture, TestGetLogicalCoreCount) {

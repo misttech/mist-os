@@ -89,7 +89,7 @@ test("aml-cpu-test-bin") {
     "//sdk/lib/async_patterns/testing/cpp",
     "//sdk/lib/component/outgoing/cpp",
     "//sdk/lib/fidl",
-    "//sdk/lib/inspect/testing/cpp:zxtest",
+    "//sdk/lib/inspect/testing/cpp",
     "//src/devices/bus/lib/device-protocol-pdev",
     "//src/devices/bus/testing/fake-pdev",
     "//src/devices/lib/amlogic",
@@ -98,14 +98,13 @@ test("aml-cpu-test-bin") {
     "//src/devices/testing/mock-ddk",
     "//src/lib/ddk",
     "//src/lib/ddktl",
+    "//src/lib/fxl/test:gtest_main",
+    "//src/lib/testing/predicates",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/fbl",
-    "//zircon/system/ulib/mock-function",
     "//zircon/system/ulib/sync",
-    "//zircon/system/ulib/zircon-internal",
     "//zircon/system/ulib/zx",
-    "//zircon/system/ulib/zxtest",
   ]
 }
 
