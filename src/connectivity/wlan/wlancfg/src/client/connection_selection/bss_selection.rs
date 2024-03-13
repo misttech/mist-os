@@ -15,7 +15,7 @@ use {
     },
     futures::lock::Mutex,
     std::{cmp::Reverse, sync::Arc},
-    tracing::{info, trace},
+    tracing::{error, info},
 };
 
 const LOCAL_ROAM_THRESHOLD_RSSI_2G: f64 = -72.0;
@@ -73,8 +73,11 @@ pub async fn select_bss(
             info!("{}", candidate.to_string_without_pii());
         })
         .filter(|&candidate| {
+            // Note: this check is redundant, because all ScannedCandidates have an authenticator,
+            // and only BSSs with compatibility can have an authenticator. It would be unexpected
+            // to ever hit this branch, unless logic changes elsewhere.
             if !candidate.bss.is_compatible() {
-                trace!("BSS is incompatible, filtering: {}", candidate.to_string_without_pii());
+                error!("BSS is unexpectedly incompatible: {}", candidate.to_string_without_pii());
                 false
             } else {
                 true
