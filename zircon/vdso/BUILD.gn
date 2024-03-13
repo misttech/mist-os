@@ -66,6 +66,7 @@ fidl("zx") {
     "resource.fidl",
     "restricted.fidl",
     "rights.fidl",
+    "sampler.fidl",
     "smc.fidl",
     "socket.fidl",
     "stream.fidl",

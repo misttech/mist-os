@@ -47,6 +47,7 @@ source_set("impl") {
     "profile.cc",
     "resource.cc",
     "restricted.cc",
+    "sampler.cc",
     "socket.cc",
     "stream.cc",
     "system.cc",

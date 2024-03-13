@@ -35,6 +35,7 @@ README_SECTIONS = [
     ("Handles", "handle"),
     ("Objects", "object"),
     ("Threads", "thread"),
+    ("Thread Sampling", "sampler"),
     ("IO Buffers", "iob"),
     ("Processes", "process"),
     ("Jobs", "job"),

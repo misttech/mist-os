@@ -2107,6 +2107,14 @@ multiconst!(u32, [
     ZX_IOMMU_TYPE_INTEL = 1;
 ]);
 
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct zx_sampler_config_t {
+    pub period: zx_duration_t,
+    pub buffer_size: usize,
+    pub iobuffer_discipline: u64,
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
