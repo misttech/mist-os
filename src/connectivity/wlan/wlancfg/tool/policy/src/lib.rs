@@ -281,6 +281,7 @@ pub async fn handle_get_saved_networks(
 ///     <SSIDB_LONGER>:           <state> - <status_if_any>,
 pub async fn handle_listen(
     mut server_stream: wlan_policy::ClientStateUpdatesRequestStream,
+    single_sample: bool,
 ) -> Result<(), Error> {
     let mut last_known_connection_state = None;
     while let Some(update_request) = server_stream.try_next().await? {
@@ -352,6 +353,11 @@ pub async fn handle_listen(
         println!("Update:");
         for update in updates {
             println!("{}", update);
+        }
+
+        // If only the current status is desired, break out and return.
+        if single_sample {
+            break;
         }
     }
     Ok(())
@@ -611,6 +617,7 @@ pub async fn handle_stop_all_aps(
 /// Listens for AP state updates and prints each update that is received.
 pub async fn handle_ap_listen(
     mut server_stream: wlan_policy::AccessPointStateUpdatesRequestStream,
+    single_sample: bool,
 ) -> Result<(), Error> {
     println!(
         "{:32} | {:4} | {:8} | {:12} | {:6} | {:4} | {:7}",
@@ -680,6 +687,11 @@ pub async fn handle_ap_listen(
                 "{:32} | {:4} | {:8} | {:12} | {:6} | {:4} | {:7}",
                 ssid, security_type, state, mode, band, frequency, client_count
             );
+        }
+
+        // If only one sample is desired, break out and return.
+        if single_sample {
+            break;
         }
     }
     Ok(())
@@ -1708,7 +1720,7 @@ mod tests {
         let mut exec = TestExecutor::new();
         let test_values = client_test_setup();
 
-        let fut = handle_listen(test_values.update_stream);
+        let fut = handle_listen(test_values.update_stream, false);
         pin_mut!(fut);
 
         // Listen should stall waiting for updates
@@ -1727,6 +1739,26 @@ mod tests {
 
         // Listener future should continue to run but stall waiting for more updates
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+    }
+
+    /// Tests to ensure that querying client status returns after the first update.
+    #[fuchsia::test]
+    fn test_client_status() {
+        let mut exec = TestExecutor::new();
+        let test_values = client_test_setup();
+
+        let fut = handle_listen(test_values.update_stream, true);
+        pin_mut!(fut);
+
+        // Listen should stall waiting for updates
+        assert!(exec.run_until_stalled(&mut fut).is_pending());
+        let _ = test_values.update_proxy.on_client_state_update(&create_client_state_summary(
+            TEST_SSID,
+            wlan_policy::ConnectionState::Connecting,
+        ));
+
+        // Listener future should complete.
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(Ok(())));
     }
 
     /// Tests the case where an AP is requested to be stopped and the policy service returns an
@@ -1902,7 +1934,7 @@ mod tests {
         let mut exec = TestExecutor::new();
         let test_values = ap_test_setup();
 
-        let fut = handle_ap_listen(test_values.update_stream);
+        let fut = handle_ap_listen(test_values.update_stream, false);
         pin_mut!(fut);
 
         // Listen should stall waiting for updates
@@ -1924,6 +1956,25 @@ mod tests {
         )]);
 
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+    }
+
+    /// Tests that the AP status routine only takes a single update.
+    #[fuchsia::test]
+    fn test_ap_status() {
+        let mut exec = TestExecutor::new();
+        let test_values = ap_test_setup();
+
+        let fut = handle_ap_listen(test_values.update_stream, true);
+        pin_mut!(fut);
+
+        // Listen should stall waiting for updates
+        assert!(exec.run_until_stalled(&mut fut).is_pending());
+        let _ = test_values.update_proxy.on_access_point_state_update(&[create_ap_state_summary(
+            wlan_policy::OperatingState::Starting,
+        )]);
+
+        // The future should complete now that a single update has been processed.
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(Ok(())));
     }
 
     #[fuchsia::test]

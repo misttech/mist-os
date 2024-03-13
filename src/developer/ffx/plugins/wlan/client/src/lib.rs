@@ -65,7 +65,7 @@ async fn handle_client_command(
             donut_lib::print_saved_networks(saved_networks)
         }
         arg_types::ClientSubCommand::Listen(arg_types::Listen {}) => {
-            donut_lib::handle_listen(listener_stream).await
+            donut_lib::handle_listen(listener_stream, false).await
         }
         arg_types::ClientSubCommand::RemoveNetwork(remove_args) => {
             let donut_args = donut_lib::opts::RemoveArgs::from(remove_args);

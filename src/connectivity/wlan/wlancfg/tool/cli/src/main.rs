@@ -101,7 +101,11 @@ async fn do_policy_client_cmd(cmd: opts::PolicyClientCmd) -> Result<(), Error> {
         }
         opts::PolicyClientCmd::Listen => {
             let update_stream = get_listener_stream()?;
-            handle_listen(update_stream).await?;
+            handle_listen(update_stream, false).await?;
+        }
+        opts::PolicyClientCmd::Status => {
+            let update_stream = get_listener_stream()?;
+            handle_listen(update_stream, true).await?;
         }
         opts::PolicyClientCmd::RemoveNetwork(remove_args) => {
             let (client_controller, _) = get_client_controller().await?;
@@ -164,7 +168,11 @@ async fn do_policy_ap_cmd(cmd: opts::PolicyAccessPointCmd) -> Result<(), Error> 
         }
         opts::PolicyAccessPointCmd::Listen => {
             let update_stream = get_ap_listener_stream()?;
-            handle_ap_listen(update_stream).await?
+            handle_ap_listen(update_stream, false).await?
+        }
+        opts::PolicyAccessPointCmd::Status => {
+            let update_stream = get_ap_listener_stream()?;
+            handle_ap_listen(update_stream, true).await?
         }
     }
     Ok(())

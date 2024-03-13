@@ -335,6 +335,8 @@ pub enum PolicyClientCmd {
     DumpConfig,
     #[structopt(name = "restore-config")]
     RestoreConfig { serialized_config: String },
+    #[structopt(name = "status")]
+    Status,
 }
 
 #[derive(StructOpt, Clone, Debug)]
@@ -348,6 +350,8 @@ pub enum PolicyAccessPointCmd {
     StopAllAccessPoints,
     #[structopt(name = "listen")]
     Listen,
+    #[structopt(name = "status")]
+    Status,
 }
 
 #[derive(StructOpt, Clone, Debug)]
