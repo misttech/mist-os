@@ -5,7 +5,7 @@
 #ifndef LIB_DRIVER_COMPAT_CPP_LOGGING_H_
 #define LIB_DRIVER_COMPAT_CPP_LOGGING_H_
 
-#include <sdk/lib/driver/logging/cpp/logger.h>
+#include <lib/driver/logging/cpp/logger.h>
 
 // This library provides an compatibility layer for <lib/ddk/debug.h>.
 // Notable differences:

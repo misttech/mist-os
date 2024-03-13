@@ -35,7 +35,10 @@ sdk_source_set("cpp") {
   ]
 }
 
-source_set("logging") {
+sdk_source_set("logging") {
+  category = "internal"
+  sdk_name = "driver_compat_logging"
+  include_base = "//sdk"
   sources = [
     "logging.cc",
     "logging.h",

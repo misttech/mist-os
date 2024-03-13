@@ -613,6 +613,7 @@ sdk_molecule("platform_libs") {
   deps = [
     ":version_history",
     "//sdk/lib/driver/compat/cpp:cpp_sdk",
+    "//sdk/lib/driver/compat/cpp:logging_sdk",
     "//sdk/lib/driver/devicetree/manager:manager_sdk",
     "//sdk/lib/driver/devicetree/testing:board-test-helper_sdk",
     "//sdk/lib/driver/devicetree/visitors:driver-visitor_sdk",
@@ -627,6 +628,7 @@ sdk_molecule("platform_libs") {
     "//src/devices/block/lib/sdmmc:sdmmc_sdk",
     "//src/devices/lib/log:log_sdk",
     "//src/devices/testing/fake-bti:fake-bti_sdk",
+    "//src/devices/testing/fake-mmio-reg:fake-mmio-reg_sdk",
     "//src/devices/testing/mock-mmio-reg:mock-mmio-reg_sdk",
     "//src/lib/containers/cpp:cpp_sdk",
     "//src/lib/diagnostics/accessor2logger:accessor2logger_sdk",

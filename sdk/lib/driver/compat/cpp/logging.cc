@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <sdk/lib/driver/compat/cpp/logging.h>
+#include <lib/driver/compat/cpp/logging.h>
 
 bool driver_log_severity_enabled_internal(FuchsiaLogSeverity severity) {
   return fdf::Logger::GlobalInstance()->GetSeverity() <= severity;

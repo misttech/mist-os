@@ -37,6 +37,7 @@ cc_library(
         "include/soc/aml-a5/a5-pwm.h",
         "include/soc/aml-common/aml-g12-reset.h",
         "include/soc/aml-common/aml-guid.h",
+        "include/soc/aml-common/aml-i2c.h",
         "include/soc/aml-common/aml-pwm-regs.h",
         "include/soc/aml-common/aml-rawnand.h",
         "include/soc/aml-common/aml-sdmmc.h",
