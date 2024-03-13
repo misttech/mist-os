@@ -123,7 +123,7 @@ impl<D: Destination> std::ops::DerefMut for NamedFileMap<D> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use assembly_util::{Destination, NamedMapKey};
+    use assembly_util::NamedMapKey;
     use serde::{Deserialize, Serialize};
 
     /// Destinations that can be used for testing.

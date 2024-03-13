@@ -12,7 +12,6 @@ rustc_library("driver_manifest") {
   name = "assembly_driver_manifest"
   version = "0.1.0"
   with_unit_tests = true
-  configs += [ "//build/config/rust/lints:allow_unused_imports" ]
   deps = [
     "//src/lib/assembly/config_schema",
     "//src/sys/pkg/lib/fuchsia-pkg",

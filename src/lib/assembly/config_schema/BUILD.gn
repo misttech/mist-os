@@ -30,8 +30,6 @@ rustc_library("config_schema") {
     "ICU_GIT_INFO_JSON_FILE=${_git_info_path}",
   ]
 
-  configs += [ "//build/config/rust/lints:allow_unused_imports" ]
-
   inputs = [ _git_info ]
   deps = [
     "//src/lib/assembly/file_relative_path",

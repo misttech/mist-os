@@ -4,7 +4,6 @@
 
 #![cfg(test)]
 
-use hex;
 use ring::digest;
 
 pub fn hash_data_and_expect(data: &[u8], expected_sha: &str) {

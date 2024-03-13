@@ -149,9 +149,7 @@ impl CompiledPackageDefinition {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::assembly_config::AssemblyConfig;
     use crate::common::{FeatureControl, PackageSet};
-    use crate::image_assembly_config::PartialKernelConfig;
     use crate::platform_config::{BuildType, FeatureSupportLevel};
     use crate::product_config::ProductPackageDetails;
     use assembly_file_relative_path::FileRelativePathBuf;

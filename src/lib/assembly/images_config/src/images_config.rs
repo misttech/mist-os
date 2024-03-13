@@ -512,7 +512,6 @@ impl ImagesConfig {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::convert::TryInto;
     use std::path::PathBuf;
 
     fn test_board_config_fastboot() -> bfc::BoardFilesystemConfig {

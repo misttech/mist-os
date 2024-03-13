@@ -116,7 +116,7 @@ fn path_relative_to_dir(path: impl AsRef<Path>, dir: impl AsRef<Path>) -> Result
 #[cfg(test)]
 mod tests {
     use super::*;
-    use fuchsia_pkg::{BlobInfo, MetaPackage, PackageManifest, PackageManifestBuilder};
+    use fuchsia_pkg::{BlobInfo, MetaPackage, PackageManifestBuilder};
     use tempfile::{NamedTempFile, TempDir};
 
     #[test]

@@ -13,8 +13,6 @@ rustc_library("vbmeta") {
   version = "0.1.0"
   with_unit_tests = true
 
-  configs += [ "//build/config/rust/lints:allow_unused_imports" ]
-
   deps = [
     "//src/lib/mundane",
     "//third_party/modinv",

@@ -11,8 +11,6 @@ rustc_library("platform_configuration") {
   name = "assembly_platform_configuration"
   with_unit_tests = true
 
-  configs += [ "//build/config/rust/lints:allow_unused_imports" ]
-
   sources = [
     "src/common.rs",
     "src/lib.rs",

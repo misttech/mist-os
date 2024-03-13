@@ -12,7 +12,6 @@ rustc_library("config_data") {
   name = "assembly_config_data"
   version = "0.1.0"
   with_unit_tests = true
-  configs += [ "//build/config/rust/lints:allow_unused_imports" ]
   deps = [
     "//src/lib/assembly/util",
     "//src/sys/pkg/lib/fuchsia-pkg",

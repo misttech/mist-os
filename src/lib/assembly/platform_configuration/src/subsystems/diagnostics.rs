@@ -262,7 +262,6 @@ mod tests {
     use super::*;
     use crate::common::ConfigurationBuilderImpl;
     use assembly_config_schema::platform_config::diagnostics_config::SamplerConfig;
-    use assembly_config_schema::BuildType;
     use camino::Utf8PathBuf;
     use serde_json::{json, Number, Value};
     use tempfile::TempDir;

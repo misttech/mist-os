@@ -790,7 +790,6 @@ mod tests {
     use assembly_named_file_map::SourceMerklePair;
     use lazy_static::lazy_static;
     use std::io::Write;
-    use tempfile::TempDir;
     use utf8_path::path_relative_from_current_dir;
 
     lazy_static! {

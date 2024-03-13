@@ -153,7 +153,6 @@ mod tests {
     use assembly_tool::testing::FakeToolProvider;
     use assembly_tool::{ToolCommandLog, ToolProvider};
     use serde_json::json;
-    use std::fs::File;
     use std::io::Write;
     use tempfile::TempDir;
 

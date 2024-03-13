@@ -34,7 +34,6 @@ impl DefineSubsystemConfiguration<GraphicsConfig> for GraphicsSubsystemConfig {
 mod tests {
     use super::*;
     use crate::common::ConfigurationBuilderImpl;
-    use assembly_config_schema::BuildType;
 
     #[test]
     fn test_user_default() {

@@ -12,7 +12,6 @@ rustc_library("images_config") {
   name = "assembly_images_config"
   version = "0.1.0"
   with_unit_tests = true
-  configs += [ "//build/config/rust/lints:allow_unused_imports" ]
   deps = [
     "//src/lib/assembly/file_relative_path",
     "//third_party/rust_crates:anyhow",

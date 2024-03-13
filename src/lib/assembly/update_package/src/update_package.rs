@@ -405,15 +405,13 @@ impl UpdatePackageBuilder {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use assembly_manifest::Image;
     use assembly_partitions_config::Slot as PartitionSlot;
-    use assembly_partitions_config::{BootloaderPartition, Partition, PartitionsConfig};
+    use assembly_partitions_config::{BootloaderPartition, Partition};
     use assembly_tool::testing::{blobfs_side_effect, FakeToolProvider};
-    use assembly_update_packages_manifest::UpdatePackagesManifest;
     use assembly_util::write_json_file;
     use fuchsia_archive::Utf8Reader;
-    use fuchsia_hash::{Hash, HASH_SIZE};
-    use fuchsia_pkg::{PackageManifest, PackagePath};
+    use fuchsia_hash::HASH_SIZE;
+    use fuchsia_pkg::PackagePath;
     use serde_json::json;
     use std::fs::File;
     use std::io::{BufReader, Write};

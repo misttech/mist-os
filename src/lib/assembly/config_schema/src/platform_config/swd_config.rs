@@ -102,7 +102,6 @@ mod tests {
 
     use anyhow::Result;
     use assembly_util as util;
-    use camino::Utf8PathBuf;
     use std::str::FromStr;
 
     #[test]

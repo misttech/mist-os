@@ -40,7 +40,7 @@ impl ComponentIdIndexBuilder {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use component_id_index::{Index, InstanceId};
+    use component_id_index::InstanceId;
     use moniker::{Moniker, MonikerBase};
     use pretty_assertions::assert_eq;
     use std::io::Write;

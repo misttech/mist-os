@@ -12,7 +12,6 @@ rustc_library("subpackage_blobs_package") {
   name = "assembly_subpackage_blobs_package"
   version = "0.1.0"
   with_unit_tests = true
-  configs += [ "//build/config/rust/lints:allow_unused_imports" ]
   deps = [
     "//src/sys/pkg/lib/fuchsia-merkle",
     "//src/sys/pkg/lib/fuchsia-pkg",

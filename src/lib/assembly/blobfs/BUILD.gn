@@ -14,8 +14,6 @@ rustc_library("blobfs") {
   version = "0.1.0"
   with_unit_tests = true
 
-  configs += [ "//build/config/rust/lints:allow_unused_imports" ]
-
   sources = [
     "src/blobfs.rs",
     "src/lib.rs",

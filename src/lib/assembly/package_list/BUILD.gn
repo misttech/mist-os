@@ -12,7 +12,6 @@ rustc_library("package_list") {
   name = "assembly_package_list"
   version = "0.1.0"
   with_unit_tests = true
-  configs += [ "//build/config/rust/lints:allow_unused_imports" ]
   deps = [
     "//src/lib/fuchsia-url",
     "//src/sys/pkg/lib/fuchsia-hash",

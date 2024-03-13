@@ -64,10 +64,8 @@ impl BlobSizeCalculator {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use assembly_images_config::BlobfsLayout;
     use assembly_tool::testing::FakeToolProvider;
     use assembly_util::write_json_file;
-    use camino::Utf8Path;
     use serde_json::json;
     use std::path::Path;
     use std::str::FromStr;

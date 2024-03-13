@@ -117,7 +117,6 @@ pub struct SubpackageBlobsPackageBuildResults {
 mod tests {
     use super::*;
     use fuchsia_archive::Utf8Reader;
-    use fuchsia_pkg::PackageBuilder;
     use pretty_assertions::assert_eq;
     use std::fs::File;
     use tempfile::TempDir;

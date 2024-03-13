@@ -13,8 +13,6 @@ rustc_library("named_file_map") {
   version = "0.1.0"
   with_unit_tests = true
 
-  configs += [ "//build/config/rust/lints:allow_unused_imports" ]
-
   deps = [
     "//src/lib/assembly/util",
     "//src/lib/utf8_path",

@@ -12,7 +12,6 @@ rustc_library("fxfs") {
   name = "assembly_fxfs"
   version = "0.1.0"
   with_unit_tests = true
-  configs += [ "//build/config/rust/lints:allow_unused_imports" ]
   deps = [
     "//src/lib/assembly/blobfs",
     "//src/lib/assembly/util",

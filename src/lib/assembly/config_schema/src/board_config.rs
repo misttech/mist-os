@@ -134,7 +134,6 @@ pub struct BoardProvidedConfig {
 #[cfg(test)]
 mod test {
     use super::*;
-    use assembly_file_relative_path::SupportsFileRelativePaths;
     use camino::Utf8PathBuf;
 
     #[test]

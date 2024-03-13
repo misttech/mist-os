@@ -100,7 +100,6 @@ impl ShellCommandsBuilder {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use anyhow::Result;
     use std::fs;
     use tempfile::TempDir;
 

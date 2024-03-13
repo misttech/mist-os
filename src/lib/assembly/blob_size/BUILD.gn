@@ -11,7 +11,6 @@ rustc_library("blob_size") {
   edition = "2021"
   name = "assembly_blob_size"
   with_unit_tests = true
-  configs += [ "//build/config/rust/lints:allow_unused_imports" ]
   deps = [
     "//src/lib/assembly/blobfs",
     "//src/lib/assembly/images_config",

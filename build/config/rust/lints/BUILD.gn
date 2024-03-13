@@ -130,8 +130,5 @@ config("allow_unused_imports") {
   #    --all=//build/config/rust/lints:deny_unused_imports \
   #    --allow=//build/config/rust/lints:allow_unused_imports \
   #    --ignore-suffix=_rust  # FIDL bindings use the _rust suffix
-  visibility = [
-    "//src/lib/assembly/*",
-    "//vendor/*",
-  ]
+  visibility = [ "//vendor/*" ]
 }

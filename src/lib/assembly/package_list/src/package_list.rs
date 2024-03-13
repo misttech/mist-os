@@ -209,8 +209,7 @@ impl PartialEq<PackageList> for Vec<(String, Hash)> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use fuchsia_pkg::{BlobInfo, MetaPackage, PackageManifest, PackageManifestBuilder};
-    use std::path::Path;
+    use fuchsia_pkg::{BlobInfo, MetaPackage, PackageManifestBuilder};
 
     #[test]
     fn package_list() {

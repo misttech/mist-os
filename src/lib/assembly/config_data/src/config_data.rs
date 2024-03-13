@@ -79,7 +79,6 @@ impl ConfigDataBuilder {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use camino::Utf8Path;
     use fuchsia_pkg::PackageManifest;
     use std::fs::File;
     use tempfile::{NamedTempFile, TempDir};

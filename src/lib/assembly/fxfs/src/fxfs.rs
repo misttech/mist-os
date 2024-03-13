@@ -121,10 +121,8 @@ pub struct BlobJsonEntry {
 mod tests {
     use {
         super::*,
-        camino::Utf8Path,
         fuchsia_merkle::MerkleTree,
-        fuchsia_pkg::{BlobInfo, MetaPackage, PackageManifest, PackageManifestBuilder},
-        std::fs::File,
+        fuchsia_pkg::{BlobInfo, MetaPackage, PackageManifestBuilder},
         std::io::Write as _,
         std::path::Path,
         tempfile::TempDir,

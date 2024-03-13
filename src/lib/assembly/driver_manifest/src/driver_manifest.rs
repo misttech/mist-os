@@ -85,7 +85,7 @@ impl DriverManifestBuilder {
 mod tests {
     use super::*;
     use assembly_test_util::generate_test_manifest;
-    use camino::{Utf8Path, Utf8PathBuf};
+    use camino::Utf8PathBuf;
     use std::fs;
     use std::io::Write;
     use tempfile::TempDir;
