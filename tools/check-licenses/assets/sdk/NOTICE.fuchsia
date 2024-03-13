@@ -19282,8 +19282,8 @@ socket2-0.4.4
 syn-0.15.26
 syn-1.0.98
 tempfile-3.2.0
-thiserror-1.0.23
-thiserror-impl-1.0.23
+thiserror-1.0.57
+thiserror-impl-1.0.57
 thread_local-1.0.1
 time-0.1.43
 typed-builder-0.10.0
@@ -19919,7 +19919,7 @@ limitations under the License.
 
 ================================================================================
 
-thiserror-impl-1.0.23
+thiserror-impl-1.0.57
 ---------------------------------
 
 Apache License
@@ -23231,7 +23231,7 @@ limitations under the License.
 
 ================================================================================
 
-thiserror-1.0.23
+thiserror-1.0.57
 ---------------------------------
 
 Apache License
@@ -47633,8 +47633,8 @@ serde_json-1.0.87
 syn-0.15.26
 syn-1.0.98
 syn-2.0.16
-thiserror-1.0.23
-thiserror-impl-1.0.23
+thiserror-1.0.57
+thiserror-impl-1.0.57
 typed-builder-0.10.0
 unicode-ident-1.0.1
 waker-fn-1.1.0
@@ -47956,7 +47956,7 @@ DEALINGS IN THE SOFTWARE.
 
 ================================================================================
 
-thiserror-impl-1.0.23
+thiserror-impl-1.0.57
 ---------------------------------
 
 Permission is hereby granted, free of charge, to any
@@ -48217,7 +48217,7 @@ DEALINGS IN THE SOFTWARE.
 
 ================================================================================
 
-thiserror-1.0.23
+thiserror-1.0.57
 ---------------------------------
 
 Permission is hereby granted, free of charge, to any

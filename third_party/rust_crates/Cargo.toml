@@ -210,7 +210,7 @@ tuf = { version = "0.3.0-beta11", default-features = false, features = ["hyper"]
 termion = "1.5.3"
 test-case = "3.2.1"
 textwrap = "0.11.0"
-thiserror = "1.0.23"
+thiserror = "1.0.57"
 tokio-rustls = "0.22.0"
 toml = "0.5"
 toml_edit = "0.2.1"
@@ -792,6 +792,9 @@ rustflags = []
 rustflags = []
 
 [gn.package.syn."1.0.98"]
+# Has build script but no config needed.
+
+[gn.package.thiserror."1.0.57"]
 # Has build script but no config needed.
 
 # Not actually used in the gn build at all, just for the rules_rust bazel rules.
