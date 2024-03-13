@@ -47,6 +47,7 @@
 
                 // TODO(https://fxbug.dev/328412818)
                 "OverlayFsTest.CanChmodAsExecutable",
+                "OverlayFs/FsMountTest.CantBypassDirectoryPermissions/0",
             ],
         },
     ],

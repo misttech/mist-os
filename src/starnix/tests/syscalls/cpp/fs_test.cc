@@ -5,6 +5,7 @@
 #include <dirent.h>
 #include <fcntl.h>
 #include <sys/mman.h>
+#include <sys/mount.h>
 #include <sys/syscall.h>
 #include <sys/types.h>
 #include <sys/uio.h>
@@ -13,12 +14,14 @@
 #include <algorithm>
 #include <climits>
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <vector>
 
 #include <gtest/gtest.h>
 #include <linux/capability.h>
 
+#include "src/lib/fxl/strings/string_printf.h"
 #include "src/starnix/tests/syscalls/cpp/test_helper.h"
 
 namespace {
@@ -202,6 +205,11 @@ constexpr uid_t kNonOwnerUid = 65533;
 constexpr gid_t kOwnerGid = 65534;
 constexpr gid_t kNonOwnerGid = 65533;
 
+constexpr uid_t kUser1Uid = 65532;
+constexpr uid_t kUser2Uid = 65531;
+constexpr gid_t kUser1Gid = 65532;
+constexpr gid_t kUser2Gid = 65531;
+
 class UtimensatTest : public ::testing::Test {
  protected:
   void SetUp() {
@@ -248,6 +256,15 @@ void unset_capability(int cap) {
   __user_cap_data_struct caps[_LINUX_CAPABILITY_U32S_3];
   SAFE_SYSCALL(syscall(SYS_capget, &header, &caps));
   caps[CAP_TO_INDEX(cap)].effective &= ~CAP_TO_MASK(cap);
+  SAFE_SYSCALL(syscall(SYS_capset, &header, &caps));
+}
+
+// Drops all capabilities from the effective, permitted and inheritable sets.
+void drop_all_capabilities(void) {
+  __user_cap_header_struct header;
+  memset(&header, 0, sizeof(header));
+  header.version = _LINUX_CAPABILITY_VERSION_3;
+  __user_cap_data_struct caps[_LINUX_CAPABILITY_U32S_3] = {{0}};
   SAFE_SYSCALL(syscall(SYS_capset, &header, &caps));
 }
 
@@ -427,4 +444,108 @@ TEST_F(UtimensatTest, ReturnsENOENTOnEmptyPath) {
   });
   EXPECT_TRUE(helper.WaitForChildren());
 }
+
+std::optional<std::string> MountOverlayFs(const std::string &temp_dir) {
+  EXPECT_FALSE(temp_dir.empty());
+
+  std::string overlay = temp_dir + "/overlay";
+  EXPECT_THAT(mkdir(overlay.c_str(), S_IRWXU), SyscallSucceeds());
+
+  std::string lower = temp_dir + "/lower";
+  EXPECT_THAT(mkdir(lower.c_str(), S_IRWXU), SyscallSucceeds());
+
+  std::string upper = temp_dir + "/upper";
+  EXPECT_THAT(mkdir(upper.c_str(), S_IRWXU), SyscallSucceeds());
+
+  std::string work = temp_dir + "/work";
+  EXPECT_THAT(mkdir(work.c_str(), S_IRWXU), SyscallSucceeds());
+
+  std::string options = fxl::StringPrintf("lowerdir=%s,upperdir=%s,workdir=%s", lower.c_str(),
+                                          upper.c_str(), work.c_str());
+
+  int res = mount(nullptr, overlay.c_str(), "overlay", 0, options.c_str());
+  EXPECT_EQ(res, 0) << "mount: " << std::strerror(errno);
+
+  if (res != 0) {
+    return std::nullopt;
+  }
+
+  return overlay;
+}
+
+std::optional<std::string> MountTmpFs(const std::string &temp_dir) {
+  std::string temp = temp_dir + "/tmp";
+  EXPECT_THAT(mkdir(temp.c_str(), S_IRWXU), SyscallSucceeds());
+
+  int res = mount(nullptr, temp.c_str(), "tmpfs", 0, "");
+  EXPECT_EQ(res, 0) << "mount: " << std::strerror(errno);
+
+  if (res != 0) {
+    return std::nullopt;
+  }
+
+  return temp;
+}
+
+class FsMountTest
+    : public testing::TestWithParam<std::optional<std::string> (*)(const std::string &)> {
+ protected:
+  void SetUp() override {
+    if (!test_helper::HasSysAdmin()) {
+      GTEST_SKIP() << "Not running with sysadmin capabilities, skipping suite.";
+    }
+    auto mounter = GetParam();
+    auto mounted = mounter(temp_dir_.path());
+    ASSERT_TRUE(mounted.has_value()) << "failed to mount fs";
+    mount_path_ = mounted.value();
+
+    // Directory Permissions: owner can do everything, user and other can search.
+    constexpr int kDirPerms = S_IRWXU | S_IXGRP | S_IXOTH;
+
+    ASSERT_THAT(chmod(mount_path_.c_str(), kDirPerms), SyscallSucceeds());
+    ASSERT_THAT(chmod(temp_dir_.path().c_str(), kDirPerms), SyscallSucceeds());
+  }
+
+  test_helper::ScopedTempDir temp_dir_;
+  std::string mount_path_;
+};
+
+INSTANTIATE_TEST_SUITE_P(TmpFs, FsMountTest, ::testing::Values(MountTmpFs));
+INSTANTIATE_TEST_SUITE_P(OverlayFs, FsMountTest, ::testing::Values(MountOverlayFs));
+
+TEST_P(FsMountTest, CantBypassDirectoryPermissions) {
+  std::string user1_folder = mount_path_ + "/user1";
+  ASSERT_THAT(mkdir(user1_folder.c_str(), S_IRWXU), SyscallSucceeds());
+  ASSERT_THAT(chown(user1_folder.c_str(), kUser1Uid, kUser1Gid), SyscallSucceeds());
+
+  std::string user2_folder = mount_path_ + "/user2";
+  ASSERT_THAT(mkdir(user2_folder.c_str(), S_IRWXU), SyscallSucceeds());
+  ASSERT_THAT(chown(user2_folder.c_str(), kUser2Uid, kUser2Gid), SyscallSucceeds());
+
+  test_helper::ForkHelper helper;
+  helper.RunInForkedProcess([&] {
+    ASSERT_TRUE(change_ids(kUser2Uid, kUser2Gid));
+    drop_all_capabilities();
+
+    // We should be able to create files in user2's directory.
+    std::string file_path = user2_folder + "/test_file";
+    int fd = open(file_path.c_str(), O_RDWR | O_CREAT | O_EXCL, S_IRUSR | S_IWUSR);
+    EXPECT_NE(fd, -1) << "open " << file_path << ": " << std::strerror(errno);
+    if (fd != -1) {
+      close(fd);
+      EXPECT_EQ(unlink(file_path.c_str()), 0);
+    }
+
+    // We shouldn't be able to create files in user1's directory.
+    file_path = user1_folder + "/test_file";
+    fd = open(file_path.c_str(), O_RDWR | O_CREAT | O_EXCL, S_IRUSR | S_IWUSR);
+    EXPECT_EQ(fd, -1);
+    EXPECT_EQ(errno, EACCES);
+    if (fd != -1) {
+      close(fd);
+      EXPECT_EQ(unlink(file_path.c_str()), 0);
+    }
+  });
+}
+
 }  // namespace
