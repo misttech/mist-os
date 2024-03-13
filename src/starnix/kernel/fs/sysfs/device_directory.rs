@@ -14,7 +14,7 @@ use crate::{
     },
 };
 use starnix_logging::{bug_ref, track_stub};
-use starnix_sync::{FileOpsCore, Locked, WriteOps};
+use starnix_sync::{Locked, ReadOps, WriteOps};
 use starnix_uapi::{
     auth::FsCred, device_type::DeviceType, errno, error, errors::Errno, file_mode::mode,
     open_flags::OpenFlags,
@@ -72,7 +72,7 @@ impl FsNodeOps for DeviceDirectory {
 
     fn create_file_ops(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<'_, ReadOps>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         _flags: OpenFlags,
@@ -155,7 +155,7 @@ impl FsNodeOps for BlockDeviceDirectory {
 
     fn create_file_ops(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<'_, ReadOps>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         _flags: OpenFlags,
@@ -199,7 +199,7 @@ impl FsNodeOps for BlockDeviceQueueDirectory {
 
     fn create_file_ops(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<'_, ReadOps>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         _flags: OpenFlags,
@@ -294,7 +294,7 @@ impl FsNodeOps for ReadAheadKbNode {
 
     fn create_file_ops(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<'_, ReadOps>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         _flags: OpenFlags,

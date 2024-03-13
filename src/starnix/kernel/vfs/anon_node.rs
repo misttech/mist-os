@@ -9,7 +9,7 @@ use crate::{
         FileSystemHandle, FileSystemOps, FileSystemOptions, FsNode, FsNodeInfo, FsNodeOps, FsStr,
     },
 };
-use starnix_sync::{FileOpsCore, Locked};
+use starnix_sync::{Locked, ReadOps};
 use starnix_uapi::{
     error, errors::Errno, file_mode::FileMode, ino_t, open_flags::OpenFlags, statfs,
     vfs::default_statfs, ANON_INODE_FS_MAGIC,
@@ -23,7 +23,7 @@ impl FsNodeOps for Anon {
 
     fn create_file_ops(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<'_, ReadOps>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         _flags: OpenFlags,

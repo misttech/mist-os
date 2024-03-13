@@ -15,7 +15,7 @@ use fidl_fuchsia_hardware_power_statecontrol::{AdminMarker, RebootReason};
 use fuchsia_component::client::connect_to_protocol_sync;
 use fuchsia_zircon as zx;
 use starnix_logging::{log_warn, track_stub};
-use starnix_sync::{FileOpsCore, Locked, WriteOps};
+use starnix_sync::{Locked, ReadOps, WriteOps};
 use starnix_uapi::{
     auth::FsCred, device_type::DeviceType, error, errors::Errno, file_mode::FileMode, off_t,
     open_flags::OpenFlags,
@@ -32,7 +32,7 @@ impl SysRqNode {
 impl FsNodeOps for SysRqNode {
     fn create_file_ops(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<'_, ReadOps>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         _flags: OpenFlags,
@@ -42,7 +42,6 @@ impl FsNodeOps for SysRqNode {
 
     fn mknod(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         _name: &FsStr,
@@ -105,7 +104,7 @@ impl FileOps for SysRqFile {
 
     fn read(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<'_, ReadOps>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         _offset: usize,

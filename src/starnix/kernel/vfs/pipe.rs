@@ -16,7 +16,7 @@ use crate::{
         SpecialNode,
     },
 };
-use starnix_sync::{FileOpsCore, FileOpsIoctl, LockBefore, Locked, Mutex, MutexGuard, WriteOps};
+use starnix_sync::{FileOpsIoctl, LockBefore, Locked, Mutex, MutexGuard, ReadOps, WriteOps};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::{
     auth::CAP_SYS_RESOURCE,
@@ -426,7 +426,7 @@ impl FileOps for PipeFileObject {
 
     fn read(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<'_, ReadOps>,
         file: &FileObject,
         current_task: &CurrentTask,
         offset: usize,
@@ -824,7 +824,7 @@ impl PipeFileObject {
         non_blocking: bool,
     ) -> Result<usize, Errno>
     where
-        L: LockBefore<FileOpsCore>,
+        L: LockBefore<ReadOps>,
     {
         // If both ends are pipes, use `lock_pipes` and `Pipe::splice`.
         assert!(from.downcast_file::<PipeFileObject>().is_none());

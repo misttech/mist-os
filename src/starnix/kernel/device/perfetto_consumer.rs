@@ -22,7 +22,7 @@ use perfetto_consumer_proto::perfetto::protos::{
 };
 use prost::Message;
 use starnix_logging::{log_error, CATEGORY_ATRACE, NAME_PERFETTO_BLOB};
-use starnix_sync::{FileOpsCore, LockBefore, Locked, Unlocked, WriteOps};
+use starnix_sync::{LockBefore, Locked, ReadOps, Unlocked, WriteOps};
 use starnix_uapi::{errno, errors::Errno, open_flags::OpenFlags, vfs::FdEvents};
 use std::{
     collections::VecDeque,
@@ -76,7 +76,7 @@ impl FrameReader {
         current_task: &CurrentTask,
     ) -> Result<IpcFrame, anyhow::Error>
     where
-        L: LockBefore<FileOpsCore>,
+        L: LockBefore<ReadOps>,
     {
         loop {
             if self.next_message_size.is_none() && self.data.len() >= 4 {

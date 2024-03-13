@@ -9,7 +9,7 @@ use crate::{
         SimpleFileNode,
     },
 };
-use starnix_sync::{FileOpsCore, Locked, WriteOps};
+use starnix_sync::{Locked, ReadOps, WriteOps};
 use starnix_uapi::{errno, error, errors::Errno};
 
 /// This file allows user space to put the system into a sleep state while taking into account the
@@ -55,7 +55,7 @@ impl FileOps for PowerWakeupCountFile {
 
     fn read(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<'_, ReadOps>,
         _file: &FileObject,
         current_task: &CurrentTask,
         offset: usize,

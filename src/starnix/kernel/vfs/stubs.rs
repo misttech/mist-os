@@ -7,7 +7,6 @@ use crate::vfs::{
     SimpleFileNode,
 };
 use starnix_logging::BugRef;
-use starnix_sync::{DeviceOpen, Locked};
 use starnix_uapi::{device_type::DeviceType, errors::Errno, open_flags::OpenFlags};
 use std::panic::Location;
 
@@ -35,21 +34,11 @@ impl FileOps for StubEmptyFile {
 pub fn create_stub_device_with_bug(
     message: &'static str,
     bug: BugRef,
-) -> impl Fn(
-    &mut Locked<'_, DeviceOpen>,
-    &CurrentTask,
-    DeviceType,
-    &FsNode,
-    OpenFlags,
-) -> Result<Box<dyn FileOps>, Errno>
-       + Clone {
+) -> impl Fn(&CurrentTask, DeviceType, &FsNode, OpenFlags) -> Result<Box<dyn FileOps>, Errno> + Clone
+{
     // This ensures the caller of this fn is recorded instead of the location of the closure.
     let location = Location::caller();
-    move |_locked: &mut Locked<'_, DeviceOpen>,
-          _current_task: &CurrentTask,
-          _id: DeviceType,
-          _node: &FsNode,
-          _flags: OpenFlags| {
+    move |_current_task: &CurrentTask, _id: DeviceType, _node: &FsNode, _flags: OpenFlags| {
         starnix_logging::__track_stub_inner(bug, message, None, location);
         starnix_uapi::errors::error!(ENODEV)
     }

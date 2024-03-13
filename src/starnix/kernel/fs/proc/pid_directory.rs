@@ -22,7 +22,7 @@ use itertools::Itertools;
 use once_cell::sync::Lazy;
 use regex::Regex;
 use starnix_logging::{bug_ref, track_stub};
-use starnix_sync::{FileOpsCore, Locked, WriteOps};
+use starnix_sync::{Locked, ReadOps, WriteOps};
 use starnix_uapi::{
     auth::CAP_SYS_RESOURCE,
     errno, error,
@@ -69,7 +69,7 @@ impl FsNodeOps for Arc<TaskDirectory> {
 
     fn create_file_ops(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<'_, ReadOps>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         _flags: OpenFlags,
@@ -275,7 +275,7 @@ impl FsNodeOps for FdDirectory {
 
     fn create_file_ops(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<'_, ReadOps>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         _flags: OpenFlags,
@@ -331,7 +331,7 @@ impl FsNodeOps for NsDirectory {
 
     fn create_file_ops(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<'_, ReadOps>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         _flags: OpenFlags,
@@ -460,7 +460,7 @@ impl FsNodeOps for FdInfoDirectory {
 
     fn create_file_ops(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<'_, ReadOps>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         _flags: OpenFlags,
@@ -510,7 +510,7 @@ impl FsNodeOps for TaskListDirectory {
 
     fn create_file_ops(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<'_, ReadOps>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         _flags: OpenFlags,
@@ -767,7 +767,7 @@ impl FileOps for MemFile {
 
     fn read(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<'_, ReadOps>,
         _file: &FileObject,
         current_task: &CurrentTask,
         offset: usize,

@@ -10,7 +10,7 @@ use crate::{
     },
 };
 use starnix_logging::log_info;
-use starnix_sync::{FileOpsCore, FileOpsIoctl, Locked, WriteOps};
+use starnix_sync::{FileOpsIoctl, Locked, ReadOps, WriteOps};
 use starnix_syscalls::{SyscallArg, SyscallResult};
 use starnix_uapi::{errors::Errno, open_flags::OpenFlags};
 
@@ -42,7 +42,7 @@ impl FileOps for SyslogFile {
 
     fn read(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<'_, ReadOps>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         offset: usize,

@@ -17,7 +17,7 @@ use crate::{
 };
 use fuchsia_zircon as zx;
 use starnix_logging::{bug_ref, log_error};
-use starnix_sync::{DeviceOpen, FileOpsCore, LockBefore, Locked, Unlocked};
+use starnix_sync::{Locked, ReadOps};
 use starnix_uapi::{
     auth::FsCred,
     device_type::{DeviceType, ZRAM_MAJOR},
@@ -45,7 +45,6 @@ impl ZramDevice {
 impl DeviceOps for Arc<ZramDevice> {
     fn open(
         &self,
-        _locked: &mut Locked<'_, DeviceOpen>,
         _current_task: &CurrentTask,
         _id: DeviceType,
         _node: &FsNode,
@@ -95,7 +94,7 @@ impl FsNodeOps for ZramDeviceDirectory {
 
     fn create_file_ops(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<'_, ReadOps>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         _flags: OpenFlags,
@@ -177,10 +176,7 @@ impl DynamicFileSource for MmStatFile {
     }
 }
 
-pub fn zram_device_init<L>(locked: &mut Locked<'_, L>, system_task: &CurrentTask)
-where
-    L: LockBefore<FileOpsCore>,
-{
+pub fn zram_device_init(system_task: &CurrentTask) {
     let zram_dev = Arc::new(ZramDevice::default());
     let zram_dev_weak = Arc::downgrade(&zram_dev);
     let kernel = system_task.kernel();
@@ -191,7 +187,6 @@ where
         .expect("Failed to register zram device.");
 
     registry.add_device(
-        locked,
         system_task,
         "zram0".into(),
         DeviceMetadata::new("zram0".into(), DeviceType::new(ZRAM_MAJOR, 0), DeviceMode::Block),

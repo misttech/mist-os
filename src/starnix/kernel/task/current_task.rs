@@ -30,8 +30,8 @@ use fuchsia_zircon::{
 };
 use starnix_logging::{log_error, log_warn, set_zx_name, track_file_not_found, track_stub};
 use starnix_sync::{
-    DeviceOpen, EventWaitGuard, FileOpsCore, LockBefore, Locked, MmDumpable, RwLock,
-    RwLockWriteGuard, TaskRelease, WakeReason,
+    EventWaitGuard, LockBefore, Locked, MmDumpable, ReadOps, RwLock, RwLockWriteGuard, TaskRelease,
+    WakeReason,
 };
 use starnix_syscalls::{decls::Syscall, SyscallResult};
 use starnix_uapi::{
@@ -429,8 +429,7 @@ impl CurrentTask {
         flags: OpenFlags,
     ) -> Result<FileHandle, Errno>
     where
-        L: LockBefore<FileOpsCore>,
-        L: LockBefore<DeviceOpen>,
+        L: LockBefore<ReadOps>,
     {
         if flags.contains(OpenFlags::CREAT) {
             // In order to support OpenFlags::CREAT we would need to take a
@@ -457,18 +456,14 @@ impl CurrentTask {
     /// final path component.
     ///
     /// This returns the resolved node, and a boolean indicating whether the node has been created.
-    fn resolve_open_path<L>(
+    fn resolve_open_path(
         &self,
-        locked: &mut Locked<'_, L>,
         context: &mut LookupContext,
         dir: &NamespaceNode,
         path: &FsStr,
         mode: FileMode,
         flags: OpenFlags,
-    ) -> Result<(NamespaceNode, bool), Errno>
-    where
-        L: LockBefore<FileOpsCore>,
-    {
+    ) -> Result<(NamespaceNode, bool), Errno> {
         context.update_for_path(path);
         let mut parent_content = context.with(SymlinkMode::Follow);
         let (parent, basename) = self.lookup_parent(&mut parent_content, dir, path)?;
@@ -501,14 +496,7 @@ impl CurrentTask {
                     match name.readlink(self)? {
                         SymlinkTarget::Path(path) => {
                             let dir = if path[0] == b'/' { self.fs().root() } else { parent };
-                            self.resolve_open_path(
-                                locked,
-                                context,
-                                &dir,
-                                path.as_ref(),
-                                mode,
-                                flags,
-                            )
+                            self.resolve_open_path(context, &dir, path.as_ref(), mode, flags)
                         }
                         SymlinkTarget::Node(node) => {
                             if context.resolve_flags.contains(ResolveFlags::NO_MAGICLINKS) {
@@ -531,7 +519,6 @@ impl CurrentTask {
                 }
                 Ok((
                     parent.open_create_node(
-                        locked,
                         self,
                         basename,
                         mode.with_type(FileMode::IFREG),
@@ -564,8 +551,7 @@ impl CurrentTask {
         resolve_flags: ResolveFlags,
     ) -> Result<FileHandle, Errno>
     where
-        L: LockBefore<FileOpsCore>,
-        L: LockBefore<DeviceOpen>,
+        L: LockBefore<ReadOps>,
     {
         if path.is_empty() {
             return error!(ENOENT);
@@ -585,8 +571,7 @@ impl CurrentTask {
         mut resolve_flags: ResolveFlags,
     ) -> Result<FileHandle, Errno>
     where
-        L: LockBefore<FileOpsCore>,
-        L: LockBefore<DeviceOpen>,
+        L: LockBefore<ReadOps>,
     {
         // 64-bit kernels force the O_LARGEFILE flag to be on.
         let mut flags = flags | OpenFlags::LARGEFILE;
@@ -636,16 +621,15 @@ impl CurrentTask {
             resolve_flags,
             resolve_base,
         };
-        let (name, created) =
-            match self.resolve_open_path(locked, &mut context, &dir, path, mode, flags) {
-                Ok((n, c)) => (n, c),
-                Err(e) => {
-                    let mut abs_path = dir.path(&self.task);
-                    abs_path.extend(&**path);
-                    track_file_not_found(abs_path);
-                    return Err(e);
-                }
-            };
+        let (name, created) = match self.resolve_open_path(&mut context, &dir, path, mode, flags) {
+            Ok((n, c)) => (n, c),
+            Err(e) => {
+                let mut abs_path = dir.path(&self.task);
+                abs_path.extend(&**path);
+                track_file_not_found(abs_path);
+                return Err(e);
+            }
+        };
 
         let name = if flags.contains(OpenFlags::TMPFILE) {
             name.create_tmpfile(self, mode.with_type(FileMode::IFREG), flags)?
@@ -785,8 +769,7 @@ impl CurrentTask {
         environ: Vec<CString>,
     ) -> Result<(), Errno>
     where
-        L: LockBefore<FileOpsCore>,
-        L: LockBefore<DeviceOpen>,
+        L: LockBefore<ReadOps>,
     {
         // Executable must be a regular file
         if !executable.name.entry.node.is_reg() {

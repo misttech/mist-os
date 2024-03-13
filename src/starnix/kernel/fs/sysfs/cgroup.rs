@@ -15,7 +15,7 @@ use crate::{
         FsNodeInfo, FsNodeOps, FsStr, MemoryDirectoryFile,
     },
 };
-use starnix_sync::{FileOpsCore, Locked, Mutex, WriteOps};
+use starnix_sync::{Locked, Mutex, ReadOps, WriteOps};
 use starnix_uapi::{
     auth::FsCred, device_type::DeviceType, errno, error, errors::Errno, file_mode::FileMode,
     open_flags::OpenFlags, ownership::WeakRef, pid_t,
@@ -52,7 +52,7 @@ impl CgroupDirectoryNode {
 impl FsNodeOps for CgroupDirectoryNode {
     fn create_file_ops(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<'_, ReadOps>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         _flags: OpenFlags,
@@ -80,7 +80,6 @@ impl FsNodeOps for CgroupDirectoryNode {
 
     fn mknod(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
         node: &FsNode,
         current_task: &CurrentTask,
         name: &FsStr,
@@ -144,7 +143,7 @@ impl FsNodeOps for ControlGroupNode {
 
     fn create_file_ops(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<'_, ReadOps>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         _flags: OpenFlags,

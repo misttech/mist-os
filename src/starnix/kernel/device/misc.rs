@@ -12,18 +12,13 @@ use crate::{
     vfs::{create_stub_device_with_bug, fuse::open_fuse_device},
 };
 use starnix_logging::bug_ref;
-use starnix_sync::{FileOpsCore, LockBefore, Locked};
 use starnix_uapi::device_type::DeviceType;
 
-pub fn misc_device_init<L>(locked: &mut Locked<'_, L>, current_task: &CurrentTask)
-where
-    L: LockBefore<FileOpsCore>,
-{
+pub fn misc_device_init(current_task: &CurrentTask) {
     let kernel = current_task.kernel();
     let registry = &kernel.device_registry;
     let misc_class = registry.get_or_create_class("misc".into(), registry.virtual_bus());
     registry.add_and_register_device(
-        locked,
         current_task,
         // TODO(https://fxbug.dev/322365477) consider making this configurable
         "hw_random".into(),
@@ -33,7 +28,6 @@ where
         simple_device_ops::<DevRandom>,
     );
     registry.add_and_register_device(
-        locked,
         current_task,
         "fuse".into(),
         DeviceMetadata::new("fuse".into(), DeviceType::FUSE, DeviceMode::Char),
@@ -42,7 +36,6 @@ where
         open_fuse_device,
     );
     registry.add_and_register_device(
-        locked,
         current_task,
         "device-mapper".into(),
         DeviceMetadata::new("mapper/control".into(), DeviceType::DEVICE_MAPPER, DeviceMode::Char),
@@ -54,7 +47,6 @@ where
         ),
     );
     registry.add_and_register_device(
-        locked,
         current_task,
         "loop-control".into(),
         DeviceMetadata::new("loop-control".into(), DeviceType::LOOP_CONTROL, DeviceMode::Char),
@@ -63,7 +55,6 @@ where
         create_loop_control_device,
     );
     registry.add_and_register_device(
-        locked,
         current_task,
         "uinput".into(),
         DeviceMetadata::new("uinput".into(), DeviceType::UINPUT, DeviceMode::Char),

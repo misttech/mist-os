@@ -17,9 +17,7 @@ use crate::{
 use bitflags::bitflags;
 use fuchsia_zircon::{Vmo, VmoChildOptions};
 use starnix_logging::track_stub;
-use starnix_sync::{
-    DeviceOpen, FileOpsCore, FileOpsIoctl, LockBefore, Locked, Mutex, Unlocked, WriteOps,
-};
+use starnix_sync::{FileOpsIoctl, Locked, Mutex, ReadOps, WriteOps};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::{
     __kernel_old_dev_t,
@@ -133,10 +131,7 @@ struct LoopDevice {
 }
 
 impl LoopDevice {
-    fn new<L>(locked: &mut Locked<'_, L>, current_task: &CurrentTask, minor: u32) -> Arc<Self>
-    where
-        L: LockBefore<FileOpsCore>,
-    {
+    fn new(current_task: &CurrentTask, minor: u32) -> Arc<Self> {
         let kernel = current_task.kernel();
         let registry = &kernel.device_registry;
         let loop_device_name = FsString::from(format!("loop{minor}"));
@@ -145,7 +140,6 @@ impl LoopDevice {
         let device = Arc::new(Self { number: minor, state: Default::default() });
         let device_weak = Arc::<LoopDevice>::downgrade(&device);
         registry.add_device(
-            locked,
             current_task,
             loop_device_name.as_ref(),
             DeviceMetadata::new(
@@ -280,7 +274,7 @@ impl FileOps for LoopDeviceFile {
 
     fn read(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<'_, ReadOps>,
         _file: &FileObject,
         current_task: &CurrentTask,
         offset: usize,
@@ -554,7 +548,7 @@ impl FileOps for LoopDeviceFile {
     }
 }
 
-pub fn loop_device_init(locked: &mut Locked<'_, Unlocked>, current_task: &CurrentTask) {
+pub fn loop_device_init(current_task: &CurrentTask) {
     let kernel = current_task.kernel();
 
     // Device registry.
@@ -564,7 +558,7 @@ pub fn loop_device_init(locked: &mut Locked<'_, Unlocked>, current_task: &Curren
         .expect("loop device register failed.");
 
     // Ensure initial loop devices.
-    kernel.loop_device_registry.ensure_initial_devices(locked, current_task);
+    kernel.loop_device_registry.ensure_initial_devices(current_task);
 }
 
 #[derive(Debug, Default)]
@@ -574,40 +568,26 @@ pub struct LoopDeviceRegistry {
 
 impl LoopDeviceRegistry {
     /// Ensure initial loop devices.
-    fn ensure_initial_devices<L>(&self, locked: &mut Locked<'_, L>, current_task: &CurrentTask)
-    where
-        L: LockBefore<FileOpsCore>,
-    {
+    fn ensure_initial_devices(&self, current_task: &CurrentTask) {
         for minor in 0..8 {
-            self.get_or_create(locked, current_task, minor);
+            self.get_or_create(current_task, minor);
         }
     }
 
-    fn get_or_create<L>(
-        &self,
-        locked: &mut Locked<'_, L>,
-        current_task: &CurrentTask,
-        minor: u32,
-    ) -> Arc<LoopDevice>
-    where
-        L: LockBefore<FileOpsCore>,
-    {
+    fn get_or_create(&self, current_task: &CurrentTask, minor: u32) -> Arc<LoopDevice> {
         self.devices
             .lock()
             .entry(minor)
-            .or_insert_with(|| LoopDevice::new(locked, current_task, minor))
+            .or_insert_with(|| LoopDevice::new(current_task, minor))
             .clone()
     }
 
-    fn find<L>(&self, locked: &mut Locked<'_, L>, current_task: &CurrentTask) -> Result<u32, Errno>
-    where
-        L: LockBefore<FileOpsCore>,
-    {
+    fn find(&self, current_task: &CurrentTask) -> Result<u32, Errno> {
         let mut devices = self.devices.lock();
         for minor in 0..u32::MAX {
             match devices.entry(minor) {
                 Entry::Vacant(e) => {
-                    e.insert(LoopDevice::new(locked, current_task, minor));
+                    e.insert(LoopDevice::new(current_task, minor));
                     return Ok(minor);
                 }
                 Entry::Occupied(e) => {
@@ -620,18 +600,10 @@ impl LoopDeviceRegistry {
         Err(errno!(ENODEV))
     }
 
-    fn add<L>(
-        &self,
-        locked: &mut Locked<'_, L>,
-        current_task: &CurrentTask,
-        minor: u32,
-    ) -> Result<(), Errno>
-    where
-        L: LockBefore<FileOpsCore>,
-    {
+    fn add(&self, current_task: &CurrentTask, minor: u32) -> Result<(), Errno> {
         match self.devices.lock().entry(minor) {
             Entry::Vacant(e) => {
-                e.insert(LoopDevice::new(locked, current_task, minor));
+                e.insert(LoopDevice::new(current_task, minor));
                 Ok(())
             }
             Entry::Occupied(_) => {
@@ -655,7 +627,6 @@ impl LoopDeviceRegistry {
 }
 
 pub fn create_loop_control_device(
-    _locked: &mut Locked<'_, DeviceOpen>,
     current_task: &CurrentTask,
     _id: DeviceType,
     _node: &FsNode,
@@ -680,21 +651,23 @@ impl FileOps for LoopControlDevice {
 
     fn ioctl(
         &self,
-        locked: &mut Locked<'_, FileOpsIoctl>,
+        _locked: &mut Locked<'_, FileOpsIoctl>,
         file: &FileObject,
         current_task: &CurrentTask,
         request: u32,
         arg: SyscallArg,
     ) -> Result<SyscallResult, Errno> {
         match request {
-            LOOP_CTL_GET_FREE => Ok(self.registry.find(locked, current_task)?.into()),
+            LOOP_CTL_GET_FREE => Ok(self.registry.find(current_task)?.into()),
             LOOP_CTL_ADD => {
                 let minor = arg.into();
                 let registry = Arc::clone(&self.registry);
                 // Delegate to the system task to have the permission to create the loop device.
-                current_task.kernel().kthreads.spawner().spawn_and_get_result_sync(
-                    move |locked, task| registry.add(locked, task, minor),
-                )??;
+                current_task
+                    .kernel()
+                    .kthreads
+                    .spawner()
+                    .spawn_and_get_result_sync(move |_, task| registry.add(task, minor))??;
                 Ok(minor.into())
             }
             LOOP_CTL_REMOVE => {
@@ -708,7 +681,6 @@ impl FileOps for LoopControlDevice {
 }
 
 fn get_or_create_loop_device(
-    locked: &mut Locked<'_, DeviceOpen>,
     current_task: &CurrentTask,
     id: DeviceType,
     _node: &FsNode,
@@ -717,7 +689,7 @@ fn get_or_create_loop_device(
     Ok(current_task
         .kernel()
         .loop_device_registry
-        .get_or_create(locked, current_task, id.minor())
+        .get_or_create(current_task, id.minor())
         .create_file_ops())
 }
 

@@ -11,7 +11,7 @@ use crate::{
 };
 use fuchsia_zircon::{self as zx, AsHandleRef};
 use starnix_logging::track_stub;
-use starnix_sync::{FileOpsCore, Locked, Mutex, WriteOps};
+use starnix_sync::{Locked, Mutex, ReadOps, WriteOps};
 use starnix_uapi::{
     error,
     errors::Errno,
@@ -183,7 +183,7 @@ impl FileOps for TimerFile {
 
     fn read(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<'_, ReadOps>,
         file: &FileObject,
         current_task: &CurrentTask,
         offset: usize,

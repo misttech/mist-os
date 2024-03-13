@@ -25,7 +25,7 @@ use starnix_core::{
     },
 };
 use starnix_logging::{log_error, log_warn};
-use starnix_sync::{DeviceOpen, FileOpsCore, LockBefore, Locked, TaskRelease, Unlocked};
+use starnix_sync::{LockBefore, Locked, ReadOps, TaskRelease, Unlocked};
 use starnix_uapi::{open_flags::OpenFlags, uapi};
 use std::{ffi::CString, sync::Arc};
 
@@ -37,8 +37,7 @@ pub fn expose_root<L>(
     server_end: ServerEnd<fio::DirectoryMarker>,
 ) -> Result<(), Error>
 where
-    L: LockBefore<FileOpsCore>,
-    L: LockBefore<DeviceOpen>,
+    L: LockBefore<ReadOps>,
 {
     let root_file = system_task.open_file(locked, "/".into(), OpenFlags::RDONLY)?;
     serve_file_at(locked, server_end.into_channel().into(), system_task, &root_file)?;

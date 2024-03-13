@@ -21,7 +21,7 @@ use selinux::{
 };
 use selinux_policy::SUPPORTED_POLICY_VERSION;
 use starnix_logging::{log_error, log_info, track_stub};
-use starnix_sync::{FileOpsCore, Locked, Mutex, WriteOps};
+use starnix_sync::{Locked, Mutex, ReadOps, WriteOps};
 use starnix_uapi::{
     device_type::DeviceType,
     errno, error,
@@ -345,7 +345,7 @@ impl FileOps for AccessFile {
 
     fn read(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<'_, ReadOps>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         offset: usize,
@@ -377,7 +377,7 @@ impl FsNodeOps for DeviceFileNode {
 
     fn create_file_ops(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<'_, ReadOps>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         _flags: OpenFlags,
@@ -401,7 +401,7 @@ impl FsNodeOps for AccessFileNode {
 
     fn create_file_ops(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<'_, ReadOps>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         _flags: OpenFlags,
@@ -430,7 +430,7 @@ impl FsNodeOps for Arc<SeLinuxBooleansDirectory> {
 
     fn create_file_ops(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<'_, ReadOps>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         _flags: OpenFlags,
@@ -559,7 +559,7 @@ impl FsNodeOps for Arc<SeLinuxClassDirectory> {
 
     fn create_file_ops(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<'_, ReadOps>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         _flags: OpenFlags,

@@ -14,7 +14,7 @@ use crate::{
         FileHandle,
     },
 };
-use starnix_sync::{FileOpsCore, Locked, Mutex, WriteOps};
+use starnix_sync::{Locked, Mutex, ReadOps, WriteOps};
 use starnix_uapi::{errno, error, errors::Errno, open_flags::OpenFlags, ucred, vfs::FdEvents};
 
 // An implementation of AF_VSOCK.
@@ -137,7 +137,7 @@ impl SocketOps for VsockSocket {
 
     fn read(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<'_, ReadOps>,
         _socket: &Socket,
         current_task: &CurrentTask,
         data: &mut dyn OutputBuffer,

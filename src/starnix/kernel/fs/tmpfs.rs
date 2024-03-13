@@ -14,7 +14,7 @@ use crate::{
 };
 use bstr::B;
 use starnix_logging::{log_warn, track_stub};
-use starnix_sync::{FileOpsCore, Locked, Mutex, MutexGuard};
+use starnix_sync::{Locked, Mutex, MutexGuard, ReadOps};
 use starnix_uapi::{
     auth::FsCred,
     device_type::DeviceType,
@@ -220,7 +220,7 @@ impl FsNodeOps for TmpfsDirectory {
 
     fn create_file_ops(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<'_, ReadOps>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         _flags: OpenFlags,
@@ -249,7 +249,6 @@ impl FsNodeOps for TmpfsDirectory {
 
     fn mknod(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
         node: &FsNode,
         current_task: &CurrentTask,
         _name: &FsStr,
@@ -339,7 +338,7 @@ impl FsNodeOps for TmpfsSpecialNode {
 
     fn create_file_ops(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<'_, ReadOps>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         _flags: OpenFlags,
@@ -363,12 +362,12 @@ mod test {
 
     #[::fuchsia::test]
     async fn test_tmpfs() {
-        let (kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
+        let (kernel, current_task) = create_kernel_and_task();
         let fs = TmpFs::new_fs(&kernel);
         let root = fs.root();
-        let usr = root.create_dir(&mut locked, &current_task, "usr".into()).unwrap();
-        let _etc = root.create_dir(&mut locked, &current_task, "etc".into()).unwrap();
-        let _usr_bin = usr.create_dir(&mut locked, &current_task, "bin".into()).unwrap();
+        let usr = root.create_dir(&current_task, "usr".into()).unwrap();
+        let _etc = root.create_dir(&current_task, "etc".into()).unwrap();
+        let _usr_bin = usr.create_dir(&current_task, "bin".into()).unwrap();
         let mut names = root.copy_child_names();
         names.sort();
         assert!(names.iter().eq(["etc", "usr"].iter()));
@@ -382,13 +381,7 @@ mod test {
         let _file = current_task
             .fs()
             .root()
-            .create_node(
-                &mut locked,
-                &current_task,
-                path.into(),
-                mode!(IFREG, 0o777),
-                DeviceType::NONE,
-            )
+            .create_node(&current_task, path.into(), mode!(IFREG, 0o777), DeviceType::NONE)
             .unwrap();
 
         let wr_file = current_task.open_file(&mut locked, path.into(), OpenFlags::RDWR).unwrap();
@@ -417,13 +410,7 @@ mod test {
         let _file = current_task
             .fs()
             .root()
-            .create_node(
-                &mut locked,
-                &current_task,
-                path.into(),
-                mode!(IFREG, 0o777),
-                DeviceType::NONE,
-            )
+            .create_node(&current_task, path.into(), mode!(IFREG, 0o777), DeviceType::NONE)
             .unwrap();
         let rd_file = current_task.open_file(&mut locked, path.into(), OpenFlags::RDONLY).unwrap();
 
@@ -508,13 +495,9 @@ mod test {
 
         {
             let root = &current_task.fs().root().entry;
-            let usr = root
-                .create_dir(&mut locked, &current_task, "usr".into())
-                .expect("failed to create usr");
-            root.create_dir(&mut locked, &current_task, "etc".into())
-                .expect("failed to create usr/etc");
-            usr.create_dir(&mut locked, &current_task, "bin".into())
-                .expect("failed to create usr/bin");
+            let usr = root.create_dir(&current_task, "usr".into()).expect("failed to create usr");
+            root.create_dir(&current_task, "etc".into()).expect("failed to create usr/etc");
+            usr.create_dir(&current_task, "bin".into()).expect("failed to create usr/bin");
         }
 
         // At this point, all the nodes are dropped.

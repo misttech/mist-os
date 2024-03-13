@@ -10,17 +10,16 @@ use crate::{
     fs::devpts::tty_device_init,
     task::CurrentTask,
 };
-use starnix_sync::{Locked, Unlocked};
 
 /// Initializes common devices in `Kernel`.
 ///
 /// Adding device nodes to devtmpfs requires the current running task. The `Kernel` constructor does
 /// not create an initial task, so this function should be triggered after a `CurrentTask` has been
 /// initialized.
-pub fn init_common_devices(locked: &mut Locked<'_, Unlocked>, system_task: &CurrentTask) {
-    misc_device_init(locked, system_task);
-    mem_device_init(locked, system_task);
-    tty_device_init(locked, system_task);
-    loop_device_init(locked, system_task);
-    zram_device_init(locked, system_task);
+pub fn init_common_devices(system_task: &CurrentTask) {
+    misc_device_init(system_task);
+    mem_device_init(system_task);
+    tty_device_init(system_task);
+    loop_device_init(system_task);
+    zram_device_init(system_task);
 }

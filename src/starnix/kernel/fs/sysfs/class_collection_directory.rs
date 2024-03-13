@@ -11,7 +11,7 @@ use crate::{
         FsNodeOps, FsStr, VecDirectory, VecDirectoryEntry,
     },
 };
-use starnix_sync::{FileOpsCore, Locked};
+use starnix_sync::{Locked, ReadOps};
 use starnix_uapi::{auth::FsCred, error, errors::Errno, file_mode::mode, open_flags::OpenFlags};
 use std::sync::Weak;
 
@@ -36,7 +36,7 @@ impl FsNodeOps for ClassCollectionDirectory {
 
     fn create_file_ops(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<'_, ReadOps>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         _flags: OpenFlags,

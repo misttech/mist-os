@@ -17,7 +17,7 @@ use crate::{
 use bstr::ByteSlice;
 use starnix_lifecycle::AtomicU64Counter;
 use starnix_logging::{log_error, log_warn, track_stub};
-use starnix_sync::{FileOpsCore, FileOpsIoctl, Locked, Mutex, WriteOps};
+use starnix_sync::{FileOpsIoctl, Locked, Mutex, ReadOps, WriteOps};
 use starnix_syscalls::{decls::Syscall, SyscallArg, SyscallResult};
 use starnix_uapi::{
     __NR_exit, __NR_read, __NR_write, errno, errno_from_code, error,
@@ -900,7 +900,7 @@ impl FileOps for SeccompNotifierFileObject {
 
     fn read(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<'_, ReadOps>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         _offset: usize,

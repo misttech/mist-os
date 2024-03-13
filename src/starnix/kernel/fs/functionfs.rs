@@ -12,7 +12,7 @@ use crate::{
     },
 };
 use starnix_logging::track_stub;
-use starnix_sync::{FileOpsCore, Locked, WriteOps};
+use starnix_sync::{Locked, ReadOps, WriteOps};
 use starnix_uapi::{
     error, errors::Errno, file_mode::mode, open_flags::OpenFlags, statfs, vfs::default_statfs,
 };
@@ -73,7 +73,7 @@ impl FsNodeOps for FunctionFsRootDir {
 
     fn create_file_ops(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<'_, ReadOps>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         _flags: OpenFlags,
@@ -89,7 +89,7 @@ impl FsNodeOps for Arc<FunctionFsControlEndpoint> {
 
     fn create_file_ops(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<'_, ReadOps>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         _flags: OpenFlags,
@@ -103,7 +103,7 @@ impl FileOps for Arc<FunctionFsControlEndpoint> {
 
     fn read(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<'_, ReadOps>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         _offset: usize,

@@ -36,8 +36,7 @@ use starnix_logging::{
     log_error, log_trace, log_warn, trace_duration, track_stub, CATEGORY_STARNIX,
 };
 use starnix_sync::{
-    DeviceOpen, FileOpsCore, FileOpsIoctl, InterruptibleEvent, LockBefore, Locked, Mutex,
-    MutexGuard, RwLock, Unlocked, WriteOps,
+    FileOpsIoctl, InterruptibleEvent, Locked, Mutex, MutexGuard, ReadOps, RwLock, WriteOps,
 };
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::{
@@ -126,7 +125,6 @@ pub type BinderDevice = Arc<BinderDriverReleaser>;
 impl DeviceOps for BinderDevice {
     fn open(
         &self,
-        _locked: &mut Locked<'_, DeviceOpen>,
         current_task: &CurrentTask,
         _id: DeviceType,
         _node: &FsNode,
@@ -291,7 +289,7 @@ impl FileOps for BinderConnection {
 
     fn read(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<'_, ReadOps>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         offset: usize,
@@ -4502,7 +4500,7 @@ impl FsNodeOps for BinderFsDir {
 
     fn create_file_ops(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<'_, ReadOps>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         _flags: OpenFlags,
@@ -6941,24 +6939,16 @@ pub mod tests {
 
     // Open the binder device, which creates an instance of the binder device associated with
     // the process.
-    fn open_binder_fd<L>(
-        locked: &mut Locked<'_, L>,
-        current_task: &CurrentTask,
-        binder_driver: &BinderDevice,
-    ) -> FileHandle
-    where
-        L: LockBefore<DeviceOpen>,
-    {
+    fn open_binder_fd(current_task: &CurrentTask, binder_driver: &BinderDevice) -> FileHandle {
         let fs = anon_fs(current_task.kernel());
         let node = fs.create_node(
             &current_task,
             Anon,
             FsNodeInfo::new_factory(FileMode::from_bits(0o600), current_task.as_fscred()),
         );
-        let mut locked = locked.cast_locked::<DeviceOpen>();
         FileObject::new_anonymous(
             binder_driver
-                .open(&mut locked, &current_task, DeviceType::NONE, &node, OpenFlags::RDWR)
+                .open(&current_task, DeviceType::NONE, &node, OpenFlags::RDWR)
                 .expect("binder dev open failed"),
             Arc::clone(&node),
             OpenFlags::RDWR,
@@ -6967,10 +6957,10 @@ pub mod tests {
 
     #[fuchsia::test]
     async fn close_binder() {
-        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
+        let (_kernel, current_task) = create_kernel_and_task();
         let binder_driver = BinderDevice::default();
 
-        let binder_fd = open_binder_fd(&mut locked, &current_task, &binder_driver);
+        let binder_fd = open_binder_fd(&current_task, &binder_driver);
         let binder_connection =
             binder_fd.downcast_file::<BinderConnection>().expect("must be a BinderConnection");
         let identifier = binder_connection.identifier;
@@ -6991,12 +6981,12 @@ pub mod tests {
 
     #[fuchsia::test]
     async fn flush_kicks_threads() {
-        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
+        let (_kernel, current_task) = create_kernel_and_task();
         let binder_driver = BinderDevice::default();
 
         // Open the binder device, which creates an instance of the binder device associated with
         // the process.
-        let binder_fd = open_binder_fd(&mut locked, &current_task, &binder_driver);
+        let binder_fd = open_binder_fd(&current_task, &binder_driver);
         let binder_connection =
             binder_fd.downcast_file::<BinderConnection>().expect("must be a BinderConnection");
         let binder_proc = binder_connection.proc(&current_task).unwrap();
@@ -7865,12 +7855,12 @@ pub mod tests {
 
     #[fuchsia::test]
     async fn connect_to_multiple_binder() {
-        let (_kernel, task, mut locked) = create_kernel_task_and_unlocked();
+        let (_kernel, task) = create_kernel_and_task();
         let driver = BinderDevice::default();
 
         // Opening the driver twice from the same task must succeed.
-        let _d1 = open_binder_fd(&mut locked, &task, &driver);
-        let _d2 = open_binder_fd(&mut locked, &task, &driver);
+        let _d1 = open_binder_fd(&task, &driver);
+        let _d2 = open_binder_fd(&task, &driver);
     }
 
     pub type TestFdTable = BTreeMap<i32, fbinder::FileHandle>;

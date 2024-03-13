@@ -23,9 +23,7 @@ use fidl::HandleBased;
 use fuchsia_inspect_contrib::profile_duration;
 use fuchsia_zircon as zx;
 use starnix_logging::{impossible_error, trace_duration, track_stub, CATEGORY_STARNIX_MM};
-use starnix_sync::{
-    FileOpsCore, FileOpsIoctl, LockEqualOrBefore, Locked, Mutex, Unlocked, WriteOps,
-};
+use starnix_sync::{FileOpsIoctl, LockEqualOrBefore, Locked, Mutex, ReadOps, Unlocked, WriteOps};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::{
     as_any::AsAny,
@@ -146,7 +144,7 @@ pub trait FileOps: Send + Sync + AsAny + 'static {
     /// Returns the number of bytes read.
     fn read(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<'_, ReadOps>,
         file: &FileObject,
         current_task: &CurrentTask,
         offset: usize,
@@ -365,7 +363,7 @@ pub trait FileOps: Send + Sync + AsAny + 'static {
         file: &FileObject,
         current_task: &CurrentTask,
     ) -> Result<Option<zx::Handle>, Errno> {
-        let mut locked = Unlocked::new(); // TODO(https://fxbug.dev/314138012): FileOpsToHandle before FileOpsCore
+        let mut locked = Unlocked::new(); // TODO(https://fxbug.dev/314138012): FileOpsToHandle before ReadOps
         serve_file(&mut locked, current_task, file).map(|c| Some(c.0.into_handle()))
     }
 
@@ -456,7 +454,7 @@ macro_rules! fileops_impl_delegate_read_and_seek {
 
         fn read(
             &$self,
-            locked: &mut starnix_sync::Locked<'_, starnix_sync::FileOpsCore>,
+            locked: &mut starnix_sync::Locked<'_, starnix_sync::ReadOps>,
             file: &FileObject,
             current_task: &crate::task::CurrentTask,
             offset: usize,
@@ -559,7 +557,7 @@ macro_rules! fileops_impl_dataless {
 
         fn read(
             &self,
-            _locked: &mut starnix_sync::Locked<'_, starnix_sync::FileOpsCore>,
+            _locked: &mut starnix_sync::Locked<'_, starnix_sync::ReadOps>,
             _file: &crate::vfs::FileObject,
             _current_task: &crate::task::CurrentTask,
             _offset: usize,
@@ -580,7 +578,7 @@ macro_rules! fileops_impl_directory {
 
         fn read(
             &self,
-            _locked: &mut starnix_sync::Locked<'_, starnix_sync::FileOpsCore>,
+            _locked: &mut starnix_sync::Locked<'_, starnix_sync::ReadOps>,
             _file: &crate::vfs::FileObject,
             _current_task: &crate::task::CurrentTask,
             _offset: usize,
@@ -703,7 +701,7 @@ impl FileOps for OPathOps {
     }
     fn read(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<'_, ReadOps>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         _offset: usize,
@@ -846,7 +844,7 @@ impl FileOps for ProxyFileOps {
     // These take &mut Locked<'_, L> as a second argument
     fn read(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<'_, ReadOps>,
         _file: &FileObject,
         current_task: &CurrentTask,
         offset: usize,
@@ -1100,10 +1098,10 @@ impl FileObject {
         data: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno>
     where
-        L: LockEqualOrBefore<FileOpsCore>,
+        L: LockEqualOrBefore<ReadOps>,
     {
         self.read_internal(|| {
-            let mut locked = locked.cast_locked::<FileOpsCore>();
+            let mut locked = locked.cast_locked::<ReadOps>();
             if !self.ops().has_persistent_offsets() {
                 if data.available() > MAX_LFS_FILESIZE {
                     return error!(EINVAL);
@@ -1128,13 +1126,13 @@ impl FileObject {
         data: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno>
     where
-        L: LockEqualOrBefore<FileOpsCore>,
+        L: LockEqualOrBefore<ReadOps>,
     {
         if !self.ops().is_seekable() {
             return error!(ESPIPE);
         }
         checked_add_offset_and_length(offset, data.available())?;
-        let mut locked = locked.cast_locked::<FileOpsCore>();
+        let mut locked = locked.cast_locked::<ReadOps>();
         self.read_internal(|| self.ops.read(&mut locked, self, current_task, offset, data))
     }
 
@@ -1522,7 +1520,6 @@ mod tests {
         let file = root_node
             .create_entry(&current_task, &mount, "test".into(), |dir, mount, name| {
                 dir.mknod(
-                    &mut locked,
                     &current_task,
                     mount,
                     name,

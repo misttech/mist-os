@@ -28,7 +28,7 @@ use fidl_fuchsia_io as fio;
 use macro_rules_attribute::apply;
 use ref_cast::RefCast;
 use starnix_logging::log_warn;
-use starnix_sync::{DeviceOpen, FileOpsCore, LockBefore, Locked, Mutex, RwLock, WriteOps};
+use starnix_sync::{LockBefore, Locked, Mutex, ReadOps, RwLock, WriteOps};
 use starnix_uapi::{
     arc_key::{ArcKey, PtrKey, WeakKey},
     device_type::DeviceType,
@@ -110,7 +110,7 @@ impl FsNodeOps for Arc<Namespace> {
 
     fn create_file_ops(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<'_, ReadOps>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         _flags: OpenFlags,
@@ -642,15 +642,12 @@ impl fmt::Debug for Mount {
 pub trait FileSystemCreator {
     fn kernel(&self) -> &Arc<Kernel>;
 
-    fn create_filesystem<L>(
+    fn create_filesystem<L: LockBefore<ReadOps>>(
         &self,
         locked: &mut Locked<'_, L>,
         fs_type: &FsStr,
         options: FileSystemOptions,
-    ) -> Result<FileSystemHandle, Errno>
-    where
-        L: LockBefore<DeviceOpen>,
-        L: LockBefore<FileOpsCore>;
+    ) -> Result<FileSystemHandle, Errno>;
 }
 
 impl Kernel {
@@ -672,16 +669,12 @@ impl FileSystemCreator for Arc<Kernel> {
         self
     }
 
-    fn create_filesystem<L>(
+    fn create_filesystem<L: LockBefore<ReadOps>>(
         &self,
         _locked: &mut Locked<'_, L>,
         fs_type: &FsStr,
         options: FileSystemOptions,
-    ) -> Result<FileSystemHandle, Errno>
-    where
-        L: LockBefore<FileOpsCore>,
-        L: LockBefore<DeviceOpen>,
-    {
+    ) -> Result<FileSystemHandle, Errno> {
         Ok(match &**fs_type {
             b"binder" => BinderFs::new_fs(self, options)?,
             b"bpf" => BpfFs::new_fs(self, options)?,
@@ -715,23 +708,19 @@ impl FileSystemCreator for CurrentTask {
         (self as &Task).kernel()
     }
 
-    fn create_filesystem<L>(
+    fn create_filesystem<L: LockBefore<ReadOps>>(
         &self,
         locked: &mut Locked<'_, L>,
         fs_type: &FsStr,
         options: FileSystemOptions,
-    ) -> Result<FileSystemHandle, Errno>
-    where
-        L: LockBefore<FileOpsCore>,
-        L: LockBefore<DeviceOpen>,
-    {
+    ) -> Result<FileSystemHandle, Errno> {
         let kernel = self.kernel();
 
         match &**fs_type {
             b"fuse" => new_fuse_fs(self, options),
             b"fusectl" => new_fusectl_fs(self, options),
             b"devpts" => Ok(dev_pts_fs(self, options).clone()),
-            b"devtmpfs" => Ok(dev_tmp_fs(locked, self).clone()),
+            b"devtmpfs" => Ok(dev_tmp_fs(self).clone()),
             b"ext4" => ExtFilesystem::new_fs(locked, kernel, self, options),
             b"functionfs" => FunctionFs::new_fs(self, options),
             b"overlay" => OverlayFs::new_fs(locked, self, options),
@@ -1062,8 +1051,7 @@ impl NamespaceNode {
         check_access: bool,
     ) -> Result<FileHandle, Errno>
     where
-        L: LockBefore<FileOpsCore>,
-        L: LockBefore<DeviceOpen>,
+        L: LockBefore<ReadOps>,
     {
         FileObject::new(
             self.entry.node.open(locked, current_task, &self.mount, flags, check_access)?,
@@ -1077,22 +1065,18 @@ impl NamespaceNode {
     /// Works for any type of node other than a symlink.
     ///
     /// Will return an existing node unless `flags` contains `OpenFlags::EXCL`.
-    pub fn open_create_node<L>(
+    pub fn open_create_node(
         &self,
-        locked: &mut Locked<'_, L>,
         current_task: &CurrentTask,
         name: &FsStr,
         mode: FileMode,
         dev: DeviceType,
         flags: OpenFlags,
-    ) -> Result<NamespaceNode, Errno>
-    where
-        L: LockBefore<FileOpsCore>,
-    {
+    ) -> Result<NamespaceNode, Errno> {
         let owner = current_task.as_fscred();
         let mode = current_task.fs().apply_umask(mode);
         let create_fn = |dir: &FsNodeHandle, mount: &MountInfo, name: &_| {
-            dir.mknod(locked, current_task, mount, name, mode, dev, owner)
+            dir.mknod(current_task, mount, name, mode, dev, owner)
         };
         let entry = if flags.contains(OpenFlags::EXCL) {
             self.entry.create_entry(current_task, &self.mount, name, create_fn)
@@ -1107,22 +1091,18 @@ impl NamespaceNode {
     /// Works for any type of node other than a symlink.
     ///
     /// Does not return an existing node.
-    pub fn create_node<L>(
+    pub fn create_node(
         &self,
-        locked: &mut Locked<'_, L>,
         current_task: &CurrentTask,
         name: &FsStr,
         mode: FileMode,
         dev: DeviceType,
-    ) -> Result<NamespaceNode, Errno>
-    where
-        L: LockBefore<FileOpsCore>,
-    {
+    ) -> Result<NamespaceNode, Errno> {
         let owner = current_task.as_fscred();
         let mode = current_task.fs().apply_umask(mode);
         let entry =
             self.entry.create_entry(current_task, &self.mount, name, |dir, mount, name| {
-                dir.mknod(locked, current_task, mount, name, mode, dev, owner)
+                dir.mknod(current_task, mount, name, mode, dev, owner)
             })?;
         Ok(self.with_new_entry(entry))
     }
@@ -1179,22 +1159,17 @@ impl NamespaceNode {
         Ok(self.with_new_entry(dir_entry))
     }
 
-    pub fn bind_socket<L>(
+    pub fn bind_socket(
         &self,
-        locked: &mut Locked<'_, L>,
         current_task: &CurrentTask,
         name: &FsStr,
         socket: SocketHandle,
         socket_address: SocketAddress,
         mode: FileMode,
-    ) -> Result<NamespaceNode, Errno>
-    where
-        L: LockBefore<FileOpsCore>,
-    {
+    ) -> Result<NamespaceNode, Errno> {
         let dir_entry =
             self.entry.create_entry(current_task, &self.mount, name, |dir, mount, name| {
                 let node = dir.mknod(
-                    locked,
                     current_task,
                     mount,
                     name,
@@ -1577,7 +1552,7 @@ impl Hash for NamespaceNode {
 mod test {
     use crate::{
         fs::tmpfs::TmpFs,
-        testing::create_kernel_task_and_unlocked,
+        testing::create_kernel_and_task,
         vfs::{LookupContext, Namespace, UnlinkKind, WhatToMount},
     };
     use starnix_uapi::{errno, mount_flags::MountFlags};
@@ -1585,17 +1560,15 @@ mod test {
 
     #[::fuchsia::test]
     async fn test_namespace() -> anyhow::Result<()> {
-        let (kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
+        let (kernel, current_task) = create_kernel_and_task();
         let root_fs = TmpFs::new_fs(&kernel);
         let root_node = Arc::clone(root_fs.root());
-        let _dev_node = root_node
-            .create_dir(&mut locked, &current_task, "dev".into())
-            .expect("failed to mkdir dev");
+        let _dev_node =
+            root_node.create_dir(&current_task, "dev".into()).expect("failed to mkdir dev");
         let dev_fs = TmpFs::new_fs(&kernel);
         let dev_root_node = Arc::clone(dev_fs.root());
-        let _dev_pts_node = dev_root_node
-            .create_dir(&mut locked, &current_task, "pts".into())
-            .expect("failed to mkdir pts");
+        let _dev_pts_node =
+            dev_root_node.create_dir(&current_task, "pts".into()).expect("failed to mkdir pts");
 
         let ns = Namespace::new(root_fs);
         let mut context = LookupContext::default();
@@ -1627,17 +1600,15 @@ mod test {
 
     #[::fuchsia::test]
     async fn test_mount_does_not_upgrade() -> anyhow::Result<()> {
-        let (kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
+        let (kernel, current_task) = create_kernel_and_task();
         let root_fs = TmpFs::new_fs(&kernel);
         let root_node = Arc::clone(root_fs.root());
-        let _dev_node = root_node
-            .create_dir(&mut locked, &current_task, "dev".into())
-            .expect("failed to mkdir dev");
+        let _dev_node =
+            root_node.create_dir(&current_task, "dev".into()).expect("failed to mkdir dev");
         let dev_fs = TmpFs::new_fs(&kernel);
         let dev_root_node = Arc::clone(dev_fs.root());
-        let _dev_pts_node = dev_root_node
-            .create_dir(&mut locked, &current_task, "pts".into())
-            .expect("failed to mkdir pts");
+        let _dev_pts_node =
+            dev_root_node.create_dir(&current_task, "pts".into()).expect("failed to mkdir pts");
 
         let ns = Namespace::new(root_fs);
         let mut context = LookupContext::default();
@@ -1667,17 +1638,15 @@ mod test {
 
     #[::fuchsia::test]
     async fn test_path() -> anyhow::Result<()> {
-        let (kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
+        let (kernel, current_task) = create_kernel_and_task();
         let root_fs = TmpFs::new_fs(&kernel);
         let root_node = Arc::clone(root_fs.root());
-        let _dev_node = root_node
-            .create_dir(&mut locked, &current_task, "dev".into())
-            .expect("failed to mkdir dev");
+        let _dev_node =
+            root_node.create_dir(&current_task, "dev".into()).expect("failed to mkdir dev");
         let dev_fs = TmpFs::new_fs(&kernel);
         let dev_root_node = Arc::clone(dev_fs.root());
-        let _dev_pts_node = dev_root_node
-            .create_dir(&mut locked, &current_task, "pts".into())
-            .expect("failed to mkdir pts");
+        let _dev_pts_node =
+            dev_root_node.create_dir(&current_task, "pts".into()).expect("failed to mkdir pts");
 
         let ns = Namespace::new(root_fs);
         let mut context = LookupContext::default();
@@ -1706,10 +1675,10 @@ mod test {
 
     #[::fuchsia::test]
     async fn test_shadowing() -> anyhow::Result<()> {
-        let (kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
+        let (kernel, current_task) = create_kernel_and_task();
         let root_fs = TmpFs::new_fs(&kernel);
         let ns = Namespace::new(root_fs.clone());
-        let _foo_node = root_fs.root().create_dir(&mut locked, &current_task, "foo".into())?;
+        let _foo_node = root_fs.root().create_dir(&current_task, "foo".into())?;
         let mut context = LookupContext::default();
         let foo_dir = ns.root().lookup_child(&current_task, &mut context, "foo".into())?;
 
@@ -1745,11 +1714,11 @@ mod test {
 
     #[::fuchsia::test]
     async fn test_unlink_mounted_directory() -> anyhow::Result<()> {
-        let (kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
+        let (kernel, current_task) = create_kernel_and_task();
         let root_fs = TmpFs::new_fs(&kernel);
         let ns1 = Namespace::new(root_fs.clone());
         let ns2 = Namespace::new(root_fs.clone());
-        let _foo_node = root_fs.root().create_dir(&mut locked, &current_task, "foo".into())?;
+        let _foo_node = root_fs.root().create_dir(&current_task, "foo".into())?;
         let mut context = LookupContext::default();
         let foo_dir = ns1.root().lookup_child(&current_task, &mut context, "foo".into())?;
 

@@ -33,9 +33,7 @@ use starnix_logging::{
     log_error, log_warn, trace_duration, trace_flow_begin, trace_flow_end, trace_flow_step,
     CATEGORY_STARNIX,
 };
-use starnix_sync::{
-    DeviceOpen, FileOpsCore, FileOpsIoctl, Locked, Mutex, MutexGuard, Unlocked, WriteOps,
-};
+use starnix_sync::{FileOpsIoctl, Locked, Mutex, MutexGuard, ReadOps, WriteOps};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::{
     device_type::DeviceType,
@@ -91,7 +89,6 @@ pub struct RemoteBinderDevice {}
 impl DeviceOps for RemoteBinderDevice {
     fn open(
         &self,
-        _locked: &mut Locked<'_, DeviceOpen>,
         current_task: &CurrentTask,
         _id: DeviceType,
         _node: &FsNode,
@@ -161,7 +158,7 @@ impl FileOps for RemoteBinderFileOps {
 
     fn read(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<'_, ReadOps>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         offset: usize,
@@ -1100,13 +1097,7 @@ mod tests {
                 current_task
                     .fs()
                     .root()
-                    .create_node(
-                        locked,
-                        &current_task,
-                        "dev".into(),
-                        mode!(IFDIR, 0o755),
-                        DeviceType::NONE,
-                    )
+                    .create_node(&current_task, "dev".into(), mode!(IFDIR, 0o755), DeviceType::NONE)
                     .expect("mkdir dev");
                 let dev = current_task
                     .lookup_path_from_root("/dev".into())

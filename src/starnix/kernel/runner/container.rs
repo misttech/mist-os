@@ -44,7 +44,7 @@ use starnix_kernel_config::Config;
 use starnix_logging::{
     log_error, log_info, log_warn, trace_duration, CATEGORY_STARNIX, NAME_CREATE_CONTAINER,
 };
-use starnix_sync::{DeviceOpen, FileOpsCore, LockBefore, Locked, Unlocked};
+use starnix_sync::{LockBefore, Locked, ReadOps, Unlocked};
 use starnix_uapi::{
     auth::Credentials,
     errno,
@@ -392,15 +392,13 @@ async fn create_container(
     kernel.syslog.init(&system_task).source_context("initializing syslog")?;
 
     // Register common devices and add them in sysfs and devtmpfs.
-    init_common_devices(locked, &system_task);
+    init_common_devices(&system_task);
 
     mount_filesystems(locked, &system_task, config, &pkg_dir_proxy)
         .source_context("mounting filesystems")?;
 
     // Run all common features that were specified in the .cml.
-    {
-        run_container_features(locked, &system_task, &features)?;
-    }
+    run_container_features(&system_task, &features)?;
 
     // If there is an init binary path, run it, optionally waiting for the
     // startup_file_path to be created. The task struct is still used
@@ -445,8 +443,7 @@ fn create_fs_context<L>(
     pkg_dir_proxy: &fio::DirectorySynchronousProxy,
 ) -> Result<Arc<FsContext>, Error>
 where
-    L: LockBefore<FileOpsCore>,
-    L: LockBefore<DeviceOpen>,
+    L: LockBefore<ReadOps>,
 {
     // The mounts are applied in the order listed. Mounting will fail if the designated mount
     // point doesn't exist in a previous mount. The root must be first so other mounts can be
@@ -538,8 +535,7 @@ fn mount_filesystems<L>(
     pkg_dir_proxy: &fio::DirectorySynchronousProxy,
 ) -> Result<(), Error>
 where
-    L: LockBefore<FileOpsCore>,
-    L: LockBefore<DeviceOpen>,
+    L: LockBefore<ReadOps>,
 {
     let mut mounts_iter = config.mounts.iter();
     // Skip the first mount, that was used to create the root filesystem.

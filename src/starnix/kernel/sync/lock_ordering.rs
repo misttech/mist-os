@@ -18,14 +18,12 @@ lock_level!(ProcessGroupState);
 // FileOps lock levels. These are artificial lock levels used to call methods of FileOps traits.
 lock_level!(FileOpsIoctl);
 
-// These lock levels are use to denote operations on FileOps, SocketOps and FsNodeOps
-// TODO(https://fxbug.dev/324065824): FsNode.create_file_ops, FSNode.mknod, FileOps.read, SocketOps.read
-// use the same level because of the circular dependencies between them.
-lock_level!(FileOpsCore);
+// These lock levels are use to denote write and read operations for FileOps and SocketOps
+// TODO(https://fxbug.dev/324065824): FsNodeCreateFileOps is also using the same level as read() because of
+// the circular dependency in OverlayFS implementation:
+// read -> open_anonymous -> create_file_ops -> create_upper_maybe_copy -> copy_file_content -> read
+lock_level!(ReadOps);
 lock_level!(WriteOps);
-
-// Lock level for DeviceOps.open. Must be before FileOpsCore because of get_or_create_loop_device
-lock_level!(DeviceOpen);
 
 // This file defines a hierarchy of locks, that is, the order in which
 // the locks must be acquired. Unlocked is a highest level and represents
@@ -36,11 +34,10 @@ impl_lock_after!(Unlocked => KernelIpTables);
 impl_lock_after!(Unlocked => KernelSwapFiles);
 impl_lock_after!(Unlocked => DiagnosticsCoreDumpList);
 impl_lock_after!(Unlocked => MmDumpable);
-
 impl_lock_after!(Unlocked => TaskRelease);
-impl_lock_after!(TaskRelease => DeviceOpen);
-impl_lock_after!(DeviceOpen => FileOpsIoctl);
+
+impl_lock_after!(TaskRelease => FileOpsIoctl);
 // FileOpsIoctl is before read/write because SocketFile.ioctl ends up indirectly calling FileOps.read and FileOps.write
-impl_lock_after!(FileOpsIoctl => FileOpsCore);
-impl_lock_after!(FileOpsCore => WriteOps);
-impl_lock_after!(WriteOps =>  ProcessGroupState);
+impl_lock_after!(FileOpsIoctl  => ReadOps);
+impl_lock_after!(ReadOps => WriteOps);
+impl_lock_after!(WriteOps => ProcessGroupState);

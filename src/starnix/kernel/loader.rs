@@ -16,7 +16,7 @@ use fuchsia_zircon::{
 };
 use process_builder::{elf_load, elf_parse};
 use starnix_logging::{log_error, log_warn};
-use starnix_sync::{DeviceOpen, FileOpsCore, LockBefore, Locked};
+use starnix_sync::{LockBefore, Locked, ReadOps};
 use starnix_uapi::{
     errno, error, errors::Errno, from_status_like_fdio, open_flags::OpenFlags,
     time::SCHEDULER_CLOCK_HZ, user_address::UserAddress, AT_BASE, AT_CLKTCK, AT_EGID, AT_ENTRY,
@@ -281,8 +281,7 @@ pub fn resolve_executable<L>(
     selinux_state: Option<SeLinuxResolvedElfState>,
 ) -> Result<ResolvedElf, Errno>
 where
-    L: LockBefore<FileOpsCore>,
-    L: LockBefore<DeviceOpen>,
+    L: LockBefore<ReadOps>,
 {
     resolve_executable_impl(locked, current_task, file, path, argv, environ, 0, selinux_state)
 }
@@ -300,8 +299,7 @@ fn resolve_executable_impl<L>(
     selinux_state: Option<SeLinuxResolvedElfState>,
 ) -> Result<ResolvedElf, Errno>
 where
-    L: LockBefore<FileOpsCore>,
-    L: LockBefore<DeviceOpen>,
+    L: LockBefore<ReadOps>,
 {
     if recursion_depth > MAX_RECURSION_DEPTH {
         return error!(ELOOP);
@@ -343,8 +341,7 @@ fn resolve_script<L>(
     selinux_state: Option<SeLinuxResolvedElfState>,
 ) -> Result<ResolvedElf, Errno>
 where
-    L: LockBefore<FileOpsCore>,
-    L: LockBefore<DeviceOpen>,
+    L: LockBefore<ReadOps>,
 {
     // All VMOs have sizes in multiple of the system page size, so as long as we only read a page or
     // less, we should never read past the end of the VMO.
@@ -427,8 +424,7 @@ fn resolve_elf<L>(
     selinux_state: Option<SeLinuxResolvedElfState>,
 ) -> Result<ResolvedElf, Errno>
 where
-    L: LockBefore<FileOpsCore>,
-    L: LockBefore<DeviceOpen>,
+    L: LockBefore<ReadOps>,
 {
     let elf_headers = elf_parse::Elf64Headers::from_vmo(&vmo).map_err(elf_parse_error_to_errno)?;
     let interp = if let Some(interp_hdr) = elf_headers
@@ -694,8 +690,7 @@ mod tests {
         current_task: &mut CurrentTask,
     ) -> Result<(), Errno>
     where
-        L: LockBefore<FileOpsCore>,
-        L: LockBefore<DeviceOpen>,
+        L: LockBefore<ReadOps>,
     {
         let argv = vec![CString::new("bin/hello_starnix").unwrap()];
         let executable =

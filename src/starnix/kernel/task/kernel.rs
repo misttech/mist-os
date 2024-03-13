@@ -43,10 +43,7 @@ use once_cell::sync::OnceCell;
 use selinux::security_server::{SecurityServer, SecurityServerStatus as _};
 use starnix_lifecycle::{AtomicU32Counter, AtomicU64Counter};
 use starnix_logging::{log_error, CoreDumpList};
-use starnix_sync::{
-    DeviceOpen, KernelIpTables, KernelSwapFiles, LockBefore, Locked, OrderedMutex, OrderedRwLock,
-    RwLock, Unlocked,
-};
+use starnix_sync::{KernelIpTables, KernelSwapFiles, OrderedMutex, OrderedRwLock, RwLock};
 use starnix_uapi::{
     device_type::DeviceType, errno, errors::Errno, from_status_like_fdio, open_flags::OpenFlags,
 };
@@ -374,19 +371,15 @@ impl Kernel {
     }
 
     /// Opens a device file (driver) identified by `dev`.
-    pub fn open_device<L>(
+    pub fn open_device(
         &self,
-        locked: &mut Locked<'_, L>,
         current_task: &CurrentTask,
         node: &FsNode,
         flags: OpenFlags,
         dev: DeviceType,
         mode: DeviceMode,
-    ) -> Result<Box<dyn FileOps>, Errno>
-    where
-        L: LockBefore<DeviceOpen>,
-    {
-        self.device_registry.open_device(locked, current_task, node, flags, dev, mode)
+    ) -> Result<Box<dyn FileOps>, Errno> {
+        self.device_registry.open_device(current_task, node, flags, dev, mode)
     }
 
     /// Return a reference to the GenericNetlink implementation.

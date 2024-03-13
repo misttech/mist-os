@@ -25,10 +25,7 @@ use starnix_uapi::{
     open_flags::OpenFlags,
 };
 
-use starnix_sync::{
-    DeviceOpen, FileOpsCore, LockBefore, Locked, MappedMutexGuard, Mutex, MutexGuard, RwLock,
-    Unlocked,
-};
+use starnix_sync::{MappedMutexGuard, Mutex, MutexGuard, RwLock};
 use std::{
     collections::btree_map::{BTreeMap, Entry},
     sync::Arc,
@@ -52,7 +49,6 @@ pub enum DeviceMode {
 pub trait DeviceOps: DynClone + Send + Sync + 'static {
     fn open(
         &self,
-        _locked: &mut Locked<'_, DeviceOpen>,
         _current_task: &CurrentTask,
         _id: DeviceType,
         _node: &FsNode,
@@ -81,30 +77,22 @@ where
         + Send
         + Sync
         + Clone
-        + Fn(
-            &mut Locked<'_, DeviceOpen>,
-            &CurrentTask,
-            DeviceType,
-            &FsNode,
-            OpenFlags,
-        ) -> Result<Box<dyn FileOps>, Errno>
+        + Fn(&CurrentTask, DeviceType, &FsNode, OpenFlags) -> Result<Box<dyn FileOps>, Errno>
         + 'static,
 {
     fn open(
         &self,
-        locked: &mut Locked<'_, DeviceOpen>,
         current_task: &CurrentTask,
         id: DeviceType,
         node: &FsNode,
         flags: OpenFlags,
     ) -> Result<Box<dyn FileOps>, Errno> {
-        self(locked, current_task, id, node, flags)
+        self(current_task, id, node, flags)
     }
 }
 
 /// A simple `DeviceOps` function for any device that implements `FileOps + Default`.
 pub fn simple_device_ops<T: Default + FileOps + 'static>(
-    _locked: &mut Locked<'_, DeviceOpen>,
     _current_task: &CurrentTask,
     _id: DeviceType,
     _node: &FsNode,
@@ -256,9 +244,8 @@ impl DeviceRegistry {
         Class::new(bus.kobject().get_or_create_child(name, SysfsDirectory::new), bus, collection)
     }
 
-    pub fn add_device<F, N, L>(
+    pub fn add_device<F, N>(
         &self,
-        locked: &mut Locked<'_, L>,
         current_task: &CurrentTask,
         name: &FsStr,
         metadata: DeviceMetadata,
@@ -268,7 +255,6 @@ impl DeviceRegistry {
     where
         F: Fn(Device) -> N + Send + Sync + 'static,
         N: DeviceSysfsOps,
-        L: LockBefore<FileOpsCore>,
     {
         let class_cloned = class.clone();
         let metadata_cloned = metadata.clone();
@@ -289,7 +275,7 @@ impl DeviceRegistry {
             bus_collection.kobject().insert_child(device_kobject.clone());
         }
 
-        if let Err(err) = devtmpfs_create_device(locked, current_task, metadata.clone()) {
+        if let Err(err) = devtmpfs_create_device(current_task, metadata.clone()) {
             log_error!("Cannot add device {:?} in devtmpfs ({:?})", metadata, err);
         }
 
@@ -298,9 +284,8 @@ impl DeviceRegistry {
         device
     }
 
-    pub fn add_and_register_device<F, N, L>(
+    pub fn add_and_register_device<F, N>(
         &self,
-        locked: &mut Locked<'_, L>,
         current_task: &CurrentTask,
         name: &FsStr,
         metadata: DeviceMetadata,
@@ -311,7 +296,6 @@ impl DeviceRegistry {
     where
         F: Fn(Device) -> N + Send + Sync + 'static,
         N: DeviceSysfsOps,
-        L: LockBefore<FileOpsCore>,
     {
         if let Err(err) = self.register_device(
             metadata.device_type.major(),
@@ -322,17 +306,10 @@ impl DeviceRegistry {
         ) {
             log_error!("Cannot register device {:?} ({:?})", metadata, err);
         }
-        self.add_device(locked, current_task, name, metadata, class, create_device_sysfs_ops)
+        self.add_device(current_task, name, metadata, class, create_device_sysfs_ops)
     }
 
-    pub fn remove_device<L>(
-        &self,
-        locked: &mut Locked<'_, L>,
-        current_task: &CurrentTask,
-        device: Device,
-    ) where
-        L: LockBefore<FileOpsCore>,
-    {
+    pub fn remove_device(&self, current_task: &CurrentTask, device: Device) {
         let kobject = device.kobject();
         let name = kobject.name();
         device.class.collection.kobject().remove_child(name);
@@ -342,8 +319,7 @@ impl DeviceRegistry {
         device.kobject().remove();
         self.dispatch_uevent(UEventAction::Remove, device.clone());
 
-        if let Err(err) = devtmpfs_remove_node(locked, current_task, device.metadata.name.as_ref())
-        {
+        if let Err(err) = devtmpfs_remove_node(current_task, device.metadata.name.as_ref()) {
             log_error!("Cannot remove device {:?} ({:?})", device, err);
         }
     }
@@ -428,18 +404,14 @@ impl DeviceRegistry {
     }
 
     /// Opens a device file corresponding to the device identifier `dev`.
-    pub fn open_device<L>(
+    pub fn open_device(
         &self,
-        locked: &mut Locked<'_, L>,
         current_task: &CurrentTask,
         node: &FsNode,
         flags: OpenFlags,
         id: DeviceType,
         mode: DeviceMode,
-    ) -> Result<Box<dyn FileOps>, Errno>
-    where
-        L: LockBefore<DeviceOpen>,
-    {
+    ) -> Result<Box<dyn FileOps>, Errno> {
         let device_ops = {
             // Access the actual devices in a nested scope to avoid holding the state lock while
             // creating the FileOps from any single DeviceOps.
@@ -450,8 +422,7 @@ impl DeviceRegistry {
             };
             devices.get(id)?
         };
-        let mut locked = locked.cast_locked::<DeviceOpen>();
-        device_ops.open(&mut locked, current_task, id, node, flags)
+        device_ops.open(current_task, id, node, flags)
     }
 }
 
@@ -503,16 +474,14 @@ impl DynRegistry {
 impl DeviceOps for Arc<RwLock<DynRegistry>> {
     fn open(
         &self,
-        locked: &mut Locked<'_, DeviceOpen>,
         current_task: &CurrentTask,
         id: DeviceType,
         node: &FsNode,
         flags: OpenFlags,
     ) -> Result<Box<dyn FileOps>, Errno> {
-        // TODO(mariagl): Does this lock need to be held while calling .open?
         let state = self.read();
         let device = state.dyn_devices.get(&id.minor()).ok_or_else(|| errno!(ENODEV))?;
-        device.open(locked, current_task, id, node, flags)
+        device.open(current_task, id, node, flags)
     }
 }
 
@@ -538,7 +507,7 @@ mod tests {
 
     #[::fuchsia::test]
     async fn registry_opens_device() {
-        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
+        let (_kernel, current_task) = create_kernel_and_task();
 
         let registry = DeviceRegistry::default();
         registry
@@ -550,7 +519,6 @@ mod tests {
         // Fail to open non-existent device.
         assert!(registry
             .open_device(
-                &mut locked,
                 &current_task,
                 &node,
                 OpenFlags::RDONLY,
@@ -562,7 +530,6 @@ mod tests {
         // Fail to open in wrong mode.
         assert!(registry
             .open_device(
-                &mut locked,
                 &current_task,
                 &node,
                 OpenFlags::RDONLY,
@@ -574,7 +541,6 @@ mod tests {
         // Open in correct mode.
         let _ = registry
             .open_device(
-                &mut locked,
                 &current_task,
                 &node,
                 OpenFlags::RDONLY,
@@ -586,10 +552,9 @@ mod tests {
 
     #[::fuchsia::test]
     async fn registry_dynamic_misc() {
-        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
+        let (_kernel, current_task) = create_kernel_and_task();
 
         fn create_test_device(
-            _locked: &mut Locked<'_, DeviceOpen>,
             _current_task: &CurrentTask,
             _id: DeviceType,
             _node: &FsNode,
@@ -604,25 +569,17 @@ mod tests {
 
         let node = FsNode::new_root(PanickingFsNode);
         let _ = registry
-            .open_device(
-                &mut locked,
-                &current_task,
-                &node,
-                OpenFlags::RDONLY,
-                device_type,
-                DeviceMode::Char,
-            )
+            .open_device(&current_task, &node, OpenFlags::RDONLY, device_type, DeviceMode::Char)
             .expect("opens device");
     }
 
     #[::fuchsia::test]
     async fn registery_add_class() {
-        let (kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
+        let (kernel, current_task) = create_kernel_and_task();
         let registry = &kernel.device_registry;
 
         let input_class = registry.get_or_create_class("input".into(), registry.virtual_bus());
         registry.add_device(
-            &mut locked,
             &current_task,
             "mice".into(),
             DeviceMetadata::new("mice".into(), DeviceType::new(INPUT_MAJOR, 0), DeviceMode::Char),
@@ -640,13 +597,12 @@ mod tests {
 
     #[::fuchsia::test]
     async fn registry_add_bus() {
-        let (kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
+        let (kernel, current_task) = create_kernel_and_task();
         let registry = &kernel.device_registry;
 
         let bus = registry.get_or_create_bus("bus".into());
         let class = registry.get_or_create_class("class".into(), bus);
         registry.add_device(
-            &mut locked,
             &current_task,
             "device".into(),
             DeviceMetadata::new("device".into(), DeviceType::new(0, 0), DeviceMode::Char),
@@ -663,13 +619,12 @@ mod tests {
 
     #[::fuchsia::test]
     async fn registry_remove_device() {
-        let (kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
+        let (kernel, current_task) = create_kernel_and_task();
         let registry = &kernel.device_registry;
 
         let pci_bus = registry.get_or_create_bus("pci".into());
         let input_class = registry.get_or_create_class("input".into(), pci_bus);
         let mice_dev = registry.add_device(
-            &mut locked,
             &current_task,
             "mice".into(),
             DeviceMetadata::new("mice".into(), DeviceType::new(INPUT_MAJOR, 0), DeviceMode::Char),
@@ -677,7 +632,7 @@ mod tests {
             DeviceDirectory::new,
         );
 
-        registry.remove_device(&mut locked, &current_task, mice_dev);
+        registry.remove_device(&current_task, mice_dev);
         assert!(!input_class.kobject().has_child("mice".into()));
         assert!(!registry
             .bus_subsystem_kobject()
@@ -693,12 +648,11 @@ mod tests {
 
     #[::fuchsia::test]
     async fn registery_unregister_device() {
-        let (kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
+        let (kernel, current_task) = create_kernel_and_task();
         let registry = &kernel.device_registry;
         let node = FsNode::new_root(PanickingFsNode);
         let _ = registry
             .open_device(
-                &mut locked,
                 &current_task,
                 &node,
                 OpenFlags::RDONLY,
@@ -710,7 +664,6 @@ mod tests {
         let _ = registry.unregister_major(MEM_MAJOR, DeviceMode::Char);
         assert!(registry
             .open_device(
-                &mut locked,
                 &current_task,
                 &node,
                 OpenFlags::RDONLY,

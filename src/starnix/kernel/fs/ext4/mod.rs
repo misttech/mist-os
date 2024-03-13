@@ -21,7 +21,7 @@ use ext4_read_only::{
 use fuchsia_zircon as zx;
 use once_cell::sync::OnceCell;
 use starnix_logging::track_stub;
-use starnix_sync::{DeviceOpen, FileOpsCore, LockBefore, Locked};
+use starnix_sync::{LockBefore, Locked, ReadOps};
 use starnix_uapi::{
     auth::FsCred, errno, error, errors::Errno, file_mode::FileMode, ino_t, mount_flags::MountFlags,
     off_t, open_flags::OpenFlags, statfs, vfs::default_statfs, EXT4_SUPER_MAGIC,
@@ -61,8 +61,7 @@ impl ExtFilesystem {
         options: FileSystemOptions,
     ) -> Result<FileSystemHandle, Errno>
     where
-        L: LockBefore<FileOpsCore>,
-        L: LockBefore<DeviceOpen>,
+        L: LockBefore<ReadOps>,
     {
         let mut open_flags = OpenFlags::RDWR;
         let mut prot_flags = ProtectionFlags::READ | ProtectionFlags::WRITE | ProtectionFlags::EXEC;
@@ -132,7 +131,7 @@ impl FsNodeOps for ExtDirectory {
 
     fn create_file_ops(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<'_, ReadOps>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         _flags: OpenFlags,
@@ -228,7 +227,7 @@ impl FsNodeOps for ExtFile {
 
     fn create_file_ops(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<'_, ReadOps>,
         node: &FsNode,
         _current_task: &CurrentTask,
         _flags: OpenFlags,
