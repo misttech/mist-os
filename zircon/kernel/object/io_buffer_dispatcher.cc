@@ -37,6 +37,96 @@ KCOUNTER(dispatcher_iob_create_count, "dispatcher.iob.create")
 KCOUNTER(dispatcher_iob_destroy_count, "dispatcher.iob.destroy")
 
 // static
+zx::result<fbl::Array<IoBufferDispatcher::IobRegion>> IoBufferDispatcher::CreateRegions(
+    const IoBufferDispatcher::RegionArray& region_configs,
+    const fbl::RefPtr<AttributionObject>& attribution_object, VmObjectChildObserver* ep0,
+    VmObjectChildObserver* ep1) {
+  fbl::AllocChecker ac;
+  fbl::Array<IobRegion> region_inner = fbl::MakeArray<IobRegion>(&ac, region_configs.size());
+  if (!ac.check()) {
+    return zx::error(ZX_ERR_NO_MEMORY);
+  }
+
+  for (unsigned i = 0; i < region_configs.size(); i++) {
+    zx_iob_region_t region_config = region_configs[i];
+    if (region_config.type != ZX_IOB_REGION_TYPE_PRIVATE) {
+      return zx::error(ZX_ERR_INVALID_ARGS);
+    }
+    if (region_config.access == 0) {
+      return zx::error(ZX_ERR_INVALID_ARGS);
+    }
+
+    // A note on resource management:
+    //
+    // Everything we allocate in this loop ultimately gets owned by the SharedIobState and will be
+    // cleaned up when both PeeredDispatchers are destroyed and drop their reference to the
+    // SharedIobState.
+    //
+    // However, there is a complication. The VmoChildObservers have a reference to the dispatchers
+    // which creates a cycle: IoBufferDispatcher -> SharedIobState -> IobRegion -> VmObject ->
+    // VmoChildObserver -> IoBufferDispatcher.
+    //
+    // Since the VmoChildObservers keep a raw pointers to the dispatchers, we need to be sure to
+    // reset the the corresponding pointers when we destroy an IoBufferDispatcher. Otherwise when an
+    // IoBufferDispatcher maps a region, it could try to update a destroyed peer.
+    //
+    // See: IoBufferDispatcher~IoBufferDispatcher.
+
+    // We effectively duplicate the logic from sys_vmo_create here, but instead of creating a
+    // kernel handle and dispatcher, we keep ownership of it and assign it to a region.
+
+    uint32_t vmo_options = 0;
+    if (zx_status_t status = VmObjectDispatcher::parse_create_syscall_flags(
+            region_config.private_region.options, &vmo_options);
+        status != ZX_OK) {
+      return zx::error(status);
+    }
+
+    fbl::RefPtr<VmObjectPaged> vmo;
+    if (zx_status_t status = VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY, vmo_options,
+                                                   region_config.size, attribution_object, &vmo);
+        status != ZX_OK) {
+      return zx::error(status);
+    }
+
+    // VmObjectPaged::Create will round up the size to the nearest page. We need to know the actual
+    // size of the vmo to later return if asked.
+    region_config.size = vmo->size();
+    zx_koid_t koid = KernelObjectId::Generate();
+    vmo->set_user_id(koid);
+
+    // In order to track mappings and unmappings separately for each endpoint, we give each
+    // endpoint a child reference instead of the created vmo.
+    fbl::RefPtr<VmObject> ep0_reference;
+    fbl::RefPtr<VmObject> ep1_reference;
+
+    Resizability resizability =
+        vmo->is_resizable() ? Resizability::Resizable : Resizability::NonResizable;
+    if (zx_status_t status =
+            vmo->CreateChildReference(resizability, 0, 0, true, nullptr, &ep0_reference);
+        status != ZX_OK) {
+      return zx::error(status);
+    }
+    if (zx_status_t status =
+            vmo->CreateChildReference(resizability, 0, 0, true, nullptr, &ep1_reference);
+        status != ZX_OK) {
+      return zx::error(status);
+    }
+
+    ep0_reference->set_user_id(koid);
+    ep1_reference->set_user_id(koid);
+
+    // Now each endpoint can observe the mappings created by the other
+    ep0_reference->SetChildObserver(ep1);
+    ep1_reference->SetChildObserver(ep0);
+
+    region_inner[i] =
+        IobRegion{ktl::move(ep0_reference), ktl::move(ep1_reference), region_config, koid};
+  }
+  return zx::ok(ktl::move(region_inner));
+}
+
+// static
 zx_status_t IoBufferDispatcher::Create(uint64_t options,
                                        const IoBufferDispatcher::RegionArray& region_configs,
                                        const fbl::RefPtr<AttributionObject>& attribution_object,
@@ -74,87 +164,16 @@ zx_status_t IoBufferDispatcher::Create(uint64_t options,
     return ZX_ERR_NO_MEMORY;
   }
 
-  fbl::Array<IobRegion> region_inner = fbl::MakeArray<IobRegion>(&ac, region_configs.size());
-  if (!ac.check()) {
-    return ZX_ERR_NO_MEMORY;
+  zx::result<fbl::Array<IobRegion>> regions =
+      CreateRegions(region_configs, attribution_object, new_handle0.dispatcher().get(),
+                    new_handle1.dispatcher().get());
+  if (regions.is_error()) {
+    return regions.error_value();
   }
-
-  Guard<CriticalMutex> guard{&shared_regions->state_lock};
-  for (unsigned i = 0; i < region_configs.size(); i++) {
-    zx_iob_region_t region_config = region_configs[i];
-    if (region_config.type != ZX_IOB_REGION_TYPE_PRIVATE) {
-      return ZX_ERR_INVALID_ARGS;
-    }
-    if (region_config.access == 0) {
-      return ZX_ERR_INVALID_ARGS;
-    }
-
-    // A note on resource management:
-    //
-    // Everything we allocate in this loop ultimately gets owned by the SharedIobState and will be
-    // cleaned up when both PeeredDispatchers are destroyed and drop their reference to the
-    // SharedIobState.
-    //
-    // However, there is a complication. The VmoChildObservers have a reference to the dispatchers
-    // which creates a cycle: IoBufferDispatcher -> SharedIobState -> IobRegion -> VmObject ->
-    // VmoChildObserver -> IoBufferDispatcher.
-    //
-    // Since the VmoChildObservers keep a raw pointers to the dispatchers, we need to be sure to
-    // reset the the corresponding pointers when we destroy an IoBufferDispatcher. Otherwise when an
-    // IoBufferDispatcher maps a region, it could try to update a destroyed peer.
-    //
-    // See: IoBufferDispatcher~IoBufferDispatcher.
-
-    // We effectively duplicate the logic from sys_vmo_create here, but instead of creating a
-    // kernel handle and dispatcher, we keep ownership of it and assign it to a region.
-
-    uint32_t vmo_options = 0;
-    zx_status_t status = VmObjectDispatcher::parse_create_syscall_flags(
-        region_config.private_region.options, &vmo_options);
-    if (status != ZX_OK) {
-      return status;
-    }
-
-    fbl::RefPtr<VmObjectPaged> vmo;
-    status = VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY | PMM_ALLOC_FLAG_CAN_WAIT, vmo_options,
-                                   region_config.size, attribution_object, &vmo);
-    if (status != ZX_OK) {
-      return status;
-    }
-
-    // VmObjectPaged::Create will round up the size to the nearest page. We need to know the actual
-    // size of the vmo to later return if asked.
-    region_config.size = vmo->size();
-    zx_koid_t koid = KernelObjectId::Generate();
-    vmo->set_user_id(koid);
-
-    // In order to track mappings and unmappings separately for each endpoint, we give each
-    // endpoint a child reference instead of the created vmo.
-    fbl::RefPtr<VmObject> ep0_reference;
-    fbl::RefPtr<VmObject> ep1_reference;
-
-    Resizability resizability =
-        vmo->is_resizable() ? Resizability::Resizable : Resizability::NonResizable;
-    status = vmo->CreateChildReference(resizability, 0, 0, true, nullptr, &ep0_reference);
-    if (status != ZX_OK) {
-      return status;
-    }
-    status = vmo->CreateChildReference(resizability, 0, 0, true, nullptr, &ep1_reference);
-    if (status != ZX_OK) {
-      return status;
-    }
-
-    ep0_reference->set_user_id(koid);
-    ep1_reference->set_user_id(koid);
-
-    // Now each endpoint can observe the mappings created by the other
-    ep0_reference->SetChildObserver(new_handle1.dispatcher().get());
-    ep1_reference->SetChildObserver(new_handle0.dispatcher().get());
-
-    region_inner[i] =
-        IobRegion{ktl::move(ep0_reference), ktl::move(ep1_reference), region_config, koid};
+  {
+    Guard<CriticalMutex> guard{&shared_regions->state_lock};
+    shared_regions->regions = *ktl::move(regions);
   }
-  shared_regions->regions = std::move(region_inner);
 
   new_handle0.dispatcher()->InitPeer(new_handle1.dispatcher());
   new_handle1.dispatcher()->InitPeer(new_handle0.dispatcher());
@@ -170,7 +189,7 @@ IoBufferDispatcher::IoBufferDispatcher(fbl::RefPtr<PeerHolder<IoBufferDispatcher
                                        IobEndpointId endpoint_id,
                                        fbl::RefPtr<SharedIobState> shared_state)
     : PeeredDispatcher(ktl::move(holder)),
-      shared_state_(std::move(shared_state)),
+      shared_state_(ktl::move(shared_state)),
       endpoint_id_(endpoint_id) {
   kcounter_add(dispatcher_iob_create_count, 1);
 }

@@ -198,6 +198,17 @@ class ThreadDispatcher final : public SoloDispatcher<ThreadDispatcher, ZX_DEFAUL
   zx_status_t SetBaseProfile(const SchedulerState::BaseProfile& profile) TA_EXCL(get_lock());
   zx_status_t SetSoftAffinity(cpu_mask_t mask) TA_EXCL(get_lock());
 
+  // Thread Sampling Support
+  zx_status_t EnableStackSampling(uint64_t sampler_id) TA_EXCL(get_lock());
+  uint64_t SamplerId() const TA_EXCL(get_lock()) {
+    Guard<CriticalMutex> guard{get_lock()};
+    return sampler_id_;
+  }
+  void DisableStackSampling() TA_EXCL(get_lock()) {
+    Guard<CriticalMutex> guard{get_lock()};
+    sampler_id_ = ZX_KOID_INVALID;
+  }
+
   // For ChannelDispatcher use.
   ChannelDispatcher::MessageWaiter* GetMessageWaiter() { return &channel_waiter_; }
 
@@ -365,6 +376,19 @@ class ThreadDispatcher final : public SoloDispatcher<ThreadDispatcher, ZX_DEFAUL
   ktl::atomic<uint64_t> stats_generation_count_ = 0;
   // The runtime stats for this thread.
   Thread::RuntimeStats runtime_stats_ = {};
+
+  // Marker to denote that thread sampling has been requested for this thread and that we should
+  // take a sample when we handle THREAD_SIGNAL_SAMPLE_STACK.
+  //
+  // A thread should have its thread_sampling_session checked to ensure it matches the current
+  // session before taking a sample.
+  //
+  // The session is associated with a specific thread sampler's koid. When a thread is marked to be
+  // sampled, its thread_sampling_session will be set to the current sampler's koid. This allows us
+  // to eliminate the need to track when threads we have marked to be sampled and avoid iterating
+  // through to clean up after a session as when a new session is created, the koid recorded in
+  // `sampler_id_` will no longer match.
+  uint64_t sampler_id_ TA_GUARDED(get_lock()){0};
 };
 
 #endif  // ZIRCON_KERNEL_OBJECT_INCLUDE_OBJECT_THREAD_DISPATCHER_H_

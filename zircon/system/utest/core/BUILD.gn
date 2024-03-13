@@ -116,6 +116,7 @@ unified_only = [
   "system-event",
   "system-cpu",
   "system-suspend",
+  "thread-sampler",
 ]
 assert(core_tests + core_tests_with_custom_manifests -
            core_tests_with_custom_manifests == core_tests,

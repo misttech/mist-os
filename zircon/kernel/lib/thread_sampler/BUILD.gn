@@ -1,0 +1,23 @@
+# Copyright 2023 The Fuchsia Authors
+#
+# Use of this source code is governed by a MIT-style
+# license that can be found in the LICENSE file or at
+# https://opensource.org/licenses/MIT
+
+import("//build/zircon/migrated_targets.gni")
+
+zx_library("thread_sampler") {
+  sources = [
+    "buffer_writer.cc",
+    "per_cpu_state.cc",
+    "thread_sampler.cc",
+  ]
+  deps = [
+    "//sdk/lib/fit",
+    "//src/performance/lib/fxt",
+    "//zircon/kernel/lib/boot-options",
+    "//zircon/kernel/lib/init",
+    "//zircon/kernel/object",
+  ]
+  public_deps = [ "//src/performance/lib/fxt:headers" ]
+}

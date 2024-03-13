@@ -7,6 +7,7 @@
 #include <lib/boot-options/boot-options.h>
 #include <lib/boot-options/types.h>
 #include <lib/syscalls/forward.h>
+#include <lib/thread_sampler/thread_sampler.h>
 
 #include <object/io_buffer_dispatcher.h>
 #include <object/resource.h>
@@ -40,14 +41,13 @@ zx_status_t sys_sampler_create(zx_handle_t rsrc, uint64_t options,
 
   // The sampler is a special case of an IOBuffer, so we use the same policy.
   auto up = ProcessDispatcher::GetCurrent();
-  if (zx_status_t res = up->EnforceBasicPolicy(ZX_POL_NEW_IOB); res != ZX_OK) {
-    return res;
+  if (zx_status_t status = up->EnforceBasicPolicy(ZX_POL_NEW_IOB); status != ZX_OK) {
+    return status;
   }
 
   zx_sampler_config_t sample_config;
-  zx_status_t result = config.copy_from_user(&sample_config);
-  if (result != ZX_OK) {
-    return result;
+  if (zx_status_t status = config.copy_from_user(&sample_config); status != ZX_OK) {
+    return status;
   }
 
   // Validate the the provided config has reasonable values in it.
@@ -71,7 +71,15 @@ zx_status_t sys_sampler_create(zx_handle_t rsrc, uint64_t options,
     return ZX_ERR_INVALID_ARGS;
   }
 
-  return ZX_ERR_NOT_SUPPORTED;
+  zx::result<KernelHandle<sampler::ThreadSamplerDispatcher>> create_res =
+      sampler::ThreadSamplerDispatcher::Create(sample_config, up->attribution_object());
+  if (create_res.is_error()) {
+    return create_res.status_value();
+  }
+  return up->MakeAndAddHandle(
+      ktl::move(*create_res),
+      (IoBufferDispatcher::default_rights() | ZX_RIGHT_APPLY_PROFILE) & ~ZX_RIGHT_WRITE,
+      buffers_out);
 }
 
 // zx_status_t zx_sampler_attach
@@ -84,7 +92,24 @@ zx_status_t sys_sampler_attach(zx_handle_t iobuffer, zx_handle_t thread) {
     return ZX_ERR_NOT_SUPPORTED;
   }
 
-  return ZX_ERR_NOT_SUPPORTED;
+  auto up = ProcessDispatcher::GetCurrent();
+  fbl::RefPtr<ThreadDispatcher> thread_dispatcher;
+
+  if (zx_status_t status = up->handle_table().GetDispatcherWithRights(*up, thread, ZX_RIGHT_READ,
+                                                                      &thread_dispatcher);
+      status != ZX_OK) {
+    return status;
+  }
+
+  fbl::RefPtr<IoBufferDispatcher> thread_sampler;
+  if (zx_status_t status = up->handle_table().GetDispatcherWithRights(
+          *up, iobuffer, ZX_RIGHT_APPLY_PROFILE, &thread_sampler);
+      status != ZX_OK) {
+    return status;
+  }
+
+  return sampler::ThreadSamplerDispatcher::AddThread(thread_sampler, thread_dispatcher)
+      .status_value();
 }
 
 // zx_status_t zx_sampler_start
@@ -96,7 +121,16 @@ zx_status_t sys_sampler_start(zx_handle_t iobuffer) {
   if (!gBootOptions->enable_debugging_syscalls) {
     return ZX_ERR_NOT_SUPPORTED;
   }
-  return ZX_ERR_NOT_SUPPORTED;
+
+  fbl::RefPtr<IoBufferDispatcher> thread_sampler;
+  auto up = ProcessDispatcher::GetCurrent();
+  if (zx_status_t status = up->handle_table().GetDispatcherWithRights(
+          *up, iobuffer, ZX_RIGHT_APPLY_PROFILE, &thread_sampler);
+      status != ZX_OK) {
+    return status;
+  }
+
+  return sampler::ThreadSamplerDispatcher::Start(thread_sampler).status_value();
 }
 
 // zx_status_t zx_sampler_stop
@@ -108,5 +142,14 @@ zx_status_t sys_sampler_stop(zx_handle_t iobuffer) {
   if (!gBootOptions->enable_debugging_syscalls) {
     return ZX_ERR_NOT_SUPPORTED;
   }
-  return ZX_ERR_NOT_SUPPORTED;
+
+  fbl::RefPtr<IoBufferDispatcher> thread_sampler;
+  auto up = ProcessDispatcher::GetCurrent();
+  if (zx_status_t status = up->handle_table().GetDispatcherWithRights(
+          *up, iobuffer, ZX_RIGHT_APPLY_PROFILE, &thread_sampler);
+      status != ZX_OK) {
+    return status;
+  }
+
+  return sampler::ThreadSamplerDispatcher::Stop(thread_sampler).status_value();
 }

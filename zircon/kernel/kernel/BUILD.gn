@@ -49,6 +49,7 @@ source_set("kernel") {
     "//zircon/kernel/lib/ktl",
     "//zircon/kernel/lib/ktrace",
     "//zircon/kernel/lib/libc",
+    "//zircon/kernel/lib/thread_sampler",
     "//zircon/kernel/lib/topology",
     "//zircon/kernel/lib/version",
     "//zircon/kernel/object",

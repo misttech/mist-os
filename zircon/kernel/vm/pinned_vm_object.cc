@@ -48,8 +48,6 @@ void PinnedVmObject::reset() {
   }
 }
 
-PinnedVmObject::PinnedVmObject() = default;
-
 PinnedVmObject::PinnedVmObject(PinnedVmObject&&) noexcept = default;
 
 PinnedVmObject& PinnedVmObject::operator=(PinnedVmObject&& pinned) noexcept {

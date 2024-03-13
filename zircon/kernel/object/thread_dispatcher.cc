@@ -869,6 +869,17 @@ zx_status_t ThreadDispatcher::SetSoftAffinity(cpu_mask_t mask) {
   return ZX_OK;
 }
 
+zx_status_t ThreadDispatcher::EnableStackSampling(uint64_t sampler_id) {
+  Guard<CriticalMutex> guard{get_lock()};
+  if ((state_.lifecycle() == ThreadState::Lifecycle::INITIAL) ||
+      (state_.lifecycle() == ThreadState::Lifecycle::DYING) ||
+      (state_.lifecycle() == ThreadState::Lifecycle::DEAD)) {
+    return ZX_ERR_BAD_STATE;
+  }
+  sampler_id_ = sampler_id;
+  return ZX_OK;
+}
+
 const char* ThreadLifecycleToString(ThreadState::Lifecycle lifecycle) {
   switch (lifecycle) {
     case ThreadState::Lifecycle::INITIAL:

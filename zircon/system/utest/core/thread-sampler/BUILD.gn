@@ -1,0 +1,24 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//zircon/kernel/params.gni")
+
+source_set("thread-sampler") {
+  testonly = true
+  sources = [ "thread-sampler.cc" ]
+  deps = [
+    "//src/performance/lib/fxt",
+    "//src/zircon/testing/standalone-test",
+    "//zircon/system/ulib/runtime",
+    "//zircon/system/ulib/zx",
+    "//zircon/system/ulib/zxtest",
+  ]
+  configs += [ ":include_experimental_thread_sampler" ]
+}
+
+config("include_experimental_thread_sampler") {
+  defines = [
+    "EXPERIMENTAL_THREAD_SAMPLER_ENABLED=$experimental_thread_sampler_enabled",
+  ]
+}

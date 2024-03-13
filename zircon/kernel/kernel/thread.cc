@@ -26,6 +26,7 @@
 #include <lib/heap.h>
 #include <lib/ktrace.h>
 #include <lib/lazy_init/lazy_init.h>
+#include <lib/thread_sampler/thread_sampler.h>
 #include <lib/version.h>
 #include <lib/zircon-internal/macros.h>
 #include <platform.h>
@@ -65,6 +66,8 @@
 #include <vm/vm_address_region.h>
 #include <vm/vm_aspace.h>
 
+#include "lib/zx/time.h"
+
 #include <ktl/enforce.h>
 
 #define LOCAL_TRACE 0
@@ -87,6 +90,8 @@ KCOUNTER(thread_resume_count, "thread.resume")
 KCOUNTER(thread_timeslice_extended, "thread.timeslice_extended")
 // counts the number of calls to restricted_kick() that succeeded.
 KCOUNTER(thread_restricted_kick_count, "thread.restricted_kick")
+// counts the number of failed samples
+KCOUNTER(thread_sampling_failed, "thread.sampling_failed")
 
 // The global thread list. This is a lazy_init type, since initial thread code
 // manipulates the list before global constructors are run. This is initialized by
@@ -950,6 +955,54 @@ void Thread::Current::DoSuspend() {
   }
 }
 
+void Thread::SignalSampleStack(Timer* timer, zx_time_t, void* per_cpu_state) {
+  // Regardless of if the thread is marked to be sampled or not we'll set the sample_stack thread
+  // signal. This reduces the time we spend in the interrupt context and means we don't need to grab
+  // a lock here. When we handle the thread signal in ProcessPendingSignals we'll check if the
+  // thread actually needs to be sampled.
+  Thread* current_thread = Thread::Current::Get();
+  current_thread->canary_.Assert();
+  current_thread->signals_.fetch_or(THREAD_SIGNAL_SAMPLE_STACK, ktl::memory_order_relaxed);
+
+  // We set the timer here as opposed to when we handle the THREAD_SIGNAL_SAMPLE_STACK as a thread
+  // could be suspended or killed before the sample signal is handled.
+  reinterpret_cast<sampler::internal::PerCpuState*>(per_cpu_state)->SetTimer();
+}
+
+void Thread::Current::DoSampleStack(GeneralRegsSource source, void* gregs) {
+  DEBUG_ASSERT(!arch_ints_disabled());
+  Thread* current_thread = Thread::Current::Get();
+
+  // Make sure the sample signal wasn't cleared while we were running the
+  // callback.
+  if (current_thread->signals() & THREAD_SIGNAL_SAMPLE_STACK) {
+    current_thread->signals_.fetch_and(~THREAD_SIGNAL_SAMPLE_STACK, ktl::memory_order_relaxed);
+
+    if (current_thread->user_thread() == nullptr) {
+      // There's no user thread to sample, just move on.
+      return;
+    }
+
+    const uint64_t expected_sampler = current_thread->user_thread()->SamplerId();
+
+    // If a thread was marked to be sampled but was first suspended, it may now be long after the
+    // sampling session has ended. sampler::SampleThread grabs the global state, checks if it's
+    // valid and if the session is the one we were expecting to sample to before attempting a
+    // sample.
+    auto sampler_result = sampler::ThreadSamplerDispatcher::SampleThread(
+        current_thread->pid(), current_thread->tid(), source, gregs, expected_sampler);
+    // ZX_ERR_NOT_SUPPORTED indicates that we didn't take a sample, but that was intentional and we
+    // should move on.
+    if (sampler_result.is_error() && sampler_result.error_value() != ZX_ERR_NOT_SUPPORTED) {
+      // Any other error means sampling failed for this thread and likely won't succeed in the
+      // future. Likely either the global sampler is now disabled or the per cpu buffer is full.
+      // Disable future attempts to sample.
+      kcounter_add(thread_sampling_failed, 1);
+      current_thread->user_thread()->DisableStackSampling();
+    }
+  }
+}
+
 bool Thread::SaveUserStateLocked() {
   thread_lock.AssertHeld();
   DEBUG_ASSERT(this == Thread::Current::Get());
@@ -1130,6 +1183,13 @@ void Thread::Current::ProcessPendingSignals(GeneralRegsSource source, void* greg
         // for the next time we try to enter restricted mode.
         current_thread->set_restricted_kick_pending(true);
       }
+    }
+
+    if (signals & THREAD_SIGNAL_SAMPLE_STACK) {
+      // Sampling the user stack may page fault as we try to do usercopies.
+      arch_enable_ints();
+      Thread::Current::DoSampleStack(source, gregs);
+      arch_disable_ints();
     }
   }
 

@@ -23,8 +23,8 @@
 
 enum class IobEndpointId : size_t { Ep0 = 0, Ep1 = 1 };
 
-class IoBufferDispatcher final : public PeeredDispatcher<IoBufferDispatcher, ZX_DEFAULT_IOB_RIGHTS>,
-                                 VmObjectChildObserver {
+class IoBufferDispatcher : public PeeredDispatcher<IoBufferDispatcher, ZX_DEFAULT_IOB_RIGHTS>,
+                           public VmObjectChildObserver {
  public:
   // Make sure that RegionArray is small enough to comfortably fit on the stack.
   using RegionArray = fbl::InlineArray<zx_iob_region_t, 4>;
@@ -36,7 +36,7 @@ class IoBufferDispatcher final : public PeeredDispatcher<IoBufferDispatcher, ZX_
                             KernelHandle<IoBufferDispatcher>* handle0,
                             KernelHandle<IoBufferDispatcher>* handle1, zx_rights_t* rights);
 
-  ~IoBufferDispatcher() final;
+  ~IoBufferDispatcher() override;
   zx_obj_type_t get_type() const final { return ZX_OBJ_TYPE_IOB; }
 
   IobEndpointId GetEndpointId() const { return endpoint_id_; }
@@ -52,14 +52,14 @@ class IoBufferDispatcher final : public PeeredDispatcher<IoBufferDispatcher, ZX_
 
   // PeeredDispatcher implementation
   void on_zero_handles_locked() TA_REQ(get_lock());
-  void OnPeerZeroHandlesLocked() TA_REQ(get_lock());
+  virtual void OnPeerZeroHandlesLocked() TA_REQ(get_lock());
   zx_status_t set_name(const char* name, size_t len) override;
   zx_status_t get_name(char (&out_name)[ZX_MAX_NAME_LEN]) const override;
 
   // VmObjectChildObserver implementation
   void OnZeroChild() override;
 
- private:
+ protected:
   class IobRegion {
    public:
     IobRegion() = default;
@@ -147,9 +147,15 @@ class IoBufferDispatcher final : public PeeredDispatcher<IoBufferDispatcher, ZX_
     fbl::Array<const IobRegion> TA_GUARDED(state_lock) regions;
   };
 
+  static zx::result<fbl::Array<IobRegion>> CreateRegions(
+      const IoBufferDispatcher::RegionArray& region_configs,
+      const fbl::RefPtr<AttributionObject>& attribution_object, VmObjectChildObserver* ep0,
+      VmObjectChildObserver* ep1);
+
   explicit IoBufferDispatcher(fbl::RefPtr<PeerHolder<IoBufferDispatcher>> holder,
                               IobEndpointId endpoint_id, fbl::RefPtr<SharedIobState> shared_state);
 
+ private:
   fbl::RefPtr<SharedIobState> const shared_state_;
   const IobEndpointId endpoint_id_;
 

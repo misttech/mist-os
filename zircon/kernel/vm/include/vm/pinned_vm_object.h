@@ -15,7 +15,7 @@ class PinnedVmObject {
   static zx_status_t Create(fbl::RefPtr<VmObject> vmo, size_t offset, size_t size, bool write,
                             PinnedVmObject* out_pinned_vmo);
 
-  PinnedVmObject();
+  constexpr PinnedVmObject() = default;
   PinnedVmObject(PinnedVmObject&&) noexcept;
   PinnedVmObject& operator=(PinnedVmObject&&) noexcept;
   ~PinnedVmObject();
@@ -28,8 +28,8 @@ class PinnedVmObject {
 
  private:
   fbl::RefPtr<VmObject> vmo_;
-  size_t offset_;
-  size_t size_;
+  size_t offset_ = 0;
+  size_t size_ = 0;
 
   DISALLOW_COPY_AND_ASSIGN_ALLOW_MOVE(PinnedVmObject);
 };

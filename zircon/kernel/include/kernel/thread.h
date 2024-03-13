@@ -478,6 +478,7 @@ typedef void (*thread_trampoline_routine)() __NO_RETURN;
 #define THREAD_SIGNAL_SUSPEND                (1 << 1)
 #define THREAD_SIGNAL_POLICY_EXCEPTION       (1 << 2)
 #define THREAD_SIGNAL_RESTRICTED_KICK        (1 << 3)
+#define THREAD_SIGNAL_SAMPLE_STACK           (1 << 4)
 // clang-format on
 
 // thread priority
@@ -1220,6 +1221,10 @@ struct Thread {
   static void SleepHandler(Timer* timer, zx_time_t now, void* arg);
   void HandleSleep(Timer* timer, zx_time_t now);
 
+  // Request a thread to check if it should sample its backtrace. When the thread returns to
+  // usermode, it will take a sample of its userstack if sampling is enabled.
+  static void SignalSampleStack(Timer* t, zx_time_t, void* per_cpu_state);
+
   // All of these operations implicitly operate on the current thread.
   struct Current {
     // This is defined below, just after the Thread declaration.
@@ -1249,6 +1254,9 @@ struct Thread {
 
     // Transition the current thread to the THREAD_SUSPENDED state.
     static void DoSuspend();
+
+    // Write the current thread's stack to the assigned sampler buffers
+    static void DoSampleStack(GeneralRegsSource source, void* gregs);
 
     // |policy_exception_code| should be a ZX_EXCP_POLICY_CODE_* value.
     static void SignalPolicyException(uint32_t policy_exception_code,
