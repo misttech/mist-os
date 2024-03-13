@@ -49,7 +49,7 @@ fn make_test_url(component_name: &str) -> String {
 }
 
 pub struct RoutingTestForAnalyzer {
-    model: Arc<ComponentModelForAnalyzer>,
+    pub model: Arc<ComponentModelForAnalyzer>,
 }
 
 pub struct RoutingTestBuilderForAnalyzer {

@@ -5,9 +5,11 @@
 mod tests {
     use {
         crate::routing::RoutingTestBuilderForAnalyzer,
+        cm_fidl_analyzer::route::VerifyRouteResult,
         cm_moniker::InstancedMoniker,
         cm_rust::{
-            Availability, OfferDecl, OfferSource, OfferStorageDecl, OfferTarget,
+            Availability, CapabilityDecl, CapabilityTypeName, DependencyType, OfferDecl,
+            OfferDirectoryDecl, OfferSource, OfferStorageDecl, OfferTarget, StorageDecl,
             StorageDirectorySource,
         },
         cm_rust_testing::*,
@@ -15,10 +17,12 @@ mod tests {
         fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_io as fio,
         fuchsia_zircon_status as zx_status,
         moniker::{Moniker, MonikerBase},
+        routing::{mapper::RouteSegment, RegistrationDecl},
         routing_test_helpers::{
             component_id_index::make_index_file, storage::CommonStorageTest, CheckUse,
             ExpectedResult, RoutingTestModel, RoutingTestModelBuilder,
         },
+        std::collections::HashSet,
     };
 
     #[fuchsia::test]
@@ -218,5 +222,134 @@ mod tests {
                 },
             )
             .await;
+    }
+
+    /// Tests verification of a storage capability route from an unused offer. (Routes from offers
+    /// are only verified if the target does not use the offered capability.)
+    ///
+    ///   directory_provider
+    ///    |
+    ///   storage_provider
+    ///    |
+    ///   not_consumer
+    ///
+    /// `directory_provider` declares a directory capability and offers it to `storage_provider`.
+    /// `storage_provider` declares a storage capability with that directory as the backing dir,
+    /// and offers the storage capability to `not_consumer`. `not_consumer` does not use the
+    /// storage capability.
+    ///
+    /// Note that since the capability is not used, there is no requirement on the contents of the
+    /// component ID index, even though the storage capability uses restricted storage.
+    ///
+    /// This test only runs for the static model, since Component Manager doesn't route capabilities
+    /// from offer declarations.
+    #[fuchsia::test]
+    async fn route_storage_from_offer() {
+        let directory_decl = CapabilityBuilder::directory()
+            .name("data")
+            .path("/data")
+            .rights(fio::RW_STAR_DIR)
+            .build();
+        let offer_directory_decl = OfferDecl::Directory(OfferDirectoryDecl {
+            source: OfferSource::Self_,
+            source_name: "data".parse().unwrap(),
+            source_dictionary: None,
+            target: OfferTarget::static_child("storage_provider".to_string()),
+            target_name: "data".parse().unwrap(),
+            rights: Some(fio::RW_STAR_DIR),
+            subdir: None,
+            dependency_type: DependencyType::Strong,
+            availability: Availability::Required,
+        });
+        let inner_storage_decl = StorageDecl {
+            name: "cache".parse().unwrap(),
+            backing_dir: "data".parse().unwrap(),
+            subdir: None,
+            storage_id: fdecl::StorageId::StaticInstanceId,
+            source: StorageDirectorySource::Parent,
+        };
+        let storage_decl = CapabilityDecl::Storage(inner_storage_decl.clone());
+        let offer_storage_decl = OfferDecl::Storage(OfferStorageDecl {
+            source: OfferSource::Self_,
+            target: OfferTarget::static_child("not_consumer".to_string()),
+            source_name: "cache".parse().unwrap(),
+            target_name: "cache".parse().unwrap(),
+            availability: Availability::Required,
+        });
+        let components = vec![
+            (
+                "directory_provider",
+                ComponentDeclBuilder::new()
+                    .capability(directory_decl.clone())
+                    .offer(offer_directory_decl.clone())
+                    .child_default("storage_provider")
+                    .build(),
+            ),
+            (
+                "storage_provider",
+                ComponentDeclBuilder::new()
+                    .capability(storage_decl.clone())
+                    .offer(offer_storage_decl.clone())
+                    .child_default("not_consumer")
+                    .build(),
+            ),
+            ("not_consumer", ComponentDeclBuilder::new().build()),
+        ];
+        let test =
+            RoutingTestBuilderForAnalyzer::new("directory_provider", components).build().await;
+        let storage_provider = test
+            .look_up_instance(&Moniker::parse_str("/storage_provider").unwrap())
+            .await
+            .expect("storage_provider instance");
+
+        let route_maps = test.model.check_routes_for_instance(
+            &storage_provider,
+            &HashSet::from_iter(vec![CapabilityTypeName::Storage].into_iter()),
+        );
+        assert_eq!(route_maps.len(), 1);
+
+        let storage = route_maps
+            .get(&CapabilityTypeName::Storage)
+            .expect("expected a storage capability route");
+
+        assert_eq!(
+            storage,
+            &vec![
+                VerifyRouteResult {
+                    using_node: Moniker::parse_str("/storage_provider").unwrap(),
+                    capability: Some("cache".parse().unwrap()),
+                    error: None,
+                    route: vec![
+                        RouteSegment::OfferBy {
+                            moniker: Moniker::parse_str("/storage_provider").unwrap(),
+                            capability: offer_storage_decl
+                        },
+                        RouteSegment::DeclareBy {
+                            moniker: Moniker::parse_str("/storage_provider").unwrap(),
+                            capability: storage_decl.clone(),
+                        }
+                    ]
+                },
+                VerifyRouteResult {
+                    using_node: Moniker::parse_str("/storage_provider").unwrap(),
+                    capability: Some("cache".parse().unwrap()),
+                    error: None,
+                    route: vec![
+                        RouteSegment::RegisterBy {
+                            moniker: Moniker::parse_str("/storage_provider").unwrap(),
+                            capability: RegistrationDecl::Directory(inner_storage_decl.into())
+                        },
+                        RouteSegment::OfferBy {
+                            moniker: Moniker::root(),
+                            capability: offer_directory_decl
+                        },
+                        RouteSegment::DeclareBy {
+                            moniker: Moniker::root(),
+                            capability: directory_decl
+                        }
+                    ],
+                }
+            ]
+        );
     }
 }

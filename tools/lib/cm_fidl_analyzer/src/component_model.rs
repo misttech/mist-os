@@ -13,8 +13,9 @@ use {
     cm_config::RuntimeConfig,
     cm_rust::{
         CapabilityDecl, CapabilityTypeName, ComponentDecl, ExposeDecl, ExposeDeclCommon, OfferDecl,
-        OfferDeclCommon, OfferTarget, ProgramDecl, ResolverRegistration, SourceName, UseDecl,
-        UseDeclCommon, UseEventStreamDecl, UseRunnerDecl, UseSource, UseStorageDecl,
+        OfferDeclCommon, OfferStorageDecl, OfferTarget, ProgramDecl, ResolverRegistration,
+        SourceName, UseDecl, UseDeclCommon, UseEventStreamDecl, UseRunnerDecl, UseSource,
+        UseStorageDecl,
     },
     config_encoder::ConfigFields,
     fidl::prelude::*,
@@ -611,11 +612,6 @@ impl ComponentModelForAnalyzer {
                 let route_request = RouteRequest::OfferDirectory(offer_decl);
                 (capability, route_request)
             }
-            OfferDecl::Storage(offer_decl) => {
-                let capability = offer_decl.source_name.clone();
-                let route_request = RouteRequest::OfferStorage(offer_decl);
-                (capability, route_request)
-            }
             OfferDecl::Service(offer_decl) => {
                 let capability = offer_decl.source_name.clone();
                 let route_request = RouteRequest::OfferService(RouteBundle::from_offer(offer_decl));
@@ -640,6 +636,59 @@ impl ComponentModelForAnalyzer {
                 let capability = offer_decl.source_name.clone();
                 let route_request = RouteRequest::OfferConfig(offer_decl);
                 (capability, route_request)
+            }
+            // Storage capabilities are a special case because they result in 2 routes.
+            OfferDecl::Storage(offer_decl) => {
+                let capability = offer_decl.source_name.clone();
+                let (result, storage_route, dir_route) =
+                    Self::route_storage_and_backing_directory_from_offer_sync(offer_decl, target);
+
+                // Ignore any valid routes to void.
+                if let Ok(ref source) = result {
+                    if matches!(source.source, CapabilitySource::Void { .. }) {
+                        return vec![];
+                    }
+                }
+
+                match (
+                    result.map_err(|e| AnalyzerModelError::from(e)),
+                    vec![storage_route, dir_route],
+                    capability,
+                ) {
+                    (Ok(source), routes, capability) => match self.check_use_source(&source) {
+                        Ok(()) => {
+                            for route in routes.into_iter() {
+                                results.push(VerifyRouteResult {
+                                    using_node: target.moniker().clone(),
+                                    capability: Some(capability.clone()),
+                                    error: None,
+                                    route,
+                                });
+                            }
+                        }
+                        Err(err) => {
+                            for route in routes.into_iter() {
+                                results.push(VerifyRouteResult {
+                                    using_node: target.moniker().clone(),
+                                    capability: Some(capability.clone()),
+                                    error: Some(err.clone()),
+                                    route,
+                                });
+                            }
+                        }
+                    },
+                    (Err(err), routes, capability) => {
+                        for route in routes.into_iter() {
+                            results.push(VerifyRouteResult {
+                                using_node: target.moniker().clone(),
+                                capability: Some(capability.clone()),
+                                error: Some(err.clone()),
+                                route,
+                            });
+                        }
+                    }
+                }
+                return results;
             }
             OfferDecl::Dictionary(_offer_decl) => {
                 // TODO(https://fxbug.dev/301674053): Support this.
@@ -1147,7 +1196,8 @@ impl ComponentModelForAnalyzer {
     }
 
     // Routes a storage capability and its backing directory from a `ComponentInstanceForAnalyzer` and
-    // panics if the future returned by `route_storage_and_backing_directory` is not ready immediately.
+    // panics if the returned future is not ready immediately. If routing was successful, then `result`
+    // contains the source of the backing directory capability.
     //
     // TODO(https://fxbug.dev/42168300): Remove this function and use `route_capability` directly when Scrutiny's
     // `DataController`s allow async function calls.
@@ -1165,6 +1215,50 @@ impl ComponentModelForAnalyzer {
             let result =
                 route_capability(RouteRequest::UseStorage(use_decl), target, &mut storage_mapper)
                     .await?;
+            let (storage_decl, storage_component) = match result.source {
+                CapabilitySource::Component {
+                    capability: ComponentCapability::Storage(storage_decl),
+                    component,
+                    ..
+                } => (storage_decl, component.upgrade()?),
+                CapabilitySource::Void { .. } => return Ok(result),
+                _ => unreachable!("unexpected storage source"),
+            };
+            route_capability(
+                RouteRequest::StorageBackingDirectory(storage_decl),
+                &storage_component,
+                &mut backing_dir_mapper,
+            )
+            .await
+        }
+        .now_or_never()
+        .expect("future was not ready immediately");
+        (result, storage_mapper.get_route(), backing_dir_mapper.get_route())
+    }
+
+    // Routes a storage capability and its backing directory from an offer to a `ComponentInstanceForAnalyzer`
+    // and panics if the returned future is not ready immediately. If routing was successful, then `result`
+    // contains the source of the backing directory capability.
+    //
+    // TODO(https://fxbug.dev/42168300): Remove this function and use `route_capability` directly when Scrutiny's
+    // `DataController`s allow async function calls.
+    fn route_storage_and_backing_directory_from_offer_sync(
+        offer_decl: OfferStorageDecl,
+        target: &Arc<ComponentInstanceForAnalyzer>,
+    ) -> (
+        Result<RouteSource<ComponentInstanceForAnalyzer>, RoutingError>,
+        Vec<RouteSegment>,
+        Vec<RouteSegment>,
+    ) {
+        let mut storage_mapper = RouteMapper::new();
+        let mut backing_dir_mapper = RouteMapper::new();
+        let result = async {
+            let result = route_capability(
+                RouteRequest::OfferStorage(offer_decl),
+                target,
+                &mut storage_mapper,
+            )
+            .await?;
             let (storage_decl, storage_component) = match result.source {
                 CapabilitySource::Component {
                     capability: ComponentCapability::Storage(storage_decl),
