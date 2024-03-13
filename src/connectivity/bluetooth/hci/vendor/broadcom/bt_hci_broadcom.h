@@ -5,41 +5,38 @@
 #ifndef SRC_CONNECTIVITY_BLUETOOTH_HCI_VENDOR_BROADCOM_BT_HCI_BROADCOM_H_
 #define SRC_CONNECTIVITY_BLUETOOTH_HCI_VENDOR_BROADCOM_BT_HCI_BROADCOM_H_
 
+#include <fidl/fuchsia.driver.framework/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.bluetooth/cpp/wire.h>
 #include <fidl/fuchsia.hardware.serialimpl/cpp/driver/fidl.h>
+#include <fidl/fuchsia.io/cpp/wire_test_base.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async/cpp/executor.h>
 #include <lib/async/cpp/wait.h>
-
-#include <ddktl/device.h>
+#include <lib/driver/component/cpp/driver_base.h>
+#include <lib/driver/component/cpp/node_add_args.h>
+#include <lib/driver/devfs/cpp/connector.h>
+#include <lib/sync/cpp/completion.h>
 
 #include "packets.h"
 
 namespace bt_hci_broadcom {
 
-class BtHciBroadcom;
-
-using BtHciBroadcomType = ddk::Device<BtHciBroadcom, ddk::Initializable, ddk::Unbindable,
-                                      ddk::Messageable<fuchsia_hardware_bluetooth::Vendor>::Mixin>;
-
-class BtHciBroadcom : public BtHciBroadcomType,
-                      public fidl::WireServer<fuchsia_hardware_bluetooth::Hci> {
+class BtHciBroadcom : public fdf::DriverBase,
+                      public fidl::WireAsyncEventHandler<fuchsia_driver_framework::NodeController>,
+                      public fidl::WireAsyncEventHandler<fuchsia_driver_framework::Node>,
+                      public fidl::WireServer<fuchsia_hardware_bluetooth::Hci>,
+                      public fidl::WireServer<fuchsia_hardware_bluetooth::Vendor> {
  public:
-  // |dispatcher| will be used for the initialization thread if non-null.
-  explicit BtHciBroadcom(zx_device_t* parent, async_dispatcher_t* dispatcher);
+  explicit BtHciBroadcom(fdf::DriverStartArgs start_args,
+                         fdf::UnownedSynchronizedDispatcher driver_dispatcher);
 
-  // Static bind function for the ZIRCON_DRIVER() declaration. Binds this device and passes
-  // ownership to the driver manager.
-  static zx_status_t Create(void* ctx, zx_device_t* parent);
+  zx::result<> Start() override;
+  void PrepareStop(fdf::PrepareStopCompleter completer) override;
 
-  // Static bind function that accepts a dispatcher for the initialization thread. This is useful
-  // for testing.
-  static zx_status_t Create(void* ctx, zx_device_t* parent, async_dispatcher_t* dispatcher);
-
-  // DDK mixins:
-  void DdkInit(ddk::InitTxn txn);
-  void DdkUnbind(ddk::UnbindTxn txn);
-  void DdkRelease();
+  void handle_unknown_event(
+      fidl::UnknownEventMetadata<fuchsia_driver_framework::NodeController> metadata) override {}
+  void handle_unknown_event(
+      fidl::UnknownEventMetadata<fuchsia_driver_framework::Node> metadata) override {}
 
  private:
   static constexpr size_t kMacAddrLen = 6;
@@ -74,6 +71,7 @@ class BtHciBroadcom : public BtHciBroadcomType,
   void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_hardware_bluetooth::Hci> metadata,
                              fidl::UnknownMethodCompleter::Sync& completer) override;
 
+  void Connect(fidl::ServerEnd<fuchsia_hardware_bluetooth::Vendor> request);
   // Truly private, internal helper methods:
   zx_status_t ConnectToHciFidlProtocol();
   zx_status_t ConnectToSerialFidlProtocol();
@@ -109,17 +107,35 @@ class BtHciBroadcom : public BtHciBroadcomType,
   zx::channel command_channel_;
   // true if underlying transport is UART
   bool is_uart_;
-  std::optional<ddk::InitTxn> init_txn_;
 
-  // Only present in production. Created during initialization.
-  std::optional<async::Loop> loop_;
-  // In production, this is |loop_|'s dispatcher. In tests, this is the test dispatcher.
-  async_dispatcher_t* dispatcher_;
+  class InitializeCompleter {
+   public:
+    void Reply(zx_status_t status) {
+      init_status_ = status;
+      driver_initialized_.Signal();
+    }
+
+    void Wait() { driver_initialized_.Wait(); }
+
+    libsync::Completion driver_initialized_;
+    zx_status_t init_status_;
+  } init_completer_;
+
+  std::optional<fdf::PrepareStopCompleter> prepare_stop_completer_;
+  // // The executor dispatcher.
+  fdf::Dispatcher exec_dispatcher_;
   // The executor for |dispatcher_|, created during initialization.
   std::optional<async::Executor> executor_;
 
   fidl::WireClient<fuchsia_hardware_bluetooth::Hci> hci_client_;
   fdf::WireSyncClient<fuchsia_hardware_serialimpl::Device> serial_client_;
+
+  fidl::WireClient<fuchsia_driver_framework::Node> node_;
+  fidl::WireClient<fuchsia_driver_framework::NodeController> node_controller_;
+  fidl::WireClient<fuchsia_driver_framework::Node> child_node_;
+
+  fidl::ServerBindingGroup<fuchsia_hardware_bluetooth::Vendor> vendor_binding_group_;
+  driver_devfs::Connector<fuchsia_hardware_bluetooth::Vendor> devfs_connector_;
 };
 
 }  // namespace bt_hci_broadcom

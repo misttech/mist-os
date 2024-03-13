@@ -32,18 +32,22 @@ source_set("common") {
   deps = [
     ":bcm_hci_bind",
     "//sdk/lib/fidl",
-    "//src/devices/lib/driver",
     "//src/devices/lib/driver:driver_runtime",
     "//zircon/system/ulib/async-default",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/sync",
+    "//zircon/system/ulib/sync:sync-cpp",
   ]
 
   public_deps = [
-    "//sdk/fidl/fuchsia.hardware.bluetooth:fuchsia.hardware.bluetooth_cpp",
+    "//sdk/fidl/fuchsia.driver.compat:fuchsia.driver.compat_cpp",
+    "//sdk/fidl/fuchsia.driver.framework:fuchsia.driver.framework_cpp",
     "//sdk/fidl/fuchsia.hardware.bluetooth:fuchsia.hardware.bluetooth_cpp",
     "//sdk/fidl/fuchsia.hardware.serialimpl:fuchsia.hardware.serialimpl_cpp",
+    "//sdk/lib/driver/compat/cpp",
+    "//sdk/lib/driver/component/cpp",
+    "//sdk/lib/driver/devfs/cpp:cpp",
     "//src/lib/ddk",
     "//src/lib/ddktl",
   ]
@@ -92,11 +96,11 @@ executable("tests_executable") {
     ":common",
     "//sdk/lib/async_patterns/testing/cpp:cpp",
     "//sdk/lib/component/outgoing/cpp",
+    "//sdk/lib/driver/testing/cpp:cpp",
     "//sdk/lib/fdio",
     "//src/devices/bus/lib/device-protocol-pdev",
-    "//src/devices/testing/mock-ddk",
     "//src/lib/fxl/test:gtest_main",
-    "//src/lib/testing/loop_fixture",
+    "//src/storage/lib/vfs/cpp",
     "//third_party/googletest:gtest",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/fzl",
