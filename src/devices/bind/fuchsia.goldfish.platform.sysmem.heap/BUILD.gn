@@ -8,6 +8,6 @@ bind_library("fuchsia.goldfish.platform.sysmem.heap") {
   source = "fuchsia.goldfish.platform.sysmem.heap.bind"
   sdk_category = "partner"
 
-  # Use of sysmem heap types is not limited to drivers.
-  sdk_area = "Driver SDK"
+  # Also Graphics
+  sdk_area = "Media"
 }
