@@ -68,6 +68,8 @@ constexpr size_t kBl2ImagePages = kBl2ImageSize / kPageSize;
 constexpr uint32_t kBootloaderFirstBlock = 4;
 constexpr uint32_t kBootloaderBlocks = 4;
 constexpr uint32_t kBootloaderLastBlock = kBootloaderFirstBlock + kBootloaderBlocks - 1;
+constexpr uint32_t kZirconAFirstBlock = kBootloaderLastBlock + 1;
+constexpr uint32_t kZirconALastBlock = kZirconAFirstBlock + 1;
 constexpr uint32_t kBl2FirstBlock = kNumBlocks - 1;
 constexpr uint32_t kFvmFirstBlock = 18;
 
@@ -114,8 +116,8 @@ fuchsia_hardware_nand::wire::RamNandInfo NandInfo() {
                       {
                           .type_guid = GUID_ZIRCON_A_VALUE,
                           .unique_guid = {},
-                          .first_block = kBootloaderLastBlock + 1,
-                          .last_block = 9,
+                          .first_block = kZirconAFirstBlock,
+                          .last_block = kZirconALastBlock,
                           .copy_count = 0,
                           .copy_byte_offset = 0,
                           .name = {'z', 'i', 'r', 'c', 'o', 'n', '-', 'a'},
@@ -1602,7 +1604,7 @@ TEST_F(PaverServiceSkipBlockTest, WriteFirmwareError) {
 TEST_F(PaverServiceSkipBlockTest, ReadAssetKernelConfigA) {
   ASSERT_NO_FATAL_FAILURE(InitializeRamNand());
 
-  WriteData(8 * kPagesPerBlock, static_cast<size_t>(2) * kPagesPerBlock, 0x4a);
+  WriteData(kZirconAFirstBlock * kPagesPerBlock, static_cast<size_t>(2) * kPagesPerBlock, 0x4a);
 
   ASSERT_NO_FATAL_FAILURE(FindDataSink());
   auto result = data_sink_->ReadAsset(fuchsia_paver::wire::Configuration::kA,
@@ -1677,25 +1679,36 @@ TEST_F(PaverServiceSkipBlockTest, ReadAssetVbMetaConfigRecovery) {
   ValidateWritten(result->value()->asset, 32);
 }
 
-TEST_F(PaverServiceSkipBlockTest, ReadAssetZbiSize) {
+TEST_F(PaverServiceSkipBlockTest, ReadAssetZbi) {
   ASSERT_NO_FATAL_FAILURE(InitializeRamNand());
 
   zbi_header_t container;
+  // Currently our ZBI checker only validates the container header so the data can be anything.
+  uint8_t data[8] = {10, 20, 30, 40, 50, 60, 70, 80};
   container.type = ZBI_TYPE_CONTAINER;
   container.extra = ZBI_CONTAINER_MAGIC;
   container.magic = ZBI_ITEM_MAGIC;
   container.flags = ZBI_FLAGS_VERSION;
   container.crc32 = ZBI_ITEM_NO_CRC32;
-  container.length = sizeof(zbi_header_t);
+  container.length = sizeof(data);  // Contents size only, does not include header size.
 
-  WriteDataBytes(8 * kPagesPerBlock * kPageSize, &container, sizeof(container));
+  constexpr uint32_t kZirconAStartByte = kZirconAFirstBlock * kPagesPerBlock * kPageSize;
+  WriteDataBytes(kZirconAStartByte, &container, sizeof(container));
+  WriteDataBytes(kZirconAStartByte + sizeof(container), &data, sizeof(data));
 
   ASSERT_NO_FATAL_FAILURE(FindDataSink());
   auto result = data_sink_->ReadAsset(fuchsia_paver::wire::Configuration::kA,
                                       fuchsia_paver::wire::Asset::kKernel);
   ASSERT_OK(result.status());
   ASSERT_TRUE(result->is_ok());
-  ASSERT_EQ(result->value()->asset.size, sizeof(container));
+  ASSERT_EQ(result->value()->asset.size, sizeof(container) + sizeof(data));
+
+  fzl::VmoMapper mapper;
+  ASSERT_OK(
+      mapper.Map(result->value()->asset.vmo, 0, result->value()->asset.size, ZX_VM_PERM_READ));
+  const uint8_t* read_data = static_cast<const uint8_t*>(mapper.start());
+  ASSERT_EQ(0, memcmp(read_data, &container, sizeof(container)));
+  ASSERT_EQ(0, memcmp(read_data + sizeof(container), &data, sizeof(data)));
 }
 
 TEST_F(PaverServiceSkipBlockTest, WriteBootloader) {

@@ -219,7 +219,7 @@ zx::result<fuchsia_mem::wire::Buffer> PartitionRead(const DevicePartitioner& par
     const zbi_header_t* container_header;
     cpp20::span<const uint8_t> container_data;
     if (ExtractZbiPayload(data, &container_header, &container_data)) {
-      asset_size = container_data.size();
+      asset_size = sizeof(*container_header) + container_data.size();
     }
   }
 
