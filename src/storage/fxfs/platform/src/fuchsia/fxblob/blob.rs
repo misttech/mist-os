@@ -19,8 +19,7 @@ use {
     anyhow::{anyhow, ensure, Context, Error},
     fuchsia_hash::Hash,
     fuchsia_merkle::{hash_block, MerkleTree},
-    fuchsia_zircon::Status,
-    fuchsia_zircon::{self as zx, AsHandleRef},
+    fuchsia_zircon::{self as zx, AsHandleRef, HandleBased, Status},
     futures::try_join,
     fxfs::{
         errors::FxfsError,
@@ -68,7 +67,7 @@ impl FxBlob {
         uncompressed_size: u64,
     ) -> Arc<Self> {
         let (vmo, pager_packet_receiver_registration) =
-            handle.owner().pager().create_vmo(uncompressed_size).unwrap();
+            handle.owner().pager().create_vmo(uncompressed_size, zx::VmoOptions::empty()).unwrap();
         let trimmed_merkle = &merkle_tree.root().to_string()[0..8];
         let name = format!("blob-{}", trimmed_merkle);
         let cstr_name = std::ffi::CString::new(name).unwrap();
@@ -108,14 +107,22 @@ impl FxBlob {
         }
     }
 
-    /// Return a reference child vmo.
-    pub fn get_child_reference_vmo(&self) -> Result<zx::Vmo, Status> {
-        let child_vmo = self.vmo.create_child(zx::VmoChildOptions::REFERENCE, 0, 0)?;
+    /// Creates an immutable child VMO.
+    pub fn create_child_vmo(&self) -> Result<zx::Vmo, Status> {
+        let child_vmo = self.vmo.create_child(
+            zx::VmoChildOptions::SNAPSHOT_AT_LEAST_ON_WRITE | zx::VmoChildOptions::NO_WRITE,
+            0,
+            self.uncompressed_size,
+        )?;
         if self.handle.owner().pager().watch_for_zero_children(self).map_err(map_to_status)? {
             // Take an open count so that we keep this object alive if it is otherwise closed.
             self.open_count_add_one();
         }
-        Ok(child_vmo)
+        // Only allow read access to the VMO.
+        // TODO(https://fxbug.dev/329429293): Remove when RFC-0238 is implemented.
+        child_vmo.replace_handle(
+            zx::Rights::BASIC | zx::Rights::MAP | zx::Rights::GET_PROPERTY | zx::Rights::READ,
+        )
     }
 
     pub fn root(&self) -> Hash {
@@ -400,6 +407,26 @@ mod tests {
                 Err(zx::Status::IO_DATA_INTEGRITY)
             );
         }
+
+        fixture.close().await;
+    }
+
+    #[fasync::run(10, test)]
+    async fn test_blob_vmos_are_immutable() {
+        let fixture = new_blob_fixture().await;
+
+        let data = vec![0xffu8; 500];
+        let hash = fixture.write_blob(&data, CompressionMode::Never).await;
+        let blob_vmo = fixture.get_blob_vmo(hash).await;
+
+        // The VMO shouldn't be resizable.
+        assert_matches!(blob_vmo.set_size(20), Err(_));
+
+        // The VMO shouldn't be writable.
+        assert_matches!(blob_vmo.write(b"overwrite", 0), Err(_));
+
+        // The VMO's content size shouldn't be modifiable.
+        assert_matches!(blob_vmo.set_content_size(&20), Err(_));
 
         fixture.close().await;
     }

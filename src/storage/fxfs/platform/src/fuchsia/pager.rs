@@ -213,13 +213,14 @@ impl Pager {
     pub fn create_vmo<T: PagerBacked>(
         &self,
         initial_size: u64,
+        vmo_options: zx::VmoOptions,
     ) -> Result<(zx::Vmo, PagerPacketReceiverRegistration<T>), Error> {
         let registration = self.executor.register_receiver(Arc::new(PagerPacketReceiver {
             file: Mutex::new(FileHolder::None),
         }));
         Ok((
             self.pager.create_vmo(
-                zx::VmoOptions::RESIZABLE | zx::VmoOptions::TRAP_DIRTY,
+                vmo_options,
                 self.executor.port(),
                 registration.key(),
                 initial_size,
@@ -820,7 +821,9 @@ mod tests {
 
     impl MockFile {
         fn new(pager: Arc<Pager>) -> Self {
-            let (vmo, pager_packet_receiver_registration) = pager.create_vmo(page_size()).unwrap();
+            let (vmo, pager_packet_receiver_registration) = pager
+                .create_vmo(page_size(), zx::VmoOptions::RESIZABLE | zx::VmoOptions::TRAP_DIRTY)
+                .unwrap();
             Self { pager, vmo, pager_packet_receiver_registration }
         }
     }
@@ -898,7 +901,8 @@ mod tests {
 
     impl OnZeroChildrenFile {
         fn new(pager: Arc<Pager>, sender: mpsc::UnboundedSender<()>) -> Self {
-            let (vmo, pager_packet_receiver_registration) = pager.create_vmo(page_size()).unwrap();
+            let (vmo, pager_packet_receiver_registration) =
+                pager.create_vmo(page_size(), zx::VmoOptions::empty()).unwrap();
             Self { pager, vmo, pager_packet_receiver_registration, sender: Mutex::new(sender) }
         }
     }
@@ -1099,7 +1103,8 @@ mod tests {
 
         let scope = ExecutionScope::new();
         let pager = Arc::new(Pager::new(scope.clone()).unwrap());
-        let (vmo, pager_packet_receiver_registration) = pager.create_vmo(page_size()).unwrap();
+        let (vmo, pager_packet_receiver_registration) =
+            pager.create_vmo(page_size(), zx::VmoOptions::empty()).unwrap();
         let file = Arc::new(StatusCodeFile {
             vmo,
             pager: pager.clone(),
@@ -1266,7 +1271,7 @@ mod tests {
         ) -> Arc<Self> {
             let pager = Pager::new(ExecutionScope::new()).unwrap();
             let (vmo, pager_packet_receiver_registration) =
-                pager.create_vmo(page_size() * 2).unwrap();
+                pager.create_vmo(page_size() * 2, zx::VmoOptions::TRAP_DIRTY).unwrap();
             let this = Arc::new(Self {
                 vmo,
                 pager_packet_receiver_registration,

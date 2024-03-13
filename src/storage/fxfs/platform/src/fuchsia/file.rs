@@ -68,8 +68,11 @@ pub struct FxFile {
 impl FxFile {
     pub fn new(handle: DataObjectHandle<FxVolume>) -> Arc<Self> {
         let size = handle.get_size();
-        let (vmo, pager_packet_receiver_registration) =
-            handle.owner().pager().create_vmo(size).unwrap();
+        let (vmo, pager_packet_receiver_registration) = handle
+            .owner()
+            .pager()
+            .create_vmo(size, zx::VmoOptions::RESIZABLE | zx::VmoOptions::TRAP_DIRTY)
+            .unwrap();
         let file = Arc::new(Self {
             handle: PagedObjectHandle::new(handle, vmo),
             open_count: AtomicUsize::new(0),

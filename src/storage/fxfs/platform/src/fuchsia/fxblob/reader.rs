@@ -24,7 +24,7 @@ impl BlobDirectory {
         let node = self.lookup(fio::OpenFlags::RIGHT_READABLE, id).await.map_err(map_to_status)?;
         let any_blob = node.clone().into_any();
         let blob = any_blob.downcast_ref::<FxBlob>().ok_or(FxfsError::Internal)?;
-        let vmo = blob.get_child_reference_vmo()?;
+        let vmo = blob.create_child_vmo()?;
         Ok(vmo)
     }
 }

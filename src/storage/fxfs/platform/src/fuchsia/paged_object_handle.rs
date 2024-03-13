@@ -2307,8 +2307,14 @@ mod tests {
                 transaction.commit().await.unwrap();
                 let (notifications, mut receiver) = unbounded();
 
-                let (vmo, pager_packet_receiver_registration) =
-                    file.owner().pager().create_vmo(file.get_size()).unwrap();
+                let (vmo, pager_packet_receiver_registration) = file
+                    .owner()
+                    .pager()
+                    .create_vmo(
+                        file.get_size(),
+                        zx::VmoOptions::RESIZABLE | zx::VmoOptions::TRAP_DIRTY,
+                    )
+                    .unwrap();
                 let file = Arc::new(File {
                     notifications,
                     handle: PagedObjectHandle::new(file, vmo),

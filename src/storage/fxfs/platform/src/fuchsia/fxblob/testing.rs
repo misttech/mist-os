@@ -64,9 +64,7 @@ impl BlobFixture for TestFixture {
 
     async fn read_blob(&self, hash: Hash) -> Vec<u8> {
         let vmo = self.get_blob_vmo(hash).await;
-        let mut buf = vec![0; vmo.get_content_size().unwrap() as usize];
-        vmo.read(&mut buf[..], 0).expect("vmo read failed");
-        buf
+        vmo.read_to_vec(0, vmo.get_content_size().unwrap()).expect("vmo read failed")
     }
 
     async fn get_blob_handle(&self, name: &str) -> DataObjectHandle<FxVolume> {
