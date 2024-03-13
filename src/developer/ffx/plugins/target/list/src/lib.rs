@@ -9,13 +9,13 @@ use discovery::{DiscoverySources, TargetEvent, TargetHandle};
 use errors::{ffx_bail, ffx_bail_with_code};
 use ffx_config::EnvironmentContext;
 use ffx_list_args::{AddressTypes, ListCommand};
+use ffx_target::{Description, TargetInfoQuery};
 use fho::{daemon_protocol, deferred, Deferred, FfxMain, FfxTool, ToolIO, VerifiedMachineWriter};
 use fidl_fuchsia_developer_ffx as ffx;
 use fuchsia_async::Timer;
-use futures::{StreamExt, TryStreamExt};
+use futures::{FutureExt, StreamExt, TryStreamExt};
 use std::collections::HashSet;
 use std::time::Duration;
-use timeout::timeout;
 
 mod target_formatter;
 
@@ -126,6 +126,22 @@ fn handle_to_info(handle: discovery::TargetHandle) -> ffx::TargetInfo {
     }
 }
 
+// Descriptions are used for matching against a TargetInfoQuery
+fn handle_to_description(handle: &discovery::TargetHandle) -> Description {
+    let addresses = match &handle.state {
+        discovery::TargetState::Product(target_addr) => target_addr.clone(),
+        _ => vec![],
+    };
+    Description { nodename: handle.node_name.clone(), addresses, ..Default::default() }
+}
+
+fn non_empty_match(on1: &Option<String>, on2: &Option<String>) -> bool {
+    match (on1, on2) {
+        (Some(n1), Some(n2)) => n1 == n2,
+        _ => false,
+    }
+}
+
 async fn local_list_targets(
     ctx: &EnvironmentContext,
     cmd: &ListCommand,
@@ -136,28 +152,49 @@ async fn local_list_targets(
         | DiscoverySources::EMULATOR;
 
     let name = cmd.nodename.clone();
+    let query = TargetInfoQuery::from(name);
     let filter = move |handle: &TargetHandle| {
-        if name.is_some() {
-            handle.node_name == name
-        } else {
-            true
-        }
+        let description = handle_to_description(handle);
+        query.match_description(&description)
     };
-    let mut stream = discovery::wait_for_devices(filter, true, false, sources).await?;
+    let stream = discovery::wait_for_devices(filter, true, false, sources).await?;
     let discovery_delay = ctx.get(CONFIG_LOCAL_DISCOVERY_TIMEOUT).await.unwrap_or(1000);
     let delay = Duration::from_millis(discovery_delay);
-    let target_events: Result<Vec<TargetEvent>> = if cmd.nodename.is_some() {
-        timeout(delay, async {
-            // Get next item, if any, inside a Result
-            let r: Result<Option<_>> = stream.next().await.transpose();
-            // Convert option to vec
-            r.map(|o| o.into_iter().collect())
-        })
-        .await
-        .unwrap_or(Ok(vec![])) // Timeout case
-    } else {
-        let timer = Timer::new(delay);
-        let results: Vec<Result<_>> = stream.take_until(timer).collect().await;
+
+    // This is tricky. We want the stream to complete immediately if we find
+    // a target whose name matches the query exactly. Otherwise, run until the
+    // timer fires.
+    // We can't use `Stream::wait_until()`, because that would require us
+    // to return true for the found item, and false for the _next_ item.
+    // But there may be no next item, so the stream would end up waiting for
+    // the timer anyway. Instead, we create two futures: the timer, and one
+    // that is ready when we find the name we're looking for. Then we use
+    // `Stream::take_until()`, waiting until _either_ of those futures is ready
+    // (by using `race()`). The only remaining tricky part is that we need to
+    // examine each event to determine if it matches what we're looking for --
+    // so we interpose a closure via `Stream::map()` that examines each item,
+    // before returning them unmodified.
+    // Oh, and once we've got a set of results, if any of them are Err, cause
+    // the whole thing to be an Err.  We could stop the race early in case of
+    // failure by using the same technique, I suppose.
+    let target_events: Result<Vec<TargetEvent>> = {
+        let timer = Timer::new(delay).fuse();
+        let found_name_event = async_utils::event::Event::new();
+        let found_it = found_name_event.wait().fuse();
+        let results: Vec<Result<_>> = stream
+            .map(move |ev| {
+                if let Ok(TargetEvent::Added(ref h)) = ev {
+                    if non_empty_match(&h.node_name, &cmd.nodename) {
+                        found_name_event.signal();
+                    }
+                    ev
+                } else {
+                    unreachable!()
+                }
+            })
+            .take_until(futures_lite::future::race(timer, found_it))
+            .collect()
+            .await;
         // Fail if any results are Err
         let r: Result<Vec<_>> = results.into_iter().collect();
         r
