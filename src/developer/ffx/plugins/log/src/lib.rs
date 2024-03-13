@@ -27,6 +27,7 @@ use ffx_core as _;
 
 mod condition_variable;
 mod error;
+mod mutex;
 mod symbolizer;
 #[cfg(test)]
 mod testing_utils;

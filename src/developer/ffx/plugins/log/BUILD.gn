@@ -42,6 +42,7 @@ ffx_plugin("ffx_log") {
     "src/condition_variable.rs",
     "src/error.rs",
     "src/lib.rs",
+    "src/mutex.rs",
     "src/symbolizer.rs",
     "src/testing_utils.rs",
     "src/transactional_symbolizer.rs",

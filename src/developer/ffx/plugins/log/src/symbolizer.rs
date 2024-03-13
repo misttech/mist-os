@@ -7,10 +7,10 @@ use derivative::Derivative;
 use log_command::log_formatter;
 use log_formatter::{LogData, LogEntry, Symbolize};
 use log_symbolizer::{is_symbolizer_context_marker, Symbolizer};
-use std::{cell::Cell, fmt::Debug};
+use std::fmt::Debug;
 use thiserror::Error;
 
-use crate::{condition_variable::LocalConditionVariable, error::LogError};
+use crate::{error::LogError, mutex::LocalOrderedMutex};
 
 /// Connection to a symbolizer.
 #[derive(Derivative)]
@@ -22,7 +22,7 @@ where
     sender: async_channel::Sender<String>,
     receiver: async_channel::Receiver<String>,
     #[derivative(Debug = "ignore")]
-    pending_symbolize_tasks: Cell<Option<LocalConditionVariable>>,
+    mutex: LocalOrderedMutex<()>,
     _symbolizer: T,
 }
 
@@ -35,17 +35,8 @@ where
         // The legacy symbolizer only allows one pending operation at a time
         // as it isn't transactional. If an operation is pending,
         // wait for it to complete before trying to symbolize another line.
-        let cv = LocalConditionVariable::new();
-        if let Some(prev) = self.pending_symbolize_tasks.take() {
-            self.pending_symbolize_tasks.set(Some(cv.clone()));
-            prev.await;
-        } else {
-            self.pending_symbolize_tasks.set(Some(cv.clone()));
-        }
-        let ret = Some(self.symbolize_message(entry).await);
-        cv.notify_one();
-        // Wake any blocked symbolize tasks
-        ret
+        let _guard = self.mutex.lock().await;
+        Some(self.symbolize_message(entry).await)
     }
 }
 
@@ -73,7 +64,7 @@ where
             _symbolizer: symbolizer,
             sender: sender_tx,
             receiver: reader_rx,
-            pending_symbolize_tasks: Cell::new(None),
+            mutex: LocalOrderedMutex::new(()),
         })
     }
 
