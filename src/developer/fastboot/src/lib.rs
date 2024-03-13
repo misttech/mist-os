@@ -108,8 +108,14 @@ async fn read<T: AsyncRead + Unpin>(
 }
 
 async fn read_and_log_info<T: AsyncRead + Unpin>(interface: &mut T) -> Result<Reply> {
-    read_with_timeout(interface, &LogInfoListener {}, Duration::seconds(DEFAULT_READ_TIMEOUT_SECS))
-        .await
+    read_and_log_info_with_timeout(interface, Duration::seconds(DEFAULT_READ_TIMEOUT_SECS)).await
+}
+
+async fn read_and_log_info_with_timeout<T: AsyncRead + Unpin>(
+    interface: &mut T,
+    duration: Duration,
+) -> Result<Reply> {
+    read_with_timeout(interface, &LogInfoListener {}, duration).await
 }
 
 async fn read_with_timeout<T: AsyncRead + Unpin>(
@@ -204,12 +210,29 @@ pub async fn send_with_timeout<T: AsyncRead + AsyncWrite + Unpin>(
     read_with_timeout(interface, &LogInfoListener {}, timeout).await
 }
 
-#[tracing::instrument(skip(interface, listener, buf))]
 pub async fn upload<T: AsyncRead + AsyncWrite + Unpin, R: Read>(
     size: usize,
     buf: &mut R,
     interface: &mut T,
     listener: &impl UploadProgressListener,
+) -> Result<Reply> {
+    upload_with_read_timeout(
+        size,
+        buf,
+        interface,
+        listener,
+        Duration::seconds(DEFAULT_READ_TIMEOUT_SECS),
+    )
+    .await
+}
+
+#[tracing::instrument(skip(interface, listener, buf))]
+pub async fn upload_with_read_timeout<T: AsyncRead + AsyncWrite + Unpin, R: Read>(
+    size: usize,
+    buf: &mut R,
+    interface: &mut T,
+    listener: &impl UploadProgressListener,
+    timeout: Duration,
 ) -> Result<Reply> {
     let _lock = TRANSFER_LOCK.lock().await;
     // We are sending "Download" in our "upload" function because we are the
@@ -256,7 +279,7 @@ pub async fn upload<T: AsyncRead + AsyncWrite + Unpin, R: Read>(
                 }
             }
             tracing::debug!("fastboot: completed writing {} bytes", size);
-            match read_and_log_info(interface).await {
+            match read_and_log_info_with_timeout(interface, timeout).await {
                 Ok(reply) => {
                     listener.on_finished().await?;
                     Ok(reply)

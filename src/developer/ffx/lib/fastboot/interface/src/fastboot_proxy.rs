@@ -15,7 +15,8 @@ use fastboot::{
     command::{ClientVariable, Command},
     download,
     reply::Reply,
-    send, send_with_listener, send_with_timeout, upload, SendError, UploadError,
+    send, send_with_listener, send_with_timeout, upload, upload_with_read_timeout, SendError,
+    UploadError,
 };
 use ffx_config::get;
 use futures::io::{AsyncRead, AsyncWrite};
@@ -190,11 +191,20 @@ impl<T: AsyncRead + AsyncWrite + Unpin + Debug> Fastboot for FastbootProxy<T> {
         let mut file_to_flash = File::open(path)?;
         let size = file_to_flash.metadata()?.len();
         let progress_listener = ProgressListener::new(listener)?;
-        let upload_reply = upload(
+        //timeout rate is in mb per seconds
+        let min_timeout: i64 = get(MIN_FLASH_TIMEOUT).await?;
+        let timeout_rate: i64 = get(FLASH_TIMEOUT_RATE).await?;
+        let megabytes = (size / 1000000) as i64;
+        let mut timeout = megabytes / timeout_rate;
+        timeout = std::cmp::max(timeout, min_timeout);
+        let timeout = Duration::seconds(timeout);
+        tracing::debug!("Estimated timeout: {}s for {}MB", timeout, megabytes);
+        let upload_reply = upload_with_read_timeout(
             size.try_into()?,
             &mut file_to_flash,
             self.interface().await?,
             &progress_listener,
+            timeout,
         )
         .await
         .context(format!("uploading {}", path))?;
@@ -203,18 +213,11 @@ impl<T: AsyncRead + AsyncWrite + Unpin + Debug> Fastboot for FastbootProxy<T> {
             Reply::Fail(s) => bail!("Failed to upload {}: {}", path, s),
             _ => bail!("Unexpected reply from fastboot device for download: {:?}", upload_reply),
         };
-        //timeout rate is in mb per seconds
-        let min_timeout: i64 = get(MIN_FLASH_TIMEOUT).await?;
-        let timeout_rate: i64 = get(FLASH_TIMEOUT_RATE).await?;
-        let megabytes = (size / 1000000) as i64;
-        let mut timeout = megabytes / timeout_rate;
-        timeout = std::cmp::max(timeout, min_timeout);
-        tracing::debug!("Estimated timeout: {}s for {}MB", timeout, megabytes);
         let span = tracing::span!(tracing::Level::INFO, "device_flash").entered();
         let send_reply = send_with_timeout(
             Command::Flash(partition_name.to_string()),
             self.interface().await?,
-            Duration::seconds(timeout),
+            timeout,
         )
         .await
         .context("sending flash");
