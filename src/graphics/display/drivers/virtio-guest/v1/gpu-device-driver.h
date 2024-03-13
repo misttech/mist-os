@@ -16,7 +16,6 @@
 #include <ddktl/device.h>
 
 #include "src/graphics/display/drivers/virtio-guest/v1/display-engine.h"
-#include "src/graphics/display/drivers/virtio-guest/v1/gpu-control-server.h"
 
 namespace virtio_display {
 
@@ -24,7 +23,7 @@ class GpuDeviceDriver;
 using DdkDeviceType = ddk::Device<GpuDeviceDriver, ddk::GetProtocolable, ddk::Initializable>;
 
 // Integration between this driver and the Driver Framework.
-class GpuDeviceDriver : public DdkDeviceType, public GpuControlServer::Owner {
+class GpuDeviceDriver : public DdkDeviceType {
  public:
   // Factory method used by the device manager glue code.
   static zx_status_t Create(zx_device_t* parent);
@@ -35,7 +34,7 @@ class GpuDeviceDriver : public DdkDeviceType, public GpuControlServer::Owner {
   GpuDeviceDriver(const GpuDeviceDriver&) = delete;
   GpuDeviceDriver& operator=(const GpuDeviceDriver&) = delete;
 
-  virtual ~GpuDeviceDriver();
+  ~GpuDeviceDriver();
 
   // Resource initialization that is not suitable for the constructor.
   zx::result<> Init();
@@ -49,13 +48,8 @@ class GpuDeviceDriver : public DdkDeviceType, public GpuControlServer::Owner {
   // ddk::Device interface.
   void DdkRelease();
 
-  // GpuControlServer::DeviceAccessor interface.
-  void SendHardwareCommand(cpp20::span<uint8_t> request,
-                           std::function<void(cpp20::span<uint8_t>)> callback) override;
-
  private:
   std::unique_ptr<DisplayEngine> display_engine_;
-  std::unique_ptr<GpuControlServer> gpu_control_server_;
 
   // Used by DdkInit() for deferred initialization.
   //

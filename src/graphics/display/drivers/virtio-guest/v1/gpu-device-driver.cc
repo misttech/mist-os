@@ -75,24 +75,12 @@ GpuDeviceDriver::~GpuDeviceDriver() {
 }
 
 zx::result<> GpuDeviceDriver::Init() {
-  zx_status_t status = DdkAdd(ddk::DeviceAddArgs("virtio-gpu-display")
-                                  .set_proto_id(ZX_PROTOCOL_DISPLAY_CONTROLLER_IMPL)
-                                  .set_flags(DEVICE_ADD_NON_BINDABLE));
+  zx_status_t status = DdkAdd(
+      ddk::DeviceAddArgs("virtio-gpu-display").set_proto_id(ZX_PROTOCOL_DISPLAY_CONTROLLER_IMPL));
   if (status != ZX_OK) {
     zxlogf(ERROR, "Failed to add device node: %s", zx_status_get_string(status));
     return zx::error(status);
   }
-
-  gpu_control_server_ = std::make_unique<GpuControlServer>(
-      this, display_engine_->pci_device().GetCapabilitySetLimit());
-
-  zx::result<> result = gpu_control_server_->Init(zxdev());
-  if (result.is_error()) {
-    zxlogf(ERROR, "Failed to init virtio gpu server: %s", result.status_string());
-    return zx::error(result.status_value());
-  }
-
-  zxlogf(TRACE, "GpuDeviceDriver::Init success");
 
   return zx::ok();
 }
@@ -109,12 +97,6 @@ void GpuDeviceDriver::DdkInit(ddk::InitTxn txn) {
 }
 
 void GpuDeviceDriver::DdkRelease() { delete this; }
-
-void GpuDeviceDriver::SendHardwareCommand(cpp20::span<uint8_t> request,
-                                          std::function<void(cpp20::span<uint8_t>)> callback) {
-  display_engine_->pci_device().ExchangeControlqVariableLengthRequestResponse(std::move(request),
-                                                                              std::move(callback));
-}
 
 namespace {
 
