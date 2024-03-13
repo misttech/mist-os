@@ -39,10 +39,6 @@ impl DefineSubsystemConfiguration<PlatformStarnixConfig> for StarnixSubsystem {
                     .component("meta/starnix_runner.cm")?
                     .field("enable_data_collection", false)?;
             }
-
-            if *context.build_type == BuildType::Eng {
-                builder.platform_bundle("adb_support");
-            }
         }
         Ok(())
     }

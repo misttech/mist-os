@@ -54,11 +54,6 @@ fuchsia_driver_component("usb-adb-function") {
   manifest = "meta/usb-adb-function.cml"
 }
 
-fuchsia_driver_package("package") {
-  package_name = "usb-adb-function"
-  driver_components = [ ":usb-adb-function" ]
-}
-
 test("usb-adb-test") {
   sources = [ "adb-function-test.cc" ]
   deps = [
