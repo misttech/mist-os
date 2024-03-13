@@ -26,7 +26,7 @@ use fuchsia_zircon as zx;
 use linux_uapi::{IOCB_CMD_PREAD, IOCB_CMD_PWRITE, IOCB_FLAG_RESFD};
 use smallvec::smallvec;
 use starnix_logging::{log_trace, track_stub};
-use starnix_sync::{LockBefore, Locked, Mutex, ReadOps, Unlocked};
+use starnix_sync::{DeviceOpen, FileOpsCore, LockBefore, Locked, Mutex, Unlocked};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::{
     __kernel_fd_set, aio_context_t,
@@ -559,13 +559,14 @@ fn open_file_at(
 }
 
 fn lookup_parent_at<T, F>(
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     dir_fd: FdNumber,
     user_path: UserCString,
     callback: F,
 ) -> Result<T, Errno>
 where
-    F: Fn(LookupContext, NamespaceNode, &FsStr) -> Result<T, Errno>,
+    F: Fn(&mut Locked<'_, Unlocked>, LookupContext, NamespaceNode, &FsStr) -> Result<T, Errno>,
 {
     let path = current_task.read_c_string_to_vec(user_path, PATH_MAX as usize)?;
     log_trace!(%dir_fd, %path, "lookup_parent_at");
@@ -574,7 +575,7 @@ where
     }
     let mut context = LookupContext::default();
     let (parent, basename) = current_task.lookup_parent_at(&mut context, dir_fd, path.as_ref())?;
-    callback(context, parent, basename)
+    callback(locked, context, parent, basename)
 }
 
 /// Options for lookup_at.
@@ -928,7 +929,7 @@ pub fn sys_ftruncate(
 }
 
 pub fn sys_mkdirat(
-    _locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     dir_fd: FdNumber,
     user_path: UserCString,
@@ -942,6 +943,7 @@ pub fn sys_mkdirat(
     let (parent, basename) =
         current_task.lookup_parent_at(&mut LookupContext::default(), dir_fd, path.as_ref())?;
     parent.create_node(
+        locked,
         current_task,
         basename,
         mode.with_type(FileMode::IFDIR),
@@ -951,7 +953,7 @@ pub fn sys_mkdirat(
 }
 
 pub fn sys_mknodat(
-    _locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     dir_fd: FdNumber,
     user_path: UserCString,
@@ -967,14 +969,14 @@ pub fn sys_mknodat(
         FileMode::EMPTY => FileMode::IFREG,
         _ => return error!(EINVAL),
     };
-    lookup_parent_at(current_task, dir_fd, user_path, |_, parent, basename| {
-        parent.create_node(current_task, basename, mode.with_type(file_type), dev)
+    lookup_parent_at(locked, current_task, dir_fd, user_path, |locked, _, parent, basename| {
+        parent.create_node(locked, current_task, basename, mode.with_type(file_type), dev)
     })?;
     Ok(())
 }
 
 pub fn sys_linkat(
-    _locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     old_dir_fd: FdNumber,
     old_user_path: UserCString,
@@ -993,23 +995,29 @@ pub fn sys_linkat(
 
     let flags = LookupFlags::from_bits(flags, AT_EMPTY_PATH | AT_SYMLINK_FOLLOW)?;
     let target = lookup_at(current_task, old_dir_fd, old_user_path, flags)?;
-    lookup_parent_at(current_task, new_dir_fd, new_user_path, |context, parent, basename| {
-        // The path to a new link cannot end in `/`. That would imply that we are dereferencing
-        // the link to a directory.
-        if context.must_be_directory {
-            return error!(ENOENT);
-        }
-        if target.mount != parent.mount {
-            return error!(EXDEV);
-        }
-        parent.link(current_task, basename, &target.entry.node)
-    })?;
+    lookup_parent_at(
+        locked,
+        current_task,
+        new_dir_fd,
+        new_user_path,
+        |_, context, parent, basename| {
+            // The path to a new link cannot end in `/`. That would imply that we are dereferencing
+            // the link to a directory.
+            if context.must_be_directory {
+                return error!(ENOENT);
+            }
+            if target.mount != parent.mount {
+                return error!(EXDEV);
+            }
+            parent.link(current_task, basename, &target.entry.node)
+        },
+    )?;
 
     Ok(())
 }
 
 pub fn sys_unlinkat(
-    _locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     dir_fd: FdNumber,
     user_path: UserCString,
@@ -1020,14 +1028,14 @@ pub fn sys_unlinkat(
     }
     let kind =
         if flags & AT_REMOVEDIR != 0 { UnlinkKind::Directory } else { UnlinkKind::NonDirectory };
-    lookup_parent_at(current_task, dir_fd, user_path, |context, parent, basename| {
+    lookup_parent_at(locked, current_task, dir_fd, user_path, |_, context, parent, basename| {
         parent.unlink(current_task, basename, kind, context.must_be_directory)
     })?;
     Ok(())
 }
 
 pub fn sys_renameat2(
-    _locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     old_dir_fd: FdNumber,
     old_user_path: UserCString,
@@ -1053,8 +1061,8 @@ pub fn sys_renameat2(
         return error!(ENOSYS);
     };
 
-    let lookup = |dir_fd, user_path| {
-        lookup_parent_at(current_task, dir_fd, user_path, |_, parent, basename| {
+    let mut lookup = |dir_fd, user_path| {
+        lookup_parent_at(locked, current_task, dir_fd, user_path, |_, _, parent, basename| {
             Ok((parent, basename.to_owned()))
         })
     };
@@ -1469,7 +1477,7 @@ pub fn sys_ioctl(
 }
 
 pub fn sys_symlinkat(
-    _locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     user_target: UserCString,
     new_dir_fd: FdNumber,
@@ -1486,16 +1494,22 @@ pub fn sys_symlinkat(
         return error!(ENOENT);
     }
 
-    let res = lookup_parent_at(current_task, new_dir_fd, user_path, |context, parent, basename| {
-        // The path to a new symlink cannot end in `/`. That would imply that we are dereferencing
-        // the symlink to a directory.
-        //
-        // See https://pubs.opengroup.org/onlinepubs/9699919799/xrat/V4_xbd_chap03.html#tag_21_03_00_75
-        if context.must_be_directory {
-            return error!(ENOENT);
-        }
-        parent.create_symlink(current_task, basename, target.as_ref())
-    });
+    let res = lookup_parent_at(
+        locked,
+        current_task,
+        new_dir_fd,
+        user_path,
+        |_, context, parent, basename| {
+            // The path to a new symlink cannot end in `/`. That would imply that we are dereferencing
+            // the symlink to a directory.
+            //
+            // See https://pubs.opengroup.org/onlinepubs/9699919799/xrat/V4_xbd_chap03.html#tag_21_03_00_75
+            if context.must_be_directory {
+                return error!(ENOENT);
+            }
+            parent.create_symlink(current_task, basename, target.as_ref())
+        },
+    );
     res?;
     Ok(())
 }
@@ -1708,7 +1722,8 @@ fn do_mount_create<L>(
     flags: MountFlags,
 ) -> Result<(), Errno>
 where
-    L: LockBefore<ReadOps>,
+    L: LockBefore<FileOpsCore>,
+    L: LockBefore<DeviceOpen>,
 {
     let mut source_buf = [MaybeUninit::uninit(); PATH_MAX as usize];
     let source = if source_addr.is_null() {

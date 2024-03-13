@@ -10,7 +10,7 @@ use crate::{
     },
 };
 use bitflags::bitflags;
-use starnix_sync::{LockEqualOrBefore, Locked, ReadOps, RwLock, RwLockWriteGuard};
+use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked, RwLock, RwLockWriteGuard};
 use starnix_uapi::{
     auth::FsCred,
     errno, error,
@@ -150,7 +150,7 @@ impl DirEntry {
         flags: OpenFlags,
     ) -> Result<FileHandle, Errno>
     where
-        L: LockEqualOrBefore<ReadOps>,
+        L: LockEqualOrBefore<FileOpsCore>,
     {
         FileObject::new(
             self.node.create_file_ops(locked, current_task, flags)?,
@@ -306,14 +306,19 @@ impl DirEntry {
     // This is marked as test-only because it sets the owner/group to root instead of the current
     // user to save a bit of typing in tests, but this shouldn't happen silently in production.
     #[cfg(test)]
-    pub fn create_dir(
+    pub fn create_dir<L>(
         self: &DirEntryHandle,
+        locked: &mut starnix_sync::Locked<'_, L>,
         current_task: &CurrentTask,
         name: &FsStr,
-    ) -> Result<DirEntryHandle, Errno> {
+    ) -> Result<DirEntryHandle, Errno>
+    where
+        L: starnix_sync::LockBefore<starnix_sync::FileOpsCore>,
+    {
         // TODO: apply_umask
         self.create_entry(current_task, &MountInfo::detached(), name, |dir, mount, name| {
             dir.mknod(
+                locked,
                 current_task,
                 mount,
                 name,

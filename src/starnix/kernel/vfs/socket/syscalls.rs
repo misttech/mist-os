@@ -17,7 +17,7 @@ use crate::{
 };
 use fuchsia_zircon as zx;
 use starnix_logging::{log_trace, track_stub};
-use starnix_sync::{LockBefore, Locked, ReadOps, Unlocked, WriteOps};
+use starnix_sync::{FileOpsCore, LockBefore, Locked, Unlocked, WriteOps};
 use starnix_uapi::{
     cmsghdr, errno, error,
     errors::{Errno, EEXIST, EINPROGRESS},
@@ -148,7 +148,7 @@ fn generate_autobind_address() -> FsString {
 }
 
 pub fn sys_bind(
-    _locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     fd: FdNumber,
     user_socket_address: UserAddress,
@@ -191,6 +191,7 @@ pub fn sys_bind(
 
                 parent
                     .bind_socket(
+                        locked,
                         current_task,
                         basename,
                         socket.clone(),
@@ -439,7 +440,7 @@ fn recvmsg_internal<L>(
     deadline: Option<zx::Time>,
 ) -> Result<usize, Errno>
 where
-    L: LockBefore<ReadOps>,
+    L: LockBefore<FileOpsCore>,
 {
     let mut message_header = current_task.read_object(user_message_header.clone())?;
     let iovec = read_iovec_from_msghdr(current_task, &message_header)?;

@@ -20,8 +20,8 @@ use bstr::B;
 use starnix_lifecycle::AtomicU64Counter;
 use starnix_logging::{log_error, log_trace, log_warn, track_stub};
 use starnix_sync::{
-    FileOpsIoctl, Locked, Mutex, MutexGuard, ReadOps, RwLock, RwLockReadGuard, RwLockWriteGuard,
-    WriteOps,
+    DeviceOpen, FileOpsCore, FileOpsIoctl, Locked, Mutex, MutexGuard, RwLock, RwLockReadGuard,
+    RwLockWriteGuard, WriteOps,
 };
 use starnix_syscalls::{SyscallArg, SyscallResult};
 use starnix_uapi::{
@@ -53,6 +53,7 @@ pub struct DevFuse {
 }
 
 pub fn open_fuse_device(
+    _locked: &mut Locked<'_, DeviceOpen>,
     current_task: &CurrentTask,
     _id: DeviceType,
     _node: &FsNode,
@@ -72,7 +73,7 @@ impl FileOps for DevFuse {
 
     fn read(
         &self,
-        _locked: &mut Locked<'_, ReadOps>,
+        _locked: &mut Locked<'_, FileOpsCore>,
         file: &FileObject,
         current_task: &CurrentTask,
         offset: usize,
@@ -305,7 +306,7 @@ impl FsNodeOps for FuseCtlConnectionsDirectory {
 
     fn create_file_ops(
         &self,
-        _locked: &mut Locked<'_, ReadOps>,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _node: &FsNode,
         current_task: &CurrentTask,
         _flags: OpenFlags,
@@ -381,7 +382,7 @@ impl FileOps for AbortFile {
 
     fn read(
         &self,
-        _locked: &mut Locked<'_, ReadOps>,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         _offset: usize,
@@ -559,7 +560,7 @@ impl FileOps for FuseFileObject {
 
     fn read(
         &self,
-        _locked: &mut Locked<'_, ReadOps>,
+        _locked: &mut Locked<'_, FileOpsCore>,
         file: &FileObject,
         current_task: &CurrentTask,
         offset: usize,
@@ -832,7 +833,7 @@ impl FsNodeOps for Arc<FuseNode> {
 
     fn create_file_ops(
         &self,
-        _locked: &mut Locked<'_, ReadOps>,
+        _locked: &mut Locked<'_, FileOpsCore>,
         node: &FsNode,
         current_task: &CurrentTask,
         flags: OpenFlags,
@@ -869,6 +870,7 @@ impl FsNodeOps for Arc<FuseNode> {
 
     fn mknod(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         node: &FsNode,
         current_task: &CurrentTask,
         name: &FsStr,

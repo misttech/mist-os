@@ -20,7 +20,7 @@ use linux_uapi::{
     ASHMEM_PURGE_ALL_CACHES, ASHMEM_SET_NAME, ASHMEM_SET_PROT_MASK, ASHMEM_SET_SIZE, ASHMEM_UNPIN,
 };
 use starnix_logging::track_stub;
-use starnix_sync::{FileOpsIoctl, Locked, Mutex};
+use starnix_sync::{DeviceOpen, FileOpsCore, FileOpsIoctl, LockBefore, Locked, Mutex};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::{
     device_type, errno, error, errors::Errno, open_flags::OpenFlags, ASHMEM_GET_FILE_ID,
@@ -28,7 +28,10 @@ use starnix_uapi::{
 };
 
 /// Initializes the ashmem device.
-pub fn ashmem_device_init(system_task: &CurrentTask) {
+pub fn ashmem_device_init<L>(locked: &mut Locked<'_, L>, system_task: &CurrentTask)
+where
+    L: LockBefore<FileOpsCore>,
+{
     let kernel = system_task.kernel();
     let registry = &kernel.device_registry;
 
@@ -37,6 +40,7 @@ pub fn ashmem_device_init(system_task: &CurrentTask) {
         registry.register_dyn_chrdev(Ashmem::open).expect("ashmem device register failed.");
 
     registry.add_device(
+        locked,
         system_task,
         "ashmem".into(),
         DeviceMetadata::new("ashmem".into(), ashmem_device, DeviceMode::Char),
@@ -58,6 +62,7 @@ struct AshmemState {
 
 impl Ashmem {
     pub fn open(
+        _locked: &mut Locked<'_, DeviceOpen>,
         _current_task: &CurrentTask,
         _id: device_type::DeviceType,
         _node: &FsNode,

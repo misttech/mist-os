@@ -26,7 +26,7 @@ use linux_uapi::SYNC_IOC_MAGIC;
 use once_cell::sync::OnceCell;
 use starnix_logging::{impossible_error, log_warn, trace_duration, CATEGORY_STARNIX_MM};
 use starnix_sync::{
-    FileOpsIoctl, Locked, Mutex, ReadOps, RwLock, RwLockReadGuard, RwLockWriteGuard, WriteOps,
+    FileOpsCore, FileOpsIoctl, Locked, Mutex, RwLock, RwLockReadGuard, RwLockWriteGuard, WriteOps,
 };
 use starnix_syscalls::{SyscallArg, SyscallResult};
 use starnix_uapi::{
@@ -375,7 +375,7 @@ fn get_name_str<'a>(name_bytes: &'a FsStr) -> Result<&'a str, Errno> {
 impl FsNodeOps for RemoteNode {
     fn create_file_ops(
         &self,
-        _locked: &mut Locked<'_, ReadOps>,
+        _locked: &mut Locked<'_, FileOpsCore>,
         node: &FsNode,
         _current_task: &CurrentTask,
         flags: OpenFlags,
@@ -394,6 +394,7 @@ impl FsNodeOps for RemoteNode {
 
     fn mknod(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         node: &FsNode,
         current_task: &CurrentTask,
         name: &FsStr,
@@ -965,7 +966,7 @@ impl FsNodeOps for RemoteSpecialNode {
 
     fn create_file_ops(
         &self,
-        _locked: &mut Locked<'_, ReadOps>,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         _flags: OpenFlags,
@@ -1402,7 +1403,7 @@ impl FileOps for RemoteFileObject {
 
     fn read(
         &self,
-        _locked: &mut Locked<'_, ReadOps>,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         offset: usize,
@@ -1499,7 +1500,7 @@ impl FileOps for RemotePipeObject {
 
     fn read(
         &self,
-        _locked: &mut Locked<'_, ReadOps>,
+        _locked: &mut Locked<'_, FileOpsCore>,
         file: &FileObject,
         current_task: &CurrentTask,
         offset: usize,
@@ -1855,7 +1856,7 @@ mod test {
                 .spawner()
                 .spawn_and_get_result({
                     let kernel = Arc::clone(&kernel);
-                    move |_, current_task| {
+                    move |locked, current_task| {
                         current_task.set_creds(Credentials {
                             euid: 1,
                             fsuid: 1,
@@ -1875,13 +1876,31 @@ mod test {
                         let ns = Namespace::new(fs);
                         current_task.fs().set_umask(FileMode::from_bits(0));
                         ns.root()
-                            .create_node(&current_task, "file".into(), FILE_MODE, DeviceType::NONE)
+                            .create_node(
+                                locked,
+                                &current_task,
+                                "file".into(),
+                                FILE_MODE,
+                                DeviceType::NONE,
+                            )
                             .expect("create_node failed");
                         ns.root()
-                            .create_node(&current_task, "dir".into(), DIR_MODE, DeviceType::NONE)
+                            .create_node(
+                                locked,
+                                &current_task,
+                                "dir".into(),
+                                DIR_MODE,
+                                DeviceType::NONE,
+                            )
                             .expect("create_node failed");
                         ns.root()
-                            .create_node(&current_task, "dev".into(), BLK_MODE, DeviceType::RANDOM)
+                            .create_node(
+                                locked,
+                                &current_task,
+                                "dev".into(),
+                                BLK_MODE,
+                                DeviceType::RANDOM,
+                            )
                             .expect("create_node failed");
                     }
                 })
@@ -1987,10 +2006,10 @@ mod test {
                     current_task.fs().set_umask(FileMode::from_bits(0));
                     let sub_dir1 = ns
                         .root()
-                        .create_node(&current_task, "dir".into(), MODE, DeviceType::NONE)
+                        .create_node(locked, &current_task, "dir".into(), MODE, DeviceType::NONE)
                         .expect("create_node failed");
                     let sub_dir2 = sub_dir1
-                        .create_node(&current_task, "dir".into(), MODE, DeviceType::NONE)
+                        .create_node(locked, &current_task, "dir".into(), MODE, DeviceType::NONE)
                         .expect("create_node failed");
 
                     let dir_handle = ns
@@ -2073,7 +2092,7 @@ mod test {
             .spawner()
             .spawn_and_get_result({
                 let kernel = Arc::clone(&kernel);
-                move |_, current_task| {
+                move |locked, current_task| {
                     let rights = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE;
                     let fs = RemoteFs::new_fs(
                         &kernel,
@@ -2087,8 +2106,14 @@ mod test {
                     let root = ns.root();
 
                     // Create RemoteSpecialNode (e.g. FIFO)
-                    root.create_node(&current_task, "fifo".into(), FIFO_MODE, DeviceType::NONE)
-                        .expect("create_node failed");
+                    root.create_node(
+                        locked,
+                        &current_task,
+                        "fifo".into(),
+                        FIFO_MODE,
+                        DeviceType::NONE,
+                    )
+                    .expect("create_node failed");
                     let mut context = LookupContext::new(SymlinkMode::NoFollow);
                     let fifo_node = root
                         .lookup_child(&current_task, &mut context, "fifo".into())
@@ -2107,8 +2132,14 @@ mod test {
                     };
 
                     // Create regular RemoteNode
-                    root.create_node(&current_task, "file".into(), REG_MODE, DeviceType::NONE)
-                        .expect("create_node failed");
+                    root.create_node(
+                        locked,
+                        &current_task,
+                        "file".into(),
+                        REG_MODE,
+                        DeviceType::NONE,
+                    )
+                    .expect("create_node failed");
                     let mut context = LookupContext::new(SymlinkMode::NoFollow);
                     let reg_node = root
                         .lookup_child(&current_task, &mut context, "file".into())
@@ -2140,7 +2171,7 @@ mod test {
             .spawner()
             .spawn_and_get_result({
                 let kernel = Arc::clone(&kernel);
-                move |_, current_task| {
+                move |locked, current_task| {
                     let rights = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE;
                     let fs = RemoteFs::new_fs(
                         &kernel,
@@ -2154,6 +2185,7 @@ mod test {
                     let node = ns
                         .root()
                         .create_node(
+                            locked,
                             &current_task,
                             "file1".into(),
                             mode!(IFREG, 0o666),
@@ -2238,7 +2270,7 @@ mod test {
             .spawner()
             .spawn_and_get_result({
                 let kernel = Arc::clone(&kernel);
-                move |_, current_task| {
+                move |locked, current_task| {
                     let rights = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE;
                     let fs = RemoteFs::new_fs(
                         &kernel,
@@ -2251,7 +2283,7 @@ mod test {
                     current_task.fs().set_umask(FileMode::from_bits(0));
                     let file = ns
                         .root()
-                        .create_node(&current_task, "file".into(), MODE, DeviceType::NONE)
+                        .create_node(locked, &current_task, "file".into(), MODE, DeviceType::NONE)
                         .expect("create_node failed");
                     // Enable verity on the file.
                     let desc = fsverity_descriptor {
@@ -2331,7 +2363,7 @@ mod test {
             .spawner()
             .spawn_and_get_result({
                 let kernel = Arc::clone(&kernel);
-                move |_, current_task| {
+                move |locked, current_task| {
                     let rights = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE;
                     let fs = RemoteFs::new_fs(
                         &kernel,
@@ -2344,7 +2376,7 @@ mod test {
                     current_task.fs().set_umask(FileMode::from_bits(0));
                     let file = ns
                         .root()
-                        .create_node(&current_task, "file".into(), MODE, DeviceType::NONE)
+                        .create_node(locked, &current_task, "file".into(), MODE, DeviceType::NONE)
                         .expect("create_node failed");
                     // Change the mode, this change should persist
                     file.entry
@@ -2461,7 +2493,7 @@ mod test {
             .spawner()
             .spawn_and_get_result({
                 let kernel = Arc::clone(&kernel);
-                move |_, current_task| {
+                move |locked, current_task| {
                     let rights = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE;
                     let fs = RemoteFs::new_fs(
                         &kernel,
@@ -2475,8 +2507,14 @@ mod test {
                     let root = ns.root();
 
                     const REG_MODE: FileMode = FileMode::from_bits(FileMode::IFREG.bits());
-                    root.create_node(&current_task, "file".into(), REG_MODE, DeviceType::NONE)
-                        .expect("create_node failed");
+                    root.create_node(
+                        locked,
+                        &current_task,
+                        "file".into(),
+                        REG_MODE,
+                        DeviceType::NONE,
+                    )
+                    .expect("create_node failed");
                     let mut context = LookupContext::new(SymlinkMode::NoFollow);
                     let reg_node = root
                         .lookup_child(&current_task, &mut context, "file".into())
@@ -2510,7 +2548,7 @@ mod test {
             .spawner()
             .spawn_and_get_result({
                 let kernel = Arc::clone(&kernel);
-                move |_, current_task| {
+                move |locked, current_task| {
                     let rights = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE;
                     let fs = RemoteFs::new_fs(
                         &kernel,
@@ -2524,8 +2562,14 @@ mod test {
                     let root = ns.root();
 
                     const REG_MODE: FileMode = FileMode::from_bits(FileMode::IFREG.bits());
-                    root.create_node(&current_task, "file".into(), REG_MODE, DeviceType::NONE)
-                        .expect("create_node failed");
+                    root.create_node(
+                        locked,
+                        &current_task,
+                        "file".into(),
+                        REG_MODE,
+                        DeviceType::NONE,
+                    )
+                    .expect("create_node failed");
                     let mut context = LookupContext::new(SymlinkMode::NoFollow);
                     let reg_node = root
                         .lookup_child(&current_task, &mut context, "file".into())
@@ -2579,7 +2623,7 @@ mod test {
                     current_task.fs().set_umask(FileMode::from_bits(0));
                     let child = ns
                         .root()
-                        .create_node(&current_task, "file".into(), MODE, DeviceType::NONE)
+                        .create_node(locked, &current_task, "file".into(), MODE, DeviceType::NONE)
                         .expect("create_node failed");
                     // Write to file (this should update mtime (time_modify))
                     let file = child
@@ -2682,7 +2726,7 @@ mod test {
             .spawner()
             .spawn_and_get_result({
                 let kernel = Arc::clone(&kernel);
-                move |_, current_task| {
+                move |locked, current_task| {
                     let rights = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE;
                     let fs = RemoteFs::new_fs(
                         &kernel,
@@ -2695,7 +2739,7 @@ mod test {
                     current_task.fs().set_umask(FileMode::from_bits(0));
                     let child = ns
                         .root()
-                        .create_node(&current_task, "file".into(), MODE, DeviceType::NONE)
+                        .create_node(locked, &current_task, "file".into(), MODE, DeviceType::NONE)
                         .expect("create_node failed");
 
                     let info_original = child
@@ -2779,7 +2823,7 @@ mod test {
                     current_task.fs().set_umask(FileMode::from_bits(0));
                     let child = ns
                         .root()
-                        .create_node(&current_task, "file".into(), MODE, DeviceType::NONE)
+                        .create_node(locked, &current_task, "file".into(), MODE, DeviceType::NONE)
                         .expect("create_node failed");
                     let file = child
                         .open(locked, &current_task, OpenFlags::RDWR, true)

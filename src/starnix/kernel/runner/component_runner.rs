@@ -26,7 +26,7 @@ use starnix_core::{
     vfs::{FileSystemOptions, FsString, LookupContext, NamespaceNode, WhatToMount},
 };
 use starnix_logging::{log_error, log_info};
-use starnix_sync::{Mutex, Unlocked};
+use starnix_sync::{FileOpsCore, LockBefore, Locked, Mutex, Unlocked};
 use starnix_uapi::{
     auth::{Capabilities, Credentials},
     device_type::DeviceType,
@@ -66,7 +66,7 @@ pub async fn start_component(
     log_info!("start_component: {}", url);
 
     // TODO(https://fxbug.dev/42076551): We leak the directory created by this function.
-    let component_path = generate_component_path(system_task)?;
+    let component_path = generate_component_path(&mut locked, system_task)?;
 
     let mount_record = Arc::new(Mutex::new(MountRecord::default()));
 
@@ -85,11 +85,17 @@ pub async fn start_component(
                     // Mount custom_artifacts and test_data directory at root of container
                     // We may want to transition to have these directories unique per component
                     let dir_proxy = fio::DirectorySynchronousProxy::new(dir_handle.into_channel());
-                    mount_record.lock().mount_remote(system_task, &dir_proxy, &dir_path)?;
+                    mount_record.lock().mount_remote(
+                        &mut locked,
+                        system_task,
+                        &dir_proxy,
+                        &dir_path,
+                    )?;
                 }
                 _ => {
                     let dir_proxy = fio::DirectorySynchronousProxy::new(dir_handle.into_channel());
                     mount_record.lock().mount_remote(
+                        &mut locked,
                         system_task,
                         &dir_proxy,
                         &format!("{component_path}/{dir_path}"),
@@ -300,7 +306,13 @@ async fn serve_component_controller(
 }
 
 /// Returns /container/component/{random} that doesn't already exist
-fn generate_component_path(system_task: &CurrentTask) -> Result<String, Error> {
+fn generate_component_path<L>(
+    locked: &mut Locked<'_, L>,
+    system_task: &CurrentTask,
+) -> Result<String, Error>
+where
+    L: LockBefore<FileOpsCore>,
+{
     // Checking container directory already exists
     let mount_point = system_task.lookup_path_from_root("/container/component/".into())?;
 
@@ -312,6 +324,7 @@ fn generate_component_path(system_task: &CurrentTask) -> Result<String, Error> {
         // This returns EEXIST if /container/component/{random} already exists.
         // If so, try again with another {random} string.
         match mount_point.create_node(
+            locked,
             system_task,
             random_string.as_str().into(),
             mode!(IFDIR, 0o755),
@@ -347,12 +360,16 @@ impl MountRecord {
         Ok(())
     }
 
-    fn mount_remote(
+    fn mount_remote<L>(
         &mut self,
+        locked: &mut Locked<'_, L>,
         system_task: &CurrentTask,
         directory: &fio::DirectorySynchronousProxy,
         path: &str,
-    ) -> Result<(), Error> {
+    ) -> Result<(), Error>
+    where
+        L: LockBefore<FileOpsCore>,
+    {
         // The incoming dir_path might not be top level, e.g. it could be /foo/bar.
         // Iterate through each component directory starting from the parent and
         // create it if it doesn't exist.
@@ -368,6 +385,7 @@ impl MountRecord {
             let sub_dir = sub_dir.as_os_str().as_bytes();
 
             current_node = match current_node.create_node(
+                locked,
                 system_task,
                 sub_dir.into(),
                 mode!(IFDIR, 0o755),

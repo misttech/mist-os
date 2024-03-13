@@ -20,7 +20,7 @@ use fuchsia_zircon::{
     cprng_draw_uninit, {self as zx},
 };
 use starnix_logging::{log_info, track_stub};
-use starnix_sync::{FileOpsIoctl, Locked, Mutex, ReadOps, WriteOps};
+use starnix_sync::{DeviceOpen, FileOpsCore, FileOpsIoctl, LockBefore, Locked, Mutex, WriteOps};
 use starnix_uapi::{
     auth::FsCred, device_type::DeviceType, error, errors::Errno, file_mode::FileMode,
     open_flags::OpenFlags, user_address::UserAddress, vfs::FdEvents,
@@ -74,7 +74,7 @@ impl FileOps for DevNull {
 
     fn read(
         &self,
-        _locked: &mut Locked<'_, ReadOps>,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         _offset: usize,
@@ -150,7 +150,7 @@ impl FileOps for DevZero {
 
     fn read(
         &self,
-        _locked: &mut Locked<'_, ReadOps>,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         _offset: usize,
@@ -178,7 +178,7 @@ impl FileOps for DevFull {
 
     fn read(
         &self,
-        _locked: &mut Locked<'_, ReadOps>,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         _offset: usize,
@@ -209,7 +209,7 @@ impl FileOps for DevRandom {
 
     fn read(
         &self,
-        _locked: &mut Locked<'_, ReadOps>,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         _offset: usize,
@@ -242,6 +242,7 @@ impl FileOps for DevRandom {
 }
 
 pub fn open_kmsg(
+    _locked: &mut Locked<'_, DeviceOpen>,
     current_task: &CurrentTask,
     _id: DeviceType,
     _node: &FsNode,
@@ -336,7 +337,7 @@ impl FileOps for DevKmsg {
 
     fn read(
         &self,
-        _locked: &mut Locked<'_, ReadOps>,
+        _locked: &mut Locked<'_, FileOpsCore>,
         file: &FileObject,
         current_task: &CurrentTask,
         _offset: usize,
@@ -365,12 +366,16 @@ impl FileOps for DevKmsg {
     }
 }
 
-pub fn mem_device_init(system_task: &CurrentTask) {
+pub fn mem_device_init<L>(locked: &mut Locked<'_, L>, system_task: &CurrentTask)
+where
+    L: LockBefore<FileOpsCore>,
+{
     let kernel = system_task.kernel();
     let registry = &kernel.device_registry;
 
     let mem_class = registry.get_or_create_class("mem".into(), registry.virtual_bus());
     registry.add_and_register_device(
+        locked,
         system_task,
         "null".into(),
         DeviceMetadata::new("null".into(), DeviceType::NULL, DeviceMode::Char),
@@ -379,6 +384,7 @@ pub fn mem_device_init(system_task: &CurrentTask) {
         simple_device_ops::<DevNull>,
     );
     registry.add_and_register_device(
+        locked,
         system_task,
         "zero".into(),
         DeviceMetadata::new("zero".into(), DeviceType::ZERO, DeviceMode::Char),
@@ -387,6 +393,7 @@ pub fn mem_device_init(system_task: &CurrentTask) {
         simple_device_ops::<DevZero>,
     );
     registry.add_and_register_device(
+        locked,
         system_task,
         "full".into(),
         DeviceMetadata::new("full".into(), DeviceType::FULL, DeviceMode::Char),
@@ -395,6 +402,7 @@ pub fn mem_device_init(system_task: &CurrentTask) {
         simple_device_ops::<DevFull>,
     );
     registry.add_and_register_device(
+        locked,
         system_task,
         "random".into(),
         DeviceMetadata::new("random".into(), DeviceType::RANDOM, DeviceMode::Char),
@@ -403,6 +411,7 @@ pub fn mem_device_init(system_task: &CurrentTask) {
         simple_device_ops::<DevRandom>,
     );
     registry.add_and_register_device(
+        locked,
         system_task,
         "urandom".into(),
         DeviceMetadata::new("urandom".into(), DeviceType::URANDOM, DeviceMode::Char),
@@ -411,6 +420,7 @@ pub fn mem_device_init(system_task: &CurrentTask) {
         simple_device_ops::<DevRandom>,
     );
     registry.add_and_register_device(
+        locked,
         system_task,
         "kmsg".into(),
         DeviceMetadata::new("kmsg".into(), DeviceType::KMSG, DeviceMode::Char),

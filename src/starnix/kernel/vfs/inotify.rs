@@ -12,7 +12,7 @@ use crate::{
         WdNumber,
     },
 };
-use starnix_sync::{FileOpsIoctl, Locked, Mutex, ReadOps, WriteOps};
+use starnix_sync::{FileOpsCore, FileOpsIoctl, Locked, Mutex, WriteOps};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::{
     arc_key::WeakKey,
@@ -215,7 +215,7 @@ impl FileOps for InotifyFileObject {
 
     fn read(
         &self,
-        _locked: &mut Locked<'_, ReadOps>,
+        _locked: &mut Locked<'_, FileOpsCore>,
         file: &FileObject,
         current_task: &CurrentTask,
         offset: usize,

@@ -12,7 +12,7 @@ use crate::{
     },
 };
 use starnix_logging::track_stub;
-use starnix_sync::{Locked, Mutex, ReadOps};
+use starnix_sync::{FileOpsCore, Locked, Mutex};
 use starnix_uapi::{errno, errors::Errno, off_t, open_flags::OpenFlags};
 use std::{collections::HashMap, sync::Arc};
 
@@ -96,7 +96,7 @@ impl FsNodeOps for Arc<NetstackDevicesDirectory> {
 
     fn create_file_ops(
         &self,
-        _locked: &mut Locked<'_, ReadOps>,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         _flags: OpenFlags,

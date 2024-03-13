@@ -15,7 +15,7 @@ use crate::{
 use fuchsia_zircon as zx;
 use itertools::Itertools;
 use starnix_logging::log_warn;
-use starnix_sync::{Locked, Mutex, ReadOps, WriteOps};
+use starnix_sync::{FileOpsCore, Locked, Mutex, WriteOps};
 use starnix_uapi::{
     errno, error,
     errors::{Errno, EBADF, EINTR, ETIMEDOUT},
@@ -445,7 +445,7 @@ impl FileOps for EpollFileObject {
 
     fn read(
         &self,
-        _locked: &mut Locked<'_, ReadOps>,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         offset: usize,

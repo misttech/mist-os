@@ -16,7 +16,7 @@ use crate::{
         FileHandle, FileObject, FileOps,
     },
 };
-use starnix_sync::{FileOpsIoctl, LockEqualOrBefore, Locked, ReadOps, WriteOps};
+use starnix_sync::{FileOpsCore, FileOpsIoctl, LockEqualOrBefore, Locked, WriteOps};
 use starnix_syscalls::{SyscallArg, SyscallResult};
 use starnix_uapi::{error, errors::Errno, open_flags::OpenFlags, vfs::FdEvents};
 
@@ -43,7 +43,7 @@ impl FileOps for SocketFile {
 
     fn read(
         &self,
-        locked: &mut Locked<'_, ReadOps>,
+        locked: &mut Locked<'_, FileOpsCore>,
         file: &FileObject,
         current_task: &CurrentTask,
         offset: usize,
@@ -187,7 +187,7 @@ impl SocketFile {
         deadline: Option<zx::Time>,
     ) -> Result<MessageReadInfo, Errno>
     where
-        L: LockEqualOrBefore<ReadOps>,
+        L: LockEqualOrBefore<FileOpsCore>,
     {
         // TODO: Implement more `flags`.
         let mut read_info = MessageReadInfo::default();

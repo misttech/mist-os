@@ -11,7 +11,7 @@ use crate::{
         MountInfo, SeekTarget,
     },
 };
-use starnix_sync::{Locked, ReadOps};
+use starnix_sync::{FileOpsCore, Locked};
 use starnix_uapi::{errno, errors::Errno, ino_t, off_t, open_flags::OpenFlags, statfs};
 use std::{collections::BTreeMap, sync::Arc};
 
@@ -60,7 +60,7 @@ impl FsNodeOps for Arc<LayeredFs> {
 
     fn create_file_ops(
         &self,
-        locked: &mut Locked<'_, ReadOps>,
+        locked: &mut Locked<'_, FileOpsCore>,
         _node: &FsNode,
         current_task: &CurrentTask,
         flags: OpenFlags,
@@ -203,8 +203,8 @@ mod test {
     async fn test_remove_duplicates() {
         let (kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
         let base = TmpFs::new_fs(&kernel);
-        base.root().create_dir(&current_task, "d1".into()).expect("create_dir");
-        base.root().create_dir(&current_task, "d2".into()).expect("create_dir");
+        base.root().create_dir(&mut locked, &current_task, "d1".into()).expect("create_dir");
+        base.root().create_dir(&mut locked, &current_task, "d2".into()).expect("create_dir");
         let base_entries = get_root_entry_names(&mut locked, &current_task, &base);
         assert_eq!(base_entries.len(), 4);
         assert!(base_entries.contains(&b".".to_vec()));

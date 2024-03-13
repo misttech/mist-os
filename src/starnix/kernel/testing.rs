@@ -6,7 +6,7 @@ use crate::task::TaskBuilder;
 use fidl_fuchsia_io as fio;
 use fuchsia_zircon as zx;
 use selinux::security_server::SecurityServer;
-use starnix_sync::{FileOpsIoctl, Locked, ReadOps, Unlocked, WriteOps};
+use starnix_sync::{FileOpsCore, FileOpsIoctl, Locked, Unlocked, WriteOps};
 use std::{ffi::CString, mem::MaybeUninit, sync::Arc};
 use zerocopy::{AsBytes, NoCell};
 
@@ -114,7 +114,7 @@ fn create_kernel_task_and_unlocked_with_fs_and_selinux<'l>(
         CurrentTask::create_system_task(&mut locked, &kernel, fs).expect("create system task");
     kernel.kthreads.init(system_task).expect("failed to initialize kthreads");
 
-    init_common_devices(&kernel.kthreads.system_task());
+    init_common_devices(&mut locked, &kernel.kthreads.system_task());
 
     // Take the lock on thread group and task in the correct order to ensure any wrong ordering
     // will trigger the tracing-mutex at the right call site.
@@ -289,7 +289,7 @@ impl FsNodeOps for PanickingFsNode {
 
     fn create_file_ops(
         &self,
-        _locked: &mut Locked<'_, ReadOps>,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         _flags: OpenFlags,
@@ -324,7 +324,7 @@ impl FileOps for PanickingFile {
 
     fn read(
         &self,
-        _locked: &mut Locked<'_, ReadOps>,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         _offset: usize,
