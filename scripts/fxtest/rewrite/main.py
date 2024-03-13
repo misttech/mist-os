@@ -840,9 +840,18 @@ async def run_all_tests(
     test_failure_observed: bool = False
 
     maybe_debugger: subprocess.Popen[bytes] | None = None
+    debugger_ready: asyncio.Condition = asyncio.Condition()
+
     if flags.has_debugger():
+
+        async def on_debugger_ready() -> None:
+            # TODO(b/329317913): Emit a debugger event here.
+            async with debugger_ready:
+                debugger_ready.notify_all()
+
         maybe_debugger = debugger.spawn(
             tests.selected,
+            on_debugger_ready,
             break_on_failure=flags.break_on_failure,
             breakpoints=flags.breakpoints,
         )
@@ -952,6 +961,11 @@ async def run_all_tests(
                 if was_non_hermetic:
                     run_state.non_hermetic_running -= 1
                 run_condition.notify()
+
+    # Wait for the debugger to signal that it is ready.
+    if maybe_debugger is not None:
+        async with debugger_ready:
+            await debugger_ready.wait()
 
     for _ in range(max_parallel):
         tasks.append(asyncio.create_task(test_executor()))

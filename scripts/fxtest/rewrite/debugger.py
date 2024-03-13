@@ -2,19 +2,23 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import asyncio
 import atexit
 import os
 import random
+import signal
 import string
 import subprocess
 import sys
 import tempfile
+import typing
 
 import test_list_file
 
 
 def spawn(
     tests: list[test_list_file.Test],
+    on_debugger_ready: typing.Callable[[], typing.Any],
     break_on_failure: bool = False,
     breakpoints: list[str] = [],
 ) -> subprocess.Popen[bytes]:
@@ -29,6 +33,11 @@ def spawn(
 
     Args:
         tests (list[test_list_file.Test]): List of tests selected to be executed.
+        on_debugger_ready (typing.Callable): An async closure to be issued when the debugger is
+                                             ready for processes to be spawned.
+        break_on_failure (bool): Whether or not we are in break-on-failure mode.
+        breakpoints (list[str]): List of breakpoint locations to install. Note: this may slow down
+                                 test execution significantly.
 
     Returns:
         subprocess.Popen: process handle for the zxdb process group.
@@ -74,6 +83,8 @@ def spawn(
         *embedded_mode_context_args,
         "--stream-file",
         fifo,
+        "--signal-when-ready",
+        str(os.getpid()),
     ]
 
     # Add the requested breakpoints.
@@ -86,6 +97,17 @@ def spawn(
     debugger_process = subprocess.Popen(
         args=zxdb_args, start_new_session=True, stderr=subprocess.STDOUT
     )
+
+    def on_sigusr1() -> None:
+        # Replace stdout with the named pipe we created and enable line buffering.
+        # Note: 1 == line buffered. See https://docs.python.org/3/library/functions.html#open.
+        sys.stdout = open(fifo, "w", buffering=1)
+        asyncio.create_task(on_debugger_ready())
+
+    # zxdb will send us a SIGUSR1 when it has successfully connected to DebugAgent and is ready to
+    # stream output.
+    loop = asyncio.get_event_loop()
+    loop.add_signal_handler(signal.SIGUSR1, on_sigusr1)
 
     def _cleanup() -> None:
         # Close stdout. This may have already been done at the end of all the tests in main.py, but
@@ -115,9 +137,5 @@ def spawn(
                 debugger_process.terminate()
 
     atexit.register(_cleanup)
-
-    # Replace stdout with the named pipe we created and enable line buffering.
-    # Note: 1 == line buffered. See https://docs.python.org/3/library/functions.html#open.
-    sys.stdout = open(fifo, "w", buffering=1)
 
     return debugger_process
