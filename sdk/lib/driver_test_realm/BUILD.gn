@@ -16,8 +16,6 @@ group("driver_test_realm") {
     ":fake_resolver",
     ":test_realm_manifest",
     "//src/devices/bin/devfs:component-for-test",
-    "//src/devices/bin/driver-index:base-driver-manifest",
-    "//src/devices/bin/driver-index:boot-driver-manifest",
     "//src/devices/bin/driver-index:component",
     "//src/devices/bin/driver_host:component",
   ]
@@ -31,8 +29,6 @@ group("realm_builder_version") {
     ":realm_builder_includes",
     ":test_realm_manifest",
     "//src/devices/bin/devfs:component-for-test",
-    "//src/devices/bin/driver-index:base-driver-manifest",
-    "//src/devices/bin/driver-index:boot-driver-manifest",
     "//src/devices/bin/driver-index:component",
     "//src/devices/bin/driver_host:component",
   ]
@@ -70,7 +66,6 @@ executable("bin") {
     "//sdk/lib/zbi-format",
     "//src/lib/ddk",
     "//src/lib/ddk:ddk-metadata-headers",
-    "//src/lib/fxl",
     "//src/storage/lib/vfs/cpp",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
   ]

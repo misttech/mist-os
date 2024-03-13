@@ -30,11 +30,8 @@
 #include <lib/zx/vmo.h>
 #include <zircon/status.h>
 
-#include <charconv>
-#include <fstream>
 #include <future>
 #include <memory>
-#include <sstream>
 #include <unordered_map>
 #include <vector>
 
@@ -42,7 +39,6 @@
 #include <fbl/string_printf.h>
 
 #include "sdk/lib/driver_test_realm/driver_test_realm_config.h"
-#include "src/lib/fxl/strings/join_strings.h"
 #include "src/storage/lib/vfs/cpp/pseudo_dir.h"
 #include "src/storage/lib/vfs/cpp/pseudo_file.h"
 #include "src/storage/lib/vfs/cpp/synchronous_vfs.h"
@@ -221,22 +217,6 @@ zx::result<fidl::ClientEnd<fio::Directory>> OpenPkgDir() {
   return zx::ok(std::move(endpoints->client));
 }
 
-zx::result<fidl::ClientEnd<fio::Directory>> OpenConfigDir() {
-  auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-  if (endpoints.is_error()) {
-    return zx::error(ZX_ERR_INTERNAL);
-  }
-  zx_status_t status =
-      fdio_open("/pkg/config",
-                static_cast<uint32_t>(fuchsia_io::wire::OpenFlags::kDirectory |
-                                      fuchsia_io::wire::OpenFlags::kRightReadable),
-                endpoints->server.TakeChannel().release());
-  if (status != ZX_OK) {
-    return zx::error(ZX_ERR_INTERNAL);
-  }
-  return zx::ok(std::move(endpoints->client));
-}
-
 class DriverTestRealm final : public fidl::Server<fuchsia_driver_test::Realm> {
  public:
   DriverTestRealm(component::OutgoingDirectory* outgoing, async_dispatcher_t* dispatcher,
@@ -373,7 +353,7 @@ class DriverTestRealm final : public fidl::Server<fuchsia_driver_test::Realm> {
       return;
     }
 
-    zx::result config_dir = OpenConfigDir();
+    zx::result config_dir = ConstructConfigDir();
     if (config_dir.is_error()) {
       completer.Reply(config_dir.take_error());
       return;
@@ -604,10 +584,44 @@ class DriverTestRealm final : public fidl::Server<fuchsia_driver_test::Realm> {
   }
 
  private:
+  zx::result<fidl::ClientEnd<fio::Directory>> ConstructConfigDir() {
+    auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+    if (endpoints.is_error()) {
+      return zx::error(ZX_ERR_INTERNAL);
+    }
+    boot_driver_manifest_ =
+        fbl::MakeRefCounted<fs::BufferedPseudoFile>([](fbl::String* out_string) {
+          *out_string = "[]";
+          return ZX_OK;
+        });
+    base_driver_manifest_ =
+        fbl::MakeRefCounted<fs::BufferedPseudoFile>([](fbl::String* out_string) {
+          *out_string = "[]";
+          return ZX_OK;
+        });
+    zx_status_t status = dir_->AddEntry("boot_driver_manifest", boot_driver_manifest_);
+    if (status != ZX_OK) {
+      return zx::error(status);
+    }
+    status = dir_->AddEntry("base_driver_manifest", base_driver_manifest_);
+    if (status != ZX_OK) {
+      return zx::error(status);
+    }
+    status =
+        vfs_.Serve(dir_, endpoints->server.TakeChannel(), fs::VnodeConnectionOptions::ReadOnly());
+    if (status != ZX_OK) {
+      return zx::error(status);
+    }
+    return zx::ok(std::move(endpoints->client));
+  }
+
   bool is_started_ = false;
   component::OutgoingDirectory* outgoing_;
   async_dispatcher_t* dispatcher_;
   fs::SynchronousVfs vfs_;
+  fbl::RefPtr<fs::PseudoDir> dir_ = fbl::MakeRefCounted<fs::PseudoDir>();
+  fbl::RefPtr<fs::PseudoFile> boot_driver_manifest_;
+  fbl::RefPtr<fs::PseudoFile> base_driver_manifest_;
   fidl::ServerBindingGroup<fuchsia_driver_test::Realm> bindings_;
 
   struct Directory {
