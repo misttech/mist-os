@@ -127,7 +127,7 @@ zx_status_t arch_copy_from_user(void* dst, const void* src, size_t len) {
 }
 
 UserCopyCaptureFaultsResult arch_copy_from_user_capture_faults(void* dst, const void* src,
-                                                               size_t len) {
+                                                               size_t len, CopyContext context) {
   return _arch_copy_to_from_user<X86_USER_COPY_CAPTURE_FAULTS, CopyDirection::FromUser>(dst, src,
                                                                                         len);
 }
@@ -142,8 +142,8 @@ zx_status_t arch_copy_to_user(void* dst, const void* src, size_t len) {
       .status;
 }
 
-UserCopyCaptureFaultsResult arch_copy_to_user_capture_faults(void* dst, const void* src,
-                                                             size_t len) {
+UserCopyCaptureFaultsResult arch_copy_to_user_capture_faults(void* dst, const void* src, size_t len,
+                                                             CopyContext context) {
   return _arch_copy_to_from_user<X86_USER_COPY_CAPTURE_FAULTS, CopyDirection::ToUser>(dst, src,
                                                                                       len);
 }

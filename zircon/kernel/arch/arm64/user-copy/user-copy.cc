@@ -15,7 +15,9 @@
 #include <kernel/thread.h>
 #include <vm/vm.h>
 
-#define ARM64_USER_COPY_CAPTURE_FAULTS (~(1ull << ARM64_DFR_RUN_FAULT_HANDLER_BIT))
+#define ARM64_USER_COPY_CAPTURE_ALL_FAULTS \
+  (~((1ull << ARM64_DFR_RUN_ACCESS_FAULT_HANDLER_BIT) | (1ull << ARM64_DFR_RUN_FAULT_HANDLER_BIT)))
+#define ARM64_USER_COPY_CAPTURE_PAGE_FAULTS (~(1ull << ARM64_DFR_RUN_FAULT_HANDLER_BIT))
 #define ARM64_USER_COPY_DO_FAULTS (~0ull)
 
 zx_status_t arch_copy_from_user(void* dst, const void* src, size_t len) {
@@ -58,7 +60,7 @@ zx_status_t arch_copy_to_user(void* dst, const void* src, size_t len) {
 }
 
 UserCopyCaptureFaultsResult arch_copy_from_user_capture_faults(void* dst, const void* src,
-                                                               size_t len) {
+                                                               size_t len, CopyContext context) {
   // The assembly code just does memcpy with fault handling.  This is
   // the security check that an address from the user is actually a
   // valid userspace address so users can't access kernel memory.
@@ -69,9 +71,16 @@ UserCopyCaptureFaultsResult arch_copy_from_user_capture_faults(void* dst, const 
   // reading user-controlled addresses.
   internal::validate_user_accessible_range(reinterpret_cast<vaddr_t*>(&src), &len);
 
-  Arm64UserCopyRet ret =
-      _arm64_user_copy(dst, src, len, &Thread::Current::Get()->arch().data_fault_resume,
-                       ARM64_USER_COPY_CAPTURE_FAULTS);
+  // Ensure that the calling thread is either holding no spinlocks, or has correctly specified a
+  // non-blocking copy context.
+  DEBUG_ASSERT(arch_num_spinlocks_held() == 0 || context == CopyContext::kBlockingNotAllowed);
+  uint64_t fault_return_mask = ARM64_USER_COPY_CAPTURE_PAGE_FAULTS;
+  if (context == CopyContext::kBlockingNotAllowed) {
+    fault_return_mask = ARM64_USER_COPY_CAPTURE_ALL_FAULTS;
+  }
+
+  Arm64UserCopyRet ret = _arm64_user_copy(
+      dst, src, len, &Thread::Current::Get()->arch().data_fault_resume, fault_return_mask);
 
   // If a fault didn't occur, and ret.status == ZX_OK, this will copy garbage data. It is the
   // responsibility of the caller to check the status and ignore.
@@ -82,15 +91,22 @@ UserCopyCaptureFaultsResult arch_copy_from_user_capture_faults(void* dst, const 
   }
 }
 
-UserCopyCaptureFaultsResult arch_copy_to_user_capture_faults(void* dst, const void* src,
-                                                             size_t len) {
+UserCopyCaptureFaultsResult arch_copy_to_user_capture_faults(void* dst, const void* src, size_t len,
+                                                             CopyContext context) {
   if (!is_user_accessible_range(reinterpret_cast<vaddr_t>(dst), len)) {
     return UserCopyCaptureFaultsResult{ZX_ERR_INVALID_ARGS};
   }
 
-  Arm64UserCopyRet ret =
-      _arm64_user_copy(dst, src, len, &Thread::Current::Get()->arch().data_fault_resume,
-                       ARM64_USER_COPY_CAPTURE_FAULTS);
+  // Ensure that the calling thread is either holding no spinlocks, or has correctly specified a
+  // non-blocking copy context.
+  DEBUG_ASSERT(arch_num_spinlocks_held() == 0 || context == CopyContext::kBlockingNotAllowed);
+  uint64_t fault_return_mask = ARM64_USER_COPY_CAPTURE_PAGE_FAULTS;
+  if (context == CopyContext::kBlockingNotAllowed) {
+    fault_return_mask = ARM64_USER_COPY_CAPTURE_ALL_FAULTS;
+  }
+
+  Arm64UserCopyRet ret = _arm64_user_copy(
+      dst, src, len, &Thread::Current::Get()->arch().data_fault_resume, fault_return_mask);
 
   // If a fault didn't occur, and ret.status == ZX_OK, this will copy garbage data. It is the
   // responsibility of the caller to check the status and ignore.

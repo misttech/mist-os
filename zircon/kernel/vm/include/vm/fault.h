@@ -19,6 +19,7 @@ const uint VMM_PF_FLAG_INSTRUCTION = (1u << 3);
 const uint VMM_PF_FLAG_NOT_PRESENT = (1u << 4);
 const uint VMM_PF_FLAG_HW_FAULT = (1u << 5);  // hardware is requesting a fault
 const uint VMM_PF_FLAG_SW_FAULT = (1u << 6);  // software fault
+const uint VMM_PF_FLAG_ACCESS = (1u << 7);
 const uint VMM_PF_FLAG_FAULT_MASK = (VMM_PF_FLAG_HW_FAULT | VMM_PF_FLAG_SW_FAULT);
 
 // convenience routine for converting page fault flags to a string
@@ -34,9 +35,5 @@ static inline const char* vmm_pf_flags_to_string(uint pf_flags, char str[5]) {
 
 // page fault handler, called during page fault context, with interrupts enabled
 zx_status_t vmm_page_fault_handler(vaddr_t addr, uint pf_flags);
-
-// specialized page fault handler for accessed flag faults. Called during page fault context with
-// interrupts enabled.
-zx_status_t vmm_accessed_fault_handler(vaddr_t addr);
 
 #endif  // ZIRCON_KERNEL_VM_INCLUDE_VM_FAULT_H_

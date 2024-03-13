@@ -134,6 +134,44 @@ bool capture_faults_test_capture() {
     EXPECT_EQ(fault_info.pf_flags, VMM_PF_FLAG_NOT_PRESENT | VMM_PF_FLAG_WRITE, "");
   }
 
+  // Test that copying to/from user memory while holding a spinlock works when
+  // CopyContext::kBlockingNotAllowed is passed in as the context option.
+  DECLARE_SINGLETON_SPINLOCK_WITH_TYPE(SpinlockForUsercopyTest, MonitoredSpinLock);
+  // We have to get the base address before acquiring the spinlock because the base() method
+  // acquires the VmMapping mutex.
+  vaddr_t base_addr = user->base();
+  {
+    Guard<MonitoredSpinLock, IrqSave> guard{SpinlockForUsercopyTest::Get(), SOURCE_TAG};
+    auto ret = arch_copy_from_user_capture_faults(&temp, reinterpret_cast<uint32_t*>(base_addr),
+                                                  sizeof(temp), CopyContext::kBlockingNotAllowed);
+    ASSERT_TRUE(ret.fault_info.has_value());
+    ASSERT_NE(ZX_OK, ret.status);
+
+    const auto& fault_info = ret.fault_info.value();
+    EXPECT_EQ(fault_info.pf_va, base_addr, "");
+    // Assert that the not present flag was set. We cannot check the value of the flags explicitly
+    // because the access flag may or may not be set depending on whether the underlying hardware
+    // supports explicit access faults.
+    EXPECT_TRUE((fault_info.pf_flags & VMM_PF_FLAG_NOT_PRESENT) != 0);
+  }
+
+  {
+    Guard<MonitoredSpinLock, IrqSave> guard{SpinlockForUsercopyTest::Get(), SOURCE_TAG};
+    auto ret =
+        arch_copy_to_user_capture_faults(reinterpret_cast<uint32_t*>(base_addr), &kTestValue,
+                                         sizeof(kTestValue), CopyContext::kBlockingNotAllowed);
+    ASSERT_TRUE(ret.fault_info.has_value());
+    ASSERT_NE(ZX_OK, ret.status);
+
+    const auto& fault_info = ret.fault_info.value();
+    EXPECT_EQ(fault_info.pf_va, base_addr, "");
+    // Assert that the not present and write flags were set. We cannot check the value of the flags
+    // explicitly because the access flag may or may not be set depending on whether the underlying
+    // hardware supports explicit access faults.
+    EXPECT_TRUE((fault_info.pf_flags & VMM_PF_FLAG_NOT_PRESENT) != 0);
+    EXPECT_TRUE((fault_info.pf_flags & VMM_PF_FLAG_WRITE) != 0);
+  }
+
   END_TEST;
 }
 

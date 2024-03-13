@@ -13,6 +13,23 @@
 
 #include <ktl/optional.h>
 
+// An enum that stores the context in which the user copy is being invoked.
+enum class CopyContext : uint8_t {
+  // The caller's context allows blocking. When this option is used, the fault handler that runs
+  // during the copy may resolve access faults (on architectures that have explicit access faults),
+  // which may acquire mutexes and therefore may block the calling thread.
+  //
+  // It is an error to use this option while holding a spinlock.
+  kBlockingAllowed,
+
+  // The caller's context does not allow blocking. When this option is used, the fault handler will
+  // that runs during the copy will not acquire any mutexes. As a side effect, this means that any
+  // and all faults will be captured and returned to the calling thread.
+  //
+  // It is safe to use this option when holding a spinlock.
+  kBlockingNotAllowed,
+};
+
 // A small helper struct used for the return type of the various
 // *_capture_faults forms of the copy_(to|from)_user routines.
 //
@@ -78,12 +95,13 @@ ARCH_COPY_ACCESS zx_status_t arch_copy_from_user(void *dst, const void *src, siz
  * @param len The number of bytes to copy.
  * @param pf_va Virtual address of any fault that occurs, undefined on success.
  * @param pf_flags Flag information of any fault that occurs, undefined on success.
+ * @param context Specifies whether it's ok to block. See CopyContext for more details.
  *
  * @return ZX_OK on success, or ZX_ERR_INVALID_ARGS on failure.
  *         Changes to the return value are observable by user-space.
  */
-[[nodiscard]] ARCH_COPY_ACCESS UserCopyCaptureFaultsResult
-arch_copy_from_user_capture_faults(void *dst, const void *src, size_t len);
+[[nodiscard]] ARCH_COPY_ACCESS UserCopyCaptureFaultsResult arch_copy_from_user_capture_faults(
+    void *dst, const void *src, size_t len, CopyContext context = CopyContext::kBlockingAllowed);
 
 /*
  * @brief Copy data from kernelspace into userspace
@@ -112,11 +130,12 @@ ARCH_COPY_ACCESS zx_status_t arch_copy_to_user(void *dst, const void *src, size_
  * @param len The number of bytes to copy.
  * @param pf_va Virtual address of any fault that occurs, undefined on success.
  * @param pf_flags Flag information of any fault that occurs, undefined on success.
+ * @param context Specifies whether it's ok to block. See CopyContext for more details.
  *
  * @return ZX_OK on success, or ZX_ERR_INVALID_ARGS on failure.
  *         Changes to the return value are observable by user-space.
  */
-[[nodiscard]] ARCH_COPY_ACCESS UserCopyCaptureFaultsResult
-arch_copy_to_user_capture_faults(void *dst, const void *src, size_t len);
+[[nodiscard]] ARCH_COPY_ACCESS UserCopyCaptureFaultsResult arch_copy_to_user_capture_faults(
+    void *dst, const void *src, size_t len, CopyContext context = CopyContext::kBlockingAllowed);
 
 #endif  // ZIRCON_KERNEL_INCLUDE_ARCH_USER_COPY_H_

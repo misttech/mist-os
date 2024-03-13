@@ -41,6 +41,15 @@ static void dump_iframe(const iframe_t* iframe) {
   PrintFrame(stdout, *iframe);
 }
 
+static uint64_t kernel_addr_from_dfr(uint64_t dfr) {
+  // Assert that the DFR is a valid kernel address by checking that the bit before the
+  // ARM64_DFR_RUN_ACCESS_FAULT_HANDLER_BIT (which is before the ARM64_DFR_RUN_FAULT_HANDLER_BIT)
+  // is a 1.
+  DEBUG_ASSERT(BIT_SET(dfr, ARM64_DFR_RUN_ACCESS_FAULT_HANDLER_BIT - 1));
+  return (dfr | (1ull << ARM64_DFR_RUN_ACCESS_FAULT_HANDLER_BIT) |
+          (1ull << ARM64_DFR_RUN_FAULT_HANDLER_BIT));
+}
+
 // clang-format off
 static const char* dfsc_to_string(uint32_t dfsc) {
   switch (dfsc) {
@@ -283,15 +292,15 @@ static void arm64_instruction_abort_handler(iframe_t* iframe, uint exception_fla
   zx_status_t err;
   DEBUG_ASSERT(far == arch_detag_ptr(far) &&
                "Expected the FAR to be untagged for an instruction abort");
-  // Check for accessed fault separately and use the dedicated handler.
+  // Check for accessed fault and set the flags accordingly.
   if ((iss & 0b111100) == 0b001000) {
-    exceptions_access.Add(1);
-    err = vmm_accessed_fault_handler(far);
+    kcounter_add(exceptions_access, 1);
+    pf_flags |= VMM_PF_FLAG_ACCESS;
   } else {
     kcounter_add(exceptions_page, 1);
     CPU_STATS_INC(page_faults);
-    err = vmm_page_fault_handler(far, pf_flags);
   }
+  err = vmm_page_fault_handler(far, pf_flags);
   arch_disable_ints();
   if (err >= 0) {
     return;
@@ -340,26 +349,31 @@ static void arm64_data_abort_handler(iframe_t* iframe, uint exception_flags, uin
   }
 
   uint32_t dfsc = BITS(iss, 5, 0);
-  // Accessed faults do not need to be trapped like other kind of faults and so we attempt to
-  // resolve such faults prior to potentially invoking the data fault resume handler.
-  // 0b0010XX is access faults
-  if ((dfsc & 0b111100) == 0b001000) {
-    DEBUG_ASSERT(arch_num_spinlocks_held() == 0);
-    arch_enable_ints();
-    exceptions_access.Add(1);
-    zx_status_t err = vmm_accessed_fault_handler(arch_detag_ptr(far));
-    arch_disable_ints();
-    if (err >= 0) {
-      return;
+  // Check if this is an access fault.
+  // 0b0010XX is access faults.
+  bool access_fault = (dfsc & 0b111100) == 0b001000;
+  if (access_fault) {
+    pf_flags |= VMM_PF_FLAG_ACCESS;
+  }
+
+  // Check if we want to capture this fault.
+  bool capture_fault = false;
+  if (unlikely(dfr)) {
+    if (unlikely(!BIT_SET(dfr, ARM64_DFR_RUN_ACCESS_FAULT_HANDLER_BIT))) {
+      // This function does not support capturing only access faults. In other words, if the caller
+      // wants to capture access faults, they must also capture page faults, so we assert that
+      // here.
+      DEBUG_ASSERT(!BIT_SET(dfr, ARM64_DFR_RUN_FAULT_HANDLER_BIT));
+      capture_fault = true;
+    } else if (unlikely(!BIT_SET(dfr, ARM64_DFR_RUN_FAULT_HANDLER_BIT))) {
+      // If the RUN_FAULT_HANDLER_BIT is not set, then we only want to capture this fault if it is
+      // _not_ an access fault.
+      capture_fault = !access_fault;
     }
   }
 
-  if (unlikely(dfr && !BIT_SET(dfr, ARM64_DFR_RUN_FAULT_HANDLER_BIT))) {
-    // Need to reconstruct the canonical resume address by ensuring it is correctly sign extended.
-    // Double check the bit before ARM64_DFR_RUN_FAULT_HANDLER_BIT was set (indicating kernel
-    // address) and fill it in.
-    DEBUG_ASSERT(BIT_SET(dfr, ARM64_DFR_RUN_FAULT_HANDLER_BIT - 1));
-    iframe->elr = dfr | (1ull << ARM64_DFR_RUN_FAULT_HANDLER_BIT);
+  if (capture_fault) {
+    iframe->elr = kernel_addr_from_dfr(dfr);
     // TODO(https://fxbug.dev/42175395): x1 is relayed back to user_copy where it will be stored in
     // page fault info. Currently, the only users of this page fault info is VmAspace::SoftFault,
     // but the kernel page fault handler shouldn't accept/work with tags. To avoid
@@ -370,15 +384,21 @@ static void arm64_data_abort_handler(iframe_t* iframe, uint exception_flags, uin
     return;
   }
 
-  // Only invoke the page fault handler for translation and permission faults. Any other
+  // Only invoke the page fault handler for access, translation, and permission faults. Any other
   // kind of fault cannot be resolved by the handler.
-  // 0b0001XX is translation faults
-  // 0b0011XX is permission faults
+  // 0b0010XX is access faults.
+  // 0b0001XX is translation faults.
+  // 0b0011XX is permission faults.
   zx_status_t err = ZX_OK;
   if (likely((dfsc & 0b001100) != 0 && (dfsc & 0b110000) == 0)) {
+    if (access_fault) {
+      DEBUG_ASSERT((pf_flags & VMM_PF_FLAG_ACCESS) != 0);
+      kcounter_add(exceptions_access, 1);
+    } else {
+      kcounter_add(exceptions_page, 1);
+    }
     DEBUG_ASSERT(arch_num_spinlocks_held() == 0);
     arch_enable_ints();
-    kcounter_add(exceptions_page, 1);
     err = vmm_page_fault_handler(arch_detag_ptr(far), pf_flags);
     arch_disable_ints();
     if (err >= 0) {
@@ -389,9 +409,10 @@ static void arm64_data_abort_handler(iframe_t* iframe, uint exception_flags, uin
   // Check if the current thread was expecting a data fault and
   // we should return to its handler.
   if (dfr && is_user_accessible(far)) {
-    // Having the ARM64_DFR_RUN_FAULT_HANDLER_BIT set should have already resulted in a valid
-    // sign extended canonical address. Double check the bit before, which should be a one.
-    DEBUG_ASSERT(BIT_SET(dfr, ARM64_DFR_RUN_FAULT_HANDLER_BIT - 1));
+    // Having the ARM64_DFR_RUN_FAULT_HANDLER_BIT and ARM64_DFR_RUN_ACCESS_FAULT_HANDLER_BIT bits
+    // set should have already resulted in a valid sign extended canonical address. Double check the
+    // bit before, which should be a one.
+    DEBUG_ASSERT(BIT_SET(dfr, ARM64_DFR_RUN_ACCESS_FAULT_HANDLER_BIT - 1));
     iframe->elr = dfr;
     return;
   }

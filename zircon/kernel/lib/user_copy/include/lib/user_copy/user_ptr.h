@@ -76,7 +76,8 @@ class user_ptr {
     return arch_copy_to_user(ptr_, &src, sizeof(S));
   }
 
-  // Copies a single T to user memory. T must not be |void|.
+  // Copies a single T to user memory. T must not be |void|. Captures permission and translation
+  // faults. Access faults (on architectures that have them) will be handled transparently.
   //
   // On success ZX_OK is returned and the values in pf_va and pf_flags are undefined, otherwise they
   // are filled with fault information.
@@ -154,7 +155,8 @@ class user_ptr {
     return arch_copy_from_user(dst, ptr_, sizeof(T));
   }
 
-  // Copies a single T from user memory. T must not be |void|.
+  // Copies a single T from user memory. T must not be |void|. Captures permission and translation
+  // faults. Access faults (on architectures that have them) will be handled transparently.
   //
   // On success ZX_OK is returned and the values in pf_va and pf_flags are undefined, otherwise they
   // are filled with fault information.

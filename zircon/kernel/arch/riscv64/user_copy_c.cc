@@ -36,7 +36,7 @@ zx_status_t arch_copy_to_user(void* dst, const void* src, size_t len) {
 }
 
 UserCopyCaptureFaultsResult arch_copy_from_user_capture_faults(void* dst, const void* src,
-                                                               size_t len) {
+                                                               size_t len, CopyContext context) {
   // The assembly code just does memcpy with fault handling.  This is
   // the security check that an address from the user is actually a
   // valid userspace address so users can't access kernel memory.
@@ -61,8 +61,8 @@ UserCopyCaptureFaultsResult arch_copy_from_user_capture_faults(void* dst, const 
   }
 }
 
-UserCopyCaptureFaultsResult arch_copy_to_user_capture_faults(void* dst, const void* src,
-                                                             size_t len) {
+UserCopyCaptureFaultsResult arch_copy_to_user_capture_faults(void* dst, const void* src, size_t len,
+                                                             CopyContext context) {
   if (!is_user_accessible_range(reinterpret_cast<vaddr_t>(dst), len)) {
     return UserCopyCaptureFaultsResult{ZX_ERR_INVALID_ARGS};
   }

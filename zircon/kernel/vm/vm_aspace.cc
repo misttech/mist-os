@@ -573,6 +573,11 @@ void VmAspace::AttachToThread(Thread* t) {
 }
 
 zx_status_t VmAspace::PageFault(vaddr_t va, uint flags) {
+  // If the fault was actually an access fault, handle that and return.
+  if (flags & VMM_PF_FLAG_ACCESS) {
+    return AccessedFault(va);
+  }
+
   VM_KTRACE_DURATION(2, "VmAspace::PageFault", ("va", va), ("flags", flags));
   canary_.Assert();
   LTRACEF("va %#" PRIxPTR ", flags %#x\n", va, flags);

@@ -43,25 +43,6 @@ void vmm_context_switch(VmAspace* oldspace, VmAspace* newaspace) {
                               newaspace ? &newaspace->arch_aspace() : nullptr);
 }
 
-zx_status_t vmm_accessed_fault_handler(vaddr_t addr) {
-  Thread* current_thread = Thread::Current::Get();
-  zx_ticks_t start_time = current_ticks();
-  PageFaultTimer timer(current_thread, start_time);
-
-  // Page faults never happen on kernel addresses. Double check this is a valid user address, then
-  // continue with the user aspace.
-  if (unlikely(!is_user_accessible(addr))) {
-    LTRACEF("PageFault: Invalid virtual address 0x%lx\n", addr);
-    return ZX_ERR_NOT_FOUND;
-  }
-
-  const zx_status_t status = Thread::Current::AccessedFault(addr);
-
-  KTRACE_COMPLETE("kernel:vm", "access_fault", start_time, ("vaddr", ktrace::Pointer{addr}));
-
-  return status;
-}
-
 class FlagsString {
  public:
   explicit FlagsString(uint flags) { vmm_pf_flags_to_string(flags, string_); }

@@ -38,6 +38,18 @@ static_assert(((KERNEL_ASPACE_BASE >> ARM64_DFR_RUN_FAULT_HANDLER_BIT) & 1) == 1
                   ((KERNEL_ASPACE_SIZE - 1) & KERNEL_ASPACE_BASE) == 0,
               "DFR fault handler bit not invariant over kernel addresses");
 
+// Bit 62 of the data_fault_resume field is used to indicate whether an access fault should first
+// handle the fault, or immediately return the resume location. The 62nd bit is selected as this
+// bit is also invariant over all kernel addresses. Note that this bit should only be set to 0 if
+// the ARM64_DFR_RUN_FAULT_HANDLER_BIT is also set to 0. In other words, callers cannot capture
+// only access faults; they must either capture both page and access faults, capture only page
+// faults, or capture no faults at all.
+static constexpr uint64_t ARM64_DFR_RUN_ACCESS_FAULT_HANDLER_BIT = 62;
+// Check that the access fault handler bit would always be 1 for a kernel address.
+static_assert(((KERNEL_ASPACE_BASE >> ARM64_DFR_RUN_ACCESS_FAULT_HANDLER_BIT) & 1) == 1 &&
+                  ((KERNEL_ASPACE_SIZE - 1) & KERNEL_ASPACE_BASE) == 0,
+              "DFR access fault handler bit not invariant over kernel addresses");
+
 struct fpstate {
   // align the save state on a 16 byte offset to optimally handle vector load/stores
   alignas(16) uint64_t regs[64];
