@@ -38,6 +38,9 @@ the [Drivers][dfv2-concepts] section under _Fundamentals_.
 - [Overview][dfv1-to-dfv2-driver-migration-overview]
 - [1. Migrate from Banjo to FIDL][migrate-from-banjo-to-fidl]
 - [2. Migrate from DFv1 to DFv2][migrate-from-dfv1-to-dfv2]
+- Extension
+
+  - [Set up the compat device server in a DFv2 driver][set-up-compat-device-server]
 
 ### DFv2 driver development
 
@@ -138,8 +141,8 @@ the [Drivers][dfv2-concepts] section under _Fundamentals_.
 [zircon]: /docs/concepts/kernel/README.md
 [dfv1-and-dfv2]: /docs/concepts/drivers/comparison_between_dfv1_and_dfv2.md
 [dfv1-to-dfv2-driver-migration-overview]: migration/README.md
-[migrate-from-banjo-to-fidl]: migration/migrate-from-banjo-to-fidl.md
-[migrate-from-dfv1-to-dfv2]: migration/migrate-from-dfv1-to-dfv2.md
+[migrate-from-banjo-to-fidl]: migration/migrate-from-banjo-to-fidl/overview.md
+[migrate-from-dfv1-to-dfv2]: migration/migrate-from-dfv1-to-dfv2/overview.md
 [fuchsia-driver-development]: developer_guide/driver-development.md
 [composite-nodes]: developer_guide/composite-node.md
 [driver-runtime-api-guidelines]: developer_guide/driver-runtime-api-guidelines.md
@@ -191,3 +194,4 @@ the [Drivers][dfv2-concepts] section under _Fundamentals_.
 [interrupts]: concepts/driver_development/interrupts.md
 [dma]: concepts/driver_development/dma.md
 [gpio-init]: concepts/driver_development/gpio-initialization.md
+[set-up-compat-device-server]: migration/set-up-compat-device-server.md

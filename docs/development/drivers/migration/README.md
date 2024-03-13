@@ -24,10 +24,6 @@ Notice the following key differences between DFv1 and DFv2:
   framework manages the life cycle of drivers. (For more information,
   see [Comparison between DFv1 and DFv2][dfv1-vs-dfv2].)
 
-  Important: Although not strictly required, it is **strongly recommended**
-  to migrate existing Banjo protocols to FIDL when migrating your DFv1 driver
-  to DFv2.
-
 Here is a list for the expected conditions of your driver after completing
 the  migration to DFv2:
 
@@ -49,8 +45,8 @@ handle additional tasks that aren't covered in this playbook.
 
 Driver migration from DFv1 to DFv2 can be divided into two phases:
 
-1. [Migrate from Banjo to FIDL][migrate-from-banjo-to-fidl].
-2. [Migrate from DFv1 to DFv2][migrate-from-dfv1-to-dfv2].
+1. [Migrate from DFv1 to DFv2][migrate-from-dfv1-to-dfv2].
+2. [Migrate from Banjo to FIDL][migrate-from-banjo-to-fidl].
 
 ### Extension
 
@@ -68,6 +64,6 @@ identified as missing in the migration playbook above:
 [dfv1-vs-dfv2]: /docs/concepts/drivers/comparison_between_dfv1_and_dfv2.md
 [driver-manager]: /docs/concepts/drivers/driver_framework.md#driver_manager
 [driver-node]: /docs/concepts/drivers/drivers_and_nodes.md
-[migrate-from-banjo-to-fidl]: /docs/development/drivers/migration/migrate-from-banjo-to-fidl.md
-[migrate-from-dfv1-to-dfv2]: /docs/development/drivers/migration/migrate-from-dfv1-to-dfv2.md
-[set-up-compat-device-server]: set-up-compat-device-server.md
+[migrate-from-banjo-to-fidl]: /docs/development/drivers/migration/migrate-from-banjo-to-fidl/overview.md
+[migrate-from-dfv1-to-dfv2]: /docs/development/drivers/migration/migrate-from-dfv1-to-dfv2/overview.md
+[set-up-compat-device-server]: /docs/development/drivers/migration/set-up-compat-device-server.md

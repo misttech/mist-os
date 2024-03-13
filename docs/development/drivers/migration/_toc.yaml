@@ -8,13 +8,28 @@
 toc:
 - title: "Overview"
   path: /docs/development/drivers/migration/README.md
-  step_group: driver_migration
-- title: "1. Migrate from Banjo to FIDL"
-  path: /docs/development/drivers/migration/migrate-from-banjo-to-fidl.md
-  step_group: driver_migration
-- title: "2. Migrate from DFv1 to DFv2"
-  path: /docs/development/drivers/migration/migrate-from-dfv1-to-dfv2.md
-  step_group: driver_migration
+- title: "1. Migrate from DFv1 to DFv2"
+  section:
+  - title: "Overview"
+    path: /docs/development/drivers/migration/migrate-from-dfv1-to-dfv2/overview.md
+    step_group: driver_migration-dfv1-to-dv2
+  - title: "Frequently asked questions"
+    path: /docs/development/drivers/migration/migrate-from-dfv1-to-dfv2/faq.md
+    step_group: driver_migration-dfv1-to-dv2
+  - title: "Update driver interfaces to DFv2"
+    path: /docs/development/drivers/migration/migrate-from-dfv1-to-dfv2/update-driver-interfaces-to-dfv2.md
+    step_group: driver_migration-dfv1-to-dv2
+- title: "2. Migrate from Banjo to FIDL"
+  section:
+  - title: "Overview"
+    path: /docs/development/drivers/migration/migrate-from-banjo-to-fidl/overview.md
+    step_group: driver_migration-banjo-to-fidl
+  - title: "Frequently asked questions"
+    path: /docs/development/drivers/migration/migrate-from-banjo-to-fidl/faq.md
+    step_group: driver_migration-banjo-to-fidl
+  - title: "Convert Banjo protocols to FIDL protocols"
+    path: /docs/development/drivers/migration/migrate-from-banjo-to-fidl/convert-banjo-protocols-to-fidl-protocols.md
+    step_group: driver_migration-banjo-to-fidl
 - title: "Extension"
   section:
   - title: "Set up the compat device server in a DFv2 driver"
