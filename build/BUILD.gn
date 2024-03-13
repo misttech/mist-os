@@ -135,6 +135,7 @@ group("non_hermetic_deps") {
     "//sdk/lib/driver/devicetree/*",
     "//src/devices/board/drivers/vim3-devicetree:*",
     "//src/devices/gpio/drivers/aml-gpio:*",
+    "//src/devices/i2c/drivers/aml-i2c:*",
   ]
 
   # Products which use Bazel-based assembly have non-hermetic outputs
