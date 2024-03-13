@@ -42,7 +42,7 @@ by what needs that type of test.
 |[Hermetic integration](#hermetic-integration-tests)         |-          |All       |Some   |-        |
 |[Non-hermetic integration](#non-hermetic-integration-tests) |-          |Few       |Few    |-        |
 |[Compatibility (CTF)](#compatibility-tests)                 |-          |Some      |Some   |All (SDK)|
-|[Conformance](#conformance-tests)                           |-          |Some      |Some   |Some     |
+|[Spec Conformance](#conformance-tests)                      |-          |Some      |Some   |Some     |
 |[On-device System Validation](#system-validation-tests)     |-          |Some      |Some   |Some     |
 |[Host-driven System Automation (Lacewing)](#lacewing-tests) |-          |Some      |Some   |Some     |
 <!-- TODO(b/308191530): Fill out these sections
@@ -294,23 +294,24 @@ large scale change overhead.
 **All components exposing protocols in the partner or public SDK
 should have a CTF test.**
 
-### Conformance Tests {#conformance-tests}
+### Spec Conformance Tests {#conformance-tests}
 
 * What needs it: Out-of-tree (OOT) drivers, components undergoing
 migration from one implementation to another, (some) framework
 clients.
 * What does it test for: Consistency between different implementations
-of a protocol or library
+of a protocol or library, to ensute they conform to the spec.
 * What are its key benefits: Ensures that different implementations
 of the same interface exhibit compatible behavior. This is especially
 useful for drivers where there may be multiple implementers of the
 same interface.
 * Where to view coverage: TODO
 * How to implement: Use parts of an existing TRF integration test
-to create a new TRF test.
+to create a new TRF test. Alternatively write this test in Lacewing
+to interact with a complete system.
 * Who writes this kind of test: Contract/protocol owners define a
-TRF test for requirements, and downstream users compose pieces of
-that test to ensure their code meets the requirements.
+test for requirements, and downstream users reuse or compose pieces
+of that test to ensure their code meets the requirements.
 * Where are the sources stored: fuchsia.git or built via the SDK
 in stand-alone repos
 * When does Fuchsia run this type of test: Commit-Queue, out-of-tree
@@ -335,14 +336,14 @@ It is important that the action `LOG("Hello, world")` produces
 binary-compatible output no matter the library producing it.
 
 It is important to know that an implementation conforms to the
-specification, and a Conformance Test is used to validate this is
+specification, and a Spec Conformance Test is used to validate this is
 the case.
 
-Conformance Tests build on top of TRF tests and have identical
-structure to Compatibility Tests, the primary difference is in how
-the different pieces of the TRF test are used.
+Spec Conformance Tests may build on top of TRF tests to have identical
+structure to Compatibility Tests. In this scenario, the primary
+difference is in how the different pieces of the TRF test are used.
 
-The recommended pattern for Conformance testing is to define a
+The recommended pattern for Spec Conformance testing is to define a
 RealmFactory (containing an implementation under test), a Test Suite
 (validating the implementation of the specification) wherever the
 contract is defined (e.g. fuchsia.git for SDK protocols), and the
@@ -356,15 +357,26 @@ implement their own RealmFactory that wraps their implementation
 behind the FIDL protocol.  This means that the same exact set of
 tests that define the contract are applied to each implementation.
 
+Alternatively, Spec Conformance tests may be written using Lacewing
+and run as host-driven system interaction tests. This is particularly
+useful when the implementer of the protocol is a driver or otherwise
+depends on specific hardware. This is especially useful to assert that
+product images including the driver both conform to the spec and
+were appropriately assembled to support interacting with hardware.
+
 More concretely, we can solve the above examples as follows:
 
 1. **Drivers**
-
    Define driver FIDL in fuchsia.git. Create a TRF test with
    associated Test Suite and FIDL protocol; ship them in the SDK.
-   In an out-of-tree driver repo, implement the driver, create a RealmFactory
-   that wraps the driver and implements the test FIDL. Run the
-   distributed Test Suite against that RealmFactory.
+   In an out-of-tree driver repo, implement the driver, create a
+   RealmFactory that wraps the driver and implements the test
+   FIDL. Run the distributed Test Suite against that RealmFactory.
+1. **Drivers (Lacewing)**
+   Create a Lacewing test that interacts with the driver's FIDL
+   protocols from the host. Ship this test as a binary artifact
+   that can be run in out-of-tree driver repos or during product
+   assembly.
 1. **Component rewrite**
    Create a new code base for the rewrite, create a skeleton TRF
    test implementing the test FIDL (following best practices to
@@ -381,7 +393,7 @@ More concretely, we can solve the above examples as follows:
    all other implementations. They will remain conformant.
 
 **Interfaces that are expected to be implemented multiple times should ship
-a conformance test for integrators to build on top of.**
+a spec conformance test for integrators to build on top of.**
 
 ### On-device System Validation Tests {#system-validation-tests}
 
