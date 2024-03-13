@@ -5,6 +5,7 @@
 use {
     anyhow::Result,
     ffx_target_show_args::TargetShow,
+    schemars::JsonSchema,
     serde::Serialize,
     std::default::Default,
     std::io::Write,
@@ -18,7 +19,7 @@ use {
 const INDENT: usize = 4;
 
 /// Show entry values.
-#[derive(Debug, PartialEq, Serialize)]
+#[derive(Debug, JsonSchema, PartialEq, Serialize)]
 #[serde(untagged)]
 pub enum ShowValue {
     BoolValue(bool),
@@ -37,16 +38,15 @@ impl std::fmt::Display for ShowValue {
 }
 
 /// A node in a hierarchy of show information or groupings.
-#[derive(Default, Debug, PartialEq, Serialize)]
+#[derive(Default, Debug, JsonSchema, PartialEq, Serialize)]
 pub struct ShowEntry {
     pub title: String,
     pub label: String,
     pub description: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub value: Option<ShowValue>,
-    #[serde(skip_serializing_if = "Vec::is_empty")]
     pub child: Vec<ShowEntry>,
     #[serde(skip_serializing)]
+    #[schemars(skip)]
     pub highlight: bool,
 }
 
@@ -230,11 +230,13 @@ mod tests {
         let mut result = Vec::new();
         output_for_machine(&input, &TargetShow { json: true, ..Default::default() }, &mut result)
             .unwrap();
+        let actual = String::from_utf8(result).expect(" machine bytes should be valid utf8");
+
         assert_eq!(
-            result,
-            b"[{\"title\":\"Test\",\"label\":\"the_test\",\"description\"\
-                             :\"A test.\",\"child\":[{\"title\":\"Prop\",\"label\":\"a_prop\",\
-                             \"description\":\"Some data.\",\"value\":false}]}]"
+            actual,
+            "[{\"title\":\"Test\",\"label\":\"the_test\",\"description\"\
+                             :\"A test.\",\"value\":null,\"child\":[{\"title\":\"Prop\",\"label\":\"a_prop\",\
+                             \"description\":\"Some data.\",\"value\":false,\"child\":[]}]}]"
         );
     }
 }

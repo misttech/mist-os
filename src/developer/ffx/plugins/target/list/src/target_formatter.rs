@@ -8,14 +8,13 @@ use ffx_list_args::{AddressTypes, Format};
 use fidl_fuchsia_developer_ffx as ffx;
 use fidl_fuchsia_net::IpAddress;
 use netext::IsLocalAddr;
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::{
     cmp::max,
     fmt::{self, Display, Write},
 };
-
-mod schema;
 
 const NAME: &'static str = "NAME";
 const SERIAL: &'static str = "SERIAL";
@@ -365,7 +364,7 @@ macro_rules! make_structs_and_support_functions {
             }
         }
 
-        #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
+        #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq, JsonSchema)]
         pub struct JsonTarget {
             $(
                 $field: serde_json::Value,

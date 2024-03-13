@@ -5,7 +5,7 @@
 use anyhow::{Context, Result};
 use async_trait::async_trait;
 use ffx_target_repository_list_args::ListCommand;
-use fho::{daemon_protocol, FfxMain, FfxTool, MachineWriter, ToolIO};
+use fho::{daemon_protocol, FfxMain, FfxTool, ToolIO, VerifiedMachineWriter};
 use fidl_fuchsia_developer_ffx::{RepositoryRegistryProxy, RepositoryStorageType};
 use prettytable::{cell, row, Table};
 use std::collections::HashMap;
@@ -19,7 +19,7 @@ pub struct ListTool {
 }
 
 type RepositoryList = Vec<(String, Vec<String>)>;
-type Writer = MachineWriter<RepositoryList>;
+type Writer = VerifiedMachineWriter<RepositoryList>;
 
 fho::embedded_plugin!(ListTool);
 #[async_trait(?Send)]
@@ -34,7 +34,7 @@ impl FfxMain for ListTool {
 async fn list_impl(
     _cmd: ListCommand,
     repos: RepositoryRegistryProxy,
-    mut writer: MachineWriter<RepositoryList>,
+    mut writer: VerifiedMachineWriter<RepositoryList>,
 ) -> Result<()> {
     let (client, server) = fidl::endpoints::create_endpoints();
     repos.list_registered_targets(server).context("communicating with daemon")?;

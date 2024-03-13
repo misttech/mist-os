@@ -9,7 +9,7 @@ use discovery::{DiscoverySources, TargetEvent, TargetHandle};
 use errors::{ffx_bail, ffx_bail_with_code};
 use ffx_config::EnvironmentContext;
 use ffx_list_args::{AddressTypes, ListCommand};
-use fho::{daemon_protocol, deferred, Deferred, FfxMain, FfxTool, MachineWriter, ToolIO};
+use fho::{daemon_protocol, deferred, Deferred, FfxMain, FfxTool, ToolIO, VerifiedMachineWriter};
 use fidl_fuchsia_developer_ffx as ffx;
 use fuchsia_async::Timer;
 use futures::{StreamExt, TryStreamExt};
@@ -46,7 +46,7 @@ fho::embedded_plugin!(ListTool);
 
 #[async_trait(?Send)]
 impl FfxMain for ListTool {
-    type Writer = MachineWriter<Vec<JsonTarget>>;
+    type Writer = VerifiedMachineWriter<Vec<JsonTarget>>;
     async fn main(self, writer: Self::Writer) -> fho::Result<()> {
         let infos = if is_discovery_enabled(&self.context).await {
             list_targets(self.tc_proxy.await?, &self.cmd).await?
@@ -66,7 +66,7 @@ async fn is_discovery_enabled(ctx: &EnvironmentContext) -> bool {
 async fn show_targets(
     cmd: ListCommand,
     infos: Vec<ffx::TargetInfo>,
-    mut writer: MachineWriter<Vec<JsonTarget>>,
+    mut writer: VerifiedMachineWriter<Vec<JsonTarget>>,
     context: &EnvironmentContext,
 ) -> Result<()> {
     match infos.len() {
@@ -285,7 +285,7 @@ mod test {
     ) -> Result<String> {
         let proxy = setup_fake_target_collection_server(num_tests);
         let test_buffers = TestBuffers::default();
-        let writer = MachineWriter::new_test(None, &test_buffers);
+        let writer = VerifiedMachineWriter::new_test(None, &test_buffers);
         let infos = list_targets(proxy, &cmd).await?;
         show_targets(cmd, infos, writer, context).await?;
         Ok(test_buffers.into_stdout_str())

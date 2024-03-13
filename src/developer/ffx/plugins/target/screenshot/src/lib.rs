@@ -7,19 +7,21 @@ use {
     async_trait::async_trait,
     chrono::{Datelike, Local, Timelike},
     ffx_target_screenshot_args::{Format, ScreenshotCommand},
-    ffx_writer::{MachineWriter, ToolIO},
+    ffx_writer::{ToolIO, VerifiedMachineWriter},
     fho::{moniker, FfxContext, FfxMain, FfxTool},
     fidl_fuchsia_io as fio,
     fidl_fuchsia_math::SizeU,
     fidl_fuchsia_ui_composition::{ScreenshotFormat, ScreenshotProxy, ScreenshotTakeFileRequest},
     futures::stream::{FuturesOrdered, StreamExt},
     png::HasParameters,
+    schemars::JsonSchema,
     serde::{Deserialize, Serialize},
-    std::fmt::{Display, Formatter, Result as FmtResult},
-    std::fs,
-    std::io::BufWriter,
-    std::io::Write,
-    std::path::{Path, PathBuf},
+    std::{
+        fmt::{Display, Formatter, Result as FmtResult},
+        fs,
+        io::{BufWriter, Write},
+        path::{Path, PathBuf},
+    },
 };
 
 // Reads all of the contents of the given file from the current seek
@@ -90,7 +92,7 @@ fho::embedded_plugin!(ScreenshotTool);
 
 #[async_trait(?Send)]
 impl FfxMain for ScreenshotTool {
-    type Writer = MachineWriter<ScreenshotOutput>;
+    type Writer = VerifiedMachineWriter<ScreenshotOutput>;
     async fn main(self, mut writer: Self::Writer) -> fho::Result<()> {
         screenshot_impl(self.screenshot_proxy, self.cmd, &mut writer).await?;
         Ok(())
@@ -155,7 +157,7 @@ async fn screenshot_impl<W: ToolIO<OutputItem = ScreenshotOutput>>(
     Ok(())
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, JsonSchema)]
 pub struct ScreenshotOutput {
     output_file: PathBuf,
 }
@@ -306,8 +308,10 @@ mod test {
         let screenshot_proxy = setup_fake_screenshot_server();
 
         let test_buffers = TestBuffers::default();
-        let mut writer =
-            MachineWriter::<ScreenshotOutput>::new_test(Some(WriterFormat::Json), &test_buffers);
+        let mut writer = VerifiedMachineWriter::<ScreenshotOutput>::new_test(
+            Some(WriterFormat::Json),
+            &test_buffers,
+        );
         let result = screenshot_impl(screenshot_proxy, cmd, &mut writer).await;
         assert!(result.is_ok());
 

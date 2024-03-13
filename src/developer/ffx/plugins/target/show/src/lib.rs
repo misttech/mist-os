@@ -7,7 +7,7 @@ use addr::TargetAddr;
 use anyhow::{anyhow, bail, Result};
 use async_trait::async_trait;
 use ffx_target_show_args as args;
-use fho::{deferred, moniker, Deferred, FfxMain, FfxTool, MachineWriter, ToolIO};
+use fho::{deferred, moniker, Deferred, FfxMain, FfxTool, ToolIO, VerifiedMachineWriter};
 use fidl_fuchsia_buildinfo::ProviderProxy;
 use fidl_fuchsia_developer_ffx::{TargetAddrInfo, TargetProxy};
 use fidl_fuchsia_feedback::{DeviceIdProviderProxy, LastRebootInfoProviderProxy};
@@ -46,7 +46,7 @@ type Writer = <ShowTool as FfxMain>::Writer;
 
 #[async_trait(?Send)]
 impl FfxMain for ShowTool {
-    type Writer = MachineWriter<Vec<ShowEntry>>;
+    type Writer = VerifiedMachineWriter<Vec<ShowEntry>>;
     /// Main entry point for the `show` subcommand.
     async fn main(self, mut writer: Self::Writer) -> fho::Result<()> {
         let ShowTool {
