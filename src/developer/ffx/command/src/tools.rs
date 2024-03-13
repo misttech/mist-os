@@ -77,6 +77,16 @@ pub trait ToolSuite: Sized {
         cmd: &FfxCommandLine,
     ) -> Result<Option<Box<dyn ToolRunner + '_>>, Error>;
 
+    /// Returns the tool runner for the given command. This works even if the
+    /// subcommand args cannot be parsed successfully so the right tool runner can be found
+    /// even if the required arguments are missing.
+    /// This is intended to be used when
+    /// attempting to generate the schema for the machine output of a command.
+    async fn try_runner_from_name(
+        &self,
+        cmd: &FfxCommandLine,
+    ) -> Result<Option<Box<dyn ToolRunner + '_>>, Error>;
+
     /// Parses the given command line information into a runnable command
     /// object, exiting and printing the early exit output if help is requested
     /// or an error occurs.

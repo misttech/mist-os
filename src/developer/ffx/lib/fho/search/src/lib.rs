@@ -132,10 +132,16 @@ impl ToolSuite for ExternalSubToolSuite {
     async fn get_args_info(&self) -> Result<ffx_command::CliArgsInfo> {
         let mut external_args_info: ffx_command::CliArgsInfo = Default::default();
 
-        for tool in &self.command_list().await {
-            // construct a FfxCommandline to get the args_info for the subcommand
-            let argv = Vec::from_iter(std::env::args());
+        // Pass the same command line to each of the external subcommands which
+        // prints the json encoded args info.
+        let argv = vec![
+            "ffx".to_string(),
+            "--machine".to_string(),
+            "json".to_string(),
+            "--help".to_string(),
+        ];
 
+        for tool in &self.command_list().await {
             let cmdline =
                 FfxCommandLine::from_args_for_help(&argv).bug_context("cmd line for help")?;
             let mut c = std::process::Command::new(
@@ -151,7 +157,10 @@ impl ToolSuite for ExternalSubToolSuite {
             let output = help_cmd.output().bug_context("sub tool help")?;
             let outval = String::from_utf8_lossy(&output.stdout);
             let subcmd_args_info: CliArgsInfo = serde_json::from_slice(&output.stdout)
-                .bug_context(format!("json parsing:{outval}"))?;
+                .bug_context(format!(
+                    "json parsing:{outval} {}",
+                    String::from_utf8_lossy(&output.stderr)
+                ))?;
 
             external_args_info.commands.push(ffx_command::SubCommandInfo {
                 name: subcmd_args_info.name.clone(),
@@ -192,6 +201,15 @@ impl ToolSuite for ExternalSubToolSuite {
         }
         // and we're done
         Ok(None)
+    }
+
+    async fn try_runner_from_name(
+        &self,
+        ffx_cmd: &FfxCommandLine,
+    ) -> Result<Option<Box<dyn ToolRunner + '_>>> {
+        // External commands do not parse the entire command, so it is OK to call
+        // try_from_args here.
+        self.try_from_args(ffx_cmd).await
     }
 }
 

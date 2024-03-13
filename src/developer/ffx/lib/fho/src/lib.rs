@@ -28,7 +28,7 @@ pub mod macro_deps {
     pub use anyhow;
     pub use argh;
     pub use async_trait::async_trait;
-    pub use ffx_command::{bug, return_bug, Ffx, FfxCommandLine, ToolRunner};
+    pub use ffx_command::{bug, return_bug, return_user_error, Ffx, FfxCommandLine, ToolRunner};
     pub use ffx_config::{global_env_context, EnvironmentContext};
     pub use ffx_core::Injector;
     pub use ffx_writer;

@@ -114,43 +114,51 @@ pub async fn run<T: ToolSuite>(exe_kind: ExecutableKind) -> Result<ExitStatus> {
         _ => (),
     };
 
-    let tool = match tools.try_from_args(&cmd).await {
-        Ok(t) => t,
-        Err(Error::Help { command, output, code }) => {
-            // TODO(b/303088345): Enhance argh to support custom help better.
-            // Check for machine json output and  help.
-            // This handles the sub command of ffx information.
-            if let Some(machine_format) = find_machine_and_help(&cmd) {
-                let all_info = tools.get_args_info().await?;
-                // Tools will return the top level args info, so
-                //iterate over the subcommands to get to the right level
-                let mut info: CliArgsInfo = all_info;
-                for c in cmd.subcmd_iter() {
-                    if c.starts_with("-") {
-                        continue;
+    // If the schema is requested, then find the tool runner for the requested tool
+    // and return the schema. try_from_args() can't be used since it is common for
+    // commands to have positional arguments and they are present if the schema is
+    // requested.
+    let tool = if app.schema && app.machine.is_some() {
+        tools.try_runner_from_name(&cmd).await?
+    } else {
+        match tools.try_from_args(&cmd).await {
+            Ok(t) => t,
+            Err(Error::Help { command, output, code }) => {
+                // TODO(b/303088345): Enhance argh to support custom help better.
+                // Check for machine json output and  help.
+                // This handles the sub command of ffx information.
+                if let Some(machine_format) = find_machine_and_help(&cmd) {
+                    let all_info = tools.get_args_info().await?;
+                    // Tools will return the top level args info, so
+                    //iterate over the subcommands to get to the right level
+                    let mut info: CliArgsInfo = all_info;
+                    for c in cmd.subcmd_iter() {
+                        if c.starts_with("-") {
+                            continue;
+                        }
+                        if info.name == c {
+                            continue;
+                        }
+                        info = info
+                            .commands
+                            .iter()
+                            .find(|s| s.name == c)
+                            .map(|s| s.command.clone().into())
+                            .unwrap_or(info);
                     }
-                    if info.name == c {
-                        continue;
-                    }
-                    info = info
-                        .commands
-                        .iter()
-                        .find(|s| s.name == c)
-                        .map(|s| s.command.clone().into())
-                        .unwrap_or(info);
+                    let output = match machine_format {
+                        ffx_writer::Format::Json => serde_json::to_string(&info),
+                        ffx_writer::Format::JsonPretty => serde_json::to_string_pretty(&info),
+                    };
+                    println!("{}", output.bug_context("Error serializing args")?);
+                    return Ok(ExitStatus::from_raw(0));
+                } else {
+                    return Err(Error::Help { command, output, code });
                 }
-                let output = match machine_format {
-                    ffx_writer::Format::Json => serde_json::to_string(&info),
-                    ffx_writer::Format::JsonPretty => serde_json::to_string_pretty(&info),
-                };
-                println!("{}", output.bug_context("Error serializing args")?);
-                return Ok(ExitStatus::from_raw(0));
-            } else {
-                return Err(Error::Help { command, output, code });
             }
-        }
 
-        Err(e) => return Err(e),
+            Err(e) => return Err(e),
+        }
     };
 
     let log_to_stdio = tool.as_ref().map(|tool| tool.forces_stdout_log()).unwrap_or(false);

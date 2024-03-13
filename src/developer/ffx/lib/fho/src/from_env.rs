@@ -483,6 +483,15 @@ impl<T: serde::Serialize> TryFromEnv for ffx_writer::MachineWriter<T> {
 }
 
 #[async_trait(?Send)]
+impl<T: serde::Serialize + schemars::JsonSchema> TryFromEnv
+    for ffx_writer::VerifiedMachineWriter<T>
+{
+    async fn try_from_env(env: &FhoEnvironment) -> Result<Self> {
+        Ok(ffx_writer::VerifiedMachineWriter::new(env.ffx.global.machine))
+    }
+}
+
+#[async_trait(?Send)]
 impl TryFromEnv for EnvironmentContext {
     async fn try_from_env(env: &FhoEnvironment) -> Result<Self> {
         Ok(env.context.clone())

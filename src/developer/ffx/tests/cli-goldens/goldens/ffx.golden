@@ -64,7 +64,7 @@
       "optionality": "optional",
       "long": "--schema",
       "short": null,
-      "description": "produce the schema for the MachineWriter output. If `--machine` is also provided, produce a machine-comparable schema instead of human-readable one.",
+      "description": "produce the JSON schema for the MachineWriter output. The `--machine` option is required when producing the schema.",
       "hidden": false
     },
     {

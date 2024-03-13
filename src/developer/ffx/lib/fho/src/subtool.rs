@@ -2,11 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{FhoEnvironment, FhoToolMetadata, TryFromEnv};
+use crate::{FhoEnvironment, FhoToolMetadata, ToolIO, TryFromEnv};
 use argh::{ArgsInfo, CommandInfo, FromArgs, SubCommand, SubCommands};
 use async_trait::async_trait;
 use ffx_command::{
-    Error, FfxCommandLine, FfxContext, MetricsSession, Result, ToolRunner, ToolSuite,
+    user_error, Error, FfxCommandLine, FfxContext, MetricsSession, Result, ToolRunner, ToolSuite,
 };
 use ffx_config::environment::ExecutableKind;
 use ffx_config::EnvironmentContext;
@@ -121,8 +121,16 @@ impl<T: FfxTool> ToolRunner for FhoTool<T> {
 
     async fn run(self: Box<Self>, metrics: MetricsSession) -> Result<ExitStatus> {
         metrics.print_notice(&mut std::io::stderr()).await?;
-        let writer = TryFromEnv::try_from_env(&self.env).await?;
-        let res = self.main.main(writer).await.map(|_| ExitStatus::from_raw(0));
+        let mut writer: <T as FfxMain>::Writer = TryFromEnv::try_from_env(&self.env).await?;
+        let res: Result<ExitStatus> = if self.env.ffx.global.schema {
+            if <T as FfxMain>::Writer::has_schema() {
+                writer.try_print_schema().map(|_| ExitStatus::from_raw(0)).map_err(|e| e.into())
+            } else {
+                Err(user_error!("--schema is not supported for this command"))
+            }
+        } else {
+            self.main.main(writer).await.map(|_| ExitStatus::from_raw(0))
+        };
         metrics.command_finished(&res, &self.redacted_args).await.and(res)
     }
 }
@@ -189,6 +197,29 @@ impl<M: FfxTool> ToolSuite for FhoSuite<M> {
             }
         };
         Ok(Some(res))
+    }
+
+    async fn try_runner_from_name(
+        &self,
+        ffx: &FfxCommandLine,
+    ) -> Result<Option<Box<dyn ToolRunner + '_>>> {
+        let args = Vec::from_iter(ffx.global.subcommand.iter().map(String::as_str));
+        match ToolCommand::<M>::from_args(&Vec::from_iter(ffx.cmd_iter()), &args) {
+            Ok(cmd) => {
+                let res: Box<dyn ToolRunner> = match cmd.subcommand {
+                    FhoHandler::Metadata(cmd) => {
+                        Box::new(MetadataRunner { cmd, info: M::Command::COMMAND })
+                    }
+                    FhoHandler::Standalone(tool) => {
+                        FhoTool::<M>::build(&self.context, ffx.clone(), tool).await?
+                    }
+                };
+                return Ok(Some(res));
+            }
+            Err(err) => {
+                return Err(Error::from_early_exit(&ffx.command, err));
+            }
+        };
     }
 }
 

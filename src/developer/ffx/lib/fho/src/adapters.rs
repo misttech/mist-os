@@ -14,12 +14,10 @@ macro_rules! embedded_plugin {
             cmd: <$tool as $crate::FfxTool>::Command,
         ) -> $crate::Result<()> {
             #[allow(unused_imports)]
-            use $crate::macro_deps::{argh, bug, global_env_context, return_bug, FfxCommandLine};
+            use $crate::macro_deps::{
+                argh, bug, ffx_writer::Format, global_env_context, return_bug, FfxCommandLine,
+            };
 
-            // The legacy ffx plugin interface does not expose the global ffx command line arguments
-            // to the plugin. The ffx command line is reparsed so the subtool can be invoked.
-            // As a result global command line arguments cannot be defined in tests, preventing this
-            // from being _fully_ testable.
             let ffx = FfxCommandLine::from_env()?;
             let context = if let Some(gc) = global_env_context() {
                 gc
@@ -27,10 +25,24 @@ macro_rules! embedded_plugin {
                 $crate::macro_deps::return_bug!("global env context unavailable")
             };
             let injector = injector.clone();
-
             let env = $crate::FhoEnvironment { ffx, context, injector };
 
-            let writer = $crate::TryFromEnv::try_from_env(&env).await?;
+            // Create the writer, and if the schema is flag is set,
+            // try to print it and then exit.
+            let mut writer: <$tool as $crate::FfxMain>::Writer =
+                $crate::TryFromEnv::try_from_env(&env).await?;
+            if env.ffx.global.schema {
+                use $crate::macro_deps::ffx_writer::ToolIO;
+                if <<$tool as $crate::FfxMain>::Writer as $crate::ToolIO>::has_schema() {
+                    writer.try_print_schema()?;
+                } else {
+                    $crate::macro_deps::return_user_error!(
+                        "--schema is not supported for this command"
+                    );
+                }
+                return Ok(());
+            }
+
             let tool = <$tool as $crate::FfxTool>::from_env(env, cmd).await?;
             $crate::FfxMain::main(tool, writer).await
         }

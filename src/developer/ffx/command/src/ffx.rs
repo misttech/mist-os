@@ -200,8 +200,8 @@ pub struct Ffx {
     pub machine: Option<Format>,
 
     #[argh(switch)]
-    /// produce the schema for the MachineWriter output. If `--machine` is also provided, produce a
-    /// machine-comparable schema instead of human-readable one.
+    /// produce the JSON schema for the MachineWriter output. The `--machine` option
+    /// is required when producing the schema.
     pub schema: bool,
 
     #[argh(option)]

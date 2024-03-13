@@ -61,6 +61,8 @@ ffx("ffx") {
     "src/lib.rs",
     "src/main.rs",
   ]
+
+  test_deps = [ "//src/lib/fuchsia" ]
 }
 
 _ffx_e2e_config = [
