@@ -13,8 +13,8 @@ have "dual-stack" behavior: they can be used to communicate with IPv4 hosts or
 with IPv6 hosts.
 
 Not all network socket protocols are capable of dual-stack behavior. Netstack3
-[plans to support](https://fxbug.dev/42095034) dual-stack operation only for TCP
-and UDP, but not for ICMP or raw IP sockets.
+supports dual-stack operation only for TCP and UDP, but not for ICMP or raw IP
+sockets.
 
 ## How dual-stack behavior is implemented
 
