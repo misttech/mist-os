@@ -2006,6 +2006,25 @@ pub enum CapabilityTypeName {
     Config,
 }
 
+impl std::str::FromStr for CapabilityTypeName {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "directory" => Ok(CapabilityTypeName::Directory),
+            "event_stream" => Ok(CapabilityTypeName::EventStream),
+            "protocol" => Ok(CapabilityTypeName::Protocol),
+            "resolver" => Ok(CapabilityTypeName::Resolver),
+            "runner" => Ok(CapabilityTypeName::Runner),
+            "service" => Ok(CapabilityTypeName::Service),
+            "storage" => Ok(CapabilityTypeName::Storage),
+            "dictionary" => Ok(CapabilityTypeName::Directory),
+            "configuration" => Ok(CapabilityTypeName::Config),
+            _ => Err(Error::ParseCapabilityTypeName { raw: s.to_string() }),
+        }
+    }
+}
+
 impl fmt::Display for CapabilityTypeName {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let display_name = match &self {
@@ -2640,6 +2659,8 @@ pub enum Error {
     },
     #[error("Invalid capability path: {}", raw)]
     InvalidCapabilityPath { raw: String },
+    #[error("Invalid capability type name: {}", raw)]
+    ParseCapabilityTypeName { raw: String },
 }
 
 #[cfg(test)]

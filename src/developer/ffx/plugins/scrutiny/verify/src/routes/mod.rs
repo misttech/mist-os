@@ -35,7 +35,7 @@ impl From<&Command> for Query {
             default_capability_types()
         }
         .into_iter()
-        .map(|capability_type| capability_type.into())
+        .map(|capability_type| capability_type.to_string())
         .collect();
         Query {
             capability_types,

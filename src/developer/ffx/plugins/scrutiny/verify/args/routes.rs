@@ -3,33 +3,9 @@
 // found in the LICENSE file.
 
 use argh::{ArgsInfo, FromArgValue, FromArgs};
+use cm_rust::CapabilityTypeName;
 use ffx_core::ffx_command;
 use std::path::PathBuf;
-
-#[derive(Clone, Debug, PartialEq)]
-pub enum CapabilityType {
-    Directory,
-    Protocol,
-}
-
-impl FromArgValue for CapabilityType {
-    fn from_arg_value(value: &str) -> Result<Self, String> {
-        match value {
-            "directory" => Ok(Self::Directory),
-            "protocol" => Ok(Self::Protocol),
-            _ => Err(format!("Unsupported capability type \"{}\"; possible values are: \"directory\", \"protocol\".", value)),
-        }
-    }
-}
-
-impl Into<String> for CapabilityType {
-    fn into(self) -> String {
-        String::from(match self {
-            Self::Directory => "directory",
-            Self::Protocol => "protocol",
-        })
-    }
-}
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum ResponseLevel {
@@ -62,8 +38,8 @@ impl Into<String> for ResponseLevel {
     }
 }
 
-pub fn default_capability_types() -> Vec<CapabilityType> {
-    vec![CapabilityType::Directory, CapabilityType::Protocol]
+pub fn default_capability_types() -> Vec<CapabilityTypeName> {
+    vec![CapabilityTypeName::Directory, CapabilityTypeName::Protocol]
 }
 
 #[ffx_command()]
@@ -80,7 +56,7 @@ pub fn default_capability_types() -> Vec<CapabilityType> {
 pub struct Command {
     /// capability types to verify.
     #[argh(option)]
-    pub capability_type: Vec<CapabilityType>,
+    pub capability_type: Vec<CapabilityTypeName>,
     /// response level to report from routes scrutiny plugin.
     #[argh(option, default = "ResponseLevel::Error")]
     pub response_level: ResponseLevel,

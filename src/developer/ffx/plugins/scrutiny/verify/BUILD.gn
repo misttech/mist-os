@@ -35,6 +35,8 @@ ffx_plugin("ffx_scrutiny_verify") {
     "args/structured_config.rs",
   ]
 
+  args_deps = [ "//src/sys/lib/cm_rust" ]
+
   sources = [
     "src/bootfs.rs",
     "src/component_resolvers.rs",
