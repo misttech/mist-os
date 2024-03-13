@@ -95,120 +95,76 @@ zx_status_t provision_authorized_keys_from_bootloader_file(
   return ZX_OK;
 }
 
-// static
-Service::Socket Service::MakeSocket(async_dispatcher_t* dispatcher, IpVersion ip_version,
-                                    uint16_t port) {
-  const int family = static_cast<int>(ip_version);
-  fbl::unique_fd sock(socket(family, SOCK_STREAM, IPPROTO_TCP));
-  if (!sock.is_valid()) {
+Service::Service(async_dispatcher_t* dispatcher, uint16_t port)
+    : dispatcher_(dispatcher),
+      sock_(fbl::unique_fd(socket(AF_INET6, SOCK_STREAM, IPPROTO_TCP))),
+      waiter_(dispatcher) {
+  if (!sock_.is_valid()) {
     FX_LOGS(FATAL) << "Failed to create socket: " << strerror(errno);
   }
   sockaddr_storage addr;
-  switch (ip_version) {
-    case IpVersion::V4:
-      *reinterpret_cast<struct sockaddr_in*>(&addr) = sockaddr_in{
-          .sin_family = AF_INET,
-          .sin_port = htons(port),
-          .sin_addr = in_addr{INADDR_ANY},
-      };
-      break;
-    case IpVersion::V6:
-      *reinterpret_cast<struct sockaddr_in6*>(&addr) = sockaddr_in6{
-          .sin6_family = AF_INET6,
-          .sin6_port = htons(port),
-          .sin6_addr = in6addr_any,
-      };
-      // Disable dual-stack mode for the socket.
-      constexpr const int kEnable = 1;
-      setsockopt(sock.get(), IPPROTO_IPV6, IPV6_V6ONLY, &kEnable, sizeof(kEnable));
-      break;
-  }
-  if (bind(sock.get(), reinterpret_cast<const sockaddr*>(&addr), sizeof addr) < 0) {
+  *reinterpret_cast<struct sockaddr_in6*>(&addr) = sockaddr_in6{
+      .sin6_family = AF_INET6,
+      .sin6_port = htons(port),
+      .sin6_addr = in6addr_any,
+  };
+  if (bind(sock_.get(), reinterpret_cast<const sockaddr*>(&addr), sizeof addr) < 0) {
     FX_LOGS(FATAL) << "Failed to bind to " << port << ": " << strerror(errno);
   }
 
   FX_SLOG(INFO, "listen() for inbound SSH connections", FX_KV("port", (int)port));
-  if (listen(sock.get(), 10) < 0) {
+  if (listen(sock_.get(), 10) < 0) {
     FX_LOGS(FATAL) << "Failed to listen: " << strerror(errno);
   }
 
-  return Socket{.fd = std::move(sock), .waiter = fsl::FDWaiter(dispatcher)};
-}
-
-Service::Service(async_dispatcher_t* dispatcher, uint16_t port)
-    : dispatcher_(dispatcher),
-      port_(port),
-      v4_socket_(MakeSocket(dispatcher_, IpVersion::V4, port_)),
-      v6_socket_(MakeSocket(dispatcher_, IpVersion::V6, port_)) {
-  Wait(std::nullopt);
+  Wait();
 }
 
 Service::~Service() = default;
 
-void Service::Wait(std::optional<IpVersion> ip_version) {
+void Service::Wait() {
   FX_SLOG(DEBUG, "Waiting for next connection");
 
-  auto do_wait = [this](Service::Socket* sock, IpVersion ip_version) {
-    sock->waiter.Wait(
-        [this, sock, ip_version](zx_status_t status, uint32_t /*events*/) {
-          if (status != ZX_OK) {
-            FX_PLOGS(FATAL, status) << "Failed to wait on socket";
-          }
+  waiter_.Wait(
+      [this](zx_status_t status, uint32_t /*events*/) {
+        if (status != ZX_OK) {
+          FX_PLOGS(FATAL, status) << "Failed to wait on socket";
+        }
 
-          struct sockaddr_storage peer_addr {};
-          socklen_t peer_addr_len = sizeof(peer_addr);
-          fbl::unique_fd conn(accept(sock->fd.get(), reinterpret_cast<struct sockaddr*>(&peer_addr),
-                                     &peer_addr_len));
-          if (!conn.is_valid()) {
-            if (errno == EPIPE) {
-              FX_LOGS(FATAL) << "The netstack died. Terminating.";
-            } else {
-              FX_LOGS(ERROR) << "Failed to accept: " << strerror(errno);
-              // Wait for another connection.
-              Wait(ip_version);
-            }
-            return;
-          }
-
-          std::string peer_name = "unknown";
-          char host[NI_MAXHOST];
-          char port[NI_MAXSERV];
-          if (int res =
-                  getnameinfo(reinterpret_cast<struct sockaddr*>(&peer_addr), peer_addr_len, host,
-                              sizeof(host), port, sizeof(port), NI_NUMERICHOST | NI_NUMERICSERV);
-              res == 0) {
-            switch (ip_version) {
-              case IpVersion::V4:
-                peer_name = fxl::StringPrintf("%s:%s", host, port);
-                break;
-              case IpVersion::V6:
-                peer_name = fxl::StringPrintf("[%s]:%s", host, port);
-                break;
-            }
+        struct sockaddr_storage peer_addr {};
+        socklen_t peer_addr_len = sizeof(peer_addr);
+        fbl::unique_fd conn(
+            accept(sock_.get(), reinterpret_cast<struct sockaddr*>(&peer_addr), &peer_addr_len));
+        if (!conn.is_valid()) {
+          if (errno == EPIPE) {
+            FX_LOGS(FATAL) << "The netstack died. Terminating.";
           } else {
-            FX_LOGS(WARNING)
-                << "Error from getnameinfo(.., NI_NUMERICHOST | NI_NUMERICSERV) for peer address: "
-                << gai_strerror(res);
+            FX_LOGS(ERROR) << "Failed to accept: " << strerror(errno);
+            // Wait for another connection.
+            Wait();
           }
-          FX_SLOG(INFO, "Accepted connection", FX_KV("remote", peer_name.c_str()));
+          return;
+        }
 
-          Launch(std::move(conn));
-          Wait(ip_version);
-        },
-        sock->fd.get(), POLLIN);
-  };
+        std::string peer_name = "unknown";
+        char host[NI_MAXHOST];
+        char port[NI_MAXSERV];
+        if (int res =
+                getnameinfo(reinterpret_cast<struct sockaddr*>(&peer_addr), peer_addr_len, host,
+                            sizeof(host), port, sizeof(port), NI_NUMERICHOST | NI_NUMERICSERV);
+            res == 0) {
+          peer_name = fxl::StringPrintf("[%s]:%s", host, port);
+        } else {
+          FX_LOGS(WARNING)
+              << "Error from getnameinfo(.., NI_NUMERICHOST | NI_NUMERICSERV) for peer address: "
+              << gai_strerror(res);
+        }
+        FX_SLOG(INFO, "Accepted connection", FX_KV("remote", peer_name.c_str()));
 
-  if (ip_version) {
-    switch (*ip_version) {
-      case IpVersion::V4:
-        return do_wait(&v4_socket_, IpVersion::V4);
-      case IpVersion::V6:
-        return do_wait(&v6_socket_, IpVersion::V6);
-    }
-  } else {
-    do_wait(&v4_socket_, IpVersion::V4);
-    do_wait(&v6_socket_, IpVersion::V6);
-  }
+        Launch(std::move(conn));
+        Wait();
+      },
+      sock_.get(), POLLIN);
 }
 
 void Service::Launch(fbl::unique_fd conn) {

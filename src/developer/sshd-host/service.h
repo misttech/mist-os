@@ -43,26 +43,16 @@ class Service {
   ~Service();
 
  private:
-  enum class IpVersion { V4 = AF_INET, V6 = AF_INET6 };
   struct Controller;
 
-  struct Socket {
-    fbl::unique_fd fd;
-    fsl::FDWaiter waiter;
-  };
-
-  static Socket MakeSocket(async_dispatcher_t* dispatcher, IpVersion ip_version, uint16_t port);
-
-  void Wait(std::optional<IpVersion> ip_version);
+  void Wait();
   void Launch(fbl::unique_fd conn);
 
   void OnStop(zx_status_t status, Controller* controller);
 
   async_dispatcher_t* dispatcher_;
-  uint16_t port_;
-  // TODO(https://fxbug.dev/42095034): Replace these with a single dual-stack
-  // socket once Netstack3 supports that.
-  Socket v4_socket_, v6_socket_;
+  fbl::unique_fd sock_;
+  fsl::FDWaiter waiter_;
   uint64_t next_child_num_ = 0;
 
   struct Controller final : public fidl::AsyncEventHandler<fuchsia_component::ExecutionController> {
