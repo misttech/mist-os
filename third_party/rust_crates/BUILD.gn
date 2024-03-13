@@ -9979,7 +9979,7 @@ rust_library("pest-v2_1_3") {
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":ucd-trie-v0_1_1" ]
+  deps += [ ":ucd-trie-v0_1_6" ]
 
   rustenv = []
 
@@ -16350,18 +16350,18 @@ rust_library("typenum-v1_15_0") {
   applicable_licenses = [ ":typenum-v1_15_0.license" ]
 }
 
-license("ucd-trie-v0_1_1.license") {
+license("ucd-trie-v0_1_6.license") {
   public_package_name = "ucd_trie"
   license_files = [
-    "//third_party/rust_crates/vendor/ucd-trie-0.1.1/LICENSE-APACHE",
-    "//third_party/rust_crates/vendor/ucd-trie-0.1.1/LICENSE-MIT",
+    "//third_party/rust_crates/vendor/ucd-trie-0.1.6/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/ucd-trie-0.1.6/LICENSE-MIT",
   ]
 }
 
-rust_library("ucd-trie-v0_1_1") {
+rust_library("ucd-trie-v0_1_6") {
   crate_name = "ucd_trie"
-  crate_root = "//third_party/rust_crates/vendor/ucd-trie-0.1.1/src/lib.rs"
-  output_name = "ucd_trie-91d111d170cc5f0b"
+  crate_root = "//third_party/rust_crates/vendor/ucd-trie-0.1.6/src/lib.rs"
+  output_name = "ucd_trie-53958726f307bc9"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
@@ -16370,16 +16370,16 @@ rust_library("ucd-trie-v0_1_1") {
 
   rustflags = [
     "--cap-lints=allow",
-    "--edition=2015",
-    "-Cmetadata=91d111d170cc5f0b",
-    "-Cextra-filename=-91d111d170cc5f0b",
+    "--edition=2021",
+    "-Cmetadata=53958726f307bc9",
+    "-Cextra-filename=-53958726f307bc9",
     "--cfg=feature=\"default\"",
     "--cfg=feature=\"std\"",
   ]
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":ucd-trie-v0_1_1.license" ]
+  applicable_licenses = [ ":ucd-trie-v0_1_6.license" ]
 }
 
 license("unic-char-property-v0_9_0.license") {

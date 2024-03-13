@@ -4,7 +4,7 @@ Unicode codepoints. The principle use case for such a trie is to represent
 properties defined by Unicode that correspond to sets of Unicode codepoints.
 (These properties are formally called boolean properties or "single valued"
 properties. See
-[UTR#23 S3.3](http://www.unicode.org/reports/tr23/#PropertyTypeDefinitions)
+[UTR#23 S3.3](https://www.unicode.org/reports/tr23/#PropertyTypeDefinitions)
 for more details.)
 
 This crate has two principle types: `TrieSetOwned` and `TrieSetSlice`,
@@ -26,15 +26,13 @@ provided, which means `no_std` crates can still embed tries into their code.
 #![deny(missing_docs)]
 #![cfg_attr(not(feature = "std"), no_std)]
 
-#[cfg(feature = "std")]
-extern crate core;
-
 use core::fmt;
 
 #[cfg(feature = "std")]
-pub use owned::{Error, Result, TrieSetOwned};
+pub use crate::owned::{Error, Result, TrieSetOwned};
 
 #[cfg(test)]
+#[allow(dead_code)]
 mod general_category;
 #[cfg(feature = "std")]
 mod owned;
@@ -68,7 +66,7 @@ pub struct TrieSetSlice<'a> {
 }
 
 impl<'a> fmt::Debug for TrieSetSlice<'a> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "TrieSetSlice(...)")
     }
 }
