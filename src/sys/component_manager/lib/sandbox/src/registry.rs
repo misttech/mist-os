@@ -28,10 +28,11 @@ pub(crate) fn spawn_task(
     fut: impl Future<Output = ()> + Send + 'static,
 ) {
     let mut registry = REGISTRY.lock().unwrap();
+    let guard = scopeguard::guard((), move |_| {
+        REGISTRY.lock().unwrap().remove(koid);
+    });
     let task = fasync::Task::spawn(async move {
-        scopeguard::defer! {
-            REGISTRY.lock().unwrap().remove(koid);
-        }
+        let _guard = guard;
         fut.await;
     });
     let existing = registry.insert(koid, Entry { capability, task: Some(task) });
