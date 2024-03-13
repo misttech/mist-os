@@ -9,6 +9,7 @@ import("//build/fidl/fidl.gni")
 import("//build/test.gni")
 
 driver_bind_rules("log-test-driver-bind") {
+  testonly = true
   rules = "log-test.bind"
   deps = [
     "//src/devices/bind/fuchsia.test",
@@ -17,6 +18,7 @@ driver_bind_rules("log-test-driver-bind") {
 }
 
 source_set("common") {
+  testonly = true
   configs += [ "//build/config:all_source" ]
   sources = [ "log-tester.cc" ]
   public_deps = [
@@ -29,6 +31,7 @@ source_set("common") {
 }
 
 fuchsia_driver("log-test-driver-driver") {
+  testonly = true
   output_name = "log-test-driver"
   deps = [
     ":common",
@@ -37,6 +40,7 @@ fuchsia_driver("log-test-driver-driver") {
 }
 
 fuchsia_driver_component("log-test-driver") {
+  testonly = true
   info = "log-test-driver-info.json"
   component_name = "log-test-driver"
   deps = [ ":log-test-driver-driver" ]

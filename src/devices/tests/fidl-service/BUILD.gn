@@ -8,6 +8,7 @@ import("//build/drivers.gni")
 import("//build/test.gni")
 
 fidl("echo") {
+  testonly = true
   name = "fidl.examples.echo"
   sources = [ "echo.test.fidl" ]
   contains_drivers = true
@@ -46,11 +47,13 @@ fuchsia_unittest_package("fidl-service-test") {
 }
 
 driver_bind_rules("parent-driver-bind") {
+  testonly = true
   rules = "parent-driver.bind"
   deps = [ "//src/devices/bind/fuchsia.test" ]
 }
 
 fuchsia_driver("parent-driver") {
+  testonly = true
   output_name = "fidl-service-parent"
   sources = [ "parent-driver.cc" ]
   deps = [
@@ -68,6 +71,7 @@ fuchsia_driver("parent-driver") {
 }
 
 fuchsia_driver_component("parent") {
+  testonly = true
   component_name = "parent"
   manifest = "meta/parent.cml"
   deps = [ ":parent-driver" ]
@@ -75,11 +79,13 @@ fuchsia_driver_component("parent") {
 }
 
 driver_bind_rules("child-driver-bind") {
+  testonly = true
   rules = "child-driver.bind"
   deps = [ ":echo_bindlib" ]
 }
 
 fuchsia_driver("child-driver") {
+  testonly = true
   output_name = "fidl-service-child"
   sources = [ "child-driver.cc" ]
   deps = [
@@ -93,6 +99,7 @@ fuchsia_driver("child-driver") {
 }
 
 fuchsia_driver_component("child") {
+  testonly = true
   component_name = "child"
   manifest = "meta/child.cml"
   deps = [ ":child-driver" ]

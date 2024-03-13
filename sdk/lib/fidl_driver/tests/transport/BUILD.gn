@@ -12,6 +12,7 @@ group("transport") {
 }
 
 fidl("test.transport") {
+  testonly = true
   sources = [ "transport.test.fidl" ]
   public_deps = [
     "//sdk/fidl/fdf",

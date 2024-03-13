@@ -53,6 +53,7 @@ if (is_host) {
 }
 
 fuchsia_package("ffx_connection_test_components") {
+  testonly = true
   deps = [ "//src/testing/fidl/proxy_stressor" ]
 }
 

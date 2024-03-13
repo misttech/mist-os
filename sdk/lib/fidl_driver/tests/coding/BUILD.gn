@@ -12,6 +12,7 @@ group("coding") {
 }
 
 fidl("test.driver.coding") {
+  testonly = true
   sources = [ "coding.test.fidl" ]
   public_deps = [
     "//sdk/fidl/fdf",

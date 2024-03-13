@@ -46,18 +46,21 @@ fuchsia_unittest_package("package") {
 }
 
 fidl("driver.multiname.test") {
+  testonly = true
   sources = [ "multiname.test.fidl" ]
   public_deps = [ "//zircon/vdso/zx" ]
   excluded_checks = [ "wrong-prefix-for-platform-source-library" ]
 }
 
 driver_bind_rules("parent_device_bind") {
+  testonly = true
   rules = "parent_device.bind"
   bind_output = "parent_device.bindbc"
   deps = [ "//src/devices/bind/fuchsia.test" ]
 }
 
 fuchsia_driver("parent_device") {
+  testonly = true
   output_name = "parent_device"
   sources = [
     "child_device.cc",
@@ -75,6 +78,7 @@ fuchsia_driver("parent_device") {
 }
 
 fuchsia_driver_component("parent_device_component") {
+  testonly = true
   component_name = "parent_device"
   deps = [ ":parent_device" ]
   info = "parent_device-info.json"

@@ -24,6 +24,7 @@ group("integration") {
 }
 
 fidl("llcpptest.dispatcher.handle.ownership.test") {
+  testonly = true
   visibility = [ "//src/lib/fidl/llcpp/tests/*" ]
   sources = [ "dispatcher_handle_ownership.test.fidl" ]
   public_deps = [ "//zircon/vdso/zx" ]
@@ -118,6 +119,7 @@ fuchsia_unittest_package(
 }
 
 fidl("fidl.test.coding.fuchsia") {
+  testonly = true
   visibility = [
     "//src/lib/fidl/cpp/contrib/tests/*",
     "//src/lib/fidl/cpp/tests/*",
@@ -127,6 +129,7 @@ fidl("fidl.test.coding.fuchsia") {
 }
 
 fidl("llcpptest.flexible.test") {
+  testonly = true
   sources = [ "flexible.test.fidl" ]
   public_deps = [ "//zircon/vdso/zx" ]
 }
@@ -155,6 +158,7 @@ fuchsia_unittest_package("fidl_llcpp_flexible_tests") {
 }
 
 fidl("llcpptest.handlerights.test") {
+  testonly = true
   sources = [ "handle_rights.test.fidl" ]
   public_deps = [ "//zircon/vdso/zx" ]
 }
@@ -180,6 +184,7 @@ fuchsia_unittest_package("fidl_llcpp_handle_rights_tests") {
 }
 
 fidl("llcpptest.protocol.test") {
+  testonly = true
   sources = [ "protocol.test.fidl" ]
   public_deps = [ "//zircon/vdso/zx" ]
 }
@@ -210,6 +215,7 @@ fuchsia_unittest_package("fidl_llcpp_protocol_tests") {
 }
 
 fidl("llcpptest.handleraii.test") {
+  testonly = true
   sources = [ "handle_raii.test.fidl" ]
   public_deps = [ "//zircon/vdso/zx" ]
 }
@@ -254,6 +260,7 @@ fuchsia_unittest_package("fidl_llcpp_transitional_tests") {
 }
 
 fidl("llcpptest.v2integration.test") {
+  testonly = true
   sources = [ "v2_integration.test.fidl" ]
 }
 

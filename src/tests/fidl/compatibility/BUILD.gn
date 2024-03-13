@@ -7,6 +7,7 @@ import("//build/rust/rustc_binary.gni")
 
 # Shared between the hlcpp test server and the test harness.
 source_set("hlcpp_client_app") {
+  testonly = true
   visibility = [
     ":*",
     "hlcpp:*",
@@ -46,6 +47,7 @@ fidl_compatibilty_test_impls = [
 # LINT.ThenChange(test_driver.rs)
 
 rustc_binary("test_driver_bin") {
+  testonly = true
   output_name = "test_driver"
   edition = "2021"
   source_root = "test_driver.rs"

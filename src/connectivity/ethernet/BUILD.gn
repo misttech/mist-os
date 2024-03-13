@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 group("drivers") {
+  testonly = true
   deps = [
     "drivers/aml-ethernet",
     "drivers/asix-88179",

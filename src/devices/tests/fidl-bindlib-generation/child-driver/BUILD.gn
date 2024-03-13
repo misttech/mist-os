@@ -6,6 +6,7 @@ import("//build/bind/bind.gni")
 import("//build/drivers.gni")
 
 driver_bind_rules("child_driver_bind") {
+  testonly = true
   rules = "child_driver.bind"
   bind_output = "child_driver.bindbc"
   tests = "child_driver_bind_tests.json"
@@ -16,6 +17,7 @@ driver_bind_rules("child_driver_bind") {
 }
 
 fuchsia_driver("driver") {
+  testonly = true
   output_name = "fidl-bindlib-generation-child"
   sources = [ "child_driver.cc" ]
   deps = [
@@ -29,6 +31,7 @@ fuchsia_driver("driver") {
 }
 
 fuchsia_driver_component("child-driver") {
+  testonly = true
   component_name = "fidl-bindlib-generation-child"
   deps = [ ":driver" ]
   info = "component-info.json"

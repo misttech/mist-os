@@ -5,7 +5,7 @@
 import("//src/lib/fostr/build/fostr_fidl.gni")
 
 fostr_fidl("fuchsia.example.fostr2") {
+  testonly = true
   fidl_target = "//src/lib/fostr/test/fuchsia.example.fostr2"
-
   deps = [ "//src/lib/fostr/fidl/fuchsia.example.fostr" ]
 }

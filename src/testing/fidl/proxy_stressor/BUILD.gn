@@ -6,6 +6,7 @@ import("//build/components.gni")
 import("//build/rust/rustc_binary.gni")
 
 rustc_binary("proxy_stressor_bin") {
+  testonly = true
   edition = "2021"
   name = "proxy_stressor"
   deps = [
@@ -23,6 +24,7 @@ rustc_binary("proxy_stressor_bin") {
 }
 
 fuchsia_component("proxy_stressor") {
+  testonly = true
   manifest = "meta/server.cml"
   deps = [ ":proxy_stressor_bin" ]
 }

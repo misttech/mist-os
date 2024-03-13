@@ -121,6 +121,7 @@ action("json_for_test") {
 }
 
 fidl("fidl") {
+  testonly = true
   name = "test.fidlcat.examples"
 
   sources = [
@@ -130,6 +131,7 @@ fidl("fidl") {
 }
 
 fidl("fidl-composed") {
+  testonly = true
   name = "test.fidlcat.composedinto"
 
   sources = [ "testdata/composed_into.test.fidl" ]
@@ -138,6 +140,7 @@ fidl("fidl-composed") {
 }
 
 fidl("fidl-sys") {
+  testonly = true
   name = "test.fidlcat.sys"
 
   sources = [ "testdata/sys.test.fidl" ]

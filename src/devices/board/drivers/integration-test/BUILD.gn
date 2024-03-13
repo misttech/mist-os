@@ -7,10 +7,12 @@ import("//build/drivers.gni")
 import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.board.test") {
+  testonly = true
   sources = [ "board.test.fidl" ]
 }
 
 driver_bind_rules("test-bus-bind") {
+  testonly = true
   rules = "test-bus.bind"
   deps = [
     "//src/devices/bind/fuchsia.platform",
@@ -19,10 +21,9 @@ driver_bind_rules("test-bus-bind") {
 }
 
 fuchsia_driver("integration-test-driver") {
+  testonly = true
   output_name = "integration-test"
   configs += [ "//build/config:all_source" ]
-
-  # TODO: testonly = true
   sources = [ "test.cc" ]
   deps = [
     ":fuchsia.board.test_cpp",
@@ -38,6 +39,7 @@ fuchsia_driver("integration-test-driver") {
 }
 
 fuchsia_driver_component("integration-test") {
+  testonly = true
   component_name = "integration-test"
   deps = [ ":integration-test-driver" ]
   info = "integration-test-info.json"

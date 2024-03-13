@@ -22,12 +22,14 @@ executable("bin") {
 }
 
 fidl("fidl.test.example.codingtablesdeps") {
+  testonly = true
   visibility = [ ":*" ]
   sources = [ "coding_tables_deps.test.fidl" ]
   enable_hlcpp = true
 }
 
 fidl("fidl.test.example.codingtables") {
+  testonly = true
   visibility = [ ":*" ]
   sources = [ "coding_tables.test.fidl" ]
   public_deps = [ ":fidl.test.example.codingtablesdeps" ]

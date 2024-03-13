@@ -6,6 +6,7 @@ import("//build/components.gni")
 import("//build/rust/rustc_binary.gni")
 
 rustc_binary("bin") {
+  testonly = true
   name = "server_suite_under_test_rust"
   sources = [ "src/main.rs" ]
   edition = "2021"

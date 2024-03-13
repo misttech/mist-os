@@ -5,6 +5,7 @@
 import("//build/rust/rustc_library.gni")
 
 rustc_library("rust_util") {
+  testonly = true
   sources = [ "src/lib.rs" ]
   edition = "2021"
   deps = [

@@ -61,6 +61,8 @@ fuchsia_unittest_package("libdriver-integration-test") {
 }
 
 fidl("mock-device") {
+  testonly = true
+
   # TODO(https://fxbug.dev/42111344): Remove lint exclusions by fixing known FIDL lint violations in this target
   excluded_checks = [ "event-names-must-start-with-on" ]
 

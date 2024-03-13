@@ -7,6 +7,7 @@ import("//build/go/toolchain.gni")
 import("//build/rust/rustc_binary.gni")
 
 executable("bin") {
+  testonly = true
   output_name = "hlcpp-impl"
   output_dir = target_out_dir
 
@@ -26,6 +27,7 @@ executable("bin") {
 }
 
 fuchsia_component("impl") {
+  testonly = true
   manifest = "meta/impl.cml"
   deps = [ ":bin" ]
 }

@@ -5,6 +5,7 @@
 import("//build/fidl/fidl.gni")
 
 fidl("sink-puppet") {
+  testonly = true
   name = "fuchsia.validate.logs"
 
   sources = [ "sink-puppet.test.fidl" ]

@@ -33,11 +33,13 @@ rustc_test("integration") {
 }
 
 fidl("echo") {
+  testonly = true
   name = "test.echo"
   sources = [ "src/echo.test.fidl" ]
 }
 
 fidl("triangle") {
+  testonly = true
   name = "test.triangle"
   sources = [ "src/triangle.test.fidl" ]
   public_deps = [ ":echo" ]

@@ -16,17 +16,20 @@ group("tests") {
 }
 
 fidl("fuchsia.device.firmware.test") {
+  testonly = true
   sources = [ "firmware.test.fidl" ]
   public_deps = [ "//zircon/vdso/zx" ]
 }
 
 driver_bind_rules("ddk-firmware-test-bind") {
+  testonly = true
   bind_output = "test-driver-bind.bindbc"
   rules = "test-driver.bind"
   deps = [ "//src/devices/bind/fuchsia.test" ]
 }
 
 fuchsia_driver("ddk-firmware-test") {
+  testonly = true
   configs += [
     "//build/config:all_source",
     "//build/config/fuchsia:enable_zircon_asserts",
@@ -45,6 +48,7 @@ fuchsia_driver("ddk-firmware-test") {
 }
 
 fuchsia_driver_component("ddk-firmware-test-driver") {
+  testonly = true
   deps = [ ":ddk-firmware-test" ]
   info = "ddk-firmware-test-driver-info.json"
   manifest = "meta/ddk-firmware-test-driver.cml"

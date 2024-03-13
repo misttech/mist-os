@@ -8,6 +8,7 @@ import("//build/fidl/fidl.gni")
 import("//build/rust/rustc_binary.gni")
 
 fidl("test.structuredconfig.receiver.shim") {
+  testonly = true
   sources = [ "shim.test.fidl" ]
   public_deps = [ "//src/sys/component_manager/tests/structured_config/fidl:test.structuredconfig.receiver" ]
 }

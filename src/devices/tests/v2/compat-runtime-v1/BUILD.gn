@@ -21,6 +21,7 @@ group("drivers") {
 }
 
 fidl("fuchsia.compat.runtime") {
+  testonly = true
   sources = [ "compat.runtime.test.fidl" ]
   public_deps = [ "//zircon/vdso/zx" ]
   contains_drivers = true

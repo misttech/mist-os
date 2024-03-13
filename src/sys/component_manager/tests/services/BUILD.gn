@@ -93,6 +93,7 @@ fuchsia_test_component("filtered-service-routing-test") {
 }
 
 rustc_binary("service-routing-client-bin") {
+  testonly = true
   edition = "2021"
   output_name = "service_routing_client_bin"
   deps = [
@@ -113,6 +114,7 @@ fuchsia_test_component("echo-service-client") {
 }
 
 rustc_binary("multi_instance_echo_service_bin") {
+  testonly = true
   edition = "2021"
   output_name = "multi_instance_echo_service_bin"
   deps = [

@@ -34,12 +34,14 @@ rustc_test("security_policy_critical_integration_test_bin") {
 }
 
 fidl("test.policy") {
+  testonly = true
   name = "test.policy"
   sources = [ "policy.test.fidl" ]
   public_deps = [ "//zircon/vdso/zx" ]
 }
 
 rustc_binary("exit_on_command_bin") {
+  testonly = true
   name = "exit_on_command"
   edition = "2021"
   source_root = "exit_on_command.rs"

@@ -30,6 +30,8 @@ if (is_host) {
 
   # Expose the IR in a standard Rust library.
   rustc_library("ir_importer") {
+    testonly = true
+
     edition = "2018"
 
     name = "ir_importer"

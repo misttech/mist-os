@@ -9,16 +9,19 @@ import("//build/rust/rustc_test.gni")
 import("//build/test.gni")
 
 fidl("fuchsia.rebind.test") {
+  testonly = true
   sources = [ "rebind.test.fidl" ]
   public_deps = [ "//zircon/vdso/zx" ]
 }
 
 driver_bind_rules("child_bind") {
+  testonly = true
   rules = "rebind_child.bind"
   bind_output = "rebind_child.bindbc"
 }
 
 fuchsia_driver("child_driver") {
+  testonly = true
   output_name = "rebind_child"
   sources = [ "rebind_child.cc" ]
   deps = [
@@ -34,6 +37,7 @@ fuchsia_driver("child_driver") {
 }
 
 fuchsia_driver_component("child_driver_component") {
+  testonly = true
   component_name = "rebind_child"
   manifest = "meta/rebind_child.cml"
   deps = [ ":child_driver" ]
@@ -41,12 +45,14 @@ fuchsia_driver_component("child_driver_component") {
 }
 
 driver_bind_rules("parent_bind") {
+  testonly = true
   rules = "rebind_parent.bind"
   bind_output = "rebind_parent.bindbc"
   deps = [ "//src/devices/bind/fuchsia.test" ]
 }
 
 fuchsia_driver("parent_driver") {
+  testonly = true
   output_name = "rebind_parent"
   sources = [ "rebind_parent.cc" ]
   deps = [
@@ -63,6 +69,7 @@ fuchsia_driver("parent_driver") {
 }
 
 fuchsia_driver_component("parent_driver_component") {
+  testonly = true
   component_name = "rebind_parent"
   manifest = "meta/rebind_parent.cml"
   deps = [ ":parent_driver" ]

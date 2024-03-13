@@ -63,6 +63,7 @@ fuchsia_driver_package("package") {
 }
 
 fidl("asix-88179-test-helper") {
+  testonly = true
   name = "fuchsia.hardware.ax88179"
   sources = [ "hooks.test.fidl" ]
   public_deps = [ "//zircon/vdso/zx" ]
@@ -70,6 +71,7 @@ fidl("asix-88179-test-helper") {
 }
 
 fuchsia_driver("fake-asix-88179-driver") {
+  testonly = true
   output_name = "fake-asix-88179"
   configs += [
     "//build/config:all_source",
@@ -99,6 +101,7 @@ fuchsia_driver("fake-asix-88179-driver") {
 }
 
 fuchsia_driver_component("fake-asix-88179") {
+  testonly = true
   component_name = "fake-asix-88179"
   deps = [ ":fake-asix-88179-driver" ]
   info = "fake-asix-88179-info.json"

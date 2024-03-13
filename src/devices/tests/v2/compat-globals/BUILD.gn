@@ -21,6 +21,7 @@ group("drivers") {
 }
 
 fidl("fuchsia.hardware.compat") {
+  testonly = true
   sources = [ "compat.test.fidl" ]
   public_deps = [ "//zircon/vdso/zx" ]
   enable_banjo = true

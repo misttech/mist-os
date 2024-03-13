@@ -9,6 +9,7 @@ import("//build/go/go_test.gni")
 import("//build/go/toolchain.gni")
 
 go_library("gopkg") {
+  testonly = true
   deps = [
     ":fidl.go.types_go($go_toolchain)",
     "//third_party/golibs:github.com/google/go-cmp",
@@ -27,6 +28,7 @@ go_test("fidl-go-bindings-test") {
 }
 
 fidl("fidl.go.types") {
+  testonly = true
   sources = [ "types.test.fidl" ]
 }
 

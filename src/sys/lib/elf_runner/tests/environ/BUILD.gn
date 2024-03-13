@@ -12,6 +12,7 @@ group("environ") {
 }
 
 rustc_binary("context-bin") {
+  testonly = true
   edition = "2021"
   output_name = "context"
   deps = [
@@ -27,6 +28,7 @@ rustc_binary("context-bin") {
 }
 
 fuchsia_component("context-component") {
+  testonly = true
   manifest = "meta/context.cml"
   component_name = "context"
   deps = [ ":context-bin" ]

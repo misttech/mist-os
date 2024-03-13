@@ -6,6 +6,7 @@ import("//build/fidl/fidl.gni")
 
 # Import definitions into the protocol being tested.
 fidl("fidl_import") {
+  testonly = true
   name = "fidl.test.imported"
   sources = [ "compatibility_imported.test.fidl" ]
   enable_hlcpp = true
@@ -13,6 +14,7 @@ fidl("fidl_import") {
 
 # The protocol used in the test.
 fidl("fidl_service") {
+  testonly = true
   name = "fidl.test.compatibility"
   sources = [
     "compatibility_service.test.fidl",

@@ -12,12 +12,14 @@ import("//build/drivers.gni")
 import("//build/test.gni")
 
 driver_bind_rules("bind") {
+  testonly = true
   rules = "leaf.bind"
   bind_output = "leaf.bindbc"
   deps = [ "//src/devices/tests/v2/compat/bind:fuchsia.compat" ]
 }
 
 fuchsia_driver("driver") {
+  testonly = true
   output_name = "compat-globals-leaf"
   sources = [ "leaf.cc" ]
   deps = [
@@ -34,6 +36,7 @@ fuchsia_driver("driver") {
 }
 
 fuchsia_driver_component("component") {
+  testonly = true
   component_name = "leaf"
   deps = [ ":driver" ]
   info = "leaf-info.json"

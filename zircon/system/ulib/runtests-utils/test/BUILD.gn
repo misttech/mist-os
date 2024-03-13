@@ -33,6 +33,7 @@ test("service-proxy-dir") {
 }
 
 fidl("fidl.test.echo") {
+  testonly = true
   visibility = [ ":*" ]
   sources = [ "echo.test.fidl" ]
 }

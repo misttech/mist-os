@@ -12,12 +12,14 @@ import("//build/drivers.gni")
 import("//build/test.gni")
 
 driver_bind_rules("bind") {
+  testonly = true
   rules = "root.bind"
   bind_output = "root.bindbc"
   deps = [ "//src/devices/bind/fuchsia.test" ]
 }
 
 fuchsia_driver("driver") {
+  testonly = true
   output_name = "compat-globals-root"
   sources = [ "root.cc" ]
   deps = [
@@ -34,6 +36,7 @@ fuchsia_driver("driver") {
 }
 
 fuchsia_driver_component("component") {
+  testonly = true
   component_name = "root"
   deps = [ ":driver" ]
   info = "root-info.json"

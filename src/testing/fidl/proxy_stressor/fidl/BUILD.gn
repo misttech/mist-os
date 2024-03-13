@@ -5,6 +5,7 @@
 import("//build/fidl/fidl.gni")
 
 fidl("test.proxy.stress") {
+  testonly = true
   sources = [ "stress.test.fidl" ]
 
   public_deps = [ "//zircon/vdso/zx" ]

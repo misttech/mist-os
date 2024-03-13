@@ -44,17 +44,20 @@ _test_fidl = get_label_info("//src/lib/fidl_codec:fidl($fidl_toolchain)",
 _test_fidl_gen_dir = get_label_info(":test_fidl", "target_gen_dir")
 
 copy("test_fidl_json") {
+  testonly = true
   sources = [ "${_test_fidl}/fidl.fidl.json" ]
   outputs = [ "${_test_fidl_gen_dir}/fidl.fidl.json" ]
   deps = [ "//src/lib/fidl_codec:fidl($fidl_toolchain)" ]
 }
 
 copy("test_fidl_src") {
+  testonly = true
   sources = [ "src/test_fidl_lib.rs" ]
   outputs = [ "${_test_fidl_gen_dir}/test_fidl_lib.rs" ]
 }
 
 rustc_library("test_fidl") {
+  testonly = true
   version = "0.1.0"
   edition = "2021"
   source_root = "${_test_fidl_gen_dir}/test_fidl_lib.rs"

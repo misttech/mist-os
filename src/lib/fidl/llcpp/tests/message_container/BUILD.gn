@@ -17,14 +17,17 @@ group("message_container") {
 }
 
 fidl("fidl.llcpp.linearized.test") {
+  testonly = true
   sources = [ "linearized.test.fidl" ]
 }
 
 fidl("fidl.llcpp.empty.test") {
+  testonly = true
   sources = [ "empty.test.fidl" ]
 }
 
 fidl("fidl.llcpp.buffersize.test") {
+  testonly = true
   sources = [ "buffersize.test.fidl" ]
   public_deps = [ "//zircon/vdso/zx" ]
 }

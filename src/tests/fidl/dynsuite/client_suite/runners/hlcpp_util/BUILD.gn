@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 source_set("hlcpp_util") {
+  testonly = true
   sources = [ "error_util.h" ]
   public_deps = [
     "//sdk/lib/fidl",

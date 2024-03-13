@@ -71,6 +71,7 @@ fuchsia_component("child") {
 }
 
 fidl("test.config") {
+  testonly = true
   sources = [ "config.test.fidl" ]
   public_deps = [ "//zircon/vdso/zx" ]
 }

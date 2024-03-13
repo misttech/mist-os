@@ -60,6 +60,7 @@ bind_library("fuchsia.usb.test") {
 }
 
 driver_bind_rules("usb-virtual-bus-tester-bind") {
+  testonly = true
   rules = "usb-virtual-bus-tester.bind"
   deps = [
     ":fuchsia.usb.test",
@@ -68,10 +69,12 @@ driver_bind_rules("usb-virtual-bus-tester-bind") {
 }
 
 fidl("fuchsia.hardware.usb.virtualbustest") {
+  testonly = true
   sources = [ "usb-virtualbustest.test.fidl" ]
 }
 
 fuchsia_driver("virtual-bus-tester-driver") {
+  testonly = true
   output_name = "virtual-bus-tester"
   configs += [
     "//build/config:all_source",
@@ -95,6 +98,7 @@ fuchsia_driver("virtual-bus-tester-driver") {
 }
 
 fuchsia_driver_component("virtual-bus-tester") {
+  testonly = true
   info = "virtual-bus-tester-info.json"
   component_name = "virtual-bus-tester"
   deps = [ ":virtual-bus-tester-driver" ]
@@ -102,6 +106,7 @@ fuchsia_driver_component("virtual-bus-tester") {
 }
 
 driver_bind_rules("usb-virtual-bus-tester-function-bind") {
+  testonly = true
   rules = "usb-virtual-bus-tester-function.bind"
   deps = [
     ":fuchsia.usb.test",
@@ -110,6 +115,7 @@ driver_bind_rules("usb-virtual-bus-tester-function-bind") {
 }
 
 fuchsia_driver("virtual-bus-tester-function-driver") {
+  testonly = true
   output_name = "virtual-bus-tester-function"
   configs += [
     "//build/config:all_source",
@@ -133,6 +139,7 @@ fuchsia_driver("virtual-bus-tester-function-driver") {
 }
 
 fuchsia_driver_component("virtual-bus-tester-function") {
+  testonly = true
   info = "virtual-bus-tester-function-info.json"
   component_name = "virtual-bus-tester-function"
   deps = [ ":virtual-bus-tester-function-driver" ]

@@ -23,6 +23,7 @@ group("tests") {
 }
 
 rustc_binary("bin") {
+  testonly = true
   output_name = "mock"
   edition = "2021"
 
@@ -48,12 +49,14 @@ rustc_binary("bin") {
 }
 
 fuchsia_component("component") {
+  testonly = true
   component_name = "mock"
   manifest = "meta/mock.cml"
   deps = [ ":bin" ]
 }
 
 fuchsia_package("package") {
+  testonly = true
   package_name = "hwinfo-mock"
   deps = [ ":component" ]
 }

@@ -5,6 +5,7 @@
 import("//build/fidl/fidl.gni")
 
 fidl("test.structuredconfig.receiver") {
+  testonly = true
   sources = [ "receiver.test.fidl" ]
   enable_hlcpp = true
 }

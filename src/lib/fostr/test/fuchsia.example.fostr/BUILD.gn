@@ -5,6 +5,7 @@
 import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.example.fostr") {
+  testonly = true
   sources = [ "fostr.test.fidl" ]
   excluded_checks = [ "string-bounds-not-specified" ]
   enable_hlcpp = true

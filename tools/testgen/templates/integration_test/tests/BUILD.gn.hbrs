@@ -13,6 +13,7 @@ group("tests") {
 }
 
 rustc_test("bin") {
+  testonly = true
   edition = "2021"
   source_root = "src/main.rs"
   sources = [ source_root ]

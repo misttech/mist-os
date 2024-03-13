@@ -17,16 +17,19 @@ group("integration") {
 }
 
 fidl("fidl.cpp.wire.interop.test") {
+  testonly = true
   visibility = [ ":*" ]
   sources = [ "fidl.cpp.wire.interop.test.fidl" ]
   public_deps = [ "//zircon/vdso/zx" ]
 }
 
 fidl("fidl.cpp.wire.bindinggroup.test") {
+  testonly = true
   sources = [ "fidl.cpp.wire.bindinggroup.test.fidl" ]
 }
 
 fidl("fidl.cpp.constraint.protocol.test") {
+  testonly = true
   visibility = [ ":*" ]
   sources = [ "fidl.cpp.constraint.protocol.test.fidl" ]
 }

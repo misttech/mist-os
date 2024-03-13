@@ -5,6 +5,7 @@
 import("//build/fidl/fidl.gni")
 
 fidl("validate") {
+  testonly = true
   name = "fuchsia.validate.logs"
 
   sources = [ "validate_logs.test.fidl" ]

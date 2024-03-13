@@ -6,6 +6,7 @@ import("//build/fidl/fidl.gni")
 import("//build/fidl/toolchain.gni")
 
 fidl("test_fidl") {
+  testonly = true
   name = "fuchsia.tools.bindc.test"
   sources = [
     "protocol_one.test.fidl",
@@ -15,5 +16,6 @@ fidl("test_fidl") {
 
 # Depend on this target to have the IR generated for the test FIDL library.
 group("fidl") {
+  testonly = true
   public_deps = [ ":test_fidl($fidl_toolchain)" ]
 }

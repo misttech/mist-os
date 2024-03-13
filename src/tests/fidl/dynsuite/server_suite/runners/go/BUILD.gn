@@ -8,11 +8,13 @@ import("//build/go/go_library.gni")
 import("//build/go/toolchain.gni")
 
 go_binary("bin") {
+  testonly = true
   library = ":lib"
   output_name = "server_suite_under_test_go"
 }
 
 go_library("lib") {
+  testonly = true
   deps = [
     "//sdk/fidl/fuchsia.logger:fuchsia.logger_go($go_toolchain)",
     "//src/lib/component",

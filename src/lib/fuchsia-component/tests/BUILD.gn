@@ -8,9 +8,11 @@ import("//build/rust/rustc_binary.gni")
 import("//build/rust/rustc_test.gni")
 
 fidl("fuchsia.component.test") {
+  testonly = true
   sources = [ "test.test.fidl" ]
 }
 
 fidl("fuchsia.component.client.test") {
+  testonly = true
   sources = [ "client.test.fidl" ]
 }

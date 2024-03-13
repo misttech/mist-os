@@ -5,6 +5,7 @@
 import("//build/components.gni")
 
 executable("bin") {
+  testonly = true
   output_name = "client_suite_under_test_hlcpp_async"
   sources = [ "main.cc" ]
   deps = [

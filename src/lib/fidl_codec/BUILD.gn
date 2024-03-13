@@ -204,6 +204,7 @@ action("list_for_test") {
 }
 
 fidl("fidl") {
+  testonly = true
   name = "test.fidlcodec.examples"
 
   sources = [
@@ -221,6 +222,7 @@ fidl("fidl") {
 }
 
 fidl("fidl-composed") {
+  testonly = true
   name = "test.fidlcodec.composedinto"
 
   sources = [ "testdata/composed_into.test.fidl" ]
@@ -229,6 +231,7 @@ fidl("fidl-composed") {
 }
 
 fidl("fidl-sys") {
+  testonly = true
   name = "test.fidlcodec.sys"
 
   sources = [ "testdata/sys.test.fidl" ]

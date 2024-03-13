@@ -9,16 +9,19 @@ import("//build/fidl/fidl.gni")
 import("//build/test.gni")
 
 fidl("fuchsia.device.lifecycle.test") {
+  testonly = true
   sources = [ "lifecycle.test.fidl" ]
   public_deps = [ "//zircon/vdso/zx" ]
 }
 
 driver_bind_rules("test-lifecycle-bind") {
+  testonly = true
   rules = "test-lifecycle.bind"
   deps = [ "//src/devices/bind/fuchsia.test.platform" ]
 }
 
 fuchsia_driver("ddk-lifecycle-test-driver") {
+  testonly = true
   output_name = "ddk-lifecycle-test"
   configs += [
     "//build/config:all_source",
@@ -41,6 +44,7 @@ fuchsia_driver("ddk-lifecycle-test-driver") {
 }
 
 fuchsia_driver_component("ddk-lifecycle-test-driver-component") {
+  testonly = true
   component_name = "ddk-lifecycle-test"
   deps = [ ":ddk-lifecycle-test-driver" ]
   info = "ddk-lifecycle-test-info.json"

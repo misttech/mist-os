@@ -33,12 +33,14 @@ rustc_test("security_policy_vmex_integration_test_bin") {
 }
 
 fidl("test.policy") {
+  testonly = true
   name = "test.policy"
   sources = [ "policy.test.fidl" ]
   public_deps = [ "//zircon/vdso/zx" ]
 }
 
 rustc_binary("protected_ops_util") {
+  testonly = true
   edition = "2021"
   source_root = "protected_ops_util.rs"
   deps = [

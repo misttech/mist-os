@@ -5,11 +5,13 @@
 import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.controller.test") {
+  testonly = true
   sources = [ "fuchsia_controller.test.fidl" ]
   public_deps = [ "//zircon/vdso/zx" ]
 }
 
 fidl("fuchsia.controller.othertest") {
+  testonly = true
   sources = [ "fuchsia_controller_other.test.fidl" ]
   public_deps = [ ":fuchsia.controller.test" ]
 }

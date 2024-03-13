@@ -29,12 +29,14 @@ rustc_test("security_policy_capability_allowlist_integration_test_bin") {
 }
 
 fidl("test.policy") {
+  testonly = true
   name = "test.policy"
   sources = [ "policy.test.fidl" ]
   public_deps = [ "//zircon/vdso/zx" ]
 }
 
 rustc_binary("policy_service_bin") {
+  testonly = true
   edition = "2021"
   source_root = "policy_service.rs"
   deps = [
@@ -49,6 +51,7 @@ rustc_binary("policy_service_bin") {
 }
 
 executable("dir_service_bin") {
+  testonly = true
   sources = [ "dir_service.cc" ]
 
   deps = [
@@ -63,6 +66,7 @@ executable("dir_service_bin") {
 }
 
 rustc_binary("cap_getter_bin") {
+  testonly = true
   edition = "2021"
   source_root = "cap_getter.rs"
   deps = [
