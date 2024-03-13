@@ -15,3 +15,18 @@ Currently the following generation is supported.
 ## Usage
 
 Docsgen can be built using the command `fx build tools/docsgen`
+
+For example, you can set it to a minimal configuration:
+
+```
+fx set minimal.x64 --with //tools/docsgen
+```
+
+Then, build `docsgen`:
+
+```
+fx build tools/docsgen
+```
+
+You can then see the built documentation in the `out/default/obj/tools/docsgen`
+directory of your Fuchsia checkout.
