@@ -304,7 +304,7 @@ bool OnlyWhitespaceChanged(std::string_view unformatted_input, std::string_view 
 
 uint32_t decode_unicode_hex(std::string_view str) {
   char* endptr;
-  unsigned long codepoint = strtoul(str.begin(), &endptr, 16);
+  unsigned long codepoint = strtoul(str.data(), &endptr, 16);
   ZX_ASSERT(codepoint != ULONG_MAX);
   ZX_ASSERT(endptr == str.end());
   return codepoint;

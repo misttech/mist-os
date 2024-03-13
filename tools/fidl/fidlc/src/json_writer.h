@@ -228,7 +228,7 @@ class JsonWriter {
       while (*it != '}') {
         ++it;
       }
-      std::string_view codepoint_hex(hex_begin, it - hex_begin);
+      std::string_view codepoint_hex = value.substr(hex_begin - value.begin(), it - hex_begin);
       // Next, decode the code point X as an integer.
       auto codepoint = decode_unicode_hex(codepoint_hex);
       if (codepoint <= 0xffff) {
