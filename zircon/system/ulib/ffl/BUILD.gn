@@ -2,11 +2,10 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//build/zircon/migrated_targets.gni")
+import("//build/cpp/library_headers.gni")
 
-zx_library("ffl") {
-  sdk = "source"
-  sdk_headers = [
+library_headers("headers") {
+  headers = [
     "ffl/expression.h",
     "ffl/fixed_format.h",
     "ffl/fixed.h",
@@ -14,7 +13,10 @@ zx_library("ffl") {
     "ffl/string.h",
     "ffl/utility.h",
   ]
+}
 
+source_set("ffl") {
+  public_deps = [ ":headers" ]
   sources = [ "string.cc" ]
 }
 
