@@ -3083,7 +3083,6 @@ mod tests {
             icmp::socket::{
                 IcmpEchoSocketApi, IcmpSocketId, IcmpSocketSet, IcmpSocketState, StateContext,
             },
-            path_mtu::testutil::FakePmtuState,
             socket::testutil::{FakeDeviceConfig, FakeDualStackIpSocketCtx},
             testutil::DualStackSendIpPacketMeta,
             types::RoutableIpAddr,
@@ -3193,7 +3192,6 @@ mod tests {
         bound_socket_map_and_allocator: BoundSockets<I, D, FakeIcmpBindingsCtx<I>>,
         error_send_bucket: TokenBucket<FakeInstant>,
         receive_icmp_error: Vec<I::ErrorCode>,
-        pmtu_state: FakePmtuState<I::Addr>,
     }
 
     impl<I: socket::IpExt, D: device::WeakId> FakeIcmpInnerCoreCtxState<I, D> {
@@ -3202,7 +3200,6 @@ mod tests {
                 bound_socket_map_and_allocator: Default::default(),
                 error_send_bucket: TokenBucket::new(errors_per_second),
                 receive_icmp_error: Default::default(),
-                pmtu_state: Default::default(),
             }
         }
     }
@@ -4042,11 +4039,6 @@ mod tests {
     impl InnerIcmpv4Context<FakeIcmpBindingsCtx<Ipv4>> for FakeIcmpInnerCoreCtx<Ipv4> {
         fn should_send_timestamp_reply(&self) -> bool {
             false
-        }
-    }
-    impl<I: datagram::IpExt> AsMut<FakePmtuState<I::Addr>> for FakeIcmpInnerCoreCtx<I> {
-        fn as_mut(&mut self) -> &mut FakePmtuState<I::Addr> {
-            &mut self.outer.pmtu_state
         }
     }
     impl_pmtu_handler!(FakeIcmpInnerCoreCtx<Ipv4>, FakeIcmpBindingsCtx<Ipv4>, Ipv4);

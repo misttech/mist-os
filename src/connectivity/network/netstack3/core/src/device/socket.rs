@@ -1258,9 +1258,8 @@ mod tests {
     #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
     pub struct FakeStrongId(usize);
 
-    #[allow(dead_code)] // TODO(https://fxbug.dev/318827209)
     #[derive(Debug)]
-    pub struct FakePrimaryId(usize);
+    pub struct FakePrimaryId;
 
     impl StrongSocketId for FakeStrongId {
         type Primary = FakePrimaryId;

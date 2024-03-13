@@ -622,9 +622,10 @@ pub(crate) mod testutil {
         }
     }
 
-    #[allow(dead_code)]
+    #[cfg(test)]
     pub trait FakeStrongDeviceId: StrongId<Weak = FakeWeakDeviceId<Self>> + 'static + Ord {}
 
+    #[cfg(test)]
     impl<D: StrongId<Weak = FakeWeakDeviceId<Self>> + 'static + Ord> FakeStrongDeviceId for D {}
 
     pub fn enable_device<BC: BindingsContext>(

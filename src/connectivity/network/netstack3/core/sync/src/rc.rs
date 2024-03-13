@@ -409,7 +409,6 @@ impl<T> Primary<T> {
 #[derive(Debug, Derivative)]
 pub struct Strong<T> {
     inner: alloc::sync::Arc<Inner<T>>,
-    #[allow(dead_code)]
     caller: caller::TrackedCaller,
 }
 

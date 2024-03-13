@@ -524,9 +524,6 @@ mod tests {
             v: u8,
             neg_prefix: u8,
         ) -> (SpecifiedAddr<Self::Addr>, Subnet<Self::Addr>);
-
-        #[allow(dead_code)]
-        fn next_hop_addr() -> SpecifiedAddr<Self::Addr>;
     }
 
     impl TestIpExt for Ipv4 {
@@ -536,10 +533,6 @@ mod tests {
 
         fn next_hop_addr_sub(v: u8, neg_prefix: u8) -> (SpecifiedAddr<Ipv4Addr>, Subnet<Ipv4Addr>) {
             (SpecifiedAddr::new(Ipv4Addr::new([v, 0, 0, 1])).unwrap(), Ipv4::subnet(v, neg_prefix))
-        }
-
-        fn next_hop_addr() -> SpecifiedAddr<Ipv4Addr> {
-            SpecifiedAddr::new(Ipv4Addr::new([10, 0, 0, 1])).unwrap()
         }
     }
 
@@ -560,11 +553,6 @@ mod tests {
                 .unwrap(),
                 Ipv6::subnet(v, neg_prefix),
             )
-        }
-
-        fn next_hop_addr() -> SpecifiedAddr<Ipv6Addr> {
-            SpecifiedAddr::new(Ipv6Addr::from([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10, 0, 0, 1]))
-                .unwrap()
         }
     }
 

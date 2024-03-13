@@ -4,6 +4,8 @@
 
 //! Testing-related utilities.
 
+#![cfg(any(test, feature = "testutils"))]
+
 #[cfg(test)]
 use alloc::vec;
 use alloc::{borrow::ToOwned, collections::HashMap, sync::Arc, vec::Vec};
@@ -52,14 +54,14 @@ use tracing_subscriber::{
 
 #[cfg(test)]
 use crate::{
-    context::testutil::InstantAndData,
+    context::testutil::{FakeFrameCtx, FakeNetworkContext, InstantAndData, WithFakeFrameContext},
     ip::{device::Ipv6DeviceAddr, SendIpPacketMeta},
 };
 use crate::{
     context::{
         testutil::{
-            FakeFrameCtx, FakeInstant, FakeNetworkContext, FakeTimerCtx, FakeTimerCtxExt,
-            PureIpDeviceAndIpVersion, WithFakeFrameContext, WithFakeTimerContext,
+            FakeInstant, FakeTimerCtx, FakeTimerCtxExt, PureIpDeviceAndIpVersion,
+            WithFakeTimerContext,
         },
         EventContext, InstantBindingsTypes, InstantContext, RngContext, TimerContext, TimerHandler,
         TracingContext, UnlockedCoreCtx,
@@ -790,6 +792,7 @@ impl WithFakeTimerContext<TimerId<FakeBindingsCtx>> for FakeCtx {
     }
 }
 
+#[cfg(test)]
 impl WithFakeFrameContext<DispatchedFrame> for FakeCtx {
     fn with_fake_frame_ctx_mut<O, F: FnOnce(&mut FakeFrameCtx<DispatchedFrame>) -> O>(
         &mut self,
@@ -1512,6 +1515,7 @@ pub(crate) fn add_arp_or_ndp_table_entry<A: IpAddress>(
     }
 }
 
+#[cfg(test)]
 impl FakeNetworkContext for FakeCtx {
     type TimerId = TimerId<FakeBindingsCtx>;
     type SendMeta = DispatchedFrame;
@@ -1636,7 +1640,7 @@ impl DeviceLayerEventDispatcher for FakeBindingsCtx {
 
 /// Handles any pending frames and returns true if any frames that were in the
 /// RX queue were processed.
-#[allow(dead_code)]
+#[cfg(test)]
 pub(crate) fn handle_queued_rx_packets(ctx: &mut FakeCtx) -> bool {
     let mut handled = false;
     loop {

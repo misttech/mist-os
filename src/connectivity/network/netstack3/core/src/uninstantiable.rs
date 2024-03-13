@@ -13,7 +13,7 @@
 use core::{convert::Infallible as Never, marker::PhantomData};
 
 use explicit::UnreachableExt as _;
-use net_types::{ip::Ip, SpecifiedAddr};
+use net_types::SpecifiedAddr;
 use packet::{BufferMut, Serializer};
 
 use crate::{
@@ -179,10 +179,6 @@ where
         Self::WeakDeviceId,
         S::AddrSpec,
     >>::BoundSocketId {
-        self.uninstantiable_unreachable()
-    }
-
-    fn from_other_ip_addr(&self, _addr: <I::OtherVersion as Ip>::Addr) -> I::Addr {
         self.uninstantiable_unreachable()
     }
 

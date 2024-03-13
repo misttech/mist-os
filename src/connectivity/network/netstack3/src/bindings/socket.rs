@@ -316,16 +316,8 @@ pub(crate) trait SockAddr: std::fmt::Debug + Sized + Send {
     /// Gets this `SockAddr`'s address.
     fn addr(&self) -> Self::AddrType;
 
-    /// Set this [`SockAddr`]'s address.
-    #[allow(dead_code)]
-    fn set_addr(&mut self, addr: Self::AddrType);
-
     /// Gets this `SockAddr`'s port.
     fn port(&self) -> u16;
-
-    /// Set this [`SockAddr`]'s port.
-    #[allow(dead_code)]
-    fn set_port(&mut self, port: u16);
 
     /// Gets a `SpecifiedAddr` witness type for this `SockAddr`'s address.
     fn get_specified_addr(&self) -> Option<SpecifiedAddr<Self::AddrType>> {
@@ -364,16 +356,8 @@ impl SockAddr for fnet::Ipv6SocketAddress {
         self.address.into_core()
     }
 
-    fn set_addr(&mut self, addr: Ipv6Addr) {
-        self.address = addr.into_fidl();
-    }
-
     fn port(&self) -> u16 {
         self.port
-    }
-
-    fn set_port(&mut self, port: u16) {
-        self.port = port
     }
 
     fn zone(&self) -> Option<NonZeroU64> {
@@ -408,16 +392,8 @@ impl SockAddr for fnet::Ipv4SocketAddress {
         self.address.into_core()
     }
 
-    fn set_addr(&mut self, addr: Ipv4Addr) {
-        self.address = addr.into_fidl();
-    }
-
     fn port(&self) -> u16 {
         self.port
-    }
-
-    fn set_port(&mut self, port: u16) {
-        self.port = port
     }
 
     fn zone(&self) -> Option<NonZeroU64> {
@@ -449,24 +425,6 @@ impl IpSockAddrExt for Ipv4 {
 
 impl IpSockAddrExt for Ipv6 {
     type SocketAddress = fnet::Ipv6SocketAddress;
-}
-
-#[allow(dead_code)] // TODO(https://fxbug.dev/318827209)
-pub(crate) enum IpMulticastMembership {
-    V4(psocket::IpMulticastMembership),
-    V6(psocket::Ipv6MulticastMembership),
-}
-
-impl From<psocket::IpMulticastMembership> for IpMulticastMembership {
-    fn from(membership: psocket::IpMulticastMembership) -> Self {
-        Self::V4(membership)
-    }
-}
-
-impl From<psocket::Ipv6MulticastMembership> for IpMulticastMembership {
-    fn from(membership: psocket::Ipv6MulticastMembership) -> Self {
-        Self::V6(membership)
-    }
 }
 
 #[cfg(test)]

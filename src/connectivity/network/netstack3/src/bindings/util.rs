@@ -328,11 +328,6 @@ pub(crate) trait TryFromFidl<F>: Sized {
 }
 
 /// A core type which can be fallibly converted to the FIDL type `F`.
-///
-/// For all `C: TryIntoFidl<F>`, we provide a blanket impl of
-/// [`F: TryFromCore<C>`].
-///
-/// [`F: TryFromCore<C>`]: TryFromCore
 pub(crate) trait TryIntoFidl<F>: Sized {
     /// The type of error returned from [`try_into_fidl`].
     ///
@@ -361,28 +356,6 @@ impl<C: TryIntoFidl<F, Error = Never>, F> IntoFidl<F> for C {
             Ok(f) => f,
             Err(never) => match never {},
         }
-    }
-}
-
-/// A FIDL type which can be fallibly converted from the core type `C`.
-///
-/// `TryFromCore<C>` is automatically implemented for all `F` where
-/// [`C: TryIntoFidl<F>`].
-///
-/// [`C: TryIntoFidl<F>`]: TryIntoFidl
-#[allow(dead_code)]
-pub(crate) trait TryFromCore<C>: Sized {
-    /// The error type on conversion failure.
-    type Error;
-
-    /// Attempt to convert from `core` into an instance of `Self`.
-    fn try_from_core(core: C) -> Result<Self, Self::Error>;
-}
-
-impl<F, C: TryIntoFidl<F>> TryFromCore<C> for F {
-    type Error = C::Error;
-    fn try_from_core(core: C) -> Result<Self, Self::Error> {
-        core.try_into_fidl()
     }
 }
 
@@ -773,7 +746,7 @@ impl<A: IpAddress> TryFromFidl<fposix_socket::Ipv6MulticastMembership>
 /// completed.
 ///
 /// `ConversionContext` is used by conversion functions in
-/// [`TryFromFidlWithContext`] and [`TryFromCoreWithContext`].
+/// [`TryFromFidlWithContext`] and [`TryIntoFidlWithContext`].
 pub(crate) trait ConversionContext {
     /// Converts a binding identifier (exposed in FIDL as `u64`) to a core
     /// identifier `DeviceId`.
@@ -804,11 +777,6 @@ pub(crate) trait TryFromFidlWithContext<F>: Sized {
 
 /// A core type which can be fallibly converted to the FIDL type `F` given a
 /// context that implements [`ConversionContext`].
-///
-/// For all `C: TryIntoFidlWithContext<F>`, we provide a blanket impl of
-/// [`F: TryFromCoreWithContext<C>`].
-///
-/// [`F: TryFromCoreWithContext<C>`]: TryFromCoreWithContext
 pub(crate) trait TryIntoFidlWithContext<F>: Sized {
     /// The type of error returned from [`try_into_fidl_with_ctx`].
     ///
@@ -817,32 +785,6 @@ pub(crate) trait TryIntoFidlWithContext<F>: Sized {
 
     /// Attempt to convert from `self` into an instance of `F`.
     fn try_into_fidl_with_ctx<C: ConversionContext>(self, ctx: &C) -> Result<F, Self::Error>;
-}
-
-/// A FIDL type which can be fallibly converted from the core type `C` given a
-/// context that implements [`ConversionContext`].
-///
-/// `TryFromCoreWithContext<C>` is automatically implemented for all `F` where
-/// [`C: TryIntoFidlWithContext<F>`].
-///
-/// [`C: TryIntoFidlWithContext<F>`]: TryIntoFidlWithContext
-#[allow(dead_code)]
-pub(crate) trait TryFromCoreWithContext<C>: Sized {
-    /// The type of error returned from [`try_from_core_with_ctx`].
-    ///
-    /// [`try_from_core_with_ctx`]: TryFromCoreWithContext::try_from_core_with_ctx
-    type Error;
-
-    /// Attempt to convert from `core` into an instance of `Self`.
-    fn try_from_core_with_ctx<X: ConversionContext>(ctx: &X, core: C) -> Result<Self, Self::Error>;
-}
-
-impl<F, C: TryIntoFidlWithContext<F>> TryFromCoreWithContext<C> for F {
-    type Error = C::Error;
-
-    fn try_from_core_with_ctx<X: ConversionContext>(ctx: &X, core: C) -> Result<Self, Self::Error> {
-        core.try_into_fidl_with_ctx(ctx)
-    }
 }
 
 /// A FIDL type which can be fallibly converted into the core type `C` given a

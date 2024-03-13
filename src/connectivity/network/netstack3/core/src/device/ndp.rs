@@ -123,9 +123,9 @@ mod tests {
         icmp::{
             ndp::{
                 options::{NdpOption, NdpOptionBuilder, PrefixInformation},
-                NdpPacket, OptionSequenceBuilder, Options, RouterAdvertisement, RouterSolicitation,
+                OptionSequenceBuilder, Options, RouterAdvertisement, RouterSolicitation,
             },
-            IcmpEchoRequest, IcmpPacketBuilder, IcmpUnusedCode, Icmpv6Packet,
+            IcmpEchoRequest, IcmpPacketBuilder, IcmpUnusedCode,
         },
         ip::{IpProto, Ipv6Proto},
         ipv6::Ipv6PacketBuilder,
@@ -1023,20 +1023,6 @@ mod tests {
 
         // No more timers.
         assert_eq!(ctx.trigger_next_timer(), None);
-    }
-
-    #[allow(dead_code)]
-    trait UnwrapNdp<B: ByteSlice> {
-        fn unwrap_ndp(self) -> NdpPacket<B>;
-    }
-
-    impl<B: ByteSlice> UnwrapNdp<B> for Icmpv6Packet<B> {
-        fn unwrap_ndp(self) -> NdpPacket<B> {
-            match self {
-                Icmpv6Packet::Ndp(ndp) => ndp,
-                _ => unreachable!(),
-            }
-        }
     }
 
     #[test]

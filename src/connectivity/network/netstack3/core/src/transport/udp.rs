@@ -2467,10 +2467,6 @@ impl<
         ()
     }
 
-    fn from_other_ip_addr(&self, addr: Ipv4Addr) -> Ipv6Addr {
-        *addr.to_ipv6_mapped()
-    }
-
     fn to_other_bound_socket_id(
         &self,
         id: &UdpSocketId<Ipv6, CC::WeakDeviceId, BC>,

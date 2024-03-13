@@ -777,10 +777,6 @@ pub(crate) trait DualStackDatagramBoundStateContext<I: IpExt, BC, S: DatagramSoc
         S::AddrSpec,
     >>::BoundSocketId;
 
-    /// Converts an other-IP-version address to an address for IP version `I`.
-    #[allow(dead_code)]
-    fn from_other_ip_addr(&self, addr: <I::OtherVersion as Ip>::Addr) -> I::Addr;
-
     /// demultiplexing maps.
     fn with_both_bound_sockets_mut<
         O,
@@ -5477,10 +5473,6 @@ mod test {
         type Converter = ();
         fn converter(&self) -> Self::Converter {
             ()
-        }
-
-        fn from_other_ip_addr(&self, addr: Ipv4Addr) -> Ipv6Addr {
-            addr.to_ipv6_mapped().get()
         }
 
         fn to_other_bound_socket_id(

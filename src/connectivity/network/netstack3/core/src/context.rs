@@ -451,6 +451,8 @@ pub(crate) mod testutil {
     use derivative::Derivative;
 
     use net_types::ip::IpVersion;
+
+    #[cfg(test)]
     use packet::Buf;
     use rand_xorshift::XorShiftRng;
 
@@ -1301,7 +1303,7 @@ pub(crate) mod testutil {
         ) -> O;
     }
 
-    #[allow(dead_code)]
+    #[cfg(test)]
     pub(crate) trait WithFakeFrameContext<SendMeta> {
         fn with_fake_frame_ctx_mut<O, F: FnOnce(&mut FakeFrameCtx<SendMeta>) -> O>(
             &mut self,
@@ -1602,7 +1604,7 @@ pub(crate) mod testutil {
     }
 
     /// A context which can be used with a [`FakeNetwork`].
-    #[allow(dead_code)]
+    #[cfg(test)]
     pub(crate) trait FakeNetworkContext {
         /// The type of timer IDs installed by this context.
         type TimerId;
@@ -1631,11 +1633,12 @@ pub(crate) mod testutil {
     /// frame's sending metadata - including its context, local state, and
     /// `SendMeta` - to the set of appropriate receivers, each represented by
     /// a context ID, receive metadata, and latency.
-    #[allow(dead_code)]
+    #[cfg(test)]
     pub(crate) trait FakeNetworkLinks<SendMeta, RecvMeta, CtxId> {
         fn map_link(&self, ctx: CtxId, meta: SendMeta) -> Vec<(CtxId, RecvMeta, Option<Duration>)>;
     }
 
+    #[cfg(test)]
     impl<
             SendMeta,
             RecvMeta,
@@ -1678,12 +1681,6 @@ pub(crate) mod testutil {
                 && self.contexts_with_queued_frames == 0;
         }
     }
-
-    /// Error type that marks that one of the `run_until` family of functions
-    /// reached a maximum number of iterations.
-    #[derive(Debug)]
-    #[allow(dead_code)]
-    pub(crate) struct LoopLimitReachedError;
 
     #[cfg(test)]
     impl<CtxId, Ctx, Links> FakeNetwork<CtxId, Ctx, Links>
