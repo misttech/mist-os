@@ -9,11 +9,6 @@ import("//build/rust/rustc_library.gni")
 import("//build/rust/rustc_test.gni")
 import("//src/fonts/build/fonts.gni")
 
-declare_args() {
-  # Used in the structured configuration below.
-  src_fonts_verbose_logging = false
-}
-
 group("fonts") {
   public_deps = [
     # XXX: looks like all external deps no longer use //fonts, and the inclusion
@@ -138,16 +133,6 @@ fuchsia_component_manifest("manifest") {
 fuchsia_component("font_provider_cm") {
   cm_label = ":manifest"
   deps = [ ":font_provider" ]
-}
-
-fuchsia_structured_config_values("config_values") {
-  cm_label = ":manifest"
-  values = {
-    # Use `--args=src_fonts_verbose_logging=true` to change this value from
-    # the `fx` command line.
-    verbose_logging = src_fonts_verbose_logging
-    font_manifest = ""
-  }
 }
 
 fuchsia_structured_config_rust_lib("config") {
