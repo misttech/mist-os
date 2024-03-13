@@ -575,12 +575,15 @@ void VmAspace::AttachToThread(Thread* t) {
 zx_status_t VmAspace::PageFault(vaddr_t va, uint flags) {
   // If the fault was actually an access fault, handle that and return.
   if (flags & VMM_PF_FLAG_ACCESS) {
+    // Assert that the translation bit is not set.
+    DEBUG_ASSERT((flags & VMM_PF_FLAG_NOT_PRESENT) == 0);
     return AccessedFault(va);
   }
 
   VM_KTRACE_DURATION(2, "VmAspace::PageFault", ("va", va), ("flags", flags));
   canary_.Assert();
   LTRACEF("va %#" PRIxPTR ", flags %#x\n", va, flags);
+  DEBUG_ASSERT((flags & VMM_PF_FLAG_ACCESS) == 0);
 
   if (type_ == Type::GuestPhysical) {
     flags &= ~VMM_PF_FLAG_USER;

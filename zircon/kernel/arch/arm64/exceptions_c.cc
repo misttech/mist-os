@@ -263,7 +263,12 @@ static void arm64_instruction_abort_handler(iframe_t* iframe, uint exception_fla
   uint64_t far = __arm_rsr64("far_el1");
   uint32_t ec = BITS_SHIFT(esr, 31, 26);
   uint32_t iss = BITS(esr, 24, 0);
+  uint32_t dfsc = BITS(iss, 5, 0);
   bool is_user = !BIT(ec, 0);
+  // 0b0010XX is access faults.
+  bool is_access = (dfsc & 0b111100) == 0b001000;
+  // 0b0001XX is translation faults.
+  bool is_translation = (dfsc & 0b111100) == 0b000100;
 
   if (unlikely(!is_user)) {
     // Any instruction page fault in kernel mode is a bug.
@@ -279,10 +284,8 @@ static void arm64_instruction_abort_handler(iframe_t* iframe, uint exception_fla
 
   uint pf_flags = VMM_PF_FLAG_INSTRUCTION;
   pf_flags |= is_user ? VMM_PF_FLAG_USER : 0;
-  /* Check if this was not permission fault */
-  if ((iss & 0b111100) != 0b001100) {
-    pf_flags |= VMM_PF_FLAG_NOT_PRESENT;
-  }
+  pf_flags |= is_translation ? VMM_PF_FLAG_NOT_PRESENT : 0;
+  pf_flags |= is_access ? VMM_PF_FLAG_ACCESS : 0;
 
   LTRACEF("instruction abort: PC at %#" PRIx64 ", is_user %d, FAR %" PRIx64 ", esr %#x, iss %#x\n",
           iframe->elr, is_user, far, esr, iss);
@@ -292,13 +295,12 @@ static void arm64_instruction_abort_handler(iframe_t* iframe, uint exception_fla
   zx_status_t err;
   DEBUG_ASSERT(far == arch_detag_ptr(far) &&
                "Expected the FAR to be untagged for an instruction abort");
-  // Check for accessed fault and set the flags accordingly.
-  if ((iss & 0b111100) == 0b001000) {
+  // Check for accessed fault and update the counters accordingly.
+  if (is_access) {
+    DEBUG_ASSERT((pf_flags & VMM_PF_FLAG_ACCESS) != 0);
     kcounter_add(exceptions_access, 1);
-    pf_flags |= VMM_PF_FLAG_ACCESS;
   } else {
     kcounter_add(exceptions_page, 1);
-    CPU_STATS_INC(page_faults);
   }
   err = vmm_page_fault_handler(far, pf_flags);
   arch_disable_ints();
@@ -326,7 +328,12 @@ static void arm64_data_abort_handler(iframe_t* iframe, uint exception_flags, uin
   uint64_t far = __arm_rsr64("far_el1");
   uint32_t ec = BITS_SHIFT(esr, 31, 26);
   uint32_t iss = BITS(esr, 24, 0);
+  uint32_t dfsc = BITS(iss, 5, 0);
   bool is_user = !BIT(ec, 0);
+  // 0b0010XX is access faults.
+  bool is_access = (dfsc & 0b111100) == 0b001000;
+  // 0b0001XX is translation faults.
+  bool is_translation = (dfsc & 0b111100) == 0b000100;
   bool WnR = BIT(iss, 6);  // Write not Read
   bool CM = BIT(iss, 8);   // cache maintenance op
 
@@ -334,10 +341,8 @@ static void arm64_data_abort_handler(iframe_t* iframe, uint exception_flags, uin
   // if it was marked Write but the cache maintenance bit was set, treat it as read
   pf_flags |= (WnR && !CM) ? VMM_PF_FLAG_WRITE : 0;
   pf_flags |= is_user ? VMM_PF_FLAG_USER : 0;
-  /* Check if this was not permission fault */
-  if ((iss & 0b111100) != 0b001100) {
-    pf_flags |= VMM_PF_FLAG_NOT_PRESENT;
-  }
+  pf_flags |= is_translation ? VMM_PF_FLAG_NOT_PRESENT : 0;
+  pf_flags |= is_access ? VMM_PF_FLAG_ACCESS : 0;
 
   LTRACEF("data fault: PC at %#" PRIx64 ", is_user %d, FAR %#" PRIx64 ", esr %#x, iss %#x\n",
           iframe->elr, is_user, far, esr, iss);
@@ -346,14 +351,6 @@ static void arm64_data_abort_handler(iframe_t* iframe, uint exception_flags, uin
   if (unlikely(!is_user) && unlikely(!dfr)) {
     // Any page fault in kernel mode that's not during user-copy is a bug.
     exception_die(iframe, esr, far, "data abort in kernel mode\n");
-  }
-
-  uint32_t dfsc = BITS(iss, 5, 0);
-  // Check if this is an access fault.
-  // 0b0010XX is access faults.
-  bool access_fault = (dfsc & 0b111100) == 0b001000;
-  if (access_fault) {
-    pf_flags |= VMM_PF_FLAG_ACCESS;
   }
 
   // Check if we want to capture this fault.
@@ -368,7 +365,7 @@ static void arm64_data_abort_handler(iframe_t* iframe, uint exception_flags, uin
     } else if (unlikely(!BIT_SET(dfr, ARM64_DFR_RUN_FAULT_HANDLER_BIT))) {
       // If the RUN_FAULT_HANDLER_BIT is not set, then we only want to capture this fault if it is
       // _not_ an access fault.
-      capture_fault = !access_fault;
+      capture_fault = !is_access;
     }
   }
 
@@ -391,7 +388,7 @@ static void arm64_data_abort_handler(iframe_t* iframe, uint exception_flags, uin
   // 0b0011XX is permission faults.
   zx_status_t err = ZX_OK;
   if (likely((dfsc & 0b001100) != 0 && (dfsc & 0b110000) == 0)) {
-    if (access_fault) {
+    if (is_access) {
       DEBUG_ASSERT((pf_flags & VMM_PF_FLAG_ACCESS) != 0);
       kcounter_add(exceptions_access, 1);
     } else {

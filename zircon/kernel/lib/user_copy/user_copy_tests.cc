@@ -149,10 +149,9 @@ bool capture_faults_test_capture() {
 
     const auto& fault_info = ret.fault_info.value();
     EXPECT_EQ(fault_info.pf_va, base_addr, "");
-    // Assert that the not present flag was set. We cannot check the value of the flags explicitly
-    // because the access flag may or may not be set depending on whether the underlying hardware
-    // supports explicit access faults.
-    EXPECT_TRUE((fault_info.pf_flags & VMM_PF_FLAG_NOT_PRESENT) != 0);
+    // We cannot check the values of the flags explicitly because they change based on the
+    // underlying hardware. On architectures that generate access faults, the VMM_PF_FLAG_ACCESS
+    // will be set. On architectures that don't, the `VMM_PF_FLAG_NOT_PRESENT` will be set.
   }
 
   {
@@ -165,10 +164,11 @@ bool capture_faults_test_capture() {
 
     const auto& fault_info = ret.fault_info.value();
     EXPECT_EQ(fault_info.pf_va, base_addr, "");
-    // Assert that the not present and write flags were set. We cannot check the value of the flags
-    // explicitly because the access flag may or may not be set depending on whether the underlying
-    // hardware supports explicit access faults.
-    EXPECT_TRUE((fault_info.pf_flags & VMM_PF_FLAG_NOT_PRESENT) != 0);
+    // Assert that the write flag was set. We cannot check the value of the rest of the flags
+    // explicitly because they may or may not be set depending on whether the underlying hardware
+    // supports explicit access faults. On architectures that generate access faults, the
+    // VMM_PF_FLAG_ACCESS will be set. On architectures that don't, the `VMM_PF_FLAG_NOT_PRESENT`
+    // will be set.
     EXPECT_TRUE((fault_info.pf_flags & VMM_PF_FLAG_WRITE) != 0);
   }
 
