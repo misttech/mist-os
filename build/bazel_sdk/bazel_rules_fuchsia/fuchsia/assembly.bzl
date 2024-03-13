@@ -58,6 +58,11 @@ load(
     _fuchsia_platform_artifacts = "fuchsia_platform_artifacts",
 )
 load(
+    "//fuchsia/private/assembly:fuchsia_product.bzl",
+    _fuchsia_product = "fuchsia_product",
+    _fuchsia_product_assembly = "fuchsia_product_assembly",
+)
+load(
     "//fuchsia/private/assembly:fuchsia_product_bundle.bzl",
     _DELIVERY_BLOB_TYPE = "DELIVERY_BLOB_TYPE",
     _fuchsia_product_bundle = "fuchsia_product_bundle",
@@ -67,11 +72,6 @@ load(
     _BUILD_TYPES = "BUILD_TYPES",
     _INPUT_DEVICE_TYPE = "INPUT_DEVICE_TYPE",
     _fuchsia_product_configuration = "fuchsia_product_configuration",
-)
-load(
-    "//fuchsia/private/assembly:fuchsia_product.bzl",
-    _fuchsia_product = "fuchsia_product",
-    _fuchsia_product_assembly = "fuchsia_product_assembly",
 )
 load(
     "//fuchsia/private/assembly:fuchsia_product_ota_config.bzl",
