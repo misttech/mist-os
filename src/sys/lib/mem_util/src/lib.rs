@@ -93,9 +93,8 @@ mod tests {
     use std::sync::Arc;
     use vfs::{
         directory::{
-            entry::{DirectoryEntry, EntryInfo},
+            entry::{DirectoryEntry, EntryInfo, OpenRequest},
             entry_container::Directory,
-            simple::OpenRequest,
         },
         execution_scope::ExecutionScope,
         file::vmo::read_only,

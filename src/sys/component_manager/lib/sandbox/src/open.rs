@@ -12,10 +12,7 @@ use std::fmt::Debug;
 use std::sync::Arc;
 use vfs::{
     common::send_on_open_with_error,
-    directory::{
-        entry::{DirectoryEntry, EntryInfo},
-        simple::OpenRequest,
-    },
+    directory::entry::{DirectoryEntry, EntryInfo, OpenRequest},
     execution_scope::ExecutionScope,
     remote::RemoteLike,
 };
