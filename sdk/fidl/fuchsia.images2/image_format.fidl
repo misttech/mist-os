@@ -163,12 +163,22 @@ type PixelFormat = flexible enum {
     /// Compatible with VK_FORMAT_R8G8B8A8_UNORM.
     R8G8B8A8 = 1;
 
+    /// RGB only, 8 bits per each of R/G/B/X sample
+    ///
+    /// Compatible with VK_FORMAT_R8G8B8A8_UNORM, when treated as opaque.
+    R8G8B8X8 = 119;
+
     /// 32bpp BGRA, 1 plane.  RGB only, 8 bits per each of B/G/R/A sample.
     ///
     /// Compatible with VK_FORMAT_B8G8R8A8_UNORM.
     ///
     /// In sysmem(1), this is BGRA32.
     B8G8R8A8 = 101;
+
+    /// 32bpp BGRA, 1 plane.  RGB only, 8 bits per each of B/G/R/X sample.
+    ///
+    /// Compatible with VK_FORMAT_B8G8R8A8_UNORM, when treated as opaque.
+    B8G8R8X8 = 120;
 
     /// YUV only, 8 bits per Y sample
     ///

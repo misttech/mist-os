@@ -7249,6 +7249,38 @@ TEST(Sysmem, WaitForAllBuffersAllocatedError) {
   }
 }
 
+TEST(Sysmem, AllocateR8G8B8X8) {
+  auto parent_token = create_initial_token_v2();
+  auto parent = convert_token_to_collection_v2(std::move(parent_token));
+  set_pixel_format_modifier_constraints_v2(parent,
+                                           {Format(fuchsia_images2::PixelFormat::kR8G8B8X8,
+                                                   fuchsia_images2::PixelFormatModifier::kLinear)},
+                                           true);
+  auto wait_result = parent->WaitForAllBuffersAllocated();
+  ASSERT_TRUE(wait_result.is_ok());
+  const auto& info = wait_result->buffer_collection_info();
+  EXPECT_EQ(fuchsia_images2::PixelFormat::kR8G8B8X8,
+            info->settings()->image_format_constraints()->pixel_format().value());
+  EXPECT_EQ(fuchsia_images2::PixelFormatModifier::kLinear,
+            info->settings()->image_format_constraints()->pixel_format_modifier().value());
+}
+
+TEST(Sysmem, AllocateB8G8R8X8) {
+  auto parent_token = create_initial_token_v2();
+  auto parent = convert_token_to_collection_v2(std::move(parent_token));
+  set_pixel_format_modifier_constraints_v2(parent,
+                                           {Format(fuchsia_images2::PixelFormat::kB8G8R8X8,
+                                                   fuchsia_images2::PixelFormatModifier::kLinear)},
+                                           true);
+  auto wait_result = parent->WaitForAllBuffersAllocated();
+  ASSERT_TRUE(wait_result.is_ok());
+  const auto& info = wait_result->buffer_collection_info();
+  EXPECT_EQ(fuchsia_images2::PixelFormat::kB8G8R8X8,
+            info->settings()->image_format_constraints()->pixel_format().value());
+  EXPECT_EQ(fuchsia_images2::PixelFormatModifier::kLinear,
+            info->settings()->image_format_constraints()->pixel_format_modifier().value());
+}
+
 // This test is too likely to cause an OOM which would be treated as a flake. For now we can enable
 // and run this manually.
 #if 0

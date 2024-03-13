@@ -93,9 +93,12 @@ struct PlatformCostsEntry {
 static void AddRgbaPixelFormat(fidl::AnyArena& allocator,
                                fuchsia_images2::PixelFormatModifier format_modifier, double cost,
                                std::list<const UsagePixelFormatCostEntry>& result) {
-  // Both RGBA and BGRA versions have similar cost, if they're supported.
+  // Both RGBA and BGRA versions have similar cost, if they're supported. At least for now we also
+  // include corresponding "X" formats at the same nominal cost, though we may adjust this later
+  // since X should be measurably cheaper than A at least in some cases.
   for (auto format :
-       {fuchsia_images2::PixelFormat::kB8G8R8A8, fuchsia_images2::PixelFormat::kR8G8B8A8}) {
+       {fuchsia_images2::PixelFormat::kB8G8R8A8, fuchsia_images2::PixelFormat::kR8G8B8A8,
+        fuchsia_images2::PixelFormat::kR8G8B8X8, fuchsia_images2::PixelFormat::kB8G8R8X8}) {
     fuchsia_images2::PixelFormat pixel_format = format;
     fuchsia_images2::PixelFormatModifier pixel_format_modifier = format_modifier;
     fuchsia_sysmem2::BufferUsage buffer_usage;

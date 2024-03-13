@@ -86,7 +86,9 @@ const std::map<ColorSpaceWire, SamplingInfo> kColorSpaceSamplingInfo = {
 };
 const std::map<PixelFormatWire, SamplingInfo> kPixelFormatSamplingInfo = {
     {PixelFormat::kR8G8B8A8, {{8}, {kColorType_RGB}}},
+    {PixelFormat::kR8G8B8X8, {{8}, {kColorType_RGB}}},
     {PixelFormat::kB8G8R8A8, {{8}, {kColorType_RGB}}},
+    {PixelFormat::kB8G8R8X8, {{8}, {kColorType_RGB}}},
     {PixelFormat::kI420, {{8}, {kColorType_YUV}}},
     {PixelFormat::kM420, {{8}, {kColorType_YUV}}},
     {PixelFormat::kNv12, {{8}, {kColorType_YUV}}},
@@ -156,7 +158,9 @@ class IntelTiledFormats : public ImageFormatSet {
 
   bool IsSupported(const PixelFormatAndModifier& pixel_format) const override {
     if (pixel_format.pixel_format != PixelFormat::kR8G8B8A8 &&
+        pixel_format.pixel_format != PixelFormat::kR8G8B8X8 &&
         pixel_format.pixel_format != PixelFormat::kB8G8R8A8 &&
+        pixel_format.pixel_format != PixelFormat::kB8G8R8X8 &&
         pixel_format.pixel_format != PixelFormat::kNv12) {
       return false;
     }
@@ -375,7 +379,9 @@ class IntelTiledFormats : public ImageFormatSet {
 
     switch (pixel_format_and_modifier.pixel_format) {
       case PixelFormat::kR8G8B8A8:
-      case PixelFormat::kB8G8R8A8: {
+      case PixelFormat::kR8G8B8X8:
+      case PixelFormat::kB8G8R8A8:
+      case PixelFormat::kB8G8R8X8: {
         // Format only has one plane
         ZX_DEBUG_ASSERT(plane == 0);
 
@@ -422,7 +428,9 @@ class IntelTiledFormats : public ImageFormatSet {
   static uint32_t FormatNumOfPlanes(const PixelFormat& pixel_format) {
     switch (pixel_format) {
       case PixelFormat::kR8G8B8A8:
+      case PixelFormat::kR8G8B8X8:
       case PixelFormat::kB8G8R8A8:
+      case PixelFormat::kB8G8R8X8:
         return 1u;
       case PixelFormat::kNv12:
         return 2u;
@@ -453,7 +461,9 @@ class AfbcFormats : public ImageFormatSet {
       fuchsia_images2::kFormatModifierArmBchBit | fuchsia_images2::kFormatModifierArmTiledHeaderBit;
   bool IsSupported(const PixelFormatAndModifier& pixel_format) const override {
     if (pixel_format.pixel_format != PixelFormatWire::kR8G8B8A8 &&
-        pixel_format.pixel_format != PixelFormatWire::kB8G8R8A8) {
+        pixel_format.pixel_format != PixelFormatWire::kR8G8B8X8 &&
+        pixel_format.pixel_format != PixelFormatWire::kB8G8R8A8 &&
+        pixel_format.pixel_format != PixelFormatWire::kB8G8R8X8) {
       return false;
     }
     auto modifier_without_afbc = static_cast<fuchsia_images2::PixelFormatModifier>(
@@ -519,7 +529,9 @@ class AfbcFormats : public ImageFormatSet {
 
     ZX_DEBUG_ASSERT(image_format.pixel_format().has_value());
     ZX_DEBUG_ASSERT(image_format.pixel_format().value() == PixelFormatWire::kR8G8B8A8 ||
-                    image_format.pixel_format().value() == PixelFormatWire::kB8G8R8A8);
+                    image_format.pixel_format().value() == PixelFormatWire::kR8G8B8X8 ||
+                    image_format.pixel_format().value() == PixelFormatWire::kB8G8R8A8 ||
+                    image_format.pixel_format().value() == PixelFormatWire::kB8G8R8X8);
     constexpr uint32_t kBytesPerPixel = 4;
     constexpr uint32_t kBytesPerBlockHeader = 16;
 
@@ -625,7 +637,9 @@ class AfbcFormats : public ImageFormatSet {
 uint64_t linear_size(uint32_t surface_height, uint32_t bytes_per_row, PixelFormat type) {
   switch (type) {
     case PixelFormat::kR8G8B8A8:
+    case PixelFormat::kR8G8B8X8:
     case PixelFormat::kB8G8R8A8:
+    case PixelFormat::kB8G8R8X8:
     case PixelFormat::kB8G8R8:
     case PixelFormat::kR8G8B8:
     case PixelFormat::kR5G6B5:
@@ -707,7 +721,9 @@ class LinearFormats : public ImageFormatSet {
       case PixelFormat::kMjpeg:
         return false;
       case PixelFormat::kR8G8B8A8:
+      case PixelFormat::kR8G8B8X8:
       case PixelFormat::kB8G8R8A8:
+      case PixelFormat::kB8G8R8X8:
       case PixelFormat::kB8G8R8:
       case PixelFormat::kR8G8B8:
       case PixelFormat::kI420:
@@ -886,7 +902,9 @@ class ArmTELinearFormats : public ImageFormatSet {
       case PixelFormat::kMjpeg:
         return false;
       case PixelFormat::kR8G8B8A8:
+      case PixelFormat::kR8G8B8X8:
       case PixelFormat::kB8G8R8A8:
+      case PixelFormat::kB8G8R8X8:
       case PixelFormat::kB8G8R8:
       case PixelFormat::kR8G8B8:
       case PixelFormat::kI420:
@@ -1068,8 +1086,10 @@ uint32_t ImageFormatBitsPerPixel(const PixelFormatAndModifier& pixel_format) {
       ZX_DEBUG_ASSERT(false);
       return 0u;
     case PixelFormat::kR8G8B8A8:
+    case PixelFormat::kR8G8B8X8:
       return 4u * 8u;
     case PixelFormat::kB8G8R8A8:
+    case PixelFormat::kB8G8R8X8:
       return 4u * 8u;
     case PixelFormat::kB8G8R8:
     case PixelFormat::kR8G8B8:
@@ -1122,8 +1142,10 @@ uint32_t ImageFormatStrideBytesPerWidthPixel(const PixelFormatAndModifier& pixel
       ZX_DEBUG_ASSERT(false);
       return 0u;
     case PixelFormat::kR8G8B8A8:
+    case PixelFormat::kR8G8B8X8:
       return 4u;
     case PixelFormat::kB8G8R8A8:
+    case PixelFormat::kB8G8R8X8:
       return 4u;
     case PixelFormat::kB8G8R8:
     case PixelFormat::kR8G8B8:
@@ -1203,8 +1225,10 @@ uint32_t ImageFormatSurfaceWidthMinDivisor(const PixelFormatAndModifier& pixel_f
       ZX_DEBUG_ASSERT(false);
       return 0u;
     case PixelFormat::kR8G8B8A8:
+    case PixelFormat::kR8G8B8X8:
       return 1u;
     case PixelFormat::kB8G8R8A8:
+    case PixelFormat::kB8G8R8X8:
       return 1u;
     case PixelFormat::kB8G8R8:
     case PixelFormat::kR8G8B8:
@@ -1259,8 +1283,10 @@ uint32_t ImageFormatSurfaceHeightMinDivisor(const PixelFormatAndModifier& pixel_
       ZX_DEBUG_ASSERT(false);
       return 0u;
     case PixelFormat::kR8G8B8A8:
+    case PixelFormat::kR8G8B8X8:
       return 1u;
     case PixelFormat::kB8G8R8A8:
+    case PixelFormat::kB8G8R8X8:
       return 1u;
     case PixelFormat::kB8G8R8:
     case PixelFormat::kR8G8B8:
@@ -1315,8 +1341,10 @@ uint32_t ImageFormatSampleAlignment(const PixelFormatAndModifier& pixel_format) 
       ZX_DEBUG_ASSERT(false);
       return 0u;
     case PixelFormat::kR8G8B8A8:
+    case PixelFormat::kR8G8B8X8:
       return 4u;
     case PixelFormat::kB8G8R8A8:
+    case PixelFormat::kB8G8R8X8:
       return 4u;
     case PixelFormat::kB8G8R8:
     case PixelFormat::kR8G8B8:
@@ -1410,6 +1438,10 @@ fpromise::result<fuchsia_images2::wire::PixelFormat> ImageFormatConvertZbiToSysm
     case ZBI_PIXEL_FORMAT_ARGB_8888:
       // Switching to using alpha.
     case ZBI_PIXEL_FORMAT_RGB_X888:
+      // TODO(b/329142833): Change this to B8G8R8X8 when relevant participants support R8G8B8X8. The
+      // main benefit is ensuring that consumer participants reliably ignore the X/A byte, treating
+      // the RGB portion as fully opaque regardless of the contents of the X/A byte. Currently this
+      // happens to work out ok, but really we should ensure that participants agree re. X vs. A.
       return fpromise::ok(PixelFormat::kB8G8R8A8);
     case ZBI_PIXEL_FORMAT_MONO_8:
       return fpromise::ok(PixelFormat::kL8);
@@ -1422,6 +1454,10 @@ fpromise::result<fuchsia_images2::wire::PixelFormat> ImageFormatConvertZbiToSysm
     case ZBI_PIXEL_FORMAT_ABGR_8888:
       // Switching to using alpha.
     case ZBI_PIXEL_FORMAT_BGR_888_X:
+      // TODO(b/329142833): Change this to R8G8B8X8 when relevant participants support R8G8B8X8. The
+      // main benefit is ensuring that consumer participants reliably ignore the X/A byte, treating
+      // the RGB portion as fully opaque regardless of the contents of the X/A byte. Currently this
+      // happens to work out ok, but really we should ensure that participants agree re. X vs. A.
       return fpromise::ok(PixelFormat::kR8G8B8A8);
     case ZBI_PIXEL_FORMAT_ARGB_2_10_10_10:
       return fpromise::ok(PixelFormat::kA2R10G10B10);
