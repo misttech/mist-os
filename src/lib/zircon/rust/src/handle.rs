@@ -89,6 +89,8 @@ impl Handle {
         let handle = self.0;
         let mut out = 0;
         let status = unsafe { sys::zx_handle_replace(handle, rights.bits(), &mut out) };
+        // zx_handle_replace always invalidates |handle| so we can't run our drop handler.
+        std::mem::forget(self);
         ok(status).map(|()| Handle(out))
     }
 }

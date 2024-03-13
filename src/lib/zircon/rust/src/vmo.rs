@@ -329,6 +329,10 @@ impl Vmo {
         let status = unsafe {
             sys::zx_vmo_replace_as_executable(self.raw_handle(), vmex.raw_handle(), &mut out)
         };
+        // zx_vmo_replace_as_executable always invalidates the passed in handle
+        // so we need to forget 'self' without executing its drop which will attempt
+        // to close the now-invalid handle value.
+        std::mem::forget(self);
         ok(status)?;
         unsafe { Ok(Vmo::from(Handle::from_raw(out))) }
     }
