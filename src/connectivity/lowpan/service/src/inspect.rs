@@ -6,6 +6,7 @@ use super::*;
 
 use async_utils::hanging_get::client::HangingGetStream;
 use fidl::endpoints::create_endpoints;
+use fidl_fuchsia_lowpan_experimental::Nat64Mapping;
 use fuchsia_async::Task;
 use fuchsia_component::client::connect_to_protocol;
 use fuchsia_inspect::{LazyNode, Node, StringProperty};
@@ -270,6 +271,44 @@ pub async fn start_inspect_process(inspect_tree: Arc<LowpanServiceTree>) -> Resu
     let lookup = connect_to_protocol::<DeviceWatcherMarker>()?;
     watch_device_changes(inspect_tree, Arc::new(lookup)).await;
     Ok::<(), Error>(())
+}
+
+fn record_nat64_mapping_in_inspect_node(nat64_mapping_node: &Node, mapping: Nat64Mapping) {
+    if let Some(x) = mapping.mapping_id {
+        nat64_mapping_node.record_uint("mapping_id", x.into());
+    }
+    if let Some(x) = mapping.ip4_addr {
+        nat64_mapping_node.record_bytes("ip4_addr", x);
+    }
+    if let Some(x) = mapping.ip6_addr {
+        nat64_mapping_node.record_bytes("ip6_addr", x);
+    }
+    if let Some(x) = mapping.remaining_time_ms {
+        nat64_mapping_node.record_uint("remaining_time_ms", x.into());
+    }
+    if let Some(x) = mapping.counters {
+        nat64_mapping_node.record_child("counters", |nat64_mapping_counters_node| {
+            let mapping_counters_list =
+                [("tcp", x.tcp), ("udp", x.udp), ("icmp", x.icmp), ("total", x.total)];
+            for (counter_name, counter) in mapping_counters_list {
+                nat64_mapping_counters_node.record_child(counter_name, |per_counter_node| {
+                    let packet_counter = counter.unwrap();
+                    if let Some(y) = packet_counter.ipv4_to_ipv6_packets {
+                        per_counter_node.record_int("ipv4_to_ipv6_packets", y.into());
+                    }
+                    if let Some(y) = packet_counter.ipv4_to_ipv6_bytes {
+                        per_counter_node.record_int("ipv4_to_ipv6_bytes", y.into());
+                    }
+                    if let Some(y) = packet_counter.ipv6_to_ipv4_packets {
+                        per_counter_node.record_int("ipv6_to_ipv4_packets", y.into());
+                    }
+                    if let Some(y) = packet_counter.ipv6_to_ipv4_bytes {
+                        per_counter_node.record_int("ipv6_to_ipv4_bytes", y.into());
+                    }
+                });
+            }
+        });
+    }
 }
 
 async fn monitor_device(name: String, iface_tree: Arc<IfaceTreeHolder>) -> Result<(), Error> {
@@ -934,6 +973,103 @@ async fn monitor_device(name: String, iface_tree: Arc<IfaceTreeHolder>) -> Resul
                         }
                         if let Some(x) = telemetry_data.uptime {
                             inspector.root().record_int("uptime", x.into());
+                        }
+                        if let Some(x) = telemetry_data.trel_counters {
+                            inspector.root().record_child("trel_counters", |trel_counters_child| {
+                                if let Some(y) = x.rx_bytes {
+                                    trel_counters_child.record_uint("rx_bytes", y.into());
+                                }
+                                if let Some(y) = x.rx_packets {
+                                    trel_counters_child.record_uint("rx_packets", y.into());
+                                }
+                                if let Some(y) = x.tx_bytes {
+                                    trel_counters_child.record_uint("tx_bytes", y.into());
+                                }
+                                if let Some(y) = x.tx_failure {
+                                    trel_counters_child.record_uint("tx_failure", y.into());
+                                }
+                                if let Some(y) = x.tx_packets {
+                                    trel_counters_child.record_uint("tx_packets", y.into());
+                                }
+                            });
+                        }
+                        if let Some(x) = telemetry_data.nat64_info {
+                            inspector.root().record_child("nat64_info", |nat64_info_child| {
+                                if let Some(y) = x.nat64_state {
+                                    nat64_info_child.record_child(
+                                        "nat64_state",
+                                        |nat64_state_node| {
+                                            if let Some(z) = y.prefix_manager_state {
+                                                nat64_state_node.record_string(
+                                                    "prefix_manager_state",
+                                                    format!("{:?}", z),
+                                                );
+                                            }
+                                            if let Some(z) = y.translator_state {
+                                                nat64_state_node.record_string(
+                                                    "translator_state",
+                                                    format!("{:?}", z),
+                                                );
+                                            }
+                                        },
+                                    );
+                                }
+                                if let Some(y) = x.nat64_mappings {
+                                    nat64_info_child.record_child(
+                                        "nat64_mappings",
+                                        |nat64_mappings_child| {
+                                            for (index, nat64_mapping) in y.iter().enumerate() {
+                                                nat64_mappings_child.record_child(
+                                                    format!("nat64_mapping_{}", index),
+                                                    |nat64_mapping_node| {
+                                                        record_nat64_mapping_in_inspect_node(
+                                                            nat64_mapping_node,
+                                                            nat64_mapping.clone(),
+                                                        );
+                                                    },
+                                                );
+                                            }
+                                        },
+                                    );
+                                }
+                                if let Some(y) = x.nat64_error_counters {
+                                    nat64_info_child.record_child(
+                                        "nat64_error_counters",
+                                        |nat64_error_counters_child| {
+                                            let error_counters_list = [
+                                                ("unkonwn", y.unkonwn),
+                                                ("illegal_packet", y.illegal_packet),
+                                                ("unsupported_protocol", y.unsupported_protocol),
+                                                ("no_mapping", y.no_mapping),
+                                            ];
+                                            for (counter_name, counter) in error_counters_list {
+                                                nat64_error_counters_child.record_child(
+                                                    counter_name,
+                                                    |per_counter_node| {
+                                                        let packet_counter = counter.unwrap();
+                                                        if let Some(z) =
+                                                            packet_counter.ipv4_to_ipv6_packets
+                                                        {
+                                                            per_counter_node.record_uint(
+                                                                "ipv4_to_ipv6_packets",
+                                                                z.into(),
+                                                            );
+                                                        }
+                                                        if let Some(z) =
+                                                            packet_counter.ipv6_to_ipv4_packets
+                                                        {
+                                                            per_counter_node.record_uint(
+                                                                "ipv6_to_ipv4_packets",
+                                                                z.into(),
+                                                            );
+                                                        }
+                                                    },
+                                                );
+                                            }
+                                        },
+                                    );
+                                }
+                            });
                         }
                     }
                     Err(e) => {
