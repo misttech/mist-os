@@ -112,23 +112,3 @@ config("allow_unused_results") {
 config("deny_unused_imports") {
   rustflags = [ "-Dunused_imports" ]
 }
-
-config("allow_unused_imports") {
-  rustflags = [ "-Aunused_imports" ]
-
-  # This visibility list allows for targets to opt out of denying unused imports.
-  #
-  # TODO(https://fxbug.dev/326330182): Make this lint mandatory.
-  #
-  # To remove the lint, add the following to your rust target:
-  #   configs += ["//build/config/rust/lints:allow_unused_imports"]
-  # The visibility list below enforces the list on certain areas of the tree while
-  # we evaluate wider adoption.
-  #
-  # To update this list run and insert wildcards as appropriate:
-  # $ scripts/gn/gen_visibility_globs.py \
-  #    --all=//build/config/rust/lints:deny_unused_imports \
-  #    --allow=//build/config/rust/lints:allow_unused_imports \
-  #    --ignore-suffix=_rust  # FIDL bindings use the _rust suffix
-  visibility = [ "//vendor/*" ]
-}
