@@ -23,6 +23,7 @@ import (
 
 	"go.fuchsia.dev/fuchsia/tools/bootserver"
 	"go.fuchsia.dev/fuchsia/tools/botanist"
+	"go.fuchsia.dev/fuchsia/tools/lib/iomisc"
 	"go.fuchsia.dev/fuchsia/tools/lib/logger"
 	"go.fuchsia.dev/fuchsia/tools/lib/retry"
 	"go.fuchsia.dev/fuchsia/tools/lib/serial"
@@ -288,7 +289,20 @@ func (g *GCE) provisionSSHKey(ctx context.Context) error {
 	if err := serial.RunCommands(ctx, g.serial, cmds); err != nil {
 		return err
 	}
-	logger.Infof(g.loggerCtx, "successfully provisioned SSH key")
+	// Call ReadUntilMatchString with a new ctx w/ a shorter timeout so it doesn't hang if the output is corrupted
+	return retry.Retry(ctx, retry.WithMaxAttempts(retry.NewConstantBackoff(5*time.Second), 5), func() error {
+		truncCtx, cancel := context.WithTimeout(ctx, 1*time.Second)
+		_, readErr := iomisc.ReadUntilMatchString(truncCtx, g.serial, pubkey)
+		cancel()
+		if readErr == nil {
+			logger.Infof(g.loggerCtx, "successfully provisioned SSH key")
+		} else if errors.Is(readErr, truncCtx.Err()) {
+			logger.Warningf(ctx, "ssh key is corrupted")
+		} else {
+			logger.Errorf(ctx, "unexpected error checking for ssh key: %s", readErr)
+		}
+		return readErr
+	}, nil)
 	return nil
 }
 
