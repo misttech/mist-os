@@ -21,7 +21,9 @@ pub use ffx_command::{
 };
 
 // Re-expose the ffx_writer::Writer as the 'simple writer'
-pub use ffx_writer::{MachineWriter, SimpleWriter, ToolIO, VerifiedMachineWriter};
+pub use ffx_writer::{
+    MachineWriter, SimpleWriter, TestBuffer, TestBuffers, ToolIO, VerifiedMachineWriter,
+};
 
 #[doc(hidden)]
 pub mod macro_deps {

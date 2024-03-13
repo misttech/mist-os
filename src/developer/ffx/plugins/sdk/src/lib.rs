@@ -6,9 +6,21 @@ use anyhow::{Context, Result};
 use camino::Utf8Path;
 use ffx_config::{ConfigLevel, EnvironmentContext};
 use ffx_sdk_args::{RunCommand, SdkCommand, SetCommand, SetRootCommand, SetSubCommand, SubCommand};
-use fho::{exit_with_code, user_error, FfxContext, FfxMain, FfxTool, SimpleWriter};
+use fho::{
+    bug, exit_with_code, return_user_error, user_error, FfxContext, FfxMain, FfxTool, ToolIO,
+    VerifiedMachineWriter,
+};
+use schemars::JsonSchema;
 use sdk::{in_tree_sdk_version, metadata::ElementType, Sdk, SdkRoot, SdkVersion};
+use serde::Serialize;
 use std::io::{ErrorKind, Write};
+
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct SdkInfo {
+    /// The version of SDK based on the
+    /// local environment.
+    pub version: String,
+}
 
 #[derive(FfxTool)]
 pub struct SdkTool {
@@ -22,16 +34,31 @@ fho::embedded_plugin!(SdkTool);
 
 #[async_trait::async_trait(?Send)]
 impl FfxMain for SdkTool {
-    type Writer = SimpleWriter;
+    type Writer = VerifiedMachineWriter<SdkInfo>;
 
     async fn main(self, writer: Self::Writer) -> fho::Result<()> {
         match &self.cmd.sub {
             SubCommand::Version(_) => {
                 exec_version(self.sdk_root?.get_sdk()?, writer).await.map_err(Into::into)
             }
-            SubCommand::Set(cmd) => exec_set(self.context, cmd).await.map_err(Into::into),
-            SubCommand::Run(cmd) => exec_run(self.sdk_root?.get_sdk()?, cmd).await,
-            SubCommand::PopulatePath(cmd) => exec_populate_path(writer, self.sdk_root?, &cmd.path),
+            SubCommand::Set(cmd) => {
+                if writer.is_machine() {
+                    return_user_error!("This command does not support machine output");
+                }
+                exec_set(self.context, cmd).await.map_err(Into::into)
+            }
+            SubCommand::Run(cmd) => {
+                if writer.is_machine() {
+                    return_user_error!("This command does not support machine output");
+                }
+                exec_run(self.sdk_root?.get_sdk()?, cmd).await
+            }
+            SubCommand::PopulatePath(cmd) => {
+                if writer.is_machine() {
+                    return_user_error!("This command does not support machine output");
+                }
+                exec_populate_path(writer, self.sdk_root?, &cmd.path)
+            }
         }
     }
 }
@@ -58,12 +85,16 @@ async fn exec_run(sdk: Sdk, cmd: &RunCommand) -> fho::Result<()> {
     }
 }
 
-async fn exec_version<W: Write>(sdk: Sdk, mut writer: W) -> Result<()> {
-    match sdk.get_version() {
-        SdkVersion::Version(v) => writeln!(writer, "{}", v)?,
-        SdkVersion::InTree => writeln!(writer, "{}", in_tree_sdk_version())?,
-        SdkVersion::Unknown => writeln!(writer, "<unknown>")?,
-    }
+async fn exec_version(sdk: Sdk, mut writer: VerifiedMachineWriter<SdkInfo>) -> Result<()> {
+    let info = SdkInfo {
+        version: match sdk.get_version() {
+            SdkVersion::Version(v) => v.clone(),
+            SdkVersion::InTree => in_tree_sdk_version(),
+            SdkVersion::Unknown => "unknown".into(),
+        },
+    };
+
+    writer.machine_or_else(&info, || format!("{}", info.version)).map_err(|e| bug!("{e}"))?;
 
     Ok(())
 }
@@ -129,38 +160,42 @@ fn exec_populate_path(
 #[cfg(test)]
 mod test {
     use super::*;
+    use fho::TestBuffers;
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_version_with_string() {
-        let mut out = Vec::new();
         let sdk = Sdk::get_empty_sdk_with_version(SdkVersion::Version("Test.0".to_owned()));
+        let output = TestBuffers::default();
+        let writer = VerifiedMachineWriter::new_test(None, &output);
 
-        exec_version(sdk, &mut out).await.unwrap();
-        let out = String::from_utf8(out).unwrap();
+        exec_version(sdk, writer).await.expect("exec_version");
+        let actual = output.into_stdout_str();
 
-        assert_eq!("Test.0\n", out);
+        assert_eq!("Test.0\n", actual);
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_version_in_tree() {
-        let mut out = Vec::new();
+        let output = TestBuffers::default();
+        let writer = VerifiedMachineWriter::new_test(None, &output);
         let sdk = Sdk::get_empty_sdk_with_version(SdkVersion::InTree);
 
-        exec_version(sdk, &mut out).await.unwrap();
-        let out = String::from_utf8(out).unwrap();
+        exec_version(sdk, writer).await.expect("exec_version");
+        let actual = output.into_stdout_str();
 
         let re = regex::Regex::new(r"^\d+.99991231.0.1\n$").expect("creating regex");
-        assert!(re.is_match(&out));
+        assert!(re.is_match(&actual));
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_version_unknown() {
-        let mut out = Vec::new();
+        let output = TestBuffers::default();
+        let writer = VerifiedMachineWriter::new_test(None, &output);
         let sdk = Sdk::get_empty_sdk_with_version(SdkVersion::Unknown);
 
-        exec_version(sdk, &mut out).await.unwrap();
-        let out = String::from_utf8(out).unwrap();
+        exec_version(sdk, writer).await.expect("exec_version");
+        let actual = output.into_stdout_str();
 
-        assert_eq!("<unknown>\n", out);
+        assert_eq!("unknown\n", actual);
     }
 }
