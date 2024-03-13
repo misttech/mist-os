@@ -30,7 +30,8 @@
                 "IPUnboundSockets/IPUnboundSocketTest.ZeroTOS/*",
                 "IPUnboundSockets/IPUnboundSocketTest.ZeroTOSOptionSize/*",
 
-                // TODO(https://fxbug.dev/42095034): Support dualstack TCP sockets.
+                // TODO(https://fxbug.dev/329317900): Support setting/getting TTL for
+                // TCP sockets.
                 "IPUnboundSockets/IPUnboundSocketTest.ZeroTtl/[4-7]",
                 "IPUnboundSockets/IPUnboundSocketTest.TtlDefault/[4-7]",
                 "IPUnboundSockets/IPUnboundSocketTest.SetTtl/[4-7]",
