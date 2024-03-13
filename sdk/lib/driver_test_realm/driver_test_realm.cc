@@ -428,12 +428,17 @@ class DriverTestRealm final : public fidl::Server<fuchsia_driver_test::Realm> {
         .name = "fuchsia.driver.DisabledDrivers",
         .value = request.args().driver_disable().value_or(kEmptyVec),
     });
+    configurations.push_back({
+        .name = "fuchsia.driver.IndexUnpackagedBootDrivers",
+        .value = component_testing::ConfigValue::Bool(true),
+    });
     realm_builder_.AddConfiguration(std::move(configurations));
     realm_builder_.AddRoute({
         .capabilities =
             {
                 component_testing::Config{.name = "fuchsia.driver.BindEager"},
                 component_testing::Config{.name = "fuchsia.driver.DisabledDrivers"},
+                component_testing::Config{.name = "fuchsia.driver.IndexUnpackagedBootDrivers"},
             },
         .source = component_testing::SelfRef{},
         .targets = {component_testing::ChildRef{"driver-index"}},

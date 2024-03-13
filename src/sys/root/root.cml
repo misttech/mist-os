@@ -48,6 +48,7 @@
                 "fuchsia.driver.DriverLoadFuzzerMaxDelayMs",
                 "fuchsia.driver.EnableDriverLoadFuzzer",
                 "fuchsia.driver.EnableEphemeralDrivers",
+                "fuchsia.driver.IndexUnpackagedBootDrivers",
                 "fuchsia.driver.manager.DelayFallbackUntilBaseDriversLoaded",
                 "fuchsia.driver.manager.DriverHostCrashPolicy",
                 "fuchsia.driver.manager.EnableTestShutdownDelays",

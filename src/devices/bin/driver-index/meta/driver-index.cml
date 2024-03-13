@@ -67,6 +67,11 @@
             },
         },
         {
+            config: "fuchsia.driver.IndexUnpackagedBootDrivers",
+            key: "index_unpackaged_bootfs_drivers",
+            type: "bool",
+        },
+        {
             directory: "boot",
             rights: [ "r*" ],
             path: "/boot",

@@ -184,6 +184,7 @@
                 "fuchsia.driver.DriverLoadFuzzerMaxDelayMs",
                 "fuchsia.driver.EnableDriverLoadFuzzer",
                 "fuchsia.driver.EnableEphemeralDrivers",
+                "fuchsia.driver.IndexUnpackagedBootDrivers",
             ],
         },
         {

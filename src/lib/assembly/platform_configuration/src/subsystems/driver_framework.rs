@@ -39,6 +39,10 @@ impl DefineSubsystemConfiguration<DriverFrameworkConfig> for DriverFrameworkSubs
             Config::new(ConfigValueType::Bool, delay_fallback.into()),
         )?;
         builder.set_config_capability(
+            "fuchsia.driver.IndexUnpackagedBootDrivers",
+            Config::new(ConfigValueType::Bool, true.into()),
+        )?;
+        builder.set_config_capability(
             "fuchsia.driver.BindEager",
             Config::new(
                 ConfigValueType::Vector {

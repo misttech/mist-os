@@ -395,11 +395,14 @@ async fn main() -> Result<(), anyhow::Error> {
             .map_err(log_error)?;
 
     // TODO(https://fxbug.dev/42179754): Resolve unpackaged boot drivers until they have been fully migrated.
-    let unpackaged_boot_drivers =
+    let unpackaged_boot_drivers = if config.index_unpackaged_bootfs_drivers {
         load_unpackaged_boot_drivers(&boot, &eager_drivers, &disabled_drivers)
             .await
             .context("Failed to load unpackaged boot drivers")
-            .map_err(log_error)?;
+            .map_err(log_error)?
+    } else {
+        vec![]
+    };
 
     // Combine packaged and unpackaged drivers into the final drivers list used to load drivers.
     let drivers = merge_boot_drivers(packaged_boot_drivers, unpackaged_boot_drivers)?;
