@@ -44,3 +44,19 @@ ffx_tool("ffx_product_tool") {
   sdk_target_name = "sdk"
   sdk_category = "partner"
 }
+
+group("product") {
+  public_deps = [
+    ":ffx_product_tool",
+    ":ffx_product_tool_host_tool",
+  ]
+}
+
+group("bin") {
+  public_deps = [ ":ffx_product_tool_versioned" ]
+}
+
+group("tests") {
+  testonly = true
+  deps = [ ":ffx_product_tests($host_toolchain)" ]
+}

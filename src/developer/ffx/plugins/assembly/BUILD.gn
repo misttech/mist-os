@@ -141,3 +141,14 @@ ffx_tool("ffx_assembly_tool") {
   sdk_target_name = "sdk"
   sdk_category = "partner"
 }
+
+group("assembly") {
+  public_deps = [
+    ":ffx_assembly_tool",
+    ":ffx_assembly_tool_host_tool",
+  ]
+}
+
+group("bin") {
+  public_deps = [ ":ffx_assembly_tool_versioned" ]
+}

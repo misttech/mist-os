@@ -6,9 +6,20 @@ import("//src/developer/ffx/config.gni")
 
 # The list of tools under this directory
 _tools = [
+  "//src/developer/ffx/plugins/agis",
+  "//src/developer/ffx/plugins/assembly",
   "//src/developer/ffx/plugins/audio",
   "//src/developer/ffx/plugins/coverage",
+  "//src/developer/ffx/plugins/driver",
+  "//src/developer/ffx/plugins/fuzz",
+  "//src/developer/ffx/plugins/inspect",
+  "//src/developer/ffx/plugins/package",
+  "//src/developer/ffx/plugins/profile",
+  "//src/developer/ffx/plugins/product",
   "//src/developer/ffx/plugins/scrutiny",
+  "//src/developer/ffx/plugins/setui",
+  "//src/developer/ffx/plugins/test",
+  "//src/developer/ffx/plugins/wlan",
   "auth",
   "echo",
   "efi",

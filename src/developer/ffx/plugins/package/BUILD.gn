@@ -21,7 +21,10 @@ ffx_plugin("ffx_package") {
 
 group("tests") {
   testonly = true
-  deps = [ "archive:tests" ]
+  deps = [
+    ":ffx_package_tests($host_toolchain)",
+    "archive:tests",
+  ]
 }
 
 ffx_tool("ffx_package_tool") {
@@ -35,4 +38,15 @@ ffx_tool("ffx_package_tool") {
 
   sdk_target_name = "sdk"
   sdk_category = "partner"
+}
+
+group("package") {
+  public_deps = [
+    ":ffx_package_tool",
+    ":ffx_package_tool_host_tool",
+  ]
+}
+
+group("bin") {
+  public_deps = [ ":ffx_package_tool_versioned" ]
 }
