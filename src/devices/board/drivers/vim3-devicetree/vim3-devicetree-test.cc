@@ -53,6 +53,10 @@ TEST_F(Vim3DevicetreeTest, DevicetreeEnumeration) {
       "sys/platform/arm-mali-ffe40000",
       "sys/platform/audio-controller-ff642000",
       "sys/platform/suspend",
+      "sys/platform/phy-ffe09000",
+      "sys/platform/usb-ff500000",
+      "sys/platform/usb-ff400000",
+
   };
   ASSERT_TRUE(board_test_.StartRealm().is_ok());
   ASSERT_TRUE(board_test_.WaitOnDevices(device_node_paths).is_ok());

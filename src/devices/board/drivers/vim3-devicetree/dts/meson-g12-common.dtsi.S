@@ -53,6 +53,11 @@
 				pins = <A311D_GPIOA(4)>;
 				function = <0 2>;
 			};
+
+			usb_power: usb-power {
+				pins = <A311D_GPIOA(6)>;
+				output-high;
+			};
 		};
 
 		audio: audio-controller@ff642000 {
@@ -128,6 +133,50 @@
 				#address-cells = <1>;
 				#size-cells = <0>;
 			};
+		};
+
+		usb_phy: phy@ffe09000 {
+			compatible = "amlogic,g12b-usb-phy";
+			reg = <0x0 A311D_USBCTRL_BASE 0x0 A311D_USBCTRL_LENGTH>,
+				<0x0 A311D_USBPHY20_BASE 0x0 A311D_USBPHY20_LENGTH>,
+				<0x0 A311D_USBPHY21_BASE 0x0 A311D_USBPHY21_LENGTH>,
+				<0x0 A311D_USB3_PCIE_PHY_BASE 0x0 A311D_USB3_PCIE_PHY_LENGTH>;
+			reg-names = "usb-ctrl", "usb2-phy", "usb2-otg-phy", "usb3-phy";
+			dr_modes = "host", "peripheral", "host";
+			interrupts = <GIC_SPI 16 GIC_IRQ_MODE_EDGE_RISING>;
+			iommus = <&dummy_iommu 6>;
+			assigned-clocks = <&clock 0x10008 &clock 0x10009 &clock 0x20001>;
+			assigned-clock-rates = <0 0 100000000>;
+			pinctrl-0 = <&usb_power>;
+			registers = <&reset A311D_RESET1_REGISTER 4 0x0 0x10004>,
+				<&reset A311D_RESET1_LEVEL 4 0x0 0x30000>;
+			#phy-cells = <0>;
+			pll-settings = <0x09400414 0x927E0000 0xac5f69e5 0xfe18>,
+					<0x8000fff 0x78000 0xe0004 0xe000c>;
+		};
+
+		dwc2: usb@ff400000 {
+			compatible = "snps,dwc2";
+			reg = <0x0 A311D_USB1_BASE 0x0 A311D_USB1_LENGTH>;
+			interrupts = <GIC_SPI 31 GIC_IRQ_MODE_EDGE_RISING>;
+			iommus = <&dummy_iommu 6>;
+			phys = <&usb_phy>;
+			phy-names = "dwc2-phy";
+			g-rx-fifo-size = <256>;
+			g-np-tx-fifo-size = <32>;
+			g-tx-fifo-size = <128 4 128 16>;
+			g-turnaround-time = <9>;
+			dma-burst-len = <5>;
+			boot-metadata = <0x43414D6D 0>; /*DEVICE_METADATA_MAC_ADDRESS MACADDR_WIFI*/
+		};
+
+		xhci: usb@ff500000 {
+			compatible = "generic-xhci";
+			reg = <0x0 A311D_USB0_BASE 0x0 A311D_USB0_LENGTH>;
+			interrupts = <GIC_SPI 30 GIC_IRQ_MODE_EDGE_RISING>;
+			iommus = <&dummy_iommu 6>;
+			phys = <&usb_phy>;
+			phy-names = "xhci-phy";
 		};
 
 		aml_gpu: gpu@ffe40000 {

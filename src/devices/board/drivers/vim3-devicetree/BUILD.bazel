@@ -64,12 +64,15 @@ fuchsia_package(
     fuchsia_api_level = "HEAD",
     package_repository_name = "fuchsia.com",
     resources = [
+        "@internal_sdk//pkg/devicetree-aml-usb-phy-visitor",
         "@internal_sdk//pkg/devicetree-arm-gicv2",
         "@internal_sdk//pkg/devicetree-clockimpl-visitor",
+        "@internal_sdk//pkg/devicetree-dwc2-visitor",
         "@internal_sdk//pkg/devicetree-gpioimpl-visitor",
         "@internal_sdk//pkg/devicetree-mali-gpu-visitor",
         "@internal_sdk//pkg/devicetree-registers-visitor",
         "@internal_sdk//pkg/devicetree-sysmem-visitor",
+        "@internal_sdk//pkg/devicetree-usb-phy-visitor",
     ],
     visibility = ["//visibility:public"],
 )
@@ -122,12 +125,15 @@ fuchsia_test_package(
     fuchsia_api_level = "HEAD",
     resources = [
         ":vim3-dtb",
+        "@internal_sdk//pkg/devicetree-aml-usb-phy-visitor",
         "@internal_sdk//pkg/devicetree-arm-gicv2",
         "@internal_sdk//pkg/devicetree-clockimpl-visitor",
+        "@internal_sdk//pkg/devicetree-dwc2-visitor",
         "@internal_sdk//pkg/devicetree-gpioimpl-visitor",
         "@internal_sdk//pkg/devicetree-mali-gpu-visitor",
         "@internal_sdk//pkg/devicetree-registers-visitor",
         "@internal_sdk//pkg/devicetree-sysmem-visitor",
+        "@internal_sdk//pkg/devicetree-usb-phy-visitor",
     ],
     subpackages_to_flatten = [
         "//sdk/lib/driver/devicetree/testing:platform-bus-driver",

@@ -29,6 +29,12 @@ TEST_F(DeviceEnumerationTest, Vim3DeviceTreeTest) {
       "sys/platform/arm-mali-ffe40000",
       "sys/platform/audio-controller-ff642000/audio-controller-ff642000_group/aml-g12-audio-composite",
       "sys/platform/suspend",
+      "sys/platform/phy-ffe09000/phy-ffe09000_group/aml_usb_phy",
+      "sys/platform/phy-ffe09000/phy-ffe09000_group/aml_usb_phy/xhci",
+      "sys/platform/phy-ffe09000/phy-ffe09000_group/aml_usb_phy/dwc2",
+      "sys/platform/usb-ff500000/usb-ff500000_group/xhci/usb-bus",
+      "sys/platform/phy-ffe09000/phy-ffe09000_group/aml_usb_phy/dwc2/usb-ff400000_group/dwc2",
+      "sys/platform/phy-ffe09000/phy-ffe09000_group/aml_usb_phy/dwc2/usb-ff400000_group/dwc2/usb-peripheral",
   };
 
   ASSERT_NO_FATAL_FAILURE(TestRunner(kDevicePaths, std::size(kDevicePaths)));
