@@ -7,6 +7,8 @@
 
 #include <cstdint>
 
+#include "test-start.h"
+
 using Ehdr = elfldltl::Elf<>::Ehdr;
 
 extern "C" int64_t TestStart() {

@@ -5,7 +5,10 @@
 #include <stdint.h>
 #include <zircon/compiler.h>
 
-// These use C linkage to make debugging easier. Only TestStart _needs_ to be extern "C".
+#include "test-start.h"
+
+// These use C linkage to make debugging easier.
+// Only TestStart _needs_ to be extern "C".
 extern "C" {
 
 __EXPORT int Seven = 7;

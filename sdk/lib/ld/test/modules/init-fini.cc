@@ -6,6 +6,8 @@
 #include <lib/ld/module.h>
 #include <stdint.h>
 
+#include "test-start.h"
+
 namespace {
 
 int a;

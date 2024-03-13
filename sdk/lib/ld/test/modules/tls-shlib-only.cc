@@ -7,6 +7,7 @@
 #include <lib/ld/module.h>
 #include <lib/ld/tls.h>
 
+#include "test-start.h"
 #include "tls-dep.h"
 
 using Traits = elfldltl::TlsTraits<>;

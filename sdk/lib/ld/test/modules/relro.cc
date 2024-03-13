@@ -7,6 +7,8 @@
 
 #include <cstddef>
 
+#include "test-start.h"
+
 namespace {
 
 // This pagesize is larger than any reasonable size we expect this test to run

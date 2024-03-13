@@ -7,6 +7,8 @@
 #include <lib/ld/tls.h>
 #include <stdint.h>
 
+#include "test-start.h"
+
 [[gnu::used, gnu::retain]] alignas(64) thread_local int tls_data = 1;
 
 extern "C" int64_t TestStart() {

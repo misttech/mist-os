@@ -4,6 +4,8 @@
 
 #include <stdint.h>
 
+#include "test-start.h"
+
 extern "C" int64_t a();
 
 extern "C" int64_t TestStart() { return a() + 4; }

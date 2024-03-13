@@ -9,6 +9,8 @@
 #include <iterator>
 #include <string_view>
 
+#include "test-start.h"
+
 extern "C" int64_t TestStart() {
   constexpr auto within_module = [](const auto& module, auto* ptr) {
     const uintptr_t addr = reinterpret_cast<uintptr_t>(ptr);

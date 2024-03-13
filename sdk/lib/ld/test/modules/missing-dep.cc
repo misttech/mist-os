@@ -4,6 +4,8 @@
 
 #include <stdint.h>
 
+#include "test-start.h"
+
 // The .ifs file missing-dep-dep.ifs creates a stub shared object that defines
 // the symbol `missing_dep_sym` and specifies it's soname as libmissing_dep.so.
 // This module doesn't exist so we expect a missing module error.

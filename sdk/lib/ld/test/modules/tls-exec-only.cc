@@ -9,6 +9,7 @@
 #include <lib/stdcompat/bit.h>
 
 #include "ensure-test-thread-pointer.h"
+#include "test-start.h"
 
 namespace {
 

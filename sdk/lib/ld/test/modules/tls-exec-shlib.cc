@@ -7,6 +7,7 @@
 #include <lib/ld/tls.h>
 
 #include "ensure-test-thread-pointer.h"
+#include "test-start.h"
 #include "tls-dep.h"
 
 [[gnu::used, gnu::retain]] alignas(64) thread_local int tls_data = 23;

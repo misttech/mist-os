@@ -23,12 +23,15 @@ in_process_executables = [
   ":symbolic-namespace",
   ":many-deps",
   ":init-fini",
-  ":tls-exec-only",
   ":tls-shlib-only",
   ":tls-exec-shlib",
-  ":tls-ie",
   ":tls-gd",
   ":tls-desc",
+]
+
+non_module_in_process_executables = [
+  ":tls-exec-only",
+  ":tls-ie",
 ]
 
 # Everything in this list does not have can_be_in_process = true.
@@ -54,8 +57,11 @@ shlibs = [
 ]
 
 modules = []
+foreach(label, executables + in_process_executables) {
+  modules += [ "$label.module" ]
+}
 
-foreach(label, in_process_executables) {
+foreach(label, in_process_executables + non_module_in_process_executables) {
   executables += [
     label,
     "$label.in-process",
@@ -93,166 +99,10 @@ config("semantic-interposition") {
   }
 }
 
-template("test_executable") {
-  executable_target = target_name
-
-  suffices = [ "" ]
-  if (defined(invoker.can_be_in_process) && invoker.can_be_in_process) {
-    suffices += [ ".in-process" ]
-  }
-
-  foreach(suffix, suffices) {
-    executable(executable_target + suffix) {
-      visibility = [ ":*" ]
-      testonly = true
-
-      deps = []
-      data_deps = []
-      forward_variables_from(invoker,
-                             "*",
-                             [
-                               "configs",
-                               "shlib_deps",
-                               "testonly",
-                             ])
-      deps += [ ":test-executable$suffix" ]
-      if (defined(invoker.shlib_deps)) {
-        deps += invoker.shlib_deps
-      }
-      if (defined(invoker.configs)) {
-        configs += invoker.configs
-      }
-
-      # This is needed in the non-Zircon (host/Linux) toolchains to avoid
-      # having any implicit deps injected.
-      disable_syslog_backend = true
-
-      exclude_toolchain_tags = [ "instrumentation-runtime" ]
-
-      if (!is_fuchsia && defined(invoker.shlib_deps)) {
-        # On Fuchsia, the indirect deps are all reached as resource()
-        # equivalents implicitly.  On host, the shlib_deps binaries must both
-        # be copied into the right test-data directory and roll up as
-        # host_test_data() equivalents.  This is evaluated after variant
-        # selection so it reaches the right variant $shlib_toolchain where
-        # test_shared_library() defines the `.host-test-data` target.
-        foreach(shlib, invoker.shlib_deps) {
-          data_deps += [ "$shlib.host-test-data($shlib_toolchain)" ]
-        }
-      }
-    }
-
-    if (!is_fuchsia && current_toolchain != shlib_toolchain) {
-      # On Fuchsia, the test executable is reached as a resource() equivalent
-      # implicitly.  On host, it must both be copied into the right test-data
-      # directory and roll up as an host_test_data() equivalent.  The variant
-      # selection is done by the executable() target, but we are in the right
-      # environment that produces a copy() target into the base toolchain's
-      # $root_out_dir.  This host_test_data() will copy again from there.
-      if (is_linux) {
-        assert(toolchain_environment == "linux",
-               "$current_toolchain is $toolchain_environment")
-      }
-      host_test_data("$executable_target$suffix.host-test-data") {
-        deps = [ ":$executable_target$suffix" ]
-        sources = [ "$root_out_dir/$executable_target$suffix" ]
-        outputs = [ "$host_out_dir/test_data/elfldltl/{{source_file_part}}" ]
-      }
-    }
-  }
-}
-
-# The test executables declare an `extern "C" ... TestStart(...)` entry point.
-#
-# When built for in-process tests, the ELF entry point will be called directly
-# by the test code.  For Fuchsia, link the test executables with -e TestStart.
-# For POSIX, link with an assembly implementation of _start that tail-calls
-# TestStart.
-#
-# When built for separate-process tests, the ELF entry point cannot return.
-# Instead, it's defined to call TestStart and exit with its value.
-foreach(in_process,
-        [
-          "",
-          ".in-process",
-        ]) {
-  static_library("test-executable$in_process") {
-    visibility = [ ":*" ]
-    testonly = true
-
-    if (in_process != "") {
-      defines = [ "IN_PROCESS_TEST" ]
-    }
-
-    public = [ "ensure-test-thread-pointer.h" ]
-    public_deps = [ "//sdk/lib/ld:standalone" ]
-    public_configs = [
-      "//sdk/lib/ld:abi-interp",
-      ":semantic-interposition",
-    ]
-    sources = [ "ensure-test-thread-pointer.cc" ]
-    deps = [
-      ":test-module.deps",
-      "//zircon/system/public",
-    ]
-    if (is_fuchsia) {
-      if (in_process == "") {
-        sources += [ "zircon-test-start.cc" ]
-        deps += [ "//src/zircon/lib/zircon" ]
-      } else {
-        public_configs += [ ":test-executable.in-process.config" ]
-      }
-    } else {
-      sources += [ "posix-test-start.S" ]
-      deps += [ "//zircon/kernel/lib/arch" ]
-    }
-
-    # This dependency is evaluated in the toolchain where the test_executable()
-    # is built, after variant selection.  So it gets the right version of
-    # ld-startup installed where the test needs to find it.
-    data_deps = [ "..:ld-startup.test-data($shlib_toolchain)" ]
-  }
-}
-
-# These are things that every test module of all target types implicitly
-# depends on.
-group("test-module.deps") {
-  visibility = [ ":*" ]
-
-  # TODO(https://fxbug.dev/42085409): setting testonly seems to tickle a GN bug
-  #testonly = true
-
-  # When llvm-profdata instrumentation is in use, it may generate calls to
-  # functions that are supplied by the runtime.  Even though the modules aren't
-  # actually using the runtime to extract their data (yet, anyway), they link
-  # in the runtime to make sure any such references are satisfied at link time.
-  if (toolchain_variant.tags + [ "llvm-profdata" ] - [ "llvm-profdata" ] !=
-      toolchain_variant.tags) {
-    deps = [ "//src/lib/llvm-profdata" ]
-  }
-}
-
-# clang++ will add -lc++ and -lm, which we don't want for these tests. Note
-# there are differences between the Fuchsia and GNU toolchains in clang. The
-# GNU toolchain will unconditionally add -lm regardless of -nostdlib++ though
-# the Fuchsia driver doesn't. -nodefaultlibs will stop the driver from adding
-# -lm, but we get unused -nolibc warning because the arg is never read when
-# -nodefaultlibs is specified, so just ignore the warning.
-config("nostdlibs") {
-  if (is_fuchsia) {
-    ldflags = [ "-nostdlib++" ]
-  } else {
-    ldflags = [
-      "-nodefaultlibs",
-      "-Wno-unused-command-line-argument",
-    ]
-  }
-}
-
-template("test_shared_library") {
+template("_test_non_executable") {
   shlib_target_name = target_name
 
-  shared_library(shlib_target_name) {
+  target(invoker.target_type, shlib_target_name) {
     visibility = [ ":*" ]
 
     # TODO(https://fxbug.dev/42085409): setting testonly seems to tickle a GN bug
@@ -267,6 +117,7 @@ template("test_shared_library") {
                            [
                              "configs",
                              "remove_configs",
+                             "target_type",
                            ])
 
     public_deps += [ "//sdk/lib/ld:standalone" ]
@@ -308,6 +159,196 @@ template("test_shared_library") {
         }
       }
     }
+  }
+}
+
+template("test_shared_library") {
+  _test_non_executable(target_name) {
+    target_type = "shared_library"
+    forward_variables_from(invoker, "*", [ "target_type" ])
+  }
+}
+
+template("test_loadable_module") {
+  _test_non_executable(target_name) {
+    target_type = "loadable_module"
+    forward_variables_from(invoker, "*", [ "target_type" ])
+  }
+}
+
+template("test_executable") {
+  executable_target = target_name
+
+  suffices = [
+    "",
+    ".module",
+  ]
+  if (defined(invoker.can_be_in_process) && invoker.can_be_in_process) {
+    suffices += [ ".in-process" ]
+  }
+
+  foreach(suffix, suffices) {
+    if (suffix == ".module") {
+      target_type = "loadable_module"
+    } else {
+      target_type = "executable"
+    }
+    target(target_type, executable_target + suffix) {
+      visibility = [ ":*" ]
+      testonly = true
+
+      deps = []
+      data_deps = []
+      forward_variables_from(invoker,
+                             "*",
+                             [
+                               "configs",
+                               "shlib_deps",
+                               "testonly",
+                             ])
+      deps += [ ":test-executable$suffix" ]
+      if (defined(invoker.shlib_deps)) {
+        deps += invoker.shlib_deps
+      }
+      if (defined(invoker.configs)) {
+        configs += invoker.configs
+      }
+
+      if (target_type == "executable") {
+        # This is needed in the non-Zircon (host/Linux) toolchains to avoid
+        # having any implicit deps injected.
+        disable_syslog_backend = true
+      }
+
+      exclude_toolchain_tags = [ "instrumentation-runtime" ]
+
+      if (!is_fuchsia && defined(invoker.shlib_deps)) {
+        # On Fuchsia, the indirect deps are all reached as resource()
+        # equivalents implicitly.  On host, the shlib_deps binaries must both
+        # be copied into the right test-data directory and roll up as
+        # host_test_data() equivalents.  This is evaluated after variant
+        # selection so it reaches the right variant $shlib_toolchain where
+        # test_shared_library() defines the `.host-test-data` target.
+        foreach(shlib, invoker.shlib_deps) {
+          data_deps += [ "$shlib.host-test-data($shlib_toolchain)" ]
+        }
+      }
+    }
+
+    if (!is_fuchsia && current_toolchain != shlib_toolchain) {
+      # On Fuchsia, the test executable is reached as a resource() equivalent
+      # implicitly.  On host, it must both be copied into the right test-data
+      # directory and roll up as an host_test_data() equivalent.  The variant
+      # selection is done by the executable() target, but we are in the right
+      # environment that produces a copy() target into the base toolchain's
+      # $root_out_dir.  This host_test_data() will copy again from there.
+      if (is_linux) {
+        assert(toolchain_environment == "linux",
+               "$current_toolchain is $toolchain_environment")
+      }
+      if (target_type == "loadable_module") {
+        output_suffix = ".so"
+      } else {
+        output_suffix = ""
+      }
+      host_test_data("$executable_target$suffix.host-test-data") {
+        deps = [ ":$executable_target$suffix" ]
+        sources = [ "$root_out_dir/$executable_target$suffix$output_suffix" ]
+        outputs = [ "$host_out_dir/test_data/elfldltl/{{source_file_part}}" ]
+      }
+    }
+  }
+}
+
+# The test executables declare an `extern "C" ... TestStart(...)` entry point.
+#
+# When built for in-process tests, the ELF entry point will be called directly
+# by the test code.  For Fuchsia, link the test executables with -e TestStart.
+# For POSIX, link with an assembly implementation of _start that tail-calls
+# TestStart.
+#
+# When built for separate-process tests, the ELF entry point cannot return.
+# Instead, it's defined to call TestStart and exit with its value.
+foreach(in_process,
+        [
+          "",
+          ".in-process",
+          ".module",
+        ]) {
+  static_library("test-executable$in_process") {
+    visibility = [ ":*" ]
+    testonly = true
+
+    if (in_process != "") {
+      defines = [ "IN_PROCESS_TEST" ]
+    }
+
+    public = [
+      "ensure-test-thread-pointer.h",
+      "test-start.h",
+    ]
+    public_deps = [ "//sdk/lib/ld:standalone" ]
+    public_configs = [ ":semantic-interposition" ]
+    sources = [ "ensure-test-thread-pointer.cc" ]
+    deps = [
+      ":test-module.deps",
+      "//zircon/system/public",
+    ]
+
+    if (in_process != ".module") {
+      public_configs += [ "//sdk/lib/ld:abi-interp" ]
+      if (is_fuchsia) {
+        if (in_process == "") {
+          sources += [ "zircon-test-start.cc" ]
+          deps += [ "//src/zircon/lib/zircon" ]
+        } else {
+          public_configs += [ ":test-executable.in-process.config" ]
+        }
+      } else {
+        sources += [ "posix-test-start.S" ]
+        deps += [ "//zircon/kernel/lib/arch" ]
+      }
+
+      # This dependency is evaluated in the toolchain where the
+      # test_executable() is built, after variant selection.  So it gets the
+      # right version of ld-startup installed where the test needs to find it.
+      data_deps = [ "..:ld-startup.test-data($shlib_toolchain)" ]
+    }
+  }
+}
+
+# These are things that every test module of all target types implicitly
+# depends on.
+group("test-module.deps") {
+  visibility = [ ":*" ]
+
+  # TODO(https://fxbug.dev/42085409): setting testonly seems to tickle a GN bug
+  #testonly = true
+
+  # When llvm-profdata instrumentation is in use, it may generate calls to
+  # functions that are supplied by the runtime.  Even though the modules aren't
+  # actually using the runtime to extract their data (yet, anyway), they link
+  # in the runtime to make sure any such references are satisfied at link time.
+  if (toolchain_variant.tags + [ "llvm-profdata" ] - [ "llvm-profdata" ] !=
+      toolchain_variant.tags) {
+    deps = [ "//src/lib/llvm-profdata" ]
+  }
+}
+
+# clang++ will add -lc++ and -lm, which we don't want for these tests. Note
+# there are differences between the Fuchsia and GNU toolchains in clang. The
+# GNU toolchain will unconditionally add -lm regardless of -nostdlib++ though
+# the Fuchsia driver doesn't. -nodefaultlibs will stop the driver from adding
+# -lm, but we get unused -nolibc warning because the arg is never read when
+# -nodefaultlibs is specified, so just ignore the warning.
+config("nostdlibs") {
+  if (is_fuchsia) {
+    ldflags = [ "-nostdlib++" ]
+  } else {
+    ldflags = [
+      "-nodefaultlibs",
+      "-Wno-unused-command-line-argument",
+    ]
   }
 }
 

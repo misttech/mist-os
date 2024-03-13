@@ -8,6 +8,7 @@
 #include <stdint.h>
 
 #include "ensure-test-thread-pointer.h"
+#include "test-start.h"
 #include "tls-dep.h"
 
 extern "C" int64_t TestStart() {

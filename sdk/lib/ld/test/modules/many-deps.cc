@@ -8,6 +8,8 @@
 
 #include <iterator>
 
+#include "test-start.h"
+
 // Note, we use extern "C" to make debugging easier than seeing mangled names.
 extern "C" {
 
@@ -24,4 +26,5 @@ int64_t TestStart() {
   auto view = ld::AbiLoadedModules(ld::abi::_ld_abi);
   return a() + b() + f() + std::distance(view.begin(), view.end());
 }
-}
+
+}  // extern "C"

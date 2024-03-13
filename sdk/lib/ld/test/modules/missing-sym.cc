@@ -4,6 +4,8 @@
 
 #include <stdint.h>
 
+#include "test-start.h"
+
 // The .ifs file missing-sym-dep-a.ifs creates a stub shared object that defines
 // the symbol `b`. At link the time, the linker is satisfied that `b` exists.
 // That .ifs file specifies that it has the soname libld-dep-a.so, so the linker

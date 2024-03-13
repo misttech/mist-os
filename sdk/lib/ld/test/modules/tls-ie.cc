@@ -8,6 +8,7 @@
 #include <stdint.h>
 
 #include "ensure-test-thread-pointer.h"
+#include "test-start.h"
 #include "tls-ie-dep.h"
 
 [[gnu::weak, gnu::tls_model("initial-exec")]] extern thread_local int tls_ie_weak;
