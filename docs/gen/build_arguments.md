@@ -2801,7 +2801,7 @@ disabled.
 
 **Current value (from the default):** `false`
 
-From //zircon/kernel/params.gni:156
+From //zircon/kernel/params.gni:159
 
 ### enable_mdns_trace
 
@@ -3107,6 +3107,14 @@ instead use the `fuchsia_cxx_version` variable.
 **Current value (from the default):** `17`
 
 From //build/config/fuchsia_cxx_version.gni:10
+
+### experimental_thread_sampler_enabled
+
+Include a mechanism for the kernel to sample threads and write the results to a buffer
+
+**Current value (from the default):** `false`
+
+From //zircon/kernel/params.gni:151
 
 ### extra_bazel_assembly_targets
 
