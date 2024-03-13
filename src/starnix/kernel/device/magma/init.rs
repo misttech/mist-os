@@ -9,9 +9,11 @@ use starnix_core::{
     task::CurrentTask,
     vfs::{FileOps, FsNode},
 };
+use starnix_sync::{DeviceOpen, FileOpsCore, LockBefore, Locked};
 use starnix_uapi::{device_type::DeviceType, errors::Errno, open_flags::OpenFlags};
 
 fn create_magma_device(
+    _locked: &mut Locked<'_, DeviceOpen>,
     current_task: &CurrentTask,
     id: DeviceType,
     node: &FsNode,
@@ -20,7 +22,10 @@ fn create_magma_device(
     MagmaFile::new_file(current_task, id, node, flags)
 }
 
-pub fn magma_device_init(current_task: &CurrentTask) {
+pub fn magma_device_init<L>(locked: &mut Locked<'_, L>, current_task: &CurrentTask)
+where
+    L: LockBefore<FileOpsCore>,
+{
     let kernel = current_task.kernel();
     let registry = &kernel.device_registry;
 
@@ -30,6 +35,7 @@ pub fn magma_device_init(current_task: &CurrentTask) {
         registry.register_dyn_chrdev(create_magma_device).expect("magma device register failed.");
 
     registry.add_device(
+        locked,
         current_task,
         "magma0".into(),
         DeviceMetadata::new("magma0".into(), magma_type, DeviceMode::Char),

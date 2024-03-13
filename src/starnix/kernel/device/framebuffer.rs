@@ -22,7 +22,7 @@ use fuchsia_component::client::connect_to_protocol_sync;
 use fuchsia_fs::directory as ffs_dir;
 use fuchsia_zircon as zx;
 use starnix_logging::{impossible_error, log_info, log_warn};
-use starnix_sync::{FileOpsIoctl, Locked, RwLock};
+use starnix_sync::{DeviceOpen, FileOpsCore, FileOpsIoctl, LockBefore, Locked, RwLock};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::{
     device_type::DeviceType,
@@ -195,6 +195,7 @@ impl Framebuffer {
 impl DeviceOps for Arc<Framebuffer> {
     fn open(
         &self,
+        _locked: &mut Locked<'_, DeviceOpen>,
         _current_task: &CurrentTask,
         dev: DeviceType,
         node: &FsNode,
@@ -264,12 +265,16 @@ impl FileOps for Arc<Framebuffer> {
     }
 }
 
-pub fn fb_device_init(system_task: &CurrentTask) {
+pub fn fb_device_init<L>(locked: &mut Locked<'_, L>, system_task: &CurrentTask)
+where
+    L: LockBefore<FileOpsCore>,
+{
     let kernel = system_task.kernel();
     let registry = &kernel.device_registry;
 
     let graphics_class = registry.get_or_create_class("graphics".into(), registry.virtual_bus());
     registry.add_and_register_device(
+        locked,
         system_task,
         "fb0".into(),
         DeviceMetadata::new("fb0".into(), DeviceType::FB0, DeviceMode::Char),

@@ -10,7 +10,7 @@ use crate::{
         SeekTarget, SimpleFileNode,
     },
 };
-use starnix_sync::{Locked, Mutex, ReadOps, WriteOps};
+use starnix_sync::{FileOpsCore, Locked, Mutex, WriteOps};
 use starnix_uapi::{errno, error, errors::Errno, off_t};
 use std::collections::VecDeque;
 
@@ -148,7 +148,7 @@ impl<Source: SequenceFileSource> FileOps for DynamicFile<Source> {
 
     fn read(
         &self,
-        _locked: &mut Locked<'_, ReadOps>,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         offset: usize,

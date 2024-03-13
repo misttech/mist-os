@@ -20,7 +20,10 @@ use crate::{
     },
 };
 use starnix_logging::{log_error, track_stub};
-use starnix_sync::{FileOpsIoctl, LockBefore, Locked, ProcessGroupState, ReadOps, WriteOps};
+use starnix_sync::{
+    DeviceOpen, FileOpsCore, FileOpsIoctl, LockBefore, Locked, ProcessGroupState, Unlocked,
+    WriteOps,
+};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::{
     auth::FsCred,
@@ -79,7 +82,8 @@ pub fn create_main_and_replica<L>(
     window_size: uapi::winsize,
 ) -> Result<(FileHandle, FileHandle), Errno>
 where
-    L: LockBefore<ReadOps>,
+    L: LockBefore<FileOpsCore>,
+    L: LockBefore<DeviceOpen>,
 {
     let pty_file = current_task.open_file(locked, "/dev/ptmx".into(), OpenFlags::RDWR)?;
     let pty = pty_file.downcast_file::<DevPtmxFile>().ok_or_else(|| errno!(ENOTTY))?;
@@ -117,11 +121,15 @@ fn init_devpts(current_task: &CurrentTask, options: FileSystemOptions) -> FileSy
     fs
 }
 
-pub fn tty_device_init(current_task: &CurrentTask) {
+pub fn tty_device_init<L>(locked: &mut Locked<'_, L>, current_task: &CurrentTask)
+where
+    L: LockBefore<FileOpsCore>,
+{
     let kernel = current_task.kernel();
     let registry = &kernel.device_registry;
     let tty_class = registry.get_or_create_class("tty".into(), registry.virtual_bus());
     registry.add_device(
+        locked,
         current_task,
         "tty".into(),
         DeviceMetadata::new("tty".into(), DeviceType::TTY, DeviceMode::Char),
@@ -129,6 +137,7 @@ pub fn tty_device_init(current_task: &CurrentTask) {
         DeviceDirectory::new,
     );
     registry.add_device(
+        locked,
         current_task,
         "ptmx".into(),
         DeviceMetadata::new("ptmx".into(), DeviceType::PTMX, DeviceMode::Char),
@@ -136,13 +145,13 @@ pub fn tty_device_init(current_task: &CurrentTask) {
         DeviceDirectory::new,
     );
 
-    devtmpfs_mkdir(current_task, "pts".into()).unwrap();
+    devtmpfs_mkdir(locked, current_task, "pts".into()).unwrap();
 
     // Create a symlink from /dev/ptmx to /dev/pts/ptmx for pseudo-tty subsystem.
-    if let Err(err) = devtmpfs_remove_node(current_task, "ptmx".into()) {
+    if let Err(err) = devtmpfs_remove_node(locked, current_task, "ptmx".into()) {
         log_error!("Cannot remove device: ptmx ({:?})", err);
     }
-    devtmpfs_create_symlink(current_task, "ptmx".into(), "pts/ptmx".into()).unwrap();
+    devtmpfs_create_symlink(locked, current_task, "ptmx".into(), "pts/ptmx".into()).unwrap();
 }
 
 struct DevPtsFs;
@@ -173,7 +182,7 @@ impl FsNodeOps for DevPtsRootDir {
 
     fn create_file_ops(
         &self,
-        _locked: &mut Locked<'_, ReadOps>,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         _flags: OpenFlags,
@@ -248,6 +257,7 @@ impl DevPtsDevice {
 impl DeviceOps for Arc<DevPtsDevice> {
     fn open(
         &self,
+        _locked: &mut Locked<'_, DeviceOpen>,
         current_task: &CurrentTask,
         id: DeviceType,
         _node: &FsNode,
@@ -341,7 +351,7 @@ impl FileOps for DevPtmxFile {
 
     fn read(
         &self,
-        locked: &mut Locked<'_, ReadOps>,
+        locked: &mut Locked<'_, FileOpsCore>,
         file: &FileObject,
         current_task: &CurrentTask,
         offset: usize,
@@ -439,7 +449,7 @@ impl FileOps for DevPtsFile {
 
     fn read(
         &self,
-        locked: &mut Locked<'_, ReadOps>,
+        locked: &mut Locked<'_, FileOpsCore>,
         file: &FileObject,
         current_task: &CurrentTask,
         offset: usize,
@@ -934,7 +944,8 @@ mod tests {
         flags: OpenFlags,
     ) -> Result<FileHandle, Errno>
     where
-        L: LockBefore<ReadOps>,
+        L: LockBefore<FileOpsCore>,
+        L: LockBefore<DeviceOpen>,
     {
         let node = lookup_node(current_task, fs, name)?;
         node.open(locked, current_task, flags, true)
@@ -947,7 +958,8 @@ mod tests {
         name: &FsStr,
     ) -> Result<FileHandle, Errno>
     where
-        L: LockBefore<ReadOps>,
+        L: LockBefore<FileOpsCore>,
+        L: LockBefore<DeviceOpen>,
     {
         open_file_with_flags(locked, current_task, fs, name, OpenFlags::RDWR | OpenFlags::NOCTTY)
     }
@@ -958,8 +970,9 @@ mod tests {
         fs: &FileSystemHandle,
     ) -> Result<FileHandle, Errno>
     where
-        L: LockBefore<ReadOps>,
+        L: LockBefore<FileOpsCore>,
         L: LockBefore<FileOpsIoctl>,
+        L: LockBefore<DeviceOpen>,
     {
         let file = open_file_with_flags(locked, current_task, fs, "ptmx".into(), OpenFlags::RDWR)?;
 
@@ -1023,6 +1036,7 @@ mod tests {
             .root()
             .create_entry(&task, &mount, "custom_pts".into(), |dir, mount, name| {
                 dir.mknod(
+                    &mut locked,
                     &task,
                     mount,
                     name,
@@ -1040,7 +1054,7 @@ mod tests {
     async fn test_open_tty() {
         let (_kernel, task, mut locked) = create_kernel_task_and_unlocked();
         let fs = dev_pts_fs(&task, Default::default());
-        let devfs = crate::fs::devtmpfs::dev_tmp_fs(&task);
+        let devfs = crate::fs::devtmpfs::dev_tmp_fs(&mut locked, &task);
 
         let ptmx = open_ptmx_and_unlock(&mut locked, &task, fs).expect("ptmx");
         set_controlling_terminal(&mut locked, &task, &ptmx, false)

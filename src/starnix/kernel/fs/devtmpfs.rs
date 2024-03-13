@@ -8,22 +8,33 @@ use crate::{
     task::CurrentTask,
     vfs::{path, DirEntryHandle, FileSystemHandle, FsStr, LookupContext, MountInfo, NamespaceNode},
 };
+use starnix_sync::{FileOpsCore, LockBefore, Locked};
 use starnix_uapi::{auth::FsCred, device_type::DeviceType, errors::Errno, file_mode::mode};
 
-pub fn dev_tmp_fs(current_task: &CurrentTask) -> &FileSystemHandle {
-    current_task.kernel().dev_tmp_fs.get_or_init(|| init_devtmpfs(current_task))
+pub fn dev_tmp_fs<'l, L>(
+    locked: &mut Locked<'_, L>,
+    current_task: &'l CurrentTask,
+) -> &'l FileSystemHandle
+where
+    L: LockBefore<FileOpsCore>,
+{
+    current_task.kernel().dev_tmp_fs.get_or_init(|| init_devtmpfs(locked, current_task))
 }
 
-fn init_devtmpfs(current_task: &CurrentTask) -> FileSystemHandle {
+fn init_devtmpfs<L>(locked: &mut Locked<'_, L>, current_task: &CurrentTask) -> FileSystemHandle
+where
+    L: LockBefore<FileOpsCore>,
+{
     let kernel = current_task.kernel();
     let fs = TmpFs::new_fs(kernel);
     let root = fs.root();
 
-    let mkdir = |name| {
+    let mkdir = |locked, name| {
         // This creates content inside the temporary FS. This doesn't depend on the mount
         // information.
         root.create_entry(current_task, &MountInfo::detached(), name, |dir, mount, name| {
             dir.mknod(
+                locked,
                 current_task,
                 mount,
                 name,
@@ -35,15 +46,19 @@ fn init_devtmpfs(current_task: &CurrentTask) -> FileSystemHandle {
         .unwrap();
     };
 
-    mkdir("shm".into());
+    mkdir(locked, "shm".into());
     create_symlink(current_task, root, "fd".into(), "/proc/self/fd".into()).unwrap();
     fs
 }
 
-pub fn devtmpfs_create_device(
+pub fn devtmpfs_create_device<L>(
+    locked: &mut Locked<'_, L>,
     current_task: &CurrentTask,
     device: DeviceMetadata,
-) -> Result<DirEntryHandle, Errno> {
+) -> Result<DirEntryHandle, Errno>
+where
+    L: LockBefore<FileOpsCore>,
+{
     let separator_pos = device.name.iter().rposition(|&c| c == path::SEPARATOR);
     let (device_path, device_name) = match separator_pos {
         Some(pos) => device.name.split_at(pos + 1),
@@ -53,10 +68,11 @@ pub fn devtmpfs_create_device(
         .split(|&c| c == path::SEPARATOR)
         // Avoid EEXIST for 'foo//bar' and the last directory name.
         .filter(|dir_name| dir_name.len() > 0)
-        .try_fold(dev_tmp_fs(current_task).root().clone(), |parent_dir, dir_name| {
-            devtmpfs_get_or_create_directory_at(current_task, parent_dir, dir_name.into())
+        .try_fold(dev_tmp_fs(locked, current_task).root().clone(), |parent_dir, dir_name| {
+            devtmpfs_get_or_create_directory_at(locked, current_task, parent_dir, dir_name.into())
         })?;
     devtmpfs_create_device_node(
+        locked,
         current_task,
         parent_dir,
         device_name.into(),
@@ -65,17 +81,22 @@ pub fn devtmpfs_create_device(
     )
 }
 
-pub fn devtmpfs_get_or_create_directory_at(
+pub fn devtmpfs_get_or_create_directory_at<L>(
+    locked: &mut Locked<'_, L>,
     current_task: &CurrentTask,
     parent_dir: DirEntryHandle,
     dir_name: &FsStr,
-) -> Result<DirEntryHandle, Errno> {
+) -> Result<DirEntryHandle, Errno>
+where
+    L: LockBefore<FileOpsCore>,
+{
     parent_dir.get_or_create_entry(
         current_task,
         &MountInfo::detached(),
         dir_name,
         |dir, mount, name| {
             dir.mknod(
+                locked,
                 current_task,
                 mount,
                 name,
@@ -87,13 +108,17 @@ pub fn devtmpfs_get_or_create_directory_at(
     )
 }
 
-fn devtmpfs_create_device_node(
+fn devtmpfs_create_device_node<L>(
+    locked: &mut Locked<'_, L>,
     current_task: &CurrentTask,
     parent_dir: DirEntryHandle,
     device_name: &FsStr,
     device_mode: DeviceMode,
     device_type: DeviceType,
-) -> Result<DirEntryHandle, Errno> {
+) -> Result<DirEntryHandle, Errno>
+where
+    L: LockBefore<FileOpsCore>,
+{
     let mode = match device_mode {
         DeviceMode::Char => mode!(IFCHR, 0o666),
         DeviceMode::Block => mode!(IFBLK, 0o666),
@@ -104,19 +129,29 @@ fn devtmpfs_create_device_node(
         current_task,
         &MountInfo::detached(),
         device_name,
-        |dir, mount, name| dir.mknod(current_task, mount, name, mode, device_type, FsCred::root()),
+        |dir, mount, name| {
+            dir.mknod(locked, current_task, mount, name, mode, device_type, FsCred::root())
+        },
     )
 }
 
-pub fn devtmpfs_mkdir(current_task: &CurrentTask, name: &FsStr) -> Result<DirEntryHandle, Errno> {
+pub fn devtmpfs_mkdir<L>(
+    locked: &mut Locked<'_, L>,
+    current_task: &CurrentTask,
+    name: &FsStr,
+) -> Result<DirEntryHandle, Errno>
+where
+    L: LockBefore<FileOpsCore>,
+{
     // This creates content inside the temporary FS. This doesn't depend on the mount
     // information.
-    dev_tmp_fs(current_task).root().create_entry(
+    dev_tmp_fs(locked, current_task).root().create_entry(
         current_task,
         &MountInfo::detached(),
         name,
         |dir, mount, name| {
             dir.mknod(
+                locked,
                 current_task,
                 mount,
                 name,
@@ -128,20 +163,31 @@ pub fn devtmpfs_mkdir(current_task: &CurrentTask, name: &FsStr) -> Result<DirEnt
     )
 }
 
-pub fn devtmpfs_remove_node(current_task: &CurrentTask, path: &FsStr) -> Result<(), Errno> {
-    let root_node = NamespaceNode::new_anonymous(dev_tmp_fs(current_task).root().clone());
+pub fn devtmpfs_remove_node<L>(
+    locked: &mut Locked<'_, L>,
+    current_task: &CurrentTask,
+    path: &FsStr,
+) -> Result<(), Errno>
+where
+    L: LockBefore<FileOpsCore>,
+{
+    let root_node = NamespaceNode::new_anonymous(dev_tmp_fs(locked, current_task).root().clone());
     let mut context = LookupContext::default();
     let (parent_node, device_name) = current_task.lookup_parent(&mut context, &root_node, path)?;
     parent_node.entry.remove_child(device_name.into());
     Ok(())
 }
 
-pub fn devtmpfs_create_symlink(
+pub fn devtmpfs_create_symlink<L>(
+    locked: &mut Locked<'_, L>,
     current_task: &CurrentTask,
     name: &FsStr,
     target: &FsStr,
-) -> Result<DirEntryHandle, Errno> {
-    create_symlink(current_task, dev_tmp_fs(current_task).root(), name, target)
+) -> Result<DirEntryHandle, Errno>
+where
+    L: LockBefore<FileOpsCore>,
+{
+    create_symlink(current_task, dev_tmp_fs(locked, current_task).root(), name, target)
 }
 
 fn create_symlink(

@@ -17,7 +17,7 @@ use crate::{
 use fidl::HandleBased;
 use fuchsia_zircon as zx;
 use starnix_logging::{impossible_error, track_stub};
-use starnix_sync::{LockBefore, Locked, ReadOps};
+use starnix_sync::{DeviceOpen, FileOpsCore, LockBefore, Locked};
 use starnix_uapi::{
     errno, error, errors::Errno, file_mode::mode, open_flags::OpenFlags, resource_limits::Resource,
     seal_flags::SealFlags, signals::SIGXFSZ,
@@ -58,7 +58,7 @@ impl FsNodeOps for VmoFileNode {
 
     fn create_file_ops(
         &self,
-        _locked: &mut Locked<'_, ReadOps>,
+        _locked: &mut Locked<'_, FileOpsCore>,
         node: &FsNode,
         _current_task: &CurrentTask,
         flags: OpenFlags,
@@ -332,7 +332,7 @@ macro_rules! fileops_impl_vmo {
 
         fn read(
             &$self,
-            _locked: &mut starnix_sync::Locked<'_, starnix_sync::ReadOps>,
+            _locked: &mut starnix_sync::Locked<'_, starnix_sync::FileOpsCore>,
             file: &$crate::vfs::FileObject,
             _current_task: &$crate::task::CurrentTask,
             offset: usize,
@@ -388,7 +388,8 @@ pub fn new_memfd<L>(
     flags: OpenFlags,
 ) -> Result<FileHandle, Errno>
 where
-    L: LockBefore<ReadOps>,
+    L: LockBefore<FileOpsCore>,
+    L: LockBefore<DeviceOpen>,
 {
     let fs = anon_fs(current_task.kernel());
     let node = fs.create_node(

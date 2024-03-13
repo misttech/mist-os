@@ -29,7 +29,7 @@ use netlink_packet_route::{
     AddressMessage, LinkMessage, RtnlMessage,
 };
 use starnix_logging::{log_warn, track_stub};
-use starnix_sync::{LockBefore, LockEqualOrBefore, Locked, Mutex, ReadOps, WriteOps};
+use starnix_sync::{FileOpsCore, LockBefore, LockEqualOrBefore, Locked, Mutex, WriteOps};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::{
     as_any::AsAny,
@@ -96,7 +96,7 @@ pub trait SocketOps: Send + Sync + AsAny {
     /// data associated with the read messages.
     fn read(
         &self,
-        locked: &mut Locked<'_, ReadOps>,
+        locked: &mut Locked<'_, FileOpsCore>,
         socket: &Socket,
         current_task: &CurrentTask,
         data: &mut dyn OutputBuffer,
@@ -417,7 +417,7 @@ impl Socket {
         arg: SyscallArg,
     ) -> Result<SyscallResult, Errno>
     where
-        L: LockBefore<ReadOps>,
+        L: LockBefore<FileOpsCore>,
         L: LockBefore<WriteOps>,
     {
         let user_addr = UserAddress::from(arg);
@@ -709,9 +709,9 @@ impl Socket {
         flags: SocketMessageFlags,
     ) -> Result<MessageReadInfo, Errno>
     where
-        L: LockEqualOrBefore<ReadOps>,
+        L: LockEqualOrBefore<FileOpsCore>,
     {
-        let mut locked = locked.cast_locked::<ReadOps>();
+        let mut locked = locked.cast_locked::<FileOpsCore>();
         self.ops.read(&mut locked, self, current_task, data, flags)
     }
 
@@ -785,7 +785,7 @@ fn get_netlink_interface_info<L>(
 ) -> Result<(FileHandle, LinkMessage), Errno>
 where
     L: LockBefore<WriteOps>,
-    L: LockBefore<ReadOps>,
+    L: LockBefore<FileOpsCore>,
 {
     let iface_name = unsafe { CStr::from_ptr(in_ifreq.ifr_ifrn.ifrn_name.as_ptr()) }
         .to_str()
@@ -843,7 +843,7 @@ fn get_netlink_ipv4_addresses<L>(
     read_buf: &mut VecOutputBuffer,
 ) -> Result<(FileHandle, Vec<AddressMessage>, u32), Errno>
 where
-    L: LockBefore<ReadOps>,
+    L: LockBefore<FileOpsCore>,
     L: LockBefore<WriteOps>,
 {
     let sockaddr { sa_family, sa_data: _ } = unsafe { in_ifreq.ifr_ifru.ifru_addr };
@@ -907,7 +907,7 @@ fn set_netlink_interface_flags<L>(
 ) -> Result<(), Errno>
 where
     L: LockBefore<WriteOps>,
-    L: LockBefore<ReadOps>,
+    L: LockBefore<FileOpsCore>,
 {
     let iface_name = unsafe { CStr::from_ptr(in_ifreq.ifr_ifrn.ifrn_name.as_ptr()) }
         .to_str()
@@ -973,7 +973,7 @@ fn send_netlink_msg_and_wait_response<L>(
 ) -> Result<NetlinkMessage<RtnlMessage>, Errno>
 where
     L: LockBefore<WriteOps>,
-    L: LockBefore<ReadOps>,
+    L: LockBefore<FileOpsCore>,
 {
     msg.finalize();
     let mut buf = vec![0; msg.buffer_len()];

@@ -23,7 +23,7 @@ use fuchsia_zircon as zx;
 use maplit::btreemap;
 use once_cell::sync::Lazy;
 use starnix_logging::{bug_ref, log_error, track_stub};
-use starnix_sync::{Locked, ReadOps, WriteOps};
+use starnix_sync::{FileOpsCore, Locked, WriteOps};
 use starnix_uapi::{
     auth::FsCred, errno, error, errors::Errno, file_mode::mode, off_t, open_flags::OpenFlags,
     pid_t, time::duration_to_scheduler_clock, vfs::FdEvents,
@@ -244,7 +244,7 @@ impl FsNodeOps for Arc<ProcDirectory> {
 
     fn create_file_ops(
         &self,
-        _locked: &mut Locked<'_, ReadOps>,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         _flags: OpenFlags,
@@ -362,7 +362,7 @@ impl FileOps for ProcKmsgFile {
 
     fn read(
         &self,
-        _locked: &mut Locked<'_, ReadOps>,
+        _locked: &mut Locked<'_, FileOpsCore>,
         file: &FileObject,
         current_task: &CurrentTask,
         _offset: usize,

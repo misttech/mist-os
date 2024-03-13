@@ -20,7 +20,9 @@ use fidl_fuchsia_ui_test_input::{
 };
 use fuchsia_zircon as zx;
 use starnix_logging::log_warn;
-use starnix_sync::{FileOpsIoctl, Locked, Mutex, ReadOps, WriteOps};
+use starnix_sync::{
+    DeviceOpen, FileOpsCore, FileOpsIoctl, LockBefore, Locked, Mutex, Unlocked, WriteOps,
+};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::{
     device_type, errno, error, errors::Errno, open_flags::OpenFlags, uapi, user_address::UserRef,
@@ -42,6 +44,7 @@ enum DeviceType {
 }
 
 pub fn create_uinput_device(
+    _locked: &mut Locked<'_, DeviceOpen>,
     _current_task: &CurrentTask,
     _id: device_type::DeviceType,
     _node: &FsNode,
@@ -139,7 +142,14 @@ impl UinputDevice {
         Ok(SUCCESS)
     }
 
-    fn ui_dev_create(&self, current_task: &CurrentTask) -> Result<SyscallResult, Errno> {
+    fn ui_dev_create<L>(
+        &self,
+        locked: &mut Locked<'_, L>,
+        current_task: &CurrentTask,
+    ) -> Result<SyscallResult, Errno>
+    where
+        L: LockBefore<FileOpsCore>,
+    {
         // Only eng and userdebug builds include the `fuchsia.ui.test.input` service.
         let registry = match fuchsia_component::client::connect_to_protocol_sync::<
             futinput::RegistryMarker,
@@ -150,17 +160,21 @@ impl UinputDevice {
                 None
             }
         };
-        self.ui_dev_create_inner(current_task, registry)
+        self.ui_dev_create_inner(locked, current_task, registry)
     }
 
     /// UI_DEV_CREATE calls create the uinput device with given information
     /// from previous ioctl() calls.
-    fn ui_dev_create_inner(
+    fn ui_dev_create_inner<L>(
         &self,
+        locked: &mut Locked<'_, L>,
         current_task: &CurrentTask,
         // Takes `registry` arg so we can manually inject a mock registry in unit tests.
         registry: Option<futinput::RegistrySynchronousProxy>,
-    ) -> Result<SyscallResult, Errno> {
+    ) -> Result<SyscallResult, Errno>
+    where
+        L: LockBefore<FileOpsCore>,
+    {
         match registry {
             Some(proxy) => {
                 let mut inner = self.inner.lock();
@@ -211,6 +225,7 @@ impl UinputDevice {
                 };
 
                 let device = add_and_register_input_device(
+                    locked,
                     current_task,
                     VirtualDevice { input_id, device_type },
                 );
@@ -227,12 +242,19 @@ impl UinputDevice {
         }
     }
 
-    fn ui_dev_destroy(&self, current_task: &CurrentTask) -> Result<SyscallResult, Errno> {
+    fn ui_dev_destroy<L>(
+        &self,
+        locked: &mut Locked<'_, L>,
+        current_task: &CurrentTask,
+    ) -> Result<SyscallResult, Errno>
+    where
+        L: LockBefore<FileOpsCore>,
+    {
         let mut inner = self.inner.lock();
         match inner.k_device.clone() {
             Some(device) => {
                 let kernel = current_task.kernel();
-                kernel.device_registry.remove_device(current_task, device);
+                kernel.device_registry.remove_device(locked, current_task, device);
             }
             None => {
                 log_warn!("UI_DEV_DESTROY kHandle not found");
@@ -268,7 +290,7 @@ impl FileOps for Arc<UinputDevice> {
 
     fn ioctl(
         &self,
-        _locked: &mut Locked<'_, FileOpsIoctl>,
+        locked: &mut Locked<'_, FileOpsIoctl>,
         file: &FileObject,
         current_task: &CurrentTask,
         request: u32,
@@ -285,8 +307,8 @@ impl FileOps for Arc<UinputDevice> {
             | uapi::UI_SET_PHYS
             | uapi::UI_SET_PROPBIT => Ok(SUCCESS),
             uapi::UI_DEV_SETUP => self.ui_dev_setup(current_task, arg.into()),
-            uapi::UI_DEV_CREATE => self.ui_dev_create(current_task),
-            uapi::UI_DEV_DESTROY => self.ui_dev_destroy(current_task),
+            uapi::UI_DEV_CREATE => self.ui_dev_create(locked, current_task),
+            uapi::UI_DEV_DESTROY => self.ui_dev_destroy(locked, current_task),
             // default_ioctl() handles file system related requests and reject
             // others.
             _ => {
@@ -354,7 +376,7 @@ impl FileOps for Arc<UinputDevice> {
 
     fn read(
         &self,
-        _locked: &mut Locked<'_, ReadOps>,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _file: &vfs::FileObject,
         _current_task: &crate::task::CurrentTask,
         _offset: usize,
@@ -374,6 +396,7 @@ pub struct VirtualDevice {
 impl DeviceOps for VirtualDevice {
     fn open(
         &self,
+        _locked: &mut Locked<'_, DeviceOpen>,
         current_task: &CurrentTask,
         _id: device_type::DeviceType,
         _node: &FsNode,
@@ -718,7 +741,7 @@ mod test {
             })
         });
 
-        let res = dev.ui_dev_create_inner(&current_task, Some(registry_proxy));
+        let res = dev.ui_dev_create_inner(&mut locked, &current_task, Some(registry_proxy));
         assert_eq!(res, Ok(SUCCESS));
 
         handle.join().expect("stream panic");
@@ -747,7 +770,7 @@ mod test {
         );
         let _ =
             dev.ioctl(&mut locked, &file_object, &current_task, uapi::UI_DEV_SETUP, address.into());
-        let res = dev.ui_dev_create_inner(&current_task, None);
+        let res = dev.ui_dev_create_inner(&mut locked, &current_task, None);
         assert_eq!(res, error!(EPERM))
     }
 
@@ -789,7 +812,11 @@ mod test {
             Some((id, dev)) => (id, dev),
             None => panic!("Could not get device ID and type."),
         };
-        add_and_register_input_device(&current_task, VirtualDevice { input_id, device_type });
+        add_and_register_input_device(
+            &mut locked,
+            &current_task,
+            VirtualDevice { input_id, device_type },
+        );
         new_device();
 
         let expected_pressed_keys: Vec<Vec<Key>> =
@@ -868,16 +895,23 @@ mod test {
             UserAddress::default(),
             std::mem::size_of::<uapi::uinput_setup>() as u64,
         );
-        let mut locked = locked.cast_locked::<FileOpsIoctl>();
-        let _ = dev.ioctl(
-            &mut locked,
-            &file_object,
-            &current_task,
-            uapi::UI_SET_EVBIT,
-            SyscallArg::from(uapi::EV_ABS as u64),
-        );
-        let _ =
-            dev.ioctl(&mut locked, &file_object, &current_task, uapi::UI_DEV_SETUP, address.into());
+        {
+            let mut locked = locked.cast_locked::<FileOpsIoctl>();
+            let _ = dev.ioctl(
+                &mut locked,
+                &file_object,
+                &current_task,
+                uapi::UI_SET_EVBIT,
+                SyscallArg::from(uapi::EV_ABS as u64),
+            );
+            let _ = dev.ioctl(
+                &mut locked,
+                &file_object,
+                &current_task,
+                uapi::UI_DEV_SETUP,
+                address.into(),
+            );
+        }
 
         let (registry_proxy, mut stream) =
             create_sync_proxy_and_stream::<futinput::RegistryMarker>()
@@ -900,7 +934,7 @@ mod test {
             })
         });
 
-        let res = dev.ui_dev_create_inner(&current_task, Some(registry_proxy));
+        let res = dev.ui_dev_create_inner(&mut locked, &current_task, Some(registry_proxy));
         assert_eq!(res, Ok(SUCCESS));
 
         handle.join().expect("stream panic");
@@ -919,17 +953,24 @@ mod test {
             UserAddress::default(),
             std::mem::size_of::<uapi::uinput_setup>() as u64,
         );
-        let mut locked = locked.cast_locked::<FileOpsIoctl>();
-        let _ = dev.ioctl(
-            &mut locked,
-            &file_object,
-            &current_task,
-            uapi::UI_SET_EVBIT,
-            SyscallArg::from(uapi::EV_ABS as u64),
-        );
-        let _ =
-            dev.ioctl(&mut locked, &file_object, &current_task, uapi::UI_DEV_SETUP, address.into());
-        let res = dev.ui_dev_create_inner(&current_task, None);
+        {
+            let mut locked = locked.cast_locked::<FileOpsIoctl>();
+            let _ = dev.ioctl(
+                &mut locked,
+                &file_object,
+                &current_task,
+                uapi::UI_SET_EVBIT,
+                SyscallArg::from(uapi::EV_ABS as u64),
+            );
+            let _ = dev.ioctl(
+                &mut locked,
+                &file_object,
+                &current_task,
+                uapi::UI_DEV_SETUP,
+                address.into(),
+            );
+        }
+        let res = dev.ui_dev_create_inner(&mut locked, &current_task, None);
         assert_eq!(res, error!(EPERM))
     }
 
@@ -940,26 +981,28 @@ mod test {
     async fn touchscreen_write() {
         let dev = UinputDevice::new();
         let (_kernel, current_task, file_object, mut locked) = make_kernel_objects(dev.clone());
-        let mut locked_ioctl = locked.cast_locked::<FileOpsIoctl>();
-        let address = map_memory(
-            &current_task,
-            UserAddress::default(),
-            std::mem::size_of::<uapi::uinput_setup>() as u64,
-        );
-        let _ = dev.ioctl(
-            &mut locked_ioctl,
-            &file_object,
-            &current_task,
-            uapi::UI_SET_EVBIT,
-            SyscallArg::from(uapi::EV_ABS as u64),
-        );
-        let _ = dev.ioctl(
-            &mut locked_ioctl,
-            &file_object,
-            &current_task,
-            uapi::UI_DEV_SETUP,
-            address.into(),
-        );
+        {
+            let mut locked_ioctl = locked.cast_locked::<FileOpsIoctl>();
+            let address = map_memory(
+                &current_task,
+                UserAddress::default(),
+                std::mem::size_of::<uapi::uinput_setup>() as u64,
+            );
+            let _ = dev.ioctl(
+                &mut locked_ioctl,
+                &file_object,
+                &current_task,
+                uapi::UI_SET_EVBIT,
+                SyscallArg::from(uapi::EV_ABS as u64),
+            );
+            let _ = dev.ioctl(
+                &mut locked_ioctl,
+                &file_object,
+                &current_task,
+                uapi::UI_DEV_SETUP,
+                address.into(),
+            );
+        }
 
         let (touch_client, mut touch_server) =
             fidl::endpoints::create_sync_proxy_and_stream::<futinput::TouchScreenMarker>()
@@ -971,7 +1014,11 @@ mod test {
             Some((id, dev)) => (id, dev),
             None => panic!("Could not get device ID and type."),
         };
-        add_and_register_input_device(&current_task, VirtualDevice { input_id, device_type });
+        add_and_register_input_device(
+            &mut locked,
+            &current_task,
+            VirtualDevice { input_id, device_type },
+        );
         new_device();
 
         let expected_touch_contacts: Vec<Vec<fir::ContactInputReport>> = vec![

@@ -11,7 +11,7 @@ use starnix_core::{
     task::CurrentTask,
     vfs::{FileOps, FsNode},
 };
-use starnix_sync::Mutex;
+use starnix_sync::{DeviceOpen, FileOpsCore, LockBefore, Locked, Mutex};
 use starnix_uapi::{device_type::DeviceType, errors::Errno, open_flags::OpenFlags};
 use std::sync::Arc;
 
@@ -29,6 +29,7 @@ impl GrallocDevice {
 impl DeviceOps for GrallocDevice {
     fn open(
         &self,
+        _locked: &mut Locked<'_, DeviceOpen>,
         _current_task: &CurrentTask,
         _id: DeviceType,
         _node: &FsNode,
@@ -38,7 +39,10 @@ impl DeviceOps for GrallocDevice {
     }
 }
 
-pub fn gralloc_device_init(current_task: &CurrentTask) {
+pub fn gralloc_device_init<L>(locked: &mut Locked<'_, L>, current_task: &CurrentTask)
+where
+    L: LockBefore<FileOpsCore>,
+{
     let mode_setter = current_task.kernel().connect_to_named_protocol_at_container_svc::<fgralloc::VulkanModeSetterMarker>(fgralloc::VulkanModeSetterMarker::PROTOCOL_NAME).expect("gralloc feature requires fuchsia.starnix.gralloc.VulkanModeSetter protocol in container /svc dir, and a corresponding server").into_proxy().expect("into_proxy failed");
     let mode_setter = Arc::new(Mutex::new(mode_setter));
 
@@ -52,6 +56,7 @@ pub fn gralloc_device_init(current_task: &CurrentTask) {
         .expect("gralloc device register failed.");
 
     registry.add_device(
+        locked,
         current_task,
         "virtgralloc0".into(),
         DeviceMetadata::new("virtgralloc0".into(), gralloc_type, DeviceMode::Char),

@@ -27,7 +27,8 @@ use once_cell::sync::OnceCell;
 use selinux::SecurityId;
 use starnix_logging::{log_error, track_stub};
 use starnix_sync::{
-    LockBefore, LockEqualOrBefore, Locked, Mutex, ReadOps, RwLock, RwLockReadGuard,
+    DeviceOpen, FileOpsCore, LockBefore, LockEqualOrBefore, Locked, Mutex, RwLock, RwLockReadGuard,
+    Unlocked,
 };
 use starnix_uapi::{
     as_any::AsAny,
@@ -511,7 +512,7 @@ pub trait FsNodeOps: Send + Sync + AsAny + 'static {
     /// be assigned an FdNumber.
     fn create_file_ops(
         &self,
-        locked: &mut Locked<'_, ReadOps>,
+        locked: &mut Locked<'_, FileOpsCore>,
         node: &FsNode,
         _current_task: &CurrentTask,
         flags: OpenFlags,
@@ -541,6 +542,7 @@ pub trait FsNodeOps: Send + Sync + AsAny + 'static {
     /// is used to create directories instead.
     fn mknod(
         &self,
+        locked: &mut Locked<'_, FileOpsCore>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         _name: &FsStr,
@@ -768,7 +770,7 @@ macro_rules! fs_node_impl_symlink {
 
         fn create_file_ops(
             &self,
-            _locked: &mut starnix_sync::Locked<'_, starnix_sync::ReadOps>,
+            _locked: &mut starnix_sync::Locked<'_, starnix_sync::FileOpsCore>,
             _node: &crate::vfs::FsNode,
             _current_task: &CurrentTask,
             _flags: starnix_uapi::open_flags::OpenFlags,
@@ -793,6 +795,7 @@ macro_rules! fs_node_impl_dir_readonly {
 
         fn mknod(
             &self,
+            _locked: &mut starnix_sync::Locked<'_, starnix_sync::FileOpsCore>,
             _node: &crate::vfs::FsNode,
             _current_task: &crate::task::CurrentTask,
             _name: &crate::vfs::FsStr,
@@ -896,6 +899,7 @@ macro_rules! fs_node_impl_not_dir {
 
         fn mknod(
             &self,
+            _locked: &mut starnix_sync::Locked<'_, starnix_sync::FileOpsCore>,
             _node: &crate::vfs::FsNode,
             _current_task: &crate::task::CurrentTask,
             _name: &crate::vfs::FsStr,
@@ -960,7 +964,7 @@ impl FsNodeOps for SpecialNode {
 
     fn create_file_ops(
         &self,
-        _locked: &mut Locked<'_, ReadOps>,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         _flags: OpenFlags,
@@ -1135,9 +1139,9 @@ impl FsNode {
         flags: OpenFlags,
     ) -> Result<Box<dyn FileOps>, Errno>
     where
-        L: LockEqualOrBefore<ReadOps>,
+        L: LockEqualOrBefore<FileOpsCore>,
     {
-        let mut locked = locked.cast_locked::<ReadOps>();
+        let mut locked = locked.cast_locked::<FileOpsCore>();
         self.ops().create_file_ops(&mut locked, self, current_task, flags)
     }
 
@@ -1150,7 +1154,8 @@ impl FsNode {
         check_access: bool,
     ) -> Result<Box<dyn FileOps>, Errno>
     where
-        L: LockBefore<ReadOps>,
+        L: LockBefore<FileOpsCore>,
+        L: LockBefore<DeviceOpen>,
     {
         // If O_PATH is set, there is no need to create a real FileOps because
         // most file operations are disabled.
@@ -1170,10 +1175,16 @@ impl FsNode {
         };
 
         match mode & FileMode::IFMT {
-            FileMode::IFCHR => {
-                current_task.kernel().open_device(current_task, self, flags, rdev, DeviceMode::Char)
-            }
+            FileMode::IFCHR => current_task.kernel().open_device(
+                locked,
+                current_task,
+                self,
+                flags,
+                rdev,
+                DeviceMode::Char,
+            ),
             FileMode::IFBLK => current_task.kernel().open_device(
+                locked,
                 current_task,
                 self,
                 flags,
@@ -1197,15 +1208,19 @@ impl FsNode {
         self.ops().lookup(self, current_task, name)
     }
 
-    pub fn mknod(
+    pub fn mknod<L>(
         &self,
+        locked: &mut Locked<'_, L>,
         current_task: &CurrentTask,
         mount: &MountInfo,
         name: &FsStr,
         mut mode: FileMode,
         dev: DeviceType,
         mut owner: FsCred,
-    ) -> Result<FsNodeHandle, Errno> {
+    ) -> Result<FsNodeHandle, Errno>
+    where
+        L: LockEqualOrBefore<FileOpsCore>,
+    {
         assert!(mode & FileMode::IFMT != FileMode::EMPTY, "mknod called without node type.");
         self.check_access(current_task, mount, Access::WRITE)?;
         self.update_metadata_for_child(current_task, &mut mode, &mut owner);
@@ -1227,8 +1242,8 @@ impl FsNode {
                     return error!(EPERM);
                 }
             }
-
-            self.ops().mknod(self, current_task, name, mode, dev, owner)
+            let mut locked = locked.cast_locked::<FileOpsCore>();
+            self.ops().mknod(&mut locked, self, current_task, name, mode, dev, owner)
         }
     }
 
@@ -1985,11 +2000,14 @@ mod tests {
 
     const VALID_SECURITY_CONTEXT: &'static str = "system_u:object_r:unconfined_t:s0";
 
-    fn create_test_file(current_task: &AutoReleasableTask) -> NamespaceNode {
+    fn create_test_file(
+        locked: &mut Locked<'_, Unlocked>,
+        current_task: &AutoReleasableTask,
+    ) -> NamespaceNode {
         current_task
             .fs()
             .root()
-            .create_node(&current_task, "file".into(), FileMode::IFREG, DeviceType::NONE)
+            .create_node(locked, &current_task, "file".into(), FileMode::IFREG, DeviceType::NONE)
             .expect("create_node(file)")
     }
 
@@ -2002,7 +2020,13 @@ mod tests {
         current_task
             .fs()
             .root()
-            .create_node(&current_task, "zero".into(), mode!(IFCHR, 0o666), DeviceType::ZERO)
+            .create_node(
+                &mut locked,
+                &current_task,
+                "zero".into(),
+                mode!(IFCHR, 0o666),
+                DeviceType::ZERO,
+            )
             .expect("create_node");
 
         const CONTENT_LEN: usize = 10;
@@ -2020,13 +2044,19 @@ mod tests {
 
     #[::fuchsia::test]
     async fn node_info_is_reflected_in_stat() {
-        let (_kernel, current_task) = create_kernel_and_task();
+        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
 
         // Create a node.
         let node = &current_task
             .fs()
             .root()
-            .create_node(&current_task, "zero".into(), FileMode::IFCHR, DeviceType::ZERO)
+            .create_node(
+                &mut locked,
+                &current_task,
+                "zero".into(),
+                FileMode::IFCHR,
+                DeviceType::ZERO,
+            )
             .expect("create_node")
             .entry
             .node;
@@ -2084,7 +2114,7 @@ mod tests {
 
     #[::fuchsia::test]
     async fn test_check_access() {
-        let (_kernel, current_task) = create_kernel_and_task();
+        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
         let mut creds = Credentials::with_ids(1, 2);
         creds.groups = vec![3, 4];
         current_task.set_creds(creds);
@@ -2093,7 +2123,13 @@ mod tests {
         let node = &current_task
             .fs()
             .root()
-            .create_node(&current_task, "foo".into(), FileMode::IFREG, DeviceType::NONE)
+            .create_node(
+                &mut locked,
+                &current_task,
+                "foo".into(),
+                FileMode::IFREG,
+                DeviceType::NONE,
+            )
             .expect("create_node")
             .entry
             .node;
@@ -2151,8 +2187,9 @@ mod tests {
     async fn setxattr_set_sid() {
         let security_server = SecurityServer::new(SecurityServerMode::Enable);
         security_server.set_enforcing(true);
-        let (_kernel, current_task) = create_kernel_and_task_with_selinux(security_server);
-        let node = &create_test_file(&current_task).entry.node;
+        let (_kernel, current_task, mut locked) =
+            create_kernel_task_and_unlocked_with_selinux(security_server);
+        let node = &create_test_file(&mut locked, &current_task).entry.node;
         assert_eq!(None, node.info().sid);
 
         node.set_xattr(

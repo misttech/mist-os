@@ -176,12 +176,18 @@ mod tests {
     use starnix_uapi::{device_type::DeviceType, file_mode::FileMode};
 
     fn create_fs_node() -> FsNodeHandle {
-        let (_kernel, current_task) = create_kernel_and_task();
+        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
 
         current_task
             .fs()
             .root()
-            .create_node(&current_task, "foo".into(), FileMode::IFREG, DeviceType::NONE)
+            .create_node(
+                &mut locked,
+                &current_task,
+                "foo".into(),
+                FileMode::IFREG,
+                DeviceType::NONE,
+            )
             .expect("create_node")
             .entry
             .node

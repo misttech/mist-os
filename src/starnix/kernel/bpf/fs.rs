@@ -17,7 +17,7 @@ use crate::{
     },
 };
 use starnix_logging::track_stub;
-use starnix_sync::{Locked, ReadOps, WriteOps};
+use starnix_sync::{FileOpsCore, Locked, WriteOps};
 use starnix_uapi::{
     auth::FsCred,
     device_type::DeviceType,
@@ -88,7 +88,7 @@ impl FileOps for BpfHandle {
     fileops_impl_nonseekable!();
     fn read(
         &self,
-        _locked: &mut Locked<'_, ReadOps>,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _file: &FileObject,
         _current_task: &crate::task::CurrentTask,
         _offset: usize,
@@ -192,7 +192,7 @@ impl FsNodeOps for BpfFsDir {
 
     fn create_file_ops(
         &self,
-        _locked: &mut Locked<'_, ReadOps>,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         _flags: OpenFlags,
@@ -218,6 +218,7 @@ impl FsNodeOps for BpfFsDir {
 
     fn mknod(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         _name: &FsStr,
@@ -281,7 +282,7 @@ impl FsNodeOps for BpfFsObject {
 
     fn create_file_ops(
         &self,
-        _locked: &mut Locked<'_, ReadOps>,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         _flags: OpenFlags,

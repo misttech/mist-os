@@ -12,7 +12,7 @@ use crate::{
     },
 };
 use fuchsia_zircon as zx;
-use starnix_sync::{Locked, ReadOps};
+use starnix_sync::{FileOpsCore, Locked};
 use starnix_uapi::{auth::FsCred, error, errors::Errno, file_mode::mode, open_flags::OpenFlags};
 use std::sync::Weak;
 
@@ -37,7 +37,7 @@ impl FsNodeOps for CpuClassDirectory {
 
     fn create_file_ops(
         &self,
-        _locked: &mut Locked<'_, ReadOps>,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         _flags: OpenFlags,

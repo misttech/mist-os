@@ -11,6 +11,7 @@ use crate::{
 };
 
 use selinux::security_server::{SecurityServer, SecurityServerStatus};
+use starnix_sync::{Locked, Unlocked};
 use starnix_uapi::{errors::Errno, signals::Signal};
 
 // Call the `f` closure if SELinux is enabled and enforcing.
@@ -247,11 +248,14 @@ mod tests {
         (current_task, another_task)
     }
 
-    fn create_test_file(current_task: &AutoReleasableTask) -> NamespaceNode {
+    fn create_test_file(
+        locked: &mut Locked<'_, Unlocked>,
+        current_task: &AutoReleasableTask,
+    ) -> NamespaceNode {
         current_task
             .fs()
             .root()
-            .create_node(&current_task, "file".into(), FileMode::IFREG, DeviceType::NONE)
+            .create_node(locked, &current_task, "file".into(), FileMode::IFREG, DeviceType::NONE)
             .expect("create_node(file)")
     }
 
@@ -489,8 +493,8 @@ mod tests {
 
     #[fuchsia::test]
     async fn post_setxattr_noop_selinux_disabled() {
-        let (_kernel, current_task) = create_kernel_and_task();
-        let node = &create_test_file(&current_task).entry.node;
+        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
+        let node = &create_test_file(&mut locked, &current_task).entry.node;
         assert_eq!(None, node.info().sid);
 
         post_setxattr(
@@ -506,8 +510,9 @@ mod tests {
     #[fuchsia::test]
     async fn post_setxattr_noop_selinux_fake() {
         let security_server = SecurityServer::new(Mode::Fake);
-        let (_kernel, current_task) = create_kernel_and_task_with_selinux(security_server);
-        let node = &create_test_file(&current_task).entry.node;
+        let (_kernel, current_task, mut locked) =
+            create_kernel_task_and_unlocked_with_selinux(security_server);
+        let node = &create_test_file(&mut locked, &current_task).entry.node;
         assert_eq!(None, node.info().sid);
 
         post_setxattr(
@@ -524,8 +529,9 @@ mod tests {
     async fn post_setxattr_noop_selinux_permissive() {
         let security_server = SecurityServer::new(Mode::Enable);
         security_server.set_enforcing(false);
-        let (_kernel, current_task) = create_kernel_and_task_with_selinux(security_server);
-        let node = &create_test_file(&current_task).entry.node;
+        let (_kernel, current_task, mut locked) =
+            create_kernel_task_and_unlocked_with_selinux(security_server);
+        let node = &create_test_file(&mut locked, &current_task).entry.node;
         assert_eq!(None, node.info().sid);
 
         post_setxattr(
@@ -542,8 +548,9 @@ mod tests {
     async fn post_setxattr_noop_different_name() {
         let security_server = SecurityServer::new(Mode::Enable);
         security_server.set_enforcing(true);
-        let (_kernel, current_task) = create_kernel_and_task_with_selinux(security_server);
-        let node = &create_test_file(&current_task).entry.node;
+        let (_kernel, current_task, mut locked) =
+            create_kernel_task_and_unlocked_with_selinux(security_server);
+        let node = &create_test_file(&mut locked, &current_task).entry.node;
         assert_eq!(None, node.info().sid);
 
         post_setxattr(
@@ -560,8 +567,9 @@ mod tests {
     async fn post_setxattr_clear_invalid_security_context() {
         let security_server = SecurityServer::new(Mode::Enable);
         security_server.set_enforcing(true);
-        let (_kernel, current_task) = create_kernel_and_task_with_selinux(security_server);
-        let node = &create_test_file(&current_task).entry.node;
+        let (_kernel, current_task, mut locked) =
+            create_kernel_task_and_unlocked_with_selinux(security_server);
+        let node = &create_test_file(&mut locked, &current_task).entry.node;
         post_setxattr(
             current_task.as_ref(),
             node.as_ref(),
@@ -584,8 +592,9 @@ mod tests {
     async fn post_setxattr_set_sid_selinux_enforcing() {
         let security_server = SecurityServer::new(Mode::Enable);
         security_server.set_enforcing(true);
-        let (_kernel, current_task) = create_kernel_and_task_with_selinux(security_server);
-        let node = &create_test_file(&current_task).entry.node;
+        let (_kernel, current_task, mut locked) =
+            create_kernel_task_and_unlocked_with_selinux(security_server);
+        let node = &create_test_file(&mut locked, &current_task).entry.node;
         assert_eq!(None, node.info().sid);
 
         post_setxattr(
@@ -602,8 +611,9 @@ mod tests {
     async fn post_setxattr_different_sid_for_different_context() {
         let security_server = SecurityServer::new(Mode::Enable);
         security_server.set_enforcing(true);
-        let (_kernel, current_task) = create_kernel_and_task_with_selinux(security_server);
-        let node = &create_test_file(&current_task).entry.node;
+        let (_kernel, current_task, mut locked) =
+            create_kernel_task_and_unlocked_with_selinux(security_server);
+        let node = &create_test_file(&mut locked, &current_task).entry.node;
         assert_eq!(None, node.info().sid);
 
         post_setxattr(

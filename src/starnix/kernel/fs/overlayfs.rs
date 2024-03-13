@@ -17,8 +17,8 @@ use once_cell::sync::OnceCell;
 use rand::Rng;
 use starnix_logging::{log_error, log_warn, track_stub};
 use starnix_sync::{
-    LockBefore, LockEqualOrBefore, Locked, ReadOps, RwLock, RwLockReadGuard, RwLockWriteGuard,
-    Unlocked, WriteOps,
+    DeviceOpen, FileOpsCore, LockBefore, LockEqualOrBefore, Locked, RwLock, RwLockReadGuard,
+    RwLockWriteGuard, Unlocked, WriteOps,
 };
 use starnix_uapi::{
     auth::FsCred,
@@ -149,13 +149,25 @@ impl ActiveEntry {
     /// Creates a "whiteout" entry in the directory called `name`. Whiteouts are created by
     /// overlayfs to denote files and directories that were removed and should not be listed in the
     /// directory. This is necessary because we cannot remove entries from the lower FS.
-    fn create_whiteout(
+    fn create_whiteout<L>(
         &self,
+        locked: &mut Locked<'_, L>,
         current_task: &CurrentTask,
         name: &FsStr,
-    ) -> Result<ActiveEntry, Errno> {
+    ) -> Result<ActiveEntry, Errno>
+    where
+        L: LockBefore<FileOpsCore>,
+    {
         self.create_entry(current_task, name, |dir, mount, name| {
-            dir.mknod(current_task, mount, name, FileMode::IFCHR, DeviceType::NONE, FsCred::root())
+            dir.mknod(
+                locked,
+                current_task,
+                mount,
+                name,
+                FileMode::IFCHR,
+                DeviceType::NONE,
+                FsCred::root(),
+            )
         })
     }
 
@@ -187,7 +199,7 @@ impl ActiveEntry {
         current_task: &CurrentTask,
     ) -> Result<Vec<DirEntryInfo>, Errno>
     where
-        L: LockBefore<ReadOps>,
+        L: LockBefore<FileOpsCore>,
     {
         let mut sink = DirentSinkAdapter::default();
         self.entry()
@@ -270,7 +282,7 @@ impl OverlayNode {
     ) -> Result<&ActiveEntry, Errno>
     where
         L: LockBefore<WriteOps>,
-        L: LockEqualOrBefore<ReadOps>,
+        L: LockEqualOrBefore<FileOpsCore>,
     {
         self.ensure_upper_maybe_copy(locked, current_task, UpperCopyMode::CopyAll)
     }
@@ -284,7 +296,7 @@ impl OverlayNode {
     ) -> Result<&ActiveEntry, Errno>
     where
         L: LockBefore<WriteOps>,
-        L: LockEqualOrBefore<ReadOps>,
+        L: LockEqualOrBefore<FileOpsCore>,
     {
         self.upper.get_or_try_init(|| {
             let lower = self.lower.as_ref().expect("lower is expected when upper is missing");
@@ -309,12 +321,14 @@ impl OverlayNode {
             } else if info.mode.is_reg() && copy_mode == UpperCopyMode::CopyAll {
                 // Regular files need to be copied from lower FS to upper FS.
                 self.fs.create_upper_entry(
+                    locked,
                     current_task,
                     parent_upper,
                     name.as_ref(),
-                    |dir, name| {
+                    |locked, dir, name| {
                         dir.create_entry(current_task, name, |dir_node, mount, name| {
                             dir_node.mknod(
+                                locked,
                                 current_task,
                                 mount,
                                 name,
@@ -324,12 +338,12 @@ impl OverlayNode {
                             )
                         })
                     },
-                    |entry| copy_file_content(locked, current_task, lower, &entry),
+                    |locked, entry| copy_file_content(locked, current_task, lower, &entry),
                 )
             } else {
                 // TODO(sergeyu): create_node() checks access, but we don't need that here.
                 parent_upper.create_entry(current_task, name.as_ref(), |dir, mount, name| {
-                    dir.mknod(current_task, mount, name, info.mode, info.rdev, cred)
+                    dir.mknod(locked, current_task, mount, name, info.mode, info.rdev, cred)
                 })
             };
 
@@ -366,9 +380,9 @@ impl OverlayNode {
         do_create: F,
     ) -> Result<ActiveEntry, Errno>
     where
-        F: Fn(&ActiveEntry, &FsStr) -> Result<ActiveEntry, Errno>,
+        F: Fn(&mut Locked<'_, L>, &ActiveEntry, &FsStr) -> Result<ActiveEntry, Errno>,
         L: LockBefore<WriteOps>,
-        L: LockBefore<ReadOps>,
+        L: LockEqualOrBefore<FileOpsCore>,
     {
         let upper = self.ensure_upper(locked, current_task)?;
 
@@ -389,7 +403,14 @@ impl OverlayNode {
             Err(e) => return Err(e),
         };
 
-        self.fs.create_upper_entry(current_task, upper, name, do_create, |_entry| Ok(()))
+        self.fs.create_upper_entry(
+            locked,
+            current_task,
+            upper,
+            name,
+            |locked, entry, fs| do_create(locked, entry, fs),
+            |_, _entry| Ok(()),
+        )
     }
 
     /// An overlay directory may appear empty when the corresponding upper dir isn't empty:
@@ -398,7 +419,7 @@ impl OverlayNode {
     /// `prepare_to_unlink()` checks that the directory doesn't contain anything other
     /// than whiteouts and if that is the case then it unlinks all of them.
     fn prepare_to_unlink(self: &Arc<OverlayNode>, current_task: &CurrentTask) -> Result<(), Errno> {
-        let mut locked = Unlocked::new(); // TODO(https://fxbug.dev/320460258): Propagate Locked through FsNodeOps. Needs to be before ReadOps
+        let mut locked = Unlocked::new(); // TODO(https://fxbug.dev/320460258): Propagate Locked through FsNodeOps. Needs to be before FileOpsCore
         if self.main_entry().entry().node.is_dir() {
             let mut lower_entries = BTreeSet::new();
             if let Some(dir) = &self.lower {
@@ -447,7 +468,7 @@ impl OverlayNode {
 impl FsNodeOps for Arc<OverlayNode> {
     fn create_file_ops(
         &self,
-        locked: &mut Locked<'_, ReadOps>,
+        locked: &mut Locked<'_, FileOpsCore>,
         node: &FsNode,
         current_task: &CurrentTask,
         flags: OpenFlags,
@@ -540,6 +561,7 @@ impl FsNodeOps for Arc<OverlayNode> {
 
     fn mknod(
         &self,
+        locked: &mut Locked<'_, FileOpsCore>,
         node: &FsNode,
         current_task: &CurrentTask,
         name: &FsStr,
@@ -547,11 +569,10 @@ impl FsNodeOps for Arc<OverlayNode> {
         dev: DeviceType,
         owner: FsCred,
     ) -> Result<FsNodeHandle, Errno> {
-        let mut locked = Unlocked::new(); // TODO(https://fxbug.dev/320460258): Propagate Locked through FsNodeOps
         let new_upper_node =
-            self.create_entry(&mut locked, current_task, name, |dir, temp_name| {
+            self.create_entry(locked, current_task, name, |locked, dir, temp_name| {
                 dir.create_entry(current_task, temp_name, |dir_node, mount, name| {
-                    dir_node.mknod(current_task, mount, name, mode, dev, owner.clone())
+                    dir_node.mknod(locked, current_task, mount, name, mode, dev, owner.clone())
                 })
             })?;
         Ok(self.init_fs_node_for_child(current_task, node, None, Some(new_upper_node)))
@@ -567,10 +588,11 @@ impl FsNodeOps for Arc<OverlayNode> {
     ) -> Result<FsNodeHandle, Errno> {
         let mut locked = Unlocked::new(); // TODO(https://fxbug.dev/320460258): Propagate Locked through FsNodeOps
         let new_upper_node =
-            self.create_entry(&mut locked, current_task, name, |dir, temp_name| {
+            self.create_entry(&mut locked, current_task, name, |locked, dir, temp_name| {
                 let entry =
                     dir.create_entry(current_task, temp_name, |dir_node, mount, name| {
                         dir_node.mknod(
+                            locked,
                             current_task,
                             mount,
                             name,
@@ -599,7 +621,7 @@ impl FsNodeOps for Arc<OverlayNode> {
     ) -> Result<FsNodeHandle, Errno> {
         let mut locked = Unlocked::new(); // TODO(https://fxbug.dev/320460258): Propagate Locked through FsNodeOps
         let new_upper_node =
-            self.create_entry(&mut locked, current_task, name, |dir, temp_name| {
+            self.create_entry(&mut locked, current_task, name, |_, dir, temp_name| {
                 dir.create_entry(current_task, temp_name, |dir_node, mount, name| {
                     dir_node.create_symlink(current_task, mount, name, target, owner.clone())
                 })
@@ -621,7 +643,7 @@ impl FsNodeOps for Arc<OverlayNode> {
         let mut locked = Unlocked::new(); // TODO(https://fxbug.dev/320460258): Propagate Locked through FsNodeOps
         let child_overlay = OverlayNode::from_fs_node(child)?;
         let upper_child = child_overlay.ensure_upper(&mut locked, current_task)?;
-        self.create_entry(&mut locked, current_task, name, |dir, temp_name| {
+        self.create_entry(&mut locked, current_task, name, |_, dir, temp_name| {
             dir.create_entry(current_task, temp_name, |dir_node, mount, name| {
                 dir_node.link(current_task, mount, name, &upper_child.entry().node)
             })
@@ -636,7 +658,7 @@ impl FsNodeOps for Arc<OverlayNode> {
         name: &FsStr,
         child: &FsNodeHandle,
     ) -> Result<(), Errno> {
-        let mut locked = Unlocked::new(); // TODO(https://fxbug.dev/320460258): Propagate Locked through FsNodeOps
+        let mut locked = Unlocked::new(); // TODO(https://fxbug.dev/320460258): Propagate Locked through FsNodeOps; needs to be before FileOpsCore
         let upper = self.ensure_upper(&mut locked, current_task)?;
         let child_overlay = OverlayNode::from_fs_node(child)?;
         child_overlay.prepare_to_unlink(current_task)?;
@@ -644,11 +666,12 @@ impl FsNodeOps for Arc<OverlayNode> {
         let need_whiteout = self.lower_entry_exists(current_task, name)?;
         if need_whiteout {
             self.fs.create_upper_entry(
+                &mut locked,
                 current_task,
                 &upper,
                 &name,
-                |work, name| work.create_whiteout(current_task, name),
-                |_entry| Ok(()),
+                |locked, work, name| work.create_whiteout(locked, current_task, name),
+                |_, _entry| Ok(()),
             )?;
         } else if let Some(child_upper) = child_overlay.upper.get() {
             let kind = if child_upper.entry().node.is_dir() {
@@ -713,7 +736,7 @@ impl OverlayDirectory {
         current_task: &CurrentTask,
     ) -> Result<(), Errno>
     where
-        L: LockBefore<ReadOps>,
+        L: LockBefore<FileOpsCore>,
     {
         let mut entries = DirEntries::new();
 
@@ -772,7 +795,7 @@ impl FileOps for OverlayDirectory {
         current_task: &CurrentTask,
         sink: &mut dyn DirentSink,
     ) -> Result<(), Errno> {
-        let mut locked = Unlocked::new(); // TODO(https://fxbug.dev/314138012): FileOpsReaddir before ReadOps before Read/Write ops
+        let mut locked = Unlocked::new(); // TODO(https://fxbug.dev/314138012): FileOpsReaddir before FileOpsCore
         if sink.offset() == 0 {
             self.refresh_dir_entries(&mut locked, current_task)?;
         }
@@ -811,7 +834,7 @@ impl FileOps for OverlayFile {
 
     fn read(
         &self,
-        locked: &mut Locked<'_, ReadOps>,
+        locked: &mut Locked<'_, FileOpsCore>,
         _file: &FileObject,
         current_task: &CurrentTask,
         offset: usize,
@@ -894,7 +917,8 @@ impl OverlayFs {
         options: FileSystemOptions,
     ) -> Result<FileSystemHandle, Errno>
     where
-        L: LockBefore<ReadOps>,
+        L: LockBefore<FileOpsCore>,
+        L: LockBefore<DeviceOpen>,
     {
         let mount_options = fs_args::generic_parse_mount_options(options.params.as_ref());
         match mount_options.get("redirect_dir".as_bytes()) {
@@ -932,8 +956,9 @@ impl OverlayFs {
     // 3. The new entry is moved to `target_dir`. If there is an existing entry called `name` in
     //    `target_dir` then it's replaced with the new entry.
     // The temp file is cleared from the work dir if either of the last two steps fails.
-    fn create_upper_entry<FCreate, FInit>(
+    fn create_upper_entry<FCreate, FInit, L>(
         &self,
+        locked: &mut Locked<'_, L>,
         current_task: &CurrentTask,
         target_dir: &ActiveEntry,
         name: &FsStr,
@@ -941,21 +966,21 @@ impl OverlayFs {
         do_init: FInit,
     ) -> Result<ActiveEntry, Errno>
     where
-        FCreate: Fn(&ActiveEntry, &FsStr) -> Result<ActiveEntry, Errno>,
-        FInit: FnOnce(&ActiveEntry) -> Result<(), Errno>,
+        FCreate: Fn(&mut Locked<'_, L>, &ActiveEntry, &FsStr) -> Result<ActiveEntry, Errno>,
+        FInit: FnOnce(&mut Locked<'_, L>, &ActiveEntry) -> Result<(), Errno>,
     {
         let mut rng = rand::thread_rng();
         let (temp_name, entry) = loop {
             let x: u64 = rng.gen();
             let temp_name = FsString::from(format!("tmp{:x}", x));
-            match try_create(&self.work, temp_name.as_ref()) {
+            match try_create(locked, &self.work, temp_name.as_ref()) {
                 Err(err) if err.code == EEXIST => continue,
                 Err(err) => return Err(err),
                 Ok(entry) => break (temp_name, entry),
             }
         };
 
-        do_init(&entry)
+        do_init(locked, &entry)
             .and_then(|()| {
                 DirEntry::rename(
                     current_task,
@@ -1009,7 +1034,7 @@ impl FileSystemOps for Arc<OverlayFs> {
         renamed: &FsNodeHandle,
         _replaced: Option<&FsNodeHandle>,
     ) -> Result<(), Errno> {
-        let mut locked = Unlocked::new(); // TODO(https://fxbug.dev/320461648): Propagate Locked through FileSystemOps
+        let mut locked = Unlocked::new(); // TODO(https://fxbug.dev/320461648): Propagate Locked through FileSystemOps; needs to be before FileOpsCore
         let renamed = OverlayNode::from_fs_node(renamed)?;
         if renamed.main_entry().entry().node.is_dir() {
             // Return EXDEV for directory renames. Potentially they may be handled with the
@@ -1040,7 +1065,7 @@ impl FileSystemOps for Arc<OverlayFs> {
 
         // If the old node existed in lower FS, then override it in the upper FS with a whiteout.
         if need_whiteout {
-            match old_parent_upper.create_whiteout(current_task, old_name) {
+            match old_parent_upper.create_whiteout(&mut locked, current_task, old_name) {
                 Err(e) => log_warn!("overlayfs: failed to create whiteout for {old_name}: {e}"),
                 Ok(_) => (),
             }
@@ -1062,7 +1087,8 @@ fn resolve_dir_param<L>(
     name: &FsStr,
 ) -> Result<ActiveEntry, Errno>
 where
-    L: LockBefore<ReadOps>,
+    L: LockBefore<FileOpsCore>,
+    L: LockBefore<DeviceOpen>,
 {
     let path = mount_options.get(&**name).ok_or_else(|| {
         log_error!("overlayfs: {name} was not specified");
@@ -1086,7 +1112,7 @@ fn copy_file_content<L>(
     to: &ActiveEntry,
 ) -> Result<(), Errno>
 where
-    L: LockEqualOrBefore<ReadOps>,
+    L: LockEqualOrBefore<FileOpsCore>,
     L: LockBefore<WriteOps>,
 {
     let from_file = from.entry().open_anonymous(locked, current_task, OpenFlags::RDONLY)?;

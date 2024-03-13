@@ -19,7 +19,7 @@ use crate::{
     },
 };
 use starnix_logging::{log_info, log_warn, track_stub};
-use starnix_sync::{FileOpsIoctl, Locked, ReadOps, WriteOps};
+use starnix_sync::{DeviceOpen, FileOpsCore, FileOpsIoctl, LockBefore, Locked, Unlocked, WriteOps};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::{
     device_type::{DeviceType, INPUT_MAJOR},
@@ -103,6 +103,7 @@ impl InputDevice {
 }
 
 fn create_touch_device(
+    _locked: &mut Locked<'_, DeviceOpen>,
     current_task: &CurrentTask,
     _id: DeviceType,
     _node: &FsNode,
@@ -112,6 +113,7 @@ fn create_touch_device(
 }
 
 fn create_keyboard_device(
+    _locked: &mut Locked<'_, DeviceOpen>,
     current_task: &CurrentTask,
     _id: DeviceType,
     _node: &FsNode,
@@ -572,7 +574,7 @@ impl FileOps for Arc<InputFile> {
 
     fn read(
         &self,
-        _locked: &mut Locked<'_, ReadOps>,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         offset: usize,
@@ -861,7 +863,14 @@ fn get_next_device_id() -> u32 {
 /// # Parameters:
 /// - `system_task`: current task.
 /// - `dev_ops`: the open op handler of the device.
-pub fn add_and_register_input_device(system_task: &CurrentTask, dev_ops: impl DeviceOps) -> Device {
+pub fn add_and_register_input_device<L>(
+    locked: &mut Locked<'_, L>,
+    system_task: &CurrentTask,
+    dev_ops: impl DeviceOps,
+) -> Device
+where
+    L: LockBefore<FileOpsCore>,
+{
     let kernel = system_task.kernel();
     let registry = &kernel.device_registry;
 
@@ -869,6 +878,7 @@ pub fn add_and_register_input_device(system_task: &CurrentTask, dev_ops: impl De
 
     let device_id = get_next_device_id();
     registry.add_and_register_device(
+        locked,
         system_task,
         FsString::from(format!("event{}", device_id)).as_ref(),
         DeviceMetadata::new(
@@ -883,9 +893,12 @@ pub fn add_and_register_input_device(system_task: &CurrentTask, dev_ops: impl De
 }
 
 /// add and register 1 touch device and 1 keyboard device to kernel.
-pub fn init_input_devices(system_task: &CurrentTask) {
-    add_and_register_input_device(system_task, create_touch_device);
-    add_and_register_input_device(system_task, create_keyboard_device);
+pub fn init_input_devices<L>(locked: &mut Locked<'_, L>, system_task: &CurrentTask)
+where
+    L: LockBefore<FileOpsCore>,
+{
+    add_and_register_input_device(locked, system_task, create_touch_device);
+    add_and_register_input_device(locked, system_task, create_keyboard_device);
 }
 
 #[cfg(test)]
@@ -1016,10 +1029,10 @@ mod test {
         current_task: &CurrentTask,
     ) -> Vec<uapi::input_event>
     where
-        L: LockBefore<ReadOps>,
+        L: LockBefore<FileOpsCore>,
     {
         std::iter::from_fn(|| {
-            let mut locked = locked.cast_locked::<ReadOps>();
+            let mut locked = locked.cast_locked::<FileOpsCore>();
             let mut event_bytes = VecOutputBuffer::new(INPUT_EVENT_SIZE);
             match file.read(&mut locked, file_object, current_task, 0, &mut event_bytes) {
                 Ok(INPUT_EVENT_SIZE) => Some(

@@ -19,7 +19,7 @@ use fidl::{
 use fidl_fuchsia_io as fio;
 use fuchsia_zircon as zx;
 use starnix_logging::track_stub;
-use starnix_sync::{LockBefore, Locked, ReadOps, Unlocked};
+use starnix_sync::{DeviceOpen, FileOpsCore, LockBefore, Locked, Unlocked};
 use starnix_uapi::{
     device_type::DeviceType, errno, error, errors::Errno, file_mode::FileMode, ino_t, off_t,
     open_flags::OpenFlags, vfs::ResolveFlags,
@@ -41,7 +41,8 @@ pub fn serve_file<L>(
     file: &FileObject,
 ) -> Result<(ClientEnd<fio::NodeMarker>, execution_scope::ExecutionScope), Errno>
 where
-    L: LockBefore<ReadOps>,
+    L: LockBefore<FileOpsCore>,
+    L: LockBefore<DeviceOpen>,
 {
     let (client_end, server_end) = fidl::endpoints::create_endpoints::<fio::NodeMarker>();
     let scope = serve_file_at(locked, server_end, current_task, file)?;
@@ -55,7 +56,8 @@ pub fn serve_file_at<L>(
     file: &FileObject,
 ) -> Result<execution_scope::ExecutionScope, Errno>
 where
-    L: LockBefore<ReadOps>,
+    L: LockBefore<FileOpsCore>,
+    L: LockBefore<DeviceOpen>,
 {
     // Reopen file object to not share state with the given FileObject.
     let file = file.name.open(locked, current_task, file.flags(), false)?;
@@ -129,7 +131,8 @@ impl StarnixNodeConnection {
         flags: fio::OpenFlags,
     ) -> Result<Arc<Self>, Errno>
     where
-        L: LockBefore<ReadOps>,
+        L: LockBefore<FileOpsCore>,
+        L: LockBefore<DeviceOpen>,
     {
         let file = self.file.name.open(locked, current_task, flags.into(), true)?;
         Ok(StarnixNodeConnection::new(self.kernel.clone(), file))
@@ -241,7 +244,8 @@ impl StarnixNodeConnection {
         server_end: &mut ServerEnd<fio::NodeMarker>,
     ) -> Result<(), Errno>
     where
-        L: LockBefore<ReadOps>,
+        L: LockBefore<FileOpsCore>,
+        L: LockBefore<DeviceOpen>,
     {
         let current_task = self.task().await?;
         if self.is_dir() {
@@ -277,7 +281,8 @@ impl StarnixNodeConnection {
                 Err(e) if e == errno!(EISDIR) && must_create_directory => {
                     let mode =
                         current_task.fs().apply_umask(FileMode::from_bits(0o777) | FileMode::IFDIR);
-                    let name = node.create_node(&current_task, name, mode, DeviceType::NONE)?;
+                    let name =
+                        node.create_node(locked, &current_task, name, mode, DeviceType::NONE)?;
                     let flags =
                         flags & !(fio::OpenFlags::CREATE | fio::OpenFlags::CREATE_IF_ABSENT);
                     name.open(locked, &current_task, flags.into(), false)?

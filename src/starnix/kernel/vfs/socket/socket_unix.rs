@@ -39,7 +39,7 @@ use starnix_uapi::{
 };
 use zerocopy::AsBytes;
 
-use starnix_sync::{Locked, Mutex, ReadOps, WriteOps};
+use starnix_sync::{FileOpsCore, Locked, Mutex, WriteOps};
 use std::sync::Arc;
 
 // From unix.go in gVisor.
@@ -493,7 +493,7 @@ impl SocketOps for UnixSocket {
 
     fn read(
         &self,
-        _locked: &mut Locked<'_, ReadOps>,
+        _locked: &mut Locked<'_, FileOpsCore>,
         socket: &Socket,
         _current_task: &CurrentTask,
         data: &mut dyn OutputBuffer,

@@ -18,6 +18,7 @@ use starnix_core::{
     task::{CurrentTask, Kernel, KernelFeatures},
     vfs::FsString,
 };
+use starnix_sync::{Locked, Unlocked};
 use starnix_uapi::{error, errors::Errno};
 use std::sync::Arc;
 
@@ -114,13 +115,17 @@ pub fn parse_features(entries: &Vec<String>) -> Result<Features, Error> {
 }
 
 /// Runs all the features that are enabled in `system_task.kernel()`.
-pub fn run_container_features(system_task: &CurrentTask, features: &Features) -> Result<(), Error> {
+pub fn run_container_features(
+    locked: &mut Locked<'_, Unlocked>,
+    system_task: &CurrentTask,
+    features: &Features,
+) -> Result<(), Error> {
     let kernel = system_task.kernel();
 
     let mut enabled_profiling = false;
     if features.framebuffer {
-        fb_device_init(system_task);
-        init_input_devices(system_task);
+        fb_device_init(locked, system_task);
+        init_input_devices(locked, system_task);
     }
     if features.gralloc {
         // The virtgralloc0 device allows vulkan_selector to indicate to gralloc
@@ -132,10 +137,10 @@ pub fn run_container_features(system_task: &CurrentTask, features: &Features) ->
         // the magma feature is enabled or disabled. If a call to gralloc AIDL
         // IAllocator allocate2 occurs with this feature disabled, the call will
         // fail.
-        gralloc_device_init(system_task);
+        gralloc_device_init(locked, system_task);
     }
     if features.magma {
-        magma_device_init(system_task);
+        magma_device_init(locked, system_task);
     }
     if let Some(socket_path) = features.perfetto.clone() {
         start_perfetto_consumer_thread(kernel, socket_path)
@@ -150,7 +155,7 @@ pub fn run_container_features(system_task: &CurrentTask, features: &Features) ->
         fuchsia_inspect_contrib::start_self_profiling();
     }
     if features.ashmem {
-        ashmem_device_init(system_task);
+        ashmem_device_init(locked, system_task);
     }
     if !enabled_profiling {
         fuchsia_inspect_contrib::stop_self_profiling();

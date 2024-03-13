@@ -22,7 +22,7 @@ use fuchsia_zircon::{
     HandleBased, {self as zx},
 };
 use starnix_logging::{impossible_error, log_warn};
-use starnix_sync::{Locked, ReadOps, RwLock, RwLockReadGuard, RwLockWriteGuard, WriteOps};
+use starnix_sync::{FileOpsCore, Locked, RwLock, RwLockReadGuard, RwLockWriteGuard, WriteOps};
 use starnix_uapi::{
     auth::FsCred,
     errno, error,
@@ -174,7 +174,7 @@ impl FsNodeOps for File {
 
     fn create_file_ops(
         &self,
-        _locked: &mut Locked<'_, ReadOps>,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         _flags: OpenFlags,
@@ -271,7 +271,7 @@ impl FileOps for VmoFile {
 
     fn read(
         &self,
-        _locked: &mut Locked<'_, ReadOps>,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         mut offset: usize,
@@ -387,7 +387,7 @@ impl FsNodeOps for DirectoryObject {
 
     fn create_file_ops(
         &self,
-        _locked: &mut Locked<'_, ReadOps>,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         _flags: OpenFlags,
