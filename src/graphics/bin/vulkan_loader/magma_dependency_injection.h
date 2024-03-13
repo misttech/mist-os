@@ -12,7 +12,8 @@
 class MagmaDependencyInjection {
  public:
   static zx::result<MagmaDependencyInjection> Create(
-      fidl::ClientEnd<fuchsia_memorypressure::Provider> provider);
+      fit::function<zx::result<fidl::ClientEnd<fuchsia_memorypressure::Provider>>()>
+          provider_factory);
 
  private:
   explicit MagmaDependencyInjection(std::unique_ptr<fsl::DeviceWatcher> watcher)

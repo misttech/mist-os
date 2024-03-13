@@ -9,11 +9,12 @@
 #include <lib/syslog/cpp/macros.h>
 
 zx::result<MagmaDependencyInjection> MagmaDependencyInjection::Create(
-    fidl::ClientEnd<fuchsia_memorypressure::Provider> provider) {
+    fit::function<zx::result<fidl::ClientEnd<fuchsia_memorypressure::Provider>>()>
+        provider_factory) {
   std::unique_ptr watcher = fsl::DeviceWatcher::Create(
       "/dev/class/gpu-dependency-injection",
-      [provider = std::move(provider)](const fidl::ClientEnd<fuchsia_io::Directory>& dir,
-                                       const std::string& filename) mutable {
+      [provider_factory = std::move(provider_factory)](
+          const fidl::ClientEnd<fuchsia_io::Directory>& dir, const std::string& filename) mutable {
         if (filename == ".") {
           return;
         }
@@ -28,8 +29,15 @@ zx::result<MagmaDependencyInjection> MagmaDependencyInjection::Create(
           return;
         }
 
-        if (auto result =
-                fidl::WireCall(endpoints->client)->SetMemoryPressureProvider(std::move(provider));
+        auto pressure_provider = provider_factory();
+        if (!pressure_provider.is_ok()) {
+          FX_LOGS(ERROR) << "Failed to get pressure provider: "
+                         << pressure_provider.status_string();
+          return;
+        }
+
+        if (auto result = fidl::WireCall(endpoints->client)
+                              ->SetMemoryPressureProvider(std::move(*pressure_provider));
             !result.ok()) {
           FX_LOGS(ERROR) << "Failed to set memory pressure provider: " << result.status_string();
           return;

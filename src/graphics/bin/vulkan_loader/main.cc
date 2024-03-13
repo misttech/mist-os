@@ -83,13 +83,7 @@ int main(int argc, const char* const* argv) {
     return -1;
   }
 
-  zx::result memory_pressure_provider = GetMemoryPressureProvider();
-  if (memory_pressure_provider.is_error()) {
-    FX_LOGS(INFO) << "Failed to connect to memory pressure provider: "
-                  << memory_pressure_provider.status_string();
-    return -1;
-  }
-  zx::result manager = MagmaDependencyInjection::Create(std::move(*memory_pressure_provider));
+  zx::result manager = MagmaDependencyInjection::Create(&GetMemoryPressureProvider);
   if (manager.is_error()) {
     FX_LOGS(INFO) << "Failed to initialize gpu manager " << manager.status_string();
     return -1;
