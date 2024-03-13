@@ -321,7 +321,7 @@ enum ReferenceInitialSid {
 
 /// Lowest Security Identifier value guaranteed not to be used by this
 /// implementation to refer to an initial Security Context.
-pub const FIRST_UNUSED_SID: u64 = ReferenceInitialSid::FirstUnused as u64;
+pub const FIRST_UNUSED_SID: u32 = ReferenceInitialSid::FirstUnused as u32;
 
 macro_rules! initial_sid_enum {
     ($(#[$meta:meta])* $name:ident {

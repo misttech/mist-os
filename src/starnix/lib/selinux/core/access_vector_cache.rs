@@ -465,25 +465,32 @@ impl<SS, const SHARED_SIZE: usize, const THREAD_LOCAL_SIZE: usize> Reset
 mod tests {
     use super::*;
 
+    use once_cell::sync::Lazy;
     use rand::{distributions::Uniform, thread_rng, Rng as _};
     use selinux_common::ObjectClass;
     use selinux_policy::testing::{ACCESS_VECTOR_0001, ACCESS_VECTOR_0010};
     use std::{
         collections::{HashMap, HashSet},
+        num::NonZeroU32,
         sync::atomic::{AtomicU32, AtomicUsize},
         thread::spawn,
     };
 
     /// SID to use where any value will do.
-    const A_TEST_SID: SecurityId = SecurityId(1000);
+    static A_TEST_SID: Lazy<SecurityId> = Lazy::new(unique_sid);
 
     /// Default fixed cache size to use in tests.
     const CACHE_ENTRIES: usize = 10;
 
-    /// Returns a vector of unique `SecurityIds` with values not including `A_TEST_SID`.
+    /// Returns a new `SecurityId` with unique id.
+    fn unique_sid() -> SecurityId {
+        static NEXT_ID: AtomicU32 = AtomicU32::new(1000);
+        SecurityId(NonZeroU32::new(NEXT_ID.fetch_add(1, Ordering::AcqRel)).unwrap())
+    }
+
+    /// Returns a vector of `count` unique `SecurityIds`.
     fn unique_sids(count: usize) -> Vec<SecurityId> {
-        static NEXT_ID: AtomicU64 = AtomicU64::new(1001);
-        (0..count).map(|_| SecurityId(NEXT_ID.fetch_add(1, Ordering::AcqRel))).collect()
+        (0..count).map(|_| unique_sid()).collect()
     }
 
     #[derive(Default)]
@@ -528,7 +535,7 @@ mod tests {
         let mut avc = Empty::<DenyAll>::default();
         assert_eq!(
             AccessVector::NONE,
-            avc.query(A_TEST_SID, A_TEST_SID, ObjectClass::Process.into())
+            avc.query(A_TEST_SID.clone(), A_TEST_SID.clone(), ObjectClass::Process.into())
         );
     }
 
@@ -538,12 +545,12 @@ mod tests {
         assert_eq!(0, avc.delegate.query_count());
         assert_eq!(
             AccessVector::NONE,
-            avc.query(A_TEST_SID, A_TEST_SID, ObjectClass::Process.into())
+            avc.query(A_TEST_SID.clone(), A_TEST_SID.clone(), ObjectClass::Process.into())
         );
         assert_eq!(1, avc.delegate.query_count());
         assert_eq!(
             AccessVector::NONE,
-            avc.query(A_TEST_SID, A_TEST_SID, ObjectClass::Process.into())
+            avc.query(A_TEST_SID.clone(), A_TEST_SID.clone(), ObjectClass::Process.into())
         );
         assert_eq!(1, avc.delegate.query_count());
         assert_eq!(1, avc.next_index);
@@ -561,7 +568,7 @@ mod tests {
         assert_eq!(0, avc.delegate.query_count());
         assert_eq!(
             AccessVector::NONE,
-            avc.query(A_TEST_SID, A_TEST_SID, ObjectClass::Process.into())
+            avc.query(A_TEST_SID.clone(), A_TEST_SID.clone(), ObjectClass::Process.into())
         );
         assert_eq!(1, avc.delegate.query_count());
         assert_eq!(1, avc.next_index);
@@ -577,7 +584,7 @@ mod tests {
         let mut avc = Fixed::<_, CACHE_ENTRIES>::new(Counter::<DenyAll>::default());
 
         for sid in unique_sids(CACHE_ENTRIES) {
-            avc.query(sid, A_TEST_SID, ObjectClass::Process.into());
+            avc.query(sid, A_TEST_SID.clone(), ObjectClass::Process.into());
         }
         assert_eq!(0, avc.next_index);
         assert_eq!(true, avc.is_full);
@@ -587,7 +594,7 @@ mod tests {
         assert_eq!(false, avc.is_full);
 
         for sid in unique_sids(CACHE_ENTRIES) {
-            avc.query(A_TEST_SID, sid, ObjectClass::Process.into());
+            avc.query(A_TEST_SID.clone(), sid, ObjectClass::Process.into());
         }
         assert_eq!(0, avc.next_index);
         assert_eq!(true, avc.is_full);
@@ -603,31 +610,31 @@ mod tests {
 
         // Make the test query, which will trivially miss.
         let delegate_query_count = avc.delegate.query_count();
-        avc.query(A_TEST_SID, A_TEST_SID, ObjectClass::Process.into());
+        avc.query(A_TEST_SID.clone(), A_TEST_SID.clone(), ObjectClass::Process.into());
         assert_eq!(delegate_query_count + 1, avc.delegate.query_count());
         assert!(!avc.is_full);
 
         // Fill the cache with new queries, which should evict the test query.
         for sid in unique_sids(CACHE_ENTRIES) {
-            avc.query(sid, A_TEST_SID, ObjectClass::Process.into());
+            avc.query(sid, A_TEST_SID.clone(), ObjectClass::Process.into());
         }
         assert!(avc.is_full);
 
         // Making the test query should result in another miss.
         let delegate_query_count = avc.delegate.query_count();
-        avc.query(A_TEST_SID, A_TEST_SID, ObjectClass::Process.into());
+        avc.query(A_TEST_SID.clone(), A_TEST_SID.clone(), ObjectClass::Process.into());
         assert_eq!(delegate_query_count + 1, avc.delegate.query_count());
 
         // Because the cache is not LRU, making `CACHE_ENTRIES` unique queries, each preceded by
         // the test query, will still result in the test query result being evicted.
         for sid in unique_sids(CACHE_ENTRIES) {
-            avc.query(A_TEST_SID, A_TEST_SID, ObjectClass::Process.into());
-            avc.query(sid, A_TEST_SID, ObjectClass::Process.into());
+            avc.query(A_TEST_SID.clone(), A_TEST_SID.clone(), ObjectClass::Process.into());
+            avc.query(sid, A_TEST_SID.clone(), ObjectClass::Process.into());
         }
 
         // The test query should now miss.
         let delegate_query_count = avc.delegate.query_count();
-        avc.query(A_TEST_SID, A_TEST_SID, ObjectClass::Process.into());
+        avc.query(A_TEST_SID.clone(), A_TEST_SID.clone(), ObjectClass::Process.into());
         assert_eq!(delegate_query_count + 1, avc.delegate.query_count());
     }
 
@@ -640,7 +647,7 @@ mod tests {
         assert_eq!(0, avc.delegate.reset_count());
         cache_version.reset();
         assert_eq!(0, avc.delegate.reset_count());
-        avc.query(A_TEST_SID, A_TEST_SID, ObjectClass::Process.into());
+        avc.query(A_TEST_SID.clone(), A_TEST_SID.clone(), ObjectClass::Process.into());
         assert_eq!(1, avc.delegate.reset_count());
     }
 
@@ -714,7 +721,11 @@ mod tests {
             let mut trace = vec![];
 
             for _ in 0..2000 {
-                trace.push(query_avc.query(A_TEST_SID, A_TEST_SID, ObjectClass::Process.into()))
+                trace.push(query_avc.query(
+                    A_TEST_SID.clone(),
+                    A_TEST_SID.clone(),
+                    ObjectClass::Process.into(),
+                ))
             }
 
             tx.send(trace).expect("send trace");
@@ -770,6 +781,7 @@ mod tests {
         let policy_server = Arc::new(PolicyServer { policy: active_policy.clone() });
         let fixed_avc = Fixed::<_, CACHE_ENTRIES>::new(policy_server.clone());
         let avc = Locked::new(fixed_avc);
+        let sids = unique_sids(30);
 
         // Ensure the initial policy is `NO_RIGHTS`.
         policy_server.set_policy(NO_RIGHTS);
@@ -792,22 +804,33 @@ mod tests {
         // `rx_last_policy_change_#` to synchronize  before last queries.
         let (tx1, rx1) = futures::channel::oneshot::channel();
         let avc_for_query_1 = avc.clone();
+        let sids_for_query_1 = sids.clone();
+
         let query_thread_1 = spawn(|| async move {
+            let sids = sids_for_query_1;
             let mut trace = vec![];
 
-            for sid in thread_rng().sample_iter(&Uniform::new(0, 20)).take(2000) {
+            for i in thread_rng().sample_iter(&Uniform::new(0, 20)).take(2000) {
                 trace.push((
-                    sid,
-                    avc_for_query_1.query(SecurityId(sid), A_TEST_SID, ObjectClass::Process.into()),
+                    sids[i].clone(),
+                    avc_for_query_1.query(
+                        sids[i].clone(),
+                        A_TEST_SID.clone(),
+                        ObjectClass::Process.into(),
+                    ),
                 ))
             }
 
             rx_last_policy_change_1.await.expect("receive last-policy-change signal (1)");
 
-            for sid in thread_rng().sample_iter(&Uniform::new(0, 20)).take(10) {
+            for i in thread_rng().sample_iter(&Uniform::new(0, 20)).take(10) {
                 trace.push((
-                    sid,
-                    avc_for_query_1.query(SecurityId(sid), A_TEST_SID, ObjectClass::Process.into()),
+                    sids[i].clone(),
+                    avc_for_query_1.query(
+                        sids[i].clone(),
+                        A_TEST_SID.clone(),
+                        ObjectClass::Process.into(),
+                    ),
                 ))
             }
 
@@ -823,24 +846,36 @@ mod tests {
                 assert_eq!(ACCESS_VECTOR_WRITE, item.as_ref().unwrap().access_vector);
             }
         });
+
         let (tx2, rx2) = futures::channel::oneshot::channel();
         let avc_for_query_2 = avc.clone();
+        let sids_for_query_2 = sids.clone();
+
         let query_thread_2 = spawn(|| async move {
+            let sids = sids_for_query_2;
             let mut trace = vec![];
 
-            for sid in thread_rng().sample_iter(&Uniform::new(10, 30)).take(2000) {
+            for i in thread_rng().sample_iter(&Uniform::new(10, 30)).take(2000) {
                 trace.push((
-                    sid,
-                    avc_for_query_2.query(SecurityId(sid), A_TEST_SID, ObjectClass::Process.into()),
+                    sids[i].clone(),
+                    avc_for_query_2.query(
+                        sids[i].clone(),
+                        A_TEST_SID.clone(),
+                        ObjectClass::Process.into(),
+                    ),
                 ))
             }
 
             rx_last_policy_change_2.await.expect("receive last-policy-change signal (2)");
 
-            for sid in thread_rng().sample_iter(&Uniform::new(10, 30)).take(10) {
+            for i in thread_rng().sample_iter(&Uniform::new(10, 30)).take(10) {
                 trace.push((
-                    sid,
-                    avc_for_query_2.query(SecurityId(sid), A_TEST_SID, ObjectClass::Process.into()),
+                    sids[i].clone(),
+                    avc_for_query_2.query(
+                        sids[i].clone(),
+                        A_TEST_SID.clone(),
+                        ObjectClass::Process.into(),
+                    ),
                 ))
             }
 
@@ -917,7 +952,7 @@ mod tests {
         //
 
         for trace in [trace_1, trace_2] {
-            let mut trace_by_sid = HashMap::<u64, Vec<AccessVector>>::new();
+            let mut trace_by_sid = HashMap::<SecurityId, Vec<AccessVector>>::new();
             for (sid, access_vector) in trace {
                 trace_by_sid.entry(sid).or_insert(vec![]).push(access_vector);
             }
@@ -1003,6 +1038,7 @@ mod tests {
 
             (active_policy, security_server)
         };
+        let sids = unique_sids(30);
 
         fn set_policy(owner: &Arc<AtomicU32>, policy: u32) {
             if policy > 2 {
@@ -1032,22 +1068,33 @@ mod tests {
         // `rx_last_policy_change_#` to synchronize  before last queries.
         let (tx1, rx1) = futures::channel::oneshot::channel();
         let mut avc_for_query_1 = security_server.manager().new_thread_local_cache();
+        let sids_for_query_1 = sids.clone();
+
         let query_thread_1 = spawn(|| async move {
+            let sids = sids_for_query_1;
             let mut trace = vec![];
 
-            for sid in thread_rng().sample_iter(&Uniform::new(0, 20)).take(2000) {
+            for i in thread_rng().sample_iter(&Uniform::new(0, 20)).take(2000) {
                 trace.push((
-                    sid,
-                    avc_for_query_1.query(SecurityId(sid), A_TEST_SID, ObjectClass::Process.into()),
+                    sids[i].clone(),
+                    avc_for_query_1.query(
+                        sids[i].clone(),
+                        A_TEST_SID.clone(),
+                        ObjectClass::Process.into(),
+                    ),
                 ))
             }
 
             rx_last_policy_change_1.await.expect("receive last-policy-change signal (1)");
 
-            for sid in thread_rng().sample_iter(&Uniform::new(0, 20)).take(10) {
+            for i in thread_rng().sample_iter(&Uniform::new(0, 20)).take(10) {
                 trace.push((
-                    sid,
-                    avc_for_query_1.query(SecurityId(sid), A_TEST_SID, ObjectClass::Process.into()),
+                    sids[i].clone(),
+                    avc_for_query_1.query(
+                        sids[i].clone(),
+                        A_TEST_SID.clone(),
+                        ObjectClass::Process.into(),
+                    ),
                 ))
             }
 
@@ -1063,24 +1110,36 @@ mod tests {
                 assert_eq!(ACCESS_VECTOR_WRITE, item.as_ref().unwrap().access_vector);
             }
         });
+
         let (tx2, rx2) = futures::channel::oneshot::channel();
         let mut avc_for_query_2 = security_server.manager().new_thread_local_cache();
+        let sids_for_query_2 = sids.clone();
+
         let query_thread_2 = spawn(|| async move {
+            let sids = sids_for_query_2;
             let mut trace = vec![];
 
-            for sid in thread_rng().sample_iter(&Uniform::new(10, 30)).take(2000) {
+            for i in thread_rng().sample_iter(&Uniform::new(10, 30)).take(2000) {
                 trace.push((
-                    sid,
-                    avc_for_query_2.query(SecurityId(sid), A_TEST_SID, ObjectClass::Process.into()),
+                    sids[i].clone(),
+                    avc_for_query_2.query(
+                        sids[i].clone(),
+                        A_TEST_SID.clone(),
+                        ObjectClass::Process.into(),
+                    ),
                 ))
             }
 
             rx_last_policy_change_2.await.expect("receive last-policy-change signal (2)");
 
-            for sid in thread_rng().sample_iter(&Uniform::new(10, 30)).take(10) {
+            for i in thread_rng().sample_iter(&Uniform::new(10, 30)).take(10) {
                 trace.push((
-                    sid,
-                    avc_for_query_2.query(SecurityId(sid), A_TEST_SID, ObjectClass::Process.into()),
+                    sids[i].clone(),
+                    avc_for_query_2.query(
+                        sids[i].clone(),
+                        A_TEST_SID.clone(),
+                        ObjectClass::Process.into(),
+                    ),
                 ))
             }
 
@@ -1161,7 +1220,7 @@ mod tests {
         //
 
         for trace in [trace_1, trace_2] {
-            let mut trace_by_sid = HashMap::<u64, Vec<AccessVector>>::new();
+            let mut trace_by_sid = HashMap::<SecurityId, Vec<AccessVector>>::new();
             for (sid, access_vector) in trace {
                 trace_by_sid.entry(sid).or_insert(vec![]).push(access_vector);
             }

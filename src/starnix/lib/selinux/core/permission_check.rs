@@ -176,12 +176,23 @@ impl<'a> Query for PermissionCheckImpl<'a> {
 mod tests {
     use super::{super::access_vector_cache::DenyAll, *};
 
+    use once_cell::sync::Lazy;
     use selinux_common::ProcessPermission;
     use selinux_policy::testing::{ACCESS_VECTOR_0001, ACCESS_VECTOR_0010};
-    use std::any::Any;
+    use std::{
+        any::Any,
+        num::NonZeroU32,
+        sync::atomic::{AtomicU32, Ordering},
+    };
 
     /// SID to use where any value will do.
-    const A_TEST_SID: SecurityId = SecurityId(1000);
+    static A_TEST_SID: Lazy<SecurityId> = Lazy::new(unique_sid);
+
+    /// Returns a new `SecurityId` with unique id.
+    fn unique_sid() -> SecurityId {
+        static NEXT_ID: AtomicU32 = AtomicU32::new(1000);
+        SecurityId(NonZeroU32::new(NEXT_ID.fetch_add(1, Ordering::AcqRel)).unwrap())
+    }
 
     fn access_vector_from_permission<P: ClassPermission + Into<Permission> + 'static>(
         permission: P,
@@ -296,8 +307,8 @@ mod tests {
                 false,
                 PermissionCheck::has_permission(
                     &deny_all,
-                    A_TEST_SID,
-                    A_TEST_SID,
+                    A_TEST_SID.clone(),
+                    A_TEST_SID.clone(),
                     permission.clone()
                 )
             );
@@ -305,8 +316,8 @@ mod tests {
                 false,
                 PermissionCheckMut::has_permission(
                     &mut deny_all,
-                    A_TEST_SID,
-                    A_TEST_SID,
+                    A_TEST_SID.clone(),
+                    A_TEST_SID.clone(),
                     permission.clone()
                 )
             );
@@ -315,8 +326,8 @@ mod tests {
                 true,
                 PermissionCheck::has_permission(
                     &allow_all,
-                    A_TEST_SID,
-                    A_TEST_SID,
+                    A_TEST_SID.clone(),
+                    A_TEST_SID.clone(),
                     permission.clone()
                 )
             );
@@ -324,8 +335,8 @@ mod tests {
                 true,
                 PermissionCheckMut::has_permission(
                     &mut allow_all,
-                    A_TEST_SID,
-                    A_TEST_SID,
+                    A_TEST_SID.clone(),
+                    A_TEST_SID.clone(),
                     permission.clone()
                 )
             );
@@ -336,8 +347,8 @@ mod tests {
             false,
             PermissionCheck::has_permissions(
                 &deny_all,
-                A_TEST_SID,
-                A_TEST_SID,
+                A_TEST_SID.clone(),
+                A_TEST_SID.clone(),
                 permissions.clone()
             )
         );
@@ -345,8 +356,8 @@ mod tests {
             false,
             PermissionCheckMut::has_permissions(
                 &mut deny_all,
-                A_TEST_SID,
-                A_TEST_SID,
+                A_TEST_SID.clone(),
+                A_TEST_SID.clone(),
                 permissions.clone()
             )
         );
@@ -356,8 +367,8 @@ mod tests {
             true,
             PermissionCheck::has_permissions(
                 &allow_all,
-                A_TEST_SID,
-                A_TEST_SID,
+                A_TEST_SID.clone(),
+                A_TEST_SID.clone(),
                 permissions.clone()
             )
         );
@@ -365,8 +376,8 @@ mod tests {
             true,
             PermissionCheckMut::has_permissions(
                 &mut allow_all,
-                A_TEST_SID,
-                A_TEST_SID,
+                A_TEST_SID.clone(),
+                A_TEST_SID.clone(),
                 permissions
             )
         );
@@ -377,8 +388,8 @@ mod tests {
             true,
             PermissionCheck::has_permissions(
                 &deny_all,
-                A_TEST_SID,
-                A_TEST_SID,
+                A_TEST_SID.clone(),
+                A_TEST_SID.clone(),
                 empty_permissions.clone()
             )
         );
@@ -386,8 +397,8 @@ mod tests {
             true,
             PermissionCheckMut::has_permissions(
                 &mut deny_all,
-                A_TEST_SID,
-                A_TEST_SID,
+                A_TEST_SID.clone(),
+                A_TEST_SID.clone(),
                 empty_permissions.clone()
             )
         );
@@ -395,8 +406,8 @@ mod tests {
             true,
             PermissionCheck::has_permissions(
                 &allow_all,
-                A_TEST_SID,
-                A_TEST_SID,
+                A_TEST_SID.clone(),
+                A_TEST_SID.clone(),
                 empty_permissions.clone()
             )
         );
@@ -404,8 +415,8 @@ mod tests {
             true,
             PermissionCheckMut::has_permissions(
                 &mut allow_all,
-                A_TEST_SID,
-                A_TEST_SID,
+                A_TEST_SID.clone(),
+                A_TEST_SID.clone(),
                 empty_permissions
             )
         );

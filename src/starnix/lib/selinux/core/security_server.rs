@@ -19,7 +19,7 @@ use selinux_policy::{
     AccessVectorComputer, Policy, SecurityContext, SecurityContextParseError,
 };
 use starnix_sync::Mutex;
-use std::{collections::HashMap, ops::DerefMut, sync::Arc};
+use std::{collections::HashMap, num::NonZeroU32, ops::DerefMut, sync::Arc};
 use zerocopy::{AsBytes, NoCell};
 
 /// The version of the SELinux "status" file this implementation implements.
@@ -92,7 +92,7 @@ struct SecurityServerState {
     sids: HashMap<SecurityId, SecurityContext>,
 
     /// Identifier to allocate to the next new Security Context.
-    next_sid: u64,
+    next_sid: NonZeroU32,
 
     /// Describes the currently active policy.
     policy: Option<Arc<LoadedPolicy>>,
@@ -120,7 +120,7 @@ impl SecurityServerState {
             None => {
                 // Create and insert a new SID for `security_context`.
                 let sid = SecurityId(self.next_sid);
-                self.next_sid += 1;
+                self.next_sid = self.next_sid.checked_add(1).expect("exhausted SID namespace");
                 assert!(
                     self.sids.insert(sid.clone(), security_context).is_none(),
                     "impossible error: SID already exists."
@@ -161,7 +161,7 @@ impl SecurityServer {
         let status = SeLinuxStatus::new_default().expect("Failed to create SeLinuxStatus");
         let state = Mutex::new(SecurityServerState {
             sids: HashMap::new(),
-            next_sid: FIRST_UNUSED_SID,
+            next_sid: NonZeroU32::new(FIRST_UNUSED_SID).unwrap(),
             policy: None,
             booleans: SeLinuxBooleans::default(),
             status,
@@ -556,7 +556,7 @@ mod tests {
             .security_context_to_sid(security_context)
             .expect("creating SID from security context should succeed");
         assert_eq!(security_server.state.lock().sids.len(), 1);
-        assert!(sid.0 >= FIRST_UNUSED_SID);
+        assert!(sid.0.get() >= FIRST_UNUSED_SID);
     }
 
     #[fuchsia::test]

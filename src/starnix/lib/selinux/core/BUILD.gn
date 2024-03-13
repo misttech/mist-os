@@ -21,6 +21,7 @@ rustc_library("core") {
   test_deps = [
     "//src/lib/fuchsia",
     "//third_party/rust_crates:futures",
+    "//third_party/rust_crates:once_cell",
     "//third_party/rust_crates:rand",
   ]
   source_root = "lib.rs"

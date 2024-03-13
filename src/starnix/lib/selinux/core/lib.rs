@@ -9,15 +9,17 @@ pub mod seq_lock;
 
 pub use selinux_common::InitialSid;
 
+use std::num::NonZeroU32;
+
 /// The Security ID (SID) used internally to refer to a security context.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub struct SecurityId(u64);
+pub struct SecurityId(NonZeroU32);
 
 impl SecurityId {
     /// Returns a `SecurityId` encoding the specified initial Security Context.
     /// These are used when labeling kernel resources created before policy
     /// load, allowing the policy to determine the Security Context to use.
     pub fn initial(initial_sid: InitialSid) -> Self {
-        Self(initial_sid as u64)
+        Self(NonZeroU32::new(initial_sid as u32).unwrap())
     }
 }
