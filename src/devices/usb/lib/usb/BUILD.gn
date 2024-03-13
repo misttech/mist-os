@@ -103,6 +103,11 @@ source_set("cdc") {
   public_configs = [ ":includes" ]
 }
 
+source_set("dwc2") {
+  public = [ "include/usb/dwc2/metadata.h" ]
+  public_configs = [ ":includes" ]
+}
+
 source_set("peripheral") {
   public = [ "include/usb/peripheral.h" ]
   public_configs = [ ":includes" ]
