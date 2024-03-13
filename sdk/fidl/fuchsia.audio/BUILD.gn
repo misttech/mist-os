@@ -5,6 +5,9 @@
 import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.audio") {
+  sdk_category = "partner_internal"
+  sdk_area = "Media"
+
   sources = [
     "compression.fidl",
     "delay.fidl",

@@ -5,9 +5,13 @@
 import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.audio.device") {
+  sdk_category = "partner_internal"
+  sdk_area = "Media"
+
   sources = [
     "control.fidl",
     "device.fidl",
+    "overview.fidl",
     "provider.fidl",
     "registry.fidl",
   ]

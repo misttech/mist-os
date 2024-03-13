@@ -5,7 +5,11 @@
 import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.media2") {
+  sdk_category = "partner_internal"
+  sdk_area = "Media"
+
   sources = [
+    "overview.fidl",
     "payload_range.fidl",
     "reasons.fidl",
     "transport.fidl",
