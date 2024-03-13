@@ -7675,14 +7675,6 @@ Platform portability header for spinel.
 
 From //third_party/openthread/src/lib/spinel/BUILD.gn:32
 
-### src_fonts_verbose_logging
-
-Used in the structured configuration below.
-
-**Current value (from the default):** `false`
-
-From //src/fonts/BUILD.gn:14
-
 ### stack_size_section
 
 Whether to emit a stack-size section in the output file
