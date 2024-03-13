@@ -58,7 +58,12 @@ def spawn(
 
     attach_args = []
     for test in tests:
-        attach_args.extend(["--attach", test.info.name])
+        # If there are no explicit breakpoints, then we can weakly attach to all tests. Explicit
+        # breakpoints require us to load symbols proactively.
+        if not breakpoints:
+            attach_args.extend(["--execute", f"attach --weak {test.info.name}"])
+        else:
+            attach_args.extend(["--execute", f"attach {test.info.name}"])
 
     # If only --breakpoint was specified on the command line (we won't get here if neither
     # debug option was specified), we want to output a more general message than "test
@@ -76,8 +81,8 @@ def spawn(
         "debug",
         "connect",
         "--new-agent",
-        *attach_args,
         "--",
+        *attach_args,
         "--console-mode",
         "embedded",
         *embedded_mode_context_args,
