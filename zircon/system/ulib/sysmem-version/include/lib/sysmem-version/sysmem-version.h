@@ -86,7 +86,6 @@ template <typename T>
 struct TypeIdentity {
   using type = T;
 };
-// #if __Fuchsia_API_level__ >= FUCHSIA_HEAD
 template <typename T>
 using TypeIdentity_t = typename TypeIdentity<T>::type;
 
