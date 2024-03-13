@@ -10,6 +10,7 @@ Currently the following generation is supported.
 - Driversdoc
 - FIDL
 - Helpdoc
+- Syscalls
 
 ## Usage
 
