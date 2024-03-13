@@ -4,6 +4,7 @@
 
 use addr::TargetAddr;
 use anyhow::{Context as _, Result};
+use discovery::{DiscoverySources, TargetEvent, TargetHandle, TargetState};
 use errors::{ffx_bail, FfxError};
 use ffx_config::{keys::TARGET_DEFAULT_KEY, EnvironmentContext};
 use fidl::{endpoints::create_proxy, prelude::*};
@@ -13,7 +14,7 @@ use fidl_fuchsia_developer_ffx::{
 };
 use fidl_fuchsia_developer_remotecontrol::{RemoteControlMarker, RemoteControlProxy};
 use fidl_fuchsia_net as net;
-use futures::{select, Future, FutureExt, TryStreamExt};
+use futures::{select, Future, FutureExt, StreamExt, TryStreamExt};
 use itertools::Itertools;
 use netext::IsLocalAddr;
 use std::cmp::Ordering;
@@ -40,6 +41,7 @@ pub use query::TargetInfoQuery;
 pub use fidl_fuchsia_developer_ffx::TargetProxy;
 
 const FASTBOOT_INLINE_TARGET: &str = "ffx.fastboot.inline_target";
+const DISCOVERY_TIMEOUT: &str = "discovery.timeout";
 
 #[derive(Debug, Clone)]
 pub enum TargetKind {
@@ -202,49 +204,64 @@ pub async fn resolve_default_target_address(
 ) -> Result<Option<SocketAddr>> {
     let t = resolve_default_target(env_context).await?;
     let query = TargetInfoQuery::from(t.as_ref().map(|t| t.to_string()));
-    match query {
+    let nodename_or_serial = match query {
+        TargetInfoQuery::NodenameOrSerial(nnos) => nnos,
         TargetInfoQuery::First => {
             return Ok(None);
         }
-        TargetInfoQuery::NodenameOrSerial(_) => {}
         TargetInfoQuery::Addr(a) => {
             let scope_id = if let SocketAddr::V6(addr) = a { addr.scope_id() } else { 0 };
             return Ok(Some(TargetAddr::new(a.ip(), scope_id, SSH_PORT_DEFAULT).into()));
         }
-    }
-    // If we're here then we have to discover the target as it is either a nodename or serial
-    // number.
-    let info = mdns_discovery::discover_target_by(
-        mdns_discovery::MDNS_ONESHOT_DISCOVERY_TIMEOUT,
-        mdns_discovery::MDNS_PORT,
-        move |target_info| query.match_target_info(target_info),
+    };
+    let mut stream = discovery::wait_for_devices(
+        move |handle: &TargetHandle| {
+            // This will only match the nodename initially because checking the product state and
+            // returning an error will make it clearer to the user what the source of the error is.
+            handle.node_name.as_ref().map(|n| *n == nodename_or_serial).unwrap_or(false)
+        },
+        true,
+        false,
+        DiscoverySources::MDNS
+            | DiscoverySources::USB
+            | DiscoverySources::MANUAL
+            | DiscoverySources::EMULATOR,
     )
     .await?;
-    match info.ssh_address {
-        None => {}
-        Some(addr) => return Ok(Some(target_addr_info_to_socket(&addr))),
-    }
-    match info.addresses {
-        None => Ok(None),
-        Some(addresses) => {
-            let addrs = addresses
-                .iter()
-                .map(target_addr_info_to_socket)
-                .sorted_by(|a1, a2| {
-                    match (a1.ip().is_link_local_addr(), a2.ip().is_link_local_addr()) {
-                        (true, true) | (false, false) => Ordering::Equal,
-                        (true, false) => Ordering::Less,
-                        (false, true) => Ordering::Greater,
-                    }
-                })
-                .collect::<Vec<_>>();
-            Ok(addrs.into_iter().next().map(|mut addr| {
-                if addr.port() == 0 {
-                    addr.set_port(SSH_PORT_DEFAULT)
+    let delay = Duration::from_millis(env_context.get(DISCOVERY_TIMEOUT).await.unwrap_or(1000));
+    let event = timeout(delay, async { stream.next().await.transpose() })
+        .await??
+        .expect("target event should have been received");
+    match event {
+        TargetEvent::Added(target) => match target.state {
+            TargetState::Product(ref addresses) => {
+                if addresses.is_empty() {
+                    return Err(anyhow::anyhow!(
+                        "Target discovered but does not contain addresses: {target:?}"
+                    ));
                 }
-                addr
-            }))
-        }
+                let mut addrs_sorted = addresses
+                    .into_iter()
+                    .map(SocketAddr::from)
+                    .sorted_by(|a1, a2| {
+                        match (a1.ip().is_link_local_addr(), a2.ip().is_link_local_addr()) {
+                            (true, true) | (false, false) => Ordering::Equal,
+                            (true, false) => Ordering::Less,
+                            (false, true) => Ordering::Greater,
+                        }
+                    })
+                    .collect::<Vec<_>>();
+                let mut sock: SocketAddr = addrs_sorted.pop().unwrap();
+                if sock.port() == 0 {
+                    sock.set_port(SSH_PORT_DEFAULT)
+                }
+                Ok(Some(sock))
+            }
+            state => {
+                Err(anyhow::anyhow!("Target discovered but not in the correct state: {state:?}"))
+            }
+        },
+        _ => unreachable!(),
     }
 }
 
