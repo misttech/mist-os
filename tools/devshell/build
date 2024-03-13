@@ -154,8 +154,8 @@ function main {
       # The following options are used to specify GN toolchain for future
       # labels that appear on the command line.
       --host|--fidl|--default|--fuchsia|--toolchain=*)
-         fuchsia_targets+=("$1")
-         ;;
+        fuchsia_targets+=("$1")
+        ;;
 
       # Anything that follows the Ninja tool name is passed to the tool itself
       # and not processed by Ninja itself, so stop the loop right here. If
@@ -306,6 +306,20 @@ build_dir: \"${FUCHSIA_BUILD_DIR}\"
   else
     # If FX_BUILD_WITH_LABELS is set to 1, support GN labels directly.
     if [[ "${FX_BUILD_WITH_LABELS:-0}" == 1 && "${#fuchsia_targets[@]}" -gt 0 ]]; then
+      # A common mistake is to place a toolchain option after the GN label, thinking it
+      # applies to all labels. For example `fx build //src:foo --host` instead of
+      # `fx build --host //src:foo`.
+      #
+      # The latter builds //src:foo for the host, but the former builds //src:foo for Fuchsia,
+      # then ignores the --host option. This results in confusing build error messages
+      # (see https://fxbug.dev/328421720), so detect this here and make trailing toolchain
+      # options an error with an explicit message.
+      local last_index=$(("${#fuchsia_targets[@]}" - 1))
+      local last_fuchsia_target="${fuchsia_targets[${last_index}]}"
+      if [[ "${last_fuchsia_target}" =~ --.* ]]; then
+        fx-error "Toolchain option ${last_fuchsia_target} must be followed by at least one GN label"
+        exit 1
+      fi
       # Parse GN labels into a set of fully qualified GN labels
       build_api_client="${FUCHSIA_DIR}/build/api/client"
       # TODO(https://fxbug.dev/328316506): Remove --allow-unknown once GN is fixed.
