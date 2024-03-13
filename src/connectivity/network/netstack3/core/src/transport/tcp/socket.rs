@@ -2930,23 +2930,46 @@ where
                                 &conn.socket_options,
                             ) {
                                 Err(CloseError::NoConnection) => true,
-                                Err(CloseError::Closing) => false,
-                                Ok(()) => matches!(conn.state, State::Closed(_)),
+                                Err(CloseError::Closing) | Ok(()) => false,
                             };
-                            if already_closed {
-                                core_ctx.with_demux_mut(|DemuxState { socketmap }| {
-                                    socketmap
-                                        .conns_mut()
-                                        .remove(demux_id, addr)
-                                        .expect("failed to remove from socketmap");
-                                });
-                                let _: Option<_> = bindings_ctx.cancel_timer(id.downgrade());
-                            } else {
+                            // The connection transitions to closed because of
+                            // this call, we need to unregister it from the
+                            // socketmap.
+                            let now_closed = if !already_closed {
                                 do_send_inner(&id, conn, &addr, core_ctx, bindings_ctx);
+                                let now_closed = matches!(conn.state, State::Closed(_));
+                                if now_closed {
+                                    core_ctx.with_demux_mut(|DemuxState { socketmap }| {
+                                        socketmap
+                                            .conns_mut()
+                                            .remove(demux_id, addr)
+                                            .expect("failed to remove from socketmap");
+                                    });
+                                    let _: Option<_> = bindings_ctx.cancel_timer(id.downgrade());
+                                }
+                                now_closed
+                            } else {
+                                true
                             };
-                            already_closed
+                            if now_closed {
+                                debug_assert!(
+                                    core_ctx.with_demux_mut(|DemuxState { socketmap }| {
+                                        socketmap.conns_mut().entry(demux_id, addr).is_none()
+                                    }),
+                                    "lingering state in socketmap: demux_id: {:?}, addr: {:?}",
+                                    demux_id,
+                                    addr,
+                                );
+                                debug_assert_eq!(
+                                    bindings_ctx.scheduled_instant(id.downgrade()),
+                                    None,
+                                    "lingering timer for {:?}",
+                                    id,
+                                )
+                            };
+                            now_closed
                         }
-                        let already_closed = match core_ctx {
+                        let closed = match core_ctx {
                             MaybeDualStack::NotDualStack((core_ctx, converter)) => {
                                 let (conn, addr) = converter.convert(conn);
                                 do_close(
@@ -2979,7 +3002,7 @@ where
                                 }
                             }
                         };
-                        (already_closed, None)
+                        (closed, None)
                     }
                 }
             });
@@ -2995,8 +3018,8 @@ where
     ///
     /// For a connection, calling this function signals the other side of the
     /// connection that we will not be sending anything over the connection; The
-    /// connection will still stay in the socketmap even after reaching `Closed`
-    /// state.
+    /// connection will be removed from the socketmap if the state moves to the
+    /// `Closed` state.
     ///
     /// For a Listener, calling this function brings it back to bound state and
     /// shutdowns all the connection that is currently ready to be accepted.
@@ -3468,7 +3491,7 @@ where
         // Alias refs so we can move weak_id to the closure.
         let id_alias = &id;
         let bindings_ctx_alias = &mut *bindings_ctx;
-        let defunct =
+        let closed_and_defunct =
             core_ctx.with_socket_mut_transport_demux(&id, move |core_ctx, socket_state| {
                 let TcpSocketState { socket_state, ip_options: _ } = socket_state;
                 let id = id_alias;
@@ -3496,8 +3519,9 @@ where
                     CC: TransportIpContext<WireI, BC>
                         + TcpDemuxContext<WireI, CC::WeakDeviceId, BC>,
                 {
+                    let was_closed = matches!(conn.state, State::Closed(_));
                     do_send_inner(id, conn, addr, core_ctx, bindings_ctx);
-                    if conn.defunct && matches!(conn.state, State::Closed(_)) {
+                    if !was_closed && matches!(conn.state, State::Closed(_)) {
                         core_ctx.with_demux_mut(|DemuxState { socketmap }| {
                             socketmap
                                 .conns_mut()
@@ -3505,10 +3529,8 @@ where
                                 .expect("failed to remove from socketmap");
                         });
                         let _: Option<_> = bindings_ctx.cancel_timer(weak_id);
-                        true
-                    } else {
-                        false
                     }
+                    conn.defunct && matches!(conn.state, State::Closed(_))
                 }
                 match core_ctx {
                     MaybeDualStack::NotDualStack((core_ctx, converter)) => {
@@ -3547,7 +3569,7 @@ where
                     }
                 }
             });
-        if defunct {
+        if closed_and_defunct {
             // Remove the entry from the primary map and drop primary.
             destroy_socket(core_ctx, bindings_ctx, id);
         }
@@ -3846,35 +3868,36 @@ where
             if let State::Closed(Closed { reason }) = state {
                 debug!("handshake_status: {handshake_status:?}");
                 let _: bool = handshake_status.update_if_pending(HandshakeStatus::Aborted);
+                // Always unregister the socket from the socketmap.
+                match this_or_other_stack {
+                    EitherStack::ThisStack((core_ctx, demux_id, addr)) => {
+                        TcpDemuxContext::<I, _, _>::with_demux_mut(
+                            core_ctx,
+                            |DemuxState { socketmap }| {
+                                socketmap
+                                    .conns_mut()
+                                    .remove(&demux_id, addr)
+                                    .expect("failed to remove from socketmap");
+                            },
+                        );
+                    }
+                    EitherStack::OtherStack((core_ctx, demux_id, addr)) => {
+                        TcpDemuxContext::<I::OtherVersion, _, _>::with_demux_mut(
+                            core_ctx,
+                            |DemuxState { socketmap }| {
+                                socketmap
+                                    .conns_mut()
+                                    .remove(&demux_id, addr)
+                                    .expect("failed to remove from socketmap");
+                            },
+                        );
+                    }
+                };
+                let _: Option<_> = bindings_ctx.cancel_timer(id.downgrade());
                 match accept_queue {
                     Some(accept_queue) => {
                         accept_queue.remove(&id);
-                        // Remove the socket from demux and destroy it if not
-                        // held by the user.
-                        match this_or_other_stack {
-                            EitherStack::ThisStack((core_ctx, demux_id, addr)) => {
-                                TcpDemuxContext::<I, _, _>::with_demux_mut(
-                                    core_ctx,
-                                    |DemuxState { socketmap }| {
-                                        socketmap
-                                            .conns_mut()
-                                            .remove(&demux_id, addr)
-                                            .expect("failed to remove from socketmap");
-                                    },
-                                );
-                            }
-                            EitherStack::OtherStack((core_ctx, demux_id, addr)) => {
-                                TcpDemuxContext::<I::OtherVersion, _, _>::with_demux_mut(
-                                    core_ctx,
-                                    |DemuxState { socketmap }| {
-                                        socketmap
-                                            .conns_mut()
-                                            .remove(&demux_id, addr)
-                                            .expect("failed to remove from socketmap");
-                                    },
-                                );
-                            }
-                        }
+                        // destroy the socket if not held by the user.
                         return true;
                     }
                     None => {
@@ -4204,10 +4227,10 @@ fn close_pending_sockets<I, CC, BC>(
 
             match this_or_other_stack {
                 EitherStack::ThisStack((core_ctx, demux_id, state, ip_sock, conn_addr)) => {
-                    close_pending_socket(core_ctx, bindings_ctx, &demux_id, state, ip_sock, &conn_addr)
+                    close_pending_socket(core_ctx, bindings_ctx, &demux_id, conn_id.downgrade(), state, ip_sock, &conn_addr)
                 }
                 EitherStack::OtherStack((core_ctx, demux_id, state, ip_sock, conn_addr)) => {
-                    close_pending_socket(core_ctx, bindings_ctx, &demux_id, state, ip_sock, &conn_addr)
+                    close_pending_socket(core_ctx, bindings_ctx, &demux_id, conn_id.downgrade(), state, ip_sock, &conn_addr)
                 }
             }
         });
@@ -4215,28 +4238,36 @@ fn close_pending_sockets<I, CC, BC>(
     }
 }
 
-fn close_pending_socket<WireI, DC, BT>(
+fn close_pending_socket<WireI, SockI, DC, BC>(
     core_ctx: &mut DC,
-    bindings_ctx: &mut BT,
-    demux_id: &WireI::DemuxSocketId<DC::WeakDeviceId, BT>,
+    bindings_ctx: &mut BC,
+    demux_id: &WireI::DemuxSocketId<DC::WeakDeviceId, BC>,
+    timer_id: WeakTcpSocketId<SockI, DC::WeakDeviceId, BC>,
     state: &mut State<
-        BT::Instant,
-        BT::ReceiveBuffer,
-        BT::SendBuffer,
-        BT::ListenerNotifierOrProvidedBuffers,
+        BC::Instant,
+        BC::ReceiveBuffer,
+        BC::SendBuffer,
+        BC::ListenerNotifierOrProvidedBuffers,
     >,
     ip_sock: &IpSock<WireI, DC::WeakDeviceId, DefaultSendOptions>,
     conn_addr: &ConnAddr<ConnIpAddr<WireI::Addr, NonZeroU16, NonZeroU16>, DC::WeakDeviceId>,
 ) where
     WireI: DualStackIpExt,
-    DC: TransportIpContext<WireI, BT>
-        + DeviceIpSocketHandler<WireI, BT>
-        + TcpDemuxContext<WireI, DC::WeakDeviceId, BT>,
-    BT: TcpBindingsTypes,
+    SockI: DualStackIpExt,
+    DC: TransportIpContext<WireI, BC>
+        + DeviceIpSocketHandler<WireI, BC>
+        + TcpDemuxContext<WireI, DC::WeakDeviceId, BC>,
+    BC: TcpBindingsContext<SockI, DC::WeakDeviceId>,
 {
-    core_ctx.with_demux_mut(|DemuxState { socketmap }| {
-        socketmap.conns_mut().remove(demux_id, conn_addr).expect("failed to remove from socketmap");
-    });
+    if !matches!(state, State::Closed(_)) {
+        core_ctx.with_demux_mut(|DemuxState { socketmap }| {
+            socketmap
+                .conns_mut()
+                .remove(demux_id, conn_addr)
+                .expect("failed to remove from socketmap");
+        });
+        let _: Option<_> = bindings_ctx.cancel_timer(timer_id);
+    }
 
     if let Some(reset) = state.abort() {
         let ConnAddr { ip, device: _ } = conn_addr;
@@ -8021,5 +8052,47 @@ mod tests {
                 Err(SetDualStackEnabledError::NotCapable)
             );
         });
+    }
+
+    #[ip_test]
+    fn closed_not_in_demux<I: Ip + TcpTestIpExt>()
+    where
+        TcpCoreCtx<FakeDeviceId, TcpBindingsCtx<FakeDeviceId>>: TcpContext<
+            I,
+            TcpBindingsCtx<FakeDeviceId>,
+            SingleStackConverter = I::SingleStackConverter,
+            DualStackConverter = I::DualStackConverter,
+        >,
+    {
+        let (mut net, local, _local_snd_end, remote) = bind_listen_connect_accept_inner::<I>(
+            I::UNSPECIFIED_ADDRESS,
+            BindConfig { client_port: None, server_port: PORT_1, client_reuse_addr: false },
+            0,
+            0.0,
+        );
+        // Assert that the sockets are bound in the socketmap.
+        for ctx_name in [LOCAL, REMOTE] {
+            net.with_context(ctx_name, |ContextPair { core_ctx, bindings_ctx: _ }| {
+                TcpDemuxContext::<I, _, _>::with_demux(core_ctx, |DemuxState { socketmap }| {
+                    assert_eq!(socketmap.len(), 1);
+                })
+            });
+        }
+        for (ctx_name, socket) in [(LOCAL, &local), (REMOTE, &remote)] {
+            net.with_context(ctx_name, |ctx| {
+                assert_eq!(ctx.tcp_api().shutdown(socket, ShutdownType::SendAndReceive), Ok(true));
+            });
+        }
+        net.run_until_idle();
+        // Both sockets are closed by now, but they are not defunct because we
+        // never called `close` on them, but they should not be in the demuxer
+        // regardless.
+        for ctx_name in [LOCAL, REMOTE] {
+            net.with_context(ctx_name, |ContextPair { core_ctx, bindings_ctx: _ }| {
+                TcpDemuxContext::<I, _, _>::with_demux(core_ctx, |DemuxState { socketmap }| {
+                    assert_eq!(socketmap.len(), 0);
+                })
+            });
+        }
     }
 }

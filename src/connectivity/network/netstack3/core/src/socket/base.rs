@@ -520,6 +520,13 @@ pub struct BoundSocketMap<I: Ip, D: device::Id, A: SocketMapAddrSpec, S: SocketM
     addr_to_state: SocketMap<AddrVec<I, D, A>, Bound<S>>,
 }
 
+impl<I: Ip, D: device::Id, A: SocketMapAddrSpec, S: SocketMapStateSpec> BoundSocketMap<I, D, A, S> {
+    #[cfg(test)]
+    pub(crate) fn len(&self) -> usize {
+        self.addr_to_state.len()
+    }
+}
+
 /// Uninstantiable tag type for denoting listening sockets.
 pub(crate) enum Listener {}
 /// Uninstantiable tag type for denoting connected sockets.

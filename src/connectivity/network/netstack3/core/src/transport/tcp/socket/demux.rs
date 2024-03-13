@@ -626,18 +626,20 @@ where
             }
         }
         State::Closed(Closed { reason }) => {
+            // We remove the socket from the socketmap and cancel the timers
+            // regardless of the socket being defunct or not. The justification
+            // is that CLOSED is a synthetic state and it means no connection
+            // exists, thus it should not exist in the demuxer.
+            TcpDemuxContext::<WireI, _, _>::with_demux_mut(
+                core_ctx,
+                |DemuxState { socketmap, .. }| {
+                    assert_matches!(socketmap.conns_mut().remove(&demux_id, &conn_addr), Ok(()))
+                },
+            );
+            let _: Option<_> = bindings_ctx.cancel_timer(conn_id.downgrade());
             if *defunct {
-                // If the incoming segment caused the state machine to
-                // enter Closed state, and the user has already promised
-                // not to use the connection again, we can remove the
-                // connection from the socketmap.
-                TcpDemuxContext::<WireI, _, _>::with_demux_mut(
-                    core_ctx,
-                    |DemuxState { socketmap, .. }| {
-                        assert_matches!(socketmap.conns_mut().remove(&demux_id, &conn_addr), Ok(()))
-                    },
-                );
-                let _: Option<_> = bindings_ctx.cancel_timer(conn_id.downgrade());
+                // If the client has promised to not touch the socket again,
+                // we can destroy the socket finally.
                 return ConnectionIncomingSegmentDisposition::Destroy;
             }
             let _: bool = handshake_status.update_if_pending(match reason {

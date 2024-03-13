@@ -123,6 +123,11 @@ where
     A: IterShadows + Hash + Eq,
     V: Tagged<A>,
 {
+    #[cfg(test)]
+    pub(crate) fn len(&self) -> usize {
+        self.len
+    }
+
     /// Gets a reference to the value associated with the given key, if any.
     pub fn get(&self, key: &A) -> Option<&V> {
         let Self { map, len: _ } = self;

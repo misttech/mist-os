@@ -2443,7 +2443,10 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
                 // actively opened, i.e., initiated by `connect`.
                 let (rcv_buffer, snd_buffer) = simultaneous_open
                     .take()
-                    .ok_or(CloseError::NoConnection)?
+                    .expect(
+                        "a SYN-RCVD state that is in the pending queue \
+                        should call abort instead of close",
+                    )
                     .into_buffers(*buffer_sizes);
                 // Note: `Send` in `FinWait1` always has a FIN queued.
                 // Since we don't support sending data when connection
