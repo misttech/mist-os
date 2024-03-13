@@ -174,22 +174,19 @@ impl MapStore {
                 if schema.key_size != 4 {
                     return error!(EINVAL);
                 }
-                let buffer_size = schema
-                    .value_size
-                    .checked_mul(schema.max_entries)
-                    .ok_or_else(|| errno!(EINVAL))?;
-                Ok(MapStore::Array(new_pinned_buffer(buffer_size as usize)))
+                let buffer_size = compute_storage_size(schema)?;
+                Ok(MapStore::Array(new_pinned_buffer(buffer_size)))
             }
-            bpf_map_type_BPF_MAP_TYPE_HASH => Ok(MapStore::Hash(HashStorage::new(&schema))),
+            bpf_map_type_BPF_MAP_TYPE_HASH => Ok(MapStore::Hash(HashStorage::new(&schema)?)),
 
             // These types are in use, but not yet implemented. Incorrectly use Hash for these
             bpf_map_type_BPF_MAP_TYPE_DEVMAP_HASH => {
                 track_stub!(TODO("https://fxbug.dev/323847465"), "BPF_MAP_TYPE_DEVMAP_HASH");
-                Ok(MapStore::Hash(HashStorage::new(&schema)))
+                Ok(MapStore::Hash(HashStorage::new(&schema)?))
             }
             bpf_map_type_BPF_MAP_TYPE_RINGBUF => {
                 track_stub!(TODO("https://fxbug.dev/323847465"), "BPF_MAP_TYPE_RINGBUF");
-                Ok(MapStore::Hash(HashStorage::new(&schema)))
+                Ok(MapStore::Hash(HashStorage::new(&schema)?))
             }
 
             // Unimplemented types
@@ -327,6 +324,14 @@ impl MapStore {
     }
 }
 
+fn compute_storage_size(schema: &MapSchema) -> Result<usize, Errno> {
+    schema
+        .value_size
+        .checked_mul(schema.max_entries)
+        .map(|v| v as usize)
+        .ok_or_else(|| errno!(EINVAL))
+}
+
 struct HashStorage {
     index_map: BTreeMap<Vec<u8>, usize>,
     data: PinnedBuffer,
@@ -334,9 +339,10 @@ struct HashStorage {
 }
 
 impl HashStorage {
-    fn new(schema: &MapSchema) -> Self {
-        let data = new_pinned_buffer((schema.value_size * schema.max_entries) as usize);
-        Self { index_map: Default::default(), data, free_list: Default::default() }
+    fn new(schema: &MapSchema) -> Result<Self, Errno> {
+        let buffer_size = compute_storage_size(schema)?;
+        let data = new_pinned_buffer(buffer_size);
+        Ok(Self { index_map: Default::default(), data, free_list: Default::default() })
     }
 
     fn len(&self) -> usize {
