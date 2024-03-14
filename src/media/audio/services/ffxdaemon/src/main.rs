@@ -2,10 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+mod clock;
 mod device;
 mod error;
 mod ring_buffer;
 mod socket;
+
+use clock::create_reference_clock;
 
 use anyhow::{anyhow, Context, Error};
 use error::ControllerError;
@@ -162,53 +165,6 @@ impl AudioDaemon {
         }
     }
 
-    fn setup_reference_clock(clock_type: fac::ClockType) -> Result<Option<zx::Clock>, Error> {
-        match clock_type {
-            fac::ClockType::Flexible(_) => Ok(None),
-            fac::ClockType::SystemMonotonic(_) => {
-                let clock =
-                    zx::Clock::create(zx::ClockOpts::CONTINUOUS | zx::ClockOpts::AUTO_START, None)
-                        .map_err(|e| anyhow!("Creating reference clock failed: {}", e))?;
-                let rights_clock = clock
-                    .replace_handle(zx::Rights::READ | zx::Rights::DUPLICATE | zx::Rights::TRANSFER)
-                    .map_err(|e| anyhow!("Replace handle for reference clock failed: {}", e))?;
-                Ok(Some(rights_clock))
-            }
-            fac::ClockType::Custom(info) => {
-                let rate = info.rate_adjust;
-                let offset = info.offset;
-                let now = zx::Time::get_monotonic();
-                let delta_time = now + zx::Duration::from_nanos(offset.unwrap_or(0).into());
-
-                let update_builder = zx::ClockUpdate::builder()
-                    .rate_adjust(rate.unwrap_or(0))
-                    .absolute_value(now, delta_time);
-
-                let auto_start = if offset.is_some() {
-                    zx::ClockOpts::empty()
-                } else {
-                    zx::ClockOpts::AUTO_START
-                };
-
-                let clock = zx::Clock::create(zx::ClockOpts::CONTINUOUS | auto_start, None)
-                    .map_err(|e| anyhow!("Creating reference clock failed: {}", e))?;
-
-                clock
-                    .update(update_builder.build())
-                    .map_err(|e| anyhow!("Updating reference clock failed: {}", e))?;
-
-                Ok(Some(
-                    clock
-                        .replace_handle(
-                            zx::Rights::READ | zx::Rights::DUPLICATE | zx::Rights::TRANSFER,
-                        )
-                        .map_err(|e| anyhow!("Replace handle for reference clock failed: {}", e))?,
-                ))
-            }
-            fac::ClockTypeUnknown!() => Ok(None),
-        }
-    }
-
     async fn create_capturer_from_location(
         location: fac::RecordSource,
         format: &Format,
@@ -253,7 +209,7 @@ impl AudioDaemon {
                     config.usage.and_then(|usage| capturer_proxy.set_usage(usage).ok());
 
                     if let Some(clock_type) = config.clock {
-                        let reference_clock = Self::setup_reference_clock(clock_type)?;
+                        let reference_clock = create_reference_clock(clock_type)?;
                         capturer_proxy.set_reference_clock(reference_clock)?;
                     }
                     Ok(capturer_proxy)
@@ -333,7 +289,7 @@ impl AudioDaemon {
                     audio_component.create_audio_renderer(server_end)?;
 
                     if let Some(clock_type) = renderer_config.clock {
-                        let reference_clock = Self::setup_reference_clock(clock_type)?;
+                        let reference_clock = create_reference_clock(clock_type)?;
                         audio_renderer_proxy.set_reference_clock(reference_clock)?;
                     }
 
