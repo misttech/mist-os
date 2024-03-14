@@ -124,6 +124,21 @@ class WlanSL4FTests(unittest.TestCase):
             self.wlan_obj.get_iface_id_list()
         self.sl4f_obj.run.assert_called()
 
+    def test_get_country_success(self) -> None:
+        """Test for Wlan.get_country()."""
+        self.sl4f_obj.run.return_value = {"result": "US"}
+
+        self.assertEqual(self.wlan_obj.get_country(1), "US")
+        self.sl4f_obj.run.assert_called()
+
+    def test_get_country_failure_resp_not_str(self) -> None:
+        """Test for Wlan.get_country()."""
+        self.sl4f_obj.run.return_value = {"result": [1]}
+
+        with self.assertRaises(TypeError):
+            self.wlan_obj.get_country(1)
+        self.sl4f_obj.run.assert_called()
+
     def test_get_phy_id_list_success(self) -> None:
         """Test for Wlan.get_phy_id_list()."""
         self.sl4f_obj.run.return_value = {"result": [1, 2, 3]}

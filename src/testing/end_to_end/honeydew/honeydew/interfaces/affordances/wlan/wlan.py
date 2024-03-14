@@ -9,6 +9,7 @@ import abc
 from honeydew.typing.wlan import (
     BssDescription,
     ClientStatusResponse,
+    CountryCodeList,
     QueryIfaceResponse,
     WlanMacRole,
 )
@@ -69,6 +70,17 @@ class Wlan(abc.ABC):
 
         Returns:
             A list of wlan iface IDs that are present on the device.
+        """
+
+    @abc.abstractmethod
+    def get_country(self, phy_id: int) -> CountryCodeList:
+        """Queries the currently configured country code from phy `phy_id`.
+
+        Args:
+            phy_id: A phy id that is present on the device.
+
+        Returns:
+            The currently configured country code from `phy_id`.
         """
 
     @abc.abstractmethod

@@ -15,6 +15,7 @@ from honeydew.typing.wlan import (
     BssType,
     ChannelBandwidth,
     ClientStatusResponse,
+    CountryCodeList,
     Protection,
     QueryIfaceResponse,
     ServingApInfo,
@@ -39,6 +40,7 @@ class _Sl4fMethods(enum.StrEnum):
     CREATE_IFACE = "wlan.create_iface"
     DESTROY_IFACE = "wlan.destroy_iface"
     DISCONNECT = "wlan.disconnect"
+    GET_COUNTRY = "wlan.get_country"
     GET_IFACE_ID_LIST = "wlan.get_iface_id_list"
     GET_PHY_ID_LIST = "wlan.get_phy_id_list"
     QUERY_IFACE = "wlan.query_iface"
@@ -141,6 +143,31 @@ class Wlan(wlan.Wlan):
             errors.Sl4fError: Sl4f run command failed.
         """
         self._sl4f.run(method=_Sl4fMethods.DISCONNECT)
+
+    def get_country(self, phy_id: int) -> CountryCodeList:
+        """Queries the currently configured country code from phy `phy_id`.
+
+        Args:
+            phy_id: A phy id that is present on the device.
+
+        Returns:
+            The currently configured country code from `phy_id`.
+
+        Raises:
+            errors.Sl4fError: Sl4f run command failed.
+            TypeError: Return value not a list.
+        """
+        method_params = {"phy_id": phy_id}
+
+        resp = self._sl4f.run(
+            method=_Sl4fMethods.GET_COUNTRY, params=method_params
+        )
+        result = resp.get("result", "")
+
+        if not isinstance(result, str):
+            raise TypeError(f'Expected "result" to be str, got {type(result)}')
+
+        return CountryCodeList(result)
 
     def get_iface_id_list(self) -> list[int]:
         """Get list of wlan iface IDs on device.
