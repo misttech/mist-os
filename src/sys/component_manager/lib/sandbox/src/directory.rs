@@ -7,7 +7,8 @@ use fidl_fuchsia_component_sandbox as fsandbox;
 use fidl_fuchsia_io as fio;
 use fuchsia_async as fasync;
 use fuchsia_zircon::{self as zx, AsHandleRef};
-use vfs::execution_scope::ExecutionScope;
+use std::sync::Arc;
+use vfs::{directory::entry::DirectoryEntry, execution_scope::ExecutionScope, remote::RemoteLike};
 
 use crate::{registry, CapabilityTrait, Open};
 
@@ -66,6 +67,12 @@ impl Directory {
     /// after it is removed from the registry.
     pub(crate) fn set_client_end(&mut self, client_end: ClientEnd<fio::DirectoryMarker>) {
         self.client_end = Some(client_end)
+    }
+
+    /// Turn the [Directory] into a remote VFS node.
+    pub(crate) fn into_remote(self) -> Arc<impl RemoteLike + DirectoryEntry> {
+        let client_end = ClientEnd::<fio::DirectoryMarker>::from(self);
+        vfs::remote::remote_dir(client_end.into_proxy().unwrap())
     }
 }
 
@@ -133,7 +140,6 @@ mod tests {
     use futures::channel::{mpsc, oneshot};
     use futures::StreamExt;
     use lazy_static::lazy_static;
-    use std::sync::Arc;
     use std::sync::Mutex;
     use test_util::Counter;
     use vfs::{

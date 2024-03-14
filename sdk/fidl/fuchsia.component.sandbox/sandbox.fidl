@@ -181,8 +181,19 @@ open protocol Factory {
     ///
     /// This registers the `Openable` as a sandbox capability,
     /// represented by the client end peer of `server_end`.
-    strict CreateOpen(resource struct {
+    flexible CreateOpen(resource struct {
         client_end client_end:fuchsia.io.Openable;
         server_end server_end:fuchsia.io.Openable;
     }) -> ();
+
+    /// Creates a [`Directory`] capability from a [`client_end:fuchsia.io.Directory`], and
+    /// registers it as a sandbox capability.
+    // TODO(https://fxbug.dev/329496030): Currently if users want to create a `Directory` capability
+    // externally, they have to use this, they can't just create a `Capability::Directory` directly.
+    // Decide what the policy should be.
+    flexible CreateDirectory(resource struct {
+        client_end client_end:fuchsia.io.Directory;
+    }) -> (resource struct {
+        capability Capability;
+    });
 };

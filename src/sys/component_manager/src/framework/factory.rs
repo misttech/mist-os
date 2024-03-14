@@ -16,7 +16,7 @@ use {
     fuchsia_zircon::AsHandleRef,
     futures::prelude::*,
     lazy_static::lazy_static,
-    sandbox::{Capability, Dict, Open, Receiver},
+    sandbox::{Capability, Dict, Directory, Open, Receiver},
     std::sync::Arc,
     tracing::warn,
 };
@@ -90,6 +90,10 @@ impl FactoryCapabilityHost {
                 self.create_open(client_end, server_end);
                 responder.send()?;
             }
+            fsandbox::FactoryRequest::CreateDirectory { client_end, responder } => {
+                let capability = self.create_directory(client_end);
+                responder.send(capability)?;
+            }
             fsandbox::FactoryRequest::_UnknownMethod { ordinal, .. } => {
                 warn!(%ordinal, "fuchsia.component.sandbox/Factory received unknown method");
             }
@@ -118,6 +122,16 @@ impl FactoryCapabilityHost {
         let open: Open = openable_client.into();
         let client_end_koid = openable_server.basic_info().unwrap().related_koid;
         open.serve_and_register(openable_server.into_stream().unwrap(), client_end_koid);
+    }
+
+    fn create_directory(
+        &self,
+        client_end: ClientEnd<fio::DirectoryMarker>,
+    ) -> fsandbox::Capability {
+        let directory = Directory::new(client_end);
+        // This will add the Directory to the registry.
+        let client_end: ClientEnd<fio::DirectoryMarker> = directory.into();
+        fsandbox::Capability::Directory(client_end)
     }
 
     fn create_dictionary(
@@ -214,6 +228,26 @@ mod tests {
         } else {
             panic!("unexpected request");
         }
+    }
+
+    #[fuchsia::test]
+    async fn create_directory() {
+        let mut tasks = fasync::TaskGroup::new();
+
+        let host = FactoryCapabilityHost::new();
+        let (factory_proxy, stream) =
+            endpoints::create_proxy_and_stream::<fsandbox::FactoryMarker>().unwrap();
+        tasks.spawn(async move {
+            host.serve(stream).await.unwrap();
+        });
+
+        let (client_end, _server_end) = endpoints::create_endpoints::<fio::DirectoryMarker>();
+        let expected_koid = client_end.get_koid().unwrap();
+        let directory = factory_proxy.create_directory(client_end).await.unwrap();
+        let fsandbox::Capability::Directory(directory) = directory else {
+            panic!("wrong type");
+        };
+        assert_eq!(directory.get_koid().unwrap(), expected_koid);
     }
 
     #[fuchsia::test]
