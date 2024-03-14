@@ -10,10 +10,11 @@
 use crate::enumerations::{EngineConsoleType, ShowDetail};
 use async_trait::async_trait;
 use emulator_instance::{EmulatorConfiguration, EmulatorInstanceData, EngineState, EngineType};
+use ffx_config::EnvironmentContext;
 use fho::Result;
-use fidl_fuchsia_developer_ffx as ffx;
 use std::{backtrace::Backtrace, process::Command};
-#[async_trait]
+
+#[async_trait(?Send)]
 pub trait EmulatorEngine: Send + Sync {
     /// Expose the EmulatorInstanceData object. This stores all the instance data for the
     /// emulator instance. There is no "mut" getter to avoid changing the contents without
@@ -44,8 +45,8 @@ pub trait EmulatorEngine: Send + Sync {
     /// emulator will be running independently, or an error will be sent back explaining the failure.
     async fn start(
         &mut self,
+        _context: &EnvironmentContext,
         mut _emulator_cmd: Command,
-        _proxy: &ffx::TargetCollectionProxy,
     ) -> Result<i32> {
         let bt = Backtrace::force_capture();
         unimplemented!(

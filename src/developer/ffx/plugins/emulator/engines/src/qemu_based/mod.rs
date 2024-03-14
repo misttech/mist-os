@@ -17,15 +17,16 @@ use emulator_instance::{
     NetworkingMode,
 };
 use errors::ffx_bail;
+use ffx_config::EnvironmentContext;
 use ffx_emulator_common::{
     config,
     config::EMU_START_TIMEOUT,
     dump_log_to_out, host_is_mac, process,
-    target::is_active,
     tuntap::{tap_ready, TAP_INTERFACE_NAME},
 };
 use ffx_emulator_config::{EmulatorEngine, EngineConsoleType, ShowDetail};
 use ffx_ssh::SshKeyFiles;
+use ffx_target::KnockError;
 use fho::{bug, return_bug, return_user_error, Result};
 use fidl_fuchsia_developer_ffx as ffx;
 use fuchsia_async::Timer;
@@ -118,7 +119,7 @@ pub(crate) struct PortPair {
 /// QEMU as the emulator.
 /// This allows the implementation to be shared
 /// across multiple engine types.
-#[async_trait]
+#[async_trait(?Send)]
 pub(crate) trait QemuBasedEngine: EmulatorEngine {
     /// Checks that the required files are present
     fn check_required_files(&self, guest: &GuestConfig) -> Result<()> {
@@ -390,8 +391,8 @@ pub(crate) trait QemuBasedEngine: EmulatorEngine {
 
     async fn run(
         &mut self,
+        context: &EnvironmentContext,
         mut emulator_cmd: Command,
-        proxy: &ffx::TargetCollectionProxy,
     ) -> Result<i32> {
         if self.emu_config().runtime.console == ConsoleType::None {
             let stdout = File::create(&self.emu_config().host.log).map_err(|e| {
@@ -472,15 +473,18 @@ pub(crate) trait QemuBasedEngine: EmulatorEngine {
             tracing::debug!("Waiting for Fuchsia to start (up to {} seconds)...", startup_timeout);
             let name = self.emu_config().runtime.name.clone();
             let start = Instant::now();
-
+            let mut connection_errors = Vec::new();
             while start.elapsed().as_secs() <= startup_timeout {
-                if let Some(info) = is_active(proxy, &name).await {
+                let compat_res =
+                    ffx_target::knock_target_daemonless(Some(name.clone()), &context).await;
+                if let Ok(compat) = compat_res {
                     println!("\nEmulator is ready.");
                     tracing::debug!(
                         "Emulator is ready after {} seconds.",
                         start.elapsed().as_secs()
                     );
-                    match info.compatibility {
+                    let compat = compat.map(|c| ffx::CompatibilityInfo::from(c.into()));
+                    match compat {
                         Some(compatibility)
                             if compatibility.state == ffx::CompatibilityState::Supported =>
                         {
@@ -493,6 +497,20 @@ pub(crate) trait QemuBasedEngine: EmulatorEngine {
                         None => println!("Warning: no compatibility information is available"),
                     }
                     return Ok(0);
+                } else {
+                    match compat_res.unwrap_err() {
+                        KnockError::NonCriticalError(e) => {
+                            connection_errors.push(e);
+                            tracing::debug!(
+                                "Unable to connect to emulator: {:?}",
+                                connection_errors.last().unwrap()
+                            );
+                        }
+                        KnockError::CriticalError(e) => {
+                            eprintln!("Failed to connect to emulator: {e:?}");
+                            return Ok(1);
+                        }
+                    }
                 }
 
                 // Perform a check to make sure the process is still alive, otherwise report
@@ -533,6 +551,10 @@ pub(crate) trait QemuBasedEngine: EmulatorEngine {
                 "After {} seconds, the emulator has not responded to network queries.",
                 self.emu_config().runtime.startup_timeout.as_secs()
             );
+            eprintln!("Here are the following errors encountered while connecting:");
+            for (i, e) in connection_errors.iter().enumerate() {
+                eprintln!("\t{}: {e:?}", i + 1);
+            }
             if self.is_running().await {
                 eprintln!("The emulator process is still running (pid {}).", self.get_pid());
                 eprintln!(
@@ -854,7 +876,7 @@ mod tests {
     use emulator_instance::{
         DataAmount, DataUnits, EmulatorInstanceData, EmulatorInstanceInfo, EngineType, PortMapping,
     };
-    use ffx_config::{ConfigLevel, EnvironmentContext};
+    use ffx_config::ConfigLevel;
     use serde::{Deserialize, Serialize};
     use std::{io::Read, os::unix::net::UnixListener};
     use tempfile::{tempdir, TempDir};
@@ -871,7 +893,7 @@ mod tests {
             todo!()
         }
     }
-    #[async_trait]
+    #[async_trait(?Send)]
     impl EmulatorEngine for TestEngine {
         fn engine_state(&self) -> EngineState {
             EngineState::default()

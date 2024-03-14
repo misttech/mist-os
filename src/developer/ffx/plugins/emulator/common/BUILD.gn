@@ -13,15 +13,10 @@ if (is_host) {
       "src/fletcher64.rs",
       "src/lib.rs",
       "src/process.rs",
-      "src/target.rs",
       "src/tuntap.rs",
     ]
     deps = [
-      "//sdk/fidl/fuchsia.developer.remotecontrol:fuchsia.developer.remotecontrol_rust",
-      "//src/developer/ffx/fidl:fuchsia.developer.ffx_rust",
       "//src/developer/ffx/lib/fho:lib",
-      "//src/developer/ffx/lib/timeout:lib",
-      "//src/lib/fidl/rust/fidl",
       "//third_party/rust_crates:anyhow",
       "//third_party/rust_crates:byteorder",
       "//third_party/rust_crates:cfg-if",
@@ -32,9 +27,6 @@ if (is_host) {
       "//third_party/rust_crates:tracing",
     ]
     test_deps = [
-      "//src/lib/fuchsia",
-      "//src/lib/fuchsia-async",
-      "//third_party/rust_crates:futures",
       "//third_party/rust_crates:libc",
       "//third_party/rust_crates:tempfile",
     ]

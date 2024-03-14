@@ -4,6 +4,7 @@
 
 use addr::TargetAddr;
 use anyhow::{Context as _, Result};
+use compat_info::CompatibilityInfo;
 use discovery::{DiscoverySources, TargetEvent, TargetHandle, TargetState};
 use errors::{ffx_bail, FfxError};
 use ffx_config::{keys::TARGET_DEFAULT_KEY, EnvironmentContext};
@@ -197,12 +198,12 @@ pub(crate) fn target_addr_info_to_socket(ti: &TargetAddrInfo) -> SocketAddr {
     socket
 }
 
-/// Attempts to resolve the default target's ssh-able address. Returns Some(_) if a target has been
+/// Attempts to resolve the target's ssh-able address. Returns Some(_) if a target has been
 /// found, None otherwise.
-pub async fn resolve_default_target_address(
+pub async fn resolve_target_address(
+    t: &Option<TargetKind>,
     env_context: &EnvironmentContext,
 ) -> Result<Option<SocketAddr>> {
-    let t = resolve_default_target(env_context).await?;
     let query = TargetInfoQuery::from(t.as_ref().map(|t| t.to_string()));
     let nodename_or_serial = match query {
         TargetInfoQuery::NodenameOrSerial(nnos) => nnos,
@@ -216,6 +217,7 @@ pub async fn resolve_default_target_address(
     };
     let mut stream = discovery::wait_for_devices(
         move |handle: &TargetHandle| {
+            // TODO(b/329328874): This should use query matching.
             // This will only match the nodename initially because checking the product state and
             // returning an error will make it clearer to the user what the source of the error is.
             handle.node_name.as_ref().map(|n| *n == nodename_or_serial).unwrap_or(false)
@@ -392,15 +394,35 @@ impl OvernetClient {
     }
 }
 
+// Helper function that attempts to resolve the default target. If none is set, then will attempt
+// to override it with the supplied target query string.
+async fn resolve_target_or_query(
+    target_query: Option<String>,
+    context: &EnvironmentContext,
+) -> Result<Option<TargetKind>> {
+    let mut target = resolve_default_target(&context).await.context("resolving default target")?;
+    if target.is_none() {
+        if target_query.is_none() {
+            return Err(anyhow::anyhow!("Cannot knock unknown target").into());
+        }
+    }
+    // Target query being set should take precedence over the default target.
+    if target_query.is_some() {
+        target = maybe_inline_target(target_query, context).await;
+    }
+    Ok(target)
+}
+
 /// Identical to the above "knock" but does not use the daemon.
 ///
 /// Unlike other errors, this is not intended to be run in a tight loop.
-pub async fn knock_target_daemonless(context: &EnvironmentContext) -> Result<(), KnockError> {
-    let target = resolve_default_target(&context).await.context("resolving default target")?;
-    if target.is_none() {
-        return Err(anyhow::anyhow!("Cannot knock unknown target").into());
-    }
-    let addr = resolve_default_target_address(&context)
+pub async fn knock_target_daemonless(
+    target_query: Option<String>,
+    context: &EnvironmentContext,
+) -> Result<Option<CompatibilityInfo>, KnockError> {
+    let target =
+        resolve_target_or_query(target_query, context).await.map_err(KnockError::CriticalError)?;
+    let addr = resolve_target_address(&target, context)
         .await?
         .ok_or_else(|| {
             anyhow::anyhow!(
@@ -417,26 +439,25 @@ pub async fn knock_target_daemonless(context: &EnvironmentContext) -> Result<(),
     // These are the two places where errors can propagate to the user. For other code using the FIDL
     // pipe it might be trickier to ensure that errors from the pipe are caught. For things like
     // FHO integration these errors will probably just be handled outside of the main subtool.
-    let result = async {
+    let result = async move {
         let rcs_proxy = client.connect_remote_control().await?;
-        rcs::knock_rcs(&rcs_proxy)
-            .await
-            .map_err(|e| KnockError::CriticalError(anyhow::anyhow!("{e:?}")))
+        rcs::knock_rcs(&rcs_proxy).await.map_err(|e| anyhow::anyhow!("{e:?}"))
     }
     .await;
     match result {
-        Ok(()) => Ok(()),
+        Ok(()) => Ok(fidl_pipe.compatibility_info()),
         Err(e) => {
             let mut pipe_errors = Vec::new();
             while let Ok(Some(err)) = error_stream.try_recv() {
                 pipe_errors.push(err);
             }
             if !pipe_errors.is_empty() {
-                return Err(
-                    anyhow::anyhow!("Error getting RCS proxy: {e:?}\n{:?}", pipe_errors).into()
-                );
+                return Err(KnockError::NonCriticalError(anyhow::anyhow!(
+                    "Error getting RCS proxy: {e:?}\n{:?}",
+                    pipe_errors
+                )));
             }
-            Err(KnockError::CriticalError(anyhow::anyhow!("{:?}", e)))
+            Err(KnockError::NonCriticalError(anyhow::anyhow!("{:?}", e).into()))
         }
     }
 }
@@ -529,6 +550,41 @@ mod test {
 
         let target = get_default_target(&env.context).await.unwrap();
         assert_eq!(target, Some("some_target".to_owned()));
+    }
+
+    #[fuchsia::test]
+    async fn test_default_target_unset_query() {
+        let env = ffx_config::test_init().await.unwrap();
+        let ctx = &env.context;
+        ctx.query(TARGET_DEFAULT_KEY)
+            .level(Some(ConfigLevel::User))
+            .set(Value::String("foobar".to_owned()))
+            .await
+            .unwrap();
+        let res = resolve_target_or_query(None, &ctx).await.unwrap();
+        assert_eq!(res.as_ref().map(ToString::to_string), Some("foobar".to_owned()));
+    }
+
+    #[fuchsia::test]
+    async fn test_default_target_set_query() {
+        let env = ffx_config::test_init().await.unwrap();
+        let ctx = &env.context;
+        ctx.query(TARGET_DEFAULT_KEY)
+            .level(Some(ConfigLevel::User))
+            .set(Value::String("foobar".to_owned()))
+            .await
+            .unwrap();
+        // This should override the default target.
+        let res = resolve_target_or_query(Some("florp".to_owned()), &ctx).await.unwrap();
+        assert_eq!(res.as_ref().map(ToString::to_string), Some("florp".to_owned()));
+    }
+
+    #[fuchsia::test]
+    async fn test_no_default_target_set() {
+        let env = ffx_config::test_init().await.unwrap();
+        let ctx = &env.context;
+        let res = resolve_target_or_query(None, &ctx).await;
+        assert!(res.is_err());
     }
 
     #[fuchsia::test]

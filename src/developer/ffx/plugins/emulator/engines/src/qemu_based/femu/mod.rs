@@ -12,10 +12,10 @@ use emulator_instance::{
     get_instance_dir, EmulatorConfiguration, EmulatorInstanceData, EmulatorInstanceInfo,
     EngineState, EngineType,
 };
+use ffx_config::EnvironmentContext;
 use ffx_emulator_common::config;
 use ffx_emulator_config::{EmulatorEngine, EngineConsoleType, ShowDetail};
 use fho::{bug, return_bug, Result};
-use fidl_fuchsia_developer_ffx as ffx;
 use std::{env, process::Command};
 
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -45,7 +45,7 @@ impl FemuEngine {
     }
 }
 
-#[async_trait]
+#[async_trait(?Send)]
 impl EmulatorEngine for FemuEngine {
     async fn stage(&mut self) -> Result<()> {
         let result = <Self as QemuBasedEngine>::stage(&mut self)
@@ -63,12 +63,8 @@ impl EmulatorEngine for FemuEngine {
         }
     }
 
-    async fn start(
-        &mut self,
-        emulator_cmd: Command,
-        proxy: &ffx::TargetCollectionProxy,
-    ) -> Result<i32> {
-        self.run(emulator_cmd, proxy).await
+    async fn start(&mut self, context: &EnvironmentContext, emulator_cmd: Command) -> Result<i32> {
+        self.run(context, emulator_cmd).await
     }
 
     fn show(&self, details: Vec<ShowDetail>) -> Vec<ShowDetail> {

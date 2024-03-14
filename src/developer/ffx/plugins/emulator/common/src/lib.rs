@@ -17,7 +17,6 @@ use std::{
 pub mod config;
 pub mod fletcher64;
 pub mod process;
-pub mod target;
 pub mod tuntap;
 
 pub use fletcher64::{get_file_hash, FletcherHasher};

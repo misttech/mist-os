@@ -14,10 +14,10 @@ use emulator_instance::{
     get_instance_dir, write_to_disk, CpuArchitecture, EmulatorConfiguration, EmulatorInstanceData,
     EmulatorInstanceInfo, EngineState, EngineType, PointingDevice,
 };
+use ffx_config::EnvironmentContext;
 use ffx_emulator_common::config::QEMU_TOOL;
 use ffx_emulator_config::{EmulatorEngine, EngineConsoleType, ShowDetail};
 use fho::{bug, return_bug, Result};
-use fidl_fuchsia_developer_ffx as ffx;
 use serde::{Deserialize, Serialize};
 use std::{
     env,
@@ -54,7 +54,7 @@ impl QemuEngine {
     }
 }
 
-#[async_trait]
+#[async_trait(?Send)]
 impl EmulatorEngine for QemuEngine {
     fn get_instance_data(&self) -> &EmulatorInstanceData {
         &self.data
@@ -76,12 +76,8 @@ impl EmulatorEngine for QemuEngine {
         }
     }
 
-    async fn start(
-        &mut self,
-        emulator_cmd: Command,
-        proxy: &ffx::TargetCollectionProxy,
-    ) -> Result<i32> {
-        self.run(emulator_cmd, proxy).await
+    async fn start(&mut self, context: &EnvironmentContext, emulator_cmd: Command) -> Result<i32> {
+        self.run(context, emulator_cmd).await
     }
 
     fn show(&self, details: Vec<ShowDetail>) -> Vec<ShowDetail> {

@@ -18,7 +18,6 @@ if (is_host) {
     deps = [
       "//build/sdk/meta:rust",
       "//src/developer/ffx/config:lib",
-      "//src/developer/ffx/fidl:fuchsia.developer.ffx_rust",
       "//src/developer/ffx/lib/emulator_instance:lib",
       "//src/developer/ffx/lib/errors:lib",
       "//src/developer/ffx/lib/fho:lib",
@@ -41,10 +40,8 @@ if (is_host) {
     ]
     test_deps = [
       "//build/sdk/meta:rust",
-      "//src/developer/ffx/fidl:fuchsia.developer.ffx_rust",
       "//src/lib/assembly/assembly_manifest",
       "//src/lib/assembly/partitions_config",
-      "//src/lib/fidl/rust/fidl",
       "//src/lib/fuchsia",
       "//third_party/rust_crates:async-trait",
       "//third_party/rust_crates:camino",

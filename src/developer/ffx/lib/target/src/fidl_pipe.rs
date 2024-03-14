@@ -4,6 +4,7 @@
 
 use anyhow::Result;
 use async_channel::Receiver;
+use compat_info::CompatibilityInfo;
 use ffx_config::EnvironmentContext;
 use ffx_ssh::ssh::build_ssh_command_with_env;
 use fuchsia_async::Task;
@@ -38,6 +39,7 @@ pub struct FidlPipe {
     task: Option<Task<()>>,
     error_queue: Receiver<Option<anyhow::Error>>,
     circuit_id: u64,
+    compat: Option<CompatibilityInfo>,
 }
 
 #[derive(thiserror::Error, Debug)]
@@ -92,11 +94,18 @@ pub fn overnet_pipe(node: Arc<overnet_core::Router>) -> Result<fidl::AsyncSocket
 
 type PipeFut<'a> = Pin<Box<dyn Future<Output = ()> + 'a>>;
 
+struct PipeTasks<'a> {
+    pipe_rx: PipeFut<'a>,
+    pipe_tx: PipeFut<'a>,
+    pipe_err: PipeFut<'a>,
+    compat: Option<CompatibilityInfo>,
+}
+
 async fn create_pipe_tasks<'a>(
     cmd: &mut Child,
     node: Arc<overnet_core::Router>,
     error_sender: async_channel::Sender<Option<anyhow::Error>>,
-) -> Result<(PipeFut<'a>, PipeFut<'a>, PipeFut<'a>)> {
+) -> Result<PipeTasks<'a>> {
     let (pipe_rx, mut pipe_tx) = tokio::io::split(overnet_pipe(node).map_err(|e| {
         FidlPipeError::InternalError(
             format!("Unable to create overnet_pipe from {e:?}"),
@@ -111,7 +120,7 @@ async fn create_pipe_tasks<'a>(
         BUFFER_SIZE,
         cmd.stderr.take().expect("process should have stderr"),
     );
-    let _ = ffx_ssh::parse::parse_ssh_output(&mut stdout, &mut stderr, false).await?;
+    let (_addr, compat) = ffx_ssh::parse::parse_ssh_output(&mut stdout, &mut stderr, false).await?;
     let mut stdin = cmd.stdin.take().expect("process should have stdin");
     let err_clone = error_sender.clone();
     let copy_in = async move {
@@ -137,7 +146,12 @@ async fn create_pipe_tasks<'a>(
             }
         }
     };
-    Ok((Box::pin(copy_in), Box::pin(copy_out), Box::pin(stderr_reader)))
+    Ok(PipeTasks {
+        pipe_rx: Box::pin(copy_in),
+        pipe_tx: Box::pin(copy_out),
+        pipe_err: Box::pin(stderr_reader),
+        compat,
+    })
 }
 
 // TODO(b/327683942): The error handling code needs better test coverage.
@@ -154,6 +168,10 @@ impl FidlPipe {
         overnet_node: Arc<overnet_core::Router>,
     ) -> Result<Self> {
         Self::run_ssh(target, env_context, overnet_node).await
+    }
+
+    pub fn compatibility_info(&self) -> Option<CompatibilityInfo> {
+        self.compat.clone()
     }
 
     pub fn circuit_id(&self) -> u64 {
@@ -188,7 +206,7 @@ impl FidlPipe {
         );
         let ssh_cmd = ssh.stdout(Stdio::piped()).stdin(Stdio::piped()).stderr(Stdio::piped());
         let mut ssh = ssh_cmd.spawn().map_err(|e| FidlPipeError::SpawnError(e.to_string()))?;
-        let (pipe_rx, pipe_tx, pipe_err) =
+        let PipeTasks { pipe_rx, pipe_tx, pipe_err, compat } =
             create_pipe_tasks(&mut ssh, overnet_node, errors_sender.clone()).await?;
         let errors_clone = errors_sender.clone();
         let main_task = async move {
@@ -202,6 +220,7 @@ impl FidlPipe {
             task: Some(Task::local(main_task)),
             error_queue: errors_receiver,
             circuit_id,
+            compat,
         })
     }
 

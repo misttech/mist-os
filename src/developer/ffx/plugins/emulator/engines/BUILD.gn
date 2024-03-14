@@ -26,6 +26,7 @@ if (is_host) {
       "//src/developer/ffx/lib/errors:lib",
       "//src/developer/ffx/lib/fho:lib",
       "//src/developer/ffx/lib/ssh:lib",
+      "//src/developer/ffx/lib/target:lib",
       "//src/developer/ffx/plugins/emulator/common:ffx_emulator_common",
       "//src/developer/ffx/plugins/emulator/configuration:ffx_emulator_config",
       "//src/lib/fuchsia-async",

@@ -7,12 +7,12 @@ use anyhow::Context;
 use async_trait::async_trait;
 use emulator_instance::{clean_up_instance_dir, EmulatorConfiguration, EngineType, NetworkingMode};
 use errors::ffx_bail;
+use ffx_config::EnvironmentContext;
 use ffx_emulator_common::get_file_hash;
 use ffx_emulator_config::EmulatorEngine;
 use ffx_emulator_engines::{process_flag_template, EngineBuilder};
 use ffx_emulator_start_args::StartCommand;
-use fho::{daemon_protocol, FfxContext, FfxMain, FfxTool, Result, SimpleWriter, TryFromEnv};
-use fidl_fuchsia_developer_ffx::TargetCollectionProxy;
+use fho::{FfxContext, FfxMain, FfxTool, Result, SimpleWriter, TryFromEnv};
 use pbms::LoadedProductBundle;
 use std::str::FromStr;
 
@@ -24,7 +24,7 @@ pub(crate) const DEFAULT_NAME: &str = "fuchsia-emulator";
 /// EngineOperations trait is used to allow mocking of
 /// these methods.
 #[cfg_attr(test, mockall::automock)]
-#[async_trait]
+#[async_trait(?Send)]
 pub trait EngineOperations: TryFromEnv + 'static {
     async fn get_engine_by_name(
         &self,
@@ -45,19 +45,23 @@ pub trait EngineOperations: TryFromEnv + 'static {
     ) -> Result<LoadedProductBundle>;
 
     async fn clean_up_instance_dir(&self, instance_name: &str) -> Result<()>;
+
+    fn context(&self) -> EnvironmentContext;
 }
 
 #[derive(Default)]
-pub struct EngineOperationsData;
+pub struct EngineOperationsData {
+    context: Option<EnvironmentContext>,
+}
 
 #[async_trait(?Send)]
 impl TryFromEnv for EngineOperationsData {
-    async fn try_from_env(_env: &fho::FhoEnvironment) -> Result<Self, fho::Error> {
-        Ok(Self::default())
+    async fn try_from_env(env: &fho::FhoEnvironment) -> Result<Self, fho::Error> {
+        Ok(Self { context: Some(env.context.clone()) })
     }
 }
 
-#[async_trait]
+#[async_trait(?Send)]
 impl EngineOperations for EngineOperationsData {
     async fn get_engine_by_name(
         &self,
@@ -93,6 +97,10 @@ impl EngineOperations for EngineOperationsData {
     async fn clean_up_instance_dir(&self, instance_name: &str) -> Result<()> {
         clean_up_instance_dir(instance_name).await.map_err(|e| e.into())
     }
+
+    fn context(&self) -> EnvironmentContext {
+        self.context.as_ref().expect("emulator environment must be set").clone()
+    }
 }
 
 /// Sub-sub tool for `emu start`
@@ -101,8 +109,6 @@ pub struct EmuStartTool<T: EngineOperations> {
     #[command]
     cmd: StartCommand,
     engine_operations: T,
-    #[with(daemon_protocol())]
-    target_collection: TargetCollectionProxy,
 }
 
 // Since this is a part of a legacy plugin, add
@@ -183,7 +189,7 @@ impl<T: EngineOperations> FfxMain for EmuStartTool<T> {
 
         // If we're just staging the instance, do not call start.
         if !self.cmd.stage && !self.cmd.dry_run {
-            match engine.start(emulator_cmd, &self.target_collection).await {
+            match engine.start(&self.engine_operations.context(), emulator_cmd).await {
                 Ok(0) => Ok(()),
                 Ok(_) => ffx_bail!("Non zero return code"),
                 Err(e) => return Err(e),
@@ -472,7 +478,7 @@ mod tests {
         }
     }
 
-    #[async_trait]
+    #[async_trait(?Send)]
     impl EmulatorEngine for TestEngine {
         async fn save_to_disk(&self) -> fho::Result<()> {
             Ok(())
@@ -490,8 +496,8 @@ mod tests {
         }
         async fn start(
             &mut self,
+            _context: &EnvironmentContext,
             emulator_cmd: Command,
-            _proxy: &TargetCollectionProxy,
         ) -> fho::Result<i32> {
             self.did_start = true;
             (self.start_test_fn)(emulator_cmd)?;
@@ -588,16 +594,7 @@ mod tests {
     }
 
     async fn make_test_emu_start_tool(cmd: StartCommand) -> EmuStartTool<MockEngineOperations> {
-        let (proxy, _) = fidl::endpoints::create_proxy_and_stream::<
-            <TargetCollectionProxy as fidl::endpoints::Proxy>::Protocol,
-        >()
-        .unwrap();
-
-        EmuStartTool {
-            cmd,
-            engine_operations: MockEngineOperations::new(),
-            target_collection: proxy,
-        }
+        EmuStartTool { cmd, engine_operations: MockEngineOperations::new() }
     }
 
     // Check that a running instance is an error
@@ -637,10 +634,12 @@ mod tests {
     #[fuchsia::test]
     async fn test_start_with_instance_dir() {
         let env = ffx_config::test_init().await.unwrap();
+        let env_context = env.context.clone();
 
         let cmd = StartCommand::default();
         let mut tool = make_test_emu_start_tool(cmd).await;
 
+        tool.engine_operations.expect_context().returning(move || env_context.clone()).times(1);
         tool.engine_operations
             .expect_get_engine_by_name()
             .returning(|_| {
@@ -664,6 +663,7 @@ mod tests {
         });
 
         tool.engine_operations.expect_clean_up_instance_dir().returning(|_| Ok(())).times(1);
+        tool.engine_operations.expect_context().times(0);
 
         let pb =
             ProductBundle::V2(make_test_product_bundle(env.isolate_root.path()).expect("test pb"));
@@ -706,6 +706,7 @@ mod tests {
             .expect_load_product_bundle()
             .returning(move |_| Ok(loaded_pb.clone()))
             .times(1);
+        tool.engine_operations.expect_context().returning(move || env.context.clone()).times(1);
 
         tool.main(SimpleWriter::new()).await.expect("main in test_get_engine_no_reuse_makes_new");
         Ok(())
@@ -714,7 +715,7 @@ mod tests {
     // Check that reuse and config together is still new_engine (i.e. config overrides reuse)
     #[fuchsia::test]
     async fn test_get_engine_with_config_doesnt_reuse() -> Result<()> {
-        let _env = ffx_config::test_init().await.unwrap();
+        let env = ffx_config::test_init().await.unwrap();
 
         let cmd = StartCommand {
             reuse: true,
@@ -749,6 +750,7 @@ mod tests {
             .times(1);
 
         tool.engine_operations.expect_load_product_bundle().times(0);
+        tool.engine_operations.expect_context().returning(move || env.context.clone()).times(1);
 
         tool.main(SimpleWriter::new())
             .await
@@ -789,6 +791,7 @@ mod tests {
             .expect_load_product_bundle()
             .returning(move |_| Ok(loaded_pb.clone()))
             .times(1);
+        tool.engine_operations.expect_context().returning(move || env.context.clone()).times(1);
 
         tool.main(SimpleWriter::new())
             .await
@@ -826,6 +829,7 @@ mod tests {
             .expect_load_product_bundle()
             .returning(move |_| Ok(loaded_pb.clone()))
             .times(1);
+        tool.engine_operations.expect_context().returning(move || env.context.clone()).times(1);
 
         tool.main(SimpleWriter::new())
             .await
@@ -868,6 +872,7 @@ mod tests {
             .expect_load_product_bundle()
             .returning(move |_| Ok(loaded_pb.clone()))
             .times(1);
+        tool.engine_operations.expect_context().returning(move || env.context.clone()).times(1);
 
         tool.main(SimpleWriter::new())
             .await
@@ -979,6 +984,7 @@ mod tests {
             .expect_load_product_bundle()
             .returning(move |_| Ok(loaded_pb.clone()))
             .times(1);
+        tool.engine_operations.expect_context().returning(move || env.context.clone()).times(1);
 
         let result = tool.main(SimpleWriter::new()).await;
         assert!(result.is_ok(), "{:?}", result.err());
@@ -1017,6 +1023,7 @@ mod tests {
             .expect_load_product_bundle()
             .returning(move |_| Ok(loaded_pb.clone()))
             .times(1);
+        tool.engine_operations.expect_context().returning(move || env.context.clone()).times(1);
 
         tool.main(SimpleWriter::new()).await?;
         Ok(())
@@ -1025,7 +1032,7 @@ mod tests {
     // Ensure start() skips the stage() call is a custom config is provided
     #[fuchsia::test]
     async fn test_custom_config_doesnt_stage() -> Result<()> {
-        let _env = ffx_config::test_init().await.unwrap();
+        let env = ffx_config::test_init().await.unwrap();
 
         let cmd = StartCommand { config: Some("filename".into()), ..Default::default() };
 
@@ -1045,6 +1052,7 @@ mod tests {
             })
             .times(1);
 
+        tool.engine_operations.expect_context().returning(move || env.context.clone()).times(1);
         tool.engine_operations.expect_load_product_bundle().times(0);
 
         tool.main(SimpleWriter::new()).await?;
@@ -1055,6 +1063,7 @@ mod tests {
     #[fuchsia::test]
     async fn test_edit() -> Result<()> {
         let env = ffx_config::test_init().await.unwrap();
+        let env_context = env.context.clone();
 
         let cmd = StartCommand { edit: true, ..Default::default() };
 
@@ -1087,6 +1096,7 @@ mod tests {
                 Ok(())
             })
             .times(1);
+        tool.engine_operations.expect_context().returning(move || env_context.clone()).times(1);
 
         let pb = ProductBundle::V2(make_test_product_bundle(env.isolate_root.path())?);
         let loaded_pb = LoadedProductBundle::new(pb, "some/path/to_bundle");
@@ -1103,11 +1113,13 @@ mod tests {
     #[fuchsia::test]
     async fn test_staging_edits() -> Result<()> {
         let env = ffx_config::test_init().await.unwrap();
+        let env_context = env.context.clone();
 
         let cmd = StartCommand::default();
 
         let mut tool = make_test_emu_start_tool(cmd).await;
 
+        tool.engine_operations.expect_context().returning(move || env_context.clone()).times(1);
         tool.engine_operations
             .expect_new_engine()
             .returning(|_, _| {
@@ -1170,6 +1182,7 @@ mod tests {
             .expect_load_product_bundle()
             .returning(move |_| Ok(loaded_pb.clone()))
             .times(1);
+        tool.engine_operations.expect_context().returning(move || env.context.clone()).times(1);
 
         // Only look for the existing engine once.
         tool.engine_operations.expect_get_engine_by_name().returning(|_| Ok(None)).times(1);
@@ -1238,6 +1251,7 @@ mod tests {
                 }) as Box<dyn EmulatorEngine>))
             })
             .times(1);
+        tool.engine_operations.expect_context().returning(move || env.context.clone()).times(1);
 
         // New engine should not be made.
         tool.engine_operations.expect_new_engine().times(0);
@@ -1331,6 +1345,7 @@ mod tests {
             .expect_load_product_bundle()
             .returning(move |_| Ok(loaded_pb.clone()))
             .times(1);
+        tool.engine_operations.expect_context().times(0);
 
         tool.finalize_start_command().await.unwrap();
 
@@ -1354,6 +1369,7 @@ mod tests {
             .expect_load_product_bundle()
             .returning(move |_| Ok(loaded_pb.clone()))
             .times(1);
+        tool.engine_operations.expect_context().times(0);
 
         tool.finalize_start_command().await.unwrap();
 
@@ -1377,6 +1393,8 @@ mod tests {
             .expect_load_product_bundle()
             .returning(move |_| Ok(loaded_pb.clone()))
             .times(1);
+
+        tool.engine_operations.expect_context().times(0);
 
         tool.finalize_start_command().await.unwrap();
 
