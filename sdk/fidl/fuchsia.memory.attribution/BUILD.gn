@@ -1,0 +1,21 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/fidl/fidl.gni")
+
+fidl("fuchsia.memory.attribution") {
+  sdk_category = "internal"
+  sources = [ "attribution.fidl" ]
+
+  public_deps = [ "//zircon/vdso/zx" ]
+
+  # TODO(https://fxbug.dev/307580082): This protocol is under construction.
+  visibility = [
+    "//examples/components/runner/colocated/*",
+    "//src/developer/memory/*",
+    "//src/performance/memory/*",
+    "//src/sys/component_manager/*",
+    "//src/sys/lib/elf_runner/*",
+  ]
+}
