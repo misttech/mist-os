@@ -154,6 +154,28 @@ impl Path {
         self.inner.as_str()
     }
 
+    /// Returns a path with `prefix` as a prefix.  This will preserve the result of is_dir().
+    pub fn with_prefix(&self, prefix: &Self) -> Self {
+        if prefix.is_empty() {
+            Self { is_dir: self.is_dir, inner: self.inner[self.next..].to_string(), next: 0 }
+        } else {
+            let end = if prefix.is_dir { prefix.inner.len() - 1 } else { prefix.inner.len() };
+            if self.is_empty() && !self.is_dir {
+                Self { is_dir: false, inner: prefix.inner[prefix.next..end].to_string(), next: 0 }
+            } else {
+                Self {
+                    is_dir: self.is_dir,
+                    inner: format!(
+                        "{}/{}",
+                        &prefix.inner[prefix.next..end],
+                        &self.inner[self.next..]
+                    ),
+                    next: 0,
+                }
+            }
+        }
+    }
+
     /// Like `into_string` but returns a reference and the path returned is valid for fuchsia.io
     /// i.e. if there are no remaining components, "." is returned.
     fn remainder(&self) -> &str {
@@ -719,5 +741,42 @@ mod tests {
         let invalid = "..".to_string();
         let path: Result<Path, _> = invalid.try_into();
         assert!(path.is_err());
+    }
+
+    #[test]
+    fn with_prefix() {
+        let mut foo: Path = "apple/ball".try_into().unwrap();
+        let mut bar: Path = "cat/dog/".try_into().unwrap();
+
+        let combined = bar.with_prefix(&foo);
+        assert_eq!(combined.as_str(), "apple/ball/cat/dog/");
+        assert!(combined.is_dir());
+
+        let combined = foo.with_prefix(&bar);
+        assert_eq!(combined.as_str(), "cat/dog/apple/ball");
+        assert!(!combined.is_dir());
+
+        let combined = bar.with_prefix(&bar);
+        assert_eq!(combined.as_str(), "cat/dog/cat/dog/");
+        assert!(combined.is_dir());
+
+        bar.next();
+        let combined = foo.with_prefix(&bar);
+        assert_eq!(combined.as_str(), "dog/apple/ball");
+        assert!(!combined.is_dir());
+
+        foo.next();
+        foo.next();
+        let combined = foo.with_prefix(&bar);
+        assert_eq!(combined.as_str(), "dog");
+        assert!(!combined.is_dir());
+
+        let combined = Path::dot().with_prefix(&Path::dot());
+        assert_eq!(combined.as_str(), "");
+        assert!(!combined.is_dir());
+
+        let combined = bar.with_prefix(&Path::dot());
+        assert_eq!(combined.as_str(), "dog/");
+        assert!(combined.is_dir());
     }
 }

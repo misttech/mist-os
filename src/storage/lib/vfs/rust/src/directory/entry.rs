@@ -250,3 +250,80 @@ impl<'a> OpenRequest<'a> {
         }
     }
 }
+
+/// A sub-node of a directory.  This will work with types that implement Directory as well as
+/// RemoteDir.
+pub struct SubNode<T: ?Sized> {
+    parent: Arc<T>,
+    path: Path,
+    entry_type: fio::DirentType,
+}
+
+impl<T: DirectoryEntry + ?Sized> SubNode<T> {
+    /// Returns a sub node of an existing entry.  The parent should be a directory (it accepts
+    /// DirectoryEntry so that it works for remotes).
+    pub fn new(parent: Arc<T>, path: Path, entry_type: fio::DirentType) -> SubNode<T> {
+        assert_eq!(parent.entry_info().type_(), fio::DirentType::Directory);
+        Self { parent, path, entry_type }
+    }
+}
+
+impl<T: DirectoryEntry + ?Sized> DirectoryEntry for SubNode<T> {
+    fn entry_info(&self) -> EntryInfo {
+        EntryInfo::new(fio::INO_UNKNOWN, self.entry_type)
+    }
+
+    fn open_entry(self: Arc<Self>, mut request: OpenRequest<'_>) -> Result<(), Status> {
+        request.path = request.path.with_prefix(&self.path);
+        self.parent.clone().open_entry(request)
+    }
+}
+
+#[cfg(all(test, target_os = "fuchsia"))]
+mod tests {
+    use {
+        super::SubNode,
+        crate::{
+            assert_read, directory::entry_container::Directory, execution_scope::ExecutionScope,
+            file::vmo::read_only, path::Path, pseudo_directory,
+        },
+        fidl::endpoints::{create_endpoints, ClientEnd},
+        fidl_fuchsia_io as fio,
+        std::sync::Arc,
+    };
+
+    #[fuchsia::test]
+    async fn sub_node() {
+        let root = pseudo_directory!(
+            "a" => pseudo_directory!(
+                "b" => pseudo_directory!(
+                    "c" => pseudo_directory!(
+                        "d" => read_only(b"foo")
+                    )
+                )
+            )
+        );
+        let sub_node = Arc::new(SubNode::new(
+            root,
+            Path::validate_and_split("a/b").unwrap(),
+            fio::DirentType::Directory,
+        ));
+        let scope = ExecutionScope::new();
+        let (client, server) = create_endpoints();
+
+        let root2 = pseudo_directory!(
+            "e" => sub_node
+        );
+
+        root2.open(
+            scope.clone(),
+            fio::OpenFlags::RIGHT_READABLE,
+            Path::validate_and_split("e/c/d").unwrap(),
+            server,
+        );
+        assert_read!(
+            ClientEnd::<fio::FileMarker>::from(client.into_channel()).into_proxy().unwrap(),
+            "foo"
+        );
+    }
+}
