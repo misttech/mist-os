@@ -71,12 +71,8 @@ class VmObjectPaged final : public VmObject {
 
   zx_status_t Resize(uint64_t size) override;
 
-  uint64_t size_locked() const TA_REQ(lock()) { return cow_pages_locked()->size_locked(); }
+  uint64_t size_locked() const override TA_REQ(lock()) { return cow_pages_locked()->size_locked(); }
 
-  uint64_t size() const override TA_EXCL(lock()) {
-    Guard<CriticalMutex> guard{lock()};
-    return size_locked();
-  }
   bool is_contiguous() const override { return (options_ & kContiguous); }
   bool is_resizable() const override { return (options_ & kResizable); }
   bool is_discardable() const override { return (options_ & kDiscardable); }

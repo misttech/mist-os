@@ -43,7 +43,7 @@ class VmObjectPhysical final : public VmObject {
     return parent_user_id_;
   }
 
-  uint64_t size() const override { return size_; }
+  uint64_t size_locked() const override { return size_; }
 
   zx_status_t Lookup(uint64_t offset, uint64_t len, LookupFunction lookup_fn) override;
   zx_status_t LookupContiguous(uint64_t offset, uint64_t len, paddr_t* out_paddr) override;

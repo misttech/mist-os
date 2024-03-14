@@ -1021,6 +1021,14 @@ zx_status_t VmMapping::PageFaultLocked(vaddr_t va, const uint pf_flags,
   uint64_t max_out_pages = ktl::min((max_map - va) / PAGE_SIZE, kMaxPages);
   DEBUG_ASSERT(max_out_pages > 0);
 
+  const uint64_t vmo_size = object_->size_locked();
+  if (vmo_offset >= vmo_size) {
+    return ZX_ERR_OUT_OF_RANGE;
+  }
+
+  // Trim out pages to the limit of the VMO.
+  max_out_pages = ktl::min(max_out_pages, (vmo_size - vmo_offset) / PAGE_SIZE);
+
   uint64_t out_pages = 0;
   __UNINITIALIZED paddr_t pages[kMaxPages];
 
@@ -1029,12 +1037,6 @@ zx_status_t VmMapping::PageFaultLocked(vaddr_t va, const uint pf_flags,
   if (likely(object_->is_paged())) {
     VmObjectPaged* object = static_cast<VmObjectPaged*>(object_.get());
     AssertHeld(object->lock_ref());
-    const uint64_t vmo_size = object->size_locked();
-    if (vmo_offset >= vmo_size) {
-      return ZX_ERR_OUT_OF_RANGE;
-    }
-    // Trim out pages to the limit of the VMO.
-    max_out_pages = ktl::min(max_out_pages, (vmo_size - vmo_offset) / PAGE_SIZE);
 
     // If this is a write fault and the VMO supports dirty tracking, only lookup 1 page. The pages
     // will also be marked dirty for a write, which we only want for the current page. We could
@@ -1098,17 +1100,12 @@ zx_status_t VmMapping::PageFaultLocked(vaddr_t va, const uint pf_flags,
   } else {
     VmObjectPhysical* object = static_cast<VmObjectPhysical*>(object_.get());
     AssertHeld(object->lock_ref());
-    const uint64_t vmo_size = object->size();
-    if (vmo_offset >= vmo_size) {
-      return ZX_ERR_OUT_OF_RANGE;
-    }
-    // Trim out pages to the limit of the VMO.
-    out_pages = ktl::min(max_out_pages, (vmo_size - vmo_offset) / PAGE_SIZE);
 
+    // Already validated the size, and since physical VMOs are always allocated, and not resizable,
+    // we know we can always retrieve the maximum number of pages without failure.
+    out_pages = max_out_pages;
     zx_status_t status =
         object->LookupContiguousLocked(vmo_offset, out_pages * PAGE_SIZE, &pages[0]);
-    // Already validated the size, and since physical VMOs are always allocated this should never
-    // fail.
     ASSERT(status == ZX_OK);
 
     // Query aspace and adjust the mapping if there is already a page mapped here.
