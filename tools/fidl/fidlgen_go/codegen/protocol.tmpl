@@ -94,30 +94,6 @@ type {{ .Name }} interface {
 {{- end }}
 }
 
-{{ $transitionalBaseName := .TransitionalBaseName }}
-
-type {{.TransitionalBaseName}} struct {}
-
-{{ range .Methods }}
-{{- if and .IsTransitional .HasRequest }}
-{{- if .Request }}
-func (_ *{{$transitionalBaseName}}) {{ .Name }} (ctx_ _bindings.Context, {{ .Request.NamesAndTypes }})
-{{- else }}
-func (_ *{{$transitionalBaseName}}) {{ .Name }} (ctx_ _bindings.Context)
-{{- end }}
-{{- if .HasResponse -}}
-	{{- if .Response }} ({{- .Response.Types -}}, error) {
-	{{- else -}}
-		error {
-	{{ end -}}
-{{- else -}}
-	error {
-{{- end -}}
-	panic("Not Implemented")
-}
-{{- end }}
-{{- end }}
-
 {{- if eq .ProxyType "ChannelProxy" }}
 type {{ .RequestName }} _bindings.InterfaceRequest
 

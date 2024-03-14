@@ -6,7 +6,6 @@
   },
   "experiments": [
     "output_index_json",
-    "transitional_allow_list",
     "zx_c_types"
   ],
   "library_dependencies": [],

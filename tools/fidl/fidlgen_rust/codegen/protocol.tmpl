@@ -36,9 +36,6 @@ pub trait {{ $protocol.ProxyInterface }}: Send + Sync {
     {{- end }}
 
     {{- if $method.HasRequest }}
-    {{- if $method.IsTransitional }}
-    #[allow(unused_variables)]
-    {{- end }}
     fn r#{{ $method.Name }}(&self,
         {{- range $method.Request.Parameters }}
         {{ .Name }}: {{ .Type }},
@@ -49,11 +46,7 @@ pub trait {{ $protocol.ProxyInterface }}: Send + Sync {
     {{- else }}
     -> Result<(), fidl::Error>
     {{- end }}
-    {{- if $method.IsTransitional }}
-    { unimplemented!("transitional method {{ .Name }} is unimplemented"); }
-    {{- else -}}
     ; {{- /* Semicolon for no default implementation */}}
-    {{- end }}
     {{- end }}
     {{- end }}
 }

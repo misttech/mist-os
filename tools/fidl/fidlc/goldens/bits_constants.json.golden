@@ -5,8 +5,7 @@
     "fuchsia": "LEGACY"
   },
   "experiments": [
-    "output_index_json",
-    "transitional_allow_list"
+    "output_index_json"
   ],
   "library_dependencies": [],
   "bits_declarations": [

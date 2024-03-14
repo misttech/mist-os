@@ -41,10 +41,3 @@ fidl("test.basic.protocol") {
   public_deps = [ "//zircon/vdso/zx" ]
   enable_hlcpp = true
 }
-
-# Methods and events with the @transitional attribute.
-fidl("test.transitional") {
-  testonly = true
-  sources = [ "transitional.test.fidl" ]
-  enable_hlcpp = true
-}

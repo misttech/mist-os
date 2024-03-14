@@ -77,25 +77,6 @@ closed protocol SyscallProtocol {
     });
 };
 
-closed protocol Transitional {
-    @transitional
-    strict Request(struct {
-        x int64;
-    }) -> (struct {
-        y int64;
-    });
-
-    @transitional
-    strict OneWay(struct {
-        x int64;
-    });
-
-    @transitional
-    strict -> Event(struct {
-        x int64;
-    });
-};
-
 @discoverable
 closed protocol DiscoverableProtocol {
     strict Method();

@@ -30,7 +30,7 @@ template("fidlc") {
          "json_representation is required")
   assert(defined(invoker.sources), "sources is required")
 
-  experimental_flags = [ "transitional_allow_list" ]
+  experimental_flags = []
 
   if (defined(invoker.experimental_flags)) {
     experimental_flags += invoker.experimental_flags

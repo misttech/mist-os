@@ -1347,14 +1347,6 @@ TEST(ErrcatGoodTests, Good0201) {
   ASSERT_COMPILED(library);
 }
 
-TEST(ErrcatGoodTests, Good0202) {
-  TestLibrary library;
-  library.AddFile("good/fi-0202.test.fidl");
-  library.EnableFlag(ExperimentalFlag::kTransitionalAllowList);
-  library.SelectVersion("test", "10");
-  ASSERT_COMPILED(library);
-}
-
 TEST(ErrcatGoodTests, Good0203a) {
   TestLibrary library;
   library.AddFile("good/fi-0203-a.test.fidl");

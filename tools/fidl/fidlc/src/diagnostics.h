@@ -404,9 +404,7 @@ constexpr ErrorDef<200> ErrOverlayMustNotContainReserved(
 constexpr ErrorDef<201, std::vector<std::string_view>, Platform> ErrPlatformVersionNotSelected(
     "library '{0}' belongs to platform '{1}', but no version was selected for it; "
     "please choose a version N by passing `--available {1}:N`");
-constexpr ErrorDef<202, std::string_view> ErrTransitionalNotAllowed(
-    "The @transitional attribute is not allowed on {0}. "
-    "Try using @available instead.");
+constexpr RetiredDef<202> ErrTransitionalNotAllowed;
 constexpr ErrorDef<203> ErrRemovedAndReplaced(
     "the @available arguments 'removed' and 'replaced' are mutually exclusive");
 constexpr ErrorDef<204> ErrLibraryReplaced(
