@@ -143,32 +143,6 @@
                 "OpenModes/SocketOpenTest.Unix/1",
                 "AllInetTests/SimpleTcpSocketTest.NonBlockingConnect_PollWrNorm/0",
                 "AllInetTests/SimpleTcpSocketTest.NonBlockingConnect_PollWrNorm/1",
-
-                // TODO(https://fxbug.dev/327661705): The following tests fail
-                // when run against fdio/netstack3 without starnix, remove the
-                // following lines once the issue is fixed.
-                "All/SocketInetLoopbackIsolatedTest.TCPFinWait2Test/ListenV4Any_ConnectV4Any",
-                "All/SocketInetLoopbackIsolatedTest.TCPFinWait2Test/ListenV4Any_ConnectV4Loopback",
-                "All/SocketInetLoopbackIsolatedTest.TCPFinWait2Test/ListenV4Any_ConnectV4MappedAny",
-                "All/SocketInetLoopbackIsolatedTest.TCPFinWait2Test/ListenV4Any_ConnectV4MappedLoopback",
-                "All/SocketInetLoopbackIsolatedTest.TCPFinWait2Test/ListenV4Loopback_ConnectV4Any",
-                "All/SocketInetLoopbackIsolatedTest.TCPFinWait2Test/ListenV4Loopback_ConnectV4Loopback",
-                "All/SocketInetLoopbackIsolatedTest.TCPFinWait2Test/ListenV4Loopback_ConnectV4MappedLoopback",
-                "All/SocketInetLoopbackIsolatedTest.TCPFinWait2Test/ListenV4MappedAny_ConnectV4Any",
-                "All/SocketInetLoopbackIsolatedTest.TCPFinWait2Test/ListenV4MappedAny_ConnectV4Loopback",
-                "All/SocketInetLoopbackIsolatedTest.TCPFinWait2Test/ListenV4MappedAny_ConnectV4MappedAny",
-                "All/SocketInetLoopbackIsolatedTest.TCPFinWait2Test/ListenV4MappedAny_ConnectV4MappedLoopback",
-                "All/SocketInetLoopbackIsolatedTest.TCPFinWait2Test/ListenV4MappedLoopback_ConnectV4Any",
-                "All/SocketInetLoopbackIsolatedTest.TCPFinWait2Test/ListenV4MappedLoopback_ConnectV4Loopback",
-                "All/SocketInetLoopbackIsolatedTest.TCPFinWait2Test/ListenV4MappedLoopback_ConnectV4MappedLoopback",
-                "All/SocketInetLoopbackIsolatedTest.TCPFinWait2Test/ListenV6Any_ConnectV4Any",
-                "All/SocketInetLoopbackIsolatedTest.TCPFinWait2Test/ListenV6Any_ConnectV4Loopback",
-                "All/SocketInetLoopbackIsolatedTest.TCPFinWait2Test/ListenV6Any_ConnectV4MappedAny",
-                "All/SocketInetLoopbackIsolatedTest.TCPFinWait2Test/ListenV6Any_ConnectV4MappedLoopback",
-                "All/SocketInetLoopbackIsolatedTest.TCPFinWait2Test/ListenV6Any_ConnectV6Any",
-                "All/SocketInetLoopbackIsolatedTest.TCPFinWait2Test/ListenV6Any_ConnectV6Loopback",
-                "All/SocketInetLoopbackIsolatedTest.TCPFinWait2Test/ListenV6Loopback_ConnectV6Any",
-                "All/SocketInetLoopbackIsolatedTest.TCPFinWait2Test/ListenV6Loopback_ConnectV6Loopback",
             ],
         },
         {

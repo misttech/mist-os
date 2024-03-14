@@ -40,33 +40,6 @@
                 "AllFamilies/SocketMultiProtocolInetLoopbackIsolatedTest.V4EphemeralPortReservedReuseAddr/UDP",
                 "AllFamilies/SocketMultiProtocolInetLoopbackIsolatedTest.V4MappedEphemeralPortReservedReuseAddr/UDP",
                 "AllFamilies/SocketMultiProtocolInetLoopbackIsolatedTest.V6EphemeralPortReservedReuseAddr/UDP",
-
-                // TODO(https://fxbug.dev/327661705): A new SYN should cause a
-                // socket in CLOSE_WAIT to send an ACK which would cause a RST
-                // sent back to CLOSE_WAIT. This is the mechanism for the socket
-                // to be cleaned up.
-                "All/SocketInetLoopbackIsolatedTest.TCPFinWait2Test/ListenV4Any_ConnectV4Any",
-                "All/SocketInetLoopbackIsolatedTest.TCPFinWait2Test/ListenV4Any_ConnectV4Loopback",
-                "All/SocketInetLoopbackIsolatedTest.TCPFinWait2Test/ListenV4Any_ConnectV4MappedAny",
-                "All/SocketInetLoopbackIsolatedTest.TCPFinWait2Test/ListenV4Any_ConnectV4MappedLoopback",
-                "All/SocketInetLoopbackIsolatedTest.TCPFinWait2Test/ListenV4Loopback_ConnectV4Any",
-                "All/SocketInetLoopbackIsolatedTest.TCPFinWait2Test/ListenV4Loopback_ConnectV4Loopback",
-                "All/SocketInetLoopbackIsolatedTest.TCPFinWait2Test/ListenV4Loopback_ConnectV4MappedLoopback",
-                "All/SocketInetLoopbackIsolatedTest.TCPFinWait2Test/ListenV4MappedAny_ConnectV4Any",
-                "All/SocketInetLoopbackIsolatedTest.TCPFinWait2Test/ListenV4MappedAny_ConnectV4Loopback",
-                "All/SocketInetLoopbackIsolatedTest.TCPFinWait2Test/ListenV4MappedAny_ConnectV4MappedAny",
-                "All/SocketInetLoopbackIsolatedTest.TCPFinWait2Test/ListenV4MappedAny_ConnectV4MappedLoopback",
-                "All/SocketInetLoopbackIsolatedTest.TCPFinWait2Test/ListenV4MappedLoopback_ConnectV4Any",
-                "All/SocketInetLoopbackIsolatedTest.TCPFinWait2Test/ListenV4MappedLoopback_ConnectV4Loopback",
-                "All/SocketInetLoopbackIsolatedTest.TCPFinWait2Test/ListenV4MappedLoopback_ConnectV4MappedLoopback",
-                "All/SocketInetLoopbackIsolatedTest.TCPFinWait2Test/ListenV6Any_ConnectV4Any",
-                "All/SocketInetLoopbackIsolatedTest.TCPFinWait2Test/ListenV6Any_ConnectV4Loopback",
-                "All/SocketInetLoopbackIsolatedTest.TCPFinWait2Test/ListenV6Any_ConnectV4MappedAny",
-                "All/SocketInetLoopbackIsolatedTest.TCPFinWait2Test/ListenV6Any_ConnectV4MappedLoopback",
-                "All/SocketInetLoopbackIsolatedTest.TCPFinWait2Test/ListenV6Any_ConnectV6Any",
-                "All/SocketInetLoopbackIsolatedTest.TCPFinWait2Test/ListenV6Any_ConnectV6Loopback",
-                "All/SocketInetLoopbackIsolatedTest.TCPFinWait2Test/ListenV6Loopback_ConnectV6Any",
-                "All/SocketInetLoopbackIsolatedTest.TCPFinWait2Test/ListenV6Loopback_ConnectV6Loopback",
             ],
         },
     ],

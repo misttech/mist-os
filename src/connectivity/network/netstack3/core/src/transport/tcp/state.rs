@@ -340,7 +340,7 @@ pub(crate) struct SynSent<I, ActiveOpen> {
 enum SynSentOnSegmentDisposition<I: Instant, ActiveOpen> {
     SendAckAndEnterEstablished(Established<I, (), ()>),
     SendSynAckAndEnterSynRcvd(Segment<()>, SynRcvd<I, ActiveOpen>),
-    SendRstAndEnterClosed(Segment<()>, Closed<Option<ConnectionError>>),
+    SendRst(Segment<()>),
     EnterClosed(Closed<Option<ConnectionError>>),
     Ignore,
 }
@@ -384,10 +384,7 @@ impl<I: Instant + 'static, ActiveOpen> SynSent<I, ActiveOpen> {
                     return if contents.control() == Some(Control::RST) {
                         SynSentOnSegmentDisposition::Ignore
                     } else {
-                        SynSentOnSegmentDisposition::SendRstAndEnterClosed(
-                            Segment::rst(ack),
-                            Closed { reason: Some(ConnectionError::ConnectionReset) },
-                        )
+                        SynSentOnSegmentDisposition::SendRst(Segment::rst(ack))
                     };
                 }
                 true
@@ -1713,10 +1710,7 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
                             });
                             Some(syn_ack)
                         }
-                        SynSentOnSegmentDisposition::SendRstAndEnterClosed(rst, closed) => {
-                            *self = State::Closed(closed);
-                            Some(rst)
-                        }
+                        SynSentOnSegmentDisposition::SendRst(rst) => Some(rst),
                         SynSentOnSegmentDisposition::EnterClosed(closed) => {
                             *self = State::Closed(closed);
                             None
@@ -2991,9 +2985,8 @@ mod test {
     => SynSentOnSegmentDisposition::Ignore; "unacceptable ACK with RST")]
     #[test_case(
         Segment::ack(ISS_2, ISS_1 - 1, UnscaledWindowSize::from(u16::MAX)), RTT
-    => SynSentOnSegmentDisposition::SendRstAndEnterClosed(
+    => SynSentOnSegmentDisposition::SendRst(
         Segment::rst(ISS_1-1),
-        Closed { reason: Some(ConnectionError::ConnectionReset) },
     ); "unacceptable ACK without RST")]
     #[test_case(
         Segment::rst_ack(ISS_2, ISS_1), RTT
