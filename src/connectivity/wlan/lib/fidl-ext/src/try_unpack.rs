@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::fmt::Display;
+use {itertools::Itertools, paste::paste, std::fmt::Display};
 
 #[derive(Clone, Copy, Debug)]
 pub struct NamedField<T, A> {
@@ -52,7 +52,7 @@ pub trait TryUnpack {
 
 #[doc(hidden)]
 #[macro_export]
-macro_rules! __one {
+macro_rules! one {
     ($_t:tt) => {
         1
     };
@@ -64,7 +64,7 @@ macro_rules! impl_try_unpack_named_fields {
             for NamedField<Option<$t>, $a>
         {
             type Unpacked = $t;
-            type Error = [String; 1];
+            type Error = anyhow::Error;
 
             /// Tries to unpack the value a `NamedField<Option<T>, A: Display>`.
             ///
@@ -74,18 +74,20 @@ macro_rules! impl_try_unpack_named_fields {
             /// iterable like in the `TryUnpack` implementation for tuples.
             fn try_unpack(self) -> Result<Self::Unpacked, Self::Error> {
                 let NamedField { value, name } = self;
-                value.ok_or_else(|| [name.to_string()])
+                value.ok_or_else(|| anyhow::format_err!(
+                    "Unable to unpack empty field: {}", name
+                ))
             }
         }
     };
 
     ($(($t:ident, $a:ident)),+) => {
-        $crate::__paste!{
+        paste!{
             impl<$($t, $a: Display),+> TryUnpack
                 for ($(NamedField<Option<$t>, $a>),+)
             {
                 type Unpacked = ($($t),+);
-                type Error = Vec<String>;
+                type Error = anyhow::Error;
 
                 /// Tries to unpack values from a tuple of *n* fields each with type
                 /// `NamedField<Option<Tᵢ>, Aᵢ: Display>`.
@@ -99,7 +101,7 @@ macro_rules! impl_try_unpack_named_fields {
                     // is the arity of the tuple this trait is implemented for.
                     let mut names = None;
                     let names = &mut names;
-                    let arity =  0usize $(+ $crate::__one!($t))+;
+                    let arity =  0usize $(+ one!($t))+;
 
                     // Deconstruct the tuple `self` into variables `t1`, `t2`, ...
                     let ($([<$t:lower>]),+) = self;
@@ -123,7 +125,10 @@ macro_rules! impl_try_unpack_named_fields {
                     // contained an error value. In that case, this function returns the error value
                     // `names`. Otherwise, each `tn` variable is returned without its name.
                     match names.take() {
-                        Some(names) => Err(names),
+                        Some(names) => Err(anyhow::format_err!(
+                            "Unable to unpack empty field(s): {}",
+                            names.into_iter().join(", "),
+                        )),
                         _ => Ok(($([<$t:lower>].unwrap()),+)),
                     }
                 }

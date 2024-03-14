@@ -6,7 +6,6 @@ use {
     crate::{SendResultExt, TryUnpack},
     anyhow::format_err,
     fidl_fuchsia_wlan_softmac as fidl_softmac,
-    itertools::Itertools,
 };
 
 /// Defines an abstract ResponderExt trait usually implemented using the impl_responder_ext!() macro.
@@ -40,19 +39,15 @@ pub trait ResponderExt {
         f: F,
     ) -> Result<(T::Unpacked, Self), anyhow::Error>
     where
-        T: TryUnpack,
-        T::Error: IntoIterator<Item = String>,
+        T: TryUnpack<Error = anyhow::Error>,
         F: FnOnce() -> Self::Response,
         Self: Sized,
     {
         match fields.try_unpack() {
             Ok(values) => Ok((values, self)),
-            Err(missing_field_names) => {
-                let error = format_err!(
-                    "Missing required field(s) in response to {}: {}",
-                    Self::REQUEST_NAME,
-                    missing_field_names.into_iter().join(", "),
-                );
+            Err(error) => {
+                let error = error
+                    .context(format_err!("Missing required field(s) in {}.", Self::REQUEST_NAME));
                 match self.send(f()).format_send_err() {
                     Ok(_) => Err(error),
                     Err(send_error) => Err(send_error.context(error)),
@@ -63,8 +58,7 @@ pub trait ResponderExt {
 
     fn unpack_fields_or_respond<T>(self, fields: T) -> Result<(T::Unpacked, Self), anyhow::Error>
     where
-        T: TryUnpack,
-        T::Error: IntoIterator<Item = String>,
+        T: TryUnpack<Error = anyhow::Error>,
         Self: ResponderExt<Response = ()> + Sized,
     {
         self.unpack_fields_or_else_send(fields, || ())
