@@ -126,6 +126,11 @@ impl FramedStreamWriter {
     }
 }
 
+pub(crate) enum FramedStreamReadResult {
+    Frame(FrameType, Vec<u8>),
+    Closed(Option<String>),
+}
+
 #[derive(Debug)]
 pub(crate) struct FramedStreamReader {
     /// The underlying reader,
@@ -168,32 +173,32 @@ impl FramedStreamReader {
         self.conn.is_client()
     }
 
-    pub(crate) async fn next<'b>(&'b mut self) -> Result<Option<(FrameType, Vec<u8>)>, Error> {
+    pub(crate) async fn next<'b>(&'b mut self) -> Result<FramedStreamReadResult, Error> {
         if let ReadState::Initial = self.read_state {
             if !read_exact(&self.reader, &mut self.hdr).await? {
-                return Ok(None);
+                return Ok(FramedStreamReadResult::Closed(self.reader.closed_reason()));
             }
             let hdr = FrameHeader::from_bytes(&self.hdr)?;
 
             if hdr.length == 0 {
-                return Ok(Some((hdr.frame_type, Vec::new())));
+                return Ok(FramedStreamReadResult::Frame(hdr.frame_type, Vec::new()));
             }
 
             self.read_state = ReadState::GotHeader(hdr);
         }
 
-        if let ReadState::GotHeader(hdr) = &self.read_state {
-            let mut payload = Vec::new();
-            payload.resize(hdr.length, 0);
-            if !read_exact(&self.reader, &mut payload).await? {
-                return Err(format_err!("Unexpected end of stream"));
-            }
-            let frame_type = hdr.frame_type;
-            self.read_state = ReadState::Initial;
-            Ok(Some((frame_type, payload)))
-        } else {
+        let ReadState::GotHeader(hdr) = &self.read_state else {
             unreachable!();
+        };
+
+        let mut payload = Vec::new();
+        payload.resize(hdr.length, 0);
+        if !read_exact(&self.reader, &mut payload).await? {
+            return Err(format_err!("Unexpected end of stream"));
         }
+        let frame_type = hdr.frame_type;
+        self.read_state = ReadState::Initial;
+        Ok(FramedStreamReadResult::Frame(frame_type, payload))
     }
 }
 

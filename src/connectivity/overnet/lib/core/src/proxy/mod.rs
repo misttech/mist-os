@@ -171,6 +171,12 @@ impl<Hdl: 'static + Proxyable> Proxy<Hdl> {
         Arc::new(Self { hdl: Some(ProxyableHandle::new(hdl, router)) })
     }
 
+    fn close_with_reason(mut self, msg: String) {
+        if let Some(hdl) = self.hdl.take() {
+            hdl.close_with_reason(msg);
+        }
+    }
+
     fn hdl(&self) -> &ProxyableHandle<Hdl> {
         self.hdl.as_ref().unwrap()
     }

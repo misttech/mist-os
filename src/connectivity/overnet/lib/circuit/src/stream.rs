@@ -205,16 +205,27 @@ impl Reader {
         Ok(())
     }
 
-    /// Whether this stream is closed. Returns false so long as there is unread data in the buffer,
-    /// even if the writer has hung up.
+    /// Whether this stream is closed. Returns false so long as there is unread
+    /// data in the buffer, even if the writer has hung up.
     pub fn is_closed(&self) -> bool {
         let state = self.0.lock().unwrap();
         state.closed.is_closed() && state.readable == 0
     }
 
+    /// Get the reason this reader is closed. If the reader is not closed, or if
+    /// no reason was given, return `None`.
+    pub fn closed_reason(&self) -> Option<String> {
+        let state = self.0.lock().unwrap();
+        state.closed.reason()
+    }
+
     /// Close this stream, giving a reason for the closure.
     pub fn close(self, reason: String) {
-        self.0.lock().unwrap().closed = Status::Closed(Some(reason))
+        let mut state = self.0.lock().unwrap();
+        match &state.closed {
+            Status::Closed(Some(_)) => (),
+            _ => state.closed = Status::Closed(Some(reason)),
+        }
     }
 }
 
@@ -308,6 +319,20 @@ impl Writer {
     /// Close this stream, giving a reason for the closure.
     pub fn close(self, reason: String) {
         self.0.lock().unwrap().closed = Status::Closed(Some(reason))
+    }
+
+    /// Whether this stream is closed. Returns false so long as there is unread
+    /// data in the buffer, even if the writer has hung up.
+    pub fn is_closed(&self) -> bool {
+        let state = self.0.lock().unwrap();
+        state.closed.is_closed() && state.readable == 0
+    }
+
+    /// Get the reason this writer is closed. If the writer is not closed, or if
+    /// no reason was given, return `None`.
+    pub fn closed_reason(&self) -> Option<String> {
+        let state = self.0.lock().unwrap();
+        state.closed.reason()
     }
 }
 

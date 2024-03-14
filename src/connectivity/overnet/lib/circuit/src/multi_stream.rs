@@ -60,8 +60,11 @@ pub async fn multi_stream(
     let (stream_errors_sender, stream_errors) = channel(1);
     let first_stream_id = if is_server { 1 } else { 0 };
     let mut stream_ids = (first_stream_id..).step_by(2);
+    let writer = Arc::new(SyncMutex::new(writer));
+    let writer_for_reader = Arc::clone(&writer);
 
     let handle_read = async move {
+        let writer = writer_for_reader;
         let streams = SyncMutex::new(HashMap::<u32, StreamStatus>::new());
 
         // Creates a stream (that's Stream in the rust async sense, not in the sense of our
@@ -183,6 +186,13 @@ pub async fn multi_stream(
             }
         }
 
+        if matches!(ret, Err(Error::ConnectionClosed(None))) {
+            let writer = writer.lock().unwrap();
+            if writer.is_closed() {
+                ret = Err(Error::ConnectionClosed(writer.closed_reason()))
+            }
+        }
+
         let mut streams = streams.lock().unwrap();
 
         for (_, stream) in streams.drain() {
@@ -194,12 +204,14 @@ pub async fn multi_stream(
         ret
     };
 
-    let writer = Arc::new(SyncMutex::new(writer));
     let handle_write = new_readers.for_each_concurrent(None, move |(id, stream)| {
         let writer = Arc::clone(&writer);
         async move {
-            let () = write_as_chunks(id, &stream, writer).await;
-            stream.close(format!("Stream terminated"));
+            if let Some(reason) = write_as_chunks(id, &stream, writer).await {
+                stream.close(format!("Stream terminated ({reason})"));
+            } else {
+                stream.close(format!("Stream terminated"));
+            }
         }
     });
 
@@ -307,7 +319,13 @@ fn handle_one_chunk<'a>(
 ///
 /// The point, of course, is that multiple functions can do this to the same writer, and since the
 /// chunks are labeled, the data can be parsed back out into separate streams on the other end.
-async fn write_as_chunks(id: u32, reader: &stream::Reader, writer: Arc<SyncMutex<stream::Writer>>) {
+///
+/// If writing stops because the writer is closed, this will return the reported reason for closure.
+async fn write_as_chunks(
+    id: u32,
+    reader: &stream::Reader,
+    writer: Arc<SyncMutex<stream::Writer>>,
+) -> Option<String> {
     loop {
         // We want to handle errors with the read and errors with the write differently, so we
         // return a nested result.
@@ -363,12 +381,14 @@ async fn write_as_chunks(id: u32, reader: &stream::Reader, writer: Arc<SyncMutex
                 });
 
                 match write_result {
-                    Ok(()) | Err(Error::ConnectionClosed(_)) => break,
+                    Ok(()) | Err(Error::ConnectionClosed(None)) => break None,
+                    Err(Error::ConnectionClosed(Some(s))) => break Some(format!("write: {s}")),
                     other => unreachable!("Unexpected write error: {other:?}"),
                 }
             }
             Ok(Ok(())) => (),
-            Ok(Err(Error::ConnectionClosed(_))) => break,
+            Ok(Err(Error::ConnectionClosed(None))) => break None,
+            Ok(Err(Error::ConnectionClosed(Some(s)))) => break Some(format!("read: {s}")),
             Ok(other) => unreachable!("Unexpected write error: {other:?}"),
             other => unreachable!("Unexpected read error: {other:?}"),
         }

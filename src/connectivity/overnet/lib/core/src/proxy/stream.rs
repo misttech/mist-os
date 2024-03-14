@@ -5,7 +5,10 @@
 use super::handle::{Message, Proxyable, ProxyableHandle, RouterHolder, Serializer};
 use crate::coding::{decode_fidl, encode_fidl};
 use crate::labels::{NodeId, TransferKey};
-use crate::peer::{FrameType, FramedStreamReader, FramedStreamWriter, PeerConn, PeerConnRef};
+use crate::peer::{
+    FrameType, FramedStreamReadResult, FramedStreamReader, FramedStreamWriter, PeerConn,
+    PeerConnRef,
+};
 use crate::router::Router;
 use anyhow::{format_err, Context as _, Error};
 use fidl_fuchsia_overnet_protocol::{BeginTransfer, Empty, SignalUpdate, StreamControl};
@@ -168,7 +171,7 @@ pub(crate) struct ReadNext<'a, Msg: Message> {
 }
 
 enum ReadNextFrameOrPeerConnRef<'a> {
-    ReadNextFrame(BoxFuture<'a, Result<Option<(FrameType, Vec<u8>)>, Error>>),
+    ReadNextFrame(BoxFuture<'a, Result<FramedStreamReadResult, Error>>),
     PeerConnRef(PeerConnRef<'a>),
 }
 
@@ -188,7 +191,7 @@ impl std::fmt::Debug for ReadNextFrameOrPeerConnRef<'_> {
 impl<'a> ReadNextFrameOrPeerConnRef<'a> {
     fn as_read_next_frame_mut(
         &mut self,
-    ) -> Option<&mut BoxFuture<'a, Result<Option<(FrameType, Vec<u8>)>, Error>>> {
+    ) -> Option<&mut BoxFuture<'a, Result<FramedStreamReadResult, Error>>> {
         match self {
             Self::ReadNextFrame(x) => Some(x),
             _ => None,
@@ -207,13 +210,20 @@ impl<'a, Msg: Message> ReadNext<'a, Msg> {
         loop {
             return Poll::Ready(Ok(match *self.state {
                 ReadNextState::Reading => {
-                    let Some((frame_type, mut bytes)) = ready!(self
+                    let (frame_type, mut bytes) = match ready!(self
                         .read_next_frame_or_peer_conn_ref
                         .as_read_next_frame_mut()
                         .unwrap()
-                        .poll_unpin(ctx))? else {
-                            return Poll::Ready(Err(format_err!("unexpected end of stream")));
-                        };
+                        .poll_unpin(ctx))?
+                    {
+                        FramedStreamReadResult::Frame(frame_type, bytes) => (frame_type, bytes),
+                        FramedStreamReadResult::Closed(Some(e)) => {
+                            return Poll::Ready(Err(format_err!("unexpected end of stream ({e})")))
+                        }
+                        FramedStreamReadResult::Closed(None) => {
+                            return Poll::Ready(Err(format_err!("unexpected end of stream")))
+                        }
+                    };
 
                     match frame_type {
                         FrameType::Hello => {

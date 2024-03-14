@@ -49,6 +49,11 @@ impl Proxyable for Channel {
     fn set_channel_proxy_protocol(&self, proto: ChannelProxyProtocol) {
         self.chan.set_channel_proxy_protocol(proto);
     }
+
+    #[cfg(not(target_os = "fuchsia"))]
+    fn close_with_reason(self, msg: String) {
+        self.chan.close_with_reason(msg);
+    }
 }
 
 impl<'a> ProxyableRW<'a> for Channel {

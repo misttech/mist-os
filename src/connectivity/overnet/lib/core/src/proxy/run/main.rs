@@ -111,14 +111,13 @@ pub(crate) async fn run_main_loop<Hdl: 'static + for<'a> ProxyableRW<'a>>(
     #[cfg(not(target_os = "fuchsia"))]
     proxy.set_channel_proxy_protocol(ChannelProxyProtocol::Cso);
 
+    assert!(Arc::strong_count(&proxy) == 1);
     let (tx_join, rx_join) = new_task_joiner();
     let hdl = proxy.hdl();
     let mut stream_writer = stream_writer.bind(hdl);
     let initial_stream_reader = initial_stream_reader.map(|s| s.bind(hdl));
     let mut stream_reader = stream_reader.bind(hdl);
-
-    // TODO: don't detach
-    futures::future::try_join(
+    let res = futures::future::try_join(
         async {
             if !stream_reader.is_initiator() {
                 stream_reader.expect_hello().await?;
@@ -134,20 +133,43 @@ pub(crate) async fn run_main_loop<Hdl: 'static + for<'a> ProxyableRW<'a>>(
             Ok(())
         },
     )
-    .await?;
-    futures::future::try_join(
+    .await;
+
+    if let Err(e) = res {
+        Arc::try_unwrap(proxy).unwrap().close_with_reason(format!("{e:?}"));
+        return Err(e);
+    }
+
+    let mut my_proxy = Some(Arc::clone(&proxy));
+
+    let take_proxy = || {
+        my_proxy = None;
+    };
+
+    let res = futures::future::try_join(
         stream_to_handle(proxy.clone(), initiate_transfer, stream_reader, tx_join)
             .map_err(|e| e.context("stream_to_handle")),
-        handle_to_stream(proxy, stream_writer, rx_join).map_err(|e| e.context("handle_to_stream")),
+        handle_to_stream(proxy, stream_writer, rx_join, take_proxy)
+            .map_err(|e| e.context("handle_to_stream")),
     )
     .map_ok(drop)
-    .await
+    .await;
+
+    if let Err(e) = res {
+        if let Some(proxy) = my_proxy {
+            Arc::try_unwrap(proxy).unwrap().close_with_reason(format!("{e:?}"));
+        }
+        Err(e)
+    } else {
+        Ok(())
+    }
 }
 
 async fn handle_to_stream<Hdl: 'static + for<'a> ProxyableRW<'a>>(
     proxy: Arc<Proxy<Hdl>>,
     mut stream: StreamWriter<Hdl::Message>,
     mut finish_proxy_loop: FinishProxyLoopReceiver<Hdl>,
+    take_proxy: impl FnOnce(),
 ) -> Result<(), Error> {
     let mut message = Default::default();
     let finish_proxy_loop_action = loop {
@@ -179,6 +201,7 @@ async fn handle_to_stream<Hdl: 'static + for<'a> ProxyableRW<'a>>(
             }
         };
     };
+    take_proxy();
     let proxy = Arc::try_unwrap(proxy).map_err(|_| format_err!("Proxy should be isolated"))?;
     match finish_proxy_loop_action {
         Ok(FinishProxyLoopAction::InitiateTransfer {
@@ -228,7 +251,7 @@ async fn join_shutdown<Hdl: 'static + Proxyable>(
 ) -> Result<(), Error> {
     stream_writer.send_shutdown(result).await?;
     let _ = stream_reader.expect_shutdown(Ok(())).await;
-    drop(proxy);
+    proxy.close_with_reason(format!("Proxy shut down (result: {result:?})"));
     Ok(())
 }
 

@@ -30,6 +30,10 @@ rustc_test("integration") {
     "src/lib.rs",
     "src/triangle.rs",
   ]
+
+  if (is_host) {
+    sources += [ "src/error_propagation.rs" ]
+  }
 }
 
 fidl("echo") {

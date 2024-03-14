@@ -11,19 +11,19 @@ mod drop;
 mod echo;
 mod triangle;
 
-use {
-    anyhow::Error,
-    circuit::multi_stream::multi_stream_node_connection_to_async,
-    fuchsia_async::Task,
-    fuchsia_sync::Mutex,
-    futures::channel::mpsc::unbounded,
-    futures::prelude::*,
-    overnet_core::{log_errors, ListablePeer, NodeId, NodeIdGenerator, Router},
-    std::sync::{
-        atomic::{AtomicU64, Ordering},
-        Arc,
-    },
-};
+#[cfg(not(target_os = "fuchsia"))]
+mod error_propagation;
+
+use anyhow::Error;
+use circuit::multi_stream::{multi_stream_node_connection, multi_stream_node_connection_to_async};
+use circuit::stream as cs;
+use fuchsia_async::Task;
+use fuchsia_sync::Mutex;
+use futures::channel::mpsc::unbounded;
+use futures::prelude::*;
+use overnet_core::{log_errors, ListablePeer, NodeId, NodeIdGenerator, Router};
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::Arc;
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 // Overnet <-> API bindings
@@ -33,6 +33,7 @@ enum OvernetCommand {
     RegisterService(String, Box<dyn Fn(fidl::Channel) -> Result<(), Error> + Send + 'static>),
     ConnectToService(NodeId, String, fidl::Channel),
     AttachCircuitSocketLink(fidl::Socket, bool),
+    AttachCircuitLink(cs::Reader, cs::Writer, bool),
 }
 
 impl std::fmt::Debug for OvernetCommand {
@@ -47,6 +48,9 @@ impl std::fmt::Debug for OvernetCommand {
             }
             Self::AttachCircuitSocketLink(arg0, arg1) => {
                 f.debug_tuple("AttachCircuitSocketLink").field(arg0).field(arg1).finish()
+            }
+            Self::AttachCircuitLink(arg0, arg1, arg2) => {
+                f.debug_tuple("AttachCircuitLink").field(arg0).field(arg1).field(arg2).finish()
             }
         }
     }
@@ -118,6 +122,15 @@ impl Overnet {
         self.send(OvernetCommand::AttachCircuitSocketLink(socket, is_server))
     }
 
+    pub fn attach_circuit_link(
+        &self,
+        reader: cs::Reader,
+        writer: cs::Writer,
+        is_server: bool,
+    ) -> Result<(), fidl::Error> {
+        self.send(OvernetCommand::AttachCircuitLink(reader, writer, is_server))
+    }
+
     pub fn node_id(&self) -> NodeId {
         self.node_id
     }
@@ -148,6 +161,20 @@ async fn run_overnet_command(node: Arc<Router>, cmd: OvernetCommand) -> Result<(
                 node.circuit_node(),
                 &mut rx,
                 &mut tx,
+                is_server,
+                circuit::Quality::IN_PROCESS,
+                errors_sender,
+                "test node".to_owned(),
+            )
+            .await?;
+            Ok(())
+        }
+        OvernetCommand::AttachCircuitLink(reader, writer, is_server) => {
+            let (errors_sender, _black_hole) = unbounded();
+            multi_stream_node_connection(
+                node.circuit_node(),
+                reader,
+                writer,
                 is_server,
                 circuit::Quality::IN_PROCESS,
                 errors_sender,

@@ -4,7 +4,9 @@
 
 mod framed_stream;
 
-pub(crate) use self::framed_stream::{FrameType, FramedStreamReader, FramedStreamWriter};
+pub(crate) use self::framed_stream::{
+    FrameType, FramedStreamReadResult, FramedStreamReader, FramedStreamWriter,
+};
 use crate::{
     coding::{decode_fidl, encode_fidl},
     future_help::Observer,
@@ -170,7 +172,7 @@ impl std::fmt::Debug for Peer {
 #[derive(Debug)]
 enum RunnerError {
     RouterGone,
-    ConnectionClosed,
+    ConnectionClosed(Option<String>),
     BadFrameType(FrameType),
     HandshakeError(Error),
     ServiceError(Error),
@@ -259,7 +261,12 @@ impl Peer {
         };
         if let Err(e) = &result {
             match e {
-                RunnerError::ConnectionClosed => tracing::debug!(
+                RunnerError::ConnectionClosed(Some(s)) => tracing::debug!(
+                    node_id = %get_router_node_id(),
+                    ?endpoint,
+                    "connection closed (reason: {s})"
+                ),
+                RunnerError::ConnectionClosed(None) => tracing::debug!(
                     node_id = %get_router_node_id(),
                     ?endpoint,
                     "connection closed"
@@ -376,13 +383,16 @@ async fn client_handshake(
         // Await config response
         tracing::trace!(my_node_id = my_node_id.0, clipeer = peer_node_id.0, "read config");
         let mut conn_stream_reader = conn_stream_reader_fut.await?;
-        let _ = Config::from_response(
-            if let Some((FrameType::Data, mut bytes)) = conn_stream_reader.next().await? {
-                decode_fidl(&mut bytes)?
-            } else {
-                bail!("Failed to read config response")
-            },
-        );
+        let _ = Config::from_response(match conn_stream_reader.next().await? {
+            FramedStreamReadResult::Frame(FrameType::Data, mut bytes) => decode_fidl(&mut bytes)?,
+            FramedStreamReadResult::Frame(_, _) => {
+                bail!("Failed to read config response (wrong frame type)")
+            }
+            FramedStreamReadResult::Closed(Some(s)) => {
+                bail!("Failed to read config response ({s})")
+            }
+            FramedStreamReadResult::Closed(None) => bail!("Failed to read config response"),
+        });
         tracing::trace!(my_node_id = my_node_id.0, clipeer = peer_node_id.0, "handshake completed");
 
         Ok((conn_stream_writer, conn_stream_reader))
@@ -453,11 +463,13 @@ async fn client_conn_stream(
         .map_err(RunnerError::ServiceError),
         async move {
             loop {
-                let (frame_type, mut bytes) = conn_stream_reader
-                    .next()
-                    .await
-                    .map_err(RunnerError::ServiceError)?
-                    .ok_or(RunnerError::ConnectionClosed)?;
+                let (frame_type, mut bytes) =
+                    match conn_stream_reader.next().await.map_err(RunnerError::ServiceError)? {
+                        FramedStreamReadResult::Frame(frame_type, bytes) => (frame_type, bytes),
+                        FramedStreamReadResult::Closed(s) => {
+                            return Err(RunnerError::ConnectionClosed(s))
+                        }
+                    };
                 match frame_type {
                     FrameType::Hello | FrameType::Control | FrameType::Signal => {
                         return Err(RunnerError::BadFrameType(frame_type));
@@ -566,13 +578,18 @@ async fn server_handshake(
     let mut conn_stream_writer = FramedStreamWriter::from_circuit(writer, 0, conn.clone(), node_id);
     // Await config request
     tracing::trace!(my_node_id = my_node_id.0, svrpeer = node_id.0, "read config");
-    let (_, mut response) = Config::negotiate(
-        if let Some((FrameType::Data, mut bytes)) = conn_stream_reader.next().await? {
-            decode_fidl(&mut bytes)?
-        } else {
-            bail!("Failed to read config response")
-        },
-    );
+    let (_, mut response) = Config::negotiate(match conn_stream_reader.next().await? {
+        FramedStreamReadResult::Frame(FrameType::Data, mut bytes) => decode_fidl(&mut bytes)?,
+        FramedStreamReadResult::Frame(_, _) => {
+            bail!("Failed to read config response (wrong frame type)")
+        }
+        FramedStreamReadResult::Closed(Some(s)) => {
+            bail!("Failed to read config response (Connection closed: {s})")
+        }
+        FramedStreamReadResult::Closed(None) => {
+            bail!("Failed to read config response (Connection closed)")
+        }
+    });
     // Send config response
     tracing::trace!(my_node_id = my_node_id.0, svrpeer = node_id.0, "send config");
     conn_stream_writer.send(FrameType::Data, &encode_fidl(&mut response)?).await?;
@@ -594,11 +611,11 @@ async fn server_conn_stream(
 
     loop {
         tracing::trace!(my_node_id = my_node_id.0, svrpeer = node_id.0, "await message");
-        let (frame_type, mut bytes) = conn_stream_reader
-            .next()
-            .await
-            .map_err(RunnerError::ServiceError)?
-            .ok_or(RunnerError::ConnectionClosed)?;
+        let (frame_type, mut bytes) =
+            match conn_stream_reader.next().await.map_err(RunnerError::ServiceError)? {
+                FramedStreamReadResult::Frame(frame_type, bytes) => (frame_type, bytes),
+                FramedStreamReadResult::Closed(s) => return Err(RunnerError::ConnectionClosed(s)),
+            };
 
         let router = Weak::upgrade(&router).ok_or_else(|| RunnerError::RouterGone)?;
         match frame_type {

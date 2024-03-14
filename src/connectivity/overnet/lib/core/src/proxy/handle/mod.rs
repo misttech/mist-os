@@ -116,6 +116,8 @@ pub(crate) trait Proxyable: Send + Sync + Sized + std::fmt::Debug {
     /// Let the channel (if this is one) know what protocol we're using to proxy it.
     #[cfg(not(target_os = "fuchsia"))]
     fn set_channel_proxy_protocol(&self, _proto: ChannelProxyProtocol) {}
+    /// Set a reason for this handle to close.
+    fn close_with_reason(self, _msg: String) {}
 }
 
 pub(crate) trait ProxyableRW<'a>: Proxyable {
@@ -154,6 +156,10 @@ impl<Hdl: Proxyable> ProxyableHandle<Hdl> {
 
     pub(crate) fn into_fidl_handle(self) -> Result<fidl::Handle, Error> {
         self.hdl.into_fidl_handle()
+    }
+
+    pub(crate) fn close_with_reason(self, msg: String) {
+        self.hdl.close_with_reason(msg);
     }
 
     /// Write `msg` to the handle.
