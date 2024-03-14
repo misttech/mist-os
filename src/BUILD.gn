@@ -36,6 +36,7 @@ group("tests_no_e2e") {
     "power:tests",
     "recovery:tests_no_e2e",
     "security:tests",
+    "sensors:tests",
     "session:tests",
     "settings:tests",
     "starnix:tests",

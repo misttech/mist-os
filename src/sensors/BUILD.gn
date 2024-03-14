@@ -9,7 +9,10 @@ import("//src/sys/core/build/core_shard.gni")
 
 group("tests") {
   testonly = true
-  deps = [ ":sensors-tests" ]
+  deps = [
+    ":sensors-tests",
+    "playback:tests",
+  ]
 }
 
 rustc_library("lib") {

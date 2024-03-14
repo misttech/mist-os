@@ -1,0 +1,142 @@
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/components.gni")
+import("//src/sys/core/build/core_shard.gni")
+
+group("tests") {
+  testonly = true
+  deps = [ ":playback_integration_test" ]
+}
+
+source_set("playback_config_validation") {
+  sources = [
+    "playback_config_validation.cc",
+    "playback_config_validation.h",
+  ]
+
+  public_deps =
+      [ "//sdk/fidl/fuchsia.hardware.sensors:fuchsia.hardware.sensors_cpp" ]
+}
+
+source_set("playback_controller") {
+  sources = [
+    "playback_controller.cc",
+    "playback_controller.h",
+  ]
+
+  deps = [ ":playback_config_validation" ]
+
+  public_deps = [
+    "//sdk/fidl/fuchsia.hardware.sensors:fuchsia.hardware.sensors_cpp",
+    "//sdk/lib/fit",
+    "//sdk/lib/fit-promise",
+    "//sdk/lib/syslog/cpp",
+    "//src/camera/lib/actor:actor_base",
+    "//zircon/system/ulib/async:async-cpp",
+    "//zircon/system/ulib/async-loop:async-loop-cpp",
+    "//zircon/system/ulib/async-loop:async-loop-default",
+    "//zircon/system/ulib/zx",
+  ]
+}
+
+source_set("driver_impl") {
+  sources = [
+    "driver_impl.cc",
+    "driver_impl.h",
+  ]
+
+  deps = [ ":playback_controller" ]
+
+  public_deps = [
+    "//sdk/fidl/fuchsia.hardware.sensors:fuchsia.hardware.sensors_cpp",
+    "//sdk/lib/fit",
+    "//sdk/lib/fit-promise",
+    "//sdk/lib/syslog/cpp",
+    "//src/camera/lib/actor:actor_base",
+    "//zircon/system/ulib/async:async-cpp",
+    "//zircon/system/ulib/async-loop:async-loop-cpp",
+    "//zircon/system/ulib/async-loop:async-loop-default",
+    "//zircon/system/ulib/zx",
+  ]
+}
+
+source_set("playback_impl") {
+  sources = [
+    "playback_impl.cc",
+    "playback_impl.h",
+  ]
+
+  deps = [ ":playback_controller" ]
+
+  public_deps = [
+    "//sdk/fidl/fuchsia.hardware.sensors:fuchsia.hardware.sensors_cpp",
+    "//sdk/lib/fit",
+    "//sdk/lib/fit-promise",
+    "//sdk/lib/syslog/cpp",
+    "//src/camera/lib/actor:actor_base",
+    "//zircon/system/ulib/async:async-cpp",
+    "//zircon/system/ulib/async-loop:async-loop-cpp",
+    "//zircon/system/ulib/async-loop:async-loop-default",
+    "//zircon/system/ulib/zx",
+  ]
+}
+
+executable("sensors_playback_bin") {
+  sources = [ "main.cc" ]
+
+  deps = [
+    ":driver_impl",
+    ":playback_controller",
+    ":playback_impl",
+    "//sdk/lib/component/outgoing/cpp",
+    "//sdk/lib/syslog/cpp",
+    "//zircon/system/ulib/async:async-cpp",
+    "//zircon/system/ulib/async-loop:async-loop-cpp",
+    "//zircon/system/ulib/async-loop:async-loop-default",
+  ]
+}
+
+fuchsia_component("sensors_playback_component") {
+  component_name = "sensors_playback"
+  manifest = "meta/playback.cml"
+  deps = [ ":sensors_playback_bin" ]
+}
+
+fuchsia_package("sensors_playback") {
+  deps = [ ":sensors_playback_component" ]
+}
+
+executable("playback_integration_test_bin") {
+  testonly = true
+  sources = [ "playback_integration_test.cc" ]
+  deps = [
+    "//sdk/fidl/fuchsia.hardware.sensors:fuchsia.hardware.sensors_cpp",
+    "//sdk/lib/component/incoming/cpp",
+    "//sdk/lib/sys/cpp",
+    "//sdk/lib/sys/cpp/testing:unit",
+    "//sdk/lib/syslog/cpp",
+    "//src/lib/fxl/test:gtest_main",
+    "//third_party/googletest:gtest",
+    "//zircon/system/ulib/async-loop:async-loop-cpp",
+    "//zircon/system/ulib/async-loop:async-loop-default",
+    "//zircon/system/ulib/zx",
+  ]
+}
+
+fuchsia_component("playback_integration_test_component") {
+  testonly = true
+  component_name = "playback_integration_test"
+  manifest = "meta/playback_integration_test.cml"
+  deps = [ ":playback_integration_test_bin" ]
+}
+
+fuchsia_test_package("playback_integration_test") {
+  test_components = [ ":playback_integration_test_component" ]
+  deps = [ ":sensors_playback_component" ]
+}
+
+core_shard("sensors-playback-core-shard") {
+  shard_file = "meta/sensors_playback.core_shard.cml"
+}

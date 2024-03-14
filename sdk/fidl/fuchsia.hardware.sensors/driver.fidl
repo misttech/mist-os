@@ -13,7 +13,7 @@ type ActivateSensorError = flexible enum : uint32 {
 };
 
 /// Errors that may be returned by Driver::DeactivateSensor.
-type DectivateSensorError = flexible enum : uint32 {
+type DeactivateSensorError = flexible enum : uint32 {
     /// The provided SensorId does not correspond to an actual sensor.
     INVALID_SENSOR_ID = 1;
 };
