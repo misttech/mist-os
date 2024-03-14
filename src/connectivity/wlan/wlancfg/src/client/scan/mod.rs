@@ -27,7 +27,7 @@ use {
     },
     itertools::Itertools,
     std::{collections::HashMap, sync::Arc},
-    tracing::{debug, error, info, warn},
+    tracing::{debug, error, info, trace, warn},
 };
 
 mod fidl_conversion;
@@ -209,6 +209,16 @@ async fn sme_scan(
                             error!("ScanResult conversion failed: {:?}", e);
                             None
                         },
+                    )
+                })
+                .inspect(|scan_result| {
+                    // This trace-level logging is only enabled when a user manually sets the log
+                    // level to TRACE with `fx log` or `fx test`.
+                    trace!(
+                        "Scan result SSID: {}, BSSID: {}, channel: {}",
+                        scan_result.bss_description.ssid,
+                        scan_result.bss_description.bssid,
+                        scan_result.bss_description.channel
                     )
                 })
                 .collect::<Vec<_>>())
