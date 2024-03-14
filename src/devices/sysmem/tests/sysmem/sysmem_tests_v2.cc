@@ -2215,7 +2215,7 @@ TEST(Sysmem, MultipleParticipantsColorspaceRankingV2) {
 //    client going first in the first couple iterations.
 TEST(Sysmem,
      MultipleParticipants_TwoImageFormatConstraintsSamePixelFormat_CompatibleColorspacesV2) {
-  // Multiple iterations to try to repro https://fxbug.dev/42139125, in case it comes back.  This
+  // Multiple iterations to try to repro https://fxbug.dev/42139125, in case it comes back. This
   // should be at least 2 to check both orderings with two clients.
   std::atomic<uint32_t> clean_failure_seen_count = 0;
   const uint32_t kCleanFailureSeenGoal = 15;
@@ -7277,6 +7277,29 @@ TEST(Sysmem, AllocateB8G8R8X8) {
             info->settings()->image_format_constraints()->pixel_format().value());
   EXPECT_EQ(fuchsia_images2::PixelFormatModifier::kLinear,
             info->settings()->image_format_constraints()->pixel_format_modifier().value());
+}
+
+TEST(Sysmem, V1ConnectToV2Allocator) {
+  auto v1_allocator_result = component::Connect<fuchsia_sysmem::Allocator>();
+  ASSERT_TRUE(v1_allocator_result.is_ok());
+  auto v1_allocator = fidl::SyncClient(std::move(v1_allocator_result.value()));
+  auto v2_allocator_endpoints_result = fidl::CreateEndpoints<fuchsia_sysmem2::Allocator>();
+  ASSERT_TRUE(v2_allocator_endpoints_result.is_ok());
+  auto v2_allocator_endpoints = std::move(v2_allocator_endpoints_result.value());
+  auto v2_allocator = fidl::SyncClient(std::move(v2_allocator_endpoints.client));
+  auto connect_result =
+      v1_allocator->ConnectToSysmem2Allocator(v2_allocator_endpoints.server.TakeChannel());
+  ASSERT_TRUE(connect_result.is_ok());
+  auto allocator = fidl::SyncClient(std::move(v2_allocator));
+
+  auto token = create_initial_token_v2();
+
+  fuchsia_sysmem2::AllocatorValidateBufferCollectionTokenRequest validate_request;
+  validate_request.token_server_koid() = get_related_koid(token.client_end().channel().get());
+  auto validate_result = allocator->ValidateBufferCollectionToken(std::move(validate_request));
+  ASSERT_TRUE(validate_result.is_ok());
+  ASSERT_TRUE(validate_result->is_known().has_value());
+  ASSERT_TRUE(validate_result->is_known().value());
 }
 
 // This test is too likely to cause an OOM which would be treated as a flake. For now we can enable

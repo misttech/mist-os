@@ -26,7 +26,9 @@ class Allocator : public LoggingMixin {
   ~Allocator();
 
   static void CreateChannelOwnedV1(zx::channel request, Device* device);
-  static void CreateChannelOwnedV2(zx::channel request, Device* device);
+  // The returned reference lasts only until the current thread returns to the FIDL dispatcher, and
+  // will likely be removed when sysmem(1) can be removed.
+  static Allocator& CreateChannelOwnedV2(zx::channel request, Device* device);
 
  private:
   struct V1 : public fidl::Server<fuchsia_sysmem::Allocator> {
@@ -44,6 +46,8 @@ class Allocator : public LoggingMixin {
         ValidateBufferCollectionTokenCompleter::Sync& completer) override;
     void SetDebugClientInfo(SetDebugClientInfoRequest& request,
                             SetDebugClientInfoCompleter::Sync& completer) override;
+    void ConnectToSysmem2Allocator(ConnectToSysmem2AllocatorRequest& request,
+                                   ConnectToSysmem2AllocatorCompleter::Sync& completer) override;
 
     std::unique_ptr<Allocator> allocator_;
   };

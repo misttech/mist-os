@@ -33,13 +33,15 @@ void Allocator::CreateChannelOwnedV1(zx::channel request, Device* device) {
                    std::move(v1_server));
 }
 
-void Allocator::CreateChannelOwnedV2(zx::channel request, Device* device) {
+Allocator& Allocator::CreateChannelOwnedV2(zx::channel request, Device* device) {
   auto allocator = std::unique_ptr<Allocator>(new Allocator(device));
+  auto allocator_ptr = allocator.get();
   auto v2_server = std::make_unique<V2>(std::move(allocator));
   // Ignore the result - allocator will be destroyed and the channel will be closed on error.
   fidl::BindServer(device->dispatcher(),
                    fidl::ServerEnd<fuchsia_sysmem2::Allocator>(std::move(request)),
                    std::move(v2_server));
+  return *allocator_ptr;
 }
 
 template <typename Completer, typename Protocol>
@@ -281,6 +283,16 @@ void Allocator::V2::SetDebugClientInfo(SetDebugClientInfoRequest& request,
   allocator_->client_debug_info_->name =
       std::string(request.name()->begin(), request.name()->end());
   allocator_->client_debug_info_->id = id;
+}
+
+void Allocator::V1::ConnectToSysmem2Allocator(ConnectToSysmem2AllocatorRequest& request,
+                                              ConnectToSysmem2AllocatorCompleter::Sync& completer) {
+  auto v2_allocator = Allocator::CreateChannelOwnedV2(std::move(request.allocator_request()),
+                                                      allocator_->parent_device_);
+  if (allocator_->client_debug_info_.has_value()) {
+    v2_allocator.client_debug_info_->name = allocator_->client_debug_info_->name;
+    v2_allocator.client_debug_info_->id = allocator_->client_debug_info_->id;
+  }
 }
 
 void Allocator::V2::GetVmoInfo(GetVmoInfoRequest& request, GetVmoInfoCompleter::Sync& completer) {

@@ -134,4 +134,21 @@ closed protocol Allocator {
         name string:64;
         id uint64;
     });
+
+    /// This allows creating a sysmem2 `Allocator` given a sysmem(1)
+    /// `Allocator`.
+    ///
+    /// This is mainly useful in situations where library code is handed a
+    /// sysmem(1) allocator, but the library code has been updated to use
+    /// sysmem2. Typically the library will provide a way to pass in a sysmem2
+    /// `Allocator` instead, but client code isn't always in the same repo, so
+    /// this message allows the library to still accept the sysmem(1) Allocator
+    /// temporarily.
+    ///
+    /// The info set via `SetDebugClientInfo` (if any) is copied to the sysmem2
+    /// `Allocator`.
+    @available(added=HEAD)
+    strict ConnectToSysmem2Allocator(resource struct {
+        allocator_request zx.Handle:CHANNEL;
+    });
 };
