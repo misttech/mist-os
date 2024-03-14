@@ -13,7 +13,10 @@ group("examples") {
 
 group("tests") {
   testonly = true
-  public_deps = [ "flatland-view-provider:flatland-view-provider-tests" ]
+  public_deps = [
+    "escher/test:escher_examples_test($host_toolchain)",
+    "flatland-view-provider:flatland-view-provider-tests",
+  ]
 }
 
 fuchsia_package("flatland-examples") {

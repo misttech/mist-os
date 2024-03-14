@@ -5,5 +5,8 @@
 group("tests") {
   testonly = true
 
-  deps = [ "json_validator:tests" ]
+  deps = [
+    "json_merge:json_merge_test($host_toolchain)",
+    "json_validator/test:tests($host_toolchain)",
+  ]
 }

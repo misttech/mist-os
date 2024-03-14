@@ -146,6 +146,7 @@ group("tests_no_e2e") {
     "//tools/update_crates:tests($host_toolchain)",
     "//tools/validate_test_type:tests",
     "//tools/virtual_device:tests($host_toolchain)",
+    "//tools/whereiscl:whereiscl_test($host_toolchain)",
     "//tools/zedmon:tests",
   ]
 }

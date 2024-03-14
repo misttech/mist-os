@@ -8,7 +8,6 @@ group("tests") {
     "//build:tests",
     "//build/api:tests",
     "//bundles/fidl:tests",
-    "//bundles/packages/tests:all",
     "//examples:tests",
     "//scripts:tests",
     "//sdk:tests",
