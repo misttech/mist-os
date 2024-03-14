@@ -291,9 +291,6 @@ pub enum RoutingError {
     #[error("Item {name} is not present in dictionary")]
     BedrockNotPresentInDictionary { name: String },
 
-    #[error("Routing request was abandoned by a router")]
-    BedrockRoutingRequestCanceled,
-
     #[error("Source dictionary was not found in child's exposes")]
     BedrockSourceDictionaryExposeNotFound,
 
@@ -372,7 +369,6 @@ impl RoutingError {
             | RoutingError::BedrockNotPresentInDictionary { .. }
             | RoutingError::BedrockSourceDictionaryExposeNotFound { .. }
             | RoutingError::BedrockSourceDictionaryCollision { .. }
-            | RoutingError::BedrockRoutingRequestCanceled { .. }
             | RoutingError::AvailabilityRoutingError(_) => zx::Status::NOT_FOUND,
             RoutingError::BedrockUnsupportedCapability { .. }
             | RoutingError::DictionariesNotSupported { .. } => zx::Status::NOT_SUPPORTED,
