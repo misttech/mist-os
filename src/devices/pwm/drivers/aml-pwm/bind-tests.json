@@ -60,6 +60,15 @@
         "name": "SuccessA1"
     },
     {
+        "name": "Match devicetree",
+        "expected": "match",
+        "device": {
+            "fuchsia.BIND_PLATFORM_DEV_VID": "fuchsia.platform.BIND_PLATFORM_DEV_VID.GENERIC",
+            "fuchsia.BIND_PLATFORM_DEV_DID": "fuchsia.platform.BIND_PLATFORM_DEV_DID.DEVICETREE",
+            "fuchsia.devicetree.FIRST_COMPATIBLE": "\"amlogic,meson-g12a-ee-pwm\""
+        }
+    },
+    {
         "device": {
             "fuchsia.BIND_PLATFORM_DEV_DID": "fuchsia.amlogic.platform.BIND_PLATFORM_DEV_DID.PWM",
             "fuchsia.BIND_PLATFORM_DEV_PID": "fuchsia.amlogic.platform.BIND_PLATFORM_DEV_PID.S905D3",
