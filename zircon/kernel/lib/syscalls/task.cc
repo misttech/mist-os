@@ -359,7 +359,9 @@ zx_status_t sys_process_start(zx_handle_t process_handle, zx_handle_t thread_han
   zx_status_t status =
       up->handle_table().GetDispatcherWithRights(*up, process_handle, ZX_RIGHT_WRITE, &process);
   if (status != ZX_OK) {
-    up->handle_table().RemoveHandle(*up, arg_handle_value);
+    if (arg_handle_value != ZX_HANDLE_INVALID) {
+      up->handle_table().RemoveHandle(*up, arg_handle_value);
+    }
     return status;
   }
 
@@ -367,11 +369,16 @@ zx_status_t sys_process_start(zx_handle_t process_handle, zx_handle_t thread_han
   fbl::RefPtr<ThreadDispatcher> thread;
   status = up->handle_table().GetDispatcherWithRights(*up, thread_handle, ZX_RIGHT_WRITE, &thread);
   if (status != ZX_OK) {
-    up->handle_table().RemoveHandle(*up, arg_handle_value);
+    if (arg_handle_value != ZX_HANDLE_INVALID) {
+      up->handle_table().RemoveHandle(*up, arg_handle_value);
+    }
     return status;
   }
 
-  HandleOwner arg_handle = up->handle_table().RemoveHandle(*up, arg_handle_value);
+  HandleOwner arg_handle;
+  if (arg_handle_value != ZX_HANDLE_INVALID) {
+    arg_handle = up->handle_table().RemoveHandle(*up, arg_handle_value);
+  }
 
   // test that the thread belongs to the starting process
   if (thread->process() != process.get())
@@ -389,8 +396,10 @@ zx_status_t sys_process_start(zx_handle_t process_handle, zx_handle_t thread_han
       thread->Start(ThreadDispatcher::EntryState{pc, sp, static_cast<uintptr_t>(arg_nhv), arg2},
                     /* ensure_initial_thread */ true);
   if (status != ZX_OK) {
-    // Remove |arg_handle| from the process that failed to start.
-    process->handle_table().RemoveHandle(*process, arg_nhv);
+    if (arg_nhv != ZX_HANDLE_INVALID) {
+      // Remove |arg_handle| from the process that failed to start.
+      process->handle_table().RemoveHandle(*process, arg_nhv);
+    }
     return status;
   }
 
