@@ -158,6 +158,7 @@ USERDEBUG_PLATFORM_AIB_NAMES = BOOTSTRAP_USERDEBUG_PLATFORM_AIB_NAMES + USER_PLA
 
 # The names of all of the platform's Assembly Input Bundles.
 ENG_PLATFORM_AIB_NAMES = BOOTSTRAP_ENG_PLATFORM_AIB_NAMES + USERDEBUG_PLATFORM_AIB_NAMES + [
+    "adb_support",
     "audio_development_support",
     "bluetooth_pandora",
     "core_realm_eng",

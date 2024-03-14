@@ -295,6 +295,9 @@ eng_only_platform_aib_names =
 
       # Bluetooth testing support
       "bluetooth_pandora",
+
+      # ADB support. ADB drivers (and no daemon) for Starnix and development.
+      "adb_support",
     ]
 eng_platform_aib_names =
     userdebug_platform_aib_names + eng_only_platform_aib_names

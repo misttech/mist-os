@@ -1977,6 +1977,22 @@ assembly_input_bundle("starnix_support") {
   bootfs_files_labels = [ "//src/starnix/config:bootfs" ]
 }
 
+# Core adb support. Does not include daemon. Daemon should be included separately.
+#
+# optional: product must specify its inclusion
+# valid feature_set_levels: minimal
+# valid build-types: all
+#
+assembly_input_bundle("adb_support") {
+  kernel_cmdline = [ "driver.usb.peripheral=cdc_adb" ]
+  base_driver_packages = [
+    {
+      package_target = "//src/developer/adb/drivers/usb-adb-function:package"
+      driver_components = [ "meta/usb-adb-function.cm" ]
+    },
+  ]
+}
+
 # This AIB enables testing support, and is meant to be used with either the
 # `common_standard_eng` and `common_standard_userdebug` AIBs.
 #
