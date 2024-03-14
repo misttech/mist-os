@@ -10,21 +10,7 @@
     program: {
         runner: "driver",
         bind: "meta/bind/amlogic-display.bindbc",
-
-        // TODO(https://fxbug.dev/42076007): `colocate` must be true.
-        // amlogic-display driver needs to create a DsiImpl banjo client, but
-        // there's no fragment proxy support for the DsiImpl protocol.
-        //
-        // As a result, the driver implementing DsiImpl protocol has to be a
-        // direct ancestor of amlogic-display and they must be colocated in the
-        // same devhost. Setting `colocate` to true gives the driver manager
-        // an advisory.
-        //
-        // However, `colocate` is advisory only and may not be enforced
-        // (for example, DEVICE_ADD_MUST_ISOLATE will override it) so the
-        // colocation is never guaranteed. We should fix the DsiImpl forwarding
-        // and remove this requirement.
-        colocate: "true",
+        colocate: "false",
         compat: "driver/amlogic-display.so",
         default_dispatcher_opts: [ "allow_sync_calls" ],
     },
