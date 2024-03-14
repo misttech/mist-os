@@ -24,9 +24,9 @@ namespace {
 template <typename CompleterType>
 void CompleteTxn(CompleterType& completer, zx_status_t status) {
   if (status == ZX_OK) {
-    completer.ReplySuccess();
+    completer.Reply(fit::ok());
   } else {
-    completer.ReplyError(status);
+    completer.Reply(fit::error(status));
   }
 }
 
@@ -72,7 +72,7 @@ void UsbAdbDevice::Stop() {
   }
 }
 
-zx_status_t UsbAdbDevice::SendLocked(const fidl::VectorView<uint8_t>& buf) {
+zx_status_t UsbAdbDevice::SendLocked(const std::vector<uint8_t>& buf) {
   if (!Online()) {
     return ZX_ERR_BAD_STATE;
   }
@@ -83,17 +83,17 @@ zx_status_t UsbAdbDevice::SendLocked(const fidl::VectorView<uint8_t>& buf) {
   }
   req->clear_buffers();
 
-  if (buf.count() > kBulkReqSize) {
+  if (buf.size() > kBulkReqSize) {
     return ZX_ERR_BUFFER_TOO_SMALL;
   }
-  auto actual = req->CopyTo(0, buf.data(), buf.count(), bulk_in_ep_.GetMappedLocked);
+  auto actual = req->CopyTo(0, buf.data(), buf.size(), bulk_in_ep_.GetMappedLocked);
   size_t total = 0;
   for (size_t i = 0; i < actual.size(); i++) {
     (*req)->data()->at(i).size(actual[i]);
     total += actual[i];
   }
-  if (total != buf.count()) {
-    zxlogf(WARNING, "Tried to copy %zu bytes, but only copied %zu bytes", buf.count(), total);
+  if (total != buf.size()) {
+    zxlogf(WARNING, "Tried to copy %zu bytes, but only copied %zu bytes", buf.size(), total);
   }
   auto status = req->CacheFlush(bulk_in_ep_.GetMappedLocked);
   if (status != ZX_OK) {
@@ -112,21 +112,22 @@ zx_status_t UsbAdbDevice::SendLocked(const fidl::VectorView<uint8_t>& buf) {
   return ZX_OK;
 }
 
-void UsbAdbDevice::QueueTx(QueueTxRequestView request, QueueTxCompleter::Sync& completer) {
-  size_t length = request->data.count();
+void UsbAdbDevice::QueueTx(QueueTxRequest& request, QueueTxCompleter::Sync& completer) {
+  size_t length = request.data().size();
   zx_status_t status;
 
   if (!Online() || length == 0) {
     zxlogf(INFO, "Invalid state - Online %d Length %zu", Online(), length);
-    completer.ReplyError(ZX_ERR_INVALID_ARGS);
+    completer.Reply(fit::error(ZX_ERR_INVALID_ARGS));
     return;
   }
 
   fbl::AutoLock _(&bulk_in_ep_.mutex_);
-  status = SendLocked(request->data);
+  status = SendLocked(request.data());
   if (status == ZX_ERR_SHOULD_WAIT) {
     // No buffers available, queue it up
-    tx_pending_infos_.emplace(txn_info_t{.buf = request->data, .completer = completer.ToAsync()});
+    tx_pending_reqs_.emplace(
+        txn_req_t{.request = std::move(request), .completer = completer.ToAsync()});
   } else {
     CompleteTxn(completer, status);
   }
@@ -135,7 +136,7 @@ void UsbAdbDevice::QueueTx(QueueTxRequestView request, QueueTxCompleter::Sync& c
 void UsbAdbDevice::Receive(ReceiveCompleter::Sync& completer) {
   // Return early during shutdown.
   if (!Online()) {
-    completer.ReplyError(ZX_ERR_BAD_STATE);
+    completer.Reply(fit::error(ZX_ERR_BAD_STATE));
     return;
   }
 
@@ -153,11 +154,11 @@ void UsbAdbDevice::Receive(ReceiveCompleter::Sync& completer) {
     auto addr = bulk_out_ep_.GetMappedAddr(req.request(), 0);
     if (!addr.has_value()) {
       zxlogf(ERROR, "Failed to get mapped");
-      completer.ReplyError(ZX_ERR_INTERNAL);
+      completer.Reply(fit::error(ZX_ERR_INTERNAL));
     } else {
-      auto buffer = fidl::VectorView<uint8_t>::FromExternal(reinterpret_cast<uint8_t*>(*addr),
-                                                            *completion.transfer_size());
-      completer.ReplySuccess(buffer);
+      completer.Reply(fit::ok(
+          std::vector<uint8_t>(reinterpret_cast<uint8_t*>(*addr),
+                               reinterpret_cast<uint8_t*>(*addr) + *completion.transfer_size())));
     }
 
     req.reset_buffers(bulk_out_ep_.GetMapped);
@@ -242,12 +243,12 @@ void UsbAdbDevice::RxComplete(fuchsia_hardware_usb_endpoint::Completion completi
       auto addr = bulk_out_ep_.GetMappedAddr(*completion.request(), 0);
       if (!addr.has_value()) {
         zxlogf(ERROR, "Failed to get mapped");
-        rx_requests_.front().ReplyError(ZX_ERR_INTERNAL);
+        rx_requests_.front().Reply(fit::error(ZX_ERR_INTERNAL));
         rx_requests_.pop();
       } else {
-        auto buffer = fidl::VectorView<uint8_t>::FromExternal(reinterpret_cast<uint8_t*>(*addr),
-                                                              *completion.transfer_size());
-        rx_requests_.front().ReplySuccess(buffer);
+        rx_requests_.front().Reply(fit::ok(
+            std::vector<uint8_t>(reinterpret_cast<uint8_t*>(*addr),
+                                 reinterpret_cast<uint8_t*>(*addr) + *completion.transfer_size())));
         rx_requests_.pop();
       }
 
@@ -274,8 +275,7 @@ void UsbAdbDevice::RxComplete(fuchsia_hardware_usb_endpoint::Completion completi
 }
 
 void UsbAdbDevice::TxComplete(fuchsia_hardware_usb_endpoint::Completion completion) {
-  std::optional<fidl::internal::WireCompleter<::fuchsia_hardware_adb::UsbAdbImpl::QueueTx>::Async>
-      completer = std::nullopt;
+  std::optional<QueueTxCompleter::Async> completer = std::nullopt;
   zx_status_t send_status = ZX_OK;
 
   {
@@ -287,10 +287,11 @@ void UsbAdbDevice::TxComplete(fuchsia_hardware_usb_endpoint::Completion completi
     // be disconnected or USB_RESET is being processed. Calling adb_send_locked in such scenario
     // will deadlock and crash the driver (see https://fxbug.dev/42174506).
     if (*completion.status() != ZX_ERR_IO_NOT_PRESENT) {
-      if (!tx_pending_infos_.empty()) {
-        if ((send_status = SendLocked(tx_pending_infos_.front().buf)) != ZX_ERR_SHOULD_WAIT) {
-          completer = std::move(tx_pending_infos_.front().completer);
-          tx_pending_infos_.pop();
+      if (!tx_pending_reqs_.empty()) {
+        if ((send_status = SendLocked(tx_pending_reqs_.front().request.data())) !=
+            ZX_ERR_SHOULD_WAIT) {
+          completer = std::move(tx_pending_reqs_.front().completer);
+          tx_pending_reqs_.pop();
         }
       }
     }
@@ -503,16 +504,16 @@ void UsbAdbDevice::Shutdown() {
     }
     adb_binding_.reset();
     while (!rx_requests_.empty()) {
-      rx_requests_.front().ReplyError(ZX_ERR_BAD_STATE);
+      rx_requests_.front().Reply(fit::error(ZX_ERR_BAD_STATE));
       rx_requests_.pop();
     }
   }
 
   // Free all request pools.
-  std::queue<txn_info_t> queue;
+  std::queue<txn_req_t> queue;
   {
     fbl::AutoLock _(&bulk_in_ep_.mutex_);
-    std::swap(queue, tx_pending_infos_);
+    std::swap(queue, tx_pending_reqs_);
   }
 
   while (!queue.empty()) {

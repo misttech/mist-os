@@ -5,7 +5,7 @@
 #ifndef SRC_DEVELOPER_ADB_DRIVERS_USB_ADB_FUNCTION_ADB_FUNCTION_H_
 #define SRC_DEVELOPER_ADB_DRIVERS_USB_ADB_FUNCTION_ADB_FUNCTION_H_
 
-#include <fidl/fuchsia.hardware.adb/cpp/wire.h>
+#include <fidl/fuchsia.hardware.adb/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.usb.function/cpp/fidl.h>
 #include <fuchsia/hardware/usb/function/cpp/banjo.h>
 #include <lib/async-loop/cpp/loop.h>
@@ -39,7 +39,7 @@ using UsbAdb = ddk::Device<UsbAdbDevice, ddk::Suspendable, ddk::Unbindable,
 class UsbAdbDevice : public UsbAdb,
                      public ddk::UsbFunctionInterfaceProtocol<UsbAdbDevice>,
                      public ddk::EmptyProtocol<ZX_PROTOCOL_ADB>,
-                     public fidl::WireServer<fuchsia_hardware_adb::UsbAdbImpl> {
+                     public fidl::Server<fuchsia_hardware_adb::UsbAdbImpl> {
  public:
   // Driver bind method.
   static zx_status_t Bind(void* ctx, zx_device_t* parent);
@@ -80,14 +80,14 @@ class UsbAdbDevice : public UsbAdb,
   void Stop();
 
   // fuchsia_hardware_adb::UsbAdbImpl methods.
-  void QueueTx(QueueTxRequestView request, QueueTxCompleter::Sync& completer) override;
+  void QueueTx(QueueTxRequest& request, QueueTxCompleter::Sync& completer) override;
   void Receive(ReceiveCompleter::Sync& completer) override;
 
  private:
   // Structure to store pending transfer requests when there are not enough USB request buffers.
-  struct txn_info_t {
-    fidl::VectorView<uint8_t> buf;
-    fidl::internal::WireCompleter<::fuchsia_hardware_adb::UsbAdbImpl::QueueTx>::Async completer;
+  struct txn_req_t {
+    QueueTxRequest request;
+    QueueTxCompleter::Async completer;
   };
 
   // Helper method to perform bookkeeping and insert requests back to the free pool.
@@ -95,7 +95,7 @@ class UsbAdbDevice : public UsbAdb,
                                usb_endpoint::UsbEndpoint<UsbAdbDevice>& ep);
 
   // Helper method to get free request buffer and queue the request for transmitting.
-  zx_status_t SendLocked(const fidl::VectorView<uint8_t>& buf) __TA_REQUIRES(bulk_in_ep_.mutex_);
+  zx_status_t SendLocked(const std::vector<uint8_t>& buf) __TA_REQUIRES(bulk_in_ep_.mutex_);
 
   // USB request completion callback methods.
   void TxComplete(fuchsia_hardware_usb_endpoint::Completion completion);
@@ -206,8 +206,7 @@ class UsbAdbDevice : public UsbAdb,
   usb_endpoint::UsbEndpoint<UsbAdbDevice> bulk_out_ep_{usb::EndpointType::BULK, this,
                                                        std::mem_fn(&UsbAdbDevice::RxComplete)};
   // Queue of pending Receive requests from client.
-  std::queue<fidl::internal::WireCompleter<::fuchsia_hardware_adb::UsbAdbImpl::Receive>::Async>
-      rx_requests_ __TA_GUARDED(adb_mutex_);
+  std::queue<ReceiveCompleter::Async> rx_requests_ __TA_GUARDED(adb_mutex_);
   // pending_replies_ only used for bulk_out_ep_
   std::queue<fuchsia_hardware_usb_endpoint::Completion> pending_replies_
       __TA_GUARDED(bulk_out_ep_.mutex_);
@@ -217,7 +216,7 @@ class UsbAdbDevice : public UsbAdb,
                                                       std::mem_fn(&UsbAdbDevice::TxComplete)};
   // Queue of pending transfer requests that need to be transmitted once the BULK IN request buffers
   // become available.
-  std::queue<txn_info_t> tx_pending_infos_ __TA_GUARDED(bulk_in_ep_.mutex_);
+  std::queue<txn_req_t> tx_pending_reqs_ __TA_GUARDED(bulk_in_ep_.mutex_);
 
   // Used for synchronizing the order of Stop() and Shutdown() in tests.
   sync_completion_t* test_stop_sync_;
