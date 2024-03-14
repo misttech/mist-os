@@ -96,8 +96,10 @@ class Node {
   uint32_t id_;
 
   // Boolean to indicate if a composite node spec needs to added.
-  // TODO(https://fxbug.dev/42080094): Add proper support for composite.
   bool composite_ = false;
+
+  // Boolean to indicate if a platform device needs to added.
+  bool add_platform_device_ = false;
 
   // Storing handle to manager. This is ok as the manager always outlives the node instance.
   NodeManager* manager_;
