@@ -53,8 +53,8 @@ exclude = [
 "CBufferProvider" = "wlansoftmac_buffer_provider_ops_t"
 "CBuffer" = "wlansoftmac_buffer_t"
 "CDeviceInterface" = "rust_device_interface_t"
-"CWlanSoftmacIfcProtocol" = "rust_wlan_softmac_ifc_protocol_copy_t"
-"CWlanSoftmacIfcProtocolOps" = "rust_wlan_softmac_ifc_protocol_ops_copy_t"
+"CFrameProcessor" = "frame_processor_t"
+"CFrameProcessorOps" = "frame_processor_ops_t"
 
 # wlan-span types
 "CSpan" = "wlan_span_t"

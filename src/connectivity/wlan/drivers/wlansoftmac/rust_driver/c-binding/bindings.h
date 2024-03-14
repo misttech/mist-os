@@ -20,24 +20,20 @@
 typedef struct wlansoftmac_handle_t wlansoftmac_handle_t;
 
 typedef struct {
-  void (*recv)(const void *ctx, const wlan_rx_packet_t *packet, trace_async_id_t async_id);
-} rust_wlan_softmac_ifc_protocol_ops_copy_t;
+  void (*wlan_rx)(const void *ctx, const uint8_t *request, uintptr_t request_size);
+} frame_processor_ops_t;
 
 /**
- * Type containing pointers to the static `PROTOCOL_OPS` and a `DriverEventSink`.
+ * Type containing pointers to the static `FRAME_PROCESSOR_OPS` and a `DriverEventSink`.
  *
- * The wlansoftmac driver copies the pointers from `CWlanSoftmacIfcProtocol` which means the code
+ * The wlansoftmac driver copies the pointers from `CFrameProcessor` which means the code
  * constructing this type must ensure those pointers remain valid for their lifetime in
  * wlansoftmac.
- *
- * Additionally, by assigning functions directly from `PROTOCOL_OPS` to the corresponding Banjo
- * generated types in wlansoftmac, wlansoftmac ensure the function signatures are correct at
- * compile-time.
  */
 typedef struct {
-  const rust_wlan_softmac_ifc_protocol_ops_copy_t *ops;
+  const frame_processor_ops_t *ops;
   const void *ctx;
-} rust_wlan_softmac_ifc_protocol_copy_t;
+} frame_processor_t;
 
 /**
  * Type that represents the FFI from the bridged wlansoftmac to wlansoftmac itself.
@@ -61,8 +57,8 @@ typedef struct {
   /**
    * Start operations on the underlying device and return the SME channel.
    */
-  int32_t (*start)(const void *device, const rust_wlan_softmac_ifc_protocol_copy_t *ifc,
-                   zx_handle_t wlan_softmac_ifc_bridge_client_handle, zx_handle_t *out_sme_channel);
+  int32_t (*start)(const void *device, zx_handle_t wlan_softmac_ifc_bridge_client_handle,
+                   const frame_processor_t *frame_processor, zx_handle_t *out_sme_channel);
   /**
    * Request to deliver an Ethernet II frame to Fuchsia's Netstack.
    */

@@ -14,8 +14,8 @@ use {
         device::{self, DeviceOps},
         error::Error,
     },
-    banjo_fuchsia_wlan_softmac as banjo_wlan_softmac, fidl_fuchsia_wlan_common as fidl_common,
-    fidl_fuchsia_wlan_minstrel as fidl_minstrel, fidl_fuchsia_wlan_mlme as fidl_mlme,
+    fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_minstrel as fidl_minstrel,
+    fidl_fuchsia_wlan_mlme as fidl_mlme, fidl_fuchsia_wlan_softmac as fidl_softmac,
     fuchsia_trace as trace, fuchsia_zircon as zx,
     ieee80211::{Bssid, MacAddr, Ssid},
     std::fmt,
@@ -149,7 +149,7 @@ impl<D: DeviceOps> crate::MlmeImpl for Ap<D> {
     fn handle_mac_frame_rx(
         &mut self,
         frame: &[u8],
-        rx_info: banjo_fuchsia_wlan_softmac::WlanRxInfo,
+        rx_info: fidl_softmac::WlanRxInfo,
         async_id: trace::Id,
     ) {
         Self::handle_mac_frame_rx(self, frame, rx_info, async_id)
@@ -411,7 +411,7 @@ impl<D: DeviceOps> Ap<D> {
     pub fn handle_mac_frame_rx<B: ByteSlice>(
         &mut self,
         bytes: B,
-        rx_info: banjo_wlan_softmac::WlanRxInfo,
+        rx_info: fidl_softmac::WlanRxInfo,
         async_id: trace::Id,
     ) {
         let bss = match self.bss.as_mut() {
@@ -429,9 +429,8 @@ impl<D: DeviceOps> Ap<D> {
             return;
         }
 
-        let body_aligned = (rx_info.rx_flags
-            & banjo_wlan_softmac::WlanRxInfoFlags::FRAME_BODY_PADDING_4)
-            != banjo_wlan_softmac::WlanRxInfoFlags(0);
+        let body_aligned = (rx_info.rx_flags & fidl_softmac::WlanRxInfoFlags::FRAME_BODY_PADDING_4)
+            != fidl_softmac::WlanRxInfoFlags::empty();
 
         let mac_frame = match mac::MacFrame::parse(bytes, body_aligned) {
             Some(mac_frame) => mac_frame,
@@ -478,8 +477,8 @@ mod tests {
             device::{test_utils, FakeDevice, FakeDeviceConfig, FakeDeviceState},
             test_utils::MockWlanRxInfo,
         },
-        banjo_fuchsia_wlan_common as banjo_common, fidl_fuchsia_wlan_common as fidl_common,
-        fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_softmac as fidl_softmac,
+        fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211,
+        fidl_fuchsia_wlan_softmac as fidl_softmac,
         fuchsia_async::TestExecutor,
         fuchsia_sync::Mutex,
         futures::task::Poll,
@@ -622,7 +621,7 @@ mod tests {
         );
     }
 
-    fn mock_rx_info(ap: &Ap<FakeDevice>) -> banjo_wlan_softmac::WlanRxInfo {
+    fn mock_rx_info(ap: &Ap<FakeDevice>) -> fidl_softmac::WlanRxInfo {
         let channel = fidl_common::WlanChannel {
             primary: ap.bss.as_ref().unwrap().channel,
             cbw: fidl_common::ChannelBandwidth::Cbw20,
@@ -821,14 +820,14 @@ mod tests {
         );
         ap.handle_mac_frame_rx(
             &[0][..],
-            banjo_wlan_softmac::WlanRxInfo {
-                rx_flags: banjo_wlan_softmac::WlanRxInfoFlags(0),
-                valid_fields: banjo_wlan_softmac::WlanRxInfoValid(0),
-                phy: banjo_common::WlanPhyType::DSSS,
+            fidl_softmac::WlanRxInfo {
+                rx_flags: fidl_softmac::WlanRxInfoFlags::empty(),
+                valid_fields: fidl_softmac::WlanRxInfoValid::empty(),
+                phy: fidl_common::WlanPhyType::Dsss,
                 data_rate: 0,
-                channel: banjo_common::WlanChannel {
+                channel: fidl_common::WlanChannel {
                     primary: 0,
-                    cbw: banjo_common::ChannelBandwidth::CBW20,
+                    cbw: fidl_common::ChannelBandwidth::Cbw20,
                     secondary80: 0,
                 },
                 mcs: 0,
@@ -866,14 +865,14 @@ mod tests {
             // SSID
             0, 7, 0x63, 0x6f, 0x6f, 0x6c, 0x6e, 0x65, 0x74, 0x0a,
         ];
-        let rx_info_wrong_channel = banjo_wlan_softmac::WlanRxInfo {
-            rx_flags: banjo_wlan_softmac::WlanRxInfoFlags(0),
-            valid_fields: banjo_wlan_softmac::WlanRxInfoValid(0),
-            phy: banjo_common::WlanPhyType::DSSS,
+        let rx_info_wrong_channel = fidl_softmac::WlanRxInfo {
+            rx_flags: fidl_softmac::WlanRxInfoFlags::empty(),
+            valid_fields: fidl_softmac::WlanRxInfoValid::empty(),
+            phy: fidl_common::WlanPhyType::Dsss,
             data_rate: 0,
-            channel: banjo_common::WlanChannel {
+            channel: fidl_common::WlanChannel {
                 primary: 0,
-                cbw: banjo_common::ChannelBandwidth::CBW20,
+                cbw: fidl_common::ChannelBandwidth::Cbw20,
                 secondary80: 0,
             },
             mcs: 0,
@@ -886,10 +885,10 @@ mod tests {
         assert_eq!(fake_device_state.lock().wlan_queue.len(), 0);
 
         // Frame from the same channel must be processed and a probe response sent.
-        let rx_info_same_channel = banjo_wlan_softmac::WlanRxInfo {
-            channel: banjo_common::WlanChannel {
+        let rx_info_same_channel = fidl_softmac::WlanRxInfo {
+            channel: fidl_common::WlanChannel {
                 primary: 1,
-                cbw: banjo_common::ChannelBandwidth::CBW20,
+                cbw: fidl_common::ChannelBandwidth::Cbw20,
                 secondary80: 0,
             },
             ..rx_info_wrong_channel

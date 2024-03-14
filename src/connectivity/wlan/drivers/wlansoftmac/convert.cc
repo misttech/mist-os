@@ -71,61 +71,6 @@ void ConvertVhtCapabilities(const fuchsia_wlan_ieee80211::wire::VhtCapabilities&
   memcpy(out->bytes, in.bytes.data(), fuchsia_wlan_ieee80211::wire::kVhtCapLen);
 }
 
-zx_status_t ConvertRxInfo(const fuchsia_wlan_softmac::wire::WlanRxInfo& in, wlan_rx_info_t* out) {
-  zx_status_t status;
-
-  // WlanRxInfo class overrides uint32_t cast to return internal bitmap.
-  out->rx_flags = static_cast<uint32_t>(in.rx_flags);
-  out->valid_fields = static_cast<uint32_t>(in.valid_fields);
-
-  if ((status = ConvertWlanPhyType(in.phy, &out->phy)) != ZX_OK) {
-    lerror("WlanPhyType is not supported.");
-    return status;
-  }
-
-  out->data_rate = in.data_rate;
-  out->channel.primary = in.channel.primary;
-  switch (in.channel.cbw) {
-    case fuchsia_wlan_common::wire::ChannelBandwidth::kCbw20:
-      out->channel.cbw = CHANNEL_BANDWIDTH_CBW20;
-      break;
-    case fuchsia_wlan_common::wire::ChannelBandwidth::kCbw40:
-      out->channel.cbw = CHANNEL_BANDWIDTH_CBW40;
-      break;
-    case fuchsia_wlan_common::wire::ChannelBandwidth::kCbw40Below:
-      out->channel.cbw = CHANNEL_BANDWIDTH_CBW40BELOW;
-      break;
-    case fuchsia_wlan_common::wire::ChannelBandwidth::kCbw80:
-      out->channel.cbw = CHANNEL_BANDWIDTH_CBW80;
-      break;
-    case fuchsia_wlan_common::wire::ChannelBandwidth::kCbw160:
-      out->channel.cbw = CHANNEL_BANDWIDTH_CBW160;
-      break;
-    case fuchsia_wlan_common::wire::ChannelBandwidth::kCbw80P80:
-      out->channel.cbw = CHANNEL_BANDWIDTH_CBW80P80;
-      break;
-    default:
-      lerror("ChannelBandwidth is not supported: %u", static_cast<uint32_t>(in.channel.cbw));
-      return ZX_ERR_NOT_SUPPORTED;
-  }
-  out->channel.secondary80 = in.channel.secondary80;
-
-  out->mcs = in.mcs;
-  out->rssi_dbm = in.rssi_dbm;
-  out->snr_dbh = in.snr_dbh;
-
-  return ZX_OK;
-}
-
-zx_status_t ConvertRxPacket(const fuchsia_wlan_softmac::wire::WlanRxPacket& in,
-                            wlan_rx_packet_t* out, uint8_t* rx_packet_buffer) {
-  memcpy(rx_packet_buffer, in.mac_frame.begin(), in.mac_frame.count());
-  out->mac_frame_buffer = rx_packet_buffer;
-  out->mac_frame_size = in.mac_frame.count();
-
-  return ConvertRxInfo(in.info, &out->info);
-}
-
 zx_status_t ConvertMacRole(const wlan_mac_role_t& in, fuchsia_wlan_common::wire::WlanMacRole* out) {
   switch (in) {
     case WLAN_MAC_ROLE_AP:

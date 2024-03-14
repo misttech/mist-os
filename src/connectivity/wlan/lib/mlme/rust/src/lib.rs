@@ -26,7 +26,6 @@ mod probe_sequence;
 
 use {
     anyhow::{bail, format_err, Error},
-    banjo_fuchsia_wlan_softmac as banjo_wlan_softmac,
     device::{completers::StopCompleter, DeviceOps},
     fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_softmac as fidl_softmac,
     fuchsia_sync::Mutex,
@@ -129,7 +128,7 @@ pub trait MlmeImpl {
     fn handle_mac_frame_rx(
         &mut self,
         bytes: &[u8],
-        rx_info: banjo_wlan_softmac::WlanRxInfo,
+        rx_info: fidl_softmac::WlanRxInfo,
         async_id: trace::Id,
     );
     fn handle_eth_frame_tx(&mut self, bytes: &[u8], async_id: trace::Id) -> Result<(), Error>;
@@ -210,7 +209,7 @@ pub enum DriverEvent {
     Stop(StopCompleter),
     // TODO(https://fxbug.dev/42119762): We need to keep stats for these events and respond to StatsQueryRequest.
     // Indicates receipt of a MAC frame from a peer.
-    MacFrameRx { bytes: Vec<u8>, rx_info: banjo_wlan_softmac::WlanRxInfo, async_id: trace::Id },
+    MacFrameRx { bytes: Vec<u8>, rx_info: fidl_softmac::WlanRxInfo, async_id: trace::Id },
     // Requests transmission of an ethernet frame over the air.
     EthFrameTx { bytes: Vec<u8>, async_id: trace::Id },
     // Reports a scan is complete.
@@ -370,8 +369,7 @@ pub mod test_utils {
     use {
         super::*,
         crate::device::FakeDevice,
-        banjo_fuchsia_wlan_common as banjo_common, fidl_fuchsia_wlan_common as fidl_common,
-        fidl_fuchsia_wlan_mlme as fidl_mlme,
+        fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_mlme as fidl_mlme,
         ieee80211::{MacAddr, MacAddrBytes},
         wlan_common::channel,
     };
@@ -404,7 +402,7 @@ pub mod test_utils {
         fn handle_mac_frame_rx(
             &mut self,
             _bytes: &[u8],
-            _rx_info: banjo_wlan_softmac::WlanRxInfo,
+            _rx_info: fidl_softmac::WlanRxInfo,
             _async_id: trace::Id,
         ) {
             unimplemented!()
@@ -441,9 +439,9 @@ pub mod test_utils {
 
     #[derive(Copy, Clone, Debug)]
     pub struct MockWlanRxInfo {
-        pub rx_flags: banjo_wlan_softmac::WlanRxInfoFlags,
-        pub valid_fields: banjo_wlan_softmac::WlanRxInfoValid,
-        pub phy: banjo_common::WlanPhyType,
+        pub rx_flags: fidl_softmac::WlanRxInfoFlags,
+        pub valid_fields: fidl_softmac::WlanRxInfoValid,
+        pub phy: fidl_common::WlanPhyType,
         pub data_rate: u32,
         pub channel: fidl_common::WlanChannel,
         pub mcs: u8,
@@ -454,33 +452,31 @@ pub mod test_utils {
     impl MockWlanRxInfo {
         pub(crate) fn with_channel(channel: fidl_common::WlanChannel) -> Self {
             Self {
-                valid_fields: banjo_wlan_softmac::WlanRxInfoValid(
-                    banjo_wlan_softmac::WlanRxInfoValid::CHAN_WIDTH.0
-                        | banjo_wlan_softmac::WlanRxInfoValid::RSSI.0
-                        | banjo_wlan_softmac::WlanRxInfoValid::SNR.0,
-                ),
+                valid_fields: fidl_softmac::WlanRxInfoValid::CHAN_WIDTH
+                    | fidl_softmac::WlanRxInfoValid::RSSI
+                    | fidl_softmac::WlanRxInfoValid::SNR,
                 channel,
                 rssi_dbm: -40,
                 snr_dbh: 35,
 
                 // Default to 0 for these fields since there are no
                 // other reasonable values to mock.
-                rx_flags: banjo_wlan_softmac::WlanRxInfoFlags(0),
-                phy: banjo_common::WlanPhyType::DSSS,
+                rx_flags: fidl_softmac::WlanRxInfoFlags::empty(),
+                phy: fidl_common::WlanPhyType::Dsss,
                 data_rate: 0,
                 mcs: 0,
             }
         }
     }
 
-    impl From<MockWlanRxInfo> for banjo_wlan_softmac::WlanRxInfo {
-        fn from(mock_rx_info: MockWlanRxInfo) -> banjo_wlan_softmac::WlanRxInfo {
-            banjo_wlan_softmac::WlanRxInfo {
+    impl From<MockWlanRxInfo> for fidl_softmac::WlanRxInfo {
+        fn from(mock_rx_info: MockWlanRxInfo) -> fidl_softmac::WlanRxInfo {
+            fidl_softmac::WlanRxInfo {
                 rx_flags: mock_rx_info.rx_flags,
                 valid_fields: mock_rx_info.valid_fields,
                 phy: mock_rx_info.phy,
                 data_rate: mock_rx_info.data_rate,
-                channel: ddk_converter::ddk_channel_from_fidl(mock_rx_info.channel).unwrap(),
+                channel: mock_rx_info.channel,
                 mcs: mock_rx_info.mcs,
                 rssi_dbm: mock_rx_info.rssi_dbm,
                 snr_dbh: mock_rx_info.snr_dbh,

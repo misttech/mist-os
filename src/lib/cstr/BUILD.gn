@@ -17,6 +17,7 @@ import("//build/rust/rustc_library.gni")
 #
 cstr_full_deps_allowlist = [
   "//src/connectivity/network/netstack-proxy:*",
+  "//src/connectivity/wlan/lib/mlme/rust:*",
   "//src/lib/cstr:*",
   "//src/lib/pty:*",
   "//src/lib/trace/rust/bench:*",

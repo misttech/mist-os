@@ -22,44 +22,30 @@ namespace wlan::drivers::wlansoftmac {
 class SoftmacIfcBridge : public fdf::WireServer<fuchsia_wlan_softmac::WlanSoftmacIfc> {
  public:
   static zx::result<std::unique_ptr<SoftmacIfcBridge>> New(
-      const fdf::Dispatcher& softmac_ifc_server_dispatcher, std::shared_ptr<std::mutex> unbind_lock,
-      std::shared_ptr<bool> unbind_called,
-      const rust_wlan_softmac_ifc_protocol_copy_t* rust_softmac_ifc,
+      const fdf::Dispatcher& softmac_ifc_server_dispatcher,
+      const frame_processor_t* frame_processor,
       fdf::ServerEnd<fuchsia_wlan_softmac::WlanSoftmacIfc>&& server_endpoint,
       fidl::ClientEnd<fuchsia_wlan_softmac::WlanSoftmacIfcBridge>&& bridge_client_endpoint);
 
   ~SoftmacIfcBridge() override = default;
 
-  void Recv(RecvRequestView request, fdf::Arena& arena, RecvCompleter::Sync& completer) override;
+  void Recv(RecvRequestView fdf_request, fdf::Arena& arena,
+            RecvCompleter::Sync& completer) override;
   void ReportTxResult(ReportTxResultRequestView request, fdf::Arena& arena,
                       ReportTxResultCompleter::Sync& completer) override;
   void NotifyScanComplete(NotifyScanCompleteRequestView request, fdf::Arena& arena,
                           NotifyScanCompleteCompleter::Sync& completer) override;
 
  private:
-  explicit SoftmacIfcBridge(std::shared_ptr<std::mutex> unbind_lock,
-                            std::shared_ptr<bool> unbind_called,
-                            const rust_wlan_softmac_ifc_protocol_copy_t* rust_softmac_ifc)
-      : unbind_lock_(std::move(unbind_lock)),
-        unbind_called_(std::move(unbind_called)),
-        rust_softmac_ifc_(*rust_softmac_ifc) {}
-
-  std::shared_ptr<std::mutex> unbind_lock_;
-  std::shared_ptr<bool> unbind_called_ __TA_GUARDED(unbind_lock_);
-
-  // The protocol functions in rust_softmac_ifc_ act as the client end
-  // of WlanSoftmacIfc protocol to the Rust portion of the wlansoftmac.
-  const rust_wlan_softmac_ifc_protocol_copy_t rust_softmac_ifc_;
+  explicit SoftmacIfcBridge(const frame_processor_t* frame_processor)
+      : frame_processor_(*frame_processor) {}
+  const frame_processor_t frame_processor_;
 
   std::unique_ptr<fdf::ServerBinding<fuchsia_wlan_softmac::WlanSoftmacIfc>>
       softmac_ifc_server_binding_;
 
   std::unique_ptr<fidl::WireClient<fuchsia_wlan_softmac::WlanSoftmacIfcBridge>>
       softmac_ifc_bridge_client_;
-
-  // Preallocated buffer for small frames
-  static const size_t kPreAllocRecvBufferSize = 2000;
-  uint8_t pre_alloc_recv_buffer_[kPreAllocRecvBufferSize];
 };
 
 }  // namespace wlan::drivers::wlansoftmac

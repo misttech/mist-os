@@ -4,8 +4,8 @@
 
 use {
     anyhow::Error,
-    banjo_fuchsia_wlan_softmac as banjo_wlan_softmac, fidl_fuchsia_wlan_common as fidl_common,
-    fidl_fuchsia_wlan_internal as fidl_internal,
+    fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_internal as fidl_internal,
+    fidl_fuchsia_wlan_softmac as fidl_softmac,
     ieee80211::{Bssid, MacAddrBytes},
     wlan_common::{channel::derive_channel, ie, mac::CapabilityInfo, TimeUnit},
 };
@@ -16,7 +16,7 @@ pub fn construct_bss_description(
     beacon_interval: TimeUnit,
     capability_info: CapabilityInfo,
     ies: &[u8],
-    rx_info: banjo_wlan_softmac::WlanRxInfo,
+    rx_info: fidl_softmac::WlanRxInfo,
 ) -> Result<fidl_internal::BssDescription, Error> {
     let mut dsss_channel = None;
     let mut parsed_ht_op = None;
@@ -68,10 +68,7 @@ fn get_bss_type(capability_info: CapabilityInfo) -> fidl_common::BssType {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*, banjo_fuchsia_wlan_common as banjo_common,
-        fidl_fuchsia_wlan_common as fidl_common, lazy_static::lazy_static,
-    };
+    use {super::*, lazy_static::lazy_static};
 
     lazy_static! {
         static ref BSSID: Bssid = [0x33; 6].into();
@@ -80,19 +77,19 @@ mod tests {
     const BEACON_INTERVAL: u16 = 100;
     // Capability information: ESS, privacy, spectrum mgmt, radio msmt
     const CAPABILITY_INFO: CapabilityInfo = CapabilityInfo(0x1111);
-    const RX_INFO: banjo_wlan_softmac::WlanRxInfo = banjo_wlan_softmac::WlanRxInfo {
-        channel: banjo_common::WlanChannel {
+    const RX_INFO: fidl_softmac::WlanRxInfo = fidl_softmac::WlanRxInfo {
+        channel: fidl_common::WlanChannel {
             primary: 11,
-            cbw: banjo_common::ChannelBandwidth::CBW20,
+            cbw: fidl_common::ChannelBandwidth::Cbw20,
             secondary80: 0,
         },
         rssi_dbm: -40,
         snr_dbh: 35,
 
         // Unused fields
-        rx_flags: banjo_wlan_softmac::WlanRxInfoFlags(0),
-        valid_fields: banjo_wlan_softmac::WlanRxInfoValid(0),
-        phy: banjo_common::WlanPhyType::DSSS,
+        rx_flags: fidl_softmac::WlanRxInfoFlags::empty(),
+        valid_fields: fidl_softmac::WlanRxInfoValid::empty(),
+        phy: fidl_common::WlanPhyType::Dsss,
         data_rate: 0,
         mcs: 0,
     };

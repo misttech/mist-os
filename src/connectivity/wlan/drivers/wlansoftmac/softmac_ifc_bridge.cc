@@ -15,25 +15,20 @@
 #include <lib/zx/result.h>
 #include <zircon/errors.h>
 
-#include <mutex>
-
 #include <wlan/drivers/log.h>
 
-#include "convert.h"
 #include "src/connectivity/wlan/drivers/wlansoftmac/rust_driver/c-binding/bindings.h"
 
 namespace wlan::drivers::wlansoftmac {
 
 zx::result<std::unique_ptr<SoftmacIfcBridge>> SoftmacIfcBridge::New(
-    const fdf::Dispatcher& softmac_ifc_server_dispatcher, std::shared_ptr<std::mutex> unbind_lock,
-    std::shared_ptr<bool> unbind_called,
-    const rust_wlan_softmac_ifc_protocol_copy_t* rust_softmac_ifc,
+    const fdf::Dispatcher& softmac_ifc_server_dispatcher, const frame_processor_t* frame_processor,
     fdf::ServerEnd<fuchsia_wlan_softmac::WlanSoftmacIfc>&& server_endpoint,
     fidl::ClientEnd<fuchsia_wlan_softmac::WlanSoftmacIfcBridge>&&
         softmac_ifc_bridge_client_endpoint) {
   WLAN_TRACE_DURATION();
-  auto softmac_ifc_bridge = std::unique_ptr<SoftmacIfcBridge>(
-      new SoftmacIfcBridge(std::move(unbind_lock), std::move(unbind_called), rust_softmac_ifc));
+  auto softmac_ifc_bridge =
+      std::unique_ptr<SoftmacIfcBridge>(new SoftmacIfcBridge(frame_processor));
 
   // Bind the WlanSoftmacIfc server and WlanSoftmacIfcBridge client on
   // softmac_ifc_bridge_server_dispatcher.
@@ -66,44 +61,29 @@ zx::result<std::unique_ptr<SoftmacIfcBridge>> SoftmacIfcBridge::New(
   return fit::ok(std::move(softmac_ifc_bridge));
 }
 
-void SoftmacIfcBridge::Recv(RecvRequestView request, fdf::Arena& arena,
+void SoftmacIfcBridge::Recv(RecvRequestView fdf_request, fdf::Arena& fdf_arena,
                             RecvCompleter::Sync& completer) {
   trace_async_id_t async_id = TRACE_NONCE();
   WLAN_TRACE_ASYNC_BEGIN_RX(async_id);
   WLAN_TRACE_DURATION();
-  {
-    std::lock_guard<std::mutex> lock(*unbind_lock_);
-    if (*unbind_called_) {
-      WLAN_TRACE_ASYNC_END_RX(async_id, ZX_ERR_CANCELED);
-      return;
-    }
-  }
 
-  wlan_rx_packet_t rx_packet;
-  bool use_prealloc_recv_buffer =
-      unlikely(request->packet.mac_frame.count() > kPreAllocRecvBufferSize);
-  uint8_t* rx_packet_buffer;
-  if (use_prealloc_recv_buffer) {
-    rx_packet_buffer = static_cast<uint8_t*>(malloc(request->packet.mac_frame.count()));
+  fidl::Arena fidl_arena;
+  auto builder = fuchsia_wlan_softmac::wire::FrameProcessorWlanRxRequest::Builder(fidl_arena);
+  builder.packet_address(reinterpret_cast<uint64_t>(fdf_request->packet.mac_frame.begin()));
+  builder.packet_size(reinterpret_cast<uint64_t>(fdf_request->packet.mac_frame.count()));
+  builder.packet_info(fdf_request->packet.info);
+  builder.async_id(async_id);
+  auto fidl_request = builder.Build();
+
+  auto fidl_request_persisted = ::fidl::Persist(fidl_request);
+  if (fidl_request_persisted.is_ok()) {
+    frame_processor_.ops->wlan_rx(frame_processor_.ctx, fidl_request_persisted.value().data(),
+                                  fidl_request_persisted.value().size());
   } else {
-    rx_packet_buffer = pre_alloc_recv_buffer_;
+    lerror("Failed to persist FrameProcessor.WlanRx fidl_request (FIDL error %s)",
+           fidl_request_persisted.error_value());
   }
-
-  zx_status_t status = ConvertRxPacket(request->packet, &rx_packet, rx_packet_buffer);
-  if (status != ZX_OK) {
-    lerror("RxPacket conversion failed: %s", zx_status_get_string(status));
-  }
-
-  rust_softmac_ifc_.ops->recv(rust_softmac_ifc_.ctx, &rx_packet, async_id);
-  if (use_prealloc_recv_buffer) {
-    // Freeing the frame buffer allocated in ConvertRxPacket() above.
-    memset(const_cast<uint8_t*>(rx_packet.mac_frame_buffer), 0, rx_packet.mac_frame_size);
-    free(const_cast<uint8_t*>(rx_packet.mac_frame_buffer));
-  } else {
-    memset(pre_alloc_recv_buffer_, 0, kPreAllocRecvBufferSize);
-  }
-
-  completer.buffer(arena).Reply();
+  completer.buffer(fdf_arena).Reply();
 }
 
 void SoftmacIfcBridge::ReportTxResult(ReportTxResultRequestView request, fdf::Arena& fdf_arena,

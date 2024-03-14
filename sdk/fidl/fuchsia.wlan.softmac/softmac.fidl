@@ -348,6 +348,32 @@ closed protocol WlanSoftmacIfcBridge {
     compose WlanSoftmacIfcBase;
 };
 
+
+/// Protocol for sending Ethernet and WLAN frames from the wlansoftmac driver to the bridged
+/// wlansoftmac driver.
+///
+/// # Experimental
+///
+/// This protocol is implemented as a foreign function interface (FFI)
+/// between the C++ wlansoftmac driver and the Rust bridged wlansoftmac
+/// driver solely to improve the performance of processing data frames
+/// through the wlan-mlme Rust crate.
+///
+/// By using an FFI, messages through this protocol never enter a FIDL
+/// channel and thus do not incur the cost of the associated system calls
+/// Empirically, we observed implementing this protocol as an FFI saves on
+/// the order of ~500µs per frame processed when compared to implementing
+/// this protocol with a FIDL channel.
+@available(added=HEAD)
+closed protocol FrameProcessor {
+    strict WlanRx(table {
+        1: packet_address uint64;
+        2: packet_size uint64;
+        3: packet_info WlanRxInfo;
+        4: async_id uint64;
+    }) -> ();
+};
+
 @discoverable
 @transport("Driver")
 @banjo_layout("ddk-interface")

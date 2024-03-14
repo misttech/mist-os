@@ -10,7 +10,7 @@ use {
     fuchsia_async::{Duration, Task},
     fuchsia_inspect::{Inspector, Node as InspectNode},
     fuchsia_inspect_contrib::auto_persist,
-    fuchsia_trace as ftrace,
+    fuchsia_trace::Id as TraceId,
     fuchsia_zircon::{self as zx, HandleBased},
     futures::{
         channel::{
@@ -62,7 +62,7 @@ impl WlanSoftmacHandle {
     pub fn queue_eth_frame_tx(
         &mut self,
         bytes: Vec<u8>,
-        async_id: ftrace::Id,
+        async_id: TraceId,
     ) -> Result<(), zx::Status> {
         wtrace::duration!(c"WlanSoftmacHandle::queue_eth_frame_tx");
         let driver_event_sink = &mut self.0;
@@ -617,7 +617,7 @@ mod tests {
     // pinning itself is feasible, it leads to a complex harness implementation that outweighs the benefit
     // of using a harness to begin with.
     macro_rules! make_bootstrap_generic_sme_test_harness {
-        (&mut $fake_device:ident, $driver_event_sink:ident) => {{
+        (&mut $fake_device:ident, $driver_event_sink:ident $(,)?) => {{
             let (softmac_ifc_bridge_proxy, _softmac_ifc_bridge_request_stream) =
                 fidl::endpoints::create_proxy_and_stream::<fidl_softmac::WlanSoftmacIfcBridgeMarker>().unwrap();
             (
@@ -626,7 +626,9 @@ mod tests {
                     $driver_event_sink,
                     softmac_ifc_bridge_proxy,
                 )),
-                BootstrapGenericSmeTestHarness { _softmac_ifc_bridge_request_stream },
+                BootstrapGenericSmeTestHarness {
+                    _softmac_ifc_bridge_request_stream,
+                }
             )
         }};
     }

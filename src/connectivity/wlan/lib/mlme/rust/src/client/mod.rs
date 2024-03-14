@@ -129,7 +129,7 @@ impl<D: DeviceOps> crate::MlmeImpl for ClientMlme<D> {
     fn handle_mac_frame_rx(
         &mut self,
         bytes: &[u8],
-        rx_info: banjo_fuchsia_wlan_softmac::WlanRxInfo,
+        rx_info: fidl_softmac::WlanRxInfo,
         async_id: trace::Id,
     ) {
         wtrace::duration!(c"ClientMlme::handle_mac_frame_rx");
@@ -238,10 +238,10 @@ impl<D: DeviceOps> ClientMlme<D> {
     pub fn on_mac_frame_rx(
         &mut self,
         frame: &[u8],
-        rx_info: banjo_wlan_softmac::WlanRxInfo,
+        rx_info: fidl_softmac::WlanRxInfo,
         async_id: trace::Id,
     ) {
-        wtrace::duration!(c"ClientMlme::OnMacFrameRx");
+        wtrace::duration!(c"ClientMlme::on_mac_frame_rx");
         // TODO(https://fxbug.dev/42120906): Send the entire frame to scanner.
         if let Some(mgmt_frame) = mac::MgmtFrame::parse(frame, false) {
             let bssid = Bssid::from(mgmt_frame.mgmt_hdr.addr3);
@@ -253,7 +253,7 @@ impl<D: DeviceOps> ClientMlme<D> {
                         bcn_hdr.beacon_interval,
                         bcn_hdr.capabilities,
                         elements,
-                        rx_info,
+                        rx_info.clone(),
                     );
                 }
                 Some(mac::MgmtBody::ProbeResp { probe_resp_hdr, elements }) => {
@@ -263,7 +263,7 @@ impl<D: DeviceOps> ClientMlme<D> {
                         probe_resp_hdr.beacon_interval,
                         probe_resp_hdr.capabilities,
                         elements,
-                        rx_info,
+                        rx_info.clone(),
                     )
                 }
                 _ => (),
@@ -1026,7 +1026,7 @@ impl<'a, D: DeviceOps> BoundClient<'a, D> {
     pub fn on_mac_frame<B: ByteSlice>(
         &mut self,
         bytes: B,
-        rx_info: banjo_wlan_softmac::WlanRxInfo,
+        rx_info: fidl_softmac::WlanRxInfo,
         async_id: trace::Id,
     ) {
         wtrace::duration!(c"BoundClient::on_mac_frame");
@@ -1310,8 +1310,7 @@ mod tests {
             device::{test_utils, FakeDevice, FakeDeviceConfig, FakeDeviceState, LinkStatus},
             test_utils::{fake_wlan_channel, MockWlanRxInfo},
         },
-        banjo_fuchsia_wlan_common as banjo_common, fidl_fuchsia_wlan_common as fidl_common,
-        fidl_fuchsia_wlan_internal as fidl_internal,
+        fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_internal as fidl_internal,
         fuchsia_async::TestExecutor,
         fuchsia_sync::Mutex,
         futures::task::Poll,
@@ -1686,15 +1685,12 @@ mod tests {
         // If this beacon is not received, the next timeout will trigger auto deauth.
         mlme.on_mac_frame_rx(
             BEACON_FRAME,
-            banjo_wlan_softmac::WlanRxInfo {
-                rx_flags: banjo_fuchsia_wlan_softmac::WlanRxInfoFlags(0),
-                valid_fields: banjo_fuchsia_wlan_softmac::WlanRxInfoValid(0),
-                phy: banjo_common::WlanPhyType::DSSS,
+            fidl_softmac::WlanRxInfo {
+                rx_flags: fidl_softmac::WlanRxInfoFlags::empty(),
+                valid_fields: fidl_softmac::WlanRxInfoValid::empty(),
+                phy: fidl_common::WlanPhyType::Dsss,
                 data_rate: 0,
-                channel: ddk_converter::ddk_channel_from_fidl(
-                    mlme.channel_state.get_main_channel().unwrap(),
-                )
-                .unwrap(),
+                channel: mlme.channel_state.get_main_channel().unwrap(),
                 mcs: 0,
                 rssi_dbm: 0,
                 snr_dbh: 0,
@@ -2018,7 +2014,7 @@ mod tests {
         ][..]);
     }
 
-    fn mock_rx_info<'a>(client: &BoundClient<'a, FakeDevice>) -> banjo_wlan_softmac::WlanRxInfo {
+    fn mock_rx_info<'a>(client: &BoundClient<'a, FakeDevice>) -> fidl_softmac::WlanRxInfo {
         let channel = client.channel_state.get_main_channel().unwrap();
         MockWlanRxInfo::with_channel(channel).into()
     }

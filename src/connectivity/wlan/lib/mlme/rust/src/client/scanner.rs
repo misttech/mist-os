@@ -11,10 +11,9 @@ use {
         WlanSoftmacBandCapabilityExt as _,
     },
     anyhow::format_err,
-    banjo_fuchsia_wlan_softmac as banjo_wlan_softmac, fidl_fuchsia_wlan_common as fidl_common,
-    fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_internal as fidl_internal,
-    fidl_fuchsia_wlan_mlme as fidl_mlme, fidl_fuchsia_wlan_softmac as fidl_softmac,
-    fuchsia_trace as trace, fuchsia_zircon as zx,
+    fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211,
+    fidl_fuchsia_wlan_internal as fidl_internal, fidl_fuchsia_wlan_mlme as fidl_mlme,
+    fidl_fuchsia_wlan_softmac as fidl_softmac, fuchsia_trace as trace, fuchsia_zircon as zx,
     ieee80211::{Bssid, MacAddr},
     thiserror::Error,
     tracing::{error, warn},
@@ -297,7 +296,7 @@ impl<'a, D: DeviceOps> BoundScanner<'a, D> {
         beacon_interval: TimeUnit,
         capability_info: CapabilityInfo,
         ies: &[u8],
-        rx_info: banjo_wlan_softmac::WlanRxInfo,
+        rx_info: fidl_softmac::WlanRxInfo,
     ) {
         wtrace::duration!(c"BoundScanner::handle_ap_advertisement");
 
@@ -571,7 +570,7 @@ mod tests {
     ];
 
     lazy_static! {
-        static ref RX_INFO_FOO: banjo_wlan_softmac::WlanRxInfo = MockWlanRxInfo {
+        static ref RX_INFO_FOO: fidl_softmac::WlanRxInfo = MockWlanRxInfo {
             rssi_dbm: -30,
             ..MockWlanRxInfo::with_channel(fake_wlan_channel().into())
         }
@@ -606,7 +605,7 @@ mod tests {
         0x05, 0x04, 0x00, 0x01, 0x00, 0x02,
     ];
     lazy_static! {
-        static ref RX_INFO_BAR: banjo_wlan_softmac::WlanRxInfo = MockWlanRxInfo {
+        static ref RX_INFO_BAR: fidl_softmac::WlanRxInfo = MockWlanRxInfo {
             rssi_dbm: -60,
             ..MockWlanRxInfo::with_channel(fake_wlan_channel().into())
         }

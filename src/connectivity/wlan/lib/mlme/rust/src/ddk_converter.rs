@@ -5,9 +5,9 @@
 use {
     crate::WlanSoftmacBandCapabilityExt as _,
     anyhow::{format_err, Error},
-    banjo_fuchsia_wlan_common as banjo_common, banjo_fuchsia_wlan_softmac as banjo_wlan_softmac,
-    fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211,
-    fidl_fuchsia_wlan_mlme as fidl_mlme, fidl_fuchsia_wlan_softmac as fidl_softmac,
+    banjo_fuchsia_wlan_common as banjo_common, fidl_fuchsia_wlan_common as fidl_common,
+    fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_mlme as fidl_mlme,
+    fidl_fuchsia_wlan_softmac as fidl_softmac,
     std::fmt::Display,
 };
 
@@ -131,13 +131,11 @@ pub fn fidl_channel_from_ddk(bc: banjo_common::WlanChannel) -> fidl_common::Wlan
     fidl_common::WlanChannel { primary: bc.primary, cbw, secondary80: bc.secondary80 }
 }
 
-pub fn get_rssi_dbm(rx_info: banjo_wlan_softmac::WlanRxInfo) -> Option<i8> {
-    match rx_info.valid_fields & banjo_wlan_softmac::WlanRxInfoValid::RSSI
-        != banjo_wlan_softmac::WlanRxInfoValid(0)
-        && rx_info.rssi_dbm != 0
-    {
-        true => Some(rx_info.rssi_dbm),
-        false => None,
+pub fn get_rssi_dbm(rx_info: fidl_softmac::WlanRxInfo) -> Option<i8> {
+    if rx_info.valid_fields.contains(fidl_softmac::WlanRxInfoValid::RSSI) && rx_info.rssi_dbm != 0 {
+        Some(rx_info.rssi_dbm)
+    } else {
+        None
     }
 }
 
@@ -157,15 +155,15 @@ pub fn cssid_from_ssid_unchecked(ssid: &Vec<u8>) -> fidl_ieee80211::CSsid {
 mod tests {
     use super::*;
 
-    fn empty_rx_info() -> banjo_wlan_softmac::WlanRxInfo {
-        banjo_wlan_softmac::WlanRxInfo {
-            rx_flags: banjo_wlan_softmac::WlanRxInfoFlags(0),
-            valid_fields: banjo_wlan_softmac::WlanRxInfoValid(0),
-            phy: banjo_common::WlanPhyType::DSSS,
+    fn empty_rx_info() -> fidl_softmac::WlanRxInfo {
+        fidl_softmac::WlanRxInfo {
+            rx_flags: fidl_softmac::WlanRxInfoFlags::empty(),
+            valid_fields: fidl_softmac::WlanRxInfoValid::empty(),
+            phy: fidl_common::WlanPhyType::Dsss,
             data_rate: 0,
-            channel: banjo_common::WlanChannel {
+            channel: fidl_common::WlanChannel {
                 primary: 0,
-                cbw: banjo_common::ChannelBandwidth::CBW20,
+                cbw: fidl_common::ChannelBandwidth::Cbw20,
                 secondary80: 0,
             },
             mcs: 0,
@@ -176,8 +174,8 @@ mod tests {
 
     #[test]
     fn test_get_rssi_dbm_field_not_valid() {
-        let rx_info = banjo_wlan_softmac::WlanRxInfo {
-            valid_fields: banjo_wlan_softmac::WlanRxInfoValid(0),
+        let rx_info = fidl_softmac::WlanRxInfo {
+            valid_fields: fidl_softmac::WlanRxInfoValid::empty(),
             rssi_dbm: 20,
             ..empty_rx_info()
         };
@@ -186,8 +184,8 @@ mod tests {
 
     #[test]
     fn test_get_rssi_dbm_zero_dbm() {
-        let rx_info = banjo_wlan_softmac::WlanRxInfo {
-            valid_fields: banjo_wlan_softmac::WlanRxInfoValid::RSSI,
+        let rx_info = fidl_softmac::WlanRxInfo {
+            valid_fields: fidl_softmac::WlanRxInfoValid::RSSI,
             rssi_dbm: 0,
             ..empty_rx_info()
         };
@@ -196,8 +194,8 @@ mod tests {
 
     #[test]
     fn test_get_rssi_dbm_all_good() {
-        let rx_info = banjo_wlan_softmac::WlanRxInfo {
-            valid_fields: banjo_wlan_softmac::WlanRxInfoValid::RSSI,
+        let rx_info = fidl_softmac::WlanRxInfo {
+            valid_fields: fidl_softmac::WlanRxInfoValid::RSSI,
             rssi_dbm: 20,
             ..empty_rx_info()
         };

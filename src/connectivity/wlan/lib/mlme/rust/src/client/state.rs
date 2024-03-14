@@ -19,7 +19,7 @@ use {
         disconnect::LocallyInitiated,
         error::Error,
     },
-    banjo_fuchsia_wlan_softmac as banjo_wlan_softmac,
+    cstr::cstr,
     fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_internal as fidl_internal,
     fidl_fuchsia_wlan_mlme as fidl_mlme, fidl_fuchsia_wlan_softmac as fidl_softmac,
     fuchsia_trace::Id as TraceId,
@@ -602,7 +602,7 @@ impl Associated {
         }
     }
 
-    fn extract_and_record_signal_dbm(&mut self, rx_info: banjo_wlan_softmac::WlanRxInfo) {
+    fn extract_and_record_signal_dbm(&mut self, rx_info: fidl_softmac::WlanRxInfo) {
         get_rssi_dbm(rx_info)
             .map(|rssi_dbm| self.0.signal_strength_average.add(DecibelMilliWatt(rssi_dbm)));
     }
@@ -674,7 +674,7 @@ impl Associated {
             }
         }
 
-        const MSDU_TRACE_NAME: &'static std::ffi::CStr = c"States::on_data_frame => MSDU";
+        const MSDU_TRACE_NAME: &'static std::ffi::CStr = cstr!("States::on_data_frame => MSDU");
 
         // Handle aggregated and non-aggregated MSDUs.
         for msdu in msdus {
@@ -1024,14 +1024,13 @@ impl States {
         mut self,
         sta: &mut BoundClient<'_, D>,
         bytes: B,
-        rx_info: banjo_wlan_softmac::WlanRxInfo,
+        rx_info: fidl_softmac::WlanRxInfo,
         async_id: TraceId,
     ) -> States {
         wtrace::duration!(c"States::on_mac_frame");
 
-        let body_aligned = (rx_info.rx_flags
-            & banjo_wlan_softmac::WlanRxInfoFlags::FRAME_BODY_PADDING_4)
-            != banjo_wlan_softmac::WlanRxInfoFlags(0);
+        let body_aligned = (rx_info.rx_flags & fidl_softmac::WlanRxInfoFlags::FRAME_BODY_PADDING_4)
+            != fidl_softmac::WlanRxInfoFlags::empty();
 
         // Parse mac frame. Drop corrupted ones.
         trace!("Parsing MAC frame:\n  {:02x?}", bytes.deref());
@@ -1100,7 +1099,7 @@ impl States {
         self,
         sta: &mut BoundClient<'_, D>,
         mgmt_frame: mac::MgmtFrame<B>,
-        rx_info: banjo_wlan_softmac::WlanRxInfo,
+        rx_info: fidl_softmac::WlanRxInfo,
     ) -> States {
         wtrace::duration!(c"States::on_mgmt_frame");
 
@@ -1480,7 +1479,7 @@ mod tests {
             test_utils::{fake_set_keys_req, fake_wlan_channel, MockWlanRxInfo},
         },
         akm::AkmAlgorithm,
-        banjo_fuchsia_wlan_common as banjo_common, fidl_fuchsia_wlan_common as fidl_common,
+        fidl_fuchsia_wlan_common as fidl_common,
         fuchsia_sync::Mutex,
         fuchsia_zircon as zx,
         lazy_static::lazy_static,
@@ -2054,7 +2053,7 @@ mod tests {
         assert!(m.fake_device_state.lock().join_bss_request.is_some());
     }
 
-    fn mock_rx_info<'a>(client: &BoundClient<'a, FakeDevice>) -> banjo_wlan_softmac::WlanRxInfo {
+    fn mock_rx_info<'a>(client: &BoundClient<'a, FakeDevice>) -> fidl_softmac::WlanRxInfo {
         let channel = client.channel_state.get_main_channel().unwrap();
         MockWlanRxInfo::with_channel(channel).into()
     }
@@ -3820,7 +3819,7 @@ mod tests {
         let mut rx_info = mock_rx_info(&sta);
         // We deliberately ignore the cbw, since it isn't important and not all
         // drivers report it consistently.
-        rx_info.channel.cbw = banjo_common::ChannelBandwidth::CBW80;
+        rx_info.channel.cbw = fidl_common::ChannelBandwidth::Cbw80;
         state.on_mac_frame(&mut sta, &data_frame[..], rx_info, 0.into());
         assert_eq!(m.fake_device_state.lock().eth_queue.len(), 1);
     }
@@ -3900,9 +3899,9 @@ mod tests {
     fn rx_info_with_dbm<'a>(
         client: &BoundClient<'a, FakeDevice>,
         rssi_dbm: i8,
-    ) -> banjo_wlan_softmac::WlanRxInfo {
-        let mut rx_info = banjo_wlan_softmac::WlanRxInfo { rssi_dbm, ..mock_rx_info(client) };
-        rx_info.valid_fields |= banjo_wlan_softmac::WlanRxInfoValid::RSSI;
+    ) -> fidl_softmac::WlanRxInfo {
+        let mut rx_info = fidl_softmac::WlanRxInfo { rssi_dbm, ..mock_rx_info(client) };
+        rx_info.valid_fields |= fidl_softmac::WlanRxInfoValid::RSSI;
         rx_info
     }
 

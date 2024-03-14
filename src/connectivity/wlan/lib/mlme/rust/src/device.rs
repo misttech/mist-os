@@ -7,8 +7,7 @@ use {
         buffer::FinalizedBuffer, common::mac::WlanGi, error::Error, DriverEvent, DriverEventSink,
     },
     anyhow::format_err,
-    banjo_fuchsia_wlan_common as banjo_common,
-    banjo_fuchsia_wlan_softmac::{self as banjo_wlan_softmac, WlanRxPacket},
+    banjo_fuchsia_wlan_common as banjo_common, banjo_fuchsia_wlan_softmac as banjo_wlan_softmac,
     fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_mlme as fidl_mlme,
     fidl_fuchsia_wlan_softmac as fidl_softmac, fuchsia_trace as trace, fuchsia_zircon as zx,
     futures::channel::mpsc,
@@ -17,6 +16,7 @@ use {
     trace::Id as TraceId,
     tracing::error,
     wlan_common::{mac::FrameControl, pointers::SendPtr, tx_vector, TimeUnit},
+    wlan_fidl_ext::{TryUnpack, WithName},
     wlan_trace as wtrace,
 };
 
@@ -178,7 +178,7 @@ impl From<fidl_mlme::ControlledPortState> for LinkStatus {
 
 pub struct Device {
     raw_device: DeviceInterface,
-    ifc: Option<Pin<Box<WlanSoftmacIfcProtocol>>>,
+    frame_processor: Option<Pin<Box<FrameProcessor>>>,
     wlan_softmac_bridge_proxy: fidl_softmac::WlanSoftmacBridgeSynchronousProxy,
     minstrel: Option<crate::MinstrelWrapper>,
     event_receiver: Option<mpsc::UnboundedReceiver<fidl_mlme::MlmeEvent>>,
@@ -193,7 +193,7 @@ impl Device {
         let (event_sink, event_receiver) = mpsc::unbounded();
         Device {
             raw_device,
-            ifc: None,
+            frame_processor: None,
             wlan_softmac_bridge_proxy,
             minstrel: None,
             event_receiver: Some(event_receiver),
@@ -385,26 +385,27 @@ impl DeviceOps for Device {
         driver_event_sink: DriverEventSink,
         wlan_softmac_ifc_bridge_client_handle: zx::sys::zx_handle_t,
     ) -> Result<zx::Handle, zx::Status> {
-        self.ifc = Some(WlanSoftmacIfcProtocol::new(driver_event_sink));
-        let ifc = self.ifc.as_mut().unwrap().as_mut();
-        // Safety: This call is safe because `self.ifc` will outlive all uses of the constructed
-        // `CWlanSoftmacIfcProtocol` across the FFI boundary. This includes during unbind
-        // when the C++ portion of wlansoftmac will ensure no additional calls will be made
-        // through `CWlanSoftmacIfcProtocol` after unbind begins.
-        let ifc = unsafe { ifc.to_c_binding() };
+        self.frame_processor = Some(FrameProcessor::new(driver_event_sink));
+        let frame_processor = self.frame_processor.as_mut().unwrap().as_mut();
+        // Safety: This call is safe because `self.frame_processor` will outlive all uses of the
+        // constructed `CFrameProcessor` across the FFI boundary. This includes during unbind when
+        // the C++ portion of wlansoftmac will ensure no additional calls will be made through
+        // `CFrameProcessor` after unbind begins.
+        let frame_processor = unsafe { frame_processor.to_c_binding() };
 
         let mut out_channel = 0;
 
-        // Safety: This call to `self.raw_device.start` is safe because `ifc` was constructed in
-        // accordance with the safety documentation of `WlanSoftmacIfcProtocol::to_c_binding`.
+        // Safety: This call to `self.raw_device.start` is safe because `frame_processor` was
+        // constructed in accordance with the safety documentation of
+        // `FrameProcessor::to_c_binding`.
         //
         // Safety: This call to `SendPtr::clone()` is safe because the original will not be used
         // while the copy is still in scope.
         let status = unsafe {
             (self.raw_device.start)(
                 self.raw_device.device.clone().as_ptr(),
-                &ifc,
                 wlan_softmac_ifc_bridge_client_handle,
+                &frame_processor,
                 &mut out_channel as *mut u32,
             )
         };
@@ -683,35 +684,92 @@ impl DeviceOps for Device {
 }
 
 #[repr(C)]
-pub struct CWlanSoftmacIfcProtocolOps {
-    recv: extern "C" fn(ctx: &DriverEventSink, packet: &WlanRxPacket, async_id: TraceId),
+pub struct CFrameProcessorOps {
+    wlan_rx: unsafe extern "C" fn(ctx: &DriverEventSink, request: *const u8, request_size: usize),
 }
 
+/// Queues a WLAN MAC frame into a `DriverEventSink` for processing.
+///
+/// # Safety
+///
+/// Behavior is undefined unless `payload` points to a persisted
+/// `fuchsia.wlan.softmac/FrameProcessor.WlanRx` request of length `payload_len` that is properly
+/// aligned.
 #[no_mangle]
-extern "C" fn handle_recv(ctx: &DriverEventSink, packet: &WlanRxPacket, async_id: TraceId) {
-    wtrace::duration!(c"handle_recv");
-    // TODO(https://fxbug.dev/42103773): C++ uses a buffer allocator for this, determine if we need one.
-    //
-    // Safety: This call is safe because `WlanRxPacket` is defined such that a slice
-    // such as this one can be constructed from the `mac_frame_buffer` and `mac_frame_size` fields.
-    let bytes =
-        unsafe { std::slice::from_raw_parts(packet.mac_frame_buffer, packet.mac_frame_size) }
-            .into();
-    let rx_info = packet.info;
-    let _ = ctx.unbounded_send(DriverEvent::MacFrameRx { bytes, rx_info, async_id }).map_err(|e| {
-        error!("Failed to receive frame: {:?}", e);
-        wtrace::async_end_wlansoftmac_rx(async_id, "failed to queue received frame");
-    });
-}
-const PROTOCOL_OPS: CWlanSoftmacIfcProtocolOps = CWlanSoftmacIfcProtocolOps { recv: handle_recv };
+unsafe extern "C" fn wlan_rx(ctx: &DriverEventSink, payload: *const u8, payload_len: usize) {
+    wtrace::duration!(c"wlan_rx");
 
-struct WlanSoftmacIfcProtocol {
+    // Safety: This call is safe because the caller promises `payload` points to a persisted
+    // `fuchsia.wlan.softmac/FrameProcessor.WlanRx` request of length `payload_len` that is properly
+    // aligned.
+    let payload = unsafe { std::slice::from_raw_parts(payload, payload_len) };
+    let payload = match fidl::unpersist::<fidl_softmac::FrameProcessorWlanRxRequest>(payload) {
+        Ok(payload) => payload,
+        Err(e) => {
+            error!("Unable to unpersist FrameProcessor.WlanRx request: {}", e);
+            return;
+        }
+    };
+
+    let async_id = match payload.async_id.with_name("async_id").try_unpack() {
+        Ok(x) => x,
+        Err(e) => {
+            let e = e.context("Missing required field in FrameProcessorWlanRxRequest.");
+            error!("{}", e);
+            return;
+        }
+    };
+
+    let (packet_address, packet_size, packet_info) = match (
+        payload.packet_address.with_name("packet_address"),
+        payload.packet_size.with_name("packet_size"),
+        payload.packet_info.with_name("packet_info"),
+    )
+        .try_unpack()
+    {
+        Ok(x) => x,
+        Err(e) => {
+            let e = e.context("Missing required field(s) in FrameProcessorWlanRxRequest.");
+            error!("{}", e);
+            wtrace::async_end_wlansoftmac_rx(async_id.into(), &e.to_string());
+            return;
+        }
+    };
+
+    let packet_ptr = packet_address as *const u8;
+    if packet_ptr.is_null() {
+        let e = format_err!("FrameProcessor.WlanRx request contained NULL packet_address");
+        error!("{:?}", e);
+        wtrace::async_end_wlansoftmac_rx(async_id.into(), &e.to_string());
+        return;
+    }
+
+    // Safety: This call is safe because a `WlanRx` request is defined such that a slice
+    // such as this one can be constructed from the `packet_address` and `packet_size` fields.
+    let packet_bytes: Vec<u8> =
+        unsafe { std::slice::from_raw_parts(packet_ptr, packet_size as usize) }.into();
+
+    let _: Result<(), ()> = ctx
+        .unbounded_send(DriverEvent::MacFrameRx {
+            bytes: packet_bytes,
+            rx_info: packet_info,
+            async_id: async_id.into(),
+        })
+        .map_err(|e| {
+            let e = format_err!("Failed to queue FrameProcessor.WlanRx request: {:?}", e);
+            error!("{:?}", e);
+            wtrace::async_end_wlansoftmac_rx(async_id.into(), &e.to_string());
+        });
+}
+const FRAME_PROCESSOR_OPS: CFrameProcessorOps = CFrameProcessorOps { wlan_rx };
+
+struct FrameProcessor {
     sink: DriverEventSink,
     _pin: PhantomPinned,
 }
 
-impl WlanSoftmacIfcProtocol {
-    /// Return a pinned `WlanSoftmacIfcProtocol`.
+impl FrameProcessor {
+    /// Return a pinned `FrameProcessor`.
     ///
     /// Pinning the returned value is imperative to ensure future `to_c_binding()` calls will return
     /// pointers that are valid for the lifetime of the returned value.
@@ -719,7 +777,7 @@ impl WlanSoftmacIfcProtocol {
         Box::pin(Self { sink, _pin: PhantomPinned })
     }
 
-    /// Returns a `CWlanSoftmacIfcProtocol` containing pointers to the static `PROTOCOL_OPS`
+    /// Returns a `CFrameProcessor` containing pointers to the static `FRAME_PROCESSOR_OPS`
     /// and `self.sink`.
     ///
     /// Note that those pointers are to a static value and a pinned value, i.e., the former pointer
@@ -733,23 +791,19 @@ impl WlanSoftmacIfcProtocol {
     ///
     /// By using this method, the caller promises the lifetime of `DriverEventSink` will exceed the
     /// `ctx` pointer used across the FFI boundary.
-    unsafe fn to_c_binding(self: Pin<&mut Self>) -> CWlanSoftmacIfcProtocol {
-        CWlanSoftmacIfcProtocol { ops: &PROTOCOL_OPS, ctx: &self.sink }
+    unsafe fn to_c_binding(self: Pin<&mut Self>) -> CFrameProcessor {
+        CFrameProcessor { ops: &FRAME_PROCESSOR_OPS, ctx: &self.sink }
     }
 }
 
-/// Type containing pointers to the static `PROTOCOL_OPS` and a `DriverEventSink`.
+/// Type containing pointers to the static `FRAME_PROCESSOR_OPS` and a `DriverEventSink`.
 ///
-/// The wlansoftmac driver copies the pointers from `CWlanSoftmacIfcProtocol` which means the code
+/// The wlansoftmac driver copies the pointers from `CFrameProcessor` which means the code
 /// constructing this type must ensure those pointers remain valid for their lifetime in
 /// wlansoftmac.
-///
-/// Additionally, by assigning functions directly from `PROTOCOL_OPS` to the corresponding Banjo
-/// generated types in wlansoftmac, wlansoftmac ensure the function signatures are correct at
-/// compile-time.
 #[repr(C)]
-pub struct CWlanSoftmacIfcProtocol {
-    ops: *const CWlanSoftmacIfcProtocolOps,
+pub struct CFrameProcessor {
+    ops: *const CFrameProcessorOps,
     ctx: *const DriverEventSink,
 }
 
@@ -774,8 +828,8 @@ pub struct CDeviceInterface {
     /// Start operations on the underlying device and return the SME channel.
     start: extern "C" fn(
         device: *const c_void,
-        ifc: *const CWlanSoftmacIfcProtocol,
         wlan_softmac_ifc_bridge_client_handle: zx::sys::zx_handle_t,
+        frame_processor: *const CFrameProcessor,
         out_sme_channel: *mut zx::sys::zx_handle_t,
     ) -> i32,
     /// Request to deliver an Ethernet II frame to Fuchsia's Netstack.
@@ -819,8 +873,8 @@ pub struct DeviceInterface {
     /// written to a dropped `DriverEventSink`.
     start: unsafe extern "C" fn(
         device: *const c_void,
-        ifc: *const CWlanSoftmacIfcProtocol,
         wlan_softmac_ifc_bridge_client_handle: zx::sys::zx_handle_t,
+        frame_processor: *const CFrameProcessor,
         out_sme_channel: *mut zx::sys::zx_handle_t,
     ) -> i32,
     /// Request to deliver an Ethernet II frame to Fuchsia's Netstack.

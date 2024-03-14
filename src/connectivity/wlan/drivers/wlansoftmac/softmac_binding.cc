@@ -202,22 +202,21 @@ void SoftmacBinding::Init() {
       });
 
   unbind_lock_->lock();
-  fit::callback<void(zx_status_t)> sta_shutdown_handler =
-      [main_device_dispatcher = main_device_dispatcher_->async_dispatcher(),
-       unbind_lock = unbind_lock_, unbind_called = unbind_called_,
-       device = device_](zx_status_t status) {
-        WLAN_LAMBDA_TRACE_DURATION("sta_shutdown_handler on Rust dispatcher");
-        if (status == ZX_OK) {
-          return;
-        }
-        lerror("Rust thread had an abnormal shutdown: %s", zx_status_get_string(status));
-        std::lock_guard<std::mutex> lock(*unbind_lock);
-        if (*unbind_called) {
-          linfo("Skipping device_async_remove() since Release() already called.");
-          return;
-        }
-        device_async_remove(device);
-      };
+  fit::callback<void(zx_status_t)> sta_shutdown_handler = [unbind_lock = unbind_lock_,
+                                                           unbind_called = unbind_called_,
+                                                           device = device_](zx_status_t status) {
+    WLAN_LAMBDA_TRACE_DURATION("sta_shutdown_handler on Rust dispatcher");
+    if (status == ZX_OK) {
+      return;
+    }
+    lerror("Rust thread had an abnormal shutdown: %s", zx_status_get_string(status));
+    std::lock_guard<std::mutex> lock(*unbind_lock);
+    if (*unbind_called) {
+      linfo("Skipping device_async_remove() since Release() already called.");
+      return;
+    }
+    device_async_remove(device);
+  };
   unbind_lock_->unlock();
 
   auto softmac_bridge = SoftmacBridge::New(softmac_bridge_server_dispatcher_, std::move(completer),
@@ -366,8 +365,8 @@ void SoftmacBinding::EthernetImplGetBti(zx_handle_t* out_bti) {
   lerror("WLAN does not support ETHERNET_FEATURE_DMA");
 }
 
-zx_status_t SoftmacBinding::Start(const rust_wlan_softmac_ifc_protocol_copy_t* rust_softmac_ifc,
-                                  zx_handle_t softmac_ifc_bridge_client_handle,
+zx_status_t SoftmacBinding::Start(zx_handle_t softmac_ifc_bridge_client_handle,
+                                  const frame_processor_t* frame_processor,
                                   zx::channel* out_sme_channel) const {
   WLAN_TRACE_DURATION();
   debugf("Start");
@@ -389,9 +388,9 @@ zx_status_t SoftmacBinding::Start(const rust_wlan_softmac_ifc_protocol_copy_t* r
       std::move(softmac_ifc_bridge_client_channel));
 
   unbind_lock_->lock();
-  auto softmac_ifc_bridge = SoftmacIfcBridge::New(
-      softmac_ifc_server_dispatcher_, unbind_lock_, unbind_called_, rust_softmac_ifc,
-      std::move(endpoints->server), std::move(softmac_ifc_bridge_client_endpoint));
+  auto softmac_ifc_bridge = SoftmacIfcBridge::New(softmac_ifc_server_dispatcher_, frame_processor,
+                                                  std::move(endpoints->server),
+                                                  std::move(softmac_ifc_bridge_client_endpoint));
   unbind_lock_->unlock();
 
   if (softmac_ifc_bridge.is_error()) {
