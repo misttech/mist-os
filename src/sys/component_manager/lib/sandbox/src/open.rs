@@ -19,6 +19,18 @@ use vfs::{
 
 use crate::{registry, CapabilityTrait, ConversionError, Directory};
 
+/// Types that implement [`Openable`] let the holder open underlying paths.
+/// For more info see `Open`.
+pub trait Openable: Send + Sync {
+    fn open(
+        &self,
+        scope: ExecutionScope,
+        flags: fio::OpenFlags,
+        path: vfs::path::Path,
+        channel: zx::Channel,
+    );
+}
+
 /// An [Open] capability lets the holder obtain other capabilities by pipelining
 /// a [zx::Channel], usually treated as the server endpoint of some FIDL protocol.
 /// We call this operation opening the capability.
@@ -51,8 +63,27 @@ pub struct Open {
 }
 
 struct OpenRemote {
-    open_fn: Box<OpenFn>,
+    openable: Box<dyn Openable>,
     entry_type: fio::DirentType,
+}
+
+/// Syntax sugar within the framework to express custom opening logic.
+impl<F> Openable for F
+where
+    F: Fn(ExecutionScope, fio::OpenFlags, vfs::path::Path, zx::Channel) -> ()
+        + Send
+        + Sync
+        + 'static,
+{
+    fn open(
+        &self,
+        scope: ExecutionScope,
+        flags: fio::OpenFlags,
+        path: vfs::path::Path,
+        channel: zx::Channel,
+    ) {
+        self(scope, flags, path, channel)
+    }
 }
 
 impl vfs::directory::entry::DirectoryEntry for OpenRemote {
@@ -73,13 +104,9 @@ impl RemoteLike for OpenRemote {
         path: vfs::path::Path,
         server_end: ServerEnd<fio::NodeMarker>,
     ) {
-        (self.open_fn)(scope, flags, path, server_end.into());
+        self.openable.open(scope, flags, path, server_end.into());
     }
 }
-
-/// The function that will be called when this capability is opened.
-pub type OpenFn =
-    dyn Fn(ExecutionScope, fio::OpenFlags, vfs::path::Path, zx::Channel) -> () + Send + Sync;
 
 impl Open {
     /// Creates an [Open] capability.
@@ -92,14 +119,8 @@ impl Open {
     ///   within a `Dict` and the user enumerates the `fuchsia.io/Directory` representation
     ///   of the dictionary.
     ///
-    pub fn new<F>(open: F, entry_type: fio::DirentType) -> Self
-    where
-        F: Fn(ExecutionScope, fio::OpenFlags, vfs::path::Path, zx::Channel) -> ()
-            + Send
-            + Sync
-            + 'static,
-    {
-        Open { inner: Arc::new(OpenRemote { open_fn: Box::new(open), entry_type }) }
+    pub fn new(open: impl Openable + 'static, entry_type: fio::DirentType) -> Self {
+        Open { inner: Arc::new(OpenRemote { openable: Box::new(open), entry_type }) }
     }
 
     /// Converts the [Open] capability into a [Directory] capability such that it will be
@@ -121,7 +142,7 @@ impl Open {
     ) {
         let path = path.validate();
         match path {
-            Ok(path) => (self.inner.open_fn)(scope.clone(), flags, path, server_end.into()),
+            Ok(path) => self.inner.openable.open(scope.clone(), flags, path, server_end.into()),
             Err(error) => {
                 let describe = flags.intersects(fio::OpenFlags::DESCRIBE);
                 send_on_open_with_error(describe, server_end.into(), error);
