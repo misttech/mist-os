@@ -6,16 +6,15 @@
 
 #include <assert.h>
 #include <endian.h>
-#include <fidl/fuchsia.driver.compat/cpp/wire.h>
 #include <lib/async-loop/default.h>
 #include <lib/async/cpp/task.h>
 #include <lib/async/default.h>
 #include <lib/ddk/binding_driver.h>
+#include <lib/ddk/debug.h>
+#include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
-#include <lib/driver/compat/cpp/device_server.h>
-#include <lib/driver/component/cpp/driver_export.h>
 #include <lib/fdf/cpp/dispatcher.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -37,125 +36,6 @@ constexpr zx::duration kFirmwareDownloadDelay = zx::msec(50);
 // Hardcoded. Better to parameterize on chipset. Broadcom chips need a few hundred msec delay after
 // firmware load.
 constexpr zx::duration kBaudRateSwitchDelay = zx::msec(200);
-
-const std::unordered_map<uint16_t, std::string> BtHciBroadcom::kFirmwareMap = {
-    {PDEV_PID_BCM43458, "BCM4345C5.hcd"},
-    {PDEV_PID_BCM4359, "BCM4359C0.hcd"},
-};
-
-BtHciBroadcom::BtHciBroadcom(fdf::DriverStartArgs start_args,
-                             fdf::UnownedSynchronizedDispatcher driver_dispatcher)
-    : DriverBase("bt_hci_broadcom", std::move(start_args), std::move(driver_dispatcher)),
-      node_(fidl::WireClient(std::move(node()), dispatcher())),
-      devfs_connector_(fit::bind_member<&BtHciBroadcom::Connect>(this)) {}
-
-zx::result<> BtHciBroadcom::Start() {
-  zx_status_t status = ConnectToHciFidlProtocol();
-  if (status != ZX_OK) {
-    return zx::error(status);
-  }
-
-  status = ConnectToSerialFidlProtocol();
-  if (status == ZX_OK) {
-    is_uart_ = true;
-  }
-
-  fdf::Arena arena('INFO');
-  auto result = serial_client_.buffer(arena)->GetInfo();
-  if (!result.ok()) {
-    FDF_LOG(ERROR, "Read failed FIDL error: %s", result.status_string());
-    return zx::error(result.status());
-  }
-
-  if (result->is_error()) {
-    FDF_LOG(ERROR, "Read failed : %s", zx_status_get_string(result->error_value()));
-    return zx::error(result->error_value());
-  }
-
-  serial_pid_ = result.value()->info.serial_pid;
-
-  auto dispatcher_result =
-      fdf::SynchronizedDispatcher::Create(fdf::SynchronizedDispatcher::Options::kAllowSyncCalls,
-                                          "bt_hci_broadcom_executor", [&](fdf_dispatcher_t*) {
-                                            if (prepare_stop_completer_) {
-                                              (*prepare_stop_completer_)(zx::ok());
-                                              prepare_stop_completer_.reset();
-                                            }
-                                          });
-  if (dispatcher_result.is_error()) {
-    FDF_LOG(ERROR, "Create dispatcher failed: %s", dispatcher_result.status_string());
-    return zx::error(dispatcher_result.status_value());
-  }
-  exec_dispatcher_ = std::move(*dispatcher_result);
-  executor_.emplace(exec_dispatcher_.async_dispatcher());
-
-  zx::result connector = devfs_connector_.Bind(dispatcher());
-  if (connector.is_error()) {
-    FDF_LOG(ERROR, "Failed to bind devfs connecter to dispatcher: %u", connector.status_value());
-    return connector.take_error();
-  }
-
-  // Continue initialization in a separate dispatcher.
-  executor_->schedule_task(Initialize());
-  init_completer_.Wait();
-  if (init_completer_.init_status_ != ZX_OK) {
-    return zx::error(init_completer_.init_status_);
-  }
-
-  fidl::Arena args_arena;
-  auto devfs = fuchsia_driver_framework::wire::DevfsAddArgs::Builder(args_arena)
-                   .connector(std::move(connector.value()))
-                   .class_name("bt-hci")
-                   .Build();
-
-  auto args = fuchsia_driver_framework::wire::NodeAddArgs::Builder(args_arena)
-                  .name("bt-hci-broadcom")
-                  .devfs_args(devfs)
-                  .Build();
-
-  auto controller_endpoints = fidl::CreateEndpoints<fuchsia_driver_framework::NodeController>();
-  if (controller_endpoints.is_error()) {
-    FDF_LOG(ERROR, "Create node controller end points failed: %s",
-            zx_status_get_string(controller_endpoints.error_value()));
-    return zx::error(controller_endpoints.error_value());
-  }
-
-  // Create the endpoints of fuchsia_driver_framework::Node protocol for the child node, and hold
-  // the client end of it, because no driver will bind to the child node.
-  auto child_node_endpoints = fidl::CreateEndpoints<fuchsia_driver_framework::Node>();
-  if (child_node_endpoints.is_error()) {
-    FDF_LOG(ERROR, "Create child node end points failed: %s",
-            zx_status_get_string(child_node_endpoints.error_value()));
-    return zx::error(child_node_endpoints.error_value());
-  }
-
-  // Add bt-hci-broadcom child node.
-  auto child_result =
-      node_.sync()->AddChild(std::move(args), std::move(controller_endpoints->server),
-                             std::move(child_node_endpoints->server));
-  if (!child_result.ok()) {
-    FDF_LOG(ERROR, "Failed to add bt-hci-broadcom node, FIDL error: %s",
-            child_result.status_string());
-    return zx::error(child_result.status());
-  }
-
-  if (child_result->is_error()) {
-    FDF_LOG(ERROR, "Failed to add bt-hci-broadcom node: %u",
-            static_cast<uint32_t>(child_result->error_value()));
-    return zx::error(ZX_ERR_INTERNAL);
-  }
-
-  child_node_.Bind(std::move(child_node_endpoints->client), dispatcher(), this);
-  node_controller_.Bind(std::move(controller_endpoints->client), dispatcher(), this);
-
-  return zx::ok();
-}
-
-void BtHciBroadcom::PrepareStop(fdf::PrepareStopCompleter completer) {
-  prepare_stop_completer_.emplace(std::move(completer));
-  command_channel_.reset();
-  exec_dispatcher_.ShutdownAsync();
-}
 
 void BtHciBroadcom::GetFeatures(GetFeaturesCompleter::Sync& completer) {
   completer.Reply(fuchsia_hardware_bluetooth::BtVendorFeatures::kSetAclPriorityCommand);
@@ -182,7 +62,7 @@ void BtHciBroadcom::EncodeCommand(EncodeCommandRequestView request,
 void BtHciBroadcom::OpenHci(OpenHciCompleter::Sync& completer) {
   auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_bluetooth::Hci>();
   if (endpoints.is_error()) {
-    FDF_LOG(ERROR, "Failed to create endpoints: %s", zx_status_get_string(endpoints.error_value()));
+    zxlogf(ERROR, "Failed to create endpoints: %s", zx_status_get_string(endpoints.error_value()));
     completer.ReplyError(endpoints.error_value());
     return;
   }
@@ -194,8 +74,72 @@ void BtHciBroadcom::OpenHci(OpenHciCompleter::Sync& completer) {
 void BtHciBroadcom::handle_unknown_method(
     fidl::UnknownMethodMetadata<fuchsia_hardware_bluetooth::Vendor> metadata,
     fidl::UnknownMethodCompleter::Sync& completer) {
-  FDF_LOG(ERROR, "Unknown method in Vendor protocol, closing with ZX_ERR_NOT_SUPPORTED");
+  zxlogf(ERROR, "Unknown method in Vendor request, closing with ZX_ERR_NOT_SUPPORTED");
   completer.Close(ZX_ERR_NOT_SUPPORTED);
+}
+
+const std::unordered_map<uint16_t, std::string> BtHciBroadcom::kFirmwareMap = {
+    {PDEV_PID_BCM43458, "BCM4345C5.hcd"},
+    {PDEV_PID_BCM4359, "BCM4359C0.hcd"},
+};
+
+BtHciBroadcom::BtHciBroadcom(zx_device_t* parent, async_dispatcher_t* dispatcher)
+    : BtHciBroadcomType(parent), dispatcher_(dispatcher) {}
+zx_status_t BtHciBroadcom::Create(void* ctx, zx_device_t* parent) {
+  return Create(ctx, parent, /*dispatcher=*/nullptr);
+}
+
+zx_status_t BtHciBroadcom::Create(void* ctx, zx_device_t* parent, async_dispatcher_t* dispatcher) {
+  std::unique_ptr<BtHciBroadcom> dev = std::make_unique<BtHciBroadcom>(parent, dispatcher);
+
+  zx_status_t bind_status = dev->Bind();
+  if (bind_status != ZX_OK) {
+    return bind_status;
+  }
+
+  // Driver Manager is now in charge of the device.
+  // Memory will be explicitly freed in DdkRelease().
+  [[maybe_unused]] BtHciBroadcom* unused = dev.release();
+  return ZX_OK;
+}
+
+void BtHciBroadcom::DdkInit(ddk::InitTxn txn) {
+  init_txn_.emplace(std::move(txn));
+
+  // Spawn a new thread in production. In tests, use the test dispatcher provided in the
+  // constructor.
+  // Note that the fdf default dispatcher is used at all other places in this driver, this new
+  // thread is only created for running the executor. The reason is that the tasks running on this
+  // executor fire synchronous FIDL calls, if we put the executor on the same dispatcher as the FIDL
+  // client which is used to fire sync FIDL call, there'll be a re-entrancy issue and result in a
+  // deadlock.
+  // TODO(b/303116559): Creating a new thread is not encouraged in a driver because it'll be
+  // unmanaged by driver framework. Create a dispatcher instead.
+  if (!dispatcher_) {
+    loop_.emplace(&kAsyncLoopConfigNoAttachToCurrentThread);
+    zx_status_t status = loop_->StartThread("bt-hci-broadcom-init");
+    if (status != ZX_OK) {
+      zxlogf(ERROR, "failed to start init thread: %s", zx_status_get_string(status));
+      OnInitializeComplete(status);
+      return;
+    }
+    dispatcher_ = loop_->dispatcher();
+  }
+  executor_.emplace(dispatcher_);
+
+  // Continue initialization in the new thread.
+  executor_->schedule_task(Initialize());
+}
+
+// NOLINTNEXTLINE(readability-convert-member-functions-to-static)
+void BtHciBroadcom::DdkUnbind(ddk::UnbindTxn txn) { txn.Reply(); }
+
+void BtHciBroadcom::DdkRelease() {
+  command_channel_.reset();
+
+  // Driver manager is given a raw pointer to this dynamically allocated object in Create(), so
+  // when DdkRelease() is called we need to free the allocated memory.
+  delete this;
 }
 
 void BtHciBroadcom::OpenCommandChannel(OpenCommandChannelRequestView request,
@@ -206,14 +150,13 @@ void BtHciBroadcom::OpenCommandChannel(OpenCommandChannelRequestView request,
               fidl::WireUnownedResult<fuchsia_hardware_bluetooth::Hci::OpenCommandChannel>&
                   result) mutable {
             if (!result.ok()) {
-              FDF_LOG(ERROR, "OpenCommandChannel failed with FIDL error %s",
-                      result.status_string());
+              zxlogf(ERROR, "OpenCommandChannel failed with FIDL error %s", result.status_string());
               completer.ReplyError(result.status());
               return;
             }
             if (result->is_error()) {
-              FDF_LOG(ERROR, "OpenCommandChannel failed with error %s",
-                      zx_status_get_string(result->error_value()));
+              zxlogf(ERROR, "OpenCommandChannel failed with error %s",
+                     zx_status_get_string(result->error_value()));
               completer.ReplyError(result->error_value());
               return;
             }
@@ -229,14 +172,13 @@ void BtHciBroadcom::OpenAclDataChannel(OpenAclDataChannelRequestView request,
               fidl::WireUnownedResult<fuchsia_hardware_bluetooth::Hci::OpenAclDataChannel>&
                   result) mutable {
             if (!result.ok()) {
-              FDF_LOG(ERROR, "OpenAclDataChannel failed with FIDL error %s",
-                      result.status_string());
+              zxlogf(ERROR, "OpenAclDataChannel failed with FIDL error %s", result.status_string());
               completer.ReplyError(result.status());
               return;
             }
             if (result->is_error()) {
-              FDF_LOG(ERROR, "OpenAclDataChannel failed with error %s",
-                      zx_status_get_string(result->error_value()));
+              zxlogf(ERROR, "OpenAclDataChannel failed with error %s",
+                     zx_status_get_string(result->error_value()));
               completer.ReplyError(result->error_value());
               return;
             }
@@ -270,13 +212,13 @@ void BtHciBroadcom::OpenSnoopChannel(OpenSnoopChannelRequestView request,
               fidl::WireUnownedResult<fuchsia_hardware_bluetooth::Hci::OpenSnoopChannel>&
                   result) mutable {
             if (!result.ok()) {
-              FDF_LOG(ERROR, "OpenSnoopChannel failed with FIDL error %s", result.status_string());
+              zxlogf(ERROR, "OpenSnoopChannel failed with FIDL error %s", result.status_string());
               completer.ReplyError(result.status());
               return;
             }
             if (result->is_error()) {
-              FDF_LOG(ERROR, "OpenSnoopChannel failed with error %s",
-                      zx_status_get_string(result->error_value()));
+              zxlogf(ERROR, "OpenSnoopChannel failed with error %s",
+                     zx_status_get_string(result->error_value()));
               completer.ReplyError(result->error_value());
               return;
             }
@@ -287,37 +229,28 @@ void BtHciBroadcom::OpenSnoopChannel(OpenSnoopChannelRequestView request,
 void BtHciBroadcom::handle_unknown_method(
     fidl::UnknownMethodMetadata<fuchsia_hardware_bluetooth::Hci> metadata,
     fidl::UnknownMethodCompleter::Sync& completer) {
-  FDF_LOG(ERROR, "Unknown method in Hci protocol, closing with ZX_ERR_NOT_SUPPORTED");
+  zxlogf(ERROR, "Unknown method in Hci request, closing with ZX_ERR_NOT_SUPPORTED");
   completer.Close(ZX_ERR_NOT_SUPPORTED);
-}
-
-// driver_devfs::Connector<fuchsia_hardware_bluetooth::Vendor>
-void BtHciBroadcom::Connect(fidl::ServerEnd<fuchsia_hardware_bluetooth::Vendor> request) {
-  vendor_binding_group_.AddBinding(dispatcher(), std::move(request), this,
-                                   fidl::kIgnoreBindingClosure);
 }
 
 zx_status_t BtHciBroadcom::ConnectToHciFidlProtocol() {
   zx::result<fidl::ClientEnd<fuchsia_hardware_bluetooth::Hci>> client_end =
-      incoming()->Connect<fuchsia_hardware_bluetooth::HciService::Hci>();
+      DdkConnectFidlProtocol<fuchsia_hardware_bluetooth::HciService::Hci>();
   if (client_end.is_error()) {
-    FDF_LOG(ERROR, "Connect to fuchsia_hardware_bluetooth::Hci protocol failed: %s",
-            client_end.status_string());
+    zxlogf(ERROR, "Connect to Hci Fidl protocol failed: %s", client_end.status_string());
     return client_end.status_value();
   }
 
   hci_client_ =
       fidl::WireClient(*std::move(client_end), fdf::Dispatcher::GetCurrent()->async_dispatcher());
-
   return ZX_OK;
 }
 
 zx_status_t BtHciBroadcom::ConnectToSerialFidlProtocol() {
   zx::result<fdf::ClientEnd<fuchsia_hardware_serialimpl::Device>> client_end =
-      incoming()->Connect<fuchsia_hardware_serialimpl::Service::Device>();
+      DdkConnectRuntimeProtocol<fuchsia_hardware_serialimpl::Service::Device>();
   if (client_end.is_error()) {
-    FDF_LOG(ERROR, "Connect to fuchsia_hardware_serialimpl::Device protocol failed: %s",
-            client_end.status_string());
+    zxlogf(ERROR, "Connect to Serial FIDL protocol failed: %s", client_end.status_string());
     return client_end.status_value();
   }
 
@@ -351,7 +284,7 @@ fpromise::promise<std::vector<uint8_t>, zx_status_t> BtHciBroadcom::SendCommand(
   zx_status_t status = command_channel_.write(/*flags=*/0, command, static_cast<uint32_t>(length),
                                               /*handles=*/nullptr, /*num_handles=*/0);
   if (status != ZX_OK) {
-    FDF_LOG(ERROR, "command channel write failed %s", zx_status_get_string(status));
+    zxlogf(ERROR, "command channel write failed %s", zx_status_get_string(status));
     return fpromise::make_result_promise<std::vector<uint8_t>, zx_status_t>(
         fpromise::error(status));
   }
@@ -375,8 +308,8 @@ fpromise::promise<std::vector<uint8_t>, zx_status_t> BtHciBroadcom::ReadEvent() 
         }
 
         if (actual < sizeof(HciCommandComplete)) {
-          FDF_LOG(ERROR, "command channel read too short: %d < %lu", actual,
-                  sizeof(HciCommandComplete));
+          zxlogf(ERROR, "command channel read too short: %d < %lu", actual,
+                 sizeof(HciCommandComplete));
           return fpromise::error(ZX_ERR_INTERNAL);
         }
 
@@ -384,12 +317,12 @@ fpromise::promise<std::vector<uint8_t>, zx_status_t> BtHciBroadcom::ReadEvent() 
         std::memcpy(&event, read_buf.data(), sizeof(HciCommandComplete));
         if (event.header.event_code != kHciEvtCommandCompleteEventCode ||
             event.header.parameter_total_size < kMinEvtParamSize) {
-          FDF_LOG(ERROR, "did not receive command complete or params too small");
+          zxlogf(ERROR, "did not receive command complete or params too small");
           return fpromise::error(ZX_ERR_INTERNAL);
         }
 
         if (event.return_code != 0) {
-          FDF_LOG(ERROR, "got command complete error %u", event.return_code);
+          zxlogf(ERROR, "got command complete error %u", event.return_code);
           return fpromise::error(ZX_ERR_INTERNAL);
         }
 
@@ -445,38 +378,16 @@ fpromise::result<std::array<uint8_t, kMacAddrLen>, zx_status_t>
 BtHciBroadcom::GetBdaddrFromBootloader() {
   std::array<uint8_t, kMacAddrLen> mac_addr;
   size_t actual_len;
-
-  zx::result compat_device = incoming()->Connect<fuchsia_driver_compat::Service::Device>();
-  if (compat_device.is_error()) {
-    return fpromise::error(compat_device.status_value());
+  zx_status_t status = device_get_metadata(parent(), DEVICE_METADATA_MAC_ADDRESS, mac_addr.data(),
+                                           sizeof(mac_addr), &actual_len);
+  if (status != ZX_OK) {
+    return fpromise::error(status);
   }
-
-  fidl::WireResult metadata = fidl::WireCall(compat_device.value())->GetMetadata();
-  if (!metadata.ok()) {
-    FDF_LOG(WARNING, "GetMetadata failed: %s", metadata.FormatDescription().c_str());
-    return fpromise::error(metadata.error().status());
+  if (actual_len < kMacAddrLen) {
+    return fpromise::error(ZX_ERR_INTERNAL);
   }
-
-  if (metadata.value().is_error()) {
-    FDF_LOG(WARNING, "GetMetadata failed: %s",
-            zx_status_get_string(metadata.value().error_value()));
-    return fpromise::error(metadata.value().error_value());
-  }
-
-  auto meta_vec = metadata.value().value();
-  for (auto& entry : meta_vec->metadata) {
-    if (entry.type == DEVICE_METADATA_MAC_ADDRESS) {
-      entry.data.get_size(&actual_len);
-      if (actual_len < kMacAddrLen) {
-        return fpromise::error(ZX_ERR_INTERNAL);
-      }
-      entry.data.read(mac_addr.data(), 0, kMacAddrLen);
-      break;
-    }
-  }
-
-  FDF_LOG(INFO, "got bootloader mac address %02x:%02x:%02x:%02x:%02x:%02x", mac_addr[0],
-          mac_addr[1], mac_addr[2], mac_addr[3], mac_addr[4], mac_addr[5]);
+  zxlogf(INFO, "got bootloader mac address %02x:%02x:%02x:%02x:%02x:%02x", mac_addr[0], mac_addr[1],
+         mac_addr[2], mac_addr[3], mac_addr[4], mac_addr[5]);
 
   return fpromise::ok(mac_addr);
 }
@@ -495,13 +406,10 @@ fpromise::promise<> BtHciBroadcom::LogControllerFallbackBdaddr() {
                    event.bdaddr[1], event.bdaddr[0]);
         }
 
-        FDF_LOG(ERROR, "error getting mac address from bootloader: %s. Fallback address: %s.",
-                zx_status_get_string(result.is_ok() ? ZX_OK : result.error()), fallback_addr);
+        zxlogf(ERROR, "error getting mac address from bootloader: %s. Fallback address: %s.",
+               zx_status_get_string(result.is_ok() ? ZX_OK : result.error()), fallback_addr);
       });
 }
-
-constexpr auto kOpenFlags =
-    fuchsia_io::wire::OpenFlags::kRightReadable | fuchsia_io::wire::OpenFlags::kNotDirectory;
 
 fpromise::promise<void, zx_status_t> BtHciBroadcom::LoadFirmware() {
   zx::vmo fw_vmo;
@@ -512,45 +420,16 @@ fpromise::promise<void, zx_status_t> BtHciBroadcom::LoadFirmware() {
   // to the firmware table if it's valid.
   ZX_ASSERT_MSG(kFirmwareMap.find(serial_pid_) != kFirmwareMap.end(), "no mapping for PID: %u",
                 serial_pid_);
-
-  std::string full_filename = "/pkg/lib/firmware/";
-  full_filename.append(kFirmwareMap.at(serial_pid_).c_str());
-
-  auto client = incoming()->Open<fuchsia_io::File>(full_filename.c_str(), kOpenFlags);
-  if (client.is_error()) {
-    FDF_LOG(WARNING, "Open firmware file failed: %s", zx_status_get_string(client.error_value()));
-    return fpromise::make_error_promise(client.error_value());
-  }
-
-  fidl::WireResult backing_memory_result =
-      fidl::WireCall(*client)->GetBackingMemory(fuchsia_io::wire::VmoFlags::kRead);
-  if (!backing_memory_result.ok()) {
-    if (backing_memory_result.is_peer_closed()) {
-      FDF_LOG(WARNING, "Failed to get backing memory: Peer closed");
-      return fpromise::make_error_promise(ZX_ERR_NOT_FOUND);
-    }
-    FDF_LOG(WARNING, "Failed to get backing memory: %s",
-            zx_status_get_string(backing_memory_result.status()));
-    return fpromise::make_error_promise(backing_memory_result.status());
-  }
-
-  const auto* backing_memory = backing_memory_result.Unwrap();
-  if (backing_memory->is_error()) {
-    FDF_LOG(WARNING, "Failed to get backing memory: %s",
-            zx_status_get_string(backing_memory->error_value()));
-    return fpromise::make_error_promise(backing_memory->error_value());
-  }
-
-  zx::vmo& backing_vmo = backing_memory->value()->vmo;
-  if (zx_status_t status = backing_vmo.get_prop_content_size(&fw_size); status != ZX_OK) {
-    FDF_LOG(WARNING, "Failed to get vmo size: %s", zx_status_get_string(status));
+  zx_status_t status = load_firmware(zxdev(), kFirmwareMap.at(serial_pid_).c_str(),
+                                     fw_vmo.reset_and_get_address(), &fw_size);
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "no firmware file found");
     return fpromise::make_error_promise(status);
   }
-  fw_vmo.reset(backing_vmo.release());
 
   return SendCommand(&kStartFirmwareDownloadCmd, sizeof(kStartFirmwareDownloadCmd))
       .or_else([](zx_status_t& status) -> fpromise::result<std::vector<uint8_t>, zx_status_t> {
-        FDF_LOG(ERROR, "could not load firmware file");
+        zxlogf(ERROR, "could not load firmware file");
         return fpromise::error(status);
       })
       .and_then([this](std::vector<uint8_t>& /*event*/) mutable {
@@ -583,7 +462,7 @@ fpromise::promise<void, zx_status_t> BtHciBroadcom::LoadFirmware() {
         }
         return fpromise::make_result_promise<void, zx_status_t>(fpromise::ok());
       })
-      .and_then([]() { FDF_LOG(INFO, "firmware loaded"); });
+      .and_then([]() { zxlogf(INFO, "firmware loaded"); });
 }
 
 fpromise::promise<void, zx_status_t> BtHciBroadcom::SendVmoAsCommands(zx::vmo vmo, size_t size,
@@ -598,7 +477,7 @@ fpromise::promise<void, zx_status_t> BtHciBroadcom::SendVmoAsCommands(zx::vmo vm
   size_t read_amount = (remaining > sizeof(buffer) ? sizeof(buffer) : remaining);
 
   if (read_amount < sizeof(HciCommandHeader)) {
-    FDF_LOG(ERROR, "short HCI command in firmware download");
+    zxlogf(ERROR, "short HCI command in firmware download");
     return fpromise::make_error_promise(ZX_ERR_INTERNAL);
   }
 
@@ -611,7 +490,7 @@ fpromise::promise<void, zx_status_t> BtHciBroadcom::SendVmoAsCommands(zx::vmo vm
   std::memcpy(&header, buffer, sizeof(HciCommandHeader));
   size_t length = header.parameter_total_size + sizeof(header);
   if (read_amount < length) {
-    FDF_LOG(ERROR, "short HCI command in firmware download");
+    zxlogf(ERROR, "short HCI command in firmware download");
     return fpromise::make_error_promise(ZX_ERR_INTERNAL);
   }
 
@@ -622,8 +501,8 @@ fpromise::promise<void, zx_status_t> BtHciBroadcom::SendVmoAsCommands(zx::vmo vm
              offset](fpromise::result<std::vector<uint8_t>, zx_status_t>& result) mutable
             -> fpromise::promise<void, zx_status_t> {
         if (result.is_error()) {
-          FDF_LOG(ERROR, "SendCommand failed in firmware download: %s",
-                  zx_status_get_string(result.error()));
+          zxlogf(ERROR, "SendCommand failed in firmware download: %s",
+                 zx_status_get_string(result.error()));
           return fpromise::make_error_promise<zx_status_t>(result.error());
         }
 
@@ -640,39 +519,39 @@ fpromise::promise<void> BtHciBroadcom::Initialize() {
     return fpromise::make_error_promise();
   }
 
-  FDF_LOG(DEBUG, "opening command channel");
+  zxlogf(DEBUG, "opening command channel");
   auto result = hci_client_.sync()->OpenCommandChannel(std::move(theirs));
   if (!result.ok()) {
-    FDF_LOG(ERROR, "OpenCommandChannel failed FIDL error: %s", result.status_string());
+    zxlogf(ERROR, "OpenCommandChannel failed FIDL error: %s", result.status_string());
     OnInitializeComplete(status);
     return fpromise::make_error_promise();
   }
   if (result->is_error()) {
-    FDF_LOG(ERROR, "OpenCommandChannel failed : %s", zx_status_get_string(result->error_value()));
+    zxlogf(ERROR, "OpenCommandChannel failed : %s", zx_status_get_string(result->error_value()));
     OnInitializeComplete(status);
     return fpromise::make_error_promise();
   }
 
-  FDF_LOG(DEBUG, "sending initial reset command");
+  zxlogf(DEBUG, "sending initial reset command");
   return SendCommand(&kResetCmd, sizeof(kResetCmd))
       .and_then([this](std::vector<uint8_t>&) -> fpromise::promise<void, zx_status_t> {
         if (is_uart_) {
-          FDF_LOG(DEBUG, "setting baud rate to %u", kTargetBaudRate);
+          zxlogf(DEBUG, "setting baud rate to %u", kTargetBaudRate);
           // switch baud rate to TARGET_BAUD_RATE
           return SetBaudRate(kTargetBaudRate);
         }
         return fpromise::make_result_promise<void, zx_status_t>(fpromise::ok());
       })
       .and_then([this]() {
-        FDF_LOG(DEBUG, "loading firmware");
+        zxlogf(DEBUG, "loading firmware");
         return LoadFirmware();
       })
       .and_then([this]() {
-        FDF_LOG(DEBUG, "sending reset command");
+        zxlogf(DEBUG, "sending reset command");
         return SendCommand(&kResetCmd, sizeof(kResetCmd));
       })
       .and_then([this](std::vector<uint8_t>&) -> fpromise::promise<void, zx_status_t> {
-        FDF_LOG(DEBUG, "setting BDADDR to value from bootloader");
+        zxlogf(DEBUG, "setting BDADDR to value from bootloader");
         fpromise::result<std::array<uint8_t, kMacAddrLen>, zx_status_t> bdaddr =
             GetBdaddrFromBootloader();
 
@@ -696,19 +575,61 @@ void BtHciBroadcom::OnInitializeComplete(zx_status_t status) {
   // We're done with the command channel. Close it so that it can be opened by
   // the host stack after the device becomes visible.
   if (command_channel_.is_valid()) {
-    FDF_LOG(DEBUG, "closing command channel");
+    zxlogf(DEBUG, "closing command channel");
     command_channel_.reset();
   }
 
-  if (status != ZX_OK) {
-    FDF_LOG(ERROR, "device initialization failed: %s", zx_status_get_string(status));
+  if (status == ZX_OK) {
+    zxlogf(INFO, "initialization completed successfully");
   } else {
-    FDF_LOG(INFO, "initialization completed successfully");
+    zxlogf(ERROR, "device initialization failed: %s", zx_status_get_string(status));
   }
 
-  init_completer_.Reply(status);
+  // In production, the initialization loop/thread is no longer needed.
+  if (loop_) {
+    loop_->Quit();
+  }
+
+  init_txn_->Reply(status);
 }
+
+zx_status_t BtHciBroadcom::Bind() {
+  zx_status_t status = ConnectToHciFidlProtocol();
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "ConnectToHciFidlProtocol failed: %s", zx_status_get_string(status));
+    return status;
+  }
+
+  status = ConnectToSerialFidlProtocol();
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "ConnectToSerialFidlProtocol failed: %s", zx_status_get_string(status));
+  } else {
+    is_uart_ = true;
+  }
+  fdf::Arena arena('INFO');
+  auto result = serial_client_.buffer(arena)->GetInfo();
+  if (!result.ok()) {
+    zxlogf(ERROR, "GetInfo failed FIDL error: %s", result.status_string());
+    return result.status();
+  }
+  if (result->is_error()) {
+    zxlogf(ERROR, "GetInfo failed : %s", zx_status_get_string(result->error_value()));
+    return result->error_value();
+  }
+
+  serial_pid_ = result.value()->info.serial_pid;
+
+  ddk::DeviceAddArgs args("bt-hci-broadcom");
+  args.set_proto_id(ZX_PROTOCOL_BT_HCI);
+  args.set_flags(DEVICE_ADD_NON_BINDABLE);
+  return DdkAdd(args);
+}
+
+static zx_driver_ops_t bcm_hci_driver_ops = {
+    .version = DRIVER_OPS_VERSION,
+    .bind = BtHciBroadcom::Create,
+};
 
 }  // namespace bt_hci_broadcom
 
-FUCHSIA_DRIVER_EXPORT(bt_hci_broadcom::BtHciBroadcom);
+ZIRCON_DRIVER(bcm_hci, bt_hci_broadcom::bcm_hci_driver_ops, "zircon", "0.1");
