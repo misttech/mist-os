@@ -201,6 +201,8 @@ zx_status_t VirtioPciDevice::Init() {
   zxlogf(TRACE, "GpuDeviceConfig - scanout limit: %d", config.scanout_limit);
   zxlogf(TRACE, "GpuDeviceConfig - capability set limit: %d", config.capability_set_limit);
 
+  capability_set_limit_ = config.capability_set_limit;
+
   // Ack and set the driver status bit
   DriverStatusAck();
 
@@ -255,7 +257,7 @@ void VirtioPciDevice::IrqRingUpdate() {
   virtio_control_queue_.IrqRingUpdate(
       [&](vring_used_elem* used_buffer_info) __TA_NO_THREAD_SAFETY_ANALYSIS {
         const uint32_t used_descriptor_index = used_buffer_info->id;
-        VirtioControlqBufferUsedByDevice(used_descriptor_index);
+        VirtioControlqBufferUsedByDevice(used_descriptor_index, used_buffer_info->len);
       });
 
   fbl::AutoLock virtio_cursor_queue_lock(&virtio_cursor_queue_mutex_);
@@ -270,7 +272,8 @@ void VirtioPciDevice::IrqConfigChange() { zxlogf(TRACE, "IrqConfigChange()"); }
 
 const char* VirtioPciDevice::tag() const { return "virtio-gpu"; }
 
-void VirtioPciDevice::VirtioControlqBufferUsedByDevice(uint32_t used_descriptor_index) {
+void VirtioPciDevice::VirtioControlqBufferUsedByDevice(uint32_t used_descriptor_index,
+                                                       uint32_t chain_written_length) {
   if (unlikely(used_descriptor_index > std::numeric_limits<uint16_t>::max())) {
     zxlogf(WARNING, "GPU device reported invalid used descriptor index: %" PRIu32,
            used_descriptor_index);
@@ -294,10 +297,8 @@ void VirtioPciDevice::VirtioControlqBufferUsedByDevice(uint32_t used_descriptor_
     // notifications. So, we only notify the request thread when the device
     // reports having used the specific buffer that populated the request.
     // buffer has been used by the device.
-    if (virtio_control_queue_request_index_.has_value() &&
-        virtio_control_queue_request_index_.value() == used_descriptor_index) {
-      virtio_control_queue_request_index_.reset();
-
+    if (virtio_control_queue_request_response_.has_value() &&
+        virtio_control_queue_request_response_->request_index == used_descriptor_index) {
       // TODO(costan): Ideally, the variable would be signaled when
       // `virtio_control_queue_mutex_` is not locked. This would avoid having the
       // ExchangeControlqRequestResponse() thread wake up, only to have to wait on the
@@ -307,6 +308,7 @@ void VirtioPciDevice::VirtioControlqBufferUsedByDevice(uint32_t used_descriptor_
       // * Replace virtio::Ring::IrqRingUpdate() with an iterator abstraction.
       //   The list of variables to be signaled would not need to be plumbed
       //   across methods.
+      virtio_control_queue_request_response_->written_length = chain_written_length;
       virtio_control_queue_buffer_used_signal_.Signal();
     }
 
@@ -362,6 +364,86 @@ void VirtioPciDevice::VirtioCursorqBufferUsedByDevice(uint32_t used_descriptor_i
     }
     used_descriptor_index_u16 = next_descriptor_index;
   }
+}
+
+void VirtioPciDevice::ExchangeControlqVariableLengthRequestResponse(
+    cpp20::span<const uint8_t> request, std::function<void(cpp20::span<uint8_t>)> callback) {
+  const size_t request_size = request.size();
+  const size_t max_response_size = virtio_control_queue_buffer_pool_.size() - request_size;
+
+  // Request/response exchanges are fully serialized.
+  //
+  // Relaxing this implementation constraint would require the following:
+  // * An allocation scheme for `virtio_control_queue_buffer_pool`.
+  // * A map of virtio queue descriptor index to condition variable, so multiple
+  //   threads can be waiting on the device notification interrupt.
+  // * Handling the case where `virtual_control_queue_buffer_pool` is full.
+  //   Options are waiting on a new condition variable signaled whenever a
+  //   buffer is released, and asserting that implies the buffer pool is
+  //   statically sized to handle the maximum possible concurrency.
+  //
+  // Optionally, the locking around `virtio_control_queue_mutex_` could be more
+  // fine-grained. Allocating the descriptors needs to be serialized, but
+  // populating them can be done concurrently. Last, submitting the descriptors
+  // to the virtio device must be serialized.
+  fbl::AutoLock exhange_controlq_request_response_lock(&exchange_controlq_request_response_mutex_);
+
+  fbl::AutoLock virtio_queue_lock(&virtio_control_queue_mutex_);
+
+  // Allocate two virtqueue descriptors. This is the minimum number of
+  // descriptors needed to represent a request / response exchange using the
+  // split virtqueue format described in the VIRTIO spec Section 2.7 "Split
+  // Virtqueues". This is because each descriptor can point to a read-only or a
+  // write-only memory buffer, and we need one of each.
+  //
+  // The first (returned) descriptor will point to the request buffer, and the
+  // second (chained) descriptor will point to the response buffer.
+
+  uint16_t request_descriptor_index;
+  vring_desc* const request_descriptor =
+      virtio_control_queue_.AllocDescChain(/*count=*/2, &request_descriptor_index);
+  ZX_ASSERT(request_descriptor);
+  virtio_control_queue_request_response_ = {request_descriptor_index, 0};
+
+  cpp20::span<uint8_t> request_span = virtio_control_queue_buffer_pool_.subspan(0, request_size);
+  std::memcpy(request_span.data(), request.data(), request_size);
+
+  const zx_paddr_t request_physical_address = virtio_control_queue_buffer_pool_physical_address_;
+  request_descriptor->addr = request_physical_address;
+  request_descriptor->len = static_cast<uint32_t>(request_size);
+  ZX_ASSERT(request_descriptor->len == request_size);
+  request_descriptor->flags = VRING_DESC_F_NEXT;
+
+  vring_desc* const response_descriptor =
+      virtio_control_queue_.DescFromIndex(request_descriptor->next);
+  ZX_ASSERT(response_descriptor);
+
+  cpp20::span<uint8_t> response_span =
+      virtio_control_queue_buffer_pool_.subspan(request_size, max_response_size);
+  std::fill(response_span.begin(), response_span.end(), 0);
+
+  const zx_paddr_t response_physical_address = request_physical_address + request_size;
+  response_descriptor->addr = response_physical_address;
+  response_descriptor->len = static_cast<uint32_t>(max_response_size);
+  response_descriptor->flags = VRING_DESC_F_WRITE;
+
+  zxlogf(TRACE, "Sending %zu-byte request descriptor %" PRIu16, request_size,
+         request_descriptor_index);
+
+  // Submit the transfer & wait for the response
+  virtio_control_queue_.SubmitChain(request_descriptor_index);
+  virtio_control_queue_.Kick();
+
+  virtio_control_queue_buffer_used_signal_.Wait(&virtio_control_queue_mutex_);
+
+  ZX_ASSERT(virtio_control_queue_request_response_.has_value());
+  auto written_length = virtio_control_queue_request_response_->written_length;
+
+  virtio_control_queue_request_response_.reset();
+
+  zxlogf(TRACE, "Got written_length %" PRIu32, written_length);
+
+  callback(virtio_control_queue_buffer_pool_.subspan(request_size, written_length));
 }
 
 }  // namespace virtio_display

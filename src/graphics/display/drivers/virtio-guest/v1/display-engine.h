@@ -125,6 +125,8 @@ class DisplayEngine : public ddk::DisplayControllerImplProtocol<DisplayEngine, d
     return ZX_ERR_NOT_SUPPORTED;
   }
 
+  VirtioPciDevice& pci_device() { return gpu_device_->pci_device(); }
+
  private:
   // TODO(https://fxbug.dev/42073721): Support more formats.
   static constexpr std::array<fuchsia_images2_pixel_format_enum_value_t, 1> kSupportedFormats = {

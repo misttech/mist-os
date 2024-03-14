@@ -93,6 +93,8 @@ class VirtioGpuDevice {
 
   const zx::bti& bti() { return virtio_device_->bti(); }
 
+  VirtioPciDevice& pci_device() { return *virtio_device_.get(); }
+
  private:
   // Tracks the resource IDs allocated by Create2DResource().
   uint32_t next_resource_id_ = 1;

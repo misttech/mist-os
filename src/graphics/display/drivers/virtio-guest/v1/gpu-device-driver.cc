@@ -82,6 +82,17 @@ zx::result<> GpuDeviceDriver::Init() {
     return zx::error(status);
   }
 
+  gpu_control_server_ = std::make_unique<GpuControlServer>(
+      this, display_engine_->pci_device().GetCapabilitySetLimit());
+
+  zx::result<> result = gpu_control_server_->Init(parent());
+  if (result.is_error()) {
+    zxlogf(ERROR, "Failed to init virtio gpu server: %s", result.status_string());
+    return zx::error(result.status_value());
+  }
+
+  zxlogf(TRACE, "GpuDeviceDriver::Init success");
+
   return zx::ok();
 }
 
@@ -97,6 +108,12 @@ void GpuDeviceDriver::DdkInit(ddk::InitTxn txn) {
 }
 
 void GpuDeviceDriver::DdkRelease() { delete this; }
+
+void GpuDeviceDriver::SendHardwareCommand(cpp20::span<uint8_t> request,
+                                          std::function<void(cpp20::span<uint8_t>)> callback) {
+  display_engine_->pci_device().ExchangeControlqVariableLengthRequestResponse(std::move(request),
+                                                                              std::move(callback));
+}
 
 namespace {
 

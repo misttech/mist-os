@@ -13,8 +13,17 @@
         colocate: "false",
         compat: "driver/virtio_gpu_v1.so",
     },
+    capabilities: [
+        { service: "fuchsia.gpu.virtio.Service" },
+    ],
     use: [
         { service: "fuchsia.hardware.pci.Service" },
         { service: "fuchsia.hardware.sysmem.Service" },
+    ],
+    expose: [
+        {
+            service: "fuchsia.gpu.virtio.Service",
+            from: "self",
+        },
     ],
 }
