@@ -9,7 +9,8 @@
 ## usage: fx sdk-deps [Options]
 ##
 ##  Options:
-##     -t < target> : List all the deps of this targert
+##     -t < target> : List all the deps of this target
+##     -d < dep> : Determine if the dependency is in SDK
 ##
 
 set -o errexit
@@ -37,7 +38,10 @@ collect_deps() {
     local deps=($(fx-command-run gn desc "${build_dir}" "${target}" deps || continue))
     for dep in ${deps[@]}; do
         # We skip some deps
-        if [[ "${dep}" == *"shlib-allowlist-check"* || "${dep}" == *"static-libc++-deps"* ]]; then
+        if [[ "${dep}" == *"shlib-allowlist-check"* \
+           || "${dep}" == *"static-libc++-deps"* \
+           || "${dep}" == *"tools/bindc:bin"* \
+           || "${dep}" == *"zircon/public/sysroot"* ]]; then
             continue
         fi
         if [[ "${dep}" == ${prefix}* ]]; then
@@ -52,36 +56,57 @@ main() {
     local build_dir=$(fx-command-run get-build-dir)
     fx-info "Using build dir: ${build_dir}"
     local targets=()
+    local sdk_deps=()
     while [[ $# -ge 1 ]]; do
         case "$1" in
         -t)
             shift
             targets+=( "$1" )
             ;;
+        -d)
+            shift
+            sdk_deps+=( "$1" )
+            ;;
         esac
         shift
     done
 
-    if [[ "${#targets[@]}" -eq 0 ]]; then
-        echo "-t is required to pass in a target."
+    if [[ "${#targets[@]}" -eq 0 && "${#sdk_deps[@]}" -eq 0 ]]; then
+        echo "Either a target that contains driver or a dependency needs to be passed in."
+        fx-command-help sdk-deps
         exit 1
     fi
 
-    # Use `gn meta` to walk the metadata and select all items with
-    # `driver_package_component_files`. This is mandatory all driver.
-    local distribution_manifests=()
-    for target in ${targets[@]}; do
-        distribution_manifests+=( $(fx-command-run gn meta "${build_dir}" --data=driver_package_component_files "${target}" | grep "distribution_manifest = " | cut -d "\"" -f2 | sed -e "s|.*|${build_dir}/&|") )
-    done
+    if [[ "${#targets[@]}" -gt 0 ]]; then
+        local distribution_manifests=()
+        # Use `gn meta` to walk the metadata and select all items with
+        # `driver_package_component_files`. This is mandatory all driver.
+        for target in ${targets[@]}; do
+            distribution_manifests+=( $(fx-command-run gn meta "${build_dir}" --data=driver_package_component_files "${target}" 2>/dev/null | grep "distribution_manifest = " | cut -d "\"" -f2 | sed -e "s|.*|${build_dir}/&|") )
+        done
 
-    # Collect all the drivers from the distribution
-    local drivers=($(fx-command-run jq -r '.[] | select((.destination|startswith("driver"))) | .label' "${distribution_manifests[@]}" | sort -u))
+        # Collect all the drivers from the distribution
+         if [[ "${#targets[@]}" -gt 0 ]]; then
+            local drivers=($(fx-command-run jq -r '.[] | select((.destination|startswith("driver"))) | .label' "${distribution_manifests[@]}" | sort -u))
+        fi
 
-    # Collect all the deps
-    fx-info "Listing all drivers and collect deps..."
-    for driver in "${drivers[@]}"; do
-        echo $driver
-        collect_deps $driver &
+        # Collect all the deps
+        fx-info "Listing all drivers and collect deps..."
+        echo
+        for driver in "${drivers[@]}"; do
+            # Don't analyze the compat driver
+            if [[ "${driver}" == *"src/devices/misc/drivers/compat:driver"* ]]; then
+                continue
+            fi
+            echo "    ${driver}"
+            collect_deps $driver &
+        done
+        echo
+    fi
+
+    # Also collect the deps directly passed in
+    for dep in ${sdk_deps[@]}; do
+        echo "${dep}" | xargs >> ${dep_list_file}
     done
 
     local core_deps=()
