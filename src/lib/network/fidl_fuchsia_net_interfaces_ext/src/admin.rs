@@ -353,19 +353,39 @@ impl Control {
                 Err(e) => Err(TerminalError::Fidl(e)),
             },
             futures::future::Either::Right((event, fut)) => {
-                match event.map_err(|e| TerminalError::Fidl(e))? {
-                    Some(removal_reason) => Err(TerminalError::Terminal(removal_reason)),
-                    None => {
-                        if let Some(query_result) = fut.now_or_never() {
-                            query_result.map_err(TerminalError::Fidl)
-                        } else {
-                            Err(TerminalError::Fidl(fidl::Error::ClientChannelClosed {
-                                status: zx::Status::PEER_CLOSED,
-                                protocol_name: fnet_interfaces_admin::ControlMarker::DEBUG_NAME,
-                                #[cfg(not(target_os = "fuchsia"))]
-                                reason: None,
-                            }))
-                        }
+                // We need to poll the query response future one more time,
+                // because of the following scenario:
+                //
+                // 1. select() polls the query response future, which returns
+                //    pending.
+                // 2. The server sends the query response and terminal event in
+                //    that order.
+                // 3. The FIDL client library dequeues both of these and wakes
+                //    the respective futures.
+                // 4. select() polls the terminal event future, which is now
+                //    ready.
+                //
+                // In that case, both futures will be ready, so we can use
+                // now_or_never() to check whether the query result future has a
+                // result, since we always want to process that result first.
+                if let Some(query_result) = fut.now_or_never() {
+                    match query_result {
+                        Ok(ok) => Ok(ok),
+                        Err(e) if e.is_closed() => match event {
+                            Ok(Some(reason)) => Err(TerminalError::Terminal(reason)),
+                            Ok(None) | Err(_) => Err(TerminalError::Fidl(e)),
+                        },
+                        Err(e) => Err(TerminalError::Fidl(e)),
+                    }
+                } else {
+                    match event.map_err(|e| TerminalError::Fidl(e))? {
+                        Some(removal_reason) => Err(TerminalError::Terminal(removal_reason)),
+                        None => Err(TerminalError::Fidl(fidl::Error::ClientChannelClosed {
+                            status: zx::Status::PEER_CLOSED,
+                            protocol_name: fnet_interfaces_admin::ControlMarker::DEBUG_NAME,
+                            #[cfg(not(target_os = "fuchsia"))]
+                            reason: None,
+                        })),
                     }
                 }
             }
