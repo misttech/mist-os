@@ -9,7 +9,10 @@ import("//src/devices/bus/drivers/pci/pci.gni")
 driver_bind_rules("qemu-arm64_bind") {
   rules = "qemu-arm64.bind"
   tests = "bind_tests.json"
-  deps = [ "//src/devices/bind/fuchsia.platform" ]
+  deps = [
+    "//sdk/fidl/fuchsia.hardware.platform.bus:fuchsia.hardware.platform.bus_bindlib",
+    "//src/devices/bind/fuchsia.platform",
+  ]
 }
 
 group("tests") {

@@ -9,8 +9,8 @@ driver_bind_rules("vim3-bind") {
   rules = "vim3.bind"
   tests = "bind-tests.json"
   deps = [
+    "//sdk/fidl/fuchsia.hardware.platform.bus:fuchsia.hardware.platform.bus_bindlib",
     "//src/devices/bind/fuchsia.khadas.platform",
-    "//src/devices/bind/fuchsia.platform",
   ]
 }
 

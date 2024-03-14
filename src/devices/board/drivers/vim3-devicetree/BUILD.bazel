@@ -22,7 +22,7 @@ fuchsia_driver_bind_bytecode(
     deps = [
         "@fuchsia_sdk//bind/fuchsia.devicetree",
         "@fuchsia_sdk//bind/fuchsia.khadas.platform",
-        "@fuchsia_sdk//bind/fuchsia.platform",
+        "@internal_sdk//fidl/fuchsia.hardware.platform.bus:fuchsia.hardware.platform.bus_bindlib",
     ],
 )
 

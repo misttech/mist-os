@@ -10,7 +10,7 @@
         "device": {
             "fuchsia.BIND_PLATFORM_DEV_PID": "fuchsia.google.platform.BIND_PLATFORM_DEV_PID.MACHINA",
             "fuchsia.BIND_PLATFORM_DEV_VID": "fuchsia.google.platform.BIND_PLATFORM_DEV_VID.GOOGLE",
-            "fuchsia.BIND_FIDL_PROTOCOL": "fuchsia.platform.BIND_FIDL_PROTOCOL.PLATFORM_BUS"
+            "fuchsia.hardware.platform.bus.Service": "fuchsia.hardware.platform.bus.Service.DriverTransport"
         },
         "expected": "match",
         "name": "Vendor"

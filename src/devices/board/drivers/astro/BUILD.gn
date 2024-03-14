@@ -19,8 +19,8 @@ driver_bind_rules("astro-bind") {
   bind_output = "astro.bindbc"
   tests = "bind-tests.json"
   deps = [
+    "//sdk/fidl/fuchsia.hardware.platform.bus:fuchsia.hardware.platform.bus_bindlib",
     "//src/devices/bind/fuchsia.google.platform",
-    "//src/devices/bind/fuchsia.platform",
   ]
 }
 

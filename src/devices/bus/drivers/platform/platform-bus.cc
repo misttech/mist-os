@@ -811,7 +811,6 @@ zx_status_t PlatformBus::Init() {
   }
 
   zx_device_prop_t passthrough_props[] = {
-      {BIND_FIDL_PROTOCOL, 0, ZX_FIDL_PROTOCOL_PLATFORM_BUS},
       {BIND_PLATFORM_DEV_VID, 0, board_info_.vid()},
       {BIND_PLATFORM_DEV_PID, 0, board_info_.pid()},
   };

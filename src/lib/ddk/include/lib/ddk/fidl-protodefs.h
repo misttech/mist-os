@@ -26,7 +26,7 @@
 // 8 was "fuchsia.hardware.spi.Service"
 DDK_FIDL_PROTOCOL_DEF(SYSMEM,          9, "fuchsia.hardware.sysmem.Service")
 // 10 was "fuchsia.hardware.mailbox.Service"
-DDK_FIDL_PROTOCOL_DEF(PLATFORM_BUS,    11, "fuchsia.hardware.platform.bus.PlatformBus")
+// 11 was "fuchsia.hardware.platform.bus.PlatformBus"
 // 12 was "fuchsia.hardware.interrupt.Provider"
 // 13 was "fuchsia.hardware.platform.device.Service"
 // 14 was "fuchsia.hardware.dsp.Service"

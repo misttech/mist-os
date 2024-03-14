@@ -3,8 +3,8 @@
 // found in the LICENSE file.
 
 using fuchsia.khadas.platform;
-using fuchsia.platform;
+using fuchsia.hardware.platform.bus;
 
-fuchsia.BIND_FIDL_PROTOCOL == fuchsia.platform.BIND_FIDL_PROTOCOL.PLATFORM_BUS;
+fuchsia.hardware.platform.bus.Service == fuchsia.hardware.platform.bus.Service.DriverTransport;
 fuchsia.BIND_PLATFORM_DEV_VID == fuchsia.khadas.platform.BIND_PLATFORM_DEV_VID.KHADAS;
 fuchsia.BIND_PLATFORM_DEV_PID == fuchsia.khadas.platform.BIND_PLATFORM_DEV_PID.VIM3;

@@ -12,11 +12,6 @@ extend uint fuchsia.BIND_PROTOCOL {
   DEVICE = 0x55,
 };
 
-extend uint fuchsia.BIND_FIDL_PROTOCOL {
-  PLATFORM_BUS = 0x0B,  // fuchsia.hardware.platform.bus
-  DEVICE = 0x0D,        // fuchsia.hardware.platform.device
-};
-
 extend uint fuchsia.BIND_PLATFORM_DEV_VID {
   GENERIC = 0x0,
   QEMU = 0x01,
