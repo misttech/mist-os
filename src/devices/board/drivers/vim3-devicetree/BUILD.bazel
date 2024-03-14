@@ -132,6 +132,7 @@ fuchsia_test_package(
         "@internal_sdk//pkg/devicetree-gpioimpl-visitor",
         "@internal_sdk//pkg/devicetree-mali-gpu-visitor",
         "@internal_sdk//pkg/devicetree-registers-visitor",
+        "@internal_sdk//pkg/devicetree-sdmmc-visitor",
         "@internal_sdk//pkg/devicetree-sysmem-visitor",
         "@internal_sdk//pkg/devicetree-usb-phy-visitor",
     ],

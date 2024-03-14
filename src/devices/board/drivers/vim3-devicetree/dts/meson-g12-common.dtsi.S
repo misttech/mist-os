@@ -58,6 +58,33 @@
 				pins = <A311D_GPIOA(6)>;
 				output-high;
 			};
+
+			emmc_d0_d7_cfg: emmc-d0-d7-cfg {
+				pins = <A311D_GPIOBOOT(0) A311D_GPIOBOOT(1) A311D_GPIOBOOT(2) A311D_GPIOBOOT(3)>,
+						<A311D_GPIOBOOT(4) A311D_GPIOBOOT(5) A311D_GPIOBOOT(6) A311D_GPIOBOOT(7)>;
+				function = <0 1>;
+			};
+
+			emmc_clk_cfg: emmc-clk-cfg {
+				pins = <A311D_GPIOBOOT(8)>;
+				function = <0 1>;
+			};
+
+			emmc_cmd_cfg: emmc-cmd-cfg {
+				pins = <A311D_GPIOBOOT(10)>;
+				function = <0 1>;
+			};
+
+			emmc_ds_cfg: emmc-ds-cfg {
+				pins = <A311D_GPIOBOOT(13)>;
+				function = <0 1>;
+			};
+
+			emmc_cs_cfg: emmc-cs-cfg {
+				pins = <A311D_GPIOBOOT(14)>;
+				output-high;
+			};
+
 		};
 
 		audio: audio-controller@ff642000 {
@@ -177,6 +204,22 @@
 			iommus = <&dummy_iommu 6>;
 			phys = <&usb_phy>;
 			phy-names = "xhci-phy";
+		};
+
+		sd_emmc_c: mmc@ffe07000 {
+			compatible = "amlogic,meson-axg-mmc";
+			reg = <0x0 0xffe07000 0x0 0x2000>;
+			interrupts = <GIC_SPI 191 GIC_IRQ_MODE_EDGE_RISING>;
+			iommus = <&dummy_iommu 6>;
+			boot-metadata = <0x5452506D 0>;
+			clocks = <&clock 0x1000C>;
+			gpios = <&gpio A311D_GPIOBOOT(12) 0>;
+			gpio-names = "SDMMC_RESET";
+			pinctrl-0 = <&emmc_d0_d7_cfg &emmc_clk_cfg &emmc_cmd_cfg>,
+						<&emmc_ds_cfg &emmc_cs_cfg>;
+			max-frequency = <120000000>;
+			non-removable;
+			no-mmc-hs400;
 		};
 
 		aml_gpu: gpu@ffe40000 {

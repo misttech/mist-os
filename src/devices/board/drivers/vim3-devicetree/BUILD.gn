@@ -41,6 +41,7 @@ devicetree("vim3") {
     "//sdk/lib/driver/devicetree/visitors/drivers/usb/aml-usb-phy:aml-usb-phy-visitor",
     "//sdk/lib/driver/devicetree/visitors/drivers/usb/usb-phy:usb-phy-visitor",
     "//sdk/lib/driver/devicetree/visitors/drivers/usb/dwc2:dwc2-visitor",
+    "//sdk/lib/driver/devicetree/visitors/drivers/mmc/sdmmc:sdmmc-visitor",
   ]
   golden = "dts/khadas-vim3.golden.dts"
 }

@@ -35,6 +35,27 @@ TEST_F(DeviceEnumerationTest, Vim3DeviceTreeTest) {
       "sys/platform/usb-ff500000/usb-ff500000_group/xhci/usb-bus",
       "sys/platform/phy-ffe09000/phy-ffe09000_group/aml_usb_phy/dwc2/usb-ff400000_group/dwc2",
       "sys/platform/phy-ffe09000/phy-ffe09000_group/aml_usb_phy/dwc2/usb-ff400000_group/dwc2/usb-peripheral",
+
+      // EMMC
+      "sys/platform/mmc-ffe07000/mmc-ffe07000_group/aml-sd-emmc",
+      "sys/platform/mmc-ffe07000/mmc-ffe07000_group/aml-sd-emmc/sdmmc",
+      "sys/platform/mmc-ffe07000/mmc-ffe07000_group/aml-sd-emmc/sdmmc/sdmmc-mmc/boot1/block",
+      "sys/platform/mmc-ffe07000/mmc-ffe07000_group/aml-sd-emmc/sdmmc/sdmmc-mmc/boot2/block",
+      "sys/platform/mmc-ffe07000/mmc-ffe07000_group/aml-sd-emmc/sdmmc/sdmmc-mmc/rpmb",
+      "sys/platform/mmc-ffe07000/mmc-ffe07000_group/aml-sd-emmc/sdmmc/sdmmc-mmc/user/block/part-000/block",
+      "sys/platform/mmc-ffe07000/mmc-ffe07000_group/aml-sd-emmc/sdmmc/sdmmc-mmc/user/block/part-001/block",
+      "sys/platform/mmc-ffe07000/mmc-ffe07000_group/aml-sd-emmc/sdmmc/sdmmc-mmc/user/block/part-002/block",
+      "sys/platform/mmc-ffe07000/mmc-ffe07000_group/aml-sd-emmc/sdmmc/sdmmc-mmc/user/block/part-003/block",
+      "sys/platform/mmc-ffe07000/mmc-ffe07000_group/aml-sd-emmc/sdmmc/sdmmc-mmc/user/block/part-004/block",
+      "sys/platform/mmc-ffe07000/mmc-ffe07000_group/aml-sd-emmc/sdmmc/sdmmc-mmc/user/block/part-005/block",
+      "sys/platform/mmc-ffe07000/mmc-ffe07000_group/aml-sd-emmc/sdmmc/sdmmc-mmc/user/block/part-006/block",
+      "sys/platform/mmc-ffe07000/mmc-ffe07000_group/aml-sd-emmc/sdmmc/sdmmc-mmc/user/block/part-007/block",
+      "sys/platform/mmc-ffe07000/mmc-ffe07000_group/aml-sd-emmc/sdmmc/sdmmc-mmc/user/block/part-008/block",
+      "sys/platform/mmc-ffe07000/mmc-ffe07000_group/aml-sd-emmc/sdmmc/sdmmc-mmc/user/block/part-009/block",
+      "sys/platform/mmc-ffe07000/mmc-ffe07000_group/aml-sd-emmc/sdmmc/sdmmc-mmc/user/block/part-010/block",
+      "sys/platform/mmc-ffe07000/mmc-ffe07000_group/aml-sd-emmc/sdmmc/sdmmc-mmc/user/block/part-011/block",
+      "sys/platform/mmc-ffe07000/mmc-ffe07000_group/aml-sd-emmc/sdmmc/sdmmc-mmc/user/block/part-012/block",
+      "sys/platform/mmc-ffe07000/mmc-ffe07000_group/aml-sd-emmc/sdmmc/sdmmc-mmc/user/block/part-013/block",
   };
 
   ASSERT_NO_FATAL_FAILURE(TestRunner(kDevicePaths, std::size(kDevicePaths)));
