@@ -724,7 +724,7 @@ func runTestOnce(
 			caseToTags[tc.DisplayName] = tc.Tags
 		}
 		for i, tc := range result.Cases {
-			result.Cases[i].Tags = caseToTags[tc.DisplayName]
+			result.Cases[i].Tags = append(result.Cases[i].Tags, caseToTags[tc.DisplayName]...)
 		}
 	}
 

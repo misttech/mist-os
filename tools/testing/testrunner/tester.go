@@ -664,6 +664,11 @@ func (t *FFXTester) ProcessResult(ctx context.Context, test testsharder.Test, ou
 	} else {
 		finalTestResult = testResult
 	}
+	ffxTag := build.TestTag{Key: "use_ffx", Value: "true"}
+	finalTestResult.Tags = append(finalTestResult.Tags, ffxTag)
+	for i, testCase := range finalTestResult.Cases {
+		finalTestResult.Cases[i].Tags = append(testCase.Tags, ffxTag)
+	}
 	if finalTestResult.Result != runtests.TestSuccess && strings.Contains(testRun.output, sshutilconstants.ProcessTerminatedMsg) {
 		if err == nil {
 			err = errors.New(sshutilconstants.ProcessTerminatedMsg)
@@ -696,6 +701,7 @@ func processTestResult(runResult *ffxutil.TestRunResult, test testsharder.Test, 
 	default:
 		testResult.Result = runtests.TestFailure
 	}
+	testResult.Tags = append(testResult.Tags, build.TestTag{Key: "test_outcome", Value: suiteResult.Outcome})
 
 	var suiteArtifacts []string
 	var stdioPath string
@@ -762,6 +768,7 @@ func processTestResult(runResult *ffxutil.TestRunResult, test testsharder.Test, 
 			Format:      "FTF",
 			OutputFiles: artifacts,
 			OutputDir:   testCaseArtifactDir,
+			Tags:        []build.TestTag{{Key: "test_outcome", Value: testCase.Outcome}},
 		})
 	}
 	testResult.Cases = cases
