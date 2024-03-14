@@ -6,9 +6,10 @@ mod clock;
 mod device;
 mod error;
 mod ring_buffer;
-mod socket;
+mod wav_socket;
 
 use clock::create_reference_clock;
+use wav_socket::WavSocket;
 
 use anyhow::{anyhow, Context, Error};
 use error::ControllerError;
@@ -52,7 +53,7 @@ impl AudioDaemon {
         let location = request
             .source
             .ok_or(ControllerError::new(fac::Error::ArgumentsMissing, format!("Input missing.")))?;
-        let wav_socket = request.wav_data.ok_or(ControllerError::new(
+        let wav_data = request.wav_data.ok_or(ControllerError::new(
             fac::Error::ArgumentsMissing,
             format!("Socket for wav data missing"),
         ))?;
@@ -69,11 +70,9 @@ impl AudioDaemon {
         let duration =
             request.duration.map(|duration_nanos| Duration::from_nanos(duration_nanos as u64));
 
-        let mut socket = socket::Socket {
-            socket: &mut fasync::Socket::from_socket(
-                wav_socket.duplicate_handle(zx::Rights::SAME_RIGHTS)?,
-            ),
-        };
+        let mut async_socket =
+            fasync::Socket::from_socket(wav_data.duplicate_handle(zx::Rights::SAME_RIGHTS)?);
+        let mut socket = WavSocket(&mut async_socket);
 
         let capturer_proxy = Self::create_capturer_from_location(
             location,
@@ -109,9 +108,9 @@ impl AudioDaemon {
         let mut stream = capturer_proxy.take_event_stream();
         let mut packets_so_far = 0;
 
-        let mut async_wav_writer = fidl::AsyncSocket::from_socket(wav_socket);
+        let mut async_wav_writer = fidl::AsyncSocket::from_socket(wav_data);
 
-        socket.write_wav_header(duration, &format).await?;
+        socket.write_header(duration, &format).await?;
         let packet_fut = async {
             while let Some(event) = stream.try_next().await? {
                 if stop_signal.load(Ordering::SeqCst) {
@@ -331,7 +330,7 @@ impl AudioDaemon {
         iteration: u32,
     ) -> BoxFuture<'b, Result<(), Error>> {
         async move {
-            let mut socket_wrapper = socket::Socket { socket: &mut socket };
+            let mut socket_wrapper = WavSocket(&mut socket);
             let mut buf = vec![0u8; bytes_per_packet];
             let total_bytes_read = socket_wrapper.read_until_full(&mut buf).await? as usize;
 
@@ -379,12 +378,9 @@ impl AudioDaemon {
     ) -> Result<fac::PlayerPlayResponse, Error> {
         let data_socket = request.wav_source.ok_or(anyhow!("Socket argument missing."))?;
 
-        let mut socket = socket::Socket {
-            socket: &mut fasync::Socket::from_socket(
-                data_socket.duplicate_handle(zx::Rights::SAME_RIGHTS)?,
-            ),
-        };
-        let spec = socket.read_wav_header().await?;
+        let mut async_socket = fasync::Socket::from_socket(data_socket);
+        let mut socket = WavSocket(&mut async_socket);
+        let spec = socket.read_header().await?;
         let format = Format::from(&spec);
 
         let location = request.destination.ok_or(anyhow!("PlayDestination argument missing."))?;
@@ -435,7 +431,9 @@ impl AudioDaemon {
             // TODO(b/300279107): Calculate total bytes sent to an AudioRenderer.
             Self::send_next_packet(
                 offset.to_owned() as u64,
-                fasync::Socket::from_socket(data_socket.duplicate_handle(zx::Rights::SAME_RIGHTS)?),
+                fasync::Socket::from_socket(
+                    socket.0.as_ref().duplicate_handle(zx::Rights::SAME_RIGHTS)?,
+                ),
                 vmo.duplicate_handle(zx::Rights::SAME_RIGHTS)?,
                 &audio_renderer_proxy,
                 bytes_per_packet,
@@ -476,7 +474,7 @@ impl AudioDaemon {
             fac::Error::ArgumentsMissing,
             format!("Stream type missing."),
         ))?;
-        let wav_socket = request.wav_data.ok_or(error::ControllerError::new(
+        let wav_data = request.wav_data.ok_or(error::ControllerError::new(
             fac::Error::ArgumentsMissing,
             format!("Socket for wav data missing."),
         ))?;
@@ -508,7 +506,7 @@ impl AudioDaemon {
         device
             .record(
                 Format::from(&stream_type),
-                fasync::Socket::from_socket(wav_socket),
+                fasync::Socket::from_socket(wav_data),
                 duration,
                 cancel_server,
             )

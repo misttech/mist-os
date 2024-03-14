@@ -5,7 +5,9 @@
 use crate::{
     error::ControllerError,
     ring_buffer::{HardwareRingBuffer, RingBuffer},
-    socket, stop_listener, SECONDS_PER_NANOSECOND,
+    stop_listener,
+    wav_socket::WavSocket,
+    SECONDS_PER_NANOSECOND,
 };
 use anyhow::{anyhow, Context, Error};
 use async_trait::async_trait;
@@ -258,8 +260,8 @@ impl Device {
         &mut self,
         mut data_socket: fasync::Socket,
     ) -> Result<fac::PlayerPlayResponse, Error> {
-        let mut socket = socket::Socket { socket: &mut data_socket };
-        let spec = socket.read_wav_header().await?;
+        let mut socket = WavSocket(&mut data_socket);
+        let spec = socket.read_header().await?;
         let format = format_utils::Format::from(&spec);
 
         let supported_formats = self.device_controller.get_supported_formats().await?;
@@ -419,7 +421,7 @@ impl Device {
         duration: Option<std::time::Duration>,
         cancel_server: Option<ServerEnd<fac::RecordCancelerMarker>>,
     ) -> Result<fac::RecorderRecordResponse, ControllerError> {
-        let mut socket = socket::Socket { socket: &mut data_socket };
+        let mut socket = WavSocket(&mut data_socket);
 
         let supported_formats = self.device_controller.get_supported_formats().await?;
         validate_format(&format, supported_formats)?;
@@ -465,7 +467,7 @@ impl Device {
         let mut buf = vec![format.silence_value(); bytes_per_wakeup_interval as usize];
         let stop_signal = std::sync::atomic::AtomicBool::new(false);
 
-        socket.write_wav_header(duration, &format).await?;
+        socket.write_header(duration, &format).await?;
         let packet_fut = async {
             loop {
                 timer.next().await;
@@ -528,13 +530,13 @@ impl Device {
                         > available_frames_to_read);
 
                 if write_full_buffer {
-                    data_socket.write_all(&buf).await?;
+                    socket.0.write_all(&buf).await?;
                     last_wakeup = now;
                 } else {
                     let bytes_to_write = (format.frames_in_duration(duration.unwrap_or_default())
                         - last_frame_read) as usize
                         * format.bytes_per_frame() as usize;
-                    data_socket.write_all(&buf[..bytes_to_write]).await?;
+                    socket.0.write_all(&buf[..bytes_to_write]).await?;
                     break;
                 }
             }

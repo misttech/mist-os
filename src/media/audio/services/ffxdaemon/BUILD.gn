@@ -90,7 +90,7 @@ rustc_binary("bin") {
     "src/error.rs",
     "src/main.rs",
     "src/ring_buffer.rs",
-    "src/socket.rs",
+    "src/wav_socket.rs",
   ]
 }
 
