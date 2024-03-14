@@ -43,6 +43,9 @@ use syncio::zxio::zxio_default_maybe_faultable_copy;
 use usercopy::slice_to_maybe_uninit_mut;
 use zerocopy::{AsBytes, FromBytes, NoCell};
 
+const ZX_VM_SPECIFIC_OVERWRITE: zx::VmarFlags =
+    zx::VmarFlags::from_bits_retain(zx::VmarFlagsExtended::SPECIFIC_OVERWRITE.bits());
+
 // We do not create shared processes in unit tests.
 pub(crate) const UNIFIED_ASPACES_ENABLED: bool =
     cfg!(not(test)) && cfg!(feature = "unified_aspace");
@@ -623,29 +626,8 @@ fn map_in_vmar(
         DesiredAddress::Hint(addr) | DesiredAddress::Fixed(addr) => {
             (addr - base_addr, zx::VmarFlags::SPECIFIC)
         }
-        DesiredAddress::FixedOverwrite(addr) => {
-            let specific_overwrite =
-                zx::VmarFlags::from_bits_retain(zx::VmarFlagsExtended::SPECIFIC_OVERWRITE.bits());
-            (addr - base_addr, specific_overwrite)
-        }
+        DesiredAddress::FixedOverwrite(addr) => (addr - base_addr, ZX_VM_SPECIFIC_OVERWRITE),
     };
-
-    let vmar_flags =
-        flags.prot_flags().to_vmar_flags() | zx::VmarFlags::ALLOW_FAULTS | vmar_extra_flags;
-
-    profile.pivot("VmarMapSyscall");
-    let mut map_result = vmar.map(vmar_offset, vmo, vmo_offset, length, vmar_flags);
-
-    // Retry mapping if the target address was a Hint.
-    profile.pivot("MapInVmarResults");
-    if map_result.is_err() {
-        if let DesiredAddress::Hint(_) = addr {
-            let vmar_flags = vmar_flags - zx::VmarFlags::SPECIFIC;
-            map_result = vmar.map(0, vmo, vmo_offset, length, vmar_flags);
-        }
-    }
-
-    let mapped_addr = map_result.map_err(MemoryManager::get_errno_for_map_err)?;
 
     if populate {
         profile_duration!("MmapPopulate");
@@ -662,6 +644,30 @@ fn map_in_vmar(
         let _ = vmo.op_range(op, vmo_offset, length as u64);
         // "The mmap() call doesn't fail if the mapping cannot be populated."
     }
+
+    let vmar_maybe_map_range = if populate && !vmar_extra_flags.contains(ZX_VM_SPECIFIC_OVERWRITE) {
+        zx::VmarFlags::MAP_RANGE
+    } else {
+        zx::VmarFlags::empty()
+    };
+    let vmar_flags = flags.prot_flags().to_vmar_flags()
+        | zx::VmarFlags::ALLOW_FAULTS
+        | vmar_extra_flags
+        | vmar_maybe_map_range;
+
+    profile.pivot("VmarMapSyscall");
+    let mut map_result = vmar.map(vmar_offset, vmo, vmo_offset, length, vmar_flags);
+
+    // Retry mapping if the target address was a Hint.
+    profile.pivot("MapInVmarResults");
+    if map_result.is_err() {
+        if let DesiredAddress::Hint(_) = addr {
+            let vmar_flags = vmar_flags - zx::VmarFlags::SPECIFIC;
+            map_result = vmar.map(0, vmo, vmo_offset, length, vmar_flags);
+        }
+    }
+
+    let mapped_addr = map_result.map_err(MemoryManager::get_errno_for_map_err)?;
 
     Ok(UserAddress::from_ptr(mapped_addr))
 }
