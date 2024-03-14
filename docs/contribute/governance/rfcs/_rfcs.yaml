@@ -3127,3 +3127,16 @@
   reviewers: ['abarth@google.com', 'ianloic@google.com', 'mkember@google.com', 'yaar@google.com']
   submitted: '2023-11-08'
   reviewed: '2024-01-30'
+
+- name: 'RFC-0240'
+  title: 'Asynchronous operations are on objects'
+  short_description: 'Defines how asynchronous operations in Zircon interact with object and handle operations.'
+  authors: ['jamesr@google.com']
+  file: '0240_async_ops_are_on_objects.md'
+  area: ['Kernel']
+  issue: ['']
+  gerrit_change_id: ['985309']
+  status: 'Accepted'
+  reviewers: ['abarth@google.com', 'cpu@google.com', 'maniscalco@google.com']
+  submitted: '2024-02-06'
+  reviewed: '2024-03-11'

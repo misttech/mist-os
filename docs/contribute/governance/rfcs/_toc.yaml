@@ -494,3 +494,5 @@ toc:
     path: /docs/contribute/governance/rfcs/0238_vmo_size.md
   - title: "RFC-0239: Platform Versioning in Practice"
     path: /docs/contribute/governance/rfcs/0239_platform_versioning_in_practice.md
+  - title: "RFC-0240: Asynchronous operations are on objects"
+    path: /docs/contribute/governance/rfcs/0240_async_ops_are_on_objects.md
