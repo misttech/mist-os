@@ -18,6 +18,20 @@
 
 namespace amlogic_display {
 
+struct BoardInfo {
+  // Values are defined in <lib/ddk/platform-defs.h>.
+  uint32_t board_vendor_id;
+
+  // Values are defined in <lib/ddk/platform-defs.h>.
+  uint32_t board_product_id;
+};
+
+// Typesafe wrapper for PdevFidl::BoardInfo();
+//
+// If the result is successful, the fields in BoardInfo are guaranteed to be
+// valid.
+zx::result<BoardInfo> GetBoardInfo(ddk::PDevFidl& platform_device);
+
 // The resource ordering in the board driver's `display_mmios` table.
 enum class MmioResourceIndex : uint8_t {
   kVpu = 0,                // VPU (Video Processing Unit)

@@ -16,6 +16,21 @@
 
 namespace amlogic_display {
 
+zx::result<BoardInfo> GetBoardInfo(ddk::PDevFidl& platform_device) {
+  pdev_board_info_t banjo_board_info;
+  zx_status_t status = platform_device.GetBoardInfo(&banjo_board_info);
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "Failed to get board info: %s", zx_status_get_string(status));
+    return zx::error(status);
+  }
+
+  BoardInfo board_info = {
+      .board_vendor_id = banjo_board_info.vid,
+      .board_product_id = banjo_board_info.pid,
+  };
+  return zx::ok(board_info);
+}
+
 zx::result<fdf::MmioBuffer> MapMmio(MmioResourceIndex mmio_index, ddk::PDevFidl& platform_device) {
   std::optional<fdf::MmioBuffer> mmio;
   zx_status_t status = platform_device.MapMmio(static_cast<uint32_t>(mmio_index), &mmio);

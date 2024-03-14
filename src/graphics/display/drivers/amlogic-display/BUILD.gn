@@ -198,7 +198,3 @@ fuchsia_unittest_package("amlogic-display-test-package") {
   package_name = "amlogic-display-test"
   deps = [ ":amlogic-display-test" ]
 }
-
-kernel_cmdline("full-hardware-reset") {
-  args = [ "driver.amlogic_display.full_hardware_reset=true" ]
-}
