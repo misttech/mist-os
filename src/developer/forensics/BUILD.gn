@@ -5,6 +5,7 @@
 import("//build/assembly/config_data_for_assembly.gni")
 import("//build/components.gni")
 import("//build/config.gni")
+import("//build/dist/renamed_binary.gni")
 
 ###############################################################################
 # GROUPS
@@ -95,37 +96,39 @@ fuchsia_component("feedback") {
 ###############################################################################
 # EXECUTABLES
 ###############################################################################
-# We use a template to have multiple copies of the same binary named differently.
-template("forensics_unified_binary") {
-  executable(target_name) {
-    output_name = invoker.output_name
-
-    sources = [ "unified_binary.cc" ]
-
-    deps = [
-      "exceptions:main",
-      "exceptions/handler:main",
-      "feedback:main",
-      "feedback_data/system_log_recorder:main",
-      "//sdk/lib/syslog/cpp",
-    ]
-  }
+executable("unified_binary") {
+  sources = [ "unified_binary.cc" ]
+  deps = [
+    "exceptions:main",
+    "exceptions/handler:main",
+    "feedback:main",
+    "feedback_data/system_log_recorder:main",
+    "//sdk/lib/syslog/cpp",
+  ]
 }
 
-forensics_unified_binary("exceptions_exe") {
-  output_name = "exceptions"
+renamed_binary("exceptions_exe") {
+  dest = "bin/exceptions"
+  source = "$root_out_dir/unified_binary"
+  source_deps = [ ":unified_binary" ]
 }
 
-forensics_unified_binary("exception_handler_exe") {
-  output_name = "exception_handler"
+renamed_binary("exception_handler_exe") {
+  dest = "bin/exception_handler"
+  source = "$root_out_dir/unified_binary"
+  source_deps = [ ":unified_binary" ]
 }
 
-forensics_unified_binary("feedback_exe") {
-  output_name = "feedback"
+renamed_binary("feedback_exe") {
+  dest = "bin/feedback"
+  source = "$root_out_dir/unified_binary"
+  source_deps = [ ":unified_binary" ]
 }
 
-forensics_unified_binary("system_log_recorder_exe") {
-  output_name = "system_log_recorder"
+renamed_binary("system_log_recorder_exe") {
+  dest = "bin/system_log_recorder"
+  source = "$root_out_dir/unified_binary"
+  source_deps = [ ":unified_binary" ]
 }
 
 ###############################################################################
