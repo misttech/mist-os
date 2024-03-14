@@ -216,10 +216,10 @@ impl FromExt<&ot::TrelCounters> for fidl_fuchsia_lowpan_experimental::TrelCounte
 impl FromExt<&ot::Nat64Counters> for fidl_fuchsia_lowpan_experimental::Nat64TrafficCounters {
     fn from_ext(x: &ot::Nat64Counters) -> Self {
         fidl_fuchsia_lowpan_experimental::Nat64TrafficCounters {
-            ipv4_to_ipv6_packets: Some(x.get_4_to_6_packets() as i64),
-            ipv4_to_ipv6_bytes: Some(x.get_4_to_6_bytes() as i64),
-            ipv6_to_ipv4_packets: Some(x.get_6_to_4_packets() as i64),
-            ipv6_to_ipv4_bytes: Some(x.get_6_to_4_bytes() as i64),
+            ipv4_to_ipv6_packets: Some(x.get_4_to_6_packets()),
+            ipv4_to_ipv6_bytes: Some(x.get_4_to_6_bytes()),
+            ipv6_to_ipv4_packets: Some(x.get_6_to_4_packets()),
+            ipv6_to_ipv4_bytes: Some(x.get_6_to_4_bytes()),
             ..Default::default()
         }
     }

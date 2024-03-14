@@ -969,7 +969,7 @@ where
             }),
             nat64_mappings: Some(nat64_mappings),
             nat64_error_counters: Some(fidl_fuchsia_lowpan_experimental::Nat64ErrorCounters {
-                unkonwn: Some(fidl_fuchsia_lowpan_experimental::Nat64PacketCounters {
+                unknown: Some(fidl_fuchsia_lowpan_experimental::Nat64PacketCounters {
                     ipv4_to_ipv6_packets: Some(
                         nat64_error_counter_4_to_6[otsys::OT_NAT64_DROP_REASON_UNKNOWN as usize],
                     ),
@@ -1011,6 +1011,7 @@ where
                 }),
                 ..Default::default()
             }),
+            nat64_protocol_counters: Some((&ot.nat64_get_counters()).into_ext()),
             ..Default::default()
         };
 

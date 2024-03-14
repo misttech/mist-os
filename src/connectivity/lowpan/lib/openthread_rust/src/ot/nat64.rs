@@ -79,6 +79,9 @@ pub trait Nat64 {
 
     /// Get NAT64 error counters
     fn nat64_get_error_counters(&self) -> Nat64ErrorCounters;
+
+    /// Get NAT64 protocol counters
+    fn nat64_get_counters(&self) -> Nat64ProtocolCounters;
 }
 
 impl<T: Nat64 + ot::Boxable> Nat64 for ot::Box<T> {
@@ -128,6 +131,9 @@ impl<T: Nat64 + ot::Boxable> Nat64 for ot::Box<T> {
     }
     fn nat64_get_error_counters(&self) -> Nat64ErrorCounters {
         self.as_ref().nat64_get_error_counters()
+    }
+    fn nat64_get_counters(&self) -> Nat64ProtocolCounters {
+        self.as_ref().nat64_get_counters()
     }
 }
 
@@ -257,6 +263,17 @@ impl Nat64 for Instance {
                 (&mut error_counters) as *mut otNat64ErrorCounters,
             );
             error_counters.into()
+        }
+    }
+
+    fn nat64_get_counters(&self) -> Nat64ProtocolCounters {
+        unsafe {
+            let mut protocol_counters: otNat64ProtocolCounters = Default::default();
+            otNat64GetCounters(
+                self.as_ot_ptr(),
+                (&mut protocol_counters) as *mut otNat64ProtocolCounters,
+            );
+            protocol_counters.into()
         }
     }
 }

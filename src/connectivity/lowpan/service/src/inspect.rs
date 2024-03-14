@@ -294,16 +294,16 @@ fn record_nat64_mapping_in_inspect_node(nat64_mapping_node: &Node, mapping: Nat6
                 nat64_mapping_counters_node.record_child(counter_name, |per_counter_node| {
                     let packet_counter = counter.unwrap();
                     if let Some(y) = packet_counter.ipv4_to_ipv6_packets {
-                        per_counter_node.record_int("ipv4_to_ipv6_packets", y.into());
+                        per_counter_node.record_uint("ipv4_to_ipv6_packets", y.into());
                     }
                     if let Some(y) = packet_counter.ipv4_to_ipv6_bytes {
-                        per_counter_node.record_int("ipv4_to_ipv6_bytes", y.into());
+                        per_counter_node.record_uint("ipv4_to_ipv6_bytes", y.into());
                     }
                     if let Some(y) = packet_counter.ipv6_to_ipv4_packets {
-                        per_counter_node.record_int("ipv6_to_ipv4_packets", y.into());
+                        per_counter_node.record_uint("ipv6_to_ipv4_packets", y.into());
                     }
                     if let Some(y) = packet_counter.ipv6_to_ipv4_bytes {
-                        per_counter_node.record_int("ipv6_to_ipv4_bytes", y.into());
+                        per_counter_node.record_uint("ipv6_to_ipv4_bytes", y.into());
                     }
                 });
             }
@@ -1037,7 +1037,7 @@ async fn monitor_device(name: String, iface_tree: Arc<IfaceTreeHolder>) -> Resul
                                         "nat64_error_counters",
                                         |nat64_error_counters_child| {
                                             let error_counters_list = [
-                                                ("unkonwn", y.unkonwn),
+                                                ("unknown", y.unknown),
                                                 ("illegal_packet", y.illegal_packet),
                                                 ("unsupported_protocol", y.unsupported_protocol),
                                                 ("no_mapping", y.no_mapping),
@@ -1062,6 +1062,60 @@ async fn monitor_device(name: String, iface_tree: Arc<IfaceTreeHolder>) -> Resul
                                                                 "ipv6_to_ipv4_packets",
                                                                 z.into(),
                                                             );
+                                                        }
+                                                    },
+                                                );
+                                            }
+                                        },
+                                    );
+                                }
+                                if let Some(y) = x.nat64_protocol_counters {
+                                    nat64_info_child.record_child(
+                                        "nat64_protocol_counters",
+                                        |nat64_protocol_counters_node| {
+                                            let mapping_counters_list = [
+                                                ("tcp", y.tcp),
+                                                ("udp", y.udp),
+                                                ("icmp", y.icmp),
+                                                ("total", y.total),
+                                            ];
+                                            for (counter_name, counter) in mapping_counters_list {
+                                                nat64_protocol_counters_node.record_child(
+                                                    counter_name,
+                                                    |per_counter_node| {
+                                                        if let Some(packet_counter) = counter {
+                                                            if let Some(z) =
+                                                                packet_counter.ipv4_to_ipv6_packets
+                                                            {
+                                                                per_counter_node.record_uint(
+                                                                    "ipv4_to_ipv6_packets",
+                                                                    z.into(),
+                                                                );
+                                                            }
+                                                            if let Some(z) =
+                                                                packet_counter.ipv4_to_ipv6_bytes
+                                                            {
+                                                                per_counter_node.record_uint(
+                                                                    "ipv4_to_ipv6_bytes",
+                                                                    z.into(),
+                                                                );
+                                                            }
+                                                            if let Some(z) =
+                                                                packet_counter.ipv6_to_ipv4_packets
+                                                            {
+                                                                per_counter_node.record_uint(
+                                                                    "ipv6_to_ipv4_packets",
+                                                                    z.into(),
+                                                                );
+                                                            }
+                                                            if let Some(z) =
+                                                                packet_counter.ipv6_to_ipv4_bytes
+                                                            {
+                                                                per_counter_node.record_uint(
+                                                                    "ipv6_to_ipv4_bytes",
+                                                                    z.into(),
+                                                                );
+                                                            }
                                                         }
                                                     },
                                                 );

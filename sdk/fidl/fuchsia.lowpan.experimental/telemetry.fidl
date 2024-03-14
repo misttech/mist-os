@@ -300,13 +300,13 @@ type BorderRoutingNat64State = table {
 
 type Nat64TrafficCounters = table {
     /// Number of packets translated from IPv4 to IPv6
-    1: ipv4_to_ipv6_packets int64;
+    1: ipv4_to_ipv6_packets uint64;
     /// Sum of size of packets translated from IPv4 to IPv6
-    2: ipv4_to_ipv6_bytes int64;
+    2: ipv4_to_ipv6_bytes uint64;
     /// Number of packets translated from IPv6 to IPv4
-    3: ipv6_to_ipv4_packets int64;
+    3: ipv6_to_ipv4_packets uint64;
     /// Sum of size of packets translated from IPv6 to IPv4
-    4: ipv6_to_ipv4_bytes int64;
+    4: ipv6_to_ipv4_bytes uint64;
 };
 
 type Nat64ProtocolCounters = table {
@@ -343,7 +343,7 @@ type Nat64PacketCounters = table {
 
 type Nat64ErrorCounters = table {
     /// Packet drop for unknown reasons
-    1: unkonwn Nat64PacketCounters;
+    1: unknown Nat64PacketCounters;
     /// Packet drop due to failed to parse the datagram
     2: illegal_packet Nat64PacketCounters;
     /// Packet drop due to unsupported IP protocol
@@ -359,6 +359,8 @@ type Nat64Info = table {
     2: nat64_mappings vector<Nat64Mapping>:MAX;
     /// NAT64 error counters
     3: nat64_error_counters Nat64ErrorCounters;
+    /// NAT64 protocol counters
+    4: nat64_protocol_counters Nat64ProtocolCounters;
 };
 
 /// Represents a group of TREL related counters in the platform layer.
