@@ -209,6 +209,7 @@ def fuchsia_unittest_package(
         subpackages = [],
         subpackages_to_flatten = [],
         unit_tests,
+        tags = [],
         **kwargs):
     # buildifier: disable=function-docstring-args
     """A variant of fuchsia_test_package containing unit tests.
@@ -223,6 +224,7 @@ def fuchsia_unittest_package(
             name = test_component_mapping[run_tag],
             unit_test = unit_test,
             run_tag = run_tag,
+            tags = tags + ["manual"],
             **kwargs
         )
 
@@ -236,6 +238,7 @@ def fuchsia_unittest_package(
         fuchsia_api_level = fuchsia_api_level,
         platform = platform,
         _test_component_mapping = test_component_mapping,
+        tags = tags,
         **kwargs
     )
 

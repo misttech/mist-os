@@ -9,61 +9,66 @@ load(":fuchsia_driver_runner_manifest.bzl", "fuchsia_driver_runner_manifest")
 load(":providers.bzl", "FuchsiaComponentInfo", "FuchsiaPackageResourcesInfo", "FuchsiaUnitTestComponentInfo")
 load(":utils.bzl", "label_name", "make_resource_struct", "rule_variant", "rule_variants")
 
-def _manifest_target(name, manifest_in):
+def _manifest_target(name, manifest_in, tags):
     if manifest_in.endswith(".cml"):
         # We need to compile the cml file
         manifest_target = name + "_" + manifest_in
         fuchsia_component_manifest(
             name = manifest_target,
             src = manifest_in,
+            tags = tags + ["manual"],
         )
         return ":{}".format(manifest_target)
     return manifest_in
 
-def fuchsia_component(name, manifest, deps = None, **kwargs):
+def fuchsia_component(*, name, manifest, deps = [], tags = ["manual"], **kwargs):
     """Creates a Fuchsia component that can be added to a package.
 
     Args:
         name: The target name.
         manifest: The component manifest file.
         deps: A list of targets that this component depends on.
+        tags: Typical meaning in Bazel. By default this target is manual.
         **kwargs: Extra attributes to forward to the build rule.
     """
-    manifest_target = _manifest_target(name, manifest)
+    manifest_target = _manifest_target(name, manifest, tags)
 
     _fuchsia_component(
         name = name,
         manifest = manifest_target,
         deps = deps,
+        tags = tags,
         is_driver = False,
         **kwargs
     )
 
-def fuchsia_test_component(name, manifest, deps = None, **kwargs):
+def fuchsia_test_component(*, name, manifest, deps = [], tags = ["manual"], **kwargs):
     """Creates a Fuchsia component that can be added to a test package.
 
     Args:
         name: The target name.
         manifest: The component manifest file.
         deps: A list of targets that this component depends on.
+        tags: Typical meaning in Bazel. By default this target is manual.
         **kwargs: Extra attributes to forward to the build rule.
     """
-    manifest_target = _manifest_target(name, manifest)
+    manifest_target = _manifest_target(name, manifest, tags)
 
     _fuchsia_component_test(
         name = name,
         manifest = manifest_target,
         deps = deps,
+        tags = tags,
         is_driver = False,
         **kwargs
     )
 
 def fuchsia_driver_component(
+        *,
         name,
         driver_lib,
         bind_bytecode,
         manifest = None,
-        deps = [],
         fallback = None,
         colocate = None,
         root_resource = None,
@@ -72,6 +77,8 @@ def fuchsia_driver_component(
         uses_boot_args = None,
         default_dispatcher_opts = None,
         default_dispatcher_scheduler_role = None,
+        deps = [],
+        tags = [],
         **kwargs):
     """Creates a Fuchsia component that can be registered as a driver.
 
@@ -84,7 +91,6 @@ def fuchsia_driver_component(
            in the manifest. See https://fuchsia.dev/fuchsia-src/concepts/components/v2/driver_runner
            for more details.
         bind_bytecode: The driver bind bytecode needed for binding the driver.
-        deps: A list of targets that this component depends on.
         fallback: If manifest is not set, this value will be used to set the fallback entry in
            the manifest file. See https://fuchsia.dev/fuchsia-src/concepts/components/v2/driver_runner#fallback
            for more information.
@@ -104,10 +110,12 @@ def fuchsia_driver_component(
         default_dispatcher_scheduler_role: If manifest is not set, this value will be used to set the
            default_dispatcher_scheduler_role entry in the manifest file.
            See https://fuchsia.dev/fuchsia-src/concepts/components/v2/driver_runner#fallback for more information.
+        deps: A list of targets that this component depends on.
+        tags: Typical meaning in Bazel. By default this target is manual.
         **kwargs: Extra attributes to forward to the build rule.
     """
     if manifest:
-        manifest_target = _manifest_target(name, manifest)
+        manifest_target = _manifest_target(name, manifest, tags)
     else:
         manifest_target = name + "_generated_driver_manifest"
         fuchsia_driver_runner_manifest(
@@ -123,6 +131,7 @@ def fuchsia_driver_component(
             uses_boot_args = uses_boot_args,
             default_dispatcher_opts = default_dispatcher_opts,
             default_dispatcher_scheduler_role = default_dispatcher_scheduler_role,
+            tags = tags + ["manual"],
         )
 
     _fuchsia_component(
@@ -132,6 +141,7 @@ def fuchsia_driver_component(
             bind_bytecode,
             driver_lib,
         ],
+        tags = tags,
         is_driver = True,
         **kwargs
     )
@@ -226,7 +236,7 @@ def _fuchsia_component_for_unit_test_impl(ctx):
         collect_debug_symbols(underlying_component),
     ]
 
-fuchsia_component_for_unit_test = rule_variant(
+_fuchsia_component_for_unit_test = rule_variant(
     variant = "test",
     doc = """Transforms a FuchsiaUnitTestComponentInfo into a test component.""",
     implementation = _fuchsia_component_for_unit_test_impl,
@@ -245,3 +255,10 @@ fuchsia_component_for_unit_test = rule_variant(
         ),
     },
 )
+
+def fuchsia_component_for_unit_test(*, name, tags = ["manual"], **kwargs):
+    _fuchsia_component_for_unit_test(
+        name = name,
+        tags = tags,
+        **kwargs
+    )

@@ -115,13 +115,13 @@ def workflow_entity_rule(*, implementation, attrs = {}, **kwargs):
             *,
             name,
             testonly = False,
-            tags = None,
+            tags = [],
             visibility = None,
             **kwargs):
         # Switch between the test and non-test workflow variant based on testonly.
         rules[1 if testonly else 0](
             name = name + "_base",
-            tags = tags,
+            tags = tags + ["manual"],
             visibility = visibility,
             **kwargs
         )

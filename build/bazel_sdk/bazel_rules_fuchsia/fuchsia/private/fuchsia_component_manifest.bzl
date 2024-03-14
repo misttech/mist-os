@@ -128,7 +128,7 @@ def _fuchsia_component_manifest_impl(ctx):
         DefaultInfo(files = depset([manifest_out])),
     ]
 
-fuchsia_component_manifest = rule(
+_fuchsia_component_manifest = rule(
     doc = """Compiles a component manifest from a input file.
 
 This rule will compile an input cml file and output a cm file. The file can,
@@ -165,3 +165,10 @@ src file and included in the includes attribute.
         ),
     },
 )
+
+def fuchsia_component_manifest(*, name, tags = ["manual"], **kwargs):
+    _fuchsia_component_manifest(
+        name = name,
+        tags = tags,
+        **kwargs
+    )

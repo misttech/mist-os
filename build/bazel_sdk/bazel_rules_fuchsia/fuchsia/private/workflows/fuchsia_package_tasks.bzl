@@ -187,6 +187,7 @@ def fuchsia_package_tasks(
         name = anonymous_publish_task,
         packages = [package],
         package_repository_name = package_repository_name or anonymous_repo_name,
+        tags = tags + ["manual"],
         **kwargs
     )
     fuchsia_task_ffx(
@@ -197,6 +198,7 @@ def fuchsia_package_tasks(
             anonymous_repo_name,
         ],
         default_argument_scope = "explicit",
+        tags = tags + ["manual"],
         **kwargs
     )
     publish_only_task = "%s_only" % publish_task
@@ -204,6 +206,7 @@ def fuchsia_package_tasks(
         name = publish_only_task,
         packages = [package],
         package_repository_name = package_repository_name,
+        tags = tags + ["manual"],
         **kwargs
     )
     fuchsia_workflow(
@@ -241,7 +244,7 @@ def fuchsia_package_tasks(
             repository = package_repository_name or anonymous_repo_name,
             package = package,
             run_tag = run_tag,
-            tags = tags,
+            tags = tags + ["manual"],
             disable_repository = disable_repository_name,
             test_realm = test_realm,
             **kwargs
@@ -269,7 +272,7 @@ def fuchsia_package_tasks(
             repository = package_repository_name or anonymous_repo_name,
             package = package,
             tool = tool,
-            tags = tags,
+            tags = tags + ["manual"],
             **kwargs
         )
 

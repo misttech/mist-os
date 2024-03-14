@@ -135,9 +135,10 @@ _fuchsia_cc_binary, _fuchsia_cc_test = rule_variants(
 
 # fuchsia_cc_binary build rules.
 def fuchsia_wrap_cc_binary(
-        name = None,
+        *,
+        name,
+        cc_binary,
         bin_name = None,
-        cc_binary = None,
         exact_cc_binary_deps = None,
         sdk_root_label = "@fuchsia_sdk",
         clang_root_label = "@fuchsia_clang",
@@ -182,10 +183,11 @@ def fuchsia_wrap_cc_binary(
     )
 
 def fuchsia_cc_binary(
-        name = None,
+        *,
+        name,
         sdk_root_label = "@fuchsia_sdk",
         clang_root_label = "@fuchsia_clang",
-        tags = None,
+        tags = ["manual"],
         visibility = None,
         **cc_binary_kwargs):
     """A fuchsia-specific cc_binary drop-in replacement.
@@ -196,21 +198,21 @@ def fuchsia_cc_binary(
         name: The target name.
         sdk_root_label: Optionally override the root label of the fuchsia sdk repo.
         clang_root_label: Optionally override the root label of the fuchsia clang repo.
-        tags: The tags of all generated targets.
+        tags: Tags to set for all generated targets. This type of target is marked "manual" by default.
         visibility: The visibility of all generated targets.
         **cc_binary_kwargs: Arguments to forward to `cc_binary`.
     """
 
     native.cc_binary(
         name = "_%s_native" % name,
-        tags = tags,
+        tags = tags + ["manual"],
         visibility = visibility,
         **cc_binary_kwargs
     )
     native.alias(
         name = "%s_native" % name,
         actual = "_%s_native" % name,
-        tags = tags,
+        tags = tags + ["manual"],
         visibility = visibility,
         deprecation = "fuchsia_cc_binary supports direct execution now. Please use `:%s` instead." % name,
     )
@@ -304,12 +306,14 @@ _add_component_info_for_unit_test = rule_variant(
 )
 
 def fuchsia_wrap_cc_test(
-        name = None,
-        cc_test = None,
+        *,
+        name,
+        cc_test,
         exact_cc_test_deps = None,
         sdk_root_label = "@fuchsia_sdk",
         clang_root_label = "@fuchsia_clang",
         googletest_root_label = "@com_google_googletest",
+        tags = [],
         **kwargs):
     """Wrap a native cc_test.
 
@@ -325,6 +329,7 @@ def fuchsia_wrap_cc_test(
         sdk_root_label: Optionally override the root label of the fuchsia sdk repo.
         clang_root_label: Optionally override the root label of the fuchsia clang repo.
         googletest_root_label: Optionally override the root label of the googletest repo.
+        tags: Tags to set for all generated targets.
         **kwargs: Arguments to forward to the fuchsia cc_test wrapper.
     """
     if exact_cc_test_deps == None:
@@ -342,6 +347,7 @@ def fuchsia_wrap_cc_test(
             "%s//:dist" % clang_root_label,
             "%s//:runtime" % clang_root_label,
         ],
+        tags = tags + ["manual"],
         **kwargs
     )
 
@@ -351,6 +357,7 @@ def fuchsia_wrap_cc_test(
         deps = exact_cc_test_deps,
         googletest = "%s//:BUILD.bazel" % googletest_root_label,
         testonly = True,
+        tags = tags + ["manual"],
         **kwargs
     )
 
@@ -360,6 +367,7 @@ def fuchsia_wrap_cc_test(
         component_name = name,
         src = ":%s_autogen_cml" % name,
         testonly = True,
+        tags = tags + ["manual"],
         **kwargs
     )
 
@@ -369,6 +377,7 @@ def fuchsia_wrap_cc_test(
         src = ":%s_autogen_manifest" % name,
         dest = "meta/%s.cm" % name,
         testonly = True,
+        tags = tags + ["manual"],
     )
 
     # Generate the default component.
@@ -380,6 +389,7 @@ def fuchsia_wrap_cc_test(
             ":%s_native_cc" % name,
             "%s_manifest_resource" % name,
         ],
+        tags = tags + ["manual"],
         **kwargs
     )
 
@@ -388,15 +398,17 @@ def fuchsia_wrap_cc_test(
         base = ":%s_native_cc" % name,
         generated_component = if_fuchsia(":%s_autogen_component" % name, if_not = None),
         testonly = True,
+        tags = tags,
         **kwargs
     )
 
 def fuchsia_cc_test(
-        name = None,
+        *,
+        name,
         sdk_root_label = "@fuchsia_sdk",
         clang_root_label = "@fuchsia_clang",
         googletest_root_label = "@com_google_googletest",
-        tags = None,
+        tags = ["manual"],
         visibility = None,
         **cc_test_kwargs):
     """A fuchsia-specific cc_test drop-in replacement.
@@ -408,20 +420,20 @@ def fuchsia_cc_test(
         sdk_root_label: Optionally override the root label of the fuchsia sdk repo.
         clang_root_label: Optionally override the root label of the fuchsia clang repo.
         googletest_root_label: Optionally override the root label of the googletest repo.
-        tags: The tags of all generated targets.
+        tags: Tags to set for all generated targets. This type of target is marked "manual" by default.
         visibility: The visibility of all generated targets.
         **cc_test_kwargs: Arguments to forward to `cc_test`.
     """
     native.cc_test(
         name = "_%s_native" % name,
-        tags = tags,
+        tags = tags + ["manual"],
         visibility = visibility,
         **cc_test_kwargs
     )
     native.alias(
         name = "%s_native" % name,
         actual = "_%s_native" % name,
-        tags = tags,
+        tags = tags + ["manual"],
         visibility = visibility,
         deprecation = "fuchsia_cc_test supports direct execution now. Please use `:%s` instead." % name,
     )
