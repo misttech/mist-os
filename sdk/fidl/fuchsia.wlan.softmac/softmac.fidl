@@ -372,6 +372,11 @@ closed protocol FrameProcessor {
         3: packet_info WlanRxInfo;
         4: async_id uint64;
     }) -> ();
+    strict EthernetTx(table {
+        1: packet_address uint64;
+        2: packet_size uint64;
+        3: async_id uint64;
+    }) -> () error zx.Status;
 };
 
 @discoverable

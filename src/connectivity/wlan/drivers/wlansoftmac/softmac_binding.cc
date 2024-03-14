@@ -336,10 +336,23 @@ void SoftmacBinding::EthernetImplQueueTx(uint32_t options, ethernet_netbuf_t* ne
                                          ethernet_impl_queue_tx_callback callback, void* cookie) {
   trace_async_id_t async_id = TRACE_NONCE();
   WLAN_TRACE_ASYNC_BEGIN_TX(async_id, "ethernet");
-
   WLAN_TRACE_DURATION();
-  eth::BorrowedOperation<> op(netbuf, callback, cookie, sizeof(ethernet_netbuf_t));
-  softmac_bridge_->QueueEthFrameTx(std::move(op), async_id);
+
+  auto op = std::make_unique<eth::BorrowedOperation<>>(netbuf, callback, cookie,
+                                                       sizeof(ethernet_netbuf_t));
+
+  // Post a task to `softmac_ifc_server_dispatcher_` to sequence queuing the Ethernet frame
+  // with other calls from `softmac_ifc_bridge_` to the bridged wlansoftmac driver. The
+  // `SoftmacIfcBridge` class is not designed to be thread-safe. Making calls to its methods
+  // from different dispatchers could result in unexpected behavior.
+  async::PostTask(softmac_ifc_server_dispatcher_.async_dispatcher(),
+                  [&, op = std::move(op), async_id]() {
+                    auto result = softmac_ifc_bridge_->EthernetTx(op.get(), async_id);
+                    if (!result.is_ok()) {
+                      WLAN_TRACE_ASYNC_END_TX(async_id, result.status_value());
+                    }
+                    op->Complete(result.status_value());
+                  });
 }
 
 zx_status_t SoftmacBinding::EthernetImplSetParam(uint32_t param, int32_t value,

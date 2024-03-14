@@ -59,8 +59,6 @@ class SoftmacBridge : public fidl::WireServer<fuchsia_wlan_softmac::WlanSoftmacB
   void UpdateWmmParameters(UpdateWmmParametersRequestView request,
                            UpdateWmmParametersCompleter::Sync& completer) final;
 
-  void QueueEthFrameTx(eth::BorrowedOperation<> op, trace_async_id_t async_id);
-
  private:
   explicit SoftmacBridge(DeviceInterface* device_interface,
                          fdf::WireSharedClient<fuchsia_wlan_softmac::WlanSoftmac>&& softmac_client);

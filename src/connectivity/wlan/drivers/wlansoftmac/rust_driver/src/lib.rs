@@ -10,7 +10,6 @@ use {
     fuchsia_async::{Duration, Task},
     fuchsia_inspect::{Inspector, Node as InspectNode},
     fuchsia_inspect_contrib::auto_persist,
-    fuchsia_trace::Id as TraceId,
     fuchsia_zircon::{self as zx, HandleBased},
     futures::{
         channel::{
@@ -57,19 +56,6 @@ impl WlanSoftmacHandle {
             }
         }
         driver_event_sink.disconnect();
-    }
-
-    pub fn queue_eth_frame_tx(
-        &mut self,
-        bytes: Vec<u8>,
-        async_id: TraceId,
-    ) -> Result<(), zx::Status> {
-        wtrace::duration!(c"WlanSoftmacHandle::queue_eth_frame_tx");
-        let driver_event_sink = &mut self.0;
-        driver_event_sink.unbounded_send(DriverEvent::EthFrameTx { bytes, async_id }).map_err(|e| {
-            error!("Failed to queue ethernet frame: {:?}", e);
-            zx::Status::INTERNAL
-        })
     }
 }
 

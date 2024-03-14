@@ -77,7 +77,6 @@ group("tests") {
     "lib/rsn:wlan-rsn-tests",
     "lib/sae:wlan-sae-tests",
     "lib/sme:wlan-sme-tests",
-    "lib/span:wlan-span-tests",
     "lib/stash:wlan-stash-tests",
     "lib/statemachine:wlan-statemachine-tests",
     "lib/trace:wlan-trace-tests",

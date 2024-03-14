@@ -11,6 +11,7 @@
 #include <lib/fdf/cpp/dispatcher.h>
 #include <lib/fidl/cpp/wire/client.h>
 #include <lib/fidl_driver/cpp/transport.h>
+#include <lib/operation/ethernet.h>
 #include <lib/zx/result.h>
 
 #include <wlan/drivers/log.h>
@@ -31,6 +32,7 @@ class SoftmacIfcBridge : public fdf::WireServer<fuchsia_wlan_softmac::WlanSoftma
 
   void Recv(RecvRequestView fdf_request, fdf::Arena& arena,
             RecvCompleter::Sync& completer) override;
+  zx::result<> EthernetTx(eth::BorrowedOperation<>* op, trace_async_id_t async_id) const;
   void ReportTxResult(ReportTxResultRequestView request, fdf::Arena& arena,
                       ReportTxResultCompleter::Sync& completer) override;
   void NotifyScanComplete(NotifyScanCompleteRequestView request, fdf::Arena& arena,

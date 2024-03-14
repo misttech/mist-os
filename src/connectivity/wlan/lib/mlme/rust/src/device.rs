@@ -686,6 +686,11 @@ impl DeviceOps for Device {
 #[repr(C)]
 pub struct CFrameProcessorOps {
     wlan_rx: unsafe extern "C" fn(ctx: &DriverEventSink, request: *const u8, request_size: usize),
+    ethernet_tx: unsafe extern "C" fn(
+        ctx: &DriverEventSink,
+        request: *const u8,
+        request_size: usize,
+    ) -> zx::zx_status_t,
 }
 
 /// Queues a WLAN MAC frame into a `DriverEventSink` for processing.
@@ -761,7 +766,90 @@ unsafe extern "C" fn wlan_rx(ctx: &DriverEventSink, payload: *const u8, payload_
             wtrace::async_end_wlansoftmac_rx(async_id.into(), &e.to_string());
         });
 }
-const FRAME_PROCESSOR_OPS: CFrameProcessorOps = CFrameProcessorOps { wlan_rx };
+
+/// Queues an Ethernet frame into a `DriverEventSink` for processing.
+///
+/// The caller should either end the async
+/// trace event corresponding to |async_id| if an error occurs or deferred ending the trace to a later call
+/// into the C++ portion of wlansoftmac.
+///
+/// Assuming no errors occur, the Rust portion of wlansoftmac will eventually
+/// rust_device_interface_t.queue_tx() with the same |async_id|. At that point, the C++ portion of
+/// wlansoftmac will assume responsibility for ending the async trace event.
+///
+/// # Safety
+///
+/// Behavior is undefined unless `payload` points to a persisted
+/// `fuchsia.wlan.softmac/FrameProcessor.EthernetTx` request of length `payload_len` that is properly
+/// aligned.
+#[no_mangle]
+unsafe extern "C" fn ethernet_tx(
+    ctx: &DriverEventSink,
+    payload: *const u8,
+    payload_len: usize,
+) -> zx::zx_status_t {
+    wtrace::duration!(c"ethernet_rx");
+
+    // Safety: This call is safe because the caller promises `payload` points to a persisted
+    // `fuchsia.wlan.softmac/FrameProcessor.EthernetTx` request of length `payload_len` that is properly
+    // aligned.
+    let payload = unsafe { std::slice::from_raw_parts(payload, payload_len) };
+    let payload = match fidl::unpersist::<fidl_softmac::FrameProcessorEthernetTxRequest>(payload) {
+        Ok(payload) => payload,
+        Err(e) => {
+            error!("Unable to unpersist FrameProcessor.EthernetTx request: {}", e);
+            return zx::Status::INTERNAL.into_raw();
+        }
+    };
+
+    let async_id = match payload.async_id.with_name("async_id").try_unpack() {
+        Ok(x) => x,
+        Err(e) => {
+            let e = e.context("Missing required field in FrameProcessorEthernetTxRequest.");
+            error!("{}", e);
+            return zx::Status::INVALID_ARGS.into_raw();
+        }
+    };
+
+    let (packet_address, packet_size) = match (
+        payload.packet_address.with_name("packet_address"),
+        payload.packet_size.with_name("packet_size"),
+    )
+        .try_unpack()
+    {
+        Ok(x) => x,
+        Err(e) => {
+            let e = e.context("Missing required field(s) in FrameProcessorEthernetTxRequest.");
+            error!("{}", e);
+            return zx::Status::INVALID_ARGS.into_raw();
+        }
+    };
+
+    let packet_ptr = packet_address as *const u8;
+    if packet_ptr.is_null() {
+        let e = format_err!("FrameProcessor.EthernetTx request contained NULL packet_address");
+        error!("{:?}", e);
+        return zx::Status::INVALID_ARGS.into_raw();
+    }
+
+    // Safety: This call is safe because a `EthernetTx` request is defined such that a slice
+    // such as this one can be constructed from the `packet_address` and `packet_size` fields.
+    let packet_bytes: Vec<u8> =
+        unsafe { std::slice::from_raw_parts(packet_ptr, packet_size as usize) }.into();
+
+    match ctx
+        .unbounded_send(DriverEvent::EthFrameTx { bytes: packet_bytes, async_id: async_id.into() })
+    {
+        Err(e) => {
+            let e = format_err!("Failed to queue FrameProcessor.EthernetTx request: {:?}", e);
+            error!("{:?}", e);
+            zx::Status::INTERNAL.into_raw()
+        }
+        Ok(()) => zx::Status::OK.into_raw(),
+    }
+}
+
+const FRAME_PROCESSOR_OPS: CFrameProcessorOps = CFrameProcessorOps { wlan_rx, ethernet_tx };
 
 struct FrameProcessor {
     sink: DriverEventSink,

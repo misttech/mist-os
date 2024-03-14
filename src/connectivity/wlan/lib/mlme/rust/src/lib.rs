@@ -203,7 +203,6 @@ impl DriverEventSink {
     }
 }
 
-// TODO(https://fxbug.dev/42103773): Remove copies from MacFrame and EthFrame.
 pub enum DriverEvent {
     // Indicates that the device is being removed and our main loop should exit.
     Stop(StopCompleter),

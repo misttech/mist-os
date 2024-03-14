@@ -21,6 +21,7 @@ typedef struct wlansoftmac_handle_t wlansoftmac_handle_t;
 
 typedef struct {
   void (*wlan_rx)(const void *ctx, const uint8_t *request, uintptr_t request_size);
+  zx_status_t (*ethernet_tx)(const void *ctx, const uint8_t *request, uintptr_t request_size);
 } frame_processor_ops_t;
 
 /**
@@ -132,14 +133,6 @@ typedef struct {
 } wlansoftmac_buffer_provider_ops_t;
 
 /**
- * A convenient C-wrapper for read-only memory that is neither owned or managed by Rust
- */
-typedef struct {
-  const uint8_t *data;
-  uintptr_t size;
-} wlan_span_t;
-
-/**
  * Start and run a bridged wlansoftmac driver hosting an MLME server and an SME server.
  *
  * The driver is "bridged" in the sense that it requires a bridge to a Fuchsia driver to
@@ -227,17 +220,5 @@ extern "C" zx_status_t start_and_run_bridged_wlansoftmac(
 extern "C" void stop_bridged_wlansoftmac(void *stop_completer,
                                          void (*run_stop_completer)(void *stop_completer),
                                          wlansoftmac_handle_t *softmac);
-
-/**
- * FFI interface: Queue an ethernet frame to be sent over the air. The caller should either end the
- * async trace event corresponding to |async_id| if an error occurs or deferred ending the trace to
- * a later call into the C++ portion of wlansoftmac.
- *
- * Assuming no errors occur, the Rust portion of wlansoftmac will eventually
- * rust_device_interface_t.queue_tx() with the same |async_id|. At that point, the C++ portion of
- * wlansoftmac will assume responsibility for ending the async trace event.
- */
-extern "C" zx_status_t sta_queue_eth_frame_tx(wlansoftmac_handle_t *softmac, wlan_span_t frame,
-                                              trace_async_id_t async_id);
 
 #endif  // SRC_CONNECTIVITY_WLAN_DRIVERS_WLANSOFTMAC_RUST_DRIVER_C_BINDING_BINDINGS_H_

@@ -342,19 +342,6 @@ void SoftmacBridge::UpdateWmmParameters(UpdateWmmParametersRequestView request,
   DispatchAndComplete(__func__, dispatcher, completer);
 }
 
-void SoftmacBridge::QueueEthFrameTx(eth::BorrowedOperation<> op, trace_async_id_t async_id) {
-  WLAN_TRACE_DURATION();
-  if (rust_handle_ == nullptr) {
-    auto status = ZX_ERR_BAD_STATE;
-    op.Complete(status);
-    WLAN_TRACE_ASYNC_END_TX(async_id, status);
-    return;
-  }
-
-  wlan_span_t span{.data = op.operation()->data_buffer, .size = op.operation()->data_size};
-  op.Complete(sta_queue_eth_frame_tx(rust_handle_, span, async_id));
-}
-
 template <typename FidlMethod>
 fidl::WireResultUnwrapType<FidlMethod> SoftmacBridge::FlattenAndLogError(
     const std::string& method_name, fdf::WireUnownedResult<FidlMethod> result) {

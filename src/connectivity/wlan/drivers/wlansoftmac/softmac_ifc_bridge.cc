@@ -10,6 +10,7 @@
 #include <lib/fdf/cpp/dispatcher.h>
 #include <lib/fidl/cpp/wire/client.h>
 #include <lib/fidl_driver/cpp/transport.h>
+#include <lib/operation/ethernet.h>
 #include <lib/sync/cpp/completion.h>
 #include <lib/trace/event.h>
 #include <lib/zx/result.h>
@@ -84,6 +85,28 @@ void SoftmacIfcBridge::Recv(RecvRequestView fdf_request, fdf::Arena& fdf_arena,
            fidl_request_persisted.error_value());
   }
   completer.buffer(fdf_arena).Reply();
+}
+
+zx::result<> SoftmacIfcBridge::EthernetTx(eth::BorrowedOperation<>* op,
+                                          trace_async_id_t async_id) const {
+  WLAN_TRACE_DURATION();
+  fidl::Arena fidl_arena;
+  auto builder = fuchsia_wlan_softmac::wire::FrameProcessorEthernetTxRequest::Builder(fidl_arena);
+  builder.packet_address(reinterpret_cast<uint64_t>(op->operation()->data_buffer));
+  builder.packet_size(reinterpret_cast<uint64_t>(op->operation()->data_size));
+  builder.async_id(async_id);
+  auto fidl_request = builder.Build();
+
+  auto fidl_request_persisted = ::fidl::Persist(fidl_request);
+  if (!fidl_request_persisted.is_ok()) {
+    lerror("Failed to persist FrameProcessor.EthernetTx request (FIDL error %s)",
+           fidl_request_persisted.error_value());
+  }
+
+  auto result = zx::make_result(
+      frame_processor_.ops->ethernet_tx(frame_processor_.ctx, fidl_request_persisted.value().data(),
+                                        fidl_request_persisted.value().size()));
+  return result;
 }
 
 void SoftmacIfcBridge::ReportTxResult(ReportTxResultRequestView request, fdf::Arena& fdf_arena,

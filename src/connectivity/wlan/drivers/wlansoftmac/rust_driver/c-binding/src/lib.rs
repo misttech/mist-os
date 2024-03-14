@@ -8,17 +8,14 @@ use {
     diagnostics_log::PublishOptions,
     fidl_fuchsia_wlan_softmac as fidl_softmac,
     fuchsia_async::SendExecutor,
-    fuchsia_trace as trace, fuchsia_zircon as zx,
+    fuchsia_zircon as zx,
     std::{ffi::c_void, sync::Once},
-    trace::Id as TraceId,
     tracing::error,
     wlan_common::pointers::SendPtr,
     wlan_mlme::{
         buffer::CBufferProvider,
         device::{completers::StopCompleter, CDeviceInterface, Device},
     },
-    wlan_span::CSpan,
-    wlan_trace as wtrace,
     wlansoftmac_rust::WlanSoftmacHandle,
 };
 
@@ -191,24 +188,4 @@ pub unsafe extern "C" fn stop_bridged_wlansoftmac(
                      // `run_stop_completer` is thread-safe and `stop_completer` is valid until its
                      // called.
                      unsafe { run_stop_completer(stop_completer.as_ptr()) })));
-}
-
-/// FFI interface: Queue an ethernet frame to be sent over the air. The caller should either end the async
-/// trace event corresponding to |async_id| if an error occurs or deferred ending the trace to a later call
-/// into the C++ portion of wlansoftmac.
-///
-/// Assuming no errors occur, the Rust portion of wlansoftmac will eventually
-/// rust_device_interface_t.queue_tx() with the same |async_id|. At that point, the C++ portion of
-/// wlansoftmac will assume responsibility for ending the async trace event.
-#[no_mangle]
-pub extern "C" fn sta_queue_eth_frame_tx(
-    softmac: &mut WlanSoftmacHandle,
-    frame: CSpan<'_>,
-    async_id: TraceId,
-) -> zx::zx_status_t {
-    zx::Status::from(softmac.queue_eth_frame_tx(frame.into(), async_id).map_err(|s| {
-        wtrace::async_end_wlansoftmac_tx(async_id, s);
-        s
-    }))
-    .into_raw()
 }
