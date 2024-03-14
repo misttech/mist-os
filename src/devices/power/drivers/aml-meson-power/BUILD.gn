@@ -12,10 +12,10 @@ driver_bind_rules("aml-meson-power-bind") {
   bind_output = "aml-meson-power.bindbc"
   tests = "bind-tests.json"
   deps = [
+    "//sdk/fidl/fuchsia.hardware.pwm:fuchsia.hardware.pwm_bindlib",
     "//sdk/fidl/fuchsia.hardware.vreg:fuchsia.hardware.vreg_bindlib",
     "//src/devices/bind/fuchsia.amlogic.platform",
     "//src/devices/bind/fuchsia.google.platform",
-    "//src/devices/bind/fuchsia.pwm",
   ]
 }
 

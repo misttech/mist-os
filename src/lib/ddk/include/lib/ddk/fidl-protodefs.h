@@ -39,7 +39,7 @@ DDK_FIDL_PROTOCOL_DEF(SYSMEM,          9, "fuchsia.hardware.sysmem.Service")
 // 21 was "fuchsia.hardware.power.Service"
 // 22 was "fuchsia.hardware.clock.Service"
 // 23 was "fuchsia.hardware.audio.CodecService"
-DDK_FIDL_PROTOCOL_DEF(PWM,             24, "fuchsia.hardware.pwm.Service")
+// 24 was "fuchsia.hardware.pwm.Service"
 // 25 was "fuchsia.hardware.ethernet.board.Service"
 // 26 was "fuchsia.hardware.gpio.Service"
 // 27 was "fuchsia.hardware.i2cimpl.Service"

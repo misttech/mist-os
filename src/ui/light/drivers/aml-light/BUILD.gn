@@ -13,6 +13,7 @@ driver_bind_rules("aml_light_bind") {
   tests = "bind_tests.json"
   deps = [
     "//sdk/fidl/fuchsia.hardware.gpio:fuchsia.hardware.gpio_bindlib",
+    "//sdk/fidl/fuchsia.hardware.pwm:fuchsia.hardware.pwm_bindlib",
     "//src/devices/bind/fuchsia.amlogic.platform",
     "//src/devices/bind/fuchsia.gpio",
     "//src/devices/bind/fuchsia.platform",

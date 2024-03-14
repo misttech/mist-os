@@ -18,6 +18,7 @@
 #include <bind/fuchsia/cpp/bind.h>
 #include <bind/fuchsia/gpio/cpp/bind.h>
 #include <bind/fuchsia/hardware/clock/cpp/bind.h>
+#include <bind/fuchsia/hardware/pwm/cpp/bind.h>
 #include <bind/fuchsia/pwm/cpp/bind.h>
 #include <ddk/metadata/camera.h>
 #include <soc/aml-common/aml-thermal.h>
@@ -329,13 +330,13 @@ zx_status_t Sherlock::ThermalInit() {
 
     for (auto& [pwm_id, function] : kPwmIdMap) {
       auto rules = std::vector{
-          fdf::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
-                                  bind_fuchsia_pwm::BIND_FIDL_PROTOCOL_DEVICE),
+          fdf::MakeAcceptBindRule(bind_fuchsia_hardware_pwm::SERVICE,
+                                  bind_fuchsia_hardware_pwm::SERVICE_ZIRCONTRANSPORT),
           fdf::MakeAcceptBindRule(bind_fuchsia::PWM_ID, pwm_id),
       };
       auto properties = std::vector{
-          fdf::MakeProperty(bind_fuchsia::FIDL_PROTOCOL,
-                            bind_fuchsia_pwm::BIND_FIDL_PROTOCOL_DEVICE),
+          fdf::MakeProperty(bind_fuchsia_hardware_pwm::SERVICE,
+                            bind_fuchsia_hardware_pwm::SERVICE_ZIRCONTRANSPORT),
           fdf::MakeProperty(bind_fuchsia_pwm::PWM_ID_FUNCTION, function),
       };
       parents.push_back(fdf::ParentSpec{{rules, properties}});

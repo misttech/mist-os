@@ -19,6 +19,7 @@
 #include <bind/fuchsia/cpp/bind.h>
 #include <bind/fuchsia/gpio/cpp/bind.h>
 #include <bind/fuchsia/hardware/clock/cpp/bind.h>
+#include <bind/fuchsia/hardware/pwm/cpp/bind.h>
 #include <bind/fuchsia/pwm/cpp/bind.h>
 #include <soc/aml-common/aml-thermal.h>
 #include <soc/aml-meson/sm1-clk.h>
@@ -240,13 +241,14 @@ static const std::vector<fpbus::Metadata> thermal_metadata{
 };
 
 const std::vector<fdf::BindRule> kPwmRules = std::vector{
-    fdf::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
-                            bind_fuchsia_pwm::BIND_FIDL_PROTOCOL_DEVICE),
+    fdf::MakeAcceptBindRule(bind_fuchsia_hardware_pwm::SERVICE,
+                            bind_fuchsia_hardware_pwm::SERVICE_ZIRCONTRANSPORT),
     fdf::MakeAcceptBindRule(bind_fuchsia::PWM_ID, static_cast<uint32_t>(S905D3_PWM_AO_D)),
 };
 
 const std::vector<fdf::NodeProperty> kPwmProperties = std::vector{
-    fdf::MakeProperty(bind_fuchsia::FIDL_PROTOCOL, bind_fuchsia_pwm::BIND_FIDL_PROTOCOL_DEVICE),
+    fdf::MakeProperty(bind_fuchsia_hardware_pwm::SERVICE,
+                      bind_fuchsia_hardware_pwm::SERVICE_ZIRCONTRANSPORT),
     fdf::MakeProperty(bind_fuchsia_pwm::PWM_ID_FUNCTION,
                       bind_fuchsia_pwm::PWM_ID_FUNCTION_CORE_POWER_BIG_CLUSTER),
 };

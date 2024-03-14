@@ -14,7 +14,7 @@
 #include <bind/fuchsia/cpp/bind.h>
 #include <bind/fuchsia/gpio/cpp/bind.h>
 #include <bind/fuchsia/hardware/gpio/cpp/bind.h>
-#include <bind/fuchsia/pwm/cpp/bind.h>
+#include <bind/fuchsia/hardware/pwm/cpp/bind.h>
 #include <ddk/metadata/pwm.h>
 #include <soc/aml-s905d2/s905d2-pwm.h>
 
@@ -78,13 +78,14 @@ static const fpbus::Node pwm_dev = []() {
 }();
 
 const ddk::BindRule kPwmRules[] = {
-    ddk::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
-                            bind_fuchsia_pwm::BIND_FIDL_PROTOCOL_DEVICE),
+    ddk::MakeAcceptBindRule(bind_fuchsia_hardware_pwm::SERVICE,
+                            bind_fuchsia_hardware_pwm::SERVICE_ZIRCONTRANSPORT),
     ddk::MakeAcceptBindRule(bind_fuchsia::PWM_ID, static_cast<uint32_t>(S905D2_PWM_E)),
 };
 
 const device_bind_prop_t kPwmProperties[] = {
-    ddk::MakeProperty(bind_fuchsia::FIDL_PROTOCOL, bind_fuchsia_pwm::BIND_FIDL_PROTOCOL_DEVICE),
+    ddk::MakeProperty(bind_fuchsia_hardware_pwm::SERVICE,
+                      bind_fuchsia_hardware_pwm::SERVICE_ZIRCONTRANSPORT),
 };
 
 const ddk::BindRule kGpioWifiRules[] = {

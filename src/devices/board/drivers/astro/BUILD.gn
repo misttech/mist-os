@@ -77,6 +77,7 @@ fuchsia_driver("astro-driver") {
     "//sdk/fidl/fuchsia.hardware.platform.bus:fuchsia.hardware.platform.bus_bindlib_cpp",
     "//sdk/fidl/fuchsia.hardware.platform.bus:fuchsia.hardware.platform.bus_cpp",
     "//sdk/fidl/fuchsia.hardware.power:fuchsia.hardware.power_bindlib_cpp",
+    "//sdk/fidl/fuchsia.hardware.pwm:fuchsia.hardware.pwm_bindlib_cpp",
     "//sdk/fidl/fuchsia.hardware.registers:fuchsia.hardware.registers_bindlib_cpp",
     "//sdk/fidl/fuchsia.hardware.sdio:fuchsia.hardware.sdio_bindlib_cpp",
     "//sdk/fidl/fuchsia.hardware.sdmmc:fuchsia.hardware.sdmmc_cpp",

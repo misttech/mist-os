@@ -18,6 +18,7 @@
 #include <bind/fuchsia/gpio/cpp/bind.h>
 #include <bind/fuchsia/hardware/gpio/cpp/bind.h>
 #include <bind/fuchsia/hardware/i2c/cpp/bind.h>
+#include <bind/fuchsia/hardware/pwm/cpp/bind.h>
 #include <bind/fuchsia/i2c/cpp/bind.h>
 #include <bind/fuchsia/pwm/cpp/bind.h>
 #include <ddk/metadata/lights.h>
@@ -161,14 +162,15 @@ zx_status_t Astro::LightInit() {
   };
 
   auto amber_led_pwm_bind_rules = std::vector{
-      fdf::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
-                              bind_fuchsia_pwm::BIND_FIDL_PROTOCOL_DEVICE),
+      fdf::MakeAcceptBindRule(bind_fuchsia_hardware_pwm::SERVICE,
+                              bind_fuchsia_hardware_pwm::SERVICE_ZIRCONTRANSPORT),
       fdf::MakeAcceptBindRule(bind_fuchsia::PWM_ID,
                               bind_fuchsia_amlogic_platform_s905d2::BIND_PWM_ID_PWM_AO_A),
   };
 
   auto amber_led_pwm_properties = std::vector{
-      fdf::MakeProperty(bind_fuchsia::FIDL_PROTOCOL, bind_fuchsia_pwm::BIND_FIDL_PROTOCOL_DEVICE),
+      fdf::MakeProperty(bind_fuchsia_hardware_pwm::SERVICE,
+                        bind_fuchsia_hardware_pwm::SERVICE_ZIRCONTRANSPORT),
       fdf::MakeProperty(bind_fuchsia_pwm::PWM_ID_FUNCTION,
                         bind_fuchsia_pwm::PWM_ID_FUNCTION_AMBER_LED),
   };

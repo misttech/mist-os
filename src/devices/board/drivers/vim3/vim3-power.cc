@@ -20,6 +20,7 @@
 #include <bind/fuchsia/gpio/cpp/bind.h>
 #include <bind/fuchsia/hardware/gpio/cpp/bind.h>
 #include <bind/fuchsia/hardware/i2c/cpp/bind.h>
+#include <bind/fuchsia/hardware/pwm/cpp/bind.h>
 #include <bind/fuchsia/hardware/vreg/cpp/bind.h>
 #include <bind/fuchsia/i2c/cpp/bind.h>
 #include <bind/fuchsia/platform/cpp/bind.h>
@@ -243,26 +244,26 @@ zx_status_t Vim3::PowerInit() {
   };
 
   auto vreg_pwm_9_node = fdf::ParentSpec{{
-      .bind_rules = {fdf::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
-                                             bind_fuchsia_pwm::BIND_FIDL_PROTOCOL_DEVICE),
+      .bind_rules = {fdf::MakeAcceptBindRule(bind_fuchsia_hardware_pwm::SERVICE,
+                                             bind_fuchsia_hardware_pwm::SERVICE_ZIRCONTRANSPORT),
                      fdf::MakeAcceptBindRule(
                          bind_fuchsia::PWM_ID,
                          bind_fuchsia_amlogic_platform_a311d::BIND_PWM_ID_PWM_AO_D)},
-      .properties = {fdf::MakeProperty(bind_fuchsia::FIDL_PROTOCOL,
-                                       bind_fuchsia_pwm::BIND_FIDL_PROTOCOL_DEVICE),
+      .properties = {fdf::MakeProperty(bind_fuchsia_hardware_pwm::SERVICE,
+                                       bind_fuchsia_hardware_pwm::SERVICE_ZIRCONTRANSPORT),
                      fdf::MakeProperty(
                          bind_fuchsia_pwm::PWM_ID_FUNCTION,
                          bind_fuchsia_pwm::PWM_ID_FUNCTION_CORE_POWER_LITTLE_CLUSTER)},
   }};
 
   auto vreg_pwm_0_node = fuchsia_driver_framework::ParentSpec{{
-      .bind_rules = {fdf::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
-                                             bind_fuchsia_pwm::BIND_FIDL_PROTOCOL_DEVICE),
+      .bind_rules = {fdf::MakeAcceptBindRule(bind_fuchsia_hardware_pwm::SERVICE,
+                                             bind_fuchsia_hardware_pwm::SERVICE_ZIRCONTRANSPORT),
                      fdf::MakeAcceptBindRule(
                          bind_fuchsia::PWM_ID,
                          bind_fuchsia_amlogic_platform_a311d::BIND_PWM_ID_PWM_A)},
-      .properties = {fdf::MakeProperty(bind_fuchsia::FIDL_PROTOCOL,
-                                       bind_fuchsia_pwm::BIND_FIDL_PROTOCOL_DEVICE),
+      .properties = {fdf::MakeProperty(bind_fuchsia_hardware_pwm::SERVICE,
+                                       bind_fuchsia_hardware_pwm::SERVICE_ZIRCONTRANSPORT),
                      fdf::MakeProperty(bind_fuchsia_pwm::PWM_ID_FUNCTION,
                                        bind_fuchsia_pwm::PWM_ID_FUNCTION_CORE_POWER_BIG_CLUSTER)},
   }};

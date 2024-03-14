@@ -15,9 +15,9 @@
 #include <bind/fuchsia/amlogic/platform/cpp/bind.h>
 #include <bind/fuchsia/cpp/bind.h>
 #include <bind/fuchsia/google/platform/cpp/bind.h>
+#include <bind/fuchsia/hardware/pwm/cpp/bind.h>
 #include <bind/fuchsia/platform/cpp/bind.h>
 #include <bind/fuchsia/power/cpp/bind.h>
-#include <bind/fuchsia/pwm/cpp/bind.h>
 #include <ddk/metadata/power.h>
 #include <soc/aml-common/aml-power.h>
 #include <soc/aml-s905d2/s905d2-power.h>
@@ -74,11 +74,12 @@ zx_status_t AddPowerImpl(fdf::WireSyncClient<fuchsia_hardware_platform_bus::Plat
   };
 
   const std::vector<fuchsia_driver_framework::BindRule> kPwmRules = {
-      fdf::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
-                              bind_fuchsia_pwm::BIND_FIDL_PROTOCOL_DEVICE),
+      fdf::MakeAcceptBindRule(bind_fuchsia_hardware_pwm::SERVICE,
+                              bind_fuchsia_hardware_pwm::SERVICE_ZIRCONTRANSPORT),
       fdf::MakeAcceptBindRule(bind_fuchsia::PWM_ID, static_cast<uint32_t>(S905D2_PWM_AO_D))};
   const std::vector<fuchsia_driver_framework::NodeProperty> kPwmProps = {
-      fdf::MakeProperty(bind_fuchsia::FIDL_PROTOCOL, bind_fuchsia_pwm::BIND_FIDL_PROTOCOL_DEVICE),
+      fdf::MakeProperty(bind_fuchsia_hardware_pwm::SERVICE,
+                        bind_fuchsia_hardware_pwm::SERVICE_ZIRCONTRANSPORT),
       fdf::MakeProperty(bind_fuchsia_amlogic_platform::PWM_ID,
                         bind_fuchsia_amlogic_platform::PWM_ID_AO_D)};
   const std::vector<fdf::ParentSpec> kParents = {fdf::ParentSpec{{kPwmRules, kPwmProps}}};

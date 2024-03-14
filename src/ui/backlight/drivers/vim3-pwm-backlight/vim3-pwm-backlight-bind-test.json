@@ -6,7 +6,7 @@
                 "name": "Match",
                 "expected": "match",
                 "device": {
-                    "fuchsia.BIND_FIDL_PROTOCOL": "fuchsia.pwm.BIND_FIDL_PROTOCOL.DEVICE",
+                    "fuchsia.hardware.pwm.Service": "fuchsia.hardware.pwm.Service.ZirconTransport",
                     "fuchsia.pwm.PWM_ID_FUNCTION": "fuchsia.pwm.PWM_ID_FUNCTION.LCD_BRIGHTNESS"
                 }
             },
@@ -22,7 +22,7 @@
                 "name": "id function",
                 "expected": "abort",
                 "device": {
-                    "fuchsia.BIND_FIDL_PROTOCOL": "fuchsia.pwm.BIND_FIDL_PROTOCOL.DEVICE",
+                    "fuchsia.hardware.pwm.Service": "fuchsia.hardware.pwm.Service.ZirconTransport",
                     "fuchsia.pwm.PWM_ID_FUNCTION": "fuchsia.pwm.PWM_ID_FUNCTION.CORE_POWER_BIG_CLUSTER"
                 }
             }

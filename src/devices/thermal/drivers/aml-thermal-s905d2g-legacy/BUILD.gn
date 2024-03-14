@@ -13,6 +13,7 @@ driver_bind_rules("aml-thermal-s905d2g-legacy-bind") {
   tests = "aml-thermal-s905d2g-legacy-bind-test.json"
   deps = [
     "//sdk/fidl/fuchsia.hardware.clock:fuchsia.hardware.clock_bindlib",
+    "//sdk/fidl/fuchsia.hardware.pwm:fuchsia.hardware.pwm_bindlib",
     "//src/devices/bind/fuchsia.amlogic.platform",
     "//src/devices/bind/fuchsia.clock",
     "//src/devices/bind/fuchsia.gpio",

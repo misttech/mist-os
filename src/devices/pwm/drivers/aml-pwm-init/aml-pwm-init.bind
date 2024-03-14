@@ -6,10 +6,10 @@ composite aml_pwm_init;
 
 using fuchsia.gpio;
 using fuchsia.hardware.gpio;
-using fuchsia.pwm;
+using fuchsia.hardware.pwm;
 
 primary node "pwm" {
-  fuchsia.BIND_FIDL_PROTOCOL == fuchsia.pwm.BIND_FIDL_PROTOCOL.DEVICE;
+  fuchsia.hardware.pwm.Service == fuchsia.hardware.pwm.Service.ZirconTransport;
 }
 
 node "gpio-wifi" {

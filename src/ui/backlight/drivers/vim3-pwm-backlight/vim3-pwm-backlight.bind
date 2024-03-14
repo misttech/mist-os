@@ -5,11 +5,12 @@
 composite backlight;
 
 using fuchsia.hardware.gpio;
+using fuchsia.hardware.pwm;
 using fuchsia.pwm;
 using fuchsia.gpio;
 
 primary node "pwm" {
-  fuchsia.BIND_FIDL_PROTOCOL == fuchsia.pwm.BIND_FIDL_PROTOCOL.DEVICE;
+  fuchsia.hardware.pwm.Service == fuchsia.hardware.pwm.Service.ZirconTransport;
   fuchsia.pwm.PWM_ID_FUNCTION == fuchsia.pwm.PWM_ID_FUNCTION.LCD_BRIGHTNESS;
 }
 
