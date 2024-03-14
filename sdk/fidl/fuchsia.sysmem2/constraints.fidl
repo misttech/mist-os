@@ -548,15 +548,34 @@ type ImageFormatConstraints = table {
     /// effectively infinite, the value will be 0xFFFFFFFF (not zero).
     7: max_bytes_per_row uint32;
 
+    /// The maximum number of pixels.
+    ///
     /// The max image area in pixels is limited indirectly via
-    /// `BufferSettings.size_bytes`, and can also be enforced directly via this
-    /// field.
+    /// [`fuchsia.sysmem/BufferMemoryConstraints.max_size_bytes`] and the
+    /// resulting [`fuchsia.sysmem/BufferSettings.size_bytes`], and can also be
+    /// enforced directly via this field.
+    ///
+    /// In contrast to the [`fuchsia.sysmem2/ImageFormatConstraints.max_size`]
+    /// field which limits width and height separately, this field limits the
+    /// total number of pixels.
+    ///
+    /// In contrast to
+    /// [`fuchsia.sysmem/BufferMemoryConstraints.max_size_bytes`], this field
+    /// doesn't limit the number of non-pixel padding bytes after each row of
+    /// pixels, and doesn't limit the number of non-pixel bytes in the case of
+    /// tiled `pixel_format_modifier`.
+    ///
+    /// Very narrow or very short image aspect ratios can have worse performance
+    /// per pixel in comparison to more typical aspect ratios. Padding and/or
+    /// memory bandwidth overheads tend to increase for extreme aspect ratios.
+    /// Participants can indicate lack of support for very narrow or very short
+    /// dimensions using ['fuchsia.sysmem/ImageFormatConstraints.min_size`].
     ///
     /// Sending to sysmem, un-set is treated as 0xFFFFFFFF.
     ///
     /// Receiving from sysmem, this field will always be set, and can be set to
     /// 0xFFFFFFFF.
-    8: max_surface_width_times_surface_height uint64;
+    8: max_width_times_height uint64;
 
     /// Alignment requirements on the image `size`.
     ///

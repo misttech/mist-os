@@ -2782,7 +2782,7 @@ bool LogicalBufferCollection::CheckSanitizeImageFormatConstraints(
 
   FIELD_DEFAULT_ZERO(constraints, min_bytes_per_row);
   FIELD_DEFAULT_MAX(constraints, max_bytes_per_row);
-  FIELD_DEFAULT_MAX(constraints, max_surface_width_times_surface_height);
+  FIELD_DEFAULT_MAX(constraints, max_width_times_height);
 
   if (!constraints.size_alignment().has_value()) {
     constraints.size_alignment() = {1, 1};
@@ -2892,8 +2892,8 @@ bool LogicalBufferCollection::CheckSanitizeImageFormatConstraints(
     LogError(FROM_HERE, "min_size.width * min_size.height failed");
     return false;
   }
-  if (min_width_times_min_height > constraints.max_surface_width_times_surface_height().value()) {
-    LogError(FROM_HERE, "min_width_times_min_height > max_surface_width_times_surface_height");
+  if (min_width_times_min_height > constraints.max_width_times_height().value()) {
+    LogError(FROM_HERE, "min_width_times_min_height > max_width_times_height");
     return false;
   }
 
@@ -3252,10 +3252,10 @@ bool LogicalBufferCollection::AccumulateConstraintImageFormat(
   acc->min_bytes_per_row() = std::max(*acc->min_bytes_per_row(), *c.min_bytes_per_row());
   acc->max_bytes_per_row() = std::min(*acc->max_bytes_per_row(), *c.max_bytes_per_row());
 
-  ZX_DEBUG_ASSERT(acc->max_surface_width_times_surface_height().has_value());
-  ZX_DEBUG_ASSERT(c.max_surface_width_times_surface_height().has_value());
-  acc->max_surface_width_times_surface_height() = std::min(
-      *acc->max_surface_width_times_surface_height(), *c.max_surface_width_times_surface_height());
+  ZX_DEBUG_ASSERT(acc->max_width_times_height().has_value());
+  ZX_DEBUG_ASSERT(c.max_width_times_height().has_value());
+  acc->max_width_times_height() =
+      std::min(*acc->max_width_times_height(), *c.max_width_times_height());
 
   // For these, see also the conditional statement below that ensures these are fixed up with any
   // pixel-format-dependent adjustment.
@@ -3653,9 +3653,8 @@ LogicalBufferCollection::GenerateUnpopulatedBufferCollectionInfo(
       LogError(FROM_HERE, "min_image width*height failed");
       return fpromise::error(ZX_ERR_NOT_SUPPORTED);
     }
-    if (min_image_width_times_height >
-        *image_format_constraints.max_surface_width_times_surface_height()) {
-      LogError(FROM_HERE, "min_image_width_times_height > max_surface_width_times_surface_height");
+    if (min_image_width_times_height > *image_format_constraints.max_width_times_height()) {
+      LogError(FROM_HERE, "min_image_width_times_height > max_width_times_height");
       return fpromise::error(ZX_ERR_NOT_SUPPORTED);
     }
 
@@ -4406,7 +4405,7 @@ void LogicalBufferCollection::LogImageFormatConstraints(
   LOG_UINT32_FIELD(FROM_HERE, indent, ifc, min_bytes_per_row);
   LOG_UINT32_FIELD(FROM_HERE, indent, ifc, max_bytes_per_row);
 
-  LOG_UINT64_FIELD(FROM_HERE, indent, ifc, max_surface_width_times_surface_height);
+  LOG_UINT64_FIELD(FROM_HERE, indent, ifc, max_width_times_height);
 
   LOG_SIZEU_FIELD(FROM_HERE, indent, ifc, size_alignment);
   LOG_SIZEU_FIELD(FROM_HERE, indent, ifc, display_rect_alignment);

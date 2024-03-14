@@ -549,7 +549,7 @@ fpromise::result<fuchsia_sysmem2::ImageFormatConstraints> V2CopyFromV1ImageForma
   PROCESS_SCALAR_FIELD_V1(max_bytes_per_row);
 
   if (v1.max_coded_width_times_coded_height() != 0) {
-    v2b.max_surface_width_times_surface_height() = v1.max_coded_width_times_coded_height();
+    v2b.max_width_times_height() = v1.max_coded_width_times_coded_height();
   }
 
   // v2 ImageFormatConstraints intentionally doesn't have the layers field. In practice this v1
@@ -1296,17 +1296,16 @@ fpromise::result<fuchsia_sysmem::ImageFormatConstraints> V1CopyFromV2ImageFormat
   PROCESS_SCALAR_FIELD_V2(min_bytes_per_row);
   PROCESS_SCALAR_FIELD_V2(max_bytes_per_row);
 
-  if (v2.max_surface_width_times_surface_height().has_value()) {
+  if (v2.max_width_times_height().has_value()) {
     using V1Type = std::remove_reference_t<decltype(v1.max_coded_width_times_coded_height())>;
-    using V2Type = std::remove_reference_t<decltype(*v2.max_surface_width_times_surface_height())>;
-    if (*v2.max_surface_width_times_surface_height() == std::numeric_limits<V2Type>::max()) {
+    using V2Type = std::remove_reference_t<decltype(*v2.max_width_times_height())>;
+    if (*v2.max_width_times_height() == std::numeric_limits<V2Type>::max()) {
       v1.max_coded_width_times_coded_height() = std::numeric_limits<V1Type>::max();
-    } else if (*v2.max_surface_width_times_surface_height() > std::numeric_limits<V1Type>::max()) {
-      LOG(ERROR, "max_surface_width_times_surface_height too large for v1");
+    } else if (*v2.max_width_times_height() > std::numeric_limits<V1Type>::max()) {
+      LOG(ERROR, "max_width_times_height too large for v1");
       return fpromise::error();
     }
-    v1.max_coded_width_times_coded_height() =
-        static_cast<V1Type>(*v2.max_surface_width_times_surface_height());
+    v1.max_coded_width_times_coded_height() = static_cast<V1Type>(*v2.max_width_times_height());
   }
   v1.layers() = 1;
 

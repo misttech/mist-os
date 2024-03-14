@@ -644,8 +644,7 @@ bool AttachTokenSucceedsV2(
                                     std::numeric_limits<uint32_t>::max()};
   image_constraints_1.min_bytes_per_row() = 256;
   image_constraints_1.max_bytes_per_row() = std::numeric_limits<uint32_t>::max();
-  image_constraints_1.max_surface_width_times_surface_height() =
-      std::numeric_limits<uint32_t>::max();
+  image_constraints_1.max_width_times_height() = std::numeric_limits<uint32_t>::max();
   image_constraints_1.size_alignment() = {2, 2};
   image_constraints_1.bytes_per_row_divisor() = 2;
   image_constraints_1.start_offset_divisor() = 2;
@@ -1367,7 +1366,7 @@ TEST(Sysmem, TokenOneParticipantWithImageConstraintsV2) {
                                   std::numeric_limits<uint32_t>::max()};
   image_constraints.min_bytes_per_row() = 256;
   image_constraints.max_bytes_per_row() = std::numeric_limits<uint32_t>::max();
-  image_constraints.max_surface_width_times_surface_height() = std::numeric_limits<uint32_t>::max();
+  image_constraints.max_width_times_height() = std::numeric_limits<uint32_t>::max();
   image_constraints.size_alignment() = {2, 2};
   image_constraints.bytes_per_row_divisor() = 2;
   image_constraints.start_offset_divisor() = 2;
@@ -1774,8 +1773,7 @@ TEST(Sysmem, MultipleParticipantsV2) {
                                     std::numeric_limits<uint32_t>::max()};
   image_constraints_1.min_bytes_per_row() = 256;
   image_constraints_1.max_bytes_per_row() = std::numeric_limits<uint32_t>::max();
-  image_constraints_1.max_surface_width_times_surface_height() =
-      std::numeric_limits<uint32_t>::max();
+  image_constraints_1.max_width_times_height() = std::numeric_limits<uint32_t>::max();
   image_constraints_1.size_alignment() = {2, 2};
   image_constraints_1.bytes_per_row_divisor() = 2;
   image_constraints_1.start_offset_divisor() = 2;
@@ -2835,7 +2833,7 @@ TEST(Sysmem, RequiredSizeV2) {
                                   std::numeric_limits<uint32_t>::max()};
   image_constraints.min_bytes_per_row() = 256;
   image_constraints.max_bytes_per_row() = std::numeric_limits<uint32_t>::max();
-  image_constraints.max_surface_width_times_surface_height() = std::numeric_limits<uint32_t>::max();
+  image_constraints.max_width_times_height() = std::numeric_limits<uint32_t>::max();
   image_constraints.size_alignment() = {1, 1};
   image_constraints.bytes_per_row_divisor() = 1;
   image_constraints.start_offset_divisor() = 1;
@@ -2880,7 +2878,7 @@ TEST(Sysmem, BytesPerRowMinRowV2) {
                                   std::numeric_limits<uint32_t>::max()};
   image_constraints.min_bytes_per_row() = 256;
   image_constraints.max_bytes_per_row() = std::numeric_limits<uint32_t>::max();
-  image_constraints.max_surface_width_times_surface_height() = std::numeric_limits<uint32_t>::max();
+  image_constraints.max_width_times_height() = std::numeric_limits<uint32_t>::max();
   image_constraints.size_alignment() = {1, 1};
   image_constraints.bytes_per_row_divisor() = kBytesPerRowDivisor;
   image_constraints.start_offset_divisor() = 1;
@@ -3401,7 +3399,7 @@ TEST(Sysmem, PixelFormatBgr24V2) {
                                   std::numeric_limits<uint32_t>::max()};
   image_constraints.min_bytes_per_row() = kStride;
   image_constraints.max_bytes_per_row() = std::numeric_limits<uint32_t>::max();
-  image_constraints.max_surface_width_times_surface_height() = std::numeric_limits<uint32_t>::max();
+  image_constraints.max_width_times_height() = std::numeric_limits<uint32_t>::max();
   image_constraints.size_alignment() = {1, 1};
   image_constraints.bytes_per_row_divisor() = divisor;
   image_constraints.start_offset_divisor() = divisor;
@@ -4197,7 +4195,7 @@ bool BasicAllocationSucceedsV2(
                                   std::numeric_limits<uint32_t>::max()};
   image_constraints.min_bytes_per_row() = 256;
   image_constraints.max_bytes_per_row() = std::numeric_limits<uint32_t>::max();
-  image_constraints.max_surface_width_times_surface_height() = std::numeric_limits<uint32_t>::max();
+  image_constraints.max_width_times_height() = std::numeric_limits<uint32_t>::max();
   image_constraints.size_alignment() = {2, 2};
   image_constraints.bytes_per_row_divisor() = 2;
   image_constraints.start_offset_divisor() = 2;
