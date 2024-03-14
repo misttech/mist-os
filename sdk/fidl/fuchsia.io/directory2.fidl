@@ -51,6 +51,122 @@ closed protocol DirectoryIterator {
 // TODO(https://fxbug.dev/42056856): Use a generated constant.
 const DIRECTORY_PROTOCOL_NAME string = "fuchsia.io/Directory";
 
+/// Options used when opening a node.
+type NodeOptions = table {
+    1: flags @generated_name("NodeFlags") flexible bits : uint64 {
+        /// Requests that an [`Node.OnRepresentation`] event be sent as the first message on the
+        /// protocol request.
+        ///
+        /// This is a special case of [`fuchsia.unknown/Queryable.Query`] + inherent `Describe`
+        /// methods on the specific protocols. It exists as an optimization to avoid an additional
+        /// round trip.
+        GET_REPRESENTATION = 0x01;
+    };
+
+    /// Callers may assert the type of the object by setting the protocol corresponding to the
+    /// expected type:
+    ///
+    /// * If the caller expected a directory but the node cannot be accessed as a directory, the
+    /// error is `ZX_ERR_NOT_DIR`.
+    ///
+    /// * If the caller expected a file but the node cannot be accessed as a file, the error is
+    /// `ZX_ERR_NOT_FILE`.
+    ///
+    /// * In other mismatched cases, and for an empty table, the error is `ZX_ERR_WRONG_TYPE`.
+    ///
+    /// If more than one protocol is present, the resultant protocol may become any one of them.
+    /// Callers should specify [`NodeFlags.GET_REPRESENTATION`] to receive a
+    /// [`Node.OnRepresentation`] event, in order to ascertain the protocol.
+    ///
+    /// If absent, indicates that the caller accepts any [`Node`] protocol (including [`Node`]
+    /// itself for connector nodes, for instance).
+    2: protocols @generated_name("NodeProtocols") table {
+        1: directory @generated_name("DirectoryProtocolOptions") table {
+            /// Optional rights to be negotiated.
+            ///
+            /// When present, indicates that the caller requests additional optional rights equal to
+            /// the intersection of this value and the rights on the requesting connection. This
+            /// acts as a high water mark that prevents rights escalation as this request is proxied
+            /// over multiple hops; each proxy must intersect the value with the rights on the
+            /// requesting connection before proxying on.
+            ///
+            /// This field is necessary to express POSIX semantics where `open` of a directory must
+            /// be `O_RDONLY` yet `openat` can be used to open non-directory nodes within that
+            /// directory with privileges exceeding `O_RDONLY`. This means that POSIX clients must
+            /// always set this to the full set of [`Rights`] to implement `open` or `openat` calls
+            /// which don't forbid directories (e.g. `O_WRONLY` and `O_RDWR` do forbid directories).
+            1: optional_rights Rights;
+        };
+        2: file @generated_name("FileProtocolFlags") flexible bits : uint64 {
+            /// Opens the file in append mode, i.e. the connection should seek to the end of the
+            /// file before every write.
+            ///
+            /// If the file does not support appending, it should result in a `ZX_ERR_NOT_SUPPORTED`
+            /// epitaph. Currently, only [`NodeProtocolKinds.FILE`] connections support appending.
+            APPEND = 0x01;
+
+            /// Truncates the object before usage, by setting its length to 0. Requires the
+            /// [`Rights.WRITE_BYTES`] right on the connection.
+            ///
+            /// If the file does not support truncating, it should result in a
+            /// `ZX_ERR_NOT_SUPPORTED` epitaph.
+            TRUNCATE = 0x02;
+        };
+        @available(added=18)
+        3: symlink @generated_name("SymlinkProtocolFlags") flexible bits : uint64 {};
+
+        /// Asks for the node protocol. The only right supported is [`Rights.GET_ATTRIBUTES`].
+        /// Calling `SetFlags` on the resulting connection will result in `ZX_ERR_BAD_HANDLE`. If
+        /// [`NodeFlags.GET_REPRESENTATION`] is specified, the `connector` variant will be returned
+        /// (even if the object supports a different representation).
+        @available(added=18)
+        4: node @generated_name("NodeProtocolFlags") flexible bits : uint64 {
+            /// Only allow the connection if the underlying object is a directory. An attempt to
+            /// open something other than a directory will result in a `ZX_ERR_NOT_DIR` epitaph.
+            MUST_BE_DIRECTORY = 0x01;
+        };
+    };
+
+    /// Specifies behavior with respect to existence. If an object is to be created, its type is
+    /// specified by `protocols`; it must be present. If a valid object type cannot be unambiguously
+    /// inferred e.g. both `directory` and `file` are set, the request must fail.
+    3: mode @generated_name("OpenMode") strict enum : uint32 {
+        /// Only succeed if the object exists.
+        OPEN_EXISTING = 1;
+
+        /// Create the object if it does not exist, otherwise open existing. The check and the
+        /// creation are performed in one atomic step.
+        MAYBE_CREATE = 2;
+
+        /// Assert that the object does not exist, then create it. The assertion and creation are
+        /// performed in one atomic step.
+        ALWAYS_CREATE = 3;
+    };
+
+    /// Requested rights on the new connection.
+    ///
+    /// If [`rights`] exceed the rights of the requesting connection then [`object_request`] will be
+    /// closed with a `ZX_ERR_ACCESS_DENIED` epitaph.
+    ///
+    /// This applies in addition to [`DirectoryProtocolOptions.optional_rights`].
+    ///
+    /// If absent, inherits appropriate rights from the requesting connection. For example, if using
+    /// the node protocol, only the GET_ATTRIBUTES right is inherited.
+    4: rights Rights;
+
+    /// If the [`NodeFlags.GET_REPRESENTATION`] flag is set, attributes to be returned in
+    /// [`Node.OnRepresentation`]. This requires the [`Rights.GET_ATTRIBUTES`] right on the parent
+    /// connection, but this is not required on the resulting connection.
+    @available(added=18)
+    5: attributes NodeAttributesQuery;
+
+    /// If an object is to be created, this specifies attributes that should be stored with the
+    /// object at creation time. Servers might not support setting any or all attributes in which
+    /// case they will return `ZX_ERR_NOT_SUPPORTED`.
+    @available(added=18)
+    6: create_attributes MutableNodeAttributes;
+};
+
 /// A [`Node2`] that is capable of containing other nodes.
 closed protocol Directory2 {
     compose Node2;
@@ -65,175 +181,28 @@ closed protocol Directory2 {
     ///
     /// Errors are presented as an epitaph on the `object_request` channel.
     ///
-    /// * error `ZX_ERR_ACCESS_DENIED` if the requested rights exceeds
-    ///   what is allowed.
+    /// * error `ZX_ERR_ACCESS_DENIED` if the requested rights exceeds what is allowed.
     /// * error `ZX_ERR_BAD_PATH` if `path` is invalid.
     @selector("fuchsia.io/Directory.Open")
     strict Open2(resource struct {
         /// Identifies the node to open.
         ///
-        /// If it contains multiple segments, then the directory is traversed,
-        /// one segment at a time, relative to the directory represented by this
-        /// connection.
+        /// If it contains multiple segments, then the directory is traversed one segment at a time,
+        /// relative to the directory represented by this connection.
         path Path;
 
-        /// The representations accepted by the caller to support a form of
-        /// protocol negotiation on the node being opened.
+        /// The representations accepted by the caller to support a form of protocol negotiation on
+        /// the node being opened.
         protocols @generated_name("ConnectionProtocols") flexible union {
-            /// Requests that the node's underlying protocol be served on the
-            /// connection.
+            /// Requests that the node's underlying protocol be served on the connection.
             1: connector @generated_name("ConnectorFlags") flexible bits : uint64 {};
 
-            /// Requests that the underlying [`Node`] protocol be served on the
-            /// connection.
-            2: node @generated_name("NodeOptions") table {
-                1: flags @generated_name("NodeFlags") flexible bits : uint64 {
-                    /// Requests that an [`Node.OnRepresentation`] event be sent
-                    /// as the first message on the protocol request.
-                    ///
-                    /// This is a special case of
-                    /// [`fuchsia.unknown/Queryable.Query`] + inherent
-                    /// `Describe` methods on the specific protocols. It exists
-                    /// as an optimization to avoid an additional round trip.
-                    GET_REPRESENTATION = 0x01;
-                };
-
-                /// Callers may assert the type of the object by setting the
-                /// protocol corresponding to the expected type:
-                ///
-                /// * If the caller expected a directory but the node cannot be
-                /// accessed as a directory, the error is `ZX_ERR_NOT_DIR`.
-                ///
-                /// * If the caller expected a file but the node cannot be
-                /// accessed as a file, the error is `ZX_ERR_NOT_FILE`.
-                ///
-                /// * In other mismatched cases, and for an empty table, the error
-                /// is `ZX_ERR_WRONG_TYPE`.
-                ///
-                /// If more than one protocol is present, the resultant protocol
-                /// may become any one of them. Callers should specify
-                /// [`NodeFlags.GET_REPRESENTATION`] to receive a
-                /// [`Node.OnRepresentation`] event, in order to ascertain the
-                /// protocol.
-                ///
-                /// If absent, indicates that the caller accepts any [`Node`]
-                /// protocol (including [`Node`] itself for connector nodes, for
-                /// instance).
-                2: protocols @generated_name("NodeProtocols") table {
-                    1: directory @generated_name("DirectoryProtocolOptions") table {
-                        /// Optional rights to be negotiated.
-                        ///
-                        /// When present, indicates that the caller requests
-                        /// additional optional rights equal to the intersection
-                        /// of this value and the rights on the requesting
-                        /// connection. This acts as a high water mark that
-                        /// prevents rights escalation as this request is
-                        /// proxied over multiple hops; each proxy must
-                        /// intersect the value with the rights on the
-                        /// requesting connection before proxying on.
-                        ///
-                        /// This field is necessary to express POSIX semantics
-                        /// where `open` of a directory must be `O_RDONLY` yet
-                        /// `openat` can be used to open non-directory nodes
-                        /// within that directory with privileges exceeding
-                        /// `O_RDONLY`. This means that POSIX clients must
-                        /// always set this to the full set of [`Rights`] to
-                        /// implement `open` or `openat` calls which do not
-                        /// forbid directories (e.g. `O_WRONLY` and `O_RDWR`
-                        /// do forbid directories).
-                        1: optional_rights Rights;
-                    };
-                    2: file @generated_name("FileProtocolFlags") flexible bits : uint64 {
-                        /// Opens the file in append mode, i.e. the connection
-                        /// should seek to the end of the file before every
-                        /// write.
-                        ///
-                        /// If the file does not support appending, it should
-                        /// result in a `ZX_ERR_NOT_SUPPORTED` epitaph.
-                        /// Currently, only [`fileProtocols.FILE`] connections
-                        /// may be configured for appending.
-                        APPEND = 0x01;
-
-                        /// Truncates the object before usage, by setting its
-                        /// length to 0. Requires the [`Rights.WRITE_BYTES`]
-                        /// right on the connection.
-                        ///
-                        /// If the file does not support truncating, it should
-                        /// result in a `ZX_ERR_NOT_SUPPORTED` epitaph.
-                        TRUNCATE = 0x02;
-                    };
-                    @available(added=18)
-                    3: symlink @generated_name("SymlinkProtocolFlags") flexible bits : uint64 {};
-
-                    /// Asks for the node protocol. The only right supported is
-                    /// GET_ATTRIBUTES. Calling `SetFlags` on the resulting
-                    /// connection will result in `ZX_ERR_BAD_HANDLE`. If
-                    /// [`NodeFlags.GET_REPRESENTATION`] is specified, the
-                    /// `connector` variant will be returned (even if the object
-                    /// supports a different representation).
-                    @available(added=18)
-                    4: node @generated_name("NodeProtocolFlags") flexible bits : uint64 {
-                        /// Only allow the connection if the underlying object
-                        /// is a directory. An attempt to open something other
-                        /// than a directory will result in a `ZX_ERR_NOT_DIR`
-                        /// epitaph.
-                        MUST_BE_DIRECTORY = 0x01;
-                    };
-                };
-
-                /// Specifies behavior with respect to existence. If an object
-                /// is to be created, its type is specified by `protocols`; it
-                /// must be present. If a valid object type cannot be
-                /// unambiguously inferred e.g. both `directory` and `file` are
-                /// set, the request must fail.
-                3: mode @generated_name("OpenMode") strict enum : uint32 {
-                    /// Only succeed if the object exists.
-                    OPEN_EXISTING = 1;
-
-                    /// Create the object if it does not exist, otherwise open
-                    /// existing. The check and the creation are performed in
-                    /// one atomic step.
-                    MAYBE_CREATE = 2;
-
-                    /// Assert that the object does not exist, then create it.
-                    /// The assertion and creation are performed in one atomic
-                    /// step.
-                    ALWAYS_CREATE = 3;
-                };
-
-                /// Requested rights on the new connection.
-                ///
-                /// If [`rights`] exceed the rights of the requesting connection
-                /// then [`object_request`] will be closed with a
-                /// `ZX_ERR_ACCESS_DENIED` epitaph.
-                ///
-                /// This applies in addition to
-                /// [`DirectoryProtocolOptions.optional_rights`].
-                ///
-                /// If absent, inherits appropriate rights from the requesting
-                /// connection. For example, if using the node protocol, only
-                /// the GET_ATTRIBUTES right is inherited.
-                4: rights Rights;
-
-                /// If the `GET_REPRESENTATION` flag is set, attributes to be
-                /// returned in [`Node.OnRepresentation`]. This requires the
-                /// GET_ATTRIBUTES right on the parent connection, but this is
-                /// not required on the resulting connection.
-                @available(added=18)
-                5: attributes NodeAttributesQuery;
-
-                /// If an object is to be created, this specifies attributes
-                /// that should be stored with the object at creation time.
-                /// Servers might not support setting any or all attributes in
-                /// which case they will return `ZX_ERR_NOT_SUPPORTED`.
-                @available(added=18)
-                6: create_attributes MutableNodeAttributes;
-            };
+            /// Requests that the underlying [`Node`] protocol be served on the connection.
+            2: node NodeOptions;
         };
 
-        /// The server end of a channel created for the new connection. The
-        /// caller may proceed to send messages on the corresponding client end
-        /// right away.
+        /// The server end of a channel created for the new connection. The caller may proceed to
+        /// send messages on the corresponding client end right away.
         object_request zx.Handle:CHANNEL;
     });
 
