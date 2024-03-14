@@ -27,8 +27,6 @@ impl DefineSubsystemConfiguration<PlatformStarnixConfig> for StarnixSubsystem {
                     builder.platform_bundle("wlan_wlanix");
                 }
 
-                builder.platform_bundle("sensors_framework");
-
                 builder
                     .package("starnix")
                     .component("meta/starnix_runner.cm")?

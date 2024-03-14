@@ -39,6 +39,7 @@ rustc_library("platform_configuration") {
     "src/subsystems/radar.rs",
     "src/subsystems/rcs.rs",
     "src/subsystems/recovery.rs",
+    "src/subsystems/sensors.rs",
     "src/subsystems/session.rs",
     "src/subsystems/setui.rs",
     "src/subsystems/starnix.rs",

@@ -47,6 +47,7 @@ mod power;
 mod radar;
 mod rcs;
 mod recovery;
+mod sensors;
 mod session;
 mod setui;
 mod starnix;
@@ -308,6 +309,13 @@ fn configure_subsystems(
 
     rcs::RcsSubsystemConfig::define_configuration(context, &(), builder)
         .context("Configuring the 'rcs' subsystem")?;
+
+    sensors::SensorsSubsystemConfig::define_configuration(
+        context,
+        &config.platform.starnix,
+        builder,
+    )
+    .context("Configuring the 'sensors' subsystem")?;
 
     session::SessionConfig::define_configuration(
         context,
