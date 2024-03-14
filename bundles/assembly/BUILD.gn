@@ -96,7 +96,7 @@ kernel_assembly_input_bundle("zircon") {
 #
 assembly_input_bundle("bootstrap") {
   bootfs_files_labels = [
-    "//build/info:bootfs",
+    "//build/info/bootfs",
     "//src/bringup:bootfs",
     "//src/sys/component_manager:bootfs",
   ]

@@ -4,9 +4,6 @@
 
 import("//build/assembly/bootfs_files_for_assembly.gni")
 import("//build/bazel/bazel_inputs.gni")
-import("//build/board.gni")
-import("//build/components/fuchsia_package.gni")
-import("//build/dist/resource.gni")
 import("//build/info/info.gni")
 
 declare_args() {
@@ -16,8 +13,18 @@ declare_args() {
 }
 
 if (current_toolchain == default_toolchain) {
+  group("build_info_files") {
+    public_deps = [
+      ":latest-commit-date-and-hash",
+      ":version",
+    ]
+  }
+
   action("latest-commit-date-and-hash") {
-    visibility = [ ":*" ]
+    visibility = [
+      ":*",
+      "bootfs/*",
+    ]
 
     # Ensure this action is invoked if integration HEAD moves
     inputs = [ "//integration/.git/HEAD" ]
@@ -55,16 +62,6 @@ if (current_toolchain == default_toolchain) {
     }
   }
 
-  resource("minimum_utc_stamp") {
-    sources = [ build_info_files.minimum_utc_stamp ]
-    outputs = [ "config/build_info/minimum_utc_stamp" ]
-    deps = [ ":latest-commit-date-and-hash" ]
-  }
-
-  bootfs_files_for_assembly("bootfs") {
-    deps = [ ":minimum_utc_stamp" ]
-  }
-
   bazel_input_resource("build_info.bazel_input") {
     sources = [
       build_info_files.version,
@@ -80,17 +77,4 @@ if (current_toolchain == default_toolchain) {
     ]
     deps = [ ":build_info_files" ]
   }
-
-  group("build_info_files") {
-    public_deps = [
-      ":latest-commit-date-and-hash",
-      ":minimum_utc_stamp",
-      ":version",
-    ]
-  }
-
-  # } else {
-  #   group("build_info_files") {
-  #     public_deps = [ ":build_info_files($default_toolchain)" ]
-  #   }
 }
