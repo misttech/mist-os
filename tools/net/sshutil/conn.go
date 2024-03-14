@@ -380,7 +380,7 @@ func (c *Conn) keepalive(ctx context.Context, session *ssh.Session, ticks <-chan
 			continue
 		}
 
-		logger.Debugf(ctx, "no activity since last tick, sending keepAlive")
+		logger.Debugf(ctx, "no activity since last tick %d, sending keepAlive", lastActivity)
 
 		// SendRequest can actually hang if the server stops responding in between
 		// receiving a keepalive and sending a response (see

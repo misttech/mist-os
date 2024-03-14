@@ -347,6 +347,11 @@ func (t *genericFuchsiaTarget) sshClient(addr *net.IPAddr) (*sshutil.Client, err
 	)
 }
 
+func (t *genericFuchsiaTarget) SSHClient() (*sshutil.Client, error) {
+	// This should be implemented by the various FuchsiaTarget types.
+	return nil, fmt.Errorf("SSHClient() not implemented")
+}
+
 // AddPackageRepository adds the given package repository to the target.
 func (t *genericFuchsiaTarget) AddPackageRepository(client *sshutil.Client, repoURL, blobURL string) error {
 	localhost := strings.Contains(repoURL, localhostPlaceholder) || strings.Contains(blobURL, localhostPlaceholder)
@@ -403,6 +408,9 @@ func (t *genericFuchsiaTarget) AddPackageRepository(client *sshutil.Client, repo
 func (t *genericFuchsiaTarget) CaptureSyslog(client *sshutil.Client, filename, repoURL, blobURL string) error {
 	var syslogger *syslog.Syslogger
 	if t.UseFFXExperimental(1) {
+		// The SSH client is no longer needed if using `ffx log`, so close it so
+		// it doesn't keep sending keepalives.
+		client.Close()
 		syslogger = syslog.NewFFXSyslogger(t.ffx.FFXInstance)
 	} else {
 		syslogger = syslog.NewSyslogger(client)
@@ -425,7 +433,12 @@ func (t *genericFuchsiaTarget) CaptureSyslog(client *sshutil.Client, filename, r
 		// build out a more resilient framework in which we register "restart handlers"
 		// that are triggered on reboot.
 		if repoURL != "" && blobURL != "" {
+			client, err := t.SSHClient()
+			if err != nil {
+				return fmt.Errorf("failed to get SSH client: %w", err)
+			}
 			t.AddPackageRepository(client, repoURL, blobURL)
+			client.Close()
 		}
 	}
 	return nil
