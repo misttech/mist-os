@@ -9,9 +9,9 @@
 
 #include <bind/fuchsia/acpi/cpp/bind.h>
 #include <bind/fuchsia/cpp/bind.h>
+#include <bind/fuchsia/hardware/i2c/cpp/bind.h>
 #include <bind/fuchsia/hardware/interrupt/cpp/bind.h>
 #include <bind/fuchsia/hardware/spi/cpp/bind.h>
-#include <bind/fuchsia/i2c/cpp/bind.h>
 #include <bind/fuchsia/pci/cpp/bind.h>
 #include <bind/fuchsia/sysmem/cpp/bind.h>
 #include <fbl/string_printf.h>
@@ -411,12 +411,14 @@ DeviceBuilder::GetFragmentBindRulesAndPropertiesForChild(size_t child_index) {
           auto chan_addr = static_cast<uint32_t>(chan.address());
           bind_rules.emplace_back(ddk::MakeAcceptBindRule(bind_fuchsia::I2C_BUS_ID, bus_id));
           bind_rules.emplace_back(ddk::MakeAcceptBindRule(bind_fuchsia::I2C_ADDRESS, chan_addr));
-          bind_rules.emplace_back(ddk::MakeAcceptBindRule(
-              bind_fuchsia::FIDL_PROTOCOL, bind_fuchsia_i2c::BIND_FIDL_PROTOCOL_DEVICE));
+          bind_rules.emplace_back(
+              ddk::MakeAcceptBindRule(bind_fuchsia_hardware_i2c::SERVICE,
+                                      bind_fuchsia_hardware_i2c::SERVICE_ZIRCONTRANSPORT));
           properties.emplace_back(ddk::MakeProperty(bind_fuchsia::I2C_BUS_ID, bus_id));
           properties.emplace_back(ddk::MakeProperty(bind_fuchsia::I2C_ADDRESS, chan_addr));
-          properties.emplace_back(ddk::MakeProperty(bind_fuchsia::FIDL_PROTOCOL,
-                                                    bind_fuchsia_i2c::BIND_FIDL_PROTOCOL_DEVICE));
+          properties.emplace_back(
+              ddk::MakeProperty(bind_fuchsia_hardware_i2c::SERVICE,
+                                bind_fuchsia_hardware_i2c::SERVICE_ZIRCONTRANSPORT));
         }
       },
       bus_children_);

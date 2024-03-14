@@ -19,7 +19,7 @@
 #include <utility>
 
 #include <bind/fuchsia/cpp/bind.h>
-#include <bind/fuchsia/i2c/cpp/bind.h>
+#include <bind/fuchsia/hardware/i2c/cpp/bind.h>
 
 namespace i2c_bus_dt {
 
@@ -46,15 +46,15 @@ zx::result<> I2cBusVisitor::AddChildNodeSpec(fdf_devicetree::ChildNode& child, u
   auto i2c_node = fuchsia_driver_framework::ParentSpec{{
       .bind_rules =
           {
-              fdf::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
-                                      bind_fuchsia_i2c::BIND_FIDL_PROTOCOL_DEVICE),
+              fdf::MakeAcceptBindRule(bind_fuchsia_hardware_i2c::SERVICE,
+                                      bind_fuchsia_hardware_i2c::SERVICE_ZIRCONTRANSPORT),
               fdf::MakeAcceptBindRule(bind_fuchsia::I2C_BUS_ID, bus_id),
               fdf::MakeAcceptBindRule(bind_fuchsia::I2C_ADDRESS, address),
           },
       .properties =
           {
-              fdf::MakeProperty(bind_fuchsia::FIDL_PROTOCOL,
-                                bind_fuchsia_i2c::BIND_FIDL_PROTOCOL_DEVICE),
+              fdf::MakeProperty(bind_fuchsia_hardware_i2c::SERVICE,
+                                bind_fuchsia_hardware_i2c::SERVICE_ZIRCONTRANSPORT),
           },
   }};
   child.AddNodeSpec(i2c_node);

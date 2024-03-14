@@ -12,6 +12,7 @@
 #include <lib/driver/component/cpp/node_add_args.h>
 
 #include <bind/fuchsia/cpp/bind.h>
+#include <bind/fuchsia/hardware/i2c/cpp/bind.h>
 #include <bind/fuchsia/i2c/cpp/bind.h>
 #include <bind/fuchsia/ti/platform/cpp/bind.h>
 #include <ddk/metadata/gpio.h>
@@ -93,13 +94,14 @@ static const gpio_pin_t gpio_pins[] = {
 
 fuchsia_driver_framework::CompositeNodeSpec CreateGpioExpanderCompositeNodeSpec() {
   std::vector<fuchsia_driver_framework::BindRule> i2cRules = {
-      fdf::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
-                              bind_fuchsia_i2c::BIND_FIDL_PROTOCOL_DEVICE),
+      fdf::MakeAcceptBindRule(bind_fuchsia_hardware_i2c::SERVICE,
+                              bind_fuchsia_hardware_i2c::SERVICE_ZIRCONTRANSPORT),
       fdf::MakeAcceptBindRule(bind_fuchsia::I2C_BUS_ID, bind_fuchsia_i2c::BIND_I2C_BUS_ID_I2C_A0_0),
       fdf::MakeAcceptBindRule(bind_fuchsia::I2C_ADDRESS, bind_fuchsia_i2c::BIND_I2C_ADDRESS_VIM3)};
 
   std::vector<fuchsia_driver_framework::NodeProperty> i2cProperties = {
-      fdf::MakeProperty(bind_fuchsia::FIDL_PROTOCOL, bind_fuchsia_i2c::BIND_FIDL_PROTOCOL_DEVICE),
+      fdf::MakeProperty(bind_fuchsia_hardware_i2c::SERVICE,
+                        bind_fuchsia_hardware_i2c::SERVICE_ZIRCONTRANSPORT),
       fdf::MakeProperty(bind_fuchsia::PLATFORM_DEV_VID,
                         bind_fuchsia_ti_platform::BIND_PLATFORM_DEV_VID_TI),
       fdf::MakeProperty(bind_fuchsia::PLATFORM_DEV_DID,

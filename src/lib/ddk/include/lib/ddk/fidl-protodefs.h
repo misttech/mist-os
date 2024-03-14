@@ -18,7 +18,7 @@
 #else
 // 1 was "fuchsia.hardware.rpmb.Service"
 // 2 was "fuchsia.hardware.google.ec.Service"
-DDK_FIDL_PROTOCOL_DEF(I2C,             3, "fuchsia.hardware.i2c.Service")
+// 3 was "fuchsia.hardware.i2c.Service"
 DDK_FIDL_PROTOCOL_DEF(PCI,             4, "fuchsia.hardware.pci.Service")
 // 5 was "fuchsia.hardware.goldfish.pipe.Service"
 // 6 was "fuchsia.hardware.goldfish.AddressSpaceService"

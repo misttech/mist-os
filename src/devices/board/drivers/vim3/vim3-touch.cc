@@ -22,6 +22,7 @@
 #include <bind/fuchsia/cpp/bind.h>
 #include <bind/fuchsia/focaltech/platform/cpp/bind.h>
 #include <bind/fuchsia/gpio/cpp/bind.h>
+#include <bind/fuchsia/hardware/i2c/cpp/bind.h>
 #include <bind/fuchsia/i2c/cpp/bind.h>
 #include <bind/fuchsia/khadas/platform/cpp/bind.h>
 #include <soc/aml-a311d/a311d-gpio.h>
@@ -40,15 +41,16 @@ namespace fpbus = fuchsia_hardware_platform_bus;
 
 zx_status_t Vim3::TouchInit() {
   const std::vector<fdf::BindRule> kI2cRules{
-      fdf::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
-                              bind_fuchsia_i2c::BIND_FIDL_PROTOCOL_DEVICE),
+      fdf::MakeAcceptBindRule(bind_fuchsia_hardware_i2c::SERVICE,
+                              bind_fuchsia_hardware_i2c::SERVICE_ZIRCONTRANSPORT),
       fdf::MakeAcceptBindRule(bind_fuchsia::I2C_BUS_ID, bind_fuchsia_i2c::BIND_I2C_BUS_ID_I2C_3),
       fdf::MakeAcceptBindRule(bind_fuchsia::I2C_ADDRESS,
                               bind_fuchsia_focaltech_platform::BIND_I2C_ADDRESS_TOUCH),
   };
 
   const std::vector<fdf::NodeProperty> kI2cProperties{
-      fdf::MakeProperty(bind_fuchsia::FIDL_PROTOCOL, bind_fuchsia_i2c::BIND_FIDL_PROTOCOL_DEVICE),
+      fdf::MakeProperty(bind_fuchsia_hardware_i2c::SERVICE,
+                        bind_fuchsia_hardware_i2c::SERVICE_ZIRCONTRANSPORT),
       fdf::MakeProperty(bind_fuchsia::I2C_ADDRESS,
                         bind_fuchsia_focaltech_platform::BIND_I2C_ADDRESS_TOUCH),
   };

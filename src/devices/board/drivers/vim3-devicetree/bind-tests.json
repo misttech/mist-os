@@ -12,7 +12,7 @@
         "device": {
             "fuchsia.BIND_PLATFORM_DEV_PID": "fuchsia.khadas.platform.BIND_PLATFORM_DEV_PID.VIM3",
             "fuchsia.BIND_PLATFORM_DEV_VID": "fuchsia.khadas.platform.BIND_PLATFORM_DEV_VID.KHADAS",
-            "fuchsia.BIND_FIDL_PROTOCOL": "fuchsia.i2c.BIND_FIDL_PROTOCOL.DEVICE"
+            "fuchsia.hardware.i2c.Service": "fuchsia.hardware.i2c.Service.ZirconTransport"
         },
         "expected": "abort",
         "name": "WrongProtocol"

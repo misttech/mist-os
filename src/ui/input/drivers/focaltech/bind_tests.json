@@ -6,7 +6,7 @@
                 "name": "Match",
                 "expected": "match",
                 "device": {
-                    "fuchsia.BIND_FIDL_PROTOCOL": "fuchsia.i2c.BIND_FIDL_PROTOCOL.DEVICE",
+                    "fuchsia.hardware.i2c.Service": "fuchsia.hardware.i2c.Service.ZirconTransport",
                     "fuchsia.BIND_I2C_ADDRESS": "fuchsia.focaltech.platform.BIND_I2C_ADDRESS.TOUCH"
                 }
             }

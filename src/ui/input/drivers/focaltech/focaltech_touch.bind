@@ -6,12 +6,12 @@ composite focaltech_touch;
 
 using fuchsia.gpio;
 using fuchsia.hardware.gpio;
-using fuchsia.i2c;
+using fuchsia.hardware.i2c;
 using fuchsia.focaltech.platform;
 using fuchsia.platform;
 
 primary node "i2c" {
-  fuchsia.BIND_FIDL_PROTOCOL == fuchsia.i2c.BIND_FIDL_PROTOCOL.DEVICE;
+  fuchsia.hardware.i2c.Service == fuchsia.hardware.i2c.Service.ZirconTransport;
   fuchsia.BIND_I2C_ADDRESS == fuchsia.focaltech.platform.BIND_I2C_ADDRESS.TOUCH;
 }
 

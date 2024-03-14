@@ -9,10 +9,6 @@ extend uint fuchsia.BIND_PROTOCOL {
   IMPL = 0x19,
 };
 
-extend uint fuchsia.BIND_FIDL_PROTOCOL {
-  DEVICE = 0x03,
-};
-
 extend uint fuchsia.BIND_I2C_CLASS {
   HID = 0x01,
 };

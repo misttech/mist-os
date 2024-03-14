@@ -14,7 +14,7 @@
 #include <cstdint>
 
 #include <bind/fuchsia/cpp/bind.h>
-#include <bind/fuchsia/i2c/cpp/bind.h>
+#include <bind/fuchsia/hardware/i2c/cpp/bind.h>
 #include <bind/fuchsia/platform/cpp/bind.h>
 #include <gtest/gtest.h>
 
@@ -82,8 +82,8 @@ TEST(I2cBusVisitorTest, TestI2CChannels) {
 
       // 1st parent is pdev. Skipping that.
       EXPECT_TRUE(fdf_devicetree::testing::CheckHasProperties(
-          {{fdf::MakeProperty(bind_fuchsia::FIDL_PROTOCOL,
-                              bind_fuchsia_i2c::BIND_FIDL_PROTOCOL_DEVICE)}},
+          {{fdf::MakeProperty(bind_fuchsia_hardware_i2c::SERVICE,
+                              bind_fuchsia_hardware_i2c::SERVICE_ZIRCONTRANSPORT)}},
           (*mgr_request.parents())[1].properties(), false));
 
       uint32_t address = 0;
@@ -94,8 +94,8 @@ TEST(I2cBusVisitorTest, TestI2CChannels) {
       }
 
       EXPECT_TRUE(fdf_devicetree::testing::CheckHasBindRules(
-          {{fdf::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
-                                    bind_fuchsia_i2c::BIND_FIDL_PROTOCOL_DEVICE),
+          {{fdf::MakeAcceptBindRule(bind_fuchsia_hardware_i2c::SERVICE,
+                                    bind_fuchsia_hardware_i2c::SERVICE_ZIRCONTRANSPORT),
             fdf::MakeAcceptBindRule(bind_fuchsia::I2C_BUS_ID, 0u),
             fdf::MakeAcceptBindRule(bind_fuchsia::I2C_ADDRESS, address)}},
           (*mgr_request.parents())[1].bind_rules(), false));

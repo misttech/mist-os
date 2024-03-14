@@ -21,6 +21,7 @@
 #include <bind/fuchsia/hardware/amlogiccanvas/cpp/bind.h>
 #include <bind/fuchsia/hardware/clock/cpp/bind.h>
 #include <bind/fuchsia/hardware/gpio/cpp/bind.h>
+#include <bind/fuchsia/hardware/i2c/cpp/bind.h>
 #include <bind/fuchsia/hardware/registers/cpp/bind.h>
 #include <bind/fuchsia/i2c/cpp/bind.h>
 #include <bind/fuchsia/isp/cpp/bind.h>
@@ -260,8 +261,8 @@ zx_status_t Sherlock::CameraInit() {
   auto imx227_sensor_i2c_spec = fuchsia_driver_framework::ParentSpec{{
       .bind_rules =
           {
-              fdf::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
-                                      bind_fuchsia_i2c::BIND_FIDL_PROTOCOL_DEVICE),
+              fdf::MakeAcceptBindRule(bind_fuchsia_hardware_i2c::SERVICE,
+                                      bind_fuchsia_hardware_i2c::SERVICE_ZIRCONTRANSPORT),
               fdf::MakeAcceptBindRule(bind_fuchsia::I2C_BUS_ID,
                                       bind_fuchsia_i2c::BIND_I2C_BUS_ID_I2C_3),
               fdf::MakeAcceptBindRule(bind_fuchsia::I2C_ADDRESS,
@@ -269,8 +270,8 @@ zx_status_t Sherlock::CameraInit() {
           },
       .properties =
           {
-              fdf::MakeProperty(bind_fuchsia::FIDL_PROTOCOL,
-                                bind_fuchsia_i2c::BIND_FIDL_PROTOCOL_DEVICE),
+              fdf::MakeProperty(bind_fuchsia_hardware_i2c::SERVICE,
+                                bind_fuchsia_hardware_i2c::SERVICE_ZIRCONTRANSPORT),
           },
   }};
 

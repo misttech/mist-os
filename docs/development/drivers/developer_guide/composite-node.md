@@ -124,7 +124,7 @@ extend uint fuchsia.BIND_I2C_ADDRESS {
 
 This lets us remap the node properties to:
 
-*   `fuchsia.BIND_FIDL_PROTOCOL` = `fuchsia.i2c.BIND_FIDL_PROTOCOL.DEVICE`
+*   `fuchsia.hardware.i2c.Service` = `fuchsia.hardware.i2c.Service.ZirconTransport`
 *   `fuchsia.BIND_I2C_BUS_ID` = `fuchsia.i2c.BIND_I2C_BUS_ID.I2C_2`
 *   `fuchsia.BIND_I2C_ADDRESS` = `fuchsia.i2c.BIND_I2C_ADDRESS.FOCALTECH_TOUCH`
 
@@ -136,7 +136,7 @@ for more information.
 We can define the following bind rules to match to these properties:
 
 ```
-accept BIND_FIDL_PROTOCOL { fuchsia.i2c.BIND_FIDL_PROTOCOL.DEVICE }
+accept fuchsia.hardware.i2c.Service { fuchsia.hardware.i2c.Service.ZirconTransport }
 accept BIND_I2C_BUS_ID { fuchsia.i2c.BIND_I2C_BUS_ID.I2C_2 }
 accept BIND_I2C_ADDRESS { fuchsia.i2c.BIND_I2C_ADDRESS.FOCALTECH_TOUCH }
 ```
@@ -151,8 +151,8 @@ following:
 
 ```
 const ddk::BindRule kI2cBindRules[] = {
-    ddk::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
-                            bind_fuchsia_i2c::BIND_FIDL_PROTOCOL_DEVICE),
+    ddk::MakeAcceptBindRule(bind_fuchsia_hardware_i2c::SERVICE,
+                            bind_fuchsia_hardware_i2c::SERVICE_ZIRCONTRANSPORT),
     ddk::MakeAcceptBindRule(bind_fuchsia::I2C_BUS_ID,
                             bind_fuchsia_i2c::BIND_I2C_BUS_ID_I2C_2),
     ddk::MakeAcceptBindRule(bind_fuchsia::I2C_ADDRESS,
@@ -174,8 +174,8 @@ following:
 
 ```
 auto i2c_bind_rules = std::vector {
-    MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
-                       bind_fuchsia_i2c::BIND_FIDL_PROTOCOL_DEVICE),
+    MakeAcceptBindRule(bind_fuchsia_hardware_i2c::SERVICE,
+                       bind_fuchsia_hardware_i2c::SERVICE_ZIRCONTRANSPORT),
     MakeAcceptBindRule(bind_fuchsia::I2C_BUS_ID,
                        bind_fuchsia_i2c::BIND_I2C_BUS_ID_I2C_2),
     MakeAcceptBindRule(bind_fuchsia::I2C_ADDRESS,
@@ -201,8 +201,8 @@ following:
 
 ```
 const device_bind_prop_t kI2cProperties[] = {
-    ddk::MakeProperty(bind_fuchsia::FIDL_PROTOCOL,
-                      bind_fuchsia_i2c::BIND_FIDL_PROTOCOL_DEVICE),
+    ddk::MakeProperty(bind_fuchsia_hardware_i2c::SERVICE,
+                      bind_fuchsia_hardware_i2c::SERVICE_ZIRCONTRANSPORT),
     ddk::MakeProperty(bind_fuchsia::I2C_ADDRESS,
                       bind_fuchsia_focaltech_platform::BIND_I2C_ADDRESS_TOUCH),
 };
@@ -257,15 +257,15 @@ For example, say we defined the following composite node specification:
 
 ```
 auto bind_rules = std::vector{
-    driver::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
-        bind_fuchsia_i2c::BIND_FIDL_PROTOCOL_DEVICE),
+    driver::MakeAcceptBindRule(bind_fuchsia_hardware_i2c::SERVICE,
+        bind_fuchsia_hardware_i2c::SERVICE_ZIRCONTRANSPORT),
     driver::MakeAcceptBindRule(bind_fuchsia::I2C_ADDRESS,
         bind_fuchsia_i2c::BIND_I2C_ADDRESS_BACKLIGHT),
 };
 
 auto properties = std::vector{
-    driver::MakeProperty(bind_fuchsia::FIDL_PROTOCOL,
-        bind_fuchsia_i2c::BIND_FIDL_PROTOCOL_DEVICE),
+    driver::MakeProperty(bind_fuchsia_hardware_i2c::SERVICE,
+        bind_fuchsia_hardware_i2c::SERVICE_ZIRCONTRANSPORT),
     driver::MakeProperty(bind_fuchsia::I2C_ADDRESS,
         bind_fuchsia_i2c::BIND_I2C_ADDRESS_BACKLIGHT),
 };
@@ -355,8 +355,8 @@ I2C parent specification:
 
 ```
 const ddk::BindRule kI2cBindRules[] = {
-    ddk::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
-                            bind_fuchsia_i2c::BIND_FIDL_PROTOCOL_DEVICE),
+    ddk::MakeAcceptBindRule(bind_fuchsia_hardware_i2c::SERVICE,
+                            bind_fuchsia_hardware_i2c::SERVICE_ZIRCONTRANSPORT),
     ddk::MakeAcceptBindRule(bind_fuchsia::I2C_BUS_ID,
                             bind_fuchsia_i2c::BIND_I2C_BUS_ID_I2C_2),
     ddk::MakeAcceptBindRule(bind_fuchsia::I2C_ADDRESS,
@@ -364,8 +364,8 @@ const ddk::BindRule kI2cBindRules[] = {
 };
 
 const device_bind_prop_t kI2cProperties[] = {
-    ddk::MakeProperty(bind_fuchsia::FIDL_PROTOCOL,
-                      bind_fuchsia_i2c::BIND_FIDL_PROTOCOL_DEVICE),
+    ddk::MakeProperty(bind_fuchsia_hardware_i2c::SERVICE,
+                      bind_fuchsia_hardware_i2c::SERVICE_ZIRCONTRANSPORT),
     ddk::MakeProperty(bind_fuchsia::I2C_ADDRESS,
                       bind_fuchsia_focaltech_platform::BIND_I2C_ADDRESS_TOUCH),
 };
@@ -441,8 +441,8 @@ specifications for an I2C node and gpio-interrupt node:
 
 ```
 auto i2c_bind_rules = std::vector {
-    MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
-                       bind_fuchsia_i2c::BIND_FIDL_PROTOCOL_DEVICE),
+    MakeAcceptBindRule(bind_fuchsia_hardware_i2c::SERVICE,
+                       bind_fuchsia_hardware_i2c::SERVICE_ZIRCONTRANSPORT),
     MakeAcceptBindRule(bind_fuchsia::I2C_BUS_ID,
                        bind_fuchsia_i2c::BIND_I2C_BUS_ID_I2C_2),
     MakeAcceptBindRule(bind_fuchsia::I2C_ADDRESS,
@@ -549,7 +549,7 @@ with the following properties in its parent specifications:
 
 ```
 i2c parent specification properties {
-     fuchsia.BIND_FIDL_PROTOCOL: fuchsia.i2c.BIND_FIDL_PROTOCOL_DEVICE,
+     fuchsia.hardware.i2c.Service: fuchsia.hardware.i2c.Service.ZirconTransport,
      fuchsia.BIND_I2C_ADDRESS: fuchsia.focaltech.platform.BIND_I2C_ADDRESS_TOUCH,
 }
 
@@ -565,10 +565,11 @@ We can write the composite bind rules so it’ll match the parent specification:
 composite focaltech_touch;
 
 using fuchsia.gpio;
+using fuchsia.hardware.i2c;
 using fuchsia.i2c;
 
 primary node "i2c" {
-  fuchsia.BIND_FIDL_PROTOCOL == fuchsia.i2c.BIND_FIDL_PROTOCOL.DEVICE;
+  fuchsia.hardware.i2c.Service == fuchsia.hardware.i2c.Service.ZirconTransport;
   fuchsia.BIND_I2C_ADDRESS == fuchsia.i2c.BIND_I2C_ADDRESS.FOCALTECH_TOUCH;
 }
 

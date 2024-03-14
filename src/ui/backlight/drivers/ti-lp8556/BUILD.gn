@@ -13,7 +13,7 @@ driver_bind_rules("ti-lp8556-bind") {
   bind_output = "ti-lp8556.bindbc"
   tests = "ti-lp8556-bind-test.json"
   deps = [
-    "//src/devices/bind/fuchsia.i2c",
+    "//sdk/fidl/fuchsia.hardware.i2c:fuchsia.hardware.i2c_bindlib",
     "//src/devices/bind/fuchsia.platform",
     "//src/devices/bind/fuchsia.ti.platform",
   ]

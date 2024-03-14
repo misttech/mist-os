@@ -4,12 +4,12 @@
 
 composite ti_ina231;
 
-using fuchsia.i2c;
+using fuchsia.hardware.i2c;
 using fuchsia.platform;
 using fuchsia.ti.platform;
 
 primary node "i2c" {
-  fuchsia.BIND_FIDL_PROTOCOL == fuchsia.i2c.BIND_FIDL_PROTOCOL.DEVICE;
+  fuchsia.hardware.i2c.Service == fuchsia.hardware.i2c.Service.ZirconTransport;
   accept fuchsia.BIND_I2C_ADDRESS {
     fuchsia.ti.platform.BIND_I2C_ADDRESS.INA231_MLB,
     fuchsia.ti.platform.BIND_I2C_ADDRESS.INA231_SPEAKERS

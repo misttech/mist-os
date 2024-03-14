@@ -4,12 +4,12 @@
 
 composite ti_tca6408a;
 
-using fuchsia.i2c;
+using fuchsia.hardware.i2c;
 using fuchsia.platform;
 using fuchsia.ti.platform;
 
 primary node "i2c" {
-    fuchsia.BIND_FIDL_PROTOCOL == fuchsia.i2c.BIND_FIDL_PROTOCOL.DEVICE;
+    fuchsia.hardware.i2c.Service == fuchsia.hardware.i2c.Service.ZirconTransport;
     fuchsia.BIND_PLATFORM_DEV_VID == fuchsia.ti.platform.BIND_PLATFORM_DEV_VID.TI;
     fuchsia.BIND_PLATFORM_DEV_DID == fuchsia.ti.platform.BIND_PLATFORM_DEV_DID.TCA6408A;
 }

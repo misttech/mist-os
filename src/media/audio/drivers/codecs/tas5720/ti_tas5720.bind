@@ -5,12 +5,12 @@
 composite tas5720;
 
 using fuchsia.gpio;
-using fuchsia.i2c;
+using fuchsia.hardware.i2c;
 using fuchsia.platform;
 using fuchsia.ti.platform;
 
 primary node "i2c" {
-  fuchsia.BIND_FIDL_PROTOCOL == fuchsia.i2c.BIND_FIDL_PROTOCOL.DEVICE;
+  fuchsia.hardware.i2c.Service == fuchsia.hardware.i2c.Service.ZirconTransport;
 }
 
 node "pdev" {

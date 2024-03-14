@@ -741,7 +741,7 @@ TEST_F(DeviceTest, CreateNodeProperties) {
 
   auto properties = compat::CreateProperties(arena, *logger, &args);
 
-  ASSERT_EQ(4ul, properties.size());
+  ASSERT_EQ(3ul, properties.size());
 
   EXPECT_EQ(11u, properties[0].key.int_value());
   EXPECT_EQ(2u, properties[0].value.int_value());
@@ -749,9 +749,6 @@ TEST_F(DeviceTest, CreateNodeProperties) {
   EXPECT_EQ("test", properties[1].key.string_value().get());
   EXPECT_EQ(5u, properties[1].value.int_value());
 
-  EXPECT_EQ(static_cast<uint32_t>(BIND_FIDL_PROTOCOL), properties[2].key.int_value());
-  EXPECT_EQ(3u, properties[2].value.int_value());
-
-  EXPECT_EQ(static_cast<uint32_t>(BIND_PROTOCOL), properties[3].key.int_value());
-  EXPECT_EQ(10u, properties[3].value.int_value());
+  EXPECT_EQ(static_cast<uint32_t>(BIND_PROTOCOL), properties[2].key.int_value());
+  EXPECT_EQ(10u, properties[2].value.int_value());
 }

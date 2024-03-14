@@ -22,7 +22,7 @@ driver_bind_rules("vim3_mcu_bind") {
   rules = "vim3_mcu.bind"
   tests = "bind_tests.json"
   deps = [
-    "//src/devices/bind/fuchsia.i2c",
+    "//sdk/fidl/fuchsia.hardware.i2c:fuchsia.hardware.i2c_bindlib",
     "//src/devices/bind/fuchsia.khadas.platform",
   ]
 }

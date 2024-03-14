@@ -20,10 +20,10 @@ driver_bind_rules("imx227_bind") {
   deps = [
     "//sdk/fidl/fuchsia.hardware.clock:fuchsia.hardware.clock_bindlib",
     "//sdk/fidl/fuchsia.hardware.gpio:fuchsia.hardware.gpio_bindlib",
+    "//sdk/fidl/fuchsia.hardware.i2c:fuchsia.hardware.i2c_bindlib",
     "//src/devices/bind/fuchsia.camera",
     "//src/devices/bind/fuchsia.clock",
     "//src/devices/bind/fuchsia.gpio",
-    "//src/devices/bind/fuchsia.i2c",
     "//src/devices/bind/fuchsia.platform",
     "//src/devices/bind/fuchsia.sony.platform",
   ]

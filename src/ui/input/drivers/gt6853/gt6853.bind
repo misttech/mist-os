@@ -4,10 +4,10 @@
 
 composite gt6853_touch;
 
-using fuchsia.i2c;
 using fuchsia.goodix.platform;
 using fuchsia.gpio;
 using fuchsia.hardware.gpio;
+using fuchsia.hardware.i2c;
 using fuchsia.amlogic.platform.s905d3;
 using fuchsia.platform;
 
@@ -18,7 +18,7 @@ primary node "pdev" {
 }
 
 node "i2c" {
-  fuchsia.BIND_FIDL_PROTOCOL == fuchsia.i2c.BIND_FIDL_PROTOCOL.DEVICE;
+  fuchsia.hardware.i2c.Service == fuchsia.hardware.i2c.Service.ZirconTransport;
   fuchsia.BIND_I2C_ADDRESS == fuchsia.goodix.platform.BIND_I2C_ADDRESS.TOUCH;
 }
 

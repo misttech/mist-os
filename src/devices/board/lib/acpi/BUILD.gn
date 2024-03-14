@@ -47,10 +47,10 @@ shared_fuchsia_public_deps = [
 
 shared_deps = [
   "//sdk/banjo/fuchsia.hardware.pciroot:fuchsia.hardware.pciroot_banjo_cpp",
+  "//sdk/fidl/fuchsia.hardware.i2c:fuchsia.hardware.i2c_bindlib_cpp",
   "//sdk/fidl/fuchsia.hardware.interrupt:fuchsia.hardware.interrupt_bindlib_cpp",
   "//sdk/fidl/fuchsia.hardware.spi:fuchsia.hardware.spi_bindlib_cpp",
   "//src/devices/bind/fuchsia:fuchsia_cpp",
-  "//src/devices/bind/fuchsia.i2c:fuchsia.i2c_cpp",
   "//src/devices/bind/fuchsia.pci:fuchsia.pci_cpp",
   "//src/devices/bind/fuchsia.sysmem:fuchsia.sysmem_cpp",
   "//zircon/system/ulib/fbl",

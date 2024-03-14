@@ -1,7 +1,7 @@
 [
     {
         "device": {
-            "fuchsia.BIND_FIDL_PROTOCOL": "fuchsia.i2c.BIND_FIDL_PROTOCOL.DEVICE"
+            "fuchsia.hardware.i2c.Service": "fuchsia.hardware.i2c.Service.ZirconTransport"
         },
         "expected": "abort",
         "name": "Protocol"
