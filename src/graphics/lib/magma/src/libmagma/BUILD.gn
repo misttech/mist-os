@@ -12,16 +12,26 @@ group("libmagma") {
   public_deps = [ ":libmagma_static" ]
 }
 
-static_library("libmagma_static") {
-  public_deps = [ "//sdk/lib/magma_client:magma_headers" ]
+# Magma ICDs are only allowed to depend on (parts of) libc and libzircon, and no other shared libraries.
+disallowed_dependencies = [
+  "//sdk/lib/fdio",
+  "//zircon/system/ulib/async-default",
+]
 
+config("static_lib_config") {
   # All functions should be declared in magma.h or magma_sysmem.h, so warn about unnecessary functions.
   cflags = [ "-Wmissing-prototypes" ]
 
+  defines = [ "MAGMA_EXPORT=__attribute__((visibility(\"default\")))" ]
+}
+
+static_library("libmagma_static") {
+  public_deps = [ "//sdk/lib/magma_client:magma_headers" ]
+
+  configs += [ ":static_lib_config" ]
+
   # This allows the library to be used as a dependency by rust build rules.
   public_configs = [ "//build/config/fuchsia:static_cpp_standard_library" ]
-
-  defines = [ "MAGMA_EXPORT=__attribute__((visibility(\"default\")))" ]
 
   sources = [ "magma.cc" ]
 
@@ -37,20 +47,37 @@ static_library("libmagma_static") {
     "//src/graphics/magma/lib/magma/platform:trace",
     "//src/graphics/magma/lib/magma/platform:trace_provider",
     "//src/graphics/magma/lib/magma/util:short_macros",
+  ]
+
+  if (is_fuchsia) {
+    deps += [ ":magma_sysmem" ]
+  }
+
+  assert_no_deps = disallowed_dependencies
+}
+
+# Factored out from ":libmagma_static" in order to support Lavapipe.  See "visibility" labels.
+source_set("magma_sysmem") {
+  visibility = [
+    "./*",
+    "//third_party/mesa/src/gallium/frontends/lavapipe:*",
+  ]
+
+  configs += [ ":static_lib_config" ]
+
+  # This allows the library to be used as a dependency by rust build rules.
+  public_configs = [ "//build/config/fuchsia:static_cpp_standard_library" ]
+
+  sources = [ "magma_sysmem.cc" ]
+
+  deps = [
+    "//src/graphics/magma/lib/magma/platform:sysmem_connection",
+    "//src/graphics/magma/lib/magma/util:short_macros",
     "//zircon/system/ulib/trace:trace-with-static-engine",
     "//zircon/system/ulib/trace-vthread:trace-vthread-with-static-engine",
   ]
 
-  if (is_fuchsia) {
-    sources += [ "magma_sysmem.cc" ]
-    deps += [ "//src/graphics/magma/lib/magma/platform:sysmem_connection" ]
-  }
-
-  # Magma ICDs are only allowed to depend on (parts of) libc and libzircon, and no other shared libraries.
-  assert_no_deps = [
-    "//sdk/lib/fdio",
-    "//zircon/system/ulib/async-default",
-  ]
+  assert_no_deps = disallowed_dependencies
 }
 
 # This library is complete, so it's usable outside BUILD.gn.
