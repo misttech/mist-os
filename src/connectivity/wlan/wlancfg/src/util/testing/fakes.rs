@@ -39,8 +39,14 @@ pub struct FakeSavedNetworksManager {
     pub fail_all_stores: bool,
     // A type alias for this complex type would be needless indirection, so allow the complex type
     #[allow(clippy::type_complexity)]
-    pub scan_result_records:
-        Arc<Mutex<Vec<(Vec<client_types::Ssid>, Vec<client_types::NetworkIdentifierDetailed>)>>>,
+    pub scan_result_records: Arc<
+        Mutex<
+            Vec<(
+                Vec<client_types::Ssid>,
+                HashMap<client_types::NetworkIdentifierDetailed, Vec<client_types::Bss>>,
+            )>,
+        >,
+    >,
     pub past_connections_response: PastConnectionList,
 }
 
@@ -260,10 +266,10 @@ impl SavedNetworksManagerApi for FakeSavedNetworksManager {
     async fn record_scan_result(
         &self,
         target_ssids: Vec<client_types::Ssid>,
-        results: Vec<&client_types::NetworkIdentifierDetailed>,
+        results: &HashMap<client_types::NetworkIdentifierDetailed, Vec<client_types::Bss>>,
     ) {
         let mut records = self.scan_result_records.lock().await;
-        records.push((target_ssids, results.into_iter().cloned().collect()));
+        records.push((target_ssids, results.clone()));
     }
 
     async fn get_networks(&self) -> Vec<NetworkConfig> {

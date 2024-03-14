@@ -283,11 +283,7 @@ async fn perform_scan(
                 };
                 bss_by_network =
                     bss_to_network_map(results, &target_ssids, &mut scan_event_inspect_data);
-                // TODO(https://fxbug.dev/42085988) Consider passing in scan results and reading the
-                // "ScanObservation" there to create a single source of truth for "ScanObservation".
-                saved_networks_manager
-                    .record_scan_result(target_ssids, bss_by_network.keys().collect())
-                    .await;
+                saved_networks_manager.record_scan_result(target_ssids, &bss_by_network).await;
                 break;
             }
             Err(scan_err) => match scan_err {
@@ -1090,13 +1086,22 @@ mod tests {
                 security_type: scan_result.security_type_detailed,
             })
             .collect();
-        let mut scan_result_record_guard =
+
+        let scan_result_record_guard =
             exec.run_singlethreaded(saved_networks_manager.scan_result_records.lock());
         assert_eq!(scan_result_record_guard.len(), 1);
         assert_eq!(scan_result_record_guard[0].0, target_ssids);
-        scan_result_record_guard[0].1.sort();
+
+        // Get recorded scan result network ids
+        let mut recorded_ids = scan_result_record_guard[0]
+            .1
+            .keys()
+            .map(|id| id.clone())
+            .collect::<Vec<types::NetworkIdentifierDetailed>>();
+
+        recorded_ids.sort();
         scan_results_ids.sort();
-        assert_eq!(scan_result_record_guard[0].1, scan_results_ids);
+        assert_eq!(scan_results_ids, recorded_ids);
 
         // Note: the decision to active scan is non-deterministic (using the hidden network probabilities),
         // no need to continue and verify the results in this test case.
