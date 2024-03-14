@@ -21,7 +21,7 @@ library fuchsia.images2;
 // fuchsia.math.RectU which is only available at 18. For earlier API levels,
 // use this definition (same as the RectU that existed before
 // https://fxrev.dev/796842).
-@available(added=12, removed=18)
+@available(added=12, removed=18, legacy=true)
 type RectU = struct {
     /// The location of the origin of the rectangle in the x-axis.
     x uint32;
