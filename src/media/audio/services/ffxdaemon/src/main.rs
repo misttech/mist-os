@@ -806,11 +806,3 @@ async fn main() -> Result<(), Error> {
 
     Ok(())
 }
-
-#[cfg(test)]
-mod tests {
-    #[fuchsia::test]
-    async fn smoke_test() {
-        assert!(true);
-    }
-}

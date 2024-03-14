@@ -13,7 +13,7 @@ use std::{str::FromStr, time::Duration};
 
 pub const DURATION_REGEX: &'static str = r"^(\d+)(h|m|s|ms)$";
 
-#[derive(Debug, Eq, PartialEq, Clone)]
+#[derive(Debug, Eq, PartialEq, Clone, Copy)]
 pub struct Format {
     pub sample_type: fmedia::AudioSampleFormat,
     pub frames_per_second: u32,

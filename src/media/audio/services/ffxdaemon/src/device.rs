@@ -3,7 +3,9 @@
 // found in the LICENSE file.
 
 use crate::{
-    error::ControllerError, ring_buffer::RingBuffer, socket, stop_listener, SECONDS_PER_NANOSECOND,
+    error::ControllerError,
+    ring_buffer::{HardwareRingBuffer, RingBuffer},
+    socket, stop_listener, SECONDS_PER_NANOSECOND,
 };
 use anyhow::{anyhow, Context, Error};
 use async_trait::async_trait;
@@ -12,6 +14,7 @@ use fidl::endpoints::{create_proxy, Proxy, ServerEnd};
 use fidl_fuchsia_audio_controller as fac;
 use fidl_fuchsia_hardware_audio as fhaudio;
 use fidl_fuchsia_io as fio;
+use format_utils::Format;
 use fuchsia_async as fasync;
 use fuchsia_component::client::connect_to_protocol_at_path;
 use fuchsia_zircon::{self as zx};
@@ -24,11 +27,7 @@ pub trait DeviceControl: Send + Sync {
     async fn get_supported_formats(&mut self) -> Result<Formats, Error>;
     async fn watch_gain_state(&mut self) -> Result<fhaudio::GainState, Error>;
     async fn watch_plug_state(&mut self) -> Result<fhaudio::PlugState, Error>;
-    fn create_ring_buffer(
-        &mut self,
-        format: &fhaudio::Format,
-        rb_server: ServerEnd<fhaudio::RingBufferMarker>,
-    ) -> Result<(), Error>;
+    async fn create_ring_buffer(&mut self, format: Format) -> Result<Box<dyn RingBuffer>, Error>;
     fn set_gain(&mut self, gain_state: fhaudio::GainState) -> Result<(), Error>;
 }
 
@@ -36,19 +35,14 @@ pub enum Properties {
     StreamConfig(fhaudio::StreamProperties),
     Composite(fhaudio::CompositeProperties),
 }
+
 pub enum Formats {
     StreamConfig(Vec<fhaudio::SupportedFormats>),
     Composite { dai: Vec<fhaudio::DaiSupportedFormats>, stream: Vec<fhaudio::SupportedFormats> },
 }
 
-pub struct Device {
-    pub device_controller: Box<dyn DeviceControl>,
-}
 pub struct StreamConfigDevice {
     pub proxy: fhaudio::StreamConfigProxy,
-}
-pub struct CompositeDevice {
-    pub proxy: fhaudio::CompositeProxy,
 }
 
 #[async_trait]
@@ -79,6 +73,7 @@ impl DeviceControl for StreamConfigDevice {
             .watch_gain_state()
             .await
             .map_err(|e| anyhow!("Could not query streamconfig gain state: {e}"))?;
+
         Ok(response)
     }
 
@@ -88,21 +83,26 @@ impl DeviceControl for StreamConfigDevice {
             .watch_plug_state()
             .await
             .map_err(|e| anyhow!("Could not query streamconfig plug state: {e}"))?;
+
         Ok(response)
     }
 
-    fn create_ring_buffer(
-        &mut self,
-        format: &fhaudio::Format,
-        rb_server: ServerEnd<fhaudio::RingBufferMarker>,
-    ) -> Result<(), Error> {
-        self.proxy
-            .create_ring_buffer(format, rb_server)
-            .map_err(|e| anyhow!("Unable to create ring buffer: {e}"))
+    async fn create_ring_buffer(&mut self, format: Format) -> Result<Box<dyn RingBuffer>, Error> {
+        let (ring_buffer_proxy, ring_buffer_server) =
+            create_proxy::<fhaudio::RingBufferMarker>().unwrap();
+        self.proxy.create_ring_buffer(&fhaudio::Format::from(&format), ring_buffer_server)?;
+        let ring_buffer = HardwareRingBuffer::new(ring_buffer_proxy, format).await?;
+
+        Ok(Box::new(ring_buffer))
     }
+
     fn set_gain(&mut self, gain_state: fhaudio::GainState) -> Result<(), Error> {
         self.proxy.set_gain(&gain_state).map_err(|e| anyhow!("Error setting gain state: {e}"))
     }
+}
+
+pub struct CompositeDevice {
+    pub proxy: fhaudio::CompositeProxy,
 }
 
 #[async_trait]
@@ -121,17 +121,16 @@ impl DeviceControl for CompositeDevice {
         let _formats = Formats::Composite { dai: vec![], stream: vec![] };
         Err(anyhow!("Supported formats for Composite devices not yet supported yet in ffx audio."))
     }
+
     async fn watch_gain_state(&mut self) -> Result<fhaudio::GainState, Error> {
         Err(anyhow!("watch gain state for Composite devices not supported yet in ffx audio."))
     }
+
     async fn watch_plug_state(&mut self) -> Result<fhaudio::PlugState, Error> {
         Err(anyhow!("watch plug state for Composite devices not supported yet in ffx audio."))
     }
-    fn create_ring_buffer(
-        &mut self,
-        _format: &fhaudio::Format,
-        _rb_server: ServerEnd<fhaudio::RingBufferMarker>,
-    ) -> Result<(), Error> {
+
+    async fn create_ring_buffer(&mut self, _format: Format) -> Result<Box<dyn RingBuffer>, Error> {
         Err(anyhow!("Creating ring buffers for Composite devices not supported yet in ffx audio."))
     }
 
@@ -198,6 +197,10 @@ pub fn connect_to_device_controller(
     }
 }
 
+pub struct Device {
+    pub device_controller: Box<dyn DeviceControl>,
+}
+
 impl Device {
     pub fn new_from_selector(selector: &fac::DeviceSelector) -> Result<Self, Error> {
         let device_controller = connect_to_device_controller(
@@ -262,13 +265,7 @@ impl Device {
         let supported_formats = self.device_controller.get_supported_formats().await?;
         validate_format(&format, supported_formats)?;
 
-        // Create ring buffer channel.
-        let (ring_buffer_client, ring_buffer_server) = create_proxy::<fhaudio::RingBufferMarker>()
-            .map_err(|e| anyhow!("Failed to create ring buffer channel: {e}"))?;
-
-        self.device_controller
-            .create_ring_buffer(&fhaudio::Format::from(&format), ring_buffer_server)?;
-        let ring_buffer_wrapper = RingBuffer::new(&format, ring_buffer_client).await?;
+        let ring_buffer = self.device_controller.create_ring_buffer(format).await?;
 
         let mut silenced_frames = 0u64;
         let mut late_wakeups = 0;
@@ -279,8 +276,8 @@ impl Device {
 
         let frames_per_nanosecond = format.frames_per_second as f64 * SECONDS_PER_NANOSECOND;
 
-        let bytes_in_rb = ring_buffer_wrapper.num_frames * format.bytes_per_frame() as u64;
-        let consumer_bytes = ring_buffer_wrapper.driver_bytes;
+        let bytes_in_rb = ring_buffer.vmo_buffer().data_size_bytes();
+        let consumer_bytes = ring_buffer.consumer_bytes();
         let bytes_per_wakeup_interval =
             (nanos_per_wakeup_interval * frames_per_nanosecond * format.bytes_per_frame() as f64)
                 .floor() as u64;
@@ -294,7 +291,7 @@ impl Device {
             ));
         }
 
-        let t_zero = zx::Time::from_nanos(ring_buffer_wrapper.start().await?);
+        let t_zero = ring_buffer.start().await?;
 
         // To start, wait until at least t0 + (wakeup_interval) so we can start writing at
         // the first bytes in the ring buffer.
@@ -396,7 +393,7 @@ impl Device {
                 silenced_frames += partial_silence_bytes / format.bytes_per_frame() as u64;
             }
 
-            ring_buffer_wrapper.write_to_frame(last_frame_written, &mut buf)?;
+            ring_buffer.vmo_buffer().write_to_frame(last_frame_written, &buf)?;
             last_frame_written += new_frames_available_to_write;
 
             // We want entire ring buffer to be silenced.
@@ -405,7 +402,7 @@ impl Device {
             }
         }
 
-        ring_buffer_wrapper.stop().await?;
+        ring_buffer.stop().await?;
 
         println!(
             "Successfully processed all audio data. \n Woke up late {} times.\n ",
@@ -427,35 +424,11 @@ impl Device {
         let supported_formats = self.device_controller.get_supported_formats().await?;
         validate_format(&format, supported_formats)?;
 
-        // Create ring buffer channel.
-        let (ring_buffer_client, ring_buffer_server) = create_proxy::<fhaudio::RingBufferMarker>()
-            .map_err(|e| {
-                ControllerError::new(
-                    fac::Error::UnknownFatal,
-                    format!("Failed to create ring buffer channel: {e}"),
-                )
-            })?;
-
-        self.device_controller
-            .create_ring_buffer(&fhaudio::Format::from(&format), ring_buffer_server)
-            .map_err(|e| {
-                ControllerError::new(
-                    fac::Error::UnknownFatal,
-                    format!("Failed to create ring buffer: {e}"),
-                )
-            })?;
-
-        let ring_buffer_wrapper =
-            RingBuffer::new(&format, ring_buffer_client).await.map_err(|e| {
-                ControllerError::new(
-                    fac::Error::UnknownFatal,
-                    format!("Failed to allocate ring buffer memory: {e}"),
-                )
-            })?;
+        let ring_buffer = self.device_controller.create_ring_buffer(format).await?;
 
         // Hardware might not use all bytes in vmo. Only want to read frames hardware will write to.
-        let bytes_in_rb = ring_buffer_wrapper.num_frames * format.bytes_per_frame() as u64;
-        let producer_bytes = ring_buffer_wrapper.driver_bytes;
+        let bytes_in_rb = ring_buffer.vmo_buffer().data_size_bytes();
+        let producer_bytes = ring_buffer.producer_bytes();
         let wakeup_interval = zx::Duration::from_millis(10);
         let frames_per_nanosecond = format.frames_per_second as f64 * SECONDS_PER_NANOSECOND;
 
@@ -482,7 +455,7 @@ impl Device {
         // To start, sleep until at least t0 + (wakeup_interval) so we can start reading from
         // the first bytes in the ring buffer.
 
-        let t_zero = zx::Time::from_nanos(ring_buffer_wrapper.start().await?);
+        let t_zero = ring_buffer.start().await?;
         fuchsia_async::Timer::new(t_zero).await;
 
         let mut last_wakeup = t_zero;
@@ -544,7 +517,8 @@ impl Device {
                 }
 
                 buf[..bytes_missed].fill(format.silence_value());
-                let _ = ring_buffer_wrapper
+                let _ = ring_buffer
+                    .vmo_buffer()
                     .read_from_frame(last_frame_read, &mut buf[bytes_missed..])?;
 
                 last_frame_read += available_frames_to_read;
