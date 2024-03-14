@@ -7,7 +7,7 @@ composite aml_securemem;
 using fuchsia.amlogic.platform;
 using fuchsia.hardware.tee;
 using fuchsia.platform;
-using fuchsia.sysmem;
+using fuchsia.hardware.sysmem;
 
 primary node "pdev" {
   fuchsia.BIND_PROTOCOL == fuchsia.platform.BIND_PROTOCOL.DEVICE;
@@ -16,7 +16,7 @@ primary node "pdev" {
 }
 
 node "sysmem" {
-  fuchsia.BIND_FIDL_PROTOCOL == fuchsia.sysmem.BIND_FIDL_PROTOCOL.DEVICE;
+  fuchsia.hardware.sysmem.Service == fuchsia.hardware.sysmem.Service.ZirconTransport;
 }
 
 node "tee" {

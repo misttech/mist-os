@@ -12,7 +12,7 @@ using fuchsia.pci;
 using fuchsia.pci.serial;
 using fuchsia.pci.serial.usb;
 using fuchsia.platform;
-using fuchsia.sysmem;
+using fuchsia.hardware.sysmem;
 using fuchsia.usb.phy;
 using fuchsia.devicetree;
 
@@ -63,7 +63,7 @@ optional node "xhci-phy" {
 }
 
 optional node "sysmem" {
-  fuchsia.BIND_FIDL_PROTOCOL == fuchsia.sysmem.BIND_FIDL_PROTOCOL.DEVICE;
+  fuchsia.hardware.sysmem.Service == fuchsia.hardware.sysmem.Service.ZirconTransport;
 }
 
 optional node "acpi" {

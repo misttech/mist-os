@@ -12,8 +12,8 @@
 #include <bind/fuchsia/hardware/i2c/cpp/bind.h>
 #include <bind/fuchsia/hardware/interrupt/cpp/bind.h>
 #include <bind/fuchsia/hardware/spi/cpp/bind.h>
+#include <bind/fuchsia/hardware/sysmem/cpp/bind.h>
 #include <bind/fuchsia/pci/cpp/bind.h>
-#include <bind/fuchsia/sysmem/cpp/bind.h>
 #include <fbl/string_printf.h>
 
 #ifdef __Fuchsia__
@@ -29,10 +29,10 @@
 namespace acpi {
 namespace {
 const std::vector<ddk::BindRule> kSysmemBindRules = {ddk::MakeAcceptBindRule(
-    bind_fuchsia::FIDL_PROTOCOL, bind_fuchsia_sysmem::BIND_FIDL_PROTOCOL_DEVICE)};
+    bind_fuchsia_hardware_sysmem::SERVICE, bind_fuchsia_hardware_sysmem::SERVICE_ZIRCONTRANSPORT)};
 
-const std::vector<device_bind_prop_t> kSysmemProperties = {
-    ddk::MakeProperty(bind_fuchsia::FIDL_PROTOCOL, bind_fuchsia_sysmem::BIND_FIDL_PROTOCOL_DEVICE)};
+const std::vector<device_bind_prop_t> kSysmemProperties = {ddk::MakeProperty(
+    bind_fuchsia_hardware_sysmem::SERVICE, bind_fuchsia_hardware_sysmem::SERVICE_ZIRCONTRANSPORT)};
 
 }  // namespace
 

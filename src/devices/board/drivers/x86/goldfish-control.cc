@@ -13,7 +13,7 @@
 #include <bind/fuchsia/google/platform/cpp/bind.h>
 #include <bind/fuchsia/hardware/goldfish/cpp/bind.h>
 #include <bind/fuchsia/hardware/goldfish/pipe/cpp/bind.h>
-#include <bind/fuchsia/sysmem/cpp/bind.h>
+#include <bind/fuchsia/hardware/sysmem/cpp/bind.h>
 
 #include "src/devices/board/drivers/x86/x86.h"
 
@@ -67,12 +67,13 @@ const device_bind_prop_t kGoldfishSyncProperties[] = {
 };
 
 const ddk::BindRule kSysmemRules[] = {
-    ddk::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
-                            bind_fuchsia_sysmem::BIND_FIDL_PROTOCOL_DEVICE),
+    ddk::MakeAcceptBindRule(bind_fuchsia_hardware_sysmem::SERVICE,
+                            bind_fuchsia_hardware_sysmem::SERVICE_ZIRCONTRANSPORT),
 };
 
 const device_bind_prop_t kSysmemProperties[] = {
-    ddk::MakeProperty(bind_fuchsia::FIDL_PROTOCOL, bind_fuchsia_sysmem::BIND_FIDL_PROTOCOL_DEVICE),
+    ddk::MakeProperty(bind_fuchsia_hardware_sysmem::SERVICE,
+                      bind_fuchsia_hardware_sysmem::SERVICE_ZIRCONTRANSPORT),
 };
 
 zx_status_t X86::GoldfishControlInit() {

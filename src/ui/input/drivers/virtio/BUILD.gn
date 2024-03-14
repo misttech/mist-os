@@ -12,9 +12,9 @@ driver_bind_rules("virtio_input_bind") {
   tests = "bind_tests.json"
   deps = [
     "//sdk/fidl/fuchsia.hardware.pci:fuchsia.hardware.pci_bindlib",
+    "//sdk/fidl/fuchsia.hardware.sysmem:fuchsia.hardware.sysmem_bindlib",
     "//src/devices/bind/fuchsia.acpi",
     "//src/devices/bind/fuchsia.pci",
-    "//src/devices/bind/fuchsia.sysmem",
   ]
 }
 

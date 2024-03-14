@@ -15,7 +15,7 @@
 #include <bind/fuchsia/gpio/cpp/bind.h>
 #include <bind/fuchsia/hardware/amlogiccanvas/cpp/bind.h>
 #include <bind/fuchsia/hardware/gpio/cpp/bind.h>
-#include <bind/fuchsia/sysmem/cpp/bind.h>
+#include <bind/fuchsia/hardware/sysmem/cpp/bind.h>
 #include <ddk/metadata/display.h>
 #include <soc/aml-s905d3/s905d3-hw.h>
 
@@ -204,13 +204,13 @@ zx::result<> PostInit::InitDisplay() {
   };
 
   std::vector<fuchsia_driver_framework::BindRule> sysmem_bind_rules = std::vector{
-      fdf::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
-                              bind_fuchsia_sysmem::BIND_FIDL_PROTOCOL_DEVICE),
+      fdf::MakeAcceptBindRule(bind_fuchsia_hardware_sysmem::SERVICE,
+                              bind_fuchsia_hardware_sysmem::SERVICE_ZIRCONTRANSPORT),
   };
 
   std::vector<fuchsia_driver_framework::NodeProperty> sysmem_properties = std::vector{
-      fdf::MakeProperty(bind_fuchsia::FIDL_PROTOCOL,
-                        bind_fuchsia_sysmem::BIND_FIDL_PROTOCOL_DEVICE),
+      fdf::MakeProperty(bind_fuchsia_hardware_sysmem::SERVICE,
+                        bind_fuchsia_hardware_sysmem::SERVICE_ZIRCONTRANSPORT),
   };
 
   std::vector<fuchsia_driver_framework::BindRule> canvas_bind_rules{

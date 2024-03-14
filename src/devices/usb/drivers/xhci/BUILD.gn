@@ -14,6 +14,7 @@ driver_bind_rules("usb_xhci_bind") {
   deps = [
     "//sdk/fidl/fuchsia.hardware.pci:fuchsia.hardware.pci_bindlib",
     "//sdk/fidl/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_bindlib",
+    "//sdk/fidl/fuchsia.hardware.sysmem:fuchsia.hardware.sysmem_bindlib",
     "//sdk/fidl/fuchsia.hardware.usb.phy:fuchsia.hardware.usb.phy_bindlib",
     "//src/devices/bind/fuchsia.acpi",
     "//src/devices/bind/fuchsia.devicetree",
@@ -21,7 +22,6 @@ driver_bind_rules("usb_xhci_bind") {
     "//src/devices/bind/fuchsia.pci:serial",
     "//src/devices/bind/fuchsia.pci:serial.usb",
     "//src/devices/bind/fuchsia.platform",
-    "//src/devices/bind/fuchsia.sysmem",
     "//src/devices/bind/fuchsia.usb.phy",
   ]
 }

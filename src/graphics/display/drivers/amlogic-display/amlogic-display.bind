@@ -8,7 +8,7 @@ using fuchsia.hardware.amlogiccanvas;
 using fuchsia.hardware.gpio;
 using fuchsia.gpio;
 using fuchsia.platform;
-using fuchsia.sysmem;
+using fuchsia.hardware.sysmem;
 using fuchsia.amlogic.platform;
 
 primary node "pdev" {
@@ -34,7 +34,7 @@ optional node "gpio-hdmi-hotplug-detect" {
 }
 
 node "sysmem" {
-  fuchsia.BIND_FIDL_PROTOCOL == fuchsia.sysmem.BIND_FIDL_PROTOCOL.DEVICE;
+  fuchsia.hardware.sysmem.Service == fuchsia.hardware.sysmem.Service.ZirconTransport;
 }
 
 node "canvas" {

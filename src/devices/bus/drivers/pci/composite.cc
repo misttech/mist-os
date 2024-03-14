@@ -9,7 +9,7 @@
 #include <bind/fuchsia/acpi/cpp/bind.h>
 #include <bind/fuchsia/cpp/bind.h>
 #include <bind/fuchsia/hardware/pci/cpp/bind.h>
-#include <bind/fuchsia/sysmem/cpp/bind.h>
+#include <bind/fuchsia/hardware/sysmem/cpp/bind.h>
 
 namespace pci {
 
@@ -18,13 +18,13 @@ ddk::CompositeNodeSpec CreateCompositeNodeSpec(const CompositeInfo& info) {
       static_cast<uint32_t>(BIND_PCI_TOPO_PACK(info.bus_id, info.dev_id, info.func_id));
 
   const ddk::BindRule kSysmemRules[] = {
-      ddk::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
-                              bind_fuchsia_sysmem::BIND_FIDL_PROTOCOL_DEVICE),
+      ddk::MakeAcceptBindRule(bind_fuchsia_hardware_sysmem::SERVICE,
+                              bind_fuchsia_hardware_sysmem::SERVICE_ZIRCONTRANSPORT),
   };
 
   const device_bind_prop_t kSysmemProperties[] = {
-      ddk::MakeProperty(bind_fuchsia::FIDL_PROTOCOL,
-                        bind_fuchsia_sysmem::BIND_FIDL_PROTOCOL_DEVICE),
+      ddk::MakeProperty(bind_fuchsia_hardware_sysmem::SERVICE,
+                        bind_fuchsia_hardware_sysmem::SERVICE_ZIRCONTRANSPORT),
   };
 
   const ddk::BindRule kAcpiRules[] = {

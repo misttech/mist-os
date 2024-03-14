@@ -39,21 +39,6 @@ driver_bind_rules("nelson-bind") {
   ]
 }
 
-driver_bind_rules("nelson_aml_video_bind") {
-  rules = "bind/nelson_aml_video.bind"
-  bind_output = "nelson_aml_video_bind.bc"
-  tests = "bind-tests/nelson_aml_video-test.json"
-  deps = [
-    "//src/devices/bind/fuchsia.amlogic.platform",
-    "//src/devices/bind/fuchsia.amlogic.platform",
-    "//src/devices/bind/fuchsia.amlogic.platform.meson",
-    "//src/devices/bind/fuchsia.clock",
-    "//src/devices/bind/fuchsia.platform",
-    "//src/devices/bind/fuchsia.sysmem",
-    "//src/devices/bind/fuchsia.tee",
-  ]
-}
-
 fuchsia_driver("nelson-module-driver") {
   output_name = "nelson-module"
   configs += [
@@ -118,6 +103,7 @@ fuchsia_driver("nelson-module-driver") {
     "//sdk/fidl/fuchsia.hardware.sdio:fuchsia.hardware.sdio_bindlib_cpp",
     "//sdk/fidl/fuchsia.hardware.sdmmc:fuchsia.hardware.sdmmc_cpp",
     "//sdk/fidl/fuchsia.hardware.serial:fuchsia.hardware.serial_cpp",
+    "//sdk/fidl/fuchsia.hardware.sysmem:fuchsia.hardware.sysmem_bindlib_cpp",
     "//sdk/fidl/fuchsia.hardware.tee:fuchsia.hardware.tee_bindlib_cpp",
     "//sdk/fidl/fuchsia.hardware.thermal:fuchsia.hardware.thermal_cpp",
     "//sdk/fidl/fuchsia.hardware.usb.phy:fuchsia.hardware.usb.phy_bindlib_cpp",
@@ -146,7 +132,6 @@ fuchsia_driver("nelson-module-driver") {
     "//src/devices/bind/fuchsia.register:fuchsia.register_cpp",
     "//src/devices/bind/fuchsia.sdio:fuchsia.sdio_cpp",
     "//src/devices/bind/fuchsia.spi:fuchsia.spi_cpp",
-    "//src/devices/bind/fuchsia.sysmem:fuchsia.sysmem_cpp",
     "//src/devices/bind/fuchsia.ti.platform:fuchsia.ti.platform_cpp",
     "//src/devices/bind/fuchsia.usb.phy:fuchsia.usb.phy_cpp",
     "//src/devices/lib/amlogic",

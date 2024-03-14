@@ -78,7 +78,7 @@
         "tests": [
             {
                 "device": {
-                    "fuchsia.BIND_FIDL_PROTOCOL": "fuchsia.sysmem.BIND_FIDL_PROTOCOL.DEVICE"
+                    "fuchsia.hardware.sysmem.Service": "fuchsia.hardware.sysmem.Service.ZirconTransport"
                 },
                 "expected": "match",
                 "name": "Match"

@@ -29,8 +29,8 @@ driver_bind_rules("bind") {
   bind_output = "da7219.bindbc"
   deps = [
     "//sdk/fidl/fuchsia.hardware.interrupt:fuchsia.hardware.interrupt_bindlib",
+    "//sdk/fidl/fuchsia.hardware.sysmem:fuchsia.hardware.sysmem_bindlib",
     "//src/devices/bind/fuchsia.acpi",
-    "//src/devices/bind/fuchsia.sysmem",
   ]
 }
 

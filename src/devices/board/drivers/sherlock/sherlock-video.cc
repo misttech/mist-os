@@ -18,8 +18,8 @@
 #include <bind/fuchsia/cpp/bind.h>
 #include <bind/fuchsia/hardware/amlogiccanvas/cpp/bind.h>
 #include <bind/fuchsia/hardware/clock/cpp/bind.h>
+#include <bind/fuchsia/hardware/sysmem/cpp/bind.h>
 #include <bind/fuchsia/hardware/tee/cpp/bind.h>
-#include <bind/fuchsia/sysmem/cpp/bind.h>
 #include <soc/aml-meson/g12b-clk.h>
 #include <soc/aml-t931/t931-hw.h>
 
@@ -104,13 +104,13 @@ zx_status_t Sherlock::VideoInit() {
   auto video_sysmem = fuchsia_driver_framework::ParentSpec{{
       .bind_rules =
           {
-              fdf::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
-                                      bind_fuchsia_sysmem::BIND_FIDL_PROTOCOL_DEVICE),
+              fdf::MakeAcceptBindRule(bind_fuchsia_hardware_sysmem::SERVICE,
+                                      bind_fuchsia_hardware_sysmem::SERVICE_ZIRCONTRANSPORT),
           },
       .properties =
           {
-              fdf::MakeProperty(bind_fuchsia::FIDL_PROTOCOL,
-                                bind_fuchsia_sysmem::BIND_FIDL_PROTOCOL_DEVICE),
+              fdf::MakeProperty(bind_fuchsia_hardware_sysmem::SERVICE,
+                                bind_fuchsia_hardware_sysmem::SERVICE_ZIRCONTRANSPORT),
           },
   }};
 

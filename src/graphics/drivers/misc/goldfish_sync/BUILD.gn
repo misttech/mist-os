@@ -12,8 +12,8 @@ driver_bind_rules("goldfish-sync-bind") {
   tests = "tests.json"
   deps = [
     "//sdk/fidl/fuchsia.hardware.interrupt:fuchsia.hardware.interrupt_bindlib",
+    "//sdk/fidl/fuchsia.hardware.sysmem:fuchsia.hardware.sysmem_bindlib",
     "//src/devices/bind/fuchsia.acpi",
-    "//src/devices/bind/fuchsia.sysmem",
   ]
 }
 

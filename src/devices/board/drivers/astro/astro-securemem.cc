@@ -15,9 +15,9 @@
 
 #include <bind/fuchsia/amlogic/platform/cpp/bind.h>
 #include <bind/fuchsia/cpp/bind.h>
+#include <bind/fuchsia/hardware/sysmem/cpp/bind.h>
 #include <bind/fuchsia/hardware/tee/cpp/bind.h>
 #include <bind/fuchsia/platform/cpp/bind.h>
-#include <bind/fuchsia/sysmem/cpp/bind.h>
 
 #include "astro.h"
 
@@ -49,23 +49,32 @@ zx_status_t Astro::SecureMemInit() {
   fidl::Arena<> fidl_arena;
   fdf::Arena arena('SECU');
 
-  const std::vector<uint32_t> kParentNodeProtocols = {
-      bind_fuchsia_sysmem::BIND_FIDL_PROTOCOL_DEVICE};
-  std::vector<fdf::ParentSpec> parents;
-  parents.reserve(kParentNodeProtocols.size() + 1);
-  for (auto& protocol : kParentNodeProtocols) {
-    parents.push_back(fdf::ParentSpec{
-        {{fdf::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL, protocol)},
-         {fdf::MakeProperty(bind_fuchsia::FIDL_PROTOCOL, protocol)}},
-    });
-  }
-
-  parents.push_back(fdf::ParentSpec{
-      {{fdf::MakeAcceptBindRule(bind_fuchsia_hardware_tee::SERVICE,
-                                bind_fuchsia_hardware_tee::SERVICE_ZIRCONTRANSPORT)},
-       {fdf::MakeProperty(bind_fuchsia_hardware_tee::SERVICE,
-                          bind_fuchsia_hardware_tee::SERVICE_ZIRCONTRANSPORT)}},
-  });
+  std::vector<fdf::ParentSpec> parents = {
+      {
+          {
+              {
+                  fdf::MakeAcceptBindRule(bind_fuchsia_hardware_sysmem::SERVICE,
+                                          bind_fuchsia_hardware_sysmem::SERVICE_ZIRCONTRANSPORT),
+              },
+              {
+                  fdf::MakeProperty(bind_fuchsia_hardware_sysmem::SERVICE,
+                                    bind_fuchsia_hardware_sysmem::SERVICE_ZIRCONTRANSPORT),
+              },
+          },
+      },
+      {
+          {
+              {
+                  fdf::MakeAcceptBindRule(bind_fuchsia_hardware_tee::SERVICE,
+                                          bind_fuchsia_hardware_tee::SERVICE_ZIRCONTRANSPORT),
+              },
+              {
+                  fdf::MakeProperty(bind_fuchsia_hardware_tee::SERVICE,
+                                    bind_fuchsia_hardware_tee::SERVICE_ZIRCONTRANSPORT),
+              },
+          },
+      },
+  };
 
   auto result = pbus_.buffer(arena)->AddCompositeNodeSpec(
       fidl::ToWire(fidl_arena, secure_mem_dev),

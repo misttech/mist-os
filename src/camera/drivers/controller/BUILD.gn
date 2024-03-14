@@ -18,10 +18,10 @@ driver_bind_rules("camera_controller_bind") {
   rules = "camera_controller.bind"
   tests = "bind_tests.json"
   deps = [
+    "//sdk/fidl/fuchsia.hardware.sysmem:fuchsia.hardware.sysmem_bindlib",
     "//src/devices/bind/fuchsia.camera",
     "//src/devices/bind/fuchsia.camera",
     "//src/devices/bind/fuchsia.isp",
-    "//src/devices/bind/fuchsia.sysmem",
   ]
 }
 

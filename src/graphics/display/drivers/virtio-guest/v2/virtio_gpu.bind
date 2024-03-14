@@ -6,9 +6,8 @@ composite virtio_gpu;
 
 using fuchsia.acpi;
 using fuchsia.hardware.pci;
-using fuchsia.sysmem;
+using fuchsia.hardware.sysmem;
 using fuchsia.pci;
-using fuchsia.sysmem;
 
 primary node "pci" {
   fuchsia.hardware.pci.Service == fuchsia.hardware.pci.Service.ZirconTransport;
@@ -17,7 +16,7 @@ primary node "pci" {
 }
 
 node "sysmem" {
-  fuchsia.BIND_FIDL_PROTOCOL == fuchsia.sysmem.BIND_FIDL_PROTOCOL.DEVICE;
+  fuchsia.hardware.sysmem.Service == fuchsia.hardware.sysmem.Service.ZirconTransport;
 }
 
 optional node "acpi" {

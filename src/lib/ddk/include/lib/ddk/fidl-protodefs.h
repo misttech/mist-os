@@ -24,7 +24,7 @@
 // 6 was "fuchsia.hardware.goldfish.AddressSpaceService"
 // 7 was "fuchsia.hardware.goldfish.SyncService"
 // 8 was "fuchsia.hardware.spi.Service"
-DDK_FIDL_PROTOCOL_DEF(SYSMEM,          9, "fuchsia.hardware.sysmem.Service")
+// 9 was "fuchsia.hardware.sysmem.Service"
 // 10 was "fuchsia.hardware.mailbox.Service"
 // 11 was "fuchsia.hardware.platform.bus.PlatformBus"
 // 12 was "fuchsia.hardware.interrupt.Provider"
@@ -43,5 +43,6 @@ DDK_FIDL_PROTOCOL_DEF(SYSMEM,          9, "fuchsia.hardware.sysmem.Service")
 // 25 was "fuchsia.hardware.ethernet.board.Service"
 // 26 was "fuchsia.hardware.gpio.Service"
 // 27 was "fuchsia.hardware.i2cimpl.Service"
+DDK_FIDL_PROTOCOL_DEF(PLACEHOLDER_FOR_MIGRATION, 1000, "PLACEHOLDER_FOR_MIGRATION")
 #undef DDK_FIDL_PROTOCOL_DEF
 #endif

@@ -13,8 +13,8 @@ driver_bind_rules("goldfish_control_composite-bind") {
   deps = [
     "//sdk/fidl/fuchsia.hardware.goldfish:fuchsia.hardware.goldfish_bindlib",
     "//sdk/fidl/fuchsia.hardware.goldfish.pipe:fuchsia.hardware.goldfish.pipe_bindlib",
+    "//sdk/fidl/fuchsia.hardware.sysmem:fuchsia.hardware.sysmem_bindlib",
     "//src/devices/bind/fuchsia.google.platform",
-    "//src/devices/bind/fuchsia.sysmem",
   ]
 }
 

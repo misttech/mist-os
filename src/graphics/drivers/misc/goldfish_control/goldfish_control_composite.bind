@@ -7,7 +7,7 @@ composite goldfish_control_2;
 using fuchsia.google.platform;
 using fuchsia.hardware.goldfish;
 using fuchsia.hardware.goldfish.pipe;
-using fuchsia.sysmem;
+using fuchsia.hardware.sysmem;
 
 primary node "goldfish-pipe" {
     fuchsia.hardware.goldfish.pipe.Service == fuchsia.hardware.goldfish.pipe.Service.ZirconTransport;
@@ -25,5 +25,5 @@ node "goldfish-sync" {
 }
 
 node "sysmem" {
-    fuchsia.BIND_FIDL_PROTOCOL == fuchsia.sysmem.BIND_FIDL_PROTOCOL.DEVICE;
+    fuchsia.hardware.sysmem.Service == fuchsia.hardware.sysmem.Service.ZirconTransport;
 }

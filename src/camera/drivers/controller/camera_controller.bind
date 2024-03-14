@@ -7,7 +7,7 @@ composite camera_controller;
 using fuchsia.isp;
 using fuchsia.camera;
 using fuchsia.camera;
-using fuchsia.sysmem;
+using fuchsia.hardware.sysmem;
 
 primary node "isp" {
   fuchsia.BIND_PROTOCOL == fuchsia.isp.BIND_PROTOCOL.DEVICE;
@@ -22,5 +22,5 @@ node "ge2d" {
 }
 
 node "sysmem" {
-  fuchsia.BIND_FIDL_PROTOCOL == fuchsia.sysmem.BIND_FIDL_PROTOCOL.DEVICE;
+  fuchsia.hardware.sysmem.Service == fuchsia.hardware.sysmem.Service.ZirconTransport;
 }

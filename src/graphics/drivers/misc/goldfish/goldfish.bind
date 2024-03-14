@@ -6,7 +6,7 @@ composite goldfish;
 
 using fuchsia.acpi;
 using fuchsia.hardware.interrupt;
-using fuchsia.sysmem;
+using fuchsia.hardware.sysmem;
 
 primary node "acpi" {
   fuchsia.BIND_PROTOCOL == fuchsia.acpi.BIND_PROTOCOL.DEVICE;
@@ -18,5 +18,5 @@ node "irq000" {
 }
 
 node "sysmem" {
-  fuchsia.BIND_FIDL_PROTOCOL == fuchsia.sysmem.BIND_FIDL_PROTOCOL.DEVICE;
+  fuchsia.hardware.sysmem.Service == fuchsia.hardware.sysmem.Service.ZirconTransport;
 }
