@@ -12,6 +12,7 @@ use {
         policy::PolicyError,
         resolving::ResolverError,
     },
+    bedrock_error::{BedrockError, Explain},
     clonable_error::ClonableError,
     cm_config::CompatibilityCheckError,
     cm_moniker::{InstancedExtendedMoniker, InstancedMoniker},
@@ -20,7 +21,7 @@ use {
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_sys2 as fsys, fuchsia_zircon as zx,
     moniker::{ChildName, Moniker, MonikerError},
     sandbox::ConversionError,
-    std::path::PathBuf,
+    std::{path::PathBuf, sync::Arc},
     thiserror::Error,
 };
 
@@ -139,8 +140,10 @@ impl ModelError {
     pub fn open_directory_error(moniker: Moniker, relative_path: impl Into<String>) -> ModelError {
         ModelError::OpenDirectoryError { moniker, relative_path: relative_path.into() }
     }
+}
 
-    pub fn as_zx_status(&self) -> zx::Status {
+impl Explain for ModelError {
+    fn as_zx_status(&self) -> zx::Status {
         match self {
             ModelError::RoutingError { err } => err.as_zx_status(),
             ModelError::PolicyError { err } => err.as_zx_status(),
@@ -205,13 +208,19 @@ pub enum OpenOutgoingDirError {
     Fidl(#[from] fidl::Error),
 }
 
-impl OpenOutgoingDirError {
-    pub fn as_zx_status(&self) -> zx::Status {
+impl Explain for OpenOutgoingDirError {
+    fn as_zx_status(&self) -> zx::Status {
         match self {
             Self::InstanceNotRunning => zx::Status::NOT_FOUND,
             Self::InstanceNonExecutable => zx::Status::NOT_FOUND,
             Self::Fidl(_) => zx::Status::INTERNAL,
         }
+    }
+}
+
+impl From<OpenOutgoingDirError> for BedrockError {
+    fn from(value: OpenOutgoingDirError) -> Self {
+        BedrockError::OpenError(Arc::new(value))
     }
 }
 
@@ -385,7 +394,7 @@ pub enum ActionError {
     },
 }
 
-impl ActionError {
+impl Explain for ActionError {
     fn as_zx_status(&self) -> zx::Status {
         match self {
             ActionError::DiscoverError { .. } => zx::Status::INTERNAL,
@@ -395,6 +404,12 @@ impl ActionError {
             ActionError::StopError { .. } => zx::Status::INTERNAL,
             ActionError::DestroyError { .. } => zx::Status::INTERNAL,
         }
+    }
+}
+
+impl From<ActionError> for BedrockError {
+    fn from(value: ActionError) -> Self {
+        BedrockError::LifecycleError(Arc::new(value))
     }
 }
 
@@ -722,8 +737,8 @@ pub enum OpenError {
     BedrockOpen(#[from] BedrockOpenError),
 }
 
-impl OpenError {
-    pub fn as_zx_status(&self) -> zx::Status {
+impl Explain for OpenError {
+    fn as_zx_status(&self) -> zx::Status {
         match self {
             Self::GetDefaultProviderError { err } => err.as_zx_status(),
             Self::OpenStorageError { err } => err.as_zx_status(),
@@ -732,6 +747,12 @@ impl OpenError {
             Self::CapabilityProviderNotFound => zx::Status::NOT_FOUND,
             Self::Timeout => zx::Status::TIMED_OUT,
         }
+    }
+}
+
+impl From<OpenError> for BedrockError {
+    fn from(value: OpenError) -> Self {
+        BedrockError::OpenError(Arc::new(value))
     }
 }
 
@@ -744,11 +765,20 @@ pub enum RouteOrOpenError {
     OpenError(#[from] OpenError),
 }
 
-impl RouteOrOpenError {
-    pub fn as_zx_status(&self) -> zx::Status {
+impl Explain for RouteOrOpenError {
+    fn as_zx_status(&self) -> zx::Status {
         match self {
             Self::RoutingError(err) => err.as_zx_status(),
             Self::OpenError(err) => err.as_zx_status(),
+        }
+    }
+}
+
+impl From<RouteOrOpenError> for BedrockError {
+    fn from(value: RouteOrOpenError) -> Self {
+        match value {
+            RouteOrOpenError::RoutingError(err) => err.into(),
+            RouteOrOpenError::OpenError(err) => err.into(),
         }
     }
 }

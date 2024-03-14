@@ -4,11 +4,13 @@
 
 use {
     crate::{policy::PolicyError, rights::Rights},
+    bedrock_error::{BedrockError, Explain},
     clonable_error::ClonableError,
     cm_rust::CapabilityTypeName,
     cm_types::Name,
     fidl_fuchsia_component as fcomponent, fuchsia_zircon_status as zx,
     moniker::{ChildName, Moniker, MonikerError},
+    std::sync::Arc,
     thiserror::Error,
 };
 
@@ -326,14 +328,9 @@ pub enum RoutingError {
     SourceCapabilityIsVoid,
 }
 
-impl RoutingError {
-    /// Convert this error into its approximate `fuchsia.component.Error` equivalent.
-    pub fn as_fidl_error(&self) -> fcomponent::Error {
-        fcomponent::Error::ResourceUnavailable
-    }
-
+impl Explain for RoutingError {
     /// Convert this error into its approximate `zx::Status` equivalent.
-    pub fn as_zx_status(&self) -> zx::Status {
+    fn as_zx_status(&self) -> zx::Status {
         match self {
             RoutingError::UseFromRootEnvironmentNotAllowed { .. } => zx::Status::ACCESS_DENIED,
             RoutingError::StorageFromChildExposeNotFound { .. }
@@ -378,6 +375,19 @@ impl RoutingError {
             RoutingError::PolicyError(err) => err.as_zx_status(),
             RoutingError::SourceCapabilityIsVoid => zx::Status::NOT_FOUND,
         }
+    }
+}
+
+impl From<RoutingError> for BedrockError {
+    fn from(value: RoutingError) -> Self {
+        BedrockError::RoutingError(Arc::new(value))
+    }
+}
+
+impl RoutingError {
+    /// Convert this error into its approximate `fuchsia.component.Error` equivalent.
+    pub fn as_fidl_error(&self) -> fcomponent::Error {
+        fcomponent::Error::ResourceUnavailable
     }
 
     pub fn storage_from_child_expose_not_found(

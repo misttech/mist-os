@@ -7,7 +7,6 @@ use {
         capability::CapabilitySource,
         model::{
             component::{ComponentInstance, ResolvedInstanceState, WeakComponentInstance},
-            error::RouteOrOpenError,
             routing::router::{Request, Router},
         },
         sandbox_util::{DictExt, LaunchTaskOnReceive},
@@ -17,6 +16,7 @@ use {
         component_instance::ComponentInstanceInterface,
         error::{ComponentInstanceError, RoutingError},
     },
+    bedrock_error::BedrockError,
     cm_rust::{ExposeDeclCommon, OfferDeclCommon, SourceName, SourcePath, UseDeclCommon},
     cm_types::{IterablePath, Name, SeparatedPath},
     fidl_fuchsia_component_decl as fdecl,
@@ -430,9 +430,7 @@ fn make_dict_extending_router(
                 let source_entries = source_dict.lock_entries();
                 for source_key in source_entries.keys() {
                     if entries.contains_key(source_key.as_str()) {
-                        return Err(RouteOrOpenError::RoutingError(
-                            RoutingError::BedrockSourceDictionaryCollision,
-                        ));
+                        return Err(RoutingError::BedrockSourceDictionaryCollision.into());
                     }
                 }
                 for (source_key, source_value) in &*source_entries {
@@ -846,7 +844,7 @@ async fn forward_request_to_child(
     capability_path: impl IterablePath + 'static,
     expose_not_found_error: RoutingError,
     request: Request,
-) -> Result<Capability, RouteOrOpenError> {
+) -> Result<Capability, BedrockError> {
     let router = {
         let child = weak_child.upgrade().map_err(|e| RoutingError::ComponentInstanceError(e))?;
         let child_state = child.lock_resolved_state().await.map_err(|e| {

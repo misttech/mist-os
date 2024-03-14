@@ -279,7 +279,7 @@ async fn route_directory(
         _ => panic!("not a directory or storage capability"),
     };
     if let Err(e) = route_and_open_capability(&route_request, &target, open_options).await {
-        routing::report_routing_failure(&route_request, &target, e.into(), server_end).await;
+        routing::report_routing_failure(&route_request, &target, e, server_end).await;
     }
 }
 
@@ -323,7 +323,7 @@ fn service_or_protocol_use(
                 routing::report_routing_failure(
                     &legacy_request,
                     &target,
-                    error.clone().into(),
+                    error.clone(),
                     open_request.server_end,
                 )
                 .await
@@ -381,8 +381,7 @@ fn service_or_protocol_use(
             let res =
                 routing::route_and_open_capability(&route_request, &target, open_options).await;
             if let Err(e) = res {
-                routing::report_routing_failure(&route_request, &target, e.into(), server_end)
-                    .await;
+                routing::report_routing_failure(&route_request, &target, e, server_end).await;
             }
         };
         component.blocking_task_group().spawn(task)

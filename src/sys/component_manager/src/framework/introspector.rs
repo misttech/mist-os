@@ -16,7 +16,7 @@ use fuchsia_zircon as zx;
 use futures::TryStreamExt;
 use lazy_static::lazy_static;
 use moniker::{ExtendedMoniker, Moniker, MonikerBase};
-use routing::{capability_source::InternalCapability, policy::PolicyError};
+use routing::{capability_source::InternalCapability, error::RoutingError, policy::PolicyError};
 use tracing::warn;
 
 use crate::{
@@ -163,12 +163,11 @@ impl CapabilityProvider for AccessDeniedCapabilityProvider {
         report_routing_failure(
             &DEBUG_REQUEST,
             &target,
-            PolicyError::CapabilityUseDisallowed {
+            RoutingError::from(PolicyError::CapabilityUseDisallowed {
                 cap: INTROSPECTOR_SERVICE.to_string(),
                 source_moniker: ExtendedMoniker::ComponentInstance(self.source_moniker),
                 target_moniker: self.target.moniker,
-            }
-            .into(),
+            }),
             server_end,
         )
         .await;

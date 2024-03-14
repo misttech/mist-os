@@ -10,6 +10,7 @@ use {
         PkgUrlMatch,
     },
     anyhow::{anyhow, Context, Result},
+    bedrock_error::Explain,
     cm_config::RuntimeConfig,
     cm_rust::{
         CapabilityDecl, CapabilityTypeName, ComponentDecl, ExposeDecl, ExposeDeclCommon, OfferDecl,

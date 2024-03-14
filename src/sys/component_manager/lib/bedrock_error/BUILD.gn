@@ -18,5 +18,6 @@ rustc_library("bedrock_error") {
   visibility = [
     "//src/sys/component_manager/*",
     "//src/sys/lib/routing/*",
+    "//tools/lib/cm_fidl_analyzer:*",
   ]
 }

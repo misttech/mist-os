@@ -13,6 +13,7 @@ rustc_library("cm_fidl_analyzer") {
     "//sdk/fidl/fuchsia.sys2:fuchsia.sys2_rust",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia-url",
+    "//src/sys/component_manager/lib/bedrock_error",
     "//src/sys/lib/cm_config",
     "//src/sys/lib/cm_moniker",
     "//src/sys/lib/cm_rust",

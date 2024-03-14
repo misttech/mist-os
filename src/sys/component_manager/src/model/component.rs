@@ -18,9 +18,8 @@ use {
             context::ModelContext,
             environment::Environment,
             error::{
-                ActionError, AddChildError, AddDynamicChildError, CapabilityProviderError,
-                ComponentProviderError, CreateNamespaceError, DestroyActionError,
-                DynamicOfferError, ModelError, OpenError, OpenExposedDirError,
+                ActionError, AddChildError, AddDynamicChildError, CreateNamespaceError,
+                DestroyActionError, DynamicOfferError, ModelError, OpenExposedDirError,
                 OpenOutgoingDirError, RebootError, ResolveActionError, StartActionError,
                 StopActionError, StructuredConfigError,
             },
@@ -55,6 +54,7 @@ use {
     },
     async_trait::async_trait,
     async_utils::async_once::Once,
+    bedrock_error::Explain,
     clonable_error::ClonableError,
     cm_fidl_validator::error::DeclType,
     cm_logger::scoped::ScopedLogger,
@@ -1715,12 +1715,7 @@ impl ResolvedInstanceState {
         capability_name: Name,
     ) -> Router {
         if decl.program.is_none() {
-            return Router::new_error(
-                OpenError::from(CapabilityProviderError::from(ComponentProviderError::from(
-                    OpenOutgoingDirError::InstanceNonExecutable,
-                )))
-                .into(),
-            );
+            return Router::new_error(OpenOutgoingDirError::InstanceNonExecutable.into());
         }
         let outgoing_dict = Self::build_program_outgoing_dict(component, &decl.capabilities);
         let weak_component = WeakComponentInstance::new(component);
@@ -1730,33 +1725,19 @@ impl ResolvedInstanceState {
             let capability_name = capability_name.clone();
             let target_moniker = request.target.moniker.clone();
             async move {
-                let component = weak_component.upgrade().map_err(RoutingError::from)?;
                 // If the component is already started, this will be a no-op.
-                match component
-                    .start(
-                        &StartReason::AccessCapability {
-                            target: target_moniker,
-                            name: capability_name.clone(),
-                        },
-                        None,
-                        IncomingCapabilities::default(),
-                    )
-                    .await
-                {
-                    Ok(_) => {
-                        let cap =
-                            outgoing_dict.get_capability(iter::once(capability_name.as_str()));
-                        match cap {
-                            Some(cap) => cap.route(request).await,
-                            None => Err(RoutingError::BedrockNotPresentInDictionary {
-                                name: capability_name.into(),
-                            }
-                            .into()),
-                        }
+                weak_component
+                    .ensure_started(&StartReason::AccessCapability {
+                        target: target_moniker,
+                        name: capability_name.clone(),
+                    })
+                    .await?;
+                let cap = outgoing_dict.get_capability(iter::once(capability_name.as_str()));
+                match cap {
+                    Some(cap) => cap.route(request).await,
+                    None => Err(RoutingError::BedrockNotPresentInDictionary {
+                        name: capability_name.into(),
                     }
-                    Err(e) => Err(OpenError::from(CapabilityProviderError::from(
-                        ComponentProviderError::from(e),
-                    ))
                     .into()),
                 }
             }

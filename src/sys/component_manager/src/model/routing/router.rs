@@ -3,10 +3,11 @@
 // found in the LICENSE file.
 
 use crate::capability::CapabilitySource;
-use crate::model::{component::WeakComponentInstance, error::RouteOrOpenError};
+use crate::model::component::WeakComponentInstance;
 use crate::sandbox_util::walk_dict_resolve_routers;
 use ::routing::{error::RoutingError, policy::GlobalPolicyChecker};
 use async_trait::async_trait;
+use bedrock_error::{BedrockError, Explain};
 use cm_types::Availability;
 use cm_util::TaskGroup;
 use fidl::epitaph::ChannelEpitaphExt;
@@ -24,7 +25,7 @@ use zx::HandleBased;
 /// capabilities from them.
 #[async_trait]
 pub trait Routable: Send + Sync {
-    async fn route(&self, request: Request) -> Result<Capability, RouteOrOpenError>;
+    async fn route(&self, request: Request) -> Result<Capability, BedrockError>;
 }
 
 /// [`Request`] contains metadata around how to obtain a capability.
@@ -67,16 +68,10 @@ impl From<Router> for Capability {
 /// that takes a request and returns such future.
 impl<F> Routable for F
 where
-    F: Fn(Request) -> BoxFuture<'static, Result<Capability, RouteOrOpenError>>
-        + Send
-        + Sync
-        + 'static,
+    F: Fn(Request) -> BoxFuture<'static, Result<Capability, BedrockError>> + Send + Sync + 'static,
 {
     // We use the desugared form of `async_trait` to avoid unnecessary boxing.
-    fn route<'a, 'b>(
-        &'a self,
-        request: Request,
-    ) -> BoxFuture<'b, Result<Capability, RouteOrOpenError>>
+    fn route<'a, 'b>(&'a self, request: Request) -> BoxFuture<'b, Result<Capability, BedrockError>>
     where
         'a: 'b,
         Self: 'b,
@@ -93,13 +88,13 @@ impl Router {
 
     pub fn new_non_async<F>(route_fn: F) -> Self
     where
-        F: Fn(Request) -> Result<Capability, RouteOrOpenError> + Send + Sync + 'static,
+        F: Fn(Request) -> Result<Capability, BedrockError> + Send + Sync + 'static,
     {
         Router::new(move |request: Request| std::future::ready(route_fn(request)).boxed())
     }
 
     /// Creates a router that will always fail a request with the provided error.
-    pub fn new_error(error: RouteOrOpenError) -> Self {
+    pub fn new_error(error: BedrockError) -> Self {
         Router::new_non_async(move |_request| Err(error.clone()))
     }
 
@@ -112,7 +107,7 @@ impl Router {
     }
 
     /// Obtain a capability from this router, following the description in `request`.
-    pub async fn route(&self, request: Request) -> Result<Capability, RouteOrOpenError> {
+    pub async fn route(&self, request: Request) -> Result<Capability, BedrockError> {
         self.routable.route(request).await
     }
 
@@ -278,7 +273,7 @@ impl Router {
                             match super::capability_into_open(capability.clone()) {
                                 Ok(open) => open.open(scope, flags, relative_path, server_end),
                                 Err(error) => errors_fn(ErrorCapsule {
-                                    error,
+                                    error: error.into(),
                                     open_request: OpenRequest { flags, relative_path, server_end },
                                 }),
                             }
@@ -302,7 +297,7 @@ impl Router {
 /// server endpoint in the open request with an appropriate epitaph on drop.
 #[derive(Debug)]
 pub struct ErrorCapsule {
-    error: RouteOrOpenError,
+    error: BedrockError,
     open_request: OpenRequest,
 }
 
@@ -311,7 +306,7 @@ impl ErrorCapsule {
     /// sent by the client when they connect to the requested capability. It is
     /// provided here such that the endpoint may be closed with an appropriate
     /// epitaph, which is now the responsibility of the caller.
-    pub fn manually_handle(mut self) -> (RouteOrOpenError, OpenRequest) {
+    pub fn manually_handle(mut self) -> (BedrockError, OpenRequest) {
         (self.error.clone(), self.open_request.take())
     }
 }
@@ -360,7 +355,7 @@ impl From<Router> for fsandbox::Capability {
 
 #[async_trait]
 impl Routable for Capability {
-    async fn route(&self, request: Request) -> Result<Capability, RouteOrOpenError> {
+    async fn route(&self, request: Request) -> Result<Capability, BedrockError> {
         match self.clone() {
             Capability::Router(router) => Router::from_any(router).route(request).await,
             capability => Ok(capability),
@@ -386,7 +381,7 @@ impl PolicyCheckRouter {
 
 #[async_trait]
 impl Routable for PolicyCheckRouter {
-    async fn route(&self, request: Request) -> Result<Capability, RouteOrOpenError> {
+    async fn route(&self, request: Request) -> Result<Capability, BedrockError> {
         match self
             .policy_checker
             .can_route_capability(&self.capability_source, &request.target.moniker)
@@ -438,9 +433,10 @@ mod tests {
         use ::routing::error::AvailabilityRoutingError;
         assert_matches!(
             error,
-            RouteOrOpenError::RoutingError(RoutingError::AvailabilityRoutingError(
+            BedrockError::RoutingError(err)
+            if err.to_string() == RoutingError::AvailabilityRoutingError(
                 AvailabilityRoutingError::TargetHasStrongerAvailability
-            ))
+            ).to_string()
         );
     }
 

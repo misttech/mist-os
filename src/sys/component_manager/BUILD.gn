@@ -24,6 +24,7 @@ rustc_binary("bin") {
   deps = [
     ":measure_tape_for_events",
     ":measure_tape_for_instance",
+    "lib/bedrock_error",
     "lib/sandbox",
     "//sdk/fidl/fuchsia.boot:fuchsia.boot_rust",
     "//sdk/fidl/fuchsia.component:fuchsia.component_rust",

@@ -44,8 +44,7 @@ pub fn route_fn(component: WeakComponentInstance, request: RouteRequest) -> Rout
                 let res =
                     routing::route_and_open_capability(&request, &component, open_options).await;
                 if let Err(e) = res {
-                    routing::report_routing_failure(&request, &component, e.into(), server_end)
-                        .await;
+                    routing::report_routing_failure(&request, &component, e, server_end).await;
                 }
             });
         },

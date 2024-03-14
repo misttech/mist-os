@@ -7,6 +7,7 @@ pub mod providers;
 pub mod router;
 pub mod service;
 pub use ::routing::error::RoutingError;
+use bedrock_error::Explain;
 pub use open::*;
 
 use {
@@ -156,7 +157,7 @@ https://fuchsia.dev/go/components/connect-errors";
 pub async fn report_routing_failure(
     request: &RouteRequest,
     target: &Arc<ComponentInstance>,
-    err: ModelError,
+    err: impl Explain,
     server_end: zx::Channel,
 ) {
     server_end

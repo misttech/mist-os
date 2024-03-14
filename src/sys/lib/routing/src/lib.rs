@@ -35,6 +35,7 @@ use {
         rights::Rights,
         walk_state::WalkState,
     },
+    bedrock_error::Explain,
     cm_rust::{
         Availability, CapabilityTypeName, ExposeConfigurationDecl, ExposeDecl, ExposeDeclCommon,
         ExposeDirectoryDecl, ExposeProtocolDecl, ExposeResolverDecl, ExposeRunnerDecl,

@@ -16,8 +16,8 @@ pub enum BedrockError {
     #[error("could not route: {0}")]
     RoutingError(Arc<dyn Explain>),
 
-    #[error("could not start: {0}")]
-    StartError(Arc<dyn Explain>),
+    #[error("could not transition lifecycle: {0}")]
+    LifecycleError(Arc<dyn Explain>),
 
     #[error("could not open: {0}")]
     OpenError(Arc<dyn Explain>),
@@ -37,7 +37,7 @@ impl Explain for BedrockError {
     fn as_zx_status(&self) -> zx::Status {
         match self {
             BedrockError::RoutingError(err) => err.as_zx_status(),
-            BedrockError::StartError(err) => err.as_zx_status(),
+            BedrockError::LifecycleError(err) => err.as_zx_status(),
             BedrockError::OpenError(err) => err.as_zx_status(),
         }
     }
