@@ -48,7 +48,6 @@ zx::result<> FidlDevice::Create(zx_device_t* parent, pci::Device* device) {
       BIND_PCI_TOPO_PACK(device->bus_id(), device->dev_id(), device->func_id()));
   // clang-format off
   zx_device_prop_t pci_device_props[] = {
-      {BIND_FIDL_PROTOCOL, 0, ZX_FIDL_PROTOCOL_PCI},
       {BIND_PCI_VID, 0, device->vendor_id()},
       {BIND_PCI_DID, 0, device->device_id()},
       {BIND_PCI_CLASS, 0, device->class_id()},

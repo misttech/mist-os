@@ -11,6 +11,7 @@ driver_bind_rules("virtio_gpu_bind_v1") {
   rules = "virtio_gpu.bind"
   tests = "bind_tests.json"
   deps = [
+    "//sdk/fidl/fuchsia.hardware.pci:fuchsia.hardware.pci_bindlib",
     "//src/devices/bind/fuchsia.acpi",
     "//src/devices/bind/fuchsia.pci",
     "//src/devices/bind/fuchsia.sysmem",

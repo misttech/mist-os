@@ -5,11 +5,12 @@
 composite pci_sdhci;
 
 using fuchsia.acpi;
+using fuchsia.hardware.pci;
 using fuchsia.pci;
 using fuchsia.sysmem;
 
 primary node "pci" {
-  fuchsia.BIND_FIDL_PROTOCOL == fuchsia.pci.BIND_FIDL_PROTOCOL.DEVICE;
+  fuchsia.hardware.pci.Service == fuchsia.hardware.pci.Service.ZirconTransport;
   fuchsia.BIND_PCI_CLASS == fuchsia.pci.BIND_PCI_CLASS.GENERIC_SYSTEM_PERIPHERAL;
   fuchsia.BIND_PCI_SUBCLASS == 0x05;
   fuchsia.BIND_PCI_INTERFACE == 0x01;

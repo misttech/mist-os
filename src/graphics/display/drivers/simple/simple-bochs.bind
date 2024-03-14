@@ -5,11 +5,11 @@
 composite goldfish_address_space;
 
 using fuchsia.acpi;
-using fuchsia.pci;
+using fuchsia.hardware.pci;
 using fuchsia.sysmem;
 
 primary node "pci" {
-  fuchsia.BIND_FIDL_PROTOCOL == fuchsia.pci.BIND_FIDL_PROTOCOL.DEVICE;
+  fuchsia.hardware.pci.Service == fuchsia.hardware.pci.Service.ZirconTransport;
 
   // QEMU_GFX_VID
   fuchsia.BIND_PCI_VID == 0x1234;

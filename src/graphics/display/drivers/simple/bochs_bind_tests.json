@@ -14,7 +14,7 @@
                 "device": {
                     "fuchsia.BIND_PCI_DID": "0x1111",
                     "fuchsia.BIND_PCI_VID": "0x1234",
-                    "fuchsia.BIND_FIDL_PROTOCOL": "fuchsia.pci.BIND_FIDL_PROTOCOL.DEVICE",
+                    "fuchsia.hardware.pci.Service": "fuchsia.hardware.pci.Service.ZirconTransport",
                     "fuchsia.BIND_COMPOSITE": "1"
                 },
                 "expected": "match",

@@ -5,6 +5,7 @@
 composite inteli2c;
 
 using fuchsia.acpi;
+using fuchsia.hardware.pci;
 using fuchsia.pci;
 using fuchsia.intel.platform.pci;
 using fuchsia.platform;
@@ -12,7 +13,7 @@ using fuchsia.platform;
 primary node "pci" {
     fuchsia.platform.DRIVER_FRAMEWORK_VERSION == 2;
 
-    fuchsia.BIND_FIDL_PROTOCOL == fuchsia.pci.BIND_FIDL_PROTOCOL.DEVICE;
+    fuchsia.hardware.pci.Service == fuchsia.hardware.pci.Service.ZirconTransport;
     fuchsia.BIND_PCI_VID == fuchsia.pci.BIND_PCI_VID.INTEL;
 
     accept fuchsia.BIND_PCI_DID {

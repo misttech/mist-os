@@ -18,7 +18,10 @@ driver_bind_rules("fake_pci_bus_driver_bind") {
 driver_bind_rules("pci_protocol_test_driver_bind") {
   rules = "pci_protocol_test_driver.bind"
   tests = "pci_protocol_bind_tests.json"
-  deps = [ "//src/devices/bind/fuchsia.pci" ]
+  deps = [
+    "//sdk/fidl/fuchsia.hardware.pci:fuchsia.hardware.pci_bindlib",
+    "//src/devices/bind/fuchsia.pci",
+  ]
 }
 
 group("tests") {

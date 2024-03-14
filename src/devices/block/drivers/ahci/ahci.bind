@@ -5,12 +5,13 @@
 composite ahci;
 
 using fuchsia.acpi;
+using fuchsia.hardware.pci;
 using fuchsia.sysmem;
 using fuchsia.pci;
 using fuchsia.pci.massstorage;
 
 primary node "pci" {
-  fuchsia.BIND_FIDL_PROTOCOL == fuchsia.pci.BIND_FIDL_PROTOCOL.DEVICE;
+  fuchsia.hardware.pci.Service == fuchsia.hardware.pci.Service.ZirconTransport;
   fuchsia.BIND_PCI_CLASS ==  fuchsia.pci.BIND_PCI_CLASS.MASS_STORAGE;
   fuchsia.BIND_PCI_SUBCLASS ==  fuchsia.pci.massstorage.BIND_PCI_SUBCLASS.SATA;
   fuchsia.BIND_PCI_INTERFACE ==  0x01;

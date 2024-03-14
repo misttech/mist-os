@@ -12,6 +12,7 @@ driver_bind_rules("usb_xhci_bind") {
   bind_output = "xhci.bindbc"
   tests = "tests.json"
   deps = [
+    "//sdk/fidl/fuchsia.hardware.pci:fuchsia.hardware.pci_bindlib",
     "//sdk/fidl/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_bindlib",
     "//sdk/fidl/fuchsia.hardware.usb.phy:fuchsia.hardware.usb.phy_bindlib",
     "//src/devices/bind/fuchsia.acpi",

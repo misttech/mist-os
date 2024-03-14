@@ -13,7 +13,7 @@
                 "device": {
                     "fuchsia.BIND_PCI_CLASS": "fuchsia.pci.BIND_PCI_CLASS.DISPLAY",
                     "fuchsia.BIND_PCI_VID": "0x15ad",
-                    "fuchsia.BIND_FIDL_PROTOCOL": "fuchsia.pci.BIND_FIDL_PROTOCOL.DEVICE"
+                    "fuchsia.hardware.pci.Service": "fuchsia.hardware.pci.Service.ZirconTransport"
                 },
                 "expected": "match",
                 "name": "VMware"

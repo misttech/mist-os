@@ -5,6 +5,7 @@
 composite xhci;
 
 using fuchsia.acpi;
+using fuchsia.hardware.pci;
 using fuchsia.hardware.usb.phy;
 using fuchsia.hardware.platform.device;
 using fuchsia.pci;
@@ -16,7 +17,7 @@ using fuchsia.usb.phy;
 using fuchsia.devicetree;
 
 primary node "pdev" {
-  if fuchsia.BIND_FIDL_PROTOCOL == fuchsia.pci.BIND_FIDL_PROTOCOL.DEVICE {
+  if fuchsia.hardware.pci.Service == fuchsia.hardware.pci.Service.ZirconTransport {
     // PCI binding support.
     fuchsia.BIND_PCI_CLASS == fuchsia.pci.BIND_PCI_CLASS.SERIAL_BUS_CONTROLLER;
     fuchsia.BIND_PCI_SUBCLASS == fuchsia.pci.serial.BIND_PCI_SUBCLASS.USB;

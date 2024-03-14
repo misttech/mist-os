@@ -216,7 +216,6 @@ zx_status_t KernelPci::CreateComposite(zx_device_t* parent, kpci_device device, 
   auto pci_bind_topo = static_cast<uint32_t>(
       BIND_PCI_TOPO_PACK(device.info.bus_id, device.info.dev_id, device.info.func_id));
   zx_device_prop_t fragment_props[] = {
-      {BIND_FIDL_PROTOCOL, 0, ZX_FIDL_PROTOCOL_PCI},
       {BIND_PCI_VID, 0, device.info.vendor_id},
       {BIND_PCI_DID, 0, device.info.device_id},
       {BIND_PCI_CLASS, 0, device.info.base_class},
