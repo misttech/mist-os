@@ -85,8 +85,6 @@
                 "getpriority02",
                 "io_cancel01",
                 "io_cancel02",
-                "io_getevents01",
-                "io_getevents02",
                 "io_setup01",
                 "io_setup02",
 

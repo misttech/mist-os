@@ -9,22 +9,20 @@ use crate::{
     vfs::{
         buffers::{UserBuffersInputBuffer, UserBuffersOutputBuffer},
         checked_add_offset_and_length,
-        eventfd::{new_eventfd, EventFdType},
+        eventfd::{new_eventfd, EventFdFileObject, EventFdType},
         inotify::InotifyFileObject,
         namespace::FileSystemCreator,
         new_memfd,
         pidfd::new_pidfd,
         pipe::{new_pipe, PipeFileObject},
-        splice, DirentSink64, EpollFileObject, FallocMode, FdFlags, FdNumber, FileAsyncOwner,
-        FileHandle, FileSystemOptions, FlockOperation, FsStr, FsString, LookupContext,
-        NamespaceNode, PathWithReachability, RecordLockCommand, RenameFlags, SeekTarget,
-        StatxFlags, SymlinkMode, SymlinkTarget, TargetFdNumber, TimeUpdateType, UnlinkKind,
-        ValueOrSize, WdNumber, WhatToMount, XattrOp,
+        splice, AioContext, DirentSink64, EpollFileObject, FallocMode, FdFlags, FdNumber,
+        FileAsyncOwner, FileHandle, FileSystemOptions, FlockOperation, FsStr, FsString,
+        IoOperation, IoOperationType, LookupContext, NamespaceNode, PathWithReachability,
+        RecordLockCommand, RenameFlags, SeekTarget, StatxFlags, SymlinkMode, SymlinkTarget,
+        TargetFdNumber, TimeUpdateType, UnlinkKind, ValueOrSize, WdNumber, WhatToMount, XattrOp,
     },
 };
 use fuchsia_zircon as zx;
-use linux_uapi::{IOCB_CMD_PREAD, IOCB_CMD_PWRITE, IOCB_FLAG_RESFD};
-use smallvec::smallvec;
 use starnix_logging::{log_trace, track_stub};
 use starnix_sync::{DeviceOpen, FileOpsCore, LockBefore, Locked, Mutex, Unlocked};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
@@ -41,7 +39,6 @@ use starnix_uapi::{
     mount_flags::MountFlags,
     off_t,
     open_flags::OpenFlags,
-    ownership::OwnedRef,
     personality::PersonalityFlags,
     pid_t, pollfd, pselect6_sigmask,
     resource_limits::Resource,
@@ -62,25 +59,17 @@ use starnix_uapi::{
     EFD_SEMAPHORE, EPOLL_CLOEXEC, EPOLL_CTL_ADD, EPOLL_CTL_DEL, EPOLL_CTL_MOD, F_ADD_SEALS,
     F_DUPFD, F_DUPFD_CLOEXEC, F_GETFD, F_GETFL, F_GETLK, F_GETOWN, F_GETOWN_EX, F_GET_SEALS,
     F_OFD_GETLK, F_OFD_SETLK, F_OFD_SETLKW, F_OWNER_PGRP, F_OWNER_PID, F_OWNER_TID, F_SETFD,
-    F_SETFL, F_SETLK, F_SETLKW, F_SETOWN, F_SETOWN_EX, IN_CLOEXEC, IN_NONBLOCK, MFD_ALLOW_SEALING,
-    MFD_CLOEXEC, MFD_HUGETLB, MFD_HUGE_MASK, MFD_HUGE_SHIFT, NAME_MAX, O_CLOEXEC, O_CREAT,
-    O_TMPFILE, PATH_MAX, PIDFD_NONBLOCK, POLLERR, POLLHUP, POLLIN, POLLOUT, POLLPRI, POLLRDBAND,
-    POLLRDNORM, POLLWRBAND, POLLWRNORM, POSIX_FADV_DONTNEED, POSIX_FADV_NOREUSE, POSIX_FADV_NORMAL,
-    POSIX_FADV_RANDOM, POSIX_FADV_SEQUENTIAL, POSIX_FADV_WILLNEED, RWF_SUPPORTED, TFD_CLOEXEC,
-    TFD_NONBLOCK, TFD_TIMER_ABSTIME, TFD_TIMER_CANCEL_ON_SET, UMOUNT_NOFOLLOW, XATTR_CREATE,
-    XATTR_NAME_MAX, XATTR_REPLACE,
+    F_SETFL, F_SETLK, F_SETLKW, F_SETOWN, F_SETOWN_EX, IN_CLOEXEC, IN_NONBLOCK, IOCB_FLAG_RESFD,
+    MFD_ALLOW_SEALING, MFD_CLOEXEC, MFD_HUGETLB, MFD_HUGE_MASK, MFD_HUGE_SHIFT, NAME_MAX,
+    O_CLOEXEC, O_CREAT, O_TMPFILE, PATH_MAX, PIDFD_NONBLOCK, POLLERR, POLLHUP, POLLIN, POLLOUT,
+    POLLPRI, POLLRDBAND, POLLRDNORM, POLLWRBAND, POLLWRNORM, POSIX_FADV_DONTNEED,
+    POSIX_FADV_NOREUSE, POSIX_FADV_NORMAL, POSIX_FADV_RANDOM, POSIX_FADV_SEQUENTIAL,
+    POSIX_FADV_WILLNEED, RWF_SUPPORTED, TFD_CLOEXEC, TFD_NONBLOCK, TFD_TIMER_ABSTIME,
+    TFD_TIMER_CANCEL_ON_SET, UMOUNT_NOFOLLOW, XATTR_CREATE, XATTR_NAME_MAX, XATTR_REPLACE,
 };
 use std::{
-    cmp::Ordering,
-    collections::VecDeque,
-    marker::PhantomData,
-    mem::MaybeUninit,
-    sync::{mpsc::channel, Arc},
-    usize,
+    cmp::Ordering, collections::VecDeque, marker::PhantomData, mem::MaybeUninit, sync::Arc, usize,
 };
-use zerocopy::IntoBytes;
-
-use super::{eventfd::EventFdFileObject, VecInputBuffer};
 
 // Constants from bionic/libc/include/sys/stat.h
 const UTIME_NOW: i64 = 0x3fffffff;
@@ -2765,14 +2754,6 @@ pub fn sys_io_setup(
     Ok(())
 }
 
-struct IocbEvent {
-    opcode: u32,
-    file: FileHandle,
-    buffer: UserBuffer,
-    offset: usize,
-    eventfd: Option<FileHandle>,
-}
-
 pub fn sys_io_submit(
     locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
@@ -2786,69 +2767,23 @@ pub fn sys_io_submit(
     if nr == 0 {
         return Ok(0);
     }
-    {
+    let ctx = {
         let mm_state = current_task.mm().state.read();
-        let ctx = mm_state.aio_contexts.get_context(ctx_id).ok_or_else(|| errno!(EINVAL))?;
-        if !ctx.can_queue() {
-            return error!(EAGAIN);
-        }
-    }
-
-    let (iocb_sender, iocb_receiver) = channel::<IocbEvent>();
-    let weak_task = OwnedRef::downgrade(&current_task.task);
-    current_task.kernel().kthreads.spawn(move |inner_locked, current_task| loop {
-        let IocbEvent { opcode, file, buffer, offset, eventfd } = match iocb_receiver.recv() {
-            Ok(r) => r,
-            Err(_) => return,
-        };
-        if let Some(task) = weak_task.upgrade() {
-            match opcode {
-                IOCB_CMD_PREAD => {
-                    let mut output_buffer =
-                        match UserBuffersOutputBuffer::vmo_new(&task, smallvec![buffer]) {
-                            Ok(b) => b,
-                            Err(_) => continue,
-                        };
-                    if offset != 0 {
-                        let _ =
-                            file.read_at(inner_locked, current_task, offset, &mut output_buffer);
-                    } else {
-                        let _ = file.read(inner_locked, current_task, &mut output_buffer);
-                    }
-                }
-                IOCB_CMD_PWRITE => {
-                    let mut input_buffer =
-                        match UserBuffersInputBuffer::vmo_new(&task, smallvec![buffer]) {
-                            Ok(b) => b,
-                            Err(_) => continue,
-                        };
-                    if offset != 0 {
-                        let _ =
-                            file.write_at(inner_locked, current_task, offset, &mut input_buffer);
-                    } else {
-                        let _ = file.write(inner_locked, current_task, &mut input_buffer);
-                    }
-                }
-                _ => {}
-            }
-
-            if let Some(eventfd) = eventfd {
-                let mut input_buffer = VecInputBuffer::new(1u64.as_bytes());
-                let _ = eventfd.write(inner_locked, current_task, &mut input_buffer);
-            }
-        }
-    });
+        mm_state.aio_contexts.get_context(ctx_id).ok_or_else(|| errno!(EINVAL))?
+    };
 
     // `iocbpp` is an array of addresses to iocb's.
     let mut iocb_addrs: UserRef<UserAddress> = UserRef::new(iocbpp);
     let mut num_submitted: i32 = 0;
     loop {
         let iocb_addr = current_task.read_object(iocb_addrs)?;
-        let iocb_ref: UserRef<iocb> = UserRef::new(iocb_addr);
+        let iocb_ref: UserRef<iocb> = UserRef::new(iocb_addr.clone());
         let control_block = current_task.read_object(iocb_ref)?;
 
-        match (num_submitted, submit_iocb(locked, current_task, control_block, iocb_sender.clone()))
-        {
+        match (
+            num_submitted,
+            submit_iocb(locked, current_task, control_block, iocb_addr, ctx.clone()),
+        ) {
             (0, Err(e)) => return Err(e),
             (_, Err(_)) => break,
             (_, Ok(())) => {
@@ -2869,9 +2804,11 @@ fn submit_iocb(
     _locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     control_block: iocb,
-    iocb_sender: std::sync::mpsc::Sender<IocbEvent>,
+    iocb_addr: UserAddress,
+    ctx: Arc<Mutex<AioContext>>,
 ) -> Result<(), Errno> {
     let file = current_task.files.get(FdNumber::from_raw(control_block.aio_fildes as i32))?;
+    let id = control_block.aio_data;
     let opcode = control_block.aio_lio_opcode as u32;
     let offset = control_block.aio_offset as usize;
     let flags = control_block.aio_flags;
@@ -2884,44 +2821,79 @@ fn submit_iocb(
         if eventfd.downcast_file::<EventFdFileObject>().is_none() {
             return error!(EINVAL);
         }
-        Some(eventfd)
+        Some(Arc::downgrade(&eventfd))
     } else {
         None
     };
 
-    match opcode {
-        IOCB_CMD_PREAD | IOCB_CMD_PWRITE => {}
+    let op_type = match opcode {
+        starnix_uapi::IOCB_CMD_PREAD => {
+            if !file.can_read() {
+                return error!(EBADF);
+            }
+            IoOperationType::Read
+        }
+        starnix_uapi::IOCB_CMD_PWRITE => {
+            if !file.can_write() {
+                return error!(EBADF);
+            }
+            IoOperationType::Write
+        }
         _ => {
             track_stub!(TODO("https://fxbug.dev/297433877"), "io_submit opcode", opcode);
             return error!(ENOSYS);
         }
-    }
+    };
 
-    // Verify that the operation is permitted on the file before attempting it on a separate
-    // thread, so that an error can be returned.
-    if opcode == IOCB_CMD_PWRITE && !file.can_write() {
-        return error!(EBADF);
-    }
-    if opcode == IOCB_CMD_PREAD && !file.can_read() {
-        return error!(EBADF);
-    }
-
-    let _ = iocb_sender.send(IocbEvent { opcode, file, buffer, offset, eventfd });
-
-    Ok(())
+    let mut ctx = ctx.lock();
+    ctx.queue_op(
+        current_task,
+        IoOperation {
+            op_type,
+            file: Arc::downgrade(&file),
+            buffer,
+            offset,
+            id,
+            iocb_addr,
+            eventfd,
+        },
+    )
 }
 
 pub fn sys_io_getevents(
     _locked: &mut Locked<'_, Unlocked>,
-    _current_task: &CurrentTask,
-    _ctx_id: aio_context_t,
-    _min_nr: i64,
-    _nr: i64,
-    _events: UserRef<io_event>,
-    _timeout: UserRef<timespec>,
+    current_task: &CurrentTask,
+    ctx_id: aio_context_t,
+    min_nr: i64,
+    nr: i64,
+    events_ref: UserRef<io_event>,
+    timeout_ref: UserRef<timespec>,
 ) -> Result<i32, Errno> {
-    track_stub!(TODO("https://fxbug.dev/297433877"), "io_getevents");
-    return error!(ENOSYS);
+    if min_nr < 0 || min_nr > nr || nr < 0 {
+        return error!(EINVAL);
+    }
+
+    if !timeout_ref.addr().is_null() && min_nr != 0 {
+        let timeout = current_task.read_object(timeout_ref)?;
+        if (timeout.tv_sec, timeout.tv_nsec) != (0, 0) {
+            track_stub!(TODO("https://fxbug.dev/297433877"), "io_getevents with blocking");
+            return error!(ENOSYS);
+        }
+    }
+
+    let ctx = {
+        let mm_state = current_task.mm().state.read();
+        mm_state.aio_contexts.get_context(ctx_id).ok_or_else(|| errno!(EINVAL))?
+    };
+
+    let events = {
+        let mut ctx = ctx.lock();
+        ctx.read_available_results(nr as usize)
+    };
+
+    current_task.write_objects(events_ref, &events)?;
+
+    Ok(events.len() as i32)
 }
 
 pub fn sys_io_cancel(

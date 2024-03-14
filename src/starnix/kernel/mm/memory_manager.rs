@@ -1935,9 +1935,48 @@ pub trait MemoryAccessor {
     fn zero(&self, addr: UserAddress, length: usize) -> Result<usize, Errno>;
 }
 
+impl MemoryAccessor for MemoryManager {
+    fn read_memory<'a>(
+        &self,
+        addr: UserAddress,
+        bytes: &'a mut [MaybeUninit<u8>],
+    ) -> Result<&'a mut [u8], Errno> {
+        self.vmo_read_memory(addr, bytes)
+    }
+    fn read_memory_partial<'a>(
+        &self,
+        addr: UserAddress,
+        bytes: &'a mut [MaybeUninit<u8>],
+    ) -> Result<&'a mut [u8], Errno> {
+        self.vmo_read_memory_partial(addr, bytes)
+    }
+    fn read_memory_partial_until_null_byte<'a>(
+        &self,
+        addr: UserAddress,
+        bytes: &'a mut [MaybeUninit<u8>],
+    ) -> Result<&'a mut [u8], Errno> {
+        self.vmo_read_memory_partial_until_null_byte(addr, bytes)
+    }
+    fn write_memory(&self, addr: UserAddress, bytes: &[u8]) -> Result<usize, Errno> {
+        self.vmo_write_memory(addr, bytes)
+    }
+    fn write_memory_partial(&self, addr: UserAddress, bytes: &[u8]) -> Result<usize, Errno> {
+        self.vmo_write_memory_partial(addr, bytes)
+    }
+    fn zero(&self, addr: UserAddress, length: usize) -> Result<usize, Errno> {
+        self.vmo_zero(addr, length)
+    }
+}
+
 pub trait TaskMemoryAccessor: MemoryAccessor {
     /// Returns the maximum valid address for this memory accessor.
     fn maximum_valid_address(&self) -> UserAddress;
+}
+
+impl TaskMemoryAccessor for MemoryManager {
+    fn maximum_valid_address(&self) -> UserAddress {
+        self.maximum_valid_user_address
+    }
 }
 
 // TODO(https://fxbug.dev/42079727): replace this with MaybeUninit::as_bytes_mut.

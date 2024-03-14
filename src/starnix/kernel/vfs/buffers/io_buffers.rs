@@ -4,7 +4,7 @@
 
 use crate::{
     mm::{
-        read_to_array, read_to_object_as_bytes, read_to_vec, MemoryAccessorExt,
+        read_to_array, read_to_object_as_bytes, read_to_vec, MemoryAccessorExt, MemoryManager,
         NumberOfElementsRead, TaskMemoryAccessor, UNIFIED_ASPACES_ENABLED,
     },
     task::{CurrentTask, Task},
@@ -432,6 +432,12 @@ impl<'a> UserBuffersOutputBuffer<'a, Task> {
     }
 }
 
+impl<'a> UserBuffersOutputBuffer<'a, MemoryManager> {
+    pub fn vmo_new(mm: &'a MemoryManager, buffers: UserBuffers) -> Result<Self, Errno> {
+        Self::new_inner(mm, buffers)
+    }
+}
+
 impl<'a, M: TaskMemoryAccessor> Buffer for UserBuffersOutputBuffer<'a, M> {
     fn segments_count(&self) -> Result<usize, Errno> {
         Ok(self.buffers.iter().filter(|b| b.is_null()).count())
@@ -602,6 +608,12 @@ impl<'a> UserBuffersInputBuffer<'a, CurrentTask> {
 
 impl<'a> UserBuffersInputBuffer<'a, Task> {
     pub fn vmo_new(mm: &'a Task, buffers: UserBuffers) -> Result<Self, Errno> {
+        Self::new_inner(mm, buffers)
+    }
+}
+
+impl<'a> UserBuffersInputBuffer<'a, MemoryManager> {
+    pub fn vmo_new(mm: &'a MemoryManager, buffers: UserBuffers) -> Result<Self, Errno> {
         Self::new_inner(mm, buffers)
     }
 }
