@@ -121,6 +121,11 @@ bool ReadFileDescriptorToVector(int fd, std::vector<uint8_t>* result) {
   return ReadFileDescriptor(fd, result);
 }
 
+bool ReadFileToVectorAt(int dirfd, const std::string& path, std::vector<uint8_t>* result) {
+  fbl::unique_fd fd(openat(dirfd, path.c_str(), O_RDONLY));
+  return ReadFileDescriptor(fd.get(), result);
+}
+
 bool IsFile(const std::string& path) { return IsFileAt(AT_FDCWD, path); }
 
 bool IsFileAt(int dirfd, const std::string& path) {

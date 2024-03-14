@@ -119,5 +119,18 @@ TEST(File, GetFileSizeAt) {
   EXPECT_EQ(content.size(), size);
 }
 
+TEST(File, ReadWriteFileVectorAt) {
+  ScopedTempDir dir;
+  std::string filename = "bar";
+  std::string content = "content";
+  fbl::unique_fd dirfd(open(dir.path().c_str(), O_RDONLY));
+
+  EXPECT_TRUE(files::WriteFileAt(dirfd.get(), filename, content.c_str(), content.size()));
+
+  std::vector<uint8_t> read_content;
+  EXPECT_TRUE(files::ReadFileToVectorAt(dirfd.get(), filename, &read_content));
+  EXPECT_EQ(std::vector<uint8_t>({'c', 'o', 'n', 't', 'e', 'n', 't'}), read_content);
+}
+
 }  // namespace
 }  // namespace files

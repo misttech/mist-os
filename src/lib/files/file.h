@@ -42,6 +42,7 @@ bool ReadFileToStringAt(int dirfd, const std::string& path, std::string* result)
 // false. If this function returns false, |result| will be the empty string.
 bool ReadFileToVector(const std::string& path, std::vector<uint8_t>* result);
 bool ReadFileDescriptorToVector(int fd, std::vector<uint8_t>* result);
+bool ReadFileToVectorAt(int dirfd, const std::string& path, std::vector<uint8_t>* result);
 
 // Returns whether the given path is a file.
 bool IsFile(const std::string& path);
