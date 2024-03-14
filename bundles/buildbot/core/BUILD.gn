@@ -60,6 +60,11 @@ group("core") {
 
   # Ensure paths to known e2e test libs are always up-to-date.
   deps += e2e_test_libs
+
+  metadata = {
+    # Disallow test bundles to add shell commands to the main image.
+    shell_commands_barrier = []
+  }
 }
 
 # WARNING: Known to infrastructure
@@ -71,6 +76,10 @@ group("core") {
 group("no_e2e") {
   testonly = true
   deps = [ ":no_e2e_dep" ] + e2e_lib_unit_tests
+  metadata = {
+    # Disallow test bundles to add shell commands to the main image.
+    shell_commands_barrier = []
+  }
 }
 
 # This group contains tests that don't depend on any known e2e test libraries.
@@ -107,6 +116,10 @@ group("no_e2e_dep") {
     "//src:tests_no_e2e",
     "//tools:tests_no_e2e",
   ]
+  metadata = {
+    # Disallow test bundles to add shell commands to the main image.
+    shell_commands_barrier = []
+  }
 }
 
 # TODO(fxbug.dev/319132749): remove from coverage bot dependencies.
