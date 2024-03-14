@@ -6,9 +6,6 @@
 
 #include <zircon/assert.h>
 
-#include <algorithm>
-
-#include "tools/fidl/fidlc/src/diagnostics.h"
 #include "tools/fidl/fidlc/src/names.h"
 
 namespace fidlc {
@@ -235,41 +232,6 @@ CalcDependencies::CalcDependencies(const Decl* decl) : library_(decl->name.libra
   }
 }
 
-// Recursive helper for building a cycle to use as the example in
-// ErrIncludeCycle. Given |dependencies|, the set of remaining undeclared
-// dependencies of each decl and |inverse_dependencies|, the list other decls
-// which depend on each decl, build out |cycle| by recursively searching all
-// dependents of the last element in the cycle until one is found which is
-// already a member of the cycle.
-//
-// The cycle must not be empty, as the last element of the cycle is the current
-// search point in the recursion.
-static bool BuildExampleCycle(
-    std::map<const Decl*, std::set<const Decl*, CmpDeclName>, CmpDeclName>& dependencies,
-    std::vector<const Decl*>& cycle) {
-  const Decl* const decl = cycle.back();
-  for (const Decl* dep : dependencies[decl]) {
-    auto dep_pos = std::find(cycle.begin(), cycle.end(), dep);
-    if (dep_pos != cycle.end()) {
-      // We found a decl that is in the cycle already. That means we have a
-      // cycle from dep_pos to cycle.end(), but there may be other decls from
-      // cycle.begin() to decl_pos which are either leaf elements not part of
-      // this cycle or part of another cycle which intersects this one.
-      cycle.erase(cycle.begin(), dep_pos);
-      // Add another reference to the same decl so it gets printed at both the
-      // start and end of the cycle.
-      cycle.push_back(dep);
-      return true;
-    }
-    cycle.push_back(dep);
-    if (BuildExampleCycle(dependencies, cycle)) {
-      return true;
-    }
-    cycle.pop_back();
-  }
-  return false;
-}
-
 void SortStep::RunImpl() {
   // |dependences| is the number of undeclared dependencies left for each decl.
   std::map<const Decl*, std::set<const Decl*, CmpDeclName>, CmpDeclName> dependencies;
@@ -311,33 +273,8 @@ void SortStep::RunImpl() {
     }
   }
 
-  if (library()->declaration_order.size() != dependencies.size()) {
-    // We didn't visit all the edges! There was a cycle.
-
-    // Find a cycle to use as an example in the error message.  We start from
-    // some type that still has undeclared outgoing dependencies, then do a DFS
-    // until we get back to a type we've visited before.
-    std::vector<const Decl*> cycle;
-    for (auto const& [decl, deps] : dependencies) {
-      // Find the first type that still has undeclared deps.
-      if (!deps.empty()) {
-        cycle.push_back(decl);
-        break;
-      }
-    }
-    // There is a cycle so we should find at least one decl with remaining
-    // undeclared deps.
-    ZX_ASSERT(!cycle.empty());
-    // Because there is a cycle, building a cycle should always succeed.
-    bool found_cycle = BuildExampleCycle(dependencies, cycle);
-    ZX_ASSERT(found_cycle);
-    // Even if there is only one element in the cycle (a self-loop),
-    // BuildExampleCycle should add a second entry so when printing we get A->A,
-    // so the list should always end up with at least two elements.
-    ZX_ASSERT(cycle.size() > 1);
-
-    reporter()->Fail(ErrIncludeCycle, cycle.front()->name.span().value(), cycle);
-  }
+  ZX_ASSERT_MSG(library()->declaration_order.size() == dependencies.size(),
+                "CompileStep should have reported ErrIncludeCycle");
 }
 
 }  // namespace fidlc
