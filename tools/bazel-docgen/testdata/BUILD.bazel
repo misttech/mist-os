@@ -1,0 +1,22 @@
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+exports_files(
+    ["foo.bzl"],
+    ["//visibility:__subpackages__"],
+)
+
+# For testing:
+# fx build to build the bazel-docgen host tool
+# fx bazel build  //tools/bazel-docgen/testdata:extract_foo_docs
+# Run the tool found at `fx list-build-artifacts --name bazel-docgen --expect-one tools`
+# bazel-docgen --proto $(fx bazel info execution_root)/bazel-out/k8-fastbuild/bin/tools/bazel-docgen/testdata/extract_foo_docs.textproto --output foo.txt
+starlark_doc_extract(
+    name = "extract_foo_docs",
+    src = ":foo.bzl",
+    # render_main_repo_name = True,
+    deps = ["//tools/bazel-docgen/testdata/foo:bzl_lib"],
+    # symbol_names = symbol_names,
+    # **(kwargs if extractor_is_main_target else auxiliary_target_kwargs)
+)
