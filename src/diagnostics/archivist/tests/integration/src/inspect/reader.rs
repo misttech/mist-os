@@ -180,7 +180,7 @@ async fn unified_reader() -> Result<(), Error> {
 
     // Then verify that subtree selection retrieves all trees under and including root.
     let accessor = realm_proxy.connect_to_protocol::<ArchiveAccessorMarker>().await.unwrap();
-    retrieve_and_validate_results(accessor, vec!["puppet*:root"], &UNIFIED_ALL_GOLDEN, 3).await;
+    retrieve_and_validate_results(accessor, vec!["puppet*:root"], &UNIFIED_ALL_GOLDEN, 4).await;
 
     // Then verify that a selector with a correct moniker, but no resolved nodes
     // produces an error schema.
