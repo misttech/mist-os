@@ -4,6 +4,7 @@
 
 #include <dirent.h>
 #include <fcntl.h>
+#include <lib/fit/defer.h>
 #include <sys/mman.h>
 #include <sys/mount.h>
 #include <sys/syscall.h>
@@ -544,6 +545,75 @@ TEST_P(FsMountTest, CantBypassDirectoryPermissions) {
     if (fd != -1) {
       close(fd);
       EXPECT_EQ(unlink(file_path.c_str()), 0);
+    }
+  });
+}
+
+TEST_P(FsMountTest, CreateWithDifferentModes) {
+  std::string user1_folder = mount_path_ + "/user1";
+  ASSERT_THAT(mkdir(user1_folder.c_str(), S_IRWXU), SyscallSucceeds());
+  ASSERT_THAT(chown(user1_folder.c_str(), kUser1Uid, kUser1Gid), SyscallSucceeds());
+
+  test_helper::ForkHelper helper;
+  helper.RunInForkedProcess([user1_folder] {
+    ASSERT_TRUE(change_ids(kUser1Uid, kUser1Gid));
+    drop_all_capabilities();
+
+    const mode_t old_umask = umask(0);
+    constexpr mode_t kModeMask = 0777;
+    auto clean_umask = fit::defer([old_umask]() { umask(old_umask); });
+
+    for (mode_t mode = 0000; mode <= 0777; mode++) {
+      SCOPED_TRACE(fxl::StringPrintf("Mode: %o", mode));
+
+      std::string file_path = fxl::StringPrintf("%s/create.%o", user1_folder.c_str(), mode);
+      {
+        test_helper::ScopedFD fd(open(file_path.c_str(), O_RDWR | O_CREAT | O_EXCL, mode));
+        EXPECT_TRUE(fd.is_valid()) << "open: " << std::strerror(errno);
+      }
+
+      auto cleanup =
+          fit::defer([file_path]() { EXPECT_THAT(unlink(file_path.c_str()), SyscallSucceeds()); });
+
+      struct stat file_stat;
+      EXPECT_THAT(stat(file_path.c_str(), &file_stat), SyscallSucceeds());
+      EXPECT_TRUE(file_stat.st_mode & S_IFREG) << "not a regular file";
+      EXPECT_EQ(file_stat.st_mode & kModeMask, mode) << "wrong permissions";
+    }
+  });
+}
+
+TEST_P(FsMountTest, ChmodWithDifferentModes) {
+  std::string user1_folder = mount_path_ + "/user1";
+  ASSERT_THAT(mkdir(user1_folder.c_str(), S_IRWXU), SyscallSucceeds());
+  ASSERT_THAT(chown(user1_folder.c_str(), kUser1Uid, kUser1Gid), SyscallSucceeds());
+
+  test_helper::ForkHelper helper;
+  helper.RunInForkedProcess([user1_folder] {
+    ASSERT_TRUE(change_ids(kUser1Uid, kUser1Gid));
+    drop_all_capabilities();
+    const mode_t old_umask = umask(0);
+    constexpr mode_t kModeMask = 0777;
+    auto clean_umask = fit::defer([old_umask]() { umask(old_umask); });
+
+    for (mode_t mode = 0000; mode <= 0777; mode++) {
+      SCOPED_TRACE(fxl::StringPrintf("Mode: %o", mode));
+
+      std::string file_path = fxl::StringPrintf("%s/chmod.%o", user1_folder.c_str(), mode);
+      {
+        test_helper::ScopedFD fd(
+            open(file_path.c_str(), O_RDWR | O_CREAT | O_EXCL, S_IRUSR | S_IWUSR));
+        EXPECT_TRUE(fd.is_valid()) << "open: " << std::strerror(errno);
+      }
+      auto cleanup =
+          fit::defer([file_path]() { EXPECT_THAT(unlink(file_path.c_str()), SyscallSucceeds()); });
+
+      EXPECT_THAT(chmod(file_path.c_str(), mode), SyscallSucceeds());
+
+      struct stat file_stat;
+      EXPECT_THAT(stat(file_path.c_str(), &file_stat), SyscallSucceeds());
+      EXPECT_TRUE(file_stat.st_mode & S_IFREG) << "not a regular file";
+      EXPECT_EQ(file_stat.st_mode & kModeMask, mode) << "wrong permissions";
     }
   });
 }
