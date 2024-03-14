@@ -32,6 +32,9 @@ _base = {
       key_metadata =
           "//src/firmware/avb_keys/vim3/vim3-dev-key/vim3_dev_atx_metadata.bin"
     }
+    zbi = {
+      compression = "zstd.max"
+    }
     fvm = {
       blobfs = {
         size_checker_maximum_bytes = 5216665600
