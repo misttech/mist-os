@@ -1,5 +1,4 @@
 {
     minimum_sample_rate_sec: 10,
-    configure_reader_for_tests: false,
     configs_path: "/config/data",
 }

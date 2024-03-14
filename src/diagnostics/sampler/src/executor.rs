@@ -263,7 +263,6 @@ impl SamplerExecutor {
         );
 
         let minimum_sample_rate_sec = sampler_config.minimum_sample_rate_sec;
-        let configure_reader_for_tests = sampler_config.configure_reader_for_tests;
 
         let sampler_executor_stats = Arc::new(
             SamplerExecutorStats::new()
@@ -302,7 +301,6 @@ impl SamplerExecutor {
                     project_config,
                     metric_logger_factory.clone(),
                     minimum_sample_rate_sec,
-                    configure_reader_for_tests,
                     project_sampler_stats.clone(),
                 )
             });
@@ -371,8 +369,6 @@ impl SamplerExecutor {
 
 pub struct ProjectSampler {
     archive_reader: ArchiveReader,
-    /// Whether to configure the ArchiveReader for tests (e.g. increase timeouts to avoid flakes)
-    configure_reader_for_tests: bool,
     /// The metrics used by this Project. Indexed by moniker_to_selector_map.
     metrics: Vec<MetricConfig>,
     /// Cache from Inspect selector to last sampled property. This is the selector from
@@ -439,7 +435,6 @@ impl ProjectSampler {
         config: Arc<ProjectConfig>,
         metric_logger_factory: Arc<MetricEventLoggerFactoryProxy>,
         minimum_sample_rate_sec: i64,
-        configure_reader_for_tests: bool,
         project_sampler_stats: Arc<ProjectSamplerStats>,
     ) -> Result<ProjectSampler, Error> {
         let customer_id = config.customer_id();
@@ -500,7 +495,6 @@ impl ProjectSampler {
         let mut project_sampler = ProjectSampler {
             project_id,
             archive_reader: ArchiveReader::new(),
-            configure_reader_for_tests,
             moniker_to_selector_map: HashMap::new(),
             metrics: config.metrics.clone(),
             metric_cache: HashMap::new(),
@@ -639,9 +633,6 @@ impl ProjectSampler {
         }
         self.archive_reader = ArchiveReader::new();
         self.archive_reader.retry(RetryConfig::never()).add_selectors(all_selectors.into_iter());
-        if self.configure_reader_for_tests {
-            self.archive_reader.with_batch_retrieval_timeout_seconds(i64::MAX);
-        }
         self.moniker_to_selector_map = HashMap::new();
         for (metric_index, metric) in self.metrics.iter().enumerate() {
             for (selector_index, selector) in metric.selectors.iter().enumerate() {
@@ -1238,7 +1229,6 @@ mod tests {
 
         let mut sampler = ProjectSampler {
             archive_reader: ArchiveReader::new(),
-            configure_reader_for_tests: false,
             moniker_to_selector_map: HashMap::new(),
             metrics: vec![],
             metric_cache: HashMap::new(),
@@ -1367,7 +1357,6 @@ mod tests {
 
         let mut sampler = ProjectSampler {
             archive_reader: ArchiveReader::new(),
-            configure_reader_for_tests: false,
             moniker_to_selector_map: HashMap::new(),
             metrics: vec![],
             metric_cache: HashMap::new(),
@@ -1975,7 +1964,6 @@ mod tests {
     async fn test_filename_distinguishes_data() {
         let mut sampler = ProjectSampler {
             archive_reader: ArchiveReader::new(),
-            configure_reader_for_tests: false,
             moniker_to_selector_map: HashMap::new(),
             metrics: vec![],
             metric_cache: HashMap::new(),
@@ -2062,7 +2050,6 @@ mod tests {
     async fn project_id_can_be_overwritten_by_the_metric_project_id() {
         let mut sampler = ProjectSampler {
             archive_reader: ArchiveReader::new(),
-            configure_reader_for_tests: false,
             moniker_to_selector_map: HashMap::new(),
             metrics: vec![],
             metric_cache: HashMap::new(),

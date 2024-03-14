@@ -1,5 +1,4 @@
 {
     minimum_sample_rate_sec: 1,
-    configure_reader_for_tests: true,
     configs_path: "/pkg/data/config",
 }

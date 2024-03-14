@@ -51,7 +51,6 @@ pub async fn main() -> Result<(), Error> {
 
     match config::SamplerConfigBuilder::default()
         .minimum_sample_rate_sec(component_config.minimum_sample_rate_sec)
-        .configure_reader_for_tests(component_config.configure_reader_for_tests)
         .sampler_dir(sampler_config)
         .fire_dir(fire_config)
         .load()

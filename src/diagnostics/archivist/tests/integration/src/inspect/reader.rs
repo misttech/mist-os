@@ -372,10 +372,7 @@ async fn retrieve_and_validate_results(
     expected_results_count: usize,
 ) {
     let mut reader = ArchiveReader::new();
-    reader
-        .with_archive(accessor)
-        .add_selectors(custom_selectors.into_iter())
-        .with_batch_retrieval_timeout_seconds(300);
+    reader.with_archive(accessor).add_selectors(custom_selectors.into_iter());
     if expected_results_count == 0 {
         reader.with_timeout(fuchsia_zircon::Duration::from_seconds(10));
     } else {
@@ -447,7 +444,6 @@ async fn pipeline_is_filtered(
 
     let pipeline_results = ArchiveReader::new()
         .with_archive(archive_accessor)
-        .with_batch_retrieval_timeout_seconds(300)
         .with_minimum_schema_count(expected_results_count)
         .snapshot_raw::<Inspect, serde_json::Value>()
         .await
@@ -458,7 +454,6 @@ async fn pipeline_is_filtered(
 
     let all_results = ArchiveReader::new()
         .with_archive(all_archive_accessor)
-        .with_batch_retrieval_timeout_seconds(300)
         .with_minimum_schema_count(expected_results_count)
         .snapshot_raw::<Inspect, serde_json::Value>()
         .await

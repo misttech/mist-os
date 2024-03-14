@@ -79,7 +79,6 @@ async fn main() {
 async fn get_coredumps_from_inspect() -> anyhow::Result<Vec<CoredumpReport>> {
     let kernel_inspect = ArchiveReader::new()
         .select_all_for_moniker("kernel")
-        .with_batch_retrieval_timeout_seconds(std::i64::MAX)
         .with_minimum_schema_count(1)
         .snapshot::<Inspect>()
         .await?;

@@ -22,7 +22,6 @@ async fn wait_for_single_counter_inspect(ns: &InstalledNamespace) {
         connect_to_protocol_at::<fdiagnostics::ArchiveAccessorMarker>(ns.prefix()).unwrap();
     let _ = ArchiveReader::new()
         .with_archive(accessor)
-        .with_batch_retrieval_timeout_seconds(i64::MAX)
         .add_selector(format!("{}:root", test_topology::COUNTER_NAME))
         .snapshot::<Inspect>()
         .await
@@ -225,7 +224,6 @@ async fn sampler_inspect_test() {
         root: {
             config: {
                 minimum_sample_rate_sec: 1 as u64,
-                configure_reader_for_tests: true,
                 configs_path: "/pkg/data/config",
             },
             sampler_executor_stats: {
