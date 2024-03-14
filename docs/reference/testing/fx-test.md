@@ -175,6 +175,9 @@ For example:
 
 # Disable status output.
 --no-status
+
+# Print output for tests taking longer than 2 seconds.
+--slow 2
 ```
 
 The above file overrides the defaults for `--parallel` and `--status`
@@ -318,6 +321,8 @@ executing.**
   `--parallel 1` to prevent interleaving).
   - Use `--no-output` to hide output explicitly, such as to
   override `--output` set in config.
+  - Use `--slow N` (`-s N`) to show output only for test suites
+  that take longer than `N` seconds to execute.
 - **Logs are written to a timestamped `.json.gz` file under the build
 directory specified by `fx status`.**
   - Use `--[no-]log` to toggle logging entirely.
