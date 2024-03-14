@@ -467,18 +467,21 @@ class Model:
                     if isinstance(event, DurationEvent):
                         if event.parent:
                             event.parent = get_new_event(event.parent)
-                        event.child_durations = [
-                            child
-                            for e in event.child_durations
-                            for child in [get_new_event(e)]
-                            if child is not None
-                        ]
-                        event.child_flows = [
-                            child
-                            for e in event.child_flows
-                            for child in [get_new_event(e)]
-                            if child is not None
-                        ]
+
+                        updated_child_durations = []
+                        for de in event.child_durations:
+                            new_duration = get_new_event(de)
+                            if new_duration is not None:
+                                updated_child_durations.append(new_duration)
+                        event.child_durations = updated_child_durations
+
+                        updated_child_flows = []
+                        for fe in event.child_flows:
+                            new_flow = get_new_event(fe)
+                            if new_flow is not None:
+                                updated_child_flows.append(new_flow)
+                        event.child_flows = updated_child_flows
+
                     elif isinstance(event, FlowEvent):
                         event.enclosing_duration = get_new_event(
                             event.enclosing_duration
