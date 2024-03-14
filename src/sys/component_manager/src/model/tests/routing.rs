@@ -16,8 +16,10 @@ use {
     crate::{
         capability::CapabilitySource,
         model::{
-            actions::{ActionSet, DestroyAction, ShutdownAction, ShutdownType, StopAction},
-            component::StartReason,
+            actions::{
+                ActionSet, DestroyAction, ShutdownAction, ShutdownType, StartAction, StopAction,
+            },
+            component::{IncomingCapabilities, StartReason},
             error::{
                 ActionError, ModelError, ResolveActionError, RouteOrOpenError, StartActionError,
             },
@@ -58,12 +60,128 @@ use {
         default_service_capability, instantiate_common_routing_tests, RoutingTestModel,
     },
     sandbox::Open,
-    std::{collections::HashSet, iter, sync::Arc, task::Poll},
+    std::{collections::HashSet, iter, pin::pin, sync::Arc, task::Poll},
     tracing::warn,
     vfs::{execution_scope::ExecutionScope, pseudo_directory, service},
 };
 
 instantiate_common_routing_tests! { RoutingTestBuilder }
+
+#[test]
+fn namespace_teardown_processes_final_request() {
+    // We will replace the target component's ExecutionScope with one with a custom executor that
+    // we can run manually.
+    let (ehandle_tx, ehandle_rx) = std::sync::mpsc::channel();
+    let (run_scope_executor_tx, run_scope_executor_rx) = std::sync::mpsc::channel();
+    // Spawn a new thread for the new executor because there is a one executor per thread rule.
+    let _scope_executor_thread = std::thread::spawn(move || {
+        let mut executor = fasync::TestExecutor::new();
+        ehandle_tx.send(fasync::EHandle::local()).unwrap();
+        run_scope_executor_rx.recv().unwrap();
+        executor.run_singlethreaded(std::future::pending::<()>());
+    });
+    let mut executor = fasync::TestExecutor::new();
+
+    // Run the test until we stop the root component.
+    let (_test, echo_proxy, mut stop_fut) = executor.run_singlethreaded(async move {
+        let components = vec![
+            (
+                "root",
+                ComponentDeclBuilder::new()
+                    .use_(
+                        UseBuilder::protocol().name("foo").source(UseSource::Child("leaf".into())),
+                    )
+                    .child(ChildBuilder::new().name("leaf"))
+                    .build(),
+            ),
+            (
+                "leaf",
+                ComponentDeclBuilder::new()
+                    .protocol_default("foo")
+                    .expose(ExposeBuilder::protocol().name("foo").source(ExposeSource::Self_))
+                    .build(),
+            ),
+        ];
+        let test = RoutingTestBuilder::new("root", components).build().await;
+        let root_component = test.model.root().clone();
+        let ehandle = ehandle_rx.recv().unwrap();
+        let scope = ExecutionScope::build().executor(ehandle).new();
+        ActionSet::register(
+            root_component.clone(),
+            StartAction::new_with_scope(
+                StartReason::Debug,
+                None,
+                IncomingCapabilities::default(),
+                scope,
+            ),
+        )
+        .await
+        .unwrap();
+
+        let resolved_url = RoutingTest::resolved_url("root");
+        let root_namespace = test.mock_runner.get_namespace(&resolved_url).unwrap();
+        let echo_proxy = capability_util::connect_to_svc_in_namespace::<echo::EchoMarker>(
+            &root_namespace,
+            &"/svc/foo".parse().unwrap(),
+        )
+        .await;
+
+        let stop_fut = async move { root_component.stop().await };
+        (test, echo_proxy, stop_fut)
+    });
+
+    // The future that stops the component should stall at the point it has told the namespace to
+    // shutdown and is waiting for its tasks to drain. Since we aren't running the ExecutionScope's
+    // executor yet, that wait should stall.
+    let mut stop_fut = pin!(stop_fut);
+    assert!(executor.run_until_stalled(&mut stop_fut).is_pending());
+
+    // Now allow the ExecutionScope's executor to run so it can process the namespace request.
+    run_scope_executor_tx.send(()).unwrap();
+
+    // The namespace request should get processed, even though the namespace was told to
+    // shutdown.
+    executor.run_singlethreaded(async move {
+        stop_fut.await.unwrap();
+        capability_util::call_echo_and_validate_result(echo_proxy, ExpectedResult::Ok).await;
+    });
+}
+
+#[fuchsia::test]
+async fn namespace_teardown_rejects_late_request() {
+    let components = vec![
+        (
+            "root",
+            ComponentDeclBuilder::new()
+                .use_(UseBuilder::protocol().name("foo").source(UseSource::Child("leaf".into())))
+                .child(ChildBuilder::new().name("leaf"))
+                .build(),
+        ),
+        (
+            "leaf",
+            ComponentDeclBuilder::new()
+                .protocol_default("foo")
+                .expose(ExposeBuilder::protocol().name("foo").source(ExposeSource::Self_))
+                .build(),
+        ),
+    ];
+    let test = RoutingTestBuilder::new("root", components).build().await;
+    test.start_instance_and_wait_start(&".".parse().unwrap()).await.unwrap();
+
+    // Stop the component.
+    let resolved_url = RoutingTest::resolved_url("root");
+    let root_namespace = test.mock_runner.get_namespace(&resolved_url).unwrap();
+    test.model.root().stop().await.unwrap();
+
+    // Trying to connect to the stopped component's namespace now should fail.
+    let echo_proxy = capability_util::connect_to_svc_in_namespace::<echo::EchoMarker>(
+        &root_namespace,
+        &"/svc/foo".parse().unwrap(),
+    )
+    .await;
+    capability_util::call_echo_and_validate_result(echo_proxy, ExpectedResult::ErrWithNoEpitaph)
+        .await;
+}
 
 ///   a
 ///    \

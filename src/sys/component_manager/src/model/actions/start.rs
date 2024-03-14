@@ -49,6 +49,7 @@ pub struct StartAction {
     execution_controller_task: Option<controller::ExecutionControllerTask>,
     incoming: IncomingCapabilities,
     abort_handle: AbortHandle,
+    namespace_scope: ExecutionScope,
     abortable_scope: AbortableScope,
 }
 
@@ -58,8 +59,34 @@ impl StartAction {
         execution_controller_task: Option<controller::ExecutionControllerTask>,
         incoming: IncomingCapabilities,
     ) -> Self {
+        Self::new_inner(start_reason, execution_controller_task, incoming, ExecutionScope::new())
+    }
+
+    fn new_inner(
+        start_reason: StartReason,
+        execution_controller_task: Option<controller::ExecutionControllerTask>,
+        incoming: IncomingCapabilities,
+        namespace_scope: ExecutionScope,
+    ) -> Self {
         let (abortable_scope, abort_handle) = AbortableScope::new();
-        Self { start_reason, execution_controller_task, incoming, abort_handle, abortable_scope }
+        Self {
+            start_reason,
+            execution_controller_task,
+            incoming,
+            namespace_scope,
+            abort_handle,
+            abortable_scope,
+        }
+    }
+
+    #[cfg(test)]
+    pub fn new_with_scope(
+        start_reason: StartReason,
+        execution_controller_task: Option<controller::ExecutionControllerTask>,
+        incoming: IncomingCapabilities,
+        namespace_scope: ExecutionScope,
+    ) -> Self {
+        Self::new_inner(start_reason, execution_controller_task, incoming, namespace_scope)
     }
 }
 
@@ -71,6 +98,7 @@ impl Action for StartAction {
             &self.start_reason,
             self.execution_controller_task,
             self.incoming,
+            self.namespace_scope,
             self.abortable_scope,
         )
         .await
@@ -90,7 +118,7 @@ struct StartContext {
     runner: Option<RemoteRunner>,
     url: String,
     namespace_builder: NamespaceBuilder,
-    scope: ExecutionScope,
+    namespace_scope: ExecutionScope,
     numbered_handles: Vec<fprocess::HandleInfo>,
     encoded_config: Option<fmem::Data>,
     program_input_dict_additions: Option<Dict>,
@@ -101,6 +129,7 @@ async fn do_start(
     start_reason: &StartReason,
     execution_controller_task: Option<controller::ExecutionControllerTask>,
     incoming: IncomingCapabilities,
+    namespace_scope: ExecutionScope,
     abortable_scope: AbortableScope,
 ) -> Result<(), StartActionError> {
     // Translates the error when a long running future is aborted.
@@ -145,13 +174,12 @@ async fn do_start(
     } = incoming;
 
     // Create the component's namespace.
-    let scope = ExecutionScope::new();
     let mut namespace_builder = create_namespace(
         resolved_component.package.as_ref(),
         component,
         &resolved_component.decl,
         &program_input_dict,
-        scope.clone(),
+        namespace_scope.clone(),
     )
     .await
     .map_err(|err| StartActionError::CreateNamespaceError {
@@ -217,7 +245,7 @@ async fn do_start(
         runner,
         url: resolved_component.resolved_url.clone(),
         namespace_builder,
-        scope,
+        namespace_scope,
         numbered_handles,
         encoded_config,
         program_input_dict_additions,
@@ -253,7 +281,7 @@ async fn start_component(
         url,
         namespace_builder,
         numbered_handles,
-        scope,
+        namespace_scope,
         encoded_config,
         program_input_dict_additions,
     } = start_context;
@@ -279,9 +307,9 @@ async fn start_component(
         };
 
         pending_runtime.set_program(
-            Program::start(&runner, start_info, diagnostics_sender, scope).map_err(|err| {
-                StartActionError::StartProgramError { moniker: moniker.clone(), err }
-            })?,
+            Program::start(&runner, start_info, diagnostics_sender, namespace_scope).map_err(
+                |err| StartActionError::StartProgramError { moniker: moniker.clone(), err },
+            )?,
             component.as_weak(),
         );
     }
