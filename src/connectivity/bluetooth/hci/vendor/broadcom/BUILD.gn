@@ -13,8 +13,7 @@ driver_bind_rules("bcm_hci_bind") {
   bind_output = "bt-hci-broadcom.bindbc"
   tests = "bind_tests.json"
   deps = [
-    "//src/devices/bind/fuchsia.bluetooth",
-    "//src/devices/bind/fuchsia.broadcom.platform.serial",
+    "//sdk/fidl/fuchsia.hardware.bluetooth:fuchsia.hardware.bluetooth_bindlib",
   ]
 }
 

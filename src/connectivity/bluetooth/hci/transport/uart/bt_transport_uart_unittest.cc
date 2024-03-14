@@ -5,16 +5,20 @@
 #include "bt_transport_uart.h"
 
 #include <fidl/fuchsia.hardware.serial/cpp/wire.h>
-#include <fuchsia/hardware/serialimpl/async/cpp/banjo.h>
 #include <lib/async/cpp/task.h>
-#include <lib/sync/cpp/completion.h>
+#include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
+#include <lib/driver/testing/cpp/driver_lifecycle.h>
+#include <lib/driver/testing/cpp/driver_runtime.h>
+#include <lib/driver/testing/cpp/test_environment.h>
+#include <lib/driver/testing/cpp/test_node.h>
+#include <lib/fdio/directory.h>
 #include <zircon/device/bt-hci.h>
 
 #include <queue>
 
-#include "src/devices/testing/mock-ddk/mock-device.h"
-#include "src/lib/testing/loop_fixture/test_loop_fixture.h"
+#include <gtest/gtest.h>
 
+namespace bt_transport_uart {
 namespace {
 
 // HCI UART packet indicators
@@ -26,15 +30,15 @@ enum BtHciPacketIndicator {
   kHciEvent = 4,
 };
 
-class FakeSerialDevice : public ddk::SerialImplAsyncProtocol<FakeSerialDevice> {
+class FakeSerialDevice : public fdf::WireServer<fuchsia_hardware_serialimpl::Device> {
  public:
-  explicit FakeSerialDevice(async_dispatcher_t* dispatcher) : dispatcher_(dispatcher) {}
+  explicit FakeSerialDevice() = default;
 
-  serial_impl_async_protocol_t proto() const {
-    serial_impl_async_protocol_t proto;
-    proto.ctx = const_cast<FakeSerialDevice*>(this);
-    proto.ops = const_cast<serial_impl_async_protocol_ops_t*>(&serial_impl_async_protocol_ops_);
-    return proto;
+  fuchsia_hardware_serialimpl::Service::InstanceHandler GetInstanceHandler() {
+    return fuchsia_hardware_serialimpl::Service::InstanceHandler({
+        .device = binding_group_.CreateHandler(this, fdf::Dispatcher::GetCurrent()->get(),
+                                               fidl::kIgnoreBindingClosure),
+    });
   }
 
   void QueueReadValue(std::vector<uint8_t> buffer) {
@@ -57,147 +61,207 @@ class FakeSerialDevice : public ddk::SerialImplAsyncProtocol<FakeSerialDevice> {
     MaybeRespondToWrite();
   }
 
-  // ddk::SerialImplAsyncProtocol mixins:
+  // fuchsia_hardware_serialimpl::Device FIDL implementation.
+  void GetInfo(fdf::Arena& arena, GetInfoCompleter::Sync& completer) override {
+    fuchsia_hardware_serial::wire::SerialPortInfo info = {
+        .serial_class = fuchsia_hardware_serial::Class::kBluetoothHci,
+    };
 
-  // NOLINTNEXTLINE(readability-convert-member-functions-to-static)
-  zx_status_t SerialImplAsyncGetInfo(serial_port_info_t* out_info) {
-    out_info->serial_class = static_cast<uint32_t>(fuchsia_hardware_serial::Class::kBluetoothHci);
-    return ZX_OK;
+    completer.buffer(arena).ReplySuccess(info);
+  }
+  void Config(ConfigRequestView request, fdf::Arena& arena,
+              ConfigCompleter::Sync& completer) override {
+    completer.buffer(arena).ReplySuccess();
   }
 
-  // NOLINTNEXTLINE(readability-convert-member-functions-to-static,bugprone-easily-swappable-parameters)
-  zx_status_t SerialImplAsyncConfig(uint32_t baud_rate, uint32_t flags) { return ZX_OK; }
-
-  zx_status_t SerialImplAsyncEnable(bool enable) {
-    enabled_ = enable;
-    return ZX_OK;
+  void Enable(EnableRequestView request, fdf::Arena& arena,
+              EnableCompleter::Sync& completer) override {
+    enabled_ = request->enable;
+    completer.buffer(arena).ReplySuccess();
   }
 
-  void SerialImplAsyncReadAsync(serial_impl_async_read_async_callback callback, void* cookie) {
+  void Read(fdf::Arena& arena, ReadCompleter::Sync& completer) override {
     // Serial only supports 1 pending read at a time.
-    if (!enabled_ || read_req_) {
-      callback(cookie, ZX_ERR_IO_REFUSED, /*buf_buffer=*/nullptr, /*buf_size=*/0);
+    if (!enabled_) {
+      completer.buffer(arena).ReplyError(ZX_ERR_IO_REFUSED);
       return;
     }
-    read_req_.emplace(ReadRequest{callback, cookie});
+    read_request_.emplace(ReadRequest{std::move(arena), completer.ToAsync()});
     // The real serial async handler will call the callback immediately if there is data
     // available, do so here to simulate the recursive callstack there.
     MaybeRespondToRead();
   }
 
-  void SerialImplAsyncWriteAsync(const uint8_t* buf_buffer, size_t buf_size,
-                                 serial_impl_async_write_async_callback callback, void* cookie) {
-    ASSERT_FALSE(write_req_);
-    std::vector<uint8_t> buffer(buf_buffer, buf_buffer + buf_size);
+  void Write(WriteRequestView request, fdf::Arena& arena,
+             WriteCompleter::Sync& completer) override {
+    ASSERT_FALSE(write_request_);
+    std::vector<uint8_t> buffer(request->data.data(), request->data.data() + request->data.count());
     writes_.emplace_back(std::move(buffer));
-    write_req_.emplace(WriteRequest{callback, cookie});
-    async::PostTask(dispatcher_, fit::bind_member<&FakeSerialDevice::MaybeRespondToWrite>(this));
+    write_request_.emplace(WriteRequest{std::move(arena), completer.ToAsync()});
+    MaybeRespondToWrite();
   }
 
-  void SerialImplAsyncCancelAll() {
-    if (read_req_) {
-      read_req_->callback(read_req_->cookie, ZX_ERR_CANCELED, /*buf_buffer=*/nullptr,
-                          /*buf_size=*/0);
-      read_req_.reset();
+  void CancelAll(fdf::Arena& arena, CancelAllCompleter::Sync& completer) override {
+    if (read_request_) {
+      read_request_->completer.buffer(read_request_->arena).ReplyError(ZX_ERR_CANCELED);
+      read_request_.reset();
     }
     canceled_ = true;
+    completer.buffer(arena).Reply();
+  }
+
+  void handle_unknown_method(
+      fidl::UnknownMethodMetadata<fuchsia_hardware_serialimpl::Device> metadata,
+      fidl::UnknownMethodCompleter::Sync& completer) override {
+    ZX_PANIC("Unknown method in Serial requests");
   }
 
  private:
   struct ReadRequest {
-    serial_impl_async_read_async_callback callback;
-    void* cookie;
+    fdf::Arena arena;
+    ReadCompleter::Async completer;
   };
-
   struct WriteRequest {
-    serial_impl_async_write_async_callback callback;
-    void* cookie;
+    fdf::Arena arena;
+    WriteCompleter::Async completer;
   };
 
   void MaybeRespondToRead() {
-    if (read_rsp_queue_.empty() || !read_req_) {
+    if (read_rsp_queue_.empty() || !read_request_) {
       return;
     }
     std::vector<uint8_t> buffer = std::move(read_rsp_queue_.front());
     read_rsp_queue_.pop();
     // Callback may send new read request synchronously, so clear read_req_.
-    ReadRequest req = read_req_.value();
-    read_req_.reset();
-    req.callback(req.cookie, ZX_OK, buffer.data(), buffer.size());
+    ReadRequest request = std::move(read_request_.value());
+    read_request_.reset();
+    auto data_view = fidl::VectorView<uint8_t>::FromExternal(buffer);
+    request.completer.buffer(request.arena).ReplySuccess(data_view);
   }
 
   void MaybeRespondToWrite() {
     if (writes_paused_) {
-      zxlogf(DEBUG, "FakeSerialDevice: writes paused; queueing completion callback");
       return;
     }
-    if (!write_req_) {
+    if (!write_request_) {
       return;
     }
-    write_req_->callback(write_req_->cookie, ZX_OK);
-    write_req_.reset();
+    write_request_->completer.buffer(write_request_->arena).ReplySuccess();
+    write_request_.reset();
   }
 
   bool enabled_ = false;
   bool canceled_ = false;
   bool writes_paused_ = false;
-  async_dispatcher_t* dispatcher_;
-  std::optional<ReadRequest> read_req_;
-  std::optional<WriteRequest> write_req_;
+  std::optional<ReadRequest> read_request_;
+  std::optional<WriteRequest> write_request_;
   std::queue<std::vector<uint8_t>> read_rsp_queue_;
   std::vector<std::vector<uint8_t>> writes_;
+
+  fdf::ServerBindingGroup<fuchsia_hardware_serialimpl::Device> binding_group_;
+};
+
+class TestEnvironmentLocal : public fdf_testing::TestEnvironment {
+ public:
+  zx::result<> Initialize(fidl::ServerEnd<fuchsia_io::Directory> incoming_directory_server_end) {
+    return fdf_testing::TestEnvironment::Initialize(std::move(incoming_directory_server_end));
+  }
+
+  void AddService(fuchsia_hardware_serialimpl::Service::InstanceHandler&& handler) {
+    zx::result result =
+        incoming_directory().AddService<fuchsia_hardware_serialimpl::Service>(std::move(handler));
+    EXPECT_TRUE(result.is_ok());
+  }
 };
 
 class BtTransportUartTest : public ::testing::Test {
  public:
-  BtTransportUartTest() : fake_serial_device_(fdf::Dispatcher::GetCurrent()->async_dispatcher()) {}
+  BtTransportUartTest() = default;
 
   void SetUp() override {
-    root_device_->AddProtocol(ZX_PROTOCOL_SERIAL_IMPL_ASYNC, fake_serial_device_.proto().ops,
-                              fake_serial_device_.proto().ctx);
+    // Create start args
+    zx::result start_args = node_server_.SyncCall(&fdf_testing::TestNode::CreateStartArgsAndServe);
+    ASSERT_EQ(ZX_OK, start_args.status_value());
 
-    ASSERT_EQ(bt_transport_uart::BtTransportUart::Create(nullptr /*ctx*/, root_device_.get()),
-              ZX_OK);
-    ASSERT_EQ(1u, root_dev()->child_count());
-    ASSERT_TRUE(dut());
-    EXPECT_TRUE(fake_serial_device_.enabled());
+    // Start the test environment with incoming directory returned from the start args
+    zx::result init_result =
+        test_environment_.SyncCall(&fdf_testing::TestEnvironment::Initialize,
+                                   std::move(start_args->incoming_directory_server));
+    EXPECT_EQ(ZX_OK, init_result.status_value());
 
-    // Connect to the dut Vendor protocol server.
-    auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_bluetooth::Hci>();
-    ASSERT_FALSE(endpoints.is_error());
-    hci_client_.Bind(std::move(endpoints->client));
+    // Get service handler from the fake_serial_device_ object.
+    auto handler = fake_serial_device_.SyncCall(&FakeSerialDevice::GetInstanceHandler);
 
-    libsync::Completion bind;
-    async::PostTask(hci_dispatcher_->async_dispatcher(), [&]() {
-      fidl::BindServer(hci_dispatcher_->async_dispatcher(), std::move(endpoints->server),
-                       dut()->GetDeviceContext<bt_transport_uart::BtTransportUart>());
-      bind.Signal();
-    });
-    bind.Wait();
+    test_environment_.SyncCall(&TestEnvironmentLocal::AddService, std::move(handler));
+
+    zx::result start_result = runtime_.RunToCompletion(driver_.SyncCall(
+        &fdf_testing::DriverUnderTest<BtTransportUart>::Start, std::move(start_args->start_args)));
+    EXPECT_EQ(ZX_OK, start_result.status_value());
+
+    EXPECT_TRUE(fake_serial_device_.SyncCall(&FakeSerialDevice::enabled));
+
+    // Open the svc directory in the driver's outgoing, and store a client to it.
+    auto svc_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+    EXPECT_EQ(ZX_OK, svc_endpoints.status_value());
+    zx_status_t status = fdio_open_at(start_args->outgoing_directory_client.handle()->get(), "/svc",
+                                      static_cast<uint32_t>(fuchsia_io::OpenFlags::kDirectory),
+                                      svc_endpoints->server.TakeChannel().release());
+    ASSERT_EQ(ZX_OK, status);
+
+    zx::result connect_result =
+        component::ConnectAtMember<fuchsia_hardware_bluetooth::HciService::Hci>(
+            std::move(svc_endpoints->client));
+
+    ASSERT_EQ(ZX_OK, connect_result.status_value());
+    hci_client_.Bind(std::move(connect_result.value()));
   }
 
   void TearDown() override {
-    mock_ddk::GetDriverRuntime()->RunUntilIdle();
-    dut()->UnbindOp();
-    mock_ddk::GetDriverRuntime()->RunUntilIdle();
-    EXPECT_EQ(dut()->UnbindReplyCallStatus(), ZX_OK);
-    EXPECT_TRUE(fake_serial_device_.canceled());
-    dut()->ReleaseOp();
+    zx::result prepare_stop_result = runtime_.RunToCompletion(
+        driver_.SyncCall(&fdf_testing::DriverUnderTest<BtTransportUart>::PrepareStop));
+    EXPECT_EQ(ZX_OK, prepare_stop_result.status_value());
+
+    EXPECT_TRUE(fake_serial_device_.SyncCall(&FakeSerialDevice::canceled));
+
+    zx::result stop_result = driver_.SyncCall(&fdf_testing::DriverUnderTest<BtTransportUart>::Stop);
+    EXPECT_EQ(ZX_OK, stop_result.status_value());
   }
 
-  MockDevice* root_dev() const { return root_device_.get(); }
+  async_patterns::TestDispatcherBound<FakeSerialDevice>* serial() { return &fake_serial_device_; }
 
-  MockDevice* dut() const { return root_device_->GetLatestChild(); }
+  async_dispatcher_t* env_dispatcher() { return env_dispatcher_->async_dispatcher(); }
 
-  FakeSerialDevice* serial() { return &fake_serial_device_; }
+  async_dispatcher_t* driver_dispatcher() { return driver_dispatcher_->async_dispatcher(); }
 
+  fdf_testing::DriverRuntime* runtime() { return &runtime_; }
+
+  // The FIDL client used in the test to call into dut Hci server.
   fidl::WireSyncClient<fuchsia_hardware_bluetooth::Hci> hci_client_;
 
  private:
-  std::shared_ptr<MockDevice> root_device_ = MockDevice::FakeRootParent();
-  fdf::UnownedSynchronizedDispatcher hci_dispatcher_ =
-      mock_ddk::GetDriverRuntime()->StartBackgroundDispatcher();
-  FakeSerialDevice fake_serial_device_;
+  // Attaches a foreground dispatcher for us automatically.
+  fdf_testing::DriverRuntime runtime_;
+
+  // Env dispatcher runs in the background because we need to make sync calls into it.
+  fdf::UnownedSynchronizedDispatcher env_dispatcher_ = runtime_.StartBackgroundDispatcher();
+
+  // Driver dispatcher set as a background dispatcher. The protocols served by dut will run on
+  // this dispatcher.
+  fdf::UnownedSynchronizedDispatcher driver_dispatcher_ = runtime_.StartBackgroundDispatcher();
+
+  fdf::UnownedSynchronizedDispatcher hci_dispatcher_ = runtime_.StartBackgroundDispatcher();
+
+  async_patterns::TestDispatcherBound<fdf_testing::TestNode> node_server_{
+      env_dispatcher(), std::in_place, std::string("root")};
+
+  async_patterns::TestDispatcherBound<TestEnvironmentLocal> test_environment_{env_dispatcher(),
+                                                                              std::in_place};
+
+  async_patterns::TestDispatcherBound<FakeSerialDevice> fake_serial_device_{env_dispatcher(),
+                                                                            std::in_place};
+
+  async_patterns::TestDispatcherBound<fdf_testing::DriverUnderTest<BtTransportUart>> driver_{
+      driver_dispatcher(), std::in_place};
 };
 
 // Test fixture that opens all channels and has helpers for reading/writing data.
@@ -296,8 +360,8 @@ class BtTransportUartHciProtocolTest : public BtTransportUartTest {
   zx::channel* sco_chan() { return &sco_chan_; }
 
  private:
-  // This method is shared by the waits for all channels. |wait| is used to differentiate which wait
-  // called the method.
+  // This method is shared by the waits for all channels. |wait| is used to differentiate which
+  // wait called the method.
   void OnChannelReady(async_dispatcher_t*, async::WaitBase* wait, zx_status_t status,
                       const zx_packet_signal_t* signal) {
     ASSERT_EQ(status, ZX_OK);
@@ -357,8 +421,6 @@ class BtTransportUartHciProtocolTest : public BtTransportUartTest {
   std::vector<std::vector<uint8_t>> sco_chan_received_packets_;
 };
 
-TEST_F(BtTransportUartTest, Lifecycle) {}
-
 TEST_F(BtTransportUartHciProtocolTest, SendAclPackets) {
   const uint8_t kNumPackets = 25;
   for (uint8_t i = 0; i < kNumPackets; i++) {
@@ -370,9 +432,12 @@ TEST_F(BtTransportUartHciProtocolTest, SendAclPackets) {
     ASSERT_EQ(write_status, ZX_OK);
   }
   // Allow ACL packets to be processed and sent to the serial device.
-  mock_ddk::GetDriverRuntime()->RunUntilIdle();
+  // This function waits until the condition in the lambda is satisfied, The default poll interval
+  // is 10 msec, the default wait timeout is 1 sec. The function returns true if it didn't timeout.
+  EXPECT_TRUE(runtime()->RunWithTimeoutOrUntil(
+      [&]() { return serial()->SyncCall(&FakeSerialDevice::writes).size() == kNumPackets; }));
 
-  const std::vector<std::vector<uint8_t>>& packets = serial()->writes();
+  const std::vector<std::vector<uint8_t>>& packets = serial()->SyncCall(&FakeSerialDevice::writes);
   ASSERT_EQ(packets.size(), kNumPackets);
   for (uint8_t i = 0; i < kNumPackets; i++) {
     // A packet indicator should be prepended.
@@ -380,7 +445,8 @@ TEST_F(BtTransportUartHciProtocolTest, SendAclPackets) {
     EXPECT_EQ(packets[i], expected);
   }
 
-  ASSERT_EQ(snoop_packets().size(), kNumPackets);
+  EXPECT_TRUE(
+      runtime()->RunWithTimeoutOrUntil([&]() { return snoop_packets().size() == kNumPackets; }));
   for (uint8_t i = 0; i < kNumPackets; i++) {
     // Snoop packets should have a snoop packet flag prepended (NOT a UART packet indicator).
     const std::vector<uint8_t> kExpectedSnoopPacket = {BT_HCI_SNOOP_TYPE_ACL,  // Snoop packet flag
@@ -391,7 +457,7 @@ TEST_F(BtTransportUartHciProtocolTest, SendAclPackets) {
 
 TEST_F(BtTransportUartHciProtocolTest, AclReadableSignalIgnoredUntilFirstWriteCompletes) {
   // Delay completion of first write.
-  serial()->set_writes_paused(true);
+  serial()->SyncCall(&FakeSerialDevice::set_writes_paused, true);
 
   const uint8_t kNumPackets = 2;
   for (uint8_t i = 0; i < kNumPackets; i++) {
@@ -402,14 +468,19 @@ TEST_F(BtTransportUartHciProtocolTest, AclReadableSignalIgnoredUntilFirstWriteCo
                           /*num_handles=*/0);
     ASSERT_EQ(write_status, ZX_OK);
   }
-  mock_ddk::GetDriverRuntime()->RunUntilIdle();
+
+  // Wait until the first packet has been received by fake serial device.
+  EXPECT_TRUE(runtime()->RunWithTimeoutOrUntil(
+      [&]() { return serial()->SyncCall(&FakeSerialDevice::writes).size() == 1u; }));
 
   // Call the first packet's completion callback. This should resume waiting for signals.
-  serial()->set_writes_paused(false);
-  // Wait for the readable signal to be processed.
-  mock_ddk::GetDriverRuntime()->RunUntilIdle();
+  serial()->SyncCall(&FakeSerialDevice::set_writes_paused, false);
+  // Wait for the readable signal to be processed, and both packets has been received by fake serial
+  // device.
+  EXPECT_TRUE(runtime()->RunWithTimeoutOrUntil(
+      [&]() { return serial()->SyncCall(&FakeSerialDevice::writes).size() == kNumPackets; }));
 
-  const std::vector<std::vector<uint8_t>>& packets = serial()->writes();
+  const std::vector<std::vector<uint8_t>>& packets = serial()->SyncCall(&FakeSerialDevice::writes);
   ASSERT_EQ(packets.size(), kNumPackets);
   for (uint8_t i = 0; i < kNumPackets; i++) {
     // A packet indicator should be prepended.
@@ -435,21 +506,22 @@ TEST_F(BtTransportUartHciProtocolTest, ReceiveAclPacketsIn2Parts) {
   const std::vector<uint8_t> kPart1(kSerialAclBuffer.begin(), kSerialAclBuffer.begin() + 4);
   const std::vector<uint8_t> kPart2(kSerialAclBuffer.begin() + 4, kSerialAclBuffer.end());
 
-  const int kNumPackets = 20;
-  for (int i = 0; i < kNumPackets; i++) {
-    serial()->QueueReadValue(kPart1);
-    serial()->QueueReadValue(kPart2);
-    mock_ddk::GetDriverRuntime()->RunUntilIdle();
+  const size_t kNumPackets = 20;
+  for (size_t i = 0; i < kNumPackets; i++) {
+    serial()->SyncCall(&FakeSerialDevice::QueueReadValue, kPart1);
+    serial()->SyncCall(&FakeSerialDevice::QueueReadValue, kPart2);
   }
 
-  ASSERT_EQ(received_acl_packets().size(), static_cast<size_t>(kNumPackets));
+  EXPECT_TRUE(runtime()->RunWithTimeoutOrUntil(
+      [&]() { return received_acl_packets().size() == static_cast<size_t>(kNumPackets); }));
+
   for (const std::vector<uint8_t>& packet : received_acl_packets()) {
     EXPECT_EQ(packet.size(), kAclBuffer.size());
     EXPECT_EQ(packet, kAclBuffer);
   }
 
-  mock_ddk::GetDriverRuntime()->RunUntilIdle();
-  ASSERT_EQ(snoop_packets().size(), static_cast<size_t>(kNumPackets));
+  EXPECT_TRUE(
+      runtime()->RunWithTimeoutOrUntil([&]() { return snoop_packets().size() == kNumPackets; }));
   for (const std::vector<uint8_t>& packet : snoop_packets()) {
     EXPECT_EQ(packet, kSnoopAclBuffer);
   }
@@ -472,14 +544,17 @@ TEST_F(BtTransportUartHciProtocolTest, ReceiveAclPacketsLotsInQueue) {
   const std::vector<uint8_t> kPart1(kSerialAclBuffer.begin(), kSerialAclBuffer.begin() + 4);
   const std::vector<uint8_t> kPart2(kSerialAclBuffer.begin() + 4, kSerialAclBuffer.end());
 
-  const int kNumPackets = 1000;
-  for (int i = 0; i < kNumPackets; i++) {
-    serial()->QueueWithoutSignaling(kPart1);
-    serial()->QueueWithoutSignaling(kPart2);
+  const size_t kNumPackets = 1000;
+  for (size_t i = 0; i < kNumPackets; i++) {
+    serial()->SyncCall(&FakeSerialDevice::QueueWithoutSignaling, kPart1);
+    serial()->SyncCall(&FakeSerialDevice::QueueWithoutSignaling, kPart2);
   }
-  serial()->QueueReadValue(kPart1);
-  serial()->QueueReadValue(kPart2);
-  mock_ddk::GetDriverRuntime()->RunUntilIdle();
+  serial()->SyncCall(&FakeSerialDevice::QueueReadValue, kPart1);
+  serial()->SyncCall(&FakeSerialDevice::QueueReadValue, kPart2);
+
+  // Wait Until all the packets to be received.
+  EXPECT_TRUE(runtime()->RunWithTimeoutOrUntil(
+      [&]() { return received_acl_packets().size() == static_cast<size_t>(kNumPackets + 1); }));
 
   ASSERT_EQ(received_acl_packets().size(), static_cast<size_t>(kNumPackets + 1));
   for (const std::vector<uint8_t>& packet : received_acl_packets()) {
@@ -487,8 +562,8 @@ TEST_F(BtTransportUartHciProtocolTest, ReceiveAclPacketsLotsInQueue) {
     EXPECT_EQ(packet, kAclBuffer);
   }
 
-  mock_ddk::GetDriverRuntime()->RunUntilIdle();
-  ASSERT_EQ(snoop_packets().size(), static_cast<size_t>(kNumPackets + 1));
+  EXPECT_TRUE(runtime()->RunWithTimeoutOrUntil(
+      [&]() { return snoop_packets().size() == kNumPackets + 1; }));
   for (const std::vector<uint8_t>& packet : snoop_packets()) {
     EXPECT_EQ(packet, kSnoopAclBuffer);
   }
@@ -509,8 +584,10 @@ TEST_F(BtTransportUartHciProtocolTest, SendHciCommands) {
                         /*handles=*/nullptr,
                         /*num_handles=*/0);
   EXPECT_EQ(write_status, ZX_OK);
-  mock_ddk::GetDriverRuntime()->RunUntilIdle();
-  EXPECT_EQ(serial()->writes().size(), 1u);
+
+  // Wait until the first packet is received.
+  EXPECT_TRUE(runtime()->RunWithTimeoutOrUntil(
+      [&]() { return serial()->SyncCall(&FakeSerialDevice::writes).size() == 1u; }));
 
   const std::vector<uint8_t> kSnoopCmd1 = {
       BT_HCI_SNOOP_TYPE_CMD,  // Snoop packet flag
@@ -525,22 +602,23 @@ TEST_F(BtTransportUartHciProtocolTest, SendHciCommands) {
                                    /*handles=*/nullptr,
                                    /*num_handles=*/0);
   EXPECT_EQ(write_status, ZX_OK);
-  mock_ddk::GetDriverRuntime()->RunUntilIdle();
 
-  const std::vector<std::vector<uint8_t>>& packets = serial()->writes();
-  ASSERT_EQ(packets.size(), 2u);
+  // Wait until the second packet is received.
+  EXPECT_TRUE(runtime()->RunWithTimeoutOrUntil(
+      [&]() { return serial()->SyncCall(&FakeSerialDevice::writes).size() == 2u; }));
+
+  const std::vector<std::vector<uint8_t>>& packets = serial()->SyncCall(&FakeSerialDevice::writes);
   EXPECT_EQ(packets[0], kUartCmd0);
   EXPECT_EQ(packets[1], kUartCmd1);
 
-  mock_ddk::GetDriverRuntime()->RunUntilIdle();
-  ASSERT_EQ(snoop_packets().size(), 2u);
+  EXPECT_TRUE(runtime()->RunWithTimeoutOrUntil([&]() { return snoop_packets().size() == 2u; }));
   EXPECT_EQ(snoop_packets()[0], kSnoopCmd0);
   EXPECT_EQ(snoop_packets()[1], kSnoopCmd1);
 }
 
 TEST_F(BtTransportUartHciProtocolTest, CommandReadableSignalIgnoredUntilFirstWriteCompletes) {
   // Delay completion of first write.
-  serial()->set_writes_paused(true);
+  serial()->SyncCall(&FakeSerialDevice::set_writes_paused, true);
 
   const std::vector<uint8_t> kUartCmd0 = {
       BtHciPacketIndicator::kHciCommand,  // UART packet indicator
@@ -552,8 +630,6 @@ TEST_F(BtTransportUartHciProtocolTest, CommandReadableSignalIgnoredUntilFirstWri
                         /*handles=*/nullptr,
                         /*num_handles=*/0);
   EXPECT_EQ(write_status, ZX_OK);
-  // We have not run the loop, so the write should not be processed yet.
-  EXPECT_EQ(serial()->writes().size(), 0u);
 
   const std::vector<uint8_t> kUartCmd1 = {
       BtHciPacketIndicator::kHciCommand,  // UART packet indicator
@@ -564,15 +640,23 @@ TEST_F(BtTransportUartHciProtocolTest, CommandReadableSignalIgnoredUntilFirstWri
                                    /*handles=*/nullptr,
                                    /*num_handles=*/0);
   EXPECT_EQ(write_status, ZX_OK);
-  mock_ddk::GetDriverRuntime()->RunUntilIdle();
+
+  // Wait until the first packet is received.
+  EXPECT_TRUE(runtime()->RunWithTimeoutOrUntil(
+      [&]() { return serial()->SyncCall(&FakeSerialDevice::writes).size() == 1u; }));
+
+  // Make sure the number of packet received never run over 1 before the pause is released.
+  EXPECT_FALSE(runtime()->RunWithTimeoutOrUntil(
+      [&]() { return serial()->SyncCall(&FakeSerialDevice::writes).size() > 1u; }, zx::msec(500)));
 
   // Call the first command's completion callback. This should resume waiting for signals.
-  serial()->set_writes_paused(false);
-  // Wait for the readable signal to be processed.
-  mock_ddk::GetDriverRuntime()->RunUntilIdle();
+  serial()->SyncCall(&FakeSerialDevice::set_writes_paused, false);
 
-  const std::vector<std::vector<uint8_t>>& packets = serial()->writes();
-  ASSERT_EQ(packets.size(), 2u);
+  // Wait for the readable signal to be processed and the second packet is received.
+  EXPECT_TRUE(runtime()->RunWithTimeoutOrUntil(
+      [&]() { return serial()->SyncCall(&FakeSerialDevice::writes).size() == 2u; }));
+
+  const std::vector<std::vector<uint8_t>>& packets = serial()->SyncCall(&FakeSerialDevice::writes);
   EXPECT_EQ(packets[0], kUartCmd0);
   EXPECT_EQ(packets[1], kUartCmd1);
 }
@@ -591,28 +675,32 @@ TEST_F(BtTransportUartHciProtocolTest, ReceiveManyHciEventsSplitIntoTwoResponses
   const std::vector<uint8_t> kPart1(kSerialEventBuffer.begin(), kSerialEventBuffer.begin() + 3);
   const std::vector<uint8_t> kPart2(kSerialEventBuffer.begin() + 3, kSerialEventBuffer.end());
 
-  const int kNumEvents = 20;
-  for (int i = 0; i < kNumEvents; i++) {
-    serial()->QueueReadValue(kPart1);
-    serial()->QueueReadValue(kPart2);
-    mock_ddk::GetDriverRuntime()->RunUntilIdle();
+  const size_t kNumEvents = 20;
+  for (size_t i = 0; i < kNumEvents; i++) {
+    serial()->SyncCall(&FakeSerialDevice::QueueReadValue, kPart1);
+    serial()->SyncCall(&FakeSerialDevice::QueueReadValue, kPart2);
   }
 
-  ASSERT_EQ(hci_events().size(), static_cast<size_t>(kNumEvents));
+  // Wait for all the packets to be received.
+  EXPECT_TRUE(
+      runtime()->RunWithTimeoutOrUntil([&]() { return hci_events().size() == kNumEvents; }));
+
+  ASSERT_EQ(hci_events().size(), kNumEvents);
   for (const std::vector<uint8_t>& event : hci_events()) {
     EXPECT_EQ(event, kEventBuffer);
   }
 
-  ASSERT_EQ(snoop_packets().size(), static_cast<size_t>(kNumEvents));
+  EXPECT_TRUE(
+      runtime()->RunWithTimeoutOrUntil([&]() { return snoop_packets().size() == kNumEvents; }));
   for (const std::vector<uint8_t>& packet : snoop_packets()) {
     EXPECT_EQ(packet, kSnoopEventBuffer);
   }
 }
 
 TEST_F(BtTransportUartHciProtocolTest, SendScoPackets) {
-  const uint8_t kNumPackets = 25;
-  for (uint8_t i = 0; i < kNumPackets; i++) {
-    const std::vector<uint8_t> kScoPacket = {i};
+  const size_t kNumPackets = 25;
+  for (size_t i = 0; i < kNumPackets; i++) {
+    const std::vector<uint8_t> kScoPacket = {static_cast<uint8_t>(i)};
     zx_status_t write_status =
         sco_chan()->write(/*flags=*/0, kScoPacket.data(), static_cast<uint32_t>(kScoPacket.size()),
                           /*handles=*/nullptr,
@@ -620,17 +708,18 @@ TEST_F(BtTransportUartHciProtocolTest, SendScoPackets) {
     ASSERT_EQ(write_status, ZX_OK);
   }
   // Allow SCO packets to be processed and sent to the serial device.
-  mock_ddk::GetDriverRuntime()->RunUntilIdle();
+  EXPECT_TRUE(runtime()->RunWithTimeoutOrUntil(
+      [&]() { return serial()->SyncCall(&FakeSerialDevice::writes).size() == kNumPackets; }));
 
-  const std::vector<std::vector<uint8_t>>& packets = serial()->writes();
-  ASSERT_EQ(packets.size(), kNumPackets);
+  const std::vector<std::vector<uint8_t>>& packets = serial()->SyncCall(&FakeSerialDevice::writes);
   for (uint8_t i = 0; i < kNumPackets; i++) {
     // A packet indicator should be prepended.
     std::vector<uint8_t> expected = {BtHciPacketIndicator::kHciSco, i};
     EXPECT_EQ(packets[i], expected);
   }
 
-  ASSERT_EQ(snoop_packets().size(), kNumPackets);
+  EXPECT_TRUE(
+      runtime()->RunWithTimeoutOrUntil([&]() { return snoop_packets().size() == kNumPackets; }));
   for (uint8_t i = 0; i < kNumPackets; i++) {
     // Snoop packets should have a snoop packet flag prepended (NOT a UART packet indicator).
     const std::vector<uint8_t> kExpectedSnoopPacket = {BT_HCI_SNOOP_TYPE_SCO, i};
@@ -640,7 +729,7 @@ TEST_F(BtTransportUartHciProtocolTest, SendScoPackets) {
 
 TEST_F(BtTransportUartHciProtocolTest, ScoReadableSignalIgnoredUntilFirstWriteCompletes) {
   // Delay completion of first write.
-  serial()->set_writes_paused(true);
+  serial()->SyncCall(&FakeSerialDevice::set_writes_paused, true);
 
   const uint8_t kNumPackets = 2;
   for (uint8_t i = 0; i < kNumPackets; i++) {
@@ -651,14 +740,19 @@ TEST_F(BtTransportUartHciProtocolTest, ScoReadableSignalIgnoredUntilFirstWriteCo
                           /*num_handles=*/0);
     ASSERT_EQ(write_status, ZX_OK);
   }
-  mock_ddk::GetDriverRuntime()->RunUntilIdle();
+
+  // Wait for the first packet to be received.
+  EXPECT_TRUE(runtime()->RunWithTimeoutOrUntil(
+      [&]() { return serial()->SyncCall(&FakeSerialDevice::writes).size() == 1u; }));
 
   // Call the first packet's completion callback. This should resume waiting for signals.
-  serial()->set_writes_paused(false);
-  // Wait for the readable signal to be processed.
-  mock_ddk::GetDriverRuntime()->RunUntilIdle();
+  serial()->SyncCall(&FakeSerialDevice::set_writes_paused, false);
 
-  const std::vector<std::vector<uint8_t>>& packets = serial()->writes();
+  // Wait for the readable signal to be processed and the second packet to be received.
+  EXPECT_TRUE(runtime()->RunWithTimeoutOrUntil(
+      [&]() { return serial()->SyncCall(&FakeSerialDevice::writes).size() == kNumPackets; }));
+
+  const std::vector<std::vector<uint8_t>>& packets = serial()->SyncCall(&FakeSerialDevice::writes);
   ASSERT_EQ(packets.size(), kNumPackets);
   for (uint8_t i = 0; i < kNumPackets; i++) {
     // A packet indicator should be prepended.
@@ -682,24 +776,27 @@ TEST_F(BtTransportUartHciProtocolTest, ReceiveScoPacketsIn2Parts) {
   const std::vector<uint8_t> kPart1(kSerialScoBuffer.begin(), kSerialScoBuffer.begin() + 3);
   const std::vector<uint8_t> kPart2(kSerialScoBuffer.begin() + 3, kSerialScoBuffer.end());
 
-  const int kNumPackets = 20;
-  for (int i = 0; i < kNumPackets; i++) {
-    serial()->QueueReadValue(kPart1);
-    serial()->QueueReadValue(kPart2);
-    mock_ddk::GetDriverRuntime()->RunUntilIdle();
+  const size_t kNumPackets = 20;
+  for (size_t i = 0; i < kNumPackets; i++) {
+    serial()->SyncCall(&FakeSerialDevice::QueueReadValue, kPart1);
+    serial()->SyncCall(&FakeSerialDevice::QueueReadValue, kPart2);
   }
 
-  ASSERT_EQ(received_sco_packets().size(), static_cast<size_t>(kNumPackets));
+  // Wait for all the packets to be received.
+  EXPECT_TRUE(runtime()->RunWithTimeoutOrUntil(
+      [&]() { return received_sco_packets().size() == static_cast<size_t>(kNumPackets); }));
+
   for (const std::vector<uint8_t>& packet : received_sco_packets()) {
     EXPECT_EQ(packet.size(), kScoBuffer.size());
     EXPECT_EQ(packet, kScoBuffer);
   }
 
-  mock_ddk::GetDriverRuntime()->RunUntilIdle();
-  ASSERT_EQ(snoop_packets().size(), static_cast<size_t>(kNumPackets));
+  EXPECT_TRUE(
+      runtime()->RunWithTimeoutOrUntil([&]() { return snoop_packets().size() == kNumPackets; }));
   for (const std::vector<uint8_t>& packet : snoop_packets()) {
     EXPECT_EQ(packet, kSnoopScoBuffer);
   }
 }
 
 }  // namespace
+}  // namespace bt_transport_uart

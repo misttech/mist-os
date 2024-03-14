@@ -49,6 +49,7 @@ source_set("aml-uart-source") {
     "registers.h",
   ]
   deps = [
+    "//sdk/lib/driver/outgoing/cpp:cpp",
     "//sdk/lib/fit",
     "//src/devices/bin/driver_runtime",
     "//src/devices/lib/driver",

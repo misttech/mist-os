@@ -5,13 +5,17 @@
 #ifndef SRC_CONNECTIVITY_BLUETOOTH_HCI_TRANSPORT_UART_BT_TRANSPORT_UART_H_
 #define SRC_CONNECTIVITY_BLUETOOTH_HCI_TRANSPORT_UART_BT_TRANSPORT_UART_H_
 
+#include <fidl/fuchsia.driver.compat/cpp/wire.h>
+#include <fidl/fuchsia.driver.framework/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.bluetooth/cpp/wire.h>
 #include <fidl/fuchsia.hardware.serialimpl/cpp/driver/fidl.h>
-#include <fuchsia/hardware/serialimpl/async/c/banjo.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/async/cpp/task.h>
 #include <lib/async/cpp/wait.h>
+#include <lib/driver/compat/cpp/device_server.h>
+#include <lib/driver/component/cpp/driver_base.h>
+#include <lib/driver/component/cpp/node_add_args.h>
 #include <lib/driver/outgoing/cpp/outgoing_directory.h>
 #include <lib/fdf/cpp/dispatcher.h>
 #include <lib/fit/thread_checker.h>
@@ -21,28 +25,26 @@
 
 #include <mutex>
 
-#include <ddktl/device.h>
-#include <ddktl/fidl.h>
+#include <sdk/lib/driver/logging/cpp/logger.h>
+
 namespace bt_transport_uart {
 
-class BtTransportUart;
-using BtTransportUartType = ddk::Device<BtTransportUart, ddk::Unbindable>;
-
-class BtTransportUart : public BtTransportUartType,
-                        public fidl::WireServer<fuchsia_hardware_bluetooth::Hci>,
-                        public fdf::WireServer<fuchsia_hardware_serialimpl::Device> {
+class BtTransportUart
+    : public fdf::DriverBase,
+      public fidl::WireAsyncEventHandler<fuchsia_driver_framework::NodeController>,
+      public fidl::WireServer<fuchsia_hardware_bluetooth::Hci>,
+      public fdf::WireServer<fuchsia_hardware_serialimpl::Device> {
  public:
   // If |dispatcher| is non-null, it will be used instead of a new work thread.
   // tests.
-  explicit BtTransportUart(zx_device_t* parent);
+  explicit BtTransportUart(fdf::DriverStartArgs start_args,
+                           fdf::UnownedSynchronizedDispatcher driver_dispatcher);
 
-  // Static bind function for the ZIRCON_DRIVER() declaration. Binds this device and passes
-  // ownership to the driver manager.
-  static zx_status_t Create(void* ctx, zx_device_t* parent);
+  zx::result<> Start() override;
+  void PrepareStop(fdf::PrepareStopCompleter completer) override;
 
-  // DDK mixins:
-  void DdkUnbind(ddk::UnbindTxn txn);
-  void DdkRelease();
+  void handle_unknown_event(
+      fidl::UnknownEventMetadata<fuchsia_driver_framework::NodeController> metadata) override {}
 
   // Request handlers for Hci protocol.
   void OpenCommandChannel(OpenCommandChannelRequestView request,
@@ -152,7 +154,7 @@ class BtTransportUart : public BtTransportUartType,
 
   zx_status_t HciOpenChannel(zx::channel* in_channel, zx_handle_t in) __TA_EXCLUDES(mutex_);
 
-  zx_status_t ServeProtocols(fidl::ServerEnd<fuchsia_io::Directory> server_end);
+  zx_status_t ServeProtocols();
 
   // Adds the device.
   zx_status_t Bind() __TA_EXCLUDES(mutex_);
@@ -179,7 +181,7 @@ class BtTransportUart : public BtTransportUartType,
   // 1 byte packet indicator + 2 byte header + payload
   static constexpr uint32_t kEventBufSize = 255 + 3;
 
-  serial_impl_async_protocol_t serial_ __TA_GUARDED(mutex_);
+  fdf::WireClient<fuchsia_hardware_serialimpl::Device> serial_client_;
 
   zx::channel cmd_channel_ __TA_GUARDED(mutex_);
   Wait cmd_channel_wait_ __TA_GUARDED(mutex_){this, &cmd_channel_};
@@ -233,13 +235,13 @@ class BtTransportUart : public BtTransportUartType,
   // In production, this is loop_.dispatcher(). In tests, this is the test dispatcher.
   async_dispatcher_t* dispatcher_ = nullptr;
 
-  // To expose a FIDL protocol from a driver in DFv1, we need to manually add the corresponding
-  // service to the outgoing directory of the driver and wait for the child driver to connect to.
-  // This object is the outgoing directory instance that this driver provides to the child device.
-  fdf::OutgoingDirectory outgoing_dir_;
+  fidl::WireClient<fuchsia_driver_framework::Node> node_;
+  fidl::WireClient<fuchsia_driver_framework::NodeController> node_controller_;
 
   // The task which runs to queue a uart read.
   async::TaskClosureMethod<BtTransportUart, &BtTransportUart::QueueUartRead> queue_read_task_{this};
+
+  compat::SyncInitializedDeviceServer compat_server_;
 };
 
 }  // namespace bt_transport_uart
