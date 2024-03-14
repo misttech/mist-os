@@ -4,8 +4,8 @@
 
 #include "src/graphics/display/drivers/amlogic-display/mipi-phy.h"
 
+#include <fidl/fuchsia.hardware.platform.device/cpp/wire.h>
 #include <lib/ddk/debug.h>
-#include <lib/device-protocol/pdev-fidl.h>
 #include <lib/mmio/mmio-buffer.h>
 
 #include <fbl/algorithm.h>
@@ -211,19 +211,12 @@ zx::result<> MipiPhy::Startup() {
 
 // static
 zx::result<std::unique_ptr<MipiPhy>> MipiPhy::Create(
-    zx_device_t* parent, designware_dsi::DsiHostController* designware_dsi_host_controller,
-    bool enabled) {
-  ZX_DEBUG_ASSERT(parent != nullptr);
+    fidl::UnownedClientEnd<fuchsia_hardware_platform_device::Device> platform_device,
+    designware_dsi::DsiHostController* designware_dsi_host_controller, bool enabled) {
+  ZX_DEBUG_ASSERT(platform_device.is_valid());
 
-  static constexpr char kPdevFragmentName[] = "pdev";
-  zx::result<ddk::PDevFidl> pdev_result = ddk::PDevFidl::Create(parent, kPdevFragmentName);
-  if (pdev_result.is_error()) {
-    zxlogf(ERROR, "Failed to get the pdev client: %s", pdev_result.status_string());
-    return pdev_result.take_error();
-  }
-  ddk::PDevFidl pdev = std::move(pdev_result).value();
-
-  zx::result<fdf::MmioBuffer> d_phy_mmio_result = MapMmio(MmioResourceIndex::kDsiPhy, pdev);
+  zx::result<fdf::MmioBuffer> d_phy_mmio_result =
+      MapMmio(MmioResourceIndex::kDsiPhy, platform_device);
   if (d_phy_mmio_result.is_error()) {
     return d_phy_mmio_result.take_error();
   }

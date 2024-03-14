@@ -4,6 +4,7 @@
 
 #include "src/graphics/display/drivers/amlogic-display/vout.h"
 
+#include <fidl/fuchsia.hardware.platform.device/cpp/wire.h>
 #include <fidl/fuchsia.images2/cpp/wire.h>
 #include <fuchsia/hardware/dsiimpl/cpp/banjo.h>
 #include <lib/device-protocol/display-panel.h>
@@ -84,13 +85,23 @@ zx::result<std::unique_ptr<Vout>> Vout::CreateDsiVout(zx_device_t* parent, uint3
   }
   std::unique_ptr<DsiHost> dsi_host = std::move(dsi_host_result).value();
 
-  ddk::PDevFidl pdev;
-  zx_status_t status = ddk::PDevFidl::FromFragment(parent, &pdev);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Could not get PDEV protocol");
-    return zx::error(status);
+  static constexpr char kPdevFragmentName[] = "pdev";
+  zx::result<fidl::ClientEnd<fuchsia_hardware_platform_device::Device>> pdev_result =
+      ddk::Device<void>::DdkConnectFragmentFidlProtocol<
+          fuchsia_hardware_platform_device::Service::Device>(parent, kPdevFragmentName);
+  if (pdev_result.is_error()) {
+    zxlogf(ERROR, "Failed to get the pdev client: %s", pdev_result.status_string());
+    return pdev_result.take_error();
   }
-  zx::result<std::unique_ptr<Clock>> clock_result = Clock::Create(pdev, kBootloaderDisplayEnabled);
+  fidl::ClientEnd<fuchsia_hardware_platform_device::Device> platform_device =
+      std::move(pdev_result).value();
+  if (!platform_device.is_valid()) {
+    zxlogf(ERROR, "Failed to get a valid platform device client");
+    return zx::error(ZX_ERR_INTERNAL);
+  }
+
+  zx::result<std::unique_ptr<Clock>> clock_result =
+      Clock::Create(platform_device, kBootloaderDisplayEnabled);
   if (clock_result.is_error()) {
     zxlogf(ERROR, "Could not create Clock: %s", clock_result.status_string());
     return clock_result.take_error();

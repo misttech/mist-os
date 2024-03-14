@@ -5,7 +5,7 @@
 #ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_AMLOGIC_DISPLAY_BOARD_RESOURCES_H_
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_AMLOGIC_DISPLAY_BOARD_RESOURCES_H_
 
-#include <lib/device-protocol/pdev-fidl.h>
+#include <fidl/fuchsia.hardware.platform.device/cpp/wire.h>
 #include <lib/mmio/mmio-buffer.h>
 #include <lib/zx/bti.h>
 #include <lib/zx/interrupt.h>
@@ -26,11 +26,14 @@ struct BoardInfo {
   uint32_t board_product_id;
 };
 
-// Typesafe wrapper for PdevFidl::BoardInfo();
+// Typesafe wrapper for [`fuchsia.hardware.platform.device/Device.GetBoardInfo`].
+//
+// `platform_device` must be valid.
 //
 // If the result is successful, the fields in BoardInfo are guaranteed to be
 // valid.
-zx::result<BoardInfo> GetBoardInfo(ddk::PDevFidl& platform_device);
+zx::result<BoardInfo> GetBoardInfo(
+    fidl::UnownedClientEnd<fuchsia_hardware_platform_device::Device> platform_device);
 
 // The resource ordering in the board driver's `display_mmios` table.
 enum class MmioResourceIndex : uint8_t {
@@ -46,10 +49,14 @@ enum class MmioResourceIndex : uint8_t {
   kHdmiTxTop = 9,          // HDMITX (HDMI Transmitter Top-Level)
 };
 
-// Typesafe wrapper for PdevFidl::MapMmio().
+// Typesafe wrapper for [`fuchsia.hardware.platform.device/Device.GetMmioById`].
+//
+// `platform_device` must be valid.
 //
 // If the result is successful, the MmioBuffer is guaranteed to be valid.
-zx::result<fdf::MmioBuffer> MapMmio(MmioResourceIndex mmio_index, ddk::PDevFidl& platform_device);
+zx::result<fdf::MmioBuffer> MapMmio(
+    MmioResourceIndex mmio_index,
+    fidl::UnownedClientEnd<fuchsia_hardware_platform_device::Device> platform_device);
 
 // The resource ordering in the board driver's `display_irqs` table.
 enum class InterruptResourceIndex : uint8_t {
@@ -58,33 +65,43 @@ enum class InterruptResourceIndex : uint8_t {
   kVid1Write = 2,  // Display capture done on VID1.
 };
 
-// Typesafe wrapper for PdevFidl::GetInterrupt().
+// Typesafe wrapper for [`fuchsia.hardware.platform.device/Device.GetInterruptById`].
+//
+// `platform_device` must be valid.
 //
 // If the result is successful, the zx::interrupt is guaranteed to be valid.
-zx::result<zx::interrupt> GetInterrupt(InterruptResourceIndex interrupt_index,
-                                       ddk::PDevFidl& platform_device);
+zx::result<zx::interrupt> GetInterrupt(
+    InterruptResourceIndex interrupt_index,
+    fidl::UnownedClientEnd<fuchsia_hardware_platform_device::Device> platform_device);
 
 // The resource ordering in the board driver's `display_btis` table.
 enum class BtiResourceIndex : uint8_t {
   kDma = 0,  // BTI used for CANVAS / DMA transfers.
 };
 
-// Typesafe wrapper for PdevFidl::GetBti().
+// Typesafe wrapper for [`fuchsia.hardware.platform.device/Device.GetBtiById`].
+//
+// `platform_device` must be valid.
 //
 // If the result is successful, the zx::bti is guaranteed to be valid.
-zx::result<zx::bti> GetBti(BtiResourceIndex bti_index, ddk::PDevFidl& platform_device);
+zx::result<zx::bti> GetBti(
+    BtiResourceIndex bti_index,
+    fidl::UnownedClientEnd<fuchsia_hardware_platform_device::Device> platform_device);
 
 // The resource ordering in the board driver's `kDisplaySmcs` table.
 enum class SecureMonitorCallResourceIndex : uint8_t {
   kSiliconProvider = 0,  // SMC used to initialize HDCP.
 };
 
-// Typesafe wrapper for PdevFidl::GetSmc().
+// Typesafe wrapper for [`fuchsia.hardware.platform.device/Device.GetSmcById`].
+//
+// `platform_device` must be valid.
 //
 // If the result is successful, the zx::resource is guaranteed to be valid and
 // represent a Secure Monitor Call.
 zx::result<zx::resource> GetSecureMonitorCall(
-    SecureMonitorCallResourceIndex secure_monitor_call_index, ddk::PDevFidl& platform_device);
+    SecureMonitorCallResourceIndex secure_monitor_call_index,
+    fidl::UnownedClientEnd<fuchsia_hardware_platform_device::Device> platform_device);
 
 }  // namespace amlogic_display
 

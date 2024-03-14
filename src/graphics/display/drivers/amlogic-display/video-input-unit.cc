@@ -831,14 +831,17 @@ void VideoInputUnit::Release() {
 
 // static
 zx::result<std::unique_ptr<VideoInputUnit>> VideoInputUnit::Create(
-    ddk::PDevFidl* pdev, inspect::Node* video_input_unit_node) {
-  zx::result<fdf::MmioBuffer> vpu_mmio_result = MapMmio(MmioResourceIndex::kVpu, *pdev);
+    fidl::UnownedClientEnd<fuchsia_hardware_platform_device::Device> platform_device,
+    inspect::Node* video_input_unit_node) {
+  ZX_DEBUG_ASSERT(platform_device.is_valid());
+
+  zx::result<fdf::MmioBuffer> vpu_mmio_result = MapMmio(MmioResourceIndex::kVpu, platform_device);
   if (vpu_mmio_result.is_error()) {
     return vpu_mmio_result.take_error();
   }
 
   zx::result<std::unique_ptr<RdmaEngine>> rdma_result =
-      RdmaEngine::Create(pdev, video_input_unit_node);
+      RdmaEngine::Create(platform_device, video_input_unit_node);
   if (rdma_result.is_error()) {
     return rdma_result.take_error();
   }

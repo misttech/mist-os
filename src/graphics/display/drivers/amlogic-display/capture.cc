@@ -4,10 +4,11 @@
 
 #include "src/graphics/display/drivers/amlogic-display/capture.h"
 
+#include <fidl/fuchsia.hardware.platform.device/cpp/wire.h>
 #include <lib/ddk/debug.h>
-#include <lib/device-protocol/pdev-fidl.h>
 #include <lib/zx/interrupt.h>
 #include <lib/zx/result.h>
+#include <zircon/assert.h>
 #include <zircon/status.h>
 #include <zircon/threads.h>
 
@@ -22,8 +23,11 @@
 namespace amlogic_display {
 
 // static
-zx::result<std::unique_ptr<Capture>> Capture::Create(ddk::PDevFidl& platform_device,
-                                                     OnCaptureCompleteHandler on_capture_complete) {
+zx::result<std::unique_ptr<Capture>> Capture::Create(
+    fidl::UnownedClientEnd<fuchsia_hardware_platform_device::Device> platform_device,
+    OnCaptureCompleteHandler on_capture_complete) {
+  ZX_DEBUG_ASSERT(platform_device.is_valid());
+
   zx::result<zx::interrupt> capture_interrupt_result =
       GetInterrupt(InterruptResourceIndex::kVid1Write, platform_device);
   if (capture_interrupt_result.is_error()) {

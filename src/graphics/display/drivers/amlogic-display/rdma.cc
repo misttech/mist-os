@@ -4,6 +4,7 @@
 
 #include "src/graphics/display/drivers/amlogic-display/rdma.h"
 
+#include <fidl/fuchsia.hardware.platform.device/cpp/wire.h>
 #include <lib/ddk/debug.h>
 #include <lib/mmio/mmio-buffer.h>
 #include <lib/zx/clock.h>
@@ -28,11 +29,12 @@
 namespace amlogic_display {
 
 // static
-zx::result<std::unique_ptr<RdmaEngine>> RdmaEngine::Create(ddk::PDevFidl* pdev,
-                                                           inspect::Node* video_input_unit_node) {
-  ZX_DEBUG_ASSERT(pdev != nullptr);
+zx::result<std::unique_ptr<RdmaEngine>> RdmaEngine::Create(
+    fidl::UnownedClientEnd<fuchsia_hardware_platform_device::Device> platform_device,
+    inspect::Node* video_input_unit_node) {
+  ZX_DEBUG_ASSERT(platform_device.is_valid());
 
-  zx::result<zx::bti> bti_result = GetBti(BtiResourceIndex::kDma, *pdev);
+  zx::result<zx::bti> bti_result = GetBti(BtiResourceIndex::kDma, platform_device);
   if (bti_result.is_error()) {
     zxlogf(ERROR, "Could not get BTI handle");
     return zx::error(bti_result.error_value());
@@ -41,13 +43,13 @@ zx::result<std::unique_ptr<RdmaEngine>> RdmaEngine::Create(ddk::PDevFidl* pdev,
 
   // Map RDMA Done Interrupt
   zx::result<zx::interrupt> rdma_done_result =
-      GetInterrupt(InterruptResourceIndex::kRdmaDone, *pdev);
+      GetInterrupt(InterruptResourceIndex::kRdmaDone, platform_device);
   if (rdma_done_result.is_error()) {
     return rdma_done_result.take_error();
   }
   zx::interrupt rdma_done_interrupt = std::move(rdma_done_result).value();
 
-  zx::result<fdf::MmioBuffer> vpu_mmio_result = MapMmio(MmioResourceIndex::kVpu, *pdev);
+  zx::result<fdf::MmioBuffer> vpu_mmio_result = MapMmio(MmioResourceIndex::kVpu, platform_device);
   if (vpu_mmio_result.is_error()) {
     return vpu_mmio_result.take_error();
   }

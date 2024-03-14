@@ -5,9 +5,9 @@
 #ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_AMLOGIC_DISPLAY_MIPI_PHY_H_
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_AMLOGIC_DISPLAY_MIPI_PHY_H_
 
+#include <fidl/fuchsia.hardware.platform.device/cpp/wire.h>
 #include <fuchsia/hardware/dsiimpl/cpp/banjo.h>
 #include <lib/ddk/device.h>
-#include <lib/device-protocol/pdev-fidl.h>
 #include <lib/mmio/mmio-buffer.h>
 #include <lib/mmio/mmio.h>
 #include <unistd.h>
@@ -27,6 +27,8 @@ class MipiPhy {
  public:
   // Factory method intended for production use.
   //
+  // `platform_device` must be valid.
+  //
   // `designware_dsi_host_controller` must be non-null and outlive the `MipiPhy`
   // instance.
   //
@@ -37,8 +39,8 @@ class MipiPhy {
   // therefore safe to use when adopting a device previously initialized by
   // the bootloader or another driver.
   static zx::result<std::unique_ptr<MipiPhy>> Create(
-      zx_device_t* parent, designware_dsi::DsiHostController* designware_dsi_host_controller,
-      bool enabled);
+      fidl::UnownedClientEnd<fuchsia_hardware_platform_device::Device> platform_device,
+      designware_dsi::DsiHostController* designware_dsi_host_controller, bool enabled);
 
   // Production code should prefer using the `Create()` factory method.
   //

@@ -5,9 +5,9 @@
 #ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_AMLOGIC_DISPLAY_CLOCK_H_
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_AMLOGIC_DISPLAY_CLOCK_H_
 
+#include <fidl/fuchsia.hardware.platform.device/cpp/wire.h>
 #include <fuchsia/hardware/dsiimpl/c/banjo.h>
 #include <lib/ddk/driver.h>
-#include <lib/device-protocol/pdev-fidl.h>
 #include <lib/mmio/mmio.h>
 #include <lib/zx/result.h>
 #include <unistd.h>
@@ -31,9 +31,13 @@ class Clock {
  public:
   // Factory method intended for production use.
   //
+  // `platform_device` must be valid.
+  //
   // Creating a Clock instance doesn't change the hardware state, and is
   // therefore safe to use when adopting a bootloader initialized device.
-  static zx::result<std::unique_ptr<Clock>> Create(ddk::PDevFidl& pdev, bool already_enabled);
+  static zx::result<std::unique_ptr<Clock>> Create(
+      fidl::UnownedClientEnd<fuchsia_hardware_platform_device::Device> platform_device,
+      bool already_enabled);
 
   // Production code should prefer using the `Create()` factory method.
   //

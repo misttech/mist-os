@@ -7,7 +7,6 @@
 
 #include <fuchsia/hardware/display/controller/cpp/banjo.h>
 #include <fuchsia/hardware/i2cimpl/cpp/banjo.h>
-#include <lib/device-protocol/pdev-fidl.h>
 #include <lib/mmio/mmio.h>
 
 #include "src/graphics/display/drivers/amlogic-display/common.h"

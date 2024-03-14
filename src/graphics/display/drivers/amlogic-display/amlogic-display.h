@@ -6,11 +6,11 @@
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_AMLOGIC_DISPLAY_AMLOGIC_DISPLAY_H_
 
 #include <fidl/fuchsia.hardware.amlogiccanvas/cpp/wire.h>
+#include <fidl/fuchsia.hardware.platform.device/cpp/wire.h>
 #include <fidl/fuchsia.hardware.sysmem/cpp/wire.h>
 #include <fidl/fuchsia.images2/cpp/wire.h>
 #include <fidl/fuchsia.sysmem/cpp/wire.h>
 #include <fuchsia/hardware/display/controller/cpp/banjo.h>
-#include <fuchsia/hardware/platform/device/cpp/banjo.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
@@ -260,7 +260,7 @@ class AmlogicDisplay
   std::optional<thrd_t> vsync_thread_;
 
   // Protocol handles used in by this driver
-  ddk::PDevFidl pdev_;
+  fidl::WireSyncClient<fuchsia_hardware_platform_device::Device> pdev_;
   fidl::WireSyncClient<fuchsia_hardware_amlogiccanvas::Device> canvas_;
   // The sysmem allocator client used to bind incoming buffer collection tokens.
   fidl::WireSyncClient<fuchsia_sysmem::Allocator> sysmem_;

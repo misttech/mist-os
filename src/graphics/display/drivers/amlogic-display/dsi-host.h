@@ -7,7 +7,6 @@
 
 #include <fidl/fuchsia.hardware.gpio/cpp/wire.h>
 #include <fuchsia/hardware/dsiimpl/cpp/banjo.h>
-#include <lib/device-protocol/pdev-fidl.h>
 #include <lib/fit/function.h>
 #include <lib/zx/result.h>
 #include <unistd.h>

@@ -4,14 +4,15 @@
 
 #include "src/graphics/display/drivers/amlogic-display/hdmi-host.h"
 
+#include <fidl/fuchsia.hardware.platform.device/cpp/wire.h>
 #include <fuchsia/hardware/display/controller/c/banjo.h>
 #include <lib/ddk/debug.h>
-#include <lib/device-protocol/pdev-fidl.h>
 #include <lib/mmio/mmio-buffer.h>
 #include <zircon/errors.h>
 
 #include <limits>
 
+#include <ddktl/device.h>
 #include <fbl/alloc_checker.h>
 
 #include "src/graphics/display/drivers/amlogic-display/board-resources.h"
@@ -124,14 +125,15 @@ pll_param CalculateClockParameters(const display::DisplayTiming& timing) {
   return params;
 }
 
-zx::result<std::unique_ptr<HdmiTransmitter>> CreateHdmiTransmitter(ddk::PDevFidl& pdev) {
-  if (!pdev.is_valid()) {
+zx::result<std::unique_ptr<HdmiTransmitter>> CreateHdmiTransmitter(
+    fidl::UnownedClientEnd<fuchsia_hardware_platform_device::Device> platform_device) {
+  if (!platform_device.is_valid()) {
     zxlogf(ERROR, "PDev protocol is invalid");
     return zx::error(ZX_ERR_NO_RESOURCES);
   }
 
   zx::result<fdf::MmioBuffer> hdmi_tx_mmio_result =
-      MapMmio(MmioResourceIndex::kHdmiTxController, pdev);
+      MapMmio(MmioResourceIndex::kHdmiTxController, platform_device);
   if (hdmi_tx_mmio_result.is_error()) {
     return hdmi_tx_mmio_result.take_error();
   }
@@ -145,13 +147,14 @@ zx::result<std::unique_ptr<HdmiTransmitter>> CreateHdmiTransmitter(ddk::PDevFidl
     return zx::error(ZX_ERR_NO_MEMORY);
   }
 
-  zx::result<fdf::MmioBuffer> hdmi_top_mmio_result = MapMmio(MmioResourceIndex::kHdmiTxTop, pdev);
+  zx::result<fdf::MmioBuffer> hdmi_top_mmio_result =
+      MapMmio(MmioResourceIndex::kHdmiTxTop, platform_device);
   if (hdmi_top_mmio_result.is_error()) {
     return hdmi_top_mmio_result.take_error();
   }
 
   zx::result<zx::resource> smc_result =
-      GetSecureMonitorCall(SecureMonitorCallResourceIndex::kSiliconProvider, pdev);
+      GetSecureMonitorCall(SecureMonitorCallResourceIndex::kSiliconProvider, platform_device);
   if (smc_result.is_error()) {
     return smc_result.take_error();
   }
@@ -179,28 +182,40 @@ HdmiHost::HdmiHost(std::unique_ptr<HdmiTransmitter> hdmi_transmitter, fdf::MmioB
 
 // static
 zx::result<std::unique_ptr<HdmiHost>> HdmiHost::Create(zx_device_t* parent) {
-  ddk::PDevFidl pdev = ddk::PDevFidl::FromFragment(parent);
-  if (!pdev.is_valid()) {
+  static constexpr char kPdevFragmentName[] = "pdev";
+  zx::result<fidl::ClientEnd<fuchsia_hardware_platform_device::Device>> pdev_result =
+      ddk::Device<void>::DdkConnectFragmentFidlProtocol<
+          fuchsia_hardware_platform_device::Service::Device>(parent, kPdevFragmentName);
+  if (pdev_result.is_error()) {
+    zxlogf(ERROR, "Failed to get the pdev client: %s", pdev_result.status_string());
+    return pdev_result.take_error();
+  }
+  fidl::ClientEnd<fuchsia_hardware_platform_device::Device> platform_device =
+      std::move(pdev_result).value();
+
+  if (!platform_device.is_valid()) {
     zxlogf(ERROR, "Could not get the platform device client.");
     return zx::error(ZX_ERR_INTERNAL);
   }
 
-  zx::result<fdf::MmioBuffer> vpu_mmio_result = MapMmio(MmioResourceIndex::kVpu, pdev);
+  zx::result<fdf::MmioBuffer> vpu_mmio_result = MapMmio(MmioResourceIndex::kVpu, platform_device);
   if (vpu_mmio_result.is_error()) {
     return vpu_mmio_result.take_error();
   }
 
-  zx::result<fdf::MmioBuffer> hhi_mmio_result = MapMmio(MmioResourceIndex::kHhi, pdev);
+  zx::result<fdf::MmioBuffer> hhi_mmio_result = MapMmio(MmioResourceIndex::kHhi, platform_device);
   if (hhi_mmio_result.is_error()) {
     return hhi_mmio_result.take_error();
   }
 
-  zx::result<fdf::MmioBuffer> gpio_mux_mmio_result = MapMmio(MmioResourceIndex::kGpioMux, pdev);
+  zx::result<fdf::MmioBuffer> gpio_mux_mmio_result =
+      MapMmio(MmioResourceIndex::kGpioMux, platform_device);
   if (gpio_mux_mmio_result.is_error()) {
     return gpio_mux_mmio_result.take_error();
   }
 
-  zx::result<std::unique_ptr<HdmiTransmitter>> hdmi_transmitter = CreateHdmiTransmitter(pdev);
+  zx::result<std::unique_ptr<HdmiTransmitter>> hdmi_transmitter =
+      CreateHdmiTransmitter(platform_device);
   if (hdmi_transmitter.is_error()) {
     zxlogf(ERROR, "Could not create HDMI transmitter: %s", hdmi_transmitter.status_string());
     return hdmi_transmitter.take_error();

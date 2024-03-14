@@ -5,9 +5,9 @@
 #ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_AMLOGIC_DISPLAY_CAPTURE_H_
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_AMLOGIC_DISPLAY_CAPTURE_H_
 
+#include <fidl/fuchsia.hardware.platform.device/cpp/wire.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async/cpp/irq.h>
-#include <lib/device-protocol/pdev-fidl.h>
 #include <lib/zx/interrupt.h>
 #include <lib/zx/result.h>
 
@@ -29,10 +29,13 @@ class Capture {
 
   // Factory method intended for production use.
   //
+  // `platform_device` must be valid.
+  //
   // `on_state_change` is called when the display engine finishes writing a
   // captured image to DRAM.
-  static zx::result<std::unique_ptr<Capture>> Create(ddk::PDevFidl& platform_device,
-                                                     OnCaptureCompleteHandler on_capture_complete);
+  static zx::result<std::unique_ptr<Capture>> Create(
+      fidl::UnownedClientEnd<fuchsia_hardware_platform_device::Device> platform_device,
+      OnCaptureCompleteHandler on_capture_complete);
 
   explicit Capture(zx::interrupt capture_finished_interrupt,
                    OnCaptureCompleteHandler on_capture_complete);

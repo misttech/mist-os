@@ -5,10 +5,10 @@
 #ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_AMLOGIC_DISPLAY_RDMA_H_
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_AMLOGIC_DISPLAY_RDMA_H_
 
+#include <fidl/fuchsia.hardware.platform.device/cpp/wire.h>
 #include <fuchsia/hardware/display/controller/cpp/banjo.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async/cpp/irq.h>
-#include <lib/device-protocol/pdev-fidl.h>
 #include <lib/inspect/cpp/inspect.h>
 #include <lib/mmio/mmio-buffer.h>
 #include <lib/mmio/mmio.h>
@@ -158,9 +158,12 @@ class RdmaEngine {
  public:
   // Factory method intended for production use.
   //
+  // `platform_device` must be valid.
+  //
   // `video_input_unit_node` must outlive the RdmaEngine instance.
-  static zx::result<std::unique_ptr<RdmaEngine>> Create(ddk::PDevFidl* pdev,
-                                                        inspect::Node* video_input_unit_node);
+  static zx::result<std::unique_ptr<RdmaEngine>> Create(
+      fidl::UnownedClientEnd<fuchsia_hardware_platform_device::Device> platform_device,
+      inspect::Node* video_input_unit_node);
 
   // Production code should prefer the `Create()` factory method.
   //

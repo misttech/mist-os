@@ -5,8 +5,8 @@
 #ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_AMLOGIC_DISPLAY_VIDEO_INPUT_UNIT_H_
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_AMLOGIC_DISPLAY_VIDEO_INPUT_UNIT_H_
 
+#include <fidl/fuchsia.hardware.platform.device/cpp/wire.h>
 #include <fuchsia/hardware/display/controller/cpp/banjo.h>
-#include <lib/device-protocol/pdev-fidl.h>
 #include <lib/inspect/cpp/inspect.h>
 #include <lib/mmio/mmio.h>
 #include <lib/zircon-internal/thread_annotations.h>
@@ -41,8 +41,14 @@ namespace amlogic_display {
 // controls the OSD layers, scalers and blenders within the VIU.
 class VideoInputUnit {
  public:
-  static zx::result<std::unique_ptr<VideoInputUnit>> Create(ddk::PDevFidl* pdev,
-                                                            inspect::Node* video_input_unit_node);
+  // Factory method for production use.
+  //
+  // `platform_device` must be valid.
+  //
+  // `video_input_unit_node` must outlive the `VideoInputUnit` instance.
+  static zx::result<std::unique_ptr<VideoInputUnit>> Create(
+      fidl::UnownedClientEnd<fuchsia_hardware_platform_device::Device> platform_device,
+      inspect::Node* video_input_unit_node);
 
   // Creates a VideoInputUnit with `vpu_mmio`, `rdma` injected and
   // `layer_image_size` / `display_contents_size` set.

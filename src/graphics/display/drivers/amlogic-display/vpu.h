@@ -5,7 +5,7 @@
 #ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_AMLOGIC_DISPLAY_VPU_H_
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_AMLOGIC_DISPLAY_VPU_H_
 
-#include <lib/device-protocol/pdev-fidl.h>
+#include <fidl/fuchsia.hardware.platform.device/cpp/wire.h>
 #include <lib/mmio/mmio.h>
 #include <lib/zircon-internal/thread_annotations.h>
 #include <zircon/compiler.h>
@@ -35,7 +35,10 @@ enum class ColorSpaceConversionMode {
 class Vpu {
  public:
   // Factory method intended for production use.
-  static zx::result<std::unique_ptr<Vpu>> Create(ddk::PDevFidl& pdev);
+  //
+  // `platform_device` must be valid.
+  static zx::result<std::unique_ptr<Vpu>> Create(
+      fidl::UnownedClientEnd<fuchsia_hardware_platform_device::Device> platform_device);
 
   // Production code should prefer the `Create()` factory method.
   //

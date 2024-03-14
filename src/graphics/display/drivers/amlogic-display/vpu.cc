@@ -4,6 +4,7 @@
 
 #include "src/graphics/display/drivers/amlogic-display/vpu.h"
 
+#include <fidl/fuchsia.hardware.platform.device/cpp/wire.h>
 #include <lib/ddk/debug.h>
 #include <lib/mmio/mmio-buffer.h>
 #include <lib/zx/time.h>
@@ -74,27 +75,32 @@ constexpr VideoInputModuleId kVideoInputModuleId = VideoInputModuleId::kVideoInp
 #define RESET7_LEVEL 0x9c
 
 // static
-zx::result<std::unique_ptr<Vpu>> Vpu::Create(ddk::PDevFidl& pdev) {
+zx::result<std::unique_ptr<Vpu>> Vpu::Create(
+    fidl::UnownedClientEnd<fuchsia_hardware_platform_device::Device> platform_device) {
+  ZX_DEBUG_ASSERT(platform_device.is_valid());
+
   // Map VPU registers
-  zx::result<fdf::MmioBuffer> vpu_mmio_result = MapMmio(MmioResourceIndex::kVpu, pdev);
+  zx::result<fdf::MmioBuffer> vpu_mmio_result = MapMmio(MmioResourceIndex::kVpu, platform_device);
   if (vpu_mmio_result.is_error()) {
     return vpu_mmio_result.take_error();
   }
   fdf::MmioBuffer vpu_mmio = std::move(vpu_mmio_result).value();
 
-  zx::result<fdf::MmioBuffer> hhi_mmio_result = MapMmio(MmioResourceIndex::kHhi, pdev);
+  zx::result<fdf::MmioBuffer> hhi_mmio_result = MapMmio(MmioResourceIndex::kHhi, platform_device);
   if (hhi_mmio_result.is_error()) {
     return hhi_mmio_result.take_error();
   }
   fdf::MmioBuffer hhi_mmio = std::move(hhi_mmio_result).value();
 
-  zx::result<fdf::MmioBuffer> aobus_mmio_result = MapMmio(MmioResourceIndex::kAonRti, pdev);
+  zx::result<fdf::MmioBuffer> aobus_mmio_result =
+      MapMmio(MmioResourceIndex::kAonRti, platform_device);
   if (aobus_mmio_result.is_error()) {
     return aobus_mmio_result.take_error();
   }
   fdf::MmioBuffer aobus_mmio = std::move(aobus_mmio_result).value();
 
-  zx::result<fdf::MmioBuffer> reset_mmio_result = MapMmio(MmioResourceIndex::kEeReset, pdev);
+  zx::result<fdf::MmioBuffer> reset_mmio_result =
+      MapMmio(MmioResourceIndex::kEeReset, platform_device);
   if (reset_mmio_result.is_error()) {
     return reset_mmio_result.take_error();
   }

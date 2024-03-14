@@ -4,10 +4,10 @@
 
 #include "src/graphics/display/drivers/amlogic-display/dsi-host.h"
 
+#include <fidl/fuchsia.hardware.platform.device/cpp/wire.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/device-protocol/display-panel.h>
-#include <lib/device-protocol/pdev-fidl.h>
 #include <lib/mmio/mmio-buffer.h>
 #include <zircon/assert.h>
 #include <zircon/status.h>
@@ -24,9 +24,9 @@ namespace amlogic_display {
 namespace {
 
 zx::result<std::unique_ptr<designware_dsi::DsiHostController>> CreateDesignwareDsiHostController(
-    ddk::PDevFidl& pdev) {
+    fidl::UnownedClientEnd<fuchsia_hardware_platform_device::Device> platform_device) {
   zx::result<fdf::MmioBuffer> dsi_host_mmio_result =
-      MapMmio(MmioResourceIndex::kDsiHostController, pdev);
+      MapMmio(MmioResourceIndex::kDsiHostController, platform_device);
   if (dsi_host_mmio_result.is_error()) {
     return dsi_host_mmio_result.take_error();
   }
@@ -83,27 +83,31 @@ zx::result<std::unique_ptr<DsiHost>> DsiHost::Create(zx_device_t* parent, uint32
       std::move(lcd_reset_gpio_result).value();
 
   static constexpr char kPdevFragmentName[] = "pdev";
-  zx::result<ddk::PDevFidl> pdev_result = ddk::PDevFidl::Create(parent, kPdevFragmentName);
+  zx::result<fidl::ClientEnd<fuchsia_hardware_platform_device::Device>> pdev_result =
+      ddk::Device<void>::DdkConnectFragmentFidlProtocol<
+          fuchsia_hardware_platform_device::Service::Device>(parent, kPdevFragmentName);
   if (pdev_result.is_error()) {
     zxlogf(ERROR, "Failed to get the pdev client: %s", pdev_result.status_string());
     return pdev_result.take_error();
   }
-  ddk::PDevFidl pdev = std::move(pdev_result).value();
+  fidl::ClientEnd<fuchsia_hardware_platform_device::Device> platform_device =
+      std::move(pdev_result).value();
 
-  zx::result<fdf::MmioBuffer> dsi_top_mmio_result = MapMmio(MmioResourceIndex::kDsiTop, pdev);
+  zx::result<fdf::MmioBuffer> dsi_top_mmio_result =
+      MapMmio(MmioResourceIndex::kDsiTop, platform_device);
   if (dsi_top_mmio_result.is_error()) {
     return dsi_top_mmio_result.take_error();
   }
   fdf::MmioBuffer mipi_dsi_top_mmio = std::move(dsi_top_mmio_result).value();
 
-  zx::result<fdf::MmioBuffer> hhi_mmio_result = MapMmio(MmioResourceIndex::kHhi, pdev);
+  zx::result<fdf::MmioBuffer> hhi_mmio_result = MapMmio(MmioResourceIndex::kHhi, platform_device);
   if (hhi_mmio_result.is_error()) {
     return hhi_mmio_result.take_error();
   }
   fdf::MmioBuffer hhi_mmio = std::move(hhi_mmio_result).value();
 
   zx::result<std::unique_ptr<designware_dsi::DsiHostController>>
-      designware_dsi_host_controller_result = CreateDesignwareDsiHostController(pdev);
+      designware_dsi_host_controller_result = CreateDesignwareDsiHostController(platform_device);
   if (designware_dsi_host_controller_result.is_error()) {
     zxlogf(ERROR, "Failed to Create Designware DsiHostController: %s",
            designware_dsi_host_controller_result.status_string());
@@ -121,8 +125,8 @@ zx::result<std::unique_ptr<DsiHost>> DsiHost::Create(zx_device_t* parent, uint32
   }
   std::unique_ptr<Lcd> lcd = std::move(lcd_result).value();
 
-  zx::result<std::unique_ptr<MipiPhy>> mipi_phy_result =
-      MipiPhy::Create(parent, designware_dsi_host_controller.get(), kBootloaderDisplayEnabled);
+  zx::result<std::unique_ptr<MipiPhy>> mipi_phy_result = MipiPhy::Create(
+      platform_device, designware_dsi_host_controller.get(), kBootloaderDisplayEnabled);
   if (mipi_phy_result.is_error()) {
     zxlogf(ERROR, "Failed to Create MipiPhy: %s", mipi_phy_result.status_string());
     return mipi_phy_result.take_error();

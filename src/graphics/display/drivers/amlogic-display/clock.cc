@@ -4,8 +4,10 @@
 
 #include "src/graphics/display/drivers/amlogic-display/clock.h"
 
+#include <fidl/fuchsia.hardware.platform.device/cpp/wire.h>
 #include <lib/ddk/debug.h>
 #include <lib/mmio/mmio-buffer.h>
+#include <zircon/assert.h>
 #include <zircon/status.h>
 
 #include <cstdint>
@@ -425,14 +427,18 @@ zx::result<> Clock::Enable(const PanelConfig& panel_config) {
 void Clock::SetVideoOn(bool on) { vpu_mmio_.Write32(on, ENCL_VIDEO_EN); }
 
 // static
-zx::result<std::unique_ptr<Clock>> Clock::Create(ddk::PDevFidl& pdev, bool already_enabled) {
-  zx::result<fdf::MmioBuffer> vpu_mmio_result = MapMmio(MmioResourceIndex::kVpu, pdev);
+zx::result<std::unique_ptr<Clock>> Clock::Create(
+    fidl::UnownedClientEnd<fuchsia_hardware_platform_device::Device> platform_device,
+    bool already_enabled) {
+  ZX_DEBUG_ASSERT(platform_device.is_valid());
+
+  zx::result<fdf::MmioBuffer> vpu_mmio_result = MapMmio(MmioResourceIndex::kVpu, platform_device);
   if (vpu_mmio_result.is_error()) {
     return vpu_mmio_result.take_error();
   }
   fdf::MmioBuffer vpu_mmio = std::move(vpu_mmio_result).value();
 
-  zx::result<fdf::MmioBuffer> hhi_mmio_result = MapMmio(MmioResourceIndex::kHhi, pdev);
+  zx::result<fdf::MmioBuffer> hhi_mmio_result = MapMmio(MmioResourceIndex::kHhi, platform_device);
   if (hhi_mmio_result.is_error()) {
     return hhi_mmio_result.take_error();
   }

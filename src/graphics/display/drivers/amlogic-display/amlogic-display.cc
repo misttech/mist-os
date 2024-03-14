@@ -6,6 +6,7 @@
 
 #include <fidl/fuchsia.hardware.amlogiccanvas/cpp/wire.h>
 #include <fidl/fuchsia.hardware.gpio/cpp/wire.h>
+#include <fidl/fuchsia.hardware.platform.device/cpp/wire.h>
 #include <fidl/fuchsia.sysmem/cpp/wire.h>
 #include <fuchsia/hardware/display/controller/cpp/banjo.h>
 #include <fuchsia/hardware/dsiimpl/cpp/banjo.h>
@@ -112,10 +113,11 @@ ColorSpaceConversionMode GetColorSpaceConversionMode(VoutType vout_type) {
 
 // TODO(https://fxbug.dev/329375540): Use driver metadata instead of hardcoded
 // per-board rules to determine the display engine reset policy.
-bool IsFullHardwareResetRequired(ddk::PDevFidl& pdev) {
+bool IsFullHardwareResetRequired(
+    fidl::UnownedClientEnd<fuchsia_hardware_platform_device::Device> platform_device) {
   constexpr bool kDefaultValue = true;
 
-  zx::result<BoardInfo> board_info_result = GetBoardInfo(pdev);
+  zx::result<BoardInfo> board_info_result = GetBoardInfo(platform_device);
   if (board_info_result.is_error()) {
     zxlogf(ERROR,
            "Failed to get board information: %s. Falling back to "
@@ -1167,10 +1169,19 @@ zx_status_t AmlogicDisplay::GetCommonProtocolsAndResources() {
   ZX_ASSERT(!bti_.is_valid());
   ZX_ASSERT(!vsync_irq_.is_valid());
 
-  zx_status_t status = ddk::PDevFidl::FromFragment(parent_, &pdev_);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to get PDev protocol: %s", zx_status_get_string(status));
-    return status;
+  static constexpr char kPdevFragmentName[] = "pdev";
+  zx::result<fidl::ClientEnd<fuchsia_hardware_platform_device::Device>> pdev_result =
+      ddk::Device<void>::DdkConnectFragmentFidlProtocol<
+          fuchsia_hardware_platform_device::Service::Device>(parent_, kPdevFragmentName);
+  if (pdev_result.is_error()) {
+    zxlogf(ERROR, "Failed to get the pdev client: %s", pdev_result.status_string());
+    return pdev_result.status_value();
+  }
+
+  pdev_ = fidl::WireSyncClient(std::move(pdev_result).value());
+  if (!pdev_.is_valid()) {
+    zxlogf(ERROR, "Failed to get a valid platform device client");
+    return ZX_ERR_INTERNAL;
   }
 
   zx::result<fidl::ClientEnd<fuchsia_sysmem::Allocator>> sysmem_client_result =
@@ -1192,14 +1203,14 @@ zx_status_t AmlogicDisplay::GetCommonProtocolsAndResources() {
   }
   canvas_.Bind(std::move(canvas_client_result.value()));
 
-  zx::result<zx::bti> bti_result = GetBti(BtiResourceIndex::kDma, pdev_);
-  if (status != ZX_OK) {
+  zx::result<zx::bti> bti_result = GetBti(BtiResourceIndex::kDma, pdev_.client_end());
+  if (bti_result.is_error()) {
     return bti_result.error_value();
   }
   bti_ = std::move(bti_result).value();
 
   zx::result<zx::interrupt> vsync_interrupt_result =
-      GetInterrupt(InterruptResourceIndex::kViu1Vsync, pdev_);
+      GetInterrupt(InterruptResourceIndex::kViu1Vsync, pdev_.client_end());
   if (vsync_interrupt_result.is_error()) {
     return vsync_interrupt_result.error_value();
   }
@@ -1279,7 +1290,7 @@ zx_status_t AmlogicDisplay::Bind() {
 
   video_input_unit_node_ = root_node_.CreateChild("video_input_unit");
   zx::result<std::unique_ptr<VideoInputUnit>> video_input_unit_create_result =
-      VideoInputUnit::Create(&pdev_, &video_input_unit_node_);
+      VideoInputUnit::Create(pdev_.client_end(), &video_input_unit_node_);
   if (video_input_unit_create_result.is_error()) {
     zxlogf(ERROR, "Failed to create VideoInputUnit instance: %s",
            video_input_unit_create_result.status_string());
@@ -1287,7 +1298,7 @@ zx_status_t AmlogicDisplay::Bind() {
   }
   video_input_unit_ = std::move(video_input_unit_create_result).value();
 
-  zx::result<std::unique_ptr<Vpu>> vpu_result = Vpu::Create(pdev_);
+  zx::result<std::unique_ptr<Vpu>> vpu_result = Vpu::Create(pdev_.client_end());
   if (vpu_result.is_error()) {
     zxlogf(ERROR, "Failed to initialize VPU object: %s", vpu_result.status_string());
     return vpu_result.status_value();
@@ -1299,7 +1310,7 @@ zx_status_t AmlogicDisplay::Bind() {
   // hardware, our driver must have been unloaded and reloaded.
   // We currently do a full hardware reset in that case.
   const bool performs_full_hardware_reset =
-      IsFullHardwareResetRequired(pdev_) || !vpu_->CheckAndClaimHardwareOwnership();
+      IsFullHardwareResetRequired(pdev_.client_end()) || !vpu_->CheckAndClaimHardwareOwnership();
   if (performs_full_hardware_reset) {
     fbl::AutoLock lock(&display_mutex_);
     zx::result<> reset_result = ResetDisplayEngine();
@@ -1332,8 +1343,8 @@ zx_status_t AmlogicDisplay::Bind() {
   }
 
   {
-    zx::result<std::unique_ptr<Capture>> capture_result =
-        Capture::Create(pdev_, fit::bind_member<&AmlogicDisplay::OnCaptureComplete>(this));
+    zx::result<std::unique_ptr<Capture>> capture_result = Capture::Create(
+        pdev_.client_end(), fit::bind_member<&AmlogicDisplay::OnCaptureComplete>(this));
     if (capture_result.is_error()) {
       // Create() already logged the error.
       return capture_result.error_value();
