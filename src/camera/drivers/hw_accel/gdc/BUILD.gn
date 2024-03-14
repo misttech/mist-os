@@ -37,7 +37,6 @@ source_set("lib") {
   public_deps = [
     ":gdc_bind",
     "//sdk/banjo/fuchsia.hardware.gdc:fuchsia.hardware.gdc_banjo_cpp",
-    "//sdk/banjo/fuchsia.hardware.sysmem:fuchsia.hardware.sysmem_banjo_cpp",
     "//sdk/lib/fit",
     "//src/camera/drivers/hw_accel/task:camera-task",
     "//src/devices/bus/lib/device-protocol-pdev",

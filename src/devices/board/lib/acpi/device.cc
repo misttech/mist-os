@@ -4,7 +4,6 @@
 
 #include "src/devices/board/lib/acpi/device.h"
 
-#include <fuchsia/hardware/sysmem/c/banjo.h>
 #include <lib/async/cpp/executor.h>
 #include <lib/component/outgoing/cpp/handlers.h>
 #include <lib/ddk/debug.h>

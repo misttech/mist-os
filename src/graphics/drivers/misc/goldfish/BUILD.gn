@@ -83,7 +83,6 @@ test("goldfish-pipe-device-test") {
     "pipe_device_test.cc",
   ]
   deps = common_deps + [
-           "//sdk/banjo/fuchsia.hardware.sysmem:fuchsia.hardware.sysmem_banjo_cpp_mock",
            "//sdk/fidl/fuchsia.hardware.goldfish:fuchsia.hardware.goldfish_cpp_testing",
            "//sdk/fidl/fuchsia.hardware.goldfish.pipe:fuchsia.hardware.goldfish.pipe_cpp_testing",
            "//sdk/fidl/fuchsia.hardware.sysmem:fuchsia.hardware.sysmem_cpp_testing",

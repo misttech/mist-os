@@ -72,7 +72,6 @@ fuchsia_driver("platform-bus-x86-driver") {
     ":x64-bind",
     "//sdk/banjo/fuchsia.hardware.hidbus:fuchsia.hardware.hidbus_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.pciroot:fuchsia.hardware.pciroot_banjo_cpp",
-    "//sdk/banjo/fuchsia.hardware.sysmem:fuchsia.hardware.sysmem_banjo_cpp",
     "//sdk/banjo/fuchsia.sysmem:fuchsia.sysmem_banjo_c",
     "//sdk/fidl/fuchsia.acpi.tables:fuchsia.acpi.tables_cpp",
     "//sdk/fidl/fuchsia.hardware.acpi:fuchsia.hardware.acpi_cpp",

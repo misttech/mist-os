@@ -9,7 +9,6 @@
 #include <fidl/fuchsia.hardware.clock/cpp/wire.h>
 #include <fidl/fuchsia.hardware.sysmem/cpp/wire.h>
 #include <fidl/fuchsia.hardware.tee/cpp/wire.h>
-#include <fuchsia/hardware/sysmem/cpp/banjo.h>
 #include <fuchsia/tee/cpp/fidl.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>

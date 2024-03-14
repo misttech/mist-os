@@ -4,7 +4,6 @@
 //
 #include <endian.h>
 #include <fuchsia/hardware/pciroot/c/banjo.h>
-#include <fuchsia/hardware/sysmem/c/banjo.h>
 #include <inttypes.h>
 #include <lib/ddk/debug.h>
 #include <lib/pci/pciroot.h>

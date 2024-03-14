@@ -187,7 +187,6 @@ if (target_cpu == "arm64") {
       "local_codec_factory.h",
     ]
     public_deps = [
-      "//sdk/banjo/fuchsia.hardware.sysmem:fuchsia.hardware.sysmem_banjo_cpp",
       "//sdk/fidl/fuchsia.hardware.amlogiccanvas:fuchsia.hardware.amlogiccanvas_cpp",
       "//sdk/fidl/fuchsia.hardware.clock:fuchsia.hardware.clock_cpp",
       "//sdk/fidl/fuchsia.hardware.mediacodec:fuchsia.hardware.mediacodec_cpp",

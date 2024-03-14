@@ -5,7 +5,6 @@
 #include "src/devices/bus/drivers/pci/kpci.h"
 
 #include <fuchsia/hardware/pciroot/cpp/banjo.h>
-#include <fuchsia/hardware/sysmem/cpp/banjo.h>
 #include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>

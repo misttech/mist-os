@@ -35,7 +35,6 @@ source_set("lib") {
   ]
   public_deps = [
     "//sdk/banjo/fuchsia.hardware.ge2d:fuchsia.hardware.ge2d_banjo_cpp",
-    "//sdk/banjo/fuchsia.hardware.sysmem:fuchsia.hardware.sysmem_banjo_cpp",
     "//sdk/fidl/fuchsia.hardware.amlogiccanvas:fuchsia.hardware.amlogiccanvas_cpp",
     "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_cpp",
     "//src/camera/drivers/hw_accel/task:camera-task",
@@ -101,7 +100,6 @@ executable("ge2d_task_unittest_bin") {
   deps = [
     ":lib",
     "//sdk/banjo/fuchsia.hardware.ge2d:fuchsia.hardware.ge2d_banjo_cpp",
-    "//sdk/banjo/fuchsia.hardware.sysmem:fuchsia.hardware.sysmem_banjo_cpp",
     "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_cpp",
     "//sdk/lib/async_patterns/testing/cpp",
     "//src/camera/drivers/test_utils",

@@ -4,7 +4,6 @@
 
 #include <fidl/fuchsia.hardware.camera/cpp/wire.h>
 #include <fuchsia/hardware/camera/cpp/fidl.h>
-#include <fuchsia/hardware/sysmem/cpp/banjo.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>

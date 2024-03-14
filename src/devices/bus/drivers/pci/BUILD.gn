@@ -126,7 +126,6 @@ if (platform_enable_user_pci) {
     deps = [
       ":pci_bind",
       "//sdk/banjo/fuchsia.hardware.pciroot:fuchsia.hardware.pciroot_banjo_cpp",
-      "//sdk/banjo/fuchsia.hardware.sysmem:fuchsia.hardware.sysmem_banjo_cpp",
       "//sdk/fidl/fuchsia.hardware.pci:fuchsia.hardware.pci_bindlib_cpp",
       "//sdk/fidl/fuchsia.hardware.pci:fuchsia.hardware.pci_cpp",
       "//sdk/lib/component/outgoing/cpp",
