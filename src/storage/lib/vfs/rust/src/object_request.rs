@@ -189,6 +189,20 @@ impl ObjectRequest {
             fut.await
         });
     }
+
+    #[cfg(target_os = "fuchsia")]
+    pub async fn wait_till_ready(&self) {
+        if !matches!(self.what_to_send, ObjectRequestSend::Nothing) {
+            return;
+        }
+        fasync::OnSignals::new(
+            &self.object_request,
+            fuchsia_zircon::Signals::CHANNEL_READABLE
+                | fuchsia_zircon::Signals::CHANNEL_PEER_CLOSED,
+        )
+        .await
+        .unwrap();
+    }
 }
 
 /// Holds a reference to an ObjectRequest.

@@ -10,6 +10,7 @@ use crate::{assert_close, assert_read, assert_read_dirents, pseudo_directory};
 
 use crate::{
     directory::{
+        entry::{DirectoryEntry, EntryInfo, OpenRequest},
         entry_container::Directory,
         test_utils::{run_client, DirentsSameInodeBuilder},
     },
@@ -19,7 +20,13 @@ use crate::{
     test_utils::test_file::TestFile,
 };
 
-use {fidl::endpoints::ServerEnd, fidl_fuchsia_io as fio, fuchsia_async as fasync};
+use {
+    fidl::endpoints::{create_proxy, ServerEnd},
+    fidl_fuchsia_io as fio, fuchsia_async as fasync,
+    fuchsia_zircon_status::Status,
+    futures::channel::oneshot,
+    std::sync::{Arc, Mutex},
+};
 
 fn set_up_remote(scope: ExecutionScope) -> fio::DirectoryProxy {
     let r = pseudo_directory! {
@@ -189,4 +196,56 @@ fn remote_dir_direct_connection_dir_contents() {
         assert_read!(proxy, "a content");
         assert_close!(proxy);
     })
+}
+
+#[fuchsia::test]
+async fn lazy_remote() {
+    struct Remote(Mutex<Option<oneshot::Sender<()>>>);
+    impl DirectoryEntry for Remote {
+        fn entry_info(&self) -> EntryInfo {
+            EntryInfo::new(fio::INO_UNKNOWN, fio::DirentType::Unknown)
+        }
+
+        fn open_entry(self: Arc<Self>, request: OpenRequest<'_>) -> Result<(), Status> {
+            request.open_remote(self)
+        }
+    }
+    impl RemoteLike for Remote {
+        fn open(
+            self: Arc<Self>,
+            _scope: ExecutionScope,
+            _flags: fio::OpenFlags,
+            _path: Path,
+            _server_end: ServerEnd<fio::NodeMarker>,
+        ) {
+            self.0.lock().unwrap().take().unwrap().send(()).unwrap();
+        }
+
+        fn lazy(&self, _path: &Path) -> bool {
+            true
+        }
+    }
+    let (sender, mut receiver) = oneshot::channel();
+
+    let root = pseudo_directory! {
+        "remote" => Arc::new(Remote(Mutex::new(Some(sender)))),
+    };
+
+    let scope = ExecutionScope::new();
+
+    let (client, server_end) = create_proxy().unwrap();
+    root.open(
+        scope.clone(),
+        fio::OpenFlags::empty(),
+        Path::validate_and_split("remote").unwrap(),
+        server_end,
+    );
+
+    // The open shouldn't get forwarded until we write something to client.
+    assert_eq!(receiver.try_recv().unwrap(), None);
+
+    // Sending get_attributes should cause the open to trigger.
+    let _ = client.get_attributes(fio::NodeAttributesQuery::default());
+
+    receiver.await.expect("Open not sent");
 }

@@ -13,7 +13,6 @@ use crate::{
     file::{self, FileLike},
     node::IsDirectory,
     path::Path,
-    remote::RemoteLike,
     service::{self, ServiceLike},
     ObjectRequestRef,
 };
@@ -202,7 +201,12 @@ impl<'a> OpenRequest<'a> {
     }
 
     /// Forwards the request to a remote.
-    pub fn open_remote(self, remote: Arc<impl RemoteLike>) -> Result<(), Status> {
+    #[cfg(target_os = "fuchsia")]
+    pub fn open_remote(
+        self,
+        remote: Arc<impl crate::remote::RemoteLike + Send + Sync + 'static>,
+    ) -> Result<(), Status> {
+        use crate::object_request::ObjectRequestSend;
         match self {
             OpenRequest {
                 scope,
@@ -210,7 +214,16 @@ impl<'a> OpenRequest<'a> {
                 path,
                 object_request,
             } => {
-                remote.open(scope, flags, path, object_request.take().into_server_end());
+                if object_request.what_to_send() == ObjectRequestSend::Nothing && remote.lazy(&path)
+                {
+                    let object_request = object_request.take();
+                    scope.clone().spawn(async move {
+                        object_request.wait_till_ready().await;
+                        remote.open(scope, flags, path, object_request.into_server_end());
+                    });
+                } else {
+                    remote.open(scope, flags, path, object_request.take().into_server_end());
+                }
                 Ok(())
             }
             OpenRequest {
@@ -219,8 +232,20 @@ impl<'a> OpenRequest<'a> {
                 path,
                 object_request,
             } => {
-                // We should fix the copy of protocols here.
-                remote.open2(scope, path, protocols.clone(), object_request)
+                let protocols = protocols.clone();
+                if object_request.what_to_send() == ObjectRequestSend::Nothing && remote.lazy(&path)
+                {
+                    let object_request = object_request.take();
+                    scope.clone().spawn(async move {
+                        object_request.wait_till_ready().await;
+                        object_request.handle(|object_request| {
+                            remote.open2(scope, path, protocols, object_request)
+                        });
+                    });
+                    Ok(())
+                } else {
+                    remote.open2(scope, path, protocols, object_request)
+                }
             }
         }
     }

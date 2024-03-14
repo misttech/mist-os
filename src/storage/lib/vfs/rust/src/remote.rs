@@ -38,6 +38,14 @@ pub trait RemoteLike {
     ) -> Result<(), Status> {
         Err(Status::NOT_SUPPORTED)
     }
+
+    /// Returns whether the remote should be opened lazily for the given path.  If true, the remote
+    /// won't be opened until the channel in the request is readable.  This request will *not* be
+    /// considered lazy if the request requires an event such as OnRepresentation, and this method
+    /// will by bypassed.
+    fn lazy(&self, _path: &Path) -> bool {
+        false
+    }
 }
 
 /// Create a new [`Remote`] node that forwards open requests to the provided [`DirectoryProxy`],
