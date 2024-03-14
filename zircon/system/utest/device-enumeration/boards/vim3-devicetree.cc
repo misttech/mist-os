@@ -36,6 +36,9 @@ TEST_F(DeviceEnumerationTest, Vim3DeviceTreeTest) {
       "sys/platform/phy-ffe09000/phy-ffe09000_group/aml_usb_phy/dwc2/usb-ff400000_group/dwc2",
       "sys/platform/phy-ffe09000/phy-ffe09000_group/aml_usb_phy/dwc2/usb-ff400000_group/dwc2/usb-peripheral",
 
+      // SD card
+      "sys/platform/mmc-ffe05000/mmc-ffe05000_group/aml-sd-emmc/sdmmc",
+
       // EMMC
       "sys/platform/mmc-ffe07000/mmc-ffe07000_group/aml-sd-emmc",
       "sys/platform/mmc-ffe07000/mmc-ffe07000_group/aml-sd-emmc/sdmmc",

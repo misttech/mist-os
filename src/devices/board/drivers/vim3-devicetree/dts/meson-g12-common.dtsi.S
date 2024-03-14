@@ -85,6 +85,20 @@
 				output-high;
 			};
 
+			sdcard_d0_d3_cfg: sdcard-d0-d3-cfg{
+				pins = <A311D_GPIOC(0) A311D_GPIOC(1) A311D_GPIOC(2) A311D_GPIOC(3)>;
+				function = <0 1>;
+			};
+
+			sdcard_clk_cfg: sdcard-clk-cfg{
+				pins = <A311D_GPIOC(4)>;
+				function = <0 1>;
+			};
+
+			sdcard_cmd_cfg: sdcard-cmd-cfg{
+				pins = <A311D_GPIOC(5)>;
+				function = <0 1>;
+			};
 		};
 
 		audio: audio-controller@ff642000 {
@@ -204,6 +218,15 @@
 			iommus = <&dummy_iommu 6>;
 			phys = <&usb_phy>;
 			phy-names = "xhci-phy";
+		};
+
+		sd_emmc_b: mmc@ffe05000 {
+			compatible = "amlogic,meson-axg-mmc";
+			reg = <0x0 0xffe05000 0x0 0x2000>;
+			interrupts = <GIC_SPI 190 GIC_IRQ_MODE_EDGE_RISING>;
+			iommus = <&dummy_iommu 7>;
+			pinctrl-0 = <&sdcard_d0_d3_cfg &sdcard_clk_cfg &sdcard_cmd_cfg>;
+			max-frequency = <50000000>;
 		};
 
 		sd_emmc_c: mmc@ffe07000 {
