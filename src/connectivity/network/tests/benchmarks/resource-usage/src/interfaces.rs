@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use assert_matches::assert_matches;
 use async_trait::async_trait;
 use fidl_fuchsia_hardware_network as fhardware_network;
 use fidl_fuchsia_net as fnet;
@@ -92,7 +93,7 @@ impl crate::Workload for Interfaces {
 struct Interface {
     id: u64,
     addr: net_types::ip::Ipv6Addr,
-    control: fnet_interfaces_admin::ControlProxy,
+    control: fnet_interfaces_ext::admin::Control,
     _device_control: fnet_interfaces_admin::DeviceControlProxy,
     tun_device: fnet_tun::DeviceProxy,
     _tun_port: fnet_tun::PortProxy,
@@ -121,6 +122,7 @@ async fn install_interface(
     device_control
         .create_interface(&port_id, server_end, &fnet_interfaces_admin::Options::default())
         .expect("create interface");
+    let control = fnet_interfaces_ext::admin::Control::new(control);
     assert!(control.enable().await.expect("call enable").expect("enable interface"));
     tun_port.set_online(true).await.expect("can set online");
 
@@ -201,6 +203,14 @@ async fn stress_interface(interface: Interface, interfaces_state: &fnet_interfac
             }
         }
     }
+
+    control.remove().await.expect("interface should be removable").expect("remove interface");
+    assert_matches!(
+        control.wait_termination().await,
+        fnet_interfaces_ext::admin::TerminalError::Terminal(
+            fnet_interfaces_admin::InterfaceRemovedReason::User
+        )
+    );
 }
 
 fn serialize_neighbor_solictation(
