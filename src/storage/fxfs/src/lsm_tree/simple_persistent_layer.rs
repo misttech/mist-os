@@ -47,10 +47,7 @@ use {
         object_handle::{ObjectHandle, ReadObjectHandle, WriteBytes},
         object_store::caching_object_handle::{CachedChunk, CachingObjectHandle, CHUNK_SIZE},
         round::{how_many, round_down, round_up},
-        serialized_types::{
-            Version, Versioned, VersionedLatest, INTERBLOCK_SEEK_VERSION, LATEST_VERSION,
-            PER_BLOCK_SEEK_VERSION,
-        },
+        serialized_types::{Version, Versioned, VersionedLatest, LATEST_VERSION},
     },
     anyhow::{anyhow, bail, ensure, Context, Error},
     async_trait::async_trait,
@@ -94,7 +91,7 @@ pub struct SimplePersistentLayer {
     caching_object_handle: CachingObjectHandle<Arc<dyn ReadObjectHandle>>,
     layer_info: LayerInfo,
     size: u64,
-    seek_table: Option<Vec<u64>>,
+    seek_table: Vec<u64>,
     close_event: Mutex<Option<Arc<DropEvent>>>,
 }
 
@@ -165,58 +162,10 @@ impl<K: Key, V: Value> KeyOnlyIterator<'_, K, V> {
         }
     }
 
-    // Like `seek_to_block_item`, but ineffeciently scans through each record to get to the desired
-    // record.  Exists for backwards compatibility prior to PER_BLOCK_SEEK_VERSION.
-    fn scan_to_block_item(&mut self, index: u16) -> Result<(), Error> {
-        debug_assert!(self.layer.layer_info.key_value_version < PER_BLOCK_SEEK_VERSION);
-        ensure!(index < self.item_count, FxfsError::OutOfRange);
-        let old_pos = self.buffer.pos;
-        if index < self.item_index {
-            // Reset to the start of the block and scan forward from there.
-            self.item_index = 0;
-            self.buffer.pos = BLOCK_HEADER_SIZE
-                + round_down(self.buffer.pos, self.layer.layer_info.block_size as usize);
-        } else if !self.value_deserialized {
-            // Scan forward from the current position when possible.
-            let _v = V::deserialize_from_version(
-                self.buffer.by_ref(),
-                self.layer.layer_info.key_value_version,
-            )
-            .context("Corrupt layer (value)")?;
-            let _sequence =
-                self.buffer.read_u64::<LittleEndian>().context("Corrupt layer (seq)")?;
-            self.value_deserialized = true;
-        }
-        while self.item_index < index {
-            let _k = K::deserialize_from_version(
-                self.buffer.by_ref(),
-                self.layer.layer_info.key_value_version,
-            )
-            .context("Corrupt layer (key)")?;
-            let _v = V::deserialize_from_version(
-                self.buffer.by_ref(),
-                self.layer.layer_info.key_value_version,
-            )
-            .context("Corrupt layer (value)")?;
-            let _sequence =
-                self.buffer.read_u64::<LittleEndian>().context("Corrupt layer (seq)")?;
-            self.item_index += 1;
-            self.value_deserialized = true;
-        }
-        debug_assert!(
-            round_down(self.buffer.pos, self.layer.layer_info.block_size as usize)
-                == round_down(old_pos, self.layer.layer_info.block_size as usize)
-        );
-        Ok(())
-    }
-
     // Repositions the iterator to point to the `index`'th item in the current block.
     // Returns an error if the index is out of range or the resulting offset contains an obviously
     // invalid value.
     fn seek_to_block_item(&mut self, index: u16) -> Result<(), Error> {
-        if self.layer.layer_info.key_value_version < PER_BLOCK_SEEK_VERSION {
-            return self.scan_to_block_item(index);
-        }
         ensure!(index < self.item_count, FxfsError::OutOfRange);
         if index == self.item_index && self.value_deserialized {
             // Fast-path when we are seeking in a linear manner, as is the case when advancing a
@@ -389,19 +338,14 @@ fn block_split(size: u64, block_size: u64) -> Result<(u64, u64), Error> {
     Ok((data_block_count, seek_block_count))
 }
 
-// Parse the seek table, if present at the end of the layer and return the offset where the
-// seek table begins. If not present, return None for the seek table and the end of layer
-// offset.
+// Parse the seek table at the end of the layer and return the offset where the seek table begins.
 async fn parse_seek_table(
     object_handle: &(impl ReadObjectHandle + 'static),
     layer_info: &LayerInfo,
     mut buffer: Buffer<'_>,
-) -> Result<(Option<Vec<u64>>, u64), Error> {
+) -> Result<(Vec<u64>, u64), Error> {
     let size = object_handle.get_size();
     ensure!(size < u64::MAX - layer_info.block_size, FxfsError::TooBig);
-    if layer_info.key_value_version < INTERBLOCK_SEEK_VERSION {
-        return Ok((None, size));
-    }
 
     let (data_block_count, seek_block_count) = block_split(size, layer_info.block_size)?;
     let seek_table_offset =
@@ -439,7 +383,7 @@ async fn parse_seek_table(
         prev = next;
         seek_table.push(next);
     }
-    Ok((Some(seek_table), seek_table_offset))
+    Ok((seek_table, seek_table_offset))
 }
 
 impl SimplePersistentLayer {
@@ -504,31 +448,25 @@ impl<K: Key, V: Value> Layer<K, V> for SimplePersistentLayer {
             Bound::Excluded(k) => (k, true),
         };
 
-        let (mut left_offset, mut right_offset) = match &self.seek_table {
-            Some(seek_table) => {
-                // We are searching for a range here, as multiple items can have the same value in
-                // this approximate search. Since the values used are the smallest in the associated
-                // block it means that if the value equals the target you should also search the
-                // one before it. The goal is for table[left] < target < table[right].
-                let target = key.get_leading_u64();
-                // Because the first entry in the table is always 0, right_index will never be 0.
-                let right_index = seek_table.as_slice().partition_point(|&x| x <= target) as u64;
-                // Since partition_point will find the index of the first place where the predicate
-                // is false, we subtract 1 to get the index where it was last true.
-                let left_index = seek_table.as_slice()[..right_index as usize]
-                    .partition_point(|&x| x < target)
-                    .saturating_sub(1) as u64;
+        let (mut left_offset, mut right_offset) = {
+            // We are searching for a range here, as multiple items can have the same value in
+            // this approximate search. Since the values used are the smallest in the associated
+            // block it means that if the value equals the target you should also search the
+            // one before it. The goal is for table[left] < target < table[right].
+            let target = key.get_leading_u64();
+            // Because the first entry in the table is always 0, right_index will never be 0.
+            let right_index = self.seek_table.as_slice().partition_point(|&x| x <= target) as u64;
+            // Since partition_point will find the index of the first place where the predicate
+            // is false, we subtract 1 to get the index where it was last true.
+            let left_index = self.seek_table.as_slice()[..right_index as usize]
+                .partition_point(|&x| x < target)
+                .saturating_sub(1) as u64;
 
-                // Skip the first block. We store version info there for now.
-                (
-                    (left_index + 1) * self.layer_info.block_size,
-                    (right_index + 1) * self.layer_info.block_size,
-                )
-            }
-            None => (
-                self.layer_info.block_size,
-                round_up(self.size, self.layer_info.block_size).unwrap(),
-            ),
+            // Skip the first block. We store version info there.
+            (
+                (left_index + 1) * self.layer_info.block_size,
+                (right_index + 1) * self.layer_info.block_size,
+            )
         };
         let mut left = KeyOnlyIterator::new(self, left_offset);
         left.advance().await.context("Initial seek advance")?;
@@ -573,67 +511,45 @@ impl<K: Key, V: Value> Layer<K, V> for SimplePersistentLayer {
             }
         }
 
-        if self.layer_info.key_value_version >= PER_BLOCK_SEEK_VERSION {
-            // We have a seek table, use it to binary search.
-            let mut left_index = 0;
-            let mut right_index = left.item_count;
-            // If the size is zero then we don't touch the iterator.
-            while left_index < (right_index - 1) {
-                let mid_index = left_index + ((right_index - left_index) / 2);
-                left.seek_to_block_item(mid_index)
-                    .context("Read index offset for binary search")?;
-                left.advance().await?;
-                match left.get().unwrap().cmp_upper_bound(key) {
-                    Ordering::Greater => {
-                        right_index = mid_index;
-                    }
-                    Ordering::Equal => {
-                        if excluded {
-                            left.advance().await?;
-                        }
-                        return Ok(Box::new(Iterator::new(left)?));
-                    }
-                    Ordering::Less => {
-                        left_index = mid_index;
-                    }
+        // Finish the binary search on the block pointed to by `left`.
+        let mut left_index = 0;
+        let mut right_index = left.item_count;
+        // If the size is zero then we don't touch the iterator.
+        while left_index < (right_index - 1) {
+            let mid_index = left_index + ((right_index - left_index) / 2);
+            left.seek_to_block_item(mid_index).context("Read index offset for binary search")?;
+            left.advance().await?;
+            match left.get().unwrap().cmp_upper_bound(key) {
+                Ordering::Greater => {
+                    right_index = mid_index;
                 }
-            }
-            // When we don't find an exact match, we need to return with the first entry *after* the
-            // the target key. Which might be the first one in the next block, currently already
-            // pointed to by the "right" buffer, but usually it's just the result of the right index
-            // within the "left" buffer.
-            if right_index < left.item_count {
-                right = left;
-                right
-                    .seek_to_block_item(right_index)
-                    .context("Read index for offset of right pointer")?;
-                right.advance().await?;
-            } else if right.key.is_none() {
-                // This is cheap if we're actually off the end, but otherwise it catches when we
-                // need to look inside the next block.
-                right.advance().await.context("Seek to start of next block")?;
-            }
-            return Ok(Box::new(Iterator::new(right)?));
-        } else {
-            // At this point, we know that left_key < key and right_key >= key, so we have to
-            // iterate through left_key to find the key we want.
-            loop {
-                left.advance().await?;
-                match left.get() {
-                    None => return Ok(Box::new(Iterator::new(left)?)),
-                    Some(left_key) => match left_key.cmp_upper_bound(key) {
-                        Ordering::Greater => return Ok(Box::new(Iterator::new(left)?)),
-                        Ordering::Equal => {
-                            if excluded {
-                                left.advance().await?;
-                            }
-                            return Ok(Box::new(Iterator::new(left)?));
-                        }
-                        Ordering::Less => {}
-                    },
+                Ordering::Equal => {
+                    if excluded {
+                        left.advance().await?;
+                    }
+                    return Ok(Box::new(Iterator::new(left)?));
+                }
+                Ordering::Less => {
+                    left_index = mid_index;
                 }
             }
         }
+        // When we don't find an exact match, we need to return with the first entry *after* the
+        // the target key. Which might be the first one in the next block, currently already
+        // pointed to by the "right" buffer, but usually it's just the result of the right index
+        // within the "left" buffer.
+        if right_index < left.item_count {
+            right = left;
+            right
+                .seek_to_block_item(right_index)
+                .context("Read index for offset of right pointer")?;
+            right.advance().await?;
+        } else if right.key.is_none() {
+            // This is cheap if we're actually off the end, but otherwise it catches when we
+            // need to look inside the next block.
+            right.advance().await.context("Seek to start of next block")?;
+        }
+        Ok(Box::new(Iterator::new(right)?))
     }
 
     fn lock(&self) -> Option<Arc<DropEvent>> {

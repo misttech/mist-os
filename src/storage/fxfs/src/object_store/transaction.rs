@@ -14,8 +14,7 @@ use {
             allocator::{AllocatorItem, Reservation},
             object_manager::{reserved_space_from_journal_usage, ObjectManager},
             object_record::{
-                ObjectItem, ObjectItemV25, ObjectItemV29, ObjectItemV30, ObjectItemV31,
-                ObjectItemV36, ObjectItemV37, ObjectItemV5, ObjectKey, ObjectKeyData, ObjectValue,
+                ObjectItem, ObjectItemV36, ObjectItemV37, ObjectKey, ObjectKeyData, ObjectValue,
                 ProjectProperty,
             },
         },
@@ -144,75 +143,6 @@ pub enum MutationV32 {
     UpdateMutationsKey(UpdateMutationsKey),
 }
 
-#[derive(Debug, Deserialize, Migrate, Serialize, Versioned, TypeFingerprint)]
-#[migrate_to_version(MutationV32)]
-pub enum MutationV31 {
-    ObjectStore(ObjectStoreMutationV31),
-    EncryptedObjectStore(Box<[u8]>),
-    Allocator(AllocatorMutation),
-    BeginFlush,
-    EndFlush,
-    DeleteVolume,
-    UpdateBorrowed(u64),
-    UpdateMutationsKey(UpdateMutationsKey),
-}
-
-#[derive(Debug, Deserialize, Migrate, Serialize, Versioned, TypeFingerprint)]
-#[migrate_to_version(MutationV31)]
-pub enum MutationV30 {
-    ObjectStore(ObjectStoreMutationV30),
-    EncryptedObjectStore(Box<[u8]>),
-    Allocator(AllocatorMutation),
-    BeginFlush,
-    EndFlush,
-    DeleteVolume,
-    UpdateBorrowed(u64),
-    UpdateMutationsKey(UpdateMutationsKey),
-}
-
-#[derive(Debug, Deserialize, Migrate, Serialize, Versioned, TypeFingerprint)]
-#[migrate_to_version(MutationV30)]
-pub enum MutationV29 {
-    ObjectStore(ObjectStoreMutationV29),
-    EncryptedObjectStore(Box<[u8]>),
-    Allocator(AllocatorMutation),
-    BeginFlush,
-    EndFlush,
-    DeleteVolume,
-    UpdateBorrowed(u64),
-    UpdateMutationsKey(UpdateMutationsKey),
-}
-
-#[derive(Debug, Deserialize, Migrate, Serialize, Versioned, TypeFingerprint)]
-#[migrate_to_version(MutationV29)]
-pub enum MutationV25 {
-    ObjectStore(ObjectStoreMutationV25),
-    EncryptedObjectStore(Box<[u8]>),
-    Allocator(AllocatorMutation),
-    BeginFlush,
-    EndFlush,
-    DeleteVolume,
-    UpdateBorrowed(u64),
-    UpdateMutationsKey(UpdateMutationsKey),
-}
-
-#[derive(Debug, Deserialize, Migrate, Serialize, Versioned, TypeFingerprint)]
-#[migrate_to_version(MutationV25)]
-pub enum MutationV20 {
-    ObjectStore(ObjectStoreMutationV20),
-    EncryptedObjectStore(Box<[u8]>),
-    Allocator(AllocatorMutation),
-    // Indicates the beginning of a flush.  This would typically involve sealing a tree.
-    BeginFlush,
-    // Indicates the end of a flush.  This would typically involve replacing the immutable layers
-    // with compacted ones.
-    EndFlush,
-    // Volume has been deleted.  Requires we remove it from the set of managed ObjectStore.
-    DeleteVolume,
-    UpdateBorrowed(u64),
-    UpdateMutationsKey(UpdateMutationsKey),
-}
-
 impl Mutation {
     pub fn insert_object(key: ObjectKey, value: ObjectValue) -> Self {
         Mutation::ObjectStore(ObjectStoreMutation {
@@ -263,46 +193,6 @@ pub struct ObjectStoreMutationV37 {
 #[migrate_to_version(ObjectStoreMutationV37)]
 pub struct ObjectStoreMutationV36 {
     item: ObjectItemV36,
-    op: Operation,
-}
-
-#[derive(Debug, Deserialize, Migrate, Serialize, TypeFingerprint)]
-#[migrate_nodefault]
-#[migrate_to_version(ObjectStoreMutationV36)]
-pub struct ObjectStoreMutationV31 {
-    item: ObjectItemV31,
-    op: Operation,
-}
-
-#[derive(Debug, Deserialize, Migrate, Serialize, TypeFingerprint)]
-#[migrate_nodefault]
-#[migrate_to_version(ObjectStoreMutationV31)]
-pub struct ObjectStoreMutationV30 {
-    item: ObjectItemV30,
-    op: Operation,
-}
-
-#[derive(Debug, Deserialize, Migrate, Serialize, TypeFingerprint)]
-#[migrate_nodefault]
-#[migrate_to_version(ObjectStoreMutationV30)]
-pub struct ObjectStoreMutationV29 {
-    item: ObjectItemV29,
-    op: Operation,
-}
-
-#[derive(Debug, Deserialize, Migrate, Serialize, TypeFingerprint)]
-#[migrate_nodefault]
-#[migrate_to_version(ObjectStoreMutationV29)]
-pub struct ObjectStoreMutationV25 {
-    item: ObjectItemV25,
-    op: Operation,
-}
-
-#[derive(Debug, Deserialize, Migrate, Serialize, TypeFingerprint)]
-#[migrate_nodefault]
-#[migrate_to_version(ObjectStoreMutationV25)]
-pub struct ObjectStoreMutationV20 {
-    item: ObjectItemV5,
     op: Operation,
 }
 

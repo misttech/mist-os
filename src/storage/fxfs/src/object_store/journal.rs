@@ -45,8 +45,7 @@ use {
             object_manager::ObjectManager,
             object_record::{AttributeKey, ObjectKey, ObjectKeyData, ObjectValue},
             transaction::{
-                lock_keys, AllocatorMutation, Mutation, MutationV20, MutationV25, MutationV29,
-                MutationV30, MutationV31, MutationV32, MutationV36, MutationV37,
+                lock_keys, AllocatorMutation, Mutation, MutationV32, MutationV36, MutationV37,
                 ObjectStoreMutation, Options, Transaction, TxnMutation,
                 TRANSACTION_MAX_JOURNAL_USAGE,
             },
@@ -78,7 +77,6 @@ use {
 
 // The journal file is written to in blocks of this size.
 pub const BLOCK_SIZE: u64 = 4096;
-const OLD_BLOCK_SIZE: u64 = 8192;
 
 // The journal file is extended by this amount when necessary.
 const CHUNK_SIZE: u64 = 131_072;
@@ -220,56 +218,6 @@ pub enum JournalRecordV34 {
 pub enum JournalRecordV32 {
     EndBlock,
     Mutation { object_id: u64, mutation: MutationV32 },
-    Commit,
-    Discard(u64),
-    DidFlushDevice(u64),
-}
-
-#[derive(Debug, Deserialize, Migrate, Serialize, Versioned, TypeFingerprint)]
-#[migrate_to_version(JournalRecordV32)]
-pub enum JournalRecordV31 {
-    EndBlock,
-    Mutation { object_id: u64, mutation: MutationV31 },
-    Commit,
-    Discard(u64),
-    DidFlushDevice(u64),
-}
-
-#[derive(Debug, Deserialize, Migrate, Serialize, Versioned, TypeFingerprint)]
-#[migrate_to_version(JournalRecordV31)]
-pub enum JournalRecordV30 {
-    EndBlock,
-    Mutation { object_id: u64, mutation: MutationV30 },
-    Commit,
-    Discard(u64),
-    DidFlushDevice(u64),
-}
-
-#[derive(Debug, Deserialize, Migrate, Serialize, Versioned, TypeFingerprint)]
-#[migrate_to_version(JournalRecordV30)]
-pub enum JournalRecordV29 {
-    EndBlock,
-    Mutation { object_id: u64, mutation: MutationV29 },
-    Commit,
-    Discard(u64),
-    DidFlushDevice(u64),
-}
-
-#[derive(Debug, Deserialize, Migrate, Serialize, Versioned, TypeFingerprint)]
-#[migrate_to_version(JournalRecordV29)]
-pub enum JournalRecordV25 {
-    EndBlock,
-    Mutation { object_id: u64, mutation: MutationV25 },
-    Commit,
-    Discard(u64),
-    DidFlushDevice(u64),
-}
-
-#[derive(Debug, Deserialize, Migrate, Serialize, Versioned, TypeFingerprint)]
-#[migrate_to_version(JournalRecordV25)]
-pub enum JournalRecordV20 {
-    EndBlock,
-    Mutation { object_id: u64, mutation: MutationV20 },
     Commit,
     Discard(u64),
     DidFlushDevice(u64),

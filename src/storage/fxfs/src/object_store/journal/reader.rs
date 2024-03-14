@@ -5,12 +5,8 @@
 use {
     crate::{
         checksum::{fletcher64, Checksum},
-        object_store::journal::{
-            JournalCheckpoint, JournalHandle, BLOCK_SIZE, OLD_BLOCK_SIZE, RESET_XOR,
-        },
-        serialized_types::{
-            Version, Versioned, VersionedLatest, JOURNAL_BLOCK_SIZE_CHANGE_VERSION,
-        },
+        object_store::journal::{JournalCheckpoint, JournalHandle, BLOCK_SIZE, RESET_XOR},
+        serialized_types::{Version, Versioned, VersionedLatest},
     },
     anyhow::{bail, Context, Error},
     byteorder::{ByteOrder, LittleEndian},
@@ -209,31 +205,6 @@ impl JournalReader {
                     return Ok(());
                 }
                 ChecksumResult::Bad => {
-                    if self.version < JOURNAL_BLOCK_SIZE_CHANGE_VERSION && !self.first_read {
-                        // Try reading with the newer block size.  If block size has changed, the
-                        // only possible result should be ChecksumResult::Reset.
-                        let (contents_slice, checksum_slice) = buffer
-                            .as_slice()
-                            .split_at(BLOCK_SIZE as usize - std::mem::size_of::<Checksum>());
-                        let stored_checksum = LittleEndian::read_u64(checksum_slice);
-                        if let ChecksumResult::Reset = verify_checksum(
-                            contents_slice,
-                            stored_checksum,
-                            last_read_checksum,
-                            true,
-                        ) {
-                            self.found_reset = true;
-                            if let Some(checksum) = self.checksums.last_mut() {
-                                *checksum ^= RESET_XOR;
-                            }
-                            self.checksums.push(stored_checksum);
-                            self.read_offset += BLOCK_SIZE;
-                            self.buf
-                                .resize(self.buf.len() - (OLD_BLOCK_SIZE - BLOCK_SIZE) as usize, 0);
-                            return Ok(());
-                        }
-                    }
-
                     self.bad_checksum = true;
                     return Ok(());
                 }
@@ -278,11 +249,7 @@ impl JournalReader {
     }
 
     fn block_size(&self) -> u64 {
-        if self.version != Version::default() && self.version < JOURNAL_BLOCK_SIZE_CHANGE_VERSION {
-            OLD_BLOCK_SIZE as u64
-        } else {
-            BLOCK_SIZE
-        }
+        BLOCK_SIZE
     }
 }
 

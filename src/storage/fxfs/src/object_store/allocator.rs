@@ -118,7 +118,7 @@ use {
         range::RangeExt,
         round::{round_div, round_down},
         serialized_types::{
-            Migrate, Version, Versioned, VersionedLatest, DEFAULT_MAX_SERIALIZED_RECORD_SIZE,
+            Version, Versioned, VersionedLatest, DEFAULT_MAX_SERIALIZED_RECORD_SIZE,
         },
     },
     anyhow::{anyhow, bail, ensure, Context, Error},
@@ -400,13 +400,6 @@ pub struct AllocatorInfo {
     // The limit for the number of allocates bytes per `owner_object_id` whereas the value. If there
     // is no limit present here for an `owner_object_id` assume it is max u64.
     pub limit_bytes: BTreeMap<u64, u64>,
-}
-
-#[derive(Debug, Deserialize, Migrate, Serialize, Versioned, TypeFingerprint)]
-pub struct AllocatorInfoV18 {
-    pub layers: Vec<u64>,
-    pub allocated_bytes: BTreeMap<u64, u64>,
-    pub marked_for_deletion: HashSet<u64>,
 }
 
 const MAX_ALLOCATOR_INFO_SERIALIZED_SIZE: usize = 131_072;

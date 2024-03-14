@@ -42,10 +42,7 @@ use {
                 writer::JournalWriter,
                 JournalCheckpoint, JournalHandle as _, BLOCK_SIZE,
             },
-            object_record::{
-                ObjectItem, ObjectItemV25, ObjectItemV29, ObjectItemV30, ObjectItemV31,
-                ObjectItemV36, ObjectItemV37, ObjectItemV5,
-            },
+            object_record::{ObjectItem, ObjectItemV36, ObjectItemV37},
             transaction::{AssocObj, Options},
             tree::MajorCompactable,
             DataObjectHandle, HandleOptions, HandleOwner, Mutation, ObjectKey, ObjectStore,
@@ -231,46 +228,6 @@ pub enum SuperBlockRecordV37 {
 pub enum SuperBlockRecordV36 {
     Extent(Range<u64>),
     ObjectItem(ObjectItemV36),
-    End,
-}
-
-#[derive(Debug, Deserialize, Migrate, Serialize, Versioned, TypeFingerprint)]
-#[migrate_to_version(SuperBlockRecordV36)]
-pub enum SuperBlockRecordV31 {
-    Extent(Range<u64>),
-    ObjectItem(ObjectItemV31),
-    End,
-}
-
-#[derive(Debug, Deserialize, Migrate, Serialize, Versioned, TypeFingerprint)]
-#[migrate_to_version(SuperBlockRecordV31)]
-pub enum SuperBlockRecordV30 {
-    Extent(Range<u64>),
-    ObjectItem(ObjectItemV30),
-    End,
-}
-
-#[derive(Debug, Deserialize, Migrate, Serialize, Versioned, TypeFingerprint)]
-#[migrate_to_version(SuperBlockRecordV30)]
-pub enum SuperBlockRecordV29 {
-    Extent(Range<u64>),
-    ObjectItem(ObjectItemV29),
-    End,
-}
-
-#[derive(Debug, Deserialize, Migrate, Serialize, Versioned, TypeFingerprint)]
-#[migrate_to_version(SuperBlockRecordV29)]
-pub enum SuperBlockRecordV25 {
-    Extent(Range<u64>),
-    ObjectItem(ObjectItemV25),
-    End,
-}
-
-#[derive(Debug, Deserialize, Migrate, Serialize, Versioned, TypeFingerprint)]
-#[migrate_to_version(SuperBlockRecordV25)]
-pub enum SuperBlockRecordV5 {
-    Extent(Range<u64>),
-    ObjectItem(ObjectItemV5),
     End,
 }
 

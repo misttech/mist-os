@@ -10,7 +10,7 @@ use {
             Item, ItemRef, LayerKey, MergeType, OrdLowerBound, OrdUpperBound, RangeKey, SortByU64,
         },
         object_store::extent_record::{ExtentKey, ExtentValue, ExtentValueV36, ExtentValueV37},
-        serialized_types::{migrate_nodefault, migrate_to_version, Migrate, Versioned},
+        serialized_types::{migrate_to_version, Migrate, Versioned},
     },
     fprint::TypeFingerprint,
     fxfs_crypto::WrappedKeys,
@@ -126,21 +126,6 @@ pub struct ObjectKey {
     pub object_id: u64,
     /// The type and data of the key.
     pub data: ObjectKeyData,
-}
-
-#[derive(Debug, Deserialize, Migrate, Serialize, Versioned, TypeFingerprint)]
-#[migrate_nodefault]
-pub struct ObjectKeyV25 {
-    pub object_id: u64,
-    pub data: ObjectKeyDataV25,
-}
-
-#[derive(Debug, Deserialize, Migrate, Serialize, Versioned, TypeFingerprint)]
-#[migrate_nodefault]
-#[migrate_to_version(ObjectKeyV25)]
-pub struct ObjectKeyV5 {
-    pub object_id: u64,
-    pub data: ObjectKeyDataV5,
 }
 
 impl SortByU64 for ObjectKey {
@@ -425,14 +410,6 @@ pub enum ObjectKindV31 {
     Symlink { refs: u64, link: Vec<u8> },
 }
 
-#[derive(Debug, Deserialize, Serialize, TypeFingerprint)]
-pub enum ObjectKindV30 {
-    File { refs: u64, allocated_size: u64 },
-    Directory { sub_dirs: u64 },
-    Graveyard,
-    Symlink { refs: u64, link: Vec<u8> },
-}
-
 impl From<ObjectKindV31> for ObjectKind {
     fn from(value: ObjectKindV31) -> Self {
         match value {
@@ -515,30 +492,6 @@ pub struct ObjectAttributesV31 {
     pub project_id: u64,
     pub posix_attributes: Option<PosixAttributes>,
     pub allocated_size: u64,
-}
-
-#[derive(Debug, Default, Deserialize, Migrate, Serialize, TypeFingerprint)]
-#[migrate_to_version(ObjectAttributesV31)]
-pub struct ObjectAttributesV30 {
-    creation_time: Timestamp,
-    modification_time: Timestamp,
-    project_id: u64,
-    posix_attributes: Option<PosixAttributes>,
-}
-
-#[derive(Debug, Default, Deserialize, Migrate, Serialize, TypeFingerprint)]
-#[migrate_to_version(ObjectAttributesV30)]
-pub struct ObjectAttributesV25 {
-    creation_time: Timestamp,
-    modification_time: Timestamp,
-    project_id: u64,
-}
-
-#[derive(Debug, Default, Deserialize, Migrate, Serialize, TypeFingerprint)]
-#[migrate_to_version(ObjectAttributesV25)]
-pub struct ObjectAttributesV5 {
-    creation_time: Timestamp,
-    modification_time: Timestamp,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, TypeFingerprint)]
@@ -646,136 +599,6 @@ pub enum ObjectValueV36 {
     VerifiedAttribute { size: u64, fsverity_metadata: FsverityMetadata },
 }
 
-#[derive(Debug, Deserialize, Migrate, Serialize, Versioned, TypeFingerprint)]
-#[migrate_to_version(ObjectValueV36)]
-pub enum ObjectValueV31 {
-    None,
-    Some,
-    Object { kind: ObjectKindV31, attributes: ObjectAttributesV31 },
-    Keys(EncryptionKeys),
-    Attribute { size: u64 },
-    Extent(ExtentValueV36),
-    Child(ChildValue),
-    Trim,
-    BytesAndNodes { bytes: i64, nodes: i64 },
-    ExtendedAttribute(ExtendedAttributeValue),
-}
-
-#[derive(Debug, Deserialize, Serialize, Versioned, TypeFingerprint)]
-pub enum ObjectValueV30 {
-    None,
-    Some,
-    Object { kind: ObjectKindV30, attributes: ObjectAttributesV30 },
-    Keys(EncryptionKeys),
-    Attribute { size: u64 },
-    Extent(ExtentValueV36),
-    Child(ChildValue),
-    Trim,
-    BytesAndNodes { bytes: i64, nodes: i64 },
-    ExtendedAttribute(ExtendedAttributeValue),
-}
-
-// Manual migration from V30 -> V31. If the ObjectKind is file, move the allocated_size from the
-// kind type to ObjectAttributes. For other kinds the allocated_size is initialized as zero.
-impl From<ObjectValueV30> for ObjectValueV31 {
-    fn from(value: ObjectValueV30) -> Self {
-        match value {
-            ObjectValueV30::Object {
-                kind,
-                attributes:
-                    ObjectAttributesV30 {
-                        creation_time,
-                        modification_time,
-                        project_id,
-                        posix_attributes,
-                    },
-            } => {
-                let (new_kind, allocated_size) = match kind {
-                    // File lost the allocated_size field
-                    ObjectKindV30::File { refs, allocated_size } => {
-                        (ObjectKindV31::File { refs }, allocated_size)
-                    }
-
-                    // The rest are 1:1 mappings, defaulting to zero allocated_size.
-                    ObjectKindV30::Directory { sub_dirs } => {
-                        (ObjectKindV31::Directory { sub_dirs }, 0)
-                    }
-                    ObjectKindV30::Symlink { refs, link } => {
-                        (ObjectKindV31::Symlink { refs, link }, 0)
-                    }
-                    ObjectKindV30::Graveyard => (ObjectKindV31::Graveyard, 0),
-                };
-
-                ObjectValueV31::Object {
-                    kind: new_kind,
-                    attributes: ObjectAttributesV31 {
-                        creation_time,
-                        modification_time,
-                        project_id,
-                        posix_attributes,
-                        allocated_size,
-                    },
-                }
-            }
-
-            // The rest are 1:1 mappings
-            ObjectValueV30::None => ObjectValueV31::None,
-            ObjectValueV30::Some => ObjectValueV31::Some,
-            ObjectValueV30::Keys(keys) => ObjectValueV31::Keys(keys),
-            ObjectValueV30::Attribute { size } => ObjectValueV31::Attribute { size },
-            ObjectValueV30::Extent(extent_value) => ObjectValueV31::Extent(extent_value),
-            ObjectValueV30::Child(child) => ObjectValueV31::Child(child),
-            ObjectValueV30::Trim => ObjectValueV31::Trim,
-            ObjectValueV30::BytesAndNodes { bytes, nodes } => {
-                ObjectValueV31::BytesAndNodes { bytes, nodes }
-            }
-            ObjectValueV30::ExtendedAttribute(v) => ObjectValueV31::ExtendedAttribute(v),
-        }
-    }
-}
-
-#[derive(Debug, Deserialize, Migrate, Serialize, Versioned, TypeFingerprint)]
-#[migrate_to_version(ObjectValueV30)]
-pub enum ObjectValueV29 {
-    None,
-    Some,
-    Object { kind: ObjectKindV30, attributes: ObjectAttributesV30 },
-    Keys(EncryptionKeys),
-    Attribute { size: u64 },
-    Extent(ExtentValueV36),
-    Child(ChildValue),
-    Trim,
-    BytesAndNodes { bytes: i64, nodes: i64 },
-}
-
-#[derive(Debug, Deserialize, Migrate, Serialize, Versioned, TypeFingerprint)]
-#[migrate_to_version(ObjectValueV29)]
-pub enum ObjectValueV25 {
-    None,
-    Some,
-    Object { kind: ObjectKindV30, attributes: ObjectAttributesV25 },
-    Keys(EncryptionKeys),
-    Attribute { size: u64 },
-    Extent(ExtentValueV36),
-    Child(ChildValue),
-    Trim,
-    BytesAndNodes { bytes: i64, nodes: i64 },
-}
-
-#[derive(Debug, Deserialize, Serialize, Migrate, Versioned, TypeFingerprint)]
-#[migrate_to_version(ObjectValueV25)]
-pub enum ObjectValueV5 {
-    None,
-    Some,
-    Object { kind: ObjectKindV30, attributes: ObjectAttributesV5 },
-    Keys(EncryptionKeys),
-    Attribute { size: u64 },
-    Extent(ExtentValueV36),
-    Child(ChildValue),
-    Trim,
-    BytesAndNodes { bytes: i64, nodes: i64 },
-}
-
 impl ObjectValue {
     /// Creates an ObjectValue for a file object.
     pub fn file(
@@ -856,11 +679,6 @@ impl ObjectValue {
 pub type ObjectItem = Item<ObjectKey, ObjectValue>;
 pub type ObjectItemV37 = Item<ObjectKey, ObjectValueV37>;
 pub type ObjectItemV36 = Item<ObjectKey, ObjectValueV36>;
-pub type ObjectItemV31 = Item<ObjectKey, ObjectValueV31>;
-pub type ObjectItemV30 = Item<ObjectKey, ObjectValueV30>;
-pub type ObjectItemV29 = Item<ObjectKeyV25, ObjectValueV29>;
-pub type ObjectItemV25 = Item<ObjectKeyV25, ObjectValueV25>;
-pub type ObjectItemV5 = Item<ObjectKeyV5, ObjectValueV5>;
 
 impl ObjectItem {
     pub fn is_tombstone(&self) -> bool {
