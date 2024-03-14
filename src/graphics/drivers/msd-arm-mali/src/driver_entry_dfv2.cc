@@ -113,9 +113,9 @@ class MaliDriver : public MagmaDriverBaseType,
 
     msd::Device* dev = magma_system_device()->msd_dev();
 
-    static_cast<MsdArmDevice*>(dev)->SetPowerState(request->enabled);
-
-    completer.ReplySuccess();
+    static_cast<MsdArmDevice*>(dev)->SetPowerState(
+        request->enabled,
+        [completer = completer.ToAsync()]() mutable { completer.ReplySuccess(); });
   }
 
  private:

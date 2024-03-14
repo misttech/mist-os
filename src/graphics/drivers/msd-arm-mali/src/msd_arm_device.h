@@ -130,7 +130,7 @@ class MsdArmDevice : public msd::Device,
   magma::Status ProcessTimestampRequest(std::shared_ptr<magma::PlatformBuffer> buffer);
 
   // Called from the device framework threadpool.
-  void SetPowerState(bool enabled);
+  void SetPowerState(bool enabled, fit::closure completer);
 
   void RefCycleCounter();
   void DerefCycleCounter();
@@ -153,6 +153,9 @@ class MsdArmDevice : public msd::Device,
     std::lock_guard lock(connection_list_mutex_);
     return current_memory_pressure_level_;
   }
+
+  // PowerManager::Owner implementation
+  void ReportPowerChangeComplete(bool success) override;
 
   magma_status_t QueryInfo(uint64_t id, uint64_t* value_out);
   magma_status_t QueryReturnsBuffer(uint64_t id, uint32_t* buffer_out);
@@ -326,6 +329,9 @@ class MsdArmDevice : public msd::Device,
   std::unique_ptr<JobScheduler> scheduler_;
   std::unique_ptr<magma::PlatformBusMapper> bus_mapper_;
   uint64_t cycle_counter_refcount_ = 0;
+
+  // Collects all callbacks to be called when the power change completes.
+  std::vector<fit::closure> callbacks_on_power_change_complete_;
 
   std::unique_ptr<PerformanceCounters> perf_counters_;
 

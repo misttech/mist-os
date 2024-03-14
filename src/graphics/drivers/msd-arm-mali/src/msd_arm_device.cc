@@ -272,7 +272,12 @@ bool MsdArmDevice::Init(ParentDevice* platform_device,
   device_request_semaphore_ = magma::PlatformSemaphore::Create();
   device_port_ = magma::PlatformPort::Create();
 
-  power_manager_ = std::make_unique<PowerManager>(this);
+  uint64_t default_enabled_cores = 1;
+#if defined(MSD_ARM_ENABLE_ALL_CORES)
+  default_enabled_cores = gpu_features_.shader_present;
+#endif
+
+  power_manager_ = std::make_unique<PowerManager>(this, default_enabled_cores);
   perf_counters_ = std::make_unique<PerformanceCounters>(this);
   perf_counters_->SetGpuFeatures(gpu_features_);
   scheduler_ = std::make_unique<JobScheduler>(this, 3);
@@ -363,13 +368,7 @@ bool MsdArmDevice::InitializeDevicePropertiesBuffer() {
   return true;
 }
 
-void MsdArmDevice::EnableAllCores() {
-  uint64_t enabled_cores = 1;
-#if defined(MSD_ARM_ENABLE_ALL_CORES)
-  enabled_cores = gpu_features_.shader_present;
-#endif
-  power_manager_->EnableCores(enabled_cores);
-}
+void MsdArmDevice::EnableAllCores() { power_manager_->EnableDefaultCores(); }
 
 std::shared_ptr<MsdArmConnection> MsdArmDevice::OpenArmConnection(msd::msd_client_id_t client_id) {
   auto connection = MsdArmConnection::Create(client_id, this);
@@ -1712,11 +1711,30 @@ magma_status_t MsdArmDevice::Query(uint64_t id, zx::vmo* result_buffer_out, uint
   return status;
 }
 
-void MsdArmDevice::SetPowerState(bool enabled) {
-  EnqueueDeviceRequest(std::make_unique<TaskRequest>([this, enabled](MsdArmDevice* device) {
-    scheduler_->SetSchedulingEnabled(enabled);
-    return MAGMA_STATUS_OK;
-  }));
+void MsdArmDevice::ReportPowerChangeComplete(bool success) {
+  if (!success) {
+    // Post a task to dump status because the GPU active lock may be held at this point.
+    DumpStatusToLog();
+  }
+  auto complete_callbacks = std::move(callbacks_on_power_change_complete_);
+  callbacks_on_power_change_complete_.clear();
+  for (auto& callback : complete_callbacks) {
+    callback();
+  }
+}
+
+void MsdArmDevice::SetPowerState(bool enabled, fit::closure completer) {
+  EnqueueDeviceRequest(std::make_unique<TaskRequest>(
+      [this, enabled, completer = std::move(completer)](MsdArmDevice* device) mutable {
+        callbacks_on_power_change_complete_.emplace_back(std::move(completer));
+        if (!enabled) {
+          power_manager_->PowerDownOnIdle();
+        } else {
+          power_manager_->PowerUpAfterIdle();
+        }
+        scheduler_->SetSchedulingEnabled(enabled);
+        return MAGMA_STATUS_OK;
+      }));
 }
 
 void MsdArmDevice::DumpStatus(uint32_t dump_flags) { DumpStatusToLog(); }

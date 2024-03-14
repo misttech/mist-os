@@ -14,6 +14,7 @@
 #include <gtest/gtest.h>
 #include <src/devices/bus/testing/fake-pdev/fake-pdev.h>
 
+#include "src/graphics/drivers/msd-arm-mali/src/gpu_features.h"
 #include "src/graphics/drivers/msd-arm-mali/src/registers.h"
 
 enum InterruptIndex {
@@ -142,11 +143,12 @@ TEST(MsdArmDFv2, LoadDriver) {
 
   // Mark that shader cores are ready.
   {
-    constexpr uint64_t kCoresEnabled = 2;
+    constexpr uint64_t kCoresEnabled = (1 << 2) - 1;
     constexpr uint32_t kShaderReadyOffset =
         static_cast<uint32_t>(registers::CoreReadyState::CoreType::kShader) +
         static_cast<uint32_t>(registers::CoreReadyState::StatusType::kReady);
     mmio_buffer->Write32(kCoresEnabled, kShaderReadyOffset);
+    mmio_buffer->Write<uint32_t>(kCoresEnabled, GpuFeatures::kShaderPresentLowOffset);
   }
 
   fdf_testing::DriverUnderTest<> driver;

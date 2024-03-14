@@ -114,8 +114,12 @@ TEST(PowerManagement, RepeatedSuspendResume) {
     }
     finished_test = true;
   });
+  uint32_t i = 0;
   while (!finished_test) {
-    test->SubmitCommandBuffer(mali_utils::AtomHelper::NORMAL, 1, 0, false);
+    {
+      SCOPED_TRACE(std::to_string(i++));
+      test->SubmitCommandBuffer(mali_utils::AtomHelper::NORMAL, 1, 0, false);
+    }
   }
   enable_thread.join();
 }

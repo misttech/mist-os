@@ -22,12 +22,21 @@ class PowerManager {
   class Owner {
    public:
     virtual mali::RegisterIo* register_io() = 0;
+    // Report that all requested power state changes are complete.
+    virtual void ReportPowerChangeComplete(bool success) = 0;
   };
 
-  explicit PowerManager(Owner* owner);
+  explicit PowerManager(Owner* owner, uint64_t default_core_bitmask);
 
   // Called on the device thread or the initial driver thread.
   void EnableCores(uint64_t shader_bitmask);
+  void EnableDefaultCores();
+
+  // Power down GPU once it's idled. Called on device thread.
+  void PowerDownOnIdle();
+  // Power up the GPU after PowerDownOnIdle was called; will cancel incomplete PowerDownOnIdle
+  // actions. Called on device thread.
+  void PowerUpAfterIdle();
 
   // Called on the GPU interrupt thread.
   void ReceivedPowerInterrupt();
@@ -64,11 +73,18 @@ class PowerManager {
 
   mali::RegisterIo* register_io() { return owner_->register_io(); }
   void UpdateReadyStatus();
+  // Called if power_down_on_idle_ is true and the GPU is now idle.
+  void PowerDownWhileIdle();
   // Called to update timekeeping and possible update the gpu activity info.
   void UpdateGpuActiveLocked(bool active) FIT_REQUIRES(active_time_mutex_);
   std::deque<TimePeriod>& time_periods() { return time_periods_; }
 
   Owner* owner_;
+
+  uint64_t default_cores_{1};
+  // The set of cores that were requested be enabled.
+  uint64_t required_cores_{0};
+  bool power_down_on_idle_{false};
 
   mutable std::mutex ready_status_mutex_;
   FIT_GUARDED(ready_status_mutex_) uint64_t tiler_ready_status_ = 0;

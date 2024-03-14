@@ -18,7 +18,8 @@ constexpr size_t kLogAtPowerTry = 2;
 
 }  // anonymous namespace
 
-PowerManager::PowerManager(Owner* owner) : owner_(owner) {
+PowerManager::PowerManager(Owner* owner, uint64_t default_core_bitmask)
+    : owner_(owner), default_cores_(default_core_bitmask) {
   power_state_semaphore_ = magma::PlatformSemaphore::Create();
   // Initialize current set of running cores.
   ReceivedPowerInterrupt();
@@ -27,9 +28,41 @@ PowerManager::PowerManager(Owner* owner) : owner_(owner) {
   last_trace_time_ = now;
 }
 
+void PowerManager::PowerDownOnIdle() {
+  power_down_on_idle_ = true;
+  std::lock_guard<std::mutex> lock(active_time_mutex_);
+  if (!gpu_active_) {
+    PowerDownWhileIdle();
+  }
+}
+void PowerManager::PowerDownWhileIdle() {
+  MAGMA_DASSERT(power_down_on_idle_);
+  DisableShaders();
+  bool success = true;
+  if (!WaitForShaderDisable()) {
+    success = false;
+    MAGMA_LOG(ERROR, "Waiting for shader disable timed out");
+  }
+  power_down_on_idle_ = false;
+  owner_->ReportPowerChangeComplete(success);
+}
+
+void PowerManager::PowerUpAfterIdle() {
+  power_down_on_idle_ = false;
+
+  EnableDefaultCores();
+  bool success = true;
+  if (!WaitForShaderReady()) {
+    success = false;
+    MAGMA_LOG(ERROR, "Waiting for shader enable timed out");
+  }
+  owner_->ReportPowerChangeComplete(success);
+}
+
 void PowerManager::EnableCores(uint64_t shader_bitmask) {
   TRACE_DURATION("magma:power", "PowerManager::EnableCores", "shader_bitmask",
                  TA_UINT64(shader_bitmask));
+  required_cores_ |= shader_bitmask;
   registers::CoreReadyState::WriteState(register_io(), registers::CoreReadyState::CoreType::kShader,
                                         registers::CoreReadyState::ActionType::kActionPowerOn,
                                         shader_bitmask);
@@ -39,7 +72,10 @@ void PowerManager::EnableCores(uint64_t shader_bitmask) {
                                         registers::CoreReadyState::ActionType::kActionPowerOn, 1);
 }
 
+void PowerManager::EnableDefaultCores() { EnableCores(default_cores_); }
+
 void PowerManager::DisableShaders() {
+  required_cores_ = 0;
   TRACE_DURATION("magma:power", "PowerManager::DisableShaders");
   uint64_t powered_on_shaders = registers::CoreReadyState::ReadBitmask(
                                     register_io(), registers::CoreReadyState::CoreType::kShader,
@@ -91,6 +127,7 @@ bool PowerManager::WaitForL2Disable() {
                           register_io(), registers::CoreReadyState::CoreType::kL2,
                           registers::CoreReadyState::StatusType::kPowerTransitioning);
     if (!powered_on) {
+      MAGMA_LOG(INFO, "L2 disable time was %zu ms", i);
       UpdateReadyStatus();
       return true;
     }
@@ -106,19 +143,22 @@ bool PowerManager::WaitForL2Disable() {
 bool PowerManager::WaitForShaderReady() {
   TRACE_DURATION("magma:power", "PowerManager::WaitForShaderReady");
   for (size_t i = 0; i < kMaxPowerTries; i++) {
-    // Only wait for 1 shader to be ready, since that's enough to execute
-    // commands.
-    bool powered_on = registers::CoreReadyState::ReadBitmask(
+    MAGMA_DASSERT(required_cores_);
+    // Wait for all required cores to be available, to ensure the hardware is in the expected state
+    // later.
+    uint64_t powered_on_cores = registers::CoreReadyState::ReadBitmask(
         register_io(), registers::CoreReadyState::CoreType::kShader,
         registers::CoreReadyState::StatusType::kReady);
-    if (powered_on) {
+    if ((powered_on_cores & required_cores_) == required_cores_) {
       UpdateReadyStatus();
       return true;
     }
+    // Shader power up takes < 1ms generally.
     const magma::Status status = power_state_semaphore_->Wait(1);
     if (!status.ok() && i == kLogAtPowerTry) {
       TRACE_ALERT("magma", "long-wait");
-      MAGMA_LOG(WARNING, "Waiting for shader enable longer than %zu ms", i + 1);
+      MAGMA_LOG(WARNING, "Waiting for shader core 0x%lx enable longer than %zu ms",
+                required_cores_ & ~powered_on_cores, i + 1);
     }
   }
   return false;
@@ -149,6 +189,9 @@ void PowerManager::UpdateGpuActive(bool active) {
 
 void PowerManager::UpdateGpuActiveLocked(bool active) {
   TRACE_DURATION("magma:power", "PowerManager::UpdateGpuActiveLocked", "active", TA_BOOL(active));
+  if (power_down_on_idle_ && !active) {
+    PowerDownWhileIdle();
+  }
   auto now = std::chrono::steady_clock::now();
   std::chrono::steady_clock::duration total_time = now - last_check_time_;
   constexpr std::chrono::milliseconds kMemoryDuration(100);

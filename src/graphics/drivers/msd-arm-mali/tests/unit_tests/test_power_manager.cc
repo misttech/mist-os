@@ -18,10 +18,22 @@ class FakePowerOwner : public PowerManager::Owner {
  public:
   explicit FakePowerOwner(mali::RegisterIo* register_io) : register_io_(register_io) {}
 
-  mali::RegisterIo* register_io() { return register_io_; }
+  mali::RegisterIo* register_io() override { return register_io_; }
+  void ReportPowerChangeComplete(bool success) override {
+    if (!success) {
+      power_change_failure_count_++;
+    }
+
+    power_change_complete_count_++;
+  }
+
+  uint32_t power_change_failure_count() const { return power_change_failure_count_; }
+  uint32_t power_change_complete_count() const { return power_change_complete_count_; }
 
  private:
   mali::RegisterIo* register_io_;
+  uint32_t power_change_failure_count_{0};
+  uint32_t power_change_complete_count_{0};
 };
 }  // namespace
 
@@ -30,7 +42,7 @@ class TestPowerManager {
   void MockEnable() {
     auto reg_io = std::make_unique<mali::RegisterIo>(MockMmio::Create(1024 * 1024));
     FakePowerOwner power_owner{reg_io.get()};
-    auto power_manager = std::make_unique<PowerManager>(&power_owner);
+    auto power_manager = std::make_unique<PowerManager>(&power_owner, 1);
 
     constexpr uint32_t kShaderOnOffset =
         static_cast<uint32_t>(registers::CoreReadyState::CoreType::kShader) +
@@ -61,7 +73,7 @@ class TestPowerManager {
   void MockDisable() {
     auto reg_io = std::make_unique<mali::RegisterIo>(MockMmio::Create(1024 * 1024));
     FakePowerOwner power_owner{reg_io.get()};
-    auto power_manager = std::make_unique<PowerManager>(&power_owner);
+    auto power_manager = std::make_unique<PowerManager>(&power_owner, 1);
 
     constexpr uint64_t kCoresEnabled = 2;
     constexpr uint32_t kShaderReadyOffset =
@@ -100,7 +112,7 @@ class TestPowerManager {
   void TimeCoalesce() {
     auto reg_io = std::make_unique<mali::RegisterIo>(MockMmio::Create(1024 * 1024));
     FakePowerOwner power_owner{reg_io.get()};
-    PowerManager power_manager(&power_owner);
+    PowerManager power_manager(&power_owner, 1);
 
     for (int i = 0; i < 100; i++) {
       power_manager.UpdateGpuActive(true);
@@ -131,7 +143,7 @@ TEST(PowerManager, MockDisable) {
 TEST(PowerManager, TimeAccumulation) {
   auto reg_io = std::make_unique<mali::RegisterIo>(MockMmio::Create(1024 * 1024));
   FakePowerOwner power_owner{reg_io.get()};
-  PowerManager power_manager(&power_owner);
+  PowerManager power_manager(&power_owner, 1);
   power_manager.UpdateGpuActive(true);
   usleep(150 * 1000);
 
@@ -169,4 +181,65 @@ TEST(PowerManager, TimeAccumulation) {
 TEST(PowerManager, TimeCoalesce) {
   TestPowerManager test;
   test.TimeCoalesce();
+}
+
+TEST(PowerManager, PowerDownOnIdle) {
+  auto mock_mmio = MockMmio::Create(1024 * 1024);
+
+  constexpr uint32_t kShaderReadyOffset =
+      static_cast<uint32_t>(registers::CoreReadyState::CoreType::kShader) +
+      static_cast<uint32_t>(registers::CoreReadyState::StatusType::kReady);
+  constexpr uint32_t kShaderPowerOffOffset =
+      static_cast<uint32_t>(registers::CoreReadyState::CoreType::kShader) +
+      static_cast<uint32_t>(registers::CoreReadyState::ActionType::kActionPowerOff);
+  constexpr uint32_t kShaderPowerOnOffset =
+      static_cast<uint32_t>(registers::CoreReadyState::CoreType::kShader) +
+      static_cast<uint32_t>(registers::CoreReadyState::ActionType::kActionPowerOn);
+
+  class Hook : public magma::RegisterIo::Hook {
+   public:
+    explicit Hook(MockMmio* mock_mmio) : mock_mmio_(mock_mmio) {}
+    ~Hook() override {}
+    void Write32(uint32_t val, uint32_t offset) override {
+      if (offset == kShaderPowerOffOffset) {
+        mock_mmio_->Write32(0, kShaderReadyOffset);
+      }
+      if (offset == kShaderPowerOnOffset) {
+        mock_mmio_->Write32(val, kShaderReadyOffset);
+      }
+    }
+    void Read32(uint32_t val, uint32_t offset) override {}
+    void Read64(uint64_t val, uint32_t offset) override {}
+
+   private:
+    MockMmio* mock_mmio_;
+  };
+
+  auto hook = std::make_unique<Hook>(mock_mmio.get());
+  auto reg_io = std::make_unique<mali::RegisterIo>(std::move(mock_mmio));
+  reg_io->InstallHook(std::move(hook));
+
+  FakePowerOwner power_owner{reg_io.get()};
+  auto power_manager = std::make_unique<PowerManager>(&power_owner, 2);
+
+  constexpr uint64_t kCoresEnabled = 2;
+  reg_io->Write32(kCoresEnabled, kShaderReadyOffset);
+
+  power_manager->UpdateGpuActive(true);
+  power_manager->PowerDownOnIdle();
+  EXPECT_EQ(reg_io->Read32(kShaderPowerOffOffset), 0u);
+  EXPECT_EQ(0u, power_owner.power_change_complete_count());
+
+  power_manager->UpdateGpuActive(false);
+  EXPECT_EQ(reg_io->Read32(kShaderPowerOffOffset), kCoresEnabled);
+
+  EXPECT_EQ(0u, power_owner.power_change_failure_count());
+  EXPECT_EQ(1u, power_owner.power_change_complete_count());
+
+  power_manager->PowerUpAfterIdle();
+
+  EXPECT_EQ(0u, power_owner.power_change_failure_count());
+  EXPECT_EQ(2u, power_owner.power_change_complete_count());
+
+  EXPECT_EQ(reg_io->Read32(kShaderPowerOnOffset), kCoresEnabled);
 }

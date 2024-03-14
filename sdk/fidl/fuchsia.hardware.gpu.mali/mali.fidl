@@ -42,8 +42,7 @@ closed protocol ArmMali {
 /// Low-level protocol exposed by the ARM Mali GPU driver to allow fine-grained management. Used
 /// mainly for testing and debugging the driver.
 closed protocol MaliUtils {
-    /// Set whether the GPU is powered on or off. When disabling, will stop scheduling new commands
-    /// immediately, but may return the the power off operation is complete.
+    /// Set whether the GPU is powered on or off. Returns after the transition is complete.
     strict SetPowerState(struct {
         enabled bool;
     }) -> () error zx.Status;
