@@ -107,6 +107,13 @@ def _fuchsia_clang_repository_impl(ctx):
     if ctx.attr.local_path:
         local_clang = workspace_path(ctx, ctx.attr.local_path)
         _instantiate_from_local_dir(ctx, local_clang)
+    elif ctx.attr.from_workspace:
+        # `$CWD` is `<output_base>/external/fuchsia_clang`, so make
+        # `local_clang_workspace`
+        # `<output_base>/external/fuchsia_clang/../../external/$from_workspace`
+        # to have the path resolve to `<output_base>/external/$from_workspace`.
+        local_clang_workspace = "../../%s" % ctx.attr.from_workspace.workspace_root
+        _instantiate_from_local_dir(ctx, local_clang_workspace)
     elif _LOCAL_FUCHSIA_PLATFORM_BUILD in ctx.os.environ:
         _instantiate_from_local_fuchsia_tree(ctx)
     elif ctx.attr.local_archive:
@@ -233,6 +240,9 @@ archive file.
         ),
         "local_path": attr.string(
             doc = "local clang installation directory, relative to workspace root.",
+        ),
+        "from_workspace": attr.label(
+            doc = "Any label to a bazel external workspace containing a clang installation.",
         ),
         "local_version_file": attr.label(
             doc = "Optional path to a workspace-relative path to a version file for this clang installation.",
