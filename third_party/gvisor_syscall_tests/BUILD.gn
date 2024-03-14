@@ -462,7 +462,7 @@ syscall_test_suite(loopback_test_label) {
   # other suites. To compensate for this, use additional shards.
   num_shards = 10
 
-  # These tests are generating too much logging.
+  # These tests are generating too much logging.  https://fxbug.dev/328822330
   debug_netstack2 = false
 }
 syscall_test_suite(loopback_isolated_test_label) {
