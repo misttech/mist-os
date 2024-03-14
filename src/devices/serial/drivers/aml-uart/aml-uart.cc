@@ -451,7 +451,6 @@ void AmlUart::Write(WriteRequestView request, fdf::Arena& arena, WriteCompleter:
 
 void AmlUart::CancelAll(fdf::Arena& arena, CancelAllCompleter::Sync& completer) {
   SerialImplAsyncCancelAll();
-  completer.buffer(arena).Reply();
 }
 
 void AmlUart::handle_unknown_method(

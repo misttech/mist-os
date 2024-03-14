@@ -5,9 +5,14 @@
 #include "bt_transport_uart.h"
 
 #include <assert.h>
+#include <fidl/fuchsia.hardware.serial/cpp/wire.h>
 #include <lib/async/default.h>
+#include <lib/ddk/binding_driver.h>
+#include <lib/ddk/debug.h>
+#include <lib/ddk/device.h>
+#include <lib/ddk/driver.h>
 #include <lib/ddk/metadata.h>
-#include <lib/driver/component/cpp/driver_export.h>
+#include <lib/ddk/platform-defs.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -18,159 +23,23 @@
 
 namespace bt_transport_uart {
 
-BtTransportUart::BtTransportUart(fuchsia_driver_framework::DriverStartArgs start_args,
-                                 fdf::UnownedSynchronizedDispatcher driver_dispatcher)
-    : DriverBase("bt_transport_uart", std::move(start_args), std::move(driver_dispatcher)),
-      dispatcher_(dispatcher()),
-      node_(fidl::WireClient(std::move(node()), dispatcher())) {}
+BtTransportUart::BtTransportUart(zx_device_t* parent)
+    : BtTransportUartType(parent),
+      dispatcher_(fdf::Dispatcher::GetCurrent()->async_dispatcher()),
+      outgoing_dir_(fdf::OutgoingDirectory::Create(fdf::Dispatcher::GetCurrent()->get())) {}
 
-zx::result<> BtTransportUart::Start() {
-  FDF_LOG(DEBUG, "Start");
+zx_status_t BtTransportUart::Create(void* /*ctx*/, zx_device_t* parent) {
+  std::unique_ptr<BtTransportUart> dev = std::make_unique<BtTransportUart>(parent);
 
-  zx::result<fdf::ClientEnd<fuchsia_hardware_serialimpl::Device>> client_end =
-      incoming()->Connect<fuchsia_hardware_serialimpl::Service::Device>();
-  if (client_end.is_error()) {
-    FDF_LOG(ERROR, "Connect to fuchsia_hardware_serialimpl::Device protocol failed: %s",
-            client_end.status_string());
-    return zx::error(client_end.status_value());
+  zx_status_t bind_status = dev->Bind();
+  if (bind_status != ZX_OK) {
+    return bind_status;
   }
 
-  {
-    std::lock_guard guard(mutex_);
-
-    serial_client_ = fdf::WireClient<fuchsia_hardware_serialimpl::Device>(
-        std::move(client_end.value()), driver_dispatcher()->get());
-    if (!serial_client_.is_valid()) {
-      FDF_LOG(ERROR, "fuchsia_hardware_serialimpl::Device Client is not valid");
-      return zx::error(ZX_ERR_BAD_HANDLE);
-    }
-
-    // pre-populate event packet indicators
-    event_buffer_[0] = kHciEvent;
-    event_buffer_offset_ = 1;
-    acl_buffer_[0] = kHciAclData;
-    acl_buffer_offset_ = 1;
-    sco_buffer_[0] = kHciSco;
-    sco_buffer_offset_ = 1;
-  }
-
-  fdf::Arena arena('INIT');
-  auto info_result = serial_client_.sync().buffer(arena)->GetInfo();
-  if (!info_result.ok()) {
-    FDF_LOG(ERROR, "hci_start: GetInfo failed with FIDL error %s", info_result.status_string());
-    return zx::error(info_result.status());
-  }
-  if (info_result->is_error()) {
-    FDF_LOG(ERROR, "hci_start: GetInfo failed with error %s",
-            zx_status_get_string(info_result->error_value()));
-    return zx::error(info_result->error_value());
-  }
-
-  if (info_result.value()->info.serial_class != fuchsia_hardware_serial::Class::kBluetoothHci) {
-    FDF_LOG(ERROR, "hci_start: device class isn't BLUETOOTH_HCI");
-    return zx::error(ZX_ERR_INTERNAL);
-  }
-
-  serial_pid_ = info_result.value()->info.serial_pid;
-
-  auto enable_result = serial_client_.sync().buffer(arena)->Enable(true);
-  if (!enable_result.ok()) {
-    FDF_LOG(ERROR, "hci_start: Enable failed with FIDL error %s", enable_result.status_string());
-    return zx::error(enable_result.status());
-  }
-
-  if (enable_result->is_error()) {
-    FDF_LOG(ERROR, "hci_start: Enable failed with error %s",
-            zx_status_get_string(enable_result->error_value()));
-    return zx::error(enable_result->error_value());
-  }
-
-  queue_read_task_.Post(dispatcher_);
-
-  zx_status_t status = ServeProtocols();
-  if (status != ZX_OK) {
-    FDF_LOG(ERROR, "Failed to serve protocols: %s", zx_status_get_string(status));
-    return zx::error(status);
-  }
-
-  // Start compat device server to forward metadata.
-  zx::result compat_server_result =
-      compat_server_.Initialize(incoming(), outgoing(), node_name(), "bt-uart-transport",
-                                compat::ForwardMetadata::Some({DEVICE_METADATA_MAC_ADDRESS}));
-  if (compat_server_result.is_error()) {
-    FDF_LOG(ERROR, "Failed to initialize device server: %s", compat_server_result.status_string());
-    return compat_server_result.take_error();
-  }
-
-  // Add child node for the vendor driver to bind.
-  fidl::Arena args_arena;
-
-  // Build offers
-  auto offers = compat_server_.CreateOffers2(args_arena);
-  offers.push_back(fdf::MakeOffer2<fuchsia_hardware_bluetooth::HciService>(args_arena));
-  offers.push_back(fdf::MakeOffer2<fuchsia_hardware_serialimpl::Service>(args_arena));
-
-  auto args = fuchsia_driver_framework::wire::NodeAddArgs::Builder(args_arena)
-                  .name("bt-uart-transport")
-                  .offers2(std::move(offers))
-                  .Build();
-
-  auto controller_endpoints = fidl::CreateEndpoints<fuchsia_driver_framework::NodeController>();
-  if (controller_endpoints.is_error()) {
-    FDF_LOG(ERROR, "Create node controller end points failed: %s",
-            zx_status_get_string(controller_endpoints.error_value()));
-    return zx::error(controller_endpoints.error_value());
-  }
-
-  // Add bt-uart-transport child node.
-  auto result =
-      node_.sync()->AddChild(std::move(args), std::move(controller_endpoints->server), {});
-  if (!result.ok()) {
-    FDF_LOG(ERROR, "Failed to add bt-transport-uart node, FIDL error: %s", result.status_string());
-    return zx::error(result.status());
-  }
-
-  if (result->is_error()) {
-    FDF_LOG(ERROR, "Failed to add bt-uart-transport node: %u",
-            static_cast<uint32_t>(result->error_value()));
-    return zx::error(ZX_ERR_INTERNAL);
-  }
-
-  node_controller_.Bind(std::move(controller_endpoints->client), dispatcher(), this);
-
-  return zx::ok();
-}
-
-void BtTransportUart::PrepareStop(fdf::PrepareStopCompleter completer) {
-  FDF_LOG(TRACE, "Unbind");
-
-  // We are now shutting down.  Make sure that any pending callbacks in
-  // flight from the serial_impl are nerfed and that our thread is shut down.
-  std::atomic_store_explicit(&shutting_down_, true, std::memory_order_relaxed);
-
-  {
-    std::lock_guard guard(mutex_);
-
-    // Close the transport channels so that the host stack is notified of device
-    // removal and tasks aren't posted to work thread.
-    ChannelCleanupLocked(&cmd_channel_);
-    ChannelCleanupLocked(&acl_channel_);
-    ChannelCleanupLocked(&sco_channel_);
-    ChannelCleanupLocked(&snoop_channel_);
-  }
-
-  // Finish by making sure that all in flight transactions transactions have
-  // been canceled.
-  fdf::Arena arena('CANC');
-  auto result = serial_client_.sync().buffer(arena)->CancelAll();
-  if (!result.ok()) {
-    FDF_LOG(ERROR, "hci_bind: CancelAll failed with FIDL error %s", result.status_string());
-    completer(zx::error(result.status()));
-  }
-
-  FDF_LOG(TRACE, "PrepareStop complete");
-
-  completer(zx::ok());
+  // Driver Manager is now in charge of the device.
+  // Memory will be explicitly freed in DdkRelease().
+  [[maybe_unused]] BtTransportUart* unused = dev.release();
+  return ZX_OK;
 }
 
 // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
@@ -243,8 +112,8 @@ void BtTransportUart::SnoopChannelWriteLocked(uint8_t flags, uint8_t* bytes, siz
 
   if (status != ZX_OK) {
     if (status != ZX_ERR_PEER_CLOSED) {
-      FDF_LOG(ERROR, "bt-transport-uart: failed to write to snoop channel: %s",
-              zx_status_get_string(status));
+      zxlogf(ERROR, "bt-transport-uart: failed to write to snoop channel: %s",
+             zx_status_get_string(status));
     }
 
     // It should be safe to clean up the channel right here as the work thread
@@ -256,7 +125,7 @@ void BtTransportUart::SnoopChannelWriteLocked(uint8_t flags, uint8_t* bytes, siz
 void BtTransportUart::HciBeginShutdown() {
   bool was_shutting_down = shutting_down_.exchange(true, std::memory_order_relaxed);
   if (!was_shutting_down) {
-    auto result = node_.UnbindMaybeGetEndpoint();
+    DdkAsyncRemove();
   }
 }
 
@@ -269,24 +138,10 @@ void BtTransportUart::SerialWrite(uint8_t* buffer, size_t length) {
     can_write_ = false;
   }
 
-  fdf::Arena arena('WRIT');
-  auto data = fidl::VectorView<uint8_t>::FromExternal(buffer, length);
-  serial_client_.buffer(arena)->Write(data).ThenExactlyOnce(
-      [this](fdf::WireUnownedResult<fuchsia_hardware_serialimpl::Device::Write>& result) mutable {
-        if (!result.ok()) {
-          FDF_LOG(ERROR, "hci_bind: Write failed with FIDL error %s", result.status_string());
-          HciWriteComplete(result.status());
-          return;
-        }
-
-        if (result->is_error()) {
-          FDF_LOG(ERROR, "hci_bind: Write failed with error %s",
-                  zx_status_get_string(result->error_value()));
-          HciWriteComplete(result->error_value());
-          return;
-        }
-        HciWriteComplete(ZX_OK);
-      });
+  serial_impl_async_write_async_callback write_cb = [](void* cookie, zx_status_t status) {
+    static_cast<BtTransportUart*>(cookie)->HciWriteComplete(status);
+  };
+  serial_impl_async_write_async(&serial_, buffer, length, write_cb, this);
 }
 
 // Returns false if there's an error while sending the packet to the hardware or
@@ -328,7 +183,7 @@ void BtTransportUart::HciHandleClientChannel(zx::channel* chan, zx_signals_t pen
   // Handle the read signal first.  If we are also peer closed, we want to make
   // sure that we have processed all of the pending messages before cleaning up.
   if (pending & ZX_CHANNEL_READABLE) {
-    FDF_LOG(TRACE, "received readable signal for %s channel", chan_name);
+    zxlogf(TRACE, "received readable signal for %s channel", chan_name);
     uint32_t length = max_buf_size - 1;
     {
       std::lock_guard guard(mutex_);
@@ -344,12 +199,12 @@ void BtTransportUart::HciHandleClientChannel(zx::channel* chan, zx_signals_t pen
       status =
           zx_channel_read(chan->get(), 0, write_buffer_ + 1, nullptr, length, 0, &length, nullptr);
       if (status == ZX_ERR_SHOULD_WAIT) {
-        FDF_LOG(WARNING, "ignoring ZX_ERR_SHOULD_WAIT when reading %s channel", chan_name);
+        zxlogf(WARNING, "ignoring ZX_ERR_SHOULD_WAIT when reading %s channel", chan_name);
         return;
       }
       if (status != ZX_OK) {
-        FDF_LOG(ERROR, "hci_read_thread: failed to read from %s channel %s", chan_name,
-                zx_status_get_string(status));
+        zxlogf(ERROR, "hci_read_thread: failed to read from %s channel %s", chan_name,
+               zx_status_get_string(status));
         ChannelCleanupLocked(chan);
         return;
       }
@@ -364,7 +219,7 @@ void BtTransportUart::HciHandleClientChannel(zx::channel* chan, zx_signals_t pen
   }
 
   if (pending & ZX_CHANNEL_PEER_CLOSED) {
-    FDF_LOG(DEBUG, "received closed signal for %s channel", chan_name);
+    zxlogf(DEBUG, "received closed signal for %s channel", chan_name);
     std::lock_guard guard(mutex_);
     ChannelCleanupLocked(chan);
   }
@@ -395,8 +250,8 @@ void BtTransportUart::HciHandleUartReadEvents(const uint8_t* buf, size_t length)
                                             &sco_channel_, BT_HCI_SNOOP_TYPE_SCO);
         break;
       default:
-        FDF_LOG(ERROR, "unsupported HCI packet type %u received. We may be out of sync",
-                cur_uart_packet_type_);
+        zxlogf(ERROR, "unsupported HCI packet type %u received. We may be out of sync",
+               cur_uart_packet_type_);
         cur_uart_packet_type_ = kHciNone;
         return;
     }
@@ -424,10 +279,10 @@ void BtTransportUart::ProcessNextUartPacketFromReadBuffer(
   }
 
   if (packet_length > buffer_size) {
-    FDF_LOG(ERROR,
-            "packet_length is too large (%zu > %zu) during packet reassembly. Dropping and "
-            "attempting to re-sync.",
-            packet_length, buffer_size);
+    zxlogf(ERROR,
+           "packet_length is too large (%zu > %zu) during packet reassembly. Dropping and "
+           "attempting to re-sync.",
+           packet_length, buffer_size);
 
     // Reset the reassembly state machine.
     *buffer_offset = 1;
@@ -461,7 +316,7 @@ void BtTransportUart::ProcessNextUartPacketFromReadBuffer(
   if (channel->is_valid()) {
     zx_status_t status = channel->write(/*flags=*/0, &buffer[1], packet_length - 1, nullptr, 0);
     if (status != ZX_OK) {
-      FDF_LOG(ERROR, "failed to write packet: %s", zx_status_get_string(status));
+      zxlogf(ERROR, "failed to write packet: %s", zx_status_get_string(status));
       ChannelCleanupLocked(&acl_channel_);
     }
   }
@@ -475,7 +330,7 @@ void BtTransportUart::ProcessNextUartPacketFromReadBuffer(
 }
 
 void BtTransportUart::HciReadComplete(zx_status_t status, const uint8_t* buffer, size_t length) {
-  FDF_LOG(TRACE, "Read complete with status: %s", zx_status_get_string(status));
+  zxlogf(TRACE, "Read complete with status: %s", zx_status_get_string(status));
 
   // If we are in the process of shutting down, we are done.
   if (atomic_load_explicit(&shutting_down_, std::memory_order_relaxed)) {
@@ -488,13 +343,13 @@ void BtTransportUart::HciReadComplete(zx_status_t status, const uint8_t* buffer,
   } else {
     // There is not much we can do in the event of a UART read error.  Do not
     // queue a read job and start the process of shutting down.
-    FDF_LOG(ERROR, "Fatal UART read error (%s), shutting down", zx_status_get_string(status));
+    zxlogf(ERROR, "Fatal UART read error (%s), shutting down", zx_status_get_string(status));
     HciBeginShutdown();
   }
 }
 
 void BtTransportUart::HciWriteComplete(zx_status_t status) {
-  FDF_LOG(TRACE, "Write complete with status: %s", zx_status_get_string(status));
+  zxlogf(TRACE, "Write complete with status: %s", zx_status_get_string(status));
 
   // If we are in the process of shutting down, we are done as soon as we
   // have freed our operation.
@@ -546,7 +401,7 @@ zx_status_t BtTransportUart::HciOpenChannel(zx::channel* in_channel, zx_handle_t
   zx_status_t result = ZX_OK;
 
   if (in_channel->is_valid()) {
-    FDF_LOG(ERROR, "bt-transport-uart: already bound, failing");
+    zxlogf(ERROR, "bt-transport-uart: already bound, failing");
     result = ZX_ERR_ALREADY_BOUND;
     return result;
   }
@@ -555,16 +410,16 @@ zx_status_t BtTransportUart::HciOpenChannel(zx::channel* in_channel, zx_handle_t
 
   Wait* wait = nullptr;
   if (in_channel == &cmd_channel_) {
-    FDF_LOG(DEBUG, "opening command channel");
+    zxlogf(DEBUG, "opening command channel");
     wait = &cmd_channel_wait_;
   } else if (in_channel == &acl_channel_) {
-    FDF_LOG(DEBUG, "opening ACL channel");
+    zxlogf(DEBUG, "opening ACL channel");
     wait = &acl_channel_wait_;
   } else if (in_channel == &sco_channel_) {
-    FDF_LOG(DEBUG, "opening SCO channel");
+    zxlogf(DEBUG, "opening SCO channel");
     wait = &sco_channel_wait_;
   } else if (in_channel == &snoop_channel_) {
-    FDF_LOG(DEBUG, "opening snoop channel");
+    zxlogf(DEBUG, "opening snoop channel");
     // TODO(https://fxbug.dev/42172901): Handle snoop channel closed signal.
     return ZX_OK;
   }
@@ -576,11 +431,51 @@ zx_status_t BtTransportUart::HciOpenChannel(zx::channel* in_channel, zx_handle_t
   return result;
 }
 
+void BtTransportUart::DdkUnbind(ddk::UnbindTxn txn) {
+  zxlogf(TRACE, "Unbind");
+
+  // We are now shutting down.  Make sure that any pending callbacks in
+  // flight from the serial_impl are nerfed and that our thread is shut down.
+  std::atomic_store_explicit(&shutting_down_, true, std::memory_order_relaxed);
+
+  {
+    std::lock_guard guard(mutex_);
+
+    // Close the transport channels so that the host stack is notified of device
+    // removal and tasks aren't posted to work thread.
+    ChannelCleanupLocked(&cmd_channel_);
+    ChannelCleanupLocked(&acl_channel_);
+    ChannelCleanupLocked(&sco_channel_);
+    ChannelCleanupLocked(&snoop_channel_);
+  }
+
+  if (loop_) {
+    loop_->Quit();
+    loop_->JoinThreads();
+  }
+
+  // Finish by making sure that all in flight transactions transactions have
+  // been canceled.
+  serial_impl_async_cancel_all(&serial_);
+
+  zxlogf(TRACE, "Unbind complete");
+
+  // Tell the DDK we are done unbinding.
+  txn.Reply();
+}
+
+void BtTransportUart::DdkRelease() {
+  zxlogf(TRACE, "Release");
+  // Driver manager is given a raw pointer to this dynamically allocated object in Create(), so
+  // when DdkRelease() is called we need to free the allocated memory.
+  delete this;
+}
+
 void BtTransportUart::OpenCommandChannel(OpenCommandChannelRequestView request,
                                          OpenCommandChannelCompleter::Sync& completer) {
   if (zx_status_t status = HciOpenChannel(&cmd_channel_, std::move(request->channel.release()));
       status != ZX_OK) {
-    FDF_LOG(ERROR, "Failed to open command channel: %s", zx_status_get_string(status));
+    zxlogf(ERROR, "Failed to open command channel: %s", zx_status_get_string(status));
     completer.ReplyError(status);
     return;
   }
@@ -590,7 +485,7 @@ void BtTransportUart::OpenAclDataChannel(OpenAclDataChannelRequestView request,
                                          OpenAclDataChannelCompleter::Sync& completer) {
   if (zx_status_t status = HciOpenChannel(&acl_channel_, std::move(request->channel.release()));
       status != ZX_OK) {
-    FDF_LOG(ERROR, "Failed to open acl channel: %s", zx_status_get_string(status));
+    zxlogf(ERROR, "Failed to open acl channel: %s", zx_status_get_string(status));
     completer.ReplyError(status);
     return;
   }
@@ -600,7 +495,7 @@ void BtTransportUart::OpenSnoopChannel(OpenSnoopChannelRequestView request,
                                        OpenSnoopChannelCompleter::Sync& completer) {
   if (zx_status_t status = HciOpenChannel(&snoop_channel_, std::move(request->channel.release()));
       status != ZX_OK) {
-    FDF_LOG(ERROR, "Failed to open snoop channel: %s", zx_status_get_string(status));
+    zxlogf(ERROR, "Failed to open snoop channel: %s", zx_status_get_string(status));
     completer.ReplyError(status);
     return;
   }
@@ -610,7 +505,7 @@ void BtTransportUart::OpenScoDataChannel(OpenScoDataChannelRequestView request,
                                          OpenScoDataChannelCompleter::Sync& completer) {
   if (zx_status_t status = HciOpenChannel(&sco_channel_, std::move(request->channel.release()));
       status != ZX_OK) {
-    FDF_LOG(ERROR, "Failed to open sco channel: %s", zx_status_get_string(status));
+    zxlogf(ERROR, "Failed to open sco channel: %s", zx_status_get_string(status));
     completer.ReplyError(status);
     return;
   }
@@ -629,10 +524,11 @@ void BtTransportUart::ResetSco(ResetScoCompleter::Sync& completer) {
   // UART doesn't require any SCO configuration, so there's nothing to do.
   completer.ReplySuccess();
 }
+
 void BtTransportUart::handle_unknown_method(
     fidl::UnknownMethodMetadata<fuchsia_hardware_bluetooth::Hci> metadata,
     fidl::UnknownMethodCompleter::Sync& completer) {
-  FDF_LOG(ERROR, "Unknown method in Hci protocol, closing with ZX_ERR_NOT_SUPPORTED");
+  zxlogf(ERROR, "Unknown method in Hci protocol, closing with ZX_ERR_NOT_SUPPORTED");
   completer.Close(ZX_ERR_NOT_SUPPORTED);
 }
 
@@ -645,20 +541,13 @@ void BtTransportUart::GetInfo(fdf::Arena& arena, GetInfoCompleter::Sync& complet
 }
 void BtTransportUart::Config(ConfigRequestView request, fdf::Arena& arena,
                              ConfigCompleter::Sync& completer) {
-  auto result = serial_client_.sync().buffer(arena)->Config(
-      request->baud_rate, fuchsia_hardware_serialimpl::wire::kSerialSetBaudRateOnly);
-  if (!result.ok()) {
-    FDF_LOG(ERROR, "Config request failed with FIDL error %s", result.status_string());
-    completer.buffer(arena).ReplyError(result.status());
-    return;
+  zx_status_t status =
+      serial_impl_async_config(&serial_, request->baud_rate, SERIAL_SET_BAUD_RATE_ONLY);
+  if (status == ZX_OK) {
+    completer.buffer(arena).ReplySuccess();
+  } else {
+    completer.buffer(arena).ReplyError(status);
   }
-  if (result->is_error()) {
-    FDF_LOG(ERROR, "Config request failed with error %s",
-            zx_status_get_string(result->error_value()));
-    completer.buffer(arena).ReplyError(result->error_value());
-    return;
-  }
-  completer.buffer(arena).ReplySuccess();
 }
 
 void BtTransportUart::Enable(EnableRequestView request, fdf::Arena& arena,
@@ -682,40 +571,18 @@ void BtTransportUart::CancelAll(fdf::Arena& arena, CancelAllCompleter::Sync& com
 void BtTransportUart::handle_unknown_method(
     fidl::UnknownMethodMetadata<fuchsia_hardware_serialimpl::Device> metadata,
     fidl::UnknownMethodCompleter::Sync& completer) {
-  FDF_LOG(
-      ERROR,
-      "Unknown method in fuchsia_hardware_serialimpl::Device protocol, closing with ZX_ERR_NOT_SUPPORTED");
-  completer.Close(ZX_ERR_NOT_SUPPORTED);
+  ZX_PANIC("Unknown method in fuchsia_hardware_serialimpl::Device request");
 }
 
 void BtTransportUart::QueueUartRead() {
-  fdf::Arena arena('READ');
-  serial_client_.buffer(arena)->Read().ThenExactlyOnce([this](fdf::WireUnownedResult<
-                                                              fuchsia_hardware_serialimpl::Device::
-                                                                  Read>& result) {
-    if (!result.ok()) {
-      FDF_LOG(ERROR, "Read request failed with FIDL error %s", result.status_string());
-      HciReadComplete(result.status(), nullptr, 0);
-      return;
-    }
-
-    if (result->is_error()) {
-      if (result->error_value() == ZX_ERR_CANCELED) {
-        FDF_LOG(
-            WARNING,
-            "Read request is cancel by the bus driver, it's likely the serial driver is de-initialized.");
-      } else {
-        FDF_LOG(ERROR, "Read request failed with error %s",
-                zx_status_get_string(result->error_value()));
-      }
-      HciReadComplete(result->error_value(), nullptr, 0);
-      return;
-    }
-    HciReadComplete(ZX_OK, result->value()->data.data(), result->value()->data.count());
-  });
+  serial_impl_async_read_async_callback read_cb = [](void* ctx, zx_status_t status,
+                                                     const uint8_t* buffer, size_t length) {
+    static_cast<BtTransportUart*>(ctx)->HciReadComplete(status, buffer, length);
+  };
+  serial_impl_async_read_async(&serial_, read_cb, this);
 }
 
-zx_status_t BtTransportUart::ServeProtocols() {
+zx_status_t BtTransportUart::ServeProtocols(fidl::ServerEnd<fuchsia_io::Directory> server_end) {
   // Add HCI service to the outgoing directory.
   auto hci_protocol = [this](fidl::ServerEnd<fuchsia_hardware_bluetooth::Hci> server_end) mutable {
     fidl::BindServer(dispatcher_, std::move(server_end), this);
@@ -723,29 +590,139 @@ zx_status_t BtTransportUart::ServeProtocols() {
   fuchsia_hardware_bluetooth::HciService::InstanceHandler hci_handler(
       {.hci = std::move(hci_protocol)});
   auto status =
-      outgoing()->AddService<fuchsia_hardware_bluetooth::HciService>(std::move(hci_handler));
+      outgoing_dir_.AddService<fuchsia_hardware_bluetooth::HciService>(std::move(hci_handler));
   if (status.is_error()) {
-    FDF_LOG(ERROR, "Failed to add HCI service to outgoing directory: %s\n", status.status_string());
+    zxlogf(ERROR, "Failed to add HCI service to outgoing directory: %s\n", status.status_string());
     return status.error_value();
   }
 
   // Add Serial service to the outgoing directory.
   auto serial_protocol =
       [this](fdf::ServerEnd<fuchsia_hardware_serialimpl::Device> server_end) mutable {
-        fdf::BindServer(driver_dispatcher()->get(), std::move(server_end), this);
+        fdf::BindServer(fdf::Dispatcher::GetCurrent()->get(), std::move(server_end), this);
       };
   fuchsia_hardware_serialimpl::Service::InstanceHandler serial_handler(
       {.device = std::move(serial_protocol)});
-  status = outgoing()->AddService<fuchsia_hardware_serialimpl::Service>(std::move(serial_handler));
+  status =
+      outgoing_dir_.AddService<fuchsia_hardware_serialimpl::Service>(std::move(serial_handler));
   if (status.is_error()) {
-    FDF_LOG(ERROR, "Failed to add Serial service to outgoing directory: %s\n",
-            status.status_string());
+    zxlogf(ERROR, "Failed to add Serial service to outgoing directory: %s\n",
+           status.status_string());
     return status.error_value();
+  }
+
+  auto result = outgoing_dir_.Serve(std::move(server_end));
+  if (result.is_error()) {
+    zxlogf(ERROR, "Failed to serve outgoing directory: %s\n", result.status_string());
+    return result.error_value();
   }
 
   return ZX_OK;
 }
 
+zx_status_t BtTransportUart::Bind() {
+  zxlogf(DEBUG, "Bind");
+
+  serial_impl_async_protocol_t serial;
+
+  zx_status_t status = device_get_protocol(parent(), ZX_PROTOCOL_SERIAL_IMPL_ASYNC, &serial);
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "bt-transport-uart: get protocol ZX_PROTOCOL_SERIAL failed: %s",
+           zx_status_get_string(status));
+    return status;
+  }
+
+  {
+    std::lock_guard guard(mutex_);
+
+    serial_ = serial;
+
+    // pre-populate event packet indicators
+    event_buffer_[0] = kHciEvent;
+    event_buffer_offset_ = 1;
+    acl_buffer_[0] = kHciAclData;
+    acl_buffer_offset_ = 1;
+    sco_buffer_[0] = kHciSco;
+    sco_buffer_offset_ = 1;
+  }
+
+  serial_port_info_t info;
+  status = serial_impl_async_get_info(&serial, &info);
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "hci_bind: serial_get_info failed: %s", zx_status_get_string(status));
+    return status;
+  }
+
+  if (info.serial_class != static_cast<uint32_t>(fuchsia_hardware_serial::Class::kBluetoothHci)) {
+    zxlogf(ERROR, "hci_bind: info.device_class != BLUETOOTH_HCI");
+    return ZX_ERR_INTERNAL;
+  }
+
+  serial_pid_ = info.serial_pid;
+
+  // Spawn a new thread in production. In tests, use the test dispatcher provided in the
+  // constructor.
+  if (!dispatcher_) {
+    loop_.emplace(&kAsyncLoopConfigNoAttachToCurrentThread);
+    status = loop_->StartThread("bt-transport-uart");
+    if (status != ZX_OK) {
+      zxlogf(ERROR, "failed to start thread: %s", zx_status_get_string(status));
+      DdkRelease();
+      return status;
+    }
+    dispatcher_ = loop_->dispatcher();
+  }
+
+  serial_impl_async_enable(&serial, true);
+  queue_read_task_.Post(dispatcher_);
+
+  zxlogf(DEBUG, "Bind complete, adding device");
+
+  auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+  if (endpoints.is_error()) {
+    zxlogf(ERROR, "failed to create endpoints: %s\n", endpoints.status_string());
+    return endpoints.status_value();
+  }
+
+  status = ServeProtocols(std::move(endpoints->server));
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "Failed to serve protocols: %s", zx_status_get_string(status));
+    return status;
+  }
+
+  ddk::DeviceAddArgs args("bt-transport-uart");
+  // Copy the PID and VID from the platform device info so it can be filtered on
+  // for HCI drivers
+  zx_device_prop_t props[] = {
+      {.id = BIND_PROTOCOL, .reserved = 0, .value = ZX_PROTOCOL_BT_TRANSPORT},
+      {.id = BIND_SERIAL_VID, .reserved = 0, .value = info.serial_vid},
+      {.id = BIND_SERIAL_PID, .reserved = 0, .value = info.serial_pid},
+  };
+
+  std::array offers = {
+      fuchsia_hardware_bluetooth::HciService::Name,
+      fuchsia_hardware_serialimpl::Service::Name,
+  };
+
+  args.set_props(props);
+  args.set_proto_id(ZX_PROTOCOL_BT_TRANSPORT);
+  args.forward_metadata(parent(), DEVICE_METADATA_MAC_ADDRESS);
+  args.set_fidl_service_offers(offers);
+  args.set_outgoing_dir(endpoints->client.TakeChannel());
+
+  status = DdkAdd(args);
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "Failed to add bt-transport-uart device: %s\n", zx_status_get_string(status));
+  }
+
+  return status;
+}
+
+static zx_driver_ops_t bt_hci_driver_ops = {
+    .version = DRIVER_OPS_VERSION,
+    .bind = BtTransportUart::Create,
+};
+
 }  // namespace bt_transport_uart
 
-FUCHSIA_DRIVER_EXPORT(bt_transport_uart::BtTransportUart);
+ZIRCON_DRIVER(bt_transport_uart, bt_transport_uart::bt_hci_driver_ops, "zircon", "0.1");

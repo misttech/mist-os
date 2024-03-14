@@ -3,15 +3,15 @@
 // found in the LICENSE file.
 {
     include: [
-        "driver_component/driver.shard.cml",
+        "//sdk/lib/driver/compat/compat.shard.cml",
         "inspect/client.shard.cml",
         "syslog/client.shard.cml",
     ],
     program: {
         runner: "driver",
-        binary: "driver/bt-transport-uart.so",
         bind: "meta/bind/bt-transport-uart.bindbc",
         colocate: "true",
+        compat: "driver/bt-transport-uart.so",
         default_dispatcher_opts: [ "allow_sync_calls" ],
         fallback: "false",
     },
@@ -19,9 +19,7 @@
         { service: "fuchsia.hardware.bluetooth.HciService" },
         { service: "fuchsia.hardware.serialimpl.Service" },
     ],
-    use: [
-        { service: "fuchsia.hardware.serialimpl.Service" },
-    ],
+    use: [],
     expose: [
         {
             service: "fuchsia.hardware.bluetooth.HciService",

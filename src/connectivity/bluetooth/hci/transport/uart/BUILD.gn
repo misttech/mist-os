@@ -22,13 +22,11 @@ source_set("common") {
 
   public_deps = [
     ":bt_transport_uart_bind",
-    "//sdk/fidl/fuchsia.driver.compat:fuchsia.driver.compat_cpp",
-    "//sdk/fidl/fuchsia.driver.framework:fuchsia.driver.framework_cpp",
+    "//sdk/banjo/fuchsia.hardware.serialimpl.async:fuchsia.hardware.serialimpl.async_banjo_cpp",
     "//sdk/fidl/fuchsia.hardware.bluetooth:fuchsia.hardware.bluetooth_cpp",
     "//sdk/fidl/fuchsia.hardware.serialimpl:fuchsia.hardware.serialimpl_cpp",
-    "//sdk/lib/driver/compat/cpp",
-    "//sdk/lib/driver/component/cpp",
     "//sdk/lib/driver/outgoing/cpp:cpp",
+    "//src/devices/lib/driver",
     "//src/devices/lib/driver:driver_runtime",
     "//src/lib/ddk",
     "//zircon/system/ulib/async-default",
@@ -72,9 +70,9 @@ executable("tests_executable") {
 
   deps = [
     ":common",
-    "//sdk/lib/async_patterns/testing/cpp:cpp",
-    "//sdk/lib/driver/testing/cpp:cpp",
+    "//src/devices/testing/mock-ddk",
     "//src/lib/fxl/test:gtest_main",
+    "//src/lib/testing/loop_fixture",
     "//third_party/googletest:gtest",
   ]
 }

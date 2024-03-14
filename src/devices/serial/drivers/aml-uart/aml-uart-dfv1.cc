@@ -114,44 +114,8 @@ zx_status_t AmlUartV1::Init(ddk::PDevFidl pdev, const serial_port_info_t& serial
       {BIND_PROTOCOL, 0, ZX_PROTOCOL_SERIAL_IMPL_ASYNC},
       {BIND_SERIAL_CLASS, 0, aml_uart_->serial_port_info().serial_class},
   };
-
-  fuchsia_hardware_serialimpl::Service::InstanceHandler handler({
-      .device =
-          [this](fdf::ServerEnd<fuchsia_hardware_serialimpl::Device> server_end) {
-            serial_impl_bindings_.AddBinding(fdf::Dispatcher::GetCurrent()->get(),
-                                             std::move(server_end), &aml_uart_.value(),
-                                             fidl::kIgnoreBindingClosure);
-          },
-  });
-
-  zx::result<> add_result =
-      outgoing_.AddService<fuchsia_hardware_serialimpl::Service>(std::move(handler));
-  if (add_result.is_error()) {
-    zxlogf(ERROR, "Failed to add fuchsia_hardware_serialimpl::Service %s",
-           add_result.status_string());
-    return add_result.status_value();
-  }
-
-  auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-  if (endpoints.is_error()) {
-    zxlogf(ERROR, "failed to create endpoints: %s\n", endpoints.status_string());
-    return endpoints.status_value();
-  }
-
-  auto result = outgoing_.Serve(std::move(endpoints->server));
-  if (result.is_error()) {
-    zxlogf(ERROR, "Failed to serve outgoing directory: %s\n", result.status_string());
-    return result.error_value();
-  }
-
-  std::array offers = {
-      fuchsia_hardware_serialimpl::Service::Name,
-  };
-
   auto status = DdkAdd(ddk::DeviceAddArgs("aml-uart")
                            .set_props(props)
-                           .set_runtime_service_offers(offers)
-                           .set_outgoing_dir(endpoints->client.TakeChannel())
                            .forward_metadata(parent(), DEVICE_METADATA_MAC_ADDRESS));
   if (status != ZX_OK) {
     zxlogf(ERROR, "%s: DdkDeviceAdd failed", __func__);
