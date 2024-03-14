@@ -5,6 +5,7 @@
 import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.hardware.display.types") {
+  sdk_category = "internal"
   sources = [
     "config.fidl",
     "display.fidl",

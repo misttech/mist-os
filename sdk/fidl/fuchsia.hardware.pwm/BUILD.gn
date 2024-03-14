@@ -5,6 +5,7 @@
 import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.hardware.pwm") {
+  sdk_category = "internal"
   public_deps = [ "//zircon/vdso/zx" ]
   sources = [ "pwm.fidl" ]
 }
