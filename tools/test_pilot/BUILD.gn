@@ -15,6 +15,7 @@ if (is_host) {
     edition = "2021"
 
     deps = [
+      "//src/lib/fuchsia",
       "//third_party/rust_crates:anyhow",
       "//third_party/rust_crates:futures",
       "//third_party/rust_crates:serde",
@@ -24,7 +25,6 @@ if (is_host) {
     ]
 
     test_deps = [
-      "//src/lib/fuchsia",
       "//third_party/rust_crates:assert_matches",
       "//third_party/rust_crates:rand",
       "//third_party/rust_crates:tempfile",
@@ -44,12 +44,17 @@ if (is_host) {
     output_name = "test_pilot"
     deps = [ ":test_pilot" ]
   }
-}
 
-install_host_tools("install") {
-  deps = [ ":test_pilot" ]
+  install_host_tools("install") {
+    deps = [ ":test_pilot" ]
+    outputs = [ "test_pilot" ]
+  }
 
-  outputs = [ "test_pilot" ]
+  host_test_data("test_deps") {
+    testonly = true
+    deps = [ ":install" ]
+    sources = [ "${root_out_dir}/test_pilot" ]
+  }
 }
 
 group("tests") {

@@ -420,6 +420,7 @@ template("test_spec") {
                                "name",
                                "os",
                                "path",
+                               "new_path",
                                "package_url",
                                "package_label",
                                "component_label",
@@ -447,6 +448,9 @@ template("test_spec") {
           # Trim leading //.
           path = rebase_path(path, root_build_dir)
         }
+      } else if (defined(new_path)) {
+        # Trim leading //.
+        new_path = rebase_path(new_path, root_build_dir)
       }
 
       if (!defined(name)) {

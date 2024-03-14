@@ -65,8 +65,10 @@ pub struct EnvironmentArgs {
 trait Environment {
     fn var(&self, key: &str) -> Result<String, VarError>;
     fn vars(&self) -> impl Iterator<Item = (String, String)>;
-    fn set_var(&mut self, key: &str, value: &str);
     fn remove_var(&mut self, key: &str);
+
+    #[cfg(test)]
+    fn set_var(&mut self, key: &str, value: &str);
 }
 
 struct StandardEnvironment;
@@ -80,40 +82,13 @@ impl Environment for StandardEnvironment {
         std::env::vars()
     }
 
-    fn set_var(&mut self, key: &str, value: &str) {
-        std::env::set_var(key, value);
-    }
-
     fn remove_var(&mut self, key: &str) {
         std::env::remove_var(key);
     }
-}
 
-struct MockEnvironment {
-    variables: std::collections::HashMap<String, String>,
-}
-
-impl MockEnvironment {
-    fn new() -> Self {
-        Self { variables: std::collections::HashMap::new() }
-    }
-}
-
-impl Environment for MockEnvironment {
-    fn var(&self, key: &str) -> Result<String, VarError> {
-        self.variables.get(key).cloned().ok_or(VarError::NotPresent)
-    }
-
-    fn vars(&self) -> impl Iterator<Item = (String, String)> {
-        self.variables.clone().into_iter()
-    }
-
+    #[cfg(test)]
     fn set_var(&mut self, key: &str, value: &str) {
-        self.variables.insert(key.to_string(), value.to_string());
-    }
-
-    fn remove_var(&mut self, key: &str) {
-        self.variables.remove(key);
+        std::env::set_var(key, value);
     }
 }
 
@@ -231,6 +206,34 @@ mod tests {
     use tempfile::tempdir;
     use tempfile::NamedTempFile;
     use test_config::*;
+
+    struct MockEnvironment {
+        variables: std::collections::HashMap<String, String>,
+    }
+
+    impl MockEnvironment {
+        fn new() -> Self {
+            Self { variables: std::collections::HashMap::new() }
+        }
+    }
+
+    impl Environment for MockEnvironment {
+        fn var(&self, key: &str) -> Result<String, VarError> {
+            self.variables.get(key).cloned().ok_or(VarError::NotPresent)
+        }
+
+        fn vars(&self) -> impl Iterator<Item = (String, String)> {
+            self.variables.clone().into_iter()
+        }
+
+        fn set_var(&mut self, key: &str, value: &str) {
+            self.variables.insert(key.to_string(), value.to_string());
+        }
+
+        fn remove_var(&mut self, key: &str) {
+            self.variables.remove(key);
+        }
+    }
 
     #[test]
     fn test_parse_u32() {

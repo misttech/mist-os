@@ -115,6 +115,13 @@ template("fuchsia_test_package") {
       _validate_structured_config = invoker.validate_structured_config
     }
 
+    host_executable = "$root_out_dir/host_test_component"
+    host_executable_rebased = rebase_path(host_executable, root_build_dir)
+
+    test_pilot_executable = "$root_out_dir/test_pilot"
+    test_pilot_executable_rebased =
+        rebase_path(test_pilot_executable, root_build_dir)
+
     test_deps = []
     foreach(test, invoker.test_components) {
       test_target_name = get_label_info(test, "name")
@@ -122,6 +129,40 @@ template("fuchsia_test_package") {
       test_target = "${target_name}_test_" + test_target_name
       manifest_name = get_target_outputs(test)
       manifest_name = get_path_info(manifest_name[0], "file")
+
+      action("${test_target}_script_gen") {
+        script = "//build/components/test_component_executable_generator.py"
+        inputs = [ "//build/components/test_component_executable_generator.py" ]
+
+        outputs = [ "${root_out_dir}/${package_name}_${manifest_name}_test.sh" ]
+        args = [
+          "--bin_path",
+          host_executable_rebased,
+          "--test_pilot",
+          test_pilot_executable_rebased,
+          "--output_filename",
+          rebase_path(outputs[0], root_build_dir),
+        ]
+      }
+      script_outputs = []
+      script_outputs = get_target_outputs(":${test_target}_script_gen")
+
+      group("${test_target}_runtime_deps_group") {
+        testonly = true
+        data_deps = [
+          ":${test_target}_script_gen",
+          "//src/developer/ffx:test_data($host_toolchain)",
+          "//tools/host_test_component:test_deps($host_toolchain)",
+          "//tools/test_pilot:test_deps($host_toolchain)",
+        ]
+        metadata = {
+          test_runtime_deps = [ script_outputs[0] ]
+
+          # avoid adding unintended entries to the test package due to
+          # dependency on ffx.
+          distribution_entries_barrier = []
+        }
+      }
 
       test_spec(test_target) {
         forward_variables_from(test_specs, "*")
@@ -134,7 +175,15 @@ template("fuchsia_test_package") {
         package_manifests = [ package_manifest ]
         package_url =
             "fuchsia-pkg://fuchsia.com/$package_name#meta/$manifest_name"
+
+        # Adding new_path for transition period. We will later replace this with path.
+        new_path = script_outputs[0]
+        if (!defined(data_deps)) {
+          data_deps = []
+        }
+        data_deps += [ ":${test_target}_runtime_deps_group" ]
       }
+
       test_deps += [ ":$test_target" ]
     }
 
@@ -153,6 +202,7 @@ template("fuchsia_test_package") {
       }
       deps += invoker.test_components
       deps += test_deps
+
       testonly = true
       if (!defined(invoker.metadata)) {
         metadata = {

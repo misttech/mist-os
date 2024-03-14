@@ -2,6 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/host.gni")
 import("//build/python/python_binary.gni")
 import("//build/python/python_host_test.gni")
 
@@ -85,4 +86,18 @@ group("tests") {
 group("host_test_component") {
   testonly = true
   deps = [ ":host_test_component_runner" ]
+}
+
+# Rename the resulting .pyz for the host tool
+copy("copy") {
+  testonly = true
+  deps = [ ":host_test_component_runner" ]
+  sources = [ "${target_out_dir}/host_test_component_runner.pyz" ]
+  outputs = [ "${root_out_dir}/host_test_component" ]
+}
+
+host_test_data("test_deps") {
+  testonly = true
+  deps = [ ":copy" ]
+  sources = [ "${root_out_dir}/host_test_component" ]
 }
