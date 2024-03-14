@@ -4,10 +4,10 @@
 
 // Helper functions for reading and writing wav files to and from sockets.
 
-use {
-    anyhow::Error, byteorder::ByteOrder, fuchsia_async as _, fuchsia_zircon as _,
-    futures::prelude::*, std::io::Cursor,
-};
+use anyhow::{anyhow, Error};
+use byteorder::ByteOrder;
+use futures::{AsyncReadExt, AsyncWriteExt};
+use std::io::Cursor;
 
 pub struct Socket<'a> {
     pub socket: &'a mut fidl::AsyncSocket,
@@ -28,7 +28,7 @@ impl<'a> Socket<'a> {
         self.socket
             .write_all(&header)
             .await
-            .map_err(|e| anyhow::anyhow!("Failed to write header to socket: {}", e))
+            .map_err(|e| anyhow!("Failed to write header to socket: {}", e))
     }
 
     pub async fn read_wav_header(&mut self) -> Result<hound::WavSpec, Error> {

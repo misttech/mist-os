@@ -2,21 +2,20 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{Error, Result},
-    camino::Utf8PathBuf,
-    fidl_fuchsia_audio_controller::DeviceSelector,
-    fidl_fuchsia_media::AudioSampleFormat,
-    regex::Regex,
-    std::io::{Cursor, Seek, SeekFrom, Write},
-    std::{str::FromStr, time::Duration},
-};
+use anyhow::{anyhow, Error, Result};
+use camino::Utf8PathBuf;
+use fidl_fuchsia_audio_controller as fac;
+use fidl_fuchsia_hardware_audio as fhaudio;
+use fidl_fuchsia_media as fmedia;
+use regex::Regex;
+use std::io::{Cursor, Seek, SeekFrom, Write};
+use std::{str::FromStr, time::Duration};
 
 pub const DURATION_REGEX: &'static str = r"^(\d+)(h|m|s|ms)$";
 
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub struct Format {
-    pub sample_type: fidl_fuchsia_media::AudioSampleFormat,
+    pub sample_type: fmedia::AudioSampleFormat,
     pub frames_per_second: u32,
     pub channels: u32,
 }
@@ -28,10 +27,10 @@ impl Format {
 
     pub const fn bytes_per_sample(&self) -> u32 {
         match self.sample_type {
-            fidl_fuchsia_media::AudioSampleFormat::Unsigned8 => 1,
-            fidl_fuchsia_media::AudioSampleFormat::Signed16 => 2,
-            fidl_fuchsia_media::AudioSampleFormat::Signed24In32 => 4,
-            fidl_fuchsia_media::AudioSampleFormat::Float => 4,
+            fmedia::AudioSampleFormat::Unsigned8 => 1,
+            fmedia::AudioSampleFormat::Signed16 => 2,
+            fmedia::AudioSampleFormat::Signed24In32 => 4,
+            fmedia::AudioSampleFormat::Float => 4,
         }
     }
 
@@ -41,21 +40,21 @@ impl Format {
 
     pub const fn valid_bits_per_sample(&self) -> u32 {
         match self.sample_type {
-            fidl_fuchsia_media::AudioSampleFormat::Unsigned8 => 8,
-            fidl_fuchsia_media::AudioSampleFormat::Signed16 => 16,
-            fidl_fuchsia_media::AudioSampleFormat::Signed24In32 => 24,
-            fidl_fuchsia_media::AudioSampleFormat::Float => 32,
+            fmedia::AudioSampleFormat::Unsigned8 => 8,
+            fmedia::AudioSampleFormat::Signed16 => 16,
+            fmedia::AudioSampleFormat::Signed24In32 => 24,
+            fmedia::AudioSampleFormat::Float => 32,
         }
     }
 
     pub const fn silence_value(&self) -> u8 {
         match self.sample_type {
-            fidl_fuchsia_media::AudioSampleFormat::Unsigned8 => 128,
+            fmedia::AudioSampleFormat::Unsigned8 => 128,
             _ => 0,
         }
     }
 
-    pub fn wav_header_for_duration(&self, duration: std::time::Duration) -> Result<Vec<u8>, Error> {
+    pub fn wav_header_for_duration(&self, duration: Duration) -> Result<Vec<u8>, Error> {
         // A valid Wav File Header must have the data format and data length fields.
         // We need all values corresponding to wav header fields set on the cursor_writer
         // before writing to stdout.
@@ -67,7 +66,7 @@ impl Format {
             // to 0, since the number of samples (and resulting file and chunk sizes) are
             // unknown to the WavWriter at this point.
             let _writer = hound::WavWriter::new(&mut cursor_writer, self.into())
-                .map_err(|e| anyhow::anyhow!("Failed to create WavWriter from spec: {}", e))?;
+                .map_err(|e| anyhow!("Failed to create WavWriter from spec: {}", e))?;
         }
 
         // The file and chunk size fields are set to 0 as placeholder values by the
@@ -96,11 +95,8 @@ impl Format {
         Ok(cursor_writer.into_inner())
     }
 
-    pub fn is_supported_by(
-        &self,
-        supported_formats: &Vec<fidl_fuchsia_hardware_audio::SupportedFormats>,
-    ) -> bool {
-        let hardware_format = fidl_fuchsia_hardware_audio::Format::from(self);
+    pub fn is_supported_by(&self, supported_formats: &Vec<fhaudio::SupportedFormats>) -> bool {
+        let hardware_format = fhaudio::Format::from(self);
         let mut is_format_supported = false;
 
         for supported_format in supported_formats {
@@ -133,11 +129,11 @@ impl From<&hound::WavSpec> for Format {
         Format {
             sample_type: match item.sample_format {
                 hound::SampleFormat::Int => match item.bits_per_sample {
-                    0..=8 => fidl_fuchsia_media::AudioSampleFormat::Unsigned8,
-                    9..=16 => fidl_fuchsia_media::AudioSampleFormat::Signed16,
-                    17.. => fidl_fuchsia_media::AudioSampleFormat::Signed24In32,
+                    0..=8 => fmedia::AudioSampleFormat::Unsigned8,
+                    9..=16 => fmedia::AudioSampleFormat::Signed16,
+                    17.. => fmedia::AudioSampleFormat::Signed24In32,
                 },
-                hound::SampleFormat::Float => fidl_fuchsia_media::AudioSampleFormat::Float,
+                hound::SampleFormat::Float => fmedia::AudioSampleFormat::Float,
             },
             frames_per_second: item.sample_rate,
             channels: item.channels as u32,
@@ -145,8 +141,8 @@ impl From<&hound::WavSpec> for Format {
     }
 }
 
-impl From<&fidl_fuchsia_media::AudioStreamType> for Format {
-    fn from(item: &fidl_fuchsia_media::AudioStreamType) -> Self {
+impl From<&fmedia::AudioStreamType> for Format {
+    fn from(item: &fmedia::AudioStreamType) -> Self {
         Format {
             sample_type: item.sample_format,
             frames_per_second: item.frames_per_second,
@@ -155,22 +151,16 @@ impl From<&fidl_fuchsia_media::AudioStreamType> for Format {
     }
 }
 
-impl From<&Format> for fidl_fuchsia_hardware_audio::Format {
-    fn from(item: &Format) -> fidl_fuchsia_hardware_audio::Format {
-        fidl_fuchsia_hardware_audio::Format {
-            pcm_format: Some(fidl_fuchsia_hardware_audio::PcmFormat {
+impl From<&Format> for fhaudio::Format {
+    fn from(item: &Format) -> fhaudio::Format {
+        fhaudio::Format {
+            pcm_format: Some(fhaudio::PcmFormat {
                 number_of_channels: item.channels as u8,
                 sample_format: match item.sample_type {
-                    AudioSampleFormat::Unsigned8 => {
-                        fidl_fuchsia_hardware_audio::SampleFormat::PcmUnsigned
-                    }
-                    AudioSampleFormat::Signed16 => {
-                        fidl_fuchsia_hardware_audio::SampleFormat::PcmSigned
-                    }
-                    AudioSampleFormat::Signed24In32 => {
-                        fidl_fuchsia_hardware_audio::SampleFormat::PcmSigned
-                    }
-                    AudioSampleFormat::Float => fidl_fuchsia_hardware_audio::SampleFormat::PcmFloat,
+                    fmedia::AudioSampleFormat::Unsigned8 => fhaudio::SampleFormat::PcmUnsigned,
+                    fmedia::AudioSampleFormat::Signed16 => fhaudio::SampleFormat::PcmSigned,
+                    fmedia::AudioSampleFormat::Signed24In32 => fhaudio::SampleFormat::PcmSigned,
+                    fmedia::AudioSampleFormat::Float => fhaudio::SampleFormat::PcmFloat,
                 },
                 bytes_per_sample: item.bytes_per_sample() as u8,
                 valid_bits_per_sample: item.valid_bits_per_sample() as u8,
@@ -186,23 +176,23 @@ impl From<&Format> for hound::WavSpec {
         hound::WavSpec {
             channels: item.channels as u16,
             sample_format: match item.sample_type {
-                fidl_fuchsia_media::AudioSampleFormat::Float => hound::SampleFormat::Float,
+                fmedia::AudioSampleFormat::Float => hound::SampleFormat::Float,
                 _ => hound::SampleFormat::Int,
             },
             sample_rate: item.frames_per_second,
             bits_per_sample: match item.sample_type {
-                fidl_fuchsia_media::AudioSampleFormat::Unsigned8 => 8,
-                fidl_fuchsia_media::AudioSampleFormat::Signed16 => 16,
-                fidl_fuchsia_media::AudioSampleFormat::Signed24In32 => 32,
-                fidl_fuchsia_media::AudioSampleFormat::Float => 32,
+                fmedia::AudioSampleFormat::Unsigned8 => 8,
+                fmedia::AudioSampleFormat::Signed16 => 16,
+                fmedia::AudioSampleFormat::Signed24In32 => 32,
+                fmedia::AudioSampleFormat::Float => 32,
             },
         }
     }
 }
 
-impl From<&Format> for fidl_fuchsia_media::AudioStreamType {
+impl From<&Format> for fmedia::AudioStreamType {
     fn from(item: &Format) -> Self {
-        fidl_fuchsia_media::AudioStreamType {
+        fmedia::AudioStreamType {
             sample_format: item.sample_type,
             channels: item.channels,
             frames_per_second: item.frames_per_second,
@@ -215,13 +205,13 @@ impl FromStr for Format {
 
     fn from_str(s: &str) -> Result<Self, Error> {
         if s.len() == 0 {
-            return Err(anyhow::anyhow!("No format specified."));
+            return Err(anyhow!("No format specified."));
         };
 
         let splits: Vec<&str> = s.split(",").collect();
 
         if splits.len() != 3 {
-            return Err(anyhow::anyhow!(
+            return Err(anyhow!(
                 "Expected 3 comma-separated values: 
             <SampleRate>,<SampleType>,<Channels> but have {}.",
                 splits.len()
@@ -230,12 +220,12 @@ impl FromStr for Format {
 
         let frame_rate = match splits[0].parse::<u32>() {
             Ok(sample_rate) => Ok(sample_rate),
-            Err(_) => Err(anyhow::anyhow!("First value (sample rate) should be an integer.")),
+            Err(_) => Err(anyhow!("First value (sample rate) should be an integer.")),
         }?;
 
         let sample_type = match CommandSampleType::from_str(splits[1]) {
             Ok(sample_type) => Ok(sample_type),
-            Err(_) => Err(anyhow::anyhow!(
+            Err(_) => Err(anyhow!(
                 "Second value (sample type) should be one of: uint8, int16, int32, float32."
             )),
         }?;
@@ -243,16 +233,14 @@ impl FromStr for Format {
         let channels = match splits[2].strip_suffix("ch") {
             Some(channels) => match channels.parse::<u16>() {
                 Ok(channels) => Ok(channels as u32),
-                Err(_) => {
-                    Err(anyhow::anyhow!("Third value (channels) should have form \"<uint>ch\"."))
-                }
+                Err(_) => Err(anyhow!("Third value (channels) should have form \"<uint>ch\".")),
             },
-            None => Err(anyhow::anyhow!("Channel argument should have form \"<uint>ch\".")),
+            None => Err(anyhow!("Channel argument should have form \"<uint>ch\".")),
         }?;
 
         Ok(Self {
             frames_per_second: frame_rate,
-            sample_type: AudioSampleFormat::from(sample_type),
+            sample_type: fmedia::AudioSampleFormat::from(sample_type),
             channels,
         })
     }
@@ -274,18 +262,18 @@ impl FromStr for CommandSampleType {
             "int16" => Ok(CommandSampleType::Int16),
             "int32" => Ok(CommandSampleType::Int32),
             "float32" => Ok(CommandSampleType::Float32),
-            _ => Err(anyhow::anyhow!("Invalid sampletype: {}.", s)),
+            _ => Err(anyhow!("Invalid sampletype: {}.", s)),
         }
     }
 }
 
-impl From<CommandSampleType> for fidl_fuchsia_media::AudioSampleFormat {
-    fn from(item: CommandSampleType) -> fidl_fuchsia_media::AudioSampleFormat {
+impl From<CommandSampleType> for fmedia::AudioSampleFormat {
+    fn from(item: CommandSampleType) -> fmedia::AudioSampleFormat {
         match item {
-            CommandSampleType::Uint8 => fidl_fuchsia_media::AudioSampleFormat::Unsigned8,
-            CommandSampleType::Int16 => fidl_fuchsia_media::AudioSampleFormat::Signed16,
-            CommandSampleType::Int32 => fidl_fuchsia_media::AudioSampleFormat::Signed24In32,
-            CommandSampleType::Float32 => fidl_fuchsia_media::AudioSampleFormat::Float,
+            CommandSampleType::Uint8 => fmedia::AudioSampleFormat::Unsigned8,
+            CommandSampleType::Int16 => fmedia::AudioSampleFormat::Signed16,
+            CommandSampleType::Int32 => fmedia::AudioSampleFormat::Signed24In32,
+            CommandSampleType::Float32 => fmedia::AudioSampleFormat::Float,
         }
     }
 }
@@ -315,40 +303,33 @@ pub fn parse_duration(value: &str) -> Result<Duration, String> {
 ///
 /// The selector must have Some values for the `id`, `device_type`,
 /// and, for StreamConfig devices, `is_input`.
-pub fn path_for_selector(device_selector: &DeviceSelector) -> Result<Utf8PathBuf, Error> {
-    let id = device_selector.id.as_ref().ok_or(anyhow::anyhow!("Device ID missing"))?;
+pub fn path_for_selector(device_selector: &fac::DeviceSelector) -> Result<Utf8PathBuf, Error> {
+    let id = device_selector.id.as_ref().ok_or(anyhow!("Device ID missing"))?;
     let device_type =
-        device_selector.device_type.ok_or_else(|| anyhow::anyhow!("Device type not specified."))?;
+        device_selector.device_type.ok_or_else(|| anyhow!("Device type not specified."))?;
 
     let class = match device_type {
-        fidl_fuchsia_hardware_audio::DeviceType::StreamConfig => device_selector
+        fhaudio::DeviceType::StreamConfig => device_selector
             .is_input
             .map(|is_input| if is_input { "audio-input" } else { "audio-output" })
-            .ok_or_else(|| {
-                anyhow::anyhow!("Device direction not specified for StreamConfig device.")
-            }),
-        fidl_fuchsia_hardware_audio::DeviceType::Composite => Ok("audio-composite"),
-        _ => Err(anyhow::anyhow!("Unexpected device type.")),
+            .ok_or_else(|| anyhow!("Device direction not specified for StreamConfig device.")),
+        fhaudio::DeviceType::Composite => Ok("audio-composite"),
+        _ => Err(anyhow!("Unexpected device type.")),
     }?;
 
     Ok(Utf8PathBuf::from("/dev/class").join(class).join(id))
 }
 
 pub fn device_id_for_path(path: &std::path::Path) -> Result<String> {
-    let device_id = path.file_name().ok_or(anyhow::anyhow!("Can't get filename from path"))?;
-    let id_str =
-        device_id.to_str().ok_or(anyhow::anyhow!("Could not convert device id to string"))?;
+    let device_id = path.file_name().ok_or(anyhow!("Can't get filename from path"))?;
+    let id_str = device_id.to_str().ok_or(anyhow!("Could not convert device id to string"))?;
     Ok(id_str.to_string())
 }
 
-pub fn str_to_clock(src: &str) -> Result<fidl_fuchsia_audio_controller::ClockType, String> {
+pub fn str_to_clock(src: &str) -> Result<fac::ClockType, String> {
     match src.to_lowercase().as_str() {
-        "flexible" => Ok(fidl_fuchsia_audio_controller::ClockType::Flexible(
-            fidl_fuchsia_audio_controller::Flexible,
-        )),
-        "monotonic" => Ok(fidl_fuchsia_audio_controller::ClockType::SystemMonotonic(
-            fidl_fuchsia_audio_controller::SystemMonotonic,
-        )),
+        "flexible" => Ok(fac::ClockType::Flexible(fac::Flexible)),
+        "monotonic" => Ok(fac::ClockType::SystemMonotonic(fac::SystemMonotonic)),
         _ => {
             let splits: Vec<&str> = src.split(",").collect();
             if splits[0] == "custom" {
@@ -362,13 +343,11 @@ pub fn str_to_clock(src: &str) -> Result<fidl_fuchsia_audio_controller::ClockTyp
                     Err(_) => None,
                 };
 
-                Ok(fidl_fuchsia_audio_controller::ClockType::Custom(
-                    fidl_fuchsia_audio_controller::CustomClockConfig {
-                        rate_adjust,
-                        offset,
-                        ..Default::default()
-                    },
-                ))
+                Ok(fac::ClockType::Custom(fac::CustomClockConfig {
+                    rate_adjust,
+                    offset,
+                    ..Default::default()
+                }))
             } else {
                 return Err(format!("Invalid clock argument: {}.", src));
             }
@@ -382,28 +361,23 @@ pub fn str_to_clock(src: &str) -> Result<fidl_fuchsia_audio_controller::ClockTyp
 pub mod test {
     use super::*;
 
-    fn example_formats() -> Vec<Format> {
-        vec![
-            Format {
-                frames_per_second: 48000,
-                sample_type: AudioSampleFormat::Unsigned8,
-                channels: 2,
-            },
-            Format { frames_per_second: 44100, sample_type: AudioSampleFormat::Float, channels: 1 },
-        ]
-    }
-
     #[test]
     fn test_format_parse() {
-        let example_formats = example_formats();
-
         pretty_assertions::assert_eq!(
-            example_formats[0],
+            Format {
+                frames_per_second: 48000,
+                sample_type: fmedia::AudioSampleFormat::Unsigned8,
+                channels: 2,
+            },
             Format::from_str("48000,uint8,2ch").unwrap()
         );
 
         pretty_assertions::assert_eq!(
-            example_formats[1],
+            Format {
+                frames_per_second: 44100,
+                sample_type: fmedia::AudioSampleFormat::Float,
+                channels: 1,
+            },
             Format::from_str("44100,float32,1ch").unwrap()
         );
 

@@ -2,19 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Error,
-    format_utils::Format,
-    fuchsia_runtime::vmar_root_self,
-    fuchsia_zircon::{self as zx},
-};
+use anyhow::{anyhow, Error};
+use fidl_fuchsia_hardware_audio as fhaudio;
+use format_utils::Format;
+use fuchsia_runtime::vmar_root_self;
+use fuchsia_zircon::{self as zx};
 
 // Wrapper for reading and writing to specific frames in audio driver ring buffers.
 
 pub struct RingBuffer {
     vmo: zx::Vmo,
     base_address: usize,
-    ring_buffer_proxy: fidl_fuchsia_hardware_audio::RingBufferProxy,
+    ring_buffer_proxy: fhaudio::RingBufferProxy,
     format: Format,
     pub num_frames: u64,
     pub driver_bytes: u64,
@@ -23,8 +22,8 @@ pub struct RingBuffer {
 impl RingBuffer {
     pub async fn new(
         requested_format: &Format,
-        ring_buffer_client: fidl_fuchsia_hardware_audio::RingBufferProxy,
-    ) -> Result<Self, anyhow::Error> {
+        ring_buffer_client: fhaudio::RingBufferProxy,
+    ) -> Result<Self, Error> {
         let res = ring_buffer_client
             .get_vmo(
                 requested_format.frames_per_second / 10,
@@ -34,9 +33,7 @@ impl RingBuffer {
 
         let (num_frames_in_rb, vmo) = match res {
             Ok((num_frames, vmo)) => (num_frames as u64, vmo),
-            Err(e) => {
-                return Err(anyhow::anyhow!("Couldn't receive vmo from ring buffer: {:?}", e))
-            }
+            Err(e) => return Err(anyhow!("Couldn't receive vmo from ring buffer: {:?}", e)),
         };
 
         // Hardware might not use all bytes in vmo. Only want to use to frames hardware will read/write from.
@@ -45,26 +42,24 @@ impl RingBuffer {
 
         if bytes_in_rb > bytes_in_vmo {
             println!("Bad ring buffer size returned by audio driver! \n (kernel size = {} bytes, driver size = {} bytes. ", bytes_in_vmo, bytes_in_rb);
-            return Err(anyhow::anyhow!("Bad ring buffer size returned by audio driver! \n (kernel size = {} bytes, driver size = {} bytes. ", bytes_in_vmo, bytes_in_rb));
+            return Err(anyhow!("Bad ring buffer size returned by audio driver! \n (kernel size = {} bytes, driver size = {} bytes. ", bytes_in_vmo, bytes_in_rb));
         }
 
         let driver_bytes = ring_buffer_client
             .get_properties()
             .await?
             .driver_transfer_bytes
-            .ok_or(anyhow::anyhow!("driver transfer bytes unavailable"))?
-            as u64;
+            .ok_or(anyhow!("driver transfer bytes unavailable"))? as u64;
 
         let base_address = vmar_root_self()
             .map(
                 0,
                 &vmo,
                 0,
-                vmo.get_size().map_err(|e| anyhow::anyhow!("Failed to get vmo size: {}", e))?
-                    as usize,
+                vmo.get_size().map_err(|e| anyhow!("Failed to get vmo size: {}", e))? as usize,
                 zx::VmarFlags::PERM_READ | zx::VmarFlags::PERM_WRITE,
             )
-            .map_err(|e| anyhow::anyhow!("Failed to mmap vmo: {}", e))?;
+            .map_err(|e| anyhow!("Failed to mmap vmo: {}", e))?;
         Ok(Self {
             vmo,
             base_address,
@@ -87,7 +82,7 @@ impl RingBuffer {
 
     pub fn write_to_frame(&self, frame: u64, buf: &mut Vec<u8>) -> Result<(), Error> {
         if buf.len() % self.format.bytes_per_frame() as usize != 0 {
-            return Err(anyhow::anyhow!("Must pass buffer with complete frames."));
+            return Err(anyhow!("Must pass buffer with complete frames."));
         }
         let frame_offset = frame % self.num_frames;
         let byte_offset = frame_offset * self.format.bytes_per_frame() as u64;
@@ -108,10 +103,7 @@ impl RingBuffer {
                     zx::sys::ZX_CACHE_FLUSH_DATA,
                 );
                 if res != zx::sys::ZX_OK {
-                    return Err(anyhow::Error::msg(format!(
-                        "Call to flush cache failed with status {}.",
-                        res
-                    )));
+                    return Err(anyhow!("Call to flush cache failed with status {}.", res));
                 }
             }
         } else {
@@ -130,10 +122,7 @@ impl RingBuffer {
                     zx::sys::ZX_CACHE_FLUSH_DATA,
                 );
                 if res != zx::sys::ZX_OK {
-                    return Err(anyhow::Error::msg(format!(
-                        "Call to flush cache failed with status {}.",
-                        res
-                    )));
+                    return Err(anyhow!("Call to flush cache failed with status {}.", res));
                 }
             }
 
@@ -148,10 +137,7 @@ impl RingBuffer {
                     zx::sys::ZX_CACHE_FLUSH_DATA,
                 );
                 if res != zx::sys::ZX_OK {
-                    return Err(anyhow::Error::msg(format!(
-                        "Call to flush cache failed with status {}.",
-                        res
-                    )));
+                    return Err(anyhow!("Call to flush cache failed with status {}.", res));
                 }
             }
         }
@@ -159,7 +145,7 @@ impl RingBuffer {
     }
     pub fn read_from_frame(&self, frame: u64, buf: &mut [u8]) -> Result<(), Error> {
         if buf.len() % self.format.bytes_per_frame() as usize != 0 {
-            return Err(anyhow::anyhow!("Must pass buffer with complete frames."));
+            return Err(anyhow!("Must pass buffer with complete frames."));
         }
         let frame_offset = frame % self.num_frames;
         let byte_offset = frame_offset * self.format.bytes_per_frame() as u64;
@@ -178,10 +164,7 @@ impl RingBuffer {
                     zx::sys::ZX_CACHE_FLUSH_DATA,
                 );
                 if res != zx::sys::ZX_OK {
-                    return Err(anyhow::Error::msg(format!(
-                        "Call to flush cache failed with status {}.",
-                        res
-                    )));
+                    return Err(anyhow!("Call to flush cache failed with status {}.", res));
                 }
             }
             self.vmo.read(buf, byte_offset)?;
@@ -200,10 +183,7 @@ impl RingBuffer {
                     zx::sys::ZX_CACHE_FLUSH_DATA,
                 );
                 if res != zx::sys::ZX_OK {
-                    return Err(anyhow::Error::msg(format!(
-                        "Call to flush cache failed with status {}.",
-                        res
-                    )));
+                    return Err(anyhow!("Call to flush cache failed with status {}.", res));
                 }
             }
             self.vmo.read(&mut buf[..bytes_until_buffer_end], byte_offset)?;
@@ -217,10 +197,7 @@ impl RingBuffer {
                     zx::sys::ZX_CACHE_FLUSH_DATA,
                 );
                 if res != zx::sys::ZX_OK {
-                    return Err(anyhow::Error::msg(format!(
-                        "Call to flush cache failed with status {}.",
-                        res
-                    )));
+                    return Err(anyhow!("Call to flush cache failed with status {}.", res));
                 }
             }
             self.vmo.read(&mut buf[bytes_until_buffer_end..], 0)?;

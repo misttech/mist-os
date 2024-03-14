@@ -2,19 +2,19 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fidl_fuchsia_audio_controller::Error;
+use fidl_fuchsia_audio_controller as fac;
 use std::fmt;
 
 // Wrapper for the Controller FIDL error type.
 
 #[derive(Debug, Clone)]
 pub struct ControllerError {
-    pub inner: fidl_fuchsia_audio_controller::Error,
+    pub inner: fac::Error,
     pub msg: String,
 }
 
 impl ControllerError {
-    pub fn new(inner: fidl_fuchsia_audio_controller::Error, msg: String) -> Self {
+    pub fn new(inner: fac::Error, msg: String) -> Self {
         ControllerError { inner, msg }
     }
 }
@@ -29,18 +29,18 @@ impl std::error::Error for ControllerError {}
 
 impl From<fidl::Error> for ControllerError {
     fn from(source: fidl::Error) -> Self {
-        Self { inner: Error::UnknownCanRetry, msg: format!("FIDL Error: {source}") }
+        Self { inner: fac::Error::UnknownCanRetry, msg: format!("FIDL Error: {source}") }
     }
 }
 
 impl From<fuchsia_zircon_status::Status> for ControllerError {
     fn from(source: fuchsia_zircon_status::Status) -> Self {
-        Self { inner: Error::UnknownCanRetry, msg: format!("Zx error: {source}") }
+        Self { inner: fac::Error::UnknownCanRetry, msg: format!("Zx error: {source}") }
     }
 }
 
 impl From<anyhow::Error> for ControllerError {
     fn from(source: anyhow::Error) -> Self {
-        Self { inner: Error::UnknownCanRetry, msg: format!("{source}") }
+        Self { inner: fac::Error::UnknownCanRetry, msg: format!("{source}") }
     }
 }

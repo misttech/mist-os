@@ -7,68 +7,64 @@ mod error;
 mod ring_buffer;
 mod socket;
 
-pub use ring_buffer::RingBuffer;
-
-use {
-    anyhow::{Context, Error},
-    async_lock as _,
-    error::ControllerError,
-    fidl_fuchsia_audio_controller::{
-        CapturerConfig, DeviceControlGetDeviceInfoResponse, DeviceControlListDevicesResponse,
-        DeviceControlRequest, DeviceControlRequestStream, DeviceSelector, Error::ArgumentsMissing,
-        GainSettings, PlayDestination, PlayerPlayRequest, PlayerPlayResponse, PlayerRequest,
-        PlayerRequestStream, RecordCancelerMarker, RecordSource, RecorderRecordRequest,
-        RecorderRecordResponse, RecorderRequest, RecorderRequestStream, RendererConfig,
-    },
-    fidl_fuchsia_hardware_audio::DeviceType,
-    fidl_fuchsia_media::{AudioCapturerProxy, AudioRendererProxy, AudioStreamType},
-    fuchsia as _, fuchsia_async as fasync,
-    fuchsia_component::server::ServiceFs,
-    fuchsia_inspect::{component, health::Reporter},
-    fuchsia_zircon::{self as zx, HandleBased},
-    futures::future::{BoxFuture, FutureExt},
-    futures::prelude::*,
-    futures::StreamExt,
-    std::cmp,
-    std::rc::Rc,
-    tracing::error,
-};
+use anyhow::{anyhow, Context, Error};
+use error::ControllerError;
+use fidl::endpoints::{create_endpoints, ServerEnd};
+use fidl_fuchsia_audio_controller as fac;
+use fidl_fuchsia_hardware_audio as fhaudio;
+use fidl_fuchsia_media as fmedia;
+use fidl_fuchsia_media_audio as fmedia_audio;
+use fidl_fuchsia_ultrasound as fultrasound;
+use format_utils::Format;
+use fuchsia_async as fasync;
+use fuchsia_component::client::connect_to_protocol;
+use fuchsia_component::server::ServiceFs;
+use fuchsia_inspect::{component, health::Reporter};
+use fuchsia_zircon::{self as zx, HandleBased};
+use futures::future::{BoxFuture, FutureExt};
+use futures::{AsyncWriteExt, StreamExt, TryStreamExt};
+use std::cmp;
+use std::rc::Rc;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::time::Duration;
+use tracing::error;
 
 const SECONDS_PER_NANOSECOND: f64 = 1.0 / 10_u64.pow(9) as f64;
 
 /// Wraps all hosted protocols into a single type that can be matched against
 /// and dispatched.
 enum IncomingRequest {
-    DeviceControl(DeviceControlRequestStream),
-    Player(PlayerRequestStream),
-    Recorder(RecorderRequestStream),
+    DeviceControl(fac::DeviceControlRequestStream),
+    Player(fac::PlayerRequestStream),
+    Recorder(fac::RecorderRequestStream),
 }
 
 struct AudioDaemon {}
+
 impl AudioDaemon {
     async fn record_capturer(
         &self,
-        request: RecorderRecordRequest,
-    ) -> Result<RecorderRecordResponse, ControllerError> {
+        request: fac::RecorderRecordRequest,
+    ) -> Result<fac::RecorderRecordResponse, ControllerError> {
         let location = request
             .source
-            .ok_or(ControllerError::new(ArgumentsMissing, format!("Input missing.")))?;
+            .ok_or(ControllerError::new(fac::Error::ArgumentsMissing, format!("Input missing.")))?;
         let wav_socket = request.wav_data.ok_or(ControllerError::new(
-            ArgumentsMissing,
+            fac::Error::ArgumentsMissing,
             format!("Socket for wav data missing"),
         ))?;
 
-        let stop_signal = std::sync::atomic::AtomicBool::new(false);
+        let stop_signal = AtomicBool::new(false);
         let cancel_server = request.canceler;
 
-        let stream_type = request
-            .stream_type
-            .ok_or(ControllerError::new(ArgumentsMissing, format!("Stream type missing")))?;
-        let format = format_utils::Format::from(&stream_type);
+        let stream_type = request.stream_type.ok_or(ControllerError::new(
+            fac::Error::ArgumentsMissing,
+            format!("Stream type missing"),
+        ))?;
+        let format = Format::from(&stream_type);
 
-        let duration = request
-            .duration
-            .map(|duration_nanos| std::time::Duration::from_nanos(duration_nanos as u64));
+        let duration =
+            request.duration.map(|duration_nanos| Duration::from_nanos(duration_nanos as u64));
 
         let mut socket = socket::Socket {
             socket: &mut fasync::Socket::from_socket(
@@ -104,7 +100,7 @@ impl AudioDaemon {
         capturer_proxy.start_async_capture(
             frames_per_packet
                 .try_into()
-                .map_err(|e| anyhow::anyhow!("Frames per packet argument is too large: {}", e))?,
+                .map_err(|e| anyhow!("Frames per packet argument is too large: {}", e))?,
         )?;
 
         let mut stream = capturer_proxy.take_event_stream();
@@ -115,26 +111,26 @@ impl AudioDaemon {
         socket.write_wav_header(duration, &format).await?;
         let packet_fut = async {
             while let Some(event) = stream.try_next().await? {
-                if stop_signal.load(std::sync::atomic::Ordering::SeqCst) {
+                if stop_signal.load(Ordering::SeqCst) {
                     break;
                 }
                 match event {
-                    fidl_fuchsia_media::AudioCapturerEvent::OnPacketProduced { packet } => {
+                    fmedia::AudioCapturerEvent::OnPacketProduced { packet } => {
                         packets_so_far += 1;
 
                         let mut data = vec![0u8; packet.payload_size as usize];
                         let _audio_data = vmo
                             .read(&mut data[..], packet.payload_offset)
-                            .map_err(|e| anyhow::anyhow!("Failed to read vmo {e}"))?;
+                            .map_err(|e| anyhow!("Failed to read vmo {e}"))?;
 
                         async_wav_writer
                             .write_all(&data)
                             .await
-                            .map_err(|e| anyhow::anyhow!("Error writing to stdout socket: {e}"))?;
+                            .map_err(|e| anyhow!("Error writing to stdout socket: {e}"))?;
 
                         capturer_proxy
                             .release_packet(&packet)
-                            .map_err(|e| anyhow::anyhow!("Release packet error: {}", e))?;
+                            .map_err(|e| anyhow!("Release packet error: {}", e))?;
 
                         if let Some(packets_to_capture) = packets_to_capture {
                             if packets_so_far == packets_to_capture {
@@ -142,11 +138,11 @@ impl AudioDaemon {
                             }
                         }
                     }
-                    fidl_fuchsia_media::AudioCapturerEvent::OnEndOfStream {} => break,
+                    fmedia::AudioCapturerEvent::OnEndOfStream {} => break,
                 }
             }
 
-            Ok(RecorderRecordResponse {
+            Ok(fac::RecorderRecordResponse {
                 bytes_processed: Some(packets_so_far * bytes_per_packet),
                 packets_processed: Some(packets_so_far),
                 late_wakeups: None,
@@ -166,23 +162,19 @@ impl AudioDaemon {
         }
     }
 
-    fn setup_reference_clock(
-        clock_type: fidl_fuchsia_audio_controller::ClockType,
-    ) -> Result<Option<zx::Clock>, Error> {
+    fn setup_reference_clock(clock_type: fac::ClockType) -> Result<Option<zx::Clock>, Error> {
         match clock_type {
-            fidl_fuchsia_audio_controller::ClockType::Flexible(_) => Ok(None),
-            fidl_fuchsia_audio_controller::ClockType::SystemMonotonic(_) => {
+            fac::ClockType::Flexible(_) => Ok(None),
+            fac::ClockType::SystemMonotonic(_) => {
                 let clock =
                     zx::Clock::create(zx::ClockOpts::CONTINUOUS | zx::ClockOpts::AUTO_START, None)
-                        .map_err(|e| anyhow::anyhow!("Creating reference clock failed: {}", e))?;
+                        .map_err(|e| anyhow!("Creating reference clock failed: {}", e))?;
                 let rights_clock = clock
                     .replace_handle(zx::Rights::READ | zx::Rights::DUPLICATE | zx::Rights::TRANSFER)
-                    .map_err(|e| {
-                        anyhow::anyhow!("Replace handle for reference clock failed: {}", e)
-                    })?;
+                    .map_err(|e| anyhow!("Replace handle for reference clock failed: {}", e))?;
                 Ok(Some(rights_clock))
             }
-            fidl_fuchsia_audio_controller::ClockType::Custom(info) => {
+            fac::ClockType::Custom(info) => {
                 let rate = info.rate_adjust;
                 let offset = info.offset;
                 let now = zx::Time::get_monotonic();
@@ -199,42 +191,37 @@ impl AudioDaemon {
                 };
 
                 let clock = zx::Clock::create(zx::ClockOpts::CONTINUOUS | auto_start, None)
-                    .map_err(|e| anyhow::anyhow!("Creating reference clock failed: {}", e))?;
+                    .map_err(|e| anyhow!("Creating reference clock failed: {}", e))?;
 
                 clock
                     .update(update_builder.build())
-                    .map_err(|e| anyhow::anyhow!("Updating reference clock failed: {}", e))?;
+                    .map_err(|e| anyhow!("Updating reference clock failed: {}", e))?;
 
                 Ok(Some(
                     clock
                         .replace_handle(
                             zx::Rights::READ | zx::Rights::DUPLICATE | zx::Rights::TRANSFER,
                         )
-                        .map_err(|e| {
-                            anyhow::anyhow!("Replace handle for reference clock failed: {}", e)
-                        })?,
+                        .map_err(|e| anyhow!("Replace handle for reference clock failed: {}", e))?,
                 ))
             }
-            fidl_fuchsia_audio_controller::ClockTypeUnknown!() => Ok(None),
+            fac::ClockTypeUnknown!() => Ok(None),
         }
     }
 
     async fn create_capturer_from_location(
-        location: RecordSource,
-        format: &format_utils::Format,
-        stream_type: AudioStreamType,
-        gain_settings: Option<GainSettings>,
-    ) -> Result<AudioCapturerProxy, Error> {
-        let (client_end, server_end) =
-            fidl::endpoints::create_endpoints::<fidl_fuchsia_media::AudioCapturerMarker>();
+        location: fac::RecordSource,
+        format: &Format,
+        stream_type: fmedia::AudioStreamType,
+        gain_settings: Option<fac::GainSettings>,
+    ) -> Result<fmedia::AudioCapturerProxy, Error> {
+        let (client_end, server_end) = create_endpoints::<fmedia::AudioCapturerMarker>();
 
         match location {
-            RecordSource::Capturer(capturer_type) => match capturer_type {
-                CapturerConfig::StandardCapturer(config) => {
-                    let audio_component = fuchsia_component::client::connect_to_protocol::<
-                        fidl_fuchsia_media::AudioMarker,
-                    >()
-                    .context("Failed to connect to fuchsia.media.Audio")?;
+            fac::RecordSource::Capturer(capturer_type) => match capturer_type {
+                fac::CapturerConfig::StandardCapturer(config) => {
+                    let audio_component = connect_to_protocol::<fmedia::AudioMarker>()
+                        .context("Failed to connect to fuchsia.media.Audio")?;
 
                     audio_component.create_audio_capturer(server_end, false)?;
                     let capturer_proxy = client_end.into_proxy()?;
@@ -244,7 +231,7 @@ impl AudioDaemon {
                         Ok(_) => Ok(()),
                         Err(e) => {
                             println!("{e}");
-                            Err(anyhow::anyhow!("Failed to get reference clock {e}"))
+                            Err(anyhow!("Failed to get reference clock {e}"))
                         }
                     }?;
 
@@ -252,9 +239,7 @@ impl AudioDaemon {
 
                     if let Some(gain_settings) = gain_settings {
                         let (gain_control_client_end, gain_control_server_end) =
-                            fidl::endpoints::create_endpoints::<
-                                fidl_fuchsia_media_audio::GainControlMarker,
-                            >();
+                            create_endpoints::<fmedia_audio::GainControlMarker>();
 
                         capturer_proxy.bind_gain_control(gain_control_server_end)?;
                         let gain_control_proxy = gain_control_client_end.into_proxy()?;
@@ -273,18 +258,16 @@ impl AudioDaemon {
                     }
                     Ok(capturer_proxy)
                 }
-                CapturerConfig::UltrasoundCapturer(_) => {
-                    let component = fuchsia_component::client::connect_to_protocol::<
-                        fidl_fuchsia_ultrasound::FactoryMarker,
-                    >()
-                    .context("Failed to connect to fuchsia.ultrasound.Factory")?;
+                fac::CapturerConfig::UltrasoundCapturer(_) => {
+                    let component = connect_to_protocol::<fultrasound::FactoryMarker>()
+                        .context("Failed to connect to fuchsia.ultrasound.Factory")?;
                     let (_reference_clock, stream_type) =
                         component.create_capturer(server_end).await?;
                     if format.channels != stream_type.channels
                         || format.sample_type != stream_type.sample_format
                         || format.frames_per_second != stream_type.frames_per_second
                     {
-                        return Err(anyhow::anyhow!(
+                        return Err(anyhow!(
                             "Requested format for ultrasound capturer\
                             does not match available format.
                             Expected {}hz, {:?}, {:?}ch\n",
@@ -295,44 +278,39 @@ impl AudioDaemon {
                     }
                     client_end
                         .into_proxy()
-                        .map_err(|e| anyhow::anyhow!("Error getting AudioCapturerProxy: {e}"))
+                        .map_err(|e| anyhow!("Error getting AudioCapturerProxy: {e}"))
                 }
-                _ => Err(anyhow::anyhow!("Unsupported capturer type.")),
+                _ => Err(anyhow!("Unsupported capturer type.")),
             },
-            RecordSource::Loopback(..) => {
-                let audio_component = fuchsia_component::client::connect_to_protocol::<
-                    fidl_fuchsia_media::AudioMarker,
-                >()
-                .context("Failed to connect to fuchsia.media.Audio")?;
+            fac::RecordSource::Loopback(..) => {
+                let audio_component = connect_to_protocol::<fmedia::AudioMarker>()
+                    .context("Failed to connect to fuchsia.media.Audio")?;
                 audio_component.create_audio_capturer(server_end, true)?;
 
                 let capturer_proxy = client_end.into_proxy()?;
                 capturer_proxy.set_pcm_stream_type(&stream_type)?;
                 Ok(capturer_proxy)
             }
-            _ => Err(anyhow::anyhow!("Unsupported RecordSource")),
+            _ => Err(anyhow!("Unsupported RecordSource")),
         }
     }
 
     async fn create_renderer_from_location(
-        location: PlayDestination,
-        format: &format_utils::Format,
-        gain_settings: Option<GainSettings>,
-    ) -> Result<AudioRendererProxy, Error> {
-        let (client_end, server_end) =
-            fidl::endpoints::create_endpoints::<fidl_fuchsia_media::AudioRendererMarker>();
+        location: fac::PlayDestination,
+        format: &Format,
+        gain_settings: Option<fac::GainSettings>,
+    ) -> Result<fmedia::AudioRendererProxy, Error> {
+        let (client_end, server_end) = create_endpoints::<fmedia::AudioRendererMarker>();
 
         let audio_renderer_proxy = client_end
             .into_proxy()
-            .map_err(|e| anyhow::anyhow!("Error getting AudioRendererProxy: {e}"))?;
+            .map_err(|e| anyhow!("Error getting AudioRendererProxy: {e}"))?;
 
-        if let PlayDestination::Renderer(renderer_config) = location {
+        if let fac::PlayDestination::Renderer(renderer_config) = location {
             match renderer_config {
-                RendererConfig::UltrasoundRenderer(_) => {
-                    let component = fuchsia_component::client::connect_to_protocol::<
-                        fidl_fuchsia_ultrasound::FactoryMarker,
-                    >()
-                    .context("Failed to connect to fuchsia.ultrasound.Factory")?;
+                fac::RendererConfig::UltrasoundRenderer(_) => {
+                    let component = connect_to_protocol::<fultrasound::FactoryMarker>()
+                        .context("Failed to connect to fuchsia.ultrasound.Factory")?;
                     let (_reference_clock, stream_type) =
                         component.create_renderer(server_end).await?;
 
@@ -340,7 +318,7 @@ impl AudioDaemon {
                         || format.sample_type != stream_type.sample_format
                         || format.frames_per_second != stream_type.frames_per_second
                     {
-                        return Err(anyhow::anyhow!(
+                        return Err(anyhow!(
                             "Requested format for ultrasound renderer does not match available\
                             format. Expected {}hz, {:?}, {:?}ch\n",
                             stream_type.frames_per_second,
@@ -349,11 +327,9 @@ impl AudioDaemon {
                         ));
                     }
                 }
-                RendererConfig::StandardRenderer(renderer_config) => {
-                    let audio_component = fuchsia_component::client::connect_to_protocol::<
-                        fidl_fuchsia_media::AudioMarker,
-                    >()
-                    .context("Failed to connect to fuchsia.media.Audio")?;
+                fac::RendererConfig::StandardRenderer(renderer_config) => {
+                    let audio_component = connect_to_protocol::<fmedia::AudioMarker>()
+                        .context("Failed to connect to fuchsia.media.Audio")?;
                     audio_component.create_audio_renderer(server_end)?;
 
                     if let Some(clock_type) = renderer_config.clock {
@@ -365,13 +341,12 @@ impl AudioDaemon {
                         audio_renderer_proxy.set_usage(usage)?;
                     }
 
-                    audio_renderer_proxy.set_pcm_stream_type(&AudioStreamType::from(format))?;
+                    audio_renderer_proxy
+                        .set_pcm_stream_type(&fmedia::AudioStreamType::from(format))?;
 
                     if let Some(gain_settings) = gain_settings {
                         let (gain_control_client_end, gain_control_server_end) =
-                            fidl::endpoints::create_endpoints::<
-                                fidl_fuchsia_media_audio::GainControlMarker,
-                            >();
+                            create_endpoints::<fmedia_audio::GainControlMarker>();
 
                         audio_renderer_proxy.bind_gain_control(gain_control_server_end)?;
                         let gain_control_proxy = gain_control_client_end.into_proxy()?;
@@ -383,10 +358,10 @@ impl AudioDaemon {
                     }
                 }
 
-                _ => return Err(anyhow::anyhow!("Unexpected RendererType")),
+                _ => return Err(anyhow!("Unexpected RendererType")),
             }
         } else {
-            return Err(anyhow::anyhow!("Unexpected PlayDestination"));
+            return Err(anyhow!("Unexpected PlayDestination"));
         };
         Ok(audio_renderer_proxy)
     }
@@ -395,7 +370,7 @@ impl AudioDaemon {
         payload_offset: u64,
         mut socket: fidl::AsyncSocket,
         vmo: zx::Vmo,
-        audio_renderer_proxy: &'b AudioRendererProxy,
+        audio_renderer_proxy: &'b fmedia::AudioRendererProxy,
         bytes_per_packet: usize,
         iteration: u32,
     ) -> BoxFuture<'b, Result<(), Error>> {
@@ -409,8 +384,8 @@ impl AudioDaemon {
             }
             vmo.write(&buf[..total_bytes_read], payload_offset)?;
 
-            let packet_fut = audio_renderer_proxy.send_packet(&fidl_fuchsia_media::StreamPacket {
-                pts: fidl_fuchsia_media::NO_TIMESTAMP,
+            let packet_fut = audio_renderer_proxy.send_packet(&fmedia::StreamPacket {
+                pts: fmedia::NO_TIMESTAMP,
                 payload_buffer_id: 0,
                 payload_offset,
                 payload_size: total_bytes_read as u64,
@@ -420,9 +395,7 @@ impl AudioDaemon {
             });
 
             if payload_offset == 0 && iteration == 1 {
-                audio_renderer_proxy
-                    .play(fidl_fuchsia_media::NO_TIMESTAMP, fidl_fuchsia_media::NO_TIMESTAMP)
-                    .await?;
+                audio_renderer_proxy.play(fmedia::NO_TIMESTAMP, fmedia::NO_TIMESTAMP).await?;
             }
 
             packet_fut.await?;
@@ -446,9 +419,9 @@ impl AudioDaemon {
 
     async fn play_renderer(
         &self,
-        request: PlayerPlayRequest,
-    ) -> Result<PlayerPlayResponse, anyhow::Error> {
-        let data_socket = request.wav_source.ok_or(anyhow::anyhow!("Socket argument missing."))?;
+        request: fac::PlayerPlayRequest,
+    ) -> Result<fac::PlayerPlayResponse, Error> {
+        let data_socket = request.wav_source.ok_or(anyhow!("Socket argument missing."))?;
 
         let mut socket = socket::Socket {
             socket: &mut fasync::Socket::from_socket(
@@ -456,18 +429,17 @@ impl AudioDaemon {
             ),
         };
         let spec = socket.read_wav_header().await?;
-        let format = format_utils::Format::from(&spec);
+        let format = Format::from(&spec);
 
-        let location =
-            request.destination.ok_or(anyhow::anyhow!("PlayDestination argument missing."))?;
+        let location = request.destination.ok_or(anyhow!("PlayDestination argument missing."))?;
         let default_packet_count = 4;
 
         let packet_count = match &location {
-            PlayDestination::Renderer(renderer_config) => match &renderer_config {
-                RendererConfig::StandardRenderer(config) => {
+            fac::PlayDestination::Renderer(renderer_config) => match &renderer_config {
+                fac::RendererConfig::StandardRenderer(config) => {
                     config.packet_count.unwrap_or(default_packet_count)
                 }
-                RendererConfig::UltrasoundRenderer(config) => {
+                fac::RendererConfig::UltrasoundRenderer(config) => {
                     config.packet_count.unwrap_or(default_packet_count)
                 }
                 _ => default_packet_count,
@@ -493,9 +465,7 @@ impl AudioDaemon {
         let mut stream = audio_renderer_proxy.take_event_stream();
         while let Some(event) = stream.try_next().await? {
             match event {
-                fidl_fuchsia_media::AudioRendererEvent::OnMinLeadTimeChanged {
-                    min_lead_time_nsec,
-                } => {
+                fmedia::AudioRendererEvent::OnMinLeadTimeChanged { min_lead_time_nsec } => {
                     if min_lead_time_nsec > 0 {
                         break;
                     }
@@ -519,22 +489,22 @@ impl AudioDaemon {
         });
 
         futures::future::try_join_all(futs).await?;
-        Ok(PlayerPlayResponse { bytes_processed: None, ..Default::default() })
+        Ok(fac::PlayerPlayResponse { bytes_processed: None, ..Default::default() })
     }
 
     async fn play_device(
         &self,
-        request: PlayerPlayRequest,
-    ) -> Result<PlayerPlayResponse, anyhow::Error> {
+        request: fac::PlayerPlayRequest,
+    ) -> Result<fac::PlayerPlayResponse, Error> {
         let device_selector = request
             .destination
-            .ok_or(anyhow::anyhow!("Device id argument missing."))
+            .ok_or(anyhow!("Device id argument missing."))
             .and_then(|play_location| match play_location {
-                PlayDestination::DeviceRingBuffer(device_selector) => Ok(device_selector),
-                _ => Err(anyhow::anyhow!("Expected Ring Buffer play location")),
+                fac::PlayDestination::DeviceRingBuffer(device_selector) => Ok(device_selector),
+                _ => Err(anyhow!("Expected Ring Buffer play location")),
             })?;
 
-        let data_socket = request.wav_source.ok_or(anyhow::anyhow!("Socket argument missing."))?;
+        let data_socket = request.wav_source.ok_or(anyhow!("Socket argument missing."))?;
         let async_socket = fasync::Socket::from_socket(data_socket);
 
         let mut device = device::Device::new_from_selector(&device_selector)?;
@@ -544,45 +514,44 @@ impl AudioDaemon {
 
     async fn record_device(
         &self,
-        request: RecorderRecordRequest,
-    ) -> Result<RecorderRecordResponse, error::ControllerError> {
+        request: fac::RecorderRecordRequest,
+    ) -> Result<fac::RecorderRecordResponse, error::ControllerError> {
         let stream_type = request.stream_type.ok_or(error::ControllerError::new(
-            fidl_fuchsia_audio_controller::Error::ArgumentsMissing,
+            fac::Error::ArgumentsMissing,
             format!("Stream type missing."),
         ))?;
         let wav_socket = request.wav_data.ok_or(error::ControllerError::new(
-            fidl_fuchsia_audio_controller::Error::ArgumentsMissing,
+            fac::Error::ArgumentsMissing,
             format!("Socket for wav data missing."),
         ))?;
 
         let device_selector = request
             .source
             .ok_or(error::ControllerError::new(
-                fidl_fuchsia_audio_controller::Error::ArgumentsMissing,
+                fac::Error::ArgumentsMissing,
                 format!("Record source missing."),
             ))
             .and_then(|location| match location {
-                RecordSource::DeviceRingBuffer(device_selector) => Ok(device_selector),
+                fac::RecordSource::DeviceRingBuffer(device_selector) => Ok(device_selector),
                 unknown_source => Err(error::ControllerError::new(
-                    fidl_fuchsia_audio_controller::Error::InvalidArguments,
+                    fac::Error::InvalidArguments,
                     format!("Expected ring buffer source, found {unknown_source:?}"),
                 )),
             })?;
 
         let cancel_server = request.canceler;
-        let duration =
-            request.duration.map(|duration| std::time::Duration::from_nanos(duration as u64));
+        let duration = request.duration.map(|duration| Duration::from_nanos(duration as u64));
 
         let mut device = device::Device::new_from_selector(&device_selector).map_err(|err| {
             error::ControllerError::new(
-                fidl_fuchsia_audio_controller::Error::DeviceNotReachable,
+                fac::Error::DeviceNotReachable,
                 format!("Failed to connect to device with error: {err}"),
             )
         })?;
 
         device
             .record(
-                format_utils::Format::from(&stream_type),
+                Format::from(&stream_type),
                 fasync::Socket::from_socket(wav_socket),
                 duration,
                 cancel_server,
@@ -590,39 +559,37 @@ impl AudioDaemon {
             .await
     }
 
-    async fn serve_player(&mut self, mut stream: PlayerRequestStream) -> Result<(), Error> {
+    async fn serve_player(&mut self, mut stream: fac::PlayerRequestStream) -> Result<(), Error> {
         while let Ok(Some(request)) = stream.try_next().await {
             let request_name = request.method_name();
             let result = match request {
-                PlayerRequest::Play { payload, responder } => {
+                fac::PlayerRequest::Play { payload, responder } => {
                     let response = match payload.destination {
-                        Some(PlayDestination::Renderer(..)) => {
+                        Some(fac::PlayDestination::Renderer(..)) => {
                             self.play_renderer(payload).await.map_err(|e| {
                                 println!("Error trying to play to AudioRenderer {e}");
-                                fidl_fuchsia_audio_controller::Error::UnknownFatal
+                                fac::Error::UnknownFatal
                             })
                         }
-                        Some(PlayDestination::DeviceRingBuffer(..)) => {
+                        Some(fac::PlayDestination::DeviceRingBuffer(..)) => {
                             self.play_device(payload).await.map_err(|e| {
                                 println!("Error trying to play to device ring buffer {e}");
-                                fidl_fuchsia_audio_controller::Error::UnknownFatal
+                                fac::Error::UnknownFatal
                             })
                         }
                         Some(unknown_destination) => {
                             println!("Unsupported PlayDestination variant specified. Requested: {:?} not supported.", unknown_destination);
-                            Err(fidl_fuchsia_audio_controller::Error::InvalidArguments)
+                            Err(fac::Error::InvalidArguments)
                         }
                         None => {
                             println!("Missing destination argument.");
-                            Err(fidl_fuchsia_audio_controller::Error::ArgumentsMissing)
+                            Err(fac::Error::ArgumentsMissing)
                         }
                     };
 
-                    responder
-                        .send(response)
-                        .map_err(|e| anyhow::anyhow!("Could not send reponse: {}", e))
+                    responder.send(response).map_err(|e| anyhow!("Could not send reponse: {}", e))
                 }
-                _ => Err(anyhow::anyhow!("Request {request_name} not supported.")),
+                _ => Err(anyhow!("Request {request_name} not supported.")),
             };
 
             match result {
@@ -636,30 +603,31 @@ impl AudioDaemon {
         Ok(())
     }
 
-    async fn serve_recorder(&mut self, mut stream: RecorderRequestStream) -> Result<(), Error> {
+    async fn serve_recorder(
+        &mut self,
+        mut stream: fac::RecorderRequestStream,
+    ) -> Result<(), Error> {
         while let Ok(Some(request)) = stream.try_next().await {
             let request_name = request.method_name();
             match request {
-                RecorderRequest::Record { payload, responder } => {
+                fac::RecorderRequest::Record { payload, responder } => {
                     let record_result = match payload.source {
-                        Some(RecordSource::Capturer(..)) | Some(RecordSource::Loopback(..)) => {
+                        Some(fac::RecordSource::Capturer(..))
+                        | Some(fac::RecordSource::Loopback(..)) => {
                             self.record_capturer(payload).await
                         }
-                        Some(RecordSource::DeviceRingBuffer(..)) => {
+                        Some(fac::RecordSource::DeviceRingBuffer(..)) => {
                             self.record_device(payload).await
                         }
                         Some(unknown_source) => {
                             let error_msg = format!("Unsupported RecordSource variant specified. Requested: {unknown_source:?} not supported.");
                             println!("{error_msg}");
-                            Err(ControllerError::new(
-                                fidl_fuchsia_audio_controller::Error::InvalidArguments,
-                                error_msg,
-                            ))
+                            Err(ControllerError::new(fac::Error::InvalidArguments, error_msg))
                         }
                         None => {
                             println!("RecordSource argument missing.");
                             Err(ControllerError::new(
-                                fidl_fuchsia_audio_controller::Error::ArgumentsMissing,
+                                fac::Error::ArgumentsMissing,
                                 format!("RecordSource argument missing"),
                             ))
                         }
@@ -669,17 +637,17 @@ impl AudioDaemon {
                             println!("Request succeeded.");
                             responder
                                 .send(Ok(response))
-                                .map_err(|e| anyhow::anyhow!("Could not send reponse: {e}"))
+                                .map_err(|e| anyhow!("Could not send reponse: {e}"))
                         }
                         Err(e) => {
                             println!("Request {request_name} failed with error {e} \n");
                             responder
                                 .send(Err(e.inner))
-                                .map_err(|e| anyhow::anyhow!("Could not send reponse: {e}"))
+                                .map_err(|e| anyhow!("Could not send reponse: {e}"))
                         }
                     }
                 }
-                _ => Err(anyhow::anyhow!("Request {request_name} not supported.")),
+                _ => Err(anyhow!("Request {request_name} not supported.")),
             }?;
         }
         Ok(())
@@ -688,17 +656,21 @@ impl AudioDaemon {
     // TODO(b/298683668) this will be removed, replaced by client direct calls.
     async fn serve_device_control(
         &mut self,
-        mut stream: DeviceControlRequestStream,
+        mut stream: fac::DeviceControlRequestStream,
     ) -> Result<(), Error> {
         while let Ok(Some(request)) = stream.try_next().await {
             let request_name = request.method_name();
             let request_result = match request {
-                DeviceControlRequest::ListDevices { responder } => {
-                    let mut entries = Vec::<DeviceSelector>::new();
+                fac::DeviceControlRequest::ListDevices { responder } => {
+                    let mut entries = Vec::<fac::DeviceSelector>::new();
                     let devfs_devices = [
-                        (DeviceType::StreamConfig, "/dev/class/audio-input/", Some(true)),
-                        (DeviceType::StreamConfig, "/dev/class/audio-output/", Some(false)),
-                        (DeviceType::Composite, "/dev/class/audio-composite/", None),
+                        (fhaudio::DeviceType::StreamConfig, "/dev/class/audio-input/", Some(true)),
+                        (
+                            fhaudio::DeviceType::StreamConfig,
+                            "/dev/class/audio-output/",
+                            Some(false),
+                        ),
+                        (fhaudio::DeviceType::Composite, "/dev/class/audio-composite/", None),
                     ];
 
                     for (device_type, path, is_input) in devfs_devices {
@@ -710,54 +682,48 @@ impl AudioDaemon {
                         }
                     }
 
-                    let response = DeviceControlListDevicesResponse {
+                    let response = fac::DeviceControlListDevicesResponse {
                         devices: Some(entries),
                         ..Default::default()
                     };
-                    responder
-                        .send(Ok(response))
-                        .map_err(|e| anyhow::anyhow!("Error sending response: {e}"))
+                    responder.send(Ok(response)).map_err(|e| anyhow!("Error sending response: {e}"))
                 }
-
-                DeviceControlRequest::GetDeviceInfo { payload, responder } => {
-                    let device_selector =
-                        payload.device.ok_or(anyhow::anyhow!("No device specified"))?;
+                fac::DeviceControlRequest::GetDeviceInfo { payload, responder } => {
+                    let device_selector = payload.device.ok_or(anyhow!("No device specified"))?;
 
                     let mut device = device::Device::new_from_selector(&device_selector)?;
 
                     let info = device.get_info().await;
                     match info {
                         Ok(info) => {
-                            let response = DeviceControlGetDeviceInfoResponse {
+                            let response = fac::DeviceControlGetDeviceInfoResponse {
                                 device_info: Some(info),
                                 ..Default::default()
                             };
                             responder
                                 .send(Ok(response))
-                                .map_err(|e| anyhow::anyhow!("Error sending response: {e}"))
+                                .map_err(|e| anyhow!("Error sending response: {e}"))
                         }
                         Err(e) => {
                             println!("Could not connect to device. {e}");
                             responder
                                 .send(Err(zx::Status::INTERNAL.into_raw()))
-                                .map_err(|e| anyhow::anyhow!("Error sending response: {e}"))
+                                .map_err(|e| anyhow!("Error sending response: {e}"))
                         }
                     }
                 }
-                DeviceControlRequest::DeviceSetGainState { payload, responder } => {
+                fac::DeviceControlRequest::DeviceSetGainState { payload, responder } => {
                     let (device_selector, gain_state) = (
-                        payload.device.ok_or(anyhow::anyhow!("No device specified"))?,
-                        payload.gain_state.ok_or(anyhow::anyhow!("No gain state specified"))?,
+                        payload.device.ok_or(anyhow!("No device specified"))?,
+                        payload.gain_state.ok_or(anyhow!("No gain state specified"))?,
                     );
 
                     let mut device = device::Device::new_from_selector(&device_selector)?;
 
                     device.set_gain(gain_state)?;
-                    responder
-                        .send(Ok(()))
-                        .map_err(|e| anyhow::anyhow!("Error sending response: {e}"))
+                    responder.send(Ok(())).map_err(|e| anyhow!("Error sending response: {e}"))
                 }
-                _ => Err(anyhow::anyhow!("Request {request_name} not supported.")),
+                _ => Err(anyhow!("Request {request_name} not supported.")),
             };
             match request_result {
                 Ok(_) => println!("Request succeeded."),
@@ -772,30 +738,30 @@ impl AudioDaemon {
 }
 
 pub async fn stop_listener(
-    canceler: fidl::endpoints::ServerEnd<RecordCancelerMarker>,
-    stop_signal: &std::sync::atomic::AtomicBool,
-) -> Result<(), anyhow::Error> {
+    canceler: ServerEnd<fac::RecordCancelerMarker>,
+    stop_signal: &AtomicBool,
+) -> Result<(), Error> {
     let mut stream = canceler
         .into_stream()
-        .map_err(|e| anyhow::anyhow!("Error turning canceler server into stream {}", e))?;
+        .map_err(|e| anyhow!("Error turning canceler server into stream {}", e))?;
 
     match stream.try_next().await {
         Ok(Some(request)) => match request {
-            fidl_fuchsia_audio_controller::RecordCancelerRequest::Cancel { responder } => {
-                stop_signal.store(true, std::sync::atomic::Ordering::SeqCst);
+            fac::RecordCancelerRequest::Cancel { responder } => {
+                stop_signal.store(true, Ordering::SeqCst);
                 responder.send(Ok(())).context("FIDL error with stop request")
             }
-            _ => Err(anyhow::anyhow!("Request not supported.")),
+            _ => Err(anyhow!("Request not supported.")),
         },
         Ok(None) | Err(_) => {
-            stop_signal.store(true, std::sync::atomic::Ordering::SeqCst);
-            Err(anyhow::anyhow!("FIDL error with stop request"))
+            stop_signal.store(true, Ordering::SeqCst);
+            Err(anyhow!("FIDL error with stop request"))
         }
     }
 }
 
 #[fuchsia::main(logging = true)]
-async fn main() -> Result<(), anyhow::Error> {
+async fn main() -> Result<(), Error> {
     let mut service_fs = ServiceFs::new_local();
 
     // Initialize inspect
