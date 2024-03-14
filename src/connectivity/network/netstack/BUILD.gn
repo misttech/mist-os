@@ -42,6 +42,13 @@ fuchsia_component("component-with-fast-udp-tracing") {
   deps = [ ":bin_with_tracing" ]
 }
 
+fuchsia_component("component-with-sync-udp") {
+  testonly = true
+  component_name = "netstack-with-sync-udp"
+  manifest = "meta/netstack_with_sync_udp.cml"
+  deps = [ ":bin" ]
+}
+
 go_binary("bin_with_deadlock_detection") {
   library = "stub"
   output_name = string_replace(target_name, "bin", "netstack")

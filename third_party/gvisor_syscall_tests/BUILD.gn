@@ -285,6 +285,13 @@ source_set("${loopback_isolated_test_label}_socket_tests") {
 #     Type: bool
 #     Default: true
 #
+#   debug_netstack2 (optional)
+#     When true, use the debug NS2 component, and otherwise the regular one.
+#     Debug NS2 enables packet tracing and debug logs, which may overload some
+#     systems (https://fxbug.dev/328822330).
+#     Type: bool
+#     Default: true
+#
 #   test_srcs_target (optional)
 #     The local target containing the test source files used to run the suite.
 #     Type: string
@@ -308,19 +315,33 @@ template("syscall_test_suite") {
 
   ns3_label = "netstack3"
 
+  debug_netstack2 = true
+  if (defined(invoker.debug_netstack2)) {
+    debug_netstack2 = invoker.debug_netstack2
+  }
+
   stacks = [
-    {
-      label = "netstack2_syncudp"
-      component =
-          "//src/connectivity/network/netstack:component-with-sync-udp-debug"
-      manifest = "meta/netstack2/syncudp/${suite_label}_syscall_tests.cml"
-    },
     {
       label = ns3_label
       component = "//src/connectivity/network/netstack3:component-debug"
       manifest = "meta/netstack3/${suite_label}_syscall_tests.cml"
     },
   ]
+  ns2_syncudp_stack = {
+    label = "netstack2_syncudp"
+    component =
+        "//src/connectivity/network/netstack:component-with-sync-udp-debug"
+    manifest = "meta/netstack2/syncudp/${suite_label}_syscall_tests.cml"
+  }
+  if (debug_netstack2) {
+    ns2_syncudp_stack.component =
+        "//src/connectivity/network/netstack:component-with-sync-udp-debug"
+  } else {
+    ns2_syncudp_stack.component =
+        "//src/connectivity/network/netstack:component-with-sync-udp"
+  }
+
+  stacks += [ ns2_syncudp_stack ]
 
   run_with_fast_udp = true
   if (defined(invoker.run_with_fast_udp)) {
@@ -330,14 +351,18 @@ template("syscall_test_suite") {
   ns2_fastudp_label = "netstack2_fastudp"
 
   if (run_with_fast_udp) {
-    stacks += [
-      {
-        label = ns2_fastudp_label
-        component =
-            "//src/connectivity/network/netstack:component-with-fast-udp-debug"
-        manifest = "meta/netstack2/fastudp/${suite_label}_syscall_tests.cml"
-      },
-    ]
+    ns2_fastudp_stack = {
+      label = ns2_fastudp_label
+      manifest = "meta/netstack2/fastudp/${suite_label}_syscall_tests.cml"
+    }
+    if (debug_netstack2) {
+      ns2_fastudp_stack.component =
+          "//src/connectivity/network/netstack:component-with-fast-udp-debug"
+    } else {
+      ns2_fastudp_stack.component =
+          "//src/connectivity/network/netstack:component-with-fast-udp"
+    }
+    stacks += [ ns2_fastudp_stack ]
   } else {
     not_needed([ "ns2_fastudp_label" ])
   }
@@ -436,6 +461,9 @@ syscall_test_suite(loopback_test_label) {
   # suites because it is longer-running and has more cases than many of the
   # other suites. To compensate for this, use additional shards.
   num_shards = 10
+
+  # These tests are generating too much logging.
+  debug_netstack2 = false
 }
 syscall_test_suite(loopback_isolated_test_label) {
   # The loopback_isolated suite was previously manually sharded into multiple
