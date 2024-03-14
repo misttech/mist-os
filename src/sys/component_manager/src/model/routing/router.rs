@@ -27,22 +27,6 @@ pub trait Routable: Send + Sync {
     async fn route(&self, request: Request) -> Result<Capability, RouteOrOpenError>;
 }
 
-/// A [`Router`] is a capability that lets the holder obtain other capabilities
-/// asynchronously. [`Router`] is the object capability representation of [`Routable`].
-///
-/// During routing, a request usually traverses through the component topology,
-/// passing through several routers, ending up at some router that will fulfill
-/// the completer instead of forwarding it upstream.
-#[derive(Clone)]
-pub struct Router {
-    route_fn: Arc<RouteFn>,
-}
-
-/// [`RouteFn`] encapsulates arbitrary logic to fulfill a request to asynchronously
-/// obtain a capability.
-pub type RouteFn =
-    dyn Fn(Request) -> BoxFuture<'static, Result<Capability, RouteOrOpenError>> + Send + Sync;
-
 /// [`Request`] contains metadata around how to obtain a capability.
 #[derive(Debug, Clone)]
 pub struct Request {
@@ -51,6 +35,17 @@ pub struct Request {
 
     /// A reference to the requesting component.
     pub target: WeakComponentInstance,
+}
+
+/// A [`Router`] is a capability that lets the holder obtain other capabilities
+/// asynchronously. [`Router`] is the object capability representation of [`Routable`].
+///
+/// During routing, a request usually traverses through the component topology,
+/// passing through several routers, ending up at some router that will fulfill
+/// the request instead of forwarding it upstream.
+#[derive(Clone)]
+pub struct Router {
+    routable: Arc<dyn Routable>,
 }
 
 impl fmt::Debug for Router {
@@ -85,16 +80,32 @@ where
     }
 }
 
-impl Router {
-    /// Creates a router that calls the provided function to route a request.
-    pub fn new<F>(route_fn: F) -> Self
+/// Syntax sugar within the framework to express custom routing logic using a function
+/// that takes a request and returns such future.
+impl<F> Routable for F
+where
+    F: Fn(Request) -> BoxFuture<'static, Result<Capability, RouteOrOpenError>>
+        + Send
+        + Sync
+        + 'static,
+{
+    // We use the desugared form of `async_trait` to avoid unnecessary boxing.
+    fn route<'a, 'b>(
+        &'a self,
+        request: Request,
+    ) -> BoxFuture<'b, Result<Capability, RouteOrOpenError>>
     where
-        F: Fn(Request) -> BoxFuture<'static, Result<Capability, RouteOrOpenError>>
-            + Send
-            + Sync
-            + 'static,
+        'a: 'b,
+        Self: 'b,
     {
-        Router { route_fn: Arc::new(route_fn) }
+        self(request)
+    }
+}
+
+impl Router {
+    /// Package a [`Routable`] object into a [`Router`].
+    pub fn new(routable: impl Routable + 'static) -> Self {
+        Router { routable: Arc::new(routable) }
     }
 
     pub fn new_non_async<F>(route_fn: F) -> Self
@@ -108,27 +119,18 @@ impl Router {
     pub fn new_error(error: RouteOrOpenError) -> Self {
         Router::new_non_async(move |_request| Err(error.clone()))
     }
+
     pub fn from_any(any: AnyCapability) -> Router {
         *any.into_any().downcast::<Router>().unwrap()
     }
 
-    /// Package a [`Routable`] object into a [`Router`].
-    pub fn from_routable<T: Routable + Send + Sync + 'static>(routable: T) -> Router {
-        let routable = Arc::new(routable);
-        let route_fn = move |request| {
-            let routable = routable.clone();
-            async move { routable.route(request).await }.boxed()
-        };
-        Router::new(route_fn)
-    }
-
     pub fn from_capability(capability: Capability) -> Router {
-        Router::from_routable(capability)
+        Router::new(capability)
     }
 
     /// Obtain a capability from this router, following the description in `request`.
     pub async fn route(&self, request: Request) -> Result<Capability, RouteOrOpenError> {
-        (self.route_fn)(request).await
+        self.routable.route(request).await
     }
 
     /// Returns an router that requests capabilities from the specified `path` relative
@@ -198,7 +200,7 @@ impl Router {
         capability_source: CapabilitySource,
         policy_checker: GlobalPolicyChecker,
     ) -> Self {
-        Router::from_routable(PolicyCheckRouter::new(capability_source, policy_checker, self))
+        Router::new(PolicyCheckRouter::new(capability_source, policy_checker, self))
     }
 
     /// Returns a [Dict] equivalent to `dict`, but with all [Router]s replaced with [Open].
@@ -422,7 +424,7 @@ mod tests {
     #[fuchsia::test]
     async fn availability_good() {
         let source: Capability = Data::String("hello".to_string()).into();
-        let base = Router::from_routable(source);
+        let base = Router::new(source);
         let proxy = base.with_availability(Availability::Optional);
         let capability = proxy
             .route(Request {
@@ -441,7 +443,7 @@ mod tests {
     #[fuchsia::test]
     async fn availability_bad() {
         let source: Capability = Data::String("hello".to_string()).into();
-        let base = Router::from_routable(source);
+        let base = Router::new(source);
         let proxy = base.with_availability(Availability::Optional);
         let error = proxy
             .route(Request {
