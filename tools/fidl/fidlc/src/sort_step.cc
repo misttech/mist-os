@@ -222,7 +222,6 @@ CalcDependencies::CalcDependencies(const Decl* decl) : library_(decl->name.libra
       }
       break;
     }
-
     case Decl::Kind::kAlias: {
       auto alias_decl = static_cast<const Alias*>(decl);
       VisitTypeConstructor(alias_decl->partial_type_ctor.get());

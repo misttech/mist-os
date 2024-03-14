@@ -209,12 +209,11 @@ std::string Display(const Element* e) {
   return ss.str();
 }
 
-// Display a list of nested types with arrows indicating what includes what:
-// ['A', 'B', 'C'] -> "A -> B -> C"
+// Displays decls with arrows, e.g "struct 'Foo' -> union 'Bar' -> struct 'Foo'".
 std::string Display(const std::vector<const Decl*>& d) {
   std::stringstream ss;
-  for (auto it = d.cbegin(); it != d.cend(); it++) {
-    if (it != d.cbegin()) {
+  for (auto it = d.begin(); it != d.end(); ++it) {
+    if (it != d.begin()) {
       ss << " -> ";
     }
     ss << Display(*it);

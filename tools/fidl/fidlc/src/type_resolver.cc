@@ -13,10 +13,10 @@ namespace fidlc {
 
 bool TypeResolver::ResolveParamAsType(const Reference& layout,
                                       const std::unique_ptr<LayoutParameter>& param,
-                                      Type** out_type) {
+                                      bool compile_decls, Type** out_type) {
   auto type_ctor = param->AsTypeCtor();
   auto check = reporter()->Checkpoint();
-  if (!type_ctor || !ResolveType(type_ctor)) {
+  if (!type_ctor || !ResolveType(type_ctor, compile_decls)) {
     // if there were no errors reported but we couldn't resolve to a type, it must
     // mean that the parameter referred to a non-type, so report a new error here.
     if (check.NoNewErrors()) {
@@ -68,8 +68,8 @@ bool TypeResolver::ResolveParamAsSize(const Reference& layout,
   return true;
 }
 
-bool TypeResolver::ResolveType(TypeConstructor* type) {
-  compile_step_->CompileTypeConstructor(type);
+bool TypeResolver::ResolveType(TypeConstructor* type, bool compile_decls) {
+  compile_step_->CompileTypeConstructor(type, compile_decls);
   return type->type != nullptr;
 }
 
@@ -107,9 +107,5 @@ bool TypeResolver::ResolveAsProtocol(const Constant* constant, const Protocol** 
 }
 
 void TypeResolver::CompileDecl(Decl* decl) { compile_step_->CompileDecl(decl); }
-
-std::optional<std::vector<const Decl*>> TypeResolver::GetDeclCycle(const Decl* decl) {
-  return compile_step_->GetDeclCycle(decl);
-}
 
 }  // namespace fidlc

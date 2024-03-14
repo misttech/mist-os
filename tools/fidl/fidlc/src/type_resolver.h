@@ -23,13 +23,13 @@ class TypeResolver {
   // Top level methods for resolving layout parameters. These are used by
   // TypeTemplates.
   bool ResolveParamAsType(const Reference& layout, const std::unique_ptr<LayoutParameter>& param,
-                          Type** out_type);
+                          bool compile_decls, Type** out_type);
   bool ResolveParamAsSize(const Reference& layout, const std::unique_ptr<LayoutParameter>& param,
                           const SizeValue** out_size);
 
   // These methods forward their implementation to the library_. They are used
   // by the top level methods above
-  bool ResolveType(TypeConstructor* type);
+  bool ResolveType(TypeConstructor* type, bool compile_decls);
   bool ResolveSizeBound(Constant* size_constant, const SizeValue** out_size);
   bool ResolveAsOptional(Constant* constant);
   bool ResolveAsHandleSubtype(Resource* resource, Constant* constant, HandleSubtype* out_obj_type);
@@ -37,12 +37,9 @@ class TypeResolver {
                              const HandleRightsValue** out_rights);
   bool ResolveAsProtocol(const Constant* size_constant, const Protocol** out_decl);
 
-  // Used in Typespace::Creator::Create{Identifier,Alias}Type to recursively
-  // compile the right-hand side.
+  // Used in Typespace::Creator::CreateAliasType to recursively compile the
+  // right-hand side.
   void CompileDecl(Decl* decl);
-
-  // Use in Typespace::Creator::CreateAliasType to check for cycles.
-  std::optional<std::vector<const Decl*>> GetDeclCycle(const Decl* decl);
 
  private:
   CompileStep* compile_step_;

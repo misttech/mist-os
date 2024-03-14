@@ -260,9 +260,34 @@ TEST(StructsTests, BadSelfRecursive) {
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
-TEST(StructsTests, GoodOptionalityAllowsRecursion) {
+TEST(StructsTests, GoodRecursiveBox) {
   TestLibrary library;
   library.AddFile("good/fi-0057.test.fidl");
+
+  ASSERT_COMPILED(library);
+}
+
+TEST(StructsTests, BadRecursiveThroughVector) {
+  TestLibrary library(R"FIDL(
+library example;
+
+type MySelf = struct {
+    me vector<MySelf>;
+};
+)FIDL");
+
+  library.ExpectFail(ErrIncludeCycle, "struct 'MySelf' -> struct 'MySelf'");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
+}
+
+TEST(StructsTests, GoodRecursiveOptionalVector) {
+  TestLibrary library(R"FIDL(
+library example;
+
+type MySelf = struct {
+    me vector<MySelf>:optional;
+};
+)FIDL");
 
   ASSERT_COMPILED(library);
 }
@@ -327,6 +352,8 @@ type Intersection = struct {
   yang Yang;
 };
 )FIDL");
+  library.ExpectFail(ErrIncludeCycle,
+                     "struct 'Intersection' -> struct 'Yin' -> struct 'Intersection'");
   library.ExpectFail(ErrIncludeCycle,
                      "struct 'Intersection' -> struct 'Yang' -> struct 'Intersection'");
   ASSERT_COMPILER_DIAGNOSTICS(library);

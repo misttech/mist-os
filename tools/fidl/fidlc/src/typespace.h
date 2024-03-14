@@ -38,7 +38,7 @@ class Typespace final {
 
   Type* Create(TypeResolver* resolver, const Reference& layout,
                const LayoutParameterList& parameters, const TypeConstraints& constraints,
-               LayoutInvocation* out_params);
+               bool compile_decls, LayoutInvocation* out_params);
 
   PrimitiveType* GetPrimitiveType(PrimitiveSubtype subtype);
   InternalType* GetInternalType(InternalSubtype subtype);

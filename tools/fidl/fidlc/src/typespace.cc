@@ -107,12 +107,13 @@ class Typespace::Creator {
  public:
   Creator(Typespace* typespace, TypeResolver* resolver, const Reference& layout,
           const LayoutParameterList& parameters, const TypeConstraints& constraints,
-          LayoutInvocation* out_params)
+          bool compile_decls, LayoutInvocation* out_params)
       : typespace_(typespace),
         resolver_(resolver),
         layout_(layout),
         parameters_(parameters),
         constraints_(constraints),
+        compile_decls_(compile_decls),
         out_params_(out_params) {}
 
   Type* Create();
@@ -142,16 +143,18 @@ class Typespace::Creator {
   const Reference& layout_;
   const LayoutParameterList& parameters_;
   const TypeConstraints& constraints_;
+  bool compile_decls_;
   LayoutInvocation* out_params_;
 };
 
 Type* Typespace::Create(TypeResolver* resolver, const Reference& layout,
                         const LayoutParameterList& parameters, const TypeConstraints& constraints,
-                        LayoutInvocation* out_params) {
+                        bool compile_decls, LayoutInvocation* out_params) {
   // TODO(https://fxbug.dev/42156099): lookup whether we've already created the type, and
   // return it rather than create a new one. Lookup must be by name, arg_type,
   // size, and nullability.
-  return Creator(this, resolver, layout, parameters, constraints, out_params).Create();
+  return Creator(this, resolver, layout, parameters, constraints, compile_decls, out_params)
+      .Create();
 }
 
 Type* Typespace::Creator::Create() {
@@ -260,7 +263,7 @@ Type* Typespace::Creator::CreateArrayType() {
     return nullptr;
 
   Type* element_type = nullptr;
-  if (!resolver_->ResolveParamAsType(layout_, parameters_.items[0], &element_type))
+  if (!resolver_->ResolveParamAsType(layout_, parameters_.items[0], compile_decls_, &element_type))
     return nullptr;
   out_params_->element_type_resolved = element_type;
   out_params_->element_type_raw = parameters_.items[0]->AsTypeCtor();
@@ -303,8 +306,17 @@ Type* Typespace::Creator::CreateVectorType() {
   if (!EnsureNumberOfLayoutParams(1))
     return nullptr;
 
+  // Check for `optional`, since vector<T>:optional types are cycle-breaking.
+  // TODO(https://fxbug.dev/42153849): As part of refactoring Typespace we could
+  // resolve all parameters and constraints before creating the Type.
+  for (auto& constraint : constraints_.items) {
+    if (resolver_->ResolveAsOptional(constraint.get())) {
+      compile_decls_ = false;
+      break;
+    }
+  }
   Type* element_type = nullptr;
-  if (!resolver_->ResolveParamAsType(layout_, parameters_.items[0], &element_type))
+  if (!resolver_->ResolveParamAsType(layout_, parameters_.items[0], compile_decls_, &element_type))
     return nullptr;
   out_params_->element_type_resolved = element_type;
   out_params_->element_type_raw = parameters_.items[0]->AsTypeCtor();
@@ -321,7 +333,7 @@ Type* Typespace::Creator::CreateZxExperimentalPointerType() {
     return nullptr;
 
   Type* element_type = nullptr;
-  if (!resolver_->ResolveParamAsType(layout_, parameters_.items[0], &element_type))
+  if (!resolver_->ResolveParamAsType(layout_, parameters_.items[0], compile_decls_, &element_type))
     return nullptr;
   out_params_->element_type_resolved = element_type;
   out_params_->element_type_raw = parameters_.items[0]->AsTypeCtor();
@@ -347,10 +359,6 @@ Type* Typespace::Creator::CreateStringType() {
 Type* Typespace::Creator::CreateHandleType(Resource* resource) {
   if (!EnsureNumberOfLayoutParams(0))
     return nullptr;
-  if (auto cycle = resolver_->GetDeclCycle(resource); cycle) {
-    reporter()->Fail(ErrIncludeCycle, resource->name.span().value(), cycle.value());
-    return nullptr;
-  }
   resolver_->CompileDecl(resource);
 
   HandleType type(layout_.resolved().name(), resource);
@@ -375,33 +383,22 @@ Type* Typespace::Creator::CreateTransportSideType(TransportSide end) {
 }
 
 Type* Typespace::Creator::CreateIdentifierType(TypeDecl* type_decl) {
-  if (type_decl->state == Decl::State::kNotCompiled && type_decl->kind != Decl::Kind::kProtocol) {
-    resolver_->CompileDecl(type_decl);
-  }
-
   if (!EnsureNumberOfLayoutParams(0))
     return nullptr;
-
   IdentifierType type(type_decl);
   std::unique_ptr<Type> constrained_type;
   type.ApplyConstraints(resolver_, reporter(), constraints_, layout_, &constrained_type,
                         out_params_);
+  if (compile_decls_ && constrained_type && !constrained_type->IsNullable())
+    resolver_->CompileDecl(type_decl);
   return typespace_->Intern(std::move(constrained_type));
 }
 
 Type* Typespace::Creator::CreateAliasType(Alias* alias) {
-  if (auto cycle = resolver_->GetDeclCycle(alias); cycle) {
-    reporter()->Fail(ErrIncludeCycle, alias->name.span().value(), cycle.value());
-    return nullptr;
-  }
-  resolver_->CompileDecl(alias);
-
   if (!EnsureNumberOfLayoutParams(0))
     return nullptr;
-
-  // Compilation failed while trying to resolve something farther up the chain;
-  // exit early
-  if (alias->partial_type_ctor->type == nullptr)
+  resolver_->CompileDecl(alias);
+  if (!alias->partial_type_ctor->type)
     return nullptr;
   const auto& aliased_type = alias->partial_type_ctor->type;
   out_params_->from_alias = alias;
@@ -437,8 +434,10 @@ Type* Typespace::Creator::CreateBoxType() {
   if (!EnsureNumberOfLayoutParams(1))
     return nullptr;
 
+  // box<T> types are cycle-breaking.
+  compile_decls_ = false;
   Type* boxed_type = nullptr;
-  if (!resolver_->ResolveParamAsType(layout_, parameters_.items[0], &boxed_type))
+  if (!resolver_->ResolveParamAsType(layout_, parameters_.items[0], compile_decls_, &boxed_type))
     return nullptr;
   if (!IsStruct(boxed_type)) {
     if (boxed_type) {

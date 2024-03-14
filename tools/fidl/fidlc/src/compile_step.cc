@@ -96,34 +96,24 @@ struct MethodScope {
 
 }  // namespace
 
-std::optional<std::vector<const Decl*>> CompileStep::GetDeclCycle(const Decl* decl) {
-  if (decl->state == Decl::State::kCompiling) {
-    auto decl_pos = std::find(decl_stack_.begin(), decl_stack_.end(), decl);
-    // Decl should already be in the stack somewhere because compiling is set to
-    // true iff the decl is in the decl stack.
-    ZX_ASSERT(decl_pos != decl_stack_.end());
-    // Copy the part of the cycle we care about so Compiling guards can pop
-    // normally when returning.
-    std::vector<const Decl*> cycle(decl_pos, decl_stack_.end());
-    // Add a second instance of the decl at the end of the list so it shows as
-    // both the beginning and end of the cycle.
-    cycle.push_back(decl);
-    return cycle;
-  }
-  return std::nullopt;
-}
-
 void CompileStep::CompileDecl(Decl* decl) {
   if (decl->name.library() != library()) {
     ZX_ASSERT_MSG(decl->state == Decl::State::kCompiled,
                   "decls in dependencies must already be compiled");
   }
-  if (decl->state == Decl::State::kCompiled) {
-    return;
-  }
-  if (auto cycle = GetDeclCycle(decl); cycle) {
-    reporter()->Fail(ErrIncludeCycle, decl->name.span().value(), cycle.value());
-    return;
+  switch (decl->state) {
+    case Decl::State::kNotCompiled:
+      break;
+    case Decl::State::kCompiled:
+      return;
+    case Decl::State::kCompiling: {
+      auto it = std::find(decl_stack_.begin(), decl_stack_.end(), decl);
+      ZX_ASSERT_MSG(it != decl_stack_.end(), "kCompiling decl should be in decl_stack_");
+      std::vector<const Decl*> cycle(it, decl_stack_.end());
+      cycle.push_back(decl);
+      reporter()->Fail(ErrIncludeCycle, decl->name.span().value(), cycle);
+      return;
+    }
   }
   decl->state = Decl::State::kCompiling;
   decl_stack_.push_back(decl);
@@ -347,6 +337,7 @@ bool CompileStep::ResolveIdentifierConstant(IdentifierConstant* identifier_const
     }
     case Type::Kind::kIdentifier: {
       auto identifier_type = static_cast<const IdentifierType*>(type);
+      CompileDecl(identifier_type->type_decl);
       const PrimitiveType* primitive_type;
       switch (identifier_type->type_decl->kind) {
         case Decl::Kind::kEnum: {
@@ -1367,13 +1358,14 @@ void CompileStep::CompileNewType(NewType* new_type) {
   CompileTypeConstructor(new_type->type_ctor.get());
 }
 
-void CompileStep::CompileTypeConstructor(TypeConstructor* type_ctor) {
+void CompileStep::CompileTypeConstructor(TypeConstructor* type_ctor, bool compile_decls) {
   if (type_ctor->type != nullptr) {
     return;
   }
   TypeResolver type_resolver(this);
-  type_ctor->type = typespace()->Create(&type_resolver, type_ctor->layout, *type_ctor->parameters,
-                                        *type_ctor->constraints, &type_ctor->resolved_params);
+  type_ctor->type =
+      typespace()->Create(&type_resolver, type_ctor->layout, *type_ctor->parameters,
+                          *type_ctor->constraints, compile_decls, &type_ctor->resolved_params);
 }
 
 bool CompileStep::ResolveHandleRightsConstant(Resource* resource, Constant* constant,

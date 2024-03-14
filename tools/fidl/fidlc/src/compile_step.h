@@ -41,7 +41,8 @@ class CompileStep : public Compiler::Step {
   void CompileService(Service* service_decl);
   void CompileStruct(Struct* struct_declaration);
   void CompileTable(Table* table_declaration);
-  void CompileTypeConstructor(TypeConstructor* type_ctor);
+  // If compile_decls is true, recursively compiles TypeDecls the type refers to.
+  void CompileTypeConstructor(TypeConstructor* type_ctor, bool compile_decls = true);
   void CompileUnion(Union* union_declaration);
   void CompileOverlay(Overlay* overlay_declaration);
 
@@ -89,13 +90,7 @@ class CompileStep : public Compiler::Step {
   // Decl for the HEAD constant, used in attribute_schema.cc.
   Decl* head_decl;
 
-  // If the given |decl| is already in the decl_stack, gets a vector of decls
-  // describing the decl cycle starting and ending with that decl. Otherwise,
-  // returns nullopt.
-  std::optional<std::vector<const Decl*>> GetDeclCycle(const Decl* decl);
-
-  // Stack of decls being compiled. Used to trace back and print the cycle if a
-  // cycle is detected.
+  // Stack of decls in the kCompiling state, used to detect cycles.
   std::vector<const Decl*> decl_stack_;
 };
 
