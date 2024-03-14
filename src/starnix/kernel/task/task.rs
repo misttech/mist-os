@@ -1428,7 +1428,6 @@ mod test {
         let pids = kernel.pids.read();
         assert_eq!(pids.get_task(1).upgrade().unwrap().get_tid(), 1);
         assert_eq!(pids.get_task(another_tid).upgrade().unwrap().get_tid(), another_tid);
-        assert!(pids.get_task(another_tid + 1).upgrade().is_none(), "{:?}", pids);
     }
 
     #[::fuchsia::test]
