@@ -22,7 +22,7 @@ function is_feature_enabled_by_default {
   "incremental_legacy") return 1 ;;
   "incremental_new") return 1 ;;
   "legacy_fastboot") return 1 ;;
-  "legacy_fxtest") return 0 ;;
+  "legacy_fxtest") return 1 ;;
   "foreground_repo_server") return 0 ;;
   esac
 
