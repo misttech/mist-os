@@ -383,6 +383,70 @@ def _format_duration_lines(flags: args.Flags, status: TaskStatus) -> list[str]:
     return duration_lines
 
 
+class TestExecutionInfo:
+    """Track and record a single test suite's execution."""
+
+    def __init__(self, name: str):
+        """Initialize execution info for a named suite.
+
+        Args:
+            name (str): The test suite's name.
+        """
+        self.name: str = name
+        self.buffered_lines: list[str] = []
+        self.buffered_output_task: asyncio.Task[None] | None = None
+
+    def spawn_buffered_output_printer(
+        self, timeout: float, queue: asyncio.Queue[list[str]]
+    ) -> None:
+        """Spawn an async task that will print buffered lines after a timeout.
+
+        Args:
+            timeout (float): Seconds to wait before printing buffered data.
+            queue (asyncio.Queue[list[str]]): Queue to print the
+                buffered data to upon timeout.
+        """
+
+        async def output_printer_task() -> None:
+            """Task that handles sleeping and then sending queued lines.
+
+            May be asynchronously canceled.
+            """
+            await asyncio.sleep(timeout)
+            await queue.put(self.buffered_lines)
+            self.buffered_lines = []  # drop to release memory
+
+        self.buffered_output_task = asyncio.create_task(output_printer_task())
+
+    def print_verbatim(self) -> bool:
+        """Determine if an output printer should skip buffering and just print.
+
+        Returns:
+            bool: True if output should be printed verbatim, False otherwise.
+        """
+        return (task := self.buffered_output_task) is not None and task.done()
+
+    def should_buffer_output(self) -> bool:
+        """Determine if output should be buffered.
+
+        Returns:
+            bool: True if an output printer should buffer lines in
+                this object, False otherwise.
+        """
+        return (
+            task := self.buffered_output_task
+        ) is not None and not task.done()
+
+    def cleanup(self) -> None:
+        """Clean up any buffers, cancel, print tasks, and drop any buffered output."""
+        if (
+            self.buffered_output_task is not None
+            and not self.buffered_output_task.done()
+        ):
+            self.buffered_output_task.cancel()
+            self.buffered_lines = []
+
+
 async def _console_event_loop(
     recorder: event.EventRecorder,
     flags: args.Flags,
@@ -402,11 +466,17 @@ async def _console_event_loop(
         print_queue (asyncio.Queue): Queue for lines to print to the user.
     """
 
-    # Keep track of ids corresponding to test suites for display purposes.
-    # First, we need the name to report success or failure.
-    # Second, we flatten the status display so that commands run
-    # as part of a test execution are not shown.
-    test_suite_names: dict[event.Id, str] = dict()
+    # Keep track of ids corresponding to test suites for display purposes:
+    # 1. We need the name to report success or failure.
+    # 2. We flatten the status display so that commands run as
+    #    part of a test execution are not shown.
+    # 3. We can buffer output from those programs for later display using
+    #    the --slow flag.
+    test_suite_execution_info: dict[event.Id, TestExecutionInfo] = dict()
+
+    # Keep track of task IDs that are nested under a test suite.
+    # This is needed to map buffered program output to the correct test suite.
+    event_id_to_test_suite: dict[event.Id, event.Id] = dict()
     next_event: event.Event
     async for next_event in recorder.iter():
         lines_to_print: list[str] = []
@@ -441,7 +511,7 @@ async def _console_event_loop(
             if (
                 next_event.id is not None
                 and next_event.starting
-                and next_event.parent not in test_suite_names
+                and next_event.parent not in test_suite_execution_info
             ):
                 # Provide nice formatting for event types that need to be tracked for a duration.
 
@@ -516,6 +586,17 @@ async def _console_event_loop(
                         parent=next_event.parent,
                     )
 
+            if (
+                next_event.id is not None
+                and next_event.parent in test_suite_execution_info
+            ):
+                # Track direct children of a test suite, so their
+                # output can be buffered to the right suite.
+                if next_event.starting:
+                    event_id_to_test_suite[next_event.id] = next_event.parent
+                elif next_event.ending:
+                    del event_id_to_test_suite[next_event.id]
+
             if next_event.payload.process_env is not None:
                 # Extract the path from the parsed environment.
                 root_path = next_event.payload.process_env["fuchsia_dir"]
@@ -534,15 +615,30 @@ async def _console_event_loop(
                     text = msg.value
                 lines_to_print.append(text)
             elif next_event.payload.program_output is not None:
-                # If a program execution requests verbatim output,
-                # print to console.
                 output = next_event.payload.program_output
+
+                if output.data.endswith("\n"):
+                    data = output.data[:-1]
+                else:
+                    data = output.data
+
                 if output.print_verbatim:
-                    if output.data.endswith("\n"):
-                        data = output.data[:-1]
-                    else:
-                        data = output.data
+                    # If a program execution requests verbatim output,
+                    # print to console.
                     lines_to_print.append(data)
+                elif (
+                    next_event.id is not None
+                    and (suite_id := event_id_to_test_suite.get(next_event.id))
+                    is not None
+                ):
+                    # This output corresponds to a running suite.
+                    suite_info = test_suite_execution_info[suite_id]
+                    if suite_info.print_verbatim():
+                        # Already timed out, just print this output verbatim.
+                        lines_to_print.append(data)
+                    elif suite_info.should_buffer_output():
+                        # Awaiting timeout, buffer this output.
+                        suite_info.buffered_lines.append(data)
             elif next_event.payload.test_file_loaded is not None:
                 # Print a result to the user when the tests file is parsed.
                 test_info = next_event.payload.test_file_loaded
@@ -597,9 +693,24 @@ async def _console_event_loop(
             elif next_event.payload.test_suite_started is not None:
                 # Let the user know a test suite is starting.
                 assert next_event.id
-                test_suite_names[
-                    next_event.id
-                ] = next_event.payload.test_suite_started.name
+                suite_info = TestExecutionInfo(
+                    next_event.payload.test_suite_started.name
+                )
+                test_suite_execution_info[next_event.id] = suite_info
+                if flags.slow > 0:
+                    suite_info.buffered_lines.extend(
+                        [
+                            statusinfo.dim(
+                                f"Runtime has exceeded {flags.slow} seconds",
+                                style=flags.style,
+                            ),
+                            f"Showing output for {test_suite_execution_info[next_event.id].name}",
+                        ]
+                    )
+                    suite_info.spawn_buffered_output_printer(
+                        flags.slow, print_queue
+                    )
+
                 label = "Starting:"
                 val = statusinfo.green_highlight(
                     next_event.payload.test_suite_started.name,
@@ -638,17 +749,20 @@ async def _console_event_loop(
                         "BUG: UNKNOWN", style=flags.style
                     )
 
-                state.test_results[payload.status].add(
-                    test_suite_names[next_event.id]
-                )
+                # Record status of the test, and stop tracking the test task.
+                finished_test = test_suite_execution_info[next_event.id]
+                state.test_results[payload.status].add(finished_test.name)
+                finished_test.cleanup()
+                del test_suite_execution_info[next_event.id]
 
                 suffix = ""
                 if payload.message:
                     suffix = "\n" + statusinfo.dim(payload.message) + "\n"
 
                 lines_to_print.append(
-                    f"\n{label}: {test_suite_names[next_event.id]}{suffix}"
+                    f"\n{label}: {finished_test.name}{suffix}"
                 )
+
             elif next_event.payload.enumerate_test_cases is not None:
                 cases_payload = next_event.payload.enumerate_test_cases
                 styled_name = statusinfo.green_highlight(

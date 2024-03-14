@@ -64,6 +64,7 @@ class Flags:
     status_lines: int
     status_delay: float
     ffx_output_directory: str | None
+    slow: float
 
     def validate(self) -> None:
         """Validate incoming flags, raising an exception on failure.
@@ -436,6 +437,13 @@ def parse_args(
         "--ffx-output-directory",
         default=None,
         help="If set, write ffx test output to this directory for post processing.",
+    )
+    output.add_argument(
+        "-s",
+        "--slow",
+        type=float,
+        default=0,
+        help="If non-zero, automatically show output for tests taking longer than this many seconds.",
     )
 
     if defaults is not None:
