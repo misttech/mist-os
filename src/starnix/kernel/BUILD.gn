@@ -20,6 +20,8 @@ group("tests") {
 
   deps = [
     ":starnix-tests",
+    ":starnix_kernel_bin-tests",
+    ":starnix_kernel_runner-tests",
     ":starnix_lifecycle-tests",
     ":starnix_logging-tests",
     ":starnix_sync-tests",
@@ -751,8 +753,6 @@ fuchsia_unittest_package("starnix-tests") {
   deps = [
     ":starnix-test-files",
     ":starnix_core_test",
-    ":starnix_kernel_bin_test",
-    ":starnix_kernel_runner_test",
     "//src/starnix/examples/hello_starnix:bin",
   ]
   test_specs = {
@@ -762,6 +762,22 @@ fuchsia_unittest_package("starnix-tests") {
     }
   }
   test_type = "system"
+}
+
+fuchsia_unittest_package("starnix_kernel_bin-tests") {
+  deps = [ ":starnix_kernel_bin_test" ]
+  manifest = "meta/starnix_kernel_bin-tests.cml"
+}
+
+fuchsia_unittest_package("starnix_kernel_runner-tests") {
+  deps = [ ":starnix_kernel_runner_test" ]
+  manifest = "meta/starnix_kernel_runner-tests.cml"
+  test_specs = {
+    log_settings = {
+      # Tests exercise failure cases, so ERROR logs are expected.
+      max_severity = "ERROR"
+    }
+  }
 }
 
 fuchsia_unittest_package("starnix_lifecycle-tests") {
