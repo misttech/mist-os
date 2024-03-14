@@ -8,6 +8,7 @@ if (is_host) {
     testonly = true
     public_deps = [
       "test_bluetooth:tests",
+      "test_rtc:tests",
       "test_session:tests",
       "test_tracing:tests",
       "test_ui:tests",

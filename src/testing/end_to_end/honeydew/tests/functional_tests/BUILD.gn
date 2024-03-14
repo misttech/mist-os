@@ -415,7 +415,10 @@ if (is_host) {
 
   group("unstable_vim3_tests") {
     testonly = true
-    public_deps = [ "auxiliary_device_tests/test_power_switch_dmc:power_switch_dmc_test_fc($host_toolchain)" ]
+    public_deps = [
+      "affordance_tests/test_rtc:rtc_test_fc($host_toolchain)",
+      "auxiliary_device_tests/test_power_switch_dmc:power_switch_dmc_test_fc($host_toolchain)",
+    ]
   }
 
   group("unstable_nuc_sl4f_tests") {

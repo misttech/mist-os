@@ -6,11 +6,6 @@
 import abc
 import datetime
 
-# TODO(hansens) Add some functional tests to accompany the system validation
-# test. The functional tests should not reboot the device.
-#
-# //src/testing/end_to_end/honeydew/tests/functional_tests/affordance_tests
-
 
 class Rtc(abc.ABC):
     """Abstract base class for an RTC affordance.
