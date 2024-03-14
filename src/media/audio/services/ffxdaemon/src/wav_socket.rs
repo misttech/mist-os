@@ -9,9 +9,9 @@ use byteorder::ByteOrder;
 use futures::{AsyncReadExt, AsyncWriteExt};
 use std::io::Cursor;
 
-pub struct WavSocket<'a>(pub &'a mut fidl::AsyncSocket);
+pub struct WavSocket(pub fidl::AsyncSocket);
 
-impl<'a> WavSocket<'a> {
+impl WavSocket {
     pub async fn write_header(
         &mut self,
         duration: Option<std::time::Duration>,

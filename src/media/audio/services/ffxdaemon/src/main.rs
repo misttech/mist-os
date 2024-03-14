@@ -70,9 +70,9 @@ impl AudioDaemon {
         let duration =
             request.duration.map(|duration_nanos| Duration::from_nanos(duration_nanos as u64));
 
-        let mut async_socket =
-            fasync::Socket::from_socket(wav_data.duplicate_handle(zx::Rights::SAME_RIGHTS)?);
-        let mut socket = WavSocket(&mut async_socket);
+        let mut socket = WavSocket(fasync::Socket::from_socket(
+            wav_data.duplicate_handle(zx::Rights::SAME_RIGHTS)?,
+        ));
 
         let capturer_proxy = Self::create_capturer_from_location(
             location,
@@ -323,14 +323,14 @@ impl AudioDaemon {
 
     fn send_next_packet<'b>(
         payload_offset: u64,
-        mut socket: fidl::AsyncSocket,
+        socket: fidl::AsyncSocket,
         vmo: zx::Vmo,
         audio_renderer_proxy: &'b fmedia::AudioRendererProxy,
         bytes_per_packet: usize,
         iteration: u32,
     ) -> BoxFuture<'b, Result<(), Error>> {
         async move {
-            let mut socket_wrapper = WavSocket(&mut socket);
+            let mut socket_wrapper = WavSocket(socket);
             let mut buf = vec![0u8; bytes_per_packet];
             let total_bytes_read = socket_wrapper.read_until_full(&mut buf).await? as usize;
 
@@ -358,7 +358,7 @@ impl AudioDaemon {
             if total_bytes_read == bytes_per_packet {
                 Self::send_next_packet(
                     payload_offset,
-                    socket,
+                    socket_wrapper.0,
                     vmo.duplicate_handle(zx::Rights::SAME_RIGHTS)?,
                     &audio_renderer_proxy,
                     bytes_per_packet,
@@ -378,8 +378,7 @@ impl AudioDaemon {
     ) -> Result<fac::PlayerPlayResponse, Error> {
         let data_socket = request.wav_source.ok_or(anyhow!("Socket argument missing."))?;
 
-        let mut async_socket = fasync::Socket::from_socket(data_socket);
-        let mut socket = WavSocket(&mut async_socket);
+        let mut socket = WavSocket(fasync::Socket::from_socket(data_socket));
         let spec = socket.read_header().await?;
         let format = Format::from(&spec);
 

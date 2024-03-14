@@ -258,9 +258,9 @@ impl Device {
 
     pub async fn play(
         &mut self,
-        mut data_socket: fasync::Socket,
+        data_socket: fasync::Socket,
     ) -> Result<fac::PlayerPlayResponse, Error> {
-        let mut socket = WavSocket(&mut data_socket);
+        let mut socket = WavSocket(data_socket);
         let spec = socket.read_header().await?;
         let format = format_utils::Format::from(&spec);
 
@@ -417,11 +417,11 @@ impl Device {
     pub async fn record(
         &mut self,
         format: format_utils::Format,
-        mut data_socket: fasync::Socket,
+        data_socket: fasync::Socket,
         duration: Option<std::time::Duration>,
         cancel_server: Option<ServerEnd<fac::RecordCancelerMarker>>,
     ) -> Result<fac::RecorderRecordResponse, ControllerError> {
-        let mut socket = WavSocket(&mut data_socket);
+        let mut socket = WavSocket(data_socket);
 
         let supported_formats = self.device_controller.get_supported_formats().await?;
         validate_format(&format, supported_formats)?;
