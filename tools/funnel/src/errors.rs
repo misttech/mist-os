@@ -4,6 +4,7 @@
 
 use crate::ssh::{CloseExistingTunnelError, TunnelError};
 use crate::target::ChooseTargetError;
+#[cfg(feature = "update")]
 use crate::update::UpdateError;
 use std::fmt::Debug;
 use thiserror::Error;
@@ -26,6 +27,7 @@ pub enum FunnelError {
     #[error("{}", .0)]
     TunnelError(#[from] TunnelError),
 
+    #[cfg(feature = "update")]
     #[error("{}", .0)]
     UpdateError(#[from] UpdateError),
 
@@ -40,6 +42,7 @@ impl IntoExitCode for FunnelError {
             Self::IoError(e) => e.raw_os_error().unwrap_or_else(|| 2),
             Self::CloseExistingTunnelError(e) => e.exit_code(),
             Self::TunnelError(e) => e.exit_code(),
+            #[cfg(feature = "update")]
             Self::UpdateError(e) => e.exit_code(),
             Self::ChooseTargetError(e) => e.exit_code(),
         }

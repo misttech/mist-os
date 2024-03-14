@@ -6,9 +6,11 @@ use crate::errors::{FunnelError, IntoExitCode};
 use crate::metrics::MetricsService;
 use crate::ssh::do_ssh;
 use crate::target::choose_target;
+#[cfg(feature = "update")]
 use anyhow::anyhow;
 use anyhow::{Context, Result};
 use argh::FromArgs;
+#[cfg(feature = "update")]
 use camino::Utf8PathBuf;
 use discovery::{
     wait_for_devices, DiscoverySources, FastbootConnectionState, TargetEvent, TargetState,
@@ -54,6 +56,7 @@ struct Funnel {
 #[argh(subcommand)]
 enum FunnelSubcommands {
     Host(SubCommandHost),
+    #[cfg(feature = "update")]
     Update(SubCommandUpdate),
     Cleanup(SubCommandCleanupRemote),
     CloseLocalTunnel(SubCommandCloseLocalTunnel),
@@ -63,6 +66,7 @@ impl FunnelSubcommands {
     fn command_name(&self) -> String {
         match self {
             Self::Host(_) => "host",
+            #[cfg(feature = "update")]
             Self::Update(_) => "update",
             Self::Cleanup(_) => "cleanup",
             Self::CloseLocalTunnel(_) => "close-local-tunnel",
@@ -141,6 +145,7 @@ async fn main() -> Result<()> {
 
     let res = match args.nested {
         FunnelSubcommands::Host(host_command) => funnel_main(host_command).await,
+        #[cfg(feature = "update")]
         FunnelSubcommands::Update(update_command) => update_main(update_command).await,
         FunnelSubcommands::Cleanup(cleanup_command) => cleanup_main(cleanup_command).await,
         FunnelSubcommands::CloseLocalTunnel(close_existing_tunnel) => {
@@ -176,6 +181,7 @@ async fn cleanup_main(args: SubCommandCleanupRemote) -> Result<(), FunnelError> 
     ssh::cleanup_remote_sshd(args.host).await.map_err(FunnelError::from)
 }
 
+#[cfg(feature = "update")]
 async fn update_main(_args: SubCommandUpdate) -> Result<(), FunnelError> {
     let current_exe_path = std::env::current_exe()?;
     let exe_path_buf = Utf8PathBuf::from_path_buf(current_exe_path)
