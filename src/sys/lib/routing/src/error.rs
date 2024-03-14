@@ -291,9 +291,6 @@ pub enum RoutingError {
     #[error("Item {name} is not present in dictionary")]
     BedrockNotPresentInDictionary { name: String },
 
-    #[error("Object was destroyed")]
-    BedrockObjectDestroyed,
-
     #[error("Routing request was abandoned by a router")]
     BedrockRoutingRequestCanceled,
 
@@ -373,7 +370,6 @@ impl RoutingError {
             | RoutingError::UnsupportedCapabilityType { .. }
             | RoutingError::EventsRoutingError(_)
             | RoutingError::BedrockNotPresentInDictionary { .. }
-            | RoutingError::BedrockObjectDestroyed { .. }
             | RoutingError::BedrockSourceDictionaryExposeNotFound { .. }
             | RoutingError::BedrockSourceDictionaryCollision { .. }
             | RoutingError::BedrockRoutingRequestCanceled { .. }

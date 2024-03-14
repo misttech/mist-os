@@ -63,23 +63,6 @@ impl From<Router> for Capability {
     }
 }
 
-/// If `T` is [`Routable`], then a `Weak<T>` is also [`Routable`], except the request
-/// may fail if the weak pointer has expired.
-#[async_trait]
-impl<T> Routable for std::sync::Weak<T>
-where
-    T: Routable + Send + Sync + 'static,
-{
-    async fn route(&self, request: Request) -> Result<Capability, RouteOrOpenError> {
-        match self.upgrade() {
-            Some(routable) => {
-                return routable.route(request).await;
-            }
-            None => return Err(RoutingError::BedrockObjectDestroyed.into()),
-        }
-    }
-}
-
 /// Syntax sugar within the framework to express custom routing logic using a function
 /// that takes a request and returns such future.
 impl<F> Routable for F
