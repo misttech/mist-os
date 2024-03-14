@@ -831,8 +831,6 @@ config("Wno-vla-cxx-extension") {
     "//src/performance/lib/trace_converters:*",
     "//src/starnix/tests/syscalls/cpp:*",
     "//src/storage/blobfs/test:*",
-    "//src/storage/f2fs:*",
-    "//src/storage/f2fs/test:*",
     "//src/storage/fs_test:*",
     "//src/storage/fxfs:*",
     "//src/storage/gpt:*",
