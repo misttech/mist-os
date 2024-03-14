@@ -57,7 +57,7 @@ if (is_host) {
 
   # Main executable target.
   python_binary("fxtest-rewrite") {
-    enable_pytype = true
+    enable_mypy = true
     main_source = "main.py"
     output_name = "fxtest_rewrite.pyz"
     sources = binary_sources
@@ -84,9 +84,9 @@ if (is_host) {
     python_host_test(target) {
       # TODO(https://fxbug.dev/329239255): Re-enable when flake is addressed
       if (test_name != "main") {
-        enable_pytype = true
+        enable_mypy = true
       } else {
-        enable_pytype = false
+        enable_mypy = false
       }
       main_source = main_source
       main_callable = "unittest.main"

@@ -14,7 +14,7 @@ group("tests") {
 
 if (is_host) {
   python_library("util") {
-    enable_pytype = true
+    enable_mypy = true
     sources = [
       "__init__.py",
       "arg_option.py",
@@ -24,7 +24,7 @@ if (is_host) {
   }
 
   python_host_test("lib_test") {
-    enable_pytype = true
+    enable_mypy = true
     main_source = "tests/util_test.py"
     main_callable = "unittest.main"
     extra_args = [ "-v" ]

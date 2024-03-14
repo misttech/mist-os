@@ -12,7 +12,7 @@ import("//build/testing/host_test_data.gni")
 #
 # ```
 # python_host_test("my_host_test") {
-#   enable_pytype = true
+#   enable_mypy = true
 #   main_source = "my_host_test.py"
 #   sources = [
 #     "test_helpers_foo.py",
@@ -58,8 +58,8 @@ import("//build/testing/host_test_data.gni")
 #    Type: string
 #    Default: unittest.main
 #
-#   enable_pytype(optional)
-#     If true, enable pytype checking on the target and respective deps.
+#   enable_mypy (optional)
+#     If true, enable MyPy type checking on the target and respective deps.
 #     Type: boolean
 #     Default: False
 #
@@ -79,7 +79,7 @@ template("python_host_test") {
                              "main_source",
                              "sources",
                              "deps",
-                             "enable_pytype",
+                             "enable_mypy",
                            ])
 
     testonly = true

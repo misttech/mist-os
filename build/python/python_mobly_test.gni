@@ -17,7 +17,7 @@ import("//build/testing/host_test_data.gni")
 # Example
 # ```
 # python_mobly_test("hello_world_test") {
-#   enable_pytype = true
+#   enable_mypy = true
 #   main_source = "my_mobly_test.py"
 #   sources = [
 #     "test_helpers_foo.py",
@@ -130,8 +130,8 @@ import("//build/testing/host_test_data.gni")
 #    Type: list of scopes.
 #    Default: emu_env
 #
-#   enable_pytype(optional)
-#     If true, enable pytype checking on the target and respective deps.
+#   enable_mypy (optional)
+#     If true, enable MyPy type checking on the target and respective deps.
 #     Type: boolean
 #     Default: False
 #
@@ -172,7 +172,7 @@ template("python_mobly_test") {
                            [
                              "main_source",
                              "sources",
-                             "enable_pytype",
+                             "enable_mypy",
                            ])
 
     testonly = _testonly

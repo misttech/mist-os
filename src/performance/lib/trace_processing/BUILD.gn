@@ -24,7 +24,7 @@ python_library("trace_processing") {
 # TODO(b/328517888): Typecheck the trace processing library
 python_library("trace_processing_type_checked") {
   testonly = true
-  enable_pytype = true
+  enable_mypy = true
   library_name = "trace_processing"
   sources = [
     "trace_importing.py",

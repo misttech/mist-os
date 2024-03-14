@@ -6,18 +6,18 @@ import("//build/python/python_library.gni")
 
 if (is_host) {
   python_library("base_mobly_driver") {
-    enable_pytype = true
+    enable_mypy = true
     sources = [ "base_mobly_driver.py" ]
   }
 
   python_library("common") {
-    enable_pytype = true
+    enable_mypy = true
     sources = [ "common.py" ]
     library_deps = [ "//third_party/pyyaml:yaml" ]
   }
 
   python_library("local_driver") {
-    enable_pytype = true
+    enable_mypy = true
     sources = [ "local_driver.py" ]
     library_deps = [
       ":base_mobly_driver",
@@ -30,7 +30,7 @@ if (is_host) {
   }
 
   python_library("infra_driver") {
-    enable_pytype = true
+    enable_mypy = true
     sources = [ "infra_driver.py" ]
     library_deps = [
       ":base_mobly_driver",

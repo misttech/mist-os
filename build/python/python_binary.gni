@@ -14,7 +14,7 @@
 #     "foo.py",
 #     "bar.py",
 #   ]
-#   enable_pytype = true
+#   enable_mypy = true
 #   output_name = "main.pyz"
 #   deps = [ "//path/to/lib" ]
 # }
@@ -42,8 +42,8 @@
 #     Type: string
 #     Default: ${target_name}.pyz
 #
-#   enable_pytype(optional)
-#     If true, enable pytype checking on the target and respective deps.
+#   enable_mypy (optional)
+#     If true, enable MyPy type checking on the target and respective deps.
 #     Type: boolean
 #     Default: False
 #
@@ -130,8 +130,8 @@ template("python_binary") {
              "--output",
              rebase_path(_output, root_build_dir),
            ]
-    if (defined(invoker.enable_pytype) && invoker.enable_pytype) {
-      args += [ "--enable_pytype" ]
+    if (defined(invoker.enable_mypy) && invoker.enable_mypy) {
+      args += [ "--enable_mypy" ]
     }
   }
 }

@@ -10,7 +10,7 @@ import("//build/group_with_inputs.gni")
 # ```
 # python_library("lib") {
 #   library_name = "lib"
-#   enable_pytype = true
+#   enable_mypy = true
 #   sources = [
 #     "__init__.py",
 #     "lib.py",
@@ -38,8 +38,8 @@ import("//build/group_with_inputs.gni")
 #    List of targets for other python_library()s that this library depends on
 #    Type: list(target)
 #
-#   enable_pytype(optional)
-#     If true, enable pytype checking on the target and respective deps.
+#   enable_mypy (optional)
+#     If true, enable MyPy type checking on the target and respective deps.
 #     Type: boolean
 #     Default: False
 #
@@ -73,7 +73,7 @@ template("python_library") {
     _full_source_paths += [ _source_root + "/" + source ]
   }
 
-  _enable_pytype = defined(invoker.enable_pytype) && invoker.enable_pytype
+  _enable_mypy = defined(invoker.enable_mypy) && invoker.enable_mypy
   group_with_inputs(target_name) {
     forward_variables_from(invoker,
                            [
@@ -93,8 +93,8 @@ template("python_library") {
       deps += invoker.deps
     }
 
-    # Run python type checks using Mypy if enable_pytype flag is set
-    if (_enable_pytype) {
+    # Run python type checks using Mypy if enable_mypy flag is set
+    if (_enable_mypy) {
       deps += [ ":${target_name}_mypy_checker" ]
     }
 
@@ -105,7 +105,7 @@ template("python_library") {
           library_name = library_name
           source_root = rebase_path(source_root, root_build_dir)
           sources = invoker.sources
-          pytype_support = _enable_pytype
+          mypy_support = _enable_mypy
         },
       ]
 
@@ -115,7 +115,7 @@ template("python_library") {
     sources = _full_source_paths
   }
 
-  if (_enable_pytype) {
+  if (_enable_mypy) {
     # Generate library_info.json file with all the library dependencies info
     _library_infos_target = "${target_name}_library_infos"
     _library_infos_json = "${target_gen_dir}/${target_name}_library_infos.json"

@@ -59,7 +59,7 @@ def main() -> int:
         required=True,
     )
     parser.add_argument(
-        "--enable_pytype",
+        "--enable_mypy",
         action="store_true",
         help="Name of the build target",
     )
@@ -144,8 +144,8 @@ sys.exit({args.main_callable}())
             os.rmdir(os.path.join(root, dir))
     os.rmdir(app_dir)
 
-    # Type check for Python binary sources and their pytype_enabled library sources
-    if args.enable_pytype:
+    # Type check for Python binary sources and their library sources that have "mypy_enable = True"
+    if args.enable_mypy:
         return mypy_checker.run_mypy_checks(args.sources, infos)
     return 0
 

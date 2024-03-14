@@ -7,7 +7,7 @@ import("//build/testing/environments.gni")
 
 if (is_host) {
   python_mobly_test("ffx_test_fc") {
-    enable_pytype = true
+    enable_mypy = true
     main_source = "test_ffx.py"
     libraries = [
       "//src/testing/end_to_end/honeydew",
@@ -20,7 +20,7 @@ if (is_host) {
   }
 
   python_mobly_test("ffx_wait_for_rcs_disconnection_test_fc") {
-    enable_pytype = true
+    enable_mypy = true
     main_source = "test_ffx_wait_for_rcs_disconnection.py"
     libraries = [
       "//src/testing/end_to_end/honeydew",

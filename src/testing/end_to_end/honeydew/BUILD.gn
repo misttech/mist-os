@@ -8,7 +8,7 @@ import("//build/testing/host_test_data.gni")
 
 python_library("honeydew") {
   library_name = "honeydew"
-  enable_pytype = true
+  enable_mypy = true
   testonly = true
   source_root = "//src/testing/end_to_end/honeydew/honeydew"
   sources = [

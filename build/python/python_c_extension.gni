@@ -64,7 +64,7 @@ template("python_c_extension") {
     deps = [ ":" + target_name + "_wrapper" ]
     source_root = "${target_gen_dir}/" + target_name + "_wrapper"
     sources = [ "__init__.py" ]
-    enable_pytype = true
+    enable_mypy = true
   }
 }
 

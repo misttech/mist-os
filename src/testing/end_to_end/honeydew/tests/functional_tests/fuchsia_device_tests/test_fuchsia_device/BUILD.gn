@@ -7,7 +7,7 @@ import("//build/testing/environments.gni")
 
 if (is_host) {
   python_mobly_test("x64_emu_test_sl4f") {
-    enable_pytype = true
+    enable_mypy = true
     main_source = "test_fuchsia_device.py"
     libraries = [
       "//src/testing/end_to_end/honeydew",
@@ -19,7 +19,7 @@ if (is_host) {
   }
 
   python_mobly_test("x64_emu_test_fc") {
-    enable_pytype = true
+    enable_mypy = true
     main_source = "test_fuchsia_device.py"
     libraries = [
       "//src/testing/end_to_end/honeydew",
@@ -31,7 +31,7 @@ if (is_host) {
   }
 
   python_mobly_test("x64_emu_test_fc_preferred") {
-    enable_pytype = true
+    enable_mypy = true
     main_source = "test_fuchsia_device.py"
     libraries = [
       "//src/testing/end_to_end/honeydew",
@@ -43,7 +43,7 @@ if (is_host) {
   }
 
   python_mobly_test("x64_nuc_test_sl4f") {
-    enable_pytype = true
+    enable_mypy = true
     main_source = "test_fuchsia_device.py"
     libraries = [
       "//src/testing/end_to_end/honeydew",
@@ -55,7 +55,7 @@ if (is_host) {
   }
 
   python_mobly_test("x64_nuc_test_fc") {
-    enable_pytype = true
+    enable_mypy = true
     main_source = "test_fuchsia_device.py"
     libraries = [
       "//src/testing/end_to_end/honeydew",
@@ -67,7 +67,7 @@ if (is_host) {
   }
 
   python_mobly_test("x64_nuc_test_fc_preferred") {
-    enable_pytype = true
+    enable_mypy = true
     main_source = "test_fuchsia_device.py"
     libraries = [
       "//src/testing/end_to_end/honeydew",
@@ -79,7 +79,7 @@ if (is_host) {
   }
 
   python_mobly_test("vim3_test_sl4f") {
-    enable_pytype = true
+    enable_mypy = true
     main_source = "test_fuchsia_device.py"
     libraries = [
       "//src/testing/end_to_end/honeydew",
@@ -91,7 +91,7 @@ if (is_host) {
   }
 
   python_mobly_test("vim3_test_fc") {
-    enable_pytype = true
+    enable_mypy = true
     main_source = "test_fuchsia_device.py"
     libraries = [
       "//src/testing/end_to_end/honeydew",
@@ -103,7 +103,7 @@ if (is_host) {
   }
 
   python_mobly_test("vim3_test_fc_preferred") {
-    enable_pytype = true
+    enable_mypy = true
     main_source = "test_fuchsia_device.py"
     libraries = [
       "//src/testing/end_to_end/honeydew",

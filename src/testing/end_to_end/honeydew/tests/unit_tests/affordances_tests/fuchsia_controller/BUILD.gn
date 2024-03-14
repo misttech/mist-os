@@ -6,7 +6,7 @@ import("//build/python/python_host_test.gni")
 
 if (is_host) {
   python_host_test("tracing_fc_test") {
-    enable_pytype = true
+    enable_mypy = true
     main_source = "tracing_test.py"
     libraries = [
       "//src/testing/end_to_end/honeydew",
@@ -17,7 +17,7 @@ if (is_host) {
   }
 
   python_host_test("rtc_fc_test") {
-    enable_pytype = true
+    enable_mypy = true
     main_source = "rtc_test.py"
     libraries = [ "//src/testing/end_to_end/honeydew" ]
     main_callable = "unittest.main"

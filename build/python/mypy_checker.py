@@ -42,8 +42,8 @@ def run_mypy_checks(
     src_files: list[str], lib_infos: list[dict[str, str]]
 ) -> int:
     """
-    Runs `mypy` type checking on the provided file paths and pytype enabled
-    library sources, excluding duplicates.
+    Runs `mypy` type checking on the provided file paths and library sources
+    that have "mypy_enable = True"', excluding duplicates.
 
     Args:
         src_files: List of source file paths to run type checking on
@@ -53,7 +53,7 @@ def run_mypy_checks(
         int: returncode if type checking was successful, else error returncode
     """
 
-    lib_files = get_pytype_enabled_library_sources(lib_infos)
+    lib_files = get_mypy_enabled_library_sources(lib_infos)
     # Remove the duplicate and non-MyPy supported files
     files = exclude_files(src_files + lib_files)
     if not files:
@@ -101,24 +101,24 @@ def run_mypy_checks(
         return e.returncode
 
 
-def get_pytype_enabled_library_sources(
+def get_mypy_enabled_library_sources(
     lib_infos: list[dict[str, str]]
 ) -> list[str]:
-    """Returns a list of library sources with Pytype enabled targets.
+    """Returns a list of library sources with MyPy type checking enabled targets.
 
     Args:
         lib_infos: List of library infos
 
     Returns:
-        list of pytype enabled library sources
+        list of MyPy type checking enabled library sources
     """
     type_check_files = []
     for info in lib_infos:
-        # Add the target sources only if pytype support is enabled.
+        # Add the target sources only if type checking support is enabled.
         type_check_files += [
             os.path.join(info["source_root"], source)
             for source in info["sources"]
-            if info["pytype_support"]
+            if info["mypy_support"]
         ]
     return type_check_files
 

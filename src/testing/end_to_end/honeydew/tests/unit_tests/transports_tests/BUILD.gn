@@ -6,7 +6,7 @@ import("//build/python/python_host_test.gni")
 
 if (is_host) {
   python_host_test("fastboot_test") {
-    enable_pytype = true
+    enable_mypy = true
     main_source = "fastboot_test.py"
     libraries = [
       "//src/testing/end_to_end/honeydew",
@@ -17,7 +17,7 @@ if (is_host) {
   }
 
   python_host_test("ffx_test") {
-    enable_pytype = true
+    enable_mypy = true
     main_source = "ffx_test.py"
     libraries = [
       "//src/testing/end_to_end/honeydew",
@@ -28,7 +28,7 @@ if (is_host) {
   }
 
   python_host_test("fuchsia_controller_test") {
-    enable_pytype = true
+    enable_mypy = true
     main_source = "fuchsia_controller_test.py"
     libraries = [
       "//src/testing/end_to_end/honeydew",
@@ -39,7 +39,7 @@ if (is_host) {
   }
 
   python_host_test("ssh_test") {
-    enable_pytype = true
+    enable_mypy = true
     main_source = "ssh_test.py"
     libraries = [
       "//src/testing/end_to_end/honeydew",
@@ -50,7 +50,7 @@ if (is_host) {
   }
 
   python_host_test("sl4f_test") {
-    enable_pytype = true
+    enable_mypy = true
     main_source = "sl4f_test.py"
     libraries = [
       "//src/testing/end_to_end/honeydew",

@@ -14,7 +14,7 @@ group("tests") {
 
 if (is_host) {
   python_library("statusinfo") {
-    enable_pytype = true
+    enable_mypy = true
     sources = [
       "__init__.py",
       "statusinfo.py",
@@ -23,7 +23,7 @@ if (is_host) {
   }
 
   python_host_test("statusinfo_doctest_tests") {
-    enable_pytype = true
+    enable_mypy = true
     main_source = "tests/statusinfo_doctest_test.py"
     main_callable = "unittest.main"
     extra_args = [ "-v" ]

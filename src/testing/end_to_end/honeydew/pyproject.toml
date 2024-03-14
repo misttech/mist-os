@@ -44,8 +44,8 @@ profile = "black"
 line_length = 80
 
 # Honeydew uses the MyPy config in fuchsia/pyproject.toml for type checking.
-# To enable pytype checking on a Python target:
-# 1. Add `enable_pytype = true` to the python build target configuration
+# To enable MyPy type checking on a Python target:
+# 1. Add `enable_mypy = true` to the python build target configuration
 # 2. Run `fx build` to generate type checking results
 # Alternatively, run the following command for MyPy type checking on Honeydew directory:
 # PYTHONPATH=$FUCHSIA_DIR/third_party/pylibs/mypy/src:$FUCHSIA_DIR/third_party/pylibs/mypy_extensions/src:$FUCHSIA_DIR/third_party/pylibs/typing_extensions/src/src:$PYTHONPATH

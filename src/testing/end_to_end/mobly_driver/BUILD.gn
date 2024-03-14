@@ -8,12 +8,12 @@ import("//build/testing/host_test_data.gni")
 
 if (is_host) {
   python_library("api_infra") {
-    enable_pytype = true
+    enable_mypy = true
     sources = [ "api_infra.py" ]
   }
 
   python_library("api_mobly") {
-    enable_pytype = true
+    enable_mypy = true
     sources = [ "api_mobly.py" ]
     library_deps = [
       ":api_infra",
@@ -22,12 +22,12 @@ if (is_host) {
   }
 
   python_library("api_ffx") {
-    enable_pytype = true
+    enable_mypy = true
     sources = [ "api_ffx.py" ]
   }
 
   python_library("mobly_driver_lib") {
-    enable_pytype = true
+    enable_mypy = true
     sources = [ "mobly_driver_lib.py" ]
     library_deps = [
       ":api_infra",
@@ -36,7 +36,7 @@ if (is_host) {
   }
 
   python_library("driver_factory") {
-    enable_pytype = true
+    enable_mypy = true
     sources = [ "driver_factory.py" ]
     library_deps = [
       ":api_infra",
@@ -51,7 +51,7 @@ if (is_host) {
   _md_bin_name = "mobly_driver.pyz"
   python_binary(_md_bin_target) {
     testonly = true
-    enable_pytype = true
+    enable_mypy = true
     main_source = "main.py"
     sources = [
       "api_ffx.py",
