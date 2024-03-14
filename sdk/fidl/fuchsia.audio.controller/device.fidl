@@ -2,8 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-/// This library contains protocols used by the `ffx audio` tool only.
-@available(added=HEAD)
 library fuchsia.audio.controller;
 
 using fuchsia.hardware.audio;
@@ -62,7 +60,6 @@ type CompositeDeviceInfo = table {
             vector<fuchsia.hardware.audio.SupportedFormats>:fuchsia.hardware.audio.MAX_COUNT_FORMATS;
 };
 
-
 /// Identifies which device to retrieve information about.
 type DeviceSelector = table {
     /// Whether device is input or output.
@@ -75,15 +72,15 @@ type DeviceSelector = table {
     /// Required.
     2: id fuchsia.io.Path;
 
-    /// Device type. If not specified, defaults to StreamConfig.
+    /// Device type.
+    ///
+    /// Optional. If not specified, defaults to StreamConfig.
     3: device_type fuchsia.hardware.audio.DeviceType;
 };
-
 
 /// Enumerate, query, and control audio devices from clients.
 @discoverable
 open protocol DeviceControl {
-
     /// Lists all available audio devices on target.
     flexible ListDevices() -> (resource table {
         /// List of available devices, sorted by name.

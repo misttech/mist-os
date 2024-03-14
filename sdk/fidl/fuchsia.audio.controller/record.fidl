@@ -7,96 +7,97 @@ library fuchsia.audio.controller;
 using fuchsia.media;
 using zx;
 
-/// Where to read audio data from to send back to an ffx client.
-type RecordSource = flexible union {
-    /// Create an audio_core `AudioCapturer` and record audio data from it.
-    1: capturer CapturerConfig;
-
-    /// Create an audio_core `AudioCapturer` with loopback and record audio data from it.
-    2: loopback struct {};
-
-    /// Raad audio data directly from a device ring buffer.
-    3: device_ring_buffer DeviceSelector;
-};
-
-/// Selection of the frequency range than an `AudioCapturer` can read.
-type CapturerConfig = flexible union {
-    /// AudioCapturer for standard frequencies.
-    1: standard_capturer StandardCapturerConfig;
-
-    /// AudioCapturer for ultrasonic frequencies.
-    2: ultrasound_capturer struct {};
-};
-
-/// Configuration parameters for creating an `AudioCapturer` for the standard frequency range.
-type StandardCapturerConfig = table {
-    /// The usage of the audio stream.
-    ///
-    /// Required.
-    1: usage fuchsia.media.AudioCaptureUsage;
-
-    /// The reference clock type used by the stream. If unspecified, use the default
-    /// reference clock provided by the capturer.
-    ///
-    /// Optional.
-    2: clock ClockType;
-};
-
-/// Cancels an RecordRequest.
+/// Cancels a `Recorder.Record` request.
 open protocol RecordCanceler {
-    /// Finish sending audio data back to the client.
+    /// Stop recording and writing data on the output socket.
     strict Cancel() -> () error zx.Status;
 };
 
 @discoverable
 open protocol Recorder {
-    /// Records audio data from either an `AudioCapturer` or device ring buffer.
-    /// Returns sockets containing audio data and errors back to host.
+    /// Record audio data and write it to a socket in WAV format.
     flexible Record(resource table {
-        /// Record from `AudioCapturer` or ring buffer.
+        /// The source from which to record the audio.
         ///
         /// Required.
-        1: source RecordSource;
+        1: source @generated_name("RecordSource") flexible union {
+            /// An audio_core `AudioCapturer` protocol connection.
+            1: capturer @generated_name("CapturerConfig") flexible union {
+                /// `AudioCapturer` for standard frequencies.
+                1: standard_capturer @generated_name("StandardCapturerConfig") table {
+                    /// The usage of the audio stream.
+                    ///
+                    /// Required.
+                    1: usage fuchsia.media.AudioCaptureUsage;
 
-        /// Streamtype.
+                    /// The reference clock type used by the stream.
+                    ///
+                    /// Optional. If not specified, the default reference clock
+                    /// provided by the capturer is used.
+                    2: clock ClockType;
+                };
+
+                /// `AudioCapturer` for ultrasonic frequencies.
+                2: ultrasound_capturer struct {};
+            };
+
+            /// An audio_core `AudioCapturer` protocol connection with loopback enabled.
+            2: loopback struct {};
+
+            /// A device ring buffer.
+            3: device_ring_buffer DeviceSelector;
+        };
+
+        /// The stream format in which to record the audio.
         ///
         /// Required.
         2: stream_type fuchsia.media.AudioStreamType;
 
-        /// Duration in nanoseconds to record audio data. If not specified, daemon will send
-        /// data back to ffx client until it receives a stop signal following a keypress.
-        /// If present, the record request is still cancelable via handle below.
+        /// Duration in nanoseconds to record audio data.
+        ///
+        /// If not specified, `Recorder` will record and write data to the
+        /// socket until it receives a stop signal on `canceler`.
+        ///
+        /// If present, the record request is still cancelable via `canceler`.
         ///
         /// Optional.
         3: duration zx.Duration;
 
-        /// Handle to signal when to stop sending data back to ffx client.
+        /// Handle to signal when to stop sending data back to the client.
         ///
         /// Required.
         4: canceler server_end:RecordCanceler;
 
-        /// Record gain settings. If not specified, AudioCapturer's defaults will apply.
+        /// Record gain settings.
+        ///
+        /// Only used for the `capturer` and `loopback` sources.
         ///
         /// Optional.
         5: gain_settings GainSettings;
 
-        /// Buffer size. If not specified, allocate enough to hold one second of audio data.
+        /// Buffer size.
         ///
-        /// Optional.
+        /// Optional. If not specified, defaults to a size that is enough to
+        /// hold one second of audio data.
         6: buffer_size uint64;
 
-        /// Sink for audio data in the form of a complete WAV file.
+        /// Sink for audio data.
+        ///
+        /// The captured data here will be written here as a complete WAV file.
         ///
         /// Required.
         7: wav_data zx.Handle:SOCKET;
     }) -> (resource table {
-        /// Total number of bytes read from source.
+        /// Total number of bytes read from the source.
         1: bytes_processed uint64;
 
-        /// If applicable, number of packets read from an AudioCapturer.
+        /// If applicable, number of packets read from an `AudioCapturer`.
         2: packets_processed uint64;
 
-        /// If applicable, number late wakeups.
+        /// If applicable, number of times the capturer woke up too late to
+        /// read valid data from the device.
+        ///
+        /// If this is non-zero, some data was lost and replaced with silence.
         3: late_wakeups uint64;
     }) error Error;
 };
