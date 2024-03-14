@@ -357,6 +357,8 @@ Resourceness Type::Resourceness() const {
   }
 
   const auto* decl = static_cast<const IdentifierType*>(this)->type_decl;
+  ZX_ASSERT_MSG(decl->state == Decl::State::kCompiled,
+                "accessing resourceness of not-yet-compiled decl");
 
   switch (decl->kind) {
     case Decl::Kind::kBits:
@@ -365,22 +367,15 @@ Resourceness Type::Resourceness() const {
     case Decl::Kind::kProtocol:
       return Resourceness::kResource;
     case Decl::Kind::kStruct:
-      ZX_ASSERT_MSG(decl->compiled, "accessing resourceness of not-yet-compiled struct");
-      return static_cast<const Struct*>(decl)->resourceness.value();
+      return static_cast<const Struct*>(decl)->resourceness;
     case Decl::Kind::kTable:
       return static_cast<const Table*>(decl)->resourceness;
     case Decl::Kind::kUnion:
-      ZX_ASSERT_MSG(decl->compiled, "accessing resourceness of not-yet-compiled union");
       return static_cast<const Union*>(decl)->resourceness.value();
     case Decl::Kind::kOverlay:
-      ZX_ASSERT_MSG(decl->compiled, "accessing resourceness of not-yet-compiled overlay");
       return static_cast<const Overlay*>(decl)->resourceness;
-    case Decl::Kind::kNewType: {
-      const auto* new_type = static_cast<const NewType*>(decl);
-      const auto* underlying_type = new_type->type_ctor->type;
-      ZX_ASSERT_MSG(underlying_type, "accessing resourceness of not-yet-compiled new-type");
-      return underlying_type->Resourceness();
-    }
+    case Decl::Kind::kNewType:
+      return static_cast<const NewType*>(decl)->type_ctor->type->Resourceness();
     case Decl::Kind::kBuiltin:
     case Decl::Kind::kConst:
     case Decl::Kind::kResource:

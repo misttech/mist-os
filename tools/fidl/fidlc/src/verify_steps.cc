@@ -19,7 +19,8 @@ void VerifyResourcenessStep::RunImpl() {
 }
 
 void VerifyResourcenessStep::VerifyDecl(const Decl* decl) {
-  ZX_ASSERT_MSG(decl->compiled, "verification must happen after compilation of decls");
+  ZX_ASSERT_MSG(decl->state == Decl::State::kCompiled,
+                "verification must happen after compilation of decls");
   switch (decl->kind) {
     case Decl::Kind::kStruct: {
       const auto* struct_decl = static_cast<const Struct*>(decl);
@@ -124,7 +125,7 @@ Resourceness VerifyResourcenessStep::EffectiveResourceness(const Type* type) {
     case Decl::Kind::kProtocol:
       return Resourceness::kResource;
     case Decl::Kind::kStruct:
-      if (static_cast<const Struct*>(decl)->resourceness.value() == Resourceness::kResource) {
+      if (static_cast<const Struct*>(decl)->resourceness == Resourceness::kResource) {
         return Resourceness::kResource;
       }
       break;
@@ -382,7 +383,8 @@ void VerifyOpenInteractionsStep::RunImpl() {
 }
 
 void VerifyOpenInteractionsStep::VerifyProtocolOpenness(const Protocol& protocol) {
-  ZX_ASSERT_MSG(protocol.compiled, "verification must happen after compilation of decls");
+  ZX_ASSERT_MSG(protocol.state == Decl::State::kCompiled,
+                "verification must happen after compilation of decls");
 
   for (const auto& composed : protocol.composed_protocols) {
     auto target = composed.reference.resolved().element();

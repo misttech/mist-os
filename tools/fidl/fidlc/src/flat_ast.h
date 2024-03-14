@@ -166,8 +166,12 @@ struct Decl : public Element {
   // members' availabilities, to the range.
   std::unique_ptr<Decl> Split(VersionRange range) const;
 
-  bool compiling = false;
-  bool compiled = false;
+  enum class State : uint8_t {
+    kNotCompiled,
+    kCompiling,
+    kCompiled,
+  };
+  State state = State::kNotCompiled;
 
  private:
   // Helper to implement Split. Leaves the result's availability unset.
@@ -213,7 +217,9 @@ struct Builtin : public Decl {
   };
 
   Builtin(Identity id, Name name)
-      : Decl(Decl::Kind::kBuiltin, std::make_unique<AttributeList>(), std::move(name)), id(id) {}
+      : Decl(Decl::Kind::kBuiltin, std::make_unique<AttributeList>(), std::move(name)), id(id) {
+    state = State::kCompiled;
+  }
 
   const Identity id;
 
@@ -534,17 +540,13 @@ struct Struct final : public TypeDecl {
   };
 
   Struct(std::unique_ptr<AttributeList> attributes, Name name, std::vector<Member> members,
-         std::optional<Resourceness> resourceness)
+         Resourceness resourceness)
       : TypeDecl(Kind::kStruct, std::move(attributes), std::move(name)),
         members(std::move(members)),
         resourceness(resourceness) {}
 
   std::vector<Member> members;
-
-  // For user-defined structs, this is set during construction. For synthesized
-  // structs (requests/responses, error result success payload) it is set during
-  // compilation based on the struct's members.
-  std::optional<Resourceness> resourceness;
+  const Resourceness resourceness;
 
  private:
   std::unique_ptr<Decl> SplitImpl(VersionRange range) const override;
@@ -666,8 +668,6 @@ struct Union final : public TypeDecl {
   // the unions's members.
   std::optional<Resourceness> resourceness;
 
-  std::vector<std::reference_wrapper<const Member>> MembersSortedByUnionOrdinal() const;
-
  private:
   std::unique_ptr<Decl> SplitImpl(VersionRange range) const override;
 };
@@ -723,7 +723,7 @@ struct Overlay final : public TypeDecl {
 
   std::vector<Member> members;
   const Strictness strictness;
-  Resourceness resourceness;
+  const Resourceness resourceness;
 
  private:
   std::unique_ptr<Decl> SplitImpl(VersionRange range) const override;

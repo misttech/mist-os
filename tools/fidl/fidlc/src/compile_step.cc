@@ -94,61 +94,10 @@ struct MethodScope {
   Scope<const Protocol*> protocols;
 };
 
-// A helper class to derive the resourceness of synthesized decls based on their
-// members. If the given std::optional<Resourceness> is already set
-// (meaning the decl is user-defined, not synthesized), this does nothing.
-//
-// Types added via AddType must already be compiled. In other words, there must
-// not be cycles among the synthesized decls.
-class DeriveResourceness {
- public:
-  explicit DeriveResourceness(std::optional<Resourceness>* target)
-      : target_(target), derive_(!target->has_value()) {}
-
-  ~DeriveResourceness() {
-    if (derive_) {
-      *target_ = result_;
-    }
-  }
-
-  void AddType(const Type* type) {
-    if (derive_ && result_ == Resourceness::kValue &&
-        type->Resourceness() == Resourceness::kResource) {
-      result_ = Resourceness::kResource;
-    }
-  }
-
- private:
-  std::optional<Resourceness>* const target_;
-  const bool derive_;
-  Resourceness result_ = Resourceness::kValue;
-};
-
-// A helper class to track when a Decl is compiling and compiled.
-class Compiling {
- public:
-  Compiling(Decl* decl, std::vector<const Decl*>& decl_stack)
-      : decl_(decl), decl_stack_(decl_stack) {
-    decl_->compiling = true;
-    decl_stack_.push_back(decl);
-  }
-
-  ~Compiling() {
-    decl_->compiling = false;
-    decl_->compiled = true;
-    decl_stack_.pop_back();
-  }
-
- private:
-  Decl* decl_;
-  // Stack trace of decl compile calls.
-  std::vector<const Decl*>& decl_stack_;
-};
-
 }  // namespace
 
 std::optional<std::vector<const Decl*>> CompileStep::GetDeclCycle(const Decl* decl) {
-  if (!decl->compiled && decl->compiling) {
+  if (decl->state == Decl::State::kCompiling) {
     auto decl_pos = std::find(decl_stack_.begin(), decl_stack_.end(), decl);
     // Decl should already be in the stack somewhere because compiling is set to
     // true iff the decl is in the decl stack.
@@ -165,14 +114,19 @@ std::optional<std::vector<const Decl*>> CompileStep::GetDeclCycle(const Decl* de
 }
 
 void CompileStep::CompileDecl(Decl* decl) {
-  if (decl->compiled) {
+  if (decl->name.library() != library()) {
+    ZX_ASSERT_MSG(decl->state == Decl::State::kCompiled,
+                  "decls in dependencies must already be compiled");
+  }
+  if (decl->state == Decl::State::kCompiled) {
     return;
   }
   if (auto cycle = GetDeclCycle(decl); cycle) {
     reporter()->Fail(ErrIncludeCycle, decl->name.span().value(), cycle.value());
     return;
   }
-  Compiling guard(decl, decl_stack_);
+  decl->state = Decl::State::kCompiling;
+  decl_stack_.push_back(decl);
   switch (decl->kind) {
     case Decl::Kind::kBuiltin:
       // Nothing to do.
@@ -214,6 +168,8 @@ void CompileStep::CompileDecl(Decl* decl) {
       CompileNewType(static_cast<NewType*>(decl));
       break;
   }  // switch
+  decl->state = Decl::State::kCompiled;
+  decl_stack_.pop_back();
 }
 
 bool CompileStep::ResolveOrOperatorConstant(Constant* constant, std::optional<const Type*> opt_type,
@@ -1252,8 +1208,6 @@ void CompileStep::CompileService(Service* service_decl) {
 }
 
 void CompileStep::CompileStruct(Struct* struct_declaration) {
-  DeriveResourceness derive_resourceness(&struct_declaration->resourceness);
-
   CompileAttributeList(struct_declaration->attributes.get());
   for (auto& member : struct_declaration->members) {
     CompileAttributeList(member.attributes.get());
@@ -1270,7 +1224,6 @@ void CompileStep::CompileStruct(Struct* struct_declaration) {
         reporter()->Fail(ErrCouldNotResolveMemberDefault, member.name, NameIdentifier(member.name));
       }
     }
-    derive_resourceness.AddType(member.type_ctor->type);
   }
 }
 
@@ -1321,10 +1274,11 @@ void CompileStep::CompileTable(Table* table_declaration) {
 
 void CompileStep::CompileUnion(Union* union_declaration) {
   Ordinal64Scope ordinal_scope;
-  DeriveResourceness derive_resourceness(&union_declaration->resourceness);
 
   CompileAttributeList(union_declaration->attributes.get());
   bool contains_non_reserved_member = false;
+  bool infer_resourceness = !union_declaration->resourceness.has_value();
+  auto resourceness = Resourceness::kValue;
   for (const auto& member : union_declaration->members) {
     CompileAttributeList(member.attributes.get());
     const auto ordinal_result = ordinal_scope.Insert(member.ordinal->value, member.ordinal->span());
@@ -1345,7 +1299,16 @@ void CompileStep::CompileUnion(Union* union_declaration) {
     if (member_used.type_ctor->type->IsNullable()) {
       reporter()->Fail(ErrOptionalUnionMember, member_used.name);
     }
-    derive_resourceness.AddType(member_used.type_ctor->type);
+    if (infer_resourceness &&
+        member_used.type_ctor->type->Resourceness() == Resourceness::kResource) {
+      resourceness = Resourceness::kResource;
+    }
+  }
+
+  if (infer_resourceness) {
+    auto* name = union_declaration->name.as_anonymous();
+    ZX_ASSERT(name && name->provenance == Name::Provenance::kGeneratedResultUnion);
+    union_declaration->resourceness = resourceness;
   }
 
   if (union_declaration->strictness == Strictness::kStrict && !contains_non_reserved_member) {

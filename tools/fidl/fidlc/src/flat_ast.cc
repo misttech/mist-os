@@ -195,17 +195,6 @@ bool Builtin::IsInternal() const {
   }
 }
 
-std::vector<std::reference_wrapper<const Union::Member>> Union::MembersSortedByUnionOrdinal()
-    const {
-  std::vector<std::reference_wrapper<const Member>> sorted_members(members.cbegin(),
-                                                                   members.cend());
-  std::sort(sorted_members.begin(), sorted_members.end(),
-            [](const auto& member1, const auto& member2) {
-              return member1.get().ordinal->value < member2.get().ordinal->value;
-            });
-  return sorted_members;
-}
-
 Resource::Property* Resource::LookupProperty(std::string_view name) {
   for (Property& property : properties) {
     if (property.name.data() == name.data()) {
