@@ -64,8 +64,13 @@ def _fuchsia_board_configuration_impl(ctx):
         _copy_bash(ctx, ctx.file.board_bundles_dir, board_dir)
         deps.append(board_dir)
 
+    # Files from board_input_bundles have paths that are relative to root,
+    # prefix "../"s to make them relative to the output board config.
+    board_config_relative_to_root = "../" * board_config_file.path.count("/")
     for bib in ctx.attr.board_input_bundles:
-        board_config["input_bundles"] = board_config.get("input_bundles", []) + [bib[FuchsiaBoardInputBundleInfo].config.dirname]
+        board_config["input_bundles"] = board_config.get("input_bundles", []) + [
+            board_config_relative_to_root + bib[FuchsiaBoardInputBundleInfo].config.dirname,
+        ]
         deps.extend(bib[FuchsiaBoardInputBundleInfo].files)
 
     content = json.encode_indent(board_config, indent = "  ")

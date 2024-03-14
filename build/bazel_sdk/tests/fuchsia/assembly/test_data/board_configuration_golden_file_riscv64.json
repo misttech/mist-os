@@ -1,7 +1,7 @@
 {
     "input_bundles": [
-        "bazel-out/riscv64-fastbuild/bin/fuchsia/assembly/testing_board_input_bundle_out",
-        "fuchsia/assembly/test_data"
+        "../../../../../bazel-out/riscv64-fastbuild/bin/fuchsia/assembly/testing_board_input_bundle_out",
+        "../../../../../fuchsia/assembly/test_data"
     ],
     "name": "x64",
     "provided_features": []

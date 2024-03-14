@@ -183,19 +183,24 @@ def _fuchsia_prebuilt_board_input_bundle_impl(ctx):
         ),
     ]
 
-def fuchsia_prebuilt_board_input_bundle(name, config):
+def fuchsia_prebuilt_board_input_bundle(name, config, files = []):
     """Define a Board Input Bundle based on pre-existed BIB directory.
 
     Args:
         name: Name for fuchsia_prebuilt_board_input_bundle target.
         config: Path to Board Input Bundle config file.
+        files: Supporting files needed for this target
     """
     filegroup = "{}_files".format(name)
-    native.filegroup(
-        name = filegroup,
-        srcs = native.glob(["{}/**/*".format(paths.dirname(config))]),
-    )
-    files = [":{}".format(filegroup)]
+
+    # If the files are not provided, we will glob the directory based on the
+    # config file.
+    if not files:
+        native.filegroup(
+            name = filegroup,
+            srcs = native.glob(["{}/**/*".format(paths.dirname(config))]),
+        )
+        files = [":{}".format(filegroup)]
 
     _fuchsia_prebuilt_board_input_bundle(
         name = name,
