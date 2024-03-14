@@ -16,8 +16,8 @@ use {
     anyhow::{format_err, Context, Error},
     cobalt_client::traits::AsEventCode,
     fidl_fuchsia_metrics::{MetricEvent, MetricEventPayload},
-    fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211,
-    fidl_fuchsia_wlan_internal as fidl_internal, fidl_fuchsia_wlan_sme as fidl_sme,
+    fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_internal as fidl_internal,
+    fidl_fuchsia_wlan_sme as fidl_sme,
     fuchsia_async::{self as fasync, TimeoutExt},
     fuchsia_inspect::{
         ArrayProperty, InspectType, Inspector, LazyNode, Node as InspectNode, NumericProperty,
@@ -643,18 +643,13 @@ fn inspect_record_connection_status(inspect_node: &InspectNode, telemetry_sender
                 ConnectionStateInfo::Connected { .. } => "connected".to_string(),
             });
             if let ConnectionStateInfo::Connected { ap_state, .. } = info {
-                let fidl_channel = fidl_common::WlanChannel::from(ap_state.tracked.channel);
                 inspect_insert!(inspector.root(), connected_network: {
                     rssi_dbm: ap_state.tracked.signal.rssi_dbm,
                     snr_db: ap_state.tracked.signal.snr_db,
                     bssid: ap_state.original().bssid.to_string(),
                     ssid: ap_state.original().ssid.to_string(),
                     protection: format!("{:?}", ap_state.original().protection()),
-                    channel: {
-                        primary: fidl_channel.primary,
-                        cbw: format!("{:?}", fidl_channel.cbw),
-                        secondary80: fidl_channel.secondary80,
-                    },
+                    channel: format!("{}", ap_state.original().channel),
                     ht_cap?: ap_state.original().raw_ht_cap().map(|cap| InspectBytes(cap.bytes)),
                     vht_cap?: ap_state.original().raw_vht_cap().map(|cap| InspectBytes(cap.bytes)),
                     wsc?: ap_state.original().probe_resp_wsc().as_ref().map(|wsc| make_inspect_loggable!(
@@ -1471,7 +1466,6 @@ impl Telemetry {
     }
 
     pub fn log_disconnect_event_inspect(&self, info: &DisconnectInfo) {
-        let fidl_channel = fidl_common::WlanChannel::from(info.ap_state.original().channel);
         inspect_log!(self.disconnect_events_node.lock().get_mut(), {
             connected_duration: info.connected_duration.into_nanos(),
             disconnect_source: info.disconnect_source.inspect_string(),
@@ -1481,11 +1475,7 @@ impl Telemetry {
                 bssid: info.ap_state.original().bssid.to_string(),
                 ssid: info.ap_state.original().ssid.to_string(),
                 protection: format!("{:?}", info.ap_state.original().protection()),
-                channel: {
-                    primary: fidl_channel.primary,
-                    cbw: format!("{:?}", fidl_channel.cbw),
-                    secondary80: fidl_channel.secondary80,
-                },
+                channel: format!("{}", info.ap_state.tracked.channel),
                 ht_cap?: info.ap_state.original().raw_ht_cap().map(|cap| InspectBytes(cap.bytes)),
                 vht_cap?: info.ap_state.original().raw_vht_cap().map(|cap| InspectBytes(cap.bytes)),
                 wsc?: info.ap_state.original().probe_resp_wsc().as_ref().map(|wsc| make_inspect_loggable!(
@@ -3877,6 +3867,7 @@ mod tests {
         },
         fidl::endpoints::create_proxy_and_stream,
         fidl_fuchsia_metrics::{MetricEvent, MetricEventLoggerRequest, MetricEventPayload},
+        fidl_fuchsia_wlan_common as fidl_common,
         futures::{pin_mut, stream::FusedStream, task::Poll, TryStreamExt},
         ieee80211_testutils::{BSSID_REGEX, SSID_REGEX},
         rand::Rng,
@@ -4050,11 +4041,7 @@ mod tests {
                         bssid: &*BSSID_REGEX,
                         ssid: &*SSID_REGEX,
                         protection: AnyStringProperty,
-                        channel: {
-                            primary: AnyNumericProperty,
-                            cbw: AnyStringProperty,
-                            secondary80: AnyNumericProperty,
-                        },
+                        channel: AnyStringProperty,
                         is_wmm_assoc: AnyBoolProperty,
                     }
                 }
@@ -4101,11 +4088,7 @@ mod tests {
                             bssid: &*BSSID_REGEX,
                             ssid: &*SSID_REGEX,
                             protection: AnyStringProperty,
-                            channel: {
-                                primary: AnyNumericProperty,
-                                cbw: AnyStringProperty,
-                                secondary80: AnyNumericProperty,
-                            },
+                            channel: AnyStringProperty,
                             is_wmm_assoc: AnyBoolProperty,
                         }
                     }
