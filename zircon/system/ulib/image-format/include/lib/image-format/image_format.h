@@ -14,7 +14,7 @@
 // Most of the functions in this file are only available at HEAD because they
 // depend on fuchsia.images2 and fuchsia.sysmem2 which are currently
 // `added=HEAD`. See https://fxbug.dev/42085119.
-#if __Fuchsia_API_level__ >= FUCHSIA_HEAD
+#if __Fuchsia_API_level__ >= 19
 
 #include <fidl/fuchsia.images2/cpp/fidl.h>
 #include <fidl/fuchsia.sysmem/cpp/fidl.h>
@@ -137,7 +137,7 @@ bool ImageFormatCompatibleWithProtectedMemory(const PixelFormatAndModifier& pixe
 bool ImageFormatCompatibleWithProtectedMemory(
     const fuchsia_sysmem::wire::PixelFormat& pixel_format);
 
-#else  // __Fuchsia_API_level__ >= FUCHSIA_HEAD
+#else  // __Fuchsia_API_level__ >= 19
 
 // A small subset of the functions are exposed for use by zircon_platform_sysmem_connection.cc when
 // __ALLOW_IMAGES2_AND_SYSMEM2_TYPES_ONLY__ is defined. See https://fxbug.dev/42085119.
@@ -159,6 +159,6 @@ bool ImageFormatPlaneRowBytes(const fuchsia_sysmem::wire::ImageFormat2& image_fo
 #error Should only be included for API level HEAD where fuchsia.images2 and fuchsia.sysmem2 are supported.
 #endif  // defined(__ALLOW_IMAGES2_AND_SYSMEM2_TYPES_ONLY__)
 
-#endif  // __Fuchsia_API_level__ >= FUCHSIA_HEAD
+#endif  // __Fuchsia_API_level__ >= 19
 
 #endif  // LIB_IMAGE_FORMAT_IMAGE_FORMAT_H_

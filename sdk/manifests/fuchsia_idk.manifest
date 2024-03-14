@@ -206,6 +206,7 @@ fidl_library://fidl/fuchsia.hardware.temperature
 fidl_library://fidl/fuchsia.hardware.trippoint
 fidl_library://fidl/fuchsia.hwinfo
 fidl_library://fidl/fuchsia.images
+fidl_library://fidl/fuchsia.images2
 fidl_library://fidl/fuchsia.input
 fidl_library://fidl/fuchsia.input.report
 fidl_library://fidl/fuchsia.input.virtualkeyboard
@@ -262,6 +263,7 @@ fidl_library://fidl/fuchsia.sys
 fidl_library://fidl/fuchsia.sys.test
 fidl_library://fidl/fuchsia.sysinfo
 fidl_library://fidl/fuchsia.sysmem
+fidl_library://fidl/fuchsia.sysmem2
 fidl_library://fidl/fuchsia.test
 fidl_library://fidl/fuchsia.thermal
 fidl_library://fidl/fuchsia.tracing

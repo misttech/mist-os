@@ -2,9 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-// TODO(dalesat): Consider changing this library name.
-// fuchsia.images is currently occupied by ImagePipe. Will we be able to use that name? When?
-// Is the term 'image' too generic?
 library fuchsia.images2;
 
 /// The upper 8 bits are a vendor code. The lower 56 bits are vendor-defined.
@@ -104,25 +101,25 @@ type PixelFormatModifier = flexible enum : uint64 {
 //
 
 // Per-vendor upper byte vendor-codes.
-@available(added=HEAD)
+@available(added=19)
 const FORMAT_MODIFIER_VENDOR_INTEL uint64 = 0x0100000000000000;
-@available(added=HEAD)
+@available(added=19)
 const FORMAT_MODIFIER_VENDOR_AMD uint64 = 0x0200000000000000;
-@available(added=HEAD)
+@available(added=19)
 const FORMAT_MODIFIER_VENDOR_NVIDIA uint64 = 0x0300000000000000;
-@available(added=HEAD)
+@available(added=19)
 const FORMAT_MODIFIER_VENDOR_SAMSUNG uint64 = 0x0400000000000000;
-@available(added=HEAD)
+@available(added=19)
 const FORMAT_MODIFIER_VENDOR_QCOM uint64 = 0x0500000000000000;
-@available(added=HEAD)
+@available(added=19)
 const FORMAT_MODIFIER_VENDOR_VIVANTE uint64 = 0x0600000000000000;
-@available(added=HEAD)
+@available(added=19)
 const FORMAT_MODIFIER_VENDOR_BROADCOM uint64 = 0x0700000000000000;
-@available(added=HEAD)
+@available(added=19)
 const FORMAT_MODIFIER_VENDOR_ARM uint64 = 0x0800000000000000;
-@available(added=HEAD)
+@available(added=19)
 const FORMAT_MODIFIER_VENDOR_ALLWINNER uint64 = 0x0900000000000000;
-@available(added=HEAD)
+@available(added=19)
 const FORMAT_MODIFIER_VENDOR_AMLOGIC uint64 = 0x0a00000000000000;
 // Avoid unilaterally allocating vendor numbers from 0x0b onwards, to hopefully
 // avoid collisions with vendor numbers allocated elsewhere and to allow for
@@ -131,7 +128,7 @@ const FORMAT_MODIFIER_VENDOR_AMLOGIC uint64 = 0x0a00000000000000;
 // The 0x67 is 'g'. The intent of this vendor number is to avoid collision with
 // sequentially-allocated vendor numbers allocated elsewhere and listed above,
 // at least for now.
-@available(added=HEAD)
+@available(added=19)
 const FORMAT_MODIFIER_VENDOR_GOOGLE uint64 = 0x6700000000000000;
 
 //

@@ -1,0 +1,134 @@
+[
+    {
+        "kind": "table/member",
+        "name": "fuchsia.sysmem2/ImageFormatConstraints.bytes_per_row_divisor",
+        "ordinal": "13",
+        "type": "uint32"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.sysmem2/ImageFormatConstraints.color_spaces",
+        "ordinal": "3",
+        "type": "vector<fuchsia.images2/ColorSpace>:32"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.sysmem2/ImageFormatConstraints.display_rect_alignment",
+        "ordinal": "10",
+        "type": "fuchsia.math/SizeU"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.sysmem2/ImageFormatConstraints.max_bytes_per_row",
+        "ordinal": "7",
+        "type": "uint32"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.sysmem2/ImageFormatConstraints.max_size",
+        "ordinal": "5",
+        "type": "fuchsia.math/SizeU"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.sysmem2/ImageFormatConstraints.max_width_times_height",
+        "ordinal": "8",
+        "type": "uint64"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.sysmem2/ImageFormatConstraints.min_bytes_per_row",
+        "ordinal": "6",
+        "type": "uint32"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.sysmem2/ImageFormatConstraints.min_size",
+        "ordinal": "4",
+        "type": "fuchsia.math/SizeU"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.sysmem2/ImageFormatConstraints.pixel_format",
+        "ordinal": "1",
+        "type": "fuchsia.images2/PixelFormat"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.sysmem2/ImageFormatConstraints.pixel_format_and_modifiers",
+        "ordinal": "15",
+        "type": "vector<fuchsia.sysmem2/PixelFormatAndModifier>:64"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.sysmem2/ImageFormatConstraints.pixel_format_modifier",
+        "ordinal": "2",
+        "type": "fuchsia.images2/PixelFormatModifier"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.sysmem2/ImageFormatConstraints.require_bytes_per_row_at_pixel_boundary",
+        "ordinal": "16",
+        "type": "bool"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.sysmem2/ImageFormatConstraints.required_max_size",
+        "ordinal": "12",
+        "type": "fuchsia.math/SizeU"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.sysmem2/ImageFormatConstraints.required_min_size",
+        "ordinal": "11",
+        "type": "fuchsia.math/SizeU"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.sysmem2/ImageFormatConstraints.size_alignment",
+        "ordinal": "9",
+        "type": "fuchsia.math/SizeU"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.sysmem2/ImageFormatConstraints.start_offset_divisor",
+        "ordinal": "14",
+        "type": "uint32"
+    },
+    {
+        "kind": "table",
+        "name": "fuchsia.sysmem2/ImageFormatConstraints"
+    },
+    {
+        "kind": "const",
+        "name": "fuchsia.sysmem2/MAX_COUNT_IMAGE_FORMAT_CONSTRAINTS_COLOR_SPACES",
+        "type": "uint32",
+        "value": "32"
+    },
+    {
+        "kind": "const",
+        "name": "fuchsia.sysmem2/MAX_COUNT_PIXEL_FORMAT_AND_MODIFIERS",
+        "type": "uint32",
+        "value": "64"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.sysmem2/PixelFormatAndModifier.pixel_format",
+        "ordinal": "1",
+        "type": "fuchsia.images2/PixelFormat"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.sysmem2/PixelFormatAndModifier.pixel_format_modifier",
+        "ordinal": "2",
+        "type": "fuchsia.images2/PixelFormatModifier"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.sysmem2/PixelFormatAndModifier"
+    },
+    {
+        "kind": "library",
+        "name": "fuchsia.sysmem2"
+    }
+]

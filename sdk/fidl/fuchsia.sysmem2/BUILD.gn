@@ -5,10 +5,10 @@
 import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.sysmem2") {
-  # Promoting this library will require extra care since part of it is marked
-  # available at an older API level (see https://fxbug.dev/42085119), and this would
-  # carry over to the new category.
-  sdk_category = "internal"
+  sdk_category = "partner"
+
+  # Also Graphics
+  sdk_area = "Media"
   api = "fuchsia.sysmem2.api"
   sources = [
     "allocator.fidl",

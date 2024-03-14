@@ -27,7 +27,7 @@ const MAX_COUNT_PIXEL_FORMAT_AND_MODIFIERS uint32 = 64;
 /// stored in the buffers. These constraints can be specified per-participant.
 /// The sysmem service implements aggregation of constraints from multiple
 /// participants.
-@available(added=HEAD)
+@available(added=19)
 type BufferCollectionConstraints = table {
     /// The `usage` is a hint to sysmem to potentially help choose a more
     /// optimal [`fuchsia.images2/PixelFormat`] and/or `pixel_format_modifier`
@@ -169,7 +169,7 @@ type BufferCollectionConstraints = table {
 /// these `Heap` aliases is not a reliable way to determine if two `Heap` tables
 /// refer to the same heap (matching means yes, but not matching means maybe).
 /// Allowing heap aliases makes renaming `Heap.type`(s) easier.
-@available(added=HEAD)
+@available(added=19)
 type Heap = table {
     /// The type of the heap, specified using a bind string defined per the
     /// schema and mechanism described in comments in the
@@ -200,7 +200,7 @@ type Heap = table {
     2: id uint64;
 };
 
-@available(added=HEAD)
+@available(added=19)
 type BufferMemoryConstraints = table {
     /// un-set is treated as 1
     1: min_size_bytes uint64;
@@ -276,7 +276,7 @@ type BufferMemoryConstraints = table {
 /// the CPU. The `RAM` domain can be faster than the `CPU` domain when all
 /// access is via HW DMA, since in that case no CPU cache ops are required,
 /// since no participant is actually reading/writing using the CPU.
-@available(added=HEAD)
+@available(added=19)
 type CoherencyDomain = flexible enum {
     CPU = 0;
     RAM = 1;

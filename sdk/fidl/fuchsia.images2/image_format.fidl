@@ -2,21 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-// TODO(dalesat): Consider changing this library name.
-// fuchsia.images is currently occupied by ImagePipe. Will we be able to use that name? When?
-// Is the term 'image' too generic?
-
-// Some non-protocol types in this library are used by libmagma, which ships in
-// the IDK and must be built at all API levels supported by the IDK. See
-// https://fxbug.dev/42085119. The library is, however, unstable, and all other parts of
-// it should be explicitly marked as `added=HEAD`.
-@available(added=12)
 library fuchsia.images2;
+
 using fuchsia.math;
 
 /// Describes the format of images.
-// This is currently a placeholder. Please do not take a dependency on the details of this table
-// yet.
 type ImageFormat = table {
     /// Describes the manner in which pixels are encoded.
     1: pixel_format PixelFormat;

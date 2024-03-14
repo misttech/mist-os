@@ -21,8 +21,8 @@
 // While most of the code in this file is only available at HEAD, a subset is
 // available for a specific use case when
 // __ALLOW_IMAGES2_AND_SYSMEM2_TYPES_ONLY__ is defined. See https://fxbug.dev/42085119.
-#if (__Fuchsia_API_level__ < FUCHSIA_HEAD) && !defined(__ALLOW_IMAGES2_AND_SYSMEM2_TYPES_ONLY__)
-#error Should only be included for API level HEAD where fuchsia.images2 and fuchsia.sysmem2 are supported.
+#if (__Fuchsia_API_level__ < 19) && !defined(__ALLOW_IMAGES2_AND_SYSMEM2_TYPES_ONLY__)
+#error Should only be included for API level >= 19 where fuchsia.images2 and fuchsia.sysmem2 are supported.
 #endif
 
 // In sysmem V1, there's a PixelFormat FIDL struct that includes both pixel_format and
@@ -66,7 +66,7 @@ inline PixelFormatAndModifier PixelFormatAndModifierFromImageFormat(
   return PixelFormatAndModifier(*image_format.pixel_format(), pixel_format_modifier);
 }
 
-#if __Fuchsia_API_level__ >= FUCHSIA_HEAD
+#if __Fuchsia_API_level__ >= 19
 inline PixelFormatAndModifier PixelFormatAndModifierFromImageFormat(
     const fuchsia_images2::wire::ImageFormat& image_format) {
   ZX_ASSERT(image_format.has_pixel_format());
@@ -75,7 +75,7 @@ inline PixelFormatAndModifier PixelFormatAndModifierFromImageFormat(
                                                : fuchsia_images2::PixelFormatModifier::kLinear;
   return PixelFormatAndModifier(image_format.pixel_format(), pixel_format_modifier);
 }
-#endif  // __Fuchsia_API_level__ >= FUCHSIA_HEAD
+#endif  // __Fuchsia_API_level__ >= 19
 
 namespace sysmem {
 
@@ -179,7 +179,7 @@ constexpr FidlUnderlyingTypeOrType_t<T> fidl_underlying_cast(const T& value) {
   return static_cast<FidlUnderlyingTypeOrType_t<T>>(value);
 }
 
-#if __Fuchsia_API_level__ >= FUCHSIA_HEAD
+#if __Fuchsia_API_level__ >= 19
 
 ///////////////////////
 // V2 Copy/Move from V1
@@ -395,7 +395,7 @@ V2CopyFromV1ImageFormatConstraints(const fuchsia_sysmem::ImageFormatConstraints&
 [[nodiscard]] fpromise::result<fuchsia_sysmem::ImageFormat2> V1CopyFromV2ImageFormat(
     fuchsia_images2::ImageFormat& v2);
 
-#endif  // __Fuchsia_API_level__ >= FUCHSIA_HEAD
+#endif  // __Fuchsia_API_level__ >= 19
 
 }  // namespace sysmem
 

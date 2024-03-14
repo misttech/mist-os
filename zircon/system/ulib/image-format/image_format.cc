@@ -7,7 +7,7 @@
 // This file is always in the GN sources list, but its contents should not be
 // used for API levels other than HEAD where images2 and sysmem2 are supported.
 
-#if __Fuchsia_API_level__ < FUCHSIA_HEAD
+#if __Fuchsia_API_level__ < 19
 // Enable a subset of functionality. See https://fxbug.dev/42085119.
 // It cannot be undefined because other Fuchsia headers may indirectly include image_format.h.
 #define __ALLOW_IMAGES2_AND_SYSMEM2_TYPES_ONLY__
@@ -38,8 +38,8 @@ using safemath::CheckDiv;
 using safemath::CheckMul;
 using safemath::CheckSub;
 
-#if __Fuchsia_API_level__ < FUCHSIA_HEAD
-// This id used by the ImageFormatSet implementations before it is defined.
+#if __Fuchsia_API_level__ < 19
+// This is used by the ImageFormatSet implementations before it is defined.
 // Normally, it is declared by the header.
 uint32_t ImageFormatStrideBytesPerWidthPixel(const PixelFormatAndModifier& pixel_format);
 #endif
@@ -56,7 +56,7 @@ using ImageFormatWire = fuchsia_images2::wire::ImageFormat;
 using ImageFormatConstraintsWire = fuchsia_sysmem2::wire::ImageFormatConstraints;
 using PixelFormatWire = fuchsia_images2::wire::PixelFormat;
 
-#if __Fuchsia_API_level__ >= FUCHSIA_HEAD
+#if __Fuchsia_API_level__ >= 19
 // There are two aspects of the ColorSpaceWire and PixelFormatWire that we care about:
 //   * bits-per-sample - bits per primary sample (R, G, B, or Y)
 //   * RGB vs. YUV - whether the system supports the ColorSpaceWire or PixelFormatWire
@@ -114,7 +114,7 @@ const std::map<PixelFormatWire, SamplingInfo> kPixelFormatSamplingInfo = {
     {PixelFormat::kA2B10G10R10, {{8}, {kColorType_RGB}}},
     {PixelFormat::kA2R10G10B10, {{8}, {kColorType_RGB}}},
 };
-#endif  // __Fuchsia_API_level__ >= FUCHSIA_HEAD
+#endif  // __Fuchsia_API_level__ >= 19
 
 constexpr uint32_t kTransactionEliminationAlignment = 64;
 // The transaction elimination buffer is always reported as plane 3.
@@ -990,7 +990,7 @@ constexpr const ImageFormatSet* kImageFormats[] = {
 
 }  // namespace
 
-#if __Fuchsia_API_level__ >= FUCHSIA_HEAD
+#if __Fuchsia_API_level__ >= 19
 
 bool ImageFormatIsPixelFormatEqual(const PixelFormatAndModifier& a,
                                    const PixelFormatAndModifier& b) {
@@ -1059,7 +1059,7 @@ bool ImageFormatIsSupportedColorSpaceForPixelFormat(
   return ImageFormatIsSupportedColorSpaceForPixelFormat(color_space_v2, pixel_format_v2);
 }
 
-#endif  // __Fuchsia_API_level__ >= FUCHSIA_HEAD
+#endif  // __Fuchsia_API_level__ >= 19
 
 bool ImageFormatIsSupported(const PixelFormatAndModifier& pixel_format) {
   return std::any_of(std::begin(kImageFormats), std::end(kImageFormats),
@@ -1068,7 +1068,7 @@ bool ImageFormatIsSupported(const PixelFormatAndModifier& pixel_format) {
                      });
 }
 
-#if __Fuchsia_API_level__ >= FUCHSIA_HEAD
+#if __Fuchsia_API_level__ >= 19
 
 bool ImageFormatIsSupported(const fuchsia_sysmem::wire::PixelFormat& wire_pixel_format_v1) {
   auto pixel_format_v1 = fidl::ToNatural(wire_pixel_format_v1);
@@ -1129,7 +1129,7 @@ uint32_t ImageFormatBitsPerPixel(const fuchsia_sysmem::wire::PixelFormat& wire_p
   return ImageFormatBitsPerPixel(pixel_format_v2);
 }
 
-#endif  // __Fuchsia_API_level__ >= FUCHSIA_HEAD
+#endif  // __Fuchsia_API_level__ >= 19
 
 uint32_t ImageFormatStrideBytesPerWidthPixel(const PixelFormatAndModifier& pixel_format) {
   ZX_DEBUG_ASSERT(ImageFormatIsSupported(pixel_format));
@@ -1183,7 +1183,7 @@ uint32_t ImageFormatStrideBytesPerWidthPixel(const PixelFormatAndModifier& pixel
   }
 }
 
-#if __Fuchsia_API_level__ >= FUCHSIA_HEAD
+#if __Fuchsia_API_level__ >= 19
 
 uint32_t ImageFormatStrideBytesPerWidthPixel(
     const fuchsia_sysmem::wire::PixelFormat& wire_pixel_format_v1) {
@@ -1388,7 +1388,7 @@ uint32_t ImageFormatSampleAlignment(const fuchsia_sysmem::wire::PixelFormat& wir
   return ImageFormatSampleAlignment(pixel_format_v2);
 }
 
-#endif  // __Fuchsia_API_level__ >= FUCHSIA_HEAD
+#endif  // __Fuchsia_API_level__ >= 19
 
 bool ImageFormatMinimumRowBytes(const fuchsia_sysmem2::ImageFormatConstraints& constraints,
                                 uint32_t width, uint32_t* minimum_row_bytes_out) {
@@ -1408,7 +1408,7 @@ bool ImageFormatMinimumRowBytes(const fuchsia_sysmem2::ImageFormatConstraints& c
   return false;
 }
 
-#if __Fuchsia_API_level__ >= FUCHSIA_HEAD
+#if __Fuchsia_API_level__ >= 19
 
 bool ImageFormatMinimumRowBytes(
     const fuchsia_sysmem2::wire::ImageFormatConstraints& wire_constraints, uint32_t width,
@@ -1468,7 +1468,7 @@ fpromise::result<fuchsia_images2::wire::PixelFormat> ImageFormatConvertZbiToSysm
   }
 }
 
-#endif  // __Fuchsia_API_level__ >= FUCHSIA_HEAD
+#endif  // __Fuchsia_API_level__ >= 19
 
 fpromise::result<ImageFormat> ImageConstraintsToFormat(const ImageFormatConstraints& constraints,
                                                        uint32_t width, uint32_t height) {
@@ -1500,7 +1500,7 @@ fpromise::result<ImageFormat> ImageConstraintsToFormat(const ImageFormatConstrai
   return fpromise::ok(std::move(result));
 }
 
-#if __Fuchsia_API_level__ >= FUCHSIA_HEAD
+#if __Fuchsia_API_level__ >= 19
 fpromise::result<ImageFormatWire> ImageConstraintsToFormat(
     fidl::AnyArena& allocator, const ImageFormatConstraintsWire& wire_constraints, uint32_t width,
     uint32_t height) {
@@ -1511,7 +1511,7 @@ fpromise::result<ImageFormatWire> ImageConstraintsToFormat(
   }
   return fpromise::ok(fidl::ToWire(allocator, result.take_value()));
 }
-#endif  // __Fuchsia_API_level__ >= FUCHSIA_HEAD
+#endif  // __Fuchsia_API_level__ >= 19
 
 fpromise::result<fuchsia_sysmem::wire::ImageFormat2> ImageConstraintsToFormat(
     const fuchsia_sysmem::wire::ImageFormatConstraints& wire_image_format_constraints_v1,
@@ -1551,12 +1551,12 @@ bool ImageFormatPlaneByteOffset(const ImageFormat& image_format, uint32_t plane,
   return false;
 }
 
-#if __Fuchsia_API_level__ >= FUCHSIA_HEAD
+#if __Fuchsia_API_level__ >= 19
 bool ImageFormatPlaneByteOffset(const ImageFormatWire& image_format, uint32_t plane,
                                 uint64_t* offset_out) {
   return ImageFormatPlaneByteOffset(fidl::ToNatural(image_format), plane, offset_out);
 }
-#endif  // __Fuchsia_API_level__ >= FUCHSIA_HEAD
+#endif  // __Fuchsia_API_level__ >= 19
 
 bool ImageFormatPlaneByteOffset(const fuchsia_sysmem::wire::ImageFormat2& wire_image_format_v1,
                                 uint32_t plane, uint64_t* offset_out) {
@@ -1582,12 +1582,12 @@ bool ImageFormatPlaneRowBytes(const ImageFormat& image_format, uint32_t plane,
   return false;
 }
 
-#if __Fuchsia_API_level__ >= FUCHSIA_HEAD
+#if __Fuchsia_API_level__ >= 19
 bool ImageFormatPlaneRowBytes(const ImageFormatWire& wire_image_format, uint32_t plane,
                               uint32_t* row_bytes_out) {
   return ImageFormatPlaneRowBytes(fidl::ToNatural(wire_image_format), plane, row_bytes_out);
 }
-#endif  // __Fuchsia_API_level__ >= FUCHSIA_HEAD
+#endif  // __Fuchsia_API_level__ >= 19
 
 bool ImageFormatPlaneRowBytes(const fuchsia_sysmem::wire::ImageFormat2& wire_image_format_v1,
                               uint32_t plane, uint32_t* row_bytes_out) {
@@ -1601,7 +1601,7 @@ bool ImageFormatPlaneRowBytes(const fuchsia_sysmem::wire::ImageFormat2& wire_ima
   return ImageFormatPlaneRowBytes(image_format_v2, plane, row_bytes_out);
 }
 
-#if __Fuchsia_API_level__ >= FUCHSIA_HEAD
+#if __Fuchsia_API_level__ >= 19
 
 bool ImageFormatCompatibleWithProtectedMemory(const PixelFormatAndModifier& pixel_format) {
   // AKA kFormatModifierLinear
@@ -1630,4 +1630,4 @@ bool ImageFormatCompatibleWithProtectedMemory(
   return ImageFormatCompatibleWithProtectedMemory(pixel_format_v2);
 }
 
-#endif  // __Fuchsia_API_level__ >= FUCHSIA_HEAD
+#endif  // __Fuchsia_API_level__ >= 19

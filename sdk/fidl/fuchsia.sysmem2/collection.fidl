@@ -5,7 +5,7 @@ library fuchsia.sysmem2;
 
 using zx;
 
-@available(added=HEAD)
+@available(added=19)
 const MAX_COUNT_DUPLICATES uint32 = 64;
 
 /// The maximum number of token children of an OR group that can be created per
@@ -18,13 +18,13 @@ const MAX_COUNT_DUPLICATES uint32 = 64;
 /// in aggregation attempts to a separate maximum that is not settable via
 /// sysmem protocols. The maximum number of total nodes in a sysmem token tree
 /// is limited to a separate maximum that is not settable via these protocols.
-@available(added=HEAD)
+@available(added=19)
 const MAX_COUNT_CREATE_CHILDREN int32 = 64;
 
 /// The max length in bytes of the `name` request field in
 /// [`fuchsia.sysmem2/Allocator.SetDebugClientInfo`] and
 /// [`fuchsia.sysmem2/Node.SetDebugClientInfo`].
-@available(added=HEAD)
+@available(added=19)
 const MAX_CLIENT_NAME_LENGTH int32 = 256;
 
 /// This protocol is the parent protocol for all nodes in the tree established
@@ -34,7 +34,7 @@ const MAX_CLIENT_NAME_LENGTH int32 = 256;
 /// to a [`fuchsia.sysmem2/BufferCollection`] channel.
 ///
 /// Epitaphs are not used in this protocol.
-@available(added=HEAD)
+@available(added=19)
 open protocol Node {
     /// Ensure that previous messages have been received server side. This is
     /// particularly useful after previous messages that created new tokens,
@@ -460,7 +460,7 @@ open protocol Node {
 /// `eventpair` (pair) because this way we can detect error conditions like a
 /// participant failing mid-create.
 // LINT.IfChange
-@available(added=HEAD)
+@available(added=19)
 open protocol BufferCollectionToken {
     compose Node;
 
@@ -707,7 +707,7 @@ open protocol BufferCollectionToken {
 /// fully deallocated prior to the initiator allocating a new buffer collection.
 ///
 /// Epitaphs are not used in this protocol.
-@available(added=HEAD)
+@available(added=19)
 open protocol BufferCollection {
     compose Node;
 
@@ -1051,7 +1051,7 @@ open protocol BufferCollection {
 /// doesn't propagate failure to its parent).
 ///
 /// Epitaphs are not used in this protocol.
-@available(added=HEAD)
+@available(added=19)
 open protocol BufferCollectionTokenGroup {
     compose Node;
 

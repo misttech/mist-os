@@ -19,7 +19,7 @@
 // The GetPlanes() implementation relies on non-protocol types in fuchsia.images2 and
 // fuchsia.sysmem2. Allow use of these as an exception to general availability
 // of the full protocols. See https://fxbug.dev/42085119.
-#if __Fuchsia_API_level__ < FUCHSIA_HEAD
+#if __Fuchsia_API_level__ < 19
 // Enable a subset of functionality in image_format.h.
 #define __ALLOW_IMAGES2_AND_SYSMEM2_TYPES_ONLY__
 #endif
