@@ -108,10 +108,8 @@ pub enum ScanObservation {
 pub struct Bss {
     /// MAC address for the AP interface.
     pub bssid: Bssid,
-    /// Calculated received signal strength for the beacon/probe response.
-    pub rssi: i8,
-    /// Signal to noise ratio  for the beacon/probe response.
-    pub snr_db: i8,
+    /// Signal strength for the beacon/probe response.
+    pub signal: Signal,
     /// Channel for this network.
     pub channel: WlanChan,
     /// Realtime timestamp for this scan result entry.
@@ -138,7 +136,9 @@ impl Bss {
 //                         in `BssDescription`.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct Signal {
+    /// Calculated received signal strength for the beacon/probe response.
     pub rssi_dbm: i8,
+    /// Signal to noise ratio  for the beacon/probe response.
     pub snr_db: i8,
 }
 

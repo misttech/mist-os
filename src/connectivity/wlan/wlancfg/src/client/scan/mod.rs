@@ -377,8 +377,10 @@ fn bss_to_network_map(
         {
             entry.push(types::Bss {
                 bssid: scan_result.bss_description.bssid,
-                rssi: scan_result.bss_description.rssi_dbm,
-                snr_db: scan_result.bss_description.snr_db,
+                signal: types::Signal {
+                    rssi_dbm: scan_result.bss_description.rssi_dbm,
+                    snr_db: scan_result.bss_description.snr_db,
+                },
                 channel: scan_result.bss_description.channel,
                 timestamp: scan_result.timestamp,
                 // TODO(123709): if target_ssids contains the wildcard, this need to be "Unknown"
@@ -683,9 +685,8 @@ mod tests {
                 entries: vec![
                     types::Bss {
                         bssid: types::Bssid::from([0, 0, 0, 0, 0, 0]),
-                        rssi: 0,
+                        signal: types::Signal { rssi_dbm: 0, snr_db: 1 },
                         timestamp: zx::Time::from_nanos(sme_result_1.timestamp_nanos),
-                        snr_db: 1,
                         channel: types::WlanChan::new(1, types::Cbw::Cbw20),
                         observation: observation,
                         compatibility: Compatibility::expect_some([
@@ -695,9 +696,8 @@ mod tests {
                     },
                     types::Bss {
                         bssid: types::Bssid::from([7, 8, 9, 10, 11, 12]),
-                        rssi: 13,
+                        signal: types::Signal { rssi_dbm: 13, snr_db: 3 },
                         timestamp: zx::Time::from_nanos(sme_result_3.timestamp_nanos),
-                        snr_db: 3,
                         channel: types::WlanChan::new(11, types::Cbw::Cbw20),
                         observation: observation,
                         compatibility: None,
@@ -711,9 +711,8 @@ mod tests {
                 security_type_detailed: types::SecurityTypeDetailed::Wpa2Personal,
                 entries: vec![types::Bss {
                     bssid: types::Bssid::from([1, 2, 3, 4, 5, 6]),
-                    rssi: 7,
+                    signal: types::Signal { rssi_dbm: 7, snr_db: 2 },
                     timestamp: zx::Time::from_nanos(sme_result_2.timestamp_nanos),
-                    snr_db: 2,
                     channel: types::WlanChan::new(8, types::Cbw::Cbw20),
                     observation: observation,
                     compatibility: Compatibility::expect_some([SecurityDescriptor::WPA2_PERSONAL]),
@@ -1155,9 +1154,8 @@ mod tests {
         let expected_bss = vec![
             types::Bss {
                 bssid: types::Bssid::from([0, 0, 0, 0, 0, 0]),
-                rssi: 0,
+                signal: types::Signal { rssi_dbm: 0, snr_db: 1 },
                 timestamp: zx::Time::from_nanos(first_result.timestamp_nanos),
-                snr_db: 1,
                 channel: types::WlanChan::new(1, types::Cbw::Cbw20),
                 observation: types::ScanObservation::Passive,
                 compatibility: Compatibility::expect_some([SecurityDescriptor::WPA3_PERSONAL]),
@@ -1165,9 +1163,8 @@ mod tests {
             },
             types::Bss {
                 bssid: types::Bssid::from([1, 2, 3, 4, 5, 6]),
-                rssi: 101,
+                signal: types::Signal { rssi_dbm: 101, snr_db: 101 },
                 timestamp: zx::Time::from_nanos(second_result.timestamp_nanos),
-                snr_db: 101,
                 channel: types::WlanChan::new(101, types::Cbw::Cbw40),
                 observation: types::ScanObservation::Passive,
                 compatibility: Compatibility::expect_some([SecurityDescriptor::WPA3_PERSONAL]),

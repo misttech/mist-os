@@ -29,7 +29,7 @@ const SCORE_PENALTY_FOR_RECENT_CREDENTIAL_REJECTED: i16 = 30;
 const SCORE_PENALTY_FOR_SHORT_CONNECTION: i16 = 20;
 
 pub fn score_bss_scanned_candidate(bss_candidate: types::ScannedCandidate) -> i16 {
-    let mut score = bss_candidate.bss.rssi as i16;
+    let mut score = bss_candidate.bss.signal.rssi_dbm as i16;
     let channel = bss_candidate.bss.channel;
 
     // If the network is 5G and has a strong enough RSSI, give it a bonus
@@ -213,10 +213,16 @@ mod test {
 
     #[fasync::run_singlethreaded(test)]
     async fn test_score_bss_prefers_less_short_connections() {
-        let bss_worse =
-            types::Bss { rssi: -60, channel: generate_channel(3), ..generate_random_bss() };
-        let bss_better =
-            types::Bss { rssi: -60, channel: generate_channel(3), ..generate_random_bss() };
+        let bss_worse = types::Bss {
+            signal: types::Signal { rssi_dbm: -60, snr_db: 0 },
+            channel: generate_channel(3),
+            ..generate_random_bss()
+        };
+        let bss_better = types::Bss {
+            signal: types::Signal { rssi_dbm: -60, snr_db: 0 },
+            channel: generate_channel(3),
+            ..generate_random_bss()
+        };
         let mut internal_data = generate_random_saved_network_data();
         let short_uptime = zx::Duration::from_seconds(30);
         let okay_uptime = zx::Duration::from_minutes(100);
@@ -239,10 +245,16 @@ mod test {
 
     #[fasync::run_singlethreaded(test)]
     async fn test_score_bss_prefers_less_failures() {
-        let bss_worse =
-            types::Bss { rssi: -60, channel: generate_channel(3), ..generate_random_bss() };
-        let bss_better =
-            types::Bss { rssi: -60, channel: generate_channel(3), ..generate_random_bss() };
+        let bss_worse = types::Bss {
+            signal: types::Signal { rssi_dbm: -60, snr_db: 0 },
+            channel: generate_channel(3),
+            ..generate_random_bss()
+        };
+        let bss_better = types::Bss {
+            signal: types::Signal { rssi_dbm: -60, snr_db: 0 },
+            channel: generate_channel(3),
+            ..generate_random_bss()
+        };
         let mut internal_data = generate_random_saved_network_data();
         // Add many test failures for the worse BSS and one for the better BSS
         let mut failures = vec![connect_failure_with_bssid(bss_worse.bssid); 12];
@@ -263,10 +275,16 @@ mod test {
     async fn test_score_bss_prefers_strong_5ghz_with_failures() {
         // Test test that if one network has a few network failures but is 5 Ghz instead of 2.4,
         // the 5 GHz network has a higher score.
-        let bss_worse =
-            types::Bss { rssi: -35, channel: generate_channel(3), ..generate_random_bss() };
-        let bss_better =
-            types::Bss { rssi: -35, channel: generate_channel(36), ..generate_random_bss() };
+        let bss_worse = types::Bss {
+            signal: types::Signal { rssi_dbm: -35, snr_db: 0 },
+            channel: generate_channel(3),
+            ..generate_random_bss()
+        };
+        let bss_better = types::Bss {
+            signal: types::Signal { rssi_dbm: -35, snr_db: 0 },
+            channel: generate_channel(36),
+            ..generate_random_bss()
+        };
         let mut internal_data = generate_random_saved_network_data();
         // Set the failure list to have 0 failures for the worse BSS and 4 failures for the
         // stronger BSS.
@@ -286,10 +304,16 @@ mod test {
         // If two BSS are identical other than one failed to connect with wrong credentials and
         // the other failed with a few connect failurs, the one with wrong credentials has a lower
         // score.
-        let bss_worse =
-            types::Bss { rssi: -30, channel: generate_channel(44), ..generate_random_bss() };
-        let bss_better =
-            types::Bss { rssi: -30, channel: generate_channel(44), ..generate_random_bss() };
+        let bss_worse = types::Bss {
+            signal: types::Signal { rssi_dbm: -30, snr_db: 0 },
+            channel: generate_channel(44),
+            ..generate_random_bss()
+        };
+        let bss_better = types::Bss {
+            signal: types::Signal { rssi_dbm: -30, snr_db: 0 },
+            channel: generate_channel(44),
+            ..generate_random_bss()
+        };
         let mut internal_data = generate_random_saved_network_data();
         // Add many test failures for the worse BSS and one for the better BSS
         let mut failures = vec![connect_failure_with_bssid(bss_better.bssid); 4];
@@ -312,7 +336,11 @@ mod test {
 
     #[fasync::run_singlethreaded(test)]
     async fn score_many_penalties_do_not_cause_panic() {
-        let bss = types::Bss { rssi: -80, channel: generate_channel(1), ..generate_random_bss() };
+        let bss = types::Bss {
+            signal: types::Signal { rssi_dbm: -80, snr_db: 0 },
+            channel: generate_channel(1),
+            ..generate_random_bss()
+        };
         let mut internal_data = generate_random_saved_network_data();
         // Add 10 general failures and 10 rejected credentials failures
         internal_data.recent_failures = vec![connect_failure_with_bssid(bss.bssid); 10];

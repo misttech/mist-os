@@ -440,7 +440,7 @@ impl types::ScannedCandidate {
 
     pub fn to_string_without_pii(&self) -> String {
         let channel = self.bss.channel;
-        let rssi = self.bss.rssi;
+        let rssi = self.bss.signal.rssi_dbm;
         let recent_failure_count = self.recent_failure_count();
         let recent_short_connection_count = self.recent_short_connections();
 
@@ -474,7 +474,7 @@ impl WriteInspect for types::ScannedCandidate {
         inspect_insert!(writer, var key: {
             ssid: self.network.ssid.to_string(),
             bssid: self.bss.bssid.to_string(),
-            rssi: self.bss.rssi,
+            rssi: self.bss.signal.rssi_dbm,
             score: scoring_functions::score_bss_scanned_candidate(self.clone()),
             security_type_saved: self.saved_security_type_to_string(),
             security_type_scanned: format!("{}", wlan_common::bss::Protection::from(self.security_type_detailed)),
@@ -1350,7 +1350,10 @@ mod tests {
                     ),
                     bssid: bssid_1,
                     channel: channel_1,
-                    rssi: 20, // much higher than other result
+                    signal: types::Signal {
+                        rssi_dbm: 20, // much higher than other result
+                        snr_db: 0,
+                    },
                     observation: types::ScanObservation::Passive,
                     ..generate_random_bss()
                 }],
@@ -1365,7 +1368,10 @@ mod tests {
                     ),
                     bssid: bssid_2,
                     channel: channel_2,
-                    rssi: -100, // much lower than other result
+                    signal: types::Signal {
+                        rssi_dbm: -100, // much lower than other result
+                        snr_db: 0,
+                    },
                     observation: types::ScanObservation::Passive,
                     ..generate_random_bss()
                 }],

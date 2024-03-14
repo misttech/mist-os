@@ -70,7 +70,7 @@ pub fn scan_result_to_policy_scan_result(
                                 let frequency = input.channel.get_center_freq().unwrap_or(0);
                                 fidl_policy::Bss {
                                     bssid: Some(input.bssid.to_array()),
-                                    rssi: Some(input.rssi),
+                                    rssi: Some(input.signal.rssi_dbm),
                                     frequency: Some(frequency.into()), // u16.into() -> u32
                                     timestamp_nanos: Some(input.timestamp.into_nanos()),
                                     ..Default::default()
@@ -333,11 +333,10 @@ mod tests {
                 entries: vec![
                     types::Bss {
                         bssid: types::Bssid::from([0, 0, 0, 0, 0, 0]),
-                        rssi: 0,
+                        signal: types::Signal { rssi_dbm: 0, snr_db: 1 },
                         timestamp: zx::Time::from_nanos(
                             fidl_aps[0].entries.as_ref().unwrap()[0].timestamp_nanos.unwrap(),
                         ),
-                        snr_db: 1,
                         channel: types::WlanChan::new(1, types::Cbw::Cbw20),
                         observation: types::ScanObservation::Passive,
                         compatibility: Compatibility::expect_some([
@@ -355,11 +354,10 @@ mod tests {
                     },
                     types::Bss {
                         bssid: types::Bssid::from([7, 8, 9, 10, 11, 12]),
-                        rssi: 13,
+                        signal: types::Signal { rssi_dbm: 13, snr_db: 3 },
                         timestamp: zx::Time::from_nanos(
                             fidl_aps[0].entries.as_ref().unwrap()[1].timestamp_nanos.unwrap(),
                         ),
-                        snr_db: 3,
                         channel: types::WlanChan::new(11, types::Cbw::Cbw20),
                         observation: types::ScanObservation::Passive,
                         compatibility: None,
@@ -381,11 +379,10 @@ mod tests {
                 security_type_detailed: types::SecurityTypeDetailed::Wpa2Personal,
                 entries: vec![types::Bss {
                     bssid: types::Bssid::from([1, 2, 3, 4, 5, 6]),
-                    rssi: 7,
+                    signal: types::Signal { rssi_dbm: 7, snr_db: 2 },
                     timestamp: zx::Time::from_nanos(
                         fidl_aps[1].entries.as_ref().unwrap()[0].timestamp_nanos.unwrap(),
                     ),
-                    snr_db: 2,
                     channel: types::WlanChan::new(8, types::Cbw::Cbw20),
                     observation: types::ScanObservation::Passive,
                     compatibility: Compatibility::expect_some([SecurityDescriptor::WPA2_PERSONAL]),

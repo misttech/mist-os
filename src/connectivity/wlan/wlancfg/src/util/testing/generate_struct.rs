@@ -91,10 +91,9 @@ pub fn generate_random_bss() -> types::Bss {
 
     types::Bss {
         bssid,
-        rssi,
+        signal: types::Signal { rssi_dbm: rssi, snr_db },
         channel,
         timestamp,
-        snr_db,
         observation: if rng.gen::<bool>() {
             types::ScanObservation::Passive
         } else {

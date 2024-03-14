@@ -187,8 +187,7 @@ mod test {
         channel: types::WlanChan,
     ) -> types::ScannedCandidate {
         let bss = types::Bss {
-            rssi,
-            snr_db,
+            signal: types::Signal { rssi_dbm: rssi, snr_db },
             channel: channel,
             bss_description: fidl_internal::BssDescription {
                 rssi_dbm: rssi,
@@ -421,7 +420,7 @@ mod test {
                     "selected": {
                         ssid: candidates[2].network.ssid.to_string(),
                         bssid: candidates[2].bss.bssid.to_string(),
-                        rssi: i64::from(candidates[2].bss.rssi),
+                        rssi: i64::from(candidates[2].bss.signal.rssi_dbm),
                         score: i64::from(scoring_functions::score_bss_scanned_candidate(candidates[2].clone())),
                         security_type_saved: candidates[2].saved_security_type_to_string(),
                         security_type_scanned: format!("{}", wlan_common::bss::Protection::from(candidates[2].security_type_detailed)),

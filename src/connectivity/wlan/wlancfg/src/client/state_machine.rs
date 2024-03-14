@@ -2693,8 +2693,8 @@ mod tests {
         let mut connect_selection = generate_connect_selection();
         let init_rssi = -40;
         let init_snr = 30;
-        connect_selection.target.bss.rssi = init_rssi;
-        connect_selection.target.bss.snr_db = init_snr;
+        connect_selection.target.bss.signal =
+            types::Signal { rssi_dbm: init_rssi, snr_db: init_snr };
 
         let mut bss_description =
             Sequestered::release(connect_selection.target.bss.bss_description.clone());

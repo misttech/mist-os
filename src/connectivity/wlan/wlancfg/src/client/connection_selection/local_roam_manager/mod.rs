@@ -231,10 +231,13 @@ fn is_roam_worthwhile(
     let current_snr = request.connection_data.quality_data.signal_data.ewma_snr.get();
     info!(
         "Roam candidate BSS - RSSI: {:?}, SNR: {:?}. Current BSS - RSSI: {:?}, SNR: {:?}.",
-        roam_candidate.bss.rssi, roam_candidate.bss.snr_db, current_rssi, current_snr
+        roam_candidate.bss.signal.rssi_dbm,
+        roam_candidate.bss.signal.snr_db,
+        current_rssi,
+        current_snr
     );
-    if (roam_candidate.bss.rssi as f64) < current_rssi + MIN_RSSI_IMPROVEMENT_TO_ROAM
-        && (roam_candidate.bss.snr_db as f64) < current_snr + MIN_SNR_IMPROVEMENT_TO_ROAM
+    if (roam_candidate.bss.signal.rssi_dbm as f64) < current_rssi + MIN_RSSI_IMPROVEMENT_TO_ROAM
+        && (roam_candidate.bss.signal.snr_db as f64) < current_snr + MIN_SNR_IMPROVEMENT_TO_ROAM
     {
         info!(
             "Selected roam candidate ({:?}) is not enough of an improvement. Ignoring.",
@@ -371,8 +374,7 @@ mod tests {
                     SecurityDescriptor::WPA2_PERSONAL,
                 ]),
                 bss_description: random_fidl_bss_description!().into(),
-                rssi: rssi,
-                snr_db: snr,
+                signal: types::Signal { rssi_dbm: rssi, snr_db: snr },
                 ..generate_random_bss()
             }],
         }
