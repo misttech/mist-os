@@ -9,29 +9,43 @@
 use ::gcs::client::{Client, ProgressResponse, ProgressState};
 use anyhow::{anyhow, Context, Result};
 use async_fs::rename;
+use async_trait::async_trait;
 use errors::ffx_bail;
-use ffx_core::ffx_plugin;
 use ffx_product_download_args::DownloadCommand;
 use ffx_product_list::pb_list_impl;
+use fho::{FfxMain, FfxTool, SimpleWriter};
 use pbms::{make_way_for_output, transfer_download, AuthFlowChoice};
 use std::{
     io::{stderr, stdin, stdout},
     path::Path,
 };
 
-/// `ffx product download` sub-command.
-#[ffx_plugin()]
-pub async fn pb_download(cmd: DownloadCommand) -> Result<()> {
-    let client = Client::initial()?;
-    let mut input = stdin();
-    let mut output = stdout();
-    let mut err_out = stderr();
-    let ui = structured_ui::TextUi::new(&mut input, &mut output, &mut err_out);
-
-    let cmd = preprocess_cmd(cmd, &ui).await?;
-
-    pb_download_impl(&cmd.auth, cmd.force, &cmd.manifest_url, &cmd.product_dir, &client, &ui).await
+#[derive(FfxTool)]
+pub struct PbDownloadTool {
+    #[command]
+    cmd: DownloadCommand,
 }
+
+#[async_trait(?Send)]
+impl FfxMain for PbDownloadTool {
+    type Writer = SimpleWriter;
+    async fn main(self, _writer: SimpleWriter) -> fho::Result<()> {
+        let client = Client::initial()?;
+        let mut input = stdin();
+        let mut output = stdout();
+        let mut err_out = stderr();
+        let ui = structured_ui::TextUi::new(&mut input, &mut output, &mut err_out);
+
+        let cmd = preprocess_cmd(self.cmd, &ui).await?;
+
+        pb_download_impl(&cmd.auth, cmd.force, &cmd.manifest_url, &cmd.product_dir, &client, &ui)
+            .await
+            .map_err(|e| <anyhow::Error as Into<fho::Error>>::into(e))?;
+        Ok(())
+    }
+}
+
+fho::embedded_plugin!(PbDownloadTool);
 
 pub async fn pb_download_impl<I: structured_ui::Interface + Sync>(
     auth: &AuthFlowChoice,

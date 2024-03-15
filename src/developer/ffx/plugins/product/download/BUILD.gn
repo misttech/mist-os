@@ -15,12 +15,14 @@ ffx_plugin("ffx_product_download") {
 
   deps = [
     "//src/developer/ffx/lib/errors:lib",
+    "//src/developer/ffx/lib/fho:lib",
     "//src/developer/ffx/lib/pbms:lib",
     "//src/developer/ffx/plugins/product/list:ffx_product_list",
     "//src/lib/gcs",
     "//src/lib/structured_ui",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:async-fs",
+    "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:tempfile",
     "//third_party/rust_crates:tracing",
     "//third_party/rust_crates:url",
