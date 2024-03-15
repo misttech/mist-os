@@ -547,12 +547,19 @@ func canAccessRbe(checkoutDir string) (bool, error) {
 	if len(lines) < 1 {
 		return false, fmt.Errorf("Failed to read 'git remote -v'")
 	}
-	fields := strings.Fields(lines[0])
-	// Expect a line like:
-	//   "origin	sso://.../integration (fetch)"
-	// or
-	//   "origin	https://.../integration (fetch)"
-	return strings.HasPrefix(fields[1], "sso://"), nil
+	// Check all remotes.  If any have SSO access, then assume user
+	// can access RBE.
+	for _, line := range lines {
+		fields := strings.Fields(line)
+		// Expect lines like:
+		//   "origin	sso://.../integration (fetch)"
+		// or
+		//   "origin	https://.../integration (fetch)"
+		if len(fields) >= 2 && strings.HasPrefix(fields[1], "sso://") {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 func isGomaAuthenticated(ctx context.Context, fx fxRunner) (bool, error) {
