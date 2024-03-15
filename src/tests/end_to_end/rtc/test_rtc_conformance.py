@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 """RTC conformance test."""
 
+import contextlib
 import datetime
 import logging
 import random
@@ -12,6 +13,35 @@ from honeydew.interfaces.device_classes import fuchsia_device
 from mobly import asserts, test_runner
 
 LOGGER: logging.Logger = logging.getLogger(__name__)
+
+
+class TimeIt(contextlib.ContextDecorator):
+    """A context manager which logs elapsed time of the with-block.
+
+    Any exception raised by the with-block will propagate.
+
+    Attributes:
+        time_elapsed: The measured elapsed time, only available after the
+            context manager exits.
+    """
+
+    time_elapsed: datetime.timedelta
+
+    def __init__(self, msg: str) -> None:
+        """Initialized with a descriptive context message."""
+        self._msg = msg
+
+    def __enter__(self) -> "TimeIt":
+        """Context enter hook."""
+        self._started = datetime.datetime.now()
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback) -> bool:
+        """Context exit hook."""
+        self.time_elapsed = abs(datetime.datetime.now() - self._started)
+
+        LOGGER.info(f"{self._msg}: time elapsed {self.time_elapsed}")
+        return False  # Never suppress raised exceptions.
 
 
 class RtcTest(fuchsia_base_test.FuchsiaBaseTest):
@@ -47,13 +77,16 @@ class RtcTest(fuchsia_base_test.FuchsiaBaseTest):
         # possible field transposition errors in the driver.
         base_time = datetime.datetime(randyear, 12, 20, 23, 30, 0)
         LOGGER.info("Setting RTC time: %s", base_time)
-        self.rtc.set(base_time)
+        with TimeIt("Set()"):
+            self.rtc.set(base_time)
 
         # Ensure the time was actually set by re-reading the time and ensuring
         # the time elapsed is within some reasonable threshold. The threshold
         # value may need tuning. The value read here will be used as a benchmark
         # later (post-reboot).
-        rtc_time1 = self.rtc.get()
+        with TimeIt("Get()"):
+            rtc_time1 = self.rtc.get()
+
         LOGGER.info("Time read off RTC is: %s", rtc_time1)
         asserts.assert_less(
             rtc_time1 - base_time, datetime.timedelta(seconds=threshold)
@@ -62,30 +95,21 @@ class RtcTest(fuchsia_base_test.FuchsiaBaseTest):
         # Next, reboot the device, re-read the RTC time, and (again) ensure the
         # total elapsed time is within some reasonable threshold. This needs to
         # account for the time spent actually rebooting the device.
-        #
-        # When reading the current time, microseconds are discarded because the
-        # RTC protocol only has 1s resolution. Otherwise, the unaccounted-for
-        # time would push the delta slightly negative, which is rendered in a
-        # bizarre format (e.g. -1 day 23:59:59.600 vs. -00:00:00.400 given
-        # a 400ms error).
-        #
-        # See:
-        # https://docs.python.org/3/library/datetime.html#datetime.timedelta.resolution
-        start = datetime.datetime.now().replace(microsecond=0)
-        self.dut.reboot()
-        elapsed = datetime.datetime.now().replace(microsecond=0) - start
+        with TimeIt("Reboot") as reboot:
+            self.dut.reboot()
 
-        LOGGER.info("Elapsed time spent during reboot: %s", elapsed)
+        with TimeIt("Get()"):
+            rtc_time2 = self.rtc.get()
 
-        rtc_time2 = self.rtc.get()
-        LOGGER.info("Expected RTC time %s", rtc_time1 + elapsed)
-        LOGGER.info("Got RTC time: %s", rtc_time2)
+        LOGGER.info("Expected RTC time %s", rtc_time1 + reboot.time_elapsed)
+        LOGGER.info("Time read off RTC is: %s", rtc_time2)
 
-        # Here, we take the benchmark time above, subtract the time spent
-        # rebooting, and then subtract the current time. The delta value should
-        # be close to 0.
-        delta = rtc_time2 - rtc_time1 - elapsed
+        # Here, we take the time read off the chip, subtract the time spent
+        # rebooting, and then subtract the benchmark time above. The delta value
+        # should be close to 0.
+        delta = abs(rtc_time2 - rtc_time1 - reboot.time_elapsed)
         LOGGER.info("Delta: %s", delta)
+
         asserts.assert_less(delta, datetime.timedelta(seconds=threshold))
 
 
