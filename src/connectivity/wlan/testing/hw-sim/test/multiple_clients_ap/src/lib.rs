@@ -150,10 +150,10 @@ async fn multiple_clients_ap() {
         .unwrap_or_else(|oneshot::Canceled| panic!("waiting for connect confirmation"));
 
     // Start client 1
-    let client1_test_realm_proxy = client1_helper.test_realm_proxy();
+    let client1_test_ns_prefix = client1_helper.test_ns_prefix().to_string();
     let client1_connect_fut = async {
         save_network_and_wait_until_connected(
-            &client1_test_realm_proxy,
+            &client1_test_ns_prefix,
             &AP_SSID,
             fidl_policy::SecurityType::None,
             fidl_policy::Credential::None(fidl_policy::Empty),
@@ -171,10 +171,10 @@ async fn multiple_clients_ap() {
     );
 
     // Start client 2
-    let client2_test_realm_proxy = client2_helper.test_realm_proxy();
+    let client2_test_ns_prefix = client2_helper.test_ns_prefix().to_string();
     let client2_connect_fut = async {
         save_network_and_wait_until_connected(
-            &client2_test_realm_proxy,
+            &client2_test_ns_prefix,
             &AP_SSID,
             fidl_policy::SecurityType::None,
             fidl_policy::Credential::None(fidl_policy::Empty),

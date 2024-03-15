@@ -56,7 +56,7 @@ async fn connect_to_modern_wpa_network() {
         (Protection::Wpa3Personal, fidl_policy::SecurityType::Wpa3, password),
     ];
 
-    let test_realm_proxy = helper.test_realm_proxy();
+    let test_ns_prefix = helper.test_ns_prefix().to_string();
     for (bss_protection, policy_security_type, credential) in combinations {
         info!(
             "Starting connection test for {} with Policy security {:?} and credential {:?}",
@@ -76,7 +76,7 @@ async fn connect_to_modern_wpa_network() {
 
         // Remove the network and await disconnection
         let (client_controller, mut client_state_update_stream) =
-            wlan_hw_sim::init_client_controller(&test_realm_proxy).await;
+            wlan_hw_sim::init_client_controller(&test_ns_prefix).await;
         remove_network(
             &client_controller,
             &ssid,

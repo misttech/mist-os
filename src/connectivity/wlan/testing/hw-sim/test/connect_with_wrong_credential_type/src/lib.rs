@@ -50,7 +50,7 @@ async fn connecting_to_aps_with_wrong_credential_types() {
     let () = loop_until_iface_is_found(&mut helper).await;
 
     let (client_controller, mut client_state_update_stream) =
-        init_client_controller(&helper.test_realm_proxy()).await;
+        init_client_controller(helper.test_ns_prefix()).await;
     let mut supplicant = Supplicant {
         controller: &client_controller,
         state_update_stream: &mut client_state_update_stream,

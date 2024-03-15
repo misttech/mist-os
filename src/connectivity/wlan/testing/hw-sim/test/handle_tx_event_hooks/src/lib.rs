@@ -110,13 +110,13 @@ async fn handle_tx_event_hooks() {
     };
     let mut trace = UpdateSink::new();
 
-    let test_realm_proxy = helper.test_realm_proxy();
+    let test_ns_prefix = helper.test_ns_prefix().to_string();
 
     // Run Policy and wait for the client to connect and EssSa to establish.
     let run_policy_future = async {
         join!(
             save_network_and_wait_until_connected(
-                &test_realm_proxy,
+                &test_ns_prefix,
                 &AP_SSID,
                 fidl_policy::SecurityType::Wpa2,
                 password_or_psk_to_policy_credential(Some(PASSWORD))

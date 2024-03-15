@@ -19,8 +19,19 @@ use {
 pub mod error;
 pub use error::Error;
 
+/// A thin wrapper that represents the namespace created by [extend_namespace].
+///
+/// Users can obtain the path to the namespace from [InstalledNamespace::prefix] and pass that
+/// to capability connection APIs such as [fuchsia-component]'s [client::connect_to_protocol_at]
+/// to access capabilities in the namespace.
+///
+/// Furthermore, the [InstalledNamespace] acts as an RAII container for the capabilities. When
+/// the [InstalledNamespace] is dropped, the test realm factory server may free state associated
+/// with serving those capabilities. Therefore, the test should only drop this once it no longer
+/// needs to connect to the capabilities or needs activity performed on their behalf.
 pub struct InstalledNamespace {
     prefix: String,
+
     /// This is not used, but it keeps the RealmFactory connection alive.
     ///
     /// The RealmFactory server may use this connection to pin the lifetime of the realm created
@@ -43,7 +54,17 @@ impl Drop for InstalledNamespace {
     }
 }
 
-/// Converts the given dictionary to a namespace and adds it this component's namespace.
+/// Converts the given dictionary to a namespace and adds it this component's namespace,
+/// thinly wrapped by the returned [InstalledNamespace].
+///
+/// Users can obtain the path to the namespace from [InstalledNamespace::prefix] and pass that
+/// to capability connection APIs such as [fuchsia-component]'s [client::connect_to_protocol_at]
+/// to access capabilities in the namespace.
+///
+/// Furthermore, the [InstalledNamespace] acts as an RAII container for the capabilities. When
+/// the [InstalledNamespace] is dropped, the test realm factory server may free state associated
+/// with serving those capabilities. Therefore, the test should only drop this once it no longer
+/// needs to connect to the capabilities or needs activity performed on their behalf.
 pub async fn extend_namespace<T>(
     realm_factory: T,
     dictionary: ClientEnd<fsandbox::DictionaryMarker>,

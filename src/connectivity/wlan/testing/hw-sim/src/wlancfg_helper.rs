@@ -7,10 +7,10 @@ use {
     fidl::endpoints::{create_endpoints, create_proxy},
     fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_policy as fidl_policy,
     fidl_fuchsia_wlan_policy::{Credential, NetworkConfig, NetworkIdentifier, SecurityType},
+    fuchsia_component::client::connect_to_protocol_at,
     fuchsia_zircon::prelude::*,
     futures::{StreamExt, TryStreamExt},
     ieee80211::Ssid,
-    realm_proxy_client::RealmProxyClient,
     tracing::info,
 };
 
@@ -92,16 +92,15 @@ impl From<NetworkConfigBuilder> for fidl_policy::NetworkConfig {
 }
 
 pub async fn start_ap_and_wait_for_confirmation(
-    realm_proxy: &RealmProxyClient,
+    test_ns_prefix: &str,
     network_config: NetworkConfigBuilder,
 ) {
     let network_config = NetworkConfigBuilder::from(network_config);
 
     // Get a handle to control the AccessPointController.
-    let ap_provider = realm_proxy
-        .connect_to_protocol::<fidl_policy::AccessPointProviderMarker>()
-        .await
-        .expect("connecting to AP provider");
+    let ap_provider =
+        connect_to_protocol_at::<fidl_policy::AccessPointProviderMarker>(test_ns_prefix)
+            .expect("connecting to AP provider");
     let (ap_controller, server_end) =
         create_proxy::<fidl_policy::AccessPointControllerMarker>().expect("creating AP controller");
     let (update_client_end, update_server_end) =
@@ -169,10 +168,10 @@ pub async fn start_ap_and_wait_for_confirmation(
 
 /// Creates a client controller and update stream for getting status updates.
 pub async fn get_client_controller(
-    realm_proxy: &RealmProxyClient,
+    test_ns_prefix: &str,
 ) -> (fidl_policy::ClientControllerProxy, fidl_policy::ClientStateUpdatesRequestStream) {
     let provider =
-        realm_proxy.connect_to_protocol::<fidl_policy::ClientProviderMarker>().await.unwrap();
+        connect_to_protocol_at::<fidl_policy::ClientProviderMarker>(test_ns_prefix).unwrap();
     let (controller_client_end, controller_server_end) = fidl::endpoints::create_proxy().unwrap();
     let (listener_client_end, listener_server_end) = fidl::endpoints::create_endpoints();
     provider.get_controller(controller_server_end, listener_client_end).unwrap();
@@ -184,10 +183,10 @@ pub async fn get_client_controller(
 /// Creates a client controller and update stream, and wait to verify that client connections are
 /// enabled.
 pub async fn init_client_controller(
-    realm_proxy: &RealmProxyClient,
+    test_ns_prefix: &str,
 ) -> (fidl_policy::ClientControllerProxy, fidl_policy::ClientStateUpdatesRequestStream) {
     let (controller_client_end, mut client_state_update_stream) =
-        get_client_controller(realm_proxy).await;
+        get_client_controller(test_ns_prefix).await;
     // Clear the initial state notifications that are sent by the policy layer.  This initial state
     // is variable depending on whether or not the policy layer has discovered a PHY or created an
     // interface yet.  The policy layer enables client connections by default.  Wait until the

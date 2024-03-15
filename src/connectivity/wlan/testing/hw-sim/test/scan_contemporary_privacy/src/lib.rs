@@ -36,8 +36,7 @@ async fn scan_contemporary_privacy() {
     let phy = helper.proxy();
 
     // Create a client controller.
-    let (client_controller, _update_stream) =
-        init_client_controller(&helper.test_realm_proxy()).await;
+    let (client_controller, _update_stream) = init_client_controller(helper.test_ns_prefix()).await;
 
     let scan_result_list_fut = test_utils::policy_scan_for_networks(client_controller);
     pin_mut!(scan_result_list_fut);

@@ -89,7 +89,7 @@ async fn connect_with_failed_association() {
     let () = loop_until_iface_is_found(&mut helper).await;
 
     let (mut client_controller, mut client_state_update_stream) =
-        wlan_hw_sim::init_client_controller(&helper.test_realm_proxy()).await;
+        wlan_hw_sim::init_client_controller(helper.test_ns_prefix()).await;
     let save_network_fut = save_network_and_await_failed_connection(
         &mut client_controller,
         &mut client_state_update_stream,

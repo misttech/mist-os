@@ -6,6 +6,7 @@ use {
     fidl::endpoints::{create_endpoints, create_proxy},
     fidl_fuchsia_wlan_policy as fidl_policy,
     fidl_test_wlan_realm::WlanConfig,
+    fuchsia_component::client::connect_to_protocol_at,
     pin_utils::pin_mut,
     wlan_hw_sim::{event::action, *},
 };
@@ -26,11 +27,9 @@ async fn run_without_regulatory_manager() {
     let () = loop_until_iface_is_found(&mut helper).await;
 
     // Connect to the client policy service and get a client controller.
-    let policy_provider = helper
-        .test_realm_proxy()
-        .connect_to_protocol::<fidl_policy::ClientProviderMarker>()
-        .await
-        .expect("connecting to wlan policy");
+    let policy_provider =
+        connect_to_protocol_at::<fidl_policy::ClientProviderMarker>(helper.test_ns_prefix())
+            .expect("connecting to wlan policy");
     let (client_controller, server_end) = create_proxy().expect("creating client controller");
     let (update_client_end, _update_server_end) = create_endpoints();
     let () =

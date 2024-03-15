@@ -12,8 +12,6 @@ use {
     futures::channel::oneshot,
     ieee80211::{Bssid, Ssid},
     pin_utils::pin_mut,
-    realm_proxy_client::RealmProxyClient,
-    std::sync::Arc,
     wlan_common::{
         bss::Protection,
         channel::{Cbw, Channel},
@@ -30,7 +28,7 @@ use {
 };
 
 async fn run_policy_and_assert_transparent_reconnect(
-    test_realm_proxy: Arc<RealmProxyClient>,
+    test_ns_prefix: &str,
     ssid: &'static Ssid,
     // TODO(https://fxbug.dev/42080534): Unify security protocol types and respect this parameter.
     _protection: &Protection,
@@ -41,7 +39,7 @@ async fn run_policy_and_assert_transparent_reconnect(
     let protection = fidl_policy::SecurityType::Wpa2;
     // Connect to the client policy service and get a client controller.
     let (_client_controller, mut client_state_updates) = save_network_and_wait_until_connected(
-        &test_realm_proxy,
+        test_ns_prefix,
         ssid,
         protection,
         password_or_psk_to_policy_credential(password),
@@ -156,8 +154,9 @@ async fn reconnect_to_wpa2_network() {
         ),
     };
 
+    let test_ns_prefix = helper.test_ns_prefix().to_string();
     let run_policy_future = run_policy_and_assert_transparent_reconnect(
-        helper.test_realm_proxy(),
+        &test_ns_prefix,
         &AP_SSID,
         &PROTECTION,
         Some(PASSWORD),

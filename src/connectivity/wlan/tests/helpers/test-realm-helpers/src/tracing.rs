@@ -4,10 +4,10 @@
 
 use {
     fidl::endpoints::Proxy,
+    fuchsia_component::client::connect_to_protocol_at,
     fuchsia_sync::Mutex,
     fuchsia_zircon::{self as zx, prelude::*},
     futures::AsyncReadExt,
-    realm_proxy_client::RealmProxyClient,
     std::{io::Write, sync::Arc},
     tracing::info,
 };
@@ -23,11 +23,11 @@ pub struct Tracing {
 }
 
 impl Tracing {
-    pub async fn create_and_initialize_tracing(realm_proxy: &RealmProxyClient) -> Self {
-        let tracing_controller = realm_proxy
-            .connect_to_protocol::<fidl_fuchsia_tracing_controller::ControllerMarker>()
-            .await
-            .expect("Failed to get tracing controller.");
+    pub async fn create_and_initialize_tracing(test_ns_prefix: &str) -> Self {
+        let tracing_controller = connect_to_protocol_at::<
+            fidl_fuchsia_tracing_controller::ControllerMarker,
+        >(test_ns_prefix)
+        .expect("Failed to get tracing controller.");
         let tracing_controller = fidl_fuchsia_tracing_controller::ControllerSynchronousProxy::new(
             fidl::Channel::from_handle(
                 tracing_controller

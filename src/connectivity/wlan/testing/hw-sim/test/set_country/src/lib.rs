@@ -7,6 +7,7 @@ use {
         DeviceMonitorMarker, DeviceMonitorProxy, SetCountryRequest,
     },
     fidl_test_wlan_realm::WlanConfig,
+    fuchsia_component::client::connect_to_protocol_at,
     fuchsia_zircon::sys::ZX_OK,
     fuchsia_zircon::DurationNum,
     futures::channel::oneshot,
@@ -37,10 +38,7 @@ async fn set_country() {
         WlanConfig { use_legacy_privacy: Some(false), ..Default::default() },
     )
     .await;
-    let svc = helper
-        .test_realm_proxy()
-        .connect_to_protocol::<DeviceMonitorMarker>()
-        .await
+    let svc = connect_to_protocol_at::<DeviceMonitorMarker>(helper.test_ns_prefix())
         .expect("Failed to connect to wlandevicemonitor");
 
     let resp = svc.list_phys().await.unwrap();

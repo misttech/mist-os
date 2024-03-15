@@ -30,6 +30,7 @@ async fn main() -> Result<(), Error> {
 
 async fn serve_realm_factory(mut stream: RealmFactoryRequestStream) {
     let mut task_group = fasync::TaskGroup::new();
+    let mut realms = vec![];
     let result: Result<(), Error> = async move {
         while let Ok(Some(request)) = stream.try_next().await {
             match request {
@@ -51,6 +52,12 @@ async fn serve_realm_factory(mut stream: RealmFactoryRequestStream) {
                             responder.send(Err(OperationError::Failed))?;
                         }
                     }
+                }
+                RealmFactoryRequest::CreateRealm2 { options, dictionary, responder } => {
+                    let realm = create_realm(options).await?;
+                    realm.root.controller().get_exposed_dictionary(dictionary).await?.unwrap();
+                    realms.push(realm);
+                    responder.send(Ok(()))?;
                 }
             }
         }

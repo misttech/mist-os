@@ -12,6 +12,7 @@ rustc_test("run_without_regulatory_manager") {
     "//src/connectivity/wlan/tests/helpers/realm-factory/fidl:test.wlan.realm_rust",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",
+    "//src/lib/fuchsia-component",
     "//third_party/rust_crates:pin-utils",
   ]
 

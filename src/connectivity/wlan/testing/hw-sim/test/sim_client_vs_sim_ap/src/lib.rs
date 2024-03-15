@@ -55,7 +55,7 @@ async fn verify_client_connects_to_ap(
     ap_helper: &mut test_utils::TestHelper,
 ) {
     let (client_controller, update_stream) =
-        wlan_hw_sim::init_client_controller(&client_helper.test_realm_proxy()).await;
+        wlan_hw_sim::init_client_controller(client_helper.test_ns_prefix()).await;
 
     let (sender, connect_confirm_receiver) = oneshot::channel();
     let network_config = NetworkConfigBuilder::protected(

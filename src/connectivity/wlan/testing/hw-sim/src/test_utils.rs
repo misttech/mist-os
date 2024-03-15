@@ -12,11 +12,11 @@ use {
     fidl_fuchsia_driver_test as fidl_driver_test, fidl_fuchsia_wlan_policy as fidl_policy,
     fidl_fuchsia_wlan_tap as wlantap, fidl_test_wlan_realm as fidl_realm,
     fuchsia_async::{DurationExt, Time, TimeoutExt, Timer},
-    fuchsia_component::client::connect_to_protocol,
+    fuchsia_component::client::{connect_to_protocol, connect_to_protocol_at},
     fuchsia_zircon::{self as zx, prelude::*},
     futures::{channel::oneshot, FutureExt, StreamExt},
     ieee80211::{MacAddr, MacAddrBytes},
-    realm_proxy_client::RealmProxyClient,
+    realm_proxy_client::{extend_namespace, InstalledNamespace},
     std::{
         fmt::Display,
         future::Future,
@@ -59,9 +59,9 @@ use {
 //     directory_server.into_channel(),
 //  )?;
 pub struct TestRealmContext {
-    // The test realm proxy client, which allows the test suite to connect to protocols exposed by
+    // The test namespace, which allows the test suite to connect to protocols exposed by
     // the test realm.
-    test_realm_proxy: Arc<RealmProxyClient>,
+    test_ns: InstalledNamespace,
 
     // A directory proxy connected to "/dev" in the test realm.
     devfs: fidl_fuchsia_io::DirectoryProxy,
@@ -76,27 +76,29 @@ impl TestRealmContext {
         let realm_factory = connect_to_protocol::<fidl_realm::RealmFactoryMarker>()
             .expect("Could not connect to realm factory protocol");
 
-        let (realm_client, realm_server) = create_endpoints();
+        let (dict_client, dict_server) = create_endpoints();
         let (devfs_proxy, devfs_server) = create_proxy().expect("Could not create devfs proxy");
 
-        // Create the test realm through the realm factory
+        // Create the test realm for this test. This returns a
+        // `fuchsia.component.sandbox/Dictionary`, which is then consumed by `extend_namespace`
+        // to turn it into a directory installed in this component's namespace at
+        // `test_ns.prefix()`.
         let options = fidl_realm::RealmOptions {
             devfs_server_end: Some(devfs_server),
             wlan_config: Some(config),
             ..Default::default()
         };
-
         let _ = realm_factory
-            .create_realm(options, realm_server)
+            .create_realm2(options, dict_server)
             .await
             .expect("Could not create realm");
+        let test_ns =
+            extend_namespace(realm_factory, dict_client).await.expect("failed to extend ns");
 
         // Start the driver test realm
-        let test_realm_proxy = RealmProxyClient::from(realm_client);
-        let driver_test_realm_proxy = test_realm_proxy
-            .connect_to_protocol::<fidl_driver_test::RealmMarker>()
-            .await
-            .expect("Failed to connect to driver test realm");
+        let driver_test_realm_proxy =
+            connect_to_protocol_at::<fidl_driver_test::RealmMarker>(test_ns.prefix())
+                .expect("Failed to connect to driver test realm");
 
         let (pkg_client, pkg_server) = create_endpoints();
         fuchsia_fs::directory::open_channel_in_namespace(
@@ -113,11 +115,11 @@ impl TestRealmContext {
             .expect("FIDL error when starting driver test realm")
             .expect("Driver test realm server returned an error");
 
-        Arc::new(Self { test_realm_proxy: Arc::new(test_realm_proxy), devfs: devfs_proxy })
+        Arc::new(Self { test_ns, devfs: devfs_proxy })
     }
 
-    pub fn test_realm_proxy(&self) -> Arc<RealmProxyClient> {
-        self.test_realm_proxy.clone()
+    pub fn test_ns_prefix(&self) -> &str {
+        self.test_ns.prefix()
     }
 
     pub fn devfs(&self) -> &fidl_fuchsia_io::DirectoryProxy {
@@ -256,7 +258,7 @@ impl TestHelper {
         network_config: NetworkConfigBuilder,
     ) -> Self {
         let mut helper = TestHelper::create_phy_and_helper(config, ctx).await;
-        start_ap_and_wait_for_confirmation(&helper.ctx.test_realm_proxy, network_config).await;
+        start_ap_and_wait_for_confirmation(helper.ctx.test_ns_prefix(), network_config).await;
         helper.wait_for_wlan_softmac_start().await;
         helper
     }
@@ -265,7 +267,7 @@ impl TestHelper {
         config: wlantap::WlantapPhyConfig,
         ctx: Arc<TestRealmContext>,
     ) -> Self {
-        let tracing = Tracing::create_and_initialize_tracing(&ctx.test_realm_proxy()).await;
+        let tracing = Tracing::create_and_initialize_tracing(ctx.test_ns_prefix()).await;
 
         // Trigger creation of wlantap serviced phy and iface for testing.
         let wlantap =
@@ -302,8 +304,8 @@ impl TestHelper {
         Arc::clone(&self.proxy)
     }
 
-    pub fn test_realm_proxy(&self) -> Arc<RealmProxyClient> {
-        self.ctx.test_realm_proxy()
+    pub fn test_ns_prefix(&self) -> &str {
+        self.ctx.test_ns_prefix()
     }
 
     pub fn devfs(&self) -> &fidl_fuchsia_io::DirectoryProxy {

@@ -21,7 +21,7 @@ async fn autoconnect_idle_iface() {
     })
     .await;
     let (client_controller, mut client_state_update_stream) =
-        get_client_controller(&ctx.test_realm_proxy()).await;
+        get_client_controller(ctx.test_ns_prefix()).await;
 
     wait_until_client_state(&mut client_state_update_stream, |update| {
         if update.state == Some(fidl_policy::WlanClientState::ConnectionsDisabled) {
@@ -59,7 +59,7 @@ async fn autoconnect_idle_iface() {
     let () = loop_until_iface_is_found(&mut helper).await;
 
     let (_client_controller, mut client_state_update_stream) =
-        init_client_controller(&helper.test_realm_proxy()).await;
+        init_client_controller(helper.test_ns_prefix()).await;
 
     let wait_for_connect =
         Box::pin(wait_until_client_state(&mut client_state_update_stream, |update| {

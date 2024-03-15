@@ -7,6 +7,7 @@
 // TODO(b/317219542): Rename to start with "fuchsia." and use versioning.
 library test.wlan.realm;
 
+using fuchsia.component.sandbox;
 using fuchsia.testing.harness;
 using fuchsia.io;
 using fuchsia.driver.test;
@@ -75,5 +76,11 @@ open protocol RealmFactory {
     flexible CreateRealm(resource struct {
         options RealmOptions;
         realm_server server_end:fuchsia.testing.harness.RealmProxy;
+    }) -> () error fuchsia.testing.harness.OperationError;
+
+    /// Creates a new realm and returns a dictionary containing its exposed capabilities.
+    flexible CreateRealm2(resource struct {
+        options RealmOptions;
+        dictionary server_end:fuchsia.component.sandbox.Dictionary;
     }) -> () error fuchsia.testing.harness.OperationError;
 };
