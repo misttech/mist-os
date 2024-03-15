@@ -9,14 +9,13 @@
 #include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
 #include <lib/driver/testing/cpp/driver_lifecycle.h>
 #include <lib/driver/testing/cpp/driver_runtime.h>
+#include <lib/driver/testing/cpp/fixtures/gtest_fixture.h>
 #include <lib/driver/testing/cpp/test_environment.h>
 #include <lib/driver/testing/cpp/test_node.h>
 #include <lib/fdio/directory.h>
 #include <zircon/device/bt-hci.h>
 
 #include <queue>
-
-#include <gtest/gtest.h>
 
 namespace bt_transport_uart {
 namespace {
@@ -50,7 +49,7 @@ class FakeSerialDevice : public fdf::WireServer<fuchsia_hardware_serialimpl::Dev
     read_rsp_queue_.emplace(std::move(buffer));
   }
 
-  const std::vector<std::vector<uint8_t>>& writes() const { return writes_; }
+  const std::vector<std::vector<uint8_t>> writes() const { return writes_; }
 
   bool canceled() const { return canceled_; }
 
@@ -161,107 +160,54 @@ class FakeSerialDevice : public fdf::WireServer<fuchsia_hardware_serialimpl::Dev
   fdf::ServerBindingGroup<fuchsia_hardware_serialimpl::Device> binding_group_;
 };
 
-class TestEnvironmentLocal : public fdf_testing::TestEnvironment {
+class FixtureBasedTestEnvironment : fdf_testing::Environment {
  public:
-  zx::result<> Initialize(fidl::ServerEnd<fuchsia_io::Directory> incoming_directory_server_end) {
-    return fdf_testing::TestEnvironment::Initialize(std::move(incoming_directory_server_end));
+  zx::result<> Serve(fdf::OutgoingDirectory& to_driver_vfs) override {
+    auto result = to_driver_vfs.AddService<fuchsia_hardware_serialimpl::Service>(
+        serial_device_.GetInstanceHandler());
+    return result;
   }
 
-  void AddService(fuchsia_hardware_serialimpl::Service::InstanceHandler&& handler) {
-    zx::result result =
-        incoming_directory().AddService<fuchsia_hardware_serialimpl::Service>(std::move(handler));
-    EXPECT_TRUE(result.is_ok());
-  }
+  FakeSerialDevice serial_device_;
 };
 
-class BtTransportUartTest : public ::testing::Test {
+class BackgroundFixtureConfig final {
+ public:
+  static constexpr bool kDriverOnForeground = false;
+  static constexpr bool kAutoStartDriver = true;
+  static constexpr bool kAutoStopDriver = false;
+
+  using DriverType = BtTransportUart;
+  using EnvironmentType = FixtureBasedTestEnvironment;
+};
+
+class BtTransportUartTest : public fdf_testing::DriverTestFixture<BackgroundFixtureConfig> {
  public:
   BtTransportUartTest() = default;
 
   void SetUp() override {
-    // Create start args
-    zx::result start_args = node_server_.SyncCall(&fdf_testing::TestNode::CreateStartArgsAndServe);
-    ASSERT_EQ(ZX_OK, start_args.status_value());
+    EXPECT_TRUE(RunInEnvironmentTypeContext<bool>(
+        [](FixtureBasedTestEnvironment& env) { return env.serial_device_.enabled(); }));
 
-    // Start the test environment with incoming directory returned from the start args
-    zx::result init_result =
-        test_environment_.SyncCall(&fdf_testing::TestEnvironment::Initialize,
-                                   std::move(start_args->incoming_directory_server));
-    EXPECT_EQ(ZX_OK, init_result.status_value());
-
-    // Get service handler from the fake_serial_device_ object.
-    auto handler = fake_serial_device_.SyncCall(&FakeSerialDevice::GetInstanceHandler);
-
-    test_environment_.SyncCall(&TestEnvironmentLocal::AddService, std::move(handler));
-
-    zx::result start_result = runtime_.RunToCompletion(driver_.SyncCall(
-        &fdf_testing::DriverUnderTest<BtTransportUart>::Start, std::move(start_args->start_args)));
-    EXPECT_EQ(ZX_OK, start_result.status_value());
-
-    EXPECT_TRUE(fake_serial_device_.SyncCall(&FakeSerialDevice::enabled));
-
-    // Open the svc directory in the driver's outgoing, and store a client to it.
-    auto svc_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-    EXPECT_EQ(ZX_OK, svc_endpoints.status_value());
-    zx_status_t status = fdio_open_at(start_args->outgoing_directory_client.handle()->get(), "/svc",
-                                      static_cast<uint32_t>(fuchsia_io::OpenFlags::kDirectory),
-                                      svc_endpoints->server.TakeChannel().release());
-    ASSERT_EQ(ZX_OK, status);
-
-    zx::result connect_result =
-        component::ConnectAtMember<fuchsia_hardware_bluetooth::HciService::Hci>(
-            std::move(svc_endpoints->client));
+    zx::result connect_result = Connect<fuchsia_hardware_bluetooth::HciService::Hci>();
+    ASSERT_EQ(ZX_OK, connect_result.status_value());
 
     ASSERT_EQ(ZX_OK, connect_result.status_value());
     hci_client_.Bind(std::move(connect_result.value()));
   }
 
   void TearDown() override {
-    zx::result prepare_stop_result = runtime_.RunToCompletion(
-        driver_.SyncCall(&fdf_testing::DriverUnderTest<BtTransportUart>::PrepareStop));
+    // Only PrepareStop() will be called in StopDriver(), Stop() won't be called.
+    zx::result prepare_stop_result = StopDriver();
     EXPECT_EQ(ZX_OK, prepare_stop_result.status_value());
 
-    EXPECT_TRUE(fake_serial_device_.SyncCall(&FakeSerialDevice::canceled));
-
-    zx::result stop_result = driver_.SyncCall(&fdf_testing::DriverUnderTest<BtTransportUart>::Stop);
-    EXPECT_EQ(ZX_OK, stop_result.status_value());
+    EXPECT_TRUE(RunInEnvironmentTypeContext<bool>(
+        [](FixtureBasedTestEnvironment& env) { return env.serial_device_.canceled(); }));
   }
 
-  async_patterns::TestDispatcherBound<FakeSerialDevice>* serial() { return &fake_serial_device_; }
-
-  async_dispatcher_t* env_dispatcher() { return env_dispatcher_->async_dispatcher(); }
-
-  async_dispatcher_t* driver_dispatcher() { return driver_dispatcher_->async_dispatcher(); }
-
-  fdf_testing::DriverRuntime* runtime() { return &runtime_; }
-
+ protected:
   // The FIDL client used in the test to call into dut Hci server.
   fidl::WireSyncClient<fuchsia_hardware_bluetooth::Hci> hci_client_;
-
- private:
-  // Attaches a foreground dispatcher for us automatically.
-  fdf_testing::DriverRuntime runtime_;
-
-  // Env dispatcher runs in the background because we need to make sync calls into it.
-  fdf::UnownedSynchronizedDispatcher env_dispatcher_ = runtime_.StartBackgroundDispatcher();
-
-  // Driver dispatcher set as a background dispatcher. The protocols served by dut will run on
-  // this dispatcher.
-  fdf::UnownedSynchronizedDispatcher driver_dispatcher_ = runtime_.StartBackgroundDispatcher();
-
-  fdf::UnownedSynchronizedDispatcher hci_dispatcher_ = runtime_.StartBackgroundDispatcher();
-
-  async_patterns::TestDispatcherBound<fdf_testing::TestNode> node_server_{
-      env_dispatcher(), std::in_place, std::string("root")};
-
-  async_patterns::TestDispatcherBound<TestEnvironmentLocal> test_environment_{env_dispatcher(),
-                                                                              std::in_place};
-
-  async_patterns::TestDispatcherBound<FakeSerialDevice> fake_serial_device_{env_dispatcher(),
-                                                                            std::in_place};
-
-  async_patterns::TestDispatcherBound<fdf_testing::DriverUnderTest<BtTransportUart>> driver_{
-      driver_dispatcher(), std::in_place};
 };
 
 // Test fixture that opens all channels and has helpers for reading/writing data.
@@ -434,10 +380,15 @@ TEST_F(BtTransportUartHciProtocolTest, SendAclPackets) {
   // Allow ACL packets to be processed and sent to the serial device.
   // This function waits until the condition in the lambda is satisfied, The default poll interval
   // is 10 msec, the default wait timeout is 1 sec. The function returns true if it didn't timeout.
-  EXPECT_TRUE(runtime()->RunWithTimeoutOrUntil(
-      [&]() { return serial()->SyncCall(&FakeSerialDevice::writes).size() == kNumPackets; }));
+  EXPECT_TRUE(runtime().RunWithTimeoutOrUntil([&]() {
+    return RunInEnvironmentTypeContext<size_t>([](FixtureBasedTestEnvironment& env) {
+             return env.serial_device_.writes().size();
+           }) == kNumPackets;
+  }));
 
-  const std::vector<std::vector<uint8_t>>& packets = serial()->SyncCall(&FakeSerialDevice::writes);
+  const std::vector<std::vector<uint8_t>> packets =
+      RunInEnvironmentTypeContext<const std::vector<std::vector<uint8_t>>>(
+          [](FixtureBasedTestEnvironment& env) { return env.serial_device_.writes(); });
   ASSERT_EQ(packets.size(), kNumPackets);
   for (uint8_t i = 0; i < kNumPackets; i++) {
     // A packet indicator should be prepended.
@@ -446,7 +397,7 @@ TEST_F(BtTransportUartHciProtocolTest, SendAclPackets) {
   }
 
   EXPECT_TRUE(
-      runtime()->RunWithTimeoutOrUntil([&]() { return snoop_packets().size() == kNumPackets; }));
+      runtime().RunWithTimeoutOrUntil([&]() { return snoop_packets().size() == kNumPackets; }));
   for (uint8_t i = 0; i < kNumPackets; i++) {
     // Snoop packets should have a snoop packet flag prepended (NOT a UART packet indicator).
     const std::vector<uint8_t> kExpectedSnoopPacket = {BT_HCI_SNOOP_TYPE_ACL,  // Snoop packet flag
@@ -457,7 +408,8 @@ TEST_F(BtTransportUartHciProtocolTest, SendAclPackets) {
 
 TEST_F(BtTransportUartHciProtocolTest, AclReadableSignalIgnoredUntilFirstWriteCompletes) {
   // Delay completion of first write.
-  serial()->SyncCall(&FakeSerialDevice::set_writes_paused, true);
+  RunInEnvironmentTypeContext(
+      [](FixtureBasedTestEnvironment& env) { return env.serial_device_.set_writes_paused(true); });
 
   const uint8_t kNumPackets = 2;
   for (uint8_t i = 0; i < kNumPackets; i++) {
@@ -470,17 +422,27 @@ TEST_F(BtTransportUartHciProtocolTest, AclReadableSignalIgnoredUntilFirstWriteCo
   }
 
   // Wait until the first packet has been received by fake serial device.
-  EXPECT_TRUE(runtime()->RunWithTimeoutOrUntil(
-      [&]() { return serial()->SyncCall(&FakeSerialDevice::writes).size() == 1u; }));
+  EXPECT_TRUE(runtime().RunWithTimeoutOrUntil([&]() {
+    return RunInEnvironmentTypeContext<size_t>([](FixtureBasedTestEnvironment& env) {
+             return env.serial_device_.writes().size();
+           }) == 1u;
+  }));
 
   // Call the first packet's completion callback. This should resume waiting for signals.
-  serial()->SyncCall(&FakeSerialDevice::set_writes_paused, false);
-  // Wait for the readable signal to be processed, and both packets has been received by fake serial
-  // device.
-  EXPECT_TRUE(runtime()->RunWithTimeoutOrUntil(
-      [&]() { return serial()->SyncCall(&FakeSerialDevice::writes).size() == kNumPackets; }));
+  RunInEnvironmentTypeContext(
+      [](FixtureBasedTestEnvironment& env) { return env.serial_device_.set_writes_paused(false); });
 
-  const std::vector<std::vector<uint8_t>>& packets = serial()->SyncCall(&FakeSerialDevice::writes);
+  // Wait for the readable signal to be processed, and both packets has been received by fake
+  // serial device.
+  EXPECT_TRUE(runtime().RunWithTimeoutOrUntil([&]() {
+    return RunInEnvironmentTypeContext<size_t>([](FixtureBasedTestEnvironment& env) {
+             return env.serial_device_.writes().size();
+           }) == kNumPackets;
+  }));
+
+  const std::vector<std::vector<uint8_t>> packets =
+      RunInEnvironmentTypeContext<const std::vector<std::vector<uint8_t>>>(
+          [](FixtureBasedTestEnvironment& env) { return env.serial_device_.writes(); });
   ASSERT_EQ(packets.size(), kNumPackets);
   for (uint8_t i = 0; i < kNumPackets; i++) {
     // A packet indicator should be prepended.
@@ -508,11 +470,15 @@ TEST_F(BtTransportUartHciProtocolTest, ReceiveAclPacketsIn2Parts) {
 
   const size_t kNumPackets = 20;
   for (size_t i = 0; i < kNumPackets; i++) {
-    serial()->SyncCall(&FakeSerialDevice::QueueReadValue, kPart1);
-    serial()->SyncCall(&FakeSerialDevice::QueueReadValue, kPart2);
+    RunInEnvironmentTypeContext([&](FixtureBasedTestEnvironment& env) {
+      return env.serial_device_.QueueReadValue(kPart1);
+    });
+    RunInEnvironmentTypeContext([&](FixtureBasedTestEnvironment& env) {
+      return env.serial_device_.QueueReadValue(kPart2);
+    });
   }
 
-  EXPECT_TRUE(runtime()->RunWithTimeoutOrUntil(
+  EXPECT_TRUE(runtime().RunWithTimeoutOrUntil(
       [&]() { return received_acl_packets().size() == static_cast<size_t>(kNumPackets); }));
 
   for (const std::vector<uint8_t>& packet : received_acl_packets()) {
@@ -521,7 +487,7 @@ TEST_F(BtTransportUartHciProtocolTest, ReceiveAclPacketsIn2Parts) {
   }
 
   EXPECT_TRUE(
-      runtime()->RunWithTimeoutOrUntil([&]() { return snoop_packets().size() == kNumPackets; }));
+      runtime().RunWithTimeoutOrUntil([&]() { return snoop_packets().size() == kNumPackets; }));
   for (const std::vector<uint8_t>& packet : snoop_packets()) {
     EXPECT_EQ(packet, kSnoopAclBuffer);
   }
@@ -546,14 +512,20 @@ TEST_F(BtTransportUartHciProtocolTest, ReceiveAclPacketsLotsInQueue) {
 
   const size_t kNumPackets = 1000;
   for (size_t i = 0; i < kNumPackets; i++) {
-    serial()->SyncCall(&FakeSerialDevice::QueueWithoutSignaling, kPart1);
-    serial()->SyncCall(&FakeSerialDevice::QueueWithoutSignaling, kPart2);
+    RunInEnvironmentTypeContext([&](FixtureBasedTestEnvironment& env) {
+      return env.serial_device_.QueueWithoutSignaling(kPart1);
+    });
+    RunInEnvironmentTypeContext([&](FixtureBasedTestEnvironment& env) {
+      return env.serial_device_.QueueWithoutSignaling(kPart2);
+    });
   }
-  serial()->SyncCall(&FakeSerialDevice::QueueReadValue, kPart1);
-  serial()->SyncCall(&FakeSerialDevice::QueueReadValue, kPart2);
+  RunInEnvironmentTypeContext(
+      [&](FixtureBasedTestEnvironment& env) { return env.serial_device_.QueueReadValue(kPart1); });
+  RunInEnvironmentTypeContext(
+      [&](FixtureBasedTestEnvironment& env) { return env.serial_device_.QueueReadValue(kPart2); });
 
   // Wait Until all the packets to be received.
-  EXPECT_TRUE(runtime()->RunWithTimeoutOrUntil(
+  EXPECT_TRUE(runtime().RunWithTimeoutOrUntil(
       [&]() { return received_acl_packets().size() == static_cast<size_t>(kNumPackets + 1); }));
 
   ASSERT_EQ(received_acl_packets().size(), static_cast<size_t>(kNumPackets + 1));
@@ -562,8 +534,8 @@ TEST_F(BtTransportUartHciProtocolTest, ReceiveAclPacketsLotsInQueue) {
     EXPECT_EQ(packet, kAclBuffer);
   }
 
-  EXPECT_TRUE(runtime()->RunWithTimeoutOrUntil(
-      [&]() { return snoop_packets().size() == kNumPackets + 1; }));
+  EXPECT_TRUE(
+      runtime().RunWithTimeoutOrUntil([&]() { return snoop_packets().size() == kNumPackets + 1; }));
   for (const std::vector<uint8_t>& packet : snoop_packets()) {
     EXPECT_EQ(packet, kSnoopAclBuffer);
   }
@@ -586,8 +558,11 @@ TEST_F(BtTransportUartHciProtocolTest, SendHciCommands) {
   EXPECT_EQ(write_status, ZX_OK);
 
   // Wait until the first packet is received.
-  EXPECT_TRUE(runtime()->RunWithTimeoutOrUntil(
-      [&]() { return serial()->SyncCall(&FakeSerialDevice::writes).size() == 1u; }));
+  EXPECT_TRUE(runtime().RunWithTimeoutOrUntil([&]() {
+    return RunInEnvironmentTypeContext<size_t>([](FixtureBasedTestEnvironment& env) {
+             return env.serial_device_.writes().size();
+           }) == 1u;
+  }));
 
   const std::vector<uint8_t> kSnoopCmd1 = {
       BT_HCI_SNOOP_TYPE_CMD,  // Snoop packet flag
@@ -604,21 +579,27 @@ TEST_F(BtTransportUartHciProtocolTest, SendHciCommands) {
   EXPECT_EQ(write_status, ZX_OK);
 
   // Wait until the second packet is received.
-  EXPECT_TRUE(runtime()->RunWithTimeoutOrUntil(
-      [&]() { return serial()->SyncCall(&FakeSerialDevice::writes).size() == 2u; }));
+  EXPECT_TRUE(runtime().RunWithTimeoutOrUntil([&]() {
+    return RunInEnvironmentTypeContext<size_t>([](FixtureBasedTestEnvironment& env) {
+             return env.serial_device_.writes().size();
+           }) == 2u;
+  }));
 
-  const std::vector<std::vector<uint8_t>>& packets = serial()->SyncCall(&FakeSerialDevice::writes);
+  const std::vector<std::vector<uint8_t>> packets =
+      RunInEnvironmentTypeContext<const std::vector<std::vector<uint8_t>>>(
+          [](FixtureBasedTestEnvironment& env) { return env.serial_device_.writes(); });
   EXPECT_EQ(packets[0], kUartCmd0);
   EXPECT_EQ(packets[1], kUartCmd1);
 
-  EXPECT_TRUE(runtime()->RunWithTimeoutOrUntil([&]() { return snoop_packets().size() == 2u; }));
+  EXPECT_TRUE(runtime().RunWithTimeoutOrUntil([&]() { return snoop_packets().size() == 2u; }));
   EXPECT_EQ(snoop_packets()[0], kSnoopCmd0);
   EXPECT_EQ(snoop_packets()[1], kSnoopCmd1);
 }
 
 TEST_F(BtTransportUartHciProtocolTest, CommandReadableSignalIgnoredUntilFirstWriteCompletes) {
   // Delay completion of first write.
-  serial()->SyncCall(&FakeSerialDevice::set_writes_paused, true);
+  RunInEnvironmentTypeContext(
+      [](FixtureBasedTestEnvironment& env) { return env.serial_device_.set_writes_paused(true); });
 
   const std::vector<uint8_t> kUartCmd0 = {
       BtHciPacketIndicator::kHciCommand,  // UART packet indicator
@@ -642,21 +623,35 @@ TEST_F(BtTransportUartHciProtocolTest, CommandReadableSignalIgnoredUntilFirstWri
   EXPECT_EQ(write_status, ZX_OK);
 
   // Wait until the first packet is received.
-  EXPECT_TRUE(runtime()->RunWithTimeoutOrUntil(
-      [&]() { return serial()->SyncCall(&FakeSerialDevice::writes).size() == 1u; }));
+  EXPECT_TRUE(runtime().RunWithTimeoutOrUntil([&]() {
+    return RunInEnvironmentTypeContext<size_t>([](FixtureBasedTestEnvironment& env) {
+             return env.serial_device_.writes().size();
+           }) == 1u;
+  }));
 
   // Make sure the number of packet received never run over 1 before the pause is released.
-  EXPECT_FALSE(runtime()->RunWithTimeoutOrUntil(
-      [&]() { return serial()->SyncCall(&FakeSerialDevice::writes).size() > 1u; }, zx::msec(500)));
+  EXPECT_FALSE(runtime().RunWithTimeoutOrUntil(
+      [&]() {
+        return RunInEnvironmentTypeContext<size_t>([](FixtureBasedTestEnvironment& env) {
+                 return env.serial_device_.writes().size();
+               }) > 1u;
+      },
+      zx::msec(500)));
 
   // Call the first command's completion callback. This should resume waiting for signals.
-  serial()->SyncCall(&FakeSerialDevice::set_writes_paused, false);
+  RunInEnvironmentTypeContext(
+      [](FixtureBasedTestEnvironment& env) { return env.serial_device_.set_writes_paused(false); });
 
   // Wait for the readable signal to be processed and the second packet is received.
-  EXPECT_TRUE(runtime()->RunWithTimeoutOrUntil(
-      [&]() { return serial()->SyncCall(&FakeSerialDevice::writes).size() == 2u; }));
+  EXPECT_TRUE(runtime().RunWithTimeoutOrUntil([&]() {
+    return RunInEnvironmentTypeContext<size_t>([](FixtureBasedTestEnvironment& env) {
+             return env.serial_device_.writes().size();
+           }) == 2u;
+  }));
 
-  const std::vector<std::vector<uint8_t>>& packets = serial()->SyncCall(&FakeSerialDevice::writes);
+  const std::vector<std::vector<uint8_t>> packets =
+      RunInEnvironmentTypeContext<const std::vector<std::vector<uint8_t>>>(
+          [](FixtureBasedTestEnvironment& env) { return env.serial_device_.writes(); });
   EXPECT_EQ(packets[0], kUartCmd0);
   EXPECT_EQ(packets[1], kUartCmd1);
 }
@@ -677,13 +672,16 @@ TEST_F(BtTransportUartHciProtocolTest, ReceiveManyHciEventsSplitIntoTwoResponses
 
   const size_t kNumEvents = 20;
   for (size_t i = 0; i < kNumEvents; i++) {
-    serial()->SyncCall(&FakeSerialDevice::QueueReadValue, kPart1);
-    serial()->SyncCall(&FakeSerialDevice::QueueReadValue, kPart2);
+    RunInEnvironmentTypeContext([&](FixtureBasedTestEnvironment& env) {
+      return env.serial_device_.QueueReadValue(kPart1);
+    });
+    RunInEnvironmentTypeContext([&](FixtureBasedTestEnvironment& env) {
+      return env.serial_device_.QueueReadValue(kPart2);
+    });
   }
 
   // Wait for all the packets to be received.
-  EXPECT_TRUE(
-      runtime()->RunWithTimeoutOrUntil([&]() { return hci_events().size() == kNumEvents; }));
+  EXPECT_TRUE(runtime().RunWithTimeoutOrUntil([&]() { return hci_events().size() == kNumEvents; }));
 
   ASSERT_EQ(hci_events().size(), kNumEvents);
   for (const std::vector<uint8_t>& event : hci_events()) {
@@ -691,7 +689,7 @@ TEST_F(BtTransportUartHciProtocolTest, ReceiveManyHciEventsSplitIntoTwoResponses
   }
 
   EXPECT_TRUE(
-      runtime()->RunWithTimeoutOrUntil([&]() { return snoop_packets().size() == kNumEvents; }));
+      runtime().RunWithTimeoutOrUntil([&]() { return snoop_packets().size() == kNumEvents; }));
   for (const std::vector<uint8_t>& packet : snoop_packets()) {
     EXPECT_EQ(packet, kSnoopEventBuffer);
   }
@@ -708,10 +706,15 @@ TEST_F(BtTransportUartHciProtocolTest, SendScoPackets) {
     ASSERT_EQ(write_status, ZX_OK);
   }
   // Allow SCO packets to be processed and sent to the serial device.
-  EXPECT_TRUE(runtime()->RunWithTimeoutOrUntil(
-      [&]() { return serial()->SyncCall(&FakeSerialDevice::writes).size() == kNumPackets; }));
+  EXPECT_TRUE(runtime().RunWithTimeoutOrUntil([&]() {
+    return RunInEnvironmentTypeContext<size_t>([](FixtureBasedTestEnvironment& env) {
+             return env.serial_device_.writes().size();
+           }) == kNumPackets;
+  }));
 
-  const std::vector<std::vector<uint8_t>>& packets = serial()->SyncCall(&FakeSerialDevice::writes);
+  const std::vector<std::vector<uint8_t>> packets =
+      RunInEnvironmentTypeContext<const std::vector<std::vector<uint8_t>>>(
+          [](FixtureBasedTestEnvironment& env) { return env.serial_device_.writes(); });
   for (uint8_t i = 0; i < kNumPackets; i++) {
     // A packet indicator should be prepended.
     std::vector<uint8_t> expected = {BtHciPacketIndicator::kHciSco, i};
@@ -719,7 +722,7 @@ TEST_F(BtTransportUartHciProtocolTest, SendScoPackets) {
   }
 
   EXPECT_TRUE(
-      runtime()->RunWithTimeoutOrUntil([&]() { return snoop_packets().size() == kNumPackets; }));
+      runtime().RunWithTimeoutOrUntil([&]() { return snoop_packets().size() == kNumPackets; }));
   for (uint8_t i = 0; i < kNumPackets; i++) {
     // Snoop packets should have a snoop packet flag prepended (NOT a UART packet indicator).
     const std::vector<uint8_t> kExpectedSnoopPacket = {BT_HCI_SNOOP_TYPE_SCO, i};
@@ -729,7 +732,8 @@ TEST_F(BtTransportUartHciProtocolTest, SendScoPackets) {
 
 TEST_F(BtTransportUartHciProtocolTest, ScoReadableSignalIgnoredUntilFirstWriteCompletes) {
   // Delay completion of first write.
-  serial()->SyncCall(&FakeSerialDevice::set_writes_paused, true);
+  RunInEnvironmentTypeContext(
+      [](FixtureBasedTestEnvironment& env) { return env.serial_device_.set_writes_paused(true); });
 
   const uint8_t kNumPackets = 2;
   for (uint8_t i = 0; i < kNumPackets; i++) {
@@ -742,17 +746,26 @@ TEST_F(BtTransportUartHciProtocolTest, ScoReadableSignalIgnoredUntilFirstWriteCo
   }
 
   // Wait for the first packet to be received.
-  EXPECT_TRUE(runtime()->RunWithTimeoutOrUntil(
-      [&]() { return serial()->SyncCall(&FakeSerialDevice::writes).size() == 1u; }));
+  EXPECT_TRUE(runtime().RunWithTimeoutOrUntil([&]() {
+    return RunInEnvironmentTypeContext<size_t>([](FixtureBasedTestEnvironment& env) {
+             return env.serial_device_.writes().size();
+           }) == 1u;
+  }));
 
   // Call the first packet's completion callback. This should resume waiting for signals.
-  serial()->SyncCall(&FakeSerialDevice::set_writes_paused, false);
+  RunInEnvironmentTypeContext(
+      [](FixtureBasedTestEnvironment& env) { return env.serial_device_.set_writes_paused(false); });
 
   // Wait for the readable signal to be processed and the second packet to be received.
-  EXPECT_TRUE(runtime()->RunWithTimeoutOrUntil(
-      [&]() { return serial()->SyncCall(&FakeSerialDevice::writes).size() == kNumPackets; }));
+  EXPECT_TRUE(runtime().RunWithTimeoutOrUntil([&]() {
+    return RunInEnvironmentTypeContext<size_t>([](FixtureBasedTestEnvironment& env) {
+             return env.serial_device_.writes().size();
+           }) == kNumPackets;
+  }));
 
-  const std::vector<std::vector<uint8_t>>& packets = serial()->SyncCall(&FakeSerialDevice::writes);
+  const std::vector<std::vector<uint8_t>> packets =
+      RunInEnvironmentTypeContext<const std::vector<std::vector<uint8_t>>>(
+          [](FixtureBasedTestEnvironment& env) { return env.serial_device_.writes(); });
   ASSERT_EQ(packets.size(), kNumPackets);
   for (uint8_t i = 0; i < kNumPackets; i++) {
     // A packet indicator should be prepended.
@@ -778,12 +791,16 @@ TEST_F(BtTransportUartHciProtocolTest, ReceiveScoPacketsIn2Parts) {
 
   const size_t kNumPackets = 20;
   for (size_t i = 0; i < kNumPackets; i++) {
-    serial()->SyncCall(&FakeSerialDevice::QueueReadValue, kPart1);
-    serial()->SyncCall(&FakeSerialDevice::QueueReadValue, kPart2);
+    RunInEnvironmentTypeContext([&](FixtureBasedTestEnvironment& env) {
+      return env.serial_device_.QueueReadValue(kPart1);
+    });
+    RunInEnvironmentTypeContext([&](FixtureBasedTestEnvironment& env) {
+      return env.serial_device_.QueueReadValue(kPart2);
+    });
   }
 
   // Wait for all the packets to be received.
-  EXPECT_TRUE(runtime()->RunWithTimeoutOrUntil(
+  EXPECT_TRUE(runtime().RunWithTimeoutOrUntil(
       [&]() { return received_sco_packets().size() == static_cast<size_t>(kNumPackets); }));
 
   for (const std::vector<uint8_t>& packet : received_sco_packets()) {
@@ -792,7 +809,7 @@ TEST_F(BtTransportUartHciProtocolTest, ReceiveScoPacketsIn2Parts) {
   }
 
   EXPECT_TRUE(
-      runtime()->RunWithTimeoutOrUntil([&]() { return snoop_packets().size() == kNumPackets; }));
+      runtime().RunWithTimeoutOrUntil([&]() { return snoop_packets().size() == kNumPackets; }));
   for (const std::vector<uint8_t>& packet : snoop_packets()) {
     EXPECT_EQ(packet, kSnoopScoBuffer);
   }
