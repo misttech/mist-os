@@ -1148,7 +1148,7 @@ from infra builds, and later inspection.
 
 **Current value (from the default):** `"//out/not-default/comparison-reports"`
 
-From //build/toolchain/rbe.gni:190
+From //build/toolchain/rbe.gni:195
 
 ### compress_debuginfo
 
@@ -1313,7 +1313,7 @@ One of:
 
 **Current value (from the default):** `"none"`
 
-From //build/toolchain/rbe.gni:185
+From //build/toolchain/rbe.gni:190
 
 ### cxx_rbe_download_obj_files
 
@@ -1325,7 +1325,7 @@ and not restricted environments that lack direct network access.
 
 **Current value (from the default):** `true`
 
-From //build/toolchain/rbe.gni:197
+From //build/toolchain/rbe.gni:202
 
 ### cxx_rbe_enable
 
@@ -1338,7 +1338,7 @@ From //out/not-default/args.gn:7
 
 **Overridden from the default:** `false`
 
-From //build/toolchain/rbe.gni:138
+From //build/toolchain/rbe.gni:143
 
 **Current value for `target_cpu = "x64"`:** `false`
 
@@ -1346,7 +1346,7 @@ From //out/not-default/args.gn:7
 
 **Overridden from the default:** `false`
 
-From //build/toolchain/rbe.gni:138
+From //build/toolchain/rbe.gni:143
 
 ### cxx_rbe_exec_strategy
 
@@ -1369,7 +1369,7 @@ One of:
 
 **Current value (from the default):** `"remote_local_fallback"`
 
-From //build/toolchain/rbe.gni:161
+From //build/toolchain/rbe.gni:166
 
 ### cxx_rbe_minimalist_wrapper
 
@@ -1379,7 +1379,7 @@ This flag is only meaningful when `cxx_rbe_enable` is true.
 
 **Current value (from the default):** `true`
 
-From //build/toolchain/rbe.gni:143
+From //build/toolchain/rbe.gni:148
 
 ### data_filesystem_format
 
@@ -4392,7 +4392,7 @@ One of:
 
 **Current value (from the default):** `"none"`
 
-From //build/toolchain/rbe.gni:244
+From //build/toolchain/rbe.gni:249
 
 ### link_rbe_enable
 
@@ -4406,7 +4406,7 @@ From //out/not-default/args.gn:11
 
 **Overridden from the default:** `false`
 
-From //build/toolchain/rbe.gni:206
+From //build/toolchain/rbe.gni:211
 
 **Current value for `target_cpu = "x64"`:** `false`
 
@@ -4414,7 +4414,7 @@ From //out/not-default/args.gn:11
 
 **Overridden from the default:** `false`
 
-From //build/toolchain/rbe.gni:206
+From //build/toolchain/rbe.gni:211
 
 ### link_rbe_exec_strategy
 
@@ -4437,7 +4437,7 @@ One of:
 
 **Current value (from the default):** `"remote"`
 
-From //build/toolchain/rbe.gni:224
+From //build/toolchain/rbe.gni:229
 
 ### llvm_prefix
 
@@ -7049,7 +7049,7 @@ to quickly evaluate transitive dependencies (and remote inputs).
 
 **Current value (from the default):** `false`
 
-From //build/toolchain/rbe.gni:126
+From //build/toolchain/rbe.gni:131
 
 ### rust_incremental
 
@@ -7110,7 +7110,7 @@ One of:
 
 **Current value (from the default):** `"none"`
 
-From //build/toolchain/rbe.gni:114
+From //build/toolchain/rbe.gni:119
 
 ### rust_rbe_download_rlibs
 
@@ -7119,7 +7119,7 @@ rlibs from remote Rust build actions.
 
 **Current value (from the default):** `true`
 
-From //build/toolchain/rbe.gni:130
+From //build/toolchain/rbe.gni:135
 
 ### rust_rbe_download_unstripped_binaries
 
@@ -7131,7 +7131,7 @@ and not restricted environments that lack direct network access.
 
 **Current value (from the default):** `true`
 
-From //build/toolchain/rbe.gni:121
+From //build/toolchain/rbe.gni:126
 
 ### rust_rbe_enable
 
@@ -7143,7 +7143,7 @@ From //out/not-default/args.gn:12
 
 **Overridden from the default:** `false`
 
-From //build/toolchain/rbe.gni:70
+From //build/toolchain/rbe.gni:75
 
 **Current value for `target_cpu = "x64"`:** `false`
 
@@ -7151,7 +7151,7 @@ From //out/not-default/args.gn:12
 
 **Overridden from the default:** `false`
 
-From //build/toolchain/rbe.gni:70
+From //build/toolchain/rbe.gni:75
 
 ### rust_rbe_exec_strategy
 
@@ -7174,7 +7174,7 @@ One of:
 
 **Current value (from the default):** `"remote"`
 
-From //build/toolchain/rbe.gni:88
+From //build/toolchain/rbe.gni:93
 
 ### rust_toolchain_triple_suffix
 
