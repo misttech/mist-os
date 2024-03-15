@@ -18,8 +18,9 @@ using testing::MatchesRegex;
 class SysfsPowerTest : public ::testing::Test {
  public:
   void SetUp() override {
-    // Assume starnix always has /sys/power.
-    if (!test_helper::IsStarnix() && access("/sys/power", F_OK) == -1) {
+    // Assume starnix always has /sys/power and /sys/kernel/wakeup_reasons
+    if (!test_helper::IsStarnix() && access("/sys/power", F_OK) == -1 &&
+        access("/sys/kernel/wakeup_reasons", F_OK) == -1) {
       GTEST_SKIP() << "/sys/power not available, skipping...";
     }
   }
@@ -29,6 +30,12 @@ TEST_F(SysfsPowerTest, PowerDirectoryContainsExpectedContents) {
   std::vector<std::string> files;
   EXPECT_TRUE(files::ReadDirContents("/sys/power", &files));
   EXPECT_THAT(files, IsSupersetOf({"suspend_stats", "wakeup_count", "state", "sync_on_suspend"}));
+}
+
+TEST_F(SysfsPowerTest, WakeupReasonsDirectoryContainsExpectedContents) {
+  std::vector<std::string> files;
+  EXPECT_TRUE(files::ReadDirContents("/sys/kernel/wakeup_reasons", &files));
+  EXPECT_THAT(files, IsSupersetOf({"last_resume_reason", "last_suspend_time"}));
 }
 
 TEST_F(SysfsPowerTest, SuspendStatsDirectoryContainsExpectedContents) {
@@ -104,4 +111,18 @@ TEST_F(SysfsPowerTest, SyncOnSuspendFileWrite) {
   EXPECT_FALSE(files::WriteFile("/sys/power/sync_on_suspend", "test"));
   EXPECT_FALSE(files::WriteFile("/sys/power/sync_on_suspend", std::to_string(2)));
   EXPECT_TRUE(files::WriteFile("/sys/power/sync_on_suspend", std::to_string(0)));
+}
+
+TEST_F(SysfsPowerTest, LastSuspendTimeFileContainsExpectedContents) {
+  std::string last_suspend_time_str;
+  EXPECT_TRUE(files::ReadFileToString("/sys/kernel/wakeup_reasons/last_suspend_time",
+                                      &last_suspend_time_str));
+  EXPECT_THAT(last_suspend_time_str, ContainsRegex("^[0-9]+\\s[0-9]+\n"));
+}
+
+TEST_F(SysfsPowerTest, LastResumeReasonFileContainsExpectedContents) {
+  std::string last_suspend_time_str;
+  EXPECT_TRUE(files::ReadFileToString("/sys/kernel/wakeup_reasons/last_resume_reason",
+                                      &last_suspend_time_str));
+  EXPECT_THAT(last_suspend_time_str, ContainsRegex("^.*\n"));
 }

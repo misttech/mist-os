@@ -39,10 +39,10 @@ impl FileOps for PowerSyncOnSuspendFile {
             .parse::<u32>()
             .map_err(|_| errno!(EINVAL))?;
         match enable_sync_on_suspend {
-            0 | 1 => {
-                *current_task.kernel().power_manager.enable_sync_on_suspend.lock() =
-                    enable_sync_on_suspend != 0
-            }
+            0 | 1 => current_task
+                .kernel()
+                .suspend_resume_manager
+                .set_sync_on_suspend(enable_sync_on_suspend != 0),
             _ => return error!(EINVAL),
         }
 
@@ -59,7 +59,7 @@ impl FileOps for PowerSyncOnSuspendFile {
     ) -> Result<usize, Errno> {
         let content = format!(
             "{}\n",
-            if *current_task.kernel().power_manager.enable_sync_on_suspend.lock() {
+            if current_task.kernel().suspend_resume_manager.sync_on_suspend_enabled() {
                 "1"
             } else {
                 "0"

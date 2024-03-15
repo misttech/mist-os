@@ -22,6 +22,14 @@
             name: "netstack",
             url: "netstack#meta/netstack.cm",
         },
+        {
+            name: "fake-power-broker",
+            url: "fake-power-broker#meta/fake-power-broker.cm",
+        },
+        {
+            name: "fake-system-activity-governor",
+            url: "fake-system-activity-governor#meta/fake-system-activity-governor.cm",
+        },
     ],
     capabilities: [
         { protocol: "fuchsia.test.Suite" },
@@ -50,6 +58,19 @@
                 "fuchsia.vulkan.loader.Loader",
             ],
             from: "parent",
+            to: [ "#kernel" ],
+        },
+        {
+            protocol: [ "fuchsia.power.broker.Topology" ],
+            from: "#fake-power-broker",
+            to: [ "#kernel" ],
+        },
+        {
+            protocol: [
+                "fuchsia.power.suspend.Stats",
+                "fuchsia.power.system.ActivityGovernor",
+            ],
+            from: "#fake-system-activity-governor",
             to: [ "#kernel" ],
         },
         {
@@ -99,7 +120,10 @@
         {
             protocol: "fuchsia.logger.LogSink",
             from: "parent",
-            to: "#netstack",
+            to: [
+                "#fake-system-activity-governor",
+                "#netstack",
+            ],
         },
     ],
     environments: [

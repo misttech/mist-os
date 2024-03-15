@@ -2,9 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use starnix_uapi::errors::Errno;
-
 use fuchsia_zircon as zx;
+use starnix_uapi::errors::Errno;
 
 #[derive(Debug, Default, Clone, Eq, PartialEq)]
 pub struct SuspendStats {
@@ -14,5 +13,6 @@ pub struct SuspendStats {
     pub last_failed_errno: Option<Errno>,
     pub wakeup_count: u64,
     pub last_resume_reason: Option<String>,
-    pub last_suspend_time: zx::Duration,
+    pub last_time_in_sleep: zx::Duration,
+    pub last_time_in_suspend_operations: zx::Duration,
 }

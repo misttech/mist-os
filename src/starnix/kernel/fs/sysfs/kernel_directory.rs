@@ -6,7 +6,7 @@ use crate::{
     task::CurrentTask,
     vfs::{create_bytes_file_with_handler, StaticDirectoryBuilder, StubEmptyFile},
 };
-use starnix_logging::{bug_ref, track_stub};
+use starnix_logging::bug_ref;
 use starnix_uapi::file_mode::mode;
 use std::sync::Arc;
 
@@ -35,7 +35,11 @@ pub fn sysfs_kernel_directory(current_task: &CurrentTask, dir: &mut StaticDirect
                 current_task,
                 "last_resume_reason",
                 create_bytes_file_with_handler(Arc::downgrade(kernel), |kernel| {
-                    kernel.power_manager.suspend_stats().last_resume_reason.unwrap_or_default()
+                    kernel
+                        .suspend_resume_manager
+                        .suspend_stats()
+                        .last_resume_reason
+                        .unwrap_or_default()
                 }),
                 read_only_file_mode,
             );
@@ -43,20 +47,14 @@ pub fn sysfs_kernel_directory(current_task: &CurrentTask, dir: &mut StaticDirect
                 current_task,
                 "last_suspend_time",
                 create_bytes_file_with_handler(Arc::downgrade(kernel), |kernel| {
-                    // It contains two numbers (in seconds) separated by space.
+                    let suspend_stats = kernel.suspend_resume_manager.suspend_stats();
                     // First number is the time spent in suspend and resume processes.
                     // Second number is the time spent in sleep state.
-                    track_stub!(
-                        TODO("https://fxbug.dev/297438732"),
-                        "/sys/kernel/wakeup_reasons/last_suspend_time"
-                    );
-                    let suspend_time = kernel
-                        .power_manager
-                        .suspend_stats()
-                        .last_suspend_time
-                        .into_seconds()
-                        .to_string();
-                    format!("{} {}", suspend_time, suspend_time)
+                    format!(
+                        "{} {}",
+                        suspend_stats.last_time_in_suspend_operations.into_seconds_f64(),
+                        suspend_stats.last_time_in_sleep.into_seconds_f64()
+                    )
                 }),
                 read_only_file_mode,
             );

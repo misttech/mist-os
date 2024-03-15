@@ -391,6 +391,10 @@ async fn create_container(
 
     kernel.syslog.init(&system_task).source_context("initializing syslog")?;
 
+    if let Err(e) = kernel.suspend_resume_manager.init(&system_task) {
+        log_warn!("Suspend/Resume manager initialization failed: ({e:?})");
+    }
+
     // Register common devices and add them in sysfs and devtmpfs.
     init_common_devices(locked, &system_task);
 

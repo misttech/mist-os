@@ -11,32 +11,39 @@ use crate::{
         SimpleFileNode,
     },
 };
+use fidl_fuchsia_power_broker::PowerLevel;
 use starnix_sync::{FileOpsCore, Locked, WriteOps};
 use starnix_uapi::{errno, error, errors::Errno};
 
 #[derive(Copy, Clone, Eq, PartialEq, Hash)]
 pub enum SuspendState {
+    /// Suspend-to-disk
+    ///
+    /// This state offers the greatest energy savings.
+    Disk,
     /// Suspend-to-Ram
     ///
     /// This state, if supported, offers significant power savings as everything in the system is
     /// put into a low-power state, except for memory.
     Ram,
+    /// Standby
+    ///
+    /// This state, if supported, offers moderate, but real, energy savings, while providing a
+    /// relatively straightforward transition back to the working state.
+    ///
+    Standby,
     /// Suspend-To-Idle
     ///
     /// This state is a generic, pure software, light-weight, system sleep state.
     Idle,
-    /// Suspend-to-disk
-    Disk,
-    /// Power-On Suspend
-    Standby,
 }
 
 impl SuspendState {
     fn to_str(&self) -> &'static str {
         match self {
+            SuspendState::Disk => "disk",
             SuspendState::Ram => "mem",
             SuspendState::Idle => "freeze",
-            SuspendState::Disk => "disk",
             SuspendState::Standby => "standby",
         }
     }
@@ -47,12 +54,23 @@ impl TryFrom<&str> for SuspendState {
 
     fn try_from(value: &str) -> Result<Self, Self::Error> {
         Ok(match value {
-            "mem" => SuspendState::Ram,
-            "freeze" => SuspendState::Idle,
             "disk" => SuspendState::Disk,
+            "mem" => SuspendState::Ram,
             "standby" => SuspendState::Standby,
+            "freeze" => SuspendState::Idle,
             _ => return error!(EINVAL),
         })
+    }
+}
+
+impl From<SuspendState> for PowerLevel {
+    fn from(value: SuspendState) -> Self {
+        match value {
+            SuspendState::Disk => 0,
+            SuspendState::Ram => 1,
+            SuspendState::Standby => 2,
+            SuspendState::Idle => 3,
+        }
     }
 }
 
@@ -80,7 +98,7 @@ impl FileOps for PowerStateFile {
         let state_str = std::str::from_utf8(&bytes).map_err(|_| errno!(EINVAL))?;
         let state: SuspendState = state_str.try_into()?;
 
-        let power_manager = &current_task.kernel().power_manager;
+        let power_manager = &current_task.kernel().suspend_resume_manager;
         let supported_states = power_manager.suspend_states();
         if !supported_states.contains(&state) {
             return error!(EINVAL);
@@ -98,7 +116,7 @@ impl FileOps for PowerStateFile {
         offset: usize,
         data: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno> {
-        let states = current_task.kernel().power_manager.suspend_states();
+        let states = current_task.kernel().suspend_resume_manager.suspend_states();
         let content = states.iter().map(SuspendState::to_str).join(" ") + "\n";
         data.write(content[offset..].as_bytes())
     }

@@ -45,7 +45,7 @@ impl FileOps for PowerWakeupCountFile {
             .trim()
             .parse::<u64>()
             .map_err(|_| errno!(EINVAL))?;
-        let real_count = current_task.kernel().power_manager.suspend_stats().wakeup_count;
+        let real_count = current_task.kernel().suspend_resume_manager.suspend_stats().wakeup_count;
         if expected_count != real_count {
             return error!(EINVAL);
         }
@@ -61,7 +61,8 @@ impl FileOps for PowerWakeupCountFile {
         offset: usize,
         data: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno> {
-        let wakeup_count = current_task.kernel().power_manager.suspend_stats().wakeup_count;
+        let wakeup_count =
+            current_task.kernel().suspend_resume_manager.suspend_stats().wakeup_count;
         let content = format!("{}\n", wakeup_count);
         data.write(content[offset..].as_bytes())
     }

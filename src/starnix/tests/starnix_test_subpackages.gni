@@ -7,4 +7,6 @@
 starnix_test_subpackages = [
   "//src/starnix/kernel:starnix_kernel_package",
   "//src/starnix/tests:netstack_package",
+  "//src/power/testing/fake-system-activity-governor:package",
+  "//src/power/testing/fake-broker:package",
 ]

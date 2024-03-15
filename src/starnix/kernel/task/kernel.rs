@@ -12,7 +12,7 @@ use crate::{
     },
     fs::proc::SystemLimits,
     mm::{FutexTable, SharedFutexKey},
-    power::PowerManager,
+    power::SuspendResumeManagerHandle,
     task::{
         AbstractUnixSocketNamespace, AbstractVsockSocketNamespace, CurrentTask, IpTables,
         KernelStats, KernelThreads, NetstackDevices, PidTable, StopState, Syslog, UtsNamespace,
@@ -200,8 +200,8 @@ pub struct Kernel {
     /// in a text form in the file /proc/sys/kernel/seccomp/actions_logged.
     pub actions_logged: AtomicU16,
 
-    /// The manager for power subsystems including reboot and suspend.
-    pub power_manager: PowerManager,
+    /// The manager for suspend/resume.
+    pub suspend_resume_manager: SuspendResumeManagerHandle,
 
     /// Unique IDs for new mounts and mount namespaces.
     pub next_mount_id: AtomicU64Counter,
@@ -343,7 +343,7 @@ impl Kernel {
             inspect_node,
             core_dumps,
             actions_logged: AtomicU16::new(0),
-            power_manager: PowerManager::default(),
+            suspend_resume_manager: Default::default(),
             next_mount_id: AtomicU64Counter::new(1),
             next_peer_group_id: AtomicU64Counter::new(1),
             next_namespace_id: AtomicU64Counter::new(1),

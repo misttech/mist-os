@@ -22,6 +22,8 @@ fidl("fuchsia.power.broker") {
     "//src/devices/bus/drivers/platform/test/*:*",
     "//src/power/broker/*:*",
     "//src/power/system-activity-governor/*:*",
+    "//src/power/testing/fake-broker/*:*",
+    "//src/starnix/kernel/*:*",
     "//src/sys/time/timekeeper/*:*",
     "//vendor/*",
   ]
