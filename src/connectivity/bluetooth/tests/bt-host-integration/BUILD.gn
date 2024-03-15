@@ -37,6 +37,11 @@ fuchsia_test_component("bt-host-integration-tests-component") {
 # component in this package via the dep on the bt-test-harness crate.
 fuchsia_test_package("bt-host-integration-tests") {
   test_components = [ ":bt-host-integration-tests-component" ]
+  test_specs = {
+    log_settings = {
+      max_severity = "ERROR"
+    }
+  }
   subpackages =
       [ "//src/connectivity/bluetooth/core/bt-host:bt-host-component" ]
 }

@@ -101,7 +101,7 @@ void FidlController::Initialize(PwStatusCallback complete_callback,
 
   vendor_ = vendor_handle_.Bind();
   vendor_.set_error_handler([this](zx_status_t status) {
-    bt_log(ERROR, "controllers", "BtVendor protocol closed: %s", zx_status_get_string(status));
+    bt_log(WARN, "controllers", "Vendor protocol closed: %s", zx_status_get_string(status));
     OnError(status);
   });
 
@@ -125,7 +125,7 @@ void FidlController::InitializeHci(fuchsia::hardware::bluetooth::HciHandle hci_h
   // synchronously, so there is no risk that OnError() is called immediately.
   hci_ = hci_handle.Bind();
   hci_.set_error_handler([this](zx_status_t status) {
-    bt_log(ERROR, "controllers", "BtHci protocol closed: %s", zx_status_get_string(status));
+    bt_log(WARN, "controllers", "HCI protocol closed: %s", zx_status_get_string(status));
     OnError(status);
   });
 

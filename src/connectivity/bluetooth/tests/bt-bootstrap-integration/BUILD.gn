@@ -31,6 +31,9 @@ fuchsia_test_package("bt-bootstrap-integration-tests") {
   test_specs = {
     # control the parallelism
     parallel = 1
+    log_settings = {
+      max_severity = "ERROR"
+    }
   }
   subpackages =
       [ "//src/connectivity/bluetooth/core/bt-host:bt-host-component" ]
