@@ -422,7 +422,9 @@ Capabilities that are [offered](#offer) or [exposed](#expose) from `self` must b
 here.
 
 #### Capability fields
+
 This supports the following capability keys. Exactly one of these must be set:
+
 - `protocol`: (_optional `string or array of strings`_)
 - `service`: (_optional `string or array of strings`_)
 - `directory`: (_optional `string`_)
@@ -434,6 +436,7 @@ This supports the following capability keys. Exactly one of these must be set:
 - `config`: (_optional `string`_)
 
 #### Additional fields
+
 This supports the following additional fields:
 [glossary.outgoing directory]: /docs/glossary/README.md#outgoing-directory
 
@@ -525,7 +528,9 @@ and each capability must have a valid route through all components between
 this component and the capability's source.
 
 #### Capability fields
+
 This supports the following capability keys. Exactly one of these must be set:
+
 - `service`: (_optional `string or array of strings`_)
 - `directory`: (_optional `string`_)
 - `protocol`: (_optional `string or array of strings`_)
@@ -536,6 +541,7 @@ This supports the following capability keys. Exactly one of these must be set:
 - `config`: (_optional `string`_)
 
 #### Additional fields
+
 This supports the following additional fields:
 [fidl-environment-decl]: /reference/fidl/fuchsia.component.decl#Environment
 [glossary.namespace]: /docs/glossary/README.md#namespace
@@ -663,7 +669,9 @@ Declares the capabilities that are made available to the parent component or to 
 framework. It is valid to `expose` from `self` or from a child component.
 
 #### Capability fields
+
 This supports the following capability keys. Exactly one of these must be set:
+
 - `service`: (_optional `string or array of strings`_)
 - `protocol`: (_optional `string or array of strings`_)
 - `directory`: (_optional `string`_)
@@ -673,6 +681,7 @@ This supports the following capability keys. Exactly one of these must be set:
 - `config`: (_optional `string`_)
 
 #### Additional fields
+
 This supports the following additional fields:
 
 - `from`: (_`string or array of strings`_) `from`: The source of the capability, one of:
@@ -756,7 +765,9 @@ Declares the capabilities that are made available to a [child component][doc-chi
 instance or a [child collection][doc-collections].
 
 #### Capability fields
+
 This supports the following capability keys. Exactly one of these must be set:
+
 - `protocol`: (_optional `string or array of strings`_)
 - `service`: (_optional `string or array of strings`_)
 - `directory`: (_optional `string`_)
@@ -768,6 +779,7 @@ This supports the following capability keys. Exactly one of these must be set:
 - `config`: (_optional `string`_)
 
 #### Additional fields
+
 This supports the following additional fields:
 
 - `service`: (_optional `string or array of strings`_) When routing a service, the [name](#name) of a [service capability][doc-service].

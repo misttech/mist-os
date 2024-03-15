@@ -1246,7 +1246,9 @@ pub struct Document {
     /// here.
     ///
     /// # Capability fields
+    ///
     /// This supports the following capability keys. Exactly one of these must be set:
+    ///
     /// - `protocol`: (_optional `string or array of strings`_)
     /// - `service`: (_optional `string or array of strings`_)
     /// - `directory`: (_optional `string`_)
@@ -1258,6 +1260,7 @@ pub struct Document {
     /// - `config`: (_optional `string`_)
     ///
     /// # Additional fields
+    ///
     /// This supports the following additional fields:
     /// [glossary.outgoing directory]: /docs/glossary/README.md#outgoing-directory
     #[reference_doc(recurse)]
@@ -1271,7 +1274,9 @@ pub struct Document {
     /// this component and the capability's source.
     ///
     /// # Capability fields
+    ///
     /// This supports the following capability keys. Exactly one of these must be set:
+    ///
     /// - `service`: (_optional `string or array of strings`_)
     /// - `directory`: (_optional `string`_)
     /// - `protocol`: (_optional `string or array of strings`_)
@@ -1282,6 +1287,7 @@ pub struct Document {
     /// - `config`: (_optional `string`_)
     ///
     /// # Additional fields
+    ///
     /// This supports the following additional fields:
     /// [fidl-environment-decl]: /reference/fidl/fuchsia.component.decl#Environment
     /// [glossary.namespace]: /docs/glossary/README.md#namespace
@@ -1293,7 +1299,9 @@ pub struct Document {
     /// framework. It is valid to `expose` from `self` or from a child component.
     ///
     /// # Capability fields
+    ///
     /// This supports the following capability keys. Exactly one of these must be set:
+    ///
     /// - `service`: (_optional `string or array of strings`_)
     /// - `protocol`: (_optional `string or array of strings`_)
     /// - `directory`: (_optional `string`_)
@@ -1303,6 +1311,7 @@ pub struct Document {
     /// - `config`: (_optional `string`_)
     ///
     /// # Additional fields
+    ///
     /// This supports the following additional fields:
     #[reference_doc(recurse)]
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -1312,7 +1321,9 @@ pub struct Document {
     /// instance or a [child collection][doc-collections].
     ///
     /// # Capability fields
+    ///
     /// This supports the following capability keys. Exactly one of these must be set:
+    ///
     /// - `protocol`: (_optional `string or array of strings`_)
     /// - `service`: (_optional `string or array of strings`_)
     /// - `directory`: (_optional `string`_)
@@ -1324,6 +1335,7 @@ pub struct Document {
     /// - `config`: (_optional `string`_)
     ///
     /// # Additional fields
+    ///
     /// This supports the following additional fields:
     #[reference_doc(recurse)]
     #[serde(skip_serializing_if = "Option::is_none")]
