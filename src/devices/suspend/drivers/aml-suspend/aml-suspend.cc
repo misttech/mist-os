@@ -26,7 +26,7 @@ namespace suspend {
 namespace {
 
 constexpr char kDeviceName[] = "aml-suspend-device";
-constexpr zx::duration kDebugSuspendDuration = zx::sec(10);
+constexpr zx::duration kDebugSuspendDuration = zx::sec(5);
 
 }  // namespace
 
@@ -132,8 +132,9 @@ void AmlSuspend::Suspend(SuspendRequestView request, SuspendCompleter::Sync& com
   fidl::Arena arena;
 
   auto resp = fuchsia_hardware_suspend::wire::SuspenderSuspendResponse::Builder(arena)
-      .suspend_duration(0)
-      .suspend_overhead(0).Build();
+                  .suspend_duration(0)
+                  .suspend_overhead(0)
+                  .Build();
 
   if (!request->has_state_index() || request->state_index() != 0) {
     // This driver only supports one suspend state for now.
