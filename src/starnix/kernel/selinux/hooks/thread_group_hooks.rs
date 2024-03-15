@@ -2,14 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use selinux::{permission_check::PermissionCheck, security_server::SecurityServer, SecurityId};
+use crate::task::Kernel;
+
+use selinux::{permission_check::PermissionCheck, InitialSid, SecurityId};
 use selinux_common::ProcessPermission;
 use starnix_uapi::{
     error,
     errors::Errno,
     signals::{Signal, SIGCHLD, SIGKILL, SIGSTOP},
 };
-use std::sync::Arc;
 
 /// Checks if creating a task is allowed.
 pub(crate) fn check_task_create_access(
@@ -173,6 +174,20 @@ fn check_permission(
     });
 }
 
+/// Returns an `SeLinuxThreadGroupState` instance for a new task.
+pub fn alloc_security(
+    kernel: &Kernel,
+    parent: Option<&SeLinuxThreadGroupState>,
+) -> Option<SeLinuxThreadGroupState> {
+    if kernel.security_server.is_none() {
+        return None;
+    };
+    Some(match parent {
+        Some(parent) => parent.clone(),
+        None => SeLinuxThreadGroupState::for_kernel(),
+    })
+}
+
 /// The SELinux security structure for `ThreadGroup`.
 #[derive(Clone, Debug, PartialEq)]
 pub struct SeLinuxThreadGroupState {
@@ -196,15 +211,11 @@ pub struct SeLinuxThreadGroupState {
 }
 
 impl SeLinuxThreadGroupState {
-    // TODO(http://b/316181721): initialize with correct values; use hard coded value for fake
-    // mode. Move default value to the security server `create_sid` for Fake mode.
-    pub fn new_default(security_server: &Arc<SecurityServer>) -> Self {
-        let sid = security_server
-            .security_context_to_sid(b"unconfined_u:unconfined_r:unconfined_t:s0-s0:c0-c1023")
-            .unwrap();
-        SeLinuxThreadGroupState {
-            current_sid: sid.clone(),
-            previous_sid: sid,
+    /// Returns initial state for the kernel's root thread group.
+    pub fn for_kernel() -> Self {
+        Self {
+            current_sid: SecurityId::initial(InitialSid::Kernel),
+            previous_sid: SecurityId::initial(InitialSid::Kernel),
             exec_sid: None,
             fscreate_sid: None,
             keycreate_sid: None,
@@ -223,8 +234,10 @@ pub struct SeLinuxResolvedElfState {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use selinux::security_server::Mode;
+    use crate::testing::{create_kernel_and_task, create_kernel_and_task_with_selinux};
+    use selinux::security_server::{Mode, SecurityServer};
     use starnix_uapi::signals::SIGTERM;
+    use std::sync::Arc;
 
     const HOOKS_TESTS_BINARY_POLICY: &[u8] =
         include_bytes!("../../../lib/selinux/testdata/micro_policies/hooks_tests_policy.pp");
@@ -318,7 +331,7 @@ mod tests {
         let security_server = SecurityServer::new(Mode::Enable);
         security_server.set_enforcing(true);
 
-        let initial_state = SeLinuxThreadGroupState::new_default(&security_server);
+        let initial_state = SeLinuxThreadGroupState::for_kernel();
         let mut selinux_state = Some(initial_state.clone());
         update_state_on_exec(&mut selinux_state, &None);
         assert_eq!(selinux_state.expect("missing SELinux state"), initial_state);
@@ -329,7 +342,7 @@ mod tests {
         let security_server = SecurityServer::new(Mode::Enable);
         security_server.set_enforcing(true);
 
-        let initial_state = SeLinuxThreadGroupState::new_default(&security_server);
+        let initial_state = SeLinuxThreadGroupState::for_kernel();
         let mut selinux_state = Some(initial_state.clone());
 
         let elf_sid = security_server
@@ -633,5 +646,48 @@ mod tests {
             check_ptrace_access(&security_server.as_permission_check(), source_sid, target_sid),
             error!(EACCES)
         );
+    }
+
+    #[fuchsia::test]
+    async fn alloc_security_selinux_disabled() {
+        let (kernel, _current_task) = create_kernel_and_task();
+
+        let selinux_state = alloc_security(&kernel, None);
+        assert_eq!(selinux_state, None);
+    }
+
+    #[fuchsia::test]
+    async fn alloc_security_no_parent() {
+        let security_server = SecurityServer::new(Mode::Fake);
+        let (kernel, _current_task) = create_kernel_and_task_with_selinux(security_server);
+        let selinux_state = alloc_security(&kernel, None);
+        assert_eq!(
+            selinux_state,
+            Some(SeLinuxThreadGroupState {
+                current_sid: SecurityId::initial(InitialSid::Kernel),
+                previous_sid: SecurityId::initial(InitialSid::Kernel),
+                exec_sid: None,
+                fscreate_sid: None,
+                keycreate_sid: None,
+                sockcreate_sid: None,
+            })
+        );
+    }
+
+    #[fuchsia::test]
+    async fn alloc_security_from_parent() {
+        let security_server = SecurityServer::new(Mode::Fake);
+        let (kernel, _current_task) = create_kernel_and_task_with_selinux(security_server);
+
+        // Create a fake parent state, with values for some fields, to check for.
+        let mut parent_selinux_state = alloc_security(&kernel, None).unwrap();
+        parent_selinux_state.current_sid = SecurityId::initial(InitialSid::Unlabeled);
+        parent_selinux_state.exec_sid = Some(SecurityId::initial(InitialSid::Unlabeled));
+        parent_selinux_state.fscreate_sid = Some(SecurityId::initial(InitialSid::Unlabeled));
+        parent_selinux_state.keycreate_sid = Some(SecurityId::initial(InitialSid::Unlabeled));
+        parent_selinux_state.sockcreate_sid = Some(SecurityId::initial(InitialSid::Unlabeled));
+
+        let selinux_state = alloc_security(&kernel, Some(&parent_selinux_state));
+        assert_eq!(selinux_state, Some(parent_selinux_state));
     }
 }

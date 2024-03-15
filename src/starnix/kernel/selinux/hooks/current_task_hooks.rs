@@ -321,7 +321,7 @@ mod tests {
     #[fuchsia::test]
     async fn no_state_update_for_fake_mode() {
         let security_server = SecurityServer::new(Mode::Fake);
-        let initial_state = SeLinuxThreadGroupState::new_default(&security_server);
+        let initial_state = SeLinuxThreadGroupState::for_kernel();
         let (kernel, task) = create_kernel_and_task_with_selinux(security_server);
         let mut task = task;
         task.thread_group.write().selinux_state = Some(initial_state.clone());
@@ -345,7 +345,7 @@ mod tests {
     async fn no_state_update_for_permissive_mode() {
         let security_server = SecurityServer::new(Mode::Enable);
         security_server.set_enforcing(false);
-        let initial_state = SeLinuxThreadGroupState::new_default(&security_server);
+        let initial_state = SeLinuxThreadGroupState::for_kernel();
         let (kernel, task) = create_kernel_and_task_with_selinux(security_server);
         let mut task = task;
         task.thread_group.write().selinux_state = Some(initial_state.clone());

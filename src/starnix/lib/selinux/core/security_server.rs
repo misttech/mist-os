@@ -15,8 +15,8 @@ use selinux_common::{
     AbstractObjectClass, ClassPermission, FileClass, InitialSid, Permission, FIRST_UNUSED_SID,
 };
 use selinux_policy::{
-    metadata::HandleUnknown, parse_policy_by_value, parser::ByValue, AccessVector,
-    AccessVectorComputer, Policy, SecurityContext, SecurityContextParseError,
+    error::ValidateError, metadata::HandleUnknown, parse_policy_by_value, parser::ByValue,
+    AccessVector, AccessVectorComputer, Policy, SecurityContext, SecurityContextParseError,
 };
 use starnix_sync::Mutex;
 use std::{collections::HashMap, num::NonZeroU32, ops::DerefMut, sync::Arc};
@@ -223,6 +223,14 @@ impl SecurityServer {
             let security_context = policy.parsed.initial_context(id);
             initial_contexts.insert(SecurityId::initial(id), security_context);
         }
+
+        // TODO(b/322848117): Label the kernel "unconfined", for descendants to inherit, until
+        // the necessary task transition / labelling hooks are implemented.
+        initial_contexts.insert(
+            SecurityId::initial(InitialSid::Kernel),
+            SecurityContext::try_from("unconfined_u:unconfined_r:unconfined_t:s0-s0:c0.c1023")
+                .map_err(|_| anyhow::Error::from(ValidateError::MissingUnconfined))?,
+        );
 
         // Replace any existing policy and update the [`SeLinuxStatus`].
         self.with_state_and_update_status(|state| {

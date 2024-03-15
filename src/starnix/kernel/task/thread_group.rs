@@ -5,7 +5,7 @@
 use crate::{
     device::terminal::{ControllingSession, Terminal},
     mutable_state::{state_accessor, state_implementation},
-    selinux::hooks::thread_group_hooks::SeLinuxThreadGroupState,
+    selinux::hooks::thread_group_hooks,
     signals::{
         send_signal, send_standard_signal, syscalls::WaitingOptions, SignalActions, SignalDetail,
         SignalInfo,
@@ -113,7 +113,7 @@ pub struct ThreadGroupMutableState {
     pub terminating: bool,
 
     /// The SELinux operations for this thread group.
-    pub selinux_state: Option<SeLinuxThreadGroupState>,
+    pub selinux_state: Option<thread_group_hooks::SeLinuxThreadGroupState>,
 
     /// Time statistics accumulated from the children.
     pub children_time_stats: TaskTimeStats,
@@ -376,9 +376,10 @@ impl ThreadGroup {
     {
         let timers = TimerTable::new();
         let itimer_real_id = timers.create(CLOCK_REALTIME as ClockId, None).unwrap();
-        // TODO(http://b/316181721): propagate initial contexts to tasks.
-        let selinux_state =
-            kernel.security_server.as_ref().map(|ss| SeLinuxThreadGroupState::new_default(ss));
+        let selinux_state = thread_group_hooks::alloc_security(
+            &kernel,
+            parent.as_ref().and_then(|p| p.selinux_state.as_ref()),
+        );
         let mut thread_group = ThreadGroup {
             kernel,
             process,
