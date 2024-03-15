@@ -49,7 +49,8 @@ class FakeDisplayStack {
   void SyncShutdown();
 
  private:
-  fidl::ClientEnd<fuchsia_io::Directory> SetUpPDevFidlServer();
+  void SetUpOutgoingServices();
+  fidl::ClientEnd<fuchsia_io::Directory> ConnectToOutgoingServiceDirectory();
 
   std::shared_ptr<zx_device> mock_root_;
 
@@ -83,6 +84,8 @@ class FakeDisplayStack {
   // Runs services provided by the fake platform device (pdev). Must be torn
   // down before `pdev_fidl_`.
   async::Loop pdev_loop_{&kAsyncLoopConfigNeverAttachToThread};
+  // Serves the `outgoing_` service directory. Must outlive `outgoing_`.
+  async::Loop service_loop_{&kAsyncLoopConfigNeverAttachToThread};
   std::optional<component::OutgoingDirectory> outgoing_;
 
   fidl::WireSyncClient<fuchsia_hardware_display::Provider> display_provider_client_;

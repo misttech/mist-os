@@ -4,9 +4,9 @@
 
 #include "src/graphics/display/drivers/fake/fake-display.h"
 
+#include <fidl/fuchsia.hardware.sysmem/cpp/fidl.h>
 #include <fidl/fuchsia.sysmem/cpp/fidl.h>
 #include <fuchsia/hardware/display/controller/cpp/banjo.h>
-#include <fuchsia/hardware/sysmem/cpp/banjo.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
@@ -122,18 +122,15 @@ void FakeDisplay::PopulateAddedDisplayArgs(added_display_args_t* args) {
 }
 
 zx_status_t FakeDisplay::InitSysmemAllocatorClient() {
-  auto endpoints = fidl::CreateEndpoints<fuchsia_sysmem::Allocator>();
-  if (endpoints.is_error()) {
-    zxlogf(ERROR, "Cannot create sysmem allocator endpoints: %s", endpoints.status_string());
-    return endpoints.error_value();
+  zx::result<fidl::ClientEnd<fuchsia_sysmem::Allocator>> sysmem_client_result =
+      DdkConnectFragmentFidlProtocol<fuchsia_hardware_sysmem::Service::AllocatorV1>(parent_,
+                                                                                    "sysmem");
+  if (sysmem_client_result.is_error()) {
+    zxlogf(ERROR, "Cannot connect to the fuchsia.hardware.sysmem.Sysmem protocol: %s",
+           sysmem_client_result.status_string());
+    return sysmem_client_result.error_value();
   }
-  auto& [client, server] = endpoints.value();
-  auto status = sysmem_.Connect(server.TakeChannel());
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Cannot connect to sysmem Allocator protocol: %s", zx_status_get_string(status));
-    return status;
-  }
-  sysmem_allocator_client_ = fidl::WireSyncClient(std::move(client));
+  sysmem_allocator_client_ = fidl::WireSyncClient(std::move(sysmem_client_result).value());
 
   std::string debug_name = fxl::StringPrintf("fake-display[%lu]", fsl::GetCurrentProcessKoid());
   auto set_debug_status = sysmem_allocator_client_->SetDebugClientInfo(
@@ -411,13 +408,14 @@ void FakeDisplay::DisplayControllerImplSetEld(uint64_t display_id, const uint8_t
                                               size_t raw_eld_count) {}
 
 zx_status_t FakeDisplay::DisplayControllerImplGetSysmemConnection(zx::channel connection) {
-  zx_status_t status = sysmem_.Connect(std::move(connection));
+  // We can't use DdkConnectFragmentFidlProtocol here because it wants to create the endpoints but
+  // we only have the server_end here.
+  using ServiceMember = fuchsia_hardware_sysmem::Service::AllocatorV1;
+  zx_status_t status = device_connect_fragment_fidl_protocol(
+      parent_, "sysmem", ServiceMember::ServiceName, ServiceMember::Name, connection.release());
   if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed connecting to sysmem: %s", zx_status_get_string(status));
-    ;
     return status;
   }
-
   return ZX_OK;
 }
 
@@ -885,13 +883,7 @@ zx_status_t FakeDisplay::Bind() {
   }
   pdev_ = std::move(pdev_result.value());
 
-  zx_status_t status = ddk::SysmemProtocolClient::CreateFromDevice(parent(), "sysmem", &sysmem_);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to get Display Sysmem protocol: %s", zx_status_get_string(status));
-    return status;
-  }
-
-  status = InitSysmemAllocatorClient();
+  zx_status_t status = InitSysmemAllocatorClient();
   if (status != ZX_OK) {
     zxlogf(ERROR, "Failed to initialize sysmem Allocator client: %s", zx_status_get_string(status));
     return status;

@@ -180,7 +180,6 @@ class FakeDisplay : public DeviceType,
   FakeDisplayDeviceConfig device_config_;
 
   ddk::PDevFidl pdev_;
-  ddk::SysmemProtocolClient sysmem_;
 
   std::atomic_bool vsync_shutdown_flag_ = false;
   std::atomic_bool capture_shutdown_flag_ = false;

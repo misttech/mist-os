@@ -7,6 +7,7 @@
 
 #include <fidl/fuchsia.hardware.sysmem/cpp/wire.h>
 #include <fidl/fuchsia.sysmem2/cpp/wire.h>
+#include <lib/ddk/device.h>
 #include <zircon/errors.h>
 #include <zircon/types.h>
 
@@ -31,8 +32,6 @@ class SysmemDeviceWrapper {
  public:
   virtual ~SysmemDeviceWrapper() = default;
 
-  virtual const sysmem_protocol_t* proto() const = 0;
-  virtual const zx_device_t* device() const = 0;
   virtual zx_status_t Bind() = 0;
   virtual fidl::WireServer<fuchsia_hardware_sysmem::DriverConnector>* DriverConnectorServer() = 0;
 };
@@ -53,8 +52,6 @@ class GenericSysmemDeviceWrapper : public SysmemDeviceWrapper {
     sysmem_ = owned_sysmem_.get();
   }
 
-  const sysmem_protocol_t* proto() const override { return sysmem_->proto(); }
-  const zx_device_t* device() const override { return sysmem_->device(); }
   fidl::WireServer<fuchsia_hardware_sysmem::DriverConnector>* DriverConnectorServer() override {
     return sysmem_;
   }
