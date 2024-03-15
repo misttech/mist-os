@@ -212,37 +212,36 @@ fs::VnodeConnectionOptions fdio_flags_to_connection_options(uint32_t flags) {
 
   switch (flags & O_ACCMODE) {
     case O_RDONLY:
-      options.rights.read = true;
+      options.rights |= fuchsia_io::kRStarDir;
       break;
     case O_WRONLY:
-      options.rights.write = true;
+      options.rights |= fuchsia_io::kWStarDir;
       break;
     case O_RDWR:
-      options.rights.read = true;
-      options.rights.write = true;
+      options.rights |= fuchsia_io::kRwStarDir;
       break;
   }
 #ifdef O_PATH
   if (flags & O_PATH) {
-    options.flags.node_reference = true;
+    options.flags |= fuchsia_io::OpenFlags::kNodeReference;
   }
 #endif
 #ifdef O_DIRECTORY
   if (flags & O_DIRECTORY) {
-    options.flags.directory = true;
+    options.flags |= fuchsia_io::OpenFlags::kDirectory;
   }
 #endif
   if (flags & O_CREAT) {
-    options.flags.create = true;
+    options.flags |= fuchsia_io::OpenFlags::kCreate;
   }
   if (flags & O_EXCL) {
-    options.flags.fail_if_exists = true;
+    options.flags |= fuchsia_io::OpenFlags::kCreateIfAbsent;
   }
   if (flags & O_TRUNC) {
-    options.flags.truncate = true;
+    options.flags |= fuchsia_io::OpenFlags::kTruncate;
   }
   if (flags & O_APPEND) {
-    options.flags.append = true;
+    options.flags |= fuchsia_io::OpenFlags::kAppend;
   }
 
   return options;
@@ -477,9 +476,8 @@ int emu_mkdir(const char* path, mode_t mode) {
 DIR* emu_opendir(const char* name) {
   ZX_DEBUG_ASSERT_MSG(!host_path(name), "'emu_' functions can only operate on target paths");
   std::string_view path(name + PREFIX_SIZE);
-  fs::VnodeConnectionOptions options;
-  options.rights.read = true;
-  options.flags.posix_write = true;
+  fs::VnodeConnectionOptions options{.flags = fuchsia_io::OpenFlags::kPosixWritable,
+                                     .rights = fuchsia_io::kRStarDir};
   auto result =
       fake_fs.fake_vfs->Open(fake_fs.fake_root, path, options, fs::Rights::ReadWrite(), 0);
   if (result.is_error()) {

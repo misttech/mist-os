@@ -15,6 +15,8 @@
 #include "src/storage/lib/vfs/cpp/debug.h"
 #include "src/storage/lib/vfs/cpp/vnode.h"
 
+namespace fio = fuchsia_io;
+
 namespace fs {
 namespace {
 
@@ -31,7 +33,8 @@ zx_status_t LookupNode(fbl::RefPtr<Vnode> vn, std::string_view name, fbl::RefPtr
 
 // Validate open flags as much as they can be validated independently of the target node.
 zx_status_t PrevalidateOptions(VnodeConnectionOptions options) {
-  if (!options.rights.write && options.flags.truncate) {
+  if ((options.flags & fuchsia_io::OpenFlags::kTruncate) &&
+      !(options.rights & fuchsia_io::Rights::kWriteBytes)) {
     return ZX_ERR_INVALID_ARGS;
   }
   return ZX_OK;
@@ -42,15 +45,18 @@ zx_status_t PrevalidateOptions(VnodeConnectionOptions options) {
 Vfs::Vfs() = default;
 
 Vfs::OpenResult Vfs::Open(fbl::RefPtr<Vnode> vndir, std::string_view path,
-                          VnodeConnectionOptions options, Rights parent_rights, uint32_t mode) {
+                          VnodeConnectionOptions options, fuchsia_io::Rights parent_rights,
+                          uint32_t mode) {
   std::lock_guard lock(vfs_lock_);
   return OpenLocked(std::move(vndir), path, options, parent_rights, mode);
 }
 
 Vfs::OpenResult Vfs::OpenLocked(fbl::RefPtr<Vnode> vndir, std::string_view path,
-                                VnodeConnectionOptions options, Rights parent_rights,
+                                VnodeConnectionOptions options, fuchsia_io::Rights parent_rights,
                                 uint32_t mode) {
-  FS_PRETTY_TRACE_DEBUG("VfsOpen: path='", path, "' options=", options);
+  FS_PRETTY_TRACE_DEBUG("Vfs::OpenLocked: path='", path, "' options=", options,
+                        ", parent_rights=", parent_rights);
+
   if (zx_status_t status = PrevalidateOptions(options); status != ZX_OK) {
     return status;
   }
@@ -72,13 +78,13 @@ Vfs::OpenResult Vfs::OpenLocked(fbl::RefPtr<Vnode> vndir, std::string_view path,
       return ZX_ERR_INVALID_ARGS;
     }
     if (result.value()) {
-      options.flags.directory = true;
+      options.flags |= fuchsia_io::OpenFlags::kDirectory;
     }
   }
 
   fbl::RefPtr<Vnode> vn;
   bool just_created;
-  if (options.flags.create) {
+  if (options.flags & fuchsia_io::OpenFlags::kCreate) {
     zx::result result = EnsureExists(std::move(vndir), path, &vn, options, mode, parent_rights);
     if (result.is_error()) {
       return result.status_value();
@@ -96,21 +102,25 @@ Vfs::OpenResult Vfs::OpenLocked(fbl::RefPtr<Vnode> vndir, std::string_view path,
     return OpenResult::Remote{.vnode = std::move(vn), .path = "."};
   }
 
-  if (ReadonlyLocked() && options.rights.write &&
+  if (ReadonlyLocked() && (options.rights & fio::Rights::kWriteBytes) &&
       !vn->Supports(fuchsia_io::NodeProtocolKinds::kConnector)) {
     return ZX_ERR_ACCESS_DENIED;
   }
 
-  if ((options.flags.posix_write || options.flags.posix_execute) &&
+  if ((options.flags & (fio::OpenFlags::kPosixWritable | fio::OpenFlags::kPosixExecutable)) &&
       vn->Supports(fuchsia_io::NodeProtocolKinds::kDirectory)) {
     // This is such that POSIX open() can open a directory with O_RDONLY, and still get the
     // write/execute right if the parent directory connection has the write/execute right
     // respectively.  With the execute right in particular, the resulting connection may be passed
     // to fdio_get_vmo_exec() which requires the execute right. This transfers write and execute
     // from the parent, if present.
-    Rights inheritable_rights{};
-    inheritable_rights.write = options.flags.posix_write;
-    inheritable_rights.execute = options.flags.posix_execute;
+    fuchsia_io::Rights inheritable_rights;
+    if (options.flags & fuchsia_io::OpenFlags::kPosixWritable) {
+      inheritable_rights |= fuchsia_io::kWStarDir;
+    }
+    if (options.flags & fuchsia_io::OpenFlags::kPosixExecutable) {
+      inheritable_rights |= fuchsia_io::kXStarDir;
+    }
     options.rights |= parent_rights & inheritable_rights;
   }
   auto validated_options = vn->ValidateOptions(options);
@@ -120,7 +130,7 @@ Vfs::OpenResult Vfs::OpenLocked(fbl::RefPtr<Vnode> vndir, std::string_view path,
 
   // |node_reference| requests that we don't actually open the underlying Vnode, but use the
   // connection as a reference to the Vnode.
-  if (!options.flags.node_reference && !just_created) {
+  if (!(options.flags & fuchsia_io::OpenFlags::kNodeReference) && !just_created) {
     if (zx_status_t status = OpenVnode(validated_options.value(), &vn); status != ZX_OK) {
       return status;
     }
@@ -130,7 +140,7 @@ Vfs::OpenResult Vfs::OpenLocked(fbl::RefPtr<Vnode> vndir, std::string_view path,
       return OpenResult::Remote{.vnode = std::move(vn), .path = "."};
     }
 
-    if (options.flags.truncate) {
+    if (options.flags & fuchsia_io::OpenFlags::kTruncate) {
       if (zx_status_t status = vn->Truncate(0); status != ZX_OK) {
         vn->Close();
         return status;
@@ -156,21 +166,21 @@ zx_status_t Vfs::Unlink(fbl::RefPtr<Vnode> vndir, std::string_view name, bool mu
 
 zx::result<bool> Vfs::EnsureExists(fbl::RefPtr<Vnode> vndir, std::string_view path,
                                    fbl::RefPtr<Vnode>* out_vn, fs::VnodeConnectionOptions options,
-                                   uint32_t mode, Rights parent_rights) {
-  if (options.flags.directory) {
+                                   uint32_t mode, fuchsia_io::Rights parent_rights) {
+  if (options.flags & fuchsia_io::OpenFlags::kDirectory) {
     if (mode == 0) {
       mode |= S_IFDIR;
     } else if (!S_ISDIR(mode)) {
       return zx::error(ZX_ERR_INVALID_ARGS);
     }
   }
-  if (options.flags.not_directory && S_ISDIR(mode)) {
+  if ((options.flags & fuchsia_io::OpenFlags::kNotDirectory) && S_ISDIR(mode)) {
     return zx::error(ZX_ERR_INVALID_ARGS);
   }
   if (ReadonlyLocked()) {
     return zx::error(ZX_ERR_ACCESS_DENIED);
   }
-  if (!parent_rights.write) {
+  if (!(parent_rights & fuchsia_io::Rights::kModifyDirectory)) {
     return zx::error(ZX_ERR_ACCESS_DENIED);
   }
   zx_status_t status = path == "." ? ZX_ERR_ALREADY_EXISTS : vndir->Create(path, mode, out_vn);
@@ -178,7 +188,7 @@ zx::result<bool> Vfs::EnsureExists(fbl::RefPtr<Vnode> vndir, std::string_view pa
     case ZX_OK:
       return zx::ok(true);
     case ZX_ERR_ALREADY_EXISTS:
-      if (options.flags.fail_if_exists) {
+      if (options.flags & fuchsia_io::OpenFlags::kCreateIfAbsent) {
         return zx::error(status);
       }
       __FALLTHROUGH;

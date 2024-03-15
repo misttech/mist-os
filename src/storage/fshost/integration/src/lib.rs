@@ -221,6 +221,7 @@ impl TestFixture {
 
     pub fn dir(&self, dir: &str, flags: fio::OpenFlags) -> fio::DirectoryProxy {
         let (dev, server) = create_proxy::<fio::DirectoryMarker>().expect("create_proxy failed");
+        let flags = flags | fio::OpenFlags::DIRECTORY;
         self.realm
             .root
             .get_exposed_dir()

@@ -32,44 +32,26 @@ static_assert(PATH_MAX == fio::wire::kMaxPathLength + 1,
 static_assert(NAME_MAX == fio::wire::kMaxFilename,
               "POSIX NAME_MAX inconsistent with Fuchsia MAX_FILENAME");
 
-namespace fs {
+namespace fs::internal {
 
-namespace internal {
-
-bool PrevalidateFlags(fio::wire::OpenFlags flags) {
-  if (flags & fio::wire::OpenFlags::kNodeReference) {
+bool PrevalidateFlags(fio::OpenFlags flags) {
+  if (flags & fio::OpenFlags::kNodeReference) {
     // Explicitly reject VNODE_REF_ONLY together with any invalid flags.
-    if (flags - fio::wire::kOpenFlagsAllowedWithNodeReference) {
+    if (flags - fio::kOpenFlagsAllowedWithNodeReference) {
       return false;
     }
   }
 
-  if ((flags & fio::wire::OpenFlags::kNotDirectory) && (flags & fio::wire::OpenFlags::kDirectory)) {
+  if ((flags & fio::OpenFlags::kNotDirectory) && (flags & fio::OpenFlags::kDirectory)) {
+    return false;
+  }
+
+  // If CLONE_SAME_RIGHTS is specified, the client cannot request any specific rights.
+  if ((flags & fio::OpenFlags::kCloneSameRights) && (flags & kAllIo1Rights)) {
     return false;
   }
 
   return true;
-}
-
-zx_status_t EnforceHierarchicalRights(Rights parent_rights, VnodeConnectionOptions child_options,
-                                      VnodeConnectionOptions* out_options) {
-  // The POSIX compatibiltiy flags allow the child directory connection to inherit the writable
-  // and executable rights.  If there exists a directory without the corresponding right along
-  // the Open() chain, we remove that POSIX flag preventing it from being inherited down the line
-  // (this applies both for local and remote mount points, as the latter may be served using
-  // a connection with vastly greater rights).
-  if (child_options.flags.posix_write && !parent_rights.write) {
-    child_options.flags.posix_write = false;
-  }
-  if (child_options.flags.posix_execute && !parent_rights.execute) {
-    child_options.flags.posix_execute = false;
-  }
-  if (!child_options.rights.StricterOrSameAs(parent_rights)) {
-    // Client asked for some right but we do not have it
-    return ZX_ERR_ACCESS_DENIED;
-  }
-  *out_options = child_options;
-  return ZX_OK;
 }
 
 Connection::Connection(FuchsiaVfs* vfs, fbl::RefPtr<Vnode> vnode, VnodeProtocol protocol,
@@ -114,10 +96,9 @@ zx_status_t Connection::EnsureVnodeClosed() {
   return vnode_->Close();
 }
 
-void Connection::NodeClone(fio::wire::OpenFlags flags, fidl::ServerEnd<fio::Node> server_end) {
-  auto clone_options = VnodeConnectionOptions::FromIoV1Flags(flags);
-  auto write_error = [describe = clone_options.flags.describe](fidl::ServerEnd<fio::Node> channel,
-                                                               zx_status_t error) {
+void Connection::NodeClone(fio::OpenFlags flags, fidl::ServerEnd<fio::Node> server_end) {
+  auto write_error = [describe = flags & fio::OpenFlags::kDescribe](
+                         fidl::ServerEnd<fio::Node> channel, zx_status_t error) {
     FS_PRETTY_TRACE_DEBUG("[NodeClone] error: ", zx_status_get_string(error));
     if (describe) {
       // Ignore errors since there is nothing we can do if this fails.
@@ -130,23 +111,23 @@ void Connection::NodeClone(fio::wire::OpenFlags flags, fidl::ServerEnd<fio::Node
     FS_PRETTY_TRACE_DEBUG("[NodeClone] prevalidate failed", ", incoming flags: ", flags);
     return write_error(std::move(server_end), ZX_ERR_INVALID_ARGS);
   }
+  auto clone_options = VnodeConnectionOptions::FromIoV1Flags(flags);
   FS_PRETTY_TRACE_DEBUG("[NodeClone] our options: ", options(),
                         ", incoming options: ", clone_options);
 
-  // If CLONE_SAME_RIGHTS is specified, the client cannot request any specific rights.
-  if (clone_options.flags.clone_same_rights && clone_options.rights.any()) {
-    return write_error(std::move(server_end), ZX_ERR_INVALID_ARGS);
-  }
   // These two flags are always preserved.
-  clone_options.flags.append = options().flags.append;
-  clone_options.flags.node_reference = options().flags.node_reference;
+  clone_options.flags |=
+      options().flags & (fio::OpenFlags::kAppend | fio::OpenFlags::kNodeReference);
   // If CLONE_SAME_RIGHTS is requested, cloned connection will inherit the same rights as those from
   // the originating connection.
-  if (clone_options.flags.clone_same_rights) {
+  if (clone_options.flags & fio::OpenFlags::kCloneSameRights) {
     clone_options.rights = options().rights;
-  }
-  if (!clone_options.rights.StricterOrSameAs(options().rights)) {
-    return write_error(std::move(server_end), ZX_ERR_ACCESS_DENIED);
+  } else {
+    // Return ACCESS_DENIED if the client asked for a right the parent connection doesn't have.
+    if (clone_options.rights - options().rights) {
+      write_error(std::move(server_end), ZX_ERR_ACCESS_DENIED);
+      return;
+    }
   }
 
   fbl::RefPtr<Vnode> vn(vnode_);
@@ -156,7 +137,7 @@ void Connection::NodeClone(fio::wire::OpenFlags flags, fidl::ServerEnd<fio::Node
   }
   auto& validated_options = result.value();
   zx_status_t open_status = ZX_OK;
-  if (!clone_options.flags.node_reference) {
+  if (!(clone_options.flags & fio::OpenFlags::kNodeReference)) {
     open_status = OpenVnode(validated_options, &vn);
   }
   if (open_status != ZX_OK) {
@@ -175,18 +156,18 @@ fidl::VectorView<uint8_t> Connection::NodeQuery() {
   const std::string_view kProtocol = [protocol = protocol_]() {
     switch (protocol) {
       case VnodeProtocol::kDirectory: {
-        return fio::wire::kDirectoryProtocolName;
+        return fio::kDirectoryProtocolName;
       }
       case VnodeProtocol::kFile: {
-        return fio::wire::kFileProtocolName;
+        return fio::kFileProtocolName;
       }
       case VnodeProtocol::kNode:
       case VnodeProtocol::kService: {
-        return fio::wire::kNodeProtocolName;
+        return fio::kNodeProtocolName;
       }
 #if __Fuchsia_API_level__ >= FUCHSIA_HEAD
       case VnodeProtocol::kSymlink: {
-        return fio::wire::kSymlinkProtocolName;
+        return fio::kSymlinkProtocolName;
       }
 #endif
     }
@@ -198,7 +179,6 @@ fidl::VectorView<uint8_t> Connection::NodeQuery() {
 
 void Connection::NodeSync(fit::callback<void(zx_status_t)> callback) {
   FS_PRETTY_TRACE_DEBUG("[NodeSync] options: ", options());
-
   if (protocol_ == VnodeProtocol::kNode) {
     callback(ZX_ERR_BAD_HANDLE);
     return;
@@ -208,7 +188,7 @@ void Connection::NodeSync(fit::callback<void(zx_status_t)> callback) {
 
 zx::result<VnodeAttributes> Connection::NodeGetAttr() {
   FS_PRETTY_TRACE_DEBUG("[NodeGetAttr] options: ", options());
-
+  // TODO(https://fxbug.dev/324080764): This io1 operation should require the GET_ATTRIBUTES right.
   fs::VnodeAttributes attr;
   if (zx_status_t status = vnode_->GetAttributes(&attr); status != ZX_OK) {
     return zx::error(status);
@@ -216,29 +196,24 @@ zx::result<VnodeAttributes> Connection::NodeGetAttr() {
   return zx::ok(attr);
 }
 
-zx::result<> Connection::NodeSetAttr(fio::wire::NodeAttributeFlags flags,
+zx::result<> Connection::NodeSetAttr(fio::NodeAttributeFlags flags,
                                      const fio::wire::NodeAttributes& attributes) {
   FS_PRETTY_TRACE_DEBUG("[NodeSetAttr] our options: ", options(), ", incoming flags: ", flags);
-
-  if (protocol_ == VnodeProtocol::kNode) {
+  if (!(options().rights & fio::Rights::kUpdateAttributes)) {
     return zx::error(ZX_ERR_BAD_HANDLE);
   }
-  if (!options().rights.write) {
-    return zx::error(ZX_ERR_BAD_HANDLE);
-  }
-
   fs::VnodeAttributesUpdate update;
-  if (flags & fio::wire::NodeAttributeFlags::kCreationTime) {
+  if (flags & fio::NodeAttributeFlags::kCreationTime) {
     update.set_creation_time(attributes.creation_time);
   }
-  if (flags & fio::wire::NodeAttributeFlags::kModificationTime) {
+  if (flags & fio::NodeAttributeFlags::kModificationTime) {
     update.set_modification_time(attributes.modification_time);
   }
   return zx::make_result(vnode_->SetAttributes(update));
 }
 
-zx::result<fio::wire::OpenFlags> Connection::NodeGetFlags() {
-  return zx::ok(options().ToIoV1Flags() & (kStatusFlags | fio::wire::kOpenRights));
+zx::result<fio::OpenFlags> Connection::NodeGetFlags() {
+  return zx::ok(options().ToIoV1Flags() & (kStatusFlags | fio::kOpenRights));
 }
 
 zx::result<> Connection::NodeSetFlags(fio::wire::OpenFlags flags) {
@@ -246,11 +221,11 @@ zx::result<> Connection::NodeSetFlags(fio::wire::OpenFlags flags) {
     return zx::error(ZX_ERR_BAD_HANDLE);
   }
   auto options = VnodeConnectionOptions::FromIoV1Flags(flags);
-  set_append(options.flags.append);
+  set_append(static_cast<bool>(options.flags & fio::OpenFlags::kAppend));
   return zx::ok();
 }
 
-zx::result<fuchsia_io::wire::FilesystemInfo> Connection::NodeQueryFilesystem() {
+zx::result<fio::wire::FilesystemInfo> Connection::NodeQueryFilesystem() {
   zx::result<FilesystemInfo> info = vfs_->GetFilesystemInfo();
   if (info.is_error()) {
     return info.take_error();
@@ -258,6 +233,4 @@ zx::result<fuchsia_io::wire::FilesystemInfo> Connection::NodeQueryFilesystem() {
   return zx::ok(info.value().ToFidl());
 }
 
-}  // namespace internal
-
-}  // namespace fs
+}  // namespace fs::internal

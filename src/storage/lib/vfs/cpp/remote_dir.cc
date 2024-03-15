@@ -8,6 +8,7 @@
 
 #include <utility>
 
+#include "src/storage/lib/vfs/cpp/debug.h"
 #include "src/storage/lib/vfs/cpp/vfs_types.h"
 
 namespace fio = fuchsia_io;
@@ -37,6 +38,7 @@ bool RemoteDir::IsRemote() const { return true; }
 
 zx_status_t RemoteDir::OpenRemote(fio::OpenFlags flags, fio::ModeType mode, fidl::StringView path,
                                   fidl::ServerEnd<fio::Node> object) const {
+  FS_PRETTY_TRACE_DEBUG("RemoteDir::OpenRemote: path='", path, "' flags=", flags);
   return fidl::WireCall(remote_client_)->Open(flags, mode, path, std::move(object)).status();
 }
 

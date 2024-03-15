@@ -35,13 +35,13 @@ namespace {
 // Performs a path walk and opens a connection to another node.
 void OpenAt(FuchsiaVfs* vfs, const fbl::RefPtr<Vnode>& parent,
             fidl::ServerEnd<fio::Node> server_end, std::string_view path,
-            VnodeConnectionOptions options, Rights parent_rights) {
+            VnodeConnectionOptions options, fio::Rights parent_rights) {
   vfs->Open(parent, path, options, parent_rights, 0)
       .visit([vfs, &server_end, options, path](auto&& result) {
         using ResultT = std::decay_t<decltype(result)>;
         using OpenResult = fs::Vfs::OpenResult;
         if constexpr (std::is_same_v<ResultT, OpenResult::Error>) {
-          if (options.flags.describe) {
+          if (options.flags & fuchsia_io::OpenFlags::kDescribe) {
             // Ignore errors since there is nothing we can do if this fails.
             [[maybe_unused]] const fidl::Status unused_result =
                 fidl::WireSendEvent(server_end)->OnOpen(result, fio::wire::NodeInfoDeprecated());
@@ -66,7 +66,7 @@ void OpenAt(FuchsiaVfs* vfs, const fbl::RefPtr<Vnode>& parent,
                 path.length() == 8 &&
                 std::all_of(path.begin(), path.end(), [](char c) { return std::isxdigit(c); });
             if (path == "000" || is_device) {
-              options.rights.read = false;
+              options.rights -= fio::Rights::kReadBytes;
             }
           }
           // |Vfs::Open| already performs option validation for us.
@@ -85,7 +85,7 @@ DirectoryConnection::DirectoryConnection(fs::FuchsiaVfs* vfs, fbl::RefPtr<fs::Vn
                                          zx_koid_t koid)
     : Connection(vfs, std::move(vnode), protocol, options), koid_(koid) {
   ZX_DEBUG_ASSERT(protocol == VnodeProtocol::kDirectory);
-  ZX_DEBUG_ASSERT(!options.flags.node_reference);
+  ZX_DEBUG_ASSERT(!(options.flags & fuchsia_io::OpenFlags::kNodeReference));
 }
 
 DirectoryConnection::~DirectoryConnection() { vnode()->DeleteFileLockInTeardown(koid_); }
@@ -117,17 +117,8 @@ void DirectoryConnection::Query(QueryCompleter::Sync& completer) {
 }
 
 void DirectoryConnection::GetConnectionInfo(GetConnectionInfoCompleter::Sync& completer) {
-  using fuchsia_io::Operations;
-  using fuchsia_io::wire::ConnectionInfo;
-  Operations rights = {};
-  if (options().rights.read)
-    rights |= fio::wire::kRStarDir;
-  if (options().rights.write)
-    rights |= fio::wire::kWStarDir;
-  if (options().rights.execute)
-    rights |= fio::wire::kXStarDir;
   fidl::Arena arena;
-  completer.Reply(ConnectionInfo::Builder(arena).rights(rights).Build());
+  completer.Reply(fio::wire::ConnectionInfo::Builder(arena).rights(options().rights).Build());
 }
 
 void DirectoryConnection::Sync(SyncCompleter::Sync& completer) {
@@ -188,6 +179,7 @@ void DirectoryConnection::Open(OpenRequestView request, OpenCompleter::Sync& com
       channel.reset();
     }
   };
+  // TODO(https://fxbug.dev/324080764): This io1 operation should require the TRAVERSE right.
 
   std::string_view path(request->path.data(), request->path.size());
   if (path.size() > fio::wire::kMaxPathLength) {
@@ -215,21 +207,40 @@ void DirectoryConnection::Open(OpenRequestView request, OpenCompleter::Sync& com
   FS_PRETTY_TRACE_DEBUG("[DirectoryOpen] our options: ", options(),
                         ", incoming options: ", open_options, ", path: ", request->path);
 
-  if (open_options.flags.clone_same_rights) {
+  if (open_options.flags & fuchsia_io::OpenFlags::kCloneSameRights) {
     return write_error(std::move(request->object), ZX_ERR_INVALID_ARGS);
   }
 
-  // Check for directory rights inheritance
-  zx_status_t status = EnforceHierarchicalRights(options().rights, open_options, &open_options);
-  if (status != ZX_OK) {
-    return write_error(std::move(request->object), status);
+  // The POSIX compatibility flags allow the child directory connection to inherit the writable
+  // and executable rights.  If there exists a directory without the corresponding right along
+  // the Open() chain, we remove that POSIX flag preventing it from being inherited down the line
+  // (this applies both for local and remote mount points, as the latter may be served using
+  // a connection with vastly greater rights).
+  if (!(options().rights & fio::Rights::kWriteBytes)) {
+    open_options.flags &= ~fio::OpenFlags::kPosixWritable;
   }
+  if (!(options().rights & fio::Rights::kExecute)) {
+    open_options.flags &= ~fio::OpenFlags::kPosixExecutable;
+  }
+  // Return ACCESS_DENIED if the client asked for a right the parent connection doesn't have.
+  if (open_options.rights - options().rights) {
+    write_error(std::move(request->object), ZX_ERR_ACCESS_DENIED);
+    return;
+  }
+
   OpenAt(vfs(), vnode(), std::move(request->object), path, open_options, options().rights);
 }
 
 void DirectoryConnection::Unlink(UnlinkRequestView request, UnlinkCompleter::Sync& completer) {
   FS_PRETTY_TRACE_DEBUG("[DirectoryUnlink] our options: ", options(), ", name: ", request->name);
-  if (!options().rights.write) {
+
+  if (options().flags & fuchsia_io::OpenFlags::kNodeReference) {
+    completer.ReplyError(ZX_ERR_BAD_HANDLE);
+    return;
+  }
+  // TODO(https://fxbug.dev/324080764): This operation should require ENUMERATE and MODIFY_DIRECTORY
+  // rights, instead of WRITE_BYTES.
+  if (!(options().rights & fuchsia_io::Rights::kWriteBytes)) {
     completer.ReplyError(ZX_ERR_BAD_HANDLE);
     return;
   }
@@ -253,6 +264,7 @@ void DirectoryConnection::Unlink(UnlinkRequestView request, UnlinkCompleter::Syn
 void DirectoryConnection::ReadDirents(ReadDirentsRequestView request,
                                       ReadDirentsCompleter::Sync& completer) {
   FS_PRETTY_TRACE_DEBUG("[DirectoryReadDirents] our options: ", options());
+  // TODO(https://fxbug.dev/324080764): This io1 operation should require the ENUMERATE right.
   if (request->max_bytes > fio::wire::kMaxBuf) {
     completer.Reply(ZX_ERR_BAD_HANDLE, fidl::VectorView<uint8_t>());
     return;
@@ -266,14 +278,15 @@ void DirectoryConnection::ReadDirents(ReadDirentsRequestView request,
 
 void DirectoryConnection::Rewind(RewindCompleter::Sync& completer) {
   FS_PRETTY_TRACE_DEBUG("[DirectoryRewind] our options: ", options());
+  // TODO(https://fxbug.dev/324080764): This io1 operation should require the ENUMERATE right.
   dircookie_ = VdirCookie();
   completer.Reply(ZX_OK);
 }
 
 void DirectoryConnection::GetToken(GetTokenCompleter::Sync& completer) {
   FS_PRETTY_TRACE_DEBUG("[DirectoryGetToken] our options: ", options());
-
-  if (!options().rights.write) {
+  // TODO(https://fxbug.dev/324080764): This io1 operation should need ENUMERATE or another right.
+  if (!(options().rights & fuchsia_io::Rights::kWriteBytes)) {
     completer.Reply(ZX_ERR_BAD_HANDLE, zx::handle());
     return;
   }
@@ -289,7 +302,9 @@ void DirectoryConnection::Rename(RenameRequestView request, RenameCompleter::Syn
     completer.ReplyError(ZX_ERR_INVALID_ARGS);
     return;
   }
-  if (!options().rights.write) {
+  // TODO(https://fxbug.dev/324080764): This operation should require the MODIFY_DIRECTORY right
+  // instead of the WRITE_BYTES right.
+  if (!(options().rights & fuchsia_io::Rights::kWriteBytes)) {
     completer.ReplyError(ZX_ERR_BAD_HANDLE);
     return;
   }
@@ -312,7 +327,9 @@ void DirectoryConnection::Link(LinkRequestView request, LinkCompleter::Sync& com
     completer.Reply(ZX_ERR_INVALID_ARGS);
     return;
   }
-  if (!options().rights.write) {
+  // TODO(https://fxbug.dev/324080764): This operation should require the MODIFY_DIRECTORY right
+  // instead of the WRITE_BYTES right.
+  if (!(options().rights & fuchsia_io::Rights::kWriteBytes)) {
     completer.Reply(ZX_ERR_BAD_HANDLE);
     return;
   }
@@ -324,6 +341,7 @@ void DirectoryConnection::Link(LinkRequestView request, LinkCompleter::Sync& com
 
 void DirectoryConnection::Watch(WatchRequestView request, WatchCompleter::Sync& completer) {
   FS_PRETTY_TRACE_DEBUG("[DirectoryWatch] our options: ", options());
+  // TODO(https://fxbug.dev/324080764): This io1 operation should require the ENUMERATE right.
   zx_status_t status =
       vnode()->WatchDir(vfs(), request->mask, request->options, std::move(request->watcher));
   completer.Reply(status);

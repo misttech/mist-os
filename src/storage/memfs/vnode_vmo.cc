@@ -49,8 +49,14 @@ fuchsia_io::NodeProtocolKinds VnodeVmo::GetProtocols() const {
   return fuchsia_io::NodeProtocolKinds::kFile;
 }
 
-bool VnodeVmo::ValidateRights(fs::Rights rights) const {
-  return !rights.write && (!rights.execute || executable_);
+bool VnodeVmo::ValidateRights(fuchsia_io::Rights rights) const {
+  if (rights & fuchsia_io::Rights::kWriteBytes) {
+    return false;
+  }
+  if (!executable_ && (rights & fuchsia_io::Rights::kExecute)) {
+    return false;
+  }
+  return true;
 }
 
 zx_status_t VnodeVmo::Read(void* data, size_t len, size_t off, size_t* out_actual) {

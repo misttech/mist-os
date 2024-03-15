@@ -123,7 +123,7 @@ class Vnode : public VnodeRefCounted<Vnode>, public fbl::Recyclable<Vnode> {
   // To be overridden by implementations to check that it is valid to access the vnode with the
   // given |rights|. The default implementation always returns true. The vnode will only be opened
   // for a particular request if the validation passes.
-  virtual bool ValidateRights(Rights rights) const;
+  virtual bool ValidateRights(fuchsia_io::Rights rights) const;
 
   // Ensures that it is valid to access the vnode with given connection options. The vnode will only
   // be opened for a particular request if the validation returns |zx::ok(...)|.

@@ -209,21 +209,19 @@ pub(crate) mod io2_conversions {
     }
 
     pub fn io1_to_io2(flags: fio::OpenFlags) -> fio::Operations {
-        if flags.contains(fio::OpenFlags::NODE_REFERENCE) {
-            fio::Operations::GET_ATTRIBUTES
-        } else {
-            let mut operations = fio::Operations::empty();
-            if flags.contains(fio::OpenFlags::RIGHT_READABLE) {
-                operations |= fio::R_STAR_DIR;
-            }
-            if flags.contains(fio::OpenFlags::RIGHT_WRITABLE) {
-                operations |= fio::W_STAR_DIR;
-            }
-            if flags.contains(fio::OpenFlags::RIGHT_EXECUTABLE) {
-                operations |= fio::X_STAR_DIR;
-            }
-            operations
+        // Using Open1 requires GET_ATTRIBUTES as this is not expressible via [`fio::OpenFlags`].
+        // TODO(https://fxbug.dev/324080764): Restrict GET_ATTRIBUTES.
+        let mut operations = fio::Operations::GET_ATTRIBUTES;
+        if flags.contains(fio::OpenFlags::RIGHT_READABLE) {
+            operations |= fio::R_STAR_DIR;
         }
+        if flags.contains(fio::OpenFlags::RIGHT_WRITABLE) {
+            operations |= fio::W_STAR_DIR;
+        }
+        if flags.contains(fio::OpenFlags::RIGHT_EXECUTABLE) {
+            operations |= fio::X_STAR_DIR;
+        }
+        operations
     }
 }
 

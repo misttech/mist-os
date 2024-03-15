@@ -25,8 +25,6 @@
 #include <cstdint>
 #include <cstring>
 #include <optional>
-#include <utility>
-#include <variant>
 
 #include <fbl/bits.h>
 
@@ -36,76 +34,31 @@
 // counterparts.
 namespace fs {
 
-union Rights {
-  uint32_t raw_value = 0;
-  fbl::BitFieldMember<uint32_t, 0, 1> read;
-  fbl::BitFieldMember<uint32_t, 1, 1> write;
-  fbl::BitFieldMember<uint32_t, 3, 1> execute;
+namespace Rights {
 
-  explicit constexpr Rights(uint32_t initial = 0) : raw_value(initial) {}
+// Alias for commonly used read-only directory rights.
+constexpr fuchsia_io::Rights ReadOnly() { return fuchsia_io::kRStarDir; }
 
-  // True if any right is present.
-  bool any() const { return raw_value != 0; }
+// Alias for commonly used write-only directory rights.
+constexpr fuchsia_io::Rights WriteOnly() {
+  // TODO(https://fxbug.dev/42157659): Restrict GET_ATTRIBUTES.
+  return fuchsia_io::Rights::kGetAttributes | fuchsia_io::kWStarDir;
+}
 
-  Rights& operator|=(Rights other) {
-    raw_value |= other.raw_value;
-    return *this;
-  }
+// Alias for commonly used read-write directory rights.
+constexpr fuchsia_io::Rights ReadWrite() { return fuchsia_io::kRwStarDir; }
 
-  constexpr Rights& operator=(const Rights& other) {
-    raw_value = other.raw_value;
-    return *this;
-  }
+// Alias for commonly used read-execute directory rights.
+constexpr fuchsia_io::Rights ReadExec() { return fuchsia_io::kRxStarDir; }
 
-  constexpr Rights(const Rights& other) = default;
+// Alias for all possible rights.
+constexpr fuchsia_io::Rights All() { return fuchsia_io::Rights::kMask; }
 
-  // Returns true if the rights does not exceed those in |other|.
-  bool StricterOrSameAs(Rights other) const { return (raw_value & ~(other.raw_value)) == 0; }
+}  // namespace Rights
 
-  // Convenience factory functions for commonly used option combinations.
-  constexpr static Rights ReadOnly() {
-    Rights rights{};
-    rights.read = true;
-    return rights;
-  }
-
-  constexpr static Rights WriteOnly() {
-    Rights rights{};
-    rights.write = true;
-    return rights;
-  }
-
-  constexpr static Rights ReadWrite() {
-    Rights rights{};
-    rights.read = true;
-    rights.write = true;
-    return rights;
-  }
-
-  constexpr static Rights ReadExec() {
-    Rights rights{};
-    rights.read = true;
-    rights.execute = true;
-    return rights;
-  }
-
-  constexpr static Rights WriteExec() {
-    Rights rights{};
-    rights.write = true;
-    rights.execute = true;
-    return rights;
-  }
-
-  constexpr static Rights All() {
-    Rights rights{};
-    rights.read = true;
-    rights.write = true;
-    rights.execute = true;
-    return rights;
-  }
-};
-
-constexpr Rights operator&(Rights lhs, Rights rhs) { return Rights(lhs.raw_value & rhs.raw_value); }
+constexpr fuchsia_io::OpenFlags kAllIo1Rights = fuchsia_io::OpenFlags::kRightReadable |
+                                                fuchsia_io::OpenFlags::kRightWritable |
+                                                fuchsia_io::OpenFlags::kRightExecutable;
 
 // Identifies a single type of node protocol where required for protocol negotiation/resolution.
 enum class VnodeProtocol : uint8_t {
@@ -138,55 +91,36 @@ inline zx::result<VnodeProtocol> NegotiateProtocol(fuchsia_io::NodeProtocolKinds
 
 // Options specified during opening and cloning.
 struct VnodeConnectionOptions {
-  union Flags {
-    uint32_t raw_value = 0;
-    fbl::BitFieldMember<uint32_t, 0, 1> create;
-    fbl::BitFieldMember<uint32_t, 1, 1> fail_if_exists;
-    fbl::BitFieldMember<uint32_t, 2, 1> truncate;
-    fbl::BitFieldMember<uint32_t, 3, 1> directory;
-    fbl::BitFieldMember<uint32_t, 4, 1> not_directory;
-    fbl::BitFieldMember<uint32_t, 5, 1> append;
-    fbl::BitFieldMember<uint32_t, 6, 1> node_reference;
-    fbl::BitFieldMember<uint32_t, 7, 1> describe;
-    fbl::BitFieldMember<uint32_t, 8, 1> posix_write;
-    fbl::BitFieldMember<uint32_t, 9, 1> posix_execute;
-    fbl::BitFieldMember<uint32_t, 10, 1> clone_same_rights;
+  fuchsia_io::OpenFlags flags;
+  fuchsia_io::Rights rights;
 
-    constexpr Flags() = default;
-
-    constexpr Flags& operator=(const Flags& other) {
-      raw_value = other.raw_value;
-      return *this;
-    }
-
-    constexpr Flags(const Flags& other) = default;
-
-  } flags = {};
-
-  Rights rights{};
+  // TODO(https://fxbug.dev/324112857): Remove the following setters, as some aren't compatible with
+  // io2 directly (e.g. not_directory has no equivalent, and set_truncate only applies if the file
+  // protocol was selected). These setters are only used in tests anyways - same with the factory
+  // functions below.
 
   constexpr VnodeConnectionOptions set_directory() {
-    flags.directory = true;
+    flags |= fuchsia_io::OpenFlags::kDirectory;
     return *this;
   }
 
   constexpr VnodeConnectionOptions set_not_directory() {
-    flags.not_directory = true;
+    flags |= fuchsia_io::OpenFlags::kNotDirectory;
     return *this;
   }
 
   constexpr VnodeConnectionOptions set_node_reference() {
-    flags.node_reference = true;
+    flags |= fuchsia_io::OpenFlags::kNodeReference;
     return *this;
   }
 
   constexpr VnodeConnectionOptions set_truncate() {
-    flags.truncate = true;
+    flags |= fuchsia_io::OpenFlags::kTruncate;
     return *this;
   }
 
   constexpr VnodeConnectionOptions set_create() {
-    flags.create = true;
+    flags |= fuchsia_io::OpenFlags::kCreate;
     return *this;
   }
 
@@ -225,17 +159,18 @@ struct VnodeConnectionOptions {
 #else
         fuchsia_io::NodeProtocolKinds::kMask;
 #endif
-    if (flags.directory) {
+    if (flags & fuchsia_io::OpenFlags::kDirectory) {
       return fuchsia_io::NodeProtocolKinds::kDirectory;
     }
-    if (flags.not_directory) {
+    if (flags & fuchsia_io::OpenFlags::kNotDirectory) {
       return kSupportedIo1Protocols ^ fuchsia_io::NodeProtocolKinds::kDirectory;
     }
     return kSupportedIo1Protocols;
   }
 
 #ifdef __Fuchsia__
-  // Converts from fuchsia.io v1 flags to |VnodeConnectionOptions|.
+  // Converts from io1 OpenFlags flags to |VnodeConnectionOptions|. Note that in io1, certain
+  // operations were unprivileged, so they may be implicitly added to the resulting `rights`.
   static VnodeConnectionOptions FromIoV1Flags(fuchsia_io::OpenFlags fidl_flags);
 
   // Converts from |VnodeConnectionOptions| to fuchsia.io flags.
@@ -243,8 +178,7 @@ struct VnodeConnectionOptions {
 
   // Some flags (e.g. POSIX) only affect the interpretation of rights at the time of Open/Clone, and
   // should have no effects thereafter. Hence we filter them here.
-  // TODO(https://fxbug.dev/42108521): Some of these flag groups should be defined in fuchsia.io and
-  // use that as the source of truth.
+  // TODO(https://fxbug.dev/324080864): Remove this when removing OpenFlags from fuchsia.io.
   static VnodeConnectionOptions FilterForNewConnection(VnodeConnectionOptions options);
 #endif  // __Fuchsia__
 };

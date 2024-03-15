@@ -357,14 +357,14 @@ fuchsia_io::NodeProtocolKinds Blob::GetProtocols() const {
   return fuchsia_io::NodeProtocolKinds::kFile;
 }
 
-bool Blob::ValidateRights(fs::Rights rights) const {
+bool Blob::ValidateRights(fuchsia_io::Rights rights) const {
   // To acquire write access to a blob, it must be empty.
   //
   // TODO(https://fxbug.dev/42146597) If we run FIDL on multiple threads (we currently don't) there
   // is a race condition here where another thread could start writing at the same time. Decide
   // whether we support FIDL from multiple threads and if so, whether this condition is important.
   std::lock_guard lock(mutex_);
-  return !rights.write || state_ == BlobState::kEmpty;
+  return !(rights & fuchsia_io::Rights::kWriteBytes) || state_ == BlobState::kEmpty;
 }
 
 zx_status_t Blob::Read(void* data, size_t len, size_t off, size_t* out_actual) {

@@ -14,116 +14,50 @@ namespace fio = fuchsia_io;
 
 namespace fs {
 
-VnodeConnectionOptions VnodeConnectionOptions::FromIoV1Flags(
-    fuchsia_io::wire::OpenFlags fidl_flags) {
+VnodeConnectionOptions VnodeConnectionOptions::FromIoV1Flags(fio::OpenFlags fidl_flags) {
   VnodeConnectionOptions options;
+  // Filter out io1 OpenFlags.RIGHT_* flags, translated to io2 Rights below.
+  options.flags = fidl_flags & ~kAllIo1Rights;
 
-  // Flags:
-  if (fidl_flags & fio::wire::OpenFlags::kCreate) {
-    options.flags.create = true;
-  }
-  if (fidl_flags & fio::wire::OpenFlags::kCreateIfAbsent) {
-    options.flags.fail_if_exists = true;
-  }
-  if (fidl_flags & fio::wire::OpenFlags::kTruncate) {
-    options.flags.truncate = true;
-  }
-  if (fidl_flags & fio::wire::OpenFlags::kDirectory) {
-    options.flags.directory = true;
-  }
-  if (fidl_flags & fio::wire::OpenFlags::kAppend) {
-    options.flags.append = true;
-  }
-  if (fidl_flags & fio::wire::OpenFlags::kNodeReference) {
-    options.flags.node_reference = true;
-  }
-  if (fidl_flags & fio::wire::OpenFlags::kDescribe) {
-    options.flags.describe = true;
-  }
-  if (fidl_flags & fio::wire::OpenFlags::kPosixWritable) {
-    options.flags.posix_write = true;
-  }
-  if (fidl_flags & fio::wire::OpenFlags::kPosixExecutable) {
-    options.flags.posix_execute = true;
-  }
-  if (fidl_flags & fio::wire::OpenFlags::kNotDirectory) {
-    options.flags.not_directory = true;
-  }
-  if (fidl_flags & fio::wire::OpenFlags::kCloneSameRights) {
-    options.flags.clone_same_rights = true;
-  }
+  // Using Open1 requires GET_ATTRIBUTES as this is not expressible via |fio::OpenFlags|.
+  // TODO(https://fxbug.dev/324080764): Restrict GET_ATTRIBUTES.
+  options.rights = fio::Rights::kGetAttributes;
 
-  // Rights (these are smushed into |fidl_flags| in fuchsia.io v1):
-  if (fidl_flags & fio::wire::OpenFlags::kRightReadable) {
-    options.rights.read = true;
-  }
-  if (fidl_flags & fio::wire::OpenFlags::kRightWritable) {
-    options.rights.write = true;
-  }
-  if (fidl_flags & fio::wire::OpenFlags::kRightExecutable) {
-    options.rights.execute = true;
+  // Approximate a set of io2 Rights corresponding to what is expected by |fidl_flags|.
+  if (!(options.flags & fio::OpenFlags::kNodeReference)) {
+    if (fidl_flags & fio::OpenFlags::kRightReadable) {
+      options.rights |= fio::kRStarDir;
+    }
+    if (fidl_flags & fio::OpenFlags::kRightWritable) {
+      options.rights |= fio::kWStarDir;
+    }
+    if (fidl_flags & fio::OpenFlags::kRightExecutable) {
+      options.rights |= fio::kXStarDir;
+    }
   }
 
   return options;
 }
 
-fuchsia_io::wire::OpenFlags VnodeConnectionOptions::ToIoV1Flags() const {
-  fuchsia_io::wire::OpenFlags fidl_flags = {};
-
-  // Flags:
-  if (flags.create) {
-    fidl_flags |= fio::wire::OpenFlags::kCreate;
+fio::OpenFlags VnodeConnectionOptions::ToIoV1Flags() const {
+  fio::OpenFlags fidl_flags = flags;
+  // Map io2 rights to io1 flags only if all constituent io2 rights are present.
+  if ((rights & fio::kRStarDir) == fio::kRStarDir) {
+    fidl_flags |= fio::OpenFlags::kRightReadable;
   }
-  if (flags.fail_if_exists) {
-    fidl_flags |= fio::wire::OpenFlags::kCreateIfAbsent;
+  if ((rights & fio::kWStarDir) == fio::kWStarDir) {
+    fidl_flags |= fio::OpenFlags::kRightWritable;
   }
-  if (flags.truncate) {
-    fidl_flags |= fio::wire::OpenFlags::kTruncate;
+  if ((rights & fio::kXStarDir) == fio::kXStarDir) {
+    fidl_flags |= fio::OpenFlags::kRightExecutable;
   }
-  if (flags.directory) {
-    fidl_flags |= fio::wire::OpenFlags::kDirectory;
-  }
-  if (flags.append) {
-    fidl_flags |= fio::wire::OpenFlags::kAppend;
-  }
-  if (flags.node_reference) {
-    fidl_flags |= fio::wire::OpenFlags::kNodeReference;
-  }
-  if (flags.describe) {
-    fidl_flags |= fio::wire::OpenFlags::kDescribe;
-  }
-  if (flags.posix_write) {
-    fidl_flags |= fio::wire::OpenFlags::kPosixWritable;
-  }
-  if (flags.posix_execute) {
-    fidl_flags |= fio::wire::OpenFlags::kPosixExecutable;
-  }
-  if (flags.not_directory) {
-    fidl_flags |= fio::wire::OpenFlags::kNotDirectory;
-  }
-  if (flags.clone_same_rights) {
-    fidl_flags |= fio::wire::OpenFlags::kCloneSameRights;
-  }
-
-  // Rights (these are smushed into |fidl_flags| in fuchsia.io v1):
-  if (rights.read) {
-    fidl_flags |= fio::wire::OpenFlags::kRightReadable;
-  }
-  if (rights.write) {
-    fidl_flags |= fio::wire::OpenFlags::kRightWritable;
-  }
-  if (rights.execute) {
-    fidl_flags |= fio::wire::OpenFlags::kRightExecutable;
-  }
-
   return fidl_flags;
 }
 
 VnodeConnectionOptions VnodeConnectionOptions::FilterForNewConnection(
     VnodeConnectionOptions options) {
   VnodeConnectionOptions result;
-  result.flags.append = options.flags.append;
-  result.flags.node_reference = options.flags.node_reference;
+  result.flags = options.flags & (fio::OpenFlags::kAppend | fio::OpenFlags::kNodeReference);
   result.rights = options.rights;
   return result;
 }

@@ -275,9 +275,9 @@ fuchsia_io::NodeProtocolKinds File::GetProtocols() const {
   return fuchsia_io::NodeProtocolKinds::kFile;
 }
 
-bool File::ValidateRights(fs::Rights rights) const {
+bool File::ValidateRights(fuchsia_io::Rights rights) const {
   // Minfs files can only be opened as readable/writable, not executable.
-  return !rights.execute;
+  return !(rights & fuchsia_io::Rights::kExecute);
 }
 
 zx_status_t File::Read(void* data, size_t len, size_t off, size_t* out_actual) {

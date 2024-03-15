@@ -113,12 +113,13 @@ class FuchsiaVfs : public Vfs {
   // Serves a Vnode over the specified channel (used for creating new filesystems); the Vnode must
   // be a directory.
   zx_status_t ServeDirectory(fbl::RefPtr<Vnode> vn,
-                             fidl::ServerEnd<fuchsia_io::Directory> server_end, Rights rights);
+                             fidl::ServerEnd<fuchsia_io::Directory> server_end,
+                             fuchsia_io::Rights rights);
 
   // Convenience wrapper over |ServeDirectory| with maximum rights.
   zx_status_t ServeDirectory(fbl::RefPtr<Vnode> vn,
                              fidl::ServerEnd<fuchsia_io::Directory> server_end) {
-    return ServeDirectory(std::move(vn), std::move(server_end), fs::Rights::All());
+    return ServeDirectory(std::move(vn), std::move(server_end), fuchsia_io::Rights::kMask);
   }
 
   // Closes all connections to a Vnode and calls |callback| after all connections are closed. The
@@ -132,7 +133,7 @@ class FuchsiaVfs : public Vfs {
   // Vfs protected overrides.
   zx::result<bool> EnsureExists(fbl::RefPtr<Vnode> vndir, std::string_view path,
                                 fbl::RefPtr<Vnode>* out_vn, fs::VnodeConnectionOptions options,
-                                uint32_t mode, Rights parent_rights) override
+                                uint32_t mode, fuchsia_io::Rights parent_rights) override
       __TA_REQUIRES(vfs_lock_);
 
   // Starts FIDL message dispatching on |channel|, at the same time starts to manage the lifetime of

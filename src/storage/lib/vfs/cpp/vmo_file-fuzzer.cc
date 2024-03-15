@@ -38,11 +38,6 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
   size_t bytes_written = 0;
   size_t bytes_read = 0;
 
-  // This is defined before the to_write variable so that we don't have to worry about fuzzed_data
-  // running out of bytes.
-  fs::Rights rights;
-  rights.raw_value = fuzzed_data.ConsumeIntegral<uint32_t>();
-
   std::vector<uint8_t> to_write =
       fuzzed_data.ConsumeBytes<uint8_t>(fuzzed_data.ConsumeIntegralInRange<size_t>(0, kMaxWriteSz));
 

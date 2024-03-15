@@ -31,14 +31,17 @@ fuchsia_io::NodeProtocolKinds VmoFile::GetProtocols() const {
   return fuchsia_io::NodeProtocolKinds::kFile;
 }
 
-bool VmoFile::ValidateRights(Rights rights) const {
+bool VmoFile::ValidateRights(fuchsia_io::Rights rights) const {
   // Executable rights/VMOs are currently not supported, but may be added in the future.
   // If this is the case, we should further restrict the allowable set of rights such that
   // an executable VmoFile can only be opened as readable/executable and not writable.
-  if (rights.execute) {
+  if (rights & fuchsia_io::Rights::kExecute) {
     return false;
   }
-  return !rights.write || writable_;
+  if (!writable_ && rights & fuchsia_io::Rights::kWriteBytes) {
+    return false;
+  }
+  return true;
 }
 
 zx_status_t VmoFile::GetAttributes(VnodeAttributes* attr) {

@@ -32,7 +32,7 @@ FileConnection::FileConnection(fs::FuchsiaVfs* vfs, fbl::RefPtr<fs::Vnode> vnode
                                zx_koid_t koid)
     : Connection(vfs, std::move(vnode), protocol, options), koid_(koid) {
   ZX_DEBUG_ASSERT(protocol == VnodeProtocol::kFile);
-  ZX_DEBUG_ASSERT(!options.flags.node_reference);
+  ZX_DEBUG_ASSERT(!(options.flags & fuchsia_io::OpenFlags::kNodeReference));
 }
 
 FileConnection::~FileConnection() { vnode()->DeleteFileLockInTeardown(koid_); }
@@ -86,12 +86,13 @@ void FileConnection::Describe(DescribeCompleter::Sync& completer) {
 }
 
 void FileConnection::GetConnectionInfo(GetConnectionInfoCompleter::Sync& completer) {
-  fio::Operations rights = fio::Operations::kGetAttributes;
-  rights |= options().rights.read ? fio::Operations::kReadBytes : fio::Operations();
-  rights |= options().rights.write
-                ? fio::Operations::kWriteBytes | fio::Operations::kUpdateAttributes
-                : fio::Operations();
-  rights |= options().rights.execute ? fio::Operations::kExecute : fio::Operations();
+  // Filter out directory-only operations for consistency with Rust VFS.
+  // TODO(https://fxbug.dev/324112857): When adding Open2 support, use the node's abilities to
+  // filter out unsupported rights. Although the protocol currently allows rights to exceed the
+  // abilities of a node, this can be confusing. Instead, we can make it such that rights can
+  // only be downscoped, and can only be requested if the node type supports or allows it.
+  fio::Rights rights = options().rights & ~(fio::Rights::kConnect | fio::Rights::kModifyDirectory |
+                                            fio::Rights::kEnumerate | fio::Rights::kTraverse);
   fidl::Arena arena;
   completer.Reply(fio::wire::ConnectionInfo::Builder(arena).rights(rights).Build());
 }
@@ -134,7 +135,7 @@ void FileConnection::QueryFilesystem(QueryFilesystemCompleter::Sync& completer) 
 
 zx_status_t FileConnection::ResizeInternal(uint64_t length) {
   FS_PRETTY_TRACE_DEBUG("[FileTruncate] options: ", options());
-  if (!options().rights.write) {
+  if (!(options().rights & fuchsia_io::Rights::kWriteBytes)) {
     return ZX_ERR_BAD_HANDLE;
   }
   return vnode()->Truncate(length);
@@ -150,17 +151,16 @@ void FileConnection::Resize(ResizeRequestView request, ResizeCompleter::Sync& co
 }
 
 zx_status_t FileConnection::GetBackingMemoryInternal(fio::wire::VmoFlags flags, zx::vmo* out_vmo) {
-  if ((flags & fio::wire::VmoFlags::kPrivateClone) &&
-      (flags & fio::wire::VmoFlags::kSharedBuffer)) {
+  if ((flags & fio::VmoFlags::kPrivateClone) && (flags & fio::VmoFlags::kSharedBuffer)) {
     return ZX_ERR_INVALID_ARGS;
   }
-  if (!options().rights.write && (flags & fio::wire::VmoFlags::kWrite)) {
+  if ((flags & fio::VmoFlags::kRead) && !(options().rights & fio::Rights::kReadBytes)) {
     return ZX_ERR_ACCESS_DENIED;
   }
-  if (!options().rights.execute && (flags & fio::wire::VmoFlags::kExecute)) {
+  if ((flags & fio::VmoFlags::kWrite) && !(options().rights & fio::Rights::kWriteBytes)) {
     return ZX_ERR_ACCESS_DENIED;
   }
-  if (!options().rights.read && (flags & fio::wire::VmoFlags::kRead)) {
+  if ((flags & fio::VmoFlags::kExecute) && !(options().rights & fio::Rights::kExecute)) {
     return ZX_ERR_ACCESS_DENIED;
   }
   return vnode()->GetVmo(flags, out_vmo);

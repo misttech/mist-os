@@ -44,13 +44,13 @@ zx::result<zx_koid_t> GetObjectKoid(const zx::object_base& object) {
 
 uint32_t ToStreamOptions(const VnodeConnectionOptions& options) {
   uint32_t stream_options = 0u;
-  if (options.rights.read) {
+  if (options.rights & fuchsia_io::Rights::kReadBytes) {
     stream_options |= ZX_STREAM_MODE_READ;
   }
-  if (options.rights.write) {
+  if (options.rights & fuchsia_io::Rights::kWriteBytes) {
     stream_options |= ZX_STREAM_MODE_WRITE;
   }
-  if (options.flags.append) {
+  if (options.flags & fuchsia_io::OpenFlags::kAppend) {
     stream_options |= ZX_STREAM_MODE_APPEND;
   }
   return stream_options;
@@ -59,7 +59,7 @@ uint32_t ToStreamOptions(const VnodeConnectionOptions& options) {
 zx_status_t ConnectService(const fbl::RefPtr<fs::Vnode>& vnode, Vnode::ValidatedOptions options,
                            fidl::ServerEnd<fio::Node> server_end) {
   // For service connections, we don't know the final protocol that will be spoken over |server_end|
-  // as it is dependent on the service Vnode type/connector. However, if |options.describe|
+  // as it is dependent on the service Vnode type/connector. However, if |fio::OpenFlags::kDescribe|
   // is set, the channel first speaks |fuchsia.io/Node| to send the OnOpen event, then switches to
   // the service protocol.
   //
@@ -68,14 +68,14 @@ zx_status_t ConnectService(const fbl::RefPtr<fs::Vnode>& vnode, Vnode::Validated
   // We will likely need to remove support for protocol switching in io1 to support the migration.
   if (options->ToIoV1Flags() & ~(fio::OpenFlags::kDescribe | fio::OpenFlags::kNotDirectory)) {
     constexpr zx_status_t kStatus = ZX_ERR_INVALID_ARGS;
-    if (options->flags.describe) {
+    if (options->flags & fio::OpenFlags::kDescribe) {
       [[maybe_unused]] fidl::Status status = fidl::WireSendEvent(server_end)->OnOpen(kStatus, {});
     } else {
       [[maybe_unused]] zx_status_t status = server_end.Close(kStatus);
     }
     return kStatus;
   }
-  if (options->flags.describe) {
+  if (options->flags & fio::OpenFlags::kDescribe) {
     fidl::Status status = fidl::WireSendEvent(server_end)
                               ->OnOpen(ZX_OK, fio::wire::NodeInfoDeprecated::WithService({}));
     if (!status.ok()) {
@@ -187,7 +187,7 @@ bool FuchsiaVfs::IsTokenAssociatedWithVnode(zx::event token) {
 zx::result<bool> FuchsiaVfs::EnsureExists(fbl::RefPtr<Vnode> vndir, std::string_view path,
                                           fbl::RefPtr<Vnode>* out_vn,
                                           fs::VnodeConnectionOptions options, uint32_t mode,
-                                          Rights parent_rights) {
+                                          fuchsia_io::Rights parent_rights) {
   zx::result result = Vfs::EnsureExists(vndir, path, out_vn, options, mode, parent_rights);
   if (result.is_ok() && result.value()) {
     vndir->Notify(path, fio::wire::WatchEvent::kAdded);
@@ -328,7 +328,7 @@ zx_status_t FuchsiaVfs::Serve(fbl::RefPtr<Vnode> vnode, zx::channel server_end,
 zx_status_t FuchsiaVfs::Serve(fbl::RefPtr<Vnode> vnode, zx::channel server_end,
                               Vnode::ValidatedOptions options) {
   VnodeProtocol protocol;
-  if (options->flags.node_reference) {
+  if (options->flags & fio::OpenFlags::kNodeReference) {
     protocol = VnodeProtocol::kNode;
   } else {
     zx::result negotiated = NegotiateProtocol(options->protocols() & vnode->GetProtocols());
@@ -385,7 +385,7 @@ zx_status_t FuchsiaVfs::Serve(fbl::RefPtr<Vnode> vnode, zx::channel server_end,
 
   // Send an |fuchsia.io/OnOpen| event if requested. At this point we know the connection is either
   // a Node connection, or a File/Directory that composes the node protocol.
-  if (options->flags.describe) {
+  if (options->flags & fuchsia_io::OpenFlags::kDescribe) {
     zx::result representation = connection->NodeGetRepresentation();
     if (representation.is_error()) {
       // Ignore errors since there is nothing we can do if this fails.
@@ -408,9 +408,9 @@ zx_status_t FuchsiaVfs::Serve(fbl::RefPtr<Vnode> vnode, zx::channel server_end,
 
 zx_status_t FuchsiaVfs::ServeDirectory(fbl::RefPtr<fs::Vnode> vn,
                                        fidl::ServerEnd<fuchsia_io::Directory> server_end,
-                                       Rights rights) {
+                                       fuchsia_io::Rights rights) {
   VnodeConnectionOptions options;
-  options.flags.directory = true;
+  options.flags |= fuchsia_io::OpenFlags::kDirectory;
   options.rights = rights;
   zx::result validated_options = vn->ValidateOptions(options);
   if (validated_options.is_error()) {

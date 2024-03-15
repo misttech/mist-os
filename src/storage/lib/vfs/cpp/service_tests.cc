@@ -118,7 +118,10 @@ TEST(Service, ServiceNodeIsNotDirectory) {
   ASSERT_OK(vfs.ServeDirectory(directory, std::move(root->server)));
 
   // Call |ValidateOptions| with the directory flag should fail.
-  auto result = vnode->ValidateOptions(fs::VnodeConnectionOptions::ReadWrite().set_directory());
+  auto result = vnode->ValidateOptions(fs::VnodeConnectionOptions{
+      .flags = fuchsia_io::OpenFlags::kDirectory,
+      .rights = fuchsia_io::kRwStarDir,
+  });
   ASSERT_TRUE(result.is_error());
   ASSERT_EQ(ZX_ERR_NOT_DIR, result.status_value());
 

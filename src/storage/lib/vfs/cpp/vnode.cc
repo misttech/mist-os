@@ -102,11 +102,12 @@ bool Vnode::DeleteFileLockInTeardown(zx_koid_t owner) {
 
 #endif  // __Fuchsia__
 
-bool Vnode::ValidateRights([[maybe_unused]] Rights rights) const { return true; }
+bool Vnode::ValidateRights([[maybe_unused]] fuchsia_io::Rights rights) const { return true; }
 
 zx::result<Vnode::ValidatedOptions> Vnode::ValidateOptions(VnodeConnectionOptions options) const {
   // The connection should ensure only one of DIRECTORY and NOT_DIRECTORY is set.
-  ZX_DEBUG_ASSERT(!(options.flags.directory & options.flags.not_directory));
+  ZX_DEBUG_ASSERT(!((options.flags & fuchsia_io::OpenFlags::kDirectory) &&
+                    options.flags & fuchsia_io::OpenFlags::kNotDirectory));
   if (!Supports(options.protocols())) {
     if (options.protocols() & fuchsia_io::NodeProtocolKinds::kDirectory) {
       return zx::error(ZX_ERR_NOT_DIR);
@@ -142,7 +143,7 @@ zx_status_t Vnode::OpenValidating(VnodeConnectionOptions options,
   }
   // The documentation on Vnode::Open promises it will never be called if options includes
   // vnode_reference.
-  ZX_DEBUG_ASSERT(!validated_options.value()->flags.node_reference);
+  ZX_DEBUG_ASSERT(!(validated_options.value()->flags & fuchsia_io::OpenFlags::kNodeReference));
   return Open(validated_options.value(), out_redirect);
 }
 

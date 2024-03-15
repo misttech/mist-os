@@ -52,7 +52,8 @@ class NoOpVfsGood : public NoOpVfs {
 };
 
 // A Vfs that first starts message dispatch on a connection before placing it into a linked list.
-// This behavior is racy (https://fxbug.dev/42122489) so we test that it triggers a failed precondition check.
+// This behavior is racy (https://fxbug.dev/42122489) so we test that it triggers a failed
+// precondition check.
 class NoOpVfsBad : public NoOpVfs {
  public:
   using NoOpVfs::NoOpVfs;
@@ -69,11 +70,10 @@ class NoOpVfsBad : public NoOpVfs {
 template <typename VfsType>
 void RunTest(async::Loop* loop, VfsType&& vfs) {
   auto root = fbl::MakeRefCounted<fs::PseudoDir>();
-  auto endpoints = fidl::CreateEndpoints<fuchsia_io::Node>();
+  auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
   ASSERT_OK(endpoints.status_value());
 
-  ASSERT_OK(
-      vfs.Serve(root, endpoints->server.TakeChannel(), fs::VnodeConnectionOptions::ReadOnly()));
+  ASSERT_OK(vfs.ServeDirectory(root, std::move(endpoints->server), fuchsia_io::kRStarDir));
   loop->RunUntilIdle();
 }
 

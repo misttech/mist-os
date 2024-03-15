@@ -63,7 +63,9 @@ async fn get_connection_info_directory() {
         let test_dir = harness.get_directory(root, harness.dir_rights.all());
         let dir = open_dir_with_flags(&test_dir, dir_flags, "dir").await;
 
-        let mut rights = fio::Operations::empty();
+        // TODO(https://fxbug.dev/42157659): Restrict GET_ATTRIBUTES, it is always requested when
+        // opening nodes via Open1.
+        let mut rights = fio::Operations::GET_ATTRIBUTES;
         if dir_flags.contains(fio::OpenFlags::RIGHT_READABLE) {
             rights |= fio::R_STAR_DIR;
         }

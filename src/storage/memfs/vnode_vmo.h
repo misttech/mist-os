@@ -16,7 +16,7 @@ class VnodeVmo final : public Vnode {
   ~VnodeVmo() override;
 
   fuchsia_io::NodeProtocolKinds GetProtocols() const final;
-  bool ValidateRights(fs::Rights rights) const final;
+  bool ValidateRights(fuchsia_io::Rights rights) const final;
 
  private:
   zx_status_t Read(void* data, size_t len, size_t off, size_t* out_actual) final;

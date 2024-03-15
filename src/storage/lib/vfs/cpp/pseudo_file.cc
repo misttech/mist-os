@@ -24,17 +24,17 @@ fuchsia_io::NodeProtocolKinds PseudoFile::GetProtocols() const {
   return fuchsia_io::NodeProtocolKinds::kFile;
 }
 
-bool PseudoFile::ValidateRights(Rights rights) const {
-  if (rights.read && !read_handler_) {
+bool PseudoFile::ValidateRights(fuchsia_io::Rights rights) const {
+  if ((rights & fuchsia_io::Rights::kReadBytes) && !read_handler_) {
     return false;
   }
-  if (rights.write && !write_handler_) {
+  if ((rights & fuchsia_io::Rights::kWriteBytes) && !write_handler_) {
     return false;
   }
   // Executable pseudo-files are not supported, thus we prevent it from being opened with
   // OPEN_RIGHT_EXECUTABLE (since even if GetBackingMemory was supported, there is no way of
   // creating an executable VMO without a VMEX, which poses potential security issues).
-  if (rights.execute) {
+  if (rights & fuchsia_io::Rights::kExecute) {
     return false;
   }
   return true;
@@ -62,7 +62,7 @@ BufferedPseudoFile::~BufferedPseudoFile() = default;
 zx_status_t BufferedPseudoFile::OpenNode(ValidatedOptions options,
                                          fbl::RefPtr<Vnode>* out_redirect) {
   fbl::String output;
-  if (options->rights.read) {
+  if (options->rights & fuchsia_io::Rights::kReadBytes) {
     zx_status_t status = read_handler_(&output);
     if (status != ZX_OK) {
       return status;
@@ -84,7 +84,7 @@ fuchsia_io::NodeProtocolKinds BufferedPseudoFile::Content::GetProtocols() const 
 }
 
 zx_status_t BufferedPseudoFile::Content::CloseNode() {
-  if (options_.rights.write) {
+  if (options_.rights & fuchsia_io::Rights::kWriteBytes) {
     return file_->write_handler_(std::string_view(input_data_, input_length_));
   }
   return ZX_OK;
@@ -98,7 +98,7 @@ zx_status_t BufferedPseudoFile::Content::GetAttributes(fs::VnodeAttributes* a) {
 
 zx_status_t BufferedPseudoFile::Content::Read(void* data, size_t length, size_t offset,
                                               size_t* out_actual) {
-  ZX_DEBUG_ASSERT(options_.rights.read);
+  ZX_DEBUG_ASSERT(options_.rights & fuchsia_io::Rights::kReadBytes);
 
   if (length == 0u || offset >= output_.length()) {
     *out_actual = 0u;
@@ -115,7 +115,7 @@ zx_status_t BufferedPseudoFile::Content::Read(void* data, size_t length, size_t 
 
 zx_status_t BufferedPseudoFile::Content::Write(const void* data, size_t length, size_t offset,
                                                size_t* out_actual) {
-  ZX_DEBUG_ASSERT(options_.rights.write);
+  ZX_DEBUG_ASSERT(options_.rights & fuchsia_io::Rights::kWriteBytes);
 
   if (length == 0u) {
     *out_actual = 0u;
@@ -139,7 +139,7 @@ zx_status_t BufferedPseudoFile::Content::Write(const void* data, size_t length, 
 
 zx_status_t BufferedPseudoFile::Content::Append(const void* data, size_t length, size_t* out_end,
                                                 size_t* out_actual) {
-  ZX_DEBUG_ASSERT(options_.rights.write);
+  ZX_DEBUG_ASSERT(options_.rights & fuchsia_io::Rights::kWriteBytes);
 
   zx_status_t status = Write(data, length, input_length_, out_actual);
   if (status == ZX_OK) {
@@ -149,7 +149,7 @@ zx_status_t BufferedPseudoFile::Content::Append(const void* data, size_t length,
 }
 
 zx_status_t BufferedPseudoFile::Content::Truncate(size_t length) {
-  ZX_DEBUG_ASSERT(options_.rights.write);
+  ZX_DEBUG_ASSERT(options_.rights && fuchsia_io::Rights::kWriteBytes);
 
   if (length > file_->input_buffer_capacity_) {
     return ZX_ERR_NO_SPACE;
@@ -191,7 +191,8 @@ UnbufferedPseudoFile::Content::Content(fbl::RefPtr<UnbufferedPseudoFile> file,
                                        VnodeConnectionOptions options)
     : file_(std::move(file)),
       options_(options),
-      truncated_since_last_successful_write_(options.flags.create || options.flags.truncate) {}
+      truncated_since_last_successful_write_(
+          options.flags & (fuchsia_io::OpenFlags::kCreate | fuchsia_io::OpenFlags::kTruncate)) {}
 
 UnbufferedPseudoFile::Content::~Content() = default;
 
@@ -201,7 +202,7 @@ zx_status_t UnbufferedPseudoFile::Content::OpenNode(ValidatedOptions options,
 }
 
 zx_status_t UnbufferedPseudoFile::Content::CloseNode() {
-  if (options_.rights.write && truncated_since_last_successful_write_) {
+  if (options_.rights & fuchsia_io::Rights::kWriteBytes && truncated_since_last_successful_write_) {
     return file_->write_handler_(std::string_view());
   }
   return ZX_OK;
@@ -213,7 +214,7 @@ zx_status_t UnbufferedPseudoFile::Content::GetAttributes(fs::VnodeAttributes* a)
 
 zx_status_t UnbufferedPseudoFile::Content::Read(void* data, size_t length, size_t offset,
                                                 size_t* out_actual) {
-  ZX_DEBUG_ASSERT(options_.rights.read);
+  ZX_DEBUG_ASSERT(options_.rights & fuchsia_io::Rights::kReadBytes);
 
   if (offset != 0u) {
     // If the offset is non-zero, we assume the client already read the property. Simulate end of
@@ -236,7 +237,7 @@ zx_status_t UnbufferedPseudoFile::Content::Read(void* data, size_t length, size_
 
 zx_status_t UnbufferedPseudoFile::Content::Write(const void* data, size_t length, size_t offset,
                                                  size_t* out_actual) {
-  ZX_DEBUG_ASSERT(options_.rights.write);
+  ZX_DEBUG_ASSERT(options_.rights & fuchsia_io::Rights::kWriteBytes);
 
   if (offset != 0u) {
     // If the offset is non-zero, we assume the client already wrote the property. Simulate an
@@ -255,7 +256,7 @@ zx_status_t UnbufferedPseudoFile::Content::Write(const void* data, size_t length
 
 zx_status_t UnbufferedPseudoFile::Content::Append(const void* data, size_t length, size_t* out_end,
                                                   size_t* out_actual) {
-  ZX_DEBUG_ASSERT(options_.rights.write);
+  ZX_DEBUG_ASSERT(options_.rights & fuchsia_io::Rights::kWriteBytes);
 
   zx_status_t status = Write(data, length, 0u, out_actual);
   if (status == ZX_OK) {
@@ -265,7 +266,7 @@ zx_status_t UnbufferedPseudoFile::Content::Append(const void* data, size_t lengt
 }
 
 zx_status_t UnbufferedPseudoFile::Content::Truncate(size_t length) {
-  ZX_DEBUG_ASSERT(options_.rights.write);
+  ZX_DEBUG_ASSERT(options_.rights & fuchsia_io::Rights::kWriteBytes);
 
   if (length != 0u) {
     return ZX_ERR_INVALID_ARGS;

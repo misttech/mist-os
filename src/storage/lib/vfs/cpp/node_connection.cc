@@ -29,7 +29,9 @@ NodeConnection::NodeConnection(fs::FuchsiaVfs* vfs, fbl::RefPtr<fs::Vnode> vnode
                                VnodeProtocol protocol, VnodeConnectionOptions options)
     : Connection(vfs, std::move(vnode), protocol, options) {
   ZX_DEBUG_ASSERT(protocol == VnodeProtocol::kNode);
-  ZX_DEBUG_ASSERT(options.flags.node_reference);
+  ZX_DEBUG_ASSERT(options.flags & fio::OpenFlags::kNodeReference);
+  // Only the GET_ATTRIBUTES right is supported for node connections.
+  ZX_DEBUG_ASSERT(!(options.rights & ~fio::Rights::kGetAttributes));
 }
 
 std::unique_ptr<Binding> NodeConnection::Bind(async_dispatcher_t* dispatcher, zx::channel channel,
@@ -54,11 +56,8 @@ void NodeConnection::Query(QueryCompleter::Sync& completer) {
 }
 
 void NodeConnection::GetConnectionInfo(GetConnectionInfoCompleter::Sync& completer) {
-  using fuchsia_io::Operations;
-  using fuchsia_io::wire::ConnectionInfo;
-
   fidl::Arena arena;
-  completer.Reply(ConnectionInfo::Builder(arena).rights(Operations::kGetAttributes).Build());
+  completer.Reply(fio::wire::ConnectionInfo::Builder(arena).rights(options().rights).Build());
 }
 
 void NodeConnection::Sync(SyncCompleter::Sync& completer) {

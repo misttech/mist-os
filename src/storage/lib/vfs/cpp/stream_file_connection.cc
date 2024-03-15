@@ -35,12 +35,12 @@ StreamFileConnection::StreamFileConnection(fs::FuchsiaVfs* vfs, fbl::RefPtr<fs::
                                            VnodeConnectionOptions options, zx_koid_t koid)
     : FileConnection(vfs, std::move(vnode), protocol, options, koid), stream_(std::move(stream)) {
   ZX_DEBUG_ASSERT(protocol == VnodeProtocol::kFile);
-  ZX_DEBUG_ASSERT(!options.flags.node_reference);
+  ZX_DEBUG_ASSERT(!(options.flags & fuchsia_io::OpenFlags::kNodeReference));
 }
 
 zx_status_t StreamFileConnection::ReadInternal(void* data, size_t len, size_t* out_actual) {
   FS_PRETTY_TRACE_DEBUG("[FileRead] options: ", options());
-  if (!options().rights.read) {
+  if (!(options().rights & fuchsia_io::Rights::kReadBytes)) {
     return ZX_ERR_BAD_HANDLE;
   }
   if (len > fio::wire::kMaxBuf) {
@@ -71,7 +71,7 @@ void StreamFileConnection::Read(ReadRequestView request, ReadCompleter::Sync& co
 zx_status_t StreamFileConnection::ReadAtInternal(void* data, size_t len, size_t offset,
                                                  size_t* out_actual) {
   FS_PRETTY_TRACE_DEBUG("[FileReadAt] options: ", options());
-  if (!options().rights.read) {
+  if (!(options().rights & fuchsia_io::Rights::kReadBytes)) {
     return ZX_ERR_BAD_HANDLE;
   }
   if (len > fio::wire::kMaxBuf) {
@@ -101,7 +101,7 @@ void StreamFileConnection::ReadAt(ReadAtRequestView request, ReadAtCompleter::Sy
 
 zx_status_t StreamFileConnection::WriteInternal(const void* data, size_t len, size_t* out_actual) {
   FS_PRETTY_TRACE_DEBUG("[FileWrite] options: ", options());
-  if (!options().rights.write) {
+  if (!(options().rights & fuchsia_io::Rights::kWriteBytes)) {
     return ZX_ERR_BAD_HANDLE;
   }
   zx_iovec_t vector = {
@@ -129,7 +129,7 @@ void StreamFileConnection::Write(WriteRequestView request, WriteCompleter::Sync&
 zx_status_t StreamFileConnection::WriteAtInternal(const void* data, size_t len, size_t offset,
                                                   size_t* out_actual) {
   FS_PRETTY_TRACE_DEBUG("[FileWriteAt] options: ", options());
-  if (!options().rights.write) {
+  if (!(options().rights & fuchsia_io::Rights::kWriteBytes)) {
     return ZX_ERR_BAD_HANDLE;
   }
   zx_iovec_t vector = {
@@ -201,7 +201,7 @@ zx::result<fuchsia_io::wire::OpenFlags> StreamFileConnection::GetFlagsInternal()
 
 zx::result<> StreamFileConnection::SetFlagsInternal(fuchsia_io::wire::OpenFlags flags) {
   auto new_options = VnodeConnectionOptions::FromIoV1Flags(flags);
-  bool append = new_options.flags.append;
+  bool append = static_cast<bool>(new_options.flags & fuchsia_io::OpenFlags::kAppend);
   auto status = zx::make_result(stream_.set_prop_mode_append(append));
   if (status.is_ok()) {
     set_append(append);

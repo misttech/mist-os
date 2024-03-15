@@ -36,9 +36,6 @@ class Binding;
 // Returns false if the flags combination is invalid.
 bool PrevalidateFlags(fuchsia_io::wire::OpenFlags flags);
 
-zx_status_t EnforceHierarchicalRights(Rights parent_rights, VnodeConnectionOptions child_options,
-                                      VnodeConnectionOptions* out_options);
-
 // Connection is a base class representing an open connection to a Vnode (the server-side component
 // of a file descriptor). It contains the logic to synchronize connection teardown with the vfs, as
 // well as shared utilities such as connection cloning and enforcement of connection rights.
@@ -99,7 +96,13 @@ class Connection : public fbl::DoublyLinkedListable<std::unique_ptr<Connection>>
 
   const VnodeConnectionOptions& options() const { return options_; }
 
-  void set_append(bool append) { options_.flags.append = append; }
+  void set_append(bool append) {
+    if (append) {
+      options_.flags |= fuchsia_io::OpenFlags::kAppend;
+    } else {
+      options_.flags -= fuchsia_io::OpenFlags::kAppend;
+    }
+  }
 
   FuchsiaVfs* vfs() const { return vfs_; }
 

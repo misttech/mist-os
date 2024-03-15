@@ -31,12 +31,12 @@ RemoteFileConnection::RemoteFileConnection(fs::FuchsiaVfs* vfs, fbl::RefPtr<fs::
                                            zx_koid_t koid)
     : FileConnection(vfs, std::move(vnode), protocol, options, koid) {
   ZX_DEBUG_ASSERT(protocol == VnodeProtocol::kFile);
-  ZX_DEBUG_ASSERT(!options.flags.node_reference);
+  ZX_DEBUG_ASSERT(!(options.flags & fuchsia_io::OpenFlags::kNodeReference));
 }
 
 zx_status_t RemoteFileConnection::ReadInternal(void* data, size_t len, size_t* out_actual) {
   FS_PRETTY_TRACE_DEBUG("[FileRead] options: ", options());
-  if (!options().rights.read) {
+  if (!(options().rights & fuchsia_io::Rights::kReadBytes)) {
     return ZX_ERR_BAD_HANDLE;
   }
   if (len > fio::wire::kMaxTransferSize) {
@@ -64,7 +64,7 @@ void RemoteFileConnection::Read(ReadRequestView request, ReadCompleter::Sync& co
 zx_status_t RemoteFileConnection::ReadAtInternal(void* data, size_t len, size_t offset,
                                                  size_t* out_actual) {
   FS_PRETTY_TRACE_DEBUG("[FileReadAt] options: ", options());
-  if (!options().rights.read) {
+  if (!(options().rights & fuchsia_io::Rights::kReadBytes)) {
     return ZX_ERR_BAD_HANDLE;
   }
   if (len > fio::wire::kMaxTransferSize) {
@@ -90,11 +90,11 @@ void RemoteFileConnection::ReadAt(ReadAtRequestView request, ReadAtCompleter::Sy
 
 zx_status_t RemoteFileConnection::WriteInternal(const void* data, size_t len, size_t* out_actual) {
   FS_PRETTY_TRACE_DEBUG("[FileWrite] options: ", options());
-  if (!options().rights.write) {
+  if (!(options().rights & fuchsia_io::Rights::kWriteBytes)) {
     return ZX_ERR_BAD_HANDLE;
   }
   zx_status_t status;
-  if (options().flags.append) {
+  if (options().flags & fuchsia_io::OpenFlags::kAppend) {
     size_t end = 0u;
     status = vnode()->Append(data, len, &end, out_actual);
     if (status == ZX_OK) {
@@ -125,7 +125,7 @@ void RemoteFileConnection::Write(WriteRequestView request, WriteCompleter::Sync&
 zx_status_t RemoteFileConnection::WriteAtInternal(const void* data, size_t len, size_t offset,
                                                   size_t* out_actual) {
   FS_PRETTY_TRACE_DEBUG("[FileWriteAt] options: ", options());
-  if (!options().rights.write) {
+  if (!(options().rights & fuchsia_io::Rights::kWriteBytes)) {
     return ZX_ERR_BAD_HANDLE;
   }
   zx_status_t status = vnode()->Write(data, len, offset, out_actual);

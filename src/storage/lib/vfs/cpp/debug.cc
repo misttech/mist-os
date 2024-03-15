@@ -4,11 +4,12 @@
 
 #include "src/storage/lib/vfs/cpp/debug.h"
 
-#include <iostream>
-#include <string_view>
+#ifdef FS_TRACE_DEBUG_ENABLED
 
-namespace fs::debug_internal {
+std::ostream& operator<<(std::ostream& os, const fs::VnodeConnectionOptions& options) {
+  os << "VnodeConnectionOptions{ flags: " << fidl::ostream::Formatted(options.flags)
+     << ", rights: " << fidl::ostream::Formatted(options.rights) << "}";
+  return os;
+}
 
-void Log(std::string_view buffer) { std::cerr << buffer << std::endl; }
-
-}  // namespace fs::debug_internal
+#endif
