@@ -91,10 +91,6 @@ core_shard("core-shard") {
   shard_file = "meta/bt-init.core_shard.cml"
 }
 
-core_shard("fastpair-core-shard") {
-  shard_file = "meta/bt-fastpair.core_shard.cml"
-}
-
 fuchsia_unittest_package("tests") {
   component_name = "bt-init-unittests"
   package_name = "bt-init-unittests"
