@@ -1,7 +1,7 @@
 [
     {
         "device": {
-            "fuchsia.BIND_FIDL_PROTOCOL": "fuchsia.bluetooth.BIND_FIDL_PROTOCOL.DEVICE"
+            "fuchsia.hardware.bluetooth.HciService": "fuchsia.hardware.bluetooth.HciService.ZirconTransport"
         },
         "expected": "abort",
         "name": "Incorrect_Protocol"

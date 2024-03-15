@@ -82,14 +82,14 @@ Proto    : ZX_PROTOCOL_I2C (24)
 3 Properties
 [ 1/  3] : Key fuchsia.BIND_I2C_BUS_ID        Value 0x000001
 [ 2/  3] : Key fuchsia.BIND_I2C_ADDRESS       Value 0x000038
-[ 3/  3] : Key fuchsia.BIND_FIDL_PROTOCOL     Value 0x000003
+[ 3/  3] : Key "fuchsia.hardware.i2c.Service" Value "fuchsia.hardware.i2c.Service.ZirconTransport"
 ```
 
 From the dump, the node properties are:
 
 *   `fuchsia.I2C_BUS_ID` = 0x01
 *   `fuchsia.I2C_ADDRESS` = 0x38
-*   `fuchsia.FIDL_PROTOCOL` = 0x03
+*   `fuchsia.hardware.i2c.Service` = fuchsia.hardware.i2c.Service.ZirconTransport
 
 The property values can be searched through bind libraries (for example, the
 bind libraries in [src/devices/bind](/src/devices/bind)). In this example. since
@@ -99,10 +99,6 @@ the node is an I2C node, the property values are found in
 *fuchsia.i2c.bind*
 
 ```
-extend uint fuchsia.BIND_FIDL_PROTOCOL {
-  DEVICE = 3,
-};
-
 extend uint fuchsia.BIND_I2C_BUS_ID {
   I2C_A0_0 = 0,
   I2C_2 = 1,
@@ -121,6 +117,12 @@ extend uint fuchsia.BIND_I2C_ADDRESS {
   TI_INA231_MLB_PROTO = 0x46,
 };
 ```
+
+We also generate bind libraries from FIDL libraries, which is where the entry for
+`fuchsia.hardware.i2c.Service` and its value `fuchsia.hardware.i2c.Service.ZirconTransport`
+comes from. See
+[generated-bind-libraries](/docs/development/drivers/tutorials/fidl-tutorial.md#generated-bind-libraries)
+for more info.
 
 This lets us remap the node properties to:
 
@@ -331,10 +333,10 @@ Node 0    : None
   [ 3/ 3] : Key "fuchsia.BIND_PLATFORM_DEV_DID"   Value 0x000001
 Node 1    : None
   2 Bind Rules
-  [ 1/ 2] : Accept "fuchsia.BIND_FIDL_PROTOCOL" { 0x000003 }
-  [ 2/ 2] : Accept "fuchsia.BIND_I2C_ADDRESS" { 0x00002C }
+  [ 1/ 2] : Accept "fuchsia.hardware.i2c.Service" { "fuchsia.hardware.i2c.Service.ZirconTransport" }
+  [ 2/ 2] : Accept "fuchsia.BIND_I2C_ADDRESS"     { 0x00002C }
   2 Properties
-  [ 1/ 2] : Key "fuchsia.BIND_FIDL_PROTOCOL"   Value 0x000003
+  [ 1/ 2] : Key "fuchsia.hardware.i2c.Service" Value "fuchsia.hardware.i2c.Service.ZirconTransport"
   [ 2/ 2] : Key "fuchsia.BIND_I2C_ADDRESS"     Value 0x00002C
 }
 ```
@@ -604,11 +606,11 @@ Driver    : fuchsia-boot:///#meta/focaltech.cm
 Nodes     : 2
 Node 0    : "i2c" (Primary)
   3 Bind Rules
-  [ 1/ 3] : Accept "fuchsia.BIND_FIDL_PROTOCOL" { 0x000003 }
+  [ 1/ 3] : Accept "fuchsia.hardware.i2c.Service" { "fuchsia.hardware.i2c.Service.ZirconTransport" }
   [ 2/ 3] : Accept "fuchsia.BIND_I2C_BUS_ID" { 0x000001 }
   [ 3/ 3] : Accept "fuchsia.BIND_I2C_ADDRESS" { 0x000038 }
   2 Properties
-  [ 1/ 2] : Key "fuchsia.BIND_FIDL_PROTOCOL"   Value 0x000003
+  [ 1/ 2] : Key "fuchsia.hardware.i2c.Service" Value "fuchsia.hardware.i2c.Service.ZirconTransport"
   [ 2/ 2] : Key "fuchsia.BIND_I2C_ADDRESS"     Value 0x000038
 Node 1    : "gpio-int"
   2 Bind Rules
@@ -628,11 +630,11 @@ Driver    : None
 Nodes     : 2
 Node 0    : None
   3 Bind Rules
-  [ 1/ 3] : Accept "fuchsia.BIND_FIDL_PROTOCOL" { 0x000003 }
+  [ 1/ 3] : Accept "fuchsia.hardware.i2c.Service" { "fuchsia.hardware.i2c.Service.ZirconTransport" }
   [ 2/ 3] : Accept "fuchsia.BIND_I2C_BUS_ID" { 0x000001 }
   [ 3/ 3] : Accept "fuchsia.BIND_I2C_ADDRESS" { 0x000038 }
   1 Properties
-  [ 1/ 2] : Key "fuchsia.BIND_FIDL_PROTOCOL"   Value 0x000003
+  [ 1/ 2] : Key "fuchsia.hardware.i2c.Service" Value "fuchsia.hardware.i2c.Service.ZirconTransport"
   [ 2/ 2] : Key "fuchsia.BIND_I2C_ADDRESS"     Value 0x000038
 Node 1    : None
   2 Bind Rules

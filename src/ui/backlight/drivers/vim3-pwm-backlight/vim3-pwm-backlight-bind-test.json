@@ -43,7 +43,7 @@
                 "name": "protocol",
                 "expected": "abort",
                 "device": {
-                    "fuchsia.BIND_FIDL_PROTOCOL": "fuchsia.i2c.BIND_FIDL_PROTOCOL.SERVICE",
+                    "fuchsia.hardware.i2c.Service": "fuchsia.hardware.i2c.Service.ZirconTransport",
                     "fuchsia.gpio.FUNCTION": "fuchsia.gpio.FUNCTION.LCD_BACKLIGHT_ENABLE"
                 }
             },

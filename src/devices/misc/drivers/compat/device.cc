@@ -57,26 +57,6 @@ fidl::StringView ProtocolIdToClassName(uint32_t protocol_id) {
   return {};
 }
 
-std::optional<fdf::wire::NodeProperty> fidl_offer_to_device_prop(fidl::AnyArena& arena,
-                                                                 const char* fidl_offer) {
-  static const std::unordered_map<std::string_view, uint32_t> kPropMap = {
-#define DDK_FIDL_PROTOCOL_DEF(tag, val, name) \
-  {                                           \
-      name,                                   \
-      val,                                    \
-  },
-#include <lib/ddk/fidl-protodefs.h>
-  };
-
-  auto prop = kPropMap.find(fidl_offer);
-  if (prop == kPropMap.end()) {
-    return std::nullopt;
-  }
-
-  auto& [key, value] = *prop;
-  return fdf::MakeProperty(arena, BIND_FIDL_PROTOCOL, value);
-}
-
 template <typename T>
 bool HasOp(const zx_protocol_device_t* ops, T member) {
   return ops != nullptr && ops->*member != nullptr;
@@ -155,21 +135,6 @@ std::vector<fuchsia_driver_framework::wire::NodeProperty> CreateProperties(
       default:
         FDF_LOGL(ERROR, logger, "Unsupported property type, key: %s", key);
         break;
-    }
-  }
-
-  for (auto value : cpp20::span(zx_args->fidl_service_offers, zx_args->fidl_service_offer_count)) {
-    auto property = fidl_offer_to_device_prop(arena, value);
-    if (property) {
-      properties.push_back(*property);
-    }
-  }
-
-  for (auto value :
-       cpp20::span(zx_args->runtime_service_offers, zx_args->runtime_service_offer_count)) {
-    auto property = fidl_offer_to_device_prop(arena, value);
-    if (property) {
-      properties.push_back(*property);
     }
   }
 

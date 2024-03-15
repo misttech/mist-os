@@ -17,6 +17,7 @@ uint BIND_AUTOBIND;
 uint BIND_COMPOSITE;
 
 // Primary FIDL protocol of the device.
+// This is now DEPRECATED. Please use fidl service based bind properties.
 uint BIND_FIDL_PROTOCOL;
 
 // PCI bind properties.

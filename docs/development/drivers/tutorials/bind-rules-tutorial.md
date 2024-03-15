@@ -158,7 +158,6 @@ The integer key names are defined in `binding_priv.h` and are prefixed with “f
 #define BIND_PROTOCOL 0x0001       // primary protocol of the device
 #define BIND_AUTOBIND 0x0002       // if this is an automated bind/load
 #define BIND_COMPOSITE 0x003       // Whether this is a composite device
-#define BIND_FIDL_PROTOCOL 0x0004  // primary FIDL protocol of the device
 ```
 
 ### Property values

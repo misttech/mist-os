@@ -36,13 +36,16 @@ __BEGIN_CDECLS
 // flags are initially zero, may be set/cleared with SET/CLEAR
 // flags may be tested by comparison against BIND_FLAGS
 
-#define BINDINST(c, o, a, b, v) \
-  { (((c)&0xF) << 28) | (((o)&0xF) << 24) | (((a)&0xFF) << 16) | ((b)&0xFFFF), (v), 0 /* debug */ }
+#define BINDINST(c, o, a, b, v)                                                             \
+  {                                                                                         \
+    (((c) & 0xF) << 28) | (((o) & 0xF) << 24) | (((a) & 0xFF) << 16) | ((b) & 0xFFFF), (v), \
+        0 /* debug */                                                                       \
+  }
 
 #define BINDINST_CC(n) ((n) >> 28)
 #define BINDINST_OP(n) (((n) >> 24) & 0xF)
 #define BINDINST_PA(n) (((n) >> 16) & 0xFF)
-#define BINDINST_PB(n) ((n)&0xFFFF)
+#define BINDINST_PB(n) ((n) & 0xFFFF)
 
 #define BI_ABORT() BINDINST(COND_AL, OP_ABORT, 0, 0, 0)
 #define BI_MATCH() BINDINST(COND_AL, OP_MATCH, 0, 0, 0)
@@ -58,11 +61,10 @@ __BEGIN_CDECLS
 
 // LINT.IfChange
 // global binding variables at 0x00XX
-#define BIND_FLAGS 0x0000          // value of the flags register
-#define BIND_PROTOCOL 0x0001       // primary protocol of the device
-#define BIND_AUTOBIND 0x0002       // if this is an automated bind/load
-#define BIND_COMPOSITE 0x003       // Whether this is a composite device
-#define BIND_FIDL_PROTOCOL 0x0004  // primary FIDL protocol of the device
+#define BIND_FLAGS 0x0000     // value of the flags register
+#define BIND_PROTOCOL 0x0001  // primary protocol of the device
+#define BIND_AUTOBIND 0x0002  // if this is an automated bind/load
+#define BIND_COMPOSITE 0x003  // Whether this is a composite device
 
 // pci binding variables at 0x01XX
 #define BIND_PCI_VID 0x0100

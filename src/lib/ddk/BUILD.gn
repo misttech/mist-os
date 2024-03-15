@@ -28,7 +28,6 @@ sdk_static_library("ddk") {
     "include/lib/ddk/debug.h",
     "include/lib/ddk/device.h",
     "include/lib/ddk/driver.h",
-    "include/lib/ddk/fidl-protodefs.h",
     "include/lib/ddk/hw/arch_ops.h",
     "include/lib/ddk/hw/inout.h",
     "include/lib/ddk/io-buffer.h",
@@ -39,10 +38,7 @@ sdk_static_library("ddk") {
   ]
 
   # These headers will error out if included directly from user code.
-  sdk_headers_for_internal_use = [
-    "include/lib/ddk/protodefs.h",
-    "include/lib/ddk/fidl-protodefs.h",
-  ]
+  sdk_headers_for_internal_use = [ "include/lib/ddk/protodefs.h" ]
 
   if (is_fuchsia) {
     sources = [
