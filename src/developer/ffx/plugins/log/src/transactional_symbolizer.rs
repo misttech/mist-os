@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use anyhow::{Context, Error};
-use diagnostics_data::LogsData;
 use ffx_config::global_env_context;
 use futures::{ready, select, FutureExt, Stream, StreamExt};
 use log_command::log_formatter::{LogData, LogEntry, Symbolize};
@@ -72,6 +71,7 @@ where
     state: LocalOrderedMutex<SymbolizerState<T>>,
     /// Woken when a line is available from the device.
     line_available_event: LocalConditionVariable,
+    disabled: Cell<bool>,
 }
 
 #[async_trait::async_trait(?Send)]
@@ -82,7 +82,20 @@ where
     T: SymbolizerProcess + 'static,
 {
     async fn symbolize(&self, entry: LogEntry) -> Option<LogEntry> {
-        self.symbolize_internal(entry).await.map(|value| Some(value)).unwrap_or(None)
+        if self.disabled.get() {
+            return Some(entry);
+        }
+        let LogEntry { timestamp, data } = entry;
+        match self.symbolize_internal(LogEntry { timestamp, data }).await {
+            Ok(entry) => Some(entry),
+            Err(ReadError::EmptyOutputFromSymbolizer) => None,
+            Err(error) => {
+                self.disabled.set(true);
+                let error = error.to_string();
+                eprintln!("Internal symbolizer error: {error}. Symbolization has been disabled.");
+                Some(LogEntry { timestamp, data: LogData::MalformedTargetLog(error) })
+            }
+        }
     }
 }
 
@@ -299,18 +312,18 @@ where
             )),
             current_transaction_id: Cell::new(0),
             line_available_event: LocalConditionVariable::new(),
+            disabled: Cell::new(false),
         })
     }
 
-    async fn symbolize_internal(&self, entry: LogEntry) -> Result<LogEntry, ReadError> {
+    async fn symbolize_internal(&self, mut entry: LogEntry) -> Result<LogEntry, ReadError> {
         // Get a transaction ID, later these will be generated on-device
         // and then translated to global IDs once devices support transactional logs.
         let id = self.current_transaction_id.get();
         self.current_transaction_id.set(id + 1);
 
         // Encode incoming log into transactional log and write to symbolizer
-        let timestamp = entry.timestamp;
-        let target_log: LogsData = entry.data.take_target_log().ok_or(ReadError::NoTargetLog)?;
+        let target_log = entry.data.as_target_log_mut().ok_or(ReadError::NoTargetLog)?;
         self.pending_lines.borrow_mut().push_back(format!(
             "TXN:{id}:\n{}\nTXN-COMMIT:{id}:COMMIT\n",
             UnescapedMessage::from(Cow::from(target_log.msg().unwrap_or("").to_string()))
@@ -340,8 +353,19 @@ where
         // The TXN ID we get from the symbolizer should always match the expected TXN.
         assert_eq!(txn_id, id);
         let msg = EscapedMessage::from(msg.as_str()).unescape().to_string();
-        let new_entry = LogEntry { timestamp, data: LogData::SymbolizedTargetLog(target_log, msg) };
-        Ok(new_entry)
+        // Message wasn't changed by the symbolizer.
+        if msg == target_log.msg().unwrap_or("") {
+            return Ok(entry);
+        }
+        // Message was changed by the symbolizer and is empty,
+        // omit the message to avoid printing an extra newline.
+        if msg.is_empty() {
+            return Err(ReadError::EmptyOutputFromSymbolizer);
+        }
+        *target_log
+            .msg_mut()
+            .expect("if a symbolized message is provided then the payload has a message") = msg;
+        Ok(entry)
     }
 
     /// Writes pending lines to the symbolizer
@@ -376,6 +400,10 @@ pub enum ReadError {
     NoStdin,
     #[error("Failed to take stdout")]
     NoStdout,
+    #[error("Not an error -- empty symbolizer output")]
+    EmptyOutputFromSymbolizer,
+    #[error("Unexpected message received before a valid transaction ID")]
+    UnexpectedMessageOutsideTransaction,
 }
 
 #[derive(Debug)]
@@ -409,7 +437,7 @@ impl<'a> TransactionReader<'a> {
         match (state, msg.is_txn_commit, msg.transaction_id) {
             // Not in transaction, no TXN ID to associate with
             (TransactionState::Start, false, None) | (TransactionState::Start, true, _) => {
-                unreachable!("Unexpected message received before a valid transaction ID")
+                Err(ReadError::UnexpectedMessageOutsideTransaction)
             }
             // Not in transaction, first message containing TXN ID
             (TransactionState::Start, false, Some(txn_id)) => {
@@ -651,7 +679,7 @@ mod tests {
                 .build(),
             ),
         };
-        let txn_data = assert_matches!(txn.data.as_target_log(), Some(value) => value).clone();
+        let mut txn_data = assert_matches!(txn.data.as_target_log(), Some(value) => value).clone();
         let txn_2 = LogEntry {
             timestamp: 1.into(),
             data: LogData::TargetLog(
@@ -667,7 +695,8 @@ mod tests {
                 .build(),
             ),
         };
-        let txn_data_2 = assert_matches!(txn_2.data.as_target_log(), Some(value) => value).clone();
+        let mut txn_data_2 =
+            assert_matches!(txn_2.data.as_target_log(), Some(value) => value).clone();
         let (stdin_sender, stdin_receiver) = duplex(DUPLEX_BUFFER_SIZE);
         let (mut stdout_sender, stdout_receiver) = duplex(DUPLEX_BUFFER_SIZE);
         let symbolizer = assert_matches!(
@@ -687,13 +716,12 @@ mod tests {
         // TXN 1 shouldn't be completed
         assert_eq!(fake_waker.clone().poll_while_woke(symbolize_task_1.as_mut()), Poll::Pending);
         // TXN 0 should be completed
+        // Hello world!\n\n\nTest line 2\nTXN:0:nothing
+        *txn_data.msg_mut().unwrap() = "Hello world!\n\n\nTest line 2\nTXN:0:nothing".into();
         assert_eq!(
             fake_waker.clone().poll_while_woke(symbolize_task_0.as_mut()),
             Poll::Ready(Some(LogEntry {
-                data: LogData::SymbolizedTargetLog(
-                    txn_data.clone(),
-                    "Hello world!\n\n\nTest line 2\nTXN:0:nothing".into()
-                ),
+                data: LogData::TargetLog(txn_data.clone()),
                 timestamp: Timestamp::from(0),
             }))
         );
@@ -708,12 +736,128 @@ mod tests {
         );
 
         // TXN 1 should have completed
+        // Hello world 2!
+        *txn_data_2.msg_mut().unwrap() = "Hello world 2!".into();
         assert_eq!(
             fake_waker.clone().poll_while_woke(symbolize_task_1.as_mut()),
             Poll::Ready(Some(LogEntry {
-                data: LogData::SymbolizedTargetLog(txn_data_2.clone(), "Hello world 2!".into()),
+                data: LogData::TargetLog(txn_data_2.clone()),
                 timestamp: Timestamp::from(1),
             }))
+        );
+    }
+
+    #[fuchsia::test]
+    async fn read_transacted_malformed_input_test() {
+        let fake_waker = Arc::new(FakeWaker::default());
+        let txn = LogEntry {
+            timestamp: 0.into(),
+            data: LogData::TargetLog(
+                LogsDataBuilder::new(BuilderArgs {
+                    component_url: Some("ffx".into()),
+                    moniker: "ffx".into(),
+                    severity: Severity::Info,
+                    timestamp_nanos: Timestamp::from(0),
+                })
+                .set_pid(1)
+                .set_tid(2)
+                .set_message("Hello world!")
+                .build(),
+            ),
+        };
+        let txn_2 = LogEntry {
+            timestamp: 1.into(),
+            data: LogData::TargetLog(
+                LogsDataBuilder::new(BuilderArgs {
+                    component_url: Some("ffx".into()),
+                    moniker: "ffx".into(),
+                    severity: Severity::Info,
+                    timestamp_nanos: Timestamp::from(1),
+                })
+                .set_pid(1)
+                .set_tid(2)
+                .set_message("Not symbolized")
+                .build(),
+            ),
+        };
+        let txn_2_clone = txn_2.clone();
+        let (stdin_sender, stdin_receiver) = duplex(DUPLEX_BUFFER_SIZE);
+        let (mut stdout_sender, stdout_receiver) = duplex(DUPLEX_BUFFER_SIZE);
+        let symbolizer = assert_matches!(
+            TransactionalSymbolizer::new(FakeProcess::new(stdin_sender, stdout_receiver)),
+            Ok(value) => value
+        );
+        let mut symbolize_task_0 = symbolizer.symbolize(txn);
+        let mut symbolize_task_1 = symbolizer.symbolize(txn_2);
+        // Task should be pending initially.
+        assert_eq!(fake_waker.clone().poll_while_woke(symbolize_task_0.as_mut()), Poll::Pending);
+        let mut reader = BufReader::new(stdin_receiver).lines();
+        // Read the output from the device
+        assert_matches!(reader.next_line().await, Ok(Some(value)) if value == "TXN:0:");
+        assert_matches!(reader.next_line().await, Ok(Some(value)) if value == "Hello world!");
+        assert_matches!(
+            stdout_sender.write_all("this is invalid input\n".as_bytes()).await,
+            Ok(())
+        );
+        // TXN should complete with error
+        assert_eq!(
+            fake_waker.clone().poll_while_woke(symbolize_task_0.as_mut()),
+            Poll::Ready(Some(LogEntry {
+                data: LogData::MalformedTargetLog(
+                    "Unexpected message received before a valid transaction ID".into()
+                ),
+                timestamp: Timestamp::from(0),
+            }))
+        );
+        // Symbolizer should be disabled by the error
+        assert_eq!(
+            fake_waker.clone().poll_while_woke(symbolize_task_1.as_mut()),
+            Poll::Ready(Some(txn_2_clone))
+        );
+    }
+
+    #[fuchsia::test]
+    async fn read_transacted_should_discard_empty_lines_test() {
+        let fake_waker = Arc::new(FakeWaker::default());
+        let txn = LogEntry {
+            timestamp: 0.into(),
+            data: LogData::TargetLog(
+                LogsDataBuilder::new(BuilderArgs {
+                    component_url: Some("ffx".into()),
+                    moniker: "ffx".into(),
+                    severity: Severity::Info,
+                    timestamp_nanos: Timestamp::from(0),
+                })
+                .set_pid(1)
+                .set_tid(2)
+                .set_message("Hello world!")
+                .build(),
+            ),
+        };
+        let (stdin_sender, stdin_receiver) = duplex(DUPLEX_BUFFER_SIZE);
+        let (mut stdout_sender, stdout_receiver) = duplex(DUPLEX_BUFFER_SIZE);
+        let symbolizer = assert_matches!(
+            TransactionalSymbolizer::new(FakeProcess::new(stdin_sender, stdout_receiver)),
+            Ok(value) => value
+        );
+        let mut symbolize_task_0 = symbolizer.symbolize(txn);
+        // Task should be pending initially.
+        assert_eq!(fake_waker.clone().poll_while_woke(symbolize_task_0.as_mut()), Poll::Pending);
+        let mut reader = BufReader::new(stdin_receiver).lines();
+        // Read the output from the device
+        assert_matches!(reader.next_line().await, Ok(Some(value)) if value == "TXN:0:");
+        assert_matches!(reader.next_line().await, Ok(Some(value)) if value == "Hello world!");
+        assert_matches!(
+            stdout_sender.write_all("TXN:0:ignored\nTXN-COMMIT:0:end\n".as_bytes()).await,
+            Ok(())
+        );
+        // TXN should discard the log message (this matches
+        // previous behavior in log_formatter for empty symbolized messages).
+        // The symbolizer sends an empty line when given an input to indicate
+        // the message should be discarded.
+        assert_eq!(
+            fake_waker.clone().poll_while_woke(symbolize_task_0.as_mut()),
+            Poll::Ready(None)
         );
     }
 

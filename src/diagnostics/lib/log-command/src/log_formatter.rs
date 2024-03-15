@@ -69,7 +69,7 @@ impl LogData {
         }
     }
 
-    pub fn take_target_log(self) -> Option<LogsData> {
+    pub fn as_target_log_mut(&mut self) -> Option<&mut LogsData> {
         match self {
             LogData::TargetLog(log) => Some(log),
             _ => None,
