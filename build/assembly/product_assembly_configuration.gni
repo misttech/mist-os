@@ -2,6 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/assembly/product_assembly_config_file_impl.gni")
 import("//build/group_with_inputs.gni")
 
 # Create a product assembly config file from the lists of packages and config
@@ -75,6 +76,11 @@ template("product_assembly_configuration") {
     target_name = target_name
 
     assembly_config = "${target_name}.product_assembly_config.json"
+
+    # This is a second target created by the product_assembly_config_file()
+    # template that wraps up all the input file labels found in the product and
+    # platform config with the deps that are passed to this template.
+    assembly_config_inputs = "${assembly_config}.inputs"
 
     # This is a publicly visible, test-only target, that allows the assembly
     # config to be used without needing the deps used create it.
@@ -278,215 +284,6 @@ template("product_assembly_configuration") {
     }
   }
 
-  # Platform configuration schema fields that are paths to files.  These need to
-  # be tracked as GN action `inputs`.
-  #
-  # Each is a path to a 'node' in the schema, and then a list of field names on
-  # that node:
-  #
-  #  platform: {
-  #    foo: {
-  #      bar: {
-  #        field: "../../path/to/source/filename.json"
-  #      }
-  #    }
-  #  }
-  #
-  # is the following:
-  #
-  #  {
-  #    node_path = "foo.bar"
-  #    items = [ "field" ]
-  #  }
-  #
-  # These paths need to be present in the generated assembly configuration json
-  # file as _rebased_ paths.  In the example above, the GN label in GN for that
-  # file is: `//path/to/source/filename.json`
-  #
-  # Assembly runs in a root_build_dir such as `//out/default`, and so the
-  # rebased path from the root_build_dir to the file is
-  # `../../path/to/source/filename.json`
-  #
-  # The GN label for the file needs to be passed to GN in the `inputs` list for
-  # the `target_name` action defined by this template (below).
-  #
-  # However, because GN doesn't allow us to set the value of a variable in a
-  # scope using the `scope_name[var_name]` syntax, only read it, we cannot do
-  # any sort of programmatic field replacement, at least not without hard-coded
-  # logic that's repeated for each field (which prior versions of this file did
-  # when there was only field to deal with), e.g.:
-  #
-  #  _p = invoker.platform
-  #
-  #  # platform configuration with rebased contents:
-  #  _new_platform_config = {
-  #    forward_variables_from(_p, "*", [ "foo" ])
-  #    if (defined(_p.foo)) {
-  #      _foo = _p.foo
-  #
-  #      # 'foo' with rebased contents:
-  #      foo = {
-  #        forward_variables_from(_p.foo, "*", ["bar"])
-  #
-  #        if (defined(_foo.bar)) {
-  #          _bar = _foo.bar
-  #
-  #          # 'bar' with rebased contents:
-  #          bar = {
-  #            forward_variables_from(_bar, "*", ["field"])
-  #            if (defined(_bar.field)) {
-  #              field = rebase_path(_bar.field, root_build_dir)
-  #            }
-  #          }
-  #        }
-  #      }
-  #    }
-  #  }
-  #
-  # The original invoker.platform scope would need to be carefully reconstructed
-  # at every level using this pattern of forwarding variables that weren't part
-  # of the newly-constructed ones, and then assigning the newly-constructed ones
-  # to the appropriate variables in each of the nested scopes.
-
-  config_file_potential_inputs = [
-    {
-      node_path = "platform.ui"
-      fields = [ "sensor_config" ]
-    },
-    {
-      node_path = "platform.development_support"
-      fields = [
-        "authorized_ssh_keys_path",
-        "authorized_ssh_ca_certs_path",
-      ]
-    },
-    {
-      node_path = "product.component_policy"
-      fields = [ "product_policies" ]
-      is_list = true
-    },
-    {
-      node_path = "platform.diagnostics.sampler"
-      fields = [
-        "fire_configs",
-        "metrics_configs",
-      ]
-      is_list = true
-    },
-    {
-      node_path = "platform.forensics.cobalt"
-      fields = [ "registry" ]
-    },
-    {
-      node_path = "platform.storage.component_id_index"
-      fields = [ "product_index" ]
-    },
-    {
-      node_path = "platform.connectivity.network"
-      fields = [ "netcfg_config_path" ]
-    },
-    {
-      node_path = "product.build_info"
-      fields = [
-        "version",
-        "jiri_snapshot",
-        "latest_commit_date",
-        "minimum_utc_stamp",
-      ]
-    },
-  ]
-
-  # The assembly configuration
-  config_inputs = []
-
-  _config = {
-    if (defined(invoker.platform)) {
-      platform = invoker.platform
-    }
-    if (defined(invoker.product)) {
-      product = invoker.product
-    }
-  }
-
-  # Iterate over each item in the list above.
-  foreach(potential_input, config_file_potential_inputs) {
-    _node = {
-    }
-    _node = _config
-
-    # Since we can't use recursion, iteratively change `_node` to the next
-    # child in the path, e.g. 'foo', then 'bar'.  The `continue` var is used
-    # to signal that some node along the path has been omitted, and this will
-    # be a no-op for the rest of the iteration (since it can't exit early)
-    _continue = true
-    foreach(_node_name, string_split(potential_input.node_path, ".")) {
-      if (_continue && defined(_node[_node_name])) {
-        # because GN will not let you replace a non-empty scope, this does a
-        # little workaround to what would be the following, if it was allowed:
-        #
-        #  _node = _node[_node_name]
-        #
-        # Instead, we need to create a _next_node temporary to hold the next
-        # node, but even that temporary lives across iterations of the loop,
-        # and must be reset to an empty scope before re-assigning to it.
-        #
-
-        # Clear the previous _next_node, and then cache the next node to look
-        # at in _next_node.
-        _next_node = {
-        }
-        _next_node = _node[_node_name]
-
-        # Clear the _node var, so that we can assign _next_node to it.
-        _node = {
-        }
-        _node = _next_node
-      } else {
-        # The node wasn't found, so do nothing for the rest of the iteration.
-        _continue = false
-      }
-    }
-
-    # 'continue' will still be true if the all the nodes in the path were
-    # found.
-    if (_continue) {
-      foreach(_field_name, potential_input.fields) {
-        if (defined(_node[_field_name])) {
-          _file_paths = []
-          if (defined(potential_input.is_list) && potential_input.is_list) {
-            _file_paths += _node[_field_name]
-          } else {
-            _file_paths += [ _node[_field_name] ]
-          }
-
-          # Here the rebased path is converted back in to an absolute GN
-          # file label, from the GN root dir `//`:
-          #
-          # ../../path/to/filename.json
-          #
-          # becomes:
-          #
-          # //path/to/filename.json
-          #
-          # and if a file in root_build_dir:
-          #
-          # path/to/filename.json
-          #
-          # it becomes (for `root_build_dir` == "//out/default"):
-          #
-          # //out/default/path/to/filename.json
-          #
-          # And the resultant (non-rebased) path can be used in the GN
-          # action's `inputs` list
-          foreach(_file_path, _file_paths) {
-            _gn_path = "//" + rebase_path(_file_path, "//", root_build_dir)
-            config_inputs += [ _gn_path ]
-          }
-        }
-      }
-    }
-  }
-
   _assembly_config = {
     # Create the platform configuration section from the caller's argument
     platform = invoker.platform
@@ -512,18 +309,28 @@ template("product_assembly_configuration") {
 
   # Generate the Product Assembly configuration file itself.
   #
-  # This does _not_ have deps on any of the passed in targets, which is why it
-  # restricts it's visibility to the target that does dep on them.
+  # While deps are passed to this, the target created with the target_name does
+  # depend on those deps, but creates a separate target (suffixed with
+  # `.inputs`) that wraps up the input labels and the dependencies.  This needs
+  # to be depended-upon by this template's `target_name`, with the validator
+  # target that's created depending on this file here, _without_ depending on
+  # the inputs and deps, so that the validation target can use the json file for
+  # textual comparison but without having the burden of all the compilation deps
+  # of this template.
   #
-  generated_file(labels.assembly_config) {
-    forward_variables_from(invoker, [ "testonly" ])
+  product_assembly_config_file(labels.assembly_config) {
+    forward_variables_from(invoker,
+                           [
+                             "deps",
+                             "public_deps",
+                             "testonly",
+                           ])
     visibility = [
       ":${labels.assembly_config_for_validation}",
       ":${labels.target_name}",
     ]
     outputs = [ files.assembly_config_file ]
-    output_conversion = "json"
-    contents = _assembly_config
+    product_assembly_config = _assembly_config
   }
 
   # These are used to detect if the deps don't correspond to a set of input
@@ -577,11 +384,9 @@ template("product_assembly_configuration") {
     deps = labels.cache_package_config_data_deps
   }
 
-  group_with_inputs(labels.target_name) {
+  group(labels.target_name) {
     forward_variables_from(invoker,
                            [
-                             "deps",
-                             "public_deps",
                              "inputs",
                              "testonly",
                              "visibility",
@@ -591,19 +396,18 @@ template("product_assembly_configuration") {
     }
     public_deps += [ ":${labels.assembly_config}" ]
 
-    if (!defined(inputs)) {
-      inputs = []
-    }
-
-    # Add any inputs found by looking at the known config schema items
-    # that contain paths to files, so that they are guaranteed to be added to
-    # the ninja deps for the product assembly configuration.
-    inputs += config_inputs
-
     if (!defined(deps)) {
       deps = []
     }
     deps += [
+      # Add the group of inputs found by looking at the known config schema
+      # items that contain paths to files, so that they are guaranteed to be
+      # added to the ninja deps for the product assembly configuration.
+      ":${labels.assembly_config_inputs}",
+
+      # Add the groups of package manifests that validate that each set of
+      # package labels contain labels that produce package manifests in the
+      # expected location.
       ":${labels.base_driver_package_set}",
       ":${labels.base_package_config_data}",
       ":${labels.base_package_set}",
