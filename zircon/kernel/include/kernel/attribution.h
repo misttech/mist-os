@@ -117,40 +117,6 @@ class AttributionObject : public fbl::RefCounted<AttributionObject>, public Attr
   void AddToGlobalListWithKoid(AttributionObjectNode* where, zx_koid_t owning_koid)
       TA_EXCL(AllAttributionObjectsLock::Get());
 
-  // Increment allocation counters by `page_count`.
-  // total_resident_pages_allocated_ is unconditionally incremented.
-  // private_resident_pages_allocated_ is only incremented when
-  // `is_shared` is false.
-  void AddPages(size_t page_count, bool is_shared) TA_EXCL(seq_lock_) {
-    SeqLockGuard<ExclusiveIrqSave> guard{&seq_lock_};
-    Stats stats = stats_.unsynchronized_get();
-
-    stats.total_resident_pages_allocated_ += page_count;
-
-    if (!is_shared) {
-      stats.private_resident_pages_allocated_ += page_count;
-    }
-
-    stats_.Update(stats);
-  }
-
-  // Increment deallocation counters by page_count.
-  // total_resident_pages_deallocated_ is unconditionally incremented.
-  // private_resident_pages_deallocated_ is only incremented when
-  // `is_shared` is false.
-  void RemovePages(size_t page_count, bool is_shared) TA_EXCL(seq_lock_) {
-    SeqLockGuard<ExclusiveIrqSave> guard{&seq_lock_};
-    Stats stats = stats_.unsynchronized_get();
-
-    stats.total_resident_pages_deallocated_ += page_count;
-
-    if (!is_shared) {
-      stats.private_resident_pages_deallocated_ += page_count;
-    }
-
-    stats_.Update(stats);
-  }
-
   zx_info_memory_attribution_t ToInfoEntry() const TA_EXCL(seq_lock_) {
     Stats stats;
 
