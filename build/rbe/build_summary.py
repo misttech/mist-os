@@ -17,9 +17,7 @@ import textpb
 from pathlib import Path
 from typing import Any, Dict, Iterable, Optional, Sequence, Tuple
 
-_SCRIPT_BASENAME = os.path.basename(__file__)
-# This script lives at _PROJECT_ROOT/build/rbe/{__file__}.
-_PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+_SCRIPT = Path(__file__)
 
 
 def _main_arg_parser() -> argparse.ArgumentParser:
@@ -229,6 +227,10 @@ def main(argv: Sequence[str]) -> int:
     )
 
     # Render multi-table.
+    script_rel = os.path.relpath(str(_SCRIPT), start=os.curdir)
+    print(
+        f"=== Remote build summary (from: {script_rel} {args.reproxy_logdir})"
+    )
     for row in tablefmt.format_numeric_table(joint_table):
         print(row)
 

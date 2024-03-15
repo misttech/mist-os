@@ -29,7 +29,6 @@ readonly config="$script_dir"/fuchsia-reproxy.cfg
 readonly PREBUILT_SUBDIR="$PREBUILT_OS"-"$PREBUILT_ARCH"
 
 readonly build_summary_script="$script_dir"/build_summary.py
-readonly build_summary_script_rel=$(relpath . "$build_summary_script")
 
 # location of reclient binaries relative to output directory where build is run
 reclient_bindir="$project_root_rel"/prebuilt/proprietary/third_party/reclient/"$PREBUILT_SUBDIR"
@@ -148,7 +147,6 @@ mkdir -p "$logs_root"
 # 'mktemp -p' still yields to TMPDIR in the environment (bug?),
 # so override TMPDIR instead.
 readonly reproxy_logdir="$(env TMPDIR="$logs_root" mktemp -d -t "reproxy.$date.XXXX")"
-readonly reproxy_logdir_rel=$(relpath . "$reproxy_logdir")
 readonly log_base="${reproxy_logdir##*/}"  # basename
 
 readonly _fake_tmpdir="$(mktemp -u)"
@@ -320,7 +318,6 @@ shutdown() {
   cleanup
 
   [[ "${FX_BUILD_RBE_STATS-NOT_SET}" == "NOT_SET" ]] || {
-    echo "=== Remote build summary (from: $build_summary_script_rel $reproxy_logdir_rel)"
     "$python" -S "$build_summary_script" "$reproxy_logdir"
   }
 
