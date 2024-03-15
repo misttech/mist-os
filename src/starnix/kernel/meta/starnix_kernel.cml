@@ -40,6 +40,11 @@
             path: "/dev/class/gpu",
         },
         {
+            directory: "dev-adb",
+            rights: [ "r*" ],
+            path: "/dev/class/adb",
+        },
+        {
             directory: "container_config",
             from: "parent",
             rights: [ "r*" ],

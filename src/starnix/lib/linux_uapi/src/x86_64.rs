@@ -15659,14 +15659,14 @@ pub const usb_functionfs_event_type_FUNCTIONFS_SUSPEND: usb_functionfs_event_typ
 pub const usb_functionfs_event_type_FUNCTIONFS_RESUME: usb_functionfs_event_type = 6;
 pub type usb_functionfs_event_type = crate::types::c_uint;
 #[repr(C, packed)]
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
 pub struct usb_functionfs_event {
     pub u: usb_functionfs_event__bindgen_ty_1,
     pub type_: __u8,
     pub _pad: [__u8; 3usize],
 }
 #[repr(C, packed)]
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
 pub union usb_functionfs_event__bindgen_ty_1 {
     pub setup: usb_ctrlrequest,
 }

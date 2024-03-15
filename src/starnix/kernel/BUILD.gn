@@ -287,6 +287,7 @@ rustc_library("starnix_core") {
     "//sdk/fidl/fuchsia.diagnostics:fuchsia.diagnostics_rust",
     "//sdk/fidl/fuchsia.element:fuchsia.element_rust",
     "//sdk/fidl/fuchsia.fs:fuchsia.fs_rust",
+    "//sdk/fidl/fuchsia.hardware.adb:fuchsia.hardware.adb_rust",
     "//sdk/fidl/fuchsia.hardware.power.statecontrol:fuchsia.hardware.power.statecontrol_rust",
     "//sdk/fidl/fuchsia.input:fuchsia.input_rust",
     "//sdk/fidl/fuchsia.input.report:fuchsia.input.report_rust",

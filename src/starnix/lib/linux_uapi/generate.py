@@ -95,6 +95,10 @@ AUTO_DERIVE_TRAITS = [
     ),
     (r"bpf_attr.*", ["FromBytes", "NoCell", "FromZeros"]),
     (r"flat_binder_object.*", ["FromBytes", "NoCell", "FromZeros"]),
+    (
+        r"usb_functionfs_event.*",
+        ["Clone", "AsBytes", "FromBytes", "NoCell", "FromZeros"],
+    ),
     (r"fuse_dirent", ["Clone", "AsBytes", "FromBytes", "NoCell", "FromZeros"]),
     (r"ifreq.*", ["FromBytes", "NoCell", "FromZeros"]),
     (r"if_settings.*", ["FromBytes", "NoCell", "FromZeros"]),

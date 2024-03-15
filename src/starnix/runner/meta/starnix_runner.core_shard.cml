@@ -102,6 +102,13 @@
             subdir: "gpu",
         },
         {
+            directory: "dev-class",
+            from: "parent",
+            as: "dev-adb",
+            to: [ "#starnix_runner" ],
+            subdir: "adb",
+        },
+        {
             protocol: [
                 "fuchsia.power.broker.Topology",
                 "fuchsia.power.suspend.Stats",

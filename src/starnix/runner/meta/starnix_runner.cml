@@ -99,6 +99,11 @@
             from: "parent",
             to: [ "#kernels" ],
         },
+        {
+            directory: "dev-adb",
+            from: "parent",
+            to: [ "#kernels" ],
+        },
     ],
     expose: [
         {
