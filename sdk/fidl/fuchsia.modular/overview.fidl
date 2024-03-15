@@ -9,5 +9,5 @@
 ///
 /// The fuchsia.session.* and fuchsia.element.* APIs are a replacement
 /// for Modular's session and module functionality, respectively.
-@available(added=7, removed=13)
+@available(added=7, removed=13, legacy=true)
 library fuchsia.modular;

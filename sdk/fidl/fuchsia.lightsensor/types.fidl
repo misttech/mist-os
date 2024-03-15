@@ -19,7 +19,7 @@ type Rgbc = struct {
 };
 
 /// Possible error results from API calls.
-@available(added=7, deprecated=9, removed=HEAD)
+@available(added=7, deprecated=9, removed=HEAD, legacy=true)
 type Error = strict enum {
     /// The input provided to the API was outside of the valid range of input, or required
     /// parameters were missing from a table.
