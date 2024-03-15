@@ -6,15 +6,21 @@
 #define SRC_CONNECTIVITY_WLAN_DRIVERS_THIRD_PARTY_BROADCOM_BRCMFMAC_SIM_TEST_SIM_TEST_H_
 
 #include <lib/async-loop/cpp/loop.h>
+#include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
+#include <lib/driver/testing/cpp/driver_lifecycle.h>
+#include <lib/driver/testing/cpp/driver_runtime.h>
+#include <lib/driver/testing/cpp/test_environment.h>
+#include <lib/driver/testing/cpp/test_node.h>
 #include <zircon/types.h>
 
 #include <map>
 
 #include <zxtest/zxtest.h>
 
-#include "src/connectivity/wlan/drivers/testing/lib/sim-device/device.h"
+#include "lib/fdf/cpp/dispatcher.h"
 #include "src/connectivity/wlan/drivers/testing/lib/sim-env/sim-env.h"
 #include "src/connectivity/wlan/drivers/testing/lib/sim-fake-ap/sim-fake-ap.h"
+#include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/sim/sim_data_path.h"
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/sim/sim_device.h"
 #include "zircon/system/ulib/sync/include/lib/sync/cpp/completion.h"
 
@@ -78,15 +84,12 @@ class SimInterface : public fdf::WireServer<fuchsia_wlan_fullmac::WlanFullmacImp
   SimInterface(const SimInterface&) = delete;
   ~SimInterface();
 
-  zx_status_t Init(std::shared_ptr<simulation::Environment> env, wlan_common::WlanMacRole role);
+  zx_status_t Init(simulation::Environment* env, wlan_common::WlanMacRole role);
+  void Reset();
 
   // This function establish connection between this object and WlanInterface instance.
-  zx_status_t Connect(fdf::ClientEnd<fuchsia_wlan_fullmac::WlanFullmacImpl> client_end);
-
-  // Create server_dispatcher_.
-  void CreateDispatcher();
-  // Shutdown server_dispatcher_.
-  void DestroyDispatcher();
+  zx_status_t Connect(fdf::ClientEnd<fuchsia_wlan_fullmac::WlanFullmacImpl> client_end,
+                      fdf_dispatcher_t* server_dispatcher);
 
   // Default SME Callbacks
   // Implementation of wlan_fullmac_wire::WlanFullmacImplIfc.
@@ -175,7 +178,7 @@ class SimInterface : public fdf::WireServer<fuchsia_wlan_fullmac::WlanFullmacImp
 
   zx_status_t SetMulticastPromisc(bool enable);
 
-  std::shared_ptr<simulation::Environment> env_;
+  simulation::Environment* env_;
 
   fdf::WireSyncClient<fuchsia_wlan_fullmac::WlanFullmacImpl> client_;
 
@@ -199,10 +202,10 @@ class SimInterface : public fdf::WireServer<fuchsia_wlan_fullmac::WlanFullmacImp
   fdf::Arena test_arena_;
 
  private:
-  // Dispatch the FIDL request from wlan_fullmac_wire::WlanFullmacImplIfc.
-  fdf::Dispatcher server_dispatcher_;
-  // The completion waits for the completion of the AsyncShutdown() of server_dispatcher_.
-  libsync::Completion server_completion_;
+  fdf_dispatcher_t* server_dispatcher_ = nullptr;
+
+  std::unique_ptr<fdf::ServerBinding<fuchsia_wlan_fullmac::WlanFullmacImplIfc>> server_binding_ =
+      nullptr;
 
   wlan_common::WlanMacRole role_;
 
@@ -236,8 +239,6 @@ class SimTest : public ::zxtest::Test, public simulation::StationIfc {
   // require PreInit() to be called first.
   zx_status_t Init();
 
-  std::shared_ptr<simulation::Environment> env_;
-
  protected:
   // Create a new interface on the simulated device, providing the specified role and function
   // callbacks
@@ -251,29 +252,75 @@ class SimTest : public ::zxtest::Test, public simulation::StationIfc {
   // e.g. when going through crash recovery.
   zx_status_t InterfaceDestroyed(SimInterface* sim_ifc);
 
-  // Fake device manager
-  std::unique_ptr<simulation::FakeDevMgr> dev_mgr_;
+  uint32_t DeviceCount();
+  uint32_t DeviceCountByProtocolId(uint32_t proto_id);
 
-  // brcmfmac's concept of a device
-  brcmfmac::SimDevice* device_ = nullptr;
+  // We don't have a good mechanism to synchronize the Remove call from
+  // brcmfmac::Device with node_server_, so these functions repeatedly check the device count and
+  // sleep until the device count matches the expected value.
+  // The result is a timeout if it doesn't work instead of immediately failing, but the upside is
+  // that we're no longer relying on the timing of the Remove call.
+  void WaitForDeviceCount(uint32_t expected);
+  void WaitForDeviceCountByProtocolId(uint32_t proto_id, uint32_t expected);
+
+  // Provides synchronous access to the brcmfmac::SimDevice instance via a callback. The callback
+  // is posted to the SimDevice's dispatcher (i.e., driver_dispatcher_).
+  //
+  // This can only be called after PreInit().
+  //
+  // Note that there is a risk of deadlock here: if SimDevice makes a sync call to
+  // WlanFullmacImplIfc (which blocks driver_dispatcher_ until the call is complete), and we try to
+  // call WithSimDevice from the WlanFullmacImplIfc handler, it will deadlock because
+  // driver_dispatcher_ is blocked from the original sync call from SimDevice.
+  void WithSimDevice(fit::function<void(brcmfmac::SimDevice*)>);
+
+  fidl::ClientEnd<fuchsia_io::Directory> CreateDriverSvcClient();
+
+  async_dispatcher_t* df_env_dispatcher() { return df_env_dispatcher_->async_dispatcher(); }
+
+  async_dispatcher_t* driver_dispatcher() { return driver_dispatcher_->async_dispatcher(); }
+  fdf_testing::DriverRuntime& runtime() { return runtime_; }
+
+  std::unique_ptr<simulation::Environment> env_;
 
   // Keep track of the ifaces we created during test by iface id.
   std::map<uint16_t, SimInterface*> ifaces_;
 
-  fdf::WireSharedClient<fuchsia_wlan_phyimpl::WlanPhyImpl> client_;
-  fidl::WireSyncClient<fuchsia_factory_wlan::Iovar> factory_device_;
-  fdf::Dispatcher client_dispatcher_;
-  // The dispatcher to manage the lifecycle of devices.
-  fdf::Dispatcher driver_dispatcher_;
+  fdf::WireSyncClient<fuchsia_wlan_phyimpl::WlanPhyImpl> client_;
   fdf::Arena test_arena_;
-  libsync::Completion completion_;
-  libsync::Completion client_completion_;
 
  private:
+  async_patterns::TestDispatcherBound<fdf_testing::DriverUnderTest<brcmfmac::SimDevice>>& dut() {
+    return dut_;
+  }
+
+  // Attaches a foreground dispatcher for us automatically.
+  fdf_testing::DriverRuntime runtime_;
+
+  // Env dispatcher. Managed by driver runtime threads.
+  fdf::UnownedSynchronizedDispatcher df_env_dispatcher_ = runtime().StartBackgroundDispatcher();
+
+  // Driver dispatcher set as a background dispatcher.
+  fdf::UnownedSynchronizedDispatcher driver_dispatcher_ = runtime().StartBackgroundDispatcher();
+
+  // Serves the fdf::Node protocol to the driver.
+  async_patterns::TestDispatcherBound<fdf_testing::TestNode> node_server_{
+      df_env_dispatcher(), std::in_place, std::string("root")};
+
+  async_patterns::TestDispatcherBound<fdf_testing::TestEnvironment> test_environment_{
+      df_env_dispatcher(), std::in_place};
+
+  // The driver under test.
+  async_patterns::TestDispatcherBound<fdf_testing::DriverUnderTest<brcmfmac::SimDevice>> dut_{
+      driver_dispatcher(), std::in_place};
+
+  fidl::ClientEnd<fuchsia_io::Directory> driver_outgoing_;
+
+  bool driver_created_{false};
+
   // StationIfc methods - by default, do nothing. These can/will be overridden by superclasses.
   void Rx(std::shared_ptr<const simulation::SimFrame> frame,
           std::shared_ptr<const simulation::WlanRxInfo> info) override {}
-  async::Loop loop_;
 };
 
 }  // namespace wlan::brcmfmac

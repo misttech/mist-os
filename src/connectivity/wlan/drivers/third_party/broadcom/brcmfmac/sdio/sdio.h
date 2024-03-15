@@ -19,6 +19,7 @@
 
 #include <fidl/fuchsia.hardware.gpio/cpp/wire.h>
 #include <fuchsia/hardware/sdio/c/banjo.h>
+#include <fuchsia/hardware/sdio/cpp/banjo.h>
 #include <lib/ddk/device.h>
 #include <lib/fdf/cpp/dispatcher.h>
 #include <lib/sync/cpp/completion.h>
@@ -210,6 +211,12 @@ enum {
   WIFI_OOB_IRQ_GPIO_INDEX,
   DEBUG_GPIO_INDEX,
   GPIO_COUNT,
+};
+
+enum {
+  SDIO_FN1_INDEX,
+  SDIO_FN2_INDEX,
+  SDIO_FN_COUNT,
 };
 
 struct brcmf_sdreg {
@@ -445,7 +452,7 @@ void brcmf_sdio_oob_irqhandler(brcmf_sdio_dev* sdiodev);
 
 zx_status_t brcmf_sdio_register(
     brcmf_pub* drvr, fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio> fidl_gpios[GPIO_COUNT],
-    std::unique_ptr<brcmf_bus>* out_bus);
+    ddk::SdioProtocolClient banjo_sdios[SDIO_FN_COUNT], std::unique_ptr<brcmf_bus>* out_bus);
 void brcmf_sdio_exit(struct brcmf_bus* bus);
 
 zx_status_t brcmf_sdio_request_card_reset(struct brcmf_sdio_dev* sdiod);

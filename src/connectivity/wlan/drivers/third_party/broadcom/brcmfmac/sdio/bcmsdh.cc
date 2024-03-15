@@ -106,8 +106,7 @@ zx_status_t brcmf_sdiod_configure_oob_interrupt(struct brcmf_sdio_dev* sdiodev,
 }
 
 zx_status_t brcmf_sdiod_get_bootloader_macaddr(struct brcmf_sdio_dev* sdiodev, uint8_t* macaddr) {
-  // MAC address is only 6 bytes, but it is rounded up to 8 in the ZBI
-  uint8_t bootloader_macaddr[8];
+  uint8_t bootloader_macaddr[ETH_ALEN];
   size_t actual_len;
   zx_status_t ret = sdiodev->drvr->device->DeviceGetMetadata(
       DEVICE_METADATA_MAC_ADDRESS, bootloader_macaddr, sizeof(bootloader_macaddr), &actual_len);
@@ -116,11 +115,11 @@ zx_status_t brcmf_sdiod_get_bootloader_macaddr(struct brcmf_sdio_dev* sdiodev, u
     return ret;
   }
   if (actual_len != ETH_ALEN) {
-    BRCMF_ERR("Incorrect metadata size: Expected %lu bytes but actual is %lu bytes", ETH_ALEN,
+    BRCMF_ERR("Incorrect metadata size: Expected %d bytes but actual is %lu bytes", ETH_ALEN,
               actual_len);
     return ZX_ERR_INTERNAL;
   }
-  memcpy(macaddr, bootloader_macaddr, 6);
+  memcpy(macaddr, bootloader_macaddr, ETH_ALEN);
   BRCMF_DBG(SDIO, "got bootloader mac address");
 #if !defined(NDEBUG)
   BRCMF_DBG(SDIO, "  address: " FMT_MAC, FMT_MAC_ARGS(macaddr));
@@ -865,7 +864,7 @@ static const struct sdio_device_id brcmf_sdmmc_ids[] = {
 
 zx_status_t brcmf_sdio_register(
     brcmf_pub* drvr, fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio> fidl_gpios[GPIO_COUNT],
-    std::unique_ptr<brcmf_bus>* out_bus) {
+    ddk::SdioProtocolClient banjo_sdios[SDIO_FN_COUNT], std::unique_ptr<brcmf_bus>* out_bus) {
   zx_status_t err;
 
   std::unique_ptr<struct brcmf_bus> bus_if;
@@ -879,19 +878,8 @@ zx_status_t brcmf_sdio_register(
   sdio_protocol_t sdio_proto_fn2;
   bool has_debug_gpio = false;
 
-  ddk::SdioProtocolClient sdio_fn1(drvr->device->parent(), "sdio-function-1");
-  if (!sdio_fn1.is_valid()) {
-    BRCMF_ERR("sdio function 1 fragment not found");
-    return ZX_ERR_NO_RESOURCES;
-  }
-  sdio_fn1.GetProto(&sdio_proto_fn1);
-
-  ddk::SdioProtocolClient sdio_fn2(drvr->device->parent(), "sdio-function-2");
-  if (!sdio_fn2.is_valid()) {
-    BRCMF_ERR("sdio function 2 fragment not found");
-    return ZX_ERR_NO_RESOURCES;
-  }
-  sdio_fn2.GetProto(&sdio_proto_fn2);
+  banjo_sdios[SDIO_FN1_INDEX].GetProto(&sdio_proto_fn1);
+  banjo_sdios[SDIO_FN2_INDEX].GetProto(&sdio_proto_fn2);
 
   if (fidl_gpios[DEBUG_GPIO_INDEX].is_valid()) {
     has_debug_gpio = true;

@@ -1052,11 +1052,11 @@ static void brcmf_sdio_txfail(struct brcmf_sdio* bus) {
       break;
     }
   }
-  // TODO(https://fxbug.dev/42126980) There is a firmware issue that will eventually cause TX CRC errors when
-  // using TX glomming. After this happens any attempt at TX glomming will fail. However, sending a
-  // single frame per transaction still works. So fall back to that when get a TX error. In most
-  // normal cases we still get the benefit of TX glomming and in some high throughput cases we will
-  // fall back to behaving as if TX glomming wasn't enabled.
+  // TODO(https://fxbug.dev/42126980) There is a firmware issue that will eventually cause TX CRC
+  // errors when using TX glomming. After this happens any attempt at TX glomming will fail.
+  // However, sending a single frame per transaction still works. So fall back to that when get a TX
+  // error. In most normal cases we still get the benefit of TX glomming and in some high throughput
+  // cases we will fall back to behaving as if TX glomming wasn't enabled.
   bus->txbound = 1;
 }
 
@@ -3179,7 +3179,7 @@ zx_status_t brcmf_sdio_load_files(brcmf_pub* drvr, bool reload) TA_NO_THREAD_SAF
 
   if ((status = brcmf_sdio_firmware_callback(drvr, firmware_binary.data(), firmware_binary.size(),
                                              nvram_binary.data(), nvram_binary.size())) != ZX_OK) {
-    BRCMF_ERR("Load nvram binary failed, error: %s", zx_status_get_string(status));
+    BRCMF_ERR("Download fw/nvram binary failed, error: %s", zx_status_get_string(status));
     if (reload)
       drvr->fw_reloading.unlock();
     return status;
@@ -3236,7 +3236,6 @@ zx_status_t brcmf_sdio_load_files(brcmf_pub* drvr, bool reload) TA_NO_THREAD_SAF
       return status;
     }
   }
-
   return ZX_OK;
 }
 
@@ -3284,21 +3283,20 @@ void brcmf_sdio_log_stats(struct brcmf_bus* bus_if) {
   struct brcmf_sdio_dev* sdiodev = bus_if->bus_priv.sdio;
   struct brcmf_sdio* bus = sdiodev->bus;
 
-  zxlogf(INFO,
-         "SDIO bus stats: FC: %x FC_ChangeCnt: %u TxSeq: %u TxMax: %u TxCtlCnt: %lu TxCtlErr: %lu,"
-         " RxCtlCnt: %lu, RxCtlErr: %lu, RxOutOfBufs: %u, Intrs: %u, HdrRead: %u, PktReads: %u, "
-         "PktWrites: %u",
-         bus->flowcontrol, bus->sdcnt.fc_rcvd, bus->tx_seq, bus->tx_max, bus->sdcnt.tx_ctlpkts,
-         bus->sdcnt.tx_ctlerrs, bus->sdcnt.rx_ctlpkts, bus->sdcnt.rx_ctlerrs,
-         bus->sdcnt.rx_outofbufs, bus->sdcnt.intrcount, bus->sdcnt.f2rxhdrs, bus->sdcnt.f2rxdata,
-         bus->sdcnt.f2txdata);
+  BRCMF_INFO(
+      "SDIO bus stats: FC: %x FC_ChangeCnt: %u TxSeq: %u TxMax: %u TxCtlCnt: %lu TxCtlErr: %lu,"
+      " RxCtlCnt: %lu, RxCtlErr: %lu, RxOutOfBufs: %u, Intrs: %u, HdrRead: %u, PktReads: %u, "
+      "PktWrites: %u",
+      bus->flowcontrol, bus->sdcnt.fc_rcvd, bus->tx_seq, bus->tx_max, bus->sdcnt.tx_ctlpkts,
+      bus->sdcnt.tx_ctlerrs, bus->sdcnt.rx_ctlpkts, bus->sdcnt.rx_ctlerrs, bus->sdcnt.rx_outofbufs,
+      bus->sdcnt.intrcount, bus->sdcnt.f2rxhdrs, bus->sdcnt.f2rxdata, bus->sdcnt.f2txdata);
   std::lock_guard lock(bus->tx_queue->txq_lock);
-  zxlogf(INFO,
-         "SDIO txq stats: EnqueueCnt: %lu QFullCnt: %u QLen: %lu PerPrecLen [0]: %lu [1]: %lu [2]: "
-         "%lu [3]: %lu",
-         bus->tx_queue->enqueue_count, bus->sdcnt.tx_qfull, bus->tx_queue->tx_queue.size(),
-         bus->tx_queue->tx_queue.size(1 << 0), bus->tx_queue->tx_queue.size(1 << 1),
-         bus->tx_queue->tx_queue.size(1 << 2), bus->tx_queue->tx_queue.size(1 << 3));
+  BRCMF_INFO(
+      "SDIO txq stats: EnqueueCnt: %lu QFullCnt: %u QLen: %lu PerPrecLen [0]: %lu [1]: %lu [2]: "
+      "%lu [3]: %lu",
+      bus->tx_queue->enqueue_count, bus->sdcnt.tx_qfull, bus->tx_queue->tx_queue.size(),
+      bus->tx_queue->tx_queue.size(1 << 0), bus->tx_queue->tx_queue.size(1 << 1),
+      bus->tx_queue->tx_queue.size(1 << 2), bus->tx_queue->tx_queue.size(1 << 3));
 }
 
 void brcmf_sdio_oob_irqhandler(brcmf_sdio_dev* sdiodev) {
@@ -3896,9 +3894,9 @@ zx_status_t brcmf_sdio_firmware_callback(brcmf_pub* drvr, const void* firmware,
   if (err == ZX_OK) {
     /* Allow full data communication using DPC from now on. */
     brcmf_sdiod_change_state(sdiod, BRCMF_SDIOD_DATA);
-    // TODO(https://fxbug.dev/42104108): The next line was added to enable watchdog to take effect immediately,
-    // since it currently handles all interrupt conditions. This may or may not make the
-    // previous call to brcmf_sdio_wd_timer() unnecessary; that call apparently had no effect
+    // TODO(https://fxbug.dev/42104108): The next line was added to enable watchdog to take effect
+    // immediately, since it currently handles all interrupt conditions. This may or may not make
+    // the previous call to brcmf_sdio_wd_timer() unnecessary; that call apparently had no effect
     // because the state wasn't BRCMF_SDIOD_DATA yet. Once interrupts are working, revisit
     // and figure out this logic.
     brcmf_sdio_wd_timer(bus, true);
@@ -3924,7 +3922,6 @@ zx_status_t brcmf_sdio_firmware_callback(brcmf_pub* drvr, const void* firmware,
 
   sdio_release_host(sdiodev->func1);
   zx_nanosleep(zx_deadline_after(ZX_MSEC(100)));
-
   return ZX_OK;
 
 release:
@@ -4097,7 +4094,7 @@ struct brcmf_sdio* brcmf_sdio_probe(struct brcmf_sdio_dev* sdiodev, bool reloadi
     bus->sdiodev->drvr->settings = bus->sdiodev->settings;
 
     /* Set up the watchdog timer */
-    bus->timer = new Timer(bus->sdiodev->drvr->device->GetDispatcher(),
+    bus->timer = new Timer(bus->sdiodev->drvr->device->GetTimerDispatcher(),
                            std::bind(brcmf_sdio_watchdog, bus), false);
 
     ret = brcmf_attach(bus->sdiodev->drvr);

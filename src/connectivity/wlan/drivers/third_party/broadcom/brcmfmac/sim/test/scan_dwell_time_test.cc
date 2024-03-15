@@ -4,14 +4,9 @@
 
 #include <lib/zx/clock.h>
 
-#include <functional>
-
 #include <zxtest/zxtest.h>
 
-#include "src/connectivity/wlan/drivers/testing/lib/sim-device/device.h"
-#include "src/connectivity/wlan/drivers/testing/lib/sim-env/sim-env.h"
 #include "src/connectivity/wlan/drivers/testing/lib/sim-fake-ap/sim-fake-ap.h"
-#include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/cfg80211.h"
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/sim/test/sim_test.h"
 
 namespace wlan::brcmfmac {

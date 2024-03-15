@@ -26,22 +26,22 @@ TEST_F(SimTest, ScanResultAfterIfaceStop) {
   EXPECT_EQ(DeleteInterface(&client_ifc), ZX_OK);
 }
 
-// Verify that calling WlanPhyImplDestroyIface() twice will not cause a crash when the first call
-// failed.
-TEST_F(SimTest, DeleteIfaceTwice) {
+// Verify that calling WlanPhyImplDestroyIface() will return a failure if the firmware returns an
+// error on iface removal.
+TEST_F(SimTest, DeleteIfaceOnFirmwareFailure) {
   ASSERT_EQ(Init(), ZX_OK);
 
   SimInterface softap_ifc;
   ASSERT_EQ(StartInterface(wlan_common::WlanMacRole::kAp, &softap_ifc), ZX_OK);
 
   // Inject firmware error to "interface_remove" iovar.
-  brcmf_simdev* sim = device_->GetSim();
-  sim->sim_fw->err_inj_.AddErrInjIovar("interface_remove", ZX_OK, BCME_ERROR, softap_ifc.iface_id_);
+  WithSimDevice([&](brcmfmac::SimDevice* device) {
+    brcmf_simdev* sim = device->GetSim();
+    sim->sim_fw->err_inj_.AddErrInjIovar("interface_remove", ZX_OK, BCME_ERROR,
+                                         softap_ifc.iface_id_);
+  });
 
   EXPECT_EQ(DeleteInterface(&softap_ifc), ZX_ERR_IO_REFUSED);
-
-  // Cancel the injected error.
-  sim->sim_fw->err_inj_.DelErrInjIovar("interface_remove");
-  EXPECT_EQ(DeleteInterface(&softap_ifc), ZX_OK);
 }
+
 }  // namespace wlan::brcmfmac

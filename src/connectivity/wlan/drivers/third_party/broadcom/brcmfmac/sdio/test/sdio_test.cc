@@ -23,26 +23,22 @@
 #include <lib/async-loop/default.h>
 #include <lib/async/default.h>
 #include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
-#include <lib/ddk/device.h>
-#include <lib/ddk/metadata.h>
 #include <zircon/errors.h>
 #include <zircon/types.h>
 
-#include <array>
 #include <memory>
 #include <tuple>
 
 #include <wifi/wifi-config.h>
+#include <wlan/drivers/testing/test_helpers.h>
 #include <zxtest/zxtest.h>
 
 #include "sdk/lib/driver/testing/cpp/driver_runtime.h"
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/bus.h"
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/common.h"
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/device.h"
-#include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/sdio/sdio_device.h"
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/test/stub_device.h"
 #include "src/devices/gpio/testing/fake-gpio/fake-gpio.h"
-#include "src/devices/testing/mock-ddk/mock-device.h"
 
 // These numbers come from real bugs.
 #define NOT_ALIGNED_SIZE 1541
@@ -183,9 +179,11 @@ class FakeSdioBus {
 };
 
 class SdioTest : public zxtest::Test {
- protected:
-  fdf_testing::DriverRuntime* runtime() { return fdf_testing::DriverRuntime::GetInstance(); }
-  std::shared_ptr<MockDevice> root_{MockDevice::FakeRootParent()};
+  wlan::drivers::log::testing::UnitTestLogContext logging_{"SdioTest"};
+
+ private:
+  // Create a testing driver runtime to allow for the creation of fdf dispatchers.
+  fdf_testing::DriverRuntime driver_runtime_;
 };
 
 TEST_F(SdioTest, IntrRegisterUnregister) {
@@ -787,20 +785,6 @@ TEST_F(SdioTest, TxCtlCtrlFrameStateClearedWithError) {
       },
       1, 0);
   EXPECT_EQ(status, ZX_ERR_NO_MEMORY);
-}
-
-TEST_F(SdioTest, SdioDeviceMultipleShutdowns) {
-  wlan::brcmfmac::SdioDevice::Create(root_.get());
-
-  zx_device_t* child = root_->GetLatestChild();
-
-  // Suspend the device twice, it should not crash. Parameters shouldn't matter as the device
-  // doesn't care.
-  child->SuspendNewOp(0, false, 0);
-  child->SuspendNewOp(0, false, 0);
-
-  // Then release it, it should still not crash.
-  child->ReleaseOp();
 }
 
 TEST_F(SdioTest, ResetClearsTxGlom) {

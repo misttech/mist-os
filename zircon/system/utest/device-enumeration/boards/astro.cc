@@ -86,8 +86,8 @@ TEST_F(DeviceEnumerationTest, AstroTest) {
       "sys/platform/05:03:e/aml_video",
 
       // WLAN
-      "sys/platform/05:00:7/aml_sdio/aml-sd-emmc/sdmmc/sdmmc-sdio/sdmmc-sdio-1/wifi/brcmfmac-wlanphy",
-      "sys/platform/05:00:7/aml_sdio/aml-sd-emmc/sdmmc/sdmmc-sdio/sdmmc-sdio-1/wifi/brcmfmac-wlanphy/wlanphy",
+      "sys/platform/05:00:7/aml_sdio/aml-sd-emmc/sdmmc/sdmmc-sdio/sdmmc-sdio-1/wifi/brcmfmac-wlanphyimpl",
+      "sys/platform/05:00:7/aml_sdio/aml-sd-emmc/sdmmc/sdmmc-sdio/sdmmc-sdio-1/wifi/brcmfmac-wlanphyimpl/wlanphy",
 #endif
 
   };

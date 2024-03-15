@@ -19,14 +19,11 @@ source_set("sim_test") {
   sources = [ "sim_test.cc" ]
   public = [ "sim_test.h" ]
   public_deps = [
-    "//sdk/fidl/fuchsia.wlan.internal:fuchsia.wlan.internal_banjo_c",
     "//sdk/fidl/fuchsia.wlan.phyimpl:fuchsia.wlan.phyimpl_cpp",
     "//sdk/lib/fdio",
-    "//src/connectivity/wlan/drivers/testing/lib/sim-device",
     "//src/connectivity/wlan/drivers/testing/lib/sim-env",
     "//src/connectivity/wlan/drivers/testing/lib/sim-fake-ap",
     "//src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/sim",
-    "//src/devices/testing/driver-runtime-main:zxtest",
     "//zircon/system/public",
     "//zircon/system/ulib/sync:sync-cpp",
     "//zircon/system/ulib/zxtest",
@@ -42,8 +39,6 @@ executable("active_scan_test") {
   sources = [ "active_scan_test.cc" ]
   deps = [
     ":sim_test",
-    "//sdk/fidl/fuchsia.wlan.internal:fuchsia.wlan.internal_banjo_c",
-    "//src/connectivity/wlan/drivers/testing/lib/sim-device",
     "//src/connectivity/wlan/drivers/testing/lib/sim-env",
     "//src/connectivity/wlan/drivers/testing/lib/sim-fake-ap",
     "//src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac:core",
@@ -61,7 +56,6 @@ executable("arp_test") {
   deps = [
     ":sim_test",
     "//sdk/fidl/fuchsia.wlan.ieee80211:fuchsia.wlan.ieee80211_hlcpp",
-    "//src/connectivity/wlan/drivers/testing/lib/sim-device",
     "//src/connectivity/wlan/drivers/testing/lib/sim-env",
     "//src/connectivity/wlan/drivers/testing/lib/sim-fake-ap",
     "//src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac:core",
@@ -79,11 +73,8 @@ executable("connect_test") {
   deps = [
     ":sim_test",
     "//sdk/fidl/fuchsia.wlan.ieee80211:fuchsia.wlan.ieee80211_hlcpp",
-    "//sdk/fidl/fuchsia.wlan.internal:fuchsia.wlan.internal_banjo_c",
     "//src/connectivity/wlan/drivers/testing/lib/sim-fake-ap",
     "//src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac:core",
-    "//src/connectivity/wlan/lib/common/cpp:common",
-    "//src/devices/lib/broadcom",
   ]
 
   # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings
@@ -163,23 +154,12 @@ executable("cc_test") {
   sources = [ "cc_test.cc" ]
   deps = [
     ":sim_test",
-    "//src/connectivity/wlan/drivers/testing/lib/sim-device",
     "//src/connectivity/wlan/drivers/testing/lib/sim-env",
     "//src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac:core",
   ]
 
   # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings
   configs += [ "//build/config:Wno-conversion" ]
-}
-
-executable("factory_device_test") {
-  output_name = "factory_device_test"
-  testonly = true
-  sources = [ "factory_device_test.cc" ]
-  deps = [
-    ":sim_test",
-    "//src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac:core",
-  ]
 }
 
 executable("channel_switch_test") {
@@ -202,7 +182,6 @@ executable("crash_recovery_test") {
   sources = [ "crash_recovery_test.cc" ]
   deps = [
     ":sim_test",
-    "//src/connectivity/wlan/drivers/testing/lib/sim-device",
     "//src/connectivity/wlan/drivers/testing/lib/sim-env",
     "//src/connectivity/wlan/drivers/testing/lib/sim-fake-ap",
     "//src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac:core",
@@ -221,8 +200,6 @@ executable("create_softap_test") {
   deps = [
     ":sim_test",
     "//sdk/fidl/fuchsia.wlan.ieee80211:fuchsia.wlan.ieee80211_hlcpp",
-    "//sdk/fidl/fuchsia.wlan.internal:fuchsia.wlan.internal_banjo_c",
-    "//src/connectivity/wlan/drivers/testing/lib/sim-device",
     "//src/connectivity/wlan/drivers/testing/lib/sim-env",
     "//src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac:core",
     "//src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/test:device_inspect_utils",
@@ -239,7 +216,6 @@ executable("data_frame_test") {
   sources = [ "data_frame_test.cc" ]
   deps = [
     ":sim_test",
-    "//sdk/fidl/fuchsia.wlan.internal:fuchsia.wlan.internal_banjo_c",
     "//src/connectivity/wlan/drivers/testing/lib/sim-fake-ap",
     "//src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/test:device_inspect_utils",
     "//src/connectivity/wlan/lib/common/cpp:common",
@@ -297,11 +273,7 @@ executable("escan_params_test") {
   output_name = "escan_params_test"
   testonly = true
   sources = [ "escan_params_test.cc" ]
-  deps = [
-    ":sim_test",
-    "//sdk/fidl/fuchsia.wlan.internal:fuchsia.wlan.internal_banjo_c",
-    "//src/connectivity/wlan/drivers/testing/lib/sim-device",
-  ]
+  deps = [ ":sim_test" ]
 
   # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings
   configs += [ "//build/config:Wno-conversion" ]
@@ -313,11 +285,9 @@ executable("firmware_config_test") {
   sources = [ "firmware_config_test.cc" ]
   deps = [
     ":sim_test",
-    "//src/connectivity/wlan/drivers/testing/lib/sim-device",
     "//src/connectivity/wlan/drivers/testing/lib/sim-env",
     "//src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac:core",
     "//src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/sim",
-    "//src/lib/ddk",
     "//zircon/system/public",
   ]
 
@@ -341,7 +311,6 @@ executable("wmm_status_test") {
   sources = [ "wmm_status_test.cc" ]
   deps = [
     ":sim_test",
-    "//src/connectivity/wlan/drivers/testing/lib/sim-device",
     "//src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac:core",
   ]
 
@@ -365,7 +334,6 @@ executable("ifc_query_test") {
   sources = [ "ifc_query_test.cc" ]
   deps = [
     ":sim_test",
-    "//sdk/fidl/fuchsia.wlan.ieee80211:fuchsia.wlan.ieee80211_banjo_c",
     "//src/connectivity/wlan/lib/common/cpp:common",
   ]
 
@@ -379,7 +347,6 @@ executable("ifc_query_feature_support_test") {
   sources = [ "ifc_query_feature_support_test.cc" ]
   deps = [
     ":sim_test",
-    "//sdk/fidl/fuchsia.wlan.ieee80211:fuchsia.wlan.ieee80211_banjo_c",
     "//src/connectivity/wlan/lib/common/cpp:common",
   ]
 
@@ -393,7 +360,6 @@ executable("iovar_test") {
   sources = [ "iovar_test.cc" ]
   deps = [
     ":sim_test",
-    "//src/connectivity/wlan/drivers/testing/lib/sim-device",
     "//src/connectivity/wlan/drivers/testing/lib/sim-env",
     "//src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac:bcdc",
     "//src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac:core",
@@ -408,15 +374,7 @@ executable("lifecycle_test") {
   output_name = "lifecycle_test"
   testonly = true
   sources = [ "lifecycle_test.cc" ]
-  deps = [
-    "//sdk/lib/fdio",
-    "//src/connectivity/wlan/drivers/testing/lib/sim-device",
-    "//src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac:core",
-    "//src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/sim",
-    "//src/devices/testing/driver-runtime-main:zxtest",
-    "//zircon/system/public",
-    "//zircon/system/ulib/zxtest",
-  ]
+  deps = [ ":sim_test" ]
 
   # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings
   configs += [ "//build/config:Wno-conversion" ]
@@ -431,11 +389,9 @@ executable("mfg_test") {
   ]
   public = [ "sim_test.h" ]
   public_deps = [
-    "//src/connectivity/wlan/drivers/testing/lib/sim-device",
     "//src/connectivity/wlan/drivers/testing/lib/sim-env",
     "//src/connectivity/wlan/drivers/testing/lib/sim-fake-ap",
     "//src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/sim:sim_mfg",
-    "//src/devices/testing/driver-runtime-main:zxtest",
     "//zircon/system/public",
     "//zircon/system/ulib/zxtest",
   ]
@@ -454,7 +410,6 @@ executable("no_random_mac_test") {
   sources = [ "no_random_mac_test.cc" ]
   deps = [
     ":sim_test",
-    "//src/connectivity/wlan/drivers/testing/lib/sim-device",
     "//src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac:core",
   ]
 
@@ -468,7 +423,6 @@ executable("passive_scan_test") {
   sources = [ "passive_scan_test.cc" ]
   deps = [
     ":sim_test",
-    "//src/connectivity/wlan/drivers/testing/lib/sim-device",
     "//src/connectivity/wlan/drivers/testing/lib/sim-env",
     "//src/connectivity/wlan/drivers/testing/lib/sim-fake-ap",
     "//src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac:core",
@@ -485,7 +439,6 @@ executable("phy_ps_mode_test") {
   sources = [ "phy_ps_mode_test.cc" ]
   deps = [
     ":sim_test",
-    "//src/connectivity/wlan/drivers/testing/lib/sim-device",
     "//src/connectivity/wlan/drivers/testing/lib/sim-env",
     "//src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac:core",
   ]
@@ -500,7 +453,6 @@ executable("phy_mac_roles_test") {
   sources = [ "phy_mac_roles_test.cc" ]
   deps = [
     ":sim_test",
-    "//src/connectivity/wlan/drivers/testing/lib/sim-device",
     "//src/connectivity/wlan/drivers/testing/lib/sim-env",
     "//src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac:core",
   ]
@@ -515,7 +467,6 @@ executable("scan_dwell_time_test") {
   sources = [ "scan_dwell_time_test.cc" ]
   deps = [
     ":sim_test",
-    "//src/connectivity/wlan/drivers/testing/lib/sim-device",
     "//src/connectivity/wlan/drivers/testing/lib/sim-fake-ap",
     "//src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac:core",
   ]
@@ -530,7 +481,6 @@ executable("scan_while_scanning_test") {
   sources = [ "scan_while_scanning_test.cc" ]
   deps = [
     ":sim_test",
-    "//src/connectivity/wlan/drivers/testing/lib/sim-device",
     "//src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac:core",
   ]
 
@@ -544,7 +494,6 @@ executable("set_keys_test") {
   sources = [ "set_keys_test.cc" ]
   deps = [
     ":sim_test",
-    "//src/connectivity/wlan/drivers/testing/lib/sim-device",
     "//src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac:core",
   ]
 
@@ -558,7 +507,6 @@ executable("set_multicast_test") {
   sources = [ "set_multicast_test.cc" ]
   deps = [
     ":sim_test",
-    "//src/connectivity/wlan/drivers/testing/lib/sim-device",
     "//src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac:core",
   ]
 
@@ -572,7 +520,6 @@ executable("start_ap_while_scanning_test") {
   sources = [ "start_ap_while_scanning_test.cc" ]
   deps = [
     ":sim_test",
-    "//src/connectivity/wlan/drivers/testing/lib/sim-device",
     "//src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac:core",
   ]
 
@@ -604,7 +551,6 @@ _tests = [
   "bootloader_mac_addr_test",
   "call_after_del_iface_test",
   "cc_test",
-  "factory_device_test",
   "channel_switch_test",
   "connect_test",
   "crash_recovery_test",
@@ -636,12 +582,41 @@ _tests = [
 ]
 
 foreach(test_name, _tests) {
+  # Generate a custom manifest because dfv2 unit test framework expects the test component to have
+  # access to fuchsia.log.LogSink, which is not true by default.
+  generated_file("${test_name}_generated_manifest") {
+    testonly = true
+    contents = {
+      include = [
+        "syslog/client.shard.cml",
+        "inspect/client.shard.cml",
+        "//sdk/lib/sys/testing/elf_test_runner.shard.cml",
+      ]
+      program = {
+        binary = "bin/${test_name}"
+      }
+    }
+    outputs = [ "${target_gen_dir}/${test_name}_generated_manifest.cml" ]
+    output_conversion = "json"
+    visibility = [ ":*" ]
+  }
+
   fuchsia_unittest_component("${test_name}_component") {
-    deps = [ ":${test_name}" ]
+    manifest = "${target_gen_dir}/${test_name}_generated_manifest.cml"
+    deps = [
+      ":${test_name}",
+      ":${test_name}_generated_manifest",
+    ]
   }
 }
 
 fuchsia_test_package("brcmfmac_sim_test") {
+  test_specs = {
+    log_settings = {
+      max_severity = "ERROR"
+    }
+  }
+
   test_components = []
   foreach(test_name, _tests) {
     test_components += [ ":${test_name}_component" ]

@@ -39,65 +39,26 @@ constexpr uint32_t kEthernetMtu = 1500;
 WlanInterface::WlanInterface(wlan::brcmfmac::Device* device,
                              const network_device_ifc_protocol_t& proto, uint8_t port_id,
                              const char* name)
-    : ddk::Device<WlanInterface, ddk::Unbindable>(device->parent()),
-      NetworkPort(proto, *this, port_id),
-      wdev_(nullptr),
-      device_(nullptr),
-      outgoing_dir_(fdf::OutgoingDirectory::Create(fdf::Dispatcher::GetCurrent()->get())) {
-  zx_status_t status = ZX_OK;
+    : NetworkPort(proto, *this, port_id), wdev_(nullptr), device_(nullptr), name_(name) {}
 
-  // The protocol to let pass device_add. This is to support FakeDevMgr device lifecycle management
-  // in SIM tests, we can get rid of it after everything get into DFv2 world including driver
-  // unittest framework.
-  static const zx_protocol_device_t device_proto = {
-      .version = DEVICE_OPS_VERSION,
-      .release = [](void* ctx) { return static_cast<WlanInterface*>(ctx)->DdkRelease(); },
-  };
-
-  auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-  if (endpoints.is_error()) {
-    BRCMF_ERR("failed to create endpoints: %s\n", endpoints.status_string());
-    return;
-  }
-
-  status = ServeWlanFullmacImplProtocol(std::move(endpoints->server));
-  if (status != ZX_OK) {
-    BRCMF_ERR("failed to serve WlanFullmacImpl service: %s\n", zx_status_get_string(status));
-    return;
-  }
-
-  std::array offers = {
-      fuchsia_wlan_fullmac::Service::Name,
-  };
-
-  device_add_args device_args = {
-      .version = DEVICE_ADD_ARGS_VERSION,
-      .name = name,
-      .ctx = this,
-      .ops = &device_proto,
-      .proto_id = ZX_PROTOCOL_WLAN_FULLMAC_IMPL,
-      .runtime_service_offers = offers.data(),
-      .runtime_service_offer_count = offers.size(),
-      .outgoing_dir_channel = endpoints->client.TakeChannel().release(),
-  };
-
-  if ((status = device->DeviceAdd(&device_args, &this->zxdev_)) != ZX_OK) {
-    BRCMF_ERR("failed to add interface device: %s\n", zx_status_get_string(status));
-    return;
-  }
-}
-
-zx_status_t WlanInterface::Create(wlan::brcmfmac::Device* device, const char* name,
-                                  wireless_dev* wdev, fuchsia_wlan_common_wire::WlanMacRole role,
-                                  WlanInterface** out_interface) {
+zx::result<std::unique_ptr<WlanInterface>> WlanInterface::Create(
+    wlan::brcmfmac::Device* device, const char* name, wireless_dev* wdev,
+    fuchsia_wlan_common_wire::WlanMacRole role) {
   std::unique_ptr<WlanInterface> interface(new WlanInterface(
-      device, device->NetDev().NetDevIfcProto(), ndev_to_if(wdev->netdev)->ifidx, name));
+      device, device->NetDev()->NetDevIfcProto(), ndev_to_if(wdev->netdev)->ifidx, name));
   {
     std::lock_guard<std::shared_mutex> guard(interface->lock_);
     interface->device_ = device;
     interface->wdev_ = wdev;
   }
 
+  interface->role_ = role;
+  zx_status_t status;
+
+  if ((status = interface->AddWlanFullmacDevice()) != ZX_OK) {
+    BRCMF_ERR("Error while adding fullmac dev: %s", zx_status_get_string(status));
+    return zx::error(status);
+  }
   NetworkPort::Role net_port_role;
   switch (role) {
     case fuchsia_wlan_common_wire::WlanMacRole::kClient:
@@ -108,16 +69,116 @@ zx_status_t WlanInterface::Create(wlan::brcmfmac::Device* device, const char* na
       break;
     default:
       BRCMF_ERR("Unsupported role %u", uint32_t(role));
-      return ZX_ERR_INVALID_ARGS;
+      return zx::error(ZX_ERR_INVALID_ARGS);
   }
 
-  zx_status_t status = interface->NetworkPort::Init(net_port_role);
+  status = interface->NetworkPort::Init(net_port_role);
   if (status != ZX_OK) {
     BRCMF_ERR("Failed to initialize port: %s", zx_status_get_string(status));
-    return status;
+    return zx::error(status);
   }
 
-  *out_interface = interface.release();  // This now has its lifecycle managed by the devhost.
+  return zx::ok(std::move(interface));
+}
+
+zx_status_t WlanInterface::AddWlanFullmacDevice() {
+  fdf_dispatcher_t* driver_dispatcher = fdf::Dispatcher::GetCurrent()->get();
+  auto wlanfullmacimpl =
+      [this, driver_dispatcher](fdf::ServerEnd<fuchsia_wlan_fullmac::WlanFullmacImpl> server_end) {
+        ServiceConnectHandler(driver_dispatcher, std::move(server_end));
+      };
+
+  // Add the service contains WlanFullmac protocol to outgoing directory.
+  fuchsia_wlan_fullmac::Service::InstanceHandler wlanfullmac_service_handler(
+      {.wlan_fullmac_impl = wlanfullmacimpl});
+
+  auto status = device_->Outgoing()->AddService<fuchsia_wlan_fullmac::Service>(
+      std::move(wlanfullmac_service_handler), GetName());
+  if (status.is_error()) {
+    BRCMF_ERR("Failed to add service to outgoing directory: %s", status.status_string());
+    return status.status_value();
+  }
+
+  fidl::Arena arena;
+
+  fidl::VectorView<fuchsia_driver_framework::wire::Offer> offers(arena, 1);
+  offers[0] = fdf::MakeOffer2<fuchsia_wlan_fullmac::Service>(arena, GetName());
+  auto property = fdf::MakeProperty(arena, BIND_PROTOCOL, ZX_PROTOCOL_WLAN_FULLMAC_IMPL);
+
+  auto args = fdf::wire::NodeAddArgs::Builder(arena)
+                  .name(arena, GetName())
+                  .properties(fidl::VectorView<fdf::wire::NodeProperty>::FromExternal(&property, 1))
+                  .offers2(offers)
+                  .Build();
+
+  auto endpoints = fidl::CreateEndpoints<fdf::NodeController>();
+  if (endpoints.is_error()) {
+    return endpoints.status_value();
+  }
+
+  wlanfullmac_controller_.Bind(std::move(endpoints->client),
+                               fdf::Dispatcher::GetCurrent()->async_dispatcher(), this);
+  // Add wlanfullmac child node for the node that this driver is binding to. Doing a sync version
+  // here to reduce chaos.
+  auto result =
+      device_->GetParentNode().sync()->AddChild(std::move(args), std::move(endpoints->server), {});
+  if (!result.ok()) {
+    BRCMF_ERR("Add wlanfullmac node error due to FIDL error on protocol [Node]: %s",
+              result.status_string());
+    return result.status();
+  }
+  if (result->is_error()) {
+    BRCMF_ERR("Add wlanfullmac node error: %u", static_cast<uint32_t>(result->error_value()));
+    return ZX_ERR_INTERNAL;
+  }
+  return ZX_OK;
+}
+
+zx_status_t WlanInterface::RemoveWlanFullmacDevice() {
+  if (!wlanfullmac_controller_.is_valid()) {
+    BRCMF_ERR("Fullmac device for role %u cannot be removed because controller is invalid", Role());
+    return ZX_ERR_BAD_STATE;
+  }
+  auto result = wlanfullmac_controller_->Remove();
+  if (!result.ok()) {
+    BRCMF_ERR("Fullmac child remove failed for role %u, FIDL error: %s", Role(),
+              result.status_string());
+    return result.status();
+  }
+  wlanfullmac_controller_ = {};
+
+  auto remove_result = device_->Outgoing()->RemoveService<fuchsia_wlan_fullmac::Service>(GetName());
+  if (remove_result.is_error()) {
+    BRCMF_ERR("Failed to remove wlanfullmac service from outgoing directory: %s.",
+              remove_result.status_string());
+    return remove_result.status_value();
+  }
+  return ZX_OK;
+}
+
+zx_status_t WlanInterface::DestroyIface() {
+  zx_status_t status = RemoveWlanFullmacDevice();
+  if (status != ZX_OK) {
+    BRCMF_ERR("Device::RemoveWlanFullmacDevice() failed for Client interface : %s",
+              zx_status_get_string(status));
+
+    // If ZX_ERR_BAD_STATE is returned, we may have previously called RemoveWlanFullmacDevice
+    // successfully but failed to delete the iface from firmware.
+    // In that case, we don't return here to try deleting the iface from firmware again to avoid
+    // having an iface in firmware that we can never delete.
+    if (status != ZX_ERR_BAD_STATE) {
+      return status;
+    }
+  }
+
+  RemovePort();
+  wireless_dev* wdev = take_wdev();
+
+  if ((status = brcmf_cfg80211_del_iface(device_->drvr()->config, wdev)) != ZX_OK) {
+    BRCMF_ERR("Failed to del iface, status: %s", zx_status_get_string(status));
+    set_wdev(wdev);
+    return status;
+  }
   return ZX_OK;
 }
 
@@ -138,54 +199,16 @@ void WlanInterface::Remove(fit::callback<void()>&& on_remove) {
     std::lock_guard lock(lock_);
     on_remove_ = std::move(on_remove);
   }
-  // Just like DeviceAdd(), we also have to call into the phy device for invoking different handlers
-  // from different buses.
-  device_->DeviceAsyncRemove(this->zxdev_);
 }
 
-void WlanInterface::DdkUnbind(ddk::UnbindTxn txn) {
-  zx::result res =
-      outgoing_dir_.RemoveService<fuchsia_wlan_fullmac::Service>(fdf::kDefaultInstance);
-  if (res.is_error()) {
-    BRCMF_ERR("Failed to remove WlanFullmacImpl service from outgoing directory: %s\n",
-              res.status_string());
-  }
-  txn.Reply();
-}
-
-void WlanInterface::DdkRelease() {
-  fit::callback<void()> on_remove;
-  {
-    std::lock_guard lock(lock_);
-    if (on_remove_) {
-      on_remove = std::move(on_remove_);
+void WlanInterface::ServiceConnectHandler(
+    fdf_dispatcher_t* dispatcher,
+    fdf::ServerEnd<fuchsia_wlan_fullmac::WlanFullmacImpl> server_end) {
+  bindings_.AddBinding(dispatcher, std::move(server_end), this, [](fidl::UnbindInfo info) {
+    if (!info.is_user_initiated()) {
+      BRCMF_ERR("WlanFullmacImpl binding unexpectedly closed: %s", info.lossy_description());
     }
-  }
-  delete this;
-  if (on_remove) {
-    on_remove();
-  }
-}
-
-zx_status_t WlanInterface::ServeWlanFullmacImplProtocol(
-    fidl::ServerEnd<fuchsia_io::Directory> server_end) {
-  auto protocol = [this](fdf::ServerEnd<fuchsia_wlan_fullmac::WlanFullmacImpl> server_end) mutable {
-    fdf::BindServer(fdf::Dispatcher::GetCurrent()->get(), std::move(server_end), this);
-  };
-  fuchsia_wlan_fullmac::Service::InstanceHandler handler(
-      {.wlan_fullmac_impl = std::move(protocol)});
-  auto status = outgoing_dir_.AddService<fuchsia_wlan_fullmac::Service>(std::move(handler));
-  if (status.is_error()) {
-    BRCMF_ERR("Failed to add service to outgoing directory: %s\n", status.status_string());
-    return status.error_value();
-  }
-  auto result = outgoing_dir_.Serve(std::move(server_end));
-  if (result.is_error()) {
-    BRCMF_ERR("Failed to serve outgoing directory: %s\n", result.status_string());
-    return result.error_value();
-  }
-
-  return ZX_OK;
+  });
 }
 
 zx_status_t WlanInterface::GetSupportedMacRoles(

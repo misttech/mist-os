@@ -22,8 +22,6 @@ constexpr simulation::WlanTxInfo kDefaultTxInfo = {.channel = kDefaultChannel};
 class MfgTest : public SimTest {
  public:
   static constexpr zx::duration kTestDuration = zx::sec(100);
-  // How many devices have been registered by the fake devhost
-  uint32_t DeviceCountByProtocolId(uint32_t proto_id);
   void CreateIF(wlan_common::WlanMacRole role);
   void DelIF(SimInterface* ifc);
   void StartSoftAP();
@@ -33,10 +31,6 @@ class MfgTest : public SimTest {
   SimInterface client_ifc_;
   SimInterface softap_ifc_;
 };
-
-uint32_t MfgTest::DeviceCountByProtocolId(uint32_t proto_id) {
-  return dev_mgr_->DeviceCountByProtocolId(proto_id);
-}
 
 void MfgTest::CreateIF(wlan_common::WlanMacRole role) {
   switch (role) {
@@ -80,7 +74,6 @@ TEST_F(MfgTest, BasicTest) {
 
   // Now delete the Client IF and SoftAP creation should pass
   EXPECT_EQ(DeleteInterface(&client_ifc_), ZX_OK);
-  EXPECT_EQ(DeviceCountByProtocolId(ZX_PROTOCOL_WLAN_FULLMAC_IMPL), 0u);
   ASSERT_EQ(StartInterface(wlan_common::WlanMacRole::kAp, &softap_ifc_, kDefaultBssid), ZX_OK);
   // Now that SoftAP IF is created, Client IF creation should fail
   ASSERT_NE(StartInterface(wlan_common::WlanMacRole::kClient, &client_ifc_), ZX_OK);

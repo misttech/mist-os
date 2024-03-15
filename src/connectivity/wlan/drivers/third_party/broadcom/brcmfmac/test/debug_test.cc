@@ -16,20 +16,23 @@
 
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/debug.h"
 
-#include <algorithm>
-
 #include <gtest/gtest.h>
+#include <wlan/drivers/testing/test_helpers.h>
 
 namespace {
 
+class DebugTest : public ::testing::Test {
+  wlan::drivers::log::testing::UnitTestLogContext logging_{"DebugTest"};
+};
+
 // Sanity test for log lines.
-TEST(DebugTest, Logging) {
+TEST_F(DebugTest, Logging) {
   BRCMF_INFO("foo %s", "foo");
   BRCMF_WARN("bar %s", "bar");
   BRCMF_ERR("baz %s", "baz");
 }
 
-TEST(DebugTest, ThrottleMacrosCompile) {
+TEST_F(DebugTest, ThrottleMacrosCompile) {
   BRCMF_ERR_THROTTLE("Throttled error message: %d", 42);
   BRCMF_WARN_THROTTLE("Throttled warning message: %s", "scary");
   BRCMF_INFO_THROTTLE("Throttled info message: %x", 0xf00);

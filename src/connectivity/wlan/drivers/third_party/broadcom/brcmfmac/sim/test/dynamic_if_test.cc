@@ -49,9 +49,6 @@ class DynamicIfTest : public SimTest {
   DynamicIfTest() : ap_(env_.get(), kDefaultBssid, kDefaultSsid, kDefaultChannel) {}
   void Init();
 
-  // How many devices have been registered by the fake devhost
-  uint32_t DeviceCountByProtocolId(uint32_t proto_id);
-
   // Force fail an attempt to stop the softAP
   void InjectStopAPError();
 
@@ -91,34 +88,38 @@ void DynamicIfTest::Init() {
   ap_.EnableBeacon(zx::msec(100));
 }
 
-uint32_t DynamicIfTest::DeviceCountByProtocolId(uint32_t proto_id) {
-  return dev_mgr_->DeviceCountByProtocolId(proto_id);
-}
-
 void DynamicIfTest::InjectStopAPError() {
-  brcmf_simdev* sim = device_->GetSim();
-  sim->sim_fw->err_inj_.AddErrInjIovar("bss", ZX_ERR_IO, BCME_OK, softap_ifc_.iface_id_);
+  WithSimDevice([&](brcmfmac::SimDevice* device) {
+    brcmf_simdev* sim = device->GetSim();
+    sim->sim_fw->err_inj_.AddErrInjIovar("bss", ZX_ERR_IO, BCME_OK, softap_ifc_.iface_id_);
+  });
 }
 
 void DynamicIfTest::InjectStartAPIgnore() {
-  brcmf_simdev* sim = device_->GetSim();
-  sim->sim_fw->err_inj_.AddErrInjCmd(BRCMF_C_SET_SSID, ZX_OK, BCME_OK, softap_ifc_.iface_id_);
+  WithSimDevice([&](brcmfmac::SimDevice* device) {
+    brcmf_simdev* sim = device->GetSim();
+    sim->sim_fw->err_inj_.AddErrInjCmd(BRCMF_C_SET_SSID, ZX_OK, BCME_OK, softap_ifc_.iface_id_);
+  });
 }
 
 void DynamicIfTest::DelInjectedStartAPIgnore() {
-  brcmf_simdev* sim = device_->GetSim();
-  sim->sim_fw->err_inj_.DelErrInjCmd(BRCMF_C_SET_SSID);
+  WithSimDevice([&](brcmfmac::SimDevice* device) {
+    brcmf_simdev* sim = device->GetSim();
+    sim->sim_fw->err_inj_.DelErrInjCmd(BRCMF_C_SET_SSID);
+  });
 }
 
 void DynamicIfTest::ChannelCheck() {
   uint16_t softap_chanspec = GetChanspec(true, ZX_OK);
   uint16_t client_chanspec = GetChanspec(false, ZX_OK);
   EXPECT_EQ(softap_chanspec, client_chanspec);
-  brcmf_simdev* sim = device_->GetSim();
-  wlan_common::WlanChannel channel;
-  sim->sim_fw->convert_chanspec_to_channel(softap_chanspec, &channel);
-  EXPECT_GE(softap_ifc_.stats_.csa_indications.size(), 1U);
-  EXPECT_EQ(channel.primary, softap_ifc_.stats_.csa_indications.front().new_channel);
+  WithSimDevice([&](brcmfmac::SimDevice* device) {
+    brcmf_simdev* sim = device->GetSim();
+    wlan_common::WlanChannel channel;
+    sim->sim_fw->convert_chanspec_to_channel(softap_chanspec, &channel);
+    EXPECT_GE(softap_ifc_.stats_.csa_indications.size(), 1U);
+    EXPECT_EQ(channel.primary, softap_ifc_.stats_.csa_indications.front().new_channel);
+  });
 }
 
 void DynamicIfTest::TxAuthAndAssocReq() {
@@ -139,9 +140,11 @@ void DynamicIfTest::VerifyAssocWithSoftAP() {
   // the number of clients
   ASSERT_EQ(softap_ifc_.stats_.assoc_indications.size(), 1U);
   ASSERT_EQ(softap_ifc_.stats_.auth_indications.size(), 1U);
-  brcmf_simdev* sim = device_->GetSim();
-  uint16_t num_clients = sim->sim_fw->GetNumClients(softap_ifc_.iface_id_);
-  ASSERT_EQ(num_clients, 1U);
+  WithSimDevice([&](brcmfmac::SimDevice* device) {
+    brcmf_simdev* sim = device->GetSim();
+    uint16_t num_clients = sim->sim_fw->GetNumClients(softap_ifc_.iface_id_);
+    ASSERT_EQ(num_clients, 1U);
+  });
 }
 
 void DynamicIfTest::VerifyStartApTimer() {
@@ -153,20 +156,24 @@ void DynamicIfTest::VerifyStartApTimer() {
 }
 
 void DynamicIfTest::SetChanspec(bool is_ap_iface, uint16_t* chanspec, zx_status_t expect_result) {
-  brcmf_simdev* sim = device_->GetSim();
-  struct brcmf_if* ifp =
-      brcmf_get_ifp(sim->drvr, is_ap_iface ? softap_ifc_.iface_id_ : client_ifc_.iface_id_);
-  zx_status_t status = brcmf_fil_iovar_int_set(ifp, "chanspec", *chanspec, nullptr);
-  EXPECT_EQ(status, expect_result);
+  WithSimDevice([&](brcmfmac::SimDevice* device) {
+    brcmf_simdev* sim = device->GetSim();
+    struct brcmf_if* ifp =
+        brcmf_get_ifp(sim->drvr, is_ap_iface ? softap_ifc_.iface_id_ : client_ifc_.iface_id_);
+    zx_status_t status = brcmf_fil_iovar_int_set(ifp, "chanspec", *chanspec, nullptr);
+    EXPECT_EQ(status, expect_result);
+  });
 }
 
 uint16_t DynamicIfTest::GetChanspec(bool is_ap_iface, zx_status_t expect_result) {
-  brcmf_simdev* sim = device_->GetSim();
   uint32_t chanspec;
-  struct brcmf_if* ifp =
-      brcmf_get_ifp(sim->drvr, is_ap_iface ? softap_ifc_.iface_id_ : client_ifc_.iface_id_);
-  zx_status_t status = brcmf_fil_iovar_int_get(ifp, "chanspec", &chanspec, nullptr);
-  EXPECT_EQ(status, expect_result);
+  WithSimDevice([&](brcmfmac::SimDevice* device) {
+    brcmf_simdev* sim = device->GetSim();
+    struct brcmf_if* ifp =
+        brcmf_get_ifp(sim->drvr, is_ap_iface ? softap_ifc_.iface_id_ : client_ifc_.iface_id_);
+    zx_status_t status = brcmf_fil_iovar_int_get(ifp, "chanspec", &chanspec, nullptr);
+    EXPECT_EQ(status, expect_result);
+  });
   return chanspec;
 }
 
@@ -255,11 +262,14 @@ TEST_F(DynamicIfTest, CreateDestroy) {
   Init();
 
   uint32_t buf_key_b4_m4;
-  brcmf_simdev* sim = device_->GetSim();
-  struct brcmf_if* ifp = brcmf_get_ifp(sim->drvr, 0);
-  // Iovar buf_key_b4_m4 is set to 1 during init. Check if it is set correctly.
-  EXPECT_EQ(ZX_OK, brcmf_fil_iovar_data_get(ifp, "buf_key_b4_m4", &buf_key_b4_m4,
-                                            sizeof(buf_key_b4_m4), nullptr));
+  WithSimDevice([&](brcmfmac::SimDevice* device) {
+    brcmf_simdev* sim = device->GetSim();
+    struct brcmf_if* ifp = brcmf_get_ifp(sim->drvr, 0);
+    // Iovar buf_key_b4_m4 is set to 1 during init. Check if it is set correctly.
+    EXPECT_EQ(ZX_OK, brcmf_fil_iovar_data_get(ifp, "buf_key_b4_m4", &buf_key_b4_m4,
+                                              sizeof(buf_key_b4_m4), nullptr));
+  });
+
   EXPECT_EQ(buf_key_b4_m4, 1U);
   ASSERT_EQ(StartInterface(wlan_common::WlanMacRole::kClient, &client_ifc_, kFakeMac), ZX_OK);
 
@@ -269,7 +279,6 @@ TEST_F(DynamicIfTest, CreateDestroy) {
   EXPECT_EQ(client_mac, kFakeMac);
 
   EXPECT_EQ(DeleteInterface(&client_ifc_), ZX_OK);
-  EXPECT_EQ(DeviceCountByProtocolId(ZX_PROTOCOL_WLAN_FULLMAC_IMPL), 0u);
 
   ASSERT_EQ(StartInterface(wlan_common::WlanMacRole::kAp, &softap_ifc_, kDefaultBssid), ZX_OK);
 
@@ -279,37 +288,39 @@ TEST_F(DynamicIfTest, CreateDestroy) {
   EXPECT_EQ(soft_ap_mac, kDefaultBssid);
 
   EXPECT_EQ(DeleteInterface(&softap_ifc_), ZX_OK);
-  EXPECT_EQ(DeviceCountByProtocolId(ZX_PROTOCOL_WLAN_FULLMAC_IMPL), 0u);
 }
 
-// https://fxbug.dev/42158897 resulted because of a race created by the invokation of the event handler prior
-// to handling of the armed check based interface removal. In this test, we use a fake event handler
-// to validate that the handler is invoked after all BRCMF_E_IF_DEL related handling is complete.
+// https://fxbug.dev/42158897 resulted because of a race created by the invokation of the event
+// handler prior to handling of the armed check based interface removal. In this test, we use a fake
+// event handler to validate that the handler is invoked after all BRCMF_E_IF_DEL related handling
+// is complete.
 TEST_F(DynamicIfTest, EventHandlingOnSoftAPDel) {
   Init();
-  brcmf_simdev* sim = device_->GetSim();
-  wireless_dev* wdev = nullptr;
+  WithSimDevice([&](brcmfmac::SimDevice* device) {
+    brcmf_simdev* sim = device->GetSim();
+    wireless_dev* wdev = nullptr;
 
-  // We manually start the AP interface to avoid the additional logic within
-  // StartInterface(). This allows us to keep the interface removal simple.
-  wlan_common::WlanMacRole ap_role = wlan_common::WlanMacRole::kAp;
-  EXPECT_EQ(ZX_OK, softap_ifc_.Init(env_, ap_role));
+    // We manually start the AP interface to avoid the additional logic within
+    // StartInterface(). This allows us to keep the interface removal simple.
+    wlan_common::WlanMacRole ap_role = wlan_common::WlanMacRole::kAp;
+    EXPECT_EQ(ZX_OK, softap_ifc_.Init(env_.get(), ap_role));
 
-  auto builder = fuchsia_wlan_phyimpl::wire::WlanPhyImplCreateIfaceRequest::Builder(test_arena_);
-  builder.role(fuchsia_wlan_common_wire::WlanMacRole::kAp);
-  auto ch = zx::channel(softap_ifc_.ch_mlme_);
-  builder.mlme_channel(std::move(ch));
-  auto req = builder.Build();
-  EXPECT_EQ(ZX_OK, brcmf_cfg80211_add_iface(sim->drvr, kFakeApName, nullptr, &req, &wdev));
+    auto builder = fuchsia_wlan_phyimpl::wire::WlanPhyImplCreateIfaceRequest::Builder(test_arena_);
+    builder.role(fuchsia_wlan_common_wire::WlanMacRole::kAp);
+    auto ch = zx::channel(softap_ifc_.ch_mlme_);
+    builder.mlme_channel(std::move(ch));
+    auto req = builder.Build();
+    EXPECT_EQ(ZX_OK, brcmf_cfg80211_add_iface(sim->drvr, kFakeApName, nullptr, &req, &wdev));
 
-  // Override callback function to validate that it does not get invoked for del event.
-  brcmf_fweh_unregister(sim->drvr, BRCMF_E_IF);
-  EXPECT_EQ(ZX_OK, brcmf_fweh_register(sim->drvr, BRCMF_E_IF, validate_not_invoked_on_del));
+    // Override callback function to validate that it does not get invoked for del event.
+    brcmf_fweh_unregister(sim->drvr, BRCMF_E_IF);
+    EXPECT_EQ(ZX_OK, brcmf_fweh_register(sim->drvr, BRCMF_E_IF, validate_not_invoked_on_del));
 
-  struct net_device* ndev = wdev->netdev;
-  struct brcmf_if* ifp = ndev_to_if(ndev);
-  EXPECT_EQ(wdev->iftype, fuchsia_wlan_common_wire::WlanMacRole::kAp);
-  EXPECT_EQ(ZX_OK, brcmf_fil_bsscfg_data_set(ifp, "interface_remove", nullptr, 0));
+    struct net_device* ndev = wdev->netdev;
+    struct brcmf_if* ifp = ndev_to_if(ndev);
+    EXPECT_EQ(wdev->iftype, fuchsia_wlan_common_wire::WlanMacRole::kAp);
+    EXPECT_EQ(ZX_OK, brcmf_fil_bsscfg_data_set(ifp, "interface_remove", nullptr, 0));
+  });
 }
 
 // Verify if all iovars in metadata were set.
@@ -369,28 +380,38 @@ static void verify_metadata_iovars(brcmf_simdev* sim, brcmf_if* ifp) {
 TEST_F(DynamicIfTest, CheckClientInitParams) {
   // Call Preinit to create the sim device (initialization is done in Init()).
   PreInit();
-  brcmf_simdev* sim = device_->GetSim();
-  // Replace get_wifi_metadata with the local function
-  brcmf_bus_ops modified_bus_ops = *(sim->drvr->bus_if->ops);
-  modified_bus_ops.get_wifi_metadata = &modified_get_metadata;
-  const brcmf_bus_ops* original_bus_ops = sim->drvr->bus_if->ops;
-  sim->drvr->bus_if->ops = &modified_bus_ops;
+
+  const brcmf_bus_ops* original_bus_ops;
+  brcmf_bus_ops modified_bus_ops;
+
+  WithSimDevice([&](brcmfmac::SimDevice* device) {
+    ASSERT_NOT_NULL(device);
+    brcmf_simdev* sim = device->GetSim();
+    ASSERT_NOT_NULL(sim);
+    // Replace get_wifi_metadata with the local function
+    modified_bus_ops = *(sim->drvr->bus_if->ops);
+    modified_bus_ops.get_wifi_metadata = &modified_get_metadata;
+    original_bus_ops = sim->drvr->bus_if->ops;
+    sim->drvr->bus_if->ops = &modified_bus_ops;
+  });
 
   // Complete initialization.
   Init();
   ASSERT_EQ(StartInterface(wlan_common::WlanMacRole::kClient, &client_ifc_, kFakeMac), ZX_OK);
 
   // Get the client ifp to check iovars
-  struct brcmf_if* ifp = brcmf_get_ifp(sim->drvr, client_ifc_.iface_id_);
-  ASSERT_NE(ifp, nullptr);
+  WithSimDevice([&](brcmfmac::SimDevice* device) {
+    brcmf_simdev* sim = device->GetSim();
+    struct brcmf_if* ifp = brcmf_get_ifp(sim->drvr, client_ifc_.iface_id_);
+    ASSERT_NE(ifp, nullptr);
 
-  // Verify if all iovars in metadata were set to FW.
-  verify_metadata_iovars(sim, ifp);
+    // Verify if all iovars in metadata were set to FW.
+    verify_metadata_iovars(sim, ifp);
 
-  // Set sim->drvr->bus_if->ops back to the original set of brcmf_bus_ops
-  sim->drvr->bus_if->ops = original_bus_ops;
+    // Set sim->drvr->bus_if->ops back to the original set of brcmf_bus_ops
+    sim->drvr->bus_if->ops = original_bus_ops;
+  });
   EXPECT_EQ(DeleteInterface(&client_ifc_), ZX_OK);
-  EXPECT_EQ(DeviceCountByProtocolId(ZX_PROTOCOL_WLAN_FULLMAC_IMPL), 0u);
 }
 
 // This test case verifies that starting an AP iface using the same MAC address as the existing
@@ -404,23 +425,24 @@ TEST_F(DynamicIfTest, CreateApWithSameMacAsClient) {
   client_ifc_.GetMacAddr(&client_mac);
   EXPECT_EQ(StartInterface(wlan_common::WlanMacRole::kAp, &softap_ifc_, client_mac),
             ZX_ERR_ALREADY_EXISTS);
-  EXPECT_EQ(DeviceCountByProtocolId(ZX_PROTOCOL_WLAN_FULLMAC_IMPL), 1u);
   EXPECT_EQ(DeleteInterface(&client_ifc_), ZX_OK);
-  EXPECT_EQ(DeviceCountByProtocolId(ZX_PROTOCOL_WLAN_FULLMAC_IMPL), 0u);
 }
 
 // Ensure AP uses auto-gen MAC address when MAC address is not specified in the StartInterface
 // request.
 TEST_F(DynamicIfTest, CreateApWithNoMACAddress) {
   Init();
-  brcmf_simdev* sim = device_->GetSim();
 
-  // Get the expected auto-gen MAC addr that AP will use when no MAC addr is passed.
-  // Note, since the default MAC addr of client iface is same as the AP iface, we use that to figure
-  // out the auto-gen MAC addr.
-  struct brcmf_if* ifp = brcmf_get_ifp(sim->drvr, 0);
   wlan::common::MacAddr expected_mac_addr;
-  EXPECT_EQ(brcmf_gen_ap_macaddr(ifp, expected_mac_addr), ZX_OK);
+  WithSimDevice([&](brcmfmac::SimDevice* device) {
+    brcmf_simdev* sim = device->GetSim();
+
+    // Get the expected auto-gen MAC addr that AP will use when no MAC addr is passed.
+    // Note, since the default MAC addr of client iface is same as the AP iface, we use that to
+    // figure out the auto-gen MAC addr.
+    struct brcmf_if* ifp = brcmf_get_ifp(sim->drvr, 0);
+    EXPECT_EQ(brcmf_gen_ap_macaddr(ifp, expected_mac_addr), ZX_OK);
+  });
 
   // Ensure passing nullopt for mac_addr results in use of auto generated MAC address.
   EXPECT_EQ(StartInterface(wlan_common::WlanMacRole::kAp, &softap_ifc_, std::nullopt), ZX_OK);
@@ -428,9 +450,7 @@ TEST_F(DynamicIfTest, CreateApWithNoMACAddress) {
   softap_ifc_.GetMacAddr(&softap_mac);
   EXPECT_EQ(softap_mac, expected_mac_addr);
 
-  EXPECT_EQ(DeviceCountByProtocolId(ZX_PROTOCOL_WLAN_FULLMAC_IMPL), 1u);
   EXPECT_EQ(DeleteInterface(&softap_ifc_), ZX_OK);
-  EXPECT_EQ(DeviceCountByProtocolId(ZX_PROTOCOL_WLAN_FULLMAC_IMPL), 0u);
 }
 
 // This test verifies that if we want to create an client iface with the same MAC address as the
@@ -438,89 +458,94 @@ TEST_F(DynamicIfTest, CreateApWithNoMACAddress) {
 TEST_F(DynamicIfTest, CreateClientWithPreAllocMac) {
   Init();
   common::MacAddr pre_set_mac;
-  brcmf_simdev* sim = device_->GetSim();
-  struct brcmf_if* ifp = brcmf_get_ifp(sim->drvr, 0);
-  zx_status_t status =
-      brcmf_fil_iovar_data_get(ifp, "cur_etheraddr", pre_set_mac.byte, ETH_ALEN, nullptr);
-  EXPECT_EQ(status, ZX_OK);
+
+  WithSimDevice([&](brcmfmac::SimDevice* device) {
+    brcmf_simdev* sim = device->GetSim();
+    struct brcmf_if* ifp = brcmf_get_ifp(sim->drvr, 0);
+    zx_status_t status =
+        brcmf_fil_iovar_data_get(ifp, "cur_etheraddr", pre_set_mac.byte, ETH_ALEN, nullptr);
+    EXPECT_EQ(status, ZX_OK);
+  });
 
   EXPECT_EQ(StartInterface(wlan_common::WlanMacRole::kClient, &client_ifc_, pre_set_mac), ZX_OK);
-  EXPECT_EQ(DeviceCountByProtocolId(ZX_PROTOCOL_WLAN_FULLMAC_IMPL), 1u);
   EXPECT_EQ(DeleteInterface(&client_ifc_), ZX_OK);
-  EXPECT_EQ(DeviceCountByProtocolId(ZX_PROTOCOL_WLAN_FULLMAC_IMPL), 0u);
 }
 
 // This test verifies that we still successfully create an iface with a random
 // MAC address even if the bootloader MAC address cannot be retrieved.
 TEST_F(DynamicIfTest, CreateClientWithRandomMac) {
   Init();
-  brcmf_simdev* sim = device_->GetSim();
+  brcmf_bus_ops modified_bus_ops;
+  WithSimDevice([&](brcmfmac::SimDevice* device) {
+    brcmf_simdev* sim = device->GetSim();
 
-  // Replace get_bootloader_mac_addr with a function that will fail
-  brcmf_bus_ops modified_bus_ops = *(sim->drvr->bus_if->ops);
-  modified_bus_ops.get_bootloader_macaddr = [](brcmf_bus* bus, uint8_t* mac_addr) {
-    return ZX_ERR_NOT_SUPPORTED;
-  };
-  const brcmf_bus_ops* original_bus_ops = sim->drvr->bus_if->ops;
-  sim->drvr->bus_if->ops = &modified_bus_ops;
+    // Replace get_bootloader_mac_addr with a function that will fail
+    modified_bus_ops = *(sim->drvr->bus_if->ops);
+    modified_bus_ops.get_bootloader_macaddr = [](brcmf_bus* bus, uint8_t* mac_addr) {
+      return ZX_ERR_NOT_SUPPORTED;
+    };
+    const brcmf_bus_ops* original_bus_ops = sim->drvr->bus_if->ops;
+    sim->drvr->bus_if->ops = &modified_bus_ops;
 
-  // Test that get_bootloader_macaddr was indeed replaced
-  uint8_t bootloader_macaddr[ETH_ALEN];
-  EXPECT_EQ(ZX_ERR_NOT_SUPPORTED,
-            brcmf_bus_get_bootloader_macaddr(sim->drvr->bus_if, bootloader_macaddr));
+    // Test that get_bootloader_macaddr was indeed replaced
+    uint8_t bootloader_macaddr[ETH_ALEN];
+    EXPECT_EQ(ZX_ERR_NOT_SUPPORTED,
+              brcmf_bus_get_bootloader_macaddr(sim->drvr->bus_if, bootloader_macaddr));
 
-  EXPECT_EQ(ZX_OK, client_ifc_.Init(env_, wlan_common::WlanMacRole::kClient));
-  wireless_dev* wdev = nullptr;
-  auto builder = fuchsia_wlan_phyimpl::wire::WlanPhyImplCreateIfaceRequest::Builder(test_arena_);
-  builder.role(fuchsia_wlan_common_wire::WlanMacRole::kClient);
-  auto ch = zx::channel(client_ifc_.ch_mlme_);
-  builder.mlme_channel(std::move(ch));
-  auto req = builder.Build();
-  EXPECT_EQ(ZX_OK, brcmf_cfg80211_add_iface(sim->drvr, kFakeClientName, nullptr, &req, &wdev));
-  EXPECT_EQ(ZX_OK, brcmf_cfg80211_del_iface(sim->drvr->config, wdev));
+    EXPECT_EQ(ZX_OK, client_ifc_.Init(env_.get(), wlan_common::WlanMacRole::kClient));
+    wireless_dev* wdev = nullptr;
+    auto builder = fuchsia_wlan_phyimpl::wire::WlanPhyImplCreateIfaceRequest::Builder(test_arena_);
+    builder.role(fuchsia_wlan_common_wire::WlanMacRole::kClient);
+    auto ch = zx::channel(client_ifc_.ch_mlme_);
+    builder.mlme_channel(std::move(ch));
+    auto req = builder.Build();
+    EXPECT_EQ(ZX_OK, brcmf_cfg80211_add_iface(sim->drvr, kFakeClientName, nullptr, &req, &wdev));
+    EXPECT_EQ(ZX_OK, brcmf_cfg80211_del_iface(sim->drvr->config, wdev));
 
-  // Set sim->drvr->bus_if->ops back to the original set of brcmf_bus_ops
-  sim->drvr->bus_if->ops = original_bus_ops;
-  EXPECT_EQ(DeviceCountByProtocolId(ZX_PROTOCOL_WLAN_FULLMAC_IMPL), 0u);
+    // Set sim->drvr->bus_if->ops back to the original set of brcmf_bus_ops
+    sim->drvr->bus_if->ops = original_bus_ops;
+  });
 }
 
 // This test verifies brcmf_cfg80211_add_iface() returns ZX_ERR_INVALID_ARGS if the wdev_out
 // argument is nullptr.
 TEST_F(DynamicIfTest, CreateIfaceMustProvideWdevOut) {
   Init();
-  brcmf_simdev* sim = device_->GetSim();
 
-  wlan_common::WlanMacRole client_role = wlan_common::WlanMacRole::kClient;
-  EXPECT_EQ(ZX_OK, client_ifc_.Init(env_, client_role));
-  auto builder = fuchsia_wlan_phyimpl::wire::WlanPhyImplCreateIfaceRequest::Builder(test_arena_);
-  builder.role(fuchsia_wlan_common_wire::WlanMacRole::kAp);
-  auto ch = zx::channel(client_ifc_.ch_mlme_);
-  builder.mlme_channel(std::move(ch));
-  auto req = builder.Build();
-  EXPECT_EQ(ZX_ERR_INVALID_ARGS,
-            brcmf_cfg80211_add_iface(sim->drvr, kFakeClientName, nullptr, &req, nullptr));
-  EXPECT_EQ(DeviceCountByProtocolId(ZX_PROTOCOL_WLAN_FULLMAC_IMPL), 0u);
+  WithSimDevice([&](brcmfmac::SimDevice* device) {
+    brcmf_simdev* sim = device->GetSim();
+
+    wlan_common::WlanMacRole client_role = wlan_common::WlanMacRole::kClient;
+    EXPECT_EQ(ZX_OK, client_ifc_.Init(env_.get(), client_role));
+    auto builder = fuchsia_wlan_phyimpl::wire::WlanPhyImplCreateIfaceRequest::Builder(test_arena_);
+    builder.role(fuchsia_wlan_common_wire::WlanMacRole::kAp);
+    auto ch = zx::channel(client_ifc_.ch_mlme_);
+    builder.mlme_channel(std::move(ch));
+    auto req = builder.Build();
+    EXPECT_EQ(ZX_ERR_INVALID_ARGS,
+              brcmf_cfg80211_add_iface(sim->drvr, kFakeClientName, nullptr, &req, nullptr));
+  });
 }
 
 void DynamicIfTest::CheckAddIfaceWritesWdev(wlan_common::WlanMacRole role, const char iface_name[],
                                             SimInterface& ifc) {
-  brcmf_simdev* sim = device_->GetSim();
-  wireless_dev* wdev = nullptr;
+  WithSimDevice([&](brcmfmac::SimDevice* device) {
+    brcmf_simdev* sim = device->GetSim();
+    wireless_dev* wdev = nullptr;
 
-  EXPECT_EQ(ZX_OK, ifc.Init(env_, role));
-  auto builder = fuchsia_wlan_phyimpl::wire::WlanPhyImplCreateIfaceRequest::Builder(test_arena_);
-  builder.role(role);
-  auto ch = zx::channel(ifc.ch_mlme_);
-  builder.mlme_channel(std::move(ch));
-  auto req = builder.Build();
-  EXPECT_EQ(ZX_OK, brcmf_cfg80211_add_iface(sim->drvr, iface_name, nullptr, &req, &wdev));
-  EXPECT_NE(nullptr, wdev);
-  EXPECT_NE(nullptr, wdev->netdev);
-  EXPECT_EQ(wdev->iftype, role);
+    EXPECT_EQ(ZX_OK, ifc.Init(env_.get(), role));
+    auto builder = fuchsia_wlan_phyimpl::wire::WlanPhyImplCreateIfaceRequest::Builder(test_arena_);
+    builder.role(role);
+    auto ch = zx::channel(ifc.ch_mlme_);
+    builder.mlme_channel(std::move(ch));
+    auto req = builder.Build();
+    EXPECT_EQ(ZX_OK, brcmf_cfg80211_add_iface(sim->drvr, iface_name, nullptr, &req, &wdev));
+    EXPECT_NE(nullptr, wdev);
+    EXPECT_NE(nullptr, wdev->netdev);
+    EXPECT_EQ(wdev->iftype, role);
 
-  EXPECT_EQ(ZX_OK, brcmf_cfg80211_del_iface(sim->drvr->config, wdev));
-
-  EXPECT_EQ(DeviceCountByProtocolId(ZX_PROTOCOL_WLAN_FULLMAC_IMPL), 0u);
+    EXPECT_EQ(ZX_OK, brcmf_cfg80211_del_iface(sim->drvr->config, wdev));
+  });
 }
 
 // This test verifies brcmf_cfg80211_add_iface() behavior with respect to
@@ -541,98 +566,100 @@ TEST_F(DynamicIfTest, CreateApWritesWdev) {
 // primary network interface is kPrimaryNetworkInterfaceName (defined in core.h)
 TEST_F(DynamicIfTest, CreateClientWithCustomName) {
   Init();
-  brcmf_simdev* sim = device_->GetSim();
-  struct brcmf_if* ifp = brcmf_get_ifp(sim->drvr, 0);
-  wireless_dev* wdev = nullptr;
+  WithSimDevice([&](brcmfmac::SimDevice* device) {
+    brcmf_simdev* sim = device->GetSim();
+    struct brcmf_if* ifp = brcmf_get_ifp(sim->drvr, 0);
+    wireless_dev* wdev = nullptr;
 
-  wlan_common::WlanMacRole client_role = wlan_common::WlanMacRole::kClient;
-  EXPECT_EQ(ZX_OK, client_ifc_.Init(env_, client_role));
-  auto builder = fuchsia_wlan_phyimpl::wire::WlanPhyImplCreateIfaceRequest::Builder(test_arena_);
-  builder.role(fuchsia_wlan_common_wire::WlanMacRole::kClient);
-  auto ch = zx::channel(client_ifc_.ch_mlme_);
-  builder.mlme_channel(std::move(ch));
-  auto req = builder.Build();
+    wlan_common::WlanMacRole client_role = wlan_common::WlanMacRole::kClient;
+    EXPECT_EQ(ZX_OK, client_ifc_.Init(env_.get(), client_role));
+    auto builder = fuchsia_wlan_phyimpl::wire::WlanPhyImplCreateIfaceRequest::Builder(test_arena_);
+    builder.role(fuchsia_wlan_common_wire::WlanMacRole::kClient);
+    auto ch = zx::channel(client_ifc_.ch_mlme_);
+    builder.mlme_channel(std::move(ch));
+    auto req = builder.Build();
 
-  EXPECT_EQ(0, strcmp(brcmf_ifname(ifp), kPrimaryNetworkInterfaceName));
-  EXPECT_EQ(ZX_OK, brcmf_cfg80211_add_iface(sim->drvr, kFakeClientName, nullptr, &req, &wdev));
-  EXPECT_EQ(0, strcmp(wdev->netdev->name, kFakeClientName));
-  EXPECT_EQ(0, strcmp(brcmf_ifname(ifp), kFakeClientName));
-  EXPECT_EQ(ZX_OK, brcmf_cfg80211_del_iface(sim->drvr->config, wdev));
-  EXPECT_EQ(0, strcmp(brcmf_ifname(ifp), kPrimaryNetworkInterfaceName));
-
-  EXPECT_EQ(DeviceCountByProtocolId(ZX_PROTOCOL_WLAN_FULLMAC_IMPL), 0u);
+    EXPECT_EQ(0, strcmp(brcmf_ifname(ifp), kPrimaryNetworkInterfaceName));
+    EXPECT_EQ(ZX_OK, brcmf_cfg80211_add_iface(sim->drvr, kFakeClientName, nullptr, &req, &wdev));
+    EXPECT_EQ(0, strcmp(wdev->netdev->name, kFakeClientName));
+    EXPECT_EQ(0, strcmp(brcmf_ifname(ifp), kFakeClientName));
+    EXPECT_EQ(ZX_OK, brcmf_cfg80211_del_iface(sim->drvr->config, wdev));
+    EXPECT_EQ(0, strcmp(brcmf_ifname(ifp), kPrimaryNetworkInterfaceName));
+  });
 }
 
 // This test verifies new ap interface names are assigned.
 TEST_F(DynamicIfTest, CreateApWithCustomName) {
   Init();
-  brcmf_simdev* sim = device_->GetSim();
-  wireless_dev* wdev = nullptr;
+  WithSimDevice([&](brcmfmac::SimDevice* device) {
+    brcmf_simdev* sim = device->GetSim();
+    wireless_dev* wdev = nullptr;
 
-  wlan_common::WlanMacRole ap_role = wlan_common::WlanMacRole::kAp;
-  EXPECT_EQ(ZX_OK, softap_ifc_.Init(env_, ap_role));
+    wlan_common::WlanMacRole ap_role = wlan_common::WlanMacRole::kAp;
+    EXPECT_EQ(ZX_OK, softap_ifc_.Init(env_.get(), ap_role));
 
-  auto builder = fuchsia_wlan_phyimpl::wire::WlanPhyImplCreateIfaceRequest::Builder(test_arena_);
-  builder.role(fuchsia_wlan_common_wire::WlanMacRole::kAp);
-  auto ch = zx::channel(softap_ifc_.ch_mlme_);
-  builder.mlme_channel(std::move(ch));
-  auto req = builder.Build();
-  EXPECT_EQ(ZX_OK, brcmf_cfg80211_add_iface(sim->drvr, kFakeApName, nullptr, &req, &wdev));
-  EXPECT_EQ(0, strcmp(wdev->netdev->name, kFakeApName));
-  EXPECT_EQ(ZX_OK, brcmf_cfg80211_del_iface(sim->drvr->config, wdev));
-
-  EXPECT_EQ(DeviceCountByProtocolId(ZX_PROTOCOL_WLAN_FULLMAC_IMPL), 0u);
+    auto builder = fuchsia_wlan_phyimpl::wire::WlanPhyImplCreateIfaceRequest::Builder(test_arena_);
+    builder.role(fuchsia_wlan_common_wire::WlanMacRole::kAp);
+    auto ch = zx::channel(softap_ifc_.ch_mlme_);
+    builder.mlme_channel(std::move(ch));
+    auto req = builder.Build();
+    EXPECT_EQ(ZX_OK, brcmf_cfg80211_add_iface(sim->drvr, kFakeApName, nullptr, &req, &wdev));
+    EXPECT_EQ(0, strcmp(wdev->netdev->name, kFakeApName));
+    EXPECT_EQ(ZX_OK, brcmf_cfg80211_del_iface(sim->drvr->config, wdev));
+  });
 }
 
 // This test verifies the truncation of long interface names.
 TEST_F(DynamicIfTest, CreateClientWithLongName) {
   Init();
-  brcmf_simdev* sim = device_->GetSim();
-  wireless_dev* wdev = nullptr;
+  WithSimDevice([&](brcmfmac::SimDevice* device) {
+    brcmf_simdev* sim = device->GetSim();
+    wireless_dev* wdev = nullptr;
 
-  wlan_common::WlanMacRole client_role = wlan_common::WlanMacRole::kClient;
-  EXPECT_EQ(ZX_OK, client_ifc_.Init(env_, client_role));
+    wlan_common::WlanMacRole client_role = wlan_common::WlanMacRole::kClient;
+    EXPECT_EQ(ZX_OK, client_ifc_.Init(env_.get(), client_role));
 
-  size_t really_long_name_len = NET_DEVICE_NAME_MAX_LEN + 1;
-  ASSERT_GT(really_long_name_len,
-            (size_t)NET_DEVICE_NAME_MAX_LEN);  // assert + 1 did not cause an overflow
-  char really_long_name[really_long_name_len];
-  for (size_t i = 0; i < really_long_name_len - 1; i++) {
-    really_long_name[i] = '0' + ((i + 1) % 10);
-  }
-  really_long_name[really_long_name_len - 1] = '\0';
+    size_t really_long_name_len = NET_DEVICE_NAME_MAX_LEN + 1;
+    ASSERT_GT(really_long_name_len,
+              (size_t)NET_DEVICE_NAME_MAX_LEN);  // assert + 1 did not cause an overflow
+    char really_long_name[really_long_name_len];
+    for (size_t i = 0; i < really_long_name_len - 1; i++) {
+      really_long_name[i] = '0' + ((i + 1) % 10);
+    }
+    really_long_name[really_long_name_len - 1] = '\0';
 
-  char truncated_name[NET_DEVICE_NAME_MAX_LEN];
-  strlcpy(truncated_name, really_long_name, sizeof(truncated_name));
-  ASSERT_LT(strlen(truncated_name),
-            strlen(really_long_name));  // sanity check that truncated_name is actually shorter
+    char truncated_name[NET_DEVICE_NAME_MAX_LEN];
+    strlcpy(truncated_name, really_long_name, sizeof(truncated_name));
+    ASSERT_LT(strlen(truncated_name),
+              strlen(really_long_name));  // check that truncated_name is actually shorter
 
-  auto builder = fuchsia_wlan_phyimpl::wire::WlanPhyImplCreateIfaceRequest::Builder(test_arena_);
-  builder.role(fuchsia_wlan_common_wire::WlanMacRole::kClient);
-  auto ch = zx::channel(client_ifc_.ch_mlme_);
-  builder.mlme_channel(std::move(ch));
-  auto req = builder.Build();
-  EXPECT_EQ(ZX_OK, brcmf_cfg80211_add_iface(sim->drvr, really_long_name, nullptr, &req, &wdev));
-  EXPECT_EQ(0, strcmp(wdev->netdev->name, truncated_name));
-  EXPECT_EQ(ZX_OK, brcmf_cfg80211_del_iface(sim->drvr->config, wdev));
-  EXPECT_EQ(DeviceCountByProtocolId(ZX_PROTOCOL_WLAN_FULLMAC_IMPL), 0u);
+    auto builder = fuchsia_wlan_phyimpl::wire::WlanPhyImplCreateIfaceRequest::Builder(test_arena_);
+    builder.role(fuchsia_wlan_common_wire::WlanMacRole::kClient);
+    auto ch = zx::channel(client_ifc_.ch_mlme_);
+    builder.mlme_channel(std::move(ch));
+    auto req = builder.Build();
+    EXPECT_EQ(ZX_OK, brcmf_cfg80211_add_iface(sim->drvr, really_long_name, nullptr, &req, &wdev));
+    EXPECT_EQ(0, strcmp(wdev->netdev->name, truncated_name));
+    EXPECT_EQ(ZX_OK, brcmf_cfg80211_del_iface(sim->drvr->config, wdev));
+  });
 }
 
 // This test verifies that creating a client interface with a pre-set MAC address will not cause
 // the pre-set MAC to be remembered by the driver.
 TEST_F(DynamicIfTest, CreateClientWithCustomMac) {
   Init();
-  common::MacAddr retrieved_mac;
-  brcmf_simdev* sim = device_->GetSim();
-  struct brcmf_if* ifp = brcmf_get_ifp(sim->drvr, 0);
   EXPECT_EQ(StartInterface(wlan_common::WlanMacRole::kClient, &client_ifc_, kFakeMac), ZX_OK);
-  EXPECT_EQ(ZX_OK,
-            brcmf_fil_iovar_data_get(ifp, "cur_etheraddr", retrieved_mac.byte, ETH_ALEN, nullptr));
-  EXPECT_EQ(retrieved_mac, kFakeMac);
 
-  EXPECT_EQ(DeviceCountByProtocolId(ZX_PROTOCOL_WLAN_FULLMAC_IMPL), 1u);
+  WithSimDevice([&](brcmfmac::SimDevice* device) {
+    common::MacAddr retrieved_mac;
+    brcmf_simdev* sim = device->GetSim();
+    struct brcmf_if* ifp = brcmf_get_ifp(sim->drvr, 0);
+    EXPECT_EQ(ZX_OK, brcmf_fil_iovar_data_get(ifp, "cur_etheraddr", retrieved_mac.byte, ETH_ALEN,
+                                              nullptr));
+    EXPECT_EQ(retrieved_mac, kFakeMac);
+  });
+
   EXPECT_EQ(DeleteInterface(&client_ifc_), ZX_OK);
-  EXPECT_EQ(DeviceCountByProtocolId(ZX_PROTOCOL_WLAN_FULLMAC_IMPL), 0u);
 }
 
 // This test verifies that creating a client interface with a custom MAC address will not cause
@@ -642,42 +669,57 @@ TEST_F(DynamicIfTest, ClientDefaultMacFallback) {
   Init();
   common::MacAddr pre_set_mac;
   common::MacAddr retrieved_mac;
-  brcmf_simdev* sim = device_->GetSim();
-  struct brcmf_if* ifp = brcmf_get_ifp(sim->drvr, 0);
-  EXPECT_EQ(ZX_OK,
-            brcmf_fil_iovar_data_get(ifp, "cur_etheraddr", pre_set_mac.byte, ETH_ALEN, nullptr));
+
+  WithSimDevice([&](brcmfmac::SimDevice* device) {
+    brcmf_simdev* sim = device->GetSim();
+    struct brcmf_if* ifp = brcmf_get_ifp(sim->drvr, 0);
+    EXPECT_EQ(ZX_OK,
+              brcmf_fil_iovar_data_get(ifp, "cur_etheraddr", pre_set_mac.byte, ETH_ALEN, nullptr));
+  });
 
   // Create a client with a custom MAC address
   EXPECT_EQ(ZX_OK, StartInterface(wlan_common::WlanMacRole::kClient, &client_ifc_, kFakeMac));
-  EXPECT_EQ(ZX_OK,
-            brcmf_fil_iovar_data_get(ifp, "cur_etheraddr", retrieved_mac.byte, ETH_ALEN, nullptr));
-  EXPECT_EQ(retrieved_mac, kFakeMac);
 
-  EXPECT_EQ(DeviceCountByProtocolId(ZX_PROTOCOL_WLAN_FULLMAC_IMPL), 1u);
+  WithSimDevice([&](brcmfmac::SimDevice* device) {
+    brcmf_simdev* sim = device->GetSim();
+    struct brcmf_if* ifp = brcmf_get_ifp(sim->drvr, 0);
+
+    EXPECT_EQ(ZX_OK, brcmf_fil_iovar_data_get(ifp, "cur_etheraddr", retrieved_mac.byte, ETH_ALEN,
+                                              nullptr));
+    EXPECT_EQ(retrieved_mac, kFakeMac);
+  });
+
   EXPECT_EQ(DeleteInterface(&client_ifc_), ZX_OK);
-  EXPECT_EQ(DeviceCountByProtocolId(ZX_PROTOCOL_WLAN_FULLMAC_IMPL), 0u);
 
   // Create a client without a custom MAC address
   EXPECT_EQ(ZX_OK, StartInterface(wlan_common::WlanMacRole::kClient, &client_ifc_));
-  EXPECT_EQ(ZX_OK,
-            brcmf_fil_iovar_data_get(ifp, "cur_etheraddr", retrieved_mac.byte, ETH_ALEN, nullptr));
-  EXPECT_EQ(retrieved_mac, pre_set_mac);
 
-  EXPECT_EQ(DeviceCountByProtocolId(ZX_PROTOCOL_WLAN_FULLMAC_IMPL), 1u);
+  WithSimDevice([&](brcmfmac::SimDevice* device) {
+    ASSERT_NOT_NULL(device);
+    brcmf_simdev* sim = device->GetSim();
+    struct brcmf_if* ifp = brcmf_get_ifp(sim->drvr, 0);
+    EXPECT_EQ(ZX_OK, brcmf_fil_iovar_data_get(ifp, "cur_etheraddr", retrieved_mac.byte, ETH_ALEN,
+                                              nullptr));
+    EXPECT_EQ(retrieved_mac, pre_set_mac);
+  });
+
   EXPECT_EQ(DeleteInterface(&client_ifc_), ZX_OK);
-  EXPECT_EQ(DeviceCountByProtocolId(ZX_PROTOCOL_WLAN_FULLMAC_IMPL), 0u);
 }
 
 // Test to check if C_DOWN & C_UP are set in FW during client disconnect.
 TEST_F(DynamicIfTest, CheckIfDownUpCalled) {
   // Call Preinit to create the sim device (initialization is done in Init()).
   PreInit();
-  brcmf_simdev* sim = device_->GetSim();
-  // Replace txctl with the local function
-  brcmf_bus_ops modified_bus_ops = *(sim->drvr->bus_if->ops);
-  modified_bus_ops.txctl = &modified_bus_txctl;
-  original_bus_ops = *(sim->drvr->bus_if->ops);
-  sim->drvr->bus_if->ops = &modified_bus_ops;
+
+  brcmf_bus_ops modified_bus_ops;
+  WithSimDevice([&](brcmfmac::SimDevice* device) {
+    brcmf_simdev* sim = device->GetSim();
+    // Replace txctl with the local function
+    modified_bus_ops = *(sim->drvr->bus_if->ops);
+    modified_bus_ops.txctl = &modified_bus_txctl;
+    original_bus_ops = *(sim->drvr->bus_if->ops);
+    sim->drvr->bus_if->ops = &modified_bus_ops;
+  });
 
   // Complete initialization.
   Init();
@@ -698,20 +740,20 @@ TEST_F(DynamicIfTest, CheckIfDownUpCalled) {
   EXPECT_EQ(c_up_cnt, 1u);
 
   // Set sim->drvr->bus_if->ops back to the original set of brcmf_bus_ops
-  sim->drvr->bus_if->ops = &original_bus_ops;
+  WithSimDevice([&](brcmfmac::SimDevice* device) {
+    brcmf_simdev* sim = device->GetSim();
+    sim->drvr->bus_if->ops = &original_bus_ops;
+  });
   EXPECT_EQ(DeleteInterface(&client_ifc_), ZX_OK);
-  EXPECT_EQ(DeviceCountByProtocolId(ZX_PROTOCOL_WLAN_FULLMAC_IMPL), 0u);
 }
 
 TEST_F(DynamicIfTest, DualInterfaces) {
   Init();
   StartInterface(wlan_common::WlanMacRole::kClient, &client_ifc_);
   StartInterface(wlan_common::WlanMacRole::kAp, &softap_ifc_);
-  EXPECT_EQ(DeviceCountByProtocolId(ZX_PROTOCOL_WLAN_FULLMAC_IMPL), 2u);
 
   EXPECT_EQ(DeleteInterface(&client_ifc_), ZX_OK);
   EXPECT_EQ(DeleteInterface(&softap_ifc_), ZX_OK);
-  EXPECT_EQ(DeviceCountByProtocolId(ZX_PROTOCOL_WLAN_FULLMAC_IMPL), 0u);
 }
 
 // Start both client and SoftAP interfaces simultaneously and check if
@@ -782,15 +824,18 @@ TEST_F(DynamicIfTest, PM_ModeDoesNotGetAffected) {
   // Create our device instances
   Init();
   StartInterface(wlan_common::WlanMacRole::kClient, &client_ifc_);
-  brcmf_simdev* sim = device_->GetSim();
-  struct brcmf_if* ifp = brcmf_get_ifp(sim->drvr, client_ifc_.iface_id_);
+
   uint32_t pm_mode = PM_FAST;
-  zx_status_t err = brcmf_fil_cmd_int_set(ifp, BRCMF_C_SET_PM, pm_mode, nullptr);
-  EXPECT_EQ(err, ZX_OK);
   uint32_t cur_pm_mode = PM_OFF;
-  err = brcmf_fil_cmd_int_get(ifp, BRCMF_C_GET_PM, &cur_pm_mode, nullptr);
-  EXPECT_EQ(err, ZX_OK);
-  EXPECT_EQ(cur_pm_mode, pm_mode);
+  WithSimDevice([&](brcmfmac::SimDevice* device) {
+    brcmf_simdev* sim = device->GetSim();
+    struct brcmf_if* ifp = brcmf_get_ifp(sim->drvr, client_ifc_.iface_id_);
+    zx_status_t err = brcmf_fil_cmd_int_set(ifp, BRCMF_C_SET_PM, pm_mode, nullptr);
+    EXPECT_EQ(err, ZX_OK);
+    err = brcmf_fil_cmd_int_get(ifp, BRCMF_C_GET_PM, &cur_pm_mode, nullptr);
+    EXPECT_EQ(err, ZX_OK);
+    EXPECT_EQ(cur_pm_mode, pm_mode);
+  });
   StartInterface(wlan_common::WlanMacRole::kAp, &softap_ifc_);
 
   // Start our SoftAP
@@ -809,10 +854,15 @@ TEST_F(DynamicIfTest, PM_ModeDoesNotGetAffected) {
   // Verify Assoc with SoftAP succeeded
   VerifyAssocWithSoftAP();
   EXPECT_EQ(DeleteInterface(&softap_ifc_), ZX_OK);
-  cur_pm_mode = PM_OFF;
-  err = brcmf_fil_cmd_int_get(ifp, BRCMF_C_GET_PM, &cur_pm_mode, nullptr);
-  EXPECT_EQ(err, ZX_OK);
-  EXPECT_EQ(cur_pm_mode, pm_mode);
+
+  WithSimDevice([&](brcmfmac::SimDevice* device) {
+    brcmf_simdev* sim = device->GetSim();
+    struct brcmf_if* ifp = brcmf_get_ifp(sim->drvr, client_ifc_.iface_id_);
+    cur_pm_mode = PM_OFF;
+    zx_status_t err = brcmf_fil_cmd_int_get(ifp, BRCMF_C_GET_PM, &cur_pm_mode, nullptr);
+    EXPECT_EQ(err, ZX_OK);
+    EXPECT_EQ(cur_pm_mode, pm_mode);
+  });
 }
 // Start both client and SoftAP interfaces simultaneously and check if stopping the AP's beacons
 // does not affect the client.

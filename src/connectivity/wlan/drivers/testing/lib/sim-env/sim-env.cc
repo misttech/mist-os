@@ -16,6 +16,7 @@ Environment::Environment()
     : signal_loss_model_(std::unique_ptr<SignalLossModel>(new LogSignalLossModel())) {
   // Construct the dispatcher ops for task post/cancel using the notification system.
   static const async_ops_t ops = {
+      .version = ASYNC_OPS_V1,
       .v1 = {
           .now =
               [](async_dispatcher_t* dispatcher) {

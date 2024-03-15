@@ -122,8 +122,8 @@ TEST_F(DeviceEnumerationTest, Vim3Test) {
       "sys/platform/05:00:2/i2c-0/aml-i2c/i2c/i2c-0-81/rtc",
 
       // WLAN
-      "sys/platform/05:00:6/vim3_sdio/aml-sd-emmc/sdmmc/sdmmc-sdio/sdmmc-sdio-1/wifi/brcmfmac-wlanphy",
-      "sys/platform/05:00:6/vim3_sdio/aml-sd-emmc/sdmmc/sdmmc-sdio/sdmmc-sdio-1/wifi/brcmfmac-wlanphy/wlanphy",
+      "sys/platform/05:00:6/vim3_sdio/aml-sd-emmc/sdmmc/sdmmc-sdio/sdmmc-sdio-1/wifi/brcmfmac-wlanphyimpl",
+      "sys/platform/05:00:6/vim3_sdio/aml-sd-emmc/sdmmc/sdmmc-sdio/sdmmc-sdio-1/wifi/brcmfmac-wlanphyimpl/wlanphy",
 
       // GPU
       "sys/platform/05:06:17/aml-gpu-composite/aml-gpu",

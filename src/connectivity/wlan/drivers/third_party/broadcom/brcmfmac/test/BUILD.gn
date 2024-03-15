@@ -21,7 +21,6 @@ source_set("stub_device") {
   public = [ "stub_device.h" ]
   public_deps = [
     "//src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac:core",
-    "//src/lib/ddktl",
     "//zircon/system/public",
   ]
 
@@ -60,7 +59,6 @@ executable("bits_test") {
     "bits_test.cc",
   ]
   deps = [
-    "//src/devices/testing/no_ddk",
     "//src/lib/fxl/test:gtest_main",
     "//third_party/googletest:gmock",
   ]
@@ -72,7 +70,6 @@ executable("brcmu_utils_test") {
   sources = [ "brcmu_utils_test.cc" ]
   deps = [
     "//src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac:core",
-    "//src/devices/testing/no_ddk",
     "//src/lib/fxl/test:gtest_main",
     "//third_party/googletest:gmock",
   ]
@@ -84,7 +81,6 @@ executable("channel_conversion_test") {
   sources = [ "channel_conversion_test.cc" ]
   deps = [
     "//src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac:core",
-    "//src/devices/testing/no_ddk",
     "//src/lib/fxl/test:gtest_main",
   ]
 }
@@ -96,7 +92,6 @@ executable("cfg80211_test") {
   deps = [
     "//src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac:core",
     "//src/connectivity/wlan/lib/common/cpp:common",
-    "//src/devices/testing/no_ddk",
     "//src/lib/fxl/test:gtest_main",
     "//third_party/googletest:gmock",
   ]
@@ -110,9 +105,10 @@ executable("debug_test") {
   testonly = true
   sources = [ "debug_test.cc" ]
   deps = [
+    "//src/connectivity/wlan/drivers/lib/log/cpp:dfv2_test_helpers",
     "//src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac:debug",
-    "//src/devices/testing/no_ddk",
     "//src/lib/fxl/test:gtest_main",
+    "//zircon/system/ulib/async-loop:async-loop-cpp",
   ]
 }
 
@@ -125,10 +121,10 @@ executable("device_inspect_test") {
   ]
   deps = [
     "//sdk/lib/inspect/testing/cpp",
+    "//src/connectivity/wlan/drivers/lib/log/cpp:dfv2_test_helpers",
     "//src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac:debug",
     "//src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/inspect",
     "//src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/test:device_inspect_utils",
-    "//src/devices/testing/no_ddk",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/loop_fixture",
     "//src/lib/testing/loop_fixture",
@@ -184,7 +180,6 @@ executable("workqueue_test") {
   deps = [
     "//sdk/lib/driver/testing/cpp:cpp",
     "//src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac:linuxisms",
-    "//src/devices/testing/no_ddk",
     "//src/lib/fxl/test:gtest_main",
     "//zircon/system/ulib/sync",
   ]
@@ -196,13 +191,33 @@ _tests = [
   "brcmu_utils_test",
   "channel_conversion_test",
   "cfg80211_test",
-  "debug_test",
-  "device_inspect_test",
   "intrusive_list_test",
   "task_queue_test",
   "timer_test",
   "workqueue_test",
 ]
+
+#
+# debug_test and device_inspect_test are separate from the rest of the
+# tests because these is expected to emit ERROR logs
+#
+fuchsia_unittest_package("brcmfmac_debug_test") {
+  deps = [ ":debug_test" ]
+  test_specs = {
+    log_settings = {
+      max_severity = "ERROR"
+    }
+  }
+}
+
+fuchsia_unittest_package("brcmfmac_device_inspect_test") {
+  deps = [ ":device_inspect_test" ]
+  test_specs = {
+    log_settings = {
+      max_severity = "ERROR"
+    }
+  }
+}
 
 foreach(test_name, _tests) {
   fuchsia_unittest_component("${test_name}_component") {

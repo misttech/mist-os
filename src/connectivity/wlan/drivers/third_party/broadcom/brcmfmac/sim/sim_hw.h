@@ -36,7 +36,7 @@ class SimHardware : public simulation::StationIfc {
     RxHandler rx_handler;
   };
 
-  explicit SimHardware(std::shared_ptr<simulation::Environment> env);
+  explicit SimHardware(simulation::Environment* env);
   ~SimHardware();
 
   // Tells us how to call the SimFirmware instance
@@ -60,14 +60,10 @@ class SimHardware : public simulation::StationIfc {
   // Operations that are forwarded to the environment
   void Tx(const simulation::SimFrame& frame);
 
-  // Timing and scheduling from the environment.
-  zx::time GetTime() { return env_->GetTime(); }
-  async_dispatcher_t* GetDispatcher() { return env_->GetDispatcher(); }
-
  private:
   bool rx_enabled_ = false;
   wlan_common::WlanChannel channel_;
-  std::shared_ptr<simulation::Environment> env_;
+  simulation::Environment* env_;
   EventHandlers event_handlers_;
   std::list<uint64_t> scheduled_ids;
 };

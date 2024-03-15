@@ -50,8 +50,10 @@ TEST_F(TimeoutTest, ScanTimeout) {
   ap.EnableBeacon(kBeaconInterval);
 
   // Ignore scan request in sim-fw.
-  brcmf_simdev* sim = device_->GetSim();
-  sim->sim_fw->err_inj_.AddErrInjIovar("escan", ZX_OK, BCME_OK, client_ifc_.iface_id_);
+  WithSimDevice([this](brcmfmac::SimDevice* device) {
+    brcmf_simdev* sim = device->GetSim();
+    sim->sim_fw->err_inj_.AddErrInjIovar("escan", ZX_OK, BCME_OK, client_ifc_.iface_id_);
+  });
 
   // Start a passive scan
   env_->ScheduleNotification(std::bind(&SimInterface::StartScan, &client_ifc_, kDefaultScanTxnId,
@@ -79,8 +81,10 @@ TEST_F(TimeoutTest, AssocTimeout) {
   simulation::FakeAp ap(env_.get(), kDefaultBssid, kDefaultSsid, kDefaultChannel);
 
   // Ignore association req in sim-fw.
-  brcmf_simdev* sim = device_->GetSim();
-  sim->sim_fw->err_inj_.AddErrInjCmd(BRCMF_C_SET_SSID, ZX_OK, BCME_OK, client_ifc_.iface_id_);
+  WithSimDevice([this](brcmfmac::SimDevice* device) {
+    brcmf_simdev* sim = device->GetSim();
+    sim->sim_fw->err_inj_.AddErrInjCmd(BRCMF_C_SET_SSID, ZX_OK, BCME_OK, client_ifc_.iface_id_);
+  });
 
   client_ifc_.AssociateWith(ap, zx::msec(10));
 
@@ -107,8 +111,10 @@ TEST_F(TimeoutTest, DisassocTimeout) {
   Init();
 
   // Ignore disassociation req in sim-fw.
-  brcmf_simdev* sim = device_->GetSim();
-  sim->sim_fw->err_inj_.AddErrInjCmd(BRCMF_C_DISASSOC, ZX_OK, BCME_OK, client_ifc_.iface_id_);
+  WithSimDevice([this](brcmfmac::SimDevice* device) {
+    brcmf_simdev* sim = device->GetSim();
+    sim->sim_fw->err_inj_.AddErrInjCmd(BRCMF_C_DISASSOC, ZX_OK, BCME_OK, client_ifc_.iface_id_);
+  });
   env_->ScheduleNotification(
       std::bind(&SimInterface::DeauthenticateFrom, &client_ifc_, kDefaultBssid,
                 wlan_ieee80211::ReasonCode::kUnspecifiedReason),
@@ -130,8 +136,10 @@ TEST_F(TimeoutTest, ScanAfterAssocTimeout) {
   ap.EnableBeacon(kBeaconInterval);
 
   // Ignore association req in sim-fw.
-  brcmf_simdev* sim = device_->GetSim();
-  sim->sim_fw->err_inj_.AddErrInjCmd(BRCMF_C_SET_SSID, ZX_OK, BCME_OK, client_ifc_.iface_id_);
+  WithSimDevice([this](brcmfmac::SimDevice* device) {
+    brcmf_simdev* sim = device->GetSim();
+    sim->sim_fw->err_inj_.AddErrInjCmd(BRCMF_C_SET_SSID, ZX_OK, BCME_OK, client_ifc_.iface_id_);
+  });
   // There are three timers for them, and all have been cancelled.
   client_ifc_.AssociateWith(ap, zx::msec(10));
   env_->ScheduleNotification(

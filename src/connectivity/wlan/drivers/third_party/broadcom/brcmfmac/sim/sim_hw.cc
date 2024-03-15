@@ -24,9 +24,7 @@
 
 namespace wlan::brcmfmac {
 
-SimHardware::SimHardware(std::shared_ptr<simulation::Environment> env) : env_(env) {
-  env->AddStation(this);
-}
+SimHardware::SimHardware(simulation::Environment* env) : env_(env) { env->AddStation(this); }
 
 SimHardware::~SimHardware() {
   // Clean all the events the firmware scheduled.
@@ -93,7 +91,7 @@ void SimHardware::RequestCallback(std::function<void()> callback, zx::duration d
 
 void SimHardware::CancelCallback(uint64_t id) {
   if (env_->CancelNotification(id) != ZX_OK) {
-    BRCMF_ERR("Event has already been cancelled or executed.");
+    BRCMF_WARN("Event has already been cancelled or executed.");
     return;
   }
   // Remove event from the list if it's cancelled successfully, but the those event who have already

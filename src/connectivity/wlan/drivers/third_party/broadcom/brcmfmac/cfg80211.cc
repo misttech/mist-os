@@ -575,7 +575,7 @@ zx_status_t brcmf_cfg80211_add_iface(brcmf_pub* drvr, const char* name, struct v
   wireless_dev* wdev;
   int32_t bsscfgidx;
 
-  BRCMF_DBG(TRACE, "enter: %s type %d", name, req->role());
+  BRCMF_DBG(TRACE, "enter: %s type %d", name, fidl::ToUnderlying(req->role()));
 
   if (wdev_out == nullptr) {
     BRCMF_ERR("cannot write wdev to nullptr");
@@ -747,7 +747,7 @@ static void brcmf_signal_scan_end(struct net_device* ndev, uint64_t txn_id,
   scan_end.code = scan_result_code;
   std::shared_lock<std::shared_mutex> guard(ndev->if_proto_lock);
   BRCMF_DBG(SCAN, "Signaling on_scan_end with txn_id %ld and code %d", scan_end.txn_id,
-            scan_end.code);
+            fidl::ToUnderlying(scan_end.code));
   BRCMF_IFDBG(
       WLANIF, ndev,
       "Sending scan end event to SME. txn_id: %" PRIu64
@@ -1059,7 +1059,7 @@ static zx_status_t brcmf_run_escan(
   // Validate command size
   size_t total_cmd_size = params_size + sizeof("escan");
   if (total_cmd_size > BCDC_TX_IOCTL_MAX_MSG_SIZE) {
-    BRCMF_ERR("Escan params size (%zu) exceeds command max capacity (%d)", total_cmd_size,
+    BRCMF_ERR("Escan params size (%zu) exceeds command max capacity (%lu)", total_cmd_size,
               BCDC_TX_IOCTL_MAX_MSG_SIZE);
     return ZX_ERR_INVALID_ARGS;
   }
@@ -1330,7 +1330,8 @@ static void brcmf_notify_deauth_ind(net_device* ndev, const uint8_t mac_addr[ETH
 
   fuchsia_wlan_fullmac_wire::WlanFullmacDeauthIndication ind = {};
 
-  BRCMF_IFDBG(WLANIF, ndev, "Link Down: Sending deauth ind to SME. reason: %d", reason_code);
+  BRCMF_IFDBG(WLANIF, ndev, "Link Down: Sending deauth ind to SME. reason: %d",
+              fidl::ToUnderlying(reason_code));
 #if !defined(NDEBUG)
   BRCMF_IFDBG(WLANIF, ndev, "  address: " FMT_MAC "", FMT_MAC_ARGS(mac_addr));
 #endif /* !defined(NDEBUG) */
@@ -1362,7 +1363,8 @@ static void brcmf_notify_disassoc_ind(net_device* ndev, const uint8_t mac_addr[E
 
   fuchsia_wlan_fullmac_wire::WlanFullmacDisassocIndication ind = {};
 
-  BRCMF_IFDBG(WLANIF, ndev, "Link Down: Sending disassoc ind to SME. reason: %d", reason_code);
+  BRCMF_IFDBG(WLANIF, ndev, "Link Down: Sending disassoc ind to SME. reason: %d",
+              fidl::ToUnderlying(reason_code));
 #if !defined(NDEBUG)
   BRCMF_IFDBG(WLANIF, ndev, "  address: " FMT_MAC ", ", FMT_MAC_ARGS(mac_addr));
 #endif /* !defined(NDEBUG) */
@@ -1394,7 +1396,7 @@ static void cfg80211_disconnected(struct brcmf_cfg80211_vif* vif,
 
   struct brcmf_cfg80211_info* cfg = vif->ifp->drvr->config;
   BRCMF_DBG(CONN, "Link Down: address: " FMT_MAC ", SME reason: %d",
-            FMT_MAC_ARGS(vif->profile.bssid), reason_code);
+            FMT_MAC_ARGS(vif->profile.bssid), fidl::ToUnderlying(reason_code));
 
   const bool sme_initiated_deauth =
       cfg->disconnect_mode == BRCMF_DISCONNECT_DEAUTH &&
@@ -1847,7 +1849,7 @@ void brcmf_return_assoc_result(struct net_device* ndev,
   }
 
   BRCMF_IFDBG(WLANIF, ndev, "Sending connect result to SME. result: %" PRIu16 ", aid: %" PRIu16,
-              conf.result_code, conf.association_id);
+              fidl::ToUnderlying(conf.result_code), conf.association_id);
   auto arena = fdf::Arena::Create(0, 0);
   if (arena.is_error()) {
     BRCMF_ERR("Failed to create Arena status=%s", arena.status_string());
@@ -1893,8 +1895,8 @@ void brcmf_return_roam_result(struct net_device* ndev, const uint8_t* target_bss
   }
 
   BRCMF_INFO("Firmware-initiated roam");
-  BRCMF_IFDBG(WLANIF, ndev, "Sending roam result: 0x%x, BSSID: " FMT_MAC, conf.result_code,
-              FMT_MAC_ARGS(conf.target_bssid));
+  BRCMF_IFDBG(WLANIF, ndev, "Sending roam result: 0x%hx, BSSID: " FMT_MAC,
+              fidl::ToUnderlying(conf.result_code), FMT_MAC_ARGS(conf.target_bssid));
   auto arena = fdf::Arena::Create(0, 0);
   if (arena.is_error()) {
     BRCMF_ERR("Failed to create Arena status=%s", arena.status_string());
@@ -1979,8 +1981,8 @@ zx_status_t brcmf_cfg80211_connect(
     }
   }
 
-  // TODO(https://fxbug.dev/42104096): We should be getting the IEs from SME. Passing a null entry seems
-  // to work for now, presumably because the firmware uses its defaults.
+  // TODO(https://fxbug.dev/42104096): We should be getting the IEs from SME. Passing a null entry
+  // seems to work for now, presumably because the firmware uses its defaults.
   err = brcmf_vif_set_mgmt_ie(ifp->vif, BRCMF_VNDR_IE_ASSOCREQ_FLAG, nullptr, 0);
   if (err != ZX_OK) {
     BRCMF_ERR("Set Assoc REQ IE Failed");
@@ -2110,9 +2112,8 @@ static void brcmf_log_client_stats(struct brcmf_cfg80211_info* cfg) {
     BRCMF_INFO("Unable to get noise: %s fw err %s", zx_status_get_string(err),
                brcmf_fil_get_errstr(fw_err));
   }
-  zxlogf(INFO,
-         "Client IF up: %d channel: %d Rate: %.2f Mbps RSSI: %d dBm SNR: %d dB  noise: %d dBm",
-         is_up, ctl_chan, real_rate, ndev->last_known_rssi_dbm, ndev->last_known_snr_db, noise);
+  BRCMF_INFO("Client IF up: %d channel: %d Rate: %.2f Mbps RSSI: %d dBm SNR: %d dB  noise: %d dBm",
+             is_up, ctl_chan, real_rate, ndev->last_known_rssi_dbm, ndev->last_known_snr_db, noise);
 
   // Get the FW packet counts
   brcmf_pktcnt_le fw_pktcnt = {};
@@ -2141,8 +2142,7 @@ static void brcmf_log_client_stats(struct brcmf_cfg80211_info* cfg) {
     }
 
     const uint32_t period = BRCMF_CONNECT_LOG_DUR / ZX_SEC(1);
-    zxlogf(
-        INFO,
+    BRCMF_INFO(
         "FW Stats: Rx - Good: %d Bad: %d Ocast: %d Err Rate %.2f%% (last %us %.2f%%); Tx - Good: %d Bad: %d Err Rate %.2f%% (last %us %.2f%%)",
         fw_pktcnt.rx_good_pkt, fw_pktcnt.rx_bad_pkt, fw_pktcnt.rx_ocast_good_pkt,
         lifetime_err_rate_rx * 100, period, periodic_err_rate_rx * 100, fw_pktcnt.tx_good_pkt,
@@ -2188,9 +2188,9 @@ static void brcmf_log_client_stats(struct brcmf_cfg80211_info* cfg) {
     deauth_reason_code = fuchsia_wlan_ieee80211::ReasonCode::kFwRxStalled;
   }
 
-  zxlogf(INFO, "Driver Stats: Rx - Good: %d Bad: %d; Tx - Sent to FW: %d Conf: %d Drop: %d Bad: %d",
-         ndev->stats.rx_packets, ndev->stats.rx_errors, ndev->stats.tx_packets,
-         ndev->stats.tx_confirmed, ndev->stats.tx_dropped, ndev->stats.tx_errors);
+  BRCMF_INFO("Driver Stats: Rx - Good: %d Bad: %d; Tx - Sent to FW: %d Conf: %d Drop: %d Bad: %d",
+             ndev->stats.rx_packets, ndev->stats.rx_errors, ndev->stats.tx_packets,
+             ndev->stats.tx_confirmed, ndev->stats.tx_dropped, ndev->stats.tx_errors);
 
   // Get the WME counters
   wl_wme_cnt_t wme_cnt;
@@ -2229,28 +2229,28 @@ static void brcmf_log_client_stats(struct brcmf_cfg80211_info* cfg) {
         (BRCMF_HIGH_WME_RX_ERROR_RATE_PERIOD_THRESHOLD / BRCMF_CONNECT_LOG_DUR)) {
       // Log excessive wme rx error indicent to inspect
       ifp->drvr->device->GetInspect()->LogHighWmeRxErrorRate();
-      BRCMF_ERR("wme rx error rate has been greater than %.2f%% for %ds, attempting deauth.",
+      BRCMF_ERR("wme rx error rate has been greater than %.2f%% for %ld, attempting deauth.",
                 BRCMF_WME_BAD_PKT_THRESHOLD * 100,
                 BRCMF_HIGH_WME_RX_ERROR_RATE_PERIOD_THRESHOLD / ZX_SEC(1));
       attempt_deauth = true;
       deauth_reason_code = fuchsia_wlan_ieee80211::ReasonCode::kFwHighWmeRxErrRate;
     }
 
-    zxlogf(INFO, "WME counters - Rx: %d; Rx Bad: %d; Tx: %d; Tx Bad: %d", wme_rx_good_pkts,
-           wme_rx_bad_pkts, wme_tx_good_pkts, wme_tx_bad_pkts);
+    BRCMF_INFO("WME counters - Rx: %d; Rx Bad: %d; Tx: %d; Tx Bad: %d", wme_rx_good_pkts,
+               wme_rx_bad_pkts, wme_tx_good_pkts, wme_tx_bad_pkts);
 
-    zxlogf(INFO, "VO AC - Rx: %d; Rx Bad: %d; Tx: %d; Tx Bad: %d", wme_cnt.rx[AC_VO].packets,
-           wme_cnt.rx_failed[AC_VO].packets, wme_cnt.tx[AC_VO].packets,
-           wme_cnt.tx_failed[AC_VO].packets);
-    zxlogf(INFO, "VI AC - Rx: %d; Rx Bad: %d; Tx: %d; Tx Bad: %d", wme_cnt.rx[AC_VI].packets,
-           wme_cnt.rx_failed[AC_VI].packets, wme_cnt.tx[AC_VI].packets,
-           wme_cnt.tx_failed[AC_VI].packets);
-    zxlogf(INFO, "BE AC - Rx: %d; Rx Bad: %d; Tx: %d; Tx Bad: %d", wme_cnt.rx[AC_BE].packets,
-           wme_cnt.rx_failed[AC_BE].packets, wme_cnt.tx[AC_BE].packets,
-           wme_cnt.tx_failed[AC_BE].packets);
-    zxlogf(INFO, "BK AC - Rx: %d; Rx Bad: %d; Tx: %d; Tx Bad: %d", wme_cnt.rx[AC_BK].packets,
-           wme_cnt.rx_failed[AC_BK].packets, wme_cnt.tx[AC_BK].packets,
-           wme_cnt.tx_failed[AC_BK].packets);
+    BRCMF_INFO("VO AC - Rx: %d; Rx Bad: %d; Tx: %d; Tx Bad: %d", wme_cnt.rx[AC_VO].packets,
+               wme_cnt.rx_failed[AC_VO].packets, wme_cnt.tx[AC_VO].packets,
+               wme_cnt.tx_failed[AC_VO].packets);
+    BRCMF_INFO("VI AC - Rx: %d; Rx Bad: %d; Tx: %d; Tx Bad: %d", wme_cnt.rx[AC_VI].packets,
+               wme_cnt.rx_failed[AC_VI].packets, wme_cnt.tx[AC_VI].packets,
+               wme_cnt.tx_failed[AC_VI].packets);
+    BRCMF_INFO("BE AC - Rx: %d; Rx Bad: %d; Tx: %d; Tx Bad: %d", wme_cnt.rx[AC_BE].packets,
+               wme_cnt.rx_failed[AC_BE].packets, wme_cnt.tx[AC_BE].packets,
+               wme_cnt.tx_failed[AC_BE].packets);
+    BRCMF_INFO("BK AC - Rx: %d; Rx Bad: %d; Tx: %d; Tx Bad: %d", wme_cnt.rx[AC_BK].packets,
+               wme_cnt.rx_failed[AC_BK].packets, wme_cnt.tx[AC_BK].packets,
+               wme_cnt.tx_failed[AC_BK].packets);
   }
 
   if (attempt_deauth && !deauth_reason_code.has_value()) {
@@ -2328,18 +2328,18 @@ static void brcmf_log_client_stats(struct brcmf_cfg80211_info* cfg) {
     } else {
       wl_cnt_ver_6_t* counters = reinterpret_cast<wl_cnt_ver_6_t*>(cnt_buf);
 
-      zxlogf(INFO,
-             "FW Err Counts: Tx: retrans: %u err %u serr %u nobuf %u runt %u uflo %u "
-             "phyerr %u fail %u noassoc %u noack %u",
-             counters->txretrans, counters->txerror, counters->txserr, counters->txnobuf,
-             counters->txrunt, counters->txuflo, counters->txphyerr, counters->txfail,
-             counters->txnoassoc, counters->txnoack);
-      zxlogf(INFO,
-             "FW Err Counts: Rx: err %u oflo %u nobuf %u runt %u fragerr %u badplcp %u "
-             "crsglitch %u badfcs %u giant %u noscb %u badsrcmac %u",
-             counters->rxerror, counters->rxoflo, counters->rxnobuf, counters->rxrunt,
-             counters->rxfragerr, counters->rxbadplcp, counters->rxcrsglitch, counters->rxbadfcs,
-             counters->rxgiant, counters->rxnoscb, counters->rxbadsrcmac);
+      BRCMF_INFO(
+          "FW Err Counts: Tx: retrans: %u err %u serr %u nobuf %u runt %u uflo %u "
+          "phyerr %u fail %u noassoc %u noack %u",
+          counters->txretrans, counters->txerror, counters->txserr, counters->txnobuf,
+          counters->txrunt, counters->txuflo, counters->txphyerr, counters->txfail,
+          counters->txnoassoc, counters->txnoack);
+      BRCMF_INFO(
+          "FW Err Counts: Rx: err %u oflo %u nobuf %u runt %u fragerr %u badplcp %u "
+          "crsglitch %u badfcs %u giant %u noscb %u badsrcmac %u",
+          counters->rxerror, counters->rxoflo, counters->rxnobuf, counters->rxrunt,
+          counters->rxfragerr, counters->rxbadplcp, counters->rxcrsglitch, counters->rxbadfcs,
+          counters->rxgiant, counters->rxnoscb, counters->rxbadsrcmac);
     }
   }
   ndev->client_stats_log_count++;
@@ -2693,7 +2693,7 @@ static zx_status_t brcmf_cfg80211_add_key(struct net_device* ndev,
       BRCMF_DBG(CONN, "WPA_CIPHER_CCMP_128");
       break;
     default:
-      BRCMF_ERR("Unsupported cipher (0x%x)", req->cipher_type());
+      BRCMF_ERR("Unsupported cipher (0x%x)", fidl::ToUnderlying(req->cipher_type()));
       err = ZX_ERR_INVALID_ARGS;
       goto done;
   }
@@ -2771,7 +2771,7 @@ void brcmf_cfg80211_rx(struct brcmf_if* ifp, wlan::drivers::components::Frame&& 
     return;
   }
 
-  ifp->drvr->device->NetDev().CompleteRx(std::move(frame));
+  ifp->drvr->device->NetDev()->CompleteRx(std::move(frame));
 }
 
 void brcmf_cfg80211_rx(struct brcmf_pub* drvr, wlan::drivers::components::FrameContainer&& frames) {
@@ -2787,7 +2787,7 @@ void brcmf_cfg80211_rx(struct brcmf_pub* drvr, wlan::drivers::components::FrameC
     }
   }
 
-  drvr->device->NetDev().CompleteRx(std::move(frames));
+  drvr->device->NetDev()->CompleteRx(std::move(frames));
 }
 
 static void brcmf_iedump(uint8_t* ies, size_t total_len) {
@@ -3094,7 +3094,7 @@ static void brcmf_init_escan(struct brcmf_cfg80211_info* cfg) {
   cfg->escan_info.escan_state = WL_ESCAN_STATE_IDLE;
   /* Init scan_timeout timer */
   cfg->escan_timer =
-      new Timer(cfg->pub->device->GetDispatcher(), std::bind(brcmf_escan_timeout, cfg), false);
+      new Timer(cfg->pub->device->GetTimerDispatcher(), std::bind(brcmf_escan_timeout, cfg), false);
   cfg->escan_timeout_work = WorkItem(brcmf_cfg80211_escan_timeout_worker);
 }
 
@@ -3429,7 +3429,7 @@ static fuchsia_wlan_fullmac_wire::WlanStartResult brcmf_cfg80211_start_ap(
   }
 
   if (req->bss_type() != fuchsia_wlan_common::BssType::kInfrastructure) {
-    BRCMF_ERR("Attempt to start AP in unsupported mode (%d)", req->bss_type());
+    BRCMF_ERR("Attempt to start AP in unsupported mode (%d)", fidl::ToUnderlying(req->bss_type()));
     return fuchsia_wlan_fullmac_wire::WlanStartResult::kNotSupported;
   }
 
@@ -3591,7 +3591,7 @@ fail:
 
 static zx_status_t brcmf_cfg80211_del_station(struct net_device* ndev, const uint8_t* mac,
                                               fuchsia_wlan_ieee80211::ReasonCode reason) {
-  BRCMF_DBG(TRACE, "Enter: reason: %d", reason);
+  BRCMF_DBG(TRACE, "Enter: reason: %d", fidl::ToUnderlying(reason));
 
   struct brcmf_if* ifp = ndev_to_if(ndev);
   struct brcmf_scb_val_le scbval;
@@ -3906,7 +3906,8 @@ void brcmf_if_deauth_req(net_device* ndev,
               req->has_peer_sta_address(), req->has_reason_code());
     return;
   }
-  BRCMF_IFDBG(WLANIF, ndev, "Deauth request from SME. reason: %" PRIu16 "", req->reason_code());
+  BRCMF_IFDBG(WLANIF, ndev, "Deauth request from SME. reason: %" PRIu16 "",
+              fidl::ToUnderlying(req->reason_code()));
 
   if (brcmf_is_apmode(ifp->vif)) {
     struct brcmf_scb_val_le scbval;
@@ -3941,12 +3942,12 @@ void brcmf_if_assoc_resp(
   struct brcmf_if* ifp = ndev_to_if(ndev);
 
   if (!req->has_result_code() || !req->has_association_id() || !req->has_peer_sta_address()) {
-    BRCMF_ERR("Assoc resp does not contain all fields reason: %d id: peer addr: %d",
+    BRCMF_ERR("Assoc resp does not contain all fields reason: %d assoc id: %d id: peer addr: %d",
               req->has_result_code(), req->has_association_id(), req->has_peer_sta_address());
     return;
   }
   BRCMF_IFDBG(WLANIF, ndev, "Assoc response from SME. result: %" PRIu8 ", aid: %" PRIu16,
-              req->result_code(), req->association_id());
+              fidl::ToUnderlying(req->result_code()), req->association_id());
 #if !defined(NDEBUG)
   BRCMF_IFDBG(WLANIF, ndev, "  address: " FMT_MAC, FMT_MAC_ARGS(req->peer_sta_address().data()));
 #endif /* !defined(NDEBUG) */
@@ -3993,7 +3994,8 @@ void brcmf_if_disassoc_req(
               req->has_reason_code(), req->has_peer_sta_address());
     return;
   }
-  BRCMF_IFDBG(WLANIF, ndev, "Disassoc request from SME. reason: %" PRIu16, req->reason_code());
+  BRCMF_IFDBG(WLANIF, ndev, "Disassoc request from SME. reason: %" PRIu16,
+              fidl::ToUnderlying(req->reason_code()));
 #if !defined(NDEBUG)
   BRCMF_IFDBG(WLANIF, ndev, "  address: " FMT_MAC, FMT_MAC_ARGS(req->peer_sta_address().data()));
 #endif /* !defined(NDEBUG) */
@@ -4379,8 +4381,8 @@ static void brcmf_update_vht_cap(struct brcmf_if* ifp,
       wlan::VhtCapabilities::ViewFromRawBytes(band_cap->vht_caps.bytes.data());
 
   // Set Max MPDU length to 11454
-  // TODO(https://fxbug.dev/42103822): Value hardcoded from firmware behavior of the BCM4356 and BCM4359
-  // chips.
+  // TODO(https://fxbug.dev/42103822): Value hardcoded from firmware behavior of the BCM4356 and
+  // BCM4359 chips.
   vht_caps->vht_cap_info.set_max_mpdu_len(2);
 
   /* 80MHz is mandatory */
@@ -4578,7 +4580,7 @@ void brcmf_if_query(net_device* ndev, fuchsia_wlan_fullmac_wire::WlanFullmacQuer
       break;
     }
     default:
-      BRCMF_ERR("Invalid wdev->iftype obtained : %u", wdev->iftype);
+      BRCMF_ERR("Invalid wdev->iftype obtained : %u", fidl::ToUnderlying(wdev->iftype));
   }
 
   // bands
@@ -4706,16 +4708,16 @@ void brcmf_if_query(net_device* ndev, fuchsia_wlan_fullmac_wire::WlanFullmacQuer
   // The "rxstreams_cap" iovar, when present, indicates the maximum number of Rx streams
   // possible, encoded as one bit per stream (i.e., a value of 0x3 indicates 2 streams/chains).
   if (brcmf_feat_is_quirk_enabled(ifp, BRCMF_FEAT_QUIRK_IS_4359)) {
-    // TODO(https://fxbug.dev/42103822): The BCM4359 firmware supports rxstreams_cap, but it returns 0x2
-    // instead of 0x3, which is incorrect.
+    // TODO(https://fxbug.dev/42103822): The BCM4359 firmware supports rxstreams_cap, but it returns
+    // 0x2 instead of 0x3, which is incorrect.
     rxchain = 0x3;
   } else {
     // According to Broadcom, rxstreams_cap, when available, is an accurate representation of
     // the number of rx chains.
     status = brcmf_fil_iovar_int_get(ifp, "rxstreams_cap", &rxchain, nullptr);
     if (status != ZX_OK) {
-      // TODO(https://fxbug.dev/42103822): The rxstreams_cap iovar isn't yet supported in the BCM4356
-      // firmware. For now we use a hard-coded value (another option would be to parse the
+      // TODO(https://fxbug.dev/42103822): The rxstreams_cap iovar isn't yet supported in the
+      // BCM4356 firmware. For now we use a hard-coded value (another option would be to parse the
       // nvram contents ourselves (looking for the value associated with the key "rxchain").
       BRCMF_INFO("Failed to retrieve value for Rx chains. Assuming chip supports 2 Rx chains.");
       rxchain = 0x3;
@@ -5167,9 +5169,9 @@ zx_status_t brcmf_if_sae_frame_tx(net_device* ndev,
 
   BRCMF_DBG(CONN,
             "The peer_sta_address: " FMT_MAC ", the ifp mac is: " FMT_MAC
-            ", the seq_num is %u, the status_code is %u",
+            ", the seq_num is %u, the status_code is %hu",
             FMT_MAC_ARGS(frame->peer_sta_address), FMT_MAC_ARGS(ifp->mac_addr), frame->seq_num,
-            frame->status_code);
+            fidl::ToUnderlying(frame->status_code));
 
   // Fill the authentication frame header fields.
   sae_frame->auth_hdr.auth_algorithm_number = BRCMF_AUTH_MODE_SAE;
@@ -5779,8 +5781,8 @@ static zx_status_t brcmf_handle_assoc_event(struct brcmf_if* ifp, const struct b
     BRCMF_INFO(
         "Reason is SUCCESS(%u) while status indicates error: %u. Overriding reason to "
         "REFUSED_REASON_UNSPECIFIED(%u).",
-        fuchsia_wlan_ieee80211_wire::StatusCode::kSuccess, e->status,
-        fuchsia_wlan_ieee80211_wire::StatusCode::kRefusedReasonUnspecified);
+        fidl::ToUnderlying(fuchsia_wlan_ieee80211_wire::StatusCode::kSuccess), e->status,
+        fidl::ToUnderlying(fuchsia_wlan_ieee80211_wire::StatusCode::kRefusedReasonUnspecified));
     reason_code = fuchsia_wlan_ieee80211_wire::StatusCode::kRefusedReasonUnspecified;
   }
 
@@ -6276,7 +6278,7 @@ static bool brcmf_bss_info_le_ie_buffer_well_formed(brcmf_bss_info_le* bi) {
     offset += elem_len;
   }
   if (offset != ies_len) {
-    BRCMF_WARN("BSS description IE buffer sum of bytes (%ld) does not match IE buffer length %ld",
+    BRCMF_WARN("BSS description IE buffer sum of bytes (%ld) does not match IE buffer length %u",
                offset, ies_len);
     return false;
   }
@@ -6575,7 +6577,7 @@ init_priv_mem_out:
 
 static zx_status_t brcmf_init_cfg(struct brcmf_cfg80211_info* cfg) {
   zx_status_t err = ZX_OK;
-  async_dispatcher_t* dispatcher = cfg->pub->device->GetDispatcher();
+  async_dispatcher_t* dispatcher = cfg->pub->device->GetTimerDispatcher();
 
   cfg->scan_in_progress = false;
   cfg->dongle_up = false; /* dongle is not up yet */

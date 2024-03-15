@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <fuchsia/wlan/internal/c/banjo.h>
 #include <zircon/errors.h>
 
 #include <functional>
@@ -12,7 +11,6 @@
 
 #include <zxtest/zxtest.h>
 
-#include "src/connectivity/wlan/drivers/testing/lib/sim-device/device.h"
 #include "src/connectivity/wlan/drivers/testing/lib/sim-env/sim-env.h"
 #include "src/connectivity/wlan/drivers/testing/lib/sim-fake-ap/sim-fake-ap.h"
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/cfg80211.h"
@@ -65,13 +63,15 @@ class ActiveScanTest : public SimTest {
         std::bind(&ActiveScanTest::OnScanResult, this, std::placeholders::_1);
     client_ifc_.on_scan_end_ = std::bind(&ActiveScanTest::OnScanEnd, this, std::placeholders::_1);
   }
-  void Init();
+  void SetUp() override;
+
   void StartFakeAp(const common::MacAddr& bssid, const wlan_ieee80211::CSsid& ssid,
                    const wlan_common::WlanChannel& channel,
                    zx::duration beacon_interval = kBeaconInterval);
 
   void StartScan(const wlan_fullmac_wire::WlanFullmacImplBaseStartScanRequest* req);
-  // TODO(https://fxbug.dev/https://fxbug.dev/42164585): Align the way active_scan_test and passive_scan_test
+  // TODO(https://fxbug.dev/https://fxbug.dev/42164585): Align the way active_scan_test and
+  // passive_scan_test
 
   // verify scan results.
   void VerifyScanResults();
@@ -134,7 +134,7 @@ void ActiveScanTest::OnScanEnd(const wlan_fullmac_wire::WlanFullmacScanEnd* end)
   scan_result_code_ = end->code;
 }
 
-void ActiveScanTest::Init() {
+void ActiveScanTest::SetUp() {
   ASSERT_EQ(SimTest::Init(), ZX_OK);
   ASSERT_EQ(StartInterface(wlan_common::WlanMacRole::kClient, &client_ifc_), ZX_OK);
 
@@ -164,12 +164,14 @@ void ActiveScanTest::EndSimulation() {
 }
 
 void ActiveScanTest::GetFirmwarePfnMac() {
-  brcmf_simdev* sim = device_->GetSim();
   if (!sim_fw_pfn_mac_) {
-    struct brcmf_if* ifp = brcmf_get_ifp(sim->drvr, client_ifc_.iface_id_);
-    zx_status_t status =
-        brcmf_fil_iovar_data_get(ifp, "pfn_macaddr", sim_fw_pfn_mac_->byte, ETH_ALEN, nullptr);
-    EXPECT_EQ(status, ZX_OK);
+    WithSimDevice([this](brcmfmac::SimDevice* device) {
+      brcmf_simdev* sim = device->GetSim();
+      struct brcmf_if* ifp = brcmf_get_ifp(sim->drvr, client_ifc_.iface_id_);
+      zx_status_t status =
+          brcmf_fil_iovar_data_get(ifp, "pfn_macaddr", sim_fw_pfn_mac_->byte, ETH_ALEN, nullptr);
+      EXPECT_EQ(status, ZX_OK);
+    });
   }
 }
 
@@ -269,9 +271,6 @@ const common::MacAddr kAp3Bssid({0x12, 0x34, 0x56, 0x78, 0x9a, 0xbe});
 
 // This test case might fail in a very low possibility because it's random.
 TEST_F(ActiveScanTest, RandomMacThreeAps) {
-  // Create simulated device
-  Init();
-
   // Start the first AP
   StartFakeAp(kAp1Bssid, kAp1Ssid, kDefaultChannel1);
   StartFakeAp(kAp2Bssid, kAp2Ssid, kDefaultChannel1);
@@ -302,7 +301,6 @@ TEST_F(ActiveScanTest, RandomMacThreeAps) {
 }
 
 TEST_F(ActiveScanTest, ScanTwice) {
-  Init();
   // Build scan request
   auto builder =
       wlan_fullmac_wire::WlanFullmacImplBaseStartScanRequest::Builder(client_ifc_.test_arena_);
@@ -335,8 +333,6 @@ TEST_F(ActiveScanTest, ScanTwice) {
 // Ensure that the FW sends out the max # probe requests set by the
 // driver (as there are no APs in the environment).
 TEST_F(ActiveScanTest, CheckNumProbeReqsSent) {
-  Init();
-
   auto builder =
       wlan_fullmac_wire::WlanFullmacImplBaseStartScanRequest::Builder(client_ifc_.test_arena_);
   builder.txn_id(++scan_txn_id_);
@@ -362,8 +358,6 @@ TEST_F(ActiveScanTest, CheckNumProbeReqsSent) {
 // of channels is indicated in active scan test request.
 TEST_F(ActiveScanTest, EmptyChannelList) {
   constexpr zx::duration kScanStartTime = zx::sec(1);
-
-  Init();
 
   StartFakeAp(kAp1Bssid, kAp1Ssid, kDefaultChannel1);
 
@@ -395,8 +389,6 @@ TEST_F(ActiveScanTest, EmptyChannelList) {
 // is indicated in active scan test request.
 TEST_F(ActiveScanTest, SsidTooLong) {
   constexpr zx::duration kScanStartTime = zx::sec(1);
-
-  Init();
 
   StartFakeAp(kAp1Bssid, kAp1Ssid, kDefaultChannel1);
 
@@ -441,14 +433,14 @@ TEST_F(ActiveScanTest, SsidTooLong) {
 // This test case verifies that the driver returns SHOULD_WAIT as the scan result code when firmware
 // is busy.
 TEST_F(ActiveScanTest, ScanWhenFirmwareBusy) {
-  Init();
-
   // Start the first AP
   StartFakeAp(kAp1Bssid, kAp1Ssid, kDefaultChannel1);
 
   // Set up our injector
-  brcmf_simdev* sim = device_->GetSim();
-  sim->sim_fw->err_inj_.AddErrInjIovar("escan", ZX_OK, BCME_BUSY);
+  WithSimDevice([](brcmfmac::SimDevice* device) {
+    brcmf_simdev* sim = device->GetSim();
+    sim->sim_fw->err_inj_.AddErrInjIovar("escan", ZX_OK, BCME_BUSY);
+  });
 
   auto builder =
       wlan_fullmac_wire::WlanFullmacImplBaseStartScanRequest::Builder(client_ifc_.test_arena_);

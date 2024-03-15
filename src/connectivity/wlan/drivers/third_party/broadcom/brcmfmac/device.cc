@@ -13,19 +13,18 @@
 
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/device.h"
 
+#include <lib/fdf/dispatcher.h>
 #include <lib/fidl/cpp/wire/arena.h>
 #include <lib/sync/cpp/completion.h>
 #include <zircon/status.h>
 
-#include <ddktl/fidl.h>
-#include <ddktl/init-txn.h>
+#include <bind/fuchsia/wlan/phyimpl/cpp/bind.h>
 #include <wlan/common/ieee80211.h>
 
 #include "fidl/fuchsia.wlan.phyimpl/cpp/wire_types.h"
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/cfg80211.h"
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/common.h"
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/debug.h"
-#include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/factory_device.h"
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/feature.h"
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/fwil.h"
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/wlan_interface.h"
@@ -34,25 +33,18 @@ namespace wlan {
 namespace brcmfmac {
 namespace {
 
-constexpr char kNetDevDriverName[] = "brcmfmac-netdev";
 constexpr char kClientInterfaceName[] = "brcmfmac-wlan-fullmac-client";
 constexpr uint8_t kClientInterfaceId = 0;
 constexpr char kApInterfaceName[] = "brcmfmac-wlan-fullmac-ap";
 constexpr uint8_t kApInterfaceId = 1;
 constexpr uint8_t kMaxBufferParts = 1;
-constexpr zx::duration kDeviceRemovalTimeout = zx::sec(5);
+constexpr char kNetDevDriverName[] = "brcmfmac-netdev";
 }  // namespace
 
-namespace wlan_llcpp = fuchsia_factory_wlan;
-
-Device::Device(zx_device_t* parent)
-    : DeviceType(parent),
-      brcmf_pub_(std::make_unique<brcmf_pub>()),
+Device::Device()
+    : brcmf_pub_(std::make_unique<brcmf_pub>()),
       client_interface_(nullptr),
-      ap_interface_(nullptr),
-      network_device_(parent, this),
-      parent_(parent),
-      outgoing_dir_(fdf::OutgoingDirectory::Create(fdf::Dispatcher::GetCurrent()->get())) {
+      ap_interface_(nullptr) {
   brcmf_pub_->device = this;
   for (auto& entry : brcmf_pub_->if2bss) {
     entry = BRCMF_BSSIDX_INVALID;
@@ -63,99 +55,145 @@ Device::Device(zx_device_t* parent)
   *recovery_start_callback = std::bind(&brcmf_schedule_recovery_worker, brcmf_pub_.get());
   brcmf_pub_->recovery_trigger =
       std::make_unique<wlan::brcmfmac::RecoveryTrigger>(recovery_start_callback);
-
-  auto dispatcher = fdf::SynchronizedDispatcher::Create(
-      {}, "brcmfmac-wlanphy", [&](fdf_dispatcher_t*) { completion_.Signal(); });
-  ZX_ASSERT_MSG(!dispatcher.is_error(), "%s(): Dispatcher created failed: %s\n", __func__,
-                zx_status_get_string(dispatcher.status_value()));
-  dispatcher_ = std::move(*dispatcher);
-  driver_async_dispatcher_ = fdf::Dispatcher::GetCurrent()->async_dispatcher();
 }
 
-Device::~Device() {
-  zx::result res =
-      outgoing_dir_.RemoveService<fuchsia_wlan_phyimpl::Service>(fdf::kDefaultInstance);
-  if (res.is_error()) {
-    BRCMF_ERR("Failed to remove WlanPhyImpl service from outgoing directory: %s\n",
-              res.status_string());
+Device::~Device() {}
+
+void Device::Shutdown() {
+  if (brcmf_pub_) {
+    // Shut down the default WorkQueue here to ensure that its dispatcher is shutdown properly even
+    // if the Device object's destructor is not called.
+    brcmf_pub_->default_wq.Shutdown();
   }
-  ShutdownDispatcher();
 }
 
-zx_status_t Device::Init() {
-  zx_status_t status = DeviceInit();
-  if (status == ZX_OK) {
-    status = network_device_.Init(kNetDevDriverName);
-    if (status != ZX_OK) {
-      BRCMF_ERR("Failed to initialize network device %s", zx_status_get_string(status));
-      return status;
-    }
+zx_status_t Device::AddWlanPhyImplService() {
+  // Add the service contains WlanphyImpl protocol to outgoing directory.
+  auto wlanphyimpl = [this](fdf::ServerEnd<fuchsia_wlan_phyimpl::WlanPhyImpl> server_end) {
+    // Call the handler inherited from WlanPhyImplDevice.
+    // Note: The same dispatcher here is used for fullmac device, will it affect the data path
+    // performance?
+    ServiceConnectHandler(GetDriverDispatcher(), std::move(server_end));
+  };
+
+  fuchsia_wlan_phyimpl::Service::InstanceHandler wlanphy_service_handler(
+      {.wlan_phy_impl = wlanphyimpl});
+
+  auto status =
+      Outgoing()->AddService<fuchsia_wlan_phyimpl::Service>(std::move(wlanphy_service_handler));
+  if (status.is_error()) {
+    BRCMF_ERR("Failed to add service to outgoing directory: %s", status.status_string());
+    return status.status_value();
   }
 
-  // This does not have to be freed since its lifecycle is taken care by FDF.
-  status = FactoryDevice::Create(parent_, brcmf_pub_.get(), &factory_device_);
+  return ZX_OK;
+}
+
+zx_status_t Device::InitWlanPhyImpl() {
+  fidl::Arena arena;
+  fidl::VectorView<fuchsia_driver_framework::wire::Offer> offers(arena, 1);
+  offers[0] = fdf::MakeOffer2<fuchsia_wlan_phyimpl::Service>(arena);
+
+  auto args = fdf::wire::NodeAddArgs::Builder(arena)
+                  .name("brcmfmac-wlanphyimpl")
+                  // .properties(properties)
+                  .offers2(offers)
+                  .Build();
+
+  auto endpoints = fidl::CreateEndpoints<fdf::NodeController>();
+  if (endpoints.is_error()) {
+    BRCMF_ERR("CreateEndPoints failed: %s", endpoints.status_string());
+    return endpoints.error_value();
+  }
+
+  // Adding wlanphy child node. Doing a sync version here to reduce chaos.
+  auto result = GetParentNode().sync()->AddChild(std::move(args), std::move(endpoints->server), {});
+
+  if (!result.ok()) {
+    BRCMF_ERR("Add wlanphy node error due to FIDL error on protocol [Node]: %s",
+              result.status_string());
+    return result.status();
+  }
+
+  if (result->is_error()) {
+    BRCMF_ERR("Add wlanphy node error: %u", static_cast<uint32_t>(result->error_value()));
+    return result.status();
+  }
+
+  wlanphy_controller_client_.Bind(std::move(endpoints->client),
+                                  fdf::Dispatcher::GetCurrent()->async_dispatcher(), this);
+
+  return ZX_OK;
+}
+
+void Device::CreateNetDevice() {
+  network_device_ = std::make_unique<::wlan::drivers::components::NetworkDevice>(this);
+}
+
+zx_status_t Device::AddNetworkDevice(const char* deviceName) {
+  fidl::Arena arena;
+  auto property = fdf::MakeProperty(arena, BIND_PROTOCOL, ZX_PROTOCOL_NETWORK_DEVICE_IMPL);
+  auto args = fdf::wire::NodeAddArgs::Builder(arena)
+                  .name(arena, deviceName)
+                  .properties(fidl::VectorView<fdf::wire::NodeProperty>::FromExternal(&property, 1))
+                  .offers2(GetCompatServer().CreateOffers2(arena))
+                  .Build();
+  auto endpoints = fidl::CreateEndpoints<fdf::NodeController>();
+  if (endpoints.is_error()) {
+    BRCMF_ERR("Create Endpoints failed: %s", endpoints.status_string());
+    return endpoints.status_value();
+  }
+
+  // Add the netdevice child node for the node that this driver is binding to. Doing a sync version
+  // here to reduce chaos.
+  auto result = GetParentNode().sync()->AddChild(std::move(args), std::move(endpoints->server), {});
+  if (!result.ok()) {
+    BRCMF_ERR("Add controller node error due to FIDL error on protocol [Node]: %s",
+              result.status_string());
+    return result.status();
+  }
+  if (result->is_error()) {
+    BRCMF_ERR("Add controller node error: %u", static_cast<uint32_t>(result->error_value()));
+    return ZX_ERR_INTERNAL;
+  }
+  NetDev()->Init(std::move(endpoints->client), fdf::Dispatcher::GetCurrent()->async_dispatcher());
+  return ZX_OK;
+}
+
+zx_status_t Device::InitDevice() {
+  zx_status_t status = AddNetworkDevice(kNetDevDriverName);
   if (status != ZX_OK) {
-    BRCMF_ERR("Failed to create factory device %s", zx_status_get_string(status));
+    BRCMF_ERR("Failed to initialize network device %s", zx_status_get_string(status));
     return status;
   }
-
-  return status;
+  status = BusInit();
+  if (status != ZX_OK) {
+    BRCMF_ERR("Init failed: %s", zx_status_get_string(status));
+    return status;
+  }
+  return ZX_OK;
 }
 
-void Device::DdkInit(ddk::InitTxn txn) { txn.Reply(Init()); }
+void Device::InitPhyDevice() {
+  // Setup the WlanPhyImpl Service
+  zx_status_t status;
 
-void Device::DdkRelease() {
-  ShutdownDevice();
-  delete this;
-}
-
-void Device::DdkSuspend(ddk::SuspendTxn txn) {
-  BRCMF_INFO("Shutdown requested");
-  ShutdownDevice();
-  BRCMF_INFO("Shutdown completed");
-  txn.Reply(ZX_OK, txn.requested_state());
+  if ((status = AddWlanPhyImplService()) != ZX_OK) {
+    BRCMF_ERR("ServeRuntimeProtocolForV1Devices failed: %s", zx_status_get_string(status));
+    NetDevInitReply(status);
+    return;
+  }
+  if ((status = InitWlanPhyImpl()) != ZX_OK) {
+    BRCMF_ERR("Init WlanPhyImpl failed: %s", zx_status_get_string(status));
+    NetDevInitReply(status);
+    return;
+  }
+  NetDevInitReply(ZX_OK);
 }
 
 brcmf_pub* Device::drvr() { return brcmf_pub_.get(); }
 
 const brcmf_pub* Device::drvr() const { return brcmf_pub_.get(); }
-
-void Device::WaitForProtocolConnection() { protocol_connected_.Wait(); }
-
-zx_status_t Device::ServeWlanPhyImplProtocol(fidl::ServerEnd<fuchsia_io::Directory> server_end) {
-  // This callback will be invoked when this service is being connected.
-  auto protocol = [this](fdf::ServerEnd<fuchsia_wlan_phyimpl::WlanPhyImpl> server_end) mutable {
-    // Return immediately if the dispatcher has already been shutdown.
-    if (completion_.Wait(zx::sec(0)) == ZX_OK) {
-      BRCMF_WARN("Dispatcher has been shutdown, cannot bind fidl server.");
-      return;
-    }
-    fdf::BindServer(dispatcher_.get(), std::move(server_end), this);
-    // Notify that the server end is ready to accept request. Waiting for this signal by other
-    // entity is not necessary, the current use case of it is in SIM tests.
-    protocol_connected_.Signal();
-  };
-
-  // Register the callback to handler.
-  fuchsia_wlan_phyimpl::Service::InstanceHandler handler({.wlan_phy_impl = std::move(protocol)});
-
-  // Add this service to the outgoing directory so that the child driver can connect to by calling
-  // DdkConnectRuntimeProtocol().
-  auto status = outgoing_dir_.AddService<fuchsia_wlan_phyimpl::Service>(std::move(handler));
-  if (status.is_error()) {
-    BRCMF_ERR("%s(): Failed to add service to outgoing directory: %s\n", status.status_string());
-    return status.error_value();
-  }
-
-  // Serve the outgoing directory to the entity that intends to open it, which is DFv1 in this case.
-  auto result = outgoing_dir_.Serve(std::move(server_end));
-  if (result.is_error()) {
-    BRCMF_ERR("%s(): Failed to serve outgoing directory: %s\n", result.status_string());
-    return result.error_value();
-  }
-
-  return ZX_OK;
-}
 
 void Device::GetSupportedMacRoles(fdf::Arena& arena,
                                   GetSupportedMacRolesCompleter::Sync& completer) {
@@ -232,24 +270,15 @@ void Device::CreateIface(CreateIfaceRequestView request, fdf::Arena& arena,
         return;
       }
 
-      WlanInterface* interface = nullptr;
-
-      libsync::Completion created;
-      // Create WlanInterface on the default driver dispatcher to ensure its OutgoingDirectory is
-      // only accessed on a single thread.
-      async::PostTask(driver_async_dispatcher_, [&]() {
-        status =
-            WlanInterface::Create(this, kClientInterfaceName, wdev, request->role(), &interface);
-        created.Signal();
-      });
-      created.Wait();
-      if (status != ZX_OK) {
-        BRCMF_ERR("Failed to create WlanInterface: %s", zx_status_get_string(status));
-        completer.buffer(arena).ReplyError(status);
+      zx::result create_result =
+          WlanInterface::Create(this, kClientInterfaceName, wdev, request->role());
+      if (create_result.is_error()) {
+        BRCMF_ERR("Failed to create WlanInterface: %s", create_result.status_string());
+        completer.buffer(arena).ReplyError(create_result.status_value());
         return;
       }
 
-      client_interface_ = interface;  // The lifecycle of `interface` is owned by the devhost.
+      client_interface_ = std::move(create_result.value());
       iface_id = kClientInterfaceId;
 
       break;
@@ -279,30 +308,23 @@ void Device::CreateIface(CreateIfaceRequestView request, fdf::Arena& arena,
         return;
       }
 
-      WlanInterface* interface = nullptr;
-
-      libsync::Completion created;
-      // Create WlanInterface on the default driver dispatcher to ensure its OutgoingDirectory is
-      // only accessed on a single thread.
-      async::PostTask(driver_async_dispatcher_, [&]() {
-        status = WlanInterface::Create(this, kApInterfaceName, wdev, request->role(), &interface);
-        created.Signal();
-      });
-      created.Wait();
-      if (status != ZX_OK) {
-        BRCMF_ERR("Failed to create WlanInterface: %s", zx_status_get_string(status));
-        completer.buffer(arena).ReplyError(status);
+      zx::result create_result =
+          WlanInterface::Create(this, kApInterfaceName, wdev, request->role());
+      if (create_result.is_error()) {
+        BRCMF_ERR("Failed to create WlanInterface: %s", create_result.status_string());
+        completer.buffer(arena).ReplyError(create_result.status_value());
         return;
       }
 
-      ap_interface_ = interface;  // The lifecycle of `interface` is owned by the devhost.
+      ap_interface_ = std::move(create_result.value());
       iface_id = kApInterfaceId;
 
       break;
     }
 
     default: {
-      BRCMF_ERR("Device::CreateIface() MAC role %d not supported", request->role());
+      BRCMF_ERR("Device::CreateIface() MAC role %d not supported",
+                fidl::ToUnderlying(request->role()));
       completer.buffer(arena).ReplyError(ZX_ERR_NOT_SUPPORTED);
       return;
     }
@@ -330,6 +352,7 @@ void Device::CreateIface(CreateIfaceRequestView request, fdf::Arena& arena,
 
 void Device::DestroyIface(DestroyIfaceRequestView request, fdf::Arena& arena,
                           DestroyIfaceCompleter::Sync& completer) {
+  zx_status_t status;
   std::lock_guard<std::mutex> lock(lock_);
 
   if (!request->has_iface_id()) {
@@ -342,48 +365,40 @@ void Device::DestroyIface(DestroyIfaceRequestView request, fdf::Arena& arena,
   BRCMF_DBG(WLANPHY, "Destroying interface %d", iface_id);
   switch (iface_id) {
     case kClientInterfaceId: {
-      libsync::Completion device_removal;
-      DestroyIface(&client_interface_, [&device_removal, completer = completer.ToAsync(),
-                                        arena = std::move(arena), iface_id](auto status) mutable {
-        if (status != ZX_OK) {
-          if (status != ZX_ERR_NOT_FOUND) {
-            BRCMF_ERR("Device::DestroyIface() Error destroying Client interface : %s",
-                      zx_status_get_string(status));
-          }
-          completer.buffer(arena).ReplyError(status);
-          device_removal.Signal();
-          return;
-        }
+      if (client_interface_ == nullptr) {
+        BRCMF_WARN("Client interface not found");
+        completer.buffer(arena).ReplyError(ZX_ERR_NOT_FOUND);
+        return;
+      }
+      status = client_interface_->DestroyIface();
+      if (status == ZX_OK) {
         BRCMF_DBG(WLANPHY, "Interface %d destroyed successfully", iface_id);
+        client_interface_.reset();
         completer.buffer(arena).ReplySuccess();
-        device_removal.Signal();
-      });
-      zx_status_t status = device_removal.Wait(kDeviceRemovalTimeout);
-      if (status != ZX_OK) {
-        BRCMF_ERR(
-            "Timeout: Waiting for brcmfmac-wlan-fullmac-client to be released in driver framework.");
+      } else {
+        // Don't reset client_interface_ here since we failed to delete it.
+        BRCMF_ERR("Device::DestroyIface() Error destroying Client interface : %s",
+                  zx_status_get_string(status));
+        completer.buffer(arena).ReplyError(status);
       }
       return;
     }
     case kApInterfaceId: {
-      libsync::Completion device_removal;
-      DestroyIface(&ap_interface_, [&device_removal, completer = completer.ToAsync(),
-                                    arena = std::move(arena), iface_id](auto status) mutable {
-        if (status != ZX_OK) {
-          BRCMF_ERR("Device::DestroyIface() Error destroying AP interface : %s",
-                    zx_status_get_string(status));
-          completer.buffer(arena).ReplyError(status);
-          device_removal.Signal();
-          return;
-        }
+      if (ap_interface_ == nullptr) {
+        BRCMF_ERR("Softap interface not found");
+        completer.buffer(arena).ReplyError(ZX_ERR_NOT_FOUND);
+        return;
+      }
+      status = ap_interface_->DestroyIface();
+      if (status == ZX_OK) {
         BRCMF_DBG(WLANPHY, "Interface %d destroyed successfully", iface_id);
+        ap_interface_.reset();
         completer.buffer(arena).ReplySuccess();
-        device_removal.Signal();
-      });
-      zx_status_t status = device_removal.Wait(kDeviceRemovalTimeout);
-      if (status != ZX_OK) {
-        BRCMF_ERR(
-            "Timeout: Waiting for brcmfmac-wlan-fullmac-ap to be released in driver framework.");
+      } else {
+        // Don't reset ap_interface_ here since we failed to delete it.
+        BRCMF_ERR("Device::DestroyIface() Error destroying Client interface : %s",
+                  zx_status_get_string(status));
+        completer.buffer(arena).ReplyError(status);
       }
       return;
     }
@@ -478,8 +493,32 @@ void Device::GetPowerSaveMode(fdf::Arena& arena, GetPowerSaveModeCompleter::Sync
   completer.buffer(arena).ReplySuccess(builder.Build());
 }
 
+void Device::ServiceConnectHandler(fdf_dispatcher_t* dispatcher,
+                                   fdf::ServerEnd<fuchsia_wlan_phyimpl::WlanPhyImpl> server_end) {
+  bindings_.AddBinding(dispatcher, std::move(server_end), this, [](fidl::UnbindInfo info) {
+    if (!info.is_user_initiated()) {
+      BRCMF_ERR("WlanPhyImpl binding unexpectedly closed: %s", info.lossy_description());
+    }
+  });
+}
+
+void Device::NetDevInitReply(zx_status_t status) {
+  if (!netdev_init_txn_.has_value()) {
+    BRCMF_ERR("NetDev Init Txn is not valid");
+    return;
+  }
+  netdev_init_txn_.value().Reply(static_cast<int32_t>(status));
+  netdev_init_txn_.reset();
+}
+
 void Device::NetDevInit(wlan::drivers::components::NetworkDevice::Callbacks::InitTxn txn) {
-  txn.Reply(ZX_OK);
+  netdev_init_txn_.emplace(std::move(txn));
+  zx_status_t status = async::PostTask(fdf_dispatcher_get_async_dispatcher(GetDriverDispatcher()),
+                                       [this] { InitPhyDevice(); });
+  if (status != ZX_OK) {
+    BRCMF_ERR("Async PostTask failed: %s", zx_status_get_string(status));
+    NetDevInitReply(status);
+  }
 }
 
 void Device::NetDevRelease() {
@@ -535,72 +574,26 @@ void Device::NetDevReleaseVmo(uint8_t vmo_id) { brcmf_release_vmo(drvr(), vmo_id
 
 void Device::NetDevSetSnoopEnabled(bool snoop) {}
 
-void Device::ShutdownDispatcher() {
-  dispatcher_.ShutdownAsync();
-  completion_.Wait();
-}
-
-void Device::DestroyAllIfaces(void) {
+void Device::DestroyAllIfaces() {
   std::lock_guard<std::mutex> lock(lock_);
-  libsync::Completion client_device_removal;
-  libsync::Completion ap_device_removal;
-  DestroyIface(&client_interface_, [&client_device_removal](auto status) {
-    if (status != ZX_OK) {
+  if (client_interface_) {
+    zx_status_t status = client_interface_->DestroyIface();
+    if (status == ZX_OK) {
+      client_interface_.reset();
+    } else {
       BRCMF_ERR("Device::DestroyAllIfaces() : Failed destroying client interface : %s",
                 zx_status_get_string(status));
     }
-    client_device_removal.Signal();
-  });
-  DestroyIface(&ap_interface_, [&ap_device_removal](auto status) {
-    if (status != ZX_OK) {
-      BRCMF_ERR("Device::DestroyAllIfaces() : Failed destroying AP interface : %s",
-                zx_status_get_string(status));
-    }
-    ap_device_removal.Signal();
-  });
-  client_device_removal.Wait();
-  ap_device_removal.Wait();
-}
-
-void Device::DestroyIface(WlanInterface** iface_ptr, fit::callback<void(zx_status_t)> respond) {
-  WlanInterface* iface = *iface_ptr;
-  zx_status_t status = ZX_OK;
-  if (iface == nullptr) {
-    respond(ZX_ERR_NOT_FOUND);
-    return;
   }
 
-  iface->RemovePort();
-  wireless_dev* wdev = iface->take_wdev();
-
-  libsync::Completion destroyed;
-  // In SIM tests, the Reomve() function below deletes WlanInterface, make sure this operation
-  // happens on the default driver dispatcher to ensure the OutgoingDirectory of WlanInterface is
-  // only accessed on a single thread.
-  async::PostTask(driver_async_dispatcher_, [&]() {
-    if ((status = brcmf_cfg80211_del_iface(brcmf_pub_->config, wdev)) != ZX_OK) {
-      BRCMF_ERR("Failed to del iface, status: %s", zx_status_get_string(status));
-      iface->set_wdev(wdev);
-      respond(status);
-      destroyed.Signal();
-      return;
+  if (ap_interface_) {
+    zx_status_t status = ap_interface_->DestroyIface();
+    if (status == ZX_OK) {
+      ap_interface_.reset();
+    } else {
+      BRCMF_ERR("Device::DestroyAllIfaces() : Failed destroying ap interface : %s",
+                zx_status_get_string(status));
     }
-    iface->Remove([status, respond = std::move(respond)]() mutable { respond(status); });
-    *iface_ptr = nullptr;
-
-    destroyed.Signal();
-  });
-  destroyed.Wait();
-}
-
-void Device::ShutdownDevice() {
-  // Perform shutdown as implemented by subclasses first.
-  Shutdown();
-
-  if (brcmf_pub_) {
-    // Shut down the default WorkQueue here to ensure that its dispatcher is shutdown properly even
-    // if the Device object's destructor is not called.
-    brcmf_pub_->default_wq.Shutdown();
   }
 }
 

@@ -248,7 +248,7 @@ zx_status_t SimFirmware::BusPreinit() {
   return ZX_OK;
 }
 
-void SimFirmware::BusStop() { BRCMF_ERR("%s unimplemented", __FUNCTION__); }
+void SimFirmware::BusStop() { BRCMF_WARN("%s unimplemented", __FUNCTION__); }
 
 // Returns a buffer that can be used for BCDC-formatted communications, with the requested
 // payload size and an initialized BCDC header. "data_offset" represents any signalling offset
@@ -2290,7 +2290,7 @@ zx_status_t SimFirmware::IovarsSet(uint16_t ifidx, const char* name_buf, const v
 
   auto iovar = iovar_table_.find(name);
   if (iovar == iovar_table_.end()) {
-    BRCMF_ERR("Iovar -- %s is not found in iovar table.", name);
+    BRCMF_WARN("Iovar -- %s is not found in iovar table.", name);
     return ZX_OK;
   }
   auto& impl = iovar->second;
@@ -2334,7 +2334,7 @@ zx_status_t SimFirmware::IovarsGet(uint16_t ifidx, const char* name, void* value
 
   auto iovar = iovar_table_.find(name);
   if (iovar == iovar_table_.end()) {
-    BRCMF_ERR("Iovar -- %s is not found in iovar table.", name);
+    BRCMF_WARN("Iovar -- %s is not found in iovar table.", name);
     memset(value_out, 0, value_len);
     return ZX_OK;
   }
@@ -3303,8 +3303,8 @@ void SimFirmware::EscanResultSeen(const ScanResult& result_in) {
       continue;
     }
     switch (ie->IeType()) {
-      // TODO(https://fxbug.dev/42170664): scan_state_.opts should contain SSIDs which would determine
-      // whether to report this scan result or not.
+      // TODO(https://fxbug.dev/42170664): scan_state_.opts should contain SSIDs which would
+      // determine whether to report this scan result or not.
       case simulation::InformationElement::IE_TYPE_SSID: {
         const auto ssid_ie = std::static_pointer_cast<simulation::SsidInformationElement>(ie);
         std::vector<uint8_t> current_ie_buf = ssid_ie->ToRawIe();

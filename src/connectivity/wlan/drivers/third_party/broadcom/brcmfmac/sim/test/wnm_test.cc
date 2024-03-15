@@ -58,13 +58,15 @@ class WnmTest : public SimTest {
 // Set up the driver feature flags before the device is created.
 void WnmTest::PreInit() {
   ASSERT_EQ(SimTest::PreInit(), ZX_OK);
-  if (setup_btm_firmware_support_) {
-    device_->GetSim()->drvr->feat_flags |= BIT(BRCMF_FEAT_ROAM_ENGINE);
-    device_->GetSim()->drvr->feat_flags |= BIT(BRCMF_FEAT_WNM_BTM);
-  } else {
-    device_->GetSim()->drvr->feat_flags &= !(BIT(BRCMF_FEAT_ROAM_ENGINE));
-    device_->GetSim()->drvr->feat_flags &= !(BIT(BRCMF_FEAT_WNM_BTM));
-  }
+  WithSimDevice([this](brcmfmac::SimDevice* device) {
+    if (setup_btm_firmware_support_) {
+      device->GetSim()->drvr->feat_flags |= BIT(BRCMF_FEAT_ROAM_ENGINE);
+      device->GetSim()->drvr->feat_flags |= BIT(BRCMF_FEAT_WNM_BTM);
+    } else {
+      device->GetSim()->drvr->feat_flags &= !(BIT(BRCMF_FEAT_ROAM_ENGINE));
+      device->GetSim()->drvr->feat_flags &= !(BIT(BRCMF_FEAT_WNM_BTM));
+    }
+  });
   // Set to false here to prevent this from being enabled inadvertently in future tests.
   setup_btm_firmware_support_ = false;
 }
@@ -226,9 +228,11 @@ TEST_F(WnmTest, DisconnectOnBtmReqWhenTargetBssInfoUnsupported) {
   Init();
 
   // Inject firmware error to "target_bss_info" iovar.
-  brcmf_simdev* sim = device_->GetSim();
-  sim->sim_fw->err_inj_.AddErrInjIovar("target_bss_info", ZX_ERR_NOT_SUPPORTED, BCME_UNSUPPORTED,
-                                       client_ifc_.iface_id_);
+  WithSimDevice([this](brcmfmac::SimDevice* device) {
+    brcmf_simdev* sim = device->GetSim();
+    sim->sim_fw->err_inj_.AddErrInjIovar("target_bss_info", ZX_ERR_NOT_SUPPORTED, BCME_UNSUPPORTED,
+                                         client_ifc_.iface_id_);
+  });
 
   simulation::FakeAp ap_0(env_.get(), kAp0Bssid, kDefaultSsid, kAp0Channel);
   simulation::FakeAp ap_1(env_.get(), kAp1Bssid, kDefaultSsid, kAp1Channel);
@@ -267,12 +271,17 @@ TEST_F(WnmTest, DisconnectOnBtmReqWhenTargetBssInfoIeBufferMalformed) {
   PreInit();
   Init();
 
-  // Inject firmware error to "target_bss_info" iovar.
-  brcmf_simdev* sim = device_->GetSim();
-  // IE buffer that is all zero values, and is too short.
+  // This needs to have the same lifetime as the test because the sim FW will read from this
+  // buffer during the test.
   const std::vector<uint8_t> malformed_ie_buf{0, 0, 0, 0};
-  sim->sim_fw->err_inj_.AddErrInjIovar("target_bss_info", ZX_OK, BCME_OK, client_ifc_.iface_id_,
-                                       &malformed_ie_buf);
+
+  // Inject firmware error to "target_bss_info" iovar.
+  WithSimDevice([&](brcmfmac::SimDevice* device) {
+    brcmf_simdev* sim = device->GetSim();
+    // IE buffer that is all zero values, and is too short.
+    sim->sim_fw->err_inj_.AddErrInjIovar("target_bss_info", ZX_OK, BCME_OK, client_ifc_.iface_id_,
+                                         &malformed_ie_buf);
+  });
 
   simulation::FakeAp ap_0(env_.get(), kAp0Bssid, kDefaultSsid, kAp0Channel);
   simulation::FakeAp ap_1(env_.get(), kAp1Bssid, kDefaultSsid, kAp1Channel);

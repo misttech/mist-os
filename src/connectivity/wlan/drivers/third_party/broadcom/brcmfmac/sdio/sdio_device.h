@@ -14,48 +14,62 @@
 #ifndef SRC_CONNECTIVITY_WLAN_DRIVERS_THIRD_PARTY_BROADCOM_BRCMFMAC_SDIO_SDIO_DEVICE_H_
 #define SRC_CONNECTIVITY_WLAN_DRIVERS_THIRD_PARTY_BROADCOM_BRCMFMAC_SDIO_SDIO_DEVICE_H_
 
-#include <lib/async-loop/cpp/loop.h>
-#include <lib/async/dispatcher.h>
-#include <lib/ddk/device.h>
+#include <fidl/fuchsia.driver.compat/cpp/wire.h>
+#include <fidl/fuchsia.driver.framework/cpp/fidl.h>
+#include <lib/driver/compat/cpp/compat.h>
+#include <lib/driver/compat/cpp/device_server.h>
+#include <lib/driver/component/cpp/driver_base.h>
+#include <lib/driver/component/cpp/node_add_args.h>
+#include <lib/driver/outgoing/cpp/outgoing_directory.h>
+#include <lib/sync/cpp/completion.h>
+#include <lib/zx/result.h>
 #include <zircon/types.h>
 
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/device.h"
+
+namespace fdf {
+using namespace fuchsia_driver_framework;
+}
 
 namespace wlan::brcmfmac {
 
 class DeviceInspect;
 
-// This class uses the DDKTL classes to manage the lifetime of a brcmfmac driver instance.
-class SdioDevice : public Device {
+// This class uses the DriverBase class to manage the lifetime of a brcmfmac driver instance.
+class SdioDevice final : public Device, public fdf::DriverBase {
  public:
+  SdioDevice();
   SdioDevice(const SdioDevice& device) = delete;
   SdioDevice& operator=(const SdioDevice& other) = delete;
-  ~SdioDevice() override;
+  SdioDevice(fdf::DriverStartArgs start_args, fdf::UnownedSynchronizedDispatcher driver_dispatcher);
+  ~SdioDevice();
 
-  // Static factory function for SdioDevice instances. This factory does not return an owned
-  // instance, as on successful invocation the instance will have its lifecycle managed by the
-  // devhost.
-  static zx_status_t Create(zx_device_t* parent_device);
+  static constexpr const char* Name() { return "brcmfmac-sdio"; }
+  zx::result<> Start() override;
+  void PrepareStop(fdf::PrepareStopCompleter completer) override;
+  zx_status_t BusInit() override;
 
   // Virtual state accessor implementation.
-  async_dispatcher_t* GetDispatcher() override;
-  DeviceInspect* GetInspect() override;
+  async_dispatcher_t* GetTimerDispatcher() override { return dispatcher(); }
+  fdf_dispatcher_t* GetDriverDispatcher() override { return driver_dispatcher()->get(); }
+  DeviceInspect* GetInspect() override { return inspect_.get(); }
+  compat::DeviceServer& GetCompatServer() override { return compat_server_.inner(); }
+  fidl::WireClient<fdf::Node>& GetParentNode() override { return parent_node_; }
+  std::shared_ptr<fdf::OutgoingDirectory>& Outgoing() override { return outgoing(); }
+  const std::shared_ptr<fdf::Namespace>& Incoming() const override { return incoming(); }
 
-  // Trampolines for DDK functions, for platforms that support them
-  zx_status_t DeviceInit() override;
-  zx_status_t DeviceAdd(device_add_args_t* args, zx_device_t** out_device) override;
-  void DeviceAsyncRemove(zx_device_t* dev) override;
   zx_status_t LoadFirmware(const char* path, zx_handle_t* fw, size_t* size) override;
+  void on_fidl_error(fidl::UnbindInfo error) override {
+    BRCMF_WARN("Fidl Error: %s", error.FormatDescription().c_str());
+  }
+
   zx_status_t DeviceGetMetadata(uint32_t type, void* buf, size_t buflen, size_t* actual) override;
 
  protected:
-  void Shutdown() override;
-
  private:
-  explicit SdioDevice(zx_device_t* parent);
-
-  std::unique_ptr<async::Loop> async_loop_;
+  fidl::WireClient<fdf::Node> parent_node_;
   std::unique_ptr<DeviceInspect> inspect_;
+  compat::SyncInitializedDeviceServer compat_server_;
   std::unique_ptr<brcmf_bus> brcmf_bus_;
 };
 

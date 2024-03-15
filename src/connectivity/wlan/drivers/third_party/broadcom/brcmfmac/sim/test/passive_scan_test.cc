@@ -10,7 +10,6 @@
 
 #include <zxtest/zxtest.h>
 
-#include "src/connectivity/wlan/drivers/testing/lib/sim-device/device.h"
 #include "src/connectivity/wlan/drivers/testing/lib/sim-env/sim-env.h"
 #include "src/connectivity/wlan/drivers/testing/lib/sim-env/sim-frame.h"
 #include "src/connectivity/wlan/drivers/testing/lib/sim-fake-ap/sim-fake-ap.h"
@@ -38,8 +37,8 @@ struct ApInfo {
 
 class PassiveScanTestInterface : public SimInterface {
  public:
-  // TODO(https://fxbug.dev/https://fxbug.dev/42164585): Align the way active_scan_test and passive_scan_test
-  // verify scan results.
+  // TODO(https://fxbug.dev/https://fxbug.dev/42164585): Align the way active_scan_test and
+  // passive_scan_test verify scan results.
 
   // Add a functor that can be run on each scan result by the VerifyScanResult method.
   // This allows scan results to be inspected (e.g. with EXPECT_EQ) as they come in, rather than
@@ -67,7 +66,7 @@ class PassiveScanTest : public SimTest {
   static constexpr zx::duration kBeaconInterval =
       zx::msec((SimInterface::kDefaultPassiveScanDwellTimeMs / 5) * 4);
 
-  void Init();
+  void SetUp() override;
 
   // Create a new AP with the specified parameters, and tell it to start beaconing.
   void StartFakeAp(const common::MacAddr& bssid, const wlan_ieee80211::CSsid& ssid,
@@ -90,7 +89,7 @@ class PassiveScanTest : public SimTest {
   PassiveScanTestInterface client_ifc_;
 };
 
-void PassiveScanTest::Init() {
+void PassiveScanTest::SetUp() {
   ASSERT_EQ(SimTest::Init(), ZX_OK);
   ASSERT_EQ(StartInterface(wlan_common::WlanMacRole::kClient, &client_ifc_), ZX_OK);
   client_ifc_.test_ = this;
@@ -147,13 +146,10 @@ TEST_F(PassiveScanTest, BasicFunctionality) {
   constexpr zx::duration kDefaultTestDuration = zx::sec(100);
   constexpr uint64_t kScanId = 0x1248;
 
-  // Create our simulated device
-  Init();
-
   // Start up a single AP
   StartFakeAp(kDefaultBssid, kDefaultSsid, kDefaultChannel);
 
-  // Request a future scan
+  // // Request a future scan
   env_->ScheduleNotification(std::bind(&PassiveScanTestInterface::StartScan, &client_ifc_, kScanId,
                                        false, std::optional<const std::vector<uint8_t>>{}),
                              kScanStartTime);
@@ -189,14 +185,12 @@ TEST_F(PassiveScanTest, BasicFunctionality) {
   env_->Run(kDefaultTestDuration);
 }
 
-// TODO(https://fxbug.dev/42170829): The correct behavior is to default to scanning all supported channels.
+// TODO(https://fxbug.dev/42170829): The correct behavior is to default to scanning all supported
+// channels.
 TEST_F(PassiveScanTest, EmptyChannelList) {
   constexpr zx::duration kScanStartTime = zx::sec(1);
   constexpr zx::duration kDefaultTestDuration = zx::sec(100);
   constexpr uint64_t kScanId = 0x2012;
-
-  // Create our simulated device
-  Init();
 
   // Start up a single AP
   StartFakeAp(kDefaultBssid, kDefaultSsid, kDefaultChannel);
@@ -222,9 +216,6 @@ TEST_F(PassiveScanTest, ScanWithMalformedBeaconMissingSsidInformationElement) {
   constexpr zx::duration kScanStartTime = zx::sec(1);
   constexpr zx::duration kDefaultTestDuration = zx::sec(100);
   constexpr uint64_t kScanId = 0x1248;
-
-  // Create our simulated device
-  Init();
 
   // Functor that will remove the SSID information element from a beacon frame.
   auto beacon_mutator = [](const SimBeaconFrame& beacon) {
@@ -275,15 +266,14 @@ TEST_F(PassiveScanTest, ScanWhenFirmwareBusy) {
   constexpr zx::duration kDefaultTestDuration = zx::sec(100);
   constexpr uint64_t kScanId = 0x1248;
 
-  // Create our simulated device
-  Init();
-
   // Start up a single AP, with beacon error injection.
   StartFakeAp(kDefaultBssid, kDefaultSsid, kDefaultChannel);
 
   // Set up our injector
-  brcmf_simdev* sim = device_->GetSim();
-  sim->sim_fw->err_inj_.AddErrInjIovar("escan", ZX_OK, BCME_BUSY);
+  WithSimDevice([](brcmfmac::SimDevice* device) {
+    brcmf_simdev* sim = device->GetSim();
+    sim->sim_fw->err_inj_.AddErrInjIovar("escan", ZX_OK, BCME_BUSY);
+  });
 
   // Request a future scan
   env_->ScheduleNotification(std::bind(&PassiveScanTestInterface::StartScan, &client_ifc_, kScanId,
@@ -304,9 +294,6 @@ TEST_F(PassiveScanTest, ScanWhileAssocInProgress) {
   constexpr zx::duration kAssocStartTime = zx::msec(1);
   constexpr zx::duration kDefaultTestDuration = zx::sec(100);
   constexpr uint64_t kScanId = 0x1248;
-
-  // Create our simulated device
-  Init();
 
   // Start up an AP for association.
   StartFakeAp(kDefaultBssid, kDefaultSsid, kDefaultChannel);
@@ -331,9 +318,6 @@ TEST_F(PassiveScanTest, ScanAbortedInFirmware) {
   constexpr zx::duration kAssocStartTime = zx::msec(10);
   constexpr zx::duration kDefaultTestDuration = zx::sec(100);
   constexpr uint64_t kScanId = 0x1248;
-
-  // Create our simulated device
-  Init();
 
   // Start up an AP for association.
   StartFakeAp(kDefaultBssid, kDefaultSsid, kDefaultChannel);

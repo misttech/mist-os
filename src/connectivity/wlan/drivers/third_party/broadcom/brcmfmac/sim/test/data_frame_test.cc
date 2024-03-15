@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <fuchsia/wlan/internal/c/banjo.h>
 #include <lib/inspect/cpp/hierarchy.h>
 #include <lib/inspect/cpp/inspect.h>
 #include <zircon/errors.h>
@@ -161,15 +160,17 @@ class DataFrameTest : public SimTest {
  protected:
   void GetHighWmeRxErrorRateInspectCount(uint64_t* out_count) {
     ASSERT_NOT_NULL(out_count);
-    auto hierarchy = FetchHierarchy(device_->GetInspect()->inspector());
-    auto* root = hierarchy.value().GetByPath({"brcmfmac-phy"});
-    ASSERT_NE(nullptr, root);
-    // Only verify the value of hourly counter here, the relationship between hourly counter and
-    // daily counter is verified in device_inspect_test.
-    auto* uint_property =
-        root->node().get_property<inspect::UintPropertyValue>("high_wme_rx_error_rate");
-    ASSERT_NE(nullptr, uint_property);
-    *out_count = uint_property->value();
+    WithSimDevice([&out_count](brcmfmac::SimDevice* device) {
+      auto hierarchy = FetchHierarchy(device->GetInspect()->inspector());
+      auto* root = hierarchy.value().GetByPath({"brcmfmac-phy"});
+      ASSERT_NE(nullptr, root);
+      // Only verify the value of hourly counter here, the relationship between hourly counter and
+      // daily counter is verified in device_inspect_test.
+      auto* uint_property =
+          root->node().get_property<inspect::UintPropertyValue>("high_wme_rx_error_rate");
+      ASSERT_NE(nullptr, uint_property);
+      *out_count = uint_property->value();
+    });
   }
 
   struct AssocContext {
@@ -348,8 +349,10 @@ void DataFrameTest::OnSignalReport(
     // Transmit a frame to AP right after each signal report to increase tx count and hold rx count.
     constexpr uint16_t kFrameId = 123;
     auto transmit = [&](void) {
-      device_->DataPath().TxEthernet(kFrameId, kClientMacAddress, ifc_mac_, ETH_P_IP,
-                                     kSampleEthBody);
+      WithSimDevice([this](brcmfmac::SimDevice* device) {
+        device->DataPath().TxEthernet(kFrameId, kClientMacAddress, ifc_mac_, ETH_P_IP,
+                                      kSampleEthBody);
+      });
     };
     env_->ScheduleNotification(transmit, zx::msec(200));
   }
@@ -437,7 +440,10 @@ TEST_F(DataFrameTest, TxDataFrame) {
 
   constexpr uint16_t kFrameId = 123;
   auto transmit = [&](void) {
-    device_->DataPath().TxEthernet(kFrameId, kClientMacAddress, ifc_mac_, ETH_P_IP, kSampleEthBody);
+    WithSimDevice([this](brcmfmac::SimDevice* device) {
+      device->DataPath().TxEthernet(kFrameId, kClientMacAddress, ifc_mac_, ETH_P_IP,
+                                    kSampleEthBody);
+    });
   };
 
   env_->ScheduleNotification(transmit, zx::sec(1));
@@ -449,19 +455,21 @@ TEST_F(DataFrameTest, TxDataFrame) {
   // Verify frame was sent successfully
   EXPECT_EQ(assoc_context_.connect_resp_count, 1U);
 
-  auto& tx_results = device_->DataPath().TxResults();
-  ASSERT_EQ(tx_results.size(), 1);
-  EXPECT_EQ(tx_results[0].id, kFrameId);
-  EXPECT_EQ(tx_results[0].status, ZX_OK);
+  WithSimDevice([&](brcmfmac::SimDevice* device) {
+    auto& tx_results = device->DataPath().TxResults();
+    ASSERT_EQ(tx_results.size(), 1);
+    EXPECT_EQ(tx_results[0].id, kFrameId);
+    EXPECT_EQ(tx_results[0].status, ZX_OK);
 
-  EXPECT_EQ(env_data_frame_capture_.size(), 1U);
-  EXPECT_EQ(env_data_frame_capture_.front().toDS_, true);
-  EXPECT_EQ(env_data_frame_capture_.front().fromDS_, false);
-  EXPECT_EQ(env_data_frame_capture_.front().addr2_, ifc_mac_);
-  EXPECT_EQ(env_data_frame_capture_.front().addr3_, kClientMacAddress);
-  EXPECT_EQ(env_data_frame_capture_.front().payload_, kSampleEthBody);
-  EXPECT_TRUE(env_data_frame_capture_.front().qosControl_.has_value());
-  EXPECT_EQ(env_data_frame_capture_.front().qosControl_.value(), 6);
+    EXPECT_EQ(env_data_frame_capture_.size(), 1U);
+    EXPECT_EQ(env_data_frame_capture_.front().toDS_, true);
+    EXPECT_EQ(env_data_frame_capture_.front().fromDS_, false);
+    EXPECT_EQ(env_data_frame_capture_.front().addr2_, ifc_mac_);
+    EXPECT_EQ(env_data_frame_capture_.front().addr3_, kClientMacAddress);
+    EXPECT_EQ(env_data_frame_capture_.front().payload_, kSampleEthBody);
+    EXPECT_TRUE(env_data_frame_capture_.front().qosControl_.has_value());
+    EXPECT_EQ(env_data_frame_capture_.front().qosControl_.value(), 6);
+  });
 }
 
 // Verify that malformed ethernet header frames are detected by the driver
@@ -481,7 +489,10 @@ TEST_F(DataFrameTest, TxMalformedDataFrame) {
   // Simulate sending a illegal ethernet frame from us to the AP
   std::vector<uint8_t> illegal = {0x20, 0x43};
   constexpr uint16_t kFrameId = 123;
-  auto transmit = [&]() { device_->DataPath().TxRaw(kFrameId, illegal); };
+  auto transmit = [&]() {
+    WithSimDevice(
+        [&](brcmfmac::SimDevice* device) { device->DataPath().TxRaw(kFrameId, illegal); });
+  };
   env_->ScheduleNotification(transmit, zx::sec(1));
 
   env_->Run(kSimulatedClockDuration);
@@ -489,10 +500,12 @@ TEST_F(DataFrameTest, TxMalformedDataFrame) {
   // Verify frame was rejected
   EXPECT_EQ(assoc_context_.connect_resp_count, 1U);
 
-  auto& tx_results = device_->DataPath().TxResults();
-  ASSERT_EQ(tx_results.size(), 1);
-  EXPECT_EQ(tx_results[0].id, kFrameId);
-  EXPECT_EQ(tx_results[0].status, ZX_ERR_INVALID_ARGS);
+  WithSimDevice([&](brcmfmac::SimDevice* device) {
+    auto& tx_results = device->DataPath().TxResults();
+    ASSERT_EQ(tx_results.size(), 1);
+    EXPECT_EQ(tx_results[0].id, kFrameId);
+    EXPECT_EQ(tx_results[0].status, ZX_ERR_INVALID_ARGS);
+  });
 }
 
 TEST_F(DataFrameTest, TxEapolFrame) {
@@ -521,15 +534,17 @@ TEST_F(DataFrameTest, TxEapolFrame) {
   EXPECT_EQ(eapol_context_.tx_eapol_conf_codes.front(),
             wlan_fullmac_wire::WlanEapolResult::kSuccess);
 
-  auto& tx_results = device_->DataPath().TxResults();
-  ASSERT_EQ(tx_results.size(), 0);
+  WithSimDevice([&](brcmfmac::SimDevice* device) {
+    auto& tx_results = device->DataPath().TxResults();
+    ASSERT_EQ(tx_results.size(), 0);
 
-  ASSERT_EQ(env_data_frame_capture_.size(), 1U);
-  EXPECT_EQ(env_data_frame_capture_.front().toDS_, true);
-  EXPECT_EQ(env_data_frame_capture_.front().fromDS_, false);
-  EXPECT_EQ(env_data_frame_capture_.front().addr2_, ifc_mac_);
-  EXPECT_EQ(env_data_frame_capture_.front().addr3_, kClientMacAddress);
-  EXPECT_EQ(env_data_frame_capture_.front().payload_, kSampleEapol);
+    ASSERT_EQ(env_data_frame_capture_.size(), 1U);
+    EXPECT_EQ(env_data_frame_capture_.front().toDS_, true);
+    EXPECT_EQ(env_data_frame_capture_.front().fromDS_, false);
+    EXPECT_EQ(env_data_frame_capture_.front().addr2_, ifc_mac_);
+    EXPECT_EQ(env_data_frame_capture_.front().addr3_, kClientMacAddress);
+    EXPECT_EQ(env_data_frame_capture_.front().payload_, kSampleEapol);
+  });
 }
 
 // Test driver can receive data frames
@@ -563,11 +578,13 @@ TEST_F(DataFrameTest, RxDataFrame) {
   EXPECT_EQ(eapol_ind_count, 0U);
   EXPECT_EQ(eapol_context_.received_data.size(), 0);
 
-  ASSERT_EQ(device_->DataPath().RxData().size(), 1);
-  auto& actual = device_->DataPath().RxData().front();
+  WithSimDevice([&](brcmfmac::SimDevice* device) {
+    ASSERT_EQ(device->DataPath().RxData().size(), 1);
+    auto& actual = device->DataPath().RxData().front();
 
-  ASSERT_EQ(actual.size(), expected.size());
-  ASSERT_EQ(actual, expected);
+    ASSERT_EQ(actual.size(), expected.size());
+    ASSERT_EQ(actual, expected);
+  });
 }
 
 // Test driver can receive data frames
@@ -597,7 +614,8 @@ TEST_F(DataFrameTest, RxMalformedDataFrame) {
   // Confirm that the driver received that packet
   EXPECT_EQ(assoc_context_.connect_resp_count, 1U);
   EXPECT_EQ(non_eapol_data_count, 0U);
-  ASSERT_EQ(device_->DataPath().RxData().size(), 0U);
+  WithSimDevice(
+      [](brcmfmac::SimDevice* device) { ASSERT_EQ(device->DataPath().RxData().size(), 0U); });
 }
 
 TEST_F(DataFrameTest, RxEapolFrame) {
@@ -630,7 +648,8 @@ TEST_F(DataFrameTest, RxEapolFrame) {
   // The driver strips the ethernet header from the sent frame
   EXPECT_EQ(eapol_context_.received_data.front().size(), kSampleEapol.size());
   EXPECT_EQ(eapol_context_.received_data.front(), kSampleEapol);
-  ASSERT_EQ(device_->DataPath().RxData().size(), 0U);
+  WithSimDevice(
+      [](brcmfmac::SimDevice* device) { ASSERT_EQ(device->DataPath().RxData().size(), 0U); });
 }
 
 TEST_F(DataFrameTest, RxEapolFrameAfterAssoc) {
@@ -662,7 +681,8 @@ TEST_F(DataFrameTest, RxEapolFrameAfterAssoc) {
   // Confirm that the driver received that packet
   EXPECT_EQ(assoc_context_.connect_resp_count, 1U);
   EXPECT_EQ(eapol_ind_count, 1U);
-  ASSERT_EQ(device_->DataPath().RxData().size(), 0U);
+  WithSimDevice(
+      [](brcmfmac::SimDevice* device) { ASSERT_EQ(device->DataPath().RxData().size(), 0U); });
 }
 
 // Send a ucast packet to client before association is complete. Resulting E_DEAUTH from SIM FW
@@ -692,9 +712,12 @@ TEST_F(DataFrameTest, RxUcastBeforeAssoc) {
   env_->Run(kSimulatedClockDuration);
 
   // Confirm that the driver did not receive the packet
-  EXPECT_EQ(device_->DataPath().RxData().size(), 0U);
+  WithSimDevice(
+      [](brcmfmac::SimDevice* device) { ASSERT_EQ(device->DataPath().RxData().size(), 0U); });
+
   EXPECT_EQ(assoc_context_.connect_resp_count, 1U);
-  ASSERT_EQ(device_->DataPath().RxData().size(), 0U);
+  WithSimDevice(
+      [](brcmfmac::SimDevice* device) { ASSERT_EQ(device->DataPath().RxData().size(), 0U); });
 }
 
 TEST_F(DataFrameTest, DeauthWhenRxFreeze) {
@@ -750,7 +773,8 @@ TEST_F(DataFrameTest, WmeRxErrorHighDeauthTest) {
   env_->ScheduleNotification(std::bind(&DataFrameTest::StartConnect, this), kFirstAssocDelay);
 
   // Set sim fw to return high wme rx error
-  device_->GetSim()->sim_fw->SetHighWmeRxErrorRate();
+  WithSimDevice(
+      [](brcmfmac::SimDevice* device) { device->GetSim()->sim_fw->SetHighWmeRxErrorRate(); });
 
   // Ensure inspect metric is 0 at the start.
   uint64_t count;
@@ -812,13 +836,20 @@ TEST_F(DataFrameTest, WmeRxErrorHighResetTest) {
 
   // Alternate stats to return high rx error, and no rx error. This should create a scenario where
   // there is no prolonged periods of high error rate, causing this trigger to not kicked.
-  device_->GetSim()->sim_fw->SetHighWmeRxErrorRate();
+  WithSimDevice(
+      [](brcmfmac::SimDevice* device) { device->GetSim()->sim_fw->SetHighWmeRxErrorRate(); });
   env_->Run(kWmeRxErrorTestDuration);
-  device_->GetSim()->sim_fw->ClearHighWmeRxErrorRate();
+  WithSimDevice(
+      [](brcmfmac::SimDevice* device) { device->GetSim()->sim_fw->ClearHighWmeRxErrorRate(); });
+
   env_->Run(kWmeRxErrorTestDuration);
-  device_->GetSim()->sim_fw->SetHighWmeRxErrorRate();
+  WithSimDevice(
+      [](brcmfmac::SimDevice* device) { device->GetSim()->sim_fw->SetHighWmeRxErrorRate(); });
+
   env_->Run(kWmeRxErrorTestDuration);
-  device_->GetSim()->sim_fw->ClearHighWmeRxErrorRate();
+  WithSimDevice(
+      [](brcmfmac::SimDevice* device) { device->GetSim()->sim_fw->ClearHighWmeRxErrorRate(); });
+
   env_->Run(kWmeRxErrorTestDuration);
 
   // Ensure that inspect metrics has not incremented.

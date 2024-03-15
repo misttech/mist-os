@@ -19,8 +19,10 @@ class BootloaderMacAddrTest : public SimTest {
 void BootloaderMacAddrTest::Init(const common::MacAddr& mac_addr) {
   ASSERT_EQ(PreInit(), ZX_OK);
 
-  brcmf_simdev* sim = device_->GetSim();
-  sim->sim_fw->err_inj_.SetBootloaderMacAddr(mac_addr);
+  WithSimDevice([&mac_addr](brcmfmac::SimDevice* device) {
+    brcmf_simdev* sim = device->GetSim();
+    sim->sim_fw->err_inj_.SetBootloaderMacAddr(mac_addr);
+  });
 
   ASSERT_EQ(SimTest::Init(), ZX_OK);
 }

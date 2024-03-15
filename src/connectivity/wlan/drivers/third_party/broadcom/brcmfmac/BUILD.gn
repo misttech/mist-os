@@ -20,9 +20,7 @@ import("config.gni")
 visibility = [ "./*" ]
 
 # The brcmfmac driver can be built with support for different system buses (SDIO and
-# simulated-firmware), and different configurations will require different support.  To facilitate
-# consolidating all the potentially messy conditional compilation in one place, "binding.cc" is
-# conditionally compiled based on the values of the preprocessor #defines:
+# simulated-firmware), and different configurations will require different support.
 #
 # * CONFIG_BRCMFMAC_SDIO
 # * CONFIG_BRCMFMAC_SIM
@@ -33,17 +31,13 @@ visibility = [ "./*" ]
 # * sdio/sdio
 # * sim/sim
 #
-# Thus a target that depends on one of the above targets, can include "binding.cc" in its sources
-# and will then conditionally compile it with the set of preprocessor #defines set by the targets
-# it depends on.
-#
-# See the targets ":fuchsia_driver" and ":test_fuchsia_driver" to see how this is done.
 
 # Sources set for driver logging.
 source_set("debug") {
   public = [ "debug.h" ]
   public_deps = [
-    "//src/connectivity/wlan/drivers/lib/log/cpp",
+    "//sdk/lib/driver/compat/cpp:logging",
+    "//src/connectivity/wlan/drivers/lib/log/cpp:dfv2",
     "//zircon/system/public",
   ]
 }
@@ -73,7 +67,6 @@ source_set("linuxisms") {
     "//zircon/system/ulib/zircon-internal",
   ]
   public_deps = [
-    "//sdk/banjo/fuchsia.hardware.ethernet:fuchsia.hardware.ethernet_banjo_cpp",
     "//sdk/fidl/fuchsia.wlan.common:fuchsia.wlan.common_cpp",
     "//src/devices/lib/driver:driver_runtime",
     "//zircon/system/public",
@@ -122,7 +115,6 @@ source_set("core") {
     "core.cc",
     "d11.cc",
     "device.cc",
-    "factory_device.cc",
     "feature.cc",
     "fweh.cc",
     "fwil.cc",
@@ -159,25 +151,24 @@ source_set("core") {
     "//sdk/lib/driver/component/cpp:cpp",
     "//src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/inspect",
     "//src/connectivity/wlan/lib/common/cpp:common",
-    "//src/lib/ddktl",
     "//third_party/bcmdhd/crossdriver:bcmdhd_crossdriver",
     "//zircon/system/ulib/async",
   ]
   public_deps = [
     ":debug",
     ":linuxisms",
-    "//sdk/banjo/fuchsia.hardware.ethernet:fuchsia.hardware.ethernet_banjo_cpp",
-    "//sdk/fidl/fuchsia.factory.wlan:fuchsia.factory.wlan_cpp",
+    "//sdk/fidl/fuchsia.driver.compat:fuchsia.driver.compat_cpp",
     "//sdk/fidl/fuchsia.wlan.fullmac:fuchsia.wlan.fullmac_cpp",
+    "//sdk/fidl/fuchsia.wlan.phyimpl:fuchsia.wlan.phyimpl_bindlib_cpp",
     "//sdk/fidl/fuchsia.wlan.phyimpl:fuchsia.wlan.phyimpl_cpp",
+    "//sdk/lib/driver/compat/cpp:logging",
     "//sdk/lib/driver/component/cpp:cpp",
+    "//sdk/lib/driver/runtime:driver_runtime",
     "//sdk/lib/stdcompat",
     "//src/connectivity/wlan/drivers/lib/components:cpp",
     "//src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/recovery",
     "//src/connectivity/wlan/lib/common/cpp:common",
     "//src/devices/lib/broadcom",
-    "//src/devices/lib/driver:driver_runtime",
-    "//src/lib/ddktl",
     "//third_party/bcmdhd/crossdriver:bcmdhd_crossdriver",
     "//zircon/system/public",
     "//zircon/system/ulib/sync",
@@ -201,7 +192,7 @@ source_set("driver_sources") {
   deps = [
     ":core",
     ":debug",
-    "//src/devices/lib/driver",
+    "//sdk/lib/driver/runtime:driver_runtime",
   ]
 
   # The bus target dependencies below are public_deps so that their configs propagate to users of
@@ -230,7 +221,7 @@ driver_bind_rules("brcmfmac_sdio_bind") {
 # Driver module for the brcmfmac driver.
 fuchsia_driver("fuchsia_driver-driver") {
   output_name = "brcmfmac"
-  sources = [ "binding.cc" ]
+  sources = []
   deps = [
     ":core",
     ":driver_sources",
@@ -256,7 +247,8 @@ fuchsia_driver_component("fuchsia_driver") {
 # tests.
 fuchsia_driver("test_fuchsia_driver-driver") {
   output_name = "brcmfmac-test"
-  sources = [ "binding.cc" ]
+
+  sources = []
   deps = [
     ":core",
     ":driver_sources",
@@ -352,6 +344,8 @@ group("brcmfmac_tests") {
     "recovery/test:brcmfmac_recovery_test",
     "sdio/test:brcmfmac_sdio_test",
     "sim/test:brcmfmac_sim_test",
+    "test:brcmfmac_debug_test",
+    "test:brcmfmac_device_inspect_test",
     "test:brcmfmac_test",
   ]
   testonly = true

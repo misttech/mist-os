@@ -61,9 +61,11 @@ TEST_F(SimTest, BadNchainIovar) {
   // This invalid value of rxchain data has the potential to overflow the driver's internal
   // data structures
   const std::vector<uint8_t> alt_rxchain_data = {0xff, 0xff, 0xff, 0xff};
-  brcmf_simdev* sim = device_->GetSim();
-  sim->sim_fw->err_inj_.AddErrInjIovar("rxstreams_cap", ZX_OK, BCME_OK, client_ifc.iface_id_,
-                                       &alt_rxchain_data);
+  WithSimDevice([&](brcmfmac::SimDevice* device) {
+    brcmf_simdev* sim = device->GetSim();
+    sim->sim_fw->err_inj_.AddErrInjIovar("rxstreams_cap", ZX_OK, BCME_OK, client_ifc.iface_id_,
+                                         &alt_rxchain_data);
+  });
 
   wlan_fullmac_wire::WlanFullmacQueryInfo ifc_query_result;
   env_->ScheduleNotification(std::bind(&SimInterface::Query, &client_ifc, &ifc_query_result),

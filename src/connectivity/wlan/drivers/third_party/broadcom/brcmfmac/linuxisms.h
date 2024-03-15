@@ -24,7 +24,7 @@
 #ifndef SRC_CONNECTIVITY_WLAN_DRIVERS_THIRD_PARTY_BROADCOM_BRCMFMAC_LINUXISMS_H_
 #define SRC_CONNECTIVITY_WLAN_DRIVERS_THIRD_PARTY_BROADCOM_BRCMFMAC_LINUXISMS_H_
 
-#include <lib/ddk/debug.h>
+#include <fidl/fuchsia.wlan.common/cpp/wire.h>
 #include <netinet/if_ether.h>
 #include <pthread.h>
 #include <stdarg.h>
@@ -36,7 +36,6 @@
 #include <zircon/listnode.h>
 #include <zircon/syscalls.h>
 #include <zircon/types.h>
-#include <fidl/fuchsia.wlan.common/cpp/wire.h>
 typedef uint16_t __be16;
 typedef uint32_t __be32;
 typedef uint64_t __be64;
@@ -45,7 +44,7 @@ typedef uint64_t __be64;
 
 #define BIT(pos) (1UL << (pos))
 
-#define DIV_ROUND_UP(n, m) (((n) + ((m)-1)) / (m))
+#define DIV_ROUND_UP(n, m) (((n) + ((m) - 1)) / (m))
 
 #define GENMASK1(val) ((1UL << (val)) - 1)
 #define GENMASK(start, end) ((GENMASK1((start) + 1) & ~GENMASK1(end)))

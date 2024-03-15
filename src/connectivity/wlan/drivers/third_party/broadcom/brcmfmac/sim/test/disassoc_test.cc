@@ -73,10 +73,12 @@ TEST_F(SimTest, SmeDeauthFollowedByFwDisassoc) {
   client_ifc.AssociateWith(ap, zx::sec(3));
   // Schedule a disassocaition from firmware
   wlan_ieee80211::ReasonCode disassoc_reason = wlan_ieee80211::ReasonCode::kUnspecifiedReason;
-  SimFirmware& fw = *device_->GetSim()->sim_fw;
-  // Note that this disassociation cannot go through SME, it has to be initiated by firmware so that
-  // the disconnect mode tracking is not modified.
-  env_->ScheduleNotification([&] { fw.TriggerFirmwareDisassoc(disassoc_reason); }, zx::sec(4));
+  WithSimDevice([&](brcmfmac::SimDevice* device) {
+    SimFirmware& fw = *device->GetSim()->sim_fw;
+    // Note that this disassociation cannot go through SME, it has to be initiated by firmware so
+    // that the disconnect mode tracking is not modified.
+    env_->ScheduleNotification([&] { fw.TriggerFirmwareDisassoc(disassoc_reason); }, zx::sec(4));
+  });
 
   env_->Run(kTestDuration);
 

@@ -16,7 +16,7 @@
 #ifndef SRC_CONNECTIVITY_WLAN_DRIVERS_THIRD_PARTY_BROADCOM_BRCMFMAC_DEBUG_H_
 #define SRC_CONNECTIVITY_WLAN_DRIVERS_THIRD_PARTY_BROADCOM_BRCMFMAC_DEBUG_H_
 
-#include <lib/ddk/debug.h>
+#include <lib/driver/logging/cpp/logger.h>
 #include <stdint.h>
 #include <zircon/types.h>
 

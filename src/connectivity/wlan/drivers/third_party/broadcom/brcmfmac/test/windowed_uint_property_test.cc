@@ -26,6 +26,7 @@
 
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
+#include <wlan/drivers/testing/test_helpers.h>
 
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/test/device_inspect_test_utils.h"
 #include "src/lib/testing/loop_fixture/test_loop_fixture.h"
@@ -65,8 +66,7 @@ class WindowedUintPropertyTest : public gtest::TestLoopFixture {
 
   void ScheduleIncrement(zx::duration delay, uint64_t count) {
     for (uint64_t i = 0; i < count; i++) {
-      async::PostDelayedTask(
-          dispatcher(), [this]() { count_.Add(1); }, delay);
+      async::PostDelayedTask(dispatcher(), [this]() { count_.Add(1); }, delay);
     }
   }
 
@@ -90,6 +90,7 @@ class WindowedUintPropertyTest : public gtest::TestLoopFixture {
   inspect::Inspector inspector_;
   WindowedUintProperty count_;
   const std::string name_ = "uint_property_counter";
+  wlan::drivers::log::testing::UnitTestLogContext logging_{"WindowedUintPropertyTest"};
 };
 
 TEST_F(WindowedUintPropertyTest, InitErrors) {

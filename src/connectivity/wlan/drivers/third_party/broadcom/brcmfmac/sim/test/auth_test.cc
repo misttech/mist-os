@@ -158,7 +158,6 @@ class AuthTest : public SimTest {
   // This is the interface we will use for our single client interface
   AuthInterface client_ifc_;
 
-  SimFirmware* sim_fw_;
   uint32_t wsec_;
   uint16_t auth_;
   uint32_t wpa_auth_;
@@ -203,7 +202,6 @@ void AuthTest::Rx(std::shared_ptr<const simulation::SimFrame> frame,
 void AuthTest::Init() {
   ASSERT_EQ(SimTest::Init(), ZX_OK);
   ASSERT_EQ(StartInterface(wlan_common::WlanMacRole::kClient, &client_ifc_), ZX_OK);
-  sim_fw_ = device_->GetSim()->sim_fw.get();
   ap_.EnableBeacon(zx::msec(100));
 }
 
@@ -223,8 +221,10 @@ void AuthTest::VerifyAuthFrames() {
 }
 
 void AuthTest::SecErrorInject() {
-  brcmf_simdev* sim = device_->GetSim();
-  sim->sim_fw->err_inj_.AddErrInjIovar("wsec", ZX_ERR_IO, BCME_OK, client_ifc_.iface_id_);
+  WithSimDevice([this](brcmfmac::SimDevice* device) {
+    brcmf_simdev* sim = device->GetSim();
+    sim->sim_fw->err_inj_.AddErrInjIovar("wsec", ZX_ERR_IO, BCME_OK, client_ifc_.iface_id_);
+  });
 }
 
 fuchsia_wlan_common_wire::WlanKeyConfig AuthTest::CreateKeyConfig(
@@ -431,32 +431,34 @@ void AuthTest::OnConnectConf(const wlan_fullmac_wire::WlanFullmacConnectConfirm*
     return;
   }
 
-  brcmf_simdev* sim = device_->GetSim();
-  struct brcmf_if* ifp = brcmf_get_ifp(sim->drvr, client_ifc_.iface_id_);
-  zx_status_t status;
+  WithSimDevice([this](brcmfmac::SimDevice* device) {
+    brcmf_simdev* sim = device->GetSim();
+    struct brcmf_if* ifp = brcmf_get_ifp(sim->drvr, client_ifc_.iface_id_);
+    zx_status_t status;
 
-  {
-    // Since auth_ is uint16_t, we need a uint32_t to get the iovar
-    uint32_t auth32;
-    status = brcmf_fil_bsscfg_int_get(ifp, "auth", &auth32);
-    auth_ = static_cast<uint16_t>(auth32);
+    {
+      // Since auth_ is uint16_t, we need a uint32_t to get the iovar
+      uint32_t auth32;
+      status = brcmf_fil_bsscfg_int_get(ifp, "auth", &auth32);
+      auth_ = static_cast<uint16_t>(auth32);
+      EXPECT_EQ(status, ZX_OK);
+    }
+
+    status = brcmf_fil_bsscfg_int_get(ifp, "wsec", &wsec_);
     EXPECT_EQ(status, ZX_OK);
-  }
 
-  status = brcmf_fil_bsscfg_int_get(ifp, "wsec", &wsec_);
-  EXPECT_EQ(status, ZX_OK);
-
-  status = brcmf_fil_bsscfg_int_get(ifp, "wpa_auth", &wpa_auth_);
-  EXPECT_EQ(status, ZX_OK);
-
-  // The wsec_key iovar is only meaningful for WEP security
-  if (sec_type_ == SEC_TYPE_WEP_SHARED104 || sec_type_ == SEC_TYPE_WEP_SHARED40 ||
-      sec_type_ == SEC_TYPE_WEP_OPEN) {
-    status = brcmf_fil_bsscfg_data_get(ifp, "wsec_key", &wsec_key_, sizeof(wsec_key_));
+    status = brcmf_fil_bsscfg_int_get(ifp, "wpa_auth", &wpa_auth_);
     EXPECT_EQ(status, ZX_OK);
-    EXPECT_EQ(wsec_key_.flags, (uint32_t)BRCMF_PRIMARY_KEY);
-    EXPECT_EQ(wsec_key_.index, kDefaultKeyIndex);
-  }
+
+    // The wsec_key iovar is only meaningful for WEP security
+    if (sec_type_ == SEC_TYPE_WEP_SHARED104 || sec_type_ == SEC_TYPE_WEP_SHARED40 ||
+        sec_type_ == SEC_TYPE_WEP_OPEN) {
+      status = brcmf_fil_bsscfg_data_get(ifp, "wsec_key", &wsec_key_, sizeof(wsec_key_));
+      EXPECT_EQ(status, ZX_OK);
+      EXPECT_EQ(wsec_key_.flags, (uint32_t)BRCMF_PRIMARY_KEY);
+      EXPECT_EQ(wsec_key_.index, kDefaultKeyIndex);
+    }
+  });
 
   switch (sec_type_) {
     case SEC_TYPE_WEP_SHARED104:
@@ -652,8 +654,11 @@ TEST_F(AuthTest, AuthFailTest) {
   sec_type_ = SEC_TYPE_WEP_OPEN;
   ap_.SetSecurity({.auth_handling_mode = simulation::AUTH_TYPE_OPEN,
                    .sec_type = simulation::SEC_PROTO_TYPE_OPEN});
-  brcmf_simdev* sim = device_->GetSim();
-  sim->sim_fw->err_inj_.AddErrInjIovar("auth", ZX_ERR_IO, BCME_OK, client_ifc_.iface_id_);
+
+  WithSimDevice([this](brcmfmac::SimDevice* device) {
+    brcmf_simdev* sim = device->GetSim();
+    sim->sim_fw->err_inj_.AddErrInjIovar("auth", ZX_ERR_IO, BCME_OK, client_ifc_.iface_id_);
+  });
   env_->ScheduleNotification(std::bind(&AuthTest::StartConnect, this), zx::msec(10));
 
   env_->Run(kTestDuration);
@@ -674,10 +679,14 @@ TEST_F(AuthTest, WEPIgnoreTest) {
   // AuthHandleFailure() will retry for "max_retries" times and will send an BRCMF_E_SET_SSID event
   // with status BRCMF_E_STATUS_FAIL finally.
   uint32_t max_retries = 0;
-  brcmf_simdev* sim = device_->GetSim();
-  struct brcmf_if* ifp = brcmf_get_ifp(sim->drvr, client_ifc_.iface_id_);
-  zx_status_t status = brcmf_fil_iovar_int_get(ifp, "assoc_retry_max", &max_retries, nullptr);
-  EXPECT_EQ(status, ZX_OK);
+
+  WithSimDevice([this, &max_retries](brcmfmac::SimDevice* device) {
+    brcmf_simdev* sim = device->GetSim();
+    struct brcmf_if* ifp = brcmf_get_ifp(sim->drvr, client_ifc_.iface_id_);
+    zx_status_t status = brcmf_fil_iovar_int_get(ifp, "assoc_retry_max", &max_retries, nullptr);
+    EXPECT_EQ(status, ZX_OK);
+  });
+
   for (uint32_t i = 0; i < max_retries + 1; i++) {
     expect_auth_frames_.emplace_back(1, simulation::AUTH_TYPE_OPEN,
                                      wlan_ieee80211::StatusCode::kSuccess);
@@ -709,8 +718,10 @@ TEST_F(AuthTest, WPA1FailTest) {
   sec_type_ = SEC_TYPE_WPA1;
   ap_.SetSecurity({.auth_handling_mode = simulation::AUTH_TYPE_OPEN,
                    .sec_type = simulation::SEC_PROTO_TYPE_WPA1});
-  brcmf_simdev* sim = device_->GetSim();
-  sim->sim_fw->err_inj_.AddErrInjIovar("wpaie", ZX_ERR_IO, BCME_OK, client_ifc_.iface_id_);
+  WithSimDevice([this](brcmfmac::SimDevice* device) {
+    brcmf_simdev* sim = device->GetSim();
+    sim->sim_fw->err_inj_.AddErrInjIovar("wpaie", ZX_ERR_IO, BCME_OK, client_ifc_.iface_id_);
+  });
   env_->ScheduleNotification(std::bind(&AuthTest::StartConnect, this), zx::msec(10));
 
   env_->Run(kTestDuration);
@@ -764,10 +775,12 @@ TEST_F(AuthTest, WrongSecTypeAuthFail) {
 
   uint32_t max_retries = 0;
 
-  brcmf_simdev* sim = device_->GetSim();
-  struct brcmf_if* ifp = brcmf_get_ifp(sim->drvr, client_ifc_.iface_id_);
-  zx_status_t status = brcmf_fil_iovar_int_get(ifp, "assoc_retry_max", &max_retries, nullptr);
-  EXPECT_EQ(status, ZX_OK);
+  WithSimDevice([this, &max_retries](brcmfmac::SimDevice* device) {
+    brcmf_simdev* sim = device->GetSim();
+    struct brcmf_if* ifp = brcmf_get_ifp(sim->drvr, client_ifc_.iface_id_);
+    zx_status_t status = brcmf_fil_iovar_int_get(ifp, "assoc_retry_max", &max_retries, nullptr);
+    EXPECT_EQ(status, ZX_OK);
+  });
 
   for (uint32_t i = 0; i < max_retries + 1; i++) {
     expect_auth_frames_.emplace_back(1, simulation::AUTH_TYPE_OPEN,

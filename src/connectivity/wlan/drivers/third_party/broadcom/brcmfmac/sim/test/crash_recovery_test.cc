@@ -37,7 +37,6 @@ class CrashRecoveryTest : public SimTest {
 
   simulation::FakeAp ap_;
   SimInterface client_ifc_;
-  brcmf_if* client_ifp_;
   common::MacAddr client_mac_addr_;
 };
 
@@ -45,8 +44,6 @@ void CrashRecoveryTest::Init() {
   ASSERT_EQ(SimTest::Init(), ZX_OK);
   ASSERT_EQ(StartInterface(wlan_common::WlanMacRole::kClient, &client_ifc_), ZX_OK);
   ap_.EnableBeacon(zx::msec(100));
-  brcmf_simdev* sim = device_->GetSim();
-  client_ifp_ = brcmf_get_ifp(sim->drvr, client_ifc_.iface_id_);
   client_ifc_.GetMacAddr(&client_mac_addr_);
   uint64_t count;
   GetFwRcvrInspectCount(&count);
@@ -58,17 +55,28 @@ void CrashRecoveryTest::RecreateClientIface() {
   // need to notify the sim about it before attempting to recreate.
   SimTest::InterfaceDestroyed(&client_ifc_);
   SimTest::StartInterface(wlan_common::WlanMacRole::kClient, &client_ifc_);
-  brcmf_simdev* sim = device_->GetSim();
-  client_ifp_ = brcmf_get_ifp(sim->drvr, client_ifc_.iface_id_);
 }
 
 void CrashRecoveryTest::ScheduleCrash(zx::duration delay) {
-  env_->ScheduleNotification(std::bind(&brcmf_fil_iovar_int_set, client_ifp_, "crash", 0, nullptr),
-                             delay);
+  auto crash_firmware_callback = [this]() {
+    WithSimDevice([&](brcmfmac::SimDevice* device) {
+      brcmf_simdev* sim = device->GetSim();
+      struct brcmf_if* ifp = brcmf_get_ifp(sim->drvr, client_ifc_.iface_id_);
+      EXPECT_OK(brcmf_fil_iovar_int_set(ifp, "crash", 0, nullptr));
+    });
+  };
+  env_->ScheduleNotification(crash_firmware_callback, delay);
+
   // Reset the MAC address to firmware after recovery.
-  env_->ScheduleNotification(std::bind(&brcmf_fil_iovar_data_set, client_ifp_, "cur_etheraddr",
-                                       client_mac_addr_.byte, ETH_ALEN, nullptr),
-                             delay + zx::msec(1));
+  auto reset_mac_addr_callback = [this]() {
+    WithSimDevice([&](brcmfmac::SimDevice* device) {
+      brcmf_simdev* sim = device->GetSim();
+      struct brcmf_if* ifp = brcmf_get_ifp(sim->drvr, client_ifc_.iface_id_);
+      EXPECT_OK(
+          brcmf_fil_iovar_data_set(ifp, "cur_etheraddr", client_mac_addr_.byte, ETH_ALEN, nullptr));
+    });
+  };
+  env_->ScheduleNotification(reset_mac_addr_callback, delay + zx::msec(1));
 }
 
 void CrashRecoveryTest::VerifyScanResult(const uint64_t scan_id, size_t min_result_num,
@@ -91,7 +99,12 @@ void CrashRecoveryTest::VerifyScanResult(const uint64_t scan_id, size_t min_resu
 
 void CrashRecoveryTest::GetFwRcvrInspectCount(uint64_t* out_count) {
   ASSERT_NOT_NULL(out_count);
-  auto hierarchy = FetchHierarchy(device_->GetInspect()->inspector());
+
+  fpromise::result<inspect::Hierarchy> hierarchy;
+  WithSimDevice([&](brcmfmac::SimDevice* device) {
+    hierarchy = FetchHierarchy(device->GetInspect()->inspector());
+  });
+
   auto* root = hierarchy.value().GetByPath({"brcmfmac-phy"});
   ASSERT_NOT_NULL(root);
   // Only verify the value of hourly counter here, the relationship between hourly counter and daily
@@ -103,17 +116,17 @@ void CrashRecoveryTest::GetFwRcvrInspectCount(uint64_t* out_count) {
 
 TEST_F(CrashRecoveryTest, DeviceDestroyOnCrash) {
   Init();
-  uint32_t dev_count = dev_mgr_->DeviceCount();
+  uint32_t dev_count = DeviceCount();
 
   ScheduleCrash(zx::msec(10));
   env_->Run(kTestDuration);
 
   // Since we currently have one client interface, that should have gotten destroyed.
-  ASSERT_EQ(dev_mgr_->DeviceCount(), dev_count - 1);
+  WaitForDeviceCount(dev_count - 1);
 
   // Ensure RecreateClientIface brings it back.
   RecreateClientIface();
-  ASSERT_EQ(dev_mgr_->DeviceCount(), dev_count);
+  WaitForDeviceCount(dev_count);
 }
 
 // Verify that an association can be done correctly after a crash and a recovery happen after a scan

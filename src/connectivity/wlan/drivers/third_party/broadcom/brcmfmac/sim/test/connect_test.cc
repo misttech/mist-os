@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 #include <fuchsia/wlan/ieee80211/cpp/fidl.h>
-#include <fuchsia/wlan/internal/c/banjo.h>
 #include <fuchsia/wlan/stats/cpp/fidl.h>
 #include <zircon/errors.h>
 
@@ -542,10 +541,11 @@ TEST_F(ConnectTest, GetIfaceHistogramStatsTest) {
   const uint8_t expected_antenna_index = 0;
   const uint8_t expected_snr_index = 60;
   const uint8_t expected_snr_num_frames = 50;
-  // TODO(https://fxbug.dev/42104477): Test all bucket values when sim firmware fully supports wstats_counters.
-  // Sim firmware populates only SNR buckets, probably due to the discrepancies between the iovar
-  // get handling between real and sim firmware (e.g. fxr/404141). When wstats_counters is fully
-  // supported in sim firmware we can test for the expected noise floor, RSSI, and rate buckets.
+  // TODO(https://fxbug.dev/42104477): Test all bucket values when sim firmware fully supports
+  // wstats_counters. Sim firmware populates only SNR buckets, probably due to the discrepancies
+  // between the iovar get handling between real and sim firmware (e.g. fxr/404141). When
+  // wstats_counters is fully supported in sim firmware we can test for the expected noise floor,
+  // RSSI, and rate buckets.
 
   ASSERT_EQ(stats.noise_floor_histograms().count(), 1U);
   EXPECT_EQ(stats.noise_floor_histograms().data()[0].hist_scope, expected_hist_scope);
@@ -607,16 +607,20 @@ TEST_F(ConnectTest, GetIfaceHistogramStatsNotSupportedTest) {
 }
 
 void ConnectTest::ConnectErrorInject() {
-  brcmf_simdev* sim = device_->GetSim();
-  sim->sim_fw->err_inj_.AddErrInjCmd(BRCMF_C_SET_SSID, ZX_OK, BCME_OK, client_ifc_.iface_id_);
+  WithSimDevice([&](brcmfmac::SimDevice* device) {
+    brcmf_simdev* sim = device->GetSim();
+    sim->sim_fw->err_inj_.AddErrInjCmd(BRCMF_C_SET_SSID, ZX_OK, BCME_OK, client_ifc_.iface_id_);
+  });
 }
 
 void ConnectTest::ConnectErrorEventInject(brcmf_fweh_event_status_t ret_status,
                                           wlan_ieee80211::StatusCode ret_reason) {
-  brcmf_simdev* sim = device_->GetSim();
-  sim->sim_fw->err_inj_.AddErrEventInjCmd(BRCMF_C_SET_SSID, BRCMF_E_ASSOC, ret_status,
-                                          static_cast<status_code_t>(ret_reason), 0,
-                                          client_ifc_.iface_id_);
+  WithSimDevice([&](brcmfmac::SimDevice* device) {
+    brcmf_simdev* sim = device->GetSim();
+    sim->sim_fw->err_inj_.AddErrEventInjCmd(BRCMF_C_SET_SSID, BRCMF_E_ASSOC, ret_status,
+                                            static_cast<status_code_t>(ret_reason), 0,
+                                            client_ifc_.iface_id_);
+  });
 }
 
 void ConnectTest::StartDisassoc() {
@@ -703,9 +707,11 @@ void ConnectTest::TxFakeDisassocReq() {
 }
 
 void ConnectTest::DetailedHistogramErrorInject() {
-  brcmf_simdev* sim = device_->GetSim();
-  sim->sim_fw->err_inj_.AddErrInjIovar("wstats_counters", ZX_ERR_NOT_SUPPORTED, BCME_OK,
-                                       client_ifc_.iface_id_);
+  WithSimDevice([&](brcmfmac::SimDevice* device) {
+    brcmf_simdev* sim = device->GetSim();
+    sim->sim_fw->err_inj_.AddErrInjIovar("wstats_counters", ZX_ERR_NOT_SUPPORTED, BCME_OK,
+                                         client_ifc_.iface_id_);
+  });
 }
 
 // For this test, we want the pre-assoc scan test to fail because no APs are found.
@@ -884,12 +890,16 @@ TEST_F(ConnectTest, ApTemporarilyRefusedRequest) {
 
   env_->Run(kTestDuration);
 
-  brcmf_simdev* sim = device_->GetSim();
-  struct brcmf_if* ifp = brcmf_get_ifp(sim->drvr, client_ifc_.iface_id_);
   uint32_t max_assoc_retries;
-  zx_status_t status = brcmf_fil_iovar_int_get(ifp, "assoc_retry_max", &max_assoc_retries, nullptr);
-  EXPECT_EQ(status, ZX_OK);
-  ASSERT_EQ(max_assoc_retries, kMaxAssocRetries);
+  WithSimDevice([&](brcmfmac::SimDevice* device) {
+    brcmf_simdev* sim = device->GetSim();
+    struct brcmf_if* ifp = brcmf_get_ifp(sim->drvr, client_ifc_.iface_id_);
+    zx_status_t status =
+        brcmf_fil_iovar_int_get(ifp, "assoc_retry_max", &max_assoc_retries, nullptr);
+    EXPECT_EQ(status, ZX_OK);
+    ASSERT_EQ(max_assoc_retries, kMaxAssocRetries);
+  });
+
   // We should have gotten a refusal from the fake AP
   EXPECT_EQ(assoc_responses_.size(), max_assoc_retries + 1);
   EXPECT_EQ(assoc_responses_.front().status, wlan_ieee80211::StatusCode::kRefusedTemporarily);
@@ -915,12 +925,15 @@ TEST_F(ConnectTest, ApRefusedRequest) {
 
   env_->Run(kTestDuration);
 
-  brcmf_simdev* sim = device_->GetSim();
-  struct brcmf_if* ifp = brcmf_get_ifp(sim->drvr, client_ifc_.iface_id_);
   uint32_t max_assoc_retries;
-  zx_status_t status = brcmf_fil_iovar_int_get(ifp, "assoc_retry_max", &max_assoc_retries, nullptr);
-  EXPECT_EQ(status, ZX_OK);
-  ASSERT_EQ(max_assoc_retries, kMaxAssocRetries);
+  WithSimDevice([&](brcmfmac::SimDevice* device) {
+    brcmf_simdev* sim = device->GetSim();
+    struct brcmf_if* ifp = brcmf_get_ifp(sim->drvr, client_ifc_.iface_id_);
+    zx_status_t status =
+        brcmf_fil_iovar_int_get(ifp, "assoc_retry_max", &max_assoc_retries, nullptr);
+    EXPECT_EQ(status, ZX_OK);
+    ASSERT_EQ(max_assoc_retries, kMaxAssocRetries);
+  });
 
   // We should have gotten a refusal from the fake AP.
   EXPECT_EQ(assoc_responses_.size(), max_assoc_retries + 1);
@@ -1015,10 +1028,12 @@ void ConnectTest::SendMultipleResp() {
 
 void ConnectTest::SendAssocRespWithWmm() {
   uint8_t mac_buf[ETH_ALEN];
-  brcmf_simdev* sim = device_->GetSim();
-  struct brcmf_if* ifp = brcmf_get_ifp(sim->drvr, client_ifc_.iface_id_);
-  zx_status_t status = brcmf_fil_iovar_data_get(ifp, "cur_etheraddr", mac_buf, ETH_ALEN, nullptr);
-  EXPECT_EQ(status, ZX_OK);
+  WithSimDevice([&](brcmfmac::SimDevice* device) {
+    brcmf_simdev* sim = device->GetSim();
+    struct brcmf_if* ifp = brcmf_get_ifp(sim->drvr, client_ifc_.iface_id_);
+    zx_status_t status = brcmf_fil_iovar_data_get(ifp, "cur_etheraddr", mac_buf, ETH_ALEN, nullptr);
+    EXPECT_EQ(status, ZX_OK);
+  });
   common::MacAddr my_mac(mac_buf);
   simulation::SimAssocRespFrame assoc_resp_frame(context_.bssid, my_mac,
                                                  wlan_ieee80211::StatusCode::kSuccess);
@@ -1437,18 +1452,24 @@ TEST_F(ConnectTest, AssocMaxRetries) {
 
   zx_status_t status;
   uint32_t max_assoc_retries = 5;
-  brcmf_simdev* sim = device_->GetSim();
-  struct brcmf_if* ifp = brcmf_get_ifp(sim->drvr, client_ifc_.iface_id_);
-  status = brcmf_fil_iovar_int_set(ifp, "assoc_retry_max", max_assoc_retries, nullptr);
-  EXPECT_EQ(status, ZX_OK);
+  WithSimDevice([&](brcmfmac::SimDevice* device) {
+    brcmf_simdev* sim = device->GetSim();
+    struct brcmf_if* ifp = brcmf_get_ifp(sim->drvr, client_ifc_.iface_id_);
+    status = brcmf_fil_iovar_int_set(ifp, "assoc_retry_max", max_assoc_retries, nullptr);
+    EXPECT_EQ(status, ZX_OK);
+  });
   env_->ScheduleNotification(std::bind(&ConnectTest::StartConnect, this), zx::msec(10));
 
   env_->Run(kTestDuration);
 
   uint32_t assoc_retries;
-  status = brcmf_fil_iovar_int_get(ifp, "assoc_retry_max", &assoc_retries, nullptr);
-  EXPECT_EQ(status, ZX_OK);
-  ASSERT_EQ(max_assoc_retries, assoc_retries);
+  WithSimDevice([&](brcmfmac::SimDevice* device) {
+    brcmf_simdev* sim = device->GetSim();
+    struct brcmf_if* ifp = brcmf_get_ifp(sim->drvr, client_ifc_.iface_id_);
+    status = brcmf_fil_iovar_int_get(ifp, "assoc_retry_max", &assoc_retries, nullptr);
+    EXPECT_EQ(status, ZX_OK);
+    ASSERT_EQ(max_assoc_retries, assoc_retries);
+  });
   // Should have received as many refusals as the configured # of retries.
   EXPECT_EQ(assoc_responses_.size(), max_assoc_retries + 1);
   EXPECT_EQ(assoc_responses_.front().status, wlan_ieee80211::StatusCode::kRefusedReasonUnspecified);
@@ -1473,10 +1494,13 @@ TEST_F(ConnectTest, AssocMaxRetriesWhenTimedOut) {
   context_.expected_results.push_front(wlan_ieee80211::StatusCode::kRefusedReasonUnspecified);
 
   uint32_t max_assoc_retries = 5;
-  brcmf_simdev* sim = device_->GetSim();
-  struct brcmf_if* ifp = brcmf_get_ifp(sim->drvr, client_ifc_.iface_id_);
-  zx_status_t status = brcmf_fil_iovar_int_set(ifp, "assoc_retry_max", max_assoc_retries, nullptr);
-  EXPECT_EQ(status, ZX_OK);
+  WithSimDevice([&](brcmfmac::SimDevice* device) {
+    brcmf_simdev* sim = device->GetSim();
+    struct brcmf_if* ifp = brcmf_get_ifp(sim->drvr, client_ifc_.iface_id_);
+    zx_status_t status =
+        brcmf_fil_iovar_int_set(ifp, "assoc_retry_max", max_assoc_retries, nullptr);
+    EXPECT_EQ(status, ZX_OK);
+  });
   env_->ScheduleNotification(std::bind(&ConnectTest::StartConnect, this), zx::msec(10));
 
   env_->Run(kTestDuration);
@@ -1501,18 +1525,24 @@ TEST_F(ConnectTest, AssocNoRetries) {
 
   zx_status_t status;
   uint32_t max_assoc_retries = 0;
-  brcmf_simdev* sim = device_->GetSim();
-  struct brcmf_if* ifp = brcmf_get_ifp(sim->drvr, client_ifc_.iface_id_);
-  status = brcmf_fil_iovar_int_set(ifp, "assoc_retry_max", max_assoc_retries, nullptr);
-  EXPECT_EQ(status, ZX_OK);
+  WithSimDevice([&](brcmfmac::SimDevice* device) {
+    brcmf_simdev* sim = device->GetSim();
+    struct brcmf_if* ifp = brcmf_get_ifp(sim->drvr, client_ifc_.iface_id_);
+    status = brcmf_fil_iovar_int_set(ifp, "assoc_retry_max", max_assoc_retries, nullptr);
+    EXPECT_EQ(status, ZX_OK);
+  });
   env_->ScheduleNotification(std::bind(&ConnectTest::StartConnect, this), zx::msec(10));
 
   env_->Run(kTestDuration);
 
   uint32_t assoc_retries;
-  status = brcmf_fil_iovar_int_get(ifp, "assoc_retry_max", &assoc_retries, nullptr);
-  EXPECT_EQ(status, ZX_OK);
-  ASSERT_EQ(max_assoc_retries, assoc_retries);
+  WithSimDevice([&](brcmfmac::SimDevice* device) {
+    brcmf_simdev* sim = device->GetSim();
+    struct brcmf_if* ifp = brcmf_get_ifp(sim->drvr, client_ifc_.iface_id_);
+    status = brcmf_fil_iovar_int_get(ifp, "assoc_retry_max", &assoc_retries, nullptr);
+    EXPECT_EQ(status, ZX_OK);
+    ASSERT_EQ(max_assoc_retries, assoc_retries);
+  });
 
   // We should have gotten a refusal from the fake AP.
   EXPECT_EQ(assoc_responses_.size(), 1U);

@@ -17,6 +17,7 @@
 #include "core.h"
 
 #include <endian.h>
+#include <lib/fdf/dispatcher.h>
 #include <netinet/if_ether.h>
 #include <pthread.h>
 #include <threads.h>
@@ -240,7 +241,7 @@ void brcmf_netdev_set_allmulti(struct net_device* ndev) {
 
 void brcmf_tx_complete(struct brcmf_pub* drvr, cpp20::span<wlan::drivers::components::Frame> frames,
                        zx_status_t result) {
-  drvr->device->NetDev().CompleteTx(frames, result);
+  drvr->device->NetDev()->CompleteTx(frames, result);
 }
 
 zx_status_t brcmf_start_xmit(struct brcmf_pub* drvr,
@@ -607,32 +608,41 @@ void brcmf_recovery_worker(WorkItem* work) {
   struct brcmf_bus* bus = drvr->bus_if;
   zx_status_t error = ZX_OK;
 
+  auto finish_recovery_worker = fit::defer([drvr] {
+    drvr->recovery_trigger->ClearStatistics();
+    // Notice that here we set drvr_resetting but not fw_reloading to false, drvr_resetting is set
+    // to true before the worker is added into the workqueue, and fw_loading is set to false in
+    // brcmf_sdio_load_files(), which marks that the firmware loading is finished.
+    drvr->drvr_resetting.store(false);
+  });
+
   // Do clean up in cfg80211 layer.
   if ((error = brcmf_reset(drvr)) != ZX_OK) {
     BRCMF_ERR("Reset cfg80211 layer failed -- error: %s", zx_status_get_string(error));
     brcmf_detach(drvr);
-    goto fail;
+    return;
   }
 
   if ((error = brcmf_bus_recovery(bus)) != ZX_OK) {
     BRCMF_ERR("Bus recovery failed -- error: %s", zx_status_get_string(error));
     brcmf_detach(drvr);
-    goto fail;
+    return;
   }
 
   drvr->device->GetInspect()->LogFwRecovered();
-  drvr->device->DestroyAllIfaces();
 
-fail:
-  // Clean the counters for all the trigger conditions at the end of the recovery process to ensure
-  // all the counters are 0 after driver is recovered and start working. Skip it here for SIM to
-  // break deadlock.
-  if (brcmf_bus_get_bus_type(bus) != BRCMF_BUS_TYPE_SIM)
-    drvr->recovery_trigger->ClearStatistics();
-  // Notice that here we set drvr_resetting but not fw_reloading to false, drvr_resetting is set to
-  // true before the worker is added into the workqueue, and fw_loading is set to false in
-  // brcmf_sdio_load_files(), which marks that the firmware loading is finished.
-  drvr->drvr_resetting.store(false);
+  // DestroyAllIfaces must be called on the driver dispatcher's async_dispatcher since it removes
+  // the Fullmac service from the OutgoingDirectory, which must be accessed from the same dispatcher
+  // it was created on.
+  async_dispatcher_t* driver_dispatcher =
+      fdf_dispatcher_get_async_dispatcher(drvr->device->GetDriverDispatcher());
+
+  // Move finish_driver_reset into this task so that it's called when the task finishes.
+  async::PostTask(driver_dispatcher,
+                  [drvr, _finish_recovery_worker = std::move(finish_recovery_worker)]() {
+                    drvr->device->DestroyAllIfaces();
+                    // finish_driver_reset should be called at the end of scope here
+                  });
 }
 
 zx_status_t brcmf_attach(brcmf_pub* drvr) {
@@ -865,13 +875,7 @@ zx_status_t brcmf_schedule_recovery_worker(struct brcmf_pub* drvr) {
     return ZX_ERR_UNAVAILABLE;
   }
   BRCMF_INFO("The crash recovery process has been triggered.");
-
-  if (brcmf_bus_get_bus_type(drvr->bus_if) == BRCMF_BUS_TYPE_SIM) {
-    (*drvr->recovery_work.handler)(&drvr->recovery_work);
-  } else {
-    drvr->default_wq.Schedule(&drvr->recovery_work);
-  }
-
+  drvr->default_wq.Schedule(&drvr->recovery_work);
   return ZX_OK;
 }
 

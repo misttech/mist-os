@@ -25,6 +25,32 @@
 // implementations. 'sim-env' is commonly used for all drivers. Therefore we can
 // leverage the fancy features (e.g. RSSI model) in the sim-env for all drivers.
 //
+// ** Simulated environment internals **
+//
+// The `Environment` class maintains an event queue that contains all events that are scheduled to
+// occur within the simulated environment. Users can schedule events by calling
+// `Environment::ScheduleNotification`, and process the event queue synchronously by calling
+// `Environment::Run`. Events will be executed in chronological order as determined by their
+// deadlines.
+//
+// Each event is associated with a deadline; however events are processed as
+// quickly as possible. That is, if there are two events in the event queue where the 1st event is
+// scheduled to occur at 1 second and the 2nd event is scheduled to occur at 30 seconds, calling
+// `Environment::Run` will run the events as quickly as possible (i.e. almost instantaneously
+// without waiting 29 seconds in between the two events).
+//
+// `Environment` also exposes an async_dispatcher_t interface through `Environment::GetDispatcher`.
+// Posting a task to this dispatcher will insert the task into the simulated environment's event
+// queue. Note that this task will **not** be run asynchronously on some background thread. Instead,
+// it will be run on the thread that calls `Environment::Run`, along with all other events in the
+// event queue.
+//
+// ** Environment thread safety **
+//
+// Adding, removing, and moving stations are **not** thread-safe and should be done from a single
+// thread.
+//
+// All operations on the event queue (including calling `Environment::Tx`) are thread-safe.
 
 #ifndef SRC_CONNECTIVITY_WLAN_DRIVERS_TESTING_LIB_SIM_ENV_SIM_ENV_H_
 #define SRC_CONNECTIVITY_WLAN_DRIVERS_TESTING_LIB_SIM_ENV_SIM_ENV_H_

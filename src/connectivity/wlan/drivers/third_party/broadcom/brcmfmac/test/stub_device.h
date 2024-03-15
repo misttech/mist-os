@@ -4,7 +4,6 @@
 #ifndef SRC_CONNECTIVITY_WLAN_DRIVERS_THIRD_PARTY_BROADCOM_BRCMFMAC_TEST_STUB_DEVICE_H_
 #define SRC_CONNECTIVITY_WLAN_DRIVERS_THIRD_PARTY_BROADCOM_BRCMFMAC_TEST_STUB_DEVICE_H_
 
-#include <lib/ddk/device.h>
 #include <zircon/types.h>
 
 #include <memory>
@@ -24,18 +23,23 @@ class StubDevice : public Device {
   StubDevice();
   ~StubDevice() override;
 
+  zx_status_t BusInit() override { return ZX_OK; }
   // Device implementation.
-  async_dispatcher* GetDispatcher() override;
-  DeviceInspect* GetInspect() override;
-
-  zx_status_t DeviceInit() override;
-  zx_status_t DeviceAdd(device_add_args_t* args, zx_device_t** out_device) override;
-  void DeviceAsyncRemove(zx_device_t* dev) override;
+  async_dispatcher_t* GetTimerDispatcher() override { return nullptr; }
+  DeviceInspect* GetInspect() override { return nullptr; }
   zx_status_t LoadFirmware(const char* path, zx_handle_t* fw, size_t* size) override;
   zx_status_t DeviceGetMetadata(uint32_t type, void* buf, size_t buflen, size_t* actual) override;
+  compat::DeviceServer& GetCompatServer() override { return compat_server_.value().inner(); }
+  fidl::WireClient<fdf::Node>& GetParentNode() override { return parent_node_; }
+  std::shared_ptr<fdf::OutgoingDirectory>& Outgoing() override { return outgoing_dir_.value(); }
+  const std::shared_ptr<fdf::Namespace>& Incoming() const override { return incoming_dir_.value(); }
+  fdf_dispatcher_t* GetDriverDispatcher() override { return nullptr; }
 
  protected:
-  void Shutdown() override;
+  std::optional<compat::SyncInitializedDeviceServer> compat_server_;
+  fidl::WireClient<fdf::Node> parent_node_;
+  std::optional<std::shared_ptr<fdf::OutgoingDirectory>> outgoing_dir_;
+  std::optional<std::shared_ptr<fdf::Namespace>> incoming_dir_;
 };
 
 }  // namespace brcmfmac

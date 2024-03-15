@@ -4,9 +4,6 @@
 
 #include <zxtest/zxtest.h>
 
-#include "src/connectivity/wlan/drivers/testing/lib/sim-device/device.h"
-#include "src/connectivity/wlan/drivers/testing/lib/sim-env/sim-env.h"
-#include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/sim/sim.h"
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/sim/test/sim_test.h"
 #include "zircon/errors.h"
 
@@ -59,8 +56,10 @@ TEST_F(SetKeysTest, MultipleKeys) {
 
   auto& set_keys_resp = result->resp;
 
-  std::vector<brcmf_wsec_key_le> firmware_keys =
-      device_->GetSim()->sim_fw->GetKeyList(client_ifc_.iface_id_);
+  std::vector<brcmf_wsec_key_le> firmware_keys;
+  WithSimDevice([&](brcmfmac::SimDevice* device) {
+    firmware_keys = device->GetSim()->sim_fw->GetKeyList(client_ifc_.iface_id_);
+  });
   ASSERT_EQ(firmware_keys.size(), wlan_fullmac_wire::kWlanMaxKeylistSize);
 
   for (size_t i = 0; i < firmware_keys.size(); i++) {
@@ -121,8 +120,11 @@ TEST_F(SetKeysTest, SetGroupKey) {
   ASSERT_OK(set_keys_resp.statuslist.data()[0]);
   ASSERT_OK(set_keys_resp.statuslist.data()[1]);
 
-  std::vector<brcmf_wsec_key_le> firmware_keys =
-      device_->GetSim()->sim_fw->GetKeyList(client_ifc_.iface_id_);
+  std::vector<brcmf_wsec_key_le> firmware_keys;
+  WithSimDevice([&](brcmfmac::SimDevice* device) {
+    firmware_keys = device->GetSim()->sim_fw->GetKeyList(client_ifc_.iface_id_);
+  });
+
   ASSERT_EQ(firmware_keys.size(), 2U);
   EXPECT_STREQ(reinterpret_cast<const char*>(firmware_keys[0].data),
                reinterpret_cast<const char*>(group_key));
@@ -164,8 +166,11 @@ TEST_F(SetKeysTest, CustomOuiNotSupported) {
   ASSERT_EQ(set_keys_resp.num_keys, 1ul);
   ASSERT_EQ(set_keys_resp.statuslist.data()[0], ZX_ERR_NOT_SUPPORTED);
 
-  std::vector<brcmf_wsec_key_le> firmware_keys =
-      device_->GetSim()->sim_fw->GetKeyList(client_ifc_.iface_id_);
+  std::vector<brcmf_wsec_key_le> firmware_keys;
+  WithSimDevice([&](brcmfmac::SimDevice* device) {
+    firmware_keys = device->GetSim()->sim_fw->GetKeyList(client_ifc_.iface_id_);
+  });
+
   ASSERT_EQ(firmware_keys.size(), 0U);
 }
 
@@ -197,8 +202,11 @@ TEST_F(SetKeysTest, OptionalOuiSupported) {
   ASSERT_EQ(set_keys_resp.num_keys, 1ul);
   ASSERT_OK(set_keys_resp.statuslist.data()[0]);
 
-  std::vector<brcmf_wsec_key_le> firmware_keys =
-      device_->GetSim()->sim_fw->GetKeyList(client_ifc_.iface_id_);
+  std::vector<brcmf_wsec_key_le> firmware_keys;
+  WithSimDevice([&](brcmfmac::SimDevice* device) {
+    firmware_keys = device->GetSim()->sim_fw->GetKeyList(client_ifc_.iface_id_);
+  });
+
   ASSERT_EQ(firmware_keys.size(), 1U);
 
   EXPECT_EQ(keylen, firmware_keys[0].len);
@@ -234,8 +242,11 @@ TEST_F(SetKeysTest, MsftOuiSupported) {
   ASSERT_EQ(set_keys_resp.num_keys, 1ul);
   ASSERT_OK(set_keys_resp.statuslist.data()[0]);
 
-  std::vector<brcmf_wsec_key_le> firmware_keys =
-      device_->GetSim()->sim_fw->GetKeyList(client_ifc_.iface_id_);
+  std::vector<brcmf_wsec_key_le> firmware_keys;
+  WithSimDevice([&](brcmfmac::SimDevice* device) {
+    firmware_keys = device->GetSim()->sim_fw->GetKeyList(client_ifc_.iface_id_);
+  });
+
   ASSERT_EQ(firmware_keys.size(), 1U);
 
   EXPECT_EQ(keylen, firmware_keys[0].len);

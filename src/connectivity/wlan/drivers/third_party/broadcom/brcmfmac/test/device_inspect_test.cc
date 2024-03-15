@@ -24,6 +24,7 @@
 
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
+#include <wlan/drivers/testing/test_helpers.h>
 
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/debug.h"
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/test/device_inspect_test_utils.h"
@@ -123,6 +124,8 @@ class DeviceInspectTest : public gtest::TestLoopFixture {
       PropertyTestUnit(kRootMetrics, "high_wme_rx_error_rate_24hrs",
                        std::bind(&DeviceInspectTest::LogHighWmeRxErrorRate, this)),
   };
+
+  wlan::drivers::log::testing::UnitTestLogContext logging_{"DeviceInspectTest"};
 };
 
 TEST_F(DeviceInspectTest, HierarchyCreation) {

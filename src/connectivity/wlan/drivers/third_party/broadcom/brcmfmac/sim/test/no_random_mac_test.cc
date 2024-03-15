@@ -20,8 +20,10 @@ TEST_F(SimTest, RandomMacNotSupported) {
   ASSERT_EQ(PreInit(), ZX_OK);
 
   // Force failure in the iovar used to set a random mac address
-  brcmf_simdev* sim = device_->GetSim();
-  sim->sim_fw->err_inj_.AddErrInjIovar("pfn_macaddr", ZX_ERR_IO, BCME_OK);
+  WithSimDevice([](brcmfmac::SimDevice* device) {
+    brcmf_simdev* sim = device->GetSim();
+    sim->sim_fw->err_inj_.AddErrInjIovar("pfn_macaddr", ZX_ERR_IO, BCME_OK);
+  });
 
   ASSERT_EQ(Init(), ZX_OK);
 

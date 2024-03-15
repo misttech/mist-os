@@ -78,7 +78,9 @@ void BeaconLostTest::Finish() {
 
 // Move the client (not the test)
 void BeaconLostTest::MoveClient(int32_t x, int32_t y) {
-  env_->MoveStation(device_->GetSim()->sim_fw->GetHardwareIfc(), x, y);
+  WithSimDevice([&](brcmfmac::SimDevice* device) {
+    env_->MoveStation(device->GetSim()->sim_fw->GetHardwareIfc(), x, y);
+  });
 }
 
 // Verify that deauthorization occurs if associated AP's beacons disappear

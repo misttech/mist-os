@@ -23,12 +23,12 @@
 
 #include <wifi/wifi-config.h>
 
-#include "src/connectivity/wlan/drivers/testing/lib/sim-device/device.h"
 #include "src/connectivity/wlan/drivers/testing/lib/sim-env/sim-env.h"
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/bus.h"
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/chip.h"
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/common.h"
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/debug.h"
+#include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/device.h"
 
 #define BUS_OP(bus) bus->bus_priv.sim->sim_fw
 static const struct brcmf_bus_ops brcmf_sim_bus_ops = {
@@ -106,9 +106,8 @@ static void brcmf_sim_probe(struct brcmf_bus* bus) {
   brcmf_get_module_param(BRCMF_BUS_TYPE_SIM, chip, chiprev, bus->bus_priv.sim->settings.get());
 }
 
-zx_status_t brcmf_sim_alloc(brcmf_pub* drvr, std::unique_ptr<brcmf_bus>* out_bus,
-                            ::wlan::simulation::FakeDevMgr* dev_mgr,
-                            std::shared_ptr<::wlan::simulation::Environment> env) {
+std::unique_ptr<brcmf_bus> brcmf_sim_alloc(brcmf_pub* drvr, ::wlan::simulation::Environment* env) {
+  ZX_ASSERT(drvr != nullptr);
   auto simdev = new brcmf_simdev();
   auto bus_if = std::make_unique<brcmf_bus>();
 
@@ -116,7 +115,6 @@ zx_status_t brcmf_sim_alloc(brcmf_pub* drvr, std::unique_ptr<brcmf_bus>* out_bus
   simdev->drvr = drvr;
   simdev->env = env;
   simdev->sim_fw = std::make_unique<::wlan::brcmfmac::SimFirmware>(simdev);
-  simdev->dev_mgr = dev_mgr;
   simdev->settings = std::make_unique<brcmf_mp_device>();
   bus_if->bus_priv.sim = simdev;
 
@@ -124,8 +122,7 @@ zx_status_t brcmf_sim_alloc(brcmf_pub* drvr, std::unique_ptr<brcmf_bus>* out_bus
   drvr->bus_if = bus_if.get();
   drvr->settings = simdev->settings.get();
 
-  *out_bus = std::move(bus_if);
-  return ZX_OK;
+  return bus_if;
 }
 
 zx_status_t brcmf_sim_register(brcmf_pub* drvr) {
@@ -206,9 +203,13 @@ void brcmf_sim_firmware_crash(brcmf_simdev* simdev) {
   if (err != ZX_OK) {
     BRCMF_ERR("Increase recovery trigger condition failed -- error: %s", zx_status_get_string(err));
   }
-  // Clear the counters of all TriggerConditions here instead of inside brcmf_recovery_worker() to
-  // break deadlock.
-  drvr->recovery_trigger->ClearStatistics();
+
+  // Incrementing the firmware_crash_ condition adds the recovery worker to the default workqueue.
+  // To ensure the recovery worker completes before returning to the test, flush the default
+  // workqueue here.
+  async_dispatcher_t* dispatcher =
+      fdf_dispatcher_get_async_dispatcher(drvr->device->GetDriverDispatcher());
+  async::PostTask(dispatcher, [drvr]() { drvr->default_wq.Flush(); });
 }
 
 void brcmf_sim_exit(brcmf_bus* bus) {

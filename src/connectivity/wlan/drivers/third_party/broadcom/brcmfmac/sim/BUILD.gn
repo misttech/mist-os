@@ -56,7 +56,8 @@ source_set("sim_common") {
   ]
   public_deps = [
     "//sdk/fidl/fuchsia.wlan.ieee80211:fuchsia.wlan.ieee80211_hlcpp",
-    "//src/connectivity/wlan/drivers/testing/lib/sim-device",
+    "//sdk/lib/async_patterns/testing/cpp",
+    "//sdk/lib/driver/testing/cpp",
     "//src/connectivity/wlan/drivers/testing/lib/sim-env",
     "//src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac:bcdc",
     "//src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac:core",

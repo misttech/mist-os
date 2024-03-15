@@ -4,13 +4,17 @@
 
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/sim/test/sim_test.h"
 
+#include <fidl/fuchsia.wlan.common/cpp/wire_types.h>
+#include <fidl/fuchsia.wlan.fullmac/cpp/markers.h>
+#include <fidl/fuchsia.wlan.phyimpl/cpp/markers.h>
 #include <fuchsia/wlan/ieee80211/cpp/fidl.h>
 #include <lib/driver/outgoing/cpp/outgoing_directory.h>
+#include <lib/driver/testing/cpp/test_environment.h>
+#include <lib/fdf/dispatcher.h>
 #include <lib/fdio/directory.h>
+#include <lib/fidl/cpp/wire/channel.h>
 
 #include <fbl/string_buffer.h>
-
-#include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/factory_device.h"
 
 namespace wlan::brcmfmac {
 
@@ -35,13 +39,12 @@ SimInterface::~SimInterface() {
     zx_handle_close(ch_mlme_);
   }
 
-  // If this SimInterface has a role, Init() must be called, so there was a server_dispatcher_
-  // created.
-  DestroyDispatcher();
+  if (server_binding_ != nullptr) {
+    Reset();
+  }
 }
 
-zx_status_t SimInterface::Init(std::shared_ptr<simulation::Environment> env,
-                               wlan_common::WlanMacRole role) {
+zx_status_t SimInterface::Init(simulation::Environment* env, wlan_common::WlanMacRole role) {
   zx_status_t result = zx_channel_create(0, &ch_sme_, &ch_mlme_);
   if (result == ZX_OK) {
     env_ = env;
@@ -50,21 +53,21 @@ zx_status_t SimInterface::Init(std::shared_ptr<simulation::Environment> env,
   return result;
 }
 
-void SimInterface::CreateDispatcher() {
-  auto dispatcher = fdf::SynchronizedDispatcher::Create(
-      fdf::SynchronizedDispatcher::Options::kAllowSyncCalls, "wlan_fullmac_ifc_test_server",
-      [&](fdf_dispatcher_t*) { server_completion_.Signal(); });
+void SimInterface::Reset() {
+  libsync::Completion destroy_binding_completion;
+  async::PostTask(fdf_dispatcher_get_async_dispatcher(server_dispatcher_), [&]() {
+    server_binding_.reset();
+    destroy_binding_completion.Signal();
+  });
 
-  if (dispatcher.is_error()) {
-    BRCMF_ERR("Creating server dispatcher error : %s\n", dispatcher.status_string());
+  destroy_binding_completion.Wait();
+  if (client_.is_valid()) {
+    client_.TakeClientEnd();
   }
-
-  server_dispatcher_ = std::move(*dispatcher);
-  server_completion_.Reset();
 }
 
-zx_status_t SimInterface::Connect(
-    fdf::ClientEnd<fuchsia_wlan_fullmac::WlanFullmacImpl> client_end) {
+zx_status_t SimInterface::Connect(fdf::ClientEnd<fuchsia_wlan_fullmac::WlanFullmacImpl> client_end,
+                                  fdf_dispatcher_t* server_dispatcher) {
   client_ = fdf::WireSyncClient<fuchsia_wlan_fullmac::WlanFullmacImpl>(std::move(client_end));
 
   // Establish the FIDL connection on the oppsite direction.
@@ -74,7 +77,19 @@ zx_status_t SimInterface::Connect(
     return endpoints.status_value();
   }
 
-  fdf::BindServer(server_dispatcher_.get(), std::move(endpoints->server), this);
+  // Synchronously bind the server to the given dispatcher.
+  server_dispatcher_ = server_dispatcher;
+  libsync::Completion create_binding_completion;
+  async::PostTask(
+      fdf_dispatcher_get_async_dispatcher(server_dispatcher),
+      [&, server_end = std::move(endpoints->server)]() mutable {
+        server_binding_ =
+            std::make_unique<fdf::ServerBinding<fuchsia_wlan_fullmac::WlanFullmacImplIfc>>(
+                server_dispatcher_, std::move(server_end), this, fidl::kIgnoreBindingClosure);
+        create_binding_completion.Signal();
+      });
+
+  create_binding_completion.Wait();
 
   auto result = client_.buffer(test_arena_)->Start(std::move(endpoints->client));
   if (!result.ok()) {
@@ -95,14 +110,6 @@ zx_status_t SimInterface::Connect(
   }
 
   return ZX_OK;
-}
-
-void SimInterface::DestroyDispatcher() {
-  if (server_dispatcher_.get()) {
-    server_dispatcher_.ShutdownAsync();
-    server_completion_.Wait();
-    server_dispatcher_.release();
-  }
 }
 
 void SimInterface::OnScanResult(OnScanResultRequestView request, fdf::Arena& arena,
@@ -435,7 +442,7 @@ void SimInterface::StartSoftAp(const wlan_ieee80211::CSsid& ssid,
   auto result = client_.buffer(test_arena_)->StartBss(builder.Build());
   ZX_ASSERT(result.ok());
 
-  // Remember context
+  // // Remember context
   soft_ap_ctx_.ssid = ssid;
 
   // Return value is handled asynchronously in OnStartConf
@@ -465,15 +472,9 @@ zx_status_t SimInterface::SetMulticastPromisc(bool enable) {
   return ZX_OK;
 }
 
-SimTest::SimTest() : test_arena_(fdf::Arena('T')), loop_(&kAsyncLoopConfigNeverAttachToThread) {
-  env_ = std::make_shared<simulation::Environment>();
+SimTest::SimTest() : test_arena_(fdf::Arena('T')) {
+  env_ = std::make_unique<simulation::Environment>();
   env_->AddStation(this);
-
-  dev_mgr_ = std::make_unique<simulation::FakeDevMgr>();
-  // The sim test is strictly a theoretical observer in the simulation environment thus it should be
-  // able to see everything
-  rx_sensitivity_ = std::numeric_limits<double>::lowest();
-  loop_.StartThread("factory-device-test");
 }
 
 SimTest::~SimTest() {
@@ -481,7 +482,7 @@ SimTest::~SimTest() {
   for (auto iface : ifaces_) {
     auto builder = fuchsia_wlan_phyimpl::wire::WlanPhyImplDestroyIfaceRequest::Builder(test_arena_);
     builder.iface_id(iface.first);
-    auto result = client_.sync().buffer(test_arena_)->DestroyIface(builder.Build());
+    auto result = client_.buffer(test_arena_)->DestroyIface(builder.Build());
     if (!result.ok()) {
       BRCMF_ERR("Delete iface: %u failed", iface.first);
     }
@@ -489,156 +490,75 @@ SimTest::~SimTest() {
       BRCMF_ERR("Delete iface: %u failed", iface.first);
     }
   }
-
-  libsync::Completion host_destroyed;
-  async::PostTask(driver_dispatcher_.async_dispatcher(), [&]() {
-    dev_mgr_.reset();
-    host_destroyed.Signal();
-  });
-  host_destroyed.Wait();
-
-  if (client_dispatcher_.get()) {
-    client_dispatcher_.ShutdownAsync();
-    client_completion_.Wait();
-  }
-
-  if (driver_dispatcher_.get()) {
-    driver_dispatcher_.ShutdownAsync();
-    completion_.Wait();
-  }
-  // Don't have to erase the iface ids here.
 }
 
 zx_status_t SimTest::PreInit() {
-  // Create a dispatcher to wait on the runtime channel.
-  auto dispatcher = fdf::SynchronizedDispatcher::Create(
-      fdf::SynchronizedDispatcher::Options::kAllowSyncCalls, "sim-test",
-      [&](fdf_dispatcher_t*) { completion_.Signal(); });
+  zx::result start_args = node_server_.SyncCall(&fdf_testing::TestNode::CreateStartArgsAndServe);
+  EXPECT_OK(start_args.status_value());
 
-  if (dispatcher.is_error()) {
-    BRCMF_ERR("Failed to create dispatcher : %s", zx_status_get_string(dispatcher.error_value()));
-    return ZX_ERR_INTERNAL;
-  }
+  driver_outgoing_ = std::move(start_args->outgoing_directory_client);
 
-  driver_dispatcher_ = *std::move(dispatcher);
+  zx::result init_result = test_environment_.SyncCall(
+      &fdf_testing::TestEnvironment::Initialize, std::move(start_args->incoming_directory_server));
+  EXPECT_OK(init_result.status_value());
 
-  // Create the device on driver dispatcher because the outgoing directory is required to be
-  // accessed by a single dispatcher.
-  libsync::Completion created;
-  async::PostTask(driver_dispatcher_.async_dispatcher(), [&]() {
-    // Allocate memory for a simulated device and register with dev_mgr
-    ASSERT_EQ(ZX_OK, brcmfmac::SimDevice::Create(dev_mgr_->GetRootDevice(), dev_mgr_.get(), env_,
-                                                 &device_));
-    created.Signal();
-  });
-  created.Wait();
+  // Calling SimDevice::Start also allocates the dut. Trying to access the underlying
+  // brcmfmac::SimDevice is invalid before this step.
+  zx::result start_result = runtime().RunToCompletion(
+      dut_.SyncCall(&fdf_testing::DriverUnderTest<brcmfmac::SimDevice>::Start,
+                    std::move(start_args->start_args)));
+
+  EXPECT_OK(start_result.status_value());
+
+  WithSimDevice([this](brcmfmac::SimDevice* device) { device->InitWithEnv(env_.get()); });
+
+  driver_created_ = true;
 
   return ZX_OK;
 }
 
 zx_status_t SimTest::Init() {
-  zx_status_t status;
-
-  // Allocate device and register with dev_mgr
-  if (device_ == nullptr) {
-    status = PreInit();
-    if (status != ZX_OK) {
-      return status;
-    }
+  if (!driver_created_) {
+    EXPECT_OK(PreInit());
   }
 
-  // Initialize device
-  status = device_->BusInit();
-  if (status != ZX_OK) {
-    // Ownership of the device has been transferred to the dev_mgr, so we don't need to dealloc it
-    device_ = nullptr;
-    return status;
-  }
+  WithSimDevice([](brcmfmac::SimDevice* device) { device->SimBusInit(); });
 
-  // Create a dispatcher to wait on the runtime channel.
-  auto dispatcher = fdf::SynchronizedDispatcher::Create(
-      fdf::SynchronizedDispatcher::Options::kAllowSyncCalls, "sim-test",
-      [&](fdf_dispatcher_t*) { client_completion_.Signal(); });
+  // Connect to WlanPhyimpl served on outgoing directory.
+  zx::result connect_result =
+      fdf::internal::DriverTransportConnect<fuchsia_wlan_phyimpl::Service::WlanPhyImpl>(
+          CreateDriverSvcClient(), component::kDefaultInstance);
 
-  if (dispatcher.is_error()) {
-    BRCMF_ERR("Failed to create dispatcher : %s", zx_status_get_string(dispatcher.error_value()));
-    return ZX_ERR_INTERNAL;
-  }
+  client_ =
+      fdf::WireSyncClient<fuchsia_wlan_phyimpl::WlanPhyImpl>(std::move(connect_result.value()));
 
-  client_dispatcher_ = *std::move(dispatcher);
+  // Make a synchronous phyimpl request to ensure that we are actually connected to the phyimpl
+  // protocol.
+  auto result = client_.buffer(test_arena_)->GetSupportedMacRoles();
+  EXPECT_TRUE(result.ok());
 
-  auto outgoing_dir_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-  EXPECT_FALSE(outgoing_dir_endpoints.is_error());
-
-  // Serve WlanPhyImplProtocol to the device's outgoing directory on the driver dispatcher.
-  libsync::Completion served;
-  async::PostTask(driver_dispatcher_.async_dispatcher(), [&]() {
-    ASSERT_EQ(ZX_OK, device_->ServeWlanPhyImplProtocol(std::move(outgoing_dir_endpoints->server)));
-    served.Signal();
-  });
-  served.Wait();
-
-  // Connect WlanPhyImpl protocol from this class, this operation mimics the implementation of
-  // DdkConnectRuntimeProtocol().
-  auto endpoints = fdf::CreateEndpoints<fuchsia_wlan_phyimpl::Service::WlanPhyImpl::ProtocolType>();
-  EXPECT_FALSE(endpoints.is_error());
-  zx::channel client_token, server_token;
-  EXPECT_EQ(ZX_OK, zx::channel::create(0, &client_token, &server_token));
-  EXPECT_EQ(ZX_OK, fdf::ProtocolConnect(std::move(client_token),
-                                        fdf::Channel(endpoints->server.TakeChannel().release())));
-  fbl::StringBuffer<fuchsia_io::wire::kMaxPathLength> path;
-  path.AppendPrintf("svc/%s/default/%s", fuchsia_wlan_phyimpl::Service::WlanPhyImpl::ServiceName,
-                    fuchsia_wlan_phyimpl::Service::WlanPhyImpl::Name);
-  // Serve the WlanPhyImpl protocol on `server_token` found at `path` within
-  // the outgoing directory.
-  EXPECT_EQ(ZX_OK, fdio_service_connect_at(outgoing_dir_endpoints->client.channel().get(),
-                                           path.c_str(), server_token.release()));
-
-  client_ = fdf::WireSharedClient<fuchsia_wlan_phyimpl::WlanPhyImpl>(std::move(endpoints->client),
-                                                                     client_dispatcher_.get());
-
-  device_->WaitForProtocolConnection();
-  zx::result factory_endpoints = fidl::CreateEndpoints<fuchsia_factory_wlan::Iovar>();
-  if (factory_endpoints.is_error()) {
-    BRCMF_ERR("Failed to create factory dispatcher : %s",
-              zx_status_get_string(factory_endpoints.error_value()));
-    return ZX_ERR_INTERNAL;
-  }
-  auto [client_end, server_end] = std::move(*factory_endpoints);
-  if (!client_end.is_valid()) {
-    BRCMF_ERR("Failed to create client_end");
-    return ZX_ERR_INTERNAL;
-  }
-
-  device_->Init();
-  fidl::BindServer(loop_.dispatcher(), std::move(server_end), device_->GetFactoryDevice());
-
-  factory_device_ = fidl::WireSyncClient(std::move(client_end));
-  if (!factory_device_.is_valid()) {
-    BRCMF_ERR("Failed to create device");
-    return ZX_ERR_INTERNAL;
-  }
   return ZX_OK;
 }
 
 zx_status_t SimTest::StartInterface(wlan_common::WlanMacRole role, SimInterface* sim_ifc,
                                     std::optional<common::MacAddr> mac_addr) {
   zx_status_t status;
-  if ((status = sim_ifc->Init(env_, role)) != ZX_OK) {
+  if ((status = sim_ifc->Init(env_.get(), role)) != ZX_OK) {
     return status;
   }
   auto ch = zx::channel(sim_ifc->ch_mlme_);
 
-  auto builder = fuchsia_wlan_phyimpl::wire::WlanPhyImplCreateIfaceRequest::Builder(test_arena_);
-  builder.role(role);
-  builder.mlme_channel(std::move(ch));
+  auto builder = fuchsia_wlan_phyimpl::wire::WlanPhyImplCreateIfaceRequest::Builder(test_arena_)
+                     .role(role)
+                     .mlme_channel(std::move(ch));
+
   if (mac_addr) {
     fidl::Array<unsigned char, 6> init_sta_addr;
     memcpy(&init_sta_addr, mac_addr.value().byte, ETH_ALEN);
     builder.init_sta_addr(init_sta_addr);
   }
 
-  auto result = client_.sync().buffer(test_arena_)->CreateIface(builder.Build());
+  auto result = client_.buffer(test_arena_)->CreateIface(builder.Build());
 
   EXPECT_TRUE(result.ok());
   if (result->is_error()) {
@@ -647,7 +567,6 @@ zx_status_t SimTest::StartInterface(wlan_common::WlanMacRole role, SimInterface*
     return result->error_value();
   }
   sim_ifc->iface_id_ = result->value()->iface_id();
-  sim_ifc->CreateDispatcher();
 
   status = ZX_OK;
 
@@ -656,49 +575,25 @@ zx_status_t SimTest::StartInterface(wlan_common::WlanMacRole role, SimInterface*
     return ZX_ERR_ALREADY_EXISTS;
   }
 
-  // This should have created a WLAN_FULLMAC_IMPL device
-  auto device = dev_mgr_->FindLatestByProtocolId(ZX_PROTOCOL_WLAN_FULLMAC_IMPL);
-  if (device == nullptr) {
-    return ZX_ERR_INTERNAL;
+  // Connect to WlanFullmacImpl
+  std::string instance_name = role == wlan_common::WlanMacRole::kClient
+                                  ? "brcmfmac-wlan-fullmac-client"
+                                  : "brcmfmac-wlan-fullmac-ap";
+
+  zx::result driver_connect_result =
+      fdf::internal::DriverTransportConnect<fuchsia_wlan_fullmac::Service::WlanFullmacImpl>(
+          CreateDriverSvcClient(), instance_name);
+  EXPECT_EQ(ZX_OK, driver_connect_result.status_value());
+
+  status = sim_ifc->Connect(std::move(driver_connect_result.value()), df_env_dispatcher_->get());
+  if (status != ZX_OK) {
+    BRCMF_ERR("Failed to establish FIDL connection with WlanInterface: %s",
+              zx_status_get_string(status));
+    return status;
   }
 
-  {
-    auto endpoints =
-        fdf::CreateEndpoints<fuchsia_wlan_fullmac::Service::WlanFullmacImpl::ProtocolType>();
-    EXPECT_FALSE(endpoints.is_error());
-    zx::channel client_token, server_token;
-    status = zx::channel::create(0, &client_token, &server_token);
-    if (status != ZX_OK) {
-      BRCMF_ERR("Failed to create channel: %s", zx_status_get_string(status));
-      return status;
-    }
-    status = fdf::ProtocolConnect(std::move(client_token),
-                                  fdf::Channel(endpoints->server.TakeChannel().release()));
-    if (status != ZX_OK) {
-      BRCMF_ERR("ProtocolConnect Failed: %s", zx_status_get_string(status));
-      return status;
-    }
-    fbl::StringBuffer<fuchsia_io::wire::kMaxPathLength> path;
-    path.AppendPrintf("svc/%s/default/%s",
-                      fuchsia_wlan_fullmac::Service::WlanFullmacImpl::ServiceName,
-                      fuchsia_wlan_fullmac::Service::WlanFullmacImpl::Name);
-    // Serve the WlanFullmacImpl protocol on `server_token` found at `path` within
-    // the outgoing directory. Here we get the client end outgoing_dir_channel from the device
-    // managed by FakeDevMgr.
-    status = fdio_service_connect_at(device->DevArgs().outgoing_dir_channel, path.c_str(),
-                                     server_token.release());
-    if (status != ZX_OK) {
-      BRCMF_ERR("Failed to open the directory and connect to WlanFullmacImpl service: %s",
-                zx_status_get_string(status));
-      return status;
-    }
-    status = sim_ifc->Connect(std::move(endpoints->client));
-    if (status != ZX_OK) {
-      BRCMF_ERR("Failed to establish FIDL connection with WlanInterface: %s",
-                zx_status_get_string(status));
-      return status;
-    }
-  }
+  // check that fullmac device count is expected.
+  EXPECT_EQ(ifaces_.size(), DeviceCountByProtocolId(ZX_PROTOCOL_WLAN_FULLMAC_IMPL));
 
   return ZX_OK;
 }
@@ -713,10 +608,58 @@ zx_status_t SimTest::InterfaceDestroyed(SimInterface* ifc) {
 
   // Destroy the server_dispatcher_ so that when this SimInterface is started again, the
   // server_dispatcher_ can be overwritten.
-  ifc->DestroyDispatcher();
+  ifc->Reset();
   ifaces_.erase(iter);
 
+  WaitForDeviceCountByProtocolId(ZX_PROTOCOL_WLAN_FULLMAC_IMPL, ifaces_.size());
+
   return ZX_OK;
+}
+
+uint32_t SimTest::DeviceCount() {
+  return node_server_.SyncCall([](fdf_testing::TestNode* root) { return root->children().size(); });
+}
+
+uint32_t SimTest::DeviceCountByProtocolId(uint32_t proto_id) {
+  return node_server_.SyncCall([proto_id](fdf_testing::TestNode* root) {
+    uint32_t count = 0;
+    auto expected_property = fuchsia_driver_framework::NodeProperty{{
+        .key = fuchsia_driver_framework::NodePropertyKey::WithIntValue(BIND_PROTOCOL),
+        .value = fuchsia_driver_framework::NodePropertyValue::WithIntValue(proto_id),
+    }};
+
+    for (const auto& [_, child] : root->children()) {
+      for (const fuchsia_driver_framework::NodeProperty& property : child.GetProperties()) {
+        if (property == expected_property) {
+          count++;
+          break;
+        }
+      }
+    }
+
+    return count;
+  });
+}
+
+void SimTest::WaitForDeviceCount(uint32_t expected) {
+  while (expected != DeviceCount()) {
+    std::this_thread::sleep_for(std::chrono::seconds(1));
+  }
+}
+
+void SimTest::WaitForDeviceCountByProtocolId(uint32_t proto_id, uint32_t expected) {
+  while (expected != DeviceCountByProtocolId(proto_id)) {
+    std::this_thread::sleep_for(std::chrono::seconds(1));
+  }
+}
+
+void SimTest::WithSimDevice(fit::function<void(brcmfmac::SimDevice*)> callback) {
+  dut().SyncCall([callback = std::move(callback)](
+                     fdf_testing::DriverUnderTest<brcmfmac::SimDevice>* dut) mutable {
+    // *dut dereferences the pointer and yields a DriverUnderTest<SimDevice>
+    // *(DriverUnderTest<SimDevice>) (i.e., **dut) yields a SimDevice*
+    callback(**dut);
+  });
 }
 
 zx_status_t SimTest::DeleteInterface(SimInterface* ifc) {
@@ -727,27 +670,35 @@ zx_status_t SimTest::DeleteInterface(SimInterface* ifc) {
     return ZX_ERR_NOT_FOUND;
   }
 
-  BRCMF_DBG(SIM, "Del IF: %d", ifc->iface_id_);
-
   auto builder = fuchsia_wlan_phyimpl::wire::WlanPhyImplDestroyIfaceRequest::Builder(test_arena_);
   builder.iface_id(iter->first);
-  auto result = client_.sync().buffer(test_arena_)->DestroyIface(builder.Build());
+  auto result = client_.buffer(test_arena_)->DestroyIface(builder.Build());
   EXPECT_TRUE(result.ok());
   if (result->is_error()) {
     BRCMF_ERR("Failed to destroy interface.\n");
     return result->error_value();
   }
 
-  // Destroy the server_dispatcher_ so that when this SimInterface is started again, the
-  // server_dispatcher_ can be overwritten.
-  ifc->DestroyDispatcher();
-  // This operation destroyes the WireSyncClient talking to WlanInterface, and take it back to an
-  // initialized state.
-  ifc->client_.TakeClientEnd();
+  ifc->Reset();
+
   // Once the interface data structures have been deleted, our pointers are no longer valid.
   ifaces_.erase(iter);
 
+  WaitForDeviceCountByProtocolId(ZX_PROTOCOL_WLAN_FULLMAC_IMPL, ifaces_.size());
+
   return ZX_OK;
+}
+
+fidl::ClientEnd<fuchsia_io::Directory> SimTest::CreateDriverSvcClient() {
+  // Open the svc directory in the driver's outgoing, and store a client to it.
+  auto svc_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+  EXPECT_EQ(ZX_OK, svc_endpoints.status_value());
+
+  zx_status_t status = fdio_open_at(driver_outgoing_.handle()->get(), "/svc",
+                                    static_cast<uint32_t>(fuchsia_io::OpenFlags::kDirectory),
+                                    svc_endpoints->server.TakeChannel().release());
+  EXPECT_EQ(ZX_OK, status);
+  return std::move(svc_endpoints->client);
 }
 
 }  // namespace wlan::brcmfmac

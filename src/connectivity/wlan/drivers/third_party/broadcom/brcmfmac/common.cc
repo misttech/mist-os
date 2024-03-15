@@ -606,7 +606,8 @@ zx_status_t brcmf_c_preinit_dcmds(struct brcmf_if* ifp) {
               brcmf_fil_get_errstr(fw_err));
   }
 
-  // TODO(https://fxbug.dev/42155653): Disabling mchan to work around issue of LINK DOWN and flowctl bit stuck.
+  // TODO(https://fxbug.dev/42155653): Disabling mchan to work around issue of LINK DOWN and flowctl
+  // bit stuck.
   err = brcmf_fil_iovar_data_set(ifp, "mchan", &kMchanState, sizeof(kMchanState), &fw_err);
   if (err != ZX_OK) {
     BRCMF_ERR("Failed to set mchan: %s, fw err %s", zx_status_get_string(err),

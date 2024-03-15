@@ -46,6 +46,8 @@ class ScanAndApStartTest : public SimTest {
   ScanTestIfc client_ifc_;
   ScanTestIfc softap_ifc_;
 
+  brcmf_simdev* simdev_ = nullptr;
+
   enum { NOT_STARTED, STARTED, DONE } ap_start_progress_ = NOT_STARTED;
 };
 
@@ -80,16 +82,21 @@ void ScanAndApStartTest::Init() {
 
   StartInterface(wlan_common::WlanMacRole::kClient, &client_ifc_);
   StartInterface(wlan_common::WlanMacRole::kAp, &softap_ifc_);
+
+  // This is kind of cheating, but we store our own pointer to simdev so that we can check the state
+  // of the sim device in OnScanEnd. Calling WithSimDevice() schedules an operation to occur on the
+  // sim device's dispatcher, but the sim device's dispatcher is blocked until
+  // OnScanEnd::Completer.Reply() is called. To workaround this, we keep our own pointer to simdev_
+  // in this class so we can check the state of the device in OnScanEnd without needing to schedule
+  // anything on the sim device's dispatcher.
+  WithSimDevice([this](brcmfmac::SimDevice* device) { simdev_ = device->GetSim(); });
 }
 
 void ScanAndApStartTest::OnScanEnd() {
-  brcmf_simdev* simdev = device_->GetSim();
-
   // Verify that Start AP has been called
   ASSERT_NE(ap_start_progress_, NOT_STARTED);
 
-  // Verify that the state of the Start AP operation lines up with our expectations
-  EXPECT_EQ(ap_start_progress_ == STARTED, brcmf_is_ap_start_pending(simdev->drvr->config));
+  EXPECT_EQ(ap_start_progress_ == STARTED, brcmf_is_ap_start_pending(simdev_->drvr->config));
 }
 
 void ScanAndApStartTest::OnStartConf() { ap_start_progress_ = DONE; }
@@ -134,9 +141,11 @@ TEST_F(ScanAndApStartTest, ScanAbortFailure) {
   Init();
 
   // Return an error on scan abort request from firmware.
-  brcmf_simdev* sim = device_->GetSim();
-  sim->sim_fw->err_inj_.AddErrInjCmd(BRCMF_C_SCAN, ZX_ERR_IO_REFUSED, BCME_OK,
-                                     client_ifc_.iface_id_);
+  WithSimDevice([this](brcmfmac::SimDevice* device) {
+    brcmf_simdev* sim = device->GetSim();
+    sim->sim_fw->err_inj_.AddErrInjCmd(BRCMF_C_SCAN, ZX_ERR_IO_REFUSED, BCME_OK,
+                                       client_ifc_.iface_id_);
+  });
 
   env_->ScheduleNotification(std::bind(&SimInterface::StartScan, &client_ifc_, kFirstScanId, false,
                                        std::optional<const std::vector<uint8_t>>{}),
@@ -179,8 +188,10 @@ TEST_F(ScanAndApStartTest, ScanWhileApStart) {
   // To simulate the situation where scan is blocked by AP start process, inject an error to
   // SET_SSID command, so that if the scan comes inside the 1 second AP start timeout limit, it will
   // be rejected by the driver.
-  brcmf_simdev* sim = device_->GetSim();
-  sim->sim_fw->err_inj_.AddErrInjCmd(BRCMF_C_SET_SSID, ZX_OK, BCME_OK, softap_ifc_.iface_id_);
+  WithSimDevice([this](brcmfmac::SimDevice* device) {
+    brcmf_simdev* sim = device->GetSim();
+    sim->sim_fw->err_inj_.AddErrInjCmd(BRCMF_C_SET_SSID, ZX_OK, BCME_OK, softap_ifc_.iface_id_);
+  });
 
   env_->ScheduleNotification(std::bind(&ScanAndApStartTest::StartAp, this), zx::msec(10));
   env_->ScheduleNotification(std::bind(&SimInterface::StartScan, &client_ifc_, kFirstScanId, false,

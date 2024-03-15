@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 #include <fuchsia/wlan/ieee80211/cpp/fidl.h>
-#include <fuchsia/wlan/internal/c/banjo.h>
 #include <lib/inspect/cpp/hierarchy.h>
 #include <lib/inspect/cpp/inspect.h>
 #include <zircon/errors.h>
@@ -11,8 +10,6 @@
 #include <wifi/wifi-config.h>
 #include <zxtest/zxtest.h>
 
-#include "src/connectivity/wlan/drivers/testing/lib/sim-device/device.h"
-#include "src/connectivity/wlan/drivers/testing/lib/sim-env/sim-env.h"
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/cfg80211.h"
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/fwil.h"
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/sim/sim.h"
@@ -65,12 +62,16 @@ class SoftApInterface : public SimInterface {
 class CreateSoftAPTest : public SimTest {
  public:
   CreateSoftAPTest() = default;
+  void SetUp() override {
+    Init();
+    CreateInterface();
+  }
+
   void Init();
   void CreateInterface();
   void DeleteInterface();
   zx_status_t StartSoftAP();
   zx_status_t StopSoftAP();
-  uint32_t DeviceCountByProtocolId(uint32_t proto_id);
 
   // We track a specific firmware error condition seen in AP start.
   void GetApSetSsidErrInspectCount(uint64_t* out_count);
@@ -205,20 +206,18 @@ void CreateSoftAPTest::DeleteInterface() {
   EXPECT_EQ(SimTest::DeleteInterface(&softap_ifc_), ZX_OK);
 }
 
-uint32_t CreateSoftAPTest::DeviceCountByProtocolId(uint32_t proto_id) {
-  return dev_mgr_->DeviceCountByProtocolId(proto_id);
-}
-
 void CreateSoftAPTest::GetApSetSsidErrInspectCount(uint64_t* out_count) {
   ASSERT_NOT_NULL(out_count);
-  auto hierarchy = FetchHierarchy(device_->GetInspect()->inspector());
-  auto* root = hierarchy.value().GetByPath({"brcmfmac-phy"});
-  ASSERT_NOT_NULL(root);
-  // Only verify the value of hourly counter here, the relationship between hourly counter and daily
-  // counter is verified in device_inspect_test.
-  auto* uint_property = root->node().get_property<inspect::UintPropertyValue>("ap_set_ssid_err");
-  ASSERT_NOT_NULL(uint_property);
-  *out_count = uint_property->value();
+  WithSimDevice([&](brcmfmac::SimDevice* device) {
+    auto hierarchy = FetchHierarchy(device->GetInspect()->inspector());
+    auto* root = hierarchy.value().GetByPath({"brcmfmac-phy"});
+    ASSERT_NOT_NULL(root);
+    // Only verify the value of hourly counter here, the relationship between hourly counter and
+    // daily counter is verified in device_inspect_test.
+    auto* uint_property = root->node().get_property<inspect::UintPropertyValue>("ap_set_ssid_err");
+    ASSERT_NOT_NULL(uint_property);
+    *out_count = uint_property->value();
+  });
 }
 
 uint16_t CreateSoftAPTest::CreateRsneIe(uint8_t* buffer) {
@@ -275,7 +274,7 @@ zx_status_t CreateSoftAPTest::StartSoftAP() {
 
   // If sec mode is requested, create a dummy RSNE IE (our SoftAP only
   // supports WPA2)
-  if (sec_enabled_ == true) {
+  if (sec_enabled_) {
     uint8_t rsne_data[fuchsia_wlan_ieee80211::wire::kWlanIeBodyMaxLen];
     uint32_t rsne_len = CreateRsneIe(rsne_data);
     auto rsne = std::vector<uint8_t>(rsne_data, rsne_data + rsne_len);
@@ -285,36 +284,47 @@ zx_status_t CreateSoftAPTest::StartSoftAP() {
   EXPECT_TRUE(result.ok());
 
   // Retrieve wsec from SIM FW to check if it is set appropriately
-  brcmf_simdev* sim = device_->GetSim();
-  uint32_t wsec;
-  struct brcmf_if* ifp = brcmf_get_ifp(sim->drvr, softap_ifc_.iface_id_);
-  zx_status_t status = brcmf_fil_iovar_int_get(ifp, "wsec", &wsec, nullptr);
-  EXPECT_EQ(status, ZX_OK);
-  if (sec_enabled_ == true)
-    EXPECT_NE(wsec, (uint32_t)0);
-  else
-    EXPECT_EQ(wsec, (uint32_t)0);
+  WithSimDevice([&](brcmfmac::SimDevice* device) {
+    brcmf_simdev* sim = device->GetSim();
+    uint32_t wsec;
+    struct brcmf_if* ifp = brcmf_get_ifp(sim->drvr, softap_ifc_.iface_id_);
+    zx_status_t status = brcmf_fil_iovar_int_get(ifp, "wsec", &wsec, nullptr);
+    EXPECT_EQ(status, ZX_OK);
+    if (sec_enabled_) {
+      EXPECT_NE(wsec, (uint32_t)0);
+    } else {
+      EXPECT_EQ(wsec, (uint32_t)0);
+    }
+  });
   return ZX_OK;
 }
 
 void CreateSoftAPTest::InjectStartAPError() {
-  brcmf_simdev* sim = device_->GetSim();
-  sim->sim_fw->err_inj_.AddErrInjCmd(BRCMF_C_SET_SSID, ZX_ERR_IO, BCME_OK, softap_ifc_.iface_id_);
+  WithSimDevice([&](brcmfmac::SimDevice* device) {
+    brcmf_simdev* sim = device->GetSim();
+    sim->sim_fw->err_inj_.AddErrInjCmd(BRCMF_C_SET_SSID, ZX_ERR_IO, BCME_OK, softap_ifc_.iface_id_);
+  });
 }
 
 void CreateSoftAPTest::InjectStopAPError() {
-  brcmf_simdev* sim = device_->GetSim();
-  sim->sim_fw->err_inj_.AddErrInjIovar("bss", ZX_ERR_IO, BCME_OK, softap_ifc_.iface_id_);
+  WithSimDevice([&](brcmfmac::SimDevice* device) {
+    brcmf_simdev* sim = device->GetSim();
+    sim->sim_fw->err_inj_.AddErrInjIovar("bss", ZX_ERR_IO, BCME_OK, softap_ifc_.iface_id_);
+  });
 }
 
 void CreateSoftAPTest::InjectChanspecError() {
-  brcmf_simdev* sim = device_->GetSim();
-  sim->sim_fw->err_inj_.AddErrInjIovar("chanspec", ZX_ERR_IO, BCME_BADARG, softap_ifc_.iface_id_);
+  WithSimDevice([&](brcmfmac::SimDevice* device) {
+    brcmf_simdev* sim = device->GetSim();
+    sim->sim_fw->err_inj_.AddErrInjIovar("chanspec", ZX_ERR_IO, BCME_BADARG, softap_ifc_.iface_id_);
+  });
 }
 
 void CreateSoftAPTest::InjectSetSsidError() {
-  brcmf_simdev* sim = device_->GetSim();
-  sim->sim_fw->err_inj_.AddErrInjCmd(BRCMF_C_SET_SSID, ZX_OK, BCME_ERROR, softap_ifc_.iface_id_);
+  WithSimDevice([&](brcmfmac::SimDevice* device) {
+    brcmf_simdev* sim = device->GetSim();
+    sim->sim_fw->err_inj_.AddErrInjCmd(BRCMF_C_SET_SSID, ZX_OK, BCME_ERROR, softap_ifc_.iface_id_);
+  });
 }
 
 void CreateSoftAPTest::SetExpectMacForInds(common::MacAddr set_mac) { ind_expect_mac_ = set_mac; }
@@ -434,9 +444,11 @@ void CreateSoftAPTest::VerifyAssoc() {
 void CreateSoftAPTest::ClearAssocInd() { assoc_ind_recv_ = false; }
 
 void CreateSoftAPTest::VerifyNumOfClient(uint16_t expect_client_num) {
-  brcmf_simdev* sim = device_->GetSim();
-  uint16_t num_clients = sim->sim_fw->GetNumClients(softap_ifc_.iface_id_);
-  ASSERT_EQ(num_clients, expect_client_num);
+  WithSimDevice([&](brcmfmac::SimDevice* device) {
+    brcmf_simdev* sim = device->GetSim();
+    uint16_t num_clients = sim->sim_fw->GetNumClients(softap_ifc_.iface_id_);
+    ASSERT_EQ(num_clients, expect_client_num);
+  });
 }
 
 void CreateSoftAPTest::VerifyNotAssoc() {
@@ -455,17 +467,9 @@ void CreateSoftAPTest::VerifyStopAPConf(wlan_fullmac_wire::WlanStopResult status
   ASSERT_EQ(stop_conf_status_, status);
 }
 
-TEST_F(CreateSoftAPTest, SetDefault) {
-  Init();
-  CreateInterface();
-  DeleteInterface();
-  EXPECT_EQ(DeviceCountByProtocolId(ZX_PROTOCOL_WLAN_FULLMAC_IMPL), 0u);
-}
+TEST_F(CreateSoftAPTest, SetDefault) { DeleteInterface(); }
 
 TEST_F(CreateSoftAPTest, CreateSoftAP) {
-  Init();
-  CreateInterface();
-  EXPECT_EQ(DeviceCountByProtocolId(ZX_PROTOCOL_WLAN_FULLMAC_IMPL), 1u);
   zx::duration delay = zx::msec(10);
   env_->ScheduleNotification(std::bind(&CreateSoftAPTest::StartSoftAP, this), delay);
   delay += kStartAPLinkEventDelay + kApStartedEventDelay + zx::msec(10);
@@ -475,9 +479,6 @@ TEST_F(CreateSoftAPTest, CreateSoftAP) {
 }
 
 TEST_F(CreateSoftAPTest, CreateSoftAPFail) {
-  Init();
-  CreateInterface();
-  EXPECT_EQ(DeviceCountByProtocolId(ZX_PROTOCOL_WLAN_FULLMAC_IMPL), 1u);
   InjectStartAPError();
   env_->ScheduleNotification(std::bind(&CreateSoftAPTest::StartSoftAP, this), zx::msec(50));
   env_->Run(kSimulatedClockDuration);
@@ -485,9 +486,6 @@ TEST_F(CreateSoftAPTest, CreateSoftAPFail) {
 }
 
 TEST_F(CreateSoftAPTest, CreateSoftAPMissingParams) {
-  Init();
-  CreateInterface();
-  EXPECT_EQ(DeviceCountByProtocolId(ZX_PROTOCOL_WLAN_FULLMAC_IMPL), 1u);
   // Create the Start BSS request without the SSID.
   auto builder = wlan_fullmac_wire::WlanFullmacImplBaseStartBssRequest::Builder(test_arena_)
                      .bss_type(fuchsia_wlan_common_wire::BssType::kInfrastructure)
@@ -502,9 +500,6 @@ TEST_F(CreateSoftAPTest, CreateSoftAPMissingParams) {
 }
 
 TEST_F(CreateSoftAPTest, CreateSoftAPFail_ChanSetError) {
-  Init();
-  CreateInterface();
-  EXPECT_EQ(DeviceCountByProtocolId(ZX_PROTOCOL_WLAN_FULLMAC_IMPL), 1u);
   InjectChanspecError();
   env_->ScheduleNotification(std::bind(&CreateSoftAPTest::StartSoftAP, this), zx::msec(50));
   env_->Run(kSimulatedClockDuration);
@@ -513,9 +508,6 @@ TEST_F(CreateSoftAPTest, CreateSoftAPFail_ChanSetError) {
 
 // SoftAP can encounter this specific SET_SSID firmware error, which we detect and log.
 TEST_F(CreateSoftAPTest, CreateSoftAPFail_SetSsidError) {
-  Init();
-  CreateInterface();
-  EXPECT_EQ(DeviceCountByProtocolId(ZX_PROTOCOL_WLAN_FULLMAC_IMPL), 1u);
   InjectSetSsidError();
   env_->ScheduleNotification(std::bind(&CreateSoftAPTest::StartSoftAP, this), zx::msec(50));
   uint64_t count;
@@ -532,9 +524,6 @@ TEST_F(CreateSoftAPTest, CreateSoftAPFail_SetSsidError) {
 
 // Fail the iovar bss but Stop AP should still succeed
 TEST_F(CreateSoftAPTest, BssIovarFail) {
-  Init();
-  CreateInterface();
-  EXPECT_EQ(DeviceCountByProtocolId(ZX_PROTOCOL_WLAN_FULLMAC_IMPL), 1u);
   InjectStopAPError();
   // Start SoftAP
   StartSoftAP();
@@ -543,9 +532,6 @@ TEST_F(CreateSoftAPTest, BssIovarFail) {
 }
 
 TEST_F(CreateSoftAPTest, BssStopMissingParam) {
-  Init();
-  CreateInterface();
-  EXPECT_EQ(DeviceCountByProtocolId(ZX_PROTOCOL_WLAN_FULLMAC_IMPL), 1u);
   // Start SoftAP
   StartSoftAP();
   // Create the Stop BSS request without the SSID.
@@ -561,9 +547,6 @@ TEST_F(CreateSoftAPTest, BssStopMissingParam) {
 // Appropriate secure mode is checked in StartSoftAP() after SoftAP
 // is started
 TEST_F(CreateSoftAPTest, CreateSecureSoftAP) {
-  Init();
-  CreateInterface();
-  EXPECT_EQ(DeviceCountByProtocolId(ZX_PROTOCOL_WLAN_FULLMAC_IMPL), 1u);
   // Start SoftAP in secure mode
   sec_enabled_ = true;
   StartSoftAP();
@@ -574,9 +557,6 @@ TEST_F(CreateSoftAPTest, CreateSecureSoftAP) {
 }
 
 TEST_F(CreateSoftAPTest, AssociateWithSoftAP) {
-  Init();
-  CreateInterface();
-  EXPECT_EQ(DeviceCountByProtocolId(ZX_PROTOCOL_WLAN_FULLMAC_IMPL), 1u);
   StartSoftAP();
   env_->ScheduleNotification(
       std::bind(&CreateSoftAPTest::TxAuthReq, this, simulation::AUTH_TYPE_OPEN, kFakeMac),
@@ -590,9 +570,6 @@ TEST_F(CreateSoftAPTest, AssociateWithSoftAP) {
 }
 
 TEST_F(CreateSoftAPTest, DisassociateThenAssociateWithSoftAP) {
-  Init();
-  CreateInterface();
-  EXPECT_EQ(DeviceCountByProtocolId(ZX_PROTOCOL_WLAN_FULLMAC_IMPL), 1u);
   StartSoftAP();
   env_->ScheduleNotification(
       std::bind(&CreateSoftAPTest::TxAuthReq, this, simulation::AUTH_TYPE_OPEN, kFakeMac),
@@ -610,9 +587,6 @@ TEST_F(CreateSoftAPTest, DisassociateThenAssociateWithSoftAP) {
 }
 
 TEST_F(CreateSoftAPTest, DisassociateFromSoftAP) {
-  Init();
-  CreateInterface();
-  EXPECT_EQ(DeviceCountByProtocolId(ZX_PROTOCOL_WLAN_FULLMAC_IMPL), 1u);
   StartSoftAP();
   env_->ScheduleNotification(
       std::bind(&CreateSoftAPTest::TxAuthReq, this, simulation::AUTH_TYPE_OPEN, kFakeMac),
@@ -632,9 +606,6 @@ TEST_F(CreateSoftAPTest, DisassociateFromSoftAP) {
 
 // After a client associates, deauth it from the SoftAP itself.
 TEST_F(CreateSoftAPTest, DisassociateClientFromSoftAP) {
-  Init();
-  CreateInterface();
-  EXPECT_EQ(DeviceCountByProtocolId(ZX_PROTOCOL_WLAN_FULLMAC_IMPL), 1u);
   StartSoftAP();
   env_->ScheduleNotification(
       std::bind(&CreateSoftAPTest::TxAuthReq, this, simulation::AUTH_TYPE_OPEN, kFakeMac),
@@ -652,9 +623,6 @@ TEST_F(CreateSoftAPTest, DisassociateClientFromSoftAP) {
 }
 
 TEST_F(CreateSoftAPTest, AssocWithWrongAuth) {
-  Init();
-  CreateInterface();
-  EXPECT_EQ(DeviceCountByProtocolId(ZX_PROTOCOL_WLAN_FULLMAC_IMPL), 1u);
   StartSoftAP();
   env_->ScheduleNotification(
       std::bind(&CreateSoftAPTest::TxAuthReq, this, simulation::AUTH_TYPE_SHARED_KEY, kFakeMac),
@@ -667,9 +635,6 @@ TEST_F(CreateSoftAPTest, AssocWithWrongAuth) {
 }
 
 TEST_F(CreateSoftAPTest, DeauthBeforeAssoc) {
-  Init();
-  CreateInterface();
-  EXPECT_EQ(DeviceCountByProtocolId(ZX_PROTOCOL_WLAN_FULLMAC_IMPL), 1u);
   StartSoftAP();
   env_->ScheduleNotification(
       std::bind(&CreateSoftAPTest::TxAuthReq, this, simulation::AUTH_TYPE_OPEN, kFakeMac),
@@ -685,9 +650,6 @@ TEST_F(CreateSoftAPTest, DeauthBeforeAssoc) {
 }
 
 TEST_F(CreateSoftAPTest, DeauthWhileAssociated) {
-  Init();
-  CreateInterface();
-  EXPECT_EQ(DeviceCountByProtocolId(ZX_PROTOCOL_WLAN_FULLMAC_IMPL), 1u);
   StartSoftAP();
   env_->ScheduleNotification(
       std::bind(&CreateSoftAPTest::TxAuthReq, this, simulation::AUTH_TYPE_OPEN, kFakeMac),
@@ -708,9 +670,6 @@ TEST_F(CreateSoftAPTest, DeauthWhileAssociated) {
 const common::MacAddr kSecondClientMac({0xde, 0xad, 0xbe, 0xef, 0x00, 0x04});
 
 TEST_F(CreateSoftAPTest, DeauthMultiClients) {
-  Init();
-  CreateInterface();
-  EXPECT_EQ(DeviceCountByProtocolId(ZX_PROTOCOL_WLAN_FULLMAC_IMPL), 1u);
   StartSoftAP();
   env_->ScheduleNotification(
       std::bind(&CreateSoftAPTest::TxAuthReq, this, simulation::AUTH_TYPE_OPEN, kFakeMac),

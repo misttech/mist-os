@@ -4,7 +4,6 @@
 
 #include <zxtest/zxtest.h>
 
-#include "src/connectivity/wlan/drivers/testing/lib/sim-device/device.h"
 #include "src/connectivity/wlan/drivers/testing/lib/sim-env/sim-env.h"
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/sim/sim.h"
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/sim/test/sim_test.h"
@@ -22,7 +21,7 @@ void PhyMacRolesTest::Init() { ASSERT_EQ(SimTest::Init(), ZX_OK); }
 
 TEST_F(PhyMacRolesTest, VerifyMacRoles) {
   Init();
-  auto result = client_.sync().buffer(test_arena_)->GetSupportedMacRoles();
+  auto result = client_.buffer(test_arena_)->GetSupportedMacRoles();
   ASSERT_TRUE(result.ok());
   ASSERT_FALSE(result->is_error());
   ASSERT_TRUE(result->value()->has_supported_mac_roles());

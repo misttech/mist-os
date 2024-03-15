@@ -6,8 +6,6 @@
 
 #include <zxtest/zxtest.h>
 
-#include "src/connectivity/wlan/drivers/testing/lib/sim-device/device.h"
-#include "src/connectivity/wlan/drivers/testing/lib/sim-env/sim-env.h"
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/common.h"
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/defs.h"
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/fwil.h"
@@ -26,7 +24,6 @@ class PhyPsModeTest : public SimTest {
   void GetPowerSaveModeFromFirmware(uint32_t* ps_mode);
   zx_status_t SetPowerSaveModeInFirmware(const fuchsia_wlan_common_wire::PowerSaveType ps_mode);
   zx_status_t ClearCountryCode();
-  uint32_t DeviceCountByProtocolId(uint32_t proto_id);
 
  private:
   SimInterface client_ifc_;
@@ -43,16 +40,12 @@ void PhyPsModeTest::CreateInterface() {
 
 void PhyPsModeTest::DeleteInterface() { EXPECT_EQ(SimTest::DeleteInterface(&client_ifc_), ZX_OK); }
 
-uint32_t PhyPsModeTest::DeviceCountByProtocolId(uint32_t proto_id) {
-  return (dev_mgr_->DeviceCountByProtocolId(proto_id));
-}
-
 zx_status_t PhyPsModeTest::SetPowerSaveMode(const wlan_common::PowerSaveType ps_mode) {
   fidl::Arena fidl_arena;
   auto builder =
       fuchsia_wlan_phyimpl::wire::WlanPhyImplSetPowerSaveModeRequest::Builder(fidl_arena);
   builder.ps_mode(ps_mode);
-  auto result = client_.sync().buffer(test_arena_)->SetPowerSaveMode(builder.Build());
+  auto result = client_.buffer(test_arena_)->SetPowerSaveMode(builder.Build());
   EXPECT_TRUE(result.ok());
   if (result->is_error()) {
     return result->error_value();
@@ -64,24 +57,29 @@ zx_status_t PhyPsModeTest::SetPowerSaveMode(const wlan_common::PowerSaveType ps_
 // state of PS Mode setting by bypassing the interfaces.
 void PhyPsModeTest::GetPowerSaveModeFromFirmware(uint32_t* ps_mode) {
   EXPECT_NE(ps_mode, nullptr);
-  brcmf_simdev* sim = device_->GetSim();
-  struct brcmf_if* ifp = brcmf_get_ifp(sim->drvr, client_ifc_.iface_id_);
-  zx_status_t status = brcmf_fil_cmd_int_get(ifp, BRCMF_C_GET_PM, ps_mode, nullptr);
-  EXPECT_EQ(status, ZX_OK);
+  WithSimDevice([&](brcmfmac::SimDevice* device) {
+    brcmf_simdev* sim = device->GetSim();
+    struct brcmf_if* ifp = brcmf_get_ifp(sim->drvr, client_ifc_.iface_id_);
+    zx_status_t status = brcmf_fil_cmd_int_get(ifp, BRCMF_C_GET_PM, ps_mode, nullptr);
+    EXPECT_EQ(status, ZX_OK);
+  });
 }
 
 zx_status_t PhyPsModeTest::SetPowerSaveModeInFirmware(
     const fuchsia_wlan_common_wire::PowerSaveType ps_mode) {
   // EXPECT_NE(ps_mode, nullptr);
-  brcmf_simdev* sim = device_->GetSim();
-  return brcmf_set_power_save_mode(sim->drvr, ps_mode);
+  zx_status_t status = ZX_ERR_INTERNAL;
+
+  WithSimDevice([&](brcmfmac::SimDevice* device) {
+    brcmf_simdev* sim = device->GetSim();
+    status = brcmf_set_power_save_mode(sim->drvr, ps_mode);
+  });
+  return status;
 }
 
 TEST_F(PhyPsModeTest, SetPowerSaveModeIncorrect) {
   Init();
   CreateInterface();
-  EXPECT_EQ(DeviceCountByProtocolId(ZX_PROTOCOL_WLANPHY_IMPL), 1u);
-  EXPECT_EQ(DeviceCountByProtocolId(ZX_PROTOCOL_WLAN_FULLMAC_IMPL), 1u);
 
   // Get the country code and verify that it is set to WW.
   uint32_t fw_ps_mode;
@@ -93,7 +91,7 @@ TEST_F(PhyPsModeTest, SetPowerSaveModeIncorrect) {
   fidl::Arena fidl_arena;
   auto builder =
       fuchsia_wlan_phyimpl::wire::WlanPhyImplSetPowerSaveModeRequest::Builder(fidl_arena);
-  auto result = client_.sync().buffer(test_arena_)->SetPowerSaveMode(builder.Build());
+  auto result = client_.buffer(test_arena_)->SetPowerSaveMode(builder.Build());
   EXPECT_TRUE(result.ok());
   zx_status_t status = result->is_error() ? result->error_value() : ZX_OK;
 
@@ -110,8 +108,6 @@ TEST_F(PhyPsModeTest, SetPowerSaveMode) {
 
   Init();
   CreateInterface();
-  EXPECT_EQ(DeviceCountByProtocolId(ZX_PROTOCOL_WLANPHY_IMPL), 1u);
-  EXPECT_EQ(DeviceCountByProtocolId(ZX_PROTOCOL_WLAN_FULLMAC_IMPL), 1u);
 
   // Get the country code and verify that it is set to WW.
   GetPowerSaveModeFromFirmware(&fw_ps_mode);
@@ -132,8 +128,6 @@ TEST_F(PhyPsModeTest, CheckFWPsMode) {
 
   Init();
   CreateInterface();
-  EXPECT_EQ(DeviceCountByProtocolId(ZX_PROTOCOL_WLANPHY_IMPL), 1u);
-  EXPECT_EQ(DeviceCountByProtocolId(ZX_PROTOCOL_WLAN_FULLMAC_IMPL), 1u);
 
   // Get the country code and verify that it is set to WW.
   GetPowerSaveModeFromFirmware(&fw_ps_mode);
@@ -179,7 +173,7 @@ TEST_F(PhyPsModeTest, GetPowerSaveMode) {
   {
     const auto valid_ps_mode = wlan_common::PowerSaveType::kPsModeBalanced;
     ASSERT_EQ(ZX_OK, SetPowerSaveModeInFirmware(valid_ps_mode));
-    auto result = client_.sync().buffer(test_arena_)->GetPowerSaveMode();
+    auto result = client_.buffer(test_arena_)->GetPowerSaveMode();
     EXPECT_TRUE(result.ok());
     ASSERT_FALSE(result->is_error());
     EXPECT_EQ(result->value()->ps_mode(), valid_ps_mode);
@@ -189,7 +183,7 @@ TEST_F(PhyPsModeTest, GetPowerSaveMode) {
   {
     const auto valid_ps_mode = wlan_common::PowerSaveType::kPsModePerformance;
     ASSERT_EQ(ZX_OK, SetPowerSaveModeInFirmware(valid_ps_mode));
-    auto result = client_.sync().buffer(test_arena_)->GetPowerSaveMode();
+    auto result = client_.buffer(test_arena_)->GetPowerSaveMode();
     EXPECT_TRUE(result.ok());
     ASSERT_FALSE(result->is_error());
     EXPECT_EQ(result->value()->ps_mode(), valid_ps_mode);

@@ -19,23 +19,19 @@
 
 #include <memory>
 
-#include "src/connectivity/wlan/drivers/testing/lib/sim-device/device.h"
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/sim/sim_fw.h"
 
 struct brcmf_bus;
 
 struct brcmf_simdev {
   std::unique_ptr<::wlan::brcmfmac::SimFirmware> sim_fw;
-  ::wlan::simulation::FakeDevMgr* dev_mgr;
-  std::shared_ptr<::wlan::simulation::Environment> env;
   std::unique_ptr<brcmf_mp_device> settings;
+  ::wlan::simulation::Environment* env;
   brcmf_pub* drvr;
 };
 
 // Allocate device and bus structures
-zx_status_t brcmf_sim_alloc(brcmf_pub* drvr, std::unique_ptr<brcmf_bus>* out_bus,
-                            ::wlan::simulation::FakeDevMgr* dev_mgr,
-                            std::shared_ptr<::wlan::simulation::Environment> env);
+std::unique_ptr<brcmf_bus> brcmf_sim_alloc(brcmf_pub* drvr, ::wlan::simulation::Environment* env);
 
 // Perform initialization on the appropriate bus structures
 zx_status_t brcmf_sim_register(brcmf_pub* drvr);

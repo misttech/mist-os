@@ -53,3 +53,15 @@ source_set("dfv2") {
     "//zircon/system/ulib/trace",
   ]
 }
+
+source_set("dfv2_test_helpers") {
+  public_configs = [
+    ":common_config",
+    ":dfv2_config",
+  ]
+  sources = [ "internal/dfv2/test_helpers.cc" ]
+  deps = [
+    "//sdk/lib/driver/logging/cpp",
+    "//zircon/system/ulib/async-loop:async-loop-cpp",
+  ]
+}

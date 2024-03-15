@@ -8,7 +8,6 @@
 
 #include <zxtest/zxtest.h>
 
-#include "src/connectivity/wlan/drivers/testing/lib/sim-device/device.h"
 #include "src/connectivity/wlan/drivers/testing/lib/sim-env/sim-env.h"
 #include "src/connectivity/wlan/drivers/testing/lib/sim-fake-ap/sim-fake-ap.h"
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/cfg80211.h"
@@ -166,9 +165,11 @@ void ArpTest::VerifyAssoc() {
   // Verify the event indications were received and
   // the number of clients
   ASSERT_EQ(assoc_ind_recv_, true);
-  brcmf_simdev* sim = device_->GetSim();
-  uint16_t num_clients = sim->sim_fw->GetNumClients(sim_ifc_.iface_id_);
-  ASSERT_EQ(num_clients, 1U);
+  WithSimDevice([this](brcmfmac::SimDevice* device) {
+    brcmf_simdev* sim = device->GetSim();
+    uint16_t num_clients = sim->sim_fw->GetNumClients(sim_ifc_.iface_id_);
+    ASSERT_EQ(num_clients, 1U);
+  });
 }
 
 void ArpTest::CleanupApInterface() {
@@ -204,8 +205,11 @@ void ArpTest::StartAndStopSoftAP() {
   common::MacAddr ap_mac({0xfa, 0xfb, 0xfc, 0xfd, 0xfe, 0xff});
   GenericIfc softap_ifc;
   softap_ifc.test_ = this;
+
   ASSERT_EQ(SimTest::StartInterface(wlan_common::WlanMacRole::kAp, &softap_ifc, ap_mac), ZX_OK);
+
   softap_ifc.StartSoftAp();
+
   softap_ifc.StopSoftAp();
 }
 
@@ -236,13 +240,15 @@ TEST_F(ArpTest, SoftApArpOffload) {
   env_->Run(kTestDuration);
 
   // Verify that no ARP frames were offloaded and that no non-ARP frames were suppressed
-  auto& received = device_->DataPath().RxData();
-  ASSERT_EQ(received.size(), 4);
+  WithSimDevice([](brcmfmac::SimDevice* device) {
+    auto& received = device->DataPath().RxData();
+    ASSERT_EQ(received.size(), 4);
 
-  VerifyArpFrame(received[0]);
-  VerifyNonArpFrame(received[1]);
-  VerifyArpFrame(received[2]);
-  VerifyNonArpFrame(received[3]);
+    VerifyArpFrame(received[0]);
+    VerifyNonArpFrame(received[1]);
+    VerifyArpFrame(received[2]);
+    VerifyNonArpFrame(received[3]);
+  });
 }
 
 // On a client interface, we expect no ARP frames to be offloaded to firmware, regardless of
@@ -275,13 +281,15 @@ TEST_F(ArpTest, ClientArpOffload) {
   EXPECT_EQ(sim_ifc_.stats_.connect_successes, 1U);
 
   // Verify that no ARP frames were offloaded and that no non-ARP frames were suppressed
-  auto& received = device_->DataPath().RxData();
-  ASSERT_EQ(received.size(), 4);
+  WithSimDevice([](brcmfmac::SimDevice* device) {
+    auto& received = device->DataPath().RxData();
+    ASSERT_EQ(received.size(), 4);
 
-  VerifyArpFrame(received[0]);
-  VerifyNonArpFrame(received[1]);
-  VerifyArpFrame(received[2]);
-  VerifyNonArpFrame(received[3]);
+    VerifyArpFrame(received[0]);
+    VerifyNonArpFrame(received[1]);
+    VerifyArpFrame(received[2]);
+    VerifyNonArpFrame(received[3]);
+  });
 }
 
 // Start and Stop of SoftAP should not affect ARP OL configured by client.
@@ -314,13 +322,15 @@ TEST_F(ArpTest, SoftAPStartStopDoesNotAffectArpOl) {
   EXPECT_EQ(sim_ifc_.stats_.connect_successes, 1U);
 
   // Verify that no ARP frames were offloaded and that no non-ARP frames were suppressed
-  auto& received = device_->DataPath().RxData();
-  ASSERT_EQ(received.size(), 4);
+  WithSimDevice([](brcmfmac::SimDevice* device) {
+    auto& received = device->DataPath().RxData();
+    ASSERT_EQ(received.size(), 4);
 
-  VerifyArpFrame(received[0]);
-  VerifyNonArpFrame(received[1]);
-  VerifyArpFrame(received[2]);
-  VerifyNonArpFrame(received[3]);
+    VerifyArpFrame(received[0]);
+    VerifyNonArpFrame(received[1]);
+    VerifyArpFrame(received[2]);
+    VerifyNonArpFrame(received[3]);
+  });
 }
 
 // On a client interface, we expect all ARP frames to be offloaded to firmware, regardless of
@@ -329,7 +339,9 @@ TEST_F(ArpTest, ClientArpOffloadNoSoftApFeat) {
   Init();
 
   // We disable SoftAP feature, so that our driver enabled Arp offload.
-  device_->GetSim()->drvr->feat_flags &= (!BIT(BRCMF_FEAT_AP));
+  WithSimDevice([](brcmfmac::SimDevice* device) {
+    device->GetSim()->drvr->feat_flags &= (!BIT(BRCMF_FEAT_AP));
+  });
 
   ASSERT_EQ(SimTest::StartInterface(wlan_common::WlanMacRole::kClient, &sim_ifc_, kOurMac), ZX_OK);
 
@@ -356,10 +368,12 @@ TEST_F(ArpTest, ClientArpOffloadNoSoftApFeat) {
   EXPECT_EQ(sim_ifc_.stats_.connect_successes, 1U);
 
   // Verify that all ARP frames were offloaded and that no non-ARP frames were suppressed
-  auto& received = device_->DataPath().RxData();
-  ASSERT_EQ(received.size(), 2);
-  VerifyNonArpFrame(received[0]);
-  VerifyNonArpFrame(received[1]);
+  WithSimDevice([](brcmfmac::SimDevice* device) {
+    auto& received = device->DataPath().RxData();
+    ASSERT_EQ(received.size(), 2);
+    VerifyNonArpFrame(received[0]);
+    VerifyNonArpFrame(received[1]);
+  });
 }
 
 }  // namespace wlan::brcmfmac

@@ -55,40 +55,40 @@ void SimDataPath::Init(drivers::components::NetworkDevice* net_dev) {
   ZX_ASSERT(net_dev);
   net_dev_ = net_dev;
 
-  sync_completion_t initialized;
   net_dev_->NetworkDeviceImplInit(
       &ifc_protocol_,
       [](void* ctx, zx_status_t status) {
-        sync_completion_t* initialized = static_cast<sync_completion_t*>(ctx);
         ZX_ASSERT(status == ZX_OK);
-        sync_completion_signal(initialized);
+
+        SimDataPath* data_path = static_cast<SimDataPath*>(ctx);
+        data_path->net_dev_->NetworkDeviceImplGetInfo(&data_path->device_info_);
+
+        // setup tx vmo, which is just a single frame of size kMaxFrameSize
+        zx::vmo tx_vmo;
+        auto tx_result = CreateAndMapVmo(tx_vmo, kMaxFrameSize);
+        ZX_ASSERT(tx_result.is_ok());
+        data_path->tx_span_ = tx_result.value();
+
+        // setup rx vmo
+        zx::vmo rx_vmo;
+        auto rx_result = CreateAndMapVmo(rx_vmo, kMaxFrameSize);
+        ZX_ASSERT(rx_result.is_ok());
+        data_path->rx_span_ = rx_result.value();
+
+        auto assert_ok = [](void* ctx, zx_status_t result) { ZX_ASSERT(result == ZX_OK); };
+
+        // Give both vmos to net device
+        data_path->net_dev_->NetworkDeviceImplPrepareVmo(kTxVmoId, std::move(tx_vmo), assert_ok,
+                                                         nullptr);
+        data_path->net_dev_->NetworkDeviceImplPrepareVmo(kRxVmoId, std::move(rx_vmo), assert_ok,
+                                                         nullptr);
+
+        data_path->net_dev_->NetworkDeviceImplStart(assert_ok, nullptr);
+
+        // Give the rx buffer to the network device on init
+        data_path->QueueRxBuffer();
       },
-      &initialized);
-  sync_completion_wait(&initialized, ZX_TIME_INFINITE);
-  net_dev_->NetworkDeviceImplGetInfo(&device_info_);
-
-  // setup tx vmo, which is just a single frame of size kMaxFrameSize
-  zx::vmo tx_vmo;
-  auto tx_result = CreateAndMapVmo(tx_vmo, kMaxFrameSize);
-  ZX_ASSERT(tx_result.is_ok());
-  tx_span_ = tx_result.value();
-
-  // setup rx vmo
-  zx::vmo rx_vmo;
-  auto rx_result = CreateAndMapVmo(rx_vmo, kMaxFrameSize);
-  ZX_ASSERT(rx_result.is_ok());
-  rx_span_ = rx_result.value();
-
-  auto assert_ok = [](void* ctx, zx_status_t result) { ZX_ASSERT(result == ZX_OK); };
-
-  // Give both vmos to net device
-  net_dev_->NetworkDeviceImplPrepareVmo(kTxVmoId, std::move(tx_vmo), assert_ok, nullptr);
-  net_dev_->NetworkDeviceImplPrepareVmo(kRxVmoId, std::move(rx_vmo), assert_ok, nullptr);
-
-  net_dev_->NetworkDeviceImplStart(assert_ok, nullptr);
-
-  // Give the rx buffer to the network device on init
-  QueueRxBuffer();
+      this);
 }
 
 void SimDataPath::TxEthernet(uint16_t id, common::MacAddr dst, common::MacAddr src, uint16_t type,
