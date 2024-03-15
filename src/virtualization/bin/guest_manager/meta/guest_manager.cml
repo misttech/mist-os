@@ -52,7 +52,6 @@
                 "fuchsia.logger.LogSink",
                 "fuchsia.media.Audio",
                 "fuchsia.net.virtualization.Control",
-                "fuchsia.scheduler.ProfileProvider",
                 "fuchsia.scheduler.RoleManager",
                 "fuchsia.sysinfo.SysInfo",
                 "fuchsia.sysmem.Allocator",
