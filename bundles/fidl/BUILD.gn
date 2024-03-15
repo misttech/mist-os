@@ -49,5 +49,6 @@ group("tools") {
   deps = [
     "//src/tests/benchmarks/fidl/benchmark_suite/gen:host",
     "//tools/fidl/fidldoc",
+    "//tools/fidl/platform-ir:generate-platform-ir",
   ]
 }
