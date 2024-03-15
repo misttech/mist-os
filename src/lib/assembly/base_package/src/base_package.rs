@@ -91,6 +91,15 @@ impl BasePackageBuilder {
         // package manifest).
         builder.published_name(name);
 
+        // It's not totally clear what the ABI revision means for the
+        // system-image package. It isn't checked anywhere. Regardless, it's
+        // never produced by assembly tools from one Fuchsia release and then
+        // read by binaries from another Fuchsia release, so the ABI revision
+        // for platform components seems appropriate.
+        //
+        // TODO(https://fxbug.dev/329125882): Clarify what this means.
+        builder.abi_revision(version_history::HISTORY.get_abi_revision_for_platform_components());
+
         for (destination, source) in &external_contents {
             builder.add_file_as_blob(destination, source)?;
         }

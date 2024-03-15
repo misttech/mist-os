@@ -61,7 +61,7 @@ pub struct UpdatePackageBuilder {
     packages: UpdatePackagesManifest,
 
     /// The ABI revision to use when building the packages for the update.
-    /// None will default to the latest ABI.
+    /// None will default to the `INVALID` ABI revision.
     abi_revision: Option<version_history::AbiRevision>,
 
     /// The repository to use for the images packages.
@@ -230,9 +230,6 @@ impl UpdatePackageBuilder {
         // `system-updater`.  Follow that convention for images packages as well.
         let package_name = format!("update{suffix}");
         let mut builder = PackageBuilder::new(&package_name);
-        if let Some(abi) = self.abi_revision {
-            builder.abi_revision(abi);
-        }
 
         // However, they can have different published names.  And the name here
         // is the name to publish it under (and to include in the generated
@@ -240,6 +237,25 @@ impl UpdatePackageBuilder {
         let base_publish_name = &self.name;
         let publish_name = format!("{base_publish_name}{suffix}");
         builder.published_name(publish_name);
+
+        // It's not totally clear what the ABI revision means for the update
+        // package. It isn't actually checked as part of the update process.
+        // Maybe it should be - that way we could ensure that devices only apply
+        // update packages they know they understand (currently, those checks
+        // happen at a different layer that predates ABI revisions).
+        //
+        // If the ABI stamp *was* checked as part of the update process, we'd
+        // have to be very deliberate about choosing which API level to target,
+        // based on which versions of the OS we need to be able to consume the
+        // update package.
+        //
+        // We'll set it to `INVALID` and decide on a more appropriate ABI
+        // revision if/when we decide to check it. Any checks on the `INVALID`
+        // ABI revision will fail, so this will hopefully ensure we don't
+        // accidentally add any checks without the necessary care.
+        //
+        // TODO(https://fxbug.dev/328812629): Clarify what this means.
+        builder.abi_revision(self.abi_revision.unwrap_or(version_history::AbiRevision::INVALID));
 
         // Export the package's package manifest to paths that don't change
         // based on the configured publishing name.

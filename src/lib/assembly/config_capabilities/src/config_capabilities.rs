@@ -84,7 +84,7 @@ impl Config {
 }
 
 /// Use the capabilities to build the `config` package, which consists of a single CML
-/// at `meta/config.cml` containing all of the configuration capabilities.
+/// at `meta/config.cm` containing all of the configuration capabilities.
 pub fn build_config_capability_package(
     capabilities: CapabilityNamedMap,
     outdir: &Utf8Path,
@@ -93,6 +93,12 @@ pub fn build_config_capability_package(
 
     // Build the package.
     let mut builder = PackageBuilder::new("config");
+
+    // Config capability packages built by assembly are never produced by
+    // assembly tools from one Fuchsia release and then read by binaries from
+    // another Fuchsia release.  Give them the platform ABI revision.
+    builder.abi_revision(version_history::HISTORY.get_abi_revision_for_platform_components());
+
     let manifest_path = outdir.join("package_manifest.json");
     let metafar_path = outdir.join("meta.far");
     builder.manifest_path(&manifest_path);

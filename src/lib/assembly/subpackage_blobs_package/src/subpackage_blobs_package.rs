@@ -78,13 +78,22 @@ impl SubpackageBlobsPackageBuilder {
 
         let Self { contents, seen: _ } = self;
 
-        // All base packages are named 'system-image' internally, for
-        // consistency on the platform.
         let mut builder = PackageBuilder::new("subpackage_blobs");
         // However, they can have different published names.  And the name here
         // is the name to publish it under (and to include in the generated
         // package manifest).
         builder.published_name(name);
+
+        // It's not totally clear what the ABI revision means for the
+        // subpackage_blobs package. It isn't checked anywhere. Since it's only
+        // used as a vessel to transfer blobs, it's not clear who _would_ check
+        // it.
+        //
+        // Set it to `INVALID` and decide on a more appropriate ABI revision
+        // if/when we decide to check it.
+        //
+        // TODO(https://fxbug.dev/328787524): Clarify what this means.
+        builder.abi_revision(version_history::AbiRevision::INVALID);
 
         for (destination, source) in &contents {
             builder.add_file_as_blob(destination, source)?;

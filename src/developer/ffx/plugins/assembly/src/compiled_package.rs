@@ -194,6 +194,12 @@ impl CompiledPackageBuilder {
         let mut package_builder = PackageBuilder::new(&self.name);
         package_builder.repository("fuchsia.com");
 
+        // Assembly-compiled packages are never produced by assembly tools from
+        // one Fuchsia release and then read by binaries from another Fuchsia
+        // release. Give them the platform ABI revision.
+        package_builder
+            .abi_revision(version_history::HISTORY.get_abi_revision_for_platform_components());
+
         for (component_name, cml) in &main_definition.components {
             let component_manifest_path = &self
                 .build_component(cmc_tool, component_name, cml, &outdir)

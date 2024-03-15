@@ -52,6 +52,12 @@ impl ConfigDataBuilder {
         let outdir = outdir.as_ref().join("config_data");
         let mut package_builder = PackageBuilder::new(PackageDestination::ConfigData.to_string());
 
+        // config_data is never produced by assembly tools from one Fuchsia
+        // release and then read by binaries from another Fuchsia release. Give
+        // it the platform ABI revision.
+        package_builder
+            .abi_revision(version_history::HISTORY.get_abi_revision_for_platform_components());
+
         for (package_name, entries) in self.for_packages.entries {
             for (destination_path, source_file) in entries {
                 let config_data_package_path =

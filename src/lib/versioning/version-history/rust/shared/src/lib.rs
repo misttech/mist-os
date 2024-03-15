@@ -22,13 +22,13 @@ pub struct ApiLevel(u64);
 impl ApiLevel {
     /// The `HEAD` pseudo-API level, representing the bleeding edge of
     /// development.
-    const HEAD: ApiLevel = ApiLevel(0xFFFFFFFFFFFFFFFE);
+    const HEAD: ApiLevel = ApiLevel(0xFFFF_FFFF_FFFF_FFFE);
 
     /// The `LEGACY` pseudo-API level, which is used in platform builds.
     ///
     /// TODO: https://fxbug.dev/42085274 - Remove this once `LEGACY` is actually
     /// gone, and use `HEAD` instead.
-    const LEGACY: ApiLevel = ApiLevel(0xFFFFFFFFFFFFFFFF);
+    const LEGACY: ApiLevel = ApiLevel(0xFFFF_FFFF_FFFF_FFFF);
 
     pub const fn from_u64(value: u64) -> Self {
         Self(value)
@@ -95,6 +95,10 @@ impl From<ApiLevel> for u64 {
 pub struct AbiRevision(u64);
 
 impl AbiRevision {
+    /// An ABI revision that is never supported by the platform. To be used when
+    /// an ABI revision is necessary, but none makes sense.
+    pub const INVALID: AbiRevision = AbiRevision(0xFFFF_FFFF_FFFF_FFFF);
+
     pub const PATH: &'static str = "meta/fuchsia.abi/abi-revision";
 
     /// Parse the ABI revision from little-endian bytes.
@@ -235,11 +239,20 @@ impl VersionHistory {
         VersionHistory { versions }
     }
 
-    /// Components which are not packaged but are "part of the platform"
-    /// nonetheless (e.g. components loaded from bootfs) should be considered to
-    /// have this ABI revision.
+    /// The ABI revision for components and packages that are "part of the
+    /// platform" and never "move between releases". For example:
+    ///
+    /// - Packages produced by the platform build have this ABI revision.
+    /// - Components which are not packaged but are "part of the platform"
+    ///   nonetheless (e.g. components loaded from bootfs) have this ABI
+    ///   revision.
+    /// - Most packages produced by assembly tools have this ABI revision.
+    ///   - The `update` package is a noteworthy exception, since it "moves
+    ///     between releases", in that it is produced by assembly tools from one
+    ///     Fuchsia release, and then later read by the OS from a previous
+    ///     release (that is, the one performing the update).
     pub fn get_abi_revision_for_platform_components(&self) -> AbiRevision {
-        self.supported_versions().last().unwrap().abi_revision
+        self.version_from_api_level(ApiLevel::HEAD).expect("API Level HEAD not found!").abi_revision
     }
 
     /// ffx currently presents information suggesting that the platform supports
