@@ -7,7 +7,7 @@
 
 use alloc::vec::Vec;
 use lock_order::{
-    lock::{LockFor, RwLockFor},
+    lock::{LockFor, RwLockFor, UnlockedAccess},
     relation::LockBefore,
     wrap::LockedWrapperApi,
 };
@@ -15,11 +15,11 @@ use net_types::ip::{Ip, IpVersion, Ipv4, Ipv6};
 use packet::{Buf, BufferMut, Serializer};
 
 use crate::{
-    context::{RecvFrameContext, SendFrameContext},
+    context::{RecvFrameContext, ResourceCounterContext, SendFrameContext},
     device::{
         config::DeviceConfigurationContext,
         pure_ip::{
-            PureIpDevice, PureIpDeviceId, PureIpDeviceReceiveFrameMetadata,
+            PureIpDevice, PureIpDeviceCounters, PureIpDeviceId, PureIpDeviceReceiveFrameMetadata,
             PureIpDeviceTxQueueFrameMetadata, PureIpPrimaryDeviceId, PureIpWeakDeviceId,
         },
         queue::{
@@ -31,8 +31,8 @@ use crate::{
         },
         socket::{DeviceSocketMetadata, HeldDeviceSockets, ParseSentFrameError},
         state::IpLinkDeviceState,
-        DeviceCollectionContext, DeviceIdContext, DeviceLayerEventDispatcher, DeviceSendFrameError,
-        RecvIpFrameMeta,
+        DeviceCollectionContext, DeviceCounters, DeviceIdContext, DeviceLayerEventDispatcher,
+        DeviceSendFrameError, RecvIpFrameMeta,
     },
     device_socket::SentFrame,
     neighbor::NudUserConfig,
@@ -97,7 +97,8 @@ impl<CC, BC> RecvFrameContext<BC, PureIpDeviceReceiveFrameMetadata<CC::DeviceId>
 where
     CC: DeviceIdContext<PureIpDevice>
         + RecvFrameContext<BC, RecvIpFrameMeta<CC::DeviceId, Ipv4>>
-        + RecvFrameContext<BC, RecvIpFrameMeta<CC::DeviceId, Ipv6>>,
+        + RecvFrameContext<BC, RecvIpFrameMeta<CC::DeviceId, Ipv6>>
+        + ResourceCounterContext<CC::DeviceId, DeviceCounters>,
 {
     fn receive_frame<B: BufferMut>(
         &mut self,
@@ -108,6 +109,7 @@ where
         // TODO(https://fxbug.dev/42051633): Deliver the received frame to
         // the device socket handler.
         let PureIpDeviceReceiveFrameMetadata { device_id, ip_version } = metadata;
+        self.increment(&device_id, |counters: &DeviceCounters| &counters.recv_frame);
         match ip_version {
             IpVersion::V4 => self.receive_frame(
                 bindings_ctx,
@@ -132,14 +134,9 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::PureIpDeviceRxDequ
         metadata: RecvIpFrameMeta<PureIpDeviceId<BC>, Ipv4>,
         frame: B,
     ) {
-        // TODO(https://fxbug.dev/42051633): Update device counters.
-        crate::ip::receive_ipv4_packet(
-            self,
-            bindings_ctx,
-            &metadata.device.into(),
-            metadata.frame_dst,
-            frame,
-        );
+        let RecvIpFrameMeta { device, frame_dst, _marker: _ } = metadata;
+        self.increment(&device, |counters: &DeviceCounters| &counters.recv_ipv4_delivered);
+        crate::ip::receive_ipv4_packet(self, bindings_ctx, &device.into(), frame_dst, frame);
     }
 }
 
@@ -152,14 +149,9 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::PureIpDeviceRxDequ
         metadata: RecvIpFrameMeta<PureIpDeviceId<BC>, Ipv6>,
         frame: B,
     ) {
-        // TODO(https://fxbug.dev/42051633): Update device counters.
-        crate::ip::receive_ipv6_packet(
-            self,
-            bindings_ctx,
-            &metadata.device.into(),
-            metadata.frame_dst,
-            frame,
-        );
+        let RecvIpFrameMeta { device, frame_dst, _marker: _ } = metadata;
+        self.increment(&device, |counters: &DeviceCounters| &counters.recv_ipv6_delivered);
+        crate::ip::receive_ipv6_packet(self, bindings_ctx, &device.into(), frame_dst, frame);
     }
 }
 
@@ -220,7 +212,6 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::PureIpDeviceTxQueu
         meta: Self::Meta,
         buf: Self::Buffer,
     ) -> Result<(), DeviceSendFrameError<(Self::Meta, Self::Buffer)>> {
-        // TODO(https://fxbug.dev/42051633): Update device counters.
         let PureIpDeviceTxQueueFrameMetadata { ip_version } = meta;
         DeviceLayerEventDispatcher::send_ip_packet(bindings_ctx, device_id, buf, ip_version)
             .map_err(|DeviceSendFrameError::DeviceNotReady(buf)| {
@@ -307,6 +298,18 @@ impl<BC: BindingsContext> RwLockFor<crate::lock_ordering::DeviceSockets>
     }
 }
 
+impl<BC: BindingsContext> UnlockedAccess<crate::lock_ordering::PureIpDeviceCounters>
+    for IpLinkDeviceState<PureIpDevice, BC>
+{
+    type Data = PureIpDeviceCounters;
+    type Guard<'l> = &'l PureIpDeviceCounters
+        where
+            Self: 'l ;
+    fn access(&self) -> Self::Guard<'_> {
+        &self.link.counters
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -320,9 +323,11 @@ mod tests {
     use crate::{
         context::testutil::PureIpDeviceAndIpVersion,
         device::{pure_ip::PureIpDeviceCreationProperties, DeviceId, TransmitQueueConfiguration},
+        ip::IpLayerIpExt,
         sync::RemoveResourceResult,
-        testutil::{TestIpExt, DEFAULT_INTERFACE_METRIC},
+        testutil::{FakeBindingsCtx, TestIpExt, DEFAULT_INTERFACE_METRIC},
         types::WorkQueueReport,
+        StackState,
     };
 
     const MTU: Mtu = Mtu::new(1234);
@@ -378,13 +383,29 @@ mod tests {
         );
         crate::device::testutil::enable_device(&mut ctx, &device.clone().into());
 
+        fn check_frame_counters<I: IpLayerIpExt>(
+            stack_state: &StackState<FakeBindingsCtx>,
+            count: u64,
+        ) {
+            assert_eq!(stack_state.ip_counters::<I>().receive_ip_packet.get(), count);
+            assert_eq!(stack_state.device_counters().recv_frame.get(), count);
+            match I::VERSION {
+                IpVersion::V4 => {
+                    assert_eq!(stack_state.device_counters().recv_ipv4_delivered.get(), count)
+                }
+                IpVersion::V6 => {
+                    assert_eq!(stack_state.device_counters().recv_ipv6_delivered.get(), count)
+                }
+            }
+        }
+
         // Receive a frame from the network and verify delivery to the IP layer.
-        assert_eq!(ctx.core_ctx.ip_counters::<I>().receive_ip_packet.get(), 0);
+        check_frame_counters::<I>(&ctx.core_ctx, 0);
         ctx.core_api().device::<PureIpDevice>().receive_frame(
             PureIpDeviceReceiveFrameMetadata { device_id: device, ip_version: I::VERSION },
             default_ip_packet::<I>(),
         );
-        assert_eq!(ctx.core_ctx.ip_counters::<I>().receive_ip_packet.get(), 1);
+        check_frame_counters::<I>(&ctx.core_ctx, 1);
     }
 
     #[ip_test]
@@ -402,7 +423,25 @@ mod tests {
             TransmitQueueConfiguration::Fifo => true,
         };
         ctx.core_api().transmit_queue::<PureIpDevice>().set_configuration(&device, tx_queue_config);
+
+        fn check_frame_counters<I: IpLayerIpExt>(
+            stack_state: &StackState<FakeBindingsCtx>,
+            count: u64,
+        ) {
+            assert_eq!(stack_state.device_counters().send_total_frames.get(), count);
+            assert_eq!(stack_state.device_counters().send_frame.get(), count);
+            match I::VERSION {
+                IpVersion::V4 => {
+                    assert_eq!(stack_state.device_counters().send_ipv4_frame.get(), count)
+                }
+                IpVersion::V6 => {
+                    assert_eq!(stack_state.device_counters().send_ipv6_frame.get(), count)
+                }
+            }
+        }
+
         assert_matches!(ctx.bindings_ctx.take_ip_frames()[..], [], "unexpected sent IP frame");
+        check_frame_counters::<I>(&ctx.core_ctx, 0);
 
         {
             let (mut core_ctx, bindings_ctx) = ctx.contexts();
@@ -414,6 +453,7 @@ mod tests {
             )
             .expect("send should succeed");
         }
+        check_frame_counters::<I>(&ctx.core_ctx, 1);
 
         if has_tx_queue {
             // When a queuing configuration is set, there shouldn't be any sent

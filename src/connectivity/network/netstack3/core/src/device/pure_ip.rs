@@ -5,22 +5,21 @@
 //! A pure IP device, capable of directly sending/receiving IPv4 & IPv6 packets.
 
 use alloc::vec::Vec;
-use lock_order::lock::UnlockedAccess;
 use net_types::ip::{Ip, IpVersion, Mtu};
 use packet::{Buf, BufferMut, Serializer};
 use tracing::warn;
 
 use crate::{
+    context::ResourceCounterContext,
     device::{
         queue::{
             tx::{BufVecU8Allocator, TransmitQueue, TransmitQueueHandler},
             TransmitQueueFrameError,
         },
-        state::{DeviceStateSpec, IpLinkDeviceState},
-        BaseDeviceId, BasePrimaryDeviceId, BaseWeakDeviceId, Device, DeviceLayerTypes,
-        DeviceReceiveFrameSpec, DeviceSendFrameError, PureIpDeviceCounters,
+        state::DeviceStateSpec,
+        BaseDeviceId, BasePrimaryDeviceId, BaseWeakDeviceId, Device, DeviceCounters,
+        DeviceLayerTypes, DeviceReceiveFrameSpec, DeviceSendFrameError, PureIpDeviceCounters,
     },
-    BindingsContext,
 };
 
 mod integration;
@@ -111,12 +110,18 @@ pub(super) fn send_ip_frame<CC, BC, I, S>(
     packet: S,
 ) -> Result<(), S>
 where
-    CC: TransmitQueueHandler<PureIpDevice, BC, Meta = PureIpDeviceTxQueueFrameMetadata>,
+    CC: TransmitQueueHandler<PureIpDevice, BC, Meta = PureIpDeviceTxQueueFrameMetadata>
+        + ResourceCounterContext<CC::DeviceId, DeviceCounters>,
     I: Ip,
     S: Serializer,
     S::Buffer: BufferMut,
 {
-    // TODO(https://fxbug.dev/42051633): Update device counters.
+    core_ctx.increment(device_id, |counters| &counters.send_total_frames);
+    match I::VERSION {
+        IpVersion::V4 => core_ctx.increment(device_id, |counters| &counters.send_ipv4_frame),
+        IpVersion::V6 => core_ctx.increment(device_id, |counters| &counters.send_ipv6_frame),
+    }
+
     let result = TransmitQueueHandler::<PureIpDevice, _>::queue_tx_frame(
         core_ctx,
         bindings_ctx,
@@ -125,24 +130,22 @@ where
         packet,
     );
     match result {
-        Ok(()) => Ok(()),
+        Ok(()) => {
+            core_ctx.increment(device_id, |counters| &counters.send_frame);
+            Ok(())
+        }
         Err(TransmitQueueFrameError::NoQueue(DeviceSendFrameError::DeviceNotReady(()))) => {
+            core_ctx.increment(device_id, |counters| &counters.send_dropped_no_queue);
             warn!("device {device_id:?} not ready to send frame.");
             Ok(())
         }
-        Err(TransmitQueueFrameError::QueueFull(s))
-        | Err(TransmitQueueFrameError::SerializeError(s)) => Err(s),
-    }
-}
-
-impl<BC: BindingsContext> UnlockedAccess<crate::lock_ordering::PureIpDeviceCounters>
-    for IpLinkDeviceState<PureIpDevice, BC>
-{
-    type Data = PureIpDeviceCounters;
-    type Guard<'l> = &'l PureIpDeviceCounters
-        where
-            Self: 'l ;
-    fn access(&self) -> Self::Guard<'_> {
-        &self.link.counters
+        Err(TransmitQueueFrameError::QueueFull(s)) => {
+            core_ctx.increment(device_id, |counters| &counters.send_queue_full);
+            Err(s)
+        }
+        Err(TransmitQueueFrameError::SerializeError(s)) => {
+            core_ctx.increment(device_id, |counters| &counters.send_serialize_error);
+            Err(s)
+        }
     }
 }

@@ -88,7 +88,7 @@ pub(super) struct RecvIpFrameMeta<D, I: Ip> {
     // protocols without destination addresses (i.e. PPP), but at the moment no
     // such protocols are supported.
     pub(super) frame_dst: Option<FrameDestination>,
-    _marker: PhantomData<I>,
+    pub(super) _marker: PhantomData<I>,
 }
 
 impl<D, I: Ip> RecvIpFrameMeta<D, I> {
