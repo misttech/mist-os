@@ -5,7 +5,7 @@
 # Target-side packages needed by example lacewing tests.
 group("packages") {
   testonly = true
-  public_deps = [ "..:sl4f_packages" ]
+  public_deps = [ "../honeydew:sl4f_packages" ]
 }
 
 if (is_host) {
