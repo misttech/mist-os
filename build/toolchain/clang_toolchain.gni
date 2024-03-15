@@ -582,6 +582,7 @@ template("clang_toolchain") {
             rebase_path(python_exe_src, root_build_dir),
             "-S",
             rebase_path(prebuilt_tool_remote_wrapper, root_build_dir),
+            "--label_toolname=$dump_syms",
             "--inputs",  # need to specify the executable, due to wrapper script
             "$dump_syms,\"$unstripped_outfile\"",
             "--output_files",

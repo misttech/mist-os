@@ -38,6 +38,13 @@ def _main_arg_parser() -> argparse.ArgumentParser:
         add_help=True,  # Want this to exit after printing --help
     )
     remote_action.inherit_main_arg_parser_flags(parser)
+    parser.add_argument(
+        "--label_toolname",  # "toolname" is a special label for rewrapper
+        type=Path,
+        default=None,
+        metavar="toolpath",
+        help="Identifies the action type for metrics purposes.  The basename of this tool is forwarded to `rewrapper --label=toolname=NAME`.",
+    )
     return parser
 
 
@@ -153,7 +160,7 @@ class PrebuiltToolAction(object):
         self.check_preconditions()
 
     def _setup_remote_action(self) -> remote_action.RemoteAction:
-        tool_name = self.local_tool.name
+        tool_name = self.label_toolname.name
         remote_options = [
             # type=tool says we are providing a custom tool, and thus,
             #   own the logic for providing explicit inputs.
@@ -245,6 +252,10 @@ class PrebuiltToolAction(object):
         for tok in self.local_command:
             if "=" not in tok:
                 return Path(tok)
+
+    @property
+    def label_toolname(self) -> Path:
+        return self._main_args.label_toolname or self.local_tool
 
     @property
     def remote_tool(self) -> Optional[Path]:

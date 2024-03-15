@@ -56,6 +56,35 @@ def _paths(items: Sequence[Any]) -> Sequence[Path]:
 
 
 class PrebuiltToolActionTests(unittest.TestCase):
+    def test_label_toolname(self):
+        fake_root = Path("/home/project")
+        fake_builddir = Path("out/really-not-default")
+        fake_cwd = fake_root / fake_builddir
+        real_tool = Path("utils/bin/real-tool")
+        c = prebuilt_tool_remote_wrapper.PrebuiltToolAction(
+            [
+                f"--label_toolname={real_tool}",
+                "--",
+                "wrapper.sh",
+                "--",
+                f"{real_tool}",
+                "my/input.txt",
+            ],
+            exec_root=fake_root,
+            working_dir=fake_cwd,
+            host_platform=fuchsia.REMOTE_PLATFORM,  # host = remote exec
+            auto_reproxy=False,
+        )
+        self.assertEqual(c.label_toolname, real_tool)
+        # Make sure the tool's basename is propagated to --labels
+        remote_options = list(c.remote_action._generate_options())
+        for opt in remote_options:
+            if opt.startswith("--label="):
+                labels = cl_utils.keyed_flags_to_values_dict(
+                    opt.remove_prefix("--label=").split(",")
+                )
+                self.assertEqual(labels["toolname"], [real_tool.name])
+
     def test_host_remote_same(self):
         fake_root = Path("/home/project")
         fake_builddir = Path("out/really-not-default")
