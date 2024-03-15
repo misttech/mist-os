@@ -83,12 +83,18 @@ func TestReadRunInput(t *testing.T) {
 		},
 		{
 			name:     "Success",
-			jsonData: "{\"hardware\": {\"ffx_path\":\"foo\"}}",
+			jsonData: "{\"hardware\": {\"ffx_path\":\"foo\",\"transfer_url\":\"gs://foo/bar.json\"}}",
 			wantResult: &RunInput{
 				Hardware: TargetRunInput{
-					FfxPath: "foo",
+					FfxPath:     "foo",
+					TransferURL: "gs://foo/bar.json",
 				},
 			},
+		},
+		{
+			name:     "PB Mutually Exclusive",
+			jsonData: "{\"hardware\": {\"ffx_path\":\"foo\",\"transfer_url\":\"gs://foo/bar.json\",\"local_pb\":\"foo/bar\"}}",
+			wantErr:  true,
 		},
 	}
 	for _, tc := range testCases {

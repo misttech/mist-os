@@ -83,10 +83,17 @@ func (r *TestOrchestrator) Run(in *RunInput, testCmd []string) error {
 			return fmt.Errorf("setupFfx: %w", err)
 		}
 		defer r.stopDaemon()
-		fmt.Println("=== orchestrate - Downloading Product Bundle (2/6) ===")
-		productDir, err := r.downloadProductBundle(in)
-		if err != nil {
-			return fmt.Errorf("downloadProductBundle: %w", err)
+		productDir := ""
+		if in.Target().TransferURL != "" {
+			fmt.Println("=== orchestrate - Downloading Product Bundle (2/6) ===")
+			var err error
+			productDir, err = r.downloadProductBundle(in)
+			if err != nil {
+				return fmt.Errorf("downloadProductBundle: %w", err)
+			}
+		} else if in.Target().LocalPB != "" {
+			fmt.Println("=== orchestrate - Local Product Bundle (2/6) ===")
+			productDir = in.Target().LocalPB
 		}
 		if in.IsHardware() {
 			fmt.Println("=== orchestrate - Flashing Device (3/6) ===")

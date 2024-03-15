@@ -52,6 +52,8 @@ func (oc *OrchestrateConfig) ReadDeviceConfig(path string) (*DeviceConfig, error
 type TargetRunInput struct {
 	// Product bundle URL to download with "ffx product download".
 	TransferURL string `json:"transfer_url"`
+	// Local product bundle path, either absolute or relative to CWD.
+	LocalPB string `json:"local_pb"`
 	// Fuchsia packages archives to publish with "ffx repository publish".
 	PackageArchives []string `json:"package_archives"`
 	// Build IDs to symbolize with "ffx debug symbol-index add".
@@ -138,6 +140,13 @@ func (oc *OrchestrateConfig) ReadRunInput(path string) (*RunInput, error) {
 	var data RunInput
 	if err = json.Unmarshal(content, &data); err != nil {
 		return nil, fmt.Errorf("Unmarshal: %w", err)
+	}
+	if data.IsTarget() && (data.Target().TransferURL == "") == (data.Target().LocalPB == "") {
+		return nil, fmt.Errorf(
+			"transfer_url = %q and local_pb = %q are mutually exclusive",
+			data.Target().TransferURL,
+			data.Target().LocalPB,
+		)
 	}
 	return &data, nil
 }
