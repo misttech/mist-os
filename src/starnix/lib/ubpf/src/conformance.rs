@@ -16,6 +16,7 @@ mod test {
     use pest_derive::Parser;
     use std::str::FromStr;
     use test_case::test_case;
+    use zerocopy::{FromBytes, IntoBytes};
 
     #[derive(Parser)]
     #[grammar = "../../src/starnix/lib/ubpf/src/test_grammar.pest"]
@@ -47,14 +48,14 @@ mod test {
         fn as_i32(&self) -> i32 {
             match self {
                 Self::Plus(v) => u32::try_from(*v).unwrap() as i32,
-                Self::Minus(v) => -i32::try_from(*v).unwrap(),
+                Self::Minus(v) => i32::try_from(-i64::try_from(*v).unwrap()).unwrap(),
             }
         }
 
         fn as_i16(&self) -> i16 {
             match self {
                 Self::Plus(v) => u16::try_from(*v).unwrap() as i16,
-                Self::Minus(v) => -i16::try_from(*v).unwrap(),
+                Self::Minus(v) => i16::try_from(-i64::try_from(*v).unwrap()).unwrap(),
             }
         }
 
@@ -365,12 +366,13 @@ mod test {
             instruction
         }
 
-        fn parse(content: &str) -> Self {
+        fn parse(content: &str) -> Option<Self> {
             let mut pairs =
                 TestGrammar::parse(Rule::rules, &content).expect("Parsing must be successful");
             let mut code: Option<Vec<bpf_insn>> = None;
             let mut result: Option<Option<u64>> = None;
             let mut memory: Option<Vec<u8>> = None;
+            let mut raw: Option<Vec<bpf_insn>> = None;
             for entry in pairs.next().unwrap().into_inner() {
                 match entry.as_rule() {
                     Rule::ASM => {
@@ -387,20 +389,46 @@ mod test {
                     }
                     Rule::MEMORY => {
                         assert!(memory.is_none());
-                        let mut array = vec![];
+                        let mut bytes = vec![];
                         for byte_pair in entry.into_inner() {
                             assert_eq!(byte_pair.as_rule(), Rule::MEMORY_DATA);
-                            array.push(
+                            bytes.push(
                                 u8::from_str_radix(byte_pair.as_str(), HEXADECIMAL_BASE).unwrap(),
                             );
                         }
-                        memory = Some(array);
+                        memory = Some(bytes);
+                    }
+                    Rule::RAW => {
+                        assert!(raw.is_none());
+                        let mut instructions = vec![];
+                        for byte_str in entry.into_inner() {
+                            assert_eq!(byte_str.as_rule(), Rule::RAW_VALUE);
+                            let value =
+                                u64::from_str_radix(byte_str.as_str(), HEXADECIMAL_BASE).unwrap();
+                            instructions.push(bpf_insn::read_from(value.as_bytes()).unwrap());
+                        }
+                        raw = Some(instructions);
                     }
                     Rule::EOI => (),
                     r @ _ => unreachable!("unexpected rule {r:?}"),
                 }
             }
-            TestCase { code: code.unwrap(), result: result.unwrap(), memory }
+            assert!(raw.is_some() || code.is_some());
+            if raw.is_some() && code.is_some() {
+                // Check equality
+                let raw = raw.as_ref().unwrap();
+                let code = code.as_ref().unwrap();
+                assert_eq!(raw.len(), code.len());
+                for (raw, code) in raw.iter().zip(code.iter()) {
+                    assert_eq!(raw.as_bytes(), code.as_bytes());
+                }
+                if result.is_none() {
+                    // Special case that only tests the assembler.
+                    return None;
+                }
+            }
+            let code = if let Some(code) = code { code } else { raw.unwrap() };
+            Some(TestCase { code, result: result.unwrap(), memory })
         }
     }
 
@@ -459,8 +487,10 @@ mod test {
     #[test_case(test_data!("add.data"))]
     #[test_case(test_data!("alu64-arith.data"))]
     #[test_case(test_data!("alu64-bit.data"))]
+    #[test_case(test_data!("alu64.data"))]
     #[test_case(test_data!("alu-arith.data"))]
     #[test_case(test_data!("alu-bit.data"))]
+    #[test_case(test_data!("alu.data"))]
     #[test_case(test_data!("arsh32-high-shift.data"))]
     #[test_case(test_data!("arsh64.data"))]
     #[test_case(test_data!("arsh.data"))]
@@ -488,12 +518,18 @@ mod test {
     #[test_case(test_data!("early-exit.data"))]
     #[test_case(test_data!("err-call-bad-imm.data"))]
     #[test_case(test_data!("err-call-unreg.data"))]
+    #[test_case(test_data!("err-endian-size.data"))]
+    #[test_case(test_data!("err-incomplete-lddw2.data"))]
+    #[test_case(test_data!("err-incomplete-lddw.data"))]
     #[test_case(test_data!("err-infinite-loop.data"))]
     #[test_case(test_data!("err-invalid-reg-dst.data"))]
     #[test_case(test_data!("err-invalid-reg-src.data"))]
     #[test_case(test_data!("err-jmp-lddw.data"))]
     #[test_case(test_data!("err-jmp-out.data"))]
+    #[test_case(test_data!("err-lddw-invalid-src.data"))]
     #[test_case(test_data!("err-stack-oob.data"))]
+    #[test_case(test_data!("err-too-many-instructions.data"))]
+    #[test_case(test_data!("err-unknown-opcode.data"))]
     #[test_case(test_data!("exit.data"))]
     #[test_case(test_data!("exit-not-last.data"))]
     #[test_case(test_data!("ja.data"))]
@@ -507,6 +543,7 @@ mod test {
     #[test_case(test_data!("jle-reg.data"))]
     #[test_case(test_data!("jlt-imm.data"))]
     #[test_case(test_data!("jlt-reg.data"))]
+    #[test_case(test_data!("jmp.data"))]
     #[test_case(test_data!("jne-reg.data"))]
     #[test_case(test_data!("jset-imm.data"))]
     #[test_case(test_data!("jset-reg.data"))]
@@ -519,8 +556,10 @@ mod test {
     #[test_case(test_data!("jslt-imm.data"))]
     #[test_case(test_data!("jslt-reg.data"))]
     #[test_case(test_data!("lddw2.data"))]
+    #[test_case(test_data!("lddw.data"))]
     #[test_case(test_data!("ldxb-all.data"))]
     #[test_case(test_data!("ldxb.data"))]
+    #[test_case(test_data!("ldx.data"))]
     #[test_case(test_data!("ldxdw.data"))]
     #[test_case(test_data!("ldxh-all2.data"))]
     #[test_case(test_data!("ldxh-all.data"))]
@@ -557,19 +596,25 @@ mod test {
     #[test_case(test_data!("stack3.data"))]
     #[test_case(test_data!("stack.data"))]
     #[test_case(test_data!("stb.data"))]
+    #[test_case(test_data!("st.data"))]
     #[test_case(test_data!("stdw.data"))]
     #[test_case(test_data!("sth.data"))]
+    #[test_case(test_data!("string-stack.data"))]
     #[test_case(test_data!("stw.data"))]
     #[test_case(test_data!("stxb-all2.data"))]
     #[test_case(test_data!("stxb-all.data"))]
     #[test_case(test_data!("stxb-chain.data"))]
     #[test_case(test_data!("stxb.data"))]
+    #[test_case(test_data!("stx.data"))]
     #[test_case(test_data!("stxdw.data"))]
     #[test_case(test_data!("stxh.data"))]
     #[test_case(test_data!("stxw.data"))]
     #[test_case(test_data!("subnet.data"))]
     fn test_ebpf_conformance(content: &str) {
-        let mut test_case = TestCase::parse(content);
+        let Some(mut test_case) = TestCase::parse(content) else {
+            // Special case that only test the test framework.
+            return;
+        };
         let mut builder = EbpfProgramBuilder::new().expect("unable to create builder");
         if let Some(memory) = test_case.memory.as_ref() {
             let buffer_size = memory.len() as u64;

@@ -1,6 +1,6 @@
 rules = { SOI ~
-          ( ASM | MEMORY | ( RESULT | ERROR ) | IGNORED_SECTIONS | EOL )* ~
-	  EOI }
+          ( ASM | MEMORY | RAW | ( RESULT | ERROR ) | IGNORED_SECTIONS | EOL )* ~
+          EOI }
 
 WHITESPACE = _{ " " }
 _COMMENT   = _{ "#" ~ (!NEWLINE ~ ANY)* ~ NEWLINE }
@@ -72,5 +72,10 @@ MEMORY = { "-- mem" ~ EOL ~
 RESULT = { "-- result" ~ EOL ~
            IMM ~  EOL }
 
-ERROR =  { ( "-- error pattern" | "-- error" ) ~ EOL ~
-           (!NEWLINE ~ ANY)* ~ EOL }
+ERROR = { ( "-- error pattern" | "-- error" ) ~ EOL ~
+          (!NEWLINE ~ ANY)* ~ EOL }
+
+RAW_VALUE = { ASCII_HEX_DIGIT{16} }
+RAW_LINE = _{ "0x" ~ RAW_VALUE }
+RAW = { "-- raw" ~ EOL ~
+        (RAW_LINE ~  EOL)* }
