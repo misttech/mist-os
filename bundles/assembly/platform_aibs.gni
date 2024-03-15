@@ -290,6 +290,9 @@ eng_only_platform_aib_names =
       "audio_development_support",
       "video_development_support",
 
+      # Sensor data playback support.
+      "sensors_playback",
+
       # Suspend/resume Support
       "power_framework",
 

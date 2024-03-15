@@ -14,7 +14,12 @@ impl DefineSubsystemConfiguration<PlatformStarnixConfig> for SensorsSubsystemCon
         builder: &mut dyn ConfigurationBuilder,
     ) -> anyhow::Result<()> {
         if starnix_config.enabled && *context.feature_set_level == FeatureSupportLevel::Standard {
-            builder.platform_bundle("sensors_framework");
+            if *context.build_type == BuildType::Eng {
+                builder.platform_bundle("sensors_framework");
+                builder.platform_bundle("sensors_playback");
+            } else {
+                builder.platform_bundle("sensors_framework");
+            }
         }
 
         Ok(())

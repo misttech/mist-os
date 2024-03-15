@@ -3222,6 +3222,29 @@ assembly_input_bundle("sensors_framework") {
   ]
 }
 
+# Sensor playback support.
+#
+# features_set_levels: utility, minimal
+# build-types: eng
+#
+assembly_input_bundle("sensors_playback") {
+  base_packages = [ "//src/sensors/playback:sensors_playback" ]
+
+  compiled_packages = [
+    {
+      name = "core"
+      component_shards = [
+        {
+          component_name = "core"
+          shards = rebase_path(
+                  [ "//src/sensors/playback/meta/sensors_playback.core_shard.cml" ],
+                  root_build_dir)
+        },
+      ]
+    },
+  ]
+}
+
 # Brightness Manager support
 #
 # features_set_levels: minimal

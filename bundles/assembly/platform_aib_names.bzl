@@ -167,6 +167,7 @@ ENG_PLATFORM_AIB_NAMES = BOOTSTRAP_ENG_PLATFORM_AIB_NAMES + USERDEBUG_PLATFORM_A
     "networking_test_collection",
     "pkgfs_disable_executability_restrictions",
     "power_framework",
+    "sensors_playback",
     "system_update_checker",
     "testing_support",
     "ui_eng",
