@@ -108,11 +108,7 @@ impl TestRealmContext {
         .expect("Could not open /pkg");
 
         driver_test_realm_proxy
-            .start(fidl_driver_test::RealmArgs {
-                pkg: Some(pkg_client),
-                driver_urls: Some(vec!["fuchsia-pkg://fuchsia.com/#meta/wlantap.cm".to_string()]),
-                ..Default::default()
-            })
+            .start(fidl_driver_test::RealmArgs { pkg: Some(pkg_client), ..Default::default() })
             .await
             .expect("FIDL error when starting driver test realm")
             .expect("Driver test realm server returned an error");

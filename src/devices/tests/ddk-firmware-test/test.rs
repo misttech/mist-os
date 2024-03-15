@@ -18,7 +18,7 @@ async fn load_package_firmware_test() -> Result<(), Error> {
 
     // Start DriverTestRealm
     let args = fdt::RealmArgs {
-        root_driver: Some("fuchsia-boot:///#meta/test-parent-sys.cm".to_string()),
+        root_driver: Some("fuchsia-boot:///dtr#meta/test-parent-sys.cm".to_string()),
         ..Default::default()
     };
     instance.driver_test_realm_start(args).await?;

@@ -50,11 +50,10 @@ executable("bin") {
   deps = [
     ":driver_test_realm_config",
     "//sdk/fidl/fuchsia.boot:fuchsia.boot_cpp",
+    "//sdk/fidl/fuchsia.component.decl:fuchsia.component.decl_cpp",
     "//sdk/fidl/fuchsia.component.resolution:fuchsia.component.resolution_cpp",
     "//sdk/fidl/fuchsia.device.manager:fuchsia.device.manager_cpp",
-    "//sdk/fidl/fuchsia.driver.development:fuchsia.driver.development_cpp",
     "//sdk/fidl/fuchsia.driver.framework:fuchsia.driver.framework_cpp",
-    "//sdk/fidl/fuchsia.driver.registrar:fuchsia.driver.registrar_cpp",
     "//sdk/fidl/fuchsia.driver.test:fuchsia.driver.test_cpp",
     "//sdk/fidl/fuchsia.io:fuchsia.io_cpp",
     "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_cpp",
@@ -66,6 +65,7 @@ executable("bin") {
     "//sdk/lib/zbi-format",
     "//src/lib/ddk",
     "//src/lib/ddk:ddk-metadata-headers",
+    "//src/lib/files",
     "//src/storage/lib/vfs/cpp",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
   ]
@@ -128,7 +128,7 @@ fuchsia_structured_config_values("test_config") {
     suspend_timeout_fallback = true
     verbose = false
     driver_host_crash_policy = "restart-driver-host"
-    root_driver = "fuchsia-boot:///#meta/test-parent-sys.cm"
+    root_driver = "fuchsia-boot:///dtr#meta/test-parent-sys.cm"
     enable_test_shutdown_delays = false
   }
 }

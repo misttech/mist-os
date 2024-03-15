@@ -12,7 +12,7 @@ use {
 };
 
 async fn start_driver_test_realm() -> Result<RealmInstance> {
-    const ROOT_DRIVER_URL: &str = "fuchsia-boot:///#meta/test-parent-sys.cm";
+    const ROOT_DRIVER_URL: &str = "fuchsia-boot:///dtr#meta/test-parent-sys.cm";
 
     let builder = RealmBuilder::new().await.context("Failed to create realm builder")?;
     builder.driver_test_realm_setup().await.context("Failed to setup driver test realm")?;

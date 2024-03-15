@@ -110,11 +110,11 @@ async fn test_replace_target() -> Result<()> {
     // The drivers listed in driver_disable are unavailable at first, but when they go through
     // the register flow, they will be available as ephemeral drivers.
     let args = fdt::RealmArgs {
-        root_driver: Some("fuchsia-boot:///#meta/root.cm".to_string()),
+        root_driver: Some("fuchsia-boot:///dtr#meta/root.cm".to_string()),
         offers: Some(offers),
         driver_disable: Some(vec![
-            "fuchsia-boot:///#meta/target_2_replacement.cm".to_string(),
-            "fuchsia-boot:///#meta/composite_replacement.cm".to_string(),
+            "fuchsia-boot:///dtr#meta/target_2_replacement.cm".to_string(),
+            "fuchsia-boot:///dtr#meta/composite_replacement.cm".to_string(),
         ]),
         ..Default::default()
     };
@@ -149,7 +149,7 @@ async fn test_replace_target() -> Result<()> {
     reloadtest_tools::validate_host_koids("init", device_infos, &mut nodes, vec![], None).await?;
 
     // Let's disable the first target driver.
-    let target_1_url = "fuchsia-boot:///#meta/target_1_no_colocate.cm";
+    let target_1_url = "fuchsia-boot:///dtr#meta/target_1_no_colocate.cm";
     let disable_result = driver_dev.disable_driver(&target_1_url, None).await;
     if disable_result.is_err() {
         return Err(anyhow!("Failed to disable target_1_no_colocate."));
@@ -188,7 +188,7 @@ async fn test_replace_target() -> Result<()> {
     .await?;
 
     // Now let's disable the second target driver.
-    let target_2_url = "fuchsia-boot:///#meta/target_2.cm";
+    let target_2_url = "fuchsia-boot:///dtr#meta/target_2.cm";
     let disable_2_result = driver_dev.disable_driver(&target_2_url, None).await;
     if disable_2_result.is_err() {
         return Err(anyhow!("Failed to disable target_2."));
@@ -273,7 +273,7 @@ async fn test_replace_target() -> Result<()> {
     .await?;
 
     // Now let's disable the composite driver.
-    let composite_url = "fuchsia-boot:///#meta/composite.cm";
+    let composite_url = "fuchsia-boot:///dtr#meta/composite.cm";
     let disable_2_result = driver_dev.disable_driver(&composite_url, None).await;
     if disable_2_result.is_err() {
         return Err(anyhow!("Failed to disable composite."));

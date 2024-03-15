@@ -29,6 +29,7 @@ class FakeComponentResolver final
     std::string_view kBootPrefix = "fuchsia-boot:///";
     std::string_view kPkgPrefix = "fuchsia-pkg://fuchsia.com/";
     std::string_view relative_path = request->component_url.get();
+    FX_SLOG(DEBUG, "Resolving", FX_KV("url", relative_path));
 
     if (!cpp20::starts_with(relative_path, kBootPrefix) &&
         !cpp20::starts_with(relative_path, kPkgPrefix)) {
@@ -44,11 +45,13 @@ class FakeComponentResolver final
     // relative path.
     bool is_boot = cpp20::starts_with(relative_path, kBootPrefix);
     size_t pos = relative_path.find('#');
-    std::string pkg_url = std::string(relative_path.substr(0, pos));
+    std::string_view pkg_url = relative_path.substr(0, pos);
     relative_path.remove_prefix(pos + 1);
 
     auto file = fidl::CreateEndpoints<fuchsia_io::File>();
     if (file.is_error()) {
+      FX_SLOG(ERROR, "FakeComponentResolver request not supported.",
+              FX_KV("url", std::string(relative_path).c_str()));
       completer.ReplyError(fuchsia_component_resolution::wire::ResolverError::kInternal);
       return;
     }
@@ -63,17 +66,23 @@ class FakeComponentResolver final
                      static_cast<uint32_t>(fuchsia_io::wire::OpenFlags::kRightReadable),
                      file->server.channel().release());
     if (status != ZX_OK) {
+      FX_SLOG(ERROR, "Failed to open manifest.",
+              FX_KV("manifest", std::string(relative_path).c_str()));
       completer.ReplyError(fuchsia_component_resolution::wire::ResolverError::kInternal);
       return;
     }
     fidl::WireResult result =
         fidl::WireCall(file->client)->GetBackingMemory(fuchsia_io::wire::VmoFlags::kRead);
     if (!result.ok()) {
+      FX_SLOG(ERROR, "Failed to read manifest.",
+              FX_KV("manifest", std::string(relative_path).c_str()));
       completer.ReplyError(fuchsia_component_resolution::wire::ResolverError::kIo);
       return;
     }
     auto& response = result.value();
     if (response.is_error()) {
+      FX_SLOG(ERROR, "Failed to read manifest.",
+              FX_KV("manifest", std::string(relative_path).c_str()));
       completer.ReplyError(fuchsia_component_resolution::wire::ResolverError::kIo);
       return;
     }
@@ -81,7 +90,10 @@ class FakeComponentResolver final
     uint64_t size;
     status = vmo.get_prop_content_size(&size);
     if (status != ZX_OK) {
+      FX_SLOG(ERROR, "Failed to get vmo size.",
+              FX_KV("manifest", std::string(relative_path).c_str()));
       completer.ReplyError(fuchsia_component_resolution::wire::ResolverError::kIo);
+      return;
     }
 
     // Not all boot components resolved by this resolver are packaged (e.g. root.cm) so they do
@@ -89,6 +101,7 @@ class FakeComponentResolver final
     // components can pass runtime ABI compatibility checks during testing.
     std::ifstream abi_revision_file("/pkg/meta/fuchsia.abi/abi-revision");
     if (!abi_revision_file) {
+      FX_SLOG(ERROR, "Failed to open abi-revision.");
       completer.ReplyError(fuchsia_component_resolution::wire::ResolverError::kIo);
       return;
     }
@@ -96,6 +109,7 @@ class FakeComponentResolver final
     uint64_t abi_revision;
     abi_revision_file.read(reinterpret_cast<char*>(&abi_revision), sizeof(abi_revision));
     if (!abi_revision_file) {
+      FX_SLOG(ERROR, "Failed to read abi-revision.");
       completer.ReplyError(fuchsia_component_resolution::wire::ResolverError::kIo);
       return;
     }
@@ -109,6 +123,7 @@ class FakeComponentResolver final
     }
 
     if (dir_clone_result.is_error()) {
+      FX_SLOG(ERROR, "Failed to clone directory.");
       completer.ReplyError(fuchsia_component_resolution::wire::ResolverError::kInternal);
       return;
     }
@@ -130,6 +145,7 @@ class FakeComponentResolver final
                          .package(package)
                          .Build();
 
+    FX_SLOG(DEBUG, "Successfully Resolved", FX_KV("url", relative_path));
     completer.ReplySuccess(component);
   }
 

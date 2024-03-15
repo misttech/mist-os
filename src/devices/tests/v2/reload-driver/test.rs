@@ -102,7 +102,7 @@ async fn test_reload_target() -> Result<()> {
 
     // Start the DriverTestRealm.
     let args = fdt::RealmArgs {
-        root_driver: Some("fuchsia-boot:///#meta/root.cm".to_string()),
+        root_driver: Some("fuchsia-boot:///dtr#meta/root.cm".to_string()),
         offers: Some(offers),
         ..Default::default()
     };
@@ -137,7 +137,7 @@ async fn test_reload_target() -> Result<()> {
     // Let's restart the first target driver.
     let restart_result = driver_dev
         .restart_driver_hosts(
-            "fuchsia-boot:///#meta/target_1.cm",
+            "fuchsia-boot:///dtr#meta/target_1.cm",
             fdd::RestartRematchFlags::empty(),
         )
         .await?;
@@ -177,7 +177,7 @@ async fn test_reload_target() -> Result<()> {
     // Now let's restart the second target driver.
     let restart_result = driver_dev
         .restart_driver_hosts(
-            "fuchsia-boot:///#meta/target_2.cm",
+            "fuchsia-boot:///dtr#meta/target_2.cm",
             fdd::RestartRematchFlags::empty(),
         )
         .await?;

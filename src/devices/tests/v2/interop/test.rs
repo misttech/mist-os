@@ -60,7 +60,7 @@ async fn test_interop() -> Result<()> {
 
     // Start the DriverTestRealm.
     let args = fdt::RealmArgs {
-        root_driver: Some("fuchsia-boot:///#meta/root.cm".to_string()),
+        root_driver: Some("fuchsia-boot:///dtr#meta/root.cm".to_string()),
         offers: Some(offers),
         ..Default::default()
     };

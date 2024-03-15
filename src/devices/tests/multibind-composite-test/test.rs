@@ -15,7 +15,7 @@ async fn start_driver_test_realm() -> Result<RealmInstance> {
     let instance = builder.build().await.context("Failed to build realm instance")?;
 
     let args = fdt::RealmArgs {
-        root_driver: Some("fuchsia-boot:///#meta/test-parent-sys.cm".to_string()),
+        root_driver: Some("fuchsia-boot:///dtr#meta/test-parent-sys.cm".to_string()),
         ..Default::default()
     };
 

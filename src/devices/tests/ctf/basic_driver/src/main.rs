@@ -76,7 +76,6 @@ async fn test_basic_driver() -> Result<()> {
                 service_name: ctf::ServiceMarker::SERVICE_NAME.to_string(),
                 collection: fdt::Collection::PackageDrivers,
             }]),
-            driver_urls: Some(vec!["fuchsia-pkg://fuchsia.com/#meta/basic-driver.cm".to_string()]),
             ..Default::default()
         }),
         offers_client: Some(offers_client),

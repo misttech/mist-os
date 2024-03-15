@@ -14,9 +14,9 @@ use {
     fuchsia_zircon_status as zx_status,
 };
 
-const SAMPLE_DRIVER_URL: &str = "fuchsia-boot:///#meta/sample-driver.cm";
-const PARENT_DRIVER_URL: &str = "fuchsia-boot:///#meta/test-parent-sys.cm";
-const FAKE_DRIVER_URL: &str = "fuchsia-boot:///#meta/driver-test-realm-fake-driver.cm";
+const SAMPLE_DRIVER_URL: &str = "fuchsia-boot:///dtr#meta/sample-driver.cm";
+const PARENT_DRIVER_URL: &str = "fuchsia-boot:///dtr#meta/test-parent-sys.cm";
+const FAKE_DRIVER_URL: &str = "fuchsia-boot:///dtr#meta/driver-test-realm-fake-driver.cm";
 
 fn get_no_protocol_property_list() -> Option<[fdf::NodeProperty; 3]> {
     Some([
@@ -200,7 +200,7 @@ async fn test_get_driver_info_with_filter_dfv1() -> Result<()> {
 
 #[fasync::run_singlethreaded(test)]
 async fn test_get_driver_info_with_mixed_filter_dfv1() -> Result<()> {
-    const DRIVER_FILTER: [&str; 2] = ["fuchsia-boot:///#driver/sample-driver.so", "foo"];
+    const DRIVER_FILTER: [&str; 2] = ["fuchsia-boot:///dtr#driver/sample-driver.so", "foo"];
 
     let (_instance, driver_dev) = set_up_test_driver_realm().await?;
     let iterator = send_get_driver_info_request(&driver_dev, &DRIVER_FILTER)?;
@@ -212,7 +212,7 @@ async fn test_get_driver_info_with_mixed_filter_dfv1() -> Result<()> {
 
 #[fasync::run_singlethreaded(test)]
 async fn test_get_driver_info_with_incomplete_filter_dfv1() -> Result<()> {
-    const DRIVER_FILTER: [&str; 1] = ["fuchsia-boot:///#driver/sample-driver"];
+    const DRIVER_FILTER: [&str; 1] = ["fuchsia-boot:///dtr#driver/sample-driver"];
 
     let (_instance, driver_dev) = set_up_test_driver_realm().await?;
     let iterator = send_get_driver_info_request(&driver_dev, &DRIVER_FILTER)?;
@@ -286,7 +286,7 @@ async fn test_get_driver_info_with_mixed_filter() -> Result<()> {
 
 #[fasync::run_singlethreaded(test)]
 async fn test_get_driver_info_with_incomplete_filter() -> Result<()> {
-    const DRIVER_FILTER: [&str; 1] = ["fuchsia-boot:///#meta/sample-driver"];
+    const DRIVER_FILTER: [&str; 1] = ["fuchsia-boot:///dtr#meta/sample-driver"];
 
     let (_instance, driver_dev) = set_up_test_driver_realm().await?;
     let iterator = send_get_driver_info_request(&driver_dev, &DRIVER_FILTER)?;

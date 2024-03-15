@@ -20,7 +20,7 @@ TEST(NonbindableTest, DriversExist) {
     // Start the DriverTestRealm with correct arguments.
     fidl::Arena arena;
     auto args = fuchsia_driver_test::wire::RealmArgs::Builder(arena);
-    args.root_driver("fuchsia-boot:///#meta/test-parent-sys.cm");
+    args.root_driver("fuchsia-boot:///dtr#meta/test-parent-sys.cm");
     auto wire_result = client->Start(args.Build());
     ASSERT_EQ(wire_result.status(), ZX_OK);
   }

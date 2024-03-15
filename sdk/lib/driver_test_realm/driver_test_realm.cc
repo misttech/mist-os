@@ -3,12 +3,11 @@
 // found in the LICENSE file.
 
 #include <fidl/fuchsia.boot/cpp/wire.h>
+#include <fidl/fuchsia.component.decl/cpp/fidl.h>
 #include <fidl/fuchsia.component.resolution/cpp/wire.h>
 #include <fidl/fuchsia.device.manager/cpp/wire.h>
 #include <fidl/fuchsia.diagnostics/cpp/fidl.h>
-#include <fidl/fuchsia.driver.development/cpp/wire.h>
 #include <fidl/fuchsia.driver.framework/cpp/wire.h>
-#include <fidl/fuchsia.driver.registrar/cpp/wire.h>
 #include <fidl/fuchsia.driver.test/cpp/fidl.h>
 #include <fidl/fuchsia.io/cpp/wire.h>
 #include <fidl/fuchsia.kernel/cpp/wire.h>
@@ -20,6 +19,7 @@
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/ddk/platform-defs.h>
 #include <lib/fdio/directory.h>
+#include <lib/stdcompat/string_view.h>
 #include <lib/sys/component/cpp/testing/realm_builder.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/syslog/global.h>
@@ -30,15 +30,20 @@
 #include <lib/zx/vmo.h>
 #include <zircon/status.h>
 
-#include <future>
 #include <memory>
 #include <unordered_map>
 #include <vector>
 
 #include <ddk/metadata/test.h>
 #include <fbl/string_printf.h>
+#include <fbl/unique_fd.h>
 
 #include "sdk/lib/driver_test_realm/driver_test_realm_config.h"
+#include "src/lib/files/directory.h"
+#include "src/lib/files/file.h"
+#include "src/lib/fxl/strings/concatenate.h"
+#include "src/lib/fxl/strings/join_strings.h"
+#include "src/lib/fxl/strings/substitute.h"
 #include "src/storage/lib/vfs/cpp/pseudo_dir.h"
 #include "src/storage/lib/vfs/cpp/pseudo_file.h"
 #include "src/storage/lib/vfs/cpp/synchronous_vfs.h"
@@ -47,8 +52,6 @@ namespace {
 
 namespace fio = fuchsia_io;
 namespace fdt = fuchsia_driver_test;
-namespace fdr = fuchsia_driver_registrar;
-namespace fdd = fuchsia_driver_development;
 
 using namespace component_testing;
 
@@ -347,23 +350,6 @@ class DriverTestRealm final : public fidl::Server<fuchsia_driver_test::Realm> {
       boot_dir = std::move(res.value());
     }
 
-    result = outgoing_->AddDirectory(std::move(boot_dir), "boot");
-    if (result.is_error()) {
-      completer.Reply(result.take_error());
-      return;
-    }
-
-    zx::result config_dir = ConstructConfigDir();
-    if (config_dir.is_error()) {
-      completer.Reply(config_dir.take_error());
-      return;
-    }
-    result = outgoing_->AddDirectory(std::move(*config_dir), "config");
-    if (result.is_error()) {
-      completer.Reply(result.take_error());
-      return;
-    }
-
     // Setup /pkg_drivers
     fidl::ClientEnd<fuchsia_io::Directory> pkg_drivers_dir;
     if (request.args().pkg().has_value()) {
@@ -375,6 +361,28 @@ class DriverTestRealm final : public fidl::Server<fuchsia_driver_test::Realm> {
         return;
       }
       pkg_drivers_dir = std::move(res.value());
+    }
+
+    // We only index /pkg if it's not identical to /boot.
+    const bool create_pkg_config = request.args().pkg() || request.args().boot();
+
+    zx::result config_dir = ConstructConfigDir(
+        boot_dir,
+        create_pkg_config ? pkg_drivers_dir : fidl::UnownedClientEnd<fuchsia_io::Directory>({}));
+    if (config_dir.is_error()) {
+      completer.Reply(config_dir.take_error());
+      return;
+    }
+    result = outgoing_->AddDirectory(std::move(*config_dir), "config");
+    if (result.is_error()) {
+      completer.Reply(result.take_error());
+      return;
+    }
+
+    result = outgoing_->AddDirectory(std::move(boot_dir), "boot");
+    if (result.is_error()) {
+      completer.Reply(result.take_error());
+      return;
     }
 
     result = outgoing_->AddDirectory(std::move(pkg_drivers_dir), "pkg_drivers");
@@ -430,7 +438,7 @@ class DriverTestRealm final : public fidl::Server<fuchsia_driver_test::Realm> {
     });
     configurations.push_back({
         .name = "fuchsia.driver.IndexUnpackagedBootDrivers",
-        .value = component_testing::ConfigValue::Bool(true),
+        .value = component_testing::ConfigValue::Bool(false),
     });
     realm_builder_.AddConfiguration(std::move(configurations));
     realm_builder_.AddRoute({
@@ -446,7 +454,7 @@ class DriverTestRealm final : public fidl::Server<fuchsia_driver_test::Realm> {
 
     // Set driver_manager config based on request.
     configurations = std::vector<component_testing::ConfigCapability>();
-    const std::string default_root = "fuchsia-boot:///#meta/test-parent-sys.cm";
+    const std::string default_root = "fuchsia-boot:///dtr#meta/test-parent-sys.cm";
     configurations.push_back({
         .name = "fuchsia.driver.manager.RootDriver",
         .value = request.args().root_driver().value_or(default_root),
@@ -507,69 +515,7 @@ class DriverTestRealm final : public fidl::Server<fuchsia_driver_test::Realm> {
       cb_queue_.pop_back();
     };
 
-    if (!request.args().driver_urls().has_value()) {
-      completer.Reply(zx::ok());
-      return;
-    }
-
-    // Register the driver URLs as ephemeral drivers
-    auto driver_registrar_connect = realm_->component().Connect<fdr::DriverRegistrar>();
-    if (driver_registrar_connect.is_error()) {
-      FX_SLOG(ERROR, "Cannot connect to test realm driver registrar");
-      completer.Reply(driver_registrar_connect.take_error());
-      return;
-    }
-
-    auto driver_development_connect = realm_->component().Connect<fdd::Manager>();
-    if (driver_development_connect.is_error()) {
-      FX_SLOG(ERROR, "Cannot connect to test realm driver driver development");
-      completer.Reply(driver_development_connect.take_error());
-      return;
-    }
-
-    // Driver registration and binding runs on a separate thread. This is simpler than running
-    // it all on the same dispatcher because:
-    // - The test realm serves these protocols and runs on the same dispatcher, which means we can't
-    //   synchronously call any of these protocols
-    // - DriverRegistrar::Register only takes one URL as an argument and must be called for each
-    //   URL, and if any of these fail we should ideally stop and return an error through the
-    //   completer.
-    // - DriverDevelopment::BindAllUnboundNodes should only be called after all drivers URLs have
-    //   been successfully registered.
-
-    fidl::WireSyncClient<fdr::DriverRegistrar> driver_registrar(
-        std::move(driver_registrar_connect.value()));
-    fidl::WireSyncClient<fdd::Manager> driver_development(
-        std::move(driver_development_connect.value()));
-
-    // returned future must be held by the class so that this function doesn't block on the
-    // completion of the future
-    registration_task_ = std::async(
-        std::launch::async, [driver_urls = std::move(request.args().driver_urls().value()),
-                             driver_registrar = std::move(driver_registrar),
-                             driver_development = std::move(driver_development),
-                             completer = completer.ToAsync()]() mutable {
-          // Register all urls
-          for (auto& driver_url : driver_urls) {
-            FX_SLOG(INFO, "Registering ephemeral driver", FX_KV("url", driver_url));
-            auto result = driver_registrar->Register(fidl::StringView::FromExternal(driver_url));
-            if (!result.ok()) {
-              FX_SLOG(ERROR, "Could not register driver", FX_KV("url", driver_url));
-              completer.Reply(zx::error(result.status()));
-              return;
-            }
-          }
-
-          FX_SLOG(INFO, "All drivers registered, binding unbound nodes");
-          auto result = driver_development->BindAllUnboundNodes();
-          if (!result.ok()) {
-            FX_SLOG(ERROR, "Could not bind unbound nodes");
-            completer.Reply(zx::error(result.status()));
-            return;
-          }
-
-          completer.Reply(zx::ok());
-        });
+    completer.Reply(zx::ok());
   }
 
   void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_driver_test::Realm> metadata,
@@ -589,19 +535,86 @@ class DriverTestRealm final : public fidl::Server<fuchsia_driver_test::Realm> {
   }
 
  private:
-  zx::result<fidl::ClientEnd<fio::Directory>> ConstructConfigDir() {
+  zx::result<fidl::ClientEnd<fio::Directory>> ConstructConfigDir(
+      fidl::UnownedClientEnd<fuchsia_io::Directory> boot_dir,
+      fidl::UnownedClientEnd<fuchsia_io::Directory> pkg_drivers_dir) {
+    auto list = std::vector<
+        std::tuple<fidl::UnownedClientEnd<fuchsia_io::Directory>, std::string, std::string>>{
+        std::make_tuple(boot_dir, "fuchsia-boot:///", "boot"),
+    };
+    std::unordered_map<std::string, std::string> results;
+    if (pkg_drivers_dir.is_valid()) {
+      list.emplace_back(pkg_drivers_dir, "fuchsia-pkg://fuchsia.com/", "pkg");
+    } else {
+      results["pkg"] = "[]";
+    }
+
+    for (const auto& [dir, url_prefix, type] : list) {
+      // Check each manifest to see if it uses the driver runner.
+      zx::result cloned_dir = component::Clone(dir);
+      if (cloned_dir.is_error()) {
+        FX_SLOG(ERROR, "Unable to clone dir");
+        return zx::error(ZX_ERR_IO);
+      }
+      fbl::unique_fd dir_fd;
+      zx_status_t status =
+          fdio_fd_create(cloned_dir->TakeHandle().release(), dir_fd.reset_and_get_address());
+      if (status != ZX_OK) {
+        FX_SLOG(ERROR, "Failed to turn dir into fd");
+        return zx::error(ZX_ERR_IO);
+      }
+      std::vector<std::string> manifests;
+      if (!files::ReadDirContentsAt(dir_fd.get(), "meta", &manifests)) {
+        FX_SLOG(WARNING, "Unable to dir contents for ",
+                FX_KV("dir", fxl::Concatenate({"/", type, "/meta"})));
+      }
+      std::vector<std::string> driver_components;
+      for (const auto& manifest : manifests) {
+        std::string manifest_path = "meta/" + manifest;
+        if (!files::IsFileAt(dir_fd.get(), manifest_path) ||
+            !cpp20::ends_with(std::string_view(manifest), ".cm")) {
+          continue;
+        }
+        std::vector<uint8_t> manifest_bytes;
+        if (!files::ReadFileToVectorAt(dir_fd.get(), manifest_path, &manifest_bytes)) {
+          FX_SLOG(ERROR, "Unable to read file contents for", FX_KV("manifest", manifest_path));
+          return zx::error(ZX_ERR_IO);
+        }
+        fit::result component = fidl::Unpersist<fuchsia_component_decl::Component>(manifest_bytes);
+        if (component.is_error()) {
+          FX_SLOG(ERROR, "Unable to unpersist component manifest",
+                  FX_KV("manifest", manifest_path));
+          return zx::error(ZX_ERR_IO);
+        }
+        if (!component->program() || !component->program()->runner() ||
+            *component->program()->runner() != "driver") {
+          continue;
+        }
+
+        // We add a fake package name of dtr to make it identifiable.
+        std::string entry =
+            fxl::Substitute("\t{\"driver_url\": \"$0dtr#meta/$1\"}", url_prefix, manifest);
+        driver_components.push_back(entry);
+      }
+
+      std::string joined_components = fxl::JoinStrings(driver_components, ",\n");
+      std::string driver_manifest = fxl::Substitute("[\n$0\n]", joined_components);
+      FX_SLOG(DEBUG, "Final manifest:", FX_KV("type", type), FX_KV("manifest", driver_manifest));
+      results[type] = std::move(driver_manifest);
+    }
+
     auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
     if (endpoints.is_error()) {
       return zx::error(ZX_ERR_INTERNAL);
     }
-    boot_driver_manifest_ =
-        fbl::MakeRefCounted<fs::BufferedPseudoFile>([](fbl::String* out_string) {
-          *out_string = "[]";
+    boot_driver_manifest_ = fbl::MakeRefCounted<fs::BufferedPseudoFile>(
+        [manifest = std::move(results["boot"])](fbl::String* out_string) {
+          *out_string = manifest.c_str();
           return ZX_OK;
         });
-    base_driver_manifest_ =
-        fbl::MakeRefCounted<fs::BufferedPseudoFile>([](fbl::String* out_string) {
-          *out_string = "[]";
+    base_driver_manifest_ = fbl::MakeRefCounted<fs::BufferedPseudoFile>(
+        [manifest = std::move(results["pkg"])](fbl::String* out_string) {
+          *out_string = manifest.c_str();
           return ZX_OK;
         });
     zx_status_t status = dir_->AddEntry("boot_driver_manifest", boot_driver_manifest_);
@@ -657,7 +670,6 @@ class DriverTestRealm final : public fidl::Server<fuchsia_driver_test::Realm> {
   // Queue of connection requests that need to be ran once exposed_dir_ is valid.
   std::vector<fit::closure> cb_queue_;
   driver_test_realm_config::Config config_;
-  std::future<void> registration_task_;
 };
 
 }  // namespace

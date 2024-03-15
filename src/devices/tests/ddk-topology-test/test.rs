@@ -17,7 +17,7 @@ async fn toplogy_test() -> Result<(), Error> {
     let instance = builder.build().await?;
     instance
         .driver_test_realm_start(fdt::RealmArgs {
-            root_driver: Some("fuchsia-boot:///#meta/test-parent-sys.cm".to_string()),
+            root_driver: Some("fuchsia-boot:///dtr#meta/test-parent-sys.cm".to_string()),
             ..Default::default()
         })
         .await?;

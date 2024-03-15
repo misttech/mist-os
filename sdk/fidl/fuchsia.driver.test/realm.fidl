@@ -43,7 +43,7 @@ type RealmArgs = resource table {
     1: boot client_end:fuchsia.io.Directory;
 
     /// The URL for the driver that will be bound to root.
-    /// Default: fuchsia-boot:///#meta/test-parent-sys.cm
+    /// Default: fuchsia-boot:///dtr#meta/test-parent-sys.cm
     /// NOTE: The test parent driver is not included by default. This must
     ///  be included in your package to work correctly.
     2: root_driver string:MAX;
@@ -116,13 +116,6 @@ type RealmArgs = resource table {
     /// Default: DriverTestRealm's package directory.
     @available(added=HEAD)
    13: pkg client_end:fuchsia.io.Directory;
-
-    /// The driver URLs to be loaded from `pkg`.
-    /// These URLs should use the prefix fuchsia-pkg://fuchsia.com/
-    ///
-    /// Default: empty
-    @available(added=HEAD)
-   14: driver_urls vector<string:MAX>:MAX;
 };
 
 /// This protocol is for the DriverTestRealm. It is an integration test

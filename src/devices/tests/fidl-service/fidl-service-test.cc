@@ -26,7 +26,7 @@ TEST_F(FidlServiceTest, ChildBinds) {
   fuchsia::driver::test::Realm_Start_Result realm_result;
 
   auto args = fuchsia::driver::test::RealmArgs();
-  args.set_root_driver("fuchsia-boot:///#meta/test-parent-sys.cm");
+  args.set_root_driver("fuchsia-boot:///dtr#meta/test-parent-sys.cm");
   ASSERT_EQ(ZX_OK, driver_test_realm->Start(std::move(args), &realm_result));
   ASSERT_FALSE(realm_result.is_err());
 

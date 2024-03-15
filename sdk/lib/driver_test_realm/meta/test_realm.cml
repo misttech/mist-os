@@ -49,7 +49,7 @@
         },
         {
             name: "full-pkg-drivers",
-            environment: "#full-pkg-driver-env",
+            environment: "#driver-env",
             durability: "single_run",
             allowed_offers: "static_and_dynamic",
             allow_long_names: true,
@@ -221,11 +221,7 @@
         {
             directory: "pkg_drivers",
             from: "parent",
-            to: [
-                "#driver-index",
-                "#driver_manager",
-                "#fake-resolver",
-            ],
+            to: [ "#fake-resolver" ],
             rights: [ "rx*" ],
         },
     ],
@@ -290,26 +286,6 @@
                     from: "#fake-resolver",
                     scheme: "fuchsia-boot",
                 },
-            ],
-
-            // 10 seconds
-            __stop_timeout_ms: 10000,
-        },
-        {
-            name: "full-pkg-driver-env",
-            extends: "realm",
-            runners: [
-                {
-                    runner: "driver",
-                    from: "#driver_manager",
-                },
-            ],
-            resolvers: [
-                {
-                    resolver: "boot-resolver",
-                    from: "#fake-resolver",
-                    scheme: "fuchsia-boot",
-                },
                 {
                     resolver: "pkg-resolver",
                     from: "#fake-resolver",
@@ -317,7 +293,7 @@
                 },
             ],
 
-            // 10 second
+            // 10 seconds
             __stop_timeout_ms: 10000,
         },
     ],
