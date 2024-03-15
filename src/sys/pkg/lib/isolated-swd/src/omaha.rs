@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 // TODO(https://fxbug.dev/42128998): move everything except installer and policy into a shared crate,
-// because these modules all come from //src/sys/pkg/bin/omaha-client.
+// because these modules all come from //third_party/rust_crates:omaha_client.
 mod installer;
 mod policy;
 use {
@@ -22,11 +22,11 @@ use {
         state_machine::{update_check, StateMachineBuilder, StateMachineEvent, UpdateCheckError},
         storage::MemStorage,
         time::StandardTimeSource,
+        version::Version,
     },
     omaha_client_fuchsia::{http_request, timer},
     std::rc::Rc,
     tracing::error,
-    version::Version,
 };
 
 /// Get a |Config| object to use when making requests to Omaha.

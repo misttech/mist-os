@@ -14,9 +14,9 @@ use {
     eager_package_config::pkg_resolver::EagerPackageConfigs as ResolverConfigs,
     fuchsia_url::UnpinnedAbsolutePackageUrl,
     omaha_client::cup_ecdsa::PublicKeys,
+    omaha_client::version::Version,
     serde::{Deserialize, Deserializer, Serialize, Serializer},
     std::collections::{BTreeMap, HashSet},
-    version::Version,
 };
 
 #[derive(Debug, Eq, FromArgs, PartialEq)]

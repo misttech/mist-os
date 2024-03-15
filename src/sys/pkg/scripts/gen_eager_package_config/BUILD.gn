@@ -17,10 +17,9 @@ if (is_host) {
       "//src/lib/fuchsia-url",
       "//src/sys/pkg/lib/channel-config",
       "//src/sys/pkg/lib/eager-package-config",
-      "//src/sys/pkg/lib/omaha-client",
-      "//src/sys/pkg/lib/version",
       "//third_party/rust_crates:anyhow",
       "//third_party/rust_crates:argh",
+      "//third_party/rust_crates:omaha_client",
       "//third_party/rust_crates:serde",
     ]
 

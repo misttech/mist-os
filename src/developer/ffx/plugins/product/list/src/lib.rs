@@ -16,13 +16,13 @@ use fidl_fuchsia_developer_ffx_ext::RepositoryConfig;
 use gcs::gs_url::split_gs_url;
 use lazy_static::lazy_static;
 use maplit::hashmap;
+use omaha_client::version::Version;
 use pbms::AuthFlowChoice;
 use pbms::{list_from_gcs, string_from_url};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::io::{stderr, stdin, stdout, Write};
 use std::str::FromStr;
-use version::Version;
 
 const PB_MANIFEST_NAME: &'static str = "product_bundles.json";
 const CONFIG_BASE_URLS: &'static str = "pbms.base_urls";

@@ -1417,6 +1417,7 @@ dependencies = [
  "num",
  "num-derive",
  "num-traits",
+ "omaha_client",
  "once_cell",
  "openat",
  "p256",
@@ -2600,6 +2601,37 @@ name = "numtoa"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b8f8bdf33df195859076e54ab11ee78a1b208382d3a26ec40d142ffc1ecc49ef"
+
+[[package]]
+name = "omaha_client"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0dee499723e7f70f7d1afd4c662628d65cce7b85f9aaeab89113aaec82e38773"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "ecdsa",
+ "elliptic-curve",
+ "futures",
+ "hex",
+ "http",
+ "hyper",
+ "itertools 0.10.1",
+ "p256",
+ "pin-project",
+ "pkcs8",
+ "pretty_assertions",
+ "rand 0.8.4",
+ "serde",
+ "serde_json",
+ "serde_repr",
+ "sha2",
+ "signature",
+ "thiserror",
+ "tracing",
+ "typed-builder",
+ "uuid 1.1.2",
+]
 
 [[package]]
 name = "once_cell"

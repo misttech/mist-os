@@ -72,9 +72,9 @@ rustc_binary("bin") {
   test_deps = [
     "//src/lib/diagnostics/testing/diagnostics-assertions/rust:diagnostics-assertions",
     "//src/sys/pkg/lib/fuchsia-pkg-testing",
-    "//src/sys/pkg/lib/version",
     "//src/sys/pkg/testing/mock-paver",
     "//third_party/rust_crates:assert_matches",
+    "//third_party/rust_crates:omaha_client",
     "//third_party/rust_crates:pretty_assertions",
     "//third_party/rust_crates:proptest",
   ]

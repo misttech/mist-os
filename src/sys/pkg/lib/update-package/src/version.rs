@@ -5,8 +5,8 @@
 //! Typesafe wrappers around reading the version file.
 
 use {
-    ::version::Version as SemanticVersion,
     fidl_fuchsia_io as fio,
+    omaha_client::version::Version as SemanticVersion,
     serde::{
         de::{self, Visitor},
         Deserialize, Deserializer, Serialize, Serializer,

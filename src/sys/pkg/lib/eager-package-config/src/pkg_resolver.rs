@@ -5,8 +5,8 @@
 use {
     fuchsia_url::UnpinnedAbsolutePackageUrl,
     omaha_client::cup_ecdsa::PublicKeys,
+    omaha_client::version::Version,
     serde::{Deserialize, Serialize},
-    version::Version,
 };
 
 #[cfg(target_os = "fuchsia")]

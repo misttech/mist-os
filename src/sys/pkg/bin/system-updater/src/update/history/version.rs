@@ -252,12 +252,12 @@ mod tests {
     use {
         super::*,
         crate::update::environment::NamespaceBuildInfo,
-        ::version::Version as SemanticVersion,
         fidl_fuchsia_paver::Configuration,
         fuchsia_hash::Hash,
         fuchsia_pkg_testing::{make_epoch_json, FakeUpdatePackage},
         fuchsia_zircon::Vmo,
         mock_paver::{hooks as mphooks, MockPaverServiceBuilder},
+        omaha_client::version::Version as SemanticVersion,
         pretty_assertions::assert_eq,
         std::sync::Arc,
     };

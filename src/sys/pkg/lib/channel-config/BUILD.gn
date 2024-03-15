@@ -12,7 +12,7 @@ rustc_library("channel-config") {
   with_unit_tests = true
 
   deps = [
-    "//src/sys/pkg/lib/omaha-client",
+    "//third_party/rust_crates:omaha_client",
     "//third_party/rust_crates:serde",
   ]
 

@@ -30,7 +30,6 @@ group("lib") {
     "repo",
     "system-image",
     "update-package",
-    "version",
     "work-queue",
   ]
 }
@@ -56,7 +55,6 @@ group("tests") {
     "fuchsia-repo:tests",
     "isolated-swd:tests",
     "merkle:tests",
-    "omaha-client:tests",
     "omaha-client-fuchsia:tests",
     "package-directory:tests",
     "package-tool:tests",
@@ -65,7 +63,6 @@ group("tests") {
     "system-image:tests",
     "tuf:tests",
     "update-package:tests",
-    "version:tests",
     "work-queue:tests",
   ]
 

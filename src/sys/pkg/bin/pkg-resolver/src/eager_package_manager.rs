@@ -22,6 +22,7 @@ use {
     omaha_client::{
         cup_ecdsa::{CupVerificationError, Cupv2Verifier, PublicKeys, StandardCupv2Handler},
         protocol::response::{App, Response},
+        version::Version,
     },
     p256::ecdsa::{signature::Signature, DerSignature},
     std::{
@@ -31,7 +32,6 @@ use {
     },
     system_image::CachePackages,
     tracing::{error, warn},
-    version::Version,
 };
 
 const EAGER_PACKAGE_PERSISTENT_FIDL_NAME: &str = "eager_packages.pf";

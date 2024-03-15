@@ -12,12 +12,12 @@ use omaha_client::{
     common::App,
     configuration::{Config, Updater},
     protocol::{request::OS, Cohort},
+    version::Version,
 };
 use std::collections::HashMap;
 use std::fs;
 use std::io;
 use tracing::{error, info, warn};
-use version::Version;
 
 // TODO: This is not 0.0.0.0 because that would cause state machine to not start. We should find a
 // better way to achieve that when build version is invalid.

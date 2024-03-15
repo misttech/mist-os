@@ -572,6 +572,10 @@ group("num-traits") {
   public_deps = [ ":num-traits-v0_2_14" ]
 }
 
+group("omaha_client") {
+  public_deps = [ ":omaha_client-v0_1_0" ]
+}
+
 group("once_cell") {
   public_deps = [ ":once_cell-v1_17_1" ]
 }
@@ -6836,6 +6840,7 @@ rust_library("hyper-v0_14_19") {
     "-Cmetadata=cc7cc936a1c0e0fb",
     "-Cextra-filename=-cc7cc936a1c0e0fb",
     "--cfg=feature=\"client\"",
+    "--cfg=feature=\"default\"",
     "--cfg=feature=\"http1\"",
     "--cfg=feature=\"server\"",
     "--cfg=feature=\"stream\"",
@@ -9242,6 +9247,60 @@ rust_library("numtoa-v0_1_0") {
   visibility = [ ":*" ]
 
   applicable_licenses = [ ":numtoa-v0_1_0.license" ]
+}
+
+license("omaha_client-v0_1_0.license") {
+  public_package_name = "omaha_client"
+  license_files = [
+    "//third_party/rust_crates/vendor/omaha_client-0.1.0/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/omaha_client-0.1.0/LICENSE-BSD",
+    "//third_party/rust_crates/vendor/omaha_client-0.1.0/LICENSE-MIT",
+  ]
+}
+
+rust_library("omaha_client-v0_1_0") {
+  crate_name = "omaha_client"
+  crate_root = "//third_party/rust_crates/vendor/omaha_client-0.1.0/src/lib.rs"
+  output_name = "omaha_client-464d14c78d580224"
+  configs -= [ "//build/config/rust:2018_idioms" ]
+
+  deps = []
+  deps += [ ":anyhow-v1_0_75" ]
+  deps += [ ":chrono-v0_4_19" ]
+  deps += [ ":ecdsa-v0_14_8" ]
+  deps += [ ":elliptic-curve-v0_12_3" ]
+  deps += [ ":futures-v0_3_19" ]
+  deps += [ ":hex-v0_3_2" ]
+  deps += [ ":http-v0_2_4" ]
+  deps += [ ":hyper-v0_14_19" ]
+  deps += [ ":itertools-v0_10_1" ]
+  deps += [ ":p256-v0_11_1" ]
+  deps += [ ":pin-project-v1_0_11" ]
+  deps += [ ":pkcs8-v0_9_0" ]
+  deps += [ ":pretty_assertions-v1_2_1" ]
+  deps += [ ":rand-v0_8_4" ]
+  deps += [ ":serde-v1_0_147" ]
+  deps += [ ":serde_json-v1_0_87" ]
+  deps += [ ":serde_repr-v0_1_7($host_toolchain)" ]
+  deps += [ ":sha2-v0_10_6" ]
+  deps += [ ":signature-v1_6_4" ]
+  deps += [ ":thiserror-v1_0_57" ]
+  deps += [ ":tracing-v0_1_40" ]
+  deps += [ ":typed-builder-v0_10_0($host_toolchain)" ]
+  deps += [ ":uuid-v1_1_2" ]
+
+  rustenv = []
+
+  rustflags = [
+    "--cap-lints=allow",
+    "--edition=2021",
+    "-Cmetadata=464d14c78d580224",
+    "-Cextra-filename=-464d14c78d580224",
+  ]
+
+  visibility = [ ":*" ]
+
+  applicable_licenses = [ ":omaha_client-v0_1_0.license" ]
 }
 
 license("once_cell-v1_17_1.license") {

@@ -20,11 +20,11 @@ rustc_library("omaha-client-fuchsia") {
     "//src/sys/pkg/fidl/fuchsia.update.installer:fuchsia.update.installer_rust",
     "//src/sys/pkg/lib/channel-config",
     "//src/sys/pkg/lib/fidl-fuchsia-update-installer-ext",
-    "//src/sys/pkg/lib/omaha-client",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:hyper",
     "//third_party/rust_crates:hyper-rustls",
+    "//third_party/rust_crates:omaha_client",
     "//third_party/rust_crates:thiserror",
     "//third_party/rust_crates:tracing",
   ]

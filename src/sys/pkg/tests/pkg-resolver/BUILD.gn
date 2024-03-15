@@ -322,8 +322,8 @@ rustc_test("eager_updates") {
     "//src/sys/lib/fidl-fuchsia-pkg-ext",
     "//src/sys/pkg/lib/fuchsia-pkg-testing",
     "//src/sys/pkg/lib/metrics:cobalt_sw_delivery_registry_rustlib",
-    "//src/sys/pkg/lib/omaha-client",
     "//third_party/rust_crates:assert_matches",
+    "//third_party/rust_crates:omaha_client",
     "//third_party/rust_crates:serde_json",
   ]
   sources = [ "src/eager_updates.rs" ]
