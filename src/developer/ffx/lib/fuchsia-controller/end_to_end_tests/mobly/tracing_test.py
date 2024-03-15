@@ -37,7 +37,12 @@ class FuchsiaControllerTests(base_test.BaseTestClass):  # type: ignore
             "core/trace_manager", tracing_controller.Controller.MARKER
         )
         controller = tracing_controller.Controller.Client(ch)
-        categories = (await controller.get_known_categories()).categories
+        res = await controller.get_known_categories()
+        asserts.assert_true(
+            res.response,
+            msg="Error retrieving known categories",
+        )
+        categories = res.response.categories
         found_kernel_category = False
         for category in categories:
             if category.name == "kernel:vm":

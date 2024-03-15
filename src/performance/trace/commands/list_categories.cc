@@ -30,14 +30,19 @@ void ListCategoriesCommand::Start(const fxl::CommandLine& command_line) {
     return;
   }
 
-  controller()->GetKnownCategories(
-      [this](std::vector<fuchsia::tracing::KnownCategory> known_categories) {
-        out() << "Known categories" << std::endl;
-        for (const auto& it : known_categories) {
-          out() << "  " << it.name << ": " << it.description << std::endl;
-        }
-        Done(EXIT_SUCCESS);
-      });
+  controller()->GetKnownCategories([this](controller::Controller_GetKnownCategories_Result result) {
+    out() << "Known categories" << std::endl;
+    if (result.is_response()) {
+      for (const auto& it : result.response().categories) {
+        out() << "  " << it.name << ": " << it.description << std::endl;
+      }
+      Done(EXIT_SUCCESS);
+      return;
+    }
+
+    FX_LOGS(ERROR) << "Error getting known categories.";
+    Done(EXIT_FAILURE);
+  });
 }
 
 }  // namespace tracing

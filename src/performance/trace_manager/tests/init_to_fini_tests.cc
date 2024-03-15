@@ -156,24 +156,30 @@ TEST_F(TraceManagerTest, Alerted) {
   // Intermediate-length alert name (10 characters).
   provider->SendAlert(kAlertName);
   std::string received_alert_name;
-  controller()->WatchAlert(
-      [&received_alert_name](std::string alert_name) { received_alert_name = alert_name; });
+  controller()->WatchAlert([&received_alert_name](controller::Controller_WatchAlert_Result result) {
+    ASSERT_TRUE(result.is_response());
+    received_alert_name = result.response().alert_name;
+  });
   RunLoopUntilIdle();
   ASSERT_EQ(kAlertName, received_alert_name);
 
   // Minimum-length alert name (1 character).
   provider->SendAlert(kAlertNameMin);
   received_alert_name.clear();
-  controller()->WatchAlert(
-      [&received_alert_name](std::string alert_name) { received_alert_name = alert_name; });
+  controller()->WatchAlert([&received_alert_name](controller::Controller_WatchAlert_Result result) {
+    ASSERT_TRUE(result.is_response());
+    received_alert_name = result.response().alert_name;
+  });
   RunLoopUntilIdle();
   ASSERT_EQ(kAlertNameMin, received_alert_name);
 
   // Maximum-length alert name (14 characters).
   provider->SendAlert(kAlertNameMax);
   received_alert_name.clear();
-  controller()->WatchAlert(
-      [&received_alert_name](std::string alert_name) { received_alert_name = alert_name; });
+  controller()->WatchAlert([&received_alert_name](controller::Controller_WatchAlert_Result result) {
+    ASSERT_TRUE(result.is_response());
+    received_alert_name = result.response().alert_name;
+  });
   RunLoopUntilIdle();
   ASSERT_EQ(kAlertNameMax, received_alert_name);
 
@@ -201,8 +207,10 @@ TEST_F(TraceManagerTest, AlertSequence) {
 
   // Calling |WatchAlert| before sending alert.
   std::string received_alert_name;
-  controller()->WatchAlert(
-      [&received_alert_name](std::string alert_name) { received_alert_name = alert_name; });
+  controller()->WatchAlert([&received_alert_name](controller::Controller_WatchAlert_Result result) {
+    ASSERT_TRUE(result.is_response());
+    received_alert_name = result.response().alert_name;
+  });
   RunLoopUntilIdle();
   ASSERT_EQ("", received_alert_name);
   provider->SendAlert(kAlertName);
@@ -219,7 +227,10 @@ TEST_F(TraceManagerTest, AlertSequence) {
   for (uint8_t i = 0; i < 4; ++i) {
     received_alert_name.clear();
     controller()->WatchAlert(
-        [&received_alert_name](std::string alert_name) { received_alert_name = alert_name; });
+        [&received_alert_name](controller::Controller_WatchAlert_Result result) {
+          ASSERT_TRUE(result.is_response());
+          received_alert_name = result.response().alert_name;
+        });
     RunLoopUntilIdle();
     std::string alert_name = kAlertName;
     alert_name.append(1, 'A' + i);
@@ -237,7 +248,10 @@ TEST_F(TraceManagerTest, AlertSequence) {
   for (uint8_t i = 2; i < kMaxAlertQueueDepth + 2; ++i) {
     received_alert_name.clear();
     controller()->WatchAlert(
-        [&received_alert_name](std::string alert_name) { received_alert_name = alert_name; });
+        [&received_alert_name](controller::Controller_WatchAlert_Result result) {
+          ASSERT_TRUE(result.is_response());
+          received_alert_name = result.response().alert_name;
+        });
     RunLoopUntilIdle();
     std::string alert_name = kAlertName;
     alert_name.append(1, 'A' + i);

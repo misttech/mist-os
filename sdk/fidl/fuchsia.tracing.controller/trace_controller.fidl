@@ -86,7 +86,7 @@ protocol Controller {
     /// One useful reason for the has-started acknowledgement is that the
     /// trace program can start a program to trace knowing that all the
     /// providers are started.
-    strict StartTracing(struct {
+    flexible StartTracing(struct {
         options StartOptions;
     }) -> () error StartErrorCode;
 
@@ -100,22 +100,22 @@ protocol Controller {
     }) -> ();
 
     /// Return the set of registered providers.
-    strict GetProviders() -> (struct {
+    flexible GetProviders() -> (struct {
         providers vector<ProviderInfo>:MAX_NUM_PROVIDERS;
     });
 
     // Gets the known categories.
-    strict GetKnownCategories() -> (struct {
+    flexible GetKnownCategories() -> (struct {
         categories vector<fuchsia.tracing.KnownCategory>:fuchsia.tracing.MAX_NUM_KNOWN_CATEGORIES;
     });
 
     /// Event sent when the session state changes.
-    strict -> OnSessionStateChange(struct {
+    flexible -> OnSessionStateChange(struct {
         state SessionState;
     });
 
     /// Returns the next alert when it arrives.
-    strict WatchAlert() -> (struct {
+    flexible WatchAlert() -> (struct {
         alert_name AlertName;
     });
 };

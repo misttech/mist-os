@@ -314,6 +314,7 @@ void TraceManager::StopTracing(controller::StopOptions options, StopTracingCallb
 // fidl
 void TraceManager::GetProviders(GetProvidersCallback callback) {
   FX_LOGS(DEBUG) << "GetProviders";
+  controller::Controller_GetProviders_Result result;
   std::vector<controller::ProviderInfo> provider_info;
   for (const auto& provider : providers_) {
     controller::ProviderInfo info;
@@ -322,7 +323,8 @@ void TraceManager::GetProviders(GetProvidersCallback callback) {
     info.set_name(provider.name);
     provider_info.push_back(std::move(info));
   }
-  callback(std::move(provider_info));
+  result.set_response(controller::Controller_GetProviders_Response(std::move(provider_info)));
+  callback(std::move(result));
 }
 
 // Allows multiple callers to race to call the same callback.
@@ -384,7 +386,10 @@ void TraceManager::GetKnownCategories(GetKnownCategoriesCallback callback) {
                                             result_known_categories.end());
                   }
                 }
-                callback({known_categories.begin(), known_categories.end()});
+                controller::Controller_GetKnownCategories_Result result;
+                result.set_response(controller::Controller_GetKnownCategories_Response(
+                    {known_categories.begin(), known_categories.end()}));
+                callback(std::move(result));
               });
 
   executor_.schedule_task(std::move(joined_promise));
@@ -396,7 +401,9 @@ void TraceManager::WatchAlert(WatchAlertCallback cb) {
   if (alerts_.empty()) {
     watch_alert_callbacks_.push(std::move(cb));
   } else {
-    cb(std::move(alerts_.front()));
+    controller::Controller_WatchAlert_Result result;
+    result.set_response(controller::Controller_WatchAlert_Response(std::move(alerts_.front())));
+    cb(std::move(result));
     alerts_.pop();
   }
 }
@@ -470,7 +477,9 @@ void TraceManager::OnAlert(const std::string& alert_name) {
     return;
   }
 
-  watch_alert_callbacks_.front()(alert_name);
+  controller::Controller_WatchAlert_Result result;
+  result.set_response(controller::Controller_WatchAlert_Response(alert_name));
+  watch_alert_callbacks_.front()(std::move(result));
   watch_alert_callbacks_.pop();
 }
 

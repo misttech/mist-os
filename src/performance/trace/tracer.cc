@@ -186,9 +186,13 @@ void Tracer::Done() {
 }
 
 void Tracer::BeginWatchAlert() {
-  controller_->WatchAlert([this](std::string alert_name) {
-    alert_callback_(std::move(alert_name));
-    BeginWatchAlert();
+  controller_->WatchAlert([this](controller::Controller_WatchAlert_Result result) {
+    if (result.is_response()) {
+      alert_callback_(std::move(result.response().alert_name));
+      BeginWatchAlert();
+    } else {
+      FX_LOGS(ERROR) << "Error retrieving WatchAlert";
+    }
   });
 }
 

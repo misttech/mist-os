@@ -49,8 +49,9 @@ TEST_F(TraceManagerTest, RegisterProviderWithFdio) {
 
   ConnectToControllerService();
   std::vector<controller::ProviderInfo> providers;
-  controller()->GetProviders([&providers](std::vector<controller::ProviderInfo> in_providers) {
-    providers = std::move(in_providers);
+  controller()->GetProviders([&providers](controller::Controller_GetProviders_Result result) {
+    ASSERT_TRUE(result.is_response());
+    providers = std::move(result.response().providers);
   });
   RunLoopUntilIdle();
 
@@ -94,8 +95,9 @@ TEST_F(TraceManagerTest, AddFakeProviders) {
   FX_LOGS(DEBUG) << "Providers registered";
 
   std::vector<controller::ProviderInfo> providers;
-  controller()->GetProviders([&providers](std::vector<controller::ProviderInfo> in_providers) {
-    providers = std::move(in_providers);
+  controller()->GetProviders([&providers](controller::Controller_GetProviders_Result result) {
+    ASSERT_TRUE(result.is_response());
+    providers = std::move(result.response().providers);
   });
   RunLoopUntilIdle();
 
@@ -150,8 +152,9 @@ TEST_F(TraceManagerTest, GetKnownCategories) {
 
   std::vector<fuchsia::tracing::KnownCategory> known_categories;
   controller()->GetKnownCategories(
-      [&known_categories](std::vector<fuchsia::tracing::KnownCategory> in_known_categories) {
-        known_categories = std::move(in_known_categories);
+      [&known_categories](controller::Controller_GetKnownCategories_Result result) {
+        ASSERT_TRUE(result.is_response());
+        known_categories = std::move(result.response().categories);
       });
   RunLoopUntilIdle();
 
@@ -210,8 +213,9 @@ TEST_F(TraceManagerTest, GetKnownCategoriesTimeout) {
   provider3->MarkUnresponsive();
   std::vector<fuchsia::tracing::KnownCategory> known_categories;
   controller()->GetKnownCategories(
-      [&known_categories](std::vector<fuchsia::tracing::KnownCategory> in_known_categories) {
-        known_categories = std::move(in_known_categories);
+      [&known_categories](controller::Controller_GetKnownCategories_Result result) {
+        ASSERT_TRUE(result.is_response());
+        known_categories = std::move(result.response().categories);
       });
   RunLoopFor(zx::sec(2));
 
