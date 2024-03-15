@@ -16,30 +16,22 @@ use {
     },
     async_trait::async_trait,
     bedrock_error::BedrockError,
-    cm_types::Name,
     cm_util::WeakTaskGroup,
     fidl::{
         endpoints::{ProtocolMarker, RequestStream},
         epitaph::ChannelEpitaphExt,
         AsyncChannel,
     },
-    fidl_fuchsia_component_sandbox as fsandbox, fidl_fuchsia_io as fio, fuchsia_zircon as zx,
-    futures::{future::BoxFuture, FutureExt},
-    lazy_static::lazy_static,
+    fidl_fuchsia_component_sandbox as fsandbox, fidl_fuchsia_io as fio,
+    fuchsia_zircon::{self as zx},
+    futures::future::BoxFuture,
+    futures::FutureExt,
     sandbox::{Capability, Dict, Open},
-    std::{
-        iter,
-        sync::{self, Arc},
-    },
+    std::iter,
+    std::sync::{self, Arc},
     tracing::warn,
     vfs::{execution_scope::ExecutionScope, ToObjectRequest},
 };
-
-lazy_static! {
-    static ref RECEIVER: Name = "receiver".parse().unwrap();
-    static ref ROUTER: Name = "router".parse().unwrap();
-    static ref SENDER: Name = "sender".parse().unwrap();
-}
 
 pub fn take_handle_as_stream<P: ProtocolMarker>(channel: zx::Channel) -> P::RequestStream {
     let channel = AsyncChannel::from_channel(channel);
