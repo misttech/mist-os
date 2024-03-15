@@ -4,16 +4,22 @@
 
 group("tests") {
   testonly = true
-  deps = [
-    "astro:tests",
-    "machina:tests",
-    "nelson:tests",
-    "qemu-arm64:tests",
-    "qemu-riscv64:tests",
-    "sherlock:tests",
-    "vim3:tests",
-    "vim3-devicetree:tests",
-  ]
+  deps = [ "machina:tests" ]
+
+  if (target_cpu == "arm64") {
+    deps += [
+      "astro:tests",
+      "nelson:tests",
+      "qemu-arm64:tests",
+      "sherlock:tests",
+      "vim3:tests",
+      "vim3-devicetree:tests",
+    ]
+  }
+
+  if (target_cpu == "riscv64") {
+    deps += [ "qemu-riscv64:tests" ]
+  }
 
   if (target_cpu == "x64") {
     deps += [ "x86:tests" ]
