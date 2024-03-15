@@ -43,6 +43,5 @@ fuchsia_test_package("bt-le-integration-tests") {
     }
   }
   test_components = [ ":bt-le-integration-tests-component" ]
-  subpackages =
-      [ "//src/connectivity/bluetooth/core/bt-host:bt-host-component" ]
+  subpackages = [ "//src/connectivity/bluetooth/core/bt-host" ]
 }

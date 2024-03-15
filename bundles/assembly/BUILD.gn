@@ -1815,9 +1815,7 @@ assembly_input_bundle("bluetooth_avrcp") {
 assembly_input_bundle("bluetooth_core") {
   base_packages = [
     "//src/connectivity/bluetooth/core/bt-gap",
-
-    # TODO(b/324276236): Rename to bt-host after driver is removed
-    "//src/connectivity/bluetooth/core/bt-host:bt-host-component",
+    "//src/connectivity/bluetooth/core/bt-host",
     "//src/connectivity/bluetooth/core/bt-init",
     "//src/connectivity/bluetooth/profiles/bt-rfcomm",
   ]

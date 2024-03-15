@@ -96,7 +96,7 @@ fn sanitize_filename(filename: String) -> String {
 }
 
 // Use the fuchsia.component.Realm protocol to create a dynamic child instance in the collection.
-async fn create_bthost_component(realm: &RealmProxy, filename: String) -> Result<(), Error> {
+async fn create_bt_host(realm: &RealmProxy, filename: String) -> Result<(), Error> {
     let sanitized_filename = sanitize_filename(filename);
     let component_name = format!("{BT_HOST}_{sanitized_filename}");
     let device_path = format!("{DEV_DIR}/{HCI_DEVICE_DIR}/{sanitized_filename}");
@@ -147,7 +147,7 @@ async fn run_device_watcher() -> Result<(), Error> {
                     if filename != std::path::Path::new(".") && filename != std::path::Path::new("")
                     {
                         let path = filename.to_str().expect("utf-8 path");
-                        create_bthost_component(realm_ref, path.to_owned()).await?;
+                        create_bt_host(realm_ref, path.to_owned()).await?;
                     }
                 }
                 WatchEvent::REMOVE_FILE => {

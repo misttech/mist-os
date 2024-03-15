@@ -309,8 +309,7 @@ fuchsia_test_package("bt-init-smoke-test") {
     ":test-bt-init-config",
     "//src/sys/stash:stash_secure_v2",
   ]
-  subpackages =
-      [ "//src/connectivity/bluetooth/core/bt-host:bt-host-component" ]
+  subpackages = [ "//src/connectivity/bluetooth/core/bt-host" ]
 }
 
 rustc_test("bt_gap_smoke_test_bin") {

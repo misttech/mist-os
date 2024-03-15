@@ -34,6 +34,5 @@ fuchsia_test_package("bt-inspect-integration-tests") {
       max_severity = "ERROR"
     }
   }
-  subpackages =
-      [ "//src/connectivity/bluetooth/core/bt-host:bt-host-component" ]
+  subpackages = [ "//src/connectivity/bluetooth/core/bt-host" ]
 }

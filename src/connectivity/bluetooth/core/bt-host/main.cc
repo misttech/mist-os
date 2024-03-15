@@ -12,7 +12,7 @@
 #include "fidl/fuchsia.bluetooth.host/cpp/fidl.h"
 #include "fidl/fuchsia.hardware.bluetooth/cpp/fidl.h"
 #include "fuchsia/hardware/bluetooth/cpp/fidl.h"
-#include "host_component.h"
+#include "host.h"
 #include "lib/component/incoming/cpp/protocol.h"
 #include "src/connectivity/bluetooth/core/bt-host/bt_host_config.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/log.h"

@@ -9,8 +9,8 @@ import("//src/connectivity/bluetooth/core/bt-host/build/bt_gtest_package.gni")
 
 source_set("sources") {
   sources = [
-    "host_component.cc",
-    "host_component.h",
+    "host.cc",
+    "host.h",
     "util.cc",
     "util.h",
   ]
@@ -90,10 +90,9 @@ fuchsia_component("component") {
   deps = [ ":bin" ]
 }
 
-# TODO(https://fxbug.dev/42085245): Rename to "bt-host" after removing driver code
-fuchsia_package("bt-host-component") {
+fuchsia_package("bt-host") {
   deps = [
-    # component-url: fuchsia-pkg://fuchsia.com/bt-host-component#meta/bt-host.cm
+    # component-url: fuchsia-pkg://fuchsia.com/bt-host#meta/bt-host.cm
     ":component",
     ":default_config_values",
   ]
@@ -215,7 +214,7 @@ source_set("device_tests") {
 source_set("component_tests") {
   testonly = true
 
-  sources = [ "host_component_test.cc" ]
+  sources = [ "host_test.cc" ]
 
   deps = [
     ":sources",
@@ -226,7 +225,7 @@ source_set("component_tests") {
   ]
 }
 
-bt_gtest_package("bt-host-component-tests") {
+bt_gtest_package("bt-host-tests") {
   deps = [ ":component_tests" ]
 }
 
@@ -294,7 +293,6 @@ group("tests") {
   deps = [
     ":bt-host-att-tests",
     ":bt-host-common-tests",
-    ":bt-host-component-tests",
     ":bt-host-gap-tests",
     ":bt-host-gatt-tests",
     ":bt-host-hci-spec-tests",
@@ -305,6 +303,7 @@ group("tests") {
     ":bt-host-sdp-tests",
     ":bt-host-sm-tests",
     ":bt-host-testing-tests",
+    ":bt-host-tests",
     ":bt-host-transport-tests",
     ":fuzzers",
     "controllers:bt-host-controllers-tests",

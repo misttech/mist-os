@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/connectivity/bluetooth/core/bt-host/host_component.h"
+#include "host.h"
 
 #include <lib/fidl/cpp/binding.h>
 

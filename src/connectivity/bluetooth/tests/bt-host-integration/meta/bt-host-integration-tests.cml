@@ -12,8 +12,8 @@
     },
     children: [
         {
-            name: "bt_host_component",
-            url: "bt-host-component#meta/bt-host.cm",
+            name: "bt_host",
+            url: "bt-host#meta/bt-host.cm",
         },
     ],
     offer: [

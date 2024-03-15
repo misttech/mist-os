@@ -99,7 +99,7 @@ fuchsia_component("test-bt-init") {
   cm_label = ":test_bt_init_manifest"
   deps = [
     "//src/connectivity/bluetooth/core/bt-gap:component",
-    "//src/connectivity/bluetooth/core/bt-host:bt-host-component",
+    "//src/connectivity/bluetooth/core/bt-host",
     "//src/connectivity/bluetooth/core/bt-init:bin",
     "//src/connectivity/bluetooth/profiles/bt-rfcomm:component",
   ]

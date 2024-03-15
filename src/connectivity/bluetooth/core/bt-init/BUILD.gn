@@ -70,8 +70,7 @@ fuchsia_package("bt-init") {
     ":component",
     ":default_config_values",
   ]
-  subpackages =
-      [ "//src/connectivity/bluetooth/core/bt-host:bt-host-component" ]
+  subpackages = [ "//src/connectivity/bluetooth/core/bt-host" ]
 }
 
 fuchsia_component("testonly_component") {
