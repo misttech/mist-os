@@ -105,6 +105,7 @@ VerbRecord GetOpendumpVerbRecord() {
   auto record = VerbRecord(&RunVerbOpendump, &DoCompleteOpenDump, {"opendump"}, kOpenDumpShortHelp,
                            kOpenDumpHelp, CommandGroup::kGeneral, SourceAffinity::kNone);
   record.param_type = VerbRecord::ParamType::kOneParam;
+  record.needs_elision = true;
   return record;
 }
 

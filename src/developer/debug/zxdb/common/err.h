@@ -67,6 +67,8 @@ class Err {
   std::string msg_;
 };
 
+std::string ErrTypeToString(ErrType type);
+
 }  // namespace zxdb
 
 #endif  // SRC_DEVELOPER_DEBUG_ZXDB_COMMON_ERR_H_

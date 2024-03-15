@@ -88,6 +88,9 @@ void MockConsole::ProcessInputLine(const std::string& line, fxl::RefPtr<CommandC
   Command cmd;
   if (Err err = ParseCommand(line, &cmd); err.has_error())
     return cmd_context->ReportError(err);
+
+  cmd_context->SetCommandReport(cmd.BuildReport());
+
   if (Err err = context_.FillOutCommand(&cmd); err.has_error())
     return cmd_context->ReportError(err);
   DispatchCommand(cmd, cmd_context);

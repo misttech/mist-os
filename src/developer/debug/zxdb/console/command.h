@@ -20,6 +20,7 @@
 namespace zxdb {
 
 class Breakpoint;
+struct CommandReport;
 class ConsoleContext;
 class Filter;
 class Frame;
@@ -114,7 +115,13 @@ class Command {
   const std::vector<SymbolServer*>& all_sym_servers() const { return symbol_servers_; }
   void add_sym_server(SymbolServer* s) { symbol_servers_.push_back(s); }
 
+  CommandReport BuildReport() const;
+
  private:
+  void AddNounsToCommandReport(CommandReport& report) const;
+  void AddArgsToCommandReport(CommandReport& report) const;
+  void AddSwitchesToCommandReport(CommandReport& report) const;
+
   // The nouns specified for this command. If not present here, the noun was not
   // written on the command line. If present but there was no index given for
   // it, the mapped value will be kNoIndex. Wildcards are represented as

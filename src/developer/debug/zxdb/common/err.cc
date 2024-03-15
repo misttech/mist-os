@@ -64,4 +64,35 @@ Err::~Err() = default;
 
 bool Err::operator==(const Err& other) const { return type_ == other.type_ && msg_ == other.msg_; }
 
+std::string ErrTypeToString(ErrType type) {
+  switch (type) {
+    case ErrType::kNone:
+      return "Ok";
+    case ErrType::kGeneral:
+      return "General";
+    case ErrType::kCanceled:
+      return "Canceled";
+    case ErrType::kNoConnection:
+      return "NoConnection";
+    case ErrType::kCorruptMessage:
+      return "CorruptMessage";
+    case ErrType::kClientApi:
+      return "ClientApi";
+    case ErrType::kNotSupported:
+      return "NotSupported";
+    case ErrType::kNotFound:
+      return "NotFound";
+    case ErrType::kAlreadyExists:
+      return "AlreadyExists";
+    case ErrType::kNoResources:
+      return "NoResources";
+    case ErrType::kInput:
+      return "Input";
+    case ErrType::kOptimizedOut:
+      return "OptimizedOut";
+    case ErrType::kUnsupported:
+      return "Unsupported";
+  }
+}
+
 }  // namespace zxdb

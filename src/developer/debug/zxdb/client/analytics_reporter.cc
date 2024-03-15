@@ -54,4 +54,11 @@ void AnalyticsReporter::ReportSessionEnded() const {
   Analytics::IfEnabledSendEvent(session_, std::move(session_ended));
 }
 
+void AnalyticsReporter::ReportCommand(const CommandReport& report) const {
+  auto command_event = std::make_unique<CommandEvent>(session_id_);
+  command_event->FromCommandReport(report);
+
+  Analytics::IfEnabledSendEvent(session_, std::move(command_event));
+}
+
 }  // namespace zxdb

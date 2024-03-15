@@ -96,8 +96,10 @@ void RunVerbSaveDump(const Command& cmd, fxl::RefPtr<CommandContext> cmd_context
 }  // namespace
 
 VerbRecord GetSaveDumpVerbRecord() {
-  return VerbRecord(&RunVerbSaveDump, {"savedump"}, kSaveDumpShortHelp, kSaveDumpHelp,
-                    CommandGroup::kGeneral, SourceAffinity::kNone);
+  auto record = VerbRecord(&RunVerbSaveDump, {"savedump"}, kSaveDumpShortHelp, kSaveDumpHelp,
+                           CommandGroup::kGeneral, SourceAffinity::kNone);
+  record.needs_elision = true;
+  return record;
 }
 
 }  // namespace zxdb

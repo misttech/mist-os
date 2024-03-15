@@ -10,6 +10,7 @@
 
 #include <map>
 
+#include "src/developer/debug/zxdb/client/analytics_event.h"
 #include "src/developer/debug/zxdb/common/err.h"
 #include "src/developer/debug/zxdb/console/async_output_buffer.h"
 #include "src/developer/debug/zxdb/console/output_buffer.h"
@@ -18,6 +19,7 @@
 
 namespace zxdb {
 
+class Command;
 class Console;
 class ConsoleContext;
 
@@ -53,7 +55,7 @@ class CommandContext : public fxl::RefCountedThreadSafe<CommandContext> {
   ConsoleContext* GetConsoleContext() const;
 
   // Returns true if this command context has encountered any error.
-  bool has_error() const { return has_error_; }
+  bool has_error() const;
 
   // Sets the completion observer used by the console to tell when the command is done. This is used
   // for enabling and disabling input. The callback passed into the constructors of some derived
@@ -65,6 +67,12 @@ class CommandContext : public fxl::RefCountedThreadSafe<CommandContext> {
   // generalize this in the future.
   void SetConsoleCompletionObserver(fit::deferred_callback observer);
 
+  // Sets the command report for this command. This is called after a command has been successfully
+  // parsed. If the command fails parsing, we use the default constructed |report_| with the error
+  // given to |SetError| by the derived class.
+  void SetCommandReport(CommandReport other);
+  const CommandReport& GetCommandReport() const { return report_; }
+
  protected:
   FRIEND_REF_COUNTED_THREAD_SAFE(CommandContext);
 
@@ -72,8 +80,8 @@ class CommandContext : public fxl::RefCountedThreadSafe<CommandContext> {
   explicit CommandContext(Console* console);
   virtual ~CommandContext();
 
-  // Used by derived classes to set the error flag.
-  void set_has_error() { has_error_ = true; }
+  // Used by derived classes to set the offending error.
+  void SetError(const Err& err);
 
  private:
   fxl::WeakPtr<Console> weak_console_;
@@ -86,7 +94,13 @@ class CommandContext : public fxl::RefCountedThreadSafe<CommandContext> {
   // callback for to keep them in scope until they're completed.
   std::map<AsyncOutputBuffer*, fxl::RefPtr<AsyncOutputBuffer>> async_output_;
 
-  bool has_error_ = false;
+  // A report with all of the basic information for the command associated with this context. If
+  // analytics are enabled, this will contain all of the information sent for any particular
+  // command. This value is always valid. A default constructed report is made at construction time,
+  // which can be used to report parsing errors for something that was typed on the command line.
+  // Once a command has been parsed and filled in an instance of a Command, the default report is
+  // replaced with one created from that Command instance.
+  CommandReport report_;
 
   fit::deferred_callback console_completion_observer_;
 };
@@ -135,7 +149,7 @@ class OfflineCommandContext : public CommandContext {
   FRIEND_MAKE_REF_COUNTED(OfflineCommandContext);
 
   // Console may be null.
-  explicit OfflineCommandContext(Console* console, CompletionCallback done);
+  explicit OfflineCommandContext(Console* console, CompletionCallback done = CompletionCallback());
   ~OfflineCommandContext() override;
 
   CompletionCallback done_;  // Possibly null.

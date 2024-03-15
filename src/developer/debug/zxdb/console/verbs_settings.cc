@@ -793,6 +793,7 @@ void AppendSettingsVerbs(std::map<Verb, VerbRecord>* verbs) {
 
   VerbRecord set(&DoSet, &CompleteSet, {"set"}, kSetShortHelp, kSetHelp, CommandGroup::kGeneral);
   set.param_type = VerbRecord::kOneParam;
+  set.needs_elision = true;
   (*verbs)[Verb::kSet] = std::move(set);
 }
 

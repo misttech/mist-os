@@ -5,6 +5,8 @@
 #include "src/developer/debug/zxdb/console/command_context.h"
 
 #include "src/developer/debug/shared/string_util.h"
+#include "src/developer/debug/zxdb/client/analytics_reporter.h"
+#include "src/developer/debug/zxdb/client/session.h"
 #include "src/developer/debug/zxdb/common/ref_ptr_to.h"
 #include "src/developer/debug/zxdb/console/console.h"
 
@@ -12,7 +14,12 @@ namespace zxdb {
 
 CommandContext::CommandContext(Console* console)
     : weak_console_(console ? console->GetWeakPtr() : nullptr) {}
-CommandContext::~CommandContext() = default;
+
+CommandContext::~CommandContext() {
+  if (weak_console_) {
+    weak_console_->context().session()->analytics().ReportCommand(report_);
+  }
+}
 
 void CommandContext::Output(fxl::RefPtr<AsyncOutputBuffer> output) {
   if (output->is_complete()) {
@@ -43,6 +50,12 @@ void CommandContext::SetConsoleCompletionObserver(fit::deferred_callback observe
   console_completion_observer_ = std::move(observer);
 }
 
+void CommandContext::SetCommandReport(CommandReport other) { report_ = std::move(other); }
+
+bool CommandContext::has_error() const { return report_.err.has_error(); }
+
+void CommandContext::SetError(const Err& err) { report_.err = err; }
+
 // ConsoleCommandContext ---------------------------------------------------------------------------
 
 ConsoleCommandContext::ConsoleCommandContext(Console* console, CompletionCallback done)
@@ -59,9 +72,10 @@ void ConsoleCommandContext::Output(const OutputBuffer& output) {
 }
 
 void ConsoleCommandContext::ReportError(const Err& err) {
-  set_has_error();
-  if (!first_error_.has_error())
+  if (!first_error_.has_error()) {
+    SetError(err);
     first_error_ = err;
+  }
 
   OutputBuffer out;
   out.Append(err);
@@ -81,7 +95,10 @@ OfflineCommandContext::~OfflineCommandContext() {
 void OfflineCommandContext::Output(const OutputBuffer& output) { output_.Append(output); }
 
 void OfflineCommandContext::ReportError(const Err& err) {
-  set_has_error();
+  // Set the first one to be reported.
+  if (errors_.empty())
+    SetError(err);
+
   errors_.push_back(err);
 
   OutputBuffer out;
@@ -105,9 +122,10 @@ NestedCommandContext::~NestedCommandContext() {
 void NestedCommandContext::Output(const OutputBuffer& output) { parent_->Output(output); }
 
 void NestedCommandContext::ReportError(const Err& err) {
-  set_has_error();
-  if (!first_error_.has_error())
+  if (!first_error_.has_error()) {
+    SetError(err);
     first_error_ = err;
+  }
   parent_->ReportError(err);
 }
 

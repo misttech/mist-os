@@ -13,6 +13,7 @@
 
 #include <filesystem>
 
+#include "src/developer/debug/zxdb/client/analytics_event.h"
 #include "src/developer/debug/zxdb/client/process.h"
 #include "src/developer/debug/zxdb/client/session.h"
 #include "src/developer/debug/zxdb/client/setting_schema_definition.h"
@@ -218,6 +219,8 @@ void ConsoleImpl::ProcessInputLine(const std::string& line, fxl::RefPtr<CommandC
     if (err.has_error())
       return cmd_context->ReportError(err);
   }
+
+  cmd_context->SetCommandReport(cmd.BuildReport());
 
   if (Err err = context_.FillOutCommand(&cmd); err.has_error())
     return cmd_context->ReportError(err);

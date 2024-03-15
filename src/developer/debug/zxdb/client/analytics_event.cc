@@ -4,6 +4,8 @@
 
 #include "src/developer/debug/zxdb/client/analytics_event.h"
 
+#include "src/lib/fxl/strings/string_printf.h"
+
 namespace zxdb {
 
 // AnalyticsEvent ----------------------------------------------------------------------------------
@@ -46,6 +48,39 @@ SessionEnded::SessionEnded(const std::string& session_id)
 
 void SessionEnded::SetSessionTime(std::chrono::milliseconds session_time) {
   SetParameter("session_length_ms", session_time.count());
+}
+
+// CommandEvent ------------------------------------------------------------------------------------
+CommandEvent::CommandEvent(const std::string& session_id) : AnalyticsEvent("command", session_id) {}
+
+void CommandEvent::FromCommandReport(const CommandReport& report) {
+  SetParameter("verb_id", report.verb_id);
+  SetParameter("verb", report.verb);
+  SetParameter("command_group", report.command_group);
+
+  SetParameter("noun_count", static_cast<int64_t>(report.nouns.size()));
+  for (size_t i = 0; i < report.nouns.size(); i++) {
+    SetParameter(fxl::StringPrintf("noun%zu", i), report.nouns[i].name);
+    SetParameter(fxl::StringPrintf("noun%zu_id", i), report.nouns[i].id);
+    SetParameter(fxl::StringPrintf("noun%zu_index", i), report.nouns[i].index);
+  }
+
+  SetParameter("argument_count", static_cast<int64_t>(report.arguments.size()));
+  for (size_t i = 0; i < report.arguments.size(); i++) {
+    SetParameter(fxl::StringPrintf("argument%zu", i), report.arguments[i]);
+  }
+
+  SetParameter("switch_count", static_cast<int64_t>(report.switches.size()));
+  for (size_t i = 0; i < report.switches.size(); i++) {
+    SetParameter(fxl::StringPrintf("switch%zu", i), report.switches[i].name);
+    SetParameter(fxl::StringPrintf("switch%zu_id", i), report.switches[i].id);
+    SetParameter(fxl::StringPrintf("switch%zu_value", i), report.switches[i].value);
+  }
+
+  SetParameter("has_error", report.err.has_error());
+  SetParameter("error_code", static_cast<int>(report.err.type()));
+  SetParameter("error_string", ErrTypeToString(report.err.type()));
+  SetParameter("error_message", report.err.msg());
 }
 
 }  // namespace zxdb

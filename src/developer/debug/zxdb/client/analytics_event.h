@@ -7,6 +7,7 @@
 
 #include <chrono>
 
+#include "src/developer/debug/zxdb/common/err.h"
 #include "src/lib/analytics/cpp/core_dev_tools/google_analytics_4_client.h"
 
 namespace zxdb {
@@ -53,6 +54,70 @@ class SessionEnded final : public AnalyticsEvent {
   explicit SessionEnded(const std::string& session_id);
 
   void SetSessionTime(std::chrono::milliseconds session_time);
+};
+
+// A struct to encapsulate all of the information regarding a specific command being executed,
+// including any errors that are reported along the way, including parsing and asynchronous errors.
+// This struct would really like to use some of the defined types defined for verbs and nouns, but
+// we cannot introduce a dependency on the console in the client, so they are casted to an int when
+// added to this struct.
+struct CommandReport {
+  // The verb's numerical id.
+  int verb_id = 0;
+
+  // This is the canonical name for the typed verb, if the user used an alias, it will not be
+  // reflected here.
+  std::string verb;
+
+  struct NounReport {
+    NounReport(int noun, const std::string& name, int index) : id(noun), name(name), index(index) {}
+
+    // The noun's numerical id.
+    int id = 0;
+
+    // The canonical names for this noun. The command structure doesn't keep track of aliases used.
+    std::string name;
+
+    // The index given for this noun, if any. Note this can be negative e.g. for kNoIndex or
+    // kWildcard.
+    int index;
+  };
+
+  // Nouns for this command. The order will NOT be the order specified on the command line, but
+  // rather the order in which the nouns are declared in |Nouns|. This is because the command does
+  // no bookkeeping for the order of nouns, but rather just the presence (and possible indices).
+  std::vector<NounReport> nouns;
+
+  // The command group for this command, as it appears in the help listing.
+  int command_group = 0;
+
+  // Positional arguments. May be filtered out or ellided for certain commands.
+  std::vector<std::string> arguments;
+
+  struct SwitchReport {
+    SwitchReport(int id, const std::string& name, const std::string& value)
+        : id(id), name(name), value(value) {}
+    // The id for this switch, as defined by the command.
+    int id = 0;
+
+    std::string name;
+
+    // Not all switches have associated values, so this may be empty.
+    std::string value;
+  };
+
+  // Switches, if provided.
+  std::vector<SwitchReport> switches;
+
+  // The command result.
+  Err err;
+};
+
+class CommandEvent final : public AnalyticsEvent {
+ public:
+  explicit CommandEvent(const std::string& session_id);
+
+  void FromCommandReport(const CommandReport& report);
 };
 
 }  // namespace zxdb

@@ -8,6 +8,8 @@
 #include <chrono>
 #include <string>
 
+#include "src/developer/debug/zxdb/client/analytics_event.h"
+
 namespace zxdb {
 
 class Session;
@@ -41,6 +43,8 @@ class AnalyticsReporter {
   void ReportSessionStarted() const;
   void ReportSessionConnected(bool is_minidump, bool local_agent) const;
   void ReportSessionEnded() const;
+
+  void ReportCommand(const CommandReport& report) const;
 
  private:
   Session* session_ = nullptr;  // non-owning.

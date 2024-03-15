@@ -153,6 +153,7 @@ VerbRecord GetConnectVerbRecord() {
                                          kConnectHelp, CommandGroup::kGeneral);
   connect_record.switches.push_back(unix_switch);
   connect_record.switches.push_back(quiet_switch);
+  connect_record.needs_elision = true;
   return connect_record;
 }
 

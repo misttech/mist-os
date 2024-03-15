@@ -4,6 +4,7 @@
 
 #include "src/developer/debug/zxdb/console/console_noninteractive.h"
 
+#include "src/developer/debug/zxdb/client/analytics_event.h"
 #include "src/developer/debug/zxdb/console/command_parser.h"
 
 namespace zxdb {
@@ -31,9 +32,13 @@ void ConsoleNoninteractive::ProcessInputLine(const std::string& line,
     cmd_context = fxl::MakeRefCounted<ConsoleCommandContext>(this);
 
   Command cmd;
-
   if (Err err = ParseCommand(line, &cmd); err.has_error())
     return cmd_context->ReportError(err);
+
+  // The command is parsed now, we can build a more complete report to send when the command is
+  // completed. By building the report here, we don't need to worry about the lifetime of the actual
+  // Command object.
+  cmd_context->SetCommandReport(cmd.BuildReport());
 
   if (Err err = context_.FillOutCommand(&cmd); err.has_error())
     return cmd_context->ReportError(err);

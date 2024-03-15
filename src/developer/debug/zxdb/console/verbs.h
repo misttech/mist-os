@@ -149,6 +149,10 @@ struct VerbRecord {
   const char* help = nullptr;
   std::vector<SwitchRecord> switches;  // Switches supported by this verb.
 
+  // Verbs should set this to true if they deal with things like paths or other information that
+  // would generally be able to identify users.
+  bool needs_elision = false;
+
   CommandGroup command_group = CommandGroup::kGeneral;
   SourceAffinity source_affinity = SourceAffinity::kNone;
 
