@@ -613,11 +613,11 @@ group("percent-encoding") {
 }
 
 group("pest") {
-  public_deps = [ ":pest-v2_1_3" ]
+  public_deps = [ ":pest-v2_7_8" ]
 }
 
 group("pest_derive") {
-  public_deps = [ ":pest_derive-v2_1_0($host_toolchain)" ]
+  public_deps = [ ":pest_derive-v2_7_8($host_toolchain)" ]
 }
 
 if (!(current_os == "fuchsia")) {
@@ -6350,8 +6350,8 @@ rust_library("handlebars-v4_3_5") {
 
   deps = []
   deps += [ ":log-v0_4_20" ]
-  deps += [ ":pest-v2_1_3" ]
-  deps += [ ":pest_derive-v2_1_0($host_toolchain)" ]
+  deps += [ ":pest-v2_7_8" ]
+  deps += [ ":pest_derive-v2_7_8($host_toolchain)" ]
   deps += [ ":serde-v1_0_147" ]
   deps += [ ":serde_json-v1_0_87" ]
   deps += [ ":thiserror-v1_0_57" ]
@@ -10023,135 +10023,144 @@ rust_library("percent-encoding-v2_2_0") {
   applicable_licenses = [ ":percent-encoding-v2_2_0.license" ]
 }
 
-license("pest-v2_1_3.license") {
+license("pest-v2_7_8.license") {
   public_package_name = "pest"
   license_files = [
-    "//third_party/rust_crates/vendor/pest-2.1.3/LICENSE-APACHE",
-    "//third_party/rust_crates/vendor/pest-2.1.3/LICENSE-MIT",
+    "//third_party/rust_crates/vendor/pest-2.7.8/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/pest-2.7.8/LICENSE-MIT",
   ]
 }
 
-rust_library("pest-v2_1_3") {
+rust_library("pest-v2_7_8") {
   crate_name = "pest"
-  crate_root = "//third_party/rust_crates/vendor/pest-2.1.3/src/lib.rs"
-  output_name = "pest-adcf4833e37ee85e"
+  crate_root = "//third_party/rust_crates/vendor/pest-2.7.8/src/lib.rs"
+  output_name = "pest-9198485691403e62"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
+  deps += [ ":memchr-v2_4_0" ]
+  deps += [ ":thiserror-v1_0_57" ]
   deps += [ ":ucd-trie-v0_1_6" ]
 
   rustenv = []
 
   rustflags = [
     "--cap-lints=allow",
-    "--edition=2015",
-    "-Cmetadata=adcf4833e37ee85e",
-    "-Cextra-filename=-adcf4833e37ee85e",
+    "--edition=2021",
+    "-Cmetadata=9198485691403e62",
+    "-Cextra-filename=-9198485691403e62",
+    "--cfg=feature=\"default\"",
+    "--cfg=feature=\"memchr\"",
+    "--cfg=feature=\"std\"",
   ]
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":pest-v2_1_3.license" ]
+  applicable_licenses = [ ":pest-v2_7_8.license" ]
 }
 
-license("pest_derive-v2_1_0.license") {
+license("pest_derive-v2_7_8.license") {
   public_package_name = "pest_derive"
   license_files = [
-    "//third_party/rust_crates/vendor/pest_derive-2.1.0/LICENSE-APACHE",
-    "//third_party/rust_crates/vendor/pest_derive-2.1.0/LICENSE-MIT",
+    "//third_party/rust_crates/vendor/pest_derive-2.7.8/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/pest_derive-2.7.8/LICENSE-MIT",
   ]
 }
 
-rust_proc_macro("pest_derive-v2_1_0") {
+rust_proc_macro("pest_derive-v2_7_8") {
   crate_name = "pest_derive"
-  crate_root = "//third_party/rust_crates/vendor/pest_derive-2.1.0/src/lib.rs"
-  output_name = "pest_derive-1b54193ee8a497b9"
+  crate_root = "//third_party/rust_crates/vendor/pest_derive-2.7.8/src/lib.rs"
+  output_name = "pest_derive-21dd0ec1b82f1fef"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":pest-v2_1_3" ]
-  deps += [ ":pest_generator-v2_1_3" ]
+  deps += [ ":pest-v2_7_8" ]
+  deps += [ ":pest_generator-v2_7_8" ]
 
   rustenv = []
 
   rustflags = [
     "--cap-lints=allow",
-    "--edition=2015",
-    "-Cmetadata=1b54193ee8a497b9",
-    "-Cextra-filename=-1b54193ee8a497b9",
+    "--edition=2021",
+    "-Cmetadata=21dd0ec1b82f1fef",
+    "-Cextra-filename=-21dd0ec1b82f1fef",
+    "--cfg=feature=\"default\"",
+    "--cfg=feature=\"std\"",
   ]
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":pest_derive-v2_1_0.license" ]
+  applicable_licenses = [ ":pest_derive-v2_7_8.license" ]
 }
 
-license("pest_generator-v2_1_3.license") {
+license("pest_generator-v2_7_8.license") {
   public_package_name = "pest_generator"
   license_files = [
-    "//third_party/rust_crates/vendor/pest_generator-2.1.3/LICENSE-APACHE",
-    "//third_party/rust_crates/vendor/pest_generator-2.1.3/LICENSE-MIT",
+    "//third_party/rust_crates/vendor/pest_generator-2.7.8/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/pest_generator-2.7.8/LICENSE-MIT",
   ]
 }
 
-rust_library("pest_generator-v2_1_3") {
+rust_library("pest_generator-v2_7_8") {
   crate_name = "pest_generator"
   crate_root =
-      "//third_party/rust_crates/vendor/pest_generator-2.1.3/src/lib.rs"
-  output_name = "pest_generator-8216af62d67b03b3"
+      "//third_party/rust_crates/vendor/pest_generator-2.7.8/src/lib.rs"
+  output_name = "pest_generator-faa5b05e011947da"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":pest-v2_1_3" ]
-  deps += [ ":pest_meta-v2_1_0" ]
+  deps += [ ":pest-v2_7_8" ]
+  deps += [ ":pest_meta-v2_7_8" ]
   deps += [ ":proc-macro2-v1_0_78" ]
   deps += [ ":quote-v1_0_35" ]
-  deps += [ ":syn-v1_0_98" ]
+  deps += [ ":syn-v2_0_52" ]
 
   rustenv = []
 
   rustflags = [
     "--cap-lints=allow",
-    "--edition=2015",
-    "-Cmetadata=8216af62d67b03b3",
-    "-Cextra-filename=-8216af62d67b03b3",
+    "--edition=2021",
+    "-Cmetadata=faa5b05e011947da",
+    "-Cextra-filename=-faa5b05e011947da",
+    "--cfg=feature=\"std\"",
   ]
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":pest_generator-v2_1_3.license" ]
+  applicable_licenses = [ ":pest_generator-v2_7_8.license" ]
 }
 
-license("pest_meta-v2_1_0.license") {
+license("pest_meta-v2_7_8.license") {
   public_package_name = "pest_meta"
   license_files = [
-    "//third_party/rust_crates/vendor/pest_meta-2.1.0/LICENSE-APACHE",
-    "//third_party/rust_crates/vendor/pest_meta-2.1.0/LICENSE-MIT",
+    "//third_party/rust_crates/vendor/pest_meta-2.7.8/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/pest_meta-2.7.8/LICENSE-MIT",
   ]
 }
 
-rust_library("pest_meta-v2_1_0") {
+rust_library("pest_meta-v2_7_8") {
   crate_name = "pest_meta"
-  crate_root = "//third_party/rust_crates/vendor/pest_meta-2.1.0/src/lib.rs"
-  output_name = "pest_meta-97d599c12fc59f03"
+  crate_root = "//third_party/rust_crates/vendor/pest_meta-2.7.8/src/lib.rs"
+  output_name = "pest_meta-ad122d452878e904"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":maplit-v1_0_1" ]
-  deps += [ ":pest-v2_1_3" ]
+  deps += [ ":once_cell-v1_17_1" ]
+  deps += [ ":pest-v2_7_8" ]
 
   rustenv = []
 
   rustflags = [
     "--cap-lints=allow",
-    "--edition=2015",
-    "-Cmetadata=97d599c12fc59f03",
-    "-Cextra-filename=-97d599c12fc59f03",
+    "--edition=2021",
+    "-Cmetadata=ad122d452878e904",
+    "-Cextra-filename=-ad122d452878e904",
+    "--cfg=feature=\"default\"",
   ]
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":pest_meta-v2_1_0.license" ]
+  applicable_licenses = [ ":pest_meta-v2_7_8.license" ]
 }
 
 license("petgraph-v0_6_2.license") {
@@ -13727,8 +13736,8 @@ rust_library("serde_json5-v0_1_0") {
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":pest-v2_1_3" ]
-  deps += [ ":pest_derive-v2_1_0($host_toolchain)" ]
+  deps += [ ":pest-v2_7_8" ]
+  deps += [ ":pest_derive-v2_7_8($host_toolchain)" ]
   deps += [ ":serde-v1_0_147" ]
 
   rustenv = []
@@ -16432,7 +16441,6 @@ rust_library("ucd-trie-v0_1_6") {
     "--edition=2021",
     "-Cmetadata=53958726f307bc9",
     "-Cextra-filename=-53958726f307bc9",
-    "--cfg=feature=\"default\"",
     "--cfg=feature=\"std\"",
   ]
 
