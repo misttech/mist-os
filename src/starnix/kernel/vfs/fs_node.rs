@@ -2185,8 +2185,12 @@ mod tests {
 
     #[::fuchsia::test]
     async fn setxattr_set_sid() {
+        const BINARY_POLICY: &[u8] =
+            include_bytes!("../../lib/selinux/testdata/micro_policies/hooks_tests_policy.pp");
+
         let security_server = SecurityServer::new(SecurityServerMode::Enable);
         security_server.set_enforcing(true);
+        security_server.load_policy(BINARY_POLICY.to_vec()).expect("policy load failed");
         let (_kernel, current_task, mut locked) =
             create_kernel_task_and_unlocked_with_selinux(security_server);
         let node = &create_test_file(&mut locked, &current_task).entry.node;

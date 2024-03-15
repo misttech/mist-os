@@ -85,8 +85,6 @@ pub enum ValidateError {
     InvalidClassDefaultRange { value: u32 },
     #[error("missing initial SID {initial_sid:?}")]
     MissingInitialSid { initial_sid: sc::InitialSid },
-    #[error("missing unconfined user/role/type")]
-    MissingUnconfined,
     #[error("required validation routine not implemented")]
     NotImplemented,
 }

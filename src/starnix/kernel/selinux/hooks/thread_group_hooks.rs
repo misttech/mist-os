@@ -328,9 +328,6 @@ mod tests {
 
     #[fuchsia::test]
     fn no_state_update_if_no_elf_state() {
-        let security_server = SecurityServer::new(Mode::Enable);
-        security_server.set_enforcing(true);
-
         let initial_state = SeLinuxThreadGroupState::for_kernel();
         let mut selinux_state = Some(initial_state.clone());
         update_state_on_exec(&mut selinux_state, &None);
@@ -339,9 +336,7 @@ mod tests {
 
     #[fuchsia::test]
     fn state_is_updated_on_exec() {
-        let security_server = SecurityServer::new(Mode::Enable);
-        security_server.set_enforcing(true);
-
+        let security_server = security_server_with_policy();
         let initial_state = SeLinuxThreadGroupState::for_kernel();
         let mut selinux_state = Some(initial_state.clone());
 

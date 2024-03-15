@@ -122,7 +122,10 @@ fn initial_contexts() {
     let policy = policy.validate().expect("validate policy");
 
     let kernel_context = policy.initial_context(InitialSid::Kernel);
-    assert_eq!(kernel_context.to_string(), "user0:object_r:type0:s0:c0-s1:c0.c2,c4")
+    assert_eq!(
+        policy.serialize_security_context(&kernel_context),
+        b"user0:object_r:type0:s0:c0-s1:c0.c2,c4"
+    )
 }
 
 #[cfg(feature = "selinux_policy_test_api")]

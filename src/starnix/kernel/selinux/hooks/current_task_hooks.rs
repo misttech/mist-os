@@ -216,13 +216,25 @@ mod tests {
         },
         vfs::NamespaceNode,
     };
-    use selinux::security_server::Mode;
+    use selinux::{security_server::Mode, SecurityId};
+    use selinux_common::InitialSid;
     use starnix_sync::{Locked, Unlocked};
     use starnix_uapi::{device_type::DeviceType, file_mode::FileMode, signals::SIGTERM};
     use tests::thread_group_hooks::SeLinuxThreadGroupState;
 
     const VALID_SECURITY_CONTEXT: &'static str = "system_u:object_r:unconfined_t:s0";
     const DIFFERENT_VALID_SECURITY_CONTEXT: &'static str = "system_u:object_r:unconfined_t:s1";
+
+    const HOOKS_TESTS_BINARY_POLICY: &[u8] =
+        include_bytes!("../../../lib/selinux/testdata/micro_policies/hooks_tests_policy.pp");
+
+    fn security_server_with_policy(mode: Mode) -> Arc<SecurityServer> {
+        let policy_bytes = HOOKS_TESTS_BINARY_POLICY.to_vec();
+        let security_server = SecurityServer::new(mode);
+        security_server.set_enforcing(true);
+        security_server.load_policy(policy_bytes).expect("policy load failed");
+        security_server
+    }
 
     fn create_task_pair_with_selinux_disabled() -> (AutoReleasableTask, AutoReleasableTask) {
         let (kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
@@ -232,7 +244,7 @@ mod tests {
     }
 
     fn create_task_pair_with_fake_selinux() -> (AutoReleasableTask, AutoReleasableTask) {
-        let security_server = SecurityServer::new(Mode::Fake);
+        let security_server = security_server_with_policy(Mode::Fake);
         let (kernel, current_task, mut locked) =
             create_kernel_task_and_unlocked_with_selinux(security_server);
         let another_task = create_task(&mut locked, &kernel, "another-task");
@@ -240,7 +252,7 @@ mod tests {
     }
 
     fn create_task_pair_with_permissive_selinux() -> (AutoReleasableTask, AutoReleasableTask) {
-        let security_server = SecurityServer::new(Mode::Enable);
+        let security_server = security_server_with_policy(Mode::Enable);
         security_server.set_enforcing(false);
         let (kernel, current_task, mut locked) =
             create_kernel_task_and_unlocked_with_selinux(security_server);
@@ -268,14 +280,14 @@ mod tests {
 
     #[fuchsia::test]
     async fn task_create_access_allowed_for_fake_mode() {
-        let security_server = SecurityServer::new(Mode::Fake);
+        let security_server = security_server_with_policy(Mode::Fake);
         let (_kernel, task) = create_kernel_and_task_with_selinux(security_server);
         assert_eq!(check_task_create_access(&task), Ok(()));
     }
 
     #[fuchsia::test]
     async fn task_create_access_allowed_for_permissive_mode() {
-        let security_server = SecurityServer::new(Mode::Enable);
+        let security_server = security_server_with_policy(Mode::Enable);
         security_server.set_enforcing(false);
         let (_kernel, task) = create_kernel_and_task_with_selinux(security_server);
         assert_eq!(check_task_create_access(&task), Ok(()));
@@ -290,14 +302,14 @@ mod tests {
 
     #[fuchsia::test]
     async fn exec_access_allowed_for_fake_mode() {
-        let security_server = SecurityServer::new(Mode::Fake);
+        let security_server = security_server_with_policy(Mode::Fake);
         let (_kernel, task) = create_kernel_and_task_with_selinux(security_server);
         assert_eq!(check_exec_access(&task), Ok(None));
     }
 
     #[fuchsia::test]
     async fn exec_access_allowed_for_permissive_mode() {
-        let security_server = SecurityServer::new(Mode::Enable);
+        let security_server = security_server_with_policy(Mode::Enable);
         security_server.set_enforcing(false);
         let (_kernel, task) = create_kernel_and_task_with_selinux(security_server);
         assert_eq!(check_exec_access(&task), Ok(None));
@@ -308,11 +320,9 @@ mod tests {
         let (_kernel, task) = create_kernel_and_task();
         let mut task = task;
 
-        let security_server = SecurityServer::new(Mode::Fake);
-        let elf_sid = security_server
-            .security_context_to_sid(b"u:object_r:type_t:s0")
-            .expect("invalid security context");
-        let elf_state = SeLinuxResolvedElfState { sid: elf_sid.clone() };
+        // Without SELinux enabled and a policy loaded, only `InitialSid` values exist
+        // in the system.
+        let elf_state = SeLinuxResolvedElfState { sid: SecurityId::initial(InitialSid::Kernel) };
         assert_eq!(task.thread_group.read().selinux_state.as_ref(), None);
         update_state_on_exec(&mut task, &Some(elf_state));
         assert_eq!(task.thread_group.read().selinux_state.as_ref(), None);
@@ -320,7 +330,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn no_state_update_for_fake_mode() {
-        let security_server = SecurityServer::new(Mode::Fake);
+        let security_server = security_server_with_policy(Mode::Fake);
         let initial_state = SeLinuxThreadGroupState::for_kernel();
         let (kernel, task) = create_kernel_and_task_with_selinux(security_server);
         let mut task = task;
@@ -343,7 +353,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn no_state_update_for_permissive_mode() {
-        let security_server = SecurityServer::new(Mode::Enable);
+        let security_server = security_server_with_policy(Mode::Enable);
         security_server.set_enforcing(false);
         let initial_state = SeLinuxThreadGroupState::for_kernel();
         let (kernel, task) = create_kernel_and_task_with_selinux(security_server);
@@ -509,7 +519,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn post_setxattr_noop_selinux_fake() {
-        let security_server = SecurityServer::new(Mode::Fake);
+        let security_server = security_server_with_policy(Mode::Fake);
         let (_kernel, current_task, mut locked) =
             create_kernel_task_and_unlocked_with_selinux(security_server);
         let node = &create_test_file(&mut locked, &current_task).entry.node;
@@ -527,7 +537,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn post_setxattr_noop_selinux_permissive() {
-        let security_server = SecurityServer::new(Mode::Enable);
+        let security_server = security_server_with_policy(Mode::Enable);
         security_server.set_enforcing(false);
         let (_kernel, current_task, mut locked) =
             create_kernel_task_and_unlocked_with_selinux(security_server);
@@ -546,7 +556,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn post_setxattr_noop_different_name() {
-        let security_server = SecurityServer::new(Mode::Enable);
+        let security_server = security_server_with_policy(Mode::Enable);
         security_server.set_enforcing(true);
         let (_kernel, current_task, mut locked) =
             create_kernel_task_and_unlocked_with_selinux(security_server);
@@ -565,7 +575,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn post_setxattr_clear_invalid_security_context() {
-        let security_server = SecurityServer::new(Mode::Enable);
+        let security_server = security_server_with_policy(Mode::Enable);
         security_server.set_enforcing(true);
         let (_kernel, current_task, mut locked) =
             create_kernel_task_and_unlocked_with_selinux(security_server);
@@ -590,7 +600,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn post_setxattr_set_sid_selinux_enforcing() {
-        let security_server = SecurityServer::new(Mode::Enable);
+        let security_server = security_server_with_policy(Mode::Enable);
         security_server.set_enforcing(true);
         let (_kernel, current_task, mut locked) =
             create_kernel_task_and_unlocked_with_selinux(security_server);
@@ -609,7 +619,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn post_setxattr_different_sid_for_different_context() {
-        let security_server = SecurityServer::new(Mode::Enable);
+        let security_server = security_server_with_policy(Mode::Enable);
         security_server.set_enforcing(true);
         let (_kernel, current_task, mut locked) =
             create_kernel_task_and_unlocked_with_selinux(security_server);

@@ -193,6 +193,20 @@ impl<PS: ParseStrategy> Policy<PS> {
         )
     }
 
+    /// Returns a [`SecurityContext`] with fields parsed from the supplied Security Context string.
+    pub fn parse_security_context(
+        &self,
+        security_context: &[u8],
+    ) -> Result<security_context::SecurityContext, security_context::SecurityContextParseError>
+    {
+        security_context::SecurityContext::parse(&self.0, security_context)
+    }
+
+    /// Returns a byte string describing the supplied [`SecurityContext`].
+    pub fn serialize_security_context(&self, security_context: &SecurityContext) -> Vec<u8> {
+        security_context.serialize(&self.0)
+    }
+
     /// Helper used by `security_level()` to create a `Sensitivity` instance from policy fields.
     fn sensitivity(&self, sensitivity: le::U32) -> SensitivityId {
         SensitivityId(

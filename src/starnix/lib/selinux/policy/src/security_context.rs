@@ -2,8 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{CategoryId, RoleId, SensitivityId, TypeId, UserId};
-use std::{fmt, str};
+use crate::{index::PolicyIndex, CategoryId, ParseStrategy, RoleId, SensitivityId, TypeId, UserId};
+
+use thiserror::Error;
 
 /// The security context, a variable-length string associated with each SELinux object in the
 /// system. The security context contains mandatory `user:role:type` components and an optional
@@ -30,7 +31,7 @@ impl SecurityContext {
     /// No validation of the supplied values is performed. Contexts are
     /// typically validated against the loaded policy by the Security Server,
     /// e.g. when exchanging them for a Security Id.
-    pub fn new(
+    pub(crate) fn new(
         user: UserId,
         role: RoleId,
         type_: TypeId,
@@ -64,6 +65,79 @@ impl SecurityContext {
     pub fn high_level(&self) -> Option<&SecurityLevel> {
         self.high_level.as_ref()
     }
+
+    /// Returns a `SecurityContext` parsed from `security_context`, against the supplied
+    /// `policy`.  The returned structure is guaranteed to be valid for this `policy`.
+    ///
+    /// Security Contexts in Multi-Level Security (MLS) and Multi-Category Security (MCS)
+    /// policies take the form:
+    ///   context := <user>:<role>:<type>:<levels>
+    /// such that they always include user, role, type, and a range of
+    /// security levels.
+    ///
+    /// The security levels part consists of a "low" value and optional "high"
+    /// value, defining the range.  In MCS policies each level may optionally be
+    /// associated with a set of categories:
+    /// categories:
+    ///   levels := <level>[-<level>]
+    ///   level := <sensitivity>[:<category_spec>[,<category_spec>]*]
+    ///
+    /// Entries in the optional list of categories may specify individual
+    /// categories, or ranges (from low to high):
+    ///   category_spec := <category>[.<category>]
+    ///
+    /// e.g. "u:r:t:s0" has a single (low) sensitivity.
+    /// e.g. "u:r:t:s0-s1" has a sensitivity range.
+    /// e.g. "u:r:t:s0:c1,c2,c3" has a single sensitivity, with three categories.
+    /// e.g. "u:r:t:s0:c1-s1:c1,c2,c3" has a sensitivity range, with categories
+    ///      associated with both low and high ends.
+    ///
+    /// Returns an error if the [`security_context`] is not a syntactically valid
+    /// Security Context string, or the fields are not valid under the current policy.
+    pub(crate) fn parse<PS: ParseStrategy>(
+        policy_index: &PolicyIndex<PS>,
+        security_context: &[u8],
+    ) -> Result<Self, SecurityContextParseError> {
+        let as_str = std::str::from_utf8(security_context)
+            .map_err(|_| SecurityContextParseError::Invalid)?;
+
+        // TODO(): Revise this to (1) parse (2) map names to Ids and (3) validate the combination of fields,
+        // and sensitivity & category ordering.
+        let mut items = as_str.splitn(4, ":");
+        let user = UserId(items.next().ok_or(SecurityContextParseError::Invalid)?.to_string());
+        let role = RoleId(items.next().ok_or(SecurityContextParseError::Invalid)?.to_string());
+        let type_ = TypeId(items.next().ok_or(SecurityContextParseError::Invalid)?.to_string());
+
+        // `next()` holds the remainder of the string, if any.
+        let mut levels = items.next().ok_or(SecurityContextParseError::Invalid)?.splitn(2, "-");
+        let low_level = SecurityLevel::parse(
+            policy_index,
+            levels.next().ok_or(SecurityContextParseError::Invalid)?,
+        )?;
+
+        // `next()` holds the remainder, i.e. the high part, of the range, if any.
+        let high_level =
+            levels.next().map(|x| SecurityLevel::parse(policy_index, x)).transpose()?;
+
+        // TODO(): Validate fields against the policy.
+        Ok(Self::new(user, role, type_, low_level, high_level))
+    }
+
+    /// Returns this Security Context serialized to a byte string.
+    pub(crate) fn serialize<PS: ParseStrategy>(&self, policy_index: &PolicyIndex<PS>) -> Vec<u8> {
+        let mut levels = self.low_level.serialize(policy_index);
+        if let Some(high_level) = &self.high_level {
+            levels.push(b'-');
+            levels.extend(high_level.serialize(policy_index));
+        }
+        let parts: [&[u8]; 4] = [
+            self.user.0.as_bytes(),
+            self.role.0.as_bytes(),
+            self.type_.0.as_bytes(),
+            levels.as_slice(),
+        ];
+        parts.join(b":".as_ref())
+    }
 }
 
 /// Describes a security level, consisting of a sensitivity, and an optional set
@@ -75,22 +149,21 @@ pub struct SecurityLevel {
 }
 
 impl SecurityLevel {
-    /// Returns a new instance with the specified contents.
-    /// No validation of the supplied values is performed.
-    pub fn new(sensitivity: SensitivityId, categories: Vec<Category>) -> Self {
+    pub(crate) fn new(sensitivity: SensitivityId, categories: Vec<Category>) -> Self {
         Self { sensitivity, categories }
     }
-}
 
-impl TryFrom<&str> for SecurityLevel {
-    type Error = SecurityContextParseError;
-
-    fn try_from(level: &str) -> Result<Self, Self::Error> {
+    /// Returns a new instance parsed from the supplied string slice.
+    fn parse<PS: ParseStrategy>(
+        _policy_index: &PolicyIndex<PS>,
+        level: &str,
+    ) -> Result<Self, SecurityContextParseError> {
         if level.is_empty() {
-            return Err(Self::Error::Invalid);
+            return Err(SecurityContextParseError::Invalid);
         }
         let mut items = level.split(":");
-        let sensitivity = SensitivityId(items.next().ok_or(Self::Error::Invalid)?.to_string());
+        let sensitivity =
+            SensitivityId(items.next().ok_or(SecurityContextParseError::Invalid)?.to_string());
         let categories = items.next().map_or_else(Vec::new, |s| {
             s.split(",")
                 .map(|entry| {
@@ -107,9 +180,25 @@ impl TryFrom<&str> for SecurityLevel {
         });
         // Level has at most two colon-separated parts, so nothing should remain.
         if items.next().is_some() {
-            return Err(Self::Error::Invalid);
+            return Err(SecurityContextParseError::Invalid);
         }
         Ok(Self { sensitivity, categories })
+    }
+
+    /// Returns a byte string describing the security level sensitivity and
+    /// categories.
+    fn serialize<PS: ParseStrategy>(&self, policy_index: &PolicyIndex<PS>) -> Vec<u8> {
+        let categories = self
+            .categories
+            .iter()
+            .map(|x| x.serialize(policy_index))
+            .collect::<Vec<Vec<u8>>>()
+            .join(b",".as_ref());
+        if categories.is_empty() {
+            self.sensitivity.0.clone().into()
+        } else {
+            [self.sensitivity.0.as_bytes(), categories.as_slice()].join(b":".as_ref())
+        }
     }
 }
 
@@ -121,117 +210,37 @@ pub enum Category {
     Range { low: CategoryId, high: CategoryId },
 }
 
-/// Errors that may be returned when attempting to parse a security context.
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
-pub enum SecurityContextParseError {
-    Invalid,
-}
-
-impl TryFrom<&str> for SecurityContext {
-    type Error = SecurityContextParseError;
-
-    /// Parses a security context from a `str`.
-    ///
-    /// Security Contexts take the form:
-    ///   context := <user>:<role>:<type>:<levels>
-    /// such that they always include user, role, type, and a range of
-    /// security levels.
-    ///
-    /// The security levels part consists of a "low" value and optional "high"
-    /// value, defining the range, each optionally associated with a set of
-    /// categories:
-    ///   levels := <level>[-<level>]
-    ///   level := <sensitivity>[:<category_spec>[,<category_spec>]*]
-    ///
-    /// Entries in the optional list of categories may specify individual
-    /// categories, or ranges (from low to high):
-    ///   category_spec := <category>[.<category>]
-    ///
-    /// e.g. "u:r:t:s0" has a single (low) sensitivity.
-    /// e.g. "u:r:t:s0-s1" has a sensitivity range.
-    /// e.g. "u:r:t:s0:c1,c2,c3" has a single sensitivity, with three categories.
-    /// e.g. "u:r:t:s0:c1-s1:c1,c2,c3" has a sensitivity range, with categories
-    ///      associated with both low and high ends.
-    ///
-    /// [`SecurityContext`] values returned by this function should always be
-    /// validated against the active policy, to ensure that they use policy-
-    /// defined user, role, type, etc names, and that sensitivity and
-    /// category ranges are well-ordered.
-    ///
-    /// Returns an error if the [`security_context`] is not a syntactically valid
-    /// Security Context string.
-    fn try_from(security_context: &str) -> Result<Self, Self::Error> {
-        let mut items = security_context.splitn(4, ":");
-        let user = UserId(items.next().ok_or(Self::Error::Invalid)?.to_string());
-        let role = RoleId(items.next().ok_or(Self::Error::Invalid)?.to_string());
-        let type_ = TypeId(items.next().ok_or(Self::Error::Invalid)?.to_string());
-
-        // `next()` holds the remainder of the string, if any.
-        let mut levels = items.next().ok_or(Self::Error::Invalid)?.splitn(2, "-");
-        let low_level = SecurityLevel::try_from(levels.next().ok_or(Self::Error::Invalid)?)?;
-        // `next()` holds the remainder, i.e. the high part, of the range, if any.
-        let high_level = levels.next().map(SecurityLevel::try_from).transpose()?;
-
-        Ok(Self { user, role, type_, low_level, high_level })
-    }
-}
-
-impl TryFrom<&[u8]> for SecurityContext {
-    type Error = SecurityContextParseError;
-
-    // Parses a security context from a `&[u8]`.
-    //
-    // The supplied array of octets is required to contain a valid UTF-8
-    // encoded string, from which a valid Security Context string can be
-    // parsed.
-    fn try_from(security_context: &[u8]) -> Result<Self, Self::Error> {
-        let as_str = std::str::from_utf8(security_context).map_err(|_| Self::Error::Invalid)?;
-        Self::try_from(as_str)
-    }
-}
-
-impl fmt::Display for SecurityContext {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let level_fmt = if let Some(high_level) = &self.high_level {
-            format!("{}-{}", self.low_level, high_level)
-        } else {
-            self.low_level.to_string()
-        };
-        write!(f, "{}:{}:{}:{}", self.user.0, self.role.0, self.type_.0, level_fmt)
-    }
-}
-
-impl fmt::Display for SecurityLevel {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let categories_fmt = self.categories.iter().map(|c| c.to_string()).collect::<Vec<_>>();
-        if categories_fmt.is_empty() {
-            write!(f, "{}", self.sensitivity.0)
-        } else {
-            write!(f, "{}:{}", self.sensitivity.0, categories_fmt.join(","))
-        }
-    }
-}
-
-impl fmt::Display for Category {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+impl Category {
+    /// Returns a byte string describing the category, or category range.
+    fn serialize<PS: ParseStrategy>(&self, _policy_index: &PolicyIndex<PS>) -> Vec<u8> {
         match self {
-            Category::Single(category) => {
-                write!(f, "{}", category.0)
-            }
-            Category::Range { low, high } => {
-                write!(f, "{}.{}", low.0, high.0)
-            }
+            Self::Single(category) => category.0.clone().into(),
+            Self::Range { low, high } => [low.0.as_bytes(), high.0.as_bytes()].join(b".".as_ref()),
         }
     }
+}
+
+/// Errors that may be returned when attempting to parse a security context.
+#[derive(Copy, Clone, Debug, Error, Eq, PartialEq)]
+pub enum SecurityContextParseError {
+    #[error("security context is invalid")]
+    Invalid,
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::{parse_policy_by_reference, ByRef, Policy};
+
+    fn test_policy() -> Policy<ByRef<&'static [u8]>> {
+        const TEST_POLICY: &[u8] = include_bytes!("../../testdata/policies/emulator");
+        parse_policy_by_reference(TEST_POLICY).unwrap().validate().unwrap()
+    }
 
     #[test]
     fn parse_security_context_single_sensitivity() {
-        let security_context = SecurityContext::try_from("u:unconfined_r:unconfined_t:s0")
+        let security_context = test_policy()
+            .parse_security_context(b"u:unconfined_r:unconfined_t:s0")
             .expect("creating security context should succeed");
         assert_eq!(security_context.user.0, "u");
         assert_eq!(security_context.role.0, "unconfined_r");
@@ -242,7 +251,8 @@ mod tests {
 
     #[test]
     fn parse_security_context_with_sensitivity_range() {
-        let security_context = SecurityContext::try_from("u:unconfined_r:unconfined_t:s0-s1")
+        let security_context = test_policy()
+            .parse_security_context(b"u:unconfined_r:unconfined_t:s0-s1")
             .expect("creating security context should succeed");
         assert_eq!(security_context.user.0, "u");
         assert_eq!(security_context.role.0, "unconfined_r");
@@ -256,7 +266,8 @@ mod tests {
 
     #[test]
     fn parse_security_context_with_single_sensitivity_and_categories_interval() {
-        let security_context = SecurityContext::try_from("u:unconfined_r:unconfined_t:s0:c0.c255")
+        let security_context = test_policy()
+            .parse_security_context(b"u:unconfined_r:unconfined_t:s0:c0.c255")
             .expect("creating security context should succeed");
         assert_eq!(security_context.user.0, "u");
         assert_eq!(security_context.role.0, "unconfined_r");
@@ -273,9 +284,9 @@ mod tests {
 
     #[test]
     fn parse_security_context_with_sensitivity_range_and_category_interval() {
-        let security_context =
-            SecurityContext::try_from("u:unconfined_r:unconfined_t:s0-s0:c0.c1023")
-                .expect("creating security context should succeed");
+        let security_context = test_policy()
+            .parse_security_context(b"u:unconfined_r:unconfined_t:s0-s0:c0.c1023")
+            .expect("creating security context should succeed");
         assert_eq!(security_context.user.0, "u");
         assert_eq!(security_context.role.0, "unconfined_r");
         assert_eq!(security_context.type_.0, "unconfined_t");
@@ -294,9 +305,9 @@ mod tests {
 
     #[test]
     fn parse_security_context_with_sensitivity_range_with_categories() {
-        let security_context =
-            SecurityContext::try_from("u:unconfined_r:unconfined_t:s0:c0.c255-s0:c0.c1023")
-                .expect("creating security context should succeed");
+        let security_context = test_policy()
+            .parse_security_context(b"u:unconfined_r:unconfined_t:s0:c0.c255-s0:c0.c1023")
+            .expect("creating security context should succeed");
         assert_eq!(security_context.user.0, "u");
         assert_eq!(security_context.role.0, "unconfined_r");
         assert_eq!(security_context.type_.0, "unconfined_t");
@@ -321,7 +332,8 @@ mod tests {
 
     #[test]
     fn parse_security_context_with_single_sensitivity_and_category_list() {
-        let security_context = SecurityContext::try_from("u:unconfined_r:unconfined_t:s0:c0,c255")
+        let security_context = test_policy()
+            .parse_security_context(b"u:unconfined_r:unconfined_t:s0:c0,c255")
             .expect("creating security context should succeed");
         assert_eq!(security_context.user.0, "u");
         assert_eq!(security_context.role.0, "unconfined_r");
@@ -338,9 +350,9 @@ mod tests {
 
     #[test]
     fn parse_security_context_with_single_sensitivity_and_category_list_and_range() {
-        let security_context =
-            SecurityContext::try_from("u:unconfined_r:unconfined_t:s0:c0,c200.c255")
-                .expect("creating security context should succeed");
+        let security_context = test_policy()
+            .parse_security_context(b"u:unconfined_r:unconfined_t:s0:c0,c200.c255")
+            .expect("creating security context should succeed");
         assert_eq!(security_context.user.0, "u");
         assert_eq!(security_context.role.0, "unconfined_r");
         assert_eq!(security_context.type_.0, "unconfined_t");
@@ -367,9 +379,9 @@ mod tests {
             "u:unconfined_r:unconfined_t:s0:s0:s0",
         ] {
             assert_eq!(
-                SecurityContext::try_from(invalid_label),
+                test_policy().parse_security_context(invalid_label.as_bytes()),
                 Err(SecurityContextParseError::Invalid),
-                "validating {}",
+                "validating {:?}",
                 invalid_label
             );
         }
@@ -386,11 +398,15 @@ mod tests {
             "u:unconfined_r:unconfined_t:s0-s0:c0,c3,c7",
             "u:unconfined_r:unconfined_t:s0:c0,c3.c255-s0:c0,c3.255,c1024",
             // The following is not a valid Security Context, since the "low" security level
-            // has categories not associated with the "low" level.
+            // has categories not associated with the "high" level.
             "u:unconfined_r:unconfined_t:s0:c0,c3.c255-s0",
         ] {
-            let security_context = SecurityContext::try_from(label).expect("should succeed");
-            assert_eq!(security_context.to_string(), label);
+            let security_context =
+                test_policy().parse_security_context(label.as_bytes()).expect("should succeed");
+            assert_eq!(
+                test_policy().serialize_security_context(&security_context),
+                label.as_bytes()
+            );
         }
     }
 }

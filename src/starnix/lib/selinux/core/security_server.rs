@@ -15,8 +15,8 @@ use selinux_common::{
     AbstractObjectClass, ClassPermission, FileClass, InitialSid, Permission, FIRST_UNUSED_SID,
 };
 use selinux_policy::{
-    error::ValidateError, metadata::HandleUnknown, parse_policy_by_value, parser::ByValue,
-    AccessVector, AccessVectorComputer, Policy, SecurityContext, SecurityContextParseError,
+    metadata::HandleUnknown, parse_policy_by_value, parser::ByValue, AccessVector,
+    AccessVectorComputer, Policy, SecurityContext,
 };
 use starnix_sync::Mutex;
 use std::{collections::HashMap, num::NonZeroU32, ops::DerefMut, sync::Arc};
@@ -190,17 +190,21 @@ impl SecurityServer {
     pub fn security_context_to_sid(
         &self,
         security_context: &[u8],
-    ) -> Result<SecurityId, SecurityContextParseError> {
-        let parsed = SecurityContext::try_from(security_context)?;
-        // TODO: Validate the `SecurityContext` against the current policy.
-        Ok(self.state.lock().security_context_to_sid(parsed))
+    ) -> Result<SecurityId, anyhow::Error> {
+        let mut state = self.state.lock();
+        let policy = &state.policy.as_ref().ok_or(anyhow::anyhow!("no policy loaded"))?.parsed;
+        let context =
+            policy.parse_security_context(security_context).map_err(anyhow::Error::from)?;
+        Ok(state.security_context_to_sid(context))
     }
 
     /// Returns the Security Context string for the requested `sid`.
     /// This is used only where Contexts need to be stringified to expose to userspace, as
     /// is the case for e.g. the `/proc/*/attr/` filesystem.
     pub fn sid_to_security_context(&self, sid: &SecurityId) -> Option<Vec<u8>> {
-        self.state.lock().sid_to_security_context(sid).map(|x| x.to_string().into())
+        let state = self.state.lock();
+        let context = state.sid_to_security_context(sid)?;
+        Some(state.policy.as_ref()?.parsed.serialize_security_context(context))
     }
 
     /// Applies the supplied policy to the security server.
@@ -228,8 +232,9 @@ impl SecurityServer {
         // the necessary task transition / labelling hooks are implemented.
         initial_contexts.insert(
             SecurityId::initial(InitialSid::Kernel),
-            SecurityContext::try_from("unconfined_u:unconfined_r:unconfined_t:s0-s0:c0.c1023")
-                .map_err(|_| anyhow::Error::from(ValidateError::MissingUnconfined))?,
+            policy
+                .parsed
+                .parse_security_context(b"unconfined_u:unconfined_r:unconfined_t:s0-s0:c0.c1023")?,
         );
 
         // Replace any existing policy and update the [`SeLinuxStatus`].
@@ -517,10 +522,20 @@ mod tests {
     const TESTSUITE_BINARY_POLICY: &[u8] = include_bytes!("../testdata/policies/selinux_testsuite");
     const EMULATOR_BINARY_POLICY: &[u8] = include_bytes!("../testdata/policies/emulator");
 
+    fn security_server_with_emulator_policy() -> Arc<SecurityServer> {
+        let policy_bytes = EMULATOR_BINARY_POLICY.to_vec();
+        let security_server = SecurityServer::new(Mode::Enable);
+        assert_eq!(
+            Ok(()),
+            security_server.load_policy(policy_bytes).map_err(|e| format!("{:?}", e))
+        );
+        security_server
+    }
+
     #[fuchsia::test]
     fn sid_to_security_context() {
         let security_context = b"u:unconfined_r:unconfined_t:s0";
-        let security_server = SecurityServer::new(Mode::Enable);
+        let security_server = security_server_with_emulator_policy();
         let sid = security_server
             .security_context_to_sid(security_context)
             .expect("creating SID from security context should succeed");
@@ -532,7 +547,7 @@ mod tests {
 
     #[fuchsia::test]
     fn sids_for_different_security_contexts_differ() {
-        let security_server = SecurityServer::new(Mode::Enable);
+        let security_server = security_server_with_emulator_policy();
         let sid1 = security_server
             .security_context_to_sid(b"u:object_r:file_t:s0")
             .expect("creating SID from security context should succeed");
@@ -545,7 +560,8 @@ mod tests {
     #[fuchsia::test]
     fn sids_for_same_security_context_are_equal() {
         let security_context = b"u:unconfined_r:unconfined_t:s0";
-        let security_server = SecurityServer::new(Mode::Enable);
+        let security_server = security_server_with_emulator_policy();
+        let sid_count_before = security_server.state.lock().sids.len();
         let sid1 = security_server
             .security_context_to_sid(security_context)
             .expect("creating SID from security context should succeed");
@@ -553,29 +569,26 @@ mod tests {
             .security_context_to_sid(security_context)
             .expect("creating SID from security context should succeed");
         assert_eq!(sid1, sid2);
-        assert_eq!(security_server.state.lock().sids.len(), 1);
+        assert_eq!(security_server.state.lock().sids.len(), sid_count_before + 1);
     }
 
     #[fuchsia::test]
     fn sids_allocated_outside_initial_range() {
         let security_context = b"u:unconfined_r:unconfined_t:s0";
-        let security_server = SecurityServer::new(Mode::Enable);
+        let security_server = security_server_with_emulator_policy();
+        let sid_count_before = security_server.state.lock().sids.len();
         let sid = security_server
             .security_context_to_sid(security_context)
             .expect("creating SID from security context should succeed");
-        assert_eq!(security_server.state.lock().sids.len(), 1);
+        assert_eq!(security_server.state.lock().sids.len(), sid_count_before + 1);
         assert!(sid.0.get() >= FIRST_UNUSED_SID);
     }
 
     #[fuchsia::test]
     fn compute_access_vector_allows_all() {
         let security_server = SecurityServer::new(Mode::Enable);
-        let sid1 = security_server
-            .security_context_to_sid(b"u:object_r:file_t:s0")
-            .expect("creating SID from security context should succeed");
-        let sid2 = security_server
-            .security_context_to_sid(b"u:unconfined_r:unconfined_t:s0")
-            .expect("creating SID from security context should succeed");
+        let sid1 = SecurityId::initial(InitialSid::Kernel);
+        let sid2 = SecurityId::initial(InitialSid::Unlabeled);
         assert_eq!(
             security_server.compute_access_vector(sid1, sid2, ObjectClass::Process.into()),
             AccessVector::ALL
@@ -593,12 +606,7 @@ mod tests {
 
     #[fuchsia::test]
     fn loaded_policy_can_be_retrieved() {
-        let policy_bytes = EMULATOR_BINARY_POLICY.to_vec();
-        let security_server = SecurityServer::new(Mode::Enable);
-        assert_eq!(
-            Ok(()),
-            security_server.load_policy(policy_bytes).map_err(|e| format!("{:?}", e))
-        );
+        let security_server = security_server_with_emulator_policy();
         assert_eq!(EMULATOR_BINARY_POLICY, security_server.get_binary_policy().as_slice());
     }
 
@@ -743,15 +751,22 @@ mod tests {
     }
 
     #[fuchsia::test]
+    fn parse_security_context_no_policy() {
+        let security_server = SecurityServer::new(Mode::Enable);
+        let error = security_server
+            .security_context_to_sid(b"u:unconfined_r:unconfined_t:s0")
+            .expect_err("expected error");
+        let error_string = format!("{:?}", error);
+        assert!(error_string.contains("no policy"));
+    }
+
+    #[fuchsia::test]
     fn compute_new_file_sid_no_policy() {
         let security_server = SecurityServer::new(Mode::Enable);
-        let source_sid = security_server
-            .security_context_to_sid(b"u:unconfined_r:unconfined_t:s0")
-            .expect("creating SID from security context should succeed");
-        let target_sid = security_server
-            .security_context_to_sid(b"u:object_r:file_t:s0")
-            .expect("creating SID from security context should succeed");
 
+        // Only initial SIDs can exist, until a policy has been loaded.
+        let source_sid = SecurityId::initial(InitialSid::Kernel);
+        let target_sid = SecurityId::initial(InitialSid::Unlabeled);
         let error = security_server
             .compute_new_file_sid(source_sid, target_sid, FileClass::File)
             .expect_err("expected error");
@@ -761,19 +776,11 @@ mod tests {
 
     #[fuchsia::test]
     fn compute_new_file_sid_unknown_sids() {
-        let temporary_security_server = SecurityServer::new(Mode::Enable);
-        let source_sid = temporary_security_server
-            .security_context_to_sid(b"u:unconfined_r:unconfined_t:s0")
-            .expect("creating SID from security context should succeed");
-        let target_sid = temporary_security_server
-            .security_context_to_sid(b"u:object_r:file_t:s0")
-            .expect("creating SID from security context should succeed");
+        let security_server = security_server_with_emulator_policy();
 
-        // Setup `security_server` with a valid policy, but no notion of `source_sid` and
-        // `target_sid`.
-        let security_server = SecurityServer::new(Mode::Enable);
-        let policy_bytes = EMULATOR_BINARY_POLICY.to_vec();
-        security_server.load_policy(policy_bytes).expect("emulator binary policy loads");
+        // Synthesize two SIDs having been created, and subsequently invalidated.
+        let source_sid = SecurityId(NonZeroU32::new(FIRST_UNUSED_SID + 1).unwrap());
+        let target_sid = SecurityId(NonZeroU32::new(FIRST_UNUSED_SID + 2).unwrap());
 
         let error = security_server
             .compute_new_file_sid(source_sid, target_sid, FileClass::File)
@@ -788,7 +795,7 @@ mod tests {
         let security_server = SecurityServer::new(Mode::Enable);
         let policy_bytes =
             include_bytes!("../testdata/micro_policies/file_no_defaults_policy.pp").to_vec();
-        security_server.load_policy(policy_bytes).expect("emulator binary policy loads");
+        security_server.load_policy(policy_bytes).expect("binary policy loads");
 
         let source_sid = security_server
             .security_context_to_sid(b"user_u:unconfined_r:unconfined_t:s0-s1")
@@ -814,7 +821,7 @@ mod tests {
         let security_server = SecurityServer::new(Mode::Enable);
         let policy_bytes =
             include_bytes!("../testdata/micro_policies/file_source_defaults_policy.pp").to_vec();
-        security_server.load_policy(policy_bytes).expect("emulator binary policy loads");
+        security_server.load_policy(policy_bytes).expect("binary policy loads");
 
         let source_sid = security_server
             .security_context_to_sid(b"user_u:unconfined_r:unconfined_t:s0-s2:c0")
@@ -840,7 +847,7 @@ mod tests {
         let security_server = SecurityServer::new(Mode::Enable);
         let policy_bytes =
             include_bytes!("../testdata/micro_policies/file_target_defaults_policy.pp").to_vec();
-        security_server.load_policy(policy_bytes).expect("emulator binary policy loads");
+        security_server.load_policy(policy_bytes).expect("binary policy loads");
 
         let source_sid = security_server
             .security_context_to_sid(b"user_u:unconfined_r:unconfined_t:s0-s2:c0")
@@ -865,7 +872,7 @@ mod tests {
         let security_server = SecurityServer::new(Mode::Enable);
         let policy_bytes =
             include_bytes!("../testdata/micro_policies/file_range_source_low_policy.pp").to_vec();
-        security_server.load_policy(policy_bytes).expect("emulator binary policy loads");
+        security_server.load_policy(policy_bytes).expect("binary policy loads");
 
         let source_sid = security_server
             .security_context_to_sid(b"user_u:unconfined_r:unconfined_t:s0-s1:c0")
@@ -891,7 +898,7 @@ mod tests {
         let policy_bytes =
             include_bytes!("../testdata/micro_policies/file_range_source_low_high_policy.pp")
                 .to_vec();
-        security_server.load_policy(policy_bytes).expect("emulator binary policy loads");
+        security_server.load_policy(policy_bytes).expect("binary policy loads");
 
         let source_sid = security_server
             .security_context_to_sid(b"user_u:unconfined_r:unconfined_t:s0-s1:c0")
@@ -916,7 +923,7 @@ mod tests {
         let security_server = SecurityServer::new(Mode::Enable);
         let policy_bytes =
             include_bytes!("../testdata/micro_policies/file_range_source_high_policy.pp").to_vec();
-        security_server.load_policy(policy_bytes).expect("emulator binary policy loads");
+        security_server.load_policy(policy_bytes).expect("binary policy loads");
 
         let source_sid = security_server
             .security_context_to_sid(b"user_u:unconfined_r:unconfined_t:s0-s1:c0")
@@ -941,7 +948,7 @@ mod tests {
         let security_server = SecurityServer::new(Mode::Enable);
         let policy_bytes =
             include_bytes!("../testdata/micro_policies/file_range_target_low_policy.pp").to_vec();
-        security_server.load_policy(policy_bytes).expect("emulator binary policy loads");
+        security_server.load_policy(policy_bytes).expect("binary policy loads");
 
         let source_sid = security_server
             .security_context_to_sid(b"user_u:unconfined_r:unconfined_t:s1")
@@ -967,7 +974,7 @@ mod tests {
         let policy_bytes =
             include_bytes!("../testdata/micro_policies/file_range_target_low_high_policy.pp")
                 .to_vec();
-        security_server.load_policy(policy_bytes).expect("emulator binary policy loads");
+        security_server.load_policy(policy_bytes).expect("binary policy loads");
 
         let source_sid = security_server
             .security_context_to_sid(b"user_u:unconfined_r:unconfined_t:s1")
@@ -992,7 +999,7 @@ mod tests {
         let security_server = SecurityServer::new(Mode::Enable);
         let policy_bytes =
             include_bytes!("../testdata/micro_policies/file_range_target_high_policy.pp").to_vec();
-        security_server.load_policy(policy_bytes).expect("emulator binary policy loads");
+        security_server.load_policy(policy_bytes).expect("binary policy loads");
 
         let source_sid = security_server
             .security_context_to_sid(b"user_u:unconfined_r:unconfined_t:s0")
