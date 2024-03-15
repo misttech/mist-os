@@ -9,7 +9,6 @@
 #include <fidl/fuchsia.hardware.sysmem/cpp/wire.h>
 #include <fidl/fuchsia.sysmem/cpp/wire.h>
 #include <fidl/fuchsia.sysmem2/cpp/wire.h>
-#include <fuchsia/hardware/sysmem/cpp/banjo.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
@@ -41,8 +40,7 @@ using DdkDeviceType2 =
 // which memory to use.  For example, consider a scenario where Scenic wishes to use Vulkan for
 // image compositing, and then wishes to display the resulting image on the screen.  In order to do
 // so, it must allocate an image which is acceptable both to Vulkan and the display driver.
-class SysmemProxyDevice final : public DdkDeviceType2,
-                                public ddk::SysmemProtocol<SysmemProxyDevice, ddk::base_protocol> {
+class SysmemProxyDevice final : public DdkDeviceType2 {
  public:
   SysmemProxyDevice(zx_device_t* parent_device, sysmem_driver::Driver* parent_driver);
 
@@ -51,13 +49,6 @@ class SysmemProxyDevice final : public DdkDeviceType2,
   //
   // The rest of the methods are only valid to call after Bind().
   //
-
-  // SysmemProtocol implementation.
-  zx_status_t SysmemConnect(zx::channel allocator_request);
-  zx_status_t SysmemConnectV2(zx::channel allocator_request);
-  zx_status_t SysmemRegisterHeap(uint64_t heap, zx::channel heap_connection);
-  zx_status_t SysmemRegisterSecureMem(zx::channel tee_connection);
-  zx_status_t SysmemUnregisterSecureMem();
 
   // Ddk mixin implementations.
   // Quits the async loop and joins with all spawned threads.  Note: this doesn't tear down
@@ -72,8 +63,6 @@ class SysmemProxyDevice final : public DdkDeviceType2,
   void SetAuxServiceDirectory(SetAuxServiceDirectoryRequestView request,
                               SetAuxServiceDirectoryCompleter::Sync& completer) override;
 
-  const sysmem_protocol_t* proto() const { return &in_proc_sysmem_protocol_; }
-  const zx_device_t* device() const { return zxdev_; }
   async_dispatcher_t* dispatcher() { return loop_.dispatcher(); }
 
  private:
@@ -81,12 +70,6 @@ class SysmemProxyDevice final : public DdkDeviceType2,
   inspect::Inspector inspector_;
   async::Loop loop_;
   thrd_t loop_thrd_;
-
-  fidl::SyncClient<fuchsia_hardware_platform_device::Device> pdev_;
-
-  // In-proc sysmem interface.  Essentially an in-proc version of
-  // fuchsia.sysmem.DriverConnector.
-  sysmem_protocol_t in_proc_sysmem_protocol_;
 };
 
 }  // namespace display

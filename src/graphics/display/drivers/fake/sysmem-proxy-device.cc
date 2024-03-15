@@ -36,8 +36,7 @@ SysmemProxyDevice::SysmemProxyDevice(zx_device_t* parent_device,
                                      sysmem_driver::Driver* parent_driver)
     : DdkDeviceType2(parent_device),
       parent_driver_(parent_driver),
-      loop_(&kAsyncLoopConfigNeverAttachToThread),
-      in_proc_sysmem_protocol_{.ops = &sysmem_protocol_ops_, .ctx = this} {
+      loop_(&kAsyncLoopConfigNeverAttachToThread) {
   ZX_DEBUG_ASSERT(parent_);
   ZX_DEBUG_ASSERT(parent_driver_);
   zx_status_t status = loop_.StartThread("sysmem", &loop_thrd_);
@@ -46,7 +45,10 @@ SysmemProxyDevice::SysmemProxyDevice(zx_device_t* parent_device,
 
 void SysmemProxyDevice::ConnectV1(ConnectV1RequestView request,
                                   ConnectV1Completer::Sync& completer) {
-  zx_status_t status = SysmemConnect(request->allocator_request.TakeChannel());
+  static constexpr char kServicePath[] = "/svc/fuchsia.sysmem.Allocator";
+  LOG(INFO, "fdio_service_connect to service service: %s", kServicePath);
+  zx_status_t status =
+      fdio_service_connect(kServicePath, request->allocator_request.TakeChannel().release());
   if (status != ZX_OK) {
     LOG(INFO, "SysmemConnect() failed");
     return;
@@ -55,7 +57,10 @@ void SysmemProxyDevice::ConnectV1(ConnectV1RequestView request,
 
 void SysmemProxyDevice::ConnectV2(ConnectV2RequestView request,
                                   ConnectV2Completer::Sync& completer) {
-  zx_status_t status = SysmemConnectV2(request->allocator_request.TakeChannel());
+  static constexpr char kServicePath[] = "/svc/fuchsia.sysmem2.Allocator";
+  LOG(INFO, "fdio_service_connect to service service: %s", kServicePath);
+  zx_status_t status =
+      fdio_service_connect(kServicePath, request->allocator_request.TakeChannel().release());
   if (status != ZX_OK) {
     LOG(INFO, "SysmemConnect() failed");
     return;
@@ -67,43 +72,7 @@ void SysmemProxyDevice::SetAuxServiceDirectory(SetAuxServiceDirectoryRequestView
   LOG(INFO, "SysmemProxyDevice::SetAuxServiceDirectory() not supported");
 }
 
-zx_status_t SysmemProxyDevice::SysmemConnect(zx::channel allocator_request) {
-  const char* kSvcPath = "/svc/fuchsia.sysmem.Allocator";
-  LOG(INFO, "fdio_service_connect to service service: %s", kSvcPath);
-  return fdio_service_connect(kSvcPath, allocator_request.release());
-}
-
-zx_status_t SysmemProxyDevice::SysmemConnectV2(zx::channel allocator_request) {
-  const char* kSvcPath = "/svc/fuchsia.sysmem2.Allocator";
-  LOG(INFO, "fdio_service_connect to service service: %s", kSvcPath);
-  return fdio_service_connect(kSvcPath, allocator_request.release());
-}
-
-zx_status_t SysmemProxyDevice::SysmemRegisterHeap(uint64_t heap, zx::channel heap_connection) {
-  ZX_ASSERT(false);
-  return ZX_ERR_NOT_SUPPORTED;
-}
-
-zx_status_t SysmemProxyDevice::SysmemRegisterSecureMem(zx::channel tee_connection) {
-  ZX_ASSERT(false);
-  return ZX_ERR_NOT_SUPPORTED;
-}
-
-zx_status_t SysmemProxyDevice::SysmemUnregisterSecureMem() {
-  ZX_ASSERT(false);
-  return ZX_ERR_NOT_SUPPORTED;
-}
-
 zx_status_t SysmemProxyDevice::Bind() {
-  auto pdev_client = DdkConnectFidlProtocol<fuchsia_hardware_platform_device::Service::Device>();
-  if (pdev_client.is_error()) {
-    LOG(ERROR, "Failed DdkConnectFidlProtocol() for fuchsia.hardware.platform.device - status: %s",
-        pdev_client.status_string());
-    return pdev_client.status_value();
-  }
-
-  pdev_ = fidl::SyncClient(std::move(*pdev_client));
-
   zx_status_t status = DdkAdd(ddk::DeviceAddArgs("sysmem")
                                   .set_flags(DEVICE_ADD_ALLOW_MULTI_COMPOSITE)
                                   .set_inspect_vmo(inspector_.DuplicateVmo()));
