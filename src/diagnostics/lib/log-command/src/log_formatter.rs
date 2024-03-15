@@ -68,6 +68,13 @@ impl LogData {
             _ => None,
         }
     }
+
+    pub fn take_target_log(self) -> Option<LogsData> {
+        match self {
+            LogData::TargetLog(log) => Some(log),
+            _ => None,
+        }
+    }
 }
 
 impl From<LogsData> for LogData {

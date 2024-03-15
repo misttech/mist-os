@@ -3,14 +3,19 @@
 // found in the LICENSE file.
 
 use crate::condition_variable::LocalConditionVariable;
+use derivative::Derivative;
 use std::{
     cell::{Cell, RefCell, RefMut},
+    fmt::Debug,
     ops::{Deref, DerefMut},
 };
 
 /// Mutex designed for local executors which guarantees
 /// wakeup ordering.
+#[derive(Derivative)]
+#[derivative(Debug)]
 pub struct LocalOrderedMutex<T> {
+    #[derivative(Debug = "ignore")]
     pending_tasks: Cell<Option<LocalConditionVariable>>,
     value: RefCell<T>,
 }

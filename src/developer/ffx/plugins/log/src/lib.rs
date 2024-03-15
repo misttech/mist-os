@@ -17,9 +17,11 @@ use log_command::{
     },
     InstanceGetter, LogSubCommand, WatchCommand,
 };
-use log_symbolizer::{LogSymbolizer, Symbolizer};
-use std::io::Write;
+use log_symbolizer::LogSymbolizer;
+use std::{fmt::Debug, io::Write};
 use symbolizer::NonTransactionalSymbolizer;
+use tokio::io::{AsyncRead, AsyncWrite};
+use transactional_symbolizer::{RealSymbolizerProcess, SymbolizerProcess, TransactionalSymbolizer};
 
 // NOTE: This is required for the legacy ffx toolchain
 // which automatically adds ffx_core even though we don't use it.
@@ -31,7 +33,6 @@ mod mutex;
 mod symbolizer;
 #[cfg(test)]
 mod testing_utils;
-#[cfg(test)]
 mod transactional_symbolizer;
 
 const ARCHIVIST_MONIKER: &str = "bootstrap/archivist";
@@ -74,6 +75,8 @@ pub async fn log_impl(
     target_collection_proxy: TargetCollectionProxy,
     cmd: LogCommand,
 ) -> Result<(), LogError> {
+    let enable_transactional_symbolizer =
+        ffx_config::get("logger.transactional_logging.enabled").await.unwrap_or(false);
     let no_symbolize = cmd.no_symbolize;
     let instance_getter = rcs::root_realm_query(&rcs_proxy, TIMEOUT).await?;
     log_main(
@@ -81,10 +84,76 @@ pub async fn log_impl(
         rcs_proxy,
         target_collection_proxy,
         cmd,
-        if no_symbolize { None } else { Some(LogSymbolizer::new()) },
+        if no_symbolize {
+            None
+        } else {
+            if enable_transactional_symbolizer {
+                Some(EitherSymbolizer::Left(TransactionalSymbolizer::new(
+                    RealSymbolizerProcess::new().await?,
+                )?))
+            } else {
+                Some(EitherSymbolizer::Right(LogSymbolizer::new()))
+            }
+        },
         instance_getter,
     )
     .await
+}
+
+/// Temporary compatibility enum allowing for the usage of Symbolize
+/// and Symbolizer, until the legacy Symbolizer trait is removed.
+/// This is needed because we can't implement a foreign trait (Symbolize)
+/// on a foreign type (Either), and we likely don't want to define
+/// this in log_formatter as this is specific to ffx and not needed
+/// on the device.
+enum EitherSymbolizer<A, B> {
+    Left(A),
+    Right(B),
+}
+
+/// Temporary compatibility trait allowing for the usage of Symbolize
+/// and Symbolizer, until the legacy Symbolizer trait is removed.
+trait AsyncIntoSymbolize {
+    async fn into_symbolize(self) -> Result<impl Symbolize, LogError>;
+}
+
+impl AsyncIntoSymbolize for LogSymbolizer {
+    async fn into_symbolize(self) -> Result<impl Symbolize, LogError> {
+        NonTransactionalSymbolizer::new(self).await
+    }
+}
+
+impl<T: SymbolizerProcess + 'static> AsyncIntoSymbolize for TransactionalSymbolizer<T>
+where
+    T::Stdin: AsyncWrite + Unpin + Debug,
+    T::Stdout: AsyncRead + Unpin + Debug,
+{
+    async fn into_symbolize(self) -> Result<impl Symbolize, LogError> {
+        Ok(self)
+    }
+}
+
+impl<A: AsyncIntoSymbolize, B: AsyncIntoSymbolize> AsyncIntoSymbolize for EitherSymbolizer<A, B> {
+    async fn into_symbolize(self) -> Result<impl Symbolize, LogError> {
+        Ok(match self {
+            EitherSymbolizer::Left(result) => {
+                EitherSymbolizer::Left(result.into_symbolize().await?)
+            }
+            EitherSymbolizer::Right(result) => {
+                EitherSymbolizer::Right(result.into_symbolize().await?)
+            }
+        })
+    }
+}
+
+#[async_trait(?Send)]
+impl<A: Symbolize, B: Symbolize> Symbolize for EitherSymbolizer<A, B> {
+    async fn symbolize(&self, entry: LogEntry) -> Option<LogEntry> {
+        match self {
+            EitherSymbolizer::Left(value) => value.symbolize(entry).await,
+            EitherSymbolizer::Right(value) => value.symbolize(entry).await,
+        }
+    }
 }
 
 // Main logging event loop.
@@ -93,7 +162,7 @@ async fn log_main<W>(
     rcs_proxy: RemoteControlProxy,
     target_collection_proxy: TargetCollectionProxy,
     cmd: LogCommand,
-    symbolizer: Option<impl Symbolizer>,
+    symbolizer: Option<impl AsyncIntoSymbolize>,
     instance_getter: impl InstanceGetter,
 ) -> Result<(), LogError>
 where
@@ -187,14 +256,14 @@ async fn log_loop<W>(
     target_query: TargetQuery,
     cmd: LogCommand,
     mut formatter: impl LogFormatter + BootTimeAccessor + WriterContainer<W>,
-    symbolizer: Option<impl Symbolizer>,
+    symbolizer: Option<impl AsyncIntoSymbolize>,
     realm_query: &impl InstanceGetter,
 ) -> Result<(), LogError>
 where
     W: ToolIO<OutputItem = LogEntry> + Write,
 {
     let symbolizer_channel: Box<dyn Symbolize> = match symbolizer {
-        Some(inner) => Box::new(NonTransactionalSymbolizer::new(inner).await?),
+        Some(inner) => Box::new(inner.into_symbolize().await?),
         None => Box::new(NoOpSymoblizer {}),
     };
     let mut stream_mode = get_stream_mode(cmd.clone())?;
@@ -317,6 +386,18 @@ mod tests {
     struct FakeInstanceGetter {
         output: Vec<Moniker>,
         expected_selector: Option<String>,
+    }
+
+    impl AsyncIntoSymbolize for NoOpSymbolizer {
+        async fn into_symbolize(self) -> Result<impl Symbolize, LogError> {
+            NonTransactionalSymbolizer::new(self).await
+        }
+    }
+
+    impl AsyncIntoSymbolize for FakeSymbolizerForTest {
+        async fn into_symbolize(self) -> Result<impl Symbolize, LogError> {
+            NonTransactionalSymbolizer::new(self).await
+        }
     }
 
     #[async_trait(?Send)]

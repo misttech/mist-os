@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::transactional_symbolizer::ReadError;
 use ffx_config::api::ConfigError;
 use fidl_fuchsia_developer_ffx::{OpenTargetError, TargetConnectionError};
 use fidl_fuchsia_developer_remotecontrol::{ConnectCapabilityError, IdentifyHostError};
@@ -33,6 +34,8 @@ pub enum LogError {
     NoSymbolizerConfig,
     #[error("failed to connect to RealmQuery: {:?}", error)]
     RealmQueryConnectionFailed { error: i32 },
+    #[error(transparent)]
+    SymbolizerError(#[from] ReadError),
 }
 
 impl From<log_command::LogError> for LogError {
@@ -70,6 +73,7 @@ impl From<LogError> for fho::Error {
             FidlError(err) => fho::Error::Unexpected(err.into()),
             IOError(err) => fho::Error::Unexpected(err.into()),
             ConfigError(err) => fho::Error::Unexpected(err.into()),
+            SymbolizerError(err) => fho::Error::Unexpected(err.into()),
         }
     }
 }

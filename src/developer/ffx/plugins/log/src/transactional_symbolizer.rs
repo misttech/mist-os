@@ -2,18 +2,89 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::Error;
-use futures::Stream;
+use anyhow::{Context, Error};
+use diagnostics_data::LogsData;
+use ffx_config::global_env_context;
+use futures::{ready, select, FutureExt, Stream, StreamExt};
+use log_command::log_formatter::{LogData, LogEntry, Symbolize};
 use pin_project::pin_project;
 use std::{
     borrow::Cow,
-    fmt::Display,
+    cell::{Cell, RefCell},
+    collections::VecDeque,
+    fmt::{Debug, Display},
     mem::swap,
     ops::Deref,
     pin::Pin,
-    task::{ready, Context, Poll},
+    process::Stdio,
+    task::Poll,
 };
-use tokio::io::{AsyncBufReadExt, AsyncRead, BufReader, Lines};
+use symbol_index::ensure_symbol_index_registered;
+use tokio::{
+    io::{AsyncBufReadExt, AsyncRead, AsyncWrite, AsyncWriteExt, BufReader, Lines},
+    process::{Child, ChildStdin, ChildStdout, Command},
+};
+
+use crate::{condition_variable::LocalConditionVariable, mutex::LocalOrderedMutex};
+
+/// Connection to a symbolizer.
+pub trait SymbolizerProcess {
+    type Stdin;
+    type Stdout;
+    fn take_stdin(&mut self) -> Option<Self::Stdin>;
+    fn take_stdout(&mut self) -> Option<Self::Stdout>;
+}
+
+/// Symbolizer state that can only be accessed by one future at a time.
+#[derive(Debug)]
+struct SymbolizerState<T>
+where
+    T::Stdin: AsyncWrite + Unpin,
+    T::Stdout: AsyncRead + Unpin,
+    T: SymbolizerProcess,
+{
+    stdin: T::Stdin,
+    stdout: AsyncTransactionReader<T::Stdout>,
+}
+
+impl<T> SymbolizerState<T>
+where
+    T::Stdin: AsyncWrite + Unpin,
+    T::Stdout: AsyncRead + Unpin,
+    T: SymbolizerProcess,
+{
+    fn new(stdin: T::Stdin, stdout: T::Stdout) -> Self {
+        Self { stdin, stdout: AsyncTransactionReader::new(stdout) }
+    }
+}
+
+#[derive(Debug)]
+pub struct TransactionalSymbolizer<T: SymbolizerProcess>
+where
+    T::Stdin: AsyncWrite + Unpin + Debug,
+    T::Stdout: AsyncRead + Unpin + Debug,
+    T: SymbolizerProcess,
+{
+    /// Lines that need to be written to the symbolizer
+    pending_lines: RefCell<VecDeque<String>>,
+    current_transaction_id: Cell<u64>,
+    /// State that can only be accessed by one future at once
+    state: LocalOrderedMutex<SymbolizerState<T>>,
+    /// Woken when a line is available from the device.
+    line_available_event: LocalConditionVariable,
+}
+
+#[async_trait::async_trait(?Send)]
+impl<T> Symbolize for TransactionalSymbolizer<T>
+where
+    T::Stdin: AsyncWrite + Unpin + Debug,
+    T::Stdout: AsyncRead + Unpin + Debug,
+    T: SymbolizerProcess + 'static,
+{
+    async fn symbolize(&self, entry: LogEntry) -> Option<LogEntry> {
+        self.symbolize_internal(entry).await.map(|value| Some(value)).unwrap_or(None)
+    }
+}
 
 /// Start of transaction message
 const TRANSACTION_BEGIN_STR: &'static str = "TXN";
@@ -69,7 +140,13 @@ impl<'a> Deref for UnescapedMessage<'a> {
 
 impl<'a> Display for UnescapedMessage<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.0.fmt(f)
+        write!(f, "{}", self.0)
+    }
+}
+
+impl<'a> Display for EscapedMessage<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
     }
 }
 
@@ -159,6 +236,132 @@ impl<'a> UnescapedMessage<'a> {
     }
 }
 
+/// Real implementation of the symbolizer, not used by tests.
+pub struct RealSymbolizerProcess {
+    process: Child,
+}
+
+impl RealSymbolizerProcess {
+    /// Constructs a new symbolizer with prettification enabled.
+    pub async fn new() -> anyhow::Result<Self> {
+        let sdk =
+            global_env_context().context("Loading global environment context")?.get_sdk().await?;
+        if let Err(e) = ensure_symbol_index_registered(&sdk).await {
+            tracing::warn!("ensure_symbol_index_registered failed, error was: {:#?}", e);
+        }
+
+        let path = sdk.get_host_tool("symbolizer").context("getting symbolizer binary path")?;
+        let c = Command::new(path)
+            .args(vec![
+                "--symbol-server",
+                "gs://fuchsia-artifacts/debug",
+                "--symbol-server",
+                "gs://fuchsia-artifacts-internal/debug",
+                "--symbol-server",
+                "gs://fuchsia-artifacts-release/debug",
+                "--prettify-backtrace",
+            ])
+            .stdout(Stdio::piped())
+            .stdin(Stdio::piped())
+            .stderr(Stdio::inherit())
+            .spawn()
+            .context("Spawning symbolizer")?;
+        Ok(Self { process: c })
+    }
+}
+
+impl SymbolizerProcess for RealSymbolizerProcess {
+    type Stdin = ChildStdin;
+
+    type Stdout = BufReader<ChildStdout>;
+
+    fn take_stdin(&mut self) -> Option<Self::Stdin> {
+        self.process.stdin.take()
+    }
+
+    fn take_stdout(&mut self) -> Option<Self::Stdout> {
+        self.process.stdout.take().map(|stdout| BufReader::new(stdout))
+    }
+}
+
+impl<T> TransactionalSymbolizer<T>
+where
+    T: SymbolizerProcess + 'static,
+    T::Stdin: AsyncWrite + Debug + Unpin,
+    T::Stdout: AsyncRead + Unpin + Debug,
+{
+    pub fn new(mut symbolizer_process: T) -> Result<Self, ReadError> {
+        Ok(Self {
+            pending_lines: RefCell::new(VecDeque::new()),
+            state: LocalOrderedMutex::new(SymbolizerState::new(
+                symbolizer_process.take_stdin().ok_or(ReadError::NoStdin)?,
+                symbolizer_process.take_stdout().ok_or(ReadError::NoStdout)?,
+            )),
+            current_transaction_id: Cell::new(0),
+            line_available_event: LocalConditionVariable::new(),
+        })
+    }
+
+    async fn symbolize_internal(&self, entry: LogEntry) -> Result<LogEntry, ReadError> {
+        // Get a transaction ID, later these will be generated on-device
+        // and then translated to global IDs once devices support transactional logs.
+        let id = self.current_transaction_id.get();
+        self.current_transaction_id.set(id + 1);
+
+        // Encode incoming log into transactional log and write to symbolizer
+        let timestamp = entry.timestamp;
+        let target_log: LogsData = entry.data.take_target_log().ok_or(ReadError::NoTargetLog)?;
+        self.pending_lines.borrow_mut().push_back(format!(
+            "TXN:{id}:\n{}\nTXN-COMMIT:{id}:COMMIT\n",
+            UnescapedMessage::from(Cow::from(target_log.msg().unwrap_or("").to_string()))
+                .sanitize()
+                .to_string()
+        ));
+
+        // If an existing task was waiting for input, wake it.
+        self.line_available_event.notify_one();
+        // Execute symbolization, only one future can execute at once
+        let mut state = self.state.lock().await;
+        // Write any pending lines to the symbolizer and check for incoming messages
+        // from the device.
+        let (txn_id, msg) = loop {
+            self.write_lines_to_symbolizer(&mut state).await?;
+            // Check for incoming lines from the device, and output from the symbolizer concurrently.
+            // Ordering doesn't matter here so select! is OK instead of select_biased!.
+            let v = select! {
+                res = state.stdout.next().fuse() => res,
+                _ = self.line_available_event.clone().fuse() => None,
+            };
+            if let Some(v) = v {
+                break v;
+            }
+        }?;
+
+        // The TXN ID we get from the symbolizer should always match the expected TXN.
+        assert_eq!(txn_id, id);
+        let msg = EscapedMessage::from(msg.as_str()).unescape().to_string();
+        let new_entry = LogEntry { timestamp, data: LogData::SymbolizedTargetLog(target_log, msg) };
+        Ok(new_entry)
+    }
+
+    /// Writes pending lines to the symbolizer
+    async fn write_lines_to_symbolizer(
+        &self,
+        state: &mut SymbolizerState<T>,
+    ) -> Result<(), ReadError> {
+        while let Some(line) = self.pop_pending_line() {
+            state.stdin.write_all(line.as_bytes()).await?;
+        }
+        Ok(())
+    }
+
+    /// Pops a pending line if one is available.
+    fn pop_pending_line(&self) -> Option<String> {
+        let mut pending_lines = self.pending_lines.borrow_mut();
+        pending_lines.pop_front()
+    }
+}
+
 #[derive(thiserror::Error, Debug)]
 pub enum ReadError {
     #[error("Mismatched transaction ID")]
@@ -167,6 +370,12 @@ pub enum ReadError {
     UnknownError(#[from] anyhow::Error),
     #[error(transparent)]
     IoError(#[from] std::io::Error),
+    #[error("No target log found in JSON")]
+    NoTargetLog,
+    #[error("Failed to take stdin")]
+    NoStdin,
+    #[error("Failed to take stdout")]
+    NoStdout,
 }
 
 #[derive(Debug)]
@@ -247,6 +456,7 @@ impl<'a> TransactionReader<'a> {
 /// which can read from a symbolizer's stdout
 /// and return transactions as they complete.
 #[pin_project]
+#[derive(Debug)]
 struct AsyncTransactionReader<T> {
     reader: TransactionReader<'static>,
     #[pin]
@@ -270,7 +480,10 @@ where
 {
     type Item = Result<(u64, String), ReadError>;
 
-    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+    fn poll_next(
+        self: Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+    ) -> Poll<Option<Self::Item>> {
         let this = self.project();
         match ready!(this.lines.poll_next_line(cx)) {
             Ok(Some(line)) => {
@@ -297,8 +510,85 @@ where
 mod tests {
     use super::*;
     use assert_matches::assert_matches;
-    use futures::StreamExt;
+    use diagnostics_data::{BuilderArgs, LogsDataBuilder, Severity, Timestamp};
+    use fuchsia_sync::Mutex;
+    use futures::Future;
     use std::fmt::Write;
+    use std::{
+        sync::Arc,
+        task::{Context, Wake},
+    };
+    use tokio::io::{duplex, DuplexStream};
+
+    /// Size of duplex buffer
+    const DUPLEX_BUFFER_SIZE: usize = 4096;
+
+    /// Fake waker for testing purposes. Allows a test to determine
+    /// whether or not a future is expecting further calls to poll.
+    #[derive(Default)]
+    struct FakeWaker {
+        woke: Mutex<bool>,
+    }
+
+    impl FakeWaker {
+        fn reset(&self) {
+            *self.woke.lock() = false;
+        }
+
+        /// Polls a future until it both returns Poll::Pending
+        /// the waker isn't woke or the future returns a result.
+        /// This method polls the future at least once.
+        /// This is needed due to implementation details of Tokio,
+        /// which frequently yields to the executor in order to allow
+        /// for cooperative multitasking.
+        fn poll_while_woke<T>(
+            self: Arc<Self>,
+            mut future: Pin<&mut (impl Future<Output = T> + ?Sized)>,
+        ) -> Poll<T> {
+            let waker = self.clone().into();
+            let mut context = Context::from_waker(&waker);
+            self.clone().wake();
+            while *self.woke.lock() {
+                self.reset();
+                if let Poll::Ready(result) = future.as_mut().poll(&mut context) {
+                    return Poll::Ready(result);
+                }
+            }
+            Poll::Pending
+        }
+    }
+
+    impl Wake for FakeWaker {
+        fn wake(self: std::sync::Arc<Self>) {
+            *self.woke.lock() = true;
+        }
+    }
+
+    #[derive(Debug)]
+    struct FakeProcess {
+        stdin: Option<DuplexStream>,
+        stdout: Option<DuplexStream>,
+    }
+
+    impl SymbolizerProcess for FakeProcess {
+        type Stdin = DuplexStream;
+
+        type Stdout = DuplexStream;
+
+        fn take_stdin(&mut self) -> Option<Self::Stdin> {
+            self.stdin.take()
+        }
+
+        fn take_stdout(&mut self) -> Option<Self::Stdout> {
+            self.stdout.take()
+        }
+    }
+
+    impl FakeProcess {
+        fn new(stdin: DuplexStream, stdout: DuplexStream) -> Self {
+            Self { stdin: Some(stdin), stdout: Some(stdout) }
+        }
+    }
 
     #[fuchsia::test]
     async fn string_escape_test() {
@@ -341,6 +631,90 @@ mod tests {
             }
         }
         assert_eq!(output, "Hello world!\n\n\nTest line 2\nTXN:0:nothing");
+    }
+
+    #[fuchsia::test]
+    async fn read_transacted_integration_test() {
+        let fake_waker = Arc::new(FakeWaker::default());
+        let txn = LogEntry {
+            timestamp: 0.into(),
+            data: LogData::TargetLog(
+                LogsDataBuilder::new(BuilderArgs {
+                    component_url: Some("ffx".into()),
+                    moniker: "ffx".into(),
+                    severity: Severity::Info,
+                    timestamp_nanos: Timestamp::from(0),
+                })
+                .set_pid(1)
+                .set_tid(2)
+                .set_message("Hello world!")
+                .build(),
+            ),
+        };
+        let txn_data = assert_matches!(txn.data.as_target_log(), Some(value) => value).clone();
+        let txn_2 = LogEntry {
+            timestamp: 1.into(),
+            data: LogData::TargetLog(
+                LogsDataBuilder::new(BuilderArgs {
+                    component_url: Some("ffx".into()),
+                    moniker: "ffx".into(),
+                    severity: Severity::Info,
+                    timestamp_nanos: Timestamp::from(1),
+                })
+                .set_pid(1)
+                .set_tid(2)
+                .set_message("Unused world!")
+                .build(),
+            ),
+        };
+        let txn_data_2 = assert_matches!(txn_2.data.as_target_log(), Some(value) => value).clone();
+        let (stdin_sender, stdin_receiver) = duplex(DUPLEX_BUFFER_SIZE);
+        let (mut stdout_sender, stdout_receiver) = duplex(DUPLEX_BUFFER_SIZE);
+        let symbolizer = assert_matches!(
+            TransactionalSymbolizer::new(FakeProcess::new(stdin_sender, stdout_receiver)),
+            Ok(value) => value
+        );
+        let mut symbolize_task_0 = symbolizer.symbolize(txn);
+        let mut symbolize_task_1 = symbolizer.symbolize(txn_2);
+        // Both tasks should be in pending state until symbolizer transactions complete.
+        assert_eq!(fake_waker.clone().poll_while_woke(symbolize_task_0.as_mut()), Poll::Pending);
+        assert_eq!(fake_waker.clone().poll_while_woke(symbolize_task_1.as_mut()), Poll::Pending);
+
+        let mut reader = BufReader::new(stdin_receiver).lines();
+        assert_matches!(reader.next_line().await, Ok(Some(value)) if value == "TXN:0:");
+        assert_matches!(reader.next_line().await, Ok(Some(value)) if value == "Hello world!");
+        assert_matches!(stdout_sender.write_all("TXN:0:start\nHello world!\n\n\nTest line 2\nRTXN:0:nothing\nTXN-COMMIT:0:COMMIT\n".as_bytes()).await, Ok(()));
+        // TXN 1 shouldn't be completed
+        assert_eq!(fake_waker.clone().poll_while_woke(symbolize_task_1.as_mut()), Poll::Pending);
+        // TXN 0 should be completed
+        assert_eq!(
+            fake_waker.clone().poll_while_woke(symbolize_task_0.as_mut()),
+            Poll::Ready(Some(LogEntry {
+                data: LogData::SymbolizedTargetLog(
+                    txn_data.clone(),
+                    "Hello world!\n\n\nTest line 2\nTXN:0:nothing".into()
+                ),
+                timestamp: Timestamp::from(0),
+            }))
+        );
+        // TXN 1 should still not be completed.
+        assert_eq!(fake_waker.clone().poll_while_woke(symbolize_task_1.as_mut()), Poll::Pending);
+        // Complete the second transaction
+        assert_matches!(
+            stdout_sender
+                .write_all("TXN:1:start\nHello world 2!\nTXN-COMMIT:1:COMMIT\n".as_bytes())
+                .await,
+            Ok(())
+        );
+
+        // TXN 1 should have completed
+        assert_eq!(
+            fake_waker.clone().poll_while_woke(symbolize_task_1.as_mut()),
+            Poll::Ready(Some(LogEntry {
+                data: LogData::SymbolizedTargetLog(txn_data_2.clone(), "Hello world 2!".into()),
+                timestamp: Timestamp::from(1),
+            }))
+        );
     }
 
     #[fuchsia::test]
