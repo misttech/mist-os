@@ -629,7 +629,9 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
                     store.store_object_id(),
                     Mutation::insert_object(
                         ObjectKey::keys(self.object_id),
-                        ObjectValue::keys(EncryptionKeys::AES256XTS(WrappedKeys(vec![(0, key)]))),
+                        ObjectValue::keys(EncryptionKeys::AES256XTS(WrappedKeys::from(vec![(
+                            0, key,
+                        )]))),
                     ),
                     AssocObj::Owned(Box::new(UnwrappedKeys {
                         object_id: self.object_id,

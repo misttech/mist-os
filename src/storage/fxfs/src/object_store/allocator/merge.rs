@@ -172,7 +172,6 @@ mod tests {
             object_store::allocator::{
                 merge::{filter_tombstones, merge},
                 AllocatorKey, AllocatorValue,
-                AllocatorValue::Abs,
             },
         },
         std::ops::{Bound, Range},
@@ -208,11 +207,11 @@ mod tests {
     #[fuchsia::test]
     async fn test_no_overlap() {
         test_merge(
-            (0..100, Abs { count: 1, owner_object_id: 1 }),
-            (200..300, Abs { count: 1, owner_object_id: 1 }),
+            (0..100, AllocatorValue::Abs { count: 1, owner_object_id: 1 }),
+            (200..300, AllocatorValue::Abs { count: 1, owner_object_id: 1 }),
             &[
-                (0..100, Abs { count: 1, owner_object_id: 1 }),
-                (200..300, Abs { count: 1, owner_object_id: 1 }),
+                (0..100, AllocatorValue::Abs { count: 1, owner_object_id: 1 }),
+                (200..300, AllocatorValue::Abs { count: 1, owner_object_id: 1 }),
             ],
         )
         .await;
@@ -221,9 +220,9 @@ mod tests {
     #[fuchsia::test]
     async fn test_touching() {
         test_merge(
-            (0..100, Abs { count: 1, owner_object_id: 1 }),
-            (100..200, Abs { count: 1, owner_object_id: 1 }),
-            &[(0..200, Abs { count: 1, owner_object_id: 1 })],
+            (0..100, AllocatorValue::Abs { count: 1, owner_object_id: 1 }),
+            (100..200, AllocatorValue::Abs { count: 1, owner_object_id: 1 }),
+            &[(0..200, AllocatorValue::Abs { count: 1, owner_object_id: 1 })],
         )
         .await;
     }
@@ -231,14 +230,14 @@ mod tests {
     #[fuchsia::test]
     async fn test_identical() {
         test_merge(
-            (0..100, Abs { count: 2, owner_object_id: 1 }),
-            (0..100, Abs { count: 1, owner_object_id: 1 }),
-            &[(0..100, Abs { count: 2, owner_object_id: 1 })],
+            (0..100, AllocatorValue::Abs { count: 2, owner_object_id: 1 }),
+            (0..100, AllocatorValue::Abs { count: 1, owner_object_id: 1 }),
+            &[(0..100, AllocatorValue::Abs { count: 2, owner_object_id: 1 })],
         )
         .await;
         test_merge(
             (0..100, AllocatorValue::None),
-            (0..100, Abs { count: 1, owner_object_id: 1 }),
+            (0..100, AllocatorValue::Abs { count: 1, owner_object_id: 1 }),
             &[],
         )
         .await;
@@ -247,18 +246,18 @@ mod tests {
     #[fuchsia::test]
     async fn test_left_smaller_than_right_with_same_start() {
         test_merge(
-            (0..100, Abs { count: 2, owner_object_id: 1 }),
-            (0..200, Abs { count: 1, owner_object_id: 1 }),
+            (0..100, AllocatorValue::Abs { count: 2, owner_object_id: 1 }),
+            (0..200, AllocatorValue::Abs { count: 1, owner_object_id: 1 }),
             &[
-                (0..100, Abs { count: 2, owner_object_id: 1 }),
-                (100..200, Abs { count: 1, owner_object_id: 1 }),
+                (0..100, AllocatorValue::Abs { count: 2, owner_object_id: 1 }),
+                (100..200, AllocatorValue::Abs { count: 1, owner_object_id: 1 }),
             ],
         )
         .await;
         test_merge(
             (0..100, AllocatorValue::None),
-            (0..200, Abs { count: 1, owner_object_id: 1 }),
-            &[(100..200, Abs { count: 1, owner_object_id: 1 })],
+            (0..200, AllocatorValue::Abs { count: 1, owner_object_id: 1 }),
+            &[(100..200, AllocatorValue::Abs { count: 1, owner_object_id: 1 })],
         )
         .await;
     }
@@ -266,11 +265,11 @@ mod tests {
     #[fuchsia::test]
     async fn test_left_starts_before_right_with_overlap() {
         test_merge(
-            (0..200, Abs { count: 2, owner_object_id: 1 }),
-            (100..150, Abs { count: 1, owner_object_id: 1 }),
+            (0..200, AllocatorValue::Abs { count: 2, owner_object_id: 1 }),
+            (100..150, AllocatorValue::Abs { count: 1, owner_object_id: 1 }),
             &[
-                (0..100, Abs { count: 2, owner_object_id: 1 }),
-                (100..200, Abs { count: 2, owner_object_id: 1 }),
+                (0..100, AllocatorValue::Abs { count: 2, owner_object_id: 1 }),
+                (100..200, AllocatorValue::Abs { count: 2, owner_object_id: 1 }),
             ],
         )
         .await;
@@ -280,56 +279,56 @@ mod tests {
     async fn test_different_object_id() {
         // Case 1
         test_merge(
-            (0..100, Abs { count: 1, owner_object_id: 1 }),
-            (200..300, Abs { count: 1, owner_object_id: 2 }),
+            (0..100, AllocatorValue::Abs { count: 1, owner_object_id: 1 }),
+            (200..300, AllocatorValue::Abs { count: 1, owner_object_id: 2 }),
             &[
-                (0..100, Abs { count: 1, owner_object_id: 1 }),
-                (200..300, Abs { count: 1, owner_object_id: 2 }),
+                (0..100, AllocatorValue::Abs { count: 1, owner_object_id: 1 }),
+                (200..300, AllocatorValue::Abs { count: 1, owner_object_id: 2 }),
             ],
         )
         .await;
         // Case 2
         test_merge(
-            (0..100, Abs { count: 1, owner_object_id: 1 }),
-            (100..200, Abs { count: 1, owner_object_id: 2 }),
+            (0..100, AllocatorValue::Abs { count: 1, owner_object_id: 1 }),
+            (100..200, AllocatorValue::Abs { count: 1, owner_object_id: 2 }),
             &[
-                (0..100, Abs { count: 1, owner_object_id: 1 }),
-                (100..200, Abs { count: 1, owner_object_id: 2 }),
+                (0..100, AllocatorValue::Abs { count: 1, owner_object_id: 1 }),
+                (100..200, AllocatorValue::Abs { count: 1, owner_object_id: 2 }),
             ],
         )
         .await;
         // Case 3
         test_merge(
-            (0..100, Abs { count: 1, owner_object_id: 1 }),
-            (0..100, Abs { count: 1, owner_object_id: 2 }),
-            &[(0..100, Abs { count: 1, owner_object_id: 1 })],
+            (0..100, AllocatorValue::Abs { count: 1, owner_object_id: 1 }),
+            (0..100, AllocatorValue::Abs { count: 1, owner_object_id: 2 }),
+            &[(0..100, AllocatorValue::Abs { count: 1, owner_object_id: 1 })],
         )
         .await;
         // Case 4
         test_merge(
-            (0..100, Abs { count: 1, owner_object_id: 1 }),
-            (0..200, Abs { count: 1, owner_object_id: 2 }),
+            (0..100, AllocatorValue::Abs { count: 1, owner_object_id: 1 }),
+            (0..200, AllocatorValue::Abs { count: 1, owner_object_id: 2 }),
             &[
-                (0..100, Abs { count: 1, owner_object_id: 1 }),
-                (100..200, Abs { count: 1, owner_object_id: 2 }),
+                (0..100, AllocatorValue::Abs { count: 1, owner_object_id: 1 }),
+                (100..200, AllocatorValue::Abs { count: 1, owner_object_id: 2 }),
             ],
         )
         .await;
         // Case 5
         test_merge(
-            (0..200, Abs { count: 1, owner_object_id: 1 }),
-            (0..100, Abs { count: 1, owner_object_id: 2 }),
-            &[(0..200, Abs { count: 1, owner_object_id: 1 })],
+            (0..200, AllocatorValue::Abs { count: 1, owner_object_id: 1 }),
+            (0..100, AllocatorValue::Abs { count: 1, owner_object_id: 2 }),
+            &[(0..200, AllocatorValue::Abs { count: 1, owner_object_id: 1 })],
         )
         .await;
         // Case 6
         test_merge(
-            (0..100, Abs { count: 1, owner_object_id: 1 }),
-            (50..150, Abs { count: 1, owner_object_id: 2 }),
+            (0..100, AllocatorValue::Abs { count: 1, owner_object_id: 1 }),
+            (50..150, AllocatorValue::Abs { count: 1, owner_object_id: 2 }),
             &[
-                (0..50, Abs { count: 1, owner_object_id: 1 }),
-                (50..100, Abs { count: 1, owner_object_id: 1 }),
-                (100..150, Abs { count: 1, owner_object_id: 2 }),
+                (0..50, AllocatorValue::Abs { count: 1, owner_object_id: 1 }),
+                (50..100, AllocatorValue::Abs { count: 1, owner_object_id: 1 }),
+                (100..150, AllocatorValue::Abs { count: 1, owner_object_id: 2 }),
             ],
         )
         .await;

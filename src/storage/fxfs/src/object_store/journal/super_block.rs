@@ -40,9 +40,9 @@ use {
                 bootstrap_handle::BootstrapObjectHandle,
                 reader::{JournalReader, ReadResult},
                 writer::JournalWriter,
-                JournalCheckpoint, JournalHandle as _, BLOCK_SIZE,
+                JournalCheckpoint, JournalCheckpointV32, JournalHandle as _, BLOCK_SIZE,
             },
-            object_record::{ObjectItem, ObjectItemV36, ObjectItemV37},
+            object_record::{ObjectItemV32, ObjectItemV33, ObjectItemV37, ObjectItemV38},
             transaction::{AssocObj, Options},
             tree::MajorCompactable,
             DataObjectHandle, HandleOptions, HandleOwner, Mutation, ObjectKey, ObjectStore,
@@ -119,12 +119,14 @@ impl SuperBlockInstance {
     }
 }
 
+pub type SuperBlockHeader = SuperBlockHeaderV32;
+
 #[derive(
     Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize, TypeFingerprint, Versioned,
 )]
-pub struct SuperBlockHeader {
+pub struct SuperBlockHeaderV32 {
     /// The globally unique identifier for the filesystem.
-    guid: UuidWrapper,
+    guid: UuidWrapperV32,
 
     /// There are two super-blocks which are used in an A/B configuration. The super-block with the
     /// greatest generation number is what is used when mounting an Fxfs image; the other is
@@ -151,7 +153,7 @@ pub struct SuperBlockHeader {
     pub journal_object_id: u64,
 
     /// Start checkpoint for the journal file.
-    pub journal_checkpoint: JournalCheckpoint,
+    pub journal_checkpoint: JournalCheckpointV32,
 
     /// Offset of the journal file when the super-block was written.  If no entry is present in
     /// journal_file_offsets for a particular object, then an object might have dependencies on the
@@ -171,8 +173,19 @@ pub struct SuperBlockHeader {
     pub earliest_version: Version,
 }
 
+type UuidWrapper = UuidWrapperV32;
 #[derive(Clone, Default, Eq, PartialEq)]
-struct UuidWrapper(Uuid);
+struct UuidWrapperV32(Uuid);
+
+impl UuidWrapper {
+    fn new() -> Self {
+        Self(Uuid::new_v4())
+    }
+    #[cfg(test)]
+    fn nil() -> Self {
+        Self(Uuid::nil())
+    }
+}
 
 impl fmt::Debug for UuidWrapper {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -198,25 +211,28 @@ impl Serialize for UuidWrapper {
 
 impl<'de> Deserialize<'de> for UuidWrapper {
     fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        <[u8; 16]>::deserialize(deserializer).map(|bytes| UuidWrapper(Uuid::from_bytes(bytes)))
+        <[u8; 16]>::deserialize(deserializer).map(|bytes| UuidWrapperV32(Uuid::from_bytes(bytes)))
     }
 }
 
+pub type SuperBlockRecord = SuperBlockRecordV38;
+
 #[derive(Debug, Serialize, Deserialize, TypeFingerprint, Versioned)]
-pub enum SuperBlockRecord {
+pub enum SuperBlockRecordV38 {
     // When reading the super-block we know the initial extent, but not subsequent extents, so these
     // records need to exist to allow us to completely read the super-block.
     Extent(Range<u64>),
 
     // Following the super-block header are ObjectItem records that are to be replayed into the root
     // parent object store.
-    ObjectItem(ObjectItem),
+    ObjectItem(ObjectItemV38),
 
     // Marks the end of the full super-block.
     End,
 }
 
 #[derive(Debug, Deserialize, Migrate, Serialize, Versioned, TypeFingerprint)]
+#[migrate_to_version(SuperBlockRecordV38)]
 pub enum SuperBlockRecordV37 {
     Extent(Range<u64>),
     ObjectItem(ObjectItemV37),
@@ -225,9 +241,17 @@ pub enum SuperBlockRecordV37 {
 
 #[derive(Debug, Deserialize, Migrate, Serialize, Versioned, TypeFingerprint)]
 #[migrate_to_version(SuperBlockRecordV37)]
-pub enum SuperBlockRecordV36 {
+pub enum SuperBlockRecordV33 {
     Extent(Range<u64>),
-    ObjectItem(ObjectItemV36),
+    ObjectItem(ObjectItemV33),
+    End,
+}
+
+#[derive(Debug, Deserialize, Migrate, Serialize, Versioned, TypeFingerprint)]
+#[migrate_to_version(SuperBlockRecordV33)]
+pub enum SuperBlockRecordV32 {
+    Extent(Range<u64>),
+    ObjectItem(ObjectItemV32),
     End,
 }
 
@@ -453,7 +477,7 @@ impl SuperBlockHeader {
         earliest_version: Version,
     ) -> Self {
         SuperBlockHeader {
-            guid: UuidWrapper(Uuid::new_v4()),
+            guid: UuidWrapper::new(),
             generation: 1u64,
             root_parent_store_object_id,
             root_parent_graveyard_directory_object_id,
@@ -536,7 +560,7 @@ impl SuperBlockHeader {
         });
         // If guid is zeroed (e.g. in a newly imaged system), assign one randomly.
         if super_block_header.guid.0.is_nil() {
-            super_block_header.guid = UuidWrapper(Uuid::new_v4());
+            super_block_header.guid = UuidWrapper::new();
         }
         reader.set_version(super_block_version);
         Ok((super_block_header, RecordReader { reader }))
@@ -634,7 +658,6 @@ mod tests {
             serialized_types::LATEST_VERSION,
         },
         storage_device::{fake_device::FakeDevice, DeviceHolder},
-        uuid::Uuid,
     };
 
     // We require 512kiB each for A/B super-blocks, 256kiB for the journal (128kiB before flush)
@@ -857,7 +880,7 @@ mod tests {
             /* earliest_version: */ LATEST_VERSION,
         );
         // Ensure the superblock has no set GUID.
-        super_block_header_a.guid = UuidWrapper(Uuid::nil());
+        super_block_header_a.guid = UuidWrapper::nil();
         write(
             &super_block_header_a,
             compact_root_parent(fs.object_manager().root_parent_store().as_ref())

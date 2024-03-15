@@ -31,12 +31,12 @@ change is considered to be a non-breaking change or a breaking change.
 Non-breaking changes are changes where it is possible to migrate the filesystem
 from a previous storage format version to the latest storage format version.
 
-1. Make a copy the previous version of the struct and give it a new name
-   (e.g. rename it from `Foo` to `FooV1`). Where appropriate, drop comments and
-   restrict visibility of fields to private.
-2. Implement `From<OldVersion> for NewVersion` for their new version, e.g.
-   implement `From<FooV1> for Foo`, or use the Migrate derive macro.
-3. Bump the major component of `LATEST_VERSION` and set the minor component to zero.
+1. Bump the major component of `LATEST_VERSION` and set the minor component to zero.
+2. Create a new version of the modified struct(s), and re-alias the latest version to this
+   new struct (i.e. point `Foo` to `FooV_latest`).  Move the comments to the newly created
+   struct, and drop visibility if needed.
+3. Implement `From<OldVersion> for NewVersion` for their new version, e.g.
+   implement `From<FooV2> for Foo`, or use the Migrate derive macro.
 4. Update the `versioned_type!` invocation with the new major version as an open ended range
    at the start of the list. For example, if the new major version is 4 then change this:
 
@@ -51,12 +51,11 @@ from a previous storage format version to the latest storage format version.
    ```
    versioned_type! {
      4.. => Foo,   // The new struct used for Fxfs 4.x and above
-     2.. => FooV1  // The old struct used for Fxfs 2.x and 3.x
+     2.. => FooV2  // The old struct used for Fxfs 2.x and 3.x
    }
    ```
 
-   Note that the version and the type name suffix don't need to correspond. In
-   the above example, it is invalid to decode FooV1 (or Foo) at Fxfs version 1.
+   Note that the version and the type name suffix should match.
 
 ### TypeFingerprint
 
@@ -108,7 +107,7 @@ expected to be rare.
    ```
    versioned_type! {
      4.. => Foo,
-     2.. => FooV1
+     2.. => FooV2
    }
    ```
 

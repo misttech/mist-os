@@ -9,11 +9,13 @@ use {
         lsm_tree::types::{
             Item, ItemRef, LayerKey, MergeType, OrdLowerBound, OrdUpperBound, RangeKey, SortByU64,
         },
-        object_store::extent_record::{ExtentKey, ExtentValue, ExtentValueV36, ExtentValueV37},
+        object_store::extent_record::{
+            ExtentKey, ExtentKeyV32, ExtentValue, ExtentValueV32, ExtentValueV37, ExtentValueV38,
+        },
         serialized_types::{migrate_to_version, Migrate, Versioned},
     },
     fprint::TypeFingerprint,
-    fxfs_crypto::WrappedKeys,
+    fxfs_crypto::WrappedKeysV32,
     serde::{Deserialize, Serialize},
     std::{
         default::Default,
@@ -23,9 +25,11 @@ use {
 };
 
 /// ObjectDescriptor is the set of possible records in the object store.
+pub type ObjectDescriptor = ObjectDescriptorV32;
+
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, TypeFingerprint)]
 #[cfg_attr(fuzz, derive(arbitrary::Arbitrary))]
-pub enum ObjectDescriptor {
+pub enum ObjectDescriptorV32 {
     /// A file (in the generic sense; i.e. an object with some attributes).
     File,
     /// A directory (in the generic sense; i.e. an object with children).
@@ -37,29 +41,33 @@ pub enum ObjectDescriptor {
 }
 
 /// For specifying what property of the project is being addressed.
+pub type ProjectProperty = ProjectPropertyV32;
+
 #[derive(
     Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize, Deserialize, TypeFingerprint,
 )]
 #[cfg_attr(fuzz, derive(arbitrary::Arbitrary))]
-pub enum ProjectProperty {
+pub enum ProjectPropertyV32 {
     /// The configured limit for the project.
     Limit,
     /// The currently tracked usage for the project.
     Usage,
 }
 
+pub type ObjectKeyData = ObjectKeyDataV32;
+
 #[derive(
     Clone, Debug, Eq, Hash, PartialEq, PartialOrd, Ord, Serialize, Deserialize, TypeFingerprint,
 )]
 #[cfg_attr(fuzz, derive(arbitrary::Arbitrary))]
-pub enum ObjectKeyData {
+pub enum ObjectKeyDataV32 {
     /// A generic, untyped object.  This must come first and sort before all other keys for a given
     /// object because it's also used as a tombstone and it needs to merge with all following keys.
     Object,
     /// Encryption keys for an object.
     Keys,
     /// An attribute associated with an object.  It has a 64-bit ID.
-    Attribute(u64, AttributeKey),
+    Attribute(u64, AttributeKeyV32),
     /// A child of a directory.
     /// We store the filename as a case-preserving unicode string.
     Child { name: String },
@@ -68,7 +76,7 @@ pub enum ObjectKeyData {
     /// Project ID info. This should only be attached to the volume's root node. Used to address the
     /// configured limit and the usage tracking which are ordered after the `project_id` to provide
     /// locality of the two related values.
-    Project { project_id: u64, property: ProjectProperty },
+    Project { project_id: u64, property: ProjectPropertyV32 },
     /// An extended attribute associated with an object. It stores the name used for the extended
     /// attribute, which has a maximum size of 255 bytes enforced by fuchsia.io.
     ExtendedAttribute { name: Vec<u8> },
@@ -76,37 +84,21 @@ pub enum ObjectKeyData {
     GraveyardAttributeEntry { object_id: u64, attribute_id: u64 },
 }
 
-#[derive(Debug, Deserialize, Migrate, Serialize, TypeFingerprint)]
-pub enum ObjectKeyDataV25 {
-    Object,
-    Keys,
-    Attribute(u64, AttributeKey),
-    Child { name: String },
-    GraveyardEntry { object_id: u64 },
-    Project { project_id: u64, property: ProjectProperty },
-}
-
-#[derive(Debug, Deserialize, Migrate, Serialize, TypeFingerprint)]
-#[migrate_to_version(ObjectKeyDataV25)]
-pub enum ObjectKeyDataV5 {
-    Object,
-    Keys,
-    Attribute(u64, AttributeKey),
-    Child { name: String },
-    GraveyardEntry { object_id: u64 },
-}
+pub type AttributeKey = AttributeKeyV32;
 
 #[derive(
     Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize, Deserialize, TypeFingerprint,
 )]
 #[cfg_attr(fuzz, derive(arbitrary::Arbitrary))]
-pub enum AttributeKey {
+pub enum AttributeKeyV32 {
     // Order here is important: code expects Attribute to precede Extent.
     Attribute,
-    Extent(ExtentKey),
+    Extent(ExtentKeyV32),
 }
 
 /// ObjectKey is a key in the object store.
+pub type ObjectKey = ObjectKeyV32;
+
 #[derive(
     Clone,
     Debug,
@@ -121,11 +113,11 @@ pub enum AttributeKey {
     Versioned,
 )]
 #[cfg_attr(fuzz, derive(arbitrary::Arbitrary))]
-pub struct ObjectKey {
+pub struct ObjectKeyV32 {
     /// The ID of the object referred to.
     pub object_id: u64,
     /// The type and data of the key.
-    pub data: ObjectKeyData,
+    pub data: ObjectKeyDataV32,
 }
 
 impl SortByU64 for ObjectKey {
@@ -323,6 +315,8 @@ impl RangeKey for ObjectKey {
 }
 
 /// UNIX epoch based timestamp in the UTC timezone.
+pub type Timestamp = TimestampV32;
+
 #[derive(
     Copy,
     Clone,
@@ -337,7 +331,7 @@ impl RangeKey for ObjectKey {
     TypeFingerprint,
 )]
 #[cfg_attr(fuzz, derive(arbitrary::Arbitrary))]
-pub struct Timestamp {
+pub struct TimestampV32 {
     pub secs: u64,
     pub nanos: u32,
 }
@@ -378,9 +372,11 @@ impl From<Timestamp> for std::time::Duration {
     }
 }
 
+pub type ObjectKind = ObjectKindV38;
+
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, TypeFingerprint)]
 #[cfg_attr(fuzz, derive(arbitrary::Arbitrary))]
-pub enum ObjectKind {
+pub enum ObjectKindV38 {
     File {
         /// The number of references to this file.
         refs: u64,
@@ -403,29 +399,33 @@ pub enum ObjectKind {
 }
 
 #[derive(Debug, Deserialize, Serialize, TypeFingerprint)]
-pub enum ObjectKindV31 {
+pub enum ObjectKindV32 {
     File { refs: u64 },
     Directory { sub_dirs: u64 },
     Graveyard,
     Symlink { refs: u64, link: Vec<u8> },
 }
 
-impl From<ObjectKindV31> for ObjectKind {
-    fn from(value: ObjectKindV31) -> Self {
+impl From<ObjectKindV32> for ObjectKindV38 {
+    fn from(value: ObjectKindV32) -> Self {
         match value {
             // Overwrite extents are introduced in the same version as this flag, so nothing before
             // it has these extents.
-            ObjectKindV31::File { refs } => ObjectKind::File { refs, has_overwrite_extents: false },
-            ObjectKindV31::Directory { sub_dirs } => ObjectKind::Directory { sub_dirs },
-            ObjectKindV31::Graveyard => ObjectKind::Graveyard,
-            ObjectKindV31::Symlink { refs, link } => ObjectKind::Symlink { refs, link },
+            ObjectKindV32::File { refs } => {
+                ObjectKindV38::File { refs, has_overwrite_extents: false }
+            }
+            ObjectKindV32::Directory { sub_dirs } => ObjectKindV38::Directory { sub_dirs },
+            ObjectKindV32::Graveyard => ObjectKindV38::Graveyard,
+            ObjectKindV32::Symlink { refs, link } => ObjectKindV38::Symlink { refs, link },
         }
     }
 }
 
+pub type EncryptionKeys = EncryptionKeysV32;
+
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, TypeFingerprint)]
-pub enum EncryptionKeys {
-    AES256XTS(WrappedKeys),
+pub enum EncryptionKeysV32 {
+    AES256XTS(WrappedKeysV32),
 }
 
 #[cfg(fuzz)]
@@ -445,15 +445,17 @@ impl<'a> arbitrary::Arbitrary<'a> for EncryptionKeys {
                     )
                 })?);
             }
-            Ok(EncryptionKeys::AES256XTS(WrappedKeys(keys)))
+            Ok(EncryptionKeys::AES256XTS(fxfs_crypto::WrappedKeys::from(keys)))
         })
     }
 }
 /// This consists of POSIX attributes that are not used in Fxfs but it may be meaningful to some
 /// clients to have the ability to to set and retrieve these values.
+pub type PosixAttributes = PosixAttributesV32;
+
 #[derive(Clone, Debug, Copy, Default, Serialize, Deserialize, PartialEq, TypeFingerprint)]
 #[cfg_attr(fuzz, derive(arbitrary::Arbitrary))]
-pub struct PosixAttributes {
+pub struct PosixAttributesV32 {
     /// The mode bits associated with this object
     pub mode: u32,
     /// User ID of owner
@@ -467,36 +469,32 @@ pub struct PosixAttributes {
 /// Object-level attributes.  Note that these are not the same as "attributes" in the
 /// ObjectValue::Attribute sense, which refers to an arbitrary data payload associated with an
 /// object.  This naming collision is unfortunate.
+pub type ObjectAttributes = ObjectAttributesV32;
+
 #[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, TypeFingerprint)]
 #[cfg_attr(fuzz, derive(arbitrary::Arbitrary))]
-pub struct ObjectAttributes {
+pub struct ObjectAttributesV32 {
     /// The timestamp at which the object was created (i.e. crtime).
-    pub creation_time: Timestamp,
+    pub creation_time: TimestampV32,
     /// The timestamp at which the object's data was last modified (i.e. mtime).
-    pub modification_time: Timestamp,
+    pub modification_time: TimestampV32,
     /// The project id to associate this object's resource usage with. Zero means none.
     pub project_id: u64,
     /// Mode, uid, gid, and rdev
-    pub posix_attributes: Option<PosixAttributes>,
+    pub posix_attributes: Option<PosixAttributesV32>,
     /// The number of bytes allocated to all extents across all attributes for this object.
     pub allocated_size: u64,
     /// The timestamp at which the object was last read (i.e. atime).
-    pub access_time: Timestamp,
+    pub access_time: TimestampV32,
     /// The timestamp at which the object's status was last modified (i.e. ctime).
-    pub change_time: Timestamp,
+    pub change_time: TimestampV32,
 }
-#[derive(Debug, Default, Deserialize, Migrate, Serialize, TypeFingerprint)]
-pub struct ObjectAttributesV31 {
-    pub creation_time: Timestamp,
-    pub modification_time: Timestamp,
-    pub project_id: u64,
-    pub posix_attributes: Option<PosixAttributes>,
-    pub allocated_size: u64,
-}
+
+pub type ExtendedAttributeValue = ExtendedAttributeValueV32;
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, TypeFingerprint)]
 #[cfg_attr(fuzz, derive(arbitrary::Arbitrary))]
-pub enum ExtendedAttributeValue {
+pub enum ExtendedAttributeValueV32 {
     /// The extended attribute value is stored directly in this object. If the value is above a
     /// certain size, it should be stored as an attribute with extents instead.
     Inline(Vec<u8>),
@@ -506,37 +504,45 @@ pub enum ExtendedAttributeValue {
 }
 
 /// Id and descriptor for a child entry.
+pub type ChildValue = ChildValueV32;
+
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, TypeFingerprint)]
 #[cfg_attr(fuzz, derive(arbitrary::Arbitrary))]
-pub struct ChildValue {
+pub struct ChildValueV32 {
     /// The ID of the child object.
     pub object_id: u64,
     /// Describes the type of the child.
-    pub object_descriptor: ObjectDescriptor,
+    pub object_descriptor: ObjectDescriptorV32,
 }
+
+pub type RootDigest = RootDigestV33;
 
 #[derive(
     Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize, Deserialize, TypeFingerprint,
 )]
 #[cfg_attr(fuzz, derive(arbitrary::Arbitrary))]
-pub enum RootDigest {
+pub enum RootDigestV33 {
     Sha256([u8; 32]),
     Sha512(Vec<u8>),
 }
 
+pub type FsverityMetadata = FsverityMetadataV33;
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TypeFingerprint, Versioned)]
 #[cfg_attr(fuzz, derive(arbitrary::Arbitrary))]
-pub struct FsverityMetadata {
-    pub root_digest: RootDigest,
+pub struct FsverityMetadataV33 {
+    pub root_digest: RootDigestV33,
     pub salt: Vec<u8>,
 }
 
 /// ObjectValue is the value of an item in the object store.
 /// Note that the tree stores deltas on objects, so these values describe deltas. Unless specified
 /// otherwise, a value indicates an insert/replace mutation.
+pub type ObjectValue = ObjectValueV38;
+
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, TypeFingerprint, Versioned)]
 #[cfg_attr(fuzz, derive(arbitrary::Arbitrary))]
-pub enum ObjectValue {
+pub enum ObjectValueV38 {
     /// Some keys have no value (this often indicates a tombstone of some sort).  Records with this
     /// value are always filtered when a major compaction is performed, so the meaning must be the
     /// same as if the item was not present.
@@ -545,15 +551,15 @@ pub enum ObjectValue {
     /// (None) i.e. their value is really a boolean: None => false, Some => true.
     Some,
     /// The value for an ObjectKey::Object record.
-    Object { kind: ObjectKind, attributes: ObjectAttributes },
+    Object { kind: ObjectKindV38, attributes: ObjectAttributesV32 },
     /// Encryption keys for an object.
-    Keys(EncryptionKeys),
+    Keys(EncryptionKeysV32),
     /// An attribute associated with a file object. |size| is the size of the attribute in bytes.
     Attribute { size: u64 },
     /// An extent associated with an object.
-    Extent(ExtentValue),
+    Extent(ExtentValueV38),
     /// A child of an object.
-    Child(ChildValue),
+    Child(ChildValueV32),
     /// Graveyard entries can contain these entries which will cause a file that has extents beyond
     /// EOF to be trimmed at mount time.  This is used in cases where shrinking a file can exceed
     /// the bounds of a single transaction.
@@ -562,41 +568,57 @@ pub enum ObjectValue {
     BytesAndNodes { bytes: i64, nodes: i64 },
     /// A value for an extended attribute. Either inline or a redirection to an attribute with
     /// extents.
-    ExtendedAttribute(ExtendedAttributeValue),
+    ExtendedAttribute(ExtendedAttributeValueV32),
     /// An attribute associated with a verified file object. |size| is the size of the attribute
     /// in bytes. |fsverity_metadata| holds the descriptor for the fsverity-enabled file.
-    VerifiedAttribute { size: u64, fsverity_metadata: FsverityMetadata },
+    VerifiedAttribute { size: u64, fsverity_metadata: FsverityMetadataV33 },
 }
 
 #[derive(Debug, Serialize, Deserialize, Migrate, TypeFingerprint, Versioned)]
+#[migrate_to_version(ObjectValueV38)]
 pub enum ObjectValueV37 {
     None,
     Some,
-    Object { kind: ObjectKindV31, attributes: ObjectAttributes },
-    Keys(EncryptionKeys),
+    Object { kind: ObjectKindV32, attributes: ObjectAttributesV32 },
+    Keys(EncryptionKeysV32),
     Attribute { size: u64 },
     Extent(ExtentValueV37),
-    Child(ChildValue),
+    Child(ChildValueV32),
     Trim,
     BytesAndNodes { bytes: i64, nodes: i64 },
-    ExtendedAttribute(ExtendedAttributeValue),
-    VerifiedAttribute { size: u64, fsverity_metadata: FsverityMetadata },
+    ExtendedAttribute(ExtendedAttributeValueV32),
+    VerifiedAttribute { size: u64, fsverity_metadata: FsverityMetadataV33 },
 }
 
 #[derive(Debug, Serialize, Deserialize, Migrate, TypeFingerprint, Versioned)]
 #[migrate_to_version(ObjectValueV37)]
-pub enum ObjectValueV36 {
+pub enum ObjectValueV33 {
     None,
     Some,
-    Object { kind: ObjectKindV31, attributes: ObjectAttributes },
-    Keys(EncryptionKeys),
+    Object { kind: ObjectKindV32, attributes: ObjectAttributesV32 },
+    Keys(EncryptionKeysV32),
     Attribute { size: u64 },
-    Extent(ExtentValueV36),
-    Child(ChildValue),
+    Extent(ExtentValueV32),
+    Child(ChildValueV32),
     Trim,
     BytesAndNodes { bytes: i64, nodes: i64 },
-    ExtendedAttribute(ExtendedAttributeValue),
-    VerifiedAttribute { size: u64, fsverity_metadata: FsverityMetadata },
+    ExtendedAttribute(ExtendedAttributeValueV32),
+    VerifiedAttribute { size: u64, fsverity_metadata: FsverityMetadataV33 },
+}
+
+#[derive(Debug, Deserialize, Migrate, Serialize, Versioned, TypeFingerprint)]
+#[migrate_to_version(ObjectValueV33)]
+pub enum ObjectValueV32 {
+    None,
+    Some,
+    Object { kind: ObjectKindV32, attributes: ObjectAttributesV32 },
+    Keys(EncryptionKeysV32),
+    Attribute { size: u64 },
+    Extent(ExtentValueV32),
+    Child(ChildValueV32),
+    Trim,
+    BytesAndNodes { bytes: i64, nodes: i64 },
+    ExtendedAttribute(ExtendedAttributeValueV32),
 }
 
 impl ObjectValue {
@@ -676,9 +698,29 @@ impl ObjectValue {
     }
 }
 
-pub type ObjectItem = Item<ObjectKey, ObjectValue>;
-pub type ObjectItemV37 = Item<ObjectKey, ObjectValueV37>;
-pub type ObjectItemV36 = Item<ObjectKey, ObjectValueV36>;
+pub type ObjectItem = ObjectItemV38;
+pub type ObjectItemV38 = Item<ObjectKeyV32, ObjectValueV38>;
+pub type ObjectItemV37 = Item<ObjectKeyV32, ObjectValueV37>;
+pub type ObjectItemV33 = Item<ObjectKeyV32, ObjectValueV33>;
+pub type ObjectItemV32 = Item<ObjectKeyV32, ObjectValueV32>;
+
+impl From<ObjectItemV37> for ObjectItemV38 {
+    fn from(item: ObjectItemV37) -> Self {
+        Self { key: item.key, value: item.value.into(), sequence: item.sequence }
+    }
+}
+
+impl From<ObjectItemV33> for ObjectItemV37 {
+    fn from(item: ObjectItemV33) -> Self {
+        Self { key: item.key, value: item.value.into(), sequence: item.sequence }
+    }
+}
+
+impl From<ObjectItemV32> for ObjectItemV33 {
+    fn from(item: ObjectItemV32) -> Self {
+        Self { key: item.key, value: item.value.into(), sequence: item.sequence }
+    }
+}
 
 impl ObjectItem {
     pub fn is_tombstone(&self) -> bool {

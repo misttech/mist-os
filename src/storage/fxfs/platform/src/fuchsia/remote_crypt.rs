@@ -43,12 +43,7 @@ impl Crypt for RemoteCrypt {
         let (wrapping_key_id, key, unwrapped_key) =
             self.client.create_key(owner, purpose.into_fidl()).await?.map_err(|e| anyhow!(e))?;
         Ok((
-            WrappedKey {
-                wrapping_key_id,
-                key: WrappedKeyBytes(
-                    key.try_into().map_err(|_| anyhow!("Unexpected wrapped key length"))?,
-                ),
-            },
+            WrappedKey { wrapping_key_id, key: WrappedKeyBytes::try_from(key)? },
             UnwrappedKey::new(
                 unwrapped_key.try_into().map_err(|_| anyhow!("Unexpected unwrapped key length"))?,
             ),

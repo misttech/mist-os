@@ -50,13 +50,29 @@ impl UnwrappedKey {
 
 pub type UnwrappedKeys = Vec<(u64, UnwrappedKey)>;
 
+pub type WrappedKeyBytes = WrappedKeyBytesV32;
+
 #[repr(transparent)]
 #[derive(Clone, Debug, PartialEq)]
-pub struct WrappedKeyBytes(pub [u8; WRAPPED_KEY_SIZE]);
+pub struct WrappedKeyBytesV32(pub [u8; WRAPPED_KEY_SIZE]);
 
 impl Default for WrappedKeyBytes {
     fn default() -> Self {
         Self([0u8; WRAPPED_KEY_SIZE])
+    }
+}
+
+impl TryFrom<Vec<u8>> for WrappedKeyBytes {
+    type Error = anyhow::Error;
+
+    fn try_from(buf: Vec<u8>) -> Result<Self, Self::Error> {
+        Ok(Self(buf.try_into().map_err(|_| anyhow!("wrapped key wrong length"))?))
+    }
+}
+
+impl From<[u8; WRAPPED_KEY_SIZE]> for WrappedKeyBytes {
+    fn from(buf: [u8; WRAPPED_KEY_SIZE]) -> Self {
+        Self(buf)
     }
 }
 
@@ -118,15 +134,17 @@ impl<'de> Deserialize<'de> for WrappedKeyBytes {
                 let orig_len = bytes.len();
                 let bytes: [u8; WRAPPED_KEY_SIZE] =
                     bytes.try_into().map_err(|_| SerdeError::invalid_length(orig_len, &self))?;
-                Ok(WrappedKeyBytes(bytes))
+                Ok(WrappedKeyBytes::from(bytes))
             }
         }
         deserializer.deserialize_byte_buf(WrappedKeyVisitor)
     }
 }
 
+pub type WrappedKey = WrappedKeyV32;
+
 #[derive(Clone, Debug, Serialize, Deserialize, TypeFingerprint, PartialEq)]
-pub struct WrappedKey {
+pub struct WrappedKeyV32 {
     /// The identifier of the wrapping key.  The identifier has meaning to whatever is doing the
     /// unwrapping.
     pub wrapping_key_id: u64,
@@ -135,18 +153,32 @@ pub struct WrappedKey {
     /// https://csrc.nist.gov/CSRC/media/Projects/Block-Cipher-Techniques/documents/BCM/Comments/XTS/follow-up_XTS_comments-Ball.pdf)
     /// which is what we do here.  Since the key is wrapped with AES-GCM-SIV, there are an
     /// additional 16 bytes paid per key (so the actual key material is 32 bytes once unwrapped).
-    pub key: WrappedKeyBytes,
+    pub key: WrappedKeyBytesV32,
 }
 
 /// To support key rolling and clones, a file can have more than one key.  Each key has an ID that
 /// unique to the file.
+pub type WrappedKeys = WrappedKeysV32;
+
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, TypeFingerprint)]
-pub struct WrappedKeys(pub Vec<(u64, WrappedKey)>);
+pub struct WrappedKeysV32(pub Vec<(u64, WrappedKeyV32)>);
+
+impl From<Vec<(u64, WrappedKey)>> for WrappedKeys {
+    fn from(buf: Vec<(u64, WrappedKey)>) -> Self {
+        Self(buf)
+    }
+}
 
 impl std::ops::Deref for WrappedKeys {
-    type Target = [(u64, WrappedKey)];
+    type Target = Vec<(u64, WrappedKey)>;
     fn deref(&self) -> &Self::Target {
         &self.0
+    }
+}
+
+impl std::ops::DerefMut for WrappedKeys {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
     }
 }
 

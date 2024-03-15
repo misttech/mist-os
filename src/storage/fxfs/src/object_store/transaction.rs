@@ -14,8 +14,8 @@ use {
             allocator::{AllocatorItem, Reservation},
             object_manager::{reserved_space_from_journal_usage, ObjectManager},
             object_record::{
-                ObjectItem, ObjectItemV36, ObjectItemV37, ObjectKey, ObjectKeyData, ObjectValue,
-                ProjectProperty,
+                ObjectItem, ObjectItemV32, ObjectItemV33, ObjectItemV37, ObjectItemV38, ObjectKey,
+                ObjectKeyData, ObjectValue, ProjectProperty,
             },
         },
         serialized_types::{migrate_nodefault, migrate_to_version, Migrate, Versioned},
@@ -24,7 +24,7 @@ use {
     either::{Either, Left, Right},
     fprint::TypeFingerprint,
     futures::{future::poll_fn, pin_mut},
-    fxfs_crypto::WrappedKey,
+    fxfs_crypto::{WrappedKey, WrappedKeyV32},
     rustc_hash::FxHashMap as HashMap,
     scopeguard::ScopeGuard,
     serde::{Deserialize, Serialize},
@@ -83,14 +83,16 @@ pub struct TransactionLocks<'a>(pub WriteGuard<'a>);
 /// transaction, these are stored as a set which allows some mutations to be deduplicated and found
 /// (and we require custom comparison functions below).  For example, we need to be able to find
 /// object size changes.
+pub type Mutation = MutationV38;
+
 #[derive(
     Clone, Debug, Eq, Ord, PartialEq, PartialOrd, Serialize, Deserialize, TypeFingerprint, Versioned,
 )]
 #[cfg_attr(fuzz, derive(arbitrary::Arbitrary))]
-pub enum Mutation {
-    ObjectStore(ObjectStoreMutation),
+pub enum MutationV38 {
+    ObjectStore(ObjectStoreMutationV38),
     EncryptedObjectStore(Box<[u8]>),
-    Allocator(AllocatorMutation),
+    Allocator(AllocatorMutationV32),
     // Indicates the beginning of a flush.  This would typically involve sealing a tree.
     BeginFlush,
     // Indicates the end of a flush.  This would typically involve replacing the immutable layers
@@ -99,7 +101,7 @@ pub enum Mutation {
     // Volume has been deleted.  Requires we remove it from the set of managed ObjectStore.
     DeleteVolume,
     UpdateBorrowed(u64),
-    UpdateMutationsKey(UpdateMutationsKey),
+    UpdateMutationsKey(UpdateMutationsKeyV32),
     CreateInternalDir(u64),
 }
 
@@ -107,40 +109,40 @@ pub enum Mutation {
 pub enum MutationV37 {
     ObjectStore(ObjectStoreMutationV37),
     EncryptedObjectStore(Box<[u8]>),
-    Allocator(AllocatorMutation),
+    Allocator(AllocatorMutationV32),
     BeginFlush,
     EndFlush,
     DeleteVolume,
     UpdateBorrowed(u64),
-    UpdateMutationsKey(UpdateMutationsKey),
+    UpdateMutationsKey(UpdateMutationsKeyV32),
     CreateInternalDir(u64),
 }
 
 #[derive(Debug, Deserialize, Migrate, Serialize, Versioned, TypeFingerprint)]
 #[migrate_to_version(MutationV37)]
-pub enum MutationV36 {
-    ObjectStore(ObjectStoreMutationV36),
+pub enum MutationV33 {
+    ObjectStore(ObjectStoreMutationV33),
     EncryptedObjectStore(Box<[u8]>),
-    Allocator(AllocatorMutation),
+    Allocator(AllocatorMutationV32),
     BeginFlush,
     EndFlush,
     DeleteVolume,
     UpdateBorrowed(u64),
-    UpdateMutationsKey(UpdateMutationsKey),
+    UpdateMutationsKey(UpdateMutationsKeyV32),
     CreateInternalDir(u64),
 }
 
 #[derive(Debug, Deserialize, Migrate, Serialize, Versioned, TypeFingerprint)]
-#[migrate_to_version(MutationV36)]
+#[migrate_to_version(MutationV33)]
 pub enum MutationV32 {
-    ObjectStore(ObjectStoreMutationV36),
+    ObjectStore(ObjectStoreMutationV32),
     EncryptedObjectStore(Box<[u8]>),
-    Allocator(AllocatorMutation),
+    Allocator(AllocatorMutationV32),
     BeginFlush,
     EndFlush,
     DeleteVolume,
     UpdateBorrowed(u64),
-    UpdateMutationsKey(UpdateMutationsKey),
+    UpdateMutationsKey(UpdateMutationsKeyV32),
 }
 
 impl Mutation {
@@ -166,40 +168,51 @@ impl Mutation {
     }
 
     pub fn update_mutations_key(key: WrappedKey) -> Self {
-        Mutation::UpdateMutationsKey(UpdateMutationsKey(key))
+        Mutation::UpdateMutationsKey(key.into())
     }
 }
 
 // We have custom comparison functions for mutations that just use the key, rather than the key and
 // value that would be used by default so that we can deduplicate and find mutations (see
 // get_object_mutation below).
+pub type ObjectStoreMutation = ObjectStoreMutationV38;
 
 #[derive(Clone, Debug, Serialize, Deserialize, TypeFingerprint)]
 #[cfg_attr(fuzz, derive(arbitrary::Arbitrary))]
-pub struct ObjectStoreMutation {
-    pub item: ObjectItem,
-    pub op: Operation,
+pub struct ObjectStoreMutationV38 {
+    pub item: ObjectItemV38,
+    pub op: OperationV32,
 }
 
 #[derive(Debug, Deserialize, Migrate, Serialize, TypeFingerprint)]
 #[migrate_nodefault]
 pub struct ObjectStoreMutationV37 {
     item: ObjectItemV37,
-    op: Operation,
+    op: OperationV32,
 }
 
 #[derive(Debug, Deserialize, Migrate, Serialize, TypeFingerprint)]
 #[migrate_nodefault]
 #[migrate_to_version(ObjectStoreMutationV37)]
-pub struct ObjectStoreMutationV36 {
-    item: ObjectItemV36,
-    op: Operation,
+pub struct ObjectStoreMutationV33 {
+    item: ObjectItemV33,
+    op: OperationV32,
 }
 
-// The different LSM tree operations that can be performed as part of a mutation.
+#[derive(Debug, Deserialize, Migrate, Serialize, TypeFingerprint)]
+#[migrate_nodefault]
+#[migrate_to_version(ObjectStoreMutationV33)]
+pub struct ObjectStoreMutationV32 {
+    item: ObjectItemV32,
+    op: OperationV32,
+}
+
+/// The different LSM tree operations that can be performed as part of a mutation.
+pub type Operation = OperationV32;
+
 #[derive(Clone, Debug, Serialize, Deserialize, TypeFingerprint)]
 #[cfg_attr(fuzz, derive(arbitrary::Arbitrary))]
-pub enum Operation {
+pub enum OperationV32 {
     Insert,
     ReplaceOrInsert,
     Merge,
@@ -239,9 +252,11 @@ impl PartialOrd for AllocatorItem {
 
 /// Same as std::ops::Range but with Ord and PartialOrd support, sorted first by start of the range,
 /// then by the end.
+pub type DeviceRange = DeviceRangeV32;
+
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, TypeFingerprint)]
 #[cfg_attr(fuzz, derive(arbitrary::Arbitrary))]
-pub struct DeviceRange(pub Range<u64>);
+pub struct DeviceRangeV32(pub Range<u64>);
 
 impl Deref for DeviceRange {
     type Target = Range<u64>;
@@ -259,7 +274,7 @@ impl DerefMut for DeviceRange {
 
 impl From<Range<u64>> for DeviceRange {
     fn from(range: Range<u64>) -> Self {
-        DeviceRange(range)
+        Self(range)
     }
 }
 
@@ -281,15 +296,17 @@ impl PartialOrd for DeviceRange {
     }
 }
 
+pub type AllocatorMutation = AllocatorMutationV32;
+
 #[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd, Serialize, Deserialize, TypeFingerprint)]
 #[cfg_attr(fuzz, derive(arbitrary::Arbitrary))]
-pub enum AllocatorMutation {
+pub enum AllocatorMutationV32 {
     Allocate {
-        device_range: DeviceRange,
+        device_range: DeviceRangeV32,
         owner_object_id: u64,
     },
     Deallocate {
-        device_range: DeviceRange,
+        device_range: DeviceRangeV32,
         owner_object_id: u64,
     },
     SetLimit {
@@ -304,14 +321,28 @@ pub enum AllocatorMutation {
     MarkForDeletion(u64),
 }
 
+pub type UpdateMutationsKey = UpdateMutationsKeyV32;
+
 #[derive(Clone, Debug, Serialize, Deserialize, TypeFingerprint)]
-pub struct UpdateMutationsKey(pub WrappedKey);
+pub struct UpdateMutationsKeyV32(pub WrappedKeyV32);
+
+impl From<UpdateMutationsKey> for WrappedKey {
+    fn from(outer: UpdateMutationsKey) -> Self {
+        outer.0
+    }
+}
+
+impl From<WrappedKey> for UpdateMutationsKey {
+    fn from(inner: WrappedKey) -> Self {
+        Self(inner)
+    }
+}
 
 #[cfg(fuzz)]
 impl<'a> arbitrary::Arbitrary<'a> for UpdateMutationsKey {
     fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
         <u64>::arbitrary(u).map(|wrapping_key_id| {
-            UpdateMutationsKey(WrappedKey {
+            UpdateMutationsKey::from(WrappedKey {
                 wrapping_key_id,
                 // There doesn't seem to be much point to randomly generate crypto keys.
                 key: fxfs_crypto::WrappedKeyBytes::default(),

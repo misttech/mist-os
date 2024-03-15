@@ -70,8 +70,7 @@ impl Crypt for InsecureCrypt {
         StdRng::from_entropy().fill_bytes(&mut key);
 
         let wrapped: Vec<u8> = cipher.encrypt(&nonce, &key[..]).context("Failed to wrap key")?;
-        let wrapped =
-            WrappedKeyBytes(wrapped.try_into().map_err(|_| anyhow!("wrapped key wrong length"))?);
+        let wrapped = WrappedKeyBytes::try_from(wrapped)?;
         Ok((WrappedKey { wrapping_key_id: *wrapping_key_id, key: wrapped }, UnwrappedKey::new(key)))
     }
 

@@ -24,7 +24,7 @@ mod writer;
 
 use {
     crate::{
-        checksum::{Checksum, Checksums, ChecksumsV37},
+        checksum::{Checksum, Checksums, ChecksumsV37, ChecksumsV38},
         debug_assert_not_too_long,
         errors::FxfsError,
         filesystem::{ApplyContext, ApplyMode, FxFilesystem, SyncOptions},
@@ -45,8 +45,8 @@ use {
             object_manager::ObjectManager,
             object_record::{AttributeKey, ObjectKey, ObjectKeyData, ObjectValue},
             transaction::{
-                lock_keys, AllocatorMutation, Mutation, MutationV32, MutationV36, MutationV37,
-                ObjectStoreMutation, Options, Transaction, TxnMutation,
+                lock_keys, AllocatorMutation, Mutation, MutationV32, MutationV33, MutationV37,
+                MutationV38, ObjectStoreMutation, Options, Transaction, TxnMutation,
                 TRANSACTION_MAX_JOURNAL_USAGE,
             },
             DataObjectHandle, HandleOptions, HandleOwner, Item, ItemRef, LastObjectId, LockState,
@@ -98,8 +98,10 @@ const RESET_XOR: u64 = 0xffffffffffffffff;
 // To keep track of offsets within a journal file, we need both the file offset and the check-sum of
 // the preceding block, since the check-sum of the preceding block is an input to the check-sum of
 // every block.
+pub type JournalCheckpoint = JournalCheckpointV32;
+
 #[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize, TypeFingerprint)]
-pub struct JournalCheckpoint {
+pub struct JournalCheckpointV32 {
     pub file_offset: u64,
 
     // Starting check-sum for block that contains file_offset i.e. the checksum for the previous
@@ -112,14 +114,16 @@ pub struct JournalCheckpoint {
     pub version: Version,
 }
 
+pub type JournalRecord = JournalRecordV38;
+
 #[derive(Clone, Debug, Serialize, Deserialize, TypeFingerprint, Versioned)]
 #[cfg_attr(fuzz, derive(arbitrary::Arbitrary))]
-pub enum JournalRecord {
+pub enum JournalRecordV38 {
     // Indicates no more records in this block.
     EndBlock,
     // Mutation for a particular object.  object_id here is for the collection i.e. the store or
     // allocator.
-    Mutation { object_id: u64, mutation: Mutation },
+    Mutation { object_id: u64, mutation: MutationV38 },
     // Commits records in the transaction.
     Commit,
     // Discard all mutations with offsets greater than or equal to the given offset.
@@ -136,7 +140,7 @@ pub enum JournalRecord {
     DidFlushDevice(u64),
     // Checksums for a data range written by this transaction. A transaction is only valid if these
     // checksums are right. The range is the device offset the checksums are for.
-    DataChecksums(Range<u64>, Checksums),
+    DataChecksums(Range<u64>, ChecksumsV38),
 }
 
 #[derive(Debug, Deserialize, Serialize, Versioned, TypeFingerprint)]
@@ -178,7 +182,7 @@ impl From<JournalRecordV37> for JournalRecord {
 #[derive(Debug, Deserialize, Serialize, Versioned, TypeFingerprint)]
 pub enum JournalRecordV36 {
     EndBlock,
-    Mutation { object_id: u64, mutation: MutationV36 },
+    Mutation { object_id: u64, mutation: MutationV33 },
     Commit,
     Discard(u64),
     DidFlushDevice(u64),
@@ -206,7 +210,7 @@ impl From<JournalRecordV36> for JournalRecordV37 {
 #[migrate_to_version(JournalRecordV36)]
 pub enum JournalRecordV34 {
     EndBlock,
-    Mutation { object_id: u64, mutation: MutationV32 },
+    Mutation { object_id: u64, mutation: MutationV33 },
     Commit,
     Discard(u64),
     DidFlushDevice(u64),
@@ -215,6 +219,16 @@ pub enum JournalRecordV34 {
 
 #[derive(Debug, Deserialize, Migrate, Serialize, Versioned, TypeFingerprint)]
 #[migrate_to_version(JournalRecordV34)]
+pub enum JournalRecordV33 {
+    EndBlock,
+    Mutation { object_id: u64, mutation: MutationV33 },
+    Commit,
+    Discard(u64),
+    DidFlushDevice(u64),
+}
+
+#[derive(Debug, Deserialize, Migrate, Serialize, Versioned, TypeFingerprint)]
+#[migrate_to_version(JournalRecordV33)]
 pub enum JournalRecordV32 {
     EndBlock,
     Mutation { object_id: u64, mutation: MutationV32 },

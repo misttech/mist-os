@@ -326,11 +326,11 @@ mod tests {
     }
 
     fn wrapped_keys() -> WrappedKeys {
-        WrappedKeys(vec![(
+        WrappedKeys::from(vec![(
             0,
             WrappedKey {
                 wrapping_key_id: 0x1234567812345678,
-                key: WrappedKeyBytes([0xff; WRAPPED_KEY_SIZE]),
+                key: WrappedKeyBytes::from([0xff; WRAPPED_KEY_SIZE]),
             },
         )])
     }

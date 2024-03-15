@@ -49,12 +49,12 @@ use {
             key_manager::KeyManager,
             transaction::{
                 lock_keys, AssocObj, AssociatedObject, LockKey, ObjectStoreMutation, Operation,
-                Options, Transaction, UpdateMutationsKey,
+                Options, Transaction,
             },
         },
         range::RangeExt,
         round::round_up,
-        serialized_types::{Migrate, Version, Versioned, VersionedLatest},
+        serialized_types::{migrate_to_version, Migrate, Version, Versioned, VersionedLatest},
     },
     anyhow::{anyhow, bail, ensure, Context, Error},
     assert_matches::assert_matches,
@@ -62,7 +62,9 @@ use {
     fidl_fuchsia_io as fio,
     fprint::TypeFingerprint,
     fuchsia_inspect::ArrayProperty,
-    fxfs_crypto::{ff1::Ff1, Crypt, KeyPurpose, StreamCipher, WrappedKey, WrappedKeys},
+    fxfs_crypto::{
+        ff1::Ff1, Crypt, KeyPurpose, StreamCipher, WrappedKey, WrappedKeyV32, WrappedKeys,
+    },
     once_cell::sync::OnceCell,
     scopeguard::ScopeGuard,
     serde::{Deserialize, Serialize},
@@ -100,10 +102,12 @@ const TRANSACTION_MUTATION_THRESHOLD: usize = 200;
 /// back to an ObjectStore.
 pub trait HandleOwner: AsRef<ObjectStore> + Send + Sync + 'static {}
 
-// StoreInfo stores information about the object store.  This is stored within the parent object
-// store, and is used, for example, to get the persistent layer objects.
+/// StoreInfo stores information about the object store.  This is stored within the parent object
+/// store, and is used, for example, to get the persistent layer objects.
+pub type StoreInfo = StoreInfoV36;
+
 #[derive(Clone, Debug, Default, Serialize, Deserialize, TypeFingerprint, Versioned)]
-pub struct StoreInfo {
+pub struct StoreInfoV36 {
     /// The globally unique identifier for the associated object store. If unset, will be all zero.
     guid: [u8; 16],
 
@@ -128,7 +132,7 @@ pub struct StoreInfo {
     object_count: u64,
 
     /// The (wrapped) key that encrypted mutations should use.
-    mutations_key: Option<WrappedKey>,
+    mutations_key: Option<WrappedKeyV32>,
 
     /// Mutations for the store are encrypted using a stream cipher.  To decrypt the mutations, we
     /// need to know the offset in the cipher stream to start it.
@@ -142,7 +146,7 @@ pub struct StoreInfo {
     /// reveal (such as the number of files in the system and the ordering of their creation in
     /// time).  Only the bottom 32 bits of the object ID are encrypted whilst the top 32 bits will
     /// increment after 2^32 object IDs have been used and this allows us to roll the key.
-    object_id_key: Option<WrappedKey>,
+    object_id_key: Option<WrappedKeyV32>,
 
     /// A directory for storing internal files in a directory structure. Holds INVALID_OBJECT_ID
     /// when the directory doesn't yet exist.
@@ -150,17 +154,18 @@ pub struct StoreInfo {
 }
 
 #[derive(Clone, Debug, Default, Migrate, Serialize, Deserialize, TypeFingerprint, Versioned)]
-pub struct StoreInfoV17 {
+#[migrate_to_version(StoreInfoV36)]
+pub struct StoreInfoV32 {
     guid: [u8; 16],
     last_object_id: u64,
     pub layers: Vec<u64>,
     root_directory_object_id: u64,
     graveyard_directory_object_id: u64,
     object_count: u64,
-    mutations_key: Option<WrappedKey>,
+    mutations_key: Option<WrappedKeyV32>,
     mutations_cipher_offset: u64,
     pub encrypted_mutations_object_id: u64,
-    object_id_key: Option<WrappedKey>,
+    object_id_key: Option<WrappedKeyV32>,
 }
 
 impl StoreInfo {
@@ -210,8 +215,10 @@ pub struct NewChildStoreOptions {
     pub object_id: u64,
 }
 
+pub type EncryptedMutations = EncryptedMutationsV32;
+
 #[derive(Clone, Default, Deserialize, Serialize, TypeFingerprint)]
-pub struct EncryptedMutations {
+pub struct EncryptedMutationsV32 {
     // Information about the mutations are held here, but the actual encrypted data is held within
     // data.  For each transaction, we record the checkpoint and the count of mutations within the
     // transaction.  The checkpoint is required for the log file offset (which we need to apply the
@@ -257,8 +264,8 @@ impl EncryptedMutations {
                 if store_object_id == object_id {
                     if let Mutation::EncryptedObjectStore(data) = mutation {
                         this.push(&checkpoint, data);
-                    } else if let Mutation::UpdateMutationsKey(UpdateMutationsKey(key)) = mutation {
-                        this.mutations_key_roll.push((this.data.len(), key));
+                    } else if let Mutation::UpdateMutationsKey(key) = mutation {
+                        this.mutations_key_roll.push((this.data.len(), key.into()));
                     }
                 }
             }
@@ -1020,7 +1027,7 @@ impl ObjectStore {
                 store.store_object_id(),
                 Mutation::insert_object(
                     ObjectKey::keys(object_id),
-                    ObjectValue::keys(EncryptionKeys::AES256XTS(WrappedKeys(vec![(0, key)]))),
+                    ObjectValue::keys(EncryptionKeys::AES256XTS(WrappedKeys::from(vec![(0, key)]))),
                 ),
             );
             store.key_manager.insert(object_id, &vec![(0, unwrapped_key)], permanent);
@@ -3181,13 +3188,13 @@ mod tests {
             object_count: 0x1234567812345678,
             mutations_key: Some(WrappedKey {
                 wrapping_key_id: 0x1234567812345678,
-                key: WrappedKeyBytes([0xff; WRAPPED_KEY_SIZE]),
+                key: WrappedKeyBytes::from([0xff; WRAPPED_KEY_SIZE]),
             }),
             mutations_cipher_offset: 0x1234567812345678,
             encrypted_mutations_object_id: 0x1234567812345678,
             object_id_key: Some(WrappedKey {
                 wrapping_key_id: 0x1234567812345678,
-                key: WrappedKeyBytes([0xff; WRAPPED_KEY_SIZE]),
+                key: WrappedKeyBytes::from([0xff; WRAPPED_KEY_SIZE]),
             }),
             internal_directory_object_id: INVALID_OBJECT_ID,
         };

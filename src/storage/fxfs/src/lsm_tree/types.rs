@@ -7,7 +7,6 @@ use {
         drop_event::DropEvent,
         lsm_tree::merge,
         object_handle::ReadObjectHandle,
-        object_store::object_record::{ObjectKey, ObjectValue, ObjectValueV36, ObjectValueV37},
         serialized_types::{Version, Versioned, VersionedLatest},
     },
     anyhow::Error,
@@ -116,18 +115,6 @@ impl<K: TypeFingerprint, V: TypeFingerprint> TypeFingerprint for Item<K, V> {
             + ",value:"
             + &V::fingerprint()
             + ",sequence:u64}"
-    }
-}
-
-impl From<Item<ObjectKey, ObjectValueV36>> for Item<ObjectKey, ObjectValueV37> {
-    fn from(item: Item<ObjectKey, ObjectValueV36>) -> Self {
-        Self { key: item.key, value: item.value.into(), sequence: item.sequence }
-    }
-}
-
-impl From<Item<ObjectKey, ObjectValueV37>> for Item<ObjectKey, ObjectValue> {
-    fn from(item: Item<ObjectKey, ObjectValueV37>) -> Self {
-        Self { key: item.key, value: item.value.into(), sequence: item.sequence }
     }
 }
 

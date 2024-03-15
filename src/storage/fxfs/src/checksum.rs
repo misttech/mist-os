@@ -34,9 +34,11 @@ pub fn fletcher64(buf: &[u8], previous: Checksum) -> Checksum {
 
 /// A vector of fletcher64 checksums, one per block.
 /// These are stored as a flat array of bytes for efficient deserialization.
+pub type Checksums = ChecksumsV38;
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, TypeFingerprint)]
 #[cfg_attr(fuzz, derive(arbitrary::Arbitrary))]
-pub struct Checksums {
+pub struct ChecksumsV38 {
     sums: Vec<u8>,
 }
 
@@ -87,16 +89,16 @@ impl ChecksumsV37 {
 }
 
 #[derive(Debug, Serialize, Deserialize, TypeFingerprint)]
-pub enum ChecksumsV36 {
+pub enum ChecksumsV32 {
     None,
     Fletcher(Vec<u64>),
 }
 
-impl From<ChecksumsV36> for ChecksumsV37 {
-    fn from(checksums: ChecksumsV36) -> Self {
+impl From<ChecksumsV32> for ChecksumsV37 {
+    fn from(checksums: ChecksumsV32) -> Self {
         match checksums {
-            ChecksumsV36::None => Self::None,
-            ChecksumsV36::Fletcher(sums) => Self::fletcher(sums),
+            ChecksumsV32::None => Self::None,
+            ChecksumsV32::Fletcher(sums) => Self::fletcher(sums),
         }
     }
 }

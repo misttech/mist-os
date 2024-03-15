@@ -6,7 +6,7 @@
 
 use {
     crate::{
-        checksum::{Checksums, ChecksumsV36, ChecksumsV37},
+        checksum::{Checksums, ChecksumsV32, ChecksumsV37, ChecksumsV38},
         lsm_tree::types::{OrdLowerBound, OrdUpperBound},
         serialized_types::{migrate_to_version, Migrate},
     },
@@ -34,9 +34,11 @@ pub const FSVERITY_MERKLE_ATTRIBUTE_ID: u64 = 2;
 
 /// ExtentKey is a child of ObjectKey for Object attributes that have attached extents
 /// (at time of writing this was only the used for file contents).
+pub type ExtentKey = ExtentKeyV32;
+
 #[derive(Clone, Debug, Eq, Hash, PartialEq, Serialize, Deserialize, TypeFingerprint)]
 #[cfg_attr(fuzz, derive(arbitrary::Arbitrary))]
-pub struct ExtentKey {
+pub struct ExtentKeyV32 {
     pub range: Range<u64>,
 }
 
@@ -123,15 +125,17 @@ impl PartialOrd for ExtentKey {
 }
 
 /// The mode the extent is operating in. This changes how writes work to this region of the file.
+pub type ExtentMode = ExtentModeV38;
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, TypeFingerprint)]
-pub enum ExtentMode {
+pub enum ExtentModeV38 {
     /// This extent doesn't have defined write semantics. The writer chooses how to handle the data
     /// here. Notable uses of this are things which have their own separate checksum mechanism,
     /// like the journal file and blobs.
     Raw,
     /// This extent uses copy-on-write semantics. We store the post-encryption checksums for data
     /// validation. New writes to this logical range are written to new extents.
-    Cow(Checksums),
+    Cow(ChecksumsV38),
     /// This extent uses overwrite semantics. The bitmap keeps track of blocks which have been
     /// written to at least once. Blocks which haven't been written to at least once are logically
     /// zero, so the bitmap needs to be accounted for while reading. While this extent exists, new
@@ -158,16 +162,18 @@ impl<'a> arbitrary::Arbitrary<'a> for ExtentMode {
 
 /// ExtentValue is the payload for an extent in the object store, which describes where the extent
 /// is physically located.
+pub type ExtentValue = ExtentValueV38;
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, TypeFingerprint)]
 #[cfg_attr(fuzz, derive(arbitrary::Arbitrary))]
-pub enum ExtentValue {
+pub enum ExtentValueV38 {
     /// Indicates a deleted extent; that is, the logical range described by the extent key is
     /// considered to be deleted.
     None,
     /// The location of the extent and other related information.  `key_id` identifies which of the
     /// object's keys should be used.  Unencrypted files should use 0 (which can also be used for
     /// encrypted files).  `mode` describes the write pattern for this extent.
-    Some { device_offset: u64, mode: ExtentMode, key_id: u64 },
+    Some { device_offset: u64, mode: ExtentModeV38, key_id: u64 },
 }
 
 impl ExtentValue {
@@ -266,6 +272,7 @@ impl ExtentValue {
 }
 
 #[derive(Debug, Serialize, Deserialize, TypeFingerprint)]
+#[migrate_to_version(ExtentValueV38)]
 pub enum ExtentValueV37 {
     None,
     Some { device_offset: u64, checksums: ChecksumsV37, key_id: u64 },
@@ -273,12 +280,12 @@ pub enum ExtentValueV37 {
 
 #[derive(Debug, Serialize, Deserialize, Migrate, TypeFingerprint)]
 #[migrate_to_version(ExtentValueV37)]
-pub enum ExtentValueV36 {
+pub enum ExtentValueV32 {
     None,
-    Some { device_offset: u64, checksums: ChecksumsV36, key_id: u64 },
+    Some { device_offset: u64, checksums: ChecksumsV32, key_id: u64 },
 }
 
-impl From<ExtentValueV37> for ExtentValue {
+impl From<ExtentValueV37> for ExtentValueV38 {
     fn from(value: ExtentValueV37) -> Self {
         match value {
             ExtentValueV37::None => ExtentValue::None,

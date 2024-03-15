@@ -23,7 +23,6 @@ use {
         round::round_up,
     },
     anyhow::Error,
-    fxfs_crypto::WrappedKeys,
     rustc_hash::FxHashSet as HashSet,
     std::{
         cell::UnsafeCell,
@@ -295,7 +294,8 @@ impl<'a> ScannedStore<'a> {
             ObjectKeyData::Keys => {
                 if let ObjectValue::Keys(keys) = value {
                     match keys {
-                        EncryptionKeys::AES256XTS(WrappedKeys(keys)) => {
+                        EncryptionKeys::AES256XTS(keys) => {
+                            let keys = &**keys;
                             if let Some(current_file) = &mut self.current_object {
                                 // Duplicates items should have already been checked, but not
                                 // duplicate key IDs.

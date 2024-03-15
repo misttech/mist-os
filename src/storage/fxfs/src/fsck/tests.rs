@@ -2008,7 +2008,7 @@ async fn test_orphaned_keys() {
             store_id,
             Mutation::insert_object(
                 ObjectKey::keys(1000),
-                ObjectValue::Keys(EncryptionKeys::AES256XTS(WrappedKeys(vec![]))),
+                ObjectValue::Keys(EncryptionKeys::AES256XTS(WrappedKeys::from(vec![]))),
             ),
         );
         transaction.commit().await.expect("commit failed");
@@ -2123,11 +2123,12 @@ async fn test_duplicate_key() {
 
         let key_id;
         if let Mutation::ObjectStore(ObjectStoreMutation {
-            item:
-                Item { value: ObjectValue::Keys(EncryptionKeys::AES256XTS(WrappedKeys(keys))), .. },
+            item: Item { value: ObjectValue::Keys(EncryptionKeys::AES256XTS(keys)), .. },
             ..
         }) = &mut mutation
         {
+            use std::ops::DerefMut as _;
+            let keys = keys.deref_mut();
             let duplicate = keys.first().unwrap().clone();
             key_id = duplicate.0;
             keys.push(duplicate);

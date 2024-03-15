@@ -305,12 +305,13 @@ pub type Reservation = ReservationImpl<Arc<dyn ReservationOwner>, dyn Reservatio
 
 pub type Hold<'a> = ReservationImpl<&'a Reservation, Reservation>;
 
-// Our allocator implementation tracks extents with a reference count.  At time of writing, these
-// reference counts should never exceed 1, but that might change with snapshots and clones.
+/// Our allocator implementation tracks extents with a reference count.  At time of writing, these
+/// reference counts should never exceed 1, but that might change with snapshots and clones.
+pub type AllocatorKey = AllocatorKeyV32;
 
 #[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, Serialize, TypeFingerprint, Versioned)]
 #[cfg_attr(fuzz, derive(arbitrary::Arbitrary))]
-pub struct AllocatorKey {
+pub struct AllocatorKeyV32 {
     pub device_range: Range<u64>,
 }
 
@@ -376,9 +377,11 @@ impl RangeKey for AllocatorKey {
 
 /// Allocations are "owned" by a single ObjectStore and are reference counted
 /// (for future snapshot/clone support).
+pub type AllocatorValue = AllocatorValueV32;
+
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize, TypeFingerprint, Versioned)]
 #[cfg_attr(fuzz, derive(arbitrary::Arbitrary))]
-pub enum AllocatorValue {
+pub enum AllocatorValueV32 {
     // Tombstone variant indicating an extent is no longer allocated.
     None,
     // Used when we know there are no possible allocations below us in the stack.
@@ -389,8 +392,11 @@ pub enum AllocatorValue {
 
 pub type AllocatorItem = Item<AllocatorKey, AllocatorValue>;
 
+/// Serialized information about the allocator.
+pub type AllocatorInfo = AllocatorInfoV32;
+
 #[derive(Debug, Default, Clone, Deserialize, Serialize, TypeFingerprint, Versioned)]
-pub struct AllocatorInfo {
+pub struct AllocatorInfoV32 {
     /// Holds the set of layer file object_id for the LSM tree (newest first).
     pub layers: Vec<u64>,
     /// Maps from owner_object_id to bytes allocated.
