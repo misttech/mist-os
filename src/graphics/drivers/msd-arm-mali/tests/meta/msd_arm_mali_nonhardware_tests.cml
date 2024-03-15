@@ -13,7 +13,6 @@
     use: [
         {
             protocol: [
-                "fuchsia.scheduler.ProfileProvider",
                 "fuchsia.scheduler.RoleManager",
                 "fuchsia.tracing.provider.Registry",
             ],

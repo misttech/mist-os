@@ -16,7 +16,6 @@
         {
             protocol: [
                 "fuchsia.kernel.InfoResource",
-                "fuchsia.scheduler.ProfileProvider",
                 "fuchsia.scheduler.RoleManager",
             ],
         },

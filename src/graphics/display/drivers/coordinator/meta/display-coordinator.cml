@@ -22,10 +22,7 @@
         },
         { protocol: "fuchsia.kernel.FramebufferResource" },
         {
-            protocol: [
-                "fuchsia.scheduler.ProfileProvider",
-                "fuchsia.scheduler.RoleManager",
-            ],
+            protocol: [ "fuchsia.scheduler.RoleManager" ],
         },
         { protocol: "fuchsia.boot.Arguments" },
     ],

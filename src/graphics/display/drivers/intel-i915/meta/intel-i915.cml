@@ -19,7 +19,6 @@
                 "fuchsia.kernel.FramebufferResource",
                 "fuchsia.kernel.IoportResource",
                 "fuchsia.kernel.MmioResource",
-                "fuchsia.scheduler.ProfileProvider",
                 "fuchsia.scheduler.RoleManager",
                 "fuchsia.sysmem.Allocator",
             ],
