@@ -244,15 +244,11 @@
                 // Times out.
                 "cve-2017-10661",
 
-                // TODO(b/287121317): Remove after timer_settime03 is fixed.
-                "cve-2018-12896",
-
                 // These tests are time-consuming, so they often cause timeouts in the
                 // corresponding suites. Consider moving them to separate bundles.
                 "cve-2011-0999",
                 "cve-2014-0196",
                 "cve-2016-7117",
-                "dio*",
                 "fs_fill",
                 "fs_inod01",
                 "hackbench01",
