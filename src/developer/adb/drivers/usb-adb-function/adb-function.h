@@ -10,9 +10,9 @@
 #include <fuchsia/hardware/usb/function/cpp/banjo.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/ddk/driver.h>
+#include <lib/sync/cpp/completion.h>
 #include <zircon/compiler.h>
 
-#include <optional>
 #include <queue>
 
 #include <ddktl/device.h>
@@ -23,9 +23,6 @@
 
 namespace usb_adb_function {
 
-constexpr uint32_t kBulkReqSize = 2048;
-constexpr uint32_t kBulkTxCount = 16;
-constexpr uint32_t kBulkRxCount = 16;
 constexpr uint16_t kBulkMaxPacket = 512;
 
 class UsbAdbDevice;
@@ -44,16 +41,16 @@ class UsbAdbDevice : public UsbAdb,
   // Driver bind method.
   static zx_status_t Bind(void* ctx, zx_device_t* parent);
 
-  explicit UsbAdbDevice(zx_device_t* parent)
-      : UsbAdb(parent), function_(parent), loop_(&kAsyncLoopConfigNeverAttachToThread) {
-    loop_->StartThread("usb-adb-loop");
-    dispatcher_ = loop_->dispatcher();
+  explicit UsbAdbDevice(zx_device_t* parent, uint32_t bulk_tx_count, uint32_t bulk_rx_count,
+                        uint32_t vmo_data_size)
+      : UsbAdb(parent),
+        bulk_tx_count_(bulk_tx_count),
+        bulk_rx_count_(bulk_rx_count),
+        vmo_data_size_(vmo_data_size),
+        function_(parent) {
+    loop_.StartThread("usb-adb-loop");
+    dispatcher_ = loop_.dispatcher();
   }
-
-  // Constructor used by tests. Injects dispatcher and synchronizes Stop() and Shutdown() calls.
-  explicit UsbAdbDevice(zx_device_t* parent, async_dispatcher_t* dispatcher,
-                        sync_completion_t* stop_sync)
-      : UsbAdb(parent), function_(parent), dispatcher_(dispatcher), test_stop_sync_(stop_sync) {}
 
   // Initialize endpoints and request pools.
   zx_status_t Init();
@@ -83,10 +80,18 @@ class UsbAdbDevice : public UsbAdb,
   void QueueTx(QueueTxRequest& request, QueueTxCompleter::Sync& completer) override;
   void Receive(ReceiveCompleter::Sync& completer) override;
 
+  // Used for synchronizing the order of Stop() and Shutdown() in tests.
+  libsync::Completion test_stop_sync_;
+
  private:
+  const uint32_t bulk_tx_count_;
+  const uint32_t bulk_rx_count_;
+  const size_t vmo_data_size_;
+
   // Structure to store pending transfer requests when there are not enough USB request buffers.
   struct txn_req_t {
     QueueTxRequest request;
+    size_t start = 0;
     QueueTxCompleter::Async completer;
   };
 
@@ -95,7 +100,7 @@ class UsbAdbDevice : public UsbAdb,
                                usb_endpoint::UsbEndpoint<UsbAdbDevice>& ep);
 
   // Helper method to get free request buffer and queue the request for transmitting.
-  zx_status_t SendLocked(const std::vector<uint8_t>& buf) __TA_REQUIRES(bulk_in_ep_.mutex_);
+  zx::result<> SendLocked() __TA_REQUIRES(bulk_in_ep_.mutex_);
 
   // USB request completion callback methods.
   void TxComplete(fuchsia_hardware_usb_endpoint::Completion completion);
@@ -122,7 +127,7 @@ class UsbAdbDevice : public UsbAdb,
   ddk::UsbFunctionProtocolClient function_;
   usb_speed_t speed_ = 0;
 
-  std::optional<async::Loop> loop_;
+  async::Loop loop_{&kAsyncLoopConfigNeverAttachToThread};
   async_dispatcher_t* dispatcher_;
 
   // UsbAdbImpl service binding. This is created when client calls Start.
@@ -217,9 +222,6 @@ class UsbAdbDevice : public UsbAdb,
   // Queue of pending transfer requests that need to be transmitted once the BULK IN request buffers
   // become available.
   std::queue<txn_req_t> tx_pending_reqs_ __TA_GUARDED(bulk_in_ep_.mutex_);
-
-  // Used for synchronizing the order of Stop() and Shutdown() in tests.
-  sync_completion_t* test_stop_sync_;
 };
 
 }  // namespace usb_adb_function

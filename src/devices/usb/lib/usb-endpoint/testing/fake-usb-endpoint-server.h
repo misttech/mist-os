@@ -73,7 +73,7 @@ class FakeEndpoint : public fidl::Server<fuchsia_hardware_usb_endpoint::Endpoint
 
     // Reply if there is a completion saved for it already.
     std::vector<fuchsia_hardware_usb_endpoint::Completion> completions;
-    while (!completions_.empty()) {
+    while (!completions_.empty() && !requests_.empty()) {
       auto completion =
           RequestCompleteLocked(completions_.front().first, completions_.front().second);
       if (!completion.has_value()) {
@@ -115,6 +115,11 @@ class FakeEndpoint : public fidl::Server<fuchsia_hardware_usb_endpoint::Endpoint
   //  * info: if status is ZX_OK, return this info.
   virtual void ExpectGetInfo(zx_status_t status, fuchsia_hardware_usb_endpoint::EndpointInfo info) {
     expected_get_info_.emplace(status, std::move(info));
+  }
+
+  size_t pending_request_count() {
+    fbl::AutoLock _(&lock_);
+    return requests_.size();
   }
 
  private:
