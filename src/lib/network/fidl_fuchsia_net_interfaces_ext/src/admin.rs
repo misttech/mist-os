@@ -9,7 +9,7 @@ use fidl::{HandleBased, Rights};
 use fidl_fuchsia_net_interfaces as fnet_interfaces;
 use fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin;
 use fuchsia_zircon_status as zx;
-use futures::{FutureExt as _, Stream, StreamExt as _, TryStreamExt as _};
+use futures::{Future, FutureExt as _, Stream, StreamExt as _, TryStreamExt as _};
 use thiserror::Error;
 
 /// Error type when using a [`fnet_interfaces_admin::AddressStateProviderProxy`].
@@ -191,6 +191,67 @@ pub struct Control {
     >,
 }
 
+/// Waits for response on query result and terminal event. If the query has a
+/// result, returns that. Otherwise, returns the terminal event.
+async fn or_terminal_event<QR, QF, TR>(
+    query_fut: QF,
+    terminal_event_fut: TR,
+) -> Result<QR, TerminalError<fnet_interfaces_admin::InterfaceRemovedReason>>
+where
+    QR: Unpin,
+    QF: Unpin + Future<Output = Result<QR, fidl::Error>>,
+    TR: Unpin
+        + Future<Output = Result<Option<fnet_interfaces_admin::InterfaceRemovedReason>, fidl::Error>>,
+{
+    match futures::future::select(query_fut, terminal_event_fut).await {
+        futures::future::Either::Left((query_result, terminal_event_fut)) => match query_result {
+            Ok(ok) => Ok(ok),
+            Err(e) if e.is_closed() => match terminal_event_fut.await {
+                Ok(Some(reason)) => Err(TerminalError::Terminal(reason)),
+                Ok(None) | Err(_) => Err(TerminalError::Fidl(e)),
+            },
+            Err(e) => Err(TerminalError::Fidl(e)),
+        },
+        futures::future::Either::Right((event, query_fut)) => {
+            // We need to poll the query response future one more time,
+            // because of the following scenario:
+            //
+            // 1. select() polls the query response future, which returns
+            //    pending.
+            // 2. The server sends the query response and terminal event in
+            //    that order.
+            // 3. The FIDL client library dequeues both of these and wakes
+            //    the respective futures.
+            // 4. select() polls the terminal event future, which is now
+            //    ready.
+            //
+            // In that case, both futures will be ready, so we can use
+            // now_or_never() to check whether the query result future has a
+            // result, since we always want to process that result first.
+            if let Some(query_result) = query_fut.now_or_never() {
+                match query_result {
+                    Ok(ok) => Ok(ok),
+                    Err(e) if e.is_closed() => match event {
+                        Ok(Some(reason)) => Err(TerminalError::Terminal(reason)),
+                        Ok(None) | Err(_) => Err(TerminalError::Fidl(e)),
+                    },
+                    Err(e) => Err(TerminalError::Fidl(e)),
+                }
+            } else {
+                match event.map_err(|e| TerminalError::Fidl(e))? {
+                    Some(removal_reason) => Err(TerminalError::Terminal(removal_reason)),
+                    None => Err(TerminalError::Fidl(fidl::Error::ClientChannelClosed {
+                        status: zx::Status::PEER_CLOSED,
+                        protocol_name: fnet_interfaces_admin::ControlMarker::DEBUG_NAME,
+                        #[cfg(not(target_os = "fuchsia"))]
+                        reason: None,
+                    })),
+                }
+            }
+        }
+    }
+}
+
 impl Control {
     /// Calls `AddAddress` on the proxy.
     pub fn add_address(
@@ -339,57 +400,11 @@ impl Control {
         Ok((Self::new(proxy), server_end))
     }
 
-    async fn or_terminal_event<R: Unpin>(
+    async fn or_terminal_event<R: Unpin, F: Unpin + Future<Output = Result<R, fidl::Error>>>(
         &self,
-        fut: fidl::client::QueryResponseFut<R>,
+        fut: F,
     ) -> Result<R, TerminalError<fnet_interfaces_admin::InterfaceRemovedReason>> {
-        match futures::future::select(fut, self.terminal_event_fut.clone()).await {
-            futures::future::Either::Left((query_result, fut)) => match query_result {
-                Ok(ok) => Ok(ok),
-                Err(e) if e.is_closed() => match fut.await {
-                    Ok(Some(reason)) => Err(TerminalError::Terminal(reason)),
-                    Ok(None) | Err(_) => Err(TerminalError::Fidl(e)),
-                },
-                Err(e) => Err(TerminalError::Fidl(e)),
-            },
-            futures::future::Either::Right((event, fut)) => {
-                // We need to poll the query response future one more time,
-                // because of the following scenario:
-                //
-                // 1. select() polls the query response future, which returns
-                //    pending.
-                // 2. The server sends the query response and terminal event in
-                //    that order.
-                // 3. The FIDL client library dequeues both of these and wakes
-                //    the respective futures.
-                // 4. select() polls the terminal event future, which is now
-                //    ready.
-                //
-                // In that case, both futures will be ready, so we can use
-                // now_or_never() to check whether the query result future has a
-                // result, since we always want to process that result first.
-                if let Some(query_result) = fut.now_or_never() {
-                    match query_result {
-                        Ok(ok) => Ok(ok),
-                        Err(e) if e.is_closed() => match event {
-                            Ok(Some(reason)) => Err(TerminalError::Terminal(reason)),
-                            Ok(None) | Err(_) => Err(TerminalError::Fidl(e)),
-                        },
-                        Err(e) => Err(TerminalError::Fidl(e)),
-                    }
-                } else {
-                    match event.map_err(|e| TerminalError::Fidl(e))? {
-                        Some(removal_reason) => Err(TerminalError::Terminal(removal_reason)),
-                        None => Err(TerminalError::Fidl(fidl::Error::ClientChannelClosed {
-                            status: zx::Status::PEER_CLOSED,
-                            protocol_name: fnet_interfaces_admin::ControlMarker::DEBUG_NAME,
-                            #[cfg(not(target_os = "fuchsia"))]
-                            reason: None,
-                        })),
-                    }
-                }
-            }
-        }
+        or_terminal_event(fut, self.terminal_event_fut.clone()).await
     }
 
     fn or_terminal_event_no_return(
@@ -452,14 +467,21 @@ impl<E: std::fmt::Debug> std::error::Error for TerminalError<E> {}
 
 #[cfg(test)]
 mod test {
-    use super::{assignment_state_stream, proof_from_grant, AddressStateProviderError};
+    use std::task::Poll;
+
+    use super::{
+        assignment_state_stream, or_terminal_event, proof_from_grant, AddressStateProviderError,
+        TerminalError,
+    };
     use assert_matches::assert_matches;
     use fidl::prelude::*;
     use fidl::Rights;
     use fidl_fuchsia_net_interfaces as fnet_interfaces;
     use fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin;
+    use fnet_interfaces_admin::InterfaceRemovedReason;
     use fuchsia_zircon_status as zx;
     use futures::{FutureExt as _, StreamExt as _, TryStreamExt as _};
+    use test_case::test_case;
 
     // Test that the terminal event is observed when the server closes its end.
     #[fuchsia_async::run_singlethreaded(test)]
@@ -727,6 +749,99 @@ mod test {
             },
         )
         .await;
+    }
+
+    // This test is for the case found in https://fxbug.dev/328297563.  The
+    // query result and terminal event futures both become ready after the query
+    // result is polled and returns pending. This test does not handle the case
+    // for when there is no query result.
+    #[test_case(Ok(()), Ok(Some(InterfaceRemovedReason::User)), Ok(()); "success")]
+    #[test_case(
+        Err(fidl::Error::InvalidHeader),
+        Ok(Some(InterfaceRemovedReason::User)),
+        Err(TerminalError::Fidl(fidl::Error::InvalidHeader));
+        "returns query error when not closed"
+    )]
+    #[test_case(
+        Err(fidl::Error::ClientChannelClosed {
+            status: zx::Status::PEER_CLOSED,
+            protocol_name: fnet_interfaces_admin::ControlMarker::DEBUG_NAME,
+            #[cfg(not(target_os = "fuchsia"))]
+            reason: None,
+        }),
+        Ok(Some(InterfaceRemovedReason::User)),
+        Err(TerminalError::Terminal(InterfaceRemovedReason::User));
+        "returns terminal error when channel closed"
+    )]
+    #[test_case(
+        Err(fidl::Error::ClientChannelClosed {
+            status: zx::Status::PEER_CLOSED,
+            protocol_name: fnet_interfaces_admin::ControlMarker::DEBUG_NAME,
+            #[cfg(not(target_os = "fuchsia"))]
+            reason: None,
+        }),
+        Ok(None),
+        Err(TerminalError::Fidl(
+            fidl::Error::ClientChannelClosed {
+                status: zx::Status::PEER_CLOSED,
+                protocol_name: fnet_interfaces_admin::ControlMarker::DEBUG_NAME,
+                #[cfg(not(target_os = "fuchsia"))]
+                reason: None,
+            }
+        ));
+        "returns query error when no terminal error"
+    )]
+    #[test_case(
+        Err(fidl::Error::ClientChannelClosed {
+            status: zx::Status::PEER_CLOSED,
+            protocol_name: fnet_interfaces_admin::ControlMarker::DEBUG_NAME,
+            #[cfg(not(target_os = "fuchsia"))]
+            reason: None,
+        }),
+        Err(fidl::Error::InvalidHeader),
+        Err(TerminalError::Fidl(
+            fidl::Error::ClientChannelClosed {
+                status: zx::Status::PEER_CLOSED,
+                protocol_name: fnet_interfaces_admin::ControlMarker::DEBUG_NAME,
+                #[cfg(not(target_os = "fuchsia"))]
+                reason: None,
+            }
+        ));
+        "returns query error when terminal event returns a fidl error"
+    )]
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn control_polling_race(
+        left_future_result: Result<(), fidl::Error>,
+        right_future_result: Result<
+            Option<fnet_interfaces_admin::InterfaceRemovedReason>,
+            fidl::Error,
+        >,
+        expected: Result<(), TerminalError<fnet_interfaces_admin::InterfaceRemovedReason>>,
+    ) {
+        let mut polled = false;
+        let first_future = std::future::poll_fn(|_cx| {
+            if polled {
+                Poll::Ready(left_future_result.clone())
+            } else {
+                polled = true;
+                Poll::Pending
+            }
+        })
+        .fuse();
+
+        let second_future =
+            std::future::poll_fn(|_cx| Poll::Ready(right_future_result.clone())).fuse();
+
+        let res = or_terminal_event(first_future, second_future).await;
+        match (res, expected) {
+            (Ok(()), Ok(())) => (),
+            (Err(TerminalError::Terminal(res)), Err(TerminalError::Terminal(expected)))
+                if res == expected => {}
+            // fidl::Error doesn't implement Eq, but this lack of an actual
+            // equality check does not matter for this test.
+            (Err(TerminalError::Fidl(_)), Err(TerminalError::Fidl(_))) => (),
+            (res, expected) => panic!("expected {:?} got {:?}", expected, res),
+        }
     }
 
     #[test]
