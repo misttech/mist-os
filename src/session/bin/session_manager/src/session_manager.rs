@@ -178,8 +178,8 @@ impl SessionManagerState {
 }
 
 impl vfs::remote::GetRemoteDir for SessionManagerState {
-    fn get_remote_dir(&self) -> fio::DirectoryProxy {
-        Clone::clone(&self.inner.lock().unwrap().exposed_dir)
+    fn get_remote_dir(&self) -> Result<fio::DirectoryProxy, zx::Status> {
+        Ok(Clone::clone(&self.inner.lock().unwrap().exposed_dir))
     }
 }
 

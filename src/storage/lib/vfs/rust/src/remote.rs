@@ -12,7 +12,7 @@ use {
         directory::entry::{DirectoryEntry, EntryInfo, OpenRequest},
         execution_scope::ExecutionScope,
         path::Path,
-        ObjectRequestRef,
+        ObjectRequestRef, ToObjectRequest,
     },
     fidl::endpoints::ServerEnd,
     fidl_fuchsia_io as fio,
@@ -61,15 +61,15 @@ struct RemoteDir {
 }
 
 impl GetRemoteDir for RemoteDir {
-    fn get_remote_dir(&self) -> fio::DirectoryProxy {
-        Clone::clone(&self.dir)
+    fn get_remote_dir(&self) -> Result<fio::DirectoryProxy, Status> {
+        Ok(Clone::clone(&self.dir))
     }
 }
 
 /// A trait that can be implemented to return a directory proxy that should be used as a remote
 /// directory.
 pub trait GetRemoteDir {
-    fn get_remote_dir(&self) -> fio::DirectoryProxy;
+    fn get_remote_dir(&self) -> Result<fio::DirectoryProxy, Status>;
 }
 
 impl<T: GetRemoteDir + Send + Sync + 'static> DirectoryEntry for T {
@@ -90,8 +90,15 @@ impl<T: GetRemoteDir> RemoteLike for T {
         path: Path,
         server_end: ServerEnd<fio::NodeMarker>,
     ) {
-        let _ =
-            self.get_remote_dir().open(flags, fio::ModeType::empty(), path.as_ref(), server_end);
+        flags.to_object_request(server_end).handle(|object_request| {
+            let _ = self.get_remote_dir()?.open(
+                flags,
+                fio::ModeType::empty(),
+                path.as_ref(),
+                object_request.take().into_server_end(),
+            );
+            Ok(())
+        });
     }
 
     // TODO(https://fxbug.dev/293947862): The Open2 method implies that `object_request` should be
@@ -111,7 +118,7 @@ impl<T: GetRemoteDir> RemoteLike for T {
     ) -> Result<(), Status> {
         // There is nowhere to propagate any errors since we take the `object_request`. This is okay
         // as the channel will be dropped and closed if the wire call fails.
-        let _ = self.get_remote_dir().open2(
+        let _ = self.get_remote_dir()?.open2(
             path.as_ref(),
             &protocols,
             object_request.take().into_channel(),
