@@ -7993,7 +7993,7 @@ hash with one that's synthesized from that date.
 
 **Current value (from the default):** `false`
 
-From //build/info/BUILD.gn:15
+From //build/info/BUILD.gn:12
 
 ### tsan_default_options
 
