@@ -89,6 +89,8 @@ class JTrace {
   using Entry = typename Config::Entry;
   using Header = ::jtrace::Header<Config>;
 
+  static inline constexpr size_t kRequiredBufferAlignment = alignof(Header);
+
   JTrace(TraceHooks& hooks) : hooks_(hooks) {}
 
   // No copy, no move.

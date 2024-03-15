@@ -207,7 +207,8 @@ class NonPersistentBuffer<Config,
   static ktl::span<uint8_t> get() { return {data}; }
 
  private:
-  static inline uint8_t data[Config::kTargetBufferSize];
+  alignas(jtrace::JTrace<Config>::kRequiredBufferAlignment) static inline uint8_t
+      data[Config::kTargetBufferSize];
 };
 
 lazy_init::LazyInit<jtrace::ProductionTraceHooks> g_trace_hooks;
