@@ -3,15 +3,19 @@
 // found in the LICENSE file.
 
 use {
-    crate::model::{
-        component::{ComponentInstance, WeakComponentInstance},
-        routing::router::{Request, Routable, Router},
+    crate::{
+        model::{
+            component::{ComponentInstance, WeakComponentInstance},
+            routing::router::{Request, Routable, Router},
+        },
+        PathBuf,
     },
-    crate::PathBuf,
     ::routing::{
         capability_source::CapabilitySource, component_instance::ComponentInstanceInterface,
         error::RoutingError, policy::GlobalPolicyChecker,
     },
+    async_trait::async_trait,
+    bedrock_error::BedrockError,
     cm_types::Name,
     cm_util::WeakTaskGroup,
     fidl::{
@@ -19,14 +23,14 @@ use {
         epitaph::ChannelEpitaphExt,
         AsyncChannel,
     },
-    fidl_fuchsia_component_sandbox as fsandbox, fidl_fuchsia_io as fio,
-    fuchsia_zircon::{self as zx},
-    futures::future::BoxFuture,
-    futures::FutureExt,
+    fidl_fuchsia_component_sandbox as fsandbox, fidl_fuchsia_io as fio, fuchsia_zircon as zx,
+    futures::{future::BoxFuture, FutureExt},
     lazy_static::lazy_static,
     sandbox::{Capability, Dict, Open},
-    std::iter,
-    std::sync::{self, Arc},
+    std::{
+        iter,
+        sync::{self, Arc},
+    },
     tracing::warn,
     vfs::{execution_scope::ExecutionScope, ToObjectRequest},
 };
@@ -154,13 +158,11 @@ impl DictExt for Dict {
             match current.get_capability(iter::once(next_element)) {
                 Some(Capability::Dictionary(dictionary)) => current = dictionary,
                 Some(Capability::Router(r)) => return Router::from_any(r).with_path(path),
-                Some(cap) if path.next().is_none() => {
-                    return Router::new_non_async(move |_request| Ok(cap.clone()))
-                }
-                _ => return Router::new_error(error.into()),
+                Some(cap) if path.next().is_none() => return Router::new(cap),
+                _ => return Router::new_error(error),
             }
         }
-        Router::new_error(error.into())
+        Router::new_error(error)
     }
 
     fn insert_capability<'a>(
@@ -301,10 +303,7 @@ impl LaunchTaskOnReceive {
     }
 
     pub fn into_router(self) -> Router {
-        let me = Arc::new(self);
-        Router::new_non_async(move |request: Request| {
-            Ok(me.clone().into_open(request.target).into())
-        })
+        Router::new(Arc::new(self))
     }
 
     fn launch_task(&self, channel: zx::Channel, instance: WeakComponentInstance) {
@@ -370,6 +369,13 @@ impl LaunchTaskOnReceive {
                 .boxed()
             }),
         )
+    }
+}
+
+#[async_trait]
+impl Routable for Arc<LaunchTaskOnReceive> {
+    async fn route(&self, request: Request) -> Result<Capability, BedrockError> {
+        Ok(self.clone().into_open(request.target).into())
     }
 }
 

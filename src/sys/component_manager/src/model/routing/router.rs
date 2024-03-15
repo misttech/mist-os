@@ -51,7 +51,8 @@ pub struct Router {
 
 impl fmt::Debug for Router {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("Router").field("route_fn", &"[route function]").finish()
+        // TODO(https://fxbug.dev/329680070): Require `Debug` on `Routable` trait.
+        f.debug_struct("Router").field("routable", &"[some routable object]").finish()
     }
 }
 
@@ -86,24 +87,22 @@ impl Router {
         Router { routable: Arc::new(routable) }
     }
 
-    pub fn new_non_async<F>(route_fn: F) -> Self
-    where
-        F: Fn(Request) -> Result<Capability, BedrockError> + Send + Sync + 'static,
-    {
-        Router::new(move |request: Request| std::future::ready(route_fn(request)).boxed())
+    /// Creates a router that will always resolve with the provided capability,
+    /// unless the capability is also a router, where it will recursively request
+    /// from the router.
+    pub fn new_ok(capability: impl Into<Capability>) -> Self {
+        let capability: Capability = capability.into();
+        Router::new(capability)
     }
 
     /// Creates a router that will always fail a request with the provided error.
-    pub fn new_error(error: BedrockError) -> Self {
-        Router::new_non_async(move |_request| Err(error.clone()))
+    pub fn new_error(error: impl Into<BedrockError>) -> Self {
+        let error: BedrockError = error.into();
+        Router::new(error)
     }
 
     pub fn from_any(any: AnyCapability) -> Router {
         *any.into_any().downcast::<Router>().unwrap()
-    }
-
-    pub fn from_capability(capability: Capability) -> Router {
-        Router::new(capability)
     }
 
     /// Obtain a capability from this router, following the description in `request`.
@@ -363,6 +362,13 @@ impl Routable for Capability {
     }
 }
 
+#[async_trait]
+impl Routable for BedrockError {
+    async fn route(&self, _: Request) -> Result<Capability, BedrockError> {
+        Err(self.clone())
+    }
+}
+
 pub struct PolicyCheckRouter {
     capability_source: CapabilitySource,
     policy_checker: GlobalPolicyChecker,
@@ -445,7 +451,7 @@ mod tests {
         // We want to test vending a sender with a router, dropping the associated receiver, and
         // then using the sender. The objective is to observe an error, and not panic.
         let (receiver, sender) = Receiver::new();
-        let router = Router::new_non_async(move |_request| Ok(sender.clone().into()));
+        let router = Router::new_ok(sender.clone());
 
         let capability = router
             .route(Request {
@@ -474,7 +480,7 @@ mod tests {
         let dict1 = Dict::new();
         dict1.lock_entries().insert("source".to_owned(), source);
 
-        let base_router = Router::from_capability(dict1.into());
+        let base_router = Router::new_ok(dict1);
         let downscoped_router = base_router.with_path(iter::once("source"));
 
         let capability = downscoped_router
@@ -503,7 +509,7 @@ mod tests {
         let dict4 = Dict::new();
         dict4.lock_entries().insert("dict3".to_owned(), Capability::Dictionary(dict3));
 
-        let base_router = Router::from_capability(dict4.into());
+        let base_router = Router::new_ok(dict4);
         let downscoped_router =
             base_router.with_path(vec!["dict3", "dict2", "dict1", "source"].into_iter());
 

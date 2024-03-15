@@ -328,20 +328,17 @@ fn extend_dict_with_dictionary(
                             RoutingError::BedrockSourceDictionaryExposeNotFound,
                         )
                     }
-                    None => Router::new_error(
-                        RoutingError::use_from_child_instance_not_found(
-                            &child_name,
-                            &component.moniker,
-                            source_path.iter_segments().join("/"),
-                        )
-                        .into(),
-                    ),
+                    None => Router::new_error(RoutingError::use_from_child_instance_not_found(
+                        &child_name,
+                        &component.moniker,
+                        source_path.iter_segments().join("/"),
+                    )),
                 }
             }
         };
         make_dict_extending_router(component.as_weak(), dict.clone(), source_dict_router)
     } else {
-        Router::from_capability(dict.clone().into())
+        Router::new_ok(dict.clone())
     };
     declared_dictionaries.insert_capability(iter::once(decl.name.as_str()), dict.into());
     program_output_dict.insert_capability(iter::once(decl.name.as_str()), router.into());
@@ -514,13 +511,12 @@ fn extend_dict_with_use(
                 ),
             )
         }
-        cm_rust::UseSource::Framework if use_.is_from_dictionary() => Router::new_error(
-            RoutingError::capability_from_framework_not_found(
+        cm_rust::UseSource::Framework if use_.is_from_dictionary() => {
+            Router::new_error(RoutingError::capability_from_framework_not_found(
                 &component.moniker,
                 source_path.iter_segments().join("/"),
-            )
-            .into(),
-        ),
+            ))
+        }
         cm_rust::UseSource::Framework => {
             let source_name = use_.source_name().clone();
             // TODO(https://fxbug.dev/323926925): place a router here that will return an error if
@@ -621,7 +617,7 @@ fn use_from_parent_router(
                     .program_input_dict_additions
                     .as_ref()
                     .and_then(|dict| match dict.get_capability(source_path.iter_segments()) {
-                        Some(Capability::Open(o)) => Some(Router::from_capability(o.into())),
+                        Some(Capability::Open(o)) => Some(Router::new_ok(o)),
                         _ => None,
                     })
                     // Try to get the capability from the component input dict, created from static
@@ -820,7 +816,7 @@ fn extend_dict_with_expose(
 }
 
 fn new_unit_router() -> Router {
-    Router::new_non_async(|_: Request| Ok(Unit {}.into()))
+    Router::new_ok(Unit {})
 }
 
 fn new_forwarding_router_to_child(

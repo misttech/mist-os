@@ -651,7 +651,7 @@ impl ComponentInstance {
                 // TODO(https://fxbug.dev/319542502): Consider using the external Router type, once
                 // it exists
                 let router = match value {
-                    Capability::Open(o) => Router::from_capability(o.into()),
+                    Capability::Open(o) => Router::new_ok(o),
                     _ => return Err(AddDynamicChildError::InvalidDictionary),
                 };
 
@@ -1715,7 +1715,7 @@ impl ResolvedInstanceState {
         capability_name: Name,
     ) -> Router {
         if decl.program.is_none() {
-            return Router::new_error(OpenOutgoingDirError::InstanceNonExecutable.into());
+            return Router::new_error(OpenOutgoingDirError::InstanceNonExecutable);
         }
         let outgoing_dict = Self::build_program_outgoing_dict(component, &decl.capabilities);
         let weak_component = WeakComponentInstance::new(component);
