@@ -37,6 +37,7 @@ use {
         remote::remote_dir,
         service::endpoint,
     },
+    zx::Duration,
 };
 
 mod service;
@@ -44,6 +45,8 @@ pub use service::{
     FidlService, FidlServiceMember, FidlServiceServerConnector, Service, ServiceObj,
     ServiceObjLocal, ServiceObjTrait,
 };
+mod until_stalled;
+pub use until_stalled::StallableServiceFs;
 
 /// A filesystem which connects clients to services.
 ///
@@ -526,12 +529,18 @@ impl<ServiceObjTy: ServiceObjTrait> ServiceFs<ServiceObjTy> {
 
     add_functions!();
 
+    /// When a connection is first made to the `ServiceFs` in the absence of a parent connection,
+    /// it will be granted these rights.
+    fn base_connection_flags() -> fio::OpenFlags {
+        return fio::OpenFlags::RIGHT_READABLE
+            | fio::OpenFlags::RIGHT_WRITABLE
+            | fio::OpenFlags::RIGHT_EXECUTABLE;
+    }
+
     fn serve_connection_impl(&self, chan: fidl::endpoints::ServerEnd<fio::DirectoryMarker>) {
         self.dir.clone().open(
             self.scope.clone(),
-            fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::RIGHT_WRITABLE
-                | fio::OpenFlags::RIGHT_EXECUTABLE,
+            Self::base_connection_flags(),
             Path::dot(),
             fidl::endpoints::ServerEnd::<fio::NodeMarker>::new(chan.into_channel()),
         );
@@ -635,6 +644,25 @@ impl<ServiceObjTy: ServiceObjTrait> ServiceFs<ServiceObjTy> {
             self.serve_connection_impl(chan);
         }
         Ok(self)
+    }
+
+    /// TODO(https://fxbug.dev/326626515): this is an experimental method to run a FIDL
+    /// directory connection until stalled, with the purpose to cleanly stop a component.
+    /// We'll expect to revisit how this works to generalize to all connections later.
+    /// Try not to use this function for other purposes.
+    ///
+    /// Normally the [`ServiceFs`] stream will block until all connections are closed.
+    /// In order to escrow the outgoing directory server endpoint, you may use this
+    /// function to get a [`StallableServiceFs`] that detects when no new requests
+    /// hit the outgoing directory for `debounce_interval`, and all hosted protocols
+    /// and other VFS connections to finish, then yield back the outgoing directory handle.
+    ///
+    /// The [`ServiceFs`] stream yields [`ServiceObjTy::Output`], which could be an enum
+    /// of FIDL connection requests in a typical component. By contrast, [`StallableServiceFs`]
+    /// yields an enum of either the request, or the unbound outgoing directory endpoint,
+    /// allowing you to escrow it back to `component_manager` before exiting the component.
+    pub fn until_stalled(self, debounce_interval: Duration) -> StallableServiceFs<ServiceObjTy> {
+        StallableServiceFs::<ServiceObjTy>::new(self, debounce_interval)
     }
 }
 

@@ -14,6 +14,7 @@ rustc_library("fuchsia-component") {
     "//sdk/fidl/fuchsia.component:fuchsia.component_rust",
     "//sdk/fidl/fuchsia.component.decl:fuchsia.component.decl_rust",
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
+    "//src/lib/detect-stall",
     "//src/lib/fdio/rust:fdio",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia-async",
@@ -30,7 +31,10 @@ rustc_library("fuchsia-component") {
 
   test_deps = [
     "tests:fuchsia.component.client.test_rust",
+    "//src/lib/fuchsia",
     "//src/lib/fuchsia-async",
+    "//src/lib/fuchsia-fs",
+    "//src/lib/test_util",
     "//third_party/rust_crates:assert_matches",
   ]
 
@@ -40,6 +44,7 @@ rustc_library("fuchsia-component") {
     "src/lib.rs",
     "src/server/mod.rs",
     "src/server/service.rs",
+    "src/server/until_stalled.rs",
   ]
 }
 
