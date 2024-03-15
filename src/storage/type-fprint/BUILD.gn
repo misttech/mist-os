@@ -31,5 +31,5 @@ rustc_macro("macros") {
 
 group("tests") {
   testonly = true
-  deps = [ ":fprint" ]
+  deps = [ ":fprint_test($host_toolchain)" ]
 }

@@ -9,7 +9,7 @@ use {
 };
 
 /// A TypeFingerprint is able to return a string that represents the layout of a type.
-/// It is intended to capture any structure that will affect serialiation via Serde.
+/// It is intended to capture any structure that will affect serialization via Serde.
 pub trait TypeFingerprint {
     fn fingerprint() -> String;
 }
@@ -169,13 +169,15 @@ mod tests {
     #[derive(TypeFingerprint)]
     struct Bar(Foo);
 
+    #[allow(dead_code)]
     #[derive(TypeFingerprint)]
     struct Baz {
         foo: Foo,
         bar: Bar,
-        bizz: u64, //std::collections::BTreeMap<String, (u64, u32, u16, u8, usize)>,
+        bizz: u64,
     }
 
+    #[allow(dead_code)]
     #[derive(TypeFingerprint)]
     enum Buzz {
         A(Foo),
@@ -195,14 +197,14 @@ mod tests {
 
     #[test]
     fn test_vec() {
-        assert_eq!(Vec::<[u32; 3]>::fingerprint(), "std :: vec :: Vec<[u32;3]>");
+        assert_eq!(Vec::<[u32; 3]>::fingerprint(), "Vec<[u32;3]>");
     }
 
     #[test]
     fn test_hashmap_and_tuple() {
         assert_eq!(
             std::collections::HashMap::<[u32; 3], (bool, [u64; 8])>::fingerprint(),
-            "std :: collections :: HashMap<[u32;3],(bool,[u64;8],)>"
+            "HashMap<[u32;3],(bool,[u64;8],)>"
         );
     }
 
@@ -213,12 +215,15 @@ mod tests {
 
     #[test]
     fn test_struct() {
-        assert_eq!(Bar::fingerprint(), "struct Bar {Foo,}");
-        assert_eq!(Baz::fingerprint(), "struct Baz {foo:Foo,bar:struct Bar {Foo,},bizz:u64,}");
+        assert_eq!(Bar::fingerprint(), "struct {Foo}");
+        assert_eq!(Baz::fingerprint(), "struct {foo:Foo,bar:struct {Foo},bizz:u64}");
     }
 
     #[test]
     fn test_enum() {
-        assert_eq!(Buzz::fingerprint(), "enum Buzz { A(Foo,),B(struct Bar {Foo,},),C(struct Baz {foo:Foo,bar:struct Bar {Foo,},bizz:u64,},),}");
+        assert_eq!(
+            Buzz::fingerprint(),
+            "enum {A(Foo),B(struct {Foo}),C(struct {foo:Foo,bar:struct {Foo},bizz:u64})}"
+        );
     }
 }
