@@ -73,6 +73,10 @@ def _fuchsia_board_configuration_impl(ctx):
         ]
         deps.extend(bib[FuchsiaBoardInputBundleInfo].files)
 
+    if ctx.attr.devicetree:
+        deps.append(ctx.file.devicetree)
+        board_config["devicetree"] = board_config_relative_to_root + ctx.file.devicetree.path
+
     content = json.encode_indent(board_config, indent = "  ")
     ctx.actions.write(board_config_file, content)
 
@@ -119,6 +123,10 @@ _fuchsia_board_configuration = rule(
             allow_files = True,
             default = {},
         ),
+        "devicetree": attr.label(
+            doc = "Devicetree binary (.dtb) file",
+            allow_single_file = True,
+        ),
     },
 )
 
@@ -129,7 +137,8 @@ def fuchsia_board_configuration(
         input_bundles = [],
         board_input_bundles = [],
         provided_features = [],
-        filesystems = {}):
+        filesystems = {},
+        devicetree = None):
     """A board configuration that takes a dict for the filesystems config."""
     filesystem_labels = extract_labels(filesystems)
 
@@ -142,6 +151,7 @@ def fuchsia_board_configuration(
         provided_features = provided_features,
         filesystems = json.encode_indent(filesystems, indent = "    "),
         filesystems_labels = filesystem_labels,
+        devicetree = devicetree,
     )
 
 def _fuchsia_prebuilt_board_configuration_impl(ctx):

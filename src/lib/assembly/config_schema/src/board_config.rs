@@ -32,6 +32,11 @@ pub struct BoardInformation {
     #[serde(default)]
     pub provided_features: Vec<String>,
 
+    /// Path to the devicetree binary (.dtb) this provided by this board.
+    #[serde(default)]
+    #[file_relative_paths]
+    pub devicetree: Option<FileRelativePathBuf>,
+
     /// Configuration for the various filesystems that the product can choose to
     /// include.
     #[serde(default)]
@@ -169,6 +174,7 @@ mod test {
                 "bundle_a",
                 "bundle_b"
             ],
+            "devicetree": "test.dtb"
         });
 
         let parsed: BoardInformation = serde_json::from_value(json).unwrap();
@@ -187,6 +193,7 @@ mod test {
                 FileRelativePathBuf::Resolved("some/path/to/board/bundle_a".into()),
                 FileRelativePathBuf::Resolved("some/path/to/board/bundle_b".into()),
             ],
+            devicetree: Some(FileRelativePathBuf::Resolved("some/path/to/board/test.dtb".into())),
             ..Default::default()
         };
 

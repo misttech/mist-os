@@ -1,4 +1,5 @@
 {
+    "devicetree": "../../../../../fuchsia/assembly/test_data/test.dtb",
     "input_bundles": [
         "../../../../../bazel-out/x86_64-fastbuild/bin/fuchsia/assembly/testing_board_input_bundle_out",
         "../../../../../fuchsia/assembly/test_data"

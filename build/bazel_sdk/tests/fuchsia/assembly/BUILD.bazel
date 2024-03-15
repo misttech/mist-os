@@ -71,6 +71,7 @@ fuchsia_board_configuration(
         ":testing_prebuilt_board_input_bundle",
     ],
     board_name = "x64",
+    devicetree = "test_data/test.dtb",
 )
 
 fuchsia_board_configuration_test(
