@@ -395,7 +395,7 @@ pub struct ComponentInstance {
     /// The component's mutable state.
     state: Mutex<InstanceState>,
     /// The component's execution state.
-    execution: Mutex<ExecutionState>,
+    execution: std::sync::Mutex<ExecutionState>,
     /// Actions on the instance that must eventually be completed.
     actions: Mutex<ActionSet>,
     /// Tasks owned by this component instance that will be cancelled if the component is
@@ -454,7 +454,7 @@ impl ComponentInstance {
             context,
             parent,
             state: Mutex::new(InstanceState::New),
-            execution: Mutex::new(ExecutionState::new()),
+            execution: std::sync::Mutex::new(ExecutionState::new()),
             actions: Mutex::new(ActionSet::new()),
             hooks,
             nonblocking_task_group: TaskGroup::new(),
@@ -471,8 +471,8 @@ impl ComponentInstance {
 
     /// Locks and returns the instance's execution state.
     // TODO(b/309656051): Remove this method from ComponentInstance's public API
-    pub async fn lock_execution(&self) -> MutexGuard<'_, ExecutionState> {
-        self.execution.lock().await
+    pub fn lock_execution(&self) -> std::sync::MutexGuard<'_, ExecutionState> {
+        self.execution.lock().unwrap()
     }
 
     /// Locks and returns the instance's action set.
@@ -494,8 +494,8 @@ impl ComponentInstance {
     }
 
     /// Returns true if the component is started, i.e. when it has a runtime.
-    pub async fn is_started(&self) -> bool {
-        self.lock_execution().await.is_started()
+    pub fn is_started(&self) -> bool {
+        self.lock_execution().is_started()
     }
 
     /// Locks and returns a lazily resolved and populated `ResolvedInstanceState`. Does not
@@ -759,7 +759,7 @@ impl ComponentInstance {
         shut_down: bool,
     ) -> Result<(), StopActionError> {
         let mut runtime = {
-            let mut execution = self.lock_execution().await;
+            let mut execution = self.lock_execution();
             let shut_down = execution.shut_down | shut_down;
             execution.shut_down = shut_down;
             execution.runtime.take()
@@ -996,13 +996,13 @@ impl ComponentInstance {
 
     /// Opens an object referenced by `path` from the outgoing directory of the component.
     /// The component must have a program and must be started, or this method will fail.
-    pub async fn open_outgoing(
+    pub fn open_outgoing(
         &self,
         flags: fio::OpenFlags,
         path: &str,
         server_chan: &mut zx::Channel,
     ) -> Result<(), OpenOutgoingDirError> {
-        let execution = self.lock_execution().await;
+        let execution = self.lock_execution();
         let runtime = execution.runtime.as_ref().ok_or(OpenOutgoingDirError::InstanceNotRunning)?;
         let out_dir = runtime.outgoing_dir().ok_or(OpenOutgoingDirError::InstanceNonExecutable)?;
         let path = fuchsia_fs::canonicalize_path(&path);
@@ -1029,7 +1029,7 @@ impl ComponentInstance {
                     }
                 };
                 scope.spawn(async move {
-                    match component.open_outgoing(flags, path.as_ref(), &mut server_end).await {
+                    match component.open_outgoing(flags, path.as_ref(), &mut server_end) {
                         Ok(()) => {}
                         Err(err) => {
                             let _ = server_end.close_with_epitaph(err.as_zx_status());
@@ -1082,7 +1082,7 @@ impl ComponentInstance {
         // here so we don't waste time starting eager children more than once.
         {
             let state = self.lock_state().await;
-            let execution = self.lock_execution().await;
+            let execution = self.lock_execution();
             if let Some(res) = start::should_return_early(&state, &execution, &self.moniker) {
                 return res.map_err(Into::into);
             }
@@ -1158,7 +1158,7 @@ impl ComponentInstance {
     /// If the component is not running or does not have a logger, the tracing subscriber
     /// is unchanged, so logs will be attributed to component_manager.
     pub async fn with_logger_as_default<T>(&self, op: impl FnOnce() -> T) -> T {
-        let execution = self.lock_execution().await;
+        let execution = self.lock_execution();
         match &execution.runtime {
             Some(ComponentRuntime { logger: Some(ref logger), .. }) => {
                 let logger = logger.clone() as Arc<dyn tracing::Subscriber + Send + Sync>;
@@ -1172,7 +1172,7 @@ impl ComponentInstance {
     /// of the component's lifetime, when it's running, this channel will be
     /// kept alive.
     pub async fn scope_to_runtime(self: &Arc<Self>, server_end: zx::Channel) {
-        let mut execution = self.lock_execution().await;
+        let mut execution = self.lock_execution();
         execution.scope_server_end(server_end);
     }
 
@@ -2646,8 +2646,7 @@ pub mod tests {
         assert!(started_timestamp == debug_started_timestamp);
 
         let component = bind_handle.await;
-        let component_timestamp =
-            component.lock_execution().await.runtime.as_ref().unwrap().timestamp;
+        let component_timestamp = component.lock_execution().runtime.as_ref().unwrap().timestamp;
         assert_eq!(component_timestamp, started_timestamp);
     }
 
@@ -2703,7 +2702,7 @@ pub mod tests {
             .await;
 
         // Check that the eager 'b' has started.
-        assert!(component_b.is_started().await);
+        assert!(component_b.is_started());
 
         let b_info = ComponentInfo::new(component_b.clone()).await;
         b_info.check_not_shut_down(&test.runner).await;
@@ -3730,7 +3729,7 @@ pub mod tests {
         .await
         .expect("failed to start child");
 
-        assert!(child.is_started().await);
+        assert!(child.is_started());
 
         // Log a message using the child's scoped logger.
         child.with_logger_as_default(|| info!("hello world")).await;
@@ -3838,7 +3837,7 @@ pub mod tests {
         );
 
         let root = test_topology.look_up(Moniker::default()).await;
-        assert!(!root.is_started().await);
+        assert!(!root.is_started());
 
         // Start the component.
         let root = root
@@ -3855,13 +3854,11 @@ pub mod tests {
 
         // Open the outgoing directory. This should not block.
         let (_, mut server_end) = zx::Channel::create();
-        let open_fut = root.open_outgoing(fio::OpenFlags::empty(), ".", &mut server_end);
-        futures::pin_mut!(open_fut);
         // Note: if the behavior of `open_outgoing` changes to start the component, we can simply
         // update the `Err` here accordingly.
         assert_matches!(
-            TestExecutor::poll_until_stalled(open_fut).await,
-            Poll::Ready(Err(OpenOutgoingDirError::InstanceNotRunning))
+            root.open_outgoing(fio::OpenFlags::empty(), ".", &mut server_end),
+            Err(OpenOutgoingDirError::InstanceNotRunning)
         );
 
         // Let the timer advance. The component should be stopped now.
@@ -3870,6 +3867,9 @@ pub mod tests {
 
         // Open the outgoing directory. This should still not block.
         let (_, mut server_end) = zx::Channel::create();
-        let _ = root.open_outgoing(fio::OpenFlags::empty(), ".", &mut server_end).await;
+        assert_matches!(
+            root.open_outgoing(fio::OpenFlags::empty(), ".", &mut server_end),
+            Err(OpenOutgoingDirError::InstanceNotRunning)
+        );
     }
 }

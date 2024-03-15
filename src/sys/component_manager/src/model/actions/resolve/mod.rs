@@ -42,7 +42,7 @@ impl Action for ResolveAction {
 
 async fn do_resolve(component: &Arc<ComponentInstance>) -> Result<(), ResolveActionError> {
     {
-        let execution = component.lock_execution().await;
+        let execution = component.lock_execution();
         if execution.is_shut_down() {
             return Err(ResolveActionError::InstanceShutDown {
                 moniker: component.moniker.clone(),
@@ -186,7 +186,7 @@ pub mod tests {
         let test = ActionsTest::new("root", components, None).await;
         let component_root = test.look_up(Moniker::root()).await;
         let component_a = test.start(vec!["a"].try_into().unwrap()).await;
-        assert!(component_a.is_started().await);
+        assert!(component_a.is_started());
         assert!(is_resolved(&component_root).await);
         assert!(is_resolved(&component_a).await);
 

@@ -157,7 +157,7 @@ mod tests {
             .start_instance(&moniker, &StartReason::Root)
             .await
             .expect("failed to bind");
-        let exec = component.lock_execution().await;
+        let exec = component.lock_execution();
         exec.runtime.as_ref().unwrap().timestamp
     }
 }

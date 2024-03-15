@@ -97,7 +97,7 @@ async fn get_all_remaining_monikers(root: &Arc<ComponentInstance>) -> Vec<String
         if let InstanceState::Resolved(resolved_state) = &*next.lock_state().await {
             queue.extend(resolved_state.children().map(|(_, i)| i.clone()));
 
-            let execution_state = next.lock_execution().await;
+            let execution_state = next.lock_execution();
             if execution_state.is_started() && !execution_state.is_shut_down() {
                 monikers.push(next.moniker.to_string());
             }

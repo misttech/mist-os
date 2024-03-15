@@ -226,7 +226,7 @@ pub async fn get_instance(
 
     let resolved_info = {
         let state = instance.lock_state().await;
-        let execution = instance.lock_execution().await;
+        let execution = instance.lock_execution();
 
         match &*state {
             InstanceState::Resolved(r) => {
@@ -475,7 +475,7 @@ async fn open(
 
     match dir_type {
         fsys::OpenDirType::OutgoingDir => {
-            let execution = instance.lock_execution().await;
+            let execution = instance.lock_execution();
             let dir = execution
                 .runtime
                 .as_ref()
@@ -485,7 +485,7 @@ async fn open(
             dir.open(flags, mode, path, object).map_err(|_| fsys::OpenError::FidlError)
         }
         fsys::OpenDirType::RuntimeDir => {
-            let execution = instance.lock_execution().await;
+            let execution = instance.lock_execution();
             let dir = execution
                 .runtime
                 .as_ref()
@@ -644,7 +644,7 @@ async fn get_fidl_instance_and_children(
 
     let (resolved_info, children) = {
         let state = instance.lock_state().await;
-        let execution = instance.lock_execution().await;
+        let execution = instance.lock_execution();
         match &*state {
             InstanceState::Resolved(r) => {
                 let url = r.address().url().to_string();

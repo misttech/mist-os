@@ -3483,7 +3483,7 @@ async fn route_from_while_component_is_stopping() {
     );
 
     let root = test_topology.look_up(Moniker::default()).await;
-    assert!(!root.is_started().await);
+    assert!(!root.is_started());
 
     // Start the component.
     let root = root
@@ -3491,7 +3491,7 @@ async fn route_from_while_component_is_stopping() {
         .await
         .expect("failed to start root");
     test_topology.runner.wait_for_urls(&["test:///root_resolved"]).await;
-    assert!(root.is_started().await);
+    assert!(root.is_started());
 
     // Start to stop the component. This will stall because the framework will be
     // waiting the controller to respond.
@@ -3534,5 +3534,5 @@ async fn route_from_while_component_is_stopping() {
         client_end.basic_info().unwrap().related_koid,
         server_end.basic_info().unwrap().koid
     );
-    assert!(root.is_started().await);
+    assert!(root.is_started());
 }

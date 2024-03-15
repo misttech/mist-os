@@ -92,7 +92,6 @@ impl CapabilityProvider for DefaultComponentCapabilityProvider {
         let path = path.to_str().ok_or(CapabilityProviderError::BadPath)?;
         source
             .open_outgoing(flags, path, server_end)
-            .await
             .map_err(|e| CapabilityProviderError::ComponentProviderError { err: e.into() })?;
         Ok(())
     }

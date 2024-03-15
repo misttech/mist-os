@@ -497,7 +497,7 @@ pub(crate) mod test_utils {
         };
 
         let child_state = child.lock_state().await;
-        let child_execution = child.lock_execution().await;
+        let child_execution = child.lock_execution();
         let found_child = parent_resolved_state.get_child(child.child_moniker().unwrap());
 
         found_child.is_none()
@@ -509,7 +509,7 @@ pub(crate) mod test_utils {
     pub async fn is_stopped(component: &ComponentInstance, moniker: &ChildName) -> bool {
         match *component.lock_state().await {
             InstanceState::Resolved(ref s) => match s.get_child(moniker) {
-                Some(child) => !child.is_started().await,
+                Some(child) => !child.is_started(),
                 None => false,
             },
             InstanceState::Destroyed => false,
@@ -521,7 +521,7 @@ pub(crate) mod test_utils {
 
     pub async fn is_destroyed(component: &ComponentInstance) -> bool {
         let state = component.lock_state().await;
-        let execution = component.lock_execution().await;
+        let execution = component.lock_execution();
         matches!(*state, InstanceState::Destroyed)
             && execution.runtime.is_none()
             && execution.is_shut_down()
@@ -539,7 +539,7 @@ pub(crate) mod test_utils {
 
     pub async fn is_unresolved(component: &ComponentInstance) -> bool {
         let state = component.lock_state().await;
-        let execution = component.lock_execution().await;
+        let execution = component.lock_execution();
         execution.runtime.is_none()
             && matches!(*state, InstanceState::New | InstanceState::Unresolved(_))
     }

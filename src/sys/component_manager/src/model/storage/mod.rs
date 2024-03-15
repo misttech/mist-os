@@ -210,13 +210,11 @@ async fn open_storage_root(
         let path = full_backing_directory_path
             .to_str()
             .ok_or_else(|| ModelError::path_is_not_utf8(full_backing_directory_path.clone()))?;
-        dir_source_component
-            .open_outgoing(
-                FLAGS | fio::OpenFlags::DIRECTORY,
-                path,
-                &mut local_server_end.into_channel(),
-            )
-            .await?;
+        dir_source_component.open_outgoing(
+            FLAGS | fio::OpenFlags::DIRECTORY,
+            path,
+            &mut local_server_end.into_channel(),
+        )?;
     } else {
         // If storage_source_info.storage_provider is None, the directory comes from component_manager's namespace
         let path = full_backing_directory_path

@@ -63,7 +63,7 @@ impl ComponentInfo {
         // being the Channel passed to the Runner to use for the
         // ComponentController protocol.
         let koid = {
-            let component = component.lock_execution().await;
+            let component = component.lock_execution();
             let runtime = component.runtime.as_ref().expect("runtime is unexpectedly missing");
             runtime.program_koid().expect("program is unexpectedly missing")
         };
@@ -81,7 +81,7 @@ impl ComponentInfo {
             .expect("request map didn't have channel id, perhaps the controller wasn't started?");
         assert_eq!(*request_vec, vec![ControlMessage::Stop]);
 
-        let execution = self.component.lock_execution().await;
+        let execution = self.component.lock_execution();
         assert!(execution.runtime.is_none());
         assert!(execution.is_shut_down());
     }
@@ -96,14 +96,14 @@ impl ComponentInfo {
             assert_eq!(*request_vec, vec![]);
         }
 
-        let execution = self.component.lock_execution().await;
+        let execution = self.component.lock_execution();
         assert!(execution.runtime.is_some());
         assert!(!execution.is_shut_down());
     }
 }
 
 pub async fn execution_is_shut_down(component: &ComponentInstance) -> bool {
-    let execution = component.lock_execution().await;
+    let execution = component.lock_execution();
     execution.runtime.is_none() && execution.is_shut_down()
 }
 

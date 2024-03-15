@@ -612,7 +612,7 @@ impl RoutingTest {
         if wait_for_start {
             let is_started = {
                 let component = self.model.root().find_and_maybe_resolve(moniker).await?;
-                component.is_started().await
+                component.is_started()
             };
             if !is_started {
                 self.mock_runner.reset_wait_for_url(&resolved_url);

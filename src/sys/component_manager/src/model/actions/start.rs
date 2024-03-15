@@ -266,71 +266,77 @@ async fn start_component(
     start_context: StartContext,
 ) -> Result<(), StartActionError> {
     let _actions = component.lock_actions().await;
-    let mut state = component.lock_state().await;
-    let mut execution = component.lock_execution().await;
 
-    if let Some(r) = should_return_early(&state, &execution, &component.moniker) {
-        return r;
-    }
+    let runtime_info;
+    let timestamp;
+    let runtime_dir;
+    let break_on_start_left;
+    let break_on_start_right;
 
-    let (diagnostics_sender, diagnostics_receiver) = oneshot::channel();
-    let (break_on_start_left, break_on_start_right) = zx::EventPair::create();
-
-    let StartContext {
-        runner,
-        url,
-        namespace_builder,
-        numbered_handles,
-        namespace_scope,
-        encoded_config,
-        program_input_dict_additions,
-    } = start_context;
-
-    if let Some(runner) = runner {
-        let moniker = &component.moniker;
-        let component_instance = state
-            .instance_token(moniker, &component.context)
-            .ok_or(StartActionError::InstanceDestroyed { moniker: moniker.clone() })?;
-
-        let start_info = StartInfo {
-            resolved_url: url,
-            program: decl
-                .program
-                .as_ref()
-                .map(|p| p.info.clone())
-                .unwrap_or_else(|| fdata::Dictionary::default()),
-            namespace: namespace_builder,
-            numbered_handles,
-            encoded_config,
-            break_on_start: Some(break_on_start_left),
-            component_instance,
-        };
-
-        pending_runtime.set_program(
-            Program::start(&runner, start_info, diagnostics_sender, namespace_scope).map_err(
-                |err| StartActionError::StartProgramError { moniker: moniker.clone(), err },
-            )?,
-            component.as_weak(),
-        );
-    }
-
-    let runtime_info = RuntimeInfo::from_runtime(&pending_runtime, diagnostics_receiver);
-    let runtime_dir = pending_runtime.runtime_dir().cloned();
-    let timestamp = pending_runtime.timestamp;
-
-    execution.runtime = Some(pending_runtime);
-
-    // TODO(b/322564390): Move program_input_dict_additions into `ExecutionState`.
     {
-        let resolved_state = match &mut *state {
-            InstanceState::Resolved(resolved_state) => resolved_state,
-            _ => panic!("expected component to be resolved"),
-        };
-        resolved_state.program_input_dict_additions = program_input_dict_additions;
-    }
+        let mut state = component.lock_state().await;
+        let mut execution = component.lock_execution();
 
-    drop(execution);
-    drop(state);
+        if let Some(r) = should_return_early(&state, &execution, &component.moniker) {
+            return r;
+        }
+
+        let (diagnostics_sender, diagnostics_receiver) = oneshot::channel();
+        (break_on_start_left, break_on_start_right) = zx::EventPair::create();
+
+        let StartContext {
+            runner,
+            url,
+            namespace_builder,
+            numbered_handles,
+            namespace_scope,
+            encoded_config,
+            program_input_dict_additions,
+        } = start_context;
+
+        if let Some(runner) = runner {
+            let moniker = &component.moniker;
+            let component_instance = state
+                .instance_token(moniker, &component.context)
+                .ok_or(StartActionError::InstanceDestroyed { moniker: moniker.clone() })?;
+
+            let start_info = StartInfo {
+                resolved_url: url,
+                program: decl
+                    .program
+                    .as_ref()
+                    .map(|p| p.info.clone())
+                    .unwrap_or_else(|| fdata::Dictionary::default()),
+                namespace: namespace_builder,
+                numbered_handles,
+                encoded_config,
+                break_on_start: Some(break_on_start_left),
+                component_instance,
+            };
+
+            pending_runtime.set_program(
+                Program::start(&runner, start_info, diagnostics_sender, namespace_scope).map_err(
+                    |err| StartActionError::StartProgramError { moniker: moniker.clone(), err },
+                )?,
+                component.as_weak(),
+            );
+        }
+
+        runtime_info = RuntimeInfo::from_runtime(&pending_runtime, diagnostics_receiver);
+        runtime_dir = pending_runtime.runtime_dir().cloned();
+        timestamp = pending_runtime.timestamp;
+
+        execution.runtime = Some(pending_runtime);
+
+        // TODO(b/322564390): Move program_input_dict_additions into `ExecutionState`.
+        {
+            let resolved_state = match &mut *state {
+                InstanceState::Resolved(resolved_state) => resolved_state,
+                _ => panic!("expected component to be resolved"),
+            };
+            resolved_state.program_input_dict_additions = program_input_dict_additions;
+        }
+    }
 
     // Dispatch Started and DebugStarted events outside of the execution lock and state
     // lock, but under the actions lock, so that:
@@ -867,7 +873,7 @@ mod tests {
             )
             .await
             .expect("failed to start child");
-            let execution = child.lock_execution().await;
+            let execution = child.lock_execution();
             let runtime = execution.runtime.as_ref().expect("child runtime is unexpectedly empty");
             assert!(runtime.timestamp > timestamp);
         }
@@ -876,7 +882,7 @@ mod tests {
             ActionSet::register(child.clone(), StopAction::new(false))
                 .await
                 .expect("failed to stop child");
-            let execution = child.lock_execution().await;
+            let execution = child.lock_execution();
             assert!(execution.runtime.is_none());
         }
 
@@ -888,7 +894,7 @@ mod tests {
             )
             .await
             .expect("failed to start child");
-            let execution = child.lock_execution().await;
+            let execution = child.lock_execution();
             let runtime = execution.runtime.as_ref().expect("child runtime is unexpectedly empty");
             assert!(runtime.timestamp > timestamp);
         }
@@ -906,7 +912,7 @@ mod tests {
             )
             .await
             .expect("failed to start child");
-            let execution = child.lock_execution().await;
+            let execution = child.lock_execution();
             let runtime = execution.runtime.as_ref().expect("child runtime is unexpectedly empty");
             assert!(runtime.timestamp > timestamp);
         }
@@ -915,7 +921,7 @@ mod tests {
             let () = ActionSet::register(child.clone(), StopAction::new(false))
                 .await
                 .expect("failed to stop child");
-            let execution = child.lock_execution().await;
+            let execution = child.lock_execution();
             assert!(execution.runtime.is_none());
         }
 
@@ -1011,7 +1017,7 @@ mod tests {
 
         // Check for shut_down:
         let _ = child.stop_instance_internal(true).await;
-        let execution = child.lock_execution().await;
+        let execution = child.lock_execution();
         assert!(execution.is_shut_down());
         assert_matches!(
             should_return_early(&InstanceState::New, &execution, &m),
@@ -1031,7 +1037,7 @@ mod tests {
         .expect("failed to start child");
 
         let m = Moniker::try_from(vec!["TEST_CHILD_NAME"]).unwrap();
-        let execution = child.lock_execution().await;
+        let execution = child.lock_execution();
         assert_matches!(should_return_early(&InstanceState::New, &execution, &m), Some(Ok(())));
     }
 }

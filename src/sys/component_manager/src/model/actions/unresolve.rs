@@ -41,7 +41,7 @@ async fn do_unresolve(component: &Arc<ComponentInstance>) -> Result<(), ActionEr
     // Shut down the component, preventing new starts or resolves during the UnresolveAction.
     ActionSet::register(component.clone(), ShutdownAction::new(ShutdownType::Instance)).await?;
 
-    if component.lock_execution().await.runtime.is_some() {
+    if component.lock_execution().runtime.is_some() {
         return Err(
             UnresolveActionError::InstanceRunning { moniker: component.moniker.clone() }.into()
         );
@@ -89,7 +89,7 @@ async fn do_unresolve(component: &Arc<ComponentInstance>) -> Result<(), ActionEr
     };
 
     // The component was shut down, so won't start. Re-enable it.
-    component.lock_execution().await.reset_shut_down();
+    component.lock_execution().reset_shut_down();
 
     let event = Event::new(&component, EventPayload::Unresolved);
     component.hooks.dispatch(&event).await;
@@ -326,11 +326,11 @@ pub mod tests {
         root.start_instance(&component_b.moniker, &StartReason::Eager)
             .await
             .expect("could not start coll:b");
-        assert!(component_container.is_started().await);
+        assert!(component_container.is_started());
         assert!(is_resolved(&component_a).await);
         assert!(is_resolved(&component_b).await);
-        assert!(component_a.is_started().await);
-        assert!(component_b.is_started().await);
+        assert!(component_a.is_started());
+        assert!(component_b.is_started());
         (test, component_container, component_a, component_b)
     }
 
