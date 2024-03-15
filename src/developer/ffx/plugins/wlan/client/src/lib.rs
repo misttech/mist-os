@@ -67,6 +67,9 @@ async fn handle_client_command(
         arg_types::ClientSubCommand::Listen(arg_types::Listen {}) => {
             donut_lib::handle_listen(listener_stream, false).await
         }
+        arg_types::ClientSubCommand::Status(arg_types::Status {}) => {
+            donut_lib::handle_listen(listener_stream, true).await
+        }
         arg_types::ClientSubCommand::RemoveNetwork(remove_args) => {
             let donut_args = donut_lib::opts::RemoveArgs::from(remove_args);
             let security = donut_args.parse_security();

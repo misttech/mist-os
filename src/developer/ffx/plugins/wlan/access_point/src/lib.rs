@@ -43,6 +43,9 @@ async fn handle_client_command(
         arg_types::ApSubCommand::Listen(arg_types::Listen {}) => {
             donut_lib::handle_ap_listen(listener_stream, false).await
         }
+        arg_types::ApSubCommand::Status(arg_types::Status {}) => {
+            donut_lib::handle_ap_listen(listener_stream, true).await
+        }
         arg_types::ApSubCommand::Start(config) => {
             let config = wlan_policy::NetworkConfig::from(config);
             donut_lib::handle_start_ap(ap_controller, listener_stream, config).await

@@ -22,6 +22,7 @@ pub struct ApCommand {
 pub enum ApSubCommand {
     Listen(Listen),
     Start(Start),
+    Status(Status),
     Stop(Stop),
     StopAll(StopAll),
 }
@@ -36,6 +37,17 @@ pub enum ApSubCommand {
     $ ffx wlan ap listen"
 )]
 pub struct Listen {}
+
+#[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
+#[argh(
+    subcommand,
+    name = "status",
+    description = "Provides the first available AP status update",
+    example = "To query current AP status
+
+    $ ffx wlan ap status"
+)]
+pub struct Status {}
 
 #[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(

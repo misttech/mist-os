@@ -2,6 +2,7 @@ ffx/wlan.golden
 ffx/wlan/ap.golden
 ffx/wlan/ap/listen.golden
 ffx/wlan/ap/start.golden
+ffx/wlan/ap/status.golden
 ffx/wlan/ap/stop-all.golden
 ffx/wlan/ap/stop.golden
 ffx/wlan/client.golden
@@ -15,6 +16,7 @@ ffx/wlan/client/remove-network.golden
 ffx/wlan/client/save-network.golden
 ffx/wlan/client/scan.golden
 ffx/wlan/client/start.golden
+ffx/wlan/client/status.golden
 ffx/wlan/client/stop.golden
 ffx/wlan/deprecated.golden
 ffx/wlan/deprecated/suggest-mac.golden

@@ -28,6 +28,7 @@ pub enum ClientSubCommand {
     SaveNetwork(SaveNetwork),
     Scan(Scan),
     Start(StartClientConnections),
+    Status(Status),
     Stop(StopClientConnections),
 }
 
@@ -59,6 +60,17 @@ pub enum BatchConfigSubCommand {
     $ ffx wlan client listen"
 )]
 pub struct Listen {}
+
+#[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
+#[argh(
+    subcommand,
+    name = "status",
+    description = "Provides the first available client status update",
+    example = "To query client status
+
+    $ ffx wlan client status"
+)]
+pub struct Status {}
 
 #[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(
