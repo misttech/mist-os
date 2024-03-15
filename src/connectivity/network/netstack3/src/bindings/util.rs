@@ -47,6 +47,7 @@ use netstack3_core::{
     sync::{RemoveResourceResult, RemoveResourceResultWithContext},
     types::WorkQueueReport,
 };
+use tracing::debug;
 
 use crate::bindings::{
     devices::BindingId,
@@ -838,14 +839,12 @@ pub(crate) struct DeviceNotFoundError;
 #[derive(Debug, PartialEq)]
 pub(crate) enum SocketAddressError {
     Device(DeviceNotFoundError),
-    UnexpectedZone,
 }
 
 impl IntoErrno for SocketAddressError {
     fn into_errno(self) -> fposix::Errno {
         match self {
             SocketAddressError::Device(d) => d.into_errno(),
-            SocketAddressError::UnexpectedZone => fposix::Errno::Einval,
         }
     }
 }
@@ -870,15 +869,20 @@ where
 
         let zoned = match fidl.zone() {
             Some(zone) => {
-                let addr_and_zone =
-                    AddrAndZone::new(specified, zone).ok_or(SocketAddressError::UnexpectedZone)?;
-
-                addr_and_zone
-                    .try_map_zone(|zone| {
-                        TryFromFidlWithContext::try_from_fidl_with_ctx(ctx, zone)
-                            .map_err(SocketAddressError::Device)
-                    })
-                    .map(|a| ZonedAddr::Zoned(a).into())?
+                match AddrAndZone::new(specified, zone) {
+                    None => {
+                        // For conformance with Linux, allow callers to provide
+                        // a scope ID for addresses that don't allow zones.
+                        debug!("ignoring zone ({zone:?}) provided for address ({specified})");
+                        ZonedAddr::Unzoned(specified).into()
+                    }
+                    Some(addr_and_zone) => addr_and_zone
+                        .try_map_zone(|zone| {
+                            TryFromFidlWithContext::try_from_fidl_with_ctx(ctx, zone)
+                                .map_err(SocketAddressError::Device)
+                        })
+                        .map(|a| ZonedAddr::Zoned(a).into())?,
+                }
             }
             None => ZonedAddr::Unzoned(specified).into(),
         };
@@ -1492,14 +1496,6 @@ mod tests {
     #[fixture::teardown(FakeConversionContext::shutdown)]
     #[test_case(
         fidl_net::Ipv6SocketAddress {
-            address: net_ip_v6!("1:2:3:4::").into_ext(),
-            port: 8080,
-            zone_index: 1
-        },
-        SocketAddressError::UnexpectedZone;
-        "IPv6 specified unexpected zone")]
-    #[test_case(
-        fidl_net::Ipv6SocketAddress {
             address: net_ip_v6!("fe80::1").into_ext(),
             port: 8080,
             zone_index: 2
@@ -1586,6 +1582,28 @@ mod tests {
 
         let result = result.try_into_fidl_with_ctx(&ctx).expect("reverse should succeed");
         assert_eq!(result, addr);
+        ctx
+    }
+
+    // Verify that the unnecessary zone IDs are ignored and result in
+    // `Unzoned` addresses. This is a regression test for
+    // https://fxbug.dev/329694011.
+    #[fixture::teardown(FakeConversionContext::shutdown)]
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn sock_addr_conversion_with_unnecessary_zone_id() {
+        let ctx = FakeConversionContext::new().await;
+        const GLOBAL_IPV6_ADDR: Ipv6Addr = net_ip_v6!("a:b:c:d::");
+        const PORT: u16 = 8080;
+        let fidl_addr = fidl_net::Ipv6SocketAddress {
+            address: GLOBAL_IPV6_ADDR.into_ext(),
+            port: PORT,
+            zone_index: 1,
+        };
+        let expected_addr: ZonedAddr<_, DeviceId<BindingsCtx>> =
+            ZonedAddr::Unzoned(SpecifiedAddr::new(GLOBAL_IPV6_ADDR).unwrap());
+        let addr: (Option<ZonedAddr<_, _>>, _) =
+            fidl_addr.try_into_core_with_ctx(&ctx).expect("into core should succeed");
+        assert_eq!(addr, (Some(expected_addr), PORT));
         ctx
     }
 
