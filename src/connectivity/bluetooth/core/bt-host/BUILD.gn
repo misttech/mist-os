@@ -22,6 +22,7 @@ source_set("sources") {
     "//src/connectivity/bluetooth/core/bt-host/gap",
     "//src/connectivity/bluetooth/core/bt-host/gatt",
     "//third_party/pigweed/backends/pw_async_fuchsia:dispatcher",
+    "//third_party/pigweed/backends/pw_log:printf",
     "//third_party/pigweed/backends/pw_random:zircon_random_generator",
     "//zircon/system/ulib/inspect",
   ]
@@ -48,10 +49,7 @@ source_set("sources") {
 executable("bin") {
   output_name = "bt_host"
   sources = [ "main.cc" ]
-  deps = [
-    ":sources",
-    "//third_party/pigweed/backends/pw_log:syslog",
-  ]
+  deps = [ ":sources" ]
 }
 
 config("config_enable_inspect") {
