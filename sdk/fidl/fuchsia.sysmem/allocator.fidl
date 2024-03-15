@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 library fuchsia.sysmem;
 
+using fuchsia.sysmem2;
 using zx;
 
 // Needs ForDeprecatedCBindings because used with "FIDL Simple C Bindings".
@@ -149,6 +150,6 @@ closed protocol Allocator {
     /// `Allocator`.
     @available(added=HEAD)
     strict ConnectToSysmem2Allocator(resource struct {
-        allocator_request zx.Handle:CHANNEL;
+        allocator_request server_end:fuchsia.sysmem2.Allocator;
     });
 };

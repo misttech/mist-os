@@ -7288,7 +7288,7 @@ TEST(Sysmem, V1ConnectToV2Allocator) {
   auto v2_allocator_endpoints = std::move(v2_allocator_endpoints_result.value());
   auto v2_allocator = fidl::SyncClient(std::move(v2_allocator_endpoints.client));
   auto connect_result =
-      v1_allocator->ConnectToSysmem2Allocator(v2_allocator_endpoints.server.TakeChannel());
+      v1_allocator->ConnectToSysmem2Allocator(std::move(v2_allocator_endpoints.server));
   ASSERT_TRUE(connect_result.is_ok());
   auto allocator = fidl::SyncClient(std::move(v2_allocator));
 

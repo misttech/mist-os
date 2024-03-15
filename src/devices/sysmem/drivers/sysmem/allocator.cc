@@ -287,7 +287,7 @@ void Allocator::V2::SetDebugClientInfo(SetDebugClientInfoRequest& request,
 
 void Allocator::V1::ConnectToSysmem2Allocator(ConnectToSysmem2AllocatorRequest& request,
                                               ConnectToSysmem2AllocatorCompleter::Sync& completer) {
-  auto v2_allocator = Allocator::CreateChannelOwnedV2(std::move(request.allocator_request()),
+  auto v2_allocator = Allocator::CreateChannelOwnedV2(request.allocator_request().TakeChannel(),
                                                       allocator_->parent_device_);
   if (allocator_->client_debug_info_.has_value()) {
     v2_allocator.client_debug_info_->name = allocator_->client_debug_info_->name;
