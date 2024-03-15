@@ -167,13 +167,25 @@ impl UbpfVm {
         Ok(bpf_return_value)
     }
 
+    pub fn run_with_zeroes(&self) -> Result<u64, i32> {
+        let mut bpf_return_value: u64 = 0;
+        let status = unsafe {
+            ubpf_exec(self.opaque_vm as *mut ubpf_vm, 0 as *mut c_void, 0, &mut bpf_return_value)
+        };
+
+        if status != 0 {
+            return Err(status);
+        }
+
+        Ok(bpf_return_value)
+    }
+
     /// This method instantiates an UbpfVm given a cbpf original.
     pub fn from_cbpf<T>(bpf_code: &[sock_filter]) -> Result<Self, UbpfError> {
         let code = cbpf_to_ebpf(bpf_code)?;
         let buffer_size = std::mem::size_of::<T>() as u64;
         let mut builder = UbpfVmBuilder::new()?;
         builder.set_args(&[
-            Type::default(),
             Type::PtrToMemory { id: 0, offset: 0, buffer_size },
             Type::from(buffer_size),
         ]);

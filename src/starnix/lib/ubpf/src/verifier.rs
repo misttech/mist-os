@@ -196,7 +196,8 @@ pub fn verify(
 ) -> Result<(), UbpfError> {
     let mut context = ComputationContext::default();
     for (i, t) in calling_context.args.iter().enumerate() {
-        context.set_reg(i as u8, t.clone()).map_err(UbpfError::ProgramLoadError)?;
+        // The parameter registers are r1 to r5.
+        context.set_reg((i + 1) as u8, t.clone()).map_err(UbpfError::ProgramLoadError)?;
     }
     let states = vec![context];
     let mut verification_context =
@@ -204,6 +205,9 @@ pub fn verify(
     while let Some(mut context) = verification_context.states.pop() {
         if verification_context.iteration > 10 * (crate::ubpf::UBPF_MAX_INSTS as usize) {
             return error_and_log(&mut verification_context, "bpf byte code does not terminate");
+        }
+        if context.pc >= code.len() {
+            return error_and_log(&mut verification_context, "pc out of bounds");
         }
         let visit_result = context.visit(&mut verification_context, &code[context.pc..]);
         match visit_result {

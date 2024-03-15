@@ -4,12 +4,13 @@
 
 #[cfg(test)]
 mod test {
-    use crate::{EbpfProgramBuilder, NullVerifierLogger};
+    use crate::{EbpfProgramBuilder, NullVerifierLogger, Type};
     use linux_uapi::{
-        bpf_insn, BPF_ADD, BPF_ALU, BPF_ALU64, BPF_AND, BPF_ARSH, BPF_CALL, BPF_DIV, BPF_EXIT,
-        BPF_IMM, BPF_JA, BPF_JEQ, BPF_JGE, BPF_JGT, BPF_JLE, BPF_JLT, BPF_JMP, BPF_JMP32, BPF_JNE,
-        BPF_JSET, BPF_JSGE, BPF_JSGT, BPF_JSLE, BPF_JSLT, BPF_LSH, BPF_MOD, BPF_MOV, BPF_MUL,
-        BPF_NEG, BPF_OR, BPF_RSH, BPF_SUB, BPF_XOR,
+        bpf_insn, BPF_ADD, BPF_ALU, BPF_ALU64, BPF_AND, BPF_ARSH, BPF_B, BPF_CALL, BPF_DIV, BPF_DW,
+        BPF_EXIT, BPF_H, BPF_IMM, BPF_JA, BPF_JEQ, BPF_JGE, BPF_JGT, BPF_JLE, BPF_JLT, BPF_JMP,
+        BPF_JMP32, BPF_JNE, BPF_JSET, BPF_JSGE, BPF_JSGT, BPF_JSLE, BPF_JSLT, BPF_LD, BPF_LDX,
+        BPF_LSH, BPF_MEM, BPF_MOD, BPF_MOV, BPF_MUL, BPF_NEG, BPF_OR, BPF_RSH, BPF_ST, BPF_STX,
+        BPF_SUB, BPF_W, BPF_XOR,
     };
     use pest::{iterators::Pair, Parser};
     use pest_derive::Parser;
@@ -23,11 +24,12 @@ mod test {
     struct TestCase {
         code: Vec<bpf_insn>,
         result: Option<u64>,
-        memory: Vec<u8>,
+        memory: Option<Vec<u8>>,
     }
 
     const BPF_REG: u32 = 0x08;
-    const BPF_SWAP: u32 = 0x0d;
+    const BPF_SWAP: u32 = 0xd0;
+    const HEXADECIMAL_BASE: u32 = 16;
 
     enum Value {
         Plus(u64),
@@ -44,19 +46,18 @@ mod test {
 
         fn as_i32(&self) -> i32 {
             match self {
-                Self::Plus(v) => i32::try_from(*v).unwrap(),
+                Self::Plus(v) => u32::try_from(*v).unwrap() as i32,
                 Self::Minus(v) => -i32::try_from(*v).unwrap(),
             }
         }
 
         fn as_i16(&self) -> i16 {
             match self {
-                Self::Plus(v) => i16::try_from(*v).unwrap(),
+                Self::Plus(v) => u16::try_from(*v).unwrap() as i16,
                 Self::Minus(v) => -i16::try_from(*v).unwrap(),
             }
         }
 
-        #[allow(dead_code)]
         fn as_i32_pair(&self) -> (i32, i32) {
             let v = self.as_u64();
             let (low, high) = (v as i32, (v >> 32) as i32);
@@ -86,6 +87,82 @@ mod test {
             result
         }
 
+        fn parse_deref(pair: Pair<'_, Rule>) -> (u8, i16) {
+            assert_eq!(pair.as_rule(), Rule::DEREF);
+            let mut inner = pair.into_inner();
+            let reg = Self::parse_reg(inner.next().unwrap());
+            let offset =
+                if let Some(token) = inner.next() { Self::parse_offset_or_exit(token) } else { 0 };
+            (reg, offset)
+        }
+
+        fn parse_memory_size(value: &str) -> u8 {
+            (match value {
+                "b" => BPF_B,
+                "h" => BPF_H,
+                "w" => BPF_W,
+                "dw" => BPF_DW,
+                r @ _ => unreachable!("unexpected memory size {r:?}"),
+            }) as u8
+        }
+
+        fn parse_mem_instruction(pair: Pair<'_, Rule>) -> Vec<bpf_insn> {
+            assert_eq!(pair.as_rule(), Rule::MEM_INSTRUCTION);
+            let mut inner = pair.into_inner();
+            let op = inner.next().unwrap();
+            match op.as_rule() {
+                Rule::STORE_REG_OP => {
+                    let (dst_reg, offset) = Self::parse_deref(inner.next().unwrap());
+                    let src_reg = Self::parse_reg(inner.next().unwrap());
+                    let mut instruction = bpf_insn::default();
+                    instruction.set_dst_reg(dst_reg);
+                    instruction.set_src_reg(src_reg);
+                    instruction.off = offset;
+                    instruction.code =
+                        (BPF_MEM | BPF_STX) as u8 | Self::parse_memory_size(&op.as_str()[3..]);
+                    vec![instruction]
+                }
+                Rule::STORE_IMM_OP => {
+                    let (dst_reg, offset) = Self::parse_deref(inner.next().unwrap());
+                    let imm = Self::parse_value(inner.next().unwrap()).as_i32();
+                    let mut instruction = bpf_insn::default();
+                    instruction.set_dst_reg(dst_reg);
+                    instruction.imm = imm;
+                    instruction.off = offset;
+                    instruction.code =
+                        (BPF_MEM | BPF_ST) as u8 | Self::parse_memory_size(&op.as_str()[2..]);
+                    vec![instruction]
+                }
+                Rule::LOAD_OP => {
+                    let dst_reg = Self::parse_reg(inner.next().unwrap());
+                    let (src_reg, offset) = Self::parse_deref(inner.next().unwrap());
+                    let mut instruction = bpf_insn::default();
+                    instruction.set_dst_reg(dst_reg);
+                    instruction.set_src_reg(src_reg);
+                    instruction.off = offset;
+                    instruction.code =
+                        (BPF_MEM | BPF_LDX) as u8 | Self::parse_memory_size(&op.as_str()[3..]);
+                    vec![instruction]
+                }
+                Rule::LDDW_OP => {
+                    let mut instructions: Vec<bpf_insn> = vec![];
+                    let dst_reg = Self::parse_reg(inner.next().unwrap());
+                    let value = Self::parse_value(inner.next().unwrap());
+                    let (low, high) = value.as_i32_pair();
+                    let mut instruction = bpf_insn::default();
+                    instruction.set_dst_reg(dst_reg);
+                    instruction.imm = low;
+                    instruction.code = (BPF_IMM | BPF_LD | BPF_DW) as u8;
+                    instructions.push(instruction);
+                    let mut instruction = bpf_insn::default();
+                    instruction.imm = high;
+                    instructions.push(instruction);
+                    instructions
+                }
+                r @ _ => unreachable!("unexpected rule {r:?}"),
+            }
+        }
+
         fn parse_asm_instruction(pair: Pair<'_, Rule>) -> Vec<bpf_insn> {
             assert_eq!(pair.as_rule(), Rule::ASM_INSTRUCTION);
             if let Some(entry) = pair.into_inner().next() {
@@ -93,14 +170,12 @@ mod test {
                 instruction.code = 0;
                 match entry.as_rule() {
                     Rule::ALU_INSTRUCTION => {
-                        return vec![Self::parse_alu_instruction(entry)];
+                        vec![Self::parse_alu_instruction(entry)]
                     }
                     Rule::JMP_INSTRUCTION => {
-                        return vec![Self::parse_jmp_instruction(entry)];
+                        vec![Self::parse_jmp_instruction(entry)]
                     }
-                    Rule::MEM_INSTRUCTION => {
-                        todo!("Implement mem instructions");
-                    }
+                    Rule::MEM_INSTRUCTION => Self::parse_mem_instruction(entry),
                     r @ _ => unreachable!("unexpected rule {r:?}"),
                 }
             } else {
@@ -161,7 +236,7 @@ mod test {
             let num = pair.into_inner().next().unwrap();
             match num.as_rule() {
                 Rule::DECNUM => num.as_str().parse().unwrap(),
-                Rule::HEXSUFFIX => u64::from_str_radix(num.as_str(), 16).unwrap(),
+                Rule::HEXSUFFIX => u64::from_str_radix(num.as_str(), HEXADECIMAL_BASE).unwrap(),
                 r @ _ => unreachable!("unexpected rule {r:?}"),
             }
         }
@@ -293,25 +368,39 @@ mod test {
         fn parse(content: &str) -> Self {
             let mut pairs =
                 TestGrammar::parse(Rule::rules, &content).expect("Parsing must be successful");
-            let mut code: Vec<bpf_insn> = vec![];
-            let mut result: Option<u64> = None;
-            let memory: Vec<u8> = vec![];
+            let mut code: Option<Vec<bpf_insn>> = None;
+            let mut result: Option<Option<u64>> = None;
+            let mut memory: Option<Vec<u8>> = None;
             for entry in pairs.next().unwrap().into_inner() {
                 match entry.as_rule() {
                     Rule::ASM => {
-                        code = Self::parse_asm(entry);
+                        assert!(code.is_none());
+                        code = Some(Self::parse_asm(entry));
                     }
                     Rule::RESULT => {
-                        result = Some(Self::parse_result(entry));
+                        if result.is_none() {
+                            result = Some(Some(Self::parse_result(entry)));
+                        }
                     }
                     Rule::ERROR => {
-                        // Nothing to do.
+                        result = Some(None);
+                    }
+                    Rule::MEMORY => {
+                        assert!(memory.is_none());
+                        let mut array = vec![];
+                        for byte_pair in entry.into_inner() {
+                            assert_eq!(byte_pair.as_rule(), Rule::MEMORY_DATA);
+                            array.push(
+                                u8::from_str_radix(byte_pair.as_str(), HEXADECIMAL_BASE).unwrap(),
+                            );
+                        }
+                        memory = Some(array);
                     }
                     Rule::EOI => (),
                     r @ _ => unreachable!("unexpected rule {r:?}"),
                 }
             }
-            TestCase { code, result, memory }
+            TestCase { code: code.unwrap(), result: result.unwrap(), memory }
         }
     }
 
@@ -321,17 +410,135 @@ mod test {
         };
     }
 
-    #[test_case(test_data!("jle-imm.data"))]
+    #[test_case(test_data!("add64.data"))]
+    #[test_case(test_data!("add.data"))]
+    #[test_case(test_data!("alu64-arith.data"))]
+    #[test_case(test_data!("alu64-bit.data"))]
+    #[test_case(test_data!("alu-arith.data"))]
+    #[test_case(test_data!("alu-bit.data"))]
+    #[test_case(test_data!("arsh32-high-shift.data"))]
+    #[test_case(test_data!("arsh64.data"))]
+    #[test_case(test_data!("arsh.data"))]
+    #[test_case(test_data!("arsh-reg.data"))]
+    #[test_case(test_data!("be16.data"))]
+    #[test_case(test_data!("be16-high.data"))]
+    #[test_case(test_data!("be32.data"))]
+    #[test_case(test_data!("be32-high.data"))]
+    #[test_case(test_data!("be64.data"))]
+    #[test_case(test_data!("div32-by-zero-reg.data"))]
+    #[test_case(test_data!("div32-high-divisor.data"))]
+    #[test_case(test_data!("div32-imm.data"))]
+    #[test_case(test_data!("div32-reg.data"))]
+    #[test_case(test_data!("div64-by-zero-imm.data"))]
+    #[test_case(test_data!("div64-by-zero-reg.data"))]
+    #[test_case(test_data!("div64-imm.data"))]
+    #[test_case(test_data!("div64-negative-imm.data"))]
+    #[test_case(test_data!("div64-negative-reg.data"))]
+    #[test_case(test_data!("div64-reg.data"))]
+    #[test_case(test_data!("div-by-zero-imm.data"))]
+    #[test_case(test_data!("div-by-zero-reg.data"))]
+    #[test_case(test_data!("early-exit.data"))]
     #[test_case(test_data!("err-infinite-loop.data"))]
+    #[test_case(test_data!("err-invalid-reg-dst.data"))]
+    #[test_case(test_data!("err-invalid-reg-src.data"))]
+    #[test_case(test_data!("err-jmp-lddw.data"))]
+    #[test_case(test_data!("err-jmp-out.data"))]
+    #[test_case(test_data!("err-stack-oob.data"))]
+    #[test_case(test_data!("exit.data"))]
+    #[test_case(test_data!("exit-not-last.data"))]
+    #[test_case(test_data!("ja.data"))]
+    #[test_case(test_data!("jeq-imm.data"))]
+    #[test_case(test_data!("jeq-reg.data"))]
+    #[test_case(test_data!("jge-imm.data"))]
+    #[test_case(test_data!("jgt-imm.data"))]
+    #[test_case(test_data!("jgt-reg.data"))]
+    #[test_case(test_data!("jit-bounce.data"))]
+    #[test_case(test_data!("jle-imm.data"))]
+    #[test_case(test_data!("jle-reg.data"))]
+    #[test_case(test_data!("jlt-imm.data"))]
+    #[test_case(test_data!("jlt-reg.data"))]
+    #[test_case(test_data!("jne-reg.data"))]
+    #[test_case(test_data!("jset-imm.data"))]
+    #[test_case(test_data!("jset-reg.data"))]
+    #[test_case(test_data!("jsge-imm.data"))]
+    #[test_case(test_data!("jsge-reg.data"))]
+    #[test_case(test_data!("jsgt-imm.data"))]
+    #[test_case(test_data!("jsgt-reg.data"))]
+    #[test_case(test_data!("jsle-imm.data"))]
+    #[test_case(test_data!("jsle-reg.data"))]
+    #[test_case(test_data!("jslt-imm.data"))]
+    #[test_case(test_data!("jslt-reg.data"))]
+    #[test_case(test_data!("lddw2.data"))]
+    #[test_case(test_data!("ldxb-all.data"))]
+    #[test_case(test_data!("ldxb.data"))]
+    #[test_case(test_data!("ldxdw.data"))]
+    #[test_case(test_data!("ldxh-all2.data"))]
+    #[test_case(test_data!("ldxh-all.data"))]
+    #[test_case(test_data!("ldxh.data"))]
+    #[test_case(test_data!("ldxh-same-reg.data"))]
+    #[test_case(test_data!("ldxw-all.data"))]
+    #[test_case(test_data!("ldxw.data"))]
+    #[test_case(test_data!("le16.data"))]
+    #[test_case(test_data!("le32.data"))]
+    #[test_case(test_data!("le64.data"))]
+    #[test_case(test_data!("lsh-reg.data"))]
+    #[test_case(test_data!("mem-len.data"))]
+    #[test_case(test_data!("mod32.data"))]
+    #[test_case(test_data!("mod64-by-zero-imm.data"))]
+    #[test_case(test_data!("mod64-by-zero-reg.data"))]
+    #[test_case(test_data!("mod64.data"))]
+    #[test_case(test_data!("mod-by-zero-imm.data"))]
+    #[test_case(test_data!("mod-by-zero-reg.data"))]
+    #[test_case(test_data!("mod.data"))]
+    #[test_case(test_data!("mov64-sign-extend.data"))]
+    #[test_case(test_data!("mov.data"))]
+    #[test_case(test_data!("mul32-imm.data"))]
+    #[test_case(test_data!("mul32-reg.data"))]
+    #[test_case(test_data!("mul32-reg-overflow.data"))]
+    #[test_case(test_data!("mul64-imm.data"))]
+    #[test_case(test_data!("mul64-reg.data"))]
+    #[test_case(test_data!("mul-loop.data"))]
+    #[test_case(test_data!("neg64.data"))]
+    #[test_case(test_data!("neg.data"))]
+    #[test_case(test_data!("prime.data"))]
+    #[test_case(test_data!("rsh32.data"))]
+    #[test_case(test_data!("rsh-reg.data"))]
+    #[test_case(test_data!("stack3.data"))]
+    #[test_case(test_data!("stack.data"))]
+    #[test_case(test_data!("stb.data"))]
+    #[test_case(test_data!("stdw.data"))]
+    #[test_case(test_data!("sth.data"))]
+    #[test_case(test_data!("stw.data"))]
+    #[test_case(test_data!("stxb-all2.data"))]
+    #[test_case(test_data!("stxb-all.data"))]
+    #[test_case(test_data!("stxb-chain.data"))]
+    #[test_case(test_data!("stxb.data"))]
+    #[test_case(test_data!("stxdw.data"))]
+    #[test_case(test_data!("stxh.data"))]
+    #[test_case(test_data!("stxw.data"))]
+    #[test_case(test_data!("subnet.data"))]
     fn test_ebpf_conformance(content: &str) {
         let mut test_case = TestCase::parse(content);
-        let builder = EbpfProgramBuilder::new().expect("unable to create builder");
+        let mut builder = EbpfProgramBuilder::new().expect("unable to create builder");
+        if let Some(memory) = test_case.memory.as_ref() {
+            let buffer_size = memory.len() as u64;
+            builder.set_args(&[
+                Type::PtrToMemory { id: 0, offset: 0, buffer_size },
+                Type::from(buffer_size),
+            ]);
+        } else {
+            builder.set_args(&[Type::from(0), Type::from(0)]);
+        }
+
         let program = builder.load(test_case.code, &mut NullVerifierLogger);
         if let Some(value) = test_case.result {
-            let result = program
-                .expect("program must be loadable")
-                .run_with_slice(test_case.memory.as_mut_slice())
-                .expect("run");
+            let program = program.expect("program must be loadable");
+            let result = if let Some(memory) = test_case.memory.as_mut() {
+                program.run_with_slice(memory.as_mut_slice())
+            } else {
+                program.run_with_zeroes()
+            };
+            let result = result.expect("run");
             assert_eq!(result, value);
         } else {
             assert!(program.is_err());
