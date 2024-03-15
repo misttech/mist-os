@@ -4,7 +4,7 @@
 
 #[cfg(test)]
 mod test {
-    use crate::{EbpfProgramBuilder, NullVerifierLogger, Type};
+    use crate::{BpfHelper, EbpfProgramBuilder, FunctionSignature, NullVerifierLogger, Type};
     use linux_uapi::{
         bpf_insn, BPF_ADD, BPF_ALU, BPF_ALU64, BPF_AND, BPF_ARSH, BPF_B, BPF_CALL, BPF_DIV, BPF_DW,
         BPF_EXIT, BPF_H, BPF_IMM, BPF_JA, BPF_JEQ, BPF_JGE, BPF_JGT, BPF_JLE, BPF_JLT, BPF_JMP,
@@ -404,6 +404,51 @@ mod test {
         }
     }
 
+    fn gather_bytes(mut a: u64, mut b: u64, mut c: u64, mut d: u64, mut e: u64) -> u64 {
+        a = a & 0xff;
+        b = b & 0xff;
+        c = c & 0xff;
+        d = d & 0xff;
+        e = e & 0xff;
+        (a << 32) | (b << 24) | (c << 16) | (d << 8) | e
+    }
+
+    fn memfrob(s: u64, n: u64, _: u64, _: u64, _: u64) -> u64 {
+        let ptr = s as *mut u8;
+        let slice = unsafe { std::slice::from_raw_parts_mut(ptr, n as usize) };
+        for c in slice.iter_mut() {
+            *c ^= 42;
+        }
+        slice.as_mut_ptr() as u64
+    }
+
+    fn trash_registers(_: u64, _: u64, _: u64, _: u64, _: u64) -> u64 {
+        0
+    }
+
+    fn sqrti(v: u64, _: u64, _: u64, _: u64, _: u64) -> u64 {
+        (v as f64).sqrt() as u64
+    }
+
+    fn strcmp_ext(mut s1: u64, mut s2: u64, _: u64, _: u64, _: u64) -> u64 {
+        loop {
+            let c1 = unsafe { *(s1 as *const u8) };
+            let c2 = unsafe { *(s2 as *const u8) };
+            if c1 != c2 {
+                if c2 > c1 {
+                    return 1;
+                } else {
+                    return u64::MAX;
+                }
+            }
+            if c1 == 0 {
+                return 0;
+            }
+            s1 += 1;
+            s2 += 1;
+        }
+    }
+
     macro_rules! test_data {
         ($file_name:tt) => {
             include_str!(concat!("../../../../../third_party/ubpf/src/tests/", $file_name))
@@ -425,6 +470,9 @@ mod test {
     #[test_case(test_data!("be32.data"))]
     #[test_case(test_data!("be32-high.data"))]
     #[test_case(test_data!("be64.data"))]
+    #[test_case(test_data!("call.data"))]
+    #[test_case(test_data!("call-memfrob.data"))]
+    #[test_case(test_data!("call-save.data"))]
     #[test_case(test_data!("div32-by-zero-reg.data"))]
     #[test_case(test_data!("div32-high-divisor.data"))]
     #[test_case(test_data!("div32-imm.data"))]
@@ -438,6 +486,8 @@ mod test {
     #[test_case(test_data!("div-by-zero-imm.data"))]
     #[test_case(test_data!("div-by-zero-reg.data"))]
     #[test_case(test_data!("early-exit.data"))]
+    #[test_case(test_data!("err-call-bad-imm.data"))]
+    #[test_case(test_data!("err-call-unreg.data"))]
     #[test_case(test_data!("err-infinite-loop.data"))]
     #[test_case(test_data!("err-invalid-reg-dst.data"))]
     #[test_case(test_data!("err-invalid-reg-src.data"))]
@@ -503,6 +553,7 @@ mod test {
     #[test_case(test_data!("prime.data"))]
     #[test_case(test_data!("rsh32.data"))]
     #[test_case(test_data!("rsh-reg.data"))]
+    #[test_case(test_data!("stack2.data"))]
     #[test_case(test_data!("stack3.data"))]
     #[test_case(test_data!("stack.data"))]
     #[test_case(test_data!("stb.data"))]
@@ -529,6 +580,73 @@ mod test {
         } else {
             builder.set_args(&[Type::from(0), Type::from(0)]);
         }
+
+        builder
+            .register(&BpfHelper {
+                index: 0,
+                name: "gather_bytes",
+                function_pointer: gather_bytes as *mut std::os::raw::c_void,
+                signature: FunctionSignature {
+                    args: &[
+                        Type::ScalarValueParameter,
+                        Type::ScalarValueParameter,
+                        Type::ScalarValueParameter,
+                        Type::ScalarValueParameter,
+                        Type::ScalarValueParameter,
+                    ],
+                    return_value: Type::unknown_written_scalar_value(),
+                },
+            })
+            .expect("register");
+        builder
+            .register(&BpfHelper {
+                index: 1,
+                name: "memfrob",
+                function_pointer: memfrob as *mut std::os::raw::c_void,
+                signature: FunctionSignature {
+                    args: &[
+                        Type::MemoryParameter { memory_length_index: 1 },
+                        Type::ScalarValueParameter,
+                    ],
+                    return_value: Type::AliasParameter { parameter_index: 0 },
+                },
+            })
+            .expect("register");
+        builder
+            .register(&BpfHelper {
+                index: 2,
+                name: "trash_registers",
+                function_pointer: trash_registers as *mut std::os::raw::c_void,
+                signature: FunctionSignature {
+                    args: &[],
+                    return_value: Type::unknown_written_scalar_value(),
+                },
+            })
+            .expect("register");
+        builder
+            .register(&BpfHelper {
+                index: 3,
+                name: "sqrti",
+                function_pointer: sqrti as *mut std::os::raw::c_void,
+                signature: FunctionSignature {
+                    args: &[Type::ScalarValueParameter],
+                    return_value: Type::unknown_written_scalar_value(),
+                },
+            })
+            .expect("register");
+        builder
+            .register(&BpfHelper {
+                index: 4,
+                name: "strcmp_ext",
+                function_pointer: strcmp_ext as *mut std::os::raw::c_void,
+                signature: FunctionSignature {
+                    // Args cannot be correctly verified as the verifier cannot check the string
+                    // are correctly 0 terminated.
+                    args: &[],
+                    return_value: Type::unknown_written_scalar_value(),
+                },
+            })
+            .expect("register");
 
         let program = builder.load(test_case.code, &mut NullVerifierLogger);
         if let Some(value) = test_case.result {

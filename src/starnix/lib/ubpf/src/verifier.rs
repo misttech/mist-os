@@ -75,6 +75,17 @@ pub enum Type {
         /// associated with.
         map_ptr_index: u8,
     },
+    /// A function parameter that must be a pointer to memory.
+    MemoryParameter {
+        /// The index in the arguments list that contains a scalar value containing the size of the
+        /// memory.
+        memory_length_index: u8,
+    },
+    /// A function return value that is the same type as a parameter.
+    AliasParameter {
+        /// The index in the argument list of the parameter that has the type of this return value.
+        parameter_index: u8,
+    },
 }
 
 const NotInit: Type = Type::ScalarValue {
@@ -607,6 +618,9 @@ impl ComputationContext {
         return_value: &Type,
     ) -> Result<Type, String> {
         match return_value {
+            Type::AliasParameter { parameter_index } => {
+                self.reg(parameter_index + 1).map(Clone::clone)
+            }
             Type::NullOr(t) => {
                 Ok(Type::NullOr(Box::new(self.resolve_return_value(verification_context, t)?)))
             }
@@ -1219,6 +1233,37 @@ impl BpfVisitor for ComputationContext {
                         Ok(())
                     }
                 }
+                (
+                    Type::MemoryParameter { memory_length_index },
+                    Type::PtrToMemory { offset, buffer_size, .. },
+                ) => {
+                    let length_type = self.reg(memory_length_index + 1)?;
+                    match length_type {
+                        Type::ScalarValue { value, unknown_mask: 0, .. } => {
+                            if *value <= *buffer_size - *offset {
+                                Ok(())
+                            } else {
+                                Err(format!("out of bound read"))
+                            }
+                        }
+                        _ => Err(format!("cannot known expected buffer size")),
+                    }
+                }
+
+                (Type::MemoryParameter { memory_length_index }, Type::PtrToStack { offset }) => {
+                    let length_type = self.reg(memory_length_index + 1)?;
+                    match length_type {
+                        Type::ScalarValue { value, unknown_mask: 0, .. } => {
+                            if self.stack.can_read_data_ptr(*offset, *value) {
+                                Ok(())
+                            } else {
+                                Err(format!("out of bound read"))
+                            }
+                        }
+                        _ => Err(format!("cannot known expected buffer size")),
+                    }
+                }
+
                 _ => Err(format!("incorrect parameter")),
             }?;
         }
