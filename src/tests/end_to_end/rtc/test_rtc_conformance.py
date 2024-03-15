@@ -8,10 +8,8 @@ import logging
 import random
 
 from fuchsia_base_test import fuchsia_base_test
-from honeydew.affordances.fuchsia_controller import rtc
 from honeydew.interfaces.device_classes import fuchsia_device
-from honeydew.transports import fuchsia_controller
-from mobly import test_runner
+from mobly import asserts, test_runner
 
 LOGGER: logging.Logger = logging.getLogger(__name__)
 
@@ -57,7 +55,9 @@ class RtcTest(fuchsia_base_test.FuchsiaBaseTest):
         # later (post-reboot).
         rtc_time1 = self.rtc.get()
         LOGGER.info("Time read off RTC is: %s", rtc_time1)
-        assert rtc_time1 - base_time < datetime.timedelta(seconds=threshold)
+        asserts.assert_less(
+            rtc_time1 - base_time, datetime.timedelta(seconds=threshold)
+        )
 
         # Next, reboot the device, re-read the RTC time, and (again) ensure the
         # total elapsed time is within some reasonable threshold. This needs to
@@ -86,7 +86,7 @@ class RtcTest(fuchsia_base_test.FuchsiaBaseTest):
         # be close to 0.
         delta = rtc_time2 - rtc_time1 - elapsed
         LOGGER.info("Delta: %s", delta)
-        assert delta < datetime.timedelta(seconds=threshold)
+        asserts.assert_less(delta, datetime.timedelta(seconds=threshold))
 
 
 if __name__ == "__main__":
