@@ -576,14 +576,45 @@ template("clang_toolchain") {
         breakpad_outfile = "${outfile}.sym"
         outputs += [ breakpad_outfile ]
 
+        rust_link_remote_dump_syms_prefix = ""
+        if (rust_rbe_enable || _link_rbe_enable) {
+          _remote_dump_syms_prefix_list = [
+            rebase_path(python_exe_src, root_build_dir),
+            "-S",
+            rebase_path(prebuilt_tool_remote_wrapper, root_build_dir),
+            "--inputs",  # need to specify the executable, due to wrapper script
+            "$dump_syms,\"$unstripped_outfile\"",
+            "--output_files",
+            "\"$breakpad_outfile\"",
+            "--preserve_unchanged_output_mtime",
+          ]
+          if (_link_rbe_enable) {
+            cxx_link_remote_dump_syms_prefix =
+                string_join(" ",
+                            _remote_dump_syms_prefix_list +
+                                _link_rbe_exec_strategy_flags + [ "-- " ])
+          }
+          if (rust_rbe_enable) {
+            _exec_strategy_flags = []
+            if (rust_rbe_check == "") {
+              _exec_strategy_flags = _rust_rbe_exec_strategy_flags
+            }
+            rust_link_remote_dump_syms_prefix =
+                string_join(" ",
+                            _remote_dump_syms_prefix_list +
+                                _exec_strategy_flags + [ "-- " ])
+          }
+        }
+
         # dump_syms will fail if there is no build ID.  buildidtool succeeds and
         # writes an empty stamp file for that case, so use it to tell whether
         # dump_syms should be run. In any case always create a .sym because we
         # told ninja we would create one above.
         # TODO(b/321834013): Cases that clearly do not have a build-id should
         # ideally not attempt to dump_syms.
+        log_it = rebase_path(log_it_script, root_build_dir)
         command_suffix += " && { " + "test ! -s \"$buildid_stampfile\" && " +
-                          "touch \"$outfile.sym\" || " + "$dump_syms -r {{BREAKPAD_NAME}}-o Fuchsia \"{{UNSTRIPPED_OUTFILE}}\" > \"$breakpad_outfile\"" + " ;}"
+                          "touch \"$outfile.sym\" || " + "{{REMOTE_DUMP_SYMS_PREFIX}}$log_it --log \"$breakpad_outfile\" -- $dump_syms -r {{BREAKPAD_NAME}}-o Fuchsia \"{{UNSTRIPPED_OUTFILE}}\"" + " ;}"
       }
       if (output_gsym && invoker.toolchain_os == "fuchsia") {
         gsym_outfile = "${outfile}.gsym"
@@ -615,13 +646,16 @@ template("clang_toolchain") {
       #  {{BREAKPAD_NAME}}
       #  {{STRIP_ARGS}}
       #  {{REMOTE_STRIP_PREFIX}}
+      #  {{REMOTE_DUMP_SYMS_PREFIX}}
       #
       _rust_link_common = {
         forward_variables_from(_link_common,
                                "*",
                                [
                                  "cxx_link_remote_strip_prefix",
+                                 "cxx_link_remote_dump_syms_prefix",
                                  "rust_link_remote_strip_prefix",
+                                 "rust_link_remote_dump_syms_prefix",
                                ])
         forward_variables_from(_rust_concurrent_jobs, "*")
 
@@ -690,6 +724,15 @@ template("clang_toolchain") {
         command = string_replace(command,
                                  "{{REMOTE_STRIP_PREFIX}}",
                                  _remote_strip_prefix)
+
+        _remote_dump_syms_prefix = ""
+        if (defined(_link_common.rust_link_remote_dump_syms_prefix)) {
+          _remote_dump_syms_prefix =
+              _link_common.rust_link_remote_dump_syms_prefix
+        }
+        command = string_replace(command,
+                                 "{{REMOTE_DUMP_SYMS_PREFIX}}",
+                                 _remote_dump_syms_prefix)
 
         rust_sysroot = "$rebased_rustc_prefix"
       }
@@ -998,6 +1041,7 @@ template("clang_toolchain") {
                                "command_suffix",
                                "depfile",
                                "cxx_link_remote_strip_prefix",
+                               "cxx_link_remote_dump_syms_prefix",
                              ])
       _concurrent_jobs = concurrent_jobs.local
       rspfile = "$outfile.rsp"
@@ -1058,9 +1102,20 @@ template("clang_toolchain") {
           _remote_strip_prefix = _link_common.cxx_link_remote_strip_prefix
         }
       }
-      command_suffix = string_replace(_link_common.command_suffix,
-                                      "{{REMOTE_STRIP_PREFIX}}",
-                                      _remote_strip_prefix)
+      _remote_dump_syms_prefix = ""
+      if (output_breakpad_syms) {
+        if (_link_rbe_enable) {
+          _remote_dump_syms_prefix =
+              _link_common.cxx_link_remote_dump_syms_prefix
+        }
+      }
+
+      command_suffix =
+          string_replace(string_replace(_link_common.command_suffix,
+                                        "{{REMOTE_STRIP_PREFIX}}",
+                                        _remote_strip_prefix),
+                         "{{REMOTE_DUMP_SYMS_PREFIX}}",
+                         _remote_dump_syms_prefix)
     }
 
     # Expand _cxx_link_common into a scope that can be used for "solink" and "solink_module" tools

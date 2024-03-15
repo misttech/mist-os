@@ -34,6 +34,11 @@ rbe_common_py_scripts = [
   "//build/rbe/output_leak_scanner.py",
 ]
 
+# `log-it.sh LOGFILE -- command`
+# is the same as `command >& LOGFILE`
+# but without using the redirection operator.
+log_it_script = "//build/rbe/log-it.sh"
+
 rustc_remote_wrapper = "//build/rbe/rustc_remote_wrapper.py"
 
 # Dependencies for all RBE-enabled rust actions.

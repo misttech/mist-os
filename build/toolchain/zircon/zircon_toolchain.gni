@@ -641,12 +641,31 @@ template("zircon_toolchain") {
       # dump_syms should be run. In any case always create a .sym because we
       # told ninja we would create one above.
       assert(use_buildidtool)
-      strip_command +=
-          " && { " +  # The brace group is superfluous.
-          "test ! -s \"$buildid_stampfile\" && " +
-          "touch \"$breakpad_outfile\"  || " +
-          "$dump_syms \"$unstripped_outfile\" > \"$breakpad_outfile\"" +
-          "; }"  # But makes the control flow a little clearer.
+      log_it = rebase_path(log_it_script, root_build_dir)
+      _remote_dump_syms_list = []
+      if (_link_rbe_enable) {
+        # TODO(https://fxbug.dev/42083070): disable remote dump_syms when config includes //build/config:no_remote_link.
+        _remote_dump_syms_list +=
+            [
+              rebase_path(python_exe_src, root_build_dir),
+              "-S",
+              rebase_path(prebuilt_tool_remote_wrapper, root_build_dir),
+            ] + _link_rbe_exec_strategy_flags +
+            [
+              "--inputs",  # specify executable, due to log_it wrapper
+              "$dump_syms,\"$unstripped_outfile\"",
+              "--output_files",
+              "\"$breakpad_outfile\"",
+              "--preserve_unchanged_output_mtime",
+              "-- ",
+            ]
+      }
+      _remote_dump_syms_prefix = string_join(" ", _remote_dump_syms_list)
+      strip_command += " && { " +  # The brace group is superfluous.
+                       "test ! -s \"$buildid_stampfile\" && " +
+                       "touch \"$breakpad_outfile\"  || " + "$_remote_dump_syms_prefix$log_it --log \"$breakpad_outfile\" -- $dump_syms \"$unstripped_outfile\"" + "; }"
+
+      # But makes the control flow a little clearer.
     }
 
     if (use_gsym) {
