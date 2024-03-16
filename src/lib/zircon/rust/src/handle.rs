@@ -301,6 +301,12 @@ impl<'a, T: HandleBased> AsHandleRef for Unowned<'a, T> {
     }
 }
 
+impl<T: AsHandleRef> AsHandleRef for &T {
+    fn as_handle_ref(&self) -> HandleRef<'_> {
+        (*self).as_handle_ref()
+    }
+}
+
 /// A trait implemented by all handle-based types.
 ///
 /// Note: it is reasonable for user-defined objects wrapping a handle to implement

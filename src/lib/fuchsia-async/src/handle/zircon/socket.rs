@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use super::{
-    on_signals::OnSignals,
+    on_signals::OnSignalsRef,
     rwhandle::{RWHandle, ReadableHandle, ReadableState, WritableHandle, WritableState},
 };
 use fuchsia_zircon::{self as zx, AsHandleRef};
@@ -49,7 +49,7 @@ impl Socket {
     }
 
     /// Returns a future that completes when the socket received the `OBJECT_PEER_CLOSED` signal.
-    pub fn on_closed(&self) -> OnSignals<'_> {
+    pub fn on_closed(&self) -> OnSignalsRef<'_> {
         self.0.on_closed()
     }
 

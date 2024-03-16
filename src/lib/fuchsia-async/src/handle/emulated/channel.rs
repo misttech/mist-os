@@ -7,7 +7,7 @@
 // TODO(ctiller): merge this implementation with the implementation in zircon_handle?
 
 use super::{
-    on_signals::OnSignals, Handle, HandleDisposition, HandleInfo, MessageBuf, MessageBufEtc,
+    on_signals::OnSignalsRef, Handle, HandleDisposition, HandleInfo, MessageBuf, MessageBufEtc,
     Signals,
 };
 use fuchsia_zircon_status as zx_status;
@@ -70,8 +70,8 @@ impl Channel {
     }
 
     /// Returns a future that completes when `is_closed()` is true.
-    pub fn on_closed<'a>(&'a self) -> OnSignals<'a> {
-        OnSignals::new(self, Signals::CHANNEL_PEER_CLOSED)
+    pub fn on_closed(&self) -> OnSignalsRef<'_> {
+        OnSignalsRef::new(self, Signals::CHANNEL_PEER_CLOSED)
     }
 
     /// Writes a message into the channel.

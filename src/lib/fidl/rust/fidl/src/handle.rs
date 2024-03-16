@@ -11,7 +11,7 @@ pub use fuchsia_handles::*;
 pub use non_fuchsia_handles::*;
 
 pub use fuchsia_async::Channel as AsyncChannel;
-pub use fuchsia_async::OnSignals;
+pub use fuchsia_async::OnSignalsRef;
 pub use fuchsia_async::Socket as AsyncSocket;
 
 /// Fuchsia implementation of handles just aliases the zircon library

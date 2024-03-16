@@ -7,7 +7,7 @@
 use {
     crate::{
         epitaph::ChannelEpitaphExt, AsHandleRef, AsyncChannel, Channel, Error, Handle, HandleBased,
-        HandleRef, OnSignals, ServeInner,
+        HandleRef, OnSignalsRef, ServeInner,
     },
     fuchsia_async as fasync, fuchsia_zircon_status as zx_status,
     futures::{Future, FutureExt, Stream, TryFutureExt, TryStream, TryStreamExt},
@@ -98,7 +98,7 @@ pub trait Proxy: Sized + Send + Sync {
 
     /// Returns a future that completes when the proxy receives the
     /// `PEER_CLOSED` signal.
-    fn on_closed(&self) -> OnSignals<'_> {
+    fn on_closed(&self) -> OnSignalsRef<'_> {
         self.as_channel().on_closed()
     }
 }
@@ -175,7 +175,7 @@ pub trait ControlHandle {
 
     /// Returns a future that completes when the server receives the
     /// `PEER_CLOSED` signal.
-    fn on_closed(&self) -> OnSignals<'_>;
+    fn on_closed(&self) -> OnSignalsRef<'_>;
 }
 
 /// A type associated with a particular two-way FIDL method, used by servers to

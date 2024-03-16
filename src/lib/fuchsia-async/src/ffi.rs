@@ -173,7 +173,7 @@ impl Executor {
     #[cfg(not(target_os = "fuchsia"))]
     unsafe fn begin_wait(&mut self, wait: *mut async_wait_t) -> Result<(), zx_status::Status> {
         use fasync::emulated_handle::{Handle, Signals};
-        use fasync::OnSignals;
+        use fasync::OnSignalsRef;
 
         let wait_ptr = wait;
         let dispatcher: *mut Executor = &mut *self;
@@ -185,7 +185,7 @@ impl Executor {
         let handler = wait.handler;
 
         fasync::Task::local(async move {
-            match OnSignals::new(&*object, trigger).await {
+            match OnSignalsRef::new(&*object, trigger).await {
                 Ok(sigs) => {
                     let packet = zx_packet_signal_t {
                         trigger: trigger.bits(),

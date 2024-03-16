@@ -365,7 +365,7 @@ impl fidl::endpoints::ControlHandle for AllowedControlHandle {
         self.inner.channel().is_closed()
     }
 
-    fn on_closed<'a>(&'a self) -> fidl::OnSignals<'a> {
+    fn on_closed(&self) -> fidl::OnSignalsRef<'_> {
         self.inner.channel().on_closed()
     }
 }
@@ -1032,7 +1032,7 @@ impl fidl::endpoints::ControlHandle for DenyEachBindingControlHandle {
         self.inner.channel().is_closed()
     }
 
-    fn on_closed<'a>(&'a self) -> fidl::OnSignals<'a> {
+    fn on_closed(&self) -> fidl::OnSignalsRef<'_> {
         self.inner.channel().on_closed()
     }
 }
@@ -1716,7 +1716,7 @@ impl fidl::endpoints::ControlHandle for ImportsSameNameContextControlHandle {
         self.inner.channel().is_closed()
     }
 
-    fn on_closed<'a>(&'a self) -> fidl::OnSignals<'a> {
+    fn on_closed(&self) -> fidl::OnSignalsRef<'_> {
         self.inner.channel().on_closed()
     }
 }

@@ -141,7 +141,7 @@ pub async fn reverse_port(
         (listen_socket, listen_socket_fidl_socket),
         move |(listen_socket, listen_socket_fidl_socket)| async move {
             loop {
-                match fasync::OnSignals::new(
+                match fasync::OnSignalsRef::new(
                     &listen_socket_fidl_socket,
                     fidl::Signals::from_bits(fsock::SIGNAL_STREAM_INCOMING).unwrap()
                         | fidl::Signals::OBJECT_PEER_CLOSED,

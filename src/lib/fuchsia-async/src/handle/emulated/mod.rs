@@ -198,6 +198,12 @@ pub trait AsHandleRef {
     }
 }
 
+impl<T: AsHandleRef> AsHandleRef for &T {
+    fn as_handle_ref(&self) -> HandleRef<'_> {
+        (*self).as_handle_ref()
+    }
+}
+
 /// A trait implemented by all handles for objects which have a peer.
 pub trait Peered: HandleBased {
     /// Set and clear userspace-accessible signal bits on the object's peer. Wraps the
@@ -1020,8 +1026,8 @@ impl Socket {
     }
 
     /// Get an OnSignals that returns when this handle's peer closes.
-    pub fn on_closed(&self) -> on_signals::OnSignals<'_> {
-        on_signals::OnSignals::new(self, Signals::OBJECT_PEER_CLOSED)
+    pub fn on_closed(&self) -> on_signals::OnSignalsRef<'_> {
+        on_signals::OnSignalsRef::new(self, Signals::OBJECT_PEER_CLOSED)
     }
 }
 
@@ -1302,27 +1308,19 @@ pub mod on_signals {
 
     /// Wait for some signals to be raised.
     #[must_use = "futures do nothing unless polled"]
-    pub struct OnSignals<'a> {
+    pub struct OnSignalsRef<'a> {
         h: u32,
         koid: u64,
         signals: Signals,
         _lifetime: PhantomData<&'a ()>,
     }
 
-    impl Unpin for OnSignals<'_> {}
+    impl Unpin for OnSignalsRef<'_> {}
 
-    impl<'a> OnSignals<'a> {
-        /// Construct a new OnSignals
-        pub fn new<T: AsHandleRef>(handle: &'a T, signals: Signals) -> Self {
-            Self::from_ref(handle.as_handle_ref(), signals)
-        }
-
-        /// Creates a new `OnSignals` using a HandleRef instead of an AsHandleRef.
-        ///
-        /// Passing a HandleRef to OnSignals::new is likely to lead to borrow check errors, since
-        /// the resulting OnSignals is tied to the lifetime of the HandleRef itself and not the
-        /// handle it refers to. Use this instead when you need to pass a HandleRef.
-        pub fn from_ref(handle: HandleRef<'a>, signals: Signals) -> Self {
+    impl<'a> OnSignalsRef<'a> {
+        /// Construct a new OnSignalsRef
+        pub fn new<T: AsHandleRef + 'a>(handle: T, signals: Signals) -> Self {
+            let handle = handle.as_handle_ref();
             let h = handle.0;
             with_handle(h, |mut hdl, side| Self {
                 h,
@@ -1337,12 +1335,17 @@ pub mod on_signals {
         /// It is functionally a no-op, but callers of this method should note that
         /// `OnSignals` will not fire if the handle that was used to create it is dropped or
         /// transferred to another process.
-        pub fn extend_lifetime(self) -> OnSignals<'static> {
-            OnSignals { h: self.h, koid: self.koid, signals: self.signals, _lifetime: PhantomData }
+        pub fn extend_lifetime(self) -> OnSignalsRef<'static> {
+            OnSignalsRef {
+                h: self.h,
+                koid: self.koid,
+                signals: self.signals,
+                _lifetime: PhantomData,
+            }
         }
     }
 
-    impl Future for OnSignals<'_> {
+    impl Future for OnSignalsRef<'_> {
         type Output = Result<Signals, Status>;
         fn poll(self: Pin<&mut Self>, ctx: &mut Context<'_>) -> Poll<Self::Output> {
             with_handle(self.h, |mut h, side| {
@@ -2598,7 +2601,7 @@ mod test {
     #[test]
     fn await_user_signal() {
         let (c1, _) = EventPair::create();
-        let mut on_sig = on_signals::OnSignals::new(&c1, Signals::USER_0);
+        let mut on_sig = on_signals::OnSignalsRef::new(&c1, Signals::USER_0);
         let (waker, count) = futures_test::task::new_count_waker();
         let mut ctx = Context::from_waker(&waker);
         assert_eq!(on_sig.poll_unpin(&mut ctx), Poll::Pending);
@@ -2609,7 +2612,7 @@ mod test {
         assert_eq!(count, 1);
         assert_eq!(on_sig.poll_unpin(&mut ctx), Poll::Ready(Ok(Signals::USER_0)));
         c1.signal_handle(Signals::USER_0, Signals::empty()).unwrap();
-        let mut on_sig = on_signals::OnSignals::new(&c1, Signals::USER_0);
+        let mut on_sig = on_signals::OnSignalsRef::new(&c1, Signals::USER_0);
         assert_eq!(on_sig.poll_unpin(&mut ctx), Poll::Pending);
         assert_eq!(count, 1);
         c1.signal_handle(Signals::empty(), Signals::USER_0).unwrap();
@@ -2620,7 +2623,7 @@ mod test {
     #[test]
     fn await_user_signal_peer() {
         let (c1, c2) = EventPair::create();
-        let mut on_sig = on_signals::OnSignals::new(&c1, Signals::USER_0);
+        let mut on_sig = on_signals::OnSignalsRef::new(&c1, Signals::USER_0);
         let (waker, count) = futures_test::task::new_count_waker();
         let mut ctx = Context::from_waker(&waker);
         assert_eq!(on_sig.poll_unpin(&mut ctx), Poll::Pending);
@@ -2631,7 +2634,7 @@ mod test {
         assert_eq!(count, 1);
         assert_eq!(on_sig.poll_unpin(&mut ctx), Poll::Ready(Ok(Signals::USER_0)));
         c2.signal_peer(Signals::USER_0, Signals::empty()).unwrap();
-        let mut on_sig = on_signals::OnSignals::new(&c1, Signals::USER_0);
+        let mut on_sig = on_signals::OnSignalsRef::new(&c1, Signals::USER_0);
         assert_eq!(on_sig.poll_unpin(&mut ctx), Poll::Pending);
         assert_eq!(count, 1);
         c2.signal_peer(Signals::empty(), Signals::USER_0).unwrap();
@@ -2642,7 +2645,7 @@ mod test {
     #[test]
     fn await_close_signal() {
         let (c1, c2) = EventPair::create();
-        let mut on_sig = on_signals::OnSignals::new(&c1, Signals::OBJECT_PEER_CLOSED);
+        let mut on_sig = on_signals::OnSignalsRef::new(&c1, Signals::OBJECT_PEER_CLOSED);
         let (waker, count) = futures_test::task::new_count_waker();
         let mut ctx = Context::from_waker(&waker);
         assert_eq!(on_sig.poll_unpin(&mut ctx), Poll::Pending);
@@ -2694,28 +2697,28 @@ mod test {
     fn handles_always_writable() {
         let mut ctx = futures_test::task::noop_context();
         let (s1, s2) = Socket::create_stream();
-        let mut on_sig = on_signals::OnSignals::new(&s1, Signals::OBJECT_WRITABLE);
+        let mut on_sig = on_signals::OnSignalsRef::new(&s1, Signals::OBJECT_WRITABLE);
         assert_eq!(on_sig.poll_unpin(&mut ctx), Poll::Ready(Ok(Signals::OBJECT_WRITABLE)));
-        let mut on_sig = on_signals::OnSignals::new(&s2, Signals::OBJECT_WRITABLE);
+        let mut on_sig = on_signals::OnSignalsRef::new(&s2, Signals::OBJECT_WRITABLE);
         assert_eq!(on_sig.poll_unpin(&mut ctx), Poll::Ready(Ok(Signals::OBJECT_WRITABLE)));
 
         let (s1, s2) = Socket::create_datagram();
-        let mut on_sig = on_signals::OnSignals::new(&s1, Signals::OBJECT_WRITABLE);
+        let mut on_sig = on_signals::OnSignalsRef::new(&s1, Signals::OBJECT_WRITABLE);
         assert_eq!(on_sig.poll_unpin(&mut ctx), Poll::Ready(Ok(Signals::OBJECT_WRITABLE)));
-        let mut on_sig = on_signals::OnSignals::new(&s2, Signals::OBJECT_WRITABLE);
+        let mut on_sig = on_signals::OnSignalsRef::new(&s2, Signals::OBJECT_WRITABLE);
         assert_eq!(on_sig.poll_unpin(&mut ctx), Poll::Ready(Ok(Signals::OBJECT_WRITABLE)));
 
         let (c1, c2) = Channel::create();
-        let mut on_sig = on_signals::OnSignals::new(&c1, Signals::OBJECT_WRITABLE);
+        let mut on_sig = on_signals::OnSignalsRef::new(&c1, Signals::OBJECT_WRITABLE);
         assert_eq!(on_sig.poll_unpin(&mut ctx), Poll::Ready(Ok(Signals::OBJECT_WRITABLE)));
-        let mut on_sig = on_signals::OnSignals::new(&c2, Signals::OBJECT_WRITABLE);
+        let mut on_sig = on_signals::OnSignalsRef::new(&c2, Signals::OBJECT_WRITABLE);
         assert_eq!(on_sig.poll_unpin(&mut ctx), Poll::Ready(Ok(Signals::OBJECT_WRITABLE)));
     }
 
     #[test]
     fn read_signal() {
         let (c1, c2) = Channel::create();
-        let mut on_sig = on_signals::OnSignals::new(&c1, Signals::OBJECT_READABLE);
+        let mut on_sig = on_signals::OnSignalsRef::new(&c1, Signals::OBJECT_READABLE);
         let (waker, count) = futures_test::task::new_count_waker();
         let mut ctx = Context::from_waker(&waker);
         assert_eq!(on_sig.poll_unpin(&mut ctx), Poll::Pending);
@@ -2745,7 +2748,7 @@ mod test {
     #[test]
     fn event_user_signal() {
         let e = Event::create();
-        let mut on_sig = on_signals::OnSignals::new(&e, Signals::USER_0);
+        let mut on_sig = on_signals::OnSignalsRef::new(&e, Signals::USER_0);
         let (waker, count) = futures_test::task::new_count_waker();
         let mut ctx = Context::from_waker(&waker);
         assert_eq!(on_sig.poll_unpin(&mut ctx), Poll::Pending);

@@ -10,7 +10,7 @@ use ffx_target::{knock_target, KnockError};
 use fidl::{
     AsHandleRef, HandleBased, HandleDisposition, HandleOp, ObjectType, Peered, Rights, Status,
 };
-use fuchsia_async::OnSignals;
+use fuchsia_async::OnSignalsRef;
 use fuchsia_zircon_status as zx_status;
 use fuchsia_zircon_types as zx_types;
 use std::future::Future;
@@ -371,7 +371,7 @@ impl LibraryCommand {
                 responder.send(status).unwrap();
             }
             Self::ObjectSignalPoll { lib, handle, signals, responder } => {
-                let mut on_signals = OnSignals::new(&handle, signals);
+                let mut on_signals = OnSignalsRef::new(&handle, signals);
                 let waker =
                     handle_notifier_waker(handle.raw_handle(), lib.notification_sender().await);
                 let task_ctx = &mut Context::from_waker(&waker);

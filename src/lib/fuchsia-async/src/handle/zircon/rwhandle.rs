@@ -5,7 +5,7 @@
 use {
     crate::{
         runtime::{EHandle, PacketReceiver, ReceiverRegistration},
-        OnSignals,
+        OnSignalsRef,
     },
     fuchsia_zircon::{self as zx, AsHandleRef},
     futures::task::{AtomicWaker, Context, Poll},
@@ -219,8 +219,8 @@ where
     }
 
     /// Returns a future that completes when `is_closed()` is true.
-    pub fn on_closed<'a>(&'a self) -> OnSignals<'a> {
-        OnSignals::new(&self.handle, OBJECT_PEER_CLOSED)
+    pub fn on_closed(&self) -> OnSignalsRef<'_> {
+        OnSignalsRef::new(self.handle.as_handle_ref(), OBJECT_PEER_CLOSED)
     }
 
     fn receiver(&self) -> &RWPacketReceiver {

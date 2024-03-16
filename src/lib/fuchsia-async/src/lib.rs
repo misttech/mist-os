@@ -34,7 +34,7 @@ pub use self::runtime::*;
 
 mod handle;
 pub use self::handle::channel::{Channel, RecvMsg};
-pub use self::handle::on_signals::OnSignals;
+pub use self::handle::on_signals::OnSignalsRef;
 pub use self::handle::socket::Socket;
 
 /// Asynchronous networking abstractions.
@@ -43,6 +43,7 @@ pub mod net;
 #[cfg(target_os = "fuchsia")]
 pub use self::handle::{
     fifo::{Fifo, FifoEntry, FifoReadable, FifoWritable, ReadEntries, ReadOne, WriteEntries},
+    on_signals::OnSignals,
     rwhandle::{RWHandle, ReadableHandle, ReadableState, WritableHandle, WritableState},
 };
 

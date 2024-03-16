@@ -314,7 +314,7 @@ impl fidl::endpoints::ControlHandle for FirstProtocolControlHandle {
         self.inner.channel().is_closed()
     }
 
-    fn on_closed<'a>(&'a self) -> fidl::OnSignals<'a> {
+    fn on_closed(&self) -> fidl::OnSignalsRef<'_> {
         self.inner.channel().on_closed()
     }
 }
@@ -618,7 +618,7 @@ impl fidl::endpoints::ControlHandle for SecondProtocolControlHandle {
         self.inner.channel().is_closed()
     }
 
-    fn on_closed<'a>(&'a self) -> fidl::OnSignals<'a> {
+    fn on_closed(&self) -> fidl::OnSignalsRef<'_> {
         self.inner.channel().on_closed()
     }
 }

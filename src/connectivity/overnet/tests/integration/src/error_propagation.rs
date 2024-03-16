@@ -5,7 +5,7 @@
 use super::{connect, Overnet};
 
 use anyhow::{format_err, Error};
-use fuchsia_async::OnSignals;
+use fuchsia_async::OnSignalsRef;
 use futures::prelude::*;
 use overnet_core::NodeIdGenerator;
 use std::pin::pin;
@@ -142,7 +142,7 @@ async fn error_propagation_link_fail(run: usize) {
                 }
             };
             crash_sender.send(()).unwrap();
-            assert_eq!(fidl::Signals::CHANNEL_PEER_CLOSED, OnSignals::new(&chan, fidl::Signals::CHANNEL_PEER_CLOSED).await.unwrap());
+            assert_eq!(fidl::Signals::CHANNEL_PEER_CLOSED, OnSignalsRef::new(&chan, fidl::Signals::CHANNEL_PEER_CLOSED).await.unwrap());
             let reason = chan.closed_reason().unwrap();
             assert_eq!("stream_to_handle\n\nCaused by:\n    0: stream.next()\n    1: unexpected end of stream (Multi-stream terminated: Err(ConnectionClosed(Some(\"Do they even exist anymore?\"))))", &reason);
             Ok::<(), Error>(())

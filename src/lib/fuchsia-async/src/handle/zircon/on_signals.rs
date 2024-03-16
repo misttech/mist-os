@@ -4,6 +4,7 @@
 
 use std::fmt;
 use std::future::Future;
+use std::marker::PhantomData;
 use std::mem;
 use std::pin::Pin;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -13,6 +14,7 @@ use std::task::Poll;
 use crate::runtime::{EHandle, PacketReceiver, ReceiverRegistration};
 use fuchsia_zircon::{self as zx, AsHandleRef};
 use futures::task::{AtomicWaker, Context};
+use pin_project::{pin_project, pinned_drop};
 
 struct OnSignalsReceiver {
     maybe_signals: AtomicUsize,
@@ -56,25 +58,21 @@ impl PacketReceiver for OnSignalsReceiver {
 
 /// A future that completes when some set of signals become available on a Handle.
 #[must_use = "futures do nothing unless polled"]
-pub struct OnSignals<'a> {
-    handle: zx::HandleRef<'a>,
+#[pin_project(PinnedDrop)]
+pub struct OnSignals<'a, H: AsHandleRef> {
+    handle: H,
     signals: zx::Signals,
     registration: Option<ReceiverRegistration<OnSignalsReceiver>>,
+    phantom: PhantomData<&'a H>,
 }
 
-impl<'a> OnSignals<'a> {
+/// Alias for the common case where OnSignals is used with zx::HandleRef.
+pub type OnSignalsRef<'a> = OnSignals<'a, zx::HandleRef<'a>>;
+
+impl<'a, H: AsHandleRef + 'a> OnSignals<'a, H> {
     /// Creates a new `OnSignals` object which will receive notifications when
     /// any signals in `signals` occur on `handle`.
-    pub fn new<T: AsHandleRef>(handle: &'a T, signals: zx::Signals) -> Self {
-        Self::from_ref(handle.as_handle_ref(), signals)
-    }
-
-    /// Creates a new `OnSignals` using a HandleRef instead of an AsHandleRef.
-    ///
-    /// Passing a HandleRef to OnSignals::new is likely to lead to borrow check errors, since the
-    /// resulting OnSignals is tied to the lifetime of the HandleRef itself and not the handle it
-    /// refers to. Use this instead when you need to pass a HandleRef.
-    pub fn from_ref(handle: zx::HandleRef<'a>, signals: zx::Signals) -> Self {
+    pub fn new(handle: H, signals: zx::Signals) -> Self {
         // We don't register for the signals until first polled.  When we are first polled, we'll
         // check to see if the signals are set and if they are, we're done.  If they aren't, we then
         // register for an asynchronous notification via the port.
@@ -86,7 +84,16 @@ impl<'a> OnSignals<'a> {
         // difference (and on a single-threaded executor, a notification is unlikely to be processed
         // before the first poll anyway).  The way we have it now means we don't have to register at
         // all if the signals are already set, which will be a win some of the time.
-        OnSignals { handle, signals, registration: None }
+        OnSignals { handle, signals, registration: None, phantom: PhantomData }
+    }
+
+    /// Takes the handle.
+    pub fn take_handle(mut self: Pin<&mut Self>) -> H
+    where
+        H: zx::HandleBased,
+    {
+        self.as_mut().unregister();
+        std::mem::replace(&mut self.handle, zx::Handle::invalid().into())
     }
 
     /// This function allows the `OnSignals` object to live for the `'static` lifetime, at the cost
@@ -138,9 +145,20 @@ impl<'a> OnSignals<'a> {
 
         Ok(registration)
     }
+
+    fn unregister(mut self: Pin<&mut Self>) {
+        if let Some(registration) = self.registration.take() {
+            if registration.receiver().maybe_signals.load(Ordering::SeqCst) == 0 {
+                // Ignore the error from zx_port_cancel, because it might just be a race condition.
+                // If the packet is handled between the above maybe_signals check and the port
+                // cancel, it will fail with ZX_ERR_NOT_FOUND, and we can't do anything about it.
+                let _ = registration.port().cancel(&self.handle, registration.key());
+            }
+        }
+    }
 }
 
-impl Future for OnSignals<'_> {
+impl<H: AsHandleRef> Future for OnSignals<'_, H> {
     type Output = Result<zx::Signals, zx::Status>;
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         match &self.registration {
@@ -175,22 +193,28 @@ impl Future for OnSignals<'_> {
     }
 }
 
-impl fmt::Debug for OnSignals<'_> {
+impl<H: AsHandleRef> fmt::Debug for OnSignals<'_, H> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "OnSignals")
     }
 }
 
-impl Drop for OnSignals<'_> {
-    fn drop(&mut self) {
-        if let Some(registration) = &self.registration {
-            if registration.receiver().maybe_signals.load(Ordering::SeqCst) == 0 {
-                // Ignore the error from zx_port_cancel, because it might just be a race condition.
-                // If the packet is handled between the above maybe_signals check and the port
-                // cancel, it will fail with ZX_ERR_NOT_FOUND, and we can't do anything about it.
-                let _ = registration.port().cancel(&self.handle, registration.key());
-            }
-        }
+#[pinned_drop]
+impl<H: AsHandleRef> PinnedDrop for OnSignals<'_, H> {
+    fn drop(self: Pin<&mut Self>) {
+        self.unregister();
+    }
+}
+
+impl<H: AsHandleRef> AsHandleRef for OnSignals<'_, H> {
+    fn as_handle_ref(&self) -> zx::HandleRef<'_> {
+        self.handle.as_handle_ref()
+    }
+}
+
+impl<H: AsHandleRef> AsRef<H> for OnSignals<'_, H> {
+    fn as_ref(&self) -> &H {
+        &self.handle
     }
 }
 
@@ -290,5 +314,25 @@ mod test {
             fut.poll(&mut Context::from_waker(&waker(Arc::new(Waker)))),
             Poll::Ready(Ok(signals)) if signals.contains(zx::Signals::CHANNEL_READABLE)
         );
+    }
+
+    #[test]
+    fn test_take_handle() {
+        let mut exec = TestExecutor::new();
+
+        let (rx, tx) = zx::Channel::create();
+
+        let mut fut = pin!(OnSignals::new(rx, zx::Signals::CHANNEL_READABLE));
+
+        assert_eq!(exec.run_until_stalled(&mut fut), Poll::Pending);
+
+        tx.write(b"hello", &mut []).expect("write failed");
+
+        assert_matches!(exec.run_until_stalled(&mut fut), Poll::Ready(Ok(_)));
+
+        let mut message = zx::MessageBuf::new();
+        fut.take_handle().read(&mut message).unwrap();
+
+        assert_eq!(message.bytes(), b"hello");
     }
 }
