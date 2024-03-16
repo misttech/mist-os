@@ -518,7 +518,14 @@ config("debuginfo_backtrace") {
 }
 
 config("debuginfo_debug") {
-  cflags = [ "-g3" ]
+  cflags = [
+    "-g3",
+
+    # Add command-line details to each TU's DW_AT_producer to aid build
+    # diagnosis working backwards from debug files.  Clang aliases this switch
+    # to -grecord-command-line, but both compilers accept this spelling for it.
+    "-grecord-gcc-switches",
+  ]
   if (current_os != "win") {
     asmflags = cflags
   }
