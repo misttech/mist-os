@@ -23,7 +23,7 @@ use starnix_sync::{Locked, Unlocked};
 use starnix_syscalls::SyscallResult;
 use starnix_uapi::{
     errno, error,
-    errors::{Errno, ErrnoResultExt, ETIMEDOUT},
+    errors::{Errno, ErrnoResultExt, EINTR, ETIMEDOUT},
     open_flags::OpenFlags,
     ownership::{TempRef, WeakRef},
     pid_t, rusage, sigaction, sigaltstack,
@@ -271,7 +271,18 @@ pub fn sys_rt_sigtimedwait(
         current_task.write().signals.restore_mask();
 
         if let Err(e) = waiter_result {
-            return Err(if e == ETIMEDOUT { errno!(EAGAIN) } else { e });
+            if e == EINTR {
+                // Check if EINTR was returned for a signal we were waiting for.
+                let signals = &mut current_task.write().signals;
+                if let Some(signal) = signals.take_next_where(|sig| unblock.has_signal(sig.signal))
+                {
+                    break signal;
+                }
+            } else if e == ETIMEDOUT {
+                return error!(EAGAIN);
+            }
+
+            return Err(e);
         }
     };
 
