@@ -1,0 +1,66 @@
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/rust/rustc_library.gni")
+import("//src/developer/ffx/build/ffx_plugin.gni")
+import("//src/developer/ffx/build/ffx_tool.gni")
+
+rustc_library("lib") {
+  name = "ffx_tool_playground"
+  version = "0.1.0"
+  edition = "2021"
+  with_unit_tests = true
+  sources = [
+    "src/lib.rs",
+    "src/presentation.rs",
+    "src/repl.rs",
+    "src/strict_mutex.rs",
+  ]
+  deps = [
+    "//sdk/fidl/fuchsia.developer.remotecontrol:fuchsia.developer.remotecontrol_rust",
+    "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
+    "//src/developer/ffx/lib/errors:lib",
+    "//src/developer/ffx/lib/fho:lib",
+    "//src/developer/ffx/playground",
+    "//src/lib/fidl/rust/fidl",
+    "//src/lib/fidl_codec/rust:fidl_codec",
+    "//src/lib/fuchsia-async",
+    "//src/lib/fuchsia-fs",
+    "//src/storage/lib/vfs/rust:vfs",
+    "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:argh",
+    "//third_party/rust_crates:async-fs",
+    "//third_party/rust_crates:async-trait",
+    "//third_party/rust_crates:futures",
+    "//third_party/rust_crates:termios",
+  ]
+}
+
+ffx_tool("ffx_playground") {
+  edition = "2021"
+  output_name = "ffx-playground"
+  deps = [
+    ":lib",
+    "//src/developer/ffx/lib/fho:lib",
+    "//src/lib/fuchsia-async",
+  ]
+  sources = [ "src/main.rs" ]
+}
+
+group("playground") {
+  public_deps = [
+    ":ffx_playground",
+    ":ffx_playground_host_tool",
+  ]
+}
+
+group("bin") {
+  public_deps = [ ":ffx_playground_versioned" ]
+}
+
+group("tests") {
+  testonly = true
+
+  deps = [ ":lib_test" ]
+}

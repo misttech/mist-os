@@ -40,6 +40,7 @@ rustc_library("vfs") {
     visibility = [
       "../*",
       "//sdk/lib/device-watcher/rust:*",
+      "//src/developer/ffx/tools/playground:*",
       "//src/lib/fuchsia-fs:*",
       "//src/sys/pkg/lib/update-package:*",
     ]
