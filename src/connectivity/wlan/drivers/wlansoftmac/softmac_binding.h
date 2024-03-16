@@ -131,11 +131,6 @@ class SoftmacBinding : public DeviceInterface {
   mutable std::mutex ethernet_proxy_lock_;
   ddk::EthernetIfcProtocolClient ethernet_proxy_ __TA_GUARDED(ethernet_proxy_lock_);
 
-  // Manages the lifetime of the protocol struct we pass down to the vendor driver. Actual
-  // calls to this protocol should only be performed by the vendor driver.
-  std::unique_ptr<wlan_softmac_ifc_protocol_ops_t> wlan_softmac_ifc_protocol_ops_;
-  std::unique_ptr<wlan_softmac_ifc_protocol_t> wlan_softmac_ifc_protocol_;
-
   fdf::Dispatcher softmac_bridge_server_dispatcher_;
   std::unique_ptr<SoftmacBridge> softmac_bridge_;
 

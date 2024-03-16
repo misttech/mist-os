@@ -8,11 +8,11 @@ use {
         branch, Handler,
     },
     anyhow::Error,
-    banjo_fuchsia_wlan_softmac as banjo_wlan_softmac,
     fidl::endpoints::{create_endpoints, create_proxy},
     fidl_fuchsia_wlan_common as fidl_common,
     fidl_fuchsia_wlan_common::WlanMacRole,
     fidl_fuchsia_wlan_mlme as fidl_mlme, fidl_fuchsia_wlan_policy as fidl_policy,
+    fidl_fuchsia_wlan_softmac as fidl_wlan_softmac,
     fidl_fuchsia_wlan_tap::{WlanRxInfo, WlantapPhyConfig, WlantapPhyProxy},
     fuchsia_component::client::connect_to_protocol_at,
     fuchsia_zircon as zx,
@@ -127,7 +127,11 @@ pub fn rx_info_with_default_ap() -> WlanRxInfo {
 fn rx_info_with_valid_rssi(channel: &Channel, rssi_dbm: i8) -> WlanRxInfo {
     WlanRxInfo {
         rx_flags: 0,
-        valid_fields: if rssi_dbm == 0 { 0 } else { banjo_wlan_softmac::WlanRxInfoValid::RSSI.0 },
+        valid_fields: if rssi_dbm == 0 {
+            0
+        } else {
+            fidl_wlan_softmac::WlanRxInfoValid::RSSI.bits()
+        },
         phy: fidl_common::WlanPhyType::Dsss,
         data_rate: 0,
         channel: fidl_common::WlanChannel::from(channel),

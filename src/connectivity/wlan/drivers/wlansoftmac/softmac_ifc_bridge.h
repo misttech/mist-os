@@ -7,7 +7,6 @@
 
 #include <fidl/fuchsia.wlan.softmac/cpp/driver/wire.h>
 #include <fidl/fuchsia.wlan.softmac/cpp/wire.h>
-#include <fuchsia/wlan/softmac/c/banjo.h>
 #include <lib/fdf/cpp/dispatcher.h>
 #include <lib/fidl/cpp/wire/client.h>
 #include <lib/fidl_driver/cpp/transport.h>

@@ -8,15 +8,11 @@
 #include <endian.h>
 #include <fuchsia/wlan/ieee80211/c/banjo.h>
 #include <fuchsia/wlan/mlme/cpp/fidl.h>
-#include <fuchsia/wlan/softmac/c/banjo.h>
 #include <zircon/assert.h>
 #include <zircon/compiler.h>
 #include <zircon/types.h>
 
 #include <cstdint>
-#include <unordered_map>
-#include <utility>
-#include <vector>
 
 #include <wlan/common/bitfield.h>
 #include <wlan/common/element_id.h>
