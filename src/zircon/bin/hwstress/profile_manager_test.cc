@@ -47,38 +47,5 @@ TEST(ProfileManager, ApplyProfiles) {
   worker->join();
 }
 
-struct FakeProfileProvider : public fuchsia::scheduler::ProfileProvider {
-  FakeProfileProvider() = default;
-
-  void GetProfile(uint32_t priority, std::string name, GetProfileCallback callback) override {
-    ASSERT_TRUE(!get_profile_called);
-    get_profile_called = true;
-    requested_priority = priority;
-    callback(ZX_OK, zx::profile(0));
-  }
-
-  void GetCpuAffinityProfile(fuchsia::scheduler::CpuSet cpu_mask,
-                             GetCpuAffinityProfileCallback callback) override {
-    get_affinity_profile_called = true;
-    requested_mask = cpu_mask;
-    callback(ZX_OK, zx::profile(0));
-  }
-
-  void GetDeadlineProfile(uint64_t capacity, uint64_t deadline, uint64_t period, std::string name,
-                          GetDeadlineProfileCallback callback) override {
-    ZX_PANIC("unexpected call");
-  }
-
-  void SetProfileByRole(zx::handle handle, std::string role,
-                        SetProfileByRoleCallback callback) override {
-    ZX_PANIC("unexpected call");
-  }
-
-  bool get_affinity_profile_called = false;
-  bool get_profile_called = false;
-  uint32_t requested_priority = -1;
-  fuchsia::scheduler::CpuSet requested_mask{};
-};
-
 }  // namespace
 }  // namespace hwstress
