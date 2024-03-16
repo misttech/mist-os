@@ -35,8 +35,6 @@ class DeviceInterface {
                             const frame_processor_t* frame_processor,
                             zx::channel* out_sme_channel) const = 0;
 
-  virtual zx_status_t DeliverEthernet(cpp20::span<const uint8_t> eth_frame) const = 0;
-
   virtual zx_status_t SetEthernetStatus(uint32_t status) const = 0;
 };
 

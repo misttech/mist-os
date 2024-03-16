@@ -27,7 +27,6 @@
 #include <wlan/common/macaddr.h>
 #include <wlan/drivers/log.h>
 
-#include "buffer_allocator.h"
 #include "device_interface.h"
 #include "softmac_bridge.h"
 #include "softmac_ifc_bridge.h"
@@ -48,8 +47,6 @@ class SoftmacBinding : public DeviceInterface {
   zx_status_t Start(zx_handle_t softmac_ifc_bridge_client_handle,
                     const frame_processor_t* frame_processor,
                     zx::channel* out_sme_channel) const final;
-  zx_status_t DeliverEthernet(cpp20::span<const uint8_t> eth_frame) const final
-      __TA_EXCLUDES(ethernet_proxy_lock_);
   zx_status_t SetEthernetStatus(uint32_t status) const final __TA_EXCLUDES(ethernet_proxy_lock_);
 
  private:
@@ -128,7 +125,7 @@ class SoftmacBinding : public DeviceInterface {
 
   // Mark `ethernet_proxy_lock_` as a mutable member of this class to allow const functions
   // to acquire it.
-  mutable std::mutex ethernet_proxy_lock_;
+  mutable std::shared_ptr<std::mutex> ethernet_proxy_lock_;
   ddk::EthernetIfcProtocolClient ethernet_proxy_ __TA_GUARDED(ethernet_proxy_lock_);
 
   fdf::Dispatcher softmac_bridge_server_dispatcher_;

@@ -7,6 +7,7 @@
 
 #include <fidl/fuchsia.wlan.softmac/cpp/driver/wire.h>
 #include <fidl/fuchsia.wlan.softmac/cpp/wire.h>
+#include <fuchsia/hardware/ethernet/cpp/banjo.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/fdf/cpp/dispatcher.h>
 #include <lib/fidl/cpp/wire/server.h>
@@ -14,6 +15,8 @@
 #include <lib/operation/ethernet.h>
 #include <lib/trace/event.h>
 #include <lib/zx/result.h>
+
+#include <mutex>
 
 #include <wlan/drivers/log.h>
 
@@ -31,7 +34,9 @@ class SoftmacBridge : public fidl::WireServer<fuchsia_wlan_softmac::WlanSoftmacB
       fdf::Dispatcher& softmac_bridge_server_dispatcher,
       std::unique_ptr<fit::callback<void(zx_status_t status)>> completer,
       fit::callback<void(zx_status_t)> sta_shutdown_handler, DeviceInterface* device,
-      fdf::WireSharedClient<fuchsia_wlan_softmac::WlanSoftmac>&& softmac_client);
+      fdf::WireSharedClient<fuchsia_wlan_softmac::WlanSoftmac>&& softmac_client,
+      std::shared_ptr<std::mutex> ethernet_proxy_lock,
+      ddk::EthernetIfcProtocolClient* ethernet_proxy);
   zx_status_t Stop(std::unique_ptr<StopCompleter> completer);
   ~SoftmacBridge() override;
 
@@ -59,10 +64,13 @@ class SoftmacBridge : public fidl::WireServer<fuchsia_wlan_softmac::WlanSoftmacB
   void UpdateWmmParameters(UpdateWmmParametersRequestView request,
                            UpdateWmmParametersCompleter::Sync& completer) final;
   static zx_status_t WlanTx(const void* ctx, const uint8_t* payload, size_t payload_size);
+  static zx_status_t EthernetRx(const void* ctx, const uint8_t* payload, size_t payload_size);
 
  private:
   explicit SoftmacBridge(DeviceInterface* device_interface,
-                         fdf::WireSharedClient<fuchsia_wlan_softmac::WlanSoftmac>&& softmac_client);
+                         fdf::WireSharedClient<fuchsia_wlan_softmac::WlanSoftmac>&& softmac_client,
+                         std::shared_ptr<std::mutex> ethernet_proxy_lock,
+                         ddk::EthernetIfcProtocolClient* ethernet_proxy);
 
   template <typename, typename = void>
   static constexpr bool has_value_type = false;
@@ -88,6 +96,9 @@ class SoftmacBridge : public fidl::WireServer<fuchsia_wlan_softmac::WlanSoftmacB
   DeviceInterface* device_interface_;
   wlansoftmac_handle_t* rust_handle_;
   fdf::Dispatcher rust_dispatcher_;
+
+  std::shared_ptr<std::mutex> ethernet_proxy_lock_;
+  ddk::EthernetIfcProtocolClient* ethernet_proxy_ __TA_GUARDED(ethernet_proxy_lock_);
 
   static wlansoftmac_buffer_t IntoRustBuffer(std::unique_ptr<Buffer> buffer);
   wlansoftmac_buffer_provider_ops_t rust_buffer_provider{

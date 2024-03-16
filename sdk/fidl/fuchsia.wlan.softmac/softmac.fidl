@@ -402,6 +402,10 @@ closed protocol FrameSender {
         3: packet_info WlanTxInfo;
         4: async_id uint64;
     }) -> () error zx.Status;
+    strict EthernetRx(table {
+        1: packet_address uint64;
+        2: packet_size uint64;
+    }) -> () error zx.Status;
 };
 
 @discoverable

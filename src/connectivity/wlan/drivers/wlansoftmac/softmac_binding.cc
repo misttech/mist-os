@@ -49,6 +49,8 @@ SoftmacBinding::SoftmacBinding()
   ldebug(0, nullptr, "Entering.");
   linfo("Creating a new WLAN device.");
 
+  ethernet_proxy_lock_ = std::make_shared<std::mutex>();
+
   // Create a dispatcher to serve the WlanSoftmacBridge protocol.
   {
     auto dispatcher = fdf::SynchronizedDispatcher::Create(
@@ -210,14 +212,18 @@ void SoftmacBinding::Init() {
   };
   unbind_lock_->unlock();
 
-  auto softmac_bridge = SoftmacBridge::New(softmac_bridge_server_dispatcher_, std::move(completer),
-                                           std::move(sta_shutdown_handler), this, client_.Clone());
-  if (softmac_bridge.is_error()) {
-    lerror("Failed to create SoftmacBridge: %s", softmac_bridge.status_string());
-    device_init_reply(device_, softmac_bridge.error_value(), nullptr);
-    return;
+  {
+    std::lock_guard<std::mutex> lock(*ethernet_proxy_lock_);
+    auto softmac_bridge = SoftmacBridge::New(
+        softmac_bridge_server_dispatcher_, std::move(completer), std::move(sta_shutdown_handler),
+        this, client_.Clone(), ethernet_proxy_lock_, &ethernet_proxy_);
+    if (softmac_bridge.is_error()) {
+      lerror("Failed to create SoftmacBridge: %s", softmac_bridge.status_string());
+      device_init_reply(device_, softmac_bridge.error_value(), nullptr);
+      return;
+    }
+    softmac_bridge_ = std::move(*softmac_bridge);
   }
-  softmac_bridge_ = std::move(*softmac_bridge);
 }
 
 // See lib/ddk/device.h for documentation on when this method is called.
@@ -304,7 +310,7 @@ zx_status_t SoftmacBinding::EthernetImplStart(const ethernet_ifc_protocol_t* ifc
   ldebug(0, nullptr, "Entering.");
   ZX_DEBUG_ASSERT(ifc != nullptr);
 
-  std::lock_guard<std::mutex> lock(ethernet_proxy_lock_);
+  std::lock_guard<std::mutex> lock(*ethernet_proxy_lock_);
   if (ethernet_proxy_.is_valid()) {
     return ZX_ERR_ALREADY_BOUND;
   }
@@ -316,7 +322,7 @@ void SoftmacBinding::EthernetImplStop() {
   WLAN_TRACE_DURATION();
   ldebug(0, nullptr, "Entering.");
 
-  std::lock_guard<std::mutex> lock(ethernet_proxy_lock_);
+  std::lock_guard<std::mutex> lock(*ethernet_proxy_lock_);
   if (!ethernet_proxy_.is_valid()) {
     lwarn("ethmac not started");
   }
@@ -419,24 +425,9 @@ zx_status_t SoftmacBinding::Start(zx_handle_t softmac_ifc_bridge_client_handle,
   return ZX_OK;
 }
 
-zx_status_t SoftmacBinding::DeliverEthernet(cpp20::span<const uint8_t> eth_frame) const {
-  WLAN_TRACE_DURATION();
-  if (eth_frame.size() > ETH_FRAME_MAX_SIZE) {
-    lerror("Attempted to deliver an ethernet frame of invalid length: %zu", eth_frame.size());
-    return ZX_ERR_INVALID_ARGS;
-  }
-
-  std::lock_guard<std::mutex> lock(ethernet_proxy_lock_);
-  if (ethernet_proxy_.is_valid()) {
-    ethernet_proxy_.Recv(eth_frame.data(), eth_frame.size(), 0u);
-  }
-
-  return ZX_OK;
-}
-
 zx_status_t SoftmacBinding::SetEthernetStatus(uint32_t status) const {
   WLAN_TRACE_DURATION();
-  std::lock_guard<std::mutex> lock(ethernet_proxy_lock_);
+  std::lock_guard<std::mutex> lock(*ethernet_proxy_lock_);
   if (ethernet_proxy_.is_valid()) {
     ethernet_proxy_.Status(status);
   }

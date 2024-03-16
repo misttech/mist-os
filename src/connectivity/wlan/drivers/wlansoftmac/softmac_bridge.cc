@@ -24,10 +24,13 @@ namespace wlan::drivers::wlansoftmac {
 
 SoftmacBridge::SoftmacBridge(
     DeviceInterface* device_interface,
-    fdf::WireSharedClient<fuchsia_wlan_softmac::WlanSoftmac>&& softmac_client)
+    fdf::WireSharedClient<fuchsia_wlan_softmac::WlanSoftmac>&& softmac_client,
+    std::shared_ptr<std::mutex> ethernet_proxy_lock, ddk::EthernetIfcProtocolClient* ethernet_proxy)
     : softmac_client_(
           std::forward<fdf::WireSharedClient<fuchsia_wlan_softmac::WlanSoftmac>>(softmac_client)),
-      device_interface_(device_interface) {
+      device_interface_(device_interface),
+      ethernet_proxy_lock_(std::move(ethernet_proxy_lock)),
+      ethernet_proxy_(ethernet_proxy) {
   WLAN_TRACE_DURATION();
   auto rust_dispatcher = fdf::SynchronizedDispatcher::Create(
       fdf::SynchronizedDispatcher::Options::kAllowSyncCalls, "wlansoftmac-mlme",
@@ -54,10 +57,12 @@ zx::result<std::unique_ptr<SoftmacBridge>> SoftmacBridge::New(
     fdf::Dispatcher& softmac_bridge_server_dispatcher,
     std::unique_ptr<fit::callback<void(zx_status_t status)>> completer,
     fit::callback<void(zx_status_t)> sta_shutdown_handler, DeviceInterface* device,
-    fdf::WireSharedClient<fuchsia_wlan_softmac::WlanSoftmac>&& softmac_client) {
+    fdf::WireSharedClient<fuchsia_wlan_softmac::WlanSoftmac>&& softmac_client,
+    std::shared_ptr<std::mutex> ethernet_proxy_lock,
+    ddk::EthernetIfcProtocolClient* ethernet_proxy) {
   WLAN_TRACE_DURATION();
-  auto softmac_bridge =
-      std::unique_ptr<SoftmacBridge>(new SoftmacBridge(device, std::move(softmac_client)));
+  auto softmac_bridge = std::unique_ptr<SoftmacBridge>(new SoftmacBridge(
+      device, std::move(softmac_client), std::move(ethernet_proxy_lock), ethernet_proxy));
 
   // Safety: Each of the functions initialized in `wlansoftmac_rust_ops` is safe to call
   // from any thread as long they are never called concurrently.
@@ -73,11 +78,6 @@ zx::result<std::unique_ptr<SoftmacBridge>> SoftmacBridge::New(
                 ->Start(softmac_ifc_bridge_client_handle, frame_processor, &channel);
         *out_sme_channel = channel.release();
         return result;
-      },
-      .deliver_eth_frame = [](const void* device_interface, const uint8_t* data,
-                              size_t len) -> zx_status_t {
-        WLAN_LAMBDA_TRACE_DURATION("rust_device_interface_t.deliver_eth_frame");
-        return DeviceInterface::from(device_interface)->DeliverEthernet({data, len});
       },
       .set_ethernet_status = [](const void* device_interface, uint32_t status) -> zx_status_t {
         WLAN_LAMBDA_TRACE_DURATION("rust_device_interface_t.set_ethernet_status");
@@ -134,6 +134,7 @@ zx::result<std::unique_ptr<SoftmacBridge>> SoftmacBridge::New(
            frame_sender_t{
                .ctx = softmac_bridge.get(),
                .wlan_tx = &SoftmacBridge::WlanTx,
+               .ethernet_rx = &SoftmacBridge::EthernetRx,
            },
        rust_buffer_provider = softmac_bridge->rust_buffer_provider,
        softmac_bridge_client_end =
@@ -408,6 +409,40 @@ zx_status_t SoftmacBridge::WlanTx(const void* ctx, const uint8_t* payload, size_
               WLAN_TRACE_ASYNC_END_TX(async_id, ZX_OK);
             }
           });
+
+  return ZX_OK;
+}
+
+zx_status_t SoftmacBridge::EthernetRx(const void* ctx, const uint8_t* payload,
+                                      size_t payload_size) {
+  auto self = static_cast<const SoftmacBridge*>(ctx);
+
+  WLAN_TRACE_DURATION();
+  auto fidl_request = fidl::Unpersist<fuchsia_wlan_softmac::FrameSenderEthernetRxRequest>(
+      cpp20::span(payload, payload_size));
+  if (!fidl_request.is_ok()) {
+    lerror("Failed to unpersist FrameSender.EthernetRx request: %s", fidl_request.error_value());
+    return ZX_ERR_INTERNAL;
+  }
+
+  if (!fidl_request->packet_address() || !fidl_request->packet_size()) {
+    lerror("FrameSender.EthernetRx request missing required field(s).");
+    return ZX_ERR_INTERNAL;
+  }
+
+  if (fidl_request->packet_size().value() > ETH_FRAME_MAX_SIZE) {
+    lerror("Attempted to deliver an ethernet frame of invalid length: %zu",
+           fidl_request->packet_size().value());
+    return ZX_ERR_INVALID_ARGS;
+  }
+
+  std::lock_guard<std::mutex> lock(*self->ethernet_proxy_lock_);
+  if (self->ethernet_proxy_->is_valid()) {
+    self->ethernet_proxy_->Recv(
+        reinterpret_cast<const uint8_t*>(  // NOLINT(performance-no-int-to-ptr)
+            fidl_request->packet_address().value()),
+        fidl_request->packet_size().value(), 0u);
+  }
 
   return ZX_OK;
 }

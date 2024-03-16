@@ -240,7 +240,7 @@ pub trait DeviceOps {
     fn spectrum_management_support(
         &mut self,
     ) -> Result<fidl_common::SpectrumManagementSupport, zx::Status>;
-    fn deliver_eth_frame(&mut self, slice: &[u8]) -> Result<(), zx::Status>;
+    fn deliver_eth_frame(&mut self, packet: &[u8]) -> Result<(), zx::Status>;
     /// Sends the given |buffer| as a frame over the air. If the caller does not pass an |async_id| to this
     /// function, then this function will generate its own |async_id| and end the trace if an error occurs.
     fn send_wlan_frame(
@@ -458,15 +458,13 @@ impl DeviceOps for Device {
         )
     }
 
-    fn deliver_eth_frame(&mut self, slice: &[u8]) -> Result<(), zx::Status> {
-        let status = (self.raw_device.deliver_eth_frame)(
-            // Safety: This is safe because the original will not be used while the copy
-            // is still in scope.
-            unsafe { self.raw_device.device.clone().as_ptr() },
-            slice.as_ptr(),
-            slice.len(),
-        );
-        zx::ok(status)
+    fn deliver_eth_frame(&mut self, packet: &[u8]) -> Result<(), zx::Status> {
+        wtrace::duration!(c"Device::deliver_eth_frame");
+        self.frame_sender.ethernet_rx(&fidl_softmac::FrameSenderEthernetRxRequest {
+            packet_address: Some(packet.as_ptr() as u64),
+            packet_size: Some(packet.len() as u64),
+            ..Default::default()
+        })
     }
 
     fn send_wlan_frame(
@@ -910,6 +908,17 @@ pub struct CFrameSender {
         payload: *const u8,
         payload_len: usize,
     ) -> zx::zx_status_t,
+    /// Sends an Ethernet frame to the C++ portion of wlansoftmac.
+    ///
+    /// # Safety
+    ///
+    /// Behavior is undefined unless `payload` contains a persisted `FrameSender.EthernetRx` request
+    /// and `payload_len` is the length of the persisted byte array.
+    ethernet_rx: unsafe extern "C" fn(
+        ctx: *const c_void,
+        payload: *const u8,
+        payload_len: usize,
+    ) -> zx::zx_status_t,
 }
 
 pub struct FrameSender {
@@ -925,6 +934,17 @@ pub struct FrameSender {
         payload: *const u8,
         payload_len: usize,
     ) -> zx::zx_status_t,
+    /// Sends an Ethernet frame to the C++ portion of wlansoftmac.
+    ///
+    /// # Safety
+    ///
+    /// Behavior is undefined unless `payload` contains a persisted `FrameSender.EthernetRx` request
+    /// and `payload_len` is the length of the persisted byte array.
+    ethernet_rx: unsafe extern "C" fn(
+        ctx: *const c_void,
+        payload: *const u8,
+        payload_len: usize,
+    ) -> zx::zx_status_t,
 }
 
 impl From<CFrameSender> for FrameSender {
@@ -934,6 +954,7 @@ impl From<CFrameSender> for FrameSender {
             // any other type than `*const c_void`.
             ctx: unsafe { SendPtr::from_always_const_void(frame_sender.ctx) },
             wlan_tx: frame_sender.wlan_tx,
+            ethernet_rx: frame_sender.ethernet_rx,
         }
     }
 }
@@ -958,6 +979,31 @@ impl FrameSender {
                         payload.as_slice().as_ptr(),
                         payload.len(),
                     )
+                })
+                .into()
+            }
+        }
+    }
+
+    fn ethernet_rx(
+        &self,
+        request: &fidl_softmac::FrameSenderEthernetRxRequest,
+    ) -> Result<(), zx::Status> {
+        let payload = fidl::persist(request);
+        match payload {
+            Err(e) => {
+                error!("Failed to persist FrameSender.EthernetRxRequest: {}", e);
+                Err(zx::Status::INTERNAL)
+            }
+            Ok(payload) => {
+                let payload = payload.as_slice();
+                // Safety: The `self.ethernet_rx` call is safe because the payload is a persisted
+                // `FrameSender.EthernetRx` request.
+                //
+                // Safety: The `SendPtr::clone()` call is safe because the copy of `self.ctx` is
+                // temporary and the original cannot be used until `self.ethernet_rx` returns.
+                zx::Status::from_raw(unsafe {
+                    (self.ethernet_rx)(self.ctx.clone().as_ptr(), payload.as_ptr(), payload.len())
                 })
                 .into()
             }
@@ -990,8 +1036,6 @@ pub struct CDeviceInterface {
         frame_processor: *const CFrameProcessor,
         out_sme_channel: *mut zx::sys::zx_handle_t,
     ) -> i32,
-    /// Request to deliver an Ethernet II frame to Fuchsia's Netstack.
-    deliver_eth_frame: extern "C" fn(device: *const c_void, data: *const u8, len: usize) -> i32,
     /// Reports the current status to the ethernet driver.
     set_ethernet_status: extern "C" fn(device: *const c_void, status: u32) -> i32,
 }
@@ -1022,8 +1066,6 @@ pub struct DeviceInterface {
         frame_processor: *const CFrameProcessor,
         out_sme_channel: *mut zx::sys::zx_handle_t,
     ) -> i32,
-    /// Request to deliver an Ethernet II frame to Fuchsia's Netstack.
-    deliver_eth_frame: extern "C" fn(device: *const c_void, data: *const u8, len: usize) -> i32,
     /// Reports the current status to the ethernet driver.
     set_ethernet_status: extern "C" fn(device: *const c_void, status: u32) -> i32,
 }
@@ -1035,7 +1077,6 @@ impl From<CDeviceInterface> for DeviceInterface {
             // any other type than `*const c_void`.
             device: unsafe { SendPtr::from_always_const_void(device_interface.device) },
             start: device_interface.start,
-            deliver_eth_frame: device_interface.deliver_eth_frame,
             set_ethernet_status: device_interface.set_ethernet_status,
         }
     }
@@ -1508,8 +1549,8 @@ pub mod test_utils {
             }
         }
 
-        fn deliver_eth_frame(&mut self, data: &[u8]) -> Result<(), zx::Status> {
-            self.state.lock().eth_queue.push(data.to_vec());
+        fn deliver_eth_frame(&mut self, packet: &[u8]) -> Result<(), zx::Status> {
+            self.state.lock().eth_queue.push(packet.to_vec());
             Ok(())
         }
 

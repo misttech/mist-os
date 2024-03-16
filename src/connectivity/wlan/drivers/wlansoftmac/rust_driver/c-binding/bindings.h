@@ -60,10 +60,6 @@ typedef struct {
   int32_t (*start)(const void *device, zx_handle_t wlan_softmac_ifc_bridge_client_handle,
                    const frame_processor_t *frame_processor, zx_handle_t *out_sme_channel);
   /**
-   * Request to deliver an Ethernet II frame to Fuchsia's Netstack.
-   */
-  int32_t (*deliver_eth_frame)(const void *device, const uint8_t *data, uintptr_t len);
-  /**
    * Reports the current status to the ethernet driver.
    */
   int32_t (*set_ethernet_status)(const void *device, uint32_t status);
@@ -80,6 +76,15 @@ typedef struct {
    * and `payload_len` is the length of the persisted byte array.
    */
   zx_status_t (*wlan_tx)(const void *ctx, const uint8_t *payload, uintptr_t payload_len);
+  /**
+   * Sends an Ethernet frame to the C++ portion of wlansoftmac.
+   *
+   * # Safety
+   *
+   * Behavior is undefined unless `payload` contains a persisted `FrameSender.EthernetRx` request
+   * and `payload_len` is the length of the persisted byte array.
+   */
+  zx_status_t (*ethernet_rx)(const void *ctx, const uint8_t *payload, uintptr_t payload_len);
 } frame_sender_t;
 
 /**
