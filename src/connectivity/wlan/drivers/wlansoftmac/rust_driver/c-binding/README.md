@@ -79,14 +79,14 @@ Fuchsia toolchain, you may substitute `RUSTUP_TOOLCHAIN=nightly`.
 RUSTUP_TOOLCHAIN=fuchsia cbindgen $FUCHSIA_DIR/src/connectivity/wlan/drivers/wlansoftmac/rust_driver/c-binding/ -o $FUCHSIA_DIR/src/connectivity/wlan/drivers/wlansoftmac/rust_driver/c-binding/bindings.h
 ```
 
-**NOTE:** The wlan-mlme library and wlansoftmac driver each use the
-Banjo bindings for their respective language. This means cbindgen
-cannot properly identify whether the Banjo types in the bindings exist
+**NOTE:** The wlan-mlme library and wlansoftmac driver each use
+bindings for their respective language. This means cbindgen
+cannot properly identify whether the types in those libraries exist
 or not. Therefore, it is is normal to see `WARN` logs like the
-following for Banjo types:
+following for some types:
 
 ```
-WARN: Can't find WlanRxPacket. This usually means that this type was incompatible or not found.
+WARN: Can't find zx_status_t. This usually means that this type was incompatible or not found.
 ```
 
 ## Format `bindings.h`

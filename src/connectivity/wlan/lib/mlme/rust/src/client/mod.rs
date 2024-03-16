@@ -21,7 +21,6 @@ use {
         error::Error,
     },
     anyhow::format_err,
-    banjo_fuchsia_wlan_softmac as banjo_wlan_softmac,
     channel_switch::ChannelState,
     fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211,
     fidl_fuchsia_wlan_minstrel as fidl_minstrel, fidl_fuchsia_wlan_mlme as fidl_mlme,
@@ -626,7 +625,7 @@ impl Client {
             },
         })?;
         ctx.device
-            .send_wlan_frame(buffer.finalize(written), 0, None)
+            .send_wlan_frame(buffer.finalize(written), fidl_softmac::WlanTxInfoFlags::empty(), None)
             .map_err(|error| Error::Status(format!("error sending power management frame"), error))
     }
 
@@ -815,7 +814,7 @@ impl<'a, D: DeviceOps> BoundClient<'a, D> {
         })?;
         self.ctx
             .device
-            .send_wlan_frame(buffer.finalize(written), 0, None)
+            .send_wlan_frame(buffer.finalize(written), fidl_softmac::WlanTxInfoFlags::empty(), None)
             .map_err(|s| Error::Status(format!("error sending keep alive frame"), s))
     }
 
@@ -926,8 +925,8 @@ impl<'a, D: DeviceOps> BoundClient<'a, D> {
             e
         })?;
         let tx_flags = match ether_type {
-            mac::ETHER_TYPE_EAPOL => banjo_wlan_softmac::WlanTxInfoFlags::FAVOR_RELIABILITY.0,
-            _ => 0,
+            mac::ETHER_TYPE_EAPOL => fidl_softmac::WlanTxInfoFlags::FAVOR_RELIABILITY,
+            _ => fidl_softmac::WlanTxInfoFlags::empty(),
         };
         self.ctx.device.send_wlan_frame(buffer.finalize(written), tx_flags, Some(async_id)).map_err(
             |s| {
@@ -1181,7 +1180,7 @@ impl<'a, D: DeviceOps> BoundClient<'a, D> {
     }
 
     fn send_mgmt_or_ctrl_frame(&mut self, buffer: FinalizedBuffer) -> Result<(), zx::Status> {
-        self.ctx.device.send_wlan_frame(buffer, 0, None)
+        self.ctx.device.send_wlan_frame(buffer, fidl_softmac::WlanTxInfoFlags::empty(), None)
     }
 }
 

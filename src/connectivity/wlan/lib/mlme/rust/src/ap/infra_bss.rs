@@ -312,15 +312,17 @@ impl InfraBss {
                 self.rsne.as_ref().map_or(&[], |rsne| &rsne),
             )
             .map_err(|e| Rejection::Client(client_addr, ClientRejection::WlanSendError(e)))?;
-        ctx.device.send_wlan_frame(buffer.finalize(written), 0, None).map_err(|s| {
-            Rejection::Client(
-                client_addr,
-                ClientRejection::WlanSendError(Error::Status(
-                    format!("failed to send probe resp"),
-                    s,
-                )),
-            )
-        })
+        ctx.device
+            .send_wlan_frame(buffer.finalize(written), fidl_softmac::WlanTxInfoFlags::empty(), None)
+            .map_err(|s| {
+                Rejection::Client(
+                    client_addr,
+                    ClientRejection::WlanSendError(Error::Status(
+                        format!("failed to send probe resp"),
+                        s,
+                    )),
+                )
+            })
     }
 
     pub fn handle_mgmt_frame<B: ByteSlice, D: DeviceOps>(
@@ -522,7 +524,7 @@ impl InfraBss {
                 body,
             )
             .map_err(|e| Rejection::Client(hdr.da, ClientRejection::WlanSendError(e)))?;
-        let tx_flags: u32 = 0;
+        let tx_flags = fidl_softmac::WlanTxInfoFlags::empty();
 
         if !self.clients.values().any(|client| client.dozing()) {
             ctx.device

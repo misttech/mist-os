@@ -4,11 +4,13 @@
 
 #include "softmac_bridge.h"
 
+#include <fidl/fuchsia.wlan.softmac/cpp/driver/fidl.h>
 #include <fidl/fuchsia.wlan.softmac/cpp/fidl.h>
 #include <lib/async/cpp/task.h>
 #include <lib/fdf/cpp/dispatcher.h>
 #include <lib/fdf/dispatcher.h>
 #include <lib/fidl/cpp/wire/channel.h>
+#include <lib/fidl/cpp/wire_natural_conversions.h>
 #include <lib/fit/function.h>
 #include <lib/sync/cpp/completion.h>
 #include <lib/trace/event.h>
@@ -77,22 +79,17 @@ zx::result<std::unique_ptr<SoftmacBridge>> SoftmacBridge::New(
         WLAN_LAMBDA_TRACE_DURATION("rust_device_interface_t.deliver_eth_frame");
         return DeviceInterface::from(device_interface)->DeliverEthernet({data, len});
       },
-      .queue_tx = [](const void* device_interface, uint32_t options, void* buffer, size_t written,
-                     wlan_tx_info_t tx_info, trace_async_id_t async_id) -> zx_status_t {
-        WLAN_LAMBDA_TRACE_DURATION("rust_device_interface_t.queue_tx");
-        return DeviceInterface::from(device_interface)
-            ->QueueTx(FinalizedBuffer::FromRaw(buffer, written), tx_info, async_id);
-      },
       .set_ethernet_status = [](const void* device_interface, uint32_t status) -> zx_status_t {
         WLAN_LAMBDA_TRACE_DURATION("rust_device_interface_t.set_ethernet_status");
         return DeviceInterface::from(device_interface)->SetEthernetStatus(status);
       },
   };
 
-  auto endpoints = fidl::CreateEndpoints<fuchsia_wlan_softmac::WlanSoftmacBridge>();
-  if (endpoints.is_error()) {
-    lerror("Failed to create WlanSoftmacBridge endpoints: %s", endpoints.status_string());
-    return endpoints.take_error();
+  auto softmac_bridge_endpoints = fidl::CreateEndpoints<fuchsia_wlan_softmac::WlanSoftmacBridge>();
+  if (softmac_bridge_endpoints.is_error()) {
+    lerror("Failed to create WlanSoftmacBridge endpoints: %s",
+           softmac_bridge_endpoints.status_string());
+    return softmac_bridge_endpoints.take_error();
   }
 
   // Bind the WlanSoftmacBridge server on softmac_bridge_server_dispatcher. When the task
@@ -101,13 +98,15 @@ zx::result<std::unique_ptr<SoftmacBridge>> SoftmacBridge::New(
   libsync::Completion server_binding_task_complete;
   async::PostTask(
       softmac_bridge_server_dispatcher.async_dispatcher(),
-      [softmac_bridge = softmac_bridge.get(), server_endpoint = std::move(endpoints->server),
+      [softmac_bridge = softmac_bridge.get(),
+       softmac_bridge_server_endpoint = std::move(softmac_bridge_endpoints->server),
        &server_binding_task_complete]() mutable {
         WLAN_LAMBDA_TRACE_DURATION("WlanSoftmacBridge server binding");
         softmac_bridge->softmac_bridge_server_ =
             std::make_unique<fidl::ServerBinding<fuchsia_wlan_softmac::WlanSoftmacBridge>>(
-                fdf::Dispatcher::GetCurrent()->async_dispatcher(), std::move(server_endpoint),
-                softmac_bridge, [](fidl::UnbindInfo info) {
+                fdf::Dispatcher::GetCurrent()->async_dispatcher(),
+                std::move(softmac_bridge_server_endpoint), softmac_bridge,
+                [](fidl::UnbindInfo info) {
                   WLAN_LAMBDA_TRACE_DURATION("WlanSoftmacBridge close_handler");
                   if (info.is_user_initiated()) {
                     linfo("WlanSoftmacBridge server closed.");
@@ -126,35 +125,42 @@ zx::result<std::unique_ptr<SoftmacBridge>> SoftmacBridge::New(
         (*completer)(status);
       });
 
-  async::PostTask(softmac_bridge->rust_dispatcher_.async_dispatcher(),
-                  [init_completer = std::move(init_completer),
-                   sta_shutdown_handler = std::move(sta_shutdown_handler),
-                   wlansoftmac_rust_ops = wlansoftmac_rust_ops,
-                   rust_buffer_provider = softmac_bridge->rust_buffer_provider,
-                   client_end = endpoints->client.TakeHandle().release()]() mutable {
-                    WLAN_LAMBDA_TRACE_DURATION("Rust MLME dispatcher");
-                    sta_shutdown_handler(start_and_run_bridged_wlansoftmac(
-                        init_completer.release(),
-                        [](void* ctx, zx_status_t status, wlansoftmac_handle_t* rust_handle) {
-                          WLAN_LAMBDA_TRACE_DURATION("run InitCompleter");
-                          // Safety: `init_completer` is now owned by this function, so it's safe to
-                          // cast it to a non-const pointer.
-                          auto init_completer = static_cast<InitCompleter*>(ctx);
-                          if (init_completer == nullptr) {
-                            lerror("Received NULL InitCompleter pointer!");
-                            return;
-                          }
-                          // Skip the check for whether completer has already been
-                          // called.  This is the only location where completer is
-                          // called, and its deallocated immediately after. Thus, such a
-                          // check would be a use-after-free violation.
-                          (*init_completer)(status, rust_handle);
-                          delete init_completer;
-                        },
-                        wlansoftmac_rust_ops, rust_buffer_provider, client_end));
-                  });
+  async::PostTask(
+      softmac_bridge->rust_dispatcher_.async_dispatcher(),
+      [init_completer = std::move(init_completer),
+       sta_shutdown_handler = std::move(sta_shutdown_handler),
+       wlansoftmac_rust_ops = wlansoftmac_rust_ops,
+       frame_sender =
+           frame_sender_t{
+               .ctx = softmac_bridge.get(),
+               .wlan_tx = &SoftmacBridge::WlanTx,
+           },
+       rust_buffer_provider = softmac_bridge->rust_buffer_provider,
+       softmac_bridge_client_end =
+           softmac_bridge_endpoints->client.TakeHandle().release()]() mutable {
+        WLAN_LAMBDA_TRACE_DURATION("Rust MLME dispatcher");
+        sta_shutdown_handler(start_and_run_bridged_wlansoftmac(
+            init_completer.release(),
+            [](void* ctx, zx_status_t status, wlansoftmac_handle_t* rust_handle) {
+              WLAN_LAMBDA_TRACE_DURATION("run InitCompleter");
+              // Safety: `init_completer` is now owned by this function, so it's safe to
+              // cast it to a non-const pointer.
+              auto init_completer = static_cast<InitCompleter*>(ctx);
+              if (init_completer == nullptr) {
+                lerror("Received NULL InitCompleter pointer!");
+                return;
+              }
+              // Skip the check for whether completer has already been
+              // called.  This is the only location where completer is
+              // called, and its deallocated immediately after. Thus, such a
+              // check would be a use-after-free violation.
+              (*init_completer)(status, rust_handle);
+              delete init_completer;
+            },
+            wlansoftmac_rust_ops, frame_sender, rust_buffer_provider, softmac_bridge_client_end));
+      });
 
-  // Wait for the task posted to softmac_bridge_server_dispatcher to complete before returning.
+  // Wait for the tasks posted to softmac_bridge_server_dispatcher to complete before returning.
   // Otherwise, the softmac_bridge pointer captured by the task might not be valid when the task
   // runs.
   server_binding_task_complete.Wait();
@@ -342,9 +348,73 @@ void SoftmacBridge::UpdateWmmParameters(UpdateWmmParametersRequestView request,
   DispatchAndComplete(__func__, dispatcher, completer);
 }
 
+zx_status_t SoftmacBridge::WlanTx(const void* ctx, const uint8_t* payload, size_t payload_size) {
+  auto self = static_cast<const SoftmacBridge*>(ctx);
+
+  WLAN_TRACE_DURATION();
+  auto fidl_request = fidl::Unpersist<fuchsia_wlan_softmac::FrameSenderWlanTxRequest>(
+      cpp20::span(payload, payload_size));
+  if (!fidl_request.is_ok()) {
+    lerror("Failed to unpersist FrameSender.WlanTxRequest: %s", fidl_request.error_value());
+    return ZX_ERR_INTERNAL;
+  }
+
+  auto arena = fdf::Arena::Create(0, 0);
+  if (arena.is_error()) {
+    lerror("Arena creation failed: %s", arena.status_string());
+    return ZX_ERR_INTERNAL;
+  }
+
+  if (!fidl_request->async_id()) {
+    lerror("QueueWlanTx request missing async_id field.");
+    return ZX_ERR_INTERNAL;
+  }
+  auto async_id = fidl_request->async_id().value();
+
+  if (!fidl_request->packet_address() || !fidl_request->packet_size() ||
+      !fidl_request->packet_info()) {
+    lerror("QueueWlanTx request missing required field(s).");
+    auto status = ZX_ERR_INTERNAL;
+    WLAN_TRACE_ASYNC_END_TX(async_id, status);
+    return status;
+  }
+
+  auto buffer = reinterpret_cast<Buffer*>(  // NOLINT(performance-no-int-to-ptr)
+      fidl_request->packet_address().value());
+  if (buffer == nullptr) {
+    lerror("QueueWlanTx contains NULL packet address.");
+    auto status = ZX_ERR_INTERNAL;
+    WLAN_TRACE_ASYNC_END_TX(async_id, status);
+    return status;
+  }
+
+  auto finalized_buffer = FinalizedBuffer(buffer, fidl_request->packet_size().value());
+  ZX_DEBUG_ASSERT(finalized_buffer.written() <= std::numeric_limits<uint16_t>::max());
+
+  fuchsia_wlan_softmac::wire::WlanTxPacket fdf_request;
+  fdf_request.mac_frame = fidl::VectorView<uint8_t>::FromExternal(
+      const_cast<uint8_t*>(finalized_buffer.data()), finalized_buffer.written());
+  fdf_request.info = fidl::ToWire(*arena, fidl_request->packet_info().value());
+
+  self->softmac_client_.buffer(*std::move(arena))
+      ->QueueTx(fdf_request)
+      .Then(
+          [loc = cpp20::source_location::current(), async_id](
+              fdf::WireUnownedResult<fuchsia_wlan_softmac::WlanSoftmac::QueueTx>& result) mutable {
+            auto flattened_unwrapped_result = FlattenAndLogError(loc.function_name(), result);
+            if (flattened_unwrapped_result.is_error()) {
+              WLAN_TRACE_ASYNC_END_TX(async_id, flattened_unwrapped_result.error_value());
+            } else {
+              WLAN_TRACE_ASYNC_END_TX(async_id, ZX_OK);
+            }
+          });
+
+  return ZX_OK;
+}
+
 template <typename FidlMethod>
 fidl::WireResultUnwrapType<FidlMethod> SoftmacBridge::FlattenAndLogError(
-    const std::string& method_name, fdf::WireUnownedResult<FidlMethod> result) {
+    const std::string& method_name, fdf::WireUnownedResult<FidlMethod>& result) {
   WLAN_TRACE_DURATION();
   if (!result.ok()) {
     lerror("%s failed (FIDL error %s)", method_name.c_str(), result.status_string());
@@ -373,8 +443,9 @@ void SoftmacBridge::DispatchAndComplete(const std::string& method_name,
     return;
   }
 
-  auto result = FlattenAndLogError(method_name, dispatcher(*std::move(arena), softmac_client_));
-  completer.Reply(std::move(result));
+  auto result = dispatcher(*std::move(arena), softmac_client_);
+  auto flattened_result = FlattenAndLogError(method_name, result);
+  completer.Reply(std::move(flattened_result));
 }
 
 wlansoftmac_buffer_t SoftmacBridge::IntoRustBuffer(std::unique_ptr<Buffer> buffer) {

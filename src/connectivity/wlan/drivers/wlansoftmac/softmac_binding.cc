@@ -4,12 +4,9 @@
 
 #include "softmac_binding.h"
 
+#include <fidl/fuchsia.wlan.softmac/cpp/driver/fidl.h>
 #include <fidl/fuchsia.wlan.softmac/cpp/fidl.h>
 #include <fuchsia/hardware/ethernet/cpp/banjo.h>
-#include <fuchsia/wlan/common/c/banjo.h>
-#include <fuchsia/wlan/ieee80211/c/banjo.h>
-#include <fuchsia/wlan/internal/c/banjo.h>
-#include <fuchsia/wlan/softmac/c/banjo.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async/cpp/task.h>
 #include <lib/ddk/device.h>
@@ -36,7 +33,6 @@
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
-#include <limits>
 #include <memory>
 #include <mutex>
 #include <utility>
@@ -44,11 +40,6 @@
 #include <fbl/ref_ptr.h>
 #include <wlan/common/channel.h>
 #include <wlan/drivers/log.h>
-
-#include "buffer_allocator.h"
-#include "convert.h"
-#include "softmac_bridge.h"
-#include "softmac_ifc_bridge.h"
 
 namespace wlan::drivers::wlansoftmac {
 
@@ -441,49 +432,6 @@ zx_status_t SoftmacBinding::DeliverEthernet(cpp20::span<const uint8_t> eth_frame
   }
 
   return ZX_OK;
-}
-
-zx_status_t SoftmacBinding::QueueTx(FinalizedBuffer buffer, wlan_tx_info_t tx_info,
-                                    trace_async_id_t async_id) const {
-  WLAN_TRACE_DURATION();
-  ZX_DEBUG_ASSERT(buffer.written() <= std::numeric_limits<uint16_t>::max());
-
-  zx_status_t status = ZX_OK;
-
-  auto arena = fdf::Arena::Create(0, 0);
-  if (arena.is_error()) {
-    lerror("Arena creation failed: %s", arena.status_string());
-    status = ZX_ERR_INTERNAL;
-    WLAN_TRACE_ASYNC_END_TX(async_id, status);
-    return status;
-  }
-
-  fuchsia_wlan_softmac::wire::WlanTxPacket fidl_tx_packet;
-  status = ConvertTxPacket(buffer.data(), buffer.written(), tx_info, &fidl_tx_packet);
-  if (status != ZX_OK) {
-    lerror("WlanTxPacket conversion failed: %s", zx_status_get_string(status));
-    WLAN_TRACE_ASYNC_END_TX(async_id, status);
-    return status;
-  }
-
-  auto result = client_.sync().buffer(*arena)->QueueTx(fidl_tx_packet);
-
-  if (!result.ok()) {
-    lerror("QueueTx failed (FIDL error %s)", result.status_string());
-    status = result.status();
-    WLAN_TRACE_ASYNC_END_TX(async_id, status);
-    return status;
-  }
-  if (result->is_error()) {
-    lerror("QueueTx failed (status %s)", zx_status_get_string(result->error_value()));
-    status = result->error_value();
-    WLAN_TRACE_ASYNC_END_TX(async_id, status);
-    return status;
-  }
-
-  ZX_DEBUG_ASSERT(status == ZX_OK);
-  WLAN_TRACE_ASYNC_END_TX(async_id, status);
-  return status;
 }
 
 zx_status_t SoftmacBinding::SetEthernetStatus(uint32_t status) const {

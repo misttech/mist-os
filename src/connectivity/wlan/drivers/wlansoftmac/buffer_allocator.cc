@@ -4,7 +4,6 @@
 
 #include "buffer_allocator.h"
 
-#include <fuchsia/wlan/softmac/cpp/banjo.h>
 #include <zircon/assert.h>
 
 namespace wlan::drivers {

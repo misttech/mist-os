@@ -3,11 +3,9 @@
 // found in the LICENSE file.
 
 use {
-    crate::WlanSoftmacBandCapabilityExt as _,
-    anyhow::{format_err, Error},
-    banjo_fuchsia_wlan_common as banjo_common, fidl_fuchsia_wlan_common as fidl_common,
-    fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_mlme as fidl_mlme,
-    fidl_fuchsia_wlan_softmac as fidl_softmac,
+    crate::WlanSoftmacBandCapabilityExt as _, anyhow::format_err,
+    fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211,
+    fidl_fuchsia_wlan_mlme as fidl_mlme, fidl_fuchsia_wlan_softmac as fidl_softmac,
     std::fmt::Display,
 };
 
@@ -99,36 +97,6 @@ pub fn mlme_device_info_from_softmac(
             "hardware_capability",
         )?,
     })
-}
-
-pub fn ddk_channel_from_fidl(
-    fc: fidl_common::WlanChannel,
-) -> Result<banjo_common::WlanChannel, Error> {
-    let cbw = match fc.cbw {
-        fidl_common::ChannelBandwidth::Cbw20 => banjo_common::ChannelBandwidth::CBW20,
-        fidl_common::ChannelBandwidth::Cbw40 => banjo_common::ChannelBandwidth::CBW40,
-        fidl_common::ChannelBandwidth::Cbw40Below => banjo_common::ChannelBandwidth::CBW40BELOW,
-        fidl_common::ChannelBandwidth::Cbw80 => banjo_common::ChannelBandwidth::CBW80,
-        fidl_common::ChannelBandwidth::Cbw160 => banjo_common::ChannelBandwidth::CBW160,
-        fidl_common::ChannelBandwidth::Cbw80P80 => banjo_common::ChannelBandwidth::CBW80P80,
-        fidl_common::ChannelBandwidthUnknown!() => {
-            return Err(format_err!("Unknown channel bandwidth {:?}", fc.cbw));
-        }
-    };
-    Ok(banjo_common::WlanChannel { primary: fc.primary, cbw, secondary80: fc.secondary80 })
-}
-
-pub fn fidl_channel_from_ddk(bc: banjo_common::WlanChannel) -> fidl_common::WlanChannel {
-    let cbw = match bc.cbw {
-        banjo_common::ChannelBandwidth::CBW20 => fidl_common::ChannelBandwidth::Cbw20,
-        banjo_common::ChannelBandwidth::CBW40 => fidl_common::ChannelBandwidth::Cbw40,
-        banjo_common::ChannelBandwidth::CBW40BELOW => fidl_common::ChannelBandwidth::Cbw40Below,
-        banjo_common::ChannelBandwidth::CBW80 => fidl_common::ChannelBandwidth::Cbw80,
-        banjo_common::ChannelBandwidth::CBW160 => fidl_common::ChannelBandwidth::Cbw160,
-        banjo_common::ChannelBandwidth::CBW80P80 => fidl_common::ChannelBandwidth::Cbw80P80,
-        _ => unreachable!(),
-    };
-    fidl_common::WlanChannel { primary: bc.primary, cbw, secondary80: bc.secondary80 }
 }
 
 pub fn get_rssi_dbm(rx_info: fidl_softmac::WlanRxInfo) -> Option<i8> {

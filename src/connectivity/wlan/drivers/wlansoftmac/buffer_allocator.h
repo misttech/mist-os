@@ -40,17 +40,13 @@ class FinalizedBuffer {
   FinalizedBuffer(const FinalizedBuffer&) noexcept = delete;
   FinalizedBuffer& operator=(const FinalizedBuffer&) noexcept = delete;
 
-  const uint8_t* data() const { return buffer_->data(); }
-  size_t written() const { return written_; }
-
-  static FinalizedBuffer FromRaw(void* raw, size_t written) {
-    return FinalizedBuffer(static_cast<Buffer*>(raw), written);
-  }
-
- private:
   FinalizedBuffer(Buffer* buffer, size_t written)
       : buffer_(std::unique_ptr<Buffer>(buffer)), written_(written) {}
 
+  const uint8_t* data() const { return buffer_->data(); }
+  size_t written() const { return written_; }
+
+ private:
   std::unique_ptr<Buffer> buffer_;
   size_t written_;
 };

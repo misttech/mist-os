@@ -16,7 +16,6 @@ style = "type"
 sys_includes = [
     "zircon/types.h",
     "lib/trace/event.h",
-    "fuchsia/wlan/softmac/c/banjo.h",
 ]
 
 [parse]
@@ -25,13 +24,7 @@ include = ["wlan_mlme", "wlan_span", "wlansoftmac_rust"]
 
 [export]
 exclude = [
-    # Banjo types.
-    "WlanRxInfo",
-    "WlanTxInfo",
-    "WlanTxPacket",
-    "WlanTxResult",
-
-    # Unused types.
+    # Unused types
     "LinkStatus",
 
     # Voided types.
@@ -39,13 +32,6 @@ exclude = [
 ]
 
 [export.rename]
-# fuchsia.wlan.softmac Banjo types
-"WlanRxPacket" = "wlan_rx_packet_t"
-"WlanRxInfo" = "wlan_rx_info_t"
-"WlanTxPacket" = "wlan_tx_packet_t"
-"WlanTxInfo" = "wlan_tx_info_t"
-"WlanTxResult" = "wlan_tx_result_t"
-
 # wlansoftmac-rust types
 "WlanSoftmacHandle" = "wlansoftmac_handle_t"
 
@@ -55,6 +41,7 @@ exclude = [
 "CDeviceInterface" = "rust_device_interface_t"
 "CFrameProcessor" = "frame_processor_t"
 "CFrameProcessorOps" = "frame_processor_ops_t"
+"CFrameSender" = "frame_sender_t"
 
 # wlan-span types
 "CSpan" = "wlan_span_t"

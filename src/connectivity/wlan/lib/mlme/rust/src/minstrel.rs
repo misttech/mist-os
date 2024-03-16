@@ -5,7 +5,6 @@
 use {
     crate::common::mac::WlanGi,
     crate::probe_sequence::{ProbeEntry, ProbeSequence},
-    banjo_fuchsia_wlan_common as banjo_common, banjo_fuchsia_wlan_softmac as banjo_wlan_softmac,
     fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_minstrel as fidl_minstrel,
     fidl_fuchsia_wlan_softmac as fidl_softmac, fuchsia_zircon as zx,
     ieee80211::{MacAddr, MacAddrBytes},
@@ -24,7 +23,7 @@ use {
 };
 
 // TODO(https://fxbug.dev/42103418): Enable CBW40 support once its information is available from AssocCtx.
-const ASSOC_CHAN_WIDTH: banjo_common::ChannelBandwidth = banjo_common::ChannelBandwidth::CBW20;
+const ASSOC_CHAN_WIDTH: fidl_common::ChannelBandwidth = fidl_common::ChannelBandwidth::Cbw20;
 
 const MCS_MASK_0_31: u128 = 0xFFFFFFFF;
 const MINSTREL_FRAME_LENGTH: u32 = 1400; // bytes
@@ -220,7 +219,7 @@ impl Peer {
         if sgi_20 {
             max_size += HT_NUM_MCS;
         }
-        if ASSOC_CHAN_WIDTH == banjo_common::ChannelBandwidth::CBW40 {
+        if ASSOC_CHAN_WIDTH == fidl_common::ChannelBandwidth::Cbw40 {
             max_size += HT_NUM_MCS;
             if sgi_40 {
                 max_size += HT_NUM_MCS;
@@ -231,26 +230,26 @@ impl Peer {
         self.tx_stats_map.reserve(max_size as usize);
         let mcs_set = ht_cap.mcs_set;
         self.add_supported_ht(
-            banjo_common::ChannelBandwidth::CBW20,
+            fidl_common::ChannelBandwidth::Cbw20,
             WlanGi::G_800NS,
             mcs_set.rx_mcs(),
         );
         if sgi_20 {
             self.add_supported_ht(
-                banjo_common::ChannelBandwidth::CBW20,
+                fidl_common::ChannelBandwidth::Cbw20,
                 WlanGi::G_400NS,
                 mcs_set.rx_mcs(),
             );
         }
-        if ASSOC_CHAN_WIDTH == banjo_common::ChannelBandwidth::CBW40 {
+        if ASSOC_CHAN_WIDTH == fidl_common::ChannelBandwidth::Cbw40 {
             self.add_supported_ht(
-                banjo_common::ChannelBandwidth::CBW40,
+                fidl_common::ChannelBandwidth::Cbw40,
                 WlanGi::G_800NS,
                 mcs_set.rx_mcs(),
             );
             if sgi_40 {
                 self.add_supported_ht(
-                    banjo_common::ChannelBandwidth::CBW40,
+                    fidl_common::ChannelBandwidth::Cbw40,
                     WlanGi::G_400NS,
                     mcs_set.rx_mcs(),
                 );
@@ -264,7 +263,7 @@ impl Peer {
     // In reality, devices implement MCS 0-31, sometimes 32, almost never beyond 32.
     fn add_supported_ht(
         &mut self,
-        channel_bandwidth: banjo_common::ChannelBandwidth,
+        channel_bandwidth: fidl_common::ChannelBandwidth,
         gi: WlanGi,
         mcs_set: RxMcsBitmask,
     ) {
@@ -272,7 +271,7 @@ impl Peer {
         for mcs_idx in 0..HT_NUM_MCS {
             if mcs_set.support(mcs_idx) {
                 let tx_vector =
-                    TxVector::new(banjo_common::WlanPhyType::HT, gi, channel_bandwidth, mcs_idx)
+                    TxVector::new(fidl_common::WlanPhyType::Ht, gi, channel_bandwidth, mcs_idx)
                         .expect("Should be a valid TxVector");
                 let tx_vector_idx = tx_vector.to_idx();
                 let perfect_tx_time = tx_time_ht(channel_bandwidth, gi, mcs_idx);
@@ -300,7 +299,7 @@ impl Peer {
                         None
                     }
                 }?;
-                if tx_vector.phy() != banjo_common::WlanPhyType::ERP {
+                if tx_vector.phy() != fidl_common::WlanPhyType::Erp {
                     return None;
                 }
                 let tx_vector_idx = tx_vector.to_idx();
@@ -568,14 +567,14 @@ impl<T: TimerManager> MinstrelRateSelector<T> {
         &mut self,
         frame_control: &FrameControl,
         peer_addr: &MacAddr,
-        flags: u32,
+        flags: fidl_softmac::WlanTxInfoFlags,
     ) -> Option<TxVecIdx> {
         match self.peer_map.get_mut(peer_addr) {
             None => TxVecIdx::new(ERP_START_IDX + ERP_NUM_TX_VECTOR as u16 - 1),
             Some(peer) => {
                 if frame_control.is_data() {
                     let needs_reliability =
-                        (flags & banjo_wlan_softmac::WlanTxInfoFlags::FAVOR_RELIABILITY.0) != 0;
+                        flags.contains(fidl_softmac::WlanTxInfoFlags::FAVOR_RELIABILITY);
                     peer.get_tx_vector_idx(needs_reliability, &self.probe_sequence)
                 } else {
                     peer.best_erp_for_reliability
@@ -619,7 +618,7 @@ fn tx_vec_idx_opt_to_u16(tx_vec_idx: &Option<TxVecIdx>) -> u16 {
 }
 
 fn tx_time_ht(
-    channel_bandwidth: banjo_common::ChannelBandwidth,
+    channel_bandwidth: fidl_common::ChannelBandwidth,
     gi: WlanGi,
     relative_mcs_idx: u8,
 ) -> Duration {
@@ -637,7 +636,7 @@ fn header_tx_time_ht() -> Duration {
 // 64-QAM, 3/4 7: 64-QAM, 5/6 8: 256-QAM, 3/4 (since VHT) 9: 256-QAM, 5/6 (since
 // VHT)
 fn payload_tx_time_ht(
-    channel_bandwidth: banjo_common::ChannelBandwidth,
+    channel_bandwidth: fidl_common::ChannelBandwidth,
     gi: WlanGi,
     mcs_idx: u8,
 ) -> Duration {
@@ -654,7 +653,7 @@ fn payload_tx_time_ht(
 
     let nss = 1 + mcs_idx / HT_NUM_UNIQUE_MCS;
     let relative_mcs_idx = mcs_idx % HT_NUM_UNIQUE_MCS;
-    let bits_per_symbol = if channel_bandwidth == banjo_common::ChannelBandwidth::CBW40 {
+    let bits_per_symbol = if channel_bandwidth == fidl_common::ChannelBandwidth::Cbw40 {
         BITS_PER_SYMBOL_LIST[relative_mcs_idx as usize] * DATA_SUB_CARRIERS_40
             / DATA_SUB_CARRIERS_20
     } else {
@@ -1023,7 +1022,7 @@ mod tests {
             minstrel.get_fidl_peer_stats(&TEST_MAC_ADDR).expect("Failed to get peer stats").max_tp;
         let mut fc = FrameControl(0);
         fc.set_frame_type(FrameType::DATA);
-        let flags = 0;
+        let flags = fidl_softmac::WlanTxInfoFlags::empty();
 
         for i in 0..(PROBE_INTERVAL as usize * expected_probes.len()) {
             let tx_vec_idx = minstrel.get_tx_vector_idx(&fc, &TEST_MAC_ADDR, flags);
@@ -1142,7 +1141,7 @@ mod tests {
 
     #[track_caller]
     fn assert_data_rate(
-        channel_bandwidth: banjo_common::ChannelBandwidth,
+        channel_bandwidth: fidl_common::ChannelBandwidth,
         gi: WlanGi,
         relative_mcs_idx: u8,
         expected_mbit_per_second: f64,
@@ -1163,22 +1162,22 @@ mod tests {
     #[test]
     fn tx_time_ht_approx_values_cbw20() {
         // IEEE 802.11-2016 Tables 19-27 through 19-30 list data rates for CBW20. We test a sample here.
-        assert_data_rate(banjo_common::ChannelBandwidth::CBW20, WlanGi::G_800NS, 0, 6.5);
-        assert_data_rate(banjo_common::ChannelBandwidth::CBW20, WlanGi::G_400NS, 0, 7.2);
-        assert_data_rate(banjo_common::ChannelBandwidth::CBW20, WlanGi::G_800NS, 8, 13.0);
-        assert_data_rate(banjo_common::ChannelBandwidth::CBW20, WlanGi::G_400NS, 8, 14.4);
-        assert_data_rate(banjo_common::ChannelBandwidth::CBW20, WlanGi::G_800NS, 31, 260.0);
-        assert_data_rate(banjo_common::ChannelBandwidth::CBW20, WlanGi::G_400NS, 31, 288.9);
+        assert_data_rate(fidl_common::ChannelBandwidth::Cbw20, WlanGi::G_800NS, 0, 6.5);
+        assert_data_rate(fidl_common::ChannelBandwidth::Cbw20, WlanGi::G_400NS, 0, 7.2);
+        assert_data_rate(fidl_common::ChannelBandwidth::Cbw20, WlanGi::G_800NS, 8, 13.0);
+        assert_data_rate(fidl_common::ChannelBandwidth::Cbw20, WlanGi::G_400NS, 8, 14.4);
+        assert_data_rate(fidl_common::ChannelBandwidth::Cbw20, WlanGi::G_800NS, 31, 260.0);
+        assert_data_rate(fidl_common::ChannelBandwidth::Cbw20, WlanGi::G_400NS, 31, 288.9);
     }
 
     #[test]
     fn tx_time_ht_approx_values_cbw40() {
         // IEEE 802.11-2016 Tables 19-32 through 19-34 list data rates for CBW40. We test a sample here.
-        assert_data_rate(banjo_common::ChannelBandwidth::CBW40, WlanGi::G_800NS, 0, 13.5);
-        assert_data_rate(banjo_common::ChannelBandwidth::CBW40, WlanGi::G_400NS, 0, 15.0);
-        assert_data_rate(banjo_common::ChannelBandwidth::CBW40, WlanGi::G_800NS, 8, 27.0);
-        assert_data_rate(banjo_common::ChannelBandwidth::CBW40, WlanGi::G_400NS, 8, 30.0);
-        assert_data_rate(banjo_common::ChannelBandwidth::CBW40, WlanGi::G_800NS, 31, 540.0);
-        assert_data_rate(banjo_common::ChannelBandwidth::CBW40, WlanGi::G_400NS, 31, 600.0);
+        assert_data_rate(fidl_common::ChannelBandwidth::Cbw40, WlanGi::G_800NS, 0, 13.5);
+        assert_data_rate(fidl_common::ChannelBandwidth::Cbw40, WlanGi::G_400NS, 0, 15.0);
+        assert_data_rate(fidl_common::ChannelBandwidth::Cbw40, WlanGi::G_800NS, 8, 27.0);
+        assert_data_rate(fidl_common::ChannelBandwidth::Cbw40, WlanGi::G_400NS, 8, 30.0);
+        assert_data_rate(fidl_common::ChannelBandwidth::Cbw40, WlanGi::G_800NS, 31, 540.0);
+        assert_data_rate(fidl_common::ChannelBandwidth::Cbw40, WlanGi::G_400NS, 31, 600.0);
     }
 }

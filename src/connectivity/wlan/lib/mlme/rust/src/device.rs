@@ -7,7 +7,6 @@ use {
         buffer::FinalizedBuffer, common::mac::WlanGi, error::Error, DriverEvent, DriverEventSink,
     },
     anyhow::format_err,
-    banjo_fuchsia_wlan_common as banjo_common, banjo_fuchsia_wlan_softmac as banjo_wlan_softmac,
     fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_mlme as fidl_mlme,
     fidl_fuchsia_wlan_softmac as fidl_softmac, fuchsia_trace as trace, fuchsia_zircon as zx,
     futures::channel::mpsc,
@@ -179,6 +178,7 @@ impl From<fidl_mlme::ControlledPortState> for LinkStatus {
 pub struct Device {
     raw_device: DeviceInterface,
     frame_processor: Option<Pin<Box<FrameProcessor>>>,
+    frame_sender: FrameSender,
     wlan_softmac_bridge_proxy: fidl_softmac::WlanSoftmacBridgeSynchronousProxy,
     minstrel: Option<crate::MinstrelWrapper>,
     event_receiver: Option<mpsc::UnboundedReceiver<fidl_mlme::MlmeEvent>>,
@@ -189,11 +189,13 @@ impl Device {
     pub fn new(
         raw_device: DeviceInterface,
         wlan_softmac_bridge_proxy: fidl_softmac::WlanSoftmacBridgeSynchronousProxy,
+        frame_sender: FrameSender,
     ) -> Device {
         let (event_sink, event_receiver) = mpsc::unbounded();
         Device {
             raw_device,
             frame_processor: None,
+            frame_sender,
             wlan_softmac_bridge_proxy,
             minstrel: None,
             event_receiver: Some(event_receiver),
@@ -244,7 +246,7 @@ pub trait DeviceOps {
     fn send_wlan_frame(
         &mut self,
         buffer: FinalizedBuffer,
-        tx_flags: u32,
+        tx_flags: fidl_softmac::WlanTxInfoFlags,
         async_id: Option<TraceId>,
     ) -> Result<(), zx::Status>;
 
@@ -298,7 +300,7 @@ pub trait DeviceOps {
         &mut self,
         frame_control: &FrameControl,
         peer_addr: &MacAddr,
-        flags: u32,
+        flags: fidl_softmac::WlanTxInfoFlags,
     ) -> tx_vector::TxVecIdx {
         self.minstrel()
             .as_ref()
@@ -315,9 +317,9 @@ pub trait DeviceOps {
                 // TODO(https://fxbug.dev/42119762): Log stats about minstrel usage vs default tx vector.
                 let mcs_idx = if frame_control.is_data() { 7 } else { 3 };
                 tx_vector::TxVector::new(
-                    banjo_common::WlanPhyType::ERP,
+                    fidl_common::WlanPhyType::Erp,
                     WlanGi::G_800NS,
-                    banjo_common::ChannelBandwidth::CBW20,
+                    fidl_common::ChannelBandwidth::Cbw20,
                     mcs_idx,
                 )
                 .unwrap()
@@ -470,7 +472,7 @@ impl DeviceOps for Device {
     fn send_wlan_frame(
         &mut self,
         buffer: FinalizedBuffer,
-        mut tx_flags: u32,
+        mut tx_flags: fidl_softmac::WlanTxInfoFlags,
         async_id: Option<TraceId>,
     ) -> Result<(), zx::Status> {
         let async_id_provided = async_id.is_some();
@@ -492,7 +494,7 @@ impl DeviceOps for Device {
         let frame_control =
             zerocopy::Ref::<&[u8], FrameControl>::new(&buffer[0..=1]).unwrap().into_ref();
         if frame_control.protected() {
-            tx_flags |= banjo_wlan_softmac::WlanTxInfoFlags::PROTECTED.0;
+            tx_flags |= fidl_softmac::WlanTxInfoFlags::PROTECTED;
         }
         let peer_addr: MacAddr = {
             let mut peer_addr = [0u8; 6];
@@ -502,26 +504,25 @@ impl DeviceOps for Device {
         let tx_vector_idx = self.tx_vector_idx(frame_control, &peer_addr, tx_flags);
 
         let tx_info = wlan_common::tx_vector::TxVector::from_idx(tx_vector_idx)
-            .to_banjo_tx_info(tx_flags, self.minstrel.is_some());
-        // Safety: This call is safe because the returned `buffer` pointer is sent back
-        // to the C++ portion of wlansoftmac.
-        let (buffer, _free, written) = unsafe { buffer.release() };
-        zx::ok((self.raw_device.queue_tx)(
-            // Safety: This is safe because the original will not be used while the copy
-            // is still in scope.
-            unsafe { self.raw_device.device.clone().as_ptr() },
-            0,
-            buffer,
-            written,
-            tx_info,
-            async_id,
-        ))
-        .map_err(|s| {
-            if !async_id_provided {
-                wtrace::async_end_wlansoftmac_tx(async_id, s);
-            }
-            s
-        })
+            .to_fidl_tx_info(tx_flags, self.minstrel.is_some());
+        // Safety: This call to `FinalizedBuffer::release` is safe because the `packet_address` is
+        // being sent to the C++ portion of wlansoftmac. If there is a FIDL error sending
+        // `packet_address`, indicating it was not sent, then `free(packet_address)` will be called.
+        let (packet_address, _free, packet_size) = unsafe { buffer.release() };
+        self.frame_sender
+            .wlan_tx(&fidl_softmac::FrameSenderWlanTxRequest {
+                packet_address: Some(packet_address as u64),
+                packet_size: Some(packet_size as u64),
+                packet_info: Some(tx_info),
+                async_id: Some(async_id.into()),
+                ..Default::default()
+            })
+            .map_err(|s| {
+                if !async_id_provided {
+                    wtrace::async_end_wlansoftmac_tx(async_id, s);
+                }
+                s
+            })
     }
 
     fn set_ethernet_status(&mut self, status: LinkStatus) -> Result<(), zx::Status> {
@@ -895,6 +896,75 @@ pub struct CFrameProcessor {
     ctx: *const DriverEventSink,
 }
 
+#[repr(C)]
+pub struct CFrameSender {
+    ctx: *const c_void,
+    /// Sends a WLAN MAC frame to the C++ portion of wlansoftmac.
+    ///
+    /// # Safety
+    ///
+    /// Behavior is undefined unless `payload` contains a persisted `FrameSender.WlanTx` request
+    /// and `payload_len` is the length of the persisted byte array.
+    wlan_tx: unsafe extern "C" fn(
+        ctx: *const c_void,
+        payload: *const u8,
+        payload_len: usize,
+    ) -> zx::zx_status_t,
+}
+
+pub struct FrameSender {
+    ctx: SendPtr<*const c_void>,
+    /// Sends a WLAN MAC frame to the C++ portion of wlansoftmac.
+    ///
+    /// # Safety
+    ///
+    /// Behavior is undefined unless `payload` contains a persisted `FrameSender.WlanTx` request
+    /// and `payload_len` is the length of the persisted byte array.
+    wlan_tx: unsafe extern "C" fn(
+        ctx: *const c_void,
+        payload: *const u8,
+        payload_len: usize,
+    ) -> zx::zx_status_t,
+}
+
+impl From<CFrameSender> for FrameSender {
+    fn from(frame_sender: CFrameSender) -> Self {
+        Self {
+            // Safety: This is safe because `frame_sender.ctx` will never become
+            // any other type than `*const c_void`.
+            ctx: unsafe { SendPtr::from_always_const_void(frame_sender.ctx) },
+            wlan_tx: frame_sender.wlan_tx,
+        }
+    }
+}
+
+impl FrameSender {
+    fn wlan_tx(&self, request: &fidl_softmac::FrameSenderWlanTxRequest) -> Result<(), zx::Status> {
+        let payload = fidl::persist(request);
+        match payload {
+            Err(e) => {
+                error!("Failed to persist FrameSender.WlanTxRequest: {}", e);
+                Err(zx::Status::INTERNAL)
+            }
+            Ok(payload) => {
+                // Safety: The `self.wlan_tx` call is safe because the payload is a persisted
+                // `FrameSender.EthernetRx` request.
+                //
+                // Safety: The `SendPtr::clone()` call is safe because the copy of `self.ctx` is
+                // temporary and the original cannot be used until `self.wlan_tx` returns.
+                zx::Status::from_raw(unsafe {
+                    (self.wlan_tx)(
+                        self.ctx.clone().as_ptr(),
+                        payload.as_slice().as_ptr(),
+                        payload.len(),
+                    )
+                })
+                .into()
+            }
+        }
+    }
+}
+
 /// Type that represents the FFI from the bridged wlansoftmac to wlansoftmac itself.
 ///
 /// Each of the functions in this FFI are safe to call from any thread but not
@@ -922,19 +992,6 @@ pub struct CDeviceInterface {
     ) -> i32,
     /// Request to deliver an Ethernet II frame to Fuchsia's Netstack.
     deliver_eth_frame: extern "C" fn(device: *const c_void, data: *const u8, len: usize) -> i32,
-    /// Deliver a WLAN frame directly through the firmware.
-    ///
-    /// The `buffer` and `written` arguments must be from a call to `FinalizedBuffer::release`. The
-    /// C++ portion of wlansoftmac will reconstruct an instance of the `FinalizedBuffer` class
-    /// defined in buffer_allocator.h.
-    queue_tx: extern "C" fn(
-        device: *const c_void,
-        options: u32,
-        buffer: *mut c_void,
-        written: usize,
-        tx_info: banjo_wlan_softmac::WlanTxInfo,
-        async_id: TraceId,
-    ) -> i32,
     /// Reports the current status to the ethernet driver.
     set_ethernet_status: extern "C" fn(device: *const c_void, status: u32) -> i32,
 }
@@ -967,15 +1024,6 @@ pub struct DeviceInterface {
     ) -> i32,
     /// Request to deliver an Ethernet II frame to Fuchsia's Netstack.
     deliver_eth_frame: extern "C" fn(device: *const c_void, data: *const u8, len: usize) -> i32,
-    /// Deliver a WLAN frame directly through the firmware.
-    queue_tx: extern "C" fn(
-        device: *const c_void,
-        options: u32,
-        buffer: *mut c_void,
-        written: usize,
-        tx_info: banjo_wlan_softmac::WlanTxInfo,
-        async_id: TraceId,
-    ) -> i32,
     /// Reports the current status to the ethernet driver.
     set_ethernet_status: extern "C" fn(device: *const c_void, status: u32) -> i32,
 }
@@ -988,7 +1036,6 @@ impl From<CDeviceInterface> for DeviceInterface {
             device: unsafe { SendPtr::from_always_const_void(device_interface.device) },
             start: device_interface.start,
             deliver_eth_frame: device_interface.deliver_eth_frame,
-            queue_tx: device_interface.queue_tx,
             set_ethernet_status: device_interface.set_ethernet_status,
         }
     }
@@ -1469,7 +1516,7 @@ pub mod test_utils {
         fn send_wlan_frame(
             &mut self,
             buffer: FinalizedBuffer,
-            _tx_flags: u32,
+            _tx_flags: fidl_softmac::WlanTxInfoFlags,
             _async_id: Option<TraceId>,
         ) -> Result<(), zx::Status> {
             let mut state = self.state.lock();

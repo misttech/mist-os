@@ -6,8 +6,7 @@ use {
     crate::ie::SupportedRate,
     crate::mac::WlanGi,
     anyhow::{bail, Error},
-    banjo_fuchsia_wlan_common as banjo_common, banjo_fuchsia_wlan_softmac as hw_wlan_softmac,
-    fidl_fuchsia_wlan_common as fidl_common,
+    fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_softmac as fidl_softmac,
 };
 
 pub const HT_NUM_MCS: u8 = 32; // Only support MCS 0-31
@@ -51,7 +50,7 @@ pub const MAX_VALID_IDX: u16 = DSSS_CCK_START_IDX + DSSS_CCK_NUM_TX_VECTOR as u1
 /// * VHT: IEEE 802.11-2016 Table 21-30
 ///
 /// We extend the definition of MCS index beyond IEEE 802.11-2016 as follows:
-/// * For ERP/ERP-OFDM (WlanPhyType::ERP):
+/// * For ERP/ERP-OFDM (WlanPhyType::Erp):
 ///     * 0: BPSK,   1/2 -> Data rate  6 Mbps
 ///     * 1: BPSK,   3/4 -> Data rate  9 Mbps
 ///     * 2: QPSK,   1/2 -> Data rate 12 Mbps
@@ -60,15 +59,15 @@ pub const MAX_VALID_IDX: u16 = DSSS_CCK_START_IDX + DSSS_CCK_NUM_TX_VECTOR as u1
 ///     * 5: 16-QAM, 3/4 -> Data rate 36 Mbps
 ///     * 6: 64-QAM, 2/3 -> Data rate 48 Mbps
 ///     * 7: 64-QAM, 3/4 -> Data rate 54 Mbps
-/// * For DSSS, HR/DSSS, and ERP-DSSS/CCK (WlanPhyType::DSSS and WlanPhyType::CCK):
+/// * For DSSS, HR/DSSS, and ERP-DSSS/CCK (WlanPhyType::Dsss and WlanPhyType::Cck):
 ///     * 0:  2 -> 1   Mbps DSSS
 ///     * 1:  4 -> 2   Mbps DSSS
 ///     * 2: 11 -> 5.5 Mbps CCK
 ///     * 3: 22 -> 11  Mbps CCK
 pub struct TxVector {
-    phy: banjo_common::WlanPhyType,
+    phy: fidl_common::WlanPhyType,
     gi: WlanGi,
-    cbw: banjo_common::ChannelBandwidth,
+    cbw: fidl_common::ChannelBandwidth,
     nss: u8, // Number of spatial streams for VHT and beyond.
     // For HT,  see IEEE 802.11-2016 Table 19-27
     // For VHT, see IEEE 802.11-2016 Table 21-30
@@ -78,33 +77,33 @@ pub struct TxVector {
 
 impl TxVector {
     pub fn new(
-        phy: banjo_common::WlanPhyType,
+        phy: fidl_common::WlanPhyType,
         gi: WlanGi,
-        cbw: banjo_common::ChannelBandwidth,
+        cbw: fidl_common::ChannelBandwidth,
         mcs_idx: u8,
     ) -> Result<Self, Error> {
         let supported_mcs = match phy {
-            banjo_common::WlanPhyType::DSSS => mcs_idx == 0 || mcs_idx == 1,
-            banjo_common::WlanPhyType::HR => mcs_idx == 2 || mcs_idx == 3,
-            banjo_common::WlanPhyType::HT => {
+            fidl_common::WlanPhyType::Dsss => mcs_idx == 0 || mcs_idx == 1,
+            fidl_common::WlanPhyType::Hr => mcs_idx == 2 || mcs_idx == 3,
+            fidl_common::WlanPhyType::Ht => {
                 match gi {
                     WlanGi::G_800NS | WlanGi::G_400NS => (),
                     other => bail!("Unsupported GI for HT PHY: {:?}", other),
                 }
                 match cbw {
-                    banjo_common::ChannelBandwidth::CBW20
-                    | banjo_common::ChannelBandwidth::CBW40
-                    | banjo_common::ChannelBandwidth::CBW40BELOW => (),
+                    fidl_common::ChannelBandwidth::Cbw20
+                    | fidl_common::ChannelBandwidth::Cbw40
+                    | fidl_common::ChannelBandwidth::Cbw40Below => (),
                     other => bail!("Unsupported CBW for HT PHY: {:?}", other),
                 }
                 mcs_idx < HT_NUM_MCS
             }
-            banjo_common::WlanPhyType::ERP => mcs_idx < ERP_NUM_TX_VECTOR,
+            fidl_common::WlanPhyType::Erp => mcs_idx < ERP_NUM_TX_VECTOR,
             other => bail!("Unsupported phy type: {:?}", other),
         };
         if supported_mcs {
             let nss = match phy {
-                banjo_common::WlanPhyType::HT => 1 + mcs_idx / HT_NUM_UNIQUE_MCS,
+                fidl_common::WlanPhyType::Ht => 1 + mcs_idx / HT_NUM_UNIQUE_MCS,
                 // TODO(https://fxbug.dev/42094755): Support VHT NSS
                 _ => 1,
             };
@@ -114,29 +113,29 @@ impl TxVector {
         }
     }
 
-    pub fn phy(&self) -> banjo_common::WlanPhyType {
+    pub fn phy(&self) -> fidl_common::WlanPhyType {
         self.phy
     }
 
     pub fn from_supported_rate(erp_rate: &SupportedRate) -> Result<Self, Error> {
         let (phy, mcs_idx) = match erp_rate.rate() {
-            2 => (banjo_common::WlanPhyType::DSSS, 0),
-            4 => (banjo_common::WlanPhyType::DSSS, 1),
-            11 => (banjo_common::WlanPhyType::HR, 2),
-            22 => (banjo_common::WlanPhyType::HR, 3),
-            12 => (banjo_common::WlanPhyType::ERP, 0),
-            18 => (banjo_common::WlanPhyType::ERP, 1),
-            24 => (banjo_common::WlanPhyType::ERP, 2),
-            36 => (banjo_common::WlanPhyType::ERP, 3),
-            48 => (banjo_common::WlanPhyType::ERP, 4),
-            72 => (banjo_common::WlanPhyType::ERP, 5),
-            96 => (banjo_common::WlanPhyType::ERP, 6),
-            108 => (banjo_common::WlanPhyType::ERP, 7),
+            2 => (fidl_common::WlanPhyType::Dsss, 0),
+            4 => (fidl_common::WlanPhyType::Dsss, 1),
+            11 => (fidl_common::WlanPhyType::Hr, 2),
+            22 => (fidl_common::WlanPhyType::Hr, 3),
+            12 => (fidl_common::WlanPhyType::Erp, 0),
+            18 => (fidl_common::WlanPhyType::Erp, 1),
+            24 => (fidl_common::WlanPhyType::Erp, 2),
+            36 => (fidl_common::WlanPhyType::Erp, 3),
+            48 => (fidl_common::WlanPhyType::Erp, 4),
+            72 => (fidl_common::WlanPhyType::Erp, 5),
+            96 => (fidl_common::WlanPhyType::Erp, 6),
+            108 => (fidl_common::WlanPhyType::Erp, 7),
             other_rate => {
                 bail!("Invalid rate {} * 0.5 Mbps for 802.11a/b/g.", other_rate);
             }
         };
-        Self::new(phy, WlanGi::G_800NS, banjo_common::ChannelBandwidth::CBW20, mcs_idx)
+        Self::new(phy, WlanGi::G_800NS, fidl_common::ChannelBandwidth::Cbw20, mcs_idx)
     }
 
     // We guarantee safety of the unwraps in the following two functions by testing all TxVecIdx
@@ -145,30 +144,30 @@ impl TxVector {
     pub fn from_idx(idx: TxVecIdx) -> Self {
         let phy = idx.to_phy();
         match phy {
-            banjo_common::WlanPhyType::HT => {
+            fidl_common::WlanPhyType::Ht => {
                 let group_idx = (*idx - HT_START_IDX) / HT_NUM_MCS as u16;
                 let gi = match (group_idx / HT_NUM_CBW as u16) % HT_NUM_GI as u16 {
                     1 => WlanGi::G_400NS,
                     _ => WlanGi::G_800NS,
                 };
                 let cbw = match group_idx % HT_NUM_CBW as u16 {
-                    0 => banjo_common::ChannelBandwidth::CBW20,
-                    _ => banjo_common::ChannelBandwidth::CBW40,
+                    0 => fidl_common::ChannelBandwidth::Cbw20,
+                    _ => fidl_common::ChannelBandwidth::Cbw40,
                 };
                 let mcs_idx = ((*idx - HT_START_IDX) % HT_NUM_MCS as u16) as u8;
                 Self::new(phy, gi, cbw, mcs_idx).unwrap()
             }
-            banjo_common::WlanPhyType::ERP => Self::new(
+            fidl_common::WlanPhyType::Erp => Self::new(
                 phy,
                 WlanGi::G_800NS,
-                banjo_common::ChannelBandwidth::CBW20,
+                fidl_common::ChannelBandwidth::Cbw20,
                 (*idx - ERP_START_IDX) as u8,
             )
             .unwrap(),
-            banjo_common::WlanPhyType::DSSS | banjo_common::WlanPhyType::HR => Self::new(
+            fidl_common::WlanPhyType::Dsss | fidl_common::WlanPhyType::Hr => Self::new(
                 phy,
                 WlanGi::G_800NS,
-                banjo_common::ChannelBandwidth::CBW20,
+                fidl_common::ChannelBandwidth::Cbw20,
                 (*idx - DSSS_CCK_START_IDX) as u8,
             )
             .unwrap(),
@@ -178,40 +177,44 @@ impl TxVector {
 
     pub fn to_idx(&self) -> TxVecIdx {
         match self.phy {
-            banjo_common::WlanPhyType::HT => {
+            fidl_common::WlanPhyType::Ht => {
                 let group_idx = match self.gi {
                     WlanGi::G_400NS => HT_NUM_CBW as u16,
                     _ => 0,
                 } + match self.cbw {
-                    banjo_common::ChannelBandwidth::CBW40
-                    | banjo_common::ChannelBandwidth::CBW40BELOW => 1,
+                    fidl_common::ChannelBandwidth::Cbw40
+                    | fidl_common::ChannelBandwidth::Cbw40Below => 1,
                     _ => 0,
                 };
                 TxVecIdx::new(HT_START_IDX + group_idx * HT_NUM_MCS as u16 + self.mcs_idx as u16)
                     .unwrap()
             }
-            banjo_common::WlanPhyType::ERP => {
+            fidl_common::WlanPhyType::Erp => {
                 TxVecIdx::new(ERP_START_IDX + self.mcs_idx as u16).unwrap()
             }
-            banjo_common::WlanPhyType::HR | banjo_common::WlanPhyType::DSSS => {
+            fidl_common::WlanPhyType::Hr | fidl_common::WlanPhyType::Dsss => {
                 TxVecIdx::new(DSSS_CCK_START_IDX + self.mcs_idx as u16).unwrap()
             }
             _ => unreachable!(),
         }
     }
 
-    pub fn to_banjo_tx_info(
+    pub fn to_fidl_tx_info(
         &self,
-        tx_flags: u32,
+        tx_flags: fidl_softmac::WlanTxInfoFlags,
         minstrel_enabled: bool,
-    ) -> hw_wlan_softmac::WlanTxInfo {
-        let valid_fields = hw_wlan_softmac::WlanTxInfoValid::CHANNEL_BANDWIDTH.0
-            | hw_wlan_softmac::WlanTxInfoValid::PHY.0
-            | hw_wlan_softmac::WlanTxInfoValid::MCS.0
-            | if minstrel_enabled { hw_wlan_softmac::WlanTxInfoValid::TX_VECTOR_IDX.0 } else { 0 };
-        hw_wlan_softmac::WlanTxInfo {
-            tx_flags,
-            valid_fields: valid_fields as u32,
+    ) -> fidl_softmac::WlanTxInfo {
+        fidl_softmac::WlanTxInfo {
+            tx_flags: tx_flags.bits(),
+            valid_fields: (fidl_softmac::WlanTxInfoValid::CHANNEL_BANDWIDTH
+                | fidl_softmac::WlanTxInfoValid::PHY
+                | fidl_softmac::WlanTxInfoValid::MCS
+                | if minstrel_enabled {
+                    fidl_softmac::WlanTxInfoValid::TX_VECTOR_IDX
+                } else {
+                    fidl_softmac::WlanTxInfoValid::empty()
+                })
+            .bits(),
             tx_vector_idx: self.to_idx().0,
             phy: self.phy,
             channel_bandwidth: self.cbw,
@@ -249,13 +252,13 @@ impl TxVecIdx {
         }
     }
 
-    pub fn to_phy(&self) -> banjo_common::WlanPhyType {
+    pub fn to_phy(&self) -> fidl_common::WlanPhyType {
         match self.0 {
-            idx if idx < HT_START_IDX + HT_NUM_TX_VECTOR as u16 => banjo_common::WlanPhyType::HT,
-            idx if idx < ERP_START_IDX + ERP_NUM_TX_VECTOR as u16 => banjo_common::WlanPhyType::ERP,
-            idx if idx < DSSS_CCK_START_IDX + 2 => banjo_common::WlanPhyType::DSSS,
+            idx if idx < HT_START_IDX + HT_NUM_TX_VECTOR as u16 => fidl_common::WlanPhyType::Ht,
+            idx if idx < ERP_START_IDX + ERP_NUM_TX_VECTOR as u16 => fidl_common::WlanPhyType::Erp,
+            idx if idx < DSSS_CCK_START_IDX + 2 => fidl_common::WlanPhyType::Dsss,
             idx if idx < DSSS_CCK_START_IDX + DSSS_CCK_NUM_TX_VECTOR as u16 => {
-                banjo_common::WlanPhyType::HR
+                fidl_common::WlanPhyType::Hr
             }
             // This panic is unreachable for any TxVecIdx constructed with TxVecIdx::new.
             // Verified by exhaustive test cases.
@@ -282,30 +285,6 @@ impl std::fmt::Display for TxVecIdx {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn wlan_tx_info_valid_flags() {
-        let mut valid_flags = 0;
-
-        assert_ne!(0, hw_wlan_softmac::WlanTxInfoValid::DATA_RATE.0);
-        assert_eq!(0, valid_flags & hw_wlan_softmac::WlanTxInfoValid::DATA_RATE.0);
-        valid_flags |= hw_wlan_softmac::WlanTxInfoValid::DATA_RATE.0;
-
-        assert_ne!(0, hw_wlan_softmac::WlanTxInfoValid::TX_VECTOR_IDX.0);
-        assert_eq!(0, valid_flags & hw_wlan_softmac::WlanTxInfoValid::TX_VECTOR_IDX.0);
-        valid_flags |= hw_wlan_softmac::WlanTxInfoValid::TX_VECTOR_IDX.0;
-
-        assert_ne!(0, hw_wlan_softmac::WlanTxInfoValid::PHY.0);
-        assert_eq!(0, valid_flags & hw_wlan_softmac::WlanTxInfoValid::PHY.0);
-        valid_flags |= hw_wlan_softmac::WlanTxInfoValid::PHY.0;
-
-        assert_ne!(0, hw_wlan_softmac::WlanTxInfoValid::CHANNEL_BANDWIDTH.0);
-        assert_eq!(0, valid_flags & hw_wlan_softmac::WlanTxInfoValid::CHANNEL_BANDWIDTH.0);
-        valid_flags |= hw_wlan_softmac::WlanTxInfoValid::CHANNEL_BANDWIDTH.0;
-
-        assert_ne!(0, hw_wlan_softmac::WlanTxInfoValid::MCS.0);
-        assert_eq!(0, valid_flags & hw_wlan_softmac::WlanTxInfoValid::MCS.0);
-    }
 
     #[test]
     fn valid_tx_vector_idxs() {
@@ -336,13 +315,13 @@ mod tests {
         for idx in INVALID_TX_VECTOR_IDX + 1..=MAX_VALID_IDX {
             let idx = TxVecIdx::new(idx).expect("Could not make TxVecIdx from valid index");
             if idx.is_erp() {
-                assert_eq!(idx.to_phy(), banjo_common::WlanPhyType::ERP);
+                assert_eq!(idx.to_phy(), fidl_common::WlanPhyType::Erp);
             } else if idx.is_ht() {
-                assert_eq!(idx.to_phy(), banjo_common::WlanPhyType::HT);
+                assert_eq!(idx.to_phy(), fidl_common::WlanPhyType::Ht);
             } else {
                 assert!(
-                    idx.to_phy() == banjo_common::WlanPhyType::DSSS
-                        || idx.to_phy() == banjo_common::WlanPhyType::HR
+                    idx.to_phy() == fidl_common::WlanPhyType::Dsss
+                        || idx.to_phy() == fidl_common::WlanPhyType::Hr
                 );
             }
         }
@@ -363,9 +342,9 @@ mod tests {
             let idx = TxVecIdx::new(idx).expect("Could not make TxVecIdx from valid index");
             let tx_vector = TxVector::from_idx(idx);
             if idx.is_erp() {
-                assert_eq!(tx_vector.phy(), banjo_common::WlanPhyType::ERP);
+                assert_eq!(tx_vector.phy(), fidl_common::WlanPhyType::Erp);
             } else if idx.is_ht() {
-                assert_eq!(tx_vector.phy(), banjo_common::WlanPhyType::HT);
+                assert_eq!(tx_vector.phy(), fidl_common::WlanPhyType::Ht);
             }
         }
     }

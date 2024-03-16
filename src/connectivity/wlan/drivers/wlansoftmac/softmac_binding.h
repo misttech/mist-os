@@ -7,9 +7,6 @@
 
 #include <fidl/fuchsia.wlan.softmac/cpp/driver/wire.h>
 #include <fuchsia/hardware/ethernet/cpp/banjo.h>
-#include <fuchsia/wlan/common/c/banjo.h>
-#include <fuchsia/wlan/internal/c/banjo.h>
-#include <fuchsia/wlan/softmac/c/banjo.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
@@ -53,8 +50,6 @@ class SoftmacBinding : public DeviceInterface {
                     zx::channel* out_sme_channel) const final;
   zx_status_t DeliverEthernet(cpp20::span<const uint8_t> eth_frame) const final
       __TA_EXCLUDES(ethernet_proxy_lock_);
-  zx_status_t QueueTx(FinalizedBuffer buffer, wlan_tx_info_t tx_info,
-                      trace_async_id_t async_id) const final;
   zx_status_t SetEthernetStatus(uint32_t status) const final __TA_EXCLUDES(ethernet_proxy_lock_);
 
  private:

@@ -14,7 +14,7 @@ use {
     wlan_common::pointers::SendPtr,
     wlan_mlme::{
         buffer::CBufferProvider,
-        device::{completers::StopCompleter, CDeviceInterface, Device},
+        device::{completers::StopCompleter, CDeviceInterface, CFrameSender, Device},
     },
     wlansoftmac_rust::WlanSoftmacHandle,
 };
@@ -67,6 +67,7 @@ pub unsafe extern "C" fn start_and_run_bridged_wlansoftmac(
         wlan_softmac_handle: *mut WlanSoftmacHandle,
     ),
     device: CDeviceInterface,
+    frame_sender: CFrameSender,
     buffer_provider: CBufferProvider,
     wlan_softmac_bridge_client_handle: zx::sys::zx_handle_t,
 ) -> zx::sys::zx_status_t {
@@ -89,7 +90,7 @@ pub unsafe extern "C" fn start_and_run_bridged_wlansoftmac(
         let channel = fidl::Channel::from(handle);
         fidl_softmac::WlanSoftmacBridgeSynchronousProxy::new(channel)
     };
-    let device = Device::new(device.into(), wlan_softmac_bridge_proxy);
+    let device = Device::new(device.into(), wlan_softmac_bridge_proxy, frame_sender.into());
 
     // Safety: This is safe because `init_completer` will never be cast to any other type, i.e.,
     // its type will always be `*mut c_void`.

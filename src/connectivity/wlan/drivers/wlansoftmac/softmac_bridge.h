@@ -58,6 +58,7 @@ class SoftmacBridge : public fidl::WireServer<fuchsia_wlan_softmac::WlanSoftmacB
   void CancelScan(CancelScanRequestView request, CancelScanCompleter::Sync& completer) final;
   void UpdateWmmParameters(UpdateWmmParametersRequestView request,
                            UpdateWmmParametersCompleter::Sync& completer) final;
+  static zx_status_t WlanTx(const void* ctx, const uint8_t* payload, size_t payload_size);
 
  private:
   explicit SoftmacBridge(DeviceInterface* device_interface,
@@ -70,7 +71,7 @@ class SoftmacBridge : public fidl::WireServer<fuchsia_wlan_softmac::WlanSoftmacB
 
   template <typename FidlMethod>
   static fidl::WireResultUnwrapType<FidlMethod> FlattenAndLogError(
-      const std::string& method_name, fdf::WireUnownedResult<FidlMethod> result);
+      const std::string& method_name, fdf::WireUnownedResult<FidlMethod>& result);
 
   template <typename FidlMethod>
   using Dispatcher = std::function<fdf::WireUnownedResult<FidlMethod>(

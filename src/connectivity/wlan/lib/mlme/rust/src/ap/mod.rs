@@ -37,7 +37,7 @@ use remote_client::*;
 struct BufferedFrame {
     buffer: Buffer,
     written: usize,
-    tx_flags: u32,
+    tx_flags: fidl_softmac::WlanTxInfoFlags,
     async_id: trace::Id,
 }
 

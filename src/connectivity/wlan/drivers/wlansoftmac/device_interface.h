@@ -6,7 +6,6 @@
 #define SRC_CONNECTIVITY_WLAN_DRIVERS_WLANSOFTMAC_DEVICE_INTERFACE_H_
 
 #include <fidl/fuchsia.wlan.softmac/cpp/fidl.h>
-#include <fuchsia/wlan/common/c/banjo.h>
 #include <lib/ddk/device.h>
 #include <lib/fdf/cpp/dispatcher.h>
 #include <lib/trace/event.h>
@@ -37,8 +36,6 @@ class DeviceInterface {
                             zx::channel* out_sme_channel) const = 0;
 
   virtual zx_status_t DeliverEthernet(cpp20::span<const uint8_t> eth_frame) const = 0;
-  virtual zx_status_t QueueTx(FinalizedBuffer buffer, wlan_tx_info_t tx_info,
-                              trace_async_id_t async_id) const = 0;
 
   virtual zx_status_t SetEthernetStatus(uint32_t status) const = 0;
 };

@@ -10,9 +10,9 @@ use {
         disconnect::LocallyInitiated,
         error::Error,
     },
-    banjo_fuchsia_wlan_softmac as banjo_softmac, fidl_fuchsia_wlan_common as fidl_common,
-    fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_mlme as fidl_mlme,
-    fidl_fuchsia_wlan_softmac as fidl_softmac, fuchsia_trace as trace, fuchsia_zircon as zx,
+    fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211,
+    fidl_fuchsia_wlan_mlme as fidl_mlme, fidl_fuchsia_wlan_softmac as fidl_softmac,
+    fuchsia_trace as trace, fuchsia_zircon as zx,
     ieee80211::{MacAddr, MacAddrBytes, Ssid},
     std::collections::VecDeque,
     tracing::warn,
@@ -265,12 +265,13 @@ impl RemoteClient {
                 fidl_ieee80211::ReasonCode::ReasonInactivity.into(),
             )
             .map_err(ClientRejection::WlanSendError)?;
-        self.send_wlan_frame(ctx, buffer, written, 0, None).map_err(|s| {
-            ClientRejection::WlanSendError(Error::Status(
-                format!("error sending disassoc frame on BSS idle timeout"),
-                s,
-            ))
-        })?;
+        self.send_wlan_frame(ctx, buffer, written, fidl_softmac::WlanTxInfoFlags::empty(), None)
+            .map_err(|s| {
+                ClientRejection::WlanSendError(Error::Status(
+                    format!("error sending disassoc frame on BSS idle timeout"),
+                    s,
+                ))
+            })?;
         ctx.send_mlme_disassoc_ind(
             self.addr.clone(),
             fidl_ieee80211::ReasonCode::ReasonInactivity,
@@ -375,7 +376,7 @@ impl RemoteClient {
         )?;
         // TODO(https://fxbug.dev/42172646) - Added to help investigate hw-sim test. Remove later
         tracing::info!("Sending auth frame to driver: {} bytes", written);
-        self.send_wlan_frame(ctx, buffer, written, 0, None)
+        self.send_wlan_frame(ctx, buffer, written, fidl_softmac::WlanTxInfoFlags::empty(), None)
             .map_err(|s| Error::Status(format!("error sending auth frame"), s))
     }
 
@@ -397,7 +398,7 @@ impl RemoteClient {
         // MLME-DEAUTHENTICATE.confirm is redundant.
 
         let (buffer, written) = ctx.make_deauth_frame(self.addr.clone(), reason_code.into())?;
-        self.send_wlan_frame(ctx, buffer, written, 0, None)
+        self.send_wlan_frame(ctx, buffer, written, fidl_softmac::WlanTxInfoFlags::empty(), None)
             .map_err(|s| Error::Status(format!("error sending deauth frame"), s))
     }
 
@@ -509,7 +510,7 @@ impl RemoteClient {
                 },
             ),
         }?;
-        self.send_wlan_frame(ctx, buffer, written, 0, None)
+        self.send_wlan_frame(ctx, buffer, written, fidl_softmac::WlanTxInfoFlags::empty(), None)
             .map_err(|s| Error::Status(format!("error sending assoc frame"), s))
     }
 
@@ -532,7 +533,7 @@ impl RemoteClient {
 
         let (buffer, written) =
             ctx.make_disassoc_frame(self.addr.clone(), ReasonCode(reason_code))?;
-        self.send_wlan_frame(ctx, buffer, written, 0, None)
+        self.send_wlan_frame(ctx, buffer, written, fidl_softmac::WlanTxInfoFlags::empty(), None)
             .map_err(|s| Error::Status(format!("error sending disassoc frame"), s))
     }
 
@@ -573,7 +574,7 @@ impl RemoteClient {
             ctx,
             buffer,
             written,
-            banjo_softmac::WlanTxInfoFlags::FAVOR_RELIABILITY.0,
+            fidl_softmac::WlanTxInfoFlags::FAVOR_RELIABILITY,
             None,
         )
         .map_err(|s| Error::Status(format!("error sending eapol frame"), s))
@@ -645,12 +646,20 @@ impl RemoteClient {
                             fidl_ieee80211::StatusCode::UnsupportedAuthAlgorithm.into(),
                         )
                         .map_err(ClientRejection::WlanSendError)?;
-                    return self.send_wlan_frame(ctx, buffer, written, 0, None).map_err(|s| {
-                        ClientRejection::WlanSendError(Error::Status(
-                            format!("failed to send auth frame"),
-                            s,
-                        ))
-                    });
+                    return self
+                        .send_wlan_frame(
+                            ctx,
+                            buffer,
+                            written,
+                            fidl_softmac::WlanTxInfoFlags::empty(),
+                            None,
+                        )
+                        .map_err(|s| {
+                            ClientRejection::WlanSendError(Error::Status(
+                                format!("failed to send auth frame"),
+                                s,
+                            ))
+                        });
                 }
             },
         )
@@ -870,7 +879,14 @@ impl RemoteClient {
                 let (buffer, written) = ctx
                     .make_deauth_frame(self.addr, reason_code.into())
                     .map_err(ClientRejection::WlanSendError)?;
-                self.send_wlan_frame(ctx, buffer, written, 0, None).map_err(|s| {
+                self.send_wlan_frame(
+                    ctx,
+                    buffer,
+                    written,
+                    fidl_softmac::WlanTxInfoFlags::empty(),
+                    None,
+                )
+                .map_err(|s| {
                     ClientRejection::WlanSendError(Error::Status(
                         format!("failed to send deauth frame"),
                         s,
@@ -884,7 +900,14 @@ impl RemoteClient {
                 let (buffer, written) = ctx
                     .make_disassoc_frame(self.addr, reason_code.into())
                     .map_err(ClientRejection::WlanSendError)?;
-                self.send_wlan_frame(ctx, buffer, written, 0, None).map_err(|s| {
+                self.send_wlan_frame(
+                    ctx,
+                    buffer,
+                    written,
+                    fidl_softmac::WlanTxInfoFlags::empty(),
+                    None,
+                )
+                .map_err(|s| {
                     ClientRejection::WlanSendError(Error::Status(
                         format!("failed to send disassoc frame"),
                         s,
@@ -1069,7 +1092,14 @@ impl RemoteClient {
             )
             .map_err(ClientRejection::WlanSendError)?;
 
-        self.send_wlan_frame(ctx, buffer, written, 0, Some(async_id)).map_err(move |s| {
+        self.send_wlan_frame(
+            ctx,
+            buffer,
+            written,
+            fidl_softmac::WlanTxInfoFlags::empty(),
+            Some(async_id),
+        )
+        .map_err(move |s| {
             ClientRejection::WlanSendError(Error::Status(format!("error sending eapol frame"), s))
         })
     }
@@ -1079,7 +1109,7 @@ impl RemoteClient {
         ctx: &mut Context<D>,
         buffer: Buffer,
         written: usize,
-        tx_flags: u32,
+        tx_flags: fidl_softmac::WlanTxInfoFlags,
         async_id: Option<trace::Id>,
     ) -> Result<(), zx::Status> {
         let async_id = async_id.unwrap_or_else(|| {
