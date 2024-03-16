@@ -369,7 +369,7 @@ void LowEnergyPeripheralServer::StartAdvertisingInternal(
     fuchsia::bluetooth::le::AdvertisingParameters& parameters,
     bt::gap::Adapter::LowEnergy::AdvertisingStatusCallback status_cb,
     std::optional<AdvertisementInstanceId> advertisement_instance) {
-  bt::AdvertisingData adv_data, scan_rsp;
+  bt::AdvertisingData adv_data;
   bool include_tx_power_level = false;
   if (parameters.has_data()) {
     auto maybe_adv_data = fidl_helpers::AdvertisingDataFromFidl(parameters.data());
@@ -378,6 +378,7 @@ void LowEnergyPeripheralServer::StartAdvertisingInternal(
       status_cb({}, ToResult(bt::HostError::kInvalidParameters));
       return;
     }
+
     adv_data = std::move(*maybe_adv_data);
     if (parameters.data().has_include_tx_power_level() &&
         parameters.data().include_tx_power_level()) {
@@ -385,6 +386,8 @@ void LowEnergyPeripheralServer::StartAdvertisingInternal(
       include_tx_power_level = true;
     }
   }
+
+  bt::AdvertisingData scan_rsp;
   if (parameters.has_scan_response()) {
     auto maybe_scan_rsp = fidl_helpers::AdvertisingDataFromFidl(parameters.scan_response());
     if (!maybe_scan_rsp) {
@@ -394,8 +397,12 @@ void LowEnergyPeripheralServer::StartAdvertisingInternal(
     }
     scan_rsp = std::move(*maybe_scan_rsp);
   }
-  bt::gap::AdvertisingInterval interval = fidl_helpers::AdvertisingIntervalFromFidl(
-      parameters.has_mode_hint() ? parameters.mode_hint() : fble::AdvertisingModeHint::SLOW);
+
+  fble::AdvertisingModeHint mode_hint = fble::AdvertisingModeHint::SLOW;
+  if (parameters.has_mode_hint()) {
+    mode_hint = parameters.mode_hint();
+  }
+  bt::gap::AdvertisingInterval interval = fidl_helpers::AdvertisingIntervalFromFidl(mode_hint);
 
   std::optional<bt::gap::Adapter::LowEnergy::ConnectableAdvertisingParameters> connectable_params;
 

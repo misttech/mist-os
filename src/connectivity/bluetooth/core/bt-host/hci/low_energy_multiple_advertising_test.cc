@@ -131,8 +131,8 @@ TYPED_TEST(LowEnergyMultipleAdvertisingTest, AdvertisingHandlesExhausted) {
   AdvertisingData ad = this->GetExampleData();
   AdvertisingData scan_data = this->GetExampleData();
   AdvertisingOptions options(kTestInterval,
-                             /*anonymous=*/false,
                              kDefaultNoAdvFlags,
+                             /*anonymous=*/false,
                              /*include_tx_power_level=*/true);
 
   for (uint8_t i = 0; i < this->advertiser()->MaxAdvertisements(); i++) {
@@ -175,8 +175,8 @@ TYPED_TEST(LowEnergyMultipleAdvertisingTest, SimultaneousAdvertisements) {
 
   // start public address advertising
   AdvertisingOptions public_options(kTestInterval,
-                                    /*anonymous=*/false,
                                     kDefaultNoAdvFlags,
+                                    /*anonymous=*/false,
                                     /*include_tx_power_level=*/false);
   this->advertiser()->StartAdvertising(kPublicAddress,
                                        ad,
@@ -194,8 +194,8 @@ TYPED_TEST(LowEnergyMultipleAdvertisingTest, SimultaneousAdvertisements) {
       hci_spec::kLEAdvertisingIntervalMin + 1u,
       hci_spec::kLEAdvertisingIntervalMax - 1u);
   AdvertisingOptions random_options(random_interval,
-                                    /*anonymous=*/false,
                                     kDefaultNoAdvFlags,
+                                    /*anonymous=*/false,
                                     /*include_tx_power_level=*/false);
   this->advertiser()->StartAdvertising(kRandomAddress,
                                        ad,
@@ -246,8 +246,8 @@ TYPED_TEST(LowEnergyMultipleAdvertisingTest,
 
   // start public address advertising
   AdvertisingOptions public_options(kTestInterval,
-                                    /*anonymous=*/false,
                                     kDefaultNoAdvFlags,
+                                    /*anonymous=*/false,
                                     /*include_tx_power_level=*/false);
   this->advertiser()->StartAdvertising(kPublicAddress,
                                        ad,
@@ -265,8 +265,8 @@ TYPED_TEST(LowEnergyMultipleAdvertisingTest,
       hci_spec::kLEAdvertisingIntervalMin + 1u,
       hci_spec::kLEAdvertisingIntervalMax - 1u);
   AdvertisingOptions random_options(random_interval,
-                                    /*anonymous=*/false,
                                     kDefaultNoAdvFlags,
+                                    /*anonymous=*/false,
                                     /*include_tx_power_level=*/false);
   this->advertiser()->StartAdvertising(kRandomAddress,
                                        ad,
@@ -338,8 +338,8 @@ TYPED_TEST(LowEnergyMultipleAdvertisingTest,
 
   // start public address advertising
   AdvertisingOptions public_options(kTestInterval,
-                                    /*anonymous=*/false,
                                     kDefaultNoAdvFlags,
+                                    /*anonymous=*/false,
                                     /*include_tx_power_level=*/false);
   this->advertiser()->StartAdvertising(kPublicAddress,
                                        ad,
@@ -357,8 +357,8 @@ TYPED_TEST(LowEnergyMultipleAdvertisingTest,
       hci_spec::kLEAdvertisingIntervalMin + 1u,
       hci_spec::kLEAdvertisingIntervalMax - 1u);
   AdvertisingOptions random_options(random_interval,
-                                    /*anonymous=*/false,
                                     kDefaultNoAdvFlags,
+                                    /*anonymous=*/false,
                                     /*include_tx_power_level=*/false);
   this->advertiser()->StartAdvertising(kRandomAddress,
                                        ad,
@@ -473,8 +473,8 @@ TYPED_TEST(LowEnergyMultipleAdvertisingTest, SuccessiveAdvertisingCalls) {
   AdvertisingData ad = this->GetExampleData();
   AdvertisingData scan_data = this->GetExampleData();
   AdvertisingOptions options(kTestInterval,
-                             /*anonymous=*/false,
                              kDefaultNoAdvFlags,
+                             /*anonymous=*/false,
                              /*include_tx_power_level=*/false);
 
   this->advertiser()->StartAdvertising(kPublicAddress,
@@ -513,8 +513,8 @@ TYPED_TEST(LowEnergyMultipleAdvertisingTest, InterleavedAdvertisingCalls) {
   AdvertisingData ad = this->GetExampleData();
   AdvertisingData scan_data = this->GetExampleData();
   AdvertisingOptions options(kTestInterval,
-                             /*anonymous=*/false,
                              kDefaultNoAdvFlags,
+                             /*anonymous=*/false,
                              /*include_tx_power_level=*/false);
 
   this->advertiser()->StartAdvertising(kPublicAddress,
@@ -542,8 +542,8 @@ TYPED_TEST(LowEnergyMultipleAdvertisingTest, StopWhileStarting) {
   AdvertisingData ad = this->GetExampleData();
   AdvertisingData scan_data = this->GetExampleData();
   AdvertisingOptions options(kTestInterval,
-                             /*anonymous=*/false,
                              kDefaultNoAdvFlags,
+                             /*anonymous=*/false,
                              /*include_tx_power_level=*/false);
 
   this->advertiser()->StartAdvertising(kPublicAddress,
