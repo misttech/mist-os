@@ -443,7 +443,7 @@ fuchsia_structured_config_values("pkg-resolver-config") {
   cm_label = ":pkg-resolver-manifest"
   values = {
     fetch_delivery_blob = true
-    delivery_blob_fallback = true
+    delivery_blob_fallback = false
 
     # Repository size is currently 100 KB. Allowing for 10x growth and assuming a
     # 4,096 B/s minimum bandwidth (the default minimum bandwidth used by rust-tuf

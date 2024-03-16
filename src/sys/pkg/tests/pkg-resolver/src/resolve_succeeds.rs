@@ -893,6 +893,7 @@ async fn merkle_pinned_meta_far_size_different_than_tuf_metadata() {
         repo.path().join("blobs").join(pkg_16k_pinned.hash().to_string()),
     )
     .unwrap();
+    let _delivery_size = repo.overwrite_uncompressed_delivery_blob(pkg_16k_pinned.hash()).unwrap();
 
     let repo_url = "fuchsia-pkg://test".parse().unwrap();
     let repo_config = served_repository.make_repo_config(repo_url);
