@@ -14,6 +14,7 @@ use crate::{
     node::IsDirectory,
     path::Path,
     service::{self, ServiceLike},
+    symlink::{self, Symlink},
     ObjectRequestRef,
 };
 
@@ -168,6 +169,34 @@ impl<'a> OpenRequest<'a> {
                     return Err(Status::NOT_DIR);
                 }
                 file::serve(file, scope, protocols, object_request)
+            }
+        }
+    }
+
+    /// Opens a symlink.
+    pub fn open_symlink(self, service: Arc<impl Symlink>) -> Result<(), Status> {
+        match self {
+            OpenRequest {
+                scope,
+                flags_or_protocols: FlagsOrProtocols::Flags(flags),
+                path,
+                object_request,
+            } => {
+                if !path.is_empty() {
+                    return Err(Status::NOT_DIR);
+                }
+                symlink::serve(service, scope, &flags, object_request)
+            }
+            OpenRequest {
+                scope,
+                flags_or_protocols: FlagsOrProtocols::Protocols(protocols),
+                path,
+                object_request,
+            } => {
+                if !path.is_empty() {
+                    return Err(Status::NOT_DIR);
+                }
+                symlink::serve(service, scope, protocols, object_request)
             }
         }
     }

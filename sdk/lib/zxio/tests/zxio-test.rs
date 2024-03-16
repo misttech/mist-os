@@ -261,7 +261,7 @@ async fn test_read_link_error() {
                 scope.spawn(vfs::symlink::Connection::create(
                     scope.clone(),
                     self,
-                    flags,
+                    &flags,
                     object_request,
                 )?);
                 Ok(())

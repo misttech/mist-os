@@ -87,7 +87,7 @@ impl<T: Symlink> Connection<T> {
     pub fn create(
         scope: ExecutionScope,
         symlink: Arc<T>,
-        protocols: impl ProtocolsExt,
+        protocols: &impl ProtocolsExt,
         object_request: ObjectRequestRef<'_>,
     ) -> Result<impl Future<Output = ()>, Status> {
         let _options = protocols.to_symlink_options()?;
@@ -219,7 +219,7 @@ impl<T: Symlink> Connection<T> {
             self.scope.spawn(Self::create(
                 self.scope.clone(),
                 self.symlink.clone(),
-                flags,
+                &flags,
                 object_request,
             )?);
             Ok(())
@@ -303,6 +303,21 @@ impl<T: Symlink> Representation for Connection<T> {
         Ok(fio::NodeInfoDeprecated::Symlink(fio::SymlinkObject {
             target: self.symlink.read_target().await?,
         }))
+    }
+}
+
+/// Helper to open a service or node as required.
+pub fn serve(
+    link: Arc<impl Symlink>,
+    scope: ExecutionScope,
+    protocols: &impl ProtocolsExt,
+    object_request: ObjectRequestRef<'_>,
+) -> Result<(), Status> {
+    if protocols.is_node() {
+        let options = protocols.to_node_options(link.is_directory())?;
+        link.open_as_node(scope, options, object_request)
+    } else {
+        Connection::create(scope.clone(), link, protocols, object_request).map(|x| scope.spawn(x))
     }
 }
 
@@ -432,7 +447,9 @@ mod tests {
                     scope.clone(),
                     Arc::new(TestSymlink::new()),
                     flags,
-                    Connection::create,
+                    |scope, symlink, protocols, object_request| {
+                        Connection::create(scope, symlink, &protocols, object_request)
+                    },
                 )
             });
             async move {

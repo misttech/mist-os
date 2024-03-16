@@ -790,7 +790,9 @@ impl VfsDirectory for FxDirectory {
                         scope.clone(),
                         node.take(),
                         flags,
-                        symlink::Connection::create,
+                        |scope, symlink, protocols, object_request| {
+                            symlink::Connection::create(scope, symlink, &protocols, object_request)
+                        },
                     )
                 } else {
                     unreachable!();
@@ -828,7 +830,9 @@ impl VfsDirectory for FxDirectory {
                         scope.clone(),
                         node.take(),
                         protocols,
-                        symlink::Connection::create,
+                        |scope, symlink, protocols, object_request| {
+                            symlink::Connection::create(scope, symlink, &protocols, object_request)
+                        },
                     )
                 } else {
                     unreachable!();
