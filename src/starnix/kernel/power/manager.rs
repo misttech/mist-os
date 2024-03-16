@@ -11,27 +11,18 @@ use std::{collections::HashSet, sync::Arc};
 
 use anyhow::{anyhow, Context};
 use async_utils::hanging_get::client::HangingGetStream;
-use fidl_fuchsia_kernel as fkernel;
 use fidl_fuchsia_power_broker as fbroker;
 use fidl_fuchsia_power_suspend as fsuspend;
 use fidl_fuchsia_power_system as fsystem;
 use fuchsia_component::client::{connect_to_protocol, connect_to_protocol_sync};
-use fuchsia_zircon::{self as zx, AsHandleRef};
+use fuchsia_zircon as zx;
 use futures::StreamExt;
-use once_cell::sync::{Lazy, OnceCell};
+use once_cell::sync::OnceCell;
 use starnix_logging::{log_error, log_info};
 use starnix_sync::{Mutex, MutexGuard};
-use starnix_uapi::{error, errors::Errno, from_status_like_fdio};
-
-static CPU_RESOURCE: Lazy<zx::Resource> = Lazy::new(|| {
-    connect_to_protocol_sync::<fkernel::CpuResourceMarker>()
-        .expect("couldn't connect to fuchsia.kernel.CpuResource")
-        .get(zx::Time::INFINITE)
-        .expect("couldn't talk to fuchsia.kernel.CpuResource")
-});
+use starnix_uapi::{error, errors::Errno};
 
 /// Manager for suspend and resume.
-///
 #[derive(Default)]
 pub struct SuspendResumeManager {
     /// Synch FIDL Proxy to create leases on the power topology.
@@ -266,16 +257,6 @@ impl SuspendResumeManager {
     }
 
     pub fn suspend(&self, state: SuspendState) -> Result<(), Errno> {
-        self.update_power_lease(state.into())?;
-
-        // TODO(b/316023943): Execute ops of suspend state transition via SAG suspend fidl api.
-        // Temporary hack to trigger system suspend directly.
-        let resume_at = zx::Time::after(zx::Duration::from_seconds(5));
-        zx::Status::ok(unsafe {
-            zx::sys::zx_system_suspend_enter(CPU_RESOURCE.raw_handle(), resume_at.into_nanos())
-        })
-        .map_err(|status| from_status_like_fdio!(status))?;
-
-        Ok(())
+        self.update_power_lease(state.into())
     }
 }

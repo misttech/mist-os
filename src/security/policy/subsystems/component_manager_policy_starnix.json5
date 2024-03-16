@@ -9,16 +9,6 @@
             {
                 source_moniker: "<component_manager>",
                 source: "component",
-                source_name: "fuchsia.kernel.CpuResource",
-                capability: "protocol",
-                target_monikers: [
-                    // TODO(b/316023943): Remove after SGA is ready.
-                    "/core/starnix_runner/kernels:**",
-                ],
-            },
-            {
-                source_moniker: "<component_manager>",
-                source: "component",
                 source_name: "fuchsia.kernel.VmexResource",
                 capability: "protocol",
                 target_monikers: [
