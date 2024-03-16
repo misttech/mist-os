@@ -19,7 +19,7 @@ use fuchsia_component::client::{connect_to_protocol, connect_to_protocol_sync};
 use fuchsia_zircon::{self as zx, AsHandleRef};
 use futures::StreamExt;
 use once_cell::sync::{Lazy, OnceCell};
-use starnix_logging::log_error;
+use starnix_logging::{log_error, log_info};
 use starnix_sync::{Mutex, MutexGuard};
 use starnix_uapi::{error, errors::Errno, from_status_like_fdio};
 
@@ -66,7 +66,7 @@ pub struct SuspendResumeManagerInner {
     suspend_stats: SuspendStats,
     sync_on_suspend_enabled: bool,
     /// Lease control to hold the system power state as active.
-    power_on_control: Option<fbroker::LeaseControlSynchronousProxy>,
+    lease_control: Option<fbroker::LeaseControlSynchronousProxy>,
 }
 
 pub type SuspendResumeManagerHandle = Arc<SuspendResumeManager>;
@@ -82,8 +82,18 @@ impl SuspendResumeManager {
         self: &SuspendResumeManagerHandle,
         system_task: &CurrentTask,
     ) -> Result<(), anyhow::Error> {
-        let topology = connect_to_protocol_sync::<fbroker::TopologyMarker>()?;
         let activity_governor = connect_to_protocol_sync::<fsystem::ActivityGovernorMarker>()?;
+        self.init_power_element(&activity_governor)?;
+        self.init_listener(&activity_governor, system_task);
+        self.init_stats_watcher(system_task);
+        Ok(())
+    }
+
+    fn init_power_element(
+        self: &SuspendResumeManagerHandle,
+        activity_governor: &fsystem::ActivityGovernorSynchronousProxy,
+    ) -> Result<(), anyhow::Error> {
+        let topology = connect_to_protocol_sync::<fbroker::TopologyMarker>()?;
 
         // Create the PowerMode power element depending on the Execution State of SAG.
         let power_elements = activity_governor
@@ -120,9 +130,71 @@ impl SuspendResumeManager {
                 .into_sync_proxy();
 
             self.power_mode_lessor.set(lessor).expect("Power Mode should be uninitialized");
-            self.lock().power_on_control = Some(power_on_control);
+            self.lock().lease_control = Some(power_on_control);
         };
 
+        Ok(())
+    }
+
+    fn init_listener(
+        self: &SuspendResumeManagerHandle,
+        activity_governor: &fsystem::ActivityGovernorSynchronousProxy,
+        system_task: &CurrentTask,
+    ) {
+        let (listener_client_end, mut listener_stream) =
+            fidl::endpoints::create_request_stream::<fsystem::ActivityGovernorListenerMarker>()
+                .unwrap();
+        let self_ref = self.clone();
+        system_task.kernel().kthreads.spawn_future(async move {
+            while let Some(stream) = listener_stream.next().await {
+                match stream {
+                    Ok(req) => match req {
+                        fsystem::ActivityGovernorListenerRequest::OnResume { responder } => {
+                            log_info!("Resuming from suspend");
+                            match self_ref.update_power_lease(POWER_ON_LEVEL) {
+                                Ok(_) => {
+                                    // The server is expected to respond once it has performed the
+                                    // operations required to keep the system awake.
+                                    if let Err(e) = responder.send() {
+                                        log_error!(
+                                            "OnResume server failed to send a respond to its
+                                            client: {}",
+                                            e
+                                        );
+                                    }
+                                }
+                                Err(e) => log_error!("Failed to create a power-on lease: {}", e),
+                            }
+                        }
+                        fsystem::ActivityGovernorListenerRequest::OnSuspend { .. } => {
+                            log_info!("Transiting to a low-power state");
+                        }
+                        fsystem::ActivityGovernorListenerRequest::_UnknownMethod {
+                            ordinal,
+                            ..
+                        } => {
+                            log_error!("Got unexpected method: {}", ordinal)
+                        }
+                    },
+                    Err(e) => {
+                        log_error!("listener server got an error: {}", e);
+                        break;
+                    }
+                }
+            }
+        });
+        if let Err(err) = activity_governor.register_listener(
+            fsystem::ActivityGovernorRegisterListenerRequest {
+                listener: Some(listener_client_end),
+                ..Default::default()
+            },
+            zx::Time::INFINITE,
+        ) {
+            log_error!("failed to register listener in sag {}", err)
+        }
+    }
+
+    fn init_stats_watcher(self: &SuspendResumeManagerHandle, system_task: &CurrentTask) {
         let self_ref = self.clone();
         system_task.kernel().kthreads.spawn_future(async move {
             // Start listening to the suspend stats updates
@@ -149,8 +221,6 @@ impl SuspendResumeManager {
                 }
             }
         });
-
-        Ok(())
     }
 
     pub fn suspend_stats(&self) -> SuspendStats {
@@ -170,13 +240,16 @@ impl SuspendResumeManager {
         HashSet::from([SuspendState::Ram, SuspendState::Idle])
     }
 
-    fn update_power_lease(
-        &self,
-        level: fbroker::PowerLevel,
-    ) -> Result<fbroker::LeaseControlSynchronousProxy, Errno> {
+    fn update_power_lease(&self, level: fbroker::PowerLevel) -> Result<(), Errno> {
         if let Some(lessor) = self.power_mode_lessor.get() {
+            // Before the old lease is dropped, a new lease must be created to transit to the
+            // new level. This ensures a smooth transition without going back to the initial
+            // power level.
             match lessor.lease(level, zx::Time::INFINITE) {
-                Ok(Ok(res)) => Ok(res.into_sync_proxy()),
+                Ok(Ok(res)) => {
+                    self.lock().lease_control = Some(res.into_sync_proxy());
+                    Ok(())
+                }
                 Ok(Err(err)) => {
                     log_error!("power broker lease error {:?}", err);
                     error!(EINVAL)
@@ -193,13 +266,7 @@ impl SuspendResumeManager {
     }
 
     pub fn suspend(&self, state: SuspendState) -> Result<(), Errno> {
-        // Before the old lease is dropped, a new lease must be created to transit to the new level.
-        // This ensures a smooth transition without going back to the initial power level.
-        let lease_control = self.update_power_lease(state.into())?;
-        {
-            // Clear the lease control and drop it.
-            self.lock().power_on_control = None;
-        }
+        self.update_power_lease(state.into())?;
 
         // TODO(b/316023943): Execute ops of suspend state transition via SAG suspend fidl api.
         // Temporary hack to trigger system suspend directly.
@@ -208,10 +275,6 @@ impl SuspendResumeManager {
             zx::sys::zx_system_suspend_enter(CPU_RESOURCE.raw_handle(), resume_at.into_nanos())
         })
         .map_err(|status| from_status_like_fdio!(status))?;
-
-        // TODO(b/322789559): power on when wake signal pathway is ready.
-        self.lock().power_on_control = Some(self.update_power_lease(POWER_ON_LEVEL)?);
-        drop(lease_control);
 
         Ok(())
     }
