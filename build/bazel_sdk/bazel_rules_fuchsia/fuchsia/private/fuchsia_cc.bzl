@@ -245,6 +245,10 @@ def _fuchsia_cc_test_manifest_impl(ctx):
         substitutions = {
             "{{RUNNER_SHARD}}": sdk.gtest_runner_shard if is_gtest else sdk.elf_test_runner_shard,
             "{{BINARY}}": ctx.attr.test_binary_name,
+            "{{LAUNCHER_PROTOCOL}}": """{
+        // Needed for ASSERT_DEATH, which is common across many unit tests.
+        protocol: [ "fuchsia.process.Launcher" ],
+    },""" if ctx.attr.death_unittest else "",
         },
     )
 
@@ -275,9 +279,13 @@ _fuchsia_cc_test_manifest = rule(
             allow_single_file = True,
             mandatory = True,
         ),
+        "death_unittest": attr.bool(
+            doc = "Whether the test is a gtest unit test and uses ASSERT_DEATH.",
+            mandatory = True,
+        ),
         "_template_file": attr.label(
             doc = "The template cml file.",
-            default = "//fuchsia/private:templates/cc_test_manifest.cml",
+            default = "//fuchsia/private:templates/cc_test_manifest.cml.tmpl",
             allow_single_file = True,
         ),
     },
@@ -313,6 +321,7 @@ def fuchsia_wrap_cc_test(
         sdk_root_label = "@fuchsia_sdk",
         clang_root_label = "@fuchsia_clang",
         googletest_root_label = "@com_google_googletest",
+        death_unittest = False,
         tags = [],
         **kwargs):
     """Wrap a native cc_test.
@@ -329,6 +338,7 @@ def fuchsia_wrap_cc_test(
         sdk_root_label: Optionally override the root label of the fuchsia sdk repo.
         clang_root_label: Optionally override the root label of the fuchsia clang repo.
         googletest_root_label: Optionally override the root label of the googletest repo.
+        death_unittest: Whether this test is a gtest unittest that uses ASSERT_DEATH.
         tags: Tags to set for all generated targets.
         **kwargs: Arguments to forward to the fuchsia cc_test wrapper.
     """
@@ -356,6 +366,7 @@ def fuchsia_wrap_cc_test(
         test_binary_name = name,
         deps = exact_cc_test_deps,
         googletest = "%s//:BUILD.bazel" % googletest_root_label,
+        death_unittest = death_unittest,
         testonly = True,
         tags = tags + ["manual"],
         **kwargs
@@ -408,6 +419,7 @@ def fuchsia_cc_test(
         sdk_root_label = "@fuchsia_sdk",
         clang_root_label = "@fuchsia_clang",
         googletest_root_label = "@com_google_googletest",
+        death_unittest = False,
         tags = ["manual"],
         visibility = None,
         **cc_test_kwargs):
@@ -420,6 +432,7 @@ def fuchsia_cc_test(
         sdk_root_label: Optionally override the root label of the fuchsia sdk repo.
         clang_root_label: Optionally override the root label of the fuchsia clang repo.
         googletest_root_label: Optionally override the root label of the googletest repo.
+        death_unittest: Whether this test is a gtest unittest that uses ASSERT_DEATH.
         tags: Tags to set for all generated targets. This type of target is marked "manual" by default.
         visibility: The visibility of all generated targets.
         **cc_test_kwargs: Arguments to forward to `cc_test`.
@@ -444,6 +457,7 @@ def fuchsia_cc_test(
         sdk_root_label = sdk_root_label,
         clang_root_label = clang_root_label,
         googletest_root_label = googletest_root_label,
+        death_unittest = death_unittest,
         tags = tags,
         visibility = visibility,
     )

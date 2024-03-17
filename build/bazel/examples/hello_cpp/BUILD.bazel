@@ -9,8 +9,7 @@ load(
     "fuchsia_component",
     "fuchsia_component_manifest",
     "fuchsia_package",
-    "fuchsia_test_component",
-    "fuchsia_test_package",
+    "fuchsia_unittest_package",
 )
 
 fuchsia_cc_binary(
@@ -73,21 +72,11 @@ fuchsia_cc_test(
     ],
 )
 
-fuchsia_component_manifest(
-    name = "hello_test_manifest",
-    src = "meta/hello_test.cml",
-)
-
-fuchsia_test_component(
-    name = "hello_test_component",
-    manifest = ":hello_test_manifest",
-    deps = [":hello_test"],
-)
-
 fuchsia_cc_test(
     name = "hello_gtest",
     size = "small",
     srcs = ["hello_gtest.cc"],
+    death_unittest = True,
     deps = [
         "@com_google_googletest//:gtest_main",
         "@fuchsia_sdk//pkg/fdio",
@@ -95,26 +84,13 @@ fuchsia_cc_test(
     ],
 )
 
-fuchsia_component_manifest(
-    name = "hello_gtest_manifest",
-    src = "meta/hello_gtest.cml",
-)
-
-fuchsia_test_component(
-    name = "hello_gtest_component",
-    manifest = ":hello_gtest_manifest",
-    deps = [
-        ":hello_gtest",
-    ],
-)
-
-fuchsia_test_package(
+fuchsia_unittest_package(
     name = "test_pkg",
     package_name = "hello_cpp_test",
     fuchsia_api_level = "HEAD",
-    test_components = [
-        ":hello_gtest_component",
-        ":hello_test_component",
+    unit_tests = [
+        ":hello_test",
+        ":hello_gtest",
     ],
     visibility = ["//visibility:public"],
 )
