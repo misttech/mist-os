@@ -56,7 +56,6 @@
 
                 // Without this, blobfs won't be able to set the deadline profile for it's pager
                 // threads, which may degrade performance.
-                "fuchsia.scheduler.ProfileProvider",
                 "fuchsia.scheduler.RoleManager",
 
                 // Without this, blobfs won't be able to provide traces.
@@ -79,7 +78,6 @@
         {
             protocol: [
                 "fuchsia.logger.LogSink",
-                "fuchsia.scheduler.ProfileProvider",
                 "fuchsia.scheduler.RoleManager",
             ],
             from: "parent",

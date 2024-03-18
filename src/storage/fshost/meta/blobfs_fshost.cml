@@ -32,7 +32,6 @@
                 "fuchsia.device.manager.Administrator",
                 "fuchsia.kernel.VmexResource",
                 "fuchsia.logger.LogSink",
-                "fuchsia.scheduler.ProfileProvider",
                 "fuchsia.scheduler.RoleManager",
             ],
             from: "parent",
