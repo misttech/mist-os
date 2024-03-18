@@ -13,9 +13,11 @@ use {
         AccessMarker, AccessProxy, BootstrapMarker, BootstrapProxy, ConfigurationMarker,
         ConfigurationProxy, HostWatcherMarker, HostWatcherProxy, PairingMarker, PairingProxy,
     },
+    fidl_fuchsia_component_decl::Durability,
     fidl_fuchsia_device::{NameProviderMarker, NameProviderRequestStream},
     fidl_fuchsia_io as fio,
     fidl_fuchsia_stash::SecureStoreMarker,
+    fuchsia_bluetooth::constants::BT_HOST_COLLECTION,
     fuchsia_component::server::ServiceFs,
     fuchsia_component_test::{
         Capability, ChildOptions, LocalComponentHandles, RealmBuilder, Ref, Route,
@@ -188,6 +190,17 @@ async fn bt_init_component_topology() {
         .add_child(BT_INIT_MONIKER, BT_INIT_URL.to_string(), ChildOptions::new())
         .await
         .expect("Failed adding bt-init to topology");
+    // Create bt-host collection
+    let mut realm_decl = builder.get_realm_decl().await.unwrap();
+    realm_decl.collections.push(cm_rust::CollectionDecl {
+        name: BT_HOST_COLLECTION.parse().unwrap(),
+        durability: Durability::SingleRun,
+        environment: None,
+        allowed_offers: cm_types::AllowedOffers::StaticOnly,
+        allow_long_names: false,
+        persistent_storage: None,
+    });
+    builder.replace_realm_decl(realm_decl).await.unwrap();
     // Implementation of the Secure Store service for use by bt-gap.
     let secure_store = builder
         .add_child(SECURE_STORE_MONIKER, SECURE_STORE_URL.to_string(), ChildOptions::new())
@@ -272,7 +285,8 @@ async fn bt_init_component_topology() {
                         .rights(fio::R_STAR_DIR),
                 )
                 .from(&mock_dev)
-                .to(&bt_init),
+                .to(&bt_init)
+                .to(Ref::collection(BT_HOST_COLLECTION.to_string())),
         )
         .await
         .expect("Failed adding route for bt-hci device directory");
@@ -283,6 +297,7 @@ async fn bt_init_component_topology() {
                 .capability(Capability::protocol::<fidl_fuchsia_logger::LogSinkMarker>())
                 .from(Ref::parent())
                 .to(&bt_init)
+                .to(Ref::collection(BT_HOST_COLLECTION.to_string()))
                 .to(&secure_store)
                 .to(&mock_provider)
                 .to(&mock_client),
