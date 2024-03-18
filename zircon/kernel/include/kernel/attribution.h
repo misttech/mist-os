@@ -117,90 +117,15 @@ class AttributionObject : public fbl::RefCounted<AttributionObject>, public Attr
   void AddToGlobalListWithKoid(AttributionObjectNode* where, zx_koid_t owning_koid)
       TA_EXCL(AllAttributionObjectsLock::Get());
 
-  zx_info_memory_attribution_t ToInfoEntry() const TA_EXCL(seq_lock_) {
-    Stats stats;
-
-    bool transaction_success;
-    do {
-      SeqLockGuard<SharedNoIrqSave> guard{&seq_lock_, transaction_success};
-      stats_.Read(stats);
-    } while (!transaction_success);
-
-    return zx_info_memory_attribution_t{
-        .process_koid = owning_koid_,
-        .private_resident_pages_allocated = stats.private_resident_pages_allocated_,
-        .private_resident_pages_deallocated = stats.private_resident_pages_deallocated_,
-        .total_resident_pages_allocated = stats.total_resident_pages_allocated_,
-        .total_resident_pages_deallocated = stats.total_resident_pages_deallocated_,
-    };
-  }
-
  private:
-  struct Stats {
-    // Total number of pages made resident for VmObjectPageds
-    // that are uniquely owned by owning_koid_.
-    uint64_t private_resident_pages_allocated_ = 0;
-
-    // Total number of pages that have been released from
-    // VmObjectPageds that are uniquely owned by owning_koid_.
-    uint64_t private_resident_pages_deallocated_ = 0;
-
-    // Total number of pages made resident for any VmObjectPaged
-    // being attributed to owning_koid_.
-    uint64_t total_resident_pages_allocated_ = 0;
-
-    // Total number of pages that have been released from any
-    // VmObjectPageds being attributed to owning_koid_.
-    uint64_t total_resident_pages_deallocated_ = 0;
-  };
-
   // The koid of the process that this attribution object is tracking.
   zx_koid_t owning_koid_;
-
-  // The attribution stats, protected by their SeqLock.
-  mutable DECLARE_SEQLOCK_FENCE_SYNC(AttributionObject) seq_lock_;
-  template <typename Policy>
-  using SeqLockGuard = Guard<decltype(seq_lock_)::LockType, Policy>;
-  TA_GUARDED(seq_lock_) SeqLockPayload<Stats, decltype(seq_lock_)> stats_;
 
 #if KERNEL_BASED_MEMORY_ATTRIBUTION
   // The attribution object used to track resident memory
   // for VMOs attributed to the kernel.
   static fbl::RefPtr<AttributionObject> kernel_attribution_object_;
 #endif
-};
-
-// AttributionObjectsCursor is an iterator that can visit a subrange of nodes
-// in the global list without holding the global lock for the whole duration of
-// the visit.
-class AttributionObjectsCursor : public fbl::DoublyLinkedListable<AttributionObjectsCursor*> {
- public:
-  // Creates a cursor that will return all the AttributionObjects between the
-  // given nodes. |begin| and |end| must be contained in the global list and
-  // |end| cannot be removed for the whole lifetime of the cursor.
-  AttributionObjectsCursor(AttributionObjectNode* begin, AttributionObjectNode* end)
-      TA_EXCL(AttributionObjectNode::AllAttributionObjectsLock::Get());
-  ~AttributionObjectsCursor() TA_EXCL(AttributionObjectNode::AllAttributionObjectsLock::Get());
-
-  // Returns the value of the next attribution object, or nullopt if we reached
-  // the end of the requested range.
-  ktl::optional<zx_info_memory_attribution_t> Next()
-      TA_EXCL(AttributionObjectNode::AllAttributionObjectsLock::Get());
-
-  // Advances all the cursors currently pointing to a |node| that is about to
-  // be removed.
-  static void SkipNodeBeingRemoved(AttributionObjectNode* node)
-      TA_REQ(AttributionObjectNode::AllAttributionObjectsLock::Get());
-
- private:
-  using GlobalListType = decltype(AttributionObjectNode::all_nodes_);
-  GlobalListType::iterator next_
-      TA_GUARDED(AttributionObjectNode::AllAttributionObjectsLock::Get());
-  GlobalListType::iterator end_ TA_GUARDED(AttributionObjectNode::AllAttributionObjectsLock::Get());
-
-  // All the cursors in the system.
-  static fbl::DoublyLinkedList<AttributionObjectsCursor*> all_cursors_
-      TA_GUARDED(AttributionObjectNode::AllAttributionObjectsLock::Get());
 };
 
 #endif  // ZIRCON_KERNEL_INCLUDE_KERNEL_ATTRIBUTION_H_

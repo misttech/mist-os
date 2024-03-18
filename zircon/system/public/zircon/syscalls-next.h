@@ -91,23 +91,6 @@ typedef struct zx_restricted_exception {
 
 // ====== End of restricted mode support ====== //
 
-// ====== Kernel-based memory attribution support ====== //
-// Topic for zx_object_get_info.
-#define ZX_INFO_MEMORY_ATTRIBUTION ((zx_object_info_topic_t)36u)  // zx_info_memory_attribution_t[n]
-
-typedef struct zx_info_memory_attribution {
-  // The koid of the process for which these attribution statistics apply.
-  zx_koid_t process_koid;
-
-  uint64_t private_resident_pages_allocated;
-  uint64_t private_resident_pages_deallocated;
-
-  uint64_t total_resident_pages_allocated;
-  uint64_t total_resident_pages_deallocated;
-} zx_info_memory_attribution_t;
-
-// ====== End of kernel-based memory attribution support ====== //
-
 // ====== Wake vector support ====== //
 
 #define ZX_INTERRUPT_WAKE_VECTOR ((uint32_t)0x20)
