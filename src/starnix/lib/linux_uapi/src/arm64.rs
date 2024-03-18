@@ -1185,6 +1185,125 @@ pub const BPF_BUILD_ID_SIZE: u32 = 20;
 pub const BPF_OBJ_NAME_LEN: u32 = 16;
 pub const XDP_PACKET_HEADROOM: u32 = 256;
 pub const BPF_TAG_SIZE: u32 = 8;
+pub const HWCAP_FP: u32 = 1;
+pub const HWCAP_ASIMD: u32 = 2;
+pub const HWCAP_EVTSTRM: u32 = 4;
+pub const HWCAP_AES: u32 = 8;
+pub const HWCAP_PMULL: u32 = 16;
+pub const HWCAP_SHA1: u32 = 32;
+pub const HWCAP_SHA2: u32 = 64;
+pub const HWCAP_CRC32: u32 = 128;
+pub const HWCAP_ATOMICS: u32 = 256;
+pub const HWCAP_FPHP: u32 = 512;
+pub const HWCAP_ASIMDHP: u32 = 1024;
+pub const HWCAP_CPUID: u32 = 2048;
+pub const HWCAP_ASIMDRDM: u32 = 4096;
+pub const HWCAP_JSCVT: u32 = 8192;
+pub const HWCAP_FCMA: u32 = 16384;
+pub const HWCAP_LRCPC: u32 = 32768;
+pub const HWCAP_DCPOP: u32 = 65536;
+pub const HWCAP_SHA3: u32 = 131072;
+pub const HWCAP_SM3: u32 = 262144;
+pub const HWCAP_SM4: u32 = 524288;
+pub const HWCAP_ASIMDDP: u32 = 1048576;
+pub const HWCAP_SHA512: u32 = 2097152;
+pub const HWCAP_SVE: u32 = 4194304;
+pub const HWCAP_ASIMDFHM: u32 = 8388608;
+pub const HWCAP_DIT: u32 = 16777216;
+pub const HWCAP_USCAT: u32 = 33554432;
+pub const HWCAP_ILRCPC: u32 = 67108864;
+pub const HWCAP_FLAGM: u32 = 134217728;
+pub const HWCAP_SSBS: u32 = 268435456;
+pub const HWCAP_SB: u32 = 536870912;
+pub const HWCAP_PACA: u32 = 1073741824;
+pub const HWCAP_PACG: u32 = 2147483648;
+pub const HWCAP2_DCPODP: u32 = 1;
+pub const HWCAP2_SVE2: u32 = 2;
+pub const HWCAP2_SVEAES: u32 = 4;
+pub const HWCAP2_SVEPMULL: u32 = 8;
+pub const HWCAP2_SVEBITPERM: u32 = 16;
+pub const HWCAP2_SVESHA3: u32 = 32;
+pub const HWCAP2_SVESM4: u32 = 64;
+pub const HWCAP2_FLAGM2: u32 = 128;
+pub const HWCAP2_FRINT: u32 = 256;
+pub const HWCAP2_SVEI8MM: u32 = 512;
+pub const HWCAP2_SVEF32MM: u32 = 1024;
+pub const HWCAP2_SVEF64MM: u32 = 2048;
+pub const HWCAP2_SVEBF16: u32 = 4096;
+pub const HWCAP2_I8MM: u32 = 8192;
+pub const HWCAP2_BF16: u32 = 16384;
+pub const HWCAP2_DGH: u32 = 32768;
+pub const HWCAP2_RNG: u32 = 65536;
+pub const HWCAP2_BTI: u32 = 131072;
+pub const HWCAP2_MTE: u32 = 262144;
+pub const HWCAP2_ECV: u32 = 524288;
+pub const HWCAP2_AFP: u32 = 1048576;
+pub const HWCAP2_RPRES: u32 = 2097152;
+pub const HWCAP2_MTE3: u32 = 4194304;
+pub const HWCAP2_SME: u32 = 8388608;
+pub const HWCAP2_SME_I16I64: u32 = 16777216;
+pub const HWCAP2_SME_F64F64: u32 = 33554432;
+pub const HWCAP2_SME_I8I32: u32 = 67108864;
+pub const HWCAP2_SME_F16F32: u32 = 134217728;
+pub const HWCAP2_SME_B16F32: u32 = 268435456;
+pub const HWCAP2_SME_F32F32: u32 = 536870912;
+pub const HWCAP2_SME_FA64: u32 = 1073741824;
+pub const HWCAP2_WFXT: u32 = 2147483648;
+pub const HWCAP2_EBF16: u64 = 4294967296;
+pub const HWCAP2_SVE_EBF16: u64 = 8589934592;
+pub const HWCAP2_CSSC: u64 = 17179869184;
+pub const HWCAP2_RPRFM: u64 = 34359738368;
+pub const HWCAP2_SVE2P1: u64 = 68719476736;
+pub const HWCAP2_SME2: u64 = 137438953472;
+pub const HWCAP2_SME2P1: u64 = 274877906944;
+pub const HWCAP2_SME_I16I32: u64 = 549755813888;
+pub const HWCAP2_SME_BI32I32: u64 = 1099511627776;
+pub const HWCAP2_SME_B16B16: u64 = 2199023255552;
+pub const HWCAP2_SME_F16F16: u64 = 4398046511104;
+pub const HWCAP2_MOPS: u64 = 8796093022208;
+pub const PSR_MODE_EL0t: u32 = 0;
+pub const PSR_MODE_EL1t: u32 = 4;
+pub const PSR_MODE_EL1h: u32 = 5;
+pub const PSR_MODE_EL2t: u32 = 8;
+pub const PSR_MODE_EL2h: u32 = 9;
+pub const PSR_MODE_EL3t: u32 = 12;
+pub const PSR_MODE_EL3h: u32 = 13;
+pub const PSR_MODE_MASK: u32 = 15;
+pub const PSR_MODE32_BIT: u32 = 16;
+pub const PSR_F_BIT: u32 = 64;
+pub const PSR_I_BIT: u32 = 128;
+pub const PSR_A_BIT: u32 = 256;
+pub const PSR_D_BIT: u32 = 512;
+pub const PSR_BTYPE_MASK: u32 = 3072;
+pub const PSR_SSBS_BIT: u32 = 4096;
+pub const PSR_PAN_BIT: u32 = 4194304;
+pub const PSR_UAO_BIT: u32 = 8388608;
+pub const PSR_DIT_BIT: u32 = 16777216;
+pub const PSR_TCO_BIT: u32 = 33554432;
+pub const PSR_V_BIT: u32 = 268435456;
+pub const PSR_C_BIT: u32 = 536870912;
+pub const PSR_Z_BIT: u32 = 1073741824;
+pub const PSR_N_BIT: u32 = 2147483648;
+pub const PSR_BTYPE_SHIFT: u32 = 10;
+pub const PSR_f: u32 = 4278190080;
+pub const PSR_s: u32 = 16711680;
+pub const PSR_x: u32 = 65280;
+pub const PSR_c: u32 = 255;
+pub const PSR_BTYPE_NONE: u32 = 0;
+pub const PSR_BTYPE_JC: u32 = 1024;
+pub const PSR_BTYPE_C: u32 = 2048;
+pub const PSR_BTYPE_J: u32 = 3072;
+pub const PTRACE_SYSEMU: u32 = 31;
+pub const PTRACE_SYSEMU_SINGLESTEP: u32 = 32;
+pub const PTRACE_PEEKMTETAGS: u32 = 33;
+pub const PTRACE_POKEMTETAGS: u32 = 34;
+pub const SVE_PT_REGS_MASK: u32 = 1;
+pub const SVE_PT_REGS_FPSIMD: u32 = 0;
+pub const SVE_PT_REGS_SVE: u32 = 1;
+pub const SVE_PT_VL_INHERIT: u32 = 2;
+pub const SVE_PT_VL_ONEXEC: u32 = 4;
+pub const ZA_PT_VL_INHERIT: u32 = 2;
+pub const ZA_PT_VL_ONEXEC: u32 = 4;
 pub const _LINUX_CAPABILITY_VERSION_1: u32 = 429392688;
 pub const _LINUX_CAPABILITY_U32S_1: u32 = 1;
 pub const _LINUX_CAPABILITY_VERSION_2: u32 = 537333798;
@@ -4056,125 +4175,6 @@ pub const PTRACE_O_TRACESECCOMP: u32 = 128;
 pub const PTRACE_O_EXITKILL: u32 = 1048576;
 pub const PTRACE_O_SUSPEND_SECCOMP: u32 = 2097152;
 pub const PTRACE_O_MASK: u32 = 3145983;
-pub const HWCAP_FP: u32 = 1;
-pub const HWCAP_ASIMD: u32 = 2;
-pub const HWCAP_EVTSTRM: u32 = 4;
-pub const HWCAP_AES: u32 = 8;
-pub const HWCAP_PMULL: u32 = 16;
-pub const HWCAP_SHA1: u32 = 32;
-pub const HWCAP_SHA2: u32 = 64;
-pub const HWCAP_CRC32: u32 = 128;
-pub const HWCAP_ATOMICS: u32 = 256;
-pub const HWCAP_FPHP: u32 = 512;
-pub const HWCAP_ASIMDHP: u32 = 1024;
-pub const HWCAP_CPUID: u32 = 2048;
-pub const HWCAP_ASIMDRDM: u32 = 4096;
-pub const HWCAP_JSCVT: u32 = 8192;
-pub const HWCAP_FCMA: u32 = 16384;
-pub const HWCAP_LRCPC: u32 = 32768;
-pub const HWCAP_DCPOP: u32 = 65536;
-pub const HWCAP_SHA3: u32 = 131072;
-pub const HWCAP_SM3: u32 = 262144;
-pub const HWCAP_SM4: u32 = 524288;
-pub const HWCAP_ASIMDDP: u32 = 1048576;
-pub const HWCAP_SHA512: u32 = 2097152;
-pub const HWCAP_SVE: u32 = 4194304;
-pub const HWCAP_ASIMDFHM: u32 = 8388608;
-pub const HWCAP_DIT: u32 = 16777216;
-pub const HWCAP_USCAT: u32 = 33554432;
-pub const HWCAP_ILRCPC: u32 = 67108864;
-pub const HWCAP_FLAGM: u32 = 134217728;
-pub const HWCAP_SSBS: u32 = 268435456;
-pub const HWCAP_SB: u32 = 536870912;
-pub const HWCAP_PACA: u32 = 1073741824;
-pub const HWCAP_PACG: u32 = 2147483648;
-pub const HWCAP2_DCPODP: u32 = 1;
-pub const HWCAP2_SVE2: u32 = 2;
-pub const HWCAP2_SVEAES: u32 = 4;
-pub const HWCAP2_SVEPMULL: u32 = 8;
-pub const HWCAP2_SVEBITPERM: u32 = 16;
-pub const HWCAP2_SVESHA3: u32 = 32;
-pub const HWCAP2_SVESM4: u32 = 64;
-pub const HWCAP2_FLAGM2: u32 = 128;
-pub const HWCAP2_FRINT: u32 = 256;
-pub const HWCAP2_SVEI8MM: u32 = 512;
-pub const HWCAP2_SVEF32MM: u32 = 1024;
-pub const HWCAP2_SVEF64MM: u32 = 2048;
-pub const HWCAP2_SVEBF16: u32 = 4096;
-pub const HWCAP2_I8MM: u32 = 8192;
-pub const HWCAP2_BF16: u32 = 16384;
-pub const HWCAP2_DGH: u32 = 32768;
-pub const HWCAP2_RNG: u32 = 65536;
-pub const HWCAP2_BTI: u32 = 131072;
-pub const HWCAP2_MTE: u32 = 262144;
-pub const HWCAP2_ECV: u32 = 524288;
-pub const HWCAP2_AFP: u32 = 1048576;
-pub const HWCAP2_RPRES: u32 = 2097152;
-pub const HWCAP2_MTE3: u32 = 4194304;
-pub const HWCAP2_SME: u32 = 8388608;
-pub const HWCAP2_SME_I16I64: u32 = 16777216;
-pub const HWCAP2_SME_F64F64: u32 = 33554432;
-pub const HWCAP2_SME_I8I32: u32 = 67108864;
-pub const HWCAP2_SME_F16F32: u32 = 134217728;
-pub const HWCAP2_SME_B16F32: u32 = 268435456;
-pub const HWCAP2_SME_F32F32: u32 = 536870912;
-pub const HWCAP2_SME_FA64: u32 = 1073741824;
-pub const HWCAP2_WFXT: u32 = 2147483648;
-pub const HWCAP2_EBF16: u64 = 4294967296;
-pub const HWCAP2_SVE_EBF16: u64 = 8589934592;
-pub const HWCAP2_CSSC: u64 = 17179869184;
-pub const HWCAP2_RPRFM: u64 = 34359738368;
-pub const HWCAP2_SVE2P1: u64 = 68719476736;
-pub const HWCAP2_SME2: u64 = 137438953472;
-pub const HWCAP2_SME2P1: u64 = 274877906944;
-pub const HWCAP2_SME_I16I32: u64 = 549755813888;
-pub const HWCAP2_SME_BI32I32: u64 = 1099511627776;
-pub const HWCAP2_SME_B16B16: u64 = 2199023255552;
-pub const HWCAP2_SME_F16F16: u64 = 4398046511104;
-pub const HWCAP2_MOPS: u64 = 8796093022208;
-pub const PSR_MODE_EL0t: u32 = 0;
-pub const PSR_MODE_EL1t: u32 = 4;
-pub const PSR_MODE_EL1h: u32 = 5;
-pub const PSR_MODE_EL2t: u32 = 8;
-pub const PSR_MODE_EL2h: u32 = 9;
-pub const PSR_MODE_EL3t: u32 = 12;
-pub const PSR_MODE_EL3h: u32 = 13;
-pub const PSR_MODE_MASK: u32 = 15;
-pub const PSR_MODE32_BIT: u32 = 16;
-pub const PSR_F_BIT: u32 = 64;
-pub const PSR_I_BIT: u32 = 128;
-pub const PSR_A_BIT: u32 = 256;
-pub const PSR_D_BIT: u32 = 512;
-pub const PSR_BTYPE_MASK: u32 = 3072;
-pub const PSR_SSBS_BIT: u32 = 4096;
-pub const PSR_PAN_BIT: u32 = 4194304;
-pub const PSR_UAO_BIT: u32 = 8388608;
-pub const PSR_DIT_BIT: u32 = 16777216;
-pub const PSR_TCO_BIT: u32 = 33554432;
-pub const PSR_V_BIT: u32 = 268435456;
-pub const PSR_C_BIT: u32 = 536870912;
-pub const PSR_Z_BIT: u32 = 1073741824;
-pub const PSR_N_BIT: u32 = 2147483648;
-pub const PSR_BTYPE_SHIFT: u32 = 10;
-pub const PSR_f: u32 = 4278190080;
-pub const PSR_s: u32 = 16711680;
-pub const PSR_x: u32 = 65280;
-pub const PSR_c: u32 = 255;
-pub const PSR_BTYPE_NONE: u32 = 0;
-pub const PSR_BTYPE_JC: u32 = 1024;
-pub const PSR_BTYPE_C: u32 = 2048;
-pub const PSR_BTYPE_J: u32 = 3072;
-pub const PTRACE_SYSEMU: u32 = 31;
-pub const PTRACE_SYSEMU_SINGLESTEP: u32 = 32;
-pub const PTRACE_PEEKMTETAGS: u32 = 33;
-pub const PTRACE_POKEMTETAGS: u32 = 34;
-pub const SVE_PT_REGS_MASK: u32 = 1;
-pub const SVE_PT_REGS_FPSIMD: u32 = 0;
-pub const SVE_PT_REGS_SVE: u32 = 1;
-pub const SVE_PT_VL_INHERIT: u32 = 2;
-pub const SVE_PT_VL_ONEXEC: u32 = 4;
-pub const ZA_PT_VL_INHERIT: u32 = 2;
-pub const ZA_PT_VL_ONEXEC: u32 = 4;
 pub const GRND_NONBLOCK: u32 = 1;
 pub const GRND_RANDOM: u32 = 2;
 pub const GRND_INSECURE: u32 = 4;
@@ -7505,7 +7505,7 @@ pub const BPF_SKB_TSTAMP_UNSPEC: _bindgen_ty_30 = 0;
 pub const BPF_SKB_TSTAMP_DELIVERY_MONO: _bindgen_ty_30 = 1;
 pub type _bindgen_ty_30 = crate::types::c_uint;
 #[repr(C)]
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
 pub struct __sk_buff {
     pub len: __u32,
     pub pkt_type: __u32,
@@ -7544,7 +7544,7 @@ pub struct __sk_buff {
     pub hwtstamp: __u64,
 }
 #[repr(C)]
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
 pub union __sk_buff__bindgen_ty_1 {
     pub flow_keys: uref<bpf_flow_keys>,
     pub _bitfield_1: __BindgenBitfieldUnit<[u8; 8usize]>,
@@ -7566,7 +7566,7 @@ impl __sk_buff__bindgen_ty_1 {
     }
 }
 #[repr(C)]
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
 pub union __sk_buff__bindgen_ty_2 {
     pub sk: uref<bpf_sock>,
     pub _bitfield_1: __BindgenBitfieldUnit<[u8; 8usize]>,
@@ -8344,7 +8344,7 @@ impl Default for bpf_link_info {
     }
 }
 #[repr(C)]
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
 pub struct bpf_sock_addr {
     pub user_family: __u32,
     pub user_ip4: __u32,
@@ -8359,7 +8359,7 @@ pub struct bpf_sock_addr {
     pub __bindgen_anon_1: bpf_sock_addr__bindgen_ty_1,
 }
 #[repr(C)]
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
 pub union bpf_sock_addr__bindgen_ty_1 {
     pub sk: uref<bpf_sock>,
     pub _bitfield_1: __BindgenBitfieldUnit<[u8; 8usize]>,
@@ -9161,6 +9161,86 @@ pub type _bindgen_ty_43 = crate::types::c_uint;
 #[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
 pub struct bpf_iter_num {
     pub __opaque: [__u64; 1usize],
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
+pub struct user_pt_regs {
+    pub regs: [__u64; 31usize],
+    pub sp: __u64,
+    pub pc: __u64,
+    pub pstate: __u64,
+}
+#[repr(C)]
+#[repr(align(16))]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
+pub struct user_fpsimd_state {
+    pub vregs: [__uint128_t; 32usize],
+    pub fpsr: __u32,
+    pub fpcr: __u32,
+    pub __reserved: [__u32; 2usize],
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
+pub struct user_hwdebug_state {
+    pub dbg_info: __u32,
+    pub pad: __u32,
+    pub dbg_regs: [user_hwdebug_state__bindgen_ty_1; 16usize],
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
+pub struct user_hwdebug_state__bindgen_ty_1 {
+    pub addr: __u64,
+    pub ctrl: __u32,
+    pub pad: __u32,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
+pub struct user_sve_header {
+    pub size: __u32,
+    pub max_size: __u32,
+    pub vl: __u16,
+    pub max_vl: __u16,
+    pub flags: __u16,
+    pub __reserved: __u16,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
+pub struct user_pac_mask {
+    pub data_mask: __u64,
+    pub insn_mask: __u64,
+}
+#[repr(C)]
+#[repr(align(16))]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
+pub struct user_pac_address_keys {
+    pub apiakey: __uint128_t,
+    pub apibkey: __uint128_t,
+    pub apdakey: __uint128_t,
+    pub apdbkey: __uint128_t,
+}
+#[repr(C)]
+#[repr(align(16))]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
+pub struct user_pac_generic_keys {
+    pub apgakey: __uint128_t,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
+pub struct user_za_header {
+    pub size: __u32,
+    pub max_size: __u32,
+    pub vl: __u16,
+    pub max_vl: __u16,
+    pub flags: __u16,
+    pub __reserved: __u16,
+}
+pub type bpf_user_pt_regs_t = user_pt_regs;
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
+pub struct bpf_perf_event_data {
+    pub regs: bpf_user_pt_regs_t,
+    pub sample_period: __u64,
+    pub addr: __u64,
 }
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
@@ -14210,78 +14290,6 @@ pub struct ptrace_sud_config {
     pub selector: __u64,
     pub offset: __u64,
     pub len: __u64,
-}
-#[repr(C)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
-pub struct user_pt_regs {
-    pub regs: [__u64; 31usize],
-    pub sp: __u64,
-    pub pc: __u64,
-    pub pstate: __u64,
-}
-#[repr(C)]
-#[repr(align(16))]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
-pub struct user_fpsimd_state {
-    pub vregs: [__uint128_t; 32usize],
-    pub fpsr: __u32,
-    pub fpcr: __u32,
-    pub __reserved: [__u32; 2usize],
-}
-#[repr(C)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
-pub struct user_hwdebug_state {
-    pub dbg_info: __u32,
-    pub pad: __u32,
-    pub dbg_regs: [user_hwdebug_state__bindgen_ty_1; 16usize],
-}
-#[repr(C)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
-pub struct user_hwdebug_state__bindgen_ty_1 {
-    pub addr: __u64,
-    pub ctrl: __u32,
-    pub pad: __u32,
-}
-#[repr(C)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
-pub struct user_sve_header {
-    pub size: __u32,
-    pub max_size: __u32,
-    pub vl: __u16,
-    pub max_vl: __u16,
-    pub flags: __u16,
-    pub __reserved: __u16,
-}
-#[repr(C)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
-pub struct user_pac_mask {
-    pub data_mask: __u64,
-    pub insn_mask: __u64,
-}
-#[repr(C)]
-#[repr(align(16))]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
-pub struct user_pac_address_keys {
-    pub apiakey: __uint128_t,
-    pub apibkey: __uint128_t,
-    pub apdakey: __uint128_t,
-    pub apdbkey: __uint128_t,
-}
-#[repr(C)]
-#[repr(align(16))]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
-pub struct user_pac_generic_keys {
-    pub apgakey: __uint128_t,
-}
-#[repr(C)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
-pub struct user_za_header {
-    pub size: __u32,
-    pub max_size: __u32,
-    pub vl: __u16,
-    pub max_vl: __u16,
-    pub flags: __u16,
-    pub __reserved: __u16,
 }
 #[repr(C)]
 #[derive(Debug, Default)]

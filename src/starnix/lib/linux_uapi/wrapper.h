@@ -22,6 +22,7 @@
 #include <linux/audit.h>
 #include <linux/auxvec.h>
 #include <linux/bpf.h>
+#include <linux/bpf_perf_event.h>
 #include <linux/capability.h>
 #include <linux/close_range.h>
 #include <linux/errno.h>

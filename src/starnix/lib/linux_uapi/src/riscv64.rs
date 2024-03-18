@@ -7462,7 +7462,7 @@ pub const BPF_SKB_TSTAMP_UNSPEC: _bindgen_ty_30 = 0;
 pub const BPF_SKB_TSTAMP_DELIVERY_MONO: _bindgen_ty_30 = 1;
 pub type _bindgen_ty_30 = crate::types::c_uint;
 #[repr(C)]
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
 pub struct __sk_buff {
     pub len: __u32,
     pub pkt_type: __u32,
@@ -7501,7 +7501,7 @@ pub struct __sk_buff {
     pub hwtstamp: __u64,
 }
 #[repr(C)]
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
 pub union __sk_buff__bindgen_ty_1 {
     pub flow_keys: uref<bpf_flow_keys>,
     pub _bitfield_1: __BindgenBitfieldUnit<[u8; 8usize]>,
@@ -7523,7 +7523,7 @@ impl __sk_buff__bindgen_ty_1 {
     }
 }
 #[repr(C)]
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
 pub union __sk_buff__bindgen_ty_2 {
     pub sk: uref<bpf_sock>,
     pub _bitfield_1: __BindgenBitfieldUnit<[u8; 8usize]>,
@@ -8301,7 +8301,7 @@ impl Default for bpf_link_info {
     }
 }
 #[repr(C)]
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
 pub struct bpf_sock_addr {
     pub user_family: __u32,
     pub user_ip4: __u32,
@@ -8316,7 +8316,7 @@ pub struct bpf_sock_addr {
     pub __bindgen_anon_1: bpf_sock_addr__bindgen_ty_1,
 }
 #[repr(C)]
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
 pub union bpf_sock_addr__bindgen_ty_1 {
     pub sk: uref<bpf_sock>,
     pub _bitfield_1: __BindgenBitfieldUnit<[u8; 8usize]>,
@@ -9118,6 +9118,14 @@ pub type _bindgen_ty_43 = crate::types::c_uint;
 #[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
 pub struct bpf_iter_num {
     pub __opaque: [__u64; 1usize],
+}
+pub type bpf_user_pt_regs_t = user_regs_struct;
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
+pub struct bpf_perf_event_data {
+    pub regs: bpf_user_pt_regs_t,
+    pub sample_period: __u64,
+    pub addr: __u64,
 }
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]

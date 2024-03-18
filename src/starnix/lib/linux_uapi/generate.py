@@ -118,6 +118,8 @@ AUTO_DERIVE_TRAITS = [
     (r"robust_list", ["FromBytes", "NoCell", "FromZeros"]),
     (r"sigevent", ["FromBytes", "NoCell", "FromZeros"]),
     (r"sigval", ["AsBytes", "FromBytes", "NoCell", "FromZeros"]),
+    (r"__sk_buff", ["AsBytes", "FromBytes", "NoCell", "FromZeros"]),
+    (r"bpf_sock_addr", ["AsBytes", "FromBytes", "NoCell", "FromZeros"]),
     (r"sockaddr_in*", ["AsBytes", "FromBytes", "NoCell", "FromZeros"]),
     (r"sockaddr_ll*", ["AsBytes", "FromBytes", "NoCell", "FromZeros"]),
     (r"sock_fprog", ["FromBytes", "NoCell", "FromZeros"]),
