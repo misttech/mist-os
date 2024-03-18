@@ -640,11 +640,16 @@ impl SeProcAttrNodeType {
 }
 
 impl BytesFileOps for SeProcAttrNode {
-    fn write(&self, _current_task: &CurrentTask, data: Vec<u8>) -> Result<(), Errno> {
+    fn write(&self, current_task: &CurrentTask, data: Vec<u8>) -> Result<(), Errno> {
         let task = Task::from_weak(&self.task)?;
 
         // If SELinux is disabled then no writes are accepted.
         let security_server = task.kernel().security_server.as_ref().ok_or(errno!(EINVAL))?;
+
+        // If the current task is not the target then writes are not allowed.
+        if current_task.temp_task() != task {
+            return error!(EPERM);
+        }
 
         // Attempt to convert the Security Context string to a SID.
         // Writes that consist of a single NUL or a newline clear the SID.
