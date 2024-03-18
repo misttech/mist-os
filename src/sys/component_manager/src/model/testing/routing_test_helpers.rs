@@ -1295,7 +1295,8 @@ pub mod capability_util {
                     err,
                     fidl::Error::ClientChannelClosed {
                         status, ..
-                    } if status == s
+                    } if status == s,
+                    "Actual err {err}, Expected status {s}"
                 );
             }
             ExpectedResult::ErrWithNoEpitaph => {
