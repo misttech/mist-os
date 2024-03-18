@@ -5,12 +5,13 @@
 #[cfg(test)]
 mod test {
     use crate::{
-        EbpfHelper, EbpfProgramBuilder, FunctionSignature, NullVerifierLogger, Type, BPF_ADD,
-        BPF_ALU, BPF_ALU64, BPF_AND, BPF_ARSH, BPF_B, BPF_CALL, BPF_DIV, BPF_DW, BPF_END, BPF_EXIT,
-        BPF_H, BPF_IMM, BPF_JA, BPF_JEQ, BPF_JGE, BPF_JGT, BPF_JLE, BPF_JLT, BPF_JMP, BPF_JMP32,
-        BPF_JNE, BPF_JSET, BPF_JSGE, BPF_JSGT, BPF_JSLE, BPF_JSLT, BPF_LD, BPF_LDX, BPF_LSH,
-        BPF_MEM, BPF_MOD, BPF_MOV, BPF_MUL, BPF_NEG, BPF_OR, BPF_RSH, BPF_SRC_IMM, BPF_SRC_REG,
-        BPF_ST, BPF_STX, BPF_SUB, BPF_TO_BE, BPF_TO_LE, BPF_W, BPF_XOR,
+        new_bpf_type_identifier, EbpfHelper, EbpfProgramBuilder, FunctionSignature,
+        NullVerifierLogger, Type, BPF_ADD, BPF_ALU, BPF_ALU64, BPF_AND, BPF_ARSH, BPF_B, BPF_CALL,
+        BPF_DIV, BPF_DW, BPF_END, BPF_EXIT, BPF_H, BPF_IMM, BPF_JA, BPF_JEQ, BPF_JGE, BPF_JGT,
+        BPF_JLE, BPF_JLT, BPF_JMP, BPF_JMP32, BPF_JNE, BPF_JSET, BPF_JSGE, BPF_JSGT, BPF_JSLE,
+        BPF_JSLT, BPF_LD, BPF_LDX, BPF_LSH, BPF_MEM, BPF_MOD, BPF_MOV, BPF_MUL, BPF_NEG, BPF_OR,
+        BPF_RSH, BPF_SRC_IMM, BPF_SRC_REG, BPF_ST, BPF_STX, BPF_SUB, BPF_TO_BE, BPF_TO_LE, BPF_W,
+        BPF_XOR,
     };
     use linux_uapi::bpf_insn;
     use pest::{iterators::Pair, Parser};
@@ -651,7 +652,7 @@ mod test {
         if let Some(memory) = test_case.memory.as_ref() {
             let buffer_size = memory.len() as u64;
             builder.set_args(&[
-                Type::PtrToMemory { id: 0, offset: 0, buffer_size },
+                Type::PtrToMemory { id: new_bpf_type_identifier(), offset: 0, buffer_size },
                 Type::from(buffer_size),
             ]);
         } else {

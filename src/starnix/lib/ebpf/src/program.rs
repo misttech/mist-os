@@ -14,6 +14,16 @@ use linux_uapi::{bpf_insn, sock_filter};
 use std::{collections::HashMap, fmt::Formatter, sync::Arc};
 use zerocopy::{AsBytes, FromBytes, NoCell};
 
+/// A counter that allows to generate new ids for parameters. The namespace is the same as for id
+/// generated for types while verifying an ebpf program, but it is started a u64::MAX / 2 and so is
+/// guaranteed to never collide because the number of instruction of an ebpf program are bounded.
+static BPF_TYPE_IDENTIFIER_COUNTER: std::sync::atomic::AtomicU64 =
+    std::sync::atomic::AtomicU64::new(u64::MAX / 2);
+
+pub fn new_bpf_type_identifier() -> u64 {
+    BPF_TYPE_IDENTIFIER_COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+}
+
 pub trait EpbfRunContext {
     type Context<'a>;
 }
@@ -144,7 +154,7 @@ impl EbpfProgram<()> {
         let buffer_size = std::mem::size_of::<T>() as u64;
         let mut builder = EbpfProgramBuilder::<()>::default();
         builder.set_args(&[
-            Type::PtrToMemory { id: 0, offset: 0, buffer_size },
+            Type::PtrToMemory { id: new_bpf_type_identifier(), offset: 0, buffer_size },
             Type::from(buffer_size),
         ]);
         builder.load(code, &mut NullVerifierLogger)
