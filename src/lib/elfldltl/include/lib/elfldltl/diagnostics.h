@@ -203,12 +203,19 @@ struct DiagnosticsFlags {
   bool extra_checking = false;
 };
 
+// This is an empty subclass of std::true_type or std::false_type, but
+// different Index values yield distinct subclass types.  This is necessary for
+// [[no_unique_address]] semantics to achieve an empty struct if two adjacent
+// fields have the same Value.
+template <bool Value, size_t Index>
+struct FixedBool : std::integral_constant<bool, Value> {};
+
 // An alternative Flags type can be defined like this one to make one or more
 // of the values fixed, or to change the default value of a mutable flag.
 struct DiagnosticsPanicFlags {
-  __NO_UNIQUE_ADDRESS std::false_type multiple_errors;
-  __NO_UNIQUE_ADDRESS std::true_type warnings_are_errors;
-  __NO_UNIQUE_ADDRESS std::false_type extra_checking;
+  __NO_UNIQUE_ADDRESS FixedBool<false, 0> multiple_errors;
+  __NO_UNIQUE_ADDRESS FixedBool<true, 1> warnings_are_errors;
+  __NO_UNIQUE_ADDRESS FixedBool<false, 2> extra_checking;
 };
 
 // elfldltl::Diagnostics provides a canonical implementation of a diagnostics
@@ -327,7 +334,7 @@ class Diagnostics {
   // If multiple_errors is actually std::false_type, then use the empty objects
   // so we don't bother to keep counts at all.
   static constexpr bool kCount =
-      !std::is_same_v<decltype(std::declval<Flags>().multiple_errors), std::false_type>;
+      !std::is_base_of_v<std::false_type, decltype(std::declval<Flags>().multiple_errors)>;
 
   __NO_UNIQUE_ADDRESS Report report_;
   __NO_UNIQUE_ADDRESS Flags flags_;

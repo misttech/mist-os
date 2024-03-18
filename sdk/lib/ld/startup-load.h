@@ -26,8 +26,8 @@
 
 #include "allocator.h"
 #include "bootstrap.h"
-#include "diagnostics.h"
 #include "mutable-abi.h"
+#include "startup-diagnostics.h"
 
 namespace ld {
 
@@ -149,7 +149,7 @@ struct StartupLoadModule : public StartupLoadModuleBase,
                                        uint32_t symbolizer_modid, size_type& max_tls_modid) {
     // Diagnostics sent to diag during loading will be prefixed with the module
     // name, unless the name is empty as it is for the main executable.
-    ModuleDiagnostics module_diag(diag, this->name().str());
+    ScopedModuleDiagnostics module_diag(diag, this->name().str());
 
     // Read the file header and program headers into stack buffers.
     auto headers = elfldltl::LoadHeadersFromFile<elfldltl::Elf<>>(
@@ -229,12 +229,12 @@ struct StartupLoadModule : public StartupLoadModuleBase,
   }
 
   void ProtectRelro(Diagnostics& diag) {
-    ModuleDiagnostics module_diag{diag, this->name().str()};
+    ScopedModuleDiagnostics module_diag{diag, this->name().str()};
     std::ignore = loader_.ProtectRelro(diag, relro_);
   }
 
   void Relocate(Diagnostics& diag, const List& modules) {
-    ModuleDiagnostics module_diag{diag, this->name().str()};
+    ScopedModuleDiagnostics module_diag{diag, this->name().str()};
     elfldltl::RelocateRelative(diag, memory(), reloc_info(), load_bias());
     auto resolver = elfldltl::MakeSymbolResolver(*this, modules, diag, kTlsDescResolver);
     elfldltl::RelocateSymbolic(memory(), diag, reloc_info(), symbol_info(), load_bias(), resolver);

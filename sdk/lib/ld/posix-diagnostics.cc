@@ -5,8 +5,8 @@
 #include <string.h>
 #include <unistd.h>
 
-#include "diagnostics.h"
 #include "posix.h"
+#include "startup-diagnostics.h"
 #include "stdio/printf_core/wrapper.h"
 
 namespace ld {
@@ -32,7 +32,7 @@ void DiagnosticsReport::Printf(const char* format, va_list args) const {
 template <>
 void DiagnosticsReport::ReportModuleLoaded<StartupModule>(const StartupModule& module) const {
   if (startup_.ld_debug) {
-    SymbolizerContext<kBufferSize>(StderrWrite, module);
+    ModuleSymbolizerContext<kBufferSize>(StderrWrite, module);
   }
 }
 

@@ -18,8 +18,8 @@
 
 #include "allocator.h"
 #include "bootstrap.h"
-#include "diagnostics.h"
 #include "posix.h"
+#include "startup-diagnostics.h"
 
 namespace ld {
 namespace {
@@ -219,7 +219,7 @@ extern "C" uintptr_t StartLd(StartupStack& stack) {
   }
 
   // Now that things are bootstrapped, set up the main diagnostics object.
-  auto diag = MakeDiagnostics(startup);
+  Diagnostics diag{startup};
 
   // Set up the allocators.
   auto system_page_allocator = MakeStartupSystemPageAllocator(startup);

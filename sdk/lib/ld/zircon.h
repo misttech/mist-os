@@ -15,7 +15,7 @@
 
 #include <string_view>
 
-#include "diagnostics.h"
+#include "startup-diagnostics.h"
 #include "startup-load.h"
 
 namespace ld {

@@ -13,7 +13,7 @@
 
 #include <utility>
 
-#include "diagnostics.h"
+#include "startup-diagnostics.h"
 
 namespace ld {
 

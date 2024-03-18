@@ -6,7 +6,7 @@
 
 #include <ldmsg/ldmsg.h>
 
-#include "diagnostics.h"
+#include "startup-diagnostics.h"
 #include "zircon.h"
 
 namespace ld {

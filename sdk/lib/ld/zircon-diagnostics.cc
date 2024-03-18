@@ -8,7 +8,7 @@
 
 #include <cassert>
 
-#include "diagnostics.h"
+#include "startup-diagnostics.h"
 #include "stdio/printf_core/wrapper.h"
 #include "zircon.h"
 
@@ -90,7 +90,7 @@ void DiagnosticsReport::Printf(const char* format, va_list args) const {
 template <>
 void DiagnosticsReport::ReportModuleLoaded<StartupModule>(const StartupModule& module) const {
   if (startup_.ld_debug) {
-    SymbolizerContext<kBufferSize>(startup_.LogClosure(), module);
+    ModuleSymbolizerContext<kBufferSize>(startup_.LogClosure(), module);
   }
 }
 

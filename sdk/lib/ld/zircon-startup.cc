@@ -19,7 +19,7 @@
 
 #include "allocator.h"
 #include "bootstrap.h"
-#include "diagnostics.h"
+#include "startup-diagnostics.h"
 #include "zircon.h"
 
 namespace ld {
@@ -152,7 +152,7 @@ extern "C" StartLdResult StartLd(zx_handle_t handle, void* vdso) {
   StartupData startup = ReadBootstrap(bootstrap.borrow());
 
   // Now that things are bootstrapped, set up the main diagnostics object.
-  auto diag = MakeDiagnostics(startup);
+  Diagnostics diag{startup};
 
   // Start publishing profiling data in an instrumented build.  Before this,
   // the instrumentation is updating counters in the data segment.  After this,
@@ -172,8 +172,8 @@ extern "C" StartLdResult StartLd(zx_handle_t handle, void* vdso) {
   auto scratch = MakeStartupScratchAllocator(system_page_allocator);
   auto initial_exec = MakeStartupInitialExecAllocator(system_page_allocator);
 
-  // TODO(https://fxbug.dev/42084623): We should be making an ldsvc.Config call here to get the correct shared
-  // objects.
+  // TODO(https://fxbug.dev/42084623): We should be making an ldsvc.Config call
+  // here to get the correct shared objects.
 
   // Load the main executable.
   LoadExecutableResult main =
