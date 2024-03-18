@@ -640,7 +640,7 @@ func (c *compiler) compileMemberIdentifier(val fidlgen.EncodedCompoundIdentifier
 	return fmt.Sprintf("%s::%s", c.compileDeclIdentifier(decl), member)
 }
 
-func compileLiteral(val fidlgen.Literal, typ fidlgen.Type) string {
+func (c *compiler) compileLiteral(val fidlgen.Literal, typ fidlgen.Type) string {
 	switch val.Kind {
 	case fidlgen.StringLiteral:
 		var b strings.Builder
@@ -669,11 +669,15 @@ func compileLiteral(val fidlgen.Literal, typ fidlgen.Type) string {
 		return b.String()
 	case fidlgen.NumericLiteral:
 		if typ.Kind == fidlgen.PrimitiveType &&
-			(typ.PrimitiveSubtype == fidlgen.Float32 || typ.PrimitiveSubtype == fidlgen.Float64) {
-			if !strings.ContainsRune(val.Value, '.') {
-				return fmt.Sprintf("%s.0", val.Value)
+			(typ.PrimitiveSubtype == fidlgen.Float32 || typ.PrimitiveSubtype == fidlgen.Float64) &&
+			!strings.ContainsRune(val.Value, '.') {
+			return fmt.Sprintf("%s.0", val.Value)
+		}
+		if typ.Kind == fidlgen.IdentifierType && c.lookupDeclInfo(typ.Identifier).Type == fidlgen.BitsDeclType {
+			if val.Value != "0" {
+				panic(fmt.Sprintf("integer literal for bits const must be 0, got %s", val.Value))
 			}
-			return val.Value
+			return fmt.Sprintf("%s::empty()", c.compileDeclIdentifier(typ.Identifier))
 		}
 		return val.Value
 	case fidlgen.BoolLiteral:
@@ -714,7 +718,7 @@ func (c *compiler) compileConstant(val fidlgen.Constant, typ fidlgen.Type) strin
 		}
 		return expr
 	case fidlgen.LiteralConstant:
-		return compileLiteral(*val.Literal, typ)
+		return c.compileLiteral(*val.Literal, typ)
 	case fidlgen.BinaryOperator:
 		if typ.Kind == fidlgen.PrimitiveType {
 			return val.Value

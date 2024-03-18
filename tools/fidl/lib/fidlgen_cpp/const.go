@@ -48,16 +48,25 @@ func (c *compiler) compileConstant(val fidlgen.Constant, t *Type, typ fidlgen.Ty
 		return ConstantValue{HLCPP: n.HLCPP.String(), Wire: n.Wire.String(), Unified: n.Unified.String()}
 	case fidlgen.LiteralConstant:
 		lit := c.compileLiteral(*val.Literal, typ)
+		if t != nil && t.Kind == TypeKinds.Bits {
+			if val.Value != "0" {
+				panic(fmt.Sprintf("integer literal for bits const must be 0, got %s", val.Value))
+			}
+			return staticCastValue(lit, t)
+		}
 		return ConstantValue{HLCPP: lit, Wire: lit, Unified: lit}
 	case fidlgen.BinaryOperator:
-		return ConstantValue{
-			HLCPP:   fmt.Sprintf("static_cast<%s>(%s)", t.nameVariants.HLCPP, val.Value),
-			Wire:    fmt.Sprintf("static_cast<%s>(%s)", t.nameVariants.Wire, val.Value),
-			Unified: fmt.Sprintf("static_cast<%s>(%s)", t.nameVariants.Unified, val.Value),
-		}
-		// return ConstantValue{HLCPP: naturalVal, Wire: wireVal}
+		return staticCastValue(val.Value, t)
 	default:
 		panic(fmt.Sprintf("unknown constant kind: %v", val.Kind))
+	}
+}
+
+func staticCastValue(value string, t *Type) ConstantValue {
+	return ConstantValue{
+		HLCPP:   fmt.Sprintf("static_cast<%s>(%s)", t.nameVariants.HLCPP, value),
+		Wire:    fmt.Sprintf("static_cast<%s>(%s)", t.nameVariants.Wire, value),
+		Unified: fmt.Sprintf("static_cast<%s>(%s)", t.nameVariants.Unified, value),
 	}
 }
 

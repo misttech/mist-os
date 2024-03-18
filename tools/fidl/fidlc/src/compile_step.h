@@ -61,9 +61,11 @@ class CompileStep : public Compiler::Step {
   bool ResolveLiteralConstant(LiteralConstant* literal_constant,
                               std::optional<const Type*> opt_type);
   bool ResolveAsOptional(Constant* constant);
+  bool ResolveLiteralConstantNumeric(LiteralConstant* literal_constant,
+                                     const PrimitiveType* primitive_type);
   template <typename NumericType>
-  bool ResolveLiteralConstantKindNumericLiteral(LiteralConstant* literal_constant,
-                                                const Type* type);
+  bool ResolveLiteralConstantNumericImpl(LiteralConstant* literal_constant,
+                                         const PrimitiveType* primitive_type);
 
   // Type methods
   bool TypeCanBeConst(const Type* type);

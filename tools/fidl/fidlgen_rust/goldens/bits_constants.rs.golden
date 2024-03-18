@@ -18,6 +18,8 @@ use {
 #[cfg(target_os = "fuchsia")]
 use fuchsia_zircon as zx;
 
+pub const CONST0: BitsType = BitsType::empty();
+
 pub const CONST1: BitsType = BitsType::A;
 
 pub const CONST2: BitsType = BitsType::from_bits_truncate(129);

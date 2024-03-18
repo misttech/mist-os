@@ -14,13 +14,26 @@
   "dependency_identifiers": [],
   "consts": [
     {
+      "identifier": "test.bitsconstants/Const0",
+      "location": {
+        "is_virtual": false,
+        "file": "../../tools/fidl/fidlc/testdata/bits_constants.test.fidl",
+        "data": "Const0",
+        "start_offset": 125,
+        "end_offset": 131
+      },
+      "value": {
+        "type": "literal"
+      }
+    },
+    {
       "identifier": "test.bitsconstants/Const1",
       "location": {
         "is_virtual": false,
         "file": "../../tools/fidl/fidlc/testdata/bits_constants.test.fidl",
         "data": "Const1",
-        "start_offset": 125,
-        "end_offset": 131
+        "start_offset": 152,
+        "end_offset": 158
       },
       "value": {
         "type": "identifier",
@@ -29,8 +42,8 @@
           "is_virtual": false,
           "file": "../../tools/fidl/fidlc/testdata/bits_constants.test.fidl",
           "data": "BitsType.A",
-          "start_offset": 143,
-          "end_offset": 153
+          "start_offset": 170,
+          "end_offset": 180
         }
       }
     },
@@ -40,8 +53,8 @@
         "is_virtual": false,
         "file": "../../tools/fidl/fidlc/testdata/bits_constants.test.fidl",
         "data": "Const2",
-        "start_offset": 161,
-        "end_offset": 167
+        "start_offset": 188,
+        "end_offset": 194
       },
       "value": {
         "type": "binary_operator",
@@ -52,8 +65,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/bits_constants.test.fidl",
             "data": "BitsType.A",
-            "start_offset": 179,
-            "end_offset": 189
+            "start_offset": 206,
+            "end_offset": 216
           }
         },
         "rhs": {
@@ -63,8 +76,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/bits_constants.test.fidl",
             "data": "BitsType.B",
-            "start_offset": 192,
-            "end_offset": 202
+            "start_offset": 219,
+            "end_offset": 229
           }
         }
       }
@@ -75,8 +88,8 @@
         "is_virtual": false,
         "file": "../../tools/fidl/fidlc/testdata/bits_constants.test.fidl",
         "data": "Const3",
-        "start_offset": 210,
-        "end_offset": 216
+        "start_offset": 237,
+        "end_offset": 243
       },
       "value": {
         "type": "binary_operator",
@@ -87,8 +100,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/bits_constants.test.fidl",
             "data": "BitsType.A",
-            "start_offset": 228,
-            "end_offset": 238
+            "start_offset": 255,
+            "end_offset": 265
           }
         },
         "rhs": {
@@ -100,8 +113,8 @@
               "is_virtual": false,
               "file": "../../tools/fidl/fidlc/testdata/bits_constants.test.fidl",
               "data": "BitsType.B",
-              "start_offset": 241,
-              "end_offset": 251
+              "start_offset": 268,
+              "end_offset": 278
             }
           },
           "rhs": {
@@ -111,8 +124,8 @@
               "is_virtual": false,
               "file": "../../tools/fidl/fidlc/testdata/bits_constants.test.fidl",
               "data": "BitsType.C",
-              "start_offset": 254,
-              "end_offset": 264
+              "start_offset": 281,
+              "end_offset": 291
             }
           }
         }

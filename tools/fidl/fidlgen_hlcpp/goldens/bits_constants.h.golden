@@ -70,6 +70,8 @@ inline zx_status_t Clone(::test::bitsconstants::BitsType value,
   return ZX_OK;
 }
 
+constexpr ::test::bitsconstants::BitsType Const0 = static_cast<::test::bitsconstants::BitsType>(0u);
+
 constexpr ::test::bitsconstants::BitsType Const1 = ::test::bitsconstants::BitsType::A;
 
 constexpr ::test::bitsconstants::BitsType Const2 = static_cast<::test::bitsconstants::BitsType>(129);

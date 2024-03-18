@@ -364,7 +364,7 @@ const c MyEnum = MyEnum.A;
   ASSERT_COMPILED(library);
 }
 
-TEST(ConstsTests, GoodEnumTypedConstBitsMemberReference) {
+TEST(ConstsTests, GoodBitsTypedConstBitsMemberReference) {
   TestLibrary library(R"FIDL(
 library example;
 
@@ -372,6 +372,18 @@ type MyBits = strict bits : uint32 {
     A = 0x00000001;
 };
 const c MyBits = MyBits.A;
+)FIDL");
+  ASSERT_COMPILED(library);
+}
+
+TEST(ConstsTests, GoodBitsTypedConstZero) {
+  TestLibrary library(R"FIDL(
+library example;
+
+type MyBits = strict bits : uint32 {
+    A = 0x00000001;
+};
+const c MyBits = 0;
 )FIDL");
   ASSERT_COMPILED(library);
 }

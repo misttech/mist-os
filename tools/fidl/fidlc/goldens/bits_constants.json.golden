@@ -98,10 +98,43 @@
   ],
   "const_declarations": [
     {
-      "name": "test.bitsconstants/Const1",
+      "name": "test.bitsconstants/Const0",
       "location": {
         "filename": "../../tools/fidl/fidlc/testdata/bits_constants.test.fidl",
         "line": 9,
+        "column": 7,
+        "length": 6
+      },
+      "type": {
+        "kind": "identifier",
+        "identifier": "test.bitsconstants/BitsType",
+        "nullable": false,
+        "type_shape_v2": {
+          "inline_size": 4,
+          "alignment": 4,
+          "depth": 0,
+          "max_handles": 0,
+          "max_out_of_line": 0,
+          "has_padding": false,
+          "has_flexible_envelope": false
+        }
+      },
+      "value": {
+        "kind": "literal",
+        "value": "0",
+        "expression": "0",
+        "literal": {
+          "kind": "numeric",
+          "value": "0",
+          "expression": "0"
+        }
+      }
+    },
+    {
+      "name": "test.bitsconstants/Const1",
+      "location": {
+        "filename": "../../tools/fidl/fidlc/testdata/bits_constants.test.fidl",
+        "line": 10,
         "column": 7,
         "length": 6
       },
@@ -130,7 +163,7 @@
       "name": "test.bitsconstants/Const2",
       "location": {
         "filename": "../../tools/fidl/fidlc/testdata/bits_constants.test.fidl",
-        "line": 10,
+        "line": 11,
         "column": 7,
         "length": 6
       },
@@ -158,7 +191,7 @@
       "name": "test.bitsconstants/Const3",
       "location": {
         "filename": "../../tools/fidl/fidlc/testdata/bits_constants.test.fidl",
-        "line": 11,
+        "line": 12,
         "column": 7,
         "length": 6
       },
@@ -197,10 +230,12 @@
     "test.bitsconstants/BitsType",
     "test.bitsconstants/Const3",
     "test.bitsconstants/Const2",
-    "test.bitsconstants/Const1"
+    "test.bitsconstants/Const1",
+    "test.bitsconstants/Const0"
   ],
   "declarations": {
     "test.bitsconstants/BitsType": "bits",
+    "test.bitsconstants/Const0": "const",
     "test.bitsconstants/Const1": "const",
     "test.bitsconstants/Const2": "const",
     "test.bitsconstants/Const3": "const"

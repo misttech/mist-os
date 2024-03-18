@@ -10,6 +10,7 @@ import (
 )
 
 const (
+	Const0 BitsType = 0
 	Const1 BitsType = BitsTypeA
 	Const2 BitsType = 129
 	Const3 BitsType = 131

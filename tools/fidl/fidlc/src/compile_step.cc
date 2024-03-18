@@ -433,49 +433,90 @@ bool CompileStep::ResolveLiteralConstant(LiteralConstant* literal_constant,
       return true;
     }
     case RawLiteral::Kind::kNumeric: {
-      // Even though `untyped numeric` is convertible to any numeric type, we
-      // still need to check for overflows which is done in
-      // ResolveLiteralConstantKindNumericLiteral.
-      switch (static_cast<const PrimitiveType*>(type)->subtype) {
-        case PrimitiveSubtype::kInt8:
-          return ResolveLiteralConstantKindNumericLiteral<int8_t>(literal_constant, type);
-        case PrimitiveSubtype::kInt16:
-          return ResolveLiteralConstantKindNumericLiteral<int16_t>(literal_constant, type);
-        case PrimitiveSubtype::kInt32:
-          return ResolveLiteralConstantKindNumericLiteral<int32_t>(literal_constant, type);
-        case PrimitiveSubtype::kInt64:
-          return ResolveLiteralConstantKindNumericLiteral<int64_t>(literal_constant, type);
-        case PrimitiveSubtype::kUint8:
-        case PrimitiveSubtype::kZxUchar:
-          return ResolveLiteralConstantKindNumericLiteral<uint8_t>(literal_constant, type);
-        case PrimitiveSubtype::kUint16:
-          return ResolveLiteralConstantKindNumericLiteral<uint16_t>(literal_constant, type);
-        case PrimitiveSubtype::kUint32:
-          return ResolveLiteralConstantKindNumericLiteral<uint32_t>(literal_constant, type);
-        case PrimitiveSubtype::kUint64:
-        case PrimitiveSubtype::kZxUsize64:
-        case PrimitiveSubtype::kZxUintptr64:
-          return ResolveLiteralConstantKindNumericLiteral<uint64_t>(literal_constant, type);
-        case PrimitiveSubtype::kFloat32:
-          return ResolveLiteralConstantKindNumericLiteral<float>(literal_constant, type);
-        case PrimitiveSubtype::kFloat64:
-          return ResolveLiteralConstantKindNumericLiteral<double>(literal_constant, type);
+      switch (type->kind) {
+        case Type::Kind::kPrimitive:
+          return ResolveLiteralConstantNumeric(literal_constant,
+                                               static_cast<const PrimitiveType*>(type));
+        case Type::Kind::kIdentifier: {
+          ZX_ASSERT(static_cast<const IdentifierType*>(type)->type_decl->kind == Decl::Kind::kBits);
+          auto underlying_type = UnderlyingType(type);
+          if (underlying_type->kind != Type::Kind::kPrimitive)
+            return false;
+          auto primitive_type = static_cast<const PrimitiveType*>(underlying_type);
+          if (!ResolveLiteralConstantNumeric(literal_constant, primitive_type))
+            return false;
+          auto& value = literal_constant->Value();
+          uint64_t raw_value;
+          switch (value.kind) {
+            case ConstantValue::Kind::kUint8:
+              raw_value = static_cast<const NumericConstantValue<uint8_t>&>(value).value;
+              break;
+            case ConstantValue::Kind::kUint16:
+              raw_value = static_cast<const NumericConstantValue<uint16_t>&>(value).value;
+              break;
+            case ConstantValue::Kind::kUint32:
+              raw_value = static_cast<const NumericConstantValue<uint32_t>&>(value).value;
+              break;
+            case ConstantValue::Kind::kUint64:
+              raw_value = static_cast<const NumericConstantValue<uint64_t>&>(value).value;
+              break;
+            default:
+              return false;
+          }
+          if (raw_value != 0) {
+            return reporter()->Fail(ErrTypeCannotBeConvertedToType,
+                                    literal_constant->literal->span(), literal_constant,
+                                    inferred_type, type);
+          }
+          return true;
+        }
         default:
-          ZX_PANIC("should not have any other primitive type reachable");
+          ZX_PANIC("TypeIsConvertibleTo should have returned false");
       }
     }
   }  // switch
 }
 
+bool CompileStep::ResolveLiteralConstantNumeric(LiteralConstant* literal_constant,
+                                                const PrimitiveType* primitive_type) {
+  switch (primitive_type->subtype) {
+    case PrimitiveSubtype::kInt8:
+      return ResolveLiteralConstantNumericImpl<int8_t>(literal_constant, primitive_type);
+    case PrimitiveSubtype::kInt16:
+      return ResolveLiteralConstantNumericImpl<int16_t>(literal_constant, primitive_type);
+    case PrimitiveSubtype::kInt32:
+      return ResolveLiteralConstantNumericImpl<int32_t>(literal_constant, primitive_type);
+    case PrimitiveSubtype::kInt64:
+      return ResolveLiteralConstantNumericImpl<int64_t>(literal_constant, primitive_type);
+    case PrimitiveSubtype::kUint8:
+    case PrimitiveSubtype::kZxUchar:
+      return ResolveLiteralConstantNumericImpl<uint8_t>(literal_constant, primitive_type);
+    case PrimitiveSubtype::kUint16:
+      return ResolveLiteralConstantNumericImpl<uint16_t>(literal_constant, primitive_type);
+    case PrimitiveSubtype::kUint32:
+      return ResolveLiteralConstantNumericImpl<uint32_t>(literal_constant, primitive_type);
+    case PrimitiveSubtype::kUint64:
+    case PrimitiveSubtype::kZxUsize64:
+    case PrimitiveSubtype::kZxUintptr64:
+      return ResolveLiteralConstantNumericImpl<uint64_t>(literal_constant, primitive_type);
+    case PrimitiveSubtype::kFloat32:
+      return ResolveLiteralConstantNumericImpl<float>(literal_constant, primitive_type);
+    case PrimitiveSubtype::kFloat64:
+      return ResolveLiteralConstantNumericImpl<double>(literal_constant, primitive_type);
+    default:
+      ZX_PANIC("should not have any other primitive type reachable");
+  }
+}
 template <typename NumericType>
-bool CompileStep::ResolveLiteralConstantKindNumericLiteral(LiteralConstant* literal_constant,
-                                                           const Type* type) {
+bool CompileStep::ResolveLiteralConstantNumericImpl(LiteralConstant* literal_constant,
+                                                    const PrimitiveType* primitive_type) {
   NumericType value;
   const auto span = literal_constant->literal->span();
   std::string string_data(span.data().data(), span.data().data() + span.data().size());
   switch (ParseNumeric(string_data, &value)) {
     case ParseNumericResult::kSuccess:
-      literal_constant->ResolveTo(std::make_unique<NumericConstantValue<NumericType>>(value), type);
+      literal_constant->ResolveTo(std::make_unique<NumericConstantValue<NumericType>>(value),
+                                  primitive_type);
       return true;
     case ParseNumericResult::kMalformed:
       // The caller (ResolveLiteralConstant) ensures that the constant kind is
@@ -484,7 +525,7 @@ bool CompileStep::ResolveLiteralConstantKindNumericLiteral(LiteralConstant* lite
       // to the data being too large, rather than bad input.
       [[fallthrough]];
     case ParseNumericResult::kOutOfBounds:
-      return reporter()->Fail(ErrConstantOverflowsType, span, literal_constant, type);
+      return reporter()->Fail(ErrConstantOverflowsType, span, literal_constant, primitive_type);
   }
 }
 
@@ -663,6 +704,12 @@ bool CompileStep::TypeIsConvertibleTo(const Type* from_type, const Type* to_type
           // not be allowed to convert a float to an int.
           return from_primitive_type->subtype != PrimitiveSubtype::kBool;
       }
+    }
+    case Type::Kind::kIdentifier: {
+      // Allow kUntypedNumeric for `const NONE BitsType = 0;`.
+      auto identifier_type = static_cast<const IdentifierType*>(to_type);
+      return identifier_type->type_decl->kind == Decl::Kind::kBits &&
+             from_type->kind == Type::Kind::kUntypedNumeric;
     }
     default:
       return false;
