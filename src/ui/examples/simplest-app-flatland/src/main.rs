@@ -286,7 +286,7 @@ async fn main() {
 
     let flatland =
         connect_to_protocol::<fland::FlatlandMarker>().expect("error connecting to Flatland");
-    flatland.set_debug_name("Flatland ViewProvider Example").expect("fidl error");
+    flatland.set_debug_name("simplest-app-flatland").expect("fidl error");
 
     setup_handle_flatland_events(flatland.take_event_stream(), internal_sender.clone());
     let mut app = if use_view_provider {
@@ -335,6 +335,7 @@ async fn main() {
                     // Present all pending updates with a trace flow into Scenic based on
                     // present_count.
                     trace::flow_begin!(c"gfx", c"Flatland::Present", present_count.into());
+                    trace::flow_begin!(c"gfx", c"Flatland::PerAppPresent[simplest-app-flatland]", present_count.into());
                     flatland.present(fland::PresentArgs::default()).expect("Present call failed");
                     present_count += 1;
                   }

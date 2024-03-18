@@ -15,6 +15,7 @@
 #include <functional>
 #include <memory>
 #include <sstream>
+#include <string>
 #include <utility>
 #include <vector>
 
@@ -231,6 +232,11 @@ Flatland::~Flatland() {
 void Flatland::Present(fuchsia::ui::composition::PresentArgs args) {
   TRACE_DURATION("gfx", "Flatland::Present", "debug_name", TA_STRING(debug_name_.c_str()));
   TRACE_FLOW_END("gfx", "Flatland::Present", present_count_);
+
+  std::string per_app_tracing_name = "Flatland::PerAppPresent[" + debug_name_ + "]";
+  TRACE_DURATION("gfx", per_app_tracing_name.c_str());
+  TRACE_FLOW_END("gfx", per_app_tracing_name.c_str(), present_count_);
+
   ++present_count_;
 
   FLATLAND_VERBOSE_LOG << "Flatland::Present() #" << present_count_ << " for " << local_root_ << " "
@@ -267,12 +273,14 @@ void Flatland::Present(fuchsia::ui::composition::PresentArgs args) {
 
   auto root_handle = GetRoot();
 
-  // TODO(https://fxbug.dev/42116832): Decide on a proper limit on compute time for topological sorting.
+  // TODO(https://fxbug.dev/42116832): Decide on a proper limit on compute time for topological
+  // sorting.
   auto data = transform_graph_.ComputeAndCleanup(root_handle, std::numeric_limits<uint64_t>::max());
   FX_DCHECK(data.iterations != std::numeric_limits<uint64_t>::max());
 
-  // TODO(https://fxbug.dev/42111664): Once the 2D scene graph is externalized, don't commit changes if a cycle
-  // is detected. Instead, kill the channel and remove the sub-graph from the global graph.
+  // TODO(https://fxbug.dev/42111664): Once the 2D scene graph is externalized, don't commit changes
+  // if a cycle is detected. Instead, kill the channel and remove the sub-graph from the global
+  // graph.
   failure_since_previous_present_ |= !data.cyclical_edges.empty();
 
   if (failure_since_previous_present_) {
@@ -391,7 +399,8 @@ void Flatland::Present(fuchsia::ui::composition::PresentArgs args) {
 
   // Safe to capture |this| because the Flatland is guaranteed to outlive |fence_queue_|,
   // Flatland is non-movable and FenceQueue does not fire closures after destruction.
-  // TODO(https://fxbug.dev/42156567): make the fences be the first arg, and the closure be the second.
+  // TODO(https://fxbug.dev/42156567): make the fences be the first arg, and the closure be the
+  // second.
   fence_queue_->QueueTask(
       [this, present_id, requested_presentation_time = args.requested_presentation_time(),
        unsquashable = args.unsquashable(), uber_struct = std::move(uber_struct),
@@ -752,8 +761,8 @@ void Flatland::SetClipBoundary(TransformId transform_id,
 
 void Flatland::SetClipBoundaryInternal(TransformHandle handle, fuchsia::math::Rect bounds) {
   if (bounds.width <= 0 || bounds.height <= 0) {
-    error_reporter_->ERROR() << "SetClipBoundary failed, width/height must both be positive "
-                             << "(" << bounds.width << ", " << bounds.height << ")";
+    error_reporter_->ERROR() << "SetClipBoundary failed, width/height must both be positive " << "("
+                             << bounds.width << ", " << bounds.height << ")";
     ReportBadOperationError();
     return;
   }
@@ -1111,7 +1120,8 @@ void Flatland::SetImageSampleRegion(ContentId image_id, RectF rect) {
     // image_height) limits, so we only clamp the positive differences. The root cause is the
     // precision errors in floating point arithmetic when a client tries to calculate floats within
     // pixel space.
-    // TODO(https://fxbug.dev/42082599): Remove floating point precision error checks and use uints instead.
+    // TODO(https://fxbug.dev/42082599): Remove floating point precision error checks and use uints
+    // instead.
     ClampIfNear(&rect.width, rect.x + rect.width - image_width);
     ClampIfNear(&rect.height, rect.y + rect.height - image_height);
     if (rect.x < 0.f || rect.width < 0.f || (rect.x + rect.width) > image_width || rect.y < 0.f ||
@@ -1647,8 +1657,8 @@ void Flatland::OnNextFrameBegin(uint32_t additional_present_credits,
 void Flatland::OnFramePresented(const std::map<scheduling::PresentId, zx::time>& latched_times,
                                 scheduling::PresentTimestamps present_times) {
   TRACE_DURATION("gfx", "Flatland::OnFramePresented");
-  // TODO(https://fxbug.dev/42141795): remove `num_presents_allowed` from this event.  Clients should obtain
-  // this information from OnPresentProcessedValues().
+  // TODO(https://fxbug.dev/42141795): remove `num_presents_allowed` from this event.  Clients
+  // should obtain this information from OnPresentProcessedValues().
   present2_helper_.OnPresented(latched_times, present_times, /*num_presents_allowed=*/0);
 }
 

@@ -402,7 +402,9 @@ async fn main() {
 
     let flatland =
         connect_to_protocol::<fland::FlatlandMarker>().expect("error connecting to Flatland");
-    flatland.set_debug_name("Flatland ViewProvider Example").expect("fidl error");
+
+    const DEBUG_NAME: &str = "flatland-view-provider-example";
+    flatland.set_debug_name(DEBUG_NAME).expect("fidl error");
 
     let sched_lib = ThroughputScheduler::new();
 
@@ -485,6 +487,7 @@ async fn main() {
             trace::duration!(c"gfx", c"FlatlandApp::PresentBegin");
             app.draw(present_parameters.expected_presentation_time, renderer.deref_mut());
             trace::flow_begin!(c"gfx", c"Flatland::Present", present_count.into());
+            trace::flow_begin!(c"gfx", c"Flatland::PerAppPresent[flatland-view-provider-example]", present_count.into());
             present_count += 1;
             flatland
                 .present(fland::PresentArgs {
