@@ -13,8 +13,6 @@ use crate::{
     BindingsContext, CoreCtx, StackState,
 };
 
-// TODO(https://fxbug.dev/42080992): Clean this up once it's used.
-#[allow(dead_code)]
 pub(crate) trait FilterHandlerProvider<I: IpExt, BC: FilterBindingsTypes> {
     type Handler<'a>: FilterHandler<I, BC>
     where
