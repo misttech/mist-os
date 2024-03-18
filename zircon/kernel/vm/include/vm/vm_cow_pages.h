@@ -77,18 +77,15 @@ class VmCowPages final : public VmHierarchyBase,
   static zx_status_t Create(fbl::RefPtr<VmHierarchyState> root_lock, VmCowPagesOptions options,
                             uint32_t pmm_alloc_flags, uint64_t size,
                             ktl::unique_ptr<DiscardableVmoTracker> discardable_tracker,
-                            fbl::RefPtr<AttributionObject> attribution_object,
                             fbl::RefPtr<VmCowPages>* cow_pages);
 
   static zx_status_t CreateExternal(fbl::RefPtr<PageSource> src, VmCowPagesOptions options,
                                     fbl::RefPtr<VmHierarchyState> root_lock, uint64_t size,
-                                    fbl::RefPtr<AttributionObject> attribution_object,
                                     fbl::RefPtr<VmCowPages>* cow_pages);
 
   // Creates a copy-on-write clone with the desired parameters. This can fail due to various
   // internal states not being correct.
   zx_status_t CreateCloneLocked(CloneType type, uint64_t offset, uint64_t size,
-                                fbl::RefPtr<AttributionObject> attribution_object,
                                 fbl::RefPtr<VmCowPages>* child_cow) TA_REQ(lock());
 
   // Creates a child that looks back to this VmCowPages for all operations. Once a child slice is
@@ -612,8 +609,7 @@ class VmCowPages final : public VmHierarchyBase,
   // private constructor (use Create...())
   VmCowPages(fbl::RefPtr<VmHierarchyState> root_lock, VmCowPagesOptions options,
              uint32_t pmm_alloc_flags, uint64_t size, fbl::RefPtr<PageSource> page_source,
-             ktl::unique_ptr<DiscardableVmoTracker> discardable_tracker,
-             fbl::RefPtr<AttributionObject> attribution_object);
+             ktl::unique_ptr<DiscardableVmoTracker> discardable_tracker);
 
   ~VmCowPages() override;
 
@@ -947,7 +943,6 @@ class VmCowPages final : public VmHierarchyBase,
   // transitions into being a hidden node and two children are created. This VMO is cloned into the
   // left child and the right child becomes the snapshot.
   zx_status_t CloneBidirectionalLocked(uint64_t offset, uint64_t size,
-                                       fbl::RefPtr<AttributionObject> attribution_object,
                                        fbl::RefPtr<VmCowPages>* cow_child,
                                        uint64_t new_root_parent_offset, uint64_t child_parent_limit)
       TA_REQ(lock());
@@ -955,7 +950,6 @@ class VmCowPages final : public VmHierarchyBase,
   // Helper function for CreateCloneLocked. Performs unidirectional clone operation where this VMO
   // is cloned and the child clone is then hung in an appropriate position of the COW pages chain.
   zx_status_t CloneUnidirectionalLocked(uint64_t offset, uint64_t size,
-                                        fbl::RefPtr<AttributionObject> attribution_object,
                                         fbl::RefPtr<VmCowPages>* cow_child,
                                         uint64_t new_root_parent_offset,
                                         uint64_t child_parent_limit) TA_REQ(lock());
@@ -1234,8 +1228,8 @@ class VmCowPages final : public VmHierarchyBase,
   fbl::RefPtr<VmCowPages> parent_ TA_GUARDED(lock());
 
   // list of every child
-  fbl::TaggedDoublyLinkedList<VmCowPages*, internal::ChildListTag> children_list_ TA_GUARDED(
-      lock());
+  fbl::TaggedDoublyLinkedList<VmCowPages*, internal::ChildListTag> children_list_
+      TA_GUARDED(lock());
 
   // Flag used for walking back up clone tree without recursion. See ::CloneCowPageLocked.
   enum class StackDir : bool {
@@ -1265,12 +1259,6 @@ class VmCowPages final : public VmHierarchyBase,
 
   // Count reclamation events so that we can report them to the user.
   uint64_t reclamation_event_count_ TA_GUARDED(lock()) = 0;
-
-#if KERNEL_BASED_MEMORY_ATTRIBUTION
-  // Required reference back to a AttributionObject associated with the process that last uniquely
-  // owned these pages.
-  fbl::RefPtr<AttributionObject> attribution_object_ TA_GUARDED(lock());
-#endif
 
   // a tree of pages
   VmPageList page_list_ TA_GUARDED(lock());

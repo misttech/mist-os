@@ -23,8 +23,7 @@ EmbeddedVmo::EmbeddedVmo(const char* name, const void* image, size_t size,
 
   // create vmo out of ro data mapped in kernel space
   fbl::RefPtr<VmObjectPaged> vmo;
-  zx_status_t status = VmObjectPaged::CreateFromWiredPages(
-      image, size, true, AttributionObject::GetKernelAttribution(), &vmo);
+  zx_status_t status = VmObjectPaged::CreateFromWiredPages(image, size, true, &vmo);
   ASSERT(status == ZX_OK);
 
   fbl::RefPtr<ContentSizeManager> content_size_manager;

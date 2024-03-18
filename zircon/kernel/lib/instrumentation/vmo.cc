@@ -29,8 +29,7 @@ class SymbolizerFile {
  public:
   SymbolizerFile() {
     zx_status_t status =
-        VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY, VmObjectPaged::kResizable, PAGE_SIZE,
-                              AttributionObject::GetKernelAttribution(), &vmo_);
+        VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY, VmObjectPaged::kResizable, PAGE_SIZE, &vmo_);
     ZX_ASSERT(status == ZX_OK);
   }
 
@@ -107,8 +106,7 @@ zx_status_t InstrumentationData::GetVmos(Handle* handles[]) {
     KernelHandle<VmObjectDispatcher> handle(stub_vmo);
     if (!stub_vmo) {
       fbl::RefPtr<VmObjectPaged> vmo;
-      zx_status_t status = VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY, 0, 0,
-                                                 AttributionObject::GetKernelAttribution(), &vmo);
+      zx_status_t status = VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY, 0, 0, &vmo);
       ZX_ASSERT(status == ZX_OK);
       fbl::RefPtr<ContentSizeManager> content_size_manager;
       status = ContentSizeManager::Create(0, &content_size_manager);

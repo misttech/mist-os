@@ -23,8 +23,7 @@
 KernelHandle<sampler::ThreadSamplerDispatcher> sampler::ThreadSamplerDispatcher::gThreadSampler_;
 
 zx::result<> sampler::ThreadSamplerDispatcher::CreateImpl(
-    const zx_sampler_config_t& config, const fbl::RefPtr<AttributionObject>& attribution,
-    KernelHandle<ThreadSamplerDispatcher>& read_handle,
+    const zx_sampler_config_t& config, KernelHandle<ThreadSamplerDispatcher>& read_handle,
     KernelHandle<ThreadSamplerDispatcher>& write_handle) {
   const size_t num_cpus = percpu::processor_count();
 
@@ -76,9 +75,8 @@ zx::result<> sampler::ThreadSamplerDispatcher::CreateImpl(
   {
     Guard<CriticalMutex> guard{&shared_regions->state_lock};
 
-    zx::result<fbl::Array<IobRegion>> regions =
-        CreateRegions(configs, attribution, write_dispatcher.dispatcher().get(),
-                      read_dispatcher.dispatcher().get());
+    zx::result<fbl::Array<IobRegion>> regions = CreateRegions(
+        configs, write_dispatcher.dispatcher().get(), read_dispatcher.dispatcher().get());
     if (regions.is_error()) {
       return regions.take_error();
     }
@@ -364,7 +362,7 @@ void sampler::ThreadSamplerDispatcher::SetCurrCpuTimer() {
 }
 
 zx::result<KernelHandle<sampler::ThreadSamplerDispatcher>> sampler::ThreadSamplerDispatcher::Create(
-    const zx_sampler_config_t& config, const fbl::RefPtr<AttributionObject>& attribution) {
+    const zx_sampler_config_t& config) {
   {
     Guard<Mutex> guard(ThreadSamplerLock::Get());
     if (gThreadSampler_.dispatcher() != nullptr &&
@@ -376,8 +374,7 @@ zx::result<KernelHandle<sampler::ThreadSamplerDispatcher>> sampler::ThreadSample
 
   KernelHandle<sampler::ThreadSamplerDispatcher> write_handle;
   KernelHandle<sampler::ThreadSamplerDispatcher> read_handle;
-  zx::result res =
-      sampler::ThreadSamplerDispatcher::CreateImpl(config, attribution, read_handle, write_handle);
+  zx::result res = sampler::ThreadSamplerDispatcher::CreateImpl(config, read_handle, write_handle);
   if (res.is_error()) {
     return res.take_error();
   }

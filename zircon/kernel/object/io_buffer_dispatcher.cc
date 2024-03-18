@@ -38,8 +38,7 @@ KCOUNTER(dispatcher_iob_destroy_count, "dispatcher.iob.destroy")
 
 // static
 zx::result<fbl::Array<IoBufferDispatcher::IobRegion>> IoBufferDispatcher::CreateRegions(
-    const IoBufferDispatcher::RegionArray& region_configs,
-    const fbl::RefPtr<AttributionObject>& attribution_object, VmObjectChildObserver* ep0,
+    const IoBufferDispatcher::RegionArray& region_configs, VmObjectChildObserver* ep0,
     VmObjectChildObserver* ep1) {
   fbl::AllocChecker ac;
   fbl::Array<IobRegion> region_inner = fbl::MakeArray<IobRegion>(&ac, region_configs.size());
@@ -83,8 +82,8 @@ zx::result<fbl::Array<IoBufferDispatcher::IobRegion>> IoBufferDispatcher::Create
     }
 
     fbl::RefPtr<VmObjectPaged> vmo;
-    if (zx_status_t status = VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY, vmo_options,
-                                                   region_config.size, attribution_object, &vmo);
+    if (zx_status_t status =
+            VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY, vmo_options, region_config.size, &vmo);
         status != ZX_OK) {
       return zx::error(status);
     }
@@ -129,7 +128,6 @@ zx::result<fbl::Array<IoBufferDispatcher::IobRegion>> IoBufferDispatcher::Create
 // static
 zx_status_t IoBufferDispatcher::Create(uint64_t options,
                                        const IoBufferDispatcher::RegionArray& region_configs,
-                                       const fbl::RefPtr<AttributionObject>& attribution_object,
                                        KernelHandle<IoBufferDispatcher>* handle0,
                                        KernelHandle<IoBufferDispatcher>* handle1,
                                        zx_rights_t* rights) {
@@ -165,8 +163,7 @@ zx_status_t IoBufferDispatcher::Create(uint64_t options,
   }
 
   zx::result<fbl::Array<IobRegion>> regions =
-      CreateRegions(region_configs, attribution_object, new_handle0.dispatcher().get(),
-                    new_handle1.dispatcher().get());
+      CreateRegions(region_configs, new_handle0.dispatcher().get(), new_handle1.dispatcher().get());
   if (regions.is_error()) {
     return regions.error_value();
   }

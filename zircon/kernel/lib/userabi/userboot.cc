@@ -50,8 +50,7 @@ class VmoBuffer {
   explicit VmoBuffer(fbl::RefPtr<VmObjectPaged> vmo) : size_(vmo->size()), vmo_(ktl::move(vmo)) {}
 
   explicit VmoBuffer(size_t size = PAGE_SIZE, uint32_t options = VmObjectPaged::kResizable) {
-    zx_status_t status = VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY, options, size,
-                                               AttributionObject::GetKernelAttribution(), &vmo_);
+    zx_status_t status = VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY, options, size, &vmo_);
     ZX_ASSERT(status == ZX_OK);
     size_ = vmo_->size();
   }
@@ -195,8 +194,7 @@ zx_status_t crashlog_to_vmo(fbl::RefPtr<VmObject>* out, size_t* out_size) {
 
   size_t size = crashlog.Recover(nullptr);
   fbl::RefPtr<VmObjectPaged> crashlog_vmo;
-  zx_status_t status = VmObjectPaged::Create(
-      PMM_ALLOC_FLAG_ANY, 0u, size, AttributionObject::GetKernelAttribution(), &crashlog_vmo);
+  zx_status_t status = VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY, 0u, size, &crashlog_vmo);
 
   if (status != ZX_OK) {
     return status;
@@ -241,8 +239,7 @@ void bootstrap_vmos(Handle** handles) {
 
   // The ZBI.
   fbl::RefPtr<VmObjectPaged> rootfs_vmo;
-  status = VmObjectPaged::CreateFromWiredPages(
-      rbase, rsize, true, AttributionObject::GetKernelAttribution(), &rootfs_vmo);
+  status = VmObjectPaged::CreateFromWiredPages(rbase, rsize, true, &rootfs_vmo);
   ASSERT(status == ZX_OK);
   rootfs_vmo->set_name(kZbiVmoName, sizeof(kZbiVmoName) - 1);
   status = get_vmo_handle(rootfs_vmo, false, rsize, nullptr, &handles[userboot::kZbi]);
@@ -284,8 +281,7 @@ void bootstrap_vmos(Handle** handles) {
   // kcounters names table.
   fbl::RefPtr<VmObjectPaged> kcountdesc_vmo;
   status = VmObjectPaged::CreateFromWiredPages(CounterDesc().VmoData(), CounterDesc().VmoDataSize(),
-                                               true, AttributionObject::GetKernelAttribution(),
-                                               &kcountdesc_vmo);
+                                               true, &kcountdesc_vmo);
   ASSERT(status == ZX_OK);
   kcountdesc_vmo->set_name(counters::DescriptorVmo::kVmoName,
                            sizeof(counters::DescriptorVmo::kVmoName) - 1);
@@ -295,9 +291,8 @@ void bootstrap_vmos(Handle** handles) {
 
   // kcounters live data.
   fbl::RefPtr<VmObjectPaged> kcounters_vmo;
-  status = VmObjectPaged::CreateFromWiredPages(
-      CounterArena().VmoData(), CounterArena().VmoDataSize(), false,
-      AttributionObject::GetKernelAttribution(), &kcounters_vmo);
+  status = VmObjectPaged::CreateFromWiredPages(CounterArena().VmoData(),
+                                               CounterArena().VmoDataSize(), false, &kcounters_vmo);
   ASSERT(status == ZX_OK);
   kcounters_vmo_ref = kcounters_vmo;
   kcounters_vmo->set_name(counters::kArenaVmoName, sizeof(counters::kArenaVmoName) - 1);
@@ -395,8 +390,7 @@ void userboot_init(uint) {
   uintptr_t stack_base;
   {
     fbl::RefPtr<VmObjectPaged> stack_vmo;
-    status = VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY, 0u, stack_size,
-                                   process->attribution_object(), &stack_vmo);
+    status = VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY, 0u, stack_size, &stack_vmo);
     ASSERT(status == ZX_OK);
     stack_vmo->set_name(kStackVmoName, sizeof(kStackVmoName) - 1);
 

@@ -51,7 +51,7 @@ class ThreadSamplerDispatcher : public IoBufferDispatcher {
   }
 
   static zx::result<KernelHandle<ThreadSamplerDispatcher>> Create(
-      const zx_sampler_config_t& config, const fbl::RefPtr<AttributionObject>& attribution);
+      const zx_sampler_config_t& config);
   static zx::result<> Start(const fbl::RefPtr<IoBufferDispatcher>& disp);
   static zx::result<> Stop(const fbl::RefPtr<IoBufferDispatcher>& disp);
   static zx::result<> AddThread(const fbl::RefPtr<IoBufferDispatcher>& disp,
@@ -80,7 +80,6 @@ class ThreadSamplerDispatcher : public IoBufferDispatcher {
   // readable and one end writable. The write end is retained by the kernel to write samples to. The
   // user receives the read end of the buffer so that they may read the samples written.
   static zx::result<> CreateImpl(const zx_sampler_config_t& config,
-                                 const fbl::RefPtr<AttributionObject>& attribution,
                                  KernelHandle<ThreadSamplerDispatcher>& read_handle_out,
                                  KernelHandle<ThreadSamplerDispatcher>& write_handle_out);
 

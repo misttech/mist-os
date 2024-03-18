@@ -40,9 +40,7 @@ bool TestCreateDestroyManyIoBuffers() {
                                 .options = 0,
                             }};
       }
-      auto status =
-          IoBufferDispatcher::Create(0, regions, AttributionObject::GetKernelAttribution(),
-                                     &dispatcher0, &dispatcher1, &rights);
+      auto status = IoBufferDispatcher::Create(0, regions, &dispatcher0, &dispatcher1, &rights);
       ASSERT_EQ(status, ZX_OK);
     }
   }

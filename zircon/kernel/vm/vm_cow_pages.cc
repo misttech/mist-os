@@ -306,16 +306,12 @@ zx_status_t VmCowPages::ReplaceReferenceWithPageLocked(VmPageOrMarkerRef page_or
 VmCowPages::VmCowPages(const fbl::RefPtr<VmHierarchyState> hierarchy_state_ptr,
                        VmCowPagesOptions options, uint32_t pmm_alloc_flags, uint64_t size,
                        fbl::RefPtr<PageSource> page_source,
-                       ktl::unique_ptr<DiscardableVmoTracker> discardable_tracker,
-                       fbl::RefPtr<AttributionObject> attribution_object)
+                       ktl::unique_ptr<DiscardableVmoTracker> discardable_tracker)
     : VmHierarchyBase(ktl::move(hierarchy_state_ptr)),
       pmm_alloc_flags_(pmm_alloc_flags),
       options_(options),
       size_(size),
       page_source_(ktl::move(page_source)),
-#if KERNEL_BASED_MEMORY_ATTRIBUTION
-      attribution_object_(ktl::move(attribution_object)),
-#endif
       discardable_tracker_(ktl::move(discardable_tracker)) {
   DEBUG_ASSERT(IS_PAGE_ALIGNED(size));
   DEBUG_ASSERT(!(pmm_alloc_flags & PMM_ALLOC_FLAG_CAN_BORROW));
@@ -528,13 +524,12 @@ bool VmCowPages::DedupZeroPage(vm_page_t* page, uint64_t offset) {
 zx_status_t VmCowPages::Create(fbl::RefPtr<VmHierarchyState> root_lock, VmCowPagesOptions options,
                                uint32_t pmm_alloc_flags, uint64_t size,
                                ktl::unique_ptr<DiscardableVmoTracker> discardable_tracker,
-                               fbl::RefPtr<AttributionObject> attribution_object,
                                fbl::RefPtr<VmCowPages>* cow_pages) {
   DEBUG_ASSERT(!(options & VmCowPagesOptions::kInternalOnlyMask));
   fbl::AllocChecker ac;
-  auto cow = fbl::AdoptRef<VmCowPages>(
-      new (&ac) VmCowPages(ktl::move(root_lock), options, pmm_alloc_flags, size, nullptr,
-                           ktl::move(discardable_tracker), ktl::move(attribution_object)));
+  auto cow = fbl::AdoptRef<VmCowPages>(new (&ac) VmCowPages(ktl::move(root_lock), options,
+                                                            pmm_alloc_flags, size, nullptr,
+                                                            ktl::move(discardable_tracker)));
   if (!ac.check()) {
     return ZX_ERR_NO_MEMORY;
   }
@@ -548,13 +543,11 @@ zx_status_t VmCowPages::Create(fbl::RefPtr<VmHierarchyState> root_lock, VmCowPag
 
 zx_status_t VmCowPages::CreateExternal(fbl::RefPtr<PageSource> src, VmCowPagesOptions options,
                                        fbl::RefPtr<VmHierarchyState> root_lock, uint64_t size,
-                                       fbl::RefPtr<AttributionObject> attribution_object,
                                        fbl::RefPtr<VmCowPages>* cow_pages) {
   DEBUG_ASSERT(!(options & VmCowPagesOptions::kInternalOnlyMask));
   fbl::AllocChecker ac;
-  auto cow = fbl::AdoptRef<VmCowPages>(
-      new (&ac) VmCowPages(ktl::move(root_lock), options, PMM_ALLOC_FLAG_ANY, size, ktl::move(src),
-                           nullptr, ktl::move(attribution_object)));
+  auto cow = fbl::AdoptRef<VmCowPages>(new (&ac) VmCowPages(
+      ktl::move(root_lock), options, PMM_ALLOC_FLAG_ANY, size, ktl::move(src), nullptr));
   if (!ac.check()) {
     return ZX_ERR_NO_MEMORY;
   }
@@ -634,10 +627,7 @@ zx_status_t VmCowPages::CreateChildSliceLocked(uint64_t offset, uint64_t size,
   // Slices just need the slice option and default alloc flags since they will propagate any
   // operation up to a parent and use their options and alloc flags.
   auto slice = fbl::AdoptRef<VmCowPages>(new (&ac) VmCowPages(
-      hierarchy_state_ptr_, VmCowPagesOptions::kSlice, PMM_ALLOC_FLAG_ANY, size, nullptr, nullptr,
-      // Attribution object is null for slices, since pages can never
-      // be made resident.
-      /*attribution_object=*/nullptr));
+      hierarchy_state_ptr_, VmCowPagesOptions::kSlice, PMM_ALLOC_FLAG_ANY, size, nullptr, nullptr));
   if (!ac.check()) {
     return ZX_ERR_NO_MEMORY;
   }
@@ -700,27 +690,19 @@ void VmCowPages::CloneParentIntoChildLocked(fbl::RefPtr<VmCowPages>& child) {
 }
 
 zx_status_t VmCowPages::CloneBidirectionalLocked(uint64_t offset, uint64_t size,
-                                                 fbl::RefPtr<AttributionObject> attribution_object,
                                                  fbl::RefPtr<VmCowPages>* cow_child,
                                                  uint64_t new_root_parent_offset,
                                                  uint64_t child_parent_limit) {
-  // Note: The left child inherits the attribution object of the original cow pages.
-  fbl::RefPtr<AttributionObject> left_attribution_object;
-#if KERNEL_BASED_MEMORY_ATTRIBUTION
-  left_attribution_object = attribution_object_;
-#endif
   // We need two new VmCowPages for our two children.
   fbl::AllocChecker ac;
-  fbl::RefPtr<VmCowPages> left_child = fbl::AdoptRef<VmCowPages>(
-      new (&ac) VmCowPages(hierarchy_state_ptr_, VmCowPagesOptions::kNone, pmm_alloc_flags_, size_,
-                           nullptr, nullptr, ktl::move(left_attribution_object)));
+  fbl::RefPtr<VmCowPages> left_child = fbl::AdoptRef<VmCowPages>(new (&ac) VmCowPages(
+      hierarchy_state_ptr_, VmCowPagesOptions::kNone, pmm_alloc_flags_, size_, nullptr, nullptr));
   if (!ac.check()) {
     return ZX_ERR_NO_MEMORY;
   }
   AssertHeld(left_child->lock_ref());
-  fbl::RefPtr<VmCowPages> right_child = fbl::AdoptRef<VmCowPages>(
-      new (&ac) VmCowPages(hierarchy_state_ptr_, VmCowPagesOptions::kNone, pmm_alloc_flags_, size,
-                           nullptr, nullptr, ktl::move(attribution_object)));
+  fbl::RefPtr<VmCowPages> right_child = fbl::AdoptRef<VmCowPages>(new (&ac) VmCowPages(
+      hierarchy_state_ptr_, VmCowPagesOptions::kNone, pmm_alloc_flags_, size, nullptr, nullptr));
   if (!ac.check()) {
     return ZX_ERR_NO_MEMORY;
   }
@@ -747,14 +729,12 @@ zx_status_t VmCowPages::CloneBidirectionalLocked(uint64_t offset, uint64_t size,
 }
 
 zx_status_t VmCowPages::CloneUnidirectionalLocked(uint64_t offset, uint64_t size,
-                                                  fbl::RefPtr<AttributionObject> attribution_object,
                                                   fbl::RefPtr<VmCowPages>* cow_child,
                                                   uint64_t new_root_parent_offset,
                                                   uint64_t child_parent_limit) {
   fbl::AllocChecker ac;
-  auto cow_pages = fbl::AdoptRef<VmCowPages>(
-      new (&ac) VmCowPages(hierarchy_state_ptr_, VmCowPagesOptions::kNone, pmm_alloc_flags_, size,
-                           nullptr, nullptr, ktl::move(attribution_object)));
+  auto cow_pages = fbl::AdoptRef<VmCowPages>(new (&ac) VmCowPages(
+      hierarchy_state_ptr_, VmCowPagesOptions::kNone, pmm_alloc_flags_, size, nullptr, nullptr));
   if (!ac.check()) {
     return ZX_ERR_NO_MEMORY;
   }
@@ -794,7 +774,6 @@ zx_status_t VmCowPages::CloneUnidirectionalLocked(uint64_t offset, uint64_t size
 }
 
 zx_status_t VmCowPages::CreateCloneLocked(CloneType type, uint64_t offset, uint64_t size,
-                                          fbl::RefPtr<AttributionObject> attribution_object,
                                           fbl::RefPtr<VmCowPages>* cow_child) {
   LTRACEF("vmo %p offset %#" PRIx64 " size %#" PRIx64 "\n", this, offset, size);
 
@@ -873,12 +852,12 @@ zx_status_t VmCowPages::CreateCloneLocked(CloneType type, uint64_t offset, uint6
 
   switch (type) {
     case CloneType::Snapshot: {
-      return CloneBidirectionalLocked(offset, size, attribution_object, cow_child,
-                                      new_root_parent_offset, child_parent_limit);
+      return CloneBidirectionalLocked(offset, size, cow_child, new_root_parent_offset,
+                                      child_parent_limit);
     }
     case CloneType::SnapshotAtLeastOnWrite: {
-      return CloneUnidirectionalLocked(offset, size, attribution_object, cow_child,
-                                       new_root_parent_offset, child_parent_limit);
+      return CloneUnidirectionalLocked(offset, size, cow_child, new_root_parent_offset,
+                                       child_parent_limit);
     }
     case CloneType::SnapshotModified: {
       // If at the root of vmo hierarchy or the slice of the root VMO, create a unidirectional clone
@@ -891,12 +870,12 @@ zx_status_t VmCowPages::CreateCloneLocked(CloneType type, uint64_t offset, uint6
           AssertHeld(parent_->lock_ref());
           DEBUG_ASSERT(!parent_->parent_);
         }
-        return CloneUnidirectionalLocked(offset, size, attribution_object, cow_child,
-                                         new_root_parent_offset, child_parent_limit);
+        return CloneUnidirectionalLocked(offset, size, cow_child, new_root_parent_offset,
+                                         child_parent_limit);
         // Else, take a snapshot.
       } else {
-        return CloneBidirectionalLocked(offset, size, attribution_object, cow_child,
-                                        new_root_parent_offset, child_parent_limit);
+        return CloneBidirectionalLocked(offset, size, cow_child, new_root_parent_offset,
+                                        child_parent_limit);
       }
     }
   }

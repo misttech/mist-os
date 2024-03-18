@@ -33,8 +33,7 @@ class VmMapping;
 // since there is no internal locking for efficiency reasons.
 class RestrictedState {
  public:
-  static zx::result<ktl::unique_ptr<RestrictedState>> Create(
-      fbl::RefPtr<AttributionObject> attribution_object);
+  static zx::result<ktl::unique_ptr<RestrictedState>> Create();
 
   ~RestrictedState();
   DISALLOW_COPY_ASSIGN_AND_MOVE(RestrictedState);

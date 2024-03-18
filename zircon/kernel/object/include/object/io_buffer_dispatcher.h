@@ -32,7 +32,6 @@ class IoBufferDispatcher : public PeeredDispatcher<IoBufferDispatcher, ZX_DEFAUL
 
   /// Create a pair of IoBufferDispatchers
   static zx_status_t Create(uint64_t options, const RegionArray& region_configs,
-                            const fbl::RefPtr<AttributionObject>& attribution_object,
                             KernelHandle<IoBufferDispatcher>* handle0,
                             KernelHandle<IoBufferDispatcher>* handle1, zx_rights_t* rights);
 
@@ -148,8 +147,7 @@ class IoBufferDispatcher : public PeeredDispatcher<IoBufferDispatcher, ZX_DEFAUL
   };
 
   static zx::result<fbl::Array<IobRegion>> CreateRegions(
-      const IoBufferDispatcher::RegionArray& region_configs,
-      const fbl::RefPtr<AttributionObject>& attribution_object, VmObjectChildObserver* ep0,
+      const IoBufferDispatcher::RegionArray& region_configs, VmObjectChildObserver* ep0,
       VmObjectChildObserver* ep1);
 
   explicit IoBufferDispatcher(fbl::RefPtr<PeerHolder<IoBufferDispatcher>> holder,

@@ -328,8 +328,7 @@ static bool vmaspace_usercopy_accessed_fault_test() {
 
   // Need a separate VMO to read/write from.
   fbl::RefPtr<VmObjectPaged> vmo;
-  status = VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY, 0u, PAGE_SIZE,
-                                 AttributionObject::GetKernelAttribution(), &vmo);
+  status = VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY, 0u, PAGE_SIZE, &vmo);
   ASSERT_EQ(status, ZX_OK);
 
   // Touch the mapping to make sure it is committed and mapped.
@@ -367,8 +366,7 @@ static bool vmaspace_free_unaccessed_page_tables_test() {
   constexpr size_t kNumPages = 512 * 3;
   constexpr size_t kMiddlePage = kNumPages / 2;
   constexpr size_t kMiddleOffset = kMiddlePage * PAGE_SIZE;
-  ASSERT_OK(VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY, 0u, PAGE_SIZE * kNumPages,
-                                  AttributionObject::GetKernelAttribution(), &vmo));
+  ASSERT_OK(VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY, 0u, PAGE_SIZE * kNumPages, &vmo));
 
   // Construct an additional aspace to use for mappings and touching pages. This allows us to
   // control whether the aspace is considered active, which can effect reclamation and scanning.
@@ -513,10 +511,8 @@ static bool vmaspace_unified_accessed_test() {
   constexpr uint64_t kSize = 4 * PAGE_SIZE;
   fbl::RefPtr<VmObjectPaged> shared_vmo;
   fbl::RefPtr<VmObjectPaged> restricted_vmo;
-  ASSERT_OK(VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY, 0u, kSize,
-                                  AttributionObject::GetKernelAttribution(), &shared_vmo));
-  ASSERT_OK(VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY, 0u, kSize,
-                                  AttributionObject::GetKernelAttribution(), &restricted_vmo));
+  ASSERT_OK(VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY, 0u, kSize, &shared_vmo));
+  ASSERT_OK(VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY, 0u, kSize, &restricted_vmo));
   ktl::unique_ptr<testing::UserMemory> shared_mem =
       testing::UserMemory::CreateInAspace(shared_vmo, shared_aspace);
   ktl::unique_ptr<testing::UserMemory> restricted_mem =
@@ -580,11 +576,9 @@ static bool vmaspace_merge_mapping_test() {
 
   // Create two different vmos to make mappings into.
   fbl::RefPtr<VmObjectPaged> vmo1;
-  ASSERT_OK(VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY, 0u, PAGE_SIZE * 4,
-                                  AttributionObject::GetKernelAttribution(), &vmo1));
+  ASSERT_OK(VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY, 0u, PAGE_SIZE * 4, &vmo1));
   fbl::RefPtr<VmObjectPaged> vmo2;
-  ASSERT_OK(VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY, 0u, PAGE_SIZE * 4,
-                                  AttributionObject::GetKernelAttribution(), &vmo2));
+  ASSERT_OK(VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY, 0u, PAGE_SIZE * 4, &vmo2));
 
   // Declare some enums to make writing test cases more readable instead of having lots of bools.
   enum MmuFlags { FLAG_TYPE_1, FLAG_TYPE_2 };
@@ -756,8 +750,7 @@ static bool vmaspace_priority_propagation_test() {
       &vmar));
 
   fbl::RefPtr<VmObjectPaged> vmo;
-  zx_status_t status = VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY, 0, PAGE_SIZE * 4,
-                                             AttributionObject::GetKernelAttribution(), &vmo);
+  zx_status_t status = VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY, 0, PAGE_SIZE * 4, &vmo);
   ASSERT_OK(status);
 
   auto mapping_result =
@@ -780,8 +773,7 @@ static bool vmaspace_priority_propagation_test() {
       "test sub-vmar", &sub_vmar));
 
   fbl::RefPtr<VmObjectPaged> vmo2;
-  status = VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY, 0, PAGE_SIZE * 4,
-                                 AttributionObject::GetKernelAttribution(), &vmo2);
+  status = VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY, 0, PAGE_SIZE * 4, &vmo2);
   ASSERT_OK(status);
 
   auto mapping2_result =
@@ -817,8 +809,7 @@ static bool vmaspace_priority_unmap_test() {
       &vmar));
 
   fbl::RefPtr<VmObjectPaged> vmo;
-  zx_status_t status = VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY, 0, PAGE_SIZE * 8,
-                                             AttributionObject::GetKernelAttribution(), &vmo);
+  zx_status_t status = VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY, 0, PAGE_SIZE * 8, &vmo);
   ASSERT_OK(status);
 
   auto mapping_result =
@@ -878,8 +869,7 @@ static bool vmaspace_priority_mapping_overwrite_test() {
       &vmar));
 
   fbl::RefPtr<VmObjectPaged> vmo;
-  zx_status_t status = VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY, 0, PAGE_SIZE,
-                                             AttributionObject::GetKernelAttribution(), &vmo);
+  zx_status_t status = VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY, 0, PAGE_SIZE, &vmo);
   ASSERT_OK(status);
 
   auto mapping_result =
@@ -895,8 +885,7 @@ static bool vmaspace_priority_mapping_overwrite_test() {
 
   // Overwrite the mapping with a new one from a new VMO.
   fbl::RefPtr<VmObjectPaged> vmo2;
-  status = VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY, 0, PAGE_SIZE,
-                                 AttributionObject::GetKernelAttribution(), &vmo2);
+  status = VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY, 0, PAGE_SIZE, &vmo2);
   ASSERT_OK(status);
 
   mapping_result = vmar->CreateVmMapping(mapping->base_locking() - vmar->base(),
@@ -930,8 +919,7 @@ static bool vmaspace_priority_merged_mapping_test() {
   EXPECT_OK(status);
 
   fbl::RefPtr<VmObjectPaged> vmo;
-  status = VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY, 0, PAGE_SIZE * 2,
-                                 AttributionObject::GetKernelAttribution(), &vmo);
+  status = VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY, 0, PAGE_SIZE * 2, &vmo);
   ASSERT_OK(status);
 
   // Create a mapping for the first page of the VMO, and mark it mergeable
@@ -985,8 +973,7 @@ static bool vmaspace_priority_bidir_clone_test() {
   EXPECT_OK(status);
 
   fbl::RefPtr<VmObjectPaged> vmo;
-  status = VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY, 0, PAGE_SIZE * 2,
-                                 AttributionObject::GetKernelAttribution(), &vmo);
+  status = VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY, 0, PAGE_SIZE * 2, &vmo);
   ASSERT_OK(status);
 
   auto mapping_result = vmar->CreateVmMapping(PAGE_SIZE, PAGE_SIZE, 0, VMAR_FLAG_SPECIFIC_OVERWRITE,
@@ -999,7 +986,7 @@ static bool vmaspace_priority_bidir_clone_test() {
   // Create a clone of the VMO.
   fbl::RefPtr<VmObject> vmo_child;
   status = vmo->CreateClone(Resizability::NonResizable, CloneType::Snapshot, 0, PAGE_SIZE, true,
-                            AttributionObject::GetKernelAttribution(), &vmo_child);
+                            &vmo_child);
   ASSERT_OK(status);
   VmObjectPaged* childp = reinterpret_cast<VmObjectPaged*>(vmo_child.get());
 
@@ -1018,7 +1005,7 @@ static bool vmaspace_priority_bidir_clone_test() {
 
   // Create a new clone of the VMO and map in the clone.
   status = vmo->CreateClone(Resizability::NonResizable, CloneType::Snapshot, 0, PAGE_SIZE, true,
-                            AttributionObject::GetKernelAttribution(), &vmo_child);
+                            &vmo_child);
   ASSERT_OK(status);
   childp = reinterpret_cast<VmObjectPaged*>(vmo_child.get());
   EXPECT_FALSE(vmo->DebugGetCowPages()->DebugIsHighMemoryPriority());
@@ -1056,8 +1043,7 @@ static bool vmaspace_priority_slice_test() {
   EXPECT_OK(status);
 
   fbl::RefPtr<VmObjectPaged> vmo;
-  status = VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY, 0, PAGE_SIZE * 2,
-                                 AttributionObject::GetKernelAttribution(), &vmo);
+  status = VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY, 0, PAGE_SIZE * 2, &vmo);
   ASSERT_OK(status);
 
   auto mapping_result = vmar->CreateVmMapping(PAGE_SIZE, PAGE_SIZE, 0, VMAR_FLAG_SPECIFIC_OVERWRITE,
@@ -1121,7 +1107,7 @@ static bool vmaspace_priority_pager_test() {
   // Create a clone of the VMO.
   fbl::RefPtr<VmObject> vmo_child;
   status = vmo->CreateClone(Resizability::NonResizable, CloneType::SnapshotAtLeastOnWrite, 0,
-                            PAGE_SIZE, true, AttributionObject::GetKernelAttribution(), &vmo_child);
+                            PAGE_SIZE, true, &vmo_child);
   ASSERT_OK(status);
   VmObjectPaged* childp = reinterpret_cast<VmObjectPaged*>(vmo_child.get());
 
@@ -1137,7 +1123,7 @@ static bool vmaspace_priority_pager_test() {
   // Create a second child of the root.
   fbl::RefPtr<VmObject> vmo_child2;
   status = vmo->CreateClone(Resizability::NonResizable, CloneType::SnapshotAtLeastOnWrite, 0,
-                            PAGE_SIZE, true, AttributionObject::GetKernelAttribution(), &vmo_child);
+                            PAGE_SIZE, true, &vmo_child);
   ASSERT_OK(status);
   VmObjectPaged* childp2 = reinterpret_cast<VmObjectPaged*>(vmo_child.get());
 
@@ -1176,8 +1162,7 @@ static bool vmaspace_priority_reference_test() {
   EXPECT_OK(status);
 
   fbl::RefPtr<VmObjectPaged> vmo;
-  status = VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY, 0, PAGE_SIZE * 2,
-                                 AttributionObject::GetKernelAttribution(), &vmo);
+  status = VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY, 0, PAGE_SIZE * 2, &vmo);
   ASSERT_OK(status);
 
   auto mapping_result = vmar->CreateVmMapping(PAGE_SIZE, PAGE_SIZE, 0, VMAR_FLAG_SPECIFIC_OVERWRITE,
@@ -1250,8 +1235,7 @@ static bool vmaspace_nested_attribution_test() {
   // Make 2 page vmo.
   fbl::RefPtr<VmObjectPaged> vmo;
   zx_status_t status =
-      VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY, VmObjectPaged::kResizable, 2 * PAGE_SIZE,
-                            AttributionObject::GetKernelAttribution(), &vmo);
+      VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY, VmObjectPaged::kResizable, 2 * PAGE_SIZE, &vmo);
   ASSERT_EQ(ZX_OK, status);
 
   // Map VMO to grandchild.
@@ -1295,8 +1279,7 @@ static bool vm_mapping_attribution_commit_decommit_test() {
   // Create a VMO to map.
   fbl::RefPtr<VmObjectPaged> vmo;
   zx_status_t status =
-      VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY, VmObjectPaged::kResizable, 16 * PAGE_SIZE,
-                            AttributionObject::GetKernelAttribution(), &vmo);
+      VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY, VmObjectPaged::kResizable, 16 * PAGE_SIZE, &vmo);
   ASSERT_EQ(ZX_OK, status);
 
   uint64_t expected_vmo_gen_count = 1;
@@ -1394,8 +1377,7 @@ static bool vm_mapping_attribution_map_unmap_test() {
   // Create a VMO to map.
   fbl::RefPtr<VmObjectPaged> vmo;
   zx_status_t status =
-      VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY, VmObjectPaged::kResizable, 16 * PAGE_SIZE,
-                            AttributionObject::GetKernelAttribution(), &vmo);
+      VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY, VmObjectPaged::kResizable, 16 * PAGE_SIZE, &vmo);
   ASSERT_EQ(ZX_OK, status);
 
   uint64_t expected_vmo_gen_count = 1;
@@ -1488,8 +1470,7 @@ static bool vm_mapping_attribution_merge_test() {
   // Create a VMO to map.
   fbl::RefPtr<VmObjectPaged> vmo;
   zx_status_t status =
-      VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY, VmObjectPaged::kResizable, 16 * PAGE_SIZE,
-                            AttributionObject::GetKernelAttribution(), &vmo);
+      VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY, VmObjectPaged::kResizable, 16 * PAGE_SIZE, &vmo);
   ASSERT_EQ(ZX_OK, status);
 
   uint64_t expected_vmo_gen_count = 1;
@@ -2207,8 +2188,7 @@ class EnumeratorTestHelper {
   ~EnumeratorTestHelper() { Destroy(); }
   zx_status_t Init(fbl::RefPtr<VmAspace> aspace) TA_EXCL(lock()) {
     Destroy();
-    zx_status_t status = VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY, 0u, GB,
-                                               AttributionObject::GetKernelAttribution(), &vmo_);
+    zx_status_t status = VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY, 0u, GB, &vmo_);
     if (status != ZX_OK) {
       return status;
     }

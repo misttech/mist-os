@@ -72,7 +72,7 @@ zx_status_t sys_sampler_create(zx_handle_t rsrc, uint64_t options,
   }
 
   zx::result<KernelHandle<sampler::ThreadSamplerDispatcher>> create_res =
-      sampler::ThreadSamplerDispatcher::Create(sample_config, up->attribution_object());
+      sampler::ThreadSamplerDispatcher::Create(sample_config);
   if (create_res.is_error()) {
     return create_res.status_value();
   }

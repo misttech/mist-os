@@ -50,8 +50,8 @@ zx_status_t sys_vmo_create(uint64_t size, uint32_t options, zx_handle_t* out) {
 
   // create a vm object
   fbl::RefPtr<VmObjectPaged> vmo;
-  res = VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY | PMM_ALLOC_FLAG_CAN_WAIT, vmo_options, size,
-                              up->attribution_object(), &vmo);
+  res =
+      VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY | PMM_ALLOC_FLAG_CAN_WAIT, vmo_options, size, &vmo);
   if (res != ZX_OK)
     return res;
 
@@ -279,8 +279,7 @@ zx_status_t sys_vmo_create_child(zx_handle_t handle, uint32_t options, uint64_t 
     return status;
 
   // clone the vmo into a new one
-  status = vmo->CreateChild(options, offset, size, in_rights & ZX_RIGHT_GET_PROPERTY,
-                            up->attribution_object(), &child_vmo);
+  status = vmo->CreateChild(options, offset, size, in_rights & ZX_RIGHT_GET_PROPERTY, &child_vmo);
   if (status != ZX_OK)
     return status;
 

@@ -228,7 +228,6 @@ bool VmObjectPaged::CanDedupZeroPagesLocked() {
 }
 
 zx_status_t VmObjectPaged::CreateCommon(uint32_t pmm_alloc_flags, uint32_t options, uint64_t size,
-                                        fbl::RefPtr<AttributionObject> attribution_object,
                                         fbl::RefPtr<VmObjectPaged>* obj) {
   DEBUG_ASSERT(!(options & (kContiguous | kCanBlockOnPageRequests)));
 
@@ -263,7 +262,7 @@ zx_status_t VmObjectPaged::CreateCommon(uint32_t pmm_alloc_flags, uint32_t optio
 
   fbl::RefPtr<VmCowPages> cow_pages;
   status = VmCowPages::Create(state, VmCowPagesOptions::kNone, pmm_alloc_flags, size,
-                              ktl::move(discardable), ktl::move(attribution_object), &cow_pages);
+                              ktl::move(discardable), &cow_pages);
   if (status != ZX_OK) {
     return status;
   }
@@ -316,19 +315,17 @@ zx_status_t VmObjectPaged::CreateCommon(uint32_t pmm_alloc_flags, uint32_t optio
 }
 
 zx_status_t VmObjectPaged::Create(uint32_t pmm_alloc_flags, uint32_t options, uint64_t size,
-                                  fbl::RefPtr<AttributionObject> attribution_object,
                                   fbl::RefPtr<VmObjectPaged>* obj) {
   if (options & (kContiguous | kCanBlockOnPageRequests)) {
     // Force callers to use CreateContiguous() instead.
     return ZX_ERR_INVALID_ARGS;
   }
 
-  return CreateCommon(pmm_alloc_flags, options, size, ktl::move(attribution_object), obj);
+  return CreateCommon(pmm_alloc_flags, options, size, obj);
 }
 
 zx_status_t VmObjectPaged::CreateContiguous(uint32_t pmm_alloc_flags, uint64_t size,
                                             uint8_t alignment_log2,
-                                            fbl::RefPtr<AttributionObject> attribution_object,
                                             fbl::RefPtr<VmObjectPaged>* obj) {
   DEBUG_ASSERT(alignment_log2 < sizeof(uint64_t) * 8);
   // make sure size is page aligned
@@ -353,8 +350,7 @@ zx_status_t VmObjectPaged::CreateContiguous(uint32_t pmm_alloc_flags, uint64_t s
   auto* page_source_ptr = page_source.get();
 
   fbl::RefPtr<VmObjectPaged> vmo;
-  status = CreateWithSourceCommon(page_source, pmm_alloc_flags, kContiguous, size,
-                                  ktl::move(attribution_object), &vmo);
+  status = CreateWithSourceCommon(page_source, pmm_alloc_flags, kContiguous, size, &vmo);
   if (status != ZX_OK) {
     // Ensure to close the page source we created, as it will not get closed by the VmCowPages since
     // that creation failed.
@@ -396,13 +392,11 @@ zx_status_t VmObjectPaged::CreateContiguous(uint32_t pmm_alloc_flags, uint64_t s
 }
 
 zx_status_t VmObjectPaged::CreateFromWiredPages(const void* data, size_t size, bool exclusive,
-                                                fbl::RefPtr<AttributionObject> attribution_object,
                                                 fbl::RefPtr<VmObjectPaged>* obj) {
   LTRACEF("data %p, size %zu\n", data, size);
 
   fbl::RefPtr<VmObjectPaged> vmo;
-  zx_status_t status =
-      CreateCommon(PMM_ALLOC_FLAG_ANY, 0, size, ktl::move(attribution_object), &vmo);
+  zx_status_t status = CreateCommon(PMM_ALLOC_FLAG_ANY, 0, size, &vmo);
   if (status != ZX_OK) {
     return status;
   }
@@ -469,9 +463,7 @@ zx_status_t VmObjectPaged::CreateFromWiredPages(const void* data, size_t size, b
 }
 
 zx_status_t VmObjectPaged::CreateExternal(fbl::RefPtr<PageSource> src, uint32_t options,
-                                          uint64_t size,
-                                          fbl::RefPtr<AttributionObject> attribution_object,
-                                          fbl::RefPtr<VmObjectPaged>* obj) {
+                                          uint64_t size, fbl::RefPtr<VmObjectPaged>* obj) {
   if (options & (kDiscardable | kCanBlockOnPageRequests | kAlwaysPinned)) {
     return ZX_ERR_INVALID_ARGS;
   }
@@ -485,15 +477,12 @@ zx_status_t VmObjectPaged::CreateExternal(fbl::RefPtr<PageSource> src, uint32_t 
   // External VMOs always support delayed PMM allocations, since they already have to tolerate
   // arbitrary waits for pages due to the PageSource.
   return CreateWithSourceCommon(ktl::move(src), PMM_ALLOC_FLAG_ANY | PMM_ALLOC_FLAG_CAN_WAIT,
-                                options | kCanBlockOnPageRequests, size,
-                                ktl::move(attribution_object), obj);
+                                options | kCanBlockOnPageRequests, size, obj);
 }
 
 zx_status_t VmObjectPaged::CreateWithSourceCommon(fbl::RefPtr<PageSource> src,
                                                   uint32_t pmm_alloc_flags, uint32_t options,
-                                                  uint64_t size,
-                                                  fbl::RefPtr<AttributionObject> attribution_object,
-                                                  fbl::RefPtr<VmObjectPaged>* obj) {
+                                                  uint64_t size, fbl::RefPtr<VmObjectPaged>* obj) {
   // Caller must check that size is page aligned.
   DEBUG_ASSERT(IS_PAGE_ALIGNED(size));
   DEBUG_ASSERT(!(options & kAlwaysPinned));
@@ -513,8 +502,8 @@ zx_status_t VmObjectPaged::CreateWithSourceCommon(fbl::RefPtr<PageSource> src,
   }
 
   fbl::RefPtr<VmCowPages> cow_pages;
-  zx_status_t status = VmCowPages::CreateExternal(ktl::move(src), cow_options, state, size,
-                                                  ktl::move(attribution_object), &cow_pages);
+  zx_status_t status =
+      VmCowPages::CreateExternal(ktl::move(src), cow_options, state, size, &cow_pages);
   if (status != ZX_OK) {
     return status;
   }
@@ -720,7 +709,6 @@ zx_status_t VmObjectPaged::CreateChildReference(Resizability resizable, uint64_t
 
 zx_status_t VmObjectPaged::CreateClone(Resizability resizable, CloneType type, uint64_t offset,
                                        uint64_t size, bool copy_name,
-                                       fbl::RefPtr<AttributionObject> attribution_object,
                                        fbl::RefPtr<VmObject>* child_vmo) {
   LTRACEF("vmo %p offset %#" PRIx64 " size %#" PRIx64 "\n", this, offset, size);
 
@@ -767,8 +755,7 @@ zx_status_t VmObjectPaged::CreateClone(Resizability resizable, CloneType type, u
     }
     DEBUG_ASSERT(vmo->cache_policy_ == ARCH_MMU_FLAG_CACHED);
 
-    status = cow_pages_locked()->CreateCloneLocked(type, offset, size,
-                                                   ktl::move(attribution_object), &clone_cow_pages);
+    status = cow_pages_locked()->CreateCloneLocked(type, offset, size, &clone_cow_pages);
     if (status != ZX_OK) {
       return status;
     }

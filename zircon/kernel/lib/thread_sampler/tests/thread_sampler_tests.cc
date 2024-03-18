@@ -61,9 +61,7 @@ class TestThreadSampler : public sampler::ThreadSamplerDispatcher {
       KernelHandle<sampler::ThreadSamplerDispatcher> state;
       for (int i = 0; i < 10; i++) {
         KernelHandle<sampler::ThreadSamplerDispatcher> read_handle;
-        ASSERT_TRUE(ThreadSamplerDispatcher::CreateImpl(
-                        config, AttributionObject::GetKernelAttribution(), read_handle, state)
-                        .is_ok());
+        ASSERT_TRUE(ThreadSamplerDispatcher::CreateImpl(config, read_handle, state).is_ok());
         auto test_state = fbl::RefPtr<TestThreadSampler>::Downcast(state.release());
         ASSERT_TRUE(test_state->StartImpl().is_ok());
         ASSERT_TRUE(test_state->StopImpl().is_ok());
@@ -73,9 +71,7 @@ class TestThreadSampler : public sampler::ThreadSamplerDispatcher {
       // get cleaned up properly
       for (int i = 0; i < 10; i++) {
         KernelHandle<sampler::ThreadSamplerDispatcher> read_handle;
-        ASSERT_TRUE(ThreadSamplerDispatcher::CreateImpl(
-                        config, AttributionObject::GetKernelAttribution(), read_handle, state)
-                        .is_ok());
+        ASSERT_TRUE(ThreadSamplerDispatcher::CreateImpl(config, read_handle, state).is_ok());
         auto test_state = fbl::RefPtr<TestThreadSampler>::Downcast(state.release());
         ASSERT_TRUE(test_state->StartImpl().is_ok());
       }
@@ -94,9 +90,7 @@ class TestThreadSampler : public sampler::ThreadSamplerDispatcher {
           .period = zx::msec(1).get(),
           .buffer_size = ZX_PAGE_SIZE,
       };
-      ASSERT_TRUE(ThreadSamplerDispatcher::CreateImpl(
-                      config, AttributionObject::GetKernelAttribution(), read_handle, state)
-                      .is_ok());
+      ASSERT_TRUE(ThreadSamplerDispatcher::CreateImpl(config, read_handle, state).is_ok());
 
       auto test_state = fbl::RefPtr<TestThreadSampler>::Downcast(state.release());
 

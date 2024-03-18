@@ -51,8 +51,8 @@ zx_status_t sys_iob_create(uint64_t options, user_in_ptr<const void> regions, ui
 
   KernelHandle<IoBufferDispatcher> handle0, handle1;
   zx_rights_t rights;
-  zx_status_t result = IoBufferDispatcher::Create(options, copied_regions, up->attribution_object(),
-                                                  &handle0, &handle1, &rights);
+  zx_status_t result =
+      IoBufferDispatcher::Create(options, copied_regions, &handle0, &handle1, &rights);
   if (result != ZX_OK) {
     return result;
   }

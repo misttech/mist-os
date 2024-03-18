@@ -141,8 +141,7 @@ zx_status_t KernelStack::Init() {
   // linked to the attribution objects of the corresponding processes.
   fbl::RefPtr<VmObjectPaged> stack_vmo;
   zx_status_t status =
-      VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY, VmObjectPaged::kAlwaysPinned, vmo_size,
-                            AttributionObject::GetKernelAttribution(), &stack_vmo);
+      VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY, VmObjectPaged::kAlwaysPinned, vmo_size, &stack_vmo);
   if (status != ZX_OK) {
     LTRACEF("error allocating kernel stacks for thread\n");
     return status;

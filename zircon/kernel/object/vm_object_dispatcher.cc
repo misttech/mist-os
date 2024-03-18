@@ -412,9 +412,9 @@ zx_status_t VmObjectDispatcher::SetMappingCachePolicy(uint32_t cache_policy) {
   return vmo_->SetMappingCachePolicy(cache_policy);
 }
 
-zx_status_t VmObjectDispatcher::CreateChildInternal(
-    uint32_t options, uint64_t offset, uint64_t size, bool copy_name,
-    const fbl::RefPtr<AttributionObject>& attribution_object, fbl::RefPtr<VmObject>* child_vmo) {
+zx_status_t VmObjectDispatcher::CreateChildInternal(uint32_t options, uint64_t offset,
+                                                    uint64_t size, bool copy_name,
+                                                    fbl::RefPtr<VmObject>* child_vmo) {
   // Clones are not supported for discardable VMOs.
   if (vmo_->is_discardable()) {
     return ZX_ERR_NOT_SUPPORTED;
@@ -465,12 +465,11 @@ zx_status_t VmObjectDispatcher::CreateChildInternal(
   if (options)
     return ZX_ERR_INVALID_ARGS;
 
-  return vmo_->CreateClone(resizable, type, offset, size, copy_name, attribution_object, child_vmo);
+  return vmo_->CreateClone(resizable, type, offset, size, copy_name, child_vmo);
 }
 
-zx_status_t VmObjectDispatcher::CreateChild(
-    uint32_t options, uint64_t offset, uint64_t size, bool copy_name,
-    const fbl::RefPtr<AttributionObject>& attribution_object, fbl::RefPtr<VmObject>* child_vmo) {
+zx_status_t VmObjectDispatcher::CreateChild(uint32_t options, uint64_t offset, uint64_t size,
+                                            bool copy_name, fbl::RefPtr<VmObject>* child_vmo) {
   canary_.Assert();
 
   LTRACEF("options 0x%x offset %#" PRIx64 " size %#" PRIx64 "\n", options, offset, size);
@@ -478,8 +477,7 @@ zx_status_t VmObjectDispatcher::CreateChild(
   // To synchronize the zero child signal the dispatcher lock is used over the create child path to
   // ensure we can atomically know that a child exists, and clear the zero child signal.
   Guard<CriticalMutex> guard{get_lock()};
-  zx_status_t status =
-      CreateChildInternal(options, offset, size, copy_name, attribution_object, child_vmo);
+  zx_status_t status = CreateChildInternal(options, offset, size, copy_name, child_vmo);
   DEBUG_ASSERT((status == ZX_OK) == (*child_vmo != nullptr));
   if (status == ZX_OK) {
     // We know definitively that a child exists, as we have a refptr to it, and so we can clear the
