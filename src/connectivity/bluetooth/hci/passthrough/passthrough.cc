@@ -125,7 +125,8 @@ void PassthroughDevice::OpenSnoopChannel(OpenSnoopChannelRequestView request,
 void PassthroughDevice::handle_unknown_method(
     fidl::UnknownMethodMetadata<fuchsia_hardware_bluetooth::Hci> metadata,
     fidl::UnknownMethodCompleter::Sync& completer) {
-  ZX_PANIC("Unknown method in HCI request");
+  zxlogf(ERROR, "Unknown method in Hci request, closing with ZX_ERR_NOT_SUPPORTED");
+  completer.Close(ZX_ERR_NOT_SUPPORTED);
 }
 
 zx_status_t PassthroughDevice::Bind(void* ctx, zx_device_t* device) {

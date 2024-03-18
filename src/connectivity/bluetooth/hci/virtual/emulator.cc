@@ -410,7 +410,8 @@ void EmulatorDevice::OpenHci(OpenHciCompleter::Sync& completer) {
 void EmulatorDevice::handle_unknown_method(
     fidl::UnknownMethodMetadata<fuchsia_hardware_bluetooth::Vendor> metadata,
     fidl::UnknownMethodCompleter::Sync& completer) {
-  ZX_PANIC("Unknown method in Vendor request");
+  zxlogf(ERROR, "Unknown method in Vendor request, closing with ZX_ERR_NOT_SUPPORTED");
+  completer.Close(ZX_ERR_NOT_SUPPORTED);
 }
 
 void EmulatorDevice::EncodeSetAclPriorityCommand(
@@ -783,7 +784,8 @@ void EmulatorDevice::Open(OpenRequestView request, OpenCompleter::Sync& complete
 void EmulatorDevice::handle_unknown_method(
     fidl::UnknownMethodMetadata<fuchsia_hardware_bluetooth::Hci> metadata,
     fidl::UnknownMethodCompleter::Sync& completer) {
-  ZX_PANIC("Unknown method in HCI request");
+  zxlogf(ERROR, "Unknown method in Hci request, closing with ZX_ERR_NOT_SUPPORTED");
+  completer.Close(ZX_ERR_NOT_SUPPORTED);
 }
 
 }  // namespace bt_hci_virtual

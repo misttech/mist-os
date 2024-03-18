@@ -561,7 +561,8 @@ void LoopbackDevice::OpenSnoopChannel(OpenSnoopChannelRequestView request,
 void LoopbackDevice::handle_unknown_method(
     fidl::UnknownMethodMetadata<fuchsia_hardware_bluetooth::Hci> metadata,
     fidl::UnknownMethodCompleter::Sync& completer) {
-  ZX_PANIC("Unknown method in HCI request");
+  zxlogf(ERROR, "Unknown method in Hci request, closing with ZX_ERR_NOT_SUPPORTED");
+  completer.Close(ZX_ERR_NOT_SUPPORTED);
 }
 
 zx_status_t LoopbackDevice::DdkGetProtocol(uint32_t proto_id, void* out_proto) {
