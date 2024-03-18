@@ -96,6 +96,7 @@ pub enum Error {
     Addr(std::net::AddrParseError),
     Num(std::num::ParseIntError),
     Invalid(InvalidReason),
+    RoutineNotProvided(crate::parser::Direction),
 }
 
 #[derive(Debug, PartialEq)]
@@ -122,6 +123,7 @@ impl std::fmt::Display for Error {
             Self::Addr(e) => std::fmt::Display::fmt(e, f),
             Self::Num(e) => std::fmt::Display::fmt(e, f),
             Self::Invalid(e) => write!(f, "invalid: {}", e),
+            Self::RoutineNotProvided(e) => write!(f, "expected routine for direction: {:?}", e),
         }
     }
 }

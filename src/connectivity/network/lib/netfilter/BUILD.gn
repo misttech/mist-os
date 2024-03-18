@@ -14,6 +14,7 @@ rustc_library("netfilter") {
     "//sdk/fidl/fuchsia.net:fuchsia.net_rust",
     "//sdk/fidl/fuchsia.net.filter.deprecated:fuchsia.net.filter.deprecated_rust",
     "//src/lib/fidl/rust/fidl",
+    "//src/lib/network/fidl_fuchsia_net_filter_ext",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:pest",
     "//third_party/rust_crates:pest_derive",
@@ -24,6 +25,7 @@ rustc_library("netfilter") {
     "src/error.rs",
     "src/grammar.rs",
     "src/lib.rs",
+    "src/parser.rs",
     "src/parser_deprecated.rs",
   ]
 }
