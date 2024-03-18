@@ -13,10 +13,12 @@ namespace dl::testing {
 
 namespace {
 
-Error ErrorResult() {
+// Consume the pending dlerror() state after a <dlfcn.h> call that failed.
+// The return value is suitable for any fit:result<Error, ...> return value.
+fit::error<Error> TakeError() {
   const char* error_str = dlerror();
   EXPECT_TRUE(error_str);
-  return Error{error_str};
+  return fit::error<Error>{"%s", error_str};
 }
 
 }  // namespace
@@ -25,7 +27,7 @@ fit::result<Error, void*> DlSystemTests::DlOpen(const char* name, int mode) {
   std::filesystem::path path = elfldltl::testing::GetTestDataPath(".") / name;
   void* result = dlopen(path.c_str(), mode);
   if (!result) {
-    return fit::error{ErrorResult()};
+    return TakeError();
   }
   return fit::ok(result);
 }

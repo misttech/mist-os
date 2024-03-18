@@ -17,8 +17,7 @@ Module* RuntimeDynamicLinker::FindModule(const Soname& name) {
   return nullptr;
 }
 
-fit::result<RuntimeDynamicLinker::Error, void*> RuntimeDynamicLinker::Open(const char* file,
-                                                                           int mode) {
+fit::result<Error, void*> RuntimeDynamicLinker::Open(const char* file, int mode) {
   if (mode & ~(kOpenSymbolScopeMask | kOpenBindingModeMask | kOpenFlagsMask)) {
     return fit::error{"invalid mode parameter"};
   }
@@ -46,7 +45,7 @@ fit::result<RuntimeDynamicLinker::Error, void*> RuntimeDynamicLinker::Open(const
   // TODO(https://fxbug.dev/326138362): support & test RTLD_NOLOAD.
 
   // TODO(https://fxbug.dev/324650368): support file retrieval.
-  return fit::error{"cannot open dependency: " + std::string{name.str()}};
+  return fit::error<Error>{"cannot open dependency: ", name.c_str()};
 }
 
 }  // namespace dl

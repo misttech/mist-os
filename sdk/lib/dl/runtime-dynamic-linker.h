@@ -11,6 +11,7 @@
 
 #include <fbl/intrusive_double_list.h>
 
+#include "error.h"
 #include "module.h"
 
 namespace dl {
@@ -41,9 +42,6 @@ inline constexpr int kOpenFlagsMask = OpenFlags::kNoload | OpenFlags::kNodelete;
 
 class RuntimeDynamicLinker {
  public:
-  // TODO(https://fxbug.dev/325494781): Use an allocated buffer to store string
-  // contents that is associated with dlerror.
-  using Error = std::string;
   using Soname = elfldltl::Soname<>;
 
   // Not copyable, not movable

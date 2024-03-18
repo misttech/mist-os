@@ -38,7 +38,7 @@ TYPED_TEST(DlTests, NotFound) {
     // match on the exact filename yet.
     // EXPECT_EQ(result.error_value(), "cannot open dependency: does_not_exist.so");
   } else {
-    EXPECT_THAT(result.error_value(),
+    EXPECT_THAT(result.error_value().take_str(),
                 MatchesRegex(".*does_not_exist.so:.*(No such file or directory|ZX_ERR_NOT_FOUND)"));
   }
 }
@@ -48,9 +48,19 @@ TYPED_TEST(DlTests, InvalidMode) {
     GTEST_SKIP() << "test requires dlopen to validate mode argment";
   }
 
-  auto result = this->DlOpen("libld-dep-a.so", -1);
+  int bad_mode = -1;
+  // The sanitizer runtimes (on non-Fuchsia hosts) intercept dlopen calls with
+  // RTLD_DEEPBIND and make them fail without really calling -ldl's dlopen to
+  // see if it would fail anyway.  So avoid having that flag set in the bad
+  // mode argument.
+#ifdef RTLD_DEEPBIND
+  bad_mode &= ~RTLD_DEEPBIND;
+#endif
+
+  auto result = this->DlOpen("libld-dep-a.so", bad_mode);
   ASSERT_TRUE(result.is_error());
-  EXPECT_EQ(result.error_value(), "invalid mode parameter");
+  EXPECT_EQ(result.error_value().take_str(), "invalid mode parameter")
+      << "for mode argument " << bad_mode;
 }
 
 }  // namespace

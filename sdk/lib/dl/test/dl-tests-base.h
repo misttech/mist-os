@@ -7,13 +7,11 @@
 
 #include <lib/fit/result.h>
 
-#include <string>
-
 #include <gtest/gtest.h>
 
-namespace dl::testing {
+#include "../error.h"
 
-using Error = std::string;
+namespace dl::testing {
 
 // The main purpose of this base class is to document and declare the testing
 // API that each test fixture is expected to provide definitions for. Default
