@@ -402,6 +402,7 @@ impl Routable for PolicyCheckRouter {
 mod tests {
     use super::*;
     use assert_matches::assert_matches;
+    use bedrock_error::DowncastErrorForTest;
     use sandbox::{Data, Message, Receiver};
     use std::iter;
 
@@ -440,9 +441,12 @@ mod tests {
         assert_matches!(
             error,
             BedrockError::RoutingError(err)
-            if err.to_string() == RoutingError::AvailabilityRoutingError(
-                AvailabilityRoutingError::TargetHasStrongerAvailability
-            ).to_string()
+            if matches!(
+                err.downcast_for_test::<RoutingError>(),
+                RoutingError::AvailabilityRoutingError(
+                    AvailabilityRoutingError::TargetHasStrongerAvailability
+                )
+            )
         );
     }
 

@@ -5,9 +5,7 @@
 use {
     crate::model::{
         component::StartReason,
-        error::{
-            ActionError, CreateNamespaceError, ModelError, RouteOrOpenError, StartActionError,
-        },
+        error::{ActionError, CreateNamespaceError, ModelError, StartActionError},
         routing::{route_and_open_capability, OpenOptions},
         testing::routing_test_helpers::*,
     },
@@ -15,6 +13,7 @@ use {
         component_id_index::make_index_file, storage::CommonStorageTest, RoutingTestModel,
     },
     assert_matches::assert_matches,
+    bedrock_error::{BedrockError, DowncastErrorForTest},
     cm_moniker::InstancedMoniker,
     cm_rust::*,
     cm_rust_testing::*,
@@ -662,7 +661,11 @@ async fn use_restricted_storage_open_failure() {
     .await;
     assert_matches!(
         result,
-        Err(RouteOrOpenError::RoutingError(RoutingError::ComponentNotInIdIndex { .. },))
+        Err(BedrockError::RoutingError(err))
+        if matches!(
+            err.downcast_for_test::<RoutingError>(),
+            RoutingError::ComponentNotInIdIndex { .. }
+        )
     );
 }
 

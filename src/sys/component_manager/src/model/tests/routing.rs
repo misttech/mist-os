@@ -20,9 +20,7 @@ use {
                 ActionSet, DestroyAction, ShutdownAction, ShutdownType, StartAction, StopAction,
             },
             component::{IncomingCapabilities, StartReason},
-            error::{
-                ActionError, ModelError, ResolveActionError, RouteOrOpenError, StartActionError,
-            },
+            error::{ActionError, ModelError, ResolveActionError, StartActionError},
             routing::{router::Routable, Route, RouteRequest, RouteSource, RoutingError},
             testing::{
                 echo_service::EchoProtocol, mocks::ControllerActionResponse, out_dir::OutDir,
@@ -39,6 +37,7 @@ use {
         resolving::ResolverError,
     },
     assert_matches::assert_matches,
+    bedrock_error::{BedrockError, DowncastErrorForTest},
     cm_rust::*,
     cm_rust_testing::*,
     fasync::TestExecutor,
@@ -1734,16 +1733,19 @@ async fn use_runner_from_environment_not_found() {
 
     assert_matches!(
         *err,
-        RouteOrOpenError::RoutingError(
+        BedrockError::RoutingError(err)
+        if matches!(
+            err.downcast_for_test::<RoutingError>(),
             RoutingError::UseFromEnvironmentNotFound {
                 moniker,
                 capability_type,
                 capability_name,
-            },
+            }
+            if moniker == &Moniker::try_from(vec!["b"]).unwrap() &&
+                capability_type == &"runner" &&
+                capability_name == &"hobbit"
         )
-        if moniker == Moniker::try_from(vec!["b"]).unwrap() &&
-        capability_type == "runner" &&
-        capability_name == "hobbit");
+    );
 }
 
 // TODO: Write a test for environment that extends from None. Currently, this is not

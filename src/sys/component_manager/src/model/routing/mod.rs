@@ -7,20 +7,16 @@ pub mod providers;
 pub mod router;
 pub mod service;
 pub use ::routing::error::RoutingError;
-use bedrock_error::Explain;
 pub use open::*;
 
 use {
     crate::{
         capability::CapabilitySource,
-        model::{
-            component::ComponentInstance,
-            error::{ModelError, RouteOrOpenError},
-            storage,
-        },
+        model::{component::ComponentInstance, error::ModelError, storage},
     },
     ::routing::{component_instance::ComponentInstanceInterface, mapper::NoopRouteMapper},
     async_trait::async_trait,
+    bedrock_error::{BedrockError, Explain},
     cm_rust::{ExposeDecl, ExposeDeclCommon, UseStorageDecl},
     cm_types::Availability,
     fidl::epitaph::ChannelEpitaphExt,
@@ -52,20 +48,19 @@ impl Route for RouteRequest {
 }
 
 // Helper function to log and return an error if the capability is void.
-fn check_source_for_void(source: &CapabilitySource) -> Result<(), RouteOrOpenError> {
+fn check_source_for_void(source: &CapabilitySource) -> Result<(), RoutingError> {
     if let CapabilitySource::Void { .. } = source {
         return Err(RoutingError::SourceCapabilityIsVoid.into());
     };
     Ok(())
 }
 
-pub(super) fn capability_into_open(capability: Capability) -> Result<Open, RouteOrOpenError> {
+pub(super) fn capability_into_open(capability: Capability) -> Result<Open, BedrockError> {
     match capability {
         Capability::Unit(_) => Err(RoutingError::SourceCapabilityIsVoid.into()),
-        cap => Ok(cap
-            .try_into_open()
-            .map_err(crate::model::error::BedrockOpenError::from)
-            .map_err(crate::model::error::OpenError::from)?),
+        cap => {
+            Ok(cap.try_into_open().map_err(crate::model::error::OpenError::DoesNotSupportOpen)?)
+        }
     }
 }
 
@@ -78,7 +73,7 @@ pub(super) async fn route_and_open_capability(
     route_request: &RouteRequest,
     target: &Arc<ComponentInstance>,
     open_options: OpenOptions<'_>,
-) -> Result<(), RouteOrOpenError> {
+) -> Result<(), BedrockError> {
     match route_request.clone() {
         r @ RouteRequest::UseStorage(_) | r @ RouteRequest::OfferStorage(_) => {
             let storage_source = r.route(target).await?;

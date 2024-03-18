@@ -112,9 +112,9 @@ pub enum ModelError {
         err: OpenOutgoingDirError,
     },
     #[error(transparent)]
-    RouteOrOpenError {
+    BedrockError {
         #[from]
-        err: RouteOrOpenError,
+        err: BedrockError,
     },
     #[error("error with capability provider: {err}")]
     CapabilityProviderError {
@@ -150,7 +150,7 @@ impl Explain for ModelError {
             ModelError::StartActionError { err } => err.as_zx_status(),
             ModelError::ComponentInstanceError { err } => err.as_zx_status(),
             ModelError::OpenOutgoingDirError { err } => err.as_zx_status(),
-            ModelError::RouteOrOpenError { err } => err.as_zx_status(),
+            ModelError::BedrockError { err } => err.as_zx_status(),
             ModelError::CapabilityProviderError { err } => err.as_zx_status(),
             // Any other type of error is not expected.
             _ => zx::Status::INTERNAL,
@@ -696,20 +696,6 @@ impl CapabilityProviderError {
     }
 }
 
-#[derive(Debug, Error, Clone)]
-pub enum BedrockOpenError {
-    #[error("The capability failed to convert to Open: {0}")]
-    Conversion(#[from] ConversionError),
-}
-
-impl BedrockOpenError {
-    pub fn as_zx_status(&self) -> zx::Status {
-        match self {
-            Self::Conversion(_) => zx::Status::NOT_SUPPORTED,
-        }
-    }
-}
-
 #[derive(Debug, Clone, Error)]
 pub enum OpenError {
     #[error("failed to get default capability provider: {err}")]
@@ -733,8 +719,8 @@ pub enum OpenError {
     },
     #[error("timed out opening capability")]
     Timeout,
-    #[error(transparent)]
-    BedrockOpen(#[from] BedrockOpenError),
+    #[error("the capability does not support opening: {0}")]
+    DoesNotSupportOpen(ConversionError),
 }
 
 impl Explain for OpenError {
@@ -743,9 +729,9 @@ impl Explain for OpenError {
             Self::GetDefaultProviderError { err } => err.as_zx_status(),
             Self::OpenStorageError { err } => err.as_zx_status(),
             Self::CapabilityProviderError { err } => err.as_zx_status(),
-            Self::BedrockOpen(err) => err.as_zx_status(),
             Self::CapabilityProviderNotFound => zx::Status::NOT_FOUND,
             Self::Timeout => zx::Status::TIMED_OUT,
+            Self::DoesNotSupportOpen(_) => zx::Status::NOT_SUPPORTED,
         }
     }
 }
@@ -753,33 +739,6 @@ impl Explain for OpenError {
 impl From<OpenError> for BedrockError {
     fn from(value: OpenError) -> Self {
         BedrockError::OpenError(Arc::new(value))
-    }
-}
-
-/// Describes all errors encountered when routing and opening a namespace capability.
-#[derive(Debug, Clone, Error)]
-pub enum RouteOrOpenError {
-    #[error("could not route: {0}")]
-    RoutingError(#[from] RoutingError),
-    #[error("could not open: {0}")]
-    OpenError(#[from] OpenError),
-}
-
-impl Explain for RouteOrOpenError {
-    fn as_zx_status(&self) -> zx::Status {
-        match self {
-            Self::RoutingError(err) => err.as_zx_status(),
-            Self::OpenError(err) => err.as_zx_status(),
-        }
-    }
-}
-
-impl From<RouteOrOpenError> for BedrockError {
-    fn from(value: RouteOrOpenError) -> Self {
-        match value {
-            RouteOrOpenError::RoutingError(err) => err.into(),
-            RouteOrOpenError::OpenError(err) => err.into(),
-        }
     }
 }
 
@@ -800,7 +759,7 @@ pub enum StartActionError {
         moniker: Moniker,
         runner: Name,
         #[source]
-        err: Box<RouteOrOpenError>,
+        err: Box<BedrockError>,
     },
     #[error("Couldn't start `{moniker}` because it uses `\"on_terminate\": \"reboot\"` but is not allowed to by policy: {err}")]
     RebootOnTerminateForbidden {
