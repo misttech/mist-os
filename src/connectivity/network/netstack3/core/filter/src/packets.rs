@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use net_types::ip::{IpAddress, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr};
-use packet::ParseBuffer;
+use net_types::ip::{GenericOverIp, Ip, IpAddress, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr};
+use packet::{Buf, ParseBuffer};
 use packet_formats::{
     icmp::{IcmpParseArgs, Icmpv4Packet, Icmpv6Packet},
     ip::{IpExt, IpPacket as _, IpProto, Ipv4Proto, Ipv6Proto},
@@ -109,6 +109,64 @@ impl<B: ByteSliceMut + ParseBuffer> IpPacket<B, Ipv6> for Ipv6Packet<B> {
     }
 }
 
+/// An incoming IP packet that has been parsed into its constituent parts for
+/// either local delivery or forwarding
+#[derive(GenericOverIp)]
+#[generic_over_ip(I, Ip)]
+pub struct RxPacket<'a, B, I: IpExt> {
+    src_addr: I::Addr,
+    dst_addr: I::Addr,
+    protocol: I::Proto,
+    body: &'a B,
+}
+
+impl<'a, B: ParseBuffer, I: IpExt> RxPacket<'a, B, I> {
+    /// Create a new [`RxPacket`] from its IP header fields and payload.
+    pub fn new(src_addr: I::Addr, dst_addr: I::Addr, protocol: I::Proto, body: &'a B) -> Self {
+        Self { src_addr, dst_addr, protocol, body }
+    }
+}
+
+impl<B: ParseBuffer, I: IpExt> IpPacket<B, I> for RxPacket<'_, B, I> {
+    type TransportPacket<'a> = ParsedTransportHeader where Self: 'a;
+
+    fn src_addr(&self) -> I::Addr {
+        self.src_addr
+    }
+
+    fn dst_addr(&self) -> I::Addr {
+        self.dst_addr
+    }
+
+    fn protocol(&self) -> I::Proto {
+        self.protocol
+    }
+
+    fn transport_packet(&self) -> Option<Self::TransportPacket<'_>> {
+        I::map_ip(
+            self,
+            |RxPacket { src_addr, dst_addr, protocol, body }| {
+                parse_transport_header_in_ipv4_packet(
+                    *src_addr,
+                    *dst_addr,
+                    *protocol,
+                    Buf::new(body, ..),
+                )
+            },
+            |RxPacket { src_addr, dst_addr, protocol, body }| {
+                parse_transport_header_in_ipv6_packet(
+                    *src_addr,
+                    *dst_addr,
+                    *protocol,
+                    Buf::new(body, ..),
+                )
+            },
+        )
+    }
+}
+
+#[derive(GenericOverIp)]
+#[generic_over_ip()]
 pub struct ParsedTransportHeader {
     src_port: u16,
     dst_port: u16,

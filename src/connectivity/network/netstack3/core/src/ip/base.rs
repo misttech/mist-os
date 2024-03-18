@@ -1617,6 +1617,14 @@ fn dispatch_receive_ipv4_packet<
         | None => (),
     }
 
+    match core_ctx.filter_handler().local_ingress_hook(
+        &mut crate::filter::RxPacket::new(src_ip, dst_ip.get(), proto, &body),
+        device,
+    ) {
+        crate::filter::Verdict::Drop => return,
+        crate::filter::Verdict::Accept => {}
+    }
+
     let (mut body, err) = match core_ctx.dispatch_receive_ip_packet(
         bindings_ctx,
         device,
@@ -1711,6 +1719,14 @@ fn dispatch_receive_ipv6_packet<
         | Some(FrameDestination::Multicast)
         | Some(FrameDestination::Broadcast)
         | None => (),
+    }
+
+    match core_ctx.filter_handler().local_ingress_hook(
+        &mut crate::filter::RxPacket::new(src_ip.get(), dst_ip.get(), proto, &body),
+        device,
+    ) {
+        crate::filter::Verdict::Drop => return,
+        crate::filter::Verdict::Accept => {}
     }
 
     let (mut body, err) = match core_ctx.dispatch_receive_ip_packet(
