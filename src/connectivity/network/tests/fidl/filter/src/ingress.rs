@@ -31,6 +31,7 @@ use futures::{
     io::{AsyncReadExt as _, AsyncWriteExt as _},
     FutureExt as _, StreamExt as _, TryFutureExt as _,
 };
+use heck::SnakeCase as _;
 use net_declare::{fidl_subnet, net_ip_v4, net_ip_v6};
 use net_types::{
     ip::{GenericOverIp, Ip, IpInvariant, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr},
@@ -38,6 +39,7 @@ use net_types::{
 };
 use netemul::{RealmTcpListener as _, RealmUdpSocket as _};
 use netstack_testing_common::{
+    interfaces::TestInterfaceExt as _,
     realms::{Netstack3, TestSandboxExt as _},
     ASYNC_EVENT_NEGATIVE_CHECK_TIMEOUT, ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT,
 };
@@ -710,6 +712,7 @@ impl<'a> TestRealm<'a> {
 
         let interface = realm.join_network(&network, name.clone()).await.expect("join network");
         interface.add_address_and_subnet_route(local_subnet).await.expect("configure address");
+        interface.apply_nud_flake_workaround().await.expect("nud flake workaround");
 
         let control =
             realm.connect_to_protocol::<fnet_filter::ControlMarker>().expect("connect to protocol");
@@ -785,7 +788,7 @@ async fn drop_incoming<I: net_types::ip::Ip + TestIpExt, M: Matcher>(
 ) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let network = sandbox.create_network("net").await.expect("create network");
-    let name = format!("{name}_{hook:?}");
+    let name = format!("{name}_{}", format!("{matcher:?}").to_snake_case());
 
     let mut net = TestNet::new::<I>(
         &sandbox,
@@ -977,6 +980,7 @@ impl<'a, I: RouterTestIpExt> TestRouterNet<'a, I> {
         let client_net = sandbox.create_network("router_client").await.expect("create network");
         let router_client_interface =
             router.join_network(&client_net, "router_client").await.expect("join network");
+        router_client_interface.apply_nud_flake_workaround().await.expect("nud flake workaround");
         router_client_interface
             .add_address_and_subnet_route(I::ROUTER_CLIENT_ADDR_WITH_PREFIX)
             .await
@@ -985,6 +989,7 @@ impl<'a, I: RouterTestIpExt> TestRouterNet<'a, I> {
         let server_net = sandbox.create_network("router_server").await.expect("create network");
         let router_server_interface =
             router.join_network(&server_net, "router_server").await.expect("join network");
+        router_server_interface.apply_nud_flake_workaround().await.expect("nud flake workaround");
         router_server_interface
             .add_address_and_subnet_route(I::ROUTER_SERVER_ADDR_WITH_PREFIX)
             .await
@@ -1017,6 +1022,7 @@ impl<'a, I: RouterTestIpExt> TestRouterNet<'a, I> {
                 sandbox.create_netstack_realm::<Netstack3, _>(name.clone()).expect("create realm");
             let interface = realm.join_network(net, name).await.expect("join network");
             interface.add_address_and_subnet_route(subnet).await.expect("configure address");
+            interface.apply_nud_flake_workaround().await.expect("nud flake workaround");
 
             // Add the router as a default gateway.
             let set_provider = realm
@@ -1246,7 +1252,7 @@ async fn forwarded_traffic_skips_local_ingress<
     matcher: M,
 ) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
-    let name = format!("{name}_{hook:?}");
+    let name = format!("{name}_{}", format!("{matcher:?}").to_snake_case());
 
     // Set up a network with two hosts (client and server) and a router. The client
     // and server are both link-layer neighbors with the router but on isolated L2
