@@ -475,8 +475,7 @@ pub(crate) trait QemuBasedEngine: EmulatorEngine {
             let start = Instant::now();
             let mut connection_errors = Vec::new();
             while start.elapsed().as_secs() <= startup_timeout {
-                let compat_res =
-                    ffx_target::knock_target_daemonless(Some(name.clone()), &context).await;
+                let compat_res = ffx_target::knock_target_daemonless(name.clone(), &context).await;
                 if let Ok(compat) = compat_res {
                     println!("\nEmulator is ready.");
                     tracing::debug!(

@@ -198,13 +198,12 @@ pub(crate) fn target_addr_info_to_socket(ti: &TargetAddrInfo) -> SocketAddr {
     socket
 }
 
-/// Attempts to resolve the target's ssh-able address. Returns Some(_) if a target has been
+/// Attempts to resolve the query into a target's ssh-able address. Returns Some(_) if a target has been
 /// found, None otherwise.
 pub async fn resolve_target_address(
-    t: &Option<TargetKind>,
+    query: TargetInfoQuery,
     env_context: &EnvironmentContext,
 ) -> Result<Option<SocketAddr>> {
-    let query = TargetInfoQuery::from(t.as_ref().map(|t| t.to_string()));
     let nodename_or_serial = match query {
         TargetInfoQuery::NodenameOrSerial(nnos) => nnos,
         TargetInfoQuery::First => {
@@ -394,41 +393,18 @@ impl OvernetClient {
     }
 }
 
-// Helper function that attempts to resolve the default target. If none is set, then will attempt
-// to override it with the supplied target query string.
-async fn resolve_target_or_query(
-    target_query: Option<String>,
-    context: &EnvironmentContext,
-) -> Result<Option<TargetKind>> {
-    let mut target = resolve_default_target(&context).await.context("resolving default target")?;
-    if target.is_none() {
-        if target_query.is_none() {
-            return Err(anyhow::anyhow!("Cannot knock unknown target").into());
-        }
-    }
-    // Target query being set should take precedence over the default target.
-    if target_query.is_some() {
-        target = maybe_inline_target(target_query, context).await;
-    }
-    Ok(target)
-}
-
 /// Identical to the above "knock" but does not use the daemon.
 ///
 /// Unlike other errors, this is not intended to be run in a tight loop.
 pub async fn knock_target_daemonless(
-    target_query: Option<String>,
+    target_query_string: String,
     context: &EnvironmentContext,
 ) -> Result<Option<CompatibilityInfo>, KnockError> {
-    let target =
-        resolve_target_or_query(target_query, context).await.map_err(KnockError::CriticalError)?;
-    let addr = resolve_target_address(&target, context)
+    let query = TargetInfoQuery::from(target_query_string.as_str());
+    let addr = resolve_target_address(query, context)
         .await?
         .ok_or_else(|| {
-            anyhow::anyhow!(
-                "Unable to resolve address of target '{}'",
-                target.as_ref().map(|t| t.to_string()).unwrap_or("[unknown]".to_owned())
-            )
+            anyhow::anyhow!("Unable to resolve address of target '{target_query_string}'")
         })
         .context("resolving target address")?;
     let node = overnet_core::Router::new(None)?;
@@ -550,41 +526,6 @@ mod test {
 
         let target = get_default_target(&env.context).await.unwrap();
         assert_eq!(target, Some("some_target".to_owned()));
-    }
-
-    #[fuchsia::test]
-    async fn test_default_target_unset_query() {
-        let env = ffx_config::test_init().await.unwrap();
-        let ctx = &env.context;
-        ctx.query(TARGET_DEFAULT_KEY)
-            .level(Some(ConfigLevel::User))
-            .set(Value::String("foobar".to_owned()))
-            .await
-            .unwrap();
-        let res = resolve_target_or_query(None, &ctx).await.unwrap();
-        assert_eq!(res.as_ref().map(ToString::to_string), Some("foobar".to_owned()));
-    }
-
-    #[fuchsia::test]
-    async fn test_default_target_set_query() {
-        let env = ffx_config::test_init().await.unwrap();
-        let ctx = &env.context;
-        ctx.query(TARGET_DEFAULT_KEY)
-            .level(Some(ConfigLevel::User))
-            .set(Value::String("foobar".to_owned()))
-            .await
-            .unwrap();
-        // This should override the default target.
-        let res = resolve_target_or_query(Some("florp".to_owned()), &ctx).await.unwrap();
-        assert_eq!(res.as_ref().map(ToString::to_string), Some("florp".to_owned()));
-    }
-
-    #[fuchsia::test]
-    async fn test_no_default_target_set() {
-        let env = ffx_config::test_init().await.unwrap();
-        let ctx = &env.context;
-        let res = resolve_target_or_query(None, &ctx).await;
-        assert!(res.is_err());
     }
 
     #[fuchsia::test]

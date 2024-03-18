@@ -226,18 +226,16 @@ impl Injector for Injection {
 
     #[tracing::instrument]
     async fn target_factory(&self) -> Result<TargetProxy> {
-        let target = self.target.clone();
         let timeout_error = self.daemon_timeout_error();
         let proxy_timeout = self.env_context.get_proxy_timeout().await?;
         timeout(proxy_timeout, self.target_factory_inner()).await.map_err(|_| {
-            tracing::warn!("Timed out getting Target proxy for: {:?}", target);
+            tracing::warn!("Timed out getting Target proxy for: {:?}", self.target);
             timeout_error
         })?
     }
 
     #[tracing::instrument]
     async fn remote_factory(&self) -> Result<RemoteControlProxy> {
-        let target = self.target.clone();
         let timeout_error = self.daemon_timeout_error();
         let proxy_timeout = self.env_context.get_proxy_timeout().await?;
         let target_info = std::sync::Mutex::new(None);
@@ -250,7 +248,7 @@ impl Injector for Injection {
         })
         .await
         .map_err(|_| {
-            tracing::warn!("Timed out getting remote control proxy for: {:?}", target);
+            tracing::warn!("Timed out getting remote control proxy for: {:?}", self.target);
             match target_info.lock().unwrap().take() {
                 Some(TargetInfo { nodename: Some(name), .. }) => FfxError::DaemonError {
                     err: DaemonError::Timeout,
