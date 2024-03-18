@@ -38,9 +38,11 @@ impl DefineSubsystemConfiguration<PlatformStarnixConfig> for StarnixSubsystem {
                     .field("enable_data_collection", false)?;
             }
 
-            if *context.build_type == BuildType::Eng {
-                builder.platform_bundle("adb_support");
-            }
+            // TODO(https://fxbug.dev/330159122): Re-enable this in the starnix configuration once
+            // a more precise mechanism for including aibs exists.
+            // if *context.build_type == BuildType::Eng {
+            //    builder.platform_bundle("adb_support");
+            // }
         }
         Ok(())
     }

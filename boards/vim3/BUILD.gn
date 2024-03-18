@@ -24,6 +24,7 @@ _base = {
     ":main_bundle",
     ":vulkan_arm_mali",
     ":rtc_driver",
+    ":hacky_workaround_for_starnix_features",
   ]
 
   filesystems = {
@@ -356,6 +357,25 @@ board_input_bundle("rtc_driver") {
       package_target = "//src/devices/rtc/drivers/nxp:pcf8563"
       package_set = "base"
       driver_components = [ "meta/pcf8563.cm" ]
+    },
+  ]
+}
+
+# This should be moved to a platform AIB and included as follows:
+#
+# starnix.enable_adb_over_usb = true
+#
+# The kernel_cmdline should be included under the same flag.
+#
+# TODO(https://fxbug.dev/330159122): Unwind this hack when a better mechanism
+# for including it exists.
+board_input_bundle("hacky_workaround_for_starnix_features") {
+  kernel_cmdline = [ "driver.usb.peripheral=cdc_adb" ]
+  drivers = [
+    {
+      package_target = "//src/developer/adb/drivers/usb-adb-function:package"
+      package_set = "base"
+      driver_components = [ "meta/usb-adb-function.cm" ]
     },
   ]
 }
