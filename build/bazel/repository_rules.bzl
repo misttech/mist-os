@@ -162,7 +162,7 @@ def _boringssl_repository_impl(repo_ctx):
 
     # IMPORTANT: keep this function in sync with the computation of
     # generated_repository_inputs['boringssl'] in
-    # //build/bazel/update-workspace.py.
+    # //build/bazel/update_workspace.py.
     if hasattr(repo_ctx.attr, "content_hash_file"):
         repo_ctx.path(workspace_dir + "/" + repo_ctx.attr.content_hash_file)
 
@@ -180,30 +180,21 @@ def _boringssl_repository_impl(repo_ctx):
         quiet = False,  # False for debugging.
     )
 
-    # The boringssl repo has a python script which helps with integrating into
-    # different types of build systems.
-    # This command has 2 issues that we need to work around.
-    #  1) The script does not have a shebang for python so we need to add one.
-    #  2) The script is not executable so we read the contents and write the
-    #     the file again which is more portable than calling chmod.
-    script_contents = repo_ctx.read(repo_ctx.path("src/util/generate_build_files.py"))
-    repo_ctx.file(
-        "src/util/generate_build_files.py",
-        content = """#!/usr/bin/env python3
-        {script_contents}""".format(script_contents = script_contents),
-        executable = True,
-    )
+    # Copy the generated files into the workspace root
+    generated_files = [
+        "BUILD.generated.bzl",
+        "BUILD.generated_tests.bzl",
+    ]
 
-    # Execute the script which generates a file which contains all of the
-    # sources and headers.
-    repo_ctx.execute(
-        [
-            repo_ctx.path("src/util/generate_build_files.py"),
-            "bazel",
-            "--embed_test_data=false",
-        ],
-        quiet = False,  # False for debugging.
-    )
+    for generated_file in generated_files:
+        content = repo_ctx.read(
+            repo_ctx.path(workspace_dir + "/third_party/boringssl/" + generated_file),
+        )
+        repo_ctx.file(
+            generated_file,
+            content = content,
+            executable = False,
+        )
 
     # Add a BUILD file which exposes the cc_library target.
     repo_ctx.file("BUILD.bazel", content = repo_ctx.read(

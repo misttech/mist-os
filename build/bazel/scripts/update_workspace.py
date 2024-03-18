@@ -919,6 +919,18 @@ common --enable_bzlmod=false
             "boringssl",
             "BUILD.boringssl",
         ),
+        os.path.join(
+            fuchsia_dir,
+            "third_party",
+            "boringssl",
+            "BUILD.generated.bzl",
+        ),
+        os.path.join(
+            fuchsia_dir,
+            "third_party",
+            "boringssl",
+            "BUILD.generated_tests.bzl",
+        ),
     ]
 
     # LINT.IfChange

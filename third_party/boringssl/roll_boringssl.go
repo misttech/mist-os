@@ -57,10 +57,10 @@ func updateSources(dir, commit string) []byte {
 	}
 }
 
-// Create the GN build files for the current sources.
-func generateGN(dir string) {
+// Create the build files for the current sources.
+func generateBuildFiles(dir string) {
 	log.Printf("Generating build files...")
-	cmd := exec.Command("python3", filepath.Join("src", "util", "generate_build_files.py"), "gn")
+	cmd := exec.Command("python3", filepath.Join("src", "util", "generate_build_files.py"), "gn", "bazel")
 	cmd.Dir = dir
 	if err := cmd.Run(); err != nil {
 		log.Fatalf("%s failed: %s", cmd.Args, err)
@@ -169,7 +169,7 @@ func main() {
 
 	log.Printf("Commit resolved to %s", sha1)
 
-	generateGN(dir)
+	generateBuildFiles(dir)
 	generateRustBindings(dir)
 	updateReadMe(dir, sha1)
 
