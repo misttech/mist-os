@@ -11,6 +11,7 @@ use std::{
 
 use assert_matches::assert_matches;
 use derivative::Derivative;
+use fidl_fuchsia_hardware_network as fhardware_network;
 use fidl_fuchsia_net_interfaces as fnet_interfaces;
 use fuchsia_zircon as zx;
 use net_types::{
@@ -118,29 +119,25 @@ impl Devices<DeviceId<BindingsCtx>> {
 /// Device specific iformation.
 #[derive(Debug)]
 pub(crate) enum DeviceSpecificInfo<'a> {
-    Netdevice(&'a NetdeviceInfo),
     Loopback(&'a LoopbackInfo),
+    Ethernet(&'a EthernetInfo),
     PureIp(&'a PureIpDeviceInfo),
 }
 
 impl DeviceSpecificInfo<'_> {
     pub(crate) fn static_common_info(&self) -> &StaticCommonInfo {
         match self {
-            Self::Netdevice(i) => &i.static_common_info,
             Self::Loopback(i) => &i.static_common_info,
-            Self::PureIp(i) => &i.static_common_info,
+            Self::Ethernet(i) => &i.common_info,
+            Self::PureIp(i) => &i.common_info,
         }
     }
 
     pub(crate) fn with_common_info<O, F: FnOnce(&DynamicCommonInfo) -> O>(&self, cb: F) -> O {
         match self {
-            Self::Netdevice(i) => i.with_dynamic_info(
-                |DynamicNetdeviceInfo { phy_up: _, common_info, neighbor_event_sink: _ }| {
-                    cb(common_info)
-                },
-            ),
             Self::Loopback(i) => i.with_dynamic_info(cb),
-            Self::PureIp(i) => i.with_dynamic_info(cb),
+            Self::Ethernet(i) => i.with_dynamic_info(|dynamic| cb(&dynamic.netdevice.common_info)),
+            Self::PureIp(i) => i.with_dynamic_info(|dynamic| cb(&dynamic.common_info)),
         }
     }
 
@@ -149,13 +146,11 @@ impl DeviceSpecificInfo<'_> {
         cb: F,
     ) -> O {
         match self {
-            Self::Netdevice(i) => i.with_dynamic_info_mut(
-                |DynamicNetdeviceInfo { phy_up: _, common_info, neighbor_event_sink: _ }| {
-                    cb(common_info)
-                },
-            ),
             Self::Loopback(i) => i.with_dynamic_info_mut(cb),
-            Self::PureIp(i) => i.with_dynamic_info_mut(cb),
+            Self::Ethernet(i) => {
+                i.with_dynamic_info_mut(|dynamic| cb(&mut dynamic.netdevice.common_info))
+            }
+            Self::PureIp(i) => i.with_dynamic_info_mut(|dynamic| cb(&mut dynamic.common_info)),
         }
     }
 }
@@ -220,6 +215,15 @@ pub(crate) struct StaticCommonInfo {
     pub(crate) authorization_token: zx::Event,
 }
 
+impl Default for StaticCommonInfo {
+    fn default() -> StaticCommonInfo {
+        StaticCommonInfo {
+            tx_notifier: Default::default(),
+            authorization_token: zx::Event::create(),
+        }
+    }
+}
+
 /// Information common to all devices.
 #[derive(Derivative)]
 #[derivative(Debug)]
@@ -245,6 +249,18 @@ pub(crate) struct AddressInfo {
     // which is required since Core is no-async.
     pub(crate) assignment_state_sender:
         futures::channel::mpsc::UnboundedSender<fnet_interfaces::AddressAssignmentState>,
+}
+
+/// Information associated with FIDL Protocol workers.
+#[derive(Debug)]
+pub(crate) struct FidlWorkerInfo<R> {
+    // The worker `Task`, wrapped in a `Shared` future so that it can be awaited
+    // multiple times.
+    pub(crate) worker: futures::future::Shared<fuchsia_async::Task<()>>,
+    // Mechanism to cancel the worker with reason `R`. If `Some`, the worker is
+    // active (and holds the `Receiver`). Otherwise, the worker has been
+    // canceled.
+    pub(crate) cancelation_sender: Option<futures::channel::oneshot::Sender<R>>,
 }
 
 /// Loopback device information.
@@ -284,52 +300,20 @@ impl DeviceClassMatcher<fidl_fuchsia_net_filter::DeviceClass> for LoopbackInfo {
     }
 }
 
-/// Information associated with FIDL Protocol workers.
+/// Dynamic information common to all Netdevice backed devices.
 #[derive(Debug)]
-pub(crate) struct FidlWorkerInfo<R> {
-    // The worker `Task`, wrapped in a `Shared` future so that it can be awaited
-    // multiple times.
-    pub(crate) worker: futures::future::Shared<fuchsia_async::Task<()>>,
-    // Mechanism to cancel the worker with reason `R`. If `Some`, the worker is
-    // active (and holds the `Receiver`). Otherwise, the worker has been
-    // canceled.
-    pub(crate) cancelation_sender: Option<futures::channel::oneshot::Sender<R>>,
-}
-
-#[derive(Derivative)]
-#[derivative(Debug)]
 pub(crate) struct DynamicNetdeviceInfo {
     pub(crate) phy_up: bool,
     pub(crate) common_info: DynamicCommonInfo,
-    #[derivative(Debug = "ignore")]
-    pub(crate) neighbor_event_sink: futures::channel::mpsc::UnboundedSender<neighbor_worker::Event>,
 }
 
-/// Network device information.
+/// Static information common to all Netdevice backed devices.
 #[derive(Debug)]
-pub(crate) struct NetdeviceInfo {
+pub(crate) struct StaticNetdeviceInfo {
     pub(crate) handler: super::netdevice_worker::PortHandler,
-    pub(crate) mac: UnicastAddr<Mac>,
-    pub(crate) static_common_info: StaticCommonInfo,
-    pub(crate) dynamic: std::sync::RwLock<DynamicNetdeviceInfo>,
 }
 
-impl NetdeviceInfo {
-    pub(crate) fn with_dynamic_info<O, F: FnOnce(&DynamicNetdeviceInfo) -> O>(&self, cb: F) -> O {
-        let dynamic = self.dynamic.read().unwrap();
-        cb(dynamic.deref())
-    }
-
-    pub(crate) fn with_dynamic_info_mut<O, F: FnOnce(&mut DynamicNetdeviceInfo) -> O>(
-        &self,
-        cb: F,
-    ) -> O {
-        let mut dynamic = self.dynamic.write().unwrap();
-        cb(dynamic.deref_mut())
-    }
-}
-
-impl DeviceClassMatcher<fidl_fuchsia_net_filter::DeviceClass> for NetdeviceInfo {
+impl StaticNetdeviceInfo {
     fn device_class_matches(&self, device_class: &fidl_fuchsia_net_filter::DeviceClass) -> bool {
         match device_class {
             fidl_fuchsia_net_filter::DeviceClass::Loopback(fidl_fuchsia_net_filter::Empty {}) => {
@@ -345,30 +329,74 @@ impl DeviceClassMatcher<fidl_fuchsia_net_filter::DeviceClass> for NetdeviceInfo 
     }
 }
 
-#[derive(Debug)]
-pub(crate) struct PureIpDeviceInfo {
-    pub(crate) static_common_info: StaticCommonInfo,
-    pub(crate) dynamic_common_info: std::sync::RwLock<DynamicCommonInfo>,
+/// Dynamic information for Ethernet devices
+#[derive(Derivative)]
+#[derivative(Debug)]
+pub(crate) struct DynamicEthernetInfo {
+    pub(crate) netdevice: DynamicNetdeviceInfo,
+    #[derivative(Debug = "ignore")]
+    pub(crate) neighbor_event_sink: futures::channel::mpsc::UnboundedSender<neighbor_worker::Event>,
 }
 
-impl PureIpDeviceInfo {
-    pub(crate) fn with_dynamic_info<O, F: FnOnce(&DynamicCommonInfo) -> O>(&self, cb: F) -> O {
-        cb(self.dynamic_common_info.read().unwrap().deref())
+/// Ethernet device information.
+#[derive(Debug)]
+pub(crate) struct EthernetInfo {
+    pub(crate) dynamic_info: std::sync::RwLock<DynamicEthernetInfo>,
+    pub(crate) common_info: StaticCommonInfo,
+    pub(crate) netdevice: StaticNetdeviceInfo,
+    pub(crate) mac: UnicastAddr<Mac>,
+    // We must keep the mac proxy alive to maintain our multicast filtering mode
+    // selection set.
+    pub(crate) _mac_proxy: fhardware_network::MacAddressingProxy,
+}
+
+impl EthernetInfo {
+    pub(crate) fn with_dynamic_info<O, F: FnOnce(&DynamicEthernetInfo) -> O>(&self, cb: F) -> O {
+        let dynamic = self.dynamic_info.read().unwrap();
+        cb(dynamic.deref())
     }
 
-    pub(crate) fn with_dynamic_info_mut<O, F: FnOnce(&mut DynamicCommonInfo) -> O>(
+    pub(crate) fn with_dynamic_info_mut<O, F: FnOnce(&mut DynamicEthernetInfo) -> O>(
         &self,
         cb: F,
     ) -> O {
-        cb(self.dynamic_common_info.write().unwrap().deref_mut())
+        let mut dynamic = self.dynamic_info.write().unwrap();
+        cb(dynamic.deref_mut())
+    }
+}
+
+impl DeviceClassMatcher<fidl_fuchsia_net_filter::DeviceClass> for EthernetInfo {
+    fn device_class_matches(&self, device_class: &fidl_fuchsia_net_filter::DeviceClass) -> bool {
+        self.netdevice.device_class_matches(device_class)
+    }
+}
+
+/// Pure IP device information.
+#[derive(Debug)]
+pub(crate) struct PureIpDeviceInfo {
+    pub(crate) common_info: StaticCommonInfo,
+    pub(crate) netdevice: StaticNetdeviceInfo,
+    pub(crate) dynamic_info: std::sync::RwLock<DynamicNetdeviceInfo>,
+}
+
+impl PureIpDeviceInfo {
+    pub(crate) fn with_dynamic_info<O, F: FnOnce(&DynamicNetdeviceInfo) -> O>(&self, cb: F) -> O {
+        let dynamic = self.dynamic_info.read().unwrap();
+        cb(dynamic.deref())
+    }
+
+    pub(crate) fn with_dynamic_info_mut<O, F: FnOnce(&mut DynamicNetdeviceInfo) -> O>(
+        &self,
+        cb: F,
+    ) -> O {
+        let mut dynamic = self.dynamic_info.write().unwrap();
+        cb(dynamic.deref_mut())
     }
 }
 
 impl DeviceClassMatcher<fidl_fuchsia_net_filter::DeviceClass> for PureIpDeviceInfo {
-    fn device_class_matches(&self, _device_class: &fidl_fuchsia_net_filter::DeviceClass) -> bool {
-        // TODO(https://fxbug.dev/42051633): when IP-layer netdevice-backed devices are
-        // supported, match against the port's device class.
-        false
+    fn device_class_matches(&self, device_class: &fidl_fuchsia_net_filter::DeviceClass) -> bool {
+        self.netdevice.device_class_matches(device_class)
     }
 }
 

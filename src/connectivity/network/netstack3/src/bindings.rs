@@ -43,6 +43,7 @@ use std::{
 
 use assert_matches::assert_matches;
 use fidl::endpoints::{DiscoverableProtocolMarker, ProtocolMarker as _, RequestStream};
+use fidl_fuchsia_hardware_network as fhardware_network;
 use fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin;
 use fuchsia_async as fasync;
 use fuchsia_inspect::health::Reporter as _;
@@ -55,7 +56,8 @@ use util::{ConversionContext, IntoFidl as _};
 
 use devices::{
     BindingId, DeviceIdAndName, DeviceSpecificInfo, Devices, DynamicCommonInfo,
-    DynamicNetdeviceInfo, LoopbackInfo, NetdeviceInfo, PureIpDeviceInfo, StaticCommonInfo,
+    DynamicEthernetInfo, DynamicNetdeviceInfo, EthernetInfo, LoopbackInfo, PureIpDeviceInfo,
+    StaticCommonInfo,
 };
 use interfaces_watcher::{InterfaceEventProducer, InterfaceProperties, InterfaceUpdate};
 use timers::TimerDispatcher;
@@ -215,7 +217,7 @@ trait DeviceIdExt {
 impl DeviceIdExt for DeviceId<BindingsCtx> {
     fn external_state(&self) -> DeviceSpecificInfo<'_> {
         match self {
-            DeviceId::Ethernet(d) => DeviceSpecificInfo::Netdevice(d.external_state()),
+            DeviceId::Ethernet(d) => DeviceSpecificInfo::Ethernet(d.external_state()),
             DeviceId::Loopback(d) => DeviceSpecificInfo::Loopback(d.external_state()),
             DeviceId::PureIp(d) => DeviceSpecificInfo::PureIp(d.external_state()),
         }
@@ -471,7 +473,7 @@ impl TimerContext<TimerId<BindingsCtx>> for BindingsCtx {
 
 impl DeviceLayerStateTypes for BindingsCtx {
     type LoopbackDeviceState = LoopbackInfo;
-    type EthernetDeviceState = NetdeviceInfo;
+    type EthernetDeviceState = EthernetInfo;
     type PureIpDeviceState = PureIpDeviceInfo;
     type DeviceIdentifier = DeviceIdAndName;
 }
@@ -497,24 +499,24 @@ impl DeviceLayerEventDispatcher for BindingsCtx {
     ) -> Result<(), DeviceSendFrameError<Buf<Vec<u8>>>> {
         let state = device.external_state();
         let enabled = state.with_dynamic_info(
-            |DynamicNetdeviceInfo {
-                 phy_up,
-                 common_info:
-                     DynamicCommonInfo {
-                         admin_enabled,
-                         mtu: _,
-                         events: _,
-                         control_hook: _,
-                         addresses: _,
+            |DynamicEthernetInfo {
+                 netdevice:
+                     DynamicNetdeviceInfo {
+                         phy_up,
+                         common_info: DynamicCommonInfo { admin_enabled, .. },
                      },
-                 neighbor_event_sink: _,
+                 ..
              }| { *admin_enabled && *phy_up },
         );
 
         if enabled {
-            state.handler.send(frame.as_ref()).unwrap_or_else(|e| {
-                tracing::warn!("failed to send frame to {:?}: {:?}", state.handler, e)
-            })
+            state
+                .netdevice
+                .handler
+                .send(frame.as_ref(), fhardware_network::FrameType::Ethernet)
+                .unwrap_or_else(|e| {
+                    tracing::warn!("failed to send frame to {:?}: {:?}", state.netdevice.handler, e)
+                })
         }
 
         Ok(())

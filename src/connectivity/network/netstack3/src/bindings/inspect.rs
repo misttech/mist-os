@@ -11,14 +11,15 @@ use std::{fmt::Display, string::ToString as _};
 
 use fuchsia_inspect::Node;
 use net_types::{
+    ethernet::Mac,
     ip::{Ipv4, Ipv6},
-    Witness as _,
+    UnicastAddr, Witness as _,
 };
 use netstack3_core::device::{DeviceId, EthernetLinkDevice, WeakDeviceId};
 
 use crate::bindings::{
     devices::{
-        DeviceIdAndName, DeviceSpecificInfo, DynamicCommonInfo, DynamicNetdeviceInfo, NetdeviceInfo,
+        DeviceIdAndName, DeviceSpecificInfo, DynamicCommonInfo, DynamicNetdeviceInfo, EthernetInfo,
     },
     BindingsCtx, Ctx, DeviceIdExt as _,
 };
@@ -154,36 +155,38 @@ pub(crate) fn devices(ctx: &mut Ctx) -> fuchsia_inspect::Inspector {
                 },
             );
             match external_state {
-                DeviceSpecificInfo::Netdevice(
-                    info @ NetdeviceInfo { mac, dynamic: _, handler: _, static_common_info: _ },
-                ) => {
+                DeviceSpecificInfo::Ethernet(info @ EthernetInfo { mac, .. }) => {
                     node.record_bool("Loopback", false);
-                    node.record_child("NetworkDevice", |node| {
-                        node.record_string("MacAddress", mac.get().to_string());
-                        info.with_dynamic_info(
-                            |DynamicNetdeviceInfo {
-                                 phy_up,
-                                 common_info: _,
-                                 neighbor_event_sink: _,
-                             }| {
-                                node.record_bool("PhyUp", *phy_up);
-                            },
-                        );
+                    info.with_dynamic_info(|dynamic| {
+                        record_network_device(node, &dynamic.netdevice, Some(mac))
                     });
                 }
                 DeviceSpecificInfo::Loopback(_info) => {
                     node.record_bool("Loopback", true);
                 }
-                // TODO(https://fxbug.dev/42051633): Add relevant
-                // inspect data for pure IP devices.
-                DeviceSpecificInfo::PureIp(_info) => {
-                    node.record_bool("loopback", false);
+                DeviceSpecificInfo::PureIp(info) => {
+                    node.record_bool("Loopback", false);
+                    info.with_dynamic_info(|dynamic| record_network_device(node, dynamic, None));
                 }
             }
             ctx.api().device_any().inspect(&device_id, &mut BindingsInspector::new(node));
         })
     }
     inspector
+}
+
+/// Record information about the Netdevice as a child of the given inspect node.
+fn record_network_device(
+    node: &Node,
+    DynamicNetdeviceInfo { phy_up, common_info: _ }: &DynamicNetdeviceInfo,
+    mac: Option<&UnicastAddr<Mac>>,
+) {
+    node.record_child("NetworkDevice", |node| {
+        if let Some(mac) = mac {
+            node.record_string("MacAddress", mac.get().to_string());
+        }
+        node.record_bool("PhyUp", *phy_up);
+    })
 }
 
 pub(crate) fn neighbors(mut ctx: Ctx) -> fuchsia_inspect::Inspector {

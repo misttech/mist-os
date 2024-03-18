@@ -32,7 +32,7 @@ use netstack3_core::{
 use crate::bindings::{
     devices::{
         BindingId, DeviceIdAndName, DeviceSpecificInfo, Devices, DynamicCommonInfo,
-        DynamicNetdeviceInfo, LoopbackInfo, NetdeviceInfo, PureIpDeviceInfo,
+        DynamicEthernetInfo, DynamicNetdeviceInfo,
     },
     util::{DeviceNotFoundError, IntoCore as _, IntoFidl as _, TryIntoCoreWithContext},
     Ctx, DeviceIdExt as _,
@@ -213,13 +213,17 @@ fn get_interface_flags(
 }
 
 fn flags_for_device(info: &DeviceSpecificInfo<'_>) -> psocket::InterfaceFlags {
-    let physical_up: bool;
-    let loopback: bool;
+    struct Flags {
+        physical_up: bool,
+        admin_enabled: bool,
+        loopback: bool,
+    }
 
+    // NB: Exists to force destructuring `DynamicCommonInfo` without repetition
+    // in the match statement below.
     struct FromDynamicInfo {
         admin_enabled: bool,
     }
-
     impl<'a> From<&'a DynamicCommonInfo> for FromDynamicInfo {
         fn from(value: &'a DynamicCommonInfo) -> Self {
             let DynamicCommonInfo {
@@ -233,37 +237,25 @@ fn flags_for_device(info: &DeviceSpecificInfo<'_>) -> psocket::InterfaceFlags {
         }
     }
 
-    let FromDynamicInfo { admin_enabled } = match info {
-        DeviceSpecificInfo::Netdevice(NetdeviceInfo {
-            handler: _,
-            mac: _,
-            static_common_info: _,
-            dynamic,
-        }) => {
-            let guard = dynamic.read().unwrap();
-            let DynamicNetdeviceInfo { common_info, phy_up, neighbor_event_sink: _ } = &*guard;
-            physical_up = *phy_up;
-            loopback = false;
-            common_info.into()
-        }
-        DeviceSpecificInfo::Loopback(LoopbackInfo {
-            static_common_info: _,
-            dynamic_common_info,
-            rx_notifier: _,
-        }) => {
-            physical_up = true;
-            loopback = true;
-            (&*dynamic_common_info.read().unwrap()).into()
-        }
-        DeviceSpecificInfo::PureIp(PureIpDeviceInfo {
-            static_common_info: _,
-            dynamic_common_info,
-        }) => {
-            // TODO(https://fxbug.dev/42051633): Properly account for phys up on
-            // pure IP devices.
-            physical_up = false;
-            loopback = false;
-            (&*dynamic_common_info.read().unwrap()).into()
+    let Flags { physical_up, admin_enabled, loopback } = match info {
+        DeviceSpecificInfo::Ethernet(info) => info.with_dynamic_info(
+            |DynamicEthernetInfo {
+                 netdevice: DynamicNetdeviceInfo { common_info, phy_up },
+                 neighbor_event_sink: _,
+             }| {
+                let FromDynamicInfo { admin_enabled } = common_info.into();
+                Flags { physical_up: *phy_up, admin_enabled, loopback: false }
+            },
+        ),
+        DeviceSpecificInfo::Loopback(info) => info.with_dynamic_info(|common_info| {
+            let FromDynamicInfo { admin_enabled } = common_info.into();
+            Flags { physical_up: true, admin_enabled: admin_enabled, loopback: true }
+        }),
+        DeviceSpecificInfo::PureIp(info) => {
+            info.with_dynamic_info(|DynamicNetdeviceInfo { common_info, phy_up }| {
+                let FromDynamicInfo { admin_enabled } = common_info.into();
+                Flags { physical_up: *phy_up, admin_enabled, loopback: false }
+            })
         }
     };
 

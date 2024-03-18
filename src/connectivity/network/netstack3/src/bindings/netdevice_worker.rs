@@ -143,7 +143,7 @@ impl NetdeviceWorker {
             };
 
             match workaround_drop_ssh_over_wlan(
-                &id.external_state().handler.device_class,
+                &id.external_state().netdevice.handler.device_class,
                 &buff[..frame_length],
             ) {
                 FilterResult::Drop => {
@@ -272,6 +272,19 @@ pub(crate) enum PortWireFormat {
     Ethernet,
     /// The port supports sending/receiving IPv4 and IPv6 packets.
     Ip,
+}
+
+impl PortWireFormat {
+    fn frame_types(&self) -> &[fhardware_network::FrameType] {
+        const ETHERNET_FRAMES: [fhardware_network::FrameType; 1] =
+            [fhardware_network::FrameType::Ethernet];
+        const IP_FRAMES: [fhardware_network::FrameType; 2] =
+            [fhardware_network::FrameType::Ipv4, fhardware_network::FrameType::Ipv6];
+        match self {
+            Self::Ethernet => &ETHERNET_FRAMES,
+            Self::Ip => &IP_FRAMES,
+        }
+    }
 }
 
 /// Error returned for ports with unsupported wire formats.
@@ -471,38 +484,40 @@ impl DeviceHandler {
 
         let name = name.unwrap_or_else(|| format!("eth{}", binding_id));
 
-        let info = devices::NetdeviceInfo {
-            handler: PortHandler {
-                id: binding_id,
-                port_id: port,
-                inner: self.inner.clone(),
-                _mac_proxy: mac_proxy,
-                device_class: device_class.clone(),
-            },
+        let info = devices::EthernetInfo {
             mac: mac_addr,
-            dynamic: devices::DynamicNetdeviceInfo {
-                phy_up,
-                common_info: devices::DynamicCommonInfo {
-                    mtu: max_frame_size.as_mtu(),
-                    admin_enabled: false,
-                    events: crate::bindings::create_interface_event_producer(
-                        interfaces_event_sink,
-                        binding_id,
-                        crate::bindings::InterfaceProperties {
-                            name: name.clone(),
-                            device_class: fnet_interfaces::DeviceClass::Device(device_class),
-                        },
-                    ),
-                    control_hook: control_hook,
-                    addresses: HashMap::new(),
+            _mac_proxy: mac_proxy,
+            netdevice: devices::StaticNetdeviceInfo {
+                handler: PortHandler {
+                    id: binding_id,
+                    port_id: port,
+                    inner: self.inner.clone(),
+                    device_class: device_class.clone(),
+                    wire_format,
+                },
+            },
+            common_info: Default::default(),
+            dynamic_info: devices::DynamicEthernetInfo {
+                netdevice: devices::DynamicNetdeviceInfo {
+                    phy_up,
+                    common_info: devices::DynamicCommonInfo {
+                        mtu: max_frame_size.as_mtu(),
+                        admin_enabled: false,
+                        events: crate::bindings::create_interface_event_producer(
+                            interfaces_event_sink,
+                            binding_id,
+                            crate::bindings::InterfaceProperties {
+                                name: name.clone(),
+                                device_class: fnet_interfaces::DeviceClass::Device(device_class),
+                            },
+                        ),
+                        control_hook: control_hook,
+                        addresses: HashMap::new(),
+                    },
                 },
                 neighbor_event_sink: neighbor_event_sink.clone(),
             }
             .into(),
-            static_common_info: devices::StaticCommonInfo {
-                tx_notifier: Default::default(),
-                authorization_token: zx::Event::create(),
-            },
         }
         .into();
 
@@ -517,7 +532,7 @@ impl DeviceHandler {
         let binding_id = core_ethernet_id.bindings_id().id;
         let external_state = core_ethernet_id.external_state();
         let devices::StaticCommonInfo { tx_notifier, authorization_token: _ } =
-            &external_state.static_common_info;
+            &external_state.common_info;
 
         let core_id = DeviceId::from(core_ethernet_id.clone());
         let task =
@@ -637,10 +652,8 @@ pub(crate) struct PortHandler {
     id: BindingId,
     port_id: netdevice_client::Port,
     inner: Inner,
-    // We must keep the mac proxy alive to maintain our multicast filtering mode
-    // selection set.
-    _mac_proxy: fhardware_network::MacAddressingProxy,
     device_class: fhardware_network::DeviceClass,
+    wire_format: PortWireFormat,
 }
 
 #[derive(thiserror::Error, Debug)]
@@ -657,8 +670,8 @@ impl PortHandler {
     }
 
     pub(crate) async fn attach(&self) -> Result<(), netdevice_client::Error> {
-        let Self { port_id, inner: Inner { session, .. }, .. } = self;
-        session.attach(*port_id, &[fhardware_network::FrameType::Ethernet]).await
+        let Self { port_id, inner: Inner { session, .. }, wire_format, .. } = self;
+        session.attach(*port_id, wire_format.frame_types()).await
     }
 
     pub(crate) async fn detach(&self) -> Result<(), netdevice_client::Error> {
@@ -666,7 +679,11 @@ impl PortHandler {
         session.detach(*port_id).await
     }
 
-    pub(crate) fn send(&self, frame: &[u8]) -> Result<(), SendError> {
+    pub(crate) fn send(
+        &self,
+        frame: &[u8],
+        frame_type: fhardware_network::FrameType,
+    ) -> Result<(), SendError> {
         trace_duration!(c"netdevice::send");
 
         let Self { port_id, inner: Inner { session, .. }, .. } = self;
@@ -677,7 +694,7 @@ impl PortHandler {
         let mut tx =
             session.alloc_tx_buffer(frame.len()).now_or_never().ok_or(SendError::NoTxBuffers)??;
         tx.set_port(*port_id);
-        tx.set_frame_type(fhardware_network::FrameType::Ethernet);
+        tx.set_frame_type(frame_type);
         tx.write_at(0, frame)?;
         session.send(tx)?;
         Ok(())
@@ -703,11 +720,12 @@ impl PortHandler {
 
 impl std::fmt::Debug for PortHandler {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let Self { id, port_id, inner: _, _mac_proxy: _, device_class } = self;
+        let Self { id, port_id, inner: _, device_class, wire_format } = self;
         f.debug_struct("PortHandler")
             .field("id", id)
             .field("port_id", port_id)
             .field("device_class", device_class)
+            .field("wire_format", wire_format)
             .finish()
     }
 }

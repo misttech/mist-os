@@ -80,7 +80,7 @@ fn handle_get_mac(ns: &Netstack, interface_id: u64) -> fnet_root::InterfacesGetM
         .map(|core_id| {
             let mac = match core_id.external_state() {
                 DeviceSpecificInfo::Loopback(_) => Some(LOOPBACK_MAC),
-                DeviceSpecificInfo::Netdevice(info) => Some(info.mac.into()),
+                DeviceSpecificInfo::Ethernet(info) => Some(info.mac.into()),
                 DeviceSpecificInfo::PureIp(_) => None,
             };
             mac.map(|mac| Box::new(mac.into_fidl()))

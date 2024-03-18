@@ -65,7 +65,7 @@ use netstack3_core::{
 };
 
 use crate::bindings::{
-    devices::{self, StaticCommonInfo},
+    devices::{self, EthernetInfo, StaticCommonInfo},
     netdevice_worker,
     routes::{self, admin::RouteSet},
     util::{self, IllegalZeroValueError, IntoCore as _, IntoFidl, TryIntoCore},
@@ -683,7 +683,7 @@ async fn dispatch_control_request(
 ///
 /// Panics if `id` points to a loopback device.
 async fn remove_interface(ctx: &mut Ctx, id: BindingId) {
-    let (devices::NetdeviceInfo { handler, mac: _, static_common_info: _, dynamic: _ }, weak_id) = {
+    let (devices::StaticNetdeviceInfo { handler }, weak_id) = {
         let core_id = ctx
             .bindings_ctx()
             .devices
@@ -700,14 +700,14 @@ async fn remove_interface(ctx: &mut Ctx, id: BindingId) {
                 // that device.
                 let result = ctx.api().device().remove_device(core_id);
                 ctx.bindings_ctx().remove_routes_on_device(&weak_id).await;
-                let info = util::wait_for_resource_removal(
+                let EthernetInfo { netdevice, .. } = util::wait_for_resource_removal(
                     "ethernet device",
                     &id,
                     result,
                     &debug_references,
                 )
                 .await;
-                (info, weak_id)
+                (netdevice, weak_id)
             }
             DeviceId::Loopback(core_id) => {
                 // We want to remove the routes on the device _after_ we mark
@@ -739,16 +739,14 @@ async fn remove_interface(ctx: &mut Ctx, id: BindingId) {
                 // that device.
                 let result = ctx.api().device().remove_device(core_id);
                 ctx.bindings_ctx().remove_routes_on_device(&weak_id).await;
-                let devices::PureIpDeviceInfo { static_common_info: _, dynamic_common_info: _ } =
-                    util::wait_for_resource_removal(
-                        "pure ip device",
-                        &id,
-                        result,
-                        &debug_references,
-                    )
-                    .await;
-                tracing::info!("pure IP device {id:?} removal complete");
-                return;
+                let devices::PureIpDeviceInfo { netdevice, .. } = util::wait_for_resource_removal(
+                    "pure ip device",
+                    &id,
+                    result,
+                    &debug_references,
+                )
+                .await;
+                (netdevice, weak_id)
             }
         }
     };
@@ -1712,7 +1710,7 @@ fn send_address_removal_event(
 
 mod enabled {
     use super::*;
-    use crate::bindings::{DeviceSpecificInfo, DynamicCommonInfo, DynamicNetdeviceInfo};
+    use crate::bindings::{DeviceSpecificInfo, DynamicEthernetInfo, DynamicNetdeviceInfo};
     use futures::lock::Mutex as AsyncMutex;
 
     /// A helper that provides interface enabling and disabling under an
@@ -1738,42 +1736,37 @@ mod enabled {
         pub(super) async fn set_admin_enabled(&self, enabled: bool) -> bool {
             let Self { id, ctx } = self;
             let mut ctx = ctx.lock().await;
-            enum Info<A, B> {
+            enum Info<A, B, C> {
                 Loopback(A),
-                Netdevice(B),
+                Ethernet(B),
+                PureIp(C),
             }
 
             let core_id = ctx.bindings_ctx().devices.get_core_id(*id).expect("device not present");
             let port_handler = {
-                let mut info = match core_id.external_state() {
+                let (mut info, port_handler) = match core_id.external_state() {
                     devices::DeviceSpecificInfo::Loopback(devices::LoopbackInfo {
                         static_common_info: _,
                         dynamic_common_info,
                         rx_notifier: _,
-                    }) => Info::Loopback((dynamic_common_info.write().unwrap(), None)),
-                    devices::DeviceSpecificInfo::Netdevice(devices::NetdeviceInfo {
-                        static_common_info: _,
-                        handler,
+                    }) => (Info::Loopback(dynamic_common_info.write().unwrap()), None),
+                    devices::DeviceSpecificInfo::Ethernet(devices::EthernetInfo {
+                        netdevice,
+                        common_info: _,
+                        dynamic_info,
                         mac: _,
-                        dynamic,
-                    }) => Info::Netdevice((dynamic.write().unwrap(), Some(handler))),
-                    // TODO(https://fxbug.dev/42051633): Support enabling
-                    // pure IP devices.
+                        _mac_proxy: _,
+                    }) => (Info::Ethernet(dynamic_info.write().unwrap()), Some(&netdevice.handler)),
                     devices::DeviceSpecificInfo::PureIp(devices::PureIpDeviceInfo {
-                        static_common_info: _,
-                        dynamic_common_info: _,
-                    }) => {
-                        tracing::warn!("enabling/disabling pure IP devices is not yet supported");
-                        return false;
-                    }
+                        netdevice,
+                        common_info: _,
+                        dynamic_info,
+                    }) => (Info::PureIp(dynamic_info.write().unwrap()), Some(&netdevice.handler)),
                 };
-                let (common_info, port_handler) = match info {
-                    Info::Loopback((ref mut common_info, port_handler)) => {
-                        (common_info.deref_mut(), port_handler)
-                    }
-                    Info::Netdevice((ref mut dynamic, port_handler)) => {
-                        (&mut dynamic.common_info, port_handler)
-                    }
+                let common_info = match info {
+                    Info::Loopback(ref mut common_info) => common_info.deref_mut(),
+                    Info::Ethernet(ref mut dynamic) => &mut dynamic.netdevice.common_info,
+                    Info::PureIp(ref mut dynamic) => &mut dynamic.common_info,
                 };
 
                 // Already set to expected value.
@@ -1823,17 +1816,14 @@ mod enabled {
                 .expect("device not present")
                 .external_state()
             {
-                devices::DeviceSpecificInfo::Netdevice(i) => {
-                    i.with_dynamic_info_mut(|i| i.phy_up = online)
+                devices::DeviceSpecificInfo::Ethernet(i) => {
+                    i.with_dynamic_info_mut(|i| i.netdevice.phy_up = online)
                 }
                 i @ devices::DeviceSpecificInfo::Loopback(_) => {
                     unreachable!("unexpected device info {:?} for interface {}", i, *id)
                 }
-                // TODO(https://fxbug.dev/42051633): Support enabling the
-                // underlying port for pure IP devices.
-                devices::DeviceSpecificInfo::PureIp(_) => {
-                    tracing::warn!("enabling/disabling pure IP devices is not yet supported");
-                    return;
+                devices::DeviceSpecificInfo::PureIp(i) => {
+                    i.with_dynamic_info_mut(|i| i.phy_up = online)
                 }
             };
             // Enable or disable interface with context depending on new
@@ -1858,34 +1848,19 @@ mod enabled {
                 .expect("tried to enable/disable nonexisting device");
 
             let dev_enabled = match core_id.external_state() {
-                DeviceSpecificInfo::Netdevice(i) => i.with_dynamic_info(
-                    |DynamicNetdeviceInfo {
-                         phy_up,
-                         common_info:
-                             DynamicCommonInfo {
-                                 admin_enabled,
-                                 mtu: _,
-                                 events: _,
-                                 control_hook: _,
-                                 addresses: _,
-                             },
+                DeviceSpecificInfo::Ethernet(i) => i.with_dynamic_info(
+                    |DynamicEthernetInfo {
+                         netdevice: DynamicNetdeviceInfo { phy_up, common_info },
                          neighbor_event_sink: _,
-                     }| *phy_up && *admin_enabled,
+                     }| *phy_up && common_info.admin_enabled,
                 ),
-                DeviceSpecificInfo::Loopback(i) => i.with_dynamic_info(
-                    |DynamicCommonInfo {
-                         admin_enabled,
-                         mtu: _,
-                         events: _,
-                         control_hook: _,
-                         addresses: _,
-                     }| { *admin_enabled },
-                ),
-                // TODO(https://fxbug.dev/42051633): Support enabling pure IP
-                // devices.
-                DeviceSpecificInfo::PureIp(_) => {
-                    tracing::warn!("enabling/disabling pure IP devices is not yet supported");
-                    return;
+                DeviceSpecificInfo::Loopback(i) => {
+                    i.with_dynamic_info(|common_info| common_info.admin_enabled)
+                }
+                DeviceSpecificInfo::PureIp(i) => {
+                    i.with_dynamic_info(|DynamicNetdeviceInfo { phy_up, common_info }| {
+                        *phy_up && common_info.admin_enabled
+                    })
                 }
             };
 
