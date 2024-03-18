@@ -1214,7 +1214,7 @@ pub(crate) struct User<PS: ParseStrategy> {
     user_data: UserData<PS>,
     roles: ExtensibleBitmap<PS>,
     expanded_range: MlsRange<PS>,
-    default_level: MLSLevel<PS>,
+    default_level: MlsLevel<PS>,
 }
 
 impl<PS: ParseStrategy> User<PS> {
@@ -1248,7 +1248,7 @@ where
         let (expanded_range, tail) =
             MlsRange::parse(tail).context("parsing user expanded range")?;
 
-        let (default_level, tail) = MLSLevel::parse(tail).context("parsing user default level")?;
+        let (default_level, tail) = MlsLevel::parse(tail).context("parsing user default level")?;
 
         Ok((Self { user_data, roles, expanded_range, default_level }, tail))
     }
@@ -1305,6 +1305,30 @@ impl<PS: ParseStrategy> MlsLevel<PS> {
     }
 }
 
+impl<PS: ParseStrategy> Parse<PS> for MlsLevel<PS>
+where
+    ExtensibleBitmap<PS>: Parse<PS>,
+{
+    type Error = anyhow::Error;
+
+    fn parse(bytes: PS) -> Result<(Self, PS), Self::Error> {
+        let tail = bytes;
+
+        let num_bytes = tail.len();
+        let (sensitivity, tail) = PS::parse::<le::U32>(tail).ok_or(ParseError::MissingData {
+            type_name: "MlsLevelSensitivity",
+            type_size: std::mem::size_of::<le::U32>(),
+            num_bytes,
+        })?;
+
+        let (categories, tail) = ExtensibleBitmap::parse(tail)
+            .map_err(Into::<anyhow::Error>::into)
+            .context("parsing mls level categories")?;
+
+        Ok((Self { sensitivity, categories }, tail))
+    }
+}
+
 #[derive(Debug, PartialEq)]
 pub(crate) struct MlsRange<PS: ParseStrategy> {
     count: PS::Output<le::U32>,
@@ -1333,15 +1357,18 @@ where
 
         let num_bytes = tail.len();
         let (count, tail) = PS::parse::<le::U32>(tail).ok_or(ParseError::MissingData {
-            type_name: "MLSRangeCount",
+            type_name: "MlsLevelCount",
             type_size: std::mem::size_of::<le::U32>(),
             num_bytes,
         })?;
 
+        // `MlsRange::parse()` cannot be implemented in terms of `MlsLevel::parse()` for the
+        // low and optional high level, because of the order in which the sensitivity and
+        // category bitmap fields appear.
         let num_bytes = tail.len();
         let (sensitivity_low, tail) =
             PS::parse::<le::U32>(tail).ok_or(ParseError::MissingData {
-                type_name: "MLSRangeSensitivityLow",
+                type_name: "MlsLevelSensitivityLow",
                 type_size: std::mem::size_of::<le::U32>(),
                 num_bytes,
             })?;
@@ -1350,7 +1377,7 @@ where
             let num_bytes = tail.len();
             let (sensitivity_high, tail) =
                 PS::parse::<le::U32>(tail).ok_or(ParseError::MissingData {
-                    type_name: "MLSRangeSensitivityHigh",
+                    type_name: "MlsLevelSensitivityHigh",
                     type_size: std::mem::size_of::<le::U32>(),
                     num_bytes,
                 })?;
@@ -1382,53 +1409,6 @@ where
             },
             tail,
         ))
-    }
-}
-
-#[derive(Clone, Debug, FromZeroes, FromBytes, NoCell, PartialEq, Unaligned)]
-#[repr(C, packed)]
-pub(crate) struct MLSRangeMetadata {
-    count: le::U32,
-    sensitivity_low: le::U32,
-    sensitivity_high: le::U32,
-}
-
-impl Validate for MLSRangeMetadata {
-    type Error = anyhow::Error;
-
-    /// TODO: Validate [`MLSRangeMetadata`] internals.
-    fn validate(&self) -> Result<(), Self::Error> {
-        Ok(())
-    }
-}
-
-#[derive(Debug, PartialEq)]
-pub(crate) struct MLSLevel<PS: ParseStrategy> {
-    sensitivity: PS::Output<le::U32>,
-    categories: ExtensibleBitmap<PS>,
-}
-
-impl<PS: ParseStrategy> Parse<PS> for MLSLevel<PS>
-where
-    ExtensibleBitmap<PS>: Parse<PS>,
-{
-    type Error = anyhow::Error;
-
-    fn parse(bytes: PS) -> Result<(Self, PS), Self::Error> {
-        let tail = bytes;
-
-        let num_bytes = tail.len();
-        let (sensitivity, tail) = PS::parse::<le::U32>(tail).ok_or(ParseError::MissingData {
-            type_name: "MLSLevelSensitivity",
-            type_size: std::mem::size_of::<le::U32>(),
-            num_bytes,
-        })?;
-
-        let (categories, tail) = ExtensibleBitmap::parse(tail)
-            .map_err(Into::<anyhow::Error>::into)
-            .context("parsing mls level categories")?;
-
-        Ok((Self { sensitivity, categories }, tail))
     }
 }
 
@@ -1502,7 +1482,7 @@ impl<PS: ParseStrategy> Validate for [Sensitivity<PS>] {
 #[derive(Debug, PartialEq)]
 pub(crate) struct Sensitivity<PS: ParseStrategy> {
     metadata: SensitivityMetadata<PS>,
-    level: MLSLevel<PS>,
+    level: MlsLevel<PS>,
 }
 
 impl<PS: ParseStrategy> Sensitivity<PS> {
@@ -1518,7 +1498,7 @@ impl<PS: ParseStrategy> Sensitivity<PS> {
 impl<PS: ParseStrategy> Parse<PS> for Sensitivity<PS>
 where
     SensitivityMetadata<PS>: Parse<PS>,
-    MLSLevel<PS>: Parse<PS>,
+    MlsLevel<PS>: Parse<PS>,
 {
     type Error = anyhow::Error;
 
@@ -1529,7 +1509,7 @@ where
             .map_err(Into::<anyhow::Error>::into)
             .context("parsing sensitivity metadata")?;
 
-        let (level, tail) = MLSLevel::parse(tail)
+        let (level, tail) = MlsLevel::parse(tail)
             .map_err(Into::<anyhow::Error>::into)
             .context("parsing sensitivity mls level")?;
 
