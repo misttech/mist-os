@@ -429,7 +429,14 @@ mod test {
         }
     }
 
-    fn gather_bytes(a: *mut u8, b: *mut u8, c: *mut u8, d: *mut u8, e: *mut u8) -> *mut u8 {
+    fn gather_bytes(
+        _context: &mut (),
+        a: *mut u8,
+        b: *mut u8,
+        c: *mut u8,
+        d: *mut u8,
+        e: *mut u8,
+    ) -> *mut u8 {
         let a = (a as u64) & 0xff;
         let b = (b as u64) & 0xff;
         let c = (c as u64) & 0xff;
@@ -438,7 +445,14 @@ mod test {
         ((a << 32) | (b << 24) | (c << 16) | (d << 8) | e) as *mut u8
     }
 
-    fn memfrob(ptr: *mut u8, n: *mut u8, _: *mut u8, _: *mut u8, _: *mut u8) -> *mut u8 {
+    fn memfrob(
+        _context: &mut (),
+        ptr: *mut u8,
+        n: *mut u8,
+        _: *mut u8,
+        _: *mut u8,
+        _: *mut u8,
+    ) -> *mut u8 {
         let n = n as usize;
         let slice = unsafe { std::slice::from_raw_parts_mut(ptr, n) };
         for c in slice.iter_mut() {
@@ -447,15 +461,36 @@ mod test {
         slice.as_mut_ptr()
     }
 
-    fn trash_registers(_: *mut u8, _: *mut u8, _: *mut u8, _: *mut u8, _: *mut u8) -> *mut u8 {
+    fn trash_registers(
+        _context: &mut (),
+        _: *mut u8,
+        _: *mut u8,
+        _: *mut u8,
+        _: *mut u8,
+        _: *mut u8,
+    ) -> *mut u8 {
         0 as *mut u8
     }
 
-    fn sqrti(v: *mut u8, _: *mut u8, _: *mut u8, _: *mut u8, _: *mut u8) -> *mut u8 {
+    fn sqrti(
+        _context: &mut (),
+        v: *mut u8,
+        _: *mut u8,
+        _: *mut u8,
+        _: *mut u8,
+        _: *mut u8,
+    ) -> *mut u8 {
         (((v as u64) as f64).sqrt() as u64) as *mut u8
     }
 
-    fn strcmp_ext(mut s1: *mut u8, mut s2: *mut u8, _: *mut u8, _: *mut u8, _: *mut u8) -> *mut u8 {
+    fn strcmp_ext(
+        _context: &mut (),
+        mut s1: *mut u8,
+        mut s2: *mut u8,
+        _: *mut u8,
+        _: *mut u8,
+        _: *mut u8,
+    ) -> *mut u8 {
         loop {
             let c1 = unsafe { *s1 };
             let c2 = unsafe { *s2 };
@@ -612,7 +647,7 @@ mod test {
             // Special case that only test the test framework.
             return;
         };
-        let mut builder = EbpfProgramBuilder::default();
+        let mut builder = EbpfProgramBuilder::<()>::default();
         if let Some(memory) = test_case.memory.as_ref() {
             let buffer_size = memory.len() as u64;
             builder.set_args(&[
@@ -694,9 +729,9 @@ mod test {
         if let Some(value) = test_case.result {
             let program = program.expect("program must be loadable");
             let result = if let Some(memory) = test_case.memory.as_mut() {
-                program.run_with_slice(memory.as_mut_slice())
+                program.run_with_slice(&mut (), memory.as_mut_slice())
             } else {
-                program.run_with_arguments(&[0, 0])
+                program.run_with_arguments(&mut (), &[0, 0])
             };
             assert_eq!(result, value);
         } else {

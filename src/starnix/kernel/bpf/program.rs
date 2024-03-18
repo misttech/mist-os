@@ -63,7 +63,7 @@ impl From<&bpf_attr__bindgen_ty_4> for ProgramInfo {
 
 pub struct Program {
     pub info: ProgramInfo,
-    vm: Option<EbpfProgram>,
+    vm: Option<EbpfProgram<()>>,
     _objects: Vec<BpfHandle>,
 }
 
@@ -101,7 +101,7 @@ impl Program {
 
     pub fn run<T: AsBytes + FromBytes + NoCell>(&self, data: &mut T) -> Result<u64, ()> {
         if let Some(vm) = self.vm.as_ref() {
-            Ok(vm.run(data))
+            Ok(vm.run(&mut (), data))
         } else {
             // vm is only None when bpf is faked. Return an error on execution, as random value
             // might have stronger side effects.
@@ -117,7 +117,7 @@ const BPF_PSEUDO_MAP_FD: u8 = 1;
 fn link(
     current_task: &CurrentTask,
     code: &mut Vec<bpf_insn>,
-    builder: &mut EbpfProgramBuilder,
+    builder: &mut EbpfProgramBuilder<()>,
 ) -> Result<Vec<BpfHandle>, Errno> {
     let mut objects = vec![];
     let code_len = code.len();

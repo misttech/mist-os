@@ -4,22 +4,38 @@
 
 use crate::{
     visitor::{BpfVisitor, DataWidth, ProgramCounter, Register, Source},
-    EbpfProgram, BPF_STACK_SIZE, GENERAL_REGISTER_COUNT,
+    EbpfProgram, EpbfRunContext, BPF_STACK_SIZE, GENERAL_REGISTER_COUNT,
 };
 use byteorder::{BigEndian, ByteOrder, LittleEndian};
 use std::{mem::MaybeUninit, pin::Pin};
 use zerocopy::AsBytes;
 
-pub fn execute_with_arguments(program: &EbpfProgram, arguments: &[u64]) -> u64 {
+pub fn execute_with_arguments<C: EpbfRunContext>(
+    program: &EbpfProgram<C>,
+    run_context: &mut C::Context<'_>,
+    arguments: &[u64],
+) -> u64 {
     let arguments = arguments.iter().map(|v| BpfValue::from(*v)).collect::<Vec<_>>();
-    execute_impl(program, &arguments)
+    execute_impl(program, run_context, &arguments)
 }
 
-pub fn execute(program: &EbpfProgram, data: &mut [u8]) -> u64 {
-    execute_impl(program, &[BpfValue::from(data.as_mut_ptr()), BpfValue::from(data.len())])
+pub fn execute<C: EpbfRunContext>(
+    program: &EbpfProgram<C>,
+    run_context: &mut C::Context<'_>,
+    data: &mut [u8],
+) -> u64 {
+    execute_impl(
+        program,
+        run_context,
+        &[BpfValue::from(data.as_mut_ptr()), BpfValue::from(data.len())],
+    )
 }
 
-fn execute_impl(program: &EbpfProgram, arguments: &[BpfValue]) -> u64 {
+fn execute_impl<C: EpbfRunContext>(
+    program: &EbpfProgram<C>,
+    run_context: &mut C::Context<'_>,
+    arguments: &[BpfValue],
+) -> u64 {
     assert!(arguments.len() < 5);
     let mut context = ComputationContext {
         program,
@@ -39,7 +55,7 @@ fn execute_impl(program: &EbpfProgram, arguments: &[BpfValue]) -> u64 {
             return result;
         }
         context
-            .visit(&mut (), &program.code[context.pc..])
+            .visit(run_context, &program.code[context.pc..])
             .expect("verifier should have found an issue");
     }
 }
@@ -113,9 +129,9 @@ impl BpfValue {
 
 /// The state of the computation as known by the interpreter at a given point in time.
 #[derive(Debug)]
-struct ComputationContext<'a> {
+struct ComputationContext<'a, C: EpbfRunContext> {
     /// The program to execute.
-    program: &'a EbpfProgram,
+    program: &'a EbpfProgram<C>,
     /// Register 0 to 9.
     registers: [BpfValue; GENERAL_REGISTER_COUNT as usize],
     /// The state of the stack.
@@ -126,7 +142,7 @@ struct ComputationContext<'a> {
     result: Option<u64>,
 }
 
-impl ComputationContext<'_> {
+impl<C: EpbfRunContext> ComputationContext<'_, C> {
     fn reg(&mut self, index: Register) -> BpfValue {
         if index < GENERAL_REGISTER_COUNT {
             self.registers[index as usize]
@@ -254,8 +270,8 @@ impl ComputationContext<'_> {
     }
 }
 
-impl BpfVisitor for ComputationContext<'_> {
-    type Context<'a> = ();
+impl<C: EpbfRunContext> BpfVisitor for ComputationContext<'_, C> {
+    type Context<'a> = C::Context<'a>;
 
     fn add<'a>(
         &mut self,
@@ -487,11 +503,12 @@ impl BpfVisitor for ComputationContext<'_> {
 
     fn call_external<'a>(
         &mut self,
-        _context: &mut Self::Context<'a>,
+        context: &mut Self::Context<'a>,
         index: u32,
     ) -> Result<(), String> {
         let helper = &self.program.helpers[&index];
         let result = (helper.function_pointer)(
+            context,
             self.reg(1).as_u8_ptr(),
             self.reg(2).as_u8_ptr(),
             self.reg(3).as_u8_ptr(),

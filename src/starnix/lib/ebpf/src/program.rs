@@ -14,22 +14,37 @@ use linux_uapi::{bpf_insn, sock_filter};
 use std::{collections::HashMap, fmt::Formatter, sync::Arc};
 use zerocopy::{AsBytes, FromBytes, NoCell};
 
-#[derive(Debug, Default)]
-pub struct EbpfProgramBuilder {
-    helpers: HashMap<u32, EbpfHelper>,
-    calling_context: CallingContext,
+pub trait EpbfRunContext {
+    type Context<'a>;
 }
 
-#[derive(Clone)]
-pub struct EbpfHelper {
+impl EpbfRunContext for () {
+    type Context<'a> = ();
+}
+
+pub struct EbpfHelper<C: EpbfRunContext> {
     pub index: u32,
     pub name: &'static str,
-    pub function_pointer:
-        Arc<dyn Fn(*mut u8, *mut u8, *mut u8, *mut u8, *mut u8) -> *mut u8 + Send + Sync>,
+    pub function_pointer: Arc<
+        dyn Fn(&mut C::Context<'_>, *mut u8, *mut u8, *mut u8, *mut u8, *mut u8) -> *mut u8
+            + Send
+            + Sync,
+    >,
     pub signature: FunctionSignature,
 }
 
-impl std::fmt::Debug for EbpfHelper {
+impl<C: EpbfRunContext> Clone for EbpfHelper<C> {
+    fn clone(&self) -> Self {
+        Self {
+            index: self.index,
+            name: self.name,
+            function_pointer: Arc::clone(&self.function_pointer),
+            signature: self.signature.clone(),
+        }
+    }
+}
+
+impl<C: EpbfRunContext> std::fmt::Debug for EbpfHelper<C> {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
         f.debug_struct("EbpfHelper")
             .field("index", &self.index)
@@ -39,7 +54,27 @@ impl std::fmt::Debug for EbpfHelper {
     }
 }
 
-impl EbpfProgramBuilder {
+pub struct EbpfProgramBuilder<C: EpbfRunContext> {
+    helpers: HashMap<u32, EbpfHelper<C>>,
+    calling_context: CallingContext,
+}
+
+impl<C: EpbfRunContext> Default for EbpfProgramBuilder<C> {
+    fn default() -> Self {
+        Self { helpers: Default::default(), calling_context: Default::default() }
+    }
+}
+
+impl<C: EpbfRunContext> std::fmt::Debug for EbpfProgramBuilder<C> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
+        f.debug_struct("EbpfProgramBuilder")
+            .field("helpers", &self.helpers)
+            .field("calling_context", &self.calling_context)
+            .finish()
+    }
+}
+
+impl<C: EpbfRunContext> EbpfProgramBuilder<C> {
     pub fn register_map_reference(&mut self, pc: usize, schema: MapSchema) {
         self.calling_context.register_map_reference(pc, schema);
     }
@@ -51,7 +86,7 @@ impl EbpfProgramBuilder {
     // This function signature will need more parameters eventually. The client needs to be able to
     // supply a real callback and it's type. The callback will be needed to actually call the
     // callback. The type will be needed for the verifier.
-    pub fn register(&mut self, helper: &EbpfHelper) -> Result<(), EbpfError> {
+    pub fn register(&mut self, helper: &EbpfHelper<C>) -> Result<(), EbpfError> {
         self.helpers.insert(helper.index, helper.clone());
         self.calling_context.register_function(helper.index, helper.signature.clone());
         Ok(())
@@ -61,7 +96,7 @@ impl EbpfProgramBuilder {
         self,
         code: Vec<bpf_insn>,
         logger: &mut dyn VerifierLogger,
-    ) -> Result<EbpfProgram, EbpfError> {
+    ) -> Result<EbpfProgram<C>, EbpfError> {
         verify(&code, self.calling_context, logger)?;
         Ok(EbpfProgram { code, helpers: self.helpers })
     }
@@ -69,19 +104,23 @@ impl EbpfProgramBuilder {
 
 /// An abstraction over a ebpf program and its registered helper functions.
 #[derive(Debug)]
-pub struct EbpfProgram {
+pub struct EbpfProgram<C: EpbfRunContext> {
     pub code: Vec<bpf_insn>,
-    pub helpers: HashMap<u32, EbpfHelper>,
+    pub helpers: HashMap<u32, EbpfHelper<C>>,
 }
 
-impl EbpfProgram {
+impl<C: EpbfRunContext> EbpfProgram<C> {
     /// Executes the current program on the provided data.  Warning: If
     /// this program was a cbpf program, and it uses BPF_MEM, the
     /// scratch memory must be provided by the caller to this
     /// function.  The translated CBPF program will use the last 16
     /// words of |data|.
-    pub fn run<T: AsBytes + FromBytes + NoCell>(&self, data: &mut T) -> u64 {
-        self.run_with_slice(data.as_bytes_mut())
+    pub fn run<T: AsBytes + FromBytes + NoCell>(
+        &self,
+        run_context: &mut C::Context<'_>,
+        data: &mut T,
+    ) -> u64 {
+        self.run_with_slice(run_context, data.as_bytes_mut())
     }
 
     /// Executes the current program on the provided data.  Warning: If
@@ -89,18 +128,21 @@ impl EbpfProgram {
     /// scratch memory must be provided by the caller to this
     /// function.  The translated CBPF program will use the last 16
     /// words of |data|.
-    pub fn run_with_slice(&self, data: &mut [u8]) -> u64 {
-        execute(self, data)
+    pub fn run_with_slice(&self, run_context: &mut C::Context<'_>, data: &mut [u8]) -> u64 {
+        execute(self, run_context, data)
     }
 
-    pub fn run_with_arguments(&self, arguments: &[u64]) -> u64 {
-        execute_with_arguments(self, arguments)
+    pub fn run_with_arguments(&self, run_context: &mut C::Context<'_>, arguments: &[u64]) -> u64 {
+        execute_with_arguments(self, run_context, arguments)
     }
+}
 
+impl EbpfProgram<()> {
+    /// This method instantiates an EbpfProgram given a cbpf original.
     pub fn from_cbpf<T>(bpf_code: &[sock_filter]) -> Result<Self, EbpfError> {
         let code = cbpf_to_ebpf(bpf_code)?;
         let buffer_size = std::mem::size_of::<T>() as u64;
-        let mut builder = EbpfProgramBuilder::default();
+        let mut builder = EbpfProgramBuilder::<()>::default();
         builder.set_args(&[
             Type::PtrToMemory { id: 0, offset: 0, buffer_size },
             Type::from(buffer_size),
@@ -135,8 +177,13 @@ mod test {
     const BPF_ST_REG: u16 = BPF_ST as u16;
     const BPF_MISC_TAX: u16 = (BPF_MISC | BPF_TAX) as u16;
 
-    fn with_prg_assert_result(prg: &EbpfProgram, mut data: seccomp_data, result: u32, msg: &str) {
-        let return_value = prg.run(&mut data);
+    fn with_prg_assert_result(
+        prg: &EbpfProgram<()>,
+        mut data: seccomp_data,
+        result: u32,
+        msg: &str,
+    ) {
+        let return_value = prg.run(&mut (), &mut data);
         assert_eq!(return_value, result as u64, "{}: filter return value is {}", msg, return_value);
     }
 

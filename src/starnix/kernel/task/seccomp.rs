@@ -69,7 +69,7 @@ use starnix_uapi::AUDIT_ARCH_RISCV64;
 
 pub struct SeccompFilter {
     /// The BPF program associated with this filter.
-    program: EbpfProgram,
+    program: EbpfProgram<()>,
 
     /// The unique-to-this-process id of thi1s filter.  SECCOMP_FILTER_FLAG_TSYNC only works if all
     /// threads in this process have filters that are a prefix of the filters of the thread
@@ -128,7 +128,7 @@ impl SeccompFilter {
     }
 
     pub fn run(&self, data: &mut seccomp_data) -> u32 {
-        self.program.run(data) as u32
+        self.program.run(&mut (), data) as u32
     }
 }
 

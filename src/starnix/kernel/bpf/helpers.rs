@@ -11,6 +11,7 @@ const MAP_LOOKUP_ELEM_INDEX: u32 = 1;
 const MAP_LOOKUP_ELEM_NAME: &'static str = "map_lookup_elem";
 
 fn bpf_map_lookup_elem(
+    _context: &mut (),
     _map: *mut u8,
     _key: *mut u8,
     _: *mut u8,
@@ -25,6 +26,7 @@ const MAP_UPDATE_ELEM_INDEX: u32 = 2;
 const MAP_UPDATE_ELEM_NAME: &'static str = "map_update_elem";
 
 fn bpf_map_update_elem(
+    _context: &mut (),
     _map: *mut u8,
     _key: *mut u8,
     _value: *mut u8,
@@ -39,6 +41,7 @@ const MAP_DELETE_ELEM_INDEX: u32 = 3;
 const MAP_DELETE_ELEM_NAME: &'static str = "map_delete_elem";
 
 fn bpf_map_delete_elem(
+    _context: &mut (),
     _map: *mut u8,
     _key: *mut u8,
     _: *mut u8,
@@ -49,7 +52,7 @@ fn bpf_map_delete_elem(
     u64::MAX as *mut u8
 }
 
-pub static BPF_HELPERS: Lazy<Vec<EbpfHelper>> = Lazy::new(|| {
+pub static BPF_HELPERS: Lazy<Vec<EbpfHelper<()>>> = Lazy::new(|| {
     vec![
         EbpfHelper {
             index: MAP_LOOKUP_ELEM_INDEX,
