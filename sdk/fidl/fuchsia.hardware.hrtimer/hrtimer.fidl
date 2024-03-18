@@ -1,0 +1,145 @@
+// Copyright 2024 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+library fuchsia.hardware.hrtimer;
+
+using zx;
+
+/// Maximum count of timers supported by this protocol, arbitrary,
+const MAX_COUNT_TIMERS uint32 = 64;
+
+/// Maximum count of resolutions supported by a given timer, arbitrary,
+const MAX_COUNT_RESOLUTIONS uint32 = 64;
+
+/// Errors that this driver may return.
+type DriverError = flexible enum {
+    /// The driver encountered an otherwise unspecified error while performing the operation.
+    INTERNAL_ERROR = 1;
+
+    /// The operation is not implemented, supported, or enabled.
+    NOT_SUPPORTED = 2;
+
+    /// An argument is invalid.
+    INVALID_ARGS = 3;
+
+    /// The operation failed because the current state of the driver does not allow it, or a
+    /// precondition of the operation is not satisfied.
+    BAD_STATE = 4;
+};
+
+/// Amount of time for one tick of a timer.
+type Resolution = flexible union {
+    /// The resolution specified for one tick.
+    1: duration zx.Duration;
+};
+
+/// Properties for a specific timer abstracted by the driver.
+type TimerProperties = table {
+    /// Unique identifier for this timer.
+    ///
+    /// The `id` is stable for a given timer, i.e. it does not change across different clients
+    /// or different connections from the same client.
+    ///
+    /// Required.
+    1: id uint64;
+
+    /// Retrieves the resolutions supported by this timer.
+    ///
+    /// Required.
+    2: supported_resolutions vector<Resolution>:MAX_COUNT_RESOLUTIONS;
+
+    /// Range in ticks.
+    ///
+    /// This is the maximum amount of time that can be set in terms of ticks when a timer is
+    /// started. The maximum range in actual time (e.g. nanoseconds) depends on the resolution used.
+    ///
+    /// Required.
+    3: max_ticks uint64;
+
+    /// If true then the `SetEvent` method is supported, if false it is not supported.
+    ///
+    /// Required.
+    4: supports_event bool;
+};
+
+/// Driver properties.
+type Properties = resource table {
+    /// Retrieves the supported timers properties.
+    ///
+    /// Optional.
+    1: timers_properties vector<TimerProperties>:MAX_COUNT_TIMERS;
+};
+
+/// A driver providing high resolution timers support.
+/// This API is intended for timers that are provided by hardware separate from the CPU
+/// For instance this driver may abstract hardware provided by an SoC.
+@discoverable
+open protocol Device {
+    /// Start the timer `id` to expire after `ticks`.
+    ///
+    /// If `ticks` is 0 then the timer will expire in 0 ticks (immediately).
+    /// If the timer `id` was already started, then the previous `Start` is cancelled and the driver
+    /// will restart the timer. Note that this may race with the expiration of the previous timer,
+    /// for instance the notification process may be already started and a new `Start` call won't
+    /// be able to stop a notification that is already in flight.
+    /// If the specified `id` is not within the `properties` returned by `GetProperties`,
+    /// i.e. if 'id' is not a valid identifier, this call will return `INVALID_ARGS`.
+    /// If the specified `resolution` is not supported per the `resolutions` provided by
+    /// `GetProperties`, then this call will return `INVALID_ARGS`.
+    /// If the specified `ticks` is beyond the range supported for the timer as provided by
+    /// `GetProperties`, then this call will return `INVALID_ARGS`.
+    /// If the driver encounters an internal error, then this call will return `INTERNAL_ERROR`.
+    flexible Start(struct {
+        id uint64;
+        resolution Resolution;
+        ticks uint64;
+    }) -> () error DriverError;
+
+    /// Stops the timer `id`.
+    ///
+    /// Note that this may race with the expiration of the timer, for instance notification via
+    /// an event set with `SetEvent` may be already in flight.
+    /// If the specified `id` is not within the `properties` returned by `GetProperties`,
+    /// i.e. if 'id' is not a valid identifier, this call will return `INVALID_ARGS`.
+    /// If the driver encounters an internal error, then this call will return `INTERNAL_ERROR`.
+    flexible Stop(struct {
+        id uint64;
+    }) -> () error DriverError;
+
+    /// Get the current time in ticks left in timer `id` until expiration.
+    ///
+    /// If the specified `id` is not within the `properties` returned by `GetProperties`,
+    /// i.e. if 'id' is not a valid identifier, this call will return `INVALID_ARGS`.
+    flexible GetTicksLeft(struct {
+        id uint64;
+    }) -> (struct {
+        ticks uint64;
+    }) error DriverError;
+
+    /// Sets a Zircon Event to be notified of the timer expiration.
+    ///
+    /// The timer expiration will be notified via the ZX_EVENT_SIGNALED signal.
+    /// The client is responsible for clearing the ZX_EVENT_SIGNALED signal.
+    /// Any previously event set for the specific `id` is replaced. Note that this may race with
+    /// the event signaling from the expiration of a timer already started.
+    /// To guarantee that an event is delivered upon timer expiration, this method must be
+    /// called before calling `Start`.
+    ///
+    /// If the specified `id` is not within the `properties` returned by `GetProperties`,
+    /// i.e. if 'id' is not a valid identifier, this call will return `INVALID_ARGS`.
+    /// If this method is not supported for the given `id`, then this call will return
+    /// `NOT_SUPPORTED`.
+    flexible SetEvent(resource struct {
+        id uint64;
+        event zx.Handle:EVENT;
+    }) -> () error DriverError;
+
+    /// Get driver properties.
+    flexible GetProperties() -> (resource struct {
+        properties Properties;
+    });
+};
+
+service Service {
+    device client_end:Device;
+};
