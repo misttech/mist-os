@@ -127,6 +127,11 @@ class SoftmacBinding : public DeviceInterface {
   // to acquire it.
   mutable std::shared_ptr<std::mutex> ethernet_proxy_lock_;
   ddk::EthernetIfcProtocolClient ethernet_proxy_ __TA_GUARDED(ethernet_proxy_lock_);
+  // Before the child device calls `EthernetImpl.Start`, if MLME call
+  // `DeviceInterface::SetEthernetStatus`, that status will be kept in `cached_ethernet_status`.
+  // Upon receiving `EthernetImpl.Start`, the cached status, if any, will be forwarded to
+  // `EthernetImplIfc.Start`.
+  mutable std::optional<uint32_t> cached_ethernet_status_ __TA_GUARDED(ethernet_proxy_lock_);
 
   fdf::Dispatcher softmac_bridge_server_dispatcher_;
   std::unique_ptr<SoftmacBridge> softmac_bridge_;

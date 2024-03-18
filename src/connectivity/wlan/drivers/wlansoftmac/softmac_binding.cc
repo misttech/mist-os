@@ -315,6 +315,19 @@ zx_status_t SoftmacBinding::EthernetImplStart(const ethernet_ifc_protocol_t* ifc
     return ZX_ERR_ALREADY_BOUND;
   }
   ethernet_proxy_ = ddk::EthernetIfcProtocolClient(ifc);
+
+  // If MLME sets the ethernet status before the child device calls `EthernetImpl.Start`, then
+  // the latest status will be in `cached_ethernet_status_`. If `cached_ethernet_status_` has
+  // a status, then that status must be forwarded with `EthernetImplIfc.Status`.
+  //
+  // Otherwise, if the cached status is `ONLINE` and not forwarded, the child device will never
+  // open its data path. The data path will then only open the next time MLME sets the status
+  // to `ONLINE` which would be upon reassociation.
+  if (cached_ethernet_status_.has_value()) {
+    ethernet_proxy_.Status(*cached_ethernet_status_);
+    cached_ethernet_status_.reset();
+  }
+
   return ZX_OK;
 }
 
@@ -430,6 +443,8 @@ zx_status_t SoftmacBinding::SetEthernetStatus(uint32_t status) const {
   std::lock_guard<std::mutex> lock(*ethernet_proxy_lock_);
   if (ethernet_proxy_.is_valid()) {
     ethernet_proxy_.Status(status);
+  } else {
+    cached_ethernet_status_ = status;
   }
   return ZX_OK;
 }
