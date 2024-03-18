@@ -45,3 +45,8 @@ fuchsia_driver_component("machina") {
   info = "machina-info.json"
   manifest = "meta/machina.cml"
 }
+
+fuchsia_driver_package("package") {
+  package_name = "machina"
+  driver_components = [ ":machina" ]
+}

@@ -4,6 +4,7 @@
 
 import("//build/assembly/assembled_system.gni")
 import("//build/assembly/board_configuration.gni")
+import("//build/assembly/board_input_bundle.gni")
 import("//build/assembly/product_assembly_configuration.gni")
 import("//build/board.gni")
 import("//build/images/args.gni")
@@ -56,6 +57,49 @@ if (labels.images == "//build/images/bringup") {
   }
 } else {
   # In all other builds, define the guest assembly.
+  board_input_bundle("main_bundle") {
+    drivers = [
+      {
+        package_target = "//src/devices/board/drivers/machina:package"
+        package_set = "bootfs"
+        driver_components = [ "meta/machina.cm" ]
+      },
+      {
+        package_target = "//src/devices/bus/drivers/pci:package"
+        package_set = "bootfs"
+        driver_components = [ "meta/bus-pci.cm" ]
+      },
+    ]
+    if (current_cpu == "x64") {
+      drivers += [
+        {
+          package_target = "//src/devices/block/drivers/ahci:package"
+          package_set = "bootfs"
+          driver_components = [ "meta/ahci.cm" ]
+        },
+        {
+          package_target = "//src/devices/block/drivers/mbr:package"
+          package_set = "bootfs"
+          driver_components = [ "meta/mbr.cm" ]
+        },
+        {
+          package_target = "//src/devices/board/drivers/x86:package"
+          package_set = "bootfs"
+          driver_components = [ "meta/platform-bus-x86.cm" ]
+        },
+        {
+          package_target = "//src/devices/i2c/drivers/intel-i2c:package"
+          package_set = "bootfs"
+          driver_components = [ "meta/intel-i2c.cm" ]
+        },
+        {
+          package_target = "//src/devices/serial/drivers/uart16550:package"
+          package_set = "bootfs"
+          driver_components = [ "meta/uart16550.cm" ]
+        },
+      ]
+    }
+  }
 
   board_configuration("board") {
     hardware_info = {
@@ -67,6 +111,10 @@ if (labels.images == "//build/images/bringup") {
         }
       }
     }
+    input_bundles = [
+      ":main_bundle",
+      "//boards/emulation/virtio",
+    ]
   }
 
   # Guest's specific core realm (not based on core_realm_shards).
@@ -122,36 +170,10 @@ if (labels.images == "//build/images/bringup") {
 
     bootfs_labels = [
       "//src/power/power-manager:base_config",
-      "//src/connectivity/ethernet/drivers/ethernet/netdevice-migration",
-      "//src/connectivity/ethernet/drivers/virtio:virtio_netdevice",
-      "//src/connectivity/network/drivers/network-device",
-      "//src/devices/block/drivers/virtio:virtio_block",
-      "//src/devices/block/drivers/virtio:virtio_scsi",
-      "//src/devices/board/drivers/machina",
-      "//src/devices/bus/drivers/pci:bus-pci",
-      "//src/devices/misc/drivers/virtio-rng:virtio_rng",
-      "//src/devices/serial/drivers/virtio-console:virtio_console",
-      "//src/devices/sysmem/drivers/sysmem",
-      "//src/graphics/display/drivers/coordinator",
-      "//src/graphics/display/drivers/virtio-guest:virtio_gpu",
       "//src/storage/minfs/bin:minfs-component",
       "//src/storage/bin/mount",
       "//src/storage/bin/umount",
-      "//src/storage/fvm/driver",
-      "//src/ui/input/drivers/hid",
-      "//src/ui/input/drivers/hid-input-report",
-      "//src/ui/input/drivers/virtio:virtio_input",
     ]
-
-    if (current_cpu == "x64") {
-      bootfs_labels += [
-        "//src/devices/block/drivers/ahci",
-        "//src/devices/block/drivers/mbr",
-        "//src/devices/board/drivers/x86:platform-bus-x86",
-        "//src/devices/i2c/drivers/intel-i2c",
-        "//src/devices/serial/drivers/uart16550",
-      ]
-    }
 
     core_realm_definition = ":core"
   }
