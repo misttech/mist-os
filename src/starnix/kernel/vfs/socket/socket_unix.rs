@@ -517,7 +517,7 @@ impl SocketOps for UnixSocket {
 
     fn write(
         &self,
-        _locked: &mut Locked<'_, WriteOps>,
+        locked: &mut Locked<'_, WriteOps>,
         socket: &Socket,
         current_task: &CurrentTask,
         data: &mut dyn InputBuffer,
@@ -547,7 +547,7 @@ impl SocketOps for UnixSocket {
             let creds = creds.unwrap_or_else(|| current_task.as_ucred());
             ancillary_data.push(AncillaryData::Unix(UnixControlData::Credentials(creds)));
         }
-        peer.write(data, local_address, ancillary_data, socket.socket_type)
+        peer.write(locked, current_task, data, local_address, ancillary_data, socket.socket_type)
     }
 
     fn wait_async(
@@ -897,6 +897,8 @@ impl UnixSocketInner {
     /// Returns the number of bytes that were written to the socket.
     fn write(
         &mut self,
+        locked: &mut Locked<'_, WriteOps>,
+        current_task: &CurrentTask,
         data: &mut dyn InputBuffer,
         address: Option<SocketAddress>,
         ancillary_data: &mut Vec<AncillaryData>,
@@ -909,7 +911,7 @@ impl UnixSocketInner {
             let Some(bpf_program) = self.bpf_program.as_ref() else {
                 return Some(message);
             };
-            let Ok(s) = bpf_program.run(&mut ()) else {
+            let Ok(s) = bpf_program.run(locked, current_task, &mut ()) else {
                 return Some(message);
             };
             if s == 0 {

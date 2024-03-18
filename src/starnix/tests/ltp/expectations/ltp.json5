@@ -18,8 +18,6 @@
                 "adjtimex02",
                 "adjtimex03",
                 "bind02",
-                "bpf_prog01",
-                "bpf_prog05",
                 "clock_adjtime01",
                 "clock_adjtime02",
                 "clock_settime01",

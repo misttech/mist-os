@@ -147,7 +147,7 @@ pub fn sys_bpf(
             // SAFETY: this union object was created with FromBytes so it's safe to access any
             // variant because all variants must be valid with all bit patterns.
             let user_value = UserAddress::from(unsafe { elem_attr.__bindgen_anon_1.value });
-            map.lookup(locked, current_task, key, user_value)?;
+            map.lookup(locked, current_task, &key, user_value)?;
             Ok(SUCCESS)
         }
 
@@ -170,7 +170,7 @@ pub fn sys_bpf(
             let value =
                 current_task.read_memory_to_vec(user_value, map.schema.value_size as usize)?;
 
-            map.update(locked, key, value, flags)?;
+            map.update(locked, key, &value, flags)?;
             Ok(SUCCESS)
         }
 
@@ -186,7 +186,7 @@ pub fn sys_bpf(
                 map.schema.key_size as usize,
             )?;
 
-            map.delete(locked, key)?;
+            map.delete(locked, &key)?;
             Ok(SUCCESS)
         }
 

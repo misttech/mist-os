@@ -4,6 +4,7 @@
 
 use crate::{impl_lock_after, lock_level, Unlocked};
 
+lock_level!(BpfHelperOps);
 lock_level!(BpfMapEntries);
 lock_level!(KernelIpTables);
 lock_level!(KernelSwapFiles);
@@ -31,7 +32,6 @@ lock_level!(DeviceOpen);
 // the locks must be acquired. Unlocked is a highest level and represents
 // a state in which no locks are held.
 
-impl_lock_after!(Unlocked => BpfMapEntries);
 impl_lock_after!(Unlocked => KernelIpTables);
 impl_lock_after!(Unlocked => KernelSwapFiles);
 impl_lock_after!(Unlocked => DiagnosticsCoreDumpList);
@@ -44,3 +44,5 @@ impl_lock_after!(DeviceOpen => FileOpsIoctl);
 impl_lock_after!(FileOpsIoctl => FileOpsCore);
 impl_lock_after!(FileOpsCore => WriteOps);
 impl_lock_after!(WriteOps =>  ProcessGroupState);
+impl_lock_after!(WriteOps => BpfHelperOps);
+impl_lock_after!(BpfHelperOps => BpfMapEntries);

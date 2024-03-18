@@ -8,7 +8,7 @@ use crate::{mm::MemoryAccessor, task::CurrentTask};
 use dense_map::DenseMap;
 use ebpf::MapSchema;
 use starnix_logging::track_stub;
-use starnix_sync::{BpfMapEntries, Locked, OrderedMutex, Unlocked};
+use starnix_sync::{BpfMapEntries, LockBefore, Locked, OrderedMutex};
 use starnix_uapi::{
     bpf_map_type_BPF_MAP_TYPE_ARRAY, bpf_map_type_BPF_MAP_TYPE_ARRAY_OF_MAPS,
     bpf_map_type_BPF_MAP_TYPE_BLOOM_FILTER, bpf_map_type_BPF_MAP_TYPE_CGROUP_ARRAY,
@@ -50,40 +50,42 @@ impl Map {
         Ok(Self { schema, flags, entries: OrderedMutex::new(store) })
     }
 
-    pub fn lookup(
-        &self,
-        locked: &mut Locked<'_, Unlocked>,
-        current_task: &CurrentTask,
-        key: Vec<u8>,
-        user_value: UserAddress,
-    ) -> Result<(), Errno> {
-        let entries = self.entries.lock(locked);
-        match entries.deref() {
-            MapStore::Hash(ref entries) => {
-                let Some(value) = entries.get(&self.schema, &key) else {
-                    return error!(ENOENT);
-                };
-                current_task.write_memory(user_value, value)?;
-            }
-            MapStore::Array(entries) => {
-                let index = array_key_to_index(&key);
-                if index >= self.schema.max_entries {
-                    return error!(ENOENT);
-                }
-                let value = &entries[array_range_for_index(self.schema.value_size, index)];
-                current_task.write_memory(user_value, value)?;
-            }
-        }
-        Ok(())
+    pub fn get_raw<L>(&self, locked: &mut Locked<'_, L>, key: &Vec<u8>) -> Option<*mut u8>
+    where
+        L: LockBefore<BpfMapEntries>,
+    {
+        let mut entries = self.entries.lock(locked);
+        Self::get(&mut entries, &self.schema, key).map(|s| s.as_mut_ptr())
     }
 
-    pub fn update(
+    pub fn lookup<L>(
         &self,
-        locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<'_, L>,
+        current_task: &CurrentTask,
+        key: &Vec<u8>,
+        user_value: UserAddress,
+    ) -> Result<(), Errno>
+    where
+        L: LockBefore<BpfMapEntries>,
+    {
+        let mut entries = self.entries.lock(locked);
+        if let Some(value) = Self::get(&mut entries, &self.schema, key) {
+            current_task.write_memory(user_value, value).map(|_| ())
+        } else {
+            error!(ENOENT)
+        }
+    }
+
+    pub fn update<L>(
+        &self,
+        locked: &mut Locked<'_, L>,
         key: Vec<u8>,
-        value: Vec<u8>,
+        value: &[u8],
         flags: u64,
-    ) -> Result<(), Errno> {
+    ) -> Result<(), Errno>
+    where
+        L: LockBefore<BpfMapEntries>,
+    {
         let mut entries = self.entries.lock(locked);
         match entries.deref_mut() {
             MapStore::Hash(ref mut storage) => {
@@ -104,11 +106,14 @@ impl Map {
         Ok(())
     }
 
-    pub fn delete(&self, locked: &mut Locked<'_, Unlocked>, key: Vec<u8>) -> Result<(), Errno> {
+    pub fn delete<L>(&self, locked: &mut Locked<'_, L>, key: &Vec<u8>) -> Result<(), Errno>
+    where
+        L: LockBefore<BpfMapEntries>,
+    {
         let mut entries = self.entries.lock(locked);
         match entries.deref_mut() {
             MapStore::Hash(ref mut entries) => {
-                if !entries.remove(&key) {
+                if !entries.remove(key) {
                     return error!(ENOENT);
                 }
             }
@@ -123,13 +128,16 @@ impl Map {
         Ok(())
     }
 
-    pub fn get_next_key(
+    pub fn get_next_key<L>(
         &self,
-        locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<'_, L>,
         current_task: &CurrentTask,
         key: Option<Vec<u8>>,
         user_next_key: UserAddress,
-    ) -> Result<(), Errno> {
+    ) -> Result<(), Errno>
+    where
+        L: LockBefore<BpfMapEntries>,
+    {
         let entries = self.entries.lock(locked);
         match entries.deref() {
             MapStore::Hash(ref entries) => {
@@ -151,6 +159,23 @@ impl Map {
             }
         }
         Ok(())
+    }
+
+    fn get<'a>(
+        entries: &'a mut MapStore,
+        schema: &MapSchema,
+        key: &Vec<u8>,
+    ) -> Option<&'a mut [u8]> {
+        match entries {
+            MapStore::Hash(ref mut entries) => entries.get(&schema, key),
+            MapStore::Array(ref mut entries) => {
+                let index = array_key_to_index(&key);
+                if index >= schema.max_entries {
+                    return None;
+                }
+                Some(&mut entries[array_range_for_index(schema.value_size, index)])
+            }
+        }
     }
 }
 
@@ -353,9 +378,9 @@ impl HashStorage {
         self.index_map.contains_key(key)
     }
 
-    fn get(&self, schema: &MapSchema, key: &Vec<u8>) -> Option<&'_ [u8]> {
+    fn get(&mut self, schema: &MapSchema, key: &Vec<u8>) -> Option<&'_ mut [u8]> {
         if let Some(index) = self.index_map.get(key) {
-            Some(&self.data[array_range_for_index(schema.value_size, *index as u32)])
+            Some(&mut self.data[array_range_for_index(schema.value_size, *index as u32)])
         } else {
             None
         }

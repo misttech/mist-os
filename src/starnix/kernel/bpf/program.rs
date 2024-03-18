@@ -5,7 +5,7 @@
 use crate::{
     bpf::{
         fs::{get_bpf_object, BpfHandle},
-        helpers::BPF_HELPERS,
+        helpers::{HelperFunctionContext, HelperFunctionContextMarker, BPF_HELPERS},
         map::Map,
     },
     task::CurrentTask,
@@ -17,6 +17,7 @@ use ebpf::{
     VerifierLogger, BPF_LDDW,
 };
 use starnix_logging::{log_error, log_warn, track_stub};
+use starnix_sync::{BpfHelperOps, LockBefore, Locked};
 use starnix_uapi::{
     bpf_attr__bindgen_ty_4, bpf_insn, bpf_prog_type_BPF_PROG_TYPE_KPROBE,
     bpf_prog_type_BPF_PROG_TYPE_SOCKET_FILTER, errno, error, errors::Errno,
@@ -63,7 +64,7 @@ impl From<&bpf_attr__bindgen_ty_4> for ProgramInfo {
 
 pub struct Program {
     pub info: ProgramInfo,
-    vm: Option<EbpfProgram<()>>,
+    vm: Option<EbpfProgram<HelperFunctionContextMarker>>,
     _objects: Vec<BpfHandle>,
 }
 
@@ -79,7 +80,7 @@ impl Program {
         logger: &mut dyn OutputBuffer,
         mut code: Vec<bpf_insn>,
     ) -> Result<Program, Errno> {
-        let mut builder = EbpfProgramBuilder::default();
+        let mut builder = EbpfProgramBuilder::<HelperFunctionContextMarker>::default();
         let objects = link(current_task, &mut code, &mut builder)?;
 
         let vm = (|| {
@@ -99,9 +100,22 @@ impl Program {
         Program { info, vm: None, _objects: vec![] }
     }
 
-    pub fn run<T: AsBytes + FromBytes + NoCell>(&self, data: &mut T) -> Result<u64, ()> {
+    pub fn run<L, T>(
+        &self,
+        locked: &mut Locked<'_, L>,
+        current_task: &CurrentTask,
+        data: &mut T,
+    ) -> Result<u64, ()>
+    where
+        L: LockBefore<BpfHelperOps>,
+        T: AsBytes + FromBytes + NoCell,
+    {
         if let Some(vm) = self.vm.as_ref() {
-            Ok(vm.run(&mut (), data))
+            let mut context = HelperFunctionContext {
+                locked: &mut locked.cast_locked::<BpfHelperOps>(),
+                _current_task: current_task,
+            };
+            Ok(vm.run(&mut context, data))
         } else {
             // vm is only None when bpf is faked. Return an error on execution, as random value
             // might have stronger side effects.
@@ -117,7 +131,7 @@ const BPF_PSEUDO_MAP_FD: u8 = 1;
 fn link(
     current_task: &CurrentTask,
     code: &mut Vec<bpf_insn>,
-    builder: &mut EbpfProgramBuilder<()>,
+    builder: &mut EbpfProgramBuilder<HelperFunctionContextMarker>,
 ) -> Result<Vec<BpfHandle>, Errno> {
     let mut objects = vec![];
     let code_len = code.len();
