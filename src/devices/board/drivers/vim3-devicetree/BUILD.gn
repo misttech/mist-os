@@ -6,6 +6,7 @@ import("//build/bazel/drivers/bazel_driver_package.gni")
 import("//build/bazel/wrappers.gni")
 import("//build/bind/bind.gni")
 import("//build/devicetree/devicetree.gni")
+import("//build/devicetree/devicetree_visitor.gni")
 import("//build/zbi/zbi_input.gni")
 
 group("tests") {
@@ -30,18 +31,6 @@ devicetree("vim3") {
     ":amlogic-a311d",
     ":meson-g12-common",
     "//zircon/system/ulib/ddk-platform-defs",
-  ]
-  visitors = [
-    "//sdk/lib/driver/devicetree/visitors/drivers/sysmem:sysmem-visitor",
-    "//sdk/lib/driver/devicetree/visitors/drivers/interrupt-controllers/arm-gicv2",
-    "//sdk/lib/driver/devicetree/visitors/drivers/registers:registers-visitor",
-    "//sdk/lib/driver/devicetree/visitors/drivers/clock-controllers/clockimpl-visitor",
-    "//sdk/lib/driver/devicetree/visitors/drivers/mali-gpu:mali-gpu-visitor",
-    "//sdk/lib/driver/devicetree/visitors/drivers/gpio-controllers/gpioimpl-visitor",
-    "//sdk/lib/driver/devicetree/visitors/drivers/usb/aml-usb-phy:aml-usb-phy-visitor",
-    "//sdk/lib/driver/devicetree/visitors/drivers/usb/usb-phy:usb-phy-visitor",
-    "//sdk/lib/driver/devicetree/visitors/drivers/usb/dwc2:dwc2-visitor",
-    "//sdk/lib/driver/devicetree/visitors/drivers/mmc/sdmmc:sdmmc-visitor",
   ]
   golden = "dts/khadas-vim3.golden.dts"
 }

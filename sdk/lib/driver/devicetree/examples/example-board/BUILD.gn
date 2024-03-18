@@ -20,7 +20,6 @@ devicetree("example-board-dt") {
   golden = "dts/example-board.golden.dts"
   outputs = [ "$target_out_dir/example-board.dtb" ]
   deps = [ "//zircon/system/ulib/ddk-platform-defs" ]
-  visitors = [ "//sdk/lib/driver/devicetree/examples/example-visitor" ]
 }
 
 # Add this target to |kernel_zbi_extra_deps| to include the devicetree blob

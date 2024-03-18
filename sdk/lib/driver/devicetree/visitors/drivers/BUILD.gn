@@ -1,7 +1,8 @@
 # Copyright 2023 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
-import("//build/sdk/sdk_molecule.gni")
+
+import("//build/devicetree/devicetree_visitor.gni")
 
 group("tests") {
   deps = [
@@ -17,23 +18,18 @@ group("tests") {
   testonly = true
 }
 
-sdk_molecule("devicetree-visitors") {
-  visibility = [
-    ":*",
-    "//sdk:*",
-  ]
-
+devicetree_visitor_collection("all-driver-visitors") {
   deps = [
-    "//sdk/lib/driver/devicetree/visitors/drivers/clock-controllers/clockimpl-visitor:clockimpl-visitor_sdk",
-    "//sdk/lib/driver/devicetree/visitors/drivers/gpio-controllers/gpioimpl-visitor:gpioimpl-visitor_sdk",
-    "//sdk/lib/driver/devicetree/visitors/drivers/i2c-controllers/i2c-bus-visitor:i2c-bus-visitor_sdk",
-    "//sdk/lib/driver/devicetree/visitors/drivers/interrupt-controllers/arm-gicv2:arm-gicv2_sdk",
-    "//sdk/lib/driver/devicetree/visitors/drivers/mali-gpu:mali-gpu-visitor_sdk",
-    "//sdk/lib/driver/devicetree/visitors/drivers/mmc/sdmmc:sdmmc-visitor_sdk",
-    "//sdk/lib/driver/devicetree/visitors/drivers/registers:registers-visitor_sdk",
-    "//sdk/lib/driver/devicetree/visitors/drivers/sysmem:sysmem-visitor_sdk",
-    "//sdk/lib/driver/devicetree/visitors/drivers/usb/aml-usb-phy:aml-usb-phy-visitor_sdk",
-    "//sdk/lib/driver/devicetree/visitors/drivers/usb/dwc2:dwc2-visitor_sdk",
-    "//sdk/lib/driver/devicetree/visitors/drivers/usb/usb-phy:usb-phy-visitor_sdk",
+    "//sdk/lib/driver/devicetree/visitors/drivers/clock-controllers/clockimpl-visitor",
+    "//sdk/lib/driver/devicetree/visitors/drivers/gpio-controllers/gpioimpl-visitor",
+    "//sdk/lib/driver/devicetree/visitors/drivers/i2c-controllers/i2c-bus-visitor",
+    "//sdk/lib/driver/devicetree/visitors/drivers/interrupt-controllers/arm-gicv2",
+    "//sdk/lib/driver/devicetree/visitors/drivers/mali-gpu:mali-gpu-visitor",
+    "//sdk/lib/driver/devicetree/visitors/drivers/mmc/sdmmc:sdmmc-visitor",
+    "//sdk/lib/driver/devicetree/visitors/drivers/registers:registers-visitor",
+    "//sdk/lib/driver/devicetree/visitors/drivers/sysmem:sysmem-visitor",
+    "//sdk/lib/driver/devicetree/visitors/drivers/usb/aml-usb-phy:aml-usb-phy-visitor",
+    "//sdk/lib/driver/devicetree/visitors/drivers/usb/dwc2:dwc2-visitor",
+    "//sdk/lib/driver/devicetree/visitors/drivers/usb/usb-phy:usb-phy-visitor",
   ]
 }

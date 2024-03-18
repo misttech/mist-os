@@ -2,7 +2,6 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//build/sdk/sdk_atom.gni")
 import("//build/testing/golden_files.gni")
 import("//build/zircon/c_utils.gni")
 
@@ -274,116 +273,6 @@ template("dts") {
       "-o",
       rebase_path(outputs[0], root_build_dir),
     ]
-  }
-}
-
-# Defines a devicetree visitor target.
-#
-# Parameters
-#
-#   * sources
-#     - Required: Device tree visitor source files (.cc and .h) that will be
-#       used to parse the devicetree related to the schema.
-#       TODO(https://fxbug.dev/42083285) Generate the visitor from schema file.
-#     - Type: List(path).
-#
-#   * deps
-#     - Optional: Usual GN meaning.
-#
-template("devicetree_visitor") {
-  if (!defined(output_dir)) {
-    output_dir = root_out_dir
-  }
-  if (!defined(output_name)) {
-    output_name = target_name
-  }
-  if (!defined(output_extension)) {
-    output_extension = "so"
-  }
-
-  _output_file_name = output_name
-  if (output_extension != "") {
-    _output_file_name += ".$output_extension"
-  }
-  _output_file = "$output_dir/$_output_file_name"
-  _rebased_output_file = rebase_path(_output_file, root_build_dir)
-
-  _loadable_module_target_name = target_name
-  _sdk_target_name = "${target_name}_sdk"
-  _sdk_pkg_name = "devicetree-${target_name}"
-
-  # Define the loadable_module target, this target
-  # will later be used to define the sdk_atom target
-  loadable_module(_loadable_module_target_name) {
-    forward_variables_from(invoker, "*")
-    if (!defined(ldflags)) {
-      ldflags = []
-    }
-
-    _version_script =
-        "//build/bazel_sdk/bazel_rules_fuchsia/fuchsia/private/visitor.ld"
-    ldflags += [ "-Wl,--version-script=" +
-                 rebase_path(_version_script, root_build_dir) ]
-    metadata = {
-      devicetree_barrier = []
-
-      # Used by the distribution_manifest template.
-      distribution_entries = [
-        {
-          source = _rebased_output_file
-          destination = "lib/visitors/${_output_file_name}"
-          label = get_label_info(":$_loadable_module_target_name",
-                                 "label_with_toolchain")
-          elf_runtime_dir = "lib/${toolchain_variant.libprefix}"
-        },
-      ]
-    }
-  }
-
-  sdk_atom(_sdk_target_name) {
-    id = "sdk://pkg/${_sdk_pkg_name}"
-    category = "internal"
-
-    files = [
-      {
-        source = _output_file
-        dest =
-            "arch/${target_cpu}/dist/devicetree-visitors-${_output_file_name}"
-      },
-    ]
-
-    non_sdk_deps = [ ":${_loadable_module_target_name}" ]
-    if (defined(invoker.deps)) {
-      non_sdk_deps += invoker.deps
-    }
-    if (defined(invoker.public_deps)) {
-      non_sdk_deps += invoker.public_deps
-    }
-
-    _sdk_binaries =
-        [ "arch/${target_cpu}/dist/devicetree-visitors-${_output_file_name}" ]
-
-    meta = {
-      dest = "pkg/${_sdk_pkg_name}/meta.json"
-      schema = "loadable_module"
-      value = {
-        type = "loadable_module"
-        name = "${_sdk_pkg_name}"
-        root = "pkg/${_sdk_pkg_name}"
-        binaries = {
-        }
-        resources = []
-        if (target_cpu == "arm64") {
-          binaries.arm64 = _sdk_binaries
-        } else if (target_cpu == "x64") {
-          binaries.x64 = _sdk_binaries
-        } else if (target_cpu == "riscv64") {
-          binaries.riscv64 = _sdk_binaries
-        } else {
-          assert(false, "Unknown CPU type: %target_cpu")
-        }
-      }
-    }
   }
 }
 

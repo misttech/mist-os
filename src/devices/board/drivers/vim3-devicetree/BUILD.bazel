@@ -11,6 +11,7 @@ load(
     "fuchsia_driver_component",
     "fuchsia_package",
     "fuchsia_package_resource",
+    "fuchsia_package_resource_collection",
     "fuchsia_test_component",
     "fuchsia_test_package",
 )
@@ -23,6 +24,22 @@ fuchsia_driver_bind_bytecode(
         "@fuchsia_sdk//bind/fuchsia.devicetree",
         "@fuchsia_sdk//bind/fuchsia.khadas.platform",
         "@internal_sdk//fidl/fuchsia.hardware.platform.bus:fuchsia.hardware.platform.bus_bindlib",
+    ],
+)
+
+fuchsia_package_resource_collection(
+    name = "vim3-devicetree-visitors",
+    resources = [
+        "@internal_sdk//pkg/devicetree-aml-usb-phy-visitor",
+        "@internal_sdk//pkg/devicetree-arm-gicv2",
+        "@internal_sdk//pkg/devicetree-clockimpl-visitor",
+        "@internal_sdk//pkg/devicetree-dwc2-visitor",
+        "@internal_sdk//pkg/devicetree-gpioimpl-visitor",
+        "@internal_sdk//pkg/devicetree-mali-gpu-visitor",
+        "@internal_sdk//pkg/devicetree-registers-visitor",
+        "@internal_sdk//pkg/devicetree-sdmmc-visitor",
+        "@internal_sdk//pkg/devicetree-sysmem-visitor",
+        "@internal_sdk//pkg/devicetree-usb-phy-visitor",
     ],
 )
 
@@ -64,15 +81,7 @@ fuchsia_package(
     fuchsia_api_level = "HEAD",
     package_repository_name = "fuchsia.com",
     resources = [
-        "@internal_sdk//pkg/devicetree-aml-usb-phy-visitor",
-        "@internal_sdk//pkg/devicetree-arm-gicv2",
-        "@internal_sdk//pkg/devicetree-clockimpl-visitor",
-        "@internal_sdk//pkg/devicetree-dwc2-visitor",
-        "@internal_sdk//pkg/devicetree-gpioimpl-visitor",
-        "@internal_sdk//pkg/devicetree-mali-gpu-visitor",
-        "@internal_sdk//pkg/devicetree-registers-visitor",
-        "@internal_sdk//pkg/devicetree-sysmem-visitor",
-        "@internal_sdk//pkg/devicetree-usb-phy-visitor",
+        ":vim3-devicetree-visitors",
     ],
     visibility = ["//visibility:public"],
 )
@@ -124,17 +133,8 @@ fuchsia_test_package(
     ],
     fuchsia_api_level = "HEAD",
     resources = [
+        ":vim3-devicetree-visitors",
         ":vim3-dtb",
-        "@internal_sdk//pkg/devicetree-aml-usb-phy-visitor",
-        "@internal_sdk//pkg/devicetree-arm-gicv2",
-        "@internal_sdk//pkg/devicetree-clockimpl-visitor",
-        "@internal_sdk//pkg/devicetree-dwc2-visitor",
-        "@internal_sdk//pkg/devicetree-gpioimpl-visitor",
-        "@internal_sdk//pkg/devicetree-mali-gpu-visitor",
-        "@internal_sdk//pkg/devicetree-registers-visitor",
-        "@internal_sdk//pkg/devicetree-sdmmc-visitor",
-        "@internal_sdk//pkg/devicetree-sysmem-visitor",
-        "@internal_sdk//pkg/devicetree-usb-phy-visitor",
     ],
     subpackages_to_flatten = [
         "//sdk/lib/driver/devicetree/testing:platform-bus-driver",

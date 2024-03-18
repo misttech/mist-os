@@ -632,7 +632,7 @@ sdk_molecule("platform_libs") {
     "//sdk/lib/driver/devicetree/visitors:load-visitors_sdk",
     "//sdk/lib/driver/devicetree/visitors:registration_sdk",
     "//sdk/lib/driver/devicetree/visitors/default:default_sdk",
-    "//sdk/lib/driver/devicetree/visitors/drivers:devicetree-visitors",
+    "//sdk/lib/driver/devicetree/visitors/drivers:all-driver-visitors_sdk",
     "//sdk/lib/driver/promise/cpp:cpp_sdk",
     "//sdk/lib/sys/component:realm_builder_shard",
     "//src/developer/debug/ipc:ipc_sdk",

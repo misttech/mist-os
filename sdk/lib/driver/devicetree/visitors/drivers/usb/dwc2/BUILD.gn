@@ -4,6 +4,7 @@
 
 import("//build/components.gni")
 import("//build/devicetree/devicetree.gni")
+import("//build/devicetree/devicetree_visitor.gni")
 import("//build/test.gni")
 
 group("tests") {
