@@ -256,7 +256,7 @@ pub mod udp {
 pub use api::CoreApi;
 pub use context::{
     CoreCtx, EventContext, InstantBindingsTypes, InstantContext, ReferenceNotifiers, RngContext,
-    TimerContext, TracingContext, UnlockedCoreCtx,
+    TimerBindingsTypes, TimerContext, TimerContext2, TracingContext, UnlockedCoreCtx,
 };
 pub use inspect::Inspector;
 pub use marker::{BindingsContext, BindingsTypes, CoreContext, IpBindingsContext, IpExt};
