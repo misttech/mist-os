@@ -11,6 +11,7 @@ use {
     fidl::{
         endpoints::{ControlHandle, ProtocolMarker, RequestStream, ServerEnd},
         epitaph::ChannelEpitaphExt,
+        AsHandleRef,
     },
     fidl_fuchsia_io as fio, fuchsia_async as fasync,
     fuchsia_zircon_status::Status,
@@ -190,15 +191,13 @@ impl ObjectRequest {
         });
     }
 
-    #[cfg(target_os = "fuchsia")]
     pub async fn wait_till_ready(&self) {
         if !matches!(self.what_to_send, ObjectRequestSend::Nothing) {
             return;
         }
-        fasync::OnSignals::new(
-            &self.object_request,
-            fuchsia_zircon::Signals::CHANNEL_READABLE
-                | fuchsia_zircon::Signals::CHANNEL_PEER_CLOSED,
+        fasync::OnSignalsRef::new(
+            self.object_request.as_handle_ref(),
+            fidl::Signals::OBJECT_READABLE | fidl::Signals::CHANNEL_PEER_CLOSED,
         )
         .await
         .unwrap();

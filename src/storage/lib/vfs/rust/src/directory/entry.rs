@@ -230,7 +230,6 @@ impl<'a> OpenRequest<'a> {
     }
 
     /// Forwards the request to a remote.
-    #[cfg(target_os = "fuchsia")]
     pub fn open_remote(
         self,
         remote: Arc<impl crate::remote::RemoteLike + Send + Sync + 'static>,
