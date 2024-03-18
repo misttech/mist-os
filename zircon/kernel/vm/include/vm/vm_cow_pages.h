@@ -736,11 +736,12 @@ class VmCowPages final : public VmHierarchyBase,
   }
 
   bool is_snapshot_at_least_on_write_supported() const TA_REQ(lock()) {
+    canary_.Assert();
+
     if (is_parent_hidden_locked()) {
       return false;
     }
 
-    canary_.Assert();
     auto root = GetRootLocked();
     // The root will never be null. It will either point to a valid parent, or |this| if there's no
     // parent.
