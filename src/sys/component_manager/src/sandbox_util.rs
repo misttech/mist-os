@@ -451,8 +451,8 @@ pub mod tests {
     async fn get_capability() {
         let sub_dict = Dict::new();
         sub_dict.lock_entries().insert("bar".to_string(), Capability::Dictionary(Dict::new()));
-        let (receiver, _) = Receiver::new();
-        sub_dict.lock_entries().insert("baz".to_string(), Capability::Receiver(receiver));
+        let (_, sender) = Receiver::new();
+        sub_dict.lock_entries().insert("baz".to_string(), sender.into());
 
         let test_dict = Dict::new();
         test_dict.lock_entries().insert("foo".to_string(), Capability::Dictionary(sub_dict));
@@ -471,8 +471,8 @@ pub mod tests {
         test_dict.insert_capability(["foo", "bar"].into_iter(), Dict::new().into());
         assert!(test_dict.get_capability(["foo", "bar"].into_iter()).is_some());
 
-        let (receiver, _) = Receiver::new();
-        test_dict.insert_capability(["foo", "baz"].into_iter(), receiver.into());
+        let (_, sender) = Receiver::new();
+        test_dict.insert_capability(["foo", "baz"].into_iter(), sender.into());
         assert!(test_dict.get_capability(["foo", "baz"].into_iter()).is_some());
     }
 

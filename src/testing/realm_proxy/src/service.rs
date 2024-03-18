@@ -247,9 +247,6 @@ where
         receiver_stream.try_next().await.context("failed to read request from stream")?
     {
         match request {
-            fsandbox::ReceiverRequest::Clone2 { .. } => {
-                unimplemented!()
-            }
             fsandbox::ReceiverRequest::Receive { channel, flags, control_handle: _ } => {
                 flags.to_object_request(channel).handle(|object_request| {
                     vfs::service::serve(

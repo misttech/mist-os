@@ -38,7 +38,6 @@ pub enum RemoteError {
 pub enum Capability {
     Unit(crate::Unit),
     Sender(crate::Sender),
-    Receiver(crate::Receiver),
     Open(crate::Open),
     Dictionary(crate::Dict),
     Data(crate::Data),
@@ -61,7 +60,6 @@ impl Capability {
     pub fn try_into_open(self) -> Result<Open, ConversionError> {
         match self {
             Capability::Sender(s) => s.try_into_open(),
-            Capability::Receiver(s) => s.try_into_open(),
             Capability::Open(s) => s.try_into_open(),
             Capability::Router(s) => s.try_into_open(),
             Capability::Dictionary(s) => s.try_into_open(),
@@ -75,7 +73,6 @@ impl Capability {
     pub fn into_fidl(self) -> fsandbox::Capability {
         match self {
             Capability::Sender(s) => s.into_fidl(),
-            Capability::Receiver(s) => s.into_fidl(),
             Capability::Open(s) => s.into_fidl(),
             Capability::Router(s) => s.into_fidl(),
             Capability::Dictionary(s) => s.into_fidl(),
@@ -146,21 +143,6 @@ impl TryFrom<fsandbox::Capability> for Capability {
                         _ => {
                             panic!("BUG: registry has a non-Sender capability under a Sender koid")
                         }
-                    }
-                }
-                Ok(any)
-            }
-            fsandbox::Capability::Receiver(server_end) => {
-                let mut any = try_from_handle_in_registry(server_end.as_handle_ref())?;
-                // Cache the client end so it can be reused in future conversions to FIDL.
-                {
-                    match any {
-                        Capability::Receiver(ref mut r) => {
-                            r.set_server_end(server_end);
-                        }
-                        _ => panic!(
-                            "BUG: registry has a non-Receiver capability under a Receiver koid"
-                        ),
                     }
                 }
                 Ok(any)

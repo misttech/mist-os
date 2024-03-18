@@ -1,11 +1,10 @@
 // Copyright 2023 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-use crate::{registry, CapabilityTrait, Message, Sender};
+use crate::{Message, Sender};
 use derivative::Derivative;
-use fidl::endpoints::{create_proxy, Proxy, ServerEnd};
+use fidl::endpoints::Proxy;
 use fidl_fuchsia_component_sandbox as fsandbox;
-use fuchsia_zircon::{self as zx, AsHandleRef};
 use futures::{
     channel::mpsc::{self, UnboundedReceiver},
     future::{self, Either},
@@ -22,24 +21,18 @@ pub struct Receiver {
     /// `inner` uses an async mutex because it will be locked across an await point
     /// when asynchronously waiting for the next message.
     inner: Arc<Mutex<UnboundedReceiver<Message>>>,
-
-    /// The FIDL representation of this `Receiver`.
-    ///
-    /// This will be `Some` if was previously converted into a `ServerEnd`, such as by calling
-    /// [into_fidl], and the capability is not currently in the registry.
-    server_end: Option<ServerEnd<fsandbox::ReceiverMarker>>,
 }
 
 impl Clone for Receiver {
     fn clone(&self) -> Self {
-        Self { inner: self.inner.clone(), server_end: None }
+        Self { inner: self.inner.clone() }
     }
 }
 
 impl Receiver {
     pub fn new() -> (Self, Sender) {
         let (sender, receiver) = mpsc::unbounded();
-        let receiver = Self { inner: Arc::new(Mutex::new(receiver)), server_end: None };
+        let receiver = Self { inner: Arc::new(Mutex::new(receiver)) };
         (receiver, Sender::new(sender))
     }
 
@@ -70,43 +63,6 @@ impl Receiver {
             }
         }
     }
-
-    /// Handles the `fuchsia.sandbox.Receiver` protocol for this Receiver
-    /// and moves it into the registry.
-    fn handle_and_register(self, proxy: fsandbox::ReceiverProxy, koid: zx::Koid) {
-        let receiver = self.clone();
-
-        // Move this capability into the registry.
-        registry::spawn_task(self.into(), koid, async move {
-            receiver.handle_receiver(proxy).await;
-        });
-    }
-
-    /// Sets this Receiver's server end to the provided one.
-    ///
-    /// This should only be used to put a remoted server end back into the Receiver after it is
-    /// removed from the registry.
-    pub(crate) fn set_server_end(&mut self, server_end: ServerEnd<fsandbox::ReceiverMarker>) {
-        self.server_end = Some(server_end)
-    }
-}
-
-impl CapabilityTrait for Receiver {}
-
-impl From<Receiver> for ServerEnd<fsandbox::ReceiverMarker> {
-    fn from(mut receiver: Receiver) -> Self {
-        receiver.server_end.take().unwrap_or_else(|| {
-            let (receiver_proxy, server_end) = create_proxy::<fsandbox::ReceiverMarker>().unwrap();
-            receiver.handle_and_register(receiver_proxy, server_end.get_koid().unwrap());
-            server_end
-        })
-    }
-}
-
-impl From<Receiver> for fsandbox::Capability {
-    fn from(receiver: Receiver) -> Self {
-        fsandbox::Capability::Receiver(receiver.into())
-    }
 }
 
 #[cfg(test)]
@@ -114,6 +70,7 @@ mod tests {
     use assert_matches::assert_matches;
     use fidl_fuchsia_io as fio;
     use fuchsia_async as fasync;
+    use fuchsia_zircon::{self as zx, AsHandleRef};
     use zx::Peered;
 
     use super::*;

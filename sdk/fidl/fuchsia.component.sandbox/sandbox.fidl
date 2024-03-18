@@ -36,9 +36,8 @@ type Capability = flexible resource union {
     4: cloneable client_end:fuchsia.unknown.Cloneable;
     5: dictionary client_end:Dictionary;
     6: sender client_end:Sender;
-    7: receiver server_end:Receiver;
-    8: open client_end:fuchsia.io.Openable;
-    9: directory client_end:fuchsia.io.Directory;
+    7: open client_end:fuchsia.io.Openable;
+    8: directory client_end:fuchsia.io.Directory;
 };
 
 /// The key of a [`DictionaryItem`].
@@ -137,19 +136,21 @@ open protocol DictionaryIterator {
     });
 };
 
+/// A sender allows a client to send a channel to the framework
+/// so that it can be connected.
 @discoverable
 open protocol Sender {
     compose fuchsia.unknown.Cloneable;
 
-    /// Sends a Capability over this sender.
+    /// Sends a channel over this sender.
     flexible Send(ProtocolPayload);
 };
 
+/// A receiver is served by clients and allows them to receive channels
+/// from the framework.
 @discoverable
 open protocol Receiver {
-    compose fuchsia.unknown.Cloneable;
-
-    /// Receives a Capability.
+    /// Sends a channel to this receiver.
     flexible Receive(ProtocolPayload);
 };
 
@@ -164,6 +165,8 @@ type ProtocolPayload = resource struct {
 @discoverable
 open protocol Factory {
     /// Creates a connector (pair of [`Sender`] and [`Receiver`]).
+    /// The client should serve `receiver`, and they are free to
+    /// clone the connected `sender` or place it into dictionaries.
     flexible CreateConnector(resource struct {
         sender server_end:Sender;
         receiver client_end:Receiver;
