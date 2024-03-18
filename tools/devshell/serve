@@ -257,20 +257,20 @@ elif is_feature_enabled "incremental_legacy"; then
 fi
 
 if is_feature_enabled "foreground_repo_server" && [[ "$(ffx-repository-server-state)" != "disabled" ]]; then
-  fx-warn "The 'foreground_repo_server' feature is now enabled by default."
-  fx-warn "If you prefer the previous behavior for now, you can set this"
-  fx-warn "environment variable in (sh-type) shells where you use fx / ffx:"
-  fx-warn ""
-  fx-warn "$ export FUCHSIA_DISABLED_foreground_repo_server=1"
-  fx-warn ""
-  fx-warn "Please note that an already running foreground server"
-  fx-warn "may not always be detected correctly. Please consider"
-  fx-warn "running the following commands in case of problems:"
-  fx-warn ""
-  fx-warn "$ ffx config set repository.server.listen \"\""
-  fx-warn "$ ffx doctor --restart-daemon"
-  fx-warn ""
-  fx-warn "Then restart \"fx serve\""
+  fx-info "The 'foreground_repo_server' feature is now enabled by default."
+  fx-info "If you prefer the previous behavior for now, you can set this"
+  fx-info "environment variable in (sh-type) shells where you use fx / ffx:"
+  fx-info ""
+  fx-info "$ export FUCHSIA_DISABLED_foreground_repo_server=1"
+  fx-info ""
+  fx-info "Please note that an already running foreground server"
+  fx-info "may not always be detected correctly. Please consider"
+  fx-info "running the following commands in case of problems:"
+  fx-info ""
+  fx-info "$ ffx config remove repository.server.listen"
+  fx-info "$ ffx doctor --restart-daemon"
+  fx-info ""
+  fx-info "Then restart \"fx serve\""
 fi
 
 # Error out if we can't start a package server.

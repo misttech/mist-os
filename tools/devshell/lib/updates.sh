@@ -200,7 +200,7 @@ function check-for-package-server {
       fx-error "repository server is currently disabled. to re-enable, run:"
       fx-error ""
       fx-error "$ ffx config set repository.server.mode ffx"
-      fx-error "$ ffx config set repository.server.listen \"[::]:8083\""
+      fx-error "$ ffx config remove repository.server.listen"
       fx-error ""
       fx-error "Then re-run this command."
       return 1
