@@ -43,7 +43,7 @@ pub struct OpenOptions<'a> {
 }
 
 /// A request to open a capability at its source.
-pub enum OpenRequest<'a> {
+pub enum CapabilityOpenRequest<'a> {
     // Open a capability backed by a component's outgoing directory.
     OutgoingDirectory {
         open_options: OpenOptions<'a>,
@@ -58,7 +58,7 @@ pub enum OpenRequest<'a> {
     },
 }
 
-impl<'a> OpenRequest<'a> {
+impl<'a> CapabilityOpenRequest<'a> {
     /// Creates a request to open a capability with source `route_source` for `target`.
     pub fn new_from_route_source(
         route_source: RouteSource,

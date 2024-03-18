@@ -86,9 +86,13 @@ pub(super) async fn route_and_open_capability(
 
             let backing_dir_info =
                 storage::route_backing_directory(storage_source.source.clone()).await?;
-            Ok(OpenRequest::new_from_storage_source(backing_dir_info, target, open_options)
-                .open()
-                .await?)
+            Ok(CapabilityOpenRequest::new_from_storage_source(
+                backing_dir_info,
+                target,
+                open_options,
+            )
+            .open()
+            .await?)
         }
         r => {
             let route_source = r.route(target).await?;
@@ -96,7 +100,7 @@ pub(super) async fn route_and_open_capability(
 
             // clone the source as additional context in case of an error
 
-            Ok(OpenRequest::new_from_route_source(route_source, target, open_options)
+            Ok(CapabilityOpenRequest::new_from_route_source(route_source, target, open_options)
                 .open()
                 .await?)
         }

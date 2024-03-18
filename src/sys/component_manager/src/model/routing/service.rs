@@ -10,7 +10,9 @@ use {
             error::{CapabilityProviderError, ModelError, OpenError},
             hooks::{Event, EventPayload, EventType, Hook, HooksRegistration},
             mutable_directory::MutableDirectory,
-            routing::{CapabilitySource, OpenOptions, OpenRequest, RouteSource, RoutingError},
+            routing::{
+                CapabilityOpenRequest, CapabilitySource, OpenOptions, RouteSource, RoutingError,
+            },
         },
     },
     async_trait::async_trait,
@@ -42,7 +44,7 @@ use {
     tracing::{error, warn},
     vfs::{
         directory::{
-            entry::{DirectoryEntry, EntryInfo, OpenRequest as VfsOpenRequest},
+            entry::{DirectoryEntry, EntryInfo, OpenRequest},
             entry_container::Directory,
             immutable::simple::{simple as simple_immutable_dir, Simple as SimpleImmutableDir},
         },
@@ -383,7 +385,7 @@ impl AnonymizedAggregateServiceDir {
 
         let (proxy, server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
 
-        OpenRequest::new_from_route_source(
+        CapabilityOpenRequest::new_from_route_source(
             RouteSource { source: source.clone(), relative_path: "".into() },
             &target,
             OpenOptions {
@@ -590,8 +592,11 @@ impl<T: Send + Sync + 'static> RemoteLike for ServiceInstanceDirectoryEntry<T> {
         let route_source = RouteSource::new((*self.capability_source).clone());
         scope.spawn(async move {
             let open_options = OpenOptions { flags, relative_path, server_chan: &mut server_end };
-            let open_request =
-                OpenRequest::new_from_route_source(route_source, &source_component, open_options);
+            let open_request = CapabilityOpenRequest::new_from_route_source(
+                route_source,
+                &source_component,
+                open_options,
+            );
             if let Err(err) = open_request.open().await {
                 server_end
                     .close_with_epitaph(err.as_zx_status())
@@ -616,7 +621,7 @@ impl<T: Send + Sync + 'static> DirectoryEntry for ServiceInstanceDirectoryEntry<
         EntryInfo::new(fio::INO_UNKNOWN, fio::DirentType::Directory)
     }
 
-    fn open_entry(self: Arc<Self>, request: VfsOpenRequest<'_>) -> Result<(), zx::Status> {
+    fn open_entry(self: Arc<Self>, request: OpenRequest<'_>) -> Result<(), zx::Status> {
         request.open_remote(self)
     }
 }
