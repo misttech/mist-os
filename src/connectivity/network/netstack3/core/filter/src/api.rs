@@ -5,9 +5,7 @@
 use net_types::ip::{Ipv4, Ipv6};
 use netstack3_base::ContextPair;
 
-use crate::{
-    FilterBindingsTypes, FilterContext, State, ValidState, ValidationError, ValidationInfo,
-};
+use crate::{FilterBindingsTypes, FilterContext, State, ValidState, ValidationError};
 
 /// The filtering API.
 pub struct FilterApi<C>(C);
@@ -36,25 +34,14 @@ where
     /// rules with jump actions). The behavior in this case is unspecified but could
     /// be a deadlock or a panic, for example.
     ///
-    /// TODO(https://fxbug.dev/325492760): replace usage of
-    /// [`once_cell::sync::OnceCell`] with `std::sync::OnceLock`, which always
-    /// panics when called reentrantly.
+    /// # Panics
+    ///
+    /// Panics if the provided state includes cyclic routine graphs.
     pub fn set_filter_state<RuleInfo: Clone>(
         &mut self,
-        v4: State<
-            Ipv4,
-            <C::BindingsContext as FilterBindingsTypes>::DeviceClass,
-            ValidationInfo<RuleInfo>,
-        >,
-        v6: State<
-            Ipv6,
-            <C::BindingsContext as FilterBindingsTypes>::DeviceClass,
-            ValidationInfo<RuleInfo>,
-        >,
-    ) -> Result<(), ValidationError<RuleInfo>>
-    where
-        <C::BindingsContext as FilterBindingsTypes>::DeviceClass: Clone,
-    {
+        v4: State<Ipv4, <C::BindingsContext as FilterBindingsTypes>::DeviceClass, RuleInfo>,
+        v6: State<Ipv6, <C::BindingsContext as FilterBindingsTypes>::DeviceClass, RuleInfo>,
+    ) -> Result<(), ValidationError<RuleInfo>> {
         let v4 = ValidState::new(v4)?;
         let v6 = ValidState::new(v6)?;
 

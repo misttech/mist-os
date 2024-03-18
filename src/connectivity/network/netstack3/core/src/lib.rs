@@ -109,7 +109,6 @@ pub mod filter {
         Action, AddressMatcher, AddressMatcherType, FilterApi, FilterBindingsTypes, Hook,
         InterfaceMatcher, InterfaceProperties, IpRoutines, NatRoutines, PacketMatcher, PortMatcher,
         Routine, Rule, State, TransportProtocolMatcher, UninstalledRoutine, ValidationError,
-        ValidationInfo,
     };
     pub(crate) use netstack3_filter::{
         FilterContext, FilterHandler, FilterImpl, FilterIpContext, RxPacket, ValidState, Verdict,

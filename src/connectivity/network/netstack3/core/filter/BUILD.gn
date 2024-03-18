@@ -27,7 +27,6 @@ rustc_library_with_features("netstack3-filter") {
     "//src/lib/fakealloc",
     "//src/lib/network/packet",
     "//third_party/rust_crates:derivative",
-    "//third_party/rust_crates:once_cell",
     "//third_party/rust_crates:zerocopy",
   ]
   test_deps = [
