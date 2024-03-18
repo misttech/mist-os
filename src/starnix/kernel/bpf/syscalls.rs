@@ -15,6 +15,7 @@ use crate::{
     task::CurrentTask,
     vfs::{Anon, FdFlags, FdNumber, LookupContext, OutputBuffer, UserBuffersOutputBuffer},
 };
+use ebpf::MapSchema;
 use smallvec::smallvec;
 use starnix_logging::{log_trace, track_stub};
 use starnix_sync::{Locked, Unlocked};
@@ -43,7 +44,6 @@ use starnix_uapi::{
     user_buffer::UserBuffer,
     BPF_F_RDONLY_PROG, PATH_MAX,
 };
-use ubpf::MapSchema;
 use zerocopy::{AsBytes, FromBytes};
 
 /// Read the arguments for a BPF command. The ABI works like this: If the arguments struct

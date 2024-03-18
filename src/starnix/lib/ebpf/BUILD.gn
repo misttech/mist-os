@@ -7,31 +7,31 @@ import("//build/rust/rustc_library.gni")
 
 group("tests") {
   testonly = true
-  deps = [ ":ubpf_test" ]
+  deps = [ ":ebpf-tests" ]
 }
 
-rustc_library("ubpf") {
+rustc_library("ebpf") {
   edition = "2021"
 
   sources = [
+    "src/api.rs",
     "src/conformance.rs",
     "src/converter.rs",
     "src/error.rs",
+    "src/executor.rs",
     "src/lib.rs",
     "src/maps.rs",
     "src/program.rs",
-    "src/ubpf.rs",
     "src/verifier.rs",
     "src/visitor.rs",
   ]
   deps = [
     "//src/starnix/lib/linux_uapi",
     "//third_party/rust_crates:byteorder",
-    "//third_party/rust_crates:libc",
     "//third_party/rust_crates:once_cell",
+    "//third_party/rust_crates:static_assertions",
     "//third_party/rust_crates:thiserror",
     "//third_party/rust_crates:zerocopy",
-    "//third_party/ubpf",
   ]
 
   configs += [ "//src/starnix/config:starnix_clippy_lints" ]
@@ -181,7 +181,7 @@ rustc_library("ubpf") {
   ]
 }
 
-fuchsia_unittest_package("ubpf-tests") {
-  manifest = "meta/ubpf-tests.cml"
-  deps = [ ":ubpf_test" ]
+fuchsia_unittest_package("ebpf-tests") {
+  manifest = "meta/ebpf-tests.cml"
+  deps = [ ":ebpf_test" ]
 }

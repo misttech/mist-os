@@ -6,6 +6,7 @@
 
 use crate::{mm::MemoryAccessor, task::CurrentTask};
 use dense_map::DenseMap;
+use ebpf::MapSchema;
 use starnix_logging::track_stub;
 use starnix_sync::{BpfMapEntries, Locked, OrderedMutex, Unlocked};
 use starnix_uapi::{
@@ -33,7 +34,6 @@ use std::{
     ops::{Bound, Deref, DerefMut, Range, RangeBounds},
     pin::Pin,
 };
-use ubpf::MapSchema;
 
 /// A BPF map. This is a hashtable that can be accessed both by BPF programs and userspace.
 pub struct Map {

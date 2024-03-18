@@ -4,55 +4,42 @@
 
 use crate::{
     converter::cbpf_to_ebpf,
-    ubpf::{ubpf_create, ubpf_destroy, ubpf_exec, ubpf_load, ubpf_register, ubpf_vm},
+    executor::{execute, execute_with_arguments},
     verifier::{
         verify, CallingContext, FunctionSignature, NullVerifierLogger, Type, VerifierLogger,
     },
-    MapSchema, UbpfError,
-    UbpfError::*,
+    EbpfError, MapSchema,
 };
-use linux_uapi::{bpf_insn, c_void, sock_filter};
+use linux_uapi::{bpf_insn, sock_filter};
+use std::{collections::HashMap, fmt::Formatter, sync::Arc};
 use zerocopy::{AsBytes, FromBytes, NoCell};
 
-// This file contains wrapper logic to build programs and execute
-// them in the ubpf VM.
-
-/// An alias for the UbpfVm. This allows not to reference the actual implementation in external
-/// code.
-pub type EbpfProgram = UbpfVm;
-
-/// An alias for the UbpfVmBuilder. This allows not to reference the actual implementation in
-/// external code.
-pub type EbpfProgramBuilder = UbpfVmBuilder;
-
-#[derive(Debug)]
-pub struct UbpfVmBuilder {
-    vm: *mut ubpf_vm,
+#[derive(Debug, Default)]
+pub struct EbpfProgramBuilder {
+    helpers: HashMap<u32, EbpfHelper>,
     calling_context: CallingContext,
 }
 
-pub struct BpfHelper {
+#[derive(Clone)]
+pub struct EbpfHelper {
     pub index: u32,
     pub name: &'static str,
-    pub function_pointer: *mut std::os::raw::c_void,
+    pub function_pointer:
+        Arc<dyn Fn(*mut u8, *mut u8, *mut u8, *mut u8, *mut u8) -> *mut u8 + Send + Sync>,
     pub signature: FunctionSignature,
 }
 
-// SAFETY
-//
-// The helper pointer is a constant function pointer so is safe to use across thread.
-unsafe impl Send for BpfHelper {}
-unsafe impl Sync for BpfHelper {}
-
-impl UbpfVmBuilder {
-    pub fn new() -> Result<Self, UbpfError> {
-        let vm = unsafe { ubpf_create() };
-        if vm == std::ptr::null_mut() {
-            return Err(VmInitialization);
-        }
-        Ok(UbpfVmBuilder { vm, calling_context: Default::default() })
+impl std::fmt::Debug for EbpfHelper {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
+        f.debug_struct("EbpfHelper")
+            .field("index", &self.index)
+            .field("name", &self.name)
+            .field("signature", &self.signature)
+            .finish()
     }
+}
 
+impl EbpfProgramBuilder {
     pub fn register_map_reference(&mut self, pc: usize, schema: MapSchema) {
         self.calling_context.register_map_reference(pc, schema);
     }
@@ -64,83 +51,36 @@ impl UbpfVmBuilder {
     // This function signature will need more parameters eventually. The client needs to be able to
     // supply a real callback and it's type. The callback will be needed to actually call the
     // callback. The type will be needed for the verifier.
-    pub fn register(&mut self, helper: &BpfHelper) -> Result<(), UbpfError> {
-        let success = unsafe {
-            ubpf_register(
-                self.vm,
-                helper.index,
-                helper.name.as_ptr() as *const std::os::raw::c_char,
-                helper.function_pointer,
-            )
-        };
-        if success != 0 {
-            return Err(VmRegisterError(
-                format!(
-                    "Unable to register callback {} ({}) with error {}",
-                    helper.index, helper.name, success
-                )
-                .to_string(),
-            ));
-        }
+    pub fn register(&mut self, helper: &EbpfHelper) -> Result<(), EbpfError> {
+        self.helpers.insert(helper.index, helper.clone());
         self.calling_context.register_function(helper.index, helper.signature.clone());
         Ok(())
     }
 
     pub fn load(
         self,
-        mut code: Vec<bpf_insn>,
+        code: Vec<bpf_insn>,
         logger: &mut dyn VerifierLogger,
-    ) -> Result<UbpfVm, UbpfError> {
+    ) -> Result<EbpfProgram, EbpfError> {
         verify(&code, self.calling_context, logger)?;
-        unsafe {
-            let mut errmsg = std::ptr::null_mut();
-            let success = ubpf_load(
-                self.vm,
-                code.as_mut_ptr() as *mut c_void,
-                (code.len() * std::mem::size_of::<bpf_insn>()) as u32,
-                &mut errmsg,
-            );
-
-            if !errmsg.is_null() {
-                let msg = std::ffi::CStr::from_ptr(errmsg)
-                    .to_str()
-                    .unwrap_or("Decoding error for error string")
-                    .to_string();
-                libc::free(errmsg as *mut c_void);
-                return Err(ProgramLoadError(msg));
-            }
-            if success != 0 {
-                return Err(VmLoadError(
-                    format!("Unable to load program with error {}", success).to_string(),
-                ));
-            }
-        }
-
-        Ok(UbpfVm { opaque_vm: self.vm, _code: code })
+        Ok(EbpfProgram { code, helpers: self.helpers })
     }
 }
 
-/// An abstraction over the ubpf VM.
+/// An abstraction over a ebpf program and its registered helper functions.
 #[derive(Debug)]
-pub struct UbpfVm {
-    // The bpf vm used to run the program.  ubpf enforces that there is one program per vm.
-    // We make the assumption that ubpf_vms are immutable after loading the code into them.
-    // This implies that this API does not support reloading code.
-    opaque_vm: *mut ubpf_vm,
-
-    _code: Vec<bpf_insn>,
+pub struct EbpfProgram {
+    pub code: Vec<bpf_insn>,
+    pub helpers: HashMap<u32, EbpfHelper>,
 }
 
-unsafe impl Send for UbpfVm {}
-unsafe impl Sync for UbpfVm {}
-
-impl UbpfVm {
+impl EbpfProgram {
     /// Executes the current program on the provided data.  Warning: If
     /// this program was a cbpf program, and it uses BPF_MEM, the
     /// scratch memory must be provided by the caller to this
     /// function.  The translated CBPF program will use the last 16
     /// words of |data|.
-    pub fn run<T: AsBytes + FromBytes + NoCell>(&self, data: &mut T) -> Result<u64, i32> {
+    pub fn run<T: AsBytes + FromBytes + NoCell>(&self, data: &mut T) -> u64 {
         self.run_with_slice(data.as_bytes_mut())
     }
 
@@ -149,58 +89,23 @@ impl UbpfVm {
     /// scratch memory must be provided by the caller to this
     /// function.  The translated CBPF program will use the last 16
     /// words of |data|.
-    pub fn run_with_slice(&self, data: &mut [u8]) -> Result<u64, i32> {
-        let mut bpf_return_value: u64 = 0;
-        let status = unsafe {
-            ubpf_exec(
-                self.opaque_vm as *mut ubpf_vm,
-                data.as_mut_ptr() as *mut c_void,
-                data.len(),
-                &mut bpf_return_value,
-            )
-        };
-
-        if status != 0 {
-            return Err(status);
-        }
-
-        Ok(bpf_return_value)
+    pub fn run_with_slice(&self, data: &mut [u8]) -> u64 {
+        execute(self, data)
     }
 
-    pub fn run_with_zeroes(&self) -> Result<u64, i32> {
-        let mut bpf_return_value: u64 = 0;
-        let status = unsafe {
-            ubpf_exec(self.opaque_vm as *mut ubpf_vm, 0 as *mut c_void, 0, &mut bpf_return_value)
-        };
-
-        if status != 0 {
-            return Err(status);
-        }
-
-        Ok(bpf_return_value)
+    pub fn run_with_arguments(&self, arguments: &[u64]) -> u64 {
+        execute_with_arguments(self, arguments)
     }
 
-    /// This method instantiates an UbpfVm given a cbpf original.
-    pub fn from_cbpf<T>(bpf_code: &[sock_filter]) -> Result<Self, UbpfError> {
+    pub fn from_cbpf<T>(bpf_code: &[sock_filter]) -> Result<Self, EbpfError> {
         let code = cbpf_to_ebpf(bpf_code)?;
         let buffer_size = std::mem::size_of::<T>() as u64;
-        let mut builder = UbpfVmBuilder::new()?;
+        let mut builder = EbpfProgramBuilder::default();
         builder.set_args(&[
             Type::PtrToMemory { id: 0, offset: 0, buffer_size },
             Type::from(buffer_size),
         ]);
         builder.load(code, &mut NullVerifierLogger)
-    }
-}
-
-impl Drop for UbpfVm {
-    fn drop(&mut self) {
-        unsafe {
-            let tbd = self.opaque_vm;
-            self.opaque_vm = std::ptr::null_mut();
-
-            ubpf_destroy(tbd as *mut ubpf_vm);
-        }
     }
 }
 
@@ -231,7 +136,7 @@ mod test {
     const BPF_MISC_TAX: u16 = (BPF_MISC | BPF_TAX) as u16;
 
     fn with_prg_assert_result(prg: &EbpfProgram, mut data: seccomp_data, result: u32, msg: &str) {
-        let return_value = prg.run(&mut data).expect("Error executing the program");
+        let return_value = prg.run(&mut data);
         assert_eq!(return_value, result as u64, "{}: filter return value is {}", msg, return_value);
     }
 

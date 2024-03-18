@@ -4,22 +4,23 @@
 
 #[cfg(test)]
 mod test {
-    use crate::{BpfHelper, EbpfProgramBuilder, FunctionSignature, NullVerifierLogger, Type};
-    use linux_uapi::{
-        bpf_insn, BPF_ADD, BPF_ALU, BPF_ALU64, BPF_AND, BPF_ARSH, BPF_B, BPF_CALL, BPF_DIV, BPF_DW,
-        BPF_EXIT, BPF_H, BPF_IMM, BPF_JA, BPF_JEQ, BPF_JGE, BPF_JGT, BPF_JLE, BPF_JLT, BPF_JMP,
-        BPF_JMP32, BPF_JNE, BPF_JSET, BPF_JSGE, BPF_JSGT, BPF_JSLE, BPF_JSLT, BPF_LD, BPF_LDX,
-        BPF_LSH, BPF_MEM, BPF_MOD, BPF_MOV, BPF_MUL, BPF_NEG, BPF_OR, BPF_RSH, BPF_ST, BPF_STX,
-        BPF_SUB, BPF_W, BPF_XOR,
+    use crate::{
+        EbpfHelper, EbpfProgramBuilder, FunctionSignature, NullVerifierLogger, Type, BPF_ADD,
+        BPF_ALU, BPF_ALU64, BPF_AND, BPF_ARSH, BPF_B, BPF_CALL, BPF_DIV, BPF_DW, BPF_END, BPF_EXIT,
+        BPF_H, BPF_IMM, BPF_JA, BPF_JEQ, BPF_JGE, BPF_JGT, BPF_JLE, BPF_JLT, BPF_JMP, BPF_JMP32,
+        BPF_JNE, BPF_JSET, BPF_JSGE, BPF_JSGT, BPF_JSLE, BPF_JSLT, BPF_LD, BPF_LDX, BPF_LSH,
+        BPF_MEM, BPF_MOD, BPF_MOV, BPF_MUL, BPF_NEG, BPF_OR, BPF_RSH, BPF_SRC_IMM, BPF_SRC_REG,
+        BPF_ST, BPF_STX, BPF_SUB, BPF_TO_BE, BPF_TO_LE, BPF_W, BPF_XOR,
     };
+    use linux_uapi::bpf_insn;
     use pest::{iterators::Pair, Parser};
     use pest_derive::Parser;
-    use std::str::FromStr;
+    use std::{str::FromStr, sync::Arc};
     use test_case::test_case;
     use zerocopy::{FromBytes, IntoBytes};
 
     #[derive(Parser)]
-    #[grammar = "../../src/starnix/lib/ubpf/src/test_grammar.pest"]
+    #[grammar = "../../src/starnix/lib/ebpf/src/test_grammar.pest"]
     struct TestGrammar {}
 
     struct TestCase {
@@ -28,8 +29,6 @@ mod test {
         memory: Option<Vec<u8>>,
     }
 
-    const BPF_REG: u32 = 0x08;
-    const BPF_SWAP: u32 = 0xd0;
     const HEXADECIMAL_BASE: u32 = 16;
 
     enum Value {
@@ -98,13 +97,13 @@ mod test {
         }
 
         fn parse_memory_size(value: &str) -> u8 {
-            (match value {
+            match value {
                 "b" => BPF_B,
                 "h" => BPF_H,
                 "w" => BPF_W,
                 "dw" => BPF_DW,
                 r @ _ => unreachable!("unexpected memory size {r:?}"),
-            }) as u8
+            }
         }
 
         fn parse_mem_instruction(pair: Pair<'_, Rule>) -> Vec<bpf_insn> {
@@ -120,7 +119,7 @@ mod test {
                     instruction.set_src_reg(src_reg);
                     instruction.off = offset;
                     instruction.code =
-                        (BPF_MEM | BPF_STX) as u8 | Self::parse_memory_size(&op.as_str()[3..]);
+                        BPF_MEM | BPF_STX | Self::parse_memory_size(&op.as_str()[3..]);
                     vec![instruction]
                 }
                 Rule::STORE_IMM_OP => {
@@ -131,7 +130,7 @@ mod test {
                     instruction.imm = imm;
                     instruction.off = offset;
                     instruction.code =
-                        (BPF_MEM | BPF_ST) as u8 | Self::parse_memory_size(&op.as_str()[2..]);
+                        BPF_MEM | BPF_ST | Self::parse_memory_size(&op.as_str()[2..]);
                     vec![instruction]
                 }
                 Rule::LOAD_OP => {
@@ -142,7 +141,7 @@ mod test {
                     instruction.set_src_reg(src_reg);
                     instruction.off = offset;
                     instruction.code =
-                        (BPF_MEM | BPF_LDX) as u8 | Self::parse_memory_size(&op.as_str()[3..]);
+                        BPF_MEM | BPF_LDX | Self::parse_memory_size(&op.as_str()[3..]);
                     vec![instruction]
                 }
                 Rule::LDDW_OP => {
@@ -153,7 +152,7 @@ mod test {
                     let mut instruction = bpf_insn::default();
                     instruction.set_dst_reg(dst_reg);
                     instruction.imm = low;
-                    instruction.code = (BPF_IMM | BPF_LD | BPF_DW) as u8;
+                    instruction.code = BPF_IMM | BPF_LD | BPF_DW;
                     instructions.push(instruction);
                     let mut instruction = bpf_insn::default();
                     instruction.imm = high;
@@ -187,13 +186,13 @@ mod test {
         fn parse_alu_binary_op(value: &str) -> u8 {
             let mut code: u8 = 0;
             let op = if &value[value.len() - 2..] == "32" {
-                code |= BPF_ALU as u8;
+                code |= BPF_ALU;
                 &value[..value.len() - 2]
             } else {
-                code |= BPF_ALU64 as u8;
+                code |= BPF_ALU64;
                 value
             };
-            let alu_op_code = match op {
+            code |= match op {
                 "add" => BPF_ADD,
                 "sub" => BPF_SUB,
                 "mul" => BPF_MUL,
@@ -208,7 +207,6 @@ mod test {
                 "arsh" => BPF_ARSH,
                 _ => unreachable!("unexpected operation {op}"),
             };
-            code |= alu_op_code as u8;
             code
         }
 
@@ -216,15 +214,15 @@ mod test {
             let (code, imm) = match value {
                 "neg" => (BPF_ALU64 | BPF_NEG, 0),
                 "neg32" => (BPF_ALU | BPF_NEG, 0),
-                "be16" => (BPF_ALU | BPF_SWAP | BPF_REG, 16),
-                "be32" => (BPF_ALU | BPF_SWAP | BPF_REG, 32),
-                "be64" => (BPF_ALU | BPF_SWAP | BPF_REG, 64),
-                "le16" => (BPF_ALU | BPF_SWAP | BPF_IMM, 16),
-                "le32" => (BPF_ALU | BPF_SWAP | BPF_IMM, 32),
-                "le64" => (BPF_ALU | BPF_SWAP | BPF_IMM, 64),
+                "be16" => (BPF_ALU | BPF_END | BPF_TO_BE, 16),
+                "be32" => (BPF_ALU | BPF_END | BPF_TO_BE, 32),
+                "be64" => (BPF_ALU | BPF_END | BPF_TO_BE, 64),
+                "le16" => (BPF_ALU | BPF_END | BPF_TO_LE, 16),
+                "le32" => (BPF_ALU | BPF_END | BPF_TO_LE, 32),
+                "le64" => (BPF_ALU | BPF_END | BPF_TO_LE, 64),
                 _ => unreachable!("unexpected operation {value}"),
             };
-            (code as u8, imm)
+            (code, imm)
         }
 
         fn parse_reg(pair: Pair<'_, Rule>) -> u8 {
@@ -269,11 +267,11 @@ mod test {
             match pair.as_rule() {
                 Rule::REG_NUMBER => {
                     instruction.set_src_reg(Self::parse_reg(pair));
-                    instruction.code |= BPF_REG as u8;
+                    instruction.code |= BPF_SRC_REG;
                 }
                 Rule::IMM => {
                     instruction.imm = Self::parse_value(pair).as_i32();
-                    instruction.code |= BPF_IMM as u8;
+                    instruction.code |= BPF_SRC_IMM;
                 }
                 r @ _ => unreachable!("unexpected rule {r:?}"),
             }
@@ -313,13 +311,13 @@ mod test {
             let mut code: u8 = 0;
             // Special case for operation ending by 32 but not being BPF_ALU necessarily
             let op = if &value[value.len() - 2..] == "32" {
-                code |= BPF_JMP32 as u8;
+                code |= BPF_JMP32;
                 &value[..value.len() - 2]
             } else {
-                code |= BPF_JMP as u8;
+                code |= BPF_JMP;
                 value
             };
-            let jmp_op_code = match op {
+            code |= match op {
                 "jeq" => BPF_JEQ,
                 "jgt" => BPF_JGT,
                 "jge" => BPF_JGE,
@@ -333,7 +331,6 @@ mod test {
                 "jsle" => BPF_JSLE,
                 _ => unreachable!("unexpected operation {op}"),
             };
-            code |= jmp_op_code as u8;
             code
         }
         fn parse_jmp_instruction(pair: Pair<'_, Rule>) -> bpf_insn {
@@ -350,16 +347,16 @@ mod test {
                 }
                 Rule::JMP => {
                     let mut inner = op.into_inner();
-                    instruction.code = (BPF_JMP | BPF_JA) as u8;
+                    instruction.code = BPF_JMP | BPF_JA;
                     instruction.off = Self::parse_offset_or_exit(inner.next().unwrap());
                 }
                 Rule::CALL => {
                     let mut inner = op.into_inner();
-                    instruction.code = (BPF_JMP | BPF_CALL) as u8;
+                    instruction.code = BPF_JMP | BPF_CALL;
                     instruction.imm = Self::parse_value(inner.next().unwrap()).as_i32();
                 }
                 Rule::EXIT => {
-                    instruction.code = (BPF_JMP | BPF_EXIT) as u8;
+                    instruction.code = BPF_JMP | BPF_EXIT;
                 }
                 r @ _ => unreachable!("unexpected rule {r:?}"),
             }
@@ -432,48 +429,48 @@ mod test {
         }
     }
 
-    fn gather_bytes(mut a: u64, mut b: u64, mut c: u64, mut d: u64, mut e: u64) -> u64 {
-        a = a & 0xff;
-        b = b & 0xff;
-        c = c & 0xff;
-        d = d & 0xff;
-        e = e & 0xff;
-        (a << 32) | (b << 24) | (c << 16) | (d << 8) | e
+    fn gather_bytes(a: *mut u8, b: *mut u8, c: *mut u8, d: *mut u8, e: *mut u8) -> *mut u8 {
+        let a = (a as u64) & 0xff;
+        let b = (b as u64) & 0xff;
+        let c = (c as u64) & 0xff;
+        let d = (d as u64) & 0xff;
+        let e = (e as u64) & 0xff;
+        ((a << 32) | (b << 24) | (c << 16) | (d << 8) | e) as *mut u8
     }
 
-    fn memfrob(s: u64, n: u64, _: u64, _: u64, _: u64) -> u64 {
-        let ptr = s as *mut u8;
-        let slice = unsafe { std::slice::from_raw_parts_mut(ptr, n as usize) };
+    fn memfrob(ptr: *mut u8, n: *mut u8, _: *mut u8, _: *mut u8, _: *mut u8) -> *mut u8 {
+        let n = n as usize;
+        let slice = unsafe { std::slice::from_raw_parts_mut(ptr, n) };
         for c in slice.iter_mut() {
             *c ^= 42;
         }
-        slice.as_mut_ptr() as u64
+        slice.as_mut_ptr()
     }
 
-    fn trash_registers(_: u64, _: u64, _: u64, _: u64, _: u64) -> u64 {
-        0
+    fn trash_registers(_: *mut u8, _: *mut u8, _: *mut u8, _: *mut u8, _: *mut u8) -> *mut u8 {
+        0 as *mut u8
     }
 
-    fn sqrti(v: u64, _: u64, _: u64, _: u64, _: u64) -> u64 {
-        (v as f64).sqrt() as u64
+    fn sqrti(v: *mut u8, _: *mut u8, _: *mut u8, _: *mut u8, _: *mut u8) -> *mut u8 {
+        (((v as u64) as f64).sqrt() as u64) as *mut u8
     }
 
-    fn strcmp_ext(mut s1: u64, mut s2: u64, _: u64, _: u64, _: u64) -> u64 {
+    fn strcmp_ext(mut s1: *mut u8, mut s2: *mut u8, _: *mut u8, _: *mut u8, _: *mut u8) -> *mut u8 {
         loop {
-            let c1 = unsafe { *(s1 as *const u8) };
-            let c2 = unsafe { *(s2 as *const u8) };
+            let c1 = unsafe { *s1 };
+            let c2 = unsafe { *s2 };
             if c1 != c2 {
                 if c2 > c1 {
-                    return 1;
+                    return 1 as *mut u8;
                 } else {
-                    return u64::MAX;
+                    return u64::MAX as *mut u8;
                 }
             }
             if c1 == 0 {
-                return 0;
+                return 0 as *mut u8;
             }
-            s1 += 1;
-            s2 += 1;
+            s1 = unsafe { s1.offset(1) };
+            s2 = unsafe { s2.offset(1) };
         }
     }
 
@@ -615,7 +612,7 @@ mod test {
             // Special case that only test the test framework.
             return;
         };
-        let mut builder = EbpfProgramBuilder::new().expect("unable to create builder");
+        let mut builder = EbpfProgramBuilder::default();
         if let Some(memory) = test_case.memory.as_ref() {
             let buffer_size = memory.len() as u64;
             builder.set_args(&[
@@ -627,10 +624,10 @@ mod test {
         }
 
         builder
-            .register(&BpfHelper {
+            .register(&EbpfHelper {
                 index: 0,
                 name: "gather_bytes",
-                function_pointer: gather_bytes as *mut std::os::raw::c_void,
+                function_pointer: Arc::new(gather_bytes),
                 signature: FunctionSignature {
                     args: &[
                         Type::ScalarValueParameter,
@@ -644,10 +641,10 @@ mod test {
             })
             .expect("register");
         builder
-            .register(&BpfHelper {
+            .register(&EbpfHelper {
                 index: 1,
                 name: "memfrob",
-                function_pointer: memfrob as *mut std::os::raw::c_void,
+                function_pointer: Arc::new(memfrob),
                 signature: FunctionSignature {
                     args: &[
                         Type::MemoryParameter { memory_length_index: 1 },
@@ -658,10 +655,10 @@ mod test {
             })
             .expect("register");
         builder
-            .register(&BpfHelper {
+            .register(&EbpfHelper {
                 index: 2,
                 name: "trash_registers",
-                function_pointer: trash_registers as *mut std::os::raw::c_void,
+                function_pointer: Arc::new(trash_registers),
                 signature: FunctionSignature {
                     args: &[],
                     return_value: Type::unknown_written_scalar_value(),
@@ -669,10 +666,10 @@ mod test {
             })
             .expect("register");
         builder
-            .register(&BpfHelper {
+            .register(&EbpfHelper {
                 index: 3,
                 name: "sqrti",
-                function_pointer: sqrti as *mut std::os::raw::c_void,
+                function_pointer: Arc::new(sqrti),
                 signature: FunctionSignature {
                     args: &[Type::ScalarValueParameter],
                     return_value: Type::unknown_written_scalar_value(),
@@ -680,10 +677,10 @@ mod test {
             })
             .expect("register");
         builder
-            .register(&BpfHelper {
+            .register(&EbpfHelper {
                 index: 4,
                 name: "strcmp_ext",
-                function_pointer: strcmp_ext as *mut std::os::raw::c_void,
+                function_pointer: Arc::new(strcmp_ext),
                 signature: FunctionSignature {
                     // Args cannot be correctly verified as the verifier cannot check the string
                     // are correctly 0 terminated.
@@ -699,9 +696,8 @@ mod test {
             let result = if let Some(memory) = test_case.memory.as_mut() {
                 program.run_with_slice(memory.as_mut_slice())
             } else {
-                program.run_with_zeroes()
+                program.run_with_arguments(&[0, 0])
             };
-            let result = result.expect("run");
             assert_eq!(result, value);
         } else {
             assert!(program.is_err());

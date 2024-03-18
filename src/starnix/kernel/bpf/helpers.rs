@@ -2,60 +2,68 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use ebpf::{EbpfHelper, FunctionSignature, Type};
 use once_cell::sync::Lazy;
 use starnix_logging::track_stub;
-use ubpf::{BpfHelper, FunctionSignature, Type};
+use std::sync::Arc;
 
 const MAP_LOOKUP_ELEM_INDEX: u32 = 1;
 const MAP_LOOKUP_ELEM_NAME: &'static str = "map_lookup_elem";
 
-extern "C" fn bpf_map_lookup_elem(
-    _map: *const std::os::raw::c_void,
-    _key: *const std::os::raw::c_void,
-) -> *const std::os::raw::c_void {
+fn bpf_map_lookup_elem(
+    _map: *mut u8,
+    _key: *mut u8,
+    _: *mut u8,
+    _: *mut u8,
+    _: *mut u8,
+) -> *mut u8 {
     track_stub!(TODO("https://fxbug.dev/287120494"), "bpf_map_lookup_elem");
-    std::ptr::null()
+    0 as *mut u8
 }
 
 const MAP_UPDATE_ELEM_INDEX: u32 = 2;
 const MAP_UPDATE_ELEM_NAME: &'static str = "map_update_elem";
 
-extern "C" fn bpf_map_update_elem(
-    _map: *const std::os::raw::c_void,
-    _key: *const std::os::raw::c_void,
-    _value: *const std::os::raw::c_void,
-    _flags: u64,
-) -> std::os::raw::c_long {
+fn bpf_map_update_elem(
+    _map: *mut u8,
+    _key: *mut u8,
+    _value: *mut u8,
+    _flags: *mut u8,
+    _: *mut u8,
+) -> *mut u8 {
     track_stub!(TODO("https://fxbug.dev/287120494"), "bpf_map_update_elem");
-    -1
+    u64::MAX as *mut u8
 }
 
 const MAP_DELETE_ELEM_INDEX: u32 = 3;
 const MAP_DELETE_ELEM_NAME: &'static str = "map_delete_elem";
 
-extern "C" fn bpf_map_delete_elem(
-    _map: *const std::os::raw::c_void,
-    _key: *const std::os::raw::c_void,
-) -> std::os::raw::c_long {
+fn bpf_map_delete_elem(
+    _map: *mut u8,
+    _key: *mut u8,
+    _: *mut u8,
+    _: *mut u8,
+    _: *mut u8,
+) -> *mut u8 {
     track_stub!(TODO("https://fxbug.dev/287120494"), "bpf_map_delete_elem");
-    -1
+    u64::MAX as *mut u8
 }
 
-pub static BPF_HELPERS: Lazy<Vec<BpfHelper>> = Lazy::new(|| {
+pub static BPF_HELPERS: Lazy<Vec<EbpfHelper>> = Lazy::new(|| {
     vec![
-        BpfHelper {
+        EbpfHelper {
             index: MAP_LOOKUP_ELEM_INDEX,
             name: MAP_LOOKUP_ELEM_NAME,
-            function_pointer: bpf_map_lookup_elem as *mut std::os::raw::c_void,
+            function_pointer: Arc::new(bpf_map_lookup_elem),
             signature: FunctionSignature {
                 args: &[Type::ConstPtrToMapParameter, Type::MapKeyParameter { map_ptr_index: 0 }],
                 return_value: Type::NullOr(Box::new(Type::MapValueParameter { map_ptr_index: 0 })),
             },
         },
-        BpfHelper {
+        EbpfHelper {
             index: MAP_UPDATE_ELEM_INDEX,
             name: MAP_UPDATE_ELEM_NAME,
-            function_pointer: bpf_map_update_elem as *mut std::os::raw::c_void,
+            function_pointer: Arc::new(bpf_map_update_elem),
             signature: FunctionSignature {
                 args: &[
                     Type::ConstPtrToMapParameter,
@@ -66,10 +74,10 @@ pub static BPF_HELPERS: Lazy<Vec<BpfHelper>> = Lazy::new(|| {
                 return_value: Type::unknown_written_scalar_value(),
             },
         },
-        BpfHelper {
+        EbpfHelper {
             index: MAP_DELETE_ELEM_INDEX,
             name: MAP_DELETE_ELEM_NAME,
-            function_pointer: bpf_map_delete_elem as *mut std::os::raw::c_void,
+            function_pointer: Arc::new(bpf_map_delete_elem),
             signature: FunctionSignature {
                 args: &[Type::ConstPtrToMapParameter, Type::MapKeyParameter { map_ptr_index: 0 }],
                 return_value: Type::unknown_written_scalar_value(),

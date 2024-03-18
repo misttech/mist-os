@@ -2,12 +2,21 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-// Rust compiler is complaining about the constant, but refuses to compile without these
-#![allow(dead_code)]
-
+use crate::{
+    BPF_ADD, BPF_ALU, BPF_ALU64, BPF_AND, BPF_ARSH, BPF_B, BPF_CALL, BPF_CLS_MASK, BPF_DIV, BPF_DW,
+    BPF_END, BPF_EXIT, BPF_H, BPF_JA, BPF_JEQ, BPF_JGE, BPF_JGT, BPF_JLE, BPF_JLT, BPF_JMP,
+    BPF_JMP32, BPF_JNE, BPF_JSET, BPF_JSGE, BPF_JSGT, BPF_JSLE, BPF_JSLT, BPF_LD, BPF_LDDW,
+    BPF_LDX, BPF_LSH, BPF_MEM, BPF_MOD, BPF_MOV, BPF_MUL, BPF_NEG, BPF_OR, BPF_RSH, BPF_SIZE_MASK,
+    BPF_SRC_MASK, BPF_SRC_REG, BPF_ST, BPF_STX, BPF_SUB, BPF_SUB_OP_MASK, BPF_TO_BE, BPF_W,
+    BPF_XOR,
+};
 use linux_uapi::bpf_insn;
 
+/// The index into the registers. 10 is the stack pointer.
 pub type Register = u8;
+
+/// The index into the program
+pub type ProgramCounter = usize;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Source {
@@ -17,7 +26,7 @@ pub enum Source {
 
 impl From<&bpf_insn> for Source {
     fn from(instruction: &bpf_insn) -> Self {
-        if instruction.code & EBPF_SRC_REG == EBPF_SRC_REG {
+        if instruction.code & BPF_SRC_MASK == BPF_SRC_REG {
             Self::Reg(instruction.src_reg())
         } else {
             Self::Value(instruction.imm as u64)
@@ -58,6 +67,15 @@ impl DataWidth {
             Self::U16 => "h",
             Self::U32 => "w",
             Self::U64 => "dw",
+        }
+    }
+
+    pub fn cast(&self, value: u64) -> u64 {
+        match self {
+            Self::U8 => (value as u8) as u64,
+            Self::U16 => (value as u16) as u64,
+            Self::U32 => (value as u32) as u64,
+            Self::U64 => value,
         }
     }
 }
@@ -429,13 +447,13 @@ pub trait BpfVisitor {
         let invalid_op_code =
             || -> Result<(), String> { Err(format!("invalid op code {:x}", instruction.code)) };
 
-        let class = instruction.code & EBPF_CLS_MASK;
+        let class = instruction.code & BPF_CLS_MASK;
         match class {
-            EBPF_CLS_ALU64 | EBPF_CLS_ALU => {
-                let alu_op = instruction.code & EBPF_SUB_OP_MASK;
-                let is_64 = class == EBPF_CLS_ALU64;
+            BPF_ALU64 | BPF_ALU => {
+                let alu_op = instruction.code & BPF_SUB_OP_MASK;
+                let is_64 = class == BPF_ALU64;
                 match alu_op {
-                    EBPF_ALU_OP_ADD => {
+                    BPF_ADD => {
                         if is_64 {
                             return self.add64(
                                 context,
@@ -450,7 +468,7 @@ pub trait BpfVisitor {
                             );
                         }
                     }
-                    EBPF_ALU_OP_SUB => {
+                    BPF_SUB => {
                         if is_64 {
                             return self.sub64(
                                 context,
@@ -465,7 +483,7 @@ pub trait BpfVisitor {
                             );
                         }
                     }
-                    EBPF_ALU_OP_MUL => {
+                    BPF_MUL => {
                         if is_64 {
                             return self.mul64(
                                 context,
@@ -480,7 +498,7 @@ pub trait BpfVisitor {
                             );
                         }
                     }
-                    EBPF_ALU_OP_DIV => {
+                    BPF_DIV => {
                         if is_64 {
                             return self.div64(
                                 context,
@@ -495,7 +513,7 @@ pub trait BpfVisitor {
                             );
                         }
                     }
-                    EBPF_ALU_OP_OR => {
+                    BPF_OR => {
                         if is_64 {
                             return self.or64(
                                 context,
@@ -510,7 +528,7 @@ pub trait BpfVisitor {
                             );
                         }
                     }
-                    EBPF_ALU_OP_AND => {
+                    BPF_AND => {
                         if is_64 {
                             return self.and64(
                                 context,
@@ -525,7 +543,7 @@ pub trait BpfVisitor {
                             );
                         }
                     }
-                    EBPF_ALU_OP_LSH => {
+                    BPF_LSH => {
                         if is_64 {
                             return self.lsh64(
                                 context,
@@ -540,7 +558,7 @@ pub trait BpfVisitor {
                             );
                         }
                     }
-                    EBPF_ALU_OP_RSH => {
+                    BPF_RSH => {
                         if is_64 {
                             return self.rsh64(
                                 context,
@@ -555,7 +573,7 @@ pub trait BpfVisitor {
                             );
                         }
                     }
-                    EBPF_ALU_OP_MOD => {
+                    BPF_MOD => {
                         if is_64 {
                             return self.mod64(
                                 context,
@@ -570,7 +588,7 @@ pub trait BpfVisitor {
                             );
                         }
                     }
-                    EBPF_ALU_OP_XOR => {
+                    BPF_XOR => {
                         if is_64 {
                             return self.xor64(
                                 context,
@@ -585,7 +603,7 @@ pub trait BpfVisitor {
                             );
                         }
                     }
-                    EBPF_ALU_OP_MOV => {
+                    BPF_MOV => {
                         if is_64 {
                             return self.mov64(
                                 context,
@@ -600,7 +618,7 @@ pub trait BpfVisitor {
                             );
                         }
                     }
-                    EBPF_ALU_OP_ARSH => {
+                    BPF_ARSH => {
                         if is_64 {
                             return self.arsh64(
                                 context,
@@ -616,15 +634,15 @@ pub trait BpfVisitor {
                         }
                     }
 
-                    EBPF_ALU_OP_NEG => {
+                    BPF_NEG => {
                         if is_64 {
                             return self.neg64(context, instruction.dst_reg());
                         } else {
                             return self.neg(context, instruction.dst_reg());
                         }
                     }
-                    EBPF_ALU_OP_ENDIANNESS => {
-                        let is_be = instruction.code & EBPF_SRC_REG == EBPF_SRC_REG;
+                    BPF_END => {
+                        let is_be = instruction.code & BPF_TO_BE == BPF_TO_BE;
                         let width = match instruction.imm {
                             16 => DataWidth::U16,
                             32 => DataWidth::U32,
@@ -645,11 +663,11 @@ pub trait BpfVisitor {
                     _ => return invalid_op_code(),
                 }
             }
-            EBPF_CLS_JMP | EBPF_CLS_JMP32 => {
-                let jmp_op = instruction.code & EBPF_SUB_OP_MASK;
-                let is_64 = class == EBPF_CLS_JMP;
+            BPF_JMP | BPF_JMP32 => {
+                let jmp_op = instruction.code & BPF_SUB_OP_MASK;
+                let is_64 = class == BPF_JMP;
                 match jmp_op {
-                    EBPF_JMP_OP_JEQ => {
+                    BPF_JEQ => {
                         if is_64 {
                             return self.jeq64(
                                 context,
@@ -666,7 +684,7 @@ pub trait BpfVisitor {
                             );
                         }
                     }
-                    EBPF_JMP_OP_JGT => {
+                    BPF_JGT => {
                         if is_64 {
                             return self.jgt64(
                                 context,
@@ -683,7 +701,7 @@ pub trait BpfVisitor {
                             );
                         }
                     }
-                    EBPF_JMP_OP_JGE => {
+                    BPF_JGE => {
                         if is_64 {
                             return self.jge64(
                                 context,
@@ -700,7 +718,7 @@ pub trait BpfVisitor {
                             );
                         }
                     }
-                    EBPF_JMP_OP_JSET => {
+                    BPF_JSET => {
                         if is_64 {
                             return self.jset64(
                                 context,
@@ -717,7 +735,7 @@ pub trait BpfVisitor {
                             );
                         }
                     }
-                    EBPF_JMP_OP_JNE => {
+                    BPF_JNE => {
                         if is_64 {
                             return self.jne64(
                                 context,
@@ -734,7 +752,7 @@ pub trait BpfVisitor {
                             );
                         }
                     }
-                    EBPF_JMP_OP_JSGT => {
+                    BPF_JSGT => {
                         if is_64 {
                             return self.jsgt64(
                                 context,
@@ -751,7 +769,7 @@ pub trait BpfVisitor {
                             );
                         }
                     }
-                    EBPF_JMP_OP_JSGE => {
+                    BPF_JSGE => {
                         if is_64 {
                             return self.jsge64(
                                 context,
@@ -768,7 +786,7 @@ pub trait BpfVisitor {
                             );
                         }
                     }
-                    EBPF_JMP_OP_JLT => {
+                    BPF_JLT => {
                         if is_64 {
                             return self.jlt64(
                                 context,
@@ -785,7 +803,7 @@ pub trait BpfVisitor {
                             );
                         }
                     }
-                    EBPF_JMP_OP_JLE => {
+                    BPF_JLE => {
                         if is_64 {
                             return self.jle64(
                                 context,
@@ -802,7 +820,7 @@ pub trait BpfVisitor {
                             );
                         }
                     }
-                    EBPF_JMP_OP_JSLT => {
+                    BPF_JSLT => {
                         if is_64 {
                             return self.jslt64(
                                 context,
@@ -819,7 +837,7 @@ pub trait BpfVisitor {
                             );
                         }
                     }
-                    EBPF_JMP_OP_JSLE => {
+                    BPF_JSLE => {
                         if is_64 {
                             return self.jsle64(
                                 context,
@@ -837,10 +855,10 @@ pub trait BpfVisitor {
                         }
                     }
 
-                    EBPF_JMP_OP_JA => {
+                    BPF_JA => {
                         return self.jump(context, instruction.off);
                     }
-                    EBPF_JMP_OP_CALL => {
+                    BPF_CALL => {
                         if instruction.src_reg() == 0 {
                             // Call to external function
                             return self.call_external(context, instruction.imm as u32);
@@ -851,38 +869,38 @@ pub trait BpfVisitor {
                             instruction.src_reg()
                         ));
                     }
-                    EBPF_JMP_OP_EXIT => {
+                    BPF_EXIT => {
                         return self.exit(context);
                     }
                     _ => return invalid_op_code(),
                 }
             }
-            EBPF_CLS_LD => {
-                if instruction.code == EBPF_OP_LDDW {
+            BPF_LD => {
+                if instruction.code == BPF_LDDW {
                     if code.len() < 2 {
                         return Err(format!("incomplete lddw"));
                     }
                     let next_instruction = &code[1];
-                    let value: u64 =
-                        (instruction.imm as u64) | ((next_instruction.imm as u64) << 32);
+                    let value: u64 = ((instruction.imm as u32) as u64)
+                        | (((next_instruction.imm as u32) as u64) << 32);
                     return self.load64(context, instruction.dst_reg(), value, 1);
                 }
                 // Other ld are not supported.
                 return invalid_op_code();
             }
-            EBPF_CLS_STX | EBPF_CLS_ST | EBPF_CLS_LDX => {
-                if instruction.code & EBPF_MODE_MEM != EBPF_MODE_MEM {
+            BPF_STX | BPF_ST | BPF_LDX => {
+                if instruction.code & BPF_MEM != BPF_MEM {
                     // Unsupported instruction.
                     return invalid_op_code();
                 }
-                let width = match instruction.code & EBPF_SIZE_MASK {
-                    EBPF_SIZE_B => DataWidth::U8,
-                    EBPF_SIZE_H => DataWidth::U16,
-                    EBPF_SIZE_W => DataWidth::U32,
-                    EBPF_SIZE_DW => DataWidth::U64,
+                let width = match instruction.code & BPF_SIZE_MASK {
+                    BPF_B => DataWidth::U8,
+                    BPF_H => DataWidth::U16,
+                    BPF_W => DataWidth::U32,
+                    BPF_DW => DataWidth::U64,
                     _ => unreachable!(),
                 };
-                if class == EBPF_CLS_LDX {
+                if class == BPF_LDX {
                     return self.load(
                         context,
                         instruction.dst_reg(),
@@ -891,7 +909,7 @@ pub trait BpfVisitor {
                         width,
                     );
                 } else {
-                    let src = if class == EBPF_CLS_ST {
+                    let src = if class == BPF_ST {
                         Source::Value(instruction.imm as u64)
                     } else {
                         Source::Reg(instruction.src_reg())
@@ -903,65 +921,3 @@ pub trait BpfVisitor {
         }
     }
 }
-
-// The different operation types
-const EBPF_CLS_ALU: u8 = crate::ubpf::EBPF_CLS_ALU as u8;
-const EBPF_CLS_ALU64: u8 = crate::ubpf::EBPF_CLS_ALU64 as u8;
-const EBPF_CLS_LD: u8 = crate::ubpf::EBPF_CLS_LD as u8;
-const EBPF_CLS_LDX: u8 = crate::ubpf::EBPF_CLS_LDX as u8;
-const EBPF_CLS_ST: u8 = crate::ubpf::EBPF_CLS_ST as u8;
-const EBPF_CLS_STX: u8 = crate::ubpf::EBPF_CLS_STX as u8;
-const EBPF_CLS_JMP32: u8 = crate::ubpf::EBPF_CLS_JMP32 as u8;
-const EBPF_CLS_JMP: u8 = crate::ubpf::EBPF_CLS_JMP as u8;
-const EBPF_CLS_MASK: u8 = crate::ubpf::EBPF_CLS_MASK as u8;
-
-// The mask for the sub operation
-const EBPF_SUB_OP_MASK: u8 = crate::ubpf::EBPF_ALU_OP_MASK as u8;
-
-// The mask for the src register
-const EBPF_SRC_REG: u8 = crate::ubpf::EBPF_SRC_REG as u8;
-
-// The mask for the load/store mode
-const EBPF_MODE_MEM: u8 = crate::ubpf::EBPF_MODE_MEM as u8;
-
-// The different size value
-const EBPF_SIZE_MASK: u8 = crate::ubpf::EBPF_SIZE_DW as u8;
-const EBPF_SIZE_B: u8 = crate::ubpf::EBPF_SIZE_B as u8;
-const EBPF_SIZE_H: u8 = crate::ubpf::EBPF_SIZE_H as u8;
-const EBPF_SIZE_W: u8 = crate::ubpf::EBPF_SIZE_W as u8;
-const EBPF_SIZE_DW: u8 = crate::ubpf::EBPF_SIZE_DW as u8;
-
-// The different alu operations
-const EBPF_ALU_OP_ADD: u8 = 0x00;
-const EBPF_ALU_OP_SUB: u8 = 0x10;
-const EBPF_ALU_OP_MUL: u8 = 0x20;
-const EBPF_ALU_OP_DIV: u8 = 0x30;
-const EBPF_ALU_OP_OR: u8 = 0x40;
-const EBPF_ALU_OP_AND: u8 = 0x50;
-const EBPF_ALU_OP_LSH: u8 = 0x60;
-const EBPF_ALU_OP_RSH: u8 = 0x70;
-const EBPF_ALU_OP_NEG: u8 = 0x80;
-const EBPF_ALU_OP_MOD: u8 = 0x90;
-const EBPF_ALU_OP_XOR: u8 = 0xa0;
-const EBPF_ALU_OP_MOV: u8 = 0xb0;
-const EBPF_ALU_OP_ARSH: u8 = 0xc0;
-const EBPF_ALU_OP_ENDIANNESS: u8 = 0xd0;
-
-// The different jump operation
-const EBPF_JMP_OP_JA: u8 = crate::ubpf::EBPF_MODE_JA as u8;
-const EBPF_JMP_OP_JEQ: u8 = crate::ubpf::EBPF_MODE_JEQ as u8;
-const EBPF_JMP_OP_JGT: u8 = crate::ubpf::EBPF_MODE_JGT as u8;
-const EBPF_JMP_OP_JGE: u8 = crate::ubpf::EBPF_MODE_JGE as u8;
-const EBPF_JMP_OP_JSET: u8 = crate::ubpf::EBPF_MODE_JSET as u8;
-const EBPF_JMP_OP_JNE: u8 = crate::ubpf::EBPF_MODE_JNE as u8;
-const EBPF_JMP_OP_JSGT: u8 = crate::ubpf::EBPF_MODE_JSGT as u8;
-const EBPF_JMP_OP_JSGE: u8 = crate::ubpf::EBPF_MODE_JSGE as u8;
-const EBPF_JMP_OP_CALL: u8 = crate::ubpf::EBPF_MODE_CALL as u8;
-const EBPF_JMP_OP_EXIT: u8 = crate::ubpf::EBPF_MODE_EXIT as u8;
-const EBPF_JMP_OP_JLT: u8 = crate::ubpf::EBPF_MODE_JLT as u8;
-const EBPF_JMP_OP_JLE: u8 = crate::ubpf::EBPF_MODE_JLE as u8;
-const EBPF_JMP_OP_JSLT: u8 = crate::ubpf::EBPF_MODE_JSLT as u8;
-const EBPF_JMP_OP_JSLE: u8 = crate::ubpf::EBPF_MODE_JSLE as u8;
-
-// The load double operation that allows to write 64 bits into a register.
-const EBPF_OP_LDDW: u8 = crate::ubpf::EBPF_OP_LDDW as u8;

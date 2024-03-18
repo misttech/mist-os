@@ -9,7 +9,7 @@ use linux_uapi::{
 };
 use std::collections::HashMap;
 
-use crate::{UbpfError, UbpfError::*};
+use crate::{EbpfError, EbpfError::*};
 
 // These are accessors for bits in an BPF/EBPF instruction.
 // Instructions are encoded in one byte.  The first 3 LSB represent
@@ -65,17 +65,17 @@ fn prep_patch(to_be_patched: &mut HashMap<i16, Vec<usize>>, cbpf_target: i16, eb
 /// The bpf_code parameter is kept as an array for easy transfer
 /// via FFI.  This currently only allows the subset of BPF permitted
 /// by seccomp(2).
-pub(crate) fn cbpf_to_ebpf(bpf_code: &[sock_filter]) -> Result<Vec<bpf_insn>, UbpfError> {
+pub(crate) fn cbpf_to_ebpf(bpf_code: &[sock_filter]) -> Result<Vec<bpf_insn>, EbpfError> {
     // There are only two BPF registers, A and X. There are 10
     // EBPF registers, numbered 0-9.  We map between the two as
     // follows:
 
     // r[0]: We map this to A, since it can be used as a return value.
-    // r[1]: ubpf makes this the memory passed in,
-    // r[2]: ubpf makes this the length of the memory passed in.
+    // r[1]: ebpf makes this the memory passed in,
+    // r[2]: ebpf makes this the length of the memory passed in.
     // r[6]: We map this to X, to keep it away from being clobbered by call / return.
     // r[7]: Scratch register, replaces M[0]
-    //       cbpf programs running on Linux have a 16 word scratch memory.  ubpf
+    //       cbpf programs running on Linux have a 16 word scratch memory.  ebpf
     //       only has scratch registers and the data passed in.  For now, we use
     //       the extra registers and hope that no one needs more than 3 of them.
     //       Can be replaced by allocating the incoming data into a buffer that
@@ -84,7 +84,7 @@ pub(crate) fn cbpf_to_ebpf(bpf_code: &[sock_filter]) -> Result<Vec<bpf_insn>, Ub
     //       scratch memory.
     // r[8]: Scratch register, replaces M[1]
     // r[9]: Scratch register, replaces M[2]
-    // r[10]: ubpf makes this a pointer to the end of the stack.
+    // r[10]: ebpf makes this a pointer to the end of the stack.
 
     const REG_A: u8 = 0;
     const REG_X: u8 = 6;
@@ -152,7 +152,7 @@ pub(crate) fn cbpf_to_ebpf(bpf_code: &[sock_filter]) -> Result<Vec<bpf_insn>, Ub
                         ebpf_code.push(e_instr);
                     }
                     BPF_MEM => {
-                        // cbpf programs running on Linux have a 16 word scratch memory.  ubpf
+                        // cbpf programs running on Linux have a 16 word scratch memory.  ebpf
                         // only has scratch registers and the data passed in.  For now, we use
                         // the extra registers and hope that no one needs more than 3 of them.
                         // Can be replaced by allocating the incoming data into a buffer that

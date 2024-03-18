@@ -15,6 +15,10 @@ use crate::{
     },
 };
 use bstr::ByteSlice;
+use ebpf::{
+    converter::{bpf_addressing_mode, bpf_class},
+    program::EbpfProgram,
+};
 use starnix_lifecycle::AtomicU64Counter;
 use starnix_logging::{log_error, log_warn, track_stub};
 use starnix_sync::{FileOpsCore, FileOpsIoctl, Locked, Mutex, WriteOps};
@@ -29,8 +33,8 @@ use starnix_uapi::{
     user_address::{UserAddress, UserRef},
     vfs::FdEvents,
     BPF_ABS, BPF_LD, BPF_ST, SECCOMP_IOCTL_NOTIF_ADDFD, SECCOMP_IOCTL_NOTIF_ID_VALID,
-    SECCOMP_IOCTL_NOTIF_RECV, SECCOMP_IOCTL_NOTIF_SEND, SECCOMP_RET_ACTION_FULL, SECCOMP_RET_ALLOW,
-    SECCOMP_RET_DATA, SECCOMP_USER_NOTIF_FLAG_CONTINUE, SYS_SECCOMP,
+    SECCOMP_IOCTL_NOTIF_RECV, SECCOMP_IOCTL_NOTIF_SEND, SECCOMP_RET_ACTION_FULL, SECCOMP_RET_DATA,
+    SECCOMP_USER_NOTIF_FLAG_CONTINUE, SYS_SECCOMP,
 };
 use std::{
     collections::HashMap,
@@ -38,10 +42,6 @@ use std::{
         atomic::{AtomicU8, Ordering},
         Arc,
     },
-};
-use ubpf::{
-    converter::{bpf_addressing_mode, bpf_class},
-    program::EbpfProgram,
 };
 
 #[cfg(target_arch = "aarch64")]
@@ -128,10 +128,7 @@ impl SeccompFilter {
     }
 
     pub fn run(&self, data: &mut seccomp_data) -> u32 {
-        if let Ok(r) = self.program.run(data) {
-            return r as u32;
-        }
-        SECCOMP_RET_ALLOW
+        self.program.run(data) as u32
     }
 }
 

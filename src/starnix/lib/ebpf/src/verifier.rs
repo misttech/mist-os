@@ -3,16 +3,14 @@
 // found in the LICENSE file.
 
 use crate::{
-    visitor::{BpfVisitor, DataWidth, Register, Source},
-    MapSchema, UbpfError,
+    visitor::{BpfVisitor, DataWidth, ProgramCounter, Register, Source},
+    EbpfError, MapSchema, BPF_MAX_INSTS, BPF_STACK_SIZE, GENERAL_REGISTER_COUNT, REGISTER_COUNT,
 };
 use byteorder::{BigEndian, ByteOrder, LittleEndian, NativeEndian};
 use linux_uapi::bpf_insn;
 use once_cell::sync::Lazy;
 use std::collections::HashMap;
 use zerocopy::AsBytes;
-
-pub type ProgramCounter = usize;
 
 /// A trait to receive the log from the verifier.
 pub trait VerifierLogger {
@@ -28,13 +26,6 @@ impl VerifierLogger for NullVerifierLogger {
         debug_assert!(line.is_ascii());
     }
 }
-
-// The ubpf limits
-const UBPF_STACK_SIZE: usize = crate::ubpf::UBPF_STACK_SIZE as usize;
-// The number of registers
-const REGISTER_COUNT: u8 = 11;
-// The number of general r/w registers.
-const GENERAL_REGISTER_COUNT: u8 = 10;
 
 #[derive(Clone, Debug)]
 pub enum Type {
@@ -204,26 +195,30 @@ pub fn verify(
     code: &[bpf_insn],
     calling_context: CallingContext,
     logger: &mut dyn VerifierLogger,
-) -> Result<(), UbpfError> {
+) -> Result<(), EbpfError> {
+    if code.len() > BPF_MAX_INSTS {
+        return error_and_log(logger, "ebpf program too long");
+    }
+
     let mut context = ComputationContext::default();
     for (i, t) in calling_context.args.iter().enumerate() {
         // The parameter registers are r1 to r5.
-        context.set_reg((i + 1) as u8, t.clone()).map_err(UbpfError::ProgramLoadError)?;
+        context.set_reg((i + 1) as u8, t.clone()).map_err(EbpfError::ProgramLoadError)?;
     }
     let states = vec![context];
     let mut verification_context =
         VerificationContext { calling_context, logger, states, code, counter: 0, iteration: 0 };
     while let Some(mut context) = verification_context.states.pop() {
-        if verification_context.iteration > 10 * (crate::ubpf::UBPF_MAX_INSTS as usize) {
-            return error_and_log(&mut verification_context, "bpf byte code does not terminate");
+        if verification_context.iteration > 10 * BPF_MAX_INSTS {
+            return error_and_log(verification_context.logger, "bpf byte code does not terminate");
         }
         if context.pc >= code.len() {
-            return error_and_log(&mut verification_context, "pc out of bounds");
+            return error_and_log(verification_context.logger, "pc out of bounds");
         }
         let visit_result = context.visit(&mut verification_context, &code[context.pc..]);
         match visit_result {
             Err(message) => {
-                return error_and_log(&mut verification_context, message);
+                return error_and_log(verification_context.logger, message);
             }
             _ => {}
         }
@@ -254,10 +249,6 @@ impl<'a> VerificationContext<'a> {
         self.counter += 1;
         id
     }
-
-    fn log(&mut self, line: &[u8]) {
-        self.logger.log(line);
-    }
 }
 
 /// An offset inside the stack. The offset is from the end of the stack.
@@ -267,7 +258,7 @@ pub struct StackOffset(u64);
 
 impl Default for StackOffset {
     fn default() -> Self {
-        Self(UBPF_STACK_SIZE as u64)
+        Self(BPF_STACK_SIZE as u64)
     }
 }
 
@@ -329,7 +320,7 @@ struct Stack {
 
 impl Default for Stack {
     fn default() -> Self {
-        Self { data: vec![Type::default(); UBPF_STACK_SIZE / std::mem::size_of::<u64>()] }
+        Self { data: vec![Type::default(); BPF_STACK_SIZE / std::mem::size_of::<u64>()] }
     }
 }
 
@@ -506,7 +497,7 @@ macro_rules! bpf_log {
     ($context:ident, $verification_context:ident, $($msg:tt)*) => {
         let prefix = format!("{}: ({:02x})", $context.pc, $verification_context.code[$context.pc].code);
         let suffix = format!($($msg)*);
-        $verification_context.log(format!("{prefix} {suffix}").as_bytes());
+        $verification_context.logger.log(format!("{prefix} {suffix}").as_bytes());
     }
 }
 
@@ -1750,10 +1741,10 @@ where
 }
 
 fn error_and_log<T>(
-    verification_context: &mut VerificationContext<'_>,
+    logger: &mut dyn VerifierLogger,
     msg: impl std::string::ToString,
-) -> Result<T, UbpfError> {
+) -> Result<T, EbpfError> {
     let msg = msg.to_string();
-    verification_context.log(msg.as_bytes());
-    return Err(UbpfError::ProgramLoadError(msg));
+    logger.log(msg.as_bytes());
+    return Err(EbpfError::ProgramLoadError(msg));
 }

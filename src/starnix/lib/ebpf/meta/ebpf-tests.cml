@@ -7,6 +7,6 @@
         "syslog/client.shard.cml",
     ],
     program: {
-        binary: "bin/ubpf_lib_test",
+        binary: "bin/ebpf_lib_test",
     },
 }

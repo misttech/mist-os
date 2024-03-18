@@ -2,12 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-/// An alias for the EbpfVm. This allows not to reference the actual implementation in external
-/// code.
-pub type EbpfError = UbpfError;
-
 #[derive(thiserror::Error, Debug)]
-pub enum UbpfError {
+pub enum EbpfError {
     #[error("Unable to create VM")]
     VmInitialization,
 

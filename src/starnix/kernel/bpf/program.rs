@@ -11,16 +11,15 @@ use crate::{
     task::CurrentTask,
     vfs::{FdNumber, OutputBuffer},
 };
+use ebpf::{
+    error::EbpfError,
+    program::{EbpfProgram, EbpfProgramBuilder},
+    VerifierLogger, BPF_LDDW,
+};
 use starnix_logging::{log_error, log_warn, track_stub};
 use starnix_uapi::{
     bpf_attr__bindgen_ty_4, bpf_insn, bpf_prog_type_BPF_PROG_TYPE_KPROBE,
     bpf_prog_type_BPF_PROG_TYPE_SOCKET_FILTER, errno, error, errors::Errno,
-};
-use ubpf::{
-    error::EbpfError,
-    program::{EbpfProgram, EbpfProgramBuilder},
-    ubpf::EBPF_OP_LDDW,
-    VerifierLogger,
 };
 use zerocopy::{AsBytes, FromBytes, NoCell};
 
@@ -68,8 +67,8 @@ pub struct Program {
     _objects: Vec<BpfHandle>,
 }
 
-fn map_ubpf_error(e: EbpfError) -> Errno {
-    log_error!("Failed to load BPF program: {:?}", e);
+fn map_ebpf_error(e: EbpfError) -> Errno {
+    log_error!("Failed to load eBPF program: {:?}", e);
     errno!(EINVAL)
 }
 
@@ -80,7 +79,7 @@ impl Program {
         logger: &mut dyn OutputBuffer,
         mut code: Vec<bpf_insn>,
     ) -> Result<Program, Errno> {
-        let mut builder = EbpfProgramBuilder::new().map_err(map_ubpf_error)?;
+        let mut builder = EbpfProgramBuilder::default();
         let objects = link(current_task, &mut code, &mut builder)?;
 
         let vm = (|| {
@@ -92,7 +91,7 @@ impl Program {
             let mut logger = BufferVeriferLogger::new(logger);
             builder.load(code, &mut logger)
         })()
-        .map_err(map_ubpf_error)?;
+        .map_err(map_ebpf_error)?;
         Ok(Program { info, vm: Some(vm), _objects: objects })
     }
 
@@ -102,10 +101,7 @@ impl Program {
 
     pub fn run<T: AsBytes + FromBytes + NoCell>(&self, data: &mut T) -> Result<u64, ()> {
         if let Some(vm) = self.vm.as_ref() {
-            vm.run(data).map_err(|e| {
-                log_warn!("bpf program returned with an error: {e:?}");
-                ()
-            })
+            Ok(vm.run(data))
         } else {
             // vm is only None when bpf is faked. Return an error on execution, as random value
             // might have stronger side effects.
@@ -127,8 +123,8 @@ fn link(
     let code_len = code.len();
     for pc in 0..code_len {
         let instruction = &mut code[pc];
-        if instruction.code == EBPF_OP_LDDW as u8 {
-            // EBPF_OP_LDDW requires 2 instructions.
+        if instruction.code == BPF_LDDW as u8 {
+            // BPF_LDDW requires 2 instructions.
             if pc >= code_len - 1 {
                 return error!(EINVAL);
             }
