@@ -184,7 +184,6 @@
                 "fuchsia.driver.DriverLoadFuzzerMaxDelayMs",
                 "fuchsia.driver.EnableDriverLoadFuzzer",
                 "fuchsia.driver.EnableEphemeralDrivers",
-                "fuchsia.driver.IndexUnpackagedBootDrivers",
             ],
         },
         {
@@ -403,7 +402,6 @@
             from: "parent",
             to: [
                 "#console-launcher",
-                "#driver_index",
                 "#driver_manager",
                 "#fshost",
                 "#miscsvc",

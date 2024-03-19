@@ -10,7 +10,7 @@ use {
     },
     cm_rust::FidlIntoNative,
     fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_component_resolution as fresolution,
-    fidl_fuchsia_driver_framework as fdf, fidl_fuchsia_driver_index as fdi, fidl_fuchsia_io as fio,
+    fidl_fuchsia_driver_framework as fdf, fidl_fuchsia_driver_index as fdi,
     fidl_fuchsia_pkg_ext::BlobId,
     fuchsia_pkg::{OpenRights, PackageDirectory},
     futures::TryFutureExt,
@@ -148,53 +148,6 @@ impl ResolvedDriver {
             ..Default::default()
         }
     }
-}
-
-// Load the `component_url` driver out of `dir` which should be the root
-// directory of that component. Will return Ok(None) if `component_url` is a
-// valid component but it's not a driver component. Set the driver's package
-// hash to `package_hash`.
-pub async fn load_boot_driver(
-    dir: &fio::DirectoryProxy,
-    component_url: url::Url,
-    package_type: DriverPackageType,
-    package_hash: Option<BlobId>,
-) -> Result<Option<ResolvedDriver>, Error> {
-    let component = fuchsia_fs::directory::open_file_no_describe(
-        &dir,
-        component_url
-            .fragment()
-            .ok_or(anyhow!("{}: URL is missing fragment", component_url.as_str()))?,
-        fio::OpenFlags::RIGHT_READABLE,
-    )
-    .with_context(|| {
-        format!("{}: Failed to open component manifest file", component_url.as_str())
-    })?;
-    let component_decl: fdecl::Component = fuchsia_fs::file::read_fidl(&component)
-        .await
-        .with_context(|| format!("{}: Failed to read component", component_url.as_str()))?;
-    let component: cm_rust::ComponentDecl = component_decl.clone().fidl_into_native();
-
-    let runner = match component.get_runner() {
-        Some(r) => r,
-        None => return Ok(None),
-    };
-    if runner.source != cm_rust::UseSource::Environment {
-        // TODO(b/301458801): support use/runner for drivers.
-        return Ok(None);
-    }
-    if runner.source_name.as_str() != "driver" {
-        return Ok(None);
-    }
-    load_driver(
-        component_url,
-        component_decl,
-        PackageDirectory::from_proxy(Clone::clone(dir)),
-        package_type,
-        package_hash,
-    )
-    .await
-    .map(|driver| Some(driver))
 }
 
 // Load the driver information from its resolved component's decl and package.

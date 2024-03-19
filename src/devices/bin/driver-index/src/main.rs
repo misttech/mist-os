@@ -21,7 +21,6 @@ use {
     fuchsia_zircon::Status,
     futures::prelude::*,
     std::{
-        collections::HashMap,
         collections::HashSet,
         rc::Rc,
         sync::{Arc, Mutex},
@@ -302,39 +301,6 @@ async fn run_index_server(
     Ok(())
 }
 
-// Merge the two boot driver lists, skipping duplicates that can occur during the
-// soft-transition of boot drivers to packages.
-fn merge_boot_drivers(
-    packaged_boot_drivers: Vec<ResolvedDriver>,
-    unpackaged_boot_drivers: Vec<ResolvedDriver>,
-) -> Result<Vec<ResolvedDriver>, anyhow::Error> {
-    let mut drivers = Vec::new();
-    let mut unpackaged_boot_drivers = unpackaged_boot_drivers
-        .into_iter()
-        .map(|d| (d.component_url.to_string(), d))
-        .collect::<HashMap<String, ResolvedDriver>>();
-    for driver in packaged_boot_drivers {
-        let unpackaged_url = format!(
-            "fuchsia-boot:///#{}",
-            driver
-                .component_url
-                .fragment()
-                .context("Packaged boot driver url is missing fragment")?
-        );
-        // Remove the packaged driver from unpackaged_boot_drivers if present.
-        if unpackaged_boot_drivers.remove(&unpackaged_url).is_some() {
-            tracing::info!(
-                "BootFs file is still generated for packaged driver: {}",
-                driver.component_url
-            );
-        }
-        drivers.push(driver);
-    }
-    // Add the remaining unpackaged drivers to the final drivers list.
-    drivers.extend(unpackaged_boot_drivers.into_values());
-    Ok(drivers)
-}
-
 // NOTE: This tag is load-bearing to make sure that the output
 // shows up in serial.
 #[fuchsia::main(logging_tags = ["driver"])]
@@ -378,8 +344,6 @@ async fn main() -> Result<(), anyhow::Error> {
         tracing::info!("Marking driver {} as eager", driver);
     }
 
-    let boot = fuchsia_fs::directory::open_in_namespace("/boot", fio::OpenFlags::RIGHT_READABLE)
-        .context("Failed to open /boot")?;
     let config_dir =
         fuchsia_fs::directory::open_in_namespace("/config", fio::OpenFlags::RIGHT_READABLE)
             .context("Failed to open /config")?;
@@ -388,24 +352,11 @@ async fn main() -> Result<(), anyhow::Error> {
     )
     .context("Failed to connect to boot resolver")?;
 
-    let packaged_boot_drivers =
+    let boot_drivers =
         load_boot_drivers(&config_dir, &boot_resolver, &eager_drivers, &disabled_drivers)
             .await
             .context("Failed to load boot drivers")
             .map_err(log_error)?;
-
-    // TODO(https://fxbug.dev/42179754): Resolve unpackaged boot drivers until they have been fully migrated.
-    let unpackaged_boot_drivers = if config.index_unpackaged_bootfs_drivers {
-        load_unpackaged_boot_drivers(&boot, &eager_drivers, &disabled_drivers)
-            .await
-            .context("Failed to load unpackaged boot drivers")
-            .map_err(log_error)?
-    } else {
-        vec![]
-    };
-
-    // Combine packaged and unpackaged drivers into the final drivers list used to load drivers.
-    let drivers = merge_boot_drivers(packaged_boot_drivers, unpackaged_boot_drivers)?;
 
     let mut should_load_base_drivers = true;
 
@@ -416,7 +367,7 @@ async fn main() -> Result<(), anyhow::Error> {
         }
     }
 
-    let index = create_and_setup_index(drivers, &config);
+    let index = create_and_setup_index(boot_drivers, &config);
 
     let (res1, _) = futures::future::join(
         async {
@@ -485,6 +436,7 @@ mod tests {
         fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_data as fdata,
         fidl_fuchsia_driver_framework as fdf, fidl_fuchsia_driver_index as fdi,
         fidl_fuchsia_mem as fmem,
+        std::collections::HashMap,
     };
 
     fn create_driver_info(
@@ -616,7 +568,7 @@ mod tests {
     fn create_always_match_bind_rules() -> DecodedRules {
         let bind_rules = bind::compiler::BindRules {
             instructions: vec![],
-            symbol_table: std::collections::HashMap::new(),
+            symbol_table: HashMap::new(),
             use_new_bytecode: true,
             enable_debug: false,
         };
@@ -896,7 +848,7 @@ mod tests {
         // Make the bind instructions.
         let always_match = bind::compiler::BindRules {
             instructions: vec![],
-            symbol_table: std::collections::HashMap::new(),
+            symbol_table: HashMap::new(),
             use_new_bytecode: true,
             enable_debug: false,
         };
@@ -966,7 +918,7 @@ mod tests {
         // Make the bind instructions.
         let always_match = bind::compiler::BindRules {
             instructions: vec![],
-            symbol_table: std::collections::HashMap::new(),
+            symbol_table: HashMap::new(),
             use_new_bytecode: true,
             enable_debug: false,
         };
@@ -1071,7 +1023,7 @@ mod tests {
         // Make the bind instructions.
         let always_match = bind::compiler::BindRules {
             instructions: vec![],
-            symbol_table: std::collections::HashMap::new(),
+            symbol_table: HashMap::new(),
             use_new_bytecode: true,
             enable_debug: false,
         };
@@ -1217,7 +1169,7 @@ mod tests {
         // Make the bind instructions.
         let always_match = bind::compiler::BindRules {
             instructions: vec![],
-            symbol_table: std::collections::HashMap::new(),
+            symbol_table: HashMap::new(),
             use_new_bytecode: true,
             enable_debug: false,
         };
@@ -1304,7 +1256,7 @@ mod tests {
         // Make the bind instructions.
         let always_match = bind::compiler::BindRules {
             instructions: vec![],
-            symbol_table: std::collections::HashMap::new(),
+            symbol_table: HashMap::new(),
             use_new_bytecode: true,
             enable_debug: false,
         };
@@ -1522,26 +1474,6 @@ mod tests {
     }
 
     #[fuchsia::test]
-    async fn test_dont_load_disabled_fallback_unpackaged_boot_driver() {
-        let disabled_driver_component_url =
-            url::Url::parse("fuchsia-boot:///#meta/test-fallback-component.cm").unwrap();
-
-        let boot = fuchsia_fs::directory::open_in_namespace("/pkg", fio::OpenFlags::RIGHT_READABLE)
-            .unwrap();
-        let drivers = load_unpackaged_boot_drivers(
-            &boot,
-            &HashSet::new(),
-            &HashSet::from([disabled_driver_component_url.clone()]),
-        )
-        .await
-        .unwrap();
-        assert!(drivers
-            .iter()
-            .find(|driver| driver.component_url == disabled_driver_component_url)
-            .is_none());
-    }
-
-    #[fuchsia::test]
     async fn test_dont_load_disabled_fallback_boot_driver() {
         let disabled_driver_component_url = url::Url::parse(
             "fuchsia-boot:///driver-index-unittests#meta/test-fallback-component.cm",
@@ -1705,12 +1637,16 @@ mod tests {
 
     // This test relies on two drivers existing in the /pkg/ directory of the
     // test package.
+    #[ignore = "Re-enable once we have a fake resolver"]
     #[fuchsia::test]
     async fn test_boot_drivers() {
-        let boot = fuchsia_fs::directory::open_in_namespace("/pkg", fio::OpenFlags::RIGHT_READABLE)
+        let config =
+            fuchsia_fs::directory::open_in_namespace("/pkg/config", fio::OpenFlags::RIGHT_READABLE)
+                .unwrap();
+        let boot_resolver = client::connect_to_protocol::<fresolution::ResolverMarker>().unwrap();
+        let drivers = load_boot_drivers(&config, &boot_resolver, &HashSet::new(), &HashSet::new())
+            .await
             .unwrap();
-        let drivers =
-            load_unpackaged_boot_drivers(&boot, &HashSet::new(), &HashSet::new()).await.unwrap();
 
         let (proxy, stream) =
             fidl::endpoints::create_proxy_and_stream::<fdi::DriverIndexMarker>().unwrap();
@@ -3148,7 +3084,7 @@ mod tests {
     async fn test_add_composite_node_spec_duplicate_path() {
         let always_match_rules = bind::compiler::BindRules {
             instructions: vec![],
-            symbol_table: std::collections::HashMap::new(),
+            symbol_table: HashMap::new(),
             use_new_bytecode: true,
             enable_debug: false,
         };
@@ -3250,7 +3186,7 @@ mod tests {
     async fn test_add_composite_node_spec_duplicate_key() {
         let always_match_rules = bind::compiler::BindRules {
             instructions: vec![],
-            symbol_table: std::collections::HashMap::new(),
+            symbol_table: HashMap::new(),
             use_new_bytecode: true,
             enable_debug: false,
         };
@@ -3465,7 +3401,7 @@ mod tests {
     async fn test_register_exists_in_base() {
         let always_match_rules = bind::compiler::BindRules {
             instructions: vec![],
-            symbol_table: std::collections::HashMap::new(),
+            symbol_table: HashMap::new(),
             use_new_bytecode: true,
             enable_debug: false,
         };
@@ -3529,7 +3465,7 @@ mod tests {
     async fn test_register_exists_in_boot() {
         let always_match_rules = bind::compiler::BindRules {
             instructions: vec![],
-            symbol_table: std::collections::HashMap::new(),
+            symbol_table: HashMap::new(),
             use_new_bytecode: true,
             enable_debug: false,
         };
