@@ -17,9 +17,24 @@ use {
 pub struct CompactSubCommand {}
 
 #[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
+#[argh(
+    subcommand,
+    name = "delete_profile",
+    example = "ffx storage fxfs delete_profile",
+    description = "Deletes a profile from a named unlocked volume."
+)]
+pub struct DeleteProfileSubCommand {
+    #[argh(positional)]
+    volume: String,
+    #[argh(positional)]
+    profile: String,
+}
+
+#[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(subcommand)]
 pub enum FxfsSubCommand {
     Compact(CompactSubCommand),
+    DeleteProfile(DeleteProfileSubCommand),
 }
 
 #[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
@@ -38,6 +53,13 @@ pub async fn handle_cmd(
         FxfsSubCommand::Compact(_) => {
             fxfs_proxy
                 .compact()
+                .await
+                .map_err(|e| Error::User(e.into()))?
+                .map_err(|e| Error::ExitWithCode(e))?;
+        }
+        FxfsSubCommand::DeleteProfile(args) => {
+            fxfs_proxy
+                .delete_profile(&args.volume, &args.profile)
                 .await
                 .map_err(|e| Error::User(e.into()))?
                 .map_err(|e| Error::ExitWithCode(e))?;
