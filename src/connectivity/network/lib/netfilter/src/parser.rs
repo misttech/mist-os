@@ -5,9 +5,10 @@
 use pest::{iterators::Pair, Parser};
 
 use fidl_fuchsia_hardware_network as fhnet;
+use fidl_fuchsia_net as net;
 use fidl_fuchsia_net_filter_ext as filter_ext;
 
-use crate::grammar::{Error, FilterRuleParser, Rule};
+use crate::grammar::{Error, FilterRuleParser, InvalidReason, Rule};
 
 fn parse_action(pair: Pair<'_, Rule>) -> filter_ext::Action {
     assert_eq!(pair.as_rule(), Rule::action);
@@ -70,6 +71,123 @@ fn parse_devclass(pair: Pair<'_, Rule>) -> Option<filter_ext::DeviceClass> {
     })
 }
 
+fn parse_src(
+    pair: Pair<'_, Rule>,
+) -> Result<(Option<filter_ext::AddressMatcher>, Option<filter_ext::PortMatcher>), Error> {
+    assert_eq!(pair.as_rule(), Rule::src);
+    parse_src_or_dst(pair)
+}
+
+fn parse_dst(
+    pair: Pair<'_, Rule>,
+) -> Result<(Option<filter_ext::AddressMatcher>, Option<filter_ext::PortMatcher>), Error> {
+    assert_eq!(pair.as_rule(), Rule::dst);
+    parse_src_or_dst(pair)
+}
+
+fn parse_src_or_dst(
+    pair: Pair<'_, Rule>,
+) -> Result<(Option<filter_ext::AddressMatcher>, Option<filter_ext::PortMatcher>), Error> {
+    let mut inner = pair.into_inner();
+    match inner.next() {
+        Some(pair) => match pair.as_rule() {
+            Rule::invertible_subnet => {
+                let (subnet, invert_match) = parse_invertible_subnet(pair)?;
+                let port = match inner.next() {
+                    Some(pair) => Some(parse_port_range(pair)?),
+                    None => None,
+                };
+                Ok((
+                    Some(filter_ext::AddressMatcher {
+                        matcher: filter_ext::AddressMatcherType::Subnet(
+                            filter_ext::Subnet::try_from(subnet).map_err(Error::Fidl)?,
+                        ),
+                        invert: invert_match,
+                    }),
+                    port,
+                ))
+            }
+            Rule::port_range => Ok((None, Some(parse_port_range(pair)?))),
+            _ => unreachable!("src or dst must be either an invertible subnet or port range"),
+        },
+        None => Ok((None, None)),
+    }
+}
+
+fn parse_invertible_subnet(pair: Pair<'_, Rule>) -> Result<(net::Subnet, bool), Error> {
+    assert_eq!(pair.as_rule(), Rule::invertible_subnet);
+    let mut inner = pair.into_inner();
+    let mut pair = inner.next().unwrap();
+    let invert_match = match pair.as_rule() {
+        Rule::not => {
+            pair = inner.next().unwrap();
+            true
+        }
+        Rule::subnet => false,
+        _ => unreachable!("invertible subnet must be either not or a subnet"),
+    };
+    let subnet = parse_subnet(pair)?;
+    Ok((subnet, invert_match))
+}
+
+fn parse_subnet(pair: Pair<'_, Rule>) -> Result<net::Subnet, Error> {
+    assert_eq!(pair.as_rule(), Rule::subnet);
+    let mut inner = pair.into_inner();
+    let addr = parse_ipaddr(inner.next().unwrap())?;
+    let prefix_len = parse_prefix_len(inner.next().unwrap())?;
+
+    Ok(net::Subnet { addr, prefix_len })
+}
+
+fn parse_ipaddr(pair: Pair<'_, Rule>) -> Result<net::IpAddress, Error> {
+    assert_eq!(pair.as_rule(), Rule::ipaddr);
+    let pair = pair.into_inner().next().unwrap();
+    let addr = pair.as_str().parse().map_err(Error::Addr)?;
+    match addr {
+        std::net::IpAddr::V4(ip4) => {
+            Ok(net::IpAddress::Ipv4(net::Ipv4Address { addr: ip4.octets() }))
+        }
+        std::net::IpAddr::V6(ip6) => {
+            Ok(net::IpAddress::Ipv6(net::Ipv6Address { addr: ip6.octets() }))
+        }
+    }
+}
+
+fn parse_prefix_len(pair: Pair<'_, Rule>) -> Result<u8, Error> {
+    assert_eq!(pair.as_rule(), Rule::prefix_len);
+    pair.as_str().parse::<u8>().map_err(Error::Num)
+}
+
+fn parse_port_range(pair: Pair<'_, Rule>) -> Result<filter_ext::PortMatcher, Error> {
+    assert_eq!(pair.as_rule(), Rule::port_range);
+    let mut inner = pair.into_inner();
+    let pair = inner.next().unwrap();
+    match pair.as_rule() {
+        Rule::port => {
+            let port_num = parse_port_num(inner.next().unwrap())?;
+            filter_ext::PortMatcher::new(port_num, port_num, false).map_err(|err| match err {
+                filter_ext::PortMatcherError::InvalidPortRange => {
+                    Error::Invalid(InvalidReason::InvalidPortRange)
+                }
+            })
+        }
+        Rule::range => {
+            let port_start = parse_port_num(inner.next().unwrap())?;
+            let port_end = parse_port_num(inner.next().unwrap())?;
+            filter_ext::PortMatcher::new(port_start, port_end, false).map_err(|err| match err {
+                filter_ext::PortMatcherError::InvalidPortRange => {
+                    Error::Invalid(InvalidReason::InvalidPortRange)
+                }
+            })
+        }
+        _ => unreachable!("port range must be either a single port, or a port range"),
+    }
+}
+
+fn parse_port_num(pair: Pair<'_, Rule>) -> Result<u16, Error> {
+    pair.as_str().parse::<u16>().map_err(Error::Num)
+}
+
 fn parse_rule(
     pair: Pair<'_, Rule>,
     routines: &FilterRoutines,
@@ -104,15 +222,11 @@ fn parse_rule(
             routine_id
         }
     };
-    // TODO(antoniolinhart): Once port numbers are parsed, use them for the
-    // src_port/dst_port in the TransportProtocol.
+    let (src_addr, src_port) = parse_src(pairs.next().unwrap())?;
+    let (dst_addr, dst_port) = parse_dst(pairs.next().unwrap())?;
     let transport_protocol = proto.map(|proto| match proto {
-        TransportProtocol::Tcp => {
-            filter_ext::TransportProtocolMatcher::Tcp { src_port: None, dst_port: None }
-        }
-        TransportProtocol::Udp => {
-            filter_ext::TransportProtocolMatcher::Udp { src_port: None, dst_port: None }
-        }
+        TransportProtocol::Tcp => filter_ext::TransportProtocolMatcher::Tcp { src_port, dst_port },
+        TransportProtocol::Udp => filter_ext::TransportProtocolMatcher::Udp { src_port, dst_port },
         TransportProtocol::Icmp => filter_ext::TransportProtocolMatcher::Icmp,
     });
 
@@ -121,6 +235,8 @@ fn parse_rule(
         matchers: filter_ext::Matchers {
             in_interface,
             out_interface,
+            src_addr,
+            dst_addr,
             transport_protocol,
             ..Default::default()
         },
@@ -137,6 +253,32 @@ pub struct FilterRoutines {
     pub local_egress: Option<filter_ext::RoutineId>,
 }
 
+fn ip_version_eq(left: &net::IpAddress, right: &net::IpAddress) -> bool {
+    match (left, right) {
+        (net::IpAddress::Ipv4(_), net::IpAddress::Ipv4(_))
+        | (net::IpAddress::Ipv6(_), net::IpAddress::Ipv6(_)) => true,
+        (net::IpAddress::Ipv4(_), net::IpAddress::Ipv6(_))
+        | (net::IpAddress::Ipv6(_), net::IpAddress::Ipv4(_)) => false,
+    }
+}
+
+fn validate_rule(rule: &filter_ext::Rule) -> Result<(), Error> {
+    if let (Some(src_subnet), Some(dst_subnet)) = (&rule.matchers.src_addr, &rule.matchers.dst_addr)
+    {
+        if let (
+            filter_ext::AddressMatcherType::Subnet(src_subnet),
+            filter_ext::AddressMatcherType::Subnet(dst_subnet),
+        ) = (&src_subnet.matcher, &dst_subnet.matcher)
+        {
+            if !ip_version_eq(&src_subnet.get().addr, &dst_subnet.get().addr) {
+                return Err(Error::Invalid(InvalidReason::MixedIPVersions));
+            }
+        }
+    }
+
+    Ok(())
+}
+
 pub fn parse_str_to_rules(
     line: &str,
     routines: &FilterRoutines,
@@ -147,6 +289,7 @@ pub fn parse_str_to_rules(
         match filter_rule.as_rule() {
             Rule::rule => {
                 let rule = parse_rule(filter_rule, &routines, index)?;
+                let () = validate_rule(&rule)?;
                 rules.push(rule);
             }
             Rule::EOI => (),
@@ -159,6 +302,8 @@ pub fn parse_str_to_rules(
 #[cfg(test)]
 mod test {
     use super::*;
+
+    use net_declare::fidl_subnet;
 
     fn test_filter_routines() -> FilterRoutines {
         FilterRoutines {
@@ -260,6 +405,240 @@ mod test {
     }
 
     #[test]
+    fn test_rule_with_from_v4_address() {
+        assert_eq!(
+            parse_str_to_rules("pass in proto tcp from 1.2.3.0/24;", &test_filter_routines()),
+            Ok(vec![filter_ext::Rule {
+                id: filter_ext::RuleId { routine: local_ingress_routine(), index: 0 },
+                matchers: filter_ext::Matchers {
+                    transport_protocol: Some(filter_ext::TransportProtocolMatcher::Tcp {
+                        src_port: None,
+                        dst_port: None,
+                    }),
+                    src_addr: Some(filter_ext::AddressMatcher {
+                        matcher: filter_ext::AddressMatcherType::Subnet(
+                            filter_ext::Subnet::try_from(fidl_subnet!("1.2.3.0/24")).unwrap()
+                        ),
+                        invert: false,
+                    }),
+                    ..Default::default()
+                },
+                action: filter_ext::Action::Accept,
+            }
+            .into()])
+        )
+    }
+
+    #[test]
+    fn test_rule_with_from_port() {
+        assert_eq!(
+            parse_str_to_rules("pass in proto tcp from port 10000;", &test_filter_routines()),
+            Ok(vec![filter_ext::Rule {
+                id: filter_ext::RuleId { routine: local_ingress_routine(), index: 0 },
+                matchers: filter_ext::Matchers {
+                    transport_protocol: Some(filter_ext::TransportProtocolMatcher::Tcp {
+                        src_port: Some(filter_ext::PortMatcher::new(10000, 10000, false).unwrap()),
+                        dst_port: None,
+                    }),
+                    ..Default::default()
+                },
+                action: filter_ext::Action::Accept,
+            }
+            .into()])
+        )
+    }
+
+    #[test]
+    fn test_rule_with_from_range() {
+        assert_eq!(
+            parse_str_to_rules(
+                "pass in proto tcp from range 10000:10010;",
+                &test_filter_routines()
+            ),
+            Ok(vec![filter_ext::Rule {
+                id: filter_ext::RuleId { routine: local_ingress_routine(), index: 0 },
+                matchers: filter_ext::Matchers {
+                    transport_protocol: Some(filter_ext::TransportProtocolMatcher::Tcp {
+                        src_port: Some(filter_ext::PortMatcher::new(10000, 10010, false).unwrap()),
+                        dst_port: None,
+                    }),
+                    ..Default::default()
+                },
+                action: filter_ext::Action::Accept,
+            }
+            .into()])
+        )
+    }
+
+    #[test]
+    fn test_rule_with_from_invalid_range() {
+        assert_eq!(
+            parse_str_to_rules(
+                "pass in proto tcp from range 10005:10000;",
+                &test_filter_routines()
+            ),
+            Err(Error::Invalid(InvalidReason::InvalidPortRange))
+        );
+    }
+
+    #[test]
+    fn test_rule_with_from_v4_address_port() {
+        assert_eq!(
+            parse_str_to_rules(
+                "pass in proto tcp from 1.2.3.0/24 port 10000;",
+                &test_filter_routines()
+            ),
+            Ok(vec![filter_ext::Rule {
+                id: filter_ext::RuleId { routine: local_ingress_routine(), index: 0 },
+                matchers: filter_ext::Matchers {
+                    transport_protocol: Some(filter_ext::TransportProtocolMatcher::Tcp {
+                        src_port: Some(filter_ext::PortMatcher::new(10000, 10000, false).unwrap()),
+                        dst_port: None,
+                    }),
+                    src_addr: Some(filter_ext::AddressMatcher {
+                        matcher: filter_ext::AddressMatcherType::Subnet(
+                            filter_ext::Subnet::try_from(fidl_subnet!("1.2.3.0/24")).unwrap()
+                        ),
+                        invert: false,
+                    }),
+                    ..Default::default()
+                },
+                action: filter_ext::Action::Accept,
+            }
+            .into()])
+        )
+    }
+
+    #[test]
+    fn test_rule_with_from_not_v4_address_port() {
+        assert_eq!(
+            parse_str_to_rules(
+                "pass in proto tcp from !1.2.3.0/24 port 10000;",
+                &test_filter_routines()
+            ),
+            Ok(vec![filter_ext::Rule {
+                id: filter_ext::RuleId { routine: local_ingress_routine(), index: 0 },
+                matchers: filter_ext::Matchers {
+                    transport_protocol: Some(filter_ext::TransportProtocolMatcher::Tcp {
+                        src_port: Some(filter_ext::PortMatcher::new(10000, 10000, false).unwrap()),
+                        dst_port: None,
+                    }),
+                    src_addr: Some(filter_ext::AddressMatcher {
+                        matcher: filter_ext::AddressMatcherType::Subnet(
+                            filter_ext::Subnet::try_from(fidl_subnet!("1.2.3.0/24")).unwrap()
+                        ),
+                        invert: true,
+                    }),
+                    ..Default::default()
+                },
+                action: filter_ext::Action::Accept,
+            }
+            .into()])
+        )
+    }
+
+    #[test]
+    fn test_rule_with_from_v6_address_port() {
+        assert_eq!(
+            parse_str_to_rules(
+                "pass in proto tcp from 1234:5678::/32 port 10000;",
+                &test_filter_routines()
+            ),
+            Ok(vec![filter_ext::Rule {
+                id: filter_ext::RuleId { routine: local_ingress_routine(), index: 0 },
+                matchers: filter_ext::Matchers {
+                    transport_protocol: Some(filter_ext::TransportProtocolMatcher::Tcp {
+                        src_port: Some(filter_ext::PortMatcher::new(10000, 10000, false).unwrap()),
+                        dst_port: None,
+                    }),
+                    src_addr: Some(filter_ext::AddressMatcher {
+                        matcher: filter_ext::AddressMatcherType::Subnet(
+                            filter_ext::Subnet::try_from(fidl_subnet!("1234:5678::/32")).unwrap()
+                        ),
+                        invert: false,
+                    }),
+                    ..Default::default()
+                },
+                action: filter_ext::Action::Accept,
+            }
+            .into()])
+        )
+    }
+
+    #[test]
+    fn test_rule_with_to_v6_address_port() {
+        assert_eq!(
+            parse_str_to_rules(
+                "pass in proto tcp to 1234:5678::/32 port 10000;",
+                &test_filter_routines()
+            ),
+            Ok(vec![filter_ext::Rule {
+                id: filter_ext::RuleId { routine: local_ingress_routine(), index: 0 },
+                matchers: filter_ext::Matchers {
+                    transport_protocol: Some(filter_ext::TransportProtocolMatcher::Tcp {
+                        src_port: None,
+                        dst_port: Some(filter_ext::PortMatcher::new(10000, 10000, false).unwrap()),
+                    }),
+                    dst_addr: Some(filter_ext::AddressMatcher {
+                        matcher: filter_ext::AddressMatcherType::Subnet(
+                            filter_ext::Subnet::try_from(fidl_subnet!("1234:5678::/32")).unwrap()
+                        ),
+                        invert: false,
+                    }),
+                    ..Default::default()
+                },
+                action: filter_ext::Action::Accept,
+            }
+            .into()])
+        )
+    }
+
+    #[test]
+    fn test_rule_with_from_v6_address_port_to_v4_address_port() {
+        assert_eq!(
+            parse_str_to_rules(
+                "pass in proto tcp from 1234:5678::/32 port 10000 to 1.2.3.0/24 port 1000;",
+                &test_filter_routines()
+            ),
+            Err(Error::Invalid(InvalidReason::MixedIPVersions))
+        );
+    }
+
+    #[test]
+    fn test_rule_with_from_v6_address_port_to_v6_address_port() {
+        assert_eq!(
+            parse_str_to_rules(
+                "pass in proto tcp from 1234:5678::/32 port 10000 to 2345:6789::/32 port 1000;",
+                &test_filter_routines()
+            ),
+            Ok(vec![filter_ext::Rule {
+                id: filter_ext::RuleId { routine: local_ingress_routine(), index: 0 },
+                matchers: filter_ext::Matchers {
+                    transport_protocol: Some(filter_ext::TransportProtocolMatcher::Tcp {
+                        src_port: Some(filter_ext::PortMatcher::new(10000, 10000, false).unwrap()),
+                        dst_port: Some(filter_ext::PortMatcher::new(1000, 1000, false).unwrap()),
+                    }),
+                    src_addr: Some(filter_ext::AddressMatcher {
+                        matcher: filter_ext::AddressMatcherType::Subnet(
+                            filter_ext::Subnet::try_from(fidl_subnet!("1234:5678::/32")).unwrap()
+                        ),
+                        invert: false,
+                    }),
+                    dst_addr: Some(filter_ext::AddressMatcher {
+                        matcher: filter_ext::AddressMatcherType::Subnet(
+                            filter_ext::Subnet::try_from(fidl_subnet!("2345:6789::/32")).unwrap()
+                        ),
+                        invert: false,
+                    }),
+                    ..Default::default()
+                },
+                action: filter_ext::Action::Accept,
+            }
+            .into()])
+        )
+    }
+
+    #[test]
     fn test_rule_with_device_class() {
         assert_eq!(
             parse_str_to_rules("pass in proto tcp devclass ap;", &test_filter_routines()),
@@ -277,6 +656,31 @@ mod test {
                 },
                 action: filter_ext::Action::Accept,
             }])
+        )
+    }
+
+    #[test]
+    fn test_rule_with_device_class_and_dst_range() {
+        assert_eq!(
+            parse_str_to_rules(
+                "pass in proto tcp devclass ap to range 1:2;",
+                &test_filter_routines()
+            ),
+            Ok(vec![filter_ext::Rule {
+                id: filter_ext::RuleId { routine: local_ingress_routine(), index: 0 },
+                matchers: filter_ext::Matchers {
+                    in_interface: Some(filter_ext::InterfaceMatcher::DeviceClass(
+                        filter_ext::DeviceClass::Device(fhnet::DeviceClass::WlanAp.into())
+                    )),
+                    transport_protocol: Some(filter_ext::TransportProtocolMatcher::Tcp {
+                        src_port: None,
+                        dst_port: Some(filter_ext::PortMatcher::new(1, 2, false).unwrap()),
+                    }),
+                    ..Default::default()
+                },
+                action: filter_ext::Action::Accept,
+            }
+            .into()])
         )
     }
 

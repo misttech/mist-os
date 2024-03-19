@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use fidl_fuchsia_net_filter_ext as filter_ext;
 use pest_derive::Parser;
 
 #[derive(Parser)]
@@ -97,6 +98,7 @@ pub enum Error {
     Num(std::num::ParseIntError),
     Invalid(InvalidReason),
     RoutineNotProvided(crate::parser::Direction),
+    Fidl(filter_ext::FidlConversionError),
 }
 
 #[derive(Debug, PartialEq)]
@@ -124,6 +126,7 @@ impl std::fmt::Display for Error {
             Self::Num(e) => std::fmt::Display::fmt(e, f),
             Self::Invalid(e) => write!(f, "invalid: {}", e),
             Self::RoutineNotProvided(e) => write!(f, "expected routine for direction: {:?}", e),
+            Self::Fidl(e) => std::fmt::Display::fmt(e, f),
         }
     }
 }

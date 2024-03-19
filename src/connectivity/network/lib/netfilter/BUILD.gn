@@ -19,6 +19,9 @@ rustc_library("netfilter") {
     "//third_party/rust_crates:pest",
     "//third_party/rust_crates:pest_derive",
   ]
+
+  test_deps = [ "//src/connectivity/lib/net-declare" ]
+
   configs -= [ "//build/config/rust/lints:allow_unused_results" ]
 
   sources = [

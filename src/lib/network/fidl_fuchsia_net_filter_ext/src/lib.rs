@@ -505,6 +505,13 @@ impl TryFrom<fnet_filter::InterfaceMatcher> for InterfaceMatcher {
 #[derive(Debug, Clone, PartialEq)]
 pub struct Subnet(fnet::Subnet);
 
+impl Subnet {
+    pub fn get(&self) -> fnet::Subnet {
+        let Subnet(subnet) = &self;
+        *subnet
+    }
+}
+
 impl From<Subnet> for fnet::Subnet {
     fn from(subnet: Subnet) -> Self {
         let Subnet(subnet) = subnet;
