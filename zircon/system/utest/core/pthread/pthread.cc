@@ -213,6 +213,7 @@ TEST_F(PthreadTest, Basic) {
   // Wait until they all reach the second cond wait before signaling one at a time.
   wait_for_count(ready_count, 3, &mutex);
   ready_count.store(0);
+  thread_waked.store(0);
 
   log("calling pthread_cond_signal\n");
   pthread_cond_signal(&cond);

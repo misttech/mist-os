@@ -40,6 +40,7 @@ TEST(PthreadTls, PthreadTls) {
   ASSERT_EQ(pthread_key_create(&tsd_key, NULL), 0, "Error during key creation");
   ASSERT_EQ(pthread_key_create(&tsd_key_dtor, dtor), 0, "Error during key creation");
 
+  atomic_store(&dtor_count, 0);
   int expected_dtor_count = 0;
 
   // Run this 20 times for sanity check
