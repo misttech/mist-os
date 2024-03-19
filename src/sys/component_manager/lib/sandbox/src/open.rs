@@ -17,7 +17,7 @@ use vfs::{
     remote::RemoteLike,
 };
 
-use crate::{registry, CapabilityTrait, ConversionError, Directory};
+use crate::{registry, sender::Sendable, CapabilityTrait, ConversionError, Directory};
 
 /// Types that implement [`Openable`] let the holder open underlying paths.
 /// For more info see `Open`.
@@ -105,6 +105,18 @@ impl RemoteLike for OpenRemote {
         server_end: ServerEnd<fio::NodeMarker>,
     ) {
         self.openable.open(scope, flags, path, server_end.into());
+    }
+}
+
+impl Sendable for Open {
+    fn send(&self, message: crate::Message) -> Result<(), ()> {
+        self.open(
+            ExecutionScope::new(),
+            message.payload.flags,
+            vfs::path::Path::dot(),
+            message.payload.channel,
+        );
+        Ok(())
     }
 }
 

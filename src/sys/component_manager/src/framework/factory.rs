@@ -79,8 +79,8 @@ impl FactoryCapabilityHost {
 
     async fn handle_request(&self, request: fsandbox::FactoryRequest) -> Result<(), fidl::Error> {
         match request {
-            fsandbox::FactoryRequest::CreateConnector { sender, receiver, control_handle: _ } => {
-                self.create_connector(sender, receiver);
+            fsandbox::FactoryRequest::CreateSender { receiver, sender, control_handle: _ } => {
+                self.create_sender(receiver, sender);
             }
             fsandbox::FactoryRequest::CreateDictionary { items, server_end, responder } => {
                 let res = self.create_dictionary(items, server_end);
@@ -101,10 +101,10 @@ impl FactoryCapabilityHost {
         Ok(())
     }
 
-    fn create_connector(
+    fn create_sender(
         &self,
-        sender_server: ServerEnd<fsandbox::SenderMarker>,
         receiver_client: ClientEnd<fsandbox::ReceiverMarker>,
+        sender_server: ServerEnd<fsandbox::SenderMarker>,
     ) {
         let (receiver, sender) = Receiver::new();
         self.tasks.spawn(async move {
@@ -202,7 +202,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    async fn create_connector() {
+    async fn create_sender() {
         let mut tasks = fasync::TaskGroup::new();
 
         let host = FactoryCapabilityHost::new();
@@ -216,7 +216,7 @@ mod tests {
             endpoints::create_proxy::<fsandbox::SenderMarker>().unwrap();
         let (receiver_client_end, mut receiver_stream) =
             endpoints::create_request_stream::<fsandbox::ReceiverMarker>().unwrap();
-        factory_proxy.create_connector(sender_server_end, receiver_client_end).unwrap();
+        factory_proxy.create_sender(receiver_client_end, sender_server_end).unwrap();
 
         let (ch1, _ch2) = zx::Channel::create();
         let expected_koid = ch1.get_koid().unwrap();

@@ -1765,8 +1765,10 @@ impl ResolvedInstanceState {
             };
             let name = capability.name().as_str();
             let path = fuchsia_fs::canonicalize_path(path.as_str());
-            let open = outgoing_dir.clone().downscope_path(sandbox::Path::new(path));
-            let router = Capability::Open(open)
+            let sender = sandbox::Sender::new_sendable(
+                outgoing_dir.clone().downscope_path(sandbox::Path::new(path)),
+            );
+            let router = Capability::Sender(sender)
                 .with_capability_requested_hook(weak_component.clone(), capability.name().clone());
             dict.insert_capability(iter::once(name), router.into());
         }

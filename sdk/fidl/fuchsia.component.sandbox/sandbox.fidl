@@ -164,12 +164,10 @@ type ProtocolPayload = resource struct {
 /// Entrypoint for instantiation of sandbox types.
 @discoverable
 open protocol Factory {
-    /// Creates a connector (pair of [`Sender`] and [`Receiver`]).
-    /// The client should serve `receiver`, and they are free to
-    /// clone the connected `sender` or place it into dictionaries.
-    flexible CreateConnector(resource struct {
-        sender server_end:Sender;
+    /// Creates a `Sender` from a client served `Receiver`.
+    flexible CreateSender(resource struct {
         receiver client_end:Receiver;
+        sender server_end:Sender;
     });
 
     /// Creates a [`Dictionary`] initialized with `items`.

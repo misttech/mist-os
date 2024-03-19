@@ -17,10 +17,22 @@ pub struct Message {
     pub payload: fsandbox::ProtocolPayload,
 }
 
+/// Types that implement [`Sendable`] let the holder send channels
+/// to them.
+pub trait Sendable: Send + Sync + Debug {
+    fn send(&self, message: Message) -> Result<(), ()>;
+}
+
+impl Sendable for mpsc::UnboundedSender<crate::Message> {
+    fn send(&self, message: Message) -> Result<(), ()> {
+        self.unbounded_send(message).map_err(|_| ())
+    }
+}
+
 /// A capability that transfers another capability to a [Receiver].
 #[derive(Debug)]
 pub struct Sender {
-    inner: mpsc::UnboundedSender<Message>,
+    inner: std::sync::Arc<dyn Sendable>,
 
     /// The FIDL representation of this `Sender`.
     ///
@@ -36,21 +48,25 @@ impl Clone for Sender {
 }
 
 impl Sender {
+    pub fn new_sendable(sender: impl Sendable + 'static) -> Self {
+        Self { inner: std::sync::Arc::new(sender), client_end: None }
+    }
+
     pub(crate) fn new(sender: mpsc::UnboundedSender<Message>) -> Self {
-        Self { inner: sender, client_end: None }
+        Self { inner: std::sync::Arc::new(sender), client_end: None }
     }
 
     pub(crate) fn send_channel(
         &self,
         channel: zx::Channel,
         flags: fio::OpenFlags,
-    ) -> Result<(), mpsc::TrySendError<Message>> {
+    ) -> Result<(), ()> {
         let msg = Message { payload: fsandbox::ProtocolPayload { channel, flags } };
         self.send(msg)
     }
 
-    pub fn send(&self, msg: Message) -> Result<(), mpsc::TrySendError<Message>> {
-        self.inner.unbounded_send(msg)
+    pub fn send(&self, msg: Message) -> Result<(), ()> {
+        self.inner.send(msg)
     }
 
     async fn serve_sender(self, mut stream: fsandbox::SenderRequestStream) {
