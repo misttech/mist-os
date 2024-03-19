@@ -18,8 +18,10 @@ use crate::{
         },
         state::DeviceStateSpec,
         BaseDeviceId, BasePrimaryDeviceId, BaseWeakDeviceId, Device, DeviceCounters,
-        DeviceLayerTypes, DeviceReceiveFrameSpec, DeviceSendFrameError, PureIpDeviceCounters,
+        DeviceIdContext, DeviceLayerTypes, DeviceReceiveFrameSpec, DeviceSendFrameError,
+        PureIpDeviceCounters,
     },
+    sync::RwLock,
 };
 
 mod integration;
@@ -61,12 +63,18 @@ pub struct PureIpDeviceTxQueueFrameMetadata {
 
 /// State for a pure IP device.
 pub struct PureIpDeviceState {
-    /// The MTU of the device.
-    pub(crate) mtu: Mtu,
+    /// The device's dynamic state.
+    dynamic_state: RwLock<DynamicPureIpDeviceState>,
     /// The device's transmit queue.
     tx_queue: TransmitQueue<PureIpDeviceTxQueueFrameMetadata, Buf<Vec<u8>>, BufVecU8Allocator>,
     /// Counters specific to pure IP devices.
     counters: PureIpDeviceCounters,
+}
+
+/// Dynamic state for a pure IP device.
+pub(crate) struct DynamicPureIpDeviceState {
+    /// The MTU of the device.
+    pub(crate) mtu: Mtu,
 }
 
 impl Device for PureIpDevice {}
@@ -83,7 +91,7 @@ impl DeviceStateSpec for PureIpDevice {
         PureIpDeviceCreationProperties { mtu }: Self::CreationProperties,
     ) -> Self::Link<BT> {
         PureIpDeviceState {
-            mtu,
+            dynamic_state: RwLock::new(DynamicPureIpDeviceState { mtu }),
             tx_queue: Default::default(),
             counters: PureIpDeviceCounters::default(),
         }
@@ -100,6 +108,25 @@ pub struct PureIpDeviceReceiveFrameMetadata<D> {
 
 impl DeviceReceiveFrameSpec for PureIpDevice {
     type FrameMetadata<D> = PureIpDeviceReceiveFrameMetadata<D>;
+}
+
+/// Provides access to a pure IP device's state.
+pub(crate) trait PureIpDeviceStateContext: DeviceIdContext<PureIpDevice> {
+    /// Calls the function with an immutable reference to the pure IP device's
+    /// dynamic state.
+    fn with_pure_ip_state<O, F: FnOnce(&DynamicPureIpDeviceState) -> O>(
+        &mut self,
+        device_id: &Self::DeviceId,
+        cb: F,
+    ) -> O;
+
+    /// Calls the function with a mutable reference to the pure IP device's
+    /// dynamic state.
+    fn with_pure_ip_state_mut<O, F: FnOnce(&mut DynamicPureIpDeviceState) -> O>(
+        &mut self,
+        device_id: &Self::DeviceId,
+        cb: F,
+    ) -> O;
 }
 
 /// Enqueues the given IP packet on the TX queue for the given [`PureIpDevice`].
@@ -148,4 +175,21 @@ where
             Err(s)
         }
     }
+}
+
+/// Gets the MTU of the given [`PureIpDevice`].
+pub(super) fn get_mtu<CC: PureIpDeviceStateContext>(
+    core_ctx: &mut CC,
+    device_id: &CC::DeviceId,
+) -> Mtu {
+    core_ctx.with_pure_ip_state(device_id, |DynamicPureIpDeviceState { mtu }| *mtu)
+}
+
+/// Updates the MTU of the given [`PureIpDevice`].
+pub(super) fn set_mtu<CC: PureIpDeviceStateContext>(
+    core_ctx: &mut CC,
+    device_id: &CC::DeviceId,
+    new_mtu: Mtu,
+) {
+    core_ctx.with_pure_ip_state_mut(device_id, |DynamicPureIpDeviceState { mtu }| *mtu = new_mtu)
 }

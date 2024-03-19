@@ -181,6 +181,7 @@ pub enum DeviceSockets {}
 pub struct EthernetDeviceIpState<I>(PhantomData<I>, Never);
 pub enum EthernetDeviceStaticState {}
 pub enum EthernetDeviceDynamicState {}
+pub enum PureIpDeviceDynamicState {}
 
 pub enum EthernetIpv4Arp {}
 pub enum EthernetIpv6Nud {}
@@ -285,7 +286,8 @@ impl_lock_after!(Ipv6DeviceLearnedParams => NudConfig<Ipv4>);
 impl_lock_after!(NudConfig<Ipv4> => NudConfig<Ipv6>);
 impl_lock_after!(NudConfig<Ipv6> => EthernetDeviceDynamicState);
 impl_lock_after!(EthernetDeviceDynamicState => EthernetTxQueue);
-impl_lock_after!(EthernetTxQueue => PureIpDeviceTxQueue);
+impl_lock_after!(EthernetTxQueue => PureIpDeviceDynamicState);
+impl_lock_after!(PureIpDeviceDynamicState => PureIpDeviceTxQueue);
 
 impl_lock_after!(DeviceLayerState => DeviceSockets);
 impl_lock_after!(DeviceSockets => DeviceSocketState);

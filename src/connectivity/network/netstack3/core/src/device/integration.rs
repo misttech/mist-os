@@ -757,8 +757,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceAddresses<
         match device_id {
             DeviceId::Ethernet(id) => ethernet::set_mtu(self, &id, mtu),
             DeviceId::Loopback(LoopbackDeviceId { .. }) => {}
-            // TODO(https://fxbug.dev/42051633): Support MTU updates.
-            DeviceId::PureIp(_id) => {}
+            DeviceId::PureIp(id) => pure_ip::set_mtu(self, &id, mtu),
         }
     }
 
@@ -1028,11 +1027,7 @@ fn get_mtu<BC: BindingsContext, L: LockBefore<crate::lock_ordering::DeviceLayerS
     match device {
         DeviceId::Ethernet(id) => self::ethernet::get_mtu(core_ctx, &id),
         DeviceId::Loopback(id) => self::loopback::get_mtu(core_ctx, id),
-        DeviceId::PureIp(id) => {
-            crate::device::integration::with_device_state(core_ctx, id, |mut state| {
-                state.cast_with(|s| &s.link.mtu).copied()
-            })
-        }
+        DeviceId::PureIp(id) => self::pure_ip::get_mtu(core_ctx, &id),
     }
 }
 

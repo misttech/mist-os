@@ -19,7 +19,8 @@ use crate::{
     device::{
         config::DeviceConfigurationContext,
         pure_ip::{
-            PureIpDevice, PureIpDeviceCounters, PureIpDeviceId, PureIpDeviceReceiveFrameMetadata,
+            DynamicPureIpDeviceState, PureIpDevice, PureIpDeviceCounters, PureIpDeviceId,
+            PureIpDeviceReceiveFrameMetadata, PureIpDeviceStateContext,
             PureIpDeviceTxQueueFrameMetadata, PureIpPrimaryDeviceId, PureIpWeakDeviceId,
         },
         queue::{
@@ -253,6 +254,24 @@ impl<BC: BindingsContext> TransmitQueueBindingsContext<PureIpDevice, PureIpDevic
     }
 }
 
+impl<BC: BindingsContext> RwLockFor<crate::lock_ordering::PureIpDeviceDynamicState>
+    for IpLinkDeviceState<PureIpDevice, BC>
+{
+    type Data = DynamicPureIpDeviceState;
+    type ReadGuard<'l> = crate::sync::RwLockReadGuard<'l, DynamicPureIpDeviceState>
+        where
+            Self: 'l;
+    type WriteGuard<'l> = crate::sync::RwLockWriteGuard<'l, DynamicPureIpDeviceState>
+        where
+            Self: 'l;
+    fn read_lock(&self) -> Self::ReadGuard<'_> {
+        self.link.dynamic_state.read()
+    }
+    fn write_lock(&self) -> Self::WriteGuard<'_> {
+        self.link.dynamic_state.write()
+    }
+}
+
 impl<BC: BindingsContext> LockFor<crate::lock_ordering::PureIpDeviceTxQueue>
     for IpLinkDeviceState<PureIpDevice, BC>
 {
@@ -307,6 +326,33 @@ impl<BC: BindingsContext> UnlockedAccess<crate::lock_ordering::PureIpDeviceCount
             Self: 'l ;
     fn access(&self) -> Self::Guard<'_> {
         &self.link.counters
+    }
+}
+
+impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::PureIpDeviceDynamicState>>
+    PureIpDeviceStateContext for CoreCtx<'_, BC, L>
+{
+    fn with_pure_ip_state<O, F: FnOnce(&DynamicPureIpDeviceState) -> O>(
+        &mut self,
+        device_id: &Self::DeviceId,
+        cb: F,
+    ) -> O {
+        crate::device::integration::with_device_state(self, device_id, |mut state| {
+            let dynamic_state = state.read_lock::<crate::lock_ordering::PureIpDeviceDynamicState>();
+            cb(&dynamic_state)
+        })
+    }
+
+    fn with_pure_ip_state_mut<O, F: FnOnce(&mut DynamicPureIpDeviceState) -> O>(
+        &mut self,
+        device_id: &Self::DeviceId,
+        cb: F,
+    ) -> O {
+        crate::device::integration::with_device_state(self, device_id, |mut state| {
+            let mut dynamic_state =
+                state.write_lock::<crate::lock_ordering::PureIpDeviceDynamicState>();
+            cb(&mut dynamic_state)
+        })
     }
 }
 
@@ -514,5 +560,20 @@ mod tests {
             .udp::<I>()
             .listen(&socket, Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.local_ip)), None)
             .expect("listen should succeed");
+    }
+
+    #[test]
+    fn get_set_mtu() {
+        const MTU1: Mtu = Mtu::new(1);
+        const MTU2: Mtu = Mtu::new(2);
+
+        let mut ctx = crate::testutil::FakeCtx::default();
+        let device = ctx.core_api().device::<PureIpDevice>().add_device_with_default_state(
+            PureIpDeviceCreationProperties { mtu: MTU1 },
+            DEFAULT_INTERFACE_METRIC,
+        );
+        assert_eq!(crate::device::pure_ip::get_mtu(&mut ctx.core_ctx(), &device), MTU1);
+        crate::device::pure_ip::set_mtu(&mut ctx.core_ctx(), &device, MTU2);
+        assert_eq!(crate::device::pure_ip::get_mtu(&mut ctx.core_ctx(), &device), MTU2);
     }
 }
