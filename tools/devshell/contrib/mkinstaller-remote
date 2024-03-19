@@ -63,10 +63,16 @@ if ! remote_path=$(ssh "${host}" \
   exit 1
 fi
 
-LOCAL_PATH="${FUCHSIA_DIR}/out/fetched/installer.img"
+local_image_dir="${FUCHSIA_DIR}/out/fetched"
+if ! mkdir -p ${local_image_dir}; then
+  fx-error "failed to create directory for the fetched installer image"
+  exit 1
+fi
+
+local_path="${local_image_dir}/installer.img"
 
 fx-info "Copying installer image to local host"
-rsync --compress --partial --progress --mkpath "${host}:${remote_path}" "${LOCAL_PATH}"
+rsync --compress --partial --progress "${host}:${remote_path}" "${local_path}"
 
 # Clean up the remote temp dir.
 remote_dir=$(dirname "${remote_path}")
@@ -75,4 +81,4 @@ ssh "${host}" rm -rf \"${remote_dir}\"
 # Now write the image to the final requested location.
 # We could just `dd` here, but mkinstaller has some safety-checks for the
 # output path that we want to retain.
-fx-command-run mkinstaller "$@" --from-image "${LOCAL_PATH}"
+fx-command-run mkinstaller "$@" --from-image "${local_path}"
