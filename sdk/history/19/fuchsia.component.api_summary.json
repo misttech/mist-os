@@ -15,7 +15,7 @@
         "kind": "table/member",
         "name": "fuchsia.component/CapabilityRequestedPayload.name",
         "ordinal": "1",
-        "type": "string:100"
+        "type": "string:255"
     },
     {
         "kind": "table",
@@ -147,7 +147,7 @@
         "kind": "table/member",
         "name": "fuchsia.component/DirectoryReadyPayload.name",
         "ordinal": "1",
-        "type": "string:100"
+        "type": "string:255"
     },
     {
         "kind": "table/member",
@@ -516,8 +516,8 @@
     {
         "kind": "const",
         "name": "fuchsia.component/MAX_NAME_LENGTH",
-        "type": "uint32",
-        "value": "100"
+        "type": "uint64",
+        "value": "255"
     },
     {
         "kind": "const",
@@ -540,8 +540,8 @@
     {
         "kind": "const",
         "name": "fuchsia.component/MAX_URL_SCHEME_LENGTH",
-        "type": "uint32",
-        "value": "100"
+        "type": "uint64",
+        "value": "255"
     },
     {
         "kind": "table/member",

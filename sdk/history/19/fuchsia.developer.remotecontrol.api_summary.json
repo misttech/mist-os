@@ -269,7 +269,7 @@
         "kind": "struct/member",
         "name": "fuchsia.developer.remotecontrol/RemoteControlOpenCapabilityRequest.capability_name",
         "ordinal": "3",
-        "type": "string:100"
+        "type": "string:255"
     },
     {
         "kind": "struct/member",

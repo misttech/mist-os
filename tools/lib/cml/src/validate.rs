@@ -5834,7 +5834,7 @@ mod tests {
                 "expose": [
                     {
                         "protocol": "fuchsia.logger.Log",
-                        "from": &format!("#{}", "a".repeat(101)),
+                        "from": &format!("#{}", "a".repeat(256)),
                     },
                 ],
                 "children": [
@@ -5844,7 +5844,7 @@ mod tests {
                     },
                 ]
             }),
-            Err(Error::Parse { err, .. }) if &err == "invalid length 102, expected one or an array of \"framework\", \"self\", \"#<child-name>\", or a dictionary path"
+            Err(Error::Parse { err, .. }) if &err == "invalid length 257, expected one or an array of \"framework\", \"self\", \"#<child-name>\", or a dictionary path"
         ),
         test_cml_dictionary_ref(
             json!({
@@ -5951,12 +5951,12 @@ mod tests {
             json!({
                 "children": [
                     {
-                        "name": "a".repeat(101),
+                        "name": "a".repeat(256),
                         "url": "fuchsia-pkg://fuchsia.com/logger/stable#meta/logger.cm",
                     }
                 ]
             }),
-            Err(Error::Parse { err, .. }) if &err == "invalid length 101, expected a non-empty name no more than 100 characters in length"
+            Err(Error::Parse { err, .. }) if &err == "invalid length 256, expected a non-empty name no more than 255 characters in length"
         ),
         test_cml_url(
             json!({

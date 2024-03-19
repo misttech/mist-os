@@ -105,7 +105,7 @@ pub enum ParseError {
     InvalidSegment,
 }
 
-pub const MAX_NAME_LENGTH: usize = 100;
+pub const MAX_NAME_LENGTH: usize = name::MAX_NAME_LENGTH;
 pub const MAX_LONG_NAME_LENGTH: usize = 1024;
 pub const MAX_PATH_LENGTH: usize = namespace::MAX_PATH_LENGTH;
 pub const MAX_URL_LENGTH: usize = 4096;
@@ -1007,7 +1007,7 @@ mod tests {
         expect_ok!(Name, "Foo");
         expect_ok!(Name, "O123._-");
         expect_ok!(Name, "_O123._-");
-        expect_ok!(Name, repeat("x").take(100).collect::<String>());
+        expect_ok!(Name, repeat("x").take(255).collect::<String>());
     }
 
     #[test]
@@ -1016,7 +1016,7 @@ mod tests {
         expect_err!(Name, "-");
         expect_err!(Name, ".");
         expect_err!(Name, "@&%^");
-        expect_err!(Name, repeat("x").take(101).collect::<String>());
+        expect_err!(Name, repeat("x").take(256).collect::<String>());
     }
 
     #[test]
@@ -1113,7 +1113,7 @@ mod tests {
     #[test]
     fn test_valid_url_scheme() {
         expect_ok!(UrlScheme, "fuch.sia-pkg+0");
-        expect_ok!(UrlScheme, &format!("{}", repeat("f").take(100).collect::<String>()));
+        expect_ok!(UrlScheme, &format!("{}", repeat("f").take(255).collect::<String>()));
     }
 
     #[test]
@@ -1122,7 +1122,7 @@ mod tests {
         expect_err!(UrlScheme, "0fuch.sia-pkg+0");
         expect_err!(UrlScheme, "fuchsia_pkg");
         expect_err!(UrlScheme, "FUCHSIA-PKG");
-        expect_err!(UrlScheme, &format!("{}", repeat("f").take(101).collect::<String>()));
+        expect_err!(UrlScheme, &format!("{}", repeat("f").take(256).collect::<String>()));
     }
 
     #[test]

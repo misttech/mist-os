@@ -3,7 +3,7 @@
         "kind": "union/member",
         "name": "fuchsia.sys2/ChildLocation.collection",
         "ordinal": "1",
-        "type": "string:100"
+        "type": "string:255"
     },
     {
         "kind": "union",
@@ -1107,7 +1107,7 @@
         "kind": "struct/member",
         "name": "fuchsia.sys2/RouteTarget.name",
         "ordinal": "1",
-        "type": "string:100"
+        "type": "string:255"
     },
     {
         "kind": "struct",

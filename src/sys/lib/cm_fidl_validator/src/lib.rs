@@ -4785,7 +4785,7 @@ mod tests {
                 decl.uses = Some(vec![
                     fdecl::Use::Service(fdecl::UseService {
                         source: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
-                        source_name: Some(format!("{}", "a".repeat(101))),
+                        source_name: Some(format!("{}", "a".repeat(256))),
                         target_path: Some(format!("/s/{}", "b".repeat(1024))),
                         dependency_type: Some(fdecl::DependencyType::Strong),
                         ..Default::default()
@@ -4793,14 +4793,14 @@ mod tests {
                     fdecl::Use::Protocol(fdecl::UseProtocol {
                         dependency_type: Some(fdecl::DependencyType::Strong),
                         source: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
-                        source_name: Some(format!("{}", "a".repeat(101))),
+                        source_name: Some(format!("{}", "a".repeat(256))),
                         target_path: Some(format!("/p/{}", "c".repeat(1024))),
                         ..Default::default()
                     }),
                     fdecl::Use::Directory(fdecl::UseDirectory {
                         dependency_type: Some(fdecl::DependencyType::Strong),
                         source: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
-                        source_name: Some(format!("{}", "a".repeat(101))),
+                        source_name: Some(format!("{}", "a".repeat(256))),
                         target_path: Some(format!("/d/{}", "d".repeat(1024))),
                         rights: Some(fio::Operations::CONNECT),
                         subdir: None,
@@ -5280,7 +5280,7 @@ mod tests {
                 decl.exposes = Some(vec![
                     fdecl::Expose::Service(fdecl::ExposeService {
                         source: Some(fdecl::Ref::Child(fdecl::ChildRef {
-                            name: "b".repeat(101),
+                            name: "b".repeat(256),
                             collection: None,
                         })),
                         source_name: Some(format!("{}", "a".repeat(1025))),
@@ -5290,21 +5290,21 @@ mod tests {
                     }),
                     fdecl::Expose::Protocol(fdecl::ExposeProtocol {
                         source: Some(fdecl::Ref::Child(fdecl::ChildRef {
-                            name: "b".repeat(101),
+                            name: "b".repeat(256),
                             collection: None,
                         })),
-                        source_name: Some(format!("{}", "a".repeat(101))),
-                        target_name: Some(format!("{}", "b".repeat(101))),
+                        source_name: Some(format!("{}", "a".repeat(256))),
+                        target_name: Some(format!("{}", "b".repeat(256))),
                         target: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
                         ..Default::default()
                     }),
                     fdecl::Expose::Directory(fdecl::ExposeDirectory {
                         source: Some(fdecl::Ref::Child(fdecl::ChildRef {
-                            name: "b".repeat(101),
+                            name: "b".repeat(256),
                             collection: None,
                         })),
-                        source_name: Some(format!("{}", "a".repeat(101))),
-                        target_name: Some(format!("{}", "b".repeat(101))),
+                        source_name: Some(format!("{}", "a".repeat(256))),
+                        target_name: Some(format!("{}", "b".repeat(256))),
                         target: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
                         rights: Some(fio::Operations::CONNECT),
                         subdir: None,
@@ -5312,32 +5312,32 @@ mod tests {
                     }),
                     fdecl::Expose::Runner(fdecl::ExposeRunner {
                         source: Some(fdecl::Ref::Child(fdecl::ChildRef {
-                            name: "b".repeat(101),
+                            name: "b".repeat(256),
                             collection: None,
                         })),
-                        source_name: Some("a".repeat(101)),
+                        source_name: Some("a".repeat(256)),
                         target: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
-                        target_name: Some("b".repeat(101)),
+                        target_name: Some("b".repeat(256)),
                         ..Default::default()
                     }),
                     fdecl::Expose::Resolver(fdecl::ExposeResolver {
                         source: Some(fdecl::Ref::Child(fdecl::ChildRef {
-                            name: "b".repeat(101),
+                            name: "b".repeat(256),
                             collection: None,
                         })),
-                        source_name: Some("a".repeat(101)),
+                        source_name: Some("a".repeat(256)),
                         target: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
-                        target_name: Some("b".repeat(101)),
+                        target_name: Some("b".repeat(256)),
                         ..Default::default()
                     }),
                     fdecl::Expose::Dictionary(fdecl::ExposeDictionary {
                         source: Some(fdecl::Ref::Child(fdecl::ChildRef {
-                            name: "b".repeat(101),
+                            name: "b".repeat(256),
                             collection: None,
                         })),
-                        source_name: Some("a".repeat(101)),
+                        source_name: Some("a".repeat(256)),
                         target: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
-                        target_name: Some("b".repeat(101)),
+                        target_name: Some("b".repeat(256)),
                         ..Default::default()
                     }),
                 ]);
@@ -5914,17 +5914,17 @@ mod tests {
                 decl.offers = Some(vec![
                     fdecl::Offer::Service(fdecl::OfferService {
                         source: Some(fdecl::Ref::Child(fdecl::ChildRef {
-                            name: "a".repeat(101),
+                            name: "a".repeat(256),
                             collection: None,
                         })),
-                        source_name: Some(format!("{}", "a".repeat(101))),
+                        source_name: Some(format!("{}", "a".repeat(256))),
                         target: Some(fdecl::Ref::Child(
                         fdecl::ChildRef {
-                            name: "b".repeat(101),
+                            name: "b".repeat(256),
                             collection: None,
                         }
                         )),
-                        target_name: Some(format!("{}", "b".repeat(101))),
+                        target_name: Some(format!("{}", "b".repeat(256))),
                         ..Default::default()
                     }),
                     fdecl::Offer::Service(fdecl::OfferService {
@@ -5932,25 +5932,25 @@ mod tests {
                         source_name: Some("a".to_string()),
                         target: Some(fdecl::Ref::Collection(
                         fdecl::CollectionRef {
-                            name: "b".repeat(101),
+                            name: "b".repeat(256),
                         }
                         )),
-                        target_name: Some(format!("{}", "b".repeat(101))),
+                        target_name: Some(format!("{}", "b".repeat(256))),
                         ..Default::default()
                     }),
                     fdecl::Offer::Protocol(fdecl::OfferProtocol {
                         source: Some(fdecl::Ref::Child(fdecl::ChildRef {
-                            name: "a".repeat(101),
+                            name: "a".repeat(256),
                             collection: None,
                         })),
-                        source_name: Some(format!("{}", "a".repeat(101))),
+                        source_name: Some(format!("{}", "a".repeat(256))),
                         target: Some(fdecl::Ref::Child(
                         fdecl::ChildRef {
-                            name: "b".repeat(101),
+                            name: "b".repeat(256),
                             collection: None,
                         }
                         )),
-                        target_name: Some(format!("{}", "b".repeat(101))),
+                        target_name: Some(format!("{}", "b".repeat(256))),
                         dependency_type: Some(fdecl::DependencyType::Strong),
                         ..Default::default()
                     }),
@@ -5959,26 +5959,26 @@ mod tests {
                         source_name: Some("a".to_string()),
                         target: Some(fdecl::Ref::Collection(
                         fdecl::CollectionRef {
-                            name: "b".repeat(101),
+                            name: "b".repeat(256),
                         }
                         )),
-                        target_name: Some(format!("{}", "b".repeat(101))),
+                        target_name: Some(format!("{}", "b".repeat(256))),
                         dependency_type: Some(fdecl::DependencyType::Weak),
                         ..Default::default()
                     }),
                     fdecl::Offer::Directory(fdecl::OfferDirectory {
                         source: Some(fdecl::Ref::Child(fdecl::ChildRef {
-                            name: "a".repeat(101),
+                            name: "a".repeat(256),
                             collection: None,
                         })),
-                        source_name: Some(format!("{}", "a".repeat(101))),
+                        source_name: Some(format!("{}", "a".repeat(256))),
                         target: Some(fdecl::Ref::Child(
                         fdecl::ChildRef {
-                            name: "b".repeat(101),
+                            name: "b".repeat(256),
                             collection: None,
                         }
                         )),
-                        target_name: Some(format!("{}", "b".repeat(101))),
+                        target_name: Some(format!("{}", "b".repeat(256))),
                         rights: Some(fio::Operations::CONNECT),
                         subdir: None,
                         dependency_type: Some(fdecl::DependencyType::Strong),
@@ -5989,10 +5989,10 @@ mod tests {
                         source_name: Some("a".to_string()),
                         target: Some(fdecl::Ref::Collection(
                         fdecl::CollectionRef {
-                            name: "b".repeat(101),
+                            name: "b".repeat(256),
                         }
                         )),
-                        target_name: Some(format!("{}", "b".repeat(101))),
+                        target_name: Some(format!("{}", "b".repeat(256))),
                         rights: Some(fio::Operations::CONNECT),
                         subdir: None,
                         dependency_type: Some(fdecl::DependencyType::Weak),
@@ -6003,7 +6003,7 @@ mod tests {
                         source: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
                         target: Some(fdecl::Ref::Child(
                             fdecl::ChildRef {
-                                name: "b".repeat(101),
+                                name: "b".repeat(256),
                                 collection: None,
                             }
                         )),
@@ -6014,51 +6014,51 @@ mod tests {
                         source_name: Some("data".to_string()),
                         source: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
                         target: Some(fdecl::Ref::Collection(
-                            fdecl::CollectionRef { name: "b".repeat(101) }
+                            fdecl::CollectionRef { name: "b".repeat(256) }
                         )),
                         target_name: Some("data".to_string()),
                         ..Default::default()
                     }),
                     fdecl::Offer::Runner(fdecl::OfferRunner {
                         source: Some(fdecl::Ref::Child(fdecl::ChildRef {
-                            name: "a".repeat(101),
+                            name: "a".repeat(256),
                             collection: None,
                         })),
-                        source_name: Some("b".repeat(101)),
+                        source_name: Some("b".repeat(256)),
                         target: Some(fdecl::Ref::Collection(
                         fdecl::CollectionRef {
-                            name: "c".repeat(101),
+                            name: "c".repeat(256),
                         }
                         )),
-                        target_name: Some("d".repeat(101)),
+                        target_name: Some("d".repeat(256)),
                         ..Default::default()
                     }),
                     fdecl::Offer::Resolver(fdecl::OfferResolver {
                         source: Some(fdecl::Ref::Child(fdecl::ChildRef {
-                            name: "a".repeat(101),
+                            name: "a".repeat(256),
                             collection: None,
                         })),
-                        source_name: Some("b".repeat(101)),
+                        source_name: Some("b".repeat(256)),
                         target: Some(fdecl::Ref::Collection(
                             fdecl::CollectionRef {
-                                name: "c".repeat(101),
+                                name: "c".repeat(256),
                             }
                         )),
-                        target_name: Some("d".repeat(101)),
+                        target_name: Some("d".repeat(256)),
                         ..Default::default()
                     }),
                     fdecl::Offer::Dictionary(fdecl::OfferDictionary {
                         source: Some(fdecl::Ref::Child(fdecl::ChildRef {
-                            name: "a".repeat(101),
+                            name: "a".repeat(256),
                             collection: None,
                         })),
-                        source_name: Some("b".repeat(101)),
+                        source_name: Some("b".repeat(256)),
                         target: Some(fdecl::Ref::Collection(
                             fdecl::CollectionRef {
-                                name: "c".repeat(101),
+                                name: "c".repeat(256),
                             }
                         )),
-                        target_name: Some("d".repeat(101)),
+                        target_name: Some("d".repeat(256)),
                         ..Default::default()
                     }),
                 ]);
@@ -7661,21 +7661,21 @@ mod tests {
             input = {
                 let mut decl = new_component_decl();
                 decl.environments = Some(vec![fdecl::Environment {
-                    name: Some("a".repeat(101)),
+                    name: Some("a".repeat(256)),
                     extends: Some(fdecl::EnvironmentExtends::None),
                     runners: Some(vec![
                         fdecl::RunnerRegistration {
-                            source_name: Some("a".repeat(101)),
+                            source_name: Some("a".repeat(256)),
                             source: Some(fdecl::Ref::Parent(fdecl::ParentRef{})),
-                            target_name: Some("a".repeat(101)),
+                            target_name: Some("a".repeat(256)),
                             ..Default::default()
                         },
                     ]),
                     resolvers: Some(vec![
                         fdecl::ResolverRegistration {
-                            resolver: Some("a".repeat(101)),
+                            resolver: Some("a".repeat(256)),
                             source: Some(fdecl::Ref::Parent(fdecl::ParentRef{})),
-                            scheme: Some("a".repeat(101)),
+                            scheme: Some("a".repeat(256)),
                             ..Default::default()
                         },
                     ]),
@@ -8043,17 +8043,17 @@ mod tests {
                         debug_capabilities:Some(vec![
                             fdecl::DebugRegistration::Protocol(fdecl::DebugProtocolRegistration {
                                 source: Some(fdecl::Ref::Child(fdecl::ChildRef {
-                                    name: "a".repeat(101),
+                                    name: "a".repeat(256),
                                     collection: None,
                                 })),
-                                source_name: Some(format!("{}", "a".repeat(101))),
-                                target_name: Some(format!("{}", "b".repeat(101))),
+                                source_name: Some(format!("{}", "a".repeat(256))),
+                                target_name: Some(format!("{}", "b".repeat(256))),
                                 ..Default::default()
                             }),
                             fdecl::DebugRegistration::Protocol(fdecl::DebugProtocolRegistration {
                                 source: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
                                 source_name: Some("a".to_string()),
-                                target_name: Some(format!("{}", "b".repeat(101))),
+                                target_name: Some(format!("{}", "b".repeat(256))),
                                 ..Default::default()
                             }),
                     ]),
@@ -8499,44 +8499,44 @@ mod tests {
                 let mut decl = new_component_decl();
                 decl.capabilities = Some(vec![
                     fdecl::Capability::Service(fdecl::Service {
-                        name: Some("a".repeat(101)),
+                        name: Some("a".repeat(256)),
                         source_path: Some(format!("/{}", "c".repeat(1024))),
                         ..Default::default()
                     }),
                     fdecl::Capability::Protocol(fdecl::Protocol {
-                        name: Some("a".repeat(101)),
+                        name: Some("a".repeat(256)),
                         source_path: Some(format!("/{}", "c".repeat(1024))),
                         ..Default::default()
                     }),
                     fdecl::Capability::Directory(fdecl::Directory {
-                        name: Some("a".repeat(101)),
+                        name: Some("a".repeat(256)),
                         source_path: Some(format!("/{}", "c".repeat(1024))),
                         rights: Some(fio::Operations::CONNECT),
                         ..Default::default()
                     }),
                     fdecl::Capability::Storage(fdecl::Storage {
-                        name: Some("a".repeat(101)),
+                        name: Some("a".repeat(256)),
                         source: Some(fdecl::Ref::Child(fdecl::ChildRef {
-                            name: "b".repeat(101),
+                            name: "b".repeat(256),
                             collection: None,
                         })),
-                        backing_dir: Some(format!("{}", "c".repeat(101))),
+                        backing_dir: Some(format!("{}", "c".repeat(256))),
                         subdir: None,
                         storage_id: Some(fdecl::StorageId::StaticInstanceIdOrMoniker),
                         ..Default::default()
                     }),
                     fdecl::Capability::Runner(fdecl::Runner {
-                        name: Some("a".repeat(101)),
+                        name: Some("a".repeat(256)),
                         source_path: Some(format!("/{}", "c".repeat(1024))),
                         ..Default::default()
                     }),
                     fdecl::Capability::Resolver(fdecl::Resolver {
-                        name: Some("a".repeat(101)),
+                        name: Some("a".repeat(256)),
                         source_path: Some(format!("/{}", "b".repeat(1024))),
                         ..Default::default()
                     }),
                     fdecl::Capability::Dictionary(fdecl::Dictionary {
-                        name: Some("a".repeat(101)),
+                        name: Some("a".repeat(256)),
                         ..Default::default()
                     }),
                 ]);

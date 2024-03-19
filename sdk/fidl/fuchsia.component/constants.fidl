@@ -5,7 +5,11 @@ library fuchsia.component;
 
 using fuchsia.io;
 
+@available(replaced=19)
 const MAX_NAME_LENGTH uint32 = 100;
+@available(added=19)
+const MAX_NAME_LENGTH uint64 = fuchsia.io.MAX_NAME_LENGTH;
+
 const MAX_CHILD_NAME_LENGTH uint32 = 1024;
 
 @available(replaced=15)
@@ -14,7 +18,11 @@ const MAX_PATH_LENGTH uint32 = 1024;
 const MAX_PATH_LENGTH uint64 = fuchsia.io.MAX_PATH_LENGTH;
 
 const MAX_MONIKER_LENGTH uint32 = 4096;
+
+@available(replaced=19)
 const MAX_URL_SCHEME_LENGTH uint32 = 100;
+@available(added=19)
+const MAX_URL_SCHEME_LENGTH uint64 = MAX_NAME_LENGTH;
 
 /// The maximum number of requests per event subscription.
 const MAX_SUBSCRIPTION_REQUESTS uint32 = 2;
