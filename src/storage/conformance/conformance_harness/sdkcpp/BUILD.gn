@@ -1,4 +1,4 @@
-# Copyright 2020 The Fuchsia Authors. All rights reserved.
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
@@ -9,12 +9,11 @@ executable("bin") {
   output_name = "io_conformance_harness_sdkcpp"
   sources = [ "harness.cc" ]
   deps = [
-    "//sdk/fidl/fuchsia.io:fuchsia.io_hlcpp",
-    "//sdk/fidl/fuchsia.io.test:fuchsia.io.test_hlcpp",
-    "//sdk/lib/fdio",
-    "//sdk/lib/sys/cpp",
+    "//sdk/fidl/fuchsia.io:fuchsia.io_cpp",
+    "//sdk/fidl/fuchsia.io.test:fuchsia.io.test_cpp",
+    "//sdk/lib/component/outgoing/cpp",
     "//sdk/lib/syslog/cpp",
-    "//sdk/lib/vfs/cpp:cpp",
+    "//sdk/lib/vfs/cpp",
     "//zircon/system/ulib/async-default",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/async-loop:async-loop-default",
@@ -29,11 +28,11 @@ fuchsia_component("sdkcpp-harness") {
 
 fuchsia_component("sdkcpp-test") {
   testonly = true
-  manifest = "//src/storage/conformance/meta/sdkcpp_io1_conformance_test.cml"
+  manifest = "//src/storage/conformance/meta/sdkcpp_conformance_test.cml"
   deps = [ "//src/storage/conformance:io1_conformance_test" ]
 }
 
-fuchsia_test_package("sdkcpp-io1-conformance-test") {
+fuchsia_test_package("sdkcpp-conformance-test") {
   test_components = [ ":sdkcpp-test" ]
   deps = [ ":sdkcpp-harness" ]
 }

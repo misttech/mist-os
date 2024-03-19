@@ -5,38 +5,32 @@
 #ifndef LIB_VFS_CPP_PSEUDO_FILE_H_
 #define LIB_VFS_CPP_PSEUDO_FILE_H_
 
-#include <lib/vfs/cpp/internal/connection.h>
-#include <lib/vfs/cpp/internal/file.h>
+#include <lib/fit/function.h>
+#include <lib/vfs/cpp/internal/node.h>
+
+#include <vector>
 
 namespace vfs {
 
 // Buffered pseudo-file.
 //
-// This variant is optimized for incrementally reading and writing properties
-// which are larger than can typically be read or written by the client in
-// a single I/O transaction.
+// This variant is optimized for incrementally reading and writing properties which are larger than
+// can typically be read or written by the client in a single I/O transaction.
 //
-// In read mode, the pseudo-file invokes its read handler when the file is
-// opened and retains the content in a buffer which the client incrementally
-// reads from and can seek within.
+// In read mode, the pseudo-file invokes its read handler when the file is opened and retains the
+// content in an output buffer which the client incrementally reads from and can seek within.
 //
-// In write mode, the client incrementally writes into and seeks within the
-// buffer which the pseudo-file delivers as a whole to the write handler when
-// the file is closed(if there were any writes).  Truncation is also supported.
+// In write mode, the client incrementally writes into and seeks within an input buffer which the
+// pseudo-file delivers as a whole to the write handler when the file is closed.  Truncation is also
+// supported.
 //
-// This class is thread-hostile.
+// Each client has its own separate output and input buffers.  Writing into the output buffer does
+// not affect the contents of the client's input buffer or that of any other client.  Changes to the
+// underlying state of the pseudo-file are not observed by the client until it closes and re-opens
+// the file.
 //
-//  # Simple usage
-//
-// Instances of this class should be owned and managed on the same thread
-// that services their connections.
-//
-// # Advanced usage
-//
-// You can use a background thread to service connections provided:
-// async_dispatcher_t for the background thread is stopped or suspended
-// prior to destroying the file.
-class PseudoFile final : public vfs::internal::File {
+// This class is thread-safe.
+class PseudoFile final : public internal::Node {
  public:
   // Handler called to read from the pseudo-file.
   using ReadHandler = fit::function<zx_status_t(std::vector<uint8_t>* output, size_t max_bytes)>;
@@ -46,80 +40,67 @@ class PseudoFile final : public vfs::internal::File {
 
   // Creates a buffered pseudo-file.
   //
-  // |read_handler| cannot be null. If the |write_handler| is null, then the
-  // pseudo-file is considered not writable. The |max_file_size|
-  // determines the maximum number of bytes which can be written to and read from
-  // the pseudo-file's input buffer when it it opened for writing/reading.
-  PseudoFile(size_t max_file_size, ReadHandler read_handler = ReadHandler(),
-             WriteHandler write_handler = WriteHandler());
+  // `read_handler` cannot be null. If the `write_handler` is null, then the pseudo-file is
+  // considered not writable. `max_file_size` determines the maximum number of bytes which can be
+  // written to and read from the pseudo-file's input buffer when it it opened for writing/reading.
+  explicit PseudoFile(size_t max_file_size, ReadHandler read_handler = ReadHandler(),
+                      WriteHandler write_handler = WriteHandler())
+      : Node(MakePseudoFile(max_file_size, std::move(read_handler), std::move(write_handler))) {}
 
-  ~PseudoFile() override;
-
- protected:
-  // |Node| implementations:
-  zx_status_t GetAttr(fuchsia::io::NodeAttributes* out_attributes) const override;
-
-  zx_status_t CreateConnection(fuchsia::io::OpenFlags flags,
-                               std::unique_ptr<vfs::internal::Connection>* connection) override;
-
-  fuchsia::io::OpenFlags GetAllowedFlags() const override;
+  using internal::Node::Serve;
 
  private:
-  class Content final : public vfs::internal::Connection, public File {
-   public:
-    Content(PseudoFile* file, fuchsia::io::OpenFlags flags, std::vector<uint8_t> content);
-    ~Content() override;
-
-    // |File| implementations:
-    zx_status_t ReadAt(uint64_t count, uint64_t offset, std::vector<uint8_t>* out_data) override;
-    zx_status_t WriteAt(std::vector<uint8_t> data, uint64_t offset, uint64_t* out_actual) override;
-    zx_status_t Truncate(uint64_t length) override;
-
-    uint64_t GetLength() override;
-
-    size_t GetCapacity() override;
-
-    // Connection implementation:
-    zx_status_t BindInternal(zx::channel request, async_dispatcher_t* dispatcher) override;
-
-    // |Node| implementations:
-    std::unique_ptr<Connection> Close(Connection* connection) override;
-
-    zx_status_t PreClose(Connection* connection) override;
-
-    void Clone(fuchsia::io::OpenFlags flags, fuchsia::io::OpenFlags parent_flags,
-               zx::channel request, async_dispatcher_t* dispatcher) override;
-
-    zx_status_t GetAttr(fuchsia::io::NodeAttributes* out_attributes) const override;
-
-   protected:
-    void SendOnOpenEvent(zx_status_t status) override;
-
-    fuchsia::io::OpenFlags GetAllowedFlags() const override;
-    fuchsia::io::OpenFlags GetProhibitiveFlags() const override;
-
-   private:
-    zx_status_t TryFlushIfRequired();
-
-    void SetInputLength(size_t length);
-
-    PseudoFile* const file_;
-
-    std::vector<uint8_t> buffer_;
-    fuchsia::io::OpenFlags flags_ = {};
-
-    // true if the file was written into
-    bool dirty_ = false;
+  struct PseudoFileState {
+    const ReadHandler read_handler;
+    const WriteHandler write_handler;
+    const size_t max_size;
+    std::vector<uint8_t> buffer;  // Temporary buffer used to store owned data until it's copied.
   };
 
-  // |File| implementations:
-  uint64_t GetLength() override;
+  static vfs_internal_node_t* MakePseudoFile(size_t max_file_size, ReadHandler read_handler,
+                                             WriteHandler write_handler) {
+    ZX_ASSERT(read_handler);
+    vfs_internal_node_t* file;
+    PseudoFileState* cookie = new PseudoFileState{
+        .read_handler = std::move(read_handler),
+        .write_handler = std::move(write_handler),
+        .max_size = max_file_size,
+    };
+    vfs_internal_file_context_t context{
+        .cookie = cookie,
+        .read = &ReadCallback,
+        .release = &ReleaseCallback,
+        .write = &WriteCallback,
+        .destroy = &DestroyCookie,
+    };
 
-  size_t GetCapacity() override;
+    ZX_ASSERT(vfs_internal_pseudo_file_create(max_file_size, &context, &file) == ZX_OK);
+    return file;
+  }
 
-  ReadHandler const read_handler_;
-  WriteHandler const write_handler_;
-  const size_t max_file_size_;
+  static void DestroyCookie(void* cookie) { delete static_cast<PseudoFileState*>(cookie); }
+
+  static zx_status_t ReadCallback(void* cookie, const char** data_out, size_t* len_out) {
+    PseudoFileState& state = *static_cast<PseudoFileState*>(cookie);
+    if (zx_status_t status = state.read_handler(&state.buffer, state.max_size); status != ZX_OK) {
+      return status;
+    }
+    *data_out = reinterpret_cast<const char*>(state.buffer.data());
+    *len_out = state.buffer.size();
+    return ZX_OK;
+  }
+
+  static void ReleaseCallback(void* cookie) {
+    PseudoFileState& state = *static_cast<PseudoFileState*>(cookie);
+    state.buffer.clear();
+  }
+
+  static zx_status_t WriteCallback(const void* cookie, const char* data, size_t len) {
+    const PseudoFileState& state = *static_cast<const PseudoFileState*>(cookie);
+    const uint8_t* begin = reinterpret_cast<const uint8_t*>(data);
+    std::vector<uint8_t> contents(begin, begin + len);
+    return state.write_handler(std::move(contents));
+  }
 };
 
 }  // namespace vfs

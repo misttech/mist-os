@@ -6,9 +6,9 @@
 #include <fuchsia/io/cpp/fidl.h>
 #include <lib/fdio/directory.h>
 #include <lib/fdio/fd.h>
-#include <lib/vfs/cpp/new/composed_service_dir.h>
-#include <lib/vfs/cpp/new/pseudo_dir.h>
-#include <lib/vfs/cpp/new/service.h>
+#include <lib/vfs/cpp/composed_service_dir.h>
+#include <lib/vfs/cpp/pseudo_dir.h>
+#include <lib/vfs/cpp/service.h>
 #include <zircon/status.h>
 
 #include <memory>

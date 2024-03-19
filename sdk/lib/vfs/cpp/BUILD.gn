@@ -7,48 +7,19 @@ import("//build/cpp/sdk_shared_library.gni")
 import("//build/cpp/sdk_source_set.gni")
 import("//build/test.gni")
 
-# A replacement version of this library is undergoing active development but is not available yet.
-# Please avoid new dependencies on this library and use //src/storage/lib/vfs/cpp where possible.
-# This will help ensure a smooth transition when a replacement is complete.
-#
-# See https://fxbug.dev/42054034 for details.
 sdk_source_set("cpp") {
   category = "partner"
-
   sdk_name = "vfs_cpp"
-
   include_base = "//sdk"
+
   sources = [
-    "composed_service_dir.cc",
     "composed_service_dir.h",
-    "flags.h",
-    "internal/connection.cc",
-    "internal/connection.h",
-    "internal/directory.cc",
-    "internal/directory.h",
-    "internal/directory_connection.cc",
-    "internal/directory_connection.h",
-    "internal/dirent_filler.cc",
-    "internal/dirent_filler.h",
-    "internal/file.cc",
-    "internal/file.h",
-    "internal/file_connection.cc",
-    "internal/file_connection.h",
-    "internal/node.cc",
     "internal/node.h",
-    "internal/node_connection.cc",
-    "internal/node_connection.h",
-    "lazy_dir.cc",
     "lazy_dir.h",
-    "pseudo_dir.cc",
     "pseudo_dir.h",
-    "pseudo_file.cc",
     "pseudo_file.h",
-    "remote_dir.cc",
     "remote_dir.h",
-    "service.cc",
     "service.h",
-    "vmo_file.cc",
     "vmo_file.h",
   ]
 
@@ -73,15 +44,11 @@ sdk_source_set("cpp") {
   #    |\_________\   \|__|  \|_______|\|__|
   #    \|_________|
   #
-  # Until a replacement for this library is available, please avoid new dependencies on this target
-  # and use //src/storage/lib/vfs/cpp where possible. See https://fxbug.dev/42054034 for details.
+  # **WARNING**: This library is currently undergoing an API overhaul. Please avoid new uses and
+  # prefer using the in-tree VFS at //src/storage/lib/vfs/cpp where possible.
   #
-  # To remove items from the allowlist, please send a change to one of the OWNERS of this file to
-  # remove an element from the visibility list below. Please allowlist entire directories rather
-  # than individual targets as it requires less allowlist churn over time.
+  # See https://fxbug.dev/311176363 for details.
   #
-  # To regenerate:
-  #   scripts/gn/trim_visibility.py --target=//sdk/lib/vfs/cpp
   visibility = [
     ":*",
     "//build/sdk:*",
@@ -120,24 +87,20 @@ sdk_source_set("cpp") {
 
 test("vfs_cpp_unittests") {
   sources = [
-    "composed_service_dir_unittest.cc",
-    "internal/connection_unittest.cc",
-    "internal/file_unittest.cc",
-    "lazy_dir_unittest.cc",
-    "pseudo_dir_unittest.cc",
-    "pseudo_file_unittest.cc",
-    "remote_dir_unittest.cc",
-    "service_unittest.cc",
-    "vmo_file_unittest.cc",
+    "tests/composed_service_dir_test.cc",
+    "tests/lazy_dir_test.cc",
+    "tests/pseudo_dir_test.cc",
+    "tests/pseudo_file_test.cc",
+    "tests/remote_dir_test.cc",
+    "tests/service_test.cc",
+    "tests/vmo_file_test.cc",
   ]
 
   deps = [
     ":cpp",
-    "testing",
-    "//sdk/lib/sys/cpp",
+    "//sdk/lib/fdio",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/loop_fixture",
-    "//src/testing/fidl:placeholders_hlcpp",
   ]
 }
 
@@ -145,86 +108,7 @@ fuchsia_unittest_package("vfs_cpp_tests") {
   deps = [ ":vfs_cpp_unittests" ]
 }
 
-# **WARNING**: This target is under development and is not intended for non-storage use.
-#
-# This is being developed as a drop-in replacement for the existing SDK VFS which uses the in-tree
-# C++ VFS as a backend to reduce code duplication and ensure consistency between both libraries.
-sdk_source_set("cpp_new") {
-  # TODO(https://fxbug.dev/293936429): Change to partner when replacing "cpp" with "cpp_new".
-  category = "internal"
-
-  sdk_name = "vfs_cpp"
-
-  include_base = "//sdk"
-
-  sources = [
-    "new/composed_service_dir.h",
-    "new/internal/node.h",
-    "new/lazy_dir.h",
-    "new/pseudo_dir.h",
-    "new/pseudo_file.h",
-    "new/remote_dir.h",
-    "new/service.h",
-    "new/vmo_file.h",
-  ]
-
-  public_deps = [
-    "//sdk/fidl/fuchsia.io:fuchsia.io_hlcpp",
-    "//sdk/lib/fdio",
-    "//sdk/lib/fidl/cpp",
-    "//zircon/system/ulib/async",
-    "//zircon/system/ulib/zx",
-  ]
-
-  deps = [ "//sdk/lib/vfs/internal:vfs_internal" ]
-
-  public_configs = [ "//sdk/config" ]
-
-  #  ________  _________  ________  ________
-  # |\   ____\|\___   ___\\   __  \|\   __  \
-  # \ \  \___|\|___ \  \_\ \  \|\  \ \  \|\  \
-  #  \ \_____  \   \ \  \ \ \  \\\  \ \   ____\
-  #   \|____|\  \   \ \  \ \ \  \\\  \ \  \___|
-  #     ____\_\  \   \ \__\ \ \_______\ \__\
-  #    |\_________\   \|__|  \|_______|\|__|
-  #    \|_________|
-  #
-  # This library is under development and should only be used for testing and verification by
-  # storage owned targets.
-  #
-  visibility = [
-    ":*",
-    "//src/storage/conformance/*",
-  ]
-}
-
-test("vfs_cpp_new_unittests") {
-  sources = [
-    "new/tests/composed_service_dir_test.cc",
-    "new/tests/lazy_dir_test.cc",
-    "new/tests/pseudo_dir_test.cc",
-    "new/tests/pseudo_file_test.cc",
-    "new/tests/remote_dir_test.cc",
-    "new/tests/service_test.cc",
-    "new/tests/vmo_file_test.cc",
-  ]
-
-  deps = [
-    ":cpp_new",
-    "//sdk/lib/fdio",
-    "//src/lib/fxl/test:gtest_main",
-    "//src/lib/testing/loop_fixture",
-  ]
-}
-
-fuchsia_unittest_package("vfs_cpp_new_tests") {
-  deps = [ ":vfs_cpp_new_unittests" ]
-}
-
 group("tests") {
   testonly = true
-  public_deps = [
-    ":vfs_cpp_new_tests",
-    ":vfs_cpp_tests",
-  ]
+  public_deps = [ ":vfs_cpp_tests" ]
 }

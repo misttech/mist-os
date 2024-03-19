@@ -1,13 +1,27 @@
-# vfs_cpp
+# SDK C++ VFS
 
-This library is included in the SDK to support the `sys_cpp` library.
-Currently, the library cannot be used to implement a production-quality
-file system. Instead, the libraries scope is limited to the psuedo file
-systems that components expose in their outgoing namespace for service
-discovery and introspection.
+## Overview
 
-Please do not use headers from the `internal` directory or symbols in the
-`internal` namespace. Currently, this library lacks a coherent concurrency
-model. Many of the core classes are contained in an `internal` directory and
-namespace to indiciate that these classes are likely to change dramatically as
-we develop the concurrency model.
+This library provides basic pseudo-filesystem functionality, which can be useful
+for exposing items in a component's outgoing namespace (including services).
+This allows creation of pseudo-directories that can be modified at runtime,
+pseudo/VMO-backed files, service connectors, and remote nodes.
+
+Unlike the in-tree VFS (//src/storage/lib/vfs/cpp), this library is not intended
+for filesystems development.
+
+**WARNING**: This library is currently undergoing an API overhaul. Please avoid
+new uses and prefer using the in-tree VFS at //src/storage/lib/vfs/cpp where
+possible. See https://fxbug.dev/311176363 for details.
+
+## Thread Safety
+
+The node types this library implements are thread safe, however they must only
+be used with a single-threaded asynchronous dispatcher. Multiple connections
+may be created to a given node, as long as the same dispatcher is used.
+
+Connections to a node are automatically closed when a node is destroyed. This
+includes connections to child entries, if applicable, which were opened via a
+parent node.
+
+Use of a multi-threaded asynchronous dispatcher is **not** supported.

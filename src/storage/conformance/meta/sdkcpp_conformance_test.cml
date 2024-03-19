@@ -12,10 +12,9 @@
     },
     children: [
         {
-            // TODO(https://fxbug.dev/42109125): Don't hardcode the sdkcpp harness URL here. This
-            // needs to work for all the different filesystem test harnesses.
             name: "fs_test",
-            url: "fuchsia-pkg://fuchsia.com/sdkcpp-io1-conformance-test#meta/sdkcpp-harness.cm",
+            url: "fuchsia-pkg://fuchsia.com/sdkcpp-conformance-test#meta/sdkcpp-harness.cm",
+            startup: "eager",
         },
     ],
     use: [

@@ -18,8 +18,7 @@ group("tests") {
     "//src/storage/conformance/conformance_harness/fxfs:fxfs-conformance-test",
     "//src/storage/conformance/conformance_harness/minfs:minfs-io1-conformance-test",
     "//src/storage/conformance/conformance_harness/rustvfs:rustvfs-io1-conformance-test",
-    "//src/storage/conformance/conformance_harness/sdkcpp:sdkcpp-io1-conformance-test",
-    "//src/storage/conformance/conformance_harness/sdkcpp_new:sdkcpp-new-io1-conformance-test",
+    "//src/storage/conformance/conformance_harness/sdkcpp:sdkcpp-conformance-test",
   ]
 }
 

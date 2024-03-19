@@ -6,29 +6,21 @@
 #define LIB_VFS_CPP_SERVICE_H_
 
 #include <fuchsia/io/cpp/fidl.h>
+#include <lib/async/default.h>
+#include <lib/fit/function.h>
 #include <lib/vfs/cpp/internal/node.h>
 
 namespace vfs {
 
-// A |Node| which binds a channel to a service implementation when opened.
-class Service : public vfs::internal::Node {
+// A node which binds a channel to a service implementation when opened.
+//
+// This class is thread-safe.
+class Service final : public internal::Node {
  public:
-  // Handler called to bind the provided channel to an implementation
-  // of the service.
+  // Handler callback which binds `channel` to a service instance.
   using Connector = fit::function<void(zx::channel channel, async_dispatcher_t* dispatcher)>;
+  explicit Service(Connector connector) : internal::Node(MakeService(std::move(connector))) {}
 
-  // Adds the specified interface to the set of public interfaces.
-  //
-  // Creates |Service| with a |connector| with the given |service_name|, using
-  // the given |interface_request_handler|. |interface_request_handler| should
-  // remain valid for the lifetime of this object.
-  //
-  // A typical usage may be:
-  //
-  //   vfs::Service foo_service(foobar_bindings_.GetHandler(this, dispatcher));
-  //
-  // For now this implementation ignores |dispatcher| that we get from |Serve|
-  // call, if you want to use dispatcher call |Service(Connector)|.
   template <typename Interface>
   explicit Service(fidl::InterfaceRequestHandler<Interface> handler)
       : Service(
@@ -36,37 +28,27 @@ class Service : public vfs::internal::Node {
               handler(fidl::InterfaceRequest<Interface>(std::move(channel)));
             }) {}
 
-  // Creates a service with the specified connector.
-  //
-  // If the |connector| is null, then incoming connection requests will be
-  // dropped.
-  explicit Service(Connector connector);
-
-  // Destroys the services and releases its connector.
-  ~Service() override;
-
- protected:
-  // |Node| implementation:
-  zx_status_t GetAttr(fuchsia::io::NodeAttributes* out_attributes) const final;
-
-  void Describe(fuchsia::io::NodeInfoDeprecated* out_info) final;
-
-  const Connector& connector() const { return connector_; }
-
-  fuchsia::io::OpenFlags GetAllowedFlags() const override;
-  fuchsia::io::OpenFlags GetProhibitiveFlags() const override;
-
-  // |Node| implementations:
-  zx_status_t CreateConnection(fuchsia::io::OpenFlags flags,
-                               std::unique_ptr<vfs::internal::Connection>* connection) final;
-
-  zx_status_t Connect(fuchsia::io::OpenFlags flags, zx::channel request,
-                      async_dispatcher_t* dispatcher) override;
+  using internal::Node::Serve;
 
  private:
-  Connector connector_;
-};
+  static vfs_internal_node_t* MakeService(Connector connector) {
+    vfs_internal_node_t* svc;
+    vfs_internal_svc_context_t context{
+        .cookie = new Connector(std::move(connector)),
+        .connect = &Connect,
+        .destroy = &DestroyCookie,
+    };
+    ZX_ASSERT(vfs_internal_service_create(&context, &svc) == ZX_OK);
+    return svc;
+  }
 
+  static void DestroyCookie(void* cookie) { delete static_cast<Connector*>(cookie); }
+
+  static zx_status_t Connect(const void* cookie, zx_handle_t request) {
+    (*static_cast<const Connector*>(cookie))(zx::channel{request}, async_get_default_dispatcher());
+    return ZX_OK;
+  }
+};
 }  // namespace vfs
 
 #endif  // LIB_VFS_CPP_SERVICE_H_

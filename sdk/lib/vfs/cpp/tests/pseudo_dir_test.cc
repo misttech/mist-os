@@ -9,8 +9,8 @@
 #include <fuchsia/io/cpp/fidl.h>
 #include <lib/fdio/directory.h>
 #include <lib/fdio/fd.h>
-#include <lib/vfs/cpp/new/pseudo_dir.h>
-#include <lib/vfs/cpp/new/vmo_file.h>
+#include <lib/vfs/cpp/pseudo_dir.h>
+#include <lib/vfs/cpp/vmo_file.h>
 #include <zircon/status.h>
 
 #include <memory>

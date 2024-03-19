@@ -5,38 +5,42 @@
 #ifndef LIB_VFS_CPP_VMO_FILE_H_
 #define LIB_VFS_CPP_VMO_FILE_H_
 
-#include <fuchsia/io/cpp/fidl.h>
-#include <lib/vfs/cpp/internal/file.h>
+#include <lib/vfs/cpp/internal/node.h>
 #include <lib/zx/vmo.h>
-#include <stdint.h>
+#include <zircon/availability.h>
+#include <zircon/status.h>
 
-#include <vector>
+#include <cstdint>
 
 namespace vfs {
 
-// A file object in a file system backed by a VMO.
+// A file node backed by a range of bytes in a VMO.
 //
-// Implements the |fuchsia.io.File| interface. Incoming connections are
-// owned by this object and will be destroyed when this object is destroyed.
+// The file has a fixed size specified at creating time; it does not grow or shrink even when
+// written into.
 //
-// See also:
-//
-//  * File, which represents file objects.
-class VmoFile final : public vfs::internal::File {
+// This class is thread-safe.
+class VmoFile final : public internal::Node {
  public:
   // Specifies the desired behavior of writes.
-  enum class WriteOption {
+  enum class WriteMode : vfs_internal_write_mode_t {
     // The VmoFile is read only.
-    READ_ONLY,
+    READ_ONLY = VFS_INTERNAL_WRITE_MODE_READ_ONLY,
     // The VmoFile will be writable.
-    WRITABLE,
+    WRITABLE = VFS_INTERNAL_WRITE_MODE_WRITABLE,
   };
 
-  // Specifies the desired behavior when a client asks for the file's
-  // underlying VMO.
-  enum class Sharing {
-    // The VMO is not shared with the client.
-    NONE,
+  // Specifies the default behavior when a client asks for the file's underlying VMO, but does not
+  // specify if a duplicate handle or copy-on-write clone is required.
+  //
+  // *NOTE*: This does not affect the behavior of requests that specify the required sharing mode.
+  // Requests for a specific sharing mode will be fulfilled as requested.
+  //
+  // TODO(https://fxbug.dev/311176363): Introduce new constants for these enumerations that conform
+  // to the Fuchsia C++ style guide, and deprecate the old ones.
+  enum class DefaultSharingMode : vfs_internal_sharing_mode_t {
+    // NOT_SUPPORTED will be returned, unless a sharing mode is specified in the request.
+    NONE = VFS_INTERNAL_SHARING_MODE_NONE,
 
     // The VMO handle is duplicated for each client.
     //
@@ -47,7 +51,7 @@ class VmoFile final : public vfs::internal::File {
     // This mode is significantly more efficient than |CLONE_COW| and should be
     // preferred when file spans the whole VMO or when the VMO's entire content
     // is safe for clients to read.
-    DUPLICATE,
+    DUPLICATE = VFS_INTERNAL_SHARING_MODE_DUPLICATE,
 
     // The VMO range spanned by the file is cloned on demand, using
     // copy-on-write semantics to isolate modifications of clients which open
@@ -56,61 +60,42 @@ class VmoFile final : public vfs::internal::File {
     // This is appropriate when clients need to be restricted from accessing
     // portions of the VMO outside of the range of the file and when file
     // modifications by clients should not be visible to each other.
-    CLONE_COW,
+    CLONE_COW = VFS_INTERNAL_SHARING_MODE_COW,
   };
 
+  // TODO(https://fxbug.dev/311176363): Deprecate and remove these type aliases.
+  using WriteOption = WriteMode;
+  using Sharing = DefaultSharingMode;
+
   // Creates a file node backed by a VMO.
-  VmoFile(zx::vmo vmo, size_t length, WriteOption write_option = WriteOption::READ_ONLY,
-          Sharing vmo_sharing = Sharing::DUPLICATE);
+  VmoFile(zx::vmo vmo, size_t length, WriteMode write_option = WriteMode::READ_ONLY,
+          DefaultSharingMode vmo_sharing = DefaultSharingMode::DUPLICATE)
+      : VmoFile(vmo.release(), length, write_option, vmo_sharing) {}
 
-  ~VmoFile() override;
+  using internal::Node::Serve;
 
-  // Borrowed handle to the VMO backing this file.
-  zx::unowned_vmo vmo() const { return vmo_.borrow(); }
-
- protected:
-  // Create |count| bytes of data from the file at the given |offset|.
-  //
-  // The data read should be copied to |out_data|, which should be empty when
-  // passed as an argument. When |ReadAt| returns, |out_data| should contain no
-  // more than |count| bytes.
-  zx_status_t ReadAt(uint64_t count, uint64_t offset, std::vector<uint8_t>* out_data) override;
-
-  // Write the given |data| to the file at the given |offset|.
-  //
-  // Data should be copied into the file starting at the beginning of |data|.
-  // If |WriteAt| returns |ZX_OK|, |out_actual| should contain the number of
-  // bytes actually written to the file.
-  zx_status_t WriteAt(std::vector<uint8_t> data, uint64_t offset, uint64_t* out_actual) override;
-
-  // Resize the file to the given |length|.
-  zx_status_t Truncate(uint64_t length) override;
-
-  // Returns current file length.
-  //
-  // All implementations should implement this.
-  uint64_t GetLength() override;
-
-  // Returns file capacity.
-  //
-  // Seek() uses this to return ZX_ERR_OUT_OF_RANGE if new seek is more than
-  // this value.
-  size_t GetCapacity() override;
-
-  // Override that implements this; the parent class returns an error.
-  zx_status_t GetBackingMemory(fuchsia::io::VmoFlags flags, zx::vmo* out_vmo) override;
-
-  // Returns the node attributes for this VmoFile.
-  zx_status_t GetAttr(fuchsia::io::NodeAttributes* out_attributes) const override;
-
-  fuchsia::io::OpenFlags GetAllowedFlags() const override;
+  // Returns a borrowed handle to the VMO backing this file.
+  zx::unowned_vmo vmo() const { return vmo_->borrow(); }
 
  private:
-  const size_t length_;
-  const WriteOption write_option_;
-  const Sharing vmo_sharing_;
+  VmoFile(zx_handle_t vmo_handle, size_t length, WriteMode write_option,
+          DefaultSharingMode vmo_sharing)
+      : internal::Node(CreateVmoFile(vmo_handle, length, write_option, vmo_sharing)),
+        vmo_(zx::unowned_vmo{vmo_handle}) {}
 
-  zx::vmo vmo_;
+  // The underlying node is responsible for closing `vmo_handle` when the node is destroyed.
+  static vfs_internal_node_t* CreateVmoFile(zx_handle_t vmo_handle, size_t length,
+                                            WriteMode write_option,
+                                            DefaultSharingMode vmo_sharing) {
+    vfs_internal_node_t* vmo_file;
+    ZX_ASSERT(vfs_internal_vmo_file_create(vmo_handle, static_cast<uint64_t>(length),
+                                           static_cast<vfs_internal_write_mode_t>(write_option),
+                                           static_cast<vfs_internal_sharing_mode_t>(vmo_sharing),
+                                           &vmo_file) == ZX_OK);
+    return vmo_file;
+  }
+
+  zx::unowned_vmo vmo_;  // Cannot outlive underlying node.
 };
 
 }  // namespace vfs

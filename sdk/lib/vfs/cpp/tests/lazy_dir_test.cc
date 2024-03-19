@@ -10,8 +10,8 @@
 #include <lib/fdio/directory.h>
 #include <lib/fdio/fd.h>
 #include <lib/fdio/io.h>
-#include <lib/vfs/cpp/new/lazy_dir.h>
-#include <lib/vfs/cpp/new/pseudo_dir.h>
+#include <lib/vfs/cpp/lazy_dir.h>
+#include <lib/vfs/cpp/pseudo_dir.h>
 #include <sys/stat.h>
 #include <zircon/status.h>
 
