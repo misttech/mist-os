@@ -8,7 +8,7 @@ use crate::{
     verifier::{
         verify, CallingContext, FunctionSignature, NullVerifierLogger, Type, VerifierLogger,
     },
-    EbpfError, MapSchema,
+    EbpfError, MapSchema, MemoryId,
 };
 use linux_uapi::{bpf_insn, sock_filter};
 use std::{collections::HashMap, fmt::Formatter, sync::Arc};
@@ -20,8 +20,8 @@ use zerocopy::{AsBytes, FromBytes, NoCell};
 static BPF_TYPE_IDENTIFIER_COUNTER: std::sync::atomic::AtomicU64 =
     std::sync::atomic::AtomicU64::new(u64::MAX / 2);
 
-pub fn new_bpf_type_identifier() -> u64 {
-    BPF_TYPE_IDENTIFIER_COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+pub fn new_bpf_type_identifier() -> MemoryId {
+    BPF_TYPE_IDENTIFIER_COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed).into()
 }
 
 pub trait EpbfRunContext {
@@ -154,7 +154,12 @@ impl EbpfProgram<()> {
         let buffer_size = std::mem::size_of::<T>() as u64;
         let mut builder = EbpfProgramBuilder::<()>::default();
         builder.set_args(&[
-            Type::PtrToMemory { id: new_bpf_type_identifier(), offset: 0, buffer_size },
+            Type::PtrToMemory {
+                id: new_bpf_type_identifier(),
+                offset: 0,
+                buffer_size,
+                fields: Default::default(),
+            },
             Type::from(buffer_size),
         ]);
         builder.load(code, &mut NullVerifierLogger)
@@ -163,8 +168,10 @@ impl EbpfProgram<()> {
 
 #[cfg(test)]
 mod test {
-    use crate::EbpfProgram;
+    use super::*;
+    use crate::{conformance::test::parse_asm, FieldType};
     use linux_uapi::*;
+    use zerocopy::{AsBytes, FromBytes, FromZeros, NoCell};
 
     const BPF_ALU_ADD_K: u16 = (BPF_ALU | BPF_ADD | BPF_K) as u16;
     const BPF_ALU_SUB_K: u16 = (BPF_ALU | BPF_SUB | BPF_K) as u16;
@@ -343,5 +350,84 @@ mod test {
                 "BPF math does not work",
             );
         }
+    }
+
+    #[repr(C)]
+    #[derive(Debug, Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
+    struct ProgramArgument {
+        /// Pointer to an array of u64
+        pub data: u64,
+        /// End of the array.
+        pub data_end: u64,
+    }
+
+    impl ProgramArgument {
+        fn get_type() -> Type {
+            let struct_size = std::mem::size_of::<ProgramArgument>() as u64;
+            let array_id = new_bpf_type_identifier();
+            Type::PtrToMemory {
+                id: new_bpf_type_identifier(),
+                offset: 0,
+                buffer_size: struct_size,
+                fields: vec![
+                    FieldType {
+                        offset: 0,
+                        field_type: Box::new(Type::PtrToArray { id: array_id.clone(), offset: 0 }),
+                    },
+                    FieldType {
+                        offset: 8,
+                        field_type: Box::new(Type::PtrToEndArray { id: array_id }),
+                    },
+                ],
+            }
+        }
+    }
+
+    #[test]
+    fn test_data_end() {
+        let program = r#"
+        mov %r0, 0
+        ldxdw %r2, [%r1+8]
+        ldxdw %r1, [%r1]
+        # ensure data contains at least 8 bytes
+        mov %r3, %r1
+        add %r3, 0x8
+        jgt %r3, %r2, +1
+        # read 8 bytes from data
+        ldxdw %r0, [%r1]
+        exit
+        "#;
+        let code = parse_asm(program);
+
+        let mut builder = EbpfProgramBuilder::<()>::default();
+        builder.set_args(&[ProgramArgument::get_type()]);
+        let program = builder.load(code, &mut NullVerifierLogger).expect("load");
+
+        let v: u64 = 42;
+        let v_ptr = (&v as *const u64) as u64;
+        let mut data =
+            ProgramArgument { data: v_ptr, data_end: v_ptr + std::mem::size_of::<u64>() as u64 };
+        assert_eq!(program.run(&mut (), &mut data), v);
+    }
+
+    #[test]
+    fn test_past_data_end() {
+        let program = r#"
+        mov %r0, 0
+        ldxdw %r2, [%r1+8]
+        ldxdw %r1, [%r1]
+        # ensure data contains at least 4 bytes
+        mov %r3, %r1
+        add %r3, 0x4
+        jgt %r3, %r2, +1
+        # read 8 bytes from data
+        ldxdw %r0, [%r1]
+        exit
+        "#;
+        let code = parse_asm(program);
+
+        let mut builder = EbpfProgramBuilder::<()>::default();
+        builder.set_args(&[ProgramArgument::get_type()]);
+        builder.load(code, &mut NullVerifierLogger).expect_err("incorrect program");
     }
 }

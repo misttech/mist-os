@@ -9,7 +9,7 @@ use crate::{
 use byteorder::{BigEndian, ByteOrder, LittleEndian, NativeEndian};
 use linux_uapi::bpf_insn;
 use once_cell::sync::Lazy;
-use std::collections::HashMap;
+use std::{collections::HashMap, ops::Deref};
 use zerocopy::AsBytes;
 
 /// A trait to receive the log from the verifier.
@@ -24,6 +24,55 @@ pub struct NullVerifierLogger;
 impl VerifierLogger for NullVerifierLogger {
     fn log(&mut self, line: &[u8]) {
         debug_assert!(line.is_ascii());
+    }
+}
+
+/// An identifier for a memory buffer accessible by an ebpf program. The identifiers are built as a
+/// chain of unique identifier so that a buffer can contain multiple pointers to the same type and
+/// the verifier can distinguish between the different instances.
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub struct MemoryId {
+    id: u64,
+    parent: Option<Box<MemoryId>>,
+}
+
+impl From<u64> for MemoryId {
+    fn from(id: u64) -> Self {
+        Self { id, parent: None }
+    }
+}
+
+impl MemoryId {
+    /// Build a new id such that `other` is prepended to the chain of parent of `self`.
+    fn prepended(&self, other: &MemoryId) -> Self {
+        match &self.parent {
+            None => MemoryId { id: self.id, parent: Some(Box::new(other.clone())) },
+            Some(parent) => {
+                MemoryId { id: self.id, parent: Some(Box::new(parent.prepended(other))) }
+            }
+        }
+    }
+}
+
+/// The target type of a pointer type in a struct.
+#[derive(Clone, Debug)]
+pub struct FieldType {
+    /// The offset at which the pointer is loacted.
+    pub offset: u64,
+    /// The type of the pointed memory. The verifier only supports `PtrToArray` and `PtrToEndArray`
+    /// for now.
+    pub field_type: Box<Type>,
+}
+
+impl FieldType {
+    /// Whether the pointer represented by this field intercept the memory situated at `offset` and
+    /// of width `width`.
+    fn intercept(&self, offset: u64, width: DataWidth) -> bool {
+        std::cmp::max(self.offset, offset)
+            < std::cmp::min(
+                self.offset + DataWidth::U64.bytes() as u64,
+                offset + width.bytes() as u64,
+            )
     }
 }
 
@@ -47,7 +96,20 @@ pub enum Type {
     PtrToStack { offset: StackOffset },
     /// A pointer to the kernel memory. The full buffer is `buffer_size` bytes long. The pointer is
     /// situated at `offset` from the start of the buffer.
-    PtrToMemory { id: u64, offset: u64, buffer_size: u64 },
+    PtrToMemory {
+        id: MemoryId,
+        offset: u64,
+        buffer_size: u64,
+        /// The list of fields in the buffer that are known pointer to known types.
+        fields: Vec<FieldType>,
+    },
+    /// A pointer to the kernel memory. The full buffer size is determined by an instance of
+    /// `PtrToEndArray` with the same `id`. The pointer is situadted at `offset` from the start of
+    /// the buffer.
+    PtrToArray { id: MemoryId, offset: u64 },
+    /// A pointer to the kernel memory that represents the first non accessible byte of a
+    /// `PtrToArray` with the same `id`.
+    PtrToEndArray { id: MemoryId },
     /// A pointer that might be null and must be validated before being referenced.
     NullOr(Box<Type>),
     /// A function parameter that must be a `ScalarValue` when called.
@@ -116,7 +178,12 @@ impl Type {
 
     /// Given the given conditional jump `jump_type` having been tasken, constraint the type of
     /// `type1` and `type2`.
-    fn constraint(jump_type: JumpType, type1: Self, type2: Self) -> (Self, Self) {
+    fn constraint(
+        context: &mut ComputationContext,
+        jump_type: JumpType,
+        type1: Self,
+        type2: Self,
+    ) -> (Self, Self) {
         match (jump_type, &type1, &type2) {
             (
                 JumpType::Eq,
@@ -143,17 +210,49 @@ impl Type {
                 let zero = Type::from(0);
                 (zero.clone(), zero)
             }
+            (jump_type, Self::NullOr(t), Self::ScalarValue { value: 0, unknown_mask: 0, .. })
+                if jump_type.is_strict() =>
+            {
+                (*t.clone(), type2)
+            }
+            (jump_type, Self::ScalarValue { value: 0, unknown_mask: 0, .. }, Self::NullOr(t))
+                if jump_type.is_strict() =>
+            {
+                (type1, *t.clone())
+            }
+
+            (
+                JumpType::Eq,
+                Type::PtrToArray { id: id1, offset },
+                Type::PtrToEndArray { id: id2 },
+            )
+            | (
+                JumpType::Le,
+                Type::PtrToArray { id: id1, offset },
+                Type::PtrToEndArray { id: id2 },
+            )
+            | (
+                JumpType::Ge,
+                Type::PtrToEndArray { id: id1 },
+                Type::PtrToArray { id: id2, offset },
+            ) if id1 == id2 => {
+                context.update_array_bounds(id1.clone(), *offset);
+                (type1, type2)
+            }
+            (
+                JumpType::Lt,
+                Type::PtrToArray { id: id1, offset },
+                Type::PtrToEndArray { id: id2 },
+            )
+            | (
+                JumpType::Gt,
+                Type::PtrToEndArray { id: id1 },
+                Type::PtrToArray { id: id2, offset },
+            ) if id1 == id2 => {
+                context.update_array_bounds(id1.clone(), *offset + 1);
+                (type1, type2)
+            }
             (JumpType::Eq, _, _) => (type1.clone(), type1),
-            (
-                JumpType::Ne | JumpType::StrictComparaison,
-                Self::NullOr(t),
-                Self::ScalarValue { value: 0, unknown_mask: 0, .. },
-            ) => (*t.clone(), type2),
-            (
-                JumpType::Ne | JumpType::StrictComparaison,
-                Self::ScalarValue { value: 0, unknown_mask: 0, .. },
-                Self::NullOr(t),
-            ) => (type1, *t.clone()),
             _ => (type1, type2),
         }
     }
@@ -482,6 +581,14 @@ impl Stack {
     }
 }
 
+macro_rules! bpf_log {
+    ($context:ident, $verification_context:ident, $($msg:tt)*) => {
+        let prefix = format!("{}: ({:02x})", $context.pc, $verification_context.code[$context.pc].code);
+        let suffix = format!($($msg)*);
+        $verification_context.logger.log(format!("{prefix} {suffix}").as_bytes());
+    }
+}
+
 /// The state of the computation as known by the verifier at a given point in time.
 #[derive(Clone, Debug, Default)]
 struct ComputationContext {
@@ -491,14 +598,8 @@ struct ComputationContext {
     stack: Stack,
     /// The program counter.
     pc: ProgramCounter,
-}
-
-macro_rules! bpf_log {
-    ($context:ident, $verification_context:ident, $($msg:tt)*) => {
-        let prefix = format!("{}: ({:02x})", $context.pc, $verification_context.code[$context.pc].code);
-        let suffix = format!($($msg)*);
-        $verification_context.logger.log(format!("{prefix} {suffix}").as_bytes());
-    }
+    /// The dynamically known bounds of buffers indexed by their ids.
+    array_bounds: HashMap<MemoryId, u64>,
 }
 
 impl ComputationContext {
@@ -522,6 +623,13 @@ impl ComputationContext {
         }
         self.registers[index as usize] = reg_type;
         Ok(())
+    }
+
+    fn update_array_bounds(&mut self, id: MemoryId, new_bound: u64) {
+        self.array_bounds
+            .entry(id)
+            .and_modify(|v| *v = std::cmp::max(*v, new_bound))
+            .or_insert(new_bound);
     }
 
     fn get_map_schema(&self, argument: u8) -> Result<&MapSchema, String> {
@@ -574,8 +682,28 @@ impl ComputationContext {
             Type::PtrToStack { offset } => {
                 self.stack.store(*offset + instruction_offset, value, width)?;
             }
-            Type::PtrToMemory { offset, buffer_size, .. } => {
+            Type::PtrToMemory { offset, buffer_size, fields, .. } => {
                 self.check_memory_access(*offset, *buffer_size, instruction_offset, width.bytes())?;
+                // Do not allow writing on or over a pointer.
+                if fields
+                    .iter()
+                    .any(|f| f.intercept(offset.overflowing_add(instruction_offset).0, width))
+                {
+                    return Err(format!("incorrect store"));
+                }
+                match value {
+                    Type::ScalarValue { unwritten_mask: 0, .. } => {}
+                    // Private data should not be leaked.
+                    _ => return Err(format!("incorrect store")),
+                }
+            }
+            Type::PtrToArray { id, offset } => {
+                self.check_memory_access(
+                    *offset,
+                    *self.array_bounds.get(id).unwrap_or(&0),
+                    instruction_offset,
+                    width.bytes(),
+                )?;
                 match value {
                     Type::ScalarValue { unwritten_mask: 0, .. } => {}
                     // Private data should not be leaked.
@@ -595,8 +723,42 @@ impl ComputationContext {
     ) -> Result<Type, String> {
         Ok(match addr {
             Type::PtrToStack { offset } => self.stack.load(*offset + instruction_offset, width)?,
-            Type::PtrToMemory { offset, buffer_size, .. } => {
+            Type::PtrToMemory { id, offset, buffer_size, fields } => {
                 self.check_memory_access(*offset, *buffer_size, instruction_offset, width.bytes())?;
+                let memory_offset = offset.overflowing_add(instruction_offset).0;
+                // If the read is for a full pointer and the offset correspond to a pointer, use
+                // the `field_type` to specify the returned type.
+                if width == DataWidth::U64 {
+                    if let Some(field) = fields.iter().find(|f| f.offset == memory_offset) {
+                        match field.field_type.deref() {
+                            Type::PtrToArray { id: array_id, .. } => {
+                                return Ok(Type::PtrToArray {
+                                    id: array_id.prepended(id),
+                                    offset: 0,
+                                });
+                            }
+                            Type::PtrToEndArray { id: array_id } => {
+                                return Ok(Type::PtrToEndArray { id: array_id.prepended(id) });
+                            }
+                            _ => panic!("Unexpected field_type: {field:?}"),
+                        }
+                    }
+                }
+                // Otherwise, reading on or over a pointer returns an illegal value.
+                if fields.iter().any(|f| f.intercept(memory_offset, width)) {
+                    Type::default()
+                } else {
+                    // Finally, return an unknown valid value.
+                    Type::unknown_written_scalar_value()
+                }
+            }
+            Type::PtrToArray { id, offset } => {
+                self.check_memory_access(
+                    *offset,
+                    *self.array_bounds.get(id).unwrap_or(&0),
+                    instruction_offset,
+                    width.bytes(),
+                )?;
                 Type::unknown_written_scalar_value()
             }
             _ => return Err(format!("incorrect load")),
@@ -618,7 +780,12 @@ impl ComputationContext {
             Type::MapValueParameter { map_ptr_index } => {
                 let schema = self.get_map_schema(*map_ptr_index)?;
                 let id = verification_context.next_id();
-                Ok(Type::PtrToMemory { id, offset: 0, buffer_size: schema.value_size as u64 })
+                Ok(Type::PtrToMemory {
+                    id: id.into(),
+                    offset: 0,
+                    buffer_size: schema.value_size as u64,
+                    fields: Default::default(),
+                })
             }
             t => Ok(t.clone()),
         }
@@ -710,11 +877,24 @@ impl ComputationContext {
             ) => Type::PtrToStack { offset: run_on_stack_offset(*x, |x| op(x, y)) },
             (
                 AluType::PtrCompatible,
-                Type::PtrToMemory { id, offset: x, buffer_size },
+                Type::PtrToMemory { id, offset: x, buffer_size, fields },
                 Type::ScalarValue { value: y, unknown_mask: 0, .. },
             ) => {
                 let offset = op(*x, y);
-                Type::PtrToMemory { id: *id, offset, buffer_size: *buffer_size }
+                Type::PtrToMemory {
+                    id: id.clone(),
+                    offset,
+                    buffer_size: *buffer_size,
+                    fields: fields.clone(),
+                }
+            }
+            (
+                AluType::PtrCompatible,
+                Type::PtrToArray { id, offset: x },
+                Type::ScalarValue { value: y, unknown_mask: 0, .. },
+            ) => {
+                let offset = op(*x, y);
+                Type::PtrToArray { id: id.clone(), offset }
             }
             (
                 _,
@@ -783,7 +963,8 @@ impl ComputationContext {
         let apply_constraints_and_register =
             |mut next: Self, jump_type: JumpType| -> Result<Self, String> {
                 if jump_type != JumpType::Unknown {
-                    let (new_op1, new_op2) = Type::constraint(jump_type, op1.clone(), op2.clone());
+                    let (new_op1, new_op2) =
+                        Type::constraint(&mut next, jump_type, op1.clone(), op2.clone());
                     if dst < REGISTER_COUNT {
                         next.set_reg(dst, new_op1)?;
                     }
@@ -817,6 +998,16 @@ impl ComputationContext {
                     Type::PtrToMemory { id: id1, offset: x, .. },
                     Type::PtrToMemory { id: id2, offset: y, .. },
                 ) if *id1 == *id2 => Some(op(*x, *y)),
+                (
+                    Type::PtrToArray { id: id1, offset: x, .. },
+                    Type::PtrToArray { id: id2, offset: y, .. },
+                ) if *id1 == *id2 => Some(op(*x, *y)),
+                (Type::PtrToArray { id: id1, .. }, Type::PtrToEndArray { id: id2 })
+                | (Type::PtrToEndArray { id: id1 }, Type::PtrToArray { id: id2, .. })
+                    if *id1 == *id2 =>
+                {
+                    None
+                }
                 _ => return Err(format!("non permitted comparaison")),
             }
         };
@@ -847,21 +1038,36 @@ enum AluType {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum JumpType {
-    Unknown,
     Eq,
+    Ge,
+    Gt,
+    Le,
+    LooseComparaison,
+    Lt,
     Ne,
     StrictComparaison,
-    LooseComparaison,
+    Unknown,
 }
 
 impl JumpType {
     fn invert(&self) -> Self {
         match self {
-            Self::Unknown => Self::Unknown,
             Self::Eq => Self::Ne,
+            Self::Ge => Self::Lt,
+            Self::Gt => Self::Le,
+            Self::Le => Self::Gt,
+            Self::LooseComparaison => Self::StrictComparaison,
+            Self::Lt => Self::Ge,
             Self::Ne => Self::Eq,
             Self::StrictComparaison => Self::LooseComparaison,
-            Self::LooseComparaison => Self::StrictComparaison,
+            Self::Unknown => Self::Unknown,
+        }
+    }
+
+    fn is_strict(&self) -> bool {
+        match self {
+            Self::Gt | Self::Lt | Self::Ne | Self::StrictComparaison => true,
+            _ => false,
         }
     }
 }
@@ -1331,15 +1537,9 @@ impl BpfVisitor for ComputationContext {
         src: Source,
         offset: i16,
     ) -> Result<(), String> {
-        self.conditional_jump(
-            "jge32",
-            context,
-            dst,
-            src,
-            offset,
-            JumpType::LooseComparaison,
-            |x, y| comp32(x, y, |x, y| x >= y),
-        )
+        self.conditional_jump("jge32", context, dst, src, offset, JumpType::Ge, |x, y| {
+            comp32(x, y, |x, y| x >= y)
+        })
     }
     fn jge64<'a>(
         &mut self,
@@ -1348,15 +1548,7 @@ impl BpfVisitor for ComputationContext {
         src: Source,
         offset: i16,
     ) -> Result<(), String> {
-        self.conditional_jump(
-            "jge",
-            context,
-            dst,
-            src,
-            offset,
-            JumpType::LooseComparaison,
-            |x, y| x >= y,
-        )
+        self.conditional_jump("jge", context, dst, src, offset, JumpType::Ge, |x, y| x >= y)
     }
     fn jgt<'a>(
         &mut self,
@@ -1365,15 +1557,9 @@ impl BpfVisitor for ComputationContext {
         src: Source,
         offset: i16,
     ) -> Result<(), String> {
-        self.conditional_jump(
-            "jgt32",
-            context,
-            dst,
-            src,
-            offset,
-            JumpType::StrictComparaison,
-            |x, y| comp32(x, y, |x, y| x > y),
-        )
+        self.conditional_jump("jgt32", context, dst, src, offset, JumpType::Gt, |x, y| {
+            comp32(x, y, |x, y| x > y)
+        })
     }
     fn jgt64<'a>(
         &mut self,
@@ -1382,15 +1568,7 @@ impl BpfVisitor for ComputationContext {
         src: Source,
         offset: i16,
     ) -> Result<(), String> {
-        self.conditional_jump(
-            "jgt",
-            context,
-            dst,
-            src,
-            offset,
-            JumpType::StrictComparaison,
-            |x, y| x > y,
-        )
+        self.conditional_jump("jgt", context, dst, src, offset, JumpType::Gt, |x, y| x > y)
     }
     fn jle<'a>(
         &mut self,
@@ -1399,15 +1577,9 @@ impl BpfVisitor for ComputationContext {
         src: Source,
         offset: i16,
     ) -> Result<(), String> {
-        self.conditional_jump(
-            "jle32",
-            context,
-            dst,
-            src,
-            offset,
-            JumpType::LooseComparaison,
-            |x, y| comp32(x, y, |x, y| x <= y),
-        )
+        self.conditional_jump("jle32", context, dst, src, offset, JumpType::Le, |x, y| {
+            comp32(x, y, |x, y| x <= y)
+        })
     }
     fn jle64<'a>(
         &mut self,
@@ -1416,15 +1588,7 @@ impl BpfVisitor for ComputationContext {
         src: Source,
         offset: i16,
     ) -> Result<(), String> {
-        self.conditional_jump(
-            "jle",
-            context,
-            dst,
-            src,
-            offset,
-            JumpType::LooseComparaison,
-            |x, y| x <= y,
-        )
+        self.conditional_jump("jle", context, dst, src, offset, JumpType::Le, |x, y| x <= y)
     }
     fn jlt<'a>(
         &mut self,
@@ -1433,15 +1597,9 @@ impl BpfVisitor for ComputationContext {
         src: Source,
         offset: i16,
     ) -> Result<(), String> {
-        self.conditional_jump(
-            "jlt32",
-            context,
-            dst,
-            src,
-            offset,
-            JumpType::StrictComparaison,
-            |x, y| comp32(x, y, |x, y| x < y),
-        )
+        self.conditional_jump("jlt32", context, dst, src, offset, JumpType::Lt, |x, y| {
+            comp32(x, y, |x, y| x < y)
+        })
     }
     fn jlt64<'a>(
         &mut self,
@@ -1450,15 +1608,7 @@ impl BpfVisitor for ComputationContext {
         src: Source,
         offset: i16,
     ) -> Result<(), String> {
-        self.conditional_jump(
-            "jlt",
-            context,
-            dst,
-            src,
-            offset,
-            JumpType::StrictComparaison,
-            |x, y| x < y,
-        )
+        self.conditional_jump("jlt", context, dst, src, offset, JumpType::Lt, |x, y| x < y)
     }
     fn jsge<'a>(
         &mut self,

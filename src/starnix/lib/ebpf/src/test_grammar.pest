@@ -58,8 +58,10 @@ ASM_INSTRUCTION = { (   ALU_INSTRUCTION |
                         ""
                     ) ~ EOL }
 
-ASM = { "-- asm" ~ EOL ~
-        ASM_INSTRUCTION+ }
+ASM_INSTRUCTIONS = { ASM_INSTRUCTION+ }
+
+ASM = _{ "-- asm" ~ EOL ~
+         ASM_INSTRUCTIONS }
 
 IGNORED_SECTION_MARKS = _{ "-- c" | "-- no register offset" | "-- no jit" }
 IGNORED_SECTIONS = _{ EOL* ~ IGNORED_SECTION_MARKS ~ EOL ~

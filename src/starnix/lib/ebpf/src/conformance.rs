@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 #[cfg(test)]
-mod test {
+pub mod test {
     use crate::{
         new_bpf_type_identifier, EbpfHelper, EbpfProgramBuilder, FunctionSignature,
         NullVerifierLogger, Type, BPF_ADD, BPF_ALU, BPF_ALU64, BPF_AND, BPF_ARSH, BPF_B, BPF_CALL,
@@ -23,12 +23,6 @@ mod test {
     #[derive(Parser)]
     #[grammar = "../../src/starnix/lib/ebpf/src/test_grammar.pest"]
     struct TestGrammar {}
-
-    struct TestCase {
-        code: Vec<bpf_insn>,
-        result: Option<u64>,
-        memory: Option<Vec<u8>>,
-    }
 
     const HEXADECIMAL_BASE: u32 = 16;
 
@@ -66,14 +60,16 @@ mod test {
         }
     }
 
-    impl TestCase {
+    struct ConformanceParser {}
+
+    impl ConformanceParser {
         fn parse_result(pair: Pair<'_, Rule>) -> u64 {
             assert_eq!(pair.as_rule(), Rule::RESULT);
             Self::parse_value(pair.into_inner().next().unwrap()).as_u64()
         }
 
         fn parse_asm(pair: Pair<'_, Rule>) -> Vec<bpf_insn> {
-            assert_eq!(pair.as_rule(), Rule::ASM);
+            assert_eq!(pair.as_rule(), Rule::ASM_INSTRUCTIONS);
             let mut result: Vec<bpf_insn> = vec![];
             for entry in pair.into_inner() {
                 match entry.as_rule() {
@@ -363,23 +359,31 @@ mod test {
             }
             instruction
         }
+    }
 
+    struct TestCase {
+        code: Vec<bpf_insn>,
+        result: Option<u64>,
+        memory: Option<Vec<u8>>,
+    }
+
+    impl TestCase {
         fn parse(content: &str) -> Option<Self> {
             let mut pairs =
-                TestGrammar::parse(Rule::rules, &content).expect("Parsing must be successful");
+                TestGrammar::parse(Rule::rules, content).expect("Parsing must be successful");
             let mut code: Option<Vec<bpf_insn>> = None;
             let mut result: Option<Option<u64>> = None;
             let mut memory: Option<Vec<u8>> = None;
             let mut raw: Option<Vec<bpf_insn>> = None;
             for entry in pairs.next().unwrap().into_inner() {
                 match entry.as_rule() {
-                    Rule::ASM => {
+                    Rule::ASM_INSTRUCTIONS => {
                         assert!(code.is_none());
-                        code = Some(Self::parse_asm(entry));
+                        code = Some(ConformanceParser::parse_asm(entry));
                     }
                     Rule::RESULT => {
                         if result.is_none() {
-                            result = Some(Some(Self::parse_result(entry)));
+                            result = Some(Some(ConformanceParser::parse_result(entry)));
                         }
                     }
                     Rule::ERROR => {
@@ -508,6 +512,18 @@ mod test {
             s1 = unsafe { s1.offset(1) };
             s2 = unsafe { s2.offset(1) };
         }
+    }
+
+    pub fn parse_asm(data: &str) -> Vec<bpf_insn> {
+        let mut pairs =
+            TestGrammar::parse(Rule::ASM_INSTRUCTIONS, data).expect("Parsing must be successful");
+        ConformanceParser::parse_asm(pairs.next().unwrap())
+    }
+
+    #[test]
+    fn test_parse_asm() {
+        let code = "exit\n";
+        assert_eq!(parse_asm(code).len(), 1);
     }
 
     macro_rules! test_data {
@@ -652,7 +668,12 @@ mod test {
         if let Some(memory) = test_case.memory.as_ref() {
             let buffer_size = memory.len() as u64;
             builder.set_args(&[
-                Type::PtrToMemory { id: new_bpf_type_identifier(), offset: 0, buffer_size },
+                Type::PtrToMemory {
+                    id: new_bpf_type_identifier(),
+                    offset: 0,
+                    buffer_size,
+                    fields: Default::default(),
+                },
                 Type::from(buffer_size),
             ]);
         } else {
