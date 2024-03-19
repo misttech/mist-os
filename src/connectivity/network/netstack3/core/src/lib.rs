@@ -111,7 +111,7 @@ pub mod filter {
         Routine, Rule, State, TransportProtocolMatcher, UninstalledRoutine, ValidationError,
     };
     pub(crate) use netstack3_filter::{
-        FilterContext, FilterHandler, FilterImpl, FilterIpContext, ValidState, Verdict,
+        FilterContext, FilterHandler, FilterImpl, FilterIpContext, RxPacket, ValidState, Verdict,
     };
 }
 

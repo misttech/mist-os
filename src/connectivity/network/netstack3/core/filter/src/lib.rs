@@ -23,7 +23,7 @@ pub use matchers::{
     AddressMatcher, AddressMatcherType, InterfaceMatcher, InterfaceProperties, PacketMatcher,
     PortMatcher, TransportProtocolMatcher,
 };
-pub use packets::{IpPacket, TransportPacket};
+pub use packets::{IpPacket, RxPacket, TransportPacket};
 pub use state::{
     validation::{ValidState, ValidationError},
     Action, Hook, IpRoutines, NatRoutines, Routine, Rule, State, UninstalledRoutine,
