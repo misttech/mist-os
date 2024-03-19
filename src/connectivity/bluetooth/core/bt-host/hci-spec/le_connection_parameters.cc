@@ -4,6 +4,8 @@
 
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci-spec/le_connection_parameters.h"
 
+#include "src/connectivity/bluetooth/lib/cpp-string/string_printf.h"
+
 namespace bt::hci_spec {
 
 namespace {

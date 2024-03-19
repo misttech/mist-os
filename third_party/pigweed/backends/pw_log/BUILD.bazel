@@ -6,12 +6,12 @@ package(default_visibility = ["//visibility:public"])
 
 cc_library(
     name = "pw_log",
+    srcs = [
+        "log_fuchsia.cc",
+    ],
     hdrs = [
         "public/pw_log_fuchsia/log_fuchsia.h",
         "public_overrides/pw_log_backend/log_backend.h",
-    ],
-    srcs = [
-        "log_fuchsia.cc",
     ],
     includes = [
         "public",
@@ -29,4 +29,19 @@ cc_library(
 # go directly in the backend target without causing circular dependencies.
 cc_library(
     name = "impl",
+)
+
+cc_library(
+    name = "syslog",
+    srcs = ["log_syslog.cc"],
+    deps = [
+        ":pw_log",
+        "//sdk/lib/syslog/cpp",
+    ],
+)
+
+cc_library(
+    name = "printf",
+    srcs = ["log_printf.cc"],
+    deps = [":pw_log"],
 )

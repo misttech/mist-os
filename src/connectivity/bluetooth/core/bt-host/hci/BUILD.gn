@@ -2,6 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/bazel/bazel_fuchsia_test_package.gni")
 import("//build_overrides/pigweed.gni")
 import("$dir_pw_unit_test/test.gni")
 
@@ -106,4 +107,9 @@ pw_test("tests") {
   ]
 
   test_main = "//src/connectivity/bluetooth/core/bt-host/testing:gtest_main"
+}
+
+bazel_fuchsia_test_package("test_pkg") {
+  test_package_name = "hci_tests"
+  test_component_names = [ "hci_test_autogen_cml" ]
 }

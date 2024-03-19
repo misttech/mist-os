@@ -2,6 +2,12 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+load(
+    "@fuchsia_sdk//fuchsia:defs.bzl",
+    "fuchsia_cc_test",
+    "fuchsia_unittest_package",
+)
+
 package(default_visibility = ["//visibility:public"])
 
 cc_library(
@@ -17,4 +23,32 @@ cc_library(
         "//src/connectivity/bluetooth/core/bt-host/transport",
         "@pigweed//third_party/fuchsia:fit",
     ],
+)
+
+fuchsia_cc_test(
+    name = "sco_test",
+    testonly = True,
+    srcs = [
+        "sco_connection_manager_test.cc",
+        "sco_connection_test.cc",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":sco",
+        "//src/connectivity/bluetooth/core/bt-host/hci:testing",
+        "//src/connectivity/bluetooth/core/bt-host/testing",
+        "//src/connectivity/bluetooth/core/bt-host/testing:gtest_main",
+        "//src/connectivity/bluetooth/core/bt-host/transport:testing",
+    ],
+)
+
+fuchsia_unittest_package(
+    name = "test_pkg",
+    package_name = "sco_tests",
+    testonly = True,
+    fuchsia_api_level = "HEAD",
+    unit_tests = [
+        ":sco_test",
+    ],
+    visibility = ["//visibility:public"],
 )

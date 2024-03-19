@@ -2,6 +2,12 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+load(
+    "@fuchsia_sdk//fuchsia:defs.bzl",
+    "fuchsia_cc_test",
+    "fuchsia_unittest_package",
+)
+
 package(default_visibility = ["//visibility:public"])
 
 cc_library(
@@ -33,4 +39,61 @@ cc_library(
         "@pigweed//pw_bluetooth:emboss_hci",
         "@pigweed//third_party/fuchsia:fit",
     ],
+)
+
+cc_library(
+    name = "testing",
+    srcs = [
+        "fake_bredr_connection.cc",
+        "fake_local_address_delegate.cc",
+        "fake_low_energy_connection.cc",
+        "fake_sco_connection.cc",
+    ],
+    deps = [
+        ":hci",
+        "//src/connectivity/bluetooth/core/bt-host:public",
+        "//src/connectivity/bluetooth/core/bt-host/common",
+        "@pigweed//pw_async:heap_dispatcher",
+    ],
+)
+
+fuchsia_cc_test(
+    name = "hci_test",
+    testonly = True,
+    srcs = [
+        "advertising_handle_map_test.cc",
+        "advertising_report_parser_test.cc",
+        "command_handler_test.cc",
+        "connection_test.cc",
+        "extended_low_energy_advertiser_test.cc",
+        "extended_low_energy_scanner_test.cc",
+        "legacy_low_energy_advertiser_test.cc",
+        "legacy_low_energy_scanner_test.cc",
+        "low_energy_advertiser_test.cc",
+        "low_energy_connector_test.cc",
+        "low_energy_multiple_advertising_test.cc",
+        "low_energy_scanner_test.cc",
+        "sequential_command_runner_test.cc",
+        "util_test.cc",
+    ],
+    death_unittest = True,
+    visibility = ["//visibility:public"],
+    deps = [
+        ":hci",
+        ":testing",
+        "//src/connectivity/bluetooth/core/bt-host/testing",
+        "//src/connectivity/bluetooth/core/bt-host/testing:gtest_main",
+        "@pigweed//pw_bluetooth:emboss_hci_test",
+    ],
+)
+
+fuchsia_unittest_package(
+    name = "test_pkg",
+    package_name = "hci_tests",
+    testonly = True,
+    fuchsia_api_level = "HEAD",
+    unit_tests = [
+        ":hci_test",
+    ],
+    visibility = ["//visibility:public"],
 )

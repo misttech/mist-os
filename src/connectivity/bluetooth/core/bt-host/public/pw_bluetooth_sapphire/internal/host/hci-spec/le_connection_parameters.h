@@ -8,8 +8,6 @@
 #include <cstdint>
 #include <string>
 
-#include "src/connectivity/bluetooth/lib/cpp-string/string_printf.h"
-
 namespace bt::hci_spec {
 
 // All LE connection parameters in this file are given in terms of a

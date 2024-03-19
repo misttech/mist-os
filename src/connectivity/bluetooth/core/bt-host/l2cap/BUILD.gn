@@ -2,6 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/bazel/bazel_fuchsia_test_package.gni")
 import("//build/fuzz.gni")
 import("//build_overrides/pigweed.gni")
 import("$dir_pw_fuzzer/fuzzer.gni")
@@ -305,4 +306,9 @@ pw_test_group("tests_and_fuzzers") {
     ":pw_common_handler_fuzzer_test",
     ":pw_l2cap_fuzzer_test",
   ]
+}
+
+bazel_fuchsia_test_package("test_pkg") {
+  test_package_name = "l2cap_tests"
+  test_component_names = [ "l2cap_test_autogen_cml" ]
 }

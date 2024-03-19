@@ -314,5 +314,11 @@ group("tests") {
 
 group("bazel_tests") {
   testonly = true
-  deps = [ "hci-spec:test_pkg" ]
+  deps = [
+    "hci:test_pkg",
+    "hci-spec:test_pkg",
+    "l2cap:test_pkg",
+    "sco:test_pkg",
+    "transport:test_pkg",
+  ]
 }

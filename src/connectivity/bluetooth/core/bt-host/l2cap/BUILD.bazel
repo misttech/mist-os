@@ -2,6 +2,12 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+load(
+    "@fuchsia_sdk//fuchsia:defs.bzl",
+    "fuchsia_cc_test",
+    "fuchsia_unittest_package",
+)
+
 package(default_visibility = ["//visibility:public"])
 
 cc_library(
@@ -53,6 +59,19 @@ cc_library(
 )
 
 cc_library(
+    name = "channel_manager_mock_controller_test_fixture",
+    testonly = True,
+    # Header is in bt-host:public
+    deps = [
+        ":l2cap",
+        ":testing",
+        "//src/connectivity/bluetooth/core/bt-host:public",
+        "//src/connectivity/bluetooth/core/bt-host/hci",
+        "//src/connectivity/bluetooth/core/bt-host/testing",
+    ],
+)
+
+cc_library(
     name = "testing",
     testonly = True,
     srcs = [
@@ -74,4 +93,60 @@ cc_library(
         "@pigweed//pw_bluetooth",
         "@pigweed//pw_unit_test",
     ],
+)
+
+fuchsia_cc_test(
+    name = "l2cap_test",
+    testonly = True,
+    srcs = [
+        "a2dp_offload_manager_test.cc",
+        "basic_mode_rx_engine_test.cc",
+        "basic_mode_tx_engine_test.cc",
+        "bredr_command_handler_test.cc",
+        "bredr_dynamic_channel_test.cc",
+        "bredr_signaling_channel_test.cc",
+        "channel_configuration_test.cc",
+        "channel_manager_test.cc",
+        "channel_test.cc",
+        "command_handler_test.cc",
+        "dynamic_channel_registry_test.cc",
+        "enhanced_retransmission_mode_engines_test.cc",
+        "enhanced_retransmission_mode_rx_engine_test.cc",
+        "enhanced_retransmission_mode_tx_engine_test.cc",
+        "fcs_test.cc",
+        "fragmenter_test.cc",
+        "frame_headers_test.cc",
+        "le_signaling_channel_test.cc",
+        "logical_link_test.cc",
+        "low_energy_command_handler_test.cc",
+        "pdu_test.cc",
+        "recombiner_test.cc",
+        "scoped_channel_test.cc",
+        "signaling_channel_test.cc",
+        "types_test.cc",
+    ],
+    death_unittest = True,
+    visibility = ["//visibility:public"],
+    deps = [
+        ":channel_manager_mock_controller_test_fixture",
+        ":l2cap",
+        ":testing",
+        "//src/connectivity/bluetooth/core/bt-host/hci",
+        "//src/connectivity/bluetooth/core/bt-host/hci:testing",
+        "//src/connectivity/bluetooth/core/bt-host/testing",
+        "//src/connectivity/bluetooth/core/bt-host/testing:gtest_main",
+        "//src/connectivity/bluetooth/core/bt-host/transport:testing",
+        "@pigweed//pw_async:fake_dispatcher_fixture",
+    ],
+)
+
+fuchsia_unittest_package(
+    name = "test_pkg",
+    package_name = "l2cap_tests",
+    testonly = True,
+    fuchsia_api_level = "HEAD",
+    unit_tests = [
+        ":l2cap_test",
+    ],
+    visibility = ["//visibility:public"],
 )

@@ -102,5 +102,6 @@ cc_library(
     deps = [
         ":testing",
         "//src/connectivity/bluetooth/core/bt-host/common",
+        "//third_party/pigweed/backends/pw_log:printf",
     ],
 )
