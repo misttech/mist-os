@@ -5,19 +5,12 @@
 """Fuchsia power test utility library."""
 
 # keep-sorted start
-from collections import deque
-from collections.abc import Iterable
-from dataclasses import dataclass
-from typing import Tuple, Dict, List
 import abc
-import array
 import csv
 import dataclasses
 import enum
 import itertools
-import json
 import logging
-import math
 import operator
 import os
 import signal
@@ -26,10 +19,12 @@ import subprocess
 import time
 
 # keep-sorted end
+
 # keep-sorted start
-from trace_processing import trace_metrics
-from trace_processing import trace_model
-from trace_processing import trace_time
+from collections import deque
+from collections.abc import Iterable
+from trace_processing import trace_metrics, trace_model, trace_time
+from typing import Tuple, Dict, List
 
 # keep-sorted end
 
@@ -351,6 +346,9 @@ class PowerSampler:
         """Returns a MetricsProcessor instance associated with the sampler."""
         return self._metrics_processor_impl()
 
+    def merge_power_data(self, model: trace_model.Model, fxt_path: str) -> None:
+        pass
+
     @abc.abstractmethod
     def _stop_impl(self) -> None:
         pass
@@ -466,6 +464,9 @@ class _RealPowerSampler(PowerSampler):
                 f"stderr: {stderr}"
             )
         _LOGGER.debug("measurepower process stopped.")
+
+    def merge_power_data(self, model: trace_model.Model, fxt_path: str) -> None:
+        merge_power_data(model, self._csv_output_path, fxt_path)
 
 
 def create_power_sampler(
