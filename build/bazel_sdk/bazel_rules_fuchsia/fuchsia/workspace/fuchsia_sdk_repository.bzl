@@ -5,7 +5,7 @@
 """Defines a WORKSPACE rule for loading a version of the Fuchsia IDK."""
 
 load("//fuchsia/workspace:utils.bzl", "workspace_path")
-load("//fuchsia/workspace/sdk_templates:generate_sdk_build_rules.bzl", "generate_sdk_build_rules", "generate_sdk_constants", "sdk_id_from_manifests")
+load("//fuchsia/workspace/sdk_templates:generate_sdk_build_rules.bzl", "generate_sdk_build_rules", "generate_sdk_constants", "resolve_repository_labels", "sdk_id_from_manifests")
 
 # Environment variable used to set a local Fuchsia Platform tree build output
 # directory. If this variable is set, it should point to
@@ -94,6 +94,10 @@ def _fuchsia_sdk_repository_impl(ctx):
 
     manifests = []
 
+    # Resolve labels early to avoir repository rule restarts.
+    repo_build_template = ctx.path(Label("//fuchsia/workspace/sdk_templates:repository.BUILD.template"))
+    resolve_repository_labels(ctx)
+
     if _LOCAL_FUCHSIA_IDK_DIRECTORY in ctx.os.environ:
         copy_content_strategy = "symlink"
         _instantiate_local_idk(ctx, manifests)
@@ -111,7 +115,7 @@ def _fuchsia_sdk_repository_impl(ctx):
     ctx.report_progress("Generating Bazel rules for the SDK")
     ctx.template(
         "BUILD.bazel",
-        ctx.path(Label("//fuchsia/workspace/sdk_templates:repository.BUILD.template")),
+        repo_build_template,
         substitutions = {
             "{{HOST_CPU}}": constants.host_cpus[0],
             "{{SDK_ID}}": sdk_id_from_manifests(ctx, manifests),

@@ -42,6 +42,18 @@ _SDK_TEMPLATES = {
     "sysroot_arch_sub": "//fuchsia/workspace/sdk_templates:sysroot_arch_sub.BUILD.template",
 }
 
+def resolve_repository_labels(ctx):
+    """Resolve the labels used by this repository.
+
+    Call this early in the repository_rule() to avoid unexpected restarts when
+    generate_sdk_build_rules() is called.
+
+    Args:
+       ctx: a repository_ctx value.
+    """
+    for template in _SDK_TEMPLATES.values():
+        ctx.path(Label(template))
+
 def _sdk_template_path(repo_ctx, name):
     """Return the path value of a given SDK template file.
 
