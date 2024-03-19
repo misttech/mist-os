@@ -23,6 +23,7 @@ group("tests") {
     "clock:tests",
     "cpu:tests",
     "gpio:tests",
+    "hrtimer:tests",
     "i2c:tests",
     "lib:tests",
     "light-sensor:tests",

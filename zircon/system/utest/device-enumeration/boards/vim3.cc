@@ -22,6 +22,7 @@ TEST_F(DeviceEnumerationTest, Vim3Test) {
       "sys/platform/05:06:9/ethernet_mac/aml-ethernet/dwmac/dwmac/eth_phy/phy_null_device",
       "sys/platform/00:00:35/function-button/adc-buttons",
       "sys/platform/00:00:36/vim3-buttons/buttons",
+      "sys/platform/05:00:42/aml-hrtimer",
 
       // bt-transport-uart is not included in bootfs on vim3.
       "sys/platform/05:00:3/bluetooth-composite-spec/aml-uart",

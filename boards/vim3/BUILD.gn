@@ -86,6 +86,11 @@ board_input_bundle("main_bundle") {
       driver_components = [ "meta/aml-ethernet.cm" ]
     },
     {
+      package_target = "//src/devices/hrtimer/drivers/aml-hrtimer:package"
+      package_set = "bootfs"
+      driver_components = [ "meta/aml-hrtimer.cm" ]
+    },
+    {
       package_target = "//src/connectivity/ethernet/drivers/dwmac:package"
       package_set = "bootfs"
       driver_components = [ "meta/dwmac.cm" ]

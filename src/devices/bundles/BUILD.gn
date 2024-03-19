@@ -19,6 +19,7 @@ group("drivers") {
     "//src/devices/clock:drivers",
     "//src/devices/cpu:drivers",
     "//src/devices/gpio:drivers",
+    "//src/devices/hrtimer:drivers",
     "//src/devices/i2c:drivers",
     "//src/devices/light-sensor:drivers",
     "//src/devices/mcu:drivers",

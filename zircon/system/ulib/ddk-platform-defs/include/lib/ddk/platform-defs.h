@@ -61,6 +61,7 @@
 #define PDEV_DID_ADC_BUTTONS            0x35  // ADC buttons
 #define PDEV_DID_BUTTONS                0x36  // Buttons
 #define PDEV_DID_FAKE_AC                0x37  // Fake ac for test
+#define PDEV_DID_HRTIMER                0x38  // High resolution timers
 
 // QEMU emulator
 #define PDEV_VID_QEMU               0x01

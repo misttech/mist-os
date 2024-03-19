@@ -151,6 +151,11 @@ int Vim3::Thread() {
     init_txn_->Reply(ZX_ERR_INTERNAL);
     return status;
   }
+  if (auto result = HrTimerInit(); result.is_error()) {
+    zxlogf(ERROR, "HrTimerInit() failed: %s", result.status_string());
+    init_txn_->Reply(result.error_value());
+    return result.error_value();
+  }
   if (auto result = AdcInit(); result.is_error()) {
     zxlogf(ERROR, "AdcInit() failed: %s", result.status_string());
     init_txn_->Reply(result.error_value());
