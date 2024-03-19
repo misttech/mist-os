@@ -228,15 +228,6 @@ impl SecurityServer {
             initial_contexts.insert(SecurityId::initial(id), security_context);
         }
 
-        // TODO(b/322848117): Label the kernel "unconfined", for descendants to inherit, until
-        // the necessary task transition / labelling hooks are implemented.
-        initial_contexts.insert(
-            SecurityId::initial(InitialSid::Kernel),
-            policy
-                .parsed
-                .parse_security_context(b"unconfined_u:unconfined_r:unconfined_t:s0-s0:c0.c1023")?,
-        );
-
         // Replace any existing policy and update the [`SeLinuxStatus`].
         self.with_state_and_update_status(|state| {
             // Replace the Contexts associated with initial SIDs used by this implementation.
