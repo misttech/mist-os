@@ -300,6 +300,7 @@ fn make_arg_idents<'a>(
 //
 // We also use this to descend into the body. This is because the body can also
 // contain references to the type parameters.
+#[allow(dead_code)] // TODO(https://fxbug.dev/330168486)
 struct RenameVisit {
     from: Ident,
     to: Ident,
@@ -379,6 +380,7 @@ impl VisitMut for TraitToConcreteVisit {
 // A VisitMut that searches for instances of "impl trait". These are unsupported
 // in function return values because they can't be used inside of traits, and we
 // convert the decorated function to a trait function.
+#[allow(dead_code)] // TODO(https://fxbug.dev/330168486)
 struct ReturnImplTraitVisit<'a>(&'a mut Vec<TokenStream2>);
 
 impl<'a> VisitMut for ReturnImplTraitVisit<'a> {

@@ -413,6 +413,7 @@ pub async fn run(mut fixture: impl Fixture) {
     .await;
 }
 
+#[allow(dead_code)] // TODO(https://fxbug.dev/330168051)
 struct FidlFixture;
 
 #[async_trait]

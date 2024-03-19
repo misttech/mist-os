@@ -4004,6 +4004,7 @@ mod tests {
     // traits. The rest we implement manually.
 
     // The arguments to `InnerIcmpContext::send_icmp_reply`.
+    #[allow(dead_code)] // TODO(https://fxbug.dev/330168037)
     #[derive(Debug, PartialEq)]
     struct SendIcmpReplyArgs<A: IpAddress> {
         device: Option<FakeDeviceId>,
@@ -4013,6 +4014,7 @@ mod tests {
     }
 
     // The arguments to `InnerIcmpContext::send_icmp_error_message`.
+    #[allow(dead_code)] // TODO(https://fxbug.dev/330168037)
     #[derive(Debug, PartialEq)]
     struct SendIcmpErrorMessageArgs<I: IcmpIpExt> {
         src_ip: SpecifiedAddr<I::Addr>,

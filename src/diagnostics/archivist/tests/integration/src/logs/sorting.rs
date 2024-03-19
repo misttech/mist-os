@@ -150,6 +150,7 @@ async fn timestamp_sorting_for_batches() {
     }
 }
 
+#[allow(dead_code)] // TODO(https://fxbug.dev/330168414)
 struct Listener {
     send_logs: mpsc::UnboundedSender<LogMessage>,
 }

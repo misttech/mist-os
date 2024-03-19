@@ -358,6 +358,7 @@ mod test {
         Blackholed,
     }
 
+    #[allow(dead_code)] // TODO(https://fxbug.dev/330168307)
     #[derive(Debug, PartialEq, Eq)]
     struct AddrClass {
         addr: SocketAddr,

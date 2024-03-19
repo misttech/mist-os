@@ -99,6 +99,7 @@ mod tests {
     use assert_matches::assert_matches;
     use fuchsia_async as fasync;
 
+    #[allow(dead_code)] // TODO(https://fxbug.dev/330168785)
     struct TestNode;
     impl Node for TestNode {
         fn name(&self) -> String {

@@ -76,6 +76,7 @@ pub async fn run(fixture: impl Fixture + 'static) {
     send_bytes(&fixture, sockets, &[7, 8, 9], AfterSend::CloseSender).await;
 }
 
+#[allow(dead_code)] // TODO(https://fxbug.dev/330168051)
 struct FidlFixture;
 
 #[async_trait]

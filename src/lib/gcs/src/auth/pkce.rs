@@ -29,6 +29,7 @@ const AUTHORIZATION_ENDPOINT: &str = "https://accounts.google.com/o/oauth2/v2/au
 
 const PKCE_BYTE_LENGTH: usize = 32;
 
+#[allow(dead_code)] // TODO(https://fxbug.dev/330168133)
 /// POST body to [`OAUTH_REFRESH_TOKEN_ENDPOINT`].
 #[derive(Serialize)]
 struct ExchangeAuthCodeRequest<'a> {

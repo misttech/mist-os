@@ -267,6 +267,7 @@ async fn run_mocks(
     Ok(())
 }
 
+#[allow(dead_code)] // TODO(https://fxbug.dev/330168414)
 #[derive(Clone, Copy, Debug, PartialEq)]
 struct Count {
     total: usize,

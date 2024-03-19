@@ -298,6 +298,7 @@ pub(crate) struct MldConfig {
     send_leave_anyway: bool,
 }
 
+#[allow(dead_code)] // TODO(https://fxbug.dev/330168037)
 #[derive(PartialEq, Eq, Clone, Copy, Debug)]
 pub(crate) struct ImmediateIdleState;
 
