@@ -220,7 +220,7 @@ closed protocol Volumes {
 
     /// Permanently deletes a volume identified by `name`.  If the volume is mounted, this call will
     /// fail.
-    strict Remove(resource struct {
+    strict Remove(struct {
         name string:fuchsia.io.MAX_FILENAME;
     }) -> () error zx.Status;
 };
@@ -291,4 +291,10 @@ closed protocol BlobReader {
 closed protocol Debug {
     /// Forces a compaction.
     strict Compact() -> () error zx.Status;
+
+    /// Deletes a recorded profile from a volume.
+    strict DeleteProfile(struct {
+        volume string:fuchsia.io.MAX_FILENAME;
+        profile string:fuchsia.io.MAX_FILENAME;
+    }) -> () error zx.Status;
 };

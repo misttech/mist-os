@@ -188,7 +188,7 @@ impl FxVolume {
         self.profile_state_mut().stop_profiler();
     }
 
-    pub async fn record_or_replay_profile(self: &Arc<Self>, name: &str) -> Result<(), Error> {
+    pub async fn get_profile_directory(self: &Arc<Self>) -> Result<Directory<FxVolume>, Error> {
         let internal_dir = self
             .get_or_create_internal_dir()
             .await
@@ -205,7 +205,7 @@ impl FxVolume {
                 Options::default(),
             )
             .await?;
-        let profile_dir = match internal_dir.directory().lookup(PROFILE_DIRECTORY).await? {
+        Ok(match internal_dir.directory().lookup(PROFILE_DIRECTORY).await? {
             Some((object_id, _)) => Directory::open_unchecked(self.clone(), object_id),
             None => {
                 let new_dir = internal_dir
@@ -215,13 +215,16 @@ impl FxVolume {
                 transaction.commit().await?;
                 new_dir
             }
-        };
+        })
+    }
 
+    pub async fn record_or_replay_profile(self: &Arc<Self>, name: &str) -> Result<(), Error> {
+        let profile_dir = self.get_profile_directory().await?;
         // We don't meddle in FxDirectory or FxFile here because we don't want a paged object.
         // Normally we ensure that there's only one copy by using the Node cache on the volume, but
         // that would create FxFile, so in this case we just assume that only one profile operation
         // should be ongoing at a time, as that is ensured in `VolumesDirectory`.
-        transaction = self
+        let mut transaction = self
             .store()
             .filesystem()
             .new_transaction(

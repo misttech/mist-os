@@ -415,14 +415,16 @@ impl Component {
     async fn handle_debug_requests(&self, mut stream: DebugRequestStream) -> Result<(), Error> {
         while let Some(request) = stream.try_next().await.context("Reading request")? {
             let state = self.state.lock().await;
-            let fs = match *state {
+            let (fs, volumes) = match &*state {
                 State::ComponentStarted => {
                     info!("Debug commands are not valid unless component is started.");
                     bail!("Component not started");
                 }
-                State::Running(RunningState { ref fs, .. }) => fs.deref().deref().clone(),
+                State::Running(RunningState { ref fs, volumes, .. }) => {
+                    (fs.deref().deref().clone(), volumes.clone())
+                }
             };
-            handle_debug_request(fs, request).await?;
+            handle_debug_request(fs, volumes, request).await?;
         }
         Ok(())
     }

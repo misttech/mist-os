@@ -6,6 +6,7 @@ use {
     crate::fuchsia::{
         component::map_to_raw_status,
         directory::FxDirectory,
+        errors::map_to_status,
         fxblob::BlobDirectory,
         memory_pressure::{MemoryPressureLevel, MemoryPressureMonitor},
         volume::{FxVolume, FxVolumeAndRoot, MemoryPressureConfig, RootDir},
@@ -42,7 +43,10 @@ use {
         Arc, OnceLock, Weak,
     },
     vfs::{
-        directory::{entry_container, helper::DirectlyMutable},
+        directory::{
+            entry_container::{self, MutableDirectory},
+            helper::DirectlyMutable,
+        },
         path::Path,
     },
 };
@@ -257,6 +261,28 @@ impl VolumesDirectory {
             iter.advance().await?;
         }
         Ok(me)
+    }
+
+    pub async fn delete_profile(
+        self: &Arc<Self>,
+        volume: &str,
+        profile: &str,
+    ) -> Result<(), zx::Status> {
+        for (_, (vol_name, volume_and_root)) in &*(self.mounted_volumes.lock().await) {
+            if vol_name == volume {
+                let dir = Arc::new(FxDirectory::new(
+                    None,
+                    volume_and_root
+                        .volume()
+                        .get_profile_directory()
+                        .await
+                        .map_err(map_to_status)?,
+                ));
+                return dir.unlink(profile, false).await;
+            }
+        }
+        warn!("Volume '{}' not found while deleting profile '{}'", volume, profile);
+        Err(zx::Status::NOT_FOUND)
     }
 
     pub async fn record_or_replay_profile(
@@ -1776,6 +1802,53 @@ mod tests {
         while volume.volume().profile_state_mut().busy() {
             fasync::Timer::new(Duration::from_millis(10)).await;
         }
+
+        std::mem::drop(volume);
+        volumes_directory.terminate().await;
+        std::mem::drop(volumes_directory);
+        filesystem.close().await.expect("Filesystem close");
+    }
+
+    #[fuchsia::test(threads = 10)]
+    async fn test_delete_profile() {
+        let device = DeviceHolder::new(FakeDevice::new(8192, 512));
+        let filesystem = FxFilesystem::new_empty(device).await.unwrap();
+        let volumes_directory = VolumesDirectory::new(
+            root_volume(filesystem.clone()).await.unwrap(),
+            Weak::new(),
+            None,
+        )
+        .await
+        .unwrap();
+        let volume = volumes_directory.create_and_mount_volume("foo", None, true).await.unwrap();
+
+        volumes_directory
+            .clone()
+            .record_or_replay_profile("foo".to_owned(), 0)
+            .await
+            .expect("Recording");
+
+        // Missing volume name.
+        assert_eq!(
+            volumes_directory.delete_profile("bar", "foo").await.expect_err("File shouldn't exist"),
+            Status::NOT_FOUND
+        );
+
+        // Missing Profile name.
+        assert_eq!(
+            volumes_directory.delete_profile("foo", "bar").await.expect_err("File shouldn't exist"),
+            Status::NOT_FOUND
+        );
+
+        // You can delete an in-flight profile, the file is created in a blocking method above and
+        // the recording will continue to run despite the file being unlinked.
+        volumes_directory.delete_profile("foo", "foo").await.expect("Deleting");
+
+        // Second deletion should fail with not found error.
+        assert_eq!(
+            volumes_directory.delete_profile("foo", "foo").await.expect_err("File shouldn't exist"),
+            Status::NOT_FOUND
+        );
 
         std::mem::drop(volume);
         volumes_directory.terminate().await;
