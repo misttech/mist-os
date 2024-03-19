@@ -46,35 +46,26 @@ pub use fidl_fuchsia_developer_ffx::TargetProxy;
 const FASTBOOT_INLINE_TARGET: &str = "ffx.fastboot.inline_target";
 const DISCOVERY_TIMEOUT: &str = "discovery.timeout";
 
-#[derive(Debug, Clone)]
-pub enum TargetKind {
-    Normal(String),
-    FastbootInline(String),
-}
-
-impl ToString for TargetKind {
-    fn to_string(&self) -> String {
-        match self {
-            Self::Normal(target) => target.to_string(),
-            Self::FastbootInline(serial) => serial.to_string(),
-        }
-    }
-}
-
 /// Attempt to connect to RemoteControl on a target device using a connection to a daemon.
 ///
 /// The optional |target| is a string matcher as defined in fuchsia.developer.ffx.TargetQuery
 /// fidl table.
 #[tracing::instrument]
 pub async fn get_remote_proxy(
-    target: Option<TargetKind>,
+    target: Option<String>,
     is_default_target: bool,
     daemon_proxy: DaemonProxy,
     proxy_timeout: Duration,
     mut target_info: Option<&mut Option<TargetInfo>>,
+    env_context: &EnvironmentContext,
 ) -> Result<RemoteControlProxy> {
-    let (target_proxy, target_proxy_fut) =
-        open_target_with_fut(target.clone(), is_default_target, daemon_proxy, proxy_timeout)?;
+    let (target_proxy, target_proxy_fut) = open_target_with_fut(
+        target.clone(),
+        is_default_target,
+        daemon_proxy,
+        proxy_timeout,
+        env_context,
+    )?;
     let mut target_proxy_fut = target_proxy_fut.boxed_local().fuse();
     let (remote_proxy, remote_server_end) = create_proxy::<RemoteControlMarker>()?;
     let mut open_remote_control_fut =
@@ -124,16 +115,15 @@ pub async fn get_remote_proxy(
 /// The optional |target| is a string matcher as defined in fuchsia.developer.ffx.TargetQuery
 /// fidl table.
 #[tracing::instrument]
-pub fn open_target_with_fut<'a>(
-    target: Option<TargetKind>,
+pub fn open_target_with_fut<'a, 'b: 'a>(
+    target: Option<String>,
     is_default_target: bool,
     daemon_proxy: DaemonProxy,
     target_timeout: Duration,
+    env_context: &'b EnvironmentContext,
 ) -> Result<(TargetProxy, impl Future<Output = Result<()>> + 'a)> {
     let (tc_proxy, tc_server_end) = create_proxy::<TargetCollectionMarker>()?;
     let (target_proxy, target_server_end) = create_proxy::<TargetMarker>()?;
-    let target_kind = target.clone();
-    let target = target.as_ref().map(ToString::to_string);
     let t_clone = target.clone();
     let target_collection_fut = async move {
         daemon_proxy
@@ -147,9 +137,13 @@ pub fn open_target_with_fut<'a>(
     };
     let t_clone = target.clone();
     let target_handle_fut = async move {
-        if let Some(TargetKind::FastbootInline(serial_number)) = target_kind {
-            tracing::trace!("got serial number: {}", serial_number);
-            timeout(target_timeout, tc_proxy.add_inline_fastboot_target(&serial_number)).await??;
+        let is_fastboot_inline = env_context.get(FASTBOOT_INLINE_TARGET).await.unwrap_or(false);
+        if is_fastboot_inline {
+            if let Some(ref serial_number) = target {
+                tracing::trace!("got serial number: {serial_number}");
+                timeout(target_timeout, tc_proxy.add_inline_fastboot_target(&serial_number))
+                    .await??;
+            }
         }
         timeout(
             target_timeout,
@@ -177,11 +171,8 @@ pub fn open_target_with_fut<'a>(
 
 /// Attempts to resolve the default target. Returning Some(_) if a target has been found, None
 /// otherwise.
-pub async fn resolve_default_target(
-    env_context: &EnvironmentContext,
-) -> Result<Option<TargetKind>> {
-    let t = get_default_target(&env_context).await?;
-    Ok(maybe_inline_target(t, &env_context).await)
+pub async fn resolve_default_target(env_context: &EnvironmentContext) -> Result<Option<String>> {
+    get_default_target(&env_context).await
 }
 
 pub(crate) fn target_addr_info_to_socket(ti: &TargetAddrInfo) -> SocketAddr {
@@ -265,20 +256,6 @@ pub async fn resolve_target_address(
             }
         },
         _ => unreachable!(),
-    }
-}
-
-/// In the event that a default target is supplied and there needs to be additional Fastboot
-/// inlining, this will handle wrapping the additional information for use in the FFX injector.
-pub async fn maybe_inline_target(
-    target: Option<String>,
-    env_context: &EnvironmentContext,
-) -> Option<TargetKind> {
-    let target = target?;
-    if env_context.get(FASTBOOT_INLINE_TARGET).await.unwrap_or(false) {
-        Some(TargetKind::FastbootInline(target))
-    } else {
-        Some(TargetKind::Normal(target))
     }
 }
 

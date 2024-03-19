@@ -12,7 +12,7 @@ use ffx_config::EnvironmentContext;
 use ffx_core::Injector;
 use ffx_daemon::{get_daemon_proxy_single_link, is_daemon_running_at_path, DaemonConfig};
 use ffx_metrics::add_ffx_rcs_protocol_event;
-use ffx_target::{get_remote_proxy, open_target_with_fut, TargetKind};
+use ffx_target::{get_remote_proxy, open_target_with_fut};
 use ffx_writer::{Format, Writer};
 use fidl::endpoints::Proxy;
 use fidl_fuchsia_developer_ffx::{DaemonError, DaemonProxy, TargetInfo, TargetProxy, VersionInfo};
@@ -89,7 +89,7 @@ pub struct Injection {
     env_context: EnvironmentContext,
     daemon_check: DaemonVersionCheck,
     format: Option<Format>,
-    target: Option<TargetKind>,
+    target: Option<String>,
     node: Arc<overnet_core::Router>,
     daemon_once: ProxyState<DaemonProxy>,
     remote_once: ProxyState<RemoteControlProxy>,
@@ -109,7 +109,7 @@ impl Injection {
         daemon_check: DaemonVersionCheck,
         node: Arc<overnet_core::Router>,
         format: Option<Format>,
-        target: Option<TargetKind>,
+        target: Option<String>,
     ) -> Self {
         Self {
             env_context,
@@ -156,6 +156,7 @@ impl Injection {
             daemon_proxy,
             proxy_timeout,
             Some(target_info),
+            &self.env_context,
         )
         .await
     }
@@ -169,6 +170,7 @@ impl Injection {
             self.is_default_target(),
             daemon_proxy.clone(),
             self.env_context.get_proxy_timeout().await?,
+            &self.env_context,
         )?;
         target_proxy_fut.await?;
         Ok(target_proxy)
@@ -787,7 +789,7 @@ mod test {
             DaemonVersionCheck::SameBuildId("testcurrenthash".to_owned()),
             local_node,
             None,
-            Some(TargetKind::Normal("".into())),
+            Some("".into()),
         );
 
         let error = injection.remote_factory().await.unwrap_err();

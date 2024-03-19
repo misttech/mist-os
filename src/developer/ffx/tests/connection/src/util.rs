@@ -33,6 +33,7 @@ pub struct LaunchedComponentConnector {
     rcs_proxy: RemoteControlProxy,
     ascendd_path: PathBuf,
     daemon_tasks: Mutex<Vec<fasync::Task<Result<()>>>>,
+    env_context: ffx_config::EnvironmentContext,
 }
 
 impl LaunchedComponent {
@@ -74,7 +75,8 @@ impl LaunchedComponentConnector {
     /// running on target.
     pub async fn connect_via_new_daemon_connection(&self) -> Result<StressorProxy> {
         let (rcs_proxy, daemon_task) =
-            connect_to_rcs(&self.node, &self.nodename, &self.ascendd_path).await?;
+            connect_to_rcs(&self.node, &self.nodename, &self.ascendd_path, &self.env_context)
+                .await?;
         self.daemon_tasks.lock().await.push(daemon_task);
         Self::connect_with_rcs_proxy(&rcs_proxy, &self.moniker).await
     }
@@ -89,6 +91,7 @@ async fn launch(
 ) -> Result<(LaunchedComponent, LaunchedComponentConnector)> {
     let moniker = format!("/core/ffx-laboratory:{}", name);
 
+    let env_context = isolate.env_context().clone();
     let create_output = isolate.ffx(&["component", "create", &moniker, STRESSOR_URL]).await?;
     if !create_output.status.success() {
         return Err(anyhow!("Failed to create component: {:?}", create_output));
@@ -102,7 +105,8 @@ async fn launch(
             Err(anyhow!("Failed to start component: {:?}", output))
         } else {
             let ascendd_path = isolate.ascendd_path().to_owned();
-            let (rcs_proxy, daemon_task) = connect_to_rcs(&node, nodename, &ascendd_path).await?;
+            let (rcs_proxy, daemon_task) =
+                connect_to_rcs(&node, nodename, &ascendd_path, &env_context).await?;
             Ok(LaunchedComponentConnector {
                 nodename: nodename.to_string(),
                 moniker,
@@ -110,6 +114,7 @@ async fn launch(
                 rcs_proxy,
                 ascendd_path,
                 daemon_tasks: Mutex::new(vec![daemon_task]),
+                env_context,
             })
         }
     }
@@ -130,16 +135,18 @@ async fn connect_to_rcs(
     node: &Arc<overnet_core::Router>,
     nodename: &str,
     ascendd_path: &Path,
+    context: &ffx_config::EnvironmentContext,
 ) -> Result<(RemoteControlProxy, fasync::Task<Result<()>>)> {
     let (_node, daemon_proxy, daemon_fut) =
         ffx_daemon::get_daemon_proxy_single_link(&node, ascendd_path.to_owned(), None).await?;
     let daemon_task = fasync::Task::spawn(daemon_fut);
     let rcs_proxy = ffx_target::get_remote_proxy(
-        Some(ffx_target::TargetKind::Normal(nodename.to_string())),
+        Some(nodename.to_string()),
         false,
         daemon_proxy,
         TARGET_TIMEOUT,
         None,
+        context,
     )
     .await?;
     Ok((rcs_proxy, daemon_task))
