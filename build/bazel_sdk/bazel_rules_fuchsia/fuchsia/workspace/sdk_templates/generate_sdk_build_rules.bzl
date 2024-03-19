@@ -29,7 +29,7 @@ _SDK_TEMPLATES = {
     "component_manifest_collection": "//fuchsia/workspace/sdk_templates:component_manifest_collection.BUILD.template",
     "constraint": "//fuchsia/workspace/sdk_templates:constraint.BUILD.template",
     "export_all_files": "//fuchsia/workspace/sdk_templates:export_all_files.BUILD.template",
-    "ffx_tool": "//fuchsia/workspace/sdk_templates:ffx_tool.BUILD.template",
+    "ffx_subtool": "//fuchsia/workspace/sdk_templates:ffx_subtool.BUILD.template",
     "fidl_library": "//fuchsia/workspace/sdk_templates:fidl_library.BUILD.template",
     "filegroup": "//fuchsia/workspace/sdk_templates:filegroup.BUILD.template",
     "host_tool": "//fuchsia/workspace/sdk_templates:host_tool.BUILD.template",
@@ -221,7 +221,7 @@ def _ffx_tool_files(meta, files_str):
             files_str.extend(collection)
 
 # buildifier: disable=unused-variable
-def _generate_ffx_tool_build_rules(ctx, meta, relative_dir, build_file, process_context, parent_sdk_contents):
+def _generate_ffx_subtool_build_rules(ctx, meta, relative_dir, build_file, process_context, parent_sdk_contents):
     # Include meta manifest itself because ffx uses it to locate ffx tools.
     files_str = [meta["_meta_path"]]
     if "files" in meta:
@@ -242,7 +242,7 @@ def _generate_ffx_tool_build_rules(ctx, meta, relative_dir, build_file, process_
     _merge_template(
         ctx,
         build_file,
-        _sdk_template_path(ctx, "ffx_tool"),
+        _sdk_template_path(ctx, "ffx_subtool"),
         {
             "{{files}}": _get_starlark_list(relative_files),
         },
@@ -690,7 +690,7 @@ def _process_dir(ctx, relative_dir, libraries, process_context, parent_sdk_conte
         "fidl_library": _generate_fidl_library_build_rules,
         "companion_host_tool": _generate_companion_host_tool_build_rules,
         "host_tool": _generate_host_tool_build_rules,
-        "ffx_tool": _generate_ffx_tool_build_rules,
+        "ffx_tool": _generate_ffx_subtool_build_rules,
         "cc_source_library": _generate_cc_source_library_build_rules,
         "cc_prebuilt_library": _generate_cc_prebuilt_library_build_rules,
         "bind_library": _generate_bind_library_build_rules,

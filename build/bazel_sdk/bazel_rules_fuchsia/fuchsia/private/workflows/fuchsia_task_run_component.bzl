@@ -32,7 +32,7 @@ def _fuchsia_task_run_component_impl(ctx, make_fuchsia_task):
     if component.is_driver:
         args = [
             "--ffx",
-            sdk.ffx,
+            sdk.ffx_driver,
             "--url",
             url,
         ]
@@ -45,6 +45,10 @@ def _fuchsia_task_run_component_impl(ctx, make_fuchsia_task):
         return make_fuchsia_task(
             ctx.attr._register_driver_tool,
             args,
+            runfiles = [
+                sdk.ffx_driver_fho_meta,
+                sdk.ffx_driver_manifest,
+            ],
         )
     elif component.is_test:
         args = [

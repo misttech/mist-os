@@ -23,6 +23,9 @@ def _fuchsia_toolchain_info_impl(ctx):
         ffx_assembly = ctx.executable.ffx_assembly or None,
         ffx_assembly_fho_meta = ctx.file.ffx_assembly_fho_meta or None,
         ffx_assembly_manifest = ctx.file.ffx_assembly_manifest or None,
+        ffx_driver = ctx.executable.ffx_driver or None,
+        ffx_driver_fho_meta = ctx.file.ffx_driver_fho_meta or None,
+        ffx_driver_manifest = ctx.file.ffx_driver_manifest or None,
         ffx_package = ctx.executable.ffx_package or None,
         ffx_package_fho_meta = ctx.file.ffx_package_fho_meta or None,
         ffx_package_manifest = ctx.file.ffx_package_manifest or None,
@@ -142,6 +145,20 @@ included in the Fuchsia IDK.
         ),
         "ffx_assembly_manifest": attr.label(
             doc = "ffx-assembly tool metadata.",
+            allow_single_file = True,
+        ),
+        "ffx_driver": attr.label(
+            doc = "ffx-driver tool executable.",
+            cfg = "exec",
+            executable = True,
+            allow_single_file = True,
+        ),
+        "ffx_driver_fho_meta": attr.label(
+            doc = "ffx-driver tool metadata.",
+            allow_single_file = True,
+        ),
+        "ffx_driver_manifest": attr.label(
+            doc = "ffx-driver tool metadata.",
             allow_single_file = True,
         ),
         "ffx_package": attr.label(
