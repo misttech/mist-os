@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::{
-    common::{inherit_rights_for_clone, send_on_open_with_error, IntoAny as _},
+    common::{inherit_rights_for_clone, send_on_open_with_error, CreationMode, IntoAny as _},
     directory::{
         common::check_child_connection_flags,
         entry_container::{Directory, DirectoryWatcher},
@@ -428,7 +428,7 @@ where
         //
         // TODO(b/293947862): If we add an additional node type, we will need to update this. See if
         // there is a more generic or robust way to check this so that we don't miss any node types.
-        if protocols.open_mode() != fio::OpenMode::OpenExisting
+        if protocols.creation_mode() != CreationMode::Never
             && ((protocols.is_file_allowed() && protocols.is_dir_allowed())
                 || protocols.is_symlink_allowed())
         {
@@ -436,7 +436,7 @@ where
         }
 
         if protocols.create_attributes().is_some()
-            && protocols.open_mode() == fio::OpenMode::OpenExisting
+            && protocols.creation_mode() == CreationMode::Never
         {
             return Err(Status::INVALID_ARGS);
         }
@@ -445,7 +445,7 @@ where
             if !protocols.is_node() && !protocols.is_dir_allowed() {
                 return Err(Status::INVALID_ARGS);
             }
-            if protocols.open_mode() == fio::OpenMode::AlwaysCreate {
+            if protocols.creation_mode() == CreationMode::Always {
                 return Err(Status::ALREADY_EXISTS);
             }
         }

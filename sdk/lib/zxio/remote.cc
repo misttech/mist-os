@@ -1141,7 +1141,15 @@ zx_status_t Remote<Protocol>::Open2(const char* path, size_t path_len,
         fidl::ObjectView<fio::wire::NodeProtocols>::FromExternal(&node_protocols));
 
     // -- mode --
-    node_options_builder.mode(fio::wire::OpenMode(options->mode));
+#if __Fuchsia_API_level__ >= 19
+    node_options_builder.mode(fio::wire::CreationMode(
+        options->mode == ZXIO_CREATION_MODE_NEVER_DEPRECATED ? ZXIO_CREATION_MODE_NEVER
+                                                             : options->mode));
+#else
+    node_options_builder.mode(fio::wire::OpenMode(options->mode == ZXIO_CREATION_MODE_NEVER
+                                                      ? ZXIO_CREATION_MODE_NEVER_DEPRECATED
+                                                      : options->mode));
+#endif
 
     // -- rights --
     if (rights != fio::Operations(0)) {

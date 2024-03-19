@@ -175,11 +175,8 @@ impl Directory for PkgfsPackages {
         protocols: fio::ConnectionProtocols,
         object_request: ObjectRequestRef<'_>,
     ) -> Result<(), zx::Status> {
-        match protocols.open_mode() {
-            fio::OpenMode::OpenExisting => {}
-            fio::OpenMode::AlwaysCreate | fio::OpenMode::MaybeCreate => {
-                return Err(zx::Status::NOT_SUPPORTED);
-            }
+        if protocols.creation_mode() != vfs::CreationMode::Never {
+            return Err(zx::Status::NOT_SUPPORTED);
         }
         // This directory and all child nodes are read-only
         if let Some(rights) = protocols.rights() {

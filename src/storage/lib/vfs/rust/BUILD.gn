@@ -50,6 +50,8 @@ rustc_library("vfs") {
   features = []
   if (clang_fuchsia_api_level == CLANG_FUCHSIA_HEAD_VALUE) {
     features += [ "target_api_level_head" ]
+  } else if (clang_fuchsia_api_level < 19) {
+    features += [ "uses_deprecated_open_mode" ]
   }
 
   with_unit_tests = true

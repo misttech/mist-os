@@ -46,8 +46,8 @@ use starnix_uapi::{
 use std::sync::Arc;
 use syncio::{
     zxio::{zxio_get_posix_mode, ZXIO_NODE_PROTOCOL_FILE, ZXIO_NODE_PROTOCOL_SYMLINK},
-    zxio_fsverity_descriptor_t, zxio_node_attr_has_t, zxio_node_attributes_t, DirentIterator,
-    XattrSetMode, Zxio, ZxioDirent, ZXIO_ROOT_HASH_LENGTH,
+    zxio_fsverity_descriptor_t, zxio_node_attr_has_t, zxio_node_attributes_t, CreationMode,
+    DirentIterator, OpenOptions, XattrSetMode, Zxio, ZxioDirent, ZXIO_ROOT_HASH_LENGTH,
 };
 
 pub struct RemoteFs {
@@ -426,12 +426,12 @@ impl FsNodeOps for RemoteNode {
                 self.zxio
                     .open2(
                         name,
-                        syncio::OpenOptions {
+                        OpenOptions {
                             node_protocols: Some(fio::NodeProtocols {
                                 file: Some(fio::FileProtocolFlags::default()),
                                 ..Default::default()
                             }),
-                            mode: fio::OpenMode::AlwaysCreate,
+                            mode: CreationMode::Always,
                             create_attr: Some(zxio_node_attributes_t {
                                 mode: mode.bits(),
                                 uid: owner.uid,
@@ -521,12 +521,12 @@ impl FsNodeOps for RemoteNode {
                 self.zxio
                     .open2(
                         name,
-                        syncio::OpenOptions {
+                        OpenOptions {
                             node_protocols: Some(fio::NodeProtocols {
                                 directory: Some(fio::DirectoryProtocolOptions::default()),
                                 ..Default::default()
                             }),
-                            mode: fio::OpenMode::AlwaysCreate,
+                            mode: CreationMode::Always,
                             create_attr: Some(zxio_node_attributes_t {
                                 mode: mode.bits(),
                                 uid: owner.uid,
@@ -614,7 +614,7 @@ impl FsNodeOps for RemoteNode {
                 self.zxio
                     .open2(
                         name,
-                        syncio::OpenOptions {
+                        OpenOptions {
                             node_protocols: Some(fio::NodeProtocols {
                                 directory: Some(Default::default()),
                                 file: Some(Default::default()),

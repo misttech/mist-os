@@ -296,6 +296,76 @@ macro_rules! immutable_attributes {
     )
 }
 
+/// Wrapper for [`fio::CreationMode`] which replaces [`fio::OpenMode`] at API level 19. Can be
+/// removed when we stop supporting API level 18, and replaced with [`fio::CreationMode`] directly.
+#[derive(PartialEq, Eq)]
+pub enum CreationMode {
+    Never,
+    AllowExisting,
+    Always,
+}
+
+#[cfg(feature = "uses_deprecated_open_mode")]
+impl From<fio::OpenMode> for CreationMode {
+    fn from(value: fio::OpenMode) -> Self {
+        match value {
+            fio::OpenMode::OpenExisting => CreationMode::Never,
+            fio::OpenMode::MaybeCreate => CreationMode::AllowExisting,
+            fio::OpenMode::AlwaysCreate => CreationMode::Always,
+        }
+    }
+}
+
+#[cfg(feature = "uses_deprecated_open_mode")]
+impl From<CreationMode> for fio::OpenMode {
+    fn from(value: CreationMode) -> Self {
+        match value {
+            CreationMode::Never => fio::OpenMode::OpenExisting,
+            CreationMode::AllowExisting => fio::OpenMode::MaybeCreate,
+            CreationMode::Always => fio::OpenMode::AlwaysCreate,
+        }
+    }
+}
+
+#[cfg(not(feature = "uses_deprecated_open_mode"))]
+impl From<fio::CreationMode> for CreationMode {
+    fn from(value: fio::CreationMode) -> Self {
+        match value {
+            fio::CreationMode::Never | fio::CreationMode::NeverDeprecated => CreationMode::Never,
+            fio::CreationMode::AllowExisting => CreationMode::AllowExisting,
+            fio::CreationMode::Always => CreationMode::Always,
+        }
+    }
+}
+
+#[cfg(not(feature = "uses_deprecated_open_mode"))]
+impl From<CreationMode> for fio::CreationMode {
+    fn from(value: CreationMode) -> Self {
+        match value {
+            CreationMode::Never => fio::CreationMode::Never,
+            CreationMode::AllowExisting => fio::CreationMode::AllowExisting,
+            CreationMode::Always => fio::CreationMode::Always,
+        }
+    }
+}
+
+#[cfg(not(feature = "uses_deprecated_open_mode"))]
+type CreationModeFidl = fio::CreationMode;
+#[cfg(feature = "uses_deprecated_open_mode")]
+type CreationModeFidl = fio::OpenMode;
+
+impl PartialEq<CreationModeFidl> for CreationMode {
+    fn eq(&self, other: &CreationModeFidl) -> bool {
+        *self == CreationMode::from(*other)
+    }
+}
+
+impl PartialEq<CreationMode> for CreationModeFidl {
+    fn eq(&self, other: &CreationMode) -> bool {
+        CreationMode::from(*self) == *other
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::inherit_rights_for_clone;

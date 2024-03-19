@@ -14,7 +14,7 @@ use {
     std::sync::Arc,
     syncio::{
         zxio, zxio_fsverity_descriptor_t, zxio_node_attr_has_t, zxio_node_attributes_t,
-        OpenOptions, SeekOrigin, XattrSetMode, Zxio, ZXIO_ROOT_HASH_LENGTH,
+        CreationMode, OpenOptions, SeekOrigin, XattrSetMode, Zxio, ZXIO_ROOT_HASH_LENGTH,
     },
     vfs::{
         directory::{
@@ -495,7 +495,7 @@ async fn test_open2() {
         let test_dir = dir_zxio
             .open2(
                 "test_dir",
-                OpenOptions { mode: fio::OpenMode::AlwaysCreate, ..OpenOptions::directory(None) },
+                OpenOptions { mode: CreationMode::Always, ..OpenOptions::directory(None) },
                 None,
             )
             .expect("open2 failed");
@@ -505,7 +505,7 @@ async fn test_open2() {
             .open2(
                 "test_file",
                 OpenOptions {
-                    mode: fio::OpenMode::AlwaysCreate,
+                    mode: CreationMode::Always,
                     ..OpenOptions::file(fio::FileProtocolFlags::empty())
                 },
                 None,
@@ -620,7 +620,7 @@ async fn test_open2_rights() {
             .open2(
                 "test_file",
                 OpenOptions {
-                    mode: fio::OpenMode::AlwaysCreate,
+                    mode: CreationMode::Always,
                     ..OpenOptions::file(fio::FileProtocolFlags::empty())
                 },
                 None,
@@ -712,7 +712,7 @@ async fn test_open2_node() {
             .open2(
                 "test_file",
                 OpenOptions {
-                    mode: fio::OpenMode::AlwaysCreate,
+                    mode: CreationMode::Always,
                     ..OpenOptions::file(fio::FileProtocolFlags::empty())
                 },
                 None,
@@ -946,7 +946,7 @@ async fn test_get_set_attributes_node() {
             .open2(
                 "test_file",
                 OpenOptions {
-                    mode: fio::OpenMode::AlwaysCreate,
+                    mode: CreationMode::Always,
                     ..OpenOptions::file(fio::FileProtocolFlags::empty())
                 },
                 None,

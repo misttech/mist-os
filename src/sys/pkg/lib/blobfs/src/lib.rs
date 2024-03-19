@@ -300,7 +300,7 @@ impl Client {
             return Err(zx::Status::ACCESS_DENIED);
         }
         // Reject requests that attempt to create new blobs.
-        if let fio::OpenMode::AlwaysCreate | fio::OpenMode::MaybeCreate = protocols.open_mode() {
+        if protocols.creation_mode() != vfs::CreationMode::Never {
             return Err(zx::Status::NOT_SUPPORTED);
         }
         // Errors below will be communicated via the `object_request` channel.

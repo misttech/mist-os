@@ -159,11 +159,8 @@ impl<S: crate::NonMetaStorage> vfs::directory::entry_container::Directory for Me
         protocols: fio::ConnectionProtocols,
         object_request: ObjectRequestRef<'_>,
     ) -> Result<(), zx::Status> {
-        match protocols.open_mode() {
-            fio::OpenMode::OpenExisting => {}
-            fio::OpenMode::AlwaysCreate | fio::OpenMode::MaybeCreate => {
-                return Err(zx::Status::NOT_SUPPORTED);
-            }
+        if protocols.creation_mode() != vfs::CreationMode::Never {
+            return Err(zx::Status::NOT_SUPPORTED);
         }
 
         if path.is_empty() {
@@ -558,12 +555,12 @@ mod tests {
     async fn directory_entry_open2_rejects_forbidden_open_modes() {
         let (_env, meta_as_dir) = TestEnv::new().await;
 
-        for forbidden_open_mode in [fio::OpenMode::AlwaysCreate, fio::OpenMode::MaybeCreate] {
+        for forbidden_open_mode in [vfs::CreationMode::Always, vfs::CreationMode::AllowExisting] {
             let (proxy, server_end) =
                 fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
             let scope = ExecutionScope::new();
             let protocols = fio::ConnectionProtocols::Node(fio::NodeOptions {
-                mode: Some(forbidden_open_mode),
+                mode: Some(forbidden_open_mode.into()),
                 rights: Some(fio::Operations::READ_BYTES),
                 ..Default::default()
             });

@@ -7,7 +7,7 @@
 //! to construct actual instances.  See [`Simple`] for details.
 
 use crate::{
-    common::{rights_to_posix_mode_bits, send_on_open_with_error},
+    common::{rights_to_posix_mode_bits, send_on_open_with_error, CreationMode},
     directory::{
         connection::DerivedConnection,
         dirents_sink,
@@ -135,7 +135,7 @@ where
 
         match this.entries.get(name) {
             Some(entry) => {
-                if protocols.open_mode() == fio::OpenMode::AlwaysCreate {
+                if protocols.creation_mode() == CreationMode::Always {
                     return Err(Status::ALREADY_EXISTS);
                 }
                 Ok(entry.clone())
@@ -146,7 +146,7 @@ where
                     ..
                 }) = protocols
                 {
-                    if protocols.open_mode() == fio::OpenMode::OpenExisting {
+                    if protocols.creation_mode() == CreationMode::Never {
                         return Err(Status::NOT_FOUND);
                     }
                     let entry_type = NewEntryType::from_protocols(node_protocols)?;

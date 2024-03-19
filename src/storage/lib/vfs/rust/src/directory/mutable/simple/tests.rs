@@ -786,7 +786,7 @@ fn open_existing_file() {
                         file: Some(fio::FileProtocolFlags::default()),
                         ..Default::default()
                     }),
-                    mode: Some(fio::OpenMode::OpenExisting),
+                    mode: Some(vfs::CreationMode::Never.into()),
                     ..Default::default()
                 }),
                 "bar",
@@ -803,7 +803,7 @@ fn open_existing_file() {
                         file: Some(fio::FileProtocolFlags::default()),
                         ..Default::default()
                     }),
-                    mode: Some(fio::OpenMode::OpenExisting),
+                    mode: Some(vfs::CreationMode::Never.into()),
                     ..Default::default()
                 }),
                 "foo",

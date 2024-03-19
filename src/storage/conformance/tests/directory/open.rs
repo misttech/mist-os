@@ -508,7 +508,7 @@ async fn open2_invalid() {
     );
 
     // It's an error to specify more than one protocol when trying to create an object.
-    for mode in [fio::OpenMode::MaybeCreate, fio::OpenMode::AlwaysCreate] {
+    for mode in [vfs::CreationMode::AllowExisting, vfs::CreationMode::Always] {
         let status = test_dir
             .open2_node::<fio::NodeMarker>(
                 "file",
@@ -518,7 +518,7 @@ async fn open2_invalid() {
                         directory: Some(fio::DirectoryProtocolOptions::default()),
                         ..Default::default()
                     }),
-                    mode: Some(mode),
+                    mode: Some(mode.into()),
                     ..Default::default()
                 },
             )
@@ -528,7 +528,7 @@ async fn open2_invalid() {
     }
 
     // It's an error to specify create attributes when opening an object.
-    for mode in [None, Some(fio::OpenMode::OpenExisting)] {
+    for mode in [None, Some(vfs::CreationMode::Never.into())] {
         let status = test_dir
             .open2_node::<fio::DirectoryMarker>(
                 "file",
@@ -572,7 +572,7 @@ async fn open2_create_dot_fails_with_already_exists() {
                     directory: Some(fio::DirectoryProtocolOptions::default()),
                     ..Default::default()
                 }),
-                mode: Some(fio::OpenMode::AlwaysCreate),
+                mode: Some(vfs::CreationMode::Always.into()),
                 ..Default::default()
             },
         )
@@ -1000,7 +1000,7 @@ async fn open2_open_existing_directory() {
                     directory: Some(fio::DirectoryProtocolOptions::default()),
                     ..Default::default()
                 }),
-                mode: Some(fio::OpenMode::OpenExisting),
+                mode: Some(vfs::CreationMode::Never.into()),
                 ..Default::default()
             },
         )
@@ -1017,7 +1017,7 @@ async fn open2_open_existing_directory() {
                     directory: Some(fio::DirectoryProtocolOptions::default()),
                     ..Default::default()
                 }),
-                mode: Some(fio::OpenMode::OpenExisting),
+                mode: Some(vfs::CreationMode::Never.into()),
                 ..Default::default()
             },
         )

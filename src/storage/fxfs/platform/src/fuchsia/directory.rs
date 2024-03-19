@@ -128,7 +128,7 @@ impl FxDirectory {
                 current_dir.directory.object_id()
             )];
             let transaction_or_guard =
-                if last_segment && protocols.open_mode() != fio::OpenMode::OpenExisting {
+                if last_segment && protocols.creation_mode() != vfs::CreationMode::Never {
                     Left(fs.clone().new_transaction(keys, Options::default()).await?)
                 } else {
                     // When child objects are created, the object is created along with the
@@ -175,7 +175,7 @@ impl FxDirectory {
             match child_descriptor {
                 Some((child_node, object_descriptor)) => {
                     if transaction_or_guard.is_left()
-                        && protocols.open_mode() == fio::OpenMode::AlwaysCreate
+                        && protocols.creation_mode() == vfs::CreationMode::Always
                     {
                         bail!(FxfsError::AlreadyExists);
                     }
@@ -2108,7 +2108,7 @@ mod tests {
                     directory: Some(fio::DirectoryProtocolOptions::default()),
                     ..Default::default()
                 }),
-                mode: Some(fio::OpenMode::MaybeCreate),
+                mode: Some(vfs::CreationMode::AllowExisting.into()),
                 create_attributes: Some(fio::MutableNodeAttributes {
                     mode: Some(mode),
                     ..Default::default()
@@ -2188,7 +2188,7 @@ mod tests {
                     directory: Some(fio::DirectoryProtocolOptions::default()),
                     ..Default::default()
                 }),
-                mode: Some(fio::OpenMode::MaybeCreate),
+                mode: Some(vfs::CreationMode::AllowExisting.into()),
                 create_attributes: Some(fio::MutableNodeAttributes { ..Default::default() }),
                 ..Default::default()
             });
@@ -2236,7 +2236,7 @@ mod tests {
                     file: Some(fio::FileProtocolFlags::default()),
                     ..Default::default()
                 }),
-                mode: Some(fio::OpenMode::MaybeCreate),
+                mode: Some(vfs::CreationMode::AllowExisting.into()),
                 create_attributes: Some(fio::MutableNodeAttributes {
                     modification_time: Some(modification_time),
                     mode: Some(mode),
@@ -2322,7 +2322,7 @@ mod tests {
                     file: Some(fio::FileProtocolFlags::default()),
                     ..Default::default()
                 }),
-                mode: Some(fio::OpenMode::MaybeCreate),
+                mode: Some(vfs::CreationMode::AllowExisting.into()),
                 create_attributes: Some(fio::MutableNodeAttributes { ..Default::default() }),
                 ..Default::default()
             });

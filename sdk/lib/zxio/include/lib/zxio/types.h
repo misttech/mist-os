@@ -489,10 +489,13 @@ typedef uint32_t zxio_watch_directory_event_t;
 typedef zx_status_t (*zxio_watch_directory_cb)(zxio_watch_directory_event_t event, const char* name,
                                                void* context) ZX_AVAILABLE_SINCE(7);
 
-// For mode below.
-#define ZXIO_OPEN_EXISTING 0x1
-#define ZXIO_MAYBE_CREATE 0x2,
-#define ZXIO_ALWAYS_CREATE 0x3,
+// The possible entry creation modes. See fuchsia.io's CreationMode.
+typedef uint32_t zxio_creation_mode_t;
+
+#define ZXIO_CREATION_MODE_NEVER 0x0
+#define ZXIO_CREATION_MODE_NEVER_DEPRECATED 0x1
+#define ZXIO_CREATION_MODE_ALLOW_EXISTING 0x2
+#define ZXIO_CREATION_MODE_ALWAYS 0x3
 
 // See fuchsia.io for detailed semantics.
 typedef struct zxio_open_options {
@@ -511,9 +514,9 @@ typedef struct zxio_open_options {
   // NodeProtocolFlags.
   uint64_t node_flags;
 
-  // Specifies behaviour with respect to existence. See fuchia.io's OpenMode, and use constants
+  // Specifies behaviour with respect to existence. See fuchia.io's CreationMode, and use constants
   // defined above.
-  uint32_t mode;
+  zxio_creation_mode_t mode;
 
   // Requested rights for the connection. If zero, this will mean inherit the rights of the
   // connection that handles the open.

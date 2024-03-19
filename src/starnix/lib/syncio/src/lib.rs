@@ -360,13 +360,29 @@ pub struct RecvMessageInfo {
     pub flags: i32,
 }
 
+pub enum CreationMode {
+    Never,
+    AllowExisting,
+    Always,
+}
+
+impl From<CreationMode> for zxio::zxio_creation_mode_t {
+    fn from(value: CreationMode) -> Self {
+        match value {
+            CreationMode::Never => zxio::ZXIO_CREATION_MODE_NEVER,
+            CreationMode::AllowExisting => zxio::ZXIO_CREATION_MODE_ALLOW_EXISTING,
+            CreationMode::Always => zxio::ZXIO_CREATION_MODE_ALWAYS,
+        }
+    }
+}
+
 /// Options for open2.
 pub struct OpenOptions {
     /// If None, connects to a service.
     pub node_protocols: Option<fio::NodeProtocols>,
 
     /// Behaviour with respect ot existence. See fuchsia.io for precise semantics.
-    pub mode: fio::OpenMode,
+    pub mode: CreationMode,
 
     /// See fuchsia.io for semantics. If empty, then it is regarded as absent i.e. rights will be
     /// inherited.
@@ -406,7 +422,7 @@ impl Default for OpenOptions {
         Self {
             // Default to opening a node protocol.
             node_protocols: Some(fio::NodeProtocols::default()),
-            mode: fio::OpenMode::OpenExisting,
+            mode: CreationMode::Never,
             rights: fio::Operations::empty(),
             create_attr: None,
         }
@@ -685,7 +701,7 @@ impl Zxio {
                 path.len(),
                 &zxio::zxio_open_options {
                     node_flags: node_flags.bits(),
-                    mode: fio::OpenMode::OpenExisting as u32,
+                    mode: CreationMode::Never.into(),
                     ..Default::default()
                 },
                 attributes.map(|a| a as *mut _).unwrap_or(std::ptr::null_mut()),

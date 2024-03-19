@@ -32,6 +32,7 @@ bindgen.var_allowlist = [
     "ZXIO_NODE_PROTOCOL.*",
     "ZXIO_SEEK_ORIGIN.*",
     "ZXIO_ALLOCATE.*",
+    "ZXIO_CREATION_MODE.*",
     "E[A-Z]*",
     "AF_.*",
     "SO.*",

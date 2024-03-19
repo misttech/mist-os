@@ -130,6 +130,7 @@ type NodeOptions = table {
     /// Specifies behavior with respect to existence. If an object is to be created, its type is
     /// specified by `protocols`; it must be present. If a valid object type cannot be unambiguously
     /// inferred e.g. both `directory` and `file` are set, the request must fail.
+    @available(replaced=19)
     3: mode @generated_name("OpenMode") strict enum : uint32 {
         /// Only succeed if the object exists.
         OPEN_EXISTING = 1;
@@ -141,6 +142,28 @@ type NodeOptions = table {
         /// Assert that the object does not exist, then create it. The assertion and creation are
         /// performed in one atomic step.
         ALWAYS_CREATE = 3;
+    };
+
+    /// Specifies how the target object should be created. If an object is to be created, its type
+    /// must be specified by `protocols`. The check for existence and creation of the new object
+    /// are performed atomically.
+    ///
+    /// If the type is ambiguous (e.g. both `directory` and `file` are set), the request must fail
+    /// with `ZX_ERR_INVALID_ARGS`.
+    @available(added=19)
+    3: mode @generated_name("CreationMode") strict enum : uint32 {
+        /// Only open an existing object, never create a new object.
+        NEVER = 0;
+
+        @available(deprecated=19, note="For backwards compatibility. Use NEVER instead.")
+        NEVER_DEPRECATED = 1;
+
+        /// Create a new object if one does not exist, otherwise open the existing object.
+        ALLOW_EXISTING = 2;
+
+        /// Create a new object if one does not exist, otherwise the request will fail with
+        /// `ZX_ERR_ALREADY_EXISTS`.
+        ALWAYS = 3;
     };
 
     /// Requested rights on the new connection.

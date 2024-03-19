@@ -395,11 +395,8 @@ impl FatDirectory {
 
         // Check if the entry already exists in the cache.
         if let Some(entry) = self.cache_get(name) {
-            match protocols.open_mode() {
-                fio::OpenMode::OpenExisting | fio::OpenMode::MaybeCreate => {}
-                fio::OpenMode::AlwaysCreate => {
-                    return Err(Status::ALREADY_EXISTS);
-                }
+            if protocols.creation_mode() == vfs::CreationMode::Always {
+                return Err(Status::ALREADY_EXISTS);
             }
             entry.open_ref(&fs_lock)?;
             return Ok(closer.add(entry));
@@ -407,36 +404,32 @@ impl FatDirectory {
 
         let mut created_entry = false;
         let node = match self.find_child(&fs_lock, name)? {
-            Some(entry) => match protocols.open_mode() {
-                fio::OpenMode::OpenExisting | fio::OpenMode::MaybeCreate => {
-                    if entry.is_dir() {
-                        self.add_directory(entry.to_dir(), name, closer)
-                    } else {
-                        self.add_file(entry.to_file(), name, closer)
-                    }
-                }
-                fio::OpenMode::AlwaysCreate => {
+            Some(entry) => {
+                if protocols.creation_mode() == vfs::CreationMode::Always {
                     return Err(Status::ALREADY_EXISTS);
                 }
-            },
-            None => match protocols.open_mode() {
-                fio::OpenMode::OpenExisting => {
+                if entry.is_dir() {
+                    self.add_directory(entry.to_dir(), name, closer)
+                } else {
+                    self.add_file(entry.to_file(), name, closer)
+                }
+            }
+            None => {
+                if protocols.creation_mode() == vfs::CreationMode::Never {
                     return Err(Status::NOT_FOUND);
                 }
-                fio::OpenMode::AlwaysCreate | fio::OpenMode::MaybeCreate => {
-                    created_entry = true;
-                    let dir = self.borrow_dir(&fs_lock)?;
+                created_entry = true;
+                let dir = self.borrow_dir(&fs_lock)?;
 
-                    // Create directory if the directory protocol was explicitly specified.
-                    if protocols.is_dir_allowed() & !protocols.is_any_node_protocol_allowed() {
-                        let dir = dir.create_dir(name).map_err(fatfs_error_to_status)?;
-                        self.add_directory(dir, name, closer)
-                    } else {
-                        let file = dir.create_file(name).map_err(fatfs_error_to_status)?;
-                        self.add_file(file, name, closer)
-                    }
+                // Create directory if the directory protocol was explicitly specified.
+                if protocols.is_dir_allowed() & !protocols.is_any_node_protocol_allowed() {
+                    let dir = dir.create_dir(name).map_err(fatfs_error_to_status)?;
+                    self.add_directory(dir, name, closer)
+                } else {
+                    let file = dir.create_file(name).map_err(fatfs_error_to_status)?;
+                    self.add_file(file, name, closer)
                 }
-            },
+            }
         };
 
         let mut data = self.data.write().unwrap();
@@ -1399,7 +1392,7 @@ mod tests {
         let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::NodeMarker>().unwrap();
         let protocols = fio::ConnectionProtocols::Node(fio::NodeOptions {
             rights: Some(fio::Operations::READ_BYTES),
-            mode: Some(fio::OpenMode::AlwaysCreate),
+            mode: Some(vfs::CreationMode::Always.into()),
             flags: Some(fio::NodeFlags::GET_REPRESENTATION),
             ..Default::default()
         });

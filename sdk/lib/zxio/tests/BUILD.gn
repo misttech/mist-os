@@ -18,6 +18,7 @@ test("zxio") {
   output_name = "zxio-test"
   sources = [
     "c-compilation-test.c",
+    "constants-test.cc",
     "create-test.cc",
     "debuglog-test.cc",
     "directory-test.cc",
@@ -30,7 +31,6 @@ test("zxio") {
     "pipe-test.cc",
     "posix-mode-test.cc",
     "remote-test.cc",
-    "rights-const-test.cc",
     "socket-test.cc",
     "test_directory_server_base.h",
     "test_file_server_base.h",

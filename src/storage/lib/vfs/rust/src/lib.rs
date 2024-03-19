@@ -112,6 +112,7 @@ pub use vfs_macros::pseudo_directory;
 /// permissions as specified in the `fuchsia.io` interface.
 pub use vfs_macros::mut_pseudo_directory;
 
+pub use crate::common::CreationMode;
 pub use object_request::{ObjectRequest, ObjectRequestRef, ToObjectRequest};
 pub use protocols::ProtocolsExt;
 

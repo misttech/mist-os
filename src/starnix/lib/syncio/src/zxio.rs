@@ -688,6 +688,7 @@ impl Default for zxio_xattr_data {
 }
 pub type zxio_xattr_data_t = zxio_xattr_data;
 pub type zxio_allocate_mode_t = u32;
+pub type zxio_creation_mode_t = u32;
 pub type va_list = __builtin_va_list;
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone)]
@@ -1372,6 +1373,10 @@ pub const ZXIO_ALLOCATE_PUNCH_HOLE: zxio_allocate_mode_t = 4;
 pub const ZXIO_ALLOCATE_COLLAPSE_RANGE: zxio_allocate_mode_t = 8;
 pub const ZXIO_ALLOCATE_ZERO_RANGE: zxio_allocate_mode_t = 16;
 pub const ZXIO_ALLOCATE_INSERT_RANGE: zxio_allocate_mode_t = 32;
+pub const ZXIO_CREATION_MODE_NEVER: zxio_creation_mode_t = 0;
+pub const ZXIO_CREATION_MODE_NEVER_DEPRECATED: zxio_creation_mode_t = 1;
+pub const ZXIO_CREATION_MODE_ALLOW_EXISTING: zxio_creation_mode_t = 2;
+pub const ZXIO_CREATION_MODE_ALWAYS: zxio_creation_mode_t = 3;
 pub type __builtin_va_list = [__va_list_tag; 1usize];
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]

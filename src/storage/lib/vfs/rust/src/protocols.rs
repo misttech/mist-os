@@ -4,8 +4,12 @@
 
 use {
     crate::{
-        common::io2_conversions, directory::DirectoryOptions, file::FileOptions, node::NodeOptions,
-        service::ServiceOptions, symlink::SymlinkOptions,
+        common::{io2_conversions, CreationMode},
+        directory::DirectoryOptions,
+        file::FileOptions,
+        node::NodeOptions,
+        service::ServiceOptions,
+        symlink::SymlinkOptions,
     },
     fidl_fuchsia_io as fio,
     fuchsia_zircon_status::Status,
@@ -25,8 +29,8 @@ pub trait ProtocolsExt: ToFileOptions + ToNodeOptions + Sync + 'static {
     /// True if any node protocol is allowed.
     fn is_any_node_protocol_allowed(&self) -> bool;
 
-    /// The open mode for the connection.
-    fn open_mode(&self) -> fio::OpenMode;
+    /// The creation mode for the connection.
+    fn creation_mode(&self) -> CreationMode;
 
     /// The rights for the connection.  If None, it means the connection is not for a node based
     /// protocol.  If the connection is supposed to use the same rights as the parent connection,
@@ -101,10 +105,12 @@ impl ProtocolsExt for fio::ConnectionProtocols {
         matches!(self, fio::ConnectionProtocols::Node(fio::NodeOptions { protocols: None, .. }))
     }
 
-    fn open_mode(&self) -> fio::OpenMode {
+    fn creation_mode(&self) -> CreationMode {
         match self {
-            fio::ConnectionProtocols::Node(fio::NodeOptions { mode: Some(mode), .. }) => *mode,
-            _ => fio::OpenMode::OpenExisting,
+            fio::ConnectionProtocols::Node(fio::NodeOptions { mode: Some(mode), .. }) => {
+                (*mode).into()
+            }
+            _ => CreationMode::Never,
         }
     }
 
@@ -241,15 +247,15 @@ impl ProtocolsExt for fio::OpenFlags {
         !self.intersects(fio::OpenFlags::DIRECTORY | fio::OpenFlags::NOT_DIRECTORY)
     }
 
-    fn open_mode(&self) -> fio::OpenMode {
+    fn creation_mode(&self) -> CreationMode {
         if self.contains(fio::OpenFlags::CREATE) {
             if self.contains(fio::OpenFlags::CREATE_IF_ABSENT) {
-                fio::OpenMode::AlwaysCreate
+                CreationMode::Always
             } else {
-                fio::OpenMode::MaybeCreate
+                CreationMode::AllowExisting
             }
         } else {
-            fio::OpenMode::OpenExisting
+            CreationMode::Never
         }
     }
 

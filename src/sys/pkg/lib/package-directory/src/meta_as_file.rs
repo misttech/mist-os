@@ -440,12 +440,12 @@ mod tests {
     async fn directory_entry_open2_rejects_forbidden_open_modes() {
         let (_env, root_dir) = TestEnv::new().await;
 
-        for forbidden_open_mode in [fio::OpenMode::AlwaysCreate, fio::OpenMode::MaybeCreate] {
+        for forbidden_open_mode in [vfs::CreationMode::Always, vfs::CreationMode::AllowExisting] {
             let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::FileMarker>().unwrap();
             let scope = ExecutionScope::new();
             let protocols = fio::ConnectionProtocols::Node(fio::NodeOptions {
                 flags: Some(fio::NodeFlags::GET_REPRESENTATION),
-                mode: Some(forbidden_open_mode),
+                mode: Some(forbidden_open_mode.into()),
                 rights: Some(fio::Operations::READ_BYTES),
                 protocols: Some(fio::NodeProtocols {
                     file: Some(fio::FileProtocolFlags::default()),

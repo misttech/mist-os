@@ -135,6 +135,32 @@
         "name": "fuchsia.io/ConnectorInfo"
     },
     {
+        "kind": "enum/member",
+        "name": "fuchsia.io/CreationMode.ALLOW_EXISTING",
+        "value": "2"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.io/CreationMode.ALWAYS",
+        "value": "3"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.io/CreationMode.NEVER",
+        "value": "0"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.io/CreationMode.NEVER_DEPRECATED",
+        "value": "1"
+    },
+    {
+        "kind": "enum",
+        "name": "fuchsia.io/CreationMode",
+        "strictness": "strict",
+        "type": "uint32"
+    },
+    {
         "kind": "const",
         "name": "fuchsia.io/DIRECTORY_PROTOCOL_NAME",
         "type": "string",
@@ -2638,7 +2664,7 @@
         "kind": "table/member",
         "name": "fuchsia.io/NodeOptions.mode",
         "ordinal": "3",
-        "type": "fuchsia.io/OpenMode"
+        "type": "fuchsia.io/CreationMode"
     },
     {
         "kind": "table/member",
@@ -2806,27 +2832,6 @@
     {
         "kind": "bits",
         "name": "fuchsia.io/OpenFlags",
-        "strictness": "strict",
-        "type": "uint32"
-    },
-    {
-        "kind": "enum/member",
-        "name": "fuchsia.io/OpenMode.ALWAYS_CREATE",
-        "value": "3"
-    },
-    {
-        "kind": "enum/member",
-        "name": "fuchsia.io/OpenMode.MAYBE_CREATE",
-        "value": "2"
-    },
-    {
-        "kind": "enum/member",
-        "name": "fuchsia.io/OpenMode.OPEN_EXISTING",
-        "value": "1"
-    },
-    {
-        "kind": "enum",
-        "name": "fuchsia.io/OpenMode",
         "strictness": "strict",
         "type": "uint32"
     },
