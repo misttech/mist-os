@@ -39,11 +39,23 @@ LazySymbol DwarfUnitImpl::FunctionForRelativeAddress(uint64_t relative_address) 
     return LazySymbol();
   }
 
-  EnsureFuncAddrMap();
-  uint64_t offset = func_addr_to_die_offset_.Lookup(relative_address);
-  if (offset) {
-    return binary_->GetSymbolFactory()->MakeLazy(offset);
+  // Only create the FuncAddrMap when we're actually dealing with DWO files. This operation is quite
+  // costly in addition to creating the LLVM DIE index. Note the FuncAddrMap will work in all cases,
+  // it is purely an optimization to skip creating it for non-DWO binaries. The overhead may be
+  // avoided by either not indexing the LLVM cache, or by skipping the creation of this mapping. We
+  // are currently choosing to take the second of those options to support DWO while keeping the
+  // non-DWO case fast.
+  if (unit_->isDWOUnit()) {
+    EnsureFuncAddrMap();
+    uint64_t offset = func_addr_to_die_offset_.Lookup(relative_address);
+    if (offset)
+      return binary_->GetSymbolFactory()->MakeLazy(offset);
+  } else {
+    auto die = unit_->getSubroutineForAddress(relative_address);
+    if (die.isValid())
+      return binary_->GetSymbolFactory()->MakeLazy(die.getOffset());
   }
+
   return LazySymbol();
 }
 
