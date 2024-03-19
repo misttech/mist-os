@@ -56,6 +56,7 @@ TEST_F(Vim3DevicetreeTest, DevicetreeEnumeration) {
       "sys/platform/phy-ffe09000",
       "sys/platform/usb-ff500000",
       "sys/platform/usb-ff400000",
+      "sys/platform/mmc-ffe05000",
       "sys/platform/mmc-ffe07000",
       "sys/platform/pwm-ffd1b000",
   };

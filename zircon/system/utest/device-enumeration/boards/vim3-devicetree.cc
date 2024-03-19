@@ -38,6 +38,9 @@ TEST_F(DeviceEnumerationTest, Vim3DeviceTreeTest) {
       "sys/platform/pwm-ffd1b000/aml-pwm-device",
       "sys/platform/pwm-ffd1b000/aml-pwm-device/pwm-4/pwm-init_group/aml-pwm-init",
 
+      // SD card
+      "sys/platform/mmc-ffe05000/mmc-ffe05000_group/aml-sd-emmc/sdmmc",
+
       // EMMC
       "sys/platform/mmc-ffe07000/mmc-ffe07000_group/aml-sd-emmc",
       "sys/platform/mmc-ffe07000/mmc-ffe07000_group/aml-sd-emmc/sdmmc",

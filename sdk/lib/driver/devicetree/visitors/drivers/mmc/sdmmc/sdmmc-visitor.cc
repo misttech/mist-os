@@ -29,8 +29,17 @@ SdmmcVisitor::SdmmcVisitor() {
   sdmmc_parser_ = std::make_unique<fdf_devicetree::PropertyParser>(std::move(properties));
 }
 
+bool SdmmcVisitor::is_match(std::string_view name) {
+  // Check that the name begins with mmc-.
+  return name.find("mmc-") == 0;
+}
+
 zx::result<> SdmmcVisitor::Visit(fdf_devicetree::Node& node,
                                  const devicetree::PropertyDecoder& decoder) {
+  if (!is_match(node.name())) {
+    return zx::ok();
+  }
+
   zx::result parser_output = sdmmc_parser_->Parse(node);
   if (parser_output.is_error()) {
     FDF_LOG(ERROR, "SDMMC visitor failed for node '%s' : %s", node.name().c_str(),

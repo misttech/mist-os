@@ -24,6 +24,8 @@ class SdmmcVisitor : public fdf_devicetree::Visitor {
                      const devicetree::PropertyDecoder& decoder) override;
 
  private:
+  bool is_match(std::string_view name);
+
   std::unique_ptr<fdf_devicetree::PropertyParser> sdmmc_parser_;
 };
 
