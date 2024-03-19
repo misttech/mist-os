@@ -265,7 +265,7 @@ size_checker_input = {
       component = "Connectivity/Wlan-Drivers"
       pkgs = [ "iwlwifi" ]
       limit = 5578880  # 5.32 MiB
-      creep_limit = 524288  # 512.0 KiB
+      creep_limit = 81920  # 80.0 KiB
     },
 
     # This component corresponds to the blobfs storage that is not used.
