@@ -55,6 +55,9 @@ type stringInLogCheck struct {
 	//   SkipPassedTest: Check() will return the failure as a flake if the
 	//     associated test later passes.
 	IgnoreFlakes bool
+	// AlwaysFlake will always return the failure as a flake so that it doesn't
+	// fail the build, but will still be reported as a flake.
+	AlwaysFlake bool
 	// Type of log that will be checked.
 	Type logType
 	// Whether to check the per-test Swarming output for this log and emit a
@@ -125,7 +128,7 @@ func (c *stringInLogCheck) Check(to *TestingOutputs) bool {
 				continue
 			}
 			if c.checkBytes(to.SwarmingOutput, testLog.Index, testLog.Index+len(testLog.Bytes)) {
-				failedTestsMap[testLog.TestName] = testdata{testLog.TestName, testLog.FilePath, false, i}
+				failedTestsMap[testLog.TestName] = testdata{testLog.TestName, testLog.FilePath, c.AlwaysFlake, i}
 			}
 		}
 		var failedTests []testdata
@@ -177,6 +180,9 @@ func (c *stringInLogCheck) Check(to *TestingOutputs) bool {
 
 	for _, file := range toCheck {
 		if c.checkBytes(file, 0, len(file)) {
+			if c.AlwaysFlake {
+				c.isFlake = true
+			}
 			return true
 		}
 	}
@@ -630,16 +636,19 @@ func infraToolLogChecks() []FailureModeCheck {
 		// connection. It should come before the ProcessTerminatedMsg to distinguish when the
 		// SSH connection terminates due to the keepalive or something else.
 		&stringInLogCheck{
-			String:         "botanist DEBUG: error sending keepalive",
-			Type:           swarmingOutputType,
-			SkipPassedTest: true,
-			IgnoreFlakes:   true,
+			String:      "botanist DEBUG: error sending keepalive",
+			Type:        swarmingOutputType,
+			AlwaysFlake: true,
 		},
 		&stringInLogCheck{
-			String:         "botanist DEBUG: ssh keepalive timed out",
-			Type:           swarmingOutputType,
-			SkipPassedTest: true,
-			IgnoreFlakes:   true,
+			String:      "botanist DEBUG: ssh keepalive timed out",
+			Type:        swarmingOutputType,
+			AlwaysFlake: true,
+		},
+		&stringInLogCheck{
+			String:      "remote command exited without exit status or exit signal",
+			Type:        swarmingOutputType,
+			AlwaysFlake: true,
 		},
 		// For https://fxbug.dev/317290699.
 		&stringInLogCheck{

@@ -674,8 +674,6 @@ func TestRunAndOutputTests(t *testing.T) {
 				"foo/1": {connErr: true},
 			},
 			expectedResults: []runtests.TestDetails{
-				failedTest("foo", 0, defaultDuration),
-				failedTest("foo", 1, defaultDuration),
 				succeededTest("foo", 2, defaultDuration),
 			},
 		},
@@ -691,10 +689,8 @@ func TestRunAndOutputTests(t *testing.T) {
 			behavior: map[string]testBehavior{
 				"foo/0": {connErr: true, failReconnect: true},
 			},
-			expectedResults: []runtests.TestDetails{
-				failedTest("foo", 0, defaultDuration),
-			},
-			wantErr: true,
+			expectedResults: []runtests.TestDetails{},
+			wantErr:         true,
 		},
 		{
 			name: "reconnect succeeds, then fails",
@@ -709,11 +705,8 @@ func TestRunAndOutputTests(t *testing.T) {
 				"foo/0": {connErr: true},
 				"foo/1": {connErr: true, failReconnect: true},
 			},
-			expectedResults: []runtests.TestDetails{
-				failedTest("foo", 0, defaultDuration),
-				failedTest("foo", 1, defaultDuration),
-			},
-			wantErr: true,
+			expectedResults: []runtests.TestDetails{},
+			wantErr:         true,
 		},
 		{
 			name: "fatal error running test",

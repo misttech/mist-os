@@ -466,36 +466,42 @@ func runAndOutputTests(
 		}
 
 		var result *TestResult
+		var outDir string
 		if err := retryOnConnectionFailure(ctx, t, func() error {
 			runIndex := test.previousRuns
 
-			outDir := filepath.Join(globalOutDir, url.PathEscape(strings.ReplaceAll(test.Name, ":", "")), strconv.Itoa(runIndex))
+			outDir = filepath.Join(globalOutDir, url.PathEscape(strings.ReplaceAll(test.Name, ":", "")), strconv.Itoa(runIndex))
 			var testErr error
 			result, testErr = runTestOnce(ctx, test.Test, t, outDir, testIndex)
 			if result == nil {
 				return testErr
 			}
 			result.RunIndex = runIndex
-			if err := outputs.Record(ctx, *result); err != nil {
-				return err
-			}
-			testIndex++
 
+			// TODO(ihuh): Increase the runs so that we keep the outputs of all runs
+			// in the task outputs, but temporarily do not record the test failure if
+			// it's a connection failure so that we can correlate the connection failures
+			// better through a tefmocheck.
 			test.previousRuns++
 			test.totalDuration += result.Duration()
-
-			// TODO(danikay): Temporarily using the existence of the resultdb client to
-			// enable the soft transition from uploading to resultdb from the fuchsia.py
-			// recipe to uploading the test results here, as they complete
-			if resultdbClient != nil {
-				testTags := testTagsToStringPairs(result.Tags)
-				testDetails := testDetailsFromTestResult(result.Name, result.StartTime, result)
-				testResults, _ := resultdb.TestCaseToResultSink(result.Cases, testTags, &testDetails, outDir)
-				resultdbResults = append(resultdbResults, testResults...)
-			}
 			return testErr
 		}); err != nil {
 			return err
+		}
+
+		if err := outputs.Record(ctx, *result); err != nil {
+			return err
+		}
+		testIndex++
+
+		// TODO(danikay): Temporarily using the existence of the resultdb client to
+		// enable the soft transition from uploading to resultdb from the fuchsia.py
+		// recipe to uploading the test results here, as they complete
+		if resultdbClient != nil {
+			testTags := testTagsToStringPairs(result.Tags)
+			testDetails := testDetailsFromTestResult(result.Name, result.StartTime, result)
+			testResults, _ := resultdb.TestCaseToResultSink(result.Cases, testTags, &testDetails, outDir)
+			resultdbResults = append(resultdbResults, testResults...)
 		}
 
 		if shouldKeepGoing(test.Test, result, test.totalDuration) {
@@ -712,7 +718,7 @@ func runTestOnce(
 				result.OutputFiles = append(result.OutputFiles, relPath)
 			}
 			return nil
-		}); err != nil {
+		}); err != nil && !os.IsNotExist(err) {
 			logger.Debugf(ctx, "unable to record output files: %s", err)
 		}
 		if len(result.OutputFiles) > 0 {

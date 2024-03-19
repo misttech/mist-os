@@ -47,6 +47,7 @@ func TestCheck(t *testing.T) {
 		skipAllPassedTests  bool
 		skipPassedTest      bool
 		ignoreFlakes        bool
+		alwaysFlake         bool
 		states              []string
 		swarmingResultState string
 		shouldMatch         bool
@@ -449,6 +450,111 @@ func TestCheck(t *testing.T) {
 			swarmingResultState: "COMPLETED",
 			typeToCheck:         serialLogType,
 		},
+		{
+			name: "should always flake if not attributed to test",
+			testingOutputs: TestingOutputs{
+				TestSummary: &runtests.TestSummary{
+					Tests: []runtests.TestDetails{
+						{
+							Name:   "test1",
+							Result: runtests.TestFailure,
+						},
+						{
+							Name:   "test2",
+							Result: runtests.TestSuccess,
+						},
+					},
+				},
+				SwarmingOutput: []byte(killerString),
+				SwarmingOutputPerTest: []TestLog{
+					{
+						TestName: "test1",
+						Bytes:    []byte{},
+						FilePath: "foo/log.txt",
+						Index:    0,
+					},
+					{
+						TestName: "test2",
+						Bytes:    []byte(killerString),
+						FilePath: "foo/log.txt",
+						Index:    0,
+					},
+				},
+			},
+			shouldMatch: true,
+			alwaysFlake: true,
+			wantFlake:   true,
+		},
+		{
+			name: "should always flake if skip passed test and failed test",
+			testingOutputs: TestingOutputs{
+				TestSummary: &runtests.TestSummary{
+					Tests: []runtests.TestDetails{
+						{
+							Name:   "test1",
+							Result: runtests.TestSuccess,
+						},
+						{
+							Name:   "test2",
+							Result: runtests.TestFailure,
+						},
+					},
+				},
+				SwarmingOutput: []byte(killerString),
+				SwarmingOutputPerTest: []TestLog{
+					{
+						TestName: "test1",
+						Bytes:    []byte{},
+						FilePath: "foo/log.txt",
+						Index:    0,
+					},
+					{
+						TestName: "test2",
+						Bytes:    []byte(killerString),
+						FilePath: "foo/log.txt",
+						Index:    0,
+					},
+				},
+			},
+			shouldMatch:    true,
+			skipPassedTest: true,
+			alwaysFlake:    true,
+			wantFlake:      true,
+		},
+		{
+			name: "should not flake if skip passed test",
+			testingOutputs: TestingOutputs{
+				TestSummary: &runtests.TestSummary{
+					Tests: []runtests.TestDetails{
+						{
+							Name:   "test1",
+							Result: runtests.TestFailure,
+						},
+						{
+							Name:   "test2",
+							Result: runtests.TestSuccess,
+						},
+					},
+				},
+				SwarmingOutput: []byte(killerString),
+				SwarmingOutputPerTest: []TestLog{
+					{
+						TestName: "test1",
+						Bytes:    []byte{},
+						FilePath: "foo/log.txt",
+						Index:    0,
+					},
+					{
+						TestName: "test2",
+						Bytes:    []byte(killerString),
+						FilePath: "foo/log.txt",
+						Index:    0,
+					},
+				},
+			},
+			skipPassedTest: true,
+			alwaysFlake:    true,
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			c := c // Make a copy to avoid modifying shared state.
@@ -457,6 +563,7 @@ func TestCheck(t *testing.T) {
 			c.SkipAllPassedTests = tc.skipAllPassedTests
 			c.SkipPassedTest = tc.skipPassedTest
 			c.IgnoreFlakes = tc.ignoreFlakes
+			c.AlwaysFlake = tc.alwaysFlake
 			// It accesses this field for DebugText().
 			tc.testingOutputs.SwarmingSummary = &SwarmingTaskSummary{
 				Results: &SwarmingRpcsTaskResult{
