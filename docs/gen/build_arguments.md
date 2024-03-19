@@ -5480,6 +5480,27 @@ The path to a prebuilt libvulkan.so for an IMG GPU.
 
 From //src/graphics/lib/magma/gnbuild/magma.gni:22
 
+### product_assembly_overrides
+
+This GN arg enables developer overrides for the given assembly targets
+
+This is a list of scopes that take two fields:
+ - assembly: (GN label pattern) the GN label(s) to apply the overrides to
+ - overrides (GN label) the label of a set of developer overrides
+
+Example:
+
+ product_assembly_overrides = [
+   {
+     assembly = "//build/images/fuchsia/*"
+     overrides = "//local:my_assembly_overrides"
+   }
+ ]
+
+**Current value (from the default):** `[]`
+
+From //build/assembly/developer_overrides.gni:104
+
 ### product_bootfs_labels
 
 A list of binary labels to include in ZBIs built for this product.
