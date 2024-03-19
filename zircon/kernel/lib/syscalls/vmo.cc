@@ -43,15 +43,17 @@ zx_status_t sys_vmo_create(uint64_t size, uint32_t options, zx_handle_t* out) {
   if (res != ZX_OK)
     return res;
 
-  uint32_t vmo_options = 0;
-  res = VmObjectDispatcher::parse_create_syscall_flags(options, &vmo_options);
-  if (res != ZX_OK)
-    return res;
+  zx::result<VmObjectDispatcher::CreateStats> parse_result =
+      VmObjectDispatcher::parse_create_syscall_flags(options, size);
+  if (parse_result.is_error()) {
+    return parse_result.error_value();
+  }
+  VmObjectDispatcher::CreateStats stats = parse_result.value();
 
   // create a vm object
   fbl::RefPtr<VmObjectPaged> vmo;
-  res =
-      VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY | PMM_ALLOC_FLAG_CAN_WAIT, vmo_options, size, &vmo);
+  res = VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY | PMM_ALLOC_FLAG_CAN_WAIT, stats.flags, stats.size,
+                              &vmo);
   if (res != ZX_OK)
     return res;
 

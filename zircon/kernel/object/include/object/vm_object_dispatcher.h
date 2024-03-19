@@ -29,7 +29,12 @@ class VmObjectDispatcher final : public SoloDispatcher<VmObjectDispatcher, ZX_DE
  public:
   enum class InitialMutability { kMutable, kImmutable };
 
-  static zx_status_t parse_create_syscall_flags(uint32_t flags, uint32_t* out_flags);
+  struct CreateStats {
+    uint32_t flags;
+    size_t size;
+  };
+
+  static zx::result<CreateStats> parse_create_syscall_flags(uint32_t flags, size_t size);
 
   static zx_status_t Create(fbl::RefPtr<VmObject> vmo,
                             fbl::RefPtr<ContentSizeManager> content_size_manager,

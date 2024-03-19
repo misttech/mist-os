@@ -74,16 +74,17 @@ zx::result<fbl::Array<IoBufferDispatcher::IobRegion>> IoBufferDispatcher::Create
     // We effectively duplicate the logic from sys_vmo_create here, but instead of creating a
     // kernel handle and dispatcher, we keep ownership of it and assign it to a region.
 
-    uint32_t vmo_options = 0;
-    if (zx_status_t status = VmObjectDispatcher::parse_create_syscall_flags(
-            region_config.private_region.options, &vmo_options);
-        status != ZX_OK) {
-      return zx::error(status);
+    zx::result<VmObjectDispatcher::CreateStats> parse_result =
+        VmObjectDispatcher::parse_create_syscall_flags(region_config.private_region.options,
+                                                       region_config.size);
+    if (parse_result.is_error()) {
+      return zx::error(parse_result.error_value());
     }
+    VmObjectDispatcher::CreateStats stats = parse_result.value();
 
     fbl::RefPtr<VmObjectPaged> vmo;
     if (zx_status_t status =
-            VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY, vmo_options, region_config.size, &vmo);
+            VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY, stats.flags, stats.size, &vmo);
         status != ZX_OK) {
       return zx::error(status);
     }

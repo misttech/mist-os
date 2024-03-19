@@ -30,24 +30,24 @@
 KCOUNTER(dispatcher_vmo_create_count, "dispatcher.vmo.create")
 KCOUNTER(dispatcher_vmo_destroy_count, "dispatcher.vmo.destroy")
 
-zx_status_t VmObjectDispatcher::parse_create_syscall_flags(uint32_t flags, uint32_t* out_flags) {
-  uint32_t res = 0;
+zx::result<VmObjectDispatcher::CreateStats> VmObjectDispatcher::parse_create_syscall_flags(
+    uint32_t flags, size_t size) {
+  CreateStats res = {0, size};
+
   if (flags & ZX_VMO_RESIZABLE) {
-    res |= VmObjectPaged::kResizable;
+    res.flags |= VmObjectPaged::kResizable;
     flags &= ~ZX_VMO_RESIZABLE;
   }
   if (flags & ZX_VMO_DISCARDABLE) {
-    res |= VmObjectPaged::kDiscardable;
+    res.flags |= VmObjectPaged::kDiscardable;
     flags &= ~ZX_VMO_DISCARDABLE;
   }
 
   if (flags) {
-    return ZX_ERR_INVALID_ARGS;
+    return zx::error(ZX_ERR_INVALID_ARGS);
   }
 
-  *out_flags = res;
-
-  return ZX_OK;
+  return zx::ok(res);
 }
 
 zx_status_t VmObjectDispatcher::Create(fbl::RefPtr<VmObject> vmo,

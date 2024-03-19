@@ -91,14 +91,16 @@ zx_status_t sys_pager_create_vmo(zx_handle_t pager, uint32_t options, zx_handle_
     return status;
   }
 
-  uint32_t vmo_options = 0;
-  status = VmObjectDispatcher::parse_create_syscall_flags(vmo_flags, &vmo_options);
-  if (status != ZX_OK) {
-    return status;
+  zx::result<VmObjectDispatcher::CreateStats> parse_result =
+      VmObjectDispatcher::parse_create_syscall_flags(vmo_flags, size);
+  if (parse_result.is_error()) {
+    return parse_result.error_value();
   }
 
+  VmObjectDispatcher::CreateStats stats = parse_result.value();
+
   fbl::RefPtr<VmObjectPaged> vmo;
-  status = VmObjectPaged::CreateExternal(ktl::move(src), vmo_options, size, &vmo);
+  status = VmObjectPaged::CreateExternal(ktl::move(src), stats.flags, stats.size, &vmo);
   if (status != ZX_OK) {
     return status;
   }
