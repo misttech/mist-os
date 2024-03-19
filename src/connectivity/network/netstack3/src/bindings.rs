@@ -90,7 +90,7 @@ use netstack3_core::{
     routes::RawMetric,
     udp::{UdpBindingsTypes, UdpReceiveBindingsContext, UdpSocketId},
     EventContext, InstantBindingsTypes, InstantContext, IpExt, RngContext, StackState,
-    TimerBindingsTypes, TimerContext, TimerContext2, TimerId, TracingContext,
+    TimerContext, TimerId, TracingContext,
 };
 
 mod ctx {
@@ -446,36 +446,6 @@ impl RngContext for BindingsCtx {
 
     fn rng(&mut self) -> RngImpl {
         RngImpl::new()
-    }
-}
-
-impl TimerBindingsTypes for BindingsCtx {
-    type Timer = TimerId<BindingsCtx>;
-    type DispatchId = TimerId<BindingsCtx>;
-}
-
-// TODO(https://fxbug.dev/42083407): Move the timer implementation to something
-// that keeps meaningful timer state in core instead of relying on the existing
-// timer impl.
-impl TimerContext2 for BindingsCtx {
-    fn new_timer(&mut self, id: Self::DispatchId) -> Self::Timer {
-        id
-    }
-
-    fn schedule_timer_instant2(
-        &mut self,
-        time: Self::Instant,
-        timer: &mut Self::Timer,
-    ) -> Option<Self::Instant> {
-        self.timers.schedule_timer(timer.clone(), time)
-    }
-
-    fn cancel_timer2(&mut self, timer: &mut Self::Timer) -> Option<Self::Instant> {
-        self.timers.cancel_timer(timer)
-    }
-
-    fn scheduled_instant2(&self, timer: &mut Self::Timer) -> Option<Self::Instant> {
-        self.timers.scheduled_time(timer)
     }
 }
 

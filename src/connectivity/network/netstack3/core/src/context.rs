@@ -49,9 +49,7 @@ use crate::{
     sync, Instant,
 };
 
-pub use netstack3_base::{
-    ContextPair, InstantBindingsTypes, InstantContext, TimerBindingsTypes, TimerContext2,
-};
+pub use netstack3_base::{ContextPair, InstantBindingsTypes, InstantContext};
 
 /// A marker trait indicating that the implementor is not the [`FakeCoreCtx`]
 /// type found in test environments.
@@ -710,38 +708,6 @@ pub(crate) mod testutil {
         }
     }
 
-    // TODO(https://fxbug.dev/42083407): Improve the fake timer implementation
-    // to not rely on hashing the dispatch IDs. This implementation gives us a
-    // way to soft transition to the new world, but the new API is not asking
-    // for DispatchId uniqueness between timers, even though that's how current
-    // usage works.
-    impl<Id: Debug + Clone + Send + Sync> TimerBindingsTypes for FakeTimerCtx<Id> {
-        type Timer = Id;
-        type DispatchId = Id;
-    }
-
-    impl<Id: PartialEq + Debug + Clone + Send + Sync> TimerContext2 for FakeTimerCtx<Id> {
-        fn new_timer(&mut self, id: Self::DispatchId) -> Self::Timer {
-            id
-        }
-
-        fn schedule_timer_instant2(
-            &mut self,
-            time: Self::Instant,
-            timer: &mut Self::Timer,
-        ) -> Option<Self::Instant> {
-            self.schedule_timer_instant(time, timer.clone())
-        }
-
-        fn cancel_timer2(&mut self, timer: &mut Self::Timer) -> Option<Self::Instant> {
-            self.cancel_timer(timer.clone())
-        }
-
-        fn scheduled_instant2(&self, timer: &mut Self::Timer) -> Option<Self::Instant> {
-            self.scheduled_instant(timer.clone())
-        }
-    }
-
     impl<Id: PartialEq> TimerContext<Id> for FakeTimerCtx<Id> {
         fn schedule_timer_instant(&mut self, time: FakeInstant, id: Id) -> Option<FakeInstant> {
             let ret = self.cancel_timer_inner(&id);
@@ -1240,37 +1206,6 @@ pub(crate) mod testutil {
     {
         fn as_mut(&mut self) -> &mut FakeTimerCtx<Id> {
             &mut self.timers
-        }
-    }
-
-    impl<Id: Debug + PartialEq + Clone + Send + Sync, Event: Debug, State, FrameMeta>
-        TimerBindingsTypes for FakeBindingsCtx<Id, Event, State, FrameMeta>
-    {
-        type Timer = <FakeTimerCtx<Id> as TimerBindingsTypes>::Timer;
-        type DispatchId = <FakeTimerCtx<Id> as TimerBindingsTypes>::DispatchId;
-    }
-
-    impl<Id: Debug + PartialEq + Clone + Send + Sync, Event: Debug, State, FrameMeta> TimerContext2
-        for FakeBindingsCtx<Id, Event, State, FrameMeta>
-    {
-        fn new_timer(&mut self, id: Self::DispatchId) -> Self::Timer {
-            self.timers.new_timer(id)
-        }
-
-        fn schedule_timer_instant2(
-            &mut self,
-            time: Self::Instant,
-            timer: &mut Self::Timer,
-        ) -> Option<Self::Instant> {
-            self.timers.schedule_timer_instant2(time, timer)
-        }
-
-        fn cancel_timer2(&mut self, timer: &mut Self::Timer) -> Option<Self::Instant> {
-            self.timers.cancel_timer2(timer)
-        }
-
-        fn scheduled_instant2(&self, timer: &mut Self::Timer) -> Option<Self::Instant> {
-            self.timers.scheduled_instant2(timer)
         }
     }
 

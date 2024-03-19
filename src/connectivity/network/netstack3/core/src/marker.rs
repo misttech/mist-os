@@ -12,7 +12,7 @@ use net_types::ip::{Ipv4, Ipv6};
 use crate::{
     context::{
         CounterContext, InstantBindingsTypes, ReferenceNotifiers, RngContext, TimerContext,
-        TimerContext2, TracingContext,
+        TracingContext,
     },
     device::{
         self, AnyDevice, DeviceId, DeviceIdContext, DeviceLayerTypes, EthernetDeviceId,
@@ -173,17 +173,11 @@ where
 
 /// The execution context provided by bindings.
 pub trait BindingsContext:
-    IpBindingsContext<Ipv4>
-    + IpBindingsContext<Ipv6>
-    + TimerContext<TimerId<Self>>
-    + TimerContext2<DispatchId = TimerId<Self>>
+    IpBindingsContext<Ipv4> + IpBindingsContext<Ipv6> + TimerContext<TimerId<Self>>
 {
 }
 
 impl<BC> BindingsContext for BC where
-    BC: IpBindingsContext<Ipv4>
-        + IpBindingsContext<Ipv6>
-        + TimerContext<TimerId<Self>>
-        + TimerContext2<DispatchId = TimerId<Self>>
+    BC: IpBindingsContext<Ipv4> + IpBindingsContext<Ipv6> + TimerContext<TimerId<Self>>
 {
 }

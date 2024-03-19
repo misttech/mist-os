@@ -63,8 +63,8 @@ use crate::{
             FakeInstant, FakeTimerCtx, FakeTimerCtxExt, PureIpDeviceAndIpVersion,
             WithFakeTimerContext,
         },
-        EventContext, InstantBindingsTypes, InstantContext, RngContext, TimerBindingsTypes,
-        TimerContext, TimerContext2, TimerHandler, TracingContext, UnlockedCoreCtx,
+        EventContext, InstantBindingsTypes, InstantContext, RngContext, TimerContext, TimerHandler,
+        TracingContext, UnlockedCoreCtx,
     },
     device::{
         ethernet::MaxEthernetFrameSize,
@@ -826,38 +826,6 @@ impl InstantBindingsTypes for FakeBindingsCtx {
 impl InstantContext for FakeBindingsCtx {
     fn now(&self) -> FakeInstant {
         self.with_inner(|ctx| ctx.now())
-    }
-}
-
-// TODO(https://fxbug.dev/42083407): Improve the fake timer implementation
-// to not rely on hashing the dispatch IDs. This implementation gives us a
-// way to soft transition to the new world, but the new API is not asking
-// for DispatchId uniqueness between timers, even though that's how current
-// usage works.
-impl TimerBindingsTypes for FakeBindingsCtx {
-    type Timer = TimerId<Self>;
-    type DispatchId = TimerId<Self>;
-}
-
-impl TimerContext2 for FakeBindingsCtx {
-    fn new_timer(&mut self, id: Self::DispatchId) -> Self::Timer {
-        self.with_inner_mut(|ctx| ctx.new_timer(id))
-    }
-
-    fn schedule_timer_instant2(
-        &mut self,
-        time: Self::Instant,
-        timer: &mut Self::Timer,
-    ) -> Option<Self::Instant> {
-        self.with_inner_mut(|ctx| ctx.schedule_timer_instant2(time, timer))
-    }
-
-    fn cancel_timer2(&mut self, timer: &mut Self::Timer) -> Option<Self::Instant> {
-        self.with_inner_mut(|ctx| ctx.cancel_timer2(timer))
-    }
-
-    fn scheduled_instant2(&self, timer: &mut Self::Timer) -> Option<Self::Instant> {
-        self.with_inner_mut(|ctx| ctx.scheduled_instant2(timer))
     }
 }
 

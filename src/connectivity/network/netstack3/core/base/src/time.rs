@@ -6,7 +6,7 @@
 
 pub(crate) mod testutil;
 
-use core::{fmt::Debug, time::Duration};
+use core::fmt::Debug;
 
 use crate::inspect::InspectableValue;
 
@@ -73,62 +73,4 @@ pub trait InstantContext: InstantBindingsTypes {
     /// `now` guarantees that two subsequent calls to `now` will return
     /// monotonically non-decreasing values.
     fn now(&self) -> Self::Instant;
-}
-
-/// Opaque types provided by bindings used by [`TimerContext`].
-pub trait TimerBindingsTypes {
-    /// State for a timer created through [`TimerContext`].
-    type Timer: Debug + Send + Sync;
-    /// The type used to dispatch fired timers from bindings to core.
-    type DispatchId: Clone;
-}
-
-/// A context providing time scheduling to core.
-// TODO(https://fxbug.dev/42083407): Remove '2' qualifiers when we delete the
-// old trait. Note that all the methods that conflict with the old trait names
-// have a disambiguating qualifier to make transitioning smoother.
-pub trait TimerContext2: InstantContext + TimerBindingsTypes {
-    /// Creates a new timer that dispatches `id` back to core when fired.
-    ///
-    /// Creating a new timer is an expensive operation and should be used
-    /// sparingly. Modules should prefer to create a timer on creation and then
-    /// schedule/reschedule it as needed. For modules with very dynamic timers,
-    /// a [`LocalTimerHeap`] tied to a larger `Timer` might be a better
-    /// alternative than creating many timers.
-    fn new_timer(&mut self, id: Self::DispatchId) -> Self::Timer;
-
-    /// Schedule a timer to fire at some point in the future.
-    /// Returns the previously scheduled instant, if this timer was scheduled.
-    fn schedule_timer_instant2(
-        &mut self,
-        time: Self::Instant,
-        timer: &mut Self::Timer,
-    ) -> Option<Self::Instant>;
-
-    /// Like [`schedule_timer_instant2`] but schedules a time for `duration` in
-    /// the future.
-    fn schedule_timer2(
-        &mut self,
-        duration: Duration,
-        timer: &mut Self::Timer,
-    ) -> Option<Self::Instant> {
-        self.schedule_timer_instant2(self.now().checked_add(duration).unwrap(), timer)
-    }
-
-    /// Cancel a timer.
-    ///
-    /// Cancels `timer`, returning the instant it was scheduled for if it was
-    /// scheduled.
-    ///
-    /// Note that there's no guarantee that observing `None` means that the
-    /// dispatch procedure for a previously fired timer has already concluded.
-    /// It is possible to observe `None` here while the `DispatchId` `timer`
-    /// was created with is still making its way to the module that originally
-    /// scheduled this timer. If `Some` is observed, however, then the
-    /// `TimerContext` guarantees this `timer` will *not* fire until
-    ///[`schedule_timer_instant2`] is called to reschedule it.
-    fn cancel_timer2(&mut self, timer: &mut Self::Timer) -> Option<Self::Instant>;
-
-    /// Get the instant a timer will fire, if one is scheduled.
-    fn scheduled_instant2(&self, timer: &mut Self::Timer) -> Option<Self::Instant>;
 }
