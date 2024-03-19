@@ -253,14 +253,14 @@ bool NetworkDevice::IrqRingUpdateInternal() {
           .offset = virtio_hdr_len_,
           .length = len,
       };
-      *rx_it++ = {
+      *rx_it++ = rx_buffer_t{
           .meta =
               {
                   .port = kPortId,
                   .frame_type =
                       static_cast<uint8_t>(fuchsia_hardware_network::wire::FrameType::kEthernet),
               },
-          .data_list = parts_list,
+          .data_list = &*parts_list,
           .data_count = 1,
       };
       rx_.FreeDesc(id);

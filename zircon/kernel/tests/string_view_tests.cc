@@ -129,7 +129,7 @@ bool EndPointsPastLastElement() {
   BEGIN_TEST;
   constexpr ktl::string_view kLiteral = "12345";
 
-  EXPECT_EQ(kLiteral.begin() + 5, kLiteral.end());
+  EXPECT_EQ(&*kLiteral.begin() + 5, &*kLiteral.end());
   EXPECT_TRUE(kLiteral.rbegin() + 5 == kLiteral.rend());
 
   END_TEST;
@@ -139,7 +139,7 @@ bool WhenEmptyBeginIsSameAsEnd() {
   BEGIN_TEST;
   constexpr ktl::string_view kLiteral = "";
 
-  EXPECT_EQ(kLiteral.begin(), kLiteral.end());
+  EXPECT_EQ(&*kLiteral.begin(), &*kLiteral.end());
   EXPECT_TRUE(kLiteral.rbegin() == kLiteral.rend());
 
   END_TEST;
@@ -149,7 +149,7 @@ bool FrontReturnsRefToFirstElement() {
   BEGIN_TEST;
   constexpr ktl::string_view kLiteral = "12345";
 
-  EXPECT_EQ(&(*kLiteral.begin()), &kLiteral.front());
+  EXPECT_EQ(&*kLiteral.begin(), &kLiteral.front());
 
   END_TEST;
 }
@@ -158,7 +158,7 @@ bool BackReturnsRefToLastElement() {
   BEGIN_TEST;
   constexpr ktl::string_view kLiteral = "12345";
 
-  EXPECT_EQ(&(*(kLiteral.begin() + 4)), &kLiteral.back());
+  EXPECT_EQ(&*kLiteral.begin() + 4, &kLiteral.back());
 
   END_TEST;
 }

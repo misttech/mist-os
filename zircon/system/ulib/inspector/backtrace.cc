@@ -94,7 +94,7 @@ __EXPORT void inspector_print_markup_context(FILE* f, zx_handle_t process) {
         const size_t kPageSize = zx_system_get_page_size();
         unsigned int module_id = count++;
         // Print out the module first.
-        fprintf(f, "{{{module:%#x:%s:elf:", module_id, info.name.begin());
+        fprintf(f, "{{{module:%#x:%s:elf:", module_id, &*info.name.begin());
         for (uint8_t byte : info.build_id) {
           fprintf(f, "%02x", byte);
         }

@@ -48,13 +48,13 @@ bool Commandline::AppendItems(std::string_view cmdline) {
 
   while (pos != end) {
     auto key_end = std::find_if(pos, end, [](auto& c) { return c == '=' || isspace(c); });
-    std::string_view key(pos, key_end - pos);
+    std::string_view key(&(*pos), key_end - pos);
     pos = key_end + 1;
 
     bool res;
     if (*key_end == '=') {
       auto val_end = std::find_if(pos, end, isspace);
-      std::string_view val(pos, val_end - pos);
+      std::string_view val(&(*pos), val_end - pos);
       pos = val_end;
 
       res = Add(key, val);

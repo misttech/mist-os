@@ -114,14 +114,14 @@ void SimStation::RxMgmtFrame(std::shared_ptr<const simulation::SimManagementFram
 TransTimeTest::TransTimeTest() {
   for (auto sta = stations_.begin(); sta != stations_.end(); sta++) {
     sta->env_ = &env_;
-    env_.AddStation(sta);
+    env_.AddStation(&*sta);
   }
   env_.AddStation(this);
 }
 
 TransTimeTest::~TransTimeTest() {
   for (auto sta = stations_.begin(); sta != stations_.end(); sta++) {
-    env_.RemoveStation(sta);
+    env_.RemoveStation(&*sta);
   }
   env_.RemoveStation(this);
 }

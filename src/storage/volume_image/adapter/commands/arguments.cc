@@ -58,7 +58,7 @@ fpromise::result<std::optional<size_t>, std::string> FindArgumentValueByName(
 fpromise::result<uint64_t, std::string> ParseSize(std::string_view size_str) {
   // Maybe it has a special size.
   uint64_t result = 0;
-  auto [p, ec] = std::from_chars(size_str.begin(), size_str.end(), result);
+  auto [p, ec] = std::from_chars(&(*size_str.begin()), &(*size_str.end()), result);
   if (ec != std::errc{}) {
     return fpromise::error("Failed to parse " + std::string(size_str) + " as size.");
   }

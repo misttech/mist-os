@@ -1256,7 +1256,7 @@ zx_status_t State::WriteStringReferencePayload(Block* const block, cpp17::string
   BlockIndex first_extent_index;
   zx_status_t status;
   std::tie(first_extent_index, status) =
-      InnerCreateExtentChain(std::cbegin(data) + inline_length, data.size() - inline_length);
+      InnerCreateExtentChain(&*std::cbegin(data) + inline_length, data.size() - inline_length);
 
   if (status != ZX_OK) {
     return status;

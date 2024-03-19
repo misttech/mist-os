@@ -82,7 +82,7 @@ class RxReturn : public fbl::DoublyLinkedListable<std::unique_ptr<RxReturn>> {
                     .info_type = static_cast<uint32_t>(netdev::wire::InfoType::kNoInfo),
                     .frame_type = static_cast<uint8_t>(netdev::wire::FrameType::kEthernet),
                 },
-            .data_list = parts_.begin(),
+            .data_list = &(*parts_.begin()),
             .data_count = 0,
         }) {}
   // RxReturn can't be moved because it keeps pointers to the return buffer internally.

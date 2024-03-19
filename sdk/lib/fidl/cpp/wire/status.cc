@@ -124,8 +124,8 @@ Status Status::Canceled(UnbindInfo cause) {
 
 [[nodiscard]] std::string Status::FormatDescription() const {
   StatusFormattingBuffer buf;
-  size_t length = FormatImpl(buf.begin(), sizeof(buf), /* from_unbind_info */ false);
-  return std::string(buf.begin(), length);
+  size_t length = FormatImpl(&*buf.begin(), sizeof(buf), /* from_unbind_info */ false);
+  return std::string(&*buf.begin(), length);
 }
 
 [[nodiscard]] const char* Status::lossy_description() const {
@@ -197,21 +197,21 @@ size_t Status::FormatImpl(char* destination, size_t length, bool from_unbind_inf
 
 std::ostream& operator<<(std::ostream& ostream, const Status& result) {
   StatusFormattingBuffer buf;
-  size_t length = result.FormatImpl(buf.begin(), sizeof(buf), /* from_unbind_info */ false);
-  ostream << std::string_view(buf.begin(), length);
+  size_t length = result.FormatImpl(&*buf.begin(), sizeof(buf), /* from_unbind_info */ false);
+  ostream << std::string_view(&*buf.begin(), length);
   return ostream;
 }
 
 [[nodiscard]] std::string UnbindInfo::FormatDescription() const {
   StatusFormattingBuffer buf;
-  size_t length = FormatImpl(buf.begin(), sizeof(buf), /* from_unbind_info */ true);
-  return std::string(buf.begin(), length);
+  size_t length = FormatImpl(&*buf.begin(), sizeof(buf), /* from_unbind_info */ true);
+  return std::string(&*buf.begin(), length);
 }
 
 std::ostream& operator<<(std::ostream& ostream, const UnbindInfo& info) {
   StatusFormattingBuffer buf;
-  size_t length = info.Status::FormatImpl(buf.begin(), sizeof(buf), /* from_unbind_info */ true);
-  ostream << std::string_view(buf.begin(), length);
+  size_t length = info.Status::FormatImpl(&*buf.begin(), sizeof(buf), /* from_unbind_info */ true);
+  ostream << std::string_view(&*buf.begin(), length);
   return ostream;
 }
 

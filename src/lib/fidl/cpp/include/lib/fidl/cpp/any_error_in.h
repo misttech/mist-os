@@ -90,14 +90,14 @@ class ErrorsInImpl : private ErrorsInBase {
   std::string FormatDescription() const {
     FormattingBuffer buffer;
     size_t length = Format(buffer, error_);
-    return std::string(buffer.begin(), length);
+    return std::string(&(*buffer.begin()), length);
   }
 
  private:
   friend std::ostream& operator<<(std::ostream& ostream, const ErrorsInImpl& any_error) {
     FormattingBuffer buffer;
     size_t length = Format(buffer, any_error.error_);
-    ostream << cpp17::string_view(buffer.begin(), length);
+    ostream << cpp17::string_view(&(*buffer.begin()), length);
     return ostream;
   }
 

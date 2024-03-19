@@ -171,7 +171,7 @@ fit::result<efi_status, cpp20::span<const uint8_t>> MdnsPacket::Serialize(
     zx::duration time_to_live) {
   if (time_to_live_.has_value() && *time_to_live_ == time_to_live) {
     return fit::ok(cpp20::span<const uint8_t>(reinterpret_cast<const uint8_t*>(&data_),
-                                              reinterpret_cast<const uint8_t*>(payload_end_)));
+                                              reinterpret_cast<const uint8_t*>(&(*payload_end_))));
   }
 
   ResetPayload();
@@ -184,7 +184,7 @@ fit::result<efi_status, cpp20::span<const uint8_t>> MdnsPacket::Serialize(
 }
 
 cpp20::span<const uint8_t> MdnsPacket::Finalize() {
-  uint16_t length = htons(static_cast<uint16_t>(reinterpret_cast<uintptr_t>(payload_end_) -
+  uint16_t length = htons(static_cast<uint16_t>(reinterpret_cast<uintptr_t>(&(*payload_end_)) -
                                                 reinterpret_cast<uintptr_t>(&data_.udp_header)));
   // IP6 length field does NOT include its header,
   // UDP length field DOES include its header.
@@ -192,7 +192,7 @@ cpp20::span<const uint8_t> MdnsPacket::Finalize() {
   data_.udp_header.length = length;
   data_.udp_header.checksum = 0;
 
-  const uint8_t* end_ptr = reinterpret_cast<const uint8_t*>(payload_end_);
+  const uint8_t* end_ptr = reinterpret_cast<const uint8_t*>(&(*payload_end_));
   // The UDP checksum calculation uses an IP pseudoheader and the UDP payload.
   // There are some intricacies involved in the checksum calculation:
   // 1) Assuming a checksum calculation occurs in a single call,
@@ -230,7 +230,7 @@ MdnsAgent::MdnsAgent(EthernetAgent& eth_agent, efi_system_table* sys)
   std::ignore = timer_.SetTimer(TimerRelative, zx::sec(0));
 
   auto null_terminator = std::find(device_name_.begin(), device_name_.end(), '\0');
-  std::string_view id_view(device_name_.begin(), null_terminator - device_name_.begin());
+  std::string_view id_view(&(*device_name_.begin()), null_terminator - device_name_.begin());
 
   // The name segments and the records should really be passed in on construction,
   // but the intended use case for the MDNS agent is sharply limited.

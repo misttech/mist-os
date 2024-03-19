@@ -146,13 +146,13 @@ class RxTest : public ::testing::Test {
 
 RxTest::RxTest() {
   for (auto sta = stations_.begin(); sta != stations_.end(); sta++) {
-    env_.AddStation(sta);
+    env_.AddStation(&*sta);
   }
 }
 
 RxTest::~RxTest() {
   for (auto sta = stations_.begin(); sta != stations_.end(); sta++) {
-    env_.RemoveStation(sta);
+    env_.RemoveStation(&*sta);
   }
 }
 

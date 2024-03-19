@@ -39,7 +39,7 @@ zx_status_t ReadAndSend(int fd, AsyncSender<std::string> sender) {
       if (newline == end) {
         break;
       }
-      line += std::string(start, newline - start);
+      line += std::string(&*start, newline - start);
       start = newline + 1;
       // Forward the data. If the receiver closes; just keeping draining the pipe.
       if (auto status = sender.Send(std::move(line));
@@ -56,7 +56,7 @@ zx_status_t ReadAndSend(int fd, AsyncSender<std::string> sender) {
       end -= tmp - start;
     } else if (end == buf.end()) {
       // A log line filled the buffer. Add it to `line` and keep going.
-      line += std::string(start, end - start);
+      line += std::string(&*start, end - start);
       end = start;
     }
     // Now try to read more data from the file descriptor.
@@ -72,7 +72,7 @@ zx_status_t ReadAndSend(int fd, AsyncSender<std::string> sender) {
     if (bytes_read == 0) {
       // File descriptor is closed.just send whatever's left.
       if (start != end) {
-        line += std::string(start, end - start);
+        line += std::string(&*start, end - start);
         if (auto status = sender.Send(std::move(line)); status != ZX_OK) {
           return status;
         }

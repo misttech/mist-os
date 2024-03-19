@@ -35,7 +35,7 @@ TEST(ThreadInitialStateTests, RegisterValues) {
   // including PC, SP, and the two argument registers has a known value.
 
   const uintptr_t pc = reinterpret_cast<uintptr_t>(&InitialStateTestThread);
-  const uintptr_t sp = reinterpret_cast<uintptr_t>(std::end(gThreadStack));
+  const uintptr_t sp = reinterpret_cast<uintptr_t>(&(*std::end(gThreadStack)));
   uint64_t arg1_points_to = 0;
   const uint64_t arg1 = reinterpret_cast<uintptr_t>(&arg1_points_to);
   const uint64_t arg2 = kArgumentValue;

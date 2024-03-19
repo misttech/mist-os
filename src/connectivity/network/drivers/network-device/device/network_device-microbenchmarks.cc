@@ -81,7 +81,7 @@ class FakeDeviceImpl : public ddk::NetworkPortProtocol<FakeDeviceImpl>,
           .status = ZX_OK,
       };
     }
-    iface_.CompleteTx(result.begin(), buf_count);
+    iface_.CompleteTx(&*result.begin(), buf_count);
   }
 
   void NetworkDeviceImplQueueRxSpace(const rx_space_buffer_t* buf_list, size_t buf_count) {
@@ -111,7 +111,7 @@ class FakeDeviceImpl : public ddk::NetworkPortProtocol<FakeDeviceImpl>,
           .data_list = &part,
           .data_count = 1};
     }
-    iface_.CompleteRx(result.begin(), buf_count);
+    iface_.CompleteRx(&*result.begin(), buf_count);
   }
 
   ddk::NetworkDeviceImplProtocolClient client() {
@@ -263,13 +263,13 @@ bool LatencyTest(perftest::RepeatState* state, const uint16_t buffer_count) {
   state->DeclareStep("return");
   while (state->KeepRunning()) {
     size_t actual;
-    status = session.SendDescriptors(write_descriptors.begin(), buffer_count, &actual);
+    status = session.SendDescriptors(&*write_descriptors.begin(), buffer_count, &actual);
     ZX_ASSERT_OK(status, "failed to send descriptors");
     ZX_ASSERT_MSG(actual == buffer_count, "partial FIFO write %ld/%d", actual, buffer_count);
 
     status = session.test_fifo().wait_one(ZX_FIFO_READABLE, zx::time::infinite(), nullptr);
     ZX_ASSERT_OK(status, "wait FIFO readable");
-    status = session.FetchDescriptors(returned_descriptors.begin(), buffer_count, &actual);
+    status = session.FetchDescriptors(&*returned_descriptors.begin(), buffer_count, &actual);
     ZX_ASSERT_OK(status, "failed to fetch descriptors");
     // Guarantee that all descriptors we sent come back to us, so the device can't be making any
     // work in its background threads.

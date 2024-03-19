@@ -99,7 +99,7 @@ Session::Session(async_dispatcher_t* dispatcher, netdev::wire::SessionInfo& info
       name_([&name]() {
         std::remove_const<decltype(name_)>::type t;
         ZX_ASSERT(name.size() < t.size());
-        char* end = std::copy(name.begin(), name.end(), t.begin());
+        char* end = &(*std::copy(name.begin(), name.end(), t.begin()));
         *end = '\0';
         return t;
       }()),

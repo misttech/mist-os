@@ -553,7 +553,7 @@ class ObjectCache<T, Option::Single, Allocator> : private Allocator {
       ktrace::Scope trace =
           KTRACE_BEGIN_SCOPE_ENABLE(kTraceLevel >= kDetail, "kernel:sched", "Slab::Free");
       Entry* entry = reinterpret_cast<Entry*>(pointer);
-      DEBUG_ASSERT(entry >= entries.begin() && entry < entries.end());
+      DEBUG_ASSERT(entry >= &(*entries.begin()) && entry < &(*entries.end()));
 
       Guard<Mutex> control_guard{&control.lock};
       DEBUG_ASSERT(available_objects() < kEntriesPerSlab);

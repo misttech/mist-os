@@ -380,9 +380,9 @@ zx::result<size_t> AddMemoryItems(void* zbi, size_t capacity, const ZbiContext* 
   // The structures populated by GetMemoryMap may be larger than sizeof(efi_memory_descriptor),
   // and we need to handle that potential difference in a dynamic manner.
   MemDynamicViewer<efi_memory_descriptor> efi_mem_range(efi_mem, msize / dsize, dsize);
-  zbi_mem_range_t* current_zbi = zbi_mem.begin();
+  zbi_mem_range_t* current_zbi = &(*zbi_mem.begin());
   for (const efi_memory_descriptor& efi_desc : efi_mem_range) {
-    if (current_zbi == zbi_mem.end()) {
+    if (current_zbi == &(*zbi_mem.end())) {
       break;
     }
 
@@ -395,7 +395,7 @@ zx::result<size_t> AddMemoryItems(void* zbi, size_t capacity, const ZbiContext* 
 
   if (context) {
     if (context->uart_mmio_phys) {
-      if (current_zbi == zbi_mem.end()) {
+      if (current_zbi == &(*zbi_mem.end())) {
         printf("Insufficient memory to add memory items\n");
         return zx::error(ZX_ERR_NO_MEMORY);
       }
@@ -414,7 +414,7 @@ zx::result<size_t> AddMemoryItems(void* zbi, size_t capacity, const ZbiContext* 
         // allocate 64K to make it easier when working with 64kb pages. Since we
         // use 4K pages, we allocate 16 pages here just to be safe.
         constexpr uint64_t entry_length = 16 * ZX_PAGE_SIZE;
-        if (current_zbi == zbi_mem.end()) {
+        if (current_zbi == &(*zbi_mem.end())) {
           printf("Insufficient memory to add memory items\n");
           return zx::error(ZX_ERR_NO_MEMORY);
         }
@@ -425,7 +425,7 @@ zx::result<size_t> AddMemoryItems(void* zbi, size_t capacity, const ZbiContext* 
             .type = ZBI_MEM_TYPE_PERIPHERAL,
         };
 
-        if (current_zbi == zbi_mem.end()) {
+        if (current_zbi == &(*zbi_mem.end())) {
           printf("Insufficient memory to add memory items\n");
           return zx::error(ZX_ERR_NO_MEMORY);
         }
@@ -437,7 +437,7 @@ zx::result<size_t> AddMemoryItems(void* zbi, size_t capacity, const ZbiContext* 
         };
 
         if (v2_driver->use_msi) {
-          if (current_zbi == zbi_mem.end()) {
+          if (current_zbi == &(*zbi_mem.end())) {
             printf("Insufficient memory to add memory items\n");
             return zx::error(ZX_ERR_NO_MEMORY);
           }
@@ -455,7 +455,7 @@ zx::result<size_t> AddMemoryItems(void* zbi, size_t capacity, const ZbiContext* 
           return zx::error(ZX_ERR_INTERNAL);
         }
 
-        if (current_zbi == zbi_mem.end()) {
+        if (current_zbi == &(*zbi_mem.end())) {
           printf("Insufficient memory to add memory items\n");
           return zx::error(ZX_ERR_NO_MEMORY);
         }
@@ -476,7 +476,7 @@ zx::result<size_t> AddMemoryItems(void* zbi, size_t capacity, const ZbiContext* 
     }
   }
 
-  size_t payload_size = (current_zbi - zbi_mem.begin()) * sizeof(*current_zbi);
+  size_t payload_size = (current_zbi - &(*zbi_mem.begin())) * sizeof(*current_zbi);
   zbi_result_t result = zbi_create_entry_with_payload(zbi, capacity, ZBI_TYPE_MEM_CONFIG, 0, 0,
                                                       zbi_mem.data(), payload_size);
   if (result != ZBI_RESULT_OK) {

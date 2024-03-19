@@ -98,13 +98,13 @@ class LocationTest : public ::testing::Test {
 
 LocationTest::LocationTest() {
   for (auto sta = stations_.begin(); sta != stations_.end(); sta++) {
-    env_.AddStation(sta);
+    env_.AddStation(&*sta);
   }
 }
 
 LocationTest::~LocationTest() {
   for (auto sta = stations_.begin(); sta != stations_.end(); sta++) {
-    env_.RemoveStation(sta);
+    env_.RemoveStation(&*sta);
   }
 }
 

@@ -306,7 +306,7 @@ uint32_t decode_unicode_hex(std::string_view str) {
   char* endptr;
   unsigned long codepoint = strtoul(str.data(), &endptr, 16);
   ZX_ASSERT(codepoint != ULONG_MAX);
-  ZX_ASSERT(endptr == str.end());
+  ZX_ASSERT(endptr == &(*str.end()));
   return codepoint;
 }
 
@@ -351,7 +351,7 @@ std::uint32_t string_literal_length(std::string_view str) {
             ++it;
           }
           auto codepoint =
-              decode_unicode_hex(std::string_view(codepoint_begin, it - codepoint_begin));
+              decode_unicode_hex(std::string_view(&(*codepoint_begin), it - codepoint_begin));
           count += utf8_size_for_codepoint(codepoint) - 1;
           break;
         }

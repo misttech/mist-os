@@ -210,8 +210,9 @@ bool IsSharedLibraryName(std::string_view filename) {
       continue;
     }
 
-    std::string_view start(filename.begin(), exclusion.prefix.length());
-    std::string_view finish(filename.end() - exclusion.suffix.length(), exclusion.suffix.length());
+    std::string_view start(&*filename.begin(), exclusion.prefix.length());
+    std::string_view finish(&*filename.end() - exclusion.suffix.length(),
+                            exclusion.suffix.length());
     if (start == exclusion.prefix && finish == exclusion.suffix) {
       return true;
     }
