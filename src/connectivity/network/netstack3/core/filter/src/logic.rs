@@ -204,7 +204,6 @@ mod tests {
             ArbitraryValue, FakeIpPacket, FakeTcpSegment, TestIpExt, TransportPacketExt,
         },
         state::IpRoutines,
-        ValidationInfo,
     };
 
     #[test]
@@ -291,7 +290,7 @@ mod tests {
     fn filter_handler_implements_ip_hooks_correctly<I: Ip + TestIpExt>() {
         fn drop_all_traffic<I: TestIpExt>(
             matcher: PacketMatcher<I, FakeDeviceClass>,
-        ) -> Hook<I, FakeDeviceClass, ValidationInfo<()>> {
+        ) -> Hook<I, FakeDeviceClass, ()> {
             Hook {
                 routines: vec![Routine {
                     rules: vec![Rule { matcher, action: Action::Drop, validation_info: () }],
@@ -398,8 +397,8 @@ mod tests {
         fn tcp_port_rule<I: IpExt>(
             src_port: Option<PortMatcher>,
             dst_port: Option<PortMatcher>,
-            action: Action<I, FakeDeviceClass, ValidationInfo<()>>,
-        ) -> Rule<I, FakeDeviceClass, ValidationInfo<()>> {
+            action: Action<I, FakeDeviceClass, ()>,
+        ) -> Rule<I, FakeDeviceClass, ()> {
             Rule {
                 matcher: PacketMatcher {
                     transport_protocol: Some(TransportProtocolMatcher {
@@ -414,7 +413,7 @@ mod tests {
             }
         }
 
-        fn default_filter_rules<I: IpExt>() -> Routine<I, FakeDeviceClass, ValidationInfo<()>> {
+        fn default_filter_rules<I: IpExt>() -> Routine<I, FakeDeviceClass, ()> {
             Routine {
                 rules: vec![
                     // pass in proto tcp to port 22;
@@ -466,7 +465,7 @@ mod tests {
     )]
     #[test_case(wlan_interface() => Verdict::Drop; "drop incoming traffic on wlan interface")]
     fn filter_on_wlan_only<I: Ip + TestIpExt>(interface: FakeDeviceId) -> Verdict {
-        fn drop_wlan_traffic<I: IpExt>() -> Routine<I, FakeDeviceClass, ValidationInfo<()>> {
+        fn drop_wlan_traffic<I: IpExt>() -> Routine<I, FakeDeviceClass, ()> {
             Routine {
                 rules: vec![Rule {
                     matcher: PacketMatcher {

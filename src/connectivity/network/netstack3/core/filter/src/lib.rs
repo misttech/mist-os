@@ -25,6 +25,6 @@ pub use matchers::{
 };
 pub use packets::{IpPacket, TransportPacket};
 pub use state::{
-    validation::{ValidState, ValidationError, ValidationInfo},
+    validation::{ValidState, ValidationError},
     Action, Hook, IpRoutines, NatRoutines, Routine, Rule, State, UninstalledRoutine,
 };
