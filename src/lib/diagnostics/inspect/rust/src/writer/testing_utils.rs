@@ -35,3 +35,32 @@ pub trait GetBlockExt: crate::private::InspectTypeInternal {
 }
 
 impl<T> GetBlockExt for T where T: crate::private::InspectTypeInternal {}
+
+#[macro_export]
+macro_rules! assert_update_is_atomic {
+    ($updateable_thing:ident, $($func:tt)+) => {{
+        // some types (eg Node) get their state method from InspectTypeInternal,
+        // but some (eg Inspector) just have them as regular methods
+        #[allow(unused_imports)]
+        use crate::writer::types::base::private::InspectTypeInternal;
+        let gen = $updateable_thing
+            .state()
+            .unwrap()
+            .with_current_header(|header| header.header_generation_count().unwrap());
+        $updateable_thing.atomic_update($($func)+);
+
+        let new_gen = $updateable_thing
+            .state()
+            .unwrap()
+            .with_current_header(|header| header.header_generation_count().unwrap());
+
+        let num_gen_updates = (new_gen - gen) / 2;
+        if num_gen_updates != 1 {
+            panic!(concat!("update function did not have exactly one transaction.",
+                    "\nTransaction count: {}",
+                    "\nOriginal generation count: {}",
+                    "\nCurrent generation count: {}"),
+                    num_gen_updates, gen, new_gen);
+        }
+    }}
+}

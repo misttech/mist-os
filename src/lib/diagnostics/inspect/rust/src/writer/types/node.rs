@@ -71,22 +71,7 @@ impl Node {
     where
         F: FnOnce(&Node) -> R,
     {
-        match self.inner.inner_ref() {
-            None => {
-                // If the node was a no-op we still execute the `update_fn` even if all operations
-                // inside it will be no-ops to return `R`.
-                update_fn(&self)
-            }
-            Some(inner_ref) => {
-                // Silently ignore the error when fail to lock (as in any regular operation).
-                // All operations performed in the `update_fn` won't update the vmo
-                // generation count since we'll be holding one lock here.
-                inner_ref.state.begin_transaction();
-                let result = update_fn(&self);
-                inner_ref.state.end_transaction();
-                result
-            }
-        }
+        self.atomic_access(update_fn)
     }
 
     /// Keeps track of the given property for the lifetime of the node.

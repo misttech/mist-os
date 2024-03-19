@@ -6,12 +6,18 @@ use crate::writer::{private::InspectTypeInternal, Error, InnerType, State};
 use inspect_format::BlockIndex;
 
 /// Trait implemented by properties.
-pub trait Property<'t> {
+pub trait Property<'t>: InspectTypeInternal {
     /// The type of the property.
     type Type;
 
     /// Set the property value to |value|.
     fn set(&self, value: Self::Type);
+
+    /// Takes a function to execute as under a single lock of the Inspect VMO. This function
+    /// receives a reference to the `Property` on which it is called.
+    fn atomic_update<R, F: FnOnce(&Self) -> R>(&self, update_fn: F) -> R {
+        self.atomic_access(update_fn)
+    }
 }
 
 /// Trait implemented by numeric properties providing common operations.
@@ -46,7 +52,7 @@ impl<T: ArrayProperty + InspectTypeInternal> Length for T {
 }
 
 /// Trait implemented by all array properties providing common operations on arrays.
-pub trait ArrayProperty: Length {
+pub trait ArrayProperty: Length + InspectTypeInternal {
     /// The type of the array entries.
     type Type;
 
@@ -55,6 +61,12 @@ pub trait ArrayProperty: Length {
 
     /// Sets all slots of the array to 0 and releases any references.
     fn clear(&self);
+
+    /// Takes a function to execute as under a single lock of the Inspect VMO. This function
+    /// receives a reference to the `ArrayProperty` on which it is called.
+    fn atomic_update<R, F: FnOnce(&Self) -> R>(&self, update_fn: F) -> R {
+        self.atomic_access(update_fn)
+    }
 }
 
 pub trait ArithmeticArrayProperty: ArrayProperty {

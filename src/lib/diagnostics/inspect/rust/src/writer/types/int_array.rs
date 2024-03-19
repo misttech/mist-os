@@ -82,6 +82,7 @@ impl ArithmeticArrayProperty for IntArrayProperty {
 mod tests {
     use super::*;
     use crate::{
+        assert_update_is_atomic,
         writer::{testing_utils::GetBlockExt, Length},
         Inspector,
     };
@@ -110,6 +111,7 @@ mod tests {
             });
 
             array.subtract(0, 3);
+
             array.get_block(|array_block| {
                 assert_eq!(array_block.array_get_int_slot(0).unwrap(), 7);
             });
@@ -136,6 +138,20 @@ mod tests {
         }
         node.get_block(|node_block| {
             assert_eq!(node_block.child_count().unwrap(), 0);
+        });
+    }
+
+    #[fuchsia::test]
+    fn property_atomics() {
+        let inspector = Inspector::default();
+        let array = inspector.root().create_int_array("array", 5);
+
+        assert_update_is_atomic!(array, |array| {
+            array.set(0, 0);
+            array.set(1, 1);
+            array.set(2, 2);
+            array.set(3, 3);
+            array.set(4, 4);
         });
     }
 }

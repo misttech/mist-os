@@ -298,6 +298,7 @@ impl InspectorConfig {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::assert_update_is_atomic;
     use futures::FutureExt;
 
     #[fuchsia::test]
@@ -411,22 +412,12 @@ mod tests {
     #[fuchsia::test]
     async fn atomic_update() {
         let insp = Inspector::default();
-        let gen = insp
-            .state()
-            .unwrap()
-            .with_current_header(|header| header.header_generation_count().unwrap());
-        insp.atomic_update(|n| {
+        assert_update_is_atomic!(insp, |n| {
             n.record_int("", 1);
             n.record_int("", 2);
             n.record_uint("", 3);
             n.record_string("", "abcd");
         });
-
-        let current_gen = insp
-            .state()
-            .unwrap()
-            .with_current_header(|header| header.header_generation_count().unwrap());
-        assert_eq!(gen + 2, current_gen);
     }
 }
 

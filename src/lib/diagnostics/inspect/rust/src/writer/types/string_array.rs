@@ -35,6 +35,25 @@ impl InspectTypeInternal for StringArrayProperty {
     fn block_index(&self) -> Option<BlockIndex> {
         Some(self.inner.inner_ref()?.block_index)
     }
+
+    fn atomic_access<R, F: FnOnce(&Self) -> R>(&self, f: F) -> R {
+        match self.inner.inner_ref() {
+            None => {
+                // If the node was a no-op we still execute the `update_fn` even if all operations
+                // inside it will be no-ops to return `R`.
+                f(&self)
+            }
+            Some(inner_ref) => {
+                // Silently ignore the error when fail to lock (as in any regular operation).
+                // All operations performed in the `update_fn` won't update the vmo
+                // generation count since we'll be holding one lock here.
+                inner_ref.state.begin_transaction();
+                let result = f(&self);
+                inner_ref.state.end_transaction();
+                result
+            }
+        }
+    }
 }
 
 impl ArrayProperty for StringArrayProperty {
@@ -73,6 +92,7 @@ impl Drop for StringArrayProperty {
 mod tests {
     use super::*;
     use crate::{
+        assert_update_is_atomic,
         writer::{testing_utils::GetBlockExt, Length},
         Inspector,
     };
@@ -143,6 +163,20 @@ mod tests {
 
         node.get_block(|node_block| {
             assert_eq!(node_block.child_count().unwrap(), 0);
+        });
+    }
+
+    #[fuchsia::test]
+    fn property_atomics() {
+        let inspector = Inspector::default();
+        let array = inspector.root().create_string_array("string_array", 5);
+
+        assert_update_is_atomic!(array, |array| {
+            array.set(0, "0");
+            array.set(1, "1");
+            array.set(2, "2");
+            array.set(3, "3");
+            array.set(4, "4");
         });
     }
 }

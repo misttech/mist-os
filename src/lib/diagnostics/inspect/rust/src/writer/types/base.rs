@@ -27,6 +27,7 @@ pub(crate) mod private {
         fn is_valid(&self) -> bool;
         fn block_index(&self) -> Option<BlockIndex>;
         fn state(&self) -> Option<State>;
+        fn atomic_access<R, F: FnOnce(&Self) -> R>(&self, accessor: F) -> R;
     }
 }
 
@@ -90,6 +91,25 @@ macro_rules! impl_inspect_type_internal {
                     Some(inner_ref.block_index)
                 } else {
                     None
+                }
+            }
+
+            fn atomic_access<R, F: FnOnce(&Self) -> R>(&self, accessor: F) -> R {
+                match self.inner.inner_ref() {
+                    None => {
+                        // If the node was a no-op we still execute the `accessor` even if all
+                        // operations inside it will be no-ops to return `R`.
+                        accessor(&self)
+                    }
+                    Some(inner_ref) => {
+                        // Silently ignore the error when fail to lock (as in any regular operation).
+                        // All operations performed in the `accessor` won't update the vmo
+                        // generation count since we'll be holding one lock here.
+                        inner_ref.state.begin_transaction();
+                        let result = accessor(&self);
+                        inner_ref.state.end_transaction();
+                        result
+                    }
                 }
             }
         }

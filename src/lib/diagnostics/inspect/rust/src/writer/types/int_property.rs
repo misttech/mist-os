@@ -73,9 +73,10 @@ impl NumericProperty<'_> for IntProperty {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::assert_update_is_atomic;
     use crate::writer::{
         testing_utils::{get_state, GetBlockExt},
-        Node,
+        Inspector, Node,
     };
     use inspect_format::BlockType;
 
@@ -116,6 +117,17 @@ mod tests {
         }
         node.get_block(|node_block| {
             assert_eq!(node_block.child_count().unwrap(), 0);
+        });
+    }
+
+    #[fuchsia::test]
+    fn property_atomics() {
+        let inspector = Inspector::default();
+        let property = inspector.root().create_int("property", 5);
+
+        assert_update_is_atomic!(property, |property| {
+            property.subtract(1);
+            property.subtract(2);
         });
     }
 }
