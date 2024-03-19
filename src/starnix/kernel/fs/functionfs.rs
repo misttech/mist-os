@@ -162,8 +162,8 @@ impl FunctionFsRootDir {
         if state.has_input_output_endpoints {
             return Ok(());
         }
-        state.has_input_output_endpoints = true;
         state.adb_proxy = Some(connect_to_device()?);
+        state.has_input_output_endpoints = true;
 
         // Currently FunctionFS assumes the device is always online.
         track_stub!(TODO("https://fxbug.dev/329699340"), "FunctionFS correctly handles USB events");
