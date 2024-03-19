@@ -88,5 +88,30 @@
     "archive_gn_label": "//src/sys/time/timekeeper_integration:timekeeper-integration_archive_copy",
     "archive_name": "timekeeper-integration",
     "package_name": "timekeeper-integration"
+  },
+  {
+    "archive_gn_label": "//src/ui/tests/conformance_input_tests:focus-test-suite_archive_copy",
+    "archive_name": "focus-test-suite",
+    "package_name": "focus-test-suite"
+  },
+  {
+    "archive_gn_label": "//src/ui/tests/conformance_input_tests:key-test-suite_archive_copy",
+    "archive_name": "key-test-suite",
+    "package_name": "key-test-suite"
+  },
+  {
+    "archive_gn_label": "//src/ui/tests/conformance_input_tests:media-button-test-suite_archive_copy",
+    "archive_name": "media-button-test-suite",
+    "package_name": "media-button-test-suite"
+  },
+  {
+    "archive_gn_label": "//src/ui/tests/conformance_input_tests:mouse-test-suite_archive_copy",
+    "archive_name": "mouse-test-suite",
+    "package_name": "mouse-test-suite"
+  },
+  {
+    "archive_gn_label": "//src/ui/tests/conformance_input_tests:touch-test-suite_archive_copy",
+    "archive_name": "touch-test-suite",
+    "package_name": "touch-test-suite"
   }
 ]

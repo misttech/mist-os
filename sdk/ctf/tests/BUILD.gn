@@ -19,6 +19,7 @@ group("tests") {
     "//src/sys/component_manager/tests/reboot_on_terminate:tests",
     "//src/sys/pkg/tests/pkgdir:ctf-tests",
     "//src/sys/time/timekeeper_integration:ctf-tests",
+    "//src/ui/tests/conformance_input_tests:ctf-tests",
   ]
 }
 

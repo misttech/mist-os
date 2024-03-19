@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
+import("//sdk/ctf/build/ctf.gni")
 
 group("tests") {
   testonly = true
@@ -12,6 +13,17 @@ group("tests") {
     ":media-button-conformance-test",
     ":mouse-conformance-test",
     ":touch-conformance-test",
+  ]
+}
+
+group("ctf-tests") {
+  testonly = true
+  deps = [
+    ":focus-test-suite_archive",
+    ":key-test-suite_archive",
+    ":media-button-test-suite_archive",
+    ":mouse-test-suite_archive",
+    ":touch-test-suite_archive",
   ]
 }
 
@@ -57,7 +69,7 @@ fuchsia_component("touch-validator") {
   deps = [ ":touch-validator-bin" ]
 }
 
-fuchsia_package("touch-test-suite") {
+ctf_fuchsia_package("touch-test-suite") {
   package_name = "touch-test-suite"
   testonly = true
   deps = [
@@ -70,7 +82,7 @@ fuchsia_test_component("touch-conformance-test-component") {
   testonly = true
   component_name = "touch-conformance-test"
   manifest = "meta/touch-conformance-test.cml"
-  test_type = "system"
+  test_type = "ctf"
 }
 
 fuchsia_test_package("touch-conformance-test") {
@@ -119,7 +131,7 @@ fuchsia_component("mouse-validator") {
   deps = [ ":mouse-validator-bin" ]
 }
 
-fuchsia_package("mouse-test-suite") {
+ctf_fuchsia_package("mouse-test-suite") {
   package_name = "mouse-test-suite"
   testonly = true
   deps = [
@@ -132,7 +144,7 @@ fuchsia_test_component("mouse-conformance-test-component") {
   testonly = true
   component_name = "mouse-conformance-test"
   manifest = "meta/mouse-conformance-test.cml"
-  test_type = "system"
+  test_type = "ctf"
 }
 
 fuchsia_test_package("mouse-conformance-test") {
@@ -183,7 +195,7 @@ fuchsia_component("key-validator") {
   deps = [ ":key-validator-bin" ]
 }
 
-fuchsia_package("key-test-suite") {
+ctf_fuchsia_package("key-test-suite") {
   package_name = "key-test-suite"
   testonly = true
   deps = [
@@ -196,7 +208,7 @@ fuchsia_test_component("key-conformance-test-component") {
   testonly = true
   component_name = "key-conformance-test"
   manifest = "meta/key-conformance-test.cml"
-  test_type = "system"
+  test_type = "ctf"
 }
 
 fuchsia_test_package("key-conformance-test") {
@@ -246,7 +258,7 @@ fuchsia_component("focus-validator") {
   deps = [ ":focus-validator-bin" ]
 }
 
-fuchsia_package("focus-test-suite") {
+ctf_fuchsia_package("focus-test-suite") {
   package_name = "focus-test-suite"
   testonly = true
   deps = [
@@ -259,7 +271,7 @@ fuchsia_test_component("focus-conformance-test-component") {
   testonly = true
   component_name = "focus-conformance-test"
   manifest = "meta/focus-conformance-test.cml"
-  test_type = "system"
+  test_type = "ctf"
 }
 
 fuchsia_test_package("focus-conformance-test") {
@@ -312,7 +324,7 @@ fuchsia_component("media-button-validator") {
   deps = [ ":media-button-validator-bin" ]
 }
 
-fuchsia_package("media-button-test-suite") {
+ctf_fuchsia_package("media-button-test-suite") {
   package_name = "media-button-test-suite"
   testonly = true
   deps = [
@@ -325,7 +337,7 @@ fuchsia_test_component("media-button-conformance-test-component") {
   testonly = true
   component_name = "media-button-conformance-test"
   manifest = "meta/media-button-conformance-test.cml"
-  test_type = "system"
+  test_type = "ctf"
 }
 
 fuchsia_test_package("media-button-conformance-test") {

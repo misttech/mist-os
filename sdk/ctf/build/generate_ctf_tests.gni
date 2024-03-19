@@ -265,6 +265,132 @@ template("generate_nodegroup_test") {
   }
 }
 
+template("generate_touch-test-suite") {
+  forward_variables_from(invoker, [ "test_info" ])
+  fuchsia_package_with_test(target_name) {
+    test_component = "//src/ui/tests/conformance_input_tests:touch-conformance-test-component"
+    test_component_name = "touch-conformance-test.cm"
+    subpackages = [
+      test_info.target_label,
+      "//src/ui/testing/context:ui-context-factory",
+    ]
+    test_specs = {
+      log_settings = {
+        max_severity = "ERROR"
+      }
+      environments = [
+        {
+          dimensions = {
+            # Ensure the device has Vulkan.
+            device_type = "AEMU"
+          }
+        },
+      ]
+    }
+  }
+}
+
+template("generate_mouse-test-suite") {
+  forward_variables_from(invoker, [ "test_info" ])
+  fuchsia_package_with_test(target_name) {
+    test_component = "//src/ui/tests/conformance_input_tests:mouse-conformance-test-component"
+    test_component_name = "mouse-conformance-test.cm"
+    subpackages = [
+      test_info.target_label,
+      "//src/ui/testing/context:ui-context-factory",
+    ]
+    test_specs = {
+      log_settings = {
+        max_severity = "ERROR"
+      }
+      environments = [
+        {
+          dimensions = {
+            # Ensure the device has Vulkan.
+            device_type = "AEMU"
+          }
+        },
+      ]
+    }
+  }
+}
+
+template("generate_key-test-suite") {
+  forward_variables_from(invoker, [ "test_info" ])
+  fuchsia_package_with_test(target_name) {
+    test_component =
+        "//src/ui/tests/conformance_input_tests:key-conformance-test-component"
+    test_component_name = "key-conformance-test.cm"
+    subpackages = [
+      test_info.target_label,
+      "//src/ui/testing/context:ui-context-factory",
+    ]
+    test_specs = {
+      log_settings = {
+        max_severity = "ERROR"
+      }
+      environments = [
+        {
+          dimensions = {
+            # Ensure the device has Vulkan.
+            device_type = "AEMU"
+          }
+        },
+      ]
+    }
+  }
+}
+
+template("generate_focus-test-suite") {
+  forward_variables_from(invoker, [ "test_info" ])
+  fuchsia_package_with_test(target_name) {
+    test_component = "//src/ui/tests/conformance_input_tests:focus-conformance-test-component"
+    test_component_name = "focus-conformance-test.cm"
+    subpackages = [
+      test_info.target_label,
+      "//src/ui/testing/context:ui-context-factory",
+    ]
+    test_specs = {
+      log_settings = {
+        max_severity = "ERROR"
+      }
+      environments = [
+        {
+          dimensions = {
+            # Ensure the device has Vulkan.
+            device_type = "AEMU"
+          }
+        },
+      ]
+    }
+  }
+}
+
+template("generate_media-button-test-suite") {
+  forward_variables_from(invoker, [ "test_info" ])
+  fuchsia_package_with_test(target_name) {
+    test_component = "//src/ui/tests/conformance_input_tests:media-button-conformance-test-component"
+    test_component_name = "media-button-conformance-test.cm"
+    subpackages = [
+      test_info.target_label,
+      "//src/ui/testing/context:ui-context-factory",
+    ]
+    test_specs = {
+      log_settings = {
+        max_severity = "ERROR"
+      }
+      environments = [
+        {
+          dimensions = {
+            # Ensure the device has Vulkan.
+            device_type = "AEMU"
+          }
+        },
+      ]
+    }
+  }
+}
+
 # Expands a prebuilt CTF test into a runnable fuchsia package.
 #
 # This template is called several times with every combination of ctf_test and
