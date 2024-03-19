@@ -1,0 +1,171 @@
+// Copyright 2024 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
+#include "pwm-visitor.h"
+
+#include <lib/ddk/metadata.h>
+#include <lib/driver/component/cpp/composite_node_spec.h>
+#include <lib/driver/component/cpp/node_add_args.h>
+#include <lib/driver/devicetree/visitors/common-types.h>
+#include <lib/driver/devicetree/visitors/registration.h>
+#include <lib/driver/logging/cpp/logger.h>
+
+#include <bind/fuchsia/cpp/bind.h>
+#include <bind/fuchsia/hardware/pwm/cpp/bind.h>
+#include <bind/fuchsia/pwm/cpp/bind.h>
+
+namespace pwm_visitor_dt {
+
+PwmVisitor::PwmVisitor() {
+  fdf_devicetree::Properties pwm_properties = {};
+  pwm_properties.emplace_back(
+      std::make_unique<fdf_devicetree::ReferenceProperty>(kPwmReference, kPwmCells));
+  pwm_properties.emplace_back(std::make_unique<fdf_devicetree::StringListProperty>(kPwmNames));
+  parser_ = std::make_unique<fdf_devicetree::PropertyParser>(std::move(pwm_properties));
+}
+
+bool PwmVisitor::is_match(const std::string& name) { return name.find("pwm") != std::string::npos; }
+
+zx::result<> PwmVisitor::Visit(fdf_devicetree::Node& node,
+                               const devicetree::PropertyDecoder& decoder) {
+  zx::result parser_output = parser_->Parse(node);
+  if (parser_output.is_error()) {
+    FDF_LOG(ERROR, "PWM visitor parse failed for node '%s' : %s", node.name().c_str(),
+            parser_output.status_string());
+    return parser_output.take_error();
+  }
+
+  if (parser_output->find(kPwmReference) == parser_output->end()) {
+    return zx::ok();
+  }
+
+  if (parser_output->find(kPwmNames) == parser_output->end() &&
+      (*parser_output)[kPwmReference].size() != 1u) {
+    FDF_LOG(
+        ERROR,
+        "PWM reference '%s' does not have valid pwm names property. Name is required to generate bind rules, especially when more than one pwm is referenced.",
+        node.name().c_str());
+    return zx::error(ZX_ERR_INVALID_ARGS);
+  }
+
+  const size_t reference_count = (*parser_output)[kPwmReference].size();
+  std::vector<std::optional<std::string>> pwm_names(reference_count);
+  if (parser_output->find(kPwmNames) != parser_output->end()) {
+    if (parser_output->at(kPwmNames).size() != reference_count) {
+      FDF_LOG(
+          ERROR,
+          "PWM reference '%s' does not expected number of pwm names property. Expected: %lu actual: %lu.",
+          node.name().c_str(), reference_count, parser_output->at(kPwmNames).size());
+      return zx::error(ZX_ERR_INVALID_ARGS);
+    }
+
+    size_t name_idx = 0;
+    for (auto& names : (*parser_output)[kPwmNames]) {
+      pwm_names[name_idx++] = names.AsString();
+    }
+  }
+
+  for (uint32_t index = 0; index < reference_count; index++) {
+    auto reference = (*parser_output)[kPwmReference][index].AsReference();
+    if (reference && is_match(reference->first.name())) {
+      auto result =
+          ParseReferenceChild(node, reference->first, reference->second, pwm_names[index]);
+      if (result.is_error()) {
+        return result.take_error();
+      }
+    }
+  }
+
+  return zx::ok();
+}
+
+PwmVisitor::PwmController& PwmVisitor::GetController(fdf_devicetree::Phandle phandle) {
+  const auto [controller_iter, success] = pwm_controllers_.insert({phandle, PwmController()});
+  return controller_iter->second;
+}
+
+zx::result<> PwmVisitor::ParseReferenceChild(fdf_devicetree::Node& child,
+                                             fdf_devicetree::ReferenceNode& parent,
+                                             fdf_devicetree::PropertyCells specifiers,
+                                             std::optional<std::string_view> pwm_name) {
+  auto& controller = GetController(*parent.phandle());
+
+  if (specifiers.size_bytes() < 1 * sizeof(uint32_t)) {
+    FDF_LOG(
+        ERROR,
+        "PWM reference '%s' has incorrect number of pwm specifiers (%lu) - expected at least 1.",
+        child.name().c_str(), specifiers.size_bytes() / sizeof(uint32_t));
+    return zx::error(ZX_ERR_NOT_FOUND);
+  }
+
+  auto cells = fdf_devicetree::Uint32Array(specifiers);
+  pwm_id_t pwm_id = {};
+  pwm_id.id = cells[0];
+
+  FDF_LOG(DEBUG, "PWM ID added - ID 0x%x name '%s' to controller '%s'", cells[0],
+          pwm_name ? std::string(*pwm_name).c_str() : "<anonymous>", parent.name().c_str());
+
+  controller.pwm_ids.emplace_back(pwm_id);
+
+  return AddChildNodeSpec(child, pwm_id.id, pwm_name);
+}
+
+zx::result<> PwmVisitor::AddChildNodeSpec(fdf_devicetree::Node& child, uint32_t id,
+                                          std::optional<std::string_view> pwm_name) {
+  auto pwm_node = fuchsia_driver_framework::ParentSpec{{
+      .bind_rules =
+          {
+              fdf::MakeAcceptBindRule(bind_fuchsia_hardware_pwm::SERVICE,
+                                      bind_fuchsia_hardware_pwm::SERVICE_ZIRCONTRANSPORT),
+              fdf::MakeAcceptBindRule(bind_fuchsia::PWM_ID, id),
+          },
+      .properties =
+          {
+              fdf::MakeProperty(bind_fuchsia_hardware_pwm::SERVICE,
+                                bind_fuchsia_hardware_pwm::SERVICE_ZIRCONTRANSPORT),
+          },
+  }};
+
+  if (pwm_name) {
+    pwm_node.properties().push_back(
+        fdf::MakeProperty(bind_fuchsia_pwm::PWM_ID_FUNCTION,
+                          "fuchsia.pwm.PWM_ID_FUNCTION." + std::string(*pwm_name)));
+  }
+
+  child.AddNodeSpec(pwm_node);
+  return zx::ok();
+}
+
+zx::result<> PwmVisitor::FinalizeNode(fdf_devicetree::Node& node) {
+  // Check that it is indeed a pwm that we support.
+  if (!is_match(node.name())) {
+    return zx::ok();
+  }
+
+  if (node.phandle()) {
+    auto controller = pwm_controllers_.find(*node.phandle());
+    if (controller == pwm_controllers_.end()) {
+      FDF_LOG(INFO, "PWM controller '%s' is not being used. Not adding any metadata for it.",
+              node.name().c_str());
+      return zx::ok();
+    }
+
+    if (!controller->second.pwm_ids.empty()) {
+      fuchsia_hardware_platform_bus::Metadata id_metadata = {{
+          .type = DEVICE_METADATA_PWM_IDS,
+          .data = std::vector<uint8_t>(
+              reinterpret_cast<const uint8_t*>(controller->second.pwm_ids.data()),
+              reinterpret_cast<const uint8_t*>(controller->second.pwm_ids.data()) +
+                  (controller->second.pwm_ids.size() * sizeof(pwm_id_t))),
+      }};
+      node.AddMetadata(std::move(id_metadata));
+      FDF_LOG(DEBUG, "PWM IDs metadata added to node '%s'", node.name().c_str());
+    }
+  }
+  return zx::ok();
+}
+
+}  // namespace pwm_visitor_dt
+
+REGISTER_DEVICETREE_VISITOR(pwm_visitor_dt::PwmVisitor);

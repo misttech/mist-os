@@ -1,0 +1,32 @@
+// Copyright 2024 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
+#include "pwm.h"
+
+/dts-v1/;
+/ {
+    compatible = "fuchsia,test-dt";
+    model = "test";
+    #address-cells = <2>;
+    #size-cells = <2>;
+
+    pwmA: pwm@ffffa000 {
+      compatible = "test,pwm";
+      reg = <0x0 0xffffa000 0x0 0x1000>;
+      #pwm-cells = <2>;
+    };
+
+    unused_pwm: pwm@ffffb000 {
+      compatible = "test,pwm";
+      reg = <0x0 0xffffb000 0x0 0x1000>;
+      #pwm-cells = <2>;
+      phandle = <0x10>;
+    };
+
+    audio {
+      compatible = "test,audio";
+      pwms = <&pwmA PIN1 PIN1_EXTRA &pwmA PIN2 PIN2_EXTRA>;
+      pwm-names = PIN1_NAME, PIN2_NAME;
+    };
+};

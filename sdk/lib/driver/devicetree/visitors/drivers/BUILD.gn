@@ -12,6 +12,7 @@ group("tests") {
     "interrupt-controllers:tests",
     "mali-gpu:tests",
     "mmc:tests",
+    "pwm-controllers:tests",
     "registers:tests",
     "usb:tests",
   ]

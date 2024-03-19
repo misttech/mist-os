@@ -1,0 +1,72 @@
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/components.gni")
+import("//build/devicetree/devicetree.gni")
+import("//build/devicetree/devicetree_visitor.gni")
+import("//build/test.gni")
+
+group("tests") {
+  deps = [ ":pwm-visitor-test" ]
+  testonly = true
+}
+
+devicetree_visitor("pwm-visitor") {
+  deps = [ ":pwm-visitor-impl" ]
+}
+
+source_set("pwm-visitor-impl") {
+  sources = [
+    "pwm-visitor.cc",
+    "pwm-visitor.h",
+  ]
+  deps = [
+    "//sdk/fidl/fuchsia.hardware.pwm:fuchsia.hardware.pwm_bindlib_cpp",
+    "//sdk/lib/driver/component/cpp:cpp",
+    "//sdk/lib/driver/devicetree/manager",
+    "//sdk/lib/driver/devicetree/visitors:common-types",
+    "//sdk/lib/driver/devicetree/visitors:registration",
+    "//sdk/lib/driver/logging/cpp",
+    "//src/devices/bind/fuchsia:fuchsia_cpp",
+    "//src/devices/bind/fuchsia.pwm:fuchsia.pwm_cpp",
+    "//src/lib/ddk:ddk_metadata",
+  ]
+  public_deps = [
+    "//sdk/lib/driver/devicetree/visitors:property-parser",
+    "//src/lib/ddk:ddk-metadata-headers",
+  ]
+}
+
+test("pwm-visitor-test-bin") {
+  sources = [ "test/pwm-visitor-test.cc" ]
+  deps = [
+    ":pwm-visitor-impl",
+    "//sdk/fidl/fuchsia.hardware.pwm:fuchsia.hardware.pwm_bindlib_cpp",
+    "//sdk/lib/driver/component/cpp:cpp",
+    "//sdk/lib/driver/devicetree/testing:visitor-test-helper",
+    "//sdk/lib/driver/devicetree/visitors:registry",
+    "//sdk/lib/driver/devicetree/visitors/default/bind-property",
+    "//src/devices/bind/fuchsia:fuchsia_cpp",
+    "//src/devices/bind/fuchsia.pwm:fuchsia.pwm_cpp",
+    "//src/lib/fxl/test:gtest_main",
+  ]
+}
+
+dtb("pwm-dtb") {
+  sources = [ "test/dts/pwm.dts.S" ]
+}
+
+resource("pwm-visitor-dtb-file") {
+  sources = get_target_outputs(":pwm-dtb")
+  outputs = [ "test-data/pwm.dtb" ]
+  deps = [ ":pwm-dtb" ]
+}
+
+fuchsia_unittest_package("pwm-visitor-test") {
+  component_name = "pwm-visitor-test"
+  deps = [
+    ":pwm-visitor-dtb-file",
+    ":pwm-visitor-test-bin",
+  ]
+}
