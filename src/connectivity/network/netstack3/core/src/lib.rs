@@ -112,7 +112,7 @@ pub mod filter {
         ValidationInfo,
     };
     pub(crate) use netstack3_filter::{
-        FilterContext, FilterHandler, FilterImpl, FilterIpContext, RxPacket, ValidState, Verdict,
+        FilterContext, FilterHandler, FilterImpl, FilterIpContext, ValidState, Verdict,
     };
 }
 
