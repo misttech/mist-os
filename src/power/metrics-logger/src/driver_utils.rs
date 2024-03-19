@@ -19,7 +19,7 @@ pub struct DriverAlias {
 }
 
 /// Helper struct to deserialize the optional config file loaded from CONFIG_PATH
-/// (//src/testing/metrics-logger/src/main.rs). The config file maps the human-readable aliases
+/// (//src/power/metrics-logger/src/main.rs). The config file maps the human-readable aliases
 /// to the topological paths of the drivers.
 #[derive(Deserialize)]
 pub struct Config {

@@ -52,7 +52,7 @@ Please specify a duration for immediate load display, or alternatively, utilize 
 subcommand to instruct the metrics-logger component to record the CPU usage data to Inspect, Trace,\
 and/or syslog.
 If the metrics-logger component is not available to the target, add \
-`--with //src/testing/metrics-logger` to fx set."
+`--with //src/power/metrics-logger` to fx set."
 )]
 
 pub struct CpuLoadCommand {

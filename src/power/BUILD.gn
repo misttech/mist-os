@@ -46,6 +46,7 @@ group("tests") {
     "cpu-manager:tests",
     "fake-powersource:tests",
     "fidl/testing",
+    "metrics-logger:tests",
     "power-manager:tests",
     "shutdown-shim/tests",
     "system-activity-governor:tests",

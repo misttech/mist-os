@@ -15,7 +15,7 @@
     }
   ],
   "notes": [
-    "If the metrics-logger component is not available to the target, then this command will not work\nproperly. Add --with //src/testing/metrics-logger to fx set."
+    "If the metrics-logger component is not available to the target, then this command will not work\nproperly. Add --with //src/power/metrics-logger to fx set."
   ],
   "commands": [],
   "positionals": [],

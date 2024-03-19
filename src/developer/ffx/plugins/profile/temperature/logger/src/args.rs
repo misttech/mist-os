@@ -28,7 +28,7 @@ with output-samples-to-syslog and output-stats-to-syslog enabled:
     --output-stats-to-syslog --output-samples-to-syslog -d 30s",
     note = "\
 If the metrics-logger component is not available to the target, then this command will not work
-properly. Add --with //src/testing/metrics-logger to fx set."
+properly. Add --with //src/power/metrics-logger to fx set."
 )]
 /// Top-level command for "ffx profile temperature logger".
 pub struct Command {

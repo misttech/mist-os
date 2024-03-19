@@ -26,7 +26,7 @@ To poll network activity every 1 second for 30 seconds with output-to-syslog ena
     $ ffx profile network activity start --interval 1s -d 30s --output-to-syslog",
     note = "\
 If the metrics-logger component is not available to the target, then this command will not work
-properly. Add --with //src/testing/metrics-logger to fx set."
+properly. Add --with //src/power/metrics-logger to fx set."
 )]
 /// Top-level command for "ffx profile network activity".
 pub struct Command {

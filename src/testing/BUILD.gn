@@ -19,7 +19,6 @@ group("tests") {
     "fuzzing:tests",
     "host-target-testing:tests",
     "loadbench:tests",
-    "metrics-logger:tests",
     "sl4f:tests",
   ]
 }

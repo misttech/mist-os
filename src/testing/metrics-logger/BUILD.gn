@@ -2,123 +2,16 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//build/components.gni")
-import("//build/config.gni")
-import("//build/json/validate_json.gni")
-import("//build/rust/rustc_binary.gni")
-import("//src/sys/core/build/core_shard.gni")
+# TODO(b/322007400): Remove this directory when out-of-tree files are updated.
 
-template("metrics_logger_config") {
-  config_data("${target_name}_config_data") {
-    for_pkg = "metrics-logger"
-    sources = [ "${invoker.source}" ]
-    outputs = [ "config.json" ]
-  }
-
-  validate_json("${target_name}_validate_json") {
-    data = "${invoker.source}"
-    schema = "config/config.schema.json"
-  }
-
-  group(target_name) {
-    deps = [
-      ":${target_name}_config_data",
-      ":${target_name}_validate_json",
-    ]
-  }
+group("astro_config") {
+  deps = [ "//src/power/metrics-logger:astro_config" ]
 }
 
-metrics_logger_config("astro_config") {
-  source = "config/astro_config.json"
+group("sherlock_config") {
+  deps = [ "//src/power/metrics-logger:sherlock_config" ]
 }
 
-metrics_logger_config("sherlock_config") {
-  source = "config/sherlock_config.json"
-}
-
-metrics_logger_config("nelson_config") {
-  source = "config/nelson_config.json"
-}
-
-rustc_binary("bin") {
-  name = "metrics_logger"
-  edition = "2021"
-  with_unit_tests = true
-
-  deps = [
-    "//sdk/fidl/fuchsia.boot:fuchsia.boot_rust",
-    "//sdk/fidl/fuchsia.device:fuchsia.device_rust",
-    "//sdk/fidl/fuchsia.gpu.magma:fuchsia.gpu.magma_rust",
-    "//sdk/fidl/fuchsia.hardware.network:fuchsia.hardware.network_rust",
-    "//sdk/fidl/fuchsia.hardware.power.sensor:fuchsia.hardware.power.sensor_rust",
-    "//sdk/fidl/fuchsia.hardware.temperature:fuchsia.hardware.temperature_rust",
-    "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_rust",
-    "//sdk/fidl/fuchsia.power.metrics:fuchsia.power.metrics_rust",
-    "//sdk/fidl/fuchsia.ui.activity:fuchsia.ui.activity_rust",
-    "//src/lib/diagnostics/hierarchy/rust",
-    "//src/lib/diagnostics/inspect/runtime/rust",
-    "//src/lib/diagnostics/inspect/rust",
-    "//src/lib/fdio/rust:fdio",
-    "//src/lib/fidl/rust/fidl",
-    "//src/lib/fuchsia",
-    "//src/lib/fuchsia-async",
-    "//src/lib/fuchsia-component",
-    "//src/lib/fuchsia-fs",
-    "//src/lib/trace/rust:trace",
-    "//src/lib/trace/rust:trace-provider",
-    "//src/lib/zircon/rust:fuchsia-zircon",
-    "//src/starnix/lib/magma",
-    "//src/sys/lib/fuchsia-zbi/abi",
-    "//third_party/rust_crates:anyhow",
-    "//third_party/rust_crates:argh",
-    "//third_party/rust_crates:async-trait",
-    "//third_party/rust_crates:futures",
-    "//third_party/rust_crates:num-traits",
-    "//third_party/rust_crates:serde",
-    "//third_party/rust_crates:serde_derive",
-    "//third_party/rust_crates:serde_json",
-    "//third_party/rust_crates:tracing",
-    "//third_party/rust_crates:zerocopy",
-  ]
-  test_deps = [
-    "//src/lib/diagnostics/testing/diagnostics-assertions/rust:diagnostics-assertions",
-    "//third_party/rust_crates:assert_matches",
-  ]
-
-  sources = [
-    "src/cpu_load_logger.rs",
-    "src/driver_utils.rs",
-    "src/gpu_usage_logger.rs",
-    "src/main.rs",
-    "src/network_activity_logger.rs",
-    "src/sensor_logger.rs",
-  ]
-}
-
-# TODO(b/322007400): metrics-logger-standalone is production facing. All of this
-# code should be moved to //src/power to reflect in-field production use.
-fuchsia_package_with_single_component("metrics-logger-standalone-pkg") {
-  manifest = "meta/metrics-logger-standalone.cml"
-  package_name = "metrics-logger-standalone"
-  deps = [ ":bin" ]
-}
-
-core_shard("metrics-logger-standalone-core-shard") {
-  shard_file = "meta/metrics-logger-standalone.core_shard.cml"
-}
-
-fuchsia_package_with_single_component("metrics-logger-pkg") {
-  manifest = "meta/metrics-logger.cml"
-  package_name = "metrics-logger"
-  deps = [ ":bin" ]
-}
-
-fuchsia_unittest_package("metrics-logger-tests") {
-  manifest = "meta/metrics-logger-tests.cml"
-  deps = [ ":bin_test" ]
-}
-
-group("tests") {
-  testonly = true
-  deps = [ ":metrics-logger-tests" ]
+group("nelson_config") {
+  deps = [ "//src/power/metrics-logger:nelson_config" ]
 }

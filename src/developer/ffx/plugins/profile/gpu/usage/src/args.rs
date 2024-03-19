@@ -26,7 +26,7 @@ To poll gpu driver every 1 second for 30 seconds with output-to-syslog enabled:
     $ ffx profile gpu usage start --interval 1s -d 30s --output-to-syslog",
     note = "\
 If the metrics-logger component is not available to the target, then this command will not work
-properly. Add --with //src/testing/metrics-logger to fx set."
+properly. Add --with //src/power/metrics-logger to fx set."
 )]
 /// Top-level command for "ffx profile gpu usage".
 pub struct Command {
