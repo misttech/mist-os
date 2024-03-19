@@ -964,7 +964,7 @@ impl ComputationContext {
             bpf_log!(
                 self,
                 verification_context,
-                "{op_name} {} {}",
+                "{op_name} {}, {}",
                 display_register(dst),
                 display_source(src)
             );
@@ -1024,15 +1024,17 @@ impl ComputationContext {
                 Type::ScalarValue { value, unknown_mask, unwritten_mask }
             }
             (
-                AluType::PtrCompatible,
+                alu_type,
                 Type::PtrToStack { offset: x },
                 Type::ScalarValue { value: y, unknown_mask: 0, .. },
-            ) => Type::PtrToStack { offset: run_on_stack_offset(*x, |x| op(x, y)) },
+            ) if alu_type.is_ptr_compatible() => {
+                Type::PtrToStack { offset: run_on_stack_offset(*x, |x| op(x, y)) }
+            }
             (
-                AluType::PtrCompatible,
+                alu_type,
                 Type::PtrToMemory { id, offset: x, buffer_size, fields, mappings },
                 Type::ScalarValue { value: y, unknown_mask: 0, .. },
-            ) => {
+            ) if alu_type.is_ptr_compatible() => {
                 let offset = op(*x, y);
                 Type::PtrToMemory {
                     id: id.clone(),
@@ -1043,13 +1045,36 @@ impl ComputationContext {
                 }
             }
             (
-                AluType::PtrCompatible,
+                alu_type,
                 Type::PtrToArray { id, offset: x },
                 Type::ScalarValue { value: y, unknown_mask: 0, .. },
-            ) => {
+            ) if alu_type.is_ptr_compatible() => {
                 let offset = op(*x, y);
                 Type::PtrToArray { id: id.clone(), offset }
             }
+            (
+                AluType::Sub,
+                Type::PtrToMemory { id: id1, offset: x1, .. },
+                Type::PtrToMemory { id: id2, offset: x2, .. },
+            )
+            | (
+                AluType::Sub,
+                Type::PtrToArray { id: id1, offset: x1 },
+                Type::PtrToArray { id: id2, offset: x2 },
+            ) if *id1 == id2 => Type::from(op(*x1, x2)),
+            (AluType::Sub, Type::PtrToStack { offset: x1 }, Type::PtrToStack { offset: x2 }) => {
+                Type::from(op(x1.reg(), x2.reg()))
+            }
+            (
+                AluType::Sub,
+                Type::PtrToArray { id: id1, .. },
+                Type::PtrToEndArray { id: id2, .. },
+            )
+            | (
+                AluType::Sub,
+                Type::PtrToEndArray { id: id1, .. },
+                Type::PtrToArray { id: id2, .. },
+            ) if *id1 == id2 => Type::unknown_written_scalar_value(),
             (
                 _,
                 Type::ScalarValue { unwritten_mask: 0, .. },
@@ -1107,7 +1132,7 @@ impl ComputationContext {
         bpf_log!(
             self,
             verification_context,
-            "{op_name} {} {} {}",
+            "{op_name} {}, {}, {}",
             display_register(dst),
             display_source(src),
             if offset == 0 { format!("0") } else { print_offset(offset) },
@@ -1187,7 +1212,18 @@ enum AluType {
     Bitwise,
     Shift,
     Arsh,
-    PtrCompatible,
+    Sub,
+    Add,
+}
+
+impl AluType {
+    /// Can this operation be done one a pointer and a scalar.
+    fn is_ptr_compatible(&self) -> bool {
+        match self {
+            Self::Sub | Self::Add => true,
+            _ => false,
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -1256,9 +1292,7 @@ impl BpfVisitor for ComputationContext {
         dst: Register,
         src: Source,
     ) -> Result<(), String> {
-        self.alu(Some("add"), context, dst, src, AluType::PtrCompatible, |x, y| {
-            x.overflowing_add(y).0
-        })
+        self.alu(Some("add"), context, dst, src, AluType::Add, |x, y| x.overflowing_add(y).0)
     }
     fn and<'a>(
         &mut self,
@@ -1479,9 +1513,7 @@ impl BpfVisitor for ComputationContext {
         dst: Register,
         src: Source,
     ) -> Result<(), String> {
-        self.alu(Some("sub"), context, dst, src, AluType::PtrCompatible, |x, y| {
-            x.overflowing_sub(y).0
-        })
+        self.alu(Some("sub"), context, dst, src, AluType::Sub, |x, y| x.overflowing_sub(y).0)
     }
     fn xor<'a>(
         &mut self,

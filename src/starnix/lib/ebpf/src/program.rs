@@ -469,4 +469,45 @@ mod test {
             ProgramArgument { data: v_ptr, data_end: v_ptr + std::mem::size_of::<u64>() as u64 };
         assert_eq!(program.run(&mut (), &mut data), v);
     }
+
+    #[test]
+    fn test_ptr_diff() {
+        let program = r#"
+          mov %r0, %r1
+          add %r0, 0x2
+          # Substract 2 ptr to memory
+          sub %r0, %r1
+
+          mov %r2, %r10
+          add %r2, 0x3
+          # Substract 2 ptr to stack
+          sub %r2, %r10
+          add %r0, %r2
+
+          ldxdw %r2, [%r1+8]
+          ldxdw %r1, [%r1]
+          # Substract ptr to array and ptr to array end
+          sub %r2, %r1
+          add %r0, %r2
+
+          mov %r2, %r1
+          add %r2, 0x4
+          # Substract 2 ptr to array
+          sub %r2, %r1
+          add %r0, %r2
+
+          exit
+        "#;
+        let code = parse_asm(program);
+
+        let mut builder = EbpfProgramBuilder::<()>::default();
+        builder.set_args(&[ProgramArgument::get_type()]);
+        let program = builder.load(code, &mut NullVerifierLogger).expect("load");
+
+        let v: u64 = 42;
+        let v_ptr = (&v as *const u64) as u64;
+        let mut data =
+            ProgramArgument { data: v_ptr, data_end: v_ptr + std::mem::size_of::<u64>() as u64 };
+        assert_eq!(program.run(&mut (), &mut data), 17);
+    }
 }
