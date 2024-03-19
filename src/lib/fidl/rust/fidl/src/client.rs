@@ -98,10 +98,6 @@ impl InterestId {
     fn from_txid(txid: Txid) -> Self {
         InterestId(txid.0 as usize - 1)
     }
-
-    fn as_raw_id(&self) -> usize {
-        self.0
-    }
 }
 
 impl Txid {
@@ -130,8 +126,7 @@ impl Client {
         Client {
             inner: Arc::new(ClientInner {
                 channel,
-                message_interests: Mutex::new(Slab::<MessageInterest>::new()),
-                event_channel: Mutex::default(),
+                interests: Mutex::default(),
                 epitaph: Mutex::default(),
                 protocol_name,
             }),
@@ -163,7 +158,7 @@ impl Client {
         // isn't empty, since try_unwrap destroys the original Arc.
         match Arc::try_unwrap(self.inner) {
             Ok(inner) => {
-                if inner.message_interests.lock().is_empty() || inner.channel.is_closed() {
+                if inner.interests.lock().messages.is_empty() || inner.channel.is_closed() {
                     Ok(inner.channel)
                 } else {
                     // This creates a new arc if there are outstanding
@@ -181,10 +176,10 @@ impl Client {
     /// Panics if the stream was already taken.
     pub fn take_event_receiver(&self) -> EventReceiver {
         {
-            let mut lock = self.inner.event_channel.lock();
+            let mut lock = self.inner.interests.lock();
 
-            if let EventListener::None = lock.listener {
-                lock.listener = EventListener::WillPoll;
+            if let EventListener::None = lock.event_listener {
+                lock.event_listener = EventListener::WillPoll;
             } else {
                 panic!("Event stream was already taken");
             }
@@ -266,13 +261,13 @@ impl Client {
             &'b mut Vec<HandleDisposition<'static>>,
         ) -> Result<(), Error>,
     {
-        let id = self.inner.register_msg_interest();
+        let id = self.inner.interests.lock().register_msg_interest();
         crate::encoding::with_tls_encode_buf(|bytes, handles| {
-            encode_msg(Txid::from_interest_id(id), bytes, handles)?;
+            encode_msg(id, bytes, handles)?;
             self.send_raw(bytes, handles)
         })?;
 
-        Ok(MessageResponse { id: Txid::from_interest_id(id), client: Some(self.inner.clone()) })
+        Ok(MessageResponse { id, client: Some(self.inner.clone()) })
     }
 }
 
@@ -309,7 +304,7 @@ impl Future for MessageResponse {
 impl Drop for MessageResponse {
     fn drop(&mut self) {
         if let Some(client) = &self.client {
-            client.deregister_msg_interest(InterestId::from_txid(self.id));
+            client.interests.lock().deregister(self.id);
         }
     }
 }
@@ -343,38 +338,12 @@ impl MessageInterest {
         }
     }
 
-    /// Registers the waker from `cx` if the message has not already been received, replacing any
-    /// previous waker registered.
-    fn register(&mut self, cx: &Context<'_>) {
-        if self.is_received() {
-            return;
-        }
-        if let Self::Discard = self {
-            panic!("Polled a discarded MessageReceiver?!");
-        }
-        // Must be either WillPoll or Waiting, replace the waker.
-        *self = Self::Waiting(cx.waker().clone());
-    }
-
-    /// Receive a message for this MessageInterest, waking the waiter if they are waiting to
-    /// poll.
-    /// Returns true if the task interested in the response no longer cares about it, in which
-    /// case this can be cleaned up.
-    fn receive(&mut self, message: MessageBufEtc) -> bool {
-        if let Self::Discard = self {
-            return true;
-        } else if let Self::Waiting(waker) = mem::replace(self, Self::Received(message)) {
-            waker.wake();
-        }
-        false
-    }
-
     /// Wake the interested task, if it is waiting, putting it in a WillPoll state.
     /// This function is idempotent.
     fn wake(&mut self) {
-        if let Self::Waiting(waker) = self {
-            waker.wake_by_ref();
-            *self = Self::WillPoll;
+        if let Self::Waiting(_) = self {
+            let Self::Waiting(waker) = mem::replace(self, Self::WillPoll) else { unreachable!() };
+            waker.wake();
         }
     }
 }
@@ -441,14 +410,8 @@ impl Stream for EventReceiver {
 
 impl Drop for EventReceiver {
     fn drop(&mut self) {
-        self.inner.event_channel.lock().listener = EventListener::None;
+        self.inner.interests.lock().dropped_event_listener();
     }
-}
-
-#[derive(Debug, Default)]
-struct EventChannel {
-    listener: EventListener,
-    queue: VecDeque<MessageBufEtc>,
 }
 
 #[derive(Debug, Default)]
@@ -463,15 +426,8 @@ enum EventListener {
 }
 
 impl EventListener {
-    /// Wakes this, putting it in a WillPoll State until it is polled again.
-    fn wake(&mut self) {
-        *self = match mem::replace(self, Self::None) {
-            Self::Some(waker) => {
-                waker.wake();
-                Self::WillPoll
-            }
-            x => x,
-        };
+    fn is_some(&self) -> bool {
+        matches!(self, EventListener::Some(_))
     }
 }
 
@@ -499,15 +455,8 @@ struct ClientInner {
     /// The channel that leads to the server we are connected to.
     channel: AsyncChannel,
 
-    /// A map of MessageInterests, which track state of responses to two-way
-    /// messages.
-    /// An interest is registered here with `register_msg_interest` and deregistered
-    /// by either retrieving a message via a call to `poll_recv_msg_response` or manually
-    /// deregistering with `deregister_msg_interest`
-    message_interests: Mutex<Slab<MessageInterest>>,
-
-    /// A queue of received events and a waker for the task to receive them.
-    event_channel: Mutex<EventChannel>,
+    /// Tracks the state of responses to two-way messages and events.
+    interests: Mutex<Interests>,
 
     /// The server provided epitaph, or None if the channel is not closed.
     epitaph: Mutex<Option<zx_status::Status>>,
@@ -516,31 +465,138 @@ struct ClientInner {
     protocol_name: &'static str,
 }
 
-impl ClientInner {
-    /// Registers interest in a response message.
-    ///
-    /// This function returns a `usize` ID which should be used to send a message
-    /// via the channel. Responses are then received using `poll_recv`.
-    fn register_msg_interest(&self) -> InterestId {
-        // TODO(cramertj) use `try_from` here and assert that the conversion from
-        // `usize` to `u32` hasn't overflowed.
-        InterestId(self.message_interests.lock().insert(MessageInterest::WillPoll))
+#[derive(Debug, Default)]
+struct Interests {
+    messages: Slab<MessageInterest>,
+    events: VecDeque<MessageBufEtc>,
+    event_listener: EventListener,
+    // The number of tasks waiting for either a message or an event.
+    pending: usize,
+}
+
+impl Interests {
+    /// Receives an event and returns a waker, if any.
+    fn push_event(&mut self, buf: MessageBufEtc) -> Option<Waker> {
+        self.events.push_back(buf);
+        self.take_event_waker()
     }
 
-    fn poll_recv_event(&self, cx: &Context<'_>) -> Poll<Result<MessageBufEtc, Error>> {
+    /// Returns the waker for the task waiting for events, if any.
+    fn take_event_waker(&mut self) -> Option<Waker> {
+        if self.event_listener.is_some() {
+            let EventListener::Some(waker) =
+                mem::replace(&mut self.event_listener, EventListener::WillPoll)
+            else {
+                unreachable!()
+            };
+
+            // Matches the +1 in `register_event_listener`.
+            self.pending -= 1;
+            Some(waker)
+        } else {
+            None
+        }
+    }
+
+    /// Receive a message, waking the waiter if they are waiting to poll and `wake` is true.
+    /// Returns an error of the message isn't found.
+    fn push_message(&mut self, txid: Txid, buf: MessageBufEtc, wake: bool) -> Result<(), Error> {
+        let InterestId(raw_id) = InterestId::from_txid(txid);
+        // Look for a message interest with the given ID.
+        // If one is found, store the message so that it can be picked up later.
+        let Some(interest) = self.messages.get_mut(raw_id) else {
+            // TODO(https://fxbug.dev/42066009): Should close the channel.
+            return Err(Error::InvalidResponseTxid);
+        };
+
+        if let MessageInterest::Discard = interest {
+            self.messages.remove(raw_id);
+        } else if let MessageInterest::Waiting(waker) =
+            mem::replace(interest, MessageInterest::Received(buf))
         {
-            // Update the EventListener with the latest waker, remove any stale WillPoll state
-            let mut lock = self.event_channel.lock();
-            lock.listener = EventListener::Some(cx.waker().clone());
+            if wake {
+                waker.wake();
+            }
+        }
+
+        // Matches the +1 in `register_msg_interest`.
+        self.pending -= 1;
+
+        Ok(())
+    }
+
+    /// Registers the waker from `cx` if the message has not already been received, replacing any
+    /// previous waker registered.  Returns the message if it has been received.
+    fn register(&mut self, txid: Txid, cx: &Context<'_>) -> Option<MessageBufEtc> {
+        let InterestId(raw_id) = InterestId::from_txid(txid);
+        let interest = self.messages.get_mut(raw_id).expect("Polled unregistered interest");
+        match interest {
+            MessageInterest::Received(_) => Some(self.messages.remove(raw_id).unwrap_received()),
+            MessageInterest::Discard => panic!("Polled a discarded MessageReceiver?!"),
+            MessageInterest::WillPoll | MessageInterest::Waiting(_) => {
+                *interest = MessageInterest::Waiting(cx.waker().clone());
+                None
+            }
+        }
+    }
+
+    /// Deregisters an interest.
+    fn deregister(&mut self, txid: Txid) {
+        let InterestId(raw_id) = InterestId::from_txid(txid);
+        if self.messages[raw_id].is_received() {
+            self.messages.remove(raw_id);
+        } else {
+            self.messages[raw_id] = MessageInterest::Discard;
+        }
+    }
+
+    /// Registers an event listener.
+    fn register_event_listener(&mut self, cx: &Context<'_>) -> Option<MessageBufEtc> {
+        self.events.pop_front().or_else(|| {
+            if !mem::replace(&mut self.event_listener, EventListener::Some(cx.waker().clone()))
+                .is_some()
+            {
+                self.pending += 1;
+            }
+            None
+        })
+    }
+
+    /// Indicates the event listener has been dropped.
+    fn dropped_event_listener(&mut self) {
+        if self.event_listener.is_some() {
+            // Matches the +1 in register_event_listener.
+            self.pending -= 1;
+        }
+        self.event_listener = EventListener::None;
+    }
+
+    /// Registers interest in a response message.
+    ///
+    /// This function returns a new transaction ID which should be used to send a message
+    /// via the channel. Responses are then received using `poll_recv_msg_response`.
+    fn register_msg_interest(&mut self) -> Txid {
+        self.pending += 1;
+        // TODO(cramertj) use `try_from` here and assert that the conversion from
+        // `usize` to `u32` hasn't overflowed.
+        Txid::from_interest_id(InterestId(self.messages.insert(MessageInterest::WillPoll)))
+    }
+}
+
+impl ClientInner {
+    fn poll_recv_event(&self, cx: &Context<'_>) -> Poll<Result<MessageBufEtc, Error>> {
+        // Update the EventListener with the latest waker, remove any stale WillPoll state
+        if let Some(msg_buf) = self.interests.lock().register_event_listener(cx) {
+            return Poll::Ready(Ok(msg_buf));
         }
 
         // Process any data on the channel, registering any tasks still waiting to wake when the
         // channel becomes ready.
-        let epitaph = self.recv_all()?;
+        let epitaph = self.recv_all(Txid(0))?;
 
-        let mut lock = self.event_channel.lock();
+        let mut lock = self.interests.lock();
 
-        if let Some(msg_buf) = lock.queue.pop_front() {
+        if let Some(msg_buf) = lock.events.pop_front() {
             Poll::Ready(Ok(msg_buf))
         } else if let Some(status) = epitaph {
             Poll::Ready(Err(Error::ClientChannelClosed {
@@ -561,29 +617,21 @@ impl ClientInner {
         txid: Txid,
         cx: &Context<'_>,
     ) -> Poll<Result<MessageBufEtc, Error>> {
-        let interest_id = InterestId::from_txid(txid);
-        {
-            // Register our waker with the interest if we haven't received a message yet.
-            let mut message_interests = self.message_interests.lock();
-            message_interests
-                .get_mut(interest_id.as_raw_id())
-                .expect("Polled unregistered interest")
-                .register(cx);
+        // Register our waker with the interest if we haven't received a message yet.
+        if let Some(buf) = self.interests.lock().register(txid, cx) {
+            return Poll::Ready(Ok(buf));
         }
 
         // Process any data on the channel, registering tasks still waiting for wake when the
         // channel becomes ready.
-        let epitaph = self.recv_all()?;
+        let epitaph = self.recv_all(txid)?;
 
-        let mut message_interests = self.message_interests.lock();
-        if message_interests
-            .get(interest_id.as_raw_id())
-            .expect("Polled unregistered interest")
-            .is_received()
-        {
+        let InterestId(raw_id) = InterestId::from_txid(txid);
+        let mut interests = self.interests.lock();
+        if interests.messages.get(raw_id).expect("Polled unregistered interest").is_received() {
             // If we got the result remove the received buffer and return, freeing up the
             // space for a new message.
-            let buf = message_interests.remove(interest_id.as_raw_id()).unwrap_received();
+            let buf = interests.messages.remove(raw_id).unwrap_received();
             Poll::Ready(Ok(buf))
         } else if let Some(status) = epitaph {
             Poll::Ready(Err(Error::ClientChannelClosed {
@@ -602,7 +650,7 @@ impl ClientInner {
     /// notified when their message arrives or when there is new data if the channel is empty.
     ///
     /// Returns the epitaph (or PEER_CLOSED) if the channel was closed, and None otherwise.
-    fn recv_all(&self) -> Result<Option<zx_status::Status>, Error> {
+    fn recv_all(&self, want_txid: Txid) -> Result<Option<zx_status::Status>, Error> {
         // TODO(cramertj) return errors if one has occurred _ever_ in recv_all, not just if
         // one happens on this call.
         loop {
@@ -658,37 +706,21 @@ impl ClientInner {
             // Epitaph handling is done, so the lock is no longer required.
             drop(epitaph_lock);
 
+            let mut interests = self.interests.lock();
+            assert!(interests.pending > 0, "{}", header.tx_id);
             if header.tx_id == 0 {
-                // received an event
-                let mut lock = self.event_channel.lock();
-                lock.queue.push_back(buf);
-                lock.listener.wake();
-            } else {
-                // received a message response
-                let recvd_interest_id = InterestId::from_txid(Txid(header.tx_id));
-
-                // Look for a message interest with the given ID.
-                // If one is found, store the message so that it can be picked up later.
-                let mut message_interests = self.message_interests.lock();
-                let raw_recvd_interest_id = recvd_interest_id.as_raw_id();
-                let Some(interest) = message_interests.get_mut(raw_recvd_interest_id) else {
-                    // TODO(https://fxbug.dev/42066009): Should close the channel.
-                    return Err(Error::InvalidResponseTxid);
-                };
-                let remove = interest.receive(buf);
-                if remove {
-                    message_interests.remove(raw_recvd_interest_id);
+                if let Some(waker) = interests.push_event(buf) {
+                    if want_txid != Txid(0) {
+                        waker.wake();
+                    }
                 }
+            } else {
+                let txid = Txid(header.tx_id);
+                interests.push_message(txid, buf, want_txid != txid)?;
             }
-        }
-    }
-
-    fn deregister_msg_interest(&self, InterestId(id): InterestId) {
-        let mut lock = self.message_interests.lock();
-        if lock[id].is_received() {
-            lock.remove(id);
-        } else {
-            lock[id] = MessageInterest::Discard;
+            if interests.pending == 0 {
+                return Ok(None);
+            }
         }
     }
 
@@ -700,22 +732,21 @@ impl ClientInner {
     fn get_combined_waker(&self) -> Waker {
         let mut wakers = Vec::new();
         {
-            let lock = self.message_interests.lock();
-            wakers.reserve(lock.len() + 1);
-            for (_, message_interest) in lock.iter() {
+            let lock = self.interests.lock();
+            wakers.reserve_exact(
+                lock.messages.len()
+                    + matches!(lock.event_listener, EventListener::Some(_)) as usize,
+            );
+            for (_, message_interest) in &lock.messages {
                 if let MessageInterest::Waiting(waker) = message_interest {
                     wakers.push(waker.clone());
                 }
             }
-        }
-        {
-            let lock = self.event_channel.lock();
-            if let EventListener::Some(waker) = &lock.listener {
+            if let EventListener::Some(waker) = &lock.event_listener {
                 wakers.push(waker.clone());
             }
         }
         if !wakers.is_empty() {
-            wakers.shrink_to_fit();
             CombinedWaker::make_waker(wakers)
         } else {
             noop_waker()
@@ -724,13 +755,13 @@ impl ClientInner {
 
     /// Wakes all tasks that have polled on this channel.
     fn wake_all(&self) {
-        {
-            let mut lock = self.message_interests.lock();
-            for (_, interest) in lock.iter_mut() {
-                interest.wake();
-            }
+        let mut lock = self.interests.lock();
+        for (_, interest) in &mut lock.messages {
+            interest.wake();
         }
-        self.event_channel.lock().listener.wake();
+        if let Some(waker) = lock.take_event_waker() {
+            waker.wake();
+        }
     }
 }
 
