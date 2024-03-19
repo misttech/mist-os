@@ -571,18 +571,19 @@ if (current_toolchain != default_toolchain) {
     visibility = [ ":*" ]
     testonly = true
 
+    deps = [
+      ":physboot-elf-kernel-test-data($phys_toolchain)",
+      "..:physboot-elf-kernel.package",
+    ]
+
     # TODO(https://fxbug.dev/42107497): As an interim measure, physload reuses
     # the space previously occupied by the STORAGE_KERNEL ZBI item for the
     # hand-off to the kernel. With profile instrumentation, this hand-off
     # encodes profiles which can take up a fair amount of space. When this
     # STORAGE_KERNEL item is compressed, it is too small to fit a hand-off with
-    # profiles, so we reserve more space by leaving it uncompressed for now.
-    compress = false
-
-    deps = [
-      ":physboot-elf-kernel-test-data($phys_toolchain)",
-      "..:physboot-elf-kernel.package",
-    ]
+    # profiles, so we reserve more space in there for now by including the
+    # kernel proper.
+    deps += [ "//zircon/kernel:zircon(//zircon/kernel:kernel_$current_cpu)" ]
   }
 
   zbi_test("physboot-elf-kernel-test") {
