@@ -13,6 +13,7 @@ import itertools
 import logging
 import operator
 import os
+import pathlib
 import signal
 import struct
 import subprocess
@@ -258,7 +259,7 @@ class PowerMetricsProcessor(trace_metrics.MetricsProcessor):
         trace_metrics.TestCaseResult.write_fuchsiaperf_json(
             results=results,
             test_suite=f"fuchsia.power.{metric_name}",
-            output_path=fuchsiaperf_json_path,
+            output_path=pathlib.Path(fuchsiaperf_json_path),
         )
 
         return fuchsiaperf_json_path
