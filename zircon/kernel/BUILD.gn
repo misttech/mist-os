@@ -785,6 +785,7 @@ if (is_kernel) {
       "lib/devicetree/tests",
       "lib/efi:tests",
       "lib/heap/cmpctmalloc:tests",
+      "lib/sched:tests",
       "phys:tests",
       "phys/lib:tests",
       "target:tests",
