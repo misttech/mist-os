@@ -140,8 +140,11 @@ closed protocol Paver {
 /// DataSink.Write[...]() --> DataSink.Flush() --> BootManager.Set[...]() --> BootManager.Flush()
 /// DataSink.Write[...]() --> BootManager.Set[...]() --> DataSink.Flush() --> BootManager.Flush()
 closed protocol DataSink {
-    /// Reads partition corresponding to `configuration` and `asset` into a
-    /// vmo and returns it.
+    /// Reads the partition corresponding to `configuration` and `asset` into a vmo and returns it.
+    /// The size field of the returned `Buffer` will be the size of just the asset, if it can be
+    /// determined. Otherwise, it will be the size of the entire partition.
+    /// The size and stream size of the vmo in the returned `Buffer` will always be the size of the
+    /// entire partition.
     strict ReadAsset(struct {
         configuration Configuration;
         asset Asset;
