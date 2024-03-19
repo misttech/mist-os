@@ -4,7 +4,8 @@
 
 use crate::{
     visitor::{BpfVisitor, DataWidth, ProgramCounter, Register, Source},
-    EbpfError, MapSchema, BPF_MAX_INSTS, BPF_STACK_SIZE, GENERAL_REGISTER_COUNT, REGISTER_COUNT,
+    EbpfError, MapSchema, BPF_MAX_INSTS, BPF_SIZE_MASK, BPF_STACK_SIZE, GENERAL_REGISTER_COUNT,
+    REGISTER_COUNT,
 };
 use byteorder::{BigEndian, ByteOrder, LittleEndian, NativeEndian};
 use linux_uapi::bpf_insn;
@@ -44,9 +45,9 @@ impl From<u64> for MemoryId {
 
 impl MemoryId {
     /// Build a new id such that `other` is prepended to the chain of parent of `self`.
-    fn prepended(&self, other: &MemoryId) -> Self {
+    fn prepended(&self, other: MemoryId) -> Self {
         match &self.parent {
-            None => MemoryId { id: self.id, parent: Some(Box::new(other.clone())) },
+            None => MemoryId { id: self.id, parent: Some(Box::new(other)) },
             Some(parent) => {
                 MemoryId { id: self.id, parent: Some(Box::new(parent.prepended(other))) }
             }
@@ -76,6 +77,80 @@ impl FieldType {
     }
 }
 
+/// A mapping for a field in a struct where the original ebpf program knows a different offset and
+/// data size than the one it receives from the kernel.
+#[derive(Clone, Copy, Debug)]
+pub struct FieldMapping {
+    /// The offset of the field as known by the original ebpf program.
+    pub source_offset: i16,
+    /// The actual offset of the field in the data provided by the kernel.
+    pub target_offset: i16,
+    /// Whether the epbf program consider the data to be 32 bits, while the actual data is 64 bits.
+    pub is_32_to_64: bool,
+}
+
+impl FieldMapping {
+    /// Returns a new `FieldMapping` where the source and target fields have the same width.
+    pub fn new_offset_mapping(source_offset: i16, target_offset: i16) -> Self {
+        Self { source_offset, target_offset, is_32_to_64: false }
+    }
+
+    /// Returns a new `FieldMapping` where the source field is 32 bits while the target field is 64
+    /// bits.
+    pub fn new_size_mapping(source_offset: i16, target_offset: i16) -> Self {
+        Self { source_offset, target_offset, is_32_to_64: true }
+    }
+}
+
+/// The offset and width of a field in a struct.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+struct Field {
+    offset: i16,
+    width: DataWidth,
+}
+
+impl Field {
+    fn new(offset: i16, width: DataWidth) -> Self {
+        Self { offset, width }
+    }
+
+    fn offset_as_u64(&self) -> u64 {
+        i64::from(self.offset) as u64
+    }
+}
+
+/// Helper trait to find the actual field to use when accessing a field of a struct. Returns `None`
+/// if the field is not mapped.
+trait MappingVec {
+    fn find_mapping(
+        &self,
+        context: &ComputationContext,
+        field: Field,
+    ) -> Result<Option<Field>, String>;
+}
+
+impl MappingVec for Vec<FieldMapping> {
+    fn find_mapping(
+        &self,
+        context: &ComputationContext,
+        field: Field,
+    ) -> Result<Option<Field>, String> {
+        if let Some(mapping) = self.iter().find(|m| m.source_offset == field.offset) {
+            if mapping.is_32_to_64 {
+                if field.width == DataWidth::U32 {
+                    Ok(Some(Field::new(mapping.target_offset, DataWidth::U64)))
+                } else {
+                    Err(format!("incorrect memory access width at pc {}", context.pc))
+                }
+            } else {
+                Ok(Some(Field::new(mapping.target_offset, field.width)))
+            }
+        } else {
+            Ok(None)
+        }
+    }
+}
+
 #[derive(Clone, Debug)]
 pub enum Type {
     /// A number.
@@ -102,6 +177,9 @@ pub enum Type {
         buffer_size: u64,
         /// The list of fields in the buffer that are known pointer to known types.
         fields: Vec<FieldType>,
+        /// The list of mappings in the buffer. The verifier must rewrite the actual ebpf to ensure
+        /// the right offset and operand are use to access the mapped fields.
+        mappings: Vec<FieldMapping>,
     },
     /// A pointer to the kernel memory. The full buffer size is determined by an instance of
     /// `PtrToEndArray` with the same `id`. The pointer is situadted at `offset` from the start of
@@ -289,12 +367,13 @@ impl CallingContext {
 }
 
 /// Verify the given code depending on the type of the parameters and the registered external
-/// functions.
+/// functions. This method will rewrite the code to ensure mapped fields are correctly handled.
+/// Returns the actual code to run.
 pub fn verify(
-    code: &[bpf_insn],
+    mut code: Vec<bpf_insn>,
     calling_context: CallingContext,
     logger: &mut dyn VerifierLogger,
-) -> Result<(), EbpfError> {
+) -> Result<Vec<bpf_insn>, EbpfError> {
     if code.len() > BPF_MAX_INSTS {
         return error_and_log(logger, "ebpf program too long");
     }
@@ -305,13 +384,20 @@ pub fn verify(
         context.set_reg((i + 1) as u8, t.clone()).map_err(EbpfError::ProgramLoadError)?;
     }
     let states = vec![context];
-    let mut verification_context =
-        VerificationContext { calling_context, logger, states, code, counter: 0, iteration: 0 };
+    let mut verification_context = VerificationContext {
+        calling_context,
+        logger,
+        states,
+        code: &code,
+        counter: 0,
+        iteration: 0,
+        transformations: Default::default(),
+    };
     while let Some(mut context) = verification_context.states.pop() {
         if verification_context.iteration > 10 * BPF_MAX_INSTS {
             return error_and_log(verification_context.logger, "bpf byte code does not terminate");
         }
-        if context.pc >= code.len() {
+        if context.pc >= verification_context.code.len() {
             return error_and_log(verification_context.logger, "pc out of bounds");
         }
         let visit_result = context.visit(&mut verification_context, &code[context.pc..]);
@@ -323,7 +409,16 @@ pub fn verify(
         }
         verification_context.iteration += 1;
     }
-    Ok(())
+    // Once the code is verified, applied the transformations.
+    for transformation in verification_context.transformations.into_iter() {
+        if let (pc, Some(field)) = transformation {
+            let instruction = &mut code[pc];
+            instruction.off = field.offset;
+            instruction.code &= !BPF_SIZE_MASK;
+            instruction.code |= field.width.instruction_bits();
+        }
+    }
+    Ok(code)
 }
 
 struct VerificationContext<'a> {
@@ -340,6 +435,10 @@ struct VerificationContext<'a> {
     /// The current iteration of the verifier. Used to ensure termination by limiting the number of
     /// iteration before bailing out.
     iteration: usize,
+    /// The current list of transformation to apply. This is also used to ensure that a given
+    /// instruction that acts on a mapped field always requires the same transformation. If this is
+    /// not the case, the verifier will reject the program.
+    transformations: HashMap<ProgramCounter, Option<Field>>,
 }
 
 impl<'a> VerificationContext<'a> {
@@ -347,6 +446,29 @@ impl<'a> VerificationContext<'a> {
         let id = self.counter;
         self.counter += 1;
         id
+    }
+
+    /// Register the given transformation (represented as the actual `Field` to access) for the
+    /// given `pc`. This method will fail if an incompatible transformation is already registered
+    /// at the given `pc`. In particular, instruction that requires no transformation are also
+    /// registered so that they conflict if the same instruction requires a transformation in
+    /// another context.
+    fn register_transformation(
+        &mut self,
+        pc: ProgramCounter,
+        transformation: Option<Field>,
+    ) -> Result<(), String> {
+        match self.transformations.entry(pc) {
+            std::collections::hash_map::Entry::Vacant(entry) => {
+                entry.insert(transformation);
+            }
+            std::collections::hash_map::Entry::Occupied(entry) => {
+                if *entry.get() != transformation {
+                    return Err(format!("Unable to consistently apply mapping at pc: {}", pc));
+                }
+            }
+        }
+        Ok(())
     }
 }
 
@@ -504,12 +626,18 @@ impl Stack {
         true
     }
 
-    fn store(&mut self, offset: StackOffset, value: Type, width: DataWidth) -> Result<(), String> {
+    fn store(
+        &mut self,
+        pc: ProgramCounter,
+        offset: StackOffset,
+        value: Type,
+        width: DataWidth,
+    ) -> Result<(), String> {
         if offset.array_index() >= self.data.len() {
-            return Err(format!("out of bound store: {offset:?}"));
+            return Err(format!("out of bound store at pc {}", pc));
         }
         if offset.sub_index() % width.bytes() != 0 {
-            return Err(format!("misaligned access"));
+            return Err(format!("misaligned access at pc {}", pc));
         }
 
         let index = offset.array_index();
@@ -545,19 +673,27 @@ impl Stack {
                     self.data[index] = Type::ScalarValue { value, unknown_mask, unwritten_mask };
                 }
                 _ => {
-                    return Err(format!("cannot store part of a non scalar value on the stack"));
+                    return Err(format!(
+                        "cannot store part of a non scalar value on the stack at pc {}",
+                        pc
+                    ));
                 }
             }
         }
         Ok(())
     }
 
-    fn load(&self, offset: StackOffset, width: DataWidth) -> Result<Type, String> {
+    fn load(
+        &self,
+        context: &ComputationContext,
+        offset: StackOffset,
+        width: DataWidth,
+    ) -> Result<Type, String> {
         if offset.array_index() >= self.data.len() {
-            return Err(format!("out of bound load"));
+            return Err(format!("out of bound load at pc {}", context.pc));
         }
         if offset.sub_index() % width.bytes() != 0 {
-            return Err(format!("misaligned access"));
+            return Err(format!("misaligned access at pc {}", context.pc));
         }
 
         let index = offset.array_index();
@@ -575,7 +711,7 @@ impl Stack {
                         Self::extract_sub_value(*unwritten_mask, sub_index, width.bytes());
                     Ok(Type::ScalarValue { value, unknown_mask, unwritten_mask })
                 }
-                _ => Err(format!("incorrect load of {} bytes", width.bytes())),
+                _ => Err(format!("incorrect load of {} bytes at pc {}", width.bytes(), context.pc)),
             }
         }
     }
@@ -608,7 +744,7 @@ impl ComputationContext {
             Lazy::new(|| Type::PtrToStack { offset: StackOffset::default() });
 
         if index >= REGISTER_COUNT {
-            return Err(format!("R{index} is invalid"));
+            return Err(format!("R{index} is invalid at pc {}", self.pc));
         }
         if index < GENERAL_REGISTER_COUNT {
             Ok(&self.registers[index as usize])
@@ -619,7 +755,7 @@ impl ComputationContext {
 
     fn set_reg(&mut self, index: Register, reg_type: Type) -> Result<(), String> {
         if index >= REGISTER_COUNT {
-            return Err(format!("R{index} is invalid"));
+            return Err(format!("R{index} is invalid at pc {}", self.pc));
         }
         self.registers[index as usize] = reg_type;
         Ok(())
@@ -635,7 +771,7 @@ impl ComputationContext {
     fn get_map_schema(&self, argument: u8) -> Result<&MapSchema, String> {
         match self.reg(argument + 1)? {
             Type::ConstPtrToMap { schema, .. } => Ok(schema),
-            _ => Err(format!("No map found at argument {argument}")),
+            _ => Err(format!("No map found at argument {argument} at pc {}", self.pc)),
         }
     }
 
@@ -655,6 +791,20 @@ impl ComputationContext {
         Ok(result)
     }
 
+    fn check_field_access(
+        &self,
+        dst_offset: u64,
+        dst_buffer_size: u64,
+        field: Field,
+    ) -> Result<(), String> {
+        self.check_memory_access(
+            dst_offset,
+            dst_buffer_size,
+            field.offset_as_u64(),
+            field.width.bytes(),
+        )
+    }
+
     fn check_memory_access(
         &self,
         dst_offset: u64,
@@ -663,72 +813,79 @@ impl ComputationContext {
         width: usize,
     ) -> Result<(), String> {
         let final_offset = dst_offset.overflowing_add(instruction_offset).0;
-        if final_offset.checked_add(width as u64).ok_or_else(|| format!("out of bound access"))?
+        if final_offset
+            .checked_add(width as u64)
+            .ok_or_else(|| format!("out of bound access at pc {}", self.pc))?
             > dst_buffer_size
         {
-            return Err(format!("out of bound access"));
+            return Err(format!("out of bound access at pc {}", self.pc));
         }
         Ok(())
     }
 
-    fn store_memory(
+    /// If `field` is mapped in `addr`, returns the actual field to use, if not returns `field`.
+    /// This method will also register any required transformation if needed, or register that none
+    /// is needed.
+    fn apply_mapping(
         &mut self,
-        dst: &Type,
-        value: Type,
-        instruction_offset: u64,
-        width: DataWidth,
-    ) -> Result<(), String> {
-        match dst {
+        context: &mut VerificationContext<'_>,
+        addr: &Type,
+        field: Field,
+    ) -> Result<Field, String> {
+        if let Type::PtrToMemory { offset: 0, mappings, .. } = addr {
+            if let Some(field) = mappings.find_mapping(self, field)? {
+                context.register_transformation(self.pc, Some(field))?;
+                return Ok(field);
+            }
+        }
+        context.register_transformation(self.pc, None)?;
+        Ok(field)
+    }
+
+    fn store_memory(&mut self, addr: &Type, field: Field, value: Type) -> Result<(), String> {
+        match *addr {
             Type::PtrToStack { offset } => {
-                self.stack.store(*offset + instruction_offset, value, width)?;
+                self.stack.store(self.pc, offset + field.offset_as_u64(), value, field.width)?;
             }
-            Type::PtrToMemory { offset, buffer_size, fields, .. } => {
-                self.check_memory_access(*offset, *buffer_size, instruction_offset, width.bytes())?;
+            Type::PtrToMemory { offset, buffer_size, ref fields, .. } => {
+                self.check_field_access(offset, buffer_size, field)?;
                 // Do not allow writing on or over a pointer.
-                if fields
-                    .iter()
-                    .any(|f| f.intercept(offset.overflowing_add(instruction_offset).0, width))
-                {
-                    return Err(format!("incorrect store"));
+                if fields.iter().any(|f| {
+                    f.intercept(offset.overflowing_add(field.offset_as_u64()).0, field.width)
+                }) {
+                    return Err(format!("incorrect store at pc {}", self.pc));
                 }
                 match value {
                     Type::ScalarValue { unwritten_mask: 0, .. } => {}
                     // Private data should not be leaked.
-                    _ => return Err(format!("incorrect store")),
+                    _ => return Err(format!("incorrect store at pc {}", self.pc)),
                 }
             }
-            Type::PtrToArray { id, offset } => {
-                self.check_memory_access(
-                    *offset,
-                    *self.array_bounds.get(id).unwrap_or(&0),
-                    instruction_offset,
-                    width.bytes(),
-                )?;
+            Type::PtrToArray { ref id, offset } => {
+                self.check_field_access(offset, *self.array_bounds.get(&id).unwrap_or(&0), field)?;
                 match value {
                     Type::ScalarValue { unwritten_mask: 0, .. } => {}
                     // Private data should not be leaked.
-                    _ => return Err(format!("incorrect store")),
+                    _ => return Err(format!("incorrect store at pc {}", self.pc)),
                 }
             }
-            _ => return Err(format!("incorrect store")),
+            _ => return Err(format!("incorrect store at pc {}", self.pc)),
         }
         Ok(())
     }
 
-    fn load_memory(
-        &self,
-        addr: &Type,
-        instruction_offset: u64,
-        width: DataWidth,
-    ) -> Result<Type, String> {
+    fn load_memory(&self, addr: Type, field: Field) -> Result<Type, String> {
         Ok(match addr {
-            Type::PtrToStack { offset } => self.stack.load(*offset + instruction_offset, width)?,
-            Type::PtrToMemory { id, offset, buffer_size, fields } => {
-                self.check_memory_access(*offset, *buffer_size, instruction_offset, width.bytes())?;
-                let memory_offset = offset.overflowing_add(instruction_offset).0;
+            Type::PtrToStack { offset } => {
+                let stack_offset = offset + field.offset_as_u64();
+                self.stack.load(self, stack_offset, field.width)?
+            }
+            Type::PtrToMemory { id, offset, buffer_size, fields, .. } => {
+                self.check_field_access(offset, buffer_size, field)?;
+                let memory_offset = offset.overflowing_add(field.offset_as_u64()).0;
                 // If the read is for a full pointer and the offset correspond to a pointer, use
                 // the `field_type` to specify the returned type.
-                if width == DataWidth::U64 {
+                if field.width == DataWidth::U64 {
                     if let Some(field) = fields.iter().find(|f| f.offset == memory_offset) {
                         match field.field_type.deref() {
                             Type::PtrToArray { id: array_id, .. } => {
@@ -745,7 +902,7 @@ impl ComputationContext {
                     }
                 }
                 // Otherwise, reading on or over a pointer returns an illegal value.
-                if fields.iter().any(|f| f.intercept(memory_offset, width)) {
+                if fields.iter().any(|f| f.intercept(memory_offset, field.width)) {
                     Type::default()
                 } else {
                     // Finally, return an unknown valid value.
@@ -753,15 +910,10 @@ impl ComputationContext {
                 }
             }
             Type::PtrToArray { id, offset } => {
-                self.check_memory_access(
-                    *offset,
-                    *self.array_bounds.get(id).unwrap_or(&0),
-                    instruction_offset,
-                    width.bytes(),
-                )?;
+                self.check_field_access(offset, *self.array_bounds.get(&id).unwrap_or(&0), field)?;
                 Type::unknown_written_scalar_value()
             }
-            _ => return Err(format!("incorrect load")),
+            _ => return Err(format!("incorrect load at pc {}", self.pc)),
         })
     }
 
@@ -785,6 +937,7 @@ impl ComputationContext {
                     offset: 0,
                     buffer_size: schema.value_size as u64,
                     fields: Default::default(),
+                    mappings: Default::default(),
                 })
             }
             t => Ok(t.clone()),
@@ -877,7 +1030,7 @@ impl ComputationContext {
             ) => Type::PtrToStack { offset: run_on_stack_offset(*x, |x| op(x, y)) },
             (
                 AluType::PtrCompatible,
-                Type::PtrToMemory { id, offset: x, buffer_size, fields },
+                Type::PtrToMemory { id, offset: x, buffer_size, fields, mappings },
                 Type::ScalarValue { value: y, unknown_mask: 0, .. },
             ) => {
                 let offset = op(*x, y);
@@ -886,6 +1039,7 @@ impl ComputationContext {
                     offset,
                     buffer_size: *buffer_size,
                     fields: fields.clone(),
+                    mappings: mappings.clone(),
                 }
             }
             (
@@ -1008,7 +1162,7 @@ impl ComputationContext {
                 {
                     None
                 }
-                _ => return Err(format!("non permitted comparaison")),
+                _ => return Err(format!("non permitted comparaison at pc {}", self.pc)),
             }
         };
         if branch.unwrap_or(true) {
@@ -1392,7 +1546,7 @@ impl BpfVisitor for ComputationContext {
     ) -> Result<(), String> {
         bpf_log!(self, context, "call 0x{:x}", index);
         let Some(signature) = context.calling_context.functions.get(&index).cloned() else {
-            return Err(format!("unknown external function {}", index));
+            return Err(format!("unknown external function {} at pc {}", index, self.pc));
         };
         debug_assert!(signature.args.len() <= 5);
         for (index, arg) in signature.args.iter().enumerate() {
@@ -1410,7 +1564,7 @@ impl BpfVisitor for ComputationContext {
                 (Type::MapKeyParameter { map_ptr_index }, Type::PtrToStack { offset }) => {
                     let schema = self.get_map_schema(*map_ptr_index)?;
                     if !self.stack.can_read_data_ptr(*offset, schema.key_size as u64) {
-                        Err(format!("cannot read key buffer from the stack"))
+                        Err(format!("cannot read key buffer from the stack at pc {}", self.pc))
                     } else {
                         Ok(())
                     }
@@ -1425,7 +1579,7 @@ impl BpfVisitor for ComputationContext {
                 (Type::MapValueParameter { map_ptr_index }, Type::PtrToStack { offset }) => {
                     let schema = self.get_map_schema(*map_ptr_index)?;
                     if !self.stack.can_read_data_ptr(*offset, schema.value_size as u64) {
-                        Err(format!("cannot read value buffer from the stack"))
+                        Err(format!("cannot read value buffer from the stack at pc {}", self.pc))
                     } else {
                         Ok(())
                     }
@@ -1440,10 +1594,10 @@ impl BpfVisitor for ComputationContext {
                             if *value <= *buffer_size - *offset {
                                 Ok(())
                             } else {
-                                Err(format!("out of bound read"))
+                                Err(format!("out of bound read at pc {}", self.pc))
                             }
                         }
-                        _ => Err(format!("cannot known expected buffer size")),
+                        _ => Err(format!("cannot known expected buffer size at pc {}", self.pc)),
                     }
                 }
 
@@ -1454,14 +1608,14 @@ impl BpfVisitor for ComputationContext {
                             if self.stack.can_read_data_ptr(*offset, *value) {
                                 Ok(())
                             } else {
-                                Err(format!("out of bound read"))
+                                Err(format!("out of bound read at pc {}", self.pc))
                             }
                         }
-                        _ => Err(format!("cannot known expected buffer size")),
+                        _ => Err(format!("cannot known expected buffer size at pc {}", self.pc)),
                     }
                 }
 
-                _ => Err(format!("incorrect parameter")),
+                _ => Err(format!("incorrect parameter at pc {}", self.pc)),
             }?;
         }
         // Parameters have been validated, specify the return value on return.
@@ -1478,7 +1632,7 @@ impl BpfVisitor for ComputationContext {
     fn exit<'a>(&mut self, context: &mut Self::Context<'a>) -> Result<(), String> {
         bpf_log!(self, context, "exit");
         if !matches!(self.reg(0)?, Type::ScalarValue { unwritten_mask: 0, .. }) {
-            return Err(format!("register 0 is incorrect at exit time"));
+            return Err(format!("register 0 is incorrect at exit time at pc {}", self.pc));
         }
         // Nothing to do, the program terminated with a valid scalar value.
         Ok(())
@@ -1786,8 +1940,9 @@ impl BpfVisitor for ComputationContext {
             display_register(src),
             print_offset(offset),
         );
-        let addr = self.reg(src)?;
-        let loaded_type = self.load_memory(addr, offset as u64, width)?;
+        let addr = self.reg(src)?.clone();
+        let field = self.apply_mapping(context, &addr, Field::new(offset, width))?;
+        let loaded_type = self.load_memory(addr, field)?;
         let mut next = self.next()?;
         next.set_reg(dst, loaded_type)?;
         context.states.push(next);
@@ -1850,8 +2005,9 @@ impl BpfVisitor for ComputationContext {
             }
         };
         let mut next = self.next()?;
-        let dst = self.reg(dst)?;
-        next.store_memory(dst, value, offset as u64, width)?;
+        let addr = self.reg(dst)?.clone();
+        let field = self.apply_mapping(context, &addr, Field::new(offset, width))?;
+        next.store_memory(&addr, field, value)?;
         context.states.push(next);
         Ok(())
     }

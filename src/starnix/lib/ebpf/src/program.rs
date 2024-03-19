@@ -107,7 +107,7 @@ impl<C: EpbfRunContext> EbpfProgramBuilder<C> {
         code: Vec<bpf_insn>,
         logger: &mut dyn VerifierLogger,
     ) -> Result<EbpfProgram<C>, EbpfError> {
-        verify(&code, self.calling_context, logger)?;
+        let code = verify(code, self.calling_context, logger)?;
         Ok(EbpfProgram { code, helpers: self.helpers })
     }
 }
@@ -159,6 +159,7 @@ impl EbpfProgram<()> {
                 offset: 0,
                 buffer_size,
                 fields: Default::default(),
+                mappings: Default::default(),
             },
             Type::from(buffer_size),
         ]);
@@ -169,7 +170,7 @@ impl EbpfProgram<()> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::{conformance::test::parse_asm, FieldType};
+    use crate::{conformance::test::parse_asm, FieldMapping, FieldType};
     use linux_uapi::*;
     use zerocopy::{AsBytes, FromBytes, FromZeros, NoCell};
 
@@ -363,6 +364,10 @@ mod test {
 
     impl ProgramArgument {
         fn get_type() -> Type {
+            Self::get_type_with_mappings(Default::default())
+        }
+
+        fn get_type_with_mappings(mappings: Vec<FieldMapping>) -> Type {
             let struct_size = std::mem::size_of::<ProgramArgument>() as u64;
             let array_id = new_bpf_type_identifier();
             Type::PtrToMemory {
@@ -379,6 +384,7 @@ mod test {
                         field_type: Box::new(Type::PtrToEndArray { id: array_id }),
                     },
                 ],
+                mappings,
             }
         }
     }
@@ -429,5 +435,38 @@ mod test {
         let mut builder = EbpfProgramBuilder::<()>::default();
         builder.set_args(&[ProgramArgument::get_type()]);
         builder.load(code, &mut NullVerifierLogger).expect_err("incorrect program");
+    }
+
+    #[test]
+    fn test_mapping() {
+        let program = r#"
+        mov %r0, 0
+        # Load data and data_end as 32 bits pointers
+        ldxw %r2, [%r1+4]
+        ldxw %r1, [%r1]
+        # ensure data contains at least 8 bytes
+        mov %r3, %r1
+        add %r3, 0x8
+        jgt %r3, %r2, +1
+        # read 8 bytes from data
+        ldxdw %r0, [%r1]
+        exit
+        "#;
+        let code = parse_asm(program);
+
+        let mut mappings = vec![];
+        mappings.push(FieldMapping::new_size_mapping(0, 0));
+        mappings.push(FieldMapping::new_size_mapping(4, 8));
+        let argument = ProgramArgument::get_type_with_mappings(mappings);
+
+        let mut builder = EbpfProgramBuilder::<()>::default();
+        builder.set_args(&[argument]);
+        let program = builder.load(code, &mut NullVerifierLogger).expect("load");
+
+        let v: u64 = 42;
+        let v_ptr = (&v as *const u64) as u64;
+        let mut data =
+            ProgramArgument { data: v_ptr, data_end: v_ptr + std::mem::size_of::<u64>() as u64 };
+        assert_eq!(program.run(&mut (), &mut data), v);
     }
 }

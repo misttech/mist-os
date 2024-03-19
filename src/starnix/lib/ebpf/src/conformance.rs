@@ -673,6 +673,7 @@ pub mod test {
                     offset: 0,
                     buffer_size,
                     fields: Default::default(),
+                    mappings: Default::default(),
                 },
                 Type::from(buffer_size),
             ]);

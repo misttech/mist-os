@@ -78,6 +78,15 @@ impl DataWidth {
             Self::U64 => value,
         }
     }
+
+    pub fn instruction_bits(&self) -> u8 {
+        match self {
+            Self::U8 => BPF_B,
+            Self::U16 => BPF_H,
+            Self::U32 => BPF_W,
+            Self::U64 => BPF_DW,
+        }
+    }
 }
 
 pub trait BpfVisitor {
